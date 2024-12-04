@@ -59,6 +59,9 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)
 	TArray<FParameter> GetWeatherParams() const;
 
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable)
+	void ResetWeatherParams() const;
+
 	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
 	void SetWeatherParams(const TArray<FParameter>& InParams) const;
 

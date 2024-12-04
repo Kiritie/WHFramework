@@ -29,7 +29,7 @@ void UAbilityInventoryEquipSlotBase::OnItemPreChange(FAbilityItem& InNewItem)
 {
 	Super::OnItemPreChange(InNewItem);
 
-	if(Item.IsValid() && Item.GetData<UAbilityEquipDataBase>().EquipMode == EEquipMode::Passive)
+	if(Item.IsValid() && Item.GetData<UAbilityEquipDataBase>().EquipMode == EAbilityEquipMode::Passive)
 	{
 		DeactiveItem(true);
 	}
@@ -39,15 +39,15 @@ void UAbilityInventoryEquipSlotBase::OnItemChanged(FAbilityItem& InOldItem)
 {
 	Super::OnItemChanged(InOldItem);
 
-	if(Item.IsValid() && Item.GetData<UAbilityEquipDataBase>().EquipMode == EEquipMode::Passive)
+	if(Item.IsValid() && Item.GetData<UAbilityEquipDataBase>().EquipMode == EAbilityEquipMode::Passive)
 	{
 		ActiveItem(true);
 	}
 }
 
-bool UAbilityInventoryEquipSlotBase::MatchItemLimit(FAbilityItem InItem) const
+bool UAbilityInventoryEquipSlotBase::MatchItemLimit(FAbilityItem InItem, bool bForce) const
 {
-	return Super::MatchItemLimit(InItem);
+	return Super::MatchItemLimit(InItem, bForce);
 }
 
 void UAbilityInventoryEquipSlotBase::Refresh()

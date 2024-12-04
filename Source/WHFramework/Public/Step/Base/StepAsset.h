@@ -19,11 +19,14 @@ public:
 	UStepAsset(const FObjectInitializer& ObjectInitializer);
 
 public:
-	virtual void Initialize(UAssetBase* InSource) override;
+	virtual void Initialize() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Step Stats
 public:
+	/// 自动开始初始步骤
+	UPROPERTY(EditAnywhere)
+	bool bAutoStartFirst;
 	/// 初始步骤 
 	UPROPERTY(VisibleAnywhere)
 	UStepBase* FirstStep;
@@ -33,28 +36,6 @@ public:
 	/// 步骤Map
 	UPROPERTY(Transient)
 	TMap<FString, UStepBase*> StepMap;
-
-public:
-	/**
-	* 获取初始步骤
-	*/
-	UFUNCTION(BlueprintPure)
-	UStepBase* GetFirstStep() const { return FirstStep; }
-	/**
-	* 设置初始步骤
-	*/
-	UFUNCTION(BlueprintCallable)
-	void SetFirstStep(UStepBase* InFirstStep) { this->FirstStep = InFirstStep; }
-	/**
-	* 获取根步骤列表
-	*/
-	UFUNCTION(BlueprintPure)
-	TArray<UStepBase*>& GetRootSteps() { return RootSteps; }
-	/**
-	* 获取步骤Map
-	*/
-	UFUNCTION(BlueprintPure)
-	TMap<FString, UStepBase*>& GetStepMap() { return StepMap; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Editor

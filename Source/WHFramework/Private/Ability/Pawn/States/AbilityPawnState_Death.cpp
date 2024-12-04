@@ -9,6 +9,8 @@
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "AI/Base/AIControllerBase.h"
 #include "Common/Interaction/InteractionComponent.h"
+#include "Event/EventModuleStatics.h"
+#include "Event/Handle/Ability/EventHandle_VitalityDead.h"
 
 UAbilityPawnState_Death::UAbilityPawnState_Death()
 {
@@ -35,10 +37,14 @@ void UAbilityPawnState_Death::OnEnter(UFiniteStateBase* InLastState, const TArra
 	{
 		Killer = InParams[0].GetPointerValue<IAbilityVitalityInterface>();
 	}
+	
+	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalityDead>(Cast<UObject>(this), { GetAgent(), Cast<UObject>(Killer) });
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
 	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dying);
+
+	Pawn->GetInteractionComponent()->SetInteractable(false);
 
 	if(Pawn->GetController<AAIControllerBase>())
 	{
@@ -80,6 +86,11 @@ void UAbilityPawnState_Death::OnLeave(UFiniteStateBase* InNextState)
 	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dead);
 
 	Pawn->StopAction(GameplayTags::Ability_Vitality_Action_Death);
+
+	if(Pawn->IsPlayer())
+	{
+		Pawn->Execute_SetActorVisible(Pawn, true);
+	}
 }
 
 void UAbilityPawnState_Death::OnTermination()
@@ -93,7 +104,6 @@ void UAbilityPawnState_Death::DeathStart()
 
 	Pawn->GetMovementComponent()->SetActive(false);
 	Pawn->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	Pawn->GetInteractionComponent()->SetInteractable(false);
 
 	if(!Pawn->DoAction(GameplayTags::Ability_Vitality_Action_Death))
 	{

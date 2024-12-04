@@ -9,7 +9,7 @@ UVoxelTorchData::UVoxelTorchData()
 	VoxelClass = UVoxelTorch::StaticClass();
 	AuxiliaryClass = AVoxelTorchAuxiliary::StaticClass();
 
-	Transparency = EVoxelTransparency::Transparent;
+	Nature = EVoxelNature::SmallSemiSolid;
 
 	MeshDatas.SetNum(2);
 	

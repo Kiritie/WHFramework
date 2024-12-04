@@ -2,6 +2,7 @@
 
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/PickUp/AbilityPickUpVoxel.h"
+#include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Voxels/Voxel.h"
 
 UVoxelData::UVoxelData()
@@ -13,13 +14,34 @@ UVoxelData::UVoxelData()
 	VoxelType = EVoxelType::Empty;
 	VoxelClass = UVoxel::StaticClass();
 	AuxiliaryClass = nullptr;
-	Transparency = EVoxelTransparency::Solid;
+	Nature = EVoxelNature::None;
 	bMainPart = true;
 	PartDatas = TMap<FIndex, UVoxelData*>();
 	PartIndex = FIndex::ZeroIndex;
 	MainData = nullptr;
+	GatherData = nullptr;
 	MeshDatas.SetNum(1);
 	Sounds = TMap<EVoxelSoundType, USoundBase*>();
+}
+
+bool UVoxelData::IsEmpty() const
+{
+	return VoxelType == EVoxelType::Empty;
+}
+
+bool UVoxelData::IsUnknown() const
+{
+	return VoxelType == EVoxelType::Unknown;
+}
+
+bool UVoxelData::IsMainPart() const
+{
+	return bMainPart;
+}
+
+bool UVoxelData::IsCustom() const
+{
+	return VoxelType >= EVoxelType::Custom1;
 }
 
 bool UVoxelData::HasPartData(FIndex InIndex) const
@@ -39,6 +61,11 @@ UVoxelData& UVoxelData::GetPartData(FIndex InIndex)
 	if(MainData) return MainData->GetPartData(InIndex);
 	if(PartDatas.Contains(InIndex)) return *PartDatas[InIndex];
 	return UReferencePoolModuleStatics::GetReference<UVoxelData>();
+}
+
+EVoxelTransparency UVoxelData::GetTransparency() const
+{
+	return UVoxelModuleStatics::VoxelNatureToTransparency(Nature);
 }
 
 FVector UVoxelData::GetRange(ERightAngle InAngle) const
@@ -71,24 +98,4 @@ USoundBase* UVoxelData::GetSound(EVoxelSoundType InSoundType) const
 const FVoxelMeshData& UVoxelData::GetMeshData(const FVoxelItem& InVoxelItem) const
 {
 	return MeshDatas[0];
-}
-
-bool UVoxelData::IsEmpty() const
-{
-	return VoxelType == EVoxelType::Empty;
-}
-
-bool UVoxelData::IsUnknown() const
-{
-	return VoxelType == EVoxelType::Unknown;
-}
-
-bool UVoxelData::IsMainPart() const
-{
-	return bMainPart;
-}
-
-bool UVoxelData::IsCustom() const
-{
-	return VoxelType >= EVoxelType::Custom1;
 }

@@ -10,6 +10,7 @@
 #include "World/WorldWidgetBase.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Input/InputManagerInterface.h"
+#include "Kismet/KismetInternationalizationLibrary.h"
 #include "WidgetModule.generated.h"
 
 class UWorldWidgetContainer;
@@ -50,6 +51,13 @@ public:
 
 	virtual void OnTermination(EPhase InPhase) override;
 
+protected:
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+
+	virtual void UnloadData(EPhase InPhase) override;
+
+	virtual FSaveData* ToData() override;
+
 public:
 	virtual FString GetModuleDebugMessage() override;
 
@@ -59,6 +67,44 @@ protected:
 
 	UFUNCTION()
 	void OnCloseUserWidget(UObject* InSender, UEventHandle_CloseUserWidget* InEventHandle);
+
+	////////////////////////////////////////////////////
+	// GlobalSettings
+protected:
+	UPROPERTY(EditAnywhere, Category = "GlobalSettings")
+	TArray<FLanguageType> LanguageTypes;
+
+	UPROPERTY(EditAnywhere, Category = "GlobalSettings")
+	int32 LanguageType;
+
+	UPROPERTY(EditAnywhere, Category = "GlobalSettings")
+	float GlobalScale;
+
+public:
+	UFUNCTION(BlueprintPure)
+	TArray<FLanguageType> GetLanguageTypes() const { return LanguageTypes; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetLanguageTypes(const TArray<FLanguageType>& InLanguageTypes) { LanguageTypes = InLanguageTypes; }
+
+	UFUNCTION(BlueprintPure)
+	int32 GetLanguageType() const { return LanguageType; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetLanguageType(int32 InLanguageType)
+	{
+		LanguageType = InLanguageType;
+		if(LanguageTypes.IsValidIndex(InLanguageType))
+		{
+			UKismetInternationalizationLibrary::SetCurrentCulture(LanguageTypes[LanguageType].LocalCulture);
+		}
+	}
+
+	UFUNCTION(BlueprintPure)
+	float GetGlobalScale() const { return GlobalScale; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetGlobalScale(float InGlobalScale) { GlobalScale = InGlobalScale; }
 
 	////////////////////////////////////////////////////
 	// CommonWidget
@@ -282,7 +328,7 @@ public:
 		
 		if(!HasUserWidgetByName(InName))
 		{
-			UserWidget = UObjectPoolModuleStatics::SpawnObject<UUserWidgetBase>(nullptr, nullptr, IsModuleInEditor(), UserWidgetClassMap[InName]);
+			UserWidget = UObjectPoolModuleStatics::SpawnObject<UUserWidgetBase>(nullptr, nullptr, UserWidgetClassMap[InName]);
 			if(UserWidget)
 			{
 				AllUserWidget.Add(InName, UserWidget);
@@ -594,17 +640,14 @@ public:
 	template<class T>
 	T* CreateWorldWidgetByName(FName InName, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>* InParams = nullptr)
 	{
-		if(IsModuleInEditor())
+		WorldWidgetClassMap.Empty();
+		for(auto& Iter : WorldWidgetClasses)
 		{
-			WorldWidgetClassMap.Empty();
-			for(auto& Iter : WorldWidgetClasses)
+			if(!Iter) continue;
+			const FName WidgetName = Iter->GetDefaultObject<UWorldWidgetBase>()->GetWidgetName();
+			if(!WorldWidgetClassMap.Contains(WidgetName))
 			{
-				if(!Iter) continue;
-				const FName WidgetName = Iter->GetDefaultObject<UWorldWidgetBase>()->GetWidgetName();
-				if(!WorldWidgetClassMap.Contains(WidgetName))
-				{
-					WorldWidgetClassMap.Add(WidgetName, Iter);
-				}
+				WorldWidgetClassMap.Add(WidgetName, Iter);
 			}
 		}
 		
@@ -614,15 +657,14 @@ public:
 			return nullptr;
 		}
 		
-		if(UWorldWidgetBase* WorldWidget = UObjectPoolModuleStatics::SpawnObject<UWorldWidgetBase>(nullptr, nullptr, IsModuleInEditor(), WorldWidgetClassMap[InName]))
+		if(UWorldWidgetBase* WorldWidget = UObjectPoolModuleStatics::SpawnObject<UWorldWidgetBase>(nullptr, nullptr, WorldWidgetClassMap[InName]))
 		{
 			if(!AllWorldWidget.Contains(InName))
 			{
 				AllWorldWidget.Add(InName);
 			}
 			WorldWidget->WidgetIndex = AllWorldWidget[InName].WorldWidgets.Add(WorldWidget);
-			WorldWidget->bWidgetInEditor = IsModuleInEditor();
-			WorldWidget->OnCreate(InOwner, InMapping, *InParams);
+			WorldWidget->OnCreate(InOwner, InMapping, InParams ? *InParams : TArray<FParameter>());
 			return Cast<T>(WorldWidget);
 		}
 		return nullptr;

@@ -28,7 +28,6 @@
 #include "Ability/Character/States/AbilityCharacterState_Swim.h"
 #include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
 #include "Ability/PickUp/AbilityPickUpBase.h"
-#include "Camera/CameraModuleStatics.h"
 #include "Common/Looking/LookingComponent.h"
 #include "Scene/Actor/PhysicsVolume/PhysicsVolumeBase.h"
 
@@ -160,6 +159,28 @@ void AAbilityCharacterBase::OnTermination_Implementation(EPhase InPhase)
 	Super::OnTermination_Implementation(InPhase);
 }
 
+void AAbilityCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+	Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+	BindASCInput();
+}
+
+void AAbilityCharacterBase::BindASCInput()
+{
+	if(!bASCInputBound && IsValid(AbilitySystem) && IsValid(InputComponent))
+	{
+		AbilitySystem->BindAbilityActivationToInputComponent(InputComponent, FGameplayAbilityInputBinds(FString("ConfirmTarget"),
+			FString("CancelTarget"), FTopLevelAssetPath("/Script/WHFramework", FName("EAbilityInputID")), static_cast<int32>(EAbilityInputID::Confirm), static_cast<int32>(EAbilityInputID::Cancel)));
+		bASCInputBound = true;
+	}
+}
+
+void AAbilityCharacterBase::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
+{
+	Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
+}
+
 void AAbilityCharacterBase::Serialize(FArchive& Ar)
 {
 	Super::Serialize(Ar);
@@ -238,38 +259,12 @@ FSaveData* AAbilityCharacterBase::ToData()
 
 	SaveData.ActionAbilities = ActionAbilities;
 
-	SaveData.CameraRotation = UCameraModuleStatics::GetCameraRotation();
-	SaveData.CameraDistance = UCameraModuleStatics::GetCameraDistance();
-
 	return &SaveData;
 }
 
 void AAbilityCharacterBase::ResetData()
 {
 	SetHealth(GetMaxHealth());
-}
-
-void AAbilityCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
-{
-	Super::SetupPlayerInputComponent(PlayerInputComponent);
-
-	BindASCInput();
-}
-
-void AAbilityCharacterBase::BindASCInput()
-{
-	if(!bASCInputBound && IsValid(AbilitySystem) && IsValid(InputComponent))
-	{
-		AbilitySystem->BindAbilityActivationToInputComponent(InputComponent, FGameplayAbilityInputBinds(FString("ConfirmTarget"),
-			FString("CancelTarget"), FTopLevelAssetPath("/Script/WHFramework", FName("EAbilityInputID")), static_cast<int32>(EAbilityInputID::Confirm), static_cast<int32>(EAbilityInputID::Cancel)));
-
-		bASCInputBound = true;
-	}
-}
-
-void AAbilityCharacterBase::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
-{
-	Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
 }
 
 void AAbilityCharacterBase::OnFiniteStateRefresh(UFiniteStateBase* InCurrentState)
@@ -343,7 +338,7 @@ void AAbilityCharacterBase::Kill(IAbilityVitalityInterface* InTarget)
 
 void AAbilityCharacterBase::Revive(IAbilityVitalityInterface* InRescuer)
 {
-	FSM->SwitchDefaultState();
+	FSM->SwitchDefaultState({ InRescuer });
 }
 
 void AAbilityCharacterBase::Static()
@@ -593,7 +588,12 @@ void AAbilityCharacterBase::OnRemoveItem(const FAbilityItem& InItem)
 	
 }
 
-void AAbilityCharacterBase::OnChangeItem(const FAbilityItem& InNewItem, FAbilityItem& InOldItem)
+void AAbilityCharacterBase::OnPreChangeItem(const FAbilityItem& InOldItem)
+{
+	
+}
+
+void AAbilityCharacterBase::OnChangeItem(const FAbilityItem& InNewItem)
 {
 	
 }
@@ -641,8 +641,9 @@ void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAt
 	{
 		if(InAttributeChangeData.NewValue >= GetMaxExp())
 		{
+			const float Exp = InAttributeChangeData.NewValue - GetMaxExp();
 			SetLevelA(GetLevelA() + 1);
-			SetExp(0.f);
+			SetExp(Exp);
 		}
 	}
 	else if(InAttributeChangeData.Attribute == GetMoveSpeedAttribute())
@@ -658,6 +659,16 @@ void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAt
 	{
 		GetCharacterMovement()->JumpZVelocity = InAttributeChangeData.NewValue;
 	}
+}
+
+void AAbilityCharacterBase::OnActorAttached(AActor* InActor)
+{
+	
+}
+
+void AAbilityCharacterBase::OnActorDetached(AActor* InActor)
+{
+	
 }
 
 void AAbilityCharacterBase::HandleDamage(const FGameplayAttribute& DamageAttribute, float DamageValue, float DefendValue, bool bHasCrited, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
@@ -717,6 +728,11 @@ UAttributeSetBase* AAbilityCharacterBase::GetAttributeSet() const
 UShapeComponent* AAbilityCharacterBase::GetCollisionComponent() const
 {
 	return GetCapsuleComponent();
+}
+
+UMeshComponent* AAbilityCharacterBase::GetMeshComponent() const
+{
+	return GetMesh();
 }
 
 UInteractionComponent* AAbilityCharacterBase::GetInteractionComponent() const

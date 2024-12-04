@@ -126,6 +126,46 @@ void AAbilityPawnBase::OnTermination_Implementation(EPhase InPhase)
 	Super::OnTermination_Implementation(InPhase);
 }
 
+void AAbilityPawnBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+	Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+	BindASCInput();
+}
+
+void AAbilityPawnBase::BindASCInput()
+{
+	if(!bASCInputBound && IsValid(AbilitySystem) && IsValid(InputComponent))
+	{
+		AbilitySystem->BindAbilityActivationToInputComponent(InputComponent, FGameplayAbilityInputBinds(FString("ConfirmTarget"),
+			FString("CancelTarget"), FTopLevelAssetPath("/Script/WHFramework", FName("EAbilityInputID")), static_cast<int32>(EAbilityInputID::Confirm), static_cast<int32>(EAbilityInputID::Cancel)));
+		bASCInputBound = true;
+	}
+}
+
+void AAbilityPawnBase::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
+{
+	Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
+}
+
+void AAbilityPawnBase::Serialize(FArchive& Ar)
+{
+	Super::Serialize(Ar);
+
+	if(Ar.ArIsSaveGame)
+	{
+		if(Ar.IsLoading())
+		{
+			Ar << Level;
+		}
+		else if(Ar.IsSaving())
+		{
+			Ar << Level;
+		}
+		AttributeSet->SerializeAttributes(Ar);
+	}
+}
+
 void AAbilityPawnBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData->CastRef<FPawnSaveData>();
@@ -197,24 +237,6 @@ void AAbilityPawnBase::OnFiniteStateRefresh(UFiniteStateBase* InCurrentState)
 	FSM->SwitchStateByClass<UAbilityPawnState_Walk>();
 }
 
-void AAbilityPawnBase::Serialize(FArchive& Ar)
-{
-	Super::Serialize(Ar);
-
-	if(Ar.ArIsSaveGame)
-	{
-		if(Ar.IsLoading())
-		{
-			Ar << Level;
-		}
-		else if(Ar.IsSaving())
-		{
-			Ar << Level;
-		}
-		AttributeSet->SerializeAttributes(Ar);
-	}
-}
-
 void AAbilityPawnBase::Death(IAbilityVitalityInterface* InKiller)
 {
 	FSM->SwitchFinalState({ InKiller });
@@ -227,7 +249,7 @@ void AAbilityPawnBase::Kill(IAbilityVitalityInterface* InTarget)
 
 void AAbilityPawnBase::Revive(IAbilityVitalityInterface* InRescuer)
 {
-	FSM->SwitchDefaultState();
+	FSM->SwitchDefaultState({ InRescuer });
 }
 
 void AAbilityPawnBase::Static()
@@ -327,7 +349,12 @@ void AAbilityPawnBase::OnRemoveItem(const FAbilityItem& InItem)
 	
 }
 
-void AAbilityPawnBase::OnChangeItem(const FAbilityItem& InNewItem, FAbilityItem& InOldItem)
+void AAbilityPawnBase::OnPreChangeItem(const FAbilityItem& InOldItem)
+{
+	
+}
+
+void AAbilityPawnBase::OnChangeItem(const FAbilityItem& InNewItem)
 {
 	
 }
@@ -375,10 +402,21 @@ void AAbilityPawnBase::OnAttributeChange(const FOnAttributeChangeData& InAttribu
 	{
 		if(InAttributeChangeData.NewValue >= GetMaxExp())
 		{
+			const float Exp = InAttributeChangeData.NewValue - GetMaxExp();
 			SetLevelA(GetLevelA() + 1);
-			SetExp(0.f);
+			SetExp(Exp);
 		}
 	}
+}
+
+void AAbilityPawnBase::OnActorAttached(AActor* InActor)
+{
+	
+}
+
+void AAbilityPawnBase::OnActorDetached(AActor* InActor)
+{
+	
 }
 
 void AAbilityPawnBase::HandleDamage(const FGameplayAttribute& DamageAttribute, float DamageValue, float DefendValue, bool bHasCrited, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
@@ -433,6 +471,11 @@ UAttributeSetBase* AAbilityPawnBase::GetAttributeSet() const
 UShapeComponent* AAbilityPawnBase::GetCollisionComponent() const
 {
 	return BoxComponent;
+}
+
+UMeshComponent* AAbilityPawnBase::GetMeshComponent() const
+{
+	return nullptr;
 }
 
 UAbilitySystemComponent* AAbilityPawnBase::GetAbilitySystemComponent() const
@@ -565,4 +608,19 @@ FVitalityActionAbilityData AAbilityPawnBase::GetActionAbility(const FGameplayTag
 		return ActionAbilities[InActionTag];
 	}
 	return FVitalityActionAbilityData();
+}
+
+void AAbilityPawnBase::OnRep_Controller()
+{
+	Super::OnRep_Controller();
+}
+
+void AAbilityPawnBase::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+
+	if(GetPlayerState())
+	{
+		BindASCInput();
+	}
 }

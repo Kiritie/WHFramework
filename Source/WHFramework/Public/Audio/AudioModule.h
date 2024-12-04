@@ -54,6 +54,28 @@ protected:
 public:
 	virtual FString GetModuleDebugMessage() override;
 
+	////////////////////////////////////////////////////
+	// GlobalSettings
+protected:
+	UPROPERTY(EditAnywhere, Category = "GlobalSettings")
+	TArray<FLanguageType> LanguageTypes;
+
+	UPROPERTY(EditAnywhere, Category = "GlobalSettings")
+	int32 LanguageType;
+
+public:
+	UFUNCTION(BlueprintPure)
+	TArray<FLanguageType> GetLanguageTypes() const { return LanguageTypes; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetLanguageTypes(const TArray<FLanguageType>& InLanguageTypes) { LanguageTypes = InLanguageTypes; }
+
+	UFUNCTION(BlueprintPure)
+	int32 GetLanguageType() const { return LanguageType; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetLanguageType(int32 InLanguageType) { LanguageType = InLanguageType; }
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Sound
 public:

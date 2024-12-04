@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
-#include "Widget/Screen/UserWidgetBase.h"
+#include "Widget/Sub/SubActivatableWidgetBase.h"
 
 #include "WidgetSettingPageBase.generated.h"
 
@@ -12,7 +12,7 @@ class UWidgetSettingItemBase;
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UWidgetSettingPageBase : public UUserWidgetBase
+class WHFRAMEWORK_API UWidgetSettingPageBase : public USubActivatableWidgetBase
 {
 	GENERATED_BODY()
 	
@@ -20,15 +20,13 @@ public:
 	UWidgetSettingPageBase(const FObjectInitializer& ObjectInitializer);
 	
 public:
-	virtual void OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams) override;
-
-	virtual void OnCreate(UObject* InOwner, const TArray<FParameter>& InParams) override;
-
-	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant) override;
+	virtual void OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams) override;
 
 	virtual void OnReset(bool bForce) override;
 
-	virtual void OnClose(bool bInstant) override;
+	virtual void OnActivated() override;
+
+	virtual void OnDeactivated() override;
 
 public:
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnApply")
@@ -72,20 +70,23 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
 	UVerticalBox* ContentBox;
 
-public:
+protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FText Title;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSubclassOf<UCommonButtonStyle> PageItemStyle;
 
-protected:
 	FText LastCategory;
 
 	UPROPERTY()
 	TMap<FName, UWidgetSettingItemBase*> SettingItems;
 
 public:
+	FText GetTitle() const { return Title; }
+
+	TSubclassOf<UCommonButtonStyle> GetPageItemStyle() const { return PageItemStyle; }
+
 	UFUNCTION(BlueprintPure)
 	UWidgetSettingItemBase* GetSettingItemByName(const FName InName);
 };

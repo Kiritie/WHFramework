@@ -3,7 +3,7 @@
 #pragma once
 
 #include "Ability/AbilityModuleTypes.h"
-#include "Widget/Screen/SubWidgetBase.h"
+#include "Widget/Sub/SubButtonWidgetBase.h"
 #include "WidgetAbilityInventorySlotBase.generated.h"
 
 class UAbilityInventorySlotBase;
@@ -13,7 +13,7 @@ class UAbilityInventoryBase;
  * UI物品槽
  */
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UWidgetAbilityInventorySlotBase : public USubWidgetBase
+class WHFRAMEWORK_API UWidgetAbilityInventorySlotBase : public USubButtonWidgetBase
 {
 	GENERATED_BODY()
 
@@ -30,7 +30,7 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	virtual void OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams) override;
+	virtual void OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams) override;
 
 	virtual void OnInitialize(const TArray<FParameter>& InParams) override;
 
@@ -108,6 +108,9 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	FAbilityItem& GetItem() const;
+
+	UFUNCTION(BlueprintPure)
+	TArray<FAbilityItem>& GetMatchItems() const;
 
 	UFUNCTION(BlueprintPure)
 	UAbilityInventorySlotBase* GetOwnerSlot() const { return OwnerSlot; }

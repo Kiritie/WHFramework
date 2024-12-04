@@ -10,6 +10,8 @@
 #include "AI/Base/AIControllerBase.h"
 #include "Common/Interaction/InteractionComponent.h"
 #include "Common/Looking/LookingComponent.h"
+#include "Event/EventModuleStatics.h"
+#include "Event/Handle/Ability/EventHandle_VitalityDead.h"
 
 UAbilityCharacterState_Death::UAbilityCharacterState_Death()
 {
@@ -37,10 +39,14 @@ void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastState, const 
 	{
 		Killer = InParams[0].GetPointerValue<IAbilityVitalityInterface>();
 	}
+	
+	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalityDead>(Cast<UObject>(this), { GetAgent(), Cast<UObject>(Killer) });
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
 	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dying);
+
+	Character->GetInteractionComponent()->SetInteractable(false);
 
 	if(Character->GetController<AAIControllerBase>())
 	{
@@ -91,6 +97,11 @@ void UAbilityCharacterState_Death::OnLeave(UFiniteStateBase* InNextState)
 	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dead);
 
 	Character->StopAction(GameplayTags::Ability_Vitality_Action_Death);
+
+	if(Character->IsPlayer())
+	{
+		Character->Execute_SetActorVisible(Character, true);
+	}
 }
 
 void UAbilityCharacterState_Death::OnTermination()
@@ -106,7 +117,6 @@ void UAbilityCharacterState_Death::DeathStart()
 
 	Character->GetCharacterMovement()->SetActive(false);
 	Character->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	Character->GetInteractionComponent()->SetInteractable(false);
 
 	if(!Character->DoAction(GameplayTags::Ability_Vitality_Action_Death))
 	{

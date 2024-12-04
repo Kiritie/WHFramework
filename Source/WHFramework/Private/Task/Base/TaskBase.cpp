@@ -8,8 +8,8 @@
 #include "Event/Handle/Task/EventHandle_TaskEntered.h"
 #include "Event/Handle/Task/EventHandle_TaskExecuted.h"
 #include "Event/Handle/Task/EventHandle_TaskLeaved.h"
-#include "Common/CommonStatics.h"
 #include "Debug/DebugModuleTypes.h"
+#include "Event/Handle/Task/EventHandle_TaskStateChanged.h"
 #include "Task/TaskModule.h"
 #include "Task/TaskModuleStatics.h"
 
@@ -40,8 +40,6 @@ UTaskBase::UTaskBase()
 	
 	bTaskSkipAble = false;
 
-	CurrentSubTaskIndex = -1;
-
 	bMergeSubTask = false;
 
 	SubTasks = TArray<UTaskBase*>();
@@ -66,6 +64,8 @@ void UTaskBase::OnStateChanged(ETaskState InTaskState)
 {
 	OnTaskStateChanged.Broadcast(InTaskState);
 	K2_OnStateChanged(InTaskState);
+
+	UEventModuleStatics::BroadcastEvent(UEventHandle_TaskStateChanged::StaticClass(), this, {this});
 }
 
 void UTaskBase::OnInitialize()
@@ -88,15 +88,13 @@ void UTaskBase::OnRestore()
 	TaskState = ETaskState::None;
 	OnStateChanged(TaskState);
 
-	CurrentSubTaskIndex = -1;
-
 	K2_OnRestore();
 
-	for(int32 i = SubTasks.Num() - 1; i >= 0; i--)
+	for(auto Iter : SubTasks)
 	{
-		if(SubTasks[i])
+		if(Iter)
 		{
-			SubTasks[i]->OnRestore();
+			Iter->OnRestore();
 		}
 	}
 }
@@ -107,11 +105,6 @@ void UTaskBase::OnEnter(UTaskBase* InLastTask)
 	OnStateChanged(TaskState);
 
 	GetWorld()->GetTimerManager().ClearTimer(AutoExecuteTimerHandle);
-	
-	if(ParentTask)
-	{
-		ParentTask->CurrentSubTaskIndex = TaskIndex;
-	}
 
 	TaskExecuteResult = ETaskExecuteResult::None;
 
@@ -157,30 +150,15 @@ void UTaskBase::OnEnter(UTaskBase* InLastTask)
 
 void UTaskBase::OnRefresh()
 {
-	if(HasSubTask(false))
+	K2_OnRefresh();
+
+	for (auto Iter : SubTasks)
 	{
-		if(!IsAllSubCompleted())
+		if(Iter)
 		{
-			const int32 Index = CurrentSubTaskIndex + 1;
-			if(SubTasks.IsValidIndex(Index))
-			{
-				UTaskBase* SubTask = SubTasks[Index];
-				if(SubTask)
-				{
-					if(SubTask->TaskEnterType == ETaskEnterType::Automatic)
-					{
-						SubTask->Enter();
-					}
-				}
-			}
-		}
-		else
-		{
-			Complete(IsAllSubExecuteSucceed() ? ETaskExecuteResult::Succeed : ETaskExecuteResult::Failed);
+			Iter->Refresh();
 		}
 	}
-
-	K2_OnRefresh();
 }
 
 void UTaskBase::OnGuide()
@@ -239,6 +217,14 @@ void UTaskBase::OnExecute()
 
 void UTaskBase::OnComplete(ETaskExecuteResult InTaskExecuteResult)
 {
+	for(auto Iter : SubTasks)
+	{
+		if(Iter)
+		{
+			Iter->Complete(InTaskExecuteResult);
+		}
+	}
+
 	TaskState = ETaskState::Completed;
 	OnStateChanged(TaskState);
 
@@ -251,6 +237,11 @@ void UTaskBase::OnComplete(ETaskExecuteResult InTaskExecuteResult)
 	K2_OnComplete(InTaskExecuteResult);
 
 	UEventModuleStatics::BroadcastEvent(UEventHandle_TaskCompleted::StaticClass(), this, {this});
+
+	if(InTaskExecuteResult != ETaskExecuteResult::Skipped)
+	{
+		WHDebug(FString::Printf(TEXT("任务%s: %s"), TaskExecuteResult != ETaskExecuteResult::Skipped ? TEXT("完成") : TEXT("失败"), *TaskDisplayName.ToString()), EDM_All, EDC_Task, EDV_Log, FColor::Green, 5.f);
+	}
 
 	if(TaskLeaveType == ETaskLeaveType::Automatic && TaskState != ETaskState::Leaved)
 	{
@@ -267,6 +258,14 @@ void UTaskBase::OnComplete(ETaskExecuteResult InTaskExecuteResult)
 
 void UTaskBase::OnLeave()
 {
+	for(auto Iter : SubTasks)
+	{
+		if(Iter)
+		{
+			Iter->Leave();
+		}
+	}
+
 	TaskState = ETaskState::Leaved;
 	OnStateChanged(TaskState);
 
@@ -277,17 +276,6 @@ void UTaskBase::OnLeave()
 	K2_OnLeave();
 
 	UEventModuleStatics::BroadcastEvent(UEventHandle_TaskLeaved::StaticClass(), this, {this});
-
-	if(bMergeSubTask)
-	{
-		for(auto Iter : SubTasks)
-		{
-			if(Iter)
-			{
-				Iter->OnLeave();
-			}
-		}
-	}
 }
 
 UTaskAsset* UTaskBase::GetTaskAsset() const
@@ -300,9 +288,19 @@ bool UTaskBase::IsEntered() const
 	return TaskState == ETaskState::Entered || TaskState == ETaskState::Executing;
 }
 
+bool UTaskBase::IsExecuting() const
+{
+	return TaskState == ETaskState::Executing;
+}
+
 bool UTaskBase::IsCompleted(bool bCheckSubs) const
 {
 	return (TaskState == ETaskState::Completed || TaskState == ETaskState::Leaved) && (!bCheckSubs || IsAllSubCompleted());
+}
+
+bool UTaskBase::IsLeaved() const
+{
+	return TaskState == ETaskState::None || TaskState == ETaskState::Leaved;
 }
 
 bool UTaskBase::CheckTaskCondition_Implementation(FString& OutInfo) const
@@ -339,7 +337,7 @@ bool UTaskBase::IsParentOf(UTaskBase* InTask) const
 	if(InTask && InTask->ParentTask)
 	{
 		if(InTask->ParentTask == this) return true;
-		return InTask->ParentTask->IsParentOf(InTask);
+		return IsParentOf(InTask->ParentTask);
 	}
 	return false;
 }
@@ -357,6 +355,11 @@ void UTaskBase::Enter()
 void UTaskBase::Refresh()
 {
 	UTaskModuleStatics::RefreshTask(this);
+}
+
+void UTaskBase::RefreshState()
+{
+	OnStateChanged(TaskState);
 }
 
 void UTaskBase::Guide()
@@ -389,13 +392,11 @@ void UTaskBase::Serialize(FArchive& Ar)
 		{
 			Ar << TaskState;
 			Ar << TaskExecuteResult;
-			Ar << CurrentSubTaskIndex;
 		}
 		else if(Ar.IsSaving())
 		{
 			Ar << TaskState;
 			Ar << TaskExecuteResult;
-			Ar << CurrentSubTaskIndex;
 		}
 	}
 }
@@ -440,15 +441,6 @@ FSaveData* UTaskBase::ToData()
 bool UTaskBase::HasSubTask(bool bIgnoreMerge) const
 {
 	return SubTasks.Num() > 0 && (bIgnoreMerge || !bMergeSubTask);
-}
-
-UTaskBase* UTaskBase::GetCurrentSubTask() const
-{
-	if(SubTasks.IsValidIndex(CurrentSubTaskIndex))
-	{
-		return SubTasks[CurrentSubTaskIndex];
-	}
-	return nullptr;
 }
 
 bool UTaskBase::IsSubOf(UTaskBase* InTask) const
@@ -498,7 +490,6 @@ bool UTaskBase::GenerateListItem(TSharedPtr<FTaskListItem> OutTaskListItem, cons
 			if(SubTasks[i]->GenerateListItem(Item, InFilterText))
 			{
 				OutTaskListItem->SubListItems.Add(Item);
-				return true;
 			}
 		}
 	}
@@ -590,15 +581,15 @@ void UTaskBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
 		{
 			if(bFirstTask)
 			{
-				if(GetTaskAsset()->GetFirstTask())
+				if(GetTaskAsset()->FirstTask)
 				{
-					GetTaskAsset()->GetFirstTask()->bFirstTask = false;
+					GetTaskAsset()->FirstTask->bFirstTask = false;
 				}
-				GetTaskAsset()->SetFirstTask(this);
+				GetTaskAsset()->FirstTask = this;
 			}
-			else if(GetTaskAsset()->GetFirstTask() == this)
+			else if(GetTaskAsset()->FirstTask == this)
 			{
-				GetTaskAsset()->SetFirstTask(nullptr);
+				GetTaskAsset()->FirstTask = nullptr;
 			}
 		}
 	}

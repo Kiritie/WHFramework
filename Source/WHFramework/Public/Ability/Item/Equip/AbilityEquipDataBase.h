@@ -16,10 +16,7 @@ public:
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	EEquipMode EquipMode;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	EEquipRarity EquipRarity;
+	EAbilityEquipMode EquipMode;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSubclassOf<AAbilityEquipBase> EquipClass;

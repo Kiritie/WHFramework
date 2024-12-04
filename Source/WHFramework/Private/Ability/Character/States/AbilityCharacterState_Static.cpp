@@ -37,8 +37,6 @@ void UAbilityCharacterState_Static::OnEnter(UFiniteStateBase* InLastState, const
 	Character->LimitToAnim();
 
 	Character->GetCharacterMovement()->SetActive(false);
-	Character->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	Character->GetInteractionComponent()->SetInteractable(false);
 
 	if(Character->GetController<AAIControllerBase>())
 	{
@@ -64,8 +62,6 @@ void UAbilityCharacterState_Static::OnLeave(UFiniteStateBase* InNextState)
 	Character->FreeToAnim();
 
 	Character->GetCharacterMovement()->SetActive(true);
-	Character->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	Character->GetInteractionComponent()->SetInteractable(true);
 
 	if(Character->GetController<AAIControllerBase>())
 	{

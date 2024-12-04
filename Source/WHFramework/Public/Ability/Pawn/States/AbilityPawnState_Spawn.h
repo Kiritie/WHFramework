@@ -5,6 +5,7 @@
 #include "AbilityPawnStateBase.h"
 #include "AbilityPawnState_Spawn.generated.h"
 
+class IAbilityVitalityInterface;
 /**
  * 
  */
@@ -33,4 +34,7 @@ public:
 
 protected:
 	virtual void TryLeave();
+
+protected:
+	IAbilityVitalityInterface* Rescuer;
 };

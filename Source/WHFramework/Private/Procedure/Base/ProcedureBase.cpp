@@ -9,6 +9,7 @@
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Procedure/EventHandle_ProcedureEntered.h"
 #include "Event/Handle/Procedure/EventHandle_ProcedureLeaved.h"
+#include "Event/Handle/Procedure/EventHandle_ProcedureStateChanged.h"
 #include "Procedure/ProcedureModule.h"
 #include "Procedure/ProcedureModuleStatics.h"
 
@@ -40,9 +41,9 @@ void UProcedureBase::OnUnGenerate()
 {
 	if(bFirstProcedure)
 	{
-		if(GetProcedureAsset()->GetFirstProcedure() == this)
+		if(GetProcedureAsset()->FirstProcedure == this)
 		{
-			GetProcedureAsset()->SetFirstProcedure(nullptr);
+			GetProcedureAsset()->FirstProcedure = nullptr;
 		}
 	}
 }
@@ -52,6 +53,8 @@ void UProcedureBase::OnStateChanged(EProcedureState InProcedureState)
 {
 	OnProcedureStateChanged.Broadcast(InProcedureState);
 	K2_OnStateChanged(InProcedureState);
+
+	UEventModuleStatics::BroadcastEvent(UEventHandle_ProcedureStateChanged::StaticClass(), this, {this});
 }
 
 void UProcedureBase::OnInitialize()
@@ -240,15 +243,15 @@ void UProcedureBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChang
 		{
 			if(bFirstProcedure)
 			{
-				if(GetProcedureAsset()->GetFirstProcedure())
+				if(GetProcedureAsset()->FirstProcedure)
 				{
-					GetProcedureAsset()->GetFirstProcedure()->bFirstProcedure = false;
+					GetProcedureAsset()->FirstProcedure->bFirstProcedure = false;
 				}
-				GetProcedureAsset()->SetFirstProcedure(this);
+				GetProcedureAsset()->FirstProcedure = this;
 			}
-			else if(GetProcedureAsset()->GetFirstProcedure() == this)
+			else if(GetProcedureAsset()->FirstProcedure == this)
 			{
-				GetProcedureAsset()->SetFirstProcedure(nullptr);
+				GetProcedureAsset()->FirstProcedure = nullptr;
 			}
 		}
 	}

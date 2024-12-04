@@ -2,7 +2,6 @@
 
 #include "Ability/Actor/AbilityActorInterface.h"
 
-#include "Ability/Abilities/AbilityBase.h"
 #include "Ability/Attributes/AttributeSetBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
 
@@ -38,4 +37,20 @@ void IAbilityActorInterface::RefreshAttributes()
 		OnAttributeChangeData.NewValue = AttributeSet->GetAttributeValue(Iter);
 		OnAttributeChange(OnAttributeChangeData);
 	}
+}
+
+bool IAbilityActorInterface::AttachActor(AActor* InActor, const FAttachmentTransformRules& InAttachmentRules, FName InSocketName)
+{
+	if(InActor->AttachToComponent(GetMeshComponent(), InAttachmentRules, InSocketName))
+	{
+		OnActorAttached(InActor);
+		return true;
+	}
+	return false;
+}
+
+void IAbilityActorInterface::DetachActor(AActor* InActor, const FDetachmentTransformRules& InDetachmentRules)
+{
+	InActor->DetachFromActor(InDetachmentRules);
+	OnActorDetached(InActor);
 }

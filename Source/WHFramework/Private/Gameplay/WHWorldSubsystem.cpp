@@ -7,6 +7,7 @@
 
 UWHWorldSubsystem::UWHWorldSubsystem()
 {
+	
 }
 
 void UWHWorldSubsystem::OnWorldBeginPlay(UWorld& InWorld)

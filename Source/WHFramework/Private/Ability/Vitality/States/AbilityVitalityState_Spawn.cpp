@@ -6,11 +6,15 @@
 #include "Ability/Vitality/States/AbilityVitalityState_Walk.h"
 #include "Common/Interaction/InteractionComponent.h"
 #include "Components/ShapeComponent.h"
+#include "Event/EventModuleStatics.h"
+#include "Event/Handle/Ability/EventHandle_VitalitySpawned.h"
 #include "FSM/Components/FSMComponent.h"
 
 UAbilityVitalityState_Spawn::UAbilityVitalityState_Spawn()
 {
 	StateName = FName("Spawn");
+
+	Rescuer = nullptr;
 }
 
 void UAbilityVitalityState_Spawn::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
@@ -26,6 +30,13 @@ bool UAbilityVitalityState_Spawn::OnPreEnter(UFiniteStateBase* InLastState, cons
 void UAbilityVitalityState_Spawn::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
 	Super::OnEnter(InLastState, InParams);
+
+	if(InParams.IsValidIndex(0))
+	{
+		Rescuer = InParams[0].GetPointerValue<IAbilityVitalityInterface>();
+	}
+	
+	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalitySpawned>(Cast<UObject>(this), { GetAgent(), Cast<UObject>(Rescuer) });
 
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
@@ -49,6 +60,8 @@ void UAbilityVitalityState_Spawn::OnRefresh(float DeltaSeconds)
 void UAbilityVitalityState_Spawn::OnLeave(UFiniteStateBase* InNextState)
 {
 	Super::OnLeave(InNextState);
+
+	Rescuer = nullptr;
 
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 

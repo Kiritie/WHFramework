@@ -103,7 +103,7 @@ void UVoxelInteract::Open(IVoxelAgentInterface* InAgent)
 			Iter.GetVoxel<ThisClass>().Open(InAgent);
 		}
 		GetOwner()->Generate(EPhase::Lesser);
-		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Interact1), GetLocation());
+		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Open), GetLocation());
 	}
 }
 
@@ -125,6 +125,6 @@ void UVoxelInteract::Close(IVoxelAgentInterface* InAgent)
 			Iter.GetVoxel<ThisClass>().Close(InAgent);
 		}
 		GetOwner()->Generate(EPhase::Lesser);
-		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Interact2), GetLocation());
+		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Close), GetLocation());
 	}
 }

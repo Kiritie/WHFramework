@@ -20,10 +20,10 @@ class WHFRAMEWORK_API UTaskModuleStatics : public UBlueprintFunctionLibrary
 
 public:
 	UFUNCTION(BlueprintPure, Category = "TaskModuleStatics")
-	static UTaskAsset* GetCurrentTaskAsset();
+	static TArray<UTaskAsset*> GetTaskAssets();
 
-	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
-	static void SetCurrentTaskAsset(UTaskAsset* InTaskAsset, bool bAutoEnterFirst = false);
+	UFUNCTION(BlueprintPure, Category = "TaskModuleStatics")
+	static UTaskAsset* GetCurrentTaskAsset();
 
 	UFUNCTION(BlueprintPure, Category = "TaskModuleStatics")
 	static UTaskBase* GetCurrentTask();
@@ -35,24 +35,57 @@ public:
 	static UTaskBase* GetTaskByGUID(const FString& InTaskGUID);
 
 public:
+	UFUNCTION(BlueprintPure, Category = "TaskModuleStatics")
+	static UTaskAsset* GetTaskAsset(UTaskAsset* InAsset);
+	
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static void AddTaskAsset(UTaskAsset* InAsset);
+	
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static void RemoveTaskAsset(UTaskAsset* InAsset);
+	
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static void SwitchTaskAsset(UTaskAsset* InAsset);
+
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
 	static void RestoreTask(UTaskBase* InTask);
+
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static void RestoreTaskByGUID(const FString& InTaskGUID);
 
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
 	static void EnterTask(UTaskBase* InTask);
 
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static void EnterTaskByGUID(const FString& InTaskGUID);
+
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
 	static void RefreshTask(UTaskBase* InTask);
+
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static void RefreshTaskByGUID(const FString& InTaskGUID);
 
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
 	static void GuideTask(UTaskBase* InTask);
 
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static void GuideTaskByGUID(const FString& InTaskGUID);
+
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
 	static void ExecuteTask(UTaskBase* InTask);
+
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static void ExecuteTaskByGUID(const FString& InTaskGUID);
 
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
 	static void CompleteTask(UTaskBase* InTask, ETaskExecuteResult InTaskExecuteResult = ETaskExecuteResult::Succeed);
 
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static void CompleteTaskByGUID(const FString& InTaskGUID, ETaskExecuteResult InTaskExecuteResult = ETaskExecuteResult::Succeed);
+
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
 	static void LeaveTask(UTaskBase* InTask);
+
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static void LeaveTaskByGUID(const FString& InTaskGUID);
 };

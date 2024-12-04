@@ -186,7 +186,12 @@ void AAbilityActorBase::OnRemoveItem(const FAbilityItem& InItem)
 {
 }
 
-void AAbilityActorBase::OnChangeItem(const FAbilityItem& InNewItem, FAbilityItem& InOldItem)
+void AAbilityActorBase::OnPreChangeItem(const FAbilityItem& InOldItem)
+{
+	
+}
+
+void AAbilityActorBase::OnChangeItem(const FAbilityItem& InNewItem)
 {
 	
 }
@@ -224,10 +229,21 @@ void AAbilityActorBase::OnAttributeChange(const FOnAttributeChangeData& InAttrib
 	{
 		if(InAttributeChangeData.NewValue >= GetMaxExp())
 		{
+			const float Exp = InAttributeChangeData.NewValue - GetMaxExp();
 			SetLevelA(GetLevelA() + 1);
-			SetExp(0.f);
+			SetExp(Exp);
 		}
 	}
+}
+
+void AAbilityActorBase::OnActorAttached(AActor* InActor)
+{
+	
+}
+
+void AAbilityActorBase::OnActorDetached(AActor* InActor)
+{
+	
 }
 
 UAbilityActorDataBase& AAbilityActorBase::GetActorData() const
@@ -243,6 +259,11 @@ UAttributeSetBase* AAbilityActorBase::GetAttributeSet() const
 UShapeComponent* AAbilityActorBase::GetCollisionComponent() const
 {
 	return BoxComponent;
+}
+
+UMeshComponent* AAbilityActorBase::GetMeshComponent() const
+{
+	return nullptr;
 }
 
 UAbilitySystemComponent* AAbilityActorBase::GetAbilitySystemComponent() const

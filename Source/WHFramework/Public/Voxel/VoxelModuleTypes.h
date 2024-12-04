@@ -36,12 +36,13 @@ UENUM(BlueprintType)
 enum class EVoxelWorldState : uint8
 {
 	None,
-	Spawn,
-	Destroy,
-	Generate,
-	MapLoad,
-	MapBuild,
-	MeshBuild
+	Spawning,
+	Destroying,
+	Generating,
+	MapLoading,
+	MapBuilding,
+	MeshSpawning,
+	MeshBuilding
 };
 
 /**
@@ -54,31 +55,36 @@ enum class EVoxelType : uint8
 	Unknown,
 	Bedrock, //????
 	Dirt, //????
+	Red_Brick, //???
 	Stone, //??
-	Sand, //???
-	Grass, //???
-	Snow, //???
-	Oak, //???
-	Birch, //?????
-	Oak_Plank, //?????
-	Birch_Plank, //???????
 	Cobble_Stone, //??
 	Stone_Brick, //??
-	Red_Brick, //???
+	Sand, //???
 	Sand_Stone, //??
-	Oak_Leaves, //?????
-	Birch_Leaves, //???????
-	Ice, //????
 	Glass, //????
+	Grass, //???
+	Snow, //???
+	Ice, //????
+	Coal_Ore, //??
+	Iron_Ore, //??
+	Gold_Ore, //??
+	Emerald_Ore, //??
+	Diamond_Ore, //??
+	Oak, //???
+	Oak_Leaves, //?????
+	Oak_Plank, //?????
 	Oak_Door, //?????
 	Oak_Door_Upper, //?????
+	Birch, //?????
+	Birch_Leaves, //???????
+	Birch_Plank, //???????
 	Birch_Door, //???????
 	Birch_Door_Upper, //???????
-	Torch, //???
-	Water, // ?
-	Chest, // ?
 	Furnace,
 	Crafting_Table, // ?
+	Chest, // ?
+	Torch, //???
+	Water, // ?
 	Tall_Grass, //?????
 	Flower_Allium,
 	Flower_Blue_Orchid,
@@ -116,55 +122,52 @@ enum class EVoxelTreePart : uint8
 };
 
 /**
- * ????
+ * ?????
  */
 UENUM(BlueprintType)
-enum class EVoxelMeshType : uint8
+enum class EVoxelTransparency : uint8
 {
-	Cube,
-	Custom
+	None,
+	// ???
+	Solid,
+	// ?????
+	Semi,
+	// ???
+	Trans
 };
 
 /**
  * ?????
  */
 UENUM(BlueprintType)
-enum class EVoxelTransparency : uint8
+enum class EVoxelNature : uint8
 {
+	None,
 	// ???
 	Solid,
-	// ?????
-	SemiTransparent,
 	// ???
-	Transparent
-};
-
-/**
- * 像素声音类型
- */
-UENUM(BlueprintType)
-enum class EVoxelSoundType : uint8
-{
-	// 生成
-	Generate,
-	// 销毁
-	Destroy,
-	// 脚步
-	Footstep,
-	// 交互1
-	Interact1,
-	// 交互1
-	Interact2,
-	// 交互3
-	Interact3,
+	SemiSolid,
+	// ???
+	SmallSemiSolid,
+	// ???
+	TransSolid,
+	// ???
+	Liquid,
+	// ???
+	SemiLiquid,
+	// ?????
+	Foliage,
+	// ?????
+	SemiFoliage
 };
 
 /**
  * ????????????
  */
 UENUM(BlueprintType)
-enum class EVoxelMeshNature : uint8
+enum class EVoxelScope : uint8
 {
+	None,
 	// ?????
 	Chunk,
 	// ??????
@@ -175,6 +178,25 @@ enum class EVoxelMeshNature : uint8
 	Preview,
 	// ????????
 	Vitality
+};
+
+/**
+ * 像素声音类型
+ */
+UENUM(BlueprintType)
+enum class EVoxelSoundType : uint8
+{
+	None,
+	// 生成
+	Generate,
+	// 销毁
+	Destroy,
+	// 脚步
+	Footstep,
+	// 打开
+	Open,
+	// 关闭
+	Close
 };
 
 /**
@@ -394,11 +416,11 @@ public:
 	FORCEINLINE FVoxelAuxiliarySaveData()
 	{
 		VoxelItem = FVoxelItem();
-		MeshNature = EVoxelMeshNature::Chunk;
+		MeshNature = EVoxelScope::Chunk;
 		InventoryData = FInventorySaveData();
 	}
 
-	FORCEINLINE FVoxelAuxiliarySaveData(const FVoxelItem& InVoxelItem, EVoxelMeshNature InMeshNature = EVoxelMeshNature::Chunk) : FVoxelAuxiliarySaveData()
+	FORCEINLINE FVoxelAuxiliarySaveData(const FVoxelItem& InVoxelItem, EVoxelScope InMeshNature = EVoxelScope::None) : FVoxelAuxiliarySaveData()
 	{
 		VoxelItem = InVoxelItem;
 		MeshNature = InMeshNature;
@@ -409,7 +431,7 @@ public:
 	FVoxelItem VoxelItem;
 
 	UPROPERTY()
-	EVoxelMeshNature MeshNature;
+	EVoxelScope MeshNature;
 
 	UPROPERTY(BlueprintReadWrite)
 	FInventorySaveData InventoryData;
@@ -562,6 +584,142 @@ public:
 	}
 };
 
+UENUM(BlueprintType)
+enum class EVoxelHierarchy: uint8
+{
+	None,
+	Under,
+	Upper
+};
+
+UENUM(BlueprintType)
+enum class EVoxelBiomeType: uint8
+{
+	None,
+	Plain,
+	Mountain,
+	Blob
+};
+
+UENUM(BlueprintType)
+enum class EVoxelFoliageType: uint8
+{
+	None,
+	Plant,
+	Tree
+};
+
+UENUM(BlueprintType)
+enum class EVoxelDataType: uint8
+{
+	None,
+	Basic,
+	Biome,
+	Noise,
+	Random
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelRandomData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FVoxelRandomData()
+	{
+		RandomRate = 0.f;
+		VoxelTypes = TArray<EVoxelType>();
+	}
+
+	FORCEINLINE FVoxelRandomData(float InRandomRate, const TArray<EVoxelType>& InVoxelTypes)
+	{
+		RandomRate = InRandomRate;
+		VoxelTypes = InVoxelTypes;
+	}
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float RandomRate;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TArray<EVoxelType> VoxelTypes;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelBlockData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FVoxelBlockData()
+	{
+		DataType = EVoxelDataType::None;
+		NoiseScale = FVector::ZeroVector;
+		BaseHeight = 0.f;
+		RandomRate = 0.f;
+		RandomDatas = TArray<FVoxelRandomData>();
+	}
+
+	FORCEINLINE FVoxelBlockData(float InBaseHeight, bool bSnapBiome) : FVoxelBlockData()
+	{
+		DataType = bSnapBiome ? EVoxelDataType::Biome : EVoxelDataType::Basic;
+		BaseHeight = InBaseHeight;
+	}
+
+	FORCEINLINE FVoxelBlockData(float InBaseHeight, FVector InNoiseScale) : FVoxelBlockData()
+	{
+		DataType = EVoxelDataType::Noise;
+		BaseHeight = InBaseHeight;
+		NoiseScale = InNoiseScale;
+	}
+
+	FORCEINLINE FVoxelBlockData(float InBaseHeight, FVector InNoiseScale, float InRandomRate, const TArray<FVoxelRandomData>& InDatas = TArray<FVoxelRandomData>()) : FVoxelBlockData()
+	{
+		DataType = EVoxelDataType::Random;
+		BaseHeight = InBaseHeight;
+		NoiseScale = InNoiseScale;
+		RandomRate = InRandomRate;
+		RandomDatas = InDatas;
+	}
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	EVoxelDataType DataType;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float BaseHeight;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "DataType == EVoxelDataType::Noise || DataType == EVoxelDataType::Random"))
+	FVector NoiseScale;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "DataType == EVoxelDataType::Random"))
+	float RandomRate;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "DataType == EVoxelDataType::Random"))
+	TArray<FVoxelRandomData> RandomDatas;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelBlockDatas
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FVoxelBlockDatas()
+	{
+		BlockDatas = TMap<EVoxelType, FVoxelBlockData>();
+	}
+
+	FORCEINLINE FVoxelBlockDatas(const TMap<EVoxelType, FVoxelBlockData>& InBlockDatas)
+	{
+		BlockDatas = InBlockDatas;
+	}
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TMap<EVoxelType, FVoxelBlockData> BlockDatas;
+};
+
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelWorldBasicSaveData : public FSaveData
 {
@@ -577,19 +735,61 @@ public:
 		WorldSize = FVector(-1.f, -1.f, 3.f);
 		WorldRange = FVector2D(7.f, 7.f);
 
-		BaseHeight = 0.1f;
-		BedrockHeight = 0.02f;
-		WaterHeight = 0.35f;
-		
-		PlainScale = FVector(0.001f, 0.001f, 0.25f);
-		MountainScale = FVector(0.01f, 0.01f, 0.3f);
-		BlobScale = FVector(0.05f, 0.05f, 0.2f);
-		StoneScale = FVector(0.05f, 0.05f, 0.15f);
-		SandScale = FVector(0.03f, 0.03f, 0.25f);
-		PlantScale = FVector4(0.8f, 0.8f, 0.5f, 0.08f);
-		TreeScale = FVector4(0.01f, 0.01f, 0.5f, 0.005f);
+		BlockDatas = {
+			{
+				EVoxelHierarchy::Upper,
+				FVoxelBlockDatas({
+						{ EVoxelType::Sand, FVoxelBlockData(1.f, FVector(0.05f, 0.05f, 0.3f)) },
+						{ EVoxelType::Water, FVoxelBlockData(1.4f, false) },
+						{ EVoxelType::Grass, FVoxelBlockData(0.f, true) }
+					}
+				)
+			},
+			{
+				EVoxelHierarchy::Under,	
+				FVoxelBlockDatas({
+						{ EVoxelType::Bedrock, FVoxelBlockData(0.01f, false) },
+						{ EVoxelType::Diamond_Ore, FVoxelBlockData(0.1f, FVector(0.5f, 0.5f, 0.1f), 0.0001f) },
+						{ EVoxelType::Emerald_Ore, FVoxelBlockData(0.2f, FVector(0.4f, 0.4f, 0.1f), 0.0004f) },
+						{ EVoxelType::Gold_Ore, FVoxelBlockData(0.3f, FVector(0.3f, 0.3f, 0.1f), 0.0005f) },
+						{ EVoxelType::Iron_Ore, FVoxelBlockData(0.4f, FVector(0.2f, 0.2f, 0.1), 0.005f) },
+						{ EVoxelType::Coal_Ore, FVoxelBlockData(0.6f, FVector(0.1f, 0.1f, 0.2f), 0.05f) },
+						{ EVoxelType::Stone, FVoxelBlockData(0.15f, true) },
+						{ EVoxelType::Dirt, FVoxelBlockData(0.f, true) }
+					}
+				)
+			}
+		};
 
-		RenderDatas = TMap<EVoxelTransparency, FVoxelRenderData>();
+		BiomeDatas = {
+			{ EVoxelBiomeType::Plain, FVoxelBlockData(0.6f, FVector(0.005f, 0.005f, 0.8)) },
+			{ EVoxelBiomeType::Mountain, FVoxelBlockData(0.6f, FVector(0.01f, 0.01f, 1.f)) },
+			{ EVoxelBiomeType::Blob, FVoxelBlockData(0.75f, FVector(0.05f, 0.05f, 0.5f)) }
+		};
+
+		FoliageDatas = {
+			{
+				EVoxelFoliageType::Plant,
+				FVoxelBlockData(2.0f, FVector(0.8f, 0.8f, 0.5f), 0.08f, {
+						FVoxelRandomData(0.3f, { EVoxelType::Tall_Grass }),
+						FVoxelRandomData(1.f, { EVoxelType::Flower_Allium, EVoxelType::Flower_Blue_Orchid, EVoxelType::Flower_Dandelion, EVoxelType::Flower_Houstonia, EVoxelType::Flower_Oxeye_Daisy,
+							EVoxelType::Flower_Paeonia, EVoxelType::Flower_Rose, EVoxelType::Flower_Tulip_Orange, EVoxelType::Flower_Tulip_Pink, EVoxelType::Flower_Tulip_Red, EVoxelType::Flower_Tulip_White })
+					}
+				)
+			},
+			{
+				EVoxelFoliageType::Tree,
+				FVoxelBlockData(2.0f, FVector(0.01f, 0.01f, 0.5f), 0.005f, {
+						FVoxelRandomData(0.6f, { EVoxelType::Oak }),
+						FVoxelRandomData(1.f, { EVoxelType::Birch })
+					}
+				)
+			}
+		};
+
+		RenderDatas = TMap<EVoxelNature, FVoxelRenderData>();
+
+		IconMat = nullptr;
 
 		SceneData = FSceneModuleSaveData();
 	}
@@ -606,40 +806,22 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FVector2D WorldRange;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float BaseHeight;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float BedrockHeight;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float WaterHeight;
-		
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector PlainScale;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector MountainScale;
-		
+	TMap<EVoxelHierarchy, FVoxelBlockDatas> BlockDatas;
+	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector BlobScale;
+	TMap<EVoxelBiomeType, FVoxelBlockData> BiomeDatas;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TMap<EVoxelFoliageType, FVoxelBlockData> FoliageDatas;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector StoneScale;
+	TMap<EVoxelNature, FVoxelRenderData> RenderDatas;
 				
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector SandScale;
+	UMaterialInterface* IconMat;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector4 PlantScale;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector4 TreeScale;
-		
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TMap<EVoxelTransparency, FVoxelRenderData> RenderDatas;
-		
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FSceneModuleSaveData SceneData;
 
@@ -669,6 +851,11 @@ public:
 	FORCEINLINE FVector GetBlockSizedNormal(FVector InNormal, float InLength = 0.25f) const
 	{
 		return BlockSize * InNormal * InLength;
+	}
+
+	FORCEINLINE FVoxelRenderData& GetRenderData(EVoxelNature InVoxelNature)
+	{
+		return RenderDatas[InVoxelNature];
 	}
 };
 

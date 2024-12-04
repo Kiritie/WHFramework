@@ -14,6 +14,9 @@ class WHFRAMEWORK_API IAbilityPawnInterface : public IAbilityVitalityInterface
 {
 	GENERATED_BODY()
 
+protected:
+	virtual void BindASCInput() = 0;
+
 public:
 	virtual bool IsPlayer() const = 0;
 	
@@ -25,4 +28,7 @@ public:
 	virtual void GetMotionRate(float& OutMovementRate, float& OutRotationRate) = 0;
 
 	virtual void SetMotionRate(float InMovementRate, float InRotationRate) = 0;
+
+protected:
+	bool bASCInputBound = false;
 };

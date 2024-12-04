@@ -21,6 +21,8 @@ UWidgetAbilityInventorySlotBase::UWidgetAbilityInventorySlotBase(const FObjectIn
 	
 	OwnerSlot = nullptr;
 	CooldownTimerHandle = FTimerHandle();
+
+	bWidgetTickAble = true;
 }
 
 void UWidgetAbilityInventorySlotBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -38,7 +40,7 @@ void UWidgetAbilityInventorySlotBase::OnDespawn_Implementation(bool bRecovery)
 	StopCooldown();
 }
 
-void UWidgetAbilityInventorySlotBase::OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams)
+void UWidgetAbilityInventorySlotBase::OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams)
 {
 	Super::OnCreate(InOwner, InParams);
 
@@ -109,14 +111,14 @@ bool UWidgetAbilityInventorySlotBase::NativeOnDrop(const FGeometry& InGeometry, 
 		SetStyle(DefaultStyle);
 
 		FAbilityItem& _Item = PayloadSlot->GetItem();
-		if(OwnerSlot->MatchItemLimit(_Item))
+		if(OwnerSlot->MatchItemLimit(_Item, true))
 		{
 			if (OwnerSlot->ContainsItem(_Item))
 			{
 				OwnerSlot->AddItem(_Item);
 				PayloadSlot->OwnerSlot->Refresh();
 			}
-			else if(OwnerSlot->IsEmpty() || PayloadSlot->OwnerSlot->MatchItemLimit(OwnerSlot->GetItem()))
+			else if(OwnerSlot->IsEmpty() || PayloadSlot->OwnerSlot->MatchItemLimit(OwnerSlot->GetItem(), true))
 			{
 				OwnerSlot->Replace(PayloadSlot->OwnerSlot);
 			}
@@ -135,13 +137,13 @@ void UWidgetAbilityInventorySlotBase::NativeOnDragEnter(const FGeometry& InGeome
 	{
 		TSubclassOf<UCommonButtonStyle> _Style;
 		FAbilityItem& _Item = PayloadSlot->GetItem();
-		if(OwnerSlot->MatchItemLimit(_Item))
+		if(OwnerSlot->MatchItemLimit(_Item, true))
 		{
 			if (OwnerSlot->ContainsItem(_Item))
 			{
 				_Style = MatchStyle;
 			}
-			else if(OwnerSlot->IsEmpty() || PayloadSlot->OwnerSlot->MatchItemLimit(OwnerSlot->GetItem()))
+			else if(OwnerSlot->IsEmpty() || PayloadSlot->OwnerSlot->MatchItemLimit(OwnerSlot->GetItem(), true))
 			{
 				_Style = MatchStyle;
 			}
@@ -177,7 +179,7 @@ void UWidgetAbilityInventorySlotBase::NativeOnDragDetected(const FGeometry& InGe
 	{
 		OutOperation = UWidgetBlueprintLibrary::CreateDragDropOperation(UDragDropOperation::StaticClass());
 		OutOperation->Payload = this;
-		OutOperation->DefaultDragVisual = UObjectPoolModuleStatics::SpawnObject<UWidgetAbilityDragItemBase>(nullptr, { &GetItem() }, false, UAssetModuleStatics::GetStaticClass(FName("DragItem")));
+		OutOperation->DefaultDragVisual = UObjectPoolModuleStatics::SpawnObject<UWidgetAbilityDragItemBase>(nullptr, { &GetItem() }, UAssetModuleStatics::GetStaticClass(FName("DragItem")));
 	}
 }
 
@@ -288,6 +290,22 @@ FAbilityItem& UWidgetAbilityInventorySlotBase::GetItem() const
 {
 	if(OwnerSlot) return OwnerSlot->GetItem();
 	return FAbilityItem::Empty;
+}
+
+TArray<FAbilityItem>& UWidgetAbilityInventorySlotBase::GetMatchItems() const
+{
+	static TArray<FAbilityItem> Items;
+	Items.Empty();
+	Items.Add(GetItem());
+	if(!OwnerSlot->IsMatched())
+	{
+		auto QueryData = GetInventory()->QueryItemByRange(EItemQueryType::Match, GetItem());
+		for(auto Iter : QueryData.Slots)
+		{
+			Items.Add(Iter->GetItem());
+		}
+	}
+	return Items;
 }
 
 UAbilityInventoryBase* UWidgetAbilityInventorySlotBase::GetInventory() const

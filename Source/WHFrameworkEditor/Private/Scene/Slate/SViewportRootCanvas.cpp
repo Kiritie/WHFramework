@@ -4,7 +4,6 @@
 #include "Scene/Slate/SViewportRootCanvas.h"
 
 #include "IAssetViewport.h"
-#include "LevelEditorViewport.h"
 #include "Scene/SceneEditor.h"
 #include "Slate/SObjectWidget.h"
 #include "Widget/World/WorldWidgetBase.h"

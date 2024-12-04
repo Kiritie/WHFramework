@@ -4,7 +4,6 @@
 #include "Voxel/Voxels/Voxel.h"
 
 #include "Ability/AbilityModuleStatics.h"
-#include "Asset/AssetManagerBase.h"
 #include "Audio/AudioModuleStatics.h"
 #include "Voxel/Datas/VoxelData.h"
 #include "Math/MathStatics.h"
@@ -65,7 +64,7 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 	if(GetData().bMainPart)
 	{
 		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Destroy), GetLocation());
-		UAbilityModuleStatics::SpawnAbilityPickUp(FAbilityItem(GetID(), 1), GetLocation() + GetData().GetRange(GetAngle()) * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f, GetOwner());
+		UAbilityModuleStatics::SpawnAbilityPickUp(FAbilityItem(GetData().GatherData ? GetData().GatherData->GetPrimaryAssetId() : GetData().GetPrimaryAssetId(), 1), GetLocation() + GetData().GetRange(GetAngle()) * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f, GetOwner());
 	}
 	if(GetOwner())
 	{

@@ -17,10 +17,7 @@ public:
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	ESkillType SkillType;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	ESkillMode SkillMode;
+	EAbilitySkillMode SkillMode;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSubclassOf<AAbilityProjectileBase> ProjectileClass;

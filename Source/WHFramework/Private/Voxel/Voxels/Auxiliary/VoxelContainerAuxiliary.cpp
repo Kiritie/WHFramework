@@ -58,7 +58,12 @@ void AVoxelContainerAuxiliary::OnRemoveItem(const FAbilityItem& InItem)
 	
 }
 
-void AVoxelContainerAuxiliary::OnChangeItem(const FAbilityItem& InNewItem, FAbilityItem& InOldItem)
+void AVoxelContainerAuxiliary::OnPreChangeItem(const FAbilityItem& InOldItem)
+{
+	
+}
+
+void AVoxelContainerAuxiliary::OnChangeItem(const FAbilityItem& InNewItem)
 {
 	
 }

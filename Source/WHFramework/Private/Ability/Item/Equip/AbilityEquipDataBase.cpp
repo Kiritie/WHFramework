@@ -4,7 +4,6 @@ UAbilityEquipDataBase::UAbilityEquipDataBase()
 {
 	Type = FName("Equip");
 	MaxCount = 1;
-	EquipMode = EEquipMode::None;
-	EquipRarity = EEquipRarity::Normal;
+	EquipMode = EAbilityEquipMode::None;
 	EquipClass = nullptr;
 }

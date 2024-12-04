@@ -28,11 +28,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (MultiLine = "true"))
 	FText Detail;
 	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EAbilityItemRarity Rarity;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowedClasses = "/Script/Engine.Texture,/Script/Engine.MaterialInterface"))
 	UObject* Icon;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	UMaterialInterface* IconMat;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 MaxCount;
@@ -57,13 +57,12 @@ public:
 	UFUNCTION(BlueprintPure)
 	int32 ClampLevel(int32 InLevel) const;
 
-public:
 	UFUNCTION(BlueprintPure)
 	EAbilityItemType GetItemType() const;
 
 	UFUNCTION(BlueprintPure)
-	FText GetItemAttributeInfo(int32 InLevel = 1) const;
+	virtual FString GetItemAbilityInfo(int32 InLevel = 1) const;
 
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void SetIconByTexture(UTexture* InTexture, FVector2D InSize = FVector2D::UnitVector, int32 InIndex = 0);
+	UFUNCTION(BlueprintPure)
+	virtual FString GetItemErrorInfo(AActor* InOwner, int32 InLevel = 1) const;
 };

@@ -4,7 +4,9 @@
 
 #include "Debug/Widget/SDebugPanelWidget.h"
 #include "Gameplay/WHGameState.h"
+#include "Gameplay/WHHUD.h"
 #include "Gameplay/WHPlayerController.h"
+#include "Gameplay/WHPlayerState.h"
 #include "Main/MainModule.h"
 #include "Widget/WidgetModuleStatics.h"
 
@@ -13,8 +15,10 @@ AWHGameMode::AWHGameMode()
 	PrimaryActorTick.bCanEverTick = true;
 
 	DefaultPawnClass = nullptr;
+	HUDClass = AWHHUD::StaticClass();
 	PlayerControllerClass = AWHPlayerController::StaticClass();
 	GameStateClass = AWHGameState::StaticClass();
+	PlayerStateClass = AWHPlayerState::StaticClass();
 
 	bInitialized = false;
 }
@@ -76,6 +80,16 @@ APlayerController* AWHGameMode::SpawnPlayerController(ENetRole InRemoteRole, con
 		WHPlayerController->Execute_OnInitialize(WHPlayerController);
 	}
 	return PlayerController;
+}
+
+void AWHGameMode::InitializeHUDForPlayer_Implementation(APlayerController* NewPlayer)
+{
+	Super::InitializeHUDForPlayer_Implementation(NewPlayer);
+
+	if(AWHHUD* WHHUD = Cast<AWHHUD>(NewPlayer->GetHUD()))
+	{
+		WHHUD->Execute_OnInitialize(WHHUD);
+	}
 }
 
 APlayerController* AWHGameMode::Login(UPlayer* NewPlayer, ENetRole InRemoteRole, const FString& Portal, const FString& Options, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)

@@ -5,19 +5,39 @@
 
 #include "Procedure/Base/ProcedureBase.h"
 
+TArray<UProcedureAsset*> UProcedureModuleStatics::GetProcedureAssets()
+{
+	return UProcedureModule::Get().GetAssets();
+}
+
 UProcedureAsset* UProcedureModuleStatics::GetCurrentProcedureAsset()
 {
 	return UProcedureModule::Get().GetCurrentAsset();
 }
 
-void UProcedureModuleStatics::SetCurrentProcedureAsset(UProcedureAsset* InProcedureAsset, bool bAutoSwitchFirst)
-{
-	return UProcedureModule::Get().SetCurrentAsset(InProcedureAsset, bAutoSwitchFirst);
-}
-
 UProcedureBase* UProcedureModuleStatics::GetCurrentProcedure(TSubclassOf<UProcedureBase> InClass)
 {
 	return GetDeterminesOutputObject(UProcedureModule::Get().GetCurrentProcedure(), InClass);
+}
+
+UProcedureAsset* UProcedureModuleStatics::GetProcedureAsset(UProcedureAsset* InAsset)
+{
+	return UProcedureModule::Get().GetAsset(InAsset);
+}
+
+void UProcedureModuleStatics::AddProcedureAsset(UProcedureAsset* InAsset)
+{
+	UProcedureModule::Get().AddAsset(InAsset);
+}
+
+void UProcedureModuleStatics::RemoveProcedureAsset(UProcedureAsset* InAsset)
+{
+	UProcedureModule::Get().RemoveAsset(InAsset);
+}
+
+void UProcedureModuleStatics::SwitchProcedureAsset(UProcedureAsset* InAsset)
+{
+	UProcedureModule::Get().SwitchAsset(InAsset);
 }
 
 bool UProcedureModuleStatics::HasProcedureByIndex(int32 InIndex)

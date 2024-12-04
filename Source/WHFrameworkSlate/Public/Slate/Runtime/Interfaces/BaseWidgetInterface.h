@@ -3,10 +3,12 @@
 #pragma once
 
 #include "TickAbleWidgetInterface.h"
+#include "Parameter/ParameterTypes.h"
 
 #include "UObject/Interface.h"
 #include "BaseWidgetInterface.generated.h"
 
+class UWidget;
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
 class UBaseWidgetInterface : public UTickAbleWidgetInterface

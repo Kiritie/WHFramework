@@ -32,14 +32,29 @@ void AVoxelInteractAuxiliary::OnDespawn_Implementation(bool bRecovery)
 void AVoxelInteractAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	Super::LoadData(InSaveData, InPhase);
-	
+
+	const auto& SaveData = InSaveData->CastRef<FVoxelAuxiliarySaveData>();
+
 	if(PHASEC(InPhase, EPhase::All))
 	{
-		for(const auto& Iter : VoxelItem.GetVoxelData<UVoxelInteractData>().InteractActions)
+		switch(SaveData.MeshNature)
 		{
-			Interaction->AddInteractAction(Iter);
+			case EVoxelScope::Chunk:
+			{
+				for(const auto& Iter : VoxelItem.GetVoxelData<UVoxelInteractData>().InteractActions)
+				{
+					Interaction->AddInteractAction(Iter);
+				}
+				BoxComponent->SetGenerateOverlapEvents(true);
+				BoxComponent->SetBoxExtent(VoxelItem.GetRange() * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f);
+				break;
+			}
+			default:
+			{
+				BoxComponent->SetGenerateOverlapEvents(false);
+				break;
+			}
 		}
-		BoxComponent->SetBoxExtent(VoxelItem.GetRange() * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f);
 	}
 }
 

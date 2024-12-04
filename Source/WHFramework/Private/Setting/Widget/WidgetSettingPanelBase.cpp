@@ -2,9 +2,10 @@
 
 #include "Setting/Widget/WidgetSettingPanelBase.h"
 
+#include "CommonActivatableWidgetSwitcher.h"
 #include "Setting/Widget/Page/WidgetSettingPageBase.h"
-#include "Setting/Widget/Page/WidgetSettingPageItemBase.h"
 #include "Widget/WidgetModuleStatics.h"
+#include "Widget/Common/CommonButton.h"
 #include "Widget/Common/CommonButtonGroup.h"
 
 UWidgetSettingPanelBase::UWidgetSettingPanelBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
@@ -29,6 +30,8 @@ UWidgetSettingPanelBase::UWidgetSettingPanelBase(const FObjectInitializer& Objec
 
 void UWidgetSettingPanelBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
 {
+	Super::OnCreate(InOwner, InParams);
+
 	if(Btn_Apply)
 	{
 		Btn_Apply->OnClicked().AddUObject(this, &UWidgetSettingPanelBase::OnApplyButtonClicked);
@@ -41,12 +44,11 @@ void UWidgetSettingPanelBase::OnCreate(UObject* InOwner, const TArray<FParameter
 	PageItemGroup = UObjectPoolModuleStatics::SpawnObject<UCommonButtonGroup>();
 	PageItemGroup->SetSelectionRequiredN(true);
 	PageItemGroup->SetBroadcastOnDeselected(false);
+	PageItemGroup->OnSelectedButtonBaseChanged.AddDynamic(this, &UWidgetSettingPanelBase::OnPageItemSelected);
 
-	Super::OnCreate(InOwner, InParams);
-
-	for(const auto Iter : ChildWidgets)
+	for(const auto Iter : GetSubWidgets<UWidgetSettingPageBase>())
 	{
-		SpawnPageItem(Cast<UWidgetSettingPageBase>(Iter));
+		SpawnPageItem(Iter);
 	}
 }
 
@@ -60,13 +62,16 @@ void UWidgetSettingPanelBase::OnOpen(const TArray<FParameter>& InParams, bool bI
 	Super::OnOpen(InParams, bInstant);
 	
 	SetCurrentPage(0);
-
-	GetCurrentPage()->Open();
 }
 
 void UWidgetSettingPanelBase::OnClose(bool bInstant)
 {
 	Super::OnClose(bInstant);
+}
+
+void UWidgetSettingPanelBase::OnPageItemSelected(UCommonButtonBase* SelectedTabButton, int32 ButtonIndex)
+{
+	Switcher_Page->SetActiveWidgetIndex(ButtonIndex);
 }
 
 void UWidgetSettingPanelBase::OnApplyButtonClicked()
@@ -85,14 +90,15 @@ void UWidgetSettingPanelBase::OnResetButtonClicked()
 	}
 }
 
-UWidgetSettingPageItemBase* UWidgetSettingPanelBase::SpawnPageItem_Implementation(UWidgetSettingPageBase* InPage)
+UCommonButton* UWidgetSettingPanelBase::SpawnPageItem_Implementation(UWidgetSettingPageBase* InPage)
 {
-	if(UWidgetSettingPageItemBase* PageItem = UObjectPoolModuleStatics::SpawnObject<UWidgetSettingPageItemBase>(InPage, nullptr, false, PageItemClass))
+	if(UCommonButton* PageItem = UObjectPoolModuleStatics::SpawnObject<UCommonButton>(InPage, nullptr, PageItemClass))
 	{
-		PageItem->SetTitle(InPage->Title);
-		if(InPage->PageItemStyle)
+		PageItem->SetIsSelectable(true);
+		PageItem->SetTitle(InPage->GetTitle());
+		if(InPage->GetPageItemStyle())
 		{
-			PageItem->SetStyle(InPage->PageItemStyle);
+			PageItem->SetStyle(InPage->GetPageItemStyle());
 		}
 		PageItemGroup->AddWidget(PageItem);
 		return PageItem;
@@ -107,7 +113,7 @@ int32 UWidgetSettingPanelBase::GetCurrentPageIndex() const
 
 UWidgetSettingPageBase* UWidgetSettingPanelBase::GetCurrentPage() const
 {
-	return GetChild<UWidgetSettingPageBase>(GetCurrentPageIndex());
+	return GetSubWidget<UWidgetSettingPageBase>(GetCurrentPageIndex());
 }
 
 void UWidgetSettingPanelBase::SetCurrentPage_Implementation(int32 InPageIndex)

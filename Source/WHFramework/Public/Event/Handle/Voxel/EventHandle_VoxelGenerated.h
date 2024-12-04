@@ -21,9 +21,14 @@ public:
 	UEventHandle_VoxelGenerated();
 	
 public:
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
+	
 	virtual void Parse_Implementation(const TArray<FParameter>& InParams) override;
 
 public:
 	UPROPERTY(BlueprintReadOnly)
 	FVoxelItem VoxelItem;
+
+	UPROPERTY(BlueprintReadOnly)
+	TScriptInterface<IVoxelAgentInterface> VoxelAgent;
 };

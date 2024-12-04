@@ -6,5 +6,5 @@ UVoxelWaterData::UVoxelWaterData()
 {
 	VoxelType = EVoxelType::Water;
 	VoxelClass = UVoxelWater::StaticClass();
-	Transparency = EVoxelTransparency::Transparent;
+	Nature = EVoxelNature::Liquid;
 }

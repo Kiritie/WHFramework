@@ -135,10 +135,15 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void Enter();
 	/**
-	* 进入任务
+	* 刷新任务
 	*/
 	UFUNCTION(BlueprintCallable)
 	void Refresh();
+	/**
+	* 刷新任务状态
+	*/
+	UFUNCTION(BlueprintCallable)
+	void RefreshState();
 	/**
 	* 指引任务
 	*/
@@ -223,10 +228,20 @@ public:
 	UFUNCTION(BlueprintPure)
 	bool IsEntered() const;
 	/**
+	* 是否正在执行
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsExecuting() const;
+	/**
 	* 是否已完成
 	*/
 	UFUNCTION(BlueprintPure)
 	bool IsCompleted(bool bCheckSubs = false) const;
+	/**
+	* 是否已离开
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsLeaved() const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Execute/Guide
@@ -305,9 +320,6 @@ public:
 	/// 是否合并子任务
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SubTask")
 	bool bMergeSubTask;
-	/// 当前子任务索引
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SubTask")
-	int32 CurrentSubTaskIndex;
 	/// 子任务
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SubTask")
 	TArray<UTaskBase*> SubTasks;
@@ -318,11 +330,6 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	bool HasSubTask(bool bIgnoreMerge = true) const;
-	/**
-	 * 获取当前子任务
-	 */
-	UFUNCTION(BlueprintPure)
-	UTaskBase* GetCurrentSubTask() const;
 	/**
 	 * 是否是子任务
 	 */

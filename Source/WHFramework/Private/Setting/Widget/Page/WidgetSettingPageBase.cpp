@@ -5,7 +5,6 @@
 #include "Asset/AssetModuleStatics.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/ScrollBox.h"
-#include "Components/ScrollBoxSlot.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Setting/SettingModule.h"
@@ -15,34 +14,18 @@
 
 UWidgetSettingPageBase::UWidgetSettingPageBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	ParentName = FName("SettingPanel");
-	ParentSlot = FName("Slot_SettingPage");
-	WidgetType = EWidgetType::Temporary;
-	WidgetInputMode = EInputMode::UIOnly;
-	WidgetCreateType = EWidgetCreateType::AutoCreate;
-	WidgetCloseType = EWidgetCloseType::Remove;
 }
 
-void UWidgetSettingPageBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
-{
-	Super::OnInitialize(InOwner, InParams);
-}
-
-void UWidgetSettingPageBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetSettingPageBase::OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams)
 {
 	Super::OnCreate(InOwner, InParams);
 
 	if(!ContentBox)
 	{
-		ContentBox = NewObject<UVerticalBox>(this, UVerticalBox::StaticClass(), FName("ContentBox"));
+		ContentBox = NewObject<UVerticalBox>(this);
 	}
 
 	WidgetTree->RootWidget = ContentBox;
-}
-
-void UWidgetSettingPageBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
-{
-	Super::OnOpen(InParams, bInstant);
 }
 
 void UWidgetSettingPageBase::OnReset(bool bForce)
@@ -50,9 +33,14 @@ void UWidgetSettingPageBase::OnReset(bool bForce)
 	Super::OnReset(bForce);
 }
 
-void UWidgetSettingPageBase::OnClose(bool bInstant)
+void UWidgetSettingPageBase::OnActivated()
 {
-	Super::OnClose(bInstant);
+	Super::OnActivated();
+}
+
+void UWidgetSettingPageBase::OnDeactivated()
+{
+	Super::OnDeactivated();
 }
 
 void UWidgetSettingPageBase::OnApply()
@@ -100,7 +88,7 @@ void UWidgetSettingPageBase::AddSettingItem_Implementation(const FName InName, U
 	if(!InCategory.IsEmpty() && !InCategory.EqualTo(LastCategory))
 	{
 		LastCategory = InCategory;
-		if(UVerticalBoxSlot* VerticalBoxSlot = ContentBox->AddChildToVerticalBox(UObjectPoolModuleStatics::SpawnObject<UWidgetSettingItemCategoryBase>(nullptr, { InCategory }, false, USettingModule::Get().GetSettingItemCategoryClass())))
+		if(UVerticalBoxSlot* VerticalBoxSlot = ContentBox->AddChildToVerticalBox(UObjectPoolModuleStatics::SpawnObject<UWidgetSettingItemCategoryBase>(nullptr, { InCategory }, USettingModule::Get().GetSettingItemCategoryClass())))
 		{
 			VerticalBoxSlot->SetPadding(FMargin(2.5f));
 		}

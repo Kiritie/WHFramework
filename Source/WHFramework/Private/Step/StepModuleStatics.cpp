@@ -4,16 +4,15 @@
 #include "Step/StepModuleStatics.h"
 
 #include "Step/StepModule.h"
-#include "Step/Base/StepBase.h"
+
+TArray<UStepAsset*> UStepModuleStatics::GetStepAssets()
+{
+	return UStepModule::Get().GetAssets();
+}
 
 UStepAsset* UStepModuleStatics::GetCurrentStepAsset()
 {
 	return UStepModule::Get().GetCurrentAsset();
-}
-
-void UStepModuleStatics::SetCurrentStepAsset(UStepAsset* InStepAsset, bool bAutoStartFirst)
-{
-	return UStepModule::Get().SetCurrentAsset(InStepAsset, bAutoStartFirst);
 }
 
 UStepBase* UStepModuleStatics::GetCurrentStep()
@@ -29,6 +28,26 @@ UStepBase* UStepModuleStatics::GetCurrentRootStep()
 UStepBase* UStepModuleStatics::GetStepByGUID(const FString& InStepGUID)
 {
 	return UStepModule::Get().GetStepByGUID(InStepGUID);
+}
+
+UStepAsset* UStepModuleStatics::GetStepAsset(UStepAsset* InAsset)
+{
+	return UStepModule::Get().GetAsset(InAsset);
+}
+
+void UStepModuleStatics::AddStepAsset(UStepAsset* InAsset)
+{
+	UStepModule::Get().AddAsset(InAsset);
+}
+
+void UStepModuleStatics::RemoveStepAsset(UStepAsset* InAsset)
+{
+	UStepModule::Get().RemoveAsset(InAsset);
+}
+
+void UStepModuleStatics::SwitchStepAsset(UStepAsset* InAsset)
+{
+	UStepModule::Get().SwitchAsset(InAsset);
 }
 
 void UStepModuleStatics::StartStep(int32 InRootStepIndex, bool bSkipSteps)

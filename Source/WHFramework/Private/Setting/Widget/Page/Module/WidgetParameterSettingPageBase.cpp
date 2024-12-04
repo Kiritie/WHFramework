@@ -14,17 +14,10 @@
 
 UWidgetParameterSettingPageBase::UWidgetParameterSettingPageBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	WidgetName = FName("ParameterSettingPage");
-
 	Title = FText::FromString(TEXT("参数"));
 }
 
-void UWidgetParameterSettingPageBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
-{
-	Super::OnInitialize(InOwner, InParams);
-}
-
-void UWidgetParameterSettingPageBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetParameterSettingPageBase::OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams)
 {
 	Super::OnCreate(InOwner, InParams);
 
@@ -41,17 +34,17 @@ void UWidgetParameterSettingPageBase::OnCreate(UObject* InOwner, const TArray<FP
 				case EParameterType::Name:
 				case EParameterType::Text:
 				{
-					SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetTextSettingItemBase>(nullptr, { Iter.Parameter.GetDescription() }, false, USettingModule::Get().GetTextSettingItemClass());
+					SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetTextSettingItemBase>(nullptr, { Iter.Parameter.GetDescription() }, USettingModule::Get().GetTextSettingItemClass());
 					break;
 				}
 				case EParameterType::Boolean:
 				{
-					SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { Iter.Parameter.GetDescription() }, false, USettingModule::Get().GetBoolSettingItemClass());
+					SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { Iter.Parameter.GetDescription() }, USettingModule::Get().GetBoolSettingItemClass());
 					break;
 				}
 				case EParameterType::Key:
 				{
-					SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetKeySettingItemBase>(nullptr, { Iter.Parameter.GetDescription(), 1, true }, false, USettingModule::Get().GetKeySettingItemClass());
+					SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetKeySettingItemBase>(nullptr, { Iter.Parameter.GetDescription(), 1, true }, USettingModule::Get().GetKeySettingItemClass());
 					break;
 				}
 				default: break;
@@ -59,11 +52,6 @@ void UWidgetParameterSettingPageBase::OnCreate(UObject* InOwner, const TArray<FP
 			AddSettingItem(Iter.Name, SettingItem, Iter.Category);
 		}
 	}
-}
-
-void UWidgetParameterSettingPageBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
-{
-	Super::OnOpen(InParams, bInstant);
 
 	for(auto& Iter : SettingItems)
 	{
@@ -87,6 +75,22 @@ void UWidgetParameterSettingPageBase::OnApply()
 	}
 }
 
+void UWidgetParameterSettingPageBase::OnActivated()
+{
+	Super::OnActivated();
+}
+
+void UWidgetParameterSettingPageBase::OnDeactivated()
+{
+	Super::OnDeactivated();
+
+	for(auto& Iter : SettingItems)
+	{
+		FParameter Parameter = UParameterModule::Get().GetParameter(Iter.Key);
+		Iter.Value->SetValue(Parameter);
+	}
+}
+
 void UWidgetParameterSettingPageBase::OnReset(bool bForce)
 {
 	Super::OnReset(bForce);
@@ -96,11 +100,6 @@ void UWidgetParameterSettingPageBase::OnReset(bool bForce)
 		FParameter Parameter = GetDefaultSaveData()->CastRef<FParameterModuleSaveData>().Parameters.GetParameter(Iter.Key);
 		Iter.Value->SetValue(Parameter);
 	}
-}
-
-void UWidgetParameterSettingPageBase::OnClose(bool bInstant)
-{
-	Super::OnClose(bInstant);
 }
 
 bool UWidgetParameterSettingPageBase::CanApply_Implementation() const
@@ -133,5 +132,5 @@ bool UWidgetParameterSettingPageBase::CanReset_Implementation() const
 
 FSaveData* UWidgetParameterSettingPageBase::GetDefaultSaveData() const
 {
-	return &USaveGameModuleStatics::GetSaveGame<USettingSaveGame>()->GetDefaultDataRef<FSettingModuleSaveData>().ParameterData;
+	return &USaveGameModuleStatics::GetOrCreateSaveGame<USettingSaveGame>()->GetDefaultDataRef<FSettingModuleSaveData>().ParameterData;
 }

@@ -41,7 +41,7 @@ UObject* UObjectPool::Spawn(UObject* InOwner, const TArray<FParameter>& InParams
 void UObjectPool::Despawn(UObject* InObject, bool bRecovery)
 {
 	IObjectPoolInterface::Execute_OnDespawn(InObject, bRecovery);
-	if(bRecovery && Count < Limit)
+	if(bRecovery && (Limit == -1 || Count < Limit))
 	{
 		OnDespawn(InObject, true);
 		Queue.Enqueue(InObject);

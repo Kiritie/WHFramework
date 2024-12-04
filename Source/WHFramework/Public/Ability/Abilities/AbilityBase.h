@@ -23,31 +23,10 @@ protected:
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
 public:
-	// Abilities with this set will automatically activate when the input is pressed
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Ability")
-	EAbilityInputID AbilityInputID = EAbilityInputID::None;
-
-	// Value to associate an ability with an slot without tying it to an automatically activated input.
-	// Passive abilities won't be tied to an input so we need a way to generically associate abilities with slots.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Ability")
-	EAbilityInputID AbilityID = EAbilityInputID::None;
-
-	// Tells an ability to activate immediately when its granted. Used for passive abilities and abilites forced on others.
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Ability")
-	bool bActivateAbilityOnGranted;
-
 	// If true, this ability will activate when its bound input is pressed. Disable if you want to bind an ability to an
 	// input but not have it activate when pressed.
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Ability")
 	bool bActivateOnInput;
-
-	// If true, only activate this ability if the weapon that granted it is the currently equipped weapon.
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Ability")
-	bool bSourceObjectMustEqualCurrentWeaponToActivate;
-
-	// If true, only activate this ability if not interacting with something via GA_Interact.
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Ability")
-	bool bCannotActivateWhileInteracting;
 
 	// Map of gameplay tags to gameplay effect containers
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GameplayEffects")

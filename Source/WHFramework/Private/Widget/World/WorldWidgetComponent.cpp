@@ -82,7 +82,10 @@ void UWorldWidgetComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 	{
 		if(WorldWidget && GetWidgetSpace() == EWidgetSpace::World)
 		{
-			WorldWidget->Execute_OnTick(WorldWidget, DeltaTime);
+			if(WorldWidget->Execute_IsTickAble(WorldWidget))
+			{
+				WorldWidget->Execute_OnTick(WorldWidget, DeltaTime);
+			}
 		
 			if(WorldWidget->GetWidgetRefreshType() == EWidgetRefreshType::Tick)
 			{
@@ -217,7 +220,19 @@ void UWorldWidgetComponent::CreateWorldWidget(const TArray<FParameter>& InParams
 			}
 			case EWidgetSpace::Screen:
 			{
-				SetWorldWidget(UWidgetModuleStatics::CreateWorldWidget<UWorldWidgetBase>(GetOwner(), this, InParams.IsEmpty() ? WidgetParams : InParams, bInEditor, WorldWidgetClass));
+				UWorldWidgetBase* _WorldWidget;
+				if(bInEditor)
+				{
+					_WorldWidget = CreateWidget<UWorldWidgetBase>(GetWorld(), WorldWidgetClass);
+					_WorldWidget->WidgetIndex = 0;
+					_WorldWidget->bWidgetInEditor = true;
+					_WorldWidget->OnCreate(GetOwner(), this, InParams);
+				}
+				else
+				{
+					_WorldWidget = UWidgetModuleStatics::CreateWorldWidget<UWorldWidgetBase>(GetOwner(), this, InParams.IsEmpty() ? WidgetParams : InParams, WorldWidgetClass);
+				}
+				SetWorldWidget(_WorldWidget);
 				break;
 			}
 		}
@@ -242,8 +257,15 @@ void UWorldWidgetComponent::DestroyWorldWidget(bool bRecovery, bool bInEditor)
 			}
 			case EWidgetSpace::Screen:
 			{
-				UWidgetModuleStatics::DestroyWorldWidget(WorldWidget, bRecovery, bInEditor);
-				WorldWidget = nullptr;
+				if(bInEditor)
+				{
+					WorldWidget->OnDestroy(bRecovery);
+				}
+				else
+				{
+					UWidgetModuleStatics::DestroyWorldWidget(WorldWidget, bRecovery);
+				}
+				SetWorldWidget(nullptr);
 				break;
 			}
 		}

@@ -31,9 +31,6 @@ void UAbilityVitalityState_Static::OnEnter(UFiniteStateBase* InLastState, const 
 	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Active);
 
 	Vitality->DoAction(GameplayTags::Ability_Vitality_Action_Static);
-
-	Vitality->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	Vitality->GetInteractionComponent()->SetInteractable(false);
 }
 
 void UAbilityVitalityState_Static::OnRefresh(float DeltaSeconds)
@@ -50,9 +47,6 @@ void UAbilityVitalityState_Static::OnLeave(UFiniteStateBase* InNextState)
 	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Active);
 
 	Vitality->StopAction(GameplayTags::Ability_Vitality_Action_Static);
-
-	Vitality->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	Vitality->GetInteractionComponent()->SetInteractable(true);
 }
 
 void UAbilityVitalityState_Static::OnTermination()

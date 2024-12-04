@@ -7,12 +7,16 @@
 #include "Common/Interaction/InteractionComponent.h"
 #include "Common/Looking/LookingComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Event/EventModuleStatics.h"
+#include "Event/Handle/Ability/EventHandle_VitalitySpawned.h"
 #include "FSM/Components/FSMComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 UAbilityCharacterState_Spawn::UAbilityCharacterState_Spawn()
 {
 	StateName = FName("Spawn");
+
+	Rescuer = nullptr;
 }
 
 void UAbilityCharacterState_Spawn::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
@@ -28,6 +32,13 @@ bool UAbilityCharacterState_Spawn::OnPreEnter(UFiniteStateBase* InLastState, con
 void UAbilityCharacterState_Spawn::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
 	Super::OnEnter(InLastState, InParams);
+
+	if(InParams.IsValidIndex(0))
+	{
+		Rescuer = InParams[0].GetPointerValue<IAbilityVitalityInterface>();
+	}
+	
+	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalitySpawned>(Cast<UObject>(this), { GetAgent(), Cast<UObject>(Rescuer) });
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
@@ -57,6 +68,8 @@ void UAbilityCharacterState_Spawn::OnRefresh(float DeltaSeconds)
 void UAbilityCharacterState_Spawn::OnLeave(UFiniteStateBase* InNextState)
 {
 	Super::OnLeave(InNextState);
+
+	Rescuer = nullptr;
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 

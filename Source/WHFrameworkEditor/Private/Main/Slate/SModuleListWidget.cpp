@@ -10,7 +10,9 @@
 #include "Main/MainModule.h"
 #include "Main/Base/ModuleBase.h"
 #include "Main/Blueprint/ModuleBlueprintFactory.h"
+#include "Main/Slate/SModuleDetailsWidget.h"
 #include "Main/Slate/SModuleEditorWidget.h"
+#include "Main/Slate/SModuleListItemWidget.h"
 #include "Widgets/Input/SSearchBox.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION

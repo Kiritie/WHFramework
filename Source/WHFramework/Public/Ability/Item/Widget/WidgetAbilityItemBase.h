@@ -3,14 +3,14 @@
 #pragma once
 
 #include "Ability/AbilityModuleTypes.h"
-#include "Widget/Screen/SubWidgetBase.h"
+#include "Widget/Sub/SubButtonWidgetBase.h"
 #include "WidgetAbilityItemBase.generated.h"
 
 /**
  * UI构建项
  */
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UWidgetAbilityItemBase : public USubWidgetBase
+class WHFRAMEWORK_API UWidgetAbilityItemBase : public USubButtonWidgetBase
 {
 	GENERATED_BODY()
 	
@@ -27,7 +27,7 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	virtual void OnCreate(UUserWidgetBase* InOwner, const TArray<FParameter>& InParams) override;
+	virtual void OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams) override;
 
 	virtual void OnInitialize(const TArray<FParameter>& InParams) override;
 

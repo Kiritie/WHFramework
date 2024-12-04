@@ -287,7 +287,7 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Expand")))
-						.IsEnabled_Lambda([this](){ return StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps().Num() > 0; })
+						.IsEnabled_Lambda([this](){ return StepEditor.Pin()->GetEditingAsset<UStepAsset>()->RootSteps.Num() > 0; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SStepListWidget::OnExpandAllStepItemButtonClicked)
 					]
@@ -300,7 +300,7 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Collapse")))
-						.IsEnabled_Lambda([this](){ return StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps().Num() > 0; })
+						.IsEnabled_Lambda([this](){ return StepEditor.Pin()->GetEditingAsset<UStepAsset>()->RootSteps.Num() > 0; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SStepListWidget::OnCollapseAllStepItemButtonClicked)
 					]
@@ -313,7 +313,7 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Clear All")))
-						.IsEnabled_Lambda([this](){ return StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps().Num() > 0; })
+						.IsEnabled_Lambda([this](){ return StepEditor.Pin()->GetEditingAsset<UStepAsset>()->RootSteps.Num() > 0; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SStepListWidget::OnClearAllStepItemButtonClicked)
 					]
@@ -354,7 +354,7 @@ void SStepListWidget::Construct(const FArguments& InArgs)
 						.Text(FText::FromString(TEXT("Move Down")))
 						.IsEnabled_Lambda([this](){
 							return ActiveFilterText.IsEmptyOrWhitespace() ? (SelectedStepListItems.Num() == 1 &&
-								SelectedStepListItems[0]->GetStepIndex() < (SelectedStepListItems[0]->GetParentStep() ? SelectedStepListItems[0]->GetParentSubSteps().Num() : StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps().Num()) - 1) : false;
+								SelectedStepListItems[0]->GetStepIndex() < (SelectedStepListItems[0]->GetParentStep() ? SelectedStepListItems[0]->GetParentSubSteps().Num() : StepEditor.Pin()->GetEditingAsset<UStepAsset>()->RootSteps.Num()) - 1) : false;
 						})
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &SStepListWidget::OnMoveDownStepItemButtonClicked)
@@ -480,7 +480,7 @@ void SStepListWidget::OnClassPicked(UClass* InClass)
 				}
 				else
 				{
-					StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps()[OldStep->StepIndex] = NewStep;
+					StepEditor.Pin()->GetEditingAsset<UStepAsset>()->RootSteps[OldStep->StepIndex] = NewStep;
 				}
 				OldStep->OnUnGenerate();
 			}
@@ -753,9 +753,9 @@ FReply SStepListWidget::OnAddStepItemButtonClicked()
 	}
 	else
 	{
-		NewStep->StepIndex = StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps().Num();
+		NewStep->StepIndex = StepEditor.Pin()->GetEditingAsset<UStepAsset>()->RootSteps.Num();
 		NewStep->StepHierarchy = 0;
-		StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps().Add(NewStep);
+		StepEditor.Pin()->GetEditingAsset<UStepAsset>()->RootSteps.Add(NewStep);
 		StepListItems.Add(Item);
 
 		StepEditor.Pin()->GetEditingAsset<UStepAsset>()->Modify();
@@ -792,7 +792,7 @@ FReply SStepListWidget::OnInsertStepItemButtonClicked()
 		}
 		else if(UStepBase* NewRootStep = Cast<UStepBase>(NewStep))
 		{
-			StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps().Insert(NewRootStep, SelectedStepListItems[0]->Step->StepIndex);
+			StepEditor.Pin()->GetEditingAsset<UStepAsset>()->RootSteps.Insert(NewRootStep, SelectedStepListItems[0]->Step->StepIndex);
 			StepListItems.Insert(Item, SelectedStepListItems[0]->Step->StepIndex);
 
 			StepEditor.Pin()->GetEditingAsset<UStepAsset>()->Modify();
@@ -826,7 +826,7 @@ FReply SStepListWidget::OnAppendStepItemButtonClicked()
 		}
 		else if(UStepBase* NewRootStep = Cast<UStepBase>(NewStep))
 		{
-			StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps().Insert(NewRootStep, SelectedStepListItems[0]->Step->StepIndex + 1);
+			StepEditor.Pin()->GetEditingAsset<UStepAsset>()->RootSteps.Insert(NewRootStep, SelectedStepListItems[0]->Step->StepIndex + 1);
 			StepListItems.Insert(Item, SelectedStepListItems[0]->Step->StepIndex + 1);
 
 			StepEditor.Pin()->GetEditingAsset<UStepAsset>()->Modify();
@@ -868,9 +868,9 @@ FReply SStepListWidget::OnPasteStepItemButtonClicked()
 	}
 	else
 	{
-		CopiedStep->StepIndex = StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps().Num();
+		CopiedStep->StepIndex = StepEditor.Pin()->GetEditingAsset<UStepAsset>()->RootSteps.Num();
 		CopiedStep->StepHierarchy = 0;
-		StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps().Add(CopiedStep);
+		StepEditor.Pin()->GetEditingAsset<UStepAsset>()->RootSteps.Add(CopiedStep);
 		StepListItems.Add(Item);
 
 		StepEditor.Pin()->GetEditingAsset<UStepAsset>()->Modify();
@@ -909,7 +909,7 @@ FReply SStepListWidget::OnDuplicateStepItemButtonClicked()
 		}
 		else if(UStepBase* NewRootStep = Cast<UStepBase>(NewStep))
 		{
-			StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps().Insert(NewRootStep, SelectedStepListItems[0]->Step->StepIndex + 1);
+			StepEditor.Pin()->GetEditingAsset<UStepAsset>()->RootSteps.Insert(NewRootStep, SelectedStepListItems[0]->Step->StepIndex + 1);
 			StepListItems.Insert(Item, SelectedStepListItems[0]->Step->StepIndex + 1);
 
 			StepEditor.Pin()->GetEditingAsset<UStepAsset>()->Modify();
@@ -964,8 +964,8 @@ FReply SStepListWidget::OnRemoveStepItemButtonClicked()
 			}
 			else
 			{
-				StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps()[Iter->GetStepIndex()]->OnUnGenerate();
-				StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps().RemoveAt(Iter->GetStepIndex());
+				StepEditor.Pin()->GetEditingAsset<UStepAsset>()->RootSteps[Iter->GetStepIndex()]->OnUnGenerate();
+				StepEditor.Pin()->GetEditingAsset<UStepAsset>()->RootSteps.RemoveAt(Iter->GetStepIndex());
 				StepListItems.RemoveAt(Iter->GetStepIndex());
 				//TreeView->SetSelection(StepListItems[FMath::Min(SelectedStepListItem->GetStepIndex(),StepListItems.Num() - 1)]);
 
@@ -1010,9 +1010,9 @@ FReply SStepListWidget::OnMoveUpStepItemButtonClicked()
 	}
 	else
 	{
-		const auto TmpStep = StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps()[SelectedStepListItems[0]->GetStepIndex()];
-		StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps().RemoveAt(SelectedStepListItems[0]->GetStepIndex());
-		StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps().Insert(TmpStep, SelectedStepListItems[0]->GetStepIndex() - 1);
+		const auto TmpStep = StepEditor.Pin()->GetEditingAsset<UStepAsset>()->RootSteps[SelectedStepListItems[0]->GetStepIndex()];
+		StepEditor.Pin()->GetEditingAsset<UStepAsset>()->RootSteps.RemoveAt(SelectedStepListItems[0]->GetStepIndex());
+		StepEditor.Pin()->GetEditingAsset<UStepAsset>()->RootSteps.Insert(TmpStep, SelectedStepListItems[0]->GetStepIndex() - 1);
 
 		StepListItems.RemoveAt(SelectedStepListItems[0]->GetStepIndex());
 		StepListItems.Insert(SelectedStepListItems, SelectedStepListItems[0]->GetStepIndex() - 1);
@@ -1047,11 +1047,11 @@ FReply SStepListWidget::OnMoveDownStepItemButtonClicked()
 	}
 	else
 	{
-		if(SelectedStepListItems[0]->GetStepIndex() < StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps().Num() - 1)
+		if(SelectedStepListItems[0]->GetStepIndex() < StepEditor.Pin()->GetEditingAsset<UStepAsset>()->RootSteps.Num() - 1)
 		{
-			const auto TmpStep = StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps()[SelectedStepListItems[0]->GetStepIndex()];
-			StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps().RemoveAt(SelectedStepListItems[0]->GetStepIndex());
-			StepEditor.Pin()->GetEditingAsset<UStepAsset>()->GetRootSteps().Insert(TmpStep, SelectedStepListItems[0]->GetStepIndex() + 1);
+			const auto TmpStep = StepEditor.Pin()->GetEditingAsset<UStepAsset>()->RootSteps[SelectedStepListItems[0]->GetStepIndex()];
+			StepEditor.Pin()->GetEditingAsset<UStepAsset>()->RootSteps.RemoveAt(SelectedStepListItems[0]->GetStepIndex());
+			StepEditor.Pin()->GetEditingAsset<UStepAsset>()->RootSteps.Insert(TmpStep, SelectedStepListItems[0]->GetStepIndex() + 1);
 
 			StepListItems.RemoveAt(SelectedStepListItems[0]->GetStepIndex());
 			StepListItems.Insert(SelectedStepListItems, SelectedStepListItems[0]->GetStepIndex() + 1);

@@ -9,6 +9,7 @@
 #include "Common/CommonStatics.h"
 #include "Common/Interaction/InteractionAgentInterface.h"
 #include "Debug/DebugModuleTypes.h"
+#include "Gameplay/WHPlayerState.h"
 #include "Input/InputModuleStatics.h"
 #include "Input/Components/InputComponentBase.h"
 #include "Kismet/GameplayStatics.h"
@@ -97,6 +98,16 @@ void AWHPlayerController::SetupInputComponent()
 	Super::SetupInputComponent();
 
 	ensureEditorMsgf(InputComponent->IsA<UInputComponentBase>(), FString::Printf(TEXT("Invalid InputComponent in DefaultInput.ini, must be InputComponentBase!")), EDC_Input, EDV_Error);
+}
+
+void AWHPlayerController::InitPlayerState()
+{
+	Super::InitPlayerState();
+
+	if(AWHPlayerState* WHPlayerState = Cast<AWHPlayerState>(PlayerState))
+	{
+		WHPlayerState->Execute_OnInitialize(WHPlayerState);
+	}
 }
 
 void AWHPlayerController::Tick(float DeltaSeconds) 

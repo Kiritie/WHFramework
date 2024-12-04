@@ -8,6 +8,7 @@
 #endif
 #include "Input/InputManager.h"
 #include "Slate/SlateWidgetManager.h"
+#include "Slate/Runtime/Interfaces/SubWidgetInterface.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
@@ -98,25 +99,25 @@ void SSlateWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPa
 
 	if(ParentWidget)
 	{
-		ParentWidget->RemoveChild(this);
+		ParentWidget->RemoveChildWidget(this);
 	}
 	if(ParentName != NAME_None)
 	{
-		// ParentWidget = FSlateWidgetManager::Get().GetSlateWidget<UUserWidgetBase>(ParentName);
+		// ParentWidget = FSlateWidgetManager::Get().GetSlateWidget<SSlateWidgetBase>(ParentName);
 	}
 	if(ParentWidget)
 	{
-		ParentWidget->AddChild(this);
+		ParentWidget->AddChildWidget(this);
 	}
 	//
 	// for(const auto& Iter : FSlateWidgetManager::Get().GetUserWidgetChildrenByName(WidgetName))
 	// {
 	// 	if(FSlateWidgetManager::Get().HasUserWidgetClassByName(Iter))
 	// 	{
-	// 		const UUserWidgetBase* DefaultObject = FSlateWidgetManager::Get().GetUserWidgetClassByName(Iter)->GetDefaultObject<UUserWidgetBase>();
+	// 		const SSlateWidgetBase* DefaultObject = FSlateWidgetManager::Get().GetUserWidgetClassByName(Iter)->GetDefaultObject<SSlateWidgetBase>();
 	// 		if(DefaultObject->ParentName == WidgetName && (DefaultObject->WidgetCreateType == EWidgetCreateType::AutoCreate || DefaultObject->WidgetCreateType == EWidgetCreateType::AutoCreateAndOpen))
 	// 		{
-	// 			FSlateWidgetManager::Get().CreateUserWidgetByName<UUserWidgetBase>(Iter, InOwner);
+	// 			FSlateWidgetManager::Get().CreateUserWidgetByName<SSlateWidgetBase>(Iter, InOwner);
 	// 		}
 	// 	}
 	// }
@@ -166,7 +167,7 @@ void SSlateWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 
 	if(WidgetRefreshType == EWidgetRefreshType::Timer)
 	{
-		// UCommonStatics::GetCurrentTimerManager()->GetTimerManager().SetTimer(WidgetRefreshTimerHandle, this, &UUserWidgetBase::Refresh, WidgetRefreshTime, true);
+		// UCommonStatics::GetCurrentTimerManager()->GetTimerManager().SetTimer(WidgetRefreshTimerHandle, this, &SSlateWidgetBase::Refresh, WidgetRefreshTime, true);
 	}
 	if(bInstant)
 	{
@@ -216,7 +217,7 @@ void SSlateWidgetBase::OnDestroy(bool bRecovery)
 
 	if(ParentWidget)
 	{
-		ParentWidget->RemoveChild(this);
+		ParentWidget->RemoveChildWidget(this);
 	}
 
 	FInputManager::Get().UpdateInputMode();
@@ -327,16 +328,59 @@ void SSlateWidgetBase::FinishClose(bool bInstant)
 	FInputManager::Get().UpdateInputMode();
 }
 
-void SSlateWidgetBase::AddChild(IScreenWidgetInterface* InChildWidget)
+ISubWidgetInterface* SSlateWidgetBase::CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>* InParams)
 {
+	return CreateSubWidget(InClass, InParams ? *InParams : TArray<FParameter>());
 }
 
-void SSlateWidgetBase::RemoveChild(IScreenWidgetInterface* InChildWidget)
+ISubWidgetInterface* SSlateWidgetBase::CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams)
 {
+	return nullptr;
 }
 
-void SSlateWidgetBase::RemoveAllChild()
+bool SSlateWidgetBase::DestroySubWidget(ISubWidgetInterface* InWidget, bool bRecovery)
 {
+	if(!InWidget) return false;
+
+	InWidget->OnDestroy(bRecovery);
+
+	return true;
+}
+
+void SSlateWidgetBase::DestroyAllSubWidget(bool bRecovery)
+{
+	for(auto Iter : SubWidgets)
+	{
+		Iter->Destroy();
+	}
+	SubWidgets.Empty();
+}
+
+void SSlateWidgetBase::AddChildWidget(IScreenWidgetInterface* InWidget)
+{
+	if(!ChildWidgets.Contains(InWidget))
+	{
+		ChildWidgets.Add(InWidget);
+	}
+}
+
+void SSlateWidgetBase::RemoveChildWidget(IScreenWidgetInterface* InWidget)
+{
+	if(ChildWidgets.Contains(InWidget))
+	{
+		ChildWidgets.Remove(InWidget);
+	}
+}
+
+void SSlateWidgetBase::RemoveAllChildWidget()
+{
+	ChildWidgets.Empty();
+}
+
+TArray<UWidget*> SSlateWidgetBase::GetPoolWidgets() const
+{
+	TArray<UWidget*> PoolWidgets;
+	return PoolWidgets;
 }
 
 TSharedPtr<SPanel> SSlateWidgetBase::GetRootPanelWidget() const

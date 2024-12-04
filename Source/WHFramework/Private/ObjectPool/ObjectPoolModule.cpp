@@ -17,7 +17,6 @@ UObjectPoolModule::UObjectPoolModule()
 
 	bModuleRequired = true;
 
-	DefaultLimit = 100;
 	ObjectPools = TMap<TSubclassOf<UObject>, UObjectPool*>();
 }
 
@@ -120,8 +119,7 @@ UObjectPool* UObjectPoolModule::CreatePool(TSubclassOf<UObject> InType)
 	{
 		ObjectPool = NewObject<UObjectPool>(this);
 	}
-	const int32 _Limit = IObjectPoolInterface::Execute_GetLimit(InType.GetDefaultObject());
-	ObjectPool->Initialize(_Limit != -1 ? _Limit : DefaultLimit, InType);
+	ObjectPool->Initialize(IObjectPoolInterface::Execute_GetLimit(InType.GetDefaultObject()), InType);
 	ObjectPools.Add(InType, ObjectPool);
 	return ObjectPool;
 }

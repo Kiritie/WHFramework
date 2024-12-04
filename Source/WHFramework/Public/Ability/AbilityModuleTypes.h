@@ -324,69 +324,7 @@ public:
 };
 
 /**
-* 装备模式
-*/
-UENUM(BlueprintType)
-enum class EEquipMode : uint8
-{
-	// 无
-	None,
-	// 被动
-	Passive,
-	// 主动
-	Initiative
-};
-
-/**
-* 装备稀有度
-*/
-UENUM(BlueprintType)
-enum class EEquipRarity : uint8
-{
-	// 普通
-	Normal,
-	// 中等
-	Medium,
-	// 高
-	High,
-	// 史诗
-	Epic,
-	// 传奇
-	Legendary,
-	// 神话
-	Mythic
-};
-
-/**
-* 技能类型
-*/
-UENUM(BlueprintType)
-enum class ESkillType : uint8
-{
-	// 无
-	None,
-	// 近战
-	Melee,
-	// 远程
-	Remote
-};
-
-/**
-* 技能模式
-*/
-UENUM(BlueprintType)
-enum class ESkillMode : uint8
-{
-	// 无
-	None,
-	// 被动
-	Passive,
-	// 主动
-	Initiative
-};
-
-/**
- * 能力项类型
+ * 物品类型
  */
 UENUM(BlueprintType)
 enum class EAbilityItemType : uint8
@@ -412,7 +350,59 @@ enum class EAbilityItemType : uint8
 	// 对象
 	Pawn UMETA(DisplayName="对象"),
 	// 角色
-	Character UMETA(DisplayName="角色")
+	Character UMETA(DisplayName="角色"),
+	// 混杂
+	Misc UMETA(DisplayName="混杂")
+};
+
+/**
+* 装备模式
+*/
+UENUM(BlueprintType)
+enum class EAbilityEquipMode : uint8
+{
+	// 无
+	None,
+	// 被动
+	Passive,
+	// 主动
+	Initiative
+};
+
+/**
+* 技能模式
+*/
+UENUM(BlueprintType)
+enum class EAbilitySkillMode : uint8
+{
+	// 无
+	None,
+	// 被动
+	Passive,
+	// 主动
+	Initiative
+};
+
+/**
+* 物品稀有度
+*/
+UENUM(BlueprintType)
+enum class EAbilityItemRarity : uint8
+{
+	// 无
+	None,
+	// 普通
+	Common,
+	// 非凡
+	Uncommon,
+	// 稀有
+	Rare,
+	// 史诗
+	Epic,
+	// 传奇
+	Legendary,
+	// 神话
+	Mythical
 };
 
 USTRUCT(BlueprintType)
@@ -439,13 +429,21 @@ public:
 		AbilityHandle = FGameplayAbilitySpecHandle();
 	}
 	
-	FORCEINLINE FAbilityItem(const FAbilityItem& InItem, int32 InCount = -1)
+	FORCEINLINE FAbilityItem(const FAbilityItem& InItem, int32 InCount = -1, bool bClearCaches = false)
 	{
 		ID = InItem.ID;
 		Count = InCount == -1 ? InItem.Count : InCount;
 		Level = InItem.Level;
-		InventorySlot = InItem.InventorySlot;
-		AbilityHandle = InItem.AbilityHandle;
+		if(!bClearCaches)
+		{
+			InventorySlot = InItem.InventorySlot;
+			AbilityHandle = InItem.AbilityHandle;
+		}
+		else
+		{
+			InventorySlot = nullptr;
+			AbilityHandle = FGameplayAbilitySpecHandle();
+		}
 	}
 
 	virtual ~FAbilityItem() override = default;
@@ -855,38 +853,81 @@ public:
 	TArray<UWidgetAbilityInventorySlotBase*> Slots;
 };
 
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FInventoryFillRule
+UENUM(BlueprintType)
+enum class EAbilityItemFillType : uint8
 {
-	GENERATED_BODY()
-
-public:
-	FORCEINLINE FInventoryFillRule()
-	{
-		ItemRate = 0.f;
-		ItemNum = 0;
-	}
-
-	UPROPERTY(BlueprintReadOnly, EditAnywhere)
-	float ItemRate;
-
-	UPROPERTY(BlueprintReadOnly, EditAnywhere)
-	int32 ItemNum;
+	Fixed,
+	Random,
+	Rate
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FInventoryFillRules
+struct WHFRAMEWORK_API FAbilityItemFillItem
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FInventoryFillRules()
+	FORCEINLINE FAbilityItemFillItem()
 	{
-		Rules = TArray<FInventoryFillRule>();
+		Rate = 0.f;
+		Num = 0;
 	}
 
 	UPROPERTY(BlueprintReadOnly, EditAnywhere)
-	TArray<FInventoryFillRule> Rules;
+	float Rate;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	int32 Num;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FAbilityItemFillRule
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FAbilityItemFillRule()
+	{
+		Rate = 0.f;
+		Type = EAbilityItemFillType::Fixed;
+		Num = 0;
+		MinNum = 0;
+		MaxNum = 0;
+		Items = TArray<FAbilityItemFillItem>();
+	}
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	float Rate;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	EAbilityItemFillType Type;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, meta = (EditConditionHides, EditCondition = "Type==EAbilityItemFillType::Fixed"))
+	int32 Num;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, meta = (EditConditionHides, EditCondition = "Type==EAbilityItemFillType::Random"))
+	int32 MinNum;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, meta = (EditConditionHides, EditCondition = "Type==EAbilityItemFillType::Random"))
+	int32 MaxNum;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, meta = (EditConditionHides, EditCondition = "Type==EAbilityItemFillType::Rate"))
+	TArray<FAbilityItemFillItem> Items;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FAbilityItemFillRules
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FAbilityItemFillRules()
+	{
+		Rules = TMap<EAbilityItemRarity, FAbilityItemFillRule>();
+	}
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	TMap<EAbilityItemRarity, FAbilityItemFillRule> Rules;
 };
 
 USTRUCT(BlueprintType)
@@ -900,7 +941,7 @@ public:
 		InventoryClass = nullptr;
 		SplitItems = TMap<ESlotSplitType, FAbilityItems>();
 		SelectedIndexs = TMap<ESlotSplitType, int32>();
-		FillRules = TMap<EAbilityItemType, FInventoryFillRules>();
+		FillRules = TMap<EAbilityItemType, FAbilityItemFillRules>();
 	}
 
 public:
@@ -911,7 +952,7 @@ public:
 	TMap<ESlotSplitType, FAbilityItems> SplitItems;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TMap<EAbilityItemType, FInventoryFillRules> FillRules;
+	TMap<EAbilityItemType, FAbilityItemFillRules> FillRules;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	TMap<ESlotSplitType, int32> SelectedIndexs;
@@ -924,7 +965,7 @@ public:
 		return SplitItems.Num() > 0;
 	}
 	
-	virtual void FillItems(int32 InLevel);
+	virtual void FillItems(int32 InLevel, FRandomStream InRandomStream = FRandomStream());
 
 	virtual void CopyItems(const FInventorySaveData& InSaveData);
 
@@ -954,23 +995,34 @@ enum class EItemQueryType : uint8
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FRaceItem : public FAbilityItem
+struct WHFRAMEWORK_API FRaceItem
 {
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(EditConditionHides, EditCondition = "Count == 0"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FPrimaryAssetId ID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 MinCount;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(EditConditionHides, EditCondition = "Count == 0"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 MaxCount;
 
 	FORCEINLINE FRaceItem()
 	{
-		MinCount = 0;
-		MaxCount = 0;
-		Level = 1;
+		ID = FPrimaryAssetId();
+		MinCount = 1;
+		MaxCount = 1;
 	}
+
+	template<class T>
+	T& GetData() const
+	{
+		return static_cast<T&>(GetData());
+	}
+
+	UAbilityItemDataBase& GetData() const;
 };
 
 /**
@@ -1007,12 +1059,20 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector NoiseScale;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	int32 MinLevel;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	int32 MaxLevel;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FRaceItem> Items;
 
 	FORCEINLINE FRaceData()
 	{
 		NoiseScale = FVector::OneVector;
+		MinLevel = 1;
+		MaxLevel = 1;
 		Items = TArray<FRaceItem>();
 	}
 };
@@ -1122,7 +1182,7 @@ public:
 		InventoryData.MakeSaved();
 	}
 
-	virtual void InitInventoryData();
+	virtual void InitInventoryData(FRandomStream InRandomStream = FRandomStream());
 
 	template<class T>
 	T& GetData() const
@@ -1184,20 +1244,9 @@ struct WHFRAMEWORK_API FCharacterSaveData : public FPawnSaveData
 public:
 	FORCEINLINE FCharacterSaveData()
 	{
-		CameraRotation = FRotator::ZeroRotator;
-		CameraDistance = -1.f;
 	}
 
 	FORCEINLINE FCharacterSaveData(const FPawnSaveData& InPawnSaveData) : FPawnSaveData(InPawnSaveData)
 	{
-		CameraRotation = FRotator(-1.f);
-		CameraDistance = -1.f;
 	}
-
-public:
-	UPROPERTY()
-	FRotator CameraRotation;
-
-	UPROPERTY()
-	float CameraDistance;
 };

@@ -5,6 +5,26 @@
 
 #include "Audio/AudioModule.h"
 
+TArray<FLanguageType> UAudioModuleStatics::GetAudioLanguageTypes()
+{
+	return UAudioModule::Get().GetLanguageTypes();
+}
+
+void UAudioModuleStatics::SetAudioLanguageTypes(const TArray<FLanguageType>& InLanguageTypes)
+{
+	UAudioModule::Get().SetLanguageTypes(InLanguageTypes);
+}
+
+int32 UAudioModuleStatics::GetAudioLanguageType()
+{
+	return UAudioModule::Get().GetLanguageType();
+}
+
+void UAudioModuleStatics::SetAudioLanguageType(int32 InLanguageType)
+{
+	UAudioModule::Get().SetLanguageType(InLanguageType);
+}
+
 void UAudioModuleStatics::PlaySound2D(USoundBase* InSound, float InVolume, bool bMulticast)
 {
 	UAudioModule::Get().PlaySound2D(InSound, InVolume, bMulticast);

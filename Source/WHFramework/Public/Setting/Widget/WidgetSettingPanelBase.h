@@ -5,10 +5,10 @@
 
 #include "WidgetSettingPanelBase.generated.h"
 
+class UCommonActivatableWidgetSwitcher;
 class UWidgetSettingPageBase;
-class UWidgetSettingPageItemBase;
-class UCommonButtonGroup;
 class UCommonButton;
+class UCommonButtonGroup;
 /**
  * 
  */
@@ -31,6 +31,9 @@ public:
 
 protected:
 	UFUNCTION()
+	void OnPageItemSelected(UCommonButtonBase* SelectedTabButton, int32 ButtonIndex);
+
+	UFUNCTION()
 	void OnApplyButtonClicked();
 
 	UFUNCTION()
@@ -38,9 +41,12 @@ protected:
 
 protected:
 	UFUNCTION(BlueprintNativeEvent)
-	UWidgetSettingPageItemBase* SpawnPageItem(UWidgetSettingPageBase* InPage);
+	UCommonButton* SpawnPageItem(UWidgetSettingPageBase* InPage);
 
 protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
+	UCommonActivatableWidgetSwitcher* Switcher_Page;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
 	UCommonButton* Btn_Apply;
 
@@ -51,7 +57,7 @@ protected:
 	UCommonButtonGroup* PageItemGroup;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	TSubclassOf<UWidgetSettingPageItemBase> PageItemClass;
+	TSubclassOf<UCommonButton> PageItemClass;
 
 public:
 	UFUNCTION(BlueprintPure)

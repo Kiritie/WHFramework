@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Common/CommonTypes.h"
 #include "AssetBase.generated.h"
 
 /**
@@ -21,15 +22,28 @@ public:
 	virtual void Serialize(FStructuredArchiveRecord Record) override;
 	#endif
 
-	virtual void Initialize(UAssetBase* InSource);
+	virtual void Initialize();
+
+	virtual UAssetBase* Duplicate()
+	{
+		UAssetBase* Asset = DuplicateObject<UAssetBase>(this, GetMutableWorldContext());
+		Asset->SourceObject = this;
+		return Asset;
+	}
+
+	template<class T>
+	T* Duplicate()
+	{
+		return Cast<T>(Duplicate());
+	}
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Asset Stats
 public:
 	/// 显示名称 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FText DisplayName;
-	
+
 	UPROPERTY(AssetRegistrySearchable)
 	TSubclassOf<UAssetBase> NativeClass;
 

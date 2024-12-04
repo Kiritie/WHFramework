@@ -56,25 +56,25 @@ void UAbilityInventoryBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 					}
 					case ESlotSplitType::Shortcut:
 					{
-						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventoryShortcutSlotBase>(nullptr, nullptr, false, ShortcutSlotClass);
+						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventoryShortcutSlotBase>(nullptr, nullptr, ShortcutSlotClass);
 						Slot->OnInitialize(this, EAbilityItemType::None, Iter.Key, i);
 						break;
 					}
 					case ESlotSplitType::Auxiliary:
 					{
-						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventoryAuxiliarySlotBase>(nullptr, nullptr, false, AuxiliarySlotClass);
+						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventoryAuxiliarySlotBase>(nullptr, nullptr, AuxiliarySlotClass);
 						Slot->OnInitialize(this, EAbilityItemType::None, Iter.Key, i);
 						break;
 					}
 					case ESlotSplitType::Equip:
 					{
-						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventoryEquipSlotBase>(nullptr, nullptr, false, EquipSlotClass);
+						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventoryEquipSlotBase>(nullptr, nullptr, EquipSlotClass);
 						Slot->OnInitialize(this, EAbilityItemType::Equip, Iter.Key, i);
 						break;
 					}
 					case ESlotSplitType::Skill:
 					{
-						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventorySkillSlotBase>(nullptr, nullptr, false, SkillSlotClass);
+						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventorySkillSlotBase>(nullptr, nullptr, SkillSlotClass);
 						Slot->OnInitialize(this, EAbilityItemType::Skill, Iter.Key, i);
 						break;
 					}
@@ -368,12 +368,15 @@ void UAbilityInventoryBase::DiscardItems()
 void UAbilityInventoryBase::AddItemBySlots(FAbilityItem& InItem, const TArray<UAbilityInventorySlotBase*>& InSlots, bool bBroadcast)
 {
 	auto _Item = InItem;
-	for(int i = 0; i < InSlots.Num(); i++)
+	if(InItem.GetType() != EAbilityItemType::Misc)
 	{
-		InSlots[i]->AddItem(InItem);
-		if (InItem.Count <= 0) break;
+		for(int i = 0; i < InSlots.Num(); i++)
+		{
+			InSlots[i]->AddItem(InItem);
+			if (InItem.Count <= 0) break;
+		}
+		_Item.Count -= InItem.Count;
 	}
-	_Item.Count -= InItem.Count;
 	if(auto Agent = GetOwnerAgent())
 	{
 		if(bBroadcast) Agent->OnAdditionItem(_Item);
@@ -383,12 +386,15 @@ void UAbilityInventoryBase::AddItemBySlots(FAbilityItem& InItem, const TArray<UA
 void UAbilityInventoryBase::RemoveItemBySlots(FAbilityItem& InItem, const TArray<UAbilityInventorySlotBase*>& InSlots, bool bBroadcast)
 {
 	auto _Item = InItem;
-	for (int i = 0; i < InSlots.Num(); i++)
+	if(InItem.GetType() != EAbilityItemType::Misc)
 	{
-		InSlots[i]->SubItem(InItem);
-		if (InItem.Count <= 0) break;
+		for (int i = 0; i < InSlots.Num(); i++)
+		{
+			InSlots[i]->SubItem(InItem);
+			if (InItem.Count <= 0) break;
+		}
+		_Item.Count -= InItem.Count;
 	}
-	_Item.Count -= InItem.Count;
 	if(auto Agent = GetOwnerAgent())
 	{
 		if(bBroadcast) Agent->OnRemoveItem(_Item);

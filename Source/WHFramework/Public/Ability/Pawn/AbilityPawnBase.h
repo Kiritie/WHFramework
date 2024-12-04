@@ -59,6 +59,17 @@ public:
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 protected:
+	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+
+	virtual void BindASCInput() override;
+
+	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue = 1.0f, bool bForce = false) override;
+
+protected:
+	virtual bool HasArchive() const override { return true; }
+
+	virtual void Serialize(FArchive& Ar) override;
+
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 	virtual FSaveData* ToData() override;
@@ -68,10 +79,6 @@ protected:
 	virtual void OnFiniteStateRefresh(UFiniteStateBase* InCurrentState) override;
 
 public:
-	virtual bool HasArchive() const override { return true; }
-
-	virtual void Serialize(FArchive& Ar) override;
-
 	virtual void Death(IAbilityVitalityInterface* InKiller) override;
 
 	virtual void Kill(IAbilityVitalityInterface* InTarget) override;
@@ -112,7 +119,9 @@ public:
 
 	virtual void OnRemoveItem(const FAbilityItem& InItem) override;
 
-	virtual void OnChangeItem(const FAbilityItem& InNewItem, FAbilityItem& InOldItem) override;
+	virtual void OnPreChangeItem(const FAbilityItem& InOldItem) override;
+
+	virtual void OnChangeItem(const FAbilityItem& InNewItem) override;
 
 	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
 		
@@ -124,9 +133,14 @@ public:
 
 	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
 
-public:
+protected:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
-	
+
+	virtual void OnActorAttached(AActor* InActor) override;
+
+	virtual void OnActorDetached(AActor* InActor) override;
+
+public:
 	virtual void HandleDamage(const FGameplayAttribute& DamageAttribute, float DamageValue, float DefendValue, bool bHasCrited, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
 
 	virtual void HandleRecovery(const FGameplayAttribute& RecoveryAttribute, float RecoveryValue, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
@@ -198,6 +212,8 @@ public:
 	virtual UAttributeSetBase* GetAttributeSet() const override;
 
 	virtual UShapeComponent* GetCollisionComponent() const override;
+
+	virtual UMeshComponent* GetMeshComponent() const override;
 
 	template<class T>
 	T* GetAbilitySystemComponent() const
@@ -300,4 +316,9 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual TMap<FGameplayTag, FVitalityActionAbilityData>& GetActionAbilities() override { return ActionAbilities; }
+
+public:
+	virtual void OnRep_Controller() override;
+
+	virtual void OnRep_PlayerState() override;
 };

@@ -4,6 +4,7 @@
 
 #include "Common/Base/WHObject.h"
 #include "SaveGame/Base/SaveDataAgentInterface.h"
+#include "Scene/SceneModuleTypes.h"
 #include "WorldTimer.generated.h"
 
 class ASkyLight;
@@ -50,6 +51,9 @@ protected:
 
 public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	void ResetTimerParams() const;
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 	void ResetDateTime(float InNewTime = -1.f) const;
 
 	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)
@@ -90,6 +94,9 @@ public:
 
 	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)
 	float GetSunsetTime() const;
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)
+	EWorldTimePhase GetTimePhase() const;
 
 protected:
 	UPROPERTY(EditAnywhere)

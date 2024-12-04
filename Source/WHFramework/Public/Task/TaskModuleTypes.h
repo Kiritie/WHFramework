@@ -5,6 +5,9 @@
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "TaskModuleTypes.generated.h"
 
+class UTaskBase;
+class UTaskAsset;
+
 UENUM(BlueprintType)
 enum class ETaskState : uint8
 {
@@ -84,19 +87,31 @@ struct WHFRAMEWORK_API FTaskModuleSaveData : public FSaveData
 public:
 	FORCEINLINE FTaskModuleSaveData()
 	{
-		TaskItemMap = TMap<FString, FSaveData>();
+		Assets = TArray<UTaskAsset*>();
+		CurrentAsset = nullptr;
+		CurrentTask = nullptr;
+		TaskDataMap = TMap<FString, FSaveData>();
 	}
 
 public:
 	UPROPERTY()
-	TMap<FString, FSaveData> TaskItemMap;
+	TArray<UTaskAsset*> Assets;
+
+	UPROPERTY()
+	UTaskAsset* CurrentAsset;
+
+	UPROPERTY()
+	UTaskBase* CurrentTask;
+
+	UPROPERTY()
+	TMap<FString, FSaveData> TaskDataMap;
 
 public:
 	virtual void MakeSaved() override
 	{
 		Super::MakeSaved();
 
-		for(auto& Iter : TaskItemMap)
+		for(auto& Iter : TaskDataMap)
 		{
 			Iter.Value.MakeSaved();
 		}

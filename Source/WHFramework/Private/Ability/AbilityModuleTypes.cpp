@@ -126,23 +126,60 @@ FAbilityItems FInventorySlots::GetItems()
 	return Items;
 }
 
-void FInventorySaveData::FillItems(int32 InLevel)
+void FInventorySaveData::FillItems(int32 InLevel, FRandomStream InRandomStream)
 {
+	if(InRandomStream.GetInitialSeed() == 0) InRandomStream = FRandomStream(FMath::Rand());
+	
 	for(auto& Iter1 : FillRules)
 	{
 		if(Iter1.Key == EAbilityItemType::None) continue;
 
 		const FName ItemType = *UCommonStatics::GetEnumValueAuthoredName(TEXT("/Script/WHFramework.EAbilityItemType"), (int32)Iter1.Key);
 
-		auto ItemDatas = UAssetModuleStatics::LoadPrimaryAssets<UAbilityItemDataBase>(ItemType);
-
 		int32 ItemNum = 0;
-		const float FillRate = FMath::FRand();
+		EAbilityItemRarity ItemParity = EAbilityItemRarity::None;
+		const float ParityRate = InRandomStream.FRand();
 		for(auto& Iter2 : Iter1.Value.Rules)
 		{
-			if(FillRate <= Iter2.ItemRate)
+			if(ParityRate <= Iter2.Value.Rate)
 			{
-				ItemNum = Iter2.ItemNum;
+				ItemParity = Iter2.Key;
+				switch(Iter2.Value.Type)
+				{
+					case EAbilityItemFillType::Fixed:
+					{
+						ItemNum = Iter2.Value.Num;
+						break;
+					}
+					case EAbilityItemFillType::Random:
+					{
+						ItemNum = InRandomStream.RandRange(Iter2.Value.MinNum, Iter2.Value.MaxNum);
+						break;
+					}
+					case EAbilityItemFillType::Rate:
+					{
+						const float ItemRate = InRandomStream.FRand();
+						for(auto& Iter3 : Iter2.Value.Items)
+						{
+							if(ItemRate < Iter3.Rate)
+							{
+								ItemNum = Iter3.Num;
+								break;
+							}
+						}
+						break;
+					}
+				}
+				break;
+			}
+		}
+
+		TArray<UAbilityItemDataBase*> ItemDatas;
+		for(auto Iter : UAssetModuleStatics::LoadPrimaryAssets<UAbilityItemDataBase>(ItemType))
+		{
+			if(Iter->Rarity == ItemParity)
+			{
+				ItemDatas.Add(Iter);
 			}
 		}
 
@@ -159,8 +196,8 @@ void FInventorySaveData::FillItems(int32 InLevel)
 			{
 				if(ItemDatas.IsEmpty()) break;
 
-				const int32 Index = FMath::RandRange(0, ItemDatas.Num() - 1);
-				AddItem(FAbilityItem(ItemDatas[Index]->GetPrimaryAssetId(), 1, ItemDatas[Index]->ClampLevel(InLevel)));
+				const int32 Index = InRandomStream.RandRange(0, ItemDatas.Num() - 1);
+				AddItem(FAbilityItem(ItemDatas[Index]->GetPrimaryAssetId(), InRandomStream.RandRange(1, FMath::CeilToInt(ItemDatas[Index]->MaxCount * (1.f / (int32)ItemParity))), ItemDatas[Index]->ClampLevel(InLevel)));
 				ItemDatas.RemoveAt(Index);
 			}
 		}
@@ -215,10 +252,15 @@ void FInventorySaveData::ClearItems()
 	CopyItems(Inventory.GetSaveDataRef<FInventorySaveData>(true));
 }
 
-void FActorSaveData::InitInventoryData()
+UAbilityItemDataBase& FRaceItem::GetData() const
+{
+	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityItemDataBase>(ID);
+}
+
+void FActorSaveData::InitInventoryData(FRandomStream InRandomStream)
 {
 	InventoryData = GetData().InventoryData;
-	InventoryData.FillItems(Level);
+	InventoryData.FillItems(Level, InRandomStream);
 }
 
 UAbilityActorDataBase& FActorSaveData::GetData() const

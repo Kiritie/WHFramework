@@ -19,12 +19,15 @@ public:
 	UTaskAsset(const FObjectInitializer& ObjectInitializer);
 
 public:
-	virtual void Initialize(UAssetBase* InSource) override;
+	virtual void Initialize() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Task Stats
 public:
-	/// 初始任务 
+	/// 自动进入初始任务
+	UPROPERTY(EditAnywhere)
+	bool bAutoEnterFirst;
+	/// 初始任务
 	UPROPERTY(VisibleAnywhere)
 	UTaskBase* FirstTask;
 	/// 根任务
@@ -35,26 +38,7 @@ public:
 	TMap<FString, UTaskBase*> TaskMap;
 
 public:
-	/**
-	* 获取初始任务
-	*/
-	UFUNCTION(BlueprintPure)
-	UTaskBase* GetFirstTask() const { return FirstTask; }
-	/**
-	* 设置初始任务
-	*/
-	UFUNCTION(BlueprintCallable)
-	void SetFirstTask(UTaskBase* InFirstTask) { this->FirstTask = InFirstTask; }
-	/**
-	* 获取根任务列表
-	*/
-	UFUNCTION(BlueprintPure)
-	TArray<UTaskBase*>& GetRootTasks() { return RootTasks; }
-	/**
-	* 获取任务Map
-	*/
-	UFUNCTION(BlueprintPure)
-	TMap<FString, UTaskBase*>& GetTaskMap() { return TaskMap; }
+	bool IsAllTaskCompleted() const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Editor

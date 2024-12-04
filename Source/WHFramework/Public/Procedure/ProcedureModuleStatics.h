@@ -19,10 +19,10 @@ class WHFRAMEWORK_API UProcedureModuleStatics : public UBlueprintFunctionLibrary
 
 public:
 	UFUNCTION(BlueprintPure, Category = "ProcedureModuleStatics")
-	static UProcedureAsset* GetCurrentProcedureAsset();
+	static TArray<UProcedureAsset*> GetProcedureAssets();
 
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleStatics")
-	static void SetCurrentProcedureAsset(UProcedureAsset* InProcedureAsset, bool bAutoSwitchFirst = false);
+	UFUNCTION(BlueprintPure, Category = "ProcedureModuleStatics")
+	static UProcedureAsset* GetCurrentProcedureAsset();
 
 	template<class T>
 	static T* GetCurrentProcedure()
@@ -34,6 +34,18 @@ public:
 	static UProcedureBase* GetCurrentProcedure(TSubclassOf<UProcedureBase> InClass = nullptr);
 
 public:
+	UFUNCTION(BlueprintPure, Category = "ProcedureModuleStatics")
+	static UProcedureAsset* GetProcedureAsset(UProcedureAsset* InAsset);
+	
+	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleStatics")
+	static void AddProcedureAsset(UProcedureAsset* InAsset);
+	
+	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleStatics")
+	static void RemoveProcedureAsset(UProcedureAsset* InAsset);
+	
+	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleStatics")
+	static void SwitchProcedureAsset(UProcedureAsset* InAsset);
+
 	UFUNCTION(BlueprintPure, Category = "ProcedureModuleStatics")
 	static bool HasProcedureByIndex(int32 InIndex);
 

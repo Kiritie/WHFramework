@@ -544,7 +544,7 @@ UBehaviorTree* ACharacterBase::GetBehaviorTreeAsset() const
 
 AAIControllerBase* ACharacterBase::GetAIController() const
 {
-	return GetController<AAIControllerBase>();
+	return GetDefaultController<AAIControllerBase>();
 }
 
 FVector ACharacterBase::GetMoveVelocity(bool bIgnoreZ) const
