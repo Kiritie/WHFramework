@@ -6,6 +6,11 @@
 #include "ImageUtils.h"
 #include "Engine/Texture.h"
 #endif
+#include<string>
+#include<stdio.h>
+#include<assert.h>
+
+using namespace std;
 
 void FCoreStatics::SaveObjectDataToMemory(UObject* InObject, TArray<uint8>& OutObjectData)
 {
@@ -108,6 +113,21 @@ bool FCoreStatics::RegexMatch(const FString& InSourceStr, const FString& InPatte
 	return OutResult.Num() == 0 ? false : true;
 }
 
+unsigned char FCoreStatics::ToHex(unsigned char InChar)
+{
+	return InChar > 9 ? InChar + 55 : InChar + 48;
+}
+
+unsigned char FCoreStatics::FromHex(unsigned char InChar)
+{
+	unsigned char OutChar = 0;
+	if (InChar >= 'A' && InChar <= 'Z') OutChar = InChar - 'A' + 10;
+	else if (InChar >= 'a' && InChar <= 'z') OutChar = InChar - 'a' + 10;
+	else if (InChar >= '0' && InChar <= '9') OutChar = InChar - '0';
+	else assert(0);
+	return OutChar;
+}
+
 FString FCoreStatics::BoolToString(bool InBool)
 {
 	return InBool ? TEXT("true") : TEXT("false");
@@ -116,6 +136,53 @@ FString FCoreStatics::BoolToString(bool InBool)
 bool FCoreStatics::StringToBool(const FString& InString)
 {
 	return InString == TEXT("true");
+}
+
+FString FCoreStatics::UrlEncode(const FString& InUrl)
+{
+	std::string str = TCHAR_TO_UTF8(*InUrl);
+	std::string strTemp = "";
+	size_t length = str.length();
+	for (size_t i = 0; i < length; i++)
+	{
+		if (isalnum((unsigned char)str[i]) ||
+			(str[i] == '-') ||
+			(str[i] == '_') ||
+			(str[i] == '.') ||
+			(str[i] == '~'))
+			strTemp += str[i];
+		else if (str[i] == ' ')
+			strTemp += "+";
+		else
+		{
+			strTemp += '%';
+			strTemp += ToHex((unsigned char)str[i] >> 4);
+			strTemp += ToHex((unsigned char)str[i] % 16);
+		}
+	}
+	FString OutUrl = strTemp.c_str();
+	OutUrl = OutUrl.Replace(TEXT("%5C"), TEXT("\\")).Replace(TEXT("%2F"), TEXT("/")).Replace(TEXT("%3A"), TEXT(":")).Replace(TEXT("+"), TEXT("%20"));
+	return OutUrl;
+}
+
+FString FCoreStatics::UrlDecode(const FString& InUrl)
+{
+	std::string str = TCHAR_TO_UTF8(*InUrl);
+	std::string strTemp = "";
+	size_t length = str.length();
+	for (size_t i = 0; i < length; i++)
+	{
+		if (str[i] == '+') strTemp += ' ';
+		else if (str[i] == '%')
+		{
+			assert(i + 2 < length);
+			unsigned char high = FromHex((unsigned char)str[++i]);
+			unsigned char low = FromHex((unsigned char)str[++i]);
+			strTemp += high * 16 + low;
+		}
+		else strTemp += str[i];
+	}
+	return strTemp.c_str();
 }
 
 #if WITH_ENGINE

@@ -591,7 +591,7 @@ FReply SProcedureListWidget::OnEditProcedureItemButtonClicked()
 
 FReply SProcedureListWidget::OnNewProcedureClassButtonClicked()
 {
-	if(const UBlueprint* Blueprint = UWHFrameworkEditorStatics::CreateBlueprintAssetWithDialog(UProcedureBlueprintFactory::StaticClass()))
+	if(const UBlueprint* Blueprint = UEditorStatics::CreateBlueprintAssetWithDialog(UProcedureBlueprintFactory::StaticClass()))
 	{
 		if(!bEditing)
 		{

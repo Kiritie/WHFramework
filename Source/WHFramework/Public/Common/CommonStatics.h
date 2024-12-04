@@ -226,7 +226,9 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Json
-	static bool ParseJsonObjectFromString(const FString& InJsonString, TSharedPtr<FJsonObject>& OutJsonObject);
+	static bool StringToJsonObject(const FString& InJsonString, TSharedPtr<FJsonObject>& OutJsonObject);
+
+	static bool JsonObjectToString(const TSharedPtr<FJsonObject>& InJsonObject, FString& OutJsonString);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Input

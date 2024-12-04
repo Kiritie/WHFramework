@@ -22,7 +22,7 @@ void UWebRequestHandle_GetJson::Parse(const FWebRequestResult& InResult, const T
 {
 	if(InResult.bSucceeded)
 	{
-		if(UCommonStatics::ParseJsonObjectFromString(InResult.HttpResponse->GetContentAsString(), Json))
+		if(UCommonStatics::StringToJsonObject(InResult.HttpResponse->GetContentAsString(), Json))
 		{
 			bSucceeded = true;
 		}

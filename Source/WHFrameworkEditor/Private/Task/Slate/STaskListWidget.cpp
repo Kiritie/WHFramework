@@ -721,7 +721,7 @@ FReply STaskListWidget::OnEditTaskItemButtonClicked()
 
 FReply STaskListWidget::OnNewTaskClassButtonClicked()
 {
-	if(const UBlueprint* Blueprint = UWHFrameworkEditorStatics::CreateBlueprintAssetWithDialog(UTaskBlueprintFactory::StaticClass()))
+	if(const UBlueprint* Blueprint = UEditorStatics::CreateBlueprintAssetWithDialog(UTaskBlueprintFactory::StaticClass()))
 	{
 		if(!bEditing)
 		{

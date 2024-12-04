@@ -319,10 +319,16 @@ FString UCommonStatics::MakeLiteralStringTag(const FGameplayTag& InTag)
 	return InTag.GetTagName().ToString();
 }
 
-bool UCommonStatics::ParseJsonObjectFromString(const FString& InJsonString, TSharedPtr<FJsonObject>& OutJsonObject)
+bool UCommonStatics::StringToJsonObject(const FString& InJsonString, TSharedPtr<FJsonObject>& OutJsonObject)
 {
 	const TSharedRef<TJsonReader<>> JsonReader = TJsonReaderFactory<>::Create(InJsonString);
     return FJsonSerializer::Deserialize(JsonReader, OutJsonObject);
+}
+
+bool UCommonStatics::JsonObjectToString(const TSharedPtr<FJsonObject>& InJsonObject, FString& OutJsonString)
+{
+	TSharedRef<TJsonWriter<>> JsonWriter = TJsonWriterFactory<>::Create(&OutJsonString);
+	return FJsonSerializer::Serialize(InJsonObject.ToSharedRef(), JsonWriter);
 }
 
 bool UCommonStatics::HasMouseCapture()

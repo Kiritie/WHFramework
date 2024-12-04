@@ -2,18 +2,18 @@
 #include "Slate/SlateWidgetManager.h"
 
 #define SNewEd( WidgetType, bAutoOpen, ... ) \
-FWHFrameworkSlateStatics::MakeTDeclEd<WidgetType>( #WidgetType, nullptr, bAutoOpen, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__) ) <<= TYPENAME_OUTSIDE_TEMPLATE WidgetType::FArguments()
+FSlateStatics::MakeTDeclEd<WidgetType>( #WidgetType, nullptr, bAutoOpen, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__) ) <<= TYPENAME_OUTSIDE_TEMPLATE WidgetType::FArguments()
 
 #define SNewEdN( WidgetType, ParentWidget, bAutoOpen, ... ) \
-FWHFrameworkSlateStatics::MakeTDeclEd<WidgetType>( #WidgetType, ParentWidget, bAutoOpen, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__) ) <<= TYPENAME_OUTSIDE_TEMPLATE WidgetType::FArguments()
+FSlateStatics::MakeTDeclEd<WidgetType>( #WidgetType, ParentWidget, bAutoOpen, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__) ) <<= TYPENAME_OUTSIDE_TEMPLATE WidgetType::FArguments()
 
 #define SAssignNewEd( ExposeAs, WidgetType, bAutoOpen, ... ) \
-FWHFrameworkSlateStatics::MakeTDeclEd<WidgetType>( #WidgetType, nullptr, bAutoOpen, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__) ) . Expose( ExposeAs ) <<= TYPENAME_OUTSIDE_TEMPLATE WidgetType::FArguments()
+FSlateStatics::MakeTDeclEd<WidgetType>( #WidgetType, nullptr, bAutoOpen, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__) ) . Expose( ExposeAs ) <<= TYPENAME_OUTSIDE_TEMPLATE WidgetType::FArguments()
 
 #define SAssignNewEdN( ExposeAs, WidgetType, ParentWidget, bAutoOpen, ... ) \
-FWHFrameworkSlateStatics::MakeTDeclEd<WidgetType>( #WidgetType, ParentWidget, bAutoOpen, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__) ) . Expose( ExposeAs ) <<= TYPENAME_OUTSIDE_TEMPLATE WidgetType::FArguments()
+FSlateStatics::MakeTDeclEd<WidgetType>( #WidgetType, ParentWidget, bAutoOpen, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__) ) . Expose( ExposeAs ) <<= TYPENAME_OUTSIDE_TEMPLATE WidgetType::FArguments()
 
-class FWHFrameworkSlateStatics
+class FSlateStatics
 {
 public:
 	template<typename WidgetType, typename RequiredArgsPayloadType>
