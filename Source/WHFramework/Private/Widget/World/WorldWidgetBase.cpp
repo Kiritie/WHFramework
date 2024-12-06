@@ -49,11 +49,6 @@ void UWorldWidgetBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FPa
 
 void UWorldWidgetBase::OnDespawn_Implementation(bool bRecovery)
 {
-	OwnerObject = nullptr;
-	WidgetParams.Empty();
-	WidgetIndex = 0;
-	WidgetComponent = nullptr;
-	BindWidgetMap.Empty();
 }
 
 void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
@@ -63,7 +58,7 @@ void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
 void UWorldWidgetBase::OnCreate(UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams)
 {
 	OwnerObject = InOwner;
-	
+
 	if(WidgetRefreshType == EWidgetRefreshType::Timer)
 	{
 		GetWorld()->GetTimerManager().SetTimer(RefreshTimerHandle, this, &UWorldWidgetBase::Refresh, WidgetRefreshTime, true);
@@ -194,9 +189,15 @@ void UWorldWidgetBase::OnDestroy(bool bRecovery)
 	if(K2_OnDestroyed.IsBound()) K2_OnDestroyed.Broadcast(bRecovery);
 	if(OnDestroyed.IsBound()) OnDestroyed.Broadcast(bRecovery);
 
+	K2_OnDestroy(bRecovery);
+
 	UObjectPoolModuleStatics::DespawnObject(this, bRecovery);
 
-	K2_OnDestroy(bRecovery);
+	OwnerObject = nullptr;
+	WidgetParams.Empty();
+	WidgetIndex = 0;
+	WidgetComponent = nullptr;
+	BindWidgetMap.Empty();
 }
 
 void UWorldWidgetBase::Init(const TArray<FParameter>* InParams)
@@ -256,8 +257,6 @@ bool UWorldWidgetBase::DestroySubWidget(ISubWidgetInterface* InWidget, bool bRec
 	if(!InWidget) return false;
 
 	InWidget->OnDestroy(bRecovery);
-
-	UObjectPoolModuleStatics::DespawnObject(Cast<UUserWidget>(InWidget), bRecovery);
 	return true;
 }
 

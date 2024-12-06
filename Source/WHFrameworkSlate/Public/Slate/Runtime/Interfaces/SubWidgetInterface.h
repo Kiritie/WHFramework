@@ -30,6 +30,8 @@ public:
 
 	virtual void OnInitialize(const TArray<FParameter>& InParams) = 0;
 
+	virtual void OnDestroy(bool bRecovery) = 0;
+
 public:
 	virtual void Init(const TArray<FParameter>* InParams = nullptr) = 0;
 	

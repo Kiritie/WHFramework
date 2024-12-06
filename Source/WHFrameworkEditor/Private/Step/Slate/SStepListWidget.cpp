@@ -720,7 +720,7 @@ FReply SStepListWidget::OnEditStepItemButtonClicked()
 
 FReply SStepListWidget::OnNewStepClassButtonClicked()
 {
-	if(const UBlueprint* Blueprint = UWHFrameworkEditorStatics::CreateBlueprintAssetWithDialog(UStepBlueprintFactory::StaticClass()))
+	if(const UBlueprint* Blueprint = UEditorStatics::CreateBlueprintAssetWithDialog(UStepBlueprintFactory::StaticClass()))
 	{
 		if(!bEditing)
 		{

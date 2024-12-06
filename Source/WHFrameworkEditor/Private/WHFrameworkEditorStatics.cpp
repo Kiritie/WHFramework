@@ -6,7 +6,7 @@
 #include "AssetToolsModule.h"
 #include "Common/Blueprint/Slate/SCreateBlueprintAssetDialog.h"
 
-UObject* UWHFrameworkEditorStatics::CreateAssetWithDialog(TSubclassOf<UFactory> InFactoryClass)
+UObject* UEditorStatics::CreateAssetWithDialog(TSubclassOf<UFactory> InFactoryClass)
 {
 	UFactory* Factory = NewObject<UFactory>(GetTransientPackage(), InFactoryClass);
 
@@ -14,7 +14,7 @@ UObject* UWHFrameworkEditorStatics::CreateAssetWithDialog(TSubclassOf<UFactory> 
 	return AssetToolsModule.Get().CreateAssetWithDialog(Factory->GetSupportedClass(), Factory);
 }
 
-UBlueprint* UWHFrameworkEditorStatics::CreateBlueprintAssetWithDialog(TSubclassOf<UBlueprintFactoryBase> InFactoryClass, bool bAutoOpenAsset)
+UBlueprint* UEditorStatics::CreateBlueprintAssetWithDialog(TSubclassOf<UBlueprintFactoryBase> InFactoryClass, bool bAutoOpenAsset)
 {
 	const TSharedRef<SCreateBlueprintAssetDialog> CreateBlueprintAssetDialog = SNew(SCreateBlueprintAssetDialog).BlueprintFactoryClass(InFactoryClass).IsAutoOpenAsset(bAutoOpenAsset);
 	

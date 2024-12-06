@@ -664,7 +664,7 @@ FReply SModuleListWidget::OnEditModuleItemButtonClicked()
 
 FReply SModuleListWidget::OnNewModuleClassButtonClicked()
 {
-	if(const UBlueprint* Blueprint = UWHFrameworkEditorStatics::CreateBlueprintAssetWithDialog(UModuleBlueprintFactory::StaticClass()))
+	if(const UBlueprint* Blueprint = UEditorStatics::CreateBlueprintAssetWithDialog(UModuleBlueprintFactory::StaticClass()))
 	{
 		if(!bEditing)
 		{

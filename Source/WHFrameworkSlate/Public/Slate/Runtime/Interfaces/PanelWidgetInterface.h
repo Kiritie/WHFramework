@@ -30,6 +30,8 @@ class WHFRAMEWORKSLATE_API IPanelWidgetInterface : public IBaseWidgetInterface
 public:
 	virtual void OnReset(bool bForce = false) = 0;
 
+	virtual void OnDestroy(bool bRecovery) = 0;
+
 public:
 	virtual void Reset(bool bForce = false) = 0;
 

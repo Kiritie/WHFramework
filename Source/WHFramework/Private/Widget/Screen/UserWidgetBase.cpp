@@ -71,8 +71,6 @@ void UUserWidgetBase::OnTick_Implementation(float DeltaSeconds)
 
 void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	WidgetParams = InParams;
-
 	if(ParentWidget)
 	{
 		ParentWidget->RemoveChildWidget(this);
@@ -334,9 +332,12 @@ void UUserWidgetBase::OnDestroy(bool bRecovery)
 	if(K2_OnDestroyed.IsBound()) K2_OnDestroyed.Broadcast(bRecovery);
 	if(OnDestroyed.IsBound()) OnDestroyed.Broadcast(bRecovery);
 
+	K2_OnDestroy(bRecovery);
+
 	UObjectPoolModuleStatics::DespawnObject(this, bRecovery);
 
-	K2_OnDestroy(bRecovery);
+	OwnerObject = nullptr;
+	WidgetParams.Empty();
 }
 
 void UUserWidgetBase::OnStateChanged(EScreenWidgetState InWidgetState)
@@ -508,8 +509,6 @@ bool UUserWidgetBase::DestroySubWidget(ISubWidgetInterface* InWidget, bool bReco
 	if(!InWidget) return false;
 
 	InWidget->OnDestroy(bRecovery);
-
-	UObjectPoolModuleStatics::DespawnObject(Cast<UUserWidget>(InWidget), bRecovery);
 	return true;
 }
 

@@ -54,6 +54,12 @@ public:
 	static bool RegexMatch(const FString& InSourceStr, const FString& InPattern, TArray<FString>& OutResult);
 
 	//////////////////////////////////////////////////////////////////////////
+	// Char
+	static unsigned char ToHex(unsigned char InChar);
+
+	static unsigned char FromHex(unsigned char InChar);
+
+	//////////////////////////////////////////////////////////////////////////
 	// String
 	static bool SortString(const FString& InStr1, const FString& InStr2)
 	{
@@ -74,6 +80,12 @@ public:
 	static FString BoolToString(bool InBool);
 
 	static bool StringToBool(const FString& InString);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Url
+	static FString UrlEncode(const FString& InUrl);
+
+	static FString UrlDecode(const FString& InUrl);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Array

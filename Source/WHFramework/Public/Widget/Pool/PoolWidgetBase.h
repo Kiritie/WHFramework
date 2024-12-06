@@ -39,11 +39,6 @@ public:
 	UFUNCTION()
 	virtual void OnRefresh() override;
 
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnDestroy")
-	void K2_OnDestroy(bool bRecovery);
-	UFUNCTION()
-	virtual void OnDestroy(bool bRecovery) override;
-
 public:
 	UFUNCTION(BlueprintCallable)
 	virtual void Refresh() override;

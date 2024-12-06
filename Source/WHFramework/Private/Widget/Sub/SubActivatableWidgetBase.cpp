@@ -4,6 +4,7 @@
 #include "Widget/Sub/SubActivatableWidgetBase.h"
 
 #include "Blueprint/WidgetTree.h"
+#include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Widget/Screen/UserWidgetBase.h"
 
 USubActivatableWidgetBase::USubActivatableWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
@@ -20,7 +21,7 @@ void USubActivatableWidgetBase::OnSpawn_Implementation(UObject* InOwner, const T
 
 void USubActivatableWidgetBase::OnDespawn_Implementation(bool bRecovery)
 {
-	OwnerWidget = nullptr;
+	
 }
 
 void USubActivatableWidgetBase::OnTick_Implementation(float DeltaSeconds)
@@ -63,6 +64,11 @@ void USubActivatableWidgetBase::OnRefresh()
 void USubActivatableWidgetBase::OnDestroy(bool bRecovery)
 {
 	K2_OnDestroy(bRecovery);
+
+	UObjectPoolModuleStatics::DespawnObject(this, bRecovery);
+
+	OwnerWidget = nullptr;
+	WidgetParams.Empty();
 }
 
 void USubActivatableWidgetBase::Init(const TArray<FParameter>* InParams)

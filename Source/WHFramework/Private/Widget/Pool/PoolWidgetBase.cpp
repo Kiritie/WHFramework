@@ -38,11 +38,6 @@ void UPoolWidgetBase::OnRefresh()
 	K2_OnRefresh();
 }
 
-void UPoolWidgetBase::OnDestroy(bool bRecovery)
-{
-	K2_OnDestroy(bRecovery);
-}
-
 void UPoolWidgetBase::Refresh()
 {
 	OnRefresh();
@@ -50,8 +45,6 @@ void UPoolWidgetBase::Refresh()
 
 void UPoolWidgetBase::Destroy(bool bRecovery)
 {
-	OnDestroy(bRecovery);
-	
 	UObjectPoolModuleStatics::DespawnObject(this, bRecovery);
 }
 
