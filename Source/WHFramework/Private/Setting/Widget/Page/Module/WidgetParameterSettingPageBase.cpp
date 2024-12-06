@@ -75,14 +75,14 @@ void UWidgetParameterSettingPageBase::OnApply()
 	}
 }
 
-void UWidgetParameterSettingPageBase::OnActivated()
+void UWidgetParameterSettingPageBase::NativeOnActivated()
 {
-	Super::OnActivated();
+	Super::NativeOnActivated();
 }
 
-void UWidgetParameterSettingPageBase::OnDeactivated()
+void UWidgetParameterSettingPageBase::NativeOnDeactivated()
 {
-	Super::OnDeactivated();
+	Super::NativeOnDeactivated();
 
 	for(auto& Iter : SettingItems)
 	{

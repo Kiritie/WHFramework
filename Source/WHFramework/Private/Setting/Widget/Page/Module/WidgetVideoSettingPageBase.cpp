@@ -83,14 +83,14 @@ void UWidgetVideoSettingPageBase::OnApply()
 	UVideoModule::Get().ApplyVideoQualitySettings();
 }
 
-void UWidgetVideoSettingPageBase::OnActivated()
+void UWidgetVideoSettingPageBase::NativeOnActivated()
 {
-	Super::OnActivated();
+	Super::NativeOnActivated();
 }
 
-void UWidgetVideoSettingPageBase::OnDeactivated()
+void UWidgetVideoSettingPageBase::NativeOnDeactivated()
 {
-	Super::OnDeactivated();
+	Super::NativeOnDeactivated();
 
 	SettingItem_GlobalVideoQuality->SetValue((int32)UVideoModule::Get().GetGlobalVideoQuality());
 	SettingItem_ViewDistanceQuality->SetValue((int32)UVideoModule::Get().GetViewDistanceQuality());

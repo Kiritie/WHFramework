@@ -65,40 +65,6 @@ void USubActivatableWidgetBase::OnDestroy(bool bRecovery)
 	K2_OnDestroy(bRecovery);
 }
 
-void USubActivatableWidgetBase::NativeOnActivated()
-{
-	Super::NativeOnActivated();
-
-	OnActivated();
-}
-
-void USubActivatableWidgetBase::OnActivated()
-{
-}
-
-void USubActivatableWidgetBase::NativeOnDeactivated()
-{
-	Super::NativeOnDeactivated();
-
-	OnDeactivated();
-}
-
-void USubActivatableWidgetBase::OnDeactivated()
-{
-}
-
-bool USubActivatableWidgetBase::NativeOnHandleBackAction()
-{
-	if(!Super::NativeOnHandleBackAction()) return false;
-	
-	return OnHandleBackAction();
-}
-
-bool USubActivatableWidgetBase::OnHandleBackAction()
-{
-	return true;
-}
-
 void USubActivatableWidgetBase::Init(const TArray<FParameter>* InParams)
 {
 	Init(InParams ? *InParams : TArray<FParameter>());

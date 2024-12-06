@@ -37,14 +37,14 @@ void UWidgetWidgetSettingPageBase::OnApply()
 	UWidgetModuleStatics::SetWidgetGlobalScale(SettingItem_GlobalScale->GetValue().GetFloatValue());
 }
 
-void UWidgetWidgetSettingPageBase::OnActivated()
+void UWidgetWidgetSettingPageBase::NativeOnActivated()
 {
-	Super::OnActivated();
+	Super::NativeOnActivated();
 }
 
-void UWidgetWidgetSettingPageBase::OnDeactivated()
+void UWidgetWidgetSettingPageBase::NativeOnDeactivated()
 {
-	Super::OnDeactivated();
+	Super::NativeOnDeactivated();
 
 	SettingItem_LanguageType->SetValue(UWidgetModuleStatics::GetWidgetLanguageType());
 	SettingItem_GlobalScale->SetValue(UWidgetModuleStatics::GetWidgetGlobalScale());

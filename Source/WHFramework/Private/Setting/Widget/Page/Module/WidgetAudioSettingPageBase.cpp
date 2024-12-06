@@ -55,14 +55,14 @@ void UWidgetAudioSettingPageBase::OnReset(bool bForce)
 	SettingItem_EffectSoundVolume->SetValue(GetDefaultSaveData()->CastRef<FAudioModuleSaveData>().EffectSoundParams.Volume);
 }
 
-void UWidgetAudioSettingPageBase::OnActivated()
+void UWidgetAudioSettingPageBase::NativeOnActivated()
 {
-	Super::OnActivated();
+	Super::NativeOnActivated();
 }
 
-void UWidgetAudioSettingPageBase::OnDeactivated()
+void UWidgetAudioSettingPageBase::NativeOnDeactivated()
 {
-	Super::OnDeactivated();
+	Super::NativeOnDeactivated();
 
 	SettingItem_GlobalSoundVolume->SetValue(UAudioModuleStatics::GetGlobalSoundVolume());
 	SettingItem_BackgroundSoundVolume->SetValue(UAudioModuleStatics::GetBackgroundSoundVolume());

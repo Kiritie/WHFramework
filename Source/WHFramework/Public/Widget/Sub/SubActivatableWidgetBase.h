@@ -64,19 +64,6 @@ public:
 	virtual void OnDestroy(bool bRecovery) override;
 
 public:
-	virtual void NativeOnActivated() override;
-	
-	virtual void OnActivated();
-
-	virtual void NativeOnDeactivated() override;
-
-	virtual void OnDeactivated();
-
-	virtual bool NativeOnHandleBackAction() override;
-
-	virtual bool OnHandleBackAction();
-
-public:
 	virtual void Init(const TArray<FParameter>* InParams) override;
 	
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))

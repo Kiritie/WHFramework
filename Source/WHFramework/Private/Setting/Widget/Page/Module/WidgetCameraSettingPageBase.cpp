@@ -112,14 +112,14 @@ void UWidgetCameraSettingPageBase::OnApply()
 	UCameraModule::Get().SetCameraZoomSpeed(SettingItem_CameraZoomSpeed->GetValue().GetFloatValue());
 }
 
-void UWidgetCameraSettingPageBase::OnActivated()
+void UWidgetCameraSettingPageBase::NativeOnActivated()
 {
-	Super::OnActivated();
+	Super::NativeOnActivated();
 }
 
-void UWidgetCameraSettingPageBase::OnDeactivated()
+void UWidgetCameraSettingPageBase::NativeOnDeactivated()
 {
-	Super::OnDeactivated();
+	Super::NativeOnDeactivated();
 
 	SettingItem_EnableCameraPanZMove->SetValue(UCameraModule::Get().IsEnableCameraPanZMove());
 	SettingItem_ReverseCameraPanMove->SetValue(UCameraModule::Get().IsReverseCameraPanMove());

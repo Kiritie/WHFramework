@@ -33,14 +33,14 @@ void UWidgetSettingPageBase::OnReset(bool bForce)
 	Super::OnReset(bForce);
 }
 
-void UWidgetSettingPageBase::OnActivated()
+void UWidgetSettingPageBase::NativeOnActivated()
 {
-	Super::OnActivated();
+	Super::NativeOnActivated();
 }
 
-void UWidgetSettingPageBase::OnDeactivated()
+void UWidgetSettingPageBase::NativeOnDeactivated()
 {
-	Super::OnDeactivated();
+	Super::NativeOnDeactivated();
 }
 
 void UWidgetSettingPageBase::OnApply()

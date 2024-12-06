@@ -33,11 +33,6 @@ void UWidgetAbilityInventorySlotBase::OnSpawn_Implementation(UObject* InOwner, c
 void UWidgetAbilityInventorySlotBase::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
-
-	SetStyle(DefaultStyle);
-
-	OwnerSlot = nullptr;
-	StopCooldown();
 }
 
 void UWidgetAbilityInventorySlotBase::OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams)
@@ -58,7 +53,7 @@ void UWidgetAbilityInventorySlotBase::OnInitialize(const TArray<FParameter>& InP
 		{
 			OwnerSlot->OnSlotRefresh.RemoveDynamic(this, &UWidgetAbilityInventorySlotBase::OnRefresh);
 			OwnerSlot->OnSlotActivated.RemoveDynamic(this, &UWidgetAbilityInventorySlotBase::OnActivated);
-			OwnerSlot->OnSlotDeactived.RemoveDynamic(this, &UWidgetAbilityInventorySlotBase::OnDeactived);
+			OwnerSlot->OnSlotDeactived.RemoveDynamic(this, &UWidgetAbilityInventorySlotBase::OnDeactivated);
 		}
 
 		OwnerSlot = InOwnerSlot;
@@ -67,7 +62,7 @@ void UWidgetAbilityInventorySlotBase::OnInitialize(const TArray<FParameter>& InP
 		{
 			OwnerSlot->OnSlotRefresh.AddDynamic(this, &UWidgetAbilityInventorySlotBase::OnRefresh);
 			OwnerSlot->OnSlotActivated.AddDynamic(this, &UWidgetAbilityInventorySlotBase::OnActivated);
-			OwnerSlot->OnSlotDeactived.AddDynamic(this, &UWidgetAbilityInventorySlotBase::OnDeactived);
+			OwnerSlot->OnSlotDeactived.AddDynamic(this, &UWidgetAbilityInventorySlotBase::OnDeactivated);
 		}
 	}
 	Super::OnInitialize(InParams);
@@ -99,6 +94,11 @@ void UWidgetAbilityInventorySlotBase::OnRefresh()
 void UWidgetAbilityInventorySlotBase::OnDestroy(bool bRecovery)
 {
 	Super::OnDestroy(bRecovery);
+
+	SetStyle(DefaultStyle);
+
+	OwnerSlot = nullptr;
+	StopCooldown();
 }
 
 bool UWidgetAbilityInventorySlotBase::NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)

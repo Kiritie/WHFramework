@@ -20,8 +20,6 @@ void UWidgetAbilityItemBase::OnSpawn_Implementation(UObject* InOwner, const TArr
 void UWidgetAbilityItemBase::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
-	
-	Item = FAbilityItem::Empty;
 }
 
 void UWidgetAbilityItemBase::OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams)
@@ -46,4 +44,6 @@ void UWidgetAbilityItemBase::OnRefresh()
 void UWidgetAbilityItemBase::OnDestroy(bool bRecovery)
 {
 	Super::OnDestroy(bRecovery);
+	
+	Item = FAbilityItem::Empty;
 }

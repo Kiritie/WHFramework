@@ -98,14 +98,14 @@ void UWidgetInputSettingPageBase::OnApply()
 	}
 }
 
-void UWidgetInputSettingPageBase::OnActivated()
+void UWidgetInputSettingPageBase::NativeOnActivated()
 {
-	Super::OnActivated();
+	Super::NativeOnActivated();
 }
 
-void UWidgetInputSettingPageBase::OnDeactivated()
+void UWidgetInputSettingPageBase::NativeOnDeactivated()
 {
-	Super::OnDeactivated();
+	Super::NativeOnDeactivated();
 
 	for(auto& Iter : ShortcutSettingItems)
 	{

@@ -25,9 +25,9 @@ public:
 
 	virtual void OnApply() override;
 	
-	virtual void OnActivated() override;
+	virtual void NativeOnActivated() override;
 
-	virtual void OnDeactivated() override;
+	virtual void NativeOnDeactivated() override;
 
 public:
 	virtual bool CanApply_Implementation() const override;

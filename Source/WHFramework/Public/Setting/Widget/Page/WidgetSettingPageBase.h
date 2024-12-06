@@ -24,9 +24,10 @@ public:
 
 	virtual void OnReset(bool bForce) override;
 
-	virtual void OnActivated() override;
+public:
+	virtual void NativeOnActivated() override;
 
-	virtual void OnDeactivated() override;
+	virtual void NativeOnDeactivated() override;
 
 public:
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnApply")
