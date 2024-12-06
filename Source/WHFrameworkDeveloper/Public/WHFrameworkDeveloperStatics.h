@@ -6,13 +6,11 @@
 
 #include "WHFrameworkDeveloperStatics.generated.h"
 
-class UFactory;
-class UBlueprintFactoryBase;
 /**
  * 
  */
 UCLASS()
-class WHFRAMEWORKDEVELOPER_API UWHFrameworkDeveloperStatics : public UBlueprintFunctionLibrary
+class WHFRAMEWORKDEVELOPER_API UDeveloperStatics : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
 };

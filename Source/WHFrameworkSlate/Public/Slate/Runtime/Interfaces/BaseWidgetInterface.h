@@ -28,8 +28,6 @@ class WHFRAMEWORKSLATE_API IBaseWidgetInterface : public ITickAbleWidgetInterfac
 public:
 	virtual void OnRefresh() = 0;
 
-	virtual void OnDestroy(bool bRecovery) = 0;
-
 public:
 	virtual void Refresh() = 0;
 

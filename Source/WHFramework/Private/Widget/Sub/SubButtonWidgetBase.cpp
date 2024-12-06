@@ -4,6 +4,7 @@
 #include "Widget/Sub/SubButtonWidgetBase.h"
 
 #include "Blueprint/WidgetTree.h"
+#include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Widget/Screen/UserWidgetBase.h"
 
 USubButtonWidgetBase::USubButtonWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
@@ -21,8 +22,6 @@ void USubButtonWidgetBase::OnSpawn_Implementation(UObject* InOwner, const TArray
 void USubButtonWidgetBase::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
-	
-	OwnerWidget = nullptr;
 }
 
 void USubButtonWidgetBase::OnTick_Implementation(float DeltaSeconds)
@@ -65,6 +64,11 @@ void USubButtonWidgetBase::OnRefresh()
 void USubButtonWidgetBase::OnDestroy(bool bRecovery)
 {
 	K2_OnDestroy(bRecovery);
+
+	UObjectPoolModuleStatics::DespawnObject(this, bRecovery);
+
+	OwnerWidget = nullptr;
+	WidgetParams.Empty();
 }
 
 void USubButtonWidgetBase::Init(const TArray<FParameter>* InParams)
