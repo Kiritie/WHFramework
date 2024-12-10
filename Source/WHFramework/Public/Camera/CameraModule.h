@@ -228,6 +228,9 @@ protected:
 	bool bCameraZoomControlAble;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
+	bool bCameraZoomMoveAble;
+
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	bool bNormalizeCameraZoom;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
@@ -419,7 +422,7 @@ public:
 	virtual void AddCameraRotationInput(float InYaw, float InPitch);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void AddCameraDistanceInput(float InValue, bool bMoveIfZero = false);
+	virtual void AddCameraDistanceInput(float InValue);
 
 public:
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InCameraViewData"))

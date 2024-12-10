@@ -4,7 +4,9 @@
 #include "Widget/Screen/UserWidgetBase.h"
 
 #include "Blueprint/WidgetTree.h"
+#include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
+#include "Components/ContentWidget.h"
 #include "Components/PanelWidget.h"
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Widget/EventHandle_UserWidgetClosed.h"
@@ -79,7 +81,7 @@ void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPar
 	{
 		ParentWidget = UWidgetModuleStatics::GetUserWidgetByName<UUserWidgetBase>(ParentName);
 	}
-	else if(const auto InParent = Cast<UUserWidgetBase>(InOwner))
+	else if(UUserWidgetBase* InParent = Cast<UUserWidgetBase>(InOwner); InParent != this)
 	{
 		ParentWidget = InParent;
 	}
@@ -153,6 +155,8 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 	WidgetState = EScreenWidgetState::Opening;
 	OnStateChanged(WidgetState);
 
+	K2_OnOpen(InParams, bInstant);
+
 	switch(WidgetOpenFinishType)
 	{
 		case EWidgetOpenFinishType::Instant:
@@ -201,9 +205,13 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 	{
 		if(GetParent() != ParentPanelWidget)
 		{
-			UPanelSlot* PanelSlot = ParentPanelWidget->AddChild(this);
-			if(UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(PanelSlot))
+			if(UContentWidget* ContentWidget = Cast<UContentWidget>(ParentPanelWidget))
 			{
+				ContentWidget->SetContent(this);
+			}
+			else if(UCanvasPanel* CanvasPanel = Cast<UCanvasPanel>(ParentPanelWidget))
+			{
+				UCanvasPanelSlot* CanvasPanelSlot = CanvasPanel->AddChildToCanvas(this);
 				CanvasPanelSlot->SetZOrder(WidgetZOrder);
 				CanvasPanelSlot->SetAnchors(WidgetAnchors);
 				CanvasPanelSlot->SetOffsets(WidgetOffsets);
@@ -245,8 +253,6 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 
 	UEventModuleStatics::BroadcastEvent<UEventHandle_UserWidgetOpened>(this, { this });
 
-	K2_OnOpen(InParams, bInstant);
-
 	for(const auto Iter : ChildWidgets)
 	{
 		if(Iter->GetParentName() == WidgetName && Iter->GetWidgetCreateType() == EWidgetCreateType::AutoCreateAndOpen)
@@ -262,6 +268,8 @@ void UUserWidgetBase::OnClose(bool bInstant)
 	
 	WidgetState = EScreenWidgetState::Closing;
 	OnStateChanged(WidgetState);
+
+	K2_OnClose(bInstant);
 
 	switch(WidgetCloseFinishType)
 	{
@@ -303,8 +311,6 @@ void UUserWidgetBase::OnClose(bool bInstant)
 	if(OnClosed.IsBound()) OnClosed.Broadcast(bInstant);
 
 	UEventModuleStatics::BroadcastEvent<UEventHandle_UserWidgetClosed>(this, { this });
-
-	K2_OnClose(bInstant);
 }
 
 void UUserWidgetBase::OnRefresh()
@@ -314,6 +320,8 @@ void UUserWidgetBase::OnRefresh()
 
 void UUserWidgetBase::OnDestroy(bool bRecovery)
 {
+	K2_OnDestroy(bRecovery);
+
 	if(IsInViewport())
 	{
 		RemoveFromParent();
@@ -332,8 +340,6 @@ void UUserWidgetBase::OnDestroy(bool bRecovery)
 	if(K2_OnDestroyed.IsBound()) K2_OnDestroyed.Broadcast(bRecovery);
 	if(OnDestroyed.IsBound()) OnDestroyed.Broadcast(bRecovery);
 
-	K2_OnDestroy(bRecovery);
-
 	UObjectPoolModuleStatics::DespawnObject(this, bRecovery);
 
 	OwnerObject = nullptr;
@@ -342,11 +348,11 @@ void UUserWidgetBase::OnDestroy(bool bRecovery)
 
 void UUserWidgetBase::OnStateChanged(EScreenWidgetState InWidgetState)
 {
+	K2_OnStateChanged(InWidgetState);
+
 	OnWidgetStateChanged.Broadcast(InWidgetState);
 
 	UEventModuleStatics::BroadcastEvent<UEventHandle_UserWidgetStateChanged>(this, { this, &InWidgetState });
-
-	K2_OnStateChanged(InWidgetState);
 }
 
 void UUserWidgetBase::Init(UObject* InOwner, const TArray<FParameter>* InParams, bool bForce)

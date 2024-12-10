@@ -91,6 +91,7 @@ UCameraModule::UCameraModule()
 
 	bCameraZoomAble = true;
 	bCameraZoomControlAble = true;
+	bCameraZoomMoveAble = false;
 	bNormalizeCameraZoom = false;
 	CameraZoomRate = 300.f;
 	bSmoothCameraZoom = true;
@@ -1040,13 +1041,13 @@ void UCameraModule::AddCameraRotationInput(float InYaw, float InPitch)
 	SetCameraRotation(TargetCameraRotation.Yaw + InYaw * CameraTurnRate * GetWorld()->GetDeltaSeconds(), TargetCameraRotation.Pitch + InPitch * CameraLookUpRate * GetWorld()->GetDeltaSeconds(), false);
 }
 
-void UCameraModule::AddCameraDistanceInput(float InValue, bool bMoveIfZero)
+void UCameraModule::AddCameraDistanceInput(float InValue)
 {
 	if(ModuleState != EModuleState::Running || !bCameraControlAble || !bCameraZoomControlAble || (IsTrackingTarget() && !ENUMWITH(TrackControlMode, ECameraControlMode::DistanceOnly))) return;
 
 	SetCameraDistance(TargetCameraDistance + InValue * CameraZoomRate * (2.f + (CameraZoomAltitude != 0.f ? (UCommonStatics::GetPossessedPawn() ? 0.f : FMath::Abs(FMath::Max(USceneModuleStatics::GetAltitude(false, true), CurrentCameraDistance)) / CameraZoomAltitude) : 0.f)) * GetWorld()->GetDeltaSeconds(), false);
 
-	if(bMoveIfZero && InValue < 0.f && TargetCameraDistance == 0.f)
+	if(bCameraZoomMoveAble && !IsTrackingTarget() && InValue < 0.f && TargetCameraDistance == 0.f)
 	{
 		AddCameraMovementInput(CurrentCameraRotation.Vector(), -InValue);
 	}

@@ -18,6 +18,7 @@
 #include "Event/Handle/Scene/EventHandle_SetActorVisible.h"
 #include "Event/Handle/Scene/EventHandle_SetDataLayerOwnerPlayer.h"
 #include "Event/Handle/Scene/EventHandle_SetDataLayerRuntimeState.h"
+#include "Event/Handle/Scene/EventHandle_SetLevelOwnerPlayer.h"
 #include "Event/Handle/Scene/EventHandle_StopLevelSequence.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMaterialLibrary.h"
@@ -99,7 +100,6 @@ USceneModule::USceneModule()
 	OutlineMatInst = nullptr;
 
 	AsyncLoadLevelQueue = TArray<FAsyncLoadLevelTask>();
-	AsyncUnloadLevelQueue = TArray<FAsyncUnloadLevelTask>();
 }
 
 USceneModule::~USceneModule()
@@ -163,6 +163,7 @@ void USceneModule::OnInitialize()
 	UEventModuleStatics::SubscribeEvent<UEventHandle_StopLevelSequence>(this, GET_FUNCTION_NAME_THISCLASS(OnStopLevelSequence));
 	UEventModuleStatics::SubscribeEvent<UEventHandle_SetDataLayerRuntimeState>(this, GET_FUNCTION_NAME_THISCLASS(OnSetDataLayerRuntimeState));
 	UEventModuleStatics::SubscribeEvent<UEventHandle_SetDataLayerOwnerPlayer>(this, GET_FUNCTION_NAME_THISCLASS(OnSetDataLayerOwnerPlayer));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_SetLevelOwnerPlayer>(this, GET_FUNCTION_NAME_THISCLASS(OnSetLevelOwnerPlayer));
 
 	if(WorldTimer)
 	{
@@ -302,21 +303,59 @@ void USceneModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 		}
 		MiniMapCapture->GetCapture()->OrthoWidth = MiniMapRange;
 	}
+	
 	if(WorldTimer)
 	{
 		WorldTimer->OnRefresh(DeltaSeconds);
 	}
+	
 	if(WorldWeather)
 	{
 		WorldWeather->OnRefresh(DeltaSeconds);
 	}
+	
+	if(AsyncLoadLevelQueue.Num() > 0)
+	{
+		FAsyncLoadLevelTask& Task = AsyncLoadLevelQueue[0];
+		if(!Task.bLoading)
+		{
+			switch(Task.State)
+			{
+				case EFAsyncLoadLevelState::Loading:
+				{
+					AsyncLoadLevelInternal(Task);
+					break;
+				}
+				case EFAsyncLoadLevelState::Unloading:
+				{
+					AsyncUnloadLevelInternal(Task);
+					break;
+				}
+				default: break;
+			}
+		}
+	}
 
 	for(const auto& Iter : DataLayerPlayerMappings)
 	{
-		UDataLayerAsset* DataLayer = Iter.Key;
-		const int32 PlayerIndex = Iter.Value;
-		TArray<AActor*> Actors = UCommonStatics::GetAllActorsOfDataLayer(DataLayer);
-		const AWHPlayerController* PlayerController = UCommonStatics::GetPlayerController(PlayerIndex);
+		TArray<AActor*> Actors = UCommonStatics::GetAllActorsOfDataLayer(Iter.Key);
+		const AWHPlayerController* PlayerController = UCommonStatics::GetPlayerController(Iter.Value);
+		for(const auto Iter1 : Actors)
+		{
+			Iter1->SetOwner(PlayerController->GetViewTarget());
+			TArray<UPrimitiveComponent*> Components;
+			Iter1->GetComponents<UPrimitiveComponent>(Components);
+			for(const auto Iter2 : Components)
+			{
+				Iter2->SetOnlyOwnerSee(true);
+			}
+		}
+	}
+
+	for(const auto& Iter : LevelPlayerMappings)
+	{
+		TArray<AActor*> Actors = UCommonStatics::GetAllActorsOfLevel(Iter.Key);
+		const AWHPlayerController* PlayerController = UCommonStatics::GetPlayerController(Iter.Value);
 		for(const auto Iter1 : Actors)
 		{
 			Iter1->SetOwner(PlayerController->GetViewTarget());
@@ -514,7 +553,7 @@ void USceneModule::OnAsyncLoadLevel(UObject* InSender, UEventHandle_AsyncLoadLev
 
 void USceneModule::OnAsyncUnloadLevel(UObject* InSender, UEventHandle_AsyncUnloadLevel* InEventHandle)
 {
-	FOnAsyncUnloadLevelFinished OnAsyncUnloadLevelFinished;
+	FOnAsyncLoadLevelFinished OnAsyncUnloadLevelFinished;
 	if(InEventHandle->LevelObjectPtr)
 	{
 		AsyncUnloadLevelByObjectPtr(InEventHandle->LevelObjectPtr, OnAsyncUnloadLevelFinished, InEventHandle->FinishDelayTime, InEventHandle->bCreateLoadingWidget);
@@ -607,6 +646,19 @@ void USceneModule::OnSetDataLayerOwnerPlayer(UObject* InSender, UEventHandle_Set
 	else if(DataLayerPlayerMappings.Contains(InEventHandle->DataLayer))
 	{
 		DataLayerPlayerMappings.Remove(InEventHandle->DataLayer);
+	}
+}
+
+void USceneModule::OnSetLevelOwnerPlayer(UObject* InSender, UEventHandle_SetLevelOwnerPlayer* InEventHandle)
+{
+	const FName LevelPath = InEventHandle->LevelObjectPtr ? FName(*FPackageName::ObjectPathToPackageName(InEventHandle->LevelObjectPtr.ToString())) : InEventHandle->LevelPath;
+	if(InEventHandle->PlayerIndex != -1)
+	{
+		LevelPlayerMappings.Emplace(LevelPath, InEventHandle->PlayerIndex);
+	}
+	else if(LevelPlayerMappings.Contains(LevelPath))
+	{
+		LevelPlayerMappings.Remove(LevelPath);
 	}
 }
 
@@ -845,19 +897,14 @@ void USceneModule::SetOutlineColor(const FLinearColor& InColor)
 
 void USceneModule::AsyncLoadLevel(const FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnLoadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
 {
-	for(auto& Iter : AsyncLoadLevelQueue) if(Iter.LevelPath == InLevelPath) return;
-
 	FAsyncLoadLevelTask Task;
+	Task.State = EFAsyncLoadLevelState::Loading;
 	Task.LevelPath = InLevelPath;
 	Task.OnLoadFinished = InOnLoadFinished;
 	Task.FinishDelayTime = InFinishDelayTime;
 	Task.bCreateLoadingWidget = bCreateLoadingWidget;
 
 	AsyncLoadLevelQueue.Add(Task);
-
-	if(AsyncLoadLevelQueue.Num() > 1) return;
-
-	AsyncLoadLevelInternal(Task);
 }
 
 void USceneModule::AsyncLoadLevelByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr, const FOnAsyncLoadLevelFinished& InOnLoadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
@@ -866,24 +913,19 @@ void USceneModule::AsyncLoadLevelByObjectPtr(const TSoftObjectPtr<UWorld> InLeve
 	AsyncLoadLevel(LevelPath, InOnLoadFinished, InFinishDelayTime, bCreateLoadingWidget);
 }
 
-void USceneModule::AsyncUnloadLevel(const FName InLevelPath, const FOnAsyncUnloadLevelFinished& InOnUnloadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
+void USceneModule::AsyncUnloadLevel(const FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnUnloadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
 {
-	for(auto& Iter : AsyncUnloadLevelQueue) if(Iter.LevelPath == InLevelPath) return;
-
-	FAsyncUnloadLevelTask Task;
+	FAsyncLoadLevelTask Task;
+	Task.State = EFAsyncLoadLevelState::Unloading;
 	Task.LevelPath = InLevelPath;
-	Task.OnUnloadFinished = InOnUnloadFinished;
+	Task.OnLoadFinished = InOnUnloadFinished;
 	Task.FinishDelayTime = InFinishDelayTime;
 	Task.bCreateLoadingWidget = bCreateLoadingWidget;
 
-	AsyncUnloadLevelQueue.Add(Task);
-
-	if(AsyncUnloadLevelQueue.Num() > 1) return;
-
-	AsyncUnloadLevelInternal(Task);
+	AsyncLoadLevelQueue.Add(Task);
 }
 
-void USceneModule::AsyncUnloadLevelByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr, const FOnAsyncUnloadLevelFinished& InOnUnloadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
+void USceneModule::AsyncUnloadLevelByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr, const FOnAsyncLoadLevelFinished& InOnUnloadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
 {
 	const FName LevelPath = FName(*FPackageName::ObjectPathToPackageName(InLevelObjectPtr.ToString()));
 	AsyncUnloadLevel(LevelPath, InOnUnloadFinished, InFinishDelayTime, bCreateLoadingWidget);
@@ -913,11 +955,13 @@ float USceneModule::GetAsyncUnloadLevelProgressByObjectPtr(const TSoftObjectPtr<
 	return GetAsyncUnloadLevelProgress(LevelPath);
 }
 
-void USceneModule::AsyncLoadLevelInternal(FAsyncLoadLevelTask InTask)
+void USceneModule::AsyncLoadLevelInternal(FAsyncLoadLevelTask& InTask)
 {
 	WHLog(TEXT("Start load level: %s") + InTask.LevelPath.ToString(), EDC_Scene);
 
 	const FString LoadPackagePath = FPaths::GetBaseFilename(InTask.LevelPath.ToString(), false);
+
+	InTask.bLoading = true;
 
 	if(InTask.bCreateLoadingWidget)
 	{
@@ -941,9 +985,11 @@ void USceneModule::AsyncLoadLevelInternal(FAsyncLoadLevelTask InTask)
 	}), 0, PKG_ContainsMap);
 }
 
-void USceneModule::AsyncUnloadLevelInternal(FAsyncUnloadLevelTask InTask)
+void USceneModule::AsyncUnloadLevelInternal(FAsyncLoadLevelTask& InTask)
 {
 	WHLog(TEXT("Start unload level: ") + InTask.LevelPath.ToString());
+
+	InTask.bLoading = true;
 
 	if(InTask.bCreateLoadingWidget)
 	{
@@ -972,14 +1018,9 @@ void USceneModule::OnAsyncLoadLevelFinished(FAsyncLoadLevelTask InTask)
 		InTask.OnLoadFinished.Execute(InTask.LevelPath);
 	}
 	UEventModuleStatics::BroadcastEvent(UEventHandle_AsyncLoadLevelFinished::StaticClass(), this, { InTask.LevelPath }, EEventNetType::Multicast);
-
-	if(AsyncLoadLevelQueue.IsValidIndex(0))
-	{
-		AsyncLoadLevelInternal(AsyncLoadLevelQueue[0]);
-	}
 }
 
-void USceneModule::OnAsyncUnloadLevelFinished(FAsyncUnloadLevelTask InTask)
+void USceneModule::OnAsyncUnloadLevelFinished(FAsyncLoadLevelTask InTask)
 {
 	WHLog(TEXT("Unload level Succeeded!"));
 
@@ -988,16 +1029,11 @@ void USceneModule::OnAsyncUnloadLevelFinished(FAsyncUnloadLevelTask InTask)
 		UWidgetModuleStatics::CloseUserWidget<UWidgetLoadingLevelPanel>();
 	}
 	
-	if(InTask.OnUnloadFinished.IsBound())
+	if(InTask.OnLoadFinished.IsBound())
 	{
-		InTask.OnUnloadFinished.Execute(InTask.LevelPath);
+		InTask.OnLoadFinished.Execute(InTask.LevelPath);
 	}
 	UEventModuleStatics::BroadcastEvent(UEventHandle_AsyncUnloadLevelFinished::StaticClass(), this, { InTask.LevelPath }, EEventNetType::Multicast);
-
-	if(AsyncUnloadLevelQueue.IsValidIndex(0))
-	{
-		AsyncUnloadLevelInternal(AsyncUnloadLevelQueue[0]);
-	}
 }
 
 void USceneModule::OnHandleAsyncLoadLevelFinish()
@@ -1020,10 +1056,10 @@ void USceneModule::OnHandleAsyncLoadLevelFinish()
 
 void USceneModule::OnHandleAsyncUnloadLevelFinish()
 {
-	if(AsyncUnloadLevelQueue.IsValidIndex(0))
+	if(AsyncLoadLevelQueue.IsValidIndex(0))
 	{
-		FAsyncUnloadLevelTask Task = AsyncUnloadLevelQueue[0];
-		AsyncUnloadLevelQueue.RemoveAt(0);
+		FAsyncLoadLevelTask Task = AsyncLoadLevelQueue[0];
+		AsyncLoadLevelQueue.RemoveAt(0);
 		if(Task.FinishDelayTime > 0.f)
 		{
 			FTimerHandle TimerHandle;

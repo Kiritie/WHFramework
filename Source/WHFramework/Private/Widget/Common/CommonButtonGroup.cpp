@@ -21,7 +21,6 @@ void UCommonButtonGroup::OnDespawn_Implementation(bool bRecovery)
 	bSelectionRequired = false;
 	bBroadcastOnDeselected = true;
 
-	DeselectAllN();
 	for(auto Iter : Buttons)
 	{
 		UObjectPoolModuleStatics::DespawnObject(Iter.Get(), true);

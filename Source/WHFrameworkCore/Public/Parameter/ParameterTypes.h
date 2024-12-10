@@ -158,6 +158,11 @@ public:
 		*this = MakeEnum(InValue);
 	}
 
+	FParameter(const TCHAR* InValue)
+	{
+		*this = MakeString(InValue);
+	}
+
 	FParameter(const FString& InValue)
 	{
 		*this = MakeString(InValue);
@@ -282,8 +287,10 @@ public:
 	FORCEINLINE operator uint8() const { return ByteValue; }
 	
 	FORCEINLINE operator FEnumParameterValue() const { return EnumValue; }
-	
+		
 	FORCEINLINE operator FString() const { return StringValue; }
+	
+	FORCEINLINE operator const TCHAR*() const { return *StringValue; }
 	
 	FORCEINLINE operator FName() const { return NameValue; }
 	

@@ -184,12 +184,12 @@ void UWorldWidgetBase::OnDestroy(bool bRecovery)
 		GetWorld()->GetTimerManager().ClearTimer(RefreshTimerHandle);
 	}
 	
+	K2_OnDestroy(bRecovery);
+
 	UInputModuleStatics::UpdateGlobalInputMode();
 	
 	if(K2_OnDestroyed.IsBound()) K2_OnDestroyed.Broadcast(bRecovery);
 	if(OnDestroyed.IsBound()) OnDestroyed.Broadcast(bRecovery);
-
-	K2_OnDestroy(bRecovery);
 
 	UObjectPoolModuleStatics::DespawnObject(this, bRecovery);
 

@@ -6,8 +6,10 @@
 #include "SceneModuleTypes.generated.h"
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FOnAsyncLoadLevelFinished, FName, InLevelPath);
-DECLARE_DYNAMIC_DELEGATE_OneParam(FOnAsyncUnloadLevelFinished, FName, InLevelPath);
 
+/**
+ * 时间阶段
+ */
 UENUM(BlueprintType)
 enum class EWorldTimePhase : uint8
 {
@@ -27,6 +29,19 @@ enum class EWorldTimePhase : uint8
 };
 
 /**
+ * 加载关卡状态
+ */
+UENUM(BlueprintType)
+enum class EFAsyncLoadLevelState : uint8
+{
+	None,
+	//加载
+	Loading,
+	//卸载
+	Unloading
+};
+
+/**
  *
  */
 USTRUCT(BlueprintType)
@@ -37,6 +52,8 @@ struct WHFRAMEWORK_API FAsyncLoadLevelTask
 public:
 	FAsyncLoadLevelTask()
 	{
+		bLoading = false;
+		State = EFAsyncLoadLevelState::None;
 		LevelPath = NAME_None;
 		OnLoadFinished = FOnAsyncLoadLevelFinished();
 		FinishDelayTime = 0.f;
@@ -45,41 +62,16 @@ public:
 
 public:
 	UPROPERTY(VisibleAnywhere)
+	bool bLoading;
+
+	UPROPERTY(VisibleAnywhere)
+	EFAsyncLoadLevelState State;
+
+	UPROPERTY(VisibleAnywhere)
 	FName LevelPath;
 
 	UPROPERTY(VisibleAnywhere)
 	FOnAsyncLoadLevelFinished OnLoadFinished;
-
-	UPROPERTY(VisibleAnywhere)
-	float FinishDelayTime;
-
-	UPROPERTY(VisibleAnywhere)
-	bool bCreateLoadingWidget;
-};
-
-/**
- *
- */
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FAsyncUnloadLevelTask
-{
-	GENERATED_BODY()
-
-public:
-	FAsyncUnloadLevelTask()
-	{
-		LevelPath = NAME_None;
-		OnUnloadFinished = FOnAsyncUnloadLevelFinished();
-		FinishDelayTime = 0.f;
-		bCreateLoadingWidget = false;
-	}
-
-public:
-	UPROPERTY(VisibleAnywhere)
-	FName LevelPath;
-
-	UPROPERTY(VisibleAnywhere)
-	FOnAsyncUnloadLevelFinished OnUnloadFinished;
 
 	UPROPERTY(VisibleAnywhere)
 	float FinishDelayTime;

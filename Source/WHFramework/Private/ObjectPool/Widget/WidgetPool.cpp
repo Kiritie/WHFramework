@@ -9,11 +9,26 @@ UWidgetPool::UWidgetPool()
 {
 }
 
-UObject* UWidgetPool::OnSpawn(UObject* InObject)
+UObject* UWidgetPool::OnSpawn(UObject* InOwner, UObject* InObject)
 {
 	if(!InObject)
 	{
-		InObject = CreateWidget<UUserWidget>(GetWorld(), Type.Get());
+		if(APlayerController* PlayerController = Cast<APlayerController>(InOwner))
+		{
+			InObject = CreateWidget(PlayerController, Type.Get());
+		}
+		else if(UGameInstance* GameInstance = Cast<UGameInstance>(InOwner))
+		{
+			InObject = CreateWidget(GameInstance, Type.Get());
+		}
+		else if(UWorld* World = Cast<UWorld>(InOwner))
+		{
+			InObject = CreateWidget(World, Type.Get());
+		}
+		else
+		{
+			InObject = CreateWidget(GetWorld(), Type.Get());
+		}
 	}
 	else if(InObject->IsRooted())
 	{

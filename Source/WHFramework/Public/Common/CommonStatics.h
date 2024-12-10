@@ -329,6 +329,22 @@ public:
 	}
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"), Category = "CommonStatics")
 	static TArray<AActor*> GetAllActorsOfDataLayer(UDataLayerAsset* InDataLayer, TSubclassOf<AActor> InClass = nullptr);
+	
+	template<class T>
+	static TArray<T*> GetAllActorsOfLevel(const FName InLevelName)
+	{
+		TArray<T*> ReturnValues;
+		for(auto Iter : GetAllActorsOfLevel(InLevelName, T::StaticClass()))
+		{
+			if(T* Actor = Cast<T>(Iter))
+			{
+				ReturnValues.Add(Actor);
+			}
+		}
+		return ReturnValues;
+	}
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"), Category = "CommonStatics")
+	static TArray<AActor*> GetAllActorsOfLevel(const FName InLevelName);
 
 	template<class T>
 	static T* GetGameInstance()

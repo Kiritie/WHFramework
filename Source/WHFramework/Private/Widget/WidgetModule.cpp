@@ -143,7 +143,7 @@ void UWidgetModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
 	Super::OnRefresh(DeltaSeconds, bInEditor);
 
-	if(IsModuleInEditor()) return;
+	if(bInEditor) return;
 
 	TArray<UUserWidget*> TickAbleWidgets;
 	UWidgetBlueprintLibrary::GetAllWidgetsWithInterface(this, TickAbleWidgets, UTickAbleWidgetInterface::StaticClass(), false);
