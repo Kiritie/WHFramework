@@ -64,5 +64,5 @@ public:
 	static void ClearObject(TSubclassOf<UObject> InType);
 	
 	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModuleStatics")
-	static void ClearAllObject(bool bInEditor = false);
+	static void ClearAllObject();
 };

@@ -18,7 +18,7 @@ public:
 	UActorPool();
 
 public:
-	virtual UObject* OnSpawn(UObject* InObject) override;
+	virtual UObject* OnSpawn(UObject* InOwner, UObject* InObject) override;
 
 	virtual void OnDespawn(UObject* InObject, bool bRecovery) override;
 };

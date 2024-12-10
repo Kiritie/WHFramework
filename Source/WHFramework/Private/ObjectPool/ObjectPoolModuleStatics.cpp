@@ -28,7 +28,7 @@ void UObjectPoolModuleStatics::ClearObject(TSubclassOf<UObject> InType)
 	UObjectPoolModule::Get().ClearObject(InType);
 }
 
-void UObjectPoolModuleStatics::ClearAllObject(bool bInEditor)
+void UObjectPoolModuleStatics::ClearAllObject()
 {
 	UObjectPoolModule::Get().ClearAllObject();
 }

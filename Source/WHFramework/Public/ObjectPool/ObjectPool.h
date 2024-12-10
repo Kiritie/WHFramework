@@ -53,7 +53,7 @@ public:
 	void Clear();
 
 protected:
-	virtual UObject* OnSpawn(UObject* InObject);
+	virtual UObject* OnSpawn(UObject* InOwner, UObject* InObject);
 
 	virtual void OnDespawn(UObject* InObject, bool bRecovery);
 

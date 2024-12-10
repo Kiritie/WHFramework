@@ -24,12 +24,12 @@ UObject* UObjectPool::Spawn(UObject* InOwner, const TArray<FParameter>& InParams
 	if(Count > 0)
 	{
 		Queue.Dequeue(Object);
-		OnSpawn(Object);
+		OnSpawn(InOwner, Object);
 		Count--;
 	}
 	else
 	{
-		Object = OnSpawn(nullptr);
+		Object = OnSpawn(InOwner, nullptr);
 	}
 	if(Object)
 	{
@@ -66,11 +66,11 @@ void UObjectPool::Clear()
 	Queue.Empty();
 }
 
-UObject* UObjectPool::OnSpawn(UObject* InObject)
+UObject* UObjectPool::OnSpawn(UObject* InOwner, UObject* InObject)
 {
 	if(!InObject)
 	{
-		InObject = NewObject<UObject>(this, Type);
+		InObject = NewObject<UObject>(InOwner ? InOwner : this, Type);
 	}
 	else if(InObject->IsRooted())
 	{

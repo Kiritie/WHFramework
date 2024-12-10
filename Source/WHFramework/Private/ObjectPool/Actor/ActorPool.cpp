@@ -9,7 +9,7 @@ UActorPool::UActorPool()
 {
 }
 
-UObject* UActorPool::OnSpawn(UObject* InObject)
+UObject* UActorPool::OnSpawn(UObject* InOwner, UObject* InObject)
 {
 	if(!InObject)
 	{

@@ -351,7 +351,6 @@ bool UCommonStatics::ExecuteObjectFunc(UObject* InObject, const FName& InFuncNam
 
 bool UCommonStatics::IsClassHasChildren(const UClass* InClass, EClassFlags InDisabledFlags)
 {
-	return false;
 	return !GetClassChildren(InClass, false, InDisabledFlags).IsEmpty();
 }
 
@@ -430,6 +429,27 @@ TArray<AActor*> UCommonStatics::GetAllActorsOfDataLayer(UDataLayerAsset* InDataL
 			{
 				AActor* Actor = *It;
 				if (Actor->ContainsDataLayer(InDataLayer))
+				{
+					ReturnValues.Add(Actor);
+				}
+			}
+		}
+	}
+	return ReturnValues;
+}
+
+TArray<AActor*> UCommonStatics::GetAllActorsOfLevel(const FName InLevelName)
+{
+	TArray<AActor*> ReturnValues;
+	if(!InLevelName.IsNone())
+	{
+		if (UWorld* World = GEngine->GetWorldFromContextObject(GetWorldContext(), EGetWorldErrorMode::LogAndReturnNull))
+		{
+			for (TActorIterator<AActor> It(World); It; ++It)
+			{
+				AActor* Actor = *It;
+				FString LevelName = Actor->GetPackage()->GetName().Replace(TEXT("UEDPIE_0_"), TEXT(""));
+				if (LevelName == InLevelName) 
 				{
 					ReturnValues.Add(Actor);
 				}

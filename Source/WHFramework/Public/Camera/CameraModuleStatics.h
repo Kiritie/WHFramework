@@ -167,5 +167,5 @@ public:
 	static void AddCameraRotationInput(float InYaw, float InPitch);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
-	static void AddCameraDistanceInput(float InValue, bool bMoveIfZero = false);
+	static void AddCameraDistanceInput(float InValue);
 };

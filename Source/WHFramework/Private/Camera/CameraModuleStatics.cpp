@@ -206,7 +206,7 @@ void UCameraModuleStatics::AddCameraRotationInput(float InYaw, float InPitch)
 	UCameraModule::Get().AddCameraRotationInput(InYaw, InPitch);
 }
 
-void UCameraModuleStatics::AddCameraDistanceInput(float InValue, bool bMoveIfZero)
+void UCameraModuleStatics::AddCameraDistanceInput(float InValue)
 {
-	UCameraModule::Get().AddCameraDistanceInput(InValue, bMoveIfZero);
+	UCameraModule::Get().AddCameraDistanceInput(InValue);
 }
