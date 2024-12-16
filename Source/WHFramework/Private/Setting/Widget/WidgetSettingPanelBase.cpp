@@ -69,7 +69,7 @@ void UWidgetSettingPanelBase::OnClose(bool bInstant)
 	Super::OnClose(bInstant);
 }
 
-void UWidgetSettingPanelBase::OnPageItemSelected(UCommonButtonBase* SelectedTabButton, int32 ButtonIndex)
+void UWidgetSettingPanelBase::OnPageItemSelected_Implementation(UCommonButtonBase* SelectedTabButton, int32 ButtonIndex)
 {
 	Switcher_Page->SetActiveWidgetIndex(ButtonIndex);
 }
@@ -116,7 +116,7 @@ UWidgetSettingPageBase* UWidgetSettingPanelBase::GetCurrentPage() const
 	return GetSubWidget<UWidgetSettingPageBase>(GetCurrentPageIndex());
 }
 
-void UWidgetSettingPanelBase::SetCurrentPage_Implementation(int32 InPageIndex)
+void UWidgetSettingPanelBase::SetCurrentPage(int32 InPageIndex)
 {
 	PageItemGroup->SelectButtonAtIndex(InPageIndex);
 }

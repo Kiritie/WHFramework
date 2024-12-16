@@ -217,6 +217,10 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 				CanvasPanelSlot->SetOffsets(WidgetOffsets);
 				CanvasPanelSlot->SetAlignment(WidgetAlignment);
 			}
+			else
+			{
+				ParentPanelWidget->AddChild(this);
+			}
 		}
 	}
 	switch(WidgetOpenType)

@@ -12,6 +12,7 @@ UENUM(BlueprintType)
 enum class EParameterType : uint8
 {
 	None,
+	Misc,
 	Integer,
 	Float,
 	Byte,
