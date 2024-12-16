@@ -138,7 +138,7 @@ void UCommonButtonGroup::DeselectAllN()
 		UCommonButton* Button = Cast<UCommonButton>(Iter.Get());
 		if (Button && Button->GetSelected() && !Button->IsStandalone())
 		{
-			Button->SetSelectedInternal(false);
+			Button->SetSelectedInternal(false, false);
 		}
 	}
 

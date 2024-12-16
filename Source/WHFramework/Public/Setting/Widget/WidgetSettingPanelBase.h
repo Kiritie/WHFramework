@@ -5,6 +5,7 @@
 
 #include "WidgetSettingPanelBase.generated.h"
 
+class UCommonButtonBase;
 class UCommonActivatableWidgetSwitcher;
 class UWidgetSettingPageBase;
 class UCommonButton;
@@ -30,7 +31,7 @@ public:
 	virtual void OnClose(bool bInstant) override;
 
 protected:
-	UFUNCTION()
+	UFUNCTION(BlueprintNativeEvent)
 	void OnPageItemSelected(UCommonButtonBase* SelectedTabButton, int32 ButtonIndex);
 
 	UFUNCTION()
@@ -66,6 +67,6 @@ public:
 	UFUNCTION(BlueprintPure)
 	UWidgetSettingPageBase* GetCurrentPage() const;
 
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	UFUNCTION(BlueprintCallable)
 	void SetCurrentPage(int32 InPageIndex);
 };

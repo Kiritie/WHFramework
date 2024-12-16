@@ -10,9 +10,9 @@
 #include "Engine/TargetPoint.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Scene/EventHandle_AsyncLoadLevel.h"
+#include "Event/Handle/Scene/EventHandle_AsyncLoadLevels.h"
 #include "Event/Handle/Scene/EventHandle_AsyncLoadLevelFinished.h"
-#include "Event/Handle/Scene/EventHandle_AsyncUnloadLevel.h"
+#include "Event/Handle/Scene/EventHandle_AsyncUnloadLevels.h"
 #include "Event/Handle/Scene/EventHandle_AsyncUnloadLevelFinished.h"
 #include "Event/Handle/Scene/EventHandle_PlayLevelSequence.h"
 #include "Event/Handle/Scene/EventHandle_SetActorVisible.h"
@@ -156,8 +156,8 @@ void USceneModule::OnInitialize()
 {
 	Super::OnInitialize();
 
-	UEventModuleStatics::SubscribeEvent<UEventHandle_AsyncLoadLevel>(this, GET_FUNCTION_NAME_THISCLASS(OnAsyncLoadLevel));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_AsyncUnloadLevel>(this, GET_FUNCTION_NAME_THISCLASS(OnAsyncUnloadLevel));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_AsyncLoadLevels>(this, GET_FUNCTION_NAME_THISCLASS(OnAsyncLoadLevels));
+	UEventModuleStatics::SubscribeEvent<UEventHandle_AsyncUnloadLevels>(this, GET_FUNCTION_NAME_THISCLASS(OnAsyncUnloadLevels));
 	UEventModuleStatics::SubscribeEvent<UEventHandle_SetActorVisible>(this, GET_FUNCTION_NAME_THISCLASS(OnSetActorVisible));
 	UEventModuleStatics::SubscribeEvent<UEventHandle_PlayLevelSequence>(this, GET_FUNCTION_NAME_THISCLASS(OnPlayLevelSequence));
 	UEventModuleStatics::SubscribeEvent<UEventHandle_StopLevelSequence>(this, GET_FUNCTION_NAME_THISCLASS(OnStopLevelSequence));
@@ -538,29 +538,51 @@ UWorldWeather* USceneModule::GetWorldWeather(TSubclassOf<UWorldWeather> InClass)
 	return GetDeterminesOutputObject(WorldWeather, InClass);
 }
 
-void USceneModule::OnAsyncLoadLevel(UObject* InSender, UEventHandle_AsyncLoadLevel* InEventHandle)
+void USceneModule::OnAsyncLoadLevels(UObject* InSender, UEventHandle_AsyncLoadLevels* InEventHandle)
 {
-	FOnAsyncLoadLevelFinished OnAsyncLoadLevelFinished;
-	if(InEventHandle->LevelObjectPtr)
+	for(auto& Iter : InEventHandle->SoftLevelPaths)
 	{
-		AsyncLoadLevelByObjectPtr(InEventHandle->LevelObjectPtr, OnAsyncLoadLevelFinished, InEventHandle->FinishDelayTime, InEventHandle->bCreateLoadingWidget);
-	}
-	else
-	{
-		AsyncLoadLevel(InEventHandle->LevelPath, OnAsyncLoadLevelFinished, InEventHandle->FinishDelayTime, InEventHandle->bCreateLoadingWidget);
+		if (Iter.LevelPath.ToString().EndsWith(TEXT("Sub_SCZ_Building")))
+		{
+			for (auto Iter1 : UCommonStatics::GetAllActorsOfLevel(Iter.LevelPath))
+			{
+				Iter1->SetActorHiddenInGame(false);
+			}
+			continue;
+		}
+		FOnAsyncLoadLevelFinished OnAsyncLoadLevelFinished;
+		if(Iter.LevelObjectPtr)
+		{
+			AsyncLoadLevelByObjectPtr(Iter.LevelObjectPtr, OnAsyncLoadLevelFinished, InEventHandle->FinishDelayTime, InEventHandle->bCreateLoadingWidget);
+		}
+		else
+		{
+			AsyncLoadLevel(Iter.LevelPath, OnAsyncLoadLevelFinished, InEventHandle->FinishDelayTime, InEventHandle->bCreateLoadingWidget);
+		}
 	}
 }
 
-void USceneModule::OnAsyncUnloadLevel(UObject* InSender, UEventHandle_AsyncUnloadLevel* InEventHandle)
+void USceneModule::OnAsyncUnloadLevels(UObject* InSender, UEventHandle_AsyncUnloadLevels* InEventHandle)
 {
-	FOnAsyncLoadLevelFinished OnAsyncUnloadLevelFinished;
-	if(InEventHandle->LevelObjectPtr)
+	for(auto& Iter : InEventHandle->SoftLevelPaths)
 	{
-		AsyncUnloadLevelByObjectPtr(InEventHandle->LevelObjectPtr, OnAsyncUnloadLevelFinished, InEventHandle->FinishDelayTime, InEventHandle->bCreateLoadingWidget);
-	}
-	else
-	{
-		AsyncUnloadLevel(InEventHandle->LevelPath, OnAsyncUnloadLevelFinished, InEventHandle->FinishDelayTime, InEventHandle->bCreateLoadingWidget);
+		if (Iter.LevelPath.ToString().EndsWith(TEXT("Sub_SCZ_Building")))
+		{
+			for (auto Iter1 : UCommonStatics::GetAllActorsOfLevel(Iter.LevelPath))
+			{
+				Iter1->SetActorHiddenInGame(true);
+			}
+			continue;
+		}
+		FOnAsyncLoadLevelFinished OnAsyncUnloadLevelFinished;
+		if(Iter.LevelObjectPtr)
+		{
+			AsyncUnloadLevelByObjectPtr(Iter.LevelObjectPtr, OnAsyncUnloadLevelFinished, InEventHandle->FinishDelayTime, InEventHandle->bCreateLoadingWidget);
+		}
+		else
+		{
+			AsyncUnloadLevel(Iter.LevelPath, OnAsyncUnloadLevelFinished, InEventHandle->FinishDelayTime, InEventHandle->bCreateLoadingWidget);
+		}
 	}
 }
 
@@ -897,14 +919,32 @@ void USceneModule::SetOutlineColor(const FLinearColor& InColor)
 
 void USceneModule::AsyncLoadLevel(const FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnLoadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
 {
-	FAsyncLoadLevelTask Task;
-	Task.State = EFAsyncLoadLevelState::Loading;
-	Task.LevelPath = InLevelPath;
-	Task.OnLoadFinished = InOnLoadFinished;
-	Task.FinishDelayTime = InFinishDelayTime;
-	Task.bCreateLoadingWidget = bCreateLoadingWidget;
+	bool bExistTask = false;
+	ITER_ARRAY_WITHINDEX(AsyncLoadLevelQueue, Index, Item,
+		if(Item.LevelPath == InLevelPath)
+		{
+			if(Item.State == EFAsyncLoadLevelState::Loading)
+			{
+				bExistTask = true;
+			}
+			else if(!AsyncLoadLevelQueue[Index].bLoading)
+			{
+				AsyncLoadLevelQueue.RemoveAt(Index);
+			}
+			break;
+		}
+	)
+	if(!bExistTask)
+	{
+		FAsyncLoadLevelTask Task;
+		Task.State = EFAsyncLoadLevelState::Loading;
+		Task.LevelPath = InLevelPath;
+		Task.OnLoadFinished = InOnLoadFinished;
+		Task.FinishDelayTime = InFinishDelayTime;
+		Task.bCreateLoadingWidget = bCreateLoadingWidget;
 
-	AsyncLoadLevelQueue.Add(Task);
+		AsyncLoadLevelQueue.Add(Task);
+	}
 }
 
 void USceneModule::AsyncLoadLevelByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr, const FOnAsyncLoadLevelFinished& InOnLoadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
@@ -915,14 +955,32 @@ void USceneModule::AsyncLoadLevelByObjectPtr(const TSoftObjectPtr<UWorld> InLeve
 
 void USceneModule::AsyncUnloadLevel(const FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnUnloadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
 {
-	FAsyncLoadLevelTask Task;
-	Task.State = EFAsyncLoadLevelState::Unloading;
-	Task.LevelPath = InLevelPath;
-	Task.OnLoadFinished = InOnUnloadFinished;
-	Task.FinishDelayTime = InFinishDelayTime;
-	Task.bCreateLoadingWidget = bCreateLoadingWidget;
+	bool bExistTask = false;
+	ITER_ARRAY_WITHINDEX(AsyncLoadLevelQueue, Index, Item,
+		if(Item.LevelPath == InLevelPath)
+		{
+			if(Item.State == EFAsyncLoadLevelState::Unloading)
+			{
+				bExistTask = true;
+			}
+			else if(!AsyncLoadLevelQueue[Index].bLoading)
+			{
+				AsyncLoadLevelQueue.RemoveAt(Index);
+			}
+			break;
+		}
+	)
+	if(!bExistTask)
+	{
+		FAsyncLoadLevelTask Task;
+		Task.State = EFAsyncLoadLevelState::Unloading;
+		Task.LevelPath = InLevelPath;
+		Task.OnLoadFinished = InOnUnloadFinished;
+		Task.FinishDelayTime = InFinishDelayTime;
+		Task.bCreateLoadingWidget = bCreateLoadingWidget;
 
-	AsyncLoadLevelQueue.Add(Task);
+		AsyncLoadLevelQueue.Add(Task);
+	}
 }
 
 void USceneModule::AsyncUnloadLevelByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr, const FOnAsyncLoadLevelFinished& InOnUnloadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)

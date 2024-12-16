@@ -4,19 +4,20 @@
 
 #include "Event/Handle/InstancedEventHandleBase.h"
 #include "Parameter/ParameterModuleTypes.h"
+#include "Scene/SceneModuleTypes.h"
 
-#include "EventHandle_AsyncLoadLevel.generated.h"
+#include "EventHandle_AsyncUnloadLevels.generated.h"
 
 /**
  * 
  */
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UEventHandle_AsyncLoadLevel : public UInstancedEventHandleBase
+class WHFRAMEWORK_API UEventHandle_AsyncUnloadLevels : public UInstancedEventHandleBase
 {
 	GENERATED_BODY()
 
 public:
-	UEventHandle_AsyncLoadLevel();
+	UEventHandle_AsyncUnloadLevels();
 	
 public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
@@ -27,10 +28,7 @@ public:
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TSoftObjectPtr<UWorld> LevelObjectPtr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "!LevelObjectPtr.IsValid()"))
-	FName LevelPath;
+	TArray<FSoftLevelPath> SoftLevelPaths;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float FinishDelayTime;

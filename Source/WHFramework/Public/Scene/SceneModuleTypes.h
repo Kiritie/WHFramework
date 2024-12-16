@@ -45,6 +45,29 @@ enum class EFAsyncLoadLevelState : uint8
  *
  */
 USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSoftLevelPath
+{
+	GENERATED_BODY()
+
+public:
+	FSoftLevelPath()
+	{
+		LevelObjectPtr = nullptr;
+		LevelPath = NAME_None;
+	}
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TSoftObjectPtr<UWorld> LevelObjectPtr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "!LevelObjectPtr.IsValid()"))
+	FName LevelPath;
+};
+
+/**
+ *
+ */
+USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FAsyncLoadLevelTask
 {
 	GENERATED_BODY()

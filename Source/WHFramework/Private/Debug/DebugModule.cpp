@@ -45,6 +45,10 @@ void UDebugModule::OnInitialize()
 {
 	Super::OnInitialize();
 
+#if !WITH_EDITOR
+	GEngine->Exec(GetWorld(), TEXT("DisableAllScreenMessages"));
+#endif
+
 	for(auto Iter : DebugCategoryStates)
 	{
 		FDebugManager::Get().SetDebugCategoryState(Iter.Key, Iter.Value);

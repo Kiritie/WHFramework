@@ -54,7 +54,8 @@ void FParameterCustomization::CustomizeChildren(TSharedRef<IPropertyHandle> InSt
 	ChildBuilder.AddProperty(ParamType##ValueHandle.ToSharedRef()).Visibility(TAttribute<EVisibility>::Create([this]() \
 		{ \
 			uint8 ParamTypeValue = 0; \
-			return ParameterTypeHandle->GetValue(ParamTypeValue) == FPropertyAccess::Success && (EParameterType)ParamTypeValue == EParameterType::ParamType ? EVisibility::Visible : EVisibility::Collapsed; \
+			ParameterTypeHandle->GetValue(ParamTypeValue); \
+			return (ParamTypeValue == (uint8)EParameterType::ParamType || ParamTypeValue == (uint8)EParameterType::Misc) ? EVisibility::Visible : EVisibility::Collapsed; \
 		}) \
 	);
 
@@ -85,9 +86,14 @@ void FParameterCustomization::CustomizeChildren(TSharedRef<IPropertyHandle> InSt
 
 void FParameterCustomization::OnParameterTypeChanged()
 {
-	for(auto& Iter : ParameterValueHandles)
+	uint8 ParamTypeValue = 0;
+	ParameterTypeHandle->GetValue(ParamTypeValue);
+	if(ParamTypeValue != (uint8)EParameterType::Misc)
 	{
-		Iter.Value->ResetToDefault();
+		for(auto& Iter : ParameterValueHandles)
+		{
+			Iter.Value->ResetToDefault();
+		}
 	}
 }
 

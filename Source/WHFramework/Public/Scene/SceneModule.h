@@ -11,8 +11,8 @@
 #include "SceneModule.generated.h"
 
 class UEventHandle_StopLevelSequence;
-class UEventHandle_AsyncUnloadLevel;
-class UEventHandle_AsyncLoadLevel;
+class UEventHandle_AsyncUnloadLevels;
+class UEventHandle_AsyncLoadLevels;
 class UEventHandle_PlayLevelSequence;
 class UEventHandle_SetActorVisible;
 class UEventHandle_SetDataLayerOwnerPlayer;
@@ -174,10 +174,10 @@ protected:
 	
 protected:
 	UFUNCTION()
-	void OnAsyncLoadLevel(UObject* InSender, UEventHandle_AsyncLoadLevel* InEventHandle);
+	void OnAsyncLoadLevels(UObject* InSender, UEventHandle_AsyncLoadLevels* InEventHandle);
 
 	UFUNCTION()
-	void OnAsyncUnloadLevel(UObject* InSender, UEventHandle_AsyncUnloadLevel* InEventHandle);
+	void OnAsyncUnloadLevels(UObject* InSender, UEventHandle_AsyncUnloadLevels* InEventHandle);
 
 	UFUNCTION()
 	void OnSetActorVisible(UObject* InSender, UEventHandle_SetActorVisible* InEventHandle);
