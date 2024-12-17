@@ -23,13 +23,10 @@ public:
 	static TArray<UTaskAsset*> GetTaskAssets();
 
 	UFUNCTION(BlueprintPure, Category = "TaskModuleStatics")
-	static UTaskAsset* GetCurrentTaskAsset();
-
-	UFUNCTION(BlueprintPure, Category = "TaskModuleStatics")
 	static UTaskBase* GetCurrentTask();
-
-	UFUNCTION(BlueprintPure, Category = "TaskModuleStatics")
-	static UTaskBase* GetCurrentRootTask();
+	
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static void SetCurrentTask(UTaskBase* InTask);
 
 	UFUNCTION(BlueprintPure, Category = "TaskModuleStatics")
 	static UTaskBase* GetTaskByGUID(const FString& InTaskGUID);
@@ -43,9 +40,6 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
 	static void RemoveTaskAsset(UTaskAsset* InAsset);
-	
-	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
-	static void SwitchTaskAsset(UTaskAsset* InAsset);
 
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
 	static void RestoreTask(UTaskBase* InTask);
@@ -54,10 +48,10 @@ public:
 	static void RestoreTaskByGUID(const FString& InTaskGUID);
 
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
-	static void EnterTask(UTaskBase* InTask);
+	static void EnterTask(UTaskBase* InTask, bool bSetAsCurrent = false);
 
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
-	static void EnterTaskByGUID(const FString& InTaskGUID);
+	static void EnterTaskByGUID(const FString& InTaskGUID, bool bSetAsCurrent = false);
 
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
 	static void RefreshTask(UTaskBase* InTask);

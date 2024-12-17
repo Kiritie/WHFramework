@@ -11,9 +11,6 @@ UTaskAsset::UTaskAsset(const FObjectInitializer& ObjectInitializer)
 	
 	NativeClass = GetClass();
 
-	bAutoEnterFirst = false;
-	FirstTask = nullptr;
-
 	RootTasks = TArray<UTaskBase*>();
 	TaskMap = TMap<FString, UTaskBase*>();
 }
@@ -33,11 +30,6 @@ void UTaskAsset::Initialize()
 		});
 
 		Iter->OnInitialize();
-
-		if(!FirstTask)
-		{
-			FirstTask = Iter;
-		}
 	}
 }
 

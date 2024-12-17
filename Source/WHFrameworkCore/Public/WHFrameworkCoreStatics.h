@@ -80,6 +80,8 @@ public:
 	static FString BoolToString(bool InBool);
 
 	static bool StringToBool(const FString& InString);
+	
+	static FString SanitizeFloat(float InFloat, int32 InMaxDigits = -1);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Url

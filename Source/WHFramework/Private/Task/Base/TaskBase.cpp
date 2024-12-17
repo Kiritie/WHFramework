@@ -19,7 +19,6 @@ UTaskBase::UTaskBase()
 	TaskDisplayName = FText::FromString(TEXT("Task Base"));
 	TaskDescription = FText::GetEmpty();
 
-	bFirstTask = false;
 	TaskIndex = 0;
 	TaskHierarchy = 0;
 	TaskState = ETaskState::None;
@@ -99,7 +98,7 @@ void UTaskBase::OnRestore()
 	}
 }
 
-void UTaskBase::OnEnter(UTaskBase* InLastTask)
+void UTaskBase::OnEnter()
 {
 	TaskState = ETaskState::Entered;
 	OnStateChanged(TaskState);
@@ -110,7 +109,7 @@ void UTaskBase::OnEnter(UTaskBase* InLastTask)
 
 	WHDebug(FString::Printf(TEXT("进入任务: %s"), *TaskDisplayName.ToString()), EDM_All, EDC_Task, EDV_Log, FColor::Cyan, 5.f);
 
-	K2_OnEnter(InLastTask);
+	K2_OnEnter();
 
 	switch(TaskGuideType)
 	{
@@ -130,7 +129,7 @@ void UTaskBase::OnEnter(UTaskBase* InLastTask)
 		{
 			if(Iter)
 			{
-				Iter->OnEnter(InLastTask);
+				Iter->OnEnter();
 			}
 		}
 	}
@@ -283,6 +282,11 @@ UTaskAsset* UTaskBase::GetTaskAsset() const
 	return Cast<UTaskAsset>(GetOuter());
 }
 
+bool UTaskBase::IsCurrent() const
+{
+	return UTaskModuleStatics::GetCurrentTask() == this;
+}
+
 bool UTaskBase::IsEntered() const
 {
 	return TaskState == ETaskState::Entered || TaskState == ETaskState::Executing;
@@ -347,9 +351,9 @@ void UTaskBase::Restore()
 	UTaskModuleStatics::RestoreTask(this);
 }
 
-void UTaskBase::Enter()
+void UTaskBase::Enter(bool bSetAsCurrent)
 {
-	UTaskModuleStatics::EnterTask(this);
+	UTaskModuleStatics::EnterTask(this, bSetAsCurrent);
 }
 
 void UTaskBase::Refresh()
@@ -407,7 +411,7 @@ void UTaskBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	{
 		case ETaskState::Entered:
 		{
-			OnEnter(nullptr);
+			OnEnter();
 			break;
 		}
 		case ETaskState::Executing:
@@ -574,22 +578,6 @@ void UTaskBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
 				TaskLeaveType = ETaskLeaveType::Automatic;
 				TaskGuideType = ETaskGuideType::None;				
 				TaskGuideIntervalTime = 0.f;
-			}
-		}
-
-		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UTaskBase, bFirstTask))
-		{
-			if(bFirstTask)
-			{
-				if(GetTaskAsset()->FirstTask)
-				{
-					GetTaskAsset()->FirstTask->bFirstTask = false;
-				}
-				GetTaskAsset()->FirstTask = this;
-			}
-			else if(GetTaskAsset()->FirstTask == this)
-			{
-				GetTaskAsset()->FirstTask = nullptr;
 			}
 		}
 	}

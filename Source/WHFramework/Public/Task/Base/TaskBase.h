@@ -81,12 +81,11 @@ public:
 	virtual void OnRestore();
 	/**
 	 * 任务进入
-	 * @param InLastTask 上一个任务
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnEnter")
-	void K2_OnEnter(UTaskBase* InLastTask);
+	void K2_OnEnter();
 	UFUNCTION()
-	virtual void OnEnter(UTaskBase* InLastTask);
+	virtual void OnEnter();
 	/**
 	 * 任务帧刷新
 	 */
@@ -133,7 +132,7 @@ public:
 	* 进入任务
 	*/
 	UFUNCTION(BlueprintCallable)
-	void Enter();
+	void Enter(bool bSetAsCurrent = false);
 	/**
 	* 刷新任务
 	*/
@@ -190,9 +189,6 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Index/State
 public:
-	/// 是否为开始任务
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Index/State")
-	bool bFirstTask;
 	/// 任务索引
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/State")
 	int32 TaskIndex;
@@ -222,6 +218,11 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	bool IsRootTask() const { return TaskHierarchy == 0; }
+	/**
+	* 是否是当前任务
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsCurrent() const;
 	/**
 	* 是否已进入
 	*/

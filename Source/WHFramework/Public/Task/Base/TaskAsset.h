@@ -24,12 +24,6 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Task Stats
 public:
-	/// 自动进入初始任务
-	UPROPERTY(EditAnywhere)
-	bool bAutoEnterFirst;
-	/// 初始任务
-	UPROPERTY(VisibleAnywhere)
-	UTaskBase* FirstTask;
 	/// 根任务
 	UPROPERTY(VisibleAnywhere)
 	TArray<UTaskBase*> RootTasks;

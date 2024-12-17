@@ -22,3 +22,8 @@ void UEventHandle_TaskExecuted::Parse_Implementation(const TArray<FParameter>& I
 		Task = InParams[0];
 	}
 }
+
+TArray<FParameter> UEventHandle_TaskExecuted::Pack_Implementation()
+{
+	return { Task };
+}

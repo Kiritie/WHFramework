@@ -88,7 +88,6 @@ public:
 	FORCEINLINE FTaskModuleSaveData()
 	{
 		Assets = TArray<UTaskAsset*>();
-		CurrentAsset = nullptr;
 		CurrentTask = nullptr;
 		TaskDataMap = TMap<FString, FSaveData>();
 	}
@@ -96,9 +95,6 @@ public:
 public:
 	UPROPERTY()
 	TArray<UTaskAsset*> Assets;
-
-	UPROPERTY()
-	UTaskAsset* CurrentAsset;
 
 	UPROPERTY()
 	UTaskBase* CurrentTask;

@@ -176,7 +176,7 @@ FString UAudioModule::GetModuleDebugMessage()
 	FString DebugMessage;
 	for(auto Iter : SingleSoundInfos)
 	{
-		DebugMessage.Appendf(TEXT("%s-%s(%s)\n"), *Iter.Key.ToString(), *Iter.Value.Sound->GetName(), *UCommonStatics::GetEnumValueAuthoredName(TEXT("/Script/Engine.EAudioComponentPlayState"), (int32)Iter.Value.Audio->GetPlayState()));
+		DebugMessage.Appendf(TEXT("%s-%s(%s)\n"), *Iter.Key.ToString(), *Iter.Value.Sound->GetName(), *UCommonStatics::GetEnumAuthoredNameByValue(TEXT("/Script/Engine.EAudioComponentPlayState"), (int32)Iter.Value.Audio->GetPlayState()));
 	}
 	DebugMessage.RemoveFromEnd(TEXT("\n"));
 	return DebugMessage;

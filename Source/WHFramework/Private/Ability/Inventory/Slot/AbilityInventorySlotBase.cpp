@@ -198,20 +198,14 @@ void UAbilityInventorySlotBase::SplitItem(int32 InCount /*= -1*/)
 
 	if(InCount == - 1) InCount = Item.Count;
 	const int32 Count = Item.Count / InCount;
-	auto ItemQueryData = Inventory->QueryItemByRange(EItemQueryType::Add, Item);
-	for (int32 i = 0; i < InCount; i++)
+	for (int32 i = 0; i < InCount - 1; i++)
 	{
 		FAbilityItem _Item = FAbilityItem(Item, Count);
+		auto QueryData = Inventory->QueryItemByRange(EItemQueryType::Split, _Item);
+		Inventory->AddItemByQueryData(QueryData, false);
+		_Item.Count -= QueryData.Item.Count;
 		Item.Count -= _Item.Count;
-		for (int32 j = 0; j < ItemQueryData.Slots.Num(); j++)
-		{
-			if (ItemQueryData.Slots[j]->IsEmpty() && ItemQueryData.Slots[j] != this)
-			{
-				ItemQueryData.Slots[j]->SetItem(_Item);
-				ItemQueryData.Slots.RemoveAt(j);
-				break;
-			}
-		}
+		if(QueryData.Item.Count > 0) break;
 	}
 	Refresh();
 }

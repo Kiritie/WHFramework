@@ -111,6 +111,25 @@ EAbilityItemType FAbilityItem::GetType() const
 	return GetData().GetItemType();
 }
 
+UAbilityInventoryBase* FAbilityItem::GetInventory() const
+{
+	if(InventorySlot)
+	{
+		return InventorySlot->GetInventory();
+	}
+	return nullptr;
+}
+
+UAbilityInventorySlotBase* FAbilityItem::GetSlot() const
+{
+	return InventorySlot;
+}
+
+FGameplayAbilitySpecHandle FAbilityItem::GetHandle() const
+{
+	return AbilityHandle;
+}
+
 UPrimaryAssetBase& FAbilityData::GetData() const
 {
 	return UAssetModuleStatics::LoadPrimaryAssetRef<UPrimaryAssetBase>(ID);
@@ -134,7 +153,7 @@ void FInventorySaveData::FillItems(int32 InLevel, FRandomStream InRandomStream)
 	{
 		if(Iter1.Key == EAbilityItemType::None) continue;
 
-		const FName ItemType = *UCommonStatics::GetEnumValueAuthoredName(TEXT("/Script/WHFramework.EAbilityItemType"), (int32)Iter1.Key);
+		const FName ItemType = *UCommonStatics::GetEnumAuthoredNameByValue(TEXT("/Script/WHFramework.EAbilityItemType"), (int32)Iter1.Key);
 
 		int32 ItemNum = 0;
 		EAbilityItemRarity ItemParity = EAbilityItemRarity::None;

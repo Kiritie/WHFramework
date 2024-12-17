@@ -10,19 +10,14 @@ TArray<UTaskAsset*> UTaskModuleStatics::GetTaskAssets()
 	return UTaskModule::Get().GetAssets();
 }
 
-UTaskAsset* UTaskModuleStatics::GetCurrentTaskAsset()
-{
-	return UTaskModule::Get().GetCurrentAsset();
-}
-
 UTaskBase* UTaskModuleStatics::GetCurrentTask()
 {
 	return UTaskModule::Get().GetCurrentTask();
 }
 
-UTaskBase* UTaskModuleStatics::GetCurrentRootTask()
+void UTaskModuleStatics::SetCurrentTask(UTaskBase* InTask)
 {
-	return UTaskModule::Get().GetCurrentRootTask();
+	UTaskModule::Get().SetCurrentTask(InTask);
 }
 
 UTaskBase* UTaskModuleStatics::GetTaskByGUID(const FString& InTaskGUID)
@@ -45,11 +40,6 @@ void UTaskModuleStatics::RemoveTaskAsset(UTaskAsset* InAsset)
 	UTaskModule::Get().RemoveAsset(InAsset);
 }
 
-void UTaskModuleStatics::SwitchTaskAsset(UTaskAsset* InAsset)
-{
-	UTaskModule::Get().SwitchAsset(InAsset);
-}
-
 void UTaskModuleStatics::RestoreTask(UTaskBase* InTask)
 {
 	UTaskModule::Get().RestoreTask(InTask);
@@ -60,14 +50,14 @@ void UTaskModuleStatics::RestoreTaskByGUID(const FString& InTaskGUID)
 	UTaskModule::Get().RestoreTaskByGUID(InTaskGUID);
 }
 
-void UTaskModuleStatics::EnterTask(UTaskBase* InTask)
+void UTaskModuleStatics::EnterTask(UTaskBase* InTask, bool bSetAsCurrent)
 {
-	UTaskModule::Get().EnterTask(InTask);
+	UTaskModule::Get().EnterTask(InTask, bSetAsCurrent);
 }
 
-void UTaskModuleStatics::EnterTaskByGUID(const FString& InTaskGUID)
+void UTaskModuleStatics::EnterTaskByGUID(const FString& InTaskGUID, bool bSetAsCurrent)
 {
-	UTaskModule::Get().EnterTaskByGUID(InTaskGUID);
+	UTaskModule::Get().EnterTaskByGUID(InTaskGUID, bSetAsCurrent);
 }
 
 void UTaskModuleStatics::RefreshTask(UTaskBase* InTask)

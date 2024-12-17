@@ -485,6 +485,12 @@ public:
 
 	EAbilityItemType GetType() const;
 
+	UAbilityInventoryBase* GetInventory() const;
+
+	UAbilityInventorySlotBase* GetSlot() const;
+
+	FGameplayAbilitySpecHandle GetHandle() const;
+
 	FORCEINLINE virtual bool IsValid() const override
 	{
 		return ID.IsValid();
@@ -988,6 +994,8 @@ enum class EItemQueryType : uint8
 	Get,
 	// 添加
 	Add,
+	// 分割
+	Split,
 	// 移除
 	Remove,
 	// 匹配

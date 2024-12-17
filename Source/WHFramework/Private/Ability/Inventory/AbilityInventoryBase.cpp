@@ -155,24 +155,7 @@ FItemQueryData UAbilityInventoryBase::QueryItemByRange(EItemQueryType InQueryTyp
 			if (InItem.Count > 0 && QueryData.Item.Count >= InItem.Count) goto END; \
 		} \
 	}
-	#define EXPRESSION2(Index, bPutIn) \
-	if (Slots[Index]->MatchItem(InItem, bPutIn)) \
-	{ \
-		if (!QueryData.Slots.Contains(Slots[Index])) \
-		{ \
-			QueryData.Slots.Add(Slots[Index]); \
-			InItem.Count -= Slots[Index]->GetRemainVolume(InItem); \
-			if (InItem.Count <= 0) goto END; \
-		} \
-	}
-	#define EXPRESSION3(bCheckSplit, bPutIn, bContains) \
-	ITERATION1(i , \
-		if ((!bCheckSplit || Slots[i]->MatchItemSplit(InItem, true)) && (!bContains || Slots[i]->ContainsItem(InItem))) \
-		{ \
-			EXPRESSION2(i, bPutIn) \
-		} \
-	)
-	#define EXPRESSION4(Index) \
+	#define EXPRESSION2(Index) \
 	if (Slots[Index]->ContainsItem(InItem)) \
 	{ \
 		if (!QueryData.Slots.Contains(Slots[Index])) \
@@ -182,7 +165,31 @@ FItemQueryData UAbilityInventoryBase::QueryItemByRange(EItemQueryType InQueryTyp
 			if (InItem.Count <= 0) goto END; \
 		} \
 	}
-	
+	#define EXPRESSION3(Index, bPutIn) \
+	if (Slots[Index]->MatchItem(InItem, bPutIn)) \
+	{ \
+		if (!QueryData.Slots.Contains(Slots[Index])) \
+		{ \
+			QueryData.Slots.Add(Slots[Index]); \
+			InItem.Count -= Slots[Index]->GetRemainVolume(InItem); \
+			if (InItem.Count <= 0) goto END; \
+		} \
+	}
+	#define EXPRESSION4(bCheckSplit, bPutIn, bContains) \
+	ITERATION1(i , \
+		if ((!bCheckSplit || Slots[i]->MatchItemSplit(InItem, true)) && (!bContains || Slots[i]->ContainsItem(InItem))) \
+		{ \
+			EXPRESSION3(i, bPutIn) \
+		} \
+	)
+	#define EXPRESSION5(bCheckSplit, bPutIn, bEmpty) \
+	ITERATION1(i , \
+		if ((!bCheckSplit || Slots[i]->MatchItemSplit(InItem, true)) && (!bEmpty || Slots[i]->IsEmpty())) \
+		{ \
+			EXPRESSION3(i, bPutIn) \
+		} \
+	)
+
 	switch (InQueryType)
 	{
 		case EItemQueryType::Get:
@@ -201,13 +208,20 @@ FItemQueryData UAbilityInventoryBase::QueryItemByRange(EItemQueryType InQueryTyp
 		{
 			QueryData.Item = InItem;
 			if (InItem.Count <= 0) goto END;
-			EXPRESSION3(true, true, false)
+			EXPRESSION4(true, true, false)
 			if (InStartIndex == -1)
 			{
-				EXPRESSION2(StartIndex, true)
+				EXPRESSION3(StartIndex, true)
 			}
-			EXPRESSION3(false, true, true)
-			EXPRESSION3(false, true, false)
+			EXPRESSION4(false, true, true)
+			EXPRESSION4(false, true, false)
+			break;
+		}
+		case EItemQueryType::Split:
+		{
+			QueryData.Item = InItem;
+			if (InItem.Count <= 0) goto END;
+			EXPRESSION5(false, true, true)
 			break;
 		}
 		case EItemQueryType::Remove:
@@ -216,10 +230,10 @@ FItemQueryData UAbilityInventoryBase::QueryItemByRange(EItemQueryType InQueryTyp
 			if (InItem.Count <= 0) goto END;
 			if (InStartIndex == -1)
 			{
-				EXPRESSION4(StartIndex)
+				EXPRESSION2(StartIndex)
 			}
 			ITERATION1(i ,
-				EXPRESSION4(i)
+				EXPRESSION2(i)
 			)
 			break;
 		}
@@ -227,7 +241,7 @@ FItemQueryData UAbilityInventoryBase::QueryItemByRange(EItemQueryType InQueryTyp
 		{
 			QueryData.Item = InItem;
 			if (InItem.Count <= 0) goto END;
-			EXPRESSION3(true, false, false)
+			EXPRESSION4(true, false, false)
 			break;
 		}
 	}
@@ -367,6 +381,8 @@ void UAbilityInventoryBase::DiscardItems()
 
 void UAbilityInventoryBase::AddItemBySlots(FAbilityItem& InItem, const TArray<UAbilityInventorySlotBase*>& InSlots, bool bBroadcast)
 {
+	if(InSlots.Num() == 0) return;
+	
 	auto _Item = InItem;
 	if(InItem.GetType() != EAbilityItemType::Misc)
 	{
@@ -385,6 +401,8 @@ void UAbilityInventoryBase::AddItemBySlots(FAbilityItem& InItem, const TArray<UA
 
 void UAbilityInventoryBase::RemoveItemBySlots(FAbilityItem& InItem, const TArray<UAbilityInventorySlotBase*>& InSlots, bool bBroadcast)
 {
+	if(InSlots.Num() == 0) return;
+	
 	auto _Item = InItem;
 	if(InItem.GetType() != EAbilityItemType::Misc)
 	{

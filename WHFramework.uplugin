@@ -45,7 +45,7 @@
 		},
 		{
 			"Name": "WHFrameworkDeveloper",
-			"Type": "DeveloperTool",
+			"Type": "UncookedOnly",
 			"LoadingPhase": "Default"
 		}
 	],

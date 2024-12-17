@@ -40,7 +40,7 @@ void UWidgetEnumSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const 
 	{
 		for(int32 i = 0; i < (EnumMaxNum != -1 ? EnumMaxNum : UCommonStatics::GetEnumItemNum(EnumName)); i++)
 		{
-			ComboBox_Value->AddOption(UCommonStatics::GetEnumValueDisplayName(EnumName, i).ToString());
+			ComboBox_Value->AddOption(UCommonStatics::GetEnumDisplayNameByValue(EnumName, i).ToString());
 		}
 	}
 	else

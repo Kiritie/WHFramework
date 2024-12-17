@@ -138,6 +138,25 @@ bool FCoreStatics::StringToBool(const FString& InString)
 	return InString == TEXT("true");
 }
 
+FString FCoreStatics::SanitizeFloat(float InFloat, int32 InMaxDigits)
+{
+	if(InMaxDigits != -1)
+	{
+		if(InMaxDigits > 0)
+		{
+			int32 Multiple = 1;
+			DON(InMaxDigits, Multiple *= 10;)
+			InFloat = (int32)(InFloat * Multiple);
+			InFloat = InFloat / Multiple;
+		}
+		else
+		{
+			InFloat = (int32)InFloat;
+		}
+	}
+	return FString::SanitizeFloat(InFloat, 0);
+}
+
 FString FCoreStatics::UrlEncode(const FString& InUrl)
 {
 	std::string str = TCHAR_TO_UTF8(*InUrl);

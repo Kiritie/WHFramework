@@ -143,7 +143,7 @@ int32 UCommonStatics::GetEnumItemNum(const FString& InEnumName)
 	return 0;
 }
 
-FString UCommonStatics::GetEnumValueAuthoredName(const FString& InEnumName, int32 InEnumValue)
+FString UCommonStatics::GetEnumAuthoredNameByValue(const FString& InEnumName, int32 InEnumValue)
 {
 	if(const UEnum* Enum = UAssetModuleStatics::FindEnumByValue(InEnumName, InEnumValue, true))
 	{
@@ -152,7 +152,7 @@ FString UCommonStatics::GetEnumValueAuthoredName(const FString& InEnumName, int3
 	return TEXT("");
 }
 
-FText UCommonStatics::GetEnumValueDisplayName(const FString& InEnumName, int32 InEnumValue)
+FText UCommonStatics::GetEnumDisplayNameByValue(const FString& InEnumName, int32 InEnumValue)
 {
 	if(const UEnum* Enum = UAssetModuleStatics::FindEnumByValue(InEnumName, InEnumValue, true))
 	{
@@ -164,6 +164,11 @@ FText UCommonStatics::GetEnumValueDisplayName(const FString& InEnumName, int32 I
 		return FText::FromString(Enum->GetAuthoredNameStringByValue(InEnumValue));
 	}
 	return FText::GetEmpty();
+}
+
+FText UCommonStatics::GetEnumDisplayNameByAuthoredName(const FString& InEnumName, const FString& InEnumAuthoredName)
+{
+	return GetEnumDisplayNameByValue(InEnumName, GetEnumValueByAuthoredName(InEnumName, InEnumAuthoredName));
 }
 
 int32 UCommonStatics::GetEnumValueByAuthoredName(const FString& InEnumName, const FString& InEnumAuthoredName)
@@ -208,6 +213,11 @@ FString UCommonStatics::BoolToString(bool InBool)
 bool UCommonStatics::StringToBool(const FString& InString)
 {
 	return FCoreStatics::StringToBool(InString);
+}
+
+FString UCommonStatics::SanitizeFloat(float InFloat, int32 InMaxDigits)
+{
+	return FCoreStatics::SanitizeFloat(InFloat, InMaxDigits);
 }
 
 TArray<FString> UCommonStatics::NotNumberSymbols = TArray<FString>{ TEXT("."), TEXT(","), TEXT(" ") };

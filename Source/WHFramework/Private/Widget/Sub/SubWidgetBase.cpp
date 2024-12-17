@@ -63,6 +63,8 @@ void USubWidgetBase::OnRefresh()
 
 void USubWidgetBase::OnDestroy(bool bRecovery)
 {
+	RemoveFromParent();
+
 	K2_OnDestroy(bRecovery);
 
 	UObjectPoolModuleStatics::DespawnObject(this, bRecovery);

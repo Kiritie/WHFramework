@@ -200,7 +200,11 @@ FReply UWidgetAbilityInventorySlotBase::NativeOnMouseMove(const FGeometry& InGeo
 
 FReply UWidgetAbilityInventorySlotBase::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	return UWidgetBlueprintLibrary::DetectDragIfPressed(InMouseEvent, this, FKey("LeftMouseButton")).NativeReply;
+	if(InMouseEvent.GetEffectingButton() == FKey("LeftMouseButton"))
+	{
+		return UWidgetBlueprintLibrary::DetectDragIfPressed(InMouseEvent, this, FKey("LeftMouseButton")).NativeReply;
+	}
+	return FReply::Unhandled();
 }
 
 void UWidgetAbilityInventorySlotBase::OnActivated_Implementation()
@@ -215,7 +219,7 @@ void UWidgetAbilityInventorySlotBase::OnActivated_Implementation()
 	}
 }
 
-void UWidgetAbilityInventorySlotBase::OnDeactived_Implementation()
+void UWidgetAbilityInventorySlotBase::OnDeactivated_Implementation()
 {
 	StopCooldown();
 }

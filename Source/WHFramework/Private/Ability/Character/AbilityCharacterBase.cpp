@@ -871,7 +871,6 @@ bool AAbilityCharacterBase::SetLevelA(int32 InLevel)
 		{
 			AbilitySystem->BP_ApplyGameplayEffectSpecToSelf(SpecHandle);
 		}
-		ResetData();
 		return true;
 	}
 	return false;

@@ -63,12 +63,24 @@ void USubActivatableWidgetBase::OnRefresh()
 
 void USubActivatableWidgetBase::OnDestroy(bool bRecovery)
 {
+	RemoveFromParent();
+
 	K2_OnDestroy(bRecovery);
 
 	UObjectPoolModuleStatics::DespawnObject(this, bRecovery);
 
 	OwnerWidget = nullptr;
 	WidgetParams.Empty();
+}
+
+void USubActivatableWidgetBase::NativeOnActivated()
+{
+	Super::NativeOnActivated();
+}
+
+void USubActivatableWidgetBase::NativeOnDeactivated()
+{
+	Super::NativeOnDeactivated();
 }
 
 void USubActivatableWidgetBase::Init(const TArray<FParameter>* InParams)

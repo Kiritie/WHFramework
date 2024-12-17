@@ -115,7 +115,7 @@ public:
 	 * @param InEnumValue 枚举值
 	 */
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
-	static FString GetEnumValueAuthoredName(const FString& InEnumName, int32 InEnumValue);
+	static FString GetEnumAuthoredNameByValue(const FString& InEnumName, int32 InEnumValue);
 
 	/*
 	* 获取枚举值显示名称
@@ -123,7 +123,15 @@ public:
 	* @param InEnumValue 枚举值
 	*/
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
-	static FText GetEnumValueDisplayName(const FString& InEnumName, int32 InEnumValue);
+	static FText GetEnumDisplayNameByValue(const FString& InEnumName, int32 InEnumValue);
+
+	/*
+	* 获取枚举值显示名称
+	* @param InEnumName 枚举名称
+	* @param InEnumValue 枚举值
+	*/
+	UFUNCTION(BlueprintPure, Category = "CommonStatics")
+	static FText GetEnumDisplayNameByAuthoredName(const FString& InEnumName, const FString& InEnumAuthoredName);
 
 	/*
 	 * 通过获取枚举值名称获取枚举值
@@ -177,7 +185,10 @@ public:
 
 	UFUNCTION(BlueprintPure, meta = (CompactNodeTitle = "->"), Category = "CommonStatics")
 	static bool StringToBool(const FString& InString);
-	
+		
+	UFUNCTION(BlueprintPure, Category = "CommonStatics")
+	static FString SanitizeFloat(float InFloat, int32 InMaxDigits = -1);
+
 	//////////////////////////////////////////////////////////////////////////
 	// Text
 private:

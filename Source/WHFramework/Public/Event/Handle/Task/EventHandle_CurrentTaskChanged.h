@@ -3,20 +3,21 @@
 #pragma once
 
 #include "Event/Handle/EventHandleBase.h"
+#include "Parameter/ParameterModuleTypes.h"
 
-#include "EventHandle_TaskExecuted.generated.h"
+#include "EventHandle_CurrentTaskChanged.generated.h"
 
 /**
  * 
  */
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UEventHandle_TaskExecuted : public UEventHandleBase
+class WHFRAMEWORK_API UEventHandle_CurrentTaskChanged : public UEventHandleBase
 {
 	GENERATED_BODY()
 
 public:
-	UEventHandle_TaskExecuted();
-
+	UEventHandle_CurrentTaskChanged();
+	
 public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 

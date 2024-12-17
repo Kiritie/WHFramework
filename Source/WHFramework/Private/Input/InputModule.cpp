@@ -289,7 +289,7 @@ FSaveData* UInputModule::GetData()
 
 FString UInputModule::GetModuleDebugMessage()
 {
-	return FString::Printf(TEXT("GlobalInputMode: %s"), *UCommonStatics::GetEnumValueAuthoredName(TEXT("/Script/WHFrameworkCore.EInputMode"), (int32)UInputModuleStatics::GetGlobalInputMode()));
+	return FString::Printf(TEXT("GlobalInputMode: %s"), *UCommonStatics::GetEnumAuthoredNameByValue(TEXT("/Script/WHFrameworkCore.EInputMode"), (int32)UInputModuleStatics::GetGlobalInputMode()));
 }
 
 UInputManagerBase* UInputModule::GetInputManager(TSubclassOf<UInputManagerBase> InClass) const

@@ -69,27 +69,27 @@ FString UAbilityItemDataBase::GetItemAbilityInfo(int32 InLevel) const
 				}
 				else
 				{
-					AbilityInfoStr.Appendf(TEXT("%s: %s%s\n"), *AttributeName.ToString(), (Iter2.Attribute.GetName().EndsWith(TEXT("Rate")) ? *FString::Printf(TEXT("%s%%"), *FString::SanitizeFloat(Iter2.Value * 100, 0)) : *FString::SanitizeFloat(Iter2.Value, 0)),
+					AbilityInfoStr.Appendf(TEXT("%s: %s%s\n"), *AttributeName.ToString(), (Iter2.Attribute.GetName().EndsWith(TEXT("Rate")) ? *FString::Printf(TEXT("%s%%"), *UCommonStatics::SanitizeFloat(Iter2.Value * 100, 2)) : *UCommonStatics::SanitizeFloat(Iter2.Value, 2)),
 						(Iter2.Attribute.GetName().EndsWith(TEXT("Time")) || Iter2.Attribute.GetName().EndsWith(TEXT("Interrupt")) ? TEXT("s") : TEXT("")));
 				}
 			}
 			if(Iter1.Period > 0.f)
 			{
-				AbilityInfoStr.Appendf(TEXT("%触发周期: %ss\n"), *FString::SanitizeFloat(Iter1.Period, 0));
+				AbilityInfoStr.Appendf(TEXT("%触发周期: %ss\n"), *UCommonStatics::SanitizeFloat(Iter1.Period, 2));
 			}
 			if(Iter1.Duration > 0.f)
 			{
-				AbilityInfoStr.Appendf(TEXT("%持续时间: %ss\n"), *FString::SanitizeFloat(Iter1.Duration, 0));
+				AbilityInfoStr.Appendf(TEXT("%持续时间: %ss\n"), *UCommonStatics::SanitizeFloat(Iter1.Duration, 2));
 			}
 		}
 		if(AbilityInfo.CooldownDuration > 0.f)
 		{
-			AbilityInfoStr.Appendf(TEXT("冷却时间: %ss\n"), *FString::SanitizeFloat(AbilityInfo.CooldownDuration, 0));
+			AbilityInfoStr.Appendf(TEXT("冷却时间: %ss\n"), *UCommonStatics::SanitizeFloat(AbilityInfo.CooldownDuration, 2));
 		}
 		if(FMath::Abs(AbilityInfo.CostValue) > 0.f)
 		{
 			FText AttributeName = UCommonStatics::GetPropertyDisplayName(AbilityInfo.CostAttribute.GetUProperty());
-			AbilityInfoStr.Appendf(TEXT("消耗: %s%s\n"), *FString::SanitizeFloat(FMath::Abs(AbilityInfo.CostValue), 0), *AttributeName.ToString());
+			AbilityInfoStr.Appendf(TEXT("消耗: %s%s\n"), *UCommonStatics::SanitizeFloat(FMath::Abs(AbilityInfo.CostValue), 2), *AttributeName.ToString());
 		}
 		
 		AbilityInfoStr.RemoveFromEnd(TEXT("\n"));

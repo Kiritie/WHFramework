@@ -20,3 +20,8 @@ void UEventHandle_TaskLeaved::Parse_Implementation(const TArray<FParameter>& InP
 		Task = InParams[0];
 	}
 }
+
+TArray<FParameter> UEventHandle_TaskLeaved::Pack_Implementation()
+{
+	return { Task };
+}
