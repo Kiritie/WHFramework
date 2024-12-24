@@ -29,6 +29,9 @@ public:
 	static void SetCurrentTask(UTaskBase* InTask);
 
 	UFUNCTION(BlueprintPure, Category = "TaskModuleStatics")
+	static bool IsExistTaskByGUID(const FString& InTaskGUID);
+
+	UFUNCTION(BlueprintPure, Category = "TaskModuleStatics")
 	static UTaskBase* GetTaskByGUID(const FString& InTaskGUID);
 
 public:

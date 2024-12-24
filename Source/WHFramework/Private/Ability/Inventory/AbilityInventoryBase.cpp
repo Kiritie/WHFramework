@@ -348,6 +348,28 @@ void UAbilityInventoryBase::MoveItemBySplitType(UAbilityInventoryBase* InTargetI
 	InTargetInventory->AddItemBySplitType(InItem, InTargetSlotSplitType);
 }
 
+void UAbilityInventoryBase::ResetItems()
+{
+	for(auto& Iter1 : SplitSlots)
+	{
+		for(auto& Iter2 : Iter1.Value.Slots)
+		{
+			Iter2->Reset();
+		}
+	}
+}
+
+void UAbilityInventoryBase::RefreshItems()
+{
+	for(auto& Iter1 : SplitSlots)
+	{
+		for(auto& Iter2 : Iter1.Value.Slots)
+		{
+			Iter2->Refresh();
+		}
+	}
+}
+
 void UAbilityInventoryBase::ClearItem(FAbilityItem InItem)
 {
 	auto QueryData = QueryItemByRange(EItemQueryType::Get, InItem);

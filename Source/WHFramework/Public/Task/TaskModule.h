@@ -153,6 +153,11 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void SetCurrentTask(UTaskBase* InTask);
 	/**
+	* 是否有指定GUID的任务
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsExistTaskByGUID(const FString& InTaskGUID) const;
+	/**
 	* 通过GUID获取任务
 	*/
 	UFUNCTION(BlueprintPure)

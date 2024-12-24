@@ -19,9 +19,9 @@ public:
 public:
 	virtual void OnInitialize(UAbilityInventoryBase* InInventory, EAbilityItemType InLimitType, ESlotSplitType InSplitType, int32 InSlotIndex) override;
 
-	virtual void OnItemPreChange(FAbilityItem& InNewItem) override;
+	virtual void OnItemPreChange(FAbilityItem& InNewItem, bool bBroadcast) override;
 
-	virtual void OnItemChanged(FAbilityItem& InOldItem) override;
+	virtual void OnItemChanged(FAbilityItem& InOldItem, bool bBroadcast) override;
 	
 	virtual bool ActiveItem(bool bPassive = false) override;
 	

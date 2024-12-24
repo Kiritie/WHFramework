@@ -56,6 +56,8 @@ APawnBase::APawnBase(const FObjectInitializer& ObjectInitializer) :
 
 void APawnBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
+	USceneModuleStatics::RemoveSceneActor(this);
+	
 	if(InParams.IsValidIndex(0))
 	{
 		ActorID = InParams[0];

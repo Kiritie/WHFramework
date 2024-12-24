@@ -187,7 +187,7 @@ public:
 	static bool StringToBool(const FString& InString);
 		
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
-	static FString SanitizeFloat(float InFloat, int32 InMaxDigits = -1);
+	static FString SanitizeFloat(double InFloat, int32 InMaxDigits = -1);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Text

@@ -6,7 +6,6 @@
 #include "CameraModuleTypes.h"
 #include "Debug/DebuggerInterface.h"
 #include "Main/Base/ModuleBase.h"
-#include "Math/MathTypes.h"
 #include "SaveGame/Base/SaveDataAgentInterface.h"
 
 #include "CameraModule.generated.h"

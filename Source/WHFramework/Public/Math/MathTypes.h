@@ -101,6 +101,14 @@ public:
 		Z = 0;
 	}
 
+	FORCEINLINE FIndex(int64 InX)
+	{
+		const int32 Offset = 16384;
+		X =	int32(InX>>40) - Offset;
+		Y = int32(InX>>20 & 0xFFFFF) - Offset;
+		Z = int32(InX & 0xFFFFF) - Offset;
+	}
+
 	FORCEINLINE FIndex(int32 InX)
 	{
 		X = InX;
@@ -129,6 +137,13 @@ public:
 		Z = FMath::CeilToInt(InVector.Z);
 	}
 
+	FORCEINLINE FIndex(const FVector2D& InVector)
+	{
+		X = FMath::CeilToInt(InVector.X);
+		Y = FMath::CeilToInt(InVector.Y);
+		Z = 0;
+	}
+
 	FORCEINLINE FIndex(const FString& InValue)
 	{
 		TArray<FString> Arr;
@@ -138,9 +153,23 @@ public:
 		Z = FCString::Atoi(*Arr[2]);
 	}
 
+	FORCEINLINE int64 ToInt64() const
+	{
+		const int32 Offset = 16384;
+		uint64 T = uint64(X + Offset) << 40 |
+				uint64(Y + Offset) << 20 | 
+				uint64(Z + Offset);
+		return T;
+	}
+
 	FORCEINLINE FVector ToVector() const
 	{
 		return FVector(X, Y, Z);
+	}
+
+	FORCEINLINE FVector2D ToVector2D() const
+	{
+		return FVector2D(X, Y);
 	}
 
 	FORCEINLINE FString ToString() const
@@ -201,6 +230,8 @@ public:
 	{
 		return FIndex(X / InValue, Y / InValue, Z / InValue);
 	}
+	
+	FORCEINLINE operator FVector() const { return ToVector(); }
 
 	friend void operator<<(FStructuredArchive::FSlot Slot, FIndex& InValue)
 	{
@@ -413,7 +444,7 @@ FORCEINLINE uint32 GetTypeHash(FPoint& InPoint)
 
 #define ITER_INDEX(Iter, Range, bFromCenter, Expression) \
 	FIndex Iter; \
-	if(Range == FVector::OneVector && !bFromCenter) \
+	if(Range.X == 1.f && Range.Y == 1.f && Range.Z == 1.f && !bFromCenter) \
 	{ \
 		Expression \
 	} \
@@ -427,6 +458,23 @@ FORCEINLINE uint32 GetTypeHash(FPoint& InPoint)
 				{ \
 					Expression \
 				} \
+			} \
+		} \
+	}
+
+#define ITER_INDEX_2D(Iter, Range, bFromCenter, Expression) \
+	FIndex Iter; \
+	if(Range.X == 1.f && Range.Y == 1.f && !bFromCenter) \
+	{ \
+		Expression \
+	} \
+	else \
+	{ \
+		for(Iter.X = (bFromCenter ? -Range.X * 0.5f : 0.f); Iter.X < (bFromCenter ? Range.X * 0.5f : Range.X); Iter.X++) \
+		{ \
+			for(Iter.Y = (bFromCenter ? -Range.Y * 0.5f : 0.f); Iter.Y < (bFromCenter ? Range.Y * 0.5f : Range.Y); Iter.Y++) \
+			{ \
+				Expression \
 			} \
 		} \
 	}

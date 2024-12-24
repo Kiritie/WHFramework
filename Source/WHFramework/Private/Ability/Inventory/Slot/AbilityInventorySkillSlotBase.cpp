@@ -15,9 +15,9 @@ void UAbilityInventorySkillSlotBase::OnInitialize(UAbilityInventoryBase* InInven
 	Super::OnInitialize(InInventory, InLimitType, InSplitType, InSlotIndex);
 }
 
-void UAbilityInventorySkillSlotBase::OnItemPreChange(FAbilityItem& InNewItem)
+void UAbilityInventorySkillSlotBase::OnItemPreChange(FAbilityItem& InNewItem, bool bBroadcast)
 {
-	Super::OnItemPreChange(InNewItem);
+	Super::OnItemPreChange(InNewItem, bBroadcast);
 	
 	if(Item.IsValid() && Item.GetData<UAbilitySkillDataBase>().SkillMode == EAbilitySkillMode::Passive)
 	{
@@ -25,9 +25,9 @@ void UAbilityInventorySkillSlotBase::OnItemPreChange(FAbilityItem& InNewItem)
 	}
 }
 
-void UAbilityInventorySkillSlotBase::OnItemChanged(FAbilityItem& InOldItem)
+void UAbilityInventorySkillSlotBase::OnItemChanged(FAbilityItem& InOldItem, bool bBroadcast)
 {
-	Super::OnItemChanged(InOldItem);
+	Super::OnItemChanged(InOldItem, bBroadcast);
 	
 	if(Item.IsValid() && Item.GetData<UAbilitySkillDataBase>().SkillMode == EAbilitySkillMode::Passive)
 	{

@@ -23,13 +23,13 @@ UTaskBase::UTaskBase()
 	TaskHierarchy = 0;
 	TaskState = ETaskState::None;
 
-	TaskEnterType = ETaskEnterType::Automatic;
+	TaskEnterType = ETaskEnterType::Procedure;
 	TaskExecuteResult = ETaskExecuteResult::None;
 
-	TaskExecuteType = ETaskExecuteType::Automatic;
+	TaskExecuteType = ETaskExecuteType::Procedure;
 	AutoExecuteTaskTime = 0.f;
 
-	TaskLeaveType = ETaskLeaveType::Automatic;
+	TaskLeaveType = ETaskLeaveType::Procedure;
 	AutoLeaveTaskTime = 0.f;
 
 	TaskCompleteType = ETaskCompleteType::Procedure;
@@ -45,6 +45,8 @@ UTaskBase::UTaskBase()
 
 	RootTask = nullptr;
 	ParentTask = nullptr;
+
+	bRuntimeSelected = false;
 }
 
 #if WITH_EDITOR
@@ -224,10 +226,10 @@ void UTaskBase::OnComplete(ETaskExecuteResult InTaskExecuteResult)
 		}
 	}
 
+	TaskExecuteResult = InTaskExecuteResult;
+
 	TaskState = ETaskState::Completed;
 	OnStateChanged(TaskState);
-
-	TaskExecuteResult = InTaskExecuteResult;
 
 	GetWorld()->GetTimerManager().ClearTimer(AutoCompleteTimerHandle);
 
@@ -302,9 +304,14 @@ bool UTaskBase::IsCompleted(bool bCheckSubs) const
 	return (TaskState == ETaskState::Completed || TaskState == ETaskState::Leaved) && (!bCheckSubs || IsAllSubCompleted());
 }
 
-bool UTaskBase::IsLeaved() const
+bool UTaskBase::IsSucceed(bool bCheckSubs) const
 {
-	return TaskState == ETaskState::None || TaskState == ETaskState::Leaved;
+	return (TaskExecuteResult == ETaskExecuteResult::Succeed || TaskExecuteResult == ETaskExecuteResult::Skipped) && (!bCheckSubs || IsAllSubSucceed());
+}
+
+bool UTaskBase::IsLeaved(bool bCheckSubs) const
+{
+	return (TaskState == ETaskState::None || TaskState == ETaskState::Leaved) && (!bCheckSubs || IsAllSubLeaved());
 }
 
 bool UTaskBase::CheckTaskCondition_Implementation(FString& OutInfo) const
@@ -361,7 +368,7 @@ void UTaskBase::Refresh()
 	UTaskModuleStatics::RefreshTask(this);
 }
 
-void UTaskBase::RefreshState()
+void UTaskBase::Restate()
 {
 	OnStateChanged(TaskState);
 }
@@ -457,6 +464,18 @@ bool UTaskBase::IsSubOf(UTaskBase* InTask) const
 	return false;
 }
 
+bool UTaskBase::IsAllSubEntered() const
+{
+	for (auto Iter : SubTasks)
+	{
+		if(Iter && !Iter->IsEntered())
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
 bool UTaskBase::IsAllSubCompleted() const
 {
 	for (auto Iter : SubTasks)
@@ -469,11 +488,23 @@ bool UTaskBase::IsAllSubCompleted() const
 	return true;
 }
 
-bool UTaskBase::IsAllSubExecuteSucceed() const
+bool UTaskBase::IsAllSubSucceed() const
 {
 	for (auto Iter : SubTasks)
 	{
-		if(Iter && Iter->TaskExecuteResult == ETaskExecuteResult::Failed)
+		if(Iter && !Iter->IsSucceed())
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+bool UTaskBase::IsAllSubLeaved() const
+{
+	for (auto Iter : SubTasks)
+	{
+		if(Iter && !Iter->IsLeaved())
 		{
 			return false;
 		}
@@ -529,7 +560,6 @@ bool UTaskBase::CanEditChange(const FProperty* InProperty) const
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UTaskBase, TaskExecuteType) ||
 			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UTaskBase, TaskCompleteType) ||
-			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UTaskBase, TaskLeaveType) ||
 			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UTaskBase, TaskGuideType))
 		{
 			return !HasSubTask(false);
@@ -573,10 +603,10 @@ void UTaskBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
 			if(HasSubTask(false))
 			{
 				TaskExecuteType = ETaskExecuteType::Automatic;
+				AutoExecuteTaskTime = 0.f;
 				TaskCompleteType = ETaskCompleteType::Procedure;
 				AutoCompleteTaskTime = 0.f;
-				TaskLeaveType = ETaskLeaveType::Automatic;
-				TaskGuideType = ETaskGuideType::None;				
+				TaskGuideType = ETaskGuideType::None;
 				TaskGuideIntervalTime = 0.f;
 			}
 		}

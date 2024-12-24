@@ -142,7 +142,7 @@ public:
 	* 刷新任务状态
 	*/
 	UFUNCTION(BlueprintCallable)
-	void RefreshState();
+	void Restate();
 	/**
 	* 指引任务
 	*/
@@ -239,10 +239,15 @@ public:
 	UFUNCTION(BlueprintPure)
 	bool IsCompleted(bool bCheckSubs = false) const;
 	/**
+	* 是否已成功
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsSucceed(bool bCheckSubs = false) const;
+	/**
 	* 是否已离开
 	*/
 	UFUNCTION(BlueprintPure)
-	bool IsLeaved() const;
+	bool IsLeaved(bool bCheckSubs = false) const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Execute/Guide
@@ -337,6 +342,11 @@ public:
 	UFUNCTION(BlueprintPure)
 	bool IsSubOf(UTaskBase* InTask) const;
 	/**
+	* 是否已进入所有子任务
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsAllSubEntered() const;
+	/**
 	* 是否已完成所有子任务
 	*/
 	UFUNCTION(BlueprintPure)
@@ -345,12 +355,20 @@ public:
 	* 是否已成功执行有子任务
 	*/
 	UFUNCTION(BlueprintPure)
-	bool IsAllSubExecuteSucceed() const;
+	bool IsAllSubSucceed() const;
+	/**
+	* 是否已离开所有子任务
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsAllSubLeaved() const;
 
 protected:
 	FTimerHandle AutoExecuteTimerHandle;
 	FTimerHandle AutoLeaveTimerHandle;
 	FTimerHandle AutoCompleteTimerHandle;
+
+public:
+	bool bRuntimeSelected;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// TaskListItem

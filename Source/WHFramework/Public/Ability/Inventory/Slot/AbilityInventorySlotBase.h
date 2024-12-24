@@ -34,10 +34,10 @@ public:
 	virtual void OnInitialize(UAbilityInventoryBase* InInventory, EAbilityItemType InLimitType, ESlotSplitType InSplitType, int32 InSlotIndex);
 	
 	UFUNCTION(BlueprintCallable)
-	virtual void OnItemPreChange(FAbilityItem& InNewItem);
+	virtual void OnItemPreChange(FAbilityItem& InNewItem, bool bBroadcast);
 		
 	UFUNCTION(BlueprintCallable)
-	virtual void OnItemChanged(FAbilityItem& InOldItem);
+	virtual void OnItemChanged(FAbilityItem& InOldItem, bool bBroadcast);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Checks
@@ -57,6 +57,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Actions
 public:
+	UFUNCTION(BlueprintCallable)
+	virtual void Reset();
+
 	UFUNCTION(BlueprintCallable)
 	virtual void Refresh();
 
@@ -142,7 +145,7 @@ public:
 	int32 GetMaxLevel(FAbilityItem InItem = FAbilityItem::Empty) const;
 
 	UFUNCTION(BlueprintPure)
-	FAbilityItem& GetItem()  { return Item; }
+	FAbilityItem& GetItem() { return Item; }
 
 	UFUNCTION(BlueprintPure)
 	UAbilityInventoryBase* GetInventory() const { return Inventory; }

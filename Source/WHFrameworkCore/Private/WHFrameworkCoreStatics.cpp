@@ -138,7 +138,7 @@ bool FCoreStatics::StringToBool(const FString& InString)
 	return InString == TEXT("true");
 }
 
-FString FCoreStatics::SanitizeFloat(float InFloat, int32 InMaxDigits)
+FString FCoreStatics::SanitizeFloat(double InFloat, int32 InMaxDigits)
 {
 	if(InMaxDigits != -1)
 	{

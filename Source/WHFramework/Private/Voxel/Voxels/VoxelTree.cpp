@@ -148,7 +148,7 @@ void UVoxelTree::OnDestroy(IVoxelAgentInterface* InAgent)
 				}
 				for(auto& Iter : TMap(VoxelItems))
 				{
-					if(Owner->GetVoxel<UVoxelTree>(Iter.Key).RootIndex != VoxelIndex)
+					if(Owner->GetVoxelComplex(Iter.Key).GetVoxel<UVoxelTree>().RootIndex != VoxelIndex)
 					{
 						VoxelItems.Remove(Iter.Key);
 					}

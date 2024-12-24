@@ -89,6 +89,12 @@ bool UAbilityInventorySlotBase::MatchItemLimit(FAbilityItem InItem, bool bForce)
 	return LimitType == EAbilityItemType::None || InItem.GetType() == LimitType;
 }
 
+void UAbilityInventorySlotBase::Reset()
+{
+	OnItemPreChange(Item, false);
+	OnItemChanged(Item, false);
+}
+
 void UAbilityInventorySlotBase::Refresh()
 {
 	if(Item.IsValid() && Item.Count <= 0)
@@ -99,15 +105,18 @@ void UAbilityInventorySlotBase::Refresh()
 	GetInventory()->OnRefresh.Broadcast();
 }
 
-void UAbilityInventorySlotBase::OnItemPreChange(FAbilityItem& InNewItem)
+void UAbilityInventorySlotBase::OnItemPreChange(FAbilityItem& InNewItem, bool bBroadcast)
 {
-	if(const auto Agent = Inventory->GetOwnerAgent())
+	if(bBroadcast)
 	{
-		Agent->OnPreChangeItem(Item);
+		if(const auto Agent = Inventory->GetOwnerAgent())
+		{
+			Agent->OnPreChangeItem(Item);
+		}
 	}
 }
 
-void UAbilityInventorySlotBase::OnItemChanged(FAbilityItem& InOldItem)
+void UAbilityInventorySlotBase::OnItemChanged(FAbilityItem& InOldItem, bool bBroadcast)
 {
 	if(Item.IsValid())
 	{
@@ -121,12 +130,15 @@ void UAbilityInventorySlotBase::OnItemChanged(FAbilityItem& InOldItem)
 	{
 		Item.AbilityHandle = FGameplayAbilitySpecHandle();
 	}
-	if(const auto Agent = Inventory->GetOwnerAgent())
+	if(bBroadcast)
 	{
-		Agent->OnChangeItem(Item);
-		if(IsSelected())
+		if(const auto Agent = Inventory->GetOwnerAgent())
 		{
-			Agent->OnSelectItem(Item);
+			Agent->OnChangeItem(Item);
+			if(IsSelected())
+			{
+				Agent->OnSelectItem(Item);
+			}
 		}
 	}
 }
@@ -147,7 +159,7 @@ void UAbilityInventorySlotBase::SetItem(FAbilityItem& InItem, bool bRefresh)
 {
 	if(Item == InItem) return;
 	
-	OnItemPreChange(InItem);
+	OnItemPreChange(InItem, true);
 	
 	FAbilityItem OldItem = Item;
 	
@@ -156,7 +168,7 @@ void UAbilityInventorySlotBase::SetItem(FAbilityItem& InItem, bool bRefresh)
 	Item.Level = FMath::Clamp(Item.Level, 0, GetMaxLevel(InItem));
 	Item.InventorySlot = this;
 	
-	OnItemChanged(OldItem);
+	OnItemChanged(OldItem, true);
 	
 	if(bRefresh)
 	{

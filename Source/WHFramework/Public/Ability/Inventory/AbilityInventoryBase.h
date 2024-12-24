@@ -83,6 +83,12 @@ public:
 	virtual void MoveItemBySplitType(UAbilityInventoryBase* InTargetInventory, FAbilityItem& InItem, ESlotSplitType InSelfSlotSplitType, ESlotSplitType InTargetSlotSplitType);
 
 	UFUNCTION(BlueprintCallable)
+	virtual void ResetItems();
+
+	UFUNCTION(BlueprintCallable)
+	virtual void RefreshItems();
+
+	UFUNCTION(BlueprintCallable)
 	virtual void ClearItem(FAbilityItem InItem);
 
 	UFUNCTION(BlueprintCallable)

@@ -20,6 +20,11 @@ void UTaskModuleStatics::SetCurrentTask(UTaskBase* InTask)
 	UTaskModule::Get().SetCurrentTask(InTask);
 }
 
+bool UTaskModuleStatics::IsExistTaskByGUID(const FString& InTaskGUID)
+{
+	return UTaskModule::Get().IsExistTaskByGUID(InTaskGUID);
+}
+
 UTaskBase* UTaskModuleStatics::GetTaskByGUID(const FString& InTaskGUID)
 {
 	return UTaskModule::Get().GetTaskByGUID(InTaskGUID);

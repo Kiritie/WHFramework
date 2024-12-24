@@ -37,7 +37,19 @@ bool UTaskAsset::IsAllTaskCompleted() const
 {
 	for (auto Iter : RootTasks)
 	{
-		if(Iter && !Iter->IsCompleted())
+		if(Iter && !Iter->IsCompleted(true))
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+bool UTaskAsset::IsAllTaskLeaved() const
+{
+	for (auto Iter : RootTasks)
+	{
+		if(Iter && !Iter->IsLeaved(true))
 		{
 			return false;
 		}

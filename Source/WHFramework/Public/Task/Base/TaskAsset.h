@@ -33,6 +33,8 @@ public:
 
 public:
 	bool IsAllTaskCompleted() const;
+	
+	bool IsAllTaskLeaved() const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Editor

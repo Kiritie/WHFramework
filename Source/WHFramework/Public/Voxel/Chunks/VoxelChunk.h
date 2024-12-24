@@ -88,16 +88,13 @@ public:
 
 	virtual bool HasVoxel(int32 InX, int32 InY, int32 InZ);
 
-	template<class T>
-	T& GetVoxel(FIndex InIndex, bool bMainPart = false)
-	{
-		return static_cast<T&>(GetVoxel(InIndex, bMainPart));
-	}
-	virtual UVoxel& GetVoxel(FIndex InIndex, bool bMainPart = false);
+	virtual FVoxelItem& GetVoxel(FIndex InIndex, bool bMainPart = false);
 
-	virtual FVoxelItem& GetVoxelItem(FIndex InIndex, bool bMainPart = false);
+	virtual FVoxelItem& GetVoxel(int32 InX, int32 InY, int32 InZ, bool bMainPart = false);
 
-	virtual FVoxelItem& GetVoxelItem(int32 InX, int32 InY, int32 InZ, bool bMainPart = false);
+	virtual FVoxelItem& GetVoxelComplex(FIndex InIndex, bool bMainPart = false);
+
+	virtual FVoxelItem& GetVoxelComplex(int32 InX, int32 InY, int32 InZ, bool bMainPart = false);
 
 public:
 	virtual bool CheckVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem, FVector InRange = FVector::OneVector);
@@ -108,6 +105,10 @@ public:
 
 	virtual bool CheckVoxelNeighbors(FIndex InIndex, EVoxelType InVoxelType, FVector InRange = FVector::OneVector, bool bFromCenter = false, bool bIgnoreBottom = false, bool bOnTheChunk = false);
 
+	virtual void SetVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bSafe = false);
+
+	virtual void SetVoxel(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem, bool bSafe = false);
+
 	virtual bool SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bGenerate = false, IVoxelAgentInterface* InAgent = nullptr);
 
 	virtual bool SetVoxelSample(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem, bool bGenerate = false, IVoxelAgentInterface* InAgent = nullptr);
@@ -117,6 +118,17 @@ public:
 	virtual bool SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem, bool bGenerate = false, IVoxelAgentInterface* InAgent = nullptr);
 
 	virtual bool SetVoxelComplex(const TMap<FIndex, FVoxelItem>& InVoxelItems, bool bGenerate = false, bool bFirstSample = false, IVoxelAgentInterface* InAgent = nullptr);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Topography
+public:
+	virtual FVoxelTopography& GetTopography(FIndex InIndex);
+
+	virtual FVoxelTopography& GetTopography(int32 InX, int32 InY, int32 InZ);
+
+	virtual void SetTopography(FIndex InIndex, const FVoxelTopography& InTopography);
+
+	virtual void SetTopography(int32 InX, int32 InY, int32 InZ, const FVoxelTopography& InTopography);
 
 	//////////////////////////////////////////////////////////////////////////
 	// SceneActor
@@ -191,7 +203,9 @@ protected:
 	TMap<EDirection, AVoxelChunk*> Neighbors;
 
 	TMap<FIndex, FVoxelItem> VoxelMap;
-	
+
+	TMap<FIndex, FVoxelTopography> TopographyMap;
+
 public:
 	FIndex GetIndex() const { return Index; }
 
@@ -213,4 +227,3 @@ public:
 
 	FVector GetChunkLocation() const;
 };
-

@@ -4,7 +4,6 @@
 #include "AI/Base/AIBlackboardBase.h"
 
 #include "AI/Base/AIControllerBase.h"
-#include "Math/MathTypes.h"
 
 void UAIBlackboardBase::PostLoad()
 {

@@ -331,7 +331,7 @@ void UVoxelMeshComponent::OnCollision(UPrimitiveComponent* HitComponent, AActor*
 	
 	if(IVoxelAgentInterface* VoxelAgent = Cast<IVoxelAgentInterface>(OtherActor))
 	{
-		const FVoxelItem& VoxelItem = GetOwnerChunk()->GetVoxelItem(GetOwnerChunk()->LocationToIndex(Hit.ImpactPoint - UVoxelModule::Get().GetWorldData().GetBlockSizedNormal(Hit.ImpactNormal)), true);
+		const FVoxelItem& VoxelItem = GetOwnerChunk()->GetVoxelComplex(GetOwnerChunk()->LocationToIndex(Hit.ImpactPoint - UVoxelModule::Get().GetWorldData().GetBlockSizedNormal(Hit.ImpactNormal)), true);
 		if(VoxelItem.IsValid())
 		{
 			VoxelItem.GetVoxel().OnAgentHit(VoxelAgent, FVoxelHitResult(VoxelItem, Hit.ImpactPoint, Hit.ImpactNormal));

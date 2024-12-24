@@ -105,7 +105,7 @@ void UTaskModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		if(SaveData.IsSaved())
 		{
 			Assets = SaveData.Assets;
-			CurrentTask = SaveData.CurrentTask;
+			SetCurrentTask(SaveData.CurrentTask);
 			for(auto Iter1 : Assets)
 			{
 				for(auto Iter2 : Iter1->TaskMap)
@@ -124,6 +124,8 @@ void UTaskModule::UnloadData(EPhase InPhase)
 {
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
+		Assets.Empty();
+		SetCurrentTask(nullptr);
 		for(auto Iter1 : Assets)
 		{
 			for(auto Iter2 : Iter1->RootTasks)
@@ -131,8 +133,6 @@ void UTaskModule::UnloadData(EPhase InPhase)
 				Iter2->Restore();
 			}
 		}
-		CurrentTask = nullptr;
-		Assets.Empty();
 	}
 }
 
@@ -140,8 +140,9 @@ FSaveData* UTaskModule::ToData()
 {
 	static FTaskModuleSaveData SaveData;
 	SaveData = FTaskModuleSaveData();
-	
+
 	SaveData.Assets = Assets;
+	SaveData.CurrentTask = CurrentTask;
 	for(auto Iter1 : Assets)
 	{
 		for(auto Iter2 : Iter1->TaskMap)
@@ -211,9 +212,14 @@ void UTaskModule::EnterTask(UTaskBase* InTask, bool bSetAsCurrent)
 		return;
 	}
 	
-	if(!InTask->IsEntered())
+	if(InTask->TaskState == ETaskState::None)
 	{
 		InTask->OnEnter();
+
+		if(bSetAsCurrent && !InTask->IsRootTask())
+		{
+			SetCurrentTask(InTask);
+		}
 	}
 
 	if(InTask->HasSubTask(false))
@@ -225,11 +231,6 @@ void UTaskModule::EnterTask(UTaskBase* InTask, bool bSetAsCurrent)
 				Iter->Enter(bSetAsCurrent);
 			}
 		}
-	}
-
-	if(bSetAsCurrent && !InTask->IsRootTask())
-	{
-		SetCurrentTask(InTask);
 	}
 }
 
@@ -294,7 +295,7 @@ void UTaskModule::CompleteTask(UTaskBase* InTask, ETaskExecuteResult InTaskExecu
 		InTask->OnComplete(InTaskExecuteResult);
 		if(InTask->ParentTask && InTask->ParentTask->HasSubTask() && InTask->ParentTask->IsAllSubCompleted())
 		{
-			CompleteTask(InTask->ParentTask, InTask->ParentTask->IsAllSubExecuteSucceed() ? ETaskExecuteResult::Succeed : ETaskExecuteResult::Failed);
+			CompleteTask(InTask->ParentTask, InTask->ParentTask->IsAllSubSucceed() ? ETaskExecuteResult::Succeed : ETaskExecuteResult::Failed);
 		}
 	}
 }
@@ -344,11 +345,26 @@ void UTaskModule::SetCurrentTask(UTaskBase* InTask)
 	UEventModuleStatics::BroadcastEvent(UEventHandle_CurrentTaskChanged::StaticClass(), this, {CurrentTask});
 }
 
+bool UTaskModule::IsExistTaskByGUID(const FString& InTaskGUID) const
+{
+	for(auto Iter1 : Assets)
+	{
+		if(Iter1->TaskMap.Contains(InTaskGUID))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 UTaskBase* UTaskModule::GetTaskByGUID(const FString& InTaskGUID) const
 {
 	for(auto Iter1 : Assets)
 	{
-		return *Iter1->TaskMap.Find(InTaskGUID);
+		if(Iter1->TaskMap.Contains(InTaskGUID))
+		{
+			return Iter1->TaskMap[InTaskGUID];
+		}
 	}
 	return nullptr;
 }

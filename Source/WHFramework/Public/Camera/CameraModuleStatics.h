@@ -5,7 +5,6 @@
 
 #include "CameraModuleTypes.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
-#include "Math/MathTypes.h"
 #include "CameraModuleStatics.generated.h"
 
 class ACameraPointBase;

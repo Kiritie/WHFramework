@@ -516,6 +516,11 @@ public:
 		return (InItem.ID == ID) && (InItem.Count == Count) && (InItem.Level == Level);
 	}
 
+	FORCEINLINE bool EqualID(const FAbilityItem& InItem) const
+	{
+		return (InItem.ID == ID);
+	}
+
 	FORCEINLINE friend bool operator==(const FAbilityItem& A, const FAbilityItem& B)
 	{
 		return A.Equal(B);

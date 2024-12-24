@@ -77,5 +77,11 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Noise
 	UFUNCTION(BlueprintPure, Category = "MathStatics")
+	static float GetNoise2D(FVector2D InLocation, FVector InScale, int32 InOffset = 0, bool bAbs = false);
+
+	UFUNCTION(BlueprintPure, Category = "MathStatics")
+	static float GetNoise3D(FVector InLocation, FVector InScale, int32 InOffset = 0, bool bAbs = false);
+
+	UFUNCTION(BlueprintPure, Category = "MathStatics")
 	static float GetNoiseHeight(FVector2D InLocation, FVector InScale, int32 InOffset = 0, bool bUnsigned = false);
 };

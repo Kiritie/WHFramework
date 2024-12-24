@@ -75,6 +75,8 @@ ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer) :
 
 void ACharacterBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
+	USceneModuleStatics::RemoveSceneActor(this);
+	
 	if(InParams.IsValidIndex(0))
 	{
 		ActorID = InParams[0];

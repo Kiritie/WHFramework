@@ -7,12 +7,12 @@
 /**
  * 
  */
-class AsyncTask_ChunkQueue : public FNonAbandonableTask
+class FAsyncTask_ChunkQueue : public FNonAbandonableTask
 {
-	friend class FAsyncTask<AsyncTask_ChunkQueue>;
+	friend class FAsyncTask<FAsyncTask_ChunkQueue>;
 
 public:
-	AsyncTask_ChunkQueue(TArray<FIndex> InQueue, TFunction<void(FIndex, int32)> InFunc, int32 InStage);
+	FAsyncTask_ChunkQueue(TArray<FIndex> InQueue, TFunction<void(FIndex, int32)> InFunc, int32 InStage);
 
 protected:
 	TArray<FIndex> ChunkQueue;

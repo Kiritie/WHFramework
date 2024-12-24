@@ -554,6 +554,8 @@ bool AAbilityPawnBase::SetLevelA(int32 InLevel)
 		{
 			AbilitySystem->BP_ApplyGameplayEffectSpecToSelf(SpecHandle);
 		}
+		Inventory->ResetItems();
+		ResetData();
 		return true;
 	}
 	return false;

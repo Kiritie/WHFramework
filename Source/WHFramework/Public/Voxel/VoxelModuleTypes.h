@@ -213,6 +213,52 @@ enum class EVoxelInteractAction : uint8
 	Close = EInteractAction::Custom2 UMETA(DisplayName="关闭")
 };
 
+UENUM(BlueprintType)
+enum class EVoxelHierarchy: uint8
+{
+	None,
+	Under,
+	Upper
+};
+
+UENUM(BlueprintType)
+enum class EVoxelTerrainType: uint8
+{
+	None,
+	Plain,
+	Mountain,
+	Blob
+};
+
+UENUM(BlueprintType)
+enum class EVoxelBiomeType: uint8
+{
+	None,
+	Snow,
+	Green,
+	Dry,
+	Stone,
+	Desert
+};
+
+UENUM(BlueprintType)
+enum class EVoxelFoliageType: uint8
+{
+	None,
+	Plant,
+	Tree
+};
+
+UENUM(BlueprintType)
+enum class EVoxelDataType: uint8
+{
+	None,
+	Basic,
+	Terrain,
+	Noise,
+	Random
+};
+
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelMeshUVData
 {
@@ -359,7 +405,9 @@ public:
 public:
 	virtual bool IsValid() const override;
 
-	bool IsUnknown() const;
+	virtual bool IsEmpty() const override;
+
+	virtual bool IsUnknown() const;
 
 	bool IsReplaceable(const FVoxelItem& InVoxelItem = FVoxelItem::Empty) const;
 
@@ -394,17 +442,6 @@ public:
 	}
 
 	UVoxelData& GetVoxelData(bool bEnsured = true) const;
-
-public:
-	FORCEINLINE friend bool operator==(const FVoxelItem& A, const FVoxelItem& B)
-	{
-		return (A.ID == B.ID) && (A.Count == B.Count) && (A.Level == B.Level) && (A.Index == B.Index);
-	}
-
-	FORCEINLINE friend bool operator!=(const FVoxelItem& A, const FVoxelItem& B)
-	{
-		return (A.ID != B.ID) || (A.Count != B.Count) || (A.Level != B.Level) || (A.Index != B.Index);
-	}
 };
 
 USTRUCT(BlueprintType)
@@ -539,6 +576,42 @@ public:
 };
 
 USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelTopography
+{
+	GENERATED_BODY()
+
+public:
+	FIndex Index;
+	
+	//chunk地形高度[0~256]
+	int32 Height;
+
+	//chunk地形温度[-1.0f,1.0f]
+	float Temperature;
+
+	//chunk地形湿度[0.0f,1.0f]
+	float Humidity;
+
+	//chunk生物群落属性[1,2,3,4...]
+	EVoxelBiomeType BiomeType;
+
+public:
+	FORCEINLINE FVoxelTopography()
+	{
+		Index = FIndex::ZeroIndex;
+		Height = 0;
+		Temperature = 0.f;
+		Humidity = 0.f;
+		BiomeType = EVoxelBiomeType::None;
+	}
+
+	FORCEINLINE FVoxelTopography(const FString& InSaveData);
+
+public:
+	FString ToSaveData() const;
+};
+
+USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelChunkSaveData : public FSaveData
 {
 	GENERATED_BODY()
@@ -548,6 +621,7 @@ public:
 	{
 		Index = FIndex::ZeroIndex;
 		VoxelDatas = TEXT("");
+		TopographyDatas = TEXT("");
 		PickUpDatas = TArray<FPickUpSaveData>();
 		AuxiliaryDatas = TArray<FVoxelAuxiliarySaveData>();
 		bGenerated = false;
@@ -560,6 +634,9 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	FString VoxelDatas;
 	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FString TopographyDatas;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	TArray<FPickUpSaveData> PickUpDatas;
 	
@@ -582,41 +659,6 @@ public:
 			Iter.MakeSaved();
 		}
 	}
-};
-
-UENUM(BlueprintType)
-enum class EVoxelHierarchy: uint8
-{
-	None,
-	Under,
-	Upper
-};
-
-UENUM(BlueprintType)
-enum class EVoxelBiomeType: uint8
-{
-	None,
-	Plain,
-	Mountain,
-	Blob
-};
-
-UENUM(BlueprintType)
-enum class EVoxelFoliageType: uint8
-{
-	None,
-	Plant,
-	Tree
-};
-
-UENUM(BlueprintType)
-enum class EVoxelDataType: uint8
-{
-	None,
-	Basic,
-	Biome,
-	Noise,
-	Random
 };
 
 USTRUCT(BlueprintType)
@@ -660,9 +702,9 @@ public:
 		RandomDatas = TArray<FVoxelRandomData>();
 	}
 
-	FORCEINLINE FVoxelBlockData(float InBaseHeight, bool bSnapBiome) : FVoxelBlockData()
+	FORCEINLINE FVoxelBlockData(float InBaseHeight, bool bSnapTerrain) : FVoxelBlockData()
 	{
-		DataType = bSnapBiome ? EVoxelDataType::Biome : EVoxelDataType::Basic;
+		DataType = bSnapTerrain ? EVoxelDataType::Terrain : EVoxelDataType::Basic;
 		BaseHeight = InBaseHeight;
 	}
 
@@ -761,10 +803,10 @@ public:
 			}
 		};
 
-		BiomeDatas = {
-			{ EVoxelBiomeType::Plain, FVoxelBlockData(0.6f, FVector(0.005f, 0.005f, 0.8)) },
-			{ EVoxelBiomeType::Mountain, FVoxelBlockData(0.6f, FVector(0.01f, 0.01f, 1.f)) },
-			{ EVoxelBiomeType::Blob, FVoxelBlockData(0.75f, FVector(0.05f, 0.05f, 0.5f)) }
+		TerrainDatas = {
+			{ EVoxelTerrainType::Plain, FVoxelBlockData(0.6f, FVector(0.005f, 0.005f, 0.8)) },
+			{ EVoxelTerrainType::Mountain, FVoxelBlockData(0.6f, FVector(0.01f, 0.01f, 1.f)) },
+			{ EVoxelTerrainType::Blob, FVoxelBlockData(0.75f, FVector(0.05f, 0.05f, 0.5f)) }
 		};
 
 		FoliageDatas = {
@@ -811,7 +853,7 @@ public:
 	TMap<EVoxelHierarchy, FVoxelBlockDatas> BlockDatas;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TMap<EVoxelBiomeType, FVoxelBlockData> BiomeDatas;
+	TMap<EVoxelTerrainType, FVoxelBlockData> TerrainDatas;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TMap<EVoxelFoliageType, FVoxelBlockData> FoliageDatas;
@@ -976,25 +1018,30 @@ public:
 	UPROPERTY(EditAnywhere)
 	int32 Speed;
 
+	UPROPERTY(EditAnywhere)
+	bool bFloor;
+
 	UPROPERTY(VisibleAnywhere)
 	TArray<FIndex> Queue;
 		
-	TArray<FAsyncTask<AsyncTask_ChunkQueue>*> Tasks;
+	TArray<FAsyncTask<FAsyncTask_ChunkQueue>*> Tasks;
 
 	FORCEINLINE FVoxelChunkQueue()
 	{
 		bAsync = false;
 		Speed = 100;
+		bFloor = false;
 		Queue = TArray<FIndex>();
-		Tasks = TArray<FAsyncTask<AsyncTask_ChunkQueue>*>();
+		Tasks = TArray<FAsyncTask<FAsyncTask_ChunkQueue>*>();
 	}
 
-	FORCEINLINE FVoxelChunkQueue(bool bInAsync, int32 InSpeed)
+	FORCEINLINE FVoxelChunkQueue(bool bInAsync, int32 InSpeed, bool bInFloor = false)
 	{
 		bAsync = bInAsync;
 		Speed = InSpeed;
+		bFloor = bInFloor;
 		Queue = TArray<FIndex>();
-		Tasks = TArray<FAsyncTask<AsyncTask_ChunkQueue>*>();
+		Tasks = TArray<FAsyncTask<FAsyncTask_ChunkQueue>*>();
 	}
 };
 

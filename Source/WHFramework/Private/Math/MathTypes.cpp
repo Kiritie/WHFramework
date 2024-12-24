@@ -1,6 +1,5 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "Math/MathTypes.h"
 
 const FIndex FIndex::ZeroIndex = FIndex(0, 0, 0);

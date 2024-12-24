@@ -1,6 +1,5 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "Math/MathStatics.h"
 
 FVector UMathStatics::RotatorVector(const FVector& Vector, const FRotator& Rotator, bool bRound, bool bAbsolute)
@@ -416,7 +415,21 @@ float UMathStatics::BounceEaseOut(float InTime, float InDuration)
 	return (((7.5625f * InTime) * InTime) + 0.984375f);
 }
 
+float UMathStatics::GetNoise2D(FVector2D InLocation, FVector InScale, int32 InOffset, bool bAbs)
+{
+	const float Noise2D = FMath::PerlinNoise2D(FVector2D((InLocation.X + InOffset) * InScale.X, (InLocation.Y + InOffset) * InScale.Y)) * InScale.Z;
+	return bAbs ? FMath::Abs(Noise2D) : Noise2D;
+}
+
+float UMathStatics::GetNoise3D(FVector InLocation, FVector InScale, int32 InOffset, bool bAbs)
+{
+	const float Noise3D = FMath::PerlinNoise3D(FVector((InLocation.X + InOffset) * InScale.X, (InLocation.Y + InOffset) * InScale.Y, InLocation.Z)) * InScale.Z;
+	return bAbs ? FMath::Abs(Noise3D) : Noise3D;
+}
+
 float UMathStatics::GetNoiseHeight(FVector2D InLocation, FVector InScale, int32 InOffset, bool bUnsigned)
 {
-	return (FMath::PerlinNoise2D(FVector2D((InLocation.X + InOffset) * InScale.X, (InLocation.Y + InOffset) * InScale.Y)) + (bUnsigned ? 1.f : 0.f)) * InScale.Z;
+	const float Noise2D = (FMath::PerlinNoise2D(FVector2D((InLocation.X + InOffset) * InScale.X, (InLocation.Y + InOffset) * InScale.Y)) + (bUnsigned ? 1.f : 0.f)) * InScale.Z;
+	return Noise2D;
 }
+

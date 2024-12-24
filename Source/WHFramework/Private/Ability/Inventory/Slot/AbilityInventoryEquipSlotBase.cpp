@@ -25,9 +25,9 @@ void UAbilityInventoryEquipSlotBase::OnInitialize(UAbilityInventoryBase* InInven
 	Super::OnInitialize(InInventory, InLimitType, InSplitType, InSlotIndex);
 }
 
-void UAbilityInventoryEquipSlotBase::OnItemPreChange(FAbilityItem& InNewItem)
+void UAbilityInventoryEquipSlotBase::OnItemPreChange(FAbilityItem& InNewItem, bool bBroadcast)
 {
-	Super::OnItemPreChange(InNewItem);
+	Super::OnItemPreChange(InNewItem, bBroadcast);
 
 	if(Item.IsValid() && Item.GetData<UAbilityEquipDataBase>().EquipMode == EAbilityEquipMode::Passive)
 	{
@@ -35,9 +35,9 @@ void UAbilityInventoryEquipSlotBase::OnItemPreChange(FAbilityItem& InNewItem)
 	}
 }
 
-void UAbilityInventoryEquipSlotBase::OnItemChanged(FAbilityItem& InOldItem)
+void UAbilityInventoryEquipSlotBase::OnItemChanged(FAbilityItem& InOldItem, bool bBroadcast)
 {
-	Super::OnItemChanged(InOldItem);
+	Super::OnItemChanged(InOldItem, bBroadcast);
 
 	if(Item.IsValid() && Item.GetData<UAbilityEquipDataBase>().EquipMode == EAbilityEquipMode::Passive)
 	{

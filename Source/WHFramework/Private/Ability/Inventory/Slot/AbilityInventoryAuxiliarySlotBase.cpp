@@ -14,9 +14,9 @@ void UAbilityInventoryAuxiliarySlotBase::OnInitialize(UAbilityInventoryBase* InI
 	Super::OnInitialize(InInventory, InLimitType, InSplitType, InSlotIndex);
 }
 
-void UAbilityInventoryAuxiliarySlotBase::OnItemChanged(FAbilityItem& InOldItem)
+void UAbilityInventoryAuxiliarySlotBase::OnItemChanged(FAbilityItem& InOldItem, bool bBroadcast)
 {
-	Super::OnItemChanged(InOldItem);
+	Super::OnItemChanged(InOldItem, bBroadcast);
 
 	if(auto Agent = Inventory->GetOwnerAgent())
 	{

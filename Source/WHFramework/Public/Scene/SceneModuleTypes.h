@@ -216,7 +216,7 @@ struct WHFRAMEWORK_API FSceneActorSaveData : public FSaveData
 public:
 	FORCEINLINE FSceneActorSaveData()
 	{
-		ActorID = FGuid();
+		ActorID = FGuid::NewGuid();
 		SpawnTransform = FTransform::Identity;
 	}
 

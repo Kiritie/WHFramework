@@ -215,7 +215,7 @@ bool UCommonStatics::StringToBool(const FString& InString)
 	return FCoreStatics::StringToBool(InString);
 }
 
-FString UCommonStatics::SanitizeFloat(float InFloat, int32 InMaxDigits)
+FString UCommonStatics::SanitizeFloat(double InFloat, int32 InMaxDigits)
 {
 	return FCoreStatics::SanitizeFloat(InFloat, InMaxDigits);
 }
