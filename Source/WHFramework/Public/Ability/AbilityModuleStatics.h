@@ -51,7 +51,7 @@ public:
 			for(int32 i = 0; i < RaceDatas.Num(); i++)
 			{
 				const auto& RaceData = RaceDatas[i];
-				const float NoiseHeight = UMathStatics::GetNoiseHeight(InLocation, FVector(RaceData.NoiseScale.X, RaceData.NoiseScale.Y, 1.f), InOffset * (i + 1));
+				const float NoiseHeight = UMathStatics::GetNoise2D(InLocation, FVector(RaceData.NoiseScale.X, RaceData.NoiseScale.Y, 1.f), InOffset * (i + 1));
 				if(FMath::Abs(NoiseHeight) >= RaceData.NoiseScale.Z)
 				{
 					OutDatas.Add(RaceData);

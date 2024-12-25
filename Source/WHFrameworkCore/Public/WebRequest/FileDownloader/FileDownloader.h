@@ -39,34 +39,34 @@ protected:
 	 * @param URL The URL of the file to download
 	 * @param Timeout The timeout value in seconds
 	 * @param ContentType The content type of the file
-	 * @param MaxChunkSize The maximum size of each chunk to download in bytes
+	 * @param MaxChunkSize The maximum size of each InChunk to download in bytes
 	 * @param OnProgress A function that is called with the progress as BytesReceived and ContentSize
 	 * @return A future that resolves to the downloaded data as a TArray64<uint8>
 	 */
 	virtual TFuture<FFileDownloaderResult> DownloadFile(const FString& URL, float Timeout, const FString& ContentType, int64 MaxChunkSize);
 
 	/**
-	 * Download a file by dividing it into chunks and downloading each chunk separately
+	 * Download a file by dividing it into chunks and downloading each InChunk separately
 	 *
 	 * @param URL The URL of the file to download
 	 * @param Timeout The timeout value in seconds
 	 * @param ContentType The content type of the file
-	 * @param MaxChunkSize The maximum size of each chunk to download in bytes
+	 * @param MaxChunkSize The maximum size of each InChunk to download in bytes
 	 * @param ChunkRange The range of chunks to download
 	 * @param OnProgress A function that is called with the progress as BytesReceived and ContentSize
-	 * @param OnChunkDownloaded A function that is called when each chunk is downloaded
+	 * @param OnChunkDownloaded A function that is called when each InChunk is downloaded
 	 * @return A future that resolves to true if all chunks are downloaded successfully, false otherwise
 	 */
 	virtual TFuture<EDownloadToMemoryResult> DownloadFilePerChunk(const FString& URL, float Timeout, const FString& ContentType, int64 MaxChunkSize, FInt64Vector2 ChunkRange, const TFunction<void(TArray64<uint8>&&)>& OnChunkDownloaded);
 
 	/**
-	 * Download a single chunk of a file
+	 * Download a single InChunk of a file
 	 *
 	 * @param URL The URL of the file to download
 	 * @param Timeout The timeout value in seconds
 	 * @param ContentType The content type of the file
 	 * @param ContentSize The size of the file in bytes
-	 * @param ChunkRange The range of the chunk to download
+	 * @param ChunkRange The range of the InChunk to download
 	 * @param OnProgress A function that is called with the progress as BytesReceived and ContentSize
 	 * @return A future that resolves to the downloaded data as a TArray64<uint8>
 	 */

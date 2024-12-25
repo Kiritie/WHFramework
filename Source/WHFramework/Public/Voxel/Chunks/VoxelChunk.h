@@ -47,7 +47,7 @@ protected:
 	//////////////////////////////////////////////////////////////////////////
 	// Chunk
 public:
-	virtual void Initialize(FIndex InIndex, int32 InBatch);
+	virtual void Initialize(UVoxelModule* InModule, FIndex InIndex, int32 InBatch);
 
 	virtual void Generate(EPhase InPhase);
 
@@ -160,6 +160,22 @@ public:
 	virtual void SpawnSceneActors() override;
 
 	virtual void DestroySceneActors() override;
+	
+	//////////////////////////////////////////////////////////////////////////
+	// Building
+protected:
+	virtual void GenerateBuildings();
+
+	virtual bool SpawnBuilding(FVoxelBuildingData& InBuildingData);
+
+public:
+	virtual void AddBuilding(const FVoxelBuildingData& InBuildingData);
+	
+	virtual TSubclassOf<AActor> GetBuildingClassByID(int32 InID) const;
+
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Building")
+	TArray<FVoxelBuildingData> BuildingDatas;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Auxiliary
@@ -205,6 +221,9 @@ protected:
 	TMap<FIndex, FVoxelItem> VoxelMap;
 
 	TMap<FIndex, FVoxelTopography> TopographyMap;
+
+	UPROPERTY(BlueprintReadOnly)
+	UVoxelModule* Module;
 
 public:
 	FIndex GetIndex() const { return Index; }

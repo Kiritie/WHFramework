@@ -9,16 +9,7 @@
 
 #include "VoxelModule.generated.h"
 
-const int32 LoadRadius = 5;
-const int32 ChunkSize = LoadRadius * 2 - 1;
-const int32 Center1 = LoadRadius - 1;
-
-const int32 DisplayRadius = LoadRadius-1;
-const int32 DisplaySize = DisplayRadius * 2- 1;
-const int32 DisplayCenter = DisplayRadius - 1;
-
-const int32 SeaLevel = 0;
-
+class UVoxelGenerator;
 class AVoxelCapture;
 class AVoxelChunk;
 class UVoxelData;
@@ -162,6 +153,14 @@ protected:
 	virtual void AddToChunkQueue(EVoxelWorldState InState, FIndex InIndex);
 	
 	virtual void RemoveFromChunkQueue(EVoxelWorldState InState, FIndex InIndex);
+	
+public:
+	template<class T>
+	bool GenerateVoxel(AVoxelChunk* InChunk) const
+	{
+		return GenerateVoxel(InChunk, T::StaticClass());
+	}
+	virtual bool GenerateVoxel(AVoxelChunk* InChunk, const TSubclassOf<UVoxelGenerator>& InClass) const;
 
 public:
 	virtual bool IsOnTheWorld(FIndex InIndex, bool bIgnoreZ = true) const;
@@ -194,11 +193,13 @@ public:
 	virtual void SetTopographyLocation(FVector InLocation, const FVoxelTopography& InTopography);
 
 public:
-	virtual float GetNoise2D(FVector2D InLocation, FVector InScale, int32 InOffset = 0, bool bAbs = false) const;
+	virtual float GetNoise1D(float InValue, FVector2D InScale, bool bAbs = false, bool bUnsigned = false) const;
 
-	virtual float GetNoise3D(FVector InLocation, FVector InScale, int32 InOffset = 0, bool bAbs = false) const;
+	virtual float GetNoise2D(FVector2D InLocation, FVector InScale, bool bAbs = false, bool bUnsigned = false) const;
 
-	virtual float GetNoiseHeight(FVector2D InLocation, FVector InScale, float InBaseHeight) const;
+	virtual float GetNoise3D(FVector InLocation, FVector InScale, bool bAbs = false, bool bUnsigned = false) const;
+
+	virtual float GetNoiseHeight(FVector2D InLocation, FVector InScale, float InBaseHeight, bool bAbs = false, bool bUnsigned = false) const;
 
 	virtual float GetNoiseHeight(float InBaseHeight) const;
 
@@ -260,7 +261,7 @@ protected:
 	
 	UPROPERTY(EditAnywhere, Category = "Voxel")
 	TArray<TSubclassOf<UVoxel>> VoxelClasses;
-
+	
 	UPROPERTY(VisibleAnywhere)
 	int32 ChunkSpawnBatch;
 
@@ -273,6 +274,9 @@ protected:
 	UPROPERTY(Transient)
 	TArray<AVoxelEntityPreview*> PreviewVoxels;
 
+	UPROPERTY(Transient)
+	TMap<TSubclassOf<UVoxelGenerator>, UVoxelGenerator*> VoxelGenerators;
+
 public:
 	bool IsBasicGenerated() const;
 	
@@ -283,23 +287,11 @@ public:
 	bool IsChunkGenerated(FIndex InIndex, bool bCheckVerticals = false) const;
 	
 	TArray<AVoxelChunk*> GetVerticalChunks(FIndex InIndex) const;
-	
-protected:
-	//生成建筑方块
-	void GenerateBuildingBlocks();
 
-protected:
-	//创建Building Actor
-	bool CreateBuilding(int32 id,int32 rotate, FVector pos);
-
-public:
-	//待显示建筑列表
-	TArray<TTuple<uint64,int32,int32>> Budildings2Display;
-
-public:
-	//添加建筑
-	void AddBuilding(FVector pos,int32 BuildingID,int32 rotate);
-
-	//待显示建筑列表
-	TArray<TTuple<uint64,int32,int32>>& GetBuildings2Display();
+	template<class T>
+	T* GetVoxelGenerator() const
+	{
+		return Cast<T>(GetVoxelGenerator(T::StaticClass()));
+	}
+	UVoxelGenerator* GetVoxelGenerator(const TSubclassOf<UVoxelGenerator>& InClass) const;
 };

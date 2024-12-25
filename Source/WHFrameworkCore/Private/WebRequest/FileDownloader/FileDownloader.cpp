@@ -197,7 +197,7 @@ TFuture<FFileDownloaderResult> FFileDownloader::DownloadFile(const FString& URL,
 		TSharedPtr<FFileDownloader> SharedThis = WeakThisPtr.Pin();
 		if (!SharedThis.IsValid())
 		{
-			WHLog(FString::Printf(TEXT("Failed to download file chunk from %s: downloader has been destroyed"), *URL), EDC_WebRequest, EDV_Warning);
+			WHLog(FString::Printf(TEXT("Failed to download file InChunk from %s: downloader has been destroyed"), *URL), EDC_WebRequest, EDV_Warning);
 			PromisePtr->SetValue(FFileDownloaderResult{EDownloadToMemoryResult::DownloadFailed, TArray64<uint8>()});
 			return;
 		}
@@ -216,14 +216,14 @@ TFuture<FFileDownloaderResult> FFileDownloader::DownloadFile(const FString& URL,
 				TSharedPtr<FFileDownloader> SharedThis = WeakThisPtr.Pin();
 				if (!SharedThis.IsValid())
 				{
-					WHLog(FString::Printf(TEXT("Failed to download file chunk from %s: downloader has been destroyed"), *URL), EDC_WebRequest, EDV_Warning);
+					WHLog(FString::Printf(TEXT("Failed to download file InChunk from %s: downloader has been destroyed"), *URL), EDC_WebRequest, EDV_Warning);
 					PromisePtr->SetValue(FFileDownloaderResult{EDownloadToMemoryResult::DownloadFailed, TArray64<uint8>()});
 					return;
 				}
 
 				if (SharedThis->DownloadResult == EDownloadToStorageResult::Cancelled)
 				{
-					WHLog(FString::Printf(TEXT("Canceled file chunk download from %s"), *URL), EDC_WebRequest, EDV_Warning);
+					WHLog(FString::Printf(TEXT("Canceled file InChunk download from %s"), *URL), EDC_WebRequest, EDV_Warning);
 					PromisePtr->SetValue(FFileDownloaderResult{EDownloadToMemoryResult::Cancelled, TArray64<uint8>()});
 					return;
 				}
@@ -248,7 +248,7 @@ TFuture<FFileDownloaderResult> FFileDownloader::DownloadFile(const FString& URL,
 
 		if (MaxChunkSize <= 0)
 		{
-			WHLog(FString::Printf(TEXT("Failed to download file chunk from %s: MaxChunkSize is <= 0. Trying to download the file by payload"), *URL), EDC_WebRequest, EDV_Error);
+			WHLog(FString::Printf(TEXT("Failed to download file InChunk from %s: MaxChunkSize is <= 0. Trying to download the file by payload"), *URL), EDC_WebRequest, EDV_Error);
 			DownloadByPayload();
 			return;
 		}
@@ -281,7 +281,7 @@ TFuture<FFileDownloaderResult> FFileDownloader::DownloadFile(const FString& URL,
 			TSharedPtr<FFileDownloader> SharedThis = WeakThisPtr.Pin();
 			if (!SharedThis.IsValid())
 			{
-				WHLog(FString::Printf(TEXT("Failed to download file chunk from %s: downloader has been destroyed"), *URL), EDC_WebRequest, EDV_Warning);
+				WHLog(FString::Printf(TEXT("Failed to download file InChunk from %s: downloader has been destroyed"), *URL), EDC_WebRequest, EDV_Warning);
 				PromisePtr->SetValue(FFileDownloaderResult{EDownloadToMemoryResult::DownloadFailed, TArray64<uint8>()});
 				OnChunkDownloadedFilled();
 				return;
@@ -289,7 +289,7 @@ TFuture<FFileDownloaderResult> FFileDownloader::DownloadFile(const FString& URL,
 
 			if (SharedThis->DownloadResult == EDownloadToStorageResult::Cancelled)
 			{
-				WHLog(FString::Printf(TEXT("Canceled file chunk download from %s"), *URL), EDC_WebRequest, EDV_Warning);
+				WHLog(FString::Printf(TEXT("Canceled file InChunk download from %s"), *URL), EDC_WebRequest, EDV_Warning);
 				PromisePtr->SetValue(FFileDownloaderResult{EDownloadToMemoryResult::Cancelled, TArray64<uint8>()});
 				OnChunkDownloadedFilled();
 				return;
@@ -302,7 +302,7 @@ TFuture<FFileDownloaderResult> FFileDownloader::DownloadFile(const FString& URL,
 			// {
 			// 	if (*ChunkOffsetPtr < 0 || *ChunkOffsetPtr >= OverallDownloadedDataPtr->Num())
 			// 	{
-			// 		WHLog(FString::Printf(TEXT("Failed to download file chunk from %s: data offset is out of range (%lld, expected [0, %lld]). Trying to download the file by payload"), *URL, *ChunkOffsetPtr, OverallDownloadedDataPtr->Num()), EDC_WebRequest, EDV_Error);
+			// 		WHLog(FString::Printf(TEXT("Failed to download file InChunk from %s: data offset is out of range (%lld, expected [0, %lld]). Trying to download the file by payload"), *URL, *ChunkOffsetPtr, OverallDownloadedDataPtr->Num()), EDC_WebRequest, EDV_Error);
 			// 		DownloadByPayload();
 			// 		OnChunkDownloadedFilled();
 			// 		return;
@@ -310,14 +310,14 @@ TFuture<FFileDownloaderResult> FFileDownloader::DownloadFile(const FString& URL,
 			//
 			// 	if (CurrentlyDownloadedSize > OverallDownloadedDataPtr->Num())
 			// 	{
-			// 		WHLog(FString::Printf(TEXT("Failed to download file chunk from %s: overall downloaded size is out of range (%lld, expected [0, %lld]). Trying to download the file by payload"), *URL, CurrentlyDownloadedSize, OverallDownloadedDataPtr->Num()), EDC_WebRequest, EDV_Error);
+			// 		WHLog(FString::Printf(TEXT("Failed to download file InChunk from %s: overall downloaded size is out of range (%lld, expected [0, %lld]). Trying to download the file by payload"), *URL, CurrentlyDownloadedSize, OverallDownloadedDataPtr->Num()), EDC_WebRequest, EDV_Error);
 			// 		DownloadByPayload();
 			// 		OnChunkDownloadedFilled();
 			// 		return;
 			// 	}
 			// }
 
-			// Append the downloaded chunk to the result data
+			// Append the downloaded InChunk to the result data
 			// FMemory::Memcpy(OverallDownloadedDataPtr->GetData() + *ChunkOffsetPtr, ResultData.GetData(), ResultData.Num());
 
 			if (!SharedThis->FileHandle->Write(ResultData.GetData(), ResultData.Num()))
@@ -335,18 +335,18 @@ TFuture<FFileDownloaderResult> FFileDownloader::DownloadFile(const FString& URL,
 				return;
 			}
 
-			// Increase the offset by the size of the downloaded chunk
+			// Increase the offset by the size of the downloaded InChunk
 			*ChunkOffsetPtr += ResultData.Num();
 		};
 
 		SharedThis->DownloadFilePerChunk(URL, Timeout, ContentType, MaxChunkSize, ChunkRange, OnChunkDownloaded).Next([PromisePtr, bChunkDownloadedFilledPtr, URL/*, OverallDownloadedDataPtr*/, OnChunkDownloadedFilled, DownloadByPayload](EDownloadToMemoryResult Result) mutable
 		{
-			// Only return data if no chunk was downloaded
+			// Only return data if no InChunk was downloaded
 			if (bChunkDownloadedFilledPtr.IsValid() && (*bChunkDownloadedFilledPtr.Get() == false))
 			{
 				if (Result != EDownloadToMemoryResult::Success && Result != EDownloadToMemoryResult::SucceededByPayload)
 				{
-					WHLog(FString::Printf(TEXT("Failed to download file chunk from %s: download failed. Trying to download the file by payload"), *URL), EDC_WebRequest, EDV_Error);
+					WHLog(FString::Printf(TEXT("Failed to download file InChunk from %s: download failed. Trying to download the file by payload"), *URL), EDC_WebRequest, EDV_Error);
 					DownloadByPayload();
 					OnChunkDownloadedFilled();
 					return;
@@ -363,7 +363,7 @@ TFuture<EDownloadToMemoryResult> FFileDownloader::DownloadFilePerChunk(const FSt
 {
 	if (DownloadResult == EDownloadToStorageResult::Cancelled)
 	{
-		WHLog(FString::Printf(TEXT("Canceled file chunk download from %s"), *URL), EDC_WebRequest, EDV_Warning);
+		WHLog(FString::Printf(TEXT("Canceled file InChunk download from %s"), *URL), EDC_WebRequest, EDV_Warning);
 		return MakeFulfilledPromise<EDownloadToMemoryResult>(EDownloadToMemoryResult::Cancelled).GetFuture();
 	}
 
@@ -374,14 +374,14 @@ TFuture<EDownloadToMemoryResult> FFileDownloader::DownloadFilePerChunk(const FSt
 		TSharedPtr<FFileDownloader> SharedThis = WeakThisPtr.Pin();
 		if (!SharedThis.IsValid())
 		{
-			WHLog(FString::Printf(TEXT("Failed to download file chunk from %s: downloader has been destroyed"), *URL), EDC_WebRequest, EDV_Warning);
+			WHLog(FString::Printf(TEXT("Failed to download file InChunk from %s: downloader has been destroyed"), *URL), EDC_WebRequest, EDV_Warning);
 			PromisePtr->SetValue(EDownloadToMemoryResult::DownloadFailed);
 			return;
 		}
 		
 		if (SharedThis->DownloadResult == EDownloadToStorageResult::Cancelled)
 		{
-			WHLog(FString::Printf(TEXT("Canceled file chunk download from %s"), *URL), EDC_WebRequest, EDV_Warning);
+			WHLog(FString::Printf(TEXT("Canceled file InChunk download from %s"), *URL), EDC_WebRequest, EDV_Warning);
 			PromisePtr->SetValue(EDownloadToMemoryResult::Cancelled);
 			return;
 		}
@@ -394,28 +394,28 @@ TFuture<EDownloadToMemoryResult> FFileDownloader::DownloadFilePerChunk(const FSt
 				TSharedPtr<FFileDownloader> SharedThis = WeakThisPtr.Pin();
 				if (!SharedThis.IsValid())
 				{
-					WHLog(FString::Printf(TEXT("Failed to download file chunk from %s: downloader has been destroyed"), *URL), EDC_WebRequest, EDV_Warning);
+					WHLog(FString::Printf(TEXT("Failed to download file InChunk from %s: downloader has been destroyed"), *URL), EDC_WebRequest, EDV_Warning);
 					PromisePtr->SetValue(EDownloadToMemoryResult::DownloadFailed);
 					return;
 				}
 
 				if (SharedThis->DownloadResult == EDownloadToStorageResult::Cancelled)
 				{
-					WHLog(FString::Printf(TEXT("Canceled file chunk download from %s"), *URL), EDC_WebRequest, EDV_Warning);
+					WHLog(FString::Printf(TEXT("Canceled file InChunk download from %s"), *URL), EDC_WebRequest, EDV_Warning);
 					PromisePtr->SetValue(EDownloadToMemoryResult::Cancelled);
 					return;
 				}
 
 				if (Result.Result != EDownloadToMemoryResult::Success && Result.Result != EDownloadToMemoryResult::SucceededByPayload)
 				{
-					WHLog(FString::Printf(TEXT("Failed to download file chunk from %s: %s"), *URL, *UEnum::GetValueAsString(Result.Result)), EDC_WebRequest, EDV_Error);
+					WHLog(FString::Printf(TEXT("Failed to download file InChunk from %s: %s"), *URL, *UEnum::GetValueAsString(Result.Result)), EDC_WebRequest, EDV_Error);
 					PromisePtr->SetValue(Result.Result);
 					return;
 				}
 
 				if (Result.Data.Num() <= 0)
 				{
-					WHLog(FString::Printf(TEXT("Failed to download file chunk from %s: downloaded content is empty"), *URL), EDC_WebRequest, EDV_Error);
+					WHLog(FString::Printf(TEXT("Failed to download file InChunk from %s: downloaded content is empty"), *URL), EDC_WebRequest, EDV_Error);
 					PromisePtr->SetValue(EDownloadToMemoryResult::DownloadFailed);
 					return;
 				}
@@ -435,12 +435,12 @@ TFuture<EDownloadToMemoryResult> FFileDownloader::DownloadFilePerChunk(const FSt
 
 		if (MaxChunkSize <= 0)
 		{
-			WHLog(FString::Printf(TEXT("Failed to download file chunk from %s: max chunk size is <= 0"), *URL), EDC_WebRequest, EDV_Error);
+			WHLog(FString::Printf(TEXT("Failed to download file InChunk from %s: max InChunk size is <= 0"), *URL), EDC_WebRequest, EDV_Error);
 			PromisePtr->SetValue(EDownloadToMemoryResult::DownloadFailed);
 			return;
 		}
 
-		// If the chunk range is not specified, determine the range based on the max chunk size and the content size
+		// If the InChunk range is not specified, determine the range based on the max InChunk size and the content size
 		if (ChunkRange.X == 0 && ChunkRange.Y == 0)
 		{
 			ChunkRange.Y = FMath::Min(MaxChunkSize, ContentSize) - 1;
@@ -448,7 +448,7 @@ TFuture<EDownloadToMemoryResult> FFileDownloader::DownloadFilePerChunk(const FSt
 
 		if (ChunkRange.Y > ContentSize)
 		{
-			WHLog(FString::Printf(TEXT("Failed to download file chunk from %s: chunk range is out of range (%lld, expected [0, %lld])"), *URL, ChunkRange.Y, ContentSize), EDC_WebRequest, EDV_Error);
+			WHLog(FString::Printf(TEXT("Failed to download file InChunk from %s: InChunk range is out of range (%lld, expected [0, %lld])"), *URL, ChunkRange.Y, ContentSize), EDC_WebRequest, EDV_Error);
 			PromisePtr->SetValue(EDownloadToMemoryResult::DownloadFailed);
 			return;
 		}
@@ -459,7 +459,7 @@ TFuture<EDownloadToMemoryResult> FFileDownloader::DownloadFilePerChunk(const FSt
 			if (SharedThis.IsValid())
 			{
 				const float Progress = ContentSize <= 0 ? 0.0f : static_cast<float>(BytesReceived + ChunkRange.X) / ContentSize;
-				WHLog(FString::Printf(TEXT("Downloaded %lld bytes of file chunk from %s. Range: {%lld; %lld}, Overall: %lld, Progress: %f"), BytesReceived, *URL, ChunkRange.X, ChunkRange.Y, ContentSize, Progress), EDC_WebRequest, EDV_Log);
+				WHLog(FString::Printf(TEXT("Downloaded %lld bytes of file InChunk from %s. Range: {%lld; %lld}, Overall: %lld, Progress: %f"), BytesReceived, *URL, ChunkRange.X, ChunkRange.Y, ContentSize, Progress), EDC_WebRequest, EDV_Log);
 				SharedThis->OnProgress_Internal(URL, 0, 1, BytesSent, BytesReceived + ChunkRange.X, ContentSize);
 				SharedThis->OnProgress.Broadcast(URL, 0, 1, BytesSent, BytesReceived + ChunkRange.X, ContentSize);
 			}
@@ -470,21 +470,21 @@ TFuture<EDownloadToMemoryResult> FFileDownloader::DownloadFilePerChunk(const FSt
 			TSharedPtr<FFileDownloader> SharedThis = WeakThisPtr.Pin();
 			if (!SharedThis.IsValid())
 			{
-				WHLog(FString::Printf(TEXT("Failed to download file chunk from %s: downloader has been destroyed"), *URL), EDC_WebRequest, EDV_Warning);
+				WHLog(FString::Printf(TEXT("Failed to download file InChunk from %s: downloader has been destroyed"), *URL), EDC_WebRequest, EDV_Warning);
 				PromisePtr->SetValue(EDownloadToMemoryResult::DownloadFailed);
 				return;
 			}
 
 			if (SharedThis->DownloadResult == EDownloadToStorageResult::Cancelled)
 			{
-				WHLog(FString::Printf(TEXT("Canceled file chunk download from %s"), *URL), EDC_WebRequest, EDV_Warning);
+				WHLog(FString::Printf(TEXT("Canceled file InChunk download from %s"), *URL), EDC_WebRequest, EDV_Warning);
 				PromisePtr->SetValue(EDownloadToMemoryResult::Cancelled);
 				return;
 			}
 
 			if (Result.Result != EDownloadToMemoryResult::Success && Result.Result != EDownloadToMemoryResult::SucceededByPayload)
 			{
-				WHLog(FString::Printf(TEXT("Failed to download file chunk from %s: %s"), *URL, *UEnum::GetValueAsString(Result.Result)), EDC_WebRequest, EDV_Error);
+				WHLog(FString::Printf(TEXT("Failed to download file InChunk from %s: %s"), *URL, *UEnum::GetValueAsString(Result.Result)), EDC_WebRequest, EDV_Error);
 				PromisePtr->SetValue(Result.Result);
 				return;
 			}
@@ -522,13 +522,13 @@ TFuture<FFileDownloaderResult> FFileDownloader::DownloadFileByChunk(const FStrin
 
 	if (ChunkRange.X < 0 || ChunkRange.Y <= 0 || ChunkRange.X > ChunkRange.Y)
 	{
-		WHLog(FString::Printf(TEXT("Failed to download file chunk from %s: chunk range (%lld; %lld) is invalid"), *URL, ChunkRange.X, ChunkRange.Y), EDC_WebRequest, EDV_Error);
+		WHLog(FString::Printf(TEXT("Failed to download file InChunk from %s: InChunk range (%lld; %lld) is invalid"), *URL, ChunkRange.X, ChunkRange.Y), EDC_WebRequest, EDV_Error);
 		return MakeFulfilledPromise<FFileDownloaderResult>(FFileDownloaderResult{EDownloadToMemoryResult::DownloadFailed, TArray64<uint8>()}).GetFuture();
 	}
 
 	if (ChunkRange.Y - ChunkRange.X + 1 > ContentSize)
 	{
-		WHLog(FString::Printf(TEXT("Failed to download file chunk from %s: chunk range (%lld; %lld) is out of range (%lld)"), *URL, ChunkRange.X, ChunkRange.Y, ContentSize), EDC_WebRequest, EDV_Error);
+		WHLog(FString::Printf(TEXT("Failed to download file InChunk from %s: InChunk range (%lld; %lld) is out of range (%lld)"), *URL, ChunkRange.X, ChunkRange.Y, ContentSize), EDC_WebRequest, EDV_Error);
 		return MakeFulfilledPromise<FFileDownloaderResult>(FFileDownloaderResult{EDownloadToMemoryResult::DownloadFailed, TArray64<uint8>()}).GetFuture();
 	}
 
@@ -555,7 +555,7 @@ TFuture<FFileDownloaderResult> FFileDownloader::DownloadFileByChunk(const FStrin
 		if (SharedThis.IsValid())
 		{
 			const float Progress = ContentSize <= 0 ? 0.0f : static_cast<float>(BytesReceived) / ContentSize;
-			WHLog(FString::Printf(TEXT("Downloaded %d bytes of file chunk from %s. Range: {%lld; %lld}, Overall: %lld, Progress: %f"), BytesReceived, *Request->GetURL(), ChunkRange.X, ChunkRange.Y, ContentSize, Progress), EDC_WebRequest, EDV_Log);
+			WHLog(FString::Printf(TEXT("Downloaded %d bytes of file InChunk from %s. Range: {%lld; %lld}, Overall: %lld, Progress: %f"), BytesReceived, *Request->GetURL(), ChunkRange.X, ChunkRange.Y, ContentSize, Progress), EDC_WebRequest, EDV_Log);
 			ProgressFun(BytesSent, BytesReceived, ContentSize);
 		}
 	});
@@ -566,28 +566,28 @@ TFuture<FFileDownloaderResult> FFileDownloader::DownloadFileByChunk(const FStrin
 		TSharedPtr<FFileDownloader> SharedThis = WeakThisPtr.Pin();
 		if (!SharedThis.IsValid())
 		{
-			WHLog(FString::Printf(TEXT("Failed to download file chunk from %s: downloader has been destroyed"), *URL), EDC_WebRequest, EDV_Warning);
+			WHLog(FString::Printf(TEXT("Failed to download file InChunk from %s: downloader has been destroyed"), *URL), EDC_WebRequest, EDV_Warning);
 			PromisePtr->SetValue(FFileDownloaderResult{EDownloadToMemoryResult::DownloadFailed, TArray64<uint8>()});
 			return;
 		}
 
 		if (SharedThis->DownloadResult == EDownloadToStorageResult::Cancelled)
 		{
-			WHLog(FString::Printf(TEXT("Canceled file chunk download from %s"), *URL), EDC_WebRequest, EDV_Warning);
+			WHLog(FString::Printf(TEXT("Canceled file InChunk download from %s"), *URL), EDC_WebRequest, EDV_Warning);
 			PromisePtr->SetValue(FFileDownloaderResult{EDownloadToMemoryResult::Cancelled, TArray64<uint8>()});
 			return;
 		}
 
 		if (!bSuccess || !Response.IsValid())
 		{
-			WHLog(FString::Printf(TEXT("Failed to download file chunk from %s: request failed"), *Request->GetURL()), EDC_WebRequest, EDV_Error);
+			WHLog(FString::Printf(TEXT("Failed to download file InChunk from %s: request failed"), *Request->GetURL()), EDC_WebRequest, EDV_Error);
 			PromisePtr->SetValue(FFileDownloaderResult{EDownloadToMemoryResult::DownloadFailed, TArray64<uint8>()});
 			return;
 		}
 
 		// if (Response->GetContentLength() <= 0)
 		// {
-		// 	WHLog(FString::Printf(TEXT("Failed to download file chunk from %s: content length is 0"), *Request->GetURL()), EDC_WebRequest, EDV_Error);
+		// 	WHLog(FString::Printf(TEXT("Failed to download file InChunk from %s: content length is 0"), *Request->GetURL()), EDC_WebRequest, EDV_Error);
 		// 	PromisePtr->SetValue(FFileDownloaderResult{EDownloadToMemoryResult::DownloadFailed, TArray64<uint8>()});
 		// 	return;
 		// }
@@ -596,18 +596,18 @@ TFuture<FFileDownloaderResult> FFileDownloader::DownloadFileByChunk(const FStrin
 
 		if (ContentLength != ChunkRange.Y - ChunkRange.X + 1)
 		{
-			WHLog(FString::Printf(TEXT("Failed to download file chunk from %s: content length (%lld) does not match the expected length (%lld)"), *Request->GetURL(), ContentLength, ChunkRange.Y - ChunkRange.X + 1), EDC_WebRequest, EDV_Error);
+			WHLog(FString::Printf(TEXT("Failed to download file InChunk from %s: content length (%lld) does not match the expected length (%lld)"), *Request->GetURL(), ContentLength, ChunkRange.Y - ChunkRange.X + 1), EDC_WebRequest, EDV_Error);
 			PromisePtr->SetValue(FFileDownloaderResult{EDownloadToMemoryResult::DownloadFailed, TArray64<uint8>()});
 			return;
 		}
 
-		WHLog(FString::Printf(TEXT("Successfully downloaded file chunk from %s. Range: {%lld; %lld}, Overall: %lld"), *Request->GetURL(), ChunkRange.X, ChunkRange.Y, ContentLength), EDC_WebRequest, EDV_Log);
+		WHLog(FString::Printf(TEXT("Successfully downloaded file InChunk from %s. Range: {%lld; %lld}, Overall: %lld"), *Request->GetURL(), ChunkRange.X, ChunkRange.Y, ContentLength), EDC_WebRequest, EDV_Log);
 		PromisePtr->SetValue(FFileDownloaderResult{EDownloadToMemoryResult::Success, TArray64<uint8>(Response->GetContent())});
 	});
 
 	if (!HttpRequestRef->ProcessRequest())
 	{
-		WHLog(FString::Printf(TEXT("Failed to download file chunk from %s: request failed"), *URL), EDC_WebRequest, EDV_Error);
+		WHLog(FString::Printf(TEXT("Failed to download file InChunk from %s: request failed"), *URL), EDC_WebRequest, EDV_Error);
 		return MakeFulfilledPromise<FFileDownloaderResult>(FFileDownloaderResult{EDownloadToMemoryResult::DownloadFailed, TArray64<uint8>()}).GetFuture();
 	}
 
@@ -639,7 +639,7 @@ TFuture<FFileDownloaderResult> FFileDownloader::DownloadFileByPayload(const FStr
 		{
 			const int64 ContentLength = Request->GetContentLength();
 			const float Progress = ContentLength <= 0 ? 0.0f : static_cast<float>(BytesReceived) / ContentLength;
-			WHLog(FString::Printf(TEXT("Downloaded %d bytes of file chunk from %s by payload. Overall: %lld, Progress: %f"), BytesReceived, *Request->GetURL(), static_cast<int64>(Request->GetContentLength()), Progress), EDC_WebRequest, EDV_Log);
+			WHLog(FString::Printf(TEXT("Downloaded %d bytes of file InChunk from %s by payload. Overall: %lld, Progress: %f"), BytesReceived, *Request->GetURL(), static_cast<int64>(Request->GetContentLength()), Progress), EDC_WebRequest, EDV_Log);
 			SharedThis->OnProgress.Broadcast(URL, 0, 1, BytesSent, BytesReceived, ContentLength);
 		}
 	});

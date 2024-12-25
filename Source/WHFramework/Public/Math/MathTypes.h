@@ -101,19 +101,13 @@ public:
 		Z = 0;
 	}
 
-	FORCEINLINE FIndex(int64 InX)
-	{
-		const int32 Offset = 16384;
-		X =	int32(InX>>40) - Offset;
-		Y = int32(InX>>20 & 0xFFFFF) - Offset;
-		Z = int32(InX & 0xFFFFF) - Offset;
-	}
+	FORCEINLINE FIndex(int64 InValue);
 
-	FORCEINLINE FIndex(int32 InX)
+	FORCEINLINE FIndex(int32 InValue)
 	{
-		X = InX;
-		Y = InX;
-		Z = InX;
+		X = InValue;
+		Y = InValue;
+		Z = InValue;
 	}
 
 	FORCEINLINE FIndex(int32 InX, int32 InY)
@@ -153,14 +147,7 @@ public:
 		Z = FCString::Atoi(*Arr[2]);
 	}
 
-	FORCEINLINE int64 ToInt64() const
-	{
-		const int32 Offset = 16384;
-		uint64 T = uint64(X + Offset) << 40 |
-				uint64(Y + Offset) << 20 | 
-				uint64(Z + Offset);
-		return T;
-	}
+	FORCEINLINE int64 ToInt64() const;
 
 	FORCEINLINE FVector ToVector() const
 	{
@@ -462,7 +449,7 @@ FORCEINLINE uint32 GetTypeHash(FPoint& InPoint)
 		} \
 	}
 
-#define ITER_INDEX_2D(Iter, Range, bFromCenter, Expression) \
+#define ITER_INDEX2D(Iter, Range, bFromCenter, Expression) \
 	FIndex Iter; \
 	if(Range.X == 1.f && Range.Y == 1.f && !bFromCenter) \
 	{ \

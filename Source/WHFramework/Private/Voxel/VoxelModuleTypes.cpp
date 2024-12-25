@@ -10,8 +10,6 @@
 #include "Voxel/Datas/VoxelData.h"
 #include "Voxel/Voxels/Voxel.h"
 
-FVoxelWorldSaveData FVoxelWorldSaveData::Empty = FVoxelWorldSaveData();
-
 FVoxelItem FVoxelItem::Empty = FVoxelItem(FPrimaryAssetId(FName("Voxel"), FName("DA_Empty")));
 FVoxelItem FVoxelItem::Unknown = FVoxelItem(FPrimaryAssetId(FName("Voxel"), FName("DA_Unknown")));
 
@@ -194,9 +192,9 @@ UVoxelData& FVoxelItem::GetVoxelData(bool bEnsured) const
 
 FVoxelHitResult::FVoxelHitResult(const FHitResult& InHitResult)
 {
-	if(AVoxelChunk* chunk = Cast<AVoxelChunk>(InHitResult.GetActor()))
+	if(AVoxelChunk* InChunk = Cast<AVoxelChunk>(InHitResult.GetActor()))
 	{
-		VoxelItem = chunk->GetVoxelComplex(chunk->LocationToIndex(InHitResult.ImpactPoint - UVoxelModule::Get().GetWorldData().GetBlockSizedNormal(InHitResult.ImpactNormal, 0.01f)), true);
+		VoxelItem = InChunk->GetVoxelComplex(InChunk->LocationToIndex(InHitResult.ImpactPoint - UVoxelModule::Get().GetWorldData().GetBlockSizedNormal(InHitResult.ImpactNormal, 0.01f)), true);
 		Point = InHitResult.ImpactPoint;
 		Normal = InHitResult.ImpactNormal;
 	}

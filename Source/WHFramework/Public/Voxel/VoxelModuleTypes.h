@@ -11,6 +11,7 @@
 
 #include "VoxelModuleTypes.generated.h"
 
+class UVoxelGenerator;
 class IVoxelAgentInterface;
 class UVoxelData;
 class AVoxelChunk;
@@ -581,18 +582,19 @@ struct WHFRAMEWORK_API FVoxelTopography
 	GENERATED_BODY()
 
 public:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	FIndex Index;
 	
-	//chunk地形高度[0~256]
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	int32 Height;
 
-	//chunk地形温度[-1.0f,1.0f]
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	float Temperature;
 
-	//chunk地形湿度[0.0f,1.0f]
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	float Humidity;
 
-	//chunk生物群落属性[1,2,3,4...]
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	EVoxelBiomeType BiomeType;
 
 public:
@@ -609,6 +611,34 @@ public:
 
 public:
 	FString ToSaveData() const;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelBuildingData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FVoxelBuildingData()
+	{
+		ID = 0;
+		Location = FVector();
+		Angle = 0;
+		Actor = nullptr;
+	}
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	int32 ID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FVector Location;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	int32 Angle;
+
+	UPROPERTY(VisibleAnywhere, Transient)
+	AActor* Actor;
 };
 
 USTRUCT(BlueprintType)
@@ -777,6 +807,10 @@ public:
 		WorldSize = FVector(-1.f, -1.f, 3.f);
 		WorldRange = FVector2D(7.f, 7.f);
 
+		SeaLevel = 0;
+
+		VoxelGenerators = TArray<UVoxelGenerator*>();
+
 		BlockDatas = {
 			{
 				EVoxelHierarchy::Upper,
@@ -848,7 +882,13 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FVector2D WorldRange;
-	
+		
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	int32 SeaLevel;
+
+	UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly)
+	TArray<UVoxelGenerator*> VoxelGenerators;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TMap<EVoxelHierarchy, FVoxelBlockDatas> BlockDatas;
 	
@@ -920,8 +960,6 @@ public:
 	}
 
 public:
-	static FVoxelWorldSaveData Empty;
-	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 WorldSeed;
 

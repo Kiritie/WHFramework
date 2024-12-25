@@ -77,11 +77,46 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Noise
 	UFUNCTION(BlueprintPure, Category = "MathStatics")
-	static float GetNoise2D(FVector2D InLocation, FVector InScale, int32 InOffset = 0, bool bAbs = false);
+	static float GetNoise1D(float InValue, FVector2D InScale, int32 InOffset = 0, bool bAbs = false, bool bUnsigned = false);
 
 	UFUNCTION(BlueprintPure, Category = "MathStatics")
-	static float GetNoise3D(FVector InLocation, FVector InScale, int32 InOffset = 0, bool bAbs = false);
+	static float GetNoise2D(FVector2D InLocation, FVector InScale, int32 InOffset = 0, bool bAbs = false, bool bUnsigned = false);
 
 	UFUNCTION(BlueprintPure, Category = "MathStatics")
-	static float GetNoiseHeight(FVector2D InLocation, FVector InScale, int32 InOffset = 0, bool bUnsigned = false);
+	static float GetNoise3D(FVector InLocation, FVector InScale, int32 InOffset = 0, bool bAbs = false, bool bUnsigned = false);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Misc
+	static int32 Hash11(int32 InPosition);
+
+	static int32 Hash11WithSeed(int32 InPosition, int32 InSeed = 0);
+
+	static FVector2D Hash22(FVector2D InPosition);
+
+	static int32 Hash21(FVector2D InPosition);
+
+	static FVector Hash33(FVector InPosition);
+
+	static int32 Hash31(FVector InPosition);
+
+	//Return random values 0~1023
+	static int32 RandInt(FVector2D InPosition, int32 InSeed = 0);
+	
+	//Return random value 0.0f~1.0f
+	static float Rand(FVector2D InPosition, int32 InSeed = 0);
+
+	//Second order bezier curve t should be [0.0f~1.0f]
+	static FVector2D Bezier(FVector2D InP0,FVector2D InP1,FVector2D InP2,float InT);
+
+	//The third-order bezier curve t should be [0.0f~1.0f]
+	static FVector2D Bezier(FVector2D InP0,FVector2D InP1,FVector2D InP2,FVector2D InP3,float InT);
+
+	//Three-dimensional to one-dimensional coordinates (compressed)
+	static uint64 Index(int32 InX, int32 InY, int32 InZ = 0);
+
+	//Three-dimensional to one-dimensional coordinates (compressed)
+	static uint64 Index(FVector InIndex);
+
+	//One-dimensional to three-dimensional coordinates (decompression coordinates)
+	static FVector UnIndex(uint64 InIndex);
 };
