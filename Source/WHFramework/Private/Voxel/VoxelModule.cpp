@@ -33,7 +33,17 @@
 #include "Scene/SceneModule.h"
 #include "Voxel/Capture/VoxelCapture.h"
 #include "Voxel/Components/VoxelMeshComponent.h"
+#include "Voxel/Generators/VoxelBiomeGenerator.h"
+#include "Voxel/Generators/VoxelBuildingGenerator.h"
+#include "Voxel/Generators/VoxelCaveGenerator.h"
 #include "Voxel/Generators/VoxelGenerator.h"
+#include "Voxel/Generators/VoxelHeightGenerator.h"
+#include "Voxel/Generators/VoxelHumidityGenerator.h"
+#include "Voxel/Generators/VoxelFoliageGenerator.h"
+#include "Voxel/Generators/VoxelOreGenerator.h"
+#include "Voxel/Generators/VoxelWaterGenerator.h"
+#include "Voxel/Generators/VoxelTemperatureGenerator.h"
+#include "Voxel/Generators/VoxelTerrainGenerator.h"
 #include "Voxel/Voxels/VoxelTree.h"
 
 IMPLEMENTATION_MODULE(UVoxelModule)
@@ -60,13 +70,24 @@ UVoxelModule::UVoxelModule()
 	
 	ChunkSpawnDistance = 2;
 	ChunkQueues = {
-		{ EVoxelWorldState::Spawning, FVoxelChunkQueues({ FVoxelChunkQueue(false, 100) }) },
-		{ EVoxelWorldState::Destroying, FVoxelChunkQueues({ FVoxelChunkQueue(false, 10) }) },
-		{ EVoxelWorldState::Generating, FVoxelChunkQueues({ FVoxelChunkQueue(false, 1) }) },
-		{ EVoxelWorldState::MapLoading, FVoxelChunkQueues({ FVoxelChunkQueue(true, 100) }) },
-		{ EVoxelWorldState::MapBuilding, FVoxelChunkQueues({ FVoxelChunkQueue(true, 100, true), FVoxelChunkQueue(false, 100, true), FVoxelChunkQueue(true, 1000, true) }) },
-		{ EVoxelWorldState::MeshSpawning, FVoxelChunkQueues({ FVoxelChunkQueue(false, 100) }) },
-		{ EVoxelWorldState::MeshBuilding, FVoxelChunkQueues({ FVoxelChunkQueue(true, 100) }) }
+		{ EVoxelWorldState::Spawning, FVoxelChunkQueues({
+			FVoxelChunkQueue(false, 100)
+		})}, { EVoxelWorldState::Destroying, FVoxelChunkQueues({
+			FVoxelChunkQueue(false, 10)
+		})}, { EVoxelWorldState::Generating, FVoxelChunkQueues({
+			FVoxelChunkQueue(false, 1)
+		})}, { EVoxelWorldState::MapLoading, FVoxelChunkQueues({
+			FVoxelChunkQueue(true, 1000)
+		})}, { EVoxelWorldState::MapBuilding, FVoxelChunkQueues({
+			FVoxelChunkQueue(false, 100, true),
+			FVoxelChunkQueue(true, 1000, true),
+			FVoxelChunkQueue(false, 100, true),
+			FVoxelChunkQueue(true, 1000, true)
+		})}, { EVoxelWorldState::MeshSpawning, FVoxelChunkQueues({
+			FVoxelChunkQueue(false, 100)
+		})}, { EVoxelWorldState::MeshBuilding, FVoxelChunkQueues({
+			FVoxelChunkQueue(true, 1000)
+		})}
 	};
 
 	ChunkSpawnBatch = 0;
@@ -123,6 +144,20 @@ UVoxelModule::~UVoxelModule()
 #if WITH_EDITOR
 void UVoxelModule::OnGenerate()
 {
+	if(WorldBasicData.VoxelGenerators.IsEmpty())
+	{
+		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelHeightGenerator>(this));
+		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelTemperatureGenerator>(this));
+		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelHumidityGenerator>(this));
+		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelBiomeGenerator>(this));
+		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelCaveGenerator>(this));
+		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelOreGenerator>(this));
+		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelWaterGenerator>(this));
+		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelBuildingGenerator>(this));
+		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelFoliageGenerator>(this));
+		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelTerrainGenerator>(this));
+	}
+
 	if(!VoxelCapture)
 	{
 		TArray<AActor*> ChildActors;

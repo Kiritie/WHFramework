@@ -193,11 +193,11 @@ public:
 	virtual void SetTopographyLocation(FVector InLocation, const FVoxelTopography& InTopography);
 
 public:
-	virtual float GetNoise1D(float InValue, FVector2D InScale, bool bAbs = false, bool bUnsigned = false) const;
+	virtual float GetNoise1D(float InValue, FVector2D InScale = FVector2D::UnitVector, bool bAbs = false, bool bUnsigned = false) const;
 
-	virtual float GetNoise2D(FVector2D InLocation, FVector InScale, bool bAbs = false, bool bUnsigned = false) const;
+	virtual float GetNoise2D(FVector2D InLocation, FVector InScale = FVector::OneVector, bool bAbs = false, bool bUnsigned = false) const;
 
-	virtual float GetNoise3D(FVector InLocation, FVector InScale, bool bAbs = false, bool bUnsigned = false) const;
+	virtual float GetNoise3D(FVector InLocation, FVector InScale = FVector::OneVector, bool bAbs = false, bool bUnsigned = false) const;
 
 	virtual float GetNoiseHeight(FVector2D InLocation, FVector InScale, float InBaseHeight, bool bAbs = false, bool bUnsigned = false) const;
 

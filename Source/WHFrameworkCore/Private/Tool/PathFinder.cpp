@@ -60,9 +60,9 @@ TArray<FVector2D> FPathFinder::FindPath(FVector2D StartPos, FVector2D EndPos)
 	else
 	{
 		UE_LOG(LogTemp, Warning, TEXT("path found %d"), Depth);
-		for (auto rs = ToOpen; rs != nullptr; rs = rs->Father)
+		for (auto Rs = ToOpen; Rs != nullptr; Rs = Rs->Father)
 		{
-			Road.Push(rs->Pos);
+			Road.Push(Rs->Pos);
 		}
 	}
 

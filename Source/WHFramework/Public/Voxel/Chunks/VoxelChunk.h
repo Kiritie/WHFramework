@@ -88,6 +88,10 @@ public:
 
 	virtual bool HasVoxel(int32 InX, int32 InY, int32 InZ);
 
+	virtual bool HasVoxelComplex(FIndex InIndex);
+
+	virtual bool HasVoxelComplex(int32 InX, int32 InY, int32 InZ);
+
 	virtual FVoxelItem& GetVoxel(FIndex InIndex, bool bMainPart = false);
 
 	virtual FVoxelItem& GetVoxel(int32 InX, int32 InY, int32 InZ, bool bMainPart = false);
@@ -166,16 +170,16 @@ public:
 protected:
 	virtual void GenerateBuildings();
 
-	virtual bool SpawnBuilding(FVoxelBuildingData& InBuildingData);
+	virtual void SpawnBuilding(FVoxelBuildingSaveData& InBuildingData);
+	
+	virtual void DestroyBuilding(FVoxelBuildingSaveData& InBuildingData);
+
+	virtual void DestroyBuildings();
 
 public:
-	virtual void AddBuilding(const FVoxelBuildingData& InBuildingData);
+	virtual void AddBuilding(const FVoxelBuildingSaveData& InBuildingData);
 	
 	virtual TSubclassOf<AActor> GetBuildingClassByID(int32 InID) const;
-
-protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Building")
-	TArray<FVoxelBuildingData> BuildingDatas;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Auxiliary
@@ -218,12 +222,14 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
 	TMap<EDirection, AVoxelChunk*> Neighbors;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Stats")
+	UVoxelModule* Module;
+
 	TMap<FIndex, FVoxelItem> VoxelMap;
 
 	TMap<FIndex, FVoxelTopography> TopographyMap;
 
-	UPROPERTY(BlueprintReadOnly)
-	UVoxelModule* Module;
+	TArray<FVoxelBuildingSaveData> BuildingDatas;
 
 public:
 	FIndex GetIndex() const { return Index; }

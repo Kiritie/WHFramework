@@ -76,14 +76,11 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Noise
-	UFUNCTION(BlueprintPure, Category = "MathStatics")
-	static float GetNoise1D(float InValue, FVector2D InScale, int32 InOffset = 0, bool bAbs = false, bool bUnsigned = false);
+	static float GetNoise1D(float InValue, FVector2D InScale = FVector2D::UnitVector, int32 InOffset = 0, bool bAbs = false, bool bUnsigned = false);
 
-	UFUNCTION(BlueprintPure, Category = "MathStatics")
-	static float GetNoise2D(FVector2D InLocation, FVector InScale, int32 InOffset = 0, bool bAbs = false, bool bUnsigned = false);
+	static float GetNoise2D(FVector2D InLocation, FVector InScale = FVector::OneVector, int32 InOffset = 0, bool bAbs = false, bool bUnsigned = false);
 
-	UFUNCTION(BlueprintPure, Category = "MathStatics")
-	static float GetNoise3D(FVector InLocation, FVector InScale, int32 InOffset = 0, bool bAbs = false, bool bUnsigned = false);
+	static float GetNoise3D(FVector InLocation, FVector InScale = FVector::OneVector, int32 InOffset = 0, bool bAbs = false, bool bUnsigned = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Misc

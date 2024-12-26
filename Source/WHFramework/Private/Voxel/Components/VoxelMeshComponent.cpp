@@ -177,6 +177,7 @@ void UVoxelMeshComponent::CreateMesh(int32 InSectionIndex /*= 0*/, bool bHasColl
 				SetMaterial(InSectionIndex, UVoxelModule::Get().GetWorldData().GetRenderData(Nature).UnlitMaterialInst);
 				break;
 			}
+			default: break;
 		}
 		ClearData();
 	}
@@ -391,6 +392,7 @@ void UVoxelMeshComponent::SetNature(EVoxelNature InNature)
 			SetCollisionProfileName(TEXT("TransVoxel"));
 			break;
 		}
+		default: break;
 	}
 }
 

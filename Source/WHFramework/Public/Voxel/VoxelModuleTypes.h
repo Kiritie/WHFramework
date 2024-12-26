@@ -323,6 +323,57 @@ public:
 };
 
 USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelRenderData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FVoxelRenderData()
+	{
+		Material = nullptr;
+		UnlitMaterial = nullptr;
+		PixelSize = 16;
+		TextureSize = FVector2D::ZeroVector;
+		CombineTexture = nullptr;
+		Textures = TArray<UTexture2D*>();
+		MaterialInst = nullptr;
+		UnlitMaterialInst = nullptr;
+	}
+
+	FORCEINLINE FVoxelRenderData(UMaterialInterface* InMaterial, UMaterialInterface* InUnlitMaterial, int32 InBlockPixelSize = 16) : FVoxelRenderData()
+	{
+		Material = InMaterial;
+		UnlitMaterial = InUnlitMaterial;
+		PixelSize = InBlockPixelSize;
+	}
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UMaterialInterface* Material;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UMaterialInterface* UnlitMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 PixelSize;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FVector2D TextureSize;
+
+	UPROPERTY(Transient)
+	UTexture2D* CombineTexture;
+
+	UPROPERTY(Transient)
+	TArray<UTexture2D*> Textures;
+
+	UPROPERTY(Transient)
+	UMaterialInstance* MaterialInst;
+
+	UPROPERTY(Transient)
+	UMaterialInstance* UnlitMaterialInst;
+};
+
+USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelItem : public FAbilityItem
 {
 	GENERATED_BODY()
@@ -446,45 +497,6 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelAuxiliarySaveData : public FSaveData
-{
-	GENERATED_BODY()
-
-public:
-	FORCEINLINE FVoxelAuxiliarySaveData()
-	{
-		VoxelItem = FVoxelItem();
-		MeshNature = EVoxelScope::Chunk;
-		InventoryData = FInventorySaveData();
-	}
-
-	FORCEINLINE FVoxelAuxiliarySaveData(const FVoxelItem& InVoxelItem, EVoxelScope InMeshNature = EVoxelScope::None) : FVoxelAuxiliarySaveData()
-	{
-		VoxelItem = InVoxelItem;
-		MeshNature = InMeshNature;
-	}
-
-public:
-	UPROPERTY()
-	FVoxelItem VoxelItem;
-
-	UPROPERTY()
-	EVoxelScope MeshNature;
-
-	UPROPERTY(BlueprintReadWrite)
-	FInventorySaveData InventoryData;
-
-public:
-	virtual void MakeSaved() override
-	{
-		Super::MakeSaved();
-
-		VoxelItem.MakeSaved();
-		InventoryData.MakeSaved();
-	}
-};
-
-USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelHitResult
 {
 	GENERATED_BODY()
@@ -526,60 +538,63 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelRenderData
+struct WHFRAMEWORK_API FVoxelAuxiliarySaveData : public FSaveData
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FVoxelRenderData()
+	FORCEINLINE FVoxelAuxiliarySaveData()
 	{
-		Material = nullptr;
-		UnlitMaterial = nullptr;
-		PixelSize = 16;
-		TextureSize = FVector2D::ZeroVector;
-		CombineTexture = nullptr;
-		Textures = TArray<UTexture2D*>();
-		MaterialInst = nullptr;
-		UnlitMaterialInst = nullptr;
+		VoxelItem = FVoxelItem();
+		MeshNature = EVoxelScope::Chunk;
+		InventoryData = FInventorySaveData();
 	}
 
-	FORCEINLINE FVoxelRenderData(UMaterialInterface* InMaterial, UMaterialInterface* InUnlitMaterial, int32 InBlockPixelSize = 16) : FVoxelRenderData()
+	FORCEINLINE FVoxelAuxiliarySaveData(const FVoxelItem& InVoxelItem, EVoxelScope InMeshNature = EVoxelScope::None) : FVoxelAuxiliarySaveData()
 	{
-		Material = InMaterial;
-		UnlitMaterial = InUnlitMaterial;
-		PixelSize = InBlockPixelSize;
+		VoxelItem = InVoxelItem;
+		MeshNature = InMeshNature;
 	}
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	UMaterialInterface* Material;
+	UPROPERTY()
+	FVoxelItem VoxelItem;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	UMaterialInterface* UnlitMaterial;
+	UPROPERTY()
+	EVoxelScope MeshNature;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 PixelSize;
+	UPROPERTY(BlueprintReadWrite)
+	FInventorySaveData InventoryData;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	FVector2D TextureSize;
+public:
+	virtual void MakeSaved() override
+	{
+		Super::MakeSaved();
 
-	UPROPERTY(Transient)
-	UTexture2D* CombineTexture;
-
-	UPROPERTY(Transient)
-	TArray<UTexture2D*> Textures;
-
-	UPROPERTY(Transient)
-	UMaterialInstance* MaterialInst;
-
-	UPROPERTY(Transient)
-	UMaterialInstance* UnlitMaterialInst;
+		VoxelItem.MakeSaved();
+		InventoryData.MakeSaved();
+	}
 };
 
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelTopography
 {
 	GENERATED_BODY()
+
+public:
+	FORCEINLINE FVoxelTopography()
+	{
+		Index = FIndex::ZeroIndex;
+		Height = 0;
+		Temperature = 0.f;
+		Humidity = 0.f;
+		BiomeType = EVoxelBiomeType::None;
+	}
+
+	FORCEINLINE FVoxelTopography(const FString& InSaveData);
+
+public:
+	FString ToSaveData() const;
 
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
@@ -596,30 +611,15 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	EVoxelBiomeType BiomeType;
-
-public:
-	FORCEINLINE FVoxelTopography()
-	{
-		Index = FIndex::ZeroIndex;
-		Height = 0;
-		Temperature = 0.f;
-		Humidity = 0.f;
-		BiomeType = EVoxelBiomeType::None;
-	}
-
-	FORCEINLINE FVoxelTopography(const FString& InSaveData);
-
-public:
-	FString ToSaveData() const;
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelBuildingData
+struct WHFRAMEWORK_API FVoxelBuildingSaveData : public FSaveData
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FVoxelBuildingData()
+	FORCEINLINE FVoxelBuildingSaveData()
 	{
 		ID = 0;
 		Location = FVector();
@@ -669,6 +669,9 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	TArray<FPickUpSaveData> PickUpDatas;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	TArray<FVoxelBuildingSaveData> BuildingDatas;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	TArray<FVoxelAuxiliarySaveData> AuxiliaryDatas;

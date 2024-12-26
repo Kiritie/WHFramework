@@ -431,38 +431,24 @@ FORCEINLINE uint32 GetTypeHash(FPoint& InPoint)
 
 #define ITER_INDEX(Iter, Range, bFromCenter, Expression) \
 	FIndex Iter; \
-	if(Range.X == 1.f && Range.Y == 1.f && Range.Z == 1.f && !bFromCenter) \
+	for(Iter.X = (bFromCenter ? -Range.X * 0.5f : 0.f); Iter.X < (bFromCenter ? Range.X * 0.5f : Range.X); Iter.X++) \
 	{ \
-		Expression \
-	} \
-	else \
-	{ \
-		for(Iter.X = (bFromCenter ? -Range.X * 0.5f : 0.f); Iter.X < (bFromCenter ? Range.X * 0.5f : Range.X); Iter.X++) \
+		for(Iter.Y = (bFromCenter ? -Range.Y * 0.5f : 0.f); Iter.Y < (bFromCenter ? Range.Y * 0.5f : Range.Y); Iter.Y++) \
 		{ \
-			for(Iter.Y = (bFromCenter ? -Range.Y * 0.5f : 0.f); Iter.Y < (bFromCenter ? Range.Y * 0.5f : Range.Y); Iter.Y++) \
+			for(Iter.Z = 0.f; Iter.Z < Range.Z; Iter.Z++) \
 			{ \
-				for(Iter.Z = 0.f; Iter.Z < Range.Z; Iter.Z++) \
-				{ \
-					Expression \
-				} \
+				Expression \
 			} \
 		} \
 	}
 
 #define ITER_INDEX2D(Iter, Range, bFromCenter, Expression) \
 	FIndex Iter; \
-	if(Range.X == 1.f && Range.Y == 1.f && !bFromCenter) \
+	for(Iter.X = (bFromCenter ? -Range.X * 0.5f : 0.f); Iter.X < (bFromCenter ? Range.X * 0.5f : Range.X); Iter.X++) \
 	{ \
-		Expression \
-	} \
-	else \
-	{ \
-		for(Iter.X = (bFromCenter ? -Range.X * 0.5f : 0.f); Iter.X < (bFromCenter ? Range.X * 0.5f : Range.X); Iter.X++) \
+		for(Iter.Y = (bFromCenter ? -Range.Y * 0.5f : 0.f); Iter.Y < (bFromCenter ? Range.Y * 0.5f : Range.Y); Iter.Y++) \
 		{ \
-			for(Iter.Y = (bFromCenter ? -Range.Y * 0.5f : 0.f); Iter.Y < (bFromCenter ? Range.Y * 0.5f : Range.Y); Iter.Y++) \
-			{ \
-				Expression \
-			} \
+			Expression \
 		} \
 	}
 

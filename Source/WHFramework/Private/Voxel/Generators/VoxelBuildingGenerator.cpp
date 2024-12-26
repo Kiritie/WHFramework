@@ -10,6 +10,7 @@
 
 UVoxelBuildingGenerator::UVoxelBuildingGenerator()
 {
+	Seed = 453;
 	Domains = {};
 	Roads = {};
 	StartPoint = FVector2D::ZeroVector;
@@ -18,7 +19,7 @@ UVoxelBuildingGenerator::UVoxelBuildingGenerator()
 
 void UVoxelBuildingGenerator::Generate(AVoxelChunk* InChunk)
 {
-	if (UMathStatics::Rand(InChunk->GetIndex().ToVector2D(), Module->GetWorldData().WorldSeed) < 0.98f)return;
+	if (UMathStatics::Rand(InChunk->GetIndex().ToVector2D(), Seed) < 0.98f)return;
 
 	//Domains.Reset();
 
@@ -100,8 +101,8 @@ void UVoxelBuildingGenerator::PlaceBuildings(AVoxelChunk* InChunk)
 		auto pos = q.front();
 		q.pop();
 
-		int32 index = UMathStatics::RandInt(InChunk->GetIndex().ToVector2D() + FVector2D(count, -count) * 107, Module->GetWorldData().WorldSeed) % 3;
-		int32 rotate = UMathStatics::RandInt(InChunk->GetIndex().ToVector2D() + FVector2D(count, -count) * 17, Module->GetWorldData().WorldSeed) % 4;
+		int32 index = UMathStatics::RandInt(InChunk->GetIndex().ToVector2D() + FVector2D(count, -count) * 107, Seed) % 3;
+		int32 rotate = UMathStatics::RandInt(InChunk->GetIndex().ToVector2D() + FVector2D(count, -count) * 17, Seed) % 4;
 
 		bool test = PlaceOneBuilding(InChunk, pos.X, pos.Y, index, rotate) || PlaceOneBuilding(InChunk, pos.X, pos.Y, index, (rotate + 1) % 4);
 		if (!test)
@@ -109,9 +110,9 @@ void UVoxelBuildingGenerator::PlaceBuildings(AVoxelChunk* InChunk)
 			continue;
 		}
 
-		int32 offset = UMathStatics::RandInt(InChunk->GetIndex().ToVector2D() + FVector2D(count, -count) * 67, Module->GetWorldData().WorldSeed) % 3 + 5;
-		int32 offsetX = UMathStatics::RandInt(InChunk->GetIndex().ToVector2D() + FVector2D(count, count) * 61, Module->GetWorldData().WorldSeed) % 5 - 2;
-		int32 offsetY = UMathStatics::RandInt(InChunk->GetIndex().ToVector2D() + FVector2D(-count, count) * 117, Module->GetWorldData().WorldSeed) % 5 - 2;
+		int32 offset = UMathStatics::RandInt(InChunk->GetIndex().ToVector2D() + FVector2D(count, -count) * 67, Seed) % 3 + 5;
+		int32 offsetX = UMathStatics::RandInt(InChunk->GetIndex().ToVector2D() + FVector2D(count, count) * 61, Seed) % 5 - 2;
+		int32 offsetY = UMathStatics::RandInt(InChunk->GetIndex().ToVector2D() + FVector2D(-count, count) * 117, Seed) % 5 - 2;
 
 		for (int i = 0; i < 4; ++i)
 		{
@@ -167,7 +168,7 @@ bool UVoxelBuildingGenerator::PlaceOneBuilding(AVoxelChunk* InChunk, int32 InX, 
 			Module->SetVoxelByIndex(pos, FVoxelItem::Empty);
 		}
 
-	FVoxelBuildingData BuildingData;
+	FVoxelBuildingSaveData BuildingData;
 	BuildingData.ID = index + 1;
 	BuildingData.Location = FVector(InX, InY, aver + 1);
 	BuildingData.Angle = InRotate;
@@ -200,7 +201,7 @@ void UVoxelBuildingGenerator::PlacePaths(AVoxelChunk* InChunk)
 				if (Module->HasVoxelByIndex(pos3D))
 					continue;
 
-				Module->SetVoxelByIndex(FVector(pos.X, pos.Y, Module->GetTopographyByIndex(FIndex(pos.X, pos.Y)).Height), EVoxelType::Cobble_Stone);
+				Module->SetVoxelByIndex(FIndex(pos.X, pos.Y, Module->GetTopographyByIndex(FIndex(pos.X, pos.Y)).Height), EVoxelType::Cobble_Stone);
 			}
 		}
 	BuildingPos.Reset();

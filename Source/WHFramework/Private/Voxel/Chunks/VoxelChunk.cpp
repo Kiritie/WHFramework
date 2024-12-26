@@ -21,10 +21,11 @@
 #include "Voxel/Generators/VoxelCaveGenerator.h"
 #include "Voxel/Generators/VoxelHeightGenerator.h"
 #include "Voxel/Generators/VoxelHumidityGenerator.h"
-#include "Voxel/Generators/VoxelRainGenerator.h"
+#include "Voxel/Generators/VoxelWaterGenerator.h"
 #include "Voxel/Generators/VoxelTemperatureGenerator.h"
 #include "Voxel/Generators/VoxelTerrainGenerator.h"
-#include "Voxel/Generators/VoxelPlantGenerator.h"
+#include "Voxel/Generators/VoxelFoliageGenerator.h"
+#include "Voxel/Generators/VoxelOreGenerator.h"
 
 // Sets default values
 AVoxelChunk::AVoxelChunk()
@@ -59,8 +60,13 @@ void AVoxelChunk::OnDespawn_Implementation(bool bRecovery)
 	bBuilded = false;
 	bGenerated = false;
 	bChanged = false;
+	Module = nullptr;
 
 	DestroyMeshComponents();
+
+	DestroySceneActors();
+
+	BreakNeighbors();
 
 	for(auto& Iter : VoxelMap)
 	{
@@ -71,10 +77,6 @@ void AVoxelChunk::OnDespawn_Implementation(bool bRecovery)
 	TopographyMap.Empty();
 
 	BuildingDatas.Empty();
-
-	DestroySceneActors();
-
-	BreakNeighbors();
 
 	SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
 
@@ -92,12 +94,21 @@ void AVoxelChunk::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		FVoxelItem VoxelItem = FVoxelItem(Iter);
 		SetVoxel(VoxelItem.Index, VoxelItem);
 	}
-	SaveData.TopographyDatas.ParseIntoArray(VoxelDatas, TEXT("|"));
-	for(auto& Iter : VoxelDatas)
+	
+	TArray<FString> TopographyDatas;
+	SaveData.TopographyDatas.ParseIntoArray(TopographyDatas, TEXT("|"));
+	for(auto& Iter : TopographyDatas)
 	{
 		FVoxelTopography Topography = FVoxelTopography(Iter);
 		SetTopography(Topography.Index, Topography);
 	}
+
+	BuildingDatas = SaveData.BuildingDatas;
+	for(auto& Iter : BuildingDatas)
+	{
+		AddBuilding(Iter);
+	}
+
 	for(auto& Iter : SaveData.AuxiliaryDatas)
 	{
 		FVoxelItem& VoxelItem = GetVoxel(Iter.VoxelItem.Index);
@@ -129,16 +140,18 @@ FSaveData* AVoxelChunk::ToData()
 	{
 		SaveData.VoxelDatas.RemoveFromEnd(TEXT("|"));
 	}
+	else if(Module->GetWorldData().IsExistChunkData(Index))
+	{
+		SaveData.VoxelDatas = Module->GetWorldData().GetChunkData(Index)->VoxelDatas;
+	}
+
 	for(auto& Iter : TopographyMap)
 	{
 		SaveData.TopographyDatas.Appendf(TEXT("%s|"), *Iter.Value.ToSaveData());
 	}
 	SaveData.TopographyDatas.RemoveFromEnd(TEXT("|"));
 
-	if(!bChanged && Module->GetWorldData().IsExistChunkData(Index))
-	{
-		SaveData.VoxelDatas = Module->GetWorldData().GetChunkData(Index)->VoxelDatas;
-	}
+	SaveData.BuildingDatas = BuildingDatas;
 
 	for(auto& Iter : SceneActorMap)
 	{
@@ -161,7 +174,7 @@ void AVoxelChunk::Initialize(UVoxelModule* InModule, FIndex InIndex, int32 InBat
 		ITER_INDEX2D(VoxelIndex, Module->GetWorldData().ChunkSize, false,
 			FVoxelTopography Topography;
 			Topography.Index = VoxelIndex;
-			TopographyMap.Add(VoxelIndex, FVoxelTopography());
+			TopographyMap.Add(VoxelIndex, Topography);
 		)
 	}
 	UpdateNeighbors();
@@ -220,12 +233,8 @@ void AVoxelChunk::BuildMap(int32 InStage)
 	{
 		case 0:
 		{
-			Module->GenerateVoxel<UVoxelHeightGenerator>(this);
 			Module->GenerateVoxel<UVoxelTemperatureGenerator>(this);
 			Module->GenerateVoxel<UVoxelHumidityGenerator>(this);
-			Module->GenerateVoxel<UVoxelBiomeGenerator>(this);
-			Module->GenerateVoxel<UVoxelCaveGenerator>(this);
-
 			// const auto& WorldData = Module->GetWorldData();
 			// ITER_INDEX(VoxelIndex, WorldData.ChunkSize, false,
 			// 	const auto VoxelType = UVoxelModuleStatics::GetTerrainVoxelType(LocalIndexToWorld(VoxelIndex));
@@ -244,12 +253,20 @@ void AVoxelChunk::BuildMap(int32 InStage)
 		}
 		case 1:
 		{
-			Module->GenerateVoxel<UVoxelRainGenerator>(this);
-			Module->GenerateVoxel<UVoxelBuildingGenerator>(this);
-			Module->GenerateVoxel<UVoxelPlantGenerator>(this);
+			Module->GenerateVoxel<UVoxelBiomeGenerator>(this);
+			Module->GenerateVoxel<UVoxelHeightGenerator>(this);
+			Module->GenerateVoxel<UVoxelCaveGenerator>(this);
+			Module->GenerateVoxel<UVoxelOreGenerator>(this);
 			break;
 		}
 		case 2:
+		{
+			Module->GenerateVoxel<UVoxelWaterGenerator>(this);
+			Module->GenerateVoxel<UVoxelBuildingGenerator>(this);
+			Module->GenerateVoxel<UVoxelFoliageGenerator>(this);
+			break;
+		}
+		case 3:
 		{
 			Module->GenerateVoxel<UVoxelTerrainGenerator>(this);
 			// ITER_MAP(TMap(VoxelMap), Iter,
@@ -448,10 +465,20 @@ bool AVoxelChunk::LocalIndexToNeighbor(FIndex InIndex, EDirection& OutDirection)
 
 bool AVoxelChunk::HasVoxel(FIndex InIndex)
 {
-	return HasVoxel(InIndex.X, InIndex.Y, InIndex.Z);
+	return VoxelMap.Contains(InIndex);
 }
 
 bool AVoxelChunk::HasVoxel(int32 InX, int32 InY, int32 InZ)
+{
+	return HasVoxel(FIndex(InX, InY, InZ));
+}
+
+bool AVoxelChunk::HasVoxelComplex(FIndex InIndex)
+{
+	return HasVoxelComplex(InIndex.X, InIndex.Y, InIndex.Z);
+}
+
+bool AVoxelChunk::HasVoxelComplex(int32 InX, int32 InY, int32 InZ)
 {
 	const auto& WorldData = Module->GetWorldData();
 	if(InX < 0)
@@ -498,7 +525,7 @@ bool AVoxelChunk::HasVoxel(int32 InX, int32 InY, int32 InZ)
 	}
 	else
 	{
-		return VoxelMap.Contains(FIndex(InX, InY, InZ));
+		return HasVoxel(InX, InY, InZ);
 	}
 	return false;
 }
@@ -728,6 +755,8 @@ bool AVoxelChunk::CheckVoxelNeighbors(FIndex InIndex, EVoxelType InVoxelType, FV
 
 void AVoxelChunk::SetVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bSafe)
 {
+	ensureEditor(InVoxelItem.ID.IsValid());
+	
 	if(!bSafe || InVoxelItem.IsValid())
 	{
 		FVoxelItem VoxelItem = InVoxelItem;
@@ -1009,6 +1038,7 @@ bool AVoxelChunk::RemoveSceneActor(AActor* InActor)
 void AVoxelChunk::GenerateSceneActors()
 {
 	auto& WorldData = Module->GetWorldData();
+	
 	if(WorldData.IsChunkGenerated(Index))
 	{
 		LoadSceneActors(WorldData.GetChunkData(Index));
@@ -1024,14 +1054,21 @@ void AVoxelChunk::GenerateSceneActors()
 void AVoxelChunk::LoadSceneActors(FSaveData* InSaveData)
 {
 	auto& SaveData = InSaveData->CastRef<FVoxelChunkSaveData>();
+
 	for(auto& Iter : SaveData.PickUpDatas)
 	{
 		UAbilityModuleStatics::SpawnAbilityPickUp(&Iter, this);
+	}
+
+	for(auto& Iter : SaveData.BuildingDatas)
+	{
+		SpawnBuilding(Iter);
 	}
 }
 
 void AVoxelChunk::SpawnSceneActors()
 {
+	
 }
 
 void AVoxelChunk::DestroySceneActors()
@@ -1044,6 +1081,8 @@ void AVoxelChunk::DestroySceneActors()
 		}
 		SceneActorMap.Remove(Iter.Key);
 	}
+	
+	DestroyBuildings();
 }
 
 void AVoxelChunk::GenerateBuildings()
@@ -1054,7 +1093,7 @@ void AVoxelChunk::GenerateBuildings()
 	}
 }
 
-bool AVoxelChunk::SpawnBuilding(FVoxelBuildingData& InBuildingData)
+void AVoxelChunk::SpawnBuilding(FVoxelBuildingSaveData& InBuildingData)
 {
 	if(TSubclassOf<AActor> BuildingClass = GetBuildingClassByID(InBuildingData.ID))
 	{
@@ -1065,13 +1104,28 @@ bool AVoxelChunk::SpawnBuilding(FVoxelBuildingData& InBuildingData)
 			SpawnActor->SetActorScale3D(FVector::OneVector * (Module->GetWorldData().BlockSize / 100.f));
 			SpawnActor->SetActorLocationAndRotation(InBuildingData.Location * Module->GetWorldData().BlockSize, FRotator(0, InBuildingData.Angle * 90.f, 0));
 			InBuildingData.Actor = SpawnActor;
-			return true;
 		}
 	}
-	return false;
 }
 
-void AVoxelChunk::AddBuilding(const FVoxelBuildingData& InBuildingData)
+void AVoxelChunk::DestroyBuilding(FVoxelBuildingSaveData& InBuildingData)
+{
+	if(InBuildingData.Actor)
+	{
+		UObjectPoolModuleStatics::DespawnObject(InBuildingData.Actor);
+		InBuildingData.Actor = nullptr;
+	}
+}
+
+void AVoxelChunk::DestroyBuildings()
+{
+	for (auto& Iter : BuildingDatas)
+	{
+		DestroyBuilding(Iter);
+	}
+}
+
+void AVoxelChunk::AddBuilding(const FVoxelBuildingSaveData& InBuildingData)
 {
 	BuildingDatas.Add(InBuildingData);
 }

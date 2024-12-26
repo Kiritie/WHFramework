@@ -1,33 +1,34 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "Voxel/Generators/VoxelRainGenerator.h"
+#include "Voxel/Generators/VoxelWaterGenerator.h"
 
 #include "Math/MathStatics.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 
-UVoxelRainGenerator::UVoxelRainGenerator()
+UVoxelWaterGenerator::UVoxelWaterGenerator()
 {
+	Seed = 2183;
 	Waters = TSet<uint64>();
 }
 
-void UVoxelRainGenerator::Generate(AVoxelChunk* InChunk)
+void UVoxelWaterGenerator::Generate(AVoxelChunk* InChunk)
 {
 	Waters.Reset();
 
 	//初始化雨滴（随机生成雨滴）
 	for (int n = 1; n > 0; --n)
 	{
-		float possible = UMathStatics::Rand(InChunk->GetIndex().ToVector2D() + FVector2D(13.51f, 2.16f), Module->GetWorldData().WorldSeed);
+		float possible = UMathStatics::Rand(InChunk->GetIndex().ToVector2D() + FVector2D(13.51f, 2.16f), Seed);
 		if (possible <= 0.95f) continue;
-		int32 x = UMathStatics::RandInt(InChunk->GetIndex().ToVector2D(), Module->GetWorldData().WorldSeed) % 15 + 1;
-		int32 y = UMathStatics::RandInt(InChunk->GetIndex().ToVector2D() + FVector2D(-1.512f, 41.421f), Module->GetWorldData().WorldSeed) % 15 + 1;
+		int32 x = UMathStatics::RandInt(InChunk->GetIndex().ToVector2D(), Seed) % 15 + 1;
+		int32 y = UMathStatics::RandInt(InChunk->GetIndex().ToVector2D() + FVector2D(-1.512f, 41.421f), Seed) % 15 + 1;
 		Flow(InChunk, 60.0f, x, y, InChunk->GetTopography(FIndex(x, y)).Height + 1);
 	}
 }
 
-void UVoxelRainGenerator::Flow(AVoxelChunk* InChunk, float InRain, int InX, int InY, int InZ)
+void UVoxelWaterGenerator::Flow(AVoxelChunk* InChunk, float InRain, int InX, int InY, int InZ)
 {
 	if (InRain < 0.5f/* || k<=SeaLevel*/)return;
 

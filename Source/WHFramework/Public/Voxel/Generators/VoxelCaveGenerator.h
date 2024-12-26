@@ -19,4 +19,14 @@ public:
 	
 public:
 	virtual void Generate(AVoxelChunk* InChunk) override;
+
+protected:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 CrystalSize;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector NoiseScale;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 MaxDepth;
 };

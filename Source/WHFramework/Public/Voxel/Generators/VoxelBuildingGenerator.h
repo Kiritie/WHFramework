@@ -36,6 +36,8 @@ public:
 	bool PlaceOneBuilding(AVoxelChunk* InChunk, int32 InX, int32 InY, int32 InBuildingIndex, int32 InRotate);
 
 protected:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Seed;
 	//发展域
 	TSet<uint64> Domains;
 	//已存在道路
