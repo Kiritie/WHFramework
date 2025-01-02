@@ -60,6 +60,41 @@ FVoxelWorldBasicSaveData UVoxelModuleStatics::GetWorldBasicData()
 	return UVoxelModule::Get().GetWorldBasicData();
 }
 
+FVoxelTopography& UVoxelModuleStatics::GetTopographyByIndex(FIndex InIndex)
+{
+	return UVoxelModule::Get().GetTopographyByIndex(InIndex);
+}
+
+FVoxelTopography& UVoxelModuleStatics::GetTopographyByLocation(FVector InLocation)
+{
+	return UVoxelModule::Get().GetTopographyByLocation(InLocation);
+}
+
+void UVoxelModuleStatics::SetTopographyByIndex(FIndex InIndex, const FVoxelTopography& InTopography)
+{
+	UVoxelModule::Get().SetTopographyByIndex(InIndex, InTopography);
+}
+
+void UVoxelModuleStatics::SetTopographyLocation(FVector InLocation, const FVoxelTopography& InTopography)
+{
+	UVoxelModule::Get().SetTopographyLocation(InLocation, InTopography);
+}
+
+float UVoxelModuleStatics::GetVoxelNoise1D(float InValue, bool bAbs, bool bUnsigned)
+{
+	return UVoxelModule::Get().GetVoxelNoise1D(InValue, bAbs, bUnsigned);
+}
+
+float UVoxelModuleStatics::GetVoxelNoise2D(FVector2D InLocation, bool bAbs, bool bUnsigned)
+{
+	return UVoxelModule::Get().GetVoxelNoise2D(InLocation, bAbs, bUnsigned);
+}
+
+float UVoxelModuleStatics::GetVoxelNoise3D(FVector InLocation, bool bAbs, bool bUnsigned)
+{
+	return UVoxelModule::Get().GetVoxelNoise3D(InLocation, bAbs, bUnsigned);
+}
+
 FIndex UVoxelModuleStatics::LocationToChunkIndex(FVector InLocation, bool bIgnoreZ /*= false*/)
 {
 	return UVoxelModule::Get().LocationToChunkIndex(InLocation, bIgnoreZ);
@@ -139,21 +174,6 @@ UVoxel& UVoxelModuleStatics::GetVoxel(const FVoxelItem& InVoxelItem)
 		Voxel.LoadData(InVoxelItem.Data);
 	}
 	return Voxel;
-}
-
-EVoxelTerrainType UVoxelModuleStatics::GetTerrainType(FIndex InIndex)
-{
-	return UVoxelModule::Get().GetTerrainType(InIndex);
-}
-
-EVoxelType UVoxelModuleStatics::GetTerrainVoxelType(FIndex InIndex)
-{
-	return UVoxelModule::Get().GetTerrainVoxelType(InIndex);
-}
-
-EVoxelType UVoxelModuleStatics::GetFoliageVoxelType(FIndex InIndex)
-{
-	return UVoxelModule::Get().GetFoliageVoxelType(InIndex);
 }
 
 bool UVoxelModuleStatics::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)

@@ -43,6 +43,27 @@ public:
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
 	static FVoxelWorldBasicSaveData GetWorldBasicData();
 
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static FVoxelTopography& GetTopographyByIndex(FIndex InIndex);
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static FVoxelTopography& GetTopographyByLocation(FVector InLocation);
+
+	UFUNCTION(BlueprintCallable, Category = "VoxelModuleStatics")
+	static void SetTopographyByIndex(FIndex InIndex, const FVoxelTopography& InTopography);
+
+	UFUNCTION(BlueprintCallable, Category = "VoxelModuleStatics")
+	static void SetTopographyLocation(FVector InLocation, const FVoxelTopography& InTopography);
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static float GetVoxelNoise1D(float InValue, bool bAbs = false, bool bUnsigned = false);
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static float GetVoxelNoise2D(FVector2D InLocation, bool bAbs = false, bool bUnsigned = false);
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static float GetVoxelNoise3D(FVector InLocation, bool bAbs = false, bool bUnsigned = false);
+
 	//////////////////////////////////////////////////////////////////////////
 	// Index
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
@@ -99,15 +120,6 @@ public:
 		return static_cast<T&>(GetVoxel(InVoxelItem));
 	}
 	static UVoxel& GetVoxel(const FVoxelItem& InVoxelItem);
-	
-	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static EVoxelTerrainType GetTerrainType(FIndex InIndex);
-	
-	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static EVoxelType GetTerrainVoxelType(FIndex InIndex);
-
-	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static EVoxelType GetFoliageVoxelType(FIndex InIndex);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Trace

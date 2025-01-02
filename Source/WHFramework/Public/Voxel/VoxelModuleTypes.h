@@ -3,11 +3,11 @@
 #pragma once
 
 #include "Ability/AbilityModuleTypes.h"
-#include "AsyncTasks/AsyncTask_ChunkQueue.h"
 #include "Common/CommonTypes.h"
 #include "Math/MathTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "Scene/SceneModuleTypes.h"
+#include "Threads/VoxelChunkQueueThread.h"
 
 #include "VoxelModuleTypes.generated.h"
 
@@ -215,23 +215,6 @@ enum class EVoxelInteractAction : uint8
 };
 
 UENUM(BlueprintType)
-enum class EVoxelHierarchy: uint8
-{
-	None,
-	Under,
-	Upper
-};
-
-UENUM(BlueprintType)
-enum class EVoxelTerrainType: uint8
-{
-	None,
-	Plain,
-	Mountain,
-	Blob
-};
-
-UENUM(BlueprintType)
 enum class EVoxelBiomeType: uint8
 {
 	None,
@@ -240,24 +223,6 @@ enum class EVoxelBiomeType: uint8
 	Dry,
 	Stone,
 	Desert
-};
-
-UENUM(BlueprintType)
-enum class EVoxelFoliageType: uint8
-{
-	None,
-	Plant,
-	Tree
-};
-
-UENUM(BlueprintType)
-enum class EVoxelDataType: uint8
-{
-	None,
-	Basic,
-	Terrain,
-	Noise,
-	Random
 };
 
 USTRUCT(BlueprintType)
@@ -721,81 +686,6 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelBlockData
-{
-	GENERATED_BODY()
-
-public:
-	FORCEINLINE FVoxelBlockData()
-	{
-		DataType = EVoxelDataType::None;
-		NoiseScale = FVector::ZeroVector;
-		BaseHeight = 0.f;
-		RandomRate = 0.f;
-		RandomDatas = TArray<FVoxelRandomData>();
-	}
-
-	FORCEINLINE FVoxelBlockData(float InBaseHeight, bool bSnapTerrain) : FVoxelBlockData()
-	{
-		DataType = bSnapTerrain ? EVoxelDataType::Terrain : EVoxelDataType::Basic;
-		BaseHeight = InBaseHeight;
-	}
-
-	FORCEINLINE FVoxelBlockData(float InBaseHeight, FVector InNoiseScale) : FVoxelBlockData()
-	{
-		DataType = EVoxelDataType::Noise;
-		BaseHeight = InBaseHeight;
-		NoiseScale = InNoiseScale;
-	}
-
-	FORCEINLINE FVoxelBlockData(float InBaseHeight, FVector InNoiseScale, float InRandomRate, const TArray<FVoxelRandomData>& InDatas = TArray<FVoxelRandomData>()) : FVoxelBlockData()
-	{
-		DataType = EVoxelDataType::Random;
-		BaseHeight = InBaseHeight;
-		NoiseScale = InNoiseScale;
-		RandomRate = InRandomRate;
-		RandomDatas = InDatas;
-	}
-
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	EVoxelDataType DataType;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float BaseHeight;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "DataType == EVoxelDataType::Noise || DataType == EVoxelDataType::Random"))
-	FVector NoiseScale;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "DataType == EVoxelDataType::Random"))
-	float RandomRate;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "DataType == EVoxelDataType::Random"))
-	TArray<FVoxelRandomData> RandomDatas;
-};
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelBlockDatas
-{
-	GENERATED_BODY()
-
-public:
-	FORCEINLINE FVoxelBlockDatas()
-	{
-		BlockDatas = TMap<EVoxelType, FVoxelBlockData>();
-	}
-
-	FORCEINLINE FVoxelBlockDatas(const TMap<EVoxelType, FVoxelBlockData>& InBlockDatas)
-	{
-		BlockDatas = InBlockDatas;
-	}
-
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TMap<EVoxelType, FVoxelBlockData> BlockDatas;
-};
-
-USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelWorldBasicSaveData : public FSaveData
 {
 	GENERATED_BODY()
@@ -807,64 +697,12 @@ public:
 		
 		ChunkSize = FVector(16.f);
 		
-		WorldSize = FVector(-1.f, -1.f, 3.f);
-		WorldRange = FVector2D(7.f, 7.f);
+		WorldSize = FVector(-1.f, -1.f, 5.f);
+		WorldRange = FVector2D(15.f, 15.f);
 
-		SeaLevel = 0;
+		SeaLevel = 32;
 
 		VoxelGenerators = TArray<UVoxelGenerator*>();
-
-		BlockDatas = {
-			{
-				EVoxelHierarchy::Upper,
-				FVoxelBlockDatas({
-						{ EVoxelType::Sand, FVoxelBlockData(1.f, FVector(0.05f, 0.05f, 0.3f)) },
-						{ EVoxelType::Water, FVoxelBlockData(1.4f, false) },
-						{ EVoxelType::Grass, FVoxelBlockData(0.f, true) }
-					}
-				)
-			},
-			{
-				EVoxelHierarchy::Under,	
-				FVoxelBlockDatas({
-						{ EVoxelType::Bedrock, FVoxelBlockData(0.01f, false) },
-						{ EVoxelType::Diamond_Ore, FVoxelBlockData(0.1f, FVector(0.5f, 0.5f, 0.1f), 0.0001f) },
-						{ EVoxelType::Emerald_Ore, FVoxelBlockData(0.2f, FVector(0.4f, 0.4f, 0.1f), 0.0004f) },
-						{ EVoxelType::Gold_Ore, FVoxelBlockData(0.3f, FVector(0.3f, 0.3f, 0.1f), 0.0005f) },
-						{ EVoxelType::Iron_Ore, FVoxelBlockData(0.4f, FVector(0.2f, 0.2f, 0.1), 0.005f) },
-						{ EVoxelType::Coal_Ore, FVoxelBlockData(0.6f, FVector(0.1f, 0.1f, 0.2f), 0.05f) },
-						{ EVoxelType::Stone, FVoxelBlockData(0.15f, true) },
-						{ EVoxelType::Dirt, FVoxelBlockData(0.f, true) }
-					}
-				)
-			}
-		};
-
-		TerrainDatas = {
-			{ EVoxelTerrainType::Plain, FVoxelBlockData(0.6f, FVector(0.005f, 0.005f, 0.8)) },
-			{ EVoxelTerrainType::Mountain, FVoxelBlockData(0.6f, FVector(0.01f, 0.01f, 1.f)) },
-			{ EVoxelTerrainType::Blob, FVoxelBlockData(0.75f, FVector(0.05f, 0.05f, 0.5f)) }
-		};
-
-		FoliageDatas = {
-			{
-				EVoxelFoliageType::Plant,
-				FVoxelBlockData(2.0f, FVector(0.8f, 0.8f, 0.5f), 0.08f, {
-						FVoxelRandomData(0.3f, { EVoxelType::Tall_Grass }),
-						FVoxelRandomData(1.f, { EVoxelType::Flower_Allium, EVoxelType::Flower_Blue_Orchid, EVoxelType::Flower_Dandelion, EVoxelType::Flower_Houstonia, EVoxelType::Flower_Oxeye_Daisy,
-							EVoxelType::Flower_Paeonia, EVoxelType::Flower_Rose, EVoxelType::Flower_Tulip_Orange, EVoxelType::Flower_Tulip_Pink, EVoxelType::Flower_Tulip_Red, EVoxelType::Flower_Tulip_White })
-					}
-				)
-			},
-			{
-				EVoxelFoliageType::Tree,
-				FVoxelBlockData(2.0f, FVector(0.01f, 0.01f, 0.5f), 0.005f, {
-						FVoxelRandomData(0.6f, { EVoxelType::Oak }),
-						FVoxelRandomData(1.f, { EVoxelType::Birch })
-					}
-				)
-			}
-		};
 
 		RenderDatas = TMap<EVoxelNature, FVoxelRenderData>();
 
@@ -891,15 +729,6 @@ public:
 
 	UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly)
 	TArray<UVoxelGenerator*> VoxelGenerators;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TMap<EVoxelHierarchy, FVoxelBlockDatas> BlockDatas;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TMap<EVoxelTerrainType, FVoxelBlockData> TerrainDatas;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TMap<EVoxelFoliageType, FVoxelBlockData> FoliageDatas;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TMap<EVoxelNature, FVoxelRenderData> RenderDatas;
@@ -1065,7 +894,7 @@ public:
 	UPROPERTY(VisibleAnywhere)
 	TArray<FIndex> Queue;
 		
-	TArray<FAsyncTask<FAsyncTask_ChunkQueue>*> Tasks;
+	TArray<FVoxelChunkQueueThread*> Threads;
 
 	FORCEINLINE FVoxelChunkQueue()
 	{
@@ -1073,7 +902,7 @@ public:
 		Speed = 100;
 		bFloor = false;
 		Queue = TArray<FIndex>();
-		Tasks = TArray<FAsyncTask<FAsyncTask_ChunkQueue>*>();
+		Threads = TArray<FVoxelChunkQueueThread*>();
 	}
 
 	FORCEINLINE FVoxelChunkQueue(bool bInAsync, int32 InSpeed, bool bInFloor = false)
@@ -1082,7 +911,7 @@ public:
 		Speed = InSpeed;
 		bFloor = bInFloor;
 		Queue = TArray<FIndex>();
-		Tasks = TArray<FAsyncTask<FAsyncTask_ChunkQueue>*>();
+		Threads = TArray<FVoxelChunkQueueThread*>();
 	}
 };
 
@@ -1095,13 +924,18 @@ public:
 	UPROPERTY(EditAnywhere)
 	TArray<FVoxelChunkQueue> Queues;
 
+	UPROPERTY(VisibleAnywhere)
+	int32 Stage;
+
 	FORCEINLINE FVoxelChunkQueues()
 	{
 		Queues = TArray<FVoxelChunkQueue>();
+		Stage = 0;
 	}
 
 	FORCEINLINE FVoxelChunkQueues(const TArray<FVoxelChunkQueue>& InQueues)
 	{
 		Queues = InQueues;
+		Stage = 0;
 	}
 };

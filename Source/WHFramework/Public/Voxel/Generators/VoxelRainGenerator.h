@@ -4,18 +4,19 @@
 
 #include "CoreMinimal.h"
 #include "VoxelGenerator.h"
-#include "VoxelWaterGenerator.generated.h"
+#include "Math/MathTypes.h"
+#include "VoxelRainGenerator.generated.h"
 
 /**
  *
  */
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UVoxelWaterGenerator : public UVoxelGenerator
+class WHFRAMEWORK_API UVoxelRainGenerator : public UVoxelGenerator
 {
 	GENERATED_BODY()
 
 public:
-	UVoxelWaterGenerator();
+	UVoxelRainGenerator();
 
 public:
 	virtual void Generate(AVoxelChunk* InChunk) override;
@@ -27,5 +28,14 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Seed;
 
-	TSet<uint64> Waters;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 MaxNum;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float SpawnRate;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MaxDepth;
+
+	TSet<FIndex> Waters;
 };

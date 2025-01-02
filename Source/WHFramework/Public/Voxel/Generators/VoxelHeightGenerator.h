@@ -14,28 +14,24 @@ struct FVoxelHeightGenerateData
 public:
 	FVoxelHeightGenerateData()
 	{
-		CrystalSize = 0;
-		Weight = 0.f;
+		CrystalSize = 0.f;
 		MaxHeight = 0;
+		Weight = 1.0f;
 	}
 
-	FVoxelHeightGenerateData(const int32 CrystalSize, const FVector& NoiseScale, const int32 MaxHeight, const float Weight)
+	FVoxelHeightGenerateData(const float CrystalSize, const int32 MaxHeight, const float Weight)
 		: CrystalSize(CrystalSize),
-		  NoiseScale(NoiseScale),
 		  MaxHeight(MaxHeight),
 		  Weight(Weight)
 	{
 	}
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 CrystalSize;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FVector NoiseScale;
+	float CrystalSize;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MaxHeight;
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float Weight;
 };

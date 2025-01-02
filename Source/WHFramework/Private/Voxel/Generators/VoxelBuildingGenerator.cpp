@@ -126,22 +126,23 @@ void UVoxelBuildingGenerator::PlaceBuildings(AVoxelChunk* InChunk)
 bool UVoxelBuildingGenerator::PlaceOneBuilding(AVoxelChunk* InChunk, int32 InX, int32 InY, int32 index, int32 InRotate)
 {
 	//[第几个建筑][长、宽]
-	const int32 buildingSize[3][2] = {{10, 6}, {8, 6}, {6, 6}};
+	const int32 buildingSize[3][3] = {{10, 6, 7}, {8, 6, 9}, {6, 6, 15}};
 
 	int rotateIndex = InRotate % 2;
 	int updown = buildingSize[index][rotateIndex] / 2;
 	int leftright = buildingSize[index][!rotateIndex] / 2;
+	int upbottom = buildingSize[index][2];
 
 	float aver = 0;
 	for (int i = -updown; i < updown; ++i)
 		for (int j = -leftright; j < leftright; ++j)
 		{
 			//若不在发展域，则无需生成建筑         
-			if (!Domains.Find(UMathStatics::Index(InX + i, InY + j))) { return false; }
+			if (!Domains.Find(UMathStatics::Index(InX + i, InY + j))) return false;
 
 			//若地面被挖空，则无需生成建筑
 			FVector pos3D = FVector(InX + i, InY + j, Module->GetTopographyByIndex(FIndex(InX + i, InY + j)).Height);
-			if (Module->HasVoxelByIndex(pos3D)) { return false; }
+			if (!Module->HasVoxelByIndex(pos3D)) return false;
 
 			int32 h = Module->GetTopographyByIndex(FIndex(InX + i, InY + j)).Height;
 			aver += h;
@@ -156,17 +157,23 @@ bool UVoxelBuildingGenerator::PlaceOneBuilding(AVoxelChunk* InChunk, int32 InX, 
 	for (int i = -updown; i < updown; ++i)
 		for (int j = -leftright; j < leftright; ++j)
 		{
-			Module->GetTopographyByIndex(FIndex(InX + i, InY + j)).Height = aver;
+			FIndex pos = FIndex(InX + i, InY + j, Module->GetTopographyByIndex(FIndex(InX + i, InY + j)).Height);
+			if(!Module->HasVoxelByIndex(pos, true))
+			{
+				Module->SetVoxelByIndex(pos, EVoxelType::Cobble_Stone);
+			}
+			// Module->GetTopographyByIndex(FIndex(InX + i, InY + j)).Height = aver;
 			Domains.Remove(UMathStatics::Index(InX + i, InY + j));
 		}
 
 	//地表插入空气，以免生成树木花草
 	for (int i = -updown - 1; i < updown + 1; ++i)
 		for (int j = -leftright - 1; j < leftright + 1; ++j)
-		{
-			FVector pos = FVector(InX + i, InY + j, Module->GetTopographyByIndex(FIndex(InX + i, InY + j)).Height + 1);
-			Module->SetVoxelByIndex(pos, FVoxelItem::Empty);
-		}
+			for (int k = 0; k < upbottom; ++k)
+			{
+				FIndex pos = FIndex(InX + i, InY + j, Module->GetTopographyByIndex(FIndex(InX + i, InY + j)).Height + k + 1);
+				Module->SetVoxelByIndex(pos, FVoxelItem::Empty, true);
+			}
 
 	FVoxelBuildingSaveData BuildingData;
 	BuildingData.ID = index + 1;
@@ -196,9 +203,9 @@ void UVoxelBuildingGenerator::PlacePaths(AVoxelChunk* InChunk)
 			for (FVector2D pos : path)
 			{
 				Roads.Emplace(UMathStatics::Index(pos.X, pos.Y));
-				FVector pos3D = FVector(pos.X, pos.Y, Module->GetTopographyByIndex(FIndex(pos.X, pos.Y)).Height);
+				FIndex pos3D = FIndex(pos.X, pos.Y, Module->GetTopographyByIndex(FIndex(pos.X, pos.Y)).Height);
 				//被挖空则不生成
-				if (Module->HasVoxelByIndex(pos3D))
+				if (!Module->HasVoxelByIndex(pos3D))
 					continue;
 
 				Module->SetVoxelByIndex(FIndex(pos.X, pos.Y, Module->GetTopographyByIndex(FIndex(pos.X, pos.Y)).Height), EVoxelType::Cobble_Stone);

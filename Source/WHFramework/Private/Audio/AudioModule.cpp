@@ -179,7 +179,11 @@ FString UAudioModule::GetModuleDebugMessage()
 		DebugMessage.Appendf(TEXT("%s-%s(%s)\n"), *Iter.Key.ToString(), *Iter.Value.Sound->GetName(), *UCommonStatics::GetEnumAuthoredNameByValue(TEXT("/Script/Engine.EAudioComponentPlayState"), (int32)Iter.Value.Audio->GetPlayState()));
 	}
 	DebugMessage.RemoveFromEnd(TEXT("\n"));
-	return DebugMessage;
+	if(!DebugMessage.IsEmpty())
+	{
+		return DebugMessage;
+	}
+	return Super::GetModuleDebugMessage();
 }
 
 void UAudioModule::PlaySound2D(USoundBase* InSound, float InVolume, bool bMulticast)

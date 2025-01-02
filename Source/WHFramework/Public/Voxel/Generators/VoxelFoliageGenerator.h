@@ -37,12 +37,19 @@ protected:
 	int32 Seed;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 CrystalSize;
+	float CrystalSize;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FVector NoiseScale;
+	float GrassRate;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float FlowerRate;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float TreeRate;
 
 private:
+	int32 _Seed;
 	//树叶模板（生成树叶阶段用）
 	static bool LeavesTemplate[4][5][5];
 };

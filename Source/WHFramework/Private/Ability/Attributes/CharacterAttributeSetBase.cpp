@@ -2,7 +2,6 @@
 
 #include "AbilitySystemComponent.h"
 #include "GameplayEffectExtension.h"
-#include "Ability/Character/AbilityCharacterBase.h"
 #include "Net/UnrealNetwork.h"
 
 UCharacterAttributeSetBase::UCharacterAttributeSetBase()

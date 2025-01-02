@@ -84,13 +84,13 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Voxel
 public:
-	virtual bool HasVoxel(FIndex InIndex);
+	virtual bool HasVoxel(FIndex InIndex, bool bSafe = false);
 
-	virtual bool HasVoxel(int32 InX, int32 InY, int32 InZ);
+	virtual bool HasVoxel(int32 InX, int32 InY, int32 InZ, bool bSafe = false);
 
-	virtual bool HasVoxelComplex(FIndex InIndex);
+	virtual bool HasVoxelComplex(FIndex InIndex, bool bSafe = false);
 
-	virtual bool HasVoxelComplex(int32 InX, int32 InY, int32 InZ);
+	virtual bool HasVoxelComplex(int32 InX, int32 InY, int32 InZ, bool bSafe = false);
 
 	virtual FVoxelItem& GetVoxel(FIndex InIndex, bool bMainPart = false);
 
@@ -250,5 +250,7 @@ public:
 
 	TMap<EDirection, AVoxelChunk*> GetNeighbors() const { return Neighbors; }
 
-	FVector GetChunkLocation() const;
+	FIndex GetWorldIndex() const;
+
+	FVector GetWorldLocation() const;
 };

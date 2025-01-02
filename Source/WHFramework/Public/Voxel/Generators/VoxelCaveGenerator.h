@@ -22,10 +22,7 @@ public:
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 CrystalSize;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FVector NoiseScale;
+	float CrystalSize;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MaxDepth;

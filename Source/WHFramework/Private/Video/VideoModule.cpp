@@ -155,7 +155,11 @@ FString UVideoModule::GetModuleDebugMessage()
 		DebugMessage.Appendf(TEXT("%s-%s(%s)\n"), *Iter.Key.ToString(), *Iter.Value->GetMovieName().ToString(), *MediaUtils::StateToString(Iter.Value->GetMediaPlayer()->GetPlayerFacade()->GetPlayer() ? Iter.Value->GetMediaPlayer()->GetPlayerFacade()->GetPlayer()->GetControls().GetState() : EMediaState::Stopped));
 	}
 	DebugMessage.RemoveFromEnd(TEXT("\n"));
-	return DebugMessage;
+	if(!DebugMessage.IsEmpty())
+	{
+		return DebugMessage;
+	}
+	return Super::GetModuleDebugMessage();
 }
 
 void UVideoModule::AddMediaPlayerToList(AMediaPlayerBase* InMediaPlayer)

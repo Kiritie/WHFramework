@@ -10,13 +10,15 @@
 UVoxelFoliageGenerator::UVoxelFoliageGenerator()
 {
 	Seed = 1317;
-	CrystalSize = 16;
-	NoiseScale = FVector(1.f, 1.f, 1.f);
+	CrystalSize = 16.f;
+	GrassRate = 0.9f;
+	FlowerRate = 0.98f;
+	TreeRate = 0.99f;
 }
 
 void UVoxelFoliageGenerator::Generate(AVoxelChunk* InChunk)
 {
-	Seed = UMathStatics::Hash21(InChunk->GetIndex().ToVector2D()) + 1317;
+	_Seed = UMathStatics::Hash21(InChunk->GetIndex().ToVector2D()) + Seed;
 	
 	ITER_INDEX2D(Index, Module->GetWorldData().ChunkSize, false,
 		const FVoxelTopography& Topography = InChunk->GetTopography(Index);
@@ -27,7 +29,7 @@ void UVoxelFoliageGenerator::Generate(AVoxelChunk* InChunk)
 
 		const FIndex GlobalIndex = InChunk->LocalIndexToWorld(Index);
 		// 被挖空（方块ID为0）或者方块ID为9（方块为水）就无法生成
-		if (Module->HasVoxelByIndex(FIndex(GlobalIndex.X, GlobalIndex.Y, Topography.Height))) continue;
+		if (!Module->HasVoxelByIndex(FIndex(GlobalIndex.X, GlobalIndex.Y, Topography.Height))) continue;
 
 		//查询地板上一格的方块ID
 		//如果存在方块，则无法生成
@@ -54,16 +56,16 @@ bool UVoxelFoliageGenerator::GeneratePlant(AVoxelChunk* InChunk, FIndex InIndex,
 
 	FVector2D Location = FVector2D(float(InIndex.X) / Module->GetWorldData().ChunkSize.X / InCrystalSize, float(InIndex.Y) / Module->GetWorldData().ChunkSize.Y / InCrystalSize);
 	//计算概率值
-	float Possible = UMathStatics::Rand(Location, Seed) - FMath::Abs(Temperature + 0.1f) * 0.4f + Humidity * 0.4f;
+	float Possible = UMathStatics::Rand(Location, _Seed) - FMath::Abs(Temperature + 0.1f) * 0.5f + Humidity * 0.4f;
 
 	EVoxelType VoxelType = EVoxelType::Empty;
 	//若满足生成花的概率
-	if (Possible > 1.0f)
+	if (Possible > FlowerRate)
 	{
-		VoxelType = (EVoxelType)((int32)EVoxelType::Flower_Allium + UMathStatics::RandInt(FVector2D(InIndex.X + InIndex.Y * 21, InIndex.Y - InIndex.X ^ 2), Seed) % ((int32)EVoxelType::Flower_Tulip_White - (int32)EVoxelType::Flower_Allium));
+		VoxelType = (EVoxelType)((int32)EVoxelType::Flower_Allium + UMathStatics::RandInt(FVector2D(InIndex.X + InIndex.Y * 21, InIndex.Y - InIndex.X ^ 2), _Seed) % ((int32)EVoxelType::Flower_Tulip_White - (int32)EVoxelType::Flower_Allium));
 	}
 	//若满足生成草的概率
-	else if (Possible > 0.85f)
+	else if (Possible > GrassRate)
 	{
 		//方块ID：11=绿草 12=黄草，13=白草
 		if (Temperature > 0.3f)
@@ -97,15 +99,15 @@ bool UVoxelFoliageGenerator::GenerateTree(AVoxelChunk* InChunk, FIndex InIndex, 
 	const FVector2D Location = FVector2D(float(InIndex.X) / Module->GetWorldData().ChunkSize.X / InCrystalSize, float(InIndex.Y) / Module->GetWorldData().ChunkSize.Y / InCrystalSize);
 	float Temperature = Topography.Temperature;
 	float Humidity = Topography.Humidity;
-	float Possible = (Module->GetNoise2D(Location, NoiseScale) + 1.0f) / 2.0f * 0.15f - FMath::Abs(Temperature + 0.1f) * 0.10f + Humidity * 0.15f + UMathStatics::Rand(-Location, Seed) * 0.9f;
+	float Possible = UMathStatics::Rand(-Location, _Seed) * 0.9f + Module->GetVoxelNoise2D(Location, false, true) * 0.15f - FMath::Abs(Temperature + 0.1f) * 0.15f + Humidity * 0.15f;
 
 	//若满足概率
-	if (Possible < 0.985f) return false;
+	if (Possible <= TreeRate) return false;
 	//树干高度
-	const int32 TreeHeight = (UMathStatics::RandInt(FVector2D::UnitVector - Location, Seed) % 3) + 4;
+	const int32 TreeHeight = (UMathStatics::RandInt(FVector2D::UnitVector - Location, _Seed) % 3) + 4;
 
 	//根据温度选择树类型
-	Temperature += (UMathStatics::Rand(FVector2D::UnitVector + Location, Seed) - 0.5f) * 0.2f;
+	Temperature += (UMathStatics::Rand(FVector2D::UnitVector + Location, _Seed) - 0.5f) * 0.2f;
 
 	EVoxelType WoodType;
 	EVoxelType LeafType;
@@ -132,8 +134,8 @@ bool UVoxelFoliageGenerator::GenerateTree(AVoxelChunk* InChunk, FIndex InIndex, 
 		Module->SetVoxelByIndex(InChunk->LocalIndexToWorld(FIndex(InIndex.X, InIndex.Y, Topography.Height + 1 + i)), WoodType);
 	}
 
-	const int32 T1 = UMathStatics::Rand(17 * Location, Seed) * 4 + 1.5f + int32(TreeHeight >= 5);
-	const int32 T2 = UMathStatics::Rand(11 * Location, Seed) * 4 + 1.5f + int32(TreeHeight >= 5);
+	const int32 T1 = UMathStatics::Rand(17 * Location, _Seed) * 4 + 1.5f + int32(TreeHeight >= 5);
+	const int32 T2 = UMathStatics::Rand(11 * Location, _Seed) * 4 + 1.5f + int32(TreeHeight >= 5);
 	const int32 LeafHeight = TreeHeight + 1 + T1 % 3;
 	const int32 InitLeafHeight = 2 + T2 % 2;
 	for (int i = LeafHeight - 1; i >= InitLeafHeight; --i)

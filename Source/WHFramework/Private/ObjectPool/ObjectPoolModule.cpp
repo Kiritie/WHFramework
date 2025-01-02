@@ -85,7 +85,11 @@ FString UObjectPoolModule::GetModuleDebugMessage()
 		}
 	}
 	DebugMessage.RemoveFromEnd(TEXT("\n"));
-	return DebugMessage;
+	if(!DebugMessage.IsEmpty())
+	{
+		return DebugMessage;
+	}
+	return Super::GetModuleDebugMessage();
 }
 
 bool UObjectPoolModule::HasPool(TSubclassOf<UObject> InType) const

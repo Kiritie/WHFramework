@@ -16,28 +16,23 @@ public:
 	FVoxelOreGenerateData()
 	{
 		VoxelType = EVoxelType::Empty;
-		CrystalSize = 2;
-		NoiseScale = FVector(1.f, 1.f, 1.f);
+		CrystalSize = 2.f;
 		MaxHeight = -1;
 	}
-	
-	FVoxelOreGenerateData(const EVoxelType VoxelType, const int32 CrystalSize, const FVector& NoiseScale, const int32 MaxHeight)
+
+	FVoxelOreGenerateData(const EVoxelType VoxelType, const float CrystalSize, const int32 MaxHeight)
 		: VoxelType(VoxelType),
 		  CrystalSize(CrystalSize),
-		  NoiseScale(NoiseScale),
 		  MaxHeight(MaxHeight)
 	{
 	}
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EVoxelType VoxelType;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 CrystalSize;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FVector NoiseScale;
 	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float CrystalSize;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MaxHeight;
 };

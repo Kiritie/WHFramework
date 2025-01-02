@@ -28,9 +28,6 @@ protected:
 	int32 Times;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 CrystalSize;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FVector NoiseScale;
+	float CrystalSize;
 };
   

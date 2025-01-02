@@ -25,6 +25,13 @@ FVector UMathStatics::RotatorVector(const FVector& Vector, ERightAngle Angle, bo
 	return RotatorVector(Vector, FRotator(0.f, (int32)Angle * 90.f, 0.f), bRound, bAbsolute);
 }
 
+bool UMathStatics::IsPointInEllipse2D(FVector2D InPoint, FVector2D InCenter, FVector2D InRadius)
+{
+	FVector2D Delta = FVector2D(InPoint.X - InCenter.X, InPoint.Y - InCenter.Y);
+	Delta.Y /= InRadius.Y / InRadius.X;
+	return Delta.Length() < InRadius.X;
+}
+
 float UMathStatics::RightAngleToFloat(ERightAngle InAngle)
 {
 	return (int32)InAngle * 90.f;
@@ -415,30 +422,30 @@ float UMathStatics::BounceEaseOut(float InTime, float InDuration)
 	return (((7.5625f * InTime) * InTime) + 0.984375f);
 }
 
-float UMathStatics::GetNoise1D(float InValue, FVector2D InScale, int32 InOffset, bool bAbs, bool bUnsigned)
+float UMathStatics::GetNoise1D(float InValue, int32 InOffset, bool bAbs, bool bUnsigned)
 {
-	const float Noise1D = (FMath::PerlinNoise1D(InValue + InOffset * InScale.X) + (bUnsigned ? 1.f : 0.f)) * InScale.Y;
-	return bAbs ? FMath::Abs(Noise1D) : Noise1D;
+	const float Noise1D = FMath::PerlinNoise1D(InValue + InOffset) + (bUnsigned ? 1.f : 0.f);
+	return bUnsigned ? (Noise1D * 0.5f) : (bAbs ? FMath::Abs(Noise1D) : Noise1D);
 }
 
-float UMathStatics::GetNoise2D(FVector2D InLocation, FVector InScale, int32 InOffset, bool bAbs, bool bUnsigned)
+float UMathStatics::GetNoise2D(FVector2D InLocation, int32 InOffset, bool bAbs, bool bUnsigned)
 {
-	const float Noise2D = (FMath::PerlinNoise2D(FVector2D((InLocation.X + InOffset) * InScale.X, (InLocation.Y + InOffset) * InScale.Y)) + (bUnsigned ? 1.f : 0.f)) * InScale.Z;
-	return bAbs ? FMath::Abs(Noise2D) : Noise2D;
+	const float Noise2D = FMath::PerlinNoise2D(FVector2D(InLocation.X + InOffset, InLocation.Y + InOffset)) + (bUnsigned ? 1.f : 0.f);
+	return bUnsigned ? (Noise2D * 0.5f) : (bAbs ? FMath::Abs(Noise2D) : Noise2D);
 }
 
-float UMathStatics::GetNoise3D(FVector InLocation, FVector InScale, int32 InOffset, bool bAbs, bool bUnsigned)
+float UMathStatics::GetNoise3D(FVector InLocation, int32 InOffset, bool bAbs, bool bUnsigned)
 {
-	const float Noise3D = FMath::PerlinNoise3D(FVector((InLocation.X + InOffset) * InScale.X, (InLocation.Y + InOffset) * InScale.Y, InLocation.Z) + (bUnsigned ? 1.f : 0.f)) * InScale.Z;
-	return bAbs ? FMath::Abs(Noise3D) : Noise3D;
+	const float Noise3D = FMath::PerlinNoise3D(FVector(InLocation.X + InOffset, InLocation.Y + InOffset, InLocation.Z) + (bUnsigned ? 1.f : 0.f));
+	return bUnsigned ? (Noise3D * 0.5f) : (bAbs ? FMath::Abs(Noise3D) : Noise3D);
 }
 
-int32 UMathStatics::Hash11(int32 InPosition)
+int32 UMathStatics::Hash11(int32 InValue)
 {
 	const uint32 BIT_NOISE1 = 0x85297A4D;
 	const uint32 BIT_NOISE2 = 0x68E31DA4;
 	const uint32 BIT_NOISE3 = 0x1B56C4E9;
-	uint32 Mangled = InPosition;
+	uint32 Mangled = InValue;
 	Mangled *= BIT_NOISE1;
 	Mangled ^= (Mangled >> 8);
 	Mangled += BIT_NOISE2;
@@ -448,12 +455,12 @@ int32 UMathStatics::Hash11(int32 InPosition)
 	return Mangled % 1024;
 }
 
-int32 UMathStatics::Hash11WithSeed(int32 InPosition, int32 InSeed)
+int32 UMathStatics::Hash11WithSeed(int32 InValue, int32 InSeed)
 {
 	const uint32 BIT_NOISE1 = 0x85297A4D;
 	const uint32 BIT_NOISE2 = 0x68E31DA4;
 	const uint32 BIT_NOISE3 = 0x1B56C4E9;
-	uint32 Mangled = InPosition ^ InSeed;
+	uint32 Mangled = InValue ^ InSeed;
 	Mangled *= BIT_NOISE1;
 	Mangled ^= (Mangled >> 8);
 	Mangled += BIT_NOISE2;
@@ -463,47 +470,47 @@ int32 UMathStatics::Hash11WithSeed(int32 InPosition, int32 InSeed)
 	return Mangled % 1024;
 }
 
-FVector2D UMathStatics::Hash22(FVector2D InPosition)
+FVector2D UMathStatics::Hash22(FVector2D InLocation)
 {
 	FVector2D V(
-		Hash11(0x651A6BE3 * (int32)InPosition.X - (int32)InPosition.Y) % 1024,
-		Hash11((int32)InPosition.X * (int32)InPosition.Y + 0x218AE247) % 1024
+		Hash11(0x651A6BE3 * (int32)InLocation.X - (int32)InLocation.Y) % 1024,
+		Hash11((int32)InLocation.X * (int32)InLocation.Y + 0x218AE247) % 1024
 	);
 	V /= 1024.0f;
 	return V;
 }
 
-int32 UMathStatics::Hash21(FVector2D InPosition)
+int32 UMathStatics::Hash21(FVector2D InLocation)
 {
-	return Hash11(0x651A6BE1 * (int32)InPosition.X + (int32)InPosition.Y) % 1024;
+	return Hash11(0x651A6BE1 * (int32)InLocation.X + (int32)InLocation.Y) % 1024;
 }
 
-FVector UMathStatics::Hash33(FVector InPosition)
+FVector UMathStatics::Hash33(FVector InLocation)
 {
 	FVector V(
-		Hash11((int32)InPosition.X ^ 0x651A6BE3 + (int32)InPosition.Y ^ 0x218A6147 - (int32)InPosition.Z ^ 0x118A5191) % 1024,
-		Hash11((int32)InPosition.X ^ 0x118A5191 - (int32)InPosition.Y ^ 0x218AE247 + (int32)InPosition.Z ^ 0x2B8AE147) % 1024,
-		Hash11((int32)InPosition.X ^ 0x21613122 - (int32)InPosition.Y ^ 0x118A5191 - (int32)InPosition.Z ^ 0x218AE247) % 1024
+		Hash11((int32)InLocation.X ^ 0x651A6BE3 + (int32)InLocation.Y ^ 0x218A6147 - (int32)InLocation.Z ^ 0x118A5191) % 1024,
+		Hash11((int32)InLocation.X ^ 0x118A5191 - (int32)InLocation.Y ^ 0x218AE247 + (int32)InLocation.Z ^ 0x2B8AE147) % 1024,
+		Hash11((int32)InLocation.X ^ 0x21613122 - (int32)InLocation.Y ^ 0x118A5191 - (int32)InLocation.Z ^ 0x218AE247) % 1024
 	);
 	V /= 1024.0f;
 	return V;
 }
 
-int32 UMathStatics::Hash31(FVector InPosition)
+int32 UMathStatics::Hash31(FVector InLocation)
 {
-	return Hash11(InPosition.X * 0x651A6BE6 - InPosition.Y * 0xCB251062 + InPosition.Z);
+	return Hash11(InLocation.X * 0x651A6BE6 - InLocation.Y * 0xCB251062 + InLocation.Z);
 }
 
-int32 UMathStatics::RandInt(FVector2D InPosition, int32 InSeed)
+int32 UMathStatics::RandInt(FVector2D InLocation, int32 InSeed)
 {
-	InPosition = InPosition * 1024;
-	return Hash11WithSeed(0x651A6BE1 * (int32)InPosition.X + (int32)InPosition.Y, InSeed) % 1024;
+	InLocation = InLocation * 1024;
+	return Hash11WithSeed(0x651A6BE1 * (int32)InLocation.X + (int32)InLocation.Y, InSeed) % 1024;
 }
 
-float UMathStatics::Rand(FVector2D InPosition, int32 InSeed)
+float UMathStatics::Rand(FVector2D InLocation, int32 InSeed)
 {
-	InPosition = InPosition * 1024;
-	return Hash11WithSeed(0x651A6BE1 * (int32)InPosition.X + (int32)InPosition.Y, InSeed) % 1024 / 1024.0f;
+	InLocation = InLocation * 1024;
+	return Hash11WithSeed(0x651A6BE1 * (int32)InLocation.X + (int32)InLocation.Y, InSeed) % 1024 / 1024.0f;
 }
 
 FVector2D UMathStatics::Bezier(FVector2D InP0, FVector2D InP1, FVector2D InP2, float InT)
@@ -526,15 +533,15 @@ uint64 UMathStatics::Index(int32 InX, int32 InY, int32 InZ)
 	return T;
 }
 
-uint64 UMathStatics::Index(FVector InIndex)
+uint64 UMathStatics::Index(FIndex InIndex)
 {
 	return Index(InIndex.X, InIndex.Y, InIndex.Z);
 }
 
-FVector UMathStatics::UnIndex(uint64 InIndex)
+FIndex UMathStatics::UnIndex(uint64 InIndex)
 {
 	const int32 Offset = 16384;
-	return FVector(
+	return FIndex(
 		int32(InIndex >> 40) - Offset,
 		int32((InIndex >> 20) & 0xFFFFF) - Offset,
 		int32(InIndex & 0xFFFFF) - Offset

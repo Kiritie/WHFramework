@@ -12,7 +12,6 @@ UVoxelTemperatureGenerator::UVoxelTemperatureGenerator()
 	Seed = 143;
 	Times = 3;
 	CrystalSize  = 16;
-	NoiseScale = FVector(1.f, 1.f, 1.f);
 }
 
 void UVoxelTemperatureGenerator::Generate(AVoxelChunk* InChunk)
@@ -22,7 +21,7 @@ void UVoxelTemperatureGenerator::Generate(AVoxelChunk* InChunk)
 	DON_WITHINDEX(Times, N,
 		ITER_INDEX2D(Index, Module->GetWorldData().ChunkSize, false,
 			const FVector2D Location = FVector2D((float)Index.X / Module->GetWorldData().ChunkSize.X / CrystalSize, Index.Y / Module->GetWorldData().ChunkSize.Y / CrystalSize);
-			const float Temperature = FMath::Clamp(Module->GetNoise2D(Location + (InChunk->GetIndex().ToVector2D() / CrystalSize), NoiseScale) + (UMathStatics::Rand(Location, Seed) - 0.5f) * 0.05f, 0.f, 1.f);
+			const float Temperature = FMath::Clamp(Module->GetVoxelNoise2D(Location + (InChunk->GetIndex().ToVector2D() / CrystalSize)) + (UMathStatics::Rand(Location, Seed) - 0.5f) * 0.05f, -1.f, 1.f);
 			InChunk->GetTopography(Index).Temperature += Temperature / Times;
 		)
 		_CrystalSize *= 2;

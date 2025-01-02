@@ -171,13 +171,13 @@ public:
 
 	virtual AVoxelChunk* GetChunkByVoxelIndex(FIndex InIndex) const;
 		
-	virtual bool HasVoxelByIndex(FIndex InIndex);
+	virtual bool HasVoxelByIndex(FIndex InIndex, bool bSafe = false);
 
-	virtual bool HasVoxelByLocation(FVector InLocation);
+	virtual bool HasVoxelByLocation(FVector InLocation, bool bSafe = false);
 
-	virtual FVoxelItem& GetVoxelByIndex(FIndex InIndex);
+	virtual FVoxelItem& GetVoxelByIndex(FIndex InIndex, bool bMainPart = false);
 
-	virtual FVoxelItem& GetVoxelByLocation(FVector InLocation);
+	virtual FVoxelItem& GetVoxelByLocation(FVector InLocation, bool bMainPart = false);
 	
 	virtual void SetVoxelByIndex(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bSafe = false);
 	
@@ -193,31 +193,11 @@ public:
 	virtual void SetTopographyLocation(FVector InLocation, const FVoxelTopography& InTopography);
 
 public:
-	virtual float GetNoise1D(float InValue, FVector2D InScale = FVector2D::UnitVector, bool bAbs = false, bool bUnsigned = false) const;
+	virtual float GetVoxelNoise1D(float InValue, bool bAbs = false, bool bUnsigned = false) const;
 
-	virtual float GetNoise2D(FVector2D InLocation, FVector InScale = FVector::OneVector, bool bAbs = false, bool bUnsigned = false) const;
+	virtual float GetVoxelNoise2D(FVector2D InLocation, bool bAbs = false, bool bUnsigned = false) const;
 
-	virtual float GetNoise3D(FVector InLocation, FVector InScale = FVector::OneVector, bool bAbs = false, bool bUnsigned = false) const;
-
-	virtual float GetNoiseHeight(FVector2D InLocation, FVector InScale, float InBaseHeight, bool bAbs = false, bool bUnsigned = false) const;
-
-	virtual float GetNoiseHeight(float InBaseHeight) const;
-
-	virtual int32 GetTerrainHeight(FIndex InIndex) const;
-
-	virtual EVoxelTerrainType GetTerrainType(FIndex InIndex) const;
-
-	virtual EVoxelTerrainType GetTerrainType(int32 InX, int32 InY, int32 InZ) const;
-
-	virtual EVoxelType GetTerrainVoxelType(FIndex InIndex) const;
-
-	virtual EVoxelType GetTerrainVoxelType(int32 InX, int32 InY, int32 InZ) const;
-
-	virtual EVoxelType CaculateBlockID(FIndex InIndex);
-
-	virtual EVoxelType GetFoliageVoxelType(FIndex InIndex) const;
-
-	virtual EVoxelType GetFoliageVoxelType(int32 InX, int32 InY, int32 InZ) const;
+	virtual float GetVoxelNoise3D(FVector InLocation, bool bAbs = false, bool bUnsigned = false) const;
 
 public:
 	virtual FIndex LocationToChunkIndex(FVector InLocation, bool bIgnoreZ = false) const;
