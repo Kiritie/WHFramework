@@ -68,17 +68,16 @@ void AVoxelChunk::OnDespawn_Implementation(bool bRecovery)
 
 	BreakNeighbors();
 
-	for(auto& Iter : VoxelMap)
-	{
+	ITER_MAP(VoxelMap, Iter,
 		DestroyAuxiliary(Iter.Value);
-	}
+	)
 	VoxelMap.Empty();
 
 	TopographyMap.Empty();
 
 	BuildingDatas.Empty();
 
-	SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
+	SetActorLocationAndRotation(UNDER_Vector, FRotator::ZeroRotator);
 
 	Execute_SetActorVisible(this, false);
 }
@@ -125,8 +124,7 @@ FSaveData* AVoxelChunk::ToData()
 	SaveData.Index = Index;
 	SaveData.bGenerated = bGenerated;
 
-	for(auto& Iter : VoxelMap)
-	{
+	ITER_MAP(VoxelMap, Iter,
 		if(Iter.Value.IsValid())
 		{
 			if(bChanged)
@@ -138,7 +136,7 @@ FSaveData* AVoxelChunk::ToData()
 				SaveData.AuxiliaryDatas.Add(Iter.Value.Auxiliary->GetSaveDataRef<FVoxelAuxiliarySaveData>(true));
 			}
 		}
-	}
+	)
 	if(bChanged)
 	{
 		SaveData.VoxelDatas.RemoveFromEnd(TEXT("|"));
@@ -192,13 +190,12 @@ void AVoxelChunk::Generate(EPhase InPhase)
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
 		CreateMesh();
-		for(auto& Iter : VoxelMap)
-		{
+		ITER_MAP(VoxelMap, Iter,
 			if(Iter.Value.IsValid())
 			{
 				Iter.Value.OnGenerate();
 			}
-		}
+		)
 		if(!bGenerated)
 		{
 			bGenerated = true;
@@ -213,13 +210,12 @@ void AVoxelChunk::Generate(EPhase InPhase)
 			BuildMesh();
 		}
 		CreateMesh();
-		for(auto& Iter : VoxelMap)
-		{
+		ITER_MAP(VoxelMap, Iter,
 			if(Iter.Value.IsValid())
 			{
 				Iter.Value.OnGenerate();
 			}
-		}
+		)
 		if(!bGenerated)
 		{
 			bBuilded = true;
@@ -240,7 +236,7 @@ void AVoxelChunk::BuildMap(int32 InStage)
 {
 	switch (InStage)
 	{
-		case 0:
+		case 1:
 		{
 			Module->GenerateVoxel<UVoxelTemperatureGenerator>(this);
 			Module->GenerateVoxel<UVoxelHumidityGenerator>(this);
@@ -253,15 +249,14 @@ void AVoxelChunk::BuildMap(int32 InStage)
 			Module->GenerateVoxel<UVoxelFoliageGenerator>(this);
 			break;
 		}
-		case 1:
+		case 2:
 		{
 			Module->GenerateVoxel<UVoxelBuildingGenerator>(this);
+			bBuilded = true;
 			break;
 		}
 		default: break;
 	}
-
-	bBuilded = true;
 }
 
 void AVoxelChunk::BuildMesh()
@@ -424,11 +419,7 @@ bool AVoxelChunk::LocalIndexToNeighbor(FIndex InIndex, EDirection& OutDirection)
 
 bool AVoxelChunk::HasVoxel(FIndex InIndex, bool bSafe)
 {
-	if(bSafe)
-	{
-		return VoxelMap.Contains(InIndex) && VoxelMap[InIndex].IsValid();
-	}
-	return VoxelMap.Contains(InIndex);
+	return VoxelMap.Contains(InIndex) && (!bSafe || VoxelMap[InIndex].IsValid());
 }
 
 bool AVoxelChunk::HasVoxel(int32 InX, int32 InY, int32 InZ, bool bSafe)
@@ -1048,7 +1039,7 @@ void AVoxelChunk::DestroySceneActors()
 
 void AVoxelChunk::GenerateBuildings()
 {
-	for (auto& Iter : BuildingDatas)
+	for(auto& Iter : BuildingDatas)
 	{
 		SpawnBuilding(Iter);
 	}
@@ -1058,9 +1049,7 @@ void AVoxelChunk::SpawnBuilding(FVoxelBuildingSaveData& InBuildingData)
 {
 	if(TSubclassOf<AActor> BuildingClass = GetBuildingClassByID(InBuildingData.ID))
 	{
-		FActorSpawnParameters ActorSpawnParameters;
-		ActorSpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		if (AActor* SpawnActor = GetWorld()->SpawnActor<AActor>(BuildingClass, ActorSpawnParameters))
+		if(AActor* SpawnActor = UObjectPoolModuleStatics::SpawnObject<AActor>(nullptr, nullptr, BuildingClass))
 		{
 			SpawnActor->SetActorScale3D(FVector::OneVector * (Module->GetWorldData().BlockSize / 100.f));
 			SpawnActor->SetActorLocationAndRotation(InBuildingData.Location * Module->GetWorldData().BlockSize, FRotator(0, InBuildingData.Angle * 90.f, 0));
@@ -1080,7 +1069,7 @@ void AVoxelChunk::DestroyBuilding(FVoxelBuildingSaveData& InBuildingData)
 
 void AVoxelChunk::DestroyBuildings()
 {
-	for (auto& Iter : BuildingDatas)
+	for(auto& Iter : BuildingDatas)
 	{
 		DestroyBuilding(Iter);
 	}
@@ -1130,42 +1119,54 @@ void AVoxelChunk::DestroyAuxiliary(FVoxelItem& InVoxelItem)
 	}
 }
 
-void AVoxelChunk::SpawnMeshComponents()
+void AVoxelChunk::SpawnMeshComponents(int32 InStage)
 {
-	TMap<EVoxelNature, UVoxelMeshComponent*> SpawnMeshComponents;
-	TMap<EVoxelNature, UVoxelMeshComponent*> DestroyMeshComponents = MeshComponents;
-	ITER_MAP(TMap(VoxelMap), Iter,
-		const FVoxelItem& VoxelItem = Iter.Value;
-		if(VoxelItem.IsValid())
-		{
-			UVoxelData& VoxelData = VoxelItem.GetVoxelData();
-			if(!SpawnMeshComponents.Contains(VoxelData.Nature))
+	if(InStage & 1)
+	{
+		TArray<EVoxelNature> _MeshVoxelNatures;
+		ITER_MAP(TMap(VoxelMap), Iter,
+			const FVoxelItem& VoxelItem = Iter.Value;
+			if(VoxelItem.IsValid())
 			{
-				UVoxelMeshComponent* MeshComponent = nullptr;
-				if(MeshComponents.Contains(VoxelData.Nature))
+				const UVoxelData& VoxelData = VoxelItem.GetVoxelData();
+				if(!_MeshVoxelNatures.Contains(VoxelData.Nature))
 				{
-					MeshComponent = MeshComponents[VoxelData.Nature];
+					_MeshVoxelNatures.Add(VoxelData.Nature);
 				}
-				else
-				{
-					MeshComponent = UObjectPoolModuleStatics::SpawnObject<UVoxelMeshComponent>(this);
-					MeshComponent->Register(this);
-					MeshComponent->AttachToComponent(RootComponent, FAttachmentTransformRules::SnapToTargetIncludingScale);
-					MeshComponent->Initialize(EVoxelScope::Chunk, VoxelData.Nature);
-				}
-				SpawnMeshComponents.Add(VoxelData.Nature, MeshComponent);
 			}
-			if(DestroyMeshComponents.Contains(VoxelData.Nature))
+		)
+		MeshVoxelNatures = _MeshVoxelNatures;
+	}
+	if(InStage & 2)
+	{
+		TArray<EVoxelNature> _MeshVoxelNatures;
+		MeshComponents.GenerateKeyArray(_MeshVoxelNatures);
+		TMap<EVoxelNature, UVoxelMeshComponent*> _MeshComponents;
+		for(auto& Iter : MeshVoxelNatures)
+		{
+			UVoxelMeshComponent* MeshComponent = nullptr;
+			if(MeshComponents.Contains(Iter))
 			{
-				DestroyMeshComponents.Remove(VoxelData.Nature);
+				MeshComponent = MeshComponents[Iter];
+			}
+			else
+			{
+				MeshComponent = UObjectPoolModuleStatics::SpawnObject<UVoxelMeshComponent>(this);
+				MeshComponent->Initialize(EVoxelScope::Chunk, Iter);
+			}
+			_MeshComponents.Add(Iter, MeshComponent);
+			if(_MeshVoxelNatures.Contains(Iter))
+			{
+				_MeshVoxelNatures.Remove(Iter);
 			}
 		}
-	);
-	for(auto& Iter : DestroyMeshComponents)
-	{
-		UObjectPoolModuleStatics::DespawnObject(Iter.Value);
+		MeshVoxelNatures.Empty();
+		for(auto& Iter : _MeshVoxelNatures)
+		{
+			UObjectPoolModuleStatics::DespawnObject(MeshComponents[Iter]);
+		}
+		MeshComponents = _MeshComponents;
 	}
-	MeshComponents = SpawnMeshComponents;
 }
 
 void AVoxelChunk::DestroyMeshComponents()

@@ -26,13 +26,9 @@ void UVoxelTerrainGenerator::Generate(AVoxelChunk* InChunk)
 				Module->SetVoxelByIndex(_Index, VoxelType);
 			}
 		}
-		else
+		else if(!Module->GetVoxelByIndex(_Index).IsValid())
 		{
-			const FVoxelItem VoxelItem = Module->GetVoxelByIndex(_Index);
-			if(!VoxelItem.IsValid())
-			{
-				Module->SetVoxelByIndex(_Index, FVoxelItem::Empty, true);
-			}
+			Module->SetVoxelByIndex(_Index, FVoxelItem::Empty, true);
 		}
 	)
 }

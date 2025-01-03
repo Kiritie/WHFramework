@@ -7,6 +7,7 @@
 #include "Components/ArrowComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Main/MainModule.h"
+#include "Math/MathTypes.h"
 #include "Net/UnrealNetwork.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Scene/Container/SceneContainerInterface.h"
@@ -67,7 +68,7 @@ void AAbilitySpawnerBase::OnDespawn_Implementation(bool bRecovery)
 {
 	Execute_SetActorVisible(this, false);
 
-	SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
+	SetActorLocationAndRotation(UNDER_Vector, FRotator::ZeroRotator);
 	
 	USceneModuleStatics::RemoveSceneActor(this);
 	if(Container)

@@ -33,13 +33,18 @@ UVoxelMeshComponent::UVoxelMeshComponent(const FObjectInitializer& ObjectInitial
 
 void UVoxelMeshComponent::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	
+	if(AActor* InActor = Cast<AActor>(InOwner))
+	{
+		Register(InActor);
+		AttachToComponent(InActor->GetRootComponent(), FAttachmentTransformRules::SnapToTargetIncludingScale);
+	}
 }
 
 void UVoxelMeshComponent::OnDespawn_Implementation(bool bRecovery)
 {
 	ClearMesh();
 	UnRegister();
+	DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
 }
 
 void UVoxelMeshComponent::Initialize(EVoxelScope InScope, EVoxelNature InNature)
@@ -97,7 +102,6 @@ void UVoxelMeshComponent::Register(UObject* InOuter)
 
 void UVoxelMeshComponent::UnRegister()
 {
-	DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
 	UnregisterComponent();
 }
 

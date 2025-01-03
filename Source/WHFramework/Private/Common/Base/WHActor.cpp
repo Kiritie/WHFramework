@@ -2,6 +2,7 @@
 
 #include "Common/Base/WHActor.h"
 
+#include "Math/MathTypes.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Scene/Container/SceneContainerInterface.h"
 
@@ -44,7 +45,7 @@ void AWHActor::OnDespawn_Implementation(bool bRecovery)
 {
 	Execute_SetActorVisible(this, false);
 
-	SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
+	SetActorLocationAndRotation(UNDER_Vector, FRotator::ZeroRotator);
 	
 	USceneModuleStatics::RemoveSceneActor(this);
 	if(Container)

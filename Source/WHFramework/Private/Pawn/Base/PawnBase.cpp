@@ -76,7 +76,7 @@ void APawnBase::OnDespawn_Implementation(bool bRecovery)
 {
 	Execute_SetActorVisible(this, false);
 
-	SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
+	SetActorLocationAndRotation(UNDER_Vector, FRotator::ZeroRotator);
 
 	USceneModuleStatics::RemoveSceneActor(this);
 	if(Container)

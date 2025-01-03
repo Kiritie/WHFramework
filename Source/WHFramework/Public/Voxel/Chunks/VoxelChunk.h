@@ -194,8 +194,10 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TMap<EVoxelNature, UVoxelMeshComponent*> MeshComponents;
 
+	TArray<EVoxelNature> MeshVoxelNatures;
+
 public:
-	void SpawnMeshComponents();
+	void SpawnMeshComponents(int32 InStage = 1 | 2);
 
 	void DestroyMeshComponents();
 

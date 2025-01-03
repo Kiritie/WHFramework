@@ -7,6 +7,7 @@
 
 #define DEG_2_RAD (0.01745329f)
 
+#define UNDER_Vector FVector(0.f, 0.f, -1000000.f)
 #define EMPTY_Vector FVector(MAX_flt)
 #define EMPTY_Rotator FRotator(MAX_flt)
 #define EMPTY_Index FIndex(MAX_int32)
@@ -166,8 +167,8 @@ public:
 
 	FORCEINLINE float DistanceTo(const FIndex& Index, bool bIgnoreZ = false, bool bFromCenter = false) const
 	{
-		const FVector VectorA = ToVector() + (bFromCenter ? FVector::OneVector * 0.5f : FVector::ZeroVector);
-		const FVector VectorB = Index.ToVector() + (bFromCenter ? FVector::OneVector * 0.5f : FVector::ZeroVector);
+		const FVector VectorA = ToVector() + (bFromCenter ? FVector(0.5f) : FVector::ZeroVector);
+		const FVector VectorB = Index.ToVector() + (bFromCenter ? FVector(0.5f) : FVector::ZeroVector);
 		return FVector::Distance(FVector(VectorA.X, VectorA.Y, bIgnoreZ ? 0.f : VectorA.Z), FVector(VectorB.X, VectorB.Y, bIgnoreZ ? 0.f : VectorB.Z));
 	}
 

@@ -138,7 +138,7 @@ public:
 
 	virtual void BuildChunkMap(FIndex InIndex, int32 InStage);
 
-	virtual void SpawnChunkMesh(FIndex InIndex);
+	virtual void SpawnChunkMesh(FIndex InIndex, int32 InStage);
 
 	virtual void BuildChunkMesh(FIndex InIndex);
 	
@@ -148,6 +148,8 @@ public:
 	virtual void DestroyChunkQueues();
 
 protected:
+	virtual bool UpdateChunkQueue(EVoxelWorldState InState, TFunction<void(FIndex)> InFunc);
+	
 	virtual bool UpdateChunkQueue(EVoxelWorldState InState, TFunction<void(FIndex, int32)> InFunc);
 
 	virtual void AddToChunkQueue(EVoxelWorldState InState, FIndex InIndex);
@@ -267,6 +269,8 @@ public:
 	bool IsChunkGenerated(FIndex InIndex, bool bCheckVerticals = false) const;
 	
 	TArray<AVoxelChunk*> GetVerticalChunks(FIndex InIndex) const;
+	
+	FVoxelChunkQueues GetChunkQueues(EVoxelWorldState InWorldState) const;
 
 	template<class T>
 	T* GetVoxelGenerator() const

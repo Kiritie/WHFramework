@@ -888,9 +888,6 @@ public:
 	UPROPERTY(EditAnywhere)
 	int32 Speed;
 
-	UPROPERTY(EditAnywhere)
-	bool bFloor;
-
 	UPROPERTY(VisibleAnywhere)
 	TArray<FIndex> Queue;
 		
@@ -900,16 +897,14 @@ public:
 	{
 		bAsync = false;
 		Speed = 100;
-		bFloor = false;
 		Queue = TArray<FIndex>();
 		Threads = TArray<FVoxelChunkQueueThread*>();
 	}
 
-	FORCEINLINE FVoxelChunkQueue(bool bInAsync, int32 InSpeed, bool bInFloor = false)
+	FORCEINLINE FVoxelChunkQueue(bool bInAsync, int32 InSpeed)
 	{
 		bAsync = bInAsync;
 		Speed = InSpeed;
-		bFloor = bInFloor;
 		Queue = TArray<FIndex>();
 		Threads = TArray<FVoxelChunkQueueThread*>();
 	}

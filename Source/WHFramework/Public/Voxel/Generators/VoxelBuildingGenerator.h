@@ -38,6 +38,10 @@ public:
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Seed;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float SpawnRate;
+	
 	//发展域
 	TSet<uint64> Domains;
 	//已存在道路
