@@ -18,19 +18,15 @@ public:
 	UWidgetInputSettingPageBase(const FObjectInitializer& ObjectInitializer);
 	
 public:
-	virtual void OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams) override;
-
-	virtual void OnCreate(UObject* InOwner, const TArray<FParameter>& InParams) override;
-
-	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant) override;
-
-	virtual void OnApply() override;
+	virtual void OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams) override;
 
 	virtual void OnReset(bool bForce) override;
 
-	virtual void OnValuesChange(UWidgetSettingItemBase* InSettingItem, const TArray<FParameter>& InValues) override;
+	virtual void OnApply() override;
 
-	virtual void OnClose(bool bInstant) override;
+	virtual void NativeOnActivated() override;
+
+	virtual void NativeOnDeactivated() override;
 
 public:
 	virtual bool CanApply_Implementation() const override;

@@ -13,17 +13,29 @@
 
 UEnhancedInputLocalPlayerSubsystem* UInputModuleStatics::GetInputSubsystem(int32 InPlayerIndex)
 {
-	return UCommonStatics::GetLocalPlayer(InPlayerIndex)->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
+	if(UWHLocalPlayer* LocalPlayer = UCommonStatics::GetLocalPlayer(InPlayerIndex))
+	{
+		return LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
+	}
+	return nullptr;
 }
 
 UInputUserSettingsBase* UInputModuleStatics::GetInputUserSettings(int32 InPlayerIndex, TSubclassOf<UWHLocalPlayer> InClass)
 {
-	return GetDeterminesOutputObject(GetInputSubsystem(InPlayerIndex)->GetUserSettings<UInputUserSettingsBase>(), InClass);
+	if(UEnhancedInputLocalPlayerSubsystem* InputSubsystem = GetInputSubsystem(InPlayerIndex))
+	{
+		return GetDeterminesOutputObject(InputSubsystem->GetUserSettings<UInputUserSettingsBase>(), InClass);
+	}
+	return nullptr;
 }
 
 UInputComponentBase* UInputModuleStatics::GetInputComponent(int32 InPlayerIndex, TSubclassOf<UInputComponentBase> InClass)
 {
-	return GetDeterminesOutputObject(Cast<UInputComponentBase>(UCommonStatics::GetLocalPlayerController(InPlayerIndex)->InputComponent), InClass);
+	if(AWHPlayerController* PlayerController = UCommonStatics::GetLocalPlayerController(InPlayerIndex))
+	{
+		return GetDeterminesOutputObject(Cast<UInputComponentBase>(PlayerController->InputComponent), InClass);
+	}
+	return nullptr;
 }
 
 UInputManagerBase* UInputModuleStatics::GetInputManager(TSubclassOf<UInputManagerBase> InClass)

@@ -11,5 +11,9 @@ UObject* GWorldContext = nullptr;
 uint32 FUniqueType::NextUniqueID = 0;
 
 //////////////////////////////////////////////////////////////////////////
+// FUniqueStruct
+const FUniqueType FUniqueStruct::Type = FUniqueType();
+
+//////////////////////////////////////////////////////////////////////////
 // FUniqueClass
 const FUniqueType FUniqueClass::Type = FUniqueType();

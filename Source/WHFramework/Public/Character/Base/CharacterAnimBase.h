@@ -3,8 +3,10 @@
 #pragma once
 
 #include "Animation/AnimInstance.h"
+#include "Common/CommonTypes.h"
 #include "CharacterAnimBase.generated.h"
 
+class ACharacterBase;
 /**
  * 
  */
@@ -73,4 +75,13 @@ public:
 	float GetHorizontalSpeed() const { return HorizontalSpeed; }
 
 	void SetHorizontalSpeed(float InHorizontalSpeed) { this->HorizontalSpeed = InHorizontalSpeed; }
+	
+	template<class T>
+	T* GetOwnerCharacter() const
+	{
+		return Cast<T>(GetOwnerCharacter());
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	virtual ACharacterBase* GetOwnerCharacter(TSubclassOf<ACharacterBase> InClass = nullptr) const;
 };

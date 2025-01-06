@@ -114,7 +114,7 @@ UWebInterfaceBase* UWebRequestModule::CreateWebInterface(const FName InName, TSu
 {
 	if(!HasWebInterface(InName))
 	{
-		return CreateWebInterface(UObjectPoolModuleStatics::SpawnObject<UWebInterfaceBase>(nullptr, nullptr, false, InClass));
+		return CreateWebInterface(UObjectPoolModuleStatics::SpawnObject<UWebInterfaceBase>(nullptr, nullptr, InClass));
 	}
 	return nullptr;
 }

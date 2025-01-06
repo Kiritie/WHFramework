@@ -12,7 +12,8 @@
 #include "Widget/WidgetModuleStatics.h"
 
 // Sets default values for this component's properties
-UTargetingComponent::UTargetingComponent()
+UTargetingComponent::UTargetingComponent(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
 {
 	PrimaryComponentTick.bCanEverTick = true;
 
@@ -337,9 +338,9 @@ void UTargetingComponent::TargetLockOn(AActor* TargetToLockOn)
 		}
 	}
 
-	if (OnTargetLockedOn.IsBound())
+	if (OnTargetLockOn.IsBound())
 	{
-		OnTargetLockedOn.Broadcast(TargetToLockOn);
+		OnTargetLockOn.Broadcast(TargetToLockOn);
 	}
 }
 
@@ -367,9 +368,9 @@ void UTargetingComponent::TargetLockOff()
 			OwnerPlayerController->ResetIgnoreLookInput();
 		}
 
-		if (OnTargetLockedOff.IsBound())
+		if (OnTargetLockOff.IsBound())
 		{
-			OnTargetLockedOff.Broadcast(LockedOnTargetActor);
+			OnTargetLockOff.Broadcast(LockedOnTargetActor);
 		}
 	}
 
@@ -514,7 +515,7 @@ FRotator UTargetingComponent::GetControlRotationOnTarget(const AActor* OtherActo
 
 	const FRotator ControlRotation = OwnerPlayerController->GetControlRotation();
 
-	const FVector CharacterLocation = OwnerActor->GetActorLocation();
+	const FVector CharacterLocation = OwnerActor->GetActorLocation() + OwnerActor->GetActorRotation().RotateVector(LocationOffset);
 	const FVector OtherActorLocation = OtherActor->GetActorLocation();
 
 	// Find look at rotation
@@ -542,7 +543,7 @@ FRotator UTargetingComponent::GetControlRotationOnTarget(const AActor* OtherActo
 		}
 	}
 
-	return FMath::RInterpTo(ControlRotation, TargetRotation, GetWorld()->GetDeltaSeconds(), 9.0f);
+	return RotatingSmoothnessSpeed > 0.f ? FMath::RInterpTo(ControlRotation, TargetRotation, GetWorld()->GetDeltaSeconds(), RotatingSmoothnessSpeed) : TargetRotation;
 }
 
 void UTargetingComponent::SetControlRotationOnTarget(AActor* TargetActor) const

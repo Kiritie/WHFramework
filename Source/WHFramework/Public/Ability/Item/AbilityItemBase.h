@@ -5,11 +5,7 @@
 #include "Ability/AbilityModuleTypes.h"
 #include "Asset/Primary/PrimaryEntityInterface.h"
 #include "Common/Base/WHActor.h"
-#include "GameFramework/Actor.h"
 #include "AbilityItemBase.generated.h"
-
-class UAbilityBase;
-class AAbilityCharacterBase;
 
 /**
  * 物品基类
@@ -23,23 +19,28 @@ public:
 	// Sets default values for this actor's properties
 	AAbilityItemBase();
 
+	//////////////////////////////////////////////////////////////////////////
+	/// ObjectPool
+public:
+	virtual int32 GetLimit_Implementation() const override { return -1; }
+
+	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
+		
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
+
+public:
+	UFUNCTION(BlueprintNativeEvent, Blueprintable)
+	bool Active();
+	
+	UFUNCTION(BlueprintNativeEvent, Blueprintable)
+	void Deactive();
+
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	FAbilityItem Item;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	AActor* OwnerActor;
-
-protected:
-	virtual int32 GetLimit_Implementation() const override { return 1000; }
-
-	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
-
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
-
-public:
-	UFUNCTION(BlueprintNativeEvent)
-	void Initialize(AActor* InOwnerActor, const FAbilityItem& InItem = FAbilityItem::Empty);
 
 public:
 	virtual FPrimaryAssetId GetAssetID_Implementation() const override { return Item.ID; }

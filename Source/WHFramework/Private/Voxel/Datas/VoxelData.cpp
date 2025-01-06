@@ -1,29 +1,47 @@
 #include "Voxel/Datas/VoxelData.h"
 
 #include "Ability/AbilityModuleStatics.h"
+#include "Ability/PickUp/AbilityPickUpVoxel.h"
+#include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Voxels/Voxel.h"
 
 UVoxelData::UVoxelData()
 {
 	Type = FName("Voxel");
 	MaxCount = 64;
+	MaxLevel = 0;
+	PickUpClass = AAbilityPickUpVoxel::StaticClass();
 	VoxelType = EVoxelType::Empty;
 	VoxelClass = UVoxel::StaticClass();
 	AuxiliaryClass = nullptr;
-	Transparency = EVoxelTransparency::Solid;
+	Nature = EVoxelNature::None;
 	bMainPart = true;
 	PartDatas = TMap<FIndex, UVoxelData*>();
 	PartIndex = FIndex::ZeroIndex;
 	MainData = nullptr;
+	GatherData = nullptr;
 	MeshDatas.SetNum(1);
 	Sounds = TMap<EVoxelSoundType, USoundBase*>();
 }
 
-void UVoxelData::ResetData_Implementation()
+bool UVoxelData::IsEmpty() const
 {
-	Super::ResetData_Implementation();
+	return VoxelType == EVoxelType::Empty;
+}
 
-	Icon = nullptr;
+bool UVoxelData::IsUnknown() const
+{
+	return VoxelType == EVoxelType::Unknown;
+}
+
+bool UVoxelData::IsMainPart() const
+{
+	return bMainPart;
+}
+
+bool UVoxelData::IsCustom() const
+{
+	return VoxelType >= EVoxelType::Custom1;
 }
 
 bool UVoxelData::HasPartData(FIndex InIndex) const
@@ -43,6 +61,11 @@ UVoxelData& UVoxelData::GetPartData(FIndex InIndex)
 	if(MainData) return MainData->GetPartData(InIndex);
 	if(PartDatas.Contains(InIndex)) return *PartDatas[InIndex];
 	return UReferencePoolModuleStatics::GetReference<UVoxelData>();
+}
+
+EVoxelTransparency UVoxelData::GetTransparency() const
+{
+	return UVoxelModuleStatics::VoxelNatureToTransparency(Nature);
 }
 
 FVector UVoxelData::GetRange(ERightAngle InAngle) const
@@ -67,7 +90,7 @@ USoundBase* UVoxelData::GetSound(EVoxelSoundType InSoundType) const
 {
 	if(Sounds.Contains(InSoundType))
 	{
-		Sounds[InSoundType];
+		return Sounds[InSoundType];
 	}
 	return nullptr;
 }
@@ -75,19 +98,4 @@ USoundBase* UVoxelData::GetSound(EVoxelSoundType InSoundType) const
 const FVoxelMeshData& UVoxelData::GetMeshData(const FVoxelItem& InVoxelItem) const
 {
 	return MeshDatas[0];
-}
-
-bool UVoxelData::IsEmpty() const
-{
-	return VoxelType == EVoxelType::Empty;
-}
-
-bool UVoxelData::IsUnknown() const
-{
-	return VoxelType == EVoxelType::Unknown;
-}
-
-bool UVoxelData::IsCustom() const
-{
-	return VoxelType >= EVoxelType::Custom1;
 }

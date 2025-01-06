@@ -23,6 +23,8 @@ public:
 
 	virtual void Parse_Implementation(const TArray<FParameter>& InParams) override;
 
+	virtual TArray<FParameter> Pack_Implementation() override;
+
 public:
 	UPROPERTY(BlueprintReadOnly)
 	class UTaskBase* Task;

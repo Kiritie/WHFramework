@@ -15,8 +15,12 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FInputPressWithTagsDelegate, float, 
 UCLASS()
 class WHFRAMEWORK_API UAbilityTask_WaitInputPressWithTags : public UAbilityTask
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
 	
+public:
+	UAbilityTask_WaitInputPressWithTags(const FObjectInitializer& ObjectInitializer);
+
+public:
 	UPROPERTY(BlueprintAssignable)
 	FInputPressWithTagsDelegate OnPress;
 

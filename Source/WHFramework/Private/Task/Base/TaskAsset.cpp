@@ -13,13 +13,11 @@ UTaskAsset::UTaskAsset(const FObjectInitializer& ObjectInitializer)
 
 	RootTasks = TArray<UTaskBase*>();
 	TaskMap = TMap<FString, UTaskBase*>();
-
-	FirstTask = nullptr;
 }
 
-void UTaskAsset::Initialize(UAssetBase* InSource)
+void UTaskAsset::Initialize()
 {
-	Super::Initialize(InSource);
+	Super::Initialize();
 
 	for(const auto Iter : RootTasks)
 	{
@@ -27,17 +25,36 @@ void UTaskAsset::Initialize(UAssetBase* InSource)
 
 		RecursiveArrayItems<UTaskBase>(Iter, [this](const UTaskBase* Task)
 		{
-			TaskMap.Add(Task->TaskGUID, const_cast<UTaskBase*>(Task));
+			TaskMap.Emplace(Task->TaskGUID, const_cast<UTaskBase*>(Task));
 			return Task->SubTasks;
 		});
 
 		Iter->OnInitialize();
+	}
+}
 
-		if(!FirstTask)
+bool UTaskAsset::IsAllTaskCompleted() const
+{
+	for (auto Iter : RootTasks)
+	{
+		if(Iter && !Iter->IsCompleted(true))
 		{
-			FirstTask = Iter;
+			return false;
 		}
 	}
+	return true;
+}
+
+bool UTaskAsset::IsAllTaskLeaved() const
+{
+	for (auto Iter : RootTasks)
+	{
+		if(Iter && !Iter->IsLeaved(true))
+		{
+			return false;
+		}
+	}
+	return true;
 }
 
 #if WITH_EDITOR

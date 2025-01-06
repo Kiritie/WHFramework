@@ -13,8 +13,12 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FWaitDelayOneFrameDelegate);
 UCLASS()
 class WHFRAMEWORK_API UAbilityTask_WaitDelayOneFrame : public UAbilityTask
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
 
+public:
+	UAbilityTask_WaitDelayOneFrame(const FObjectInitializer& ObjectInitializer);
+
+public:
 	UPROPERTY(BlueprintAssignable)
 	FWaitDelayOneFrameDelegate OnFinish;
 

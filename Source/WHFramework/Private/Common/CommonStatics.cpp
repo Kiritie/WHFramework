@@ -17,7 +17,6 @@
 #include "Event/Handle/Common/Game/EventHandle_GamePaused.h"
 #include "Event/Handle/Common/Game/EventHandle_GameUnPaused.h"
 #include "Gameplay/WHLocalPlayer.h"
-#include "Internationalization/Regex.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetStringLibrary.h"
 #include "Main/MainModule.h"
@@ -144,7 +143,7 @@ int32 UCommonStatics::GetEnumItemNum(const FString& InEnumName)
 	return 0;
 }
 
-FString UCommonStatics::GetEnumValueAuthoredName(const FString& InEnumName, int32 InEnumValue)
+FString UCommonStatics::GetEnumAuthoredNameByValue(const FString& InEnumName, int32 InEnumValue)
 {
 	if(const UEnum* Enum = UAssetModuleStatics::FindEnumByValue(InEnumName, InEnumValue, true))
 	{
@@ -153,7 +152,7 @@ FString UCommonStatics::GetEnumValueAuthoredName(const FString& InEnumName, int3
 	return TEXT("");
 }
 
-FText UCommonStatics::GetEnumValueDisplayName(const FString& InEnumName, int32 InEnumValue)
+FText UCommonStatics::GetEnumDisplayNameByValue(const FString& InEnumName, int32 InEnumValue)
 {
 	if(const UEnum* Enum = UAssetModuleStatics::FindEnumByValue(InEnumName, InEnumValue, true))
 	{
@@ -167,6 +166,11 @@ FText UCommonStatics::GetEnumValueDisplayName(const FString& InEnumName, int32 I
 	return FText::GetEmpty();
 }
 
+FText UCommonStatics::GetEnumDisplayNameByAuthoredName(const FString& InEnumName, const FString& InEnumAuthoredName)
+{
+	return GetEnumDisplayNameByValue(InEnumName, GetEnumValueByAuthoredName(InEnumName, InEnumAuthoredName));
+}
+
 int32 UCommonStatics::GetEnumValueByAuthoredName(const FString& InEnumName, const FString& InEnumAuthoredName)
 {
 	if(const UEnum* Enum = UAssetModuleStatics::FindEnumByAuthoredName(InEnumName, InEnumAuthoredName))
@@ -174,6 +178,16 @@ int32 UCommonStatics::GetEnumValueByAuthoredName(const FString& InEnumName, cons
 		return Enum->GetValueByNameString(InEnumAuthoredName);
 	}
 	return -1;
+}
+
+FText UCommonStatics::GetPropertyDisplayName(const FProperty* InProperty)
+{
+	FText PropertyName;
+	if(!FText::FindText(TEXT("UObjectDisplayNames"), FString::Printf(TEXT("%s:%s"), *InProperty->GetOwnerStruct()->GetName(), *InProperty->GetName()), PropertyName))
+	{
+		PropertyName = FText::FromString(InProperty->GetName());
+	}
+	return PropertyName;
 }
 
 void UCommonStatics::SaveObjectDataToMemory(UObject* InObject, TArray<uint8>& OutObjectData)
@@ -199,6 +213,11 @@ FString UCommonStatics::BoolToString(bool InBool)
 bool UCommonStatics::StringToBool(const FString& InString)
 {
 	return FCoreStatics::StringToBool(InString);
+}
+
+FString UCommonStatics::SanitizeFloat(double InFloat, int32 InMaxDigits)
+{
+	return FCoreStatics::SanitizeFloat(InFloat, InMaxDigits);
 }
 
 TArray<FString> UCommonStatics::NotNumberSymbols = TArray<FString>{ TEXT("."), TEXT(","), TEXT(" ") };
@@ -247,6 +266,11 @@ FText UCommonStatics::NumberToText(int32 InNumber, const TMap<int32, FString>& I
 		}
 	}
 	return FText::FromString(TextStr);
+}
+
+FName UCommonStatics::TextToName(const FText& InText)
+{
+	return *InText.ToString();
 }
 
 FGameplayTag UCommonStatics::NameToTag(const FName InName)
@@ -304,10 +328,16 @@ FString UCommonStatics::MakeLiteralStringTag(const FGameplayTag& InTag)
 	return InTag.GetTagName().ToString();
 }
 
-bool UCommonStatics::ParseJsonObjectFromString(const FString& InJsonString, TSharedPtr<FJsonObject>& OutJsonObject)
+bool UCommonStatics::StringToJsonObject(const FString& InJsonString, TSharedPtr<FJsonObject>& OutJsonObject)
 {
 	const TSharedRef<TJsonReader<>> JsonReader = TJsonReaderFactory<>::Create(InJsonString);
     return FJsonSerializer::Deserialize(JsonReader, OutJsonObject);
+}
+
+bool UCommonStatics::JsonObjectToString(const TSharedPtr<FJsonObject>& InJsonObject, FString& OutJsonString)
+{
+	TSharedRef<TJsonWriter<>> JsonWriter = TJsonWriterFactory<>::Create(&OutJsonString);
+	return FJsonSerializer::Serialize(InJsonObject.ToSharedRef(), JsonWriter);
 }
 
 bool UCommonStatics::HasMouseCapture()
@@ -409,6 +439,27 @@ TArray<AActor*> UCommonStatics::GetAllActorsOfDataLayer(UDataLayerAsset* InDataL
 			{
 				AActor* Actor = *It;
 				if (Actor->ContainsDataLayer(InDataLayer))
+				{
+					ReturnValues.Add(Actor);
+				}
+			}
+		}
+	}
+	return ReturnValues;
+}
+
+TArray<AActor*> UCommonStatics::GetAllActorsOfLevel(const FName InLevelName)
+{
+	TArray<AActor*> ReturnValues;
+	if(!InLevelName.IsNone())
+	{
+		if (UWorld* World = GEngine->GetWorldFromContextObject(GetWorldContext(), EGetWorldErrorMode::LogAndReturnNull))
+		{
+			for (TActorIterator<AActor> It(World); It; ++It)
+			{
+				AActor* Actor = *It;
+				FString LevelName = Actor->GetPackage()->GetName().Replace(TEXT("UEDPIE_0_"), TEXT(""));
+				if (LevelName == InLevelName) 
 				{
 					ReturnValues.Add(Actor);
 				}
@@ -523,7 +574,7 @@ TArray<UWHLocalPlayer*> UCommonStatics::GetLocalPlayers()
 UWHLocalPlayer* UCommonStatics::GetLocalPlayer(int32 InPlayerIndex, TSubclassOf<UWHLocalPlayer> InClass)
 {
 	TArray<UWHLocalPlayer*> LocalPlayers = GetLocalPlayers();
-	if(ensureEditorMsgf(LocalPlayers.IsValidIndex(InPlayerIndex), TEXT("WHLocalPlayer with no valid index"), EDC_Default, EDV_Error))
+	if(LocalPlayers.IsValidIndex(InPlayerIndex))
 	{
 		return GetDeterminesOutputObject(LocalPlayers[InPlayerIndex], InClass);
 	}

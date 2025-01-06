@@ -2,7 +2,6 @@
 
 #include "Step/Base/StepAsset.h"
 #include "AssetRegistry/AssetData.h"
-#include "Common/CommonTypes.h"
 #include "Step/Base/StepBase.h"
 
 UStepAsset::UStepAsset(const FObjectInitializer& ObjectInitializer)
@@ -12,15 +11,16 @@ UStepAsset::UStepAsset(const FObjectInitializer& ObjectInitializer)
 	
 	NativeClass = GetClass();
 
+	bAutoStartFirst = false;
+	FirstStep = nullptr;
+
 	RootSteps = TArray<UStepBase*>();
 	StepMap = TMap<FString, UStepBase*>();
-
-	FirstStep = nullptr;
 }
 
-void UStepAsset::Initialize(UAssetBase* InSource)
+void UStepAsset::Initialize()
 {
-	Super::Initialize(InSource);
+	Super::Initialize();
 
 	for(const auto Iter : RootSteps)
 	{

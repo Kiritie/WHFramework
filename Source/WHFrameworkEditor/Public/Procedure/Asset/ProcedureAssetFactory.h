@@ -10,5 +10,8 @@
 UCLASS(hidecategories=Object, MinimalAPI)
 class UProcedureAssetFactory : public UAssetFactoryBase
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UProcedureAssetFactory(const FObjectInitializer& ObjectInitializer);
 };

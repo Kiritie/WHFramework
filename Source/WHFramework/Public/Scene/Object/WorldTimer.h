@@ -3,7 +3,8 @@
 #pragma once
 
 #include "Common/Base/WHObject.h"
-#include "SaveGame/Base/SaveDataInterface.h"
+#include "SaveGame/Base/SaveDataAgentInterface.h"
+#include "Scene/SceneModuleTypes.h"
 #include "WorldTimer.generated.h"
 
 class ASkyLight;
@@ -13,7 +14,7 @@ class ADirectionalLight;
  * ʱ��������
  */
 UCLASS(Abstract, Blueprintable, BlueprintType, EditInlineNew)
-class WHFRAMEWORK_API UWorldTimer : public UWHObject, public ISaveDataInterface
+class WHFRAMEWORK_API UWorldTimer : public UWHObject, public ISaveDataAgentInterface
 {
 	GENERATED_BODY()
 
@@ -49,6 +50,9 @@ protected:
 	virtual FSaveData* ToData() override;
 
 public:
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	void ResetTimerParams() const;
+
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 	void ResetDateTime(float InNewTime = -1.f) const;
 
@@ -90,6 +94,9 @@ public:
 
 	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)
 	float GetSunsetTime() const;
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)
+	EWorldTimePhase GetTimePhase() const;
 
 protected:
 	UPROPERTY(EditAnywhere)

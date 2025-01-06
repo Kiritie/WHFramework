@@ -7,6 +7,7 @@
 #include "Components/ArrowComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Main/MainModule.h"
+#include "Math/MathTypes.h"
 #include "Net/UnrealNetwork.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Scene/Container/SceneContainerInterface.h"
@@ -23,16 +24,17 @@ AAbilitySpawnerBase::AAbilitySpawnerBase()
 	GetCapsuleComponent()->SetShouldUpdatePhysicsVolume(false);
 
 #if WITH_EDITORONLY_DATA
-	ArrowComponent = CreateEditorOnlyDefaultSubobject<UArrowComponent>(TEXT("Arrow"));
+	ArrowComponent = CreateEditorOnlyDefaultSubobject<UArrowComponent>(FName("Arrow"));
 	ArrowComponent->SetupAttachment(GetCapsuleComponent());
 	ArrowComponent->ArrowColor = FColor(150, 200, 255);
 	ArrowComponent->ArrowSize = 1.0f;
 	ArrowComponent->bTreatAsASprite = true;
 	ArrowComponent->bIsScreenSizeScaled = true;
 
-	WidgetComponent = CreateDefaultSubobject<UWorldWidgetComponent>(TEXT("Widget"));
+	WidgetComponent = CreateDefaultSubobject<UWorldWidgetComponent>(FName("Widget"));
 	WidgetComponent->SetupAttachment(GetCapsuleComponent());
 	WidgetComponent->SetRelativeLocation(FVector(0.f, 0.f, 50.f));
+	WidgetComponent->SetOrientCamera(true);
 	
 	static ConstructorHelpers::FClassFinder<UWidgetAbilitySpawnerInfo> SpawnerInfoClassFinder(TEXT("/Script/UMGEditor.WidgetBlueprint'/WHFramework/Ability/Blueprints/Widget/WBP_SpawnerInfo_Base.WBP_SpawnerInfo_Base_C'"));
 	if(SpawnerInfoClassFinder.Succeeded())
@@ -41,19 +43,56 @@ AAbilitySpawnerBase::AAbilitySpawnerBase()
 	}
 #endif
 
+	bInitialized = false;
+
 	ActorID = FGuid::NewGuid();
 	bVisible = true;
+	Container = nullptr;
+
+	bAutoSpawn = false;
+}
+
+void AAbilitySpawnerBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+{
+	USceneModuleStatics::RemoveSceneActor(this);
+	
+	if(InParams.IsValidIndex(0))
+	{
+		ActorID = InParams[0];
+	}
+	
+	USceneModuleStatics::AddSceneActor(this);
+}
+
+void AAbilitySpawnerBase::OnDespawn_Implementation(bool bRecovery)
+{
+	Execute_SetActorVisible(this, false);
+
+	SetActorLocationAndRotation(UNDER_Vector, FRotator::ZeroRotator);
+	
+	USceneModuleStatics::RemoveSceneActor(this);
+	if(Container)
+	{
+		Container->RemoveSceneActor(this);
+	}
+
 	Container = nullptr;
 }
 
 void AAbilitySpawnerBase::OnInitialize_Implementation()
 {
+	bInitialized = true;
+	
 	Execute_SetActorVisible(this, bVisible);
+
+	USceneModuleStatics::AddSceneActor(this);
 }
 
 void AAbilitySpawnerBase::OnPreparatory_Implementation(EPhase InPhase)
 {
+#if WITH_EDITORONLY_DATA
 	WidgetComponent->SetVisibility(false);
+#endif
 
 	if(bAutoSpawn)
 	{
@@ -68,10 +107,9 @@ void AAbilitySpawnerBase::OnRefresh_Implementation(float DeltaSeconds)
 
 void AAbilitySpawnerBase::OnTermination_Implementation(EPhase InPhase)
 {
-	if(bAutoDestroy)
-	{
-		Destroy();
-	}
+	USceneModuleStatics::RemoveSceneActor(this);
+
+	Destroy();
 }
 
 void AAbilitySpawnerBase::OnConstruction(const FTransform& Transform)
@@ -84,26 +122,6 @@ void AAbilitySpawnerBase::OnConstruction(const FTransform& Transform)
 		SpawnerInfo->InitAbilityItem(AbilityItem);
 	}
 #endif
-}
-
-void AAbilitySpawnerBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
-{
-	USceneModuleStatics::AddSceneActor(this);
-}
-
-void AAbilitySpawnerBase::OnDespawn_Implementation(bool bRecovery)
-{
-	Execute_SetActorVisible(this, false);
-
-	SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
-	
-	USceneModuleStatics::RemoveSceneActor(this);
-	if(Container)
-	{
-		Container->RemoveSceneActor(this);
-	}
-
-	Container = nullptr;
 }
 
 void AAbilitySpawnerBase::SetActorVisible_Implementation(bool bInVisible)
@@ -122,9 +140,12 @@ void AAbilitySpawnerBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
-		Execute_OnInitialize(this);
+		if(!Execute_IsInitialized(this))
+		{
+			Execute_OnInitialize(this);
+		}
 		Execute_OnPreparatory(this, EPhase::All);
 	}
 }
@@ -133,7 +154,7 @@ void AAbilitySpawnerBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 	
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnTermination(this, EPhase::All);
 	}
@@ -143,7 +164,7 @@ void AAbilitySpawnerBase::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnRefresh(this, DeltaSeconds);
 	}

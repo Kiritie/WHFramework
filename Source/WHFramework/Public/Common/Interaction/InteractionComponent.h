@@ -29,9 +29,9 @@ protected:
 	virtual void OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
 public:
-	virtual bool OnAgentEnter(IInteractionAgentInterface* InInteractionAgent);
+	virtual bool OnAgentEnter(IInteractionAgentInterface* InInteractionAgent, bool bPassive = false);
 
-	virtual bool OnAgentLeave(IInteractionAgentInterface* InInteractionAgent);
+	virtual bool OnAgentLeave(IInteractionAgentInterface* InInteractionAgent, bool bPassive = false);
 
 public:
 	virtual bool AddInteractAction(EInteractAction InInteractAction);

@@ -10,5 +10,8 @@
 UCLASS(MinimalAPI)
 class UModuleGraph : public UEdGraph
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UModuleGraph(const FObjectInitializer& ObjectInitializer);
 };

@@ -19,9 +19,9 @@ UFSMComponent::UFSMComponent()
 	DefaultState = nullptr;
 	FinalState = nullptr;
 	CurrentState = nullptr;
+	TargetState = nullptr;
 
 	States = TArray<TSubclassOf<UFiniteStateBase>>();
-
 	StateMap = TMap<FName, UFiniteStateBase*>();
 
 	bShowDebugMessage = false;
@@ -64,7 +64,7 @@ void UFSMComponent::OnInitialize()
 			const FName StateName = Iter->GetDefaultObject<UFiniteStateBase>()->GetStateName();
 			if(!StateMap.Contains(StateName))
 			{
-				if(UFiniteStateBase* FiniteState = UObjectPoolModuleStatics::SpawnObject<UFiniteStateBase>(nullptr, nullptr, false, Iter))
+				if(UFiniteStateBase* FiniteState = UObjectPoolModuleStatics::SpawnObject<UFiniteStateBase>(nullptr, nullptr, Iter))
 				{
 					FiniteState->OnInitialize(this, StateMap.Num());
 					StateMap.Add(StateName, FiniteState);
@@ -113,9 +113,9 @@ bool UFSMComponent::SwitchState(UFiniteStateBase* InState, const TArray<FParamet
 	
 	UFiniteStateBase* LastState = CurrentState;
 
-	if(!LastState || LastState->OnLeaveValidate(InState))
+	if(!LastState || LastState->OnPreLeave(InState))
 	{
-		if(!InState || InState->OnEnterValidate(LastState, InParams))
+		if(!InState || InState->OnPreEnter(LastState, InParams))
 		{
 			TargetState = InState;
 			if(LastState)

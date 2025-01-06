@@ -15,4 +15,7 @@ public:
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FName RaceID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TArray<FVitalityActionAbilityData> ActionAbilities;
 };

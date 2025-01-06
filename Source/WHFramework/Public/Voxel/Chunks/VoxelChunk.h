@@ -4,7 +4,6 @@
 
 #include "Common/Base/WHActor.h"
 #include "GameFramework/Actor.h"
-#include "SaveGame/Base/SaveDataInterface.h"
 #include "Scene/Container/SceneContainerInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "VoxelChunk.generated.h"
@@ -21,7 +20,7 @@ class UVoxelMeshComponent;
  * 体素块
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelChunk : public AWHActor, public ISceneContainerInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AVoxelChunk : public AWHActor, public ISceneContainerInterface
 {
 	GENERATED_BODY()
 
@@ -31,37 +30,26 @@ public:
 	// Sets default values for this actor's properties
 	AVoxelChunk();
 
-protected:
-	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
-
-	virtual FSaveData* ToData() override;
-
-	UFUNCTION()
-	virtual void OnCollision(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
-	
-	UFUNCTION()
-	virtual void OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
-
-	UFUNCTION()
-	virtual void OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
-
+	//////////////////////////////////////////////////////////////////////////
+	/// ObjectPool
 public:
-	virtual int32 GetLimit_Implementation() const override { return 5000; }
+	virtual int32 GetLimit_Implementation() const override { return -1; }
 
 	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
 		
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
-	virtual void SetActorVisible_Implementation(bool bInVisible) override;
+protected:
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+
+	virtual FSaveData* ToData() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Chunk
 public:
-	virtual void Initialize(FIndex InIndex, int32 InBatch);
+	virtual void Initialize(UVoxelModule* InModule, FIndex InIndex, int32 InBatch);
 
 	virtual void Generate(EPhase InPhase);
-
-	virtual void UnGenerate(EPhase InPhase);
 
 	virtual void CreateMesh();
 
@@ -96,20 +84,21 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Voxel
 public:
-	virtual bool HasVoxel(FIndex InIndex);
+	virtual bool HasVoxel(FIndex InIndex, bool bSafe = false);
 
-	virtual bool HasVoxel(int32 InX, int32 InY, int32 InZ);
+	virtual bool HasVoxel(int32 InX, int32 InY, int32 InZ, bool bSafe = false);
 
-	template<class T>
-	T& GetVoxel(FIndex InIndex, bool bMainPart = false)
-	{
-		return static_cast<T&>(GetVoxel(InIndex, bMainPart));
-	}
-	virtual UVoxel& GetVoxel(FIndex InIndex, bool bMainPart = false);
+	virtual bool HasVoxelComplex(FIndex InIndex, bool bSafe = false);
 
-	virtual FVoxelItem& GetVoxelItem(FIndex InIndex, bool bMainPart = false);
+	virtual bool HasVoxelComplex(int32 InX, int32 InY, int32 InZ, bool bSafe = false);
 
-	virtual FVoxelItem& GetVoxelItem(int32 InX, int32 InY, int32 InZ, bool bMainPart = false);
+	virtual FVoxelItem& GetVoxel(FIndex InIndex, bool bMainPart = false);
+
+	virtual FVoxelItem& GetVoxel(int32 InX, int32 InY, int32 InZ, bool bMainPart = false);
+
+	virtual FVoxelItem& GetVoxelComplex(FIndex InIndex, bool bMainPart = false);
+
+	virtual FVoxelItem& GetVoxelComplex(int32 InX, int32 InY, int32 InZ, bool bMainPart = false);
 
 public:
 	virtual bool CheckVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem, FVector InRange = FVector::OneVector);
@@ -119,6 +108,10 @@ public:
 	virtual bool CheckVoxelAdjacent(const FVoxelItem& InVoxelItem, EDirection InDirection);
 
 	virtual bool CheckVoxelNeighbors(FIndex InIndex, EVoxelType InVoxelType, FVector InRange = FVector::OneVector, bool bFromCenter = false, bool bIgnoreBottom = false, bool bOnTheChunk = false);
+
+	virtual void SetVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bSafe = false);
+
+	virtual void SetVoxel(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem, bool bSafe = false);
 
 	virtual bool SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bGenerate = false, IVoxelAgentInterface* InAgent = nullptr);
 
@@ -131,12 +124,25 @@ public:
 	virtual bool SetVoxelComplex(const TMap<FIndex, FVoxelItem>& InVoxelItems, bool bGenerate = false, bool bFirstSample = false, IVoxelAgentInterface* InAgent = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
+	// Topography
+public:
+	virtual FVoxelTopography& GetTopography(FIndex InIndex);
+
+	virtual FVoxelTopography& GetTopography(int32 InX, int32 InY, int32 InZ);
+
+	virtual void SetTopography(FIndex InIndex, const FVoxelTopography& InTopography);
+
+	virtual void SetTopography(int32 InX, int32 InY, int32 InZ, const FVoxelTopography& InTopography);
+
+	//////////////////////////////////////////////////////////////////////////
 	// SceneActor
 protected:
 	UPROPERTY(VisibleAnywhere, Category = "SceneActor")
 	TMap<FGuid, AActor*> SceneActorMap;
 
 public:
+	virtual void SetActorVisible_Implementation(bool bInVisible) override;
+	
 	virtual bool HasSceneActor(const FString& InID, bool bEnsured) const override;
 
 	template<class T>
@@ -158,6 +164,22 @@ public:
 	virtual void SpawnSceneActors() override;
 
 	virtual void DestroySceneActors() override;
+	
+	//////////////////////////////////////////////////////////////////////////
+	// Building
+protected:
+	virtual void GenerateBuildings();
+
+	virtual void SpawnBuilding(FVoxelBuildingSaveData& InBuildingData);
+	
+	virtual void DestroyBuilding(FVoxelBuildingSaveData& InBuildingData);
+
+	virtual void DestroyBuildings();
+
+public:
+	virtual void AddBuilding(const FVoxelBuildingSaveData& InBuildingData);
+	
+	virtual TSubclassOf<AActor> GetBuildingClassByID(int32 InID) const;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Auxiliary
@@ -169,14 +191,17 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Components
 protected:
-	UPROPERTY(BlueprintReadOnly, Category = "Components")
-	UVoxelMeshComponent* SolidMesh;
-	
-	UPROPERTY(BlueprintReadOnly, Category = "Components")
-	UVoxelMeshComponent* SemiMesh;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TMap<EVoxelNature, UVoxelMeshComponent*> MeshComponents;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Components")
-	UVoxelMeshComponent* TransMesh;
+	TArray<EVoxelNature> MeshVoxelNatures;
+
+public:
+	void SpawnMeshComponents(int32 InStage = 1 | 2);
+
+	void DestroyMeshComponents();
+
+	UVoxelMeshComponent* GetMeshComponent(EVoxelNature InVoxelNature);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Stats
@@ -199,8 +224,15 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
 	TMap<EDirection, AVoxelChunk*> Neighbors;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Stats")
+	UVoxelModule* Module;
+
 	TMap<FIndex, FVoxelItem> VoxelMap;
-	
+
+	TMap<FIndex, FVoxelTopography> TopographyMap;
+
+	TArray<FVoxelBuildingSaveData> BuildingDatas;
+
 public:
 	FIndex GetIndex() const { return Index; }
 
@@ -220,6 +252,7 @@ public:
 
 	TMap<EDirection, AVoxelChunk*> GetNeighbors() const { return Neighbors; }
 
-	FVector GetChunkLocation() const;
-};
+	FIndex GetWorldIndex() const;
 
+	FVector GetWorldLocation() const;
+};

@@ -54,6 +54,12 @@ public:
 	static bool RegexMatch(const FString& InSourceStr, const FString& InPattern, TArray<FString>& OutResult);
 
 	//////////////////////////////////////////////////////////////////////////
+	// Char
+	static unsigned char ToHex(unsigned char InChar);
+
+	static unsigned char FromHex(unsigned char InChar);
+
+	//////////////////////////////////////////////////////////////////////////
 	// String
 	static bool SortString(const FString& InStr1, const FString& InStr2)
 	{
@@ -74,6 +80,14 @@ public:
 	static FString BoolToString(bool InBool);
 
 	static bool StringToBool(const FString& InString);
+	
+	static FString SanitizeFloat(double InFloat, int32 InMaxDigits = -1);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Url
+	static FString UrlEncode(const FString& InUrl);
+
+	static FString UrlDecode(const FString& InUrl);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Array
@@ -106,12 +120,11 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Texture
-	UFUNCTION(BlueprintPure, Category = "CommonStatics")
+#if WITH_ENGINE
 	static UTexture2D* LoadTextureFromFile(const FString& InFilePath);
 
-	UFUNCTION(BlueprintCallable, Category = "CommonStatics")
 	static void SaveTextureToFile(UTexture2D* InTexture, const FString& InFilePath);
 
-	UFUNCTION(BlueprintPure, Category = "CommonStatics")
 	static UTexture2D* CompositeTextures(const TArray<UTexture2D*>& InTextures, FVector2D InTexSize, UTexture2D* InTemplate = nullptr);
+#endif
 };

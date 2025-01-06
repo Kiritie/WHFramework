@@ -91,6 +91,7 @@ UCameraModule::UCameraModule()
 
 	bCameraZoomAble = true;
 	bCameraZoomControlAble = true;
+	bCameraZoomMoveAble = false;
 	bNormalizeCameraZoom = false;
 	CameraZoomRate = 300.f;
 	bSmoothCameraZoom = true;
@@ -813,6 +814,8 @@ void UCameraModule::SetCameraOffset(FVector InOffset, bool bInstant)
 {
 	if(!CurrentCamera) return;
 
+	InOffset = InOffset != FVector(-1.f) ? InOffset : (IsTrackingTarget() ? TrackCameraViewData.CameraViewParams.CameraViewOffset : InitCameraOffset);
+
 	TargetCameraOffset = CameraMoveRange.IsValid && !IsTrackingTarget() ? ClampVector(InOffset, CameraMoveRange.Min, CameraMoveRange.Max) : InOffset;
 	if(bInstant)
 	{
@@ -824,7 +827,11 @@ void UCameraModule::SetCameraOffset(FVector InOffset, bool bInstant)
 
 void UCameraModule::DoCameraOffset(FVector InOffset, float InDuration, EEaseType InEaseType, bool bForce)
 {
-	if(!CurrentCamera || ((CameraDoOffsetOffset != EMPTY_Vector || CurrentCameraOffset == InOffset) && !bForce)) return;
+	if(!CurrentCamera) return;
+
+	InOffset = InOffset != FVector(-1.f) ? InOffset : (IsTrackingTarget() ? TrackCameraViewData.CameraViewParams.CameraViewOffset : InitCameraOffset);
+
+	if((CameraDoOffsetOffset != EMPTY_Vector || CurrentCameraOffset == InOffset) && !bForce) return;
 
 	TargetCameraOffset = InOffset;
 	if(InDuration > 0.f)
@@ -926,7 +933,7 @@ void UCameraModule::DoCameraDistance(float InDistance, float InDuration, EEaseTy
 {
 	if(!CurrentCamera || (CameraDoDistanceDistance != EMPTY_Flt || CurrentCameraDistance == InDistance)  && !bForce) return;
 
-	TargetCameraDistance = InDistance != -1.f ? FMath::Clamp(InDistance, MinCameraDistance, MaxCameraDistance == -1.f ? FLT_MAX : MaxCameraDistance) : InitCameraDistance;
+	TargetCameraDistance = InDistance != -1.f ? FMath::Clamp(InDistance, MinCameraDistance, MaxCameraDistance == -1.f ? FLT_MAX : MaxCameraDistance) : (IsTrackingTarget() ? TrackCameraViewData.CameraViewParams.CameraViewDistance : InitCameraDistance);
 	if(InDuration > 0.f)
 	{
 		CameraDoDistanceTime = 0.f;
@@ -1022,25 +1029,25 @@ void UCameraModule::StopDoCameraFov()
 
 void UCameraModule::AddCameraMovementInput(FVector InDirection, float InValue)
 {
-	if(!bCameraControlAble || !bCameraMoveControlAble || (IsTrackingTarget() && !ENUMWITH(TrackControlMode, ECameraControlMode::LocationOnly))) return;
+	if(ModuleState != EModuleState::Running || !bCameraControlAble || !bCameraMoveControlAble || (IsTrackingTarget() && !ENUMWITH(TrackControlMode, ECameraControlMode::LocationOnly))) return;
 
 	SetCameraLocation(TargetCameraLocation + InDirection * InValue * CameraMoveRate * (1.f + (CameraMoveAltitude != 0.f ? (UCommonStatics::GetPossessedPawn() ? 0.f : FMath::Abs(USceneModuleStatics::GetAltitude(false, true)) / CameraMoveAltitude) : 0.f)) * GetWorld()->GetDeltaSeconds(), false);
 }
 
 void UCameraModule::AddCameraRotationInput(float InYaw, float InPitch)
 {
-	if(!bCameraControlAble || !bCameraRotateControlAble || (IsTrackingTarget() && !ENUMWITH(TrackControlMode, ECameraControlMode::RotationOnly))) return;
+	if(ModuleState != EModuleState::Running || !bCameraControlAble || !bCameraRotateControlAble || (IsTrackingTarget() && !ENUMWITH(TrackControlMode, ECameraControlMode::RotationOnly))) return;
 
 	SetCameraRotation(TargetCameraRotation.Yaw + InYaw * CameraTurnRate * GetWorld()->GetDeltaSeconds(), TargetCameraRotation.Pitch + InPitch * CameraLookUpRate * GetWorld()->GetDeltaSeconds(), false);
 }
 
-void UCameraModule::AddCameraDistanceInput(float InValue, bool bMoveIfZero)
+void UCameraModule::AddCameraDistanceInput(float InValue)
 {
-	if(!bCameraControlAble || !bCameraZoomControlAble || (IsTrackingTarget() && !ENUMWITH(TrackControlMode, ECameraControlMode::DistanceOnly))) return;
+	if(ModuleState != EModuleState::Running || !bCameraControlAble || !bCameraZoomControlAble || (IsTrackingTarget() && !ENUMWITH(TrackControlMode, ECameraControlMode::DistanceOnly))) return;
 
 	SetCameraDistance(TargetCameraDistance + InValue * CameraZoomRate * (2.f + (CameraZoomAltitude != 0.f ? (UCommonStatics::GetPossessedPawn() ? 0.f : FMath::Abs(FMath::Max(USceneModuleStatics::GetAltitude(false, true), CurrentCameraDistance)) / CameraZoomAltitude) : 0.f)) * GetWorld()->GetDeltaSeconds(), false);
 
-	if(bMoveIfZero && InValue < 0.f && TargetCameraDistance == 0.f)
+	if(bCameraZoomMoveAble && !IsTrackingTarget() && InValue < 0.f && TargetCameraDistance == 0.f)
 	{
 		AddCameraMovementInput(CurrentCameraRotation.Vector(), -InValue);
 	}
@@ -1183,20 +1190,20 @@ void UCameraModule::OnSwitchCameraPoint(UObject* InSender, UEventHandle_SwitchCa
 
 bool UCameraModule::IsControllingMove()
 {
-	return UInputModuleStatics::GetKeyShortcut(GameplayTags::InputTag_CameraPanMove).IsPressing(GetPlayerController()) || UInputModuleStatics::GetTouchPressedCount() == 3;
+	return UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraPanMove).IsPressing(GetPlayerController()) || UInputModuleStatics::GetTouchPressedCount() == 3;
 }
 
 bool UCameraModule::IsControllingRotate()
 {
-	return UInputModuleStatics::GetKeyShortcut(GameplayTags::InputTag_CameraRotate).IsPressing(GetPlayerController()) || UInputModuleStatics::GetTouchPressedCount() == 1;
+	return UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraRotate).IsPressing(GetPlayerController()) || UInputModuleStatics::GetTouchPressedCount() == 1;
 }
 
 bool UCameraModule::IsControllingZoom()
 {
-	return UInputModuleStatics::GetKeyShortcut(GameplayTags::InputTag_CameraZoom).IsPressing(GetPlayerController()) || UInputModuleStatics::GetTouchPressedCount() == 2;
+	return UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraZoom).IsPressing(GetPlayerController()) || UInputModuleStatics::GetTouchPressedCount() == 2;
 }
 
-bool UCameraModule::IsTrackingTarget()
+bool UCameraModule::IsTrackingTarget() const
 {
 	return TrackCameraViewData.CameraViewParams.CameraViewTarget != nullptr;
 }

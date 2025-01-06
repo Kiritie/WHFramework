@@ -16,7 +16,7 @@ UCLASS(BlueprintType, meta=(ExposedAsyncProxy = AsyncTask))
 class WHFRAMEWORK_API UAsyncTask_AttributeChanged : public UBlueprintAsyncActionBase
 {
 	GENERATED_BODY()
-	
+
 public:
 	UPROPERTY(BlueprintAssignable)
 	FOnAttributeChanged OnAttributeChanged;

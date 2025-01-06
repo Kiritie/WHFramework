@@ -4,6 +4,7 @@
 #include "Character/Base/CharacterBase.h"
 
 #include "AIController.h"
+#include "AI/Base/AIControllerBase.h"
 #include "Main/MainModule.h"
 #include "Animation/AnimInstance.h"
 #include "Asset/AssetModuleStatics.h"
@@ -55,11 +56,15 @@ ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer) :
 
 	Looking = CreateDefaultSubobject<ULookingComponent>(FName("Looking"));
 	Looking->LookingMaxDistance = 1500.f;
-	Looking->OnCanLockAtTarget.BindDynamic(this, &ACharacterBase::CanLookAtTarget);
+	Looking->OnCanLookAtTarget.BindDynamic(this, &ACharacterBase::CanLookAtTarget);
+	Looking->OnTargetLookAtOn.BindDynamic(this, &ACharacterBase::OnTargetLookAtOn);
+	Looking->OnTargetLookAtOff.BindDynamic(this, &ACharacterBase::OnTargetLookAtOff);
 
 	Name = NAME_None;
 	Anim = nullptr;
 	DefaultController = nullptr;
+
+	bInitialized = false;
 
 	ActorID = FGuid::NewGuid();
 	bVisible = true;
@@ -68,22 +73,60 @@ ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer) :
 	GenerateVoxelID = FPrimaryAssetId();
 }
 
+void ACharacterBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+{
+	USceneModuleStatics::RemoveSceneActor(this);
+	
+	if(InParams.IsValidIndex(0))
+	{
+		ActorID = InParams[0];
+	}
+	if(InParams.IsValidIndex(1))
+	{
+		AssetID = InParams[1];
+	}
+
+	USceneModuleStatics::AddSceneActor(this);
+
+	Execute_SetActorVisible(this, true);
+}
+
+void ACharacterBase::OnDespawn_Implementation(bool bRecovery)
+{
+	Execute_SetActorVisible(this, false);
+
+	SetActorLocationAndRotation(UNDER_Vector, FRotator::ZeroRotator);
+
+	USceneModuleStatics::RemoveSceneActor(this);
+	if(Container)
+	{
+		Container->RemoveSceneActor(this);
+	}
+
+	Container = nullptr;
+	DefaultController = nullptr;
+
+	SetGenerateVoxelID(FPrimaryAssetId());
+}
+
 void ACharacterBase::OnInitialize_Implementation()
 {
+	bInitialized = true;
+
 	Execute_SetActorVisible(this, bVisible);
+
+	USceneModuleStatics::AddSceneActor(this);
 
 	Anim = Cast<UCharacterAnimBase>(GetMesh()->GetAnimInstance());
 }
 
 void ACharacterBase::OnPreparatory_Implementation(EPhase InPhase)
 {
-	IWHActorInterface::OnPreparatory_Implementation(InPhase);
+	
 }
 
 void ACharacterBase::OnRefresh_Implementation(float DeltaSeconds)
 {
-	IWHActorInterface::OnRefresh_Implementation(DeltaSeconds);
-
 	if(AMainModule::IsExistModuleByClass<UVoxelModule>())
 	{
 		if(AVoxelChunk* Chunk = UVoxelModuleStatics::FindChunkByLocation(GetActorLocation()))
@@ -99,7 +142,70 @@ void ACharacterBase::OnRefresh_Implementation(float DeltaSeconds)
 
 void ACharacterBase::OnTermination_Implementation(EPhase InPhase)
 {
-	IWHActorInterface::OnTermination_Implementation(InPhase);
+	USceneModuleStatics::RemoveSceneActor(this);
+}
+
+void ACharacterBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
+{
+	auto& SaveData = InSaveData->CastRef<FSceneActorSaveData>();
+
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		ActorID = SaveData.ActorID;
+		SetActorTransform(SaveData.SpawnTransform);
+	}
+}
+
+FSaveData* ACharacterBase::ToData()
+{
+	static FSceneActorSaveData SaveData;
+	SaveData = FSceneActorSaveData();
+
+	SaveData.ActorID = ActorID;
+	SaveData.SpawnTransform = GetActorTransform();
+
+	return &SaveData;
+}
+
+void ACharacterBase::BeginPlay()
+{
+	Super::BeginPlay();
+	
+	if(Execute_IsUseDefaultLifecycle(this))
+	{
+		if(!Execute_IsInitialized(this))
+		{
+			Execute_OnInitialize(this);
+		}
+		Execute_OnPreparatory(this, EPhase::All);
+	}
+}
+
+void ACharacterBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+
+	if(Execute_IsUseDefaultLifecycle(this))
+	{
+		Execute_OnTermination(this, EPhase::All);
+	}
+}
+
+void ACharacterBase::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if(Execute_IsUseDefaultLifecycle(this))
+	{
+		Execute_OnRefresh(this, DeltaSeconds);
+	}
+}
+
+void ACharacterBase::SpawnDefaultController()
+{
+	Super::SpawnDefaultController();
+
+	DefaultController = Controller;
 }
 
 void ACharacterBase::OnSwitch_Implementation()
@@ -128,78 +234,6 @@ void ACharacterBase::UnSwitch_Implementation()
 bool ACharacterBase::IsCurrent_Implementation() const
 {
 	return UCharacterModuleStatics::GetCurrentCharacter() == this;
-}
-
-void ACharacterBase::BeginPlay()
-{
-	Super::BeginPlay();
-	
-	if(Execute_IsDefaultLifecycle(this))
-	{
-		Execute_OnInitialize(this);
-		Execute_OnPreparatory(this, EPhase::All);
-	}
-}
-
-void ACharacterBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
-{
-	Super::EndPlay(EndPlayReason);
-
-	if(Execute_IsDefaultLifecycle(this))
-	{
-		Execute_OnTermination(this, EPhase::All);
-	}
-}
-
-void ACharacterBase::Tick(float DeltaSeconds)
-{
-	Super::Tick(DeltaSeconds);
-
-	if(Execute_IsDefaultLifecycle(this))
-	{
-		Execute_OnRefresh(this, DeltaSeconds);
-	}
-}
-
-void ACharacterBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
-{
-	if(InParams.IsValidIndex(0))
-	{
-		ActorID = InParams[0].GetPointerValueRef<FGuid>();
-	}
-	if(InParams.IsValidIndex(1))
-	{
-		AssetID = InParams[1].GetPointerValueRef<FPrimaryAssetId>();
-	}
-
-	USceneModuleStatics::AddSceneActor(this);
-
-	Execute_SetActorVisible(this, true);
-}
-
-void ACharacterBase::OnDespawn_Implementation(bool bRecovery)
-{
-	Execute_SetActorVisible(this, false);
-
-	SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
-
-	USceneModuleStatics::RemoveSceneActor(this);
-	if(Container)
-	{
-		Container->RemoveSceneActor(this);
-	}
-
-	Container = nullptr;
-	DefaultController = nullptr;
-
-	SetGenerateVoxelID(FPrimaryAssetId());
-}
-
-void ACharacterBase::SpawnDefaultController()
-{
-	Super::SpawnDefaultController();
-
-	DefaultController = Controller;
 }
 
 void ACharacterBase::Turn_Implementation(float InValue)
@@ -285,6 +319,17 @@ void ACharacterBase::SetActorVisible_Implementation(bool bInVisible)
 			ISceneActorInterface::Execute_SetActorVisible(Iter, bInVisible);
 		}
 	}
+}
+
+bool ACharacterBase::IsUseControllerRotation() const
+{
+	return bUseControllerRotationYaw;
+}
+
+void ACharacterBase::SetUseControllerRotation(bool bValue)
+{
+	bUseControllerRotationYaw = bValue;
+	GetCharacterMovement()->bOrientRotationToMovement = !bValue;
 }
 
 bool ACharacterBase::OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
@@ -469,6 +514,16 @@ void ACharacterBase::MultiStopAIMove_Implementation()
 	StopAIMove(false);
 }
 
+void ACharacterBase::OnTargetLookAtOn(AActor* InTargetActor)
+{
+	GetCharacterMovement()->bOrientRotationToMovement = false;
+}
+
+void ACharacterBase::OnTargetLookAtOff(AActor* InTargetActor)
+{
+	GetCharacterMovement()->bOrientRotationToMovement = true;
+}
+
 bool ACharacterBase::IsLookAtAble_Implementation(AActor* InLookerActor) const
 {
 	return true;
@@ -487,6 +542,11 @@ UPrimaryAssetBase& ACharacterBase::GetCharacterData() const
 UBehaviorTree* ACharacterBase::GetBehaviorTreeAsset() const
 {
 	return nullptr;
+}
+
+AAIControllerBase* ACharacterBase::GetAIController() const
+{
+	return GetDefaultController<AAIControllerBase>();
 }
 
 FVector ACharacterBase::GetMoveVelocity(bool bIgnoreZ) const

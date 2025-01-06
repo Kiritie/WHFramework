@@ -181,6 +181,21 @@ void UCameraModuleStatics::StopDoCameraTransform()
 	UCameraModule::Get().StopDoCameraTransform();
 }
 
+void UCameraModuleStatics::SetCameraFov(float InFov, bool bInstant)
+{
+	UCameraModule::Get().SetCameraFov(InFov, bInstant);
+}
+
+void UCameraModuleStatics::DoCameraFov(float InFov, float InDuration, EEaseType InEaseType, bool bForce)
+{
+	UCameraModule::Get().DoCameraFov(InFov, InDuration, InEaseType, bForce);
+}
+
+void UCameraModuleStatics::StopDoCameraFov()
+{
+	UCameraModule::Get().StopDoCameraFov();
+}
+
 void UCameraModuleStatics::AddCameraMovementInput(FVector InDirection, float InValue)
 {
 	UCameraModule::Get().AddCameraMovementInput(InDirection, InValue);
@@ -191,7 +206,7 @@ void UCameraModuleStatics::AddCameraRotationInput(float InYaw, float InPitch)
 	UCameraModule::Get().AddCameraRotationInput(InYaw, InPitch);
 }
 
-void UCameraModuleStatics::AddCameraDistanceInput(float InValue, bool bMoveIfZero)
+void UCameraModuleStatics::AddCameraDistanceInput(float InValue)
 {
-	UCameraModule::Get().AddCameraDistanceInput(InValue, bMoveIfZero);
+	UCameraModule::Get().AddCameraDistanceInput(InValue);
 }

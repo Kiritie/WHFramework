@@ -6,7 +6,7 @@
 #include "Task/TaskModuleTypes.h"
 #include "Common/CommonTypes.h"
 #include "Common/Base/WHObject.h"
-#include "SaveGame/Base/SaveDataInterface.h"
+#include "SaveGame/Base/SaveDataAgentInterface.h"
 
 #include "TaskBase.generated.h"
 
@@ -36,7 +36,7 @@ public:
  * 任务基类
  */
 UCLASS(Blueprintable, hidecategories = (Default))
-class WHFRAMEWORK_API UTaskBase : public UWHObject, public ISaveDataInterface
+class WHFRAMEWORK_API UTaskBase : public UWHObject, public ISaveDataAgentInterface
 {
 	GENERATED_BODY()
 
@@ -81,12 +81,11 @@ public:
 	virtual void OnRestore();
 	/**
 	 * 任务进入
-	 * @param InLastTask 上一个任务
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnEnter")
-	void K2_OnEnter(UTaskBase* InLastTask);
+	void K2_OnEnter();
 	UFUNCTION()
-	virtual void OnEnter(UTaskBase* InLastTask);
+	virtual void OnEnter();
 	/**
 	 * 任务帧刷新
 	 */
@@ -133,12 +132,17 @@ public:
 	* 进入任务
 	*/
 	UFUNCTION(BlueprintCallable)
-	void Enter();
+	void Enter(bool bSetAsCurrent = false);
 	/**
-	* 进入任务
+	* 刷新任务
 	*/
 	UFUNCTION(BlueprintCallable)
 	void Refresh();
+	/**
+	* 刷新任务状态
+	*/
+	UFUNCTION(BlueprintCallable)
+	void Restate();
 	/**
 	* 指引任务
 	*/
@@ -185,9 +189,6 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Index/State
 public:
-	/// 是否为开始任务
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Index/State")
-	bool bFirstTask;
 	/// 任务索引
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/State")
 	int32 TaskIndex;
@@ -218,15 +219,35 @@ public:
 	UFUNCTION(BlueprintPure)
 	bool IsRootTask() const { return TaskHierarchy == 0; }
 	/**
+	* 是否是当前任务
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsCurrent() const;
+	/**
 	* 是否已进入
 	*/
 	UFUNCTION(BlueprintPure)
 	bool IsEntered() const;
 	/**
+	* 是否正在执行
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsExecuting() const;
+	/**
 	* 是否已完成
 	*/
 	UFUNCTION(BlueprintPure)
 	bool IsCompleted(bool bCheckSubs = false) const;
+	/**
+	* 是否已成功
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsSucceed(bool bCheckSubs = false) const;
+	/**
+	* 是否已离开
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsLeaved(bool bCheckSubs = false) const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Execute/Guide
@@ -305,9 +326,6 @@ public:
 	/// 是否合并子任务
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SubTask")
 	bool bMergeSubTask;
-	/// 当前子任务索引
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SubTask")
-	int32 CurrentSubTaskIndex;
 	/// 子任务
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SubTask")
 	TArray<UTaskBase*> SubTasks;
@@ -319,15 +337,15 @@ public:
 	UFUNCTION(BlueprintPure)
 	bool HasSubTask(bool bIgnoreMerge = true) const;
 	/**
-	 * 获取当前子任务
-	 */
-	UFUNCTION(BlueprintPure)
-	UTaskBase* GetCurrentSubTask() const;
-	/**
 	 * 是否是子任务
 	 */
 	UFUNCTION(BlueprintPure)
 	bool IsSubOf(UTaskBase* InTask) const;
+	/**
+	* 是否已进入所有子任务
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsAllSubEntered() const;
 	/**
 	* 是否已完成所有子任务
 	*/
@@ -337,12 +355,20 @@ public:
 	* 是否已成功执行有子任务
 	*/
 	UFUNCTION(BlueprintPure)
-	bool IsAllSubExecuteSucceed() const;
+	bool IsAllSubSucceed() const;
+	/**
+	* 是否已离开所有子任务
+	*/
+	UFUNCTION(BlueprintPure)
+	bool IsAllSubLeaved() const;
 
 protected:
 	FTimerHandle AutoExecuteTimerHandle;
 	FTimerHandle AutoLeaveTimerHandle;
 	FTimerHandle AutoCompleteTimerHandle;
+
+public:
+	bool bRuntimeSelected;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// TaskListItem

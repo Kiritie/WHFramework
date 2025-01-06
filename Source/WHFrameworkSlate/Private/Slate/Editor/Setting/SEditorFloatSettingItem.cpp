@@ -1,7 +1,6 @@
 ﻿#include "Slate/Editor/Setting/SEditorFloatSettingItem.h"
 
 #include "WHFrameworkSlateStyle.h"
-#include "Kismet/KismetTextLibrary.h"
 #include "Widgets/Input/SEditableTextBox.h"
 
 SEditorFloatSettingItem::SEditorFloatSettingItem()
@@ -21,7 +20,7 @@ void SEditorFloatSettingItem::Construct(const FArguments& InArgs)
 			.Style(FWHFrameworkSlateStyle::Get(), "EditableTextBoxes.SettingItem")
 			.Text_Lambda([this]()
 			{
-				return UKismetTextLibrary::Conv_DoubleToText(GetSettingValue(), ERoundingMode::HalfToEven, false, false, 1, 324, 0, 2);
+				return FText::FromString(FString::Printf(TEXT("%2f"), GetSettingValue().GetFloatValue()));
 			})
 			.OnTextCommitted_Lambda([this](const FText& Val, ETextCommit::Type FloatCommitType)
 			{

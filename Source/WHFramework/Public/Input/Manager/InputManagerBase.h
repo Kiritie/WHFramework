@@ -29,6 +29,13 @@ public:
 	UFUNCTION()
 	virtual void OnInitialize();
 	/**
+	* 当重置
+	*/
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnReset")
+	void K2_OnReset();
+	UFUNCTION()
+	virtual void OnReset();
+	/**
 	* 当刷新
 	*/
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")

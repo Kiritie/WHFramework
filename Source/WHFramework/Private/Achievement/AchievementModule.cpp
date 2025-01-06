@@ -91,16 +91,22 @@ void UAchievementModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData->CastRef<FAchievementModuleSaveData>();
 
-	States = SaveData.States;
-	TotalUnlocked = SaveData.TotalUnlocked;
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		States = SaveData.States;
+		TotalUnlocked = SaveData.TotalUnlocked;
+	}
 }
 
 void UAchievementModule::UnloadData(EPhase InPhase)
 {
 	Super::UnloadData(InPhase);
 
-	States.SetNum(Achievements.Num());
-	TotalUnlocked = 0;
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		States.SetNum(Achievements.Num());
+		TotalUnlocked = 0;
+	}
 }
 
 FSaveData* UAchievementModule::ToData()

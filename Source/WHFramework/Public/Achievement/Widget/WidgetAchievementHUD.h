@@ -47,7 +47,7 @@ public:
 	void ScheduleAchievementDisplay(FAchievementData Achievement, FAchievementStates State);
 
 private:
-	UPROPERTY(EditDefaultsOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
+	UPROPERTY(EditDefaultsOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
 	UCanvasPanel* Canvas;
 
 	float CurrentTime;

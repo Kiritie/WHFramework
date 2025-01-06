@@ -42,6 +42,11 @@ public:
 	virtual void OnUnPause() override;
 
 	virtual void OnTermination(EPhase InPhase) override;
+	
+protected:
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+
+	virtual FSaveData* ToData() override;
 
 public:
 	virtual FString GetModuleDebugMessage() override;

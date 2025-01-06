@@ -3,32 +3,32 @@
 
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 
-bool UObjectPoolModuleStatics::HasObject(TSubclassOf<UObject> InType, bool bInEditor)
+bool UObjectPoolModuleStatics::HasObject(TSubclassOf<UObject> InType)
 {
-	return UObjectPoolModule::Get(bInEditor).HasObject(InType);
+	return UObjectPoolModule::Get().HasObject(InType);
 }
 
-UObject* UObjectPoolModuleStatics::SpawnObject(TSubclassOf<UObject> InType, UObject* InOwner, const TArray<FParameter>& InParams, bool bInEditor)
+UObject* UObjectPoolModuleStatics::SpawnObject(TSubclassOf<UObject> InType, UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	return UObjectPoolModule::Get(bInEditor).SpawnObject(InType, InOwner, InParams);
+	return UObjectPoolModule::Get().SpawnObject(InType, InOwner, InParams);
 }
 
-void UObjectPoolModuleStatics::DespawnObject(UObject* InObject, bool bRecovery, bool bInEditor)
+void UObjectPoolModuleStatics::DespawnObject(UObject* InObject, bool bRecovery)
 {
-	UObjectPoolModule::Get(bInEditor).DespawnObject(InObject, bRecovery);
+	UObjectPoolModule::Get().DespawnObject(InObject, bRecovery);
 }
 
-void UObjectPoolModuleStatics::DespawnObjects(TArray<UObject*> InObjects, bool bRecovery, bool bInEditor)
+void UObjectPoolModuleStatics::DespawnObjects(TArray<UObject*> InObjects, bool bRecovery)
 {
-	UObjectPoolModule::Get(bInEditor).DespawnObjects(InObjects, bRecovery);
+	UObjectPoolModule::Get().DespawnObjects(InObjects, bRecovery);
 }
 
-void UObjectPoolModuleStatics::ClearObject(TSubclassOf<UObject> InType, bool bInEditor)
+void UObjectPoolModuleStatics::ClearObject(TSubclassOf<UObject> InType)
 {
-	UObjectPoolModule::Get(bInEditor).ClearObject(InType);
+	UObjectPoolModule::Get().ClearObject(InType);
 }
 
-void UObjectPoolModuleStatics::ClearAllObject(bool bInEditor)
+void UObjectPoolModuleStatics::ClearAllObject()
 {
-	UObjectPoolModule::Get(bInEditor).ClearAllObject();
+	UObjectPoolModule::Get().ClearAllObject();
 }

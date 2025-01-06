@@ -22,38 +22,39 @@ void UInteractionComponent::BeginPlay()
 
 void UInteractionComponent::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	if(!GetInteractionAgent() || OtherActor == GetOwner()) return;
+	if(!GetInteractionAgent() || GetInteractionAgent()->GetInteractAgentType() == EInteractAgentType::None || OtherActor == GetOwner()) return;
 
 	if(IInteractionAgentInterface* OtherInteractionAgent = Cast<IInteractionAgentInterface>(OtherActor))
 	{
-		OnAgentEnter(OtherInteractionAgent);
+		OnAgentEnter(OtherInteractionAgent, GetInteractionAgent()->GetInteractAgentType() == EInteractAgentType::Passivity);
 	}
 }
 
 void UInteractionComponent::OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
-	if(!GetInteractionAgent() || OtherActor == GetOwner()) return;
+	if(!GetInteractionAgent() || GetInteractionAgent()->GetInteractAgentType() == EInteractAgentType::None || OtherActor == GetOwner()) return;
 
 	if(IInteractionAgentInterface* OtherInteractionAgent = Cast<IInteractionAgentInterface>(OtherActor))
 	{
-		OnAgentLeave(OtherInteractionAgent);
+		OnAgentLeave(OtherInteractionAgent, GetInteractionAgent()->GetInteractAgentType() == EInteractAgentType::Passivity);
 	}
 }
 
-bool UInteractionComponent::OnAgentEnter(IInteractionAgentInterface* InInteractionAgent)
+bool UInteractionComponent::OnAgentEnter(IInteractionAgentInterface* InInteractionAgent, bool bPassive)
 {
 	if(!GetInteractionAgent()->IsInteractable(InInteractionAgent) || GetInteractionAgent()->GetOverlappingAgents().Contains(InInteractionAgent)) return false;
+	if(!bPassive ? GetInteractionAgent()->GetInteractableActions(InInteractionAgent).IsEmpty() : InInteractionAgent->GetInteractableActions(GetInteractionAgent()).IsEmpty()) return false;
 	
 	GetInteractionAgent()->GetOverlappingAgents().Add(InInteractionAgent);
 	if(!GetInteractionAgent()->GetInteractingAgent())
 	{
 		GetInteractionAgent()->SetInteractingAgent(InInteractionAgent);
 	}
-	InInteractionAgent->GetInteractionComponent()->OnAgentEnter(GetInteractionAgent());
+	InInteractionAgent->GetInteractionComponent()->OnAgentEnter(GetInteractionAgent(), !bPassive);
 	return true;
 }
 
-bool UInteractionComponent::OnAgentLeave(IInteractionAgentInterface* InInteractionAgent)
+bool UInteractionComponent::OnAgentLeave(IInteractionAgentInterface* InInteractionAgent, bool bPassive)
 {
 	if(!GetInteractionAgent()->IsInteractable(InInteractionAgent) || !GetInteractionAgent()->GetOverlappingAgents().Contains(InInteractionAgent)) return false;
 
@@ -62,7 +63,7 @@ bool UInteractionComponent::OnAgentLeave(IInteractionAgentInterface* InInteracti
 	{
 		GetInteractionAgent()->SetInteractingAgent(nullptr);
 	}
-	InInteractionAgent->GetInteractionComponent()->OnAgentLeave(GetInteractionAgent());
+	InInteractionAgent->GetInteractionComponent()->OnAgentLeave(GetInteractionAgent(), !bPassive);
 	if(!GetInteractionAgent()->GetInteractingAgent() && GetInteractionAgent()->GetOverlappingAgents().IsValidIndex(0))
 	{
 		GetInteractionAgent()->SetInteractingAgent(GetInteractionAgent()->GetOverlappingAgents()[0]);
@@ -97,12 +98,12 @@ void UInteractionComponent::ClearInteractActions()
 
 bool UInteractionComponent::IsInteractable() const
 {
-	return GetCollisionEnabled() == ECollisionEnabled::QueryOnly;
+	return GetGenerateOverlapEvents();
 }
 
 void UInteractionComponent::SetInteractable(bool bValue)
 {
-	SetCollisionEnabled(bValue ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
+	SetGenerateOverlapEvents(bValue);
 }
 
 IInteractionAgentInterface* UInteractionComponent::GetInteractionAgent() const

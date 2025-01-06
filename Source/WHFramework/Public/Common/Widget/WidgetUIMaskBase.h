@@ -24,4 +24,12 @@ public:
 	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant) override;
 
 	virtual void OnClose(bool bInstant) override;
+
+protected:
+	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	
+	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
+
+protected:
+	FSimpleDynamicDelegate OnPressAnyKey;
 };

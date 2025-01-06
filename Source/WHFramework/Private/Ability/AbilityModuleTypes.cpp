@@ -1,10 +1,13 @@
 #include "Ability/AbilityModuleTypes.h"
 
+#include "Ability/Actor/AbilityActorDataBase.h"
 #include "Asset/AssetModuleStatics.h"
 #include "Ability/Item/AbilityItemDataBase.h"
 #include "Ability/Character/AbilityCharacterBase.h"
-#include "Ability/Inventory/Slot/AbilityInventorySlot.h"
+#include "Ability/Inventory/AbilityInventoryBase.h"
+#include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
 #include "Ability/Vitality/AbilityVitalityInterface.h"
+#include "Common/CommonStatics.h"
 
 bool FGameplayEffectContextBase::NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuccess)
 {
@@ -34,7 +37,7 @@ void UTargetType_UseEventData::GetTargets_Implementation(AActor* OwningActor, AA
 	}
 }
 
-void UDamageHandle::HandleDamage(AActor* SourceActor, AActor* TargetActor, float DamageValue, EDamageType DamageType, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
+void UDamageHandle::HandleDamage(AActor* SourceActor, AActor* TargetActor, float DamageValue, const FGameplayAttribute& DamageAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
 {
 	IAbilityVitalityInterface* TargetVitality = Cast<IAbilityVitalityInterface>(TargetActor);
 
@@ -42,12 +45,12 @@ void UDamageHandle::HandleDamage(AActor* SourceActor, AActor* TargetActor, float
 	{
 		if (TargetVitality && !TargetVitality->IsDead())
 		{
-			TargetVitality->HandleDamage(DamageType, DamageValue, false, false, HitResult, SourceTags, SourceActor);
+			TargetVitality->HandleDamage(DamageAttribute, DamageValue, false, false, HitResult, SourceTags, SourceActor);
 		}
 	}
 }
 
-void URecoveryHandle::HandleRecovery(AActor* SourceActor, AActor* TargetActor, float RecoveryValue, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
+void URecoveryHandle::HandleRecovery(AActor* SourceActor, AActor* TargetActor, float RecoveryValue, const FGameplayAttribute& RecoveryAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
 {
 	IAbilityVitalityInterface* TargetVitality = Cast<IAbilityVitalityInterface>(TargetActor);
 
@@ -55,12 +58,12 @@ void URecoveryHandle::HandleRecovery(AActor* SourceActor, AActor* TargetActor, f
 	{
 		if (TargetVitality && !TargetVitality->IsDead())
 		{
-			TargetVitality->HandleRecovery(RecoveryValue, HitResult, SourceTags, SourceActor);
+			TargetVitality->HandleRecovery(RecoveryAttribute, RecoveryValue, HitResult, SourceTags, SourceActor);
 		}
 	}
 }
 
-void UInterruptHandle::HandleInterrupt(AActor* SourceActor, AActor* TargetActor, float InterruptDuration, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
+void UInterruptHandle::HandleInterrupt(AActor* SourceActor, AActor* TargetActor, float InterruptDuration, const FGameplayAttribute& InterruptAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
 {
 	IAbilityVitalityInterface* TargetVitality = Cast<IAbilityVitalityInterface>(TargetActor);
 
@@ -68,14 +71,9 @@ void UInterruptHandle::HandleInterrupt(AActor* SourceActor, AActor* TargetActor,
 	{
 		if (TargetVitality && !TargetVitality->IsDead())
 		{
-			TargetVitality->HandleInterrupt(InterruptDuration, HitResult, SourceTags, SourceActor);
+			TargetVitality->HandleInterrupt(InterruptAttribute, InterruptDuration, HitResult, SourceTags, SourceActor);
 		}
 	}
-}
-
-UAbilityItemDataBase& FAbilityItemData::GetItemData() const
-{
-	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityItemDataBase>(AbilityID);
 }
 
 bool FGameplayEffectContainerSpec::HasValidTargets() const
@@ -113,6 +111,30 @@ EAbilityItemType FAbilityItem::GetType() const
 	return GetData().GetItemType();
 }
 
+UAbilityInventoryBase* FAbilityItem::GetInventory() const
+{
+	if(InventorySlot)
+	{
+		return InventorySlot->GetInventory();
+	}
+	return nullptr;
+}
+
+UAbilityInventorySlotBase* FAbilityItem::GetSlot() const
+{
+	return InventorySlot;
+}
+
+FGameplayAbilitySpecHandle FAbilityItem::GetHandle() const
+{
+	return AbilityHandle;
+}
+
+UPrimaryAssetBase& FAbilityData::GetData() const
+{
+	return UAssetModuleStatics::LoadPrimaryAssetRef<UPrimaryAssetBase>(ID);
+}
+
 FAbilityItems FInventorySlots::GetItems()
 {
 	FAbilityItems Items;
@@ -123,7 +145,144 @@ FAbilityItems FInventorySlots::GetItems()
 	return Items;
 }
 
-UAbilityItemDataBase& FActorSaveData::GetItemData() const
+void FInventorySaveData::FillItems(int32 InLevel, FRandomStream InRandomStream)
 {
-	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityItemDataBase>(AssetID);
+	if(InRandomStream.GetInitialSeed() == 0) InRandomStream = FRandomStream(FMath::Rand());
+	
+	for(auto& Iter1 : FillRules)
+	{
+		if(Iter1.Key == EAbilityItemType::None) continue;
+
+		const FName ItemType = *UCommonStatics::GetEnumAuthoredNameByValue(TEXT("/Script/WHFramework.EAbilityItemType"), (int32)Iter1.Key);
+
+		int32 ItemNum = 0;
+		EAbilityItemRarity ItemParity = EAbilityItemRarity::None;
+		const float ParityRate = InRandomStream.FRand();
+		for(auto& Iter2 : Iter1.Value.Rules)
+		{
+			if(ParityRate <= Iter2.Value.Rate)
+			{
+				ItemParity = Iter2.Key;
+				switch(Iter2.Value.Type)
+				{
+					case EAbilityItemFillType::Fixed:
+					{
+						ItemNum = Iter2.Value.Num;
+						break;
+					}
+					case EAbilityItemFillType::Random:
+					{
+						ItemNum = InRandomStream.RandRange(Iter2.Value.MinNum, Iter2.Value.MaxNum);
+						break;
+					}
+					case EAbilityItemFillType::Rate:
+					{
+						const float ItemRate = InRandomStream.FRand();
+						for(auto& Iter3 : Iter2.Value.Items)
+						{
+							if(ItemRate < Iter3.Rate)
+							{
+								ItemNum = Iter3.Num;
+								break;
+							}
+						}
+						break;
+					}
+				}
+				break;
+			}
+		}
+
+		TArray<UAbilityItemDataBase*> ItemDatas;
+		for(auto Iter : UAssetModuleStatics::LoadPrimaryAssets<UAbilityItemDataBase>(ItemType))
+		{
+			if(Iter->Rarity == ItemParity)
+			{
+				ItemDatas.Add(Iter);
+			}
+		}
+
+		if(Iter1.Key == EAbilityItemType::Coin)
+		{
+			if (ItemDatas.IsValidIndex(0))
+			{
+				AddItem(FAbilityItem(ItemDatas[0]->GetPrimaryAssetId(), ItemNum, ItemDatas[0]->ClampLevel(InLevel)));
+			}
+		}
+		else
+		{
+			for (int32 i = 0; i < ItemNum; i++)
+			{
+				if(ItemDatas.IsEmpty()) break;
+
+				const int32 Index = InRandomStream.RandRange(0, ItemDatas.Num() - 1);
+				AddItem(FAbilityItem(ItemDatas[Index]->GetPrimaryAssetId(), InRandomStream.RandRange(1, FMath::CeilToInt(ItemDatas[Index]->MaxCount * (1.f / (int32)ItemParity))), ItemDatas[Index]->ClampLevel(InLevel)));
+				ItemDatas.RemoveAt(Index);
+			}
+		}
+	}
+}
+
+void FInventorySaveData::CopyItems(const FInventorySaveData& InSaveData)
+{
+	SplitItems = InSaveData.SplitItems;
+}
+
+void FInventorySaveData::AddItem(FAbilityItem InItem, bool bUnique)
+{
+	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(true, InventoryClass);
+
+	Inventory.LoadSaveData(this);
+	if(!bUnique || !Inventory.QueryItemByRange(EItemQueryType::Get, InItem).IsValid())
+	{
+		Inventory.AddItemByRange(InItem, 0, -1, false);
+	}
+
+	CopyItems(Inventory.GetSaveDataRef<FInventorySaveData>(true));
+}
+
+void FInventorySaveData::RemoveItem(FAbilityItem InItem)
+{
+	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(true, InventoryClass);
+
+	Inventory.LoadSaveData(this);
+	Inventory.RemoveItemByRange(InItem, 0, -1, false);
+
+	CopyItems(Inventory.GetSaveDataRef<FInventorySaveData>(true));
+}
+
+void FInventorySaveData::ClearItem(FAbilityItem InItem)
+{
+	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(true, InventoryClass);
+
+	Inventory.LoadSaveData(this);
+	Inventory.ClearItem(InItem);
+
+	CopyItems(Inventory.GetSaveDataRef<FInventorySaveData>(true));
+}
+
+void FInventorySaveData::ClearItems()
+{
+	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(true, InventoryClass);
+
+	Inventory.LoadSaveData(this);
+	Inventory.ClearItems();
+
+	CopyItems(Inventory.GetSaveDataRef<FInventorySaveData>(true));
+}
+
+UAbilityItemDataBase& FRaceItem::GetData() const
+{
+	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityItemDataBase>(ID);
+}
+
+void FActorSaveData::InitInventoryData(FRandomStream InRandomStream)
+{
+	InventoryData = GetData().InventoryData;
+	InventoryData.FillItems(Level, InRandomStream);
+}
+
+UAbilityActorDataBase& FActorSaveData::GetData() const
+{
+	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityActorDataBase>(AssetID);
 }

@@ -11,9 +11,33 @@
 
 FPrimaryAssetId UVoxelModuleStatics::VoxelTypeToAssetID(EVoxelType InVoxelType)
 {
-	if(InVoxelType == EVoxelType::Empty) FPrimaryAssetId();
+	return FPrimaryAssetId(FName("Voxel"), *FString::Printf(TEXT("DA_%s"), *UCommonStatics::GetEnumAuthoredNameByValue(TEXT("/Script/WHFramework.EVoxelType"), (int32)InVoxelType)));
+}
 
-	return FPrimaryAssetId(FName("Voxel"), *FString::Printf(TEXT("DA_Voxel_%s"), *UCommonStatics::GetEnumValueAuthoredName(TEXT("/Script/WHFramework.EVoxelType"), (int32)InVoxelType)));
+EVoxelTransparency UVoxelModuleStatics::VoxelNatureToTransparency(EVoxelNature InVoxelNature)
+{
+	switch (InVoxelNature)
+	{
+		case EVoxelNature::Solid:
+		{
+			return EVoxelTransparency::Solid;
+		}
+		case EVoxelNature::SemiSolid:
+		case EVoxelNature::TransSolid:
+		case EVoxelNature::Foliage:
+		{
+			return EVoxelTransparency::Semi;
+		}
+		case EVoxelNature::SmallSemiSolid:
+		case EVoxelNature::Liquid:
+		case EVoxelNature::SemiLiquid:
+		case EVoxelNature::SemiFoliage:
+		{
+			return EVoxelTransparency::Trans;
+		}
+		default: break;
+	}
+	return EVoxelTransparency::Solid;
 }
 
 FVoxelWorldSaveData& UVoxelModuleStatics::GetWorldData()
@@ -34,6 +58,41 @@ EVoxelWorldState UVoxelModuleStatics::GetWorldState()
 FVoxelWorldBasicSaveData UVoxelModuleStatics::GetWorldBasicData()
 {
 	return UVoxelModule::Get().GetWorldBasicData();
+}
+
+FVoxelTopography& UVoxelModuleStatics::GetTopographyByIndex(FIndex InIndex)
+{
+	return UVoxelModule::Get().GetTopographyByIndex(InIndex);
+}
+
+FVoxelTopography& UVoxelModuleStatics::GetTopographyByLocation(FVector InLocation)
+{
+	return UVoxelModule::Get().GetTopographyByLocation(InLocation);
+}
+
+void UVoxelModuleStatics::SetTopographyByIndex(FIndex InIndex, const FVoxelTopography& InTopography)
+{
+	UVoxelModule::Get().SetTopographyByIndex(InIndex, InTopography);
+}
+
+void UVoxelModuleStatics::SetTopographyLocation(FVector InLocation, const FVoxelTopography& InTopography)
+{
+	UVoxelModule::Get().SetTopographyLocation(InLocation, InTopography);
+}
+
+float UVoxelModuleStatics::GetVoxelNoise1D(float InValue, bool bAbs, bool bUnsigned)
+{
+	return UVoxelModule::Get().GetVoxelNoise1D(InValue, bAbs, bUnsigned);
+}
+
+float UVoxelModuleStatics::GetVoxelNoise2D(FVector2D InLocation, bool bAbs, bool bUnsigned)
+{
+	return UVoxelModule::Get().GetVoxelNoise2D(InLocation, bAbs, bUnsigned);
+}
+
+float UVoxelModuleStatics::GetVoxelNoise3D(FVector InLocation, bool bAbs, bool bUnsigned)
+{
+	return UVoxelModule::Get().GetVoxelNoise3D(InLocation, bAbs, bUnsigned);
 }
 
 FIndex UVoxelModuleStatics::LocationToChunkIndex(FVector InLocation, bool bIgnoreZ /*= false*/)
@@ -68,22 +127,22 @@ FIndex UVoxelModuleStatics::NumberToVoxelIndex(int32 InNumber)
 
 AVoxelChunk* UVoxelModuleStatics::FindChunkByIndex(FIndex InIndex)
 {
-	return UVoxelModule::Get().FindChunkByIndex(InIndex);
+	return UVoxelModule::Get().GetChunkByIndex(InIndex);
 }
 
 AVoxelChunk* UVoxelModuleStatics::FindChunkByLocation(FVector InLocation)
 {
-	return UVoxelModule::Get().FindChunkByLocation(InLocation);
+	return UVoxelModule::Get().GetChunkByLocation(InLocation);
 }
 
 FVoxelItem& UVoxelModuleStatics::FindVoxelByIndex(FIndex InIndex)
 {
-	return UVoxelModule::Get().FindVoxelByIndex(InIndex);
+	return UVoxelModule::Get().GetVoxelByIndex(InIndex);
 }
 
 FVoxelItem& UVoxelModuleStatics::FindVoxelByLocation(FVector InLocation)
 {
-	return UVoxelModule::Get().FindVoxelByLocation(InLocation);
+	return UVoxelModule::Get().GetVoxelByLocation(InLocation);
 }
 
 UVoxel& UVoxelModuleStatics::GetVoxel(EVoxelType InVoxelType)
@@ -117,16 +176,6 @@ UVoxel& UVoxelModuleStatics::GetVoxel(const FVoxelItem& InVoxelItem)
 	return Voxel;
 }
 
-EVoxelType UVoxelModuleStatics::GetNoiseVoxelType(FIndex InIndex)
-{
-	return UVoxelModule::Get().GetNoiseVoxelType(InIndex);
-}
-
-EVoxelType UVoxelModuleStatics::GetRandomVoxelType(FIndex InIndex)
-{
-	return UVoxelModule::Get().GetRandomVoxelType(InIndex);
-}
-
 bool UVoxelModuleStatics::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
 {
 	return UVoxelModule::Get().VoxelRaycastSinge(InRayStart, InRayEnd, InIgnoreActors, OutHitResult);
@@ -142,17 +191,17 @@ bool UVoxelModuleStatics::VoxelItemTraceSingle(const FVoxelItem& InVoxelItem, co
 	return UVoxelModule::Get().VoxelItemTraceSingle(InVoxelItem, InIgnoreActors, OutHitResult);
 }
 
-bool UVoxelModuleStatics::VoxelAgentTraceSingle(FIndex InChunkIndex, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock, int32 InMaxCount, bool bFromCenter)
+bool UVoxelModuleStatics::VoxelAgentTraceSingle(FIndex InChunkIndex, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock, int32 InMaxCount, bool bFromCenter, bool bForce)
 {
-	return UVoxelModule::Get().VoxelAgentTraceSingle(InChunkIndex, InRadius, InHalfHeight, InIgnoreActors, OutHitResult, bSnapToBlock, InMaxCount, bFromCenter);
+	return UVoxelModule::Get().VoxelAgentTraceSingle(InChunkIndex, InRadius, InHalfHeight, InIgnoreActors, OutHitResult, bSnapToBlock, InMaxCount, bFromCenter, bForce);
 }
 
-bool UVoxelModuleStatics::VoxelAgentTraceSingle(FVector InLocation, FVector2D InRange, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock, int32 InMaxCount, bool bFromCenter)
+bool UVoxelModuleStatics::VoxelAgentTraceSingle(FVector InLocation, FVector2D InRange, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock, int32 InMaxCount, bool bFromCenter, bool bForce)
 {
-	return UVoxelModule::Get().VoxelAgentTraceSingle(InLocation, InRange, InRadius, InHalfHeight, InIgnoreActors, OutHitResult, bSnapToBlock, InMaxCount, bFromCenter);
+	return UVoxelModule::Get().VoxelAgentTraceSingle(InLocation, InRange, InRadius, InHalfHeight, InIgnoreActors, OutHitResult, bSnapToBlock, InMaxCount, bFromCenter, bForce);
 }
 
-bool UVoxelModuleStatics::VoxelAgentTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
+bool UVoxelModuleStatics::VoxelAgentTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bCheckVoxel)
 {
-	return UVoxelModule::Get().VoxelAgentTraceSingle(InRayStart, InRayEnd, InRadius, InHalfHeight, InIgnoreActors, OutHitResult);
+	return UVoxelModule::Get().VoxelAgentTraceSingle(InRayStart, InRayEnd, InRadius, InHalfHeight, InIgnoreActors, OutHitResult, bCheckVoxel);
 }

@@ -4,7 +4,6 @@
 
 #include "Common/CommonStatics.h"
 #include "Scene/SceneModule.h"
-#include "Main/MainModule.h"
 
 USceneSaveGame::USceneSaveGame()
 {

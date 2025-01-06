@@ -14,7 +14,10 @@
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UProcedureBlueprint : public UBlueprint
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UProcedureBlueprint(const FObjectInitializer& ObjectInitializer);
 
 #if WITH_EDITOR
 

@@ -3,85 +3,101 @@
 #include "Ability/Inventory/AbilityInventoryBase.h"
 
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
-#include "Ability/Inventory/Slot/AbilityInventorySlot.h"
-#include "Ability/Inventory/Slot/AbilityInventoryAuxiliarySlot.h"
-#include "Ability/Inventory/Slot/AbilityInventoryEquipSlot.h"
-#include "Ability/Inventory/Slot/AbilityInventoryShortcutSlot.h"
-#include "Ability/Inventory/Slot/AbilityInventorySkillSlot.h"
+#include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
+#include "Ability/Inventory/Slot/AbilityInventoryAuxiliarySlotBase.h"
+#include "Ability/Inventory/Slot/AbilityInventoryEquipSlotBase.h"
+#include "Ability/Inventory/Slot/AbilityInventoryShortcutSlotBase.h"
+#include "Ability/Inventory/Slot/AbilityInventorySkillSlotBase.h"
+#include "Common/CommonStatics.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 
 UAbilityInventoryBase::UAbilityInventoryBase()
 {
 	SplitSlots = TMap<ESlotSplitType, FInventorySlots>();
+	SelectedIndexs = TMap<ESlotSplitType, int32>();
 	ConnectInventory = nullptr;
-	SelectedSlot = nullptr;
 
-	ShortcutSlotClass = UAbilityInventoryShortcutSlot::StaticClass();
-	AuxiliarySlotClass = UAbilityInventoryAuxiliarySlot::StaticClass();
-	EquipSlotClass = UAbilityInventoryEquipSlot::StaticClass();
-	SkillSlotClass = UAbilityInventorySkillSlot::StaticClass();
+	ShortcutSlotClass = UAbilityInventoryShortcutSlotBase::StaticClass();
+	AuxiliarySlotClass = UAbilityInventoryAuxiliarySlotBase::StaticClass();
+	EquipSlotClass = UAbilityInventoryEquipSlotBase::StaticClass();
+	SkillSlotClass = UAbilityInventorySkillSlotBase::StaticClass();
+}
+
+void UAbilityInventoryBase::OnReset_Implementation()
+{
+	for(auto& Iter1 : SplitSlots)
+	{
+		UObjectPoolModuleStatics::DespawnObjects(Iter1.Value.Slots);
+	}
+	SplitSlots.Empty();
+	SelectedIndexs.Empty();
+	ConnectInventory = nullptr;
+	OnSlotSelected.Clear();
 }
 
 void UAbilityInventoryBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData->CastRef<FInventorySaveData>();
 
-	if(PHASEC(InPhase, EPhase::All))
+	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		for(auto& Iter1 : SplitSlots)
-		{
-			for(const auto& Iter2 : Iter1.Value.Slots)
-			{
-				UObjectPoolModuleStatics::DespawnObject(Iter2);
-			}
-		}
-		SplitSlots.Empty();
 		for (auto& Iter : SaveData.SplitItems)
 		{
 			for (int32 i = 0; i < Iter.Value.Items.Num(); i++)
 			{
-				FAbilityItem& Item = Iter.Value.Items[i];
-				UAbilityInventorySlot* Slot = nullptr;
+				UAbilityInventorySlotBase* Slot = nullptr;
 				switch(Iter.Key)
 				{
 					case ESlotSplitType::Default:
 					{
-						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventorySlot>();
+						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventorySlotBase>();
 						Slot->OnInitialize(this, EAbilityItemType::None, Iter.Key, i);
 						break;
 					}
 					case ESlotSplitType::Shortcut:
 					{
-						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventoryShortcutSlot>(nullptr, nullptr, false, ShortcutSlotClass);
+						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventoryShortcutSlotBase>(nullptr, nullptr, ShortcutSlotClass);
 						Slot->OnInitialize(this, EAbilityItemType::None, Iter.Key, i);
-						if(i == SaveData.SelectedIndex)
-						{
-							SetSelectedSlot(Slot);
-						}
 						break;
 					}
 					case ESlotSplitType::Auxiliary:
 					{
-						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventoryAuxiliarySlot>(nullptr, nullptr, false, AuxiliarySlotClass);
+						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventoryAuxiliarySlotBase>(nullptr, nullptr, AuxiliarySlotClass);
 						Slot->OnInitialize(this, EAbilityItemType::None, Iter.Key, i);
 						break;
 					}
 					case ESlotSplitType::Equip:
 					{
-						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventoryEquipSlot>(nullptr, nullptr, false, EquipSlotClass);
+						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventoryEquipSlotBase>(nullptr, nullptr, EquipSlotClass);
 						Slot->OnInitialize(this, EAbilityItemType::Equip, Iter.Key, i);
 						break;
 					}
 					case ESlotSplitType::Skill:
 					{
-						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventorySkillSlot>(nullptr, nullptr, false, SkillSlotClass);
+						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventorySkillSlotBase>(nullptr, nullptr, SkillSlotClass);
 						Slot->OnInitialize(this, EAbilityItemType::Skill, Iter.Key, i);
 						break;
 					}
 					default: break;
 				}
 				SplitSlots.FindOrAdd(Iter.Key).Slots.Add(Slot);
+			}
+		}
+	}
+
+	if(PHASEC(InPhase, EPhase::All))
+	{
+		for (auto& Iter : SaveData.SplitItems)
+		{
+			for (int32 i = 0; i < Iter.Value.Items.Num(); i++)
+			{
+				FAbilityItem& Item = Iter.Value.Items[i];
+				UAbilityInventorySlotBase* Slot = SplitSlots.FindOrAdd(Iter.Key).Slots[i];
 				Slot->SetItem(Item);
+				if(SaveData.SelectedIndexs.Contains(Iter.Key) ? SaveData.SelectedIndexs[Iter.Key] == i : i == 0)
+				{
+					SetSelectedSlot(Iter.Key, i);
+				}
 			}
 		}
 	}
@@ -92,65 +108,93 @@ FSaveData* UAbilityInventoryBase::ToData()
 	static FInventorySaveData SaveData;
 	SaveData = FInventorySaveData();
 
+	SaveData.InventoryClass = GetClass();
 	for(auto& Iter : SplitSlots)
 	{
 		SaveData.SplitItems.Add(Iter.Key, Iter.Value.GetItems());
 	}
-	if(SelectedSlot)
-	{
-		SaveData.SelectedIndex = SelectedSlot->GetSplitIndex();
-	}
+	SaveData.SelectedIndexs = SelectedIndexs;
 	return &SaveData;
 }
 
 void UAbilityInventoryBase::UnloadData(EPhase InPhase)
 {
-	SplitSlots.Empty();
 	for(auto& Iter1 : SplitSlots)
 	{
-		for(auto& Iter2 : Iter1.Value.Slots)
-		{
-			UObjectPoolModuleStatics::DespawnObject(Iter2);
-		}
+		UObjectPoolModuleStatics::DespawnObjects(Iter1.Value.Slots);
 	}
 	SplitSlots.Empty();
+	SelectedIndexs.Empty();
 	ConnectInventory = nullptr;
-	SelectedSlot = nullptr;
 	OnSlotSelected.Clear();
 }
 
-FItemQueryInfo UAbilityInventoryBase::QueryItemByRange(EItemQueryType InQueryType, FAbilityItem InItem, int32 InStartIndex, int32 InEndIndex)
+FItemQueryData UAbilityInventoryBase::QueryItemByRange(EItemQueryType InQueryType, FAbilityItem InItem, int32 InStartIndex, int32 InEndIndex)
 {
-	TArray<UAbilityInventorySlot*> Slots = GetSlots();
-	if (!InItem.IsValid() || Slots.IsEmpty()) return FItemQueryInfo();
+	TArray<UAbilityInventorySlotBase*> Slots = GetAllSlots();
+	if (!InItem.IsValid() || Slots.IsEmpty()) return FItemQueryData();
 
 	int32 StartIndex;
-	if (InStartIndex == -1) StartIndex = GetSelectedSlot() ? Slots.IndexOfByKey(GetSelectedSlot()) : 0;
+	if (InStartIndex == -1) StartIndex = GetSelectedSlot(ESlotSplitType::Shortcut) ? Slots.IndexOfByKey(GetSelectedSlot(ESlotSplitType::Shortcut)) : 0;
 	else StartIndex = FMath::Clamp(InStartIndex, 0, Slots.Num() - 1);
 	if(InEndIndex != -1) InEndIndex = FMath::Clamp(InEndIndex, InStartIndex, Slots.Num() - 1);
 
-	FItemQueryInfo QueryInfo;
+	FItemQueryData QueryData;
 	#define ITERATION1(Index, Expression) \
 	for (int32 Index = (InStartIndex == -1 ? 0 : StartIndex); i <= (InEndIndex == -1 ? (Slots.Num() - 1) : InEndIndex); i++) \
 	{ \
 		Expression \
 	}
+	#define EXPRESSION1(Index) \
+	if (Slots[Index]->ContainsItem(InItem)) \
+	{ \
+		if (!QueryData.Slots.Contains(Slots[Index])) \
+		{ \
+			QueryData.Slots.Add(Slots[Index]); \
+			QueryData.Item.Count += Slots[Index]->GetItem().Count; \
+			if (InItem.Count > 0 && QueryData.Item.Count >= InItem.Count) goto END; \
+		} \
+	}
+	#define EXPRESSION2(Index) \
+	if (Slots[Index]->ContainsItem(InItem)) \
+	{ \
+		if (!QueryData.Slots.Contains(Slots[Index])) \
+		{ \
+			QueryData.Slots.Add(Slots[Index]); \
+			InItem.Count -= Slots[Index]->GetItem().Count; \
+			if (InItem.Count <= 0) goto END; \
+		} \
+	}
+	#define EXPRESSION3(Index, bPutIn) \
+	if (Slots[Index]->MatchItem(InItem, bPutIn)) \
+	{ \
+		if (!QueryData.Slots.Contains(Slots[Index])) \
+		{ \
+			QueryData.Slots.Add(Slots[Index]); \
+			InItem.Count -= Slots[Index]->GetRemainVolume(InItem); \
+			if (InItem.Count <= 0) goto END; \
+		} \
+	}
+	#define EXPRESSION4(bCheckSplit, bPutIn, bContains) \
+	ITERATION1(i , \
+		if ((!bCheckSplit || Slots[i]->MatchItemSplit(InItem, true)) && (!bContains || Slots[i]->ContainsItem(InItem))) \
+		{ \
+			EXPRESSION3(i, bPutIn) \
+		} \
+	)
+	#define EXPRESSION5(bCheckSplit, bPutIn, bEmpty) \
+	ITERATION1(i , \
+		if ((!bCheckSplit || Slots[i]->MatchItemSplit(InItem, true)) && (!bEmpty || Slots[i]->IsEmpty())) \
+		{ \
+			EXPRESSION3(i, bPutIn) \
+		} \
+	)
 
 	switch (InQueryType)
 	{
 		case EItemQueryType::Get:
 		{
-			QueryInfo.Item = FAbilityItem(InItem, 0);
-			#define EXPRESSION1(Index) \
-			if (Slots[Index]->Contains(InItem)) \
-			{ \
-				if (!QueryInfo.Slots.Contains(Slots[Index])) \
-				{ \
-					QueryInfo.Slots.Add(Slots[Index]); \
-					QueryInfo.Item.Count += Slots[Index]->GetItem().Count; \
-					if (InItem.Count > 0 && QueryInfo.Item.Count >= InItem.Count) goto END; \
-				} \
-			}
+			QueryData.Item = FAbilityItem(InItem, 0);
 			if (InStartIndex == -1)
 			{
 				EXPRESSION1(StartIndex)
@@ -162,68 +206,55 @@ FItemQueryInfo UAbilityInventoryBase::QueryItemByRange(EItemQueryType InQueryTyp
 		}
 		case EItemQueryType::Add:
 		{
-			QueryInfo.Item = InItem;
+			QueryData.Item = InItem;
 			if (InItem.Count <= 0) goto END;
-			#define EXPRESSION2(Index) \
-			if (Slots[Index]->CanPutIn(InItem)) \
-			{ \
-				if (!QueryInfo.Slots.Contains(Slots[Index])) \
-				{ \
-					QueryInfo.Slots.Add(Slots[Index]); \
-					InItem.Count -= Slots[Index]->GetRemainVolume(InItem); \
-					if (InItem.Count <= 0) goto END; \
-				} \
-			}
-			#define EXPRESSION3(bNeedMatch, bNeedContains) \
-			ITERATION1(i , \
-				if ((!bNeedMatch || Slots[i]->IsMatch(InItem, true)) && (!bNeedContains || Slots[i]->Contains(InItem))) \
-				{ \
-					EXPRESSION2(i) \
-				} \
-			)
-			EXPRESSION3(true, false)
+			EXPRESSION4(true, true, false)
 			if (InStartIndex == -1)
 			{
-				EXPRESSION2(StartIndex)
+				EXPRESSION3(StartIndex, true)
 			}
-			EXPRESSION3(false, true)
-			EXPRESSION3(false, false)
+			EXPRESSION4(false, true, true)
+			EXPRESSION4(false, true, false)
+			break;
+		}
+		case EItemQueryType::Split:
+		{
+			QueryData.Item = InItem;
+			if (InItem.Count <= 0) goto END;
+			EXPRESSION5(false, true, true)
 			break;
 		}
 		case EItemQueryType::Remove:
 		{
-			QueryInfo.Item = InItem;
+			QueryData.Item = InItem;
 			if (InItem.Count <= 0) goto END;
-			#define EXPRESSION4(Index) \
-			if (Slots[Index]->Contains(InItem)) \
-			{ \
-				if (!QueryInfo.Slots.Contains(Slots[Index])) \
-				{ \
-					QueryInfo.Slots.Add(Slots[Index]); \
-					InItem.Count -= Slots[Index]->GetItem().Count; \
-					if (InItem.Count <= 0) goto END; \
-				} \
-			}
 			if (InStartIndex == -1)
 			{
-				EXPRESSION4(StartIndex)
+				EXPRESSION2(StartIndex)
 			}
 			ITERATION1(i ,
-				EXPRESSION4(i)
+				EXPRESSION2(i)
 			)
+			break;
+		}
+		case EItemQueryType::Match:
+		{
+			QueryData.Item = InItem;
+			if (InItem.Count <= 0) goto END;
+			EXPRESSION4(true, false, false)
 			break;
 		}
 	}
 	END:
 	if(InItem.Count > 0)
 	{
-		if(InQueryType != EItemQueryType::Get) QueryInfo.Item.Count -= InItem.Count;
-		else QueryInfo.Item.Count = FMath::Clamp(QueryInfo.Item.Count, 0, InItem.Count);
+		if(InQueryType != EItemQueryType::Get) QueryData.Item.Count -= InItem.Count;
+		else QueryData.Item.Count = FMath::Clamp(QueryData.Item.Count, 0, InItem.Count);
 	}
-	return QueryInfo;
+	return QueryData;
 }
 
-FItemQueryInfo UAbilityInventoryBase::QueryItemBySplitType(EItemQueryType InQueryType, FAbilityItem InItem, ESlotSplitType InSplitType)
+FItemQueryData UAbilityInventoryBase::QueryItemBySplitType(EItemQueryType InQueryType, FAbilityItem InItem, ESlotSplitType InSplitType)
 {
 	int32 StartIndex = 0;
 	int32 EndIndex = 0;
@@ -239,118 +270,116 @@ FItemQueryInfo UAbilityInventoryBase::QueryItemBySplitType(EItemQueryType InQuer
 	return QueryItemByRange(InQueryType, InItem, StartIndex, EndIndex);
 }
 
-FItemQueryInfo UAbilityInventoryBase::QueryItemBySplitTypes(EItemQueryType InQueryType, FAbilityItem InItem, const TArray<ESlotSplitType>& InSplitTypes)
+FItemQueryData UAbilityInventoryBase::QueryItemBySplitTypes(EItemQueryType InQueryType, FAbilityItem InItem, const TArray<ESlotSplitType>& InSplitTypes)
 {
-	FItemQueryInfo QueryInfo;
+	FItemQueryData QueryData;
 	for(auto& Iter : InSplitTypes)
 	{
-		QueryInfo += QueryItemBySplitType(InQueryType, InItem, Iter);
-		InItem.Count -= QueryInfo.Item.Count;
+		QueryData += QueryItemBySplitType(InQueryType, InItem, Iter);
+		InItem.Count -= QueryData.Item.Count;
 		if(InItem.Count <= 0) break;
 	}
-	return QueryInfo;
+	return QueryData;
 }
 
-void UAbilityInventoryBase::AddItemBySlots(FAbilityItem& InItem, const TArray<UAbilityInventorySlot*>& InSlots, bool bAddition)
+void UAbilityInventoryBase::AddItemByRange(FAbilityItem& InItem, int32 InStartIndex, int32 InEndIndex, bool bBroadcast)
 {
-	auto tmpItem = InItem;
-	for(int i = 0; i < InSlots.Num(); i++)
-	{
-		InSlots[i]->AddItem(InItem);
-		if (InItem.Count <= 0) break;
-	}
-	tmpItem.Count -= InItem.Count;
-	if(auto Agent = GetOwnerAgent())
-	{
-		if(bAddition) Agent->OnAdditionItem(tmpItem);
-	}
+	const auto QueryData = QueryItemByRange(EItemQueryType::Add, InItem, InStartIndex, InEndIndex);
+	AddItemBySlots(InItem, QueryData.Slots, bBroadcast);
 }
 
-void UAbilityInventoryBase::AddItemByRange(FAbilityItem& InItem, int32 InStartIndex, int32 InEndIndex, bool bAddition)
+void UAbilityInventoryBase::AddItemBySplitType(FAbilityItem& InItem, ESlotSplitType InSplitType, bool bBroadcast)
 {
-	const auto QueryInfo = QueryItemByRange(EItemQueryType::Add, InItem, InStartIndex, InEndIndex);
-	AddItemBySlots(InItem, QueryInfo.Slots, bAddition);
+	const auto QueryData = QueryItemBySplitType(EItemQueryType::Add, InItem, InSplitType);
+	AddItemBySlots(InItem, QueryData.Slots, bBroadcast);
 }
 
-void UAbilityInventoryBase::AddItemBySplitType(FAbilityItem& InItem, ESlotSplitType InSplitType, bool bAddition)
+void UAbilityInventoryBase::AddItemBySplitTypes(FAbilityItem& InItem, const TArray<ESlotSplitType>& InSplitTypes, bool bBroadcast)
 {
-	const auto QueryInfo = QueryItemBySplitType(EItemQueryType::Add, InItem, InSplitType);
-	AddItemBySlots(InItem, QueryInfo.Slots, bAddition);
+	const auto QueryData = QueryItemBySplitTypes(EItemQueryType::Add, InItem, InSplitTypes);
+	AddItemBySlots(InItem, QueryData.Slots, bBroadcast);
 }
 
-void UAbilityInventoryBase::AddItemBySplitTypes(FAbilityItem& InItem, const TArray<ESlotSplitType>& InSplitTypes, bool bAddition)
+void UAbilityInventoryBase::AddItemByQueryData(FItemQueryData& InQueryData, bool bBroadcast)
 {
-	const auto QueryInfo = QueryItemBySplitTypes(EItemQueryType::Add, InItem, InSplitTypes);
-	AddItemBySlots(InItem, QueryInfo.Slots, bAddition);
+	AddItemBySlots(InQueryData.Item, InQueryData.Slots, bBroadcast);
 }
 
-void UAbilityInventoryBase::AddItemByQueryInfo(FItemQueryInfo& InQueryInfo, bool bAddition)
+void UAbilityInventoryBase::RemoveItemByRange(FAbilityItem& InItem, int32 InStartIndex, int32 InEndIndex, bool bBroadcast)
 {
-	AddItemBySlots(InQueryInfo.Item, InQueryInfo.Slots, bAddition);
+	const auto QueryData = QueryItemByRange(EItemQueryType::Remove, InItem, InStartIndex, InEndIndex);
+	RemoveItemBySlots(InItem, QueryData.Slots, bBroadcast);
 }
 
-void UAbilityInventoryBase::RemoveItemBySlots(FAbilityItem& InItem, const TArray<UAbilityInventorySlot*>& InSlots)
+void UAbilityInventoryBase::RemoveItemBySplitType(FAbilityItem& InItem, ESlotSplitType InSplitType, bool bBroadcast)
 {
-	for (int i = 0; i < InSlots.Num(); i++)
-	{
-		InSlots[i]->SubItem(InItem);
-		if (InItem.Count <= 0) break;
-	}
+	const auto QueryData = QueryItemBySplitType(EItemQueryType::Remove, InItem, InSplitType);
+	RemoveItemBySlots(InItem, QueryData.Slots, bBroadcast);
 }
 
-void UAbilityInventoryBase::RemoveItemByRange(FAbilityItem& InItem, int32 InStartIndex, int32 InEndIndex)
+void UAbilityInventoryBase::RemoveItemBySplitTypes(FAbilityItem& InItem, const TArray<ESlotSplitType>& InSplitTypes, bool bBroadcast)
 {
-	const auto QueryInfo = QueryItemByRange(EItemQueryType::Remove, InItem, InStartIndex, InEndIndex);
-	RemoveItemBySlots(InItem, QueryInfo.Slots);
+	const auto QueryData = QueryItemBySplitTypes(EItemQueryType::Remove, InItem, InSplitTypes);
+	RemoveItemBySlots(InItem, QueryData.Slots, bBroadcast);
 }
 
-void UAbilityInventoryBase::RemoveItemBySplitType(FAbilityItem& InItem, ESlotSplitType InSplitType)
+void UAbilityInventoryBase::RemoveItemByQueryData(FItemQueryData& InQueryData, bool bBroadcast)
 {
-	const auto QueryInfo = QueryItemBySplitType(EItemQueryType::Remove, InItem, InSplitType);
-	RemoveItemBySlots(InItem, QueryInfo.Slots);
-}
-
-void UAbilityInventoryBase::RemoveItemBySplitTypes(FAbilityItem& InItem, const TArray<ESlotSplitType>& InSplitTypes)
-{
-	const auto QueryInfo = QueryItemBySplitTypes(EItemQueryType::Remove, InItem, InSplitTypes);
-	RemoveItemBySlots(InItem, QueryInfo.Slots);
-}
-
-void UAbilityInventoryBase::RemoveItemByQueryInfo(FItemQueryInfo& InQueryInfo)
-{
-	RemoveItemBySlots(InQueryInfo.Item, InQueryInfo.Slots);
+	RemoveItemBySlots(InQueryData.Item, InQueryData.Slots, bBroadcast);
 }
 
 void UAbilityInventoryBase::MoveItemByRange(UAbilityInventoryBase* InTargetInventory, FAbilityItem& InItem, int32 InSelfStartIndex, int32 InSelfEndIndex, int32 InTargetStartIndex, int32 InTargetEndIndex)
 {
-	const auto QueryInfo = InTargetInventory->QueryItemByRange(EItemQueryType::Remove, InItem, InTargetStartIndex, InTargetEndIndex);
-	InItem.Count = InItem.Count != -1 ? FMath::Min(InItem.Count, QueryInfo.Item.Count) : QueryInfo.Item.Count;
-	FAbilityItem tmpItem = FAbilityItem(InItem);
-	RemoveItemByRange(tmpItem, InSelfStartIndex, InSelfEndIndex);
-	InItem -= tmpItem;
+	const auto QueryData = InTargetInventory->QueryItemByRange(EItemQueryType::Remove, InItem, InTargetStartIndex, InTargetEndIndex);
+	InItem.Count = InItem.Count != -1 ? FMath::Min(InItem.Count, QueryData.Item.Count) : QueryData.Item.Count;
+	FAbilityItem _Item = FAbilityItem(InItem);
+	RemoveItemByRange(_Item, InSelfStartIndex, InSelfEndIndex);
+	InItem -= _Item;
 	InTargetInventory->AddItemByRange(InItem, InTargetStartIndex, InTargetEndIndex);
 }
 
 void UAbilityInventoryBase::MoveItemBySplitType(UAbilityInventoryBase* InTargetInventory, FAbilityItem& InItem, ESlotSplitType InSelfSlotSplitType, ESlotSplitType InTargetSlotSplitType)
 {
-	const auto QueryInfo = InTargetInventory->QueryItemBySplitType(EItemQueryType::Remove, InItem, InTargetSlotSplitType);
-	InItem.Count = InItem.Count != -1 ? FMath::Min(InItem.Count, QueryInfo.Item.Count) : QueryInfo.Item.Count;
-	FAbilityItem tmpItem = FAbilityItem(InItem);
-	RemoveItemBySplitType(tmpItem, InSelfSlotSplitType);
-	InItem -= tmpItem;
+	const auto QueryData = InTargetInventory->QueryItemBySplitType(EItemQueryType::Remove, InItem, InTargetSlotSplitType);
+	InItem.Count = InItem.Count != -1 ? FMath::Min(InItem.Count, QueryData.Item.Count) : QueryData.Item.Count;
+	FAbilityItem _Item = FAbilityItem(InItem);
+	RemoveItemBySplitType(_Item, InSelfSlotSplitType);
+	InItem -= _Item;
 	InTargetInventory->AddItemBySplitType(InItem, InTargetSlotSplitType);
+}
+
+void UAbilityInventoryBase::ResetItems()
+{
+	for(auto& Iter1 : SplitSlots)
+	{
+		for(auto& Iter2 : Iter1.Value.Slots)
+		{
+			Iter2->Reset();
+		}
+	}
+}
+
+void UAbilityInventoryBase::RefreshItems()
+{
+	for(auto& Iter1 : SplitSlots)
+	{
+		for(auto& Iter2 : Iter1.Value.Slots)
+		{
+			Iter2->Refresh();
+		}
+	}
 }
 
 void UAbilityInventoryBase::ClearItem(FAbilityItem InItem)
 {
-	auto QueryInfo = QueryItemByRange(EItemQueryType::Get, InItem);
-	for (int i = 0; i < QueryInfo.Slots.Num(); i++)
+	auto QueryData = QueryItemByRange(EItemQueryType::Get, InItem);
+	for (int i = 0; i < QueryData.Slots.Num(); i++)
 	{
-		QueryInfo.Slots[i]->ClearItem();
+		QueryData.Slots[i]->ClearItem();
 	}
 }
 
-void UAbilityInventoryBase::ClearAllItem()
+void UAbilityInventoryBase::ClearItems()
 {
 	for(auto& Iter1 : SplitSlots)
 	{
@@ -361,7 +390,7 @@ void UAbilityInventoryBase::ClearAllItem()
 	}
 }
 
-void UAbilityInventoryBase::DiscardAllItem()
+void UAbilityInventoryBase::DiscardItems()
 {
 	for(auto& Iter1 : SplitSlots)
 	{
@@ -372,26 +401,81 @@ void UAbilityInventoryBase::DiscardAllItem()
 	}
 }
 
+void UAbilityInventoryBase::AddItemBySlots(FAbilityItem& InItem, const TArray<UAbilityInventorySlotBase*>& InSlots, bool bBroadcast)
+{
+	if(InSlots.Num() == 0) return;
+	
+	auto _Item = InItem;
+	if(InItem.GetType() != EAbilityItemType::Misc)
+	{
+		for(int i = 0; i < InSlots.Num(); i++)
+		{
+			InSlots[i]->AddItem(InItem);
+			if (InItem.Count <= 0) break;
+		}
+		_Item.Count -= InItem.Count;
+	}
+	if(auto Agent = GetOwnerAgent())
+	{
+		if(bBroadcast) Agent->OnAdditionItem(_Item);
+	}
+}
+
+void UAbilityInventoryBase::RemoveItemBySlots(FAbilityItem& InItem, const TArray<UAbilityInventorySlotBase*>& InSlots, bool bBroadcast)
+{
+	if(InSlots.Num() == 0) return;
+	
+	auto _Item = InItem;
+	if(InItem.GetType() != EAbilityItemType::Misc)
+	{
+		for (int i = 0; i < InSlots.Num(); i++)
+		{
+			InSlots[i]->SubItem(InItem);
+			if (InItem.Count <= 0) break;
+		}
+		_Item.Count -= InItem.Count;
+	}
+	if(auto Agent = GetOwnerAgent())
+	{
+		if(bBroadcast) Agent->OnRemoveItem(_Item);
+	}
+}
+
 TScriptInterface<IAbilityInventoryAgentInterface> UAbilityInventoryBase::GetOwnerAgent() const
 {
 	return GetOuter();
 }
 
-void UAbilityInventoryBase::SetSelectedSlot(UAbilityInventorySlot* InSelectedSlot)
+UAbilityInventorySlotBase* UAbilityInventoryBase::GetSelectedSlot(ESlotSplitType InSplitType) const
 {
-	SelectedSlot = InSelectedSlot;
-	OnSlotSelected.Broadcast(InSelectedSlot);
-	if(auto Agent = GetOwnerAgent())
+	if(SelectedIndexs.Contains(InSplitType))
 	{
-		Agent->OnSelectItem(InSelectedSlot->GetItem());
+		return GetSlotBySplitTypeAndIndex(InSplitType, SelectedIndexs[InSplitType]);
+	}
+	return nullptr;
+}
+
+void UAbilityInventoryBase::SetSelectedSlot(ESlotSplitType InSplitType, int32 InSlotIndex)
+{
+	if(!SelectedIndexs.Contains(InSplitType) || SelectedIndexs[InSplitType] != InSlotIndex)
+	{
+		SelectedIndexs.Emplace(InSplitType, InSlotIndex);
+		if(UAbilityInventorySlotBase* SelectedSlot = GetSelectedSlot(InSplitType))
+		{
+			OnSlotSelected.Broadcast(SelectedSlot);
+			if(auto Agent = GetOwnerAgent())
+			{
+				Agent->OnSelectItem(SelectedSlot->GetItem());
+			}
+		}
 	}
 }
 
-FAbilityItem& UAbilityInventoryBase::GetSelectedItem() const
+FAbilityItem& UAbilityInventoryBase::GetSelectedItem(ESlotSplitType InSplitType) const
 {
-	if(GetSelectedSlot())
+	if(GetSelectedSlot(InSplitType))
 	{
-		return GetSelectedSlot()->GetItem();
+		return GetSelectedSlot(InSplitType)->GetItem();
 	}
 	return FAbilityItem::Empty;
 }
@@ -414,9 +498,9 @@ bool UAbilityInventoryBase::HasSplitType(ESlotSplitType InSplitType) const
 	return SplitSlots.Contains(InSplitType);
 }
 
-TArray<UAbilityInventorySlot*> UAbilityInventoryBase::GetSlots()
+TArray<UAbilityInventorySlotBase*> UAbilityInventoryBase::GetAllSlots() const
 {
-	TArray<UAbilityInventorySlot*> Slots;
+	TArray<UAbilityInventorySlotBase*> Slots;
 	for(auto& Iter1 : SplitSlots)
 	{
 		for(auto& Iter2 : Iter1.Value.Slots)
@@ -427,18 +511,69 @@ TArray<UAbilityInventorySlot*> UAbilityInventoryBase::GetSlots()
 	return Slots;
 }
 
-TArray<UAbilityInventorySlot*> UAbilityInventoryBase::GetSlotsBySplitType(ESlotSplitType InSplitType)
+TArray<FAbilityItem> UAbilityInventoryBase::GetAllItems() const
+{
+	TArray<FAbilityItem> Items;
+	for(auto Iter1 : GetAllSlots())
+	{
+		bool bMatched = false;
+		for(auto& Iter2 : Items)
+		{
+			if(Iter2.Match(Iter1->GetItem()))
+			{
+				Iter2 += Iter1->GetItem();
+				bMatched = true;
+				break;
+			}
+		}
+		if(!bMatched)
+		{
+			Items.Add(Iter1->GetItem());
+		}
+	}
+	return Items;
+}
+
+TMap<EAbilityItemType, FAbilityItems> UAbilityInventoryBase::GetAllItemMap() const
+{
+	TMap<EAbilityItemType, FAbilityItems> ItemMap;
+	for(int32 i = 1; i < UCommonStatics::GetEnumItemNum(TEXT("/Script/WHFramework.EAbilityItemType")); i++)
+	{
+		ItemMap.Add((EAbilityItemType)i);
+	}
+	for(auto Iter1 : GetAllSlots())
+	{
+		bool bMatched = false;
+		FAbilityItems& Items = ItemMap[Iter1->GetItem().GetType()];
+		for(auto& Iter2 : Items.Items)
+		{
+			if(Iter2.Match(Iter1->GetItem()))
+			{
+				Iter2 += Iter1->GetItem();
+				bMatched = true;
+				break;
+			}
+		}
+		if(!bMatched)
+		{
+			Items.Items.Add(Iter1->GetItem());
+		}
+	}
+	return ItemMap;
+}
+
+TArray<UAbilityInventorySlotBase*> UAbilityInventoryBase::GetSlotsBySplitType(ESlotSplitType InSplitType) const
 {
 	if(SplitSlots.Contains(InSplitType))
 	{
 		return SplitSlots[InSplitType].Slots;
 	}
-	return TArray<UAbilityInventorySlot*>();
+	return TArray<UAbilityInventorySlotBase*>();
 }
 
-UAbilityInventorySlot* UAbilityInventoryBase::GetSlotBySplitTypeAndIndex(ESlotSplitType InSplitType, int32 InIndex)
+UAbilityInventorySlotBase* UAbilityInventoryBase::GetSlotBySplitTypeAndIndex(ESlotSplitType InSplitType, int32 InIndex) const
 {
-	TArray<UAbilityInventorySlot*> Slots = GetSlotsBySplitType(InSplitType);
+	TArray<UAbilityInventorySlotBase*> Slots = GetSlotsBySplitType(InSplitType);
 	if(Slots.IsValidIndex(InIndex))
 	{
 		return Slots[InIndex];
@@ -446,7 +581,7 @@ UAbilityInventorySlot* UAbilityInventoryBase::GetSlotBySplitTypeAndIndex(ESlotSp
 	return nullptr;
 }
 
-UAbilityInventorySlot* UAbilityInventoryBase::GetSlotBySplitTypeAndItemID(ESlotSplitType InSplitType, const FPrimaryAssetId& InItemID)
+UAbilityInventorySlotBase* UAbilityInventoryBase::GetSlotBySplitTypeAndItemID(ESlotSplitType InSplitType, const FPrimaryAssetId& InItemID) const
 {
 	auto Slots = GetSlotsBySplitType(InSplitType);
 	for(const auto Iter : Slots)

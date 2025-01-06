@@ -104,5 +104,5 @@ public:
 
 namespace GameplayTags
 {
-	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(EventTag_EventRoot);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_EventRoot);
 };

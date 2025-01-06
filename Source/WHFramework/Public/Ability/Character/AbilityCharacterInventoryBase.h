@@ -5,7 +5,7 @@
 #include "Ability/Inventory/AbilityInventoryBase.h"
 #include "AbilityCharacterInventoryBase.generated.h"
 
-class UAbilityInventorySkillSlot;
+class UAbilityInventorySkillSlotBase;
 
 /**
  * ��ɫ��Ʒ��
@@ -24,11 +24,4 @@ protected:
 	virtual FSaveData* ToData() override;
 
 	virtual void UnloadData(EPhase InPhase) override;
-
-public:
-	virtual FItemQueryInfo QueryItemByRange(EItemQueryType InActionType, FAbilityItem InItem, int32 InStartIndex = 0, int32 InEndIndex = -1) override;
-
-	virtual void DiscardAllItem() override;
-
-	virtual void ClearAllItem() override;
 };

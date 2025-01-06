@@ -4,7 +4,7 @@
 
 #include "AbilitySystemComponent.h"
 #include "Ability/Character/AbilityCharacterBase.h"
-#include "Ability/Character/AbilityCharacterDataBase.h"
+#include "AI/Base/AIControllerBase.h"
 #include "Common/Interaction/InteractionComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -19,9 +19,9 @@ void UAbilityCharacterState_Static::OnInitialize(UFSMComponent* InFSM, int32 InS
 	Super::OnInitialize(InFSM, InStateIndex);
 }
 
-bool UAbilityCharacterState_Static::OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
+bool UAbilityCharacterState_Static::OnPreEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	return Super::OnEnterValidate(InLastState, InParams);
+	return Super::OnPreEnter(InLastState, InParams);
 }
 
 void UAbilityCharacterState_Static::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
@@ -30,11 +30,18 @@ void UAbilityCharacterState_Static::OnEnter(UFiniteStateBase* InLastState, const
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Character_Active);
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Active);
+
+	Character->DoAction(GameplayTags::Ability_Vitality_Action_Static);
+
+	Character->LimitToAnim();
 
 	Character->GetCharacterMovement()->SetActive(false);
-	Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	Character->GetInteractionComponent()->SetInteractable(false);
+
+	if(Character->GetController<AAIControllerBase>())
+	{
+		Character->GetController<AAIControllerBase>()->StopBehaviorTree();
+	}
 }
 
 void UAbilityCharacterState_Static::OnRefresh(float DeltaSeconds)
@@ -48,11 +55,18 @@ void UAbilityCharacterState_Static::OnLeave(UFiniteStateBase* InNextState)
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Character_Active);
+	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Active);
+
+	Character->StopAction(GameplayTags::Ability_Vitality_Action_Static);
+
+	Character->FreeToAnim();
 
 	Character->GetCharacterMovement()->SetActive(true);
-	Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	Character->GetInteractionComponent()->SetInteractable(true);
+
+	if(Character->GetController<AAIControllerBase>())
+	{
+		Character->GetController<AAIControllerBase>()->RunBehaviorTree();
+	}
 }
 
 void UAbilityCharacterState_Static::OnTermination()

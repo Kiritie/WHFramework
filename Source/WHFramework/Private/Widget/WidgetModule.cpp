@@ -12,6 +12,7 @@
 #include "Event/Handle/Widget/EventHandle_OpenUserWidget.h"
 #include "Event/Handle/Widget/EventHandle_SetWorldWidgetVisible.h"
 #include "Input/InputManager.h"
+#include "SaveGame/Module/WidgetSaveGame.h"
 #include "Slate/SlateWidgetManager.h"
 #include "Widget/World/WorldWidgetContainer.h"
 		
@@ -23,7 +24,13 @@ UWidgetModule::UWidgetModule()
 	ModuleName = FName("WidgetModule");
 	ModuleDisplayName = FText::FromString(TEXT("Widget Module"));
 
+	ModuleSaveGame = UWidgetSaveGame::StaticClass();
+
 	bModuleRequired = true;
+
+	LanguageTypes = TArray<FLanguageType>();
+	LanguageType = 0;
+	GlobalScale = 1.f;
 
 	UserWidgetClasses = TArray<TSubclassOf<UUserWidgetBase>>();
 	AllUserWidget = TMap<FName, UUserWidgetBase*>();
@@ -105,6 +112,8 @@ void UWidgetModule::OnPreparatory(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
+		SetLanguageType(LanguageType);
+		SetGlobalScale(GlobalScale);
 		for(const auto& Iter : UserWidgetClasses)
 		{
 			if(!Iter) continue;
@@ -134,13 +143,13 @@ void UWidgetModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
 	Super::OnRefresh(DeltaSeconds, bInEditor);
 
-	if(IsModuleInEditor()) return;
+	if(bInEditor) return;
 
 	TArray<UUserWidget*> TickAbleWidgets;
 	UWidgetBlueprintLibrary::GetAllWidgetsWithInterface(this, TickAbleWidgets, UTickAbleWidgetInterface::StaticClass(), false);
 	for (auto Iter : TickAbleWidgets)
 	{
-		if(ITickAbleWidgetInterface::Execute_IsTickAble(Iter))
+		if((Iter->IsInViewport() || Iter->GetParent()) && ITickAbleWidgetInterface::Execute_IsTickAble(Iter))
 		{
 			ITickAbleWidgetInterface::Execute_OnTick(Iter, DeltaSeconds);
 		}
@@ -195,6 +204,29 @@ void UWidgetModule::OnTermination(EPhase InPhase)
 	{
 		FInputManager::Get().RemoveInputManager(this);
 	}
+}
+
+void UWidgetModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+{
+	auto& SaveData = InSaveData->CastRef<FWidgetModuleSaveData>();
+
+	SetLanguageType(SaveData.LanguageType);
+	SetGlobalScale(SaveData.GlobalScale);
+}
+
+void UWidgetModule::UnloadData(EPhase InPhase)
+{
+}
+
+FSaveData* UWidgetModule::ToData()
+{
+	static FWidgetModuleSaveData SaveData;
+	SaveData = FWidgetModuleSaveData();
+
+	SaveData.LanguageType = LanguageType;
+	SaveData.GlobalScale = GlobalScale;
+	
+	return &SaveData;
 }
 
 FString UWidgetModule::GetModuleDebugMessage()

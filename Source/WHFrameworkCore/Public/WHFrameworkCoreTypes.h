@@ -72,6 +72,7 @@ for(auto& Item : Map) \
 	Index++; \
 }
 
+// INSTANCE
 #define GENERATED_INSTANCE(InstanceClass) \
 protected: \
 	static InstanceClass* Instance; \
@@ -94,6 +95,16 @@ InstanceClass* InstanceClass::GetPtr() \
 	return Instance; \
 }
 
+// ROB
+#define DECLARE_PROPERTY_ROB_GETTER(ClassName, PropertyName, PropertyClassName) \
+	PropertyClassName ClassName::*Get##PropertyName(); \
+	template <PropertyClassName ClassName::*M> \
+	struct ClassName##Rob { \
+		friend PropertyClassName ClassName::*Get##PropertyName() { return M; } \
+	}; \
+	template struct ClassName##Rob<&ClassName::PropertyName>;
+
+// INI
 #define GET_STRING_CONFIG(IniFilename, IniSection, IniKey, OutValue, DefaultValue) \
 	FString SettingValue = DefaultValue; \
 	bool bSuccess = GConfig->GetString(TEXT(#IniSection), TEXT(#IniKey), SettingValue, IniFilename); \
@@ -176,11 +187,70 @@ private:
 };
 
 /*
+ * FUniqueStruct
+ */
+struct WHFRAMEWORKCORE_API FUniqueStruct
+{
+public:
+	FUniqueStruct()
+		: StructType(FUniqueType())
+	{
+	}
+
+	FUniqueStruct(FUniqueType InType)
+		: StructType(InType)
+	{
+	}
+
+	virtual ~FUniqueStruct() {}
+
+	static const FUniqueType Type;
+
+public:
+	template <typename T>
+	T* Cast()
+	{
+		return StructType.IsA(T::Type) ? static_cast<T*>(this) : nullptr;
+	}
+	template <typename T>
+	const T* Cast() const
+	{
+		return StructType.IsA(T::Type) ? static_cast<const T*>(this) : nullptr;
+	}
+	template <typename T>
+	T& CastRef()
+	{
+		return StructType.IsA(T::Type) ? *static_cast<T*>(this) : *new T();
+	}
+	template <typename T>
+	const T& CastRef() const
+	{
+		return StructType.IsA(T::Type) ? *static_cast<const T*>(this) : *new T();
+	}
+	template <typename T>
+	bool IsA() const
+	{
+		return StructType.IsA(T::Type);
+	}
+
+protected:
+	FUniqueType StructType;
+
+public:
+	FUniqueType GetStructType() const { return StructType; }
+};
+
+/*
  * FUniqueClass
  */
 class WHFRAMEWORKCORE_API FUniqueClass
 {
 public:
+	FUniqueClass()
+		: ClassType(FUniqueType())
+	{
+	}
+
 	FUniqueClass(FUniqueType InType)
 		: ClassType(InType)
 	{
@@ -192,14 +262,24 @@ public:
 
 public:
 	template <typename T>
-	T* CastTo()
+	T* Cast()
 	{
-		return ClassType.IsA(T::Type) ? StaticCast<T*>(this) : nullptr;
+		return ClassType.IsA(T::Type) ? static_cast<T*>(this) : nullptr;
 	}
 	template <typename T>
-	const T* CastTo() const
+	const T* Cast() const
 	{
-		return ClassType.IsA(T::Type) ? StaticCast<const T*>(this) : nullptr;
+		return ClassType.IsA(T::Type) ? static_cast<const T*>(this) : nullptr;
+	}
+	template <typename T>
+	T& CastRef()
+	{
+		return ClassType.IsA(T::Type) ? *static_cast<T*>(this) : *new T();
+	}
+	template <typename T>
+	const T& CastRef() const
+	{
+		return ClassType.IsA(T::Type) ? *static_cast<const T*>(this) : *new T();
 	}
 	template <typename T>
 	bool IsA() const
@@ -211,7 +291,7 @@ protected:
 	FUniqueType ClassType;
 
 public:
-	FUniqueType GetType() const { return ClassType; }
+	FUniqueType GetClassType() const { return ClassType; }
 };
 
 /*

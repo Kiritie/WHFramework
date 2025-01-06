@@ -4,10 +4,8 @@
 #include "Voxel/Voxels/Voxel.h"
 
 #include "Ability/AbilityModuleStatics.h"
-#include "Asset/AssetManagerBase.h"
 #include "Audio/AudioModuleStatics.h"
 #include "Voxel/Datas/VoxelData.h"
-#include "Math/MathStatics.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
@@ -65,7 +63,7 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 	if(GetData().bMainPart)
 	{
 		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Destroy), GetLocation());
-		UAbilityModuleStatics::SpawnAbilityPickUp(FAbilityItem(GetID(), 1), GetLocation() + GetData().GetRange(GetAngle()) * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f, GetOwner());
+		UAbilityModuleStatics::SpawnAbilityPickUp(FAbilityItem(GetData().GatherData ? GetData().GatherData->GetPrimaryAssetId() : GetData().GetPrimaryAssetId(), 1), GetLocation() + GetData().GetRange(GetAngle()) * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f, GetOwner());
 	}
 	if(GetOwner())
 	{
@@ -77,7 +75,7 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 				break;
 			}
 		)
-		if(GetOwner()->HasVoxel(UMathStatics::GetAdjacentIndex(GetIndex(), EDirection::Up)) && !GetOwner()->CheckVoxelAdjacent(Item, EDirection::Up))
+		if(GetOwner()->HasVoxelComplex(UMathStatics::GetAdjacentIndex(GetIndex(), EDirection::Up)) && !GetOwner()->CheckVoxelAdjacent(Item, EDirection::Up))
 		{
 			VoxelItems.Emplace(UMathStatics::GetAdjacentIndex(GetIndex(), EDirection::Up), FVoxelItem::Empty);
 		}

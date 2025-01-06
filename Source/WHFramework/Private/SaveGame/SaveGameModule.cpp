@@ -20,7 +20,6 @@ USaveGameModule::USaveGameModule()
 
 	bModuleRequired = true;
 
-	bModuleAutoSave = true;
 	ModuleSavePhase = EPhase::Primary;
 	ModuleSaveGame = UGeneralSaveGame::StaticClass();
 
@@ -154,7 +153,11 @@ FString USaveGameModule::GetModuleDebugMessage()
 		}
 	}
 	DebugMessage.RemoveFromEnd(TEXT("\n"));
-	return DebugMessage;
+	if(!DebugMessage.IsEmpty())
+	{
+		return DebugMessage;
+	}
+	return Super::GetModuleDebugMessage();
 }
 
 FString USaveGameModule::GetSlotName(FName InSaveName, int32 InIndex) const
@@ -272,7 +275,7 @@ USaveGameBase* USaveGameModule::GetOrCreateSaveGame(TSubclassOf<USaveGameBase> I
 
 USaveGameBase* USaveGameModule::LoadOrCreateSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
 {
-	return USaveGameModuleStatics::HasSaveGame(InClass, InIndex) ? USaveGameModuleStatics::LoadSaveGame(InClass, InIndex, EPhase::Primary) : USaveGameModuleStatics::CreateSaveGame(InClass, InIndex, InPhase);
+	return USaveGameModuleStatics::HasSaveGame(InClass, InIndex) ? USaveGameModuleStatics::LoadSaveGame(InClass, InIndex, InPhase) : USaveGameModuleStatics::CreateSaveGame(InClass, InIndex, InPhase);
 }
 
 bool USaveGameModule::SaveSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, bool bRefresh)
@@ -290,7 +293,10 @@ bool USaveGameModule::SaveSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InI
 			{
 				SaveGame->OnRefresh();
 			}
-			SaveGame->GetSaveData()->MakeSaved();
+			if(SaveGame->GetSaveData())
+			{
+				SaveGame->GetSaveData()->MakeSaved();
+			}
 			SaveGame->OnSave();
 		}
 		return true;
@@ -341,7 +347,10 @@ USaveGameBase* USaveGameModule::LoadSaveGame(TSubclassOf<USaveGameBase> InClass,
 	if(!SaveGame)
 	{
 		SaveGame = Cast<USaveGameBase>(UGameplayStatics::LoadGameFromSlot(GetSlotName(SaveName, InIndex), UserIndex));
-		SaveGame->GetSaveData()->MakeSaved();
+		if(SaveGame->GetSaveData())
+		{
+			SaveGame->GetSaveData()->MakeSaved();
+		}
 		FSaveGameInfo& SaveGameInfo = SaveGameInfos.FindOrAdd(SaveName, FSaveGameInfo(InClass));
 		SaveGameInfo.SaveGames.Add(SaveGame);
 	}
@@ -349,7 +358,7 @@ USaveGameBase* USaveGameModule::LoadSaveGame(TSubclassOf<USaveGameBase> InClass,
 	{
 		if(PHASEC(InPhase, EPhase::Primary))
 		{
-			UnloadSaveGame(InClass, -1, InPhase);
+			UnloadSaveGame(InClass, -1, EPhase::Primary);
 		}
 		SaveGame->bLoaded = true;
 		if(PHASEC(InPhase, EPhase::All))

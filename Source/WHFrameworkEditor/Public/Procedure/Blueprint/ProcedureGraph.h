@@ -10,5 +10,8 @@
 UCLASS(MinimalAPI)
 class UProcedureGraph : public UEdGraph
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UProcedureGraph(const FObjectInitializer& ObjectInitializer);
 };

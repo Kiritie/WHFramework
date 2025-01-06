@@ -79,8 +79,10 @@ bool FExampleHandler::ProcessMessage(HWND Hwnd, uint32 Message, WPARAM WParam, L
 				}
 				case WM_LBUTTONDBLCLK:
 				{
+#if WITH_ENGINE
 					GEngine->GameViewport->GetWindow()->ShowWindow();
 					GEngine->GameViewport->GetWindow()->BringToFront();
+#endif
 					break;
 				}							
 			}
@@ -164,8 +166,10 @@ void FExampleHandler::AddTrayMenu(HWND Hwnd)
 	{
 		WHLog(TEXT(">>> WM_SHOWWINDOW : "), EDC_Platform, EDV_Warning);
 
+#if WITH_ENGINE
 		GEngine->GameViewport->GetWindow()->ShowWindow();
 		GEngine->GameViewport->GetWindow()->BringToFront();
+#endif
 	}
 	else if (MenuID == WM_DESTROY)
 	{
@@ -1044,7 +1048,9 @@ void ElevateNow()
 
 		sei.lpVerb = _T("runas");
 		sei.lpFile = szFilePath;
+#if WITH_ENGINE
 		sei.hwnd = (HWND)GEngine->GameViewport->GetWindow()->GetNativeWindow()->GetOSWindowHandle();
+#endif
 		sei.cbSize = sizeof(sei);
 		sei.fMask = SEE_MASK_NO_CONSOLE;
 		sei.nShow = SW_SHOWDEFAULT;
@@ -1053,8 +1059,10 @@ void ElevateNow()
 		{
 			DWORD dwError = GetLastError();
 			if (dwError == ERROR_CANCELLED)
+			{
 				//Annoys you to Elevate it LOL
-					CreateThread(0, 0, (LPTHREAD_START_ROUTINE)ElevateNow, 0, 0, 0);
+				CreateThread(0, 0, (LPTHREAD_START_ROUTINE)ElevateNow, 0, 0, 0);
+			}
 		}
 	}
 }

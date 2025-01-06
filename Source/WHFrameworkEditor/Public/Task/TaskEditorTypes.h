@@ -29,7 +29,7 @@ class FTaskEditorCommands : public TCommands<FTaskEditorCommands>
 {	  
 public:
 	FTaskEditorCommands()
-		: TCommands<FTaskEditorCommands>(TEXT("TaskEditor"),
+		: TCommands<FTaskEditorCommands>(FName("TaskEditor"),
 			NSLOCTEXT("TaskEditor", "Task Editor", "Task Editor Commands"),
 			NAME_None, FWHFrameworkEditorStyle::GetStyleSetName())
 	{}

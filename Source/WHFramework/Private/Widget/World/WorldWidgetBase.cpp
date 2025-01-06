@@ -11,6 +11,7 @@
 #include "Common/CommonStatics.h"
 #include "Input/InputModuleStatics.h"
 #include "Scene/SceneManager.h"
+#include "Slate/Runtime/Interfaces/SubWidgetInterface.h"
 #include "Widget/WidgetModule.h"
 #include "Widget/WidgetModuleStatics.h"
 #include "Widget/World/WorldWidgetComponent.h"
@@ -23,7 +24,6 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 	WidgetSpace = EWidgetSpace::Screen;
 	WidgetZOrder = 0;
 	WidgetAnchors = FAnchors(0.f, 0.f, 0.f, 0.f);
-	bWidgetPenetrable = false;
 	bWidgetAutoSize = false;
 	WidgetDrawSize = FVector2D(0.f);
 	WidgetOffsets = FMargin(0.f);
@@ -42,109 +42,6 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 	BindWidgetMap = TMap<UWidget*, FWorldWidgetMapping>();
 }
 
-FReply UWorldWidgetBase::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
-		if(IsWidgetInEditor())
-		{
-#if WITH_EDITOR
-			if(AActor* OwnerActor = GetOwnerObject<AActor>())
-			{
-				FSceneManager::Get().SelectActorsInCurrentWorld({ OwnerActor }, !InMouseEvent.IsControlDown());
-			}
-#endif
-		}
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-FReply UWorldWidgetBase::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-FReply UWorldWidgetBase::NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnMouseWheel(InGeometry, InMouseEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-FReply UWorldWidgetBase::NativeOnMouseButtonDoubleClick(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnMouseButtonDoubleClick(InGeometry, InMouseEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-FReply UWorldWidgetBase::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnMouseMove(InGeometry, InMouseEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-FReply UWorldWidgetBase::NativeOnTouchGesture(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnTouchGesture(InGeometry, InGestureEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-FReply UWorldWidgetBase::NativeOnTouchStarted(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnTouchStarted(InGeometry, InGestureEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-FReply UWorldWidgetBase::NativeOnTouchMoved(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnTouchMoved(InGeometry, InGestureEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-FReply UWorldWidgetBase::NativeOnTouchEnded(const FGeometry& InGeometry, const FPointerEvent& InGestureEvent)
-{
-	if(!bWidgetPenetrable)
-	{
-		Super::NativeOnTouchEnded(InGeometry, InGestureEvent);
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
-}
-
-void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
-{
-}
-
 void UWorldWidgetBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	
@@ -152,18 +49,16 @@ void UWorldWidgetBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FPa
 
 void UWorldWidgetBase::OnDespawn_Implementation(bool bRecovery)
 {
-	OwnerObject = nullptr;
-	WidgetParams.Empty();
-	WidgetIndex = 0;
-	WidgetComponent = nullptr;
-	BindWidgetMap.Empty();
+}
+
+void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
+{
 }
 
 void UWorldWidgetBase::OnCreate(UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams)
 {
 	OwnerObject = InOwner;
-	WidgetParams = InParams;
-	
+
 	if(WidgetRefreshType == EWidgetRefreshType::Timer)
 	{
 		GetWorld()->GetTimerManager().SetTimer(RefreshTimerHandle, this, &UWorldWidgetBase::Refresh, WidgetRefreshTime, true);
@@ -190,6 +85,8 @@ void UWorldWidgetBase::OnCreate(UObject* InOwner, FWorldWidgetMapping InMapping,
 	}
 
 	K2_OnCreate(InOwner, InParams);
+
+	Refresh();
 
 	if(GetWidgetSpace() == EWidgetSpace::Screen)
 	{
@@ -227,10 +124,36 @@ void UWorldWidgetBase::OnCreate(UObject* InOwner, FWorldWidgetMapping InMapping,
 		}
 	}
 
-	for(auto Iter : GetAllPoolWidgets())
+	for(auto Iter : GetPoolWidgets())
 	{
 		IObjectPoolInterface::Execute_OnSpawn(Iter, nullptr, {});
 	}
+	
+	TArray<UWidget*> Widgets;
+	WidgetTree->GetAllWidgets(Widgets);
+	for(auto Iter : Widgets)
+	{
+		if(ISubWidgetInterface* SubWidget = Cast<ISubWidgetInterface>(Iter))
+		{
+			SubWidgets.Add(SubWidget);
+			SubWidget->OnCreate(this, SubWidget->GetWidgetParams());
+		}
+	}
+
+	OnInitialize(InParams);
+}
+
+void UWorldWidgetBase::OnInitialize(const TArray<FParameter>& InParams)
+{
+	WidgetParams = InParams;
+	K2_OnInitialize(InParams);
+
+	OnRefresh();
+}
+
+void UWorldWidgetBase::OnReset(bool bForce)
+{
+	K2_OnReset(bForce);
 }
 
 void UWorldWidgetBase::OnRefresh()
@@ -261,6 +184,8 @@ void UWorldWidgetBase::OnDestroy(bool bRecovery)
 		GetWorld()->GetTimerManager().ClearTimer(RefreshTimerHandle);
 	}
 	
+	K2_OnDestroy(bRecovery);
+
 	UInputModuleStatics::UpdateGlobalInputMode();
 	
 	if(K2_OnDestroyed.IsBound()) K2_OnDestroyed.Broadcast(bRecovery);
@@ -268,7 +193,98 @@ void UWorldWidgetBase::OnDestroy(bool bRecovery)
 
 	UObjectPoolModuleStatics::DespawnObject(this, bRecovery);
 
-	K2_OnDestroy(bRecovery);
+	OwnerObject = nullptr;
+	WidgetParams.Empty();
+	WidgetIndex = 0;
+	WidgetComponent = nullptr;
+	BindWidgetMap.Empty();
+}
+
+void UWorldWidgetBase::Init(const TArray<FParameter>* InParams)
+{
+	Init(InParams ? *InParams : TArray<FParameter>());
+}
+
+void UWorldWidgetBase::Init(const TArray<FParameter>& InParams)
+{
+	OnInitialize(InParams);
+}
+
+void UWorldWidgetBase::Reset(bool bForce)
+{
+	OnReset(bForce);
+}
+
+void UWorldWidgetBase::Refresh()
+{
+	if(WidgetRefreshType == EWidgetRefreshType::None) return;
+
+	OnRefresh();
+}
+
+void UWorldWidgetBase::Destroy(bool bRecovery)
+{
+	UWidgetModuleStatics::DestroyWorldWidget<UWorldWidgetBase>(WidgetIndex, bRecovery, GetClass());
+}
+
+UUserWidget* UWorldWidgetBase::K2_CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams)
+{
+	return Cast<UUserWidget>(CreateSubWidget(InClass, InParams));
+}
+
+ISubWidgetInterface* UWorldWidgetBase::CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>* InParams)
+{
+	return CreateSubWidget(InClass, InParams ? *InParams : TArray<FParameter>());
+}
+
+ISubWidgetInterface* UWorldWidgetBase::CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams)
+{
+	if(ISubWidgetInterface* SubWidget = UObjectPoolModuleStatics::SpawnObject<ISubWidgetInterface>(nullptr, nullptr, InClass))
+	{
+		SubWidget->OnCreate(this, InParams);
+		return SubWidget;
+	}
+	return nullptr;
+}
+
+bool UWorldWidgetBase::K2_DestroySubWidget(UUserWidget* InWidget, bool bRecovery)
+{
+	return DestroySubWidget(Cast<ISubWidgetInterface>(InWidget), bRecovery);
+}
+
+bool UWorldWidgetBase::DestroySubWidget(ISubWidgetInterface* InWidget, bool bRecovery)
+{
+	if(!InWidget) return false;
+
+	InWidget->OnDestroy(bRecovery);
+	return true;
+}
+
+void UWorldWidgetBase::DestroyAllSubWidget(bool bRecovery)
+{
+	for(auto Iter : SubWidgets)
+	{
+		Iter->Destroy();
+	}
+	SubWidgets.Empty();
+}
+
+void UWorldWidgetBase::RefreshLocation_Implementation(UWidget* InWidget, FWorldWidgetMapping InMapping)
+{
+	if(UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(InWidget->Slot))
+	{
+		FVector2D ScreenPos;
+		const FVector Location = InMapping.GetLocation();
+		if(UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(UCommonStatics::GetPlayerController(), Location, ScreenPos, false) && Location != FVector(-1.f))
+		{
+			CanvasPanelSlot->SetPosition(ScreenPos);
+		}
+	}
+}
+
+void UWorldWidgetBase::RefreshVisibility_Implementation()
+{
+	SetVisibility(IsWidgetVisible(true) ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Hidden);
 }
 
 void UWorldWidgetBase::RefreshLocationAndVisibility_Implementation()
@@ -289,36 +305,6 @@ void UWorldWidgetBase::RefreshLocationAndVisibility_Implementation()
 		}
 		RefreshVisibility();
 	}
-}
-
-void UWorldWidgetBase::Refresh_Implementation()
-{
-	if(WidgetRefreshType == EWidgetRefreshType::None) return;
-
-	OnRefresh();
-}
-
-void UWorldWidgetBase::Destroy_Implementation(bool bRecovery)
-{
-	UWidgetModuleStatics::DestroyWorldWidget<UWorldWidgetBase>(WidgetIndex, bRecovery, IsWidgetInEditor(), GetClass());
-}
-
-void UWorldWidgetBase::RefreshLocation_Implementation(UWidget* InWidget, FWorldWidgetMapping InMapping)
-{
-	if(UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(InWidget->Slot))
-	{
-		FVector2D ScreenPos;
-		const FVector Location = InMapping.GetLocation();
-		if(UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(UCommonStatics::GetPlayerController(), Location, ScreenPos, false))
-		{
-			CanvasPanelSlot->SetPosition(ScreenPos);
-		}
-	}
-}
-
-void UWorldWidgetBase::RefreshVisibility_Implementation()
-{
-	SetVisibility(IsWidgetVisible(true) ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Hidden);
 }
 
 void UWorldWidgetBase::BindWidgetPoint_Implementation(UWidget* InWidget, FWorldWidgetMapping InMapping)
@@ -353,11 +339,12 @@ bool UWorldWidgetBase::IsWidgetVisible_Implementation(bool bRefresh)
 	if(bRefresh)
 	{
 		bool bVisible = false;
-		FWorldWidgetMapping Mapping;
-		if(GetWidgetMapping(this, Mapping) && UCommonStatics::GetLocalPlayerNum() == 1 && UWidgetModuleStatics::GetWorldWidgetVisible(false, GetClass()))
+		if(UCommonStatics::GetLocalPlayerNum() == 1 && UWidgetModuleStatics::GetWorldWidgetVisible(GetClass()))
 		{
+			FWorldWidgetMapping Mapping;
 			const auto OwnerActor = Cast<AActor>(OwnerObject);
-			const FVector Location = Mapping.GetLocation();
+			
+			const FVector Location = GetWidgetMapping(this, Mapping) ? Mapping.GetLocation() : (OwnerActor ? OwnerActor->GetActorLocation() : FVector(-1.f));
 			const float Distance = FVector::Distance(Location, UCameraModuleStatics::GetCameraLocation(true));
 			switch(WidgetVisibility)
 			{
@@ -373,7 +360,7 @@ bool UWorldWidgetBase::IsWidgetVisible_Implementation(bool bRefresh)
 				}
 				case EWorldWidgetVisibility::ScreenOnly:
 				{
-					bVisible = UCommonStatics::IsInScreenViewport(Location);
+					bVisible = UCommonStatics::IsInScreenViewport(Location) && Location != FVector(-1.f);
 					break;
 				}
 				case EWorldWidgetVisibility::DistanceOnly:
@@ -388,7 +375,7 @@ bool UWorldWidgetBase::IsWidgetVisible_Implementation(bool bRefresh)
 				}
 				case EWorldWidgetVisibility::ScreenAndDistance:
 				{
-					bVisible = UCommonStatics::IsInScreenViewport(Location) && (WidgetShowDistance == -1 || (WidgetShowDistance >= 0.f ? Distance < WidgetShowDistance : Distance > FMath::Abs(WidgetShowDistance)));
+					bVisible = UCommonStatics::IsInScreenViewport(Location) && Location != FVector(-1.f) && (WidgetShowDistance == -1 || (WidgetShowDistance >= 0.f ? Distance < WidgetShowDistance : Distance > FMath::Abs(WidgetShowDistance)));
 					break;
 				}
 				default: break;
@@ -409,7 +396,7 @@ UPanelWidget* UWorldWidgetBase::GetRootPanelWidget() const
 	return Cast<UPanelWidget>(GetRootWidget());
 }
 
-TArray<UWidget*> UWorldWidgetBase::GetAllPoolWidgets() const
+TArray<UWidget*> UWorldWidgetBase::GetPoolWidgets() const
 {
 	TArray<UWidget*> PoolWidgets;
 	TArray<UWidget*> Widgets;
@@ -422,4 +409,24 @@ TArray<UWidget*> UWorldWidgetBase::GetAllPoolWidgets() const
 		}
 	}
 	return PoolWidgets;
+}
+
+TArray<UUserWidget*> UWorldWidgetBase::K2_GetSubWidgets(TSubclassOf<UUserWidget> InClass)
+{
+	TArray<UUserWidget*> ReturnValues;
+	for(auto Iter : SubWidgets)
+	{
+		ReturnValues.Add(GetDeterminesOutputObject(Cast<UUserWidget>(Iter), InClass));
+	}
+	return ReturnValues;
+}
+
+UUserWidget* UWorldWidgetBase::GetSubWidget(int32 InIndex, TSubclassOf<UUserWidget> InClass) const
+{
+	return GetDeterminesOutputObject(Cast<UUserWidget>(GetSubWidget(InIndex)), InClass);
+}
+
+int32 UWorldWidgetBase::FindSubWidget(UUserWidget* InWidget) const
+{
+	return FindSubWidget(Cast<ISubWidgetInterface>(InWidget));
 }

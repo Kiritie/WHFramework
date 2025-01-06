@@ -1,12 +1,13 @@
 #pragma once
 
-#include "Ability/Item/AbilityItemDataBase.h"
+#include "Ability/Item/AbilityTransItemDataBase.h"
 
 #include "AbilityEquipDataBase.generated.h"
 
-class AAbilityPickUpEquip;
+class AAbilityEquipBase;
+
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UAbilityEquipDataBase : public UAbilityItemDataBase
+class WHFRAMEWORK_API UAbilityEquipDataBase : public UAbilityTransItemDataBase
 {
 	GENERATED_BODY()
 
@@ -15,8 +16,8 @@ public:
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSubclassOf<AAbilityEquipBase> EquipClass;
+	EAbilityEquipMode EquipMode;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSubclassOf<AAbilityPickUpEquip> EquipPickUpClass;
+	TSubclassOf<AAbilityEquipBase> EquipClass;
 };

@@ -280,9 +280,9 @@ bool SEditorWidgetBase::CanSave()
 	return true;
 }
 
-void SEditorWidgetBase::AddChild(const TSharedPtr<IEditorWidgetBase>& InChildWidget)
+void SEditorWidgetBase::AddChild(const TSharedPtr<IEditorWidgetBase>& InWidget)
 {
-	if(TSharedPtr<SEditorWidgetBase> ChildWidget = StaticCastSharedPtr<SEditorWidgetBase>(InChildWidget))
+	if(TSharedPtr<SEditorWidgetBase> ChildWidget = StaticCastSharedPtr<SEditorWidgetBase>(InWidget))
 	{
 		if(!ChildWidgets.Contains(ChildWidget))
 		{
@@ -293,9 +293,9 @@ void SEditorWidgetBase::AddChild(const TSharedPtr<IEditorWidgetBase>& InChildWid
 	}
 }
 
-void SEditorWidgetBase::RemoveChild(const TSharedPtr<IEditorWidgetBase>& InChildWidget)
+void SEditorWidgetBase::RemoveChild(const TSharedPtr<IEditorWidgetBase>& InWidget)
 {
-	if(TSharedPtr<SEditorWidgetBase> ChildWidget = StaticCastSharedPtr<SEditorWidgetBase>(InChildWidget))
+	if(TSharedPtr<SEditorWidgetBase> ChildWidget = StaticCastSharedPtr<SEditorWidgetBase>(InWidget))
 	{
 		if(ChildWidgets.Contains(ChildWidget))
 		{

@@ -5,7 +5,7 @@
 #include "Ability/AbilityModuleTypes.h"
 #include "Common/Base/WHActor.h"
 #include "Common/Interaction/InteractionAgentInterface.h"
-#include "SaveGame/Base/SaveDataInterface.h"
+#include "SaveGame/Base/SaveDataAgentInterface.h"
 #include "Scene/Actor/SceneActorInterface.h"
 
 #include "AbilityPickUpBase.generated.h"
@@ -22,23 +22,26 @@ class UFallingMovementComponent;
  * 可拾取项
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityPickUpBase : public AWHActor, public ISaveDataInterface, public IInteractionAgentInterface
+class WHFRAMEWORK_API AAbilityPickUpBase : public AWHActor, public IInteractionAgentInterface
 {
 	GENERATED_BODY()
 	
 public:	
 	AAbilityPickUpBase();
+	
+	//////////////////////////////////////////////////////////////////////////
+	/// ObjectPool
+public:
+	virtual int32 GetLimit_Implementation() const override { return -1; }
+
+	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
+		
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
 	virtual void OnInitialize_Implementation() override;
 
 protected:
-	virtual int32 GetLimit_Implementation() const override { return 1000; }
-	
-	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
-
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
-
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 	virtual FSaveData* ToData() override;
@@ -52,11 +55,13 @@ protected:
 
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
-	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity) override;
+	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive) override;
 
 protected:
 	UFUNCTION()
-	void OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+	virtual void OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+	virtual FBox GetComponentsBoundingBox(bool bNonColliding, bool bIncludeFromChildActors) const override;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
@@ -67,16 +72,16 @@ protected:
 	UBoxComponent* BoxComponent;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	UInteractionComponent* InteractionComponent;
+	UInteractionComponent* Interaction;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	URotatingMovementComponent* RotatingComponent;
+	URotatingMovementComponent* RotatingMovement;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	UFallingMovementComponent* FallingComponent;
+	UFallingMovementComponent* FallingMovement;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	UFollowingMovementComponent* FollowingComponent;
+	UFollowingMovementComponent* FollowingMovement;
 
 public:
 	FAbilityItem& GetItem() { return Item; }
@@ -89,7 +94,7 @@ public:
 
 	virtual UBoxComponent* GetBoxComponent() const { return BoxComponent; }
 
-	virtual URotatingMovementComponent* GetRotatingComponent() const { return RotatingComponent; }
+	virtual URotatingMovementComponent* GetRotatingComponent() const { return RotatingMovement; }
 
 	virtual IInteractionAgentInterface* GetInteractingAgent() const override { return IInteractionAgentInterface::GetInteractingAgent(); }
 
@@ -102,7 +107,7 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	virtual AActor* GetInteractingAgent(TSubclassOf<AActor> InClass) const { return GetDeterminesOutputObject(Cast<AActor>(GetInteractingAgent()), InClass); }
 
-	virtual EInteractAgentType GetInteractAgentType() const override { return EInteractAgentType::Static; }
+	virtual EInteractAgentType GetInteractAgentType() const override { return EInteractAgentType::Passivity; }
 
 	virtual UInteractionComponent* GetInteractionComponent() const override;
 };

@@ -1,5 +1,7 @@
 #include "Ability/Actor/AbilityActorDataBase.h"
 
+#include "Ability/Inventory/AbilityInventoryBase.h"
+
 UAbilityActorDataBase::UAbilityActorDataBase()
 {
 	Type = FName("Actor");
@@ -10,5 +12,16 @@ UAbilityActorDataBase::UAbilityActorDataBase()
 	HalfHeight = 40.f;
 
 	InventoryData = FInventorySaveData();
-	InventoryData.SplitItems.Add(ESlotSplitType::Default).Items.SetNum(5);
+	InventoryData.InventoryClass = UAbilityInventoryBase::StaticClass();
+	InventoryData.SplitItems.Add(ESlotSplitType::Default, 5);
+}
+
+void UAbilityActorDataBase::OnInitialize_Implementation()
+{
+	Super::OnInitialize_Implementation();
+}
+
+void UAbilityActorDataBase::OnReset_Implementation()
+{
+	Super::OnReset_Implementation();
 }

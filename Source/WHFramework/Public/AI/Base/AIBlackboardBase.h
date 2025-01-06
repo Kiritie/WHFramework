@@ -5,7 +5,6 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "BehaviorTree/BlackboardData.h"
 #include "AI/AIModuleTypes.h"
-#include "Common/CommonTypes.h"
 #include "AI/Base/AIAgentInterface.h"
 #include "AIBlackboardBase.generated.h"
 
@@ -21,8 +20,6 @@ class WHFRAMEWORK_API UAIBlackboardBase : public UBlackboardData
 
 protected:
 	virtual void PostLoad() override;
-
-	
 
 protected:
 	virtual void OnInitialize();
@@ -86,5 +83,5 @@ public:
 	IAIAgentInterface* GetAgent() const { return Agent; }
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	APawn* GetAgent(TSubclassOf<APawn> InClass) const { return GetDeterminesOutputObject(Cast<APawn>(Agent), InClass); }
+	APawn* GetAgent(TSubclassOf<APawn> InClass) const;
 };

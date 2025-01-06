@@ -17,14 +17,12 @@ class WHFRAMEWORK_API UAssetManagerBase : public UAssetManager
 public:
 	UAssetManagerBase();
 
+	static UAssetManagerBase& Get();
+
 public:
 	virtual void StartInitialLoading() override;
 
-	static UAssetManagerBase& Get();
-
-protected:
-	UPROPERTY()
-	TMap<FPrimaryAssetType, FPrimaryAssets> PrimaryAssetMap;
+	virtual void ReleaseRuntimeData();
 
 public:
 	virtual TSharedPtr<FStreamableHandle> LoadPrimaryAsset(const FPrimaryAssetId& AssetToLoad, const TArray<FName>& LoadBundles, FStreamableDelegate DelegateToCall, TAsyncLoadPriority Priority) override;
@@ -68,5 +66,7 @@ public:
 		return LoadedItems;
 	}
 
-	virtual void ReleaseRuntimeData();
+protected:
+	UPROPERTY()
+	TMap<FPrimaryAssetType, FPrimaryAssets> PrimaryAssetMap;
 };

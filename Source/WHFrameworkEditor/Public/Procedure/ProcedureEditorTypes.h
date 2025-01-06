@@ -29,7 +29,7 @@ class FProcedureEditorCommands : public TCommands<FProcedureEditorCommands>
 {	  
 public:
 	FProcedureEditorCommands()
-		: TCommands<FProcedureEditorCommands>(TEXT("ProcedureEditor"),
+		: TCommands<FProcedureEditorCommands>(FName("ProcedureEditor"),
 			NSLOCTEXT("ProcedureEditor", "Procedure Editor", "Procedure Editor Commands"),
 			NAME_None, FWHFrameworkEditorStyle::GetStyleSetName())
 	{}

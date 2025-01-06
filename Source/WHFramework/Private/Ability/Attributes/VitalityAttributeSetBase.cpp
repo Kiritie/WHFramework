@@ -1,19 +1,19 @@
 #include "Ability/Attributes/VitalityAttributeSetBase.h"
 
 #include "GameplayEffectExtension.h"
-#include "Ability/Vitality/AbilityVitalityInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "Ability/AbilityModuleTypes.h"
 #include "ReferencePool/ReferencePoolModuleStatics.h"
 
 UVitalityAttributeSetBase::UVitalityAttributeSetBase()
-:	Exp(0.f),
-	MaxExp(50.f),
-	Health(50.f),
+:	Health(50.f),
 	MaxHealth(50.f),
+	HealthRecovery(0.f),
+	HealthRegenSpeed(0.f),
 	PhysicsDamage(0.f),
 	MagicDamage(0.f),
-	FallDamage(0.f)
+	FallDamage(0.f),
+	Interrupt(0.f)
 {
 	DamageHandleClass = UDamageHandle::StaticClass();
 	RecoveryHandleClass = URecoveryHandle::StaticClass();
@@ -23,32 +23,30 @@ UVitalityAttributeSetBase::UVitalityAttributeSetBase()
 void UVitalityAttributeSetBase::PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const
 {
 	Super::PreAttributeBaseChange(Attribute, NewValue);
-
-	UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();
-	IAbilityVitalityInterface* TargetVitality = Cast<IAbilityVitalityInterface>(AbilityComp->GetAvatarActor());
 	
-	const float CurrentValue = Attribute.GetGameplayAttributeData(this)->GetCurrentValue();
 	if (Attribute == GetHealthAttribute())
 	{
-		NewValue = FMath::Clamp(NewValue, 0.f, GetBaseMaxHealth());
+		NewValue = FMath::Clamp(NewValue, 0.f, GetMaxHealth());
 	}
 }
 
 void UVitalityAttributeSetBase::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
 {
 	Super::PreAttributeChange(Attribute, NewValue);
-
-	UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();
-	IAbilityVitalityInterface* TargetVitality = Cast<IAbilityVitalityInterface>(AbilityComp->GetAvatarActor());
 	
-	const float CurrentValue = Attribute.GetGameplayAttributeData(this)->GetCurrentValue();
 	if (Attribute == GetHealthAttribute())
 	{
-		NewValue = FMath::Clamp(NewValue, 0.f, GetBaseMaxHealth());
+		NewValue = FMath::Clamp(NewValue, 0.f, GetMaxHealth());
 	}
-	else if (Attribute == GetMaxHealthAttribute())
+}
+
+void UVitalityAttributeSetBase::PostAttributeChange(const FGameplayAttribute& Attribute, float OldValue, float NewValue)
+{
+	Super::PostAttributeChange(Attribute, OldValue, NewValue);
+	
+	if (Attribute == GetMaxHealthAttribute())
 	{
-		AdjustAttributeForMaxChange(Health, MaxHealth, NewValue, GetHealthAttribute());
+		AdjustAttributeForMaxChange(GetHealthAttribute(), OldValue, NewValue);
 	}
 }
 
@@ -72,36 +70,34 @@ void UVitalityAttributeSetBase::PostGameplayEffectExecute(const struct FGameplay
 	}
 
 	AActor* TargetActor = nullptr;
-	IAbilityVitalityInterface* TargetVitality = nullptr;
 	if (Data.Target.AbilityActorInfo.IsValid() && Data.Target.AbilityActorInfo->AvatarActor.IsValid())
 	{
 		TargetActor = Data.Target.AbilityActorInfo->AvatarActor.Get();
-		TargetVitality = Cast<IAbilityVitalityInterface>(TargetActor);
 	}
 
-	if(Data.EvaluatedData.Attribute == GetPhysicsDamageAttribute())
+	if(Data.EvaluatedData.Attribute == GetHealthRecoveryAttribute())
 	{
-		UReferencePoolModuleStatics::GetReference<UDamageHandle>(true, DamageHandleClass).HandleDamage(SourceActor, TargetActor, GetPhysicsDamage(), EDamageType::Physics, HitResult, SourceTags);
+		UReferencePoolModuleStatics::GetReference<URecoveryHandle>(true, RecoveryHandleClass).HandleRecovery(SourceActor, TargetActor, GetHealthRecovery(), GetHealthRecoveryAttribute(), HitResult, SourceTags);
+		SetHealthRecovery(0.f);
+	}
+	else if(Data.EvaluatedData.Attribute == GetPhysicsDamageAttribute())
+	{
+		UReferencePoolModuleStatics::GetReference<UDamageHandle>(true, DamageHandleClass).HandleDamage(SourceActor, TargetActor, GetPhysicsDamage(), GetPhysicsDamageAttribute(), HitResult, SourceTags);
 		SetPhysicsDamage(0.f);
 	}
 	else if(Data.EvaluatedData.Attribute == GetMagicDamageAttribute())
 	{
-		UReferencePoolModuleStatics::GetReference<UDamageHandle>(true, DamageHandleClass).HandleDamage(SourceActor, TargetActor, GetMagicDamage(), EDamageType::Magic, HitResult, SourceTags);
+		UReferencePoolModuleStatics::GetReference<UDamageHandle>(true, DamageHandleClass).HandleDamage(SourceActor, TargetActor, GetMagicDamage(), GetMagicDamageAttribute(), HitResult, SourceTags);
 		SetMagicDamage(0.f);
 	}
 	else if(Data.EvaluatedData.Attribute == GetFallDamageAttribute())
 	{
-		UReferencePoolModuleStatics::GetReference<UDamageHandle>(true, DamageHandleClass).HandleDamage(SourceActor, TargetActor, GetFallDamage(), EDamageType::Fall, HitResult, SourceTags);
+		UReferencePoolModuleStatics::GetReference<UDamageHandle>(true, DamageHandleClass).HandleDamage(SourceActor, TargetActor, GetFallDamage(), GetFallDamageAttribute(), HitResult, SourceTags);
 		SetFallDamage(0.f);
-	}
-	else if (Data.EvaluatedData.Attribute == GetRecoveryAttribute())
-	{
-		UReferencePoolModuleStatics::GetReference<URecoveryHandle>(true, RecoveryHandleClass).HandleRecovery(SourceActor, TargetActor, GetRecovery(), HitResult, SourceTags);
-		SetRecovery(0.f);
 	}
 	else if (Data.EvaluatedData.Attribute == GetInterruptAttribute())
 	{
-		UReferencePoolModuleStatics::GetReference<UInterruptHandle>(true, InterruptHandleClass).HandleInterrupt(SourceActor, TargetActor, GetInterrupt(), HitResult, SourceTags);
+		UReferencePoolModuleStatics::GetReference<UInterruptHandle>(true, InterruptHandleClass).HandleInterrupt(SourceActor, TargetActor, GetInterrupt(), GetInterruptAttribute(), HitResult, SourceTags);
 		SetInterrupt(0.f);
 	}
 }
@@ -110,25 +106,14 @@ void UVitalityAttributeSetBase::GetLifetimeReplicatedProps(TArray<FLifetimePrope
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, Exp, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, MaxExp, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, Health, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, MaxHealth, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, HealthRegenSpeed, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, PhysicsDamage, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, MagicDamage, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, FallDamage, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, Recovery, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, HealthRecovery, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, Interrupt, COND_None, REPNOTIFY_Always);
-}
-
-void UVitalityAttributeSetBase::OnRep_Exp(const FGameplayAttributeData& OldExp)
-{
-	GAMEPLAYATTRIBUTE_REPNOTIFY(UVitalityAttributeSetBase, Exp, OldExp);
-}
-
-void UVitalityAttributeSetBase::OnRep_MaxExp(const FGameplayAttributeData& OldMaxExp)
-{
-	GAMEPLAYATTRIBUTE_REPNOTIFY(UVitalityAttributeSetBase, MaxExp, OldMaxExp);
 }
 
 void UVitalityAttributeSetBase::OnRep_Health(const FGameplayAttributeData& OldHealth)
@@ -139,6 +124,16 @@ void UVitalityAttributeSetBase::OnRep_Health(const FGameplayAttributeData& OldHe
 void UVitalityAttributeSetBase::OnRep_MaxHealth(const FGameplayAttributeData& OldMaxHealth)
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UVitalityAttributeSetBase, MaxHealth, OldMaxHealth);
+}
+
+void UVitalityAttributeSetBase::OnRep_HealthRecovery(const FGameplayAttributeData& OldRecovery)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UVitalityAttributeSetBase, HealthRecovery, OldRecovery);
+}
+
+void UVitalityAttributeSetBase::OnRep_HealthRegenSpeed(const FGameplayAttributeData& OldMaxHealth)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UVitalityAttributeSetBase, HealthRegenSpeed, OldMaxHealth);
 }
 
 void UVitalityAttributeSetBase::OnRep_PhysicsDamage(const FGameplayAttributeData& OldPhysicsDamage)
@@ -154,11 +149,6 @@ void UVitalityAttributeSetBase::OnRep_MagicDamage(const FGameplayAttributeData& 
 void UVitalityAttributeSetBase::OnRep_FallDamage(const FGameplayAttributeData& OldFallDamage)
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UVitalityAttributeSetBase, FallDamage, OldFallDamage);
-}
-
-void UVitalityAttributeSetBase::OnRep_Recovery(const FGameplayAttributeData& OldRecovery)
-{
-	GAMEPLAYATTRIBUTE_REPNOTIFY(UVitalityAttributeSetBase, Recovery, OldRecovery);
 }
 
 void UVitalityAttributeSetBase::OnRep_Interrupt(const FGameplayAttributeData& OldInterrupt)

@@ -84,9 +84,9 @@ public:
 	virtual bool CanSave() override;
 
 public:
-	virtual void AddChild(const TSharedPtr<IEditorWidgetBase>& InChildWidget) override;
+	virtual void AddChild(const TSharedPtr<IEditorWidgetBase>& InWidget) override;
 
-	virtual void RemoveChild(const TSharedPtr<IEditorWidgetBase>& InChildWidget) override;
+	virtual void RemoveChild(const TSharedPtr<IEditorWidgetBase>& InWidget) override;
 
 	virtual void RemoveAllChild() override;
 

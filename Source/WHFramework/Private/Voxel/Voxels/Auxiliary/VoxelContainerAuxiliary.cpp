@@ -53,31 +53,36 @@ void AVoxelContainerAuxiliary::OnAdditionItem(const FAbilityItem& InItem)
 	
 }
 
+void AVoxelContainerAuxiliary::OnRemoveItem(const FAbilityItem& InItem)
+{
+	
+}
+
+void AVoxelContainerAuxiliary::OnPreChangeItem(const FAbilityItem& InOldItem)
+{
+	
+}
+
+void AVoxelContainerAuxiliary::OnChangeItem(const FAbilityItem& InNewItem)
+{
+	
+}
+
 void AVoxelContainerAuxiliary::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
 {
 
 }
 
-void AVoxelContainerAuxiliary::OnCancelItem(const FAbilityItem& InItem, bool bPassive)
-{
-
-}
-
-void AVoxelContainerAuxiliary::OnAssembleItem(const FAbilityItem& InItem)
-{
-
-}
-
-void AVoxelContainerAuxiliary::OnDischargeItem(const FAbilityItem& InItem)
+void AVoxelContainerAuxiliary::OnDeactiveItem(const FAbilityItem& InItem, bool bPassive)
 {
 
 }
 
 void AVoxelContainerAuxiliary::OnDiscardItem(const FAbilityItem& InItem, bool bInPlace)
 {
-	FVector tmpPos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
-	if(!bInPlace) tmpPos += GetActorForwardVector() * (Interaction->GetUnscaledBoxExtent());
-	UAbilityModuleStatics::SpawnAbilityPickUp(InItem, tmpPos, Container.GetInterface());
+	FVector Pos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
+	if(!bInPlace) Pos += GetActorForwardVector() * (Interaction->GetUnscaledBoxExtent());
+	UAbilityModuleStatics::SpawnAbilityPickUp(InItem, Pos, Container.GetInterface());
 }
 
 void AVoxelContainerAuxiliary::OnSelectItem(const FAbilityItem& InItem)

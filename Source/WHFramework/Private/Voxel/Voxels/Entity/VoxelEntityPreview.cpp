@@ -10,7 +10,7 @@
 // Sets default values
 AVoxelEntityPreview::AVoxelEntityPreview()
 {
-	MeshComponent->Initialize(EVoxelMeshNature::Preview);
+	MeshComponent->Initialize(EVoxelScope::Preview);
 }
 
 void AVoxelEntityPreview::LoadData(FSaveData* InSaveData, EPhase InPhase)

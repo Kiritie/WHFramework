@@ -5,13 +5,4 @@
 
 AAbilityPropBase::AAbilityPropBase()
 {
-	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
-	MeshComponent->SetupAttachment(RootComponent);
-	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	MeshComponent->SetCastShadow(false);
-}
-
-void AAbilityPropBase::Initialize_Implementation(AActor* InOwnerActor, const FAbilityItem& InItem)
-{
-	Super::Initialize_Implementation(InOwnerActor, InItem);
 }

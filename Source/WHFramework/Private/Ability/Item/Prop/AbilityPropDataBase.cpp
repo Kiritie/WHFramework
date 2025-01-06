@@ -5,5 +5,4 @@ UAbilityPropDataBase::UAbilityPropDataBase()
 	Type = FName("Prop");
 	MaxCount = 10;
 	PropClass = nullptr;
-	PropPickUpClass = nullptr;
 }

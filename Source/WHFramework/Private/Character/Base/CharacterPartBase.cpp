@@ -36,7 +36,7 @@ void UCharacterPartBase::UpdateVoxelOverlap()
 	
 	if(AVoxelChunk* Chunk = Cast<AVoxelChunk>(ISceneActorInterface::Execute_GetContainer(GetOwnerCharacter()).GetObject()))
 	{
-		const FVoxelItem& StayingVoxel = Chunk->GetVoxelItem(Chunk->LocationToIndex(GetComponentLocation()), true);
+		const FVoxelItem& StayingVoxel = Chunk->GetVoxelComplex(Chunk->LocationToIndex(GetComponentLocation()), true);
 		const FVoxelHitResult VoxelHitResult = FVoxelHitResult(StayingVoxel, GetComponentLocation(), GetOwnerCharacter()->GetMoveDirection());
 		if(StayingVoxel != OverlappingVoxel)
 		{
@@ -82,7 +82,7 @@ void UCharacterPartBase::OnExitVoxel(UVoxel& InVoxel, const FVoxelHitResult& InH
 	InVoxel.OnAgentExit(GetOwnerCharacter(), InHitResult);
 }
 
-ACharacterBase* UCharacterPartBase::GetOwnerCharacter() const
+ACharacterBase* UCharacterPartBase::GetOwnerCharacter(TSubclassOf<ACharacterBase> InClass) const
 {
-	return Cast<ACharacterBase>(GetOwner());
+	return GetDeterminesOutputObject(Cast<ACharacterBase>(GetOwner()), InClass);
 }

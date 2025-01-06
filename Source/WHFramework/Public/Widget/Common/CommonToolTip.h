@@ -2,8 +2,8 @@
 
 #pragma once
 
-#include "Blueprint/UserWidget.h"
 #include "ObjectPool/ObjectPoolInterface.h"
+#include "Widget/Pool/PoolWidgetBase.h"
 
 #include "CommonToolTip.generated.h"
 
@@ -11,7 +11,7 @@ class UImage;
 class UCommonTextBlockN;
 
 UCLASS(Abstract, BlueprintType, Blueprintable, ClassGroup = UI, meta = (Category = "Common UI", DisplayName = "Common ToolTip", DisableNativeTick))
-class WHFRAMEWORK_API UCommonToolTip : public UUserWidget, public IObjectPoolInterface
+class WHFRAMEWORK_API UCommonToolTip : public UPoolWidgetBase
 {
 	GENERATED_BODY()
 
@@ -19,7 +19,7 @@ public:
 	UCommonToolTip(const FObjectInitializer& ObjectInitializer);
 	
 	//////////////////////////////////////////////////////////////////////////
-	/// Object
+	/// ObjectPool
 public:
 	virtual int32 GetLimit_Implementation() const override { return -1; }
 
@@ -28,11 +28,8 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 	
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
 	UCommonTextBlockN* Txt_Content;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	UWidget* OwnerWidget;
 
 public:
 	UFUNCTION(BlueprintPure)

@@ -6,6 +6,7 @@
 #include "Common/Interaction/InteractionAgentInterface.h"
 #include "VoxelInteractAuxiliary.generated.h"
 
+class UBoxComponent;
 class UVoxel;
 class UInteractionComponent;
 
@@ -31,10 +32,13 @@ public:
 
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
-	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity) override;
+	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive) override;
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
+	UBoxComponent* BoxComponent;
+
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UInteractionComponent* Interaction;
 
 public:
@@ -49,7 +53,7 @@ public:
 
 	virtual IInteractionAgentInterface* GetInteractingAgent() const override { return IInteractionAgentInterface::GetInteractingAgent(); }
 
-	virtual EInteractAgentType GetInteractAgentType() const override { return EInteractAgentType::Static; }
+	virtual EInteractAgentType GetInteractAgentType() const override { return EInteractAgentType::Passivity; }
 	
 	virtual UInteractionComponent* GetInteractionComponent() const override;
 };

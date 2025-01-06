@@ -6,6 +6,7 @@
 #include "Input/InputModuleTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "Video/VideoModuleTypes.h"
+#include "Widget/WidgetModuleTypes.h"
 
 #include "SettingModuleTypes.generated.h"
 
@@ -17,6 +18,7 @@ struct WHFRAMEWORK_API FSettingModuleSaveData : public FSaveData
 public:
 	FORCEINLINE FSettingModuleSaveData()
 	{
+		WidgetData = FWidgetModuleSaveData();
 		AudioData = FAudioModuleSaveData();
 		VideoData = FVideoModuleSaveData();
 		CameraData = FCameraModuleSaveData();
@@ -25,16 +27,19 @@ public:
 	}
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FWidgetModuleSaveData WidgetData;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FAudioModuleSaveData AudioData;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Video")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVideoModuleSaveData VideoData;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FCameraModuleSaveData CameraData;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FInputModuleSaveData InputData;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
@@ -45,6 +50,7 @@ public:
 	{
 		Super::MakeSaved();
 		
+		WidgetData.MakeSaved();
 		AudioData.MakeSaved();
 		VideoData.MakeSaved();
 		CameraData.MakeSaved();

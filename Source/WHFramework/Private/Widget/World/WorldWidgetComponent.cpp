@@ -3,9 +3,11 @@
 
 #include "Widget/World/WorldWidgetComponent.h"
 
+#include "Camera/CameraModuleStatics.h"
 #include "Common/CommonStatics.h"
 #include "Scene/SceneManager.h"
 #include "Widget/WidgetModuleStatics.h"
+#include "Widget/World/WorldWidgetActor.h"
 
 UWorldWidgetComponent::UWorldWidgetComponent()
 {
@@ -18,9 +20,10 @@ UWorldWidgetComponent::UWorldWidgetComponent()
 #endif
 
 	bAutoCreate = true;
-	bOrientCamera = true;
+	bOrientCamera = false;
 	bBindToSelf = true;
 	WidgetParams = TArray<FParameter>();
+	WidgetScale = FVector::OneVector;
 	WidgetPoints = TMap<FName, USceneComponent*>();
 	WorldWidget = nullptr;
 }
@@ -29,8 +32,6 @@ void UWorldWidgetComponent::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	InitTransform = GetRelativeTransform();
-
 	WidgetPoints.Add(GetFName(), this);
 	
 	TArray<USceneComponent*> ChildrenComps;
@@ -65,20 +66,26 @@ void UWorldWidgetComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 
 	if(bOrientCamera)
 	{
-		SetWorldRotation(FSceneManager::Get().GetActiveViewportViewRotation());
-		SetRelativeScale3D(FVector(-InitTransform.GetScale3D().X, -InitTransform.GetScale3D().Y, InitTransform.GetScale3D().Z));
+#if WITH_EDITOR
+		SetWorldRotation(GIsPlaying ? UCameraModuleStatics::GetCameraRotation(true) : FSceneManager::Get().GetActiveViewportViewRotation());
+#else
+		SetWorldRotation(UCameraModuleStatics::GetCameraRotation(true));
+#endif
+		SetRelativeScale3D(FVector(-WidgetScale.X, -WidgetScale.Y, WidgetScale.Z));
 	}
 	else
 	{
-		SetRelativeRotation(InitTransform.GetRotation());
-		SetRelativeScale3D(InitTransform.GetScale3D());
+		SetRelativeScale3D(WidgetScale);
 	}
 
 	if(UCommonStatics::IsPlaying())
 	{
 		if(WorldWidget && GetWidgetSpace() == EWidgetSpace::World)
 		{
-			WorldWidget->Execute_OnTick(WorldWidget, DeltaTime);
+			if(WorldWidget->Execute_IsTickAble(WorldWidget))
+			{
+				WorldWidget->Execute_OnTick(WorldWidget, DeltaTime);
+			}
 		
 			if(WorldWidget->GetWidgetRefreshType() == EWidgetRefreshType::Tick)
 			{
@@ -213,11 +220,28 @@ void UWorldWidgetComponent::CreateWorldWidget(const TArray<FParameter>& InParams
 			}
 			case EWidgetSpace::Screen:
 			{
-				SetWorldWidget(UWidgetModuleStatics::CreateWorldWidget<UWorldWidgetBase>(GetOwner(), this, InParams.IsEmpty() ? WidgetParams : InParams, bInEditor, WorldWidgetClass));
+				UWorldWidgetBase* _WorldWidget;
+				if(bInEditor)
+				{
+					_WorldWidget = CreateWidget<UWorldWidgetBase>(GetWorld(), WorldWidgetClass);
+					_WorldWidget->WidgetIndex = 0;
+					_WorldWidget->bWidgetInEditor = true;
+					_WorldWidget->OnCreate(GetOwner(), this, InParams);
+				}
+				else
+				{
+					_WorldWidget = UWidgetModuleStatics::CreateWorldWidget<UWorldWidgetBase>(GetOwner(), this, InParams.IsEmpty() ? WidgetParams : InParams, WorldWidgetClass);
+				}
+				SetWorldWidget(_WorldWidget);
 				break;
 			}
 		}
 	}
+}
+
+void UWorldWidgetComponent::CreateWorldWidget(const TArray<FParameter>* InParams, bool bInEditor)
+{
+	CreateWorldWidget(InParams ? *InParams : TArray<FParameter>(), bInEditor);
 }
 
 void UWorldWidgetComponent::DestroyWorldWidget(bool bRecovery, bool bInEditor)
@@ -233,8 +257,15 @@ void UWorldWidgetComponent::DestroyWorldWidget(bool bRecovery, bool bInEditor)
 			}
 			case EWidgetSpace::Screen:
 			{
-				UWidgetModuleStatics::DestroyWorldWidget(WorldWidget, bRecovery, bInEditor);
-				WorldWidget = nullptr;
+				if(bInEditor)
+				{
+					WorldWidget->OnDestroy(bRecovery);
+				}
+				else
+				{
+					UWidgetModuleStatics::DestroyWorldWidget(WorldWidget, bRecovery);
+				}
+				SetWorldWidget(nullptr);
 				break;
 			}
 		}

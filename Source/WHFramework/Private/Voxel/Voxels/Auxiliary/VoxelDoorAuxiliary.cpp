@@ -14,7 +14,7 @@ bool AVoxelDoorAuxiliary::CanInteract(EInteractAction InInteractAction, IInterac
 	return Super::CanInteract(InInteractAction, InInteractionAgent);
 }
 
-void AVoxelDoorAuxiliary::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity)
+void AVoxelDoorAuxiliary::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive)
 {
-	Super::OnInteract(InInteractAction, InInteractionAgent, bPassivity);
+	Super::OnInteract(InInteractAction, InInteractionAgent, bPassive);
 }

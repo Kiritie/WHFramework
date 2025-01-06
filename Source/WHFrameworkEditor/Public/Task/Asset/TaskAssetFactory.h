@@ -10,5 +10,8 @@
 UCLASS(hidecategories=Object, MinimalAPI)
 class UTaskAssetFactory : public UAssetFactoryBase
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UTaskAssetFactory(const FObjectInitializer& ObjectInitializer);
 };

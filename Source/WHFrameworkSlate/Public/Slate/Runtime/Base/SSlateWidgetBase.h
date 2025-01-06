@@ -2,7 +2,6 @@
 
 #pragma once
 
-
 #include "Slate/Runtime/Interfaces/ScreenWidgetInterface.h"
 #include "Widgets/SCompoundWidget.h"
 
@@ -91,25 +90,31 @@ protected:
 	virtual void FinishClose(bool bInstant) override;
 
 public:
-	virtual void AddChild(IScreenWidgetInterface* InChildWidget) override;
-
-	virtual void RemoveChild(IScreenWidgetInterface* InChildWidget) override;
-
-	virtual void RemoveAllChild() override;
-	
-	virtual IScreenWidgetInterface* GetChild(int32 InIndex) const override
+	template<class T>
+	T* CreateSubWidget(const TArray<FParameter>* InParams = nullptr, TSubclassOf<UUserWidget> InClass = T::StaticClass())
 	{
-		if(ChildWidgets.IsValidIndex(InIndex))
-		{
-			return ChildWidgets[InIndex];
-		}
-		return nullptr;
+		return Cast<T>(CreateSubWidget(InClass, InParams ? *InParams : TArray<FParameter>()));
 	}
 
-	virtual int32 FindChild(IScreenWidgetInterface* InChildWidget) const override
+	template<class T>
+	T* CreateSubWidget(const TArray<FParameter>& InParams, TSubclassOf<UUserWidget> InClass = T::StaticClass())
 	{
-		return ChildWidgets.Find(InChildWidget);
+		return Cast<T>(CreateSubWidget(InClass, InParams));
 	}
+
+	virtual ISubWidgetInterface* CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>* InParams = nullptr) override;
+
+	virtual ISubWidgetInterface* CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams) override;
+
+	virtual bool DestroySubWidget(ISubWidgetInterface* InWidget, bool bRecovery) override;
+
+	virtual void DestroyAllSubWidget(bool bRecovery) override;
+
+	virtual void AddChildWidget(IScreenWidgetInterface* InWidget) override;
+
+	virtual void RemoveChildWidget(IScreenWidgetInterface* InWidget) override;
+
+	virtual void RemoveAllChildWidget() override;
 
 protected:
 	FName _WidgetName;
@@ -121,8 +126,6 @@ protected:
 	FName ParentSlot;
 
 	int32 WidgetZOrder;
-
-	bool bWidgetPenetrable;
 
 	FAnchors WidgetAnchors;
 
@@ -146,6 +149,8 @@ protected:
 
 	EScreenWidgetState WidgetState;
 
+	bool bConsumePointerInput;
+
 	UObject* OwnerObject;
 	
 	IScreenWidgetInterface* LastTemporary;
@@ -153,6 +158,8 @@ protected:
 	IScreenWidgetInterface* ParentWidget;
 			
 	IScreenWidgetInterface* TemporaryChild;
+
+	TArray<ISubWidgetInterface*> SubWidgets;
 
 	TArray<IScreenWidgetInterface*> ChildWidgets;
 
@@ -173,8 +180,6 @@ public:
 
 	virtual FAnchors GetWidgetAnchors() const override { return WidgetAnchors; }
 
-	virtual bool IsWidgetPenetrable() const override { return bWidgetPenetrable; }
-
 	virtual bool IsWidgetAutoSize() const override { return bWidgetAutoSize; }
 
 	virtual FVector2D GetWidgetDrawSize() const override { return FVector2D(WidgetOffsets.Right, WidgetOffsets.Bottom); }
@@ -191,6 +196,16 @@ public:
 		}
 		return WidgetState;
 	}
+	
+	virtual bool IsWidgetOpened(bool bCheckOpening = true, bool bInheritParent = false) const override
+	{
+		return GetWidgetState(bInheritParent) == EScreenWidgetState::Opened || (bCheckOpening && GetWidgetState(bInheritParent) == EScreenWidgetState::Opening);
+	}
+	
+	virtual bool IsWidgetClosed(bool bCheckClosing = true, bool bInheritParent = false) const override
+	{
+		return GetWidgetState(bInheritParent) == EScreenWidgetState::Closed || (bCheckClosing && GetWidgetState(bInheritParent) == EScreenWidgetState::Closing);
+	}
 
 	virtual EWidgetCreateType GetWidgetCreateType() const override { return WidgetCreateType; }
 
@@ -201,6 +216,8 @@ public:
 	virtual EWidgetRefreshType GetWidgetRefreshType() const override { return WidgetRefreshType; }
 
 	virtual EInputMode GetWidgetInputMode() const override { return WidgetInputMode; }
+
+	virtual TArray<FParameter> GetWidgetParams() const override { return WidgetParams; }
 
 	virtual UObject* GetOwnerObject() const override { return OwnerObject; }
 
@@ -215,10 +232,76 @@ public:
 	virtual IScreenWidgetInterface* GetTemporaryChild() const override { return TemporaryChild; }
 
 	virtual void SetTemporaryChild(IScreenWidgetInterface* InTemporaryChild) override { TemporaryChild = InTemporaryChild; }
+	
+	TArray<UWidget*> GetPoolWidgets() const;
 
-	virtual int32 GetChildNum() const override { return ChildWidgets.Num(); }
+	virtual int32 GetSubWidgetNum() const override { return SubWidgets.Num(); }
 
-	virtual TArray<IScreenWidgetInterface*>& GetChildWidgets() override { return ChildWidgets; }
+	template<class T>
+	TArray<T*> GetSubWidgets()
+	{
+		TArray<T*> ReturnValues;
+		for(auto Iter : GetSubWidgets())
+		{
+			ReturnValues.Add(Cast<T>(Iter));
+		}
+		return ReturnValues;
+	}
+	virtual TArray<ISubWidgetInterface*> GetSubWidgets() override { return SubWidgets; }
+
+	template<class T>
+	T* GetSubWidget(int32 InIndex) const
+	{
+		return Cast<T>(GetSubWidget(InIndex));
+	}
+
+	virtual ISubWidgetInterface* GetSubWidget(int32 InIndex) const override
+	{
+		if(SubWidgets.IsValidIndex(InIndex))
+		{
+			return SubWidgets[InIndex];
+		}
+		return nullptr;
+	}
+
+	virtual int32 FindSubWidget(ISubWidgetInterface* InWidget) const override
+	{
+		return SubWidgets.Find(InWidget);
+	}
+
+	virtual int32 GetChildWidgetNum() const override { return ChildWidgets.Num(); }
+
+	template<class T>
+	TArray<T*> GetChildWidgets()
+	{
+		TArray<T*> ReturnValues;
+		for(auto Iter : GetChildWidgets())
+		{
+			ReturnValues.Add(Cast<T>(Iter));
+		}
+		return ReturnValues;
+	}
+	virtual TArray<IScreenWidgetInterface*> GetChildWidgets() override { return ChildWidgets; }
+
+	template<class T>
+	T* GetChildWidget(int32 InIndex) const
+	{
+		return Cast<T>(GetChildWidget(InIndex));
+	}
+
+	virtual IScreenWidgetInterface* GetChildWidget(int32 InIndex) const override
+	{
+		if(ChildWidgets.IsValidIndex(InIndex))
+		{
+			return ChildWidgets[InIndex];
+		}
+		return nullptr;
+	}
+
+	virtual int32 FindChildWidget(IScreenWidgetInterface* InWidget) const override
+	{
+		return ChildWidgets.Find(InWidget);
+	}
 
 	virtual TSharedPtr<SPanel> GetRootPanelWidget() const;
 

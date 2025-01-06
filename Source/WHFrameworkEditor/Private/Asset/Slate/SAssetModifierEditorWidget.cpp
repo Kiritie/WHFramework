@@ -85,7 +85,7 @@ TSharedRef<SWidget> SAssetModifierEditorWidget::CreateDefaultWidget()
 			.Text(this, &SAssetModifierEditorWidget::GetPickedClassName)
 		];
 
-	FContentBrowserModule& ContentBrowserModule = FModuleManager::Get().LoadModuleChecked<FContentBrowserModule>(TEXT("ContentBrowser"));
+	FContentBrowserModule& ContentBrowserModule = FModuleManager::Get().LoadModuleChecked<FContentBrowserModule>(FName("ContentBrowser"));
 	
 	FAssetPickerConfig AssetPickerConfig;
 	AssetPickerConfig.GetCurrentSelectionDelegates.Add(&GetCurrentSelectionDelegate);
@@ -162,6 +162,16 @@ TSharedRef<SWidget> SAssetModifierEditorWidget::CreateDefaultWidget()
 		[
 			ContentBrowserModule.Get().CreateAssetPicker(AssetPickerConfig)
 		];
+}
+
+FReply SAssetModifierEditorWidget::OnPreviewKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
+{
+	if (InKeyEvent.GetKey() == EKeys::Escape)
+	{
+		RequestCloseAssetModifierEditor();
+		return FReply::Handled();
+	}
+	return FReply::Unhandled();
 }
 
 TSharedRef<SWidget> SAssetModifierEditorWidget::GenerateClassPicker()
@@ -259,6 +269,7 @@ void SAssetModifierEditorWidget::OnAssetDoubleClicked(const FAssetData& AssetDat
 	{
 		GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(ObjectToEdit);
 	}
+	RequestCloseAssetModifierEditor();
 }
 
 void SAssetModifierEditorWidget::OnAssetEnterPressed(const TArray<FAssetData>& AssetDatas)
@@ -270,6 +281,7 @@ void SAssetModifierEditorWidget::OnAssetEnterPressed(const TArray<FAssetData>& A
 			GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(ObjectToEdit);
 		}
 	}
+	RequestCloseAssetModifierEditor();
 }
 
 FReply SAssetModifierEditorWidget::OnModifyForAllAssetButtonClicked()
@@ -300,6 +312,14 @@ FReply SAssetModifierEditorWidget::OnModifyForSelectedAssetButtonClicked()
 		}
 	}
 	return FReply::Handled();
+}
+
+void SAssetModifierEditorWidget::RequestCloseAssetModifierEditor()
+{
+	if (TSharedPtr<SDockTab> AssetPickerTab = FGlobalTabmanager::Get()->FindExistingLiveTab(FTabId("AssetModifierEditor")))
+	{
+		AssetPickerTab->RequestCloseTab();
+	}
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

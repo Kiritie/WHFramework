@@ -17,7 +17,7 @@ UCLASS(BlueprintType, meta = (ExposedAsyncProxy = AsyncTask))
 class WHFRAMEWORK_API UAsyncTask_GameplayTagAddedRemoved : public UBlueprintAsyncActionBase
 {
 	GENERATED_BODY()
-	
+
 public:
 	UPROPERTY(BlueprintAssignable)
 	FOnGameplayTagAddedRemoved OnTagAdded;

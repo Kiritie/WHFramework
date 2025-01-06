@@ -16,7 +16,7 @@ AVoxelEntity::AVoxelEntity()
 	
 	MeshComponent = CreateDefaultSubobject<UVoxelMeshComponent>(FName("MeshComponent"));
 	MeshComponent->SetupAttachment(RootComponent);
-	MeshComponent->Initialize(EVoxelMeshNature::Entity);
+	MeshComponent->Initialize(EVoxelScope::Entity);
 
 	VoxelID = FPrimaryAssetId();
 	Auxiliary = nullptr;
@@ -57,13 +57,13 @@ void AVoxelEntity::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			}
 			if(!Auxiliary)
 			{
-				Auxiliary = UObjectPoolModuleStatics::SpawnObject<AVoxelAuxiliary>(nullptr, nullptr, false, VoxelData.AuxiliaryClass);
+				Auxiliary = UObjectPoolModuleStatics::SpawnObject<AVoxelAuxiliary>(nullptr, nullptr, VoxelData.AuxiliaryClass);
 				Auxiliary->AttachToComponent(MeshComponent, FAttachmentTransformRules::SnapToTargetIncludingScale);
 				Auxiliary->Execute_SetActorVisible(Auxiliary, Execute_IsVisible(this));
 			}
 			if(Auxiliary)
 			{
-				Auxiliary->LoadSaveData(new FVoxelAuxiliarySaveData(SaveData, EVoxelMeshNature::Entity));
+				Auxiliary->LoadSaveData(new FVoxelAuxiliarySaveData(SaveData, EVoxelScope::Entity));
 			}
 		}
 		else if(Auxiliary)

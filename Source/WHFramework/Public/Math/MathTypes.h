@@ -7,6 +7,7 @@
 
 #define DEG_2_RAD (0.01745329f)
 
+#define UNDER_Vector FVector(0.f, 0.f, -1000000.f)
 #define EMPTY_Vector FVector(MAX_flt)
 #define EMPTY_Rotator FRotator(MAX_flt)
 #define EMPTY_Index FIndex(MAX_int32)
@@ -101,11 +102,13 @@ public:
 		Z = 0;
 	}
 
-	FORCEINLINE FIndex(int32 InX)
+	FORCEINLINE FIndex(int64 InValue);
+
+	FORCEINLINE FIndex(int32 InValue)
 	{
-		X = InX;
-		Y = InX;
-		Z = InX;
+		X = InValue;
+		Y = InValue;
+		Z = InValue;
 	}
 
 	FORCEINLINE FIndex(int32 InX, int32 InY)
@@ -129,18 +132,32 @@ public:
 		Z = FMath::CeilToInt(InVector.Z);
 	}
 
+	FORCEINLINE FIndex(const FVector2D& InVector)
+	{
+		X = FMath::CeilToInt(InVector.X);
+		Y = FMath::CeilToInt(InVector.Y);
+		Z = 0;
+	}
+
 	FORCEINLINE FIndex(const FString& InValue)
 	{
-		TArray<FString> tmpArr;
-		InValue.ParseIntoArray(tmpArr, TEXT(","));
-		X = FCString::Atoi(*tmpArr[0]);
-		Y = FCString::Atoi(*tmpArr[1]);
-		Z = FCString::Atoi(*tmpArr[2]);
+		TArray<FString> Arr;
+		InValue.ParseIntoArray(Arr, TEXT(","));
+		X = FCString::Atoi(*Arr[0]);
+		Y = FCString::Atoi(*Arr[1]);
+		Z = FCString::Atoi(*Arr[2]);
 	}
+
+	FORCEINLINE int64 ToInt64() const;
 
 	FORCEINLINE FVector ToVector() const
 	{
 		return FVector(X, Y, Z);
+	}
+
+	FORCEINLINE FVector2D ToVector2D() const
+	{
+		return FVector2D(X, Y);
 	}
 
 	FORCEINLINE FString ToString() const
@@ -150,8 +167,8 @@ public:
 
 	FORCEINLINE float DistanceTo(const FIndex& Index, bool bIgnoreZ = false, bool bFromCenter = false) const
 	{
-		const FVector VectorA = ToVector() + (bFromCenter ? FVector::OneVector * 0.5f : FVector::ZeroVector);
-		const FVector VectorB = Index.ToVector() + (bFromCenter ? FVector::OneVector * 0.5f : FVector::ZeroVector);
+		const FVector VectorA = ToVector() + (bFromCenter ? FVector(0.5f) : FVector::ZeroVector);
+		const FVector VectorB = Index.ToVector() + (bFromCenter ? FVector(0.5f) : FVector::ZeroVector);
 		return FVector::Distance(FVector(VectorA.X, VectorA.Y, bIgnoreZ ? 0.f : VectorA.Z), FVector(VectorB.X, VectorB.Y, bIgnoreZ ? 0.f : VectorB.Z));
 	}
 
@@ -201,6 +218,8 @@ public:
 	{
 		return FIndex(X / InValue, Y / InValue, Z / InValue);
 	}
+	
+	FORCEINLINE operator FVector() const { return ToVector(); }
 
 	friend void operator<<(FStructuredArchive::FSlot Slot, FIndex& InValue)
 	{
@@ -413,21 +432,24 @@ FORCEINLINE uint32 GetTypeHash(FPoint& InPoint)
 
 #define ITER_INDEX(Iter, Range, bFromCenter, Expression) \
 	FIndex Iter; \
-	if(Range == FVector::OneVector && !bFromCenter) \
+	for(Iter.X = (bFromCenter ? -Range.X * 0.5f : 0.f); Iter.X < (bFromCenter ? Range.X * 0.5f : Range.X); Iter.X++) \
 	{ \
-		Expression \
-	} \
-	else \
-	{ \
-		for(Iter.X = (bFromCenter ? -Range.X * 0.5f : 0.f); Iter.X < (bFromCenter ? Range.X * 0.5f : Range.X); Iter.X++) \
+		for(Iter.Y = (bFromCenter ? -Range.Y * 0.5f : 0.f); Iter.Y < (bFromCenter ? Range.Y * 0.5f : Range.Y); Iter.Y++) \
 		{ \
-			for(Iter.Y = (bFromCenter ? -Range.Y * 0.5f : 0.f); Iter.Y < (bFromCenter ? Range.Y * 0.5f : Range.Y); Iter.Y++) \
+			for(Iter.Z = 0.f; Iter.Z < Range.Z; Iter.Z++) \
 			{ \
-				for(Iter.Z = 0.f; Iter.Z < Range.Z; Iter.Z++) \
-				{ \
-					Expression \
-				} \
+				Expression \
 			} \
+		} \
+	}
+
+#define ITER_INDEX2D(Iter, Range, bFromCenter, Expression) \
+	FIndex Iter; \
+	for(Iter.X = (bFromCenter ? -Range.X * 0.5f : 0.f); Iter.X < (bFromCenter ? Range.X * 0.5f : Range.X); Iter.X++) \
+	{ \
+		for(Iter.Y = (bFromCenter ? -Range.Y * 0.5f : 0.f); Iter.Y < (bFromCenter ? Range.Y * 0.5f : Range.Y); Iter.Y++) \
+		{ \
+			Expression \
 		} \
 	}
 

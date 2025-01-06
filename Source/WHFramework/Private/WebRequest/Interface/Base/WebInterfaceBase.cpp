@@ -34,7 +34,7 @@ void UWebInterfaceBase::RequestComplete(FWebRequestResult InResult, const TArray
 	UWebRequestHandleBase* WebRequestHandle;
 	if(!HandleMap.Contains(InResult.Content))
 	{
-		WebRequestHandle = UObjectPoolModuleStatics::SpawnObject<UWebRequestHandleBase>(nullptr, nullptr, false, HandleClass);
+		WebRequestHandle = UObjectPoolModuleStatics::SpawnObject<UWebRequestHandleBase>(nullptr, nullptr, HandleClass);
 		HandleMap.Add(InResult.Content, WebRequestHandle);
 	}
 	else

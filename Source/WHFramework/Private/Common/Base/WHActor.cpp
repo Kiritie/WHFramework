@@ -2,22 +2,67 @@
 
 #include "Common/Base/WHActor.h"
 
+#include "Math/MathTypes.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Scene/Container/SceneContainerInterface.h"
+
+AWHActor::AWHActor()
+{
+	InitializeDefaults();
+}
 
 AWHActor::AWHActor(const FObjectInitializer& ObjectInitializer) :
 	Super(ObjectInitializer)
 {
+	InitializeDefaults();
+}
+
+void AWHActor::InitializeDefaults()
+{
 	RootComponent = CreateDefaultSubobject<USceneComponent>(FName("RootComponent"));
 
 	ActorID = FGuid::NewGuid();
+
 	bVisible = true;
+	Container = nullptr;
+}
+
+void AWHActor::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+{
+	USceneModuleStatics::RemoveSceneActor(this);
+	
+	if(InParams.IsValidIndex(0))
+	{
+		ActorID = InParams[0];
+	}
+
+	Execute_SetActorVisible(this, true);
+	
+	USceneModuleStatics::AddSceneActor(this);
+}
+
+void AWHActor::OnDespawn_Implementation(bool bRecovery)
+{
+	Execute_SetActorVisible(this, false);
+
+	SetActorLocationAndRotation(UNDER_Vector, FRotator::ZeroRotator);
+	
+	USceneModuleStatics::RemoveSceneActor(this);
+	if(Container)
+	{
+		Container->RemoveSceneActor(this);
+	}
+
 	Container = nullptr;
 }
 
 void AWHActor::OnInitialize_Implementation()
 {
+	bInitialized = true;
+
 	Execute_SetActorVisible(this, bVisible);
+
+	USceneModuleStatics::AddSceneActor(this);
 }
 
 void AWHActor::OnPreparatory_Implementation(EPhase InPhase)
@@ -32,44 +77,29 @@ void AWHActor::OnRefresh_Implementation(float DeltaSeconds)
 
 void AWHActor::OnTermination_Implementation(EPhase InPhase)
 {
-	
-}
-
-void AWHActor::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
-{
-	if(InParams.IsValidIndex(0) && InParams[0].GetParameterType() == EParameterType::Vector)
-	{
-		SetActorLocation(InParams[0]);
-	}
-
-	if(InParams.IsValidIndex(1) && InParams[1].GetParameterType() == EParameterType::Rotator)
-	{
-		SetActorRotation(InParams[1]);
-	}
-
-	if(InParams.IsValidIndex(2) && InParams[2].GetParameterType() == EParameterType::Vector)
-	{
-		SetActorScale3D(InParams[2]);
-	}
-
-	Execute_SetActorVisible(this, true);
-	
-	USceneModuleStatics::AddSceneActor(this);
-}
-
-void AWHActor::OnDespawn_Implementation(bool bRecovery)
-{
-	Execute_SetActorVisible(this, false);
-
-	SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
-	
 	USceneModuleStatics::RemoveSceneActor(this);
-	if(Container)
-	{
-		Container->RemoveSceneActor(this);
-	}
+}
 
-	Container = nullptr;
+void AWHActor::LoadData(FSaveData* InSaveData, EPhase InPhase)
+{
+	auto& SaveData = InSaveData->CastRef<FSceneActorSaveData>();
+
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		ActorID = SaveData.ActorID;
+		SetActorTransform(SaveData.SpawnTransform);
+	}
+}
+
+FSaveData* AWHActor::ToData()
+{
+	static FSceneActorSaveData SaveData;
+	SaveData = FSceneActorSaveData();
+
+	SaveData.ActorID = ActorID;
+	SaveData.SpawnTransform = GetActorTransform();
+
+	return &SaveData;
 }
 
 void AWHActor::SetActorVisible_Implementation(bool bInVisible)
@@ -88,9 +118,12 @@ void AWHActor::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
-		Execute_OnInitialize(this);
+		if(!Execute_IsInitialized(this))
+		{
+			Execute_OnInitialize(this);
+		}
 		Execute_OnPreparatory(this, EPhase::All);
 	}
 }
@@ -99,7 +132,7 @@ void AWHActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 	
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnTermination(this, EPhase::All);
 	}
@@ -109,7 +142,7 @@ void AWHActor::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnRefresh(this, DeltaSeconds);
 	}

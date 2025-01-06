@@ -8,8 +8,8 @@
 #include "Event/Handle/Task/EventHandle_TaskEntered.h"
 #include "Event/Handle/Task/EventHandle_TaskExecuted.h"
 #include "Event/Handle/Task/EventHandle_TaskLeaved.h"
-#include "Common/CommonStatics.h"
 #include "Debug/DebugModuleTypes.h"
+#include "Event/Handle/Task/EventHandle_TaskStateChanged.h"
 #include "Task/TaskModule.h"
 #include "Task/TaskModuleStatics.h"
 
@@ -19,18 +19,17 @@ UTaskBase::UTaskBase()
 	TaskDisplayName = FText::FromString(TEXT("Task Base"));
 	TaskDescription = FText::GetEmpty();
 
-	bFirstTask = false;
 	TaskIndex = 0;
 	TaskHierarchy = 0;
 	TaskState = ETaskState::None;
 
-	TaskEnterType = ETaskEnterType::Automatic;
+	TaskEnterType = ETaskEnterType::Procedure;
 	TaskExecuteResult = ETaskExecuteResult::None;
 
-	TaskExecuteType = ETaskExecuteType::Automatic;
+	TaskExecuteType = ETaskExecuteType::Procedure;
 	AutoExecuteTaskTime = 0.f;
 
-	TaskLeaveType = ETaskLeaveType::Automatic;
+	TaskLeaveType = ETaskLeaveType::Procedure;
 	AutoLeaveTaskTime = 0.f;
 
 	TaskCompleteType = ETaskCompleteType::Procedure;
@@ -40,14 +39,14 @@ UTaskBase::UTaskBase()
 	
 	bTaskSkipAble = false;
 
-	CurrentSubTaskIndex = -1;
-
 	bMergeSubTask = false;
 
 	SubTasks = TArray<UTaskBase*>();
 
 	RootTask = nullptr;
 	ParentTask = nullptr;
+
+	bRuntimeSelected = false;
 }
 
 #if WITH_EDITOR
@@ -66,6 +65,8 @@ void UTaskBase::OnStateChanged(ETaskState InTaskState)
 {
 	OnTaskStateChanged.Broadcast(InTaskState);
 	K2_OnStateChanged(InTaskState);
+
+	UEventModuleStatics::BroadcastEvent(UEventHandle_TaskStateChanged::StaticClass(), this, {this});
 }
 
 void UTaskBase::OnInitialize()
@@ -88,36 +89,29 @@ void UTaskBase::OnRestore()
 	TaskState = ETaskState::None;
 	OnStateChanged(TaskState);
 
-	CurrentSubTaskIndex = -1;
-
 	K2_OnRestore();
 
-	for(int32 i = SubTasks.Num() - 1; i >= 0; i--)
+	for(auto Iter : SubTasks)
 	{
-		if(SubTasks[i])
+		if(Iter)
 		{
-			SubTasks[i]->OnRestore();
+			Iter->OnRestore();
 		}
 	}
 }
 
-void UTaskBase::OnEnter(UTaskBase* InLastTask)
+void UTaskBase::OnEnter()
 {
 	TaskState = ETaskState::Entered;
 	OnStateChanged(TaskState);
 
 	GetWorld()->GetTimerManager().ClearTimer(AutoExecuteTimerHandle);
-	
-	if(ParentTask)
-	{
-		ParentTask->CurrentSubTaskIndex = TaskIndex;
-	}
 
 	TaskExecuteResult = ETaskExecuteResult::None;
 
 	WHDebug(FString::Printf(TEXT("进入任务: %s"), *TaskDisplayName.ToString()), EDM_All, EDC_Task, EDV_Log, FColor::Cyan, 5.f);
 
-	K2_OnEnter(InLastTask);
+	K2_OnEnter();
 
 	switch(TaskGuideType)
 	{
@@ -137,7 +131,7 @@ void UTaskBase::OnEnter(UTaskBase* InLastTask)
 		{
 			if(Iter)
 			{
-				Iter->OnEnter(InLastTask);
+				Iter->OnEnter();
 			}
 		}
 	}
@@ -157,30 +151,15 @@ void UTaskBase::OnEnter(UTaskBase* InLastTask)
 
 void UTaskBase::OnRefresh()
 {
-	if(HasSubTask(false))
+	K2_OnRefresh();
+
+	for (auto Iter : SubTasks)
 	{
-		if(!IsAllSubCompleted())
+		if(Iter)
 		{
-			const int32 Index = CurrentSubTaskIndex + 1;
-			if(SubTasks.IsValidIndex(Index))
-			{
-				UTaskBase* SubTask = SubTasks[Index];
-				if(SubTask)
-				{
-					if(SubTask->TaskEnterType == ETaskEnterType::Automatic)
-					{
-						SubTask->Enter();
-					}
-				}
-			}
-		}
-		else
-		{
-			Complete(IsAllSubExecuteSucceed() ? ETaskExecuteResult::Succeed : ETaskExecuteResult::Failed);
+			Iter->Refresh();
 		}
 	}
-
-	K2_OnRefresh();
 }
 
 void UTaskBase::OnGuide()
@@ -239,10 +218,18 @@ void UTaskBase::OnExecute()
 
 void UTaskBase::OnComplete(ETaskExecuteResult InTaskExecuteResult)
 {
-	TaskState = ETaskState::Completed;
-	OnStateChanged(TaskState);
+	for(auto Iter : SubTasks)
+	{
+		if(Iter)
+		{
+			Iter->Complete(InTaskExecuteResult);
+		}
+	}
 
 	TaskExecuteResult = InTaskExecuteResult;
+
+	TaskState = ETaskState::Completed;
+	OnStateChanged(TaskState);
 
 	GetWorld()->GetTimerManager().ClearTimer(AutoCompleteTimerHandle);
 
@@ -251,6 +238,11 @@ void UTaskBase::OnComplete(ETaskExecuteResult InTaskExecuteResult)
 	K2_OnComplete(InTaskExecuteResult);
 
 	UEventModuleStatics::BroadcastEvent(UEventHandle_TaskCompleted::StaticClass(), this, {this});
+
+	if(InTaskExecuteResult != ETaskExecuteResult::Skipped)
+	{
+		WHDebug(FString::Printf(TEXT("任务%s: %s"), TaskExecuteResult != ETaskExecuteResult::Skipped ? TEXT("完成") : TEXT("失败"), *TaskDisplayName.ToString()), EDM_All, EDC_Task, EDV_Log, FColor::Green, 5.f);
+	}
 
 	if(TaskLeaveType == ETaskLeaveType::Automatic && TaskState != ETaskState::Leaved)
 	{
@@ -267,6 +259,14 @@ void UTaskBase::OnComplete(ETaskExecuteResult InTaskExecuteResult)
 
 void UTaskBase::OnLeave()
 {
+	for(auto Iter : SubTasks)
+	{
+		if(Iter)
+		{
+			Iter->Leave();
+		}
+	}
+
 	TaskState = ETaskState::Leaved;
 	OnStateChanged(TaskState);
 
@@ -277,17 +277,6 @@ void UTaskBase::OnLeave()
 	K2_OnLeave();
 
 	UEventModuleStatics::BroadcastEvent(UEventHandle_TaskLeaved::StaticClass(), this, {this});
-
-	if(bMergeSubTask)
-	{
-		for(auto Iter : SubTasks)
-		{
-			if(Iter)
-			{
-				Iter->OnLeave();
-			}
-		}
-	}
 }
 
 UTaskAsset* UTaskBase::GetTaskAsset() const
@@ -295,14 +284,34 @@ UTaskAsset* UTaskBase::GetTaskAsset() const
 	return Cast<UTaskAsset>(GetOuter());
 }
 
+bool UTaskBase::IsCurrent() const
+{
+	return UTaskModuleStatics::GetCurrentTask() == this;
+}
+
 bool UTaskBase::IsEntered() const
 {
 	return TaskState == ETaskState::Entered || TaskState == ETaskState::Executing;
 }
 
+bool UTaskBase::IsExecuting() const
+{
+	return TaskState == ETaskState::Executing;
+}
+
 bool UTaskBase::IsCompleted(bool bCheckSubs) const
 {
 	return (TaskState == ETaskState::Completed || TaskState == ETaskState::Leaved) && (!bCheckSubs || IsAllSubCompleted());
+}
+
+bool UTaskBase::IsSucceed(bool bCheckSubs) const
+{
+	return (TaskExecuteResult == ETaskExecuteResult::Succeed || TaskExecuteResult == ETaskExecuteResult::Skipped) && (!bCheckSubs || IsAllSubSucceed());
+}
+
+bool UTaskBase::IsLeaved(bool bCheckSubs) const
+{
+	return (TaskState == ETaskState::None || TaskState == ETaskState::Leaved) && (!bCheckSubs || IsAllSubLeaved());
 }
 
 bool UTaskBase::CheckTaskCondition_Implementation(FString& OutInfo) const
@@ -339,7 +348,7 @@ bool UTaskBase::IsParentOf(UTaskBase* InTask) const
 	if(InTask && InTask->ParentTask)
 	{
 		if(InTask->ParentTask == this) return true;
-		return InTask->ParentTask->IsParentOf(InTask);
+		return IsParentOf(InTask->ParentTask);
 	}
 	return false;
 }
@@ -349,14 +358,19 @@ void UTaskBase::Restore()
 	UTaskModuleStatics::RestoreTask(this);
 }
 
-void UTaskBase::Enter()
+void UTaskBase::Enter(bool bSetAsCurrent)
 {
-	UTaskModuleStatics::EnterTask(this);
+	UTaskModuleStatics::EnterTask(this, bSetAsCurrent);
 }
 
 void UTaskBase::Refresh()
 {
 	UTaskModuleStatics::RefreshTask(this);
+}
+
+void UTaskBase::Restate()
+{
+	OnStateChanged(TaskState);
 }
 
 void UTaskBase::Guide()
@@ -389,13 +403,11 @@ void UTaskBase::Serialize(FArchive& Ar)
 		{
 			Ar << TaskState;
 			Ar << TaskExecuteResult;
-			Ar << CurrentSubTaskIndex;
 		}
 		else if(Ar.IsSaving())
 		{
 			Ar << TaskState;
 			Ar << TaskExecuteResult;
-			Ar << CurrentSubTaskIndex;
 		}
 	}
 }
@@ -406,7 +418,7 @@ void UTaskBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	{
 		case ETaskState::Entered:
 		{
-			OnEnter(nullptr);
+			OnEnter();
 			break;
 		}
 		case ETaskState::Executing:
@@ -442,15 +454,6 @@ bool UTaskBase::HasSubTask(bool bIgnoreMerge) const
 	return SubTasks.Num() > 0 && (bIgnoreMerge || !bMergeSubTask);
 }
 
-UTaskBase* UTaskBase::GetCurrentSubTask() const
-{
-	if(SubTasks.IsValidIndex(CurrentSubTaskIndex))
-	{
-		return SubTasks[CurrentSubTaskIndex];
-	}
-	return nullptr;
-}
-
 bool UTaskBase::IsSubOf(UTaskBase* InTask) const
 {
 	if(InTask && ParentTask)
@@ -459,6 +462,18 @@ bool UTaskBase::IsSubOf(UTaskBase* InTask) const
 		return ParentTask->IsSubOf(InTask);
 	}
 	return false;
+}
+
+bool UTaskBase::IsAllSubEntered() const
+{
+	for (auto Iter : SubTasks)
+	{
+		if(Iter && !Iter->IsEntered())
+		{
+			return false;
+		}
+	}
+	return true;
 }
 
 bool UTaskBase::IsAllSubCompleted() const
@@ -473,11 +488,23 @@ bool UTaskBase::IsAllSubCompleted() const
 	return true;
 }
 
-bool UTaskBase::IsAllSubExecuteSucceed() const
+bool UTaskBase::IsAllSubSucceed() const
 {
 	for (auto Iter : SubTasks)
 	{
-		if(Iter && Iter->TaskExecuteResult == ETaskExecuteResult::Failed)
+		if(Iter && !Iter->IsSucceed())
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+bool UTaskBase::IsAllSubLeaved() const
+{
+	for (auto Iter : SubTasks)
+	{
+		if(Iter && !Iter->IsLeaved())
 		{
 			return false;
 		}
@@ -498,7 +525,6 @@ bool UTaskBase::GenerateListItem(TSharedPtr<FTaskListItem> OutTaskListItem, cons
 			if(SubTasks[i]->GenerateListItem(Item, InFilterText))
 			{
 				OutTaskListItem->SubListItems.Add(Item);
-				return true;
 			}
 		}
 	}
@@ -534,7 +560,6 @@ bool UTaskBase::CanEditChange(const FProperty* InProperty) const
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UTaskBase, TaskExecuteType) ||
 			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UTaskBase, TaskCompleteType) ||
-			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UTaskBase, TaskLeaveType) ||
 			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UTaskBase, TaskGuideType))
 		{
 			return !HasSubTask(false);
@@ -578,27 +603,11 @@ void UTaskBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
 			if(HasSubTask(false))
 			{
 				TaskExecuteType = ETaskExecuteType::Automatic;
+				AutoExecuteTaskTime = 0.f;
 				TaskCompleteType = ETaskCompleteType::Procedure;
 				AutoCompleteTaskTime = 0.f;
-				TaskLeaveType = ETaskLeaveType::Automatic;
-				TaskGuideType = ETaskGuideType::None;				
+				TaskGuideType = ETaskGuideType::None;
 				TaskGuideIntervalTime = 0.f;
-			}
-		}
-
-		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UTaskBase, bFirstTask))
-		{
-			if(bFirstTask)
-			{
-				if(GetTaskAsset()->GetFirstTask())
-				{
-					GetTaskAsset()->GetFirstTask()->bFirstTask = false;
-				}
-				GetTaskAsset()->SetFirstTask(this);
-			}
-			else if(GetTaskAsset()->GetFirstTask() == this)
-			{
-				GetTaskAsset()->SetFirstTask(nullptr);
 			}
 		}
 	}

@@ -1,5 +1,7 @@
 #include "Ability/Character/AbilityCharacterDataBase.h"
 
+#include "Ability/Character/AbilityCharacterInventoryBase.h"
+
 UAbilityCharacterDataBase::UAbilityCharacterDataBase()
 {
 	Type = FName("Character");
@@ -10,6 +12,7 @@ UAbilityCharacterDataBase::UAbilityCharacterDataBase()
 	HalfHeight = 69.f;
 
 	InventoryData = FInventorySaveData();
-	InventoryData.SplitItems.Add(ESlotSplitType::Default).Items.SetNum(10);
-	InventoryData.SplitItems.Add(ESlotSplitType::Equip).Items.SetNum(6);
+	InventoryData.InventoryClass = UAbilityCharacterInventoryBase::StaticClass();
+	InventoryData.SplitItems.Add(ESlotSplitType::Default, 10);
+	InventoryData.SplitItems.Add(ESlotSplitType::Equip, 6);
 }

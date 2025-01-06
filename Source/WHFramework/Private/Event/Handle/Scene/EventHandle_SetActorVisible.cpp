@@ -19,11 +19,11 @@ void UEventHandle_SetActorVisible::Parse_Implementation(const TArray<FParameter>
 {
 	if(InParams.IsValidIndex(0))
 	{
-		ActorPath = InParams[0].GetObjectPtrValue<AActor>();
+		ActorPath = InParams[0];
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		bVisible = InParams[1].GetBooleanValue();
+		bVisible = InParams[1];
 	}
 }
 

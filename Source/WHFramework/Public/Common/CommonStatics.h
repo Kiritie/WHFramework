@@ -115,7 +115,7 @@ public:
 	 * @param InEnumValue 枚举值
 	 */
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
-	static FString GetEnumValueAuthoredName(const FString& InEnumName, int32 InEnumValue);
+	static FString GetEnumAuthoredNameByValue(const FString& InEnumName, int32 InEnumValue);
 
 	/*
 	* 获取枚举值显示名称
@@ -123,7 +123,15 @@ public:
 	* @param InEnumValue 枚举值
 	*/
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
-	static FText GetEnumValueDisplayName(const FString& InEnumName, int32 InEnumValue);
+	static FText GetEnumDisplayNameByValue(const FString& InEnumName, int32 InEnumValue);
+
+	/*
+	* 获取枚举值显示名称
+	* @param InEnumName 枚举名称
+	* @param InEnumValue 枚举值
+	*/
+	UFUNCTION(BlueprintPure, Category = "CommonStatics")
+	static FText GetEnumDisplayNameByAuthoredName(const FString& InEnumName, const FString& InEnumAuthoredName);
 
 	/*
 	 * 通过获取枚举值名称获取枚举值
@@ -132,6 +140,14 @@ public:
 	 */
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
 	static int32 GetEnumValueByAuthoredName(const FString& InEnumName, const FString& InEnumAuthoredName);
+	
+	//////////////////////////////////////////////////////////////////////////
+	// Enum
+	/*
+	* 获取属性显示名称
+	* @param InProperty 属性
+	*/
+	static FText GetPropertyDisplayName(const FProperty* InProperty);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Serialize
@@ -169,7 +185,10 @@ public:
 
 	UFUNCTION(BlueprintPure, meta = (CompactNodeTitle = "->"), Category = "CommonStatics")
 	static bool StringToBool(const FString& InString);
-	
+		
+	UFUNCTION(BlueprintPure, Category = "CommonStatics")
+	static FString SanitizeFloat(double InFloat, int32 InMaxDigits = -1);
+
 	//////////////////////////////////////////////////////////////////////////
 	// Text
 private:
@@ -178,12 +197,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
 	static bool TextIsNumber(const FText& InText);
 
-	UFUNCTION(BlueprintPure, meta = (CompactNodeTitle = "->"), Category = "CommonStatics")
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "To Number (Text)", CompactNodeTitle = "->", BlueprintAutocast), Category = "CommonStatics")
 	static int32 TextToNumber(const FText& InText, TMap<int32, FString>& OutSymbols);
 
-	UFUNCTION(BlueprintPure, meta = (CompactNodeTitle = "->"), Category = "CommonStatics")
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "To Text (Number)", CompactNodeTitle = "->", BlueprintAutocast), Category = "CommonStatics")
 	static FText NumberToText(int32 InNumber, const TMap<int32, FString>& InSymbols);
-				
+
+	UFUNCTION(BlueprintPure, meta = (DisplayName = "To Name (Text)", CompactNodeTitle = "->", BlueprintAutocast), Category = "CommonStatics")
+	static FName TextToName(const FText& InText);
+
 	//////////////////////////////////////////////////////////////////////////
 	// Tag
 	UFUNCTION(BlueprintPure, meta = (CompactNodeTitle = "->"), Category = "CommonStatics")
@@ -215,7 +237,9 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Json
-	static bool ParseJsonObjectFromString(const FString& InJsonString, TSharedPtr<FJsonObject>& OutJsonObject);
+	static bool StringToJsonObject(const FString& InJsonString, TSharedPtr<FJsonObject>& OutJsonObject);
+
+	static bool JsonObjectToString(const TSharedPtr<FJsonObject>& InJsonObject, FString& OutJsonString);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Input
@@ -316,6 +340,22 @@ public:
 	}
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"), Category = "CommonStatics")
 	static TArray<AActor*> GetAllActorsOfDataLayer(UDataLayerAsset* InDataLayer, TSubclassOf<AActor> InClass = nullptr);
+	
+	template<class T>
+	static TArray<T*> GetAllActorsOfLevel(const FName InLevelName)
+	{
+		TArray<T*> ReturnValues;
+		for(auto Iter : GetAllActorsOfLevel(InLevelName, T::StaticClass()))
+		{
+			if(T* Actor = Cast<T>(Iter))
+			{
+				ReturnValues.Add(Actor);
+			}
+		}
+		return ReturnValues;
+	}
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"), Category = "CommonStatics")
+	static TArray<AActor*> GetAllActorsOfLevel(const FName InLevelName);
 
 	template<class T>
 	static T* GetGameInstance()

@@ -42,6 +42,11 @@
 			"Name": "WHFrameworkEditor",
 			"Type": "Editor",
 			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "WHFrameworkDeveloper",
+			"Type": "UncookedOnly",
+			"LoadingPhase": "Default"
 		}
 	],
 	"Plugins": [

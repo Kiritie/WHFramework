@@ -10,7 +10,10 @@
 UCLASS(MinimalAPI)
 class UProcedureGraphSchema : public UEdGraphSchema_K2
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UProcedureGraphSchema(const FObjectInitializer& ObjectInitializer);
 
 public:
 	virtual bool ShouldAlwaysPurgeOnModification() const override { return true; }

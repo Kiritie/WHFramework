@@ -9,6 +9,7 @@
 #include "Common/CommonStatics.h"
 #include "Common/Interaction/InteractionAgentInterface.h"
 #include "Debug/DebugModuleTypes.h"
+#include "Gameplay/WHPlayerState.h"
 #include "Input/InputModuleStatics.h"
 #include "Input/Components/InputComponentBase.h"
 #include "Kismet/GameplayStatics.h"
@@ -23,11 +24,13 @@ AWHPlayerController::AWHPlayerController()
 
 	InteractionRaycastMode = EInteractionRaycastMode::None;
 	InteractionDistance = 100000.f;
+
+	bInitialized = false;
 }
 
 void AWHPlayerController::OnInitialize_Implementation()
 {
-	
+	bInitialized = true;
 }
 
 void AWHPlayerController::OnPreparatory_Implementation(EPhase InPhase)
@@ -56,9 +59,12 @@ void AWHPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
-		Execute_OnInitialize(this);
+		if(!Execute_IsInitialized(this))
+		{
+			Execute_OnInitialize(this);
+		}
 		Execute_OnPreparatory(this, EPhase::All);
 	}
 }
@@ -67,7 +73,7 @@ void AWHPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnTermination(this, EPhase::All);
 	}
@@ -94,11 +100,21 @@ void AWHPlayerController::SetupInputComponent()
 	ensureEditorMsgf(InputComponent->IsA<UInputComponentBase>(), FString::Printf(TEXT("Invalid InputComponent in DefaultInput.ini, must be InputComponentBase!")), EDC_Input, EDV_Error);
 }
 
+void AWHPlayerController::InitPlayerState()
+{
+	Super::InitPlayerState();
+
+	if(AWHPlayerState* WHPlayerState = Cast<AWHPlayerState>(PlayerState))
+	{
+		WHPlayerState->Execute_OnInitialize(WHPlayerState);
+	}
+}
+
 void AWHPlayerController::Tick(float DeltaSeconds) 
 {
 	Super::Tick(DeltaSeconds);
 
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnRefresh(this, DeltaSeconds);
 	}
@@ -157,7 +173,7 @@ void AWHPlayerController::RefreshInteraction_Implementation()
 			IInteractionAgentInterface::Execute_OnHovering(HoveringInteraction.GetObject());
 		}
 		
-		if(UInputModuleStatics::GetKeyShortcut(GameplayTags::InputTag_InteractSelect).IsPressed(this))
+		if(UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_InteractSelect).IsPressed(this))
 		{
 			if(HoveringInteraction.GetObject())
 			{

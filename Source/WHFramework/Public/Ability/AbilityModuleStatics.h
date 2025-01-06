@@ -8,6 +8,8 @@
 #include "Math/MathStatics.h"
 #include "AbilityModuleStatics.generated.h"
 
+class UAbilityBase;
+class UEffectBase;
 class AAbilityItemBase;
 class AAbilityActorBase;
 class UAbilitySystemComponentBase;
@@ -17,6 +19,7 @@ class AAbilityVitalityBase;
 class AAbilityCharacterBase;
 class AAbilityPickUpBase;
 class AAbilityPawnBase;
+class AAbilityProjectileBase;
 /**
  * 
  */
@@ -29,26 +32,29 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Ability
 	UFUNCTION(BlueprintPure, Category = "Ability|GameplayAbility")
-	static const UGameplayAbility* GetGameplayAbilityBySpec(const FGameplayAbilitySpec& AbilitySpec, bool& bIsInstance);
+	static const UAbilityBase* GetAbilityBySpec(const FGameplayAbilitySpec& InAbilitySpec, bool& bInstance);
 
 	UFUNCTION(BlueprintPure, Category = "Ability|GameplayAbility")
-	static bool GetAbilityInfoByClass(TSubclassOf<UGameplayAbility> AbilityClass, FAbilityInfo& OutAbilityInfo);
+	static FAbilityInfo GetAbilityInfoByClass(TSubclassOf<UAbilityBase> InAbilityClass, float InLevel = 1);
+
+	UFUNCTION(BlueprintPure, Category = "Ability|GameplayAbility")
+	static FEffectInfo GetEffectInfoByClass(TSubclassOf<UEffectBase> InEffectClass, float InLevel = 1);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Race
 	template<class T>
 	static bool GetNoiseRaceDatas(FVector2D InLocation, int32 InOffset, TArray<T>& OutDatas)
 	{
-		TArray<T> raceDatas;
-		if(UAssetModuleStatics::ReadDataTable(raceDatas))
+		TArray<T> RaceDatas;
+		if(UAssetModuleStatics::ReadDataTable(RaceDatas))
 		{
-			for(int32 i = 0; i < raceDatas.Num(); i++)
+			for(int32 i = 0; i < RaceDatas.Num(); i++)
 			{
-				const auto& raceData = raceDatas[i];
-				const float noiseHeight = UMathStatics::GetNoiseHeight(InLocation, FVector(raceData.NoiseScale.X, raceData.NoiseScale.Y, 1.f), InOffset * (i + 1));
-				if(noiseHeight >= raceData.NoiseScale.Z)
+				const auto& RaceData = RaceDatas[i];
+				const float NoiseHeight = UMathStatics::GetNoise2D(FVector2D(InLocation.X * RaceData.NoiseScale.X, InLocation.Y * RaceData.NoiseScale.Y), InOffset * (i + 1));
+				if(FMath::Abs(NoiseHeight) >= RaceData.NoiseScale.Z)
 				{
-					OutDatas.Add(raceData);
+					OutDatas.Add(RaceData);
 				}
 			}
 		}
@@ -57,15 +63,19 @@ public:
 	
 	//////////////////////////////////////////////////////////////////////////
 	// Item
-	static AAbilityItemBase* SpawnAbilityItem(FAbilityItem InItem, FVector InLocation = FVector::ZeroVector, FRotator InRotation = FRotator::ZeroRotator, ISceneContainerInterface* InContainer = nullptr);
+	static AAbilityItemBase* SpawnAbilityItem(FAbilityItem InItem, FVector InLocation, FRotator InRotation, ISceneContainerInterface* InContainer = nullptr);
 
-	static AAbilityItemBase* SpawnAbilityItem(FAbilityItem InItem, AActor* InOwnerActor);
+	static AAbilityItemBase* SpawnAbilityItem(FAbilityItem InItem, AActor* InOwnerActor = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	// PickUp
-	static AAbilityPickUpBase* SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation = FVector::ZeroVector, ISceneContainerInterface* InContainer = nullptr);
+	static AAbilityPickUpBase* SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer = nullptr);
 
 	static AAbilityPickUpBase* SpawnAbilityPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Projectile
+	static AAbilityProjectileBase* SpawnAbilityProjectile(const TSubclassOf<AAbilityProjectileBase>& InClass, AActor* InOwnerActor = nullptr, const FGameplayAbilitySpecHandle& InAbilityHandle = FGameplayAbilitySpecHandle());
 
 	//////////////////////////////////////////////////////////////////////////
 	// Actor

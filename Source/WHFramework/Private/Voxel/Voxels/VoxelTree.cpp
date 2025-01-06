@@ -31,7 +31,7 @@ void UVoxelTree::OnReset_Implementation()
 void UVoxelTree::LoadData(const FString& InData)
 {
 	TArray<FString> Datas;
-	InData.ParseIntoArray(Datas, TEXT(";"));
+	InData.ParseIntoArray(Datas, TEXT(","));
 	TreePart = (EVoxelTreePart)FCString::Atoi(*Datas[0]);
 	switch (TreePart)
 	{
@@ -58,12 +58,12 @@ FString UVoxelTree::ToData()
 	{
 		case EVoxelTreePart::Root:
 		{
-			return FString::Printf(TEXT("%d;%d;%d;%d"), TreePart, TreeHeight, LeavesHeight, LeavesWidth);
+			return FString::Printf(TEXT("%d,%d,%d,%d"), TreePart, TreeHeight, LeavesHeight, LeavesWidth);
 		}
 		case EVoxelTreePart::Bole:
 		case EVoxelTreePart::Leaves:
 		{
-			return FString::Printf(TEXT("%d;%d"), TreePart, UVoxelModuleStatics::VoxelIndexToNumber(RootIndex));
+			return FString::Printf(TEXT("%d,%d"), TreePart, UVoxelModuleStatics::VoxelIndexToNumber(RootIndex));
 		}
 		default: break;
 	}
@@ -148,7 +148,7 @@ void UVoxelTree::OnDestroy(IVoxelAgentInterface* InAgent)
 				}
 				for(auto& Iter : TMap(VoxelItems))
 				{
-					if(Owner->GetVoxel<UVoxelTree>(Iter.Key).RootIndex != VoxelIndex)
+					if(Owner->GetVoxelComplex(Iter.Key).GetVoxel<UVoxelTree>().RootIndex != VoxelIndex)
 					{
 						VoxelItems.Remove(Iter.Key);
 					}

@@ -11,15 +11,16 @@ UProcedureAsset::UProcedureAsset(const FObjectInitializer& ObjectInitializer)
 	
 	NativeClass = GetClass();
 
+	bAutoSwitchFirst = false;
+	FirstProcedure = nullptr;
+
 	Procedures = TArray<UProcedureBase*>();
 	ProcedureMap = TMap<TSubclassOf<UProcedureBase>, UProcedureBase*>();
-
-	FirstProcedure = nullptr;
 }
 
-void UProcedureAsset::Initialize(UAssetBase* InSource)
+void UProcedureAsset::Initialize()
 {
-	Super::Initialize(InSource);
+	Super::Initialize();
 
 	for(const auto Iter : Procedures)
 	{

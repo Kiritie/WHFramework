@@ -6,9 +6,9 @@
 #include "Fonts/SlateFontInfo.h"
 #include "Styling/SlateColor.h"
 #include "Widgets/SWidget.h"
-#include "Blueprint/UserWidget.h"
 #include "Common/CommonStatics.h"
 #include "Slate/Runtime/Interfaces/TickAbleWidgetInterface.h"
+#include "Widget/Pool/PoolWidgetBase.h"
 
 #include "AnimTextBlock.generated.h"
 
@@ -129,9 +129,28 @@ public:
 };
 
 UCLASS()
-class WHFRAMEWORK_API UAnimTextBlock : public UUserWidget, public ITickAbleWidgetInterface
+class WHFRAMEWORK_API UAnimTextBlock : public UPoolWidgetBase
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UAnimTextBlock(const FObjectInitializer& ObjectInitializer);
+
+public:
+	virtual void NativePreConstruct() override;
+
+	virtual void NativeConstruct() override;
+
+public:
+	virtual void OnTick_Implementation(float DeltaSeconds) override;
+
+protected:
+	UFUNCTION()
+	void PlayTextAnim(int32 TextIndex);
+
+	void UpdatePreviewText();
+
+	void ClearPreviewText();
 	
 public:
 	UPROPERTY(EditAnywhere, Category=Appearance, meta=( MultiLine="true" ))
@@ -172,24 +191,6 @@ public:
 	class UHorizontalBox* TextBox;
 	
 	FAnimTextInfo AnimTextInfo;
-
-public:
-	virtual void NativePreConstruct() override;
-
-	virtual void NativeConstruct() override;
-
-public:
-	virtual bool IsTickAble_Implementation() const override;
-
-	virtual void OnTick_Implementation(float DeltaSeconds) override;
-
-protected:
-	UFUNCTION()
-	void PlayTextAnim(int32 TextIndex);
-
-	void UpdatePreviewText();
-
-	void ClearPreviewText();
 
 public:
 	UFUNCTION(BlueprintCallable, Category="Widget", meta=(DisplayName="GetText (Text)"))

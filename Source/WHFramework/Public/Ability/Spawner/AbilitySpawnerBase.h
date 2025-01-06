@@ -14,12 +14,21 @@ class UCapsuleComponent;
  * 
  */
 UCLASS(Abstract, Blueprintable, hidecategories = (Tick, Replication, Collision, Input, Cooking, Hidden, Hlod, Physics, LevelInstance))
-class WHFRAMEWORK_API AAbilitySpawnerBase : public ANavigationObjectBase, public IWHActorInterface, public ISceneActorInterface, public IObjectPoolInterface
+class WHFRAMEWORK_API AAbilitySpawnerBase : public ANavigationObjectBase, public IWHActorInterface, public IObjectPoolInterface
 {
 	GENERATED_BODY()
 	
 public:
 	AAbilitySpawnerBase();
+
+	//////////////////////////////////////////////////////////////////////////
+	/// ObjectPool
+public:
+	virtual int32 GetLimit_Implementation() const override { return -1; }
+
+	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
+		
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// WHActor
@@ -33,27 +42,26 @@ public:
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 protected:
-	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "WHActor")
+	bool bInitialized;
+	
+protected:
+	virtual bool IsInitialized_Implementation() const override { return bInitialized; }
+	
+	virtual bool IsUseDefaultLifecycle_Implementation() const override { return true; }
 
 protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
-
-	//////////////////////////////////////////////////////////////////////////
-	/// ObjectPool
-public:
-	virtual int32 GetLimit_Implementation() const override { return -1; }
-
-	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
-		
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// SceneActor
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SceneActor")
 	FGuid ActorID;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SceneActor")
 	bool bVisible;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SceneActor")
 	TScriptInterface<ISceneContainerInterface> Container;
 	
@@ -106,9 +114,6 @@ protected:
 protected:
 	UPROPERTY(EditAnywhere, Category = "Spawner")
 	bool bAutoSpawn;
-	
-	UPROPERTY(EditAnywhere, Category = "Spawner")
-	bool bAutoDestroy;
 			
 	UPROPERTY(EditAnywhere, Category = "Spawner")
 	FAbilityItem AbilityItem;

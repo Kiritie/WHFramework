@@ -4,7 +4,6 @@
 #include "AI/Base/AIBlackboardBase.h"
 
 #include "AI/Base/AIControllerBase.h"
-#include "Math/MathTypes.h"
 
 void UAIBlackboardBase::PostLoad()
 {
@@ -102,4 +101,9 @@ void UAIBlackboardBase::ResetValue(FName InValueName)
 void UAIBlackboardBase::Refresh()
 {
 	OnRefresh();
+}
+
+APawn* UAIBlackboardBase::GetAgent(TSubclassOf<APawn> InClass) const
+{
+	return GetDeterminesOutputObject(Cast<APawn>(Agent), InClass);
 }

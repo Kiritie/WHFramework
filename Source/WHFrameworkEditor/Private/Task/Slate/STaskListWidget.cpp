@@ -11,6 +11,7 @@
 #include "Task/Base/TaskBase.h"
 #include "Task/Blueprint/TaskBlueprintFactory.h"
 #include "Task/Slate/STaskDetailsWidget.h"
+#include "Task/Slate/STaskListItemWidget.h"
 #include "Widgets/Input/SSearchBox.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
@@ -288,7 +289,7 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Expand")))
-						.IsEnabled_Lambda([this](){ return TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Num() > 0; })
+						.IsEnabled_Lambda([this](){ return TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->RootTasks.Num() > 0; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &STaskListWidget::OnExpandAllTaskItemButtonClicked)
 					]
@@ -301,7 +302,7 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Collapse")))
-						.IsEnabled_Lambda([this](){ return TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Num() > 0; })
+						.IsEnabled_Lambda([this](){ return TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->RootTasks.Num() > 0; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &STaskListWidget::OnCollapseAllTaskItemButtonClicked)
 					]
@@ -314,7 +315,7 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 						.ContentPadding(FMargin(0.f, 2.f))
 						.HAlign(HAlign_Center)
 						.Text(FText::FromString(TEXT("Clear All")))
-						.IsEnabled_Lambda([this](){ return TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Num() > 0; })
+						.IsEnabled_Lambda([this](){ return TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->RootTasks.Num() > 0; })
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &STaskListWidget::OnClearAllTaskItemButtonClicked)
 					]
@@ -355,7 +356,7 @@ void STaskListWidget::Construct(const FArguments& InArgs)
 						.Text(FText::FromString(TEXT("Move Down")))
 						.IsEnabled_Lambda([this](){
 							return ActiveFilterText.IsEmptyOrWhitespace() ? (SelectedTaskListItems.Num() == 1 &&
-								SelectedTaskListItems[0]->GetTaskIndex() < (SelectedTaskListItems[0]->GetParentTask() ? SelectedTaskListItems[0]->GetParentSubTasks().Num() : TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Num()) - 1) : false;
+								SelectedTaskListItems[0]->GetTaskIndex() < (SelectedTaskListItems[0]->GetParentTask() ? SelectedTaskListItems[0]->GetParentSubTasks().Num() : TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->RootTasks.Num()) - 1) : false;
 						})
 						.ClickMethod(EButtonClickMethod::MouseDown)
 						.OnClicked(this, &STaskListWidget::OnMoveDownTaskItemButtonClicked)
@@ -481,7 +482,7 @@ void STaskListWidget::OnClassPicked(UClass* InClass)
 				}
 				else
 				{
-					TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().EmplaceAt(OldTask->TaskIndex, NewTask);
+					TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->RootTasks[OldTask->TaskIndex] = NewTask;
 				}
 				OldTask->OnUnGenerate();
 			}
@@ -721,7 +722,7 @@ FReply STaskListWidget::OnEditTaskItemButtonClicked()
 
 FReply STaskListWidget::OnNewTaskClassButtonClicked()
 {
-	if(const UBlueprint* Blueprint = UWHFrameworkEditorStatics::CreateBlueprintAssetWithDialog(UTaskBlueprintFactory::StaticClass()))
+	if(const UBlueprint* Blueprint = UEditorStatics::CreateBlueprintAssetWithDialog(UTaskBlueprintFactory::StaticClass()))
 	{
 		if(!bEditing)
 		{
@@ -754,9 +755,9 @@ FReply STaskListWidget::OnAddTaskItemButtonClicked()
 	}
 	else
 	{
-		NewTask->TaskIndex = TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Num();
+		NewTask->TaskIndex = TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->RootTasks.Num();
 		NewTask->TaskHierarchy = 0;
-		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Add(NewTask);
+		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->RootTasks.Add(NewTask);
 		TaskListItems.Add(Item);
 
 		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->Modify();
@@ -793,7 +794,7 @@ FReply STaskListWidget::OnInsertTaskItemButtonClicked()
 		}
 		else
 		{
-			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Insert(NewTask, SelectedTaskListItems[0]->Task->TaskIndex);
+			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->RootTasks.Insert(NewTask, SelectedTaskListItems[0]->Task->TaskIndex);
 			TaskListItems.Insert(Item, SelectedTaskListItems[0]->Task->TaskIndex);
 
 			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->Modify();
@@ -827,7 +828,7 @@ FReply STaskListWidget::OnAppendTaskItemButtonClicked()
 		}
 		else
 		{
-			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Insert(NewTask, SelectedTaskListItems[0]->Task->TaskIndex + 1);
+			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->RootTasks.Insert(NewTask, SelectedTaskListItems[0]->Task->TaskIndex + 1);
 			TaskListItems.Insert(Item, SelectedTaskListItems[0]->Task->TaskIndex + 1);
 
 			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->Modify();
@@ -869,9 +870,9 @@ FReply STaskListWidget::OnPasteTaskItemButtonClicked()
 	}
 	else
 	{
-		CopiedTask->TaskIndex = TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Num();
+		CopiedTask->TaskIndex = TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->RootTasks.Num();
 		CopiedTask->TaskHierarchy = 0;
-		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Add(CopiedTask);
+		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->RootTasks.Add(CopiedTask);
 		TaskListItems.Add(Item);
 
 		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->Modify();
@@ -910,7 +911,7 @@ FReply STaskListWidget::OnDuplicateTaskItemButtonClicked()
 		}
 		else
 		{
-			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Insert(NewTask, SelectedTaskListItems[0]->Task->TaskIndex + 1);
+			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->RootTasks.Insert(NewTask, SelectedTaskListItems[0]->Task->TaskIndex + 1);
 			TaskListItems.Insert(Item, SelectedTaskListItems[0]->Task->TaskIndex + 1);
 
 			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->Modify();
@@ -965,8 +966,8 @@ FReply STaskListWidget::OnRemoveTaskItemButtonClicked()
 			}
 			else
 			{
-				TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks()[Iter->GetTaskIndex()]->OnUnGenerate();
-				TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().RemoveAt(Iter->GetTaskIndex());
+				TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->RootTasks[Iter->GetTaskIndex()]->OnUnGenerate();
+				TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->RootTasks.RemoveAt(Iter->GetTaskIndex());
 				TaskListItems.RemoveAt(Iter->GetTaskIndex());
 				//TreeView->SetSelection(TaskListItems[FMath::Min(SelectedTaskListItem->GetTaskIndex(),TaskListItems.Num() - 1)]);
 
@@ -1011,9 +1012,9 @@ FReply STaskListWidget::OnMoveUpTaskItemButtonClicked()
 	}
 	else
 	{
-		const auto TmpTask = TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks()[SelectedTaskListItems[0]->GetTaskIndex()];
-		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().RemoveAt(SelectedTaskListItems[0]->GetTaskIndex());
-		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Insert(TmpTask, SelectedTaskListItems[0]->GetTaskIndex() - 1);
+		const auto TmpTask = TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->RootTasks[SelectedTaskListItems[0]->GetTaskIndex()];
+		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->RootTasks.RemoveAt(SelectedTaskListItems[0]->GetTaskIndex());
+		TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->RootTasks.Insert(TmpTask, SelectedTaskListItems[0]->GetTaskIndex() - 1);
 
 		TaskListItems.RemoveAt(SelectedTaskListItems[0]->GetTaskIndex());
 		TaskListItems.Insert(SelectedTaskListItems, SelectedTaskListItems[0]->GetTaskIndex() - 1);
@@ -1048,11 +1049,11 @@ FReply STaskListWidget::OnMoveDownTaskItemButtonClicked()
 	}
 	else
 	{
-		if(SelectedTaskListItems[0]->GetTaskIndex() < TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Num() - 1)
+		if(SelectedTaskListItems[0]->GetTaskIndex() < TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->RootTasks.Num() - 1)
 		{
-			const auto TmpTask = TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks()[SelectedTaskListItems[0]->GetTaskIndex()];
-			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().RemoveAt(SelectedTaskListItems[0]->GetTaskIndex());
-			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->GetRootTasks().Insert(TmpTask, SelectedTaskListItems[0]->GetTaskIndex() + 1);
+			const auto TmpTask = TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->RootTasks[SelectedTaskListItems[0]->GetTaskIndex()];
+			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->RootTasks.RemoveAt(SelectedTaskListItems[0]->GetTaskIndex());
+			TaskEditor.Pin()->GetEditingAsset<UTaskAsset>()->RootTasks.Insert(TmpTask, SelectedTaskListItems[0]->GetTaskIndex() + 1);
 
 			TaskListItems.RemoveAt(SelectedTaskListItems[0]->GetTaskIndex());
 			TaskListItems.Insert(SelectedTaskListItems, SelectedTaskListItems[0]->GetTaskIndex() + 1);

@@ -13,14 +13,20 @@ class UProcedureBase;
 UCLASS(BlueprintType, Meta = (LoadBehavior = "LazyOnDemand"))
 class WHFRAMEWORK_API UProcedureAsset : public UAssetBase
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
 
 public:
-	virtual void Initialize(UAssetBase* InSource) override;
+	UProcedureAsset(const FObjectInitializer& ObjectInitializer);
+	
+public:
+	virtual void Initialize() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Procedure Stats
 public:
+	/// 自动切换初始流程 
+	UPROPERTY(EditAnywhere)
+	bool bAutoSwitchFirst;
 	/// 初始流程 
 	UPROPERTY(VisibleAnywhere)
 	UProcedureBase* FirstProcedure;
@@ -30,28 +36,6 @@ public:
 	/// 流程Map
 	UPROPERTY(Transient)
 	TMap<TSubclassOf<UProcedureBase>, UProcedureBase*> ProcedureMap;
-
-public:
-	/**
-	* 获取初始流程
-	*/
-	UFUNCTION(BlueprintPure)
-	UProcedureBase* GetFirstProcedure() const { return FirstProcedure; }
-	/**
-	* 设置初始流程
-	*/
-	UFUNCTION(BlueprintCallable)
-	void SetFirstProcedure(UProcedureBase* InFirstProcedure) { this->FirstProcedure = InFirstProcedure; }
-	/**
-	* 获取流程列表
-	*/
-	UFUNCTION(BlueprintPure)
-	TArray<UProcedureBase*>& GetProcedures() { return Procedures; }
-	/**
-	* 获取流程Map
-	*/
-	UFUNCTION(BlueprintPure)
-	TMap<TSubclassOf<UProcedureBase>, UProcedureBase*>& GetProcedureMap() { return ProcedureMap; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Editor

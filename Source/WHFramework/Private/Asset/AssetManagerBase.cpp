@@ -24,6 +24,17 @@ void UAssetManagerBase::StartInitialLoading()
 	Super::StartInitialLoading();
 }
 
+void UAssetManagerBase::ReleaseRuntimeData()
+{
+	for(auto& Iter1 : PrimaryAssetMap)
+	{
+		for(auto& Iter2 : Iter1.Value.Assets)
+		{
+			Iter2.Value->OnReset();
+		}
+	}
+}
+
 TSharedPtr<FStreamableHandle> UAssetManagerBase::LoadPrimaryAsset(const FPrimaryAssetId& AssetToLoad, const TArray<FName>& LoadBundles, FStreamableDelegate DelegateToCall, TAsyncLoadPriority Priority)
 {
 	return Super::LoadPrimaryAsset(AssetToLoad, LoadBundles, DelegateToCall, Priority);
@@ -43,6 +54,7 @@ UPrimaryAssetBase* UAssetManagerBase::LoadPrimaryAsset(const FPrimaryAssetId& In
 			LoadedAsset = Cast<UPrimaryAssetBase>(AssetPath.TryLoad());
 			if(LoadedAsset)
 			{
+				LoadedAsset->OnInitialize();
 				PrimaryAssets.Assets.Add(InPrimaryAssetId, LoadedAsset);
 			}
 		}
@@ -78,15 +90,4 @@ TArray<UPrimaryAssetBase*> UAssetManagerBase::LoadPrimaryAssets(FPrimaryAssetTyp
 	
 	ensureEditorMsgf(!bEnsured || !LoadedAssets.IsEmpty(), FString::Printf(TEXT("Failed to load assets for identifier %s!"), *InPrimaryAssetType.ToString()), EDC_Asset, EDV_Error);
 	return LoadedAssets;
-}
-
-void UAssetManagerBase::ReleaseRuntimeData()
-{
-	for(auto& Iter1 : PrimaryAssetMap)
-	{
-		for(auto& Iter2 : Iter1.Value.Assets)
-		{
-			Iter2.Value->ResetData();
-		}
-	}
 }

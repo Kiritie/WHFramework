@@ -15,14 +15,18 @@ public:
 	UAttributeSetBase();
 
 public:
+	virtual void SerializeAttributes(FArchive& Ar);
+
 	virtual void PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const override;
 
 	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
 
+	virtual void PostAttributeChange(const FGameplayAttribute& Attribute, float OldValue, float NewValue) override;
+
 	virtual void PostGameplayEffectExecute(const struct FGameplayEffectModCallbackData &Data) override;
 
 protected:
-	virtual void AdjustAttributeForMaxChange(FGameplayAttributeData& InAffectedAttribute, const FGameplayAttributeData& InMaxAttribute, float InNewMaxValue, const FGameplayAttribute& InAffectedAttributeProperty);
+	virtual void AdjustAttributeForMaxChange(const FGameplayAttribute& Attribute, float OldMaxValue, float NewMaxValue);
 
 public:
 	UFUNCTION(BlueprintPure)
@@ -48,4 +52,14 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	TArray<FGameplayAttribute> GetPersistentAttributes() const;
+
+public:
+	template<class T>
+	T* GetOwnerActor() const
+	{
+		return Cast<T>(GetOwnerActor());
+	}
+	
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	AActor* GetOwnerActor(TSubclassOf<AActor> InClass = nullptr) const;
 };

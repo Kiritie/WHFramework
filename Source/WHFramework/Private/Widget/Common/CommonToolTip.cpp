@@ -13,7 +13,8 @@ UCommonToolTip::UCommonToolTip(const FObjectInitializer& ObjectInitializer) : Su
 
 void UCommonToolTip::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
-	OwnerWidget = Cast<UWidget>(InOwner);
+	Super::OnSpawn_Implementation(InOwner, InParams);
+	
 	if(OwnerWidget)
 	{
 		OwnerWidget->SetToolTip(this);
@@ -28,8 +29,9 @@ void UCommonToolTip::OnDespawn_Implementation(bool bRecovery)
 	if(OwnerWidget)
 	{
 		OwnerWidget->SetToolTip(nullptr);
-		OwnerWidget = nullptr;
 	}
+	
+	OnDespawn_Implementation(bRecovery);
 }
 
 FText UCommonToolTip::GetContent() const

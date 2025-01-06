@@ -17,8 +17,12 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FMoveSceneCompRelLocationDelegate);
 UCLASS()
 class WHFRAMEWORK_API UAbilityTask_MoveSceneCompRelLocation : public UAbilityTask
 {
-	GENERATED_UCLASS_BODY()
-	
+	GENERATED_BODY()
+
+public:
+	UAbilityTask_MoveSceneCompRelLocation(const FObjectInitializer& ObjectInitializer);
+
+public:
 	UPROPERTY(BlueprintAssignable)
 	FMoveSceneCompRelLocationDelegate OnFinishMove;
 

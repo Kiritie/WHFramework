@@ -3,18 +3,16 @@
 #pragma once
 
 #include "GameFramework/Actor.h"
-#include "AbilitySystemInterface.h"
 #include "AbilityActorInterface.h"
+#include "Ability/Attributes/ActorAttributeSetBase.h"
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
 #include "Asset/Primary/PrimaryEntityInterface.h"
 #include "Common/Base/WHActor.h"
 #include "Common/Interaction/InteractionAgentInterface.h"
-#include "SaveGame/Base/SaveDataInterface.h"
 
 #include "AbilityActorBase.generated.h"
 
 class UInteractionComponent;
-class UActorAttributeSetBase;
 class UActorAbilityBase;
 class UAbilitySystemComponentBase;
 class UBoxComponent;
@@ -26,12 +24,21 @@ class UAbilityActorDataBase;
  * Ability Actor基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityActorBase : public AWHActor, public IAbilityActorInterface, public IPrimaryEntityInterface, public IInteractionAgentInterface, public IAbilityInventoryAgentInterface, public ISaveDataInterface
+class WHFRAMEWORK_API AAbilityActorBase : public AWHActor, public IAbilityActorInterface, public IPrimaryEntityInterface, public IInteractionAgentInterface, public IAbilityInventoryAgentInterface
 {
 	GENERATED_BODY()
 
 public:
-	AAbilityActorBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+	AAbilityActorBase(const FObjectInitializer& ObjectInitializer);
+
+	//////////////////////////////////////////////////////////////////////////
+	/// ObjectPool
+public:
+	virtual int32 GetLimit_Implementation() const override { return -1; }
+
+	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
+		
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// WHActor
@@ -45,12 +52,6 @@ public:
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 public:
-	virtual int32 GetLimit_Implementation() const override { return 1000; }
-
-	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
-
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
-
 	virtual bool HasArchive() const override { return true; }
 
 	virtual void Serialize(FArchive& Ar) override;
@@ -59,7 +60,7 @@ public:
 
 	virtual FSaveData* ToData() override;
 
-	virtual void ResetData();
+	virtual void ResetData() override;
 
 public:
 	virtual bool CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent) override;
@@ -68,23 +69,32 @@ public:
 
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
-	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity) override;
+	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive) override;
 
 	virtual void OnAdditionItem(const FAbilityItem& InItem) override;
 
+	virtual void OnRemoveItem(const FAbilityItem& InItem) override;
+
+	virtual void OnPreChangeItem(const FAbilityItem& InOldItem) override;
+
+	virtual void OnChangeItem(const FAbilityItem& InNewItem) override;
+
 	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
 		
-	virtual void OnCancelItem(const FAbilityItem& InItem, bool bPassive) override;
-
-	virtual void OnAssembleItem(const FAbilityItem& InItem) override;
-
-	virtual void OnDischargeItem(const FAbilityItem& InItem) override;
+	virtual void OnDeactiveItem(const FAbilityItem& InItem, bool bPassive) override;
 
 	virtual void OnDiscardItem(const FAbilityItem& InItem, bool bInPlace) override;
 
 	virtual void OnSelectItem(const FAbilityItem& InItem) override;
 
 	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
+
+protected:
+	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
+
+	virtual void OnActorAttached(AActor* InActor) override;
+
+	virtual void OnActorDetached(AActor* InActor) override;
 
 protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
@@ -105,12 +115,20 @@ protected:
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "ActorStats")
 	FPrimaryAssetId AssetID;
-	
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "ActorStats")
+	FName Name;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "ActorStats")
 	int32 Level;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "ActorStats")
+	FTransform BirthTransform;
+
 public:
-	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
+	ATTRIBUTE_ACCESSORS(UActorAttributeSetBase, Exp)
+	
+	ATTRIBUTE_ACCESSORS(UActorAttributeSetBase, MaxExp)
 
 public:
 	template<class T>
@@ -128,6 +146,10 @@ public:
 	}
 
 	virtual UAttributeSetBase* GetAttributeSet() const override;
+
+	virtual UShapeComponent* GetCollisionComponent() const override;
+
+	virtual UMeshComponent* GetMeshComponent() const override;
 
 	template<class T>
 	T* GetAbilitySystemComponent() const
@@ -148,16 +170,21 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	virtual AActor* GetInteractingAgent(TSubclassOf<AActor> InClass) const { return GetDeterminesOutputObject(Cast<AActor>(GetInteractingAgent()), InClass); }
 
-	virtual EInteractAgentType GetInteractAgentType() const override { return EInteractAgentType::Static; }
+	virtual EInteractAgentType GetInteractAgentType() const override { return EInteractAgentType::Passivity; }
 
 	virtual UInteractionComponent* GetInteractionComponent() const override { return Interaction; }
 	
 	virtual UAbilityInventoryBase* GetInventory() const override { return Inventory; }
 
-public:
 	virtual FPrimaryAssetId GetAssetID_Implementation() const override { return AssetID; }
 	
 	virtual void SetAssetID_Implementation(const FPrimaryAssetId& InID) override { AssetID = InID; }
+	
+	UFUNCTION(BlueprintPure)
+	virtual FName GetNameA() const override { return Name; }
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetNameA(FName InName) override { Name = InName; }
 
 	UFUNCTION(BlueprintPure)
 	virtual int32 GetLevelA() const override { return Level; }
@@ -170,4 +197,10 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual float GetHalfHeight() const override;
+	
+	UFUNCTION(BlueprintPure)
+	virtual float GetDistance(AActor* InTargetActor, bool bIgnoreRadius = true, bool bIgnoreZAxis = true) const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual FTransform GetBirthTransform() const override { return BirthTransform; }
 };

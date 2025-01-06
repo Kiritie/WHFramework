@@ -39,6 +39,8 @@ public:
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
 	void CreateWorldWidget(const TArray<FParameter>& InParams, bool bInEditor = false);
 
+	void CreateWorldWidget(const TArray<FParameter>* InParams = nullptr, bool bInEditor = false);
+
 	UFUNCTION(BlueprintCallable)
 	void DestroyWorldWidget(bool bRecovery = false, bool bInEditor = false);
 
@@ -69,14 +71,14 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "UserInterface")
 	TArray<FParameter> WidgetParams;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UserInterface")
+	FVector WidgetScale;
+
 	UPROPERTY(Transient, DuplicateTransient)
 	TMap<FName, USceneComponent*> WidgetPoints;
 
 	UPROPERTY(Transient, DuplicateTransient)
 	UWorldWidgetBase* WorldWidget;
-
-private:	
-	FTransform InitTransform;
 
 public:
 	UFUNCTION(BlueprintCallable)

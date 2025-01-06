@@ -35,7 +35,7 @@ void UCharacterAnimBase::NativeUpdateAnimation(float DeltaSeconds)
 {
 	Super::NativeUpdateAnimation(DeltaSeconds);
 
-	ACharacterBase* Character = Cast<ACharacterBase>(TryGetPawnOwner());
+	ACharacterBase* Character = GetOwnerCharacter<ACharacterBase>();
 
 	if(!Character || !UCommonStatics::IsPlaying()) return;
 	
@@ -52,4 +52,9 @@ void UCharacterAnimBase::NativeUpdateAnimation(float DeltaSeconds)
 
 	VerticalSpeed = Character->GetVelocity().Z;
 	HorizontalSpeed = FVector(Character->GetVelocity().X, Character->GetVelocity().Y, 0.f).Size();
+}
+
+ACharacterBase* UCharacterAnimBase::GetOwnerCharacter(TSubclassOf<ACharacterBase> InClass) const
+{
+	return GetDeterminesOutputObject(Cast<ACharacterBase>(TryGetPawnOwner()), InClass);
 }

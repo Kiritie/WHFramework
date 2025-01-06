@@ -4,7 +4,9 @@
 
 #include "Debug/Widget/SDebugPanelWidget.h"
 #include "Gameplay/WHGameState.h"
+#include "Gameplay/WHHUD.h"
 #include "Gameplay/WHPlayerController.h"
+#include "Gameplay/WHPlayerState.h"
 #include "Main/MainModule.h"
 #include "Widget/WidgetModuleStatics.h"
 
@@ -13,13 +15,17 @@ AWHGameMode::AWHGameMode()
 	PrimaryActorTick.bCanEverTick = true;
 
 	DefaultPawnClass = nullptr;
+	HUDClass = AWHHUD::StaticClass();
 	PlayerControllerClass = AWHPlayerController::StaticClass();
 	GameStateClass = AWHGameState::StaticClass();
+	PlayerStateClass = AWHPlayerState::StaticClass();
+
+	bInitialized = false;
 }
 
 void AWHGameMode::OnInitialize_Implementation()
 {
-
+	bInitialized = true;
 }
 
 void AWHGameMode::OnPreparatory_Implementation(EPhase InPhase)
@@ -32,18 +38,12 @@ void AWHGameMode::OnPreparatory_Implementation(EPhase InPhase)
 
 void AWHGameMode::OnRefresh_Implementation(float DeltaSeconds)
 {
-	if(AMainModule* MainModule = AMainModule::GetPtr())
-	{
-		MainModule->Execute_OnRefresh(MainModule, DeltaSeconds);
-	}
+	
 }
 
 void AWHGameMode::OnTermination_Implementation(EPhase InPhase)
 {
-	if(AMainModule* MainModule = AMainModule::GetPtr())
-	{
-		MainModule->Execute_OnTermination(MainModule, InPhase);
-	}
+	
 }
 
 bool AWHGameMode::ProcessConsoleExec(const TCHAR* Cmd, FOutputDevice& Ar, UObject* Executor)
@@ -59,11 +59,6 @@ bool AWHGameMode::ProcessConsoleExec(const TCHAR* Cmd, FOutputDevice& Ar, UObjec
 void AWHGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
 {
 	Super::InitGame(MapName, Options, ErrorMessage);
-
-	if(Execute_IsDefaultLifecycle(this))
-	{
-		Execute_OnInitialize(this);
-	}
 }
 
 void AWHGameMode::InitGameState()
@@ -87,6 +82,16 @@ APlayerController* AWHGameMode::SpawnPlayerController(ENetRole InRemoteRole, con
 	return PlayerController;
 }
 
+void AWHGameMode::InitializeHUDForPlayer_Implementation(APlayerController* NewPlayer)
+{
+	Super::InitializeHUDForPlayer_Implementation(NewPlayer);
+
+	if(AWHHUD* WHHUD = Cast<AWHHUD>(NewPlayer->GetHUD()))
+	{
+		WHHUD->Execute_OnInitialize(WHHUD);
+	}
+}
+
 APlayerController* AWHGameMode::Login(UPlayer* NewPlayer, ENetRole InRemoteRole, const FString& Portal, const FString& Options, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
 {
 	return Super::Login(NewPlayer, InRemoteRole, Portal, Options, UniqueId, ErrorMessage);
@@ -101,7 +106,7 @@ void AWHGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnPreparatory(this, EPhase::Primary);
 		Execute_OnPreparatory(this, EPhase::Lesser);
@@ -113,7 +118,7 @@ void AWHGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnTermination(this, EPhase::Primary);
 		Execute_OnTermination(this, EPhase::Lesser);
@@ -125,7 +130,7 @@ void AWHGameMode::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	if(Execute_IsDefaultLifecycle(this))
+	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnRefresh(this, DeltaSeconds);
 	}

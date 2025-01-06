@@ -15,7 +15,7 @@ class FAssetModifierEditorCommands : public TCommands<FAssetModifierEditorComman
 {	  
 public:
 	FAssetModifierEditorCommands()
-		: TCommands<FAssetModifierEditorCommands>(TEXT("AssetModifierEditor"),
+		: TCommands<FAssetModifierEditorCommands>(FName("AssetModifierEditor"),
 			NSLOCTEXT("AssetModifierEditor", "Asset Modifier Editor", "Asset Modifier Editor Commands"),
 			NAME_None, FWHFrameworkEditorStyle::GetStyleSetName())
 	{}

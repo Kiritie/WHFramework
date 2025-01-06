@@ -5,24 +5,16 @@
 
 #include "Ability/Actor/AbilityActorBase.h"
 #include "Ability/Actor/AbilityActorDataBase.h"
-#include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Item/AbilityItemBase.h"
 #include "Ability/Item/Equip/AbilityEquipDataBase.h"
 #include "Ability/Item/Prop/AbilityPropDataBase.h"
 #include "Ability/Item/Raw/AbilityRawDataBase.h"
-#include "Ability/Item/Skill/AbilitySkillDataBase.h"
 #include "Ability/PickUp/AbilityPickUpBase.h"
-#include "Ability/PickUp/AbilityPickUpEquip.h"
-#include "Ability/PickUp/AbilityPickUpProp.h"
-#include "Ability/PickUp/AbilityPickUpRaw.h"
-#include "Ability/PickUp/AbilityPickUpSkill.h"
-#include "Ability/PickUp/AbilityPickUpVoxel.h"
 #include "Ability/Item/Equip/AbilityEquipBase.h"
 #include "Ability/Item/Prop/AbilityPropBase.h"
 #include "Ability/Item/Raw/AbilityRawBase.h"
-#include "Ability/Item/Skill/AbilitySkillBase.h"
+#include "Ability/Projectile/AbilityProjectileBase.h"
 #include "Asset/AssetModuleStatics.h"
-#include "Common/CommonStatics.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "SaveGame/SaveGameModuleStatics.h"
 #include "Scene/Container/SceneContainerInterface.h"
@@ -90,51 +82,37 @@ void UAbilityModule::OnTermination(EPhase InPhase)
 
 AAbilityItemBase* UAbilityModule::SpawnAbilityItem(FAbilityItem InItem, FVector InLocation, FRotator InRotation, ISceneContainerInterface* InContainer)
 {
-	AAbilityItemBase* Item = nullptr;
-	switch (InItem.GetType())
-	{
-		case EAbilityItemType::Prop:
-		{
-			Item = UObjectPoolModuleStatics::SpawnObject<AAbilityPropBase>(nullptr, nullptr, false, InItem.GetData<UAbilityPropDataBase>().PropClass);
-			break;
-		}
-		case EAbilityItemType::Equip:
-		{
-			Item = UObjectPoolModuleStatics::SpawnObject<AAbilityEquipBase>(nullptr, nullptr, false, InItem.GetData<UAbilityEquipDataBase>().EquipClass);
-			break;
-		}
-		case EAbilityItemType::Skill:
-		{
-			Item = UObjectPoolModuleStatics::SpawnObject<AAbilitySkillBase>(nullptr, nullptr, false, InItem.GetData<UAbilitySkillDataBase>().SkillClass);
-			break;
-		}
-		case EAbilityItemType::Raw:
-		{
-			Item = UObjectPoolModuleStatics::SpawnObject<AAbilityRawBase>(nullptr, nullptr, false, InItem.GetData<UAbilityRawDataBase>().RawClass);
-			break;
-		}
-		default: break;
-	}
-
-	if(Item)
+	if(AAbilityItemBase* Item = SpawnAbilityItem(InItem))
 	{
 		Item->SetActorLocationAndRotation(InLocation, InRotation);
 		if(InContainer)
 		{
 			InContainer->AddSceneActor(Item);
 		}
+		return Item;
 	}
-	return Item;
+	return nullptr;
 }
 
 AAbilityItemBase* UAbilityModule::SpawnAbilityItem(FAbilityItem InItem, AActor* InOwnerActor)
 {
-	AAbilityItemBase* Item = SpawnAbilityItem(InItem);
-	if(Item)
+	switch (InItem.GetType())
 	{
-		Item->Initialize(InOwnerActor, InItem);
+		case EAbilityItemType::Prop:
+		{
+			return UObjectPoolModuleStatics::SpawnObject<AAbilityPropBase>(InOwnerActor, { &InItem }, InItem.GetData<UAbilityPropDataBase>().PropClass);
+		}
+		case EAbilityItemType::Equip:
+		{
+			return UObjectPoolModuleStatics::SpawnObject<AAbilityEquipBase>(InOwnerActor, { &InItem }, InItem.GetData<UAbilityEquipDataBase>().EquipClass);
+		}
+		case EAbilityItemType::Raw:
+		{
+			return UObjectPoolModuleStatics::SpawnObject<AAbilityRawBase>(InOwnerActor, { &InItem }, InItem.GetData<UAbilityRawDataBase>().RawClass);
+		}
+		default: break;
 	}
-	return Item;
+	return nullptr;
 }
 
 AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer)
@@ -151,55 +129,32 @@ AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(FAbilityItem InItem, FVec
 AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	const auto& SaveData = InSaveData->CastRef<FPickUpSaveData>();
-	
-	AAbilityPickUpBase* PickUp = nullptr;
-	switch (SaveData.Item.GetType())
-	{
-		case EAbilityItemType::Voxel:
-		{
-			if(UVoxelModule::IsValid()) PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpVoxel>();
-			break;
-		}
-		case EAbilityItemType::Prop:
-		{
-			PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpProp>(nullptr, nullptr, false, SaveData.Item.GetData<UAbilityPropDataBase>().PropPickUpClass);
-			break;
-		}
-		case EAbilityItemType::Equip:
-		{
-			PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpEquip>(nullptr, nullptr, false, SaveData.Item.GetData<UAbilityEquipDataBase>().EquipPickUpClass);
-			break;
-		}
-		case EAbilityItemType::Skill:
-		{
-			PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpSkill>(nullptr, nullptr, false, SaveData.Item.GetData<UAbilitySkillDataBase>().SkillPickUpClass);
-			break;
-		}
-		case EAbilityItemType::Raw:
-		{
-			PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpRaw>(nullptr, nullptr, false, SaveData.Item.GetData<UAbilityRawDataBase>().RawPickUpClass);
-			break;
-		}
-		default: break;
-	}
 
-	if(PickUp)
+	const auto& ItemData = SaveData.Item.GetData<UAbilityItemDataBase>();
+	
+	if(AAbilityPickUpBase* PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpBase>(nullptr, nullptr, ItemData.PickUpClass))
 	{
 		PickUp->LoadSaveData(InSaveData);
 		if(InContainer)
 		{
 			InContainer->AddSceneActor(PickUp);
 		}
+		return PickUp;
 	}
-	return PickUp;
+	return nullptr;
+}
+
+AAbilityProjectileBase* UAbilityModule::SpawnAbilityProjectile(const TSubclassOf<AAbilityProjectileBase>& InClass, AActor* InOwnerActor, const FGameplayAbilitySpecHandle& InAbilityHandle)
+{
+	return UObjectPoolModuleStatics::SpawnObject<AAbilityProjectileBase>(InOwnerActor, { &InAbilityHandle }, InClass);
 }
 
 AActor* UAbilityModule::SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
 {
 	auto& SaveData = InSaveData->CastRef<FActorSaveData>();
-	if(AActor* Actor = UObjectPoolModuleStatics::SpawnObject<AActor>(nullptr, { &SaveData.ActorID, &SaveData.AssetID }, false, SaveData.GetItemData<UAbilityActorDataBase>().Class))
+	if(AActor* Actor = UObjectPoolModuleStatics::SpawnObject<AActor>(nullptr, { SaveData.ActorID, SaveData.AssetID }, SaveData.GetData<UAbilityActorDataBase>().Class))
 	{
-		Cast<ISaveDataInterface>(Actor)->LoadSaveData(InSaveData);
+		Cast<ISaveDataAgentInterface>(Actor)->LoadSaveData(InSaveData);
 		if(InContainer)
 		{
 			InContainer->AddSceneActor(Actor);

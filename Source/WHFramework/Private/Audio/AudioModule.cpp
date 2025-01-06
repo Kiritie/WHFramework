@@ -30,6 +30,9 @@ UAudioModule::UAudioModule()
 	
 	ModuleNetworkComponent = UAudioModuleNetworkComponent::StaticClass();
 
+	LanguageTypes = TArray<FLanguageType>();
+	LanguageType = 0;
+
 	static ConstructorHelpers::FObjectFinder<USoundMix> GlobalSoundMixFinder(TEXT("/Script/Engine.SoundMix'/WHFramework/Audio/Sounds/Mix/SCM_Global.SCM_Global'"));
 	if(GlobalSoundMixFinder.Succeeded())
 	{
@@ -173,10 +176,14 @@ FString UAudioModule::GetModuleDebugMessage()
 	FString DebugMessage;
 	for(auto Iter : SingleSoundInfos)
 	{
-		DebugMessage.Appendf(TEXT("%s-%s(%s)\n"), *Iter.Key.ToString(), *Iter.Value.Sound->GetName(), *UCommonStatics::GetEnumValueAuthoredName(TEXT("/Script/Engine.EAudioComponentPlayState"), (int32)Iter.Value.Audio->GetPlayState()));
+		DebugMessage.Appendf(TEXT("%s-%s(%s)\n"), *Iter.Key.ToString(), *Iter.Value.Sound->GetName(), *UCommonStatics::GetEnumAuthoredNameByValue(TEXT("/Script/Engine.EAudioComponentPlayState"), (int32)Iter.Value.Audio->GetPlayState()));
 	}
 	DebugMessage.RemoveFromEnd(TEXT("\n"));
-	return DebugMessage;
+	if(!DebugMessage.IsEmpty())
+	{
+		return DebugMessage;
+	}
+	return Super::GetModuleDebugMessage();
 }
 
 void UAudioModule::PlaySound2D(USoundBase* InSound, float InVolume, bool bMulticast)

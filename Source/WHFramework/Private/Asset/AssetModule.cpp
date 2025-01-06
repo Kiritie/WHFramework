@@ -60,26 +60,23 @@ void UAssetModule::OnInitialize()
 			DataTableMap.Add(Iter->RowStruct, Iter);
 		}
 	}
+
+	for(auto& Iter : StaticClasses)
+	{
+		FStaticClass& StaticClass = Iter.Value;
+		StaticClass.LoadedClass = LoadClass(StaticClass.BaseClass, StaticClass.GetClassName());
+	}
+		
+	for(auto& Iter : StaticObjects)
+	{
+		FStaticObject& StaticObject = Iter.Value;
+		StaticObject.LoadedObject = LoadObject(StaticObject.BaseClass, StaticObject.GetObjectName());
+	}
 }
 
 void UAssetModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
-
-	if(PHASEC(InPhase, EPhase::Primary))
-	{
-		for(auto& Iter : StaticClasses)
-		{
-			FStaticClass& StaticClass = Iter.Value;
-			StaticClass.LoadedClass = StaticClass.IsNeedLoad() ? LoadClass(StaticClass.BaseClass, StaticClass.GetClassName()) : FindClass(StaticClass.GetClassName());
-		}
-		
-		for(auto& Iter : StaticObjects)
-		{
-			FStaticObject& StaticObject = Iter.Value;
-			StaticObject.LoadedObject = StaticObject.IsNeedLoad() ? LoadObject(StaticObject.BaseClass, StaticObject.GetObjectName()) : FindObject(StaticObject.BaseClass, StaticObject.GetObjectName());
-		}
-	}
 }
 
 void UAssetModule::OnRefresh(float DeltaSeconds, bool bInEditor)
@@ -109,6 +106,8 @@ void UAssetModule::OnTermination(EPhase InPhase)
 
 void UAssetModule::AddStaticClass(const FName InName, const FStaticClass& InStaticClass)
 {
+	FScopeLock ScopeLock(&CriticalSection);
+
 	StaticClasses.Add(InName, InStaticClass);
 }
 
@@ -119,6 +118,8 @@ UClass* UAssetModule::GetStaticClass(const FName InName)
 
 UClass* UAssetModule::FindClass(const FString& InName, bool bExactClass)
 {
+	FScopeLock ScopeLock(&CriticalSection);
+
 	if(!ClassMappings.Contains(InName))
 	{
 		ClassMappings.Add(InName, Cast<UClass>(StaticFindObject(UClass::StaticClass(), nullptr, *InName, bExactClass)));
@@ -128,6 +129,8 @@ UClass* UAssetModule::FindClass(const FString& InName, bool bExactClass)
 
 UClass* UAssetModule::LoadClass(UClass* InClass, const FString& InName)
 {
+	FScopeLock ScopeLock(&CriticalSection);
+
 	if(!ClassMappings.Contains(InName))
 	{
 		ClassMappings.Add(InName, StaticLoadClass(InClass, nullptr, *InName));
@@ -137,6 +140,8 @@ UClass* UAssetModule::LoadClass(UClass* InClass, const FString& InName)
 
 void UAssetModule::AddStaticObject(const FName InName, const FStaticObject& InStaticObject)
 {
+	FScopeLock ScopeLock(&CriticalSection);
+
 	StaticObjects.Add(InName, InStaticObject);
 }
 
@@ -147,6 +152,8 @@ UObject* UAssetModule::GetStaticObject(UClass* InClass, const FName InName)
 
 UObject* UAssetModule::FindObject(UClass* InClass, const FString& InName, bool bExactClass)
 {
+	FScopeLock ScopeLock(&CriticalSection);
+
 	if(!ObjectMappings.Contains(InName))
 	{
 		ObjectMappings.Add(InName, StaticFindObject(InClass, nullptr, *InName, bExactClass));
@@ -156,6 +163,8 @@ UObject* UAssetModule::FindObject(UClass* InClass, const FString& InName, bool b
 
 UObject* UAssetModule::LoadObject(UClass* InClass, const FString& InName)
 {
+	FScopeLock ScopeLock(&CriticalSection);
+
 	if(!ObjectMappings.Contains(InName))
 	{
 		ObjectMappings.Add(InName, StaticLoadObject(InClass, nullptr, *InName));
@@ -222,6 +231,8 @@ UEnum* UAssetModule::FindEnumByDisplayName(const FString& InEnumName, const FStr
 
 void UAssetModule::AddEnumMapping(const FString& InEnumName, const FString& InOtherName)
 {
+	FScopeLock ScopeLock(&CriticalSection);
+
 	FEnumMapping& Mappings = EnumMappings.FindOrAdd(InEnumName);
 	if(!Mappings.EnumNames.Contains(InOtherName))
 	{
@@ -231,6 +242,8 @@ void UAssetModule::AddEnumMapping(const FString& InEnumName, const FString& InOt
 
 void UAssetModule::RemoveEnumMapping(const FString& InEnumName, const FString& InOtherName)
 {
+	FScopeLock ScopeLock(&CriticalSection);
+
 	FEnumMapping& Mappings = EnumMappings.FindOrAdd(InEnumName);
 	if(Mappings.EnumNames.Contains(InOtherName))
 	{

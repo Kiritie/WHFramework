@@ -24,7 +24,6 @@ public class WHFrameworkEditor : ModuleRules
 			{
 				"Projects",
 				"InputCore",
-				"UnrealEd",
 				"Settings",
 				"KismetCompiler",
 				"ToolMenus",

@@ -2,6 +2,7 @@
 
 #include "Main/Slate/SModuleEditorWidget.h"
 
+#include "FileHelpers.h"
 #include "SlateOptMacros.h"
 #include "SPrimaryButton.h"
 #include "Common/CommonStatics.h"
@@ -58,7 +59,7 @@ void SModuleEditorWidget::OnSave()
 {
 	SMainEditorWidgetBase::OnSave();
 
-	FLevelEditorActionCallbacks::Save();
+	FEditorFileUtils::SaveLevel(MainModule->GetLevel());
 }
 
 void SModuleEditorWidget::OnReset()

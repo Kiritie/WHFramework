@@ -42,6 +42,9 @@ protected:
 
 	virtual TSharedRef<SWidget> CreateDefaultWidget() override;
 
+public:
+	virtual FReply OnPreviewKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Class Picker
 private:
@@ -63,6 +66,8 @@ protected:
 	FReply OnModifyForAllAssetButtonClicked();
 
 	FReply OnModifyForSelectedAssetButtonClicked();
+
+	void RequestCloseAssetModifierEditor();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats

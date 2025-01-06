@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Common/Customization/PropertyCustomizationBase.h"
+#include "Parameter/ParameterTypes.h"
 
 /** Customization for a primary asset id, shows an asset picker with filters */
 class FParameterCustomization : public FPropertyCustomizationBase
@@ -26,41 +27,5 @@ private:
 	
 	TSharedPtr<IPropertyHandle> DescriptionHandle;
 	
-	TSharedPtr<IPropertyHandle> IntegerValueHandle;
-
-	TSharedPtr<IPropertyHandle> FloatValueHandle;
-
-	TSharedPtr<IPropertyHandle> ByteValueHandle;
-
-	TSharedPtr<IPropertyHandle> EnumValueHandle;
-
-	TSharedPtr<IPropertyHandle> StringValueHandle;
-
-	TSharedPtr<IPropertyHandle> NameValueHandle;
-
-	TSharedPtr<IPropertyHandle> TextValueHandle;
-
-	TSharedPtr<IPropertyHandle> BooleanValueHandle;
-
-	TSharedPtr<IPropertyHandle> VectorValueHandle;
-
-	TSharedPtr<IPropertyHandle> RotatorValueHandle;
-
-	TSharedPtr<IPropertyHandle> ColorValueHandle;
-
-	TSharedPtr<IPropertyHandle> KeyValueHandle;
-
-	TSharedPtr<IPropertyHandle> TagValueHandle;
-
-	TSharedPtr<IPropertyHandle> TagsValueHandle;
-
-	TSharedPtr<IPropertyHandle> ClassValueHandle;
-
-	TSharedPtr<IPropertyHandle> ClassPtrValueHandle;
-
-	TSharedPtr<IPropertyHandle> ObjectValueHandle;
-
-	TSharedPtr<IPropertyHandle> ObjectPtrValueHandle;
-
-	TSharedPtr<IPropertyHandle> DelegateValueHandle;
+	TMap<EParameterType, TSharedPtr<IPropertyHandle>> ParameterValueHandles;
 };

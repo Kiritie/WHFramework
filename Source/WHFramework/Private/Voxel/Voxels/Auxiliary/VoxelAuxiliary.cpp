@@ -31,12 +31,12 @@ void AVoxelAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		VoxelItem = SaveData.VoxelItem;
 		switch(SaveData.MeshNature)
 		{
-			case EVoxelMeshNature::Chunk:
+			case EVoxelScope::Chunk:
 			{
 				SetActorRelativeLocation(VoxelItem.GetLocation() + VoxelItem.GetRange() * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f);
 				break;
 			}
-			case EVoxelMeshNature::Vitality:
+			case EVoxelScope::Vitality:
 			{
 				SetActorRelativeLocation(FVector(0.f, 0.f, VoxelItem.GetRange().Z * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f));
 				break;

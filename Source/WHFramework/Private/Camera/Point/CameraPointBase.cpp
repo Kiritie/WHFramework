@@ -71,12 +71,12 @@ void ACameraPointBase::OnConstruction(const FTransform& Transform)
 	const float CameraDistance = CameraViewParams.GetCameraDistance();
 	const float CameraFov = CameraViewParams.GetCameraFov();
 
-	CameraBoom->SetRelativeLocation(CameraLocation);
-	CameraBoom->SetRelativeRotation(FRotator(CameraPitch, CameraYaw, 0.f));
-	CameraBoom->SocketOffset = CameraOffset;
-	CameraBoom->TargetArmLength = CameraDistance;
-	
-	Camera->SetFieldOfView(CameraFov != -1.f ? CameraFov : 90.f);
+	// CameraBoom->SetRelativeLocation(CameraLocation);
+	// CameraBoom->SetRelativeRotation(FRotator(CameraPitch, CameraYaw, 0.f));
+	// CameraBoom->SocketOffset = CameraOffset;
+	// CameraBoom->TargetArmLength = CameraDistance;
+	//
+	// Camera->SetFieldOfView(CameraFov != -1.f ? CameraFov : 90.f);
 #endif
 }
 

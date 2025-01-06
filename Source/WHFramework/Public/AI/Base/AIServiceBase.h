@@ -14,7 +14,10 @@ class AAIControllerBase;
 UCLASS()
 class WHFRAMEWORK_API UAIServiceBase : public UBTService
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UAIServiceBase(const FObjectInitializer& ObjectInitializer);
 
 protected:
 	virtual bool InitService(UBehaviorTreeComponent& OwnerComp);
@@ -52,5 +55,5 @@ public:
 	IAIAgentInterface* GetAgent() const { return Agent; }
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	APawn* GetAgent(TSubclassOf<APawn> InClass) const { return GetDeterminesOutputObject(Cast<APawn>(Agent), InClass); }
+	APawn* GetAgent(TSubclassOf<APawn> InClass) const;
 };

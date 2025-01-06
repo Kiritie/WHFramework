@@ -5,8 +5,7 @@
 #include "Ability/Item/AbilityItemBase.h"
 #include "AbilityEquipBase.generated.h"
 
-class AAbilityCharacterBase;
-class UStaticMeshComponent;
+class UMeshComponent;
 
 /**
  * 装备基类
@@ -19,21 +18,14 @@ class WHFRAMEWORK_API AAbilityEquipBase : public AAbilityItemBase
 public:	
 	AAbilityEquipBase();
 
-protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UStaticMeshComponent* MeshComponent;
-
-public:
-	virtual void Initialize_Implementation(AActor* InOwnerActor, const FAbilityItem& InItem = FAbilityItem::Empty) override;
-
 public:
 	UFUNCTION(BlueprintNativeEvent)
 	void OnAssemble();
 	
 	UFUNCTION(BlueprintNativeEvent)
-	void OnDischarge();
+	void OnDisassemble();
 
 public:
 	UFUNCTION(BlueprintPure)
-	UStaticMeshComponent* GetMeshComponent() const { return MeshComponent; }
+	virtual UMeshComponent* GetMeshComponent() const;
 };

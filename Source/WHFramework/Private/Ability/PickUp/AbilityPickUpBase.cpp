@@ -17,32 +17,26 @@ AAbilityPickUpBase::AAbilityPickUpBase()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	BoxComponent = CreateDefaultSubobject<UInteractionComponent>(FName("BoxComponent"));
+	BoxComponent = CreateDefaultSubobject<UBoxComponent>(FName("BoxComponent"));
 	BoxComponent->SetupAttachment(RootComponent);
 	BoxComponent->SetCollisionProfileName(TEXT("PickUp"));
-	BoxComponent->SetBoxExtent(FVector(10.f));
+	BoxComponent->SetBoxExtent(FVector(15.f));
+	BoxComponent->OnComponentBeginOverlap.AddDynamic(this, &AAbilityPickUpBase::OnBeginOverlap);
 
-	InteractionComponent = CreateDefaultSubobject<UInteractionComponent>(FName("InteractionComponent"));
-	InteractionComponent->SetupAttachment(RootComponent);
-	InteractionComponent->SetBoxExtent(FVector(50.f));
-	InteractionComponent->SetInteractable(true);
-	InteractionComponent->AddInteractAction(EInteractAction::PickUp);
+	Interaction = CreateDefaultSubobject<UInteractionComponent>(FName("Interaction"));
+	Interaction->SetupAttachment(RootComponent);
+	Interaction->SetBoxExtent(FVector(50.f));
+	Interaction->SetInteractable(false);
+	Interaction->AddInteractAction(EInteractAction::PickUp);
 
-	RotatingComponent = CreateDefaultSubobject<URotatingMovementComponent>(TEXT("RotatingComponent"));
-	RotatingComponent->RotationRate = FRotator(0.f, 180.f, 0.f);
+	RotatingMovement = CreateDefaultSubobject<URotatingMovementComponent>(FName("RotatingMovement"));
+	RotatingMovement->RotationRate = FRotator(0.f, 180.f, 0.f);
 
-	FallingComponent = CreateDefaultSubobject<UFallingMovementComponent>(TEXT("FallingComponent"));
+	FallingMovement = CreateDefaultSubobject<UFallingMovementComponent>(FName("FallingMovement"));
 	
-	FollowingComponent = CreateDefaultSubobject<UFollowingMovementComponent>(TEXT("FollowingComponent"));
+	FollowingMovement = CreateDefaultSubobject<UFollowingMovementComponent>(FName("FollowingMovement"));
 
 	Item = FAbilityItem::Empty;
-}
-
-void AAbilityPickUpBase::OnInitialize_Implementation()
-{
-	Super::OnInitialize_Implementation();
-
-	FallingComponent->SetTraceChannel(USceneModuleStatics::GetTraceMapping(FName("PickUp")).GetTraceChannel());
 }
 
 void AAbilityPickUpBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -53,9 +47,17 @@ void AAbilityPickUpBase::OnSpawn_Implementation(UObject* InOwner, const TArray<F
 void AAbilityPickUpBase::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
+
 	Item = FAbilityItem::Empty;
 
-	FollowingComponent->SetFollowingTarget(nullptr);
+	FollowingMovement->SetFollowingTarget(nullptr);
+}
+
+void AAbilityPickUpBase::OnInitialize_Implementation()
+{
+	Super::OnInitialize_Implementation();
+
+	FallingMovement->SetTraceChannel(USceneModuleStatics::GetTraceMapping(FName("PickUp")).GetTraceChannel());
 }
 
 void AAbilityPickUpBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -91,7 +93,10 @@ bool AAbilityPickUpBase::CanInteract(EInteractAction InInteractAction, IInteract
 	{
 		case EInteractAction::PickUp:
 		{
-			return true;
+			if(IAbilityPickerInterface* Picker = Cast<IAbilityPickerInterface>(InInteractionAgent))
+			{
+				return Item.IsValid() && !Picker->IsAutoPickUp();
+			}
 		}
 		default: break;
 	}
@@ -100,49 +105,60 @@ bool AAbilityPickUpBase::CanInteract(EInteractAction InInteractAction, IInteract
 
 void AAbilityPickUpBase::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
 {
+	if(!Item.IsValid()) return;
+
+	if(IAbilityPickerInterface* Picker = Cast<IAbilityPickerInterface>(InInteractionAgent))
+	{
+		if(Picker->IsAutoPickUp())
+		{
+			FallingMovement->SetActive(false);
+			FollowingMovement->SetFollowingTarget(Cast<AActor>(Picker));
+		}
+	}
 }
 
 void AAbilityPickUpBase::OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent)
 {
 }
 
-void AAbilityPickUpBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity)
+void AAbilityPickUpBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive)
 {
-	if(!bPassivity) return;
-	
-	switch (InInteractAction)
+	if(bPassive)
 	{
-		case EInteractAction::PickUp:
+		switch (InInteractAction)
 		{
-			if(IAbilityPickerInterface* Picker = Cast<IAbilityPickerInterface>(InInteractionAgent))
+			case EInteractAction::PickUp:
 			{
-				OnPickUp(Picker);
+				if(IAbilityPickerInterface* Picker = Cast<IAbilityPickerInterface>(InInteractionAgent))
+				{
+					OnPickUp(Picker);
+				}
+				break;
 			}
-			break;
+			default: break;
 		}
-		default: break;
 	}
 }
 
-void AAbilityPickUpBase::OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+void AAbilityPickUpBase::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if(!Item.IsValid()) return;
 
 	if(IAbilityPickerInterface* Picker = Cast<IAbilityPickerInterface>(OtherActor))
 	{
-		if(OtherComp->IsA<UInteractionComponent>())
-		{
-			FallingComponent->SetActive(false);
-			FollowingComponent->SetFollowingTarget(OtherActor);
-		}
-		else
+		if(Picker->IsAutoPickUp() && !OtherComp->IsA<UInteractionComponent>())
 		{
 			OnPickUp(Picker);
 		}
 	}
 }
 
+FBox AAbilityPickUpBase::GetComponentsBoundingBox(bool bNonColliding, bool bIncludeFromChildActors) const
+{
+	return BoxComponent->Bounds.GetBox();
+}
+
 UInteractionComponent* AAbilityPickUpBase::GetInteractionComponent() const
 {
-	return InteractionComponent;
+	return Interaction;
 }

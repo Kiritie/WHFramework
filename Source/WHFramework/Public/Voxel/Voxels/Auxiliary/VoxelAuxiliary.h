@@ -4,7 +4,6 @@
 
 #include "Asset/Primary/PrimaryEntityInterface.h"
 #include "Common/Base/WHActor.h"
-#include "SaveGame/Base/SaveDataInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
 
 #include "VoxelAuxiliary.generated.h"
@@ -16,15 +15,17 @@ class UVoxel;
  * ���ظ�����
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelAuxiliary : public AWHActor, public ISaveDataInterface, public IPrimaryEntityInterface
+class WHFRAMEWORK_API AVoxelAuxiliary : public AWHActor, public IPrimaryEntityInterface
 {
 	GENERATED_BODY()
 	
 public:	
 	AVoxelAuxiliary();
 
+	//////////////////////////////////////////////////////////////////////////
+	/// ObjectPool
 public:
-	virtual int32 GetLimit_Implementation() const override { return 10000; }
+	virtual int32 GetLimit_Implementation() const override { return -1; }
 
 	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
 		

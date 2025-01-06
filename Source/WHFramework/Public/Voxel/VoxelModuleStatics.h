@@ -4,7 +4,6 @@
 
 #include "VoxelModuleTypes.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
-#include "Math/MathTypes.h"
 #include "VoxelModuleStatics.generated.h"
 
 class UWebRequestModule;
@@ -18,9 +17,12 @@ class WHFRAMEWORK_API UVoxelModuleStatics : public UBlueprintFunctionLibrary
 
 public:
 	//////////////////////////////////////////////////////////////////////////
-	// Asset
+	// Common
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
 	static FPrimaryAssetId VoxelTypeToAssetID(EVoxelType InVoxelType);
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static EVoxelTransparency VoxelNatureToTransparency(EVoxelNature InVoxelNature);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Data
@@ -40,6 +42,27 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
 	static FVoxelWorldBasicSaveData GetWorldBasicData();
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static FVoxelTopography& GetTopographyByIndex(FIndex InIndex);
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static FVoxelTopography& GetTopographyByLocation(FVector InLocation);
+
+	UFUNCTION(BlueprintCallable, Category = "VoxelModuleStatics")
+	static void SetTopographyByIndex(FIndex InIndex, const FVoxelTopography& InTopography);
+
+	UFUNCTION(BlueprintCallable, Category = "VoxelModuleStatics")
+	static void SetTopographyLocation(FVector InLocation, const FVoxelTopography& InTopography);
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static float GetVoxelNoise1D(float InValue, bool bAbs = false, bool bUnsigned = false);
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static float GetVoxelNoise2D(FVector2D InLocation, bool bAbs = false, bool bUnsigned = false);
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static float GetVoxelNoise3D(FVector InLocation, bool bAbs = false, bool bUnsigned = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Index
@@ -97,10 +120,6 @@ public:
 		return static_cast<T&>(GetVoxel(InVoxelItem));
 	}
 	static UVoxel& GetVoxel(const FVoxelItem& InVoxelItem);
-	
-	static EVoxelType GetNoiseVoxelType(FIndex InIndex);
-	
-	static EVoxelType GetRandomVoxelType(FIndex InIndex);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Trace
@@ -110,9 +129,9 @@ public:
 
 	static bool VoxelItemTraceSingle(const FVoxelItem& InVoxelItem, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
 
-	static bool VoxelAgentTraceSingle(FIndex InChunkIndex, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock = false, int32 InMaxCount = 1, bool bFromCenter = false);
+	static bool VoxelAgentTraceSingle(FIndex InChunkIndex, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock = false, int32 InMaxCount = 1, bool bFromCenter = false, bool bForce = false);
 
-	static bool VoxelAgentTraceSingle(FVector InLocation, FVector2D InRange, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock = false, int32 InMaxCount = 1, bool bFromCenter = false);
+	static bool VoxelAgentTraceSingle(FVector InLocation, FVector2D InRange, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock = false, int32 InMaxCount = 1, bool bFromCenter = false, bool bForce = false);
 
-	static bool VoxelAgentTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
+	static bool VoxelAgentTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bCheckVoxel = false);
 };

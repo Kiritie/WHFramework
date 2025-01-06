@@ -95,10 +95,12 @@ public:
 	FCameraParams(const FString& InParams)
 	{
 		TArray<FString> ParamsArr;
-		InParams.ParseIntoArray(ParamsArr, TEXT("|"));
-		CameraLocation.InitFromString(ParamsArr[0]);
-		CameraRotation.InitFromString(ParamsArr[1]);
-		CameraDistance = FCString::Atof(*ParamsArr[2]);
+		if(InParams.ParseIntoArray(ParamsArr, TEXT("|")) == 3)
+		{
+			CameraLocation.InitFromString(ParamsArr[0]);
+			CameraRotation.InitFromString(ParamsArr[1]);
+			CameraDistance = FCString::Atof(*ParamsArr[2]);
+		}
 	}
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)

@@ -3,7 +3,6 @@
 #pragma once
 
 #include "PanelWidgetInterface.h"
-#include "Parameter/ParameterTypes.h"
 
 #include "UObject/Interface.h"
 #include "ScreenWidgetInterface.generated.h"
@@ -32,8 +31,6 @@ public:
 	
 	virtual void OnClose(bool bInstant = false) = 0;
 
-	virtual void OnReset(bool bForce = false) = 0;
-
 	virtual void OnStateChanged(EScreenWidgetState InWidgetChange) = 0;
 
 public:
@@ -49,8 +46,6 @@ public:
 
 	virtual void Toggle(bool bInstant = false) = 0;
 
-	virtual void Reset(bool bForce = false) = 0;
-
 public:
 	virtual bool CanOpen() const = 0;
 
@@ -60,11 +55,11 @@ protected:
 	virtual void FinishClose(bool bInstant) = 0;
 
 public:
-	virtual void AddChild(IScreenWidgetInterface* InChildWidget) = 0;
+	virtual void AddChildWidget(IScreenWidgetInterface* InWidget) = 0;
 
-	virtual void RemoveChild(IScreenWidgetInterface* InChildWidget) = 0;
+	virtual void RemoveChildWidget(IScreenWidgetInterface* InWidget) = 0;
 
-	virtual void RemoveAllChild() = 0;
+	virtual void RemoveAllChildWidget() = 0;
 
 public:
 	virtual FName GetParentName() const = 0;
@@ -80,6 +75,10 @@ public:
 	virtual EWidgetCloseType GetWidgetCloseType() const = 0;
 
 	virtual EScreenWidgetState GetWidgetState(bool bInheritParent = false) const = 0;
+	
+	virtual bool IsWidgetOpened(bool bCheckOpening = true, bool bInheritParent = false) const = 0;
+	
+	virtual bool IsWidgetClosed(bool bCheckClosing = true, bool bInheritParent = false) const = 0;
 
 	virtual IScreenWidgetInterface* GetLastTemporary() const = 0;
 
@@ -93,11 +92,11 @@ public:
 	
 	virtual void SetTemporaryChild(IScreenWidgetInterface* InTemporaryChild) = 0;
 
-	virtual int32 GetChildNum() const = 0;
+	virtual int32 GetChildWidgetNum() const = 0;
 
-	virtual TArray<IScreenWidgetInterface*>& GetChildWidgets() = 0;
+	virtual TArray<IScreenWidgetInterface*> GetChildWidgets() = 0;
 
-	virtual IScreenWidgetInterface* GetChild(int32 InIndex) const = 0;
+	virtual IScreenWidgetInterface* GetChildWidget(int32 InIndex) const = 0;
 
-	virtual int32 FindChild(IScreenWidgetInterface* InChildWidget) const = 0;
+	virtual int32 FindChildWidget(IScreenWidgetInterface* InWidget) const = 0;
 };

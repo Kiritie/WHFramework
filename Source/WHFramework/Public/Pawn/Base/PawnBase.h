@@ -10,6 +10,7 @@
 #include "Gameplay/WHPlayerInterface.h"
 #include "Scene/Actor/SceneActorInterface.h"
 #include "ObjectPool/ObjectPoolInterface.h"
+#include "SaveGame/Base/SaveDataAgentInterface.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 
 #include "PawnBase.generated.h"
@@ -20,12 +21,21 @@ class UAIPerceptionStimuliSourceComponent;
  * 
  */
 UCLASS(meta=(ShortTooltip="A Pawn is an actor that can be 'possessed' and receive input from a controller."))
-class WHFRAMEWORK_API APawnBase : public APawn, public IPawnInterface, public IWHPlayerInterface, public IAIAgentInterface, public IVoxelAgentInterface, public IObjectPoolInterface, public ISceneActorInterface, public IPrimaryEntityInterface, public IWHActorInterface
+class WHFRAMEWORK_API APawnBase : public APawn, public IPawnInterface, public IWHPlayerInterface, public IAIAgentInterface, public IVoxelAgentInterface, public IObjectPoolInterface, public ISaveDataAgentInterface, public IPrimaryEntityInterface, public IWHActorInterface
 {
 	GENERATED_BODY()
 	
 public:
-	APawnBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+	APawnBase(const FObjectInitializer& ObjectInitializer);
+
+	//////////////////////////////////////////////////////////////////////////
+	/// ObjectPool
+public:
+	virtual int32 GetLimit_Implementation() const override { return -1; }
+
+	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
+		
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// WHActor
@@ -39,7 +49,30 @@ public:
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 protected:
-	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "WHActor")
+	bool bInitialized;
+	
+protected:
+	virtual bool IsInitialized_Implementation() const override { return bInitialized; }
+	
+	virtual bool IsUseDefaultLifecycle_Implementation() const override { return true; }
+
+	//////////////////////////////////////////////////////////////////////////
+	/// SaveData
+public:
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+
+	virtual FSaveData* ToData() override;
+
+protected:
+	virtual void BeginPlay() override;
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+public:
+	virtual void Tick(float DeltaSeconds) override;
+
+	virtual void SpawnDefaultController() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Pawn
@@ -59,22 +92,6 @@ public:
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 	bool IsCurrent() const;
-
-protected:
-	virtual void BeginPlay() override;
-
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-
-public:
-	virtual void Tick(float DeltaSeconds) override;
-	
-	virtual int32 GetLimit_Implementation() const override { return 1000; }
-
-	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
-
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
-
-	virtual void SpawnDefaultController() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Components
@@ -129,8 +146,10 @@ public:
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SceneActor")
 	FGuid ActorID;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SceneActor")
 	bool bVisible;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SceneActor")
 	TScriptInterface<ISceneContainerInterface> Container;
 	
@@ -152,8 +171,19 @@ public:
 protected:
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Components")
 	AController* DefaultController;
+	
 public:
+	template<class T>
+	T* GetDefaultController() const
+	{
+		return Cast<T>(DefaultController);
+	}
+	
 	virtual AController* GetDefaultController() const override { return DefaultController; }
+
+	virtual bool IsUseControllerRotation() const override;
+
+	virtual void SetUseControllerRotation(bool bValue) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Voxel
@@ -226,6 +256,8 @@ protected:
 public:
 	UFUNCTION(BlueprintPure)
 	virtual UBehaviorTree* GetBehaviorTreeAsset() const override;
+
+	virtual AAIControllerBase* GetAIController() const override;
 	
 	UAIPerceptionStimuliSourceComponent* GetStimuliSource() const { return StimuliSource; }
 

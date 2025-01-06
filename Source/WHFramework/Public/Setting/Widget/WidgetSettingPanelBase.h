@@ -5,10 +5,11 @@
 
 #include "WidgetSettingPanelBase.generated.h"
 
+class UCommonButtonBase;
+class UCommonActivatableWidgetSwitcher;
 class UWidgetSettingPageBase;
-class UWidgetSettingPageItemBase;
-class UCommonButtonGroup;
 class UCommonButton;
+class UCommonButtonGroup;
 /**
  * 
  */
@@ -30,6 +31,9 @@ public:
 	virtual void OnClose(bool bInstant) override;
 
 protected:
+	UFUNCTION(BlueprintNativeEvent)
+	void OnPageItemSelected(UCommonButtonBase* SelectedTabButton, int32 ButtonIndex);
+
 	UFUNCTION()
 	void OnApplyButtonClicked();
 
@@ -38,20 +42,23 @@ protected:
 
 protected:
 	UFUNCTION(BlueprintNativeEvent)
-	UWidgetSettingPageItemBase* SpawnPageItem(UWidgetSettingPageBase* InPage);
+	UCommonButton* SpawnPageItem(UWidgetSettingPageBase* InPage);
 
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
+	UCommonActivatableWidgetSwitcher* Switcher_Page;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
 	UCommonButton* Btn_Apply;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
 	UCommonButton* Btn_Reset;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UCommonButtonGroup* PageItemGroup;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	TSubclassOf<UWidgetSettingPageItemBase> PageItemClass;
+	TSubclassOf<UCommonButton> PageItemClass;
 
 public:
 	UFUNCTION(BlueprintPure)
@@ -60,6 +67,6 @@ public:
 	UFUNCTION(BlueprintPure)
 	UWidgetSettingPageBase* GetCurrentPage() const;
 
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	UFUNCTION(BlueprintCallable)
 	void SetCurrentPage(int32 InPageIndex);
 };

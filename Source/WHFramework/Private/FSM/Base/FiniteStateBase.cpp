@@ -15,11 +15,11 @@ UFiniteStateBase::UFiniteStateBase()
 	StateIndex = 0;
 	FSM = nullptr;
 
-	const UFunction* OnEnterValidateFunction = GetClass()->FindFunctionByName(FName(TEXT("K2_OnEnterValidate")));
-	bHasBlueprintOnEnterValidate = UCommonStatics::IsImplementedInBlueprint(OnEnterValidateFunction);
+	const UFunction* OnPreEnterFunction = GetClass()->FindFunctionByName(FName(TEXT("K2_OnPreEnter")));
+	bHasBlueprintOnPreEnter = UCommonStatics::IsImplementedInBlueprint(OnPreEnterFunction);
 
-	const UFunction* OnLeaveValidateFunction = GetClass()->FindFunctionByName(FName(TEXT("K2_OnLeaveValidate")));
-	bHasBlueprintOnLeaveValidate = UCommonStatics::IsImplementedInBlueprint(OnLeaveValidateFunction);
+	const UFunction* OnPreLeaveFunction = GetClass()->FindFunctionByName(FName(TEXT("K2_OnPreLeave")));
+	bHasBlueprintOnPreLeave = UCommonStatics::IsImplementedInBlueprint(OnPreLeaveFunction);
 }
 
 void UFiniteStateBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -40,9 +40,9 @@ void UFiniteStateBase::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
 	K2_OnInitialize();
 }
 
-bool UFiniteStateBase::OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
+bool UFiniteStateBase::OnPreEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	if(bHasBlueprintOnEnterValidate && !K2_OnEnterValidate(InLastState, InParams)) return false;
+	if(bHasBlueprintOnPreEnter && !K2_OnPreEnter(InLastState, InParams)) return false;
 	return true;
 }
 
@@ -63,9 +63,9 @@ void UFiniteStateBase::OnRefresh(float DeltaSeconds)
 	K2_OnRefresh(DeltaSeconds);
 }
 
-bool UFiniteStateBase::OnLeaveValidate(UFiniteStateBase* InNextState)
+bool UFiniteStateBase::OnPreLeave(UFiniteStateBase* InNextState)
 {
-	if(bHasBlueprintOnLeaveValidate && !K2_OnLeaveValidate(InNextState)) return false;
+	if(bHasBlueprintOnPreLeave && !K2_OnPreLeave(InNextState)) return false;
 	return true;
 }
 

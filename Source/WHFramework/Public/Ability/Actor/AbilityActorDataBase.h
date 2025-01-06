@@ -15,6 +15,11 @@ public:
 	UAbilityActorDataBase();
 
 public:
+	virtual void OnInitialize_Implementation() override;
+
+	virtual void OnReset_Implementation() override;
+
+public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSubclassOf<AAbilityActorBase> Class;
 	

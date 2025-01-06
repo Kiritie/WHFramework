@@ -3,7 +3,6 @@
 #include "Ability/Character/States/AbilityCharacterState_Jump.h"
 
 #include "Ability/Character/AbilityCharacterBase.h"
-#include "Ability/Character/States/AbilityCharacterState_Fall.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Scene/SceneModuleStatics.h"
 
@@ -17,20 +16,24 @@ void UAbilityCharacterState_Jump::OnInitialize(UFSMComponent* InFSM, int32 InSta
 	Super::OnInitialize(InFSM, InStateIndex);
 }
 
-bool UAbilityCharacterState_Jump::OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
+bool UAbilityCharacterState_Jump::OnPreEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	return Super::OnEnterValidate(InLastState, InParams);
+	if(!Super::OnPreEnter(InLastState, InParams)) return false;
+
+	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
+
+	return !Character->IsSwimming() && Character->DoAction(GameplayTags::Ability_Character_Action_Jump);
 }
 
 void UAbilityCharacterState_Jump::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
 	Super::OnEnter(InLastState, InParams);
-	
-	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
-	
-	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Character_Jumping);
 
-	Character->Jump();
+	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
+
+	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Character_Jumping);
+
+	Character->LimitToAnim();
 
 	if(Character->GetCharacterMovement()->MovementMode != MOVE_Walking)
 	{
@@ -40,6 +43,8 @@ void UAbilityCharacterState_Jump::OnEnter(UFiniteStateBase* InLastState, const T
 			Character->GetCharacterMovement()->UpdatedComponent->SetPhysicsVolume(USceneModuleStatics::GetDefaultPhysicsVolume(), true);
 		}
 	}
+
+	Character->Jump();
 }
 
 void UAbilityCharacterState_Jump::OnRefresh(float DeltaSeconds)
@@ -52,8 +57,12 @@ void UAbilityCharacterState_Jump::OnLeave(UFiniteStateBase* InNextState)
 	Super::OnLeave(InNextState);
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
-	
-	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Character_Jumping);
+
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Character_Jumping);
+
+	Character->StopAction(GameplayTags::Ability_Character_Action_Jump);
+
+	Character->FreeToAnim();
 
 	Character->StopJumping();
 }

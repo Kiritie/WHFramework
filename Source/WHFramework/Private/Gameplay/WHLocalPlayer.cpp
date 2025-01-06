@@ -2,7 +2,7 @@
 
 #include "Gameplay/WHLocalPlayer.h"
 
-UWHLocalPlayer::UWHLocalPlayer() : Super(FObjectInitializer::Get())
+UWHLocalPlayer::UWHLocalPlayer()
 {
 	
 }

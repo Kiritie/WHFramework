@@ -4,8 +4,6 @@ UAbilitySkillDataBase::UAbilitySkillDataBase()
 {
 	Type = FName("Skill");
 	MaxCount = 1;
-	SkillType = ESkillType::None;
-	SkillMode = ESkillMode::None;
-	SkillClass = nullptr;
-	SkillPickUpClass = nullptr;
+	SkillMode = EAbilitySkillMode::None;
+	ProjectileClass = nullptr;
 }

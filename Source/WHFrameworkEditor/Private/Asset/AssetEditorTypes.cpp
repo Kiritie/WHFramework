@@ -10,7 +10,7 @@
 // Commands
 void FAssetModifierEditorCommands::RegisterCommands()
 {
-	UI_COMMAND(OpenAssetModifierEditorWindow, "Asset Modifier Editor", "Bring up AssetModifierEditor window", EUserInterfaceActionType::Button, FInputGesture());
+	UI_COMMAND(OpenAssetModifierEditorWindow, "Asset Modifier Editor", "Bring up AssetModifierEditor window", EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::T));
 }
 
 //////////////////////////////////////////////////////////////////////////

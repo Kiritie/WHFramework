@@ -10,7 +10,7 @@ UVoxelDoorData::UVoxelDoorData()
 	VoxelClass = UVoxelDoor::StaticClass();
 	AuxiliaryClass = AVoxelDoorAuxiliary::StaticClass();
 
-	Transparency = EVoxelTransparency::SemiTransparent;
+	Nature = EVoxelNature::SemiSolid;
 
 	MeshDatas.SetNum(2);
 

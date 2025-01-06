@@ -11,6 +11,8 @@ UWidgetSettingItemCategoryBase::UWidgetSettingItemCategoryBase(const FObjectInit
 
 void UWidgetSettingItemCategoryBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
+	Super::OnSpawn_Implementation(InOwner, InParams);
+	
 	if(InParams.IsValidIndex(0))
 	{
 		SetCategory(InParams[0]);
@@ -19,6 +21,8 @@ void UWidgetSettingItemCategoryBase::OnSpawn_Implementation(UObject* InOwner, co
 
 void UWidgetSettingItemCategoryBase::OnDespawn_Implementation(bool bRecovery)
 {
+	Super::OnDespawn_Implementation(bRecovery);
+	
 	SetCategory(FText::GetEmpty());
 }
 

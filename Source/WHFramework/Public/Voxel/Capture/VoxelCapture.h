@@ -31,5 +31,5 @@ protected:
 
 public:
 	UFUNCTION(BlueprintPure)
-	USceneCaptureComponent2D* GetCapture() const { return Capture;}
+	USceneCaptureComponent2D* GetCapture() const { return Capture; }
 };

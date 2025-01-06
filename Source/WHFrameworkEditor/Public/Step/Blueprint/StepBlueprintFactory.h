@@ -13,5 +13,8 @@
 UCLASS(HideCategories=Object, MinimalAPI)
 class UStepBlueprintFactory : public UBlueprintFactoryBase
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UStepBlueprintFactory(const FObjectInitializer& ObjectInitializer);
 };

@@ -5,7 +5,7 @@
 
 #include "Common/Base/WHObject.h"
 #include "Main/MainModuleTypes.h"
-#include "SaveGame/Base/SaveDataInterface.h"
+#include "SaveGame/Base/SaveDataAgentInterface.h"
 #include "ModuleBase.generated.h"
 
 class AMainModule;
@@ -30,7 +30,7 @@ public:
 };
 
 UCLASS()
-class WHFRAMEWORK_API UModuleBase : public UWHObject, public ISaveDataInterface
+class WHFRAMEWORK_API UModuleBase : public UWHObject, public ISaveDataAgentInterface
 {
 	GENERATED_BODY()
 

@@ -21,7 +21,6 @@ void UCommonButtonGroup::OnDespawn_Implementation(bool bRecovery)
 	bSelectionRequired = false;
 	bBroadcastOnDeselected = true;
 
-	DeselectAllN();
 	for(auto Iter : Buttons)
 	{
 		UObjectPoolModuleStatics::DespawnObject(Iter.Get(), true);
@@ -139,7 +138,7 @@ void UCommonButtonGroup::DeselectAllN()
 		UCommonButton* Button = Cast<UCommonButton>(Iter.Get());
 		if (Button && Button->GetSelected() && !Button->IsStandalone())
 		{
-			Button->SetSelectedInternal(false);
+			Button->SetSelectedInternal(false, false);
 		}
 	}
 

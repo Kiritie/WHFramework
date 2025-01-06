@@ -6,6 +6,7 @@
 #include "GameplayCueManager.h"
 #include "Ability/Abilities/AbilityBase.h"
 #include "Ability/Character/AbilityCharacterBase.h"
+#include "Ability/Effects/EffectBase.h"
 #include "Net/UnrealNetwork.h"
 #include "Debug/DebugModuleTypes.h"
 
@@ -182,21 +183,18 @@ FAbilityInfo UAbilitySystemComponentBase::GetAbilityInfoBySpec(FGameplayAbilityS
 	FAbilityInfo AbilityInfo;
 	if(UAbilityBase* Ability = Cast<UAbilityBase>(Spec.Ability))
 	{
-		if(Ability->GetCostGameplayEffect())
+		if(Ability->GetCostGameplayEffect() && Ability->GetCostGameplayEffect()->Modifiers.Num() > 0)
 		{
-			if(Ability->GetCostGameplayEffect()->Modifiers.Num() > 0)
-			{
-				const FGameplayModifierInfo ModifierInfo = Ability->GetCostGameplayEffect()->Modifiers[0];
-				AbilityInfo.CostAttribute = ModifierInfo.Attribute;
-				ModifierInfo.ModifierMagnitude.GetStaticMagnitudeIfPossible(1.f, AbilityInfo.CostValue);
-			}
+			const FGameplayModifierInfo ModifierInfo = Ability->GetCostGameplayEffect()->Modifiers[0];
+			AbilityInfo.CostAttribute = ModifierInfo.Attribute;
+			ModifierInfo.ModifierMagnitude.GetStaticMagnitudeIfPossible(1.f, AbilityInfo.CostValue);
 		}
 		if(Ability->GetCooldownGameplayEffect())
 		{
-			Ability->GetCooldownGameplayEffect()->DurationMagnitude.GetStaticMagnitudeIfPossible(1.f, AbilityInfo.CooldownDuration);
+			Ability->GetCooldownGameplayEffect()->DurationMagnitude.GetStaticMagnitudeIfPossible(Spec.Level, AbilityInfo.CooldownDuration);
 		}
 	}
-	if(UGameplayAbility* Ability = Spec.GetPrimaryInstance())
+	if(UAbilityBase* Ability = Cast<UAbilityBase>(Spec.GetPrimaryInstance()))
 	{
 		AbilityInfo.CooldownRemaining = Ability->GetCooldownTimeRemaining();
 	}

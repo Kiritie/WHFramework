@@ -35,7 +35,7 @@ public:
 	virtual void SetValue(const FParameter& InValue) override;
 
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
 	UEditableTextBox* TxtBox_Value;
 
 	UPROPERTY(BlueprintReadOnly)

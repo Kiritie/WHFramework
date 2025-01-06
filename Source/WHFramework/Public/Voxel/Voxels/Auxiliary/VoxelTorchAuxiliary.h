@@ -26,13 +26,13 @@ public:
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UPointLightComponent* LightComponent;
+	UPointLightComponent* PointLight;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UParticleSystemComponent* EffectComponent;
+	UParticleSystemComponent* ParticleSystem;
 
 public:
-	UPointLightComponent* GetLightComponent() const { return LightComponent; }
+	UPointLightComponent* GetPointLight() const { return PointLight; }
 
-	UParticleSystemComponent* GetEffectComponent() const { return EffectComponent; }
+	UParticleSystemComponent* GetParticleSystem() const { return ParticleSystem; }
 };

@@ -63,23 +63,19 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// StepModule
-protected:
-	/// 自动开始初始步骤
-	UPROPERTY(EditAnywhere, Category = "StepModule")
-	bool bAutoStartFirst;
-	
-	/// 步骤模块状态
-	UPROPERTY(VisibleAnywhere, Category = "StepModule")
-	EStepModuleState StepModuleState;
-
 public:
-	/**
-	* 获取步骤模块状态
-	*/
 	UFUNCTION(BlueprintPure)
-	EStepModuleState GetStepModuleState() const { return StepModuleState; }
+	UStepAsset* GetAsset(UStepAsset* InAsset) const;
 
-public:
+	UFUNCTION(BlueprintCallable)
+	void AddAsset(UStepAsset* InAsset);
+	
+	UFUNCTION(BlueprintCallable)
+	void RemoveAsset(UStepAsset* InAsset);
+	
+	UFUNCTION(BlueprintCallable)
+	void SwitchAsset(UStepAsset* InAsset);
+
 	UFUNCTION(BlueprintCallable)
 	void StartStep(int32 InRootStepIndex = -1, bool bSkipSteps = false);
 
@@ -111,9 +107,13 @@ public:
 	UFUNCTION(BlueprintPure)
 	bool IsAllStepCompleted();
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Step Stats
 protected:
+	/// 步骤模块状态
+	UPROPERTY(VisibleAnywhere, Category = "StepModule")
+	EStepModuleState StepModuleState;
+	/// 流程资产列表
+	UPROPERTY(VisibleAnywhere, Category = "StepModule|Step Stats")
+	TArray<UStepAsset*> Assets;
 	/// 默认流程资产 
 	UPROPERTY(EditAnywhere, Category = "StepModule|Step Stats")
 	UStepAsset* DefaultAsset;
@@ -129,6 +129,16 @@ protected:
 
 public:
 	/**
+	* 获取步骤模块状态
+	*/
+	UFUNCTION(BlueprintPure)
+	EStepModuleState GetStepModuleState() const { return StepModuleState; }
+	/**
+	* 获取资产列表
+	*/
+	UFUNCTION(BlueprintPure)
+	TArray<UStepAsset*> GetAssets() const { return Assets; }
+	/**
 	* 获取默认资产
 	*/
 	UFUNCTION(BlueprintPure)
@@ -138,11 +148,6 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	UStepAsset* GetCurrentAsset() const { return CurrentAsset; }
-	/**
-	* 设置当前资产
-	*/
-	UFUNCTION(BlueprintCallable)
-	void SetCurrentAsset(UStepAsset* InStepAsset, bool bInAutoStartFirst = false);
 	/**
 	* 获取初始步骤
 	*/

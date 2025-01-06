@@ -6,7 +6,102 @@
 #include "SceneModuleTypes.generated.h"
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FOnAsyncLoadLevelFinished, FName, InLevelPath);
-DECLARE_DYNAMIC_DELEGATE_OneParam(FOnAsyncUnloadLevelFinished, FName, InLevelPath);
+
+/**
+ * 时间阶段
+ */
+UENUM(BlueprintType)
+enum class EWorldTimePhase : uint8
+{
+	None,
+	//早晨
+	Morning,
+	//上午
+	Forenoon,
+	//中午
+	Noon,
+	//下午
+	Afternoon,
+	//傍晚
+	Evening,
+	//晚上
+	Night
+};
+
+/**
+ * 加载关卡状态
+ */
+UENUM(BlueprintType)
+enum class EFAsyncLoadLevelState : uint8
+{
+	None,
+	//加载
+	Loading,
+	//卸载
+	Unloading
+};
+
+/**
+ *
+ */
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSoftLevelPath
+{
+	GENERATED_BODY()
+
+public:
+	FSoftLevelPath()
+	{
+		LevelObjectPtr = nullptr;
+		LevelPath = NAME_None;
+	}
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TSoftObjectPtr<UWorld> LevelObjectPtr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "!LevelObjectPtr.IsValid()"))
+	FName LevelPath;
+};
+
+/**
+ *
+ */
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FAsyncLoadLevelTask
+{
+	GENERATED_BODY()
+
+public:
+	FAsyncLoadLevelTask()
+	{
+		bLoading = false;
+		State = EFAsyncLoadLevelState::None;
+		LevelPath = NAME_None;
+		OnLoadFinished = FOnAsyncLoadLevelFinished();
+		FinishDelayTime = 0.f;
+		bCreateLoadingWidget = false;
+	}
+
+public:
+	UPROPERTY(VisibleAnywhere)
+	bool bLoading;
+
+	UPROPERTY(VisibleAnywhere)
+	EFAsyncLoadLevelState State;
+
+	UPROPERTY(VisibleAnywhere)
+	FName LevelPath;
+
+	UPROPERTY(VisibleAnywhere)
+	FOnAsyncLoadLevelFinished OnLoadFinished;
+
+	UPROPERTY(VisibleAnywhere)
+	float FinishDelayTime;
+
+	UPROPERTY(VisibleAnywhere)
+	bool bCreateLoadingWidget;
+};
 
 /**
  *
@@ -76,7 +171,7 @@ public:
 		DayLength = 10.f;
 		NightLength = 5.f;
 		TimeOfDay = 960.f;
-		DateTime = -1.f;
+		DateTime = FDateTime();
 	}
 
 public:
@@ -114,6 +209,26 @@ public:
 };
 
 USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSceneActorSaveData : public FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FSceneActorSaveData()
+	{
+		ActorID = FGuid::NewGuid();
+		SpawnTransform = FTransform::Identity;
+	}
+
+public:
+	UPROPERTY(BlueprintReadWrite)
+	FGuid ActorID;
+
+	UPROPERTY()
+	FTransform SpawnTransform;
+};
+
+USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FSceneModuleSaveData : public FSaveData
 {
 	GENERATED_BODY()
@@ -124,6 +239,7 @@ public:
 		MiniMapRange = 512.f;
 		TimerData = FWorldTimerSaveData();
 		WeatherData = FWorldWeatherSaveData();
+		ActorSaveDatas = TArray<FSceneActorSaveData>();
 	}
 
 public:
@@ -135,6 +251,9 @@ public:
 		
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FWorldWeatherSaveData WeatherData;
+		
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FSceneActorSaveData> ActorSaveDatas;
 
 public:
 	virtual void MakeSaved() override
@@ -143,5 +262,10 @@ public:
 
 		TimerData.MakeSaved();
 		WeatherData.MakeSaved();
+
+		for(auto& Iter : ActorSaveDatas)
+		{
+			Iter.MakeSaved();
+		}
 	}
 };

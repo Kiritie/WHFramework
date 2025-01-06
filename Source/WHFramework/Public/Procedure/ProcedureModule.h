@@ -55,16 +55,19 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ProcedureModule
-protected:
-	/// 自动切换初始流程 
-	UPROPERTY(EditAnywhere, Category = "ProcedureModule")
-	bool bAutoSwitchFirst;
-
-protected:
-	UFUNCTION(BlueprintCallable)
-	void OnSwitchProcedure(UObject* InSender, UEventHandle_SwitchProcedure* InEventHandle);
-
 public:
+	UFUNCTION(BlueprintPure)
+	UProcedureAsset* GetAsset(UProcedureAsset* InAsset) const;
+
+	UFUNCTION(BlueprintCallable)
+	void AddAsset(UProcedureAsset* InAsset);
+	
+	UFUNCTION(BlueprintCallable)
+	void RemoveAsset(UProcedureAsset* InAsset);
+	
+	UFUNCTION(BlueprintCallable)
+	void SwitchAsset(UProcedureAsset* InAsset);
+
 	UFUNCTION(BlueprintCallable)
 	void SwitchProcedure(UProcedureBase* InProcedure);
 
@@ -89,9 +92,16 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void GuideCurrentProcedure();
 
+protected:
+	UFUNCTION(BlueprintCallable)
+	void OnSwitchProcedure(UObject* InSender, UEventHandle_SwitchProcedure* InEventHandle);
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Procedure Stats
 protected:
+	/// 流程资产列表
+	UPROPERTY(VisibleAnywhere, Category = "ProcedureModule|Procedure Stats")
+	TArray<UProcedureAsset*> Assets;
 	/// 默认流程资产 
 	UPROPERTY(EditAnywhere, Category = "ProcedureModule|Procedure Stats")
 	UProcedureAsset* DefaultAsset;
@@ -104,6 +114,11 @@ protected:
 
 public:
 	/**
+	* 获取资产列表
+	*/
+	UFUNCTION(BlueprintPure)
+	TArray<UProcedureAsset*> GetAssets() const { return Assets; }
+	/**
 	* 获取默认资产
 	*/
 	UFUNCTION(BlueprintPure)
@@ -113,11 +128,6 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	UProcedureAsset* GetCurrentAsset() const { return CurrentAsset; }
-	/**
-	* 设置当前资产
-	*/
-	UFUNCTION(BlueprintCallable)
-	void SetCurrentAsset(UProcedureAsset* InProcedureAsset, bool bInAutoSwitchFirst = false);
 
 	UFUNCTION(BlueprintPure)
 	bool HasProcedureByIndex(int32 InIndex) const;

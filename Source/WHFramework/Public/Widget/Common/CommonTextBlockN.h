@@ -22,7 +22,7 @@ protected:
 	virtual void OnBindingChanged(const FName& Property) override;
 	
 	//////////////////////////////////////////////////////////////////////////
-	/// Object
+	/// ObjectPool
 public:
 	virtual int32 GetLimit_Implementation() const override { return -1; }
 

@@ -13,7 +13,7 @@ class WHFRAMEWORK_API UAsyncAction_ExecuteWithTransition : public UBlueprintAsyn
 	GENERATED_BODY()
 
 public:
-	UAsyncAction_ExecuteWithTransition(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+	UAsyncAction_ExecuteWithTransition(const FObjectInitializer& ObjectInitializer);
 
 	UFUNCTION(BlueprintCallable)
 	static UAsyncAction_ExecuteWithTransition* ExecuteWithTransition(float Duration);

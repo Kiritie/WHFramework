@@ -12,16 +12,17 @@ class UUserWidget;
 class UWidgetComponent;
 class APlayerController;
 
-DECLARE_DYNAMIC_DELEGATE_RetVal(bool, FComponentCanLockAtTarget);
+DECLARE_DYNAMIC_DELEGATE_RetVal(bool, FCanLookAtTarget);
+DECLARE_DYNAMIC_DELEGATE_OneParam(FTargetLookAtOn, AActor*, TargetActor);
+DECLARE_DYNAMIC_DELEGATE_OneParam(FTargetLookAtOff, AActor*, TargetActor);
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class WHFRAMEWORK_API ULookingComponent : public UActorComponent
 {
 	GENERATED_BODY()
-
+	
 public:
-	// Sets default values for this component's properties
-	ULookingComponent();
+	ULookingComponent(const FObjectInitializer& ObjectInitializer);
 
 protected:
 	// Called when the game starts
@@ -41,10 +42,13 @@ public:
 	bool TargetIsLookAtAble(AActor* InTargetActor) const;
 
 	UFUNCTION(BlueprintPure)
-	bool CanLookAtTarget();
+	bool CanLookAtTarget() const;
 
 	UFUNCTION(BlueprintCallable)
 	bool DoLookAtTarget(AActor* InTargetActor);
+
+	UFUNCTION(BlueprintPure)
+	FRotator GetLookingRotation(AActor* InTargetActor = nullptr) const;
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Looking")
@@ -54,7 +58,13 @@ public:
 	float LookingRotationSpeed;
 
 	UPROPERTY(BlueprintReadOnly)
-	FComponentCanLockAtTarget OnCanLockAtTarget;
+	FCanLookAtTarget OnCanLookAtTarget;
+
+	UPROPERTY(BlueprintReadOnly)
+	FTargetLookAtOn OnTargetLookAtOn;
+
+	UPROPERTY(BlueprintReadOnly)
+	FTargetLookAtOff OnTargetLookAtOff;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Looking")

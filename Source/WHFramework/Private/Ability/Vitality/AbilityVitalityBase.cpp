@@ -2,32 +2,42 @@
 
 #include "Ability/Vitality/AbilityVitalityBase.h"
 
-#include "Ability/Character/AbilityCharacterBase.h"
+#include "Ability/Abilities/VitalityActionAbilityBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
+#include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
 #include "Ability/Vitality/AbilityVitalityDataBase.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Death.h"
-#include "Ability/Vitality/States/AbilityVitalityState_Default.h"
+#include "Ability/Vitality/States/AbilityVitalityState_Spawn.h"
 #include "Asset/AssetModuleStatics.h"
 #include "FSM/Components/FSMComponent.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Voxel/VoxelModule.h"
-#include "Voxel/Datas/VoxelData.h"
 #include "Ability/Vitality/AbilityVitalityInventoryBase.h"
+#include "Ability/Vitality/States/AbilityVitalityState_Interrupt.h"
+#include "Ability/Vitality/States/AbilityVitalityState_Static.h"
+#include "Ability/Vitality/States/AbilityVitalityState_Walk.h"
 
 AAbilityVitalityBase::AAbilityVitalityBase(const FObjectInitializer& ObjectInitializer) :
-	Super(ObjectInitializer.SetDefaultSubobjectClass<UVitalityAttributeSetBase>("AttributeSet").
-		SetDefaultSubobjectClass<UAbilityVitalityInventoryBase>("Inventory"))
+	Super(ObjectInitializer.SetDefaultSubobjectClass<UVitalityAttributeSetBase>(FName("AttributeSet")).
+		SetDefaultSubobjectClass<UAbilityVitalityInventoryBase>(FName("Inventory")))
 {
 	FSM = CreateDefaultSubobject<UFSMComponent>(FName("FSM"));
-	FSM->GroupName = FName("Vitality");
-	FSM->DefaultState = UAbilityVitalityState_Default::StaticClass();
-	FSM->States.Add(UAbilityVitalityState_Default::StaticClass());
+	FSM->GroupName = TEXT("Vitality");
+	
+	FSM->DefaultState = UAbilityVitalityState_Spawn::StaticClass();
+	FSM->FinalState = UAbilityVitalityState_Death::StaticClass();
+
 	FSM->States.Add(UAbilityVitalityState_Death::StaticClass());
+	FSM->States.Add(UAbilityVitalityState_Interrupt::StaticClass());
+	FSM->States.Add(UAbilityVitalityState_Spawn::StaticClass());
+	FSM->States.Add(UAbilityVitalityState_Static::StaticClass());
+	FSM->States.Add(UAbilityVitalityState_Walk::StaticClass());
 
 	// stats
-	Name = NAME_None;
 	RaceID = NAME_None;
 	GenerateVoxelID = FPrimaryAssetId();
+
+	ActionAbilities = TMap<FGameplayTag, FVitalityActionAbilityData>();
 }
 
 void AAbilityVitalityBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -44,20 +54,38 @@ void AAbilityVitalityBase::OnDespawn_Implementation(bool bRecovery)
 	FSM->SwitchState(nullptr);
 
 	RaceID = NAME_None;
-	Level = 0;
-
-	Inventory->UnloadSaveData();
+	GenerateVoxelID = FPrimaryAssetId();
 }
 
 void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	Super::LoadData(InSaveData, InPhase);
-	
+
 	auto& SaveData = InSaveData->CastRef<FVitalitySaveData>();
 
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		if(SaveData.IsSaved())
+		{
+			ActionAbilities = SaveData.ActionAbilities;
+			for(auto& Iter : ActionAbilities)
+			{
+				Iter.Value.AbilityHandle = AbilitySystem->K2_GiveAbility(Iter.Value.AbilityClass, Iter.Value.Level);
+			}
+		}
+		else
+		{
+			const UAbilityVitalityDataBase& VitalityData = GetVitalityData<UAbilityVitalityDataBase>();
+			
+			for(auto Iter : VitalityData.ActionAbilities)
+			{
+				Iter.AbilityHandle = AbilitySystem->K2_GiveAbility(Iter.AbilityClass, Iter.Level);
+				ActionAbilities.Add(Iter.AbilityClass->GetDefaultObject<UAbilityBase>()->AbilityTags.GetByIndex(0), Iter);
+			}
+		}
+	}
 	if(PHASEC(InPhase, EPhase::All))
 	{
-		SetNameV(SaveData.Name);
 		SetRaceID(SaveData.RaceID);
 	}
 }
@@ -67,7 +95,6 @@ FSaveData* AAbilityVitalityBase::ToData()
 	static FVitalitySaveData SaveData;
 	SaveData = Super::ToData()->CastRef<FActorSaveData>();
 
-	SaveData.Name = Name;
 	SaveData.RaceID = RaceID;
 
 	return &SaveData;
@@ -80,6 +107,7 @@ void AAbilityVitalityBase::ResetData()
 
 void AAbilityVitalityBase::OnFiniteStateRefresh(UFiniteStateBase* InCurrentState)
 {
+	FSM->SwitchStateByClass<UAbilityVitalityState_Walk>();
 }
 
 void AAbilityVitalityBase::Serialize(FArchive& Ar)
@@ -89,21 +117,86 @@ void AAbilityVitalityBase::Serialize(FArchive& Ar)
 
 void AAbilityVitalityBase::Death(IAbilityVitalityInterface* InKiller)
 {
-	if(InKiller)
-	{
-		InKiller->Kill(this);
-	}
-	FSM->SwitchStateByClass<UAbilityVitalityState_Death>({ InKiller });
+	FSM->SwitchFinalState({ InKiller });
 }
 
 void AAbilityVitalityBase::Kill(IAbilityVitalityInterface* InTarget)
 {
-	
+	InTarget->Death(this);
 }
 
 void AAbilityVitalityBase::Revive(IAbilityVitalityInterface* InRescuer)
 {
-	FSM->SwitchDefaultState();
+	FSM->SwitchDefaultState({ InRescuer });
+}
+
+void AAbilityVitalityBase::Static()
+{
+	FSM->SwitchStateByClass<UAbilityVitalityState_Static>();
+}
+
+void AAbilityVitalityBase::UnStatic()
+{
+	if(FSM->IsCurrentStateClass<UAbilityVitalityState_Static>())
+	{
+		FSM->SwitchState(nullptr);
+	}
+}
+
+void AAbilityVitalityBase::Interrupt(float InDuration /*= -1*/)
+{
+	FSM->SwitchStateByClass<UAbilityVitalityState_Interrupt>({ InDuration });
+}
+
+void AAbilityVitalityBase::UnInterrupt()
+{
+	if(FSM->IsCurrentStateClass<UAbilityVitalityState_Interrupt>())
+	{
+		FSM->SwitchState(nullptr);
+	}
+}
+
+bool AAbilityVitalityBase::DoAction(const FGameplayTag& InActionTag)
+{
+	if(!HasActionAbility(InActionTag)) return false;
+	
+	const FVitalityActionAbilityData AbilityData = GetActionAbility(InActionTag);
+	const bool bSuccess = AbilitySystem->TryActivateAbility(AbilityData.AbilityHandle);
+	const FGameplayAbilitySpec Spec = AbilitySystem->FindAbilitySpecForHandle(AbilityData.AbilityHandle);
+	return bSuccess;
+}
+
+bool AAbilityVitalityBase::StopAction(const FGameplayTag& InActionTag)
+{
+	if(!HasActionAbility(InActionTag)) return false;
+	
+	const FVitalityActionAbilityData AbilityData = GetActionAbility(InActionTag);
+	const FGameplayAbilitySpec Spec = AbilitySystem->FindAbilitySpecForHandle(AbilityData.AbilityHandle);
+	if(UVitalityActionAbilityBase* Ability = Cast<UVitalityActionAbilityBase>(Spec.GetPrimaryInstance()))
+	{
+		Ability->SetStopped(true);
+	}
+	AbilitySystem->CancelAbilityHandle(AbilityData.AbilityHandle);
+	return true;
+}
+
+void AAbilityVitalityBase::EndAction(const FGameplayTag& InActionTag, bool bWasCancelled)
+{
+	if(InActionTag.MatchesTag(GameplayTags::Ability_Vitality_Action_Death))
+	{
+		if(FSM->IsCurrentStateClass<UAbilityVitalityState_Death>())
+		{
+			FSM->GetCurrentState<UAbilityVitalityState_Death>()->DeathEnd();
+		}
+	}
+	else if(InActionTag.MatchesTag(GameplayTags::Ability_Vitality_Action_Static))
+	{
+		UnStatic();
+	}
+	else if(InActionTag.MatchesTag(GameplayTags::Ability_Vitality_Action_Interrupt))
+	{
+		UnInterrupt();
+	}
 }
 
 bool AAbilityVitalityBase::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
@@ -121,9 +214,19 @@ void AAbilityVitalityBase::OnLeaveInteract(IInteractionAgentInterface* InInterac
 	Super::OnLeaveInteract(InInteractionAgent);
 }
 
-void AAbilityVitalityBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity)
+void AAbilityVitalityBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive)
 {
-	Super::OnInteract(InInteractAction, InInteractionAgent, bPassivity);
+	Super::OnInteract(InInteractAction, InInteractionAgent, bPassive);
+}
+
+void AAbilityVitalityBase::OnPreChangeItem(const FAbilityItem& InOldItem)
+{
+	Super::OnPreChangeItem(InOldItem);
+}
+
+void AAbilityVitalityBase::OnChangeItem(const FAbilityItem& InNewItem)
+{
+	Super::OnChangeItem(InNewItem);
 }
 
 void AAbilityVitalityBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
@@ -131,19 +234,14 @@ void AAbilityVitalityBase::OnActiveItem(const FAbilityItem& InItem, bool bPassiv
 	Super::OnActiveItem(InItem, bPassive, bSuccess);
 }
 
-void AAbilityVitalityBase::OnCancelItem(const FAbilityItem& InItem, bool bPassive)
+void AAbilityVitalityBase::OnRemoveItem(const FAbilityItem& InItem)
 {
-	Super::OnCancelItem(InItem, bPassive);
+	Super::OnRemoveItem(InItem);
 }
 
-void AAbilityVitalityBase::OnAssembleItem(const FAbilityItem& InItem)
+void AAbilityVitalityBase::OnDeactiveItem(const FAbilityItem& InItem, bool bPassive)
 {
-	Super::OnAssembleItem(InItem);
-}
-
-void AAbilityVitalityBase::OnDischargeItem(const FAbilityItem& InItem)
-{
-	Super::OnDischargeItem(InItem);
+	Super::OnDeactiveItem(InItem, bPassive);
 }
 
 void AAbilityVitalityBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPlace)
@@ -154,14 +252,17 @@ void AAbilityVitalityBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPla
 void AAbilityVitalityBase::OnSelectItem(const FAbilityItem& InItem)
 {
 	Super::OnSelectItem(InItem);
-	
-	if(InItem.IsValid() && InItem.GetType() == EAbilityItemType::Voxel)
+
+	if(InItem.InventorySlot->GetSplitType() == ESlotSplitType::Shortcut)
 	{
-		SetGenerateVoxelID(InItem.ID);
-	}
-	else
-	{
-		SetGenerateVoxelID(FPrimaryAssetId());
+		if(InItem.IsValid() && InItem.GetType() == EAbilityItemType::Voxel)
+		{
+			SetGenerateVoxelID(InItem.ID);
+		}
+		else
+		{
+			SetGenerateVoxelID(FPrimaryAssetId());
+		}
 	}
 }
 
@@ -180,36 +281,88 @@ bool AAbilityVitalityBase::OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResul
 	return IVoxelAgentInterface::OnDestroyVoxel(InVoxelHitResult);
 }
 
+void AAbilityVitalityBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
+{
+	Super::OnAttributeChange(InAttributeChangeData);
+}
+
+void AAbilityVitalityBase::OnActorAttached(AActor* InActor)
+{
+	Super::OnActorAttached(InActor);
+}
+
+void AAbilityVitalityBase::OnActorDetached(AActor* InActor)
+{
+	Super::OnActorDetached(InActor);
+}
+
+void AAbilityVitalityBase::HandleDamage(const FGameplayAttribute& DamageAttribute, float DamageValue, float DefendValue, bool bHasCrited, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+{
+	ModifyHealth(-DamageValue);
+
+	if (GetHealth() <= 0.f)
+	{
+		if(IAbilityVitalityInterface* SourceVitality = Cast<IAbilityVitalityInterface>(SourceActor))
+		{
+			SourceVitality->Kill(this);
+		}
+		else
+		{
+			Death(nullptr);
+		}
+	}
+
+	if(DamageValue >= 1.f)
+	{
+		USceneModuleStatics::SpawnWorldText(FString::FromInt(DamageValue), DamageAttribute != GetMagicDamageAttribute() ? FColor::Red : FColor::Cyan, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
+	}
+	if(DefendValue >= 1.f)
+	{
+		USceneModuleStatics::SpawnWorldText(FString::FromInt(DefendValue), FColor::White, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
+	}
+}
+
+void AAbilityVitalityBase::HandleRecovery(const FGameplayAttribute& RecoveryAttribute, float RecoveryValue, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+{
+	if(RecoveryAttribute == GetHealthRecoveryAttribute())
+	{
+		ModifyHealth(RecoveryValue);
+	
+		if(RecoveryValue >= 1.f)
+		{
+			USceneModuleStatics::SpawnWorldText(FString::FromInt(RecoveryValue), FColor::Green, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
+		}
+	}
+}
+
+void AAbilityVitalityBase::HandleInterrupt(const FGameplayAttribute& InterruptAttribute, float InterruptDuration, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+{
+	
+}
+
+bool AAbilityVitalityBase::IsActive(bool bNeedNotDead) const
+{
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Active) && (!bNeedNotDead || !IsDead());
+}
+
 bool AAbilityVitalityBase::IsDead(bool bCheckDying) const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Vitality_Dead) || bCheckDying && IsDying();
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Dead) || bCheckDying && IsDying();
 }
 
 bool AAbilityVitalityBase::IsDying() const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::StateTag_Vitality_Dying);
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Dying);
 }
 
-bool AAbilityVitalityBase::SetLevelA(int32 InLevel)
+bool AAbilityVitalityBase::IsWalking(bool bReally) const
 {
-	const auto& VitalityData = GetVitalityData<UAbilityVitalityDataBase>();
-	InLevel = FMath::Clamp(InLevel, 0, VitalityData.MaxLevel != -1 ? VitalityData.MaxLevel : InLevel);
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Walking);
+}
 
-	if(Level != InLevel)
-	{
-		Level = InLevel;
-
-		auto EffectContext = AbilitySystem->MakeEffectContext();
-		EffectContext.AddSourceObject(this);
-		auto SpecHandle = AbilitySystem->MakeOutgoingSpec(VitalityData.PEClass, InLevel, EffectContext);
-		if (SpecHandle.IsValid())
-		{
-			AbilitySystem->BP_ApplyGameplayEffectSpecToSelf(SpecHandle);
-		}
-
-		return true;
-	}
-	return false;
+bool AAbilityVitalityBase::IsInterrupting() const
+{
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Interrupting);
 }
 
 FString AAbilityVitalityBase::GetHeadInfo() const
@@ -217,42 +370,21 @@ FString AAbilityVitalityBase::GetHeadInfo() const
 	return FString::Printf(TEXT("Lv.%d \"%s\" "), Level, *Name.ToString());
 }
 
+bool AAbilityVitalityBase::HasActionAbility(const FGameplayTag& InActionTag) const
+{
+	return ActionAbilities.Contains(InActionTag);
+}
+
+FVitalityActionAbilityData AAbilityVitalityBase::GetActionAbility(const FGameplayTag& InActionTag)
+{
+	if(HasActionAbility(InActionTag))
+	{
+		return ActionAbilities[InActionTag];
+	}
+	return FVitalityActionAbilityData();
+}
+
 UAbilityVitalityDataBase& AAbilityVitalityBase::GetVitalityData() const
 {
 	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityVitalityDataBase>(AssetID);
-}
-
-void AAbilityVitalityBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
-{
-	if(InAttributeChangeData.Attribute == GetExpAttribute())
-	{
-		if(InAttributeChangeData.NewValue >= GetMaxExp())
-		{
-			SetLevelA(GetLevelA() + 1);
-			SetExp(0.f);
-		}
-	}
-}
-
-void AAbilityVitalityBase::HandleDamage(EDamageType DamageType, const float LocalDamageDone, bool bHasCrited, bool bHasDefend, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
-{
-	ModifyHealth(-LocalDamageDone);
-
-	if (GetHealth() <= 0.f)
-	{
-		Death(Cast<IAbilityVitalityInterface>(SourceActor));
-	}
-
-	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalDamageDone), FColor::White, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
-}
-
-void AAbilityVitalityBase::HandleRecovery(const float LocalRecoveryDone, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
-{
-	ModifyHealth(LocalRecoveryDone);
-	
-	USceneModuleStatics::SpawnWorldText(FString::FromInt(LocalRecoveryDone), FColor::Green, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
-}
-
-void AAbilityVitalityBase::HandleInterrupt(const float InterruptDuration, FHitResult HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
-{
 }

@@ -5,19 +5,27 @@
 #include "Common/Base/WHObject.h"
 #include "GameplayTagContainer.h"
 #include "Asset/AssetModuleTypes.h"
+#include "Common/CommonTypes.h"
+#include "Scene/SceneModuleTypes.h"
 
 #include "AbilityModuleTypes.generated.h"
 
+class UEffectBase;
+class UAbilityActorDataBase;
+class UVitalityActionAbilityBase;
+class UAbilityInventoryBase;
 class UAbilityCharacterDataBase;
 class UAbilityVitalityDataBase;
 class UAbilityItemDataBase;
-class AAbilitySkillBase;
+class AAbilityProjectileBase;
 class AAbilityEquipBase;
-class UWidgetInventorySlotBase;
-class UAbilityInventorySlot;
+class UWidgetAbilityInventorySlotBase;
+class UAbilityInventorySlotBase;
 
-#define GET_GAMEPLAYATTRIBUTE_PROPERTY(ClassName, PropertyName) \
-	FindFieldChecked<FProperty>(ClassName::StaticClass(), GET_MEMBER_NAME_CHECKED(ClassName, PropertyName)); \
+DECLARE_PROPERTY_ROB_GETTER(FGameplayEffectModifierMagnitude, AttributeBasedMagnitude, FAttributeBasedFloat)
+
+#define GET_GAMEPLAYATTRIBUTE(ClassName, PropertyName) \
+	FGameplayAttribute(GET_MEMBER_PROPERTY(ClassName, PropertyName))
 
 #define GAMEPLAYATTRIBUTE_VALUE_BASE_GETTER(PropertyName) \
 	FORCEINLINE float GetBase##PropertyName() const \
@@ -233,7 +241,7 @@ class WHFRAMEWORK_API UDamageHandle : public UWHObject
 public:
 	UDamageHandle() {}
 
-	virtual void HandleDamage(AActor* SourceActor, AActor* TargetActor, float DamageValue, EDamageType DamageType, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
+	virtual void HandleDamage(AActor* SourceActor, AActor* TargetActor, float DamageValue, const FGameplayAttribute& DamageAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
 };
 
 /**
@@ -247,7 +255,7 @@ class WHFRAMEWORK_API URecoveryHandle : public UWHObject
 public:
 	URecoveryHandle() {}
 
-	virtual void HandleRecovery(AActor* SourceActor, AActor* TargetActor, float RecoveryValue, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
+	virtual void HandleRecovery(AActor* SourceActor, AActor* TargetActor, float RecoveryValue, const FGameplayAttribute& RecoveryAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
 };
 
 /**
@@ -261,7 +269,7 @@ class WHFRAMEWORK_API UInterruptHandle : public UWHObject
 public:
 	UInterruptHandle() {}
 
-	virtual void HandleInterrupt(AActor* SourceActor, AActor* TargetActor, float InterruptDuration, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
+	virtual void HandleInterrupt(AActor* SourceActor, AActor* TargetActor, float InterruptDuration, const FGameplayAttribute& InterruptAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
 };
 
 /**
@@ -282,7 +290,7 @@ public:
 
     /** 目标GameplayEffect类型 */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "GameplayEffectContainer")
-    TArray<TSubclassOf<UGameplayEffect>> TargetGameplayEffectClasses;
+    TArray<TSubclassOf<UEffectBase>> TargetGameplayEffectClasses;
 };
 
 /**
@@ -315,12 +323,389 @@ public:
     void AddTargets(const TArray<FHitResult>& HitResults, const TArray<AActor*>& TargetActors);
 };
 
+/**
+ * 物品类型
+ */
+UENUM(BlueprintType)
+enum class EAbilityItemType : uint8
+{
+	// 无
+	None UMETA(DisplayName="无"),
+	// 货币
+	Coin UMETA(DisplayName="货币"),
+	// 体素
+	Voxel UMETA(DisplayName="体素"),
+	// 材料
+	Raw UMETA(DisplayName="材料"),
+	// 道具
+	Prop UMETA(DisplayName="道具"),
+	// 装备
+	Equip UMETA(DisplayName="装备"),
+	// 技能
+	Skill UMETA(DisplayName="技能"),
+	// 物体
+	Actor UMETA(DisplayName="物体"),
+	// 生命体
+	Vitality UMETA(DisplayName="生命体"),
+	// 对象
+	Pawn UMETA(DisplayName="对象"),
+	// 角色
+	Character UMETA(DisplayName="角色"),
+	// 混杂
+	Misc UMETA(DisplayName="混杂")
+};
+
+/**
+* 装备模式
+*/
+UENUM(BlueprintType)
+enum class EAbilityEquipMode : uint8
+{
+	// 无
+	None,
+	// 被动
+	Passive,
+	// 主动
+	Initiative
+};
+
+/**
+* 技能模式
+*/
+UENUM(BlueprintType)
+enum class EAbilitySkillMode : uint8
+{
+	// 无
+	None,
+	// 被动
+	Passive,
+	// 主动
+	Initiative
+};
+
+/**
+* 物品稀有度
+*/
+UENUM(BlueprintType)
+enum class EAbilityItemRarity : uint8
+{
+	// 无
+	None,
+	// 普通
+	Common,
+	// 非凡
+	Uncommon,
+	// 稀有
+	Rare,
+	// 史诗
+	Epic,
+	// 传奇
+	Legendary,
+	// 神话
+	Mythical
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FAbilityItem : public FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FAbilityItem()
+	{
+		ID = FPrimaryAssetId();
+		Count = 0;
+		Level = 0;
+		InventorySlot = nullptr;
+		AbilityHandle = FGameplayAbilitySpecHandle();
+	}
+	
+	FORCEINLINE FAbilityItem(const FPrimaryAssetId& InID, int32 InCount = 1, int32 InLevel = 0)
+	{
+		ID = InID;
+		Count = InCount;
+		Level = InLevel;
+		InventorySlot = nullptr;
+		AbilityHandle = FGameplayAbilitySpecHandle();
+	}
+	
+	FORCEINLINE FAbilityItem(const FAbilityItem& InItem, int32 InCount = -1, bool bClearCaches = false)
+	{
+		ID = InItem.ID;
+		Count = InCount == -1 ? InItem.Count : InCount;
+		Level = InItem.Level;
+		if(!bClearCaches)
+		{
+			InventorySlot = InItem.InventorySlot;
+			AbilityHandle = InItem.AbilityHandle;
+		}
+		else
+		{
+			InventorySlot = nullptr;
+			AbilityHandle = FGameplayAbilitySpecHandle();
+		}
+	}
+
+	virtual ~FAbilityItem() override = default;
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FPrimaryAssetId ID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Count;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Level;
+
+	UPROPERTY(Transient)
+	UAbilityInventorySlotBase* InventorySlot;
+	
+	UPROPERTY(Transient)
+	FGameplayAbilitySpecHandle AbilityHandle;
+	
+	static FAbilityItem Empty;
+
+public:
+	template<class T>
+	T& GetData(bool bEnsured = true) const
+	{
+		return static_cast<T&>(GetData(bEnsured));
+	}
+
+	UAbilityItemDataBase& GetData(bool bEnsured = true) const;
+	
+	template<class T>
+	bool IsDataType() const
+	{
+		return IsDataType(T::StaticClass());
+	}
+
+	bool IsDataType(TSubclassOf<UAbilityItemDataBase> InType) const;
+
+	EAbilityItemType GetType() const;
+
+	UAbilityInventoryBase* GetInventory() const;
+
+	UAbilityInventorySlotBase* GetSlot() const;
+
+	FGameplayAbilitySpecHandle GetHandle() const;
+
+	FORCEINLINE virtual bool IsValid() const override
+	{
+		return ID.IsValid();
+	}
+
+	FORCEINLINE virtual bool IsNull() const
+	{
+		return Count <= 0;
+	}
+
+	FORCEINLINE virtual bool IsEmpty() const
+	{
+		return *this == Empty;
+	}
+
+	FORCEINLINE bool Match(const FAbilityItem& InItem) const
+	{
+		return InItem.IsValid() && InItem.ID == ID && InItem.Level == Level;
+	}
+
+	FORCEINLINE bool Equal(const FAbilityItem& InItem) const
+	{
+		return (InItem.ID == ID) && (InItem.Count == Count) && (InItem.Level == Level);
+	}
+
+	FORCEINLINE bool EqualID(const FAbilityItem& InItem) const
+	{
+		return (InItem.ID == ID);
+	}
+
+	FORCEINLINE friend bool operator==(const FAbilityItem& A, const FAbilityItem& B)
+	{
+		return A.Equal(B);
+	}
+
+	FORCEINLINE friend bool operator!=(const FAbilityItem& A, const FAbilityItem& B)
+	{
+		return !A.Equal(B);
+	}
+
+	FORCEINLINE friend FAbilityItem operator+(FAbilityItem& A, FAbilityItem& B)
+	{
+		if(A.Match(B))
+		{
+			A.Count += B.Count;
+		}
+		return A;
+	}
+
+	FORCEINLINE friend FAbilityItem operator-(FAbilityItem& A, FAbilityItem& B)
+	{
+		if(A.Match(B))
+		{
+			A.Count -= B.Count;
+		}
+		return A;
+	}
+
+	FORCEINLINE friend FAbilityItem& operator+=(FAbilityItem& A, FAbilityItem& B)
+	{
+		if(A.Match(B))
+		{
+			A.Count += B.Count;
+		}
+		return A;
+	}
+
+	FORCEINLINE friend FAbilityItem& operator-=(FAbilityItem& A, FAbilityItem& B)
+	{
+		if(A.Match(B))
+		{
+			A.Count -= B.Count;
+		}
+		return A;
+	}
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FAbilityItems
+{
+	GENERATED_BODY()
+
+public:
+	FAbilityItems()
+	{
+		Items = TArray<FAbilityItem>();
+	}
+
+	FAbilityItems(int32 InNum)
+	{
+		Items = TArray<FAbilityItem>();
+		Items.SetNum(InNum);
+	}
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (TitleProperty = "ID"))
+	TArray<FAbilityItem> Items;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FAbilityData : public FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FPrimaryAssetId ID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Level;
+	
+	UPROPERTY(Transient)
+	FGameplayAbilitySpecHandle AbilityHandle;
+
+public:
+	FAbilityData()
+	{
+		ID = FPrimaryAssetId();
+		Level = 1;
+		AbilityHandle = FGameplayAbilitySpecHandle();
+	}
+
+	virtual bool IsValid() const override
+	{
+		return AbilityHandle.IsValid();
+	}
+
+	template<class T>
+	T& GetData() const
+	{
+		return static_cast<T&>(GetData());
+	}
+
+	UPrimaryAssetBase& GetData() const;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVitalityActionAbilityData : public FAbilityData
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<UVitalityActionAbilityBase> AbilityClass;
+
+	FORCEINLINE FVitalityActionAbilityData()
+	{
+		AbilityClass = nullptr;
+	}
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FAttributeInfo
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FGameplayAttribute Attribute;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FGameplayAttribute BaseAttribute;
+
+	UPROPERTY(EditDefaultsOnly, Category=Capture)
+	EGameplayEffectAttributeCaptureSource AttributeSource;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	TEnumAsByte<EGameplayModOp::Type> ModifierOp;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	float Value;
+
+public:
+	FORCEINLINE FAttributeInfo()
+	{
+		Attribute = FGameplayAttribute();
+		BaseAttribute = FGameplayAttribute();
+		AttributeSource = EGameplayEffectAttributeCaptureSource();
+		ModifierOp = EGameplayModOp::Additive;
+		Value = 0.f;
+	}
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FEffectInfo
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	TArray<FAttributeInfo> Attributes;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	float Duration;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	float Period;
+
+public:
+	FORCEINLINE FEffectInfo()
+	{
+		Attributes = TArray<FAttributeInfo>();
+		Duration = 0.f;
+		Period = 0.f;
+	}
+};
+
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FAbilityInfo
 {
 	GENERATED_BODY()
 
 public:
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	TArray<FEffectInfo> Effects;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	FGameplayAttribute CostAttribute;
 
@@ -336,6 +721,7 @@ public:
 public:
 	FORCEINLINE FAbilityInfo()
 	{
+		Effects = TArray<FEffectInfo>();
 		CostAttribute = FGameplayAttribute();
 		CostValue = 0.f;
 		CooldownDuration = -1.f;
@@ -371,276 +757,13 @@ public:
 	}
 };
 
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FAbilityData : public FDataTableRowBase
-{
-	GENERATED_BODY()
-
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 AbilityLevel;
-
-	FGameplayAbilitySpecHandle AbilityHandle;
-
-public:
-	FAbilityData()
-	{
-		AbilityLevel = 1;
-		AbilityHandle = FGameplayAbilitySpecHandle();
-	}
-
-	virtual bool IsValid() const override
-	{
-		return AbilityHandle.IsValid();
-	}
-};
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FAbilityItemData : public FAbilityData
-{
-	GENERATED_BODY()
-
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FPrimaryAssetId AbilityID;
-
-	FORCEINLINE FAbilityItemData()
-	{
-		AbilityID = FPrimaryAssetId();
-	}
-
-public:
-	template<class T>
-	T& GetItemData() const
-	{
-		return static_cast<T&>(GetItemData());
-	}
-
-	UAbilityItemDataBase& GetItemData() const;
-};
-
-/**
- * 伤害类型
- */
-UENUM(BlueprintType)
-enum class EDamageType : uint8
-{
-	// 物理伤害
-	Physics,
-	// 魔法伤害
-	Magic,
-	// 掉落伤害
-	Fall
-};
-
-/**
-* 技能类型
-*/
-UENUM(BlueprintType)
-enum class ESkillType : uint8
-{
-	// 无
-	None,
-	// 近战
-	Melee,
-	// 远程
-	Remote
-};
-
-/**
-* 技能模式
-*/
-UENUM(BlueprintType)
-enum class ESkillMode : uint8
-{
-	// 无
-	None,
-	// 被动
-	Passive,
-	// 主动
-	Initiative
-};
-
-/**
- * 能力项类型
- */
-UENUM(BlueprintType)
-enum class EAbilityItemType : uint8
-{
-	// 无
-	None UMETA(DisplayName="无"),
-	// 体素
-	Voxel UMETA(DisplayName="体素"),
-	// 材料
-	Raw UMETA(DisplayName="材料"),
-	// 道具
-	Prop UMETA(DisplayName="道具"),
-	// 装备
-	Equip UMETA(DisplayName="装备"),
-	// 技能
-	Skill UMETA(DisplayName="技能"),
-	// 对象
-	Actor UMETA(DisplayName="对象"),
-	// 生命
-	Vitality UMETA(DisplayName="生命"),
-	// 角色
-	Character UMETA(DisplayName="角色")
-};
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FAbilityItem : public FSaveData
-{
-	GENERATED_BODY()
-
-public:
-	static FAbilityItem Empty;
-
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FPrimaryAssetId ID;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Count;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Level;
-
-	FGameplayAbilitySpecHandle AbilityHandle;
-
-public:
-	FORCEINLINE FAbilityItem()
-	{
-		ID = FPrimaryAssetId();
-		Count = 0;
-		Level = 0;
-		AbilityHandle = FGameplayAbilitySpecHandle();
-	}
-				
-	FORCEINLINE FAbilityItem(const FSaveData& InSaveData) : FSaveData(InSaveData)
-	{
-		ID = FPrimaryAssetId();
-		Count = 0;
-		Level = 0;
-		AbilityHandle = FGameplayAbilitySpecHandle();
-	}
-		
-	FORCEINLINE FAbilityItem(const FPrimaryAssetId& InID, int32 InCount = 1, int32 InLevel = 0)
-	{
-		ID = InID;
-		Count = InCount;
-		Level = InLevel;
-		AbilityHandle = FGameplayAbilitySpecHandle();
-	}
-	
-	FORCEINLINE FAbilityItem(const FAbilityItem& InVoxelItem, int32 InCount = -1)
-	{
-		ID = InVoxelItem.ID;
-		Count = InCount == -1 ? InVoxelItem.Count : InCount;
-		Level = InVoxelItem.Level;
-		AbilityHandle = InVoxelItem.AbilityHandle;
-	}
-
-	virtual ~FAbilityItem() override = default;
-
-	template<class T>
-	T& GetData(bool bEnsured = true) const
-	{
-		return static_cast<T&>(GetData(bEnsured));
-	}
-
-	UAbilityItemDataBase& GetData(bool bEnsured = true) const;
-	
-	EAbilityItemType GetType() const;
-
-	FORCEINLINE virtual bool IsValid() const override
-	{
-		return ID.IsValid();
-	}
-
-	FORCEINLINE virtual bool IsNull() const
-	{
-		return Count <= 0;
-	}
-
-	FORCEINLINE virtual bool IsEmpty() const
-	{
-		return *this == Empty;
-	}
-
-	FORCEINLINE bool EqualType(const FAbilityItem& InItem) const
-	{
-		return InItem.IsValid() && InItem.ID == ID && InItem.Level == Level;
-	}
-
-	FORCEINLINE friend bool operator==(const FAbilityItem& A, const FAbilityItem& B)
-	{
-		return (A.ID == B.ID) && (A.Count == B.Count) && (A.Level == B.Level);
-	}
-
-	FORCEINLINE friend bool operator!=(const FAbilityItem& A, const FAbilityItem& B)
-	{
-		return (A.ID != B.ID) || (A.Count != B.Count) || (A.Level != B.Level);
-	}
-
-	FORCEINLINE friend FAbilityItem operator+(FAbilityItem& A, FAbilityItem& B)
-	{
-		if(A.EqualType(B))
-		{
-			A.Count += B.Count;
-		}
-		return A;
-	}
-
-	FORCEINLINE friend FAbilityItem operator-(FAbilityItem& A, FAbilityItem& B)
-	{
-		if(A.EqualType(B))
-		{
-			A.Count -= B.Count;
-		}
-		return A;
-	}
-
-	FORCEINLINE friend FAbilityItem& operator+=(FAbilityItem& A, FAbilityItem& B)
-	{
-		if(A.EqualType(B))
-		{
-			A.Count += B.Count;
-		}
-		return A;
-	}
-
-	FORCEINLINE friend FAbilityItem& operator-=(FAbilityItem& A, FAbilityItem& B)
-	{
-		if(A.EqualType(B))
-		{
-			A.Count -= B.Count;
-		}
-		return A;
-	}
-};
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FAbilityItems
-{
-	GENERATED_BODY()
-
-public:
-	FAbilityItems()
-	{
-		Items = TArray<FAbilityItem>();
-	}
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (TitleProperty = "ID"))
-	TArray<FAbilityItem> Items;
-};
-
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryRefresh);
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotSelected, UAbilityInventorySlot*, InInventorySlot);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventorySlotSelected, UAbilityInventorySlotBase*, InInventorySlot);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventorySlotRefresh);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventorySlotActivated);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventorySlotCanceled);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventorySlottDeactived);
 
 UENUM(BlueprintType)
 enum class ESlotSplitType : uint8
@@ -654,18 +777,18 @@ enum class ESlotSplitType : uint8
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FItemQueryInfo
+struct WHFRAMEWORK_API FItemQueryData
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FItemQueryInfo()
+	FORCEINLINE FItemQueryData()
 	{
 		Item = FAbilityItem();
-		Slots = TArray<UAbilityInventorySlot*>();
+		Slots = TArray<UAbilityInventorySlotBase*>();
 	}
 
-	FORCEINLINE FItemQueryInfo(FAbilityItem InItem, TArray<UAbilityInventorySlot*> InSlots)
+	FORCEINLINE FItemQueryData(FAbilityItem InItem, TArray<UAbilityInventorySlotBase*> InSlots)
 	{
 		Item = InItem;
 		Slots = InSlots;
@@ -675,7 +798,7 @@ public:
 	FAbilityItem Item;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	TArray<UAbilityInventorySlot*> Slots;
+	TArray<UAbilityInventorySlotBase*> Slots;
 
 public:
 	FORCEINLINE bool IsValid() const
@@ -683,7 +806,7 @@ public:
 		return Item.Count > 0;
 	}
 
-	FORCEINLINE friend FItemQueryInfo operator+(FItemQueryInfo& A, FItemQueryInfo& B)
+	FORCEINLINE friend FItemQueryData operator+(FItemQueryData& A, FItemQueryData& B)
 	{
 		A.Item += B.Item;
 		for(auto Iter : B.Slots)
@@ -693,7 +816,7 @@ public:
 		return A;
 	}
 
-	FORCEINLINE friend FItemQueryInfo operator+=(FItemQueryInfo& A, FItemQueryInfo B)
+	FORCEINLINE friend FItemQueryData operator+=(FItemQueryData& A, FItemQueryData B)
 	{
 		A.Item = B.Item;
 		for(auto Iter : B.Slots)
@@ -712,29 +835,110 @@ struct WHFRAMEWORK_API FInventorySlots
 public:
 	FORCEINLINE FInventorySlots()
 	{
-		Slots = TArray<UAbilityInventorySlot*>();
+		Slots = TArray<UAbilityInventorySlotBase*>();
 	}
 	
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
-	TArray<UAbilityInventorySlot*> Slots;
+	TArray<UAbilityInventorySlotBase*> Slots;
 
 public:
 	FAbilityItems GetItems();
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FWidgetInventorySlots
+struct WHFRAMEWORK_API FWidgetInventorySlotData
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FWidgetInventorySlots()
+	FORCEINLINE FWidgetInventorySlotData()
 	{
-		Slots = TArray<UWidgetInventorySlotBase*>();
+		Class = nullptr;
+		Slots = TArray<UWidgetAbilityInventorySlotBase*>();
 	}
 
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
-	TArray<UWidgetInventorySlotBase*> Slots;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TSubclassOf<UWidgetAbilityInventorySlotBase> Class;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	TArray<UWidgetAbilityInventorySlotBase*> Slots;
+};
+
+UENUM(BlueprintType)
+enum class EAbilityItemFillType : uint8
+{
+	Fixed,
+	Random,
+	Rate
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FAbilityItemFillItem
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FAbilityItemFillItem()
+	{
+		Rate = 0.f;
+		Num = 0;
+	}
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	float Rate;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	int32 Num;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FAbilityItemFillRule
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FAbilityItemFillRule()
+	{
+		Rate = 0.f;
+		Type = EAbilityItemFillType::Fixed;
+		Num = 0;
+		MinNum = 0;
+		MaxNum = 0;
+		Items = TArray<FAbilityItemFillItem>();
+	}
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	float Rate;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	EAbilityItemFillType Type;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, meta = (EditConditionHides, EditCondition = "Type==EAbilityItemFillType::Fixed"))
+	int32 Num;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, meta = (EditConditionHides, EditCondition = "Type==EAbilityItemFillType::Random"))
+	int32 MinNum;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, meta = (EditConditionHides, EditCondition = "Type==EAbilityItemFillType::Random"))
+	int32 MaxNum;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, meta = (EditConditionHides, EditCondition = "Type==EAbilityItemFillType::Rate"))
+	TArray<FAbilityItemFillItem> Items;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FAbilityItemFillRules
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FAbilityItemFillRules()
+	{
+		Rules = TMap<EAbilityItemRarity, FAbilityItemFillRule>();
+	}
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	TMap<EAbilityItemRarity, FAbilityItemFillRule> Rules;
 };
 
 USTRUCT(BlueprintType)
@@ -745,15 +949,24 @@ struct WHFRAMEWORK_API FInventorySaveData : public FSaveData
 public:
 	FORCEINLINE FInventorySaveData()
 	{
+		InventoryClass = nullptr;
 		SplitItems = TMap<ESlotSplitType, FAbilityItems>();
-		SelectedIndex = -1;
+		SelectedIndexs = TMap<ESlotSplitType, int32>();
+		FillRules = TMap<EAbilityItemType, FAbilityItemFillRules>();
 	}
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<UAbilityInventoryBase> InventoryClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TMap<ESlotSplitType, FAbilityItems> SplitItems;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TMap<EAbilityItemType, FAbilityItemFillRules> FillRules;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	int32 SelectedIndex;
+	TMap<ESlotSplitType, int32> SelectedIndexs;
 
 public:
 	virtual bool IsValid() const override
@@ -763,35 +976,17 @@ public:
 		return SplitItems.Num() > 0;
 	}
 	
-	virtual void AddItem(const FAbilityItem& InItem, const TArray<ESlotSplitType>& InSplitTypes)
-	{
-		for(const auto& Iter : InSplitTypes)
-		{
-			if(SplitItems.Contains(Iter))
-			{
-				FAbilityItems& tmpItems = SplitItems[Iter];
-				for(int32 i = 0; i < tmpItems.Items.Num(); i++)
-				{
-					if(!tmpItems.Items[i].IsValid())
-					{
-						tmpItems.Items[i] = InItem;
-						return;
-					}
-				}
-			}
-		}
-	}
+	virtual void FillItems(int32 InLevel, FRandomStream InRandomStream = FRandomStream());
 
-	virtual void ClearAllItem()
-	{
-		for(auto& Iter1 : SplitItems)
-		{
-			for(auto& Iter2 : Iter1.Value.Items)
-			{
-				Iter2 = FAbilityItem::Empty;
-			}
-		}
-	}
+	virtual void CopyItems(const FInventorySaveData& InSaveData);
+
+	virtual void AddItem(FAbilityItem InItem, bool bUnique = false);
+
+	virtual void RemoveItem(FAbilityItem InItem);
+
+	virtual void ClearItem(FAbilityItem InItem);
+
+	virtual void ClearItems();
 };
 
 /**
@@ -804,28 +999,43 @@ enum class EItemQueryType : uint8
 	Get,
 	// 添加
 	Add,
+	// 分割
+	Split,
 	// 移除
-	Remove
+	Remove,
+	// 匹配
+	Match
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FRaceItem : public FAbilityItem
+struct WHFRAMEWORK_API FRaceItem
 {
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(EditConditionHides, EditCondition = "Count == 0"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FPrimaryAssetId ID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 MinCount;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(EditConditionHides, EditCondition = "Count == 0"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 MaxCount;
 
 	FORCEINLINE FRaceItem()
 	{
-		MinCount = 0;
-		MaxCount = 0;
-		Level = 1;
+		ID = FPrimaryAssetId();
+		MinCount = 1;
+		MaxCount = 1;
 	}
+
+	template<class T>
+	T& GetData() const
+	{
+		return static_cast<T&>(GetData());
+	}
+
+	UAbilityItemDataBase& GetData() const;
 };
 
 /**
@@ -862,12 +1072,20 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector NoiseScale;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	int32 MinLevel;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	int32 MaxLevel;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FRaceItem> Items;
 
 	FORCEINLINE FRaceData()
 	{
 		NoiseScale = FVector::OneVector;
+		MinLevel = 1;
+		MaxLevel = 1;
 		Items = TArray<FRaceItem>();
 	}
 };
@@ -915,40 +1133,45 @@ struct WHFRAMEWORK_API FPickUpSaveData : public FSaveData
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	FAbilityItem Item;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	FVector Location;
-	
 	FORCEINLINE FPickUpSaveData()
 	{
 		Item = FAbilityItem::Empty;
 		Location = FVector::ZeroVector;
 	}
+
+public:
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FAbilityItem Item;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FVector Location;
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FActorSaveData : public FSaveData
+struct WHFRAMEWORK_API FActorSaveData : public FSceneActorSaveData
 {
 	GENERATED_BODY()
 
 public:
 	FORCEINLINE FActorSaveData()
 	{
-		ActorID = FGuid();
 		AssetID = FPrimaryAssetId();
 		Name = NAME_None;
 		Level = 1;
 		InventoryData = FInventorySaveData();
-		SpawnLocation = FVector::ZeroVector;
-		SpawnRotation = FRotator::ZeroRotator;
+		BirthTransform = FTransform::Identity;
+	}
+
+	FORCEINLINE FActorSaveData(const FSceneActorSaveData& InSceneActorSaveData) : FSceneActorSaveData(InSceneActorSaveData)
+	{
+		AssetID = FPrimaryAssetId();
+		Name = NAME_None;
+		Level = 1;
+		InventoryData = FInventorySaveData();
+		BirthTransform = FTransform::Identity;
 	}
 
 public:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	FGuid ActorID;
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FPrimaryAssetId AssetID;
 
@@ -957,15 +1180,12 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Level;
-		
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	
+	UPROPERTY(BlueprintReadWrite)
 	FInventorySaveData InventoryData;
 
 	UPROPERTY()
-	FVector SpawnLocation;
-	
-	UPROPERTY()
-	FRotator SpawnRotation;
+	FTransform BirthTransform;
 
 public:
 	virtual void MakeSaved() override
@@ -975,13 +1195,15 @@ public:
 		InventoryData.MakeSaved();
 	}
 
+	virtual void InitInventoryData(FRandomStream InRandomStream = FRandomStream());
+
 	template<class T>
-	T& GetItemData() const
+	T& GetData() const
 	{
-		return static_cast<T&>(GetItemData());
+		return static_cast<T&>(GetData());
 	}
 
-	UAbilityItemDataBase& GetItemData() const;
+	UAbilityActorDataBase& GetData() const;
 };
 
 USTRUCT(BlueprintType)
@@ -993,16 +1215,21 @@ public:
 	FORCEINLINE FVitalitySaveData()
 	{
 		RaceID = NAME_None;
+		ActionAbilities = TMap<FGameplayTag, FVitalityActionAbilityData>();
 	}
 
 	FORCEINLINE FVitalitySaveData(const FActorSaveData& InActorSaveData) : FActorSaveData(InActorSaveData)
 	{
 		RaceID = NAME_None;
+		ActionAbilities = TMap<FGameplayTag, FVitalityActionAbilityData>();
 	}
 
 public:
 	UPROPERTY(BlueprintReadWrite)
 	FName RaceID;
+
+	UPROPERTY()
+	TMap<FGameplayTag, FVitalityActionAbilityData> ActionAbilities;
 };
 
 USTRUCT(BlueprintType)
@@ -1013,10 +1240,12 @@ struct WHFRAMEWORK_API FPawnSaveData : public FVitalitySaveData
 public:
 	FORCEINLINE FPawnSaveData()
 	{
+		
 	}
 
 	FORCEINLINE FPawnSaveData(const FVitalitySaveData& InVitalitySaveData) : FVitalitySaveData(InVitalitySaveData)
 	{
+		
 	}
 };
 
@@ -1028,20 +1257,9 @@ struct WHFRAMEWORK_API FCharacterSaveData : public FPawnSaveData
 public:
 	FORCEINLINE FCharacterSaveData()
 	{
-		CameraRotation = FRotator::ZeroRotator;
-		CameraDistance = -1.f;
 	}
 
 	FORCEINLINE FCharacterSaveData(const FPawnSaveData& InPawnSaveData) : FPawnSaveData(InPawnSaveData)
 	{
-		CameraRotation = FRotator(-1.f);
-		CameraDistance = -1.f;
 	}
-
-public:
-	UPROPERTY()
-	FRotator CameraRotation;
-
-	UPROPERTY()
-	float CameraDistance;
 };

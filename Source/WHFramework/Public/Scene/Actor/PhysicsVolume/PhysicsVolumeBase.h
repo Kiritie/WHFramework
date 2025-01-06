@@ -7,12 +7,11 @@
 #include "GameFramework/PhysicsVolume.h"
 #include "Common/Base/WHActor.h"
 #include "ObjectPool/ObjectPoolInterface.h"
-#include "Scene/Actor/SceneActorInterface.h"
 
 #include "PhysicsVolumeBase.generated.h"
 
 UCLASS()
-class WHFRAMEWORK_API APhysicsVolumeBase : public APhysicsVolume, public ISceneActorInterface, public IObjectPoolInterface, public IWHActorInterface
+class WHFRAMEWORK_API APhysicsVolumeBase : public APhysicsVolume, public IObjectPoolInterface, public IWHActorInterface
 {
 	GENERATED_BODY()
 	
@@ -31,7 +30,22 @@ public:
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 protected:
-	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "WHActor")
+	bool bInitialized;
+	
+protected:
+	virtual bool IsInitialized_Implementation() const override { return bInitialized; }
+	
+	virtual bool IsUseDefaultLifecycle_Implementation() const override { return true; }
+
+	//////////////////////////////////////////////////////////////////////////
+	/// ObjectPool
+public:
+	virtual int32 GetLimit_Implementation() const override { return -1; }
+
+	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
+		
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 	//////////////////////////////////////////////////////////////////////////
     /// Physics Volume
@@ -51,10 +65,4 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 
 	virtual void Initialize(const FPhysicsVolumeData& InPhysicsVolumeData);
-
-	virtual int32 GetLimit_Implementation() const override { return -1; }
-
-	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
-
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
 };

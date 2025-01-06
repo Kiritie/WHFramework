@@ -14,9 +14,6 @@ public:
 	UVoxelData();
 
 public:
-	virtual void ResetData_Implementation() override;
-
-public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	EVoxelType VoxelType;
 
@@ -27,7 +24,7 @@ public:
 	TSubclassOf<AVoxelAuxiliary> AuxiliaryClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	EVoxelTransparency Transparency;
+	EVoxelNature Nature;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bMainPart;
@@ -41,6 +38,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "bMainPart == false"))
 	UVoxelData* MainData;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "bMainPart == true"))
+	UVoxelData* GatherData;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TMap<EVoxelSoundType, USoundBase*> Sounds;
 
@@ -48,20 +48,24 @@ public:
 	TArray<FVoxelMeshData> MeshDatas;
 
 public:
+	bool IsEmpty() const;
+
+	bool IsUnknown() const;
+
+	bool IsMainPart() const;
+
+	bool IsCustom() const;
+
+public:
 	virtual bool HasPartData(FIndex InIndex) const;
 
 	virtual UVoxelData& GetPartData(FIndex InIndex);
+
+	virtual EVoxelTransparency GetTransparency() const;
 
 	virtual FVector GetRange(ERightAngle InAngle = ERightAngle::RA_0) const;
 
 	virtual USoundBase* GetSound(EVoxelSoundType InSoundType) const;
 
 	virtual const FVoxelMeshData& GetMeshData(const FVoxelItem& InVoxelItem) const;
-
-public:
-	bool IsEmpty() const;
-
-	bool IsUnknown() const;
-
-	bool IsCustom() const;
 };

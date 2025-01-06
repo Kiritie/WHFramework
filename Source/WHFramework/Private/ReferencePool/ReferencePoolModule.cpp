@@ -75,7 +75,11 @@ FString UReferencePoolModule::GetModuleDebugMessage()
 		DebugMessage.Appendf(TEXT("%s: %s\n"), *Iter.Key->GetName(), *Iter.Value->Get().GetName());
 	}
 	DebugMessage.RemoveFromEnd(TEXT("\n"));
-	return DebugMessage;
+	if(!DebugMessage.IsEmpty())
+	{
+		return DebugMessage;
+	}
+	return Super::GetModuleDebugMessage();
 }
 
 void UReferencePoolModule::ClearAllReference()

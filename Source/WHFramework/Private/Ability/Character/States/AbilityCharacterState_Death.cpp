@@ -4,11 +4,14 @@
 
 #include "AbilitySystemComponent.h"
 #include "Ability/Character/AbilityCharacterBase.h"
-#include "Components/CapsuleComponent.h"
+#include "Ability/Character/AbilityCharacterInventoryBase.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "AI/Base/AIControllerBase.h"
 #include "Common/Interaction/InteractionComponent.h"
+#include "Common/Looking/LookingComponent.h"
+#include "Event/EventModuleStatics.h"
+#include "Event/Handle/Ability/EventHandle_VitalityDead.h"
 
 UAbilityCharacterState_Death::UAbilityCharacterState_Death()
 {
@@ -23,9 +26,9 @@ void UAbilityCharacterState_Death::OnInitialize(UFSMComponent* InFSM, int32 InSt
 	Super::OnInitialize(InFSM, InStateIndex);
 }
 
-bool UAbilityCharacterState_Death::OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
+bool UAbilityCharacterState_Death::OnPreEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	return Super::OnEnterValidate(InLastState, InParams);
+	return Super::OnPreEnter(InLastState, InParams);
 }
 
 void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
@@ -36,10 +39,14 @@ void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastState, const 
 	{
 		Killer = InParams[0].GetPointerValue<IAbilityVitalityInterface>();
 	}
+	
+	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalityDead>(Cast<UObject>(this), { GetAgent(), Cast<UObject>(Killer) });
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Vitality_Dying);
+	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dying);
+
+	Character->GetInteractionComponent()->SetInteractable(false);
 
 	if(Character->GetController<AAIControllerBase>())
 	{
@@ -53,6 +60,9 @@ void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastState, const 
 
 	Character->SetExp(0.f);
 	Character->SetHealth(0.f);
+
+	Character->GetLooking()->TargetLookingOff();
+	Character->LimitToAnim();
 }
 
 void UAbilityCharacterState_Death::OnRefresh(float DeltaSeconds)
@@ -67,6 +77,13 @@ void UAbilityCharacterState_Death::OnRefresh(float DeltaSeconds)
 	}
 }
 
+bool UAbilityCharacterState_Death::OnPreLeave(UFiniteStateBase* InNextState)
+{
+	if(!Super::OnPreLeave(InNextState)) return false;
+
+	return InNextState && InNextState->IsA<UAbilityCharacterState_Spawn>();
+}
+
 void UAbilityCharacterState_Death::OnLeave(UFiniteStateBase* InNextState)
 {
 	Super::OnLeave(InNextState);
@@ -76,12 +93,15 @@ void UAbilityCharacterState_Death::OnLeave(UFiniteStateBase* InNextState)
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
-	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Vitality_Dying);
-	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Vitality_Dead);
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dying);
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dead);
 
-	Character->GetCharacterMovement()->SetActive(true);
-	Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	Character->GetInteractionComponent()->SetInteractable(true);
+	Character->StopAction(GameplayTags::Ability_Vitality_Action_Death);
+
+	if(Character->IsPlayer())
+	{
+		Character->Execute_SetActorVisible(Character, true);
+	}
 }
 
 void UAbilityCharacterState_Death::OnTermination()
@@ -96,16 +116,29 @@ void UAbilityCharacterState_Death::DeathStart()
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
 	Character->GetCharacterMovement()->SetActive(false);
-	Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	Character->GetInteractionComponent()->SetInteractable(false);
+	Character->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	if(!Character->DoAction(GameplayTags::Ability_Vitality_Action_Death))
+	{
+		DeathEnd();
+	}
 }
 
 void UAbilityCharacterState_Death::DeathEnd()
 {
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 	
-	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::StateTag_Vitality_Dying);
-	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::StateTag_Vitality_Dead);
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dying);
+	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dead);
 
-	UObjectPoolModuleStatics::DespawnObject(Character);
+	Character->Inventory->DiscardItems();
+
+	if(!Character->IsPlayer())
+	{
+		UObjectPoolModuleStatics::DespawnObject(Character);
+	}
+	else
+	{
+		Character->Execute_SetActorVisible(Character, false);
+	}
 }

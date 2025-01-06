@@ -96,9 +96,12 @@ void AMainModule::OnRefresh_Implementation(float DeltaSeconds)
 
 	for(int32 i = 0; i < Modules.Num(); i++)
 	{
-		if(Modules[i] && Modules[i]->GetModuleState() == EModuleState::Running)
+		if(Modules[i])
 		{
-			Modules[i]->OnRefresh(DeltaSeconds, false);
+			if(IsInEditor() || Modules[i]->GetModuleState() == EModuleState::Running)
+			{
+				Modules[i]->OnRefresh(DeltaSeconds, IsInEditor());
+			}
 		}
 	}
 }
@@ -135,17 +138,20 @@ void AMainModule::OnTermination_Implementation(EPhase InPhase)
 	}
 }
 
+void AMainModule::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+
+	Execute_OnTermination(this, EPhase::Primary);
+	Execute_OnTermination(this, EPhase::Lesser);
+	Execute_OnTermination(this, EPhase::Final);
+}
+
 void AMainModule::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	for(int32 i = 0; i < Modules.Num(); i++)
-	{
-		if(Modules[i])
-		{
-			Modules[i]->OnRefresh(DeltaSeconds, true);
-		}
-	}
+	Execute_OnRefresh(this, DeltaSeconds);
 }
 
 ETickableTickType AMainModule::GetTickableTickType() const
@@ -154,7 +160,7 @@ ETickableTickType AMainModule::GetTickableTickType() const
 #if WITH_EDITOR
 		IsTickable() ? ETickableTickType::Conditional : 
 #endif // WITH_EDITOR
-		ETickableTickType::Never;
+		ETickableTickType::Always;
 }
 
 TStatId AMainModule::GetStatId() const
@@ -241,7 +247,7 @@ void AMainModule::UpdateModuleListItem(TArray<TSharedPtr<FModuleListItem>>& OutM
 	}
 }
 
-bool AMainModule::CanAddModule(TSubclassOf<UModuleBase> InModuleClass)
+bool AMainModule::CanAddModule(TSubclassOf<UModuleBase> InModuleClass) const
 {
 	return !ModuleMap.Contains(InModuleClass->GetDefaultObject<UModuleBase>()->ModuleName);
 }

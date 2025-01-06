@@ -12,7 +12,10 @@
 UCLASS(abstract, MinimalAPI)
 class UBlueprintFactoryBase : public UAssetFactoryBase
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UBlueprintFactoryBase(const FObjectInitializer& ObjectInitializer);
 
 public:
 	//~ Begin UFactory Interface

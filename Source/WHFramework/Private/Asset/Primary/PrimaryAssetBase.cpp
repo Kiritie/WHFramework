@@ -5,7 +5,11 @@ UPrimaryAssetBase::UPrimaryAssetBase()
 	
 }
 
-void UPrimaryAssetBase::ResetData_Implementation()
+void UPrimaryAssetBase::OnInitialize_Implementation()
+{
+}
+
+void UPrimaryAssetBase::OnReset_Implementation()
 {
 }
 
@@ -17,9 +21,4 @@ bool UPrimaryAssetBase::IsValid() const
 FPrimaryAssetId UPrimaryAssetBase::GetPrimaryAssetId() const
 {
 	return FPrimaryAssetId(Type, GetFName());
-}
-
-bool UPrimaryAssetBase::EqualID(const FPrimaryAssetId& InAssetID) const
-{
-	return GetPrimaryAssetId() == InAssetID;
 }

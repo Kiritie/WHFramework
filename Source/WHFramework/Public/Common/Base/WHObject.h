@@ -17,8 +17,10 @@ class WHFRAMEWORK_API UWHObject : public UObject, public IObjectPoolInterface
 public:
 	UWHObject();
 
+	UWHObject(const FObjectInitializer& ObjectInitializer);
+
 	//////////////////////////////////////////////////////////////////////////
-	/// Object
+	/// ObjectPool
 public:
 	virtual int32 GetLimit_Implementation() const override { return -1; }
 

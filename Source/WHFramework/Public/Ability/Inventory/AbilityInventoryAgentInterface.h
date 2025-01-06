@@ -26,13 +26,15 @@ class WHFRAMEWORK_API IAbilityInventoryAgentInterface
 public:
 	virtual void OnAdditionItem(const FAbilityItem& InItem) = 0;
 	
+	virtual void OnRemoveItem(const FAbilityItem& InItem) = 0;
+				
+	virtual void OnPreChangeItem(const FAbilityItem& InOldItem) = 0;
+
+	virtual void OnChangeItem(const FAbilityItem& InNewItem) = 0;
+
 	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) = 0;
-		
-	virtual void OnCancelItem(const FAbilityItem& InItem, bool bPassive) = 0;
-
-	virtual void OnAssembleItem(const FAbilityItem& InItem) = 0;
-
-	virtual void OnDischargeItem(const FAbilityItem& InItem) = 0;
+	
+	virtual void OnDeactiveItem(const FAbilityItem& InItem, bool bPassive) = 0;
 
 	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) = 0;
 

@@ -21,9 +21,15 @@ void FMainManager::OnInitialize()
 {
 	FManagerBase::OnInitialize();
 
-#if !IS_PROGRAM
+#if WITH_ENGINE
 	FCoreUObjectDelegates::PostLoadMapWithWorld.AddRaw(this, &FMainManager::OnWorldAdded);
 #endif
+
+	FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([this](float DeltaTime)
+	{
+		OnRefresh(DeltaTime);
+		return true;
+	}));
 }
 
 void FMainManager::OnPreparatory()
@@ -51,6 +57,7 @@ void FMainManager::OnTermination()
 	FManagerBase::OnTermination();
 }
 
+#if WITH_ENGINE
 void FMainManager::OnWorldAdded(UWorld* InWorld)
 {
 	if (InWorld && InWorld->WorldType != EWorldType::Editor)
@@ -62,13 +69,4 @@ void FMainManager::OnWorldAdded(UWorld* InWorld)
 		OnPreparatory();
 	}
 }
-
-void FMainManager::Tick(float DeltaSeconds)
-{
-	OnRefresh(DeltaSeconds);
-}
-
-TStatId FMainManager::GetStatId() const
-{
-	RETURN_QUICK_DECLARE_CYCLE_STAT(AMainModule, STATGROUP_Tickables);
-}
+#endif

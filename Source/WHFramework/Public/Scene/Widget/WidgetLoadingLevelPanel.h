@@ -24,14 +24,17 @@ public:
 	virtual void OnRefresh() override;
 
 protected:
-	UPROPERTY(BlueprintReadOnly)
-	FName LoadingLevelPath;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
 	class UProgressBar* PBar_Progress;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components", meta = (BindWidget, OptionalWidget = false))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
 	class UTextBlock* Txt_Progress;
+
+	UPROPERTY(BlueprintReadOnly)
+	FName LevelPath;
+
+	UPROPERTY(BlueprintReadOnly)
+	bool bUnloading;
 
 private:
 	float LoadProgress;
@@ -40,7 +43,7 @@ private:
 	
 public:
 	UFUNCTION(BlueprintPure)
-	float GetLoadProgress(bool bSmoothness = false) const { return bSmoothness ? CurrentProgress : LoadProgress; }
+	float GetLoadProgress(bool bSmoothness = false) const;
 
 	UFUNCTION(BlueprintCallable)
 	void SetLoadProgress(float InLoadProgress, bool bSmoothness = false);

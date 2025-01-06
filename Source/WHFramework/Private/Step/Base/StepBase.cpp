@@ -9,6 +9,7 @@
 #include "Event/Handle/Step/EventHandle_StepEntered.h"
 #include "Event/Handle/Step/EventHandle_StepExecuted.h"
 #include "Event/Handle/Step/EventHandle_StepLeaved.h"
+#include "Event/Handle/Step/EventHandle_StepStateChanged.h"
 #include "Step/StepModule.h"
 #include "Step/StepModuleStatics.h"
 
@@ -72,6 +73,8 @@ void UStepBase::OnStateChanged(EStepState InStepState)
 {
 	OnStepStateChanged.Broadcast(InStepState);
 	K2_OnStateChanged(InStepState);
+
+	UEventModuleStatics::BroadcastEvent(UEventHandle_StepStateChanged::StaticClass(), this, {this});
 }
 
 void UStepBase::OnInitialize()
@@ -589,7 +592,6 @@ bool UStepBase::GenerateListItem(TSharedPtr<FStepListItem> OutStepListItem, cons
 			if(SubSteps[i]->GenerateListItem(Item, InFilterText))
 			{
 				OutStepListItem->SubListItems.Add(Item);
-				return true;
 			}
 		}
 	}
@@ -689,15 +691,15 @@ void UStepBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
 		{
 			if(bFirstStep)
 			{
-				if(GetStepAsset()->GetFirstStep())
+				if(GetStepAsset()->FirstStep)
 				{
-					GetStepAsset()->GetFirstStep()->bFirstStep = false;
+					GetStepAsset()->FirstStep->bFirstStep = false;
 				}
-				GetStepAsset()->SetFirstStep(this);
+				GetStepAsset()->FirstStep = this;
 			}
-			else if(GetStepAsset()->GetFirstStep() == this)
+			else if(GetStepAsset()->FirstStep == this)
 			{
-				GetStepAsset()->SetFirstStep(nullptr);
+				GetStepAsset()->FirstStep = nullptr;
 			}
 		}
 	}

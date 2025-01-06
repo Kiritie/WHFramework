@@ -10,6 +10,9 @@
 
 #include "SceneModule.generated.h"
 
+class UEventHandle_StopLevelSequence;
+class UEventHandle_AsyncUnloadLevels;
+class UEventHandle_AsyncLoadLevels;
 class UEventHandle_PlayLevelSequence;
 class UEventHandle_SetActorVisible;
 class UEventHandle_SetDataLayerOwnerPlayer;
@@ -70,6 +73,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// World
 protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "bModuleAutoSave == true"))
+	bool bSaveActorDatas;
+
 	UPROPERTY(EditAnywhere, Category = "World|Coordinate")
 	float SeaLevel;
 	
@@ -163,18 +169,33 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "DataLayer")
 	TMap<UDataLayerAsset*, int32> DataLayerPlayerMappings;
 	
+	UPROPERTY(EditAnywhere, Category = "DataLayer")
+	TMap<FName, int32> LevelPlayerMappings;
+	
 protected:
+	UFUNCTION()
+	void OnAsyncLoadLevels(UObject* InSender, UEventHandle_AsyncLoadLevels* InEventHandle);
+
+	UFUNCTION()
+	void OnAsyncUnloadLevels(UObject* InSender, UEventHandle_AsyncUnloadLevels* InEventHandle);
+
 	UFUNCTION()
 	void OnSetActorVisible(UObject* InSender, UEventHandle_SetActorVisible* InEventHandle);
 	
 	UFUNCTION()
 	void OnPlayLevelSequence(UObject* InSender, UEventHandle_PlayLevelSequence* InEventHandle);
-	
+		
+	UFUNCTION()
+	void OnStopLevelSequence(UObject* InSender, UEventHandle_StopLevelSequence* InEventHandle);
+
 	UFUNCTION()
 	void OnSetDataLayerRuntimeState(UObject* InSender, UEventHandle_SetDataLayerRuntimeState* InEventHandle);
 	
 	UFUNCTION()
 	void OnSetDataLayerOwnerPlayer(UObject* InSender, UEventHandle_SetDataLayerOwnerPlayer* InEventHandle);
+	
+	UFUNCTION()
+	void OnSetLevelOwnerPlayer(UObject* InSender, UEventHandle_SetLevelOwnerPlayer* InEventHandle);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Traces
@@ -184,16 +205,16 @@ protected:
 
 public:
 	UFUNCTION(BlueprintPure)
-	virtual bool HasTraceMapping(const FName& InName, bool bEnsured = true) const;
+	virtual bool HasTraceMapping(const FName InName, bool bEnsured = true) const;
 
 	UFUNCTION(BlueprintPure)
-	virtual FTraceMapping GetTraceMapping(const FName& InName, bool bEnsured = true) const;
+	virtual FTraceMapping GetTraceMapping(const FName InName, bool bEnsured = true) const;
 
 	UFUNCTION(BlueprintCallable)
-	virtual void AddTraceMapping(const FName& InName, ECollisionChannel InTraceChannel);
+	virtual void AddTraceMapping(const FName InName, ECollisionChannel InTraceChannel);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void RemoveTraceMapping(const FName& InName);
+	virtual void RemoveTraceMapping(const FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
     /// Scene Actor
@@ -231,16 +252,16 @@ protected:
 
 public:
 	UFUNCTION(BlueprintPure)
-	bool HasTargetPointByName(FName InName, bool bEnsured = true) const;
+	bool HasTargetPointByName(const FName InName, bool bEnsured = true) const;
 
 	UFUNCTION(BlueprintPure)
-	ATargetPoint* GetTargetPointByName(FName InName, bool bEnsured = true) const;
+	ATargetPoint* GetTargetPointByName(const FName InName, bool bEnsured = true) const;
 
 	UFUNCTION(BlueprintCallable)
-	void AddTargetPointByName(FName InName, ATargetPoint* InPoint);
+	void AddTargetPointByName(const FName InName, ATargetPoint* InPoint);
 
 	UFUNCTION(BlueprintCallable)
-	void RemoveTargetPointByName(FName InName);
+	void RemoveTargetPointByName(const FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Scene Point
@@ -250,16 +271,16 @@ protected:
 
 public:
 	UFUNCTION(BlueprintPure)
-	bool HasScenePointByName(FName InName, bool bEnsured = true) const;
+	bool HasScenePointByName(const FName InName, bool bEnsured = true) const;
 
 	UFUNCTION(BlueprintPure)
-	USceneComponent* GetScenePointByName(FName InName, bool bEnsured = true) const;
+	USceneComponent* GetScenePointByName(const FName InName, bool bEnsured = true) const;
 
 	UFUNCTION(BlueprintCallable)
-	void AddScenePointByName(FName InName, USceneComponent* InSceneComp);
+	void AddScenePointByName(const FName InName, USceneComponent* InSceneComp);
 
 	UFUNCTION(BlueprintCallable)
-	void RemoveScenePointByName(FName InName);
+	void RemoveScenePointByName(const FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
     /// Physics Volume
@@ -275,25 +296,25 @@ public:
 	bool HasPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured = true) const;
 	
 	UFUNCTION(BlueprintPure)
-	bool HasPhysicsVolumeByName(FName InName, bool bEnsured = true) const;
+	bool HasPhysicsVolumeByName(const FName InName, bool bEnsured = true) const;
 	
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass))
 	APhysicsVolumeBase* GetPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured = true) const;
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = InClass))
-	APhysicsVolumeBase* GetPhysicsVolumeByName(FName InName, TSubclassOf<APhysicsVolumeBase> InClass = nullptr, bool bEnsured = true) const;
+	APhysicsVolumeBase* GetPhysicsVolumeByName(const FName InName, TSubclassOf<APhysicsVolumeBase> InClass = nullptr, bool bEnsured = true) const;
 
 	UFUNCTION(BlueprintCallable)
 	void AddPhysicsVolume(APhysicsVolumeBase* InPhysicsVolume);
 	
 	UFUNCTION(BlueprintCallable)
-	void AddPhysicsVolumeByName(FName InName, APhysicsVolumeBase* InPhysicsVolume);
+	void AddPhysicsVolumeByName(const FName InName, APhysicsVolumeBase* InPhysicsVolume);
 
 	UFUNCTION(BlueprintCallable)
 	void RemovePhysicsVolume(APhysicsVolumeBase* InPhysicsVolume);
 
 	UFUNCTION(BlueprintCallable)
-	void RemovePhysicsVolumeByName(FName InName);
+	void RemovePhysicsVolumeByName(const FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
     /// World Text
@@ -305,13 +326,13 @@ public:
 	/// Outline
 protected:
 	UPROPERTY(EditAnywhere, Category = "Outline")
-	class UMaterialInterface* OutlineMat;
+	UMaterialInterface* OutlineMat;
 
 	UPROPERTY(EditAnywhere, Category = "Outline")
 	FLinearColor OutlineColor;
 
 	UPROPERTY(Transient)
-	class UMaterialInstanceDynamic* OutlineMatInst;
+	UMaterialInstanceDynamic* OutlineMatInst;
 
 public:
 	UFUNCTION(BlueprintPure)
@@ -323,26 +344,51 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Level
 protected:
-	UPROPERTY(VisibleAnywhere, Transient, Category = "Level")
-	TMap<FName, TSoftObjectPtr<UWorld>> LoadedLevels;
-	
+	UPROPERTY(VisibleAnywhere, Category = "Level")
+	TArray<FAsyncLoadLevelTask> AsyncLoadLevelQueue;
+
 public:
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnAsyncLoadLevelFinished"))
-	void AsyncLoadLevel(FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnAsyncLoadLevelFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnLoadFinished"))
+	void AsyncLoadLevel(const FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnLoadFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
 
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnAsyncUnloadLevelFinished"))
-	void AsyncUnloadLevel(FName InLevelPath, const FOnAsyncUnloadLevelFinished& InOnAsyncUnloadLevelFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnLoadFinished"))
+	void AsyncLoadLevelByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr, const FOnAsyncLoadLevelFinished& InOnLoadFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
+
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnUnloadFinished"))
+	void AsyncUnloadLevel(const FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnUnloadFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
+
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnUnloadFinished"))
+	void AsyncUnloadLevelByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr, const FOnAsyncLoadLevelFinished& InOnUnloadFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
 
 	UFUNCTION(BlueprintPure)
-	float GetAsyncLoadLevelProgress(FName InLevelPath) const;
+	float GetAsyncLoadLevelProgress(const FName InLevelPath) const;
 
 	UFUNCTION(BlueprintPure)
-	float GetAsyncUnloadLevelProgress(FName InLevelPath) const;
+	float GetAsyncLoadLevelProgressByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr) const;
+
+	UFUNCTION(BlueprintPure)
+	float GetAsyncUnloadLevelProgress(const FName InLevelPath) const;
+
+	UFUNCTION(BlueprintPure)
+	float GetAsyncUnloadLevelProgressByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr) const;
 
 protected:
-	UFUNCTION()
-	void OnAsyncLoadLevelFinished(FName InLevelPath, const FOnAsyncLoadLevelFinished InOnAsyncLoadLevelFinished);
+	UFUNCTION(BlueprintCallable)
+	void AsyncLoadLevelInternal(FAsyncLoadLevelTask& InTask);
+
+	UFUNCTION(BlueprintCallable)
+	void AsyncUnloadLevelInternal(FAsyncLoadLevelTask& InTask);
 
 	UFUNCTION()
-	void OnAsyncUnloadLevelFinished(FName InLevelPath, const FOnAsyncUnloadLevelFinished InOnAsyncUnloadLevelFinished);
+	void OnAsyncLoadLevelFinished(FAsyncLoadLevelTask InTask);
+
+	UFUNCTION()
+	void OnAsyncUnloadLevelFinished(FAsyncLoadLevelTask InTask);
+
+private:
+	UFUNCTION()
+	void OnHandleAsyncLoadLevelFinish();
+	
+	UFUNCTION()
+	void OnHandleAsyncUnloadLevelFinish();
 };

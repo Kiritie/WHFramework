@@ -29,7 +29,7 @@ class FStepEditorCommands : public TCommands<FStepEditorCommands>
 {	  
 public:
 	FStepEditorCommands()
-		: TCommands<FStepEditorCommands>(TEXT("StepEditor"),
+		: TCommands<FStepEditorCommands>(FName("StepEditor"),
 			NSLOCTEXT("StepEditor", "Step Editor", "Step Editor Commands"),
 			NAME_None, FWHFrameworkEditorStyle::GetStyleSetName())
 	{}

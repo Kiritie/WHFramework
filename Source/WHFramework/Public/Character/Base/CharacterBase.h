@@ -12,6 +12,7 @@
 #include "Gameplay/WHPlayerInterface.h"
 #include "Scene/Actor/SceneActorInterface.h"
 #include "ObjectPool/ObjectPoolInterface.h"
+#include "SaveGame/Base/SaveDataAgentInterface.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 
 #include "CharacterBase.generated.h"
@@ -23,12 +24,21 @@ class UAIPerceptionStimuliSourceComponent;
  * 
  */
 UCLASS(meta=(ShortTooltip="A character is a type of Pawn that includes the ability to walk around."))
-class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public IWHPlayerInterface, public IAIAgentInterface, public IVoxelAgentInterface, public IObjectPoolInterface, public ISceneActorInterface, public IPrimaryEntityInterface, public IWHActorInterface, public ILookingAgentInterface
+class WHFRAMEWORK_API ACharacterBase : public ACharacter, public ICharacterInterface, public IWHPlayerInterface, public IAIAgentInterface, public IVoxelAgentInterface, public IObjectPoolInterface, public ISaveDataAgentInterface, public IPrimaryEntityInterface, public IWHActorInterface, public ILookingAgentInterface
 {
 	GENERATED_BODY()
 	
 public:
-	ACharacterBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+	ACharacterBase(const FObjectInitializer& ObjectInitializer);
+	
+	//////////////////////////////////////////////////////////////////////////
+	/// ObjectPool
+public:
+	virtual int32 GetLimit_Implementation() const override { return -1; }
+
+	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
+		
+	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// WHActor
@@ -42,8 +52,31 @@ public:
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 protected:
-	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "WHActor")
+	bool bInitialized;
+	
+protected:
+	virtual bool IsInitialized_Implementation() const override { return bInitialized; }
+	
+	virtual bool IsUseDefaultLifecycle_Implementation() const override { return true; }
 
+	//////////////////////////////////////////////////////////////////////////
+	/// SaveData
+public:
+	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+
+	virtual FSaveData* ToData() override;
+
+protected:
+	virtual void BeginPlay() override;
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+public:
+	virtual void Tick(float DeltaSeconds) override;
+	
+	virtual void SpawnDefaultController() override;
+	
 	//////////////////////////////////////////////////////////////////////////
 	/// Character
 public:
@@ -63,22 +96,6 @@ public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 	bool IsCurrent() const;
 
-protected:
-	virtual void BeginPlay() override;
-
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-
-public:
-	virtual void Tick(float DeltaSeconds) override;
-	
-	virtual int32 GetLimit_Implementation() const override { return 1000; }
-
-	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
-
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
-
-	virtual void SpawnDefaultController() override;
-
 	//////////////////////////////////////////////////////////////////////////
 	/// Name
 protected:
@@ -89,10 +106,6 @@ public:
 	virtual FName GetNameP() const override { return Name; }
 
 	virtual void SetNameP(FName InName) override { Name = InName; }
-
-	virtual FName GetNameC() const override { return Name; }
-
-	virtual void SetNameC(FName InName) override { Name = InName; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Player
@@ -129,8 +142,10 @@ public:
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SceneActor")
 	FGuid ActorID;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SceneActor")
 	bool bVisible;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SceneActor")
 	TScriptInterface<ISceneContainerInterface> Container;
 	
@@ -163,8 +178,18 @@ protected:
 	AController* DefaultController;
 	
 public:
+	template<class T>
+	T* GetDefaultController() const
+	{
+		return Cast<T>(DefaultController);
+	}
+	
 	virtual AController* GetDefaultController() const override { return DefaultController; }
 
+	virtual bool IsUseControllerRotation() const override;
+
+	virtual void SetUseControllerRotation(bool bValue) override;
+	
 	//////////////////////////////////////////////////////////////////////////
 	/// Voxel
 protected:
@@ -190,21 +215,21 @@ protected:
 	FSingleSoundHandle SoundHandle;
 	
 public:
-	virtual void PlaySound(class USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false) override;
+	virtual void PlaySound(USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false) override;
 	
 	virtual void StopSound(bool bMulticast = false) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Montage
 public:
-	virtual void PlayMontage(class UAnimMontage* InMontage, bool bMulticast = false) override;
+	virtual void PlayMontage(UAnimMontage* InMontage, bool bMulticast = false) override;
 	UFUNCTION(NetMulticast, Reliable)
-	virtual void MultiPlayMontage(class UAnimMontage* InMontage);
+	virtual void MultiPlayMontage(UAnimMontage* InMontage);
 	virtual void PlayMontageByName(const FName InMontageName, bool bMulticast = false) override;
 
-	virtual void StopMontage(class UAnimMontage* InMontage, bool bMulticast = false) override;
+	virtual void StopMontage(UAnimMontage* InMontage, bool bMulticast = false) override;
 	UFUNCTION(NetMulticast, Reliable)
-	virtual void MultiStopMontage(class UAnimMontage* InMontage);
+	virtual void MultiStopMontage(UAnimMontage* InMontage);
 	virtual void StopMontageByName(const FName InMontageName, bool bMulticast = false) override;
 
 	//////////////////////////////////////////////////////////////////////////
@@ -237,6 +262,13 @@ public:
 protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	ULookingComponent* Looking;
+
+public:
+	UFUNCTION()
+	virtual void OnTargetLookAtOn(AActor* InTargetActor);
+	
+	UFUNCTION()
+	virtual void OnTargetLookAtOff(AActor* InTargetActor);
 	
 public:
 	virtual bool IsLookAtAble_Implementation(AActor* InLookerActor) const override;
@@ -276,6 +308,8 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual UBehaviorTree* GetBehaviorTreeAsset() const override;
 	
+	virtual AAIControllerBase* GetAIController() const override;
+
 	UAIPerceptionStimuliSourceComponent* GetStimuliSource() const { return StimuliSource; }
 
 	//////////////////////////////////////////////////////////////////////////

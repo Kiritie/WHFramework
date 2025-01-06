@@ -1,13 +1,13 @@
 #pragma once
 
-#include "Ability/Item/AbilityItemDataBase.h"
+#include "Ability/Item/AbilityTransItemDataBase.h"
 
 #include "AbilityPropDataBase.generated.h"
 
-class AAbilityPickUpProp;
 class AAbilityPropBase;
+
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UAbilityPropDataBase : public UAbilityItemDataBase
+class WHFRAMEWORK_API UAbilityPropDataBase : public UAbilityTransItemDataBase
 {
 	GENERATED_BODY()
 
@@ -17,7 +17,4 @@ public:
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSubclassOf<AAbilityPropBase> PropClass;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSubclassOf<AAbilityPickUpProp> PropPickUpClass;
 };

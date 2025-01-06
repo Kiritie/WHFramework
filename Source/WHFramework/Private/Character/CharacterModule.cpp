@@ -10,7 +10,9 @@
 #include "Gameplay/WHPlayerController.h"
 #include "Common/CommonStatics.h"
 #include "Net/UnrealNetwork.h"
-		
+#include "SaveGame/Module/CharacterSaveGame.h"
+#include "Scene/SceneModuleStatics.h"
+
 IMPLEMENTATION_MODULE(UCharacterModule)
 
 // Sets default values
@@ -19,6 +21,8 @@ UCharacterModule::UCharacterModule()
 	ModuleName = FName("CharacterModule");
 	ModuleDisplayName = FText::FromString(TEXT("Character Module"));
 
+	ModuleSaveGame = UCharacterSaveGame::StaticClass();
+	
 	ModuleNetworkComponent = UCharacterModuleNetworkComponent::StaticClass();
 
 	Characters = TArray<ACharacterBase*>();
@@ -54,9 +58,9 @@ void UCharacterModule::OnInitialize()
 
 	for(auto Iter : Characters)
 	{
-		if(Iter && !CharacterMap.Contains(Iter->GetNameC()))
+		if(Iter && !CharacterMap.Contains(Iter->GetNameP()))
 		{
-			CharacterMap.Add(Iter->GetNameC(), Iter);
+			CharacterMap.Add(Iter->GetNameP(), Iter);
 		}
 	}
 }
@@ -67,7 +71,7 @@ void UCharacterModule::OnPreparatory(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		if(DefaultCharacter)
+		if(!CurrentCharacter && DefaultCharacter)
 		{
 			SwitchCharacter(DefaultCharacter, DefaultResetCamera, DefaultInstantSwitch);
 		}
@@ -94,9 +98,32 @@ void UCharacterModule::OnTermination(EPhase InPhase)
 	Super::OnTermination(InPhase);
 }
 
+void UCharacterModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+{
+	auto& SaveData = InSaveData->CastRef<FCharacterModuleSaveData>();
+
+	if(SaveData.IsSaved())
+	{
+		if(SaveData.CurrentCharacter)
+		{
+			SwitchCharacter(SaveData.CurrentCharacter, DefaultResetCamera, DefaultInstantSwitch);
+		}
+	}
+}
+
+FSaveData* UCharacterModule::ToData()
+{
+	static FCharacterModuleSaveData* SaveData;
+	SaveData = new FCharacterModuleSaveData();
+
+	SaveData->CurrentCharacter = CurrentCharacter;
+
+	return SaveData;
+}
+
 FString UCharacterModule::GetModuleDebugMessage()
 {
-	return FString::Printf(TEXT("CurrentCharacter: %s"), CurrentCharacter ? *CurrentCharacter->GetNameC().ToString() : TEXT("None"));
+	return FString::Printf(TEXT("CurrentCharacter: %s"), CurrentCharacter ? *CurrentCharacter->GetNameP().ToString() : TEXT("None"));
 }
 
 void UCharacterModule::AddCharacterToList(ACharacterBase* InCharacter)
@@ -104,9 +131,9 @@ void UCharacterModule::AddCharacterToList(ACharacterBase* InCharacter)
 	if(!Characters.Contains(InCharacter))
 	{
 		Characters.Add(InCharacter);
-		if(!CharacterMap.Contains(InCharacter->GetNameC()))
+		if(!CharacterMap.Contains(InCharacter->GetNameP()))
 		{
-			CharacterMap.Add(InCharacter->GetNameC(), InCharacter);
+			CharacterMap.Add(InCharacter->GetNameP(), InCharacter);
 		}
 	}
 }
@@ -116,9 +143,9 @@ void UCharacterModule::RemoveCharacterFromList(ACharacterBase* InCharacter)
 	if(Characters.Contains(InCharacter))
 	{
 		Characters.Remove(InCharacter);
-		if(CharacterMap.Contains(InCharacter->GetNameC()))
+		if(CharacterMap.Contains(InCharacter->GetNameP()))
 		{
-			CharacterMap.Remove(InCharacter->GetNameC());
+			CharacterMap.Remove(InCharacter->GetNameP());
 		}
 	}
 }
@@ -172,7 +199,7 @@ bool UCharacterModule::HasCharacterByClass(TSubclassOf<ACharacterBase> InClass) 
 {
 	if(!InClass) return false;
 	
-	const FName CharacterName = InClass->GetDefaultObject<ACharacterBase>()->GetNameC();
+	const FName CharacterName = InClass->GetDefaultObject<ACharacterBase>()->GetNameP();
 	return HasCharacterByName(CharacterName);
 }
 
@@ -195,7 +222,7 @@ ACharacterBase* UCharacterModule::GetCharacterByClass(TSubclassOf<ACharacterBase
 {
 	if(!InClass) return nullptr;
 	
-	const FName CharacterName = InClass->GetDefaultObject<ACharacterBase>()->GetNameC();
+	const FName CharacterName = InClass->GetDefaultObject<ACharacterBase>()->GetNameP();
 	return GetCharacterByName(CharacterName);
 }
 
@@ -203,7 +230,7 @@ ACharacterBase* UCharacterModule::GetCharacterByName(FName InName) const
 {
 	for (auto Iter : Characters)
 	{
-		if(Iter->GetNameC() == InName)
+		if(Iter->GetNameP() == InName)
 		{
 			return Iter;
 		}

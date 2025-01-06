@@ -13,6 +13,10 @@
 // Sets default values
 AVoxelInteractAuxiliary::AVoxelInteractAuxiliary()
 {
+	BoxComponent = CreateDefaultSubobject<UBoxComponent>(FName("BoxComponent"));
+	BoxComponent->SetupAttachment(RootComponent);
+	BoxComponent->SetCollisionProfileName(TEXT("VoxelAuxiliary"));
+
 	Interaction = CreateDefaultSubobject<UInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);
 	Interaction->SetInteractable(false);
@@ -22,22 +26,35 @@ void AVoxelInteractAuxiliary::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
 
-	Interaction->SetInteractable(false);
 	Interaction->ClearInteractActions();
 }
 
 void AVoxelInteractAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	Super::LoadData(InSaveData, InPhase);
-	
+
+	const auto& SaveData = InSaveData->CastRef<FVoxelAuxiliarySaveData>();
+
 	if(PHASEC(InPhase, EPhase::All))
 	{
-		for(const auto& Iter : VoxelItem.GetVoxelData<UVoxelInteractData>().InteractActions)
+		switch(SaveData.MeshNature)
 		{
-			Interaction->AddInteractAction(Iter);
+			case EVoxelScope::Chunk:
+			{
+				for(const auto& Iter : VoxelItem.GetVoxelData<UVoxelInteractData>().InteractActions)
+				{
+					Interaction->AddInteractAction(Iter);
+				}
+				BoxComponent->SetGenerateOverlapEvents(true);
+				BoxComponent->SetBoxExtent(VoxelItem.GetRange() * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f);
+				break;
+			}
+			default:
+			{
+				BoxComponent->SetGenerateOverlapEvents(false);
+				break;
+			}
 		}
-		Interaction->SetInteractable(VoxelItem.Owner != nullptr);
-		Interaction->SetBoxExtent(VoxelItem.GetRange() * UVoxelModule::Get().GetWorldData().BlockSize * FVector(1.f, 1.f, 0.5f));
 	}
 }
 
@@ -72,23 +89,24 @@ void AVoxelInteractAuxiliary::OnLeaveInteract(IInteractionAgentInterface* InInte
 {
 }
 
-void AVoxelInteractAuxiliary::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassivity)
+void AVoxelInteractAuxiliary::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive)
 {
-	if(!bPassivity) return;
-	
-	switch ((EVoxelInteractAction)InInteractAction)
+	if(bPassive)
 	{
-		case EVoxelInteractAction::Open:
+		switch ((EVoxelInteractAction)InInteractAction)
 		{
-			GetVoxelItem().GetVoxel<UVoxelInteract>().Open(nullptr);
-			break;
+			case EVoxelInteractAction::Open:
+			{
+				GetVoxelItem().GetVoxel<UVoxelInteract>().Open(nullptr);
+				break;
+			}
+			case EVoxelInteractAction::Close:
+			{
+				GetVoxelItem().GetVoxel<UVoxelInteract>().Close(nullptr);
+				break;
+			}
+			default: break;
 		}
-		case EVoxelInteractAction::Close:
-		{
-			GetVoxelItem().GetVoxel<UVoxelInteract>().Close(nullptr);
-			break;
-		}
-		default: break;
 	}
 }
 

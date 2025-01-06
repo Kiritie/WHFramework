@@ -23,15 +23,15 @@ void UEventHandle_PlayLevelSequence::Parse_Implementation(const TArray<FParamete
 {
 	if(InParams.IsValidIndex(0))
 	{
-		LevelSequence = InParams[0].GetObjectPtrValue<ALevelSequenceActor>();
+		LevelSequence = InParams[0];
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		Delay = InParams[1].GetFloatValue();
+		Delay = InParams[1];
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		bReverse = InParams[2].GetBooleanValue();
+		bReverse = InParams[2];
 	}
 }
 

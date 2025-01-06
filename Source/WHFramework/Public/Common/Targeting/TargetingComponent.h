@@ -12,8 +12,9 @@ class UUserWidget;
 class UWidgetComponent;
 class APlayerController;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FComponentOnTargetLockedOnOff, AActor*, TargetActor);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FComponentSetRotation, AActor*, TargetActor, FRotator, ControlRotation);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FTargetLockOn, AActor*, TargetActor);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FTargetLockOff, AActor*, TargetActor);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FSetControlRotation, AActor*, TargetActor, FRotator, ControlRotation);
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class WHFRAMEWORK_API UTargetingComponent : public UActorComponent
@@ -22,7 +23,7 @@ class WHFRAMEWORK_API UTargetingComponent : public UActorComponent
 
 public:
 	// Sets default values for this component's properties
-	UTargetingComponent();
+	UTargetingComponent(const FObjectInitializer& ObjectInitializer);
 
 	// The minimum distance to enable target locked on.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting")
@@ -57,6 +58,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting")
 	float StartRotatingThreshold = 0.85f;
 
+	// 旋转平滑速度
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting")
+	float RotatingSmoothnessSpeed = 9.f;
+
 	// Target LockOn Widget指示器是否应该自动绘制和附加
 	//
 	// 当设置为false时，这允许您手动绘制小部件，以进一步控制您希望它出现的位置
@@ -82,6 +87,9 @@ public:
 	// 当附加到目标时，应用于Target LockedOn小部件的相对位置
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting|Widget")
 	FVector LockedOnWidgetRelativeLocation = FVector(0.0f, 0.0f, 0.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting|Location Offset")
+	FVector LocationOffset = FVector::ZeroVector;
 
 	// 将此设置为true将告诉Targeting在锁定时调整Pitch Offset (Y轴)
 	// 取决于与目标演员的距离
@@ -151,18 +159,18 @@ public:
 
 	// 当目标被锁定时调用，如果它在到达之外(基于MinimumDistanceToEnable)或在对象后面
 	UPROPERTY(BlueprintAssignable, Category = "Targeting")
-	FComponentOnTargetLockedOnOff OnTargetLockedOff;
+	FTargetLockOff OnTargetLockOff;
 
 	// 锁定目标时调用
 	UPROPERTY(BlueprintAssignable, Category = "Targeting")
-	FComponentOnTargetLockedOnOff OnTargetLockedOn;
+	FTargetLockOn OnTargetLockOn;
 
 	// when a target is locked on
 	//
 	// 如果没有实现，将回退到默认实现
 	// 如果实现了这个事件，你就可以控制角色的旋转
 	UPROPERTY(BlueprintAssignable, Category = "Targeting")
-	FComponentSetRotation OnTargetSetRotation;
+	FSetControlRotation OnTargetSetRotation;
 
 	// 如果有的话，返回对当前目标Actor的引用
 	UFUNCTION(BlueprintCallable, Category = "Targeting")

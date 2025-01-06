@@ -25,6 +25,7 @@ class WHFRAMEWORK_API UAbilityTask_PlayMontageAndWaitForEvent : public UAbilityT
 public:
 	// Constructor and overrides
 	UAbilityTask_PlayMontageAndWaitForEvent(const FObjectInitializer& ObjectInitializer);
+	
 	virtual void Activate() override;
 	virtual void ExternalCancel() override;
 	virtual FString GetDebugString() const override;

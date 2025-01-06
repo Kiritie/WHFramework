@@ -30,7 +30,13 @@ public:
 	virtual void OnTermination_Implementation(EPhase InPhase) override;
 
 protected:
-	virtual bool IsDefaultLifecycle_Implementation() const override { return true; }
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "WHActor")
+	bool bInitialized;
+	
+protected:
+	virtual bool IsInitialized_Implementation() const override { return bInitialized; }
+	
+	virtual bool IsUseDefaultLifecycle_Implementation() const override { return true; }
 
 protected:
 	virtual bool ProcessConsoleExec(const TCHAR* Cmd, FOutputDevice& Ar, UObject* Executor) override;
@@ -39,8 +45,10 @@ public:
 	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
 
 	virtual void InitGameState() override;
-	
+
 	virtual APlayerController* SpawnPlayerController(ENetRole InRemoteRole, const FString& Options) override;
+
+	virtual void InitializeHUDForPlayer_Implementation(APlayerController* NewPlayer) override;
 
 public:
 	virtual APlayerController* Login(UPlayer* NewPlayer, ENetRole InRemoteRole, const FString& Portal, const FString& Options, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage) override;

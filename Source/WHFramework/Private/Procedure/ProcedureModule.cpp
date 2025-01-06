@@ -5,7 +5,6 @@
 
 #include "Main/MainModule.h"
 #include "Procedure/Base/ProcedureBase.h"
-#include "Character/CharacterModuleTypes.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Procedure/EventHandle_SwitchProcedure.h"
@@ -21,8 +20,7 @@ UProcedureModule::UProcedureModule()
 
 	ModuleNetworkComponent = UProcedureModuleNetworkComponent::StaticClass();
 
-	bAutoSwitchFirst = false;
-
+	Assets = TArray<UProcedureAsset*>();
 	DefaultAsset = nullptr;
 	CurrentAsset = nullptr;
 	CurrentProcedure = nullptr;
@@ -55,7 +53,7 @@ void UProcedureModule::OnInitialize()
 
 	if(DefaultAsset)
 	{
-		SetCurrentAsset(DefaultAsset);
+		AddAsset(DefaultAsset);
 	}
 }
 
@@ -65,10 +63,7 @@ void UProcedureModule::OnPreparatory(EPhase InPhase)
 	
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		if(bAutoSwitchFirst)
-		{
-			SwitchFirstProcedure();
-		}
+		SwitchAsset(DefaultAsset);
 	}
 }
 
@@ -110,6 +105,52 @@ FString UProcedureModule::GetModuleDebugMessage()
 void UProcedureModule::OnSwitchProcedure(UObject* InSender, UEventHandle_SwitchProcedure* InEventHandle)
 {
 	SwitchProcedureByClass(InEventHandle->ProcedureClass);
+}
+
+UProcedureAsset* UProcedureModule::GetAsset(UProcedureAsset* InAsset) const
+{
+	for(auto Iter : Assets)
+	{
+		if(Iter->SourceObject == InAsset)
+		{
+			return Iter;
+		}
+	}
+	return nullptr;
+}
+
+void UProcedureModule::AddAsset(UProcedureAsset* InAsset)
+{
+	if(!GetAsset(InAsset))
+	{
+		InAsset = InAsset->Duplicate<UProcedureAsset>();
+		Assets.Add(InAsset);
+		InAsset->Initialize();
+	}
+}
+
+void UProcedureModule::RemoveAsset(UProcedureAsset* InAsset)
+{
+	if(UProcedureAsset* Asset = GetAsset(InAsset))
+	{
+		Assets.Remove(Asset);
+	}
+}
+
+void UProcedureModule::SwitchAsset(UProcedureAsset* InAsset)
+{
+	if(InAsset && !InAsset->SourceObject) InAsset = GetAsset(InAsset);
+	
+	if(!InAsset || !Assets.Contains(InAsset) || CurrentAsset == InAsset) return;
+
+	CurrentAsset = InAsset;
+
+	WHDebug(FString::Printf(TEXT("切换流程源: %s"), !CurrentAsset->DisplayName.IsEmpty() ? *CurrentAsset->DisplayName.ToString() : *CurrentAsset->GetName()), EDM_All, EDC_Procedure, EDV_Log, FColor::Green, 5.f);
+
+	if(CurrentAsset->bAutoSwitchFirst)
+	{
+		SwitchFirstProcedure();
+	}
 }
 
 void UProcedureModule::SwitchProcedure(UProcedureBase* InProcedure)
@@ -201,21 +242,6 @@ void UProcedureModule::GuideCurrentProcedure()
 	if(CurrentProcedure)
 	{
 		CurrentProcedure->Guide();
-	}
-}
-
-void UProcedureModule::SetCurrentAsset(UProcedureAsset* InProcedureAsset, bool bInAutoSwitchFirst)
-{
-	if(!InProcedureAsset || (CurrentAsset && InProcedureAsset == CurrentAsset->SourceObject)) return;
-
-	CurrentAsset = DuplicateObject<UProcedureAsset>(InProcedureAsset, this);
-	CurrentAsset->Initialize(InProcedureAsset);
-
-	WHDebug(FString::Printf(TEXT("切换流程源: %s"), !CurrentAsset->DisplayName.IsEmpty() ? *CurrentAsset->DisplayName.ToString() : *CurrentAsset->GetName()), EDM_All, EDC_Procedure, EDV_Log, FColor::Green, 5.f);
-
-	if(bInAutoSwitchFirst)
-	{
-		SwitchFirstProcedure();
 	}
 }
 

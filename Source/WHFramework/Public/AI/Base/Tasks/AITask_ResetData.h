@@ -12,7 +12,10 @@
 UCLASS()
 class WHFRAMEWORK_API UAITask_ResetData : public UAITaskBase
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UAITask_ResetData(const FObjectInitializer& ObjectInitializer);
 
 protected:
 	virtual void InitializeFromAsset(UBehaviorTree& Asset) override;

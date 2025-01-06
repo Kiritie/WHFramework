@@ -6,8 +6,7 @@
 #include "CameraModuleTypes.h"
 #include "Debug/DebuggerInterface.h"
 #include "Main/Base/ModuleBase.h"
-#include "Math/MathTypes.h"
-#include "SaveGame/Base/SaveDataInterface.h"
+#include "SaveGame/Base/SaveDataAgentInterface.h"
 
 #include "CameraModule.generated.h"
 
@@ -228,6 +227,9 @@ protected:
 	bool bCameraZoomControlAble;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
+	bool bCameraZoomMoveAble;
+
+	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
 	bool bNormalizeCameraZoom;
 
 	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
@@ -362,10 +364,10 @@ public:
 	virtual void StopDoCameraLocation();
 
 	UFUNCTION(BlueprintCallable)
-	virtual void SetCameraOffset(FVector InOffset, bool bInstant = false);
+	virtual void SetCameraOffset(FVector InOffset = FVector(-1.f), bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void DoCameraOffset(FVector InOffset, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear, bool bForce = true);
+	virtual void DoCameraOffset(FVector InOffset = FVector(-1.f), float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear, bool bForce = true);
 
 	UFUNCTION(BlueprintCallable)
 	virtual void StopDoCameraOffset();
@@ -419,7 +421,7 @@ public:
 	virtual void AddCameraRotationInput(float InYaw, float InPitch);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void AddCameraDistanceInput(float InValue, bool bMoveIfZero = false);
+	virtual void AddCameraDistanceInput(float InValue);
 
 public:
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InCameraViewData"))
@@ -453,7 +455,7 @@ public:
 	bool IsControllingZoom();
 
 	UFUNCTION(BlueprintPure)
-	bool IsTrackingTarget();
+	bool IsTrackingTarget() const;
 
 public:
 	UFUNCTION(BlueprintPure)

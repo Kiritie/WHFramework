@@ -9,5 +9,8 @@
 UCLASS(MinimalAPI)
 class UFiniteStateGraph : public UEdGraph
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UFiniteStateGraph(const FObjectInitializer& ObjectInitializer);
 };

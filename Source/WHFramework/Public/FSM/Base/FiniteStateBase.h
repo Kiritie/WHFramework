@@ -19,11 +19,13 @@ class WHFRAMEWORK_API UFiniteStateBase : public UWHObject
 public:
 	UFiniteStateBase();
 
+	//////////////////////////////////////////////////////////////////////////
+	/// ObjectPool
 public:
-	virtual int32 GetLimit_Implementation() const override { return 0; }
+	virtual int32 GetLimit_Implementation() const override { return -1; }
 
 	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
-
+		
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
@@ -39,10 +41,10 @@ public:
 	 * @param InLastState 上一个状态
 	 * @param InParams 参数列表
 	 */
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnEnterValidate")
-	bool K2_OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams);
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnPreEnter")
+	bool K2_OnPreEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams);
 	UFUNCTION()
-	virtual bool OnEnterValidate(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams);
+	virtual bool OnPreEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams);
 	/**
 	 * 状态进入
 	 * @param InLastState 上一个状态
@@ -63,10 +65,10 @@ public:
 	 * 状态离开验证
 	 * @param InNextState 下一个状态
 	 */
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnLeaveValidate")
-	bool K2_OnLeaveValidate(UFiniteStateBase* InNextState);
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnPreLeave")
+	bool K2_OnPreLeave(UFiniteStateBase* InNextState);
 	UFUNCTION()
-	virtual bool OnLeaveValidate(UFiniteStateBase* InNextState);
+	virtual bool OnPreLeave(UFiniteStateBase* InNextState);
 	/**
 	 * 状态离开
 	 * @param InNextState 下一个状态
@@ -129,8 +131,8 @@ protected:
 	UFSMComponent* FSM;
 
 private:
-	bool bHasBlueprintOnEnterValidate;
-	bool bHasBlueprintOnLeaveValidate;
+	bool bHasBlueprintOnPreEnter;
+	bool bHasBlueprintOnPreLeave;
 	
 public:
 	UFUNCTION(BlueprintPure)

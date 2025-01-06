@@ -4,6 +4,7 @@
 #include "Pawn/Base/PawnBase.h"
 
 #include "AIController.h"
+#include "AI/Base/AIControllerBase.h"
 #include "Main/MainModule.h"
 #include "Animation/AnimInstance.h"
 #include "Asset/AssetModuleStatics.h"
@@ -44,6 +45,8 @@ APawnBase::APawnBase(const FObjectInitializer& ObjectInitializer) :
 	Name = NAME_None;
 	DefaultController = nullptr;
 
+	bInitialized = false;
+
 	ActorID = FGuid::NewGuid();
 	bVisible = true;
 	Container = nullptr;
@@ -51,20 +54,58 @@ APawnBase::APawnBase(const FObjectInitializer& ObjectInitializer) :
 	GenerateVoxelID = FPrimaryAssetId();
 }
 
+void APawnBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+{
+	USceneModuleStatics::RemoveSceneActor(this);
+	
+	if(InParams.IsValidIndex(0))
+	{
+		ActorID = InParams[0];
+	}
+	if(InParams.IsValidIndex(1))
+	{
+		AssetID = InParams[1];
+	}
+
+	USceneModuleStatics::AddSceneActor(this);
+
+	Execute_SetActorVisible(this, true);
+}
+
+void APawnBase::OnDespawn_Implementation(bool bRecovery)
+{
+	Execute_SetActorVisible(this, false);
+
+	SetActorLocationAndRotation(UNDER_Vector, FRotator::ZeroRotator);
+
+	USceneModuleStatics::RemoveSceneActor(this);
+	if(Container)
+	{
+		Container->RemoveSceneActor(this);
+	}
+
+	Container = nullptr;
+	DefaultController = nullptr;
+
+	SetGenerateVoxelID(FPrimaryAssetId());
+}
+
 void APawnBase::OnInitialize_Implementation()
 {
+	bInitialized = true;
+	
 	Execute_SetActorVisible(this, bVisible);
+
+	USceneModuleStatics::AddSceneActor(this);
 }
 
 void APawnBase::OnPreparatory_Implementation(EPhase InPhase)
 {
-	IWHActorInterface::OnPreparatory_Implementation(InPhase);
+	
 }
 
 void APawnBase::OnRefresh_Implementation(float DeltaSeconds)
 {
-	IWHActorInterface::OnRefresh_Implementation(DeltaSeconds);
-
 	if(AMainModule::IsExistModuleByClass<UVoxelModule>())
 	{
 		if(AVoxelChunk* Chunk = UVoxelModuleStatics::FindChunkByLocation(GetActorLocation()))
@@ -80,7 +121,70 @@ void APawnBase::OnRefresh_Implementation(float DeltaSeconds)
 
 void APawnBase::OnTermination_Implementation(EPhase InPhase)
 {
-	IWHActorInterface::OnTermination_Implementation(InPhase);
+	USceneModuleStatics::RemoveSceneActor(this);
+}
+
+void APawnBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
+{
+	auto& SaveData = InSaveData->CastRef<FSceneActorSaveData>();
+
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		ActorID = SaveData.ActorID;
+		SetActorTransform(SaveData.SpawnTransform);
+	}
+}
+
+FSaveData* APawnBase::ToData()
+{
+	static FSceneActorSaveData SaveData;
+	SaveData = FSceneActorSaveData();
+
+	SaveData.ActorID = ActorID;
+	SaveData.SpawnTransform = GetActorTransform();
+
+	return &SaveData;
+}
+
+void APawnBase::BeginPlay()
+{
+	Super::BeginPlay();
+	
+	if(Execute_IsUseDefaultLifecycle(this))
+	{
+		if(!Execute_IsInitialized(this))
+		{
+			Execute_OnInitialize(this);
+		}
+		Execute_OnPreparatory(this, EPhase::All);
+	}
+}
+
+void APawnBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+
+	if(Execute_IsUseDefaultLifecycle(this))
+	{
+		Execute_OnTermination(this, EPhase::All);
+	}
+}
+
+void APawnBase::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if(Execute_IsUseDefaultLifecycle(this))
+	{
+		Execute_OnRefresh(this, DeltaSeconds);
+	}
+}
+
+void APawnBase::SpawnDefaultController()
+{
+	Super::SpawnDefaultController();
+
+	DefaultController = Controller;
 }
 
 void APawnBase::OnSwitch_Implementation()
@@ -109,78 +213,6 @@ void APawnBase::UnSwitch_Implementation()
 bool APawnBase::IsCurrent_Implementation() const
 {
 	return UPawnModuleStatics::GetCurrentPawn() == this;
-}
-
-void APawnBase::BeginPlay()
-{
-	Super::BeginPlay();
-	
-	if(Execute_IsDefaultLifecycle(this))
-	{
-		Execute_OnInitialize(this);
-		Execute_OnPreparatory(this, EPhase::All);
-	}
-}
-
-void APawnBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
-{
-	Super::EndPlay(EndPlayReason);
-
-	if(Execute_IsDefaultLifecycle(this))
-	{
-		Execute_OnTermination(this, EPhase::All);
-	}
-}
-
-void APawnBase::Tick(float DeltaSeconds)
-{
-	Super::Tick(DeltaSeconds);
-
-	if(Execute_IsDefaultLifecycle(this))
-	{
-		Execute_OnRefresh(this, DeltaSeconds);
-	}
-}
-
-void APawnBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
-{
-	if(InParams.IsValidIndex(0))
-	{
-		ActorID = InParams[0].GetPointerValueRef<FGuid>();
-	}
-	if(InParams.IsValidIndex(1))
-	{
-		AssetID = InParams[1].GetPointerValueRef<FPrimaryAssetId>();
-	}
-
-	USceneModuleStatics::AddSceneActor(this);
-
-	Execute_SetActorVisible(this, true);
-}
-
-void APawnBase::OnDespawn_Implementation(bool bRecovery)
-{
-	Execute_SetActorVisible(this, false);
-
-	SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
-
-	USceneModuleStatics::RemoveSceneActor(this);
-	if(Container)
-	{
-		Container->RemoveSceneActor(this);
-	}
-
-	Container = nullptr;
-	DefaultController = nullptr;
-
-	SetGenerateVoxelID(FPrimaryAssetId());
-}
-
-void APawnBase::SpawnDefaultController()
-{
-	Super::SpawnDefaultController();
-
-	DefaultController = Controller;
 }
 
 void APawnBase::Turn_Implementation(float InValue)
@@ -264,6 +296,16 @@ void APawnBase::SetActorVisible_Implementation(bool bInVisible)
 			ISceneActorInterface::Execute_SetActorVisible(Iter, bInVisible);
 		}
 	}
+}
+
+bool APawnBase::IsUseControllerRotation() const
+{
+	return bUseControllerRotationYaw;
+}
+
+void APawnBase::SetUseControllerRotation(bool bValue)
+{
+	bUseControllerRotationYaw = bValue;
 }
 
 bool APawnBase::OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
@@ -378,6 +420,11 @@ UPrimaryAssetBase& APawnBase::GetPawnData() const
 UBehaviorTree* APawnBase::GetBehaviorTreeAsset() const
 {
 	return nullptr;
+}
+
+AAIControllerBase* APawnBase::GetAIController() const
+{
+	return GetDefaultController<AAIControllerBase>();
 }
 
 FVector APawnBase::GetMoveVelocity(bool bIgnoreZ) const

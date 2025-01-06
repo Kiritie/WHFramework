@@ -12,8 +12,12 @@
 UCLASS()
 class WHFRAMEWORK_API UAbilityTask_ServerWaitForClientTargetData : public UAbilityTask
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
 
+public:
+	UAbilityTask_ServerWaitForClientTargetData(const FObjectInitializer& ObjectInitializer);
+
+public:
 	UPROPERTY(BlueprintAssignable)
 	FWaitTargetDataDelegate	ValidData;
 

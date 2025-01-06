@@ -9,5 +9,8 @@
 UCLASS(HideCategories=Object, MinimalAPI)
 class UFiniteStateBlueprintFactory : public UBlueprintFactoryBase
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UFiniteStateBlueprintFactory(const FObjectInitializer& ObjectInitializer);
 };

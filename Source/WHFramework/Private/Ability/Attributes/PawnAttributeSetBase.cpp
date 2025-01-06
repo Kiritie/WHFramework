@@ -8,9 +8,19 @@ UPawnAttributeSetBase::UPawnAttributeSetBase()
 	
 }
 
+void UPawnAttributeSetBase::PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const
+{
+	Super::PreAttributeBaseChange(Attribute, NewValue);
+}
+
 void UPawnAttributeSetBase::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
 {
 	Super::PreAttributeChange(Attribute, NewValue);
+}
+
+void UPawnAttributeSetBase::PostAttributeChange(const FGameplayAttribute& Attribute, float OldValue, float NewValue)
+{
+	Super::PostAttributeChange(Attribute, OldValue, NewValue);
 }
 
 void UPawnAttributeSetBase::PostGameplayEffectExecute(const struct FGameplayEffectModCallbackData& Data)

@@ -5,7 +5,6 @@
 
 #include "CameraModuleTypes.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
-#include "Math/MathTypes.h"
 #include "CameraModuleStatics.generated.h"
 
 class ACameraPointBase;
@@ -110,10 +109,10 @@ public:
 	static void StopDoCameraLocation();
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
-	static void SetCameraOffset(FVector InOffset, bool bInstant = false);
+	static void SetCameraOffset(FVector InOffset = FVector(-1.f), bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
-	static void DoCameraOffset(FVector InOffset, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear);
+	static void DoCameraOffset(FVector InOffset = FVector(-1.f), float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
 	static void StopDoCameraOffset();
@@ -152,11 +151,20 @@ public:
 	static void StopDoCameraTransform();
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
+	static void SetCameraFov(float InFov = -1.f, bool bInstant = false);
+
+	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
+	static void DoCameraFov(float InFov = -1.f, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear, bool bForce = true);
+
+	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
+	static void StopDoCameraFov();
+
+	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
 	static void AddCameraMovementInput(FVector InDirection, float InValue);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
 	static void AddCameraRotationInput(float InYaw, float InPitch);
 
 	UFUNCTION(BlueprintCallable, Category = "CameraModuleStatics")
-	static void AddCameraDistanceInput(float InValue, bool bMoveIfZero = false);
+	static void AddCameraDistanceInput(float InValue);
 };

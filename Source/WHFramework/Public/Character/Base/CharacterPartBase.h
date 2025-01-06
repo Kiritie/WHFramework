@@ -7,6 +7,7 @@
 
 #include "CharacterPartBase.generated.h"
 
+class ACharacterBase;
 class UVoxel;
 /**
  * 角色部位组件
@@ -44,7 +45,13 @@ protected:
 public:
 	UFUNCTION(BlueprintPure)
 	FVoxelItem& GetOverlappingVoxel() { return OverlappingVoxel; }
+	
+	template<class T>
+	T* GetOwnerCharacter() const
+	{
+		return Cast<T>(GetOwnerCharacter());
+	}
 
-	UFUNCTION(BlueprintPure)
-	ACharacterBase* GetOwnerCharacter() const;
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	virtual ACharacterBase* GetOwnerCharacter(TSubclassOf<ACharacterBase> InClass = nullptr) const;
 };

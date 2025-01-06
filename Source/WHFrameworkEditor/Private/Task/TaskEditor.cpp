@@ -104,9 +104,9 @@ void FTaskEditorModule::OnClickedTaskEditorButton()
 {
 	if(const UTaskModule* TaskModule = UTaskModule::GetPtr(!UCommonStatics::IsPlaying()))
 	{
-		if(UTaskAsset* TaskAsset = !UCommonStatics::IsPlaying() ? TaskModule->GetDefaultAsset() : TaskModule->GetCurrentAsset())
+		for(auto Iter : !UCommonStatics::IsPlaying() ? TaskModule->GetDefaultAssets() : TaskModule->GetAssets())
 		{
-			GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(TaskAsset);
+			GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(Iter);
 		}
 	}
 }

@@ -10,10 +10,8 @@
 #include "Voxel/Datas/VoxelData.h"
 #include "Voxel/Voxels/Voxel.h"
 
-FVoxelWorldSaveData FVoxelWorldSaveData::Empty = FVoxelWorldSaveData();
-
-FVoxelItem FVoxelItem::Empty = FVoxelItem();
-FVoxelItem FVoxelItem::Unknown = FVoxelItem(FPrimaryAssetId(FName("Voxel"), FName("DA_Voxel_Unknown")));
+FVoxelItem FVoxelItem::Empty = FVoxelItem(FPrimaryAssetId(FName("Voxel"), FName("DA_Empty")));
+FVoxelItem FVoxelItem::Unknown = FVoxelItem(FPrimaryAssetId(FName("Voxel"), FName("DA_Unknown")));
 
 FVoxelItem::FVoxelItem(const FPrimaryAssetId& InID, FIndex InIndex, AVoxelChunk* InOwner, const FString& InData) : FVoxelItem()
 {
@@ -31,7 +29,7 @@ FVoxelItem::FVoxelItem(EVoxelType InVoxelType, FIndex InIndex, AVoxelChunk* InOw
 FVoxelItem::FVoxelItem(const FString& InSaveData) : FVoxelItem()
 {
 	TArray<FString> DataStrs;
-	InSaveData.ParseIntoArray(DataStrs, TEXT("|"));
+	InSaveData.ParseIntoArray(DataStrs, TEXT(";"));
 	ID = UVoxelModuleStatics::VoxelTypeToAssetID((EVoxelType)FCString::Atoi(*DataStrs[0]));
 	Index = UVoxelModuleStatics::NumberToVoxelIndex(FCString::Atoi(*DataStrs[1]));
 	Angle = (ERightAngle)FCString::Atoi(*DataStrs[2]);
@@ -69,7 +67,7 @@ void FVoxelItem::RefreshData(bool bOrigin)
 {
 	if(bOrigin && Owner)
 	{
-		FVoxelItem& OriginItem = Owner->GetVoxelItem(Index);
+		FVoxelItem& OriginItem = Owner->GetVoxel(Index);
 		OriginItem.RefreshData(false);
 		*this = OriginItem;
 		Owner->SetChanged(true);
@@ -84,7 +82,7 @@ void FVoxelItem::RefreshData(UVoxel& InVoxel, bool bOrigin)
 {
 	if(bOrigin && Owner)
 	{
-		FVoxelItem& OriginItem = Owner->GetVoxelItem(Index);
+		FVoxelItem& OriginItem = Owner->GetVoxel(Index);
 		OriginItem.RefreshData(InVoxel, false);
 		*this = OriginItem;
 		Owner->SetChanged(true);
@@ -97,12 +95,18 @@ void FVoxelItem::RefreshData(UVoxel& InVoxel, bool bOrigin)
 
 FString FVoxelItem::ToSaveData(bool bRefresh) const
 {
-	return FString::Printf(TEXT("%d|%d|%d|%s"), (int32)GetVoxelType(), UVoxelModuleStatics::VoxelIndexToNumber(Index), (int32)Angle, !bRefresh ? *Data : *GetVoxel().ToData());
+	const FString _Data = !bRefresh ? *Data : *GetVoxel().ToData();
+	return FString::Printf(TEXT("%d;%d;%d%s"), (int32)GetVoxelType(), UVoxelModuleStatics::VoxelIndexToNumber(Index), (int32)Angle, !_Data.IsEmpty() ? *FString::Printf(TEXT(";%s"), *_Data) : TEXT(""));
 }
 
 bool FVoxelItem::IsValid() const
 {
-	return Super::IsValid() && !IsUnknown();
+	return Super::IsValid() && !EqualID(Empty) && !EqualID(Unknown);
+}
+
+bool FVoxelItem::IsEmpty() const
+{
+	return *this == Empty;
 }
 
 bool FVoxelItem::IsUnknown() const
@@ -112,19 +116,19 @@ bool FVoxelItem::IsUnknown() const
 
 bool FVoxelItem::IsReplaceable(const FVoxelItem& InVoxelItem) const
 {
-	return !IsValid() || (!InVoxelItem.IsValid() && GetVoxelType() != EVoxelType::Bedrock) || !EqualType(static_cast<FAbilityItem>(InVoxelItem)) && GetVoxelData().Transparency == EVoxelTransparency::Transparent && InVoxelItem.GetVoxelData().Transparency != EVoxelTransparency::Transparent;
+	return !IsValid() || (!InVoxelItem.IsValid() && GetVoxelType() != EVoxelType::Bedrock) || !Match(static_cast<FAbilityItem>(InVoxelItem)) && GetVoxelData().GetTransparency() == EVoxelTransparency::Trans && InVoxelItem.GetVoxelData().GetTransparency() != EVoxelTransparency::Trans;
 }
 
 FVoxelItem FVoxelItem::ReplaceID(const FPrimaryAssetId& InID) const
 {
-	FVoxelItem tmpItem = *this;
-	tmpItem.ID = InID;
-	return tmpItem;
+	FVoxelItem _Item = *this;
+	_Item.ID = InID;
+	return _Item;
 }
 
 FVoxelItem& FVoxelItem::GetMain() const
 {
-	if(Owner) return Owner->GetVoxelItem(Index - GetVoxelData().PartIndex);
+	if(Owner) return Owner->GetVoxelComplex(Index - GetVoxelData().PartIndex);
 	return FVoxelItem::Empty;
 }
 
@@ -132,7 +136,7 @@ FVoxelItem& FVoxelItem::GetPart(FIndex InIndex) const
 {
 	if(Owner && GetVoxelData().HasPartData(InIndex))
 	{
-		return Owner->GetVoxelItem(Index + InIndex);
+		return Owner->GetVoxelComplex(Index + InIndex);
 	}
 	return FVoxelItem::Empty;
 }
@@ -144,7 +148,7 @@ TArray<FVoxelItem> FVoxelItem::GetParts() const
 		TArray<FVoxelItem> Parts;
 		for(auto& Iter : GetVoxelData().PartDatas)
 		{
-			Parts.Add(Owner->GetVoxelItem(Index + Iter.Key));
+			Parts.Add(Owner->GetVoxelComplex(Index + Iter.Key));
 		}
 		return Parts;
 	}
@@ -188,9 +192,9 @@ UVoxelData& FVoxelItem::GetVoxelData(bool bEnsured) const
 
 FVoxelHitResult::FVoxelHitResult(const FHitResult& InHitResult)
 {
-	if(AVoxelChunk* chunk = Cast<AVoxelChunk>(InHitResult.GetActor()))
+	if(AVoxelChunk* InChunk = Cast<AVoxelChunk>(InHitResult.GetActor()))
 	{
-		VoxelItem = chunk->GetVoxelItem(chunk->LocationToIndex(InHitResult.ImpactPoint - UVoxelModule::Get().GetWorldData().GetBlockSizedNormal(InHitResult.ImpactNormal, 0.01f)), true);
+		VoxelItem = InChunk->GetVoxelComplex(InChunk->LocationToIndex(InHitResult.ImpactPoint - UVoxelModule::Get().GetWorldData().GetBlockSizedNormal(InHitResult.ImpactNormal, 0.01f)), true);
 		Point = InHitResult.ImpactPoint;
 		Normal = InHitResult.ImpactNormal;
 	}
@@ -216,4 +220,20 @@ UVoxel& FVoxelHitResult::GetVoxel() const
 AVoxelChunk* FVoxelHitResult::GetChunk() const
 {
 	return VoxelItem.Owner;
+}
+
+FVoxelTopography::FVoxelTopography(const FString& InSaveData)
+{
+	TArray<FString> DataStrs;
+	InSaveData.ParseIntoArray(DataStrs, TEXT(";"));
+	Index = UVoxelModuleStatics::NumberToVoxelIndex(FCString::Atoi(*DataStrs[0]));
+	Height = FCString::Atoi(*DataStrs[1]);
+	Temperature = FCString::Atof(*DataStrs[2]);
+	Humidity = FCString::Atof(*DataStrs[3]);
+	BiomeType = (EVoxelBiomeType)FCString::Atoi(*DataStrs[4]);
+}
+
+FString FVoxelTopography::ToSaveData() const
+{
+	return FString::Printf(TEXT("%d;%d;%f;%f%d"), UVoxelModuleStatics::VoxelIndexToNumber(Index), Height, Temperature, Humidity, (int32)BiomeType);
 }

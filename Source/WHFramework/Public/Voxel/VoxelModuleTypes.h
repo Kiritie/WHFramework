@@ -3,14 +3,15 @@
 #pragma once
 
 #include "Ability/AbilityModuleTypes.h"
-#include "AsyncTasks/AsyncTask_ChunkQueue.h"
 #include "Common/CommonTypes.h"
 #include "Math/MathTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "Scene/SceneModuleTypes.h"
+#include "Threads/VoxelChunkQueueThread.h"
 
 #include "VoxelModuleTypes.generated.h"
 
+class UVoxelGenerator;
 class IVoxelAgentInterface;
 class UVoxelData;
 class AVoxelChunk;
@@ -36,12 +37,13 @@ UENUM(BlueprintType)
 enum class EVoxelWorldState : uint8
 {
 	None,
-	Spawn,
-	Destroy,
-	Generate,
-	MapLoad,
-	MapBuild,
-	MeshBuild
+	Spawning,
+	Destroying,
+	Generating,
+	MapLoading,
+	MapBuilding,
+	MeshSpawning,
+	MeshBuilding
 };
 
 /**
@@ -54,31 +56,36 @@ enum class EVoxelType : uint8
 	Unknown,
 	Bedrock, //????
 	Dirt, //????
+	Red_Brick, //???
 	Stone, //??
-	Sand, //???
-	Grass, //???
-	Snow, //???
-	Oak, //???
-	Birch, //?????
-	Oak_Plank, //?????
-	Birch_Plank, //???????
 	Cobble_Stone, //??
 	Stone_Brick, //??
-	Red_Brick, //???
+	Sand, //???
 	Sand_Stone, //??
-	Oak_Leaves, //?????
-	Birch_Leaves, //???????
-	Ice, //????
 	Glass, //????
+	Grass, //???
+	Snow, //???
+	Ice, //????
+	Coal_Ore, //??
+	Iron_Ore, //??
+	Gold_Ore, //??
+	Emerald_Ore, //??
+	Diamond_Ore, //??
+	Oak, //???
+	Oak_Leaves, //?????
+	Oak_Plank, //?????
 	Oak_Door, //?????
 	Oak_Door_Upper, //?????
+	Birch, //?????
+	Birch_Leaves, //???????
+	Birch_Plank, //???????
 	Birch_Door, //???????
 	Birch_Door_Upper, //???????
-	Torch, //???
-	Water, // ?
-	Chest, // ?
 	Furnace,
 	Crafting_Table, // ?
+	Chest, // ?
+	Torch, //???
+	Water, // ?
 	Tall_Grass, //?????
 	Flower_Allium,
 	Flower_Blue_Orchid,
@@ -116,55 +123,52 @@ enum class EVoxelTreePart : uint8
 };
 
 /**
- * ????
+ * ?????
  */
 UENUM(BlueprintType)
-enum class EVoxelMeshType : uint8
+enum class EVoxelTransparency : uint8
 {
-	Cube,
-	Custom
+	None,
+	// ???
+	Solid,
+	// ?????
+	Semi,
+	// ???
+	Trans
 };
 
 /**
  * ?????
  */
 UENUM(BlueprintType)
-enum class EVoxelTransparency : uint8
+enum class EVoxelNature : uint8
 {
+	None,
 	// ???
 	Solid,
-	// ?????
-	SemiTransparent,
 	// ???
-	Transparent
-};
-
-/**
- * 像素声音类型
- */
-UENUM(BlueprintType)
-enum class EVoxelSoundType : uint8
-{
-	// 生成
-	Generate,
-	// 销毁
-	Destroy,
-	// 脚步
-	Footstep,
-	// 交互1
-	Interact1,
-	// 交互1
-	Interact2,
-	// 交互3
-	Interact3,
+	SemiSolid,
+	// ???
+	SmallSemiSolid,
+	// ???
+	TransSolid,
+	// ???
+	Liquid,
+	// ???
+	SemiLiquid,
+	// ?????
+	Foliage,
+	// ?????
+	SemiFoliage
 };
 
 /**
  * ????????????
  */
 UENUM(BlueprintType)
-enum class EVoxelMeshNature : uint8
+enum class EVoxelScope : uint8
 {
+	None,
 	// ?????
 	Chunk,
 	// ??????
@@ -175,6 +179,25 @@ enum class EVoxelMeshNature : uint8
 	Preview,
 	// ????????
 	Vitality
+};
+
+/**
+ * 像素声音类型
+ */
+UENUM(BlueprintType)
+enum class EVoxelSoundType : uint8
+{
+	None,
+	// 生成
+	Generate,
+	// 销毁
+	Destroy,
+	// 脚步
+	Footstep,
+	// 打开
+	Open,
+	// 关闭
+	Close
 };
 
 /**
@@ -189,6 +212,17 @@ enum class EVoxelInteractAction : uint8
 	Open = EInteractAction::Custom1 UMETA(DisplayName="打开"),
 	// 关闭
 	Close = EInteractAction::Custom2 UMETA(DisplayName="关闭")
+};
+
+UENUM(BlueprintType)
+enum class EVoxelBiomeType: uint8
+{
+	None,
+	Snow,
+	Green,
+	Dry,
+	Stone,
+	Desert
 };
 
 USTRUCT(BlueprintType)
@@ -254,13 +288,60 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelItem : public FAbilityItem
+struct WHFRAMEWORK_API FVoxelRenderData
 {
 	GENERATED_BODY()
 
 public:
-	static FVoxelItem Empty;
-	static FVoxelItem Unknown;
+	FORCEINLINE FVoxelRenderData()
+	{
+		Material = nullptr;
+		UnlitMaterial = nullptr;
+		PixelSize = 16;
+		TextureSize = FVector2D::ZeroVector;
+		CombineTexture = nullptr;
+		Textures = TArray<UTexture2D*>();
+		MaterialInst = nullptr;
+		UnlitMaterialInst = nullptr;
+	}
+
+	FORCEINLINE FVoxelRenderData(UMaterialInterface* InMaterial, UMaterialInterface* InUnlitMaterial, int32 InBlockPixelSize = 16) : FVoxelRenderData()
+	{
+		Material = InMaterial;
+		UnlitMaterial = InUnlitMaterial;
+		PixelSize = InBlockPixelSize;
+	}
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UMaterialInterface* Material;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UMaterialInterface* UnlitMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 PixelSize;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FVector2D TextureSize;
+
+	UPROPERTY(Transient)
+	UTexture2D* CombineTexture;
+
+	UPROPERTY(Transient)
+	TArray<UTexture2D*> Textures;
+
+	UPROPERTY(Transient)
+	UMaterialInstance* MaterialInst;
+
+	UPROPERTY(Transient)
+	UMaterialInstance* UnlitMaterialInst;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelItem : public FAbilityItem
+{
+	GENERATED_BODY()
 
 public:
 	UPROPERTY(BlueprintReadWrite)
@@ -282,6 +363,10 @@ public:
 
 	UPROPERTY(BlueprintReadOnly)
 	bool bGenerated;
+
+public:
+	static FVoxelItem Empty;
+	static FVoxelItem Unknown;
 
 public:
 	FVoxelItem()
@@ -337,7 +422,9 @@ public:
 public:
 	virtual bool IsValid() const override;
 
-	bool IsUnknown() const;
+	virtual bool IsEmpty() const override;
+
+	virtual bool IsUnknown() const;
 
 	bool IsReplaceable(const FVoxelItem& InVoxelItem = FVoxelItem::Empty) const;
 
@@ -372,72 +459,12 @@ public:
 	}
 
 	UVoxelData& GetVoxelData(bool bEnsured = true) const;
-
-public:
-	FORCEINLINE friend bool operator==(const FVoxelItem& A, const FVoxelItem& B)
-	{
-		return (A.ID == B.ID) && (A.Count == B.Count) && (A.Level == B.Level) && (A.Index == B.Index);
-	}
-
-	FORCEINLINE friend bool operator!=(const FVoxelItem& A, const FVoxelItem& B)
-	{
-		return (A.ID != B.ID) || (A.Count != B.Count) || (A.Level != B.Level) || (A.Index != B.Index);
-	}
-};
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelAuxiliarySaveData : public FSaveData
-{
-	GENERATED_BODY()
-
-public:
-	FORCEINLINE FVoxelAuxiliarySaveData()
-	{
-		VoxelItem = FVoxelItem();
-		MeshNature = EVoxelMeshNature::Chunk;
-		InventoryData = FInventorySaveData();
-	}
-
-	FORCEINLINE FVoxelAuxiliarySaveData(const FVoxelItem& InVoxelItem, EVoxelMeshNature InMeshNature = EVoxelMeshNature::Chunk) : FVoxelAuxiliarySaveData()
-	{
-		VoxelItem = InVoxelItem;
-		MeshNature = InMeshNature;
-	}
-
-public:
-	UPROPERTY()
-	FVoxelItem VoxelItem;
-
-	UPROPERTY()
-	EVoxelMeshNature MeshNature;
-
-	UPROPERTY(BlueprintReadWrite)
-	FInventorySaveData InventoryData;
-
-public:
-	virtual void MakeSaved() override
-	{
-		Super::MakeSaved();
-
-		VoxelItem.MakeSaved();
-		InventoryData.MakeSaved();
-	}
 };
 
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelHitResult
 {
 	GENERATED_BODY()
-
-public:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	FVector Point;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	FVector Normal;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	FVoxelItem VoxelItem;
 
 public:
 	FVoxelHitResult()
@@ -450,6 +477,16 @@ public:
 	FVoxelHitResult(const FHitResult& InHitResult);
 	
 	FVoxelHitResult(const FVoxelItem& InVoxelItem, FVector InPoint = FVector::ZeroVector, FVector InNormal = FVector::ZeroVector);
+
+public:
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FVector Point;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FVector Normal;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FVoxelItem VoxelItem;
 
 public:
 	bool IsValid() const;
@@ -466,59 +503,124 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelRenderData
+struct WHFRAMEWORK_API FVoxelAuxiliarySaveData : public FSaveData
 {
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	UMaterialInterface* Material;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	UMaterialInterface* UnlitMaterial;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 PixelSize;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	FVector2D TextureSize;
-
-	UPROPERTY(Transient)
-	UTexture2D* CombineTexture;
-
-	UPROPERTY(Transient)
-	TArray<UTexture2D*> Textures;
-
-	UPROPERTY(Transient)
-	UMaterialInstance* MaterialInst;
-
-	UPROPERTY(Transient)
-	UMaterialInstance* UnlitMaterialInst;
-
-	FORCEINLINE FVoxelRenderData()
+	FORCEINLINE FVoxelAuxiliarySaveData()
 	{
-		Material = nullptr;
-		UnlitMaterial = nullptr;
-		PixelSize = 16;
-		TextureSize = FVector2D::ZeroVector;
-		CombineTexture = nullptr;
-		Textures = TArray<UTexture2D*>();
-		MaterialInst = nullptr;
-		UnlitMaterialInst = nullptr;
+		VoxelItem = FVoxelItem();
+		MeshNature = EVoxelScope::Chunk;
+		InventoryData = FInventorySaveData();
 	}
 
-	FORCEINLINE FVoxelRenderData(UMaterialInterface* InMaterial, UMaterialInterface* InUnlitMaterial, int32 InBlockPixelSize = 16) : FVoxelRenderData()
+	FORCEINLINE FVoxelAuxiliarySaveData(const FVoxelItem& InVoxelItem, EVoxelScope InMeshNature = EVoxelScope::None) : FVoxelAuxiliarySaveData()
 	{
-		Material = InMaterial;
-		UnlitMaterial = InUnlitMaterial;
-		PixelSize = InBlockPixelSize;
+		VoxelItem = InVoxelItem;
+		MeshNature = InMeshNature;
 	}
+
+public:
+	UPROPERTY()
+	FVoxelItem VoxelItem;
+
+	UPROPERTY()
+	EVoxelScope MeshNature;
+
+	UPROPERTY(BlueprintReadWrite)
+	FInventorySaveData InventoryData;
+
+public:
+	virtual void MakeSaved() override
+	{
+		Super::MakeSaved();
+
+		VoxelItem.MakeSaved();
+		InventoryData.MakeSaved();
+	}
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelTopography
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FVoxelTopography()
+	{
+		Index = FIndex::ZeroIndex;
+		Height = 0;
+		Temperature = 0.f;
+		Humidity = 0.f;
+		BiomeType = EVoxelBiomeType::None;
+	}
+
+	FORCEINLINE FVoxelTopography(const FString& InSaveData);
+
+public:
+	FString ToSaveData() const;
+
+public:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	FIndex Index;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	int32 Height;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	float Temperature;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	float Humidity;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	EVoxelBiomeType BiomeType;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelBuildingSaveData : public FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FVoxelBuildingSaveData()
+	{
+		ID = 0;
+		Location = FVector();
+		Angle = 0;
+		Actor = nullptr;
+	}
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	int32 ID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FVector Location;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	int32 Angle;
+
+	UPROPERTY(VisibleAnywhere, Transient)
+	AActor* Actor;
 };
 
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelChunkSaveData : public FSaveData
 {
 	GENERATED_BODY()
+
+public:
+	FORCEINLINE FVoxelChunkSaveData()
+	{
+		Index = FIndex::ZeroIndex;
+		VoxelDatas = TEXT("");
+		TopographyDatas = TEXT("");
+		PickUpDatas = TArray<FPickUpSaveData>();
+		AuxiliaryDatas = TArray<FVoxelAuxiliarySaveData>();
+		bGenerated = false;
+	}
 
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
@@ -528,26 +630,19 @@ public:
 	FString VoxelDatas;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FString TopographyDatas;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	TArray<FPickUpSaveData> PickUpDatas;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	TArray<FVoxelBuildingSaveData> BuildingDatas;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	TArray<FVoxelAuxiliarySaveData> AuxiliaryDatas;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	bool bBuilded;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	bool bGenerated;
-
-	FORCEINLINE FVoxelChunkSaveData()
-	{
-		Index = FIndex::ZeroIndex;
-		VoxelDatas = TEXT("");
-		PickUpDatas = TArray<FPickUpSaveData>();
-		AuxiliaryDatas = TArray<FVoxelAuxiliarySaveData>();
-		bBuilded = false;
-		bGenerated = false;
-	}
 
 public:
 	virtual void MakeSaved() override
@@ -562,11 +657,32 @@ public:
 			Iter.MakeSaved();
 		}
 	}
+};
 
-	bool HasVoxelData() const
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelRandomData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FVoxelRandomData()
 	{
-		return !VoxelDatas.IsEmpty();
+		RandomRate = 0.f;
+		VoxelTypes = TArray<EVoxelType>();
 	}
+
+	FORCEINLINE FVoxelRandomData(float InRandomRate, const TArray<EVoxelType>& InVoxelTypes)
+	{
+		RandomRate = InRandomRate;
+		VoxelTypes = InVoxelTypes;
+	}
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float RandomRate;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TArray<EVoxelType> VoxelTypes;
 };
 
 USTRUCT(BlueprintType)
@@ -581,22 +697,16 @@ public:
 		
 		ChunkSize = FVector(16.f);
 		
-		WorldSize = FVector(-1.f, -1.f, 3.f);
-		WorldRange = FVector2D(7.f, 7.f);
+		WorldSize = FVector(-1.f, -1.f, 5.f);
+		WorldRange = FVector2D(15.f, 15.f);
 
-		BaseHeight = 0.1f;
-		BedrockHeight = 0.02f;
-		WaterHeight = 0.35f;
-		
-		PlainScale = FVector(0.001f, 0.001f, 0.25f);
-		MountainScale = FVector(0.01f, 0.01f, 0.3f);
-		BlobScale = FVector(0.05f, 0.05f, 0.2f);
-		StoneScale = FVector(0.05f, 0.05f, 0.15f);
-		SandScale = FVector(0.03f, 0.03f, 0.25f);
-		PlantScale = FVector4(0.8f, 0.8f, 0.5f, 0.08f);
-		TreeScale = FVector4(0.01f, 0.01f, 0.5f, 0.005f);
+		SeaLevel = 32;
 
-		RenderDatas = TMap<EVoxelTransparency, FVoxelRenderData>();
+		VoxelGenerators = TArray<UVoxelGenerator*>();
+
+		RenderDatas = TMap<EVoxelNature, FVoxelRenderData>();
+
+		IconMat = nullptr;
 
 		SceneData = FSceneModuleSaveData();
 	}
@@ -613,40 +723,19 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FVector2D WorldRange;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float BaseHeight;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float BedrockHeight;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float WaterHeight;
 		
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector PlainScale;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector MountainScale;
-		
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector BlobScale;
+	int32 SeaLevel;
+
+	UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly)
+	TArray<UVoxelGenerator*> VoxelGenerators;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector StoneScale;
+	TMap<EVoxelNature, FVoxelRenderData> RenderDatas;
 				
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector SandScale;
+	UMaterialInterface* IconMat;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector4 PlantScale;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector4 TreeScale;
-		
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TMap<EVoxelTransparency, FVoxelRenderData> RenderDatas;
-		
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FSceneModuleSaveData SceneData;
 
@@ -677,6 +766,11 @@ public:
 	{
 		return BlockSize * InNormal * InLength;
 	}
+
+	FORCEINLINE FVoxelRenderData& GetRenderData(EVoxelNature InVoxelNature)
+	{
+		return RenderDatas[InVoxelNature];
+	}
 };
 
 USTRUCT(BlueprintType)
@@ -698,8 +792,6 @@ public:
 	}
 
 public:
-	static FVoxelWorldSaveData Empty;
-	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 WorldSeed;
 
@@ -708,24 +800,6 @@ public:
 	
 public:
 	virtual bool IsExistChunkData(FIndex InChunkIndex) const { return false; }
-	
-	virtual bool IsBuildChunkData(FIndex InChunkIndex)
-	{
-		if(const auto ChunkData = GetChunkData(InChunkIndex))
-		{
-			return ChunkData->bBuilded;
-		}
-		return false;
-	}
-	
-	virtual bool IsGenerateChunkData(FIndex InChunkIndex)
-	{
-		if(const auto ChunkData = GetChunkData(InChunkIndex))
-		{
-			return ChunkData->bGenerated;
-		}
-		return false;
-	}
 
 	template<class T>
 	T* GetChunkData(FIndex InChunkIndex)
@@ -736,6 +810,24 @@ public:
 	virtual FVoxelChunkSaveData* GetChunkData(FIndex InChunkIndex) { return nullptr; }
 
 	virtual void SetChunkData(FIndex InChunkIndex, FVoxelChunkSaveData* InChunkData) { }
+	
+	virtual bool IsChunkGenerated(FIndex InChunkIndex)
+	{
+		if(const auto ChunkData = GetChunkData(InChunkIndex))
+		{
+			return ChunkData->bGenerated;
+		}
+		return false;
+	}
+	
+	virtual bool IsChunkHasVoxelData(FIndex InChunkIndex)
+	{
+		if(const auto ChunkData = GetChunkData(InChunkIndex))
+		{
+			return !ChunkData->VoxelDatas.IsEmpty();
+		}
+		return false;
+	}
 };
 
 USTRUCT(BlueprintType)
@@ -799,14 +891,14 @@ public:
 	UPROPERTY(VisibleAnywhere)
 	TArray<FIndex> Queue;
 		
-	TArray<FAsyncTask<AsyncTask_ChunkQueue>*> Tasks;
+	TArray<FVoxelChunkQueueThread*> Threads;
 
 	FORCEINLINE FVoxelChunkQueue()
 	{
 		bAsync = false;
 		Speed = 100;
 		Queue = TArray<FIndex>();
-		Tasks = TArray<FAsyncTask<AsyncTask_ChunkQueue>*>();
+		Threads = TArray<FVoxelChunkQueueThread*>();
 	}
 
 	FORCEINLINE FVoxelChunkQueue(bool bInAsync, int32 InSpeed)
@@ -814,7 +906,7 @@ public:
 		bAsync = bInAsync;
 		Speed = InSpeed;
 		Queue = TArray<FIndex>();
-		Tasks = TArray<FAsyncTask<AsyncTask_ChunkQueue>*>();
+		Threads = TArray<FVoxelChunkQueueThread*>();
 	}
 };
 
@@ -827,13 +919,18 @@ public:
 	UPROPERTY(EditAnywhere)
 	TArray<FVoxelChunkQueue> Queues;
 
+	UPROPERTY(VisibleAnywhere)
+	int32 Stage;
+
 	FORCEINLINE FVoxelChunkQueues()
 	{
 		Queues = TArray<FVoxelChunkQueue>();
+		Stage = 0;
 	}
 
 	FORCEINLINE FVoxelChunkQueues(const TArray<FVoxelChunkQueue>& InQueues)
 	{
 		Queues = InQueues;
+		Stage = 0;
 	}
 };
