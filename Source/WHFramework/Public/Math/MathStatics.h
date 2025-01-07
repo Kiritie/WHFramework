@@ -18,6 +18,17 @@ class WHFRAMEWORK_API UMathStatics : public UBlueprintFunctionLibrary
 
 public:
 	//////////////////////////////////////////////////////////////////////////
+	// Index
+	//Three-dimensional to one-dimensional coordinates (compressed)
+	static uint64 Index(int32 InX, int32 InY, int32 InZ = 0);
+
+	//Three-dimensional to one-dimensional coordinates (compressed)
+	static uint64 Index(FIndex InIndex);
+
+	//One-dimensional to three-dimensional coordinates (decompression coordinates)
+	static FIndex UnIndex(uint64 InIndex);
+
+	//////////////////////////////////////////////////////////////////////////
 	// Rotator
 	template<class U>
 	FORCEINLINE static FRotator LerpRotator(const FRotator& A, const FRotator& B, const U& Alpha, bool bNormalized = true)
@@ -108,17 +119,8 @@ public:
 	static float Rand(FVector2D InLocation, int32 InSeed = 0);
 
 	//Second order bezier curve t should be [0.0f~1.0f]
-	static FVector2D Bezier(FVector2D InP0,FVector2D InP1,FVector2D InP2,float InT);
+	static FVector2D Bezier(FVector2D InP0, FVector2D InP1, FVector2D InP2, float InT);
 
 	//The third-order bezier curve t should be [0.0f~1.0f]
-	static FVector2D Bezier(FVector2D InP0,FVector2D InP1,FVector2D InP2,FVector2D InP3,float InT);
-
-	//Three-dimensional to one-dimensional coordinates (compressed)
-	static uint64 Index(int32 InX, int32 InY, int32 InZ = 0);
-
-	//Three-dimensional to one-dimensional coordinates (compressed)
-	static uint64 Index(FIndex InIndex);
-
-	//One-dimensional to three-dimensional coordinates (decompression coordinates)
-	static FIndex UnIndex(uint64 InIndex);
+	static FVector2D Bezier(FVector2D InP0, FVector2D InP1, FVector2D InP2, FVector2D InP3, float InT);
 };

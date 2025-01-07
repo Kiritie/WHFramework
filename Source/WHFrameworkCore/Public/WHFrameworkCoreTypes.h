@@ -29,6 +29,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE( FSimpleDynamicMulticastDelegate );
 #define PHASEC(A, B) \
 ((uint8)A & (uint8)B) != 0
 
+#define NUMWITH(A, B) \
+(A & B) != 0
+
 #define ENUMWITH(A, B) \
 ((uint8)A & (uint8)B) != 0
 

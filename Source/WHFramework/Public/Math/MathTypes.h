@@ -102,7 +102,7 @@ public:
 		Z = 0;
 	}
 
-	FORCEINLINE FIndex(int64 InValue);
+	FIndex(int64 InValue);
 
 	FORCEINLINE FIndex(int32 InValue)
 	{
@@ -148,7 +148,7 @@ public:
 		Z = FCString::Atoi(*Arr[2]);
 	}
 
-	FORCEINLINE int64 ToInt64() const;
+	int64 ToInt64() const;
 
 	FORCEINLINE FVector ToVector() const
 	{

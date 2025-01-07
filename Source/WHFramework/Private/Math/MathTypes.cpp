@@ -19,5 +19,5 @@ FIndex::FIndex(int64 InValue)
 
 int64 FIndex::ToInt64() const
 {
-	return UMathStatics::Index(ToVector());
+	return UMathStatics::Index(*this);
 }

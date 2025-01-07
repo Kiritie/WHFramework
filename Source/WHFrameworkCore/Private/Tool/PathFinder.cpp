@@ -2,22 +2,30 @@
 
 #include "Tool/PathFinder.h"
 
-//记录深度
-int FPathFinder::Depth = 0;
+FPathFinder::FPathFinder()
+{
+	//记录深度
+	Depth = 0;
 
-//深度限制
-int FPathFinder::DepthLimit = 400;
+	//深度限制
+	DepthLimit = 400;
 
-//存储OpenNode的内存空间
-std::vector<FOpenNode> FPathFinder::PointList = std::vector<FOpenNode>(DepthLimit);
+	//存储OpenNode的内存空间
+	PointList = std::vector<FOpenNode>(DepthLimit);
 
-//函数接口：检查是否有障碍物（不可走）
-std::function<bool(FVector2D pos)> FPathFinder::InBarrier = nullptr;
+	//函数接口：检查是否有障碍物（不可走）
+	InBarrier = nullptr;
 
-//函数接口：计算权值预测公式
-std::function<TPair<float, float>(FVector2D pos, FVector2D endPos, float cost)> FPathFinder::WeightFormula = nullptr;
+	//函数接口：计算权值预测公式
+	WeightFormula = nullptr;
 
-std::priority_queue<FOpenNode*, std::vector<FOpenNode*>, FOpenPointPtrCompare> FPathFinder::Openlist = {};
+	Openlist = {};
+}
+
+FPathFinder::~FPathFinder()
+{
+	
+}
 
 TArray<FVector2D> FPathFinder::FindPath(FVector2D StartPos, FVector2D EndPos)
 {
@@ -39,7 +47,7 @@ TArray<FVector2D> FPathFinder::FindPath(FVector2D StartPos, FVector2D EndPos)
 		ToOpen = Openlist.top();
 		//将父节点从openlist移除
 		Openlist.pop();
-		// 找到终点后，则停止搜索
+		//找到终点后，则停止搜索
 		if (ToOpen->Pos.X == EndPos.X && ToOpen->Pos.Y == EndPos.Y)
 		{
 			bFound = true;
@@ -53,17 +61,18 @@ TArray<FVector2D> FPathFinder::FindPath(FVector2D StartPos, FVector2D EndPos)
 		Open(*ToOpen, EndPos);
 	}
 
-	if (!bFound)
+	if (bFound)
 	{
-		// UE_LOG(LogTemp, Warning, TEXT("path unfound %d"), Depth);
+		// UE_LOG(LogTemp, Warning, TEXT("path found %d"), Depth);
+		while (ToOpen)
+		{
+			Road.Push(ToOpen->Pos);
+			ToOpen = ToOpen->Father;
+		}
 	}
 	else
 	{
-		// UE_LOG(LogTemp, Warning, TEXT("path found %d"), Depth);
-		for (auto Rs = ToOpen; Rs != nullptr; Rs = Rs->Father)
-		{
-			Road.Push(Rs->Pos);
-		}
+		// UE_LOG(LogTemp, Warning, TEXT("path unfound %d"), Depth);
 	}
 
 	return Road;

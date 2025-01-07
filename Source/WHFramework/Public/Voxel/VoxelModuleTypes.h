@@ -207,11 +207,11 @@ UENUM(BlueprintType)
 enum class EVoxelInteractAction : uint8
 {
 	// 无
-	None = EInteractAction::None UMETA(DisplayName="无"),
+	None = EInteractAction::None,
 	// 打开
-	Open = EInteractAction::Custom1 UMETA(DisplayName="打开"),
+	Open = EInteractAction::Custom1,
 	// 关闭
-	Close = EInteractAction::Custom2 UMETA(DisplayName="关闭")
+	Close = EInteractAction::Custom2
 };
 
 UENUM(BlueprintType)

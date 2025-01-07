@@ -68,4 +68,7 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetValues(const TArray<FParameter>& InValues);
+
+	UFUNCTION(BlueprintCallable)
+	virtual void SetVisible(bool bVisible);
 };

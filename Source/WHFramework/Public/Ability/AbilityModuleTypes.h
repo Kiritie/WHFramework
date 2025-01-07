@@ -330,29 +330,29 @@ UENUM(BlueprintType)
 enum class EAbilityItemType : uint8
 {
 	// 无
-	None UMETA(DisplayName="无"),
+	None,
 	// 货币
-	Coin UMETA(DisplayName="货币"),
+	Coin,
 	// 体素
-	Voxel UMETA(DisplayName="体素"),
+	Voxel,
 	// 材料
-	Raw UMETA(DisplayName="材料"),
+	Raw,
 	// 道具
-	Prop UMETA(DisplayName="道具"),
+	Prop,
 	// 装备
-	Equip UMETA(DisplayName="装备"),
+	Equip,
 	// 技能
-	Skill UMETA(DisplayName="技能"),
+	Skill,
 	// 物体
-	Actor UMETA(DisplayName="物体"),
+	Actor,
 	// 生命体
-	Vitality UMETA(DisplayName="生命体"),
+	Vitality,
 	// 对象
-	Pawn UMETA(DisplayName="对象"),
+	Pawn,
 	// 角色
-	Character UMETA(DisplayName="角色"),
+	Character,
 	// 混杂
-	Misc UMETA(DisplayName="混杂")
+	Misc
 };
 
 /**

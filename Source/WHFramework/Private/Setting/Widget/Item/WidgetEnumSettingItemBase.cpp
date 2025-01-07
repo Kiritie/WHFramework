@@ -16,36 +16,28 @@ void UWidgetEnumSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const 
 
 	ComboBox_Value->OnSelectionChanged.AddDynamic(this, &UWidgetEnumSettingItemBase::OnComboBoxSelectionChanged);
 	
-	FString EnumName;
-	TArray<FString> EnumNames;
-	int32 EnumMaxNum = -1;
-
 	if(InParams.IsValidIndex(1))
 	{
 		if(InParams[1].GetParameterType() == EParameterType::String)
 		{
-			EnumName = InParams[1].GetStringValue();
+			for(int32 i = 0; i < UCommonStatics::GetEnumItemNum(InParams[1]); i++)
+			{
+				EnumNames.Add(UCommonStatics::GetEnumDisplayNameByValue(InParams[1], i).ToString());
+			}
 		}
 		else
 		{
 			EnumNames = InParams[1].GetPointerValueRef<TArray<FString>>();
 		}
 	}
+	TArray<int32> IgnoreEnumIndexs;
 	if(InParams.IsValidIndex(2))
 	{
-		EnumMaxNum = InParams[2];
+		IgnoreEnumIndexs = InParams[2].GetPointerValueRef<TArray<int32>>();
 	}
-	
-	if(!EnumName.IsEmpty())
+	for(int32 i = 0; i < EnumNames.Num(); i++)
 	{
-		for(int32 i = 0; i < (EnumMaxNum != -1 ? EnumMaxNum : UCommonStatics::GetEnumItemNum(EnumName)); i++)
-		{
-			ComboBox_Value->AddOption(UCommonStatics::GetEnumDisplayNameByValue(EnumName, i).ToString());
-		}
-	}
-	else
-	{
-		for(int32 i = 0; i < (EnumMaxNum != -1 ? EnumMaxNum : EnumNames.Num()); i++)
+		if(!IgnoreEnumIndexs.Contains(i))
 		{
 			ComboBox_Value->AddOption(EnumNames[i]);
 		}
@@ -56,6 +48,8 @@ void UWidgetEnumSettingItemBase::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
 
+	EnumNames.Empty();
+	
 	ComboBox_Value->ClearOptions();
 
 	ComboBox_Value->OnSelectionChanged.RemoveDynamic(this, &UWidgetEnumSettingItemBase::OnComboBoxSelectionChanged);
@@ -77,11 +71,11 @@ void UWidgetEnumSettingItemBase::OnComboBoxSelectionChanged(FString InSelectedIt
 
 FParameter UWidgetEnumSettingItemBase::GetValue() const
 {
-	return ComboBox_Value->GetSelectedIndex();
+	return EnumNames.Find(ComboBox_Value->GetSelectedOption());
 }
 
 void UWidgetEnumSettingItemBase::SetValue(const FParameter& InValue)
 {
-	ComboBox_Value->SetSelectedIndex(InValue);
+	ComboBox_Value->SetSelectedOption(EnumNames[FMath::Clamp(0, InValue, EnumNames.Num() - 1)]);
 	Super::SetValue(InValue);
 }

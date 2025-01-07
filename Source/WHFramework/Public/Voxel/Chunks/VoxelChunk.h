@@ -178,8 +178,6 @@ protected:
 
 public:
 	virtual void AddBuilding(const FVoxelBuildingSaveData& InBuildingData);
-	
-	virtual TSubclassOf<AActor> GetBuildingClassByID(int32 InID) const;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Auxiliary

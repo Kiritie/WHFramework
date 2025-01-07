@@ -64,3 +64,8 @@ void UWidgetSettingItemBase::SetValues(const TArray<FParameter>& InValues)
 	}
 	Refresh();
 }
+
+void UWidgetSettingItemBase::SetVisible(bool bVisible)
+{
+	SetVisibility(bVisible ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+}

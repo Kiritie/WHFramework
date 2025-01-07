@@ -24,6 +24,7 @@ FVoxelChunkQueueThread::~FVoxelChunkQueueThread()
 
 bool FVoxelChunkQueueThread::Init()
 {
+	bFinished = false;
 	return true;
 }
 

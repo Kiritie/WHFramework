@@ -19,11 +19,10 @@ public:
 	UVoxelFoliageGenerator();
 
 public:
-	//生成植物
 	virtual void Generate(AVoxelChunk* InChunk) override;
 
 public:
-	//生成花
+	//生成植物
 	bool GeneratePlant(AVoxelChunk* InChunk, FIndex InIndex, int32 InCrystalSize);
 
 	//生成树
@@ -51,5 +50,5 @@ protected:
 private:
 	int32 _Seed;
 	//树叶模板（生成树叶阶段用）
-	static bool LeavesTemplate[4][5][5];
+	static bool _LeavesTemplate[4][5][5];
 };

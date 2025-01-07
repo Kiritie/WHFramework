@@ -14,6 +14,8 @@ UVoxelFoliageGenerator::UVoxelFoliageGenerator()
 	GrassRate = 0.9f;
 	FlowerRate = 0.98f;
 	TreeRate = 0.99f;
+	
+	_Seed = 0;
 }
 
 void UVoxelFoliageGenerator::Generate(AVoxelChunk* InChunk)
@@ -23,17 +25,15 @@ void UVoxelFoliageGenerator::Generate(AVoxelChunk* InChunk)
 	ITER_INDEX2D(Index, Module->GetWorldData().ChunkSize, false,
 		const FVoxelTopography& Topography = InChunk->GetTopography(Index);
 		//不允许在空地、石头、沙漠上产生植被
-		if (Topography.BiomeType == EVoxelBiomeType::None ||
-			Topography.BiomeType == EVoxelBiomeType::Stone ||
-			Topography.BiomeType == EVoxelBiomeType::Desert) continue;
+		if (Topography.BiomeType == EVoxelBiomeType::None || Topography.BiomeType == EVoxelBiomeType::Stone || Topography.BiomeType == EVoxelBiomeType::Desert) continue;
 
 		const FIndex GlobalIndex = InChunk->LocalIndexToWorld(Index);
 		// 被挖空（方块ID为0）或者方块ID为9（方块为水）就无法生成
-		if (!Module->HasVoxelByIndex(FIndex(GlobalIndex.X, GlobalIndex.Y, Topography.Height))) continue;
+		if (!Module->HasVoxelByIndex(FIndex(GlobalIndex.X, GlobalIndex.Y, Topography.Height), true) || Module->GetVoxelByIndex(FIndex(GlobalIndex.X, GlobalIndex.Y, Topography.Height)).GetVoxelType() == EVoxelType::Water) continue;
 
 		//查询地板上一格的方块ID
 		//如果存在方块，则无法生成
-		if (Module->HasVoxelByIndex(FIndex(GlobalIndex.X, GlobalIndex.Y, Topography.Height + 1))) continue;
+		if (Module->HasVoxelByIndex(FIndex(GlobalIndex.X, GlobalIndex.Y, Topography.Height + 1), true)) continue;
 
 		//生成树
 		if (GenerateTree(InChunk, Index, CrystalSize)) continue;
@@ -156,10 +156,10 @@ void UVoxelFoliageGenerator::GenerateLeaves(AVoxelChunk* InChunk, FIndex InIndex
 	{
 		for (int j = 0; j < 5; ++j)
 		{
-			if (!LeavesTemplate[InRadius][InChunk->LocalIndexToWorld(FIndex(i, j)).ToInt64()]) continue;
+			if (!_LeavesTemplate[InRadius][InChunk->LocalIndexToWorld(FIndex(i, j)).ToInt64()]) continue;
 
 			const FIndex Index =  InChunk->LocalIndexToWorld(FIndex(InIndex.X + i - 2, InIndex.Y + j - 2, InHeight));
-			if (!Module->HasVoxelByIndex(Index))
+			if (!Module->HasVoxelByIndex(Index, true))
 			{
 				Module->SetVoxelByIndex(Index, InLeafType);
 			}
@@ -167,7 +167,7 @@ void UVoxelFoliageGenerator::GenerateLeaves(AVoxelChunk* InChunk, FIndex InIndex
 	}
 }
 
-bool UVoxelFoliageGenerator::LeavesTemplate[4][5][5] = {
+bool UVoxelFoliageGenerator::_LeavesTemplate[4][5][5] = {
 	{
 		{0, 0, 0, 0, 0},
 		{0, 0, 1, 0, 0},

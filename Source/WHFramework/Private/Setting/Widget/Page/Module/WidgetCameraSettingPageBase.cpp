@@ -161,15 +161,15 @@ void UWidgetCameraSettingPageBase::OnValueChange(UWidgetSettingItemBase* InSetti
 
 	if(InSettingItem == SettingItem_SmoothCameraMove)
 	{
-		SettingItem_CameraMoveSpeed->SetVisibility(InSettingItem->GetValue().GetBooleanValue() ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+		SettingItem_CameraMoveSpeed->SetVisible(InSettingItem->GetValue().GetBooleanValue());
 	}
 	else if(InSettingItem == SettingItem_SmoothCameraRotate)
 	{
-		SettingItem_CameraRotateSpeed->SetVisibility(InSettingItem->GetValue().GetBooleanValue() ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+		SettingItem_CameraRotateSpeed->SetVisible(InSettingItem->GetValue().GetBooleanValue());
 	}
 	else if(InSettingItem == SettingItem_SmoothCameraZoom)
 	{
-		SettingItem_CameraZoomSpeed->SetVisibility(InSettingItem->GetValue().GetBooleanValue() ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+		SettingItem_CameraZoomSpeed->SetVisible(InSettingItem->GetValue().GetBooleanValue());
 	}
 }
 

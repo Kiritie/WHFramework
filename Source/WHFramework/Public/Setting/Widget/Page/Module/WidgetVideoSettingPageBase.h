@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
+#include "Setting/Widget/Item/WidgetBoolSettingItemBase.h"
 #include "Setting/Widget/Page/WidgetSettingPageBase.h"
 
 #include "WidgetVideoSettingPageBase.generated.h"
@@ -40,6 +41,18 @@ protected:
 	virtual FSaveData* GetDefaultSaveData() const override;
 
 protected:
+	UPROPERTY(BlueprintReadOnly, Category = "Components")
+	UWidgetEnumSettingItemBase* SettingItem_WindowMode;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Components")
+	UWidgetEnumSettingItemBase* SettingItem_WindowResolution;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Components")
+	UWidgetBoolSettingItemBase* SettingItem_EnableVSync;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Components")
+	UWidgetBoolSettingItemBase* SettingItem_EnableDynamicResolution;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Components")
 	UWidgetEnumSettingItemBase* SettingItem_GlobalVideoQuality;
 

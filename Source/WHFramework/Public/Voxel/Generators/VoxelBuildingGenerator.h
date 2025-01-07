@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "VoxelGenerator.h"
+#include "Tool/PathFinder.h"
 #include "VoxelBuildingGenerator.generated.h"
 
 /**
@@ -28,10 +29,10 @@ public:
 	void PlacePaths(AVoxelChunk* InChunk);
 
 	//检查是否有障碍物（不可走）
-	bool InBarrier(FVector2D InLocation);
+	bool InBarrier(FVector2D InPos);
 
 	//计算权值公式
-	TPair<float, float> WeightFormula(FVector2D InStartLocation, FVector2D InEndLocation, float InCost);
+	TPair<float, float> WeightFormula(FVector2D InStartPos, FVector2D InEndPos, float InCost);
 
 	bool PlaceOneBuilding(AVoxelChunk* InChunk, int32 InX, int32 InY, int32 InBuildingIndex, int32 InRotate);
 
@@ -41,13 +42,16 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float SpawnRate;
+
+	FPathFinder PathFinder;
 	
-	//发展域
-	TSet<uint64> Domains;
-	//已存在道路
-	TSet<uint64> Roads;
+private:
 	//发展域初始中心点
-	FVector2D StartPoint;
+	FVector2D _StartPoint;
+	//发展域
+	TSet<uint64> _Domains;
+	//已存在道路
+	TSet<uint64> _Roads;
 	//所有建筑门口点
-	TArray<FVector2D> BuildingPos;
+	TArray<FVector2D> _BuildingPos;
 };

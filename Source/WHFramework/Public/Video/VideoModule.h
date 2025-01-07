@@ -100,79 +100,154 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// VideoSetting
+public:
+	UFUNCTION(BlueprintCallable)
+	virtual void ApplyVideoSettings();
+
+public:
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+
 protected:
+	UPROPERTY(EditAnywhere, Category = "VideoSetting")
+	EWindowModeN WindowMode;
+
+	UPROPERTY(EditAnywhere, Category = "VideoSetting")
+	EWindowResolution WindowResolution;
+
+	UPROPERTY(EditAnywhere, Category = "VideoSetting")
+	bool bEnableVSync;
+
+	UPROPERTY(EditAnywhere, Category = "VideoSetting")
+	bool bEnableDynamicResolution;
+
 	UPROPERTY(EditAnywhere, Category = "VideoSetting")
 	EVideoQuality GlobalVideoQuality;
 
+	UPROPERTY(EditAnywhere, Category = "VideoSetting")
+	EVideoQuality ViewDistanceQuality;
+
+	UPROPERTY(EditAnywhere, Category = "VideoSetting")
+	EVideoQuality ShadowQuality;
+
+	UPROPERTY(EditAnywhere, Category = "VideoSetting")
+	EVideoQuality GlobalIlluminationQuality;
+
+	UPROPERTY(EditAnywhere, Category = "VideoSetting")
+	EVideoQuality ReflectionQuality;
+
+	UPROPERTY(EditAnywhere, Category = "VideoSetting")
+	EVideoQuality AntiAliasingQuality;
+
+	UPROPERTY(EditAnywhere, Category = "VideoSetting")
+	EVideoQuality TextureQuality;
+
+	UPROPERTY(EditAnywhere, Category = "VideoSetting")
+	EVideoQuality VisualEffectQuality;
+
+	UPROPERTY(EditAnywhere, Category = "VideoSetting")
+	EVideoQuality PostProcessingQuality;
+
+	UPROPERTY(EditAnywhere, Category = "VideoSetting")
+	EVideoQuality FoliageQuality;
+
+	UPROPERTY(EditAnywhere, Category = "VideoSetting")
+	EVideoQuality ShadingQuality;
+
 public:
+	UFUNCTION(BlueprintPure)
+	EWindowModeN GetWindowMode() const { return WindowMode; }
+
 	UFUNCTION(BlueprintCallable)
-	virtual void ApplyVideoQualitySettings();
-	
+	void SetWindowMode(EWindowModeN InMode, bool bApply = false);
+
+	UFUNCTION(BlueprintPure)
+	EWindowResolution GetWindowResolution() const { return WindowResolution; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetWindowResolution(EWindowResolution InResolution, bool bApply = false);
+
+	UFUNCTION(BlueprintPure)
+	FIntPoint GetDesktopResolution() const;
+
+	UFUNCTION(BlueprintPure)
+	bool IsEnableVSync() const { return bEnableVSync; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetEnableVSync(bool bInValue, bool bApply = false);
+
+	UFUNCTION(BlueprintPure)
+	bool IsEnableDynamicResolution() const { return bEnableDynamicResolution; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetEnableDynamicResolution(bool bInValue, bool bApply = false);
+
 	UFUNCTION(BlueprintPure)
 	virtual EVideoQuality GetGlobalVideoQuality() const { return GlobalVideoQuality; }
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetGlobalVideoQuality(EVideoQuality InQuality, bool bApply = false);
 
+	UFUNCTION(BlueprintPure)
+	virtual EVideoQuality GetViewDistanceQuality() const { return ViewDistanceQuality; }
+
 	UFUNCTION(BlueprintCallable)
 	virtual void SetViewDistanceQuality(EVideoQuality InQuality, bool bApply = false);
 
 	UFUNCTION(BlueprintPure)
-	virtual EVideoQuality GetViewDistanceQuality() const;
+	virtual EVideoQuality GetShadowQuality() const { return ShadowQuality; }
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetShadowQuality(EVideoQuality InQuality, bool bApply = false);
 
 	UFUNCTION(BlueprintPure)
-	virtual EVideoQuality GetShadowQuality() const;
+	virtual EVideoQuality GetGlobalIlluminationQuality() const { return GlobalIlluminationQuality; }
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetGlobalIlluminationQuality(EVideoQuality InQuality, bool bApply = false);
 
 	UFUNCTION(BlueprintPure)
-	virtual EVideoQuality GetGlobalIlluminationQuality() const;
+	virtual EVideoQuality GetReflectionQuality() const { return ReflectionQuality; }
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetReflectionQuality(EVideoQuality InQuality, bool bApply = false);
 
 	UFUNCTION(BlueprintPure)
-	virtual EVideoQuality GetReflectionQuality() const;
+	virtual EVideoQuality GetAntiAliasingQuality() const { return AntiAliasingQuality; }
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetAntiAliasingQuality(EVideoQuality InQuality, bool bApply = false);
 
 	UFUNCTION(BlueprintPure)
-	virtual EVideoQuality GetAntiAliasingQuality() const;
+	virtual EVideoQuality GetTextureQuality() const { return TextureQuality; }
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetTextureQuality(EVideoQuality InQuality, bool bApply = false);
 
 	UFUNCTION(BlueprintPure)
-	virtual EVideoQuality GetTextureQuality() const;
+	virtual EVideoQuality GetVisualEffectQuality() const { return VisualEffectQuality; }
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetVisualEffectQuality(EVideoQuality InQuality, bool bApply = false);
 
 	UFUNCTION(BlueprintPure)
-	virtual EVideoQuality GetVisualEffectQuality() const;
-
+	virtual EVideoQuality GetPostProcessingQuality() const { return PostProcessingQuality; }
+	
 	UFUNCTION(BlueprintCallable)
 	virtual void SetPostProcessingQuality(EVideoQuality InQuality, bool bApply = false);
 
 	UFUNCTION(BlueprintPure)
-	virtual EVideoQuality GetPostProcessingQuality() const;
-	
+	virtual EVideoQuality GetFoliageQuality() const { return FoliageQuality; }
+
 	UFUNCTION(BlueprintCallable)
 	virtual void SetFoliageQuality(EVideoQuality InQuality, bool bApply = false);
 
 	UFUNCTION(BlueprintPure)
-	virtual EVideoQuality GetFoliageQuality() const;
+	virtual EVideoQuality GetShadingQuality() const { return ShadingQuality; }
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetShadingQuality(EVideoQuality InQuality, bool bApply = false);
-
-	UFUNCTION(BlueprintPure)
-	virtual EVideoQuality GetShadingQuality() const;
 
 protected:
 	UFUNCTION(BlueprintPure)

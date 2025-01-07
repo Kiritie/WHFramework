@@ -5,13 +5,14 @@
 #include "CoreMinimal.h"
 #include "VoxelGenerator.h"
 #include "Math/MathTypes.h"
+#include "Thread/IThreadSafeInterface.h"
 #include "VoxelRainGenerator.generated.h"
 
 /**
  *
  */
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UVoxelRainGenerator : public UVoxelGenerator
+class WHFRAMEWORK_API UVoxelRainGenerator : public UVoxelGenerator, public IThreadSafeInterface
 {
 	GENERATED_BODY()
 
@@ -29,13 +30,11 @@ protected:
 	int32 Seed;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 MaxNum;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float SpawnRate;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float MaxDepth;
+	float MaxDistance;
 
-	TSet<FIndex> Waters;
+private:
+	TSet<FIndex> _Waters;
 };

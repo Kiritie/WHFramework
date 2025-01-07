@@ -2,6 +2,31 @@
 
 #include "Math/MathStatics.h"
 
+uint64 UMathStatics::Index(int32 InX, int32 InY, int32 InZ)
+{
+	const int32 Offset = 16384;
+	uint64 T =
+		uint64(InX + Offset) << 40 |
+		uint64(InY + Offset) << 20 |
+		uint64(InZ + Offset);
+	return T;
+}
+
+uint64 UMathStatics::Index(FIndex InIndex)
+{
+	return Index(InIndex.X, InIndex.Y, InIndex.Z);
+}
+
+FIndex UMathStatics::UnIndex(uint64 InIndex)
+{
+	const int32 Offset = 16384;
+	return FIndex(
+		int32(InIndex >> 40) - Offset,
+		int32((InIndex >> 20) & 0xFFFFF) - Offset,
+		int32(InIndex & 0xFFFFF) - Offset
+	);
+}
+
 FVector UMathStatics::RotatorVector(const FVector& Vector, const FRotator& Rotator, bool bRound, bool bAbsolute)
 {
 	FVector vector = !Rotator.IsZero() ? Rotator.RotateVector(Vector) : Vector;
@@ -521,29 +546,4 @@ FVector2D UMathStatics::Bezier(FVector2D InP0, FVector2D InP1, FVector2D InP2, f
 FVector2D UMathStatics::Bezier(FVector2D InP0, FVector2D InP1, FVector2D InP2, FVector2D InP3, float InT)
 {
 	return Bezier(InP0, InP1, InP2, InT) * (1 - InT) + Bezier(InP1, InP2, InP3, InT) * InT;
-}
-
-uint64 UMathStatics::Index(int32 InX, int32 InY, int32 InZ)
-{
-	const int32 Offset = 16384;
-	uint64 T =
-		uint64(InX + Offset) << 40 |
-		uint64(InY + Offset) << 20 |
-		uint64(InZ + Offset);
-	return T;
-}
-
-uint64 UMathStatics::Index(FIndex InIndex)
-{
-	return Index(InIndex.X, InIndex.Y, InIndex.Z);
-}
-
-FIndex UMathStatics::UnIndex(uint64 InIndex)
-{
-	const int32 Offset = 16384;
-	return FIndex(
-		int32(InIndex >> 40) - Offset,
-		int32((InIndex >> 20) & 0xFFFFF) - Offset,
-		int32(InIndex & 0xFFFFF) - Offset
-	);
 }

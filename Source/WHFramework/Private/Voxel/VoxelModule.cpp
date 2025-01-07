@@ -152,7 +152,7 @@ void UVoxelModule::OnGenerate()
 		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelCaveGenerator>(this));
 		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelOreGenerator>(this));
 		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelTerrainGenerator>(this));
-		// WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelRainGenerator>(this));
+		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelRainGenerator>(this));
 		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelFoliageGenerator>(this));
 		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelBuildingGenerator>(this));
 	}

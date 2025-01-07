@@ -45,17 +45,17 @@ UENUM(BlueprintType)
 enum class EInteractAction : uint8
 {
 	// 无
-	None = 0 UMETA(DisplayName="无"),
+	None = 0,
 	// 复活
-	Revive = 1 UMETA(DisplayName="复活"),
+	Revive = 1,
 	// 战斗
-	Fight = 2 UMETA(DisplayName="战斗"),
+	Fight = 2,
 	// 对话
-	Dialogue = 3 UMETA(DisplayName="对话"),
+	Dialogue = 3,
 	// 交易
-	Transaction = 4 UMETA(DisplayName="交易"),
+	Transaction = 4,
 	// 拾取
-	PickUp = 5 UMETA(DisplayName="拾取"),
+	PickUp = 5,
 
 	Custom1 = 10,
 	Custom2 = 11,
@@ -76,11 +76,11 @@ UENUM(BlueprintType)
 enum class EInteractAgentType : uint8
 {
 	// 无
-	None = 0 UMETA(DisplayName="无"),
-	// 静态的
-	Passivity = 1 UMETA(DisplayName="被动的"),
-	// 可移动的
-	Initiative = 2 UMETA(DisplayName="主动的")
+	None = 0,
+	// 被动的
+	Passivity,
+	// 主动的
+	Initiative
 };
 
 USTRUCT(BlueprintType)
@@ -103,10 +103,12 @@ public:
 	FString LocalCulture;
 };
 
+#define GET_CLASS_NAME(ClassName) #ClassName
+
 //////////////////////////////////////////////////////////////////////////
 // Property
 #define GET_MEMBER_PROPERTY(ClassName, PropertyName) \
-	FindFieldChecked<FProperty>(ClassName::StaticClass(), GET_MEMBER_NAME_CHECKED(ClassName, PropertyName)) \
+	FindFieldChecked<FProperty>(ClassName::StaticClass(), GET_MEMBER_NAME_CHECKED(ClassName, PropertyName))
 
 //////////////////////////////////////////////////////////////////////////
 // Functions

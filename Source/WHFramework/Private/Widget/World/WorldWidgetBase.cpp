@@ -354,28 +354,25 @@ bool UWorldWidgetBase::IsWidgetVisible_Implementation(bool bRefresh)
 					break;
 				}
 				case EWorldWidgetVisibility::RenderOnly:
-				{
-					bVisible = !OwnerActor || OwnerActor->WasRecentlyRendered();
-					break;
-				}
 				case EWorldWidgetVisibility::ScreenOnly:
-				{
-					bVisible = UCommonStatics::IsInScreenViewport(Location) && Location != FVector(-1.f);
-					break;
-				}
 				case EWorldWidgetVisibility::DistanceOnly:
-				{
-					bVisible = WidgetShowDistance == -1 || (WidgetShowDistance >= 0.f ? Distance < WidgetShowDistance : Distance > FMath::Abs(WidgetShowDistance));
-					break;
-				}
 				case EWorldWidgetVisibility::RenderAndDistance:
-				{
-					bVisible = (!OwnerActor || OwnerActor->WasRecentlyRendered()) && (WidgetShowDistance == -1 || (WidgetShowDistance >= 0.f ? Distance < WidgetShowDistance : Distance > FMath::Abs(WidgetShowDistance)));
-					break;
-				}
 				case EWorldWidgetVisibility::ScreenAndDistance:
+				case EWorldWidgetVisibility::RenderScreenAndDistance:
 				{
-					bVisible = UCommonStatics::IsInScreenViewport(Location) && Location != FVector(-1.f) && (WidgetShowDistance == -1 || (WidgetShowDistance >= 0.f ? Distance < WidgetShowDistance : Distance > FMath::Abs(WidgetShowDistance)));
+					bVisible = true;
+					if(ENUMWITH(WidgetVisibility, EWorldWidgetVisibility::RenderOnly))
+					{
+						bVisible = bVisible && (!OwnerActor || OwnerActor->WasRecentlyRendered());
+					}
+					if(ENUMWITH(WidgetVisibility, EWorldWidgetVisibility::ScreenOnly))
+					{
+						bVisible = bVisible && (Location != FVector(-1.f) && UCommonStatics::IsInScreenViewport(Location));
+					}
+					if(ENUMWITH(WidgetVisibility, EWorldWidgetVisibility::DistanceOnly))
+					{
+						bVisible = bVisible && (WidgetShowDistance == -1 || (WidgetShowDistance >= 0.f ? Distance < WidgetShowDistance : Distance > FMath::Abs(WidgetShowDistance)));
+					}
 					break;
 				}
 				default: break;
