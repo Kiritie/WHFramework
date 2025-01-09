@@ -550,14 +550,12 @@ void AAbilityCharacterBase::EndAction(const FGameplayTag& InActionTag, bool bWas
 	}
 }
 
-bool AAbilityCharacterBase::OnPickUp(AAbilityPickUpBase* InPickUp)
+void AAbilityCharacterBase::OnPickUp(AAbilityPickUpBase* InPickUp)
 {
 	if(InPickUp)
 	{
 		Inventory->AddItemByRange(InPickUp->GetItem(), -1);
-		return InPickUp->GetItem().Count <= 0;
 	}
-	return false;
 }
 
 bool AAbilityCharacterBase::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
@@ -633,6 +631,41 @@ void AAbilityCharacterBase::OnSelectItem(const FAbilityItem& InItem)
 void AAbilityCharacterBase::OnAuxiliaryItem(const FAbilityItem& InItem)
 {
 
+}
+
+bool AAbilityCharacterBase::OnGenerateVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
+{
+	if(!GenerateVoxelID.IsValid()) return false;
+
+	FItemQueryData ItemQueryData = Inventory->QueryItemByRange(EItemQueryType::Remove, FAbilityItem(GenerateVoxelID, 1), -1);
+	if(!ItemQueryData.IsValid()) return false;
+
+	switch(InInteractEvent)
+	{
+		case EInputInteractEvent::Started:
+		{
+			return IVoxelAgentInterface::OnGenerateVoxel(InInteractEvent, InHitResult);
+		}
+		case EInputInteractEvent::Triggered:
+		{
+			return IVoxelAgentInterface::OnGenerateVoxel(InInteractEvent, InHitResult);
+		}
+		case EInputInteractEvent::Completed:
+		{
+			if(IVoxelAgentInterface::OnGenerateVoxel(InInteractEvent, InHitResult))
+			{
+				Inventory->RemoveItemByQueryData(ItemQueryData);
+				return true;
+			}
+			break;
+		}
+	}
+	return false;
+}
+
+bool AAbilityCharacterBase::OnDestroyVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
+{
+	return IVoxelAgentInterface::OnDestroyVoxel(InInteractEvent, InHitResult);
 }
 
 void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)

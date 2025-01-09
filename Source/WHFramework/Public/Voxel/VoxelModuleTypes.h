@@ -426,6 +426,8 @@ public:
 
 	virtual bool IsUnknown() const;
 
+	virtual bool EqualIndex(const FVoxelItem& InItem) const;
+
 	bool IsReplaceable(const FVoxelItem& InVoxelItem = FVoxelItem::Empty) const;
 
 	FVoxelItem ReplaceID(const FPrimaryAssetId& InID) const;
@@ -439,6 +441,8 @@ public:
 	EVoxelType GetVoxelType() const;
 
 	FVector GetRange() const;
+
+	FIndex GetIndex(bool bWorldSpace = true) const;
 
 	FVector GetLocation(bool bWorldSpace = true) const;
 

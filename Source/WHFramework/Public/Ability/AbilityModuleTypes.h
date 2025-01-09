@@ -506,19 +506,19 @@ public:
 		return *this == Empty;
 	}
 
-	FORCEINLINE bool Match(const FAbilityItem& InItem) const
+	FORCEINLINE virtual bool Match(const FAbilityItem& InItem) const
 	{
 		return InItem.IsValid() && InItem.ID == ID && InItem.Level == Level;
 	}
 
-	FORCEINLINE bool Equal(const FAbilityItem& InItem) const
+	FORCEINLINE virtual bool Equal(const FAbilityItem& InItem) const
 	{
-		return (InItem.ID == ID) && (InItem.Count == Count) && (InItem.Level == Level);
+		return InItem.ID == ID && InItem.Count == Count && InItem.Level == Level;
 	}
 
 	FORCEINLINE bool EqualID(const FAbilityItem& InItem) const
 	{
-		return (InItem.ID == ID);
+		return InItem.ID == ID;
 	}
 
 	FORCEINLINE friend bool operator==(const FAbilityItem& A, const FAbilityItem& B)

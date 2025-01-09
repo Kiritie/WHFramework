@@ -27,6 +27,9 @@ public:
 	EVoxelNature Nature;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float Hardness;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bMainPart;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "bMainPart == true"))

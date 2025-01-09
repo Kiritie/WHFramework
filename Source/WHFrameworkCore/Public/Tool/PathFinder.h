@@ -41,7 +41,7 @@ public:
 	void SetConditionInBarrier(std::function<bool(FVector2D Pos)> Func);
 
 	//设置寻路权值公式
-	void SetWeightFormula(std::function<TPair<float, float>(FVector2D Pos, FVector2D EndPos, float Cost)> Func);
+	void SetWeightFormula(std::function<TPair<float, float>(FVector2D StartPos, FVector2D EndPos, float Cost)> Func);
 
 private:
 	//创建一个开启点
@@ -58,11 +58,11 @@ private:
 	std::function<bool(FVector2D Pos)> InBarrier;
 
 	//函数接口：计算权值公式
-	std::function<TPair<float, float>(FVector2D Pos, FVector2D EndPos, float Cost)> WeightFormula;
+	std::function<TPair<float, float>(FVector2D StartPos, FVector2D EndPos, float Cost)> WeightFormula;
 
 	//使用最大优先队列
 	std::priority_queue<FOpenNode*, std::vector<FOpenNode*>, FOpenPointPtrCompare> Openlist;
 
 	//存储OpenNode的内存空间
-	std::vector<FOpenNode> PointList;
+	TArray<FOpenNode> PointList;
 };

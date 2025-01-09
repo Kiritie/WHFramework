@@ -8,7 +8,7 @@
 
 UAbilityItemDataBase::UAbilityItemDataBase()
 {
-	Type = FName("None");
+	Type = FName("Misc");
 
 	Name = FText::GetEmpty();
 	Detail = FText::GetEmpty();

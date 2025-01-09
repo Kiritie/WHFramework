@@ -81,10 +81,11 @@ FSaveData* AAbilityPickUpBase::ToData()
 
 void AAbilityPickUpBase::OnPickUp(IAbilityPickerInterface* InPicker)
 {
-	if(InPicker && InPicker->OnPickUp(this))
+	if(InPicker)
 	{
-		UObjectPoolModuleStatics::DespawnObject(this);
+		InPicker->OnPickUp(this);
 	}
+	UObjectPoolModuleStatics::DespawnObject(this);
 }
 
 bool AAbilityPickUpBase::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)

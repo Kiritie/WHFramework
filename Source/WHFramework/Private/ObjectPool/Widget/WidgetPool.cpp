@@ -23,9 +23,12 @@ UObject* UWidgetPool::OnSpawn(UObject* InOwner, UObject* InObject)
 		}
 		else if(UWorld* World = Cast<UWorld>(InOwner))
 		{
-			InObject = CreateWidget(World, Type.Get());
+			if(!World->bIsTearingDown)
+			{
+				InObject = CreateWidget(World, Type.Get());
+			}
 		}
-		else
+		else if(!GetWorld()->bIsTearingDown)
 		{
 			InObject = CreateWidget(GetWorld(), Type.Get());
 		}

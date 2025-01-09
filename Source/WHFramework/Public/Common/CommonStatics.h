@@ -320,6 +320,12 @@ public:
 		return GetWorldFromObjectExisted(GetWorldContext(bInEditor));
 	}
 
+	UFUNCTION(BlueprintPure, Category = "CommonStatics")
+	static float GetCurrentDeltaSeconds(bool bInEditor = false)
+	{
+		return GetCurrentWorld(bInEditor)->GetDeltaSeconds();
+	}
+
 	static FTimerManager& GetCurrentTimerManager(bool bInEditor = false)
 	{
 		return GetCurrentWorld(bInEditor)->GetTimerManager();

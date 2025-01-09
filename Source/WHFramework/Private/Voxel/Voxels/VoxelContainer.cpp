@@ -62,9 +62,9 @@ void UVoxelContainer::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHit
 	Super::OnAgentExit(InAgent, InHitResult);
 }
 
-bool UVoxelContainer::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InActionType, const FVoxelHitResult& InHitResult)
+bool UVoxelContainer::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
 {
-	return Super::OnAgentInteract(InAgent, InActionType, InHitResult);
+	return Super::OnAgentInteract(InAgent, InInteractAction, InInteractEvent, InHitResult);
 }
 
 void UVoxelContainer::Open(IVoxelAgentInterface* InAgent)

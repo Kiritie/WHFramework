@@ -332,16 +332,6 @@ void ACharacterBase::SetUseControllerRotation(bool bValue)
 	GetCharacterMovement()->bOrientRotationToMovement = !bValue;
 }
 
-bool ACharacterBase::OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
-{
-	return IVoxelAgentInterface::OnGenerateVoxel(InVoxelHitResult);
-}
-
-bool ACharacterBase::OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
-{
-	return IVoxelAgentInterface::OnDestroyVoxel(InVoxelHitResult);
-}
-
 void ACharacterBase::PlaySound(USoundBase* InSound, float InVolume, bool bMulticast)
 {
 	SoundHandle = UAudioModuleStatics::PlaySingleSoundAtLocation(InSound, GetActorLocation(), InVolume, bMulticast);

@@ -19,6 +19,14 @@ enum class EInputInteractAction : uint8
 	Third
 };
 
+UENUM(BlueprintType)
+enum class EInputInteractEvent : uint8
+{
+	Started,
+	Triggered,
+	Completed
+};
+
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FInputKeyShortcut
 {

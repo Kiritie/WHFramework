@@ -308,16 +308,6 @@ void APawnBase::SetUseControllerRotation(bool bValue)
 	bUseControllerRotationYaw = bValue;
 }
 
-bool APawnBase::OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
-{
-	return IVoxelAgentInterface::OnGenerateVoxel(InVoxelHitResult);
-}
-
-bool APawnBase::OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
-{
-	return IVoxelAgentInterface::OnDestroyVoxel(InVoxelHitResult);
-}
-
 void APawnBase::TransformTowards(FTransform InTransform, float InDuration, bool bMulticast)
 {
 	if(bMulticast)

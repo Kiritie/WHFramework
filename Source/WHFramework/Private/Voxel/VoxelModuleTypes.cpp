@@ -114,9 +114,14 @@ bool FVoxelItem::IsUnknown() const
 	return *this == Unknown;
 }
 
+bool FVoxelItem::EqualIndex(const FVoxelItem& InItem) const
+{
+	return InItem.GetIndex() == GetIndex();
+}
+
 bool FVoxelItem::IsReplaceable(const FVoxelItem& InVoxelItem) const
 {
-	return !IsValid() || (!InVoxelItem.IsValid() && GetVoxelType() != EVoxelType::Bedrock) || !Match(static_cast<FAbilityItem>(InVoxelItem)) && GetVoxelData().GetTransparency() == EVoxelTransparency::Trans && InVoxelItem.GetVoxelData().GetTransparency() != EVoxelTransparency::Trans;
+	return !IsValid() || (!InVoxelItem.IsValid() && GetVoxelType() != EVoxelType::Bedrock) || !Match(InVoxelItem) && GetVoxelData().GetTransparency() == EVoxelTransparency::Trans && InVoxelItem.GetVoxelData().GetTransparency() != EVoxelTransparency::Trans;
 }
 
 FVoxelItem FVoxelItem::ReplaceID(const FPrimaryAssetId& InID) const
@@ -163,6 +168,15 @@ EVoxelType FVoxelItem::GetVoxelType() const
 FVector FVoxelItem::GetRange() const
 {
 	return GetVoxelData().GetRange(Angle);
+}
+
+FIndex FVoxelItem::GetIndex(bool bWorldSpace) const
+{
+	if(Owner && bWorldSpace)
+	{
+		return Owner->LocalIndexToWorld(Index);
+	}
+	return Index;
 }
 
 FVector FVoxelItem::GetLocation(bool bWorldSpace) const

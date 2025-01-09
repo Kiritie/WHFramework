@@ -16,16 +16,31 @@ class WHFRAMEWORK_API IVoxelAgentInterface
 	GENERATED_BODY()
 
 public:
-	virtual bool OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult);
+	IVoxelAgentInterface();
 
-	virtual bool OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult);
+public:
+	virtual bool OnGenerateVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult);
 
-	virtual bool OnInteractVoxel(const FVoxelHitResult& InVoxelHitResult, EInputInteractAction InInteractAction);
+	virtual bool OnDestroyVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult);
+
+	virtual bool OnInteractVoxel(EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult);
 
 public:
 	virtual FVector GetVoxelAgentLocation() const = 0;
 
-	virtual FPrimaryAssetId GetGenerateVoxelID() const { return FPrimaryAssetId(); };
+	virtual FPrimaryAssetId GetGenerateVoxelID() const { return FPrimaryAssetId(); }
 
-	virtual void SetGenerateVoxelID(const FPrimaryAssetId& InGenerateVoxelID) { };
+	virtual void SetGenerateVoxelID(const FPrimaryAssetId& InGenerateVoxelID) { }
+
+	virtual float GetDestroyVoxelRate() const { return 1.f; }
+
+	virtual void SetDestroyVoxelRate(float InRate) { }
+
+protected:
+	FVoxelItem InteractVoxelItem;
+
+	float InteractVoxelRemaining;
+
+public:
+	virtual float GetInteractVoxelProgress() const;
 };

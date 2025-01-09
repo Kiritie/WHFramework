@@ -252,8 +252,8 @@ public:
 			{
 				return Cast<T>(MainModule->ModuleMap[InName]);
 			}
-			ensureEditorMsgf(false, FString::Printf(TEXT("Failed to get module, module name: %s"), *InName.ToString()), EDC_Default, EDV_Error); \
 		}
+		ensureEditorMsgf(false, FString::Printf(TEXT("Failed to get module, module name: %s"), *InName.ToString()), EDC_Default, EDV_Error); \
 		return NewObject<T>();
 	}
 	/**

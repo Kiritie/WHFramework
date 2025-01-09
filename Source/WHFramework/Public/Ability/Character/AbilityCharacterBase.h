@@ -153,7 +153,7 @@ public:
 	virtual void EndAction(const FGameplayTag& InActionTag, bool bWasCancelled) override;
 
 public:
-	virtual bool OnPickUp(AAbilityPickUpBase* InPickUp) override;
+	virtual void OnPickUp(AAbilityPickUpBase* InPickUp) override;
 
 	virtual bool CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent) override;
 
@@ -180,6 +180,11 @@ public:
 	virtual void OnSelectItem(const FAbilityItem& InItem) override;
 
 	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
+
+public:
+	virtual bool OnGenerateVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult) override;
+
+	virtual bool OnDestroyVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult) override;
 
 protected:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;

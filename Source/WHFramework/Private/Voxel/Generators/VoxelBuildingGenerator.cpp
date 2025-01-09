@@ -1,7 +1,6 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Voxel/Generators/VoxelBuildingGenerator.h"
-#include "GameFramework/Actor.h"
 #include "Math/MathStatics.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleTypes.h"
@@ -14,7 +13,7 @@ UVoxelBuildingGenerator::UVoxelBuildingGenerator()
 
 	PathFinder = FPathFinder();
 	PathFinder.SetConditionInBarrier([this](FVector2D Pos) { return InBarrier(Pos); });
-	PathFinder.SetWeightFormula([this](FVector2D Pos, FVector2D EndPos, float Cost) { return WeightFormula(Pos, EndPos, Cost); });
+	PathFinder.SetWeightFormula([this](FVector2D StartPos, FVector2D EndPos, float Cost) { return WeightFormula(StartPos, EndPos, Cost); });
 
 	_StartPoint = FVector2D::ZeroVector;
 	_Domains = {};

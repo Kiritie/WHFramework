@@ -21,7 +21,7 @@ class WHFRAMEWORK_API IAbilityPickerInterface
 	GENERATED_BODY()
 
 public:
-	virtual bool OnPickUp(AAbilityPickUpBase* InPickUp) = 0;
+	virtual void OnPickUp(AAbilityPickUpBase* InPickUp) = 0;
 
 public:
 	virtual bool IsAutoPickUp() const { return false; }

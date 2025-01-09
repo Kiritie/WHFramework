@@ -796,7 +796,7 @@ void UCameraModule::DoCameraLocation(FVector InLocation, float InDuration, EEase
 		CameraDoLocationLocation = CurrentCameraLocation;
 		CameraDoLocationEaseType = InEaseType;
 	}
-	else if(CurrentCamera && CurrentCamera->IsA<ACameraActorBase>())
+	else if(CurrentCamera)
 	{
 		CurrentCameraLocation = TargetCameraLocation;
 		CurrentCamera->SetCameraLocation(TargetCameraLocation);
@@ -841,7 +841,7 @@ void UCameraModule::DoCameraOffset(FVector InOffset, float InDuration, EEaseType
 		CameraDoOffsetOffset = CurrentCameraOffset;
 		CameraDoOffsetEaseType = InEaseType;
 	}
-	else if(CurrentCamera && CurrentCamera->IsA<ACameraActorBase>())
+	else if(CurrentCamera)
 	{
 		CurrentCameraOffset = TargetCameraOffset;
 		CurrentCamera->GetCameraBoom()->SocketOffset = TargetCameraOffset;

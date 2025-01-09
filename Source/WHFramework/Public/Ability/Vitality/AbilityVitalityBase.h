@@ -108,9 +108,9 @@ public:
 	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
 
 public:
-	virtual bool OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult) override;
+	virtual bool OnGenerateVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult) override;
 
-	virtual bool OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult) override;
+	virtual bool OnDestroyVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult) override;
 
 protected:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;

@@ -11,15 +11,15 @@ FPathFinder::FPathFinder()
 	DepthLimit = 400;
 
 	//存储OpenNode的内存空间
-	PointList = std::vector<FOpenNode>(DepthLimit);
+	PointList = {};
+
+	Openlist = {};
 
 	//函数接口：检查是否有障碍物（不可走）
 	InBarrier = nullptr;
 
 	//函数接口：计算权值预测公式
 	WeightFormula = nullptr;
-
-	Openlist = {};
 }
 
 FPathFinder::~FPathFinder()
@@ -30,12 +30,14 @@ FPathFinder::~FPathFinder()
 TArray<FVector2D> FPathFinder::FindPath(FVector2D StartPos, FVector2D EndPos)
 {
 	//清理数据结构
-	PointList.clear();
+	PointList.Empty(DepthLimit);
 	while (!Openlist.empty())
+	{
 		Openlist.pop();
+	}
 	Depth = 0;
 
-	TArray<FVector2D> Road;
+	TArray<FVector2D> PathList;
 	//创建并开启一个父节点
 	Openlist.push(CreateOpenNode(StartPos, EndPos, 0, nullptr));
 
@@ -66,7 +68,7 @@ TArray<FVector2D> FPathFinder::FindPath(FVector2D StartPos, FVector2D EndPos)
 		// UE_LOG(LogTemp, Warning, TEXT("path found %d"), Depth);
 		while (ToOpen)
 		{
-			Road.Push(ToOpen->Pos);
+			PathList.Push(ToOpen->Pos);
 			ToOpen = ToOpen->Father;
 		}
 	}
@@ -75,7 +77,7 @@ TArray<FVector2D> FPathFinder::FindPath(FVector2D StartPos, FVector2D EndPos)
 		// UE_LOG(LogTemp, Warning, TEXT("path unfound %d"), Depth);
 	}
 
-	return Road;
+	return PathList;
 }
 
 void FPathFinder::SetConditionInBarrier(std::function<bool(FVector2D Pos)> Func)
@@ -83,16 +85,16 @@ void FPathFinder::SetConditionInBarrier(std::function<bool(FVector2D Pos)> Func)
 	InBarrier = Func;
 }
 
-void FPathFinder::SetWeightFormula(std::function<TPair<float, float>(FVector2D Pos, FVector2D EndPo, float Cost)> Func)
+void FPathFinder::SetWeightFormula(std::function<TPair<float, float>(FVector2D StartPos, FVector2D EndPos, float Cost)> Func)
 {
 	WeightFormula = Func;
 }
 
-FOpenNode* FPathFinder::CreateOpenNode(FVector2D pos, FVector2D EndPos, float Cost, FOpenNode* FatherNode)
+FOpenNode* FPathFinder::CreateOpenNode(FVector2D StartPos, FVector2D EndPos, float Cost, FOpenNode* FatherNode)
 {
-	TPair<float, float> Pair = WeightFormula(pos, EndPos, Cost);
-	PointList.push_back(FOpenNode(pos, Pair.Get<0>(), Pair.Get<1>(), FatherNode));
-	return &PointList.back();
+	TPair<float, float> Pair = WeightFormula(StartPos, EndPos, Cost);
+	PointList.Push(FOpenNode(StartPos, Pair.Get<0>(), Pair.Get<1>(), FatherNode));
+	return &PointList.Last();
 }
 
 void FPathFinder::Open(FOpenNode& OpenNode, FVector2D EndPos)

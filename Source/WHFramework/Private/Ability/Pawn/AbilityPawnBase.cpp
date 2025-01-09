@@ -396,6 +396,41 @@ void AAbilityPawnBase::OnAuxiliaryItem(const FAbilityItem& InItem)
 
 }
 
+bool AAbilityPawnBase::OnGenerateVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
+{
+	if(!GenerateVoxelID.IsValid()) return false;
+
+	FItemQueryData ItemQueryData = Inventory->QueryItemByRange(EItemQueryType::Remove, FAbilityItem(GenerateVoxelID, 1), -1);
+	if(!ItemQueryData.IsValid()) return false;
+
+	switch(InInteractEvent)
+	{
+		case EInputInteractEvent::Started:
+		{
+			return IVoxelAgentInterface::OnGenerateVoxel(InInteractEvent, InHitResult);
+		}
+		case EInputInteractEvent::Triggered:
+		{
+			return IVoxelAgentInterface::OnGenerateVoxel(InInteractEvent, InHitResult);
+		}
+		case EInputInteractEvent::Completed:
+		{
+			if(IVoxelAgentInterface::OnGenerateVoxel(InInteractEvent, InHitResult))
+			{
+				Inventory->RemoveItemByQueryData(ItemQueryData);
+				return true;
+			}
+			break;
+		}
+	}
+	return false;
+}
+
+bool AAbilityPawnBase::OnDestroyVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
+{
+	return IVoxelAgentInterface::OnDestroyVoxel(InInteractEvent, InHitResult);
+}
+
 void AAbilityPawnBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
 {
 	if(InAttributeChangeData.Attribute == GetExpAttribute())

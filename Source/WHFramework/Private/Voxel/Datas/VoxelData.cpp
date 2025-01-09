@@ -15,6 +15,7 @@ UVoxelData::UVoxelData()
 	VoxelClass = UVoxel::StaticClass();
 	AuxiliaryClass = nullptr;
 	Nature = EVoxelNature::None;
+	Hardness = 1.f;
 	bMainPart = true;
 	PartDatas = TMap<FIndex, UVoxelData*>();
 	PartIndex = FIndex::ZeroIndex;
