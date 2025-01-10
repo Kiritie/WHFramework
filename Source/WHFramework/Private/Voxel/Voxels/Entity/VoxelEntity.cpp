@@ -40,12 +40,8 @@ void AVoxelEntity::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	const auto& SaveData = InSaveData->CastRef<FVoxelItem>();
 
-	if(VoxelID == SaveData.ID) return;
-
 	VoxelID = SaveData.ID;
 	
-	MeshComponent->CreateVoxel(SaveData);
-
 	if(VoxelID.IsValid())
 	{
 		const UVoxelData& VoxelData = SaveData.GetVoxelData();
@@ -75,6 +71,8 @@ void AVoxelEntity::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	{
 		DestroyAuxiliary();
 	}
+
+	MeshComponent->CreateVoxel(SaveData);
 }
 
 FSaveData* AVoxelEntity::ToData()

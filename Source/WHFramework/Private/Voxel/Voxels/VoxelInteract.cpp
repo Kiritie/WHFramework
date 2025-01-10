@@ -71,8 +71,11 @@ bool UVoxelInteract::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputIntera
 		}
 		case EInputInteractAction::Secondary:
 		{
-			Toggle(InAgent);
-			break;
+			if(InInteractEvent == EInputInteractEvent::Started)
+			{
+				Toggle(InAgent);
+			}
+			return true;
 		}
 		default: break;
 	}
@@ -96,15 +99,15 @@ void UVoxelInteract::Open(IVoxelAgentInterface* InAgent)
 		}
 	}
 	SetOpened(true);
-	if(GetData().bMainPart)
+	if(GetData().IsMainPart())
 	{
 		for(auto& Iter : GetItem().GetParts())
 		{
 			Iter.GetVoxel<ThisClass>().Open(InAgent);
 		}
-		GetOwner()->Generate(EPhase::Lesser);
 		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Open), GetLocation());
 	}
+	GetOwner()->Generate(EPhase::Lesser);
 }
 
 void UVoxelInteract::Close(IVoxelAgentInterface* InAgent)
@@ -118,13 +121,13 @@ void UVoxelInteract::Close(IVoxelAgentInterface* InAgent)
 		}
 	}
 	SetOpened(false);
-	if(GetData().bMainPart)
+	if(GetData().IsMainPart())
 	{
 		for(auto& Iter : GetItem().GetParts())
 		{ 
 			Iter.GetVoxel<ThisClass>().Close(InAgent);
 		}
-		GetOwner()->Generate(EPhase::Lesser);
 		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Close), GetLocation());
 	}
+	GetOwner()->Generate(EPhase::Lesser);
 }

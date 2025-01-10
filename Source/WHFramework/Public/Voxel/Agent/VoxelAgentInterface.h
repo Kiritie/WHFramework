@@ -5,6 +5,8 @@
 
 #include "VoxelAgentInterface.generated.h"
 
+class AVoxelEntityPreview;
+
 UINTERFACE()
 class WHFRAMEWORK_API UVoxelAgentInterface : public UInterface
 {
@@ -37,10 +39,13 @@ public:
 	virtual void SetDestroyVoxelRate(float InRate) { }
 
 protected:
-	FVoxelItem InteractVoxelItem;
+	bool bCanGenerateVoxel;
+	FVoxelItem GenerateVoxelItem;
+	TObjectPtr<AVoxelEntityPreview> GeneratePreviewVoxel;
 
-	float InteractVoxelRemaining;
-
+	FVoxelItem DestroyVoxelItem;
+	float DestroyVoxelRemaining;
+	
 public:
-	virtual float GetInteractVoxelProgress() const;
+	virtual float GetDestroyVoxelProgress() const;
 };

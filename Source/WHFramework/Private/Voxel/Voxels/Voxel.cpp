@@ -50,7 +50,7 @@ void UVoxel::OnGenerate(IVoxelAgentInterface* InAgent)
 {
 	if(InAgent) return;
 	
-	if(GetData().bMainPart)
+	if(GetData().IsMainPart())
 	{
 		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Generate), GetLocation());
 	}
@@ -60,7 +60,7 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 {
 	if(!InAgent) return;
 	
-	if(GetData().bMainPart)
+	if(GetData().IsMainPart())
 	{
 		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Destroy), GetLocation());
 		UAbilityModuleStatics::SpawnAbilityPickUp(FAbilityItem(GetData().GatherData ? GetData().GatherData->GetPrimaryAssetId() : GetData().GetPrimaryAssetId(), 1), GetLocation() + GetData().GetRange(GetAngle()) * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f, GetOwner());

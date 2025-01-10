@@ -51,6 +51,9 @@ public:
 	static float RightAngleToFloat(ERightAngle InAngle);
 
 	UFUNCTION(BlueprintPure, Category = "MathStatics")
+	static ERightAngle FloatToRightAngle(float InAngle);
+
+	UFUNCTION(BlueprintPure, Category = "MathStatics")
 	static ERightAngle GetOffsetRightAngle(ERightAngle InAngle, int32 InOffset);
 
 	//////////////////////////////////////////////////////////////////////////

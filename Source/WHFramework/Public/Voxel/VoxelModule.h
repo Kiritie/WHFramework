@@ -16,7 +16,7 @@ class UVoxelData;
 class ACharacterBase;
 class UWorldTimer;
 class UWorldWeather;
-class AVoxelEntityPreview;
+class AVoxelEntityCapture;
 
 /**
  * 体素模块
@@ -254,7 +254,7 @@ protected:
 	TMap<FIndex, AVoxelChunk*> ChunkMap;
 
 	UPROPERTY(Transient)
-	TArray<AVoxelEntityPreview*> PreviewVoxels;
+	TArray<AVoxelEntityCapture*> CaptureVoxels;
 
 	UPROPERTY(Transient)
 	TMap<TSubclassOf<UVoxelGenerator>, UVoxelGenerator*> VoxelGenerators;

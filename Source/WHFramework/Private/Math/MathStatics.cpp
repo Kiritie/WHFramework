@@ -62,6 +62,11 @@ float UMathStatics::RightAngleToFloat(ERightAngle InAngle)
 	return (int32)InAngle * 90.f;
 }
 
+ERightAngle UMathStatics::FloatToRightAngle(float InAngle)
+{
+	return (ERightAngle)FMath::RoundToInt((InAngle >= 0.f ? InAngle : (360.f + InAngle)) / 90.f);
+}
+
 ERightAngle UMathStatics::GetOffsetRightAngle(ERightAngle InAngle, int32 InOffset)
 {
 	const int32 Angle = FMath::Abs((int32)InAngle + InOffset) % 4;

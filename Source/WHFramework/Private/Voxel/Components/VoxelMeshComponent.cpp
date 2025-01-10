@@ -63,21 +63,29 @@ void UVoxelMeshComponent::Initialize(EVoxelScope InScope, EVoxelNature InNature)
 		case EVoxelScope::PickUp:
 		{
 			OffsetScale = FVector::ZeroVector;
-			CenterOffset = FVector(0.5f);
+			CenterOffset = FVector(0.f, 0.f, 0.f);
 			SetCollisionEnabled(false);
 			break;
 		}
 		case EVoxelScope::Entity:
 		{
 			OffsetScale = FVector(0.f, 0.f, 1.f);
-			CenterOffset = FVector(0.f, 0.f, 0.5f);
+			CenterOffset = FVector(0.f, 0.f, 0.f);
+			SetCastShadow(false);
+			SetCollisionEnabled(false);
+			break;
+		}
+		case EVoxelScope::Capture:
+		{
+			OffsetScale = FVector::ZeroVector;
+			CenterOffset = FVector(0.f, 0.f, 0.f);
 			SetCastShadow(false);
 			SetCollisionEnabled(false);
 			break;
 		}
 		case EVoxelScope::Preview:
 		{
-			OffsetScale = FVector::ZeroVector;
+			OffsetScale = FVector::OneVector;
 			CenterOffset = FVector(0.5f);
 			SetCastShadow(false);
 			SetCollisionEnabled(false);
@@ -140,18 +148,19 @@ void UVoxelMeshComponent::CreateVoxel(const FVoxelItem& InVoxelItem)
 	if(InVoxelItem.IsValid())
 	{
 		UVoxelData& VoxelData = InVoxelItem.GetVoxelData();
-		const FVector Range = VoxelData.GetRange();
 		SetNature(VoxelData.Nature);
-		CenterOffset = FVector(0.f, 0.f, -Range.Z * 0.5f + 0.5f);
+		const FVector Range = VoxelData.GetRange();
+		if(Scope == EVoxelScope::Capture)
+		{
+			CenterOffset.Z = -(Range.Z - 1.f) * 0.5f;
+		}
 		ITER_INDEX(PartIndex, Range, false,
 			UVoxelData& PartData = VoxelData.GetPartData(PartIndex);
-			if(PartData.IsValid())
-			{
-				FVoxelItem PartItem;
-				PartItem.ID = PartData.GetPrimaryAssetId();
-				PartItem.Index = PartIndex;
-				BuildVoxel(PartItem);
-			}
+			FVoxelItem PartItem;
+			PartItem.ID = PartData.GetPrimaryAssetId();
+			PartItem.Index = PartIndex;
+			PartItem.Angle = InVoxelItem.Angle;
+			BuildVoxel(PartItem);
 		)
 		CreateMesh(0, false);
 	}
@@ -176,9 +185,14 @@ void UVoxelMeshComponent::CreateMesh(int32 InSectionIndex /*= 0*/, bool bHasColl
 				SetMaterial(InSectionIndex, UVoxelModule::Get().GetWorldData().GetRenderData(Nature).MaterialInst);
 				break;
 			}
-			case EVoxelScope::Preview:
+			case EVoxelScope::Capture:
 			{
 				SetMaterial(InSectionIndex, UVoxelModule::Get().GetWorldData().GetRenderData(Nature).UnlitMaterialInst);
+				break;
+			}
+			case EVoxelScope::Preview:
+			{
+				SetMaterial(InSectionIndex, DuplicateObject<UMaterialInstance>(UVoxelModule::Get().GetWorldData().GetRenderData(Nature).TransMaterialInst, this));
 				break;
 			}
 			default: break;

@@ -22,7 +22,7 @@
 #include "Voxel/Voxels/VoxelPlant.h"
 #include "Voxel/Voxels/VoxelTorch.h"
 #include "Voxel/Voxels/VoxelWater.h"
-#include "Voxel/Voxels/Entity/VoxelEntityPreview.h"
+#include "Voxel/Voxels/Entity/VoxelEntityCapture.h"
 #include "Common/CommonStatics.h"
 #include "Common/CommonTypes.h"
 #include "Kismet/KismetMaterialLibrary.h"
@@ -105,31 +105,33 @@ UVoxelModule::UVoxelModule()
 	
 	VoxelGenerators = TMap<TSubclassOf<UVoxelGenerator>, UVoxelGenerator*>();
 
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> UnlitSolidMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_Solid_Unlit.M_Voxel_Solid_Unlit'"));
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> UnlitSemiMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_Semi_Unlit.M_Voxel_Semi_Unlit'"));
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> UnlitTransMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_Trans_Unlit.M_Voxel_Trans_Unlit'"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> TransMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_Trans.M_Voxel_Trans'"));
+
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SolidUnlitMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_Solid_Unlit.M_Voxel_Solid_Unlit'"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SemiUnlitMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_Semi_Unlit.M_Voxel_Semi_Unlit'"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> TransUnlitMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_Trans_Unlit.M_Voxel_Trans_Unlit'"));
 
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SolidMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_Solid.M_Voxel_Solid'"));
-	WorldBasicData.RenderDatas.Add(EVoxelNature::Solid, FVoxelRenderData(SolidMatFinder.Object, UnlitSolidMatFinder.Object));
+	WorldBasicData.RenderDatas.Add(EVoxelNature::Solid, FVoxelRenderData(SolidMatFinder.Object, SolidUnlitMatFinder.Object, TransMatFinder.Object));
 	
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SemiSolidMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_SemiSolid.M_Voxel_SemiSolid'"));
-	WorldBasicData.RenderDatas.Add(EVoxelNature::SemiSolid, FVoxelRenderData(SemiSolidMatFinder.Object, UnlitSemiMatFinder.Object));
-	WorldBasicData.RenderDatas.Add(EVoxelNature::SmallSemiSolid, FVoxelRenderData(SemiSolidMatFinder.Object, UnlitSemiMatFinder.Object));
+	WorldBasicData.RenderDatas.Add(EVoxelNature::SemiSolid, FVoxelRenderData(SemiSolidMatFinder.Object, SemiUnlitMatFinder.Object, TransMatFinder.Object));
+	WorldBasicData.RenderDatas.Add(EVoxelNature::SmallSemiSolid, FVoxelRenderData(SemiSolidMatFinder.Object, SemiUnlitMatFinder.Object, TransMatFinder.Object));
 
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> TransSolidMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_TransSolid.M_Voxel_TransSolid'"));
-	WorldBasicData.RenderDatas.Add(EVoxelNature::TransSolid, FVoxelRenderData(TransSolidMatFinder.Object, UnlitTransMatFinder.Object));
+	WorldBasicData.RenderDatas.Add(EVoxelNature::TransSolid, FVoxelRenderData(TransSolidMatFinder.Object, TransUnlitMatFinder.Object, TransMatFinder.Object));
 
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> LiquidMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_Liquid.M_Voxel_Liquid'"));
-	WorldBasicData.RenderDatas.Add(EVoxelNature::Liquid, FVoxelRenderData(LiquidMatFinder.Object, UnlitTransMatFinder.Object));
+	WorldBasicData.RenderDatas.Add(EVoxelNature::Liquid, FVoxelRenderData(LiquidMatFinder.Object, TransUnlitMatFinder.Object, TransMatFinder.Object));
 
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SemiLiquidMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_SemiLiquid.M_Voxel_SemiLiquid'"));
-	WorldBasicData.RenderDatas.Add(EVoxelNature::SemiLiquid, FVoxelRenderData(SemiLiquidMatFinder.Object, UnlitTransMatFinder.Object));
+	WorldBasicData.RenderDatas.Add(EVoxelNature::SemiLiquid, FVoxelRenderData(SemiLiquidMatFinder.Object, TransUnlitMatFinder.Object, TransMatFinder.Object));
 
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> FoliageMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_Foliage.M_Voxel_Foliage'"));
-	WorldBasicData.RenderDatas.Add(EVoxelNature::Foliage, FVoxelRenderData(FoliageMatFinder.Object, UnlitSemiMatFinder.Object));
+	WorldBasicData.RenderDatas.Add(EVoxelNature::Foliage, FVoxelRenderData(FoliageMatFinder.Object, SemiUnlitMatFinder.Object, TransMatFinder.Object));
 	
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SemiFoliageMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_SemiFoliage.M_Voxel_SemiFoliage'"));
-	WorldBasicData.RenderDatas.Add(EVoxelNature::SemiFoliage, FVoxelRenderData(SemiFoliageMatFinder.Object, UnlitTransMatFinder.Object));
+	WorldBasicData.RenderDatas.Add(EVoxelNature::SemiFoliage, FVoxelRenderData(SemiFoliageMatFinder.Object, TransUnlitMatFinder.Object, TransMatFinder.Object));
 
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> IconSourceMatFinder(TEXT("/Script/Engine.Material'/WHFramework/Voxel/Materials/M_VoxelIcon.M_VoxelIcon'"));
 	WorldBasicData.IconMat = IconSourceMatFinder.Object;
@@ -234,6 +236,10 @@ void UVoxelModule::OnInitialize()
 			MatInst = UKismetMaterialLibrary::CreateDynamicMaterialInstance(this, Iter.Value.UnlitMaterial);
 			MatInst->SetTextureParameterValue(FName("Texture"), Texture);
 			Iter.Value.UnlitMaterialInst = MatInst;
+			
+			MatInst = UKismetMaterialLibrary::CreateDynamicMaterialInstance(this, Iter.Value.TransMaterial);
+			MatInst->SetTextureParameterValue(FName("Texture"), Texture);
+			Iter.Value.TransMaterialInst = MatInst;
 		}
 	}
 	for(const auto& Iter : VoxelClasses)
@@ -371,16 +377,16 @@ void UVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		ITER_ARRAY(UAssetModuleStatics::LoadPrimaryAssets<UVoxelData>(FName("Voxel")), Item,
 			if(Item->IsUnknown() || !Item->IsMainPart()) continue;
 			
-			AVoxelEntityPreview* VoxelEntity;
-			if(PreviewVoxels.IsValidIndex(ItemIndex))
+			AVoxelEntityCapture* VoxelEntity;
+			if(CaptureVoxels.IsValidIndex(ItemIndex))
 			{
-				VoxelEntity = PreviewVoxels[ItemIndex];
+				VoxelEntity = CaptureVoxels[ItemIndex];
 			}
 			else
 			{
-				VoxelEntity = UObjectPoolModuleStatics::SpawnObject<AVoxelEntityPreview>();
+				VoxelEntity = UObjectPoolModuleStatics::SpawnObject<AVoxelEntityCapture>();
 				VoxelCapture->GetCapture()->ShowOnlyActors.Add(VoxelEntity);
-				PreviewVoxels.EmplaceAt(ItemIndex, VoxelEntity);
+				CaptureVoxels.EmplaceAt(ItemIndex, VoxelEntity);
 			}
 			if(VoxelEntity)
 			{

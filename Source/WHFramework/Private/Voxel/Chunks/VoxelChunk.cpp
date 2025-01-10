@@ -828,25 +828,35 @@ bool AVoxelChunk::SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelI
 		{
 			UVoxelData& VoxelData = VoxelItem.GetVoxelData(false);
 			const FVector VoxelRange = VoxelData.GetRange(VoxelItem.Angle);
-			if(!CheckVoxel(VoxelIndex, InVoxelItem, VoxelRange))
+			if(VoxelRange != FVector::OneVector)
 			{
-				if(VoxelData.bMainPart && VoxelRange != FVector::OneVector)
+				if(VoxelData.IsMainPart())
 				{
 					TMap<FIndex, FVoxelItem> VoxelItems;
-					VoxelItems.Emplace(VoxelIndex, InVoxelItem.IsValid() ? InVoxelItem.ReplaceID(VoxelData.GetPrimaryAssetId()) : FVoxelItem::Empty);
+					VoxelItems.Emplace(VoxelIndex, InVoxelItem);
 					ITER_INDEX(PartIndex, VoxelRange, false,
 						UVoxelData& PartData = VoxelData.GetPartData(PartIndex);
-						if(!PartData.bMainPart)
+						if(!PartData.IsMainPart())
 						{
-							VoxelItems.Emplace(VoxelIndex + PartIndex, InVoxelItem.IsValid() ? InVoxelItem.ReplaceID(PartData.GetPrimaryAssetId()) : FVoxelItem::Empty);
+							FVoxelItem PartItem = FVoxelItem::Empty;
+							if(InVoxelItem.IsValid())
+							{
+								PartItem.ID = PartData.GetPrimaryAssetId();
+								PartItem.Angle = InVoxelItem.Angle;
+							}
+							VoxelItems.Emplace(VoxelIndex + PartIndex, PartItem);
 						}
 					)
 					return SetVoxelComplex(VoxelItems, bGenerate, true, InAgent);
 				}
 				else
 				{
-					return SetVoxelSample(VoxelIndex, InVoxelItem, bGenerate, InAgent);
+					return SetVoxelComplex(VoxelIndex, InVoxelItem, bGenerate, InAgent);
 				}
+			}
+			else
+			{
+				return SetVoxelSample(VoxelIndex, InVoxelItem, bGenerate, InAgent);
 			}
 		}
 	}
@@ -856,7 +866,7 @@ bool AVoxelChunk::SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelI
 bool AVoxelChunk::SetVoxelComplex(const TMap<FIndex, FVoxelItem>& InVoxelItems, bool bGenerate, bool bFirstSample, IVoxelAgentInterface* InAgent)
 {
 	bool bSuccess = true;
-	TArray<EDirection> neighbors;
+	TArray<EDirection> _Neighbors;
 	for(auto& Iter : InVoxelItems)
 	{
 		FVoxelItem VoxelItem = GetVoxelComplex(Iter.Key);
@@ -875,10 +885,10 @@ bool AVoxelChunk::SetVoxelComplex(const TMap<FIndex, FVoxelItem>& InVoxelItems, 
 			{
 				VoxelItem.OnDestroy(InAgent);
 			}
-			EDirection neighbor;
-			if(LocalIndexToNeighbor(Iter.Key, neighbor))
+			EDirection _Neighbor;
+			if(LocalIndexToNeighbor(Iter.Key, _Neighbor))
 			{
-				neighbors.AddUnique(neighbor);
+				_Neighbors.AddUnique(_Neighbor);
 			}
 		}
 		bFirstSample = false;
@@ -886,7 +896,7 @@ bool AVoxelChunk::SetVoxelComplex(const TMap<FIndex, FVoxelItem>& InVoxelItems, 
 	if(bGenerate)
 	{
 		Generate(EPhase::Lesser);
-		for(const auto& Iter : neighbors)
+		for(const auto& Iter : _Neighbors)
 		{
 			if(GetNeighbor(Iter))
 			{
@@ -1086,7 +1096,7 @@ AVoxelAuxiliary* AVoxelChunk::SpawnAuxiliary(FVoxelItem& InVoxelItem)
 	if(InVoxelItem.IsValid() && !InVoxelItem.Auxiliary)
 	{
 		const auto& VoxelData = InVoxelItem.GetVoxelData();
-		if(VoxelData.AuxiliaryClass && VoxelData.bMainPart)
+		if(VoxelData.AuxiliaryClass && VoxelData.IsMainPart())
 		{
 			if(AVoxelAuxiliary* Auxiliary = UObjectPoolModuleStatics::SpawnObject<AVoxelAuxiliary>(nullptr, nullptr, VoxelData.AuxiliaryClass))
 			{

@@ -47,21 +47,23 @@ bool UVoxelData::IsCustom() const
 
 bool UVoxelData::HasPartData(FIndex InIndex) const
 {
-	if(!bMainPart) return false;
-
-	if(InIndex == FIndex::ZeroIndex) return true;
 	if(MainData) return MainData->HasPartData(InIndex);
+	if(InIndex == FIndex::ZeroIndex) return true;
 	return PartDatas.Contains(InIndex);
 }
 
 UVoxelData& UVoxelData::GetPartData(FIndex InIndex)
 {
-	if(!bMainPart) return UReferencePoolModuleStatics::GetReference<UVoxelData>();
-
-	if(InIndex == FIndex::ZeroIndex) return *this;
 	if(MainData) return MainData->GetPartData(InIndex);
+	if(InIndex == FIndex::ZeroIndex) return *this;
 	if(PartDatas.Contains(InIndex)) return *PartDatas[InIndex];
 	return UReferencePoolModuleStatics::GetReference<UVoxelData>();
+}
+
+UVoxelData& UVoxelData::GetMainData()
+{
+	if(MainData) return *MainData;
+	return *this;
 }
 
 EVoxelTransparency UVoxelData::GetTransparency() const
@@ -72,7 +74,7 @@ EVoxelTransparency UVoxelData::GetTransparency() const
 FVector UVoxelData::GetRange(ERightAngle InAngle) const
 {
 	FVector Range = FVector::OneVector;
-	if(bMainPart && PartDatas.Num() > 0)
+	if(PartDatas.Num() > 0)
 	{
 		FVector PartRange;
 		for(const auto& Iter : PartDatas)
@@ -83,7 +85,10 @@ FVector UVoxelData::GetRange(ERightAngle InAngle) const
 		}
 		Range += PartRange;
 	}
-	Range = UMathStatics::RotatorVector(Range, InAngle, true, true);
+	if(Range != FVector::OneVector)
+	{
+		Range = UMathStatics::RotatorVector(Range, InAngle, true, true);
+	}
 	return Range;
 }
 

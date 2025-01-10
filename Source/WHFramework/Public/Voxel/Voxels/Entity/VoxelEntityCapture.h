@@ -4,24 +4,20 @@
 
 #include "VoxelEntity.h"
 
-#include "VoxelEntityPreview.generated.h"
+#include "VoxelEntityCapture.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelEntityPreview : public AVoxelEntity
+class WHFRAMEWORK_API AVoxelEntityCapture : public AVoxelEntity
 {
 	GENERATED_BODY()
 
 public:
 	// Sets default values for this actor's properties
-	AVoxelEntityPreview();
+	AVoxelEntityCapture();
 
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
-
-public:
-	UFUNCTION(BlueprintCallable)
-	void SetMaterialColor(FLinearColor InColor);
 };

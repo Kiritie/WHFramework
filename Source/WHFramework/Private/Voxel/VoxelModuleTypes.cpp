@@ -131,6 +131,11 @@ FVoxelItem FVoxelItem::ReplaceID(const FPrimaryAssetId& InID) const
 	return _Item;
 }
 
+bool FVoxelItem::IsMain() const
+{
+	return GetVoxelData().IsMainPart();
+}
+
 FVoxelItem& FVoxelItem::GetMain() const
 {
 	if(Owner) return Owner->GetVoxelComplex(Index - GetVoxelData().PartIndex);
@@ -208,7 +213,8 @@ FVoxelHitResult::FVoxelHitResult(const FHitResult& InHitResult)
 {
 	if(AVoxelChunk* InChunk = Cast<AVoxelChunk>(InHitResult.GetActor()))
 	{
-		VoxelItem = InChunk->GetVoxelComplex(InChunk->LocationToIndex(InHitResult.ImpactPoint - UVoxelModule::Get().GetWorldData().GetBlockSizedNormal(InHitResult.ImpactNormal, 0.01f)), true);
+		const FVoxelItem _VoxelItem = InChunk->GetVoxelComplex(InChunk->LocationToIndex(InHitResult.ImpactPoint - UVoxelModule::Get().GetWorldData().GetBlockSizedNormal(InHitResult.ImpactNormal, 0.01f)), true);
+		VoxelItem = _VoxelItem.IsMain() ? _VoxelItem : _VoxelItem.GetMain();
 		Point = InHitResult.ImpactPoint;
 		Normal = InHitResult.ImpactNormal;
 	}

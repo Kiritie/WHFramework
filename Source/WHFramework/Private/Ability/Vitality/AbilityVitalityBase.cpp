@@ -273,11 +273,6 @@ void AAbilityVitalityBase::OnAuxiliaryItem(const FAbilityItem& InItem)
 
 bool AAbilityVitalityBase::OnGenerateVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
 {
-	if(!GenerateVoxelID.IsValid()) return false;
-
-	FItemQueryData ItemQueryData = Inventory->QueryItemByRange(EItemQueryType::Remove, FAbilityItem(GenerateVoxelID, 1), -1);
-	if(!ItemQueryData.IsValid()) return false;
-
 	switch(InInteractEvent)
 	{
 		case EInputInteractEvent::Started:
@@ -290,6 +285,15 @@ bool AAbilityVitalityBase::OnGenerateVoxel(EInputInteractEvent InInteractEvent, 
 		}
 		case EInputInteractEvent::Completed:
 		{
+			FItemQueryData ItemQueryData;
+			if(GenerateVoxelItem.IsValid())
+			{
+				ItemQueryData = Inventory->QueryItemByRange(EItemQueryType::Remove, FAbilityItem(GenerateVoxelItem, 1), -1);
+				if(!ItemQueryData.IsValid() || !bCanGenerateVoxel)
+				{
+					GenerateVoxelItem = FVoxelItem::Empty;
+				}
+			}
 			if(IVoxelAgentInterface::OnGenerateVoxel(InInteractEvent, InHitResult))
 			{
 				Inventory->RemoveItemByQueryData(ItemQueryData);

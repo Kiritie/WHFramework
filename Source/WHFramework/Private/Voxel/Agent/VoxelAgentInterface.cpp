@@ -4,60 +4,93 @@
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Voxel/EventHandle_VoxelDestroyed.h"
 #include "Event/Handle/Voxel/EventHandle_VoxelGenerated.h"
+#include "Math/MathStatics.h"
+#include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Datas/VoxelData.h"
 #include "Voxel/Voxels/Voxel.h"
 #include "Voxel/Voxels/Auxiliary/VoxelAuxiliary.h"
+#include "Voxel/Voxels/Entity/VoxelEntityPreview.h"
 
 IVoxelAgentInterface::IVoxelAgentInterface()
 {
-	InteractVoxelItem = FVoxelItem::Empty;
-	InteractVoxelRemaining = 0.f;
+	bCanGenerateVoxel = false;
+	GenerateVoxelItem = FVoxelItem::Empty;
+	GeneratePreviewVoxel = nullptr;
+
+	DestroyVoxelItem = FVoxelItem::Empty;
+	DestroyVoxelRemaining = 0.f;
 }
 
 bool IVoxelAgentInterface::OnGenerateVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
 {
-	FPrimaryAssetId GenerateVoxelID = GetGenerateVoxelID();
-	if(!GenerateVoxelID.IsValid()) return false;
-	
 	AVoxelChunk* Chunk = InHitResult.GetChunk();
 	if(!Chunk) return false;
-
-	FVoxelItem VoxelItem = GenerateVoxelID;
-	VoxelItem.Owner = Chunk;
-	VoxelItem.Index = Chunk->LocationToIndex(InHitResult.Point - UVoxelModule::Get().GetWorldData().GetBlockSizedNormal(InHitResult.Normal)) + FIndex(InHitResult.Normal);
-	const float Angle = (GetVoxelAgentLocation() - (VoxelItem.GetLocation() + UVoxelModule::Get().GetWorldData().BlockSize * 0.5f)).GetSafeNormal2D().ToOrientationRotator().Yaw;
-	VoxelItem.Angle = (ERightAngle)FMath::RoundToInt((Angle >= 0.f ? Angle : (360.f + Angle)) / 90.f);
-
-	TArray<AActor*> IgnoreActors;
-	if(VoxelItem.Auxiliary)
-	{
-		IgnoreActors.Add(VoxelItem.Auxiliary);
-	}
 
 	switch(InInteractEvent)
 	{
 		case EInputInteractEvent::Started:
 		{
-			break;
+			GenerateVoxelItem = GetGenerateVoxelID();
+			bCanGenerateVoxel = false;
+			return true;
 		}
 		case EInputInteractEvent::Triggered:
 		{
-			break;
+			if(!GenerateVoxelItem.IsValid()) break;
+
+			GenerateVoxelItem.ID = GetGenerateVoxelID();
+
+			if(!GenerateVoxelItem.IsValid()) break;
+
+			GenerateVoxelItem.Owner = Chunk;
+			GenerateVoxelItem.Index = Chunk->LocationToIndex(InHitResult.Point - UVoxelModule::Get().GetWorldData().GetBlockSizedNormal(InHitResult.Normal)) + FIndex(InHitResult.Normal);
+
+			TArray<AActor*> IgnoreActors;
+			if(GenerateVoxelItem.Auxiliary)
+			{
+				IgnoreActors.Add(GenerateVoxelItem.Auxiliary);
+			}
+			FHitResult HitResult;
+			bCanGenerateVoxel = !UVoxelModuleStatics::VoxelItemTraceSingle(GenerateVoxelItem, IgnoreActors, HitResult);
+
+			if(!GeneratePreviewVoxel)
+			{
+				GeneratePreviewVoxel = UObjectPoolModuleStatics::SpawnObject<AVoxelEntityPreview>();
+				GeneratePreviewVoxel->LoadSaveData(&GenerateVoxelItem);
+			}
+			if(GeneratePreviewVoxel)
+			{
+				const ERightAngle Angle = UMathStatics::FloatToRightAngle((GetVoxelAgentLocation() - (GenerateVoxelItem.GetLocation() + UVoxelModule::Get().GetWorldData().BlockSize * 0.5f)).GetSafeNormal2D().ToOrientationRotator().Yaw);
+				if(GenerateVoxelItem.Angle != Angle)
+				{
+					GenerateVoxelItem.Angle = Angle;
+					GeneratePreviewVoxel->LoadSaveData(&GenerateVoxelItem);
+				}
+				GeneratePreviewVoxel->SetActorLocation(GenerateVoxelItem.GetLocation());
+				GeneratePreviewVoxel->SetMaterialColor(bCanGenerateVoxel ? FLinearColor(0.f, 0.7f, 0.f, 0.7f) : FLinearColor(1.f, 0.f, 0.f, 0.7f));
+			}
+			return true;
 		}
 		case EInputInteractEvent::Completed:
 		{
-			FHitResult HitResult;
-			if(!UVoxelModuleStatics::VoxelItemTraceSingle(VoxelItem, IgnoreActors, HitResult))
+			if(GeneratePreviewVoxel)
 			{
-				if(Chunk->SetVoxelComplex(VoxelItem.Index, VoxelItem, true, this))
-				{
-					UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelGenerated>(Cast<UObject>(this), { &VoxelItem, Cast<UObject>(this) });
-					return true;
-				}
+				UObjectPoolModuleStatics::DespawnObject(GeneratePreviewVoxel);
+				GeneratePreviewVoxel = nullptr;
 			}
+
+			if(!GenerateVoxelItem.IsValid() || !bCanGenerateVoxel) break;
+
+			if(Chunk->SetVoxelComplex(GenerateVoxelItem.Index, GenerateVoxelItem, true, this))
+			{
+				UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelGenerated>(Cast<UObject>(this), { &GenerateVoxelItem, Cast<UObject>(this) });
+				GenerateVoxelItem = FVoxelItem::Empty;
+				return true;
+			}
+			GenerateVoxelItem = FVoxelItem::Empty;
 			break;
 		}
 	}
@@ -73,33 +106,34 @@ bool IVoxelAgentInterface::OnDestroyVoxel(EInputInteractEvent InInteractEvent, c
 	{
 		case EInputInteractEvent::Started:
 		{
-			InteractVoxelItem = FVoxelItem::Empty;
+			DestroyVoxelItem = InHitResult.VoxelItem;
+			DestroyVoxelRemaining = DestroyVoxelItem.GetVoxelData().Hardness;
 			return true;
 		}
 		case EInputInteractEvent::Triggered:
 		{
-			if(InteractVoxelItem == FVoxelItem::Unknown) break;
+			if(!DestroyVoxelItem.IsValid()) break;
 			
-			if(!InteractVoxelItem.EqualIndex(InHitResult.VoxelItem))
+			if(!DestroyVoxelItem.EqualIndex(InHitResult.VoxelItem))
 			{
-				InteractVoxelItem = InHitResult.VoxelItem;
-				InteractVoxelRemaining = InteractVoxelItem.GetVoxelData().Hardness;
+				DestroyVoxelItem = InHitResult.VoxelItem;
+				DestroyVoxelRemaining = DestroyVoxelItem.GetVoxelData().Hardness;
 			}
 
-			InteractVoxelRemaining -= UCommonStatics::GetCurrentDeltaSeconds() * GetDestroyVoxelRate();
-			if(InteractVoxelRemaining <= 0.f)
+			DestroyVoxelRemaining -= UCommonStatics::GetCurrentDeltaSeconds() * GetDestroyVoxelRate();
+			if(DestroyVoxelRemaining <= 0.f)
 			{
-				if(Chunk->SetVoxelComplex(InteractVoxelItem.Index, FVoxelItem::Empty, true, this))
+				if(Chunk->SetVoxelComplex(DestroyVoxelItem.Index, FVoxelItem::Empty, true, this))
 				{
-					UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelDestroyed>(Cast<UObject>(this), { &InteractVoxelItem, Cast<UObject>(this) });
-					InteractVoxelItem = FVoxelItem::Empty;
-					return true;
+					UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelDestroyed>(Cast<UObject>(this), { &DestroyVoxelItem, Cast<UObject>(this) });
 				}
+				return true;
 			}
 			break;
 		}
 		case EInputInteractEvent::Completed:
 		{
+			DestroyVoxelItem = FVoxelItem::Empty;
 			return true;
 		}
 	}
@@ -111,12 +145,12 @@ bool IVoxelAgentInterface::OnInteractVoxel(EInputInteractAction InInteractAction
 	return InHitResult.GetVoxel().OnAgentInteract(this, InInteractAction, InInteractEvent, InHitResult);
 }
 
-float IVoxelAgentInterface::GetInteractVoxelProgress() const
+float IVoxelAgentInterface::GetDestroyVoxelProgress() const
 {
-	if(InteractVoxelItem.IsValid())
+	if(DestroyVoxelItem.IsValid())
 	{
-		const float VoxelHardness = InteractVoxelItem.GetVoxelData().Hardness;
-		return (VoxelHardness - InteractVoxelRemaining) / VoxelHardness;
+		const float VoxelHardness = DestroyVoxelItem.GetVoxelData().Hardness;
+		return (VoxelHardness - DestroyVoxelRemaining) / VoxelHardness;
 	}
 	return 0.f;
 }

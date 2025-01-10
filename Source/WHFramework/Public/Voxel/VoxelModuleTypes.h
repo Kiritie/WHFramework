@@ -176,6 +176,8 @@ enum class EVoxelScope : uint8
 	// ?????
 	Entity,
 	// ?????
+	Capture,
+	// ?????
 	Preview,
 	// ????????
 	Vitality
@@ -297,18 +299,21 @@ public:
 	{
 		Material = nullptr;
 		UnlitMaterial = nullptr;
+		TransMaterial = nullptr;
 		PixelSize = 16;
 		TextureSize = FVector2D::ZeroVector;
 		CombineTexture = nullptr;
 		Textures = TArray<UTexture2D*>();
 		MaterialInst = nullptr;
 		UnlitMaterialInst = nullptr;
+		TransMaterialInst = nullptr;
 	}
 
-	FORCEINLINE FVoxelRenderData(UMaterialInterface* InMaterial, UMaterialInterface* InUnlitMaterial, int32 InBlockPixelSize = 16) : FVoxelRenderData()
+	FORCEINLINE FVoxelRenderData(UMaterialInterface* InMaterial, UMaterialInterface* InUnlitMaterial, UMaterialInterface* InTransMaterialInst, int32 InBlockPixelSize = 16) : FVoxelRenderData()
 	{
 		Material = InMaterial;
 		UnlitMaterial = InUnlitMaterial;
+		TransMaterial = InTransMaterialInst;
 		PixelSize = InBlockPixelSize;
 	}
 
@@ -318,6 +323,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	UMaterialInterface* UnlitMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UMaterialInterface* TransMaterial;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 PixelSize;
@@ -336,6 +344,9 @@ public:
 
 	UPROPERTY(Transient)
 	UMaterialInstance* UnlitMaterialInst;
+
+	UPROPERTY(Transient)
+	UMaterialInstance* TransMaterialInst;
 };
 
 USTRUCT(BlueprintType)
@@ -431,6 +442,8 @@ public:
 	bool IsReplaceable(const FVoxelItem& InVoxelItem = FVoxelItem::Empty) const;
 
 	FVoxelItem ReplaceID(const FPrimaryAssetId& InID) const;
+
+	bool IsMain() const;
 
 	FVoxelItem& GetMain() const;
 

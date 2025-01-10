@@ -60,6 +60,8 @@ public:
 	bool IsCustom() const;
 
 public:
+	virtual UVoxelData& GetMainData();
+
 	virtual bool HasPartData(FIndex InIndex) const;
 
 	virtual UVoxelData& GetPartData(FIndex InIndex);
