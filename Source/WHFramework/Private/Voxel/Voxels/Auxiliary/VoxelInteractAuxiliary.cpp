@@ -43,7 +43,7 @@ void AVoxelInteractAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			{
 				for(const auto& Iter : VoxelItem.GetVoxelData<UVoxelInteractData>().InteractActions)
 				{
-					Interaction->AddInteractAction(Iter);
+					Interaction->AddInteractAction((EInteractAction)Iter);
 				}
 				BoxComponent->SetGenerateOverlapEvents(true);
 				BoxComponent->SetBoxExtent(VoxelItem.GetRange() * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f);
@@ -62,19 +62,9 @@ bool AVoxelInteractAuxiliary::CanInteract(EInteractAction InInteractAction, IInt
 {
 	switch ((EVoxelInteractAction)InInteractAction)
 	{
-		case EVoxelInteractAction::Open:
+		case EVoxelInteractAction::Interact:
 		{
-			if(Cast<IVoxelAgentInterface>(InInteractionAgent))
-			{
-				return !GetVoxelItem(true).GetVoxel<UVoxelInteract>().IsOpened();
-			}
-		}
-		case EVoxelInteractAction::Close:
-		{
-			if(Cast<IVoxelAgentInterface>(InInteractionAgent))
-			{
-				return GetVoxelItem(true).GetVoxel<UVoxelInteract>().IsOpened();
-			}
+			return true;
 		}
 		default: break;
 	}
@@ -95,14 +85,9 @@ void AVoxelInteractAuxiliary::OnInteract(EInteractAction InInteractAction, IInte
 	{
 		switch ((EVoxelInteractAction)InInteractAction)
 		{
-			case EVoxelInteractAction::Open:
+			case EVoxelInteractAction::Interact:
 			{
-				GetVoxelItem().GetVoxel<UVoxelInteract>().Open(nullptr);
-				break;
-			}
-			case EVoxelInteractAction::Close:
-			{
-				GetVoxelItem().GetVoxel<UVoxelInteract>().Close(nullptr);
+				GetVoxelItem().GetVoxel<UVoxelInteract>().Interact(nullptr);
 				break;
 			}
 			default: break;

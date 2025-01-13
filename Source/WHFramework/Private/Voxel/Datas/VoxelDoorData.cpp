@@ -1,14 +1,14 @@
 #include "Voxel/Datas/VoxelDoorData.h"
 
 #include "Voxel/Voxels/VoxelDoor.h"
-#include "Voxel/Voxels/Auxiliary/VoxelDoorAuxiliary.h"
+#include "Voxel/Voxels/Auxiliary/VoxelSwitchAuxiliary.h"
 
 UVoxelDoorData::UVoxelDoorData()
 {
 	MaxCount = 10;
 	
 	VoxelClass = UVoxelDoor::StaticClass();
-	AuxiliaryClass = AVoxelDoorAuxiliary::StaticClass();
+	AuxiliaryClass = AVoxelSwitchAuxiliary::StaticClass();
 
 	Nature = EVoxelNature::SemiSolid;
 

@@ -1,11 +1,11 @@
 #pragma once
 
-#include "VoxelInteractData.h"
+#include "VoxelSwitchData.h"
 
 #include "VoxelTorchData.generated.h"
 
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UVoxelTorchData : public UVoxelInteractData
+class WHFRAMEWORK_API UVoxelTorchData : public UVoxelSwitchData
 {
 	GENERATED_BODY()
 

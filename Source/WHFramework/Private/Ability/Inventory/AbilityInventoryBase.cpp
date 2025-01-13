@@ -8,6 +8,7 @@
 #include "Ability/Inventory/Slot/AbilityInventoryEquipSlotBase.h"
 #include "Ability/Inventory/Slot/AbilityInventoryShortcutSlotBase.h"
 #include "Ability/Inventory/Slot/AbilityInventorySkillSlotBase.h"
+#include "Ability/Item/AbilityItemDataBase.h"
 #include "Common/CommonStatics.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 
@@ -406,7 +407,7 @@ void UAbilityInventoryBase::AddItemBySlots(FAbilityItem& InItem, const TArray<UA
 	if(InSlots.Num() == 0) return;
 	
 	auto _Item = InItem;
-	if(InItem.GetType() != EAbilityItemType::Misc)
+	if(InItem.GetData().MaxCount > 0)
 	{
 		for(int i = 0; i < InSlots.Num(); i++)
 		{
@@ -428,7 +429,7 @@ void UAbilityInventoryBase::RemoveItemBySlots(FAbilityItem& InItem, const TArray
 	if(InSlots.Num() == 0) return;
 	
 	auto _Item = InItem;
-	if(InItem.GetType() != EAbilityItemType::Misc)
+	if(InItem.GetData().MaxCount > 0)
 	{
 		for (int i = 0; i < InSlots.Num(); i++)
 		{

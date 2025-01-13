@@ -3,24 +3,23 @@
 #pragma once
 
 #include "Voxel.h"
-#include "VoxelInteract.generated.h"
+#include "VoxelInteract.h"
+#include "VoxelBed.generated.h"
 
 /**
  * ����ֲ��
  */
 UCLASS()
-class WHFRAMEWORK_API UVoxelInteract : public UVoxel
+class WHFRAMEWORK_API UVoxelBed : public UVoxelInteract
 {
 	GENERATED_BODY()
 
 public:
-	UVoxelInteract();
+	UVoxelBed();
 	
 	//////////////////////////////////////////////////////////////////////////
 	// Voxel
 public:
-	virtual void OnReset_Implementation() override;
-	
 	virtual void LoadData(const FString& InData) override;
 
 	virtual FString ToData() override;
@@ -40,8 +39,6 @@ public:
 
 	virtual bool OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult) override;
 
-	//////////////////////////////////////////////////////////////////////////
-	// Interact
 public:
-	virtual void Interact(IVoxelAgentInterface* InAgent);
+	virtual void Interact(IVoxelAgentInterface* InAgent) override;
 };

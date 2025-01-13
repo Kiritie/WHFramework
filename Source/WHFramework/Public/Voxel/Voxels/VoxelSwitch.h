@@ -2,19 +2,19 @@
 
 #pragma once
 
-#include "Voxel.h"
-#include "VoxelInteract.generated.h"
+#include "VoxelInteract.h"
+#include "VoxelSwitch.generated.h"
 
 /**
  * ����ֲ��
  */
 UCLASS()
-class WHFRAMEWORK_API UVoxelInteract : public UVoxel
+class WHFRAMEWORK_API UVoxelSwitch : public UVoxelInteract
 {
 	GENERATED_BODY()
 
 public:
-	UVoxelInteract();
+	UVoxelSwitch();
 	
 	//////////////////////////////////////////////////////////////////////////
 	// Voxel
@@ -41,7 +41,20 @@ public:
 	virtual bool OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult) override;
 
 	//////////////////////////////////////////////////////////////////////////
-	// Interact
+	// Switch
 public:
-	virtual void Interact(IVoxelAgentInterface* InAgent);
+	virtual void Toggle(IVoxelAgentInterface* InAgent);
+
+	virtual void Open(IVoxelAgentInterface* InAgent);
+
+	virtual void Close(IVoxelAgentInterface* InAgent);
+
+protected:
+	UPROPERTY(VisibleAnywhere)
+	bool bOpened;
+
+public:
+	bool IsOpened() const { return bOpened; }
+
+	void SetOpened(bool bInOpened) { bOpened = bInOpened; RefreshData(); }
 };

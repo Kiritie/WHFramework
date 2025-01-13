@@ -14,7 +14,7 @@ UAbilityItemDataBase::UAbilityItemDataBase()
 	Detail = FText::GetEmpty();
 	Rarity = EAbilityItemRarity::None;
 	Icon = nullptr;
-	MaxCount = 1;
+	MaxCount = 0;
 	MaxLevel = 0;
 	AbilityClass = nullptr;
 	PickUpClass = nullptr;

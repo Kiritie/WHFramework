@@ -3,14 +3,14 @@
 #pragma once
 
 #include "Voxel.h"
-#include "VoxelInteract.h"
+#include "VoxelSwitch.h"
 #include "VoxelDoor.generated.h"
 
 /**
  * ������
  */
 UCLASS()
-class WHFRAMEWORK_API UVoxelDoor : public UVoxelInteract
+class WHFRAMEWORK_API UVoxelDoor : public UVoxelSwitch
 {
 	GENERATED_BODY()
 

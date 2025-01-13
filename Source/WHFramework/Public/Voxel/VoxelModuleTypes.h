@@ -81,6 +81,8 @@ enum class EVoxelType : uint8
 	Birch_Plank, //???????
 	Birch_Door, //???????
 	Birch_Door_Upper, //???????
+	Bed, //?????
+	Bed_Upper, //?????
 	Furnace,
 	Crafting_Table, // ?
 	Chest, // ?
@@ -210,10 +212,12 @@ enum class EVoxelInteractAction : uint8
 {
 	// 无
 	None = EInteractAction::None,
+	// 交互
+	Interact = EInteractAction::Interact,
 	// 打开
 	Open = EInteractAction::Custom1,
 	// 关闭
-	Close = EInteractAction::Custom2
+	Close = EInteractAction::Custom2,
 };
 
 UENUM(BlueprintType)

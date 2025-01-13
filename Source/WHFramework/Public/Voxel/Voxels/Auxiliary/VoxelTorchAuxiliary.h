@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "VoxelInteractAuxiliary.h"
+#include "VoxelSwitchAuxiliary.h"
 #include "VoxelTorchAuxiliary.generated.h"
 
 class UVoxel;
@@ -11,7 +11,7 @@ class UPointLightComponent;
 /**
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelTorchAuxiliary : public AVoxelInteractAuxiliary
+class WHFRAMEWORK_API AVoxelTorchAuxiliary : public AVoxelSwitchAuxiliary
 {
 	GENERATED_BODY()
 	
