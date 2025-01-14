@@ -23,15 +23,15 @@ enum class EWindowModeN : uint8
 UENUM(BlueprintType)
 enum class EWindowResolution : uint8
 {
-	R_ScreenSize UMETA(DisplayName = "ScreenSize"),
-	R_3840_2160 UMETA(DisplayName = "3840x2160"),
-	R_2560_1440 UMETA(DisplayName = "2560x1440"),
-	R_1920_1080 UMETA(DisplayName = "1920x1080"),
-	R_1600_900 UMETA(DisplayName = "1600x900"),
-	R_1366_768 UMETA(DisplayName = "1366x768"),
-	R_1280_720 UMETA(DisplayName = "1280x720"),
-	R_1024_576 UMETA(DisplayName = "1024x576"),
-	R_960_540 UMETA(DisplayName = "960x540")
+	WR_ScreenSize UMETA(DisplayName = "ScreenSize"),
+	WR_3840_2160 UMETA(DisplayName = "3840x2160"),
+	WR_2560_1440 UMETA(DisplayName = "2560x1440"),
+	WR_1920_1080 UMETA(DisplayName = "1920x1080"),
+	WR_1600_900 UMETA(DisplayName = "1600x900"),
+	WR_1366_768 UMETA(DisplayName = "1366x768"),
+	WR_1280_720 UMETA(DisplayName = "1280x720"),
+	WR_1024_576 UMETA(DisplayName = "1024x576"),
+	WR_960_540 UMETA(DisplayName = "960x540")
 };
 
 UENUM(BlueprintType)
@@ -60,7 +60,7 @@ public:
 	FORCEINLINE FVideoModuleSaveData()
 	{
 		WindowMode = EWindowModeN::Fullscreen;
-		WindowResolution = EWindowResolution::R_ScreenSize;
+		WindowResolution = EWindowResolution::WR_ScreenSize;
 		bEnableVSync = false;
 		bEnableDynamicResolution = false;
 		GlobalVideoQuality = EVideoQuality::Epic;

@@ -63,11 +63,14 @@ bool IVoxelAgentInterface::OnGenerateVoxel(EInputInteractEvent InInteractEvent, 
 			}
 			if(GeneratePreviewVoxel)
 			{
-				const ERightAngle Angle = UMathStatics::FloatToRightAngle((GetVoxelAgentLocation() - (GenerateVoxelItem.GetLocation() + UVoxelModule::Get().GetWorldData().BlockSize * 0.5f)).GetSafeNormal2D().ToOrientationRotator().Yaw);
-				if(GenerateVoxelItem.Angle != Angle)
+				if(GenerateVoxelItem.GetVoxelData().bRotatable)
 				{
-					GenerateVoxelItem.Angle = Angle;
-					GeneratePreviewVoxel->LoadSaveData(&GenerateVoxelItem);
+					const ERightAngle Angle = UMathStatics::FloatToRightAngle((GetVoxelAgentLocation() - (GenerateVoxelItem.GetLocation() + UVoxelModule::Get().GetWorldData().BlockSize * 0.5f)).GetSafeNormal2D().ToOrientationRotator().Yaw);
+					if(GenerateVoxelItem.Angle != Angle)
+					{
+						GenerateVoxelItem.Angle = Angle;
+						GeneratePreviewVoxel->LoadSaveData(&GenerateVoxelItem);
+					}
 				}
 				GeneratePreviewVoxel->SetActorLocation(GenerateVoxelItem.GetLocation());
 				GeneratePreviewVoxel->SetMaterialColor(bCanGenerateVoxel ? FLinearColor(0.f, 0.7f, 0.f, 0.7f) : FLinearColor(1.f, 0.f, 0.f, 0.7f));

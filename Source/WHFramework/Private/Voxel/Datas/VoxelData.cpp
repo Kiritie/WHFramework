@@ -16,13 +16,33 @@ UVoxelData::UVoxelData()
 	AuxiliaryClass = nullptr;
 	Nature = EVoxelNature::None;
 	Hardness = 1.f;
+	bRotatable = false;
 	bMainPart = true;
-	PartDatas = TMap<FIndex, UVoxelData*>();
+	PartDatas = TArray<UVoxelData*>();
 	PartIndex = FIndex::ZeroIndex;
 	MainData = nullptr;
 	GatherData = nullptr;
 	MeshDatas.SetNum(1);
 	Sounds = TMap<EVoxelSoundType, USoundBase*>();
+
+	_PartDatas = TMap<FIndex, UVoxelData*>();
+}
+
+void UVoxelData::OnInitialize_Implementation()
+{
+	Super::OnInitialize_Implementation();
+
+	for(const auto Iter : PartDatas)
+	{
+		_PartDatas.Add(Iter->PartIndex, Iter);
+	}
+}
+
+void UVoxelData::OnReset_Implementation()
+{
+	Super::OnReset_Implementation();
+	
+	_PartDatas.Empty();
 }
 
 bool UVoxelData::IsEmpty() const
@@ -49,15 +69,26 @@ bool UVoxelData::HasPartData(FIndex InIndex) const
 {
 	if(MainData) return MainData->HasPartData(InIndex);
 	if(InIndex == FIndex::ZeroIndex) return true;
-	return PartDatas.Contains(InIndex);
+	return _PartDatas.Contains(InIndex);
 }
 
 UVoxelData& UVoxelData::GetPartData(FIndex InIndex)
 {
 	if(MainData) return MainData->GetPartData(InIndex);
 	if(InIndex == FIndex::ZeroIndex) return *this;
-	if(PartDatas.Contains(InIndex)) return *PartDatas[InIndex];
+	if(_PartDatas.Contains(InIndex)) return *_PartDatas[InIndex];
 	return UReferencePoolModuleStatics::GetReference<UVoxelData>();
+}
+
+TArray<UVoxelData*> UVoxelData::GetPartDatas()
+{
+	TArray<UVoxelData*> Datas;
+	Datas.Add(this);
+	for(auto Iter : PartDatas)
+	{
+		Datas.Add(Iter);
+	}
+	return Datas;
 }
 
 UVoxelData& UVoxelData::GetMainData()
@@ -77,17 +108,17 @@ FVector UVoxelData::GetRange(ERightAngle InAngle) const
 	if(PartDatas.Num() > 0)
 	{
 		FVector PartRange;
-		for(const auto& Iter : PartDatas)
+		for(const auto Iter : PartDatas)
 		{
-			PartRange.X = FMath::Max(Iter.Key.X, PartRange.X);
-			PartRange.Y = FMath::Max(Iter.Key.Y, PartRange.Y);
-			PartRange.Z = FMath::Max(Iter.Key.Z, PartRange.Z);
+			PartRange.X = FMath::Max(Iter->PartIndex.X, PartRange.X);
+			PartRange.Y = FMath::Max(Iter->PartIndex.Y, PartRange.Y);
+			PartRange.Z = FMath::Max(Iter->PartIndex.Z, PartRange.Z);
 		}
 		Range += PartRange;
 	}
 	if(Range != FVector::OneVector)
 	{
-		Range = UMathStatics::RotatorVector(Range, InAngle, true, true);
+		Range = UMathStatics::RotatorVector(Range, InAngle);
 	}
 	return Range;
 }

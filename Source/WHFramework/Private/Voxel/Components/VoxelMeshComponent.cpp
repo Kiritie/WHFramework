@@ -3,7 +3,6 @@
 
 #include "Voxel/Components/VoxelMeshComponent.h"
 
-#include "Materials/MaterialInstanceDynamic.h"
 #include "Math/MathStatics.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
@@ -149,16 +148,15 @@ void UVoxelMeshComponent::CreateVoxel(const FVoxelItem& InVoxelItem)
 	{
 		UVoxelData& VoxelData = InVoxelItem.GetVoxelData();
 		SetNature(VoxelData.Nature);
-		const FVector Range = VoxelData.GetRange();
+		const FVector Range = VoxelData.GetRange(InVoxelItem.Angle);
 		if(Scope == EVoxelScope::Capture)
 		{
-			CenterOffset.Z = -(Range.Z - 1.f) * 0.5f;
+			CenterOffset = -(Range - 1.f) * 0.5f;
 		}
-		ITER_INDEX(PartIndex, Range, false,
-			UVoxelData& PartData = VoxelData.GetPartData(PartIndex);
+		ITER_ARRAY(VoxelData.GetPartDatas(), PartData,
 			FVoxelItem PartItem;
-			PartItem.ID = PartData.GetPrimaryAssetId();
-			PartItem.Index = PartIndex;
+			PartItem.ID = PartData->GetPrimaryAssetId();
+			PartItem.Index = UMathStatics::RotatorIndex(PartData->PartIndex, InVoxelItem.Angle);
 			PartItem.Angle = InVoxelItem.Angle;
 			BuildVoxel(PartItem);
 		)
@@ -317,8 +315,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVer
 	const FVector Scale = UMathStatics::RotatorVector(MeshData.MeshScale, InVoxelItem.Angle, false, true);
 	const FVector Offset = CenterOffset + UMathStatics::RotatorVector(MeshData.MeshOffset, InVoxelItem.Angle) * OffsetScale;
 	const FVector2D UVSize = FVector2D(RenderData.PixelSize / RenderData.TextureSize.X, RenderData.PixelSize / RenderData.TextureSize.Y);
-	const FVector2D UVCorner = FVector2D((MeshUVData.UVCorner.X + MeshUVData.UVOffset.X) * UVSize.X,
-		(1.f / UVSize.Y - (RenderData.TextureSize.Y / RenderData.PixelSize - (-MeshUVData.UVCorner.Y + MeshUVData.UVOffset.Y) - 1.f) - MeshUVData.UVSpan.Y) * UVSize.Y);
+	const FVector2D UVCorner = FVector2D((MeshUVData.UVCorner.X + MeshUVData.UVOffset.X) * UVSize.X, (1.f / UVSize.Y - (RenderData.TextureSize.Y / RenderData.PixelSize - (-MeshUVData.UVCorner.Y + MeshUVData.UVOffset.Y) - 1.f) - MeshUVData.UVSpan.Y) * UVSize.Y);
 	const FVector2D UVSpan = FVector2D(MeshUVData.UVSpan.X * UVSize.X, MeshUVData.UVSpan.Y * UVSize.Y);
 
 	for (int32 i = 0; i < 4; i++)

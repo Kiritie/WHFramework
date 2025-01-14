@@ -4,6 +4,7 @@
 #include "Voxel/VoxelModuleTypes.h"
 
 #include "Asset/AssetModuleStatics.h"
+#include "Math/MathStatics.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Chunks/VoxelChunk.h"
@@ -138,7 +139,7 @@ bool FVoxelItem::IsMain() const
 
 FVoxelItem& FVoxelItem::GetMain() const
 {
-	if(Owner) return Owner->GetVoxelComplex(Index - GetVoxelData().PartIndex);
+	if(Owner) return Owner->GetVoxelComplex(Index - UMathStatics::RotatorIndex(GetVoxelData().PartIndex, Angle));
 	return FVoxelItem::Empty;
 }
 
@@ -156,9 +157,9 @@ TArray<FVoxelItem> FVoxelItem::GetParts() const
 	if(Owner)
 	{
 		TArray<FVoxelItem> Parts;
-		for(auto& Iter : GetVoxelData().PartDatas)
+		for(auto Iter : GetVoxelData().PartDatas)
 		{
-			Parts.Add(Owner->GetVoxelComplex(Index + Iter.Key));
+			Parts.Add(Owner->GetVoxelComplex(Index + UMathStatics::RotatorIndex(Iter->PartIndex, Angle)));
 		}
 		return Parts;
 	}

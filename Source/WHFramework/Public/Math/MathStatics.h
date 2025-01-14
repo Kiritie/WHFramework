@@ -28,20 +28,22 @@ public:
 	//One-dimensional to three-dimensional coordinates (decompression coordinates)
 	static FIndex UnIndex(uint64 InIndex);
 
+	static FIndex RotatorIndex(const FIndex& InIndex, ERightAngle InAngle, bool bRound = false, bool bAbsolute = false);
+
 	//////////////////////////////////////////////////////////////////////////
 	// Rotator
 	template<class U>
-	FORCEINLINE static FRotator LerpRotator(const FRotator& A, const FRotator& B, const U& Alpha, bool bNormalized = true)
+	FORCEINLINE static FRotator LerpRotator(const FRotator& InA, const FRotator& InB, const U& InAlpha, bool bNormalized = true)
 	{
-		const FRotator Delta = B - A;
-		return A + (bNormalized ? Delta.GetNormalized() : Delta) * Alpha;
+		const FRotator Delta = InB - InA;
+		return InA + (bNormalized ? Delta.GetNormalized() : Delta) * InAlpha;
 	}
 
 	//////////////////////////////////////////////////////////////////////////
 	// Vector
-	static FVector RotatorVector(const FVector& Vector, const FRotator& Rotator, bool bRound = false, bool bAbsolute = false);
+	static FVector RotatorVector(const FVector& InVector, const FRotator& InRotator, bool bRound = false, bool bAbsolute = false);
 
-	static FVector RotatorVector(const FVector& Vector, ERightAngle Angle, bool bRound = false, bool bAbsolute = false);
+	static FVector RotatorVector(const FVector& InVector, ERightAngle InAngle, bool bRound = false, bool bAbsolute = false);
 
 	static bool IsPointInEllipse2D(FVector2D InPoint, FVector2D InCenter, FVector2D InRadius);
 

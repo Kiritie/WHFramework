@@ -27,27 +27,32 @@ FIndex UMathStatics::UnIndex(uint64 InIndex)
 	);
 }
 
-FVector UMathStatics::RotatorVector(const FVector& Vector, const FRotator& Rotator, bool bRound, bool bAbsolute)
+FIndex UMathStatics::RotatorIndex(const FIndex& InIndex, ERightAngle InAngle, bool bRound, bool bAbsolute)
 {
-	FVector vector = !Rotator.IsZero() ? Rotator.RotateVector(Vector) : Vector;
+	return RotatorVector(InIndex, InAngle, bRound, bAbsolute);
+}
+
+FVector UMathStatics::RotatorVector(const FVector& InVector, const FRotator& InRotator, bool bRound, bool bAbsolute)
+{
+	FVector Vector = !InRotator.IsZero() ? InRotator.RotateVector(InVector) : InVector;
 	if(bRound)
 	{
-		vector.X = FMath::RoundToFloat(vector.X);
-		vector.Y = FMath::RoundToFloat(vector.Y);
-		vector.Z = FMath::RoundToFloat(vector.Z);
+		Vector.X = FMath::RoundToFloat(Vector.X);
+		Vector.Y = FMath::RoundToFloat(Vector.Y);
+		Vector.Z = FMath::RoundToFloat(Vector.Z);
 	}
 	if(bAbsolute)
 	{
-		vector.X = FMath::Abs(vector.X);
-		vector.Y = FMath::Abs(vector.Y);
-		vector.Z = FMath::Abs(vector.Z);
+		Vector.X = FMath::Abs(Vector.X);
+		Vector.Y = FMath::Abs(Vector.Y);
+		Vector.Z = FMath::Abs(Vector.Z);
 	}
-	return vector;
+	return Vector;
 }
 
-FVector UMathStatics::RotatorVector(const FVector& Vector, ERightAngle Angle, bool bRound, bool bAbsolute)
+FVector UMathStatics::RotatorVector(const FVector& InVector, ERightAngle InAngle, bool bRound, bool bAbsolute)
 {
-	return RotatorVector(Vector, FRotator(0.f, (int32)Angle * 90.f, 0.f), bRound, bAbsolute);
+	return RotatorVector(InVector, FRotator(0.f, (int32)InAngle * 90.f, 0.f), bRound, bAbsolute);
 }
 
 bool UMathStatics::IsPointInEllipse2D(FVector2D InPoint, FVector2D InCenter, FVector2D InRadius)

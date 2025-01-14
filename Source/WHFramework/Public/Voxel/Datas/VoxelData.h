@@ -14,6 +14,11 @@ public:
 	UVoxelData();
 
 public:
+	virtual void OnInitialize_Implementation() override;
+
+	virtual void OnReset_Implementation() override;
+
+public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	EVoxelType VoxelType;
 
@@ -30,10 +35,13 @@ public:
 	float Hardness;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bRotatable;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bMainPart;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "bMainPart == true"))
-	TMap<FIndex, UVoxelData*> PartDatas;
+	TArray<UVoxelData*> PartDatas;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "bMainPart == false"))
 	FIndex PartIndex;
@@ -50,6 +58,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FVoxelMeshData> MeshDatas;
 
+protected:
+	UPROPERTY(Transient)
+	TMap<FIndex, UVoxelData*> _PartDatas;
+
 public:
 	bool IsEmpty() const;
 
@@ -65,6 +77,8 @@ public:
 	virtual bool HasPartData(FIndex InIndex) const;
 
 	virtual UVoxelData& GetPartData(FIndex InIndex);
+
+	virtual TArray<UVoxelData*> GetPartDatas();
 
 	virtual EVoxelTransparency GetTransparency() const;
 

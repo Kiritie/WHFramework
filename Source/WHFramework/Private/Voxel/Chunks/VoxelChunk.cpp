@@ -826,33 +826,22 @@ bool AVoxelChunk::SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelI
 		const FVoxelItem VoxelItem = InVoxelItem.IsValid() ? InVoxelItem : GetVoxel(VoxelIndex);
 		if(VoxelItem.IsValid())
 		{
-			UVoxelData& VoxelData = VoxelItem.GetVoxelData(false);
+			const UVoxelData& VoxelData = VoxelItem.GetVoxelData(false);
 			const FVector VoxelRange = VoxelData.GetRange(VoxelItem.Angle);
-			if(VoxelRange != FVector::OneVector)
+			if(VoxelData.IsMainPart() && VoxelRange != FVector::OneVector)
 			{
-				if(VoxelData.IsMainPart())
-				{
-					TMap<FIndex, FVoxelItem> VoxelItems;
-					VoxelItems.Emplace(VoxelIndex, InVoxelItem);
-					ITER_INDEX(PartIndex, VoxelRange, false,
-						UVoxelData& PartData = VoxelData.GetPartData(PartIndex);
-						if(!PartData.IsMainPart())
-						{
-							FVoxelItem PartItem = FVoxelItem::Empty;
-							if(InVoxelItem.IsValid())
-							{
-								PartItem.ID = PartData.GetPrimaryAssetId();
-								PartItem.Angle = InVoxelItem.Angle;
-							}
-							VoxelItems.Emplace(VoxelIndex + PartIndex, PartItem);
-						}
-					)
-					return SetVoxelComplex(VoxelItems, bGenerate, true, InAgent);
-				}
-				else
-				{
-					return SetVoxelComplex(VoxelIndex, InVoxelItem, bGenerate, InAgent);
-				}
+				TMap<FIndex, FVoxelItem> VoxelItems;
+				VoxelItems.Emplace(VoxelIndex, InVoxelItem);
+				ITER_ARRAY(VoxelData.PartDatas, PartData,
+					FVoxelItem PartItem = FVoxelItem::Empty;
+					if(InVoxelItem.IsValid())
+					{
+						PartItem.ID = PartData->GetPrimaryAssetId();
+						PartItem.Angle = InVoxelItem.Angle;
+					}
+					VoxelItems.Emplace(VoxelIndex + UMathStatics::RotatorIndex(PartData->PartIndex, InVoxelItem.Angle), PartItem);
+				)
+				return SetVoxelComplex(VoxelItems, bGenerate, true, InAgent);
 			}
 			else
 			{

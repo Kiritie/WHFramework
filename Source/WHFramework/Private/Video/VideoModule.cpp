@@ -33,7 +33,7 @@ UVideoModule::UVideoModule()
 	MediaPlayers = TArray<AMediaPlayerBase*>();
 
 	WindowMode = EWindowModeN::Fullscreen;
-	WindowResolution = EWindowResolution::R_ScreenSize;
+	WindowResolution = EWindowResolution::WR_ScreenSize;
 	bEnableVSync = false;
 	bEnableDynamicResolution = false;
 	
@@ -356,47 +356,47 @@ void UVideoModule::SetWindowResolution(EWindowResolution InResolution, bool bApp
 	WindowResolution = InResolution;
 	switch (InResolution)
 	{
-		case EWindowResolution::R_ScreenSize:
+		case EWindowResolution::WR_ScreenSize:
 		{
 			GetGameUserSettings()->SetScreenResolution(GetDesktopResolution());
 			break;
 		}
-		case EWindowResolution::R_3840_2160:
+		case EWindowResolution::WR_3840_2160:
 		{
 			GetGameUserSettings()->SetScreenResolution(FIntPoint(3840, 2160));
 			break;
 		}
-		case EWindowResolution::R_2560_1440:
+		case EWindowResolution::WR_2560_1440:
 		{
 			GetGameUserSettings()->SetScreenResolution(FIntPoint(2560, 1440));
 			break;
 		}
-		case EWindowResolution::R_1920_1080:
+		case EWindowResolution::WR_1920_1080:
 		{
 			GetGameUserSettings()->SetScreenResolution(FIntPoint(1920, 1080));
 			break;
 		}
-		case EWindowResolution::R_1600_900:
+		case EWindowResolution::WR_1600_900:
 		{
 			GetGameUserSettings()->SetScreenResolution(FIntPoint(1600, 900));
 			break;
 		}
-		case EWindowResolution::R_1366_768:
+		case EWindowResolution::WR_1366_768:
 		{
 			GetGameUserSettings()->SetScreenResolution(FIntPoint(1366, 768));
 			break;
 		}
-		case EWindowResolution::R_1280_720:
+		case EWindowResolution::WR_1280_720:
 		{
 			GetGameUserSettings()->SetScreenResolution(FIntPoint(1280, 720));
 			break;
 		}
-		case EWindowResolution::R_1024_576:
+		case EWindowResolution::WR_1024_576:
 		{
 			GetGameUserSettings()->SetScreenResolution(FIntPoint(1024, 576));
 			break;
 		}
-		case EWindowResolution::R_960_540:
+		case EWindowResolution::WR_960_540:
 		{
 			GetGameUserSettings()->SetScreenResolution(FIntPoint(960, 540));
 			break;

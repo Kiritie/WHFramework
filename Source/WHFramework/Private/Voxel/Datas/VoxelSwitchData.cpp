@@ -8,6 +8,7 @@ UVoxelSwitchData::UVoxelSwitchData()
 	VoxelClass = UVoxelSwitch::StaticClass();
 	AuxiliaryClass = AVoxelSwitchAuxiliary::StaticClass();
 
+	InteractActions.Empty();
 	InteractActions.Add(EVoxelInteractAction::Open);
 	InteractActions.Add(EVoxelInteractAction::Close);
 }
