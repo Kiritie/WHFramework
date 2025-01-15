@@ -94,7 +94,7 @@ public:
 	template<class T>
 	void SwitchCharacterByClass(bool bResetCamera = true, bool bInstant = false, TSubclassOf<ACharacterBase> InClass = T::StaticClass())
 	{
-		SwitchCharacterByClass(InClass, bResetCamera);
+		SwitchCharacterByClass(InClass, bInstant, bResetCamera);
 	}
 
 	UFUNCTION(BlueprintCallable)

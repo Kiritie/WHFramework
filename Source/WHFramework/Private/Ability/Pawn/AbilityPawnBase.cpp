@@ -39,6 +39,8 @@ AAbilityPawnBase::AAbilityPawnBase(const FObjectInitializer& ObjectInitializer) 
 	Interaction->SetupAttachment(RootComponent);
 	Interaction->SetInteractable(false);
 
+	Interaction->AddInteractAction(EInteractAction::Revive);
+
 	FSM = CreateDefaultSubobject<UFSMComponent>(FName("FSM"));
 	FSM->GroupName = FName("Vitality");
 	
@@ -102,8 +104,6 @@ void AAbilityPawnBase::OnPreparatory_Implementation(EPhase InPhase)
 void AAbilityPawnBase::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);
-
-	if(IsDead()) return;
 
 	if(IsActive())
 	{
@@ -323,6 +323,14 @@ void AAbilityPawnBase::EndAction(const FGameplayTag& InActionTag, bool bWasCance
 
 bool AAbilityPawnBase::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
 {
+	switch (InInteractAction)
+	{
+		case EInteractAction::Revive:
+		{
+			return IsDead();
+		}
+		default: break;
+	}
 	return false;
 }
 
@@ -336,7 +344,17 @@ void AAbilityPawnBase::OnLeaveInteract(IInteractionAgentInterface* InInteraction
 
 void AAbilityPawnBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive)
 {
-	
+	if(bPassive)
+	{
+		switch (InInteractAction)
+		{
+			case EInteractAction::Revive:
+			{
+				Revive(Cast<IAbilityVitalityInterface>(InInteractionAgent));
+			}
+			default: break;
+		}
+	}
 }
 
 void AAbilityPawnBase::OnAdditionItem(const FAbilityItem& InItem)
@@ -542,14 +560,14 @@ bool AAbilityPawnBase::IsEnemy(IAbilityPawnInterface* InTarget) const
 	return !InTarget->GetRaceID().IsEqual(RaceID);
 }
 
-bool AAbilityPawnBase::IsActive(bool bNeedNotDead) const
+bool AAbilityPawnBase::IsActive() const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Active) && (!bNeedNotDead || !IsDead());
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Active);
 }
 
 bool AAbilityPawnBase::IsDead(bool bCheckDying) const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Dead) || bCheckDying && IsDying();
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Dead) || (bCheckDying && IsDying());
 }
 
 bool AAbilityPawnBase::IsDying() const

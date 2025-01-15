@@ -20,10 +20,17 @@ AVoxelInteractAuxiliary::AVoxelInteractAuxiliary()
 	Interaction = CreateDefaultSubobject<UInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);
 	Interaction->SetInteractable(false);
+	
+	bInteracting = false;
 }
 
 void AVoxelInteractAuxiliary::OnDespawn_Implementation(bool bRecovery)
 {
+	if(bInteracting && InteractingAgent)
+	{
+		InteractingAgent->DoInteract((EInteractAction)EVoxelInteractAction::UnInteract);
+	}
+
 	Super::OnDespawn_Implementation(bRecovery);
 
 	Interaction->ClearInteractActions();
@@ -64,7 +71,11 @@ bool AVoxelInteractAuxiliary::CanInteract(EInteractAction InInteractAction, IInt
 	{
 		case EVoxelInteractAction::Interact:
 		{
-			return true;
+			return !bInteracting;
+		}
+		case EVoxelInteractAction::UnInteract:
+		{
+			return bInteracting;
 		}
 		default: break;
 	}
@@ -87,7 +98,19 @@ void AVoxelInteractAuxiliary::OnInteract(EInteractAction InInteractAction, IInte
 		{
 			case EVoxelInteractAction::Interact:
 			{
-				GetVoxelItem().GetVoxel<UVoxelInteract>().Interact(nullptr);
+				if(!GetVoxelItem().GetVoxel<UVoxelInteract>().Interact(nullptr))
+				{
+					bInteracting = true;
+				}
+				break;
+			}
+			case EVoxelInteractAction::UnInteract:
+			{
+				if(bInteracting)
+				{
+					bInteracting = false;
+					GetVoxelItem().GetVoxel<UVoxelInteract>().UnInteract(nullptr);
+				}
 				break;
 			}
 			default: break;

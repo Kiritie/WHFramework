@@ -52,7 +52,7 @@ void UDefaultInputManagerBase::TurnCamera_Implementation(const FInputActionValue
 
 	if(UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraRotate).IsPressing(UCommonStatics::GetPlayerController(), true))
 	{
-		UCameraModule::Get().AddCameraRotationInput(InValue.Get<float>(), 0.f);
+		UCameraModule::Get().AddCameraRotationInput(InValue.Get<float>() / UCommonStatics::GetTimeScale(), 0.f);
 	}
 }
 
@@ -62,7 +62,7 @@ void UDefaultInputManagerBase::LookUpCamera_Implementation(const FInputActionVal
 
 	if(UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraRotate).IsPressing(UCommonStatics::GetPlayerController(), true))
 	{
-		UCameraModule::Get().AddCameraRotationInput(0.f, UCameraModule::Get().IsReverseCameraPitch() ? -InValue.Get<float>() : InValue.Get<float>());
+		UCameraModule::Get().AddCameraRotationInput(0.f, (UCameraModule::Get().IsReverseCameraPitch() ? -InValue.Get<float>() : InValue.Get<float>()) / UCommonStatics::GetTimeScale());
 	}
 }
 
@@ -74,7 +74,7 @@ void UDefaultInputManagerBase::PanHCamera_Implementation(const FInputActionValue
 	{
 		const FRotator Rotation = FRotator(0.f, UCommonStatics::GetPlayerController()->GetControlRotation().Yaw, 0.f);
 		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * (UCameraModule::Get().IsReverseCameraPanMove() ? -0.7f : 0.7f);
-		UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>());
+		UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>() / UCommonStatics::GetTimeScale());
 	}
 }
 
@@ -86,7 +86,7 @@ void UDefaultInputManagerBase::PanVCamera_Implementation(const FInputActionValue
 	{
 		const FRotator Rotation = FRotator(UCameraModule::Get().IsEnableCameraPanZMove() ? UCommonStatics::GetPlayerController()->GetControlRotation().Pitch : 0.f, UCommonStatics::GetPlayerController()->GetControlRotation().Yaw, 0.f);
 		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(UCameraModule::Get().IsEnableCameraPanZMove() ? EAxis::Z : EAxis::X) * (UCameraModule::Get().IsReverseCameraPanMove() ? -0.7f : 0.7f);
-		UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>());
+		UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>() / UCommonStatics::GetTimeScale());
 	}
 }
 
@@ -96,7 +96,7 @@ void UDefaultInputManagerBase::ZoomCamera_Implementation(const FInputActionValue
 
 	if(UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraZoom).IsPressing(UCommonStatics::GetPlayerController(), true))
 	{
-		UCameraModule::Get().AddCameraDistanceInput(-InValue.Get<float>());
+		UCameraModule::Get().AddCameraDistanceInput(-InValue.Get<float>() / UCommonStatics::GetTimeScale());
 	}
 }
 
@@ -105,7 +105,7 @@ void UDefaultInputManagerBase::MoveForwardCamera_Implementation(const FInputActi
 	if(InValue.Get<float>() == 0.f) return;
 
 	const FVector Direction = UCameraModule::Get().GetCurrentCameraRotation().Vector();
-	UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>() * (UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraSprint).IsPressing(UCommonStatics::GetPlayerController()) ? 3.f : 1.f));
+	UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>() * (UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraSprint).IsPressing(UCommonStatics::GetPlayerController()) ? 3.f : 1.f) / UCommonStatics::GetTimeScale());
 }
 
 void UDefaultInputManagerBase::MoveRightCamera_Implementation(const FInputActionValue& InValue)
@@ -113,14 +113,14 @@ void UDefaultInputManagerBase::MoveRightCamera_Implementation(const FInputAction
 	if(InValue.Get<float>() == 0.f) return;
 
 	const FVector Direction = FRotationMatrix(UCameraModule::Get().GetCurrentCameraRotation()).GetUnitAxis(EAxis::Y);
-	UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>() * (UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraSprint).IsPressing(UCommonStatics::GetPlayerController()) ? 3.f : 1.f));
+	UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>() * (UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraSprint).IsPressing(UCommonStatics::GetPlayerController()) ? 3.f : 1.f) / UCommonStatics::GetTimeScale());
 }
 
 void UDefaultInputManagerBase::MoveUpCamera_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
-	UCameraModule::Get().AddCameraMovementInput(FVector::UpVector, InValue.Get<float>() * (UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraSprint).IsPressing(UCommonStatics::GetPlayerController()) ? 3.f : 1.f));
+	UCameraModule::Get().AddCameraMovementInput(FVector::UpVector, InValue.Get<float>() * (UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraSprint).IsPressing(UCommonStatics::GetPlayerController()) ? 3.f : 1.f) / UCommonStatics::GetTimeScale());
 }
 
 void UDefaultInputManagerBase::TurnPlayer_Implementation(const FInputActionValue& InValue)

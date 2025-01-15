@@ -43,5 +43,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Interact
 public:
-	virtual void Interact(IVoxelAgentInterface* InAgent);
+	virtual bool Interact(IVoxelAgentInterface* InAgent);
+
+	virtual void UnInteract(IVoxelAgentInterface* InAgent);
 };

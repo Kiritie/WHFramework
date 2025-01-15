@@ -9,4 +9,5 @@ UVoxelInteractData::UVoxelInteractData()
 	AuxiliaryClass = AVoxelInteractAuxiliary::StaticClass();
 
 	InteractActions.Add(EVoxelInteractAction::Interact);
+	InteractActions.Add(EVoxelInteractAction::UnInteract);
 }

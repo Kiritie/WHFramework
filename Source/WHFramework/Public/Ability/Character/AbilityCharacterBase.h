@@ -318,7 +318,7 @@ public:
 	virtual bool IsEnemy(IAbilityPawnInterface* InTarget) const override;
 
 	UFUNCTION(BlueprintPure)
-	virtual bool IsActive(bool bNeedNotDead = false) const override;
+	virtual bool IsActive() const override;
 
 	UFUNCTION(BlueprintPure)
 	virtual bool IsDead(bool bCheckDying = true) const override;

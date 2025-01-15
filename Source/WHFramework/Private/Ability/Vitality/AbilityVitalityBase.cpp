@@ -16,6 +16,7 @@
 #include "Ability/Vitality/States/AbilityVitalityState_Interrupt.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Static.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Walk.h"
+#include "Common/Interaction/InteractionComponent.h"
 
 AAbilityVitalityBase::AAbilityVitalityBase(const FObjectInitializer& ObjectInitializer) :
 	Super(ObjectInitializer.SetDefaultSubobjectClass<UVitalityAttributeSetBase>(FName("AttributeSet")).
@@ -32,6 +33,8 @@ AAbilityVitalityBase::AAbilityVitalityBase(const FObjectInitializer& ObjectIniti
 	FSM->States.Add(UAbilityVitalityState_Spawn::StaticClass());
 	FSM->States.Add(UAbilityVitalityState_Static::StaticClass());
 	FSM->States.Add(UAbilityVitalityState_Walk::StaticClass());
+
+	Interaction->AddInteractAction(EInteractAction::Revive);
 
 	// stats
 	RaceID = NAME_None;
@@ -201,6 +204,14 @@ void AAbilityVitalityBase::EndAction(const FGameplayTag& InActionTag, bool bWasC
 
 bool AAbilityVitalityBase::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
 {
+	switch (InInteractAction)
+	{
+		case EInteractAction::Revive:
+		{
+			return IsDead();
+		}
+		default: break;
+	}
 	return Super::CanInteract(InInteractAction, InInteractionAgent);
 }
 
@@ -217,6 +228,19 @@ void AAbilityVitalityBase::OnLeaveInteract(IInteractionAgentInterface* InInterac
 void AAbilityVitalityBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive)
 {
 	Super::OnInteract(InInteractAction, InInteractionAgent, bPassive);
+
+	if(bPassive)
+	{
+		switch (InInteractAction)
+		{
+			case EInteractAction::Revive:
+			{
+				Revive(Cast<IAbilityVitalityInterface>(InInteractionAgent));
+				break;
+			}
+			default: break;
+		}
+	}
 }
 
 void AAbilityVitalityBase::OnPreChangeItem(const FAbilityItem& InOldItem)
@@ -369,14 +393,14 @@ void AAbilityVitalityBase::HandleInterrupt(const FGameplayAttribute& InterruptAt
 	
 }
 
-bool AAbilityVitalityBase::IsActive(bool bNeedNotDead) const
+bool AAbilityVitalityBase::IsActive() const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Active) && (!bNeedNotDead || !IsDead());
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Active);
 }
 
 bool AAbilityVitalityBase::IsDead(bool bCheckDying) const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Dead) || bCheckDying && IsDying();
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Dead) || (bCheckDying && IsDying());
 }
 
 bool AAbilityVitalityBase::IsDying() const

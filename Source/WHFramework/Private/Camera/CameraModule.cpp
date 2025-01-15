@@ -296,6 +296,8 @@ void UCameraModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 
 	if(bInEditor) return;
 
+	DeltaSeconds /= UCommonStatics::GetTimeScale();
+
 	DoTrackTarget();
 
 	if(bCameraMoveAble && CurrentCamera)

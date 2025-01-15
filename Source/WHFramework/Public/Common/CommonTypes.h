@@ -48,16 +48,18 @@ enum class EInteractAction : uint8
 	None = 0,
 	// 交互
 	Interact = 1,
+	// 退出
+	UnInteract = 2,
 	// 复活
-	Revive = 2,
+	Revive = 3,
 	// 战斗
-	Fight = 3,
+	Fight = 4,
 	// 对话
-	Dialogue = 4,
+	Dialogue = 5,
 	// 交易
-	Transaction = 5,
+	Transaction = 6,
 	// 拾取
-	PickUp = 6,
+	PickUp = 7,
 
 	Custom1 = 10,
 	Custom2 = 11,

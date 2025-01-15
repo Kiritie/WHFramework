@@ -136,8 +136,6 @@ void AAbilityCharacterBase::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);
 
-	if(IsDead()) return;
-
 	if(IsActive())
 	{
 		if(GetMoveVelocity(true).Size() > 0.2f)
@@ -292,7 +290,7 @@ void AAbilityCharacterBase::OnMovementModeChanged(EMovementMode PrevMovementMode
 {
 	Super::OnMovementModeChanged(PrevMovementMode, PreviousCustomMode);
 
-	if(!IsActive(true)) return;
+	if(!IsActive()) return;
 	
 	FSM->RefreshState();
 
@@ -560,6 +558,14 @@ void AAbilityCharacterBase::OnPickUp(AAbilityPickUpBase* InPickUp)
 
 bool AAbilityCharacterBase::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
 {
+	switch (InInteractAction)
+	{
+		case EInteractAction::Revive:
+		{
+			return IsDead();
+		}
+		default: break;
+	}
 	return false;
 }
 
@@ -573,7 +579,17 @@ void AAbilityCharacterBase::OnLeaveInteract(IInteractionAgentInterface* InIntera
 
 void AAbilityCharacterBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive)
 {
-	
+	if(bPassive)
+	{
+		switch (InInteractAction)
+		{
+			case EInteractAction::Revive:
+			{
+				Revive(Cast<IAbilityVitalityInterface>(InInteractionAgent));
+			}
+			default: break;
+		}
+	}
 }
 
 void AAbilityCharacterBase::OnAdditionItem(const FAbilityItem& InItem)
@@ -792,14 +808,14 @@ bool AAbilityCharacterBase::IsEnemy(IAbilityPawnInterface* InTarget) const
 	return !InTarget->GetRaceID().IsEqual(RaceID);
 }
 
-bool AAbilityCharacterBase::IsActive(bool bNeedNotDead) const
+bool AAbilityCharacterBase::IsActive() const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Active) && (!bNeedNotDead || !IsDead());
+	return IsCurrent() && AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Active);
 }
 
 bool AAbilityCharacterBase::IsDead(bool bCheckDying) const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Dead) || bCheckDying && IsDying();
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Dead) || (bCheckDying && IsDying());
 }
 
 bool AAbilityCharacterBase::IsDying() const
@@ -879,7 +895,7 @@ bool AAbilityCharacterBase::IsLookAtAble_Implementation(AActor* InLookerActor) c
 
 bool AAbilityCharacterBase::CanLookAtTarget()
 {
-	return Super::CanLookAtTarget() && IsActive(true);
+	return Super::CanLookAtTarget() && IsActive();
 }
 
 void AAbilityCharacterBase::SetNameA(FName InName)

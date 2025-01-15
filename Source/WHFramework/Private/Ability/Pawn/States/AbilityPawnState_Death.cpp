@@ -42,6 +42,7 @@ void UAbilityPawnState_Death::OnEnter(UFiniteStateBase* InLastState, const TArra
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
+	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Active);
 	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dying);
 
 	Pawn->GetInteractionComponent()->SetInteractable(false);
@@ -84,6 +85,7 @@ void UAbilityPawnState_Death::OnLeave(UFiniteStateBase* InNextState)
 
 	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dying);
 	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dead);
+	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Active);
 
 	Pawn->StopAction(GameplayTags::Ability_Vitality_Action_Death);
 

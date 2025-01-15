@@ -214,6 +214,8 @@ enum class EVoxelInteractAction : uint8
 	None = EInteractAction::None,
 	// 交互
 	Interact = EInteractAction::Interact,
+	// 退出
+	UnInteract = EInteractAction::UnInteract,
 	// 打开
 	Open = EInteractAction::Custom1,
 	// 关闭

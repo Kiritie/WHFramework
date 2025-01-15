@@ -93,7 +93,7 @@ void UVoxelMeshComponent::Initialize(EVoxelScope InScope, EVoxelNature InNature)
 		case EVoxelScope::Vitality:
 		{
 			OffsetScale = FVector::OneVector;
-			CenterOffset = FVector(0.f, 0.f, 0.5f);
+			CenterOffset = FVector(0.f, 0.f, 0.f);
 			SetCollisionEnabled(false);
 			break;
 		}

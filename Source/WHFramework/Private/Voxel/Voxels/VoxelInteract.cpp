@@ -72,6 +72,12 @@ bool UVoxelInteract::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputIntera
 	return false;
 }
 
-void UVoxelInteract::Interact(IVoxelAgentInterface* InAgent)
+bool UVoxelInteract::Interact(IVoxelAgentInterface* InAgent)
 {
+	return false;
+}
+
+void UVoxelInteract::UnInteract(IVoxelAgentInterface* InAgent)
+{
+	
 }
