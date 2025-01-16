@@ -64,5 +64,7 @@ public:
 	UUserWidget* GetOwnerWidget(TSubclassOf<UUserWidget> InClass = nullptr) const;
 
 	UFUNCTION(BlueprintPure)
-	TArray<FParameter>& GetWidgetParams() { return WidgetParams; }
+	virtual TArray<FParameter> GetWidgetParams() const { return WidgetParams; }
+
+	virtual TArray<FParameter> GetSpawnParams_Implementation() const override { return WidgetParams; }
 };

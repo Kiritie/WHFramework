@@ -65,7 +65,7 @@ bool IVoxelAgentInterface::OnGenerateVoxel(EInputInteractEvent InInteractEvent, 
 			{
 				if(GenerateVoxelItem.GetVoxelData().bRotatable)
 				{
-					const ERightAngle Angle = UMathStatics::FloatToRightAngle((GetVoxelAgentLocation() - (GenerateVoxelItem.GetLocation() + UVoxelModule::Get().GetWorldData().BlockSize * 0.5f)).GetSafeNormal2D().ToOrientationRotator().Yaw);
+					const ERightAngle Angle = UMathStatics::FloatToRightAngle((GenerateVoxelItem.GetLocation() + UVoxelModule::Get().GetWorldData().BlockSize * 0.5f - GetVoxelAgentLocation()).GetSafeNormal2D().ToOrientationRotator().Yaw);
 					if(GenerateVoxelItem.Angle != Angle)
 					{
 						GenerateVoxelItem.Angle = Angle;

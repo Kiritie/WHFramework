@@ -28,7 +28,7 @@ public:
 	//One-dimensional to three-dimensional coordinates (decompression coordinates)
 	static FIndex UnIndex(uint64 InIndex);
 
-	static FIndex RotatorIndex(const FIndex& InIndex, ERightAngle InAngle, bool bRound = false, bool bAbsolute = false);
+	static FIndex RotateIndex(const FIndex& InIndex, ERightAngle InAngle, bool bRound = false, bool bAbsolute = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Rotator
@@ -41,9 +41,9 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Vector
-	static FVector RotatorVector(const FVector& InVector, const FRotator& InRotator, bool bRound = false, bool bAbsolute = false);
+	static FVector RotateVector(const FVector& InVector, const FRotator& InRotator, bool bRound = false, bool bAbsolute = false);
 
-	static FVector RotatorVector(const FVector& InVector, ERightAngle InAngle, bool bRound = false, bool bAbsolute = false);
+	static FVector RotateVector(const FVector& InVector, ERightAngle InAngle, bool bRound = false, bool bAbsolute = false);
 
 	static bool IsPointInEllipse2D(FVector2D InPoint, FVector2D InCenter, FVector2D InRadius);
 

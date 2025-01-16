@@ -23,6 +23,8 @@ class AAbilityEquipBase;
 class UWidgetAbilityInventorySlotBase;
 class UAbilityInventorySlotBase;
 
+extern WHFRAMEWORK_API FPrimaryAssetId PAID_EXP;
+
 DECLARE_PROPERTY_ROB_GETTER(FGameplayEffectModifierMagnitude, AttributeBasedMagnitude, FAttributeBasedFloat)
 
 #define GET_GAMEPLAYATTRIBUTE(ClassName, PropertyName) \

@@ -359,7 +359,10 @@ void AAbilityPawnBase::OnInteract(EInteractAction InInteractAction, IInteraction
 
 void AAbilityPawnBase::OnAdditionItem(const FAbilityItem& InItem)
 {
-	
+	if(InItem.ID == PAID_EXP)
+    {
+    	ModifyExp(InItem.Count);
+    }
 }
 
 void AAbilityPawnBase::OnRemoveItem(const FAbilityItem& InItem)

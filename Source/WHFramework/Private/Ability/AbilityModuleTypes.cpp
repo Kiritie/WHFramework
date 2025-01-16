@@ -9,6 +9,8 @@
 #include "Ability/Vitality/AbilityVitalityInterface.h"
 #include "Common/CommonStatics.h"
 
+FPrimaryAssetId PAID_EXP = FPrimaryAssetId(TEXT("Misc:DA_Exp"));
+
 bool FGameplayEffectContextBase::NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuccess)
 {
 	return Super::NetSerialize(Ar, Map, bOutSuccess) && TargetData.NetSerialize(Ar, Map, bOutSuccess);

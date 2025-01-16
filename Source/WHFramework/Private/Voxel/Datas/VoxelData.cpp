@@ -118,7 +118,7 @@ FVector UVoxelData::GetRange(ERightAngle InAngle) const
 	}
 	if(Range != FVector::OneVector)
 	{
-		Range = UMathStatics::RotatorVector(Range, InAngle);
+		Range = UMathStatics::RotateVector(Range, InAngle);
 	}
 	return Range;
 }

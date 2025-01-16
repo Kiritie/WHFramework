@@ -839,7 +839,7 @@ bool AVoxelChunk::SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelI
 						PartItem.ID = PartData->GetPrimaryAssetId();
 						PartItem.Angle = InVoxelItem.Angle;
 					}
-					VoxelItems.Emplace(VoxelIndex + UMathStatics::RotatorIndex(PartData->PartIndex, InVoxelItem.Angle), PartItem);
+					VoxelItems.Emplace(VoxelIndex + UMathStatics::RotateIndex(PartData->PartIndex, InVoxelItem.Angle), PartItem);
 				)
 				return SetVoxelComplex(VoxelItems, bGenerate, true, InAgent);
 			}

@@ -27,12 +27,12 @@ FIndex UMathStatics::UnIndex(uint64 InIndex)
 	);
 }
 
-FIndex UMathStatics::RotatorIndex(const FIndex& InIndex, ERightAngle InAngle, bool bRound, bool bAbsolute)
+FIndex UMathStatics::RotateIndex(const FIndex& InIndex, ERightAngle InAngle, bool bRound, bool bAbsolute)
 {
-	return RotatorVector(InIndex, InAngle, bRound, bAbsolute);
+	return RotateVector(InIndex, InAngle, bRound, bAbsolute);
 }
 
-FVector UMathStatics::RotatorVector(const FVector& InVector, const FRotator& InRotator, bool bRound, bool bAbsolute)
+FVector UMathStatics::RotateVector(const FVector& InVector, const FRotator& InRotator, bool bRound, bool bAbsolute)
 {
 	FVector Vector = !InRotator.IsZero() ? InRotator.RotateVector(InVector) : InVector;
 	if(bRound)
@@ -50,9 +50,9 @@ FVector UMathStatics::RotatorVector(const FVector& InVector, const FRotator& InR
 	return Vector;
 }
 
-FVector UMathStatics::RotatorVector(const FVector& InVector, ERightAngle InAngle, bool bRound, bool bAbsolute)
+FVector UMathStatics::RotateVector(const FVector& InVector, ERightAngle InAngle, bool bRound, bool bAbsolute)
 {
-	return RotatorVector(InVector, FRotator(0.f, (int32)InAngle * 90.f, 0.f), bRound, bAbsolute);
+	return RotateVector(InVector, FRotator(0.f, (int32)InAngle * 90.f, 0.f), bRound, bAbsolute);
 }
 
 bool UMathStatics::IsPointInEllipse2D(FVector2D InPoint, FVector2D InCenter, FVector2D InRadius)
@@ -69,7 +69,12 @@ float UMathStatics::RightAngleToFloat(ERightAngle InAngle)
 
 ERightAngle UMathStatics::FloatToRightAngle(float InAngle)
 {
-	return (ERightAngle)FMath::RoundToInt((InAngle >= 0.f ? InAngle : (360.f + InAngle)) / 90.f);
+	InAngle = FMath::Fmod(InAngle, 360.f);
+	if (InAngle < 0.f)
+	{
+		InAngle += 360.f;
+	}
+	return (ERightAngle)(FMath::RoundToInt(InAngle / 90.f) % 4);
 }
 
 ERightAngle UMathStatics::GetOffsetRightAngle(ERightAngle InAngle, int32 InOffset)

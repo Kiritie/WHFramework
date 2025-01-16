@@ -6,6 +6,7 @@
 
 UWidgetSettingItemBase::UWidgetSettingItemBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
+	WidgetParams.Add(FParameter::MakeText(FText::GetEmpty(), FText::FromString(TEXT("标题"))));
 }
 
 void UWidgetSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)

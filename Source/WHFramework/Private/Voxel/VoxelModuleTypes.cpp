@@ -139,7 +139,7 @@ bool FVoxelItem::IsMain() const
 
 FVoxelItem& FVoxelItem::GetMain() const
 {
-	if(Owner) return Owner->GetVoxelComplex(Index - UMathStatics::RotatorIndex(GetVoxelData().PartIndex, Angle));
+	if(Owner) return Owner->GetVoxelComplex(Index - UMathStatics::RotateIndex(GetVoxelData().PartIndex, Angle));
 	return FVoxelItem::Empty;
 }
 
@@ -159,7 +159,7 @@ TArray<FVoxelItem> FVoxelItem::GetParts() const
 		TArray<FVoxelItem> Parts;
 		for(auto Iter : GetVoxelData().PartDatas)
 		{
-			Parts.Add(Owner->GetVoxelComplex(Index + UMathStatics::RotatorIndex(Iter->PartIndex, Angle)));
+			Parts.Add(Owner->GetVoxelComplex(Index + UMathStatics::RotateIndex(Iter->PartIndex, Angle)));
 		}
 		return Parts;
 	}

@@ -127,15 +127,15 @@ public:
 
 	FORCEINLINE FIndex(const FVector& InVector)
 	{
-		X = FMath::CeilToInt(InVector.X);
-		Y = FMath::CeilToInt(InVector.Y);
-		Z = FMath::CeilToInt(InVector.Z);
+		X = FMath::RoundToInt32(InVector.X);
+		Y = FMath::RoundToInt32(InVector.Y);
+		Z = FMath::RoundToInt32(InVector.Z);
 	}
 
 	FORCEINLINE FIndex(const FVector2D& InVector)
 	{
-		X = FMath::CeilToInt(InVector.X);
-		Y = FMath::CeilToInt(InVector.Y);
+		X = FMath::RoundToInt32(InVector.X);
+		Y = FMath::RoundToInt32(InVector.Y);
 		Z = 0;
 	}
 

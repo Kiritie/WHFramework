@@ -8,6 +8,7 @@
 
 #include "SettingModule.generated.h"
 
+class UWidgetOptionSettingItemBase;
 class UWidgetSettingItemCategoryBase;
 class UWidgetKeySettingItemBase;
 class UWidgetTextSettingItemBase;
@@ -75,6 +76,9 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "WdigetClass")
 	TSubclassOf<UWidgetKeySettingItemBase> KeySettingItemClass;
 
+	UPROPERTY(EditAnywhere, Category = "WdigetClass")
+	TSubclassOf<UWidgetOptionSettingItemBase> OptionSettingItemClass;
+
 public:
 	UFUNCTION(BlueprintPure)
 	TSubclassOf<UWidgetSettingItemCategoryBase> GetSettingItemCategoryClass() const { return SettingItemCategoryClass; }
@@ -93,6 +97,9 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	TSubclassOf<UWidgetKeySettingItemBase> GetKeySettingItemClass() const { return KeySettingItemClass; }
+
+	UFUNCTION(BlueprintPure)
+	TSubclassOf<UWidgetOptionSettingItemBase> GetOptionSettingItemClass() const { return OptionSettingItemClass; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Network

@@ -126,7 +126,7 @@ void UWorldWidgetBase::OnCreate(UObject* InOwner, FWorldWidgetMapping InMapping,
 
 	for(auto Iter : GetPoolWidgets())
 	{
-		IObjectPoolInterface::Execute_OnSpawn(Iter, nullptr, {});
+		IObjectPoolInterface::Execute_OnSpawn(Iter, this, IObjectPoolInterface::Execute_GetSpawnParams(Iter));
 	}
 	
 	TArray<UWidget*> Widgets;

@@ -225,6 +225,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ExposeOnSpawn = true, EditCondition = "bSelectable"), Category = "Selection")
 	bool bStandalone;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn))
+	TArray<FParameter> WidgetParams;
+
 public:
 	UFUNCTION(BlueprintPure)
 	FText GetTitle() const { return Title; }
@@ -243,4 +246,9 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void SetMinHeight(int32 InValue);
+
+	UFUNCTION(BlueprintPure)
+	virtual TArray<FParameter> GetWidgetParams() const { return WidgetParams; }
+
+	virtual TArray<FParameter> GetSpawnParams_Implementation() const override { return WidgetParams; }
 };

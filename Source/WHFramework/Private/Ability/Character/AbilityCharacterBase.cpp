@@ -176,6 +176,13 @@ void AAbilityCharacterBase::BindASCInput()
 
 void AAbilityCharacterBase::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
 {
+	if(IsFloating())
+	{
+		if(WorldDirection.Z > -0.5f)
+		{
+			WorldDirection.Z = 0.f;
+		}
+	}
 	Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
 }
 
@@ -594,7 +601,10 @@ void AAbilityCharacterBase::OnInteract(EInteractAction InInteractAction, IIntera
 
 void AAbilityCharacterBase::OnAdditionItem(const FAbilityItem& InItem)
 {
-	
+	if(InItem.ID == PAID_EXP)
+	{
+		ModifyExp(InItem.Count);
+	}
 }
 
 void AAbilityCharacterBase::OnRemoveItem(const FAbilityItem& InItem)

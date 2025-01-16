@@ -180,6 +180,10 @@ void AAbilityActorBase::OnInteract(EInteractAction InInteractAction, IInteractio
 
 void AAbilityActorBase::OnAdditionItem(const FAbilityItem& InItem)
 {
+	if(InItem == PAID_EXP)
+	{
+		ModifyExp(InItem.Count);
+	}
 }
 
 void AAbilityActorBase::OnRemoveItem(const FAbilityItem& InItem)

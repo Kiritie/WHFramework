@@ -425,6 +425,7 @@ UCommonButton::UCommonButton(const FObjectInitializer& ObjectInitializer) : Supe
 	Txt_Title = nullptr;
 
 	bStandalone = false;
+	WidgetParams = TArray<FParameter>();
 
 	static ConstructorHelpers::FClassFinder<UCommonButtonStyle> StyleClassFinder(TEXT("/Script/Engine.Blueprint'/WHFramework/Widget/Blueprints/Common/_Style/Button/CBS_Default.CBS_Default_C'"));
 	if(StyleClassFinder.Succeeded())

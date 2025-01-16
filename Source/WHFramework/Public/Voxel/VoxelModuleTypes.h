@@ -750,7 +750,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 SeaLevel;
 
-	UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Instanced)
 	TArray<UVoxelGenerator*> VoxelGenerators;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)

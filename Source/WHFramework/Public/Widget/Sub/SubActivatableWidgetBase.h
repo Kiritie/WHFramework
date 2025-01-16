@@ -102,6 +102,8 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual TArray<FParameter> GetWidgetParams() const override { return WidgetParams; }
 
+	virtual TArray<FParameter> GetSpawnParams_Implementation() const override { return WidgetParams; }
+
 	UFUNCTION(BlueprintPure)
 	TArray<UWidget*> GetPoolWidgets() const;
 };

@@ -102,7 +102,7 @@ void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPar
 
 	for(auto Iter : GetPoolWidgets())
 	{
-		IObjectPoolInterface::Execute_OnSpawn(Iter, this, {});
+		IObjectPoolInterface::Execute_OnSpawn(Iter, this, IObjectPoolInterface::Execute_GetSpawnParams(Iter));
 	}
 
 	K2_OnCreate(InOwner, InParams);
@@ -242,12 +242,20 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 		}
 		default: break;
 	}
-		
-	Refresh();
 
-	if(WidgetRefreshType == EWidgetRefreshType::Timer)
+	switch(WidgetRefreshType)
 	{
-		GetWorld()->GetTimerManager().SetTimer(WidgetRefreshTimerHandle, this, &UUserWidgetBase::Refresh, WidgetRefreshTime, true);
+		case EWidgetRefreshType::Timer:
+		{
+			GetWorld()->GetTimerManager().SetTimer(WidgetRefreshTimerHandle, this, &UUserWidgetBase::Refresh, WidgetRefreshTime, true);
+			break;
+		}
+		case EWidgetRefreshType::Procedure:
+		{
+			Refresh();
+			break;
+		}
+		default: break;
 	}
 
 	UInputModuleStatics::UpdateGlobalInputMode();
