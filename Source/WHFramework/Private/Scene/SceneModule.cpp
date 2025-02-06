@@ -542,14 +542,6 @@ void USceneModule::OnAsyncLoadLevels(UObject* InSender, UEventHandle_AsyncLoadLe
 {
 	for(auto& Iter : InEventHandle->SoftLevelPaths)
 	{
-		if (Iter.LevelPath.ToString().EndsWith(TEXT("Sub_SCZ_Building")))
-		{
-			for (auto Iter1 : UCommonStatics::GetAllActorsOfLevel(Iter.LevelPath))
-			{
-				Iter1->SetActorHiddenInGame(false);
-			}
-			continue;
-		}
 		FOnAsyncLoadLevelFinished OnAsyncLoadLevelFinished;
 		if(Iter.LevelObjectPtr)
 		{
@@ -566,14 +558,6 @@ void USceneModule::OnAsyncUnloadLevels(UObject* InSender, UEventHandle_AsyncUnlo
 {
 	for(auto& Iter : InEventHandle->SoftLevelPaths)
 	{
-		if (Iter.LevelPath.ToString().EndsWith(TEXT("Sub_SCZ_Building")))
-		{
-			for (auto Iter1 : UCommonStatics::GetAllActorsOfLevel(Iter.LevelPath))
-			{
-				Iter1->SetActorHiddenInGame(true);
-			}
-			continue;
-		}
 		FOnAsyncLoadLevelFinished OnAsyncUnloadLevelFinished;
 		if(Iter.LevelObjectPtr)
 		{

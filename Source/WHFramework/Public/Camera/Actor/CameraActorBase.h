@@ -54,12 +54,6 @@ public:
 
 public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	void Switch();
-
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	void UnSwitch();
-
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 	bool IsCurrent() const;
 
 public:

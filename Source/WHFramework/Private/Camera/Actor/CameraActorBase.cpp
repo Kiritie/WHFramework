@@ -114,19 +114,6 @@ void ACameraActorBase::OnUnSwitch_Implementation()
 	StreamingSource->DisableStreamingSource();
 }
 
-void ACameraActorBase::Switch_Implementation()
-{
-	UCameraModuleStatics::SwitchCamera(this);
-}
-
-void ACameraActorBase::UnSwitch_Implementation()
-{
-	if(IsCurrent())
-	{
-		UCameraModuleStatics::SwitchCamera(nullptr);
-	}
-}
-
 bool ACameraActorBase::IsCurrent_Implementation() const
 {
 	return UCameraModuleStatics::GetCurrentCamera() == this;

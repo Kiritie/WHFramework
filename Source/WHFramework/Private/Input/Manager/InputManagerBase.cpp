@@ -10,6 +10,7 @@
 UInputManagerBase::UInputManagerBase()
 {
 	InputManagerName = NAME_None;
+	LocalPlayerIndex = 0;
 }
 
 void UInputManagerBase::OnInitialize()

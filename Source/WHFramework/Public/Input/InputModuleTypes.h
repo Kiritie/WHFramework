@@ -9,6 +9,7 @@
 
 #include "InputModuleTypes.generated.h"
 
+class UInputManagerBase;
 class UPlayerMappableKeyProfileBase;
 
 UENUM(BlueprintType)
@@ -204,6 +205,21 @@ public:
 
 	UPROPERTY(BlueprintReadOnly)
 	TArray<FSlateBrush> KeyBrushs;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FPlayerInputManagerInfo
+{
+	GENERATED_BODY()
+
+public:
+	FPlayerInputManagerInfo()
+	{
+	}
+
+public:
+	UPROPERTY(Transient)
+	TMap<FName, UInputManagerBase*> InputManagerRefs;
 };
 
 USTRUCT(BlueprintType)

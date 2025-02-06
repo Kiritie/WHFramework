@@ -48,16 +48,16 @@ public:
 
 public:
 	template<class T>
-	static T* GetInputManager()
+	static T* GetInputManager(int32 InPlayerIndex = 0)
 	{
-		return Cast<T>(GetInputManager(T::StaticClass()));
+		return Cast<T>(GetInputManager(T::StaticClass(), InPlayerIndex));
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "InputModuleStatics")
-	static UInputManagerBase* GetInputManager(TSubclassOf<UInputManagerBase> InClass);
+	static UInputManagerBase* GetInputManager(TSubclassOf<UInputManagerBase> InClass, int32 InPlayerIndex = 0);
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "InputModuleStatics")
-	static UInputManagerBase* GetInputManagerByName(const FName InName, TSubclassOf<UInputManagerBase> InClass = nullptr);
+	static UInputManagerBase* GetInputManagerByName(const FName InName, int32 InPlayerIndex = 0, TSubclassOf<UInputManagerBase> InClass = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	// InputShortcuts

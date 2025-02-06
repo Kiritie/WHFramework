@@ -75,8 +75,8 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "InputSteups|Manager")
 	TArray<TSubclassOf<UInputManagerBase>> InputManagers;
 
-	UPROPERTY(Transient)
-	TMap<FName, UInputManagerBase*> InputManagerRefs;
+	UPROPERTY(VisibleAnywhere, Category = "InputSteups|Manager")
+	TArray<FPlayerInputManagerInfo> InputManagerInfos;
 
 public:
 	UFUNCTION(BlueprintPure)
@@ -89,16 +89,16 @@ public:
 	virtual void SetNativeInputMode(EInputMode InInputMode) override { NativeInputMode = InInputMode; }
 
 	template<class T>
-	T* GetInputManager() const
+	T* GetInputManager(int32 InPlayerIndex = 0) const
 	{
-		return Cast<T>(GetInputManager(T::StaticClass()));
+		return Cast<T>(GetInputManager(T::StaticClass(), InPlayerIndex));
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	UInputManagerBase* GetInputManager(TSubclassOf<UInputManagerBase> InClass) const;
+	UInputManagerBase* GetInputManager(TSubclassOf<UInputManagerBase> InClass, int32 InPlayerIndex = 0) const;
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	UInputManagerBase* GetInputManagerByName(const FName InName, TSubclassOf<UInputManagerBase> InClass = nullptr) const;
+	UInputManagerBase* GetInputManagerByName(const FName InName, int32 InPlayerIndex = 0, TSubclassOf<UInputManagerBase> InClass = nullptr) const;
 
 	//////////////////////////////////////////////////////////////////////////
 	// InputShortcuts
@@ -219,14 +219,4 @@ protected:
 public:
 	UFUNCTION(BlueprintPure)
 	int32 GetTouchPressedCount() const { return TouchPressedCount; }
-
-	//////////////////////////////////////////////////////////////////////////
-	// PlayerController
-protected:
-	UPROPERTY(Transient)
-	AWHPlayerController* PlayerController;
-	
-protected:
-	UFUNCTION(BlueprintPure)
-	AWHPlayerController* GetPlayerController();
 };

@@ -38,14 +38,14 @@ UInputComponentBase* UInputModuleStatics::GetInputComponent(int32 InPlayerIndex,
 	return nullptr;
 }
 
-UInputManagerBase* UInputModuleStatics::GetInputManager(TSubclassOf<UInputManagerBase> InClass)
+UInputManagerBase* UInputModuleStatics::GetInputManager(TSubclassOf<UInputManagerBase> InClass, int32 InPlayerIndex)
 {
-	return UInputModule::Get().GetInputManager(InClass);
+	return UInputModule::Get().GetInputManager(InClass, InPlayerIndex);
 }
 
-UInputManagerBase* UInputModuleStatics::GetInputManagerByName(const FName InName, TSubclassOf<UInputManagerBase> InClass)
+UInputManagerBase* UInputModuleStatics::GetInputManagerByName(const FName InName, int32 InPlayerIndex, TSubclassOf<UInputManagerBase> InClass)
 {
-	return UInputModule::Get().GetInputManagerByName(InName, InClass);
+	return UInputModule::Get().GetInputManagerByName(InName, InPlayerIndex, InClass);
 }
 
 int32 UInputModuleStatics::GetTouchPressedCount()
