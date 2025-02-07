@@ -359,13 +359,16 @@ USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelItem : public FAbilityItem
 {
 	GENERATED_BODY()
-
+	
 public:
 	UPROPERTY(BlueprintReadWrite)
 	FIndex Index;
 
 	UPROPERTY(BlueprintReadWrite)
 	ERightAngle Angle;
+
+	UPROPERTY(BlueprintReadWrite)
+	float Durability;
 
 	UPROPERTY(BlueprintReadWrite)
 	FString Data;
@@ -390,6 +393,7 @@ public:
 	{
 		Index = FIndex::ZeroIndex;
 		Angle = ERightAngle::RA_0;
+		Durability = 1.f;
 		Data = TEXT("");
 		Owner = nullptr;
 		Auxiliary = nullptr;
@@ -401,6 +405,7 @@ public:
 	{
 		Index = FIndex::ZeroIndex;
 		Angle = ERightAngle::RA_0;
+		Durability = 1.f;
 		Data = TEXT("");
 		Owner = nullptr;
 		Auxiliary = nullptr;
@@ -412,6 +417,7 @@ public:
 	{
 		Index = FIndex::ZeroIndex;
 		Angle = ERightAngle::RA_0;
+		Durability = 1.f;
 		Data = TEXT("");
 		Owner = nullptr;
 		Auxiliary = nullptr;

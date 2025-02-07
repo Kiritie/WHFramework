@@ -31,12 +31,17 @@ FVoxelItem::FVoxelItem(const FString& InSaveData) : FVoxelItem()
 {
 	TArray<FString> DataStrs;
 	InSaveData.ParseIntoArray(DataStrs, TEXT(";"));
-	ID = UVoxelModuleStatics::VoxelTypeToAssetID((EVoxelType)FCString::Atoi(*DataStrs[0]));
-	Index = UVoxelModuleStatics::NumberToVoxelIndex(FCString::Atoi(*DataStrs[1]));
-	Angle = (ERightAngle)FCString::Atoi(*DataStrs[2]);
-	if(DataStrs.IsValidIndex(3))
+	int32 TempIndex = 0;
+	ID = UVoxelModuleStatics::VoxelTypeToAssetID((EVoxelType)FCString::Atoi(*DataStrs[TempIndex++]));
+	Index = UVoxelModuleStatics::NumberToVoxelIndex(FCString::Atoi(*DataStrs[TempIndex++]));
+	Angle = (ERightAngle)FCString::Atoi(*DataStrs[TempIndex++]);
+	if(DataStrs.Num() > 4)
 	{
-		Data = *DataStrs[3];
+		Durability = FCString::Atof(*DataStrs[TempIndex++]);
+	}
+	if(DataStrs.IsValidIndex(TempIndex))
+	{
+		Data = *DataStrs[TempIndex];
 	}
 }
 
@@ -97,7 +102,7 @@ void FVoxelItem::RefreshData(UVoxel& InVoxel, bool bOrigin)
 FString FVoxelItem::ToSaveData(bool bRefresh) const
 {
 	const FString _Data = !bRefresh ? *Data : *GetVoxel().ToData();
-	return FString::Printf(TEXT("%d;%d;%d%s"), (int32)GetVoxelType(), UVoxelModuleStatics::VoxelIndexToNumber(Index), (int32)Angle, !_Data.IsEmpty() ? *FString::Printf(TEXT(";%s"), *_Data) : TEXT(""));
+	return FString::Printf(TEXT("%d;%d;%d%s;%s"), (int32)GetVoxelType(), UVoxelModuleStatics::VoxelIndexToNumber(Index), (int32)Angle, !FMath::IsNearlyEqual(Durability, 1.f) ? *FString::Printf(TEXT(";%f"), Durability) : TEXT(""), !_Data.IsEmpty() ? *FString::Printf(TEXT(";%s"), *_Data) : TEXT(""));
 }
 
 bool FVoxelItem::IsValid() const

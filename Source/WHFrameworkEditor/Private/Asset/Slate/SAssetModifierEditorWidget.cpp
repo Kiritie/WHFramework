@@ -303,6 +303,7 @@ FReply SAssetModifierEditorWidget::OnModifyForSelectedAssetButtonClicked()
 {
 	if(UAssetModifierBase* AssetModifier = NewObject<UAssetModifierBase>(GetTransientPackage(), SelectedModifierClass))
 	{
+		AssetModifier->AddToRoot();
 		for(auto& Iter : SelectedAssets)
 		{
 			if(AssetModifier->CanModify(Iter))
@@ -310,6 +311,7 @@ FReply SAssetModifierEditorWidget::OnModifyForSelectedAssetButtonClicked()
 				AssetModifier->DoModify(Iter);
 			}
 		}
+		AssetModifier->RemoveFromRoot();
 	}
 	return FReply::Handled();
 }

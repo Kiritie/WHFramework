@@ -42,10 +42,5 @@ protected:
 	bool bCanGenerateVoxel;
 	FVoxelItem GenerateVoxelItem;
 	TObjectPtr<AVoxelEntityPreview> GeneratePreviewVoxel;
-
 	FVoxelItem DestroyVoxelItem;
-	float DestroyVoxelRemaining;
-	
-public:
-	virtual float GetDestroyVoxelProgress() const;
 };

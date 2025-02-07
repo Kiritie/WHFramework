@@ -820,7 +820,7 @@ bool AAbilityCharacterBase::IsEnemy(IAbilityPawnInterface* InTarget) const
 
 bool AAbilityCharacterBase::IsActive() const
 {
-	return IsCurrent() && AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Active);
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Active);
 }
 
 bool AAbilityCharacterBase::IsDead(bool bCheckDying) const
