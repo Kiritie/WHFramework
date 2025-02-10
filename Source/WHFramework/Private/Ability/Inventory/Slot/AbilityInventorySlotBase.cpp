@@ -53,7 +53,7 @@ bool UAbilityInventorySlotBase::ContainsItem(FAbilityItem InItem) const
 
 bool UAbilityInventorySlotBase::MatchItem(FAbilityItem InItem, bool bPutIn) const
 {
-	return bPutIn ? (IsEmpty() && MatchItemLimit(InItem, true) || Item.Match(InItem) && GetRemainVolume(InItem) > 0) :
+	return bPutIn ? IsEnabled() && (IsEmpty() && MatchItemLimit(InItem, true) || Item.Match(InItem) && GetRemainVolume(InItem) > 0) :
 		(!IsEmpty() && MatchItemSplit(InItem) && MatchItemLimit(InItem));
 }
 
@@ -107,7 +107,7 @@ void UAbilityInventorySlotBase::Refresh()
 
 void UAbilityInventorySlotBase::OnItemPreChange(FAbilityItem& InNewItem, bool bBroadcast)
 {
-	if(bBroadcast)
+	if(bBroadcast && IsEnabled())
 	{
 		if(const auto Agent = Inventory->GetOwnerAgent())
 		{
@@ -130,7 +130,7 @@ void UAbilityInventorySlotBase::OnItemChanged(FAbilityItem& InOldItem, bool bBro
 	{
 		Item.AbilityHandle = FGameplayAbilitySpecHandle();
 	}
-	if(bBroadcast)
+	if(bBroadcast && IsEnabled())
 	{
 		if(const auto Agent = Inventory->GetOwnerAgent())
 		{
@@ -366,6 +366,11 @@ void UAbilityInventorySlotBase::ClearItem()
 bool UAbilityInventorySlotBase::IsEmpty() const
 {
 	return Item.IsEmpty();
+}
+
+bool UAbilityInventorySlotBase::IsEnabled() const
+{
+	return true;
 }
 
 bool UAbilityInventorySlotBase::IsSelected() const

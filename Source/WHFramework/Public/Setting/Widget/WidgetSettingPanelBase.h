@@ -32,7 +32,7 @@ public:
 
 protected:
 	UFUNCTION(BlueprintNativeEvent)
-	void OnPageItemSelected(UCommonButtonBase* SelectedTabButton, int32 ButtonIndex);
+	void OnPageItemSelected(UCommonButtonBase* AssociatedButton, int32 ButtonIndex);
 
 	UFUNCTION()
 	void OnApplyButtonClicked();

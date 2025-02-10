@@ -882,12 +882,12 @@ enum class EAbilityItemFillType : uint8
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FAbilityItemFillItem
+struct WHFRAMEWORK_API FItemFillRow
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FAbilityItemFillItem()
+	FORCEINLINE FItemFillRow()
 	{
 		Rate = 0.f;
 		Num = 0;
@@ -901,19 +901,19 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FAbilityItemFillRule
+struct WHFRAMEWORK_API FItemFillRule
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FAbilityItemFillRule()
+	FORCEINLINE FItemFillRule()
 	{
 		Rate = 0.f;
 		Type = EAbilityItemFillType::Fixed;
 		Num = 0;
 		MinNum = 0;
 		MaxNum = 0;
-		Items = TArray<FAbilityItemFillItem>();
+		Rows = TArray<FItemFillRow>();
 	}
 
 	UPROPERTY(BlueprintReadOnly, EditAnywhere)
@@ -932,22 +932,22 @@ public:
 	int32 MaxNum;
 
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, meta = (EditConditionHides, EditCondition = "Type==EAbilityItemFillType::Rate"))
-	TArray<FAbilityItemFillItem> Items;
+	TArray<FItemFillRow> Rows;
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FAbilityItemFillRules
+struct WHFRAMEWORK_API FItemFillRules
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FAbilityItemFillRules()
+	FORCEINLINE FItemFillRules()
 	{
-		Rules = TMap<EAbilityItemRarity, FAbilityItemFillRule>();
+		Rules = TMap<EAbilityItemRarity, FItemFillRule>();
 	}
 
 	UPROPERTY(BlueprintReadOnly, EditAnywhere)
-	TMap<EAbilityItemRarity, FAbilityItemFillRule> Rules;
+	TMap<EAbilityItemRarity, FItemFillRule> Rules;
 };
 
 USTRUCT(BlueprintType)
@@ -961,7 +961,7 @@ public:
 		InventoryClass = nullptr;
 		SplitItems = TMap<ESlotSplitType, FAbilityItems>();
 		SelectedIndexs = TMap<ESlotSplitType, int32>();
-		FillRules = TMap<EAbilityItemType, FAbilityItemFillRules>();
+		FillRules = TMap<EAbilityItemType, FItemFillRules>();
 	}
 
 public:
@@ -972,7 +972,7 @@ public:
 	TMap<ESlotSplitType, FAbilityItems> SplitItems;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TMap<EAbilityItemType, FAbilityItemFillRules> FillRules;
+	TMap<EAbilityItemType, FItemFillRules> FillRules;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	TMap<ESlotSplitType, int32> SelectedIndexs;

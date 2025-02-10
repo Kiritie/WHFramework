@@ -41,7 +41,14 @@ void UAbilityInventoryEquipSlotBase::OnItemChanged(FAbilityItem& InOldItem, bool
 
 	if(Item.IsValid() && Item.GetData<UAbilityEquipDataBase>().EquipMode == EAbilityEquipMode::Passive)
 	{
-		ActiveItem(true);
+		if(IsEnabled())
+		{
+			ActiveItem(true);
+		}
+		else
+		{
+			DeactiveItem(true);
+		}
 	}
 }
 

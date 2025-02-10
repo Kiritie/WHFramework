@@ -124,19 +124,22 @@ public:
 
 public:
 	UFUNCTION(BlueprintPure)
-	bool IsEmpty() const;
+	virtual bool IsEmpty() const;
 	
 	UFUNCTION(BlueprintPure)
-	bool IsSelected() const;
+	virtual bool IsEnabled() const;
+	
+	UFUNCTION(BlueprintPure)
+	virtual bool IsSelected() const;
 
 	UFUNCTION(BlueprintPure)
-	bool IsMatched() const;
+	virtual bool IsMatched() const;
 
 	UFUNCTION(BlueprintPure)
-	bool IsLimitMatched(bool bForce = false) const;
+	virtual bool IsLimitMatched(bool bForce = false) const;
 
 	UFUNCTION(BlueprintPure)
-	bool IsSplitMatched(bool bForce = false) const;
+	virtual bool IsSplitMatched(bool bForce = false) const;
 
 	int32 GetRemainVolume(FAbilityItem InItem = FAbilityItem::Empty) const;
 

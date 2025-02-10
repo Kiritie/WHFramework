@@ -195,7 +195,7 @@ void FInventorySaveData::FillItems(int32 InLevel, FRandomStream InRandomStream)
 					case EAbilityItemFillType::Rate:
 					{
 						const float ItemRate = InRandomStream.FRand();
-						for(auto& Iter3 : Iter2.Value.Items)
+						for(auto& Iter3 : Iter2.Value.Rows)
 						{
 							if(ItemRate < Iter3.Rate)
 							{

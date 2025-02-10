@@ -129,26 +129,6 @@ void UCommonButtonGroup::SetSelectionRequiredN(bool bRequireSelection)
 	}
 }
 
-void UCommonButtonGroup::DeselectAllN()
-{
-	if(bSelectionRequired) return;
-
-	for (auto& Iter : Buttons)
-	{
-		UCommonButton* Button = Cast<UCommonButton>(Iter.Get());
-		if (Button && Button->GetSelected() && !Button->IsStandalone())
-		{
-			Button->SetSelectedInternal(false, false);
-		}
-	}
-
-	if (SelectedButtonIndex != INDEX_NONE)
-	{
-		SelectedButtonIndex = INDEX_NONE;
-		OnSelectionCleared.Broadcast();
-	}
-}
-
 UCommonButton* UCommonButtonGroup::GetButtonBaseAtIndexN(int32 Index) const
 {
 	if (Buttons.IsValidIndex(Index))
