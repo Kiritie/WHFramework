@@ -78,6 +78,16 @@ FEffectInfo UAbilityModuleStatics::GetEffectInfoByClass(TSubclassOf<UEffectBase>
 	return EffectInfo;
 }
 
+FLinearColor UAbilityModuleStatics::GetAttributeColor(const FGameplayAttribute& InAttribute)
+{
+	return UAbilityModule::Get().GetAttributeColor(InAttribute);
+}
+
+void UAbilityModuleStatics::SetAttributeColor(const FGameplayAttribute& InAttribute, const FLinearColor& InColor)
+{
+	UAbilityModule::Get().SetAttributeColor(InAttribute, InColor);
+}
+
 AAbilityItemBase* UAbilityModuleStatics::SpawnAbilityItem(FAbilityItem InItem, FVector InLocation, FRotator InRotation, ISceneContainerInterface* InContainer)
 {
 	return UAbilityModule::Get().SpawnAbilityItem(InItem, InLocation, InRotation, InContainer);

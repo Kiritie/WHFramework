@@ -320,7 +320,7 @@ public:
     /// World Text
 public:
 	UFUNCTION(BlueprintCallable)
-	void SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetMapping InMapping, FVector InOffsetRange = FVector::ZeroVector);
+	void SpawnWorldText(const FString& InText, const FLinearColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetMapping InMapping, FVector InOffsetRange = FVector::ZeroVector);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Outline

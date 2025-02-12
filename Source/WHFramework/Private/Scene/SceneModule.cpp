@@ -878,7 +878,7 @@ void USceneModule::RemovePhysicsVolumeByName(const FName InName)
 	}
 }
 
-void USceneModule::SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetMapping InMapping, FVector InOffsetRange)
+void USceneModule::SpawnWorldText(const FString& InText, const FLinearColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetMapping InMapping, FVector InOffsetRange)
 {
 	if(InOffsetRange != FVector::ZeroVector)
 	{

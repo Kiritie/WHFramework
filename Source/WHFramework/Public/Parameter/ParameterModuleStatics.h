@@ -210,6 +210,13 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FLinearColor GetLinearColorValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetLinearColorValue(); }
+
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
+	static void SetLinearColorValue(UPARAM(ref) FParameter& InParameter, const FLinearColor& InValue) { InParameter.SetLinearColorValue(InValue); }
+
+	//////////////////////////////////////////////////////////////////////////
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
 	static FKey GetKeyValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetKeyValue(); }
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InValue"), Category = "ParameterModuleStatics")

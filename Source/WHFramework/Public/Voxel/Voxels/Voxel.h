@@ -6,6 +6,7 @@
 #include "Voxel/VoxelModuleTypes.h"
 #include "Common/Base/WHObject.h"
 #include "ReferencePool/ReferencePoolInterface.h"
+#include "Asset/Primary/PrimaryEntityInterface.h"
 
 #include "Voxel.generated.h"
 
@@ -17,7 +18,7 @@ class UVoxelData;
  * ����
  */
 UCLASS()
-class WHFRAMEWORK_API UVoxel : public UWHObject, public IReferencePoolInterface
+class WHFRAMEWORK_API UVoxel : public UWHObject, public IReferencePoolInterface, public IPrimaryEntityInterface
 {
 private:
 	GENERATED_BODY()
@@ -104,6 +105,11 @@ public:
 		return static_cast<T&>(GetData());
 	}
 	UVoxelData& GetData() const { return Item.GetVoxelData(); }
+
+public:
+	virtual FPrimaryAssetId GetAssetID_Implementation() const override { return Item.ID; }
+
+	virtual void SetAssetID_Implementation(const FPrimaryAssetId& InID) override { Item.ID = InID; }
 };
 
 UCLASS()

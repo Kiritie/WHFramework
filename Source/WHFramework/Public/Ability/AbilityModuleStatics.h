@@ -62,6 +62,14 @@ public:
 	}
 	
 	//////////////////////////////////////////////////////////////////////////
+	// Attribute
+	UFUNCTION(BlueprintPure, Category = "Ability|GameplayAbility")
+	static FLinearColor GetAttributeColor(const FGameplayAttribute& InAttribute);
+
+	UFUNCTION(BlueprintCallable, Category = "Ability|GameplayAbility")
+	static void SetAttributeColor(const FGameplayAttribute& InAttribute, const FLinearColor& InColor);
+
+	//////////////////////////////////////////////////////////////////////////
 	// Item
 	static AAbilityItemBase* SpawnAbilityItem(FAbilityItem InItem, FVector InLocation, FRotator InRotation, ISceneContainerInterface* InContainer = nullptr);
 

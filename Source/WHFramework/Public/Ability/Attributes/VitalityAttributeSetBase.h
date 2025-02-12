@@ -57,7 +57,11 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, ReplicatedUsing = OnRep_FallDamage, Category = "VitalityAttributes")
 	FGameplayAttributeData FallDamage;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, FallDamage)
-	
+		
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, ReplicatedUsing = OnRep_FallDamage, Category = "VitalityAttributes")
+	FGameplayAttributeData RealDamage;
+	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, RealDamage)
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, ReplicatedUsing = OnRep_Interrupt, Category = "VitalityAttributes")
 	FGameplayAttributeData Interrupt;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Interrupt)
@@ -93,6 +97,9 @@ public:
 
 	UFUNCTION()
 	virtual void OnRep_FallDamage(const FGameplayAttributeData& OldFallDamage);
+
+	UFUNCTION()
+	virtual void OnRep_RealDamage(const FGameplayAttributeData& OldRealDamage);
 
 	UFUNCTION()
 	virtual void OnRep_Interrupt(const FGameplayAttributeData& OldInterrupt);

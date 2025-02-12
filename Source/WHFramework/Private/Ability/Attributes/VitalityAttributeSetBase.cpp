@@ -13,6 +13,7 @@ UVitalityAttributeSetBase::UVitalityAttributeSetBase()
 	PhysicsDamage(0.f),
 	MagicDamage(0.f),
 	FallDamage(0.f),
+	RealDamage(0.f),
 	Interrupt(0.f)
 {
 	DamageHandleClass = UDamageHandle::StaticClass();
@@ -95,6 +96,11 @@ void UVitalityAttributeSetBase::PostGameplayEffectExecute(const struct FGameplay
 		UReferencePoolModuleStatics::GetReference<UDamageHandle>(true, DamageHandleClass).HandleDamage(SourceActor, TargetActor, GetFallDamage(), GetFallDamageAttribute(), HitResult, SourceTags);
 		SetFallDamage(0.f);
 	}
+	else if(Data.EvaluatedData.Attribute == GetRealDamageAttribute())
+	{
+		UReferencePoolModuleStatics::GetReference<UDamageHandle>(true, DamageHandleClass).HandleDamage(SourceActor, TargetActor, GetRealDamage(), GetRealDamageAttribute(), HitResult, SourceTags);
+		SetRealDamage(0.f);
+	}
 	else if (Data.EvaluatedData.Attribute == GetInterruptAttribute())
 	{
 		UReferencePoolModuleStatics::GetReference<UInterruptHandle>(true, InterruptHandleClass).HandleInterrupt(SourceActor, TargetActor, GetInterrupt(), GetInterruptAttribute(), HitResult, SourceTags);
@@ -108,11 +114,12 @@ void UVitalityAttributeSetBase::GetLifetimeReplicatedProps(TArray<FLifetimePrope
 
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, Health, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, MaxHealth, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, HealthRecovery, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, HealthRegenSpeed, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, PhysicsDamage, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, MagicDamage, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, FallDamage, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, HealthRecovery, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, RealDamage, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, Interrupt, COND_None, REPNOTIFY_Always);
 }
 
@@ -149,6 +156,11 @@ void UVitalityAttributeSetBase::OnRep_MagicDamage(const FGameplayAttributeData& 
 void UVitalityAttributeSetBase::OnRep_FallDamage(const FGameplayAttributeData& OldFallDamage)
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UVitalityAttributeSetBase, FallDamage, OldFallDamage);
+}
+
+void UVitalityAttributeSetBase::OnRep_RealDamage(const FGameplayAttributeData& OldRealDamage)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UVitalityAttributeSetBase, RealDamage, OldRealDamage);
 }
 
 void UVitalityAttributeSetBase::OnRep_Interrupt(const FGameplayAttributeData& OldInterrupt)

@@ -52,6 +52,19 @@ public:
 	virtual void OnTermination(EPhase InPhase) override;
 
 	//////////////////////////////////////////////////////////////////////////
+	// Attribute
+protected:
+	UPROPERTY(EditAnywhere)
+	TMap<FGameplayAttribute, FLinearColor> AttributeColorMap;
+
+public:
+	UFUNCTION(BlueprintPure)
+	FLinearColor GetAttributeColor(const FGameplayAttribute& InAttribute) const;
+
+	UFUNCTION(BlueprintCallable)
+	void SetAttributeColor(const FGameplayAttribute& InAttribute, const FLinearColor& InColor);
+
+	//////////////////////////////////////////////////////////////////////////
 	// Item
 public:
 	virtual AAbilityItemBase* SpawnAbilityItem(FAbilityItem InItem, FVector InLocation, FRotator InRotation, ISceneContainerInterface* InContainer = nullptr);

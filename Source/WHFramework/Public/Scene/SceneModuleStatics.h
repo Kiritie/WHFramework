@@ -189,5 +189,5 @@ public:
 	//////////////////////////////////////////////////////////////////////////
     /// World Text
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
-	static void SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetMapping InMapping, FVector InOffsetRange = FVector::ZeroVector);
+	static void SpawnWorldText(const FString& InText, const FLinearColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetMapping InMapping, FVector InOffsetRange = FVector::ZeroVector);
 };

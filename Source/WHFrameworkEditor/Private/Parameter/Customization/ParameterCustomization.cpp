@@ -70,6 +70,7 @@ void FParameterCustomization::CustomizeChildren(TSharedRef<IPropertyHandle> InSt
 	ADD_PARAM_PROPERTY(Vector)
 	ADD_PARAM_PROPERTY(Rotator)
 	ADD_PARAM_PROPERTY(Color)
+	ADD_PARAM_PROPERTY(LinearColor)
 	ADD_PARAM_PROPERTY(Key)
 	ADD_PARAM_PROPERTY(Tag)
 	ADD_PARAM_PROPERTY(Tags)

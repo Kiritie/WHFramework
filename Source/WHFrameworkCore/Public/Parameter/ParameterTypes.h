@@ -24,6 +24,7 @@ enum class EParameterType : uint8
 	Vector,
 	Rotator,
 	Color,
+	LinearColor,
 	Key,
 	Tag,
 	Tags,
@@ -120,6 +121,7 @@ public:
 		VectorValue = FVector::ZeroVector;
 		RotatorValue = FRotator::ZeroRotator;
 		ColorValue = FColor::Transparent;
+		LinearColorValue = FLinearColor::Transparent;
 		KeyValue = FKey();
 		TagValue = FGameplayTag();
 		TagsValue = FGameplayTagContainer();
@@ -206,7 +208,7 @@ public:
 		
 	FParameter(FLinearColor InValue)
 	{
-		*this = MakeColor(InValue);
+		*this = MakeLinearColor(InValue);
 	}
 	
 	FParameter(const FKey& InValue)
@@ -304,7 +306,9 @@ public:
 	FORCEINLINE operator FRotator() const { return RotatorValue; }
 	
 	FORCEINLINE operator FColor() const { return ColorValue; }
-	
+		
+	FORCEINLINE operator FLinearColor() const { return LinearColorValue; }
+
 	FORCEINLINE operator FKey() const { return KeyValue; }
 	
 	FORCEINLINE operator FGameplayTag() const { return TagValue; }
@@ -354,6 +358,7 @@ public:
 			case EParameterType::Vector: return A.VectorValue == B.VectorValue;
 			case EParameterType::Rotator: return A.RotatorValue == B.RotatorValue;
 			case EParameterType::Color: return A.ColorValue == B.ColorValue;
+			case EParameterType::LinearColor: return A.LinearColorValue == B.LinearColorValue;
 			case EParameterType::Tag: return A.TagValue == B.TagValue;
 			case EParameterType::Tags: return A.TagsValue == B.TagsValue;
 			case EParameterType::Brush: return A.BrushValue == B.BrushValue;
@@ -386,6 +391,7 @@ public:
 			case EParameterType::Vector: return A.VectorValue != B.VectorValue;
 			case EParameterType::Rotator: return A.RotatorValue != B.RotatorValue;
 			case EParameterType::Color: return A.ColorValue != B.ColorValue;
+			case EParameterType::LinearColor: return A.LinearColorValue != B.LinearColorValue;
 			case EParameterType::Tag: return A.TagValue != B.TagValue;
 			case EParameterType::Tags: return A.TagsValue != B.TagsValue;
 			case EParameterType::Brush: return A.BrushValue != B.BrushValue;
@@ -442,6 +448,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FColor ColorValue;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FLinearColor LinearColorValue;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FKey KeyValue;
@@ -557,7 +566,10 @@ public:
 
 	void SetColorValue(const FColor& InValue) { ColorValue = InValue; }
 
-	void SetColorValue(const FLinearColor& InValue) { ColorValue = InValue.ToFColorSRGB(); }
+	//////////////////////////////////////////////////////////////////////////
+	FLinearColor GetLinearColorValue() const { return LinearColorValue; }
+
+	void SetLinearColorValue(const FLinearColor& InValue) { LinearColorValue = InValue; }
 
 	//////////////////////////////////////////////////////////////////////////
 	FKey GetKeyValue() const { return KeyValue; }
@@ -754,12 +766,12 @@ public:
 		return Parameter;
 	}
 
-	static FParameter MakeColor(const FLinearColor& InValue, const FText& InDescription = FText::GetEmpty())
+	static FParameter MakeLinearColor(const FLinearColor& InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
-		Parameter.ParameterType = EParameterType::Color;
+		Parameter.ParameterType = EParameterType::LinearColor;
 		Parameter.Description = InDescription;
-		Parameter.SetColorValue(InValue);
+		Parameter.SetLinearColorValue(InValue);
 		return Parameter;
 	}
 

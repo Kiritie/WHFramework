@@ -240,7 +240,7 @@ void USceneModuleStatics::RemovePhysicsVolumeByName(const FName InName)
 	USceneModule::Get().RemovePhysicsVolumeByName(InName);
 }
 
-void USceneModuleStatics::SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetMapping InMapping, FVector InOffsetRange)
+void USceneModuleStatics::SpawnWorldText(const FString& InText, const FLinearColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetMapping InMapping, FVector InOffsetRange)
 {
 	USceneModule::Get().SpawnWorldText(InText, InTextColor, InTextStyle, InMapping, InOffsetRange);
 }
