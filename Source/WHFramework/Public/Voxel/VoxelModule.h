@@ -192,7 +192,7 @@ public:
 
 	virtual void SetTopographyByIndex(FIndex InIndex, const FVoxelTopography& InTopography);
 
-	virtual void SetTopographyLocation(FVector InLocation, const FVoxelTopography& InTopography);
+	virtual void SetTopographyByLocation(FVector InLocation, const FVoxelTopography& InTopography);
 
 public:
 	virtual float GetVoxelNoise1D(float InValue, bool bAbs = false, bool bUnsigned = false) const;

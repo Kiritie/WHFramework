@@ -75,9 +75,9 @@ void UVoxelModuleStatics::SetTopographyByIndex(FIndex InIndex, const FVoxelTopog
 	UVoxelModule::Get().SetTopographyByIndex(InIndex, InTopography);
 }
 
-void UVoxelModuleStatics::SetTopographyLocation(FVector InLocation, const FVoxelTopography& InTopography)
+void UVoxelModuleStatics::SetTopographyByLocation(FVector InLocation, const FVoxelTopography& InTopography)
 {
-	UVoxelModule::Get().SetTopographyLocation(InLocation, InTopography);
+	UVoxelModule::Get().SetTopographyByLocation(InLocation, InTopography);
 }
 
 float UVoxelModuleStatics::GetVoxelNoise1D(float InValue, bool bAbs, bool bUnsigned)

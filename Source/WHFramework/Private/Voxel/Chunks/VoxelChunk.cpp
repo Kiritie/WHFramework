@@ -904,7 +904,8 @@ FVoxelTopography& AVoxelChunk::GetTopography(FIndex InIndex)
 		{
 			return TopographyMap[InIndex];
 		}
-		return *new FVoxelTopography();
+		static FVoxelTopography Temp;
+		return Temp;
 	}
 	return Module->GetChunkByIndex(FIndex(Index.X, Index.Y, 0))->GetTopography(InIndex);
 }

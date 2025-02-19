@@ -123,9 +123,18 @@ public:
 	//Return random value 0.0f~1.0f
 	static float Rand(FVector2D InLocation, int32 InSeed = 0);
 
+	//Return random int value MinValue~MaxValue
+	static int32 RandRange(FVector2D InLocation, int32 InMinValue, int32 InMaxValue, int32 InSeed = 0);
+
+	//Return random float value MinValue~MaxValue
+	static float RandRange(FVector2D InLocation, float InMinValue, float InMaxValue, int32 InSeed = 0);
+
 	//Second order bezier curve t should be [0.0f~1.0f]
 	static FVector2D Bezier(FVector2D InP0, FVector2D InP1, FVector2D InP2, float InT);
 
 	//The third-order bezier curve t should be [0.0f~1.0f]
 	static FVector2D Bezier(FVector2D InP0, FVector2D InP1, FVector2D InP2, FVector2D InP3, float InT);
+
+protected:
+	static int32 RandHelper(FVector2D InLocation, int32 InValue, int32 InSeed = 0);
 };

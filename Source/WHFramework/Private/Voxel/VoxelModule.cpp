@@ -868,7 +868,8 @@ FVoxelTopography& UVoxelModule::GetTopographyByIndex(FIndex InIndex)
 	{
 		return Chunk->GetTopography(Chunk->WorldIndexToLocal(FIndex(InIndex.X, InIndex.Y, 0)));
 	}
-	return *new FVoxelTopography();
+	static FVoxelTopography Temp;
+	return Temp;
 }
 
 FVoxelTopography& UVoxelModule::GetTopographyByLocation(FVector InLocation)
@@ -884,9 +885,9 @@ void UVoxelModule::SetTopographyByIndex(FIndex InIndex, const FVoxelTopography& 
 	}
 }
 
-void UVoxelModule::SetTopographyLocation(FVector InLocation, const FVoxelTopography& InTopography)
+void UVoxelModule::SetTopographyByLocation(FVector InLocation, const FVoxelTopography& InTopography)
 {
-	SetTopographyLocation(LocationToVoxelIndex(InLocation), InTopography);
+	SetTopographyByLocation(LocationToVoxelIndex(InLocation), InTopography);
 }
 
 float UVoxelModule::GetVoxelNoise1D(float InValue, bool bAbs, bool bUnsigned) const

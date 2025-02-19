@@ -2,17 +2,20 @@
 
 #include "Voxel/Generators/VoxelOreGenerator.h"
 
+#include "Math/MathStatics.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 
 UVoxelOreGenerator::UVoxelOreGenerator()
 {
+	Seed = 34834;
+	SpawnRate = 0.5f;
 	GenerateDatas = {
-		FVoxelOreGenerateData(EVoxelType::Diamond_Ore, 0.1f, 10),
-		FVoxelOreGenerateData(EVoxelType::Emerald_Ore, 0.1f, 20),
-		FVoxelOreGenerateData(EVoxelType::Gold_Ore, 0.1f, 30),
-		FVoxelOreGenerateData(EVoxelType::Iron_Ore, 0.15f, 50),
-		FVoxelOreGenerateData(EVoxelType::Coal_Ore, 0.3f, -1),
+		FVoxelOreGenerateData(EVoxelType::Diamond_Ore, 10, 0.01f, 1, 3),
+		FVoxelOreGenerateData(EVoxelType::Emerald_Ore, 20, 0.03f, 1, 5),
+		FVoxelOreGenerateData(EVoxelType::Gold_Ore, 30, 0.05f, 3, 8),
+		FVoxelOreGenerateData(EVoxelType::Iron_Ore, 50, 0.1f, 5, 10),
+		FVoxelOreGenerateData(EVoxelType::Coal_Ore, -1, 0.45f, 10, 20),
 	};
 }
 
@@ -22,18 +25,34 @@ void UVoxelOreGenerator::Generate(AVoxelChunk* InChunk)
 		const int32 Height = InChunk->GetTopography(Index).Height;
 		for(int Z = 0; Z < Height; Z++)
 		{
-			for(auto& Iter : GenerateDatas)
-			{
-				if(Iter.MaxHeight >= 0 && Z > Iter.MaxHeight) continue;
-				
-				const FVector Location = FVector((float)Index.X / Module->GetWorldData().ChunkSize.X / Iter.CrystalSize, (float)Index.Y / Module->GetWorldData().ChunkSize.Y / Iter.CrystalSize, (float)Z / Module->GetWorldData().ChunkSize.Z / Iter.CrystalSize);
-				const FIndex WorldIndex = InChunk->LocalIndexToWorld(FIndex(Index.X, Index.Y, Z));
-				if (!Module->HasVoxelByIndex(WorldIndex) && Module->GetVoxelNoise3D(Location + InChunk->GetIndex().ToVector() * 100.f) > 0.5f)
+			const FIndex WorldIndex = InChunk->LocalIndexToWorld(FIndex(Index.X, Index.Y, Z));
+			ITER_ARRAY_WITHINDEX(GenerateDatas, i, Iter,
+				if (Iter.MaxHeight != -1 && WorldIndex.Z > Iter.MaxHeight) continue;
+
+				const float Noise = Module->GetVoxelNoise3D(FVector(WorldIndex.X + i * Seed, WorldIndex.Y + i * Seed, WorldIndex.Z) * 0.1f);
+				if (Noise > SpawnRate && UMathStatics::Rand(WorldIndex.ToVector2D(), Seed) < Iter.SpawnRate)
 				{
-					Module->SetVoxelByIndex(WorldIndex, Iter.VoxelType);
+					GenerateOre(WorldIndex, Iter);
 					break;
 				}
-			}
+			)
 		}
 	)
+}
+
+void UVoxelOreGenerator::GenerateOre(FIndex InIndex, const FVoxelOreGenerateData& InGenerateData)
+{
+	const int Size = UMathStatics::RandRange(InIndex.ToVector2D(), InGenerateData.MinSize, InGenerateData.MaxSize, Seed);
+	for (int i = 0; i < Size; i++)
+	{
+		const FIndex Offset = FIndex(
+			UMathStatics::RandRange(InIndex.ToVector2D(), -1, 1, Seed),
+			UMathStatics::RandRange(InIndex.ToVector2D(), -1, 1, Seed),
+			UMathStatics::RandRange(InIndex.ToVector2D(), -1, 1, Seed)
+		);
+		if(!Module->HasVoxelByIndex(InIndex + Offset))
+		{
+			Module->SetVoxelByIndex(InIndex + Offset, InGenerateData.VoxelType);
+		}
+	}
 }

@@ -53,7 +53,7 @@ public:
 	static void SetTopographyByIndex(FIndex InIndex, const FVoxelTopography& InTopography);
 
 	UFUNCTION(BlueprintCallable, Category = "VoxelModuleStatics")
-	static void SetTopographyLocation(FVector InLocation, const FVoxelTopography& InTopography);
+	static void SetTopographyByLocation(FVector InLocation, const FVoxelTopography& InTopography);
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
 	static float GetVoxelNoise1D(float InValue, bool bAbs = false, bool bUnsigned = false);

@@ -553,6 +553,17 @@ float UMathStatics::Rand(FVector2D InLocation, int32 InSeed)
 	return Hash11WithSeed(0x651A6BE1 * (int32)InLocation.X + (int32)InLocation.Y, InSeed) % 1024 / 1024.0f;
 }
 
+int32 UMathStatics::RandRange(FVector2D InLocation, int32 InMinValue, int32 InMaxValue, int32 InSeed)
+{
+	const int32 Range = (InMaxValue - InMinValue) + 1;
+	return InMinValue + RandHelper(InLocation, Range, InSeed);
+}
+
+float UMathStatics::RandRange(FVector2D InLocation, float InMinValue, float InMaxValue, int32 InSeed)
+{
+	return InMinValue + (InMaxValue - InMinValue) * Rand(InLocation, InSeed);
+}
+
 FVector2D UMathStatics::Bezier(FVector2D InP0, FVector2D InP1, FVector2D InP2, float InT)
 {
 	return ((1 - InT) * (1 - InT) * InP0 + InT * (1 - InT) * InP1 + InT * InT * InP2);
@@ -561,4 +572,9 @@ FVector2D UMathStatics::Bezier(FVector2D InP0, FVector2D InP1, FVector2D InP2, f
 FVector2D UMathStatics::Bezier(FVector2D InP0, FVector2D InP1, FVector2D InP2, FVector2D InP3, float InT)
 {
 	return Bezier(InP0, InP1, InP2, InT) * (1 - InT) + Bezier(InP1, InP2, InP3, InT) * InT;
+}
+
+int32 UMathStatics::RandHelper(FVector2D InLocation, int32 InValue, int32 InSeed)
+{
+	return InValue > 0 ? FMath::Min(FMath::TruncToInt(Rand(InLocation, InSeed) * (float)InValue), InValue - 1) : 0;
 }
