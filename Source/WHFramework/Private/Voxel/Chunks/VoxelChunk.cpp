@@ -25,6 +25,8 @@
 #include "Voxel/Generators/VoxelTemperatureGenerator.h"
 #include "Voxel/Generators/VoxelTerrainGenerator.h"
 #include "Voxel/Generators/VoxelFoliageGenerator.h"
+#include "Voxel/Generators/VoxelHoleGenerator.h"
+#include "Voxel/Generators/VoxelLakeGenerator.h"
 #include "Voxel/Generators/VoxelOreGenerator.h"
 
 // Sets default values
@@ -241,14 +243,24 @@ void AVoxelChunk::BuildMap(int32 InStage)
 			Module->GenerateVoxel<UVoxelHumidityGenerator>(this);
 			Module->GenerateVoxel<UVoxelBiomeGenerator>(this);
 			Module->GenerateVoxel<UVoxelHeightGenerator>(this);
+			break;
+		}
+		case 2:
+		{
+			Module->GenerateVoxel<UVoxelLakeGenerator>(this);
+			break;
+		}
+		case 3:
+		{
 			Module->GenerateVoxel<UVoxelCaveGenerator>(this);
+			Module->GenerateVoxel<UVoxelHoleGenerator>(this);
 			Module->GenerateVoxel<UVoxelOreGenerator>(this);
 			Module->GenerateVoxel<UVoxelTerrainGenerator>(this);
 			Module->GenerateVoxel<UVoxelRainGenerator>(this);
 			Module->GenerateVoxel<UVoxelFoliageGenerator>(this);
 			break;
 		}
-		case 2:
+		case 4:
 		{
 			Module->GenerateVoxel<UVoxelBuildingGenerator>(this);
 		}

@@ -40,6 +40,8 @@
 #include "Voxel/Generators/VoxelHeightGenerator.h"
 #include "Voxel/Generators/VoxelHumidityGenerator.h"
 #include "Voxel/Generators/VoxelFoliageGenerator.h"
+#include "Voxel/Generators/VoxelHoleGenerator.h"
+#include "Voxel/Generators/VoxelLakeGenerator.h"
 #include "Voxel/Generators/VoxelOreGenerator.h"
 #include "Voxel/Generators/VoxelRainGenerator.h"
 #include "Voxel/Generators/VoxelTemperatureGenerator.h"
@@ -80,6 +82,8 @@ UVoxelModule::UVoxelModule()
 		})}, { EVoxelWorldState::MapLoading, FVoxelChunkQueues({
 			FVoxelChunkQueue(true, 100)
 		})}, { EVoxelWorldState::MapBuilding, FVoxelChunkQueues({
+			FVoxelChunkQueue(true, 100),
+			FVoxelChunkQueue(true, 100),
 			FVoxelChunkQueue(true, 100),
 			FVoxelChunkQueue(false, 50)
 		})}, { EVoxelWorldState::MeshSpawning, FVoxelChunkQueues({
@@ -156,8 +160,10 @@ void UVoxelModule::OnGenerate()
 		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelBiomeGenerator>(this));
 		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelHeightGenerator>(this));
 		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelCaveGenerator>(this));
-		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelOreGenerator>(this));
 		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelTerrainGenerator>(this));
+		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelLakeGenerator>(this));
+		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelHoleGenerator>(this));
+		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelOreGenerator>(this));
 		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelRainGenerator>(this));
 		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelFoliageGenerator>(this));
 		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelBuildingGenerator>(this));
@@ -543,9 +549,15 @@ AVoxelChunk* UVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 				{
 					AddToChunkQueue(EVoxelWorldState::MapLoading, InIndex);
 				}
-				else if(InIndex.Z == 0)
+				else
 				{
-					AddToChunkQueue(EVoxelWorldState::MapBuilding, InIndex);
+					// for(auto Iter : ChunkMap)
+					{
+						if(InIndex.Z == 0)
+						{
+							AddToChunkQueue(EVoxelWorldState::MapBuilding, InIndex);
+						}
+					}
 				}
 			}
 			else if(IsOnTheWorld(InIndex))
@@ -555,16 +567,16 @@ AVoxelChunk* UVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 		}
 		if(!Chunk->IsGenerated() && IsOnTheWorld(InIndex))
 		{
-			AddToChunkQueue(EVoxelWorldState::MeshSpawning, InIndex);
-			AddToChunkQueue(EVoxelWorldState::MeshBuilding, InIndex);
-			AddToChunkQueue(EVoxelWorldState::Generating, InIndex);
-			for(const auto& Iter : Chunk->GetNeighbors())
+			TArray<AVoxelChunk*> GenerateChunks;
+			Chunk->GetNeighbors().GenerateValueArray(GenerateChunks);
+			GenerateChunks.Add(Chunk);
+			for(auto Iter : GenerateChunks)
 			{
-				if(Iter.Value && Iter.Value->GetBatch() != Chunk->GetBatch())
+				if(Iter && (Iter == Chunk || Iter->GetBatch() != Chunk->GetBatch()))
 				{
-					AddToChunkQueue(EVoxelWorldState::MeshSpawning, Iter.Value->GetIndex());
-					AddToChunkQueue(EVoxelWorldState::MeshBuilding, Iter.Value->GetIndex());
-					AddToChunkQueue(EVoxelWorldState::Generating, Iter.Value->GetIndex());
+					AddToChunkQueue(EVoxelWorldState::MeshSpawning, Iter->GetIndex());
+					AddToChunkQueue(EVoxelWorldState::MeshBuilding, Iter->GetIndex());
+					AddToChunkQueue(EVoxelWorldState::Generating, Iter->GetIndex());
 				}
 			}
 		}

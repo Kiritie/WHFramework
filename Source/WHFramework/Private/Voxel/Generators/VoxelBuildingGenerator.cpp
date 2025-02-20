@@ -167,7 +167,6 @@ bool UVoxelBuildingGenerator::PlaceOneBuilding(AVoxelChunk* InChunk, int32 InX, 
 				FIndex pos = FIndex(InX + i, InY + j, k);
 				Module->SetVoxelByIndex(pos, EVoxelType::Cobble_Stone);
 			}
-			// Module->GetTopographyByIndex(FIndex(InX + i, InY + j)).Height = aver;
 			_Domains.Remove(UMathStatics::Index(InX + i, InY + j));
 		}
 	}

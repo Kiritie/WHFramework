@@ -21,37 +21,13 @@ public:
 public:
 	virtual void Generate(AVoxelChunk* InChunk) override;
 
-protected:
+public:
 	bool IsCave(FIndex InIndex) const;
 
 protected:
-	void GenerateCaveEntry(FIndex InIndex) const;
-
-	FIndex FindNearestCaveEntryIndex(const FIndex& InStartIndex, const FVector& InDirection, int32 InMaxSearchDistance) const;
-
-	FIndex FindNearestCaveEntryIndexMultiDirection(const FIndex& InStartIndex, int32 InMaxSearchDistance) const;
-
-	TArray<FIndex> GenerateCaveEntrySlopePath(FIndex InStartIndex, FIndex InEndIndex) const;
-
-protected:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Seed;
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Times;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float CrystalSize;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MaxDepth;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float SpawnEntryRate;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float MinEntryRadius;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float MaxEntryRadius;
 };
