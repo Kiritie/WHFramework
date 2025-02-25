@@ -49,7 +49,9 @@ void UVoxelLakeGenerator::GenerateLakeDepression(FIndex InIndex, float InRadius,
 			if (Distance <= InRadius)
 			{
 				float Depression = InDepth * FMath::Cos((Distance / InRadius) * PI / 2);
-				Module->GetTopographyByIndex(Pos).Height = InIndex.Z - Depression;
+				FVoxelTopography Topography = Module->GetTopographyByIndex(Pos);
+				Topography.Height = InIndex.Z - Depression;
+				Module->SetTopographyByIndex(Pos, Topography);
 			}
 		}
 	}
@@ -79,7 +81,9 @@ void UVoxelLakeGenerator::SmoothLakeEdges(FIndex InIndex, float InRadius, int32 
 						}
 					}
 					AvgHeight /= Count;
-					Module->GetTopographyByIndex(Pos).Height = AvgHeight;
+					FVoxelTopography Topography = Module->GetTopographyByIndex(Pos);
+					Topography.Height = AvgHeight;
+					Module->SetTopographyByIndex(Pos, Topography);
 				}
 			}
 		}

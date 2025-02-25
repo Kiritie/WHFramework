@@ -549,15 +549,9 @@ AVoxelChunk* UVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 				{
 					AddToChunkQueue(EVoxelWorldState::MapLoading, InIndex);
 				}
-				else
+				else if(InIndex.Z == 0)
 				{
-					// for(auto Iter : ChunkMap)
-					{
-						if(InIndex.Z == 0)
-						{
-							AddToChunkQueue(EVoxelWorldState::MapBuilding, InIndex);
-						}
-					}
+					AddToChunkQueue(EVoxelWorldState::MapBuilding, InIndex);
 				}
 			}
 			else if(IsOnTheWorld(InIndex))
@@ -598,16 +592,16 @@ void UVoxelModule::DestroyChunk(FIndex InIndex)
 	{
 		if(!Chunk->IsGenerated())
 		{
-			RemoveFromChunkQueue(EVoxelWorldState::MeshSpawning, InIndex);
-			RemoveFromChunkQueue(EVoxelWorldState::MeshBuilding, InIndex);
-			RemoveFromChunkQueue(EVoxelWorldState::Generating, InIndex);
-			for(const auto& Iter : Chunk->GetNeighbors())
+			TArray<AVoxelChunk*> DestroyChunks;
+			Chunk->GetNeighbors().GenerateValueArray(DestroyChunks);
+			DestroyChunks.Add(Chunk);
+			for(auto Iter : DestroyChunks)
 			{
-				if(Iter.Value && Iter.Value->GetBatch() != Chunk->GetBatch())
+				if(Iter && (Iter == Chunk || Iter->GetBatch() != Chunk->GetBatch()))
 				{
-					RemoveFromChunkQueue(EVoxelWorldState::MeshSpawning, Iter.Value->GetIndex());
-					RemoveFromChunkQueue(EVoxelWorldState::MeshBuilding, Iter.Value->GetIndex());
-					RemoveFromChunkQueue(EVoxelWorldState::Generating, Iter.Value->GetIndex());
+					RemoveFromChunkQueue(EVoxelWorldState::MeshSpawning, Iter->GetIndex());
+					RemoveFromChunkQueue(EVoxelWorldState::MeshBuilding, Iter->GetIndex());
+					RemoveFromChunkQueue(EVoxelWorldState::Generating, Iter->GetIndex());
 				}
 			}
 		}
@@ -865,7 +859,10 @@ void UVoxelModule::SetVoxelByIndex(FIndex InIndex, const FVoxelItem& InVoxelItem
 {
 	if(AVoxelChunk* Chunk = GetChunkByVoxelIndex(InIndex))
 	{
-		Chunk->SetVoxel(Chunk->WorldIndexToLocal(InIndex), InVoxelItem, bSafe);
+		if(!Chunk->IsBuilded())
+		{
+			Chunk->SetVoxel(Chunk->WorldIndexToLocal(InIndex), InVoxelItem, bSafe);
+		}
 	}
 }
 
@@ -874,7 +871,7 @@ void UVoxelModule::SetVoxelByLocation(FVector InLocation, const FVoxelItem& InVo
 	SetVoxelByIndex(LocationToVoxelIndex(InLocation), InVoxelItem, bSafe);
 }
 
-FVoxelTopography& UVoxelModule::GetTopographyByIndex(FIndex InIndex)
+const FVoxelTopography& UVoxelModule::GetTopographyByIndex(FIndex InIndex)
 {
 	if(AVoxelChunk* Chunk = GetChunkByVoxelIndex(FIndex(InIndex.X, InIndex.Y, 0)))
 	{
@@ -884,7 +881,7 @@ FVoxelTopography& UVoxelModule::GetTopographyByIndex(FIndex InIndex)
 	return Temp;
 }
 
-FVoxelTopography& UVoxelModule::GetTopographyByLocation(FVector InLocation)
+const FVoxelTopography& UVoxelModule::GetTopographyByLocation(FVector InLocation)
 {
 	return GetTopographyByIndex(LocationToVoxelIndex(InLocation));
 }
@@ -893,7 +890,10 @@ void UVoxelModule::SetTopographyByIndex(FIndex InIndex, const FVoxelTopography& 
 {
 	if(AVoxelChunk* Chunk = GetChunkByVoxelIndex(FIndex(InIndex.X, InIndex.Y, 0)))
 	{
-		Chunk->SetTopography(Chunk->WorldIndexToLocal(FIndex(InIndex.X, InIndex.Y, 0)), InTopography);
+		if(!Chunk->IsBuilded())
+		{
+			Chunk->SetTopography(Chunk->WorldIndexToLocal(FIndex(InIndex.X, InIndex.Y, 0)), InTopography);
+		}
 	}
 }
 

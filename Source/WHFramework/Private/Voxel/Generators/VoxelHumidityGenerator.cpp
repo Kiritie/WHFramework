@@ -23,7 +23,9 @@ void UVoxelHumidityGenerator::Generate(AVoxelChunk* InChunk)
 		ITER_INDEX2D(Index, Module->GetWorldData().ChunkSize, false,
 			const FVector2D Location = FVector2D((float)Index.X / Module->GetWorldData().ChunkSize.X / CrystalSize, Index.Y / Module->GetWorldData().ChunkSize.Y / CrystalSize);
 			const float Humidity = FMath::Clamp(Module->GetVoxelNoise2D(Location + (InChunk->GetIndex().ToVector2D() / CrystalSize), true) + UMathStatics::Rand(Location, Seed) * 0.05f, 0.f, 1.f);
-			InChunk->GetTopography(Index).Humidity += Humidity / Times;
+			FVoxelTopography Topography = InChunk->GetTopography(Index);
+			Topography.Humidity += Humidity / Times;
+			InChunk->SetTopography(Index, Topography);
 		)
 		_CrystalSize *= 2;
 	)

@@ -22,7 +22,6 @@ void UVoxelRainGenerator::Generate(AVoxelChunk* InChunk)
 
 	_Waters.Reset();
 
-	//初始化雨滴（随机生成雨滴）
 	const float Possible = UMathStatics::Rand(InChunk->GetIndex().ToVector2D() + FVector2D(13.51f, 2.16f), Seed);
 	if (Possible <= SpawnRate) return;
 	
@@ -39,12 +38,11 @@ void UVoxelRainGenerator::Flow(AVoxelChunk* InChunk, float InRain, int InX, int 
 {
 	FScopeLock ScopeLock(&CriticalSection);
 
-	if (InRain < 0.5f/* || InZ <= Module->GetWorldData().SeaLevel*/) return;
+	if (InRain < 0.5f) return;
 
 	FIndex Index = FIndex(InChunk->GetWorldIndex().X + InX, InChunk->GetWorldIndex().Y + InY, InZ);
 	_Waters.Emplace(Index);
 
-	//垂流：检测下方踏空
 	Index = FIndex(InChunk->GetWorldIndex().X + InX, InChunk->GetWorldIndex().Y + InY, InZ - 1);
 	
 	if (_Waters.Find(Index)) return;
@@ -67,7 +65,6 @@ void UVoxelRainGenerator::Flow(AVoxelChunk* InChunk, float InRain, int InX, int 
 
 		if (_Waters.Find(Index)) continue;
 
-		//水平流向无障碍
 		if (!Module->HasVoxelByIndex(Index, true))
 		{
 			Index = FIndex(InChunk->GetWorldIndex().X + X, InChunk->GetWorldIndex().Y + Y, InZ - 1);

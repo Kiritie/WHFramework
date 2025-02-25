@@ -186,9 +186,9 @@ public:
 	virtual void SetVoxelByLocation(FVector InLocation, const FVoxelItem& InVoxelItem, bool bSafe = false);
 
 public:
-	virtual FVoxelTopography& GetTopographyByIndex(FIndex InIndex);
+	virtual const FVoxelTopography& GetTopographyByIndex(FIndex InIndex);
 
-	virtual FVoxelTopography& GetTopographyByLocation(FVector InLocation);
+	virtual const FVoxelTopography& GetTopographyByLocation(FVector InLocation);
 
 	virtual void SetTopographyByIndex(FIndex InIndex, const FVoxelTopography& InTopography);
 

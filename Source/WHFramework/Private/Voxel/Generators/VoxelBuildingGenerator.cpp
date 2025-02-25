@@ -47,8 +47,6 @@ void UVoxelBuildingGenerator::DevelopeDomains(AVoxelChunk* InChunk)
 	const int32 Dx[9] = {1, -1, 0, 0, 1, -1, 1, -1, 0};
 	const int32 Dy[9] = {0, 0, 1, -1, 1, -1, -1, 1, 0};
 
-	// UE_LOG(LogTemp, Warning, TEXT("develop begin"));
-
 	while (!Points.empty())
 	{
 		Count++;
@@ -61,7 +59,6 @@ void UVoxelBuildingGenerator::DevelopeDomains(AVoxelChunk* InChunk)
 			_Domains.Emplace(UMathStatics::Index(P.X + Dx[d], P.Y + Dy[d]));
 		}
 
-		//设置最高发展度费用
 		if (Cost > 7) break;
 
 		int32 CenterHeight = Module->GetTopographyByIndex(FIndex(P.X, P.Y)).Height;
@@ -84,13 +81,10 @@ void UVoxelBuildingGenerator::DevelopeDomains(AVoxelChunk* InChunk)
 			Points.emplace(Cost + 0.5f + DeltaHeight * 0.5f, FVector2D(x, y));
 		}
 	}
-
-	// UE_LOG(LogTemp, Warning, TEXT("devlop %d"), count);
 }
 
 void UVoxelBuildingGenerator::PlaceBuildings(AVoxelChunk* InChunk)
 {
-	//[第几个建筑][长、宽]
 	const int32 BuildingSize[3][2] = {{10, 6}, {8, 6}, {6, 6}};
 	const int32 Dx[4] = {1, -1, 0, 0};
 	const int32 Dy[4] = {0, 0, 1, -1};
@@ -128,7 +122,6 @@ void UVoxelBuildingGenerator::PlaceBuildings(AVoxelChunk* InChunk)
 
 bool UVoxelBuildingGenerator::PlaceOneBuilding(AVoxelChunk* InChunk, int32 InX, int32 InY, int32 index, int32 InRotate)
 {
-	//[第几个建筑][长、宽]
 	const int32 BuildingSize[3][3] = {{10, 6, 7}, {8, 6, 9}, {6, 6, 15}};
 
 	int RotateIndex = InRotate % 2;
@@ -141,10 +134,8 @@ bool UVoxelBuildingGenerator::PlaceOneBuilding(AVoxelChunk* InChunk, int32 InX, 
 	{
 		for (int j = -LeftRight; j < LeftRight; ++j)
 		{
-			//若不在发展域，则无需生成建筑         
 			if (!_Domains.Find(UMathStatics::Index(InX + i, InY + j))) return false;
 
-			//若地面被挖空，则无需生成建筑
 			FIndex Index = FIndex(InX + i, InY + j, Module->GetTopographyByIndex(FIndex(InX + i, InY + j)).Height);
 			if (!Module->HasVoxelByIndex(Index, true)) return false;
 
@@ -155,7 +146,6 @@ bool UVoxelBuildingGenerator::PlaceOneBuilding(AVoxelChunk* InChunk, int32 InX, 
 	Aver /= (BuildingSize[index][0] * BuildingSize[index][1]);
 	Aver = floor(Aver + 0.5f);
 
-	//低于海平面，没必要生成房屋
 	if (Aver <= Module->GetWorldData().SeaLevel)return false;
 
 	for (int i = -FrontBack; i < FrontBack; ++i)
@@ -171,7 +161,6 @@ bool UVoxelBuildingGenerator::PlaceOneBuilding(AVoxelChunk* InChunk, int32 InX, 
 		}
 	}
 
-	//地表插入空气，以免生成树木花草
 	for (int i = -FrontBack - 1; i < FrontBack + 1; ++i)
 	{
 		for (int j = -LeftRight - 1; j < LeftRight + 1; ++j)
@@ -198,20 +187,17 @@ bool UVoxelBuildingGenerator::PlaceOneBuilding(AVoxelChunk* InChunk, int32 InX, 
 
 void UVoxelBuildingGenerator::PlacePaths(AVoxelChunk* InChunk)
 {
-	//两两寻路，进行道路连接
 	for (int i = 0; i < _BuildingPos.Num(); ++i)
 	{
 		for (int j = i + 1; j < _BuildingPos.Num(); ++j)
 		{
 			auto Path = PathFinder.FindPath(_BuildingPos[i], _BuildingPos[j]);
 
-			// UE_LOG(LogTemp, Warning, TEXT("path roads num = %d"), path.Num());
-
 			for (FVector2D Pos : Path)
 			{
 				_Roads.Emplace(UMathStatics::Index(Pos.X, Pos.Y));
 				FIndex Index = FIndex(Pos.X, Pos.Y, Module->GetTopographyByIndex(FIndex(Pos.X, Pos.Y)).Height);
-				//被挖空则不生成
+
 				if (!Module->HasVoxelByIndex(Index, true)) continue;
 
 				Module->SetVoxelByIndex(FIndex(Pos.X, Pos.Y, Module->GetTopographyByIndex(FIndex(Pos.X, Pos.Y)).Height), EVoxelType::Cobble_Stone);

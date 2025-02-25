@@ -62,7 +62,6 @@ void AVoxelChunk::OnDespawn_Implementation(bool bRecovery)
 	bBuilded = false;
 	bGenerated = false;
 	bChanged = false;
-	Module = nullptr;
 
 	DestroyMeshComponents();
 
@@ -263,12 +262,10 @@ void AVoxelChunk::BuildMap(int32 InStage)
 		case 4:
 		{
 			Module->GenerateVoxel<UVoxelBuildingGenerator>(this);
-		}
-		default:
-		{
 			bBuilded = true;
 			break;
 		}
+		default: break;
 	}
 }
 
@@ -280,7 +277,7 @@ void AVoxelChunk::BuildMesh()
 		{
 			GetMeshComponent(VoxelItem.GetVoxelData().Nature)->BuildVoxel(VoxelItem);
 		}
-	);
+	)
 }
 
 void AVoxelChunk::GenerateNeighbors(FIndex InIndex, EPhase InPhase)

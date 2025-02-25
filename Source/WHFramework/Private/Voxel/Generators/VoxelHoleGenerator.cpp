@@ -43,9 +43,12 @@ void UVoxelHoleGenerator::GenerateHole(FIndex InIndex) const
 				for (int32 Z = -Radius; Z <= Radius; Z++)
 				{
 					const FVector Offset(X, Y, Z);
-					if (Offset.Size() <= Radius && !Module->HasVoxelByIndex(Iter + Offset))
+					if (Offset.Size() <= Radius)
 					{
-						Module->SetVoxelByIndex(Iter + Offset, FVoxelItem::Empty);
+						if(!Module->HasVoxelByIndex(Iter + Offset))
+						{
+							Module->SetVoxelByIndex(Iter + Offset, FVoxelItem::Empty);
+						}
 					}
 				}
 			}
@@ -53,7 +56,7 @@ void UVoxelHoleGenerator::GenerateHole(FIndex InIndex) const
 	}
 }
 
-FIndex UVoxelHoleGenerator::FindNearestHoleIndex(const FIndex& InStartIndex, const FVector& InDirection, int32 InMaxSearchDistance) const
+FIndex UVoxelHoleGenerator::FindNearestHoleIndex(FIndex InStartIndex, FVector InDirection, int32 InMaxSearchDistance) const
 {
 	const FVector NormalizedDir = InDirection.GetSafeNormal();
 
@@ -74,7 +77,7 @@ FIndex UVoxelHoleGenerator::FindNearestHoleIndex(const FIndex& InStartIndex, con
 	return FIndex::ZeroIndex;
 }
 
-FIndex UVoxelHoleGenerator::FindNearestHoleIndexMultiDirection(const FIndex& InStartIndex, int32 InMaxSearchDistance) const
+FIndex UVoxelHoleGenerator::FindNearestHoleIndexMultiDirection(FIndex InStartIndex, int32 InMaxSearchDistance) const
 {
 	TArray<FVector> Directions = {
 		FVector(0, 0, -1),

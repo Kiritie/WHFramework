@@ -24,9 +24,9 @@ public:
 protected:
 	void GenerateHole(FIndex InIndex) const;
 
-	FIndex FindNearestHoleIndex(const FIndex& InStartIndex, const FVector& InDirection, int32 InMaxSearchDistance) const;
+	FIndex FindNearestHoleIndex(FIndex InStartIndex, FVector InDirection, int32 InMaxSearchDistance) const;
 
-	FIndex FindNearestHoleIndexMultiDirection(const FIndex& InStartIndex, int32 InMaxSearchDistance) const;
+	FIndex FindNearestHoleIndexMultiDirection(FIndex InStartIndex, int32 InMaxSearchDistance) const;
 
 	TArray<FIndex> GenerateHoleSlopePath(FIndex InStartIndex, FIndex InEndIndex) const;
 

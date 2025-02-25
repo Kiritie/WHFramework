@@ -20,7 +20,6 @@ void UVoxelCaveGenerator::Generate(AVoxelChunk* InChunk)
 		for(int Z = FMath::Max(Height - MaxDepth, 0); Z <= Height; Z++)
 		{
 			const FIndex WorldIndex = InChunk->LocalIndexToWorld(FIndex(Index.X, Index.Y, Z));
-			//若高于一定阈值，挖空
 			if (IsCave(WorldIndex))
 			{
 				Module->SetVoxelByIndex(WorldIndex, FVoxelItem::Empty);

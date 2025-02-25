@@ -60,12 +60,12 @@ FVoxelWorldBasicSaveData UVoxelModuleStatics::GetWorldBasicData()
 	return UVoxelModule::Get().GetWorldBasicData();
 }
 
-FVoxelTopography& UVoxelModuleStatics::GetTopographyByIndex(FIndex InIndex)
+const FVoxelTopography& UVoxelModuleStatics::GetTopographyByIndex(FIndex InIndex)
 {
 	return UVoxelModule::Get().GetTopographyByIndex(InIndex);
 }
 
-FVoxelTopography& UVoxelModuleStatics::GetTopographyByLocation(FVector InLocation)
+const FVoxelTopography& UVoxelModuleStatics::GetTopographyByLocation(FVector InLocation)
 {
 	return UVoxelModule::Get().GetTopographyByLocation(InLocation);
 }

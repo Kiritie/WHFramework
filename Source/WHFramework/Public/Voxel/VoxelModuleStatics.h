@@ -44,10 +44,10 @@ public:
 	static FVoxelWorldBasicSaveData GetWorldBasicData();
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static FVoxelTopography& GetTopographyByIndex(FIndex InIndex);
+	static const FVoxelTopography& GetTopographyByIndex(FIndex InIndex);
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static FVoxelTopography& GetTopographyByLocation(FVector InLocation);
+	static const FVoxelTopography& GetTopographyByLocation(FVector InLocation);
 
 	UFUNCTION(BlueprintCallable, Category = "VoxelModuleStatics")
 	static void SetTopographyByIndex(FIndex InIndex, const FVoxelTopography& InTopography);
