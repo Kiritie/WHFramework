@@ -26,29 +26,26 @@ void UVoxelHoleGenerator::GenerateHole(FIndex InIndex) const
 {
 	if(UMathStatics::Rand(InIndex.ToVector2D(), Seed) < SpawnRate) return;
 
-	const FIndex SurfacePos = FIndex(InIndex.X, InIndex.Y, Module->GetTopographyByIndex(InIndex).Height);
-	if(SurfacePos.Z == 0) return;
+	const FIndex SurfaceIndex = FIndex(InIndex.X, InIndex.Y, Module->GetTopographyByIndex(InIndex).Height);
+	if(SurfaceIndex.Z == 0) return;
 
-	const FIndex Hole = FindNearestHoleIndexMultiDirection(SurfacePos, 100);
-	if (Hole == FIndex::ZeroIndex) return;
+	const FIndex Hole = FindNearestHoleIndexMultiDirection(SurfaceIndex, 100);
+	if(Hole == FIndex::ZeroIndex) return;
 
 	const int32 Radius = UMathStatics::RandRange(InIndex.ToVector2D(), MinRadius, MaxRadius);
-	const TArray<FIndex> Path = GenerateHoleSlopePath(SurfacePos, Hole);
+	const TArray<FIndex> Path = GenerateHoleSlopePath(SurfaceIndex, Hole);
 	for(auto& Iter : Path)
 	{
-		for (int32 X = -Radius; X <= Radius; X++)
+		for(int32 X = -Radius; X <= Radius; X++)
 		{
-			for (int32 Y = -Radius; Y <= Radius; Y++)
+			for(int32 Y = -Radius; Y <= Radius; Y++)
 			{
-				for (int32 Z = -Radius; Z <= Radius; Z++)
+				for(int32 Z = -Radius; Z <= Radius; Z++)
 				{
 					const FVector Offset(X, Y, Z);
-					if (Offset.Size() <= Radius)
+					if(Offset.Size() <= Radius)
 					{
-						if(!Module->HasVoxelByIndex(Iter + Offset))
-						{
-							Module->SetVoxelByIndex(Iter + Offset, FVoxelItem::Empty);
-						}
+						Module->SetVoxelByIndex(Iter + Offset, FVoxelItem::Empty);
 					}
 				}
 			}
@@ -60,17 +57,17 @@ FIndex UVoxelHoleGenerator::FindNearestHoleIndex(FIndex InStartIndex, FVector In
 {
 	const FVector NormalizedDir = InDirection.GetSafeNormal();
 
-	for (int32 Step = 0; Step < InMaxSearchDistance; Step++)
+	for(int32 Step = 0; Step < InMaxSearchDistance; Step++)
 	{
-		const FIndex CurrentPos(
+		const FIndex CurrentIndex(
 			InStartIndex.X + FMath::RoundToInt(NormalizedDir.X * Step),
 			InStartIndex.Y + FMath::RoundToInt(NormalizedDir.Y * Step),
 			InStartIndex.Z + FMath::RoundToInt(NormalizedDir.Z * Step)
 		);
 
-		if (Module->GetVoxelGenerator<UVoxelCaveGenerator>()->IsCave(CurrentPos))
+		if(Module->GetVoxelGenerator<UVoxelCaveGenerator>()->IsCave(CurrentIndex))
 		{
-			return CurrentPos;
+			return CurrentIndex;
 		}
 	}
 
@@ -79,7 +76,7 @@ FIndex UVoxelHoleGenerator::FindNearestHoleIndex(FIndex InStartIndex, FVector In
 
 FIndex UVoxelHoleGenerator::FindNearestHoleIndexMultiDirection(FIndex InStartIndex, int32 InMaxSearchDistance) const
 {
-	TArray<FVector> Directions = {
+	const TArray<FVector> Directions = {
 		FVector(0, 0, -1),
 		FVector(1, 0, -1),
 		FVector(-1, 0, -1),
@@ -90,16 +87,16 @@ FIndex UVoxelHoleGenerator::FindNearestHoleIndexMultiDirection(FIndex InStartInd
 	FIndex NearestIndex = FIndex::ZeroIndex;
 	int32 MinDistance = INT_MAX;
 
-	for (auto& Iter : Directions)
+	for(auto& Iter : Directions)
 	{
-		const FIndex HolePos = FindNearestHoleIndex(InStartIndex, Iter, InMaxSearchDistance);
-		if (HolePos != FIndex::ZeroIndex)
+		const FIndex HoleIndex = FindNearestHoleIndex(InStartIndex, Iter, InMaxSearchDistance);
+		if(HoleIndex != FIndex::ZeroIndex)
 		{
-			const int32 Distance = FIndex::Distance(InStartIndex, HolePos);
-			if (Distance < MinDistance)
+			const int32 Distance = FIndex::Distance(InStartIndex, HoleIndex);
+			if(Distance < MinDistance)
 			{
 				MinDistance = Distance;
-				NearestIndex = HolePos;
+				NearestIndex = HoleIndex;
 			}
 		}
 	}
@@ -112,9 +109,9 @@ TArray<FIndex> UVoxelHoleGenerator::GenerateHoleSlopePath(FIndex InStartIndex, F
 	TArray<FIndex> Path;
 	
 	FIndex CurrentIndex = InStartIndex;
-	FVector Direction = (InEndIndex - InStartIndex).ToVector().GetSafeNormal();
+	const FVector Direction = (InEndIndex - InStartIndex).ToVector().GetSafeNormal();
 	
-	while (CurrentIndex != InEndIndex)
+	while(CurrentIndex != InEndIndex)
 	{
 		Path.Add(CurrentIndex);
 		CurrentIndex.X += FMath::RoundToInt(Direction.X);

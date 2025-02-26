@@ -401,7 +401,7 @@ public:
 				}
 				UserWidget->OnOpen(InParams ? *InParams : TArray<FParameter>(), bInstant);
 			}
-			else
+			else if(UserWidget->GetWidgetState() != EScreenWidgetState::Opening)
 			{
 				UserWidget->OnOpen(InParams ? *InParams : TArray<FParameter>(), true);
 			}

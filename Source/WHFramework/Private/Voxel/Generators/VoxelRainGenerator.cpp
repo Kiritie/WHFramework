@@ -23,12 +23,12 @@ void UVoxelRainGenerator::Generate(AVoxelChunk* InChunk)
 	_Waters.Reset();
 
 	const float Possible = UMathStatics::Rand(InChunk->GetIndex().ToVector2D() + FVector2D(13.51f, 2.16f), Seed);
-	if (Possible <= SpawnRate) return;
+	if(Possible <= SpawnRate) return;
 	
 	const int32 X = UMathStatics::RandInt(InChunk->GetIndex().ToVector2D(), Seed) % (int32)(Module->GetWorldData().ChunkSize.X - 1) + 1;
-	const int32 Y = UMathStatics::RandInt(InChunk->GetIndex().ToVector2D() + FVector2D(-1.512f, 41.421f), Seed) % (int32)(Module->GetWorldData().ChunkSize.Y - 1) + 1;
+	const int32 Y = UMathStatics::RandInt(InChunk->GetIndex().ToVector2D() + FVector2D(-1.512f, 41.421f), Seed) %(int32)(Module->GetWorldData().ChunkSize.Y - 1) + 1;
 	const int32 Z = InChunk->GetTopography(FIndex(X, Y)).Height + 1;
-	if (Module->HasVoxelByIndex(FIndex(X, Y, Z), true))
+	if(Module->HasVoxelByIndex(FIndex(X, Y, Z), true))
 	{
 		Flow(InChunk, MaxDistance, X, Y, Z);
 	}
@@ -38,16 +38,16 @@ void UVoxelRainGenerator::Flow(AVoxelChunk* InChunk, float InRain, int InX, int 
 {
 	FScopeLock ScopeLock(&CriticalSection);
 
-	if (InRain < 0.5f) return;
+	if(InRain < 0.5f) return;
 
 	FIndex Index = FIndex(InChunk->GetWorldIndex().X + InX, InChunk->GetWorldIndex().Y + InY, InZ);
 	_Waters.Emplace(Index);
 
 	Index = FIndex(InChunk->GetWorldIndex().X + InX, InChunk->GetWorldIndex().Y + InY, InZ - 1);
 	
-	if (_Waters.Find(Index)) return;
+	if(_Waters.Find(Index)) return;
 
-	if (!Module->HasVoxelByIndex(Index, true))
+	if(!Module->HasVoxelByIndex(Index, true))
 	{
 		Flow(InChunk, InRain - 0.3f, InX, InY, InZ - 1);
 		return;
@@ -56,22 +56,22 @@ void UVoxelRainGenerator::Flow(AVoxelChunk* InChunk, float InRain, int InX, int 
 	const int32 Dx[4] = {1, -1, 0, 0};
 	const int32 Dy[4] = {0, 0, 1, -1};
 
-	for (int n = 0; n < 4; ++n)
+	for(int n = 0; n < 4; ++n)
 	{
 		int32 X = InX + Dx[n];
 		int32 Y = InY + Dy[n];
 
 		Index = FIndex(InChunk->GetWorldIndex().X + X, InChunk->GetWorldIndex().Y + Y, InZ);
 
-		if (_Waters.Find(Index)) continue;
+		if(_Waters.Find(Index)) continue;
 
-		if (!Module->HasVoxelByIndex(Index, true))
+		if(!Module->HasVoxelByIndex(Index, true))
 		{
 			Index = FIndex(InChunk->GetWorldIndex().X + X, InChunk->GetWorldIndex().Y + Y, InZ - 1);
 			
-			if (_Waters.Find(Index)) continue;
+			if(_Waters.Find(Index)) continue;
 
-			if (!Module->HasVoxelByIndex(Index, true))
+			if(!Module->HasVoxelByIndex(Index, true))
 			{
 				Flow(InChunk, InRain - 1.0f, X, Y, InZ - 1);
 			}
@@ -82,7 +82,7 @@ void UVoxelRainGenerator::Flow(AVoxelChunk* InChunk, float InRain, int InX, int 
 		}
 	}
 
-	for (auto& Iter : _Waters)
+	for(auto& Iter : _Waters)
 	{
 		Module->SetVoxelByIndex(FIndex(Iter.X, Iter.Y, Iter.Z - 1), EVoxelType::Water);
 	}

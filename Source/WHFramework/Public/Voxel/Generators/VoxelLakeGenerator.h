@@ -30,6 +30,10 @@ protected:
 
 	void FillLakeWater(FIndex InIndex, float InRadius);
 
+	int32 GetSurfaceHeight(FIndex InIndex, float InRadius) const;
+
+	int32 GetEffectiveRadius(FIndex InIndex, float InRadius) const;
+
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Seed;
@@ -37,6 +41,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float SpawnRate;
 	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float NoiseScale;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MinDistance;
 	

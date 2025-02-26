@@ -16,9 +16,9 @@ AVoxelEntity::AVoxelEntity()
 	
 	MeshComponent = CreateDefaultSubobject<UVoxelMeshComponent>(FName("MeshComponent"));
 	MeshComponent->SetupAttachment(RootComponent);
-	MeshComponent->Initialize(EVoxelScope::Entity);
 
 	VoxelID = FPrimaryAssetId();
+	VoxelScope = EVoxelScope::Entity;
 	Auxiliary = nullptr;
 }
 
@@ -34,6 +34,13 @@ void AVoxelEntity::OnDespawn_Implementation(bool bRecovery)
 	VoxelID = FPrimaryAssetId();
 	MeshComponent->ClearMesh();
 	DestroyAuxiliary();
+}
+
+void AVoxelEntity::OnInitialize_Implementation()
+{
+	Super::OnInitialize_Implementation();
+
+	MeshComponent->Initialize(VoxelScope);
 }
 
 void AVoxelEntity::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -59,7 +66,7 @@ void AVoxelEntity::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			}
 			if(Auxiliary)
 			{
-				Auxiliary->LoadSaveData(new FVoxelAuxiliarySaveData(SaveData, EVoxelScope::Entity));
+				Auxiliary->LoadSaveData(new FVoxelAuxiliarySaveData(SaveData, VoxelScope));
 			}
 		}
 		else if(Auxiliary)

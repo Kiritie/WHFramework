@@ -4,6 +4,7 @@
 #include "Voxel/Voxels/VoxelWater.h"
 
 #include "Components/SkeletalMeshComponent.h"
+#include "Math/MathStatics.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Datas/VoxelData.h"
@@ -31,14 +32,14 @@ void UVoxelWater::OnGenerate(IVoxelAgentInterface* InAgent)
 	
 	if(GetOwner())
 	{
-		// TMap<FIndex, FVoxelItem> VoxelItems;
-		// ITER_DIRECTION(Iter, 
-		// 	if(Iter != EDirection::Up && !GetOwner()->CheckVoxelAdjacent(Item, Iter))
-		// 	{
-		// 		VoxelItems.Emplace(GetIndex() + UMathStatics::DirectionToIndex(Iter), GetData().VoxelType);
-		// 	}
-		// )
-		// GetOwner()->SetVoxelComplex(VoxelItems, true, false, InAgent);
+		TMap<FIndex, FVoxelItem> VoxelItems;
+		ITER_DIRECTION(Iter, 
+			if(Iter != EDirection::Up && !GetOwner()->CheckVoxelAdjacent(Item, Iter))
+			{
+				VoxelItems.Emplace(GetIndex() + UMathStatics::DirectionToIndex(Iter), GetData().VoxelType);
+			}
+		)
+		GetOwner()->SetVoxelComplex(VoxelItems, true, false, InAgent);
 	}
 }
 

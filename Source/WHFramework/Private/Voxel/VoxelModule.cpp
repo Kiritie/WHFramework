@@ -47,7 +47,6 @@
 #include "Voxel/Generators/VoxelTemperatureGenerator.h"
 #include "Voxel/Generators/VoxelTerrainGenerator.h"
 #include "Voxel/Voxels/VoxelContainer.h"
-#include "Voxel/Voxels/VoxelTree.h"
 
 IMPLEMENTATION_MODULE(UVoxelModule)
 
@@ -108,7 +107,6 @@ UVoxelModule::UVoxelModule()
 	VoxelClasses.Add(UVoxelDoor::StaticClass());
 	VoxelClasses.Add(UVoxelPlant::StaticClass());
 	VoxelClasses.Add(UVoxelTorch::StaticClass());
-	VoxelClasses.Add(UVoxelTree::StaticClass());
 	VoxelClasses.Add(UVoxelWater::StaticClass());
 	
 	VoxelGenerators = TMap<TSubclassOf<UVoxelGenerator>, UVoxelGenerator*>();

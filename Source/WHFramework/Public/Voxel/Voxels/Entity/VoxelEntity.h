@@ -4,6 +4,7 @@
 
 #include "Common/Base/WHActor.h"
 #include "ObjectPool/ObjectPoolInterface.h"
+#include "Voxel/VoxelModuleTypes.h"
 
 #include "VoxelEntity.generated.h"
 
@@ -32,6 +33,9 @@ public:
 		
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
+public:
+	virtual void OnInitialize_Implementation() override;
+
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
@@ -45,6 +49,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	FPrimaryAssetId VoxelID;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	EVoxelScope VoxelScope;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	AVoxelAuxiliary* Auxiliary;

@@ -502,7 +502,7 @@ EInputMode UWidgetModule::GetNativeInputMode() const
 	EInputMode InputMode = FSlateWidgetManager::Get().GetNativeInputMode();
     for (const auto& Iter : AllUserWidget)
     {
-    	if (Iter.Value && (Iter.Value->GetWidgetState(true) == EScreenWidgetState::Opening || Iter.Value->GetWidgetState(true) == EScreenWidgetState::Opened) && (int32)Iter.Value->GetWidgetInputMode() > (int32)InputMode)
+    	if (Iter.Value && Iter.Value->IsWidgetOpened(true, true) && Iter.Value->GetWidgetInputMode() > InputMode)
     	{
     		InputMode = Iter.Value->GetWidgetInputMode();
     	}
@@ -511,7 +511,7 @@ EInputMode UWidgetModule::GetNativeInputMode() const
 	{
 		for (const auto& Iter2 : Iter1.Value.WorldWidgets)
 		{
-			if (Iter2 && (int32)Iter2->GetWidgetInputMode() > (int32)InputMode)
+			if (Iter2 && Iter2->GetWidgetInputMode() > InputMode)
 			{
 				InputMode = Iter2->GetWidgetInputMode();
 			}

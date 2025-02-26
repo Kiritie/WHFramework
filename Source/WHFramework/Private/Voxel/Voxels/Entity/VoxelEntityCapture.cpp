@@ -10,7 +10,7 @@
 // Sets default values
 AVoxelEntityCapture::AVoxelEntityCapture()
 {
-	MeshComponent->Initialize(EVoxelScope::Capture);
+	VoxelScope = EVoxelScope::Capture;
 }
 
 void AVoxelEntityCapture::LoadData(FSaveData* InSaveData, EPhase InPhase)

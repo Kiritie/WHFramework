@@ -791,6 +791,16 @@ public:
 		return GetWorldSize() * ChunkSize * BlockSize;
 	}
 
+	FORCEINLINE float GetWorldHeight() const
+	{
+		return WorldSize.Z * ChunkSize.Z;
+	}
+
+	FORCEINLINE float GetWorldRealHeight() const
+	{
+		return GetWorldHeight() * BlockSize;
+	}
+
 	FORCEINLINE FVector GetBlockSizedNormal(FVector InNormal, float InLength = 0.25f) const
 	{
 		return BlockSize * InNormal * InLength;

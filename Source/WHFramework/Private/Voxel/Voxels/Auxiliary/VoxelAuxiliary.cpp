@@ -36,6 +36,11 @@ void AVoxelAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 				SetActorRelativeLocation(VoxelItem.GetLocation() + VoxelItem.GetRange() * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f);
 				break;
 			}
+			case EVoxelScope::Preview:
+			{
+				SetActorRelativeLocation(VoxelItem.GetRange() * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f);
+				break;
+			}
 			case EVoxelScope::Vitality:
 			{
 				SetActorRelativeLocation(FVector(0.f, 0.f, VoxelItem.GetRange().Z * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f));

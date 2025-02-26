@@ -9,29 +9,31 @@
 UVoxelLakeGenerator::UVoxelLakeGenerator()
 {
 	Seed = 8997632;
-	SpawnRate = 0.9f;
-	MinDistance = 80;
-	MinRadius = 5.f;
+	SpawnRate = 0.8f;
+	NoiseScale = 0.05f;
+	MinDistance = 8;
+	MinRadius = 4.f;
 	MaxRadius = 30.f;
-	MinDepth = 2.f;
+	MinDepth = 3.f;
 	MaxDepth = 5.f;
 }
 
 void UVoxelLakeGenerator::Generate(AVoxelChunk* InChunk)
 {
+	if(InChunk->GetIndex().X % MinDistance != 0 || InChunk->GetIndex().Y % MinDistance != 0) return;
+
 	GenerateLake(InChunk->GetWorldIndex());
 }
 
 void UVoxelLakeGenerator::GenerateLake(FIndex InIndex)
 {
-	if (UMathStatics::Rand(InIndex.ToVector2D(), Seed) < SpawnRate) return;
+	if(UMathStatics::Rand(InIndex.ToVector2D(), Seed) < SpawnRate) return;
 
-	if (InIndex.X % MinDistance != 0 || InIndex.Y % MinDistance != 0) return;
+	const float LakeRadius = UMathStatics::RandRange(InIndex.ToVector2D(), MinRadius, MaxRadius, Seed);
+	const float LakeDepth = UMathStatics::RandRange(InIndex.ToVector2D(), MinDepth, MaxDepth, Seed);
 
-	const float LakeRadius = UMathStatics::RandRange(InIndex.ToVector2D(), 5.0f, 30.0f, Seed);
-	const float LakeDepth = UMathStatics::RandRange(InIndex.ToVector2D(), 3.0f, 5.0f, Seed);
-
-	const FIndex LakeCenter = FIndex(InIndex.X, InIndex.Y, Module->GetTopographyByIndex(InIndex).Height - LakeRadius / 7.f);
+	const FIndex LakeCenter = FIndex(InIndex.X, InIndex.Y, GetSurfaceHeight(InIndex, LakeRadius));
+	if(LakeCenter.Z == 0) return;
 
 	GenerateLakeDepression(LakeCenter, LakeRadius, LakeDepth);
 	SmoothLakeEdges(LakeCenter, LakeRadius, 3);
@@ -40,18 +42,19 @@ void UVoxelLakeGenerator::GenerateLake(FIndex InIndex)
 
 void UVoxelLakeGenerator::GenerateLakeDepression(FIndex InIndex, float InRadius, float InDepth)
 {
-	for (int32 X = -InRadius; X <= InRadius; X++)
+	for(int32 X = -InRadius; X <= InRadius; X++)
 	{
-		for (int32 Y = -InRadius; Y <= InRadius; Y++)
+		for(int32 Y = -InRadius; Y <= InRadius; Y++)
 		{
-			FIndex Pos = InIndex + FIndex(X, Y, 0);
-			float Distance = FVector2D(X, Y).Size();
-			if (Distance <= InRadius)
+			const FIndex Index = InIndex + FIndex(X, Y, 0);
+			const float Distance = FVector2D(X, Y).Size();
+			const float EffectiveRadius = GetEffectiveRadius(Index, InRadius);
+			if(Distance <= EffectiveRadius)
 			{
-				float Depression = InDepth * FMath::Cos((Distance / InRadius) * PI / 2);
-				FVoxelTopography Topography = Module->GetTopographyByIndex(Pos);
+				const float Depression = InDepth * FMath::Cos(Distance / EffectiveRadius * PI / 2);
+				FVoxelTopography Topography = Module->GetTopographyByIndex(Index);
 				Topography.Height = InIndex.Z - Depression;
-				Module->SetTopographyByIndex(Pos, Topography);
+				Module->SetTopographyByIndex(Index, Topography);
 			}
 		}
 	}
@@ -59,50 +62,69 @@ void UVoxelLakeGenerator::GenerateLakeDepression(FIndex InIndex, float InRadius,
 
 void UVoxelLakeGenerator::SmoothLakeEdges(FIndex InIndex, float InRadius, int32 InIterations)
 {
-	for (int32 Iteration = 0; Iteration < InIterations; Iteration++)
-	{
-		for (int32 X = -InRadius; X <= InRadius; X++)
+	DON(InIterations,
+		for(int32 X = -InRadius; X <= InRadius; X++)
 		{
-			for (int32 Y = -InRadius; Y <= InRadius; Y++)
+			for(int32 Y = -InRadius; Y <= InRadius; Y++)
 			{
-				FIndex Pos = InIndex + FIndex(X, Y, 0);
-				float Distance = FVector2D(X, Y).Size();
-				if (Distance > InRadius - 1 && Distance <= InRadius + 1)
+				const FIndex Index = InIndex + FIndex(X, Y, 0);
+				const float Distance = FVector2D(X, Y).Size();
+				const float EffectiveRadius = GetEffectiveRadius(Index, InRadius);
+				if(Distance > EffectiveRadius - 1 && Distance <= EffectiveRadius + 1)
 				{
 					float AvgHeight = 0;
 					int32 Count = 0;
-					for (int32 DX = -1; DX <= 1; DX++)
+					for(int32 DX = -1; DX <= 1; DX++)
 					{
-						for (int32 DY = -1; DY <= 1; DY++)
+						for(int32 DY = -1; DY <= 1; DY++)
 						{
-							FIndex NeighborPos = Pos + FIndex(DX, DY, 0);
-							AvgHeight += Module->GetTopographyByIndex(NeighborPos).Height;
+							const FIndex NeighborIndex = Index + FIndex(DX, DY, 0);
+							AvgHeight += Module->GetTopographyByIndex(NeighborIndex).Height;
 							Count++;
 						}
 					}
 					AvgHeight /= Count;
-					FVoxelTopography Topography = Module->GetTopographyByIndex(Pos);
+					FVoxelTopography Topography = Module->GetTopographyByIndex(Index);
 					Topography.Height = AvgHeight;
-					Module->SetTopographyByIndex(Pos, Topography);
+					Module->SetTopographyByIndex(Index, Topography);
 				}
+			}
+		}
+	)
+}
+
+void UVoxelLakeGenerator::FillLakeWater(FIndex InIndex, float InRadius)
+{
+	for(int32 X = -InRadius; X <= InRadius; X++)
+	{
+		for(int32 Y = -InRadius; Y <= InRadius; Y++)
+		{
+			const FIndex Index = InIndex + FIndex(X, Y, 0);
+			const int32 LakeBedHeight = Module->GetTopographyByIndex(Index).Height;
+			for(int32 Z = LakeBedHeight; Z < InIndex.Z + 1; Z++)
+			{
+				const FIndex WaterIndex(Index.X, Index.Y, Z);
+				Module->SetVoxelByIndex(WaterIndex, EVoxelType::Water);
 			}
 		}
 	}
 }
 
-void UVoxelLakeGenerator::FillLakeWater(FIndex InIndex, float InRadius)
+int32 UVoxelLakeGenerator::GetSurfaceHeight(FIndex InIndex, float InRadius) const
 {
-	for (int32 X = -InRadius; X <= InRadius; X++)
+	int32 SurfaceHeight = Module->GetTopographyByIndex(InIndex).Height;
+	for(int32 X = -InRadius; X <= InRadius; X++)
 	{
-		for (int32 Y = -InRadius; Y <= InRadius; Y++)
+		for(int32 Y = -InRadius; Y <= InRadius; Y++)
 		{
-			FIndex Pos = InIndex + FIndex(X, Y, 0);
-			int32 LakeBedHeight = Module->GetTopographyByIndex(FIndex(Pos.X, Pos.Y)).Height;
-			for (int32 Z = LakeBedHeight; Z < InIndex.Z; Z++)
-			{
-				FIndex WaterPos(Pos.X, Pos.Y, Z);
-				Module->SetVoxelByIndex(WaterPos, EVoxelType::Water);
-			}
+			const FIndex Index = InIndex + FIndex(X, Y, 0);
+			SurfaceHeight = FMath::Min(Module->GetTopographyByIndex(Index).Height, SurfaceHeight);
 		}
 	}
+	return SurfaceHeight;
+}
+
+int32 UVoxelLakeGenerator::GetEffectiveRadius(FIndex InIndex, float InRadius) const
+{
+	return InRadius *(1.0f + Module->GetVoxelNoise2D(FVector2D(InIndex.X * NoiseScale, InIndex.Y * NoiseScale)) * 0.5f);
 }

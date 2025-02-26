@@ -157,6 +157,8 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 
 	K2_OnOpen(InParams, bInstant);
 
+	SetVisibility(ESlateVisibility::HitTestInvisible);
+
 	switch(WidgetOpenFinishType)
 	{
 		case EWidgetOpenFinishType::Instant:
@@ -222,25 +224,6 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 				ParentPanelWidget->AddChild(this);
 			}
 		}
-	}
-	switch(WidgetOpenType)
-	{
-		case EWidgetOpenType::Visible:
-		{
-			SetVisibility(ESlateVisibility::Visible);
-			break;
-		}
-		case EWidgetOpenType::HitTestInvisible:
-		{
-			SetVisibility(ESlateVisibility::HitTestInvisible);
-			break;
-		}
-		case EWidgetOpenType::SelfHitTestInvisible:
-		{
-			SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-			break;
-		}
-		default: break;
 	}
 
 	switch(WidgetRefreshType)
@@ -446,6 +429,26 @@ void UUserWidgetBase::FinishOpen(bool bInstant)
 
 	WidgetState = EScreenWidgetState::Opened;
 	OnStateChanged(WidgetState);
+
+	switch(WidgetOpenType)
+	{
+		case EWidgetOpenType::Visible:
+		{
+			SetVisibility(ESlateVisibility::Visible);
+			break;
+		}
+		case EWidgetOpenType::HitTestInvisible:
+		{
+			SetVisibility(ESlateVisibility::HitTestInvisible);
+			break;
+		}
+		case EWidgetOpenType::SelfHitTestInvisible:
+		{
+			SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+			break;
+		}
+		default: break;
+	}
 
 	if(bWidgetAutoFocus)
 	{

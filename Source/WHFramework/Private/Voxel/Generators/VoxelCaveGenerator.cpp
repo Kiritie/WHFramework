@@ -20,7 +20,7 @@ void UVoxelCaveGenerator::Generate(AVoxelChunk* InChunk)
 		for(int Z = FMath::Max(Height - MaxDepth, 0); Z <= Height; Z++)
 		{
 			const FIndex WorldIndex = InChunk->LocalIndexToWorld(FIndex(Index.X, Index.Y, Z));
-			if (IsCave(WorldIndex))
+			if(IsCave(WorldIndex))
 			{
 				Module->SetVoxelByIndex(WorldIndex, FVoxelItem::Empty);
 			}
@@ -39,7 +39,7 @@ bool UVoxelCaveGenerator::IsCave(FIndex InIndex) const
 	float Frequency = Scale;
 	float Amplitude = 1.f;
 
-	for (int i = 0; i < Times; i++)
+	for(int i = 0; i < Times; i++)
 	{
 		TotalNoise += Module->GetVoxelNoise3D(FVector(InIndex.X * Frequency, InIndex.Y * Frequency, InIndex.Z * Frequency)) * Amplitude;
 
