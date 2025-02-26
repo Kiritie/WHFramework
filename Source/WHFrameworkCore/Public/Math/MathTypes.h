@@ -77,7 +77,7 @@ enum class ERightAngle : uint8
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FIndex
+struct WHFRAMEWORKCORE_API FIndex
 {
 	GENERATED_BODY()
 
@@ -236,7 +236,7 @@ FORCEINLINE uint32 GetTypeHash(const FIndex& InIndex)
 }
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FPoint
+struct WHFRAMEWORKCORE_API FPoint
 {
 	GENERATED_BODY()
 

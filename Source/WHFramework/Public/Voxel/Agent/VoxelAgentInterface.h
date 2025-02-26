@@ -28,19 +28,22 @@ public:
 	virtual bool OnInteractVoxel(EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult);
 
 public:
-	virtual FVector GetVoxelAgentLocation() const = 0;
+	virtual FVector GetVoxelAgentLocation() const { return FVector::ZeroVector; }
 
 	virtual FPrimaryAssetId GetGenerateVoxelID() const { return FPrimaryAssetId(); }
 
 	virtual void SetGenerateVoxelID(const FPrimaryAssetId& InGenerateVoxelID) { }
 
-	virtual float GetDestroyVoxelRate() const { return 1.f; }
+	virtual EVoxelGenerateToolType GetGenerateToolType() const { return EVoxelGenerateToolType::None; }
 
-	virtual void SetDestroyVoxelRate(float InRate) { }
+	virtual void SetGenerateToolType(EVoxelGenerateToolType InGenerateToolType) { }
+
+	virtual float GetDestroyVoxelRate() const { return 1.f; }
 
 protected:
 	bool bCanGenerateVoxel;
 	FVoxelItem GenerateVoxelItem;
 	TObjectPtr<AVoxelEntityPreview> GeneratePreviewVoxel;
+	
 	FVoxelItem DestroyVoxelItem;
 };

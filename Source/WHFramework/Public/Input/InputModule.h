@@ -180,6 +180,9 @@ public:
 	bool IsPlayerMappedKeyByName(const FName InName, const FKey& InKey, int32 InPlayerIndex = 0) const;
 
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"))
+	bool IsPlayerMappedKeyByTag(const FGameplayTag& InTag, const FKey& InKey, int32 InPlayerIndex = 0) const;
+
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"))
 	UInputActionBase* GetInputActionByTag(const FGameplayTag& InTag, bool bEnsured = true) const;
 
 	//////////////////////////////////////////////////////////////////////////

@@ -553,6 +553,11 @@ bool UInputModule::IsPlayerMappedKeyByName(const FName InName, const FKey& InKey
 	return false;
 }
 
+bool UInputModule::IsPlayerMappedKeyByTag(const FGameplayTag& InTag, const FKey& InKey, int32 InPlayerIndex) const
+{
+	return IsPlayerMappedKeyByName(UInputModuleStatics::GetPlayerKeyMappingName(InTag), InKey, InPlayerIndex);
+}
+
 UInputActionBase* UInputModule::GetInputActionByTag(const FGameplayTag& InTag, bool bEnsured) const
 {
 	for (const auto& Iter1 : ContextMappings)

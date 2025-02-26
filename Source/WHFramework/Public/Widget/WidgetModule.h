@@ -370,7 +370,7 @@ public:
 	{
 		if(UUserWidgetBase* UserWidget = HasUserWidgetByName(InName) ? GetUserWidgetByName<UUserWidgetBase>(InName) : CreateUserWidgetByName<UUserWidgetBase>(InName))
 		{
-			if(!UserWidget->CanOpen()) return false;
+			if(!UserWidget->CanOpen() || UserWidget->GetWidgetState() == EScreenWidgetState::Closing) return false;
 			if(bForce) CloseUserWidgetByName(InName, true);
 			if(UserWidget->GetWidgetState() != EScreenWidgetState::Opening && UserWidget->GetWidgetState() != EScreenWidgetState::Opened)
 			{
@@ -401,7 +401,7 @@ public:
 				}
 				UserWidget->OnOpen(InParams ? *InParams : TArray<FParameter>(), bInstant);
 			}
-			else if(UserWidget->GetWidgetState() != EScreenWidgetState::Opening)
+			else
 			{
 				UserWidget->OnOpen(InParams ? *InParams : TArray<FParameter>(), true);
 			}

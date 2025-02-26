@@ -2,7 +2,7 @@
 
 #include "Voxel/Generators/VoxelOreGenerator.h"
 
-#include "Math/MathStatics.h"
+#include "Math/MathHelper.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 
@@ -30,7 +30,7 @@ void UVoxelOreGenerator::Generate(AVoxelChunk* InChunk)
 				if(Iter.MaxHeight != -1 && WorldIndex.Z > Iter.MaxHeight) continue;
 
 				const float Noise = Module->GetVoxelNoise3D(FVector(WorldIndex.X + i * Seed, WorldIndex.Y + i * Seed, WorldIndex.Z) * 0.1f);
-				if(Noise > SpawnRate && UMathStatics::Rand(WorldIndex.ToVector2D(), Seed) < Iter.SpawnRate)
+				if(Noise > SpawnRate && FMathHelper::HashRand(WorldIndex.ToVector2D(), Seed) < Iter.SpawnRate)
 				{
 					GenerateOre(WorldIndex, Iter);
 					break;
@@ -42,13 +42,13 @@ void UVoxelOreGenerator::Generate(AVoxelChunk* InChunk)
 
 void UVoxelOreGenerator::GenerateOre(FIndex InIndex, const FVoxelOreGenerateData& InGenerateData)
 {
-	const int Size = UMathStatics::RandRange(InIndex.ToVector2D(), InGenerateData.MinSize, InGenerateData.MaxSize, Seed);
+	const int Size = FMathHelper::HashRandRange(InIndex.ToVector2D(), InGenerateData.MinSize, InGenerateData.MaxSize, Seed);
 	for(int i = 0; i < Size; i++)
 	{
 		const FIndex Offset = FIndex(
-			UMathStatics::RandRange(InIndex.ToVector2D(), -1, 1, Seed),
-			UMathStatics::RandRange(InIndex.ToVector2D(), -1, 1, Seed),
-			UMathStatics::RandRange(InIndex.ToVector2D(), -1, 1, Seed)
+			FMathHelper::HashRandRange(InIndex.ToVector2D(), -1, 1, Seed),
+			FMathHelper::HashRandRange(InIndex.ToVector2D(), -1, 1, Seed),
+			FMathHelper::HashRandRange(InIndex.ToVector2D(), -1, 1, Seed)
 		);
 		if(!Module->HasVoxelByIndex(InIndex + Offset))
 		{

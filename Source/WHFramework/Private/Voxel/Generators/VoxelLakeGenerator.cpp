@@ -2,7 +2,7 @@
 
 #include "Voxel/Generators/VoxelLakeGenerator.h"
 
-#include "Math/MathStatics.h"
+#include "Math/MathHelper.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
 
@@ -27,10 +27,10 @@ void UVoxelLakeGenerator::Generate(AVoxelChunk* InChunk)
 
 void UVoxelLakeGenerator::GenerateLake(FIndex InIndex)
 {
-	if(UMathStatics::Rand(InIndex.ToVector2D(), Seed) < SpawnRate) return;
+	if(FMathHelper::HashRand(InIndex.ToVector2D(), Seed) < SpawnRate) return;
 
-	const float LakeRadius = UMathStatics::RandRange(InIndex.ToVector2D(), MinRadius, MaxRadius, Seed);
-	const float LakeDepth = UMathStatics::RandRange(InIndex.ToVector2D(), MinDepth, MaxDepth, Seed);
+	const float LakeRadius = FMathHelper::HashRandRange(InIndex.ToVector2D(), MinRadius, MaxRadius, Seed);
+	const float LakeDepth = FMathHelper::HashRandRange(InIndex.ToVector2D(), MinDepth, MaxDepth, Seed);
 
 	const FIndex LakeCenter = FIndex(InIndex.X, InIndex.Y, GetSurfaceHeight(InIndex, LakeRadius));
 	if(LakeCenter.Z == 0) return;

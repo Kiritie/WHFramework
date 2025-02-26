@@ -83,6 +83,12 @@ void UInputModuleStatics::AddTouchMapping(const FInputTouchMapping& InTouchMappi
 	UInputModule::Get().AddTouchMapping(InTouchMapping);
 }
 
+FName UInputModuleStatics::GetPlayerKeyMappingName(const FGameplayTag& InTag)
+{
+	const FString TagName = InTag.ToString();
+	return *TagName.Mid(TagName.Find(".", ESearchCase::IgnoreCase, ESearchDir::FromEnd) + 1, TagName.Len());
+}
+
 void UInputModuleStatics::AddPlayerKeyMapping(const FName InName, const FKey InKey, int32 InSlot, int32 InPlayerIndex)
 {
 	UInputModule::Get().AddPlayerKeyMapping(InName, InKey, InSlot, InPlayerIndex);
@@ -106,6 +112,11 @@ FPlayerKeyMappingInfo UInputModuleStatics::GetPlayerKeyMappingInfoByName(const F
 bool UInputModuleStatics::IsPlayerMappedKeyByName(const FName InName, const FKey& InKey, int32 InPlayerIndex)
 {
 	return UInputModule::Get().IsPlayerMappedKeyByName(InName, InKey, InPlayerIndex);
+}
+
+bool UInputModuleStatics::IsPlayerMappedKeyByTag(const FGameplayTag& InTag, const FKey& InKey, int32 InPlayerIndex)
+{
+	return UInputModule::Get().IsPlayerMappedKeyByTag(InTag, InKey, InPlayerIndex);
 }
 
 const UInputActionBase* UInputModuleStatics::GetInputActionByTag(const FGameplayTag& InTag, bool bEnsured)

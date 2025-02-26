@@ -2,7 +2,7 @@
 
 #include "Voxel/Generators/VoxelRainGenerator.h"
 
-#include "Math/MathStatics.h"
+#include "Math/MathHelper.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Chunks/VoxelChunk.h"
@@ -22,11 +22,11 @@ void UVoxelRainGenerator::Generate(AVoxelChunk* InChunk)
 
 	_Waters.Reset();
 
-	const float Possible = UMathStatics::Rand(InChunk->GetIndex().ToVector2D() + FVector2D(13.51f, 2.16f), Seed);
+	const float Possible = FMathHelper::HashRand(InChunk->GetIndex().ToVector2D() + FVector2D(13.51f, 2.16f), Seed);
 	if(Possible <= SpawnRate) return;
 	
-	const int32 X = UMathStatics::RandInt(InChunk->GetIndex().ToVector2D(), Seed) % (int32)(Module->GetWorldData().ChunkSize.X - 1) + 1;
-	const int32 Y = UMathStatics::RandInt(InChunk->GetIndex().ToVector2D() + FVector2D(-1.512f, 41.421f), Seed) %(int32)(Module->GetWorldData().ChunkSize.Y - 1) + 1;
+	const int32 X = FMathHelper::HashRandInt(InChunk->GetIndex().ToVector2D(), Seed) % (int32)(Module->GetWorldData().ChunkSize.X - 1) + 1;
+	const int32 Y = FMathHelper::HashRandInt(InChunk->GetIndex().ToVector2D() + FVector2D(-1.512f, 41.421f), Seed) %(int32)(Module->GetWorldData().ChunkSize.Y - 1) + 1;
 	const int32 Z = InChunk->GetTopography(FIndex(X, Y)).Height + 1;
 	if(Module->HasVoxelByIndex(FIndex(X, Y, Z), true))
 	{

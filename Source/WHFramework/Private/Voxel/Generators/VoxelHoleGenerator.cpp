@@ -2,7 +2,7 @@
 
 #include "Voxel/Generators/VoxelHoleGenerator.h"
 
-#include "Math/MathStatics.h"
+#include "Math/MathHelper.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Chunks/VoxelChunk.h"
@@ -24,7 +24,7 @@ void UVoxelHoleGenerator::Generate(AVoxelChunk* InChunk)
 
 void UVoxelHoleGenerator::GenerateHole(FIndex InIndex) const
 {
-	if(UMathStatics::Rand(InIndex.ToVector2D(), Seed) < SpawnRate) return;
+	if(FMathHelper::HashRand(InIndex.ToVector2D(), Seed) < SpawnRate) return;
 
 	const FIndex SurfaceIndex = FIndex(InIndex.X, InIndex.Y, Module->GetTopographyByIndex(InIndex).Height);
 	if(SurfaceIndex.Z == 0) return;
@@ -32,7 +32,7 @@ void UVoxelHoleGenerator::GenerateHole(FIndex InIndex) const
 	const FIndex Hole = FindNearestHoleIndexMultiDirection(SurfaceIndex, 100);
 	if(Hole == FIndex::ZeroIndex) return;
 
-	const int32 Radius = UMathStatics::RandRange(InIndex.ToVector2D(), MinRadius, MaxRadius);
+	const int32 Radius = FMathHelper::HashRandRange(InIndex.ToVector2D(), MinRadius, MaxRadius);
 	const TArray<FIndex> Path = GenerateHoleSlopePath(SurfaceIndex, Hole);
 	for(auto& Iter : Path)
 	{

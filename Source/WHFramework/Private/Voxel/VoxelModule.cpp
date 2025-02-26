@@ -10,7 +10,7 @@
 #include "Event/Handle/Voxel/EventHandle_VoxelWorldModeChanged.h"
 #include "Event/Handle/Voxel/EventHandle_VoxelWorldStateChanged.h"
 #include "Main/MainModuleStatics.h"
-#include "Math/MathStatics.h"
+#include "Math/MathHelper.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "ReferencePool/ReferencePoolModuleStatics.h"
 #include "Scene/SceneModuleStatics.h"
@@ -664,7 +664,7 @@ void UVoxelModule::GenerateChunkQueues(bool bFromAgent, bool bForce)
 				for(int32 z = 0; z < SpawnRange.Z; z++)
 				{
 					const FIndex Index = FIndex(x, y, z);
-					if(UMathStatics::IsPointInEllipse2D(Index.ToVector2D() + FVector2D(0.5f), GenerateIndex.ToVector2D(), FVector2D(SpawnRange.X, SpawnRange.Y)))
+					if(FMathHelper::IsPointInEllipse2D(Index.ToVector2D() + FVector2D(0.5f), GenerateIndex.ToVector2D(), FVector2D(SpawnRange.X, SpawnRange.Y)))
 					{
 						if(DestroyQueue.Contains(Index)) DestroyQueue.Remove(Index);
 						AddToChunkQueue(EVoxelWorldState::Spawning, Index);
@@ -902,17 +902,17 @@ void UVoxelModule::SetTopographyByLocation(FVector InLocation, const FVoxelTopog
 
 float UVoxelModule::GetVoxelNoise1D(float InValue, bool bAbs, bool bUnsigned) const
 {
-	return UMathStatics::GetNoise1D(InValue, WorldData->WorldSeed, bAbs, bUnsigned);
+	return FMathHelper::GetNoise1D(InValue, WorldData->WorldSeed, bAbs, bUnsigned);
 }
 
 float UVoxelModule::GetVoxelNoise2D(FVector2D InLocation, bool bAbs, bool bUnsigned) const
 {
-	return UMathStatics::GetNoise2D(InLocation, WorldData->WorldSeed, bAbs, bUnsigned);
+	return FMathHelper::GetNoise2D(InLocation, WorldData->WorldSeed, bAbs, bUnsigned);
 }
 
 float UVoxelModule::GetVoxelNoise3D(FVector InLocation, bool bAbs, bool bUnsigned) const
 {
-	return UMathStatics::GetNoise3D(InLocation, WorldData->WorldSeed, bAbs, bUnsigned);
+	return FMathHelper::GetNoise3D(InLocation, WorldData->WorldSeed, bAbs, bUnsigned);
 }
 
 FIndex UVoxelModule::LocationToChunkIndex(FVector InLocation, bool bIgnoreZ /*= false*/) const

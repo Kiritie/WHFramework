@@ -11,7 +11,7 @@
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Camera/EventHandle_CameraPointChanged.h"
 #include "GameFramework/SpringArmComponent.h"
-#include "Math/MathStatics.h"
+#include "Math/MathHelper.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Camera/Point/CameraPointBase.h"
 #include "Event/Handle/Camera/EventHandle_CameraTraceEnded.h"
@@ -135,7 +135,7 @@ void ACameraManagerBase::UpdateCamera(float DeltaTime)
 			if(CameraDoLocationDuration != 0.f)
 			{
 				CameraDoLocationTime = FMath::Clamp(CameraDoLocationTime + DeltaTime, 0.f, CameraDoLocationDuration);
-				CurrentCamera->SetCameraLocation(FMath::Lerp(CameraDoLocationLocation, TargetCameraLocation, UMathStatics::EvaluateByEaseType(CameraDoLocationEaseType, CameraDoLocationTime, CameraDoLocationDuration)));
+				CurrentCamera->SetCameraLocation(FMath::Lerp(CameraDoLocationLocation, TargetCameraLocation, FMathHelper::EvaluateByEaseType(CameraDoLocationEaseType, CameraDoLocationTime, CameraDoLocationDuration)));
 			}
 			else
 			{
@@ -156,7 +156,7 @@ void ACameraManagerBase::UpdateCamera(float DeltaTime)
 			if(CameraDoOffsetDuration != 0.f)
 			{
 				CameraDoOffsetTime = FMath::Clamp(CameraDoOffsetTime + DeltaTime, 0.f, CameraDoOffsetDuration);
-				CurrentCamera->GetCameraBoom()->SocketOffset = FMath::Lerp(CameraDoOffsetOffset, TargetCameraOffset, UMathStatics::EvaluateByEaseType(CameraDoOffsetEaseType, CameraDoOffsetTime, CameraDoOffsetDuration));
+				CurrentCamera->GetCameraBoom()->SocketOffset = FMath::Lerp(CameraDoOffsetOffset, TargetCameraOffset, FMathHelper::EvaluateByEaseType(CameraDoOffsetEaseType, CameraDoOffsetTime, CameraDoOffsetDuration));
 			}
 			else
 			{
@@ -177,7 +177,7 @@ void ACameraManagerBase::UpdateCamera(float DeltaTime)
 			if(CameraDoRotationDuration != 0.f)
 			{
 				CameraDoRotationTime = FMath::Clamp(CameraDoRotationTime + DeltaTime, 0.f, CameraDoRotationDuration);
-				PCOwner->SetControlRotation(UMathStatics::LerpRotator(CameraDoRotationRotation, TargetCameraRotation, UMathStatics::EvaluateByEaseType(CameraDoRotationEaseType, CameraDoRotationTime, CameraDoRotationDuration), !CameraDoRotationRotation.Equals(TargetCameraRotation)));
+				PCOwner->SetControlRotation(FMathHelper::LerpRotator(CameraDoRotationRotation, TargetCameraRotation, FMathHelper::EvaluateByEaseType(CameraDoRotationEaseType, CameraDoRotationTime, CameraDoRotationDuration), !CameraDoRotationRotation.Equals(TargetCameraRotation)));
 			}
 			else
 			{
@@ -209,7 +209,7 @@ void ACameraManagerBase::UpdateCamera(float DeltaTime)
 			if(CameraDoDistanceDuration != 0.f)
 			{
 				CameraDoDistanceTime = FMath::Clamp(CameraDoDistanceTime + DeltaTime, 0.f, CameraDoDistanceDuration);
-				CurrentCamera->GetCameraBoom()->TargetArmLength = FMath::Lerp(CameraDoDistanceDistance, TargetDistance, UMathStatics::EvaluateByEaseType(CameraDoDistanceEaseType, CameraDoDistanceTime, CameraDoDistanceDuration));
+				CurrentCamera->GetCameraBoom()->TargetArmLength = FMath::Lerp(CameraDoDistanceDistance, TargetDistance, FMathHelper::EvaluateByEaseType(CameraDoDistanceEaseType, CameraDoDistanceTime, CameraDoDistanceDuration));
 			}
 			else
 			{
@@ -230,7 +230,7 @@ void ACameraManagerBase::UpdateCamera(float DeltaTime)
 			if(CameraDoFovDuration != 0.f)
 			{
 				CameraDoFovTime = FMath::Clamp(CameraDoFovTime + DeltaTime, 0.f, CameraDoFovDuration);
-				CurrentCamera->GetCamera()->SetFieldOfView(FMath::Lerp(CameraDoFovFov, TargetCameraFov, UMathStatics::EvaluateByEaseType(CameraDoFovEaseType, CameraDoFovTime, CameraDoFovDuration)));
+				CurrentCamera->GetCamera()->SetFieldOfView(FMath::Lerp(CameraDoFovFov, TargetCameraFov, FMathHelper::EvaluateByEaseType(CameraDoFovEaseType, CameraDoFovTime, CameraDoFovDuration)));
 			}
 			CurrentCameraFov = CurrentCamera->GetCamera()->FieldOfView;
 		}

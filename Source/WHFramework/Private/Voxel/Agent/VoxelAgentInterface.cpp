@@ -4,7 +4,7 @@
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Voxel/EventHandle_VoxelDestroyed.h"
 #include "Event/Handle/Voxel/EventHandle_VoxelGenerated.h"
-#include "Math/MathStatics.h"
+#include "Math/MathHelper.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
@@ -64,7 +64,7 @@ bool IVoxelAgentInterface::OnGenerateVoxel(EInputInteractEvent InInteractEvent, 
 			{
 				if(GenerateVoxelItem.GetVoxelData().bRotatable)
 				{
-					const ERightAngle Angle = UMathStatics::FloatToRightAngle((GenerateVoxelItem.GetLocation() + UVoxelModule::Get().GetWorldData().BlockSize * 0.5f - GetVoxelAgentLocation()).GetSafeNormal2D().ToOrientationRotator().Yaw);
+					const ERightAngle Angle = FMathHelper::FloatToRightAngle((GenerateVoxelItem.GetLocation() + UVoxelModule::Get().GetWorldData().BlockSize * 0.5f - GetVoxelAgentLocation()).GetSafeNormal2D().ToOrientationRotator().Yaw);
 					if(GenerateVoxelItem.Angle != Angle)
 					{
 						GenerateVoxelItem.Angle = Angle;
@@ -120,7 +120,7 @@ bool IVoxelAgentInterface::OnDestroyVoxel(EInputInteractEvent InInteractEvent, c
 				DestroyVoxelItem = InHitResult.VoxelItem;
 			}
 
-			DestroyVoxelItem.Durability -= UCommonStatics::GetCurrentDeltaSeconds() * GetDestroyVoxelRate() / DestroyVoxelItem.GetVoxelData().Hardness;
+			DestroyVoxelItem.Durability -= UCommonStatics::GetCurrentDeltaSeconds() * GetDestroyVoxelRate() * (GetGenerateToolType() != EVoxelGenerateToolType::None && (int32)GetGenerateToolType() == (int32)DestroyVoxelItem.GetVoxelData().Element ? 1.7f : 1.f) / DestroyVoxelItem.GetVoxelData().Hardness;
 			if(DestroyVoxelItem.Durability <= 0.f)
 			{
 				if(Chunk->SetVoxelComplex(DestroyVoxelItem.Index, FVoxelItem::Empty, true, this))

@@ -75,9 +75,9 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 				break;
 			}
 		)
-		if(GetOwner()->HasVoxelComplex(UMathStatics::GetAdjacentIndex(GetIndex(), EDirection::Up)) && !GetOwner()->CheckVoxelAdjacent(Item, EDirection::Up))
+		if(GetOwner()->HasVoxelComplex(FMathHelper::GetAdjacentIndex(GetIndex(), EDirection::Up)) && !GetOwner()->CheckVoxelAdjacent(Item, EDirection::Up))
 		{
-			VoxelItems.Emplace(UMathStatics::GetAdjacentIndex(GetIndex(), EDirection::Up), FVoxelItem::Empty);
+			VoxelItems.Emplace(FMathHelper::GetAdjacentIndex(GetIndex(), EDirection::Up), FVoxelItem::Empty);
 		}
 		GetOwner()->SetVoxelComplex(VoxelItems, true, false, InAgent);
 	}

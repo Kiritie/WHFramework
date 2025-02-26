@@ -2,7 +2,7 @@
 
 #include "Math/MathTypes.h"
 
-#include "Math/MathStatics.h"
+#include "Math/MathHelper.h"
 
 const FIndex FIndex::ZeroIndex = FIndex(0, 0, 0);
 const FIndex FIndex::OneIndex = FIndex(1, 1, 1);
@@ -14,10 +14,10 @@ const FPoint FPoint::Right = FPoint(1.f, 0.f);
 
 FIndex::FIndex(int64 InValue)
 {
-	*this = UMathStatics::UnIndex(InValue);
+	*this = FMathHelper::UnIndex(InValue);
 }
 
 int64 FIndex::ToInt64() const
 {
-	return UMathStatics::Index(*this);
+	return FMathHelper::Index(*this);
 }

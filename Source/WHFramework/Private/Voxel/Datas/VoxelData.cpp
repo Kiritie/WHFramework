@@ -14,6 +14,7 @@ UVoxelData::UVoxelData()
 	VoxelType = EVoxelType::Empty;
 	VoxelClass = UVoxel::StaticClass();
 	AuxiliaryClass = nullptr;
+	Element = EVoxelElement::None;
 	Nature = EVoxelNature::None;
 	Hardness = 1.f;
 	bRotatable = false;
@@ -118,7 +119,7 @@ FVector UVoxelData::GetRange(ERightAngle InAngle) const
 	}
 	if(Range != FVector::OneVector)
 	{
-		Range = UMathStatics::RotateVector(Range, InAngle);
+		Range = FMathHelper::RotateVector(Range, InAngle);
 	}
 	return Range;
 }

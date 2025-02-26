@@ -29,6 +29,9 @@ public:
 	TSubclassOf<AVoxelAuxiliary> AuxiliaryClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EVoxelElement Element;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EVoxelNature Nature;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

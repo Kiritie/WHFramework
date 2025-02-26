@@ -3,7 +3,7 @@
 
 #include "Voxel/Components/VoxelMeshComponent.h"
 
-#include "Math/MathStatics.h"
+#include "Math/MathHelper.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
@@ -157,7 +157,7 @@ void UVoxelMeshComponent::CreateVoxel(const FVoxelItem& InVoxelItem)
 		{
 			FVoxelItem PartItem;
 			PartItem.ID = Iter->GetPrimaryAssetId();
-			PartItem.Index = UMathStatics::RotateIndex(Iter->PartIndex, InVoxelItem.Angle);
+			PartItem.Index = FMathHelper::RotateIndex(Iter->PartIndex, InVoxelItem.Angle);
 			PartItem.Angle = InVoxelItem.Angle;
 			BuildVoxel(PartItem);
 		}
@@ -303,7 +303,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EDirection In
 		default: break;
 	}
 
-	BuildFace(InVoxelItem, Vers, (int32)InFacing, UMathStatics::DirectionToVector(InFacing, InVoxelItem.Angle));
+	BuildFace(InVoxelItem, Vers, (int32)InFacing, FMathHelper::DirectionToVector(InFacing, InVoxelItem.Angle));
 }
 
 void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVertices[4], int32 InFaceIndex, FVector InNormal)
@@ -313,15 +313,15 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVer
 	const FVoxelMeshData& MeshData = VoxelData.GetMeshData(InVoxelItem);
 	const FVoxelMeshUVData& MeshUVData = MeshData.MeshUVDatas[InFaceIndex];
 	const FVoxelRenderData& RenderData = UVoxelModule::Get().GetWorldData().GetRenderData(Nature);
-	const FVector Scale = UMathStatics::RotateVector(MeshData.MeshScale, InVoxelItem.Angle, false, true);
-	const FVector Offset = CenterOffset + UMathStatics::RotateVector(MeshData.MeshOffset, InVoxelItem.Angle) * OffsetScale;
+	const FVector Scale = FMathHelper::RotateVector(MeshData.MeshScale, InVoxelItem.Angle, false, true);
+	const FVector Offset = CenterOffset + FMathHelper::RotateVector(MeshData.MeshOffset, InVoxelItem.Angle) * OffsetScale;
 	const FVector2D UVSize = FVector2D(RenderData.PixelSize / RenderData.TextureSize.X, RenderData.PixelSize / RenderData.TextureSize.Y);
 	const FVector2D UVCorner = FVector2D((MeshUVData.UVCorner.X + MeshUVData.UVOffset.X) * UVSize.X, (1.f / UVSize.Y - (RenderData.TextureSize.Y / RenderData.PixelSize - (-MeshUVData.UVCorner.Y + MeshUVData.UVOffset.Y) - 1.f) - MeshUVData.UVSpan.Y) * UVSize.Y);
 	const FVector2D UVSpan = FVector2D(MeshUVData.UVSpan.X * UVSize.X, MeshUVData.UVSpan.Y * UVSize.Y);
 
 	for (int32 i = 0; i < 4; i++)
 	{
-		Vertices.Add((InVoxelItem.Index.ToVector() + UMathStatics::RotateVector(InVertices[i], InVoxelItem.Angle) * Scale + Offset) * UVoxelModule::Get().GetWorldData().BlockSize);
+		Vertices.Add((InVoxelItem.Index.ToVector() + FMathHelper::RotateVector(InVertices[i], InVoxelItem.Angle) * Scale + Offset) * UVoxelModule::Get().GetWorldData().BlockSize);
 	}
 
 	UVs.Add(FVector2D(UVCorner.X, UVCorner.Y + UVSpan.Y));

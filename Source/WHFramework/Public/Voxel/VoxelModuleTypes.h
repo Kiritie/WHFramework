@@ -116,12 +116,12 @@ enum class EVoxelType : uint8
  * ????
  */
 UENUM(BlueprintType)
-enum class EVoxelTreePart : uint8
+enum class EVoxelElement : uint8
 {
 	None,
-	Root,
-	Bole,
-	Leaves
+	Stone,
+	Wood,
+	Silt
 };
 
 /**
@@ -202,6 +202,18 @@ enum class EVoxelSoundType : uint8
 	Open,
 	// 关闭
 	Close
+};
+
+/**
+ * ????
+ */
+UENUM(BlueprintType)
+enum class EVoxelGenerateToolType : uint8
+{
+	None,
+	Pickaxe,
+	Axe,
+	Shovel
 };
 
 /**

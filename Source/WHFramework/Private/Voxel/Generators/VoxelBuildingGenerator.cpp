@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Voxel/Generators/VoxelBuildingGenerator.h"
-#include "Math/MathStatics.h"
+#include "Math/MathHelper.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "Voxel/Chunks/VoxelChunk.h"
@@ -23,7 +23,7 @@ UVoxelBuildingGenerator::UVoxelBuildingGenerator()
 
 void UVoxelBuildingGenerator::Generate(AVoxelChunk* InChunk)
 {
-	float Possible = UMathStatics::Rand(InChunk->GetIndex().ToVector2D(), Seed);
+	float Possible = FMathHelper::HashRand(InChunk->GetIndex().ToVector2D(), Seed);
 
 	if(Possible < SpawnRate)return;
 
@@ -56,7 +56,7 @@ void UVoxelBuildingGenerator::DevelopeDomains(AVoxelChunk* InChunk)
 
 		for(int d = 0; d < 9; ++d)
 		{
-			_Domains.Emplace(UMathStatics::Index(P.X + Dx[d], P.Y + Dy[d]));
+			_Domains.Emplace(FMathHelper::Index(P.X + Dx[d], P.Y + Dy[d]));
 		}
 
 		if(Cost > 7) break;
@@ -71,7 +71,7 @@ void UVoxelBuildingGenerator::DevelopeDomains(AVoxelChunk* InChunk)
 			int32 x = P.X + Dx1[d] * 3;
 			int32 y = P.Y + Dy1[d] * 3;
 
-			if(_Domains.Find(UMathStatics::Index(x, y))) continue;
+			if(_Domains.Find(FMathHelper::Index(x, y))) continue;
 
 			int32 Height = Module->GetTopographyByIndex(FIndex(x, y)).Height;
 			if(Height <= Module->GetWorldData().SeaLevel || Height > 1000) continue;
@@ -101,17 +101,17 @@ void UVoxelBuildingGenerator::PlaceBuildings(AVoxelChunk* InChunk)
 		const auto Pos = Points.front();
 		Points.pop();
 
-		const int32 Index = UMathStatics::RandInt(InChunk->GetIndex().ToVector2D() + FVector2D(Count, -Count) * 107, Seed) % 3;
-		const int32 Rotate = UMathStatics::RandInt(InChunk->GetIndex().ToVector2D() + FVector2D(Count, -Count) * 17, Seed) % 4;
+		const int32 Index = FMathHelper::HashRandInt(InChunk->GetIndex().ToVector2D() + FVector2D(Count, -Count) * 107, Seed) % 3;
+		const int32 Rotate = FMathHelper::HashRandInt(InChunk->GetIndex().ToVector2D() + FVector2D(Count, -Count) * 17, Seed) % 4;
 
 		if(!PlaceOneBuilding(InChunk, Pos.X, Pos.Y, Index, Rotate) || PlaceOneBuilding(InChunk, Pos.X, Pos.Y, Index,(Rotate + 1) % 4))
 		{
 			continue;
 		}
 
-		int32 Offset = UMathStatics::RandInt(InChunk->GetIndex().ToVector2D() + FVector2D(Count, -Count) * 67, Seed) % 3 + 5;
-		int32 OffsetX = UMathStatics::RandInt(InChunk->GetIndex().ToVector2D() + FVector2D(Count, Count) * 61, Seed) % 5 - 2;
-		int32 OffsetY = UMathStatics::RandInt(InChunk->GetIndex().ToVector2D() + FVector2D(-Count, Count) * 117, Seed) % 5 - 2;
+		int32 Offset = FMathHelper::HashRandInt(InChunk->GetIndex().ToVector2D() + FVector2D(Count, -Count) * 67, Seed) % 3 + 5;
+		int32 OffsetX = FMathHelper::HashRandInt(InChunk->GetIndex().ToVector2D() + FVector2D(Count, Count) * 61, Seed) % 5 - 2;
+		int32 OffsetY = FMathHelper::HashRandInt(InChunk->GetIndex().ToVector2D() + FVector2D(-Count, Count) * 117, Seed) % 5 - 2;
 
 		for(int i = 0; i < 4; ++i)
 		{
@@ -134,7 +134,7 @@ bool UVoxelBuildingGenerator::PlaceOneBuilding(AVoxelChunk* InChunk, int32 InX, 
 	{
 		for(int j = -LeftRight; j < LeftRight; ++j)
 		{
-			if(!_Domains.Find(UMathStatics::Index(InX + i, InY + j))) return false;
+			if(!_Domains.Find(FMathHelper::Index(InX + i, InY + j))) return false;
 
 			FIndex Index = FIndex(InX + i, InY + j, Module->GetTopographyByIndex(FIndex(InX + i, InY + j)).Height);
 			if(!Module->HasVoxelByIndex(Index, true)) return false;
@@ -157,7 +157,7 @@ bool UVoxelBuildingGenerator::PlaceOneBuilding(AVoxelChunk* InChunk, int32 InX, 
 				FIndex pos = FIndex(InX + i, InY + j, k);
 				Module->SetVoxelByIndex(pos, EVoxelType::Cobble_Stone);
 			}
-			_Domains.Remove(UMathStatics::Index(InX + i, InY + j));
+			_Domains.Remove(FMathHelper::Index(InX + i, InY + j));
 		}
 	}
 
@@ -180,7 +180,7 @@ bool UVoxelBuildingGenerator::PlaceOneBuilding(AVoxelChunk* InChunk, int32 InX, 
 
 	InChunk->AddBuilding(BuildingData);
 
-	_Domains.Emplace(UMathStatics::Index(InX - FrontBack, InY - LeftRight));
+	_Domains.Emplace(FMathHelper::Index(InX - FrontBack, InY - LeftRight));
 	_BuildingPos.Push(FVector2D(InX - FrontBack, InY - LeftRight));
 	return true;
 }
@@ -195,7 +195,7 @@ void UVoxelBuildingGenerator::PlacePaths(AVoxelChunk* InChunk)
 
 			for(FVector2D Pos : Path)
 			{
-				_Roads.Emplace(UMathStatics::Index(Pos.X, Pos.Y));
+				_Roads.Emplace(FMathHelper::Index(Pos.X, Pos.Y));
 				FIndex Index = FIndex(Pos.X, Pos.Y, Module->GetTopographyByIndex(FIndex(Pos.X, Pos.Y)).Height);
 
 				if(!Module->HasVoxelByIndex(Index, true)) continue;
@@ -209,12 +209,12 @@ void UVoxelBuildingGenerator::PlacePaths(AVoxelChunk* InChunk)
 
 bool UVoxelBuildingGenerator::InBarrier(FVector2D InPos)
 {
-	return !_Domains.Contains(UMathStatics::Index(InPos.X, InPos.Y));
+	return !_Domains.Contains(FMathHelper::Index(InPos.X, InPos.Y));
 }
 
 TPair<float, float> UVoxelBuildingGenerator::WeightFormula(FVector2D InStartPos, FVector2D InEndPos, float InCost)
 {
-	if(_Roads.Contains(UMathStatics::Index(InStartPos.X, InStartPos.Y)))
+	if(_Roads.Contains(FMathHelper::Index(InStartPos.X, InStartPos.Y)))
 	{
 		InCost -= 0.5f;
 	}

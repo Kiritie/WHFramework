@@ -83,6 +83,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")
 	static void AddTouchMapping(const FInputTouchMapping& InTouchMapping);
 
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InTag"), Category = "InputModuleStatics")
+	static FName GetPlayerKeyMappingName(const FGameplayTag& InTag);
+
 	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")
 	static void AddPlayerKeyMapping(const FName InName, const FKey InKey, int32 InSlot = 0, int32 InPlayerIndex = 0);
 	
@@ -97,6 +100,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "InputModuleStatics")
 	static bool IsPlayerMappedKeyByName(const FName InName, const FKey& InKey, int32 InPlayerIndex = 0);
+
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"), Category = "InputModuleStatics")
+	static bool IsPlayerMappedKeyByTag(const FGameplayTag& InTag, const FKey& InKey, int32 InPlayerIndex = 0);
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InTag"), Category = "InputModuleStatics")
 	static const UInputActionBase* GetInputActionByTag(const FGameplayTag& InTag, bool bEnsured = true);

@@ -335,10 +335,10 @@ void AVoxelChunk::GenerateNeighbors(int32 InX, int32 InY, int32 InZ, EPhase InPh
 void AVoxelChunk::UpdateNeighbors()
 {
 	ITER_DIRECTION(Direction,
-		Neighbors[Direction] = Module->GetChunkByIndex(Index + UMathStatics::DirectionToIndex(Direction));
+		Neighbors[Direction] = Module->GetChunkByIndex(Index + FMathHelper::DirectionToIndex(Direction));
 		if(Neighbors[Direction])
 		{
-			Neighbors[Direction]->Neighbors[UMathStatics::InvertDirection(Direction)] = this;
+			Neighbors[Direction]->Neighbors[FMathHelper::InvertDirection(Direction)] = this;
 		}
 	)
 }
@@ -348,7 +348,7 @@ void AVoxelChunk::BreakNeighbors()
 	ITER_DIRECTION(Direction,
 		if(Neighbors[Direction])
 		{
-			Neighbors[Direction]->Neighbors[UMathStatics::InvertDirection(Direction)] = nullptr;
+			Neighbors[Direction]->Neighbors[FMathHelper::InvertDirection(Direction)] = nullptr;
 			Neighbors[Direction] = nullptr;
 		}
 	)
@@ -609,7 +609,7 @@ bool AVoxelChunk::CheckVoxelAdjacent(FIndex InIndex, EDirection InDirection)
 
 bool AVoxelChunk::CheckVoxelAdjacent(const FVoxelItem& InVoxelItem, EDirection InDirection)
 {
-	const FIndex AdjacentIndex = UMathStatics::GetAdjacentIndex(InVoxelItem.Index, InDirection, InVoxelItem.Angle);
+	const FIndex AdjacentIndex = FMathHelper::GetAdjacentIndex(InVoxelItem.Index, InDirection, InVoxelItem.Angle);
 	
 	if(!InVoxelItem.IsValid() || LocalIndexToWorld(AdjacentIndex).Z <= 0) return true;
 	
@@ -702,7 +702,7 @@ bool AVoxelChunk::CheckVoxelNeighbors(FIndex InIndex, EVoxelType InVoxelType, FV
 		ITER_DIRECTION(Iter2, 
 			if(!bIgnoreBottom || Iter2 != EDirection::Down)
 			{
-				const FIndex NeighborIndex = InIndex + Iter1 + UMathStatics::DirectionToIndex(Iter2);
+				const FIndex NeighborIndex = InIndex + Iter1 + FMathHelper::DirectionToIndex(Iter2);
 				if(!bOnTheChunk || IsOnTheChunk(NeighborIndex))
 				{
 					FVoxelItem& NeighborItem = GetVoxelComplex(NeighborIndex);
@@ -848,7 +848,7 @@ bool AVoxelChunk::SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelI
 						PartItem.ID = PartData->GetPrimaryAssetId();
 						PartItem.Angle = InVoxelItem.Angle;
 					}
-					VoxelItems.Emplace(VoxelIndex + UMathStatics::RotateIndex(PartData->PartIndex, InVoxelItem.Angle), PartItem);
+					VoxelItems.Emplace(VoxelIndex + FMathHelper::RotateIndex(PartData->PartIndex, InVoxelItem.Angle), PartItem);
 				)
 				return SetVoxelComplex(VoxelItems, bGenerate, true, InAgent);
 			}
@@ -1190,7 +1190,7 @@ UVoxelMeshComponent* AVoxelChunk::GetMeshComponent(EVoxelNature InVoxelNature)
 
 AVoxelChunk* AVoxelChunk::GetOrSpawnNeighbor(EDirection InDirection, bool bAddToQueue)
 {
-	return Neighbors[InDirection] ? Neighbors[InDirection] : Module->SpawnChunk(Index + UMathStatics::DirectionToIndex(InDirection), bAddToQueue);
+	return Neighbors[InDirection] ? Neighbors[InDirection] : Module->SpawnChunk(Index + FMathHelper::DirectionToIndex(InDirection), bAddToQueue);
 }
 
 FIndex AVoxelChunk::GetWorldIndex() const

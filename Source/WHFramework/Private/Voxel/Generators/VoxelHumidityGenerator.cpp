@@ -3,7 +3,7 @@
 
 #include "Voxel/Generators/VoxelHumidityGenerator.h"
 
-#include "Math/MathStatics.h"
+#include "Math/MathHelper.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Chunks/VoxelChunk.h"
@@ -22,7 +22,7 @@ void UVoxelHumidityGenerator::Generate(AVoxelChunk* InChunk)
 	DON_WITHINDEX(Times, N,
 		ITER_INDEX2D(Index, Module->GetWorldData().ChunkSize, false,
 			const FVector2D Location = FVector2D((float)Index.X / Module->GetWorldData().ChunkSize.X / CrystalSize, Index.Y / Module->GetWorldData().ChunkSize.Y / CrystalSize);
-			const float Humidity = FMath::Clamp(Module->GetVoxelNoise2D(Location + (InChunk->GetIndex().ToVector2D() / CrystalSize), true) + UMathStatics::Rand(Location, Seed) * 0.05f, 0.f, 1.f);
+			const float Humidity = FMath::Clamp(Module->GetVoxelNoise2D(Location + (InChunk->GetIndex().ToVector2D() / CrystalSize), true) + FMathHelper::HashRand(Location, Seed) * 0.05f, 0.f, 1.f);
 			FVoxelTopography Topography = InChunk->GetTopography(Index);
 			Topography.Humidity += Humidity / Times;
 			InChunk->SetTopography(Index, Topography);
