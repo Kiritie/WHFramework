@@ -358,13 +358,11 @@ void UVoxelMeshComponent::OnCollision(UPrimitiveComponent* HitComponent, AActor*
 
 void UVoxelMeshComponent::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	if(!GetOwnerChunk()) return;
 	
 }
 
 void UVoxelMeshComponent::OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
-	if(!GetOwnerChunk()) return;
 	
 }
 

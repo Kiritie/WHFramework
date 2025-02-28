@@ -560,11 +560,11 @@ bool UInputModule::IsPlayerMappedKeyByTag(const FGameplayTag& InTag, const FKey&
 
 UInputActionBase* UInputModule::GetInputActionByTag(const FGameplayTag& InTag, bool bEnsured) const
 {
-	for (const auto& Iter1 : ContextMappings)
+	for(const auto& Iter1 : ContextMappings)
 	{
 		if(UInputMappingContext* IMC = Iter1.InputMapping)
 		{
-			for(auto Iter2 : IMC->GetMappings())
+			for(const auto& Iter2 : IMC->GetMappings())
 			{
 				if(const auto InputAction = Cast<UInputActionBase>(Iter2.Action))
 				{

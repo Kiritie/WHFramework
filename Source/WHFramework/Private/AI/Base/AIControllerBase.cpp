@@ -107,7 +107,7 @@ void AAIControllerBase::OnUnPossess()
 
 void AAIControllerBase::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
-	const APawn* OwnerAgent = GetPawn();
+	APawn* OwnerAgent = GetPawn();
 	APawn* TargetAgent = Cast<APawn>(Actor);
 
 	if (!OwnerAgent || !TargetAgent || TargetAgent == OwnerAgent) return;

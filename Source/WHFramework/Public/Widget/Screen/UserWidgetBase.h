@@ -140,7 +140,7 @@ public:
 
 	virtual ISubWidgetInterface* CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams) override;
 
-	UFUNCTION(BlueprintCallable, DisplayName = "DestroyDestroyWidget")
+	UFUNCTION(BlueprintCallable, DisplayName = "DestroySubWidget")
 	bool K2_DestroySubWidget(UUserWidget* InWidget, bool bRecovery = false);
 
 	virtual bool DestroySubWidget(ISubWidgetInterface* InWidget, bool bRecovery) override;

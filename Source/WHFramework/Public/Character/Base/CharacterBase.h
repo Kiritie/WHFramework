@@ -110,6 +110,10 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Player
 protected:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PlayerStats")
+	bool bBlockAllInput;
+
+protected:
 	virtual void Turn_Implementation(float InValue) override;
 
 	virtual void MoveForward_Implementation(float InValue) override;
@@ -119,6 +123,11 @@ protected:
 	virtual void MoveUp_Implementation(float InValue) override;
 
 	virtual void JumpN_Implementation() override;
+
+protected:
+	virtual bool IsBlockAllInput_Implementation() const override { return bBlockAllInput; }
+
+	virtual void SetBlockAllInput_Implementation(bool bInValue) override { bBlockAllInput = bInValue; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Camera

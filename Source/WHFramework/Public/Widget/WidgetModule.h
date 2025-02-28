@@ -483,7 +483,7 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable)
-	bool DestroyUserWidget(TSubclassOf<UUserWidgetBase> InClass,  bool bRecovery = false);
+	bool DestroyUserWidget(TSubclassOf<UUserWidgetBase> InClass, bool bRecovery = false);
 
 	UFUNCTION(BlueprintCallable)
 	bool DestroyUserWidgetByName(FName InName,  bool bRecovery = false)

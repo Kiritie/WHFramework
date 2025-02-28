@@ -65,6 +65,7 @@ ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer) :
 	DefaultController = nullptr;
 
 	bInitialized = false;
+	bBlockAllInput = false;
 
 	ActorID = FGuid::NewGuid();
 	bVisible = true;

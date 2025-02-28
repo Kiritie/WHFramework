@@ -54,7 +54,7 @@ bool UAbilityInventorySlotBase::ContainsItem(FAbilityItem InItem) const
 bool UAbilityInventorySlotBase::MatchItem(FAbilityItem InItem, bool bPutIn) const
 {
 	return bPutIn ? IsEnabled() && (IsEmpty() && MatchItemLimit(InItem, true) || Item.Match(InItem) && GetRemainVolume(InItem) > 0) :
-		(!IsEmpty() && MatchItemSplit(InItem) && MatchItemLimit(InItem));
+		IsEnabled() && (!IsEmpty() && MatchItemSplit(InItem) && MatchItemLimit(InItem));
 }
 
 bool UAbilityInventorySlotBase::MatchItemSplit(FAbilityItem InItem, bool bForce) const
@@ -197,11 +197,17 @@ void UAbilityInventorySlotBase::SubItem(FAbilityItem& InItem)
 {
 	if (ContainsItem(InItem))
 	{
-		int32 Num = InItem.Count - Item.Count;
+		const int32 Num = InItem.Count - Item.Count;
 		Item.Count = FMath::Clamp(Item.Count - InItem.Count, 0, GetMaxVolume(InItem));
 		InItem.Count = FMath::Max(Num, 0);
 		Refresh();
 	}
+}
+
+void UAbilityInventorySlotBase::SubItem(int32 InCount)
+{
+	FAbilityItem _Item = FAbilityItem(Item, InCount);
+	SubItem(_Item);
 }
 
 void UAbilityInventorySlotBase::SplitItem(int32 InCount /*= -1*/)

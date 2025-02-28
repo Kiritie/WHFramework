@@ -74,7 +74,9 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SubItem(FAbilityItem& InItem);
-			
+
+	virtual void SubItem(int32 InCount = -1);
+
 	UFUNCTION(BlueprintCallable)
 	virtual void SplitItem(int32 InCount = -1);
 			
