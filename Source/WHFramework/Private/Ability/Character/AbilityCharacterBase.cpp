@@ -96,7 +96,7 @@ void AAbilityCharacterBase::OnSpawn_Implementation(UObject* InOwner, const TArra
 
 	SpawnDefaultController();
 
-	FSM->SwitchDefaultState();
+	SwitchDefaultFiniteState();
 }
 
 void AAbilityCharacterBase::OnDespawn_Implementation(bool bRecovery)
@@ -280,13 +280,13 @@ void AAbilityCharacterBase::OnFiniteStateRefresh(UFiniteStateBase* InCurrentStat
 		{
 			if(!IsJumping())
 			{
-				FSM->SwitchStateByClass<UAbilityCharacterState_Walk>();
+				SwitchFiniteStateByClass<UAbilityCharacterState_Walk>();
 			}
 			break;
 		}
 		case MOVE_Falling:
 		{
-			FSM->SwitchStateByClass<UAbilityCharacterState_Fall>();
+			SwitchFiniteStateByClass<UAbilityCharacterState_Fall>();
 			break;
 		}
 		default: break;
@@ -299,7 +299,7 @@ void AAbilityCharacterBase::OnMovementModeChanged(EMovementMode PrevMovementMode
 
 	if(!IsActive()) return;
 	
-	FSM->RefreshState();
+	RefreshFiniteState();
 
 	switch (GetCharacterMovement()->MovementMode)
 	{
@@ -333,7 +333,7 @@ void AAbilityCharacterBase::OnMovementModeChanged(EMovementMode PrevMovementMode
 
 void AAbilityCharacterBase::Death(IAbilityVitalityInterface* InKiller)
 {
-	FSM->SwitchFinalState({ InKiller });
+	SwitchFinalFiniteState({ InKiller });
 }
 
 void AAbilityCharacterBase::Kill(IAbilityVitalityInterface* InTarget)
@@ -343,32 +343,32 @@ void AAbilityCharacterBase::Kill(IAbilityVitalityInterface* InTarget)
 
 void AAbilityCharacterBase::Revive(IAbilityVitalityInterface* InRescuer)
 {
-	FSM->SwitchDefaultState({ InRescuer });
+	SwitchDefaultFiniteState({ InRescuer });
 }
 
 void AAbilityCharacterBase::Static()
 {
-	FSM->SwitchStateByClass<UAbilityCharacterState_Static>();
+	SwitchFiniteStateByClass<UAbilityCharacterState_Static>();
 }
 
 void AAbilityCharacterBase::UnStatic()
 {
-	if(FSM->IsCurrentStateClass<UAbilityCharacterState_Static>())
+	if(IsCurrentFiniteStateClass<UAbilityCharacterState_Static>())
 	{
-		FSM->SwitchState(nullptr);
+		SwitchFiniteState(nullptr);
 	}
 }
 
 void AAbilityCharacterBase::Interrupt(float InDuration /*= -1*/)
 {
-	FSM->SwitchStateByClass<UAbilityCharacterState_Interrupt>({ InDuration });
+	SwitchFiniteStateByClass<UAbilityCharacterState_Interrupt>({ InDuration });
 }
 
 void AAbilityCharacterBase::UnInterrupt()
 {
-	if(FSM->IsCurrentStateClass<UAbilityCharacterState_Interrupt>())
+	if(IsCurrentFiniteStateClass<UAbilityCharacterState_Interrupt>())
 	{
-		FSM->SwitchState(nullptr);
+		SwitchFiniteState(nullptr);
 	}
 }
 
@@ -390,9 +390,9 @@ void AAbilityCharacterBase::LimitToAnim()
 
 void AAbilityCharacterBase::Jump()
 {
-	if(!FSM->IsCurrentStateClass<UAbilityCharacterState_Jump>())
+	if(!IsCurrentFiniteStateClass<UAbilityCharacterState_Jump>())
 	{
-		FSM->SwitchStateByClass<UAbilityCharacterState_Jump>();
+		SwitchFiniteStateByClass<UAbilityCharacterState_Jump>();
 	}
 	else
 	{
@@ -402,9 +402,9 @@ void AAbilityCharacterBase::Jump()
 
 void AAbilityCharacterBase::UnJump()
 {
-	if(FSM->IsCurrentStateClass<UAbilityCharacterState_Jump>())
+	if(IsCurrentFiniteStateClass<UAbilityCharacterState_Jump>())
 	{
-		FSM->SwitchState(nullptr);
+		SwitchFiniteState(nullptr);
 	}
 	else
 	{
@@ -414,9 +414,9 @@ void AAbilityCharacterBase::UnJump()
 
 void AAbilityCharacterBase::Crouch(bool bClientSimulation)
 {
-	if(!FSM->IsCurrentStateClass<UAbilityCharacterState_Crouch>())
+	if(!IsCurrentFiniteStateClass<UAbilityCharacterState_Crouch>())
 	{
-		FSM->SwitchStateByClass<UAbilityCharacterState_Crouch>({ bClientSimulation });
+		SwitchFiniteStateByClass<UAbilityCharacterState_Crouch>({ bClientSimulation });
 	}
 	else
 	{
@@ -426,9 +426,9 @@ void AAbilityCharacterBase::Crouch(bool bClientSimulation)
 
 void AAbilityCharacterBase::UnCrouch(bool bClientSimulation)
 {
-	if(FSM->IsCurrentStateClass<UAbilityCharacterState_Crouch>())
+	if(IsCurrentFiniteStateClass<UAbilityCharacterState_Crouch>())
 	{
-		FSM->SwitchState(nullptr);
+		SwitchFiniteState(nullptr);
 	}
 	else
 	{
@@ -438,53 +438,53 @@ void AAbilityCharacterBase::UnCrouch(bool bClientSimulation)
 
 void AAbilityCharacterBase::Swim()
 {
-	FSM->SwitchStateByClass<UAbilityCharacterState_Swim>();
+	SwitchFiniteStateByClass<UAbilityCharacterState_Swim>();
 }
 
 void AAbilityCharacterBase::UnSwim()
 {
-	if(FSM->IsCurrentStateClass<UAbilityCharacterState_Swim>())
+	if(IsCurrentFiniteStateClass<UAbilityCharacterState_Swim>())
 	{
-		FSM->SwitchState(nullptr);
+		SwitchFiniteState(nullptr);
 	}
 }
 
 void AAbilityCharacterBase::Float(float InWaterPosZ)
 {
-	FSM->SwitchStateByClass<UAbilityCharacterState_Float>({ InWaterPosZ });
+	SwitchFiniteStateByClass<UAbilityCharacterState_Float>({ InWaterPosZ });
 }
 
 void AAbilityCharacterBase::UnFloat()
 {
-	if(FSM->IsCurrentStateClass<UAbilityCharacterState_Float>())
+	if(IsCurrentFiniteStateClass<UAbilityCharacterState_Float>())
 	{
-		FSM->SwitchState(nullptr);
+		SwitchFiniteState(nullptr);
 	}
 }
 
 void AAbilityCharacterBase::Climb()
 {
-	FSM->SwitchStateByClass<UAbilityCharacterState_Climb>();
+	SwitchFiniteStateByClass<UAbilityCharacterState_Climb>();
 }
 
 void AAbilityCharacterBase::UnClimb()
 {
-	if(FSM->IsCurrentStateClass<UAbilityCharacterState_Climb>())
+	if(IsCurrentFiniteStateClass<UAbilityCharacterState_Climb>())
 	{
-		FSM->SwitchState(nullptr);
+		SwitchFiniteState(nullptr);
 	}
 }
 
 void AAbilityCharacterBase::Fly()
 {
-	FSM->SwitchStateByClass<UAbilityCharacterState_Fly>();
+	SwitchFiniteStateByClass<UAbilityCharacterState_Fly>();
 }
 
 void AAbilityCharacterBase::UnFly()
 {
-	if(FSM->IsCurrentStateClass<UAbilityCharacterState_Fly>())
+	if(IsCurrentFiniteStateClass<UAbilityCharacterState_Fly>())
 	{
-		FSM->SwitchState(nullptr);
+		SwitchFiniteState(nullptr);
 	}
 }
 
@@ -516,7 +516,7 @@ void AAbilityCharacterBase::EndAction(const FGameplayTag& InActionTag, bool bWas
 {
 	if(InActionTag.MatchesTag(GameplayTags::Ability_Vitality_Action_Death))
 	{
-		if(FSM->IsCurrentStateClass<UAbilityCharacterState_Death>())
+		if(IsCurrentFiniteStateClass<UAbilityCharacterState_Death>())
 		{
 			FSM->GetCurrentState<UAbilityCharacterState_Death>()->DeathEnd();
 		}

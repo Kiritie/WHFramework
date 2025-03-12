@@ -48,14 +48,14 @@ void AAbilityVitalityBase::OnSpawn_Implementation(UObject* InOwner, const TArray
 {
 	Super::OnSpawn_Implementation(InOwner, InParams);
 
-	FSM->SwitchDefaultState();
+	SwitchDefaultFiniteState();
 }
 
 void AAbilityVitalityBase::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
 
-	FSM->SwitchState(nullptr);
+	SwitchFiniteState(nullptr);
 
 	RaceID = NAME_None;
 	GenerateVoxelID = FPrimaryAssetId();
@@ -111,7 +111,7 @@ void AAbilityVitalityBase::ResetData()
 
 void AAbilityVitalityBase::OnFiniteStateRefresh(UFiniteStateBase* InCurrentState)
 {
-	FSM->SwitchStateByClass<UAbilityVitalityState_Walk>();
+	SwitchFiniteStateByClass<UAbilityVitalityState_Walk>();
 }
 
 void AAbilityVitalityBase::Serialize(FArchive& Ar)
@@ -121,7 +121,7 @@ void AAbilityVitalityBase::Serialize(FArchive& Ar)
 
 void AAbilityVitalityBase::Death(IAbilityVitalityInterface* InKiller)
 {
-	FSM->SwitchFinalState({ InKiller });
+	SwitchFinalFiniteState({ InKiller });
 }
 
 void AAbilityVitalityBase::Kill(IAbilityVitalityInterface* InTarget)
@@ -131,32 +131,32 @@ void AAbilityVitalityBase::Kill(IAbilityVitalityInterface* InTarget)
 
 void AAbilityVitalityBase::Revive(IAbilityVitalityInterface* InRescuer)
 {
-	FSM->SwitchDefaultState({ InRescuer });
+	SwitchDefaultFiniteState({ InRescuer });
 }
 
 void AAbilityVitalityBase::Static()
 {
-	FSM->SwitchStateByClass<UAbilityVitalityState_Static>();
+	SwitchFiniteStateByClass<UAbilityVitalityState_Static>();
 }
 
 void AAbilityVitalityBase::UnStatic()
 {
-	if(FSM->IsCurrentStateClass<UAbilityVitalityState_Static>())
+	if(IsCurrentFiniteStateClass<UAbilityVitalityState_Static>())
 	{
-		FSM->SwitchState(nullptr);
+		SwitchFiniteState(nullptr);
 	}
 }
 
 void AAbilityVitalityBase::Interrupt(float InDuration /*= -1*/)
 {
-	FSM->SwitchStateByClass<UAbilityVitalityState_Interrupt>({ InDuration });
+	SwitchFiniteStateByClass<UAbilityVitalityState_Interrupt>({ InDuration });
 }
 
 void AAbilityVitalityBase::UnInterrupt()
 {
-	if(FSM->IsCurrentStateClass<UAbilityVitalityState_Interrupt>())
+	if(IsCurrentFiniteStateClass<UAbilityVitalityState_Interrupt>())
 	{
-		FSM->SwitchState(nullptr);
+		SwitchFiniteState(nullptr);
 	}
 }
 
@@ -188,7 +188,7 @@ void AAbilityVitalityBase::EndAction(const FGameplayTag& InActionTag, bool bWasC
 {
 	if(InActionTag.MatchesTag(GameplayTags::Ability_Vitality_Action_Death))
 	{
-		if(FSM->IsCurrentStateClass<UAbilityVitalityState_Death>())
+		if(IsCurrentFiniteStateClass<UAbilityVitalityState_Death>())
 		{
 			FSM->GetCurrentState<UAbilityVitalityState_Death>()->DeathEnd();
 		}

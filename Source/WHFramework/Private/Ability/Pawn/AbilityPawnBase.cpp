@@ -73,7 +73,7 @@ void AAbilityPawnBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FPa
 
 	SpawnDefaultController();
 
-	FSM->SwitchDefaultState();
+	SwitchDefaultFiniteState();
 }
 
 void AAbilityPawnBase::OnDespawn_Implementation(bool bRecovery)
@@ -234,12 +234,12 @@ void AAbilityPawnBase::ResetData()
 
 void AAbilityPawnBase::OnFiniteStateRefresh(UFiniteStateBase* InCurrentState)
 {
-	FSM->SwitchStateByClass<UAbilityPawnState_Walk>();
+	SwitchFiniteStateByClass<UAbilityPawnState_Walk>();
 }
 
 void AAbilityPawnBase::Death(IAbilityVitalityInterface* InKiller)
 {
-	FSM->SwitchFinalState({ InKiller });
+	SwitchFinalFiniteState({ InKiller });
 }
 
 void AAbilityPawnBase::Kill(IAbilityVitalityInterface* InTarget)
@@ -249,32 +249,32 @@ void AAbilityPawnBase::Kill(IAbilityVitalityInterface* InTarget)
 
 void AAbilityPawnBase::Revive(IAbilityVitalityInterface* InRescuer)
 {
-	FSM->SwitchDefaultState({ InRescuer });
+	SwitchDefaultFiniteState({ InRescuer });
 }
 
 void AAbilityPawnBase::Static()
 {
-	FSM->SwitchStateByClass<UAbilityPawnState_Static>();
+	SwitchFiniteStateByClass<UAbilityPawnState_Static>();
 }
 
 void AAbilityPawnBase::UnStatic()
 {
-	if(FSM->IsCurrentStateClass<UAbilityPawnState_Static>())
+	if(IsCurrentFiniteStateClass<UAbilityPawnState_Static>())
 	{
-		FSM->SwitchState(nullptr);
+		SwitchFiniteState(nullptr);
 	}
 }
 
 void AAbilityPawnBase::Interrupt(float InDuration /*= -1*/)
 {
-	FSM->SwitchStateByClass<UAbilityPawnState_Interrupt>({ InDuration });
+	SwitchFiniteStateByClass<UAbilityPawnState_Interrupt>({ InDuration });
 }
 
 void AAbilityPawnBase::UnInterrupt()
 {
-	if(FSM->IsCurrentStateClass<UAbilityPawnState_Interrupt>())
+	if(IsCurrentFiniteStateClass<UAbilityPawnState_Interrupt>())
 	{
-		FSM->SwitchState(nullptr);
+		SwitchFiniteState(nullptr);
 	}
 }
 
@@ -306,7 +306,7 @@ void AAbilityPawnBase::EndAction(const FGameplayTag& InActionTag, bool bWasCance
 {
 	if(InActionTag.MatchesTag(GameplayTags::Ability_Vitality_Action_Death))
 	{
-		if(FSM->IsCurrentStateClass<UAbilityPawnState_Death>())
+		if(IsCurrentFiniteStateClass<UAbilityPawnState_Death>())
 		{
 			FSM->GetCurrentState<UAbilityPawnState_Death>()->DeathEnd();
 		}

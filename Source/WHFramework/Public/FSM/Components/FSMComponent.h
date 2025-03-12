@@ -217,34 +217,25 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure)
-	bool IsCurrentStateClass(TSubclassOf<UFiniteStateBase> InStateClass) const
-	{
-		if(!InStateClass) return false;
+	bool IsCurrentStateClass(TSubclassOf<UFiniteStateBase> InStateClass) const;
 
-		const FName StateName = InStateClass->GetDefaultObject<UFiniteStateBase>()->GetStateName();
-		return CurrentState && CurrentState->GetStateName() == StateName;
-	}
 	/**
 	* 获取当前状态
 	*/
 	template<class T>
 	T* GetCurrentState() const
 	{
-		return Cast<T>(CurrentState);
+		return Cast<T>(GetCurrentState());
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	UFiniteStateBase* GetCurrentState(TSubclassOf<UFiniteStateBase> InClass = nullptr) const { return GetDeterminesOutputObject(CurrentState, InClass); }
+	UFiniteStateBase* GetCurrentState(TSubclassOf<UFiniteStateBase> InClass = nullptr) const;
+
 	/**
 	* 获取状态列表
 	*/
 	UFUNCTION(BlueprintPure)
-	TArray<UFiniteStateBase*>& GetStates() const
-	{
-		static TArray<UFiniteStateBase*> TempStates;
-		StateMap.GenerateValueArray(TempStates);
-		return TempStates;
-	}
-	
+	TArray<UFiniteStateBase*>& GetStates() const;
+
 	UFUNCTION(BlueprintPure)
 	TMap<FName, UFiniteStateBase*>& GetStateMap() { return StateMap; }
 
@@ -255,5 +246,5 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	AActor* GetAgent(TSubclassOf<AActor> InClass = nullptr) const { return GetDeterminesOutputObject(GetOwner(), InClass); }
+	AActor* GetAgent(TSubclassOf<AActor> InClass = nullptr) const;
 };

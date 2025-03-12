@@ -1021,7 +1021,7 @@ void USceneModule::AsyncLoadLevelInternal(FAsyncLoadLevelTask& InTask)
 			LatentActionInfo.UUID = FMath::Rand();
 			LatentActionInfo.Linkage = 0;
 			LatentActionInfo.CallbackTarget = this;
-			LatentActionInfo.ExecutionFunction = GET_FUNCTION_NAME_THISCLASS(OnHandleAsyncLoadLevelFinish);
+			LatentActionInfo.ExecutionFunction = GET_FUNCTION_NAME_THISC000LASS(OnHandleAsyncLoadLevelFinish);
 			UGameplayStatics::LoadStreamLevel(this, InTask.LevelPath, true, false, LatentActionInfo);
 		}
 	}), 0, PKG_ContainsMap);

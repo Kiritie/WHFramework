@@ -322,3 +322,28 @@ bool UFSMComponent::IsCurrentStateIndex(int32 InStateIndex) const
 {
 	return CurrentState && CurrentState->GetStateIndex() == InStateIndex;
 }
+
+bool UFSMComponent::IsCurrentStateClass(TSubclassOf<UFiniteStateBase> InStateClass) const
+{
+	if(!InStateClass) return false;
+
+	const FName StateName = InStateClass->GetDefaultObject<UFiniteStateBase>()->GetStateName();
+	return CurrentState && CurrentState->GetStateName() == StateName;
+}
+
+UFiniteStateBase* UFSMComponent::GetCurrentState(TSubclassOf<UFiniteStateBase> InClass) const
+{
+	return GetDeterminesOutputObject(CurrentState, InClass);
+}
+
+TArray<UFiniteStateBase*>& UFSMComponent::GetStates() const
+{
+	static TArray<UFiniteStateBase*> TempStates;
+	StateMap.GenerateValueArray(TempStates);
+	return TempStates;
+}
+
+AActor* UFSMComponent::GetAgent(TSubclassOf<AActor> InClass) const
+{
+	return GetDeterminesOutputObject(GetOwner(), InClass);
+}
