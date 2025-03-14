@@ -126,6 +126,10 @@ void AAbilityVitalityBase::Death(IAbilityVitalityInterface* InKiller)
 
 void AAbilityVitalityBase::Kill(IAbilityVitalityInterface* InTarget)
 {
+	if(InTarget != this)
+	{
+		ModifyExp(InTarget->GetLevelA() * 10.f);
+	}
 	InTarget->Death(this);
 }
 

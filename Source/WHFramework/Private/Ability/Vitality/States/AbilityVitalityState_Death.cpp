@@ -36,7 +36,7 @@ void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastState, const T
 		Killer = InParams[0].GetPointerValue<IAbilityVitalityInterface>();
 	}
 	
-	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalityDead>(Cast<UObject>(this), { GetAgent(), Cast<UObject>(Killer) });
+	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalityDead>(this, { GetAgent(), Cast<UObject>(Killer) });
 
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
@@ -44,11 +44,6 @@ void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastState, const T
 	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dying);
 
 	Vitality->GetInteractionComponent()->SetInteractable(false);
-
-	if(Killer && Killer != Vitality)
-	{
-		Killer->ModifyExp(Vitality->GetLevelA() * 10.f);
-	}
 
 	Vitality->SetExp(0.f);
 	Vitality->SetHealth(0.f);

@@ -245,23 +245,23 @@ void UAbilityInventorySlotBase::MoveItem(int32 InCount /*= -1*/)
 		{
 			case ESlotSplitType::Default:
 			{
-				Inventory->AddItemBySplitTypes(_Item, {ESlotSplitType::Shortcut, ESlotSplitType::Auxiliary}, false);
+				Inventory->AddItemBySplitTypes(_Item, { ESlotSplitType::Shortcut, ESlotSplitType::Auxiliary }, false);
 				break;
 			}
 			case ESlotSplitType::Shortcut:
 			{
-				Inventory->AddItemBySplitTypes(_Item, {ESlotSplitType::Default, ESlotSplitType::Auxiliary}, false);
+				Inventory->AddItemBySplitTypes(_Item, { ESlotSplitType::Default, ESlotSplitType::Auxiliary }, false);
 				break;
 			}
 			case ESlotSplitType::Auxiliary:
 			{
-				Inventory->AddItemBySplitTypes(_Item, {ESlotSplitType::Default, ESlotSplitType::Shortcut}, false);
+				Inventory->AddItemBySplitTypes(_Item, { ESlotSplitType::Default, ESlotSplitType::Shortcut }, false);
 				break;
 			}
 			case ESlotSplitType::Equip:
 			case ESlotSplitType::Skill:
 			{
-				Inventory->AddItemBySplitTypes(_Item, {ESlotSplitType::Default, ESlotSplitType::Shortcut, ESlotSplitType::Auxiliary}, false);
+				Inventory->AddItemBySplitTypes(_Item, { ESlotSplitType::Default, ESlotSplitType::Shortcut, ESlotSplitType::Auxiliary }, false);
 				break;
 			}
 			default: break;

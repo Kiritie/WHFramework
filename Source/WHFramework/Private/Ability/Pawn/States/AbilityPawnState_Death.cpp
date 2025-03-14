@@ -38,7 +38,7 @@ void UAbilityPawnState_Death::OnEnter(UFiniteStateBase* InLastState, const TArra
 		Killer = InParams[0].GetPointerValue<IAbilityVitalityInterface>();
 	}
 	
-	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalityDead>(Cast<UObject>(this), { GetAgent(), Cast<UObject>(Killer) });
+	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalityDead>(this, { GetAgent(), Cast<UObject>(Killer) });
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
@@ -50,11 +50,6 @@ void UAbilityPawnState_Death::OnEnter(UFiniteStateBase* InLastState, const TArra
 	if(Pawn->GetController<AAIControllerBase>())
 	{
 		Pawn->GetController<AAIControllerBase>()->StopBehaviorTree();
-	}
-
-	if(Killer && Killer != Pawn)
-	{
-		Killer->ModifyExp(Pawn->GetLevelA() * 10.f);
 	}
 
 	Pawn->SetExp(0.f);

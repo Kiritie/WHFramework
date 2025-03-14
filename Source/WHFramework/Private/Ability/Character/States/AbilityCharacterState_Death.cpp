@@ -40,7 +40,7 @@ void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastState, const 
 		Killer = InParams[0].GetPointerValue<IAbilityVitalityInterface>();
 	}
 	
-	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalityDead>(Cast<UObject>(this), { GetAgent(), Cast<UObject>(Killer) });
+	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalityDead>(this, { GetAgent(), Cast<UObject>(Killer) });
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
@@ -52,11 +52,6 @@ void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastState, const 
 	if(Character->GetController<AAIControllerBase>())
 	{
 		Character->GetController<AAIControllerBase>()->StopBehaviorTree();
-	}
-
-	if(Killer && Killer != Character)
-	{
-		Killer->ModifyExp(Character->GetLevelA() * 10.f);
 	}
 
 	Character->SetExp(0.f);
