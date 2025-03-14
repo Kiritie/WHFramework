@@ -107,6 +107,14 @@ public:
 	FString LocalCulture;
 };
 
+#define ITER_PHASE(Phase, Expression) \
+EPhase Phase = EPhase::Primary; \
+Expression \
+Phase = EPhase::Lesser; \
+Expression \
+Phase = EPhase::Final; \
+Expression
+	
 #define GET_CLASS_NAME(ClassName) #ClassName
 
 //////////////////////////////////////////////////////////////////////////

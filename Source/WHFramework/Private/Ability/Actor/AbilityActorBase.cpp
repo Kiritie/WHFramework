@@ -72,14 +72,11 @@ void AAbilityActorBase::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
-void AAbilityActorBase::OnPreparatory_Implementation(EPhase InPhase)
+void AAbilityActorBase::OnPreparatory_Implementation()
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory_Implementation();
 
-	if(PHASEC(InPhase, EPhase::Primary))
-	{
-		RefreshAttributes();
-	}
+	RefreshAttributes();
 }
 
 void AAbilityActorBase::OnRefresh_Implementation(float DeltaSeconds)
@@ -87,9 +84,9 @@ void AAbilityActorBase::OnRefresh_Implementation(float DeltaSeconds)
 	Super::OnRefresh_Implementation(DeltaSeconds);
 }
 
-void AAbilityActorBase::OnTermination_Implementation(EPhase InPhase)
+void AAbilityActorBase::OnTermination_Implementation()
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination_Implementation();
 }
 
 void AAbilityActorBase::Serialize(FArchive& Ar)

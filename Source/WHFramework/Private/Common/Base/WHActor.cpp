@@ -65,7 +65,7 @@ void AWHActor::OnInitialize_Implementation()
 	USceneModuleStatics::AddSceneActor(this);
 }
 
-void AWHActor::OnPreparatory_Implementation(EPhase InPhase)
+void AWHActor::OnPreparatory_Implementation()
 {
 	
 }
@@ -75,7 +75,7 @@ void AWHActor::OnRefresh_Implementation(float DeltaSeconds)
 	
 }
 
-void AWHActor::OnTermination_Implementation(EPhase InPhase)
+void AWHActor::OnTermination_Implementation()
 {
 	USceneModuleStatics::RemoveSceneActor(this);
 }
@@ -124,7 +124,7 @@ void AWHActor::BeginPlay()
 		{
 			Execute_OnInitialize(this);
 		}
-		Execute_OnPreparatory(this, EPhase::All);
+		Execute_OnPreparatory(this);
 	}
 }
 
@@ -134,7 +134,7 @@ void AWHActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	
 	if(Execute_IsUseDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this, EPhase::All);
+		Execute_OnTermination(this);
 	}
 }
 

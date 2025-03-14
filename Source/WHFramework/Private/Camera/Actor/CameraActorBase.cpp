@@ -52,9 +52,9 @@ void ACameraActorBase::OnInitialize_Implementation()
 	SetCameraCollisionMode(CameraCollisionMode);
 }
 
-void ACameraActorBase::OnPreparatory_Implementation(EPhase InPhase)
+void ACameraActorBase::OnPreparatory_Implementation()
 {
-	AWHActor::OnPreparatory_Implementation(InPhase);
+	AWHActor::OnPreparatory_Implementation();
 	
 	LastCameraLocation = GetActorLocation();
 }
@@ -90,9 +90,9 @@ void ACameraActorBase::OnRefresh_Implementation(float DeltaSeconds)
 	LastCameraLocation = GetActorLocation();
 }
 
-void ACameraActorBase::OnTermination_Implementation(EPhase InPhase)
+void ACameraActorBase::OnTermination_Implementation()
 {
-	AWHActor::OnTermination_Implementation(InPhase);
+	AWHActor::OnTermination_Implementation();
 
 	IDebuggerInterface::UnRegister();
 }

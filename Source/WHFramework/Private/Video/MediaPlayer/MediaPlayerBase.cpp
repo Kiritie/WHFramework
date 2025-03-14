@@ -33,9 +33,9 @@ void AMediaPlayerBase::OnInitialize_Implementation()
 	}
 }
 
-void AMediaPlayerBase::OnPreparatory_Implementation(EPhase InPhase)
+void AMediaPlayerBase::OnPreparatory_Implementation()
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory_Implementation();
 }
 
 void AMediaPlayerBase::OnRefresh_Implementation(float DeltaSeconds)
@@ -43,9 +43,9 @@ void AMediaPlayerBase::OnRefresh_Implementation(float DeltaSeconds)
 	Super::OnRefresh_Implementation(DeltaSeconds);
 }
 
-void AMediaPlayerBase::OnTermination_Implementation(EPhase InPhase)
+void AMediaPlayerBase::OnTermination_Implementation()
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination_Implementation();
 }
 
 void AMediaPlayerBase::PlayMovie_Implementation(const FName InMovieName, bool bMulticast)

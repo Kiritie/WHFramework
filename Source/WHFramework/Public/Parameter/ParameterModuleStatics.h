@@ -322,5 +322,40 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
 	static void ClearAllParameter(UPARAM(ref) FParameters& InParameters) { InParameters.ClearAllParameter(); }
-};
 
+	//////////////////////////////////////////////////////////////////////////
+	/// ParameterMap
+public:
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
+	static FParameterMap MakeParameterMap(const TMap<FString, FString>& InParameterMap);
+
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
+	static FParameterMap& AddParameterMapValue(UPARAM(ref) FParameterMap& InParameterMap, const FString& InKey, const FString& InValue);
+
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
+	static FParameterMap& SetParameterMapValue(UPARAM(ref) FParameterMap& InParameterMap, const FString& InKey, const FString& InValue);
+
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
+	static FParameterMap& RemoveParameterMapKey(UPARAM(ref) FParameterMap& InParameterMap, const FString& InKey);
+
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
+	static FParameterMap& ClearParameterMap(UPARAM(ref) FParameterMap& InParameterMap);
+
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static bool ContainsParameterMapKey(UPARAM(ref) const FParameterMap& InParameterMap, const FString& InKey) { return InParameterMap.Contains(InKey); }
+
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FString GetParameterMapValue(UPARAM(ref) const FParameterMap& InParameterMap, const FString& InKey) { return InParameterMap.Get(InKey); }
+
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static const TMap<FString, FString>& GetParameterMapSource(UPARAM(ref) const FParameterMap& InParameterMap) { return InParameterMap.GetSource(); }
+
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static int32 GetParameterMapNum(UPARAM(ref) const FParameterMap& InParameterMap) { return InParameterMap.GetNum(); }
+
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FString ParameterMapToString(UPARAM(ref) const FParameterMap& InParameterMap) { return InParameterMap.ToString(); }
+
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FString ParameterMapToJsonString(UPARAM(ref) const FParameterMap& InParameterMap) { return InParameterMap.ToJsonString(); }
+};

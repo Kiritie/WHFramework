@@ -25,9 +25,9 @@ void AWorldWidgetActor::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
-void AWorldWidgetActor::OnPreparatory_Implementation(EPhase InPhase)
+void AWorldWidgetActor::OnPreparatory_Implementation()
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory_Implementation();
 
 	if(bAutoCreate)
 	{
@@ -40,9 +40,9 @@ void AWorldWidgetActor::OnRefresh_Implementation(float DeltaSeconds)
 	Super::OnRefresh_Implementation(DeltaSeconds);
 }
 
-void AWorldWidgetActor::OnTermination_Implementation(EPhase InPhase)
+void AWorldWidgetActor::OnTermination_Implementation()
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination_Implementation();
 
 	DestroyWorldWidget(true);
 }

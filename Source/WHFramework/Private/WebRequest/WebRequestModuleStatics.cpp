@@ -75,6 +75,36 @@ void UWebRequestModuleStatics::ClearAllWebInterface()
 	UWebRequestModule::Get().ClearAllWebInterface();
 }
 
+FWebRequestConfig UWebRequestModuleStatics::GetWebRequestConfig(const FName InName)
+{
+	return UWebRequestModule::Get().GetWebRequestConfig(InName);
+}
+
+FWebRequestConfig UWebRequestModuleStatics::CreateWebRequestConfig(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>* InParams, FParameterMap InHeadMap, FWebContent InContent, EWebRequestTriggerType InTriggerType, float InTriggerTime)
+{
+	return UWebRequestModule::Get().CreateWebRequestConfig(InName, InMethod, InParams, InHeadMap, InContent, InTriggerType, InTriggerTime);
+}
+
+FWebRequestConfig UWebRequestModuleStatics::CreateWebRequestConfig(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent, EWebRequestTriggerType InTriggerType, float InTriggerTime)
+{
+	return UWebRequestModule::Get().CreateWebRequestConfig(InName, InMethod, InParams, InHeadMap, InContent, InTriggerType, InTriggerTime);
+}
+
+FWebRequestConfig UWebRequestModuleStatics::K2_CreateWebRequestConfig(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent, EWebRequestTriggerType InTriggerType, float InTriggerTime)
+{
+	return UWebRequestModule::Get().CreateWebRequestConfig(InName, InMethod, InParams, InHeadMap, InContent, InTriggerType, InTriggerTime);
+}
+
+bool UWebRequestModuleStatics::ClearWebRequestConfig(const FName InName)
+{
+	return UWebRequestModule::Get().ClearWebRequestConfig(InName);
+}
+
+void UWebRequestModuleStatics::ClearAllWebRequestConfig()
+{
+	UWebRequestModule::Get().ClearAllWebRequestConfig();
+}
+
 bool UWebRequestModuleStatics::SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>* InParams, FParameterMap InHeadMap, FWebContent InContent)
 {
 	return UWebRequestModule::Get().SendWebRequest(InName, InMethod, InParams, InHeadMap, InContent);
@@ -88,4 +118,9 @@ bool UWebRequestModuleStatics::SendWebRequest(const FName InName, EWebRequestMet
 bool UWebRequestModuleStatics::K2_SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent)
 {
 	return UWebRequestModule::Get().K2_SendWebRequest(InName, InMethod, InParams, InHeadMap, InContent);
+}
+
+bool UWebRequestModuleStatics::SendWebRequestByConfig(const FName InName)
+{
+	return UWebRequestModule::Get().SendWebRequestByConfig(InName);
 }

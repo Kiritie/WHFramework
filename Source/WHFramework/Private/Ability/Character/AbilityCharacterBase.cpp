@@ -122,14 +122,11 @@ void AAbilityCharacterBase::OnInitialize_Implementation()
 	DefaultAirControl = GetCharacterMovement()->AirControl;
 }
 
-void AAbilityCharacterBase::OnPreparatory_Implementation(EPhase InPhase)
+void AAbilityCharacterBase::OnPreparatory_Implementation()
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory_Implementation();
 
-	if(PHASEC(InPhase, EPhase::Primary))
-	{
-		RefreshAttributes();
-	}
+	RefreshAttributes();
 }
 
 void AAbilityCharacterBase::OnRefresh_Implementation(float DeltaSeconds)
@@ -152,9 +149,9 @@ void AAbilityCharacterBase::OnRefresh_Implementation(float DeltaSeconds)
 	}
 }
 
-void AAbilityCharacterBase::OnTermination_Implementation(EPhase InPhase)
+void AAbilityCharacterBase::OnTermination_Implementation()
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination_Implementation();
 }
 
 void AAbilityCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

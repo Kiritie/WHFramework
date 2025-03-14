@@ -72,9 +72,9 @@ void AAbilityProjectileBase::OnDespawn_Implementation(bool bRecovery)
 	bLaunched = false;
 }
 
-void AAbilityProjectileBase::OnPreparatory_Implementation(EPhase InPhase)
+void AAbilityProjectileBase::OnPreparatory_Implementation()
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory_Implementation();
 }
 
 void AAbilityProjectileBase::OnRefresh_Implementation(float DeltaSeconds)

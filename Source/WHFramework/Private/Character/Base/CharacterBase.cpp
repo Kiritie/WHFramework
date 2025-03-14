@@ -121,7 +121,7 @@ void ACharacterBase::OnInitialize_Implementation()
 	Anim = Cast<UCharacterAnimBase>(GetMesh()->GetAnimInstance());
 }
 
-void ACharacterBase::OnPreparatory_Implementation(EPhase InPhase)
+void ACharacterBase::OnPreparatory_Implementation()
 {
 	
 }
@@ -141,7 +141,7 @@ void ACharacterBase::OnRefresh_Implementation(float DeltaSeconds)
 	}
 }
 
-void ACharacterBase::OnTermination_Implementation(EPhase InPhase)
+void ACharacterBase::OnTermination_Implementation()
 {
 	USceneModuleStatics::RemoveSceneActor(this);
 }
@@ -178,7 +178,7 @@ void ACharacterBase::BeginPlay()
 		{
 			Execute_OnInitialize(this);
 		}
-		Execute_OnPreparatory(this, EPhase::All);
+		Execute_OnPreparatory(this);
 	}
 }
 
@@ -188,7 +188,7 @@ void ACharacterBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	if(Execute_IsUseDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this, EPhase::All);
+		Execute_OnTermination(this);
 	}
 }
 

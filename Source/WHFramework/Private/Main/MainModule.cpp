@@ -8,7 +8,6 @@
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Common/Game/EventHandle_GameExited.h"
 #include "Event/Handle/Common/Game/EventHandle_GameInited.h"
-#include "Event/Handle/Common/Game/EventHandle_GamePreExit.h"
 #include "Event/Handle/Common/Game/EventHandle_GameStarted.h"
 #include "Net/UnrealNetwork.h"
 
@@ -37,12 +36,9 @@ void AMainModule::OnGenerate()
 
 void AMainModule::OnDestroy()
 {
-	for(int32 i = 0; i < Modules.Num(); i++)
+	for(auto Iter : Modules)
 	{
-		if(Modules[i])
-		{
-			Modules[i]->OnDestroy();
-		}
+		Iter->OnDestroy();
 	}
 	Modules.Empty();
 }
@@ -54,97 +50,76 @@ void AMainModule::OnInitialize_Implementation()
 
 	GWorldContext = this;
 
-	for(int32 i = 0; i < Modules.Num(); i++)
+	for(auto Iter : Modules)
 	{
-		if(Modules[i])
-		{
-			Modules[i]->OnInitialize();
-		}
+		Iter->OnInitialize();
 	}
 
 	UEventModuleStatics::BroadcastEvent<UEventHandle_GameInited>(this);
 }
 
-void AMainModule::OnPreparatory_Implementation(EPhase InPhase)
+void AMainModule::OnPreparatory_Implementation()
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory_Implementation();
 
-	for(int32 i = 0; i < Modules.Num(); i++)
-	{
-		if(Modules[i])
+	ITER_PHASE(Phase,
+		for(auto Iter : Modules)
 		{
-			if(InPhase != EPhase::Final)
+			if(Phase != EPhase::Final)
 			{
-				Modules[i]->OnPreparatory(InPhase);
+				Iter->OnPreparatory(Phase);
 			}
-			else if(Modules[i]->IsModuleAutoRun())
+			else if(Iter->IsModuleAutoRun())
 			{
-				Modules[i]->Run();
+				Iter->Run();
 			}
 		}
-	}
+	)
 
-	if(PHASEC(InPhase, EPhase::Final))
-	{
-		UEventModuleStatics::BroadcastEvent<UEventHandle_GameStarted>(this);
-	}
+	UEventModuleStatics::BroadcastEvent<UEventHandle_GameStarted>(this);
 }
 
 void AMainModule::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);
 
-	for(int32 i = 0; i < Modules.Num(); i++)
+	for(auto Iter : Modules)
 	{
-		if(Modules[i])
+		if(IsInEditor() || Iter->GetModuleState() == EModuleState::Running)
 		{
-			if(IsInEditor() || Modules[i]->GetModuleState() == EModuleState::Running)
-			{
-				Modules[i]->OnRefresh(DeltaSeconds, IsInEditor());
-			}
+			Iter->OnRefresh(DeltaSeconds, IsInEditor());
 		}
 	}
 }
 
-void AMainModule::OnTermination_Implementation(EPhase InPhase)
+void AMainModule::OnTermination_Implementation()
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination_Implementation();
 		
-	if(PHASEC(InPhase, EPhase::Final))
-	{
-		UEventModuleStatics::BroadcastEvent<UEventHandle_GamePreExit>(this);
-	}
-
-	for(int32 i = 0; i < Modules.Num(); i++)
-	{
-		if(Modules[i])
+	ITER_PHASE(Phase,
+		for(auto Iter : Modules)
 		{
-			if(InPhase != EPhase::Final)
+			if(Phase != EPhase::Final)
 			{
-				Modules[i]->OnTermination(InPhase);
+				Iter->OnTermination(Phase);
 			}
 			else
 			{
-				Modules[i]->Termination();
+				Iter->Termination();
 			}
 		}
-	}
+	)
 	
-	if(PHASEC(InPhase, EPhase::Final))
-	{
-		UEventModuleStatics::BroadcastEvent<UEventHandle_GameExited>(this);
+	UEventModuleStatics::BroadcastEvent<UEventHandle_GameExited>(this);
 
-		ModuleMap.Empty();
-	}
+	ModuleMap.Empty();
 }
 
 void AMainModule::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
-	Execute_OnTermination(this, EPhase::Primary);
-	Execute_OnTermination(this, EPhase::Lesser);
-	Execute_OnTermination(this, EPhase::Final);
+	Execute_OnTermination(this);
 }
 
 void AMainModule::Tick(float DeltaSeconds)

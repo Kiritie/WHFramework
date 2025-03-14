@@ -37,9 +37,9 @@ void ACCTVCameraActor::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
-void ACCTVCameraActor::OnPreparatory_Implementation(EPhase InPhase)
+void ACCTVCameraActor::OnPreparatory_Implementation()
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory_Implementation();
 }
 
 void ACCTVCameraActor::OnRefresh_Implementation(float DeltaSeconds)

@@ -67,6 +67,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics")
 	static void ClearAllWebInterface();
 
+	UFUNCTION(BlueprintPure, Category = "WebRequestModuleStatics")
+	static FWebRequestConfig GetWebRequestConfig(const FName InName);
+
+	static FWebRequestConfig CreateWebRequestConfig(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>* InParams = nullptr, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent(), EWebRequestTriggerType InTriggerType = EWebRequestTriggerType::None, float InTriggerTime = 0.f);
+
+	static FWebRequestConfig CreateWebRequestConfig(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent(), EWebRequestTriggerType InTriggerType = EWebRequestTriggerType::None, float InTriggerTime = 0.f);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Create Web Request Config"), Category = "WebRequestModuleStatics")
+	FWebRequestConfig K2_CreateWebRequestConfig(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent, EWebRequestTriggerType InTriggerType, float InTriggerTime);
+
+	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics")
+	static bool ClearWebRequestConfig(const FName InName);
+
+	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics")
+	static void ClearAllWebRequestConfig();
+
 public:
 	static bool SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>* InParams = nullptr, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent());
 
@@ -74,4 +90,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Send Web Request", AutoCreateRefTerm = "InParams"), Category = "WebRequestModuleStatics")
 	static bool K2_SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent);
+
+	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics")
+	static bool SendWebRequestByConfig(const FName InName);
 };

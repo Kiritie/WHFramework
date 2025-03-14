@@ -1021,10 +1021,7 @@ public:
 
 	void Set(const FString& Key, const FString& Value)
 	{
-		if(Contains(Key))
-		{
-			Map[Key] = Value;
-		}
+		Map.Emplace(Key, Value);
 	}
 
 	void Remove(const FString& Key)
@@ -1055,7 +1052,7 @@ public:
 		return TEXT("");
 	}
 
-	const TMap<FString, FString>& GetMap() const
+	const TMap<FString, FString>& GetSource() const
 	{
 		return Map;
 	}

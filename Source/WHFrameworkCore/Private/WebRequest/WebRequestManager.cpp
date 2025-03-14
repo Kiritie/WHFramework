@@ -18,7 +18,7 @@ IMPLEMENTATION_MANAGER(FWebRequestManager)
 FWebRequestManager::FWebRequestManager() : FManagerBase(Type)
 {
 	bLocalMode = false;
-	ServerURL = TEXT("");
+	ServerIP = TEXT("");
 	ServerPort = 0;
 	bConnected = false;
 	Downloaders = TArray<TSharedPtr<IFileDownloaderInterface>>();
@@ -27,19 +27,6 @@ FWebRequestManager::FWebRequestManager() : FManagerBase(Type)
 FWebRequestManager::~FWebRequestManager()
 {
 	
-}
-
-FString FWebRequestManager::GetServerURL() const
-{
-	const int32 MidIndex = ServerURL.Find(TEXT("/"), ESearchCase::IgnoreCase, ESearchDir::FromStart, 7);
-	const FString BeginURL = !bLocalMode ? ServerURL.Mid(0, MidIndex) : TEXT("http://127.0.0.1");
-	const FString EndURL = ServerURL.Mid(MidIndex, ServerURL.Len() - MidIndex);
-	return FString::Printf(TEXT("%s:%d%s"), *BeginURL, ServerPort, *EndURL);
-}
-
-void FWebRequestManager::SetServerURL(const FString& InServerURL)
-{
-	ServerURL = InServerURL.StartsWith(TEXT("http")) ? InServerURL : (TEXT("http://") + InServerURL);
 }
 
 void FWebRequestManager::OnInitialize()
@@ -78,14 +65,15 @@ bool FWebRequestManager::SendWebRequest(const FString& InUrl, EWebRequestMethod 
 {
 	const TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
 
-	HttpRequest->SetURL(InUrl.StartsWith(TEXT("/")) ? (GetServerURL() + InUrl) : InUrl);
+	HttpRequest->SetURL((InUrl.StartsWith(TEXT("/")) ? (GetServerURL() + InUrl) : InUrl) + (InContent.ContentType == EWebContentType::Form_Url ? (TEXT("?") + InContent.ToString()) : TEXT("")));
 
 	WebRequestMap.Emplace(HttpRequest->GetURL(), HttpRequest.ToSharedPtr());
 
 	FString ContentType;
 	switch(InContent.ContentType)
 	{
-		case EWebContentType::Form:
+		case EWebContentType::Form_Url:
+		case EWebContentType::Form_Body:
 		{
 			ContentType = TEXT("application/x-www-form-urlencoded; charset=utf-8");
 			break;
@@ -109,12 +97,15 @@ bool FWebRequestManager::SendWebRequest(const FString& InUrl, EWebRequestMethod 
 	InHeadMap.Add(TEXT("Content-Type"), ContentType);
 	InHeadMap.Add(TEXT("timestamp"), FString::FromInt(FDateTime::UtcNow().ToUnixTimestamp()));
 
-	for(auto& Iter : InHeadMap.GetMap())
+	for(auto& Iter : InHeadMap.GetSource())
 	{
 		HttpRequest->SetHeader(Iter.Key, Iter.Value);
 	}
 
-	HttpRequest->SetContentAsString(InContent.ToString());
+	if(InContent.ContentType != EWebContentType::Form_Url)
+	{
+		HttpRequest->SetContentAsString(InContent.ToString());
+	}
 
 	switch(InMethod)
 	{
@@ -188,7 +179,7 @@ TSharedPtr<IHttpRequest> FWebRequestManager::GetWebRequest(const FString& InUrl)
 
 void FWebRequestManager::AddDownloader(const TSharedPtr<IFileDownloaderInterface>& Downloader)
 {
-	if(!Downloader) return;;
+	if(!Downloader) return;
 	
 	if(!Downloaders.Contains(Downloader))
 	{
@@ -253,4 +244,16 @@ void FWebRequestManager::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttp
 		WHLog(FString::Printf(TEXT("------> Message body: %s"), *HttpResponse->GetContentAsString()), EDC_WebRequest, EDV_Error);
 		OnComplete(HttpRequest, HttpResponse, false);
 	}
+}
+
+FString FWebRequestManager::GetServerURL() const
+{
+	return FString::Printf(TEXT("%s:%d"), *ServerIP, ServerPort);
+}
+
+void FWebRequestManager::SetServerURL(const FString& InServerURL)
+{
+	const int32 MidIndex = InServerURL.Find(TEXT(":"), ESearchCase::IgnoreCase, ESearchDir::FromEnd);
+	ServerIP = InServerURL.Mid(0, MidIndex);
+	ServerPort = FCString::Atoi(*InServerURL.Mid(MidIndex + 1));
 }

@@ -88,7 +88,7 @@ void AAbilitySpawnerBase::OnInitialize_Implementation()
 	USceneModuleStatics::AddSceneActor(this);
 }
 
-void AAbilitySpawnerBase::OnPreparatory_Implementation(EPhase InPhase)
+void AAbilitySpawnerBase::OnPreparatory_Implementation()
 {
 #if WITH_EDITORONLY_DATA
 	WidgetComponent->SetVisibility(false);
@@ -105,7 +105,7 @@ void AAbilitySpawnerBase::OnRefresh_Implementation(float DeltaSeconds)
 	
 }
 
-void AAbilitySpawnerBase::OnTermination_Implementation(EPhase InPhase)
+void AAbilitySpawnerBase::OnTermination_Implementation()
 {
 	USceneModuleStatics::RemoveSceneActor(this);
 
@@ -146,7 +146,7 @@ void AAbilitySpawnerBase::BeginPlay()
 		{
 			Execute_OnInitialize(this);
 		}
-		Execute_OnPreparatory(this, EPhase::All);
+		Execute_OnPreparatory(this);
 	}
 }
 
@@ -156,7 +156,7 @@ void AAbilitySpawnerBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	
 	if(Execute_IsUseDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this, EPhase::All);
+		Execute_OnTermination(this);
 	}
 }
 

@@ -9,6 +9,22 @@ public: \
 	static ManagerClass& Get(); \
 	static ManagerClass* GetPtr();
 
+#define IMPLEMENTATION_MAIN_MANAGER(ManagerClass) \
+ManagerClass* ManagerClass::Instance = nullptr; \
+ManagerClass& ManagerClass::Get() \
+{ \
+	return *ManagerClass::GetPtr(); \
+} \
+ManagerClass* ManagerClass::GetPtr() \
+{ \
+	if(!Instance) \
+	{ \
+		Instance = new ManagerClass(); \
+		Instance->OnInitialize(); \
+	} \
+	return Instance; \
+}
+
 #define GENERATED_MANAGER(ManagerClass) \
 protected: \
 	static ManagerClass* Instance; \
@@ -39,20 +55,4 @@ void ManagerClass::Register(bool bForce) \
 void ManagerClass::UnRegister() \
 { \
 	FMainManager::UnRegisterManager<ManagerClass>(); \
-}
-
-#define IMPLEMENTATION_MAIN_MANAGER(ManagerClass) \
-ManagerClass* ManagerClass::Instance = nullptr; \
-ManagerClass& ManagerClass::Get() \
-{ \
-	return *ManagerClass::GetPtr(); \
-} \
-ManagerClass* ManagerClass::GetPtr() \
-{ \
-	if(!Instance) \
-	{ \
-		Instance = new ManagerClass(); \
-		Instance->OnInitialize(); \
-	} \
-	return Instance; \
 }

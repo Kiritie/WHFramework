@@ -100,7 +100,7 @@ void APawnBase::OnInitialize_Implementation()
 	USceneModuleStatics::AddSceneActor(this);
 }
 
-void APawnBase::OnPreparatory_Implementation(EPhase InPhase)
+void APawnBase::OnPreparatory_Implementation()
 {
 	
 }
@@ -120,7 +120,7 @@ void APawnBase::OnRefresh_Implementation(float DeltaSeconds)
 	}
 }
 
-void APawnBase::OnTermination_Implementation(EPhase InPhase)
+void APawnBase::OnTermination_Implementation()
 {
 	USceneModuleStatics::RemoveSceneActor(this);
 }
@@ -157,7 +157,7 @@ void APawnBase::BeginPlay()
 		{
 			Execute_OnInitialize(this);
 		}
-		Execute_OnPreparatory(this, EPhase::All);
+		Execute_OnPreparatory(this);
 	}
 }
 
@@ -167,7 +167,7 @@ void APawnBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	if(Execute_IsUseDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this, EPhase::All);
+		Execute_OnTermination(this);
 	}
 }
 

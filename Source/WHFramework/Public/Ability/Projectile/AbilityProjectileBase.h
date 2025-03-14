@@ -28,7 +28,7 @@ public:
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
 public:
-	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
+	virtual void OnPreparatory_Implementation() override;
 	
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 

@@ -149,3 +149,32 @@ FParameter UParameterModuleStatics::MakeDelegateParameter(const FSimpleDynamicDe
 {
 	return FParameter::MakeDelegate(InValue, InDescription);
 }
+
+FParameterMap UParameterModuleStatics::MakeParameterMap(const TMap<FString, FString>& InParameterMap)
+{
+	return InParameterMap;
+}
+
+FParameterMap& UParameterModuleStatics::AddParameterMapValue(FParameterMap& InParameterMap, const FString& InKey, const FString& InValue)
+{
+	InParameterMap.Add(InKey, InValue);
+	return InParameterMap;
+}
+
+FParameterMap& UParameterModuleStatics::SetParameterMapValue(FParameterMap& InParameterMap, const FString& InKey, const FString& InValue)
+{
+	InParameterMap.Set(InKey, InValue);
+	return InParameterMap;
+}
+
+FParameterMap& UParameterModuleStatics::RemoveParameterMapKey(FParameterMap& InParameterMap, const FString& InKey)
+{
+	InParameterMap.Remove(InKey);
+	return InParameterMap;
+}
+
+FParameterMap& UParameterModuleStatics::ClearParameterMap(FParameterMap& InParameterMap)
+{
+	InParameterMap.Clear();
+	return InParameterMap;
+}

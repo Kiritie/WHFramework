@@ -36,9 +36,9 @@ public:
 	* 当准备
 	*/
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnPreparatory")
-	void K2_OnPreparatory(EPhase InPhase);
+	void K2_OnPreparatory();
 	UFUNCTION()
-	virtual void OnPreparatory(EPhase InPhase);
+	virtual void OnPreparatory();
 	/**
 	* 当刷新
 	*/

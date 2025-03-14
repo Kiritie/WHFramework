@@ -32,7 +32,8 @@ enum class EWebRequestMethod : uint8
 UENUM(BlueprintType)
 enum class EWebContentType : uint8
 {
-	Form,
+	Form_Url,
+	Form_Body,
 	Text,
 	Json,
 	Data
@@ -114,7 +115,7 @@ struct WHFRAMEWORKCORE_API FWebContent
 public:
 	FWebContent()
 	{
-		ContentType = EWebContentType::Form;
+		ContentType = EWebContentType::Form_Body;
 		Content = TEXT("");
 		ContentMap = FParameterMap();
 		ContentData = TArray<uint8>();
@@ -205,36 +206,34 @@ public:
 		{
 			return Content;
 		}
-		else
+		else if(ContentMap.GetNum() > 0)
 		{
-			if(ContentMap.GetNum() > 0)
+			FString ContentStr;
+			switch(ContentType)
 			{
-				FString ContentStr;
-				switch(ContentType)
+				case EWebContentType::Form_Url:
+				case EWebContentType::Form_Body:
 				{
-					case EWebContentType::Form:
+					for(auto& Iter : ContentMap.GetSource())
 					{
-						for(auto& Iter : ContentMap.GetMap())
-						{
-							ContentStr.Append(FString::Printf(TEXT("%s=%s&"), *Iter.Key, *Iter.Value));
-						}
-						ContentStr.RemoveFromEnd(TEXT("&"));
-						break;
+						ContentStr.Append(FString::Printf(TEXT("%s=%s&"), *Iter.Key, *Iter.Value));
 					}
-					case EWebContentType::Text:
-					{
-						ContentStr = ContentMap.ToString();
-						break;
-					}
-					case EWebContentType::Json:
-					{
-						ContentStr = ContentMap.ToJsonString();
-						break;
-					}
-					default: break;
+					ContentStr.RemoveFromEnd(TEXT("&"));
+					break;
 				}
-				return ContentStr;
+				case EWebContentType::Text:
+				{
+					ContentStr = ContentMap.ToString();
+					break;
+				}
+				case EWebContentType::Json:
+				{
+					ContentStr = ContentMap.ToJsonString();
+					break;
+				}
+				default: break;
 			}
+			return ContentStr;
 		}
 		return TEXT("");
 	}

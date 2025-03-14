@@ -65,9 +65,12 @@ void UEventModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
 
-	for(auto Iter : EventManagerRefs)
+	if(PHASEC(InPhase, EPhase::Final))
 	{
-		Iter.Value->OnPreparatory(InPhase);
+		for(auto Iter : EventManagerRefs)
+		{
+			Iter.Value->OnPreparatory();
+		}
 	}
 }
 
@@ -97,9 +100,12 @@ void UEventModule::OnTermination(EPhase InPhase)
 {
 	Super::OnTermination(InPhase);
 	
-	for(auto Iter : EventManagerRefs)
+	if(PHASEC(InPhase, EPhase::Final))
 	{
-		Iter.Value->OnTermination(InPhase);
+		for(auto Iter : EventManagerRefs)
+		{
+			Iter.Value->OnTermination(InPhase);
+		}
 	}
 }
 

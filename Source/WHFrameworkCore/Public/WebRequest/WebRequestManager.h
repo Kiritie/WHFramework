@@ -55,7 +55,7 @@ protected:
 protected:
 	bool bLocalMode;
 
-	FString ServerURL;
+	FString ServerIP;
 
 	int32 ServerPort;
 
@@ -70,13 +70,17 @@ public:
 
 	void SetLocalMode(bool bInLocalMode) { this->bLocalMode = bInLocalMode; }
 
-	FString GetServerURL() const;
+	FString GetServerIP() const { return ServerIP; }
 	
-	void SetServerURL(const FString& InServerURL);
+	void SetServerIP(const FString& InServerIP) { ServerIP = InServerIP; }
 
 	int32 GetServerPort() const { return ServerPort; }
 
 	void SetServerPort(int32 InServerPort) { ServerPort = InServerPort; }
+
+	FString GetServerURL() const;
+	
+	void SetServerURL(const FString& InServerURL);
 
 	bool IsConnected() const { return bConnected; }
 

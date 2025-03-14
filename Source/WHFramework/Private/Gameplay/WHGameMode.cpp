@@ -3,6 +3,7 @@
 #include "Gameplay/WHGameMode.h"
 
 #include "Debug/Widget/SDebugPanelWidget.h"
+#include "Gameplay/WHGameManager.h"
 #include "Gameplay/WHGameState.h"
 #include "Gameplay/WHHUD.h"
 #include "Gameplay/WHPlayerController.h"
@@ -28,11 +29,11 @@ void AWHGameMode::OnInitialize_Implementation()
 	bInitialized = true;
 }
 
-void AWHGameMode::OnPreparatory_Implementation(EPhase InPhase)
+void AWHGameMode::OnPreparatory_Implementation()
 {
 	if(AMainModule* MainModule = AMainModule::GetPtr())
 	{
-		MainModule->Execute_OnPreparatory(MainModule, InPhase);
+		MainModule->Execute_OnPreparatory(MainModule);
 	}
 }
 
@@ -41,7 +42,7 @@ void AWHGameMode::OnRefresh_Implementation(float DeltaSeconds)
 	
 }
 
-void AWHGameMode::OnTermination_Implementation(EPhase InPhase)
+void AWHGameMode::OnTermination_Implementation()
 {
 	
 }
@@ -108,9 +109,7 @@ void AWHGameMode::BeginPlay()
 
 	if(Execute_IsUseDefaultLifecycle(this))
 	{
-		Execute_OnPreparatory(this, EPhase::Primary);
-		Execute_OnPreparatory(this, EPhase::Lesser);
-		Execute_OnPreparatory(this, EPhase::Final);
+		Execute_OnPreparatory(this);
 	}
 }
 
@@ -120,9 +119,7 @@ void AWHGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	if(Execute_IsUseDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this, EPhase::Primary);
-		Execute_OnTermination(this, EPhase::Lesser);
-		Execute_OnTermination(this, EPhase::Final);
+		Execute_OnTermination(this);
 	}
 }
 
@@ -133,5 +130,46 @@ void AWHGameMode::Tick(float DeltaSeconds)
 	if(Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnRefresh(this, DeltaSeconds);
+	}
+}
+
+AWHGameManager* AWHGameMode::GetManagerByClass(TSubclassOf<AWHGameManager> InClass)
+{
+	if(!InClass) return nullptr;
+	
+	const FName ManagerName = InClass.GetDefaultObject()->GetManagerName();
+	return GetManagerByName(ManagerName);
+}
+
+AWHGameManager* AWHGameMode::GetManagerByName(const FName InName) const
+{
+	if(ManagerMap.Contains(InName))
+	{
+		return ManagerMap[InName];
+	}
+	return nullptr;
+}
+
+void AWHGameMode::AddManagerToList(AWHGameManager* InManager)
+{
+	if(!Managers.Contains(InManager))
+	{
+		Managers.Add(InManager);
+		if(!ManagerMap.Contains(InManager->GetManagerName()))
+		{
+			ManagerMap.Add(InManager->GetManagerName(), InManager);
+		}
+	}
+}
+
+void AWHGameMode::RemoveManagerFromList(AWHGameManager* InManager)
+{
+	if(Managers.Contains(InManager))
+	{
+		Managers.Remove(InManager);
+		if(ManagerMap.Contains(InManager->GetManagerName()))
+		{
+			ManagerMap.Remove(InManager->GetManagerName());
+		}
 	}
 }

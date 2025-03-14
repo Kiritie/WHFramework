@@ -30,9 +30,9 @@ void UEventManagerBase::OnInitialize()
 	UEventModuleStatics::SubscribeEvent<UEventHandle_GameExited>(this, GET_FUNCTION_NAME_THISCLASS(OnGameExited));
 }
 
-void UEventManagerBase::OnPreparatory(EPhase InPhase)
+void UEventManagerBase::OnPreparatory()
 {
-	K2_OnPreparatory(InPhase);
+	K2_OnPreparatory();
 }
 
 void UEventManagerBase::OnRefresh(float DeltaSeconds)

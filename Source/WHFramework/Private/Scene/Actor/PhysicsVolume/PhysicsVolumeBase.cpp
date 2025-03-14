@@ -27,7 +27,7 @@ void APhysicsVolumeBase::OnInitialize_Implementation()
 	bInitialized = true;
 }
 
-void APhysicsVolumeBase::OnPreparatory_Implementation(EPhase InPhase)
+void APhysicsVolumeBase::OnPreparatory_Implementation()
 {
 	
 }
@@ -37,7 +37,7 @@ void APhysicsVolumeBase::OnRefresh_Implementation(float DeltaSeconds)
 	
 }
 
-void APhysicsVolumeBase::OnTermination_Implementation(EPhase InPhase)
+void APhysicsVolumeBase::OnTermination_Implementation()
 {
 	
 }
@@ -52,7 +52,7 @@ void APhysicsVolumeBase::BeginPlay()
 		{
 			Execute_OnInitialize(this);
 		}
-		Execute_OnPreparatory(this, EPhase::Final);
+		Execute_OnPreparatory(this);
 	}
 }
 
@@ -62,7 +62,7 @@ void APhysicsVolumeBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	if(Execute_IsUseDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this, EPhase::Final);
+		Execute_OnTermination(this);
 	}
 }
 

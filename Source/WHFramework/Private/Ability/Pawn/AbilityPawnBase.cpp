@@ -91,14 +91,11 @@ void AAbilityPawnBase::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
-void AAbilityPawnBase::OnPreparatory_Implementation(EPhase InPhase)
+void AAbilityPawnBase::OnPreparatory_Implementation()
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory_Implementation();
 
-	if(PHASEC(InPhase, EPhase::Primary))
-	{
-		RefreshAttributes();
-	}
+	RefreshAttributes();
 }
 
 void AAbilityPawnBase::OnRefresh_Implementation(float DeltaSeconds)
@@ -121,9 +118,9 @@ void AAbilityPawnBase::OnRefresh_Implementation(float DeltaSeconds)
 	}
 }
 
-void AAbilityPawnBase::OnTermination_Implementation(EPhase InPhase)
+void AAbilityPawnBase::OnTermination_Implementation()
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination_Implementation();
 }
 
 void AAbilityPawnBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

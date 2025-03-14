@@ -484,6 +484,24 @@ AWHGameState* UCommonStatics::GetGameState(TSubclassOf<AWHGameState> InClass)
 	return GetDeterminesOutputObject(Cast<AWHGameState>(UGameplayStatics::GetGameState(GetWorldContext())), InClass);
 }
 
+AWHGameManager* UCommonStatics::GetGameManagerByClass(TSubclassOf<AWHGameManager> InClass)
+{
+	if(AWHGameMode* GameMode = GetGameMode())
+	{
+		return GameMode->GetManagerByClass(InClass);
+	}
+	return nullptr;
+}
+
+AWHGameManager* UCommonStatics::GetGameManagerByName(const FName InName)
+{
+	if(AWHGameMode* GameMode = GetGameMode())
+	{
+		return GameMode->GetManagerByName(InName);
+	}
+	return nullptr;
+}
+
 AWHPlayerController* UCommonStatics::GetPlayerController(int32 InPlayerIndex, TSubclassOf<AWHPlayerController> InClass)
 {
 	return GetDeterminesOutputObject(Cast<AWHPlayerController>(UGameplayStatics::GetPlayerController(GetWorldContext(), InPlayerIndex)), InClass);
