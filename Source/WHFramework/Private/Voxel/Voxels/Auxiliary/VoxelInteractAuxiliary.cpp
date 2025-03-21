@@ -7,7 +7,7 @@
 #include "Common/Interaction/InteractionComponent.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
-#include "Voxel/Datas/VoxelInteractData.h"
+#include "Voxel/Voxels/Data/VoxelInteractData.h"
 #include "Voxel/Voxels/VoxelInteract.h"
 
 // Sets default values
@@ -44,7 +44,7 @@ void AVoxelInteractAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::All))
 	{
-		switch(SaveData.MeshNature)
+		switch(SaveData.VoxelScope)
 		{
 			case EVoxelScope::Chunk:
 			{

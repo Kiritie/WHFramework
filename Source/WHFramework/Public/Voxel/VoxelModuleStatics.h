@@ -37,6 +37,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
 	static EVoxelWorldMode GetWorldMode();
 
+	UFUNCTION(BlueprintCallable, Category = "VoxelModuleStatics")
+	static void SetWorldMode(EVoxelWorldMode InWorldMode);
+
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
 	static EVoxelWorldState GetWorldState();
 

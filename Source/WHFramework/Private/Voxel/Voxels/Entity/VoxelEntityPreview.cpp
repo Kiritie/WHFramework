@@ -4,7 +4,7 @@
 #include "Voxel/Voxels/Entity/VoxelEntityPreview.h"
 
 #include "Voxel/Components/VoxelMeshComponent.h"
-#include "Voxel/Datas/VoxelData.h"
+#include "Voxel/Voxels/Data/VoxelData.h"
 
 // Sets default values
 AVoxelEntityPreview::AVoxelEntityPreview()

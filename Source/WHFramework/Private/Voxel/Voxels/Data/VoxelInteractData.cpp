@@ -1,4 +1,4 @@
-#include "Voxel/Datas/VoxelInteractData.h"
+#include "Voxel/Voxels/Data/VoxelInteractData.h"
 
 #include "Voxel/Voxels/VoxelInteract.h"
 #include "Voxel/Voxels/Auxiliary/VoxelInteractAuxiliary.h"

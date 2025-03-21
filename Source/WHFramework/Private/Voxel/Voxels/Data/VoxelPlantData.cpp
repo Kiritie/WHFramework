@@ -1,4 +1,4 @@
-#include "Voxel/Datas/VoxelPlantData.h"
+#include "Voxel/Voxels/Data/VoxelPlantData.h"
 
 #include "Voxel/Voxels/VoxelPlant.h"
 

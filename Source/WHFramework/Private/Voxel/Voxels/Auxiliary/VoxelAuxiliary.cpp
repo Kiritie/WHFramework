@@ -8,6 +8,7 @@
 AVoxelAuxiliary::AVoxelAuxiliary()
 {
 	VoxelItem = FVoxelItem::Empty;
+	VoxelScope = EVoxelScope::None;
 }
 
 void AVoxelAuxiliary::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -20,6 +21,7 @@ void AVoxelAuxiliary::OnDespawn_Implementation(bool bRecovery)
 	Super::OnDespawn_Implementation(bRecovery);
 
 	VoxelItem = FVoxelItem::Empty;
+	VoxelScope = EVoxelScope::None;
 }
 
 void AVoxelAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -29,7 +31,8 @@ void AVoxelAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	if(PHASEC(InPhase, EPhase::All))
 	{
 		VoxelItem = SaveData.VoxelItem;
-		switch(SaveData.MeshNature)
+		VoxelScope = SaveData.VoxelScope;
+		switch(VoxelScope)
 		{
 			case EVoxelScope::Chunk:
 			{
@@ -57,6 +60,7 @@ FSaveData* AVoxelAuxiliary::ToData()
 	SaveData = FVoxelAuxiliarySaveData();
 
 	SaveData.VoxelItem = VoxelItem;
+	SaveData.VoxelScope = VoxelScope;
 
 	return &SaveData;
 }

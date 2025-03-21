@@ -15,22 +15,39 @@ UVoxelTerrainGenerator::UVoxelTerrainGenerator()
 void UVoxelTerrainGenerator::Generate(AVoxelChunk* InChunk)
 {
 	//载入地形方块
-	const FVector Range = FVector(Module->GetWorldData().ChunkSize.X, Module->GetWorldData().ChunkSize.Y, Module->GetWorldData().ChunkSize.Z * Module->GetWorldData().WorldSize.Z);
-	ITER_INDEX(Index, Range, false,
-		const FIndex _Index = InChunk->LocalIndexToWorld(Index);
-		if(!Module->HasVoxelByIndex(_Index))
+	switch (Module->GetWorldMode())
+	{
+		case EVoxelWorldMode::Default:
+		case EVoxelWorldMode::Preview:
 		{
-			const EVoxelType VoxelType = CalculateVoxelType(_Index);
-			if(VoxelType != EVoxelType::Empty)
-			{
-				Module->SetVoxelByIndex(_Index, VoxelType);
-			}
+			const FVector Range = FVector(Module->GetWorldData().ChunkSize.X, Module->GetWorldData().ChunkSize.Y, Module->GetWorldData().ChunkSize.Z * Module->GetWorldData().WorldSize.Z);
+			ITER_INDEX(Index, Range, false,
+				const FIndex _Index = InChunk->LocalIndexToWorld(Index);
+				if(!Module->HasVoxelByIndex(_Index))
+				{
+					const EVoxelType VoxelType = CalculateVoxelType(_Index);
+					if(VoxelType != EVoxelType::Empty)
+					{
+						Module->SetVoxelByIndex(_Index, VoxelType);
+					}
+				}
+				else if(!Module->GetVoxelByIndex(_Index).IsValid())
+				{
+					Module->SetVoxelByIndex(_Index, FVoxelItem::Empty, true);
+				}
+			)
+			break;
 		}
-		else if(!Module->GetVoxelByIndex(_Index).IsValid())
+		case EVoxelWorldMode::Prefab:
 		{
-			Module->SetVoxelByIndex(_Index, FVoxelItem::Empty, true);
+			ITER_INDEX2D(Index, Module->GetWorldData().ChunkSize, false,
+				const FIndex _Index = InChunk->LocalIndexToWorld(Index);
+				Module->SetVoxelByIndex(_Index, EVoxelType::Grass, true);
+			)
+			break;
 		}
-	)
+		default: break;
+	}
 }
 
 EVoxelType UVoxelTerrainGenerator::CalculateVoxelType(FIndex InIndex) const

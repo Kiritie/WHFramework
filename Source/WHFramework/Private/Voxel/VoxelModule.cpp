@@ -16,7 +16,7 @@
 #include "Scene/SceneModuleStatics.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Voxel/Chunks/VoxelChunk.h"
-#include "Voxel/Datas/VoxelData.h"
+#include "Voxel/Voxels/Data/VoxelData.h"
 #include "Voxel/Voxels/Voxel.h"
 #include "Voxel/Voxels/VoxelDoor.h"
 #include "Voxel/Voxels/VoxelPlant.h"
@@ -215,6 +215,9 @@ void UVoxelModule::OnInitialize()
 	UAssetModuleStatics::AddStaticObject(FName("EVoxelType"), FStaticObject(UEnum::StaticClass(), TEXT("/Script/WHFramework.EVoxelType")));
 
 	UAssetModuleStatics::AddEnumMapping(TEXT("/Script/WHFramework.EInteractAction"), TEXT("/Script/WHFramework.EVoxelInteractAction"));
+
+	USceneModuleStatics::AddTraceMapping(FName("Chunk"), (ECollisionChannel)EGameTraceChannel::Chunk);
+	USceneModuleStatics::AddTraceMapping(FName("Voxel"), (ECollisionChannel)EGameTraceChannel::Voxel);
 
 	for(const auto Iter1 : UAssetModuleStatics::LoadPrimaryAssets<UVoxelData>(FName("Voxel")))
 	{
@@ -418,14 +421,6 @@ void UVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			ItemIndex++;
 		)
 	}
-	if(PHASEC(InPhase, EPhase::Lesser))
-	{
-		SetWorldMode(EVoxelWorldMode::Preview);
-	}
-	if(PHASEC(InPhase, EPhase::Final))
-	{
-		SetWorldMode(EVoxelWorldMode::Default);
-	}
 	if(PHASEC(InPhase, EPhase::All))
 	{
 		if(SaveData.SceneData.WeatherData.WeatherSeed == 0)
@@ -458,7 +453,6 @@ void UVoxelModule::UnloadData(EPhase InPhase)
 {
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		SetWorldMode(EVoxelWorldMode::None);
 		SetWorldState(EVoxelWorldState::None);
 
 		DestroyChunkQueues();
@@ -476,10 +470,6 @@ void UVoxelModule::UnloadData(EPhase InPhase)
 		WorldData = NewWorldData();
 
 		VoxelCapture->GetCapture()->SetActive(false);
-	}
-	if(PHASEC(InPhase, EPhase::Lesser))
-	{
-		SetWorldMode(EVoxelWorldMode::Preview);
 	}
 }
 

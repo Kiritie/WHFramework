@@ -7,7 +7,7 @@
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
 #include "Common/Interaction/InteractionComponent.h"
-#include "Voxel/Datas/VoxelContainerData.h"
+#include "Voxel/Voxels/Data/VoxelContainerData.h"
 
 // Sets default values
 AVoxelContainerAuxiliary::AVoxelContainerAuxiliary()

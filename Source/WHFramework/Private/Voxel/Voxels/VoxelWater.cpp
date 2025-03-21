@@ -7,7 +7,7 @@
 #include "Math/MathHelper.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Chunks/VoxelChunk.h"
-#include "Voxel/Datas/VoxelData.h"
+#include "Voxel/Voxels/Data/VoxelData.h"
 
 UVoxelWater::UVoxelWater()
 {

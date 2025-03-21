@@ -74,6 +74,20 @@ enum class EInteractAction : uint8
 };
 
 /**
+ * ???????????
+ */
+UENUM(BlueprintType)
+enum class EGameTraceChannel : uint8
+{
+	// ??
+	None = 0,
+	// ?????
+	Chunk = (uint8)ECC_GameTraceChannel9,
+	// ????
+	Voxel = (uint8)ECC_GameTraceChannel10,
+};
+
+/**
  * 交互对象类型
  */
 UENUM(BlueprintType)

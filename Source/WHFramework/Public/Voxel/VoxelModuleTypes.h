@@ -30,7 +30,8 @@ enum class EVoxelWorldMode : uint8
 {
 	None,
 	Default,
-	Preview
+	Preview,
+	Prefab
 };
 
 UENUM(BlueprintType)
@@ -74,11 +75,13 @@ enum class EVoxelType : uint8
 	Oak, //???
 	Oak_Leaves, //?????
 	Oak_Plank, //?????
+	Oak_Stairs, //?????
 	Oak_Door, //?????
 	Oak_Door_Upper, //?????
 	Birch, //?????
 	Birch_Leaves, //???????
 	Birch_Plank, //???????
+	Birch_Stairs, //???????
 	Birch_Door, //???????
 	Birch_Door_Upper, //???????
 	Bed, //?????
@@ -173,14 +176,16 @@ enum class EVoxelScope : uint8
 	None,
 	// ?????
 	Chunk,
-	// ??????
-	PickUp,
+	// ?????
+	Prefab,
 	// ?????
 	Entity,
 	// ?????
 	Capture,
 	// ?????
 	Preview,
+	// ??????
+	PickUp,
 	// ????????
 	Vitality
 };
@@ -552,14 +557,14 @@ public:
 	FORCEINLINE FVoxelAuxiliarySaveData()
 	{
 		VoxelItem = FVoxelItem();
-		MeshNature = EVoxelScope::Chunk;
+		VoxelScope = EVoxelScope::Chunk;
 		InventoryData = FInventorySaveData();
 	}
 
-	FORCEINLINE FVoxelAuxiliarySaveData(const FVoxelItem& InVoxelItem, EVoxelScope InMeshNature = EVoxelScope::None) : FVoxelAuxiliarySaveData()
+	FORCEINLINE FVoxelAuxiliarySaveData(const FVoxelItem& InVoxelItem, EVoxelScope InVoxelScope = EVoxelScope::None) : FVoxelAuxiliarySaveData()
 	{
 		VoxelItem = InVoxelItem;
-		MeshNature = InMeshNature;
+		VoxelScope = InVoxelScope;
 	}
 
 public:
@@ -567,7 +572,7 @@ public:
 	FVoxelItem VoxelItem;
 
 	UPROPERTY()
-	EVoxelScope MeshNature;
+	EVoxelScope VoxelScope;
 
 	UPROPERTY(BlueprintReadWrite)
 	FInventorySaveData InventoryData;
@@ -580,6 +585,22 @@ public:
 		VoxelItem.MakeSaved();
 		InventoryData.MakeSaved();
 	}
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelPrefabSaveData : public FSaveData
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FVoxelPrefabSaveData()
+	{
+		VoxelDatas = TEXT("");
+	}
+
+public:
+	UPROPERTY()
+	FString VoxelDatas;
 };
 
 USTRUCT(BlueprintType)

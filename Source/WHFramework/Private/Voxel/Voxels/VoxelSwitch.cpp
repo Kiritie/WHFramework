@@ -5,7 +5,7 @@
 #include "Audio/AudioModuleStatics.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Voxel/Chunks/VoxelChunk.h"
-#include "Voxel/Datas/VoxelData.h"
+#include "Voxel/Voxels/Data/VoxelData.h"
 #include "Voxel/Voxels/Auxiliary/VoxelInteractAuxiliary.h"
 
 UVoxelSwitch::UVoxelSwitch()

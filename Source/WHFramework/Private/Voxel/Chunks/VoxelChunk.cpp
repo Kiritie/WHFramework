@@ -11,7 +11,7 @@
 #include "Debug/DebugModuleTypes.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
-#include "Voxel/Datas/VoxelData.h"
+#include "Voxel/Voxels/Data/VoxelData.h"
 #include "Voxel/Components/VoxelMeshComponent.h"
 #include "Voxel/Voxels/Auxiliary/VoxelAuxiliary.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
@@ -234,35 +234,49 @@ void AVoxelChunk::CreateMesh()
 
 void AVoxelChunk::BuildMap(int32 InStage)
 {
-	switch (InStage)
+	switch (Module->GetWorldMode())
 	{
-		case 1:
+		case EVoxelWorldMode::Default:
+		case EVoxelWorldMode::Preview:
 		{
-			Module->GenerateVoxel<UVoxelTemperatureGenerator>(this);
-			Module->GenerateVoxel<UVoxelHumidityGenerator>(this);
-			Module->GenerateVoxel<UVoxelBiomeGenerator>(this);
-			Module->GenerateVoxel<UVoxelHeightGenerator>(this);
+			switch (InStage)
+			{
+				case 1:
+				{
+					Module->GenerateVoxel<UVoxelTemperatureGenerator>(this);
+					Module->GenerateVoxel<UVoxelHumidityGenerator>(this);
+					Module->GenerateVoxel<UVoxelBiomeGenerator>(this);
+					Module->GenerateVoxel<UVoxelHeightGenerator>(this);
+					break;
+				}
+				case 2:
+				{
+					Module->GenerateVoxel<UVoxelLakeGenerator>(this);
+					break;
+				}
+				case 3:
+				{
+					Module->GenerateVoxel<UVoxelCaveGenerator>(this);
+					Module->GenerateVoxel<UVoxelHoleGenerator>(this);
+					Module->GenerateVoxel<UVoxelOreGenerator>(this);
+					Module->GenerateVoxel<UVoxelTerrainGenerator>(this);
+					Module->GenerateVoxel<UVoxelRainGenerator>(this);
+					Module->GenerateVoxel<UVoxelFoliageGenerator>(this);
+					break;
+				}
+				case 4:
+				{
+					Module->GenerateVoxel<UVoxelBuildingGenerator>(this);
+					bBuilded = true;
+					break;
+				}
+				default: break;
+			}
 			break;
 		}
-		case 2:
+		case EVoxelWorldMode::Prefab:
 		{
-			Module->GenerateVoxel<UVoxelLakeGenerator>(this);
-			break;
-		}
-		case 3:
-		{
-			Module->GenerateVoxel<UVoxelCaveGenerator>(this);
-			Module->GenerateVoxel<UVoxelHoleGenerator>(this);
-			Module->GenerateVoxel<UVoxelOreGenerator>(this);
 			Module->GenerateVoxel<UVoxelTerrainGenerator>(this);
-			Module->GenerateVoxel<UVoxelRainGenerator>(this);
-			Module->GenerateVoxel<UVoxelFoliageGenerator>(this);
-			break;
-		}
-		case 4:
-		{
-			Module->GenerateVoxel<UVoxelBuildingGenerator>(this);
-			bBuilded = true;
 			break;
 		}
 		default: break;

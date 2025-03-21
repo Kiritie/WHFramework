@@ -1,4 +1,4 @@
-#include "Voxel/Datas/VoxelData.h"
+#include "Voxel/Voxels/Data/VoxelData.h"
 
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/PickUp/AbilityPickUpVoxel.h"

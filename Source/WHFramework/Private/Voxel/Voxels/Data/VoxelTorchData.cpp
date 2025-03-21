@@ -1,4 +1,4 @@
-#include "Voxel/Datas/VoxelTorchData.h"
+#include "Voxel/Voxels/Data/VoxelTorchData.h"
 
 #include "Voxel/Voxels/VoxelTorch.h"
 #include "Voxel/Voxels/Auxiliary/VoxelTorchAuxiliary.h"

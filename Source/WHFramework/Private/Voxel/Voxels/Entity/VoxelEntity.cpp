@@ -6,7 +6,7 @@
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Components/VoxelMeshComponent.h"
-#include "Voxel/Datas/VoxelData.h"
+#include "Voxel/Voxels/Data/VoxelData.h"
 #include "Voxel/Voxels/Auxiliary/VoxelAuxiliary.h"
 
 // Sets default values
@@ -17,9 +17,9 @@ AVoxelEntity::AVoxelEntity()
 	MeshComponent = CreateDefaultSubobject<UVoxelMeshComponent>(FName("MeshComponent"));
 	MeshComponent->SetupAttachment(RootComponent);
 
-	VoxelID = FPrimaryAssetId();
+	VoxelItem = FPrimaryAssetId();
 	VoxelScope = EVoxelScope::Entity;
-	Auxiliary = nullptr;
+	VoxelItem.Auxiliary = nullptr;
 }
 
 void AVoxelEntity::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -31,7 +31,7 @@ void AVoxelEntity::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
 	
-	VoxelID = FPrimaryAssetId();
+	VoxelItem = FPrimaryAssetId();
 	MeshComponent->ClearMesh();
 	DestroyAuxiliary();
 }
@@ -47,34 +47,25 @@ void AVoxelEntity::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	const auto& SaveData = InSaveData->CastRef<FVoxelItem>();
 
-	VoxelID = SaveData.ID;
+	VoxelItem = SaveData;
 	
-	if(VoxelID.IsValid())
+	if(VoxelItem.IsValid())
 	{
 		const UVoxelData& VoxelData = SaveData.GetVoxelData();
 		if(VoxelData.AuxiliaryClass)
 		{
-			if(Auxiliary && Auxiliary->GetClass() != VoxelData.AuxiliaryClass)
+			if(VoxelItem.Auxiliary && VoxelItem.Auxiliary->GetClass() != VoxelData.AuxiliaryClass)
 			{
 				DestroyAuxiliary();
 			}
-			if(!Auxiliary)
-			{
-				Auxiliary = UObjectPoolModuleStatics::SpawnObject<AVoxelAuxiliary>(nullptr, nullptr, VoxelData.AuxiliaryClass);
-				Auxiliary->AttachToComponent(MeshComponent, FAttachmentTransformRules::SnapToTargetIncludingScale);
-				Auxiliary->Execute_SetActorVisible(Auxiliary, Execute_IsVisible(this));
-			}
-			if(Auxiliary)
-			{
-				Auxiliary->LoadSaveData(new FVoxelAuxiliarySaveData(SaveData, VoxelScope));
-			}
+			SpawnAuxiliary();
 		}
-		else if(Auxiliary)
+		else if(VoxelItem.Auxiliary)
 		{
 			DestroyAuxiliary();
 		}
 	}
-	else if(Auxiliary)
+	else if(VoxelItem.Auxiliary)
 	{
 		DestroyAuxiliary();
 	}
@@ -87,11 +78,30 @@ FSaveData* AVoxelEntity::ToData()
 	return nullptr;
 }
 
+void AVoxelEntity::SpawnAuxiliary()
+{
+	if(VoxelItem.IsValid() && !VoxelItem.Auxiliary)
+	{
+		const UVoxelData& VoxelData = VoxelItem.GetVoxelData();
+		if(VoxelData.AuxiliaryClass)
+		{
+			if(AVoxelAuxiliary* Auxiliary = UObjectPoolModuleStatics::SpawnObject<AVoxelAuxiliary>(nullptr, nullptr, VoxelData.AuxiliaryClass))
+			{
+				Auxiliary->AttachToComponent(RootComponent, FAttachmentTransformRules::SnapToTargetIncludingScale);
+				Auxiliary->Execute_SetActorVisible(Auxiliary, Execute_IsVisible(this));
+				Auxiliary->LoadSaveData(new FVoxelAuxiliarySaveData(VoxelItem, VoxelScope));
+				VoxelItem.Auxiliary = Auxiliary;
+			}
+		}
+	}
+}
+
 void AVoxelEntity::DestroyAuxiliary()
 {
-	if(!Auxiliary) return;
-	
-	Auxiliary->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-	UObjectPoolModuleStatics::DespawnObject(Auxiliary);
-	Auxiliary = nullptr;
+	if(VoxelItem.IsValid() && VoxelItem.Auxiliary)
+	{
+		VoxelItem.Auxiliary->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+		UObjectPoolModuleStatics::DespawnObject(VoxelItem.Auxiliary);
+		VoxelItem.Auxiliary = nullptr;
+	}
 }

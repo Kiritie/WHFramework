@@ -5,8 +5,8 @@
 #include "Components/PointLightComponent.h"
 #include "Particles/ParticleSystemComponent.h"
 #include "Voxel/VoxelModule.h"
-#include "Voxel/Datas/VoxelData.h"
-#include "Voxel/Datas/VoxelTorchData.h"
+#include "Voxel/Voxels/Data/VoxelData.h"
+#include "Voxel/Voxels/Data/VoxelTorchData.h"
 
 // Sets default values
 AVoxelTorchAuxiliary::AVoxelTorchAuxiliary()

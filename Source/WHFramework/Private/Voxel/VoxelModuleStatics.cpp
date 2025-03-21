@@ -6,7 +6,7 @@
 #include "Asset/AssetModuleStatics.h"
 #include "Common/CommonStatics.h"
 #include "Voxel/VoxelModule.h"
-#include "Voxel/Datas/VoxelData.h"
+#include "Voxel/Voxels/Data/VoxelData.h"
 #include "Voxel/Voxels/Voxel.h"
 
 FPrimaryAssetId UVoxelModuleStatics::VoxelTypeToAssetID(EVoxelType InVoxelType)
@@ -48,6 +48,11 @@ FVoxelWorldSaveData& UVoxelModuleStatics::GetWorldData()
 EVoxelWorldMode UVoxelModuleStatics::GetWorldMode()
 {
 	return UVoxelModule::Get().GetWorldMode();
+}
+
+void UVoxelModuleStatics::SetWorldMode(EVoxelWorldMode InWorldMode)
+{
+	UVoxelModule::Get().SetWorldMode(InWorldMode);
 }
 
 EVoxelWorldState UVoxelModuleStatics::GetWorldState()

@@ -5,7 +5,7 @@
 #include "Common/Base/WHActor.h"
 #include "Voxel/VoxelModuleTypes.h"
 
-#include "VoxelEntity.generated.h"
+#include "VoxelPrefab.generated.h"
 
 class AVoxelAuxiliary;
 class UVoxelData;
@@ -15,13 +15,13 @@ class UVoxelMeshComponent;
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelEntity : public AWHActor
+class WHFRAMEWORK_API AVoxelPrefab : public AWHActor
 {
 	GENERATED_BODY()
 
 public:
 	// Sets default values for this actor's properties
-	AVoxelEntity();
+	AVoxelPrefab();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
@@ -41,22 +41,40 @@ protected:
 	virtual FSaveData* ToData() override;
 
 public:
-	virtual void SpawnAuxiliary();
+	virtual void CreateMesh();
 
-	virtual void DestroyAuxiliary();
+	virtual void BuildMesh();
 
 protected:
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	UVoxelMeshComponent* MeshComponent;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TMap<EVoxelNature, UVoxelMeshComponent*> MeshComponents;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	FVoxelItem VoxelItem;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
-	EVoxelScope VoxelScope;
+	TMap<FIndex, FVoxelItem> VoxelMap;
 
 public:
-	UVoxelMeshComponent* GetMeshComponent() const { return MeshComponent; }
+	void SpawnMeshComponents();
 
-	FVoxelItem GetVoxelItem() const { return VoxelItem; }
+	void DestroyMeshComponents();
+
+	AVoxelAuxiliary* SpawnAuxiliary(FVoxelItem& InVoxelItem);
+
+	void DestroyAuxiliary(FVoxelItem& InVoxelItem);
+
+	void DestroyAuxiliarys();
+
+public:
+	bool HasVoxel(FIndex InIndex);
+
+	bool HasVoxel(int32 InX, int32 InY, int32 InZ);
+
+	FVoxelItem& GetVoxel(FIndex InIndex);
+
+	FVoxelItem& GetVoxel(int32 InX, int32 InY, int32 InZ);
+
+	void SetVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem);
+
+	void SetVoxel(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem);
+
+	UVoxelMeshComponent* GetMeshComponent(EVoxelNature InVoxelNature);
 };

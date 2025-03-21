@@ -1,4 +1,4 @@
-#include "Voxel/Datas/VoxelDoorData.h"
+#include "Voxel/Voxels/Data/VoxelDoorData.h"
 
 #include "Voxel/Voxels/VoxelDoor.h"
 #include "Voxel/Voxels/Auxiliary/VoxelSwitchAuxiliary.h"

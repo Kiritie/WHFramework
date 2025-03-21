@@ -7,7 +7,7 @@
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
-#include "Voxel/Datas/VoxelData.h"
+#include "Voxel/Voxels/Data/VoxelData.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Voxels/Voxel.h"
 
@@ -53,17 +53,12 @@ void UVoxelMeshComponent::Initialize(EVoxelScope InScope, EVoxelNature InNature)
 	switch (Scope)
 	{
 		case EVoxelScope::Chunk:
+		case EVoxelScope::Prefab:
 		{
 			OffsetScale = FVector::OneVector;
 			CenterOffset = FVector(0.5f);
+			SetCastShadow(true);
 			SetCollisionEnabled(true);
-			break;
-		}
-		case EVoxelScope::PickUp:
-		{
-			OffsetScale = FVector::ZeroVector;
-			CenterOffset = FVector(0.f, 0.f, 0.f);
-			SetCollisionEnabled(false);
 			break;
 		}
 		case EVoxelScope::Entity:
@@ -90,10 +85,19 @@ void UVoxelMeshComponent::Initialize(EVoxelScope InScope, EVoxelNature InNature)
 			SetCollisionEnabled(false);
 			break;
 		}
+		case EVoxelScope::PickUp:
+		{
+			OffsetScale = FVector::ZeroVector;
+			CenterOffset = FVector(0.f, 0.f, 0.f);
+			SetCastShadow(true);
+			SetCollisionEnabled(false);
+			break;
+		}
 		case EVoxelScope::Vitality:
 		{
 			OffsetScale = FVector::OneVector;
 			CenterOffset = FVector(0.f, 0.f, 0.f);
+			SetCastShadow(true);
 			SetCollisionEnabled(false);
 			break;
 		}
@@ -177,8 +181,9 @@ void UVoxelMeshComponent::CreateMesh(int32 InSectionIndex /*= 0*/, bool bHasColl
 		switch (Scope)
 		{
 			case EVoxelScope::Chunk:
-			case EVoxelScope::PickUp:
+			case EVoxelScope::Prefab:
 			case EVoxelScope::Entity:
+			case EVoxelScope::PickUp:
 			case EVoxelScope::Vitality:
 			{
 				SetMaterial(InSectionIndex, UVoxelModule::Get().GetWorldData().GetRenderData(Nature).MaterialInst);

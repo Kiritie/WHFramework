@@ -76,7 +76,7 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "World")
 	bool bAutoGenerate;
 
-	UPROPERTY(VisibleAnywhere, Category = "World")
+	UPROPERTY(EditAnywhere, Category = "World")
 	EVoxelWorldMode WorldMode;
 
 	UPROPERTY(VisibleAnywhere, Category = "World")
@@ -88,6 +88,9 @@ public:
 	UFUNCTION(BlueprintPure)
 	EVoxelWorldMode GetWorldMode() const { return WorldMode; }
 
+	UFUNCTION(BlueprintCallable)
+	void SetWorldMode(EVoxelWorldMode InWorldMode);
+
 	UFUNCTION(BlueprintPure)
 	EVoxelWorldState GetWorldState() const { return WorldState; }
 
@@ -95,10 +98,10 @@ public:
 	FVoxelWorldBasicSaveData& GetWorldBasicData() { return WorldBasicData; }
 
 protected:
-	void SetWorldMode(EVoxelWorldMode InWorldMode);
-
+	UFUNCTION(BlueprintCallable)
 	void SetWorldState(EVoxelWorldState InWorldState);
 
+protected:
 	virtual void OnWorldModeChanged();
 
 	virtual void OnWorldStateChanged();

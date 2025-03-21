@@ -1,4 +1,4 @@
-#include "Voxel/Datas/VoxelSwitchData.h"
+#include "Voxel/Voxels/Data/VoxelSwitchData.h"
 
 #include "Voxel/Voxels/VoxelSwitch.h"
 #include "Voxel/Voxels/Auxiliary/VoxelSwitchAuxiliary.h"

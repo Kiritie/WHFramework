@@ -8,7 +8,7 @@
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Chunks/VoxelChunk.h"
-#include "Voxel/Datas/VoxelData.h"
+#include "Voxel/Voxels/Data/VoxelData.h"
 #include "Voxel/Voxels/Voxel.h"
 
 FVoxelItem FVoxelItem::Empty = FVoxelItem(FPrimaryAssetId(FName("Voxel"), FName("DA_Empty")));
@@ -196,7 +196,7 @@ FVector FVoxelItem::GetLocation(bool bWorldSpace) const
 	{
 		return Owner->IndexToLocation(Index, bWorldSpace);
 	}
-	return FVector::ZeroVector;
+	return Index.ToVector() * UVoxelModule::Get().GetWorldData().BlockSize;
 }
 
 UVoxel& FVoxelItem::GetVoxel() const
