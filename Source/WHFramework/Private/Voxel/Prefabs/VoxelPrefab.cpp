@@ -47,7 +47,7 @@ void AVoxelPrefab::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	SaveData.VoxelDatas.ParseIntoArray(VoxelDatas, TEXT("|"));
 	for(auto& Iter : VoxelDatas)
 	{
-		FVoxelItem VoxelItem = FVoxelItem(Iter);
+		FVoxelItem VoxelItem = FVoxelItem(Iter, true);
 		SetVoxel(VoxelItem.Index, VoxelItem);
 	}
 
@@ -70,9 +70,10 @@ FSaveData* AVoxelPrefab::ToData()
 	ITER_MAP(VoxelMap, Iter,
 		if(Iter.Value.IsValid())
 		{
-			SaveData.VoxelDatas.Appendf(TEXT("%s|"), *Iter.Value.ToSaveData(true));
+			SaveData.VoxelDatas.Appendf(TEXT("%s|"), *Iter.Value.ToSaveData(true, true));
 		}
 	)
+	SaveData.VoxelDatas.RemoveFromEnd(TEXT("|"));
 	return &SaveData;
 }
 

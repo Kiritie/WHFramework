@@ -3,7 +3,9 @@
 UVoxelPrefabData::UVoxelPrefabData()
 {
 	Type = FName("VoxelPrefab");
+	
 	VoxelDatas = TEXT("");
+	VoxelSize = FVector();
 }
 
 void UVoxelPrefabData::OnInitialize_Implementation()

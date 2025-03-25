@@ -94,6 +94,14 @@ public:
 	static bool IsInScreenViewport(const FVector& InWorldLocation);
 
 	//////////////////////////////////////////////////////////////////////////
+	// Clipboard
+	UFUNCTION(BlueprintCallable, Category = "CommonStatics")
+	static void ClipboardCopy(const FString& InStr);
+
+	UFUNCTION(BlueprintCallable, Category = "CommonStatics")
+	static void ClipboardPaste(FString& OutStr);
+
+	//////////////////////////////////////////////////////////////////////////
 	// Phase
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
 	static bool PhaseC(EPhase A, EPhase B)

@@ -19,21 +19,21 @@ UAbilityItemDataBase::UAbilityItemDataBase()
 	AbilityClass = nullptr;
 	PickUpClass = nullptr;
 
-	InitIcon = nullptr;
+	_Icon = nullptr;
 }
 
 void UAbilityItemDataBase::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
 
-	InitIcon = Icon;
+	_Icon = Icon;
 }
 
 void UAbilityItemDataBase::OnReset_Implementation()
 {
 	Super::OnReset_Implementation();
 
-	Icon = InitIcon;
+	Icon = _Icon;
 }
 
 int32 UAbilityItemDataBase::ClampCount(int32 InCount) const

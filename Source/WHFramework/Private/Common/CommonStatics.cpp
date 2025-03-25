@@ -22,6 +22,7 @@
 #include "Main/MainModule.h"
 #include "Main/MainModuleStatics.h"
 #include "Widgets/SViewport.h"
+#include "Windows/WindowsPlatformApplicationMisc.h"
 
 bool UCommonStatics::IsPaused()
 {
@@ -132,6 +133,16 @@ bool UCommonStatics::IsInScreenViewport(const FVector& InWorldLocation)
 		}
 	}
 	return false;
+}
+
+void UCommonStatics::ClipboardCopy(const FString& InStr)
+{
+	FPlatformApplicationMisc::ClipboardCopy(*InStr);
+}
+
+void UCommonStatics::ClipboardPaste(FString& OutStr)
+{
+	FPlatformApplicationMisc::ClipboardPaste(OutStr);
 }
 
 int32 UCommonStatics::GetEnumItemNum(const FString& InEnumName)

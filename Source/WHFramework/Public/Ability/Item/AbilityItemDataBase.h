@@ -48,7 +48,7 @@ public:
 
 protected:
 	UPROPERTY(Transient)
-	UObject* InitIcon;
+	UObject* _Icon;
 
 public:
 	UFUNCTION(BlueprintPure)

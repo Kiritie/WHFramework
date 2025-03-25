@@ -306,6 +306,12 @@ FString UInputModule::GetModuleDebugMessage()
 	return FString::Printf(TEXT("GlobalInputMode: %s"), *UCommonStatics::GetEnumAuthoredNameByValue(TEXT("/Script/WHFrameworkCore.EInputMode"), (int32)UInputModuleStatics::GetGlobalInputMode()));
 }
 
+void UInputModule::SetNativeInputMode(EInputMode InInputMode)
+{
+	NativeInputMode = InInputMode;
+	FInputManager::Get().SetNativeInputMode(InInputMode);
+}
+
 UInputManagerBase* UInputModule::GetInputManager(TSubclassOf<UInputManagerBase> InClass, int32 InPlayerIndex) const
 {
 	const FName InputManagerName = InClass->GetDefaultObject<UInputManagerBase>()->GetInputManagerName();

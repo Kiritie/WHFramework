@@ -408,14 +408,12 @@ void UVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 				VoxelEntity->GetMeshComponent()->SetRelativeRotation(FRotator(0.f, 45.f, 0.f));
 				VoxelEntity->GetMeshComponent()->SetRelativeScale3D(FVector(0.3f));
 
-				if(!Item->Icon)
+				if(UMaterialInstanceDynamic* IconMat = Cast<UMaterialInstanceDynamic>(Item->Icon))
 				{
-					UMaterialInstanceDynamic* IconMat = UMaterialInstanceDynamic::Create(WorldBasicData.IconMat, nullptr);
 					IconMat->SetTextureParameterValue(FName("Texture"), VoxelCapture->GetCapture()->TextureTarget);
+					IconMat->SetScalarParameterValue(FName("Index"), ItemIndex);
 					IconMat->SetScalarParameterValue(FName("SizeX"), 8.f);
 					IconMat->SetScalarParameterValue(FName("SizeY"), 8.f);
-					IconMat->SetScalarParameterValue(FName("Index"), ItemIndex);
-					Item->Icon = IconMat;
 				}
 			}
 			ItemIndex++;
@@ -471,6 +469,29 @@ void UVoxelModule::UnloadData(EPhase InPhase)
 
 		VoxelCapture->GetCapture()->SetActive(false);
 	}
+}
+
+void UVoxelModule::LoadPrefabData(const FVoxelPrefabSaveData& InPrefabData)
+{
+	// TODO
+}
+
+FVoxelPrefabSaveData UVoxelModule::GetPrefabData()
+{
+	FVoxelPrefabSaveData PrefabData;
+	ITER_MAP(ChunkMap, Iter1,
+		if(Iter1.Value->IsGenerated())
+		{
+			ITER_MAP(Iter1.Value->VoxelMap, Iter2,
+				if(Iter2.Key.Z > 0 && Iter2.Value.IsValid())
+				{
+					PrefabData.VoxelDatas.Appendf(TEXT("%s|"), *Iter2.Value.ToSaveData(true, true));
+				}
+			)
+		}
+	)
+	PrefabData.VoxelDatas.RemoveFromEnd(TEXT("|"));
+	return PrefabData;
 }
 
 void UVoxelModule::GenerateWorld()
@@ -531,23 +552,26 @@ AVoxelChunk* UVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 	{
 		if(!Chunk->IsBuilded())
 		{
-			if(IsOnTheWorld(InIndex, false))
+			if(WorldData->IsChunkHasVoxelData(InIndex))
 			{
-				if(WorldData->IsChunkHasVoxelData(InIndex))
-				{
-					AddToChunkQueue(EVoxelWorldState::MapLoading, InIndex);
-				}
-				else if(InIndex.Z == 0)
+				AddToChunkQueue(EVoxelWorldState::MapLoading, InIndex);
+			}
+			else if(InIndex.Z == 0)
+			{
+				if(WorldMode != EVoxelWorldMode::Prefab)
 				{
 					AddToChunkQueue(EVoxelWorldState::MapBuilding, InIndex);
 				}
-			}
-			else if(IsOnTheWorld(InIndex))
-			{
-				Chunk->bBuilded = true;
+				else
+				{
+					ITER_INDEX2D(Index, WorldData->ChunkSize, false,
+						Chunk->SetVoxel(Index, EVoxelType::Grass);
+					)
+					Chunk->bBuilded = true;
+				}
 			}
 		}
-		if(!Chunk->IsGenerated() && IsOnTheWorld(InIndex))
+		if(!Chunk->IsGenerated())
 		{
 			TArray<AVoxelChunk*> GenerateChunks;
 			Chunk->GetNeighbors().GenerateValueArray(GenerateChunks);
@@ -938,18 +962,26 @@ FIndex UVoxelModule::VoxelIndexToChunkIndex(FIndex InIndex) const
 	return FIndex(FMath::FloorToInt(Index.X), FMath::FloorToInt(Index.Y), FMath::FloorToInt(Index.Z));
 }
 
-int32 UVoxelModule::VoxelIndexToNumber(FIndex InIndex) const
+uint64 UVoxelModule::VoxelIndexToNumber(FIndex InIndex, bool bWorldSpace) const
 {
-	const int32 Num = (int32)WorldData->ChunkSize.X;
-	return InIndex.X + InIndex.Y * Num + InIndex.Z * Num * (int32)WorldData->ChunkSize.Y;
+	if(!bWorldSpace)
+	{
+		const int32 Num = (int32)WorldData->ChunkSize.X;
+		return InIndex.X + InIndex.Y * Num + InIndex.Z * Num * (int32)WorldData->ChunkSize.Y;
+	}
+	return FMathHelper::Index(InIndex);
 }
 
-FIndex UVoxelModule::NumberToVoxelIndex(int32 InNumber) const
+FIndex UVoxelModule::NumberToVoxelIndex(uint64 InNumber, bool bWorldSpace) const
 {
-	const int32 Num1 = (int32)WorldData->ChunkSize.X;
-	const int32 Num2 = Num1 * (int32)WorldData->ChunkSize.Y;
-	const int32 Num3 = InNumber % Num2;
-	return FIndex(Num3 % Num1, Num3 / Num1, InNumber / Num2);
+	if(!bWorldSpace)
+	{
+		const int32 Num1 = (int32)WorldData->ChunkSize.X;
+		const int32 Num2 = Num1 * (int32)WorldData->ChunkSize.Y;
+		const int32 Num3 = InNumber % Num2;
+		return FIndex(Num3 % Num1, Num3 / Num1, InNumber / Num2);
+	}
+	return FMathHelper::UnIndex(InNumber);
 }
 
 bool UVoxelModule::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)

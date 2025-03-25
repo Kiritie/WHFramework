@@ -40,29 +40,39 @@ EVoxelTransparency UVoxelModuleStatics::VoxelNatureToTransparency(EVoxelNature I
 	return EVoxelTransparency::Solid;
 }
 
-FVoxelWorldSaveData& UVoxelModuleStatics::GetWorldData()
+FVoxelWorldSaveData& UVoxelModuleStatics::GetVoxelWorldData()
 {
 	return UVoxelModule::Get().GetWorldData();
 }
 
-EVoxelWorldMode UVoxelModuleStatics::GetWorldMode()
+EVoxelWorldMode UVoxelModuleStatics::GetVoxelWorldMode()
 {
 	return UVoxelModule::Get().GetWorldMode();
 }
 
-void UVoxelModuleStatics::SetWorldMode(EVoxelWorldMode InWorldMode)
+void UVoxelModuleStatics::SetVoxelWorldMode(EVoxelWorldMode InWorldMode)
 {
 	UVoxelModule::Get().SetWorldMode(InWorldMode);
 }
 
-EVoxelWorldState UVoxelModuleStatics::GetWorldState()
+EVoxelWorldState UVoxelModuleStatics::GetVoxelWorldState()
 {
 	return UVoxelModule::Get().GetWorldState();
 }
 
-FVoxelWorldBasicSaveData UVoxelModuleStatics::GetWorldBasicData()
+FVoxelWorldBasicSaveData UVoxelModuleStatics::GetVoxelWorldBasicData()
 {
 	return UVoxelModule::Get().GetWorldBasicData();
+}
+
+void UVoxelModuleStatics::LoadVoxelPrefabData(const FVoxelPrefabSaveData& InPrefabData)
+{
+	return UVoxelModule::Get().LoadPrefabData(InPrefabData);
+}
+
+FVoxelPrefabSaveData UVoxelModuleStatics::GetVoxelPrefabData()
+{
+	return UVoxelModule::Get().GetPrefabData();
 }
 
 const FVoxelTopography& UVoxelModuleStatics::GetTopographyByIndex(FIndex InIndex)
@@ -120,14 +130,14 @@ FVector UVoxelModuleStatics::VoxelIndexToLocation(FIndex InIndex)
 	return UVoxelModule::Get().VoxelIndexToLocation(InIndex);
 }
 
-int32 UVoxelModuleStatics::VoxelIndexToNumber(FIndex InIndex)
+int64 UVoxelModuleStatics::VoxelIndexToNumber(FIndex InIndex, bool bWorldSpace)
 {
-	return UVoxelModule::Get().VoxelIndexToNumber(InIndex);
+	return UVoxelModule::Get().VoxelIndexToNumber(InIndex, bWorldSpace);
 }
 
-FIndex UVoxelModuleStatics::NumberToVoxelIndex(int32 InNumber)
+FIndex UVoxelModuleStatics::NumberToVoxelIndex(int64 InNumber, bool bWorldSpace)
 {
-	return UVoxelModule::Get().NumberToVoxelIndex(InNumber);
+	return UVoxelModule::Get().NumberToVoxelIndex(InNumber, bWorldSpace);
 }
 
 AVoxelChunk* UVoxelModuleStatics::FindChunkByIndex(FIndex InIndex)

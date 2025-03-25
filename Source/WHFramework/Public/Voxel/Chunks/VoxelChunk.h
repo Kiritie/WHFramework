@@ -164,20 +164,6 @@ public:
 	virtual void SpawnSceneActors() override;
 
 	virtual void DestroySceneActors() override;
-	
-	//////////////////////////////////////////////////////////////////////////
-	// Building
-protected:
-	virtual void GenerateBuildings();
-
-	virtual void SpawnBuilding(FVoxelBuildingSaveData& InBuildingData);
-	
-	virtual void DestroyBuilding(FVoxelBuildingSaveData& InBuildingData);
-
-	virtual void DestroyBuildings();
-
-public:
-	virtual void AddBuilding(const FVoxelBuildingSaveData& InBuildingData);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Auxiliary
@@ -228,8 +214,6 @@ protected:
 	TMap<FIndex, FVoxelItem> VoxelMap;
 
 	TMap<FIndex, FVoxelTopography> TopographyMap;
-
-	TArray<FVoxelBuildingSaveData> BuildingDatas;
 
 public:
 	FIndex GetIndex() const { return Index; }

@@ -1,10 +1,13 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Voxel/Generators/VoxelBuildingGenerator.h"
+
+#include "Asset/AssetModuleStatics.h"
 #include "Math/MathHelper.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "Voxel/Chunks/VoxelChunk.h"
+#include "Voxel/Prefabs/Data/VoxelPrefabData.h"
 
 UVoxelBuildingGenerator::UVoxelBuildingGenerator()
 {
@@ -15,21 +18,36 @@ UVoxelBuildingGenerator::UVoxelBuildingGenerator()
 	PathFinder.SetConditionInBarrier([this](FVector2D Pos) { return InBarrier(Pos); });
 	PathFinder.SetWeightFormula([this](FVector2D StartPos, FVector2D EndPos, float Cost) { return WeightFormula(StartPos, EndPos, Cost); });
 
+	PrefabAssets = TArray<FPrimaryAssetId>();
+	PrefabAssets.Add(FPrimaryAssetId(TEXT("VoxelPrefab:DA_Building_1")));
+	PrefabAssets.Add(FPrimaryAssetId(TEXT("VoxelPrefab:DA_Building_2")));
+	PrefabAssets.Add(FPrimaryAssetId(TEXT("VoxelPrefab:DA_Building_3")));
+	
 	_StartPoint = FVector2D::ZeroVector;
 	_Domains = {};
 	_Roads = {};
 	_BuildingPos = {};
 }
 
+void UVoxelBuildingGenerator::Initialize(UVoxelModule* InModule)
+{
+	Super::Initialize(InModule);
+
+	for(auto& Iter : PrefabAssets)
+	{
+		_PrefabAssets.Add(UAssetModuleStatics::LoadPrimaryAsset<UVoxelPrefabData>(Iter));
+	}
+}
+
 void UVoxelBuildingGenerator::Generate(AVoxelChunk* InChunk)
 {
 	float Possible = FMathHelper::HashRand(InChunk->GetIndex().ToVector2D(), Seed);
 
-	if(Possible < SpawnRate)return;
+	if(Possible < SpawnRate) return;
 
 	DevelopeDomains(InChunk);
 	PlaceBuildings(InChunk);
-	PlacePaths(InChunk);
+	PlacePaths();
 }
 
 void UVoxelBuildingGenerator::DevelopeDomains(AVoxelChunk* InChunk)
@@ -85,7 +103,6 @@ void UVoxelBuildingGenerator::DevelopeDomains(AVoxelChunk* InChunk)
 
 void UVoxelBuildingGenerator::PlaceBuildings(AVoxelChunk* InChunk)
 {
-	const int32 BuildingSize[3][2] = {{10, 6}, {8, 6}, {6, 6}};
 	const int32 Dx[4] = {1, -1, 0, 0};
 	const int32 Dy[4] = {0, 0, 1, -1};
 
@@ -101,10 +118,10 @@ void UVoxelBuildingGenerator::PlaceBuildings(AVoxelChunk* InChunk)
 		const auto Pos = Points.front();
 		Points.pop();
 
-		const int32 Index = FMathHelper::HashRandInt(InChunk->GetIndex().ToVector2D() + FVector2D(Count, -Count) * 107, Seed) % 3;
+		const int32 Index = FMathHelper::HashRandInt(InChunk->GetIndex().ToVector2D() + FVector2D(Count, -Count) * 107, Seed) % _PrefabAssets.Num();
 		const int32 Rotate = FMathHelper::HashRandInt(InChunk->GetIndex().ToVector2D() + FVector2D(Count, -Count) * 17, Seed) % 4;
 
-		if(!PlaceOneBuilding(InChunk, Pos.X, Pos.Y, Index, Rotate) || PlaceOneBuilding(InChunk, Pos.X, Pos.Y, Index,(Rotate + 1) % 4))
+		if(!PlaceOneBuilding(Pos.X, Pos.Y, Index, Rotate) || PlaceOneBuilding(Pos.X, Pos.Y, Index, ((Rotate + 1) % 4)))
 		{
 			continue;
 		}
@@ -115,19 +132,17 @@ void UVoxelBuildingGenerator::PlaceBuildings(AVoxelChunk* InChunk)
 
 		for(int i = 0; i < 4; ++i)
 		{
-			Points.push(FVector2D(Pos.X + Dx[i] *(Offset + BuildingSize[Index][0]) + OffsetX, Pos.Y + Dy[i] *(Offset + BuildingSize[Index][1]) + OffsetY));
+			Points.push(FVector2D(Pos.X + Dx[i] * (Offset + _PrefabAssets[Index]->VoxelSize.X) + OffsetX, Pos.Y + Dy[i] * (Offset + _PrefabAssets[Index]->VoxelSize.Y) + OffsetY));
 		}
 	}
 }
 
-bool UVoxelBuildingGenerator::PlaceOneBuilding(AVoxelChunk* InChunk, int32 InX, int32 InY, int32 index, int32 InRotate)
+bool UVoxelBuildingGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, int32 InRotate)
 {
-	const int32 BuildingSize[3][3] = {{10, 6, 7}, {8, 6, 9}, {6, 6, 15}};
-
 	const int RotateIndex = InRotate % 2;
-	const int FrontBack = BuildingSize[index][RotateIndex] / 2;
-	const int LeftRight = BuildingSize[index][!RotateIndex] / 2;
-	const int UpDown = BuildingSize[index][2];
+	const int FrontBack = _PrefabAssets[InIndex]->VoxelSize[RotateIndex] / 2;
+	const int LeftRight = _PrefabAssets[InIndex]->VoxelSize[!RotateIndex] / 2;
+	const int UpDown = _PrefabAssets[InIndex]->VoxelSize[2];
 
 	float Aver = 0;
 	for(int i = -FrontBack; i < FrontBack; ++i)
@@ -143,7 +158,7 @@ bool UVoxelBuildingGenerator::PlaceOneBuilding(AVoxelChunk* InChunk, int32 InX, 
 		}
 	}
 
-	Aver /=(BuildingSize[index][0] * BuildingSize[index][1]);
+	Aver /=(_PrefabAssets[InIndex]->VoxelSize[0] * _PrefabAssets[InIndex]->VoxelSize[1]);
 	Aver = floor(Aver + 0.5f);
 
 	if(Aver <= Module->GetWorldData().SeaLevel)return false;
@@ -173,19 +188,21 @@ bool UVoxelBuildingGenerator::PlaceOneBuilding(AVoxelChunk* InChunk, int32 InX, 
 		}
 	}
 
-	FVoxelBuildingSaveData BuildingData;
-	BuildingData.ID = index + 1;
-	BuildingData.Location = FVector(InX, InY, Aver + 1);
-	BuildingData.Angle = InRotate;
-
-	InChunk->AddBuilding(BuildingData);
+	TArray<FString> VoxelDatas;
+	_PrefabAssets[InIndex]->VoxelDatas.ParseIntoArray(VoxelDatas, TEXT("|"));
+	for(auto& Iter : VoxelDatas)
+	{
+		FVoxelItem VoxelItem = FVoxelItem(Iter, true);
+		Module->SetVoxelByIndex(FIndex(InX, InY, Aver) + VoxelItem.Index, VoxelItem);
+	}
 
 	_Domains.Emplace(FMathHelper::Index(InX - FrontBack, InY - LeftRight));
 	_BuildingPos.Push(FVector2D(InX - FrontBack, InY - LeftRight));
+
 	return true;
 }
 
-void UVoxelBuildingGenerator::PlacePaths(AVoxelChunk* InChunk)
+void UVoxelBuildingGenerator::PlacePaths()
 {
 	for(int i = 0; i < _BuildingPos.Num(); ++i)
 	{

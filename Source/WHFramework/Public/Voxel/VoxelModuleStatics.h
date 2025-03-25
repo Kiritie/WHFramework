@@ -27,24 +27,30 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Data
 	template<class T>
-	static T& GetWorldData()
+	static T& GetVoxelWorldData()
 	{
-		return static_cast<T&>(GetWorldData());
+		return static_cast<T&>(GetVoxelWorldData());
 	}
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static FVoxelWorldSaveData& GetWorldData();
+	static FVoxelWorldSaveData& GetVoxelWorldData();
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static EVoxelWorldMode GetWorldMode();
+	static EVoxelWorldMode GetVoxelWorldMode();
 
 	UFUNCTION(BlueprintCallable, Category = "VoxelModuleStatics")
-	static void SetWorldMode(EVoxelWorldMode InWorldMode);
+	static void SetVoxelWorldMode(EVoxelWorldMode InWorldMode);
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static EVoxelWorldState GetWorldState();
+	static EVoxelWorldState GetVoxelWorldState();
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static FVoxelWorldBasicSaveData GetWorldBasicData();
+	static FVoxelWorldBasicSaveData GetVoxelWorldBasicData();
+	
+	UFUNCTION(BlueprintCallable, Category = "VoxelModuleStatics")
+	static void LoadVoxelPrefabData(const FVoxelPrefabSaveData& InPrefabData);
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static FVoxelPrefabSaveData GetVoxelPrefabData();
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
 	static const FVoxelTopography& GetTopographyByIndex(FIndex InIndex);
@@ -82,10 +88,10 @@ public:
 	static FVector VoxelIndexToLocation(FIndex InIndex);
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static int32 VoxelIndexToNumber(FIndex InIndex);
+	static int64 VoxelIndexToNumber(FIndex InIndex, bool bWorldSpace = false);
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static FIndex NumberToVoxelIndex(int32 InNumber);
+	static FIndex NumberToVoxelIndex(int64 InNumber, bool bWorldSpace = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Chunk

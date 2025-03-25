@@ -27,13 +27,13 @@ FVoxelItem::FVoxelItem(EVoxelType InVoxelType, FIndex InIndex, AVoxelChunk* InOw
 {
 }
 
-FVoxelItem::FVoxelItem(const FString& InSaveData) : FVoxelItem()
+FVoxelItem::FVoxelItem(const FString& InSaveData, bool bWorldSpace) : FVoxelItem()
 {
 	TArray<FString> DataStrs;
 	InSaveData.ParseIntoArray(DataStrs, TEXT(";"));
 	int32 TempIndex = 0;
 	ID = UVoxelModuleStatics::VoxelTypeToAssetID((EVoxelType)FCString::Atoi(*DataStrs[TempIndex++]));
-	Index = UVoxelModuleStatics::NumberToVoxelIndex(FCString::Atoi(*DataStrs[TempIndex++]));
+	Index = UVoxelModuleStatics::NumberToVoxelIndex(FCString::Atoi64(*DataStrs[TempIndex++]), bWorldSpace);
 	Angle = (ERightAngle)FCString::Atoi(*DataStrs[TempIndex++]);
 	if(DataStrs.Num() > 4)
 	{
@@ -99,10 +99,10 @@ void FVoxelItem::RefreshData(UVoxel& InVoxel, bool bOrigin)
 	}
 }
 
-FString FVoxelItem::ToSaveData(bool bRefresh) const
+FString FVoxelItem::ToSaveData(bool bWorldSpace, bool bRefresh) const
 {
 	const FString _Data = !bRefresh ? *Data : *GetVoxel().ToData();
-	return FString::Printf(TEXT("%d;%d;%d%s;%s"), (int32)GetVoxelType(), UVoxelModuleStatics::VoxelIndexToNumber(Index), (int32)Angle, !FMath::IsNearlyEqual(Durability, 1.f) ? *FString::Printf(TEXT(";%f"), Durability) : TEXT(""), !_Data.IsEmpty() ? *FString::Printf(TEXT(";%s"), *_Data) : TEXT(""));
+	return FString::Printf(TEXT("%d;%lld;%d%s;%s"), (int32)GetVoxelType(), UVoxelModuleStatics::VoxelIndexToNumber(GetIndex(bWorldSpace), bWorldSpace), (int32)Angle, !FMath::IsNearlyEqual(Durability, 1.f) ? *FString::Printf(TEXT(";%f"), Durability) : TEXT(""), !_Data.IsEmpty() ? *FString::Printf(TEXT(";%s"), *_Data) : TEXT(""));
 }
 
 bool FVoxelItem::IsValid() const

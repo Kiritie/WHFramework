@@ -86,7 +86,7 @@ public:
 	virtual EInputMode GetNativeInputMode() const override { return NativeInputMode; }
 
 	UFUNCTION(BlueprintCallable)
-	virtual void SetNativeInputMode(EInputMode InInputMode) override { NativeInputMode = InInputMode; }
+	virtual void SetNativeInputMode(EInputMode InInputMode) override;
 
 	template<class T>
 	T* GetInputManager(int32 InPlayerIndex = 0) const

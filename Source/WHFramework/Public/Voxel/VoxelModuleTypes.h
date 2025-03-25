@@ -61,6 +61,7 @@ enum class EVoxelType : uint8
 	Stone, //??
 	Cobble_Stone, //??
 	Stone_Brick, //??
+	Stone_Stair, //?????
 	Sand, //???
 	Sand_Stone, //??
 	Glass, //????
@@ -75,13 +76,13 @@ enum class EVoxelType : uint8
 	Oak, //???
 	Oak_Leaves, //?????
 	Oak_Plank, //?????
-	Oak_Stairs, //?????
+	Oak_Stair, //?????
 	Oak_Door, //?????
 	Oak_Door_Upper, //?????
 	Birch, //?????
 	Birch_Leaves, //???????
 	Birch_Plank, //???????
-	Birch_Stairs, //???????
+	Birch_Stair, //???????
 	Birch_Door, //???????
 	Birch_Door_Upper, //???????
 	Bed, //?????
@@ -446,7 +447,7 @@ public:
 
 	FVoxelItem(EVoxelType InVoxelType, FIndex InIndex = FIndex::ZeroIndex, AVoxelChunk* InOwner = nullptr, const FString& InData = TEXT(""));
 
-	FVoxelItem(const FString& InSaveData);
+	FVoxelItem(const FString& InSaveData, bool bWorldSpace = false);
 
 public:
 	void OnGenerate(IVoxelAgentInterface* InAgent = nullptr);
@@ -457,7 +458,7 @@ public:
 
 	void RefreshData(UVoxel& InVoxel, bool bOrigin = false);
 
-	FString ToSaveData(bool bRefresh = false) const;
+	FString ToSaveData(bool bWorldSpace = false, bool bRefresh = false) const;
 
 public:
 	virtual bool IsValid() const override;
@@ -599,7 +600,7 @@ public:
 	}
 
 public:
-	UPROPERTY()
+	UPROPERTY(BlueprintReadWrite)
 	FString VoxelDatas;
 };
 
@@ -641,34 +642,6 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelBuildingSaveData : public FSaveData
-{
-	GENERATED_BODY()
-
-public:
-	FORCEINLINE FVoxelBuildingSaveData()
-	{
-		ID = 0;
-		Location = FVector();
-		Angle = 0;
-		Actor = nullptr;
-	}
-
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 ID;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector Location;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 Angle;
-
-	UPROPERTY(VisibleAnywhere, Transient)
-	AActor* Actor;
-};
-
-USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelChunkSaveData : public FSaveData
 {
 	GENERATED_BODY()
@@ -696,9 +669,6 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	TArray<FPickUpSaveData> PickUpDatas;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	TArray<FVoxelBuildingSaveData> BuildingDatas;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	TArray<FVoxelAuxiliarySaveData> AuxiliaryDatas;

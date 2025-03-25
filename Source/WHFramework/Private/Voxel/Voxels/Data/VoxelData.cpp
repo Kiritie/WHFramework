@@ -33,6 +33,8 @@ void UVoxelData::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
 
+	Icon = UMaterialInstanceDynamic::Create(UVoxelModuleStatics::GetVoxelWorldBasicData().IconMat, nullptr);
+
 	for(const auto Iter : PartDatas)
 	{
 		_PartDatas.Add(Iter->PartIndex, Iter);

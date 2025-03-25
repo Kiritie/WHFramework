@@ -127,6 +127,11 @@ protected:
 
 	virtual void UnloadData(EPhase InPhase) override;
 
+public:
+	virtual void LoadPrefabData(const FVoxelPrefabSaveData& InPrefabData);
+
+	virtual FVoxelPrefabSaveData GetPrefabData();
+
 protected:
 	virtual void GenerateWorld();
 	
@@ -217,9 +222,9 @@ public:
 
 	virtual FIndex VoxelIndexToChunkIndex(FIndex InIndex) const;
 
-	virtual int32 VoxelIndexToNumber(FIndex InIndex) const;
+	virtual uint64 VoxelIndexToNumber(FIndex InIndex, bool bWorldSpace = false) const;
 
-	virtual FIndex NumberToVoxelIndex(int32 InNumber) const;
+	virtual FIndex NumberToVoxelIndex(uint64 InNumber, bool bWorldSpace = false) const;
 
 public:
 	virtual bool VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult);

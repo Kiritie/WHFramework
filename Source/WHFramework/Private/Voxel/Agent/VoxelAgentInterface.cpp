@@ -108,32 +108,47 @@ bool IVoxelAgentInterface::OnDestroyVoxel(EInputInteractEvent InInteractEvent, c
 	{
 		case EInputInteractEvent::Started:
 		{
-			DestroyVoxelItem = InHitResult.VoxelItem;
+			if(InHitResult.VoxelItem.GetIndex().Z > 0)
+			{
+				DestroyVoxelItem = InHitResult.VoxelItem;
+			}
 			return true;
 		}
 		case EInputInteractEvent::Triggered:
 		{
 			if(!DestroyVoxelItem.IsValid()) break;
-			
-			if(!DestroyVoxelItem.EqualIndex(InHitResult.VoxelItem))
-			{
-				DestroyVoxelItem = InHitResult.VoxelItem;
-			}
 
-			DestroyVoxelItem.Durability -= UCommonStatics::GetCurrentDeltaSeconds() * GetDestroyVoxelRate() * (GetGenerateToolType() != EVoxelGenerateToolType::None && (int32)GetGenerateToolType() == (int32)DestroyVoxelItem.GetVoxelData().Element ? 1.7f : 1.f) / DestroyVoxelItem.GetVoxelData().Hardness;
+			if(UVoxelModuleStatics::GetVoxelWorldMode() == EVoxelWorldMode::Prefab)
+			{
+				DestroyVoxelItem.Durability = 0.f;
+			}
+			else
+			{
+				if(!DestroyVoxelItem.EqualIndex(InHitResult.VoxelItem))
+				{
+					DestroyVoxelItem = InHitResult.VoxelItem;
+				}
+				DestroyVoxelItem.Durability -= UCommonStatics::GetCurrentDeltaSeconds() * GetDestroyVoxelRate() * (GetGenerateToolType() != EVoxelGenerateToolType::None && (int32)GetGenerateToolType() == (int32)DestroyVoxelItem.GetVoxelData().Element ? 1.7f : 1.f) / DestroyVoxelItem.GetVoxelData().Hardness;
+			}
 			if(DestroyVoxelItem.Durability <= 0.f)
 			{
 				if(Chunk->SetVoxelComplex(DestroyVoxelItem.Index, FVoxelItem::Empty, true, this))
 				{
 					UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelDestroyed>(Cast<UObject>(this), { &DestroyVoxelItem, Cast<UObject>(this) });
 				}
+				if(UVoxelModuleStatics::GetVoxelWorldMode() == EVoxelWorldMode::Prefab)
+				{
+					DestroyVoxelItem = FVoxelItem::Empty;
+				}
 				return true;
 			}
-			Chunk->SetVoxelComplex(DestroyVoxelItem.Index, DestroyVoxelItem, false, this);	
+			Chunk->SetVoxelComplex(DestroyVoxelItem.Index, DestroyVoxelItem, false, this);
 			break;
 		}
 		case EInputInteractEvent::Completed:
 		{
+			if(!DestroyVoxelItem.IsValid()) break;
+			
 			DestroyVoxelItem.Durability = 1.f;
 			Chunk->SetVoxelComplex(DestroyVoxelItem.Index, DestroyVoxelItem, false, this);
 			DestroyVoxelItem = FVoxelItem::Empty;

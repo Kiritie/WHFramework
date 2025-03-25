@@ -117,6 +117,12 @@ public:
 	// InputMode
 public:
 	UFUNCTION(BlueprintPure, Category = "InputModuleStatics")
+	static EInputMode GetNativeInputMode();
+
+	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")
+	static void SetNativeInputMode(EInputMode InInputMode);
+
+	UFUNCTION(BlueprintPure, Category = "InputModuleStatics")
 	static EInputMode GetGlobalInputMode();
 
 	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")

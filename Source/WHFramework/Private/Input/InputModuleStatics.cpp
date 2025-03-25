@@ -53,6 +53,16 @@ int32 UInputModuleStatics::GetTouchPressedCount()
 	return UInputModule::Get().GetTouchPressedCount();
 }
 
+EInputMode UInputModuleStatics::GetNativeInputMode()
+{
+	return UInputModule::Get().GetNativeInputMode();
+}
+
+void UInputModuleStatics::SetNativeInputMode(EInputMode InInputMode)
+{
+	UInputModule::Get().SetNativeInputMode(InInputMode);
+}
+
 void UInputModuleStatics::AddKeyShortcut(const FGameplayTag& InTag, const FInputKeyShortcut& InKeyShortcut)
 {
 	UInputModule::Get().AddKeyShortcut(InTag, InKeyShortcut);

@@ -4,9 +4,11 @@
 
 #include "CoreMinimal.h"
 #include "VoxelGenerator.h"
+#include "Math/MathTypes.h"
 #include "Tool/PathFinder.h"
 #include "VoxelBuildingGenerator.generated.h"
 
+class UVoxelPrefabData;
 /**
  *
  */
@@ -19,6 +21,8 @@ public:
 	UVoxelBuildingGenerator();
 
 public:
+	virtual void Initialize(UVoxelModule* InModule) override;
+	
 	virtual void Generate(AVoxelChunk* InChunk) override;
 
 public:
@@ -26,7 +30,7 @@ public:
 
 	void PlaceBuildings(AVoxelChunk* InChunk);
 
-	void PlacePaths(AVoxelChunk* InChunk);
+	void PlacePaths();
 
 	//检查是否有障碍物（不可走）
 	bool InBarrier(FVector2D InPos);
@@ -34,7 +38,7 @@ public:
 	//计算权值公式
 	TPair<float, float> WeightFormula(FVector2D InStartPos, FVector2D InEndPos, float InCost);
 
-	bool PlaceOneBuilding(AVoxelChunk* InChunk, int32 InX, int32 InY, int32 InBuildingIndex, int32 InRotate);
+	bool PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, int32 InRotate);
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -42,6 +46,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float SpawnRate;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FPrimaryAssetId> PrefabAssets;
 
 	FPathFinder PathFinder;
 	
@@ -54,4 +61,6 @@ private:
 	TSet<uint64> _Roads;
 	//所有建筑门口点
 	TArray<FVector2D> _BuildingPos;
+	//所有建筑预制体
+	TArray<UVoxelPrefabData*> _PrefabAssets;
 };

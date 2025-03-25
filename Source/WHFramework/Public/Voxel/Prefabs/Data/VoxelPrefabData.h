@@ -17,6 +17,9 @@ public:
 	virtual void OnReset_Implementation() override;
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (MultiLine = "true"))
 	FString VoxelDatas;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FVector VoxelSize;
 };

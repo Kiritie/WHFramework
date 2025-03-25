@@ -5,14 +5,13 @@
 #include "CoreMinimal.h"
 #include "VoxelGenerator.h"
 #include "Math/MathTypes.h"
-#include "Thread/IThreadSafeInterface.h"
 #include "VoxelRainGenerator.generated.h"
 
 /**
  *
  */
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UVoxelRainGenerator : public UVoxelGenerator, public IThreadSafeInterface
+class WHFRAMEWORK_API UVoxelRainGenerator : public UVoxelGenerator
 {
 	GENERATED_BODY()
 

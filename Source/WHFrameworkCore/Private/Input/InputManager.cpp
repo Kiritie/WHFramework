@@ -139,3 +139,9 @@ void FInputManager::UpdateInputMode()
 	}
 #endif
 }
+
+void FInputManager::SetNativeInputMode(EInputMode InInputMode)
+{
+	NativeInputMode = InInputMode;
+	UpdateInputMode();
+}

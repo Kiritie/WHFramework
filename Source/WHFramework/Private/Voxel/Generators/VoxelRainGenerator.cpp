@@ -36,8 +36,6 @@ void UVoxelRainGenerator::Generate(AVoxelChunk* InChunk)
 
 void UVoxelRainGenerator::Flow(AVoxelChunk* InChunk, float InRain, int InX, int InY, int InZ)
 {
-	FScopeLock ScopeLock(&CriticalSection);
-
 	if(InRain < 0.5f) return;
 
 	FIndex Index = FIndex(InChunk->GetWorldIndex().X + InX, InChunk->GetWorldIndex().Y + InY, InZ);
