@@ -17,9 +17,8 @@ AVoxelEntity::AVoxelEntity()
 	MeshComponent = CreateDefaultSubobject<UVoxelMeshComponent>(FName("MeshComponent"));
 	MeshComponent->SetupAttachment(RootComponent);
 
-	VoxelItem = FPrimaryAssetId();
+	VoxelItem = FVoxelItem::Empty;
 	VoxelScope = EVoxelScope::Entity;
-	VoxelItem.Auxiliary = nullptr;
 }
 
 void AVoxelEntity::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -31,9 +30,10 @@ void AVoxelEntity::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
 	
-	VoxelItem = FPrimaryAssetId();
-	MeshComponent->ClearMesh();
 	DestroyAuxiliary();
+	MeshComponent->ClearMesh();
+
+	VoxelItem = FVoxelItem::Empty;
 }
 
 void AVoxelEntity::OnInitialize_Implementation()
@@ -47,30 +47,28 @@ void AVoxelEntity::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	const auto& SaveData = InSaveData->CastRef<FVoxelItem>();
 
+	DestroyAuxiliary();
+
 	VoxelItem = SaveData;
-	
+
 	if(VoxelItem.IsValid())
 	{
-		const UVoxelData& VoxelData = SaveData.GetVoxelData();
+		const UVoxelData& VoxelData = VoxelItem.GetVoxelData();
 		if(VoxelData.AuxiliaryClass)
 		{
-			if(VoxelItem.Auxiliary && VoxelItem.Auxiliary->GetClass() != VoxelData.AuxiliaryClass)
-			{
-				DestroyAuxiliary();
-			}
 			SpawnAuxiliary();
 		}
-		else if(VoxelItem.Auxiliary)
+		else
 		{
 			DestroyAuxiliary();
 		}
 	}
-	else if(VoxelItem.Auxiliary)
+	else
 	{
 		DestroyAuxiliary();
 	}
 
-	MeshComponent->CreateVoxel(SaveData);
+	MeshComponent->CreateVoxel(VoxelItem);
 }
 
 FSaveData* AVoxelEntity::ToData()
@@ -89,7 +87,8 @@ void AVoxelEntity::SpawnAuxiliary()
 			{
 				Auxiliary->AttachToComponent(RootComponent, FAttachmentTransformRules::SnapToTargetIncludingScale);
 				Auxiliary->Execute_SetActorVisible(Auxiliary, Execute_IsVisible(this));
-				Auxiliary->LoadSaveData(new FVoxelAuxiliarySaveData(VoxelItem, VoxelScope));
+				auto SaveData = FVoxelAuxiliarySaveData(VoxelItem, VoxelScope);
+				Auxiliary->LoadSaveData(&SaveData);
 				VoxelItem.Auxiliary = Auxiliary;
 			}
 		}

@@ -85,7 +85,7 @@ public:
 
 	virtual EVoxelTransparency GetTransparency() const;
 
-	virtual FVector GetRange(ERightAngle InAngle = ERightAngle::RA_0) const;
+	virtual FVector GetRange(ERightAngle InAngle = ERightAngle::RA_0, bool bIncludeDirection = false) const;
 
 	virtual USoundBase* GetSound(EVoxelSoundType InSoundType) const;
 

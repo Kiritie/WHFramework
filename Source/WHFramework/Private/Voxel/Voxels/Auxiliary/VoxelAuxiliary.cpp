@@ -3,6 +3,7 @@
 
 #include "Voxel/Voxels/Auxiliary/VoxelAuxiliary.h"
 
+#include "Math/MathHelper.h"
 #include "Voxel/VoxelModule.h"
 
 AVoxelAuxiliary::AVoxelAuxiliary()
@@ -35,13 +36,16 @@ void AVoxelAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		switch(VoxelScope)
 		{
 			case EVoxelScope::Chunk:
+			case EVoxelScope::Prefab:
 			{
-				SetActorRelativeLocation(VoxelItem.GetLocation() + VoxelItem.GetRange() * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f);
+				SetActorRelativeLocation(VoxelItem.GetLocation() + VoxelItem.GetRange(true, true) * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f);
 				break;
 			}
+			case EVoxelScope::Entity:
 			case EVoxelScope::Preview:
+			case EVoxelScope::PickUp:
 			{
-				SetActorRelativeLocation(VoxelItem.GetRange() * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f);
+				SetActorRelativeLocation(VoxelItem.GetRange(true, true) * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f);
 				break;
 			}
 			case EVoxelScope::Vitality:
@@ -51,6 +55,7 @@ void AVoxelAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			}
 			default: break;
 		}
+		SetActorRelativeRotation(FRotator(0.f, FMathHelper::RightAngleToFloat(VoxelItem.Angle), 0.f));
 	}
 }
 

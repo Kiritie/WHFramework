@@ -27,9 +27,9 @@ FIndex FMathHelper::UnIndex(uint64 InIndex)
 	);
 }
 
-FIndex FMathHelper::RotateIndex(const FIndex& InIndex, ERightAngle InAngle, bool bRound, bool bAbsolute)
+FIndex FMathHelper::RotateIndex(const FIndex& InIndex, ERightAngle InAngle, bool bAbsolute)
 {
-	return RotateVector(InIndex, InAngle, bRound, bAbsolute);
+	return RotateVector(InIndex, InAngle, true, bAbsolute);
 }
 
 FVector FMathHelper::RotateVector(const FVector& InVector, const FRotator& InRotator, bool bRound, bool bAbsolute)
@@ -81,6 +81,11 @@ ERightAngle FMathHelper::GetOffsetRightAngle(ERightAngle InAngle, int32 InOffset
 {
 	const int32 Angle = FMath::Abs((int32)InAngle + InOffset) % 4;
 	return (ERightAngle)Angle;
+}
+
+ERightAngle FMathHelper::CombineRightAngle(ERightAngle InAngle1, ERightAngle InAngle2)
+{
+	return (ERightAngle)(((int32)InAngle1 + (int32)InAngle2) % 4);
 }
 
 EDirection FMathHelper::InvertDirection(EDirection InDirection)

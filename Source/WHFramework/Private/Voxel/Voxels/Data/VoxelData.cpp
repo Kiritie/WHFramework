@@ -105,7 +105,7 @@ EVoxelTransparency UVoxelData::GetTransparency() const
 	return UVoxelModuleStatics::VoxelNatureToTransparency(Nature);
 }
 
-FVector UVoxelData::GetRange(ERightAngle InAngle) const
+FVector UVoxelData::GetRange(ERightAngle InAngle, bool bIncludeDirection) const
 {
 	FVector Range = FVector::OneVector;
 	if(PartDatas.Num() > 0)
@@ -121,7 +121,18 @@ FVector UVoxelData::GetRange(ERightAngle InAngle) const
 	}
 	if(Range != FVector::OneVector)
 	{
-		Range = FMathHelper::RotateVector(Range, InAngle);
+		Range = FMathHelper::RotateVector(Range, InAngle, true, true);
+	}
+	if(bIncludeDirection)
+	{
+		if(InAngle == ERightAngle::RA_180)
+		{
+			Range.X = (int32)Range.X % 2;
+		}
+		else if(InAngle == ERightAngle::RA_270)
+		{
+			Range.Y = (int32)Range.Y % 2;
+		}
 	}
 	return Range;
 }

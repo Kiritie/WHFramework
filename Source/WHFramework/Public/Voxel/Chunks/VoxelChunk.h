@@ -53,7 +53,11 @@ public:
 
 	virtual void CreateMesh();
 
+	virtual void ClearMap(bool bGenerate = false);
+
 	virtual void BuildMap(int32 InStage);
+
+	virtual void BuildPrefabMap();
 
 	virtual void BuildMesh();
 
@@ -233,6 +237,8 @@ public:
 	AVoxelChunk* GetOrSpawnNeighbor(EDirection InDirection, bool bAddToQueue = true);
 
 	TMap<EDirection, AVoxelChunk*> GetNeighbors() const { return Neighbors; }
+
+	TArray<AVoxelChunk*> GetVerticals() const;
 
 	FIndex GetWorldIndex() const;
 

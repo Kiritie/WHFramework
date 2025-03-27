@@ -473,17 +473,55 @@ void UVoxelModule::UnloadData(EPhase InPhase)
 
 void UVoxelModule::LoadPrefabData(const FVoxelPrefabSaveData& InPrefabData)
 {
-	// TODO
+	if(WorldMode != EVoxelWorldMode::Prefab) return;
+	
+	TArray<AVoxelChunk*> GenerateChunks;
+	ITER_MAP(ChunkMap, Iter,
+		if(Iter.Value->IsGenerated() && !Iter.Value->VoxelMap.IsEmpty())
+		{
+			if(Iter.Key.Z > 0)
+			{
+				Iter.Value->ClearMap();
+				GenerateChunks.Add(Iter.Value);
+			}
+			else if(Iter.Value->VoxelMap.Num() != WorldData->ChunkSize.X * WorldData->ChunkSize.Y)
+			{
+				Iter.Value->ClearMap();
+				Iter.Value->BuildPrefabMap();
+				GenerateChunks.Add(Iter.Value);
+			}
+		}
+	)
+	if(!InPrefabData.VoxelDatas.IsEmpty())
+	{
+		TArray<FString> VoxelDatas;
+		InPrefabData.VoxelDatas.ParseIntoArray(VoxelDatas, TEXT("|"));
+		for(auto& Iter : VoxelDatas)
+		{
+			const FVoxelItem VoxelItem = FVoxelItem(Iter, true);
+			if(VoxelItem.IsValid())
+			{
+				SetVoxelByIndex(VoxelItem.Index, VoxelItem);
+				GenerateChunks.AddUnique(GetChunkByVoxelIndex(VoxelItem.Index));
+			}
+		}
+	}
+	for(auto Iter : GenerateChunks)
+	{
+		Iter->Generate(EPhase::Lesser);
+	}
 }
 
 FVoxelPrefabSaveData UVoxelModule::GetPrefabData()
 {
+	if(WorldMode != EVoxelWorldMode::Prefab) return FVoxelPrefabSaveData();
+	
 	FVoxelPrefabSaveData PrefabData;
 	ITER_MAP(ChunkMap, Iter1,
 		if(Iter1.Value->IsGenerated())
 		{
 			ITER_MAP(Iter1.Value->VoxelMap, Iter2,
-				if(Iter2.Key.Z > 0 && Iter2.Value.IsValid())
+				if((Iter1.Key.Z > 0 || Iter2.Key.Z > 0) && Iter2.Value.IsValid())
 				{
 					PrefabData.VoxelDatas.Appendf(TEXT("%s|"), *Iter2.Value.ToSaveData(true, true));
 				}
@@ -544,7 +582,7 @@ AVoxelChunk* UVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 	if(!Chunk)
 	{
 		Chunk = UObjectPoolModuleStatics::SpawnObject<AVoxelChunk>(nullptr, nullptr, ChunkSpawnClass);
-		Chunk->Initialize(this, InIndex, ChunkSpawnBatch + (IsOnTheWorld(InIndex) ? 0 : 1));
+		Chunk->Initialize(this, InIndex, ChunkSpawnBatch + !IsOnTheWorld(InIndex));
 		Chunk->SetActorLocationAndRotation(InIndex.ToVector() * WorldData->GetChunkRealSize(), FRotator::ZeroRotator);
 		ChunkMap.Add(InIndex, Chunk);
 	}
@@ -564,10 +602,7 @@ AVoxelChunk* UVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 				}
 				else
 				{
-					ITER_INDEX2D(Index, WorldData->ChunkSize, false,
-						Chunk->SetVoxel(Index, EVoxelType::Grass);
-					)
-					Chunk->bBuilded = true;
+					Chunk->BuildPrefabMap();
 				}
 			}
 		}
@@ -871,10 +906,7 @@ void UVoxelModule::SetVoxelByIndex(FIndex InIndex, const FVoxelItem& InVoxelItem
 {
 	if(AVoxelChunk* Chunk = GetChunkByVoxelIndex(InIndex))
 	{
-		if(!Chunk->IsBuilded())
-		{
-			Chunk->SetVoxel(Chunk->WorldIndexToLocal(InIndex), InVoxelItem, bSafe);
-		}
+		Chunk->SetVoxel(Chunk->WorldIndexToLocal(InIndex), InVoxelItem, bSafe);
 	}
 }
 
@@ -1021,7 +1053,7 @@ bool UVoxelModule::VoxelRaycastSinge(EVoxelRaycastType InRaycastType, float InDi
 
 bool UVoxelModule::VoxelItemTraceSingle(const FVoxelItem& InVoxelItem, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
 {
-	const FVector Size = InVoxelItem.GetRange() * WorldData->BlockSize * 0.5f;
+	const FVector Size = InVoxelItem.GetRange(true, true) * WorldData->BlockSize * 0.5f;
 	const FVector Location = InVoxelItem.GetLocation();
 	return UKismetSystemLibrary::BoxTraceSingle(GetWorldContext(), Location + Size, Location + Size, Size * 0.95f, FRotator::ZeroRotator, USceneModuleStatics::GetTraceMapping(FName("Voxel")).GetTraceType(), false, InIgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
 }

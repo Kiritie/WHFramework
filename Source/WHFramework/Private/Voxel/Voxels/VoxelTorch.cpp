@@ -64,7 +64,15 @@ void UVoxelTorch::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResu
 
 bool UVoxelTorch::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
 {
-	return Super::OnAgentInteract(InAgent, InInteractAction, InInteractEvent, InHitResult);
+	switch (InInteractAction)
+	{
+		case EInputInteractAction::Primary:
+		{
+			return Super::OnAgentInteract(InAgent, InInteractAction, InInteractEvent, InHitResult);
+		}
+		default: break;
+	}
+	return false;
 }
 
 void UVoxelTorch::Open(IVoxelAgentInterface* InAgent)

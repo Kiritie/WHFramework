@@ -483,7 +483,7 @@ public:
 
 	EVoxelType GetVoxelType() const;
 
-	FVector GetRange() const;
+	FVector GetRange(bool bIncludeAngle = true, bool bIncludeDirection = false) const;
 
 	FIndex GetIndex(bool bWorldSpace = true) const;
 
@@ -558,7 +558,7 @@ public:
 	FORCEINLINE FVoxelAuxiliarySaveData()
 	{
 		VoxelItem = FVoxelItem();
-		VoxelScope = EVoxelScope::Chunk;
+		VoxelScope = EVoxelScope::None;
 		InventoryData = FInventorySaveData();
 	}
 

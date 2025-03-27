@@ -21,7 +21,7 @@ public:
 	//One-dimensional to three-dimensional coordinates (decompression coordinates)
 	static FIndex UnIndex(uint64 InIndex);
 
-	static FIndex RotateIndex(const FIndex& InIndex, ERightAngle InAngle, bool bRound = false, bool bAbsolute = false);
+	static FIndex RotateIndex(const FIndex& InIndex, ERightAngle InAngle, bool bAbsolute = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Rotator
@@ -47,6 +47,8 @@ public:
 	static ERightAngle FloatToRightAngle(float InAngle);
 
 	static ERightAngle GetOffsetRightAngle(ERightAngle InAngle, int32 InOffset);
+
+	static ERightAngle CombineRightAngle(ERightAngle InAngle1, ERightAngle InAngle2);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Direction

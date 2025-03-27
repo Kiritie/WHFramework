@@ -41,6 +41,7 @@ void AVoxelPrefab::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	auto& SaveData = InSaveData->CastRef<FVoxelPrefabSaveData>();
 
 	DestroyAuxiliarys();
+	
 	VoxelMap.Empty();
 
 	TArray<FString> VoxelDatas;
@@ -48,6 +49,7 @@ void AVoxelPrefab::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	for(auto& Iter : VoxelDatas)
 	{
 		FVoxelItem VoxelItem = FVoxelItem(Iter, true);
+		VoxelItem.Index.Z -= 1;
 		SetVoxel(VoxelItem.Index, VoxelItem);
 	}
 
@@ -159,7 +161,8 @@ AVoxelAuxiliary* AVoxelPrefab::SpawnAuxiliary(FVoxelItem& InVoxelItem)
 			{
 				Auxiliary->AttachToComponent(RootComponent, FAttachmentTransformRules::SnapToTargetIncludingScale);
 				Auxiliary->Execute_SetActorVisible(Auxiliary, Execute_IsVisible(this));
-				Auxiliary->LoadSaveData(new FVoxelAuxiliarySaveData(InVoxelItem, EVoxelScope::Prefab));
+				auto SaveData = FVoxelAuxiliarySaveData(InVoxelItem, EVoxelScope::Prefab);
+				Auxiliary->LoadSaveData(&SaveData);
 				InVoxelItem.Auxiliary = Auxiliary;
 				return Auxiliary;
 			}

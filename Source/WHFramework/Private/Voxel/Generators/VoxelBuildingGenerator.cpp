@@ -4,10 +4,13 @@
 
 #include "Asset/AssetModuleStatics.h"
 #include "Math/MathHelper.h"
+#include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "Voxel/Chunks/VoxelChunk.h"
+#include "Voxel/Prefabs/VoxelPrefab.h"
 #include "Voxel/Prefabs/Data/VoxelPrefabData.h"
+#include "Voxel/Voxels/Data/VoxelData.h"
 
 UVoxelBuildingGenerator::UVoxelBuildingGenerator()
 {
@@ -37,6 +40,10 @@ void UVoxelBuildingGenerator::Initialize(UVoxelModule* InModule)
 	{
 		_PrefabAssets.Add(UAssetModuleStatics::LoadPrimaryAsset<UVoxelPrefabData>(Iter));
 	}
+
+	FVoxelPrefabSaveData PrefabSaveData;
+	PrefabSaveData.VoxelDatas = _PrefabAssets[0]->VoxelDatas;
+	UObjectPoolModuleStatics::SpawnObject<AVoxelPrefab>()->LoadSaveData(&PrefabSaveData);
 }
 
 void UVoxelBuildingGenerator::Generate(AVoxelChunk* InChunk)
@@ -126,9 +133,9 @@ void UVoxelBuildingGenerator::PlaceBuildings(AVoxelChunk* InChunk)
 			continue;
 		}
 
-		int32 Offset = FMathHelper::HashRandInt(InChunk->GetIndex().ToVector2D() + FVector2D(Count, -Count) * 67, Seed) % 3 + 5;
-		int32 OffsetX = FMathHelper::HashRandInt(InChunk->GetIndex().ToVector2D() + FVector2D(Count, Count) * 61, Seed) % 5 - 2;
-		int32 OffsetY = FMathHelper::HashRandInt(InChunk->GetIndex().ToVector2D() + FVector2D(-Count, Count) * 117, Seed) % 5 - 2;
+		const int32 Offset = FMathHelper::HashRandInt(InChunk->GetIndex().ToVector2D() + FVector2D(Count, -Count) * 67, Seed) % 3 + 5;
+		const int32 OffsetX = FMathHelper::HashRandInt(InChunk->GetIndex().ToVector2D() + FVector2D(Count, Count) * 61, Seed) % 5 - 2;
+		const int32 OffsetY = FMathHelper::HashRandInt(InChunk->GetIndex().ToVector2D() + FVector2D(-Count, Count) * 117, Seed) % 5 - 2;
 
 		for(int i = 0; i < 4; ++i)
 		{
@@ -158,7 +165,7 @@ bool UVoxelBuildingGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InInd
 		}
 	}
 
-	Aver /=(_PrefabAssets[InIndex]->VoxelSize[0] * _PrefabAssets[InIndex]->VoxelSize[1]);
+	Aver /= _PrefabAssets[InIndex]->VoxelSize[0] * _PrefabAssets[InIndex]->VoxelSize[1];
 	Aver = floor(Aver + 0.5f);
 
 	if(Aver <= Module->GetWorldData().SeaLevel)return false;
@@ -193,6 +200,11 @@ bool UVoxelBuildingGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InInd
 	for(auto& Iter : VoxelDatas)
 	{
 		FVoxelItem VoxelItem = FVoxelItem(Iter, true);
+		VoxelItem.Index = FMathHelper::RotateIndex(VoxelItem.Index, (ERightAngle)InRotate);
+		if(VoxelItem.GetVoxelData().bRotatable)
+		{
+			VoxelItem.Angle = FMathHelper::CombineRightAngle(VoxelItem.Angle, (ERightAngle)InRotate);
+		}
 		Module->SetVoxelByIndex(FIndex(InX, InY, Aver) + VoxelItem.Index, VoxelItem);
 	}
 

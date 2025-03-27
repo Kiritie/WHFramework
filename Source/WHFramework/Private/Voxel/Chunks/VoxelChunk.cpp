@@ -223,6 +223,12 @@ void AVoxelChunk::CreateMesh()
 	}
 }
 
+void AVoxelChunk::ClearMap(bool bGenerate)
+{
+	VoxelMap.Empty();
+	Generate(EPhase::Lesser);
+}
+
 void AVoxelChunk::BuildMap(int32 InStage)
 {
 	switch (InStage)
@@ -256,11 +262,17 @@ void AVoxelChunk::BuildMap(int32 InStage)
 		}
 		default:
 		{
-			ITER_ARRAY(Module->GetVerticalChunks(Index), Iter, 
-				Iter->bBuilded = true;
-			)
+			ITER_ARRAY(GetVerticals(), Iter, Iter->bBuilded = true; )
 		}
 	}
+}
+
+void AVoxelChunk::BuildPrefabMap()
+{
+	ITER_INDEX2D(_Index, Module->GetWorldData().ChunkSize, false,
+		SetVoxel(_Index, EVoxelType::Grass);
+	)
+	ITER_ARRAY(GetVerticals(), Iter, Iter->bBuilded = true; )
 }
 
 void AVoxelChunk::BuildMesh()
@@ -842,7 +854,7 @@ bool AVoxelChunk::SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelI
 						PartItem.ID = PartData->GetPrimaryAssetId();
 						PartItem.Angle = InVoxelItem.Angle;
 					}
-					VoxelItems.Emplace(VoxelIndex + FMathHelper::RotateIndex(PartData->PartIndex, InVoxelItem.Angle), PartItem);
+					VoxelItems.Emplace(VoxelIndex + FMathHelper::RotateIndex(PartData->PartIndex, VoxelItem.Angle), PartItem);
 				)
 				return SetVoxelComplex(VoxelItems, bGenerate, true, InAgent);
 			}
@@ -1046,6 +1058,7 @@ AVoxelAuxiliary* AVoxelChunk::SpawnAuxiliary(FVoxelItem& InVoxelItem)
 				{
 					AuxiliaryData = InVoxelItem.AuxiliaryData->CastRef<FVoxelAuxiliarySaveData>();
 				}
+				AuxiliaryData.VoxelScope = EVoxelScope::Chunk;
 				AuxiliaryData.VoxelItem = InVoxelItem;
 				Auxiliary->LoadSaveData(&AuxiliaryData);
 				InVoxelItem.Auxiliary = Auxiliary;
@@ -1133,6 +1146,11 @@ UVoxelMeshComponent* AVoxelChunk::GetMeshComponent(EVoxelNature InVoxelNature)
 AVoxelChunk* AVoxelChunk::GetOrSpawnNeighbor(EDirection InDirection, bool bAddToQueue)
 {
 	return Neighbors[InDirection] ? Neighbors[InDirection] : Module->SpawnChunk(Index + FMathHelper::DirectionToIndex(InDirection), bAddToQueue);
+}
+
+TArray<AVoxelChunk*> AVoxelChunk::GetVerticals() const
+{
+	return Module->GetVerticalChunks(Index);
 }
 
 FIndex AVoxelChunk::GetWorldIndex() const

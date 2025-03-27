@@ -44,16 +44,17 @@ void AVoxelInteractAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::All))
 	{
+		BoxComponent->SetBoxExtent(VoxelItem.GetRange(false) * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f);
 		switch(SaveData.VoxelScope)
 		{
 			case EVoxelScope::Chunk:
+			case EVoxelScope::Prefab:
 			{
 				for(const auto& Iter : VoxelItem.GetVoxelData<UVoxelInteractData>().InteractActions)
 				{
 					Interaction->AddInteractAction((EInteractAction)Iter);
 				}
 				BoxComponent->SetGenerateOverlapEvents(true);
-				BoxComponent->SetBoxExtent(VoxelItem.GetRange() * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f);
 				break;
 			}
 			default:

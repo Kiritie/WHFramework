@@ -30,18 +30,20 @@ FVoxelItem::FVoxelItem(EVoxelType InVoxelType, FIndex InIndex, AVoxelChunk* InOw
 FVoxelItem::FVoxelItem(const FString& InSaveData, bool bWorldSpace) : FVoxelItem()
 {
 	TArray<FString> DataStrs;
-	InSaveData.ParseIntoArray(DataStrs, TEXT(";"));
-	int32 TempIndex = 0;
-	ID = UVoxelModuleStatics::VoxelTypeToAssetID((EVoxelType)FCString::Atoi(*DataStrs[TempIndex++]));
-	Index = UVoxelModuleStatics::NumberToVoxelIndex(FCString::Atoi64(*DataStrs[TempIndex++]), bWorldSpace);
-	Angle = (ERightAngle)FCString::Atoi(*DataStrs[TempIndex++]);
-	if(DataStrs.Num() > 4)
+	if(InSaveData.ParseIntoArray(DataStrs, TEXT(";")) >= 3)
 	{
-		Durability = FCString::Atof(*DataStrs[TempIndex++]);
-	}
-	if(DataStrs.IsValidIndex(TempIndex))
-	{
-		Data = *DataStrs[TempIndex];
+		int32 TempIndex = 0;
+		ID = UVoxelModuleStatics::VoxelTypeToAssetID((EVoxelType)FCString::Atoi(*DataStrs[TempIndex++]));
+		Index = UVoxelModuleStatics::NumberToVoxelIndex(FCString::Atoi64(*DataStrs[TempIndex++]), bWorldSpace);
+		Angle = (ERightAngle)FCString::Atoi(*DataStrs[TempIndex++]);
+		if(DataStrs.Num() > 4)
+		{
+			Durability = FCString::Atof(*DataStrs[TempIndex++]);
+		}
+		if(DataStrs.IsValidIndex(TempIndex))
+		{
+			Data = *DataStrs[TempIndex];
+		}
 	}
 }
 
@@ -176,9 +178,9 @@ EVoxelType FVoxelItem::GetVoxelType() const
 	return GetVoxelData().VoxelType;
 }
 
-FVector FVoxelItem::GetRange() const
+FVector FVoxelItem::GetRange(bool bIncludeAngle, bool bIncludeDirection) const
 {
-	return GetVoxelData().GetRange(Angle);
+	return GetVoxelData().GetRange(bIncludeAngle ? Angle : ERightAngle::RA_0, bIncludeDirection);
 }
 
 FIndex FVoxelItem::GetIndex(bool bWorldSpace) const

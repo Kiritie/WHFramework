@@ -60,10 +60,13 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 {
 	if(!InAgent) return;
 	
-	if(GetData().IsMainPart() && UVoxelModuleStatics::GetVoxelWorldMode() == EVoxelWorldMode::Default)
+	if(GetData().IsMainPart())
 	{
 		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Destroy), GetLocation());
-		UAbilityModuleStatics::SpawnAbilityPickUp(FAbilityItem(GetData().GatherData ? GetData().GatherData->GetPrimaryAssetId() : GetData().GetPrimaryAssetId(), 1), GetLocation() + GetData().GetRange(GetAngle()) * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f, GetOwner());
+		if(UVoxelModuleStatics::GetVoxelWorldMode() == EVoxelWorldMode::Default)
+		{
+			UAbilityModuleStatics::SpawnAbilityPickUp(FAbilityItem(GetData().GatherData ? GetData().GatherData->GetPrimaryAssetId() : GetData().GetPrimaryAssetId(), 1), GetLocation() + GetData().GetRange(GetAngle()) * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f, GetOwner());
+		}
 	}
 	if(GetOwner())
 	{
@@ -75,9 +78,10 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 				break;
 			}
 		)
-		if(GetOwner()->HasVoxelComplex(FMathHelper::GetAdjacentIndex(GetIndex(), EDirection::Up)) && !GetOwner()->CheckVoxelAdjacent(Item, EDirection::Up))
+		const FIndex UpperIndex = FMathHelper::GetAdjacentIndex(GetIndex(), EDirection::Up);
+		if(GetOwner()->HasVoxelComplex(UpperIndex) && GetOwner()->GetVoxelComplex(UpperIndex).GetVoxelData().GetTransparency() == EVoxelTransparency::Trans)
 		{
-			VoxelItems.Emplace(FMathHelper::GetAdjacentIndex(GetIndex(), EDirection::Up), FVoxelItem::Empty);
+			VoxelItems.Emplace(UpperIndex, FVoxelItem::Empty);
 		}
 		GetOwner()->SetVoxelComplex(VoxelItems, true, false, InAgent);
 	}

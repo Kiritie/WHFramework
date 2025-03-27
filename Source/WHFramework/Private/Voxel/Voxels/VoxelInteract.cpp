@@ -56,20 +56,7 @@ void UVoxelInteract::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitR
 
 bool UVoxelInteract::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
 {
-	switch (InInteractAction)
-	{
-		case EInputInteractAction::Primary:
-		{
-			return Super::OnAgentInteract(InAgent, InInteractAction, InInteractEvent, InHitResult);
-		}
-		case EInputInteractAction::Secondary:
-		{
-			Interact(InAgent);
-			return true;
-		}
-		default: break;
-	}
-	return false;
+	return Super::OnAgentInteract(InAgent, InInteractAction, InInteractEvent, InHitResult);
 }
 
 bool UVoxelInteract::Interact(IVoxelAgentInterface* InAgent)
