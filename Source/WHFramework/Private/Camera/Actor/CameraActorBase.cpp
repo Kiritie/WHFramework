@@ -23,6 +23,7 @@ ACameraActorBase::ACameraActorBase()
 	CameraBoom->SetRelativeTransform(FTransform::Identity);
 	CameraBoom->bUsePawnControlRotation = false;
 	CameraBoom->bDoCollisionTest = false;
+	CameraBoom->TargetArmLength = 0.f;
 
 	Camera = CreateDefaultSubobject<UCameraComponent>(FName("Camera"));
 	Camera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);

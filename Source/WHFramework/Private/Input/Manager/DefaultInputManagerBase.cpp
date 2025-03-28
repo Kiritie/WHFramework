@@ -24,29 +24,41 @@ void UDefaultInputManagerBase::OnBindAction(UInputComponentBase* InInputComponen
 {
 	Super::OnBindAction(InInputComponent);
 
-	InInputComponent->BindInputAction(GameplayTags::Input_TurnCamera, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::TurnCamera);
-	InInputComponent->BindInputAction(GameplayTags::Input_LookUpCamera, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::LookUpCamera);
-	InInputComponent->BindInputAction(GameplayTags::Input_PanHCamera, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::PanHCamera, false);
-	InInputComponent->BindInputAction(GameplayTags::Input_PanVCamera, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::PanVCamera, false);
-	InInputComponent->BindInputAction(GameplayTags::Input_ZoomCamera, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::ZoomCamera);
-	
-	InInputComponent->BindInputAction(GameplayTags::Input_TurnPlayer, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::TurnPlayer, false);
-	InInputComponent->BindInputAction(GameplayTags::Input_MoveForwardPlayer, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::MoveForwardPlayer);
-	InInputComponent->BindInputAction(GameplayTags::Input_MoveForwardPlayer, ETriggerEvent::Started, this, &UDefaultInputManagerBase::ActionForwardPlayer);
-	InInputComponent->BindInputAction(GameplayTags::Input_MoveRightPlayer, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::MoveRightPlayer);
-	InInputComponent->BindInputAction(GameplayTags::Input_MoveRightPlayer, ETriggerEvent::Started, this, &UDefaultInputManagerBase::ActionRightPlayer);
-	InInputComponent->BindInputAction(GameplayTags::Input_MoveUpPlayer, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::MoveUpPlayer);
-	InInputComponent->BindInputAction(GameplayTags::Input_MoveUpPlayer, ETriggerEvent::Started, this, &UDefaultInputManagerBase::ActionUpPlayer);
-	InInputComponent->BindInputAction(GameplayTags::Input_JumpPlayer, ETriggerEvent::Started, this, &UDefaultInputManagerBase::JumpPlayer, false);
-
 	InInputComponent->BindInputAction(GameplayTags::Input_SystemOperation, ETriggerEvent::Started, this, &UDefaultInputManagerBase::SystemOperation);
+
+	InInputComponent->BindInputAction(GameplayTags::Input_TurnCamera, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::OnTurnCamera);
+	InInputComponent->BindInputAction(GameplayTags::Input_LookUpCamera, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::OnLookUpCamera);
+	InInputComponent->BindInputAction(GameplayTags::Input_PanHCamera, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::OnPanHCamera, false);
+	InInputComponent->BindInputAction(GameplayTags::Input_PanVCamera, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::OnPanVCamera, false);
+	InInputComponent->BindInputAction(GameplayTags::Input_ZoomCamera, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::OnZoomCamera);
+	
+	InInputComponent->BindInputAction(GameplayTags::Input_TurnPlayer, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::OnTurnPlayer, false);
+	InInputComponent->BindInputAction(GameplayTags::Input_MoveForwardPlayer, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::OnMoveForwardPlayer);
+	InInputComponent->BindInputAction(GameplayTags::Input_MoveForwardPlayer, ETriggerEvent::Started, this, &UDefaultInputManagerBase::OnActionForwardPlayer);
+	InInputComponent->BindInputAction(GameplayTags::Input_MoveRightPlayer, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::OnMoveRightPlayer);
+	InInputComponent->BindInputAction(GameplayTags::Input_MoveRightPlayer, ETriggerEvent::Started, this, &UDefaultInputManagerBase::OnActionRightPlayer);
+	InInputComponent->BindInputAction(GameplayTags::Input_MoveUpPlayer, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::OnMoveUpPlayer);
+	InInputComponent->BindInputAction(GameplayTags::Input_MoveUpPlayer, ETriggerEvent::Started, this, &UDefaultInputManagerBase::OnActionUpPlayer);
+	InInputComponent->BindInputAction(GameplayTags::Input_JumpPlayer, ETriggerEvent::Started, this, &UDefaultInputManagerBase::OnJumpPlayer, false);
+	
+	InInputComponent->BindInputAction(GameplayTags::Input_Primary, ETriggerEvent::Started, this, &UDefaultInputManagerBase::OnPrimaryPressed, false);
+	InInputComponent->BindInputAction(GameplayTags::Input_Primary, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::OnPrimaryRepeated, false);
+	InInputComponent->BindInputAction(GameplayTags::Input_Primary, ETriggerEvent::Completed, this, &UDefaultInputManagerBase::OnPrimaryReleased, false);
+	
+	InInputComponent->BindInputAction(GameplayTags::Input_Secondary, ETriggerEvent::Started, this, &UDefaultInputManagerBase::OnSecondaryPressed, false);
+	InInputComponent->BindInputAction(GameplayTags::Input_Secondary, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::OnSecondaryRepeated, false);
+	InInputComponent->BindInputAction(GameplayTags::Input_Secondary, ETriggerEvent::Completed, this, &UDefaultInputManagerBase::OnSecondaryReleased, false);
+		
+	InInputComponent->BindInputAction(GameplayTags::Input_Third, ETriggerEvent::Started, this, &UDefaultInputManagerBase::OnThirdPressed, false);
+	InInputComponent->BindInputAction(GameplayTags::Input_Third, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::OnThirdRepeated, false);
+	InInputComponent->BindInputAction(GameplayTags::Input_Third, ETriggerEvent::Completed, this, &UDefaultInputManagerBase::OnThirdReleased, false);
 }
 
 void UDefaultInputManagerBase::SystemOperation_Implementation()
 {
 }
 
-void UDefaultInputManagerBase::TurnCamera_Implementation(const FInputActionValue& InValue)
+void UDefaultInputManagerBase::OnTurnCamera_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f || UCameraModule::Get().IsControllingMove()) return;
 
@@ -56,7 +68,7 @@ void UDefaultInputManagerBase::TurnCamera_Implementation(const FInputActionValue
 	}
 }
 
-void UDefaultInputManagerBase::LookUpCamera_Implementation(const FInputActionValue& InValue)
+void UDefaultInputManagerBase::OnLookUpCamera_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f || UCameraModule::Get().IsControllingMove()) return;
 
@@ -66,7 +78,7 @@ void UDefaultInputManagerBase::LookUpCamera_Implementation(const FInputActionVal
 	}
 }
 
-void UDefaultInputManagerBase::PanHCamera_Implementation(const FInputActionValue& InValue)
+void UDefaultInputManagerBase::OnPanHCamera_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -78,7 +90,7 @@ void UDefaultInputManagerBase::PanHCamera_Implementation(const FInputActionValue
 	}
 }
 
-void UDefaultInputManagerBase::PanVCamera_Implementation(const FInputActionValue& InValue)
+void UDefaultInputManagerBase::OnPanVCamera_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -90,7 +102,7 @@ void UDefaultInputManagerBase::PanVCamera_Implementation(const FInputActionValue
 	}
 }
 
-void UDefaultInputManagerBase::ZoomCamera_Implementation(const FInputActionValue& InValue)
+void UDefaultInputManagerBase::OnZoomCamera_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -100,7 +112,7 @@ void UDefaultInputManagerBase::ZoomCamera_Implementation(const FInputActionValue
 	}
 }
 
-void UDefaultInputManagerBase::MoveForwardCamera_Implementation(const FInputActionValue& InValue)
+void UDefaultInputManagerBase::OnMoveForwardCamera_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -108,7 +120,7 @@ void UDefaultInputManagerBase::MoveForwardCamera_Implementation(const FInputActi
 	UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>() * (UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraSprint).IsPressing(UCommonStatics::GetPlayerController(LocalPlayerIndex)) ? 3.f : 1.f) / UCommonStatics::GetTimeScale());
 }
 
-void UDefaultInputManagerBase::MoveRightCamera_Implementation(const FInputActionValue& InValue)
+void UDefaultInputManagerBase::OnMoveRightCamera_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -116,14 +128,14 @@ void UDefaultInputManagerBase::MoveRightCamera_Implementation(const FInputAction
 	UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>() * (UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraSprint).IsPressing(UCommonStatics::GetPlayerController(LocalPlayerIndex)) ? 3.f : 1.f) / UCommonStatics::GetTimeScale());
 }
 
-void UDefaultInputManagerBase::MoveUpCamera_Implementation(const FInputActionValue& InValue)
+void UDefaultInputManagerBase::OnMoveUpCamera_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
 	UCameraModule::Get().AddCameraMovementInput(FVector::UpVector, InValue.Get<float>() * (UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraSprint).IsPressing(UCommonStatics::GetPlayerController(LocalPlayerIndex)) ? 3.f : 1.f) / UCommonStatics::GetTimeScale());
 }
 
-void UDefaultInputManagerBase::TurnPlayer_Implementation(const FInputActionValue& InValue)
+void UDefaultInputManagerBase::OnTurnPlayer_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -133,7 +145,7 @@ void UDefaultInputManagerBase::TurnPlayer_Implementation(const FInputActionValue
 	}
 }
 
-void UDefaultInputManagerBase::MoveForwardPlayer_Implementation(const FInputActionValue& InValue)
+void UDefaultInputManagerBase::OnMoveForwardPlayer_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -143,15 +155,15 @@ void UDefaultInputManagerBase::MoveForwardPlayer_Implementation(const FInputActi
 	}
 	else
 	{
-		MoveForwardCamera(InValue);
+		OnMoveForwardCamera(InValue);
 	}
 }
 
-void UDefaultInputManagerBase::ActionForwardPlayer_Implementation(const FInputActionValue& InValue)
+void UDefaultInputManagerBase::OnActionForwardPlayer_Implementation(const FInputActionValue& InValue)
 {
 }
 
-void UDefaultInputManagerBase::MoveRightPlayer_Implementation(const FInputActionValue& InValue)
+void UDefaultInputManagerBase::OnMoveRightPlayer_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -161,15 +173,15 @@ void UDefaultInputManagerBase::MoveRightPlayer_Implementation(const FInputAction
 	}
 	else
 	{
-		MoveRightCamera(InValue);
+		OnMoveRightCamera(InValue);
 	}
 }
 
-void UDefaultInputManagerBase::ActionRightPlayer_Implementation(const FInputActionValue& InValue)
+void UDefaultInputManagerBase::OnActionRightPlayer_Implementation(const FInputActionValue& InValue)
 {
 }
 
-void UDefaultInputManagerBase::MoveUpPlayer_Implementation(const FInputActionValue& InValue)
+void UDefaultInputManagerBase::OnMoveUpPlayer_Implementation(const FInputActionValue& InValue)
 {
 	if(InValue.Get<float>() == 0.f) return;
 
@@ -179,18 +191,53 @@ void UDefaultInputManagerBase::MoveUpPlayer_Implementation(const FInputActionVal
 	}
 	else
 	{
-		MoveUpCamera(InValue);
+		OnMoveUpCamera(InValue);
 	}
 }
 
-void UDefaultInputManagerBase::ActionUpPlayer_Implementation(const FInputActionValue& InValue)
+void UDefaultInputManagerBase::OnActionUpPlayer_Implementation(const FInputActionValue& InValue)
 {
 }
 
-void UDefaultInputManagerBase::JumpPlayer_Implementation()
+void UDefaultInputManagerBase::OnJumpPlayer_Implementation()
 {
 	if(UCommonStatics::GetPlayerController(LocalPlayerIndex)->GetPawn() && UCommonStatics::GetPlayerController(LocalPlayerIndex)->GetPawn()->Implements<UWHPlayerInterface>())
 	{
 		IWHPlayerInterface::Execute_JumpN(UCommonStatics::GetPlayerController(LocalPlayerIndex)->GetPawn());
 	}
+}
+void UDefaultInputManagerBase::OnPrimaryPressed_Implementation()
+{
+}
+
+void UDefaultInputManagerBase::OnPrimaryRepeated_Implementation()
+{
+}
+
+void UDefaultInputManagerBase::OnPrimaryReleased_Implementation()
+{
+}
+
+void UDefaultInputManagerBase::OnSecondaryPressed_Implementation()
+{
+}
+
+void UDefaultInputManagerBase::OnSecondaryRepeated_Implementation()
+{
+}
+
+void UDefaultInputManagerBase::OnSecondaryReleased_Implementation()
+{
+}
+
+void UDefaultInputManagerBase::OnThirdPressed_Implementation()
+{
+}
+
+void UDefaultInputManagerBase::OnThirdRepeated_Implementation()
+{
+}
+
+void UDefaultInputManagerBase::OnThirdReleased_Implementation()
+{
 }

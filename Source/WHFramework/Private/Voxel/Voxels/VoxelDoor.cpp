@@ -57,15 +57,7 @@ void UVoxelDoor::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResul
 
 bool UVoxelDoor::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
 {
-	switch (InInteractAction)
-	{
-		case EInputInteractAction::Primary:
-		{
-			return Super::OnAgentInteract(InAgent, InInteractAction, InInteractEvent, InHitResult);
-		}
-		default: break;
-	}
-	return false;
+	return Super::OnAgentInteract(InAgent, InInteractAction, InInteractEvent, InHitResult);
 }
 
 void UVoxelDoor::Open(IVoxelAgentInterface* InAgent)

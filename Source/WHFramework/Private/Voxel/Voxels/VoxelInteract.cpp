@@ -3,7 +3,9 @@
 
 #include "Voxel/Voxels/VoxelInteract.h"
 
+#include "Common/Interaction/InteractionAgentInterface.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
+#include "Voxel/Voxels/Auxiliary/VoxelInteractAuxiliary.h"
 
 UVoxelInteract::UVoxelInteract()
 {
@@ -56,15 +58,46 @@ void UVoxelInteract::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitR
 
 bool UVoxelInteract::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
 {
-	return Super::OnAgentInteract(InAgent, InInteractAction, InInteractEvent, InHitResult);
+	switch (InInteractAction)
+	{
+		case EInputInteractAction::Primary:
+		{
+			return Super::OnAgentInteract(InAgent, InInteractAction, InInteractEvent, InHitResult);
+		}
+		case EInputInteractAction::Secondary:
+		{
+			if(InInteractEvent == EInputInteractEvent::Started)
+			{
+				Interact(InAgent);
+			}
+			return true;
+		}
+		default: break;
+	}
+	return false;
 }
 
 bool UVoxelInteract::Interact(IVoxelAgentInterface* InAgent)
 {
+	if(IInteractionAgentInterface* InteractionAgent = Cast<IInteractionAgentInterface>(InAgent))
+	{
+		if(AVoxelInteractAuxiliary* InteractAuxiliary = Cast<AVoxelInteractAuxiliary>(GetItem().GetMain().Auxiliary))
+		{
+			InteractionAgent->SetInteractingAgent(InteractAuxiliary);
+			InteractionAgent->DoInteract((EInteractAction)EVoxelInteractAction::Interact, InteractAuxiliary);
+		}
+	}
 	return false;
 }
 
 void UVoxelInteract::UnInteract(IVoxelAgentInterface* InAgent)
 {
-	
+	if(IInteractionAgentInterface* InteractionAgent = Cast<IInteractionAgentInterface>(InAgent))
+	{
+		if(AVoxelInteractAuxiliary* InteractAuxiliary = Cast<AVoxelInteractAuxiliary>(GetItem().GetMain().Auxiliary))
+		{
+			InteractionAgent->SetInteractingAgent(InteractAuxiliary);
+			InteractionAgent->DoInteract((EInteractAction)EVoxelInteractAction::UnInteract, InteractAuxiliary);
+		}
+	}
 }

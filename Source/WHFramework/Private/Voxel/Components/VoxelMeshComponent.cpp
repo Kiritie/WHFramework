@@ -63,8 +63,8 @@ void UVoxelMeshComponent::Initialize(EVoxelScope InScope, EVoxelNature InNature)
 		}
 		case EVoxelScope::Entity:
 		{
-			OffsetScale = FVector(0.f, 0.f, 1.f);
-			CenterOffset = FVector(0.f, 0.f, 0.f);
+			OffsetScale = FVector::UpVector;
+			CenterOffset = FVector::ZeroVector;
 			SetCastShadow(false);
 			SetCollisionEnabled(false);
 			break;
@@ -72,7 +72,7 @@ void UVoxelMeshComponent::Initialize(EVoxelScope InScope, EVoxelNature InNature)
 		case EVoxelScope::Capture:
 		{
 			OffsetScale = FVector::ZeroVector;
-			CenterOffset = FVector(0.f, 0.f, 0.f);
+			CenterOffset = FVector::ZeroVector;
 			SetCastShadow(false);
 			SetCollisionEnabled(false);
 			break;
@@ -88,7 +88,7 @@ void UVoxelMeshComponent::Initialize(EVoxelScope InScope, EVoxelNature InNature)
 		case EVoxelScope::PickUp:
 		{
 			OffsetScale = FVector::ZeroVector;
-			CenterOffset = FVector(0.f, 0.f, 0.f);
+			CenterOffset = FVector::ZeroVector;
 			SetCastShadow(true);
 			SetCollisionEnabled(false);
 			break;
@@ -96,7 +96,7 @@ void UVoxelMeshComponent::Initialize(EVoxelScope InScope, EVoxelNature InNature)
 		case EVoxelScope::Vitality:
 		{
 			OffsetScale = FVector::OneVector;
-			CenterOffset = FVector(0.f, 0.f, 0.f);
+			CenterOffset = FVector::ZeroVector;
 			SetCastShadow(true);
 			SetCollisionEnabled(false);
 			break;

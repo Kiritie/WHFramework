@@ -41,9 +41,7 @@ void AVoxelAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 				SetActorRelativeLocation(VoxelItem.GetLocation() + VoxelItem.GetRange(true, true) * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f);
 				break;
 			}
-			case EVoxelScope::Entity:
 			case EVoxelScope::Preview:
-			case EVoxelScope::PickUp:
 			{
 				SetActorRelativeLocation(VoxelItem.GetRange(true, true) * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f);
 				break;
@@ -56,6 +54,7 @@ void AVoxelAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			default: break;
 		}
 		SetActorRelativeRotation(FRotator(0.f, FMathHelper::RightAngleToFloat(VoxelItem.Angle), 0.f));
+		SetActorRelativeScale3D(FVector::OneVector);
 	}
 }
 

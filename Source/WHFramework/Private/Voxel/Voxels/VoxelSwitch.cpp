@@ -62,7 +62,23 @@ void UVoxelSwitch::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitRes
 
 bool UVoxelSwitch::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
 {
-	return Super::OnAgentInteract(InAgent, InInteractAction, InInteractEvent, InHitResult);
+	switch (InInteractAction)
+	{
+		case EInputInteractAction::Primary:
+		{
+			return Super::OnAgentInteract(InAgent, InInteractAction, InInteractEvent, InHitResult);
+		}
+		case EInputInteractAction::Secondary:
+		{
+			if(InInteractEvent == EInputInteractEvent::Started)
+			{
+				Toggle(InAgent);
+			}
+			return true;
+		}
+		default: break;
+	}
+	return false;
 }
 
 void UVoxelSwitch::Toggle(IVoxelAgentInterface* InAgent)
@@ -75,7 +91,7 @@ void UVoxelSwitch::Open(IVoxelAgentInterface* InAgent)
 {
 	if(IInteractionAgentInterface* InteractionAgent = Cast<IInteractionAgentInterface>(InAgent))
 	{
-		if(AVoxelInteractAuxiliary* InteractAuxiliary = Cast<AVoxelInteractAuxiliary>(GetItem().Auxiliary))
+		if(AVoxelInteractAuxiliary* InteractAuxiliary = Cast<AVoxelInteractAuxiliary>(GetItem().GetMain().Auxiliary))
 		{
 			InteractionAgent->SetInteractingAgent(InteractAuxiliary);
 			InteractionAgent->DoInteract((EInteractAction)EVoxelInteractAction::Open, InteractAuxiliary);
@@ -97,7 +113,7 @@ void UVoxelSwitch::Close(IVoxelAgentInterface* InAgent)
 {
 	if(IInteractionAgentInterface* InteractionAgent = Cast<IInteractionAgentInterface>(InAgent))
 	{
-		if(AVoxelInteractAuxiliary* InteractAuxiliary = Cast<AVoxelInteractAuxiliary>(GetItem().Auxiliary))
+		if(AVoxelInteractAuxiliary* InteractAuxiliary = Cast<AVoxelInteractAuxiliary>(GetItem().GetMain().Auxiliary))
 		{
 			InteractionAgent->SetInteractingAgent(InteractAuxiliary);
 			InteractionAgent->DoInteract((EInteractAction)EVoxelInteractAction::Close, InteractAuxiliary);

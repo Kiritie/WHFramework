@@ -225,6 +225,9 @@ void AVoxelChunk::CreateMesh()
 
 void AVoxelChunk::ClearMap(bool bGenerate)
 {
+	ITER_MAP(VoxelMap, Iter,
+		DestroyAuxiliary(Iter.Value);
+	)
 	VoxelMap.Empty();
 	Generate(EPhase::Lesser);
 }
