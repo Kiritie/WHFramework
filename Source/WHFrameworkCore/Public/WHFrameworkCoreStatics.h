@@ -120,11 +120,9 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Texture
-#if WITH_ENGINE
 	static UTexture2D* LoadTextureFromFile(const FString& InFilePath);
 
 	static void SaveTextureToFile(UTexture2D* InTexture, const FString& InFilePath);
 
 	static UTexture2D* CompositeTextures(const TArray<UTexture2D*>& InTextures, FVector2D InTexSize, UTexture2D* InTemplate = nullptr);
-#endif
 };

@@ -21,9 +21,7 @@ void FMainManager::OnInitialize()
 {
 	FManagerBase::OnInitialize();
 
-#if WITH_ENGINE
 	FCoreUObjectDelegates::PostLoadMapWithWorld.AddRaw(this, &FMainManager::OnWorldAdded);
-#endif
 
 	FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([this](float DeltaTime)
 	{
@@ -57,7 +55,6 @@ void FMainManager::OnTermination()
 	FManagerBase::OnTermination();
 }
 
-#if WITH_ENGINE
 void FMainManager::OnWorldAdded(UWorld* InWorld)
 {
 	if (InWorld && InWorld->WorldType != EWorldType::Editor)
@@ -69,4 +66,3 @@ void FMainManager::OnWorldAdded(UWorld* InWorld)
 		OnPreparatory();
 	}
 }
-#endif

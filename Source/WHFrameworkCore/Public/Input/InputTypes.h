@@ -24,7 +24,6 @@ enum class EInputMode : uint8
 	UIOnly
 };
 
-#if WITH_ENGINE
 struct WHFRAMEWORKCORE_API FInputModeNone : public FInputModeDataBase
 {
 	FInputModeNone()
@@ -49,4 +48,3 @@ struct WHFRAMEWORKCORE_API FInputModeGameAndUI_NotHideCursor : public FInputMode
 		bHideCursorDuringCapture = false;
 	}
 };
-#endif

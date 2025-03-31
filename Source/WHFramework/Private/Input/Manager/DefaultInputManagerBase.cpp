@@ -20,6 +20,16 @@ void UDefaultInputManagerBase::OnInitialize()
 	Super::OnInitialize();
 }
 
+void UDefaultInputManagerBase::OnReset()
+{
+	Super::OnReset();
+}
+
+void UDefaultInputManagerBase::OnRefresh(float DeltaSeconds)
+{
+	Super::OnRefresh(DeltaSeconds);
+}
+
 void UDefaultInputManagerBase::OnBindAction(UInputComponentBase* InInputComponent)
 {
 	Super::OnBindAction(InInputComponent);
@@ -52,6 +62,11 @@ void UDefaultInputManagerBase::OnBindAction(UInputComponentBase* InInputComponen
 	InInputComponent->BindInputAction(GameplayTags::Input_Third, ETriggerEvent::Started, this, &UDefaultInputManagerBase::OnThirdPressed, false);
 	InInputComponent->BindInputAction(GameplayTags::Input_Third, ETriggerEvent::Triggered, this, &UDefaultInputManagerBase::OnThirdRepeated, false);
 	InInputComponent->BindInputAction(GameplayTags::Input_Third, ETriggerEvent::Completed, this, &UDefaultInputManagerBase::OnThirdReleased, false);
+}
+
+void UDefaultInputManagerBase::OnTermination()
+{
+	Super::OnTermination();
 }
 
 void UDefaultInputManagerBase::SystemOperation_Implementation()

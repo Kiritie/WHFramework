@@ -72,8 +72,8 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "InputSteups|Mode")
 	EInputMode NativeInputMode;
 
-	UPROPERTY(EditAnywhere, Category = "InputSteups|Manager")
-	TArray<TSubclassOf<UInputManagerBase>> InputManagers;
+	UPROPERTY(EditAnywhere, Instanced, Category = "InputSteups|Manager")
+	TArray<UInputManagerBase*> InputManagers;
 
 	UPROPERTY(VisibleAnywhere, Category = "InputSteups|Manager")
 	TArray<FPlayerInputManagerInfo> InputManagerInfos;

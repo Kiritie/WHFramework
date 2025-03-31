@@ -118,8 +118,8 @@ protected:
 	//////////////////////////////////////////////////////////////////////////
 	/// Event Manager
 protected:
-	UPROPERTY(EditAnywhere)
-	TArray<TSubclassOf<UEventManagerBase>> EventManagers;
+	UPROPERTY(EditAnywhere, Instanced)
+	TArray<UEventManagerBase*> EventManagers;
 
 	UPROPERTY(Transient)
 	TMap<FName, UEventManagerBase*> EventManagerRefs;

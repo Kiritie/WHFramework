@@ -6,7 +6,6 @@
 #include "WebRequest/WebRequestManager.h"
 #include "Interfaces/IHttpRequest.h"
 #include "Main/Base/ModuleBase.h"
-#include "Parameter/ParameterModuleTypes.h"
 
 #include "WebRequestModule.generated.h"
 

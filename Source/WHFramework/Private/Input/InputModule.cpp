@@ -23,7 +23,6 @@
 #include "Input/Manager/DefaultInputManagerBase.h"
 #include "Input/Manager/InputManagerBase.h"
 #include "Input/Widget/WidgetKeyTipsItemBase.h"
-#include "ObjectPool/ObjectPoolModuleStatics.h"
 
 IMPLEMENTATION_MODULE(UInputModule)
 
@@ -36,8 +35,6 @@ UInputModule::UInputModule()
 	bModuleRequired = true;
 
 	ModuleSaveGame = UInputSaveGame::StaticClass();
-
-	InputManagers.Add(UDefaultInputManagerBase::StaticClass());
 	
 	AddKeyShortcut(GameplayTags::Input_InteractSelect, FInputKeyShortcut(FText::FromString("Interact Select"), FText::FromString("Interaction")));
 	
@@ -99,6 +96,11 @@ UInputModule::~UInputModule()
 void UInputModule::OnGenerate()
 {
 	Super::OnGenerate();
+
+	if(InputManagers.IsEmpty())
+	{
+		InputManagers.Add(NewObject<UDefaultInputManagerBase>(this));
+	}
 }
 
 void UInputModule::OnDestroy()
@@ -119,13 +121,10 @@ void UInputModule::OnInitialize()
 
 	for(auto Iter : InputManagers)
 	{
-		if(UInputManagerBase* InputManager = UObjectPoolModuleStatics::SpawnObject<UInputManagerBase>(nullptr, nullptr, Iter))
-		{
-			InputManager->OnInitialize();
-			FPlayerInputManagerInfo InputManagerInfo;
-			InputManagerInfo.InputManagerRefs.Add(InputManager->GetInputManagerName(), InputManager);
-			InputManagerInfos.Add(InputManagerInfo);
-		}
+		Iter->OnInitialize();
+		FPlayerInputManagerInfo InputManagerInfo;
+		InputManagerInfo.InputManagerRefs.Add(Iter->GetInputManagerName(), Iter);
+		InputManagerInfos.Add(InputManagerInfo);
 	}
 }
 

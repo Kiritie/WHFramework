@@ -30,15 +30,10 @@ public class WHFrameworkSlate : ModuleRules
 				"InputCore",
 				"zlib",
 				"ImageWrapper",
-				// "Engine",
+				"Engine",
 				"GameplayTags"
 			}
 		);
-		
-		if (Target.bCompileAgainstEngine)
-		{
-			PrivateDependencyModuleNames.Add("Engine");
-		}
 
 		const string ResourcesDir = "$(PluginDir)/Resources/Slate/...";
 		RuntimeDependencies.Add(ResourcesDir, StagedFileType.NonUFS);

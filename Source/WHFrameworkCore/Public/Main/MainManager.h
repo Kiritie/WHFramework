@@ -29,9 +29,7 @@ public:
 	virtual void OnTermination() override;
 
 protected:
-#if WITH_ENGINE
 	virtual void OnWorldAdded(UWorld* InWorld);
-#endif
 
 protected:
 	/// 管理器列表

@@ -20,8 +20,14 @@ public:
 	/// Defaults
 public:
 	virtual void OnInitialize() override;
+
+	virtual void OnReset() override;
+
+	virtual void OnRefresh(float DeltaSeconds) override;
 	
 	virtual void OnBindAction(UInputComponentBase* InInputComponent) override;
+
+	virtual void OnTermination() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// System

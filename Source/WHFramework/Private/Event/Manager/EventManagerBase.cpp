@@ -4,9 +4,7 @@
 #include "Event/Manager/EventManagerBase.h"
 
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Common/Game/EventHandle_GameStarted.h"
-#include "Event/Handle/Common/Game/EventHandle_GameExited.h"
-#include "Event/Handle/Common/Game/EventHandle_GameInited.h"
+#include "Event/Handle/EventHandleBase.h"
 
 // ParamSets default values
 UEventManagerBase::UEventManagerBase()
@@ -24,10 +22,6 @@ void UEventManagerBase::OnInitialize()
 	{
 		if(Iter) UEventModuleStatics::SubscribeEvent(Iter, this, GET_FUNCTION_NAME_THISCLASS(OnHandleEvent));
 	}
-	
-	UEventModuleStatics::SubscribeEvent<UEventHandle_GameInited>(this, GET_FUNCTION_NAME_THISCLASS(OnGameInited));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_GameStarted>(this, GET_FUNCTION_NAME_THISCLASS(OnGameStarted));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_GameExited>(this, GET_FUNCTION_NAME_THISCLASS(OnGameExited));
 }
 
 void UEventManagerBase::OnPreparatory()
@@ -61,19 +55,4 @@ bool UEventManagerBase::GetEventInfoByTag(const FGameplayTag& InTag, FEventInfo&
 		}
 	}
 	return false;
-}
-
-void UEventManagerBase::OnGameInited(UObject* InSender, UEventHandle_GameInited* InEventHandle)
-{
-	K2_OnGameInited(InSender, InEventHandle);
-}
-
-void UEventManagerBase::OnGameStarted(UObject* InSender, UEventHandle_GameStarted* InEventHandle)
-{
-	K2_OnGameStarted(InSender, InEventHandle);
-}
-
-void UEventManagerBase::OnGameExited(UObject* InSender, UEventHandle_GameExited* InEventHandle)
-{
-	K2_OnGameExited(InSender, InEventHandle);
 }

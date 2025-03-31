@@ -10,6 +10,7 @@
 #include "Event/Manager/EventManagerBase.h"
 #include "Event/Handle/EventHandleBase.h"
 #include "Common/CommonStatics.h"
+#include "Event/Manager/DefaultEventManagerBase.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 
 IMPLEMENTATION_MODULE(UEventModule)
@@ -24,7 +25,7 @@ UEventModule::UEventModule()
 
 	ModuleNetworkComponent = UEventModuleNetworkComponent::StaticClass();
 
-	EventManagers = TArray<TSubclassOf<UEventManagerBase>>();
+	EventManagers = TArray<UEventManagerBase*>();
 	EventManagerRefs = TMap<FName, UEventManagerBase*>();
 }
 
@@ -51,13 +52,15 @@ void UEventModule::OnInitialize()
 {
 	Super::OnInitialize();
 	
+	if(EventManagers.IsEmpty())
+	{
+		EventManagers.Add(NewObject<UDefaultEventManagerBase>(this));
+	}
+
 	for(auto Iter : EventManagers)
 	{
-		if(UEventManagerBase* EventManager = UObjectPoolModuleStatics::SpawnObject<UEventManagerBase>(nullptr, nullptr, Iter))
-		{
-			EventManager->OnInitialize();
-			EventManagerRefs.Add(EventManager->GetEventManagerName(), EventManager);
-		}
+		Iter->OnInitialize();
+		EventManagerRefs.Add(Iter->GetEventManagerName(), Iter);
 	}
 }
 
@@ -237,12 +240,12 @@ void UEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* 
 		{
 			UObject* Sender;
 			UEventHandleBase* EventHandle;
-		} Params{InSender, EventHandle};
+		} Params { InSender, EventHandle };
 
-		FEventMapping Mapping = EventMappings[InClass];
+		const FEventMapping& Mapping = EventMappings[InClass];
 		for (auto& Iter1 : Mapping.FuncMap)
 		{
-			for (auto Iter2 : Iter1.Value.FuncNames)
+			for (auto& Iter2 : Iter1.Value.FuncNames)
 			{
 				if (EventHandle->Filter(Iter1.Key, Iter2) && UCommonStatics::ExecuteObjectFunc(Iter1.Key, Iter2, &Params))
 				{
