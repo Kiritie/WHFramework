@@ -65,6 +65,41 @@ void USceneModuleStatics::SetMiniMapTexture(UTextureRenderTarget2D* InMiniMapTex
 	USceneModule::Get().SetMiniMapTexture(InMiniMapTexture);
 }
 
+FWorldMaxMapArea USceneModuleStatics::GetMaxMapArea(const FName InName)
+{
+	return USceneModule::Get().GetMaxMapArea(InName);
+}
+
+FWorldMaxMapArea USceneModuleStatics::GetMaxMapAreaByPoint(const FVector2D& InPoint)
+{
+	return USceneModule::Get().GetMaxMapAreaByPoint(InPoint);
+}
+
+TArray<FWorldMaxMapArea> USceneModuleStatics::GetMaxMapAreas()
+{
+	return USceneModule::Get().GetMaxMapAreas();
+}
+
+void USceneModuleStatics::AddMaxMapArea(const FWorldMaxMapArea& InArea)
+{
+	USceneModule::Get().AddMaxMapArea(InArea);
+}
+
+void USceneModuleStatics::RemoveMaxMapArea(const FName InName)
+{
+	USceneModule::Get().RemoveMaxMapArea(InName);
+}
+
+void USceneModuleStatics::ClearMaxMapArea()
+{
+	USceneModule::Get().ClearMaxMapArea();
+}
+
+bool USceneModuleStatics::HasMaxMapArea(const FName InName)
+{
+	return USceneModule::Get().HasMaxMapArea(InName);
+}
+
 UWorldTimer* USceneModuleStatics::GetWorldTimer(TSubclassOf<UWorldTimer> InClass)
 {
 	return USceneModule::Get().GetWorldTimer(InClass);

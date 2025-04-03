@@ -55,11 +55,44 @@ FVector FMathHelper::RotateVector(const FVector& InVector, ERightAngle InAngle, 
 	return RotateVector(InVector, FRotator(0.f, (int32)InAngle * 90.f, 0.f), bRound, bAbsolute);
 }
 
-bool FMathHelper::IsPointInEllipse2D(FVector2D InPoint, FVector2D InCenter, FVector2D InRadius)
+bool FMathHelper::IsPointInEllipse2D(const FVector2D& InPoint, const FVector2D& InCenter, const FVector2D& InRadius)
 {
 	FVector2D Delta = FVector2D(InPoint.X - InCenter.X, InPoint.Y - InCenter.Y);
 	Delta.Y /= InRadius.Y / InRadius.X;
 	return Delta.Length() < InRadius.X;
+}
+
+bool FMathHelper::IsPointInPolygon2D(const FVector2D& InPoint, const TArray<FVector2D>& InPoints)
+{
+	if (InPoints.Num() < 3)
+	{
+		return false; // 不是有效的多边形
+	}
+
+	bool bResult = false;
+	const int32 NumPoints = InPoints.Num();
+    
+	for (int32 i = 0, j = NumPoints - 1; i < NumPoints; j = i++)
+	{
+		const FVector2D& PointI = InPoints[i];
+		const FVector2D& PointJ = InPoints[j];
+        
+		// 检查点是否在边的Y范围内
+		const bool bWithinYRange = (PointI.Y > InPoint.Y) != (PointJ.Y > InPoint.Y);
+		if (bWithinYRange)
+		{
+			// 计算X轴交点
+			const float XIntersect = (PointJ.X - PointI.X) * (InPoint.Y - PointI.Y) / (PointJ.Y - PointI.Y) + PointI.X;
+            
+			// 如果测试点在交点左侧，切换结果
+			if (InPoint.X < XIntersect)
+			{
+				bResult = !bResult;
+			}
+		}
+	}
+    
+	return bResult;
 }
 
 float FMathHelper::RightAngleToFloat(ERightAngle InAngle)

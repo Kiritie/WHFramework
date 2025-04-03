@@ -42,6 +42,61 @@ enum class EFAsyncLoadLevelState : uint8
 };
 
 /**
+* 世界小地图模式
+*/
+UENUM(BlueprintType)
+enum class EWorldMiniMapMode : uint8
+{
+	// 无
+	None,
+	// 固定位置
+	FixedPoint,
+	// 视角位置
+	ViewPoint,
+	// 相机位置
+	CameraPoint
+};
+
+/**
+* 世界文本风格
+*/
+UENUM(BlueprintType)
+enum class EWorldTextStyle : uint8
+{
+	// 普通
+	Normal,
+	// 强调
+	Stress
+};
+
+/**
+ *
+ */
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FWorldMaxMapArea
+{
+	GENERATED_BODY()
+
+public:
+	FWorldMaxMapArea()
+	{
+		AreaName = NAME_None;
+		AreaDisplayName = FText::GetEmpty();
+		AreaPoints = TArray<FVector2D>();
+	}
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FName AreaName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FText AreaDisplayName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TArray<FVector2D> AreaPoints;
+};
+
+/**
  *
  */
 USTRUCT(BlueprintType)
@@ -130,34 +185,6 @@ public:
 	ECollisionChannel GetTraceChannel() const;
 	
 	ETraceTypeQuery GetTraceType() const;
-};
-
-/**
-* 世界小地图模式
-*/
-UENUM(BlueprintType)
-enum class EWorldMiniMapMode : uint8
-{
-	// 无
-	None,
-	// 固定位置
-	FixedPoint,
-	// 视角位置
-	ViewPoint,
-	// 相机位置
-	CameraPoint
-};
-
-/**
-* 世界文本风格
-*/
-UENUM(BlueprintType)
-enum class EWorldTextStyle : uint8
-{
-	// 普通
-	Normal,
-	// 强调
-	Stress
 };
 
 USTRUCT(BlueprintType)

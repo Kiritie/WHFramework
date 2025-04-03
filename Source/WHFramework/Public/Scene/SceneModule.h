@@ -7,6 +7,7 @@
 
 #include "Main/Base/ModuleBase.h"
 #include "Actor/PhysicsVolume/PhysicsVolumeTypes.h"
+#include "Debug/DebuggerInterface.h"
 
 #include "SceneModule.generated.h"
 
@@ -25,7 +26,7 @@ class UWorldTimer;
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API USceneModule : public UModuleBase, public ISceneContainerInterface
+class WHFRAMEWORK_API USceneModule : public UModuleBase, public ISceneContainerInterface, public IDebuggerInterface
 {
 	GENERATED_BODY()
 
@@ -61,9 +62,14 @@ protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 	virtual FSaveData* ToData() override;
-	
+
 public:
 	virtual FString GetModuleDebugMessage() override;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Debugger
+protected:
+	virtual void OnDrawDebug(UCanvas* InCanvas, APlayerController* InPC) override;
 
 #if WITH_EDITOR
 	virtual bool CanEditChange(const FProperty* InProperty) const override;
@@ -71,40 +77,19 @@ public:
 #endif
 
 	//////////////////////////////////////////////////////////////////////////
-	// World
+	// Module
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "bModuleAutoSave == true"))
 	bool bSaveActorDatas;
 
-	UPROPERTY(EditAnywhere, Category = "World|Coordinate")
+	//////////////////////////////////////////////////////////////////////////
+	// Coordinate
+protected:
+	UPROPERTY(EditAnywhere, Category = "Coordinate")
 	float SeaLevel;
 	
-	UPROPERTY(VisibleAnywhere, Category = "World|Coordinate")
+	UPROPERTY(VisibleAnywhere, Category = "Coordinate")
 	float Altitude;
-	
-	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "World|MiniMap")
-	AMiniMapCapture* MiniMapCapture;
-
-	UPROPERTY(EditAnywhere, Category = "World|MiniMap")
-	bool bMiniMapRotatable;
-
-	UPROPERTY(EditAnywhere, Category = "World|MiniMap")
-	EWorldMiniMapMode MiniMapMode;
-
-	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "MiniMapMode == EWorldMiniMapMode::FixedPoint"), Category = "World|MiniMap")
-	FTransform MiniMapPoint;
-
-	UPROPERTY(EditAnywhere, Category = "World|MiniMap")
-	float MiniMapRange;
-
-	UPROPERTY(EditAnywhere, Category = "World|MiniMap")
-	float MiniMapMinRange;
-
-	UPROPERTY(EditAnywhere, Category = "World|MiniMap")
-	float MiniMapMaxRange;
-
-	UPROPERTY(EditAnywhere, Category = "World|MiniMap")
-	UTextureRenderTarget2D* MiniMapTexture;
 
 public:
 	UFUNCTION(BlueprintPure)
@@ -115,7 +100,35 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	float GetAltitude(bool bUnsigned = false, bool bRefresh = false) const;
+	
+	//////////////////////////////////////////////////////////////////////////
+	// MiniMap
+protected:
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "MiniMap")
+	AMiniMapCapture* MiniMapCapture;
 
+	UPROPERTY(EditAnywhere, Category = "MiniMap")
+	bool bMiniMapRotatable;
+
+	UPROPERTY(EditAnywhere, Category = "MiniMap")
+	EWorldMiniMapMode MiniMapMode;
+
+	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "MiniMapMode == EWorldMiniMapMode::FixedPoint"), Category = "MiniMap")
+	FTransform MiniMapPoint;
+
+	UPROPERTY(EditAnywhere, Category = "MiniMap")
+	float MiniMapRange;
+
+	UPROPERTY(EditAnywhere, Category = "MiniMap")
+	float MiniMapMinRange;
+
+	UPROPERTY(EditAnywhere, Category = "MiniMap")
+	float MiniMapMaxRange;
+
+	UPROPERTY(EditAnywhere, Category = "MiniMap")
+	UTextureRenderTarget2D* MiniMapTexture;
+
+public:
 	UFUNCTION(BlueprintPure)
 	AMiniMapCapture* GetMiniMapCapture() const { return MiniMapCapture; }
 
@@ -142,6 +155,43 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void SetMiniMapTexture(UTextureRenderTarget2D* InMiniMapTexture);
+
+	//////////////////////////////////////////////////////////////////////////
+	// MaxMap
+protected:
+	UPROPERTY(EditAnywhere, Category = "MaxMap")
+	TArray<FWorldMaxMapArea> MaxMapAreas;
+
+	UPROPERTY(EditAnywhere, Category = "MaxMap")
+	bool bDrawMaxMapArea;
+
+	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bDrawMaxMapArea == true"), Category = "MaxMap")
+	float MaxMapAreaScale;
+
+	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bDrawMaxMapArea == true"), Category = "MaxMap")
+	float MaxMapAreaHeight;
+
+public:
+	UFUNCTION(BlueprintPure)
+	bool HasMaxMapArea(const FName InName) const;
+
+	UFUNCTION(BlueprintPure)
+	FWorldMaxMapArea GetMaxMapArea(const FName InName) const;
+
+	UFUNCTION(BlueprintPure)
+	FWorldMaxMapArea GetMaxMapAreaByPoint(const FVector2D& InPoint) const;
+
+	UFUNCTION(BlueprintPure)
+	TArray<FWorldMaxMapArea> GetMaxMapAreas() const { return MaxMapAreas; }
+
+	UFUNCTION(BlueprintCallable)
+	void AddMaxMapArea(const FWorldMaxMapArea& InArea);
+	
+	UFUNCTION(BlueprintCallable)
+	void RemoveMaxMapArea(const FName InName);
+		
+	UFUNCTION(BlueprintCallable)
+	void ClearMaxMapArea();
 
 	//////////////////////////////////////////////////////////////////////////
 	// WorldTimer

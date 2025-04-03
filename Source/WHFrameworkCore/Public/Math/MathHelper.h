@@ -38,7 +38,9 @@ public:
 
 	static FVector RotateVector(const FVector& InVector, ERightAngle InAngle, bool bRound = false, bool bAbsolute = false);
 
-	static bool IsPointInEllipse2D(FVector2D InPoint, FVector2D InCenter, FVector2D InRadius);
+	static bool IsPointInEllipse2D(const FVector2D& InPoint, const FVector2D& InCenter, const FVector2D& InRadius);
+
+	static bool IsPointInPolygon2D(const FVector2D& InPoint, const TArray<FVector2D>& InPoints);
 
 	//////////////////////////////////////////////////////////////////////////
 	// RightAngle

@@ -217,7 +217,10 @@ void UCameraModule::OnTermination(EPhase InPhase)
 {
 	Super::OnTermination(InPhase);
 
-	IDebuggerInterface::UnRegister();
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		IDebuggerInterface::UnRegister();
+	}
 }
 
 void UCameraModule::LoadData(FSaveData* InSaveData, EPhase InPhase)

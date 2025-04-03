@@ -24,6 +24,7 @@
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Main/MainModule.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Math/MathHelper.h"
 #include "Runtime/LevelSequence/Public/LevelSequenceActor.h"
 #include "Runtime/LevelSequence/Public/LevelSequencePlayer.h"
 #include "SaveGame/Module/SceneSaveGame.h"
@@ -68,6 +69,11 @@ USceneModule::USceneModule()
 	{
 		MiniMapTexture = MiniMapTexFinder.Object;
 	}
+
+	MaxMapAreas = TArray<FWorldMaxMapArea>();
+	bDrawMaxMapArea = false;
+	MaxMapAreaScale = 1.f;
+	MaxMapAreaHeight = 1000.f;
 	
 	WorldTimer = nullptr;
 	WorldWeather = nullptr;
@@ -155,6 +161,8 @@ void USceneModule::OnDestroy()
 void USceneModule::OnInitialize()
 {
 	Super::OnInitialize();
+
+	IDebuggerInterface::Register();
 
 	UEventModuleStatics::SubscribeEvent<UEventHandle_AsyncLoadLevels>(this, GET_FUNCTION_NAME_THISCLASS(OnAsyncLoadLevels));
 	UEventModuleStatics::SubscribeEvent<UEventHandle_AsyncUnloadLevels>(this, GET_FUNCTION_NAME_THISCLASS(OnAsyncUnloadLevels));
@@ -400,6 +408,11 @@ void USceneModule::OnUnPause()
 void USceneModule::OnTermination(EPhase InPhase)
 {
 	Super::OnTermination(InPhase);
+
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		IDebuggerInterface::UnRegister();
+	}
 }
 
 void USceneModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -475,6 +488,22 @@ FString USceneModule::GetModuleDebugMessage()
 	return Super::GetModuleDebugMessage();
 }
 
+void USceneModule::OnDrawDebug(UCanvas* InCanvas, APlayerController* InPC)
+{
+	if(bDrawMaxMapArea)
+	{
+		for(auto& Iter1 : MaxMapAreas)
+		{
+			for(auto& Iter2 : Iter1.AreaPoints)
+			{
+				const FVector StartPoint = FVector(Iter2.X * MaxMapAreaScale, Iter2.Y * MaxMapAreaScale, 0.f);
+				const FVector EndPoint = FVector(StartPoint.X, StartPoint.Y, MaxMapAreaHeight);
+				UKismetSystemLibrary::DrawDebugLine(this, StartPoint, EndPoint, FLinearColor::Red);
+			}
+		}
+	}
+}
+
 #if WITH_EDITOR
 bool USceneModule::CanEditChange(const FProperty* InProperty) const
 {
@@ -526,6 +555,72 @@ void USceneModule::SetMiniMapTexture(UTextureRenderTarget2D* InMiniMapTexture)
 	MiniMapTexture = InMiniMapTexture;
 
 	MiniMapCapture->GetCapture()->TextureTarget = MiniMapTexture;
+}
+
+bool USceneModule::HasMaxMapArea(const FName InName) const
+{
+	for(auto& Iter : MaxMapAreas)
+	{
+		if(Iter.AreaName == InName)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+FWorldMaxMapArea USceneModule::GetMaxMapArea(const FName InName) const
+{
+	for(auto& Iter : MaxMapAreas)
+	{
+		if(Iter.AreaName == InName)
+		{
+			return Iter;
+		}
+	}
+	return FWorldMaxMapArea();
+}
+
+FWorldMaxMapArea USceneModule::GetMaxMapAreaByPoint(const FVector2D& InPoint) const
+{
+	for(auto& Iter : MaxMapAreas)
+	{
+		if(FMathHelper::IsPointInPolygon2D(InPoint, Iter.AreaPoints))
+		{
+			return Iter;
+		}
+	}
+	return FWorldMaxMapArea();
+}
+
+void USceneModule::AddMaxMapArea(const FWorldMaxMapArea& InArea)
+{
+	FWorldMaxMapArea Area = InArea;
+	if(Area.AreaName.IsNone())
+	{
+		Area.AreaName = *FString::Printf(TEXT("Area_%d"), MaxMapAreas.Num());
+	}
+	if(!HasMaxMapArea(Area.AreaName))
+	{
+		MaxMapAreas.Add(Area);
+	}
+}
+
+void USceneModule::RemoveMaxMapArea(const FName InName)
+{
+	for(int32 i = 0; i < MaxMapAreas.Num(); i++)
+	{
+		if(MaxMapAreas[i].AreaName == InName)
+		{
+			MaxMapAreas.RemoveAt(i);
+			break;
+		}
+	}
+}
+
+void USceneModule::ClearMaxMapArea()
+{
+	MaxMapAreas.Empty();
 }
 
 UWorldTimer* USceneModule::GetWorldTimer(TSubclassOf<UWorldTimer> InClass) const

@@ -71,7 +71,8 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 	if(GetOwner())
 	{
 		TMap<FIndex, FVoxelItem> VoxelItems;
-		ITER_ARRAY({ EVoxelType::Water }, WaterType,
+		const TArray WaterTypes = { EVoxelType::Water };
+		ITER_ARRAY(WaterTypes, WaterType,
 			if(GetOwner()->CheckVoxelNeighbors(GetIndex(), WaterType, FVector::OneVector, false, true))
 			{
 				VoxelItems.Emplace(GetIndex(), UVoxelModuleStatics::VoxelTypeToAssetID(WaterType));

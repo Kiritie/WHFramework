@@ -14,9 +14,14 @@ FVector UMathStatics::RotateVector(const FVector& InVector, const FRotator& InRo
 	return FMathHelper::RotateVector(InVector, InRotator, bRound, bAbsolute);
 }
 
-bool UMathStatics::IsPointInEllipse2D(FVector2D InPoint, FVector2D InCenter, FVector2D InRadius)
+bool UMathStatics::IsPointInEllipse2D(const FVector2D& InPoint, const FVector2D& InCenter, const FVector2D& InRadius)
 {
 	return FMathHelper::IsPointInEllipse2D(InPoint, InCenter, InRadius);
+}
+
+bool UMathStatics::IsPointInPolygon2D(const FVector2D& InPoint, const TArray<FVector2D>& InPoints)
+{
+	return FMathHelper::IsPointInPolygon2D(InPoint, InPoints);
 }
 
 float UMathStatics::RightAngleToFloat(ERightAngle InAngle)

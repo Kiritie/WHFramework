@@ -3,6 +3,7 @@
 #include "Voxel/Generators/VoxelLakeGenerator.h"
 
 #include "Math/MathHelper.h"
+#include "Scene/SceneModuleStatics.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
 
@@ -95,19 +96,31 @@ void UVoxelLakeGenerator::SmoothLakeEdges(FIndex InIndex, float InRadius, int32 
 
 void UVoxelLakeGenerator::FillLakeWater(FIndex InIndex, float InRadius)
 {
+	FWorldMaxMapArea MaxMapArea;
+	MaxMapArea.AreaDisplayName = FText::FromString(TEXT("湖泊"));
 	for(int32 X = -InRadius; X <= InRadius; X++)
 	{
 		for(int32 Y = -InRadius; Y <= InRadius; Y++)
 		{
 			const FIndex Index = InIndex + FIndex(X, Y, 0);
-			const int32 LakeBedHeight = Module->GetTopographyByIndex(Index).Height;
-			for(int32 Z = LakeBedHeight; Z < InIndex.Z + 1; Z++)
+			const float Distance = FVector2D(X, Y).Size();
+			const float EffectiveRadius = GetEffectiveRadius(Index, InRadius);
+			if(Distance <= EffectiveRadius + 1)
 			{
-				const FIndex WaterIndex(Index.X, Index.Y, Z);
-				Module->SetVoxelByIndex(WaterIndex, EVoxelType::Water);
+				const int32 LakeBedHeight = Module->GetTopographyByIndex(Index).Height;
+				for(int32 Z = LakeBedHeight; Z < InIndex.Z + 1; Z++)
+				{
+					const FIndex WaterIndex(Index.X, Index.Y, Z);
+					Module->SetVoxelByIndex(WaterIndex, EVoxelType::Water);
+				}
+				if(Distance > EffectiveRadius && Distance <= EffectiveRadius + 1)
+				{
+					MaxMapArea.AreaPoints.Add(Index.ToVector2D());
+				}
 			}
 		}
 	}
+	USceneModuleStatics::AddMaxMapArea(MaxMapArea);
 }
 
 int32 UVoxelLakeGenerator::GetSurfaceHeight(FIndex InIndex, float InRadius) const
@@ -118,7 +131,12 @@ int32 UVoxelLakeGenerator::GetSurfaceHeight(FIndex InIndex, float InRadius) cons
 		for(int32 Y = -InRadius; Y <= InRadius; Y++)
 		{
 			const FIndex Index = InIndex + FIndex(X, Y, 0);
-			SurfaceHeight = FMath::Min(Module->GetTopographyByIndex(Index).Height, SurfaceHeight);
+			const float Distance = FVector2D(X, Y).Size();
+			const float EffectiveRadius = GetEffectiveRadius(Index, InRadius);
+			if(Distance <= EffectiveRadius)
+			{
+				SurfaceHeight = FMath::Min(Module->GetTopographyByIndex(Index).Height, SurfaceHeight);
+			}
 		}
 	}
 	return SurfaceHeight;
@@ -126,5 +144,5 @@ int32 UVoxelLakeGenerator::GetSurfaceHeight(FIndex InIndex, float InRadius) cons
 
 int32 UVoxelLakeGenerator::GetEffectiveRadius(FIndex InIndex, float InRadius) const
 {
-	return InRadius *(1.0f + Module->GetVoxelNoise2D(FVector2D(InIndex.X * NoiseScale, InIndex.Y * NoiseScale)) * 0.5f);
+	return InRadius * (1.0f + Module->GetVoxelNoise2D(FVector2D(InIndex.X * NoiseScale, InIndex.Y * NoiseScale)) * 0.5f);
 }
