@@ -28,6 +28,9 @@ public:
 	static FVector RotateVector(const FVector& InVector, const FRotator& InRotator, bool bRound = false, bool bAbsolute = false);
 
 	UFUNCTION(BlueprintPure, Category = "MathStatics")
+	static bool IsPointInBox2D(const FVector2D& InPoint, const FVector2D& InCenter, const FVector2D& InRadius);
+
+	UFUNCTION(BlueprintPure, Category = "MathStatics")
 	static bool IsPointInEllipse2D(const FVector2D& InPoint, const FVector2D& InCenter, const FVector2D& InRadius);
 	
 	UFUNCTION(BlueprintPure, Category = "MathStatics")

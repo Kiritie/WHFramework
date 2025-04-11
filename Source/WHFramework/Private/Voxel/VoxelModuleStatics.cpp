@@ -40,6 +40,51 @@ EVoxelTransparency UVoxelModuleStatics::VoxelNatureToTransparency(EVoxelNature I
 	return EVoxelTransparency::Solid;
 }
 
+FIndex UVoxelModuleStatics::LocationToChunkIndex(FVector InLocation, bool bIgnoreZ /*= false*/)
+{
+	return UVoxelModule::Get().LocationToChunkIndex(InLocation, bIgnoreZ);
+}
+
+FVector UVoxelModuleStatics::ChunkIndexToLocation(FIndex InIndex)
+{
+	return UVoxelModule::Get().ChunkIndexToLocation(InIndex);
+}
+
+FIndex UVoxelModuleStatics::LocationToVoxelIndex(FVector InLocation, bool bIgnoreZ)
+{
+	return UVoxelModule::Get().LocationToVoxelIndex(InLocation, bIgnoreZ);
+}
+
+FVector UVoxelModuleStatics::VoxelIndexToLocation(FIndex InIndex)
+{
+	return UVoxelModule::Get().VoxelIndexToLocation(InIndex);
+}
+
+int64 UVoxelModuleStatics::VoxelIndexToNumber(FIndex InIndex, bool bWorldSpace)
+{
+	return UVoxelModule::Get().VoxelIndexToNumber(InIndex, bWorldSpace);
+}
+
+FIndex UVoxelModuleStatics::NumberToVoxelIndex(int64 InNumber, bool bWorldSpace)
+{
+	return UVoxelModule::Get().NumberToVoxelIndex(InNumber, bWorldSpace);
+}
+
+float UVoxelModuleStatics::GetVoxelNoise1D(float InValue, bool bAbs, bool bUnsigned)
+{
+	return UVoxelModule::Get().GetVoxelNoise1D(InValue, bAbs, bUnsigned);
+}
+
+float UVoxelModuleStatics::GetVoxelNoise2D(FVector2D InLocation, bool bAbs, bool bUnsigned)
+{
+	return UVoxelModule::Get().GetVoxelNoise2D(InLocation, bAbs, bUnsigned);
+}
+
+float UVoxelModuleStatics::GetVoxelNoise3D(FVector InLocation, bool bAbs, bool bUnsigned)
+{
+	return UVoxelModule::Get().GetVoxelNoise3D(InLocation, bAbs, bUnsigned);
+}
+
 FVoxelWorldSaveData& UVoxelModuleStatics::GetVoxelWorldData()
 {
 	return UVoxelModule::Get().GetWorldData();
@@ -95,67 +140,62 @@ void UVoxelModuleStatics::SetTopographyByLocation(FVector InLocation, const FVox
 	UVoxelModule::Get().SetTopographyByLocation(InLocation, InTopography);
 }
 
-float UVoxelModuleStatics::GetVoxelNoise1D(float InValue, bool bAbs, bool bUnsigned)
+bool UVoxelModuleStatics::IsWorldBasicGenerated()
 {
-	return UVoxelModule::Get().GetVoxelNoise1D(InValue, bAbs, bUnsigned);
+	return UVoxelModule::Get().IsWorldBasicGenerated();
 }
 
-float UVoxelModuleStatics::GetVoxelNoise2D(FVector2D InLocation, bool bAbs, bool bUnsigned)
+float UVoxelModuleStatics::GetWorldGeneratePercent()
 {
-	return UVoxelModule::Get().GetVoxelNoise2D(InLocation, bAbs, bUnsigned);
+	return UVoxelModule::Get().GetWorldGeneratePercent();
 }
 
-float UVoxelModuleStatics::GetVoxelNoise3D(FVector InLocation, bool bAbs, bool bUnsigned)
+FBox UVoxelModuleStatics::GetWorldBounds(float InRadius, float InHalfHeight)
 {
-	return UVoxelModule::Get().GetVoxelNoise3D(InLocation, bAbs, bUnsigned);
+	return UVoxelModule::Get().GetWorldBounds(InRadius, InHalfHeight);
 }
 
-FIndex UVoxelModuleStatics::LocationToChunkIndex(FVector InLocation, bool bIgnoreZ /*= false*/)
+int32 UVoxelModuleStatics::GetChunkNum(bool bNeedGenerated)
 {
-	return UVoxelModule::Get().LocationToChunkIndex(InLocation, bIgnoreZ);
+	return UVoxelModule::Get().GetChunkNum(bNeedGenerated);
 }
 
-FVector UVoxelModuleStatics::ChunkIndexToLocation(FIndex InIndex)
+bool UVoxelModuleStatics::IsChunkGenerated(FIndex InIndex, bool bCheckVerticals)
 {
-	return UVoxelModule::Get().ChunkIndexToLocation(InIndex);
+	return UVoxelModule::Get().IsChunkGenerated(InIndex, bCheckVerticals);
 }
 
-FIndex UVoxelModuleStatics::LocationToVoxelIndex(FVector InLocation, bool bIgnoreZ)
+TArray<AVoxelChunk*> UVoxelModuleStatics::GetVerticalChunks(FIndex InIndex)
 {
-	return UVoxelModule::Get().LocationToVoxelIndex(InLocation, bIgnoreZ);
+	return UVoxelModule::Get().GetVerticalChunks(InIndex);
 }
 
-FVector UVoxelModuleStatics::VoxelIndexToLocation(FIndex InIndex)
+FVoxelChunkQueues UVoxelModuleStatics::GetChunkQueues(EVoxelWorldState InWorldState)
 {
-	return UVoxelModule::Get().VoxelIndexToLocation(InIndex);
+	return UVoxelModule::Get().GetChunkQueues(InWorldState);
 }
 
-int64 UVoxelModuleStatics::VoxelIndexToNumber(FIndex InIndex, bool bWorldSpace)
+UVoxelGenerator* UVoxelModuleStatics::GetVoxelGenerator(const TSubclassOf<UVoxelGenerator>& InClass)
 {
-	return UVoxelModule::Get().VoxelIndexToNumber(InIndex, bWorldSpace);
+	return UVoxelModule::Get().GetVoxelGenerator(InClass);
 }
 
-FIndex UVoxelModuleStatics::NumberToVoxelIndex(int64 InNumber, bool bWorldSpace)
-{
-	return UVoxelModule::Get().NumberToVoxelIndex(InNumber, bWorldSpace);
-}
-
-AVoxelChunk* UVoxelModuleStatics::FindChunkByIndex(FIndex InIndex)
+AVoxelChunk* UVoxelModuleStatics::GetChunkByIndex(FIndex InIndex)
 {
 	return UVoxelModule::Get().GetChunkByIndex(InIndex);
 }
 
-AVoxelChunk* UVoxelModuleStatics::FindChunkByLocation(FVector InLocation)
+AVoxelChunk* UVoxelModuleStatics::GetChunkByLocation(FVector InLocation)
 {
 	return UVoxelModule::Get().GetChunkByLocation(InLocation);
 }
 
-FVoxelItem& UVoxelModuleStatics::FindVoxelByIndex(FIndex InIndex)
+FVoxelItem& UVoxelModuleStatics::GetVoxelByIndex(FIndex InIndex)
 {
 	return UVoxelModule::Get().GetVoxelByIndex(InIndex);
 }
 
-FVoxelItem& UVoxelModuleStatics::FindVoxelByLocation(FVector InLocation)
+FVoxelItem& UVoxelModuleStatics::GetVoxelByLocation(FVector InLocation)
 {
 	return UVoxelModule::Get().GetVoxelByLocation(InLocation);
 }

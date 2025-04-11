@@ -1,18 +1,17 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "Voxel/Generators/VoxelBuildingGenerator.h"
+#include "Voxel/Generators/VoxelVillageGenerator.h"
 
 #include "Asset/AssetModuleStatics.h"
 #include "Math/MathHelper.h"
-#include "ObjectPool/ObjectPoolModuleStatics.h"
+#include "Scene/SceneModuleStatics.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "Voxel/Chunks/VoxelChunk.h"
-#include "Voxel/Prefabs/VoxelPrefab.h"
 #include "Voxel/Prefabs/Data/VoxelPrefabData.h"
 #include "Voxel/Voxels/Data/VoxelData.h"
 
-UVoxelBuildingGenerator::UVoxelBuildingGenerator()
+UVoxelVillageGenerator::UVoxelVillageGenerator()
 {
 	Seed = 453;
 	SpawnRate = 0.985f;
@@ -32,7 +31,7 @@ UVoxelBuildingGenerator::UVoxelBuildingGenerator()
 	_BuildingPos = {};
 }
 
-void UVoxelBuildingGenerator::Initialize(UVoxelModule* InModule)
+void UVoxelVillageGenerator::Initialize(UVoxelModule* InModule)
 {
 	Super::Initialize(InModule);
 
@@ -40,13 +39,9 @@ void UVoxelBuildingGenerator::Initialize(UVoxelModule* InModule)
 	{
 		_PrefabAssets.Add(UAssetModuleStatics::LoadPrimaryAsset<UVoxelPrefabData>(Iter));
 	}
-
-	FVoxelPrefabSaveData PrefabSaveData;
-	PrefabSaveData.VoxelDatas = _PrefabAssets[0]->VoxelDatas;
-	UObjectPoolModuleStatics::SpawnObject<AVoxelPrefab>()->LoadSaveData(&PrefabSaveData);
 }
 
-void UVoxelBuildingGenerator::Generate(AVoxelChunk* InChunk)
+void UVoxelVillageGenerator::Generate(AVoxelChunk* InChunk)
 {
 	float Possible = FMathHelper::HashRand(InChunk->GetIndex().ToVector2D(), Seed);
 
@@ -55,12 +50,21 @@ void UVoxelBuildingGenerator::Generate(AVoxelChunk* InChunk)
 	DevelopeDomains(InChunk);
 	PlaceBuildings(InChunk);
 	PlacePaths();
+
+	FWorldMaxMapArea MaxMapArea;
+	MaxMapArea.AreaDisplayName = FText::FromString(TEXT("村庄"));
+	MaxMapArea.AreaType = (EWorldMaxMapAreaType)EVoxelWorldMaxMapAreaType::Village;
+	MaxMapArea.AreaShape = EWorldMaxMapAreaShape::Ellipse;
+	MaxMapArea.AreaCenter = _StartPoint;
+	MaxMapArea.AreaRadius = FVector2D(30.f);
+	
+	USceneModuleStatics::AddMaxMapArea(MaxMapArea);
 }
 
-void UVoxelBuildingGenerator::DevelopeDomains(AVoxelChunk* InChunk)
+void UVoxelVillageGenerator::DevelopeDomains(AVoxelChunk* InChunk)
 {
 	_StartPoint = FVector2D(InChunk->GetWorldIndex().X + 7, InChunk->GetWorldIndex().Y + 7);
-
+	
 	std::priority_queue<
 		std::pair<float, FVector2D>,
 		std::vector<std::pair<float, FVector2D>>,
@@ -108,7 +112,7 @@ void UVoxelBuildingGenerator::DevelopeDomains(AVoxelChunk* InChunk)
 	}
 }
 
-void UVoxelBuildingGenerator::PlaceBuildings(AVoxelChunk* InChunk)
+void UVoxelVillageGenerator::PlaceBuildings(AVoxelChunk* InChunk)
 {
 	const int32 Dx[4] = {1, -1, 0, 0};
 	const int32 Dy[4] = {0, 0, 1, -1};
@@ -144,7 +148,7 @@ void UVoxelBuildingGenerator::PlaceBuildings(AVoxelChunk* InChunk)
 	}
 }
 
-bool UVoxelBuildingGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, int32 InRotate)
+bool UVoxelVillageGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, int32 InRotate)
 {
 	const int RotateIndex = InRotate % 2;
 	const int FrontBack = _PrefabAssets[InIndex]->VoxelSize[RotateIndex] / 2;
@@ -214,7 +218,7 @@ bool UVoxelBuildingGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InInd
 	return true;
 }
 
-void UVoxelBuildingGenerator::PlacePaths()
+void UVoxelVillageGenerator::PlacePaths()
 {
 	for(int i = 0; i < _BuildingPos.Num(); ++i)
 	{
@@ -236,12 +240,12 @@ void UVoxelBuildingGenerator::PlacePaths()
 	_BuildingPos.Reset();
 }
 
-bool UVoxelBuildingGenerator::InBarrier(FVector2D InPos)
+bool UVoxelVillageGenerator::InBarrier(FVector2D InPos)
 {
 	return !_Domains.Contains(FMathHelper::Index(InPos.X, InPos.Y));
 }
 
-TPair<float, float> UVoxelBuildingGenerator::WeightFormula(FVector2D InStartPos, FVector2D InEndPos, float InCost)
+TPair<float, float> UVoxelVillageGenerator::WeightFormula(FVector2D InStartPos, FVector2D InEndPos, float InCost)
 {
 	if(_Roads.Contains(FMathHelper::Index(InStartPos.X, InStartPos.Y)))
 	{

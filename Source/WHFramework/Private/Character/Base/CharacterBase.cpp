@@ -130,7 +130,7 @@ void ACharacterBase::OnRefresh_Implementation(float DeltaSeconds)
 {
 	if(AMainModule::IsExistModuleByClass<UVoxelModule>())
 	{
-		if(AVoxelChunk* Chunk = UVoxelModuleStatics::FindChunkByLocation(GetActorLocation()))
+		if(AVoxelChunk* Chunk = UVoxelModuleStatics::GetChunkByLocation(GetActorLocation()))
 		{
 			Chunk->AddSceneActor(this);
 		}

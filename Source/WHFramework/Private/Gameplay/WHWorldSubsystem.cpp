@@ -4,6 +4,7 @@
 
 #include "EngineUtils.h"
 #include "Gameplay/WHGameManager.h"
+#include "Gameplay/WHGameMode.h"
 #include "Main/MainModule.h"
 
 UWHWorldSubsystem::UWHWorldSubsystem()
@@ -14,6 +15,14 @@ UWHWorldSubsystem::UWHWorldSubsystem()
 void UWHWorldSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
+
+	if(AWHGameMode* GameMode = InWorld.GetAuthGameMode<AWHGameMode>())
+	{
+		if(!IWHActorInterface::Execute_IsInitialized(GameMode))
+		{
+			GameMode->Execute_OnInitialize(GameMode);
+		}
+	}
 
 	if(AMainModule* MainModule = AMainModule::GetPtr())
 	{

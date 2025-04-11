@@ -268,7 +268,9 @@ protected:
 	TMap<TSubclassOf<UVoxelGenerator>, UVoxelGenerator*> VoxelGenerators;
 
 public:
-	bool IsBasicGenerated() const;
+	bool IsWorldBasicGenerated() const;
+	
+	float GetWorldGeneratePercent() const;
 	
 	FBox GetWorldBounds(float InRadius = 0.f, float InHalfHeight = 0.f) const;
 

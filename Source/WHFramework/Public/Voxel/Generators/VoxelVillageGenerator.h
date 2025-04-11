@@ -6,19 +6,19 @@
 #include "VoxelGenerator.h"
 #include "Math/MathTypes.h"
 #include "Tool/PathFinder.h"
-#include "VoxelBuildingGenerator.generated.h"
+#include "VoxelVillageGenerator.generated.h"
 
 class UVoxelPrefabData;
 /**
  *
  */
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UVoxelBuildingGenerator : public UVoxelGenerator
+class WHFRAMEWORK_API UVoxelVillageGenerator : public UVoxelGenerator
 {
 	GENERATED_BODY()
 
 public:
-	UVoxelBuildingGenerator();
+	UVoxelVillageGenerator();
 
 public:
 	virtual void Initialize(UVoxelModule* InModule) override;

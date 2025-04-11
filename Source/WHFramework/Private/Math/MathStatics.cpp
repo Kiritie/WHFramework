@@ -14,6 +14,11 @@ FVector UMathStatics::RotateVector(const FVector& InVector, const FRotator& InRo
 	return FMathHelper::RotateVector(InVector, InRotator, bRound, bAbsolute);
 }
 
+bool UMathStatics::IsPointInBox2D(const FVector2D& InPoint, const FVector2D& InCenter, const FVector2D& InRadius)
+{
+	return FMathHelper::IsPointInBox2D(InPoint, InCenter, InRadius);
+}
+
 bool UMathStatics::IsPointInEllipse2D(const FVector2D& InPoint, const FVector2D& InCenter, const FVector2D& InRadius)
 {
 	return FMathHelper::IsPointInEllipse2D(InPoint, InCenter, InRadius);

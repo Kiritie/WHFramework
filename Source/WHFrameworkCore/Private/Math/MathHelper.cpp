@@ -55,6 +55,12 @@ FVector FMathHelper::RotateVector(const FVector& InVector, ERightAngle InAngle, 
 	return RotateVector(InVector, FRotator(0.f, (int32)InAngle * 90.f, 0.f), bRound, bAbsolute);
 }
 
+bool FMathHelper::IsPointInBox2D(const FVector2D& InPoint, const FVector2D& InCenter, const FVector2D& InRadius)
+{
+	const FBox2D Box = FBox2D(InCenter - InRadius, InCenter + InRadius);
+	return Box.IsInside(InPoint);
+}
+
 bool FMathHelper::IsPointInEllipse2D(const FVector2D& InPoint, const FVector2D& InCenter, const FVector2D& InRadius)
 {
 	FVector2D Delta = FVector2D(InPoint.X - InCenter.X, InPoint.Y - InCenter.Y);

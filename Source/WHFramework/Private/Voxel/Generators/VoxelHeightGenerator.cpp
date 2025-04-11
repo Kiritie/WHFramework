@@ -17,8 +17,7 @@ UVoxelHeightGenerator::UVoxelHeightGenerator()
 
 void UVoxelHeightGenerator::Generate(AVoxelChunk* InChunk)
 {
-	for(auto& Iter : GenerateDatas)
-	{
+	ITER_ARRAY(GenerateDatas, Iter,
 		ITER_INDEX2D(Index, Module->GetWorldData().ChunkSize, false,
 			const FVector2D Location = FVector2D((float)Index.X / Module->GetWorldData().ChunkSize.X / Iter.CrystalSize, Index.Y / Module->GetWorldData().ChunkSize.Y / Iter.CrystalSize);
 			const int32 BiomeHeight = (Module->GetVoxelNoise2D(Location + InChunk->GetIndex().ToVector2D() / Iter.CrystalSize) * Iter.MaxHeight + Iter.MaxHeight) * Iter.Weight;
@@ -26,5 +25,5 @@ void UVoxelHeightGenerator::Generate(AVoxelChunk* InChunk)
 			Topography.Height += BiomeHeight;
 			InChunk->SetTopography(Index, Topography);
 		)
-	}
+	)
 }

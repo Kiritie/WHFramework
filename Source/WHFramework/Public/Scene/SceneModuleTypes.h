@@ -70,6 +70,48 @@ enum class EWorldTextStyle : uint8
 };
 
 /**
+* 世界大地图区域形状
+*/
+UENUM(BlueprintType)
+enum class EWorldMaxMapAreaShape : uint8
+{
+	// 方形
+	Box,
+	// 椭圆
+	Ellipse,
+	// 多边形
+	Polygon
+};
+
+/**
+* 世界大地图区域类型
+*/
+UENUM(BlueprintType)
+enum class EWorldMaxMapAreaType : uint8
+{
+	// 区域1
+	Area1,
+	// 区域2
+	Area2,
+	// 区域3
+	Area3,
+	// 区域4
+	Area4,
+	// 区域5
+	Area5,
+	// 区域6
+	Area6,
+	// 区域7
+	Area7,
+	// 区域8
+	Area8,
+	// 区域9
+	Area9,
+	// 区域10
+	Area10
+};
+
+/**
  *
  */
 USTRUCT(BlueprintType)
@@ -82,6 +124,10 @@ public:
 	{
 		AreaName = NAME_None;
 		AreaDisplayName = FText::GetEmpty();
+		AreaType = EWorldMaxMapAreaType::Area1;
+		AreaShape = EWorldMaxMapAreaShape::Box;
+		AreaCenter = FVector2D::ZeroVector;
+		AreaRadius = FVector2D::ZeroVector;
 		AreaPoints = TArray<FVector2D>();
 	}
 
@@ -93,6 +139,18 @@ public:
 	FText AreaDisplayName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	EWorldMaxMapAreaType AreaType;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	EWorldMaxMapAreaShape AreaShape;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(EditConditionHides, EditCondition = "AreaShape == EWorldMaxMapAreaShape::Box || AreaShape == EWorldMaxMapAreaShape::Ellipse"))
+	FVector2D AreaCenter;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(EditConditionHides, EditCondition = "AreaShape == EWorldMaxMapAreaShape::Box || AreaShape == EWorldMaxMapAreaShape::Ellipse"))
+	FVector2D AreaRadius;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(EditConditionHides, EditCondition = "AreaShape == EWorldMaxMapAreaShape::Polygon"))
 	TArray<FVector2D> AreaPoints;
 };
 
@@ -264,6 +322,7 @@ public:
 	FORCEINLINE FSceneModuleSaveData()
 	{
 		MiniMapRange = 512.f;
+		MaxMapAreas = TArray<FWorldMaxMapArea>();
 		TimerData = FWorldTimerSaveData();
 		WeatherData = FWorldWeatherSaveData();
 		ActorSaveDatas = TArray<FSceneActorSaveData>();
@@ -272,7 +331,10 @@ public:
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float MiniMapRange;
-		
+				
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FWorldMaxMapArea> MaxMapAreas;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FWorldTimerSaveData TimerData;
 		

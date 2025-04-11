@@ -20,6 +20,7 @@ AWHGameMode::AWHGameMode()
 	PlayerControllerClass = AWHPlayerController::StaticClass();
 	GameStateClass = AWHGameState::StaticClass();
 	PlayerStateClass = AWHPlayerState::StaticClass();
+	DefaultManagerClass = nullptr;
 
 	bInitialized = false;
 }
@@ -27,6 +28,11 @@ AWHGameMode::AWHGameMode()
 void AWHGameMode::OnInitialize_Implementation()
 {
 	bInitialized = true;
+	
+	if(DefaultManagerClass)
+	{
+		GetWorld()->SpawnActor(DefaultManagerClass);
+	}
 }
 
 void AWHGameMode::OnPreparatory_Implementation()

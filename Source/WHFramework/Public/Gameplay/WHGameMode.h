@@ -68,6 +68,9 @@ public:
 	/// Manager
 
 protected:
+	UPROPERTY(EditAnywhere, Category = "Manager")
+	TSubclassOf<AWHGameManager> DefaultManagerClass;
+
 	UPROPERTY(VisibleAnywhere, Category = "Manager")
 	TArray<AWHGameManager*> Managers;
 

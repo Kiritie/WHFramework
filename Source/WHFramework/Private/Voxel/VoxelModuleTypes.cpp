@@ -209,7 +209,7 @@ UVoxel& FVoxelItem::GetVoxel() const
 AVoxelChunk* FVoxelItem::GetOwner() const
 {
 	if(Owner) return Owner;
-	return UVoxelModuleStatics::FindChunkByIndex(Index);
+	return UVoxelModuleStatics::GetChunkByIndex(Index);
 }
 
 UVoxelData& FVoxelItem::GetVoxelData(bool bEnsured) const

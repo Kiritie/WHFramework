@@ -34,7 +34,7 @@
 #include "Voxel/Capture/VoxelCapture.h"
 #include "Voxel/Components/VoxelMeshComponent.h"
 #include "Voxel/Generators/VoxelBiomeGenerator.h"
-#include "Voxel/Generators/VoxelBuildingGenerator.h"
+#include "Voxel/Generators/VoxelVillageGenerator.h"
 #include "Voxel/Generators/VoxelCaveGenerator.h"
 #include "Voxel/Generators/VoxelGenerator.h"
 #include "Voxel/Generators/VoxelHeightGenerator.h"
@@ -164,7 +164,7 @@ void UVoxelModule::OnGenerate()
 		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelOreGenerator>(this));
 		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelRainGenerator>(this));
 		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelFoliageGenerator>(this));
-		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelBuildingGenerator>(this));
+		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelVillageGenerator>(this));
 	}
 
 	if(!VoxelCapture)
@@ -215,6 +215,8 @@ void UVoxelModule::OnInitialize()
 	UAssetModuleStatics::AddStaticObject(FName("EVoxelType"), FStaticObject(UEnum::StaticClass(), TEXT("/Script/WHFramework.EVoxelType")));
 
 	UAssetModuleStatics::AddEnumMapping(TEXT("/Script/WHFramework.EInteractAction"), TEXT("/Script/WHFramework.EVoxelInteractAction"));
+	
+	UAssetModuleStatics::AddEnumMapping(TEXT("/Script/WHFramework.EWorldMaxMapAreaType"), TEXT("/Script/WHFramework.EVoxelWorldMaxMapAreaType"));
 
 	USceneModuleStatics::AddTraceMapping(FName("Chunk"), (ECollisionChannel)EGameTraceChannel::Chunk);
 	USceneModuleStatics::AddTraceMapping(FName("Voxel"), (ECollisionChannel)EGameTraceChannel::Voxel);
@@ -1104,16 +1106,28 @@ bool UVoxelModule::VoxelAgentTraceSingle(FVector InRayStart, FVector InRayEnd, f
 	return false;
 }
 
-bool UVoxelModule::IsBasicGenerated() const
+bool UVoxelModule::IsWorldBasicGenerated() const
 {
 	const FVector Range = FVector(FMath::Min(ChunkSpawnDistance, WorldData->GetWorldSize().X * 0.5f), FMath::Min(ChunkSpawnDistance, WorldData->GetWorldSize().Y * 0.5f), WorldData->GetWorldSize().Z);
 	ITER_INDEX(Iter, Range, true,
-		if(!IsChunkGenerated(Iter + ChunkGenerateIndex))
+		if(!IsChunkGenerated(Iter + ChunkGenerateIndex, true))
 		{
 			return false;
 		}
 	)
 	return true;
+}
+
+float UVoxelModule::GetWorldGeneratePercent() const
+{
+	int32 GeneratedNum = 0;
+	ITER_MAP(ChunkMap, Iter,
+		if(Iter.Value->IsGenerated())
+		{
+			GeneratedNum++;
+		}
+	)
+	return (float)GeneratedNum / ChunkMap.Num();
 }
 
 FBox UVoxelModule::GetWorldBounds(float InRadius, float InHalfHeight) const

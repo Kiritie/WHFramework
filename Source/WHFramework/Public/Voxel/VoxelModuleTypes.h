@@ -240,6 +240,18 @@ enum class EVoxelInteractAction : uint8
 	Close = EInteractAction::Custom2,
 };
 
+/**
+* 体素世界大地图区域类型
+*/
+UENUM(BlueprintType)
+enum class EVoxelWorldMaxMapAreaType : uint8
+{
+	// 湖泊
+	Lake = EWorldMaxMapAreaType::Area1,
+	// 村庄
+	Village = EWorldMaxMapAreaType::Area2
+};
+
 UENUM(BlueprintType)
 enum class EVoxelBiomeType: uint8
 {

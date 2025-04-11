@@ -5,15 +5,10 @@
 FPathFinder::FPathFinder()
 {
 	Depth = 0;
-
 	DepthLimit = 400;
-
 	PointList = {};
-
 	Openlist = {};
-
 	InBarrier = nullptr;
-
 	WeightFormula = nullptr;
 }
 

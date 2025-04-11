@@ -36,9 +36,18 @@ void UVoxelLakeGenerator::GenerateLake(FIndex InIndex)
 	const FIndex LakeCenter = FIndex(InIndex.X, InIndex.Y, GetSurfaceHeight(InIndex, LakeRadius));
 	if(LakeCenter.Z == 0) return;
 
-	GenerateLakeDepression(LakeCenter, LakeRadius, LakeDepth);
+	GenerateLakeDepression(LakeCenter, LakeRadius, LakeDepth); 
 	SmoothLakeEdges(LakeCenter, LakeRadius, 3);
 	FillLakeWater(LakeCenter, LakeRadius);
+
+	FWorldMaxMapArea MaxMapArea;
+	MaxMapArea.AreaDisplayName = FText::FromString(TEXT("湖泊"));
+	MaxMapArea.AreaType = (EWorldMaxMapAreaType)EVoxelWorldMaxMapAreaType::Lake;
+	MaxMapArea.AreaShape = EWorldMaxMapAreaShape::Ellipse;
+	MaxMapArea.AreaCenter = InIndex.ToVector2D();
+	MaxMapArea.AreaRadius = FVector2D(LakeRadius);
+	
+	USceneModuleStatics::AddMaxMapArea(MaxMapArea);
 }
 
 void UVoxelLakeGenerator::GenerateLakeDepression(FIndex InIndex, float InRadius, float InDepth)
@@ -96,8 +105,6 @@ void UVoxelLakeGenerator::SmoothLakeEdges(FIndex InIndex, float InRadius, int32 
 
 void UVoxelLakeGenerator::FillLakeWater(FIndex InIndex, float InRadius)
 {
-	FWorldMaxMapArea MaxMapArea;
-	MaxMapArea.AreaDisplayName = FText::FromString(TEXT("湖泊"));
 	for(int32 X = -InRadius; X <= InRadius; X++)
 	{
 		for(int32 Y = -InRadius; Y <= InRadius; Y++)
@@ -113,14 +120,9 @@ void UVoxelLakeGenerator::FillLakeWater(FIndex InIndex, float InRadius)
 					const FIndex WaterIndex(Index.X, Index.Y, Z);
 					Module->SetVoxelByIndex(WaterIndex, EVoxelType::Water);
 				}
-				if(Distance > EffectiveRadius && Distance <= EffectiveRadius + 1)
-				{
-					MaxMapArea.AreaPoints.Add(Index.ToVector2D());
-				}
 			}
 		}
 	}
-	USceneModuleStatics::AddMaxMapArea(MaxMapArea);
 }
 
 int32 UVoxelLakeGenerator::GetSurfaceHeight(FIndex InIndex, float InRadius) const

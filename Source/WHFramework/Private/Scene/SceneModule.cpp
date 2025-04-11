@@ -424,6 +424,7 @@ void USceneModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		if(SaveData.IsSaved())
 		{
 			MiniMapRange = SaveData.MiniMapRange;
+			MaxMapAreas = SaveData.MaxMapAreas;
 		}
 		
 		if(WorldTimer && WorldTimer->IsAutoSave())
@@ -455,6 +456,7 @@ FSaveData* USceneModule::ToData()
 	SaveData = new FSceneModuleSaveData();
 
 	SaveData->MiniMapRange = MiniMapRange;
+	SaveData->MaxMapAreas = MaxMapAreas;
 	
 	if(WorldTimer && WorldTimer->IsAutoSave())
 	{
@@ -494,11 +496,26 @@ void USceneModule::OnDrawDebug(UCanvas* InCanvas, APlayerController* InPC)
 	{
 		for(auto& Iter1 : MaxMapAreas)
 		{
-			for(auto& Iter2 : Iter1.AreaPoints)
+			switch(Iter1.AreaShape)
 			{
-				const FVector StartPoint = FVector(Iter2.X * MaxMapAreaScale, Iter2.Y * MaxMapAreaScale, 0.f);
-				const FVector EndPoint = FVector(StartPoint.X, StartPoint.Y, MaxMapAreaHeight);
-				UKismetSystemLibrary::DrawDebugLine(this, StartPoint, EndPoint, FLinearColor::Red);
+				case EWorldMaxMapAreaShape::Box:
+				{
+					UKismetSystemLibrary::DrawDebugBox(this, FVector(Iter1.AreaCenter.X * MaxMapAreaScale, Iter1.AreaCenter.Y * MaxMapAreaScale, MaxMapAreaHeight * 0.5f), FVector(Iter1.AreaRadius.X * MaxMapAreaScale, Iter1.AreaRadius.Y * MaxMapAreaScale, MaxMapAreaHeight * 0.5f), FLinearColor::Red);
+					break;
+				}
+				case EWorldMaxMapAreaShape::Ellipse:
+				{
+					UKismetSystemLibrary::DrawDebugCylinder(this, FVector(Iter1.AreaCenter.X * MaxMapAreaScale, Iter1.AreaCenter.Y * MaxMapAreaScale, 0.f), FVector(Iter1.AreaCenter.X * MaxMapAreaScale, Iter1.AreaCenter.Y * MaxMapAreaScale, MaxMapAreaHeight), Iter1.AreaRadius.GetMax() * MaxMapAreaScale, 12, FLinearColor::Red);
+					break;
+				}
+				case EWorldMaxMapAreaShape::Polygon:
+				{
+					for(auto& Iter2 : Iter1.AreaPoints)
+					{
+						UKismetSystemLibrary::DrawDebugLine(this, FVector(Iter2.X * MaxMapAreaScale, Iter2.Y * MaxMapAreaScale, 0.f), FVector(Iter2.X * MaxMapAreaScale, Iter2.Y * MaxMapAreaScale, MaxMapAreaHeight), FLinearColor::Red);
+					}
+					break;
+				}
 			}
 		}
 	}
@@ -585,9 +602,32 @@ FWorldMaxMapArea USceneModule::GetMaxMapAreaByPoint(const FVector2D& InPoint) co
 {
 	for(auto& Iter : MaxMapAreas)
 	{
-		if(FMathHelper::IsPointInPolygon2D(InPoint, Iter.AreaPoints))
+		switch(Iter.AreaShape)
 		{
-			return Iter;
+			case EWorldMaxMapAreaShape::Box:
+			{
+				if(FMathHelper::IsPointInBox2D(InPoint, Iter.AreaCenter, Iter.AreaRadius))
+				{
+					return Iter;
+				}
+				break;
+			}
+			case EWorldMaxMapAreaShape::Ellipse:
+			{
+				if(FMathHelper::IsPointInEllipse2D(InPoint, Iter.AreaCenter, Iter.AreaRadius))
+				{
+					return Iter;
+				}
+				break;
+			}
+			case EWorldMaxMapAreaShape::Polygon:
+			{
+				if(FMathHelper::IsPointInPolygon2D(InPoint, Iter.AreaPoints))
+				{
+					return Iter;
+				}
+				break;
+			}
 		}
 	}
 	return FWorldMaxMapArea();

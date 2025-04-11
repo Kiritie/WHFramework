@@ -25,7 +25,38 @@ public:
 	static EVoxelTransparency VoxelNatureToTransparency(EVoxelNature InVoxelNature);
 
 	//////////////////////////////////////////////////////////////////////////
-	// Data
+	// Index
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static FIndex LocationToChunkIndex(FVector InLocation, bool bIgnoreZ = false);
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static FVector ChunkIndexToLocation(FIndex InIndex);
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static FIndex LocationToVoxelIndex(FVector InLocation, bool bIgnoreZ = false);
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static FVector VoxelIndexToLocation(FIndex InIndex);
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static int64 VoxelIndexToNumber(FIndex InIndex, bool bWorldSpace = false);
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static FIndex NumberToVoxelIndex(int64 InNumber, bool bWorldSpace = false);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Noise
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static float GetVoxelNoise1D(float InValue, bool bAbs = false, bool bUnsigned = false);
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static float GetVoxelNoise2D(FVector2D InLocation, bool bAbs = false, bool bUnsigned = false);
+
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static float GetVoxelNoise3D(FVector InLocation, bool bAbs = false, bool bUnsigned = false);
+
+	//////////////////////////////////////////////////////////////////////////
+	// World
 	template<class T>
 	static T& GetVoxelWorldData()
 	{
@@ -65,47 +96,47 @@ public:
 	static void SetTopographyByLocation(FVector InLocation, const FVoxelTopography& InTopography);
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static float GetVoxelNoise1D(float InValue, bool bAbs = false, bool bUnsigned = false);
+	static bool IsWorldBasicGenerated();
+	
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static float GetWorldGeneratePercent();
+	
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static FBox GetWorldBounds(float InRadius = 0.f, float InHalfHeight = 0.f);
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static float GetVoxelNoise2D(FVector2D InLocation, bool bAbs = false, bool bUnsigned = false);
+	static int32 GetChunkNum(bool bNeedGenerated = false);
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static float GetVoxelNoise3D(FVector InLocation, bool bAbs = false, bool bUnsigned = false);
-
-	//////////////////////////////////////////////////////////////////////////
-	// Index
+	static bool IsChunkGenerated(FIndex InIndex, bool bCheckVerticals = false);
+	
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static FIndex LocationToChunkIndex(FVector InLocation, bool bIgnoreZ = false);
-
+	static TArray<AVoxelChunk*> GetVerticalChunks(FIndex InIndex);
+	
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static FVector ChunkIndexToLocation(FIndex InIndex);
+	static FVoxelChunkQueues GetChunkQueues(EVoxelWorldState InWorldState);
 
+	template<class T>
+	T* GetVoxelGenerator() const
+	{
+		return Cast<T>(GetVoxelGenerator(T::StaticClass()));
+	}
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static FIndex LocationToVoxelIndex(FVector InLocation, bool bIgnoreZ = false);
-
-	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static FVector VoxelIndexToLocation(FIndex InIndex);
-
-	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static int64 VoxelIndexToNumber(FIndex InIndex, bool bWorldSpace = false);
-
-	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static FIndex NumberToVoxelIndex(int64 InNumber, bool bWorldSpace = false);
+	static UVoxelGenerator* GetVoxelGenerator(const TSubclassOf<UVoxelGenerator>& InClass);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Chunk
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static AVoxelChunk* FindChunkByIndex(FIndex InIndex);
+	static AVoxelChunk* GetChunkByIndex(FIndex InIndex);
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static AVoxelChunk* FindChunkByLocation(FVector InLocation);
+	static AVoxelChunk* GetChunkByLocation(FVector InLocation);
 		
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static FVoxelItem& FindVoxelByIndex(FIndex InIndex);
+	static FVoxelItem& GetVoxelByIndex(FIndex InIndex);
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static FVoxelItem& FindVoxelByLocation(FVector InLocation);
+	static FVoxelItem& GetVoxelByLocation(FVector InLocation);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Voxel
