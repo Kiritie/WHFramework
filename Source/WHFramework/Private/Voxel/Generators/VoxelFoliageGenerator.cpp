@@ -43,16 +43,16 @@ bool UVoxelFoliageGenerator::GeneratePlant(AVoxelChunk* InChunk, FIndex InIndex,
 	
 	if(Topography.Height <= Module->GetWorldData().SeaLevel) return false;
 
-	float Temperature = Topography.Temperature;
-	float Humidity = Topography.Humidity;
+	const float Temperature = Topography.Temperature;
+	const float Humidity = Topography.Humidity;
 
-	FVector2D Location = FVector2D(float(InIndex.X) / Module->GetWorldData().ChunkSize.X / InCrystalSize, float(InIndex.Y) / Module->GetWorldData().ChunkSize.Y / InCrystalSize);
-	float Possible = FMathHelper::HashRand(Location, _Seed) - FMath::Abs(Temperature + 0.1f) * 0.5f + Humidity * 0.4f;
+	const FVector2D Location = FVector2D(float(InIndex.X) / Module->GetWorldData().ChunkSize.X / InCrystalSize, float(InIndex.Y) / Module->GetWorldData().ChunkSize.Y / InCrystalSize);
+	const float Possible = FMathHelper::HashRand(Location, _Seed) - FMath::Abs(Temperature + 0.1f) * 0.5f + Humidity * 0.4f;
 
 	EVoxelType VoxelType = EVoxelType::Empty;
 	if(Possible > FlowerRate)
 	{
-		VoxelType =(EVoxelType)((int32)EVoxelType::Flower_Allium + FMathHelper::HashRandInt(FVector2D(InIndex.X + InIndex.Y * 21, InIndex.Y - InIndex.X ^ 2), _Seed) %((int32)EVoxelType::Flower_Tulip_White -(int32)EVoxelType::Flower_Allium));
+		VoxelType = (EVoxelType)((int32)EVoxelType::Flower_Allium + FMathHelper::HashRandInt(FVector2D(InIndex.X + InIndex.Y * 21, InIndex.Y - InIndex.X ^ 2), _Seed) % ((int32)EVoxelType::Flower_Tulip_White -(int32)EVoxelType::Flower_Allium));
 	}
 	else if(Possible > GrassRate)
 	{
@@ -84,13 +84,13 @@ bool UVoxelFoliageGenerator::GenerateTree(AVoxelChunk* InChunk, FIndex InIndex, 
 
 	const FVector2D Location = FVector2D(float(InIndex.X) / Module->GetWorldData().ChunkSize.X / InCrystalSize, float(InIndex.Y) / Module->GetWorldData().ChunkSize.Y / InCrystalSize);
 	float Temperature = Topography.Temperature;
-	float Humidity = Topography.Humidity;
-	float Possible = FMathHelper::HashRand(-Location, _Seed) * 0.9f + Module->GetVoxelNoise2D(Location, false, true) * 0.15f - FMath::Abs(Temperature + 0.1f) * 0.15f + Humidity * 0.15f;
+	const float Humidity = Topography.Humidity;
+	const float Possible = FMathHelper::HashRand(-Location, _Seed) * 0.9f + Module->GetVoxelNoise2D(Location, false, true) * 0.15f - FMath::Abs(Temperature + 0.1f) * 0.1f + Humidity * 0.15f;
 
 	if(Possible <= TreeRate) return false;
-	const int32 TreeHeight =(FMathHelper::HashRandInt(FVector2D::UnitVector - Location, _Seed) % 3) + 4;
+	const int32 TreeHeight = (FMathHelper::HashRandInt(FVector2D::UnitVector - Location, _Seed) % 3) + 4;
 
-	Temperature +=(FMathHelper::HashRand(FVector2D::UnitVector + Location, _Seed) - 0.5f) * 0.2f;
+	Temperature += (FMathHelper::HashRand(FVector2D::UnitVector + Location, _Seed) - 0.5f) * 0.2f;
 
 	EVoxelType WoodType;
 	EVoxelType LeafType;
@@ -121,7 +121,7 @@ bool UVoxelFoliageGenerator::GenerateTree(AVoxelChunk* InChunk, FIndex InIndex, 
 	const int32 InitLeafHeight = 2 + T2 % 2;
 	for(int i = LeafHeight - 1; i >= InitLeafHeight; --i)
 	{
-		const float LeafRadius = FMathHelper::Bezier(FVector2D(0, 0), FVector2D(0.33f, T1), FVector2D(0.66f, T2), FVector2D(1, 0), float(i - InitLeafHeight) /(LeafHeight - 1 - InitLeafHeight)).Y;
+		const int32 LeafRadius = FMath::Clamp(FMathHelper::Bezier(FVector2D(0, 0), FVector2D(0.33f, T1), FVector2D(0.66f, T2), FVector2D(1, 0), float(i - InitLeafHeight) / (LeafHeight - 1 - InitLeafHeight)).Y, 0.f, 1.f) * 5;
 		GenerateLeaves(InChunk, InIndex, Topography.Height + 1 + i, LeafRadius, LeafType);
 	}
 	return true;
@@ -129,15 +129,11 @@ bool UVoxelFoliageGenerator::GenerateTree(AVoxelChunk* InChunk, FIndex InIndex, 
 
 void UVoxelFoliageGenerator::GenerateLeaves(AVoxelChunk* InChunk, FIndex InIndex, int32 InHeight, int32 InRadius, EVoxelType InLeafType)
 {
-	InRadius = FMath::Clamp(InRadius, 0, 3);
-
-	for(int i = 0; i < 5; ++i)
+	for(int i = 0; i < InRadius; ++i)
 	{
-		for(int j = 0; j < 5; ++j)
+		for(int j = 0; j < InRadius; ++j)
 		{
-			if(!_LeavesTemplate[InRadius][InChunk->LocalIndexToWorld(FIndex(i, j)).ToInt64()]) continue;
-
-			const FIndex Index =  InChunk->LocalIndexToWorld(FIndex(InIndex.X + i - 2, InIndex.Y + j - 2, InHeight));
+			const FIndex Index =  InChunk->LocalIndexToWorld(FIndex(InIndex.X + i - InRadius / 2, InIndex.Y + j - InRadius / 2, InHeight));
 			if(!Module->HasVoxelByIndex(Index, true))
 			{
 				Module->SetVoxelByIndex(Index, InLeafType);
@@ -145,34 +141,3 @@ void UVoxelFoliageGenerator::GenerateLeaves(AVoxelChunk* InChunk, FIndex InIndex
 		}
 	}
 }
-
-bool UVoxelFoliageGenerator::_LeavesTemplate[4][5][5] = {
-	{
-		{0, 0, 0, 0, 0},
-		{0, 0, 1, 0, 0},
-		{0, 1, 1, 1, 0},
-		{0, 0, 1, 0, 0},
-		{0, 0, 0, 0, 0}
-	},
-	{
-		{0, 0, 0, 0, 0},
-		{0, 1, 1, 1, 0},
-		{0, 1, 1, 1, 0},
-		{0, 1, 1, 1, 0},
-		{0, 0, 0, 0, 0}
-	},
-	{
-		{0, 1, 1, 1, 0},
-		{1, 1, 1, 1, 1},
-		{1, 1, 1, 1, 1},
-		{1, 1, 1, 1, 1},
-		{0, 1, 1, 1, 0}
-	},
-	{
-		{1, 1, 1, 1, 1},
-		{1, 1, 1, 1, 1},
-		{1, 1, 1, 1, 1},
-		{1, 1, 1, 1, 1},
-		{1, 1, 1, 1, 1}
-	}
-};

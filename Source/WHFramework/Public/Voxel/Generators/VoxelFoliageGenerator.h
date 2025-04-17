@@ -49,6 +49,4 @@ protected:
 
 private:
 	int32 _Seed;
-	//树叶模板（生成树叶阶段用）
-	static bool _LeavesTemplate[4][5][5];
 };

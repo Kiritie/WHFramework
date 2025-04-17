@@ -80,7 +80,20 @@ void ACharacterBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FPara
 	
 	if(InParams.IsValidIndex(0))
 	{
-		ActorID = InParams[0];
+		switch(InParams[0].GetParameterType())
+		{
+			case EParameterType::Transform:
+			{
+				SetActorTransform(InParams[0]);
+				break;
+			}
+			case EParameterType::Guid:
+			{
+				ActorID = InParams[0];
+				break;
+			}
+			default: break;
+		}
 	}
 	if(InParams.IsValidIndex(1))
 	{

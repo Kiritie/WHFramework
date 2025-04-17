@@ -341,12 +341,12 @@ void UVoxelModule::SetWorldState(EVoxelWorldState InWorldState)
 
 void UVoxelModule::OnWorldModeChanged()
 {
-	UEventModuleStatics::BroadcastEvent(UEventHandle_VoxelWorldModeChanged::StaticClass(), this, {&WorldMode});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_VoxelWorldModeChanged::StaticClass(), this, { &WorldMode });
 }
 
 void UVoxelModule::OnWorldStateChanged()
 {
-	UEventModuleStatics::BroadcastEvent(UEventHandle_VoxelWorldStateChanged::StaticClass(), this, {&WorldState});
+	UEventModuleStatics::BroadcastEvent(UEventHandle_VoxelWorldStateChanged::StaticClass(), this, { &WorldState });
 }
 
 FVoxelWorldSaveData& UVoxelModule::GetWorldData() const
@@ -475,7 +475,7 @@ void UVoxelModule::UnloadData(EPhase InPhase)
 
 void UVoxelModule::LoadPrefabData(const FVoxelPrefabSaveData& InPrefabData)
 {
-	if(WorldMode != EVoxelWorldMode::Prefab) return;
+	if(WorldMode != EVoxelWorldMode::Prefab || !IsWorldBasicGenerated()) return;
 	
 	TArray<AVoxelChunk*> GenerateChunks;
 	ITER_MAP(ChunkMap, Iter,
@@ -516,7 +516,7 @@ void UVoxelModule::LoadPrefabData(const FVoxelPrefabSaveData& InPrefabData)
 
 FVoxelPrefabSaveData UVoxelModule::GetPrefabData()
 {
-	if(WorldMode != EVoxelWorldMode::Prefab) return FVoxelPrefabSaveData();
+	if(WorldMode != EVoxelWorldMode::Prefab || !IsWorldBasicGenerated()) return FVoxelPrefabSaveData();
 	
 	FVoxelPrefabSaveData PrefabData;
 	ITER_MAP(ChunkMap, Iter1,
@@ -1157,16 +1157,24 @@ bool UVoxelModule::IsChunkGenerated(FIndex InIndex, bool bCheckVerticals) const
 {
 	if(bCheckVerticals)
 	{
-		for(auto Iter : GetVerticalChunks(InIndex))
+		const TArray<AVoxelChunk*> Chunks = GetVerticalChunks(InIndex);
+		if(Chunks.Num() > 0)
 		{
-			if(!Iter->IsGenerated())
+			for(auto Iter : Chunks)
 			{
-				return false;
+				if(!Iter->IsGenerated())
+				{
+					return false;
+				}
 			}
+			return true;
 		}
-		return true;
 	}
-	return GetChunkByIndex(InIndex) && GetChunkByIndex(InIndex)->IsGenerated();
+	else if(AVoxelChunk* Chunk = GetChunkByIndex(InIndex))
+	{
+		return Chunk->IsGenerated();
+	}
+	return false;
 }
 
 TArray<AVoxelChunk*> UVoxelModule::GetVerticalChunks(FIndex InIndex) const

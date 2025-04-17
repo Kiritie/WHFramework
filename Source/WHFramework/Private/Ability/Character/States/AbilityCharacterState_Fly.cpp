@@ -37,9 +37,7 @@ void UAbilityCharacterState_Fly::OnEnter(UFiniteStateBase* InLastState, const TA
 
 	Character->LimitToAnim();
 	Character->GetCharacterMovement()->SetMovementMode(MOVE_Flying);
-	Character->GetCharacterMovement()->Velocity *= 0.2f;
-	// Character->GetCharacterMovement()->GravityScale = 0.f;
-	// Character->GetCharacterMovement()->AirControl = 1.f;
+	Character->GetCharacterMovement()->Velocity = FVector::ZeroVector;
 
 	if(Character->GetCharacterMovement()->MovementMode != MOVE_Flying)
 	{
@@ -76,8 +74,6 @@ void UAbilityCharacterState_Fly::OnLeave(UFiniteStateBase* InNextState)
 
 	Character->FreeToAnim();
 	Character->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
-	// Character->GetCharacterMovement()->GravityScale = DefaultGravityScale;
-	// Character->GetCharacterMovement()->AirControl = DefaultAirControl;
 }
 
 void UAbilityCharacterState_Fly::OnTermination()

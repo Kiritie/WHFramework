@@ -14,7 +14,7 @@
 UVoxelVillageGenerator::UVoxelVillageGenerator()
 {
 	Seed = 453;
-	SpawnRate = 0.985f;
+	SpawnRate = 0.999f;
 
 	PathFinder = FPathFinder();
 	PathFinder.SetConditionInBarrier([this](FVector2D Pos) { return InBarrier(Pos); });

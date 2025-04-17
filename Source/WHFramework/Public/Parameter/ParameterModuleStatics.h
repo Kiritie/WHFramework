@@ -68,13 +68,19 @@ public:
 	static FParameter MakeBooleanParameter(bool InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeVectorParameter(const FVector& InValue, const FText InDescription = FText::GetEmpty());
+	static FParameter MakeVectorParameter(const FVector InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeRotatorParameter(const FRotator& InValue, const FText InDescription = FText::GetEmpty());
+	static FParameter MakeRotatorParameter(const FRotator InValue, const FText InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
-	static FParameter MakeColorParameter(FColor InValue, const FText InDescription = FText::GetEmpty());
+	static FParameter MakeTransformParameter(const FTransform InValue, const FText InDescription = FText::GetEmpty());
+
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FParameter MakeColorParameter(const FColor InValue, const FText InDescription = FText::GetEmpty());
+
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FParameter MakeLinearColorParameter(const FLinearColor InValue, const FText& InDescription = FText::GetEmpty());
 
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InValue"), Category = "ParameterModuleStatics")
 	static FParameter MakeKeyParameter(const FKey& InValue, const FText InDescription = FText::GetEmpty());
@@ -200,6 +206,13 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
 	static void SetRotatorValue(UPARAM(ref) FParameter& InParameter, const FRotator& InValue) { InParameter.SetRotatorValue(InValue); }
+
+	//////////////////////////////////////////////////////////////////////////
+	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	static FTransform GetTransformValue(UPARAM(ref) const FParameter& InParameter) { return InParameter.GetTransformValue(); }
+
+	UFUNCTION(BlueprintCallable, Category = "ParameterModuleStatics")
+	static void SetTransformValue(UPARAM(ref) FParameter& InParameter, const FTransform& InValue) { InParameter.SetTransformValue(InValue); }
 
 	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")

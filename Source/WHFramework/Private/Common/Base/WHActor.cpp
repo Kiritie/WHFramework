@@ -33,7 +33,20 @@ void AWHActor::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>
 	
 	if(InParams.IsValidIndex(0))
 	{
-		ActorID = InParams[0];
+		switch(InParams[0].GetParameterType())
+		{
+			case EParameterType::Transform:
+			{
+				SetActorTransform(InParams[0]);
+				break;
+			}
+			case EParameterType::Guid:
+			{
+				ActorID = InParams[0];
+				break;
+			}
+			default: break;
+		}
 	}
 
 	Execute_SetActorVisible(this, true);
@@ -110,7 +123,7 @@ void AWHActor::SetActorVisible_Implementation(bool bInVisible)
 	GetAttachedActors(AttachedActors);
 	for(auto Iter : AttachedActors)
 	{
-		ISceneActorInterface::Execute_SetActorVisible(Iter, bInVisible);
+		Execute_SetActorVisible(Iter, bInVisible);
 	}
 }
 

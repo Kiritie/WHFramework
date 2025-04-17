@@ -23,6 +23,7 @@ enum class EParameterType : uint8
 	Boolean,
 	Vector,
 	Rotator,
+	Transform,
 	Color,
 	LinearColor,
 	Key,
@@ -120,6 +121,7 @@ public:
 		BooleanValue = false;
 		VectorValue = FVector::ZeroVector;
 		RotatorValue = FRotator::ZeroRotator;
+		TransformValue = FTransform::Identity;
 		ColorValue = FColor::Transparent;
 		LinearColorValue = FLinearColor::Transparent;
 		KeyValue = FKey();
@@ -201,6 +203,11 @@ public:
 		*this = MakeRotator(InValue);
 	}
 	
+	FParameter(const FTransform& InValue)
+	{
+		*this = MakeTransform(InValue);
+	}
+
 	FParameter(FColor InValue)
 	{
 		*this = MakeColor(InValue);
@@ -304,7 +311,9 @@ public:
 	FORCEINLINE operator FVector() const { return VectorValue; }
 	
 	FORCEINLINE operator FRotator() const { return RotatorValue; }
-	
+		
+	FORCEINLINE operator FTransform() const { return TransformValue; }
+
 	FORCEINLINE operator FColor() const { return ColorValue; }
 		
 	FORCEINLINE operator FLinearColor() const { return LinearColorValue; }
@@ -357,6 +366,7 @@ public:
 			case EParameterType::Boolean: return A.BooleanValue == B.BooleanValue;
 			case EParameterType::Vector: return A.VectorValue == B.VectorValue;
 			case EParameterType::Rotator: return A.RotatorValue == B.RotatorValue;
+			case EParameterType::Transform: return A.TransformValue.Equals(B.TransformValue);
 			case EParameterType::Color: return A.ColorValue == B.ColorValue;
 			case EParameterType::LinearColor: return A.LinearColorValue == B.LinearColorValue;
 			case EParameterType::Tag: return A.TagValue == B.TagValue;
@@ -390,6 +400,7 @@ public:
 			case EParameterType::Boolean: return A.BooleanValue != B.BooleanValue;
 			case EParameterType::Vector: return A.VectorValue != B.VectorValue;
 			case EParameterType::Rotator: return A.RotatorValue != B.RotatorValue;
+			case EParameterType::Transform: return !A.TransformValue.Equals(B.TransformValue);
 			case EParameterType::Color: return A.ColorValue != B.ColorValue;
 			case EParameterType::LinearColor: return A.LinearColorValue != B.LinearColorValue;
 			case EParameterType::Tag: return A.TagValue != B.TagValue;
@@ -445,6 +456,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FRotator RotatorValue;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FTransform TransformValue;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FColor ColorValue;
@@ -560,6 +574,11 @@ public:
 	FRotator GetRotatorValue() const { return RotatorValue; }
 
 	void SetRotatorValue(const FRotator& InValue) { RotatorValue = InValue; }
+
+	//////////////////////////////////////////////////////////////////////////
+	FTransform GetTransformValue() const { return TransformValue; }
+
+	void SetTransformValue(const FTransform& InValue) { TransformValue = InValue; }
 
 	//////////////////////////////////////////////////////////////////////////
 	FColor GetColorValue() const { return ColorValue; }
@@ -754,6 +773,15 @@ public:
 		Parameter.ParameterType = EParameterType::Rotator;
 		Parameter.Description = InDescription;
 		Parameter.SetRotatorValue(InValue);
+		return Parameter;
+	}
+
+	static FParameter MakeTransform(const FTransform& InValue, const FText& InDescription = FText::GetEmpty())
+	{
+		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::Transform;
+		Parameter.Description = InDescription;
+		Parameter.SetTransformValue(InValue);
 		return Parameter;
 	}
 
