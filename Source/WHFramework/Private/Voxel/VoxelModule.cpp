@@ -715,7 +715,7 @@ void UVoxelModule::GenerateChunkQueues(bool bFromAgent, bool bForce)
 				for(int32 z = 0; z < SpawnRange.Z; z++)
 				{
 					const FIndex Index = FIndex(x, y, z);
-					if(FMathHelper::IsPointInEllipse2D(Index.ToVector2D() + FVector2D(0.5f), GenerateIndex.ToVector2D(), FVector2D(SpawnRange.X, SpawnRange.Y)))
+					if(FMathHelper::IsPointInEllipse2D(Index.ToVector2D() + FVector2D(0.5f), GenerateIndex.ToVector2D(), FVector2D(FMath::CeilToInt(SpawnRange.X), FMath::CeilToInt(SpawnRange.Y))))
 					{
 						if(DestroyQueue.Contains(Index)) DestroyQueue.Remove(Index);
 						AddToChunkQueue(EVoxelWorldState::Spawning, Index);

@@ -17,15 +17,20 @@ class WHFRAMEWORK_API IVoxelAgentInterface
 {
 	GENERATED_BODY()
 
+	friend class UVoxel;
+
 public:
 	IVoxelAgentInterface();
 
 public:
+	virtual bool InteractVoxel(EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult);
+
+	virtual void UnInteractVoxel(EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent);
+
+protected:
 	virtual bool OnGenerateVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult);
 
 	virtual bool OnDestroyVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult);
-
-	virtual bool OnInteractVoxel(EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult);
 
 public:
 	virtual FVector GetVoxelAgentLocation() const { return FVector::ZeroVector; }

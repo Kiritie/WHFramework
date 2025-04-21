@@ -491,6 +491,8 @@ void AAbilityCharacterBase::UnFly()
 
 bool AAbilityCharacterBase::DoAction(const FGameplayTag& InActionTag)
 {
+	if(!AssetID.IsValid()) return true;
+	
 	if(!HasActionAbility(InActionTag)) return false;
 	
 	const FVitalityActionAbilityData AbilityData = GetActionAbility(InActionTag);
@@ -501,6 +503,8 @@ bool AAbilityCharacterBase::DoAction(const FGameplayTag& InActionTag)
 
 bool AAbilityCharacterBase::StopAction(const FGameplayTag& InActionTag)
 {
+	if(!AssetID.IsValid()) return true;
+	
 	if(!HasActionAbility(InActionTag)) return false;
 	
 	const FVitalityActionAbilityData AbilityData = GetActionAbility(InActionTag);
@@ -674,15 +678,8 @@ bool AAbilityCharacterBase::OnGenerateVoxel(EInputInteractEvent InInteractEvent,
 		}
 		case EInputInteractEvent::Completed:
 		{
-			FItemQueryData ItemQueryData;
-			if(GenerateVoxelItem.IsValid())
-			{
-				ItemQueryData = Inventory->QueryItemByRange(EItemQueryType::Remove, FAbilityItem(GenerateVoxelItem, 1), -1);
-				if(!ItemQueryData.IsValid() || !bCanGenerateVoxel)
-				{
-					GenerateVoxelItem = FVoxelItem::Empty;
-				}
-			}
+			FItemQueryData ItemQueryData = Inventory->QueryItemByRange(EItemQueryType::Remove, FAbilityItem(GenerateVoxelItem, 1), -1);
+			if(!ItemQueryData.IsValid()) bCanGenerateVoxel = false;
 			if(IVoxelAgentInterface::OnGenerateVoxel(InInteractEvent, InHitResult))
 			{
 				Inventory->RemoveItemByQueryData(ItemQueryData);

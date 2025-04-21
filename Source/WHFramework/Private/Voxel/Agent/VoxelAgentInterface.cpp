@@ -25,9 +25,6 @@ IVoxelAgentInterface::IVoxelAgentInterface()
 
 bool IVoxelAgentInterface::OnGenerateVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
 {
-	AVoxelChunk* Chunk = InHitResult.GetChunk();
-	if(!Chunk) return false;
-
 	switch(InInteractEvent)
 	{
 		case EInputInteractEvent::Started:
@@ -44,8 +41,8 @@ bool IVoxelAgentInterface::OnGenerateVoxel(EInputInteractEvent InInteractEvent, 
 
 			if(!GenerateVoxelItem.IsValid()) break;
 
-			GenerateVoxelItem.Owner = Chunk;
-			GenerateVoxelItem.Index = Chunk->LocationToIndex(InHitResult.Point - UVoxelModule::Get().GetWorldData().GetBlockSizedNormal(InHitResult.Normal)) + FIndex(InHitResult.Normal);
+			GenerateVoxelItem.Owner = InHitResult.GetChunk();
+			GenerateVoxelItem.Index = InHitResult.GetChunk()->LocationToIndex(InHitResult.Point - UVoxelModule::Get().GetWorldData().GetBlockSizedNormal(InHitResult.Normal)) + FIndex(InHitResult.Normal);
 
 			TArray<AActor*> IgnoreActors;
 			if(GenerateVoxelItem.Auxiliary)
@@ -86,7 +83,7 @@ bool IVoxelAgentInterface::OnGenerateVoxel(EInputInteractEvent InInteractEvent, 
 
 			if(!GenerateVoxelItem.IsValid() || !bCanGenerateVoxel) break;
 
-			if(Chunk->SetVoxelComplex(GenerateVoxelItem.Index, GenerateVoxelItem, true, this))
+			if(InHitResult.GetChunk()->SetVoxelComplex(GenerateVoxelItem.Index, GenerateVoxelItem, true, this))
 			{
 				UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelGenerated>(Cast<UObject>(this), { &GenerateVoxelItem, Cast<UObject>(this) });
 				GenerateVoxelItem = FVoxelItem::Empty;
@@ -101,9 +98,6 @@ bool IVoxelAgentInterface::OnGenerateVoxel(EInputInteractEvent InInteractEvent, 
 
 bool IVoxelAgentInterface::OnDestroyVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
 {
-	AVoxelChunk* Chunk = InHitResult.GetChunk();
-	if(!Chunk) return false;
-
 	switch(InInteractEvent)
 	{
 		case EInputInteractEvent::Started:
@@ -118,7 +112,7 @@ bool IVoxelAgentInterface::OnDestroyVoxel(EInputInteractEvent InInteractEvent, c
 		{
 			if(!DestroyVoxelItem.IsValid()) break;
 
-			if(UVoxelModuleStatics::GetVoxelWorldMode() == EVoxelWorldMode::Prefab)
+			if(UVoxelModuleStatics::GetVoxelWorldMode() != EVoxelWorldMode::Default)
 			{
 				DestroyVoxelItem.Durability = 0.f;
 			}
@@ -132,17 +126,17 @@ bool IVoxelAgentInterface::OnDestroyVoxel(EInputInteractEvent InInteractEvent, c
 			}
 			if(DestroyVoxelItem.Durability <= 0.f)
 			{
-				if(Chunk->SetVoxelComplex(DestroyVoxelItem.Index, FVoxelItem::Empty, true, this))
+				if(InHitResult.GetChunk()->SetVoxelComplex(DestroyVoxelItem.Index, FVoxelItem::Empty, true, this))
 				{
 					UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelDestroyed>(Cast<UObject>(this), { &DestroyVoxelItem, Cast<UObject>(this) });
 				}
-				if(UVoxelModuleStatics::GetVoxelWorldMode() == EVoxelWorldMode::Prefab)
+				if(UVoxelModuleStatics::GetVoxelWorldMode() != EVoxelWorldMode::Default)
 				{
 					DestroyVoxelItem = FVoxelItem::Empty;
 				}
 				return true;
 			}
-			Chunk->SetVoxelComplex(DestroyVoxelItem.Index, DestroyVoxelItem, false, this);
+			InHitResult.GetChunk()->SetVoxelComplex(DestroyVoxelItem.Index, DestroyVoxelItem, false, this);
 			break;
 		}
 		case EInputInteractEvent::Completed:
@@ -150,7 +144,7 @@ bool IVoxelAgentInterface::OnDestroyVoxel(EInputInteractEvent InInteractEvent, c
 			if(!DestroyVoxelItem.IsValid()) break;
 			
 			DestroyVoxelItem.Durability = 1.f;
-			Chunk->SetVoxelComplex(DestroyVoxelItem.Index, DestroyVoxelItem, false, this);
+			InHitResult.GetChunk()->SetVoxelComplex(DestroyVoxelItem.Index, DestroyVoxelItem, false, this);
 			DestroyVoxelItem = FVoxelItem::Empty;
 			return true;
 		}
@@ -158,7 +152,28 @@ bool IVoxelAgentInterface::OnDestroyVoxel(EInputInteractEvent InInteractEvent, c
 	return false;
 }
 
-bool IVoxelAgentInterface::OnInteractVoxel(EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
+bool IVoxelAgentInterface::InteractVoxel(EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
 {
 	return InHitResult.GetVoxel().OnAgentInteract(this, InInteractAction, InInteractEvent, InHitResult);
+}
+
+void IVoxelAgentInterface::UnInteractVoxel(EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent)
+{
+	switch (InInteractAction)
+	{
+		case EInputInteractAction::Primary:
+		{
+			OnDestroyVoxel(InInteractEvent, FVoxelHitResult());
+		}
+		case EInputInteractAction::Secondary:
+		{
+			bCanGenerateVoxel = false;
+			OnGenerateVoxel(InInteractEvent, FVoxelHitResult());
+		}
+		case EInputInteractAction::Third:
+		{
+			break;
+		}
+		default: break;
+	}
 }

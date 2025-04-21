@@ -432,15 +432,8 @@ bool AAbilityPawnBase::OnGenerateVoxel(EInputInteractEvent InInteractEvent, cons
 		}
 		case EInputInteractEvent::Completed:
 		{
-			FItemQueryData ItemQueryData;
-			if(GenerateVoxelItem.IsValid())
-			{
-				ItemQueryData = Inventory->QueryItemByRange(EItemQueryType::Remove, FAbilityItem(GenerateVoxelItem, 1), -1);
-				if(!ItemQueryData.IsValid() || !bCanGenerateVoxel)
-				{
-					GenerateVoxelItem = FVoxelItem::Empty;
-				}
-			}
+			FItemQueryData ItemQueryData = Inventory->QueryItemByRange(EItemQueryType::Remove, FAbilityItem(GenerateVoxelItem, 1), -1);
+			if(!ItemQueryData.IsValid()) bCanGenerateVoxel = false;
 			if(IVoxelAgentInterface::OnGenerateVoxel(InInteractEvent, InHitResult))
 			{
 				Inventory->RemoveItemByQueryData(ItemQueryData);

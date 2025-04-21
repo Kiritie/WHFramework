@@ -121,7 +121,7 @@ bool UVoxelFoliageGenerator::GenerateTree(AVoxelChunk* InChunk, FIndex InIndex, 
 	const int32 InitLeafHeight = 2 + T2 % 2;
 	for(int i = LeafHeight - 1; i >= InitLeafHeight; --i)
 	{
-		const int32 LeafRadius = FMath::Clamp(FMathHelper::Bezier(FVector2D(0, 0), FVector2D(0.33f, T1), FVector2D(0.66f, T2), FVector2D(1, 0), float(i - InitLeafHeight) / (LeafHeight - 1 - InitLeafHeight)).Y, 0.f, 1.f) * 5;
+		const int32 LeafRadius = FMath::Clamp(FMathHelper::Bezier(FVector2D(0, 0), FVector2D(0.33f, T1), FVector2D(0.66f, T2), FVector2D(1, 0), float(i - InitLeafHeight) / (LeafHeight - 1 - InitLeafHeight)).Y, 0.5f, 1.f) * 5;
 		GenerateLeaves(InChunk, InIndex, Topography.Height + 1 + i, LeafRadius, LeafType);
 	}
 	return true;
