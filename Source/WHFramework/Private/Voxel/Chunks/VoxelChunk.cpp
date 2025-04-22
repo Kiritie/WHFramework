@@ -161,14 +161,11 @@ void AVoxelChunk::Initialize(UVoxelModule* InModule, FIndex InIndex, int32 InBat
 	Module = InModule;
 	Index = InIndex;
 	Batch = InBatch;
-	if(Index.Z == 0)
-	{
-		ITER_INDEX2D(VoxelIndex, Module->GetWorldData().ChunkSize, false,
-			FVoxelTopography Topography;
-			Topography.Index = VoxelIndex;
-			TopographyMap.Add(VoxelIndex, Topography);
-		)
-	}
+	ITER_INDEX2D(VoxelIndex, Module->GetWorldData().ChunkSize, false,
+		FVoxelTopography Topography;
+		Topography.Index = VoxelIndex;
+		TopographyMap.Add(VoxelIndex, Topography);
+	)
 	UpdateNeighbors();
 }
 
@@ -265,7 +262,7 @@ void AVoxelChunk::BuildMap(int32 InStage)
 		}
 		default:
 		{
-			ITER_ARRAY(GetVerticals(), Iter, Iter->bBuilded = true; )
+			bBuilded = true;
 		}
 	}
 }
@@ -275,7 +272,7 @@ void AVoxelChunk::BuildPrefabMap()
 	ITER_INDEX2D(_Index, Module->GetWorldData().ChunkSize, false,
 		SetVoxel(_Index, EVoxelType::Grass);
 	)
-	ITER_ARRAY(GetVerticals(), Iter, Iter->bBuilded = true; )
+	bBuilded = true;
 }
 
 void AVoxelChunk::BuildMesh()
@@ -291,10 +288,10 @@ void AVoxelChunk::BuildMesh()
 
 void AVoxelChunk::GenerateNeighbors(FIndex InIndex, EPhase InPhase)
 {
-	GenerateNeighbors(InIndex.X, InIndex.Y, InIndex.Z, InPhase);
+	GenerateNeighbors(InIndex.X, InIndex.Y, InPhase);
 }
 
-void AVoxelChunk::GenerateNeighbors(int32 InX, int32 InY, int32 InZ, EPhase InPhase)
+void AVoxelChunk::GenerateNeighbors(int32 InX, int32 InY, EPhase InPhase)
 {
 	const auto& WorldData = Module->GetWorldData();
 	if(InX <= 0)
@@ -321,20 +318,6 @@ void AVoxelChunk::GenerateNeighbors(int32 InX, int32 InY, int32 InZ, EPhase InPh
 	else if(InY >= WorldData.ChunkSize.Y - 1)
 	{
 		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Right))
-		{
-			Chunk->Generate(InPhase);
-		}
-	}
-	if(InZ <= 0)
-	{
-		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Down))
-		{
-			Chunk->Generate(InPhase);
-		}
-	}
-	else if(InZ >= WorldData.ChunkSize.Z - 1)
-	{
-		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Up))
 		{
 			Chunk->Generate(InPhase);
 		}
@@ -368,7 +351,7 @@ bool AVoxelChunk::IsOnTheChunk(FIndex InIndex) const
 	const auto& WorldData = Module->GetWorldData();
 	return InIndex.X >= 0 && InIndex.X < WorldData.ChunkSize.X &&
 		InIndex.Y >= 0 && InIndex.Y < WorldData.ChunkSize.Y &&
-		InIndex.Z >= 0 && InIndex.Z < WorldData.ChunkSize.Z;
+		InIndex.Z >= 0 && InIndex.Z < WorldData.SkyHeight;
 }
 
 bool AVoxelChunk::IsOnTheChunk(FVector InLocation) const
@@ -376,7 +359,7 @@ bool AVoxelChunk::IsOnTheChunk(FVector InLocation) const
 	const auto& WorldData = Module->GetWorldData();
 	return InLocation.X >= GetWorldLocation().X && InLocation.X < GetWorldLocation().X + WorldData.GetChunkRealSize().X &&
 		InLocation.Y >= GetWorldLocation().Y && InLocation.Y < GetWorldLocation().Y + WorldData.GetChunkRealSize().Y &&
-		InLocation.Z >= GetWorldLocation().Z && InLocation.Z < GetWorldLocation().Z + WorldData.GetChunkRealSize().Z;
+		InLocation.Z >= GetWorldLocation().Z && InLocation.Z < GetWorldLocation().Z + WorldData.GetWorldRealHeight();
 }
 
 FIndex AVoxelChunk::LocationToIndex(FVector InLocation, bool bWorldSpace /*= true*/) const
@@ -421,16 +404,6 @@ bool AVoxelChunk::LocalIndexToNeighbor(FIndex InIndex, EDirection& OutDirection)
 	else if(InIndex.Y >= WorldData.ChunkSize.Y)
 	{
 		OutDirection = EDirection::Right;
-		return true;
-	}
-	else if(InIndex.Z < 0)
-	{
-		OutDirection = EDirection::Down;
-		return true;
-	}
-	else if(InIndex.Z >= WorldData.ChunkSize.Z)
-	{
-		OutDirection = EDirection::Up;
 		return true;
 	}
 	return false;
@@ -480,20 +453,6 @@ bool AVoxelChunk::HasVoxelComplex(int32 InX, int32 InY, int32 InZ, bool bSafe)
 		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Right))
 		{
 			return Chunk->HasVoxel(InX, InY - WorldData.ChunkSize.Y, InZ, bSafe);
-		}
-	}
-	else if(InZ < 0)
-	{
-		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Down))
-		{
-			return Chunk->HasVoxel(InX, InY, InZ + WorldData.ChunkSize.Z, bSafe);
-		}
-	}
-	else if(InZ >= WorldData.ChunkSize.Z)
-	{
-		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Up))
-		{
-			return Chunk->HasVoxel(InX, InY, InZ - WorldData.ChunkSize.Z, bSafe);
 		}
 	}
 	else
@@ -567,28 +526,6 @@ FVoxelItem& AVoxelChunk::GetVoxelComplex(int32 InX, int32 InY, int32 InZ, bool b
 			return Chunk->GetVoxel(InX, InY - WorldData.ChunkSize.Y, InZ, bMainPart);
 		}
 		else if(WorldData.WorldSize.Y == -1.f)
-		{
-			return FVoxelItem::Unknown;
-		}
-	}
-	else if(InZ < 0)
-	{
-		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Down))
-		{
-			return Chunk->GetVoxel(InX, InY, InZ + WorldData.ChunkSize.Z, bMainPart);
-		}
-		else if(Index.Z > 0)
-		{
-			return FVoxelItem::Unknown;
-		}
-	}
-	else if(InZ >= WorldData.ChunkSize.Z)
-	{
-		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Up))
-		{
-			return Chunk->GetVoxel(InX, InY, InZ - WorldData.ChunkSize.Z, bMainPart);
-		}
-		else if(Index.Z < WorldData.WorldSize.Z)
 		{
 			return FVoxelItem::Unknown;
 		}
@@ -824,20 +761,6 @@ bool AVoxelChunk::SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelI
 			return Chunk->SetVoxelComplex(InX, InY - WorldData.ChunkSize.Y, InZ, InVoxelItem, bGenerate, InAgent);
 		}
 	}
-	else if(InZ < 0)
-	{
-		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Down))
-		{
-			return Chunk->SetVoxelComplex(InX, InY, InZ + WorldData.ChunkSize.Z, InVoxelItem, bGenerate, InAgent);
-		}
-	}
-	else if(InZ >= WorldData.ChunkSize.Z)
-	{
-		if(AVoxelChunk* Chunk = GetOrSpawnNeighbor(EDirection::Up, !bGenerate))
-		{
-			return Chunk->SetVoxelComplex(InX, InY, InZ - WorldData.ChunkSize.Z, InVoxelItem, bGenerate, InAgent);
-		}
-	}
 	else
 	{
 		const FIndex VoxelIndex = FIndex(InX, InY, InZ);
@@ -916,16 +839,12 @@ bool AVoxelChunk::SetVoxelComplex(const TMap<FIndex, FVoxelItem>& InVoxelItems, 
 
 FVoxelTopography& AVoxelChunk::GetTopography(FIndex InIndex)
 {
-	if(Index.Z == 0)
+	if(TopographyMap.Contains(InIndex))
 	{
-		if(TopographyMap.Contains(InIndex))
-		{
-			return TopographyMap[InIndex];
-		}
-		static FVoxelTopography Temp;
-		return Temp;
+		return TopographyMap[InIndex];
 	}
-	return Module->GetChunkByIndex(FIndex(Index.X, Index.Y, 0))->GetTopography(InIndex);
+	static FVoxelTopography Temp;
+	return Temp;
 }
 
 FVoxelTopography& AVoxelChunk::GetTopography(int32 InX, int32 InY, int32 InZ)
@@ -935,12 +854,7 @@ FVoxelTopography& AVoxelChunk::GetTopography(int32 InX, int32 InY, int32 InZ)
 
 void AVoxelChunk::SetTopography(FIndex InIndex, const FVoxelTopography& InTopography)
 {
-	if(Index.Z == 0)
-	{
-		TopographyMap.Emplace(InIndex, InTopography);
-		return;
-	}
-	Module->GetChunkByIndex(FIndex(Index.X, Index.Y, 0))->SetTopography(InIndex, InTopography);
+	TopographyMap.Emplace(InIndex, InTopography);
 }
 
 void AVoxelChunk::SetTopography(int32 InX, int32 InY, int32 InZ, const FVoxelTopography& InTopography)
@@ -1014,9 +928,12 @@ void AVoxelChunk::GenerateSceneActors()
 	{
 		LoadSceneActors(WorldData.GetChunkData(Index));
 	}
-	else if(Index.Z == WorldData.WorldSize.Z - 1)
+	else
 	{
-		SpawnSceneActors();
+		GetWorld()->GetTimerManager().SetTimerForNextTick([this]()
+		{
+			SpawnSceneActors();
+		});
 	}
 }
 
@@ -1149,11 +1066,6 @@ UVoxelMeshComponent* AVoxelChunk::GetMeshComponent(EVoxelNature InVoxelNature)
 AVoxelChunk* AVoxelChunk::GetOrSpawnNeighbor(EDirection InDirection, bool bAddToQueue)
 {
 	return Neighbors[InDirection] ? Neighbors[InDirection] : Module->SpawnChunk(Index + FMathHelper::DirectionToIndex(InDirection), bAddToQueue);
-}
-
-TArray<AVoxelChunk*> AVoxelChunk::GetVerticals() const
-{
-	return Module->GetVerticalChunks(Index);
 }
 
 FIndex AVoxelChunk::GetWorldIndex() const

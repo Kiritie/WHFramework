@@ -40,9 +40,9 @@ EVoxelTransparency UVoxelModuleStatics::VoxelNatureToTransparency(EVoxelNature I
 	return EVoxelTransparency::Solid;
 }
 
-FIndex UVoxelModuleStatics::LocationToChunkIndex(FVector InLocation, bool bIgnoreZ /*= false*/)
+FIndex UVoxelModuleStatics::LocationToChunkIndex(FVector InLocation)
 {
-	return UVoxelModule::Get().LocationToChunkIndex(InLocation, bIgnoreZ);
+	return UVoxelModule::Get().LocationToChunkIndex(InLocation);
 }
 
 FVector UVoxelModuleStatics::ChunkIndexToLocation(FIndex InIndex)
@@ -50,9 +50,9 @@ FVector UVoxelModuleStatics::ChunkIndexToLocation(FIndex InIndex)
 	return UVoxelModule::Get().ChunkIndexToLocation(InIndex);
 }
 
-FIndex UVoxelModuleStatics::LocationToVoxelIndex(FVector InLocation, bool bIgnoreZ)
+FIndex UVoxelModuleStatics::LocationToVoxelIndex(FVector InLocation)
 {
-	return UVoxelModule::Get().LocationToVoxelIndex(InLocation, bIgnoreZ);
+	return UVoxelModule::Get().LocationToVoxelIndex(InLocation);
 }
 
 FVector UVoxelModuleStatics::VoxelIndexToLocation(FIndex InIndex)
@@ -140,11 +140,6 @@ void UVoxelModuleStatics::SetTopographyByLocation(FVector InLocation, const FVox
 	UVoxelModule::Get().SetTopographyByLocation(InLocation, InTopography);
 }
 
-bool UVoxelModuleStatics::IsWorldBasicGenerated()
-{
-	return UVoxelModule::Get().IsWorldBasicGenerated();
-}
-
 float UVoxelModuleStatics::GetWorldGeneratePercent()
 {
 	return UVoxelModule::Get().GetWorldGeneratePercent();
@@ -160,14 +155,9 @@ int32 UVoxelModuleStatics::GetChunkNum(bool bNeedGenerated)
 	return UVoxelModule::Get().GetChunkNum(bNeedGenerated);
 }
 
-bool UVoxelModuleStatics::IsChunkGenerated(FIndex InIndex, bool bCheckVerticals)
+bool UVoxelModuleStatics::IsChunkGenerated(FIndex InIndex)
 {
-	return UVoxelModule::Get().IsChunkGenerated(InIndex, bCheckVerticals);
-}
-
-TArray<AVoxelChunk*> UVoxelModuleStatics::GetVerticalChunks(FIndex InIndex)
-{
-	return UVoxelModule::Get().GetVerticalChunks(InIndex);
+	return UVoxelModule::Get().IsChunkGenerated(InIndex);
 }
 
 FVoxelChunkQueues UVoxelModuleStatics::GetChunkQueues(EVoxelWorldState InWorldState)
@@ -210,8 +200,7 @@ UVoxel& UVoxelModuleStatics::GetVoxel(const FPrimaryAssetId& InVoxelID)
 	const UVoxelData& VoxelData = UAssetModuleStatics::LoadPrimaryAssetRef<UVoxelData>(InVoxelID);
 	if(VoxelData.IsValid())
 	{
-		const TSubclassOf<UVoxel> VoxelClass = VoxelData.VoxelClass.Get() ? VoxelData.VoxelClass.Get() : UVoxel::StaticClass();
-		UVoxel& Voxel = UReferencePoolModuleStatics::GetReference<UVoxel>(true, VoxelClass);
+		UVoxel& Voxel = UReferencePoolModuleStatics::GetReference<UVoxel>(true, VoxelData.VoxelClass.Get() ? VoxelData.VoxelClass.Get() : UVoxel::StaticClass());
 		Voxel.SetItem(InVoxelID);
 		return Voxel;
 	}

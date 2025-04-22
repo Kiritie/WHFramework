@@ -13,7 +13,7 @@ UVoxelFoliageGenerator::UVoxelFoliageGenerator()
 	CrystalSize = 16.f;
 	GrassRate = 0.9f;
 	FlowerRate = 0.98f;
-	TreeRate = 0.99f;
+	TreeRate = 0.96f;
 	
 	_Seed = 0;
 }
@@ -85,7 +85,7 @@ bool UVoxelFoliageGenerator::GenerateTree(AVoxelChunk* InChunk, FIndex InIndex, 
 	const FVector2D Location = FVector2D(float(InIndex.X) / Module->GetWorldData().ChunkSize.X / InCrystalSize, float(InIndex.Y) / Module->GetWorldData().ChunkSize.Y / InCrystalSize);
 	float Temperature = Topography.Temperature;
 	const float Humidity = Topography.Humidity;
-	const float Possible = FMathHelper::HashRand(-Location, _Seed) * 0.9f + Module->GetVoxelNoise2D(Location, false, true) * 0.15f - FMath::Abs(Temperature + 0.1f) * 0.1f + Humidity * 0.15f;
+	const float Possible = FMathHelper::HashRand(-Location, _Seed) * 0.9f + Module->GetVoxelNoise2D(Location, false, true) * 0.1f - FMath::Abs(Temperature + 0.1f) * 0.1f + Humidity * 0.1f;
 
 	if(Possible <= TreeRate) return false;
 	const int32 TreeHeight = (FMathHelper::HashRandInt(FVector2D::UnitVector - Location, _Seed) % 3) + 4;

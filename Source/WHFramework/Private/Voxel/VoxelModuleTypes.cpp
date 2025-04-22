@@ -263,5 +263,5 @@ FVoxelTopography::FVoxelTopography(const FString& InSaveData)
 
 FString FVoxelTopography::ToSaveData() const
 {
-	return FString::Printf(TEXT("%d;%d;%f;%f%d"), UVoxelModuleStatics::VoxelIndexToNumber(Index), Height, Temperature, Humidity, (int32)BiomeType);
+	return FString::Printf(TEXT("%lld;%d;%f;%f%d"), UVoxelModuleStatics::VoxelIndexToNumber(Index), Height, Temperature, Humidity, (int32)BiomeType);
 }

@@ -210,13 +210,13 @@ public:
 	virtual float GetVoxelNoise3D(FVector InLocation, bool bAbs = false, bool bUnsigned = false) const;
 
 public:
-	virtual FIndex LocationToChunkIndex(FVector InLocation, bool bIgnoreZ = false) const;
+	virtual FIndex LocationToChunkIndex(FVector InLocation) const;
 
 	virtual FVector ChunkIndexToLocation(FIndex InIndex) const;
 
 	virtual FIndex ChunkIndexToVoxelIndex(FIndex InIndex) const;
 
-	virtual FIndex LocationToVoxelIndex(FVector InLocation, bool bIgnoreZ = false) const;
+	virtual FIndex LocationToVoxelIndex(FVector InLocation) const;
 
 	virtual FVector VoxelIndexToLocation(FIndex InIndex) const;
 
@@ -268,17 +268,13 @@ protected:
 	TMap<TSubclassOf<UVoxelGenerator>, UVoxelGenerator*> VoxelGenerators;
 
 public:
-	bool IsWorldBasicGenerated() const;
-	
 	float GetWorldGeneratePercent() const;
 	
 	FBox GetWorldBounds(float InRadius = 0.f, float InHalfHeight = 0.f) const;
 
 	int32 GetChunkNum(bool bNeedGenerated = false) const;
 
-	bool IsChunkGenerated(FIndex InIndex, bool bCheckVerticals = false) const;
-	
-	TArray<AVoxelChunk*> GetVerticalChunks(FIndex InIndex) const;
+	bool IsChunkGenerated(FIndex InIndex) const;
 	
 	FVoxelChunkQueues GetChunkQueues(EVoxelWorldState InWorldState) const;
 

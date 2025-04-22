@@ -739,12 +739,13 @@ public:
 	{
 		BlockSize = 80.f;
 		
-		ChunkSize = FVector(16.f);
+		ChunkSize = FVector2D(16.f);
 		
-		WorldSize = FVector(-1.f, -1.f, 5.f);
-		WorldRange = FVector2D(15.f, 15.f);
+		WorldSize = FVector2D(-1.f);
+		WorldRange = FVector2D(15.f);
 
 		SeaLevel = 32;
+		SkyHeight = 100;
 
 		VoxelGenerators = TArray<UVoxelGenerator*>();
 
@@ -760,16 +761,19 @@ public:
 	float BlockSize;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector ChunkSize;
+	FVector2D ChunkSize;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector WorldSize;
+	FVector2D WorldSize;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FVector2D WorldRange;
 		
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 SeaLevel;
+		
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	int32 SkyHeight;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Instanced)
 	TArray<UVoxelGenerator*> VoxelGenerators;
@@ -791,29 +795,24 @@ public:
 		SceneData.MakeSaved();
 	}
 	
-	FORCEINLINE FVector GetChunkRealSize() const
+	FORCEINLINE FVector2D GetChunkRealSize() const
 	{
 		return ChunkSize * BlockSize;
 	}
 
-	FORCEINLINE FVector GetWorldSize() const
+	FORCEINLINE FVector2D GetWorldSize() const
 	{
-		return FVector(WorldSize.X != -1.f ? WorldSize.X : WorldRange.X * 2.f, WorldSize.Y != -1.f ? WorldSize.Y : WorldRange.Y * 2.f, WorldSize.Z);
+		return FVector2D(WorldSize.X != -1.f ? WorldSize.X : WorldRange.X * 2.f, WorldSize.Y != -1.f ? WorldSize.Y : WorldRange.Y * 2.f);
 	}
 
-	FORCEINLINE FVector GetWorldRealSize() const
+	FORCEINLINE FVector2D GetWorldRealSize() const
 	{
 		return GetWorldSize() * ChunkSize * BlockSize;
 	}
 
-	FORCEINLINE float GetWorldHeight() const
-	{
-		return WorldSize.Z * ChunkSize.Z;
-	}
-
 	FORCEINLINE float GetWorldRealHeight() const
 	{
-		return GetWorldHeight() * BlockSize;
+		return SkyHeight * BlockSize;
 	}
 
 	FORCEINLINE FVector GetBlockSizedNormal(FVector InNormal, float InLength = 0.25f) const

@@ -2,10 +2,15 @@
 
 #include "Ability/Spawner/AbilityPlayerSpawner.h"
 
+#include "Ability/AbilityModuleStatics.h"
 #include "Ability/AbilityModuleTypes.h"
+#include "Ability/Character/AbilityCharacterBase.h"
+#include "Ability/Character/AbilityCharacterDataBase.h"
+#include "Ability/Pawn/AbilityPawnBase.h"
+#include "Character/CharacterModuleStatics.h"
 #include "Components/ArrowComponent.h"
 #include "Components/BillboardComponent.h"
-#include "Components/CapsuleComponent.h"
+#include "Pawn/PawnModuleStatics.h"
 
 AAbilityPlayerSpawner::AAbilityPlayerSpawner()
 {
@@ -52,7 +57,26 @@ AAbilityPlayerSpawner::AAbilityPlayerSpawner()
 
 AActor* AAbilityPlayerSpawner::SpawnImpl_Implementation(const FAbilityItem& InAbilityItem)
 {
-	return nullptr;
+	const auto& CharacterData = InAbilityItem.GetData<UAbilityCharacterDataBase>();
+	
+	auto SaveData = FCharacterSaveData();
+	SaveData.AssetID = CharacterData.GetPrimaryAssetId();
+	SaveData.Name = *CharacterData.Name.ToString();
+	SaveData.RaceID = CharacterData.RaceID;
+	SaveData.Level = InAbilityItem.Level;
+	SaveData.SpawnTransform = GetActorTransform();
+	SaveData.InventoryData = CharacterData.InventoryData;
+	
+	AActor* PlayerActor = UAbilityModuleStatics::SpawnAbilityActor(&SaveData);
+	if(AAbilityPawnBase* PlayerPawn = Cast<AAbilityPawnBase>(PlayerActor))
+	{
+		UPawnModuleStatics::SwitchPawn(PlayerPawn);
+	}
+	else if(AAbilityCharacterBase* PlayerCharacter = Cast<AAbilityCharacterBase>(PlayerActor))
+	{
+		UCharacterModuleStatics::SwitchCharacter(PlayerCharacter);
+	}
+	return PlayerActor;
 }
 
 void AAbilityPlayerSpawner::DestroyImpl_Implementation(AActor* InAbilityActor)

@@ -27,13 +27,13 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Index
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static FIndex LocationToChunkIndex(FVector InLocation, bool bIgnoreZ = false);
+	static FIndex LocationToChunkIndex(FVector InLocation);
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
 	static FVector ChunkIndexToLocation(FIndex InIndex);
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static FIndex LocationToVoxelIndex(FVector InLocation, bool bIgnoreZ = false);
+	static FIndex LocationToVoxelIndex(FVector InLocation);
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
 	static FVector VoxelIndexToLocation(FIndex InIndex);
@@ -94,9 +94,6 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "VoxelModuleStatics")
 	static void SetTopographyByLocation(FVector InLocation, const FVoxelTopography& InTopography);
-
-	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static bool IsWorldBasicGenerated();
 	
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
 	static float GetWorldGeneratePercent();
@@ -108,10 +105,7 @@ public:
 	static int32 GetChunkNum(bool bNeedGenerated = false);
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static bool IsChunkGenerated(FIndex InIndex, bool bCheckVerticals = false);
-	
-	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static TArray<AVoxelChunk*> GetVerticalChunks(FIndex InIndex);
+	static bool IsChunkGenerated(FIndex InIndex);
 	
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
 	static FVoxelChunkQueues GetChunkQueues(EVoxelWorldState InWorldState);

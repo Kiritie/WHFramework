@@ -64,7 +64,7 @@ public:
 protected:
 	virtual void GenerateNeighbors(FIndex InIndex, EPhase InPhase = EPhase::Primary);
 
-	virtual void GenerateNeighbors(int32 InX, int32 InY, int32 InZ, EPhase InPhase = EPhase::Primary);
+	virtual void GenerateNeighbors(int32 InX, int32 InY, EPhase InPhase = EPhase::Primary);
 
 	virtual void UpdateNeighbors();
 
@@ -237,8 +237,6 @@ public:
 	AVoxelChunk* GetOrSpawnNeighbor(EDirection InDirection, bool bAddToQueue = true);
 
 	TMap<EDirection, AVoxelChunk*> GetNeighbors() const { return Neighbors; }
-
-	TArray<AVoxelChunk*> GetVerticals() const;
 
 	FIndex GetWorldIndex() const;
 

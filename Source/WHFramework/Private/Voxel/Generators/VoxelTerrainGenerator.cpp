@@ -15,21 +15,23 @@ UVoxelTerrainGenerator::UVoxelTerrainGenerator()
 void UVoxelTerrainGenerator::Generate(AVoxelChunk* InChunk)
 {
 	//载入地形方块
-	const FVector Range = FVector(Module->GetWorldData().ChunkSize.X, Module->GetWorldData().ChunkSize.Y, Module->GetWorldData().ChunkSize.Z * Module->GetWorldData().WorldSize.Z);
-	ITER_INDEX(Index, Range, false,
-		const FIndex _Index = InChunk->LocalIndexToWorld(Index);
-		if(!Module->HasVoxelByIndex(_Index))
-		{
-			const EVoxelType VoxelType = CalculateVoxelType(_Index);
-			if(VoxelType != EVoxelType::Empty)
+	ITER_INDEX2D(Index, Module->GetWorldData().ChunkSize, false,
+		FIndex _Index = InChunk->LocalIndexToWorld(Index);
+		DON_WITHINDEX(FMath::Max(Module->GetTopographyByIndex(_Index).Height, Module->GetWorldData().SeaLevel) + 1, Z,
+			_Index.Z = Z;
+			if(!Module->HasVoxelByIndex(_Index))
 			{
-				Module->SetVoxelByIndex(_Index, VoxelType);
+				const EVoxelType VoxelType = CalculateVoxelType(_Index);
+				if(VoxelType != EVoxelType::Empty)
+				{
+					Module->SetVoxelByIndex(_Index, VoxelType);
+				}
 			}
-		}
-		else if(!Module->GetVoxelByIndex(_Index).IsValid())
-		{
-			Module->SetVoxelByIndex(_Index, FVoxelItem::Empty, true);
-		}
+			else if(!Module->GetVoxelByIndex(_Index).IsValid())
+			{
+				Module->SetVoxelByIndex(_Index, FVoxelItem::Empty, true);
+			}
+		)
 	)
 }
 
