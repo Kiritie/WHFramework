@@ -27,6 +27,7 @@ void AAbilityItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FPa
 	if(InParams.IsValidIndex(0))
 	{
 		Item = InParams[0].GetPointerValueRef<FAbilityItem>();
+		Item.Payload = this;
 	}
 }
 
@@ -37,17 +38,17 @@ void AAbilityItemBase::OnDespawn_Implementation(bool bRecovery)
 
 bool AAbilityItemBase::Active_Implementation()
 {
-	if(Item.InventorySlot)
+	if(Item.GetPayload<UAbilityInventorySlotBase>())
 	{
-		return Item.InventorySlot->ActiveItem();
+		return Item.GetPayload<UAbilityInventorySlotBase>()->ActiveItem();
 	}
 	return false;
 }
 
 void AAbilityItemBase::Deactive_Implementation()
 {
-	if(Item.InventorySlot)
+	if(Item.GetPayload<UAbilityInventorySlotBase>())
 	{
-		Item.InventorySlot->DeactiveItem();
+		Item.GetPayload<UAbilityInventorySlotBase>()->DeactiveItem();
 	}
 }

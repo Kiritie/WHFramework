@@ -3,9 +3,11 @@
 
 #include "Ability/AbilityModuleStatics.h"
 
+#include "GameplayModMagnitudeCalculation.h"
 #include "Ability/AbilityModule.h"
 #include "Ability/Abilities/AbilityBase.h"
 #include "Ability/Effects/EffectBase.h"
+#include "Ability/Effects/Calculation/UEffectCalculation_Level.h"
 
 const UAbilityBase* UAbilityModuleStatics::GetAbilityBySpec(const FGameplayAbilitySpec& InAbilitySpec, bool& bInstance)
 {
@@ -66,6 +68,16 @@ FEffectInfo UAbilityModuleStatics::GetEffectInfoByClass(TSubclassOf<UEffectBase>
 					AttributeInfo.BaseAttribute = BasedMagnitude.BackingAttribute.AttributeToCapture;
 					AttributeInfo.AttributeSource = BasedMagnitude.BackingAttribute.AttributeSource;
 					AttributeInfo.Value = BasedMagnitude.Coefficient.GetValueAtLevel(InLevel);
+					break;
+				}
+				case EGameplayEffectMagnitudeCalculation::CustomCalculationClass:
+				{
+					FCustomCalculationBasedFloat CustomCalculation = Iter.ModifierMagnitude.*GetCustomMagnitude();
+					AttributeInfo.Value = CustomCalculation.Coefficient.GetValueAtLevel(InLevel);
+					if(CustomCalculation.CalculationClassMagnitude == UUEffectCalculation_Level::StaticClass())
+					{
+						AttributeInfo.Value *= InLevel;
+					}
 					break;
 				}
 				default: break;

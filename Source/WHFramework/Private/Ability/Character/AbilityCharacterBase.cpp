@@ -135,6 +135,8 @@ void AAbilityCharacterBase::OnRefresh_Implementation(float DeltaSeconds)
 
 	if(IsActive())
 	{
+		ModifyHealth(ATTRIBUTE_DELTAVALUE_CLAMP(this, Health, GetHealthRegenSpeed() * DeltaSeconds));
+
 		if(GetMoveVelocity(true).Size() > 0.2f)
 		{
 			if(!IsMoving())
@@ -646,7 +648,7 @@ void AAbilityCharacterBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPl
 
 void AAbilityCharacterBase::OnSelectItem(const FAbilityItem& InItem)
 {
-	if(InItem.InventorySlot->GetSplitType() == ESlotSplitType::Shortcut)
+	if(InItem.GetPayload<UAbilityInventorySlotBase>()->GetSplitType() == ESlotSplitType::Shortcut)
 	{
 		if(InItem.IsValid() && InItem.GetType() == EAbilityItemType::Voxel)
 		{

@@ -14,7 +14,7 @@
 UAbilityInventorySlotBase::UAbilityInventorySlotBase()
 {
 	Item = FAbilityItem::Empty;
-	Item.InventorySlot = this;
+	Item.Payload = this;
 	Inventory = nullptr;
 	LimitType = EAbilityItemType::None;
 	SplitType = ESlotSplitType::Default;
@@ -123,12 +123,12 @@ void UAbilityInventorySlotBase::OnItemChanged(FAbilityItem& InOldItem, bool bBro
 		const auto Actor = Inventory->GetOwnerAgent<IAbilityActorInterface>();
 		if (Actor && Item.GetData().AbilityClass)
 		{
-			Item.AbilityHandle = Actor->GetAbilitySystemComponent()->K2_GiveAbility(Item.GetData().AbilityClass, Item.Level);
+			Item.Handle = Actor->GetAbilitySystemComponent()->K2_GiveAbility(Item.GetData().AbilityClass, Item.Level);
 		}
 	}
 	else
 	{
-		Item.AbilityHandle = FGameplayAbilitySpecHandle();
+		Item.Handle = FGameplayAbilitySpecHandle();
 	}
 	if(bBroadcast && IsEnabled())
 	{
@@ -166,7 +166,7 @@ void UAbilityInventorySlotBase::SetItem(FAbilityItem& InItem, bool bRefresh)
 	Item = InItem;
 	Item.Count = FMath::Clamp(Item.Count, 0, GetMaxVolume(InItem));
 	Item.Level = FMath::Clamp(Item.Level, 0, GetMaxLevel(InItem));
-	Item.InventorySlot = this;
+	Item.Payload = this;
 	
 	OnItemChanged(OldItem, true);
 	
@@ -327,7 +327,7 @@ bool UAbilityInventorySlotBase::ActiveItem(bool bPassive /*= false*/)
 	bool bSuccess = false;
 	if(auto Actor = GetInventory()->GetOwnerAgent<IAbilityActorInterface>())
 	{
-		if(Actor->GetLevelA() >= Item.Level && Actor->GetAbilitySystemComponent()->TryActivateAbility(Item.AbilityHandle))
+		if(Actor->GetLevelA() >= Item.Level && Actor->GetAbilitySystemComponent()->TryActivateAbility(Item.Handle))
 		{
 			OnSlotActivated.Broadcast();
 			for(auto Iter : GetInventory()->QueryItemByRange(EItemQueryType::Get, Item).Slots)
@@ -353,7 +353,7 @@ void UAbilityInventorySlotBase::DeactiveItem(bool bPassive /*= false*/)
 	
 	if(auto Actor = GetInventory()->GetOwnerAgent<IAbilityActorInterface>())
 	{
-		Actor->GetAbilitySystemComponent()->CancelAbilityHandle(Item.AbilityHandle);
+		Actor->GetAbilitySystemComponent()->CancelAbilityHandle(Item.Handle);
 		OnSlotDeactived.Broadcast();
 	}
 	if(auto Agent = GetInventory()->GetOwnerAgent())
@@ -425,13 +425,13 @@ int32 UAbilityInventorySlotBase::GetMaxLevel(FAbilityItem InItem) const
 
 FAbilityInfo UAbilityInventorySlotBase::GetAbilityInfo() const
 {
-	if(IsEmpty() || !Item.AbilityHandle.IsValid()) return FAbilityInfo();
+	if(IsEmpty() || !Item.Handle.IsValid()) return FAbilityInfo();
 	
 	if(IAbilityActorInterface* AbilityActor = Inventory->GetOwnerAgent<IAbilityActorInterface>())
 	{
 		if(UAbilitySystemComponentBase* AbilitySystemComp = Cast<UAbilitySystemComponentBase>(AbilityActor->GetAbilitySystemComponent()))
 		{
-			return AbilitySystemComp->GetAbilityInfoByHandle(Item.AbilityHandle);
+			return AbilitySystemComp->GetAbilityInfoByHandle(Item.Handle);
 		}
 	}
 	return FAbilityInfo();

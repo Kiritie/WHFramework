@@ -106,6 +106,8 @@ protected:
 
 	virtual void OnWorldStateChanged();
 
+	virtual void OnWorldCenterChanged();
+
 protected:
 	FVoxelWorldSaveData* WorldData;
 public:
@@ -117,6 +119,10 @@ public:
 	FVoxelWorldSaveData& GetWorldData() const;
 
 	virtual FVoxelWorldSaveData* NewWorldData(FSaveData* InBasicData = nullptr) const;
+
+	virtual float GetWorldGeneratePercent() const;
+	
+	virtual FBox GetWorldBounds(float InRadius = 0.f, float InHalfHeight = 0.f) const;
 
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
@@ -268,20 +274,16 @@ protected:
 	TMap<TSubclassOf<UVoxelGenerator>, UVoxelGenerator*> VoxelGenerators;
 
 public:
-	float GetWorldGeneratePercent() const;
-	
-	FBox GetWorldBounds(float InRadius = 0.f, float InHalfHeight = 0.f) const;
+	virtual int32 GetChunkNum(bool bNeedGenerated = false) const;
 
-	int32 GetChunkNum(bool bNeedGenerated = false) const;
-
-	bool IsChunkGenerated(FIndex InIndex) const;
+	virtual bool IsChunkGenerated(FIndex InIndex) const;
 	
-	FVoxelChunkQueues GetChunkQueues(EVoxelWorldState InWorldState) const;
+	virtual FVoxelChunkQueues GetChunkQueues(EVoxelWorldState InWorldState) const;
 
 	template<class T>
 	T* GetVoxelGenerator() const
 	{
 		return Cast<T>(GetVoxelGenerator(T::StaticClass()));
 	}
-	UVoxelGenerator* GetVoxelGenerator(const TSubclassOf<UVoxelGenerator>& InClass) const;
+	virtual UVoxelGenerator* GetVoxelGenerator(const TSubclassOf<UVoxelGenerator>& InClass) const;
 };

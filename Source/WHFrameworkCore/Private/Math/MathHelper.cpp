@@ -116,7 +116,7 @@ ERightAngle FMathHelper::FloatToRightAngle(float InAngle)
 	return (ERightAngle)(FMath::RoundToInt(InAngle / 90.f) % 4);
 }
 
-ERightAngle FMathHelper::GetOffsetRightAngle(ERightAngle InAngle, int32 InOffset)
+ERightAngle FMathHelper::OffsetRightAngle(ERightAngle InAngle, int32 InOffset)
 {
 	const int32 Angle = FMath::Abs((int32)InAngle + InOffset) % 4;
 	return (ERightAngle)Angle;

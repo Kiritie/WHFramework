@@ -41,7 +41,7 @@ ERightAngle UMathStatics::FloatToRightAngle(float InAngle)
 
 ERightAngle UMathStatics::GetOffsetRightAngle(ERightAngle InAngle, int32 InOffset)
 {
-	return FMathHelper::GetOffsetRightAngle(InAngle, InOffset);
+	return FMathHelper::OffsetRightAngle(InAngle, InOffset);
 }
 
 EDirection UMathStatics::InvertDirection(EDirection InDirection)

@@ -6,6 +6,7 @@
 #include "Math/MathHelper.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Voxel/VoxelModule.h"
+#include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Prefabs/Data/VoxelPrefabData.h"
@@ -44,8 +45,11 @@ void UVoxelVillageGenerator::Initialize(UVoxelModule* InModule)
 void UVoxelVillageGenerator::Generate(AVoxelChunk* InChunk)
 {
 	float Possible = FMathHelper::HashRand(InChunk->GetIndex().ToVector2D(), Seed);
-
 	if(Possible < SpawnRate) return;
+
+	_Domains.Reset();
+	_Roads.Reset();
+	_BuildingPos.Empty();
 
 	DevelopeDomains(InChunk);
 	PlaceBuildings(InChunk);
@@ -172,7 +176,7 @@ bool UVoxelVillageGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InInde
 	Aver /= _PrefabAssets[InIndex]->VoxelSize[0] * _PrefabAssets[InIndex]->VoxelSize[1];
 	Aver = floor(Aver + 0.5f);
 
-	if(Aver <= Module->GetWorldData().SeaLevel)return false;
+	if(Aver <= Module->GetWorldData().SeaLevel) return false;
 
 	for(int i = -FrontBack; i < FrontBack; ++i)
 	{
@@ -180,8 +184,8 @@ bool UVoxelVillageGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InInde
 		{
 			for(int k = Module->GetTopographyByIndex(FIndex(InX + i, InY + j)).Height; k <= Aver; ++k)
 			{
-				FIndex pos = FIndex(InX + i, InY + j, k);
-				Module->SetVoxelByIndex(pos, EVoxelType::Cobble_Stone);
+				const FIndex Index = FIndex(InX + i, InY + j, k);
+				Module->SetVoxelByIndex(Index, EVoxelType::Cobble_Stone);
 			}
 			_Domains.Remove(FMathHelper::Index(InX + i, InY + j));
 		}
@@ -193,7 +197,7 @@ bool UVoxelVillageGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InInde
 		{
 			for(int k = 0; k < UpDown; ++k)
 			{
-				FIndex Index = FIndex(InX + i, InY + j, Aver + k + 1);
+				const FIndex Index = FIndex(InX + i, InY + j, Aver + k + 1);
 				Module->SetVoxelByIndex(Index, FVoxelItem::Empty, true);
 			}
 		}
@@ -204,12 +208,12 @@ bool UVoxelVillageGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InInde
 	for(auto& Iter : VoxelDatas)
 	{
 		FVoxelItem VoxelItem = FVoxelItem(Iter, true);
-		VoxelItem.Index = FMathHelper::RotateIndex(VoxelItem.Index, (ERightAngle)InRotate);
 		if(VoxelItem.GetVoxelData().bRotatable)
 		{
 			VoxelItem.Angle = FMathHelper::CombineRightAngle(VoxelItem.Angle, (ERightAngle)InRotate);
 		}
-		Module->SetVoxelByIndex(FIndex(InX, InY, Aver) + VoxelItem.Index, VoxelItem);
+		const FIndex Index = FIndex(InX, InY, Aver) + FMathHelper::RotateIndex(VoxelItem.Index, (ERightAngle)InRotate) + UVoxelModuleStatics::RightAngleToVoxelIndex((ERightAngle)InRotate);
+		Module->SetVoxelByIndex(Index, VoxelItem);
 	}
 
 	_Domains.Emplace(FMathHelper::Index(InX - FrontBack, InY - LeftRight));
@@ -229,7 +233,7 @@ void UVoxelVillageGenerator::PlacePaths()
 			for(FVector2D Pos : Path)
 			{
 				_Roads.Emplace(FMathHelper::Index(Pos.X, Pos.Y));
-				FIndex Index = FIndex(Pos.X, Pos.Y, Module->GetTopographyByIndex(FIndex(Pos.X, Pos.Y)).Height);
+				const FIndex Index = FIndex(Pos.X, Pos.Y, Module->GetTopographyByIndex(FIndex(Pos.X, Pos.Y)).Height);
 
 				if(!Module->HasVoxelByIndex(Index, true)) continue;
 

@@ -36,6 +36,8 @@ void UAttributeSetBase::SerializeAttributes(FArchive& Ar)
 void UAttributeSetBase::PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const
 {
 	Super::PreAttributeBaseChange(Attribute, NewValue);
+
+	const_cast<ThisClass*>(this)->PreAttributeChange(Attribute, NewValue);
 }
 
 void UAttributeSetBase::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)

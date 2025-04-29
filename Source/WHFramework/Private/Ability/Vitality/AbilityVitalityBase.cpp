@@ -61,6 +61,31 @@ void AAbilityVitalityBase::OnDespawn_Implementation(bool bRecovery)
 	GenerateVoxelID = FPrimaryAssetId();
 }
 
+void AAbilityVitalityBase::OnInitialize_Implementation()
+{
+	Super::OnInitialize_Implementation();
+}
+
+void AAbilityVitalityBase::OnPreparatory_Implementation()
+{
+	Super::OnPreparatory_Implementation();
+}
+
+void AAbilityVitalityBase::OnRefresh_Implementation(float DeltaSeconds)
+{
+	Super::OnRefresh_Implementation(DeltaSeconds);
+
+	if(IsActive())
+	{
+		ModifyHealth(ATTRIBUTE_DELTAVALUE_CLAMP(this, Health, GetHealthRegenSpeed() * DeltaSeconds));
+	}
+}
+
+void AAbilityVitalityBase::OnTermination_Implementation()
+{
+	Super::OnTermination_Implementation();
+}
+
 void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	Super::LoadData(InSaveData, InPhase);
@@ -282,7 +307,7 @@ void AAbilityVitalityBase::OnSelectItem(const FAbilityItem& InItem)
 {
 	Super::OnSelectItem(InItem);
 
-	if(InItem.InventorySlot->GetSplitType() == ESlotSplitType::Shortcut)
+	if(InItem.GetPayload<UAbilityInventorySlotBase>()->GetSplitType() == ESlotSplitType::Shortcut)
 	{
 		if(InItem.IsValid() && InItem.GetType() == EAbilityItemType::Voxel)
 		{

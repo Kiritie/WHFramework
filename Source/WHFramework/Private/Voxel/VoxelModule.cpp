@@ -25,6 +25,7 @@
 #include "Voxel/Voxels/Entity/VoxelEntityCapture.h"
 #include "Common/CommonStatics.h"
 #include "Common/CommonTypes.h"
+#include "Event/Handle/Voxel/EventHandle_VoxelWorldCenterChanged.h"
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Main/MainModule.h"
 #include "Math/MathTypes.h"
@@ -347,6 +348,31 @@ void UVoxelModule::OnWorldModeChanged()
 void UVoxelModule::OnWorldStateChanged()
 {
 	UEventModuleStatics::BroadcastEvent(UEventHandle_VoxelWorldStateChanged::StaticClass(), this, { &WorldState });
+}
+
+void UVoxelModule::OnWorldCenterChanged()
+{
+	UEventModuleStatics::BroadcastEvent(UEventHandle_VoxelWorldCenterChanged::StaticClass(), this, { &ChunkGenerateIndex });
+}
+
+float UVoxelModule::GetWorldGeneratePercent() const
+{
+	const int32 BasicNum = FMath::Min(ChunkSpawnDistance * 2.f, WorldData->GetWorldSize().X) * FMath::Min(ChunkSpawnDistance * 2.f, WorldData->GetWorldSize().Y);
+	int32 GeneratedNum = 0;
+	ITER_MAP(ChunkMap, Iter,
+		if(Iter.Value->IsGenerated())
+		{
+			GeneratedNum++;
+		}
+	)
+	return (float)GeneratedNum / BasicNum;
+}
+
+FBox UVoxelModule::GetWorldBounds(float InRadius, float InHalfHeight) const
+{
+	const FVector2D WorldRadius = WorldData->GetWorldRealSize() * 0.5f;
+	const FVector WorldCenter = FVector(ChunkIndexToLocation(ChunkGenerateIndex).X + ((int32)WorldData->GetWorldSize().X % 2 == 1 ? WorldData->GetChunkRealSize().X * 0.5f : 0.f), ChunkIndexToLocation(ChunkGenerateIndex).Y + ((int32)WorldData->GetWorldSize().Y % 2 == 1 ? WorldData->GetChunkRealSize().Y * 0.5f : 0.f), WorldData->SkyHeight);
+	return FBox(WorldCenter - FVector(WorldRadius.X - InRadius, WorldRadius.Y - InRadius, WorldData->GetWorldRealHeight() - InHalfHeight), WorldCenter + FVector(WorldRadius.X - InRadius, WorldRadius.Y - InRadius, WorldData->GetWorldRealHeight() - InHalfHeight));
 }
 
 FVoxelWorldSaveData& UVoxelModule::GetWorldData() const
@@ -723,6 +749,8 @@ void UVoxelModule::GenerateChunkQueues(bool bFromAgent, bool bForce)
 		ITER_ARRAY(DestroyQueue, Item, AddToChunkQueue(EVoxelWorldState::Destroying, Item););
 		ChunkGenerateIndex = GenerateIndex;
 		ChunkSpawnBatch++;
+		
+		OnWorldCenterChanged();
 	}
 }
 
@@ -1100,26 +1128,6 @@ bool UVoxelModule::VoxelAgentTraceSingle(FVector InRayStart, FVector InRayEnd, f
 		}
 	}
 	return false;
-}
-
-float UVoxelModule::GetWorldGeneratePercent() const
-{
-	const int32 BasicNum = FMath::Min(ChunkSpawnDistance * 2.f, WorldData->GetWorldSize().X) * FMath::Min(ChunkSpawnDistance * 2.f, WorldData->GetWorldSize().Y);
-	int32 GeneratedNum = 0;
-	ITER_MAP(ChunkMap, Iter,
-		if(Iter.Value->IsGenerated())
-		{
-			GeneratedNum++;
-		}
-	)
-	return (float)GeneratedNum / BasicNum;
-}
-
-FBox UVoxelModule::GetWorldBounds(float InRadius, float InHalfHeight) const
-{
-	const FVector2D WorldRadius = WorldData->GetWorldRealSize() * 0.5f;
-	const FVector WorldCenter = FVector(ChunkIndexToLocation(ChunkGenerateIndex).X + ((int32)WorldData->GetWorldSize().X % 2 == 1 ? WorldData->GetChunkRealSize().X * 0.5f : 0.f), ChunkIndexToLocation(ChunkGenerateIndex).Y + ((int32)WorldData->GetWorldSize().Y % 2 == 1 ? WorldData->GetChunkRealSize().Y * 0.5f : 0.f), WorldData->SkyHeight);
-	return FBox(WorldCenter - FVector(WorldRadius.X - InRadius, WorldRadius.Y - InRadius, WorldData->GetWorldRealHeight() - InHalfHeight), WorldCenter + FVector(WorldRadius.X - InRadius, WorldRadius.Y - InRadius, WorldData->GetWorldRealHeight() - InHalfHeight));
 }
 
 int32 UVoxelModule::GetChunkNum(bool bNeedGenerated /*= false*/) const

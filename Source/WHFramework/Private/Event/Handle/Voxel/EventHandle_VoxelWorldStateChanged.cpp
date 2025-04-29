@@ -12,6 +12,6 @@ void UEventHandle_VoxelWorldStateChanged::Parse_Implementation(const TArray<FPar
 {
 	if(InParams.IsValidIndex(0))
 	{
-		WorldState = *InParams[0].GetPointerValue<EVoxelWorldState>();
+		WorldState = InParams[0].GetPointerValueRef<EVoxelWorldState>();
 	}
 }

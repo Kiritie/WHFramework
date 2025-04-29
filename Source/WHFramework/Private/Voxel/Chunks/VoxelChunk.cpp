@@ -557,7 +557,7 @@ bool AVoxelChunk::CheckVoxelAdjacent(const FVoxelItem& InVoxelItem, EDirection I
 {
 	const FIndex AdjacentIndex = FMathHelper::GetAdjacentIndex(InVoxelItem.Index, InDirection, InVoxelItem.Angle);
 	
-	if(!InVoxelItem.IsValid() || LocalIndexToWorld(AdjacentIndex).Z <= 0) return true;
+	if(!InVoxelItem.IsValid() || AdjacentIndex.Z <= 0) return true;
 	
 	const FVoxelItem& AdjacentItem = GetVoxelComplex(AdjacentIndex);
 	if(AdjacentItem.IsValid())

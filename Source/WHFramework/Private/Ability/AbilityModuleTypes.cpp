@@ -128,25 +128,6 @@ EAbilityItemType FAbilityItem::GetType() const
 	return GetData().GetItemType();
 }
 
-UAbilityInventoryBase* FAbilityItem::GetInventory() const
-{
-	if(InventorySlot)
-	{
-		return InventorySlot->GetInventory();
-	}
-	return nullptr;
-}
-
-UAbilityInventorySlotBase* FAbilityItem::GetSlot() const
-{
-	return InventorySlot;
-}
-
-FGameplayAbilitySpecHandle FAbilityItem::GetHandle() const
-{
-	return AbilityHandle;
-}
-
 UPrimaryAssetBase& FAbilityData::GetData() const
 {
 	return UAssetModuleStatics::LoadPrimaryAssetRef<UPrimaryAssetBase>(ID);

@@ -70,6 +70,18 @@ FIndex UVoxelModuleStatics::NumberToVoxelIndex(int64 InNumber, bool bWorldSpace)
 	return UVoxelModule::Get().NumberToVoxelIndex(InNumber, bWorldSpace);
 }
 
+FIndex UVoxelModuleStatics::RightAngleToVoxelIndex(ERightAngle InAngle)
+{
+	switch(InAngle)
+	{
+		case ERightAngle::RA_0:		return FIndex(0, 0, 0);
+		case ERightAngle::RA_90:	return FIndex(-1, 0, 0);
+		case ERightAngle::RA_180:	return FIndex(-1, -1, 0);
+		case ERightAngle::RA_270:	return FIndex(0, -1, 0);
+		default:					return FIndex::ZeroIndex;
+	}
+}
+
 float UVoxelModuleStatics::GetVoxelNoise1D(float InValue, bool bAbs, bool bUnsigned)
 {
 	return UVoxelModule::Get().GetVoxelNoise1D(InValue, bAbs, bUnsigned);

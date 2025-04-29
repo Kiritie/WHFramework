@@ -64,5 +64,5 @@ public:
 	virtual FString GetItemAbilityInfo(int32 InLevel = 1) const;
 
 	UFUNCTION(BlueprintPure)
-	virtual FString GetItemErrorInfo(AActor* InOwner, int32 InLevel = 1) const;
+	virtual FString GetItemErrorInfo(FAbilityItem InItem) const;
 };

@@ -12,6 +12,6 @@ void UEventHandle_VoxelWorldModeChanged::Parse_Implementation(const TArray<FPara
 {
 	if(InParams.IsValidIndex(0))
 	{
-		WorldMode = *InParams[0].GetPointerValue<EVoxelWorldMode>();
+		WorldMode = InParams[0].GetPointerValueRef<EVoxelWorldMode>();
 	}
 }

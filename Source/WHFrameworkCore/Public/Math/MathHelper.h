@@ -50,7 +50,7 @@ public:
 
 	static ERightAngle FloatToRightAngle(float InAngle);
 
-	static ERightAngle GetOffsetRightAngle(ERightAngle InAngle, int32 InOffset);
+	static ERightAngle OffsetRightAngle(ERightAngle InAngle, int32 InOffset);
 
 	static ERightAngle CombineRightAngle(ERightAngle InAngle1, ERightAngle InAngle2);
 

@@ -27,6 +27,8 @@ extern WHFRAMEWORK_API FPrimaryAssetId PAID_EXP;
 
 DECLARE_PROPERTY_ROB_GETTER(FGameplayEffectModifierMagnitude, AttributeBasedMagnitude, FAttributeBasedFloat)
 
+DECLARE_PROPERTY_ROB_GETTER(FGameplayEffectModifierMagnitude, CustomMagnitude, FCustomCalculationBasedFloat)
+
 #define GET_GAMEPLAYATTRIBUTE(ClassName, PropertyName) \
 	FGameplayAttribute(GET_MEMBER_PROPERTY(ClassName, PropertyName))
 
@@ -425,8 +427,8 @@ public:
 		ID = FPrimaryAssetId();
 		Count = 0;
 		Level = 0;
-		InventorySlot = nullptr;
-		AbilityHandle = FGameplayAbilitySpecHandle();
+		Payload = nullptr;
+		Handle = FGameplayAbilitySpecHandle();
 	}
 	
 	FORCEINLINE FAbilityItem(const FPrimaryAssetId& InID, int32 InCount = 1, int32 InLevel = 0)
@@ -434,8 +436,8 @@ public:
 		ID = InID;
 		Count = InCount;
 		Level = InLevel;
-		InventorySlot = nullptr;
-		AbilityHandle = FGameplayAbilitySpecHandle();
+		Payload = nullptr;
+		Handle = FGameplayAbilitySpecHandle();
 	}
 	
 	FORCEINLINE FAbilityItem(const FAbilityItem& InItem, int32 InCount = -1, bool bClearCaches = false)
@@ -445,13 +447,13 @@ public:
 		Level = InItem.Level;
 		if(!bClearCaches)
 		{
-			InventorySlot = InItem.InventorySlot;
-			AbilityHandle = InItem.AbilityHandle;
+			Payload = InItem.Payload;
+			Handle = InItem.Handle;
 		}
 		else
 		{
-			InventorySlot = nullptr;
-			AbilityHandle = FGameplayAbilitySpecHandle();
+			Payload = nullptr;
+			Handle = FGameplayAbilitySpecHandle();
 		}
 	}
 
@@ -468,10 +470,10 @@ public:
 	int32 Level;
 
 	UPROPERTY(Transient)
-	UAbilityInventorySlotBase* InventorySlot;
+	UObject* Payload;
 	
 	UPROPERTY(Transient)
-	FGameplayAbilitySpecHandle AbilityHandle;
+	FGameplayAbilitySpecHandle Handle;
 	
 	static FAbilityItem Empty;
 
@@ -493,12 +495,16 @@ public:
 	bool IsDataType(TSubclassOf<UAbilityItemDataBase> InType) const;
 
 	EAbilityItemType GetType() const;
+	
+	template<class T>
+	T* GetPayload() const
+	{
+		return ::Cast<T>(GetPayload());
+	}
 
-	UAbilityInventoryBase* GetInventory() const;
+	FORCEINLINE UObject* GetPayload() const { return Payload; }
 
-	UAbilityInventorySlotBase* GetSlot() const;
-
-	FGameplayAbilitySpecHandle GetHandle() const;
+	FORCEINLINE FGameplayAbilitySpecHandle GetHandle() const { return Handle; }
 
 	FORCEINLINE virtual bool IsValid() const override
 	{

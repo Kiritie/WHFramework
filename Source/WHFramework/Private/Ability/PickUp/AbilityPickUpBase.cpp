@@ -65,6 +65,7 @@ void AAbilityPickUpBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	const auto& SaveData = InSaveData->CastRef<FPickUpSaveData>();
 
 	Item = SaveData.Item;
+	Item.Payload = this;
 	SetActorLocationAndRotation(SaveData.Location, FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f));
 }
 

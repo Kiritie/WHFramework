@@ -44,6 +44,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
 	static FIndex NumberToVoxelIndex(int64 InNumber, bool bWorldSpace = false);
 
+	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
+	static FIndex RightAngleToVoxelIndex(ERightAngle InAngle);
+
 	//////////////////////////////////////////////////////////////////////////
 	// Noise
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")

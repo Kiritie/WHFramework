@@ -37,7 +37,7 @@ public:
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	FAbilityItem Item;
+	FAbilityItem Item; 
 
 public:
 	FAbilityItem GetItem() const { return Item; }
