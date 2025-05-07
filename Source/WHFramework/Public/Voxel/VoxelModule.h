@@ -70,8 +70,11 @@ protected:
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Capture")
 	AVoxelCapture* VoxelCapture;
 
+	UPROPERTY(Transient)
+	TArray<AVoxelEntityCapture*> CaptureVoxels;
+
 	//////////////////////////////////////////////////////////////////////////
-	// Voxel
+	// World
 protected:
 	UPROPERTY(EditAnywhere, Category = "World")
 	bool bAutoGenerate;
@@ -84,6 +87,7 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "World")
 	FVoxelWorldBasicSaveData WorldBasicData;
+	
 public:
 	UFUNCTION(BlueprintPure)
 	EVoxelWorldMode GetWorldMode() const { return WorldMode; }
@@ -110,6 +114,7 @@ protected:
 
 protected:
 	FVoxelWorldSaveData* WorldData;
+	
 public:
 	template<class T>
 	T& GetWorldData() const
@@ -255,23 +260,14 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	TMap<EVoxelWorldState, FVoxelChunkQueues> ChunkQueues;
 	
-	UPROPERTY(EditAnywhere, Category = "Voxel")
-	TArray<TSubclassOf<UVoxel>> VoxelClasses;
-	
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, Category = "Chunk")
 	int32 ChunkSpawnBatch;
 
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, Category = "Chunk")
 	FIndex ChunkGenerateIndex;
 
 	UPROPERTY(Transient)
 	TMap<FIndex, AVoxelChunk*> ChunkMap;
-
-	UPROPERTY(Transient)
-	TArray<AVoxelEntityCapture*> CaptureVoxels;
-
-	UPROPERTY(Transient)
-	TMap<TSubclassOf<UVoxelGenerator>, UVoxelGenerator*> VoxelGenerators;
 
 public:
 	virtual int32 GetChunkNum(bool bNeedGenerated = false) const;
@@ -280,6 +276,17 @@ public:
 	
 	virtual FVoxelChunkQueues GetChunkQueues(EVoxelWorldState InWorldState) const;
 
+protected:
+	UPROPERTY(EditAnywhere, Category = "Voxel")
+	TArray<TSubclassOf<UVoxel>> VoxelClasses;
+
+	UPROPERTY(EditAnywhere, Instanced, Category = "Voxel")
+	TArray<UVoxelGenerator*> VoxelGenerators;
+
+	UPROPERTY(Transient)
+	TMap<TSubclassOf<UVoxelGenerator>, UVoxelGenerator*> VoxelGeneratorMap;
+
+public:
 	template<class T>
 	T* GetVoxelGenerator() const
 	{

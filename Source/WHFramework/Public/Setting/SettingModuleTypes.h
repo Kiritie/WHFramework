@@ -42,7 +42,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FInputModuleSaveData InputData;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FParameterModuleSaveData ParameterData;
 
 public:

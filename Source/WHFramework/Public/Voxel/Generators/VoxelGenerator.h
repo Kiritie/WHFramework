@@ -29,4 +29,7 @@ public:
 protected:
 	UPROPERTY(BlueprintReadOnly)
 	UVoxelModule* Module;
+
+public:
+	UVoxelModule* GetModule() const { return Module; }
 };

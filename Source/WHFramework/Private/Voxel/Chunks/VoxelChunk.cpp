@@ -254,15 +254,12 @@ void AVoxelChunk::BuildMap(int32 InStage)
 			Module->GenerateVoxel<UVoxelTerrainGenerator>(this);
 			Module->GenerateVoxel<UVoxelRainGenerator>(this);
 			Module->GenerateVoxel<UVoxelFoliageGenerator>(this);
-			break;
-		}
-		case 4:
-		{
 			Module->GenerateVoxel<UVoxelVillageGenerator>(this);
 		}
 		default:
 		{
 			bBuilded = true;
+			break;
 		}
 	}
 }

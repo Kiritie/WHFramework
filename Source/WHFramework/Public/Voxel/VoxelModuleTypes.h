@@ -747,8 +747,6 @@ public:
 		SeaLevel = 32;
 		SkyHeight = 100;
 
-		VoxelGenerators = TArray<UVoxelGenerator*>();
-
 		RenderDatas = TMap<EVoxelNature, FVoxelRenderData>();
 
 		IconMat = nullptr;
@@ -774,9 +772,6 @@ public:
 		
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 SkyHeight;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Instanced)
-	TArray<UVoxelGenerator*> VoxelGenerators;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TMap<EVoxelNature, FVoxelRenderData> RenderDatas;

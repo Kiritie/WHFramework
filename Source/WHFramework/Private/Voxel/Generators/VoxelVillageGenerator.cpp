@@ -44,12 +44,13 @@ void UVoxelVillageGenerator::Initialize(UVoxelModule* InModule)
 
 void UVoxelVillageGenerator::Generate(AVoxelChunk* InChunk)
 {
+	FScopeLock ScopeLock(&CriticalSection);
+
 	float Possible = FMathHelper::HashRand(InChunk->GetIndex().ToVector2D(), Seed);
 	if(Possible < SpawnRate) return;
 
 	_Domains.Reset();
 	_Roads.Reset();
-	_BuildingPos.Empty();
 
 	DevelopeDomains(InChunk);
 	PlaceBuildings(InChunk);
@@ -107,7 +108,7 @@ void UVoxelVillageGenerator::DevelopeDomains(AVoxelChunk* InChunk)
 			if(_Domains.Find(FMathHelper::Index(x, y))) continue;
 
 			int32 Height = Module->GetTopographyByIndex(FIndex(x, y)).Height;
-			if(Height <= Module->GetWorldData().SeaLevel || Height > 1000) continue;
+			if(Height <= Module->GetWorldData().SeaLevel) continue;
 
 			int32 DeltaHeight = FMath::Abs(CenterHeight - Height);
 

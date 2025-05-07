@@ -111,6 +111,11 @@ FParameter UWidgetFloatSettingItemBase::GetValue() const
 
 void UWidgetFloatSettingItemBase::SetValue(const FParameter& InValue)
 {
-	Slider_Value->SetValue((InValue.GetFloatValue() - MinValue) / (MaxValue - MinValue));
+	const float Value = (InValue.GetFloatValue() - MinValue) / (MaxValue - MinValue);
+	if(Slider_Value->GetValue() == Value)
+	{
+		OnSliderValueChanged(Value);
+	}
+	Slider_Value->SetValue(Value);
 	Super::SetValue(InValue);
 }

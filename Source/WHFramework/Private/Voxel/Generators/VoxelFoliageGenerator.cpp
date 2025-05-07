@@ -56,18 +56,7 @@ bool UVoxelFoliageGenerator::GeneratePlant(AVoxelChunk* InChunk, FIndex InIndex,
 	}
 	else if(Possible > GrassRate)
 	{
-		if(Temperature > 0.3f)
-		{
-			VoxelType = EVoxelType::Tall_Grass;
-		}
-		else if(Temperature > -0.3f)
-		{
-			VoxelType = EVoxelType::Tall_Grass;
-		}
-		else
-		{
-			VoxelType = EVoxelType::Tall_Grass;
-		}
+		VoxelType = EVoxelType::Tall_Grass;
 	}
 	if(VoxelType != EVoxelType::Empty)
 	{
@@ -94,12 +83,7 @@ bool UVoxelFoliageGenerator::GenerateTree(AVoxelChunk* InChunk, FIndex InIndex, 
 
 	EVoxelType WoodType;
 	EVoxelType LeafType;
-	if(Temperature > 0.3f)
-	{
-		WoodType = EVoxelType::Oak;
-		LeafType = EVoxelType::Oak_Leaves;
-	}
-	else if(Temperature > -0.3f)
+	if(FMath::Abs(Temperature) > 0.3f)
 	{
 		WoodType = EVoxelType::Oak;
 		LeafType = EVoxelType::Oak_Leaves;

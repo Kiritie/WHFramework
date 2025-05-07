@@ -71,7 +71,7 @@ UVoxelModule::UVoxelModule()
 
 	ChunkSpawnClass = AVoxelChunk::StaticClass();
 	
-	ChunkSpawnDistance = 5;
+	ChunkSpawnDistance = 0.35f;
 	ChunkQueues = {
 		{ EVoxelWorldState::Spawning, FVoxelChunkQueues({
 			FVoxelChunkQueue(false, 100)
@@ -84,8 +84,7 @@ UVoxelModule::UVoxelModule()
 		})}, { EVoxelWorldState::MapBuilding, FVoxelChunkQueues({
 			FVoxelChunkQueue(true, 100),
 			FVoxelChunkQueue(true, 100),
-			FVoxelChunkQueue(true, 100),
-			FVoxelChunkQueue(false, 50)
+			FVoxelChunkQueue(true, 100)
 		})}, { EVoxelWorldState::MeshSpawning, FVoxelChunkQueues({
 			FVoxelChunkQueue(true, 100),
 			FVoxelChunkQueue(false, 50)
@@ -110,7 +109,7 @@ UVoxelModule::UVoxelModule()
 	VoxelClasses.Add(UVoxelTorch::StaticClass());
 	VoxelClasses.Add(UVoxelWater::StaticClass());
 	
-	VoxelGenerators = TMap<TSubclassOf<UVoxelGenerator>, UVoxelGenerator*>();
+	VoxelGeneratorMap = TMap<TSubclassOf<UVoxelGenerator>, UVoxelGenerator*>();
 
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> TransMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_Trans.M_Voxel_Trans'"));
 
@@ -152,20 +151,20 @@ UVoxelModule::~UVoxelModule()
 #if WITH_EDITOR
 void UVoxelModule::OnGenerate()
 {
-	if(WorldBasicData.VoxelGenerators.IsEmpty())
+	if(VoxelGenerators.IsEmpty())
 	{
-		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelTemperatureGenerator>(this));
-		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelHumidityGenerator>(this));
-		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelBiomeGenerator>(this));
-		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelHeightGenerator>(this));
-		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelCaveGenerator>(this));
-		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelTerrainGenerator>(this));
-		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelLakeGenerator>(this));
-		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelHoleGenerator>(this));
-		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelOreGenerator>(this));
-		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelRainGenerator>(this));
-		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelFoliageGenerator>(this));
-		WorldBasicData.VoxelGenerators.Add(NewObject<UVoxelVillageGenerator>(this));
+		VoxelGenerators.Add(NewObject<UVoxelTemperatureGenerator>(this));
+		VoxelGenerators.Add(NewObject<UVoxelHumidityGenerator>(this));
+		VoxelGenerators.Add(NewObject<UVoxelBiomeGenerator>(this));
+		VoxelGenerators.Add(NewObject<UVoxelHeightGenerator>(this));
+		VoxelGenerators.Add(NewObject<UVoxelLakeGenerator>(this));
+		VoxelGenerators.Add(NewObject<UVoxelCaveGenerator>(this));
+		VoxelGenerators.Add(NewObject<UVoxelHoleGenerator>(this));
+		VoxelGenerators.Add(NewObject<UVoxelOreGenerator>(this));
+		VoxelGenerators.Add(NewObject<UVoxelTerrainGenerator>(this));
+		VoxelGenerators.Add(NewObject<UVoxelRainGenerator>(this));
+		VoxelGenerators.Add(NewObject<UVoxelFoliageGenerator>(this));
+		VoxelGenerators.Add(NewObject<UVoxelVillageGenerator>(this));
 	}
 
 	if(!VoxelCapture)
@@ -235,6 +234,7 @@ void UVoxelModule::OnInitialize()
 			}
 		}
 	}
+	
 	for(auto& Iter : WorldBasicData.RenderDatas)
 	{
 		Iter.Value.TextureSize = FVector2D(Iter.Value.PixelSize, Iter.Value.Textures.Num() * Iter.Value.PixelSize);
@@ -256,9 +256,16 @@ void UVoxelModule::OnInitialize()
 			Iter.Value.TransMaterialInst = MatInst;
 		}
 	}
+	
 	for(const auto& Iter : VoxelClasses)
 	{
 		UReferencePoolModuleStatics::CreateReference(nullptr, Iter);
+	}
+		
+	for(auto& Iter : VoxelGenerators)
+	{
+		Iter->Initialize(this);
+		VoxelGeneratorMap.Add(Iter->GetClass(), Iter);
 	}
 }
 
@@ -357,7 +364,7 @@ void UVoxelModule::OnWorldCenterChanged()
 
 float UVoxelModule::GetWorldGeneratePercent() const
 {
-	const int32 BasicNum = FMath::Min(ChunkSpawnDistance * 2.f, WorldData->GetWorldSize().X) * FMath::Min(ChunkSpawnDistance * 2.f, WorldData->GetWorldSize().Y);
+	const int32 BasicNum = (WorldData->GetWorldSize().X * ChunkSpawnDistance) * (WorldData->GetWorldSize().Y * ChunkSpawnDistance);
 	int32 GeneratedNum = 0;
 	ITER_MAP(ChunkMap, Iter,
 		if(Iter.Value->IsGenerated())
@@ -402,12 +409,6 @@ void UVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			WorldData->WorldSeed = FMath::Rand();
 		}
 		WorldData->RandomStream = FRandomStream(WorldData->WorldSeed);
-		
-		for(auto& Iter : WorldData->VoxelGenerators)
-		{
-			Iter->Initialize(this);
-			VoxelGenerators.Add(Iter->GetClass(), Iter);
-		}
 
 		VoxelCapture->GetCapture()->SetActive(true);
 		VoxelCapture->GetCapture()->OrthoWidth = WorldData->BlockSize * 4.f;
@@ -488,7 +489,7 @@ void UVoxelModule::UnloadData(EPhase InPhase)
 		)
 		ChunkMap.Empty();
 
-		VoxelGenerators.Empty();
+		VoxelGeneratorMap.Empty();
 
 		ChunkSpawnBatch = 0;
 		ChunkGenerateIndex = EMPTY_Index;
@@ -729,7 +730,7 @@ void UVoxelModule::GenerateChunkQueues(bool bFromAgent, bool bForce)
 		GenerateIndex = LocationToChunkIndex(FVector(AgentLocation.X, AgentLocation.Y, 0.f));
 		GenerateOffset = (AgentLocation / WorldData->GetChunkRealSize() - ChunkGenerateIndex.ToVector2D()).GetAbs();
 	}
-	if(bForce || ChunkGenerateIndex == EMPTY_Index || (WorldData->WorldRange.X != 0.f && GenerateOffset.X > FMath::Min(ChunkSpawnDistance, WorldData->GetWorldSize().X * 0.5f) || WorldData->WorldRange.Y != 0.f && GenerateOffset.Y > FMath::Min(ChunkSpawnDistance, WorldData->GetWorldSize().Y * 0.5f)))
+	if(bForce || ChunkGenerateIndex == EMPTY_Index || (WorldData->WorldRange.X != 0.f && GenerateOffset.X > WorldData->GetWorldSize().X * ChunkSpawnDistance * 0.5f) || (WorldData->WorldRange.Y != 0.f && GenerateOffset.Y > WorldData->GetWorldSize().Y * ChunkSpawnDistance * 0.5f))
 	{
 		TArray<FIndex> DestroyQueue;
 		ChunkMap.GenerateKeyArray(DestroyQueue);
@@ -746,7 +747,7 @@ void UVoxelModule::GenerateChunkQueues(bool bFromAgent, bool bForce)
 				}
 			}
 		}
-		ITER_ARRAY(DestroyQueue, Item, AddToChunkQueue(EVoxelWorldState::Destroying, Item););
+		ITER_ARRAY(DestroyQueue, Item, AddToChunkQueue(EVoxelWorldState::Destroying, Item);)
 		ChunkGenerateIndex = GenerateIndex;
 		ChunkSpawnBatch++;
 		
@@ -1166,9 +1167,9 @@ FVoxelChunkQueues UVoxelModule::GetChunkQueues(EVoxelWorldState InWorldState) co
 
 UVoxelGenerator* UVoxelModule::GetVoxelGenerator(const TSubclassOf<UVoxelGenerator>& InClass) const
 {
-	if(VoxelGenerators.Contains(InClass))
+	if(VoxelGeneratorMap.Contains(InClass))
 	{
-		return VoxelGenerators[InClass];
+		return VoxelGeneratorMap[InClass];
 	}
 	return nullptr;
 }
