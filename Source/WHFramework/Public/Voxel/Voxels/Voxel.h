@@ -88,9 +88,9 @@ public:
 	template<class T>
 	T* GetOwner() const
 	{
-		return Cast<T>(Item.Owner);
+		return Cast<T>(GetOwner());
 	}
-	AVoxelChunk* GetOwner() const { return Item.Owner; }
+	AVoxelChunk* GetOwner() const;
 
 	template<class T>
 	T* GetAuxiliary() const

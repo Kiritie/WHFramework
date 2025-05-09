@@ -404,9 +404,6 @@ public:
 	FString Data;
 
 	UPROPERTY(BlueprintReadOnly)
-	AVoxelChunk* Owner;
-
-	UPROPERTY(BlueprintReadOnly)
 	AVoxelAuxiliary* Auxiliary;
 
 	FSaveData* AuxiliaryData;
@@ -425,7 +422,6 @@ public:
 		Angle = ERightAngle::RA_0;
 		Durability = 1.f;
 		Data = TEXT("");
-		Owner = nullptr;
 		Auxiliary = nullptr;
 		AuxiliaryData = nullptr;
 		bGenerated = false;
@@ -437,7 +433,6 @@ public:
 		Angle = ERightAngle::RA_0;
 		Durability = 1.f;
 		Data = TEXT("");
-		Owner = nullptr;
 		Auxiliary = nullptr;
 		AuxiliaryData = nullptr;
 		bGenerated = false;
@@ -449,7 +444,6 @@ public:
 		Angle = ERightAngle::RA_0;
 		Durability = 1.f;
 		Data = TEXT("");
-		Owner = nullptr;
 		Auxiliary = nullptr;
 		AuxiliaryData = nullptr;
 		bGenerated = false;
@@ -508,8 +502,6 @@ public:
 	}
 
 	UVoxel& GetVoxel() const;
-
-	AVoxelChunk* GetOwner() const;
 
 	template<class T>
 	T& GetVoxelData(bool bEnsured = true) const

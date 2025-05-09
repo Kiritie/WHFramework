@@ -15,5 +15,5 @@ UVoxelSwitchData::UVoxelSwitchData()
 
 const FVoxelMeshData& UVoxelSwitchData::GetMeshData(const FVoxelItem& InVoxelItem) const
 {
-	return MeshDatas[InVoxelItem.Owner && MeshDatas.Num() >= 2 && InVoxelItem.GetVoxel<UVoxelSwitch>().IsOpened() ? 1 : 0];
+	return MeshDatas[InVoxelItem.Payload && MeshDatas.Num() >= 2 && InVoxelItem.GetVoxel<UVoxelSwitch>().IsOpened() ? 1 : 0];
 }

@@ -934,7 +934,7 @@ void UVoxelModule::SetVoxelByIndex(FIndex InIndex, const FVoxelItem& InVoxelItem
 {
 	if(AVoxelChunk* Chunk = GetChunkByVoxelIndex(InIndex))
 	{
-		Chunk->SetVoxel(Chunk->WorldIndexToLocal(InIndex), InVoxelItem, bSafe);
+		Chunk->SetVoxel(Chunk->WorldIndexToLocal(InIndex), InVoxelItem, bSafe || Chunk->IsBuilded());
 	}
 }
 

@@ -1,9 +1,6 @@
 #include "Voxel/Agent/VoxelAgentInterface.h"
 
 #include "Common/CommonStatics.h"
-#include "Event/EventModuleStatics.h"
-#include "Event/Handle/Voxel/EventHandle_VoxelDestroyed.h"
-#include "Event/Handle/Voxel/EventHandle_VoxelGenerated.h"
 #include "Math/MathHelper.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Voxel/VoxelModule.h"
@@ -41,7 +38,7 @@ bool IVoxelAgentInterface::OnGenerateVoxel(EInputInteractEvent InInteractEvent, 
 
 			if(!GenerateVoxelItem.IsValid()) break;
 
-			GenerateVoxelItem.Owner = InHitResult.GetChunk();
+			GenerateVoxelItem.Payload = InHitResult.GetChunk();
 			GenerateVoxelItem.Index = InHitResult.GetChunk()->LocationToIndex(InHitResult.Point - UVoxelModule::Get().GetWorldData().GetBlockSizedNormal(InHitResult.Normal)) + FIndex(InHitResult.Normal);
 
 			TArray<AActor*> IgnoreActors;
@@ -85,7 +82,6 @@ bool IVoxelAgentInterface::OnGenerateVoxel(EInputInteractEvent InInteractEvent, 
 
 			if(InHitResult.GetChunk()->SetVoxelComplex(GenerateVoxelItem.Index, GenerateVoxelItem, true, this))
 			{
-				UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelGenerated>(Cast<UObject>(this), { &GenerateVoxelItem, Cast<UObject>(this) });
 				GenerateVoxelItem = FVoxelItem::Empty;
 				return true;
 			}
@@ -126,10 +122,7 @@ bool IVoxelAgentInterface::OnDestroyVoxel(EInputInteractEvent InInteractEvent, c
 			}
 			if(DestroyVoxelItem.Durability <= 0.f)
 			{
-				if(InHitResult.GetChunk()->SetVoxelComplex(DestroyVoxelItem.Index, FVoxelItem::Empty, true, this))
-				{
-					UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelDestroyed>(Cast<UObject>(this), { &DestroyVoxelItem, Cast<UObject>(this) });
-				}
+				InHitResult.GetChunk()->SetVoxelComplex(DestroyVoxelItem.Index, FVoxelItem::Empty, true, this);
 				if(UVoxelModuleStatics::GetVoxelWorldMode() != EVoxelWorldMode::Default)
 				{
 					DestroyVoxelItem = FVoxelItem::Empty;
@@ -144,7 +137,7 @@ bool IVoxelAgentInterface::OnDestroyVoxel(EInputInteractEvent InInteractEvent, c
 			if(!DestroyVoxelItem.IsValid()) break;
 			
 			DestroyVoxelItem.Durability = 1.f;
-			InHitResult.GetChunk()->SetVoxelComplex(DestroyVoxelItem.Index, DestroyVoxelItem, false, this);
+			DestroyVoxelItem.GetPayload<AVoxelChunk>()->SetVoxelComplex(DestroyVoxelItem.Index, DestroyVoxelItem, false, this);
 			DestroyVoxelItem = FVoxelItem::Empty;
 			return true;
 		}

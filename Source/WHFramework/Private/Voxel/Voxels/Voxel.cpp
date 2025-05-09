@@ -5,6 +5,9 @@
 
 #include "Ability/AbilityModuleStatics.h"
 #include "Audio/AudioModuleStatics.h"
+#include "Event/EventModuleStatics.h"
+#include "Event/Handle/Voxel/EventHandle_VoxelDestroyed.h"
+#include "Event/Handle/Voxel/EventHandle_VoxelGenerated.h"
 #include "Voxel/Voxels/Data/VoxelData.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
@@ -53,6 +56,10 @@ void UVoxel::OnGenerate(IVoxelAgentInterface* InAgent)
 	if(GetData().IsMainPart())
 	{
 		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Generate), GetLocation());
+		if(InAgent)
+		{
+			UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelGenerated>(Cast<UObject>(this), { &Item, Cast<UObject>(this) });
+		}
 	}
 }
 
@@ -66,6 +73,10 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 		if(UVoxelModuleStatics::GetVoxelWorldMode() != EVoxelWorldMode::Prefab)
 		{
 			UAbilityModuleStatics::SpawnAbilityPickUp(FAbilityItem(GetData().GatherData ? GetData().GatherData->GetPrimaryAssetId() : GetData().GetPrimaryAssetId(), 1), GetLocation() + GetData().GetRange(GetAngle()) * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f, GetOwner());
+		}
+		if(InAgent)
+		{
+			UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelDestroyed>(Cast<UObject>(InAgent), { &Item, Cast<UObject>(InAgent) });
 		}
 	}
 	if(GetOwner())
@@ -142,4 +153,9 @@ bool UVoxel::IsEmpty() const
 bool UVoxel::IsUnknown() const
 {
 	return &UVoxel::GetUnknown() == this;
+}
+
+AVoxelChunk* UVoxel::GetOwner() const
+{
+	return Item.GetPayload<AVoxelChunk>();
 }

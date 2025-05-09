@@ -10,8 +10,8 @@ UVoxelHeightGenerator::UVoxelHeightGenerator()
 {
 	GenerateDatas = {
 		FVoxelHeightGenerateData(6.f, 64, 0.2f),
-		FVoxelHeightGenerateData(12.f, 64, 0.25f),
-		FVoxelHeightGenerateData(32.f, 64, 0.3f)
+		FVoxelHeightGenerateData(12.f, 64, 0.3f),
+		FVoxelHeightGenerateData(32.f, 64, 0.4f)
 	};
 }
 

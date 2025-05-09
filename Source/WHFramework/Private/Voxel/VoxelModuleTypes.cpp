@@ -18,7 +18,7 @@ FVoxelItem::FVoxelItem(const FPrimaryAssetId& InID, FIndex InIndex, AVoxelChunk*
 {
 	ID = InID;
 	Index = InIndex;
-	Owner = InOwner;
+	Payload = InOwner;
 	Data = InData;
 }
 
@@ -52,9 +52,9 @@ void FVoxelItem::OnGenerate(IVoxelAgentInterface* InAgent)
 	if(bGenerated) return;
 	
 	bGenerated = true;
-	if(Owner)
+	if(GetPayload<AVoxelChunk>())
 	{
-		Owner->SpawnAuxiliary(*this);
+		GetPayload<AVoxelChunk>()->SpawnAuxiliary(*this);
 	}
 	GetVoxel().OnGenerate(InAgent);
 }
@@ -64,21 +64,21 @@ void FVoxelItem::OnDestroy(IVoxelAgentInterface* InAgent)
 	if(!bGenerated) return;
 	
 	GetVoxel().OnDestroy(InAgent);
-	if(Owner)
+	if(GetPayload<AVoxelChunk>())
 	{
-		Owner->DestroyAuxiliary(*this);
+		GetPayload<AVoxelChunk>()->DestroyAuxiliary(*this);
 	}
 	bGenerated = false;
 }
 
 void FVoxelItem::RefreshData(bool bOrigin)
 {
-	if(bOrigin && Owner)
+	if(bOrigin && GetPayload<AVoxelChunk>())
 	{
-		FVoxelItem& OriginItem = Owner->GetVoxel(Index);
+		FVoxelItem& OriginItem = GetPayload<AVoxelChunk>()->GetVoxel(Index);
 		OriginItem.RefreshData(false);
 		*this = OriginItem;
-		Owner->SetChanged(true);
+		GetPayload<AVoxelChunk>()->SetChanged(true);
 	}
 	else
 	{
@@ -88,12 +88,12 @@ void FVoxelItem::RefreshData(bool bOrigin)
 
 void FVoxelItem::RefreshData(UVoxel& InVoxel, bool bOrigin)
 {
-	if(bOrigin && Owner)
+	if(bOrigin && GetPayload<AVoxelChunk>())
 	{
-		FVoxelItem& OriginItem = Owner->GetVoxel(Index);
+		FVoxelItem& OriginItem = GetPayload<AVoxelChunk>()->GetVoxel(Index);
 		OriginItem.RefreshData(InVoxel, false);
 		*this = OriginItem;
-		Owner->SetChanged(true);
+		GetPayload<AVoxelChunk>()->SetChanged(true);
 	}
 	else
 	{
@@ -146,27 +146,27 @@ bool FVoxelItem::IsMain() const
 
 FVoxelItem& FVoxelItem::GetMain() const
 {
-	if(Owner) return Owner->GetVoxelComplex(Index - FMathHelper::RotateIndex(GetVoxelData().PartIndex, Angle));
+	if(GetPayload<AVoxelChunk>()) return GetPayload<AVoxelChunk>()->GetVoxelComplex(Index - FMathHelper::RotateIndex(GetVoxelData().PartIndex, Angle));
 	return FVoxelItem::Empty;
 }
 
 FVoxelItem& FVoxelItem::GetPart(FIndex InIndex) const
 {
-	if(Owner && GetVoxelData().HasPartData(InIndex))
+	if(GetPayload<AVoxelChunk>() && GetVoxelData().HasPartData(InIndex))
 	{
-		return Owner->GetVoxelComplex(Index + InIndex);
+		return GetPayload<AVoxelChunk>()->GetVoxelComplex(Index + InIndex);
 	}
 	return FVoxelItem::Empty;
 }
 
 TArray<FVoxelItem> FVoxelItem::GetParts() const
 {
-	if(Owner)
+	if(GetPayload<AVoxelChunk>())
 	{
 		TArray<FVoxelItem> Parts;
 		for(auto Iter : GetVoxelData().PartDatas)
 		{
-			Parts.Add(Owner->GetVoxelComplex(Index + FMathHelper::RotateIndex(Iter->PartIndex, Angle)));
+			Parts.Add(GetPayload<AVoxelChunk>()->GetVoxelComplex(Index + FMathHelper::RotateIndex(Iter->PartIndex, Angle)));
 		}
 		return Parts;
 	}
@@ -185,18 +185,18 @@ FVector FVoxelItem::GetRange(bool bIncludeAngle, bool bIncludeDirection) const
 
 FIndex FVoxelItem::GetIndex(bool bWorldSpace) const
 {
-	if(Owner && bWorldSpace)
+	if(GetPayload<AVoxelChunk>() && bWorldSpace)
 	{
-		return Owner->LocalIndexToWorld(Index);
+		return GetPayload<AVoxelChunk>()->LocalIndexToWorld(Index);
 	}
 	return Index;
 }
 
 FVector FVoxelItem::GetLocation(bool bWorldSpace) const
 {
-	if(Owner)
+	if(GetPayload<AVoxelChunk>())
 	{
-		return Owner->IndexToLocation(Index, bWorldSpace);
+		return GetPayload<AVoxelChunk>()->IndexToLocation(Index, bWorldSpace);
 	}
 	return Index.ToVector() * UVoxelModule::Get().GetWorldData().BlockSize;
 }
@@ -204,12 +204,6 @@ FVector FVoxelItem::GetLocation(bool bWorldSpace) const
 UVoxel& FVoxelItem::GetVoxel() const
 {
 	return UVoxelModuleStatics::GetVoxel(*this);
-}
-
-AVoxelChunk* FVoxelItem::GetOwner() const
-{
-	if(Owner) return Owner;
-	return UVoxelModuleStatics::GetChunkByIndex(Index);
 }
 
 UVoxelData& FVoxelItem::GetVoxelData(bool bEnsured) const
@@ -247,7 +241,7 @@ UVoxel& FVoxelHitResult::GetVoxel() const
 
 AVoxelChunk* FVoxelHitResult::GetChunk() const
 {
-	return VoxelItem.Owner;
+	return VoxelItem.GetPayload<AVoxelChunk>();
 }
 
 FVoxelTopography::FVoxelTopography(const FString& InSaveData)
