@@ -36,9 +36,6 @@
 AAbilityCharacterBase::AAbilityCharacterBase(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-	// Set this actor to call Tick() every frame.  You can turn this off to improve performance ifyou don't need it.
-	PrimaryActorTick.bCanEverTick = true;
-
 	AutoPossessAI = EAutoPossessAI::Disabled;
 	
 	AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));

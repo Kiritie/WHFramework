@@ -15,6 +15,8 @@
 
 AAbilitySpawnerBase::AAbilitySpawnerBase()
 {
+	PrimaryActorTick.bCanEverTick = false;
+
 #if WITH_EDITORONLY_DATA
 	bIsSpatiallyLoaded = false;
 #endif

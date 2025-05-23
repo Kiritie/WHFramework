@@ -8,6 +8,8 @@
 
 AVoxelAuxiliary::AVoxelAuxiliary()
 {
+	PrimaryActorTick.bCanEverTick = false;
+
 	VoxelItem = FVoxelItem::Empty;
 	VoxelScope = EVoxelScope::None;
 }

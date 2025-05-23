@@ -13,7 +13,7 @@
 
 AWHGameMode::AWHGameMode()
 {
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 
 	DefaultPawnClass = nullptr;
 	HUDClass = AWHHUD::StaticClass();

@@ -28,6 +28,8 @@
 ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer) :
 	Super(ObjectInitializer)
 {
+	PrimaryActorTick.bCanEverTick = true;
+
 	bReplicates = true;
 
 	GetCapsuleComponent()->InitCapsuleSize(30.f, 89.f);

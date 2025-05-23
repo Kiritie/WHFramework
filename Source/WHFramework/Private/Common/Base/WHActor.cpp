@@ -8,6 +8,8 @@
 
 AWHActor::AWHActor()
 {
+	PrimaryActorTick.bCanEverTick = true;
+
 	InitializeDefaults();
 }
 

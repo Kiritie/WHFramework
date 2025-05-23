@@ -90,6 +90,8 @@ void UAttributeSetBase::SetAttributeValue(FGameplayAttribute InAttribute, float 
 
 void UAttributeSetBase::ModifyAttributeValue(FGameplayAttribute InAttribute, float InDeltaValue)
 {
+	if(InDeltaValue == 0.f) return;
+	
 	UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();
 	
 	AbilityComp->ApplyModToAttributeUnsafe(InAttribute, EGameplayModOp::Additive, InDeltaValue);

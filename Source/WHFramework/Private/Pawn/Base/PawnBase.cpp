@@ -24,6 +24,8 @@
 APawnBase::APawnBase(const FObjectInitializer& ObjectInitializer) :
 	Super(ObjectInitializer)
 {
+	PrimaryActorTick.bCanEverTick = true;
+
 	bReplicates = true;
 
 	BoxComponent = CreateDefaultSubobject<UBoxComponent>(FName("BoxComponent"));
