@@ -51,15 +51,12 @@ void UVoxel::RefreshData()
 
 void UVoxel::OnGenerate(IVoxelAgentInterface* InAgent)
 {
-	if(InAgent) return;
+	if(!InAgent) return;
 
 	if(GetData().IsMainPart())
 	{
 		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Generate), GetLocation());
-		if(InAgent)
-		{
-			UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelGenerated>(Cast<UObject>(this), { &Item, Cast<UObject>(this) });
-		}
+		UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelGenerated>(Cast<UObject>(InAgent), { &Item, Cast<UObject>(InAgent) });
 	}
 }
 
@@ -74,10 +71,7 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 		{
 			UAbilityModuleStatics::SpawnAbilityPickUp(FAbilityItem(GetData().GatherData ? GetData().GatherData->GetPrimaryAssetId() : GetData().GetPrimaryAssetId(), 1), GetLocation() + GetData().GetRange(GetAngle()) * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f, GetOwner());
 		}
-		if(InAgent)
-		{
-			UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelDestroyed>(Cast<UObject>(InAgent), { &Item, Cast<UObject>(InAgent) });
-		}
+		UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelDestroyed>(Cast<UObject>(InAgent), { &Item, Cast<UObject>(InAgent) });
 	}
 	if(GetOwner())
 	{
@@ -157,5 +151,5 @@ bool UVoxel::IsUnknown() const
 
 AVoxelChunk* UVoxel::GetOwner() const
 {
-	return Item.GetPayload<AVoxelChunk>();
+	return Item.Chunk;
 }

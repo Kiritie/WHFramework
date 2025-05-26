@@ -38,7 +38,7 @@ bool IVoxelAgentInterface::OnGenerateVoxel(EInputInteractEvent InInteractEvent, 
 
 			if(!GenerateVoxelItem.IsValid()) break;
 
-			GenerateVoxelItem.Payload = InHitResult.GetChunk();
+			GenerateVoxelItem.Chunk = InHitResult.GetChunk();
 			GenerateVoxelItem.Index = InHitResult.GetChunk()->LocationToIndex(InHitResult.Point - UVoxelModule::Get().GetWorldData().GetBlockSizedNormal(InHitResult.Normal)) + FIndex(InHitResult.Normal);
 
 			TArray<AActor*> IgnoreActors;
@@ -137,7 +137,7 @@ bool IVoxelAgentInterface::OnDestroyVoxel(EInputInteractEvent InInteractEvent, c
 			if(!DestroyVoxelItem.IsValid()) break;
 			
 			DestroyVoxelItem.Durability = 1.f;
-			DestroyVoxelItem.GetPayload<AVoxelChunk>()->SetVoxelComplex(DestroyVoxelItem.Index, DestroyVoxelItem, false, this);
+			DestroyVoxelItem.Chunk->SetVoxelComplex(DestroyVoxelItem.Index, DestroyVoxelItem, false, this);
 			DestroyVoxelItem = FVoxelItem::Empty;
 			return true;
 		}

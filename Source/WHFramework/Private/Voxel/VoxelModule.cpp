@@ -489,8 +489,6 @@ void UVoxelModule::UnloadData(EPhase InPhase)
 		)
 		ChunkMap.Empty();
 
-		VoxelGeneratorMap.Empty();
-
 		ChunkSpawnBatch = 0;
 		ChunkGenerateIndex = EMPTY_Index;
 

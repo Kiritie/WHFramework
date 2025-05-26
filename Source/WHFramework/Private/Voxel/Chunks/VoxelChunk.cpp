@@ -665,7 +665,7 @@ void AVoxelChunk::SetVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem, bool b
 	if(!bSafe || InVoxelItem.IsValid())
 	{
 		FVoxelItem VoxelItem = InVoxelItem;
-		VoxelItem.Payload = this;
+		VoxelItem.Chunk = this;
 		VoxelItem.Index = InIndex;
 		VoxelMap.Emplace(InIndex, VoxelItem);
 	}

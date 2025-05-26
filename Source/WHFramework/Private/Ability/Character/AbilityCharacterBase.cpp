@@ -677,7 +677,7 @@ bool AAbilityCharacterBase::OnGenerateVoxel(EInputInteractEvent InInteractEvent,
 		}
 		case EInputInteractEvent::Completed:
 		{
-			FItemQueryData ItemQueryData = Inventory->QueryItemByRange(EItemQueryType::Remove, FAbilityItem(GenerateVoxelItem, 1), -1);
+			FItemQueryData ItemQueryData = Inventory->QueryItemByRange(EItemQueryType::Remove, GenerateVoxelItem.ID, -1);
 			if(!ItemQueryData.IsValid()) bCanGenerateVoxel = false;
 			if(IVoxelAgentInterface::OnGenerateVoxel(InInteractEvent, InHitResult))
 			{

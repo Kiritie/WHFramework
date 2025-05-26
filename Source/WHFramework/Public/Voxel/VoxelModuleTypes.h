@@ -386,13 +386,16 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelItem : public FAbilityItem
+struct WHFRAMEWORK_API FVoxelItem : public FSaveData
 {
 	GENERATED_BODY()
 	
 public:
 	UPROPERTY(BlueprintReadWrite)
 	FIndex Index;
+
+	UPROPERTY(BlueprintReadWrite)
+	FPrimaryAssetId ID;
 
 	UPROPERTY(BlueprintReadWrite)
 	ERightAngle Angle;
@@ -402,6 +405,9 @@ public:
 
 	UPROPERTY(BlueprintReadWrite)
 	FString Data;
+
+	UPROPERTY(Transient)
+	AVoxelChunk* Chunk;
 
 	UPROPERTY(BlueprintReadOnly)
 	AVoxelAuxiliary* Auxiliary;
@@ -422,28 +428,20 @@ public:
 		Angle = ERightAngle::RA_0;
 		Durability = 1.f;
 		Data = TEXT("");
+		Chunk = nullptr;
 		Auxiliary = nullptr;
 		AuxiliaryData = nullptr;
 		bGenerated = false;
 	}
 		
-	FVoxelItem(const FAbilityItem& InAbilityItem) : FAbilityItem(InAbilityItem)
+	FVoxelItem(const FAbilityItem& InAbilityItem)
 	{
 		Index = FIndex::ZeroIndex;
+		ID = InAbilityItem.ID;
 		Angle = ERightAngle::RA_0;
 		Durability = 1.f;
 		Data = TEXT("");
-		Auxiliary = nullptr;
-		AuxiliaryData = nullptr;
-		bGenerated = false;
-	}
-	
-	FVoxelItem(const FVoxelItem& InVoxelItem, int32 InCount) : FAbilityItem(InVoxelItem, InCount)
-	{
-		Index = FIndex::ZeroIndex;
-		Angle = ERightAngle::RA_0;
-		Durability = 1.f;
-		Data = TEXT("");
+		Chunk = nullptr;
 		Auxiliary = nullptr;
 		AuxiliaryData = nullptr;
 		bGenerated = false;
@@ -469,11 +467,29 @@ public:
 public:
 	virtual bool IsValid() const override;
 
-	virtual bool IsEmpty() const override;
+	virtual bool IsEmpty() const;
 
 	virtual bool IsUnknown() const;
 
-	virtual bool EqualIndex(const FVoxelItem& InItem) const;
+	FORCEINLINE bool Equal(const FVoxelItem& InItem) const
+	{
+		return InItem.ID == ID;
+	}
+
+	FORCEINLINE friend bool operator==(const FVoxelItem& A, const FVoxelItem& B)
+	{
+		return A.Equal(B);
+	}
+
+	FORCEINLINE friend bool operator!=(const FVoxelItem& A, const FVoxelItem& B)
+	{
+		return !A.Equal(B);
+	}
+
+	FORCEINLINE bool EqualIndex(const FVoxelItem& InItem) const
+	{
+		return InItem.GetIndex() == GetIndex();
+	}
 
 	bool IsReplaceable(const FVoxelItem& InVoxelItem = FVoxelItem::Empty) const;
 
@@ -494,6 +510,14 @@ public:
 	FIndex GetIndex(bool bWorldSpace = true) const;
 
 	FVector GetLocation(bool bWorldSpace = true) const;
+
+	template<class T>
+	T& GetData(bool bEnsured = true) const
+	{
+		return static_cast<T&>(GetData(bEnsured));
+	}
+
+	UVoxelData& GetData(bool bEnsured = true) const;
 
 	template<class T>
 	T& GetVoxel() const

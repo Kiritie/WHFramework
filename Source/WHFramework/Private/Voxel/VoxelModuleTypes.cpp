@@ -18,7 +18,7 @@ FVoxelItem::FVoxelItem(const FPrimaryAssetId& InID, FIndex InIndex, AVoxelChunk*
 {
 	ID = InID;
 	Index = InIndex;
-	Payload = InOwner;
+	Chunk = InOwner;
 	Data = InData;
 }
 
@@ -52,9 +52,9 @@ void FVoxelItem::OnGenerate(IVoxelAgentInterface* InAgent)
 	if(bGenerated) return;
 	
 	bGenerated = true;
-	if(GetPayload<AVoxelChunk>())
+	if(Chunk)
 	{
-		GetPayload<AVoxelChunk>()->SpawnAuxiliary(*this);
+		Chunk->SpawnAuxiliary(*this);
 	}
 	GetVoxel().OnGenerate(InAgent);
 }
@@ -64,21 +64,21 @@ void FVoxelItem::OnDestroy(IVoxelAgentInterface* InAgent)
 	if(!bGenerated) return;
 	
 	GetVoxel().OnDestroy(InAgent);
-	if(GetPayload<AVoxelChunk>())
+	if(Chunk)
 	{
-		GetPayload<AVoxelChunk>()->DestroyAuxiliary(*this);
+		Chunk->DestroyAuxiliary(*this);
 	}
 	bGenerated = false;
 }
 
 void FVoxelItem::RefreshData(bool bOrigin)
 {
-	if(bOrigin && GetPayload<AVoxelChunk>())
+	if(bOrigin && Chunk)
 	{
-		FVoxelItem& OriginItem = GetPayload<AVoxelChunk>()->GetVoxel(Index);
+		FVoxelItem& OriginItem = Chunk->GetVoxel(Index);
 		OriginItem.RefreshData(false);
 		*this = OriginItem;
-		GetPayload<AVoxelChunk>()->SetChanged(true);
+		Chunk->SetChanged(true);
 	}
 	else
 	{
@@ -88,12 +88,12 @@ void FVoxelItem::RefreshData(bool bOrigin)
 
 void FVoxelItem::RefreshData(UVoxel& InVoxel, bool bOrigin)
 {
-	if(bOrigin && GetPayload<AVoxelChunk>())
+	if(bOrigin && Chunk)
 	{
-		FVoxelItem& OriginItem = GetPayload<AVoxelChunk>()->GetVoxel(Index);
+		FVoxelItem& OriginItem = Chunk->GetVoxel(Index);
 		OriginItem.RefreshData(InVoxel, false);
 		*this = OriginItem;
-		GetPayload<AVoxelChunk>()->SetChanged(true);
+		Chunk->SetChanged(true);
 	}
 	else
 	{
@@ -109,7 +109,7 @@ FString FVoxelItem::ToSaveData(bool bWorldSpace, bool bRefresh) const
 
 bool FVoxelItem::IsValid() const
 {
-	return Super::IsValid() && !EqualID(Empty) && !EqualID(Unknown);
+	return ID.IsValid() && !Equal(Empty) && !Equal(Unknown);
 }
 
 bool FVoxelItem::IsEmpty() const
@@ -122,14 +122,9 @@ bool FVoxelItem::IsUnknown() const
 	return *this == Unknown;
 }
 
-bool FVoxelItem::EqualIndex(const FVoxelItem& InItem) const
-{
-	return InItem.GetIndex() == GetIndex();
-}
-
 bool FVoxelItem::IsReplaceable(const FVoxelItem& InVoxelItem) const
 {
-	return !IsValid() || (!InVoxelItem.IsValid() && GetVoxelType() != EVoxelType::Bedrock) || !Match(InVoxelItem) && GetVoxelData().GetTransparency() == EVoxelTransparency::Trans && InVoxelItem.GetVoxelData().GetTransparency() != EVoxelTransparency::Trans;
+	return !IsValid() || (!InVoxelItem.IsValid() && GetVoxelType() != EVoxelType::Bedrock) || !Equal(InVoxelItem) && GetVoxelData().GetTransparency() == EVoxelTransparency::Trans && InVoxelItem.GetVoxelData().GetTransparency() != EVoxelTransparency::Trans;
 }
 
 FVoxelItem FVoxelItem::ReplaceID(const FPrimaryAssetId& InID) const
@@ -146,27 +141,27 @@ bool FVoxelItem::IsMain() const
 
 FVoxelItem& FVoxelItem::GetMain() const
 {
-	if(GetPayload<AVoxelChunk>()) return GetPayload<AVoxelChunk>()->GetVoxelComplex(Index - FMathHelper::RotateIndex(GetVoxelData().PartIndex, Angle));
+	if(Chunk) return Chunk->GetVoxelComplex(Index - FMathHelper::RotateIndex(GetVoxelData().PartIndex, Angle));
 	return FVoxelItem::Empty;
 }
 
 FVoxelItem& FVoxelItem::GetPart(FIndex InIndex) const
 {
-	if(GetPayload<AVoxelChunk>() && GetVoxelData().HasPartData(InIndex))
+	if(Chunk && GetVoxelData().HasPartData(InIndex))
 	{
-		return GetPayload<AVoxelChunk>()->GetVoxelComplex(Index + InIndex);
+		return Chunk->GetVoxelComplex(Index + InIndex);
 	}
 	return FVoxelItem::Empty;
 }
 
 TArray<FVoxelItem> FVoxelItem::GetParts() const
 {
-	if(GetPayload<AVoxelChunk>())
+	if(Chunk)
 	{
 		TArray<FVoxelItem> Parts;
 		for(auto Iter : GetVoxelData().PartDatas)
 		{
-			Parts.Add(GetPayload<AVoxelChunk>()->GetVoxelComplex(Index + FMathHelper::RotateIndex(Iter->PartIndex, Angle)));
+			Parts.Add(Chunk->GetVoxelComplex(Index + FMathHelper::RotateIndex(Iter->PartIndex, Angle)));
 		}
 		return Parts;
 	}
@@ -185,20 +180,25 @@ FVector FVoxelItem::GetRange(bool bIncludeAngle, bool bIncludeDirection) const
 
 FIndex FVoxelItem::GetIndex(bool bWorldSpace) const
 {
-	if(GetPayload<AVoxelChunk>() && bWorldSpace)
+	if(Chunk && bWorldSpace)
 	{
-		return GetPayload<AVoxelChunk>()->LocalIndexToWorld(Index);
+		return Chunk->LocalIndexToWorld(Index);
 	}
 	return Index;
 }
 
 FVector FVoxelItem::GetLocation(bool bWorldSpace) const
 {
-	if(GetPayload<AVoxelChunk>())
+	if(Chunk)
 	{
-		return GetPayload<AVoxelChunk>()->IndexToLocation(Index, bWorldSpace);
+		return Chunk->IndexToLocation(Index, bWorldSpace);
 	}
 	return Index.ToVector() * UVoxelModule::Get().GetWorldData().BlockSize;
+}
+
+UVoxelData& FVoxelItem::GetData(bool bEnsured) const
+{
+	return UAssetModuleStatics::LoadPrimaryAssetRef<UVoxelData>(ID, bEnsured);
 }
 
 UVoxel& FVoxelItem::GetVoxel() const
@@ -241,7 +241,7 @@ UVoxel& FVoxelHitResult::GetVoxel() const
 
 AVoxelChunk* FVoxelHitResult::GetChunk() const
 {
-	return VoxelItem.GetPayload<AVoxelChunk>();
+	return VoxelItem.Chunk;
 }
 
 FVoxelTopography::FVoxelTopography(const FString& InSaveData)
