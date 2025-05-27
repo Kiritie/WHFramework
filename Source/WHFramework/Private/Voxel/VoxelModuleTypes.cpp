@@ -49,9 +49,6 @@ FVoxelItem::FVoxelItem(const FString& InSaveData, bool bWorldSpace) : FVoxelItem
 
 void FVoxelItem::OnGenerate(IVoxelAgentInterface* InAgent)
 {
-	if(bGenerated) return;
-	
-	bGenerated = true;
 	if(Chunk)
 	{
 		Chunk->SpawnAuxiliary(*this);
@@ -61,14 +58,11 @@ void FVoxelItem::OnGenerate(IVoxelAgentInterface* InAgent)
 
 void FVoxelItem::OnDestroy(IVoxelAgentInterface* InAgent)
 {
-	if(!bGenerated) return;
-	
 	GetVoxel().OnDestroy(InAgent);
 	if(Chunk)
 	{
 		Chunk->DestroyAuxiliary(*this);
 	}
-	bGenerated = false;
 }
 
 void FVoxelItem::RefreshData(bool bOrigin)
@@ -124,7 +118,7 @@ bool FVoxelItem::IsUnknown() const
 
 bool FVoxelItem::IsReplaceable(const FVoxelItem& InVoxelItem) const
 {
-	return !IsValid() || (!InVoxelItem.IsValid() && GetVoxelType() != EVoxelType::Bedrock) || !Equal(InVoxelItem) && GetVoxelData().GetTransparency() == EVoxelTransparency::Trans && InVoxelItem.GetVoxelData().GetTransparency() != EVoxelTransparency::Trans;
+	return !IsValid() || (!InVoxelItem.IsValid() && GetVoxelType() != EVoxelType::Bedrock) || !Equal(InVoxelItem) && GetData().GetTransparency() == EVoxelTransparency::Trans && InVoxelItem.GetData().GetTransparency() != EVoxelTransparency::Trans;
 }
 
 FVoxelItem FVoxelItem::ReplaceID(const FPrimaryAssetId& InID) const
@@ -136,18 +130,18 @@ FVoxelItem FVoxelItem::ReplaceID(const FPrimaryAssetId& InID) const
 
 bool FVoxelItem::IsMain() const
 {
-	return GetVoxelData().IsMainPart();
+	return GetData().IsMainPart();
 }
 
 FVoxelItem& FVoxelItem::GetMain() const
 {
-	if(Chunk) return Chunk->GetVoxelComplex(Index - FMathHelper::RotateIndex(GetVoxelData().PartIndex, Angle));
+	if(Chunk) return Chunk->GetVoxelComplex(Index - FMathHelper::RotateIndex(GetData().PartIndex, Angle));
 	return FVoxelItem::Empty;
 }
 
 FVoxelItem& FVoxelItem::GetPart(FIndex InIndex) const
 {
-	if(Chunk && GetVoxelData().HasPartData(InIndex))
+	if(Chunk && GetData().HasPartData(InIndex))
 	{
 		return Chunk->GetVoxelComplex(Index + InIndex);
 	}
@@ -159,7 +153,7 @@ TArray<FVoxelItem> FVoxelItem::GetParts() const
 	if(Chunk)
 	{
 		TArray<FVoxelItem> Parts;
-		for(auto Iter : GetVoxelData().PartDatas)
+		for(auto Iter : GetData().PartDatas)
 		{
 			Parts.Add(Chunk->GetVoxelComplex(Index + FMathHelper::RotateIndex(Iter->PartIndex, Angle)));
 		}
@@ -170,12 +164,12 @@ TArray<FVoxelItem> FVoxelItem::GetParts() const
 
 EVoxelType FVoxelItem::GetVoxelType() const
 {
-	return GetVoxelData().VoxelType;
+	return GetData().VoxelType;
 }
 
 FVector FVoxelItem::GetRange(bool bIncludeAngle, bool bIncludeDirection) const
 {
-	return GetVoxelData().GetRange(bIncludeAngle ? Angle : ERightAngle::RA_0, bIncludeDirection);
+	return GetData().GetRange(bIncludeAngle ? Angle : ERightAngle::RA_0, bIncludeDirection);
 }
 
 FIndex FVoxelItem::GetIndex(bool bWorldSpace) const
@@ -204,11 +198,6 @@ UVoxelData& FVoxelItem::GetData(bool bEnsured) const
 UVoxel& FVoxelItem::GetVoxel() const
 {
 	return UVoxelModuleStatics::GetVoxel(*this);
-}
-
-UVoxelData& FVoxelItem::GetVoxelData(bool bEnsured) const
-{
-	return UAssetModuleStatics::LoadPrimaryAssetRef<UVoxelData>(ID, bEnsured);
 }
 
 FVoxelHitResult::FVoxelHitResult(const FHitResult& InHitResult)

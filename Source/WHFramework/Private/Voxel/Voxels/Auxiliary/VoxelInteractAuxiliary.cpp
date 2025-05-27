@@ -50,7 +50,7 @@ void AVoxelInteractAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			case EVoxelScope::Chunk:
 			case EVoxelScope::Prefab:
 			{
-				for(const auto& Iter : VoxelItem.GetVoxelData<UVoxelInteractData>().InteractActions)
+				for(const auto& Iter : VoxelItem.GetData<UVoxelInteractData>().InteractActions)
 				{
 					Interaction->AddInteractAction((EInteractAction)Iter);
 				}

@@ -406,16 +406,13 @@ public:
 	UPROPERTY(BlueprintReadWrite)
 	FString Data;
 
-	UPROPERTY(Transient)
+	UPROPERTY(BlueprintReadOnly)
 	AVoxelChunk* Chunk;
 
 	UPROPERTY(BlueprintReadOnly)
 	AVoxelAuxiliary* Auxiliary;
 
 	FSaveData* AuxiliaryData;
-
-	UPROPERTY(BlueprintReadOnly)
-	bool bGenerated;
 
 public:
 	static FVoxelItem Empty;
@@ -431,7 +428,6 @@ public:
 		Chunk = nullptr;
 		Auxiliary = nullptr;
 		AuxiliaryData = nullptr;
-		bGenerated = false;
 	}
 		
 	FVoxelItem(const FAbilityItem& InAbilityItem)
@@ -444,7 +440,6 @@ public:
 		Chunk = nullptr;
 		Auxiliary = nullptr;
 		AuxiliaryData = nullptr;
-		bGenerated = false;
 	}
 
 	FVoxelItem(const FPrimaryAssetId& InID, FIndex InIndex = FIndex::ZeroIndex, AVoxelChunk* InOwner = nullptr, const FString& InData = TEXT(""));
@@ -526,14 +521,6 @@ public:
 	}
 
 	UVoxel& GetVoxel() const;
-
-	template<class T>
-	T& GetVoxelData(bool bEnsured = true) const
-	{
-		return static_cast<T&>(GetVoxelData(bEnsured));
-	}
-
-	UVoxelData& GetVoxelData(bool bEnsured = true) const;
 };
 
 USTRUCT(BlueprintType)

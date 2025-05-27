@@ -93,7 +93,7 @@ void AVoxelPrefab::BuildMesh()
 		const FVoxelItem& VoxelItem = Iter.Value;
 		if(VoxelItem.IsValid())
 		{
-			GetMeshComponent(VoxelItem.GetVoxelData().Nature)->BuildVoxel(VoxelItem);
+			GetMeshComponent(VoxelItem.GetData().Nature)->BuildVoxel(VoxelItem);
 		}
 	)
 }
@@ -105,7 +105,7 @@ void AVoxelPrefab::SpawnMeshComponents()
 		const FVoxelItem& VoxelItem = Iter.Value;
 		if(VoxelItem.IsValid())
 		{
-			const UVoxelData& VoxelData = VoxelItem.GetVoxelData();
+			const UVoxelData& VoxelData = VoxelItem.GetData();
 			if(!MeshVoxelNatures.Contains(VoxelData.Nature))
 			{
 				MeshVoxelNatures.Add(VoxelData.Nature);
@@ -154,7 +154,7 @@ AVoxelAuxiliary* AVoxelPrefab::SpawnAuxiliary(FVoxelItem& InVoxelItem)
 {
 	if(InVoxelItem.IsValid() && !InVoxelItem.Auxiliary)
 	{
-		const UVoxelData& VoxelData = InVoxelItem.GetVoxelData();
+		const UVoxelData& VoxelData = InVoxelItem.GetData();
 		if(VoxelData.AuxiliaryClass)
 		{
 			if(AVoxelAuxiliary* Auxiliary = UObjectPoolModuleStatics::SpawnObject<AVoxelAuxiliary>(nullptr, nullptr, VoxelData.AuxiliaryClass))

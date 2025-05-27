@@ -56,7 +56,7 @@ bool IVoxelAgentInterface::OnGenerateVoxel(EInputInteractEvent InInteractEvent, 
 			}
 			if(GeneratePreviewVoxel)
 			{
-				if(GenerateVoxelItem.GetVoxelData().bRotatable)
+				if(GenerateVoxelItem.GetData().bRotatable)
 				{
 					const ERightAngle Angle = FMathHelper::FloatToRightAngle((GenerateVoxelItem.GetLocation() + UVoxelModule::Get().GetWorldData().BlockSize * 0.5f - GetVoxelAgentLocation()).GetSafeNormal2D().ToOrientationRotator().Yaw);
 					if(GenerateVoxelItem.Angle != Angle)
@@ -118,7 +118,7 @@ bool IVoxelAgentInterface::OnDestroyVoxel(EInputInteractEvent InInteractEvent, c
 				{
 					DestroyVoxelItem = InHitResult.VoxelItem;
 				}
-				DestroyVoxelItem.Durability -= UCommonStatics::GetCurrentDeltaSeconds() * GetDestroyVoxelRate() * (GetGenerateToolType() != EVoxelGenerateToolType::None && (int32)GetGenerateToolType() == (int32)DestroyVoxelItem.GetVoxelData().Element ? 1.7f : 1.f) / DestroyVoxelItem.GetVoxelData().Hardness;
+				DestroyVoxelItem.Durability -= UCommonStatics::GetCurrentDeltaSeconds() * GetDestroyVoxelRate() * (GetGenerateToolType() != EVoxelGenerateToolType::None && (int32)GetGenerateToolType() == (int32)DestroyVoxelItem.GetData().Element ? 1.7f : 1.f) / DestroyVoxelItem.GetData().Hardness;
 			}
 			if(DestroyVoxelItem.Durability <= 0.f)
 			{

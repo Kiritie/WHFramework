@@ -84,7 +84,7 @@ UVoxelModule::UVoxelModule()
 		})}, { EVoxelWorldState::MapBuilding, FVoxelChunkQueues({
 			FVoxelChunkQueue(true, 100),
 			FVoxelChunkQueue(true, 100),
-			FVoxelChunkQueue(true, 100)
+			FVoxelChunkQueue(true, 1000)
 		})}, { EVoxelWorldState::MeshSpawning, FVoxelChunkQueues({
 			FVoxelChunkQueue(true, 100),
 			FVoxelChunkQueue(false, 50)

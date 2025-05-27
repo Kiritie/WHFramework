@@ -184,31 +184,14 @@ void AVoxelChunk::Generate(EPhase InPhase)
 				Iter.Value.OnGenerate();
 			}
 		)
-		if(!bGenerated)
-		{
-			bGenerated = true;
-			GenerateSceneActors();
-		}
+		GenerateSceneActors();
+		bGenerated = true;
 	}
 	if(PHASEC(InPhase, EPhase::Lesser))
 	{
-		if(bGenerated)
-		{
-			SpawnMeshComponents();
-			BuildMesh();
-		}
+		SpawnMeshComponents();
+		BuildMesh();
 		CreateMesh();
-		ITER_MAP(VoxelMap, Iter,
-			if(Iter.Value.IsValid())
-			{
-				Iter.Value.OnGenerate();
-			}
-		)
-		if(!bGenerated)
-		{
-			bBuilded = true;
-			bGenerated = true;
-		}
 	}
 }
 
@@ -278,7 +261,7 @@ void AVoxelChunk::BuildMesh()
 		const FVoxelItem& VoxelItem = Iter.Value;
 		if(VoxelItem.IsValid())
 		{
-			GetMeshComponent(VoxelItem.GetVoxelData().Nature)->BuildVoxel(VoxelItem);
+			GetMeshComponent(VoxelItem.GetData().Nature)->BuildVoxel(VoxelItem);
 		}
 	)
 }
@@ -559,8 +542,8 @@ bool AVoxelChunk::CheckVoxelAdjacent(const FVoxelItem& InVoxelItem, EDirection I
 	const FVoxelItem& AdjacentItem = GetVoxelComplex(AdjacentIndex);
 	if(AdjacentItem.IsValid())
 	{
-		const UVoxelData& VoxelData = InVoxelItem.GetVoxelData();
-		const UVoxelData& AdjacentData = AdjacentItem.GetVoxelData();
+		const UVoxelData& VoxelData = InVoxelItem.GetData();
+		const UVoxelData& AdjacentData = AdjacentItem.GetData();
 		switch(VoxelData.GetTransparency())
 		{
 			case EVoxelTransparency::Solid:
@@ -764,7 +747,7 @@ bool AVoxelChunk::SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelI
 		const FVoxelItem VoxelItem = InVoxelItem.IsValid() ? InVoxelItem : GetVoxel(VoxelIndex);
 		if(VoxelItem.IsValid())
 		{
-			const UVoxelData& VoxelData = VoxelItem.GetVoxelData(false);
+			const UVoxelData& VoxelData = VoxelItem.GetData(false);
 			const FVector VoxelRange = VoxelData.GetRange(VoxelItem.Angle);
 			if(VoxelData.IsMainPart() && VoxelRange != FVector::OneVector)
 			{
@@ -965,7 +948,7 @@ AVoxelAuxiliary* AVoxelChunk::SpawnAuxiliary(FVoxelItem& InVoxelItem)
 {
 	if(InVoxelItem.IsValid() && !InVoxelItem.Auxiliary)
 	{
-		const auto& VoxelData = InVoxelItem.GetVoxelData();
+		const auto& VoxelData = InVoxelItem.GetData();
 		if(VoxelData.AuxiliaryClass && VoxelData.IsMainPart())
 		{
 			if(AVoxelAuxiliary* Auxiliary = UObjectPoolModuleStatics::SpawnObject<AVoxelAuxiliary>(nullptr, nullptr, VoxelData.AuxiliaryClass))
@@ -1005,7 +988,7 @@ void AVoxelChunk::SpawnMeshComponents(int32 InStage)
 			const FVoxelItem& VoxelItem = Iter.Value;
 			if(VoxelItem.IsValid())
 			{
-				const UVoxelData& VoxelData = VoxelItem.GetVoxelData();
+				const UVoxelData& VoxelData = VoxelItem.GetData();
 				if(!_MeshVoxelNatures.Contains(VoxelData.Nature))
 				{
 					_MeshVoxelNatures.Add(VoxelData.Nature);

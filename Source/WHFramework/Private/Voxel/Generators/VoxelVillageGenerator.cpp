@@ -209,7 +209,7 @@ bool UVoxelVillageGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InInde
 	for(auto& Iter : VoxelDatas)
 	{
 		FVoxelItem VoxelItem = FVoxelItem(Iter, true);
-		if(VoxelItem.GetVoxelData().bRotatable)
+		if(VoxelItem.GetData().bRotatable)
 		{
 			VoxelItem.Angle = FMathHelper::CombineRightAngle(VoxelItem.Angle, (ERightAngle)InRotate);
 		}

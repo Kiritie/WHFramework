@@ -71,8 +71,6 @@ public:
 
 	bool IsUnknown() const;
 
-	bool IsGenerated() const { return Item.bGenerated; }
-
 	FVoxelItem& GetItem() { return Item; }
 
 	void SetItem(const FVoxelItem& InItem) { Item = InItem; }
@@ -104,7 +102,7 @@ public:
 	{
 		return static_cast<T&>(GetData());
 	}
-	UVoxelData& GetData() const { return Item.GetVoxelData(); }
+	UVoxelData& GetData() const { return Item.GetData(); }
 
 public:
 	virtual FPrimaryAssetId GetAssetID_Implementation() const override { return Item.ID; }

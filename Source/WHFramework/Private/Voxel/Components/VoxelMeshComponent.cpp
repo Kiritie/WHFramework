@@ -118,7 +118,7 @@ void UVoxelMeshComponent::UnRegister()
 
 void UVoxelMeshComponent::BuildVoxel(const FVoxelItem& InVoxelItem)
 {
-	const UVoxelData& VoxelData = InVoxelItem.GetVoxelData();
+	const UVoxelData& VoxelData = InVoxelItem.GetData();
 	const FVoxelMeshData& MeshData = VoxelData.GetMeshData(InVoxelItem);
 	if(MeshData.bCustomMesh)
 	{
@@ -150,7 +150,7 @@ void UVoxelMeshComponent::CreateVoxel(const FVoxelItem& InVoxelItem)
 {
 	if(InVoxelItem.IsValid())
 	{
-		UVoxelData& VoxelData = InVoxelItem.GetVoxelData();
+		UVoxelData& VoxelData = InVoxelItem.GetData();
 		SetNature(VoxelData.Nature);
 		const FVector Range = VoxelData.GetRange(InVoxelItem.Angle);
 		if(Scope == EVoxelScope::Capture)
@@ -314,7 +314,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EDirection In
 void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVertices[4], int32 InFaceIndex, FVector InNormal)
 {
 	const int32 VerNum = Vertices.Num();
-	const UVoxelData& VoxelData = InVoxelItem.GetVoxelData();
+	const UVoxelData& VoxelData = InVoxelItem.GetData();
 	const FVoxelMeshData& MeshData = VoxelData.GetMeshData(InVoxelItem);
 	const FVoxelMeshUVData& MeshUVData = MeshData.MeshUVDatas[InFaceIndex];
 	const FVoxelRenderData& RenderData = UVoxelModule::Get().GetWorldData().GetRenderData(Nature);

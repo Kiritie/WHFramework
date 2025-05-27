@@ -30,7 +30,7 @@ void AVoxelContainerAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 	if(!SaveData.InventoryData.IsSaved())
 	{
-		SaveData.InventoryData = VoxelItem.GetVoxelData<UVoxelContainerData>().InventoryData;
+		SaveData.InventoryData = VoxelItem.GetData<UVoxelContainerData>().InventoryData;
 	}
 
 	if(PHASEC(InPhase, EPhase::All))

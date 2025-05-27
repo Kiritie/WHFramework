@@ -53,7 +53,7 @@ void AVoxelEntity::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 	if(VoxelItem.IsValid())
 	{
-		const UVoxelData& VoxelData = VoxelItem.GetVoxelData();
+		const UVoxelData& VoxelData = VoxelItem.GetData();
 		if(VoxelData.AuxiliaryClass)
 		{
 			SpawnAuxiliary();
@@ -80,7 +80,7 @@ void AVoxelEntity::SpawnAuxiliary()
 {
 	if(VoxelItem.IsValid() && !VoxelItem.Auxiliary)
 	{
-		const UVoxelData& VoxelData = VoxelItem.GetVoxelData();
+		const UVoxelData& VoxelData = VoxelItem.GetData();
 		if(VoxelData.AuxiliaryClass)
 		{
 			if(AVoxelAuxiliary* Auxiliary = UObjectPoolModuleStatics::SpawnObject<AVoxelAuxiliary>(nullptr, nullptr, VoxelData.AuxiliaryClass))
