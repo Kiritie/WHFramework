@@ -44,6 +44,7 @@ AVoxelChunk::AVoxelChunk()
 	bChanged = false;
 	Module = nullptr;
 	VoxelMap = TMap<FIndex, FVoxelItem>();
+	TopographyMap = TMap<FIndex, FVoxelTopography>();
 	Neighbors = TMap<EDirection, AVoxelChunk*>();
 	ITER_DIRECTION(Iter, Neighbors.Add(Iter); )
 }
@@ -133,17 +134,18 @@ FSaveData* AVoxelChunk::ToData()
 	if(bChanged)
 	{
 		SaveData.VoxelDatas.RemoveFromEnd(TEXT("|"));
+
+		for(auto& Iter : TopographyMap)
+		{
+			SaveData.TopographyDatas.Appendf(TEXT("%s|"), *Iter.Value.ToSaveData());
+		}
+		SaveData.TopographyDatas.RemoveFromEnd(TEXT("|"));
 	}
 	else if(Module->GetWorldData().IsExistChunkData(Index))
 	{
 		SaveData.VoxelDatas = Module->GetWorldData().GetChunkData(Index)->VoxelDatas;
+		SaveData.TopographyDatas = Module->GetWorldData().GetChunkData(Index)->TopographyDatas;
 	}
-
-	for(auto& Iter : TopographyMap)
-	{
-		SaveData.TopographyDatas.Appendf(TEXT("%s|"), *Iter.Value.ToSaveData());
-	}
-	SaveData.TopographyDatas.RemoveFromEnd(TEXT("|"));
 
 	for(auto& Iter : SceneActorMap)
 	{
@@ -691,10 +693,10 @@ bool AVoxelChunk::SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, 
 		{
 			Generate(EPhase::Lesser);
 			GenerateNeighbors(InIndex, EPhase::Lesser);
-		}
-		if(InAgent)
-		{
-			bChanged = true;
+			if(InAgent)
+			{
+				bChanged = true;
+			}
 		}
 	}
 	return bSuccess;

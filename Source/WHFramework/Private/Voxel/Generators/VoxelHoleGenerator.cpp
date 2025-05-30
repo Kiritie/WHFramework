@@ -12,7 +12,7 @@ UVoxelHoleGenerator::UVoxelHoleGenerator()
 {
 	Seed = 394835;
 	CrystalSize = 2.f;
-	SpawnRate = 0.7f;
+	SpawnRate = 0.3f;
 	MinRadius = 2.f;
 	MaxRadius = 3.f;
 }
@@ -24,7 +24,9 @@ void UVoxelHoleGenerator::Generate(AVoxelChunk* InChunk)
 
 void UVoxelHoleGenerator::GenerateHole(FIndex InIndex) const
 {
-	if(FMathHelper::HashRand(InIndex.ToVector2D(), Seed) < SpawnRate) return;
+	const float Possible = FMathHelper::HashRand(InIndex.ToVector2D(), Seed);
+
+	if((1.f - Possible) > SpawnRate) return;
 
 	const FIndex SurfaceIndex = FIndex(InIndex.X, InIndex.Y, Module->GetTopographyByIndex(InIndex).Height);
 	if(SurfaceIndex.Z == 0) return;
@@ -43,9 +45,10 @@ void UVoxelHoleGenerator::GenerateHole(FIndex InIndex) const
 				for(int32 Z = -Radius; Z <= Radius; Z++)
 				{
 					const FVector Offset(X, Y, Z);
-					if(Offset.Size() <= Radius)
+					const FIndex Index = Iter + Offset;
+					if(Offset.Size() <= Radius && Index.Z >= 0)
 					{
-						Module->SetVoxelByIndex(Iter + Offset, FVoxelItem::Empty);
+						Module->SetVoxelByIndex(Index, FVoxelItem::Empty);
 					}
 				}
 			}
@@ -56,18 +59,22 @@ void UVoxelHoleGenerator::GenerateHole(FIndex InIndex) const
 FIndex UVoxelHoleGenerator::FindNearestHoleIndex(FIndex InStartIndex, FVector InDirection, int32 InMaxSearchDistance) const
 {
 	const FVector NormalizedDir = InDirection.GetSafeNormal();
-
-	for(int32 Step = 0; Step < InMaxSearchDistance; Step++)
+	auto DirStepIndex = [InStartIndex, NormalizedDir](int32 Step)
 	{
-		const FIndex CurrentIndex(
+		return FIndex(
 			InStartIndex.X + FMath::RoundToInt(NormalizedDir.X * Step),
 			InStartIndex.Y + FMath::RoundToInt(NormalizedDir.Y * Step),
 			InStartIndex.Z + FMath::RoundToInt(NormalizedDir.Z * Step)
 		);
+	};
+
+	for(int32 Step = 0; Step < InMaxSearchDistance; Step++)
+	{
+		const FIndex CurrentIndex = DirStepIndex(Step);
 
 		if(Module->GetVoxelGenerator<UVoxelCaveGenerator>()->IsCave(CurrentIndex))
 		{
-			return CurrentIndex;
+			return DirStepIndex(Step + 4);
 		}
 	}
 

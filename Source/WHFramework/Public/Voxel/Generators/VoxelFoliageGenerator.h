@@ -45,7 +45,16 @@ protected:
 	float FlowerRate;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float FlowerFixedRate;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float TreeRate;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float TreeFixedRate;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float TreeRandomRate;
 
 private:
 	int32 _Seed;

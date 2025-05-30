@@ -15,7 +15,7 @@
 UVoxelVillageGenerator::UVoxelVillageGenerator()
 {
 	Seed = 453;
-	SpawnRate = 0.999f;
+	SpawnRate = 0.001f;
 
 	PathFinder = FPathFinder();
 	PathFinder.SetConditionInBarrier([this](FVector2D Pos) { return InBarrier(Pos); });
@@ -46,8 +46,9 @@ void UVoxelVillageGenerator::Generate(AVoxelChunk* InChunk)
 {
 	FScopeLock ScopeLock(&CriticalSection);
 
-	float Possible = FMathHelper::HashRand(InChunk->GetIndex().ToVector2D(), Seed);
-	if(Possible < SpawnRate) return;
+	const float Possible = FMathHelper::HashRand(InChunk->GetIndex().ToVector2D(), Seed);
+
+	if((1.f - Possible) > SpawnRate) return;
 
 	_Domains.Reset();
 	_Roads.Reset();

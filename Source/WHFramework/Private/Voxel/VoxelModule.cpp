@@ -25,6 +25,7 @@
 #include "Voxel/Voxels/Entity/VoxelEntityCapture.h"
 #include "Common/CommonStatics.h"
 #include "Common/CommonTypes.h"
+#include "Event/Handle/Voxel/EventHandle_VoxelWorldAgentMoved.h"
 #include "Event/Handle/Voxel/EventHandle_VoxelWorldCenterChanged.h"
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Main/MainModule.h"
@@ -66,6 +67,8 @@ UVoxelModule::UVoxelModule()
 	WorldMode = EVoxelWorldMode::None;
 	WorldState = EVoxelWorldState::None;
 	WorldBasicData = FVoxelWorldBasicSaveData();
+	WorldCenterIndex = EMPTY_Index;
+	WorldAgentIndex = EMPTY_Index;
 
 	WorldData = nullptr;
 
@@ -94,7 +97,6 @@ UVoxelModule::UVoxelModule()
 	};
 
 	ChunkSpawnBatch = 0;
-	ChunkGenerateIndex = EMPTY_Index;
 	ChunkMap = TMap<FIndex, AVoxelChunk*>();
 
 	VoxelClasses = TArray<TSubclassOf<UVoxel>>();
@@ -359,7 +361,12 @@ void UVoxelModule::OnWorldStateChanged()
 
 void UVoxelModule::OnWorldCenterChanged()
 {
-	UEventModuleStatics::BroadcastEvent(UEventHandle_VoxelWorldCenterChanged::StaticClass(), this, { &ChunkGenerateIndex });
+	UEventModuleStatics::BroadcastEvent(UEventHandle_VoxelWorldCenterChanged::StaticClass(), this, { &WorldCenterIndex });
+}
+
+void UVoxelModule::OnWorldAgentMoved()
+{
+	UEventModuleStatics::BroadcastEvent(UEventHandle_VoxelWorldAgentMoved::StaticClass(), this, { &WorldAgentIndex });
 }
 
 float UVoxelModule::GetWorldGeneratePercent() const
@@ -378,7 +385,7 @@ float UVoxelModule::GetWorldGeneratePercent() const
 FBox UVoxelModule::GetWorldBounds(float InRadius, float InHalfHeight) const
 {
 	const FVector2D WorldRadius = WorldData->GetWorldRealSize() * 0.5f;
-	const FVector WorldCenter = FVector(ChunkIndexToLocation(ChunkGenerateIndex).X + ((int32)WorldData->GetWorldSize().X % 2 == 1 ? WorldData->GetChunkRealSize().X * 0.5f : 0.f), ChunkIndexToLocation(ChunkGenerateIndex).Y + ((int32)WorldData->GetWorldSize().Y % 2 == 1 ? WorldData->GetChunkRealSize().Y * 0.5f : 0.f), WorldData->SkyHeight);
+	const FVector WorldCenter = FVector(ChunkIndexToLocation(WorldCenterIndex).X + ((int32)WorldData->GetWorldSize().X % 2 == 1 ? WorldData->GetChunkRealSize().X * 0.5f : 0.f), ChunkIndexToLocation(WorldCenterIndex).Y + ((int32)WorldData->GetWorldSize().Y % 2 == 1 ? WorldData->GetChunkRealSize().Y * 0.5f : 0.f), WorldData->SkyHeight);
 	return FBox(WorldCenter - FVector(WorldRadius.X - InRadius, WorldRadius.Y - InRadius, WorldData->GetWorldRealHeight() - InHalfHeight), WorldCenter + FVector(WorldRadius.X - InRadius, WorldRadius.Y - InRadius, WorldData->GetWorldRealHeight() - InHalfHeight));
 }
 
@@ -490,7 +497,8 @@ void UVoxelModule::UnloadData(EPhase InPhase)
 		ChunkMap.Empty();
 
 		ChunkSpawnBatch = 0;
-		ChunkGenerateIndex = EMPTY_Index;
+		WorldCenterIndex = EMPTY_Index;
+		WorldAgentIndex = EMPTY_Index;
 
 		WorldData = NewWorldData();
 
@@ -726,9 +734,14 @@ void UVoxelModule::GenerateChunkQueues(bool bFromAgent, bool bForce)
 	{
 		const FVector2D AgentLocation = FVector2D(WorldData->WorldRange.X != 0.f ? VoxelAgent->GetVoxelAgentLocation().X : 0.f, WorldData->WorldRange.Y != 0.f ? VoxelAgent->GetVoxelAgentLocation().Y : 0.f);
 		GenerateIndex = LocationToChunkIndex(FVector(AgentLocation.X, AgentLocation.Y, 0.f));
-		GenerateOffset = (AgentLocation / WorldData->GetChunkRealSize() - ChunkGenerateIndex.ToVector2D()).GetAbs();
+		GenerateOffset = (AgentLocation / WorldData->GetChunkRealSize() - WorldCenterIndex.ToVector2D()).GetAbs();
+		if(WorldAgentIndex != GenerateIndex)
+		{
+			WorldAgentIndex = GenerateIndex;
+			OnWorldAgentMoved();
+		}
 	}
-	if(bForce || ChunkGenerateIndex == EMPTY_Index || (WorldData->WorldRange.X != 0.f && GenerateOffset.X > WorldData->GetWorldSize().X * ChunkSpawnDistance * 0.5f) || (WorldData->WorldRange.Y != 0.f && GenerateOffset.Y > WorldData->GetWorldSize().Y * ChunkSpawnDistance * 0.5f))
+	if(bForce || WorldCenterIndex == EMPTY_Index || (WorldData->WorldRange.X != 0.f && GenerateOffset.X > WorldData->GetWorldSize().X * ChunkSpawnDistance * 0.5f) || (WorldData->WorldRange.Y != 0.f && GenerateOffset.Y > WorldData->GetWorldSize().Y * ChunkSpawnDistance * 0.5f))
 	{
 		TArray<FIndex> DestroyQueue;
 		ChunkMap.GenerateKeyArray(DestroyQueue);
@@ -746,7 +759,7 @@ void UVoxelModule::GenerateChunkQueues(bool bFromAgent, bool bForce)
 			}
 		}
 		ITER_ARRAY(DestroyQueue, Item, AddToChunkQueue(EVoxelWorldState::Destroying, Item);)
-		ChunkGenerateIndex = GenerateIndex;
+		WorldCenterIndex = GenerateIndex;
 		ChunkSpawnBatch++;
 		
 		OnWorldCenterChanged();
@@ -832,8 +845,8 @@ void UVoxelModule::AddToChunkQueue(EVoxelWorldState InState, FIndex InIndex)
 				case EVoxelWorldState::Generating:
 				{
 					Item.Queue.Sort([this](const FIndex& A, const FIndex& B){
-						const float LengthA = ChunkGenerateIndex.DistanceTo(A, false, true);
-						const float LengthB = ChunkGenerateIndex.DistanceTo(B, false, true);
+						const float LengthA = WorldCenterIndex.DistanceTo(A, false, true);
+						const float LengthB = WorldCenterIndex.DistanceTo(B, false, true);
 						return LengthA < LengthB;
 					});
 					break;
@@ -841,8 +854,8 @@ void UVoxelModule::AddToChunkQueue(EVoxelWorldState InState, FIndex InIndex)
 				case EVoxelWorldState::Destroying:
 				{
 					Item.Queue.Sort([this](const FIndex& A, const FIndex& B){
-						const float LengthA = ChunkGenerateIndex.DistanceTo(A, false, true);
-						const float LengthB = ChunkGenerateIndex.DistanceTo(B, false, true);
+						const float LengthA = WorldCenterIndex.DistanceTo(A, false, true);
+						const float LengthB = WorldCenterIndex.DistanceTo(B, false, true);
 						return LengthA > LengthB;
 					});
 					break;
@@ -876,8 +889,8 @@ bool UVoxelModule::GenerateVoxel(AVoxelChunk* InChunk, const TSubclassOf<UVoxelG
 bool UVoxelModule::IsOnTheWorld(FIndex InIndex, bool bIgnoreZ) const
 {
 	const FVector2D SpawnRange = WorldData->GetWorldSize() * 0.5f;
-	return InIndex.X >= ChunkGenerateIndex.X - SpawnRange.X && InIndex.X < ChunkGenerateIndex.X + SpawnRange.X &&
-		InIndex.Y >= ChunkGenerateIndex.Y - SpawnRange.Y && InIndex.Y < ChunkGenerateIndex.Y + SpawnRange.Y &&
+	return InIndex.X >= WorldCenterIndex.X - SpawnRange.X && InIndex.X < WorldCenterIndex.X + SpawnRange.X &&
+		InIndex.Y >= WorldCenterIndex.Y - SpawnRange.Y && InIndex.Y < WorldCenterIndex.Y + SpawnRange.Y &&
 		(!bIgnoreZ || InIndex.Z >= 0 && InIndex.Z < WorldData->SkyHeight);
 }
 

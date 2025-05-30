@@ -94,5 +94,5 @@ void UAbilityCharacterState_Spawn::OnTermination()
 
 void UAbilityCharacterState_Spawn::TryLeave()
 {
-	FSM->SwitchStateByClass<UAbilityCharacterState_Walk>();
+	Switch(nullptr);
 }

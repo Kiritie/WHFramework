@@ -22,7 +22,7 @@ UVoxelOreGenerator::UVoxelOreGenerator()
 void UVoxelOreGenerator::Generate(AVoxelChunk* InChunk)
 {
     ITER_INDEX2D(Index, Module->GetWorldData().ChunkSize, false,
-		const int32 Height = InChunk->GetTopography(Index).Height;
+		const int32 Height = InChunk->GetTopography(Index).Height - 1;
 		for(int Z = 0; Z < Height; Z++)
 		{
 			const FIndex WorldIndex = InChunk->LocalIndexToWorld(FIndex(Index.X, Index.Y, Z));
@@ -30,7 +30,7 @@ void UVoxelOreGenerator::Generate(AVoxelChunk* InChunk)
 				if(Iter.MaxHeight != -1 && WorldIndex.Z > Iter.MaxHeight) continue;
 
 				const float Noise = Module->GetVoxelNoise3D(FVector(WorldIndex.X + i * Seed, WorldIndex.Y + i * Seed, WorldIndex.Z) * 0.1f);
-				if(Noise > SpawnRate && FMathHelper::HashRand(WorldIndex.ToVector2D(), Seed) < Iter.SpawnRate)
+				if(Noise >= SpawnRate && (1.f - FMathHelper::HashRand(WorldIndex.ToVector2D(), Seed)) <= Iter.SpawnRate)
 				{
 					GenerateOre(WorldIndex, Iter);
 					break;

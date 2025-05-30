@@ -10,7 +10,7 @@
 UVoxelLakeGenerator::UVoxelLakeGenerator()
 {
 	Seed = 8997632;
-	SpawnRate = 0.8f;
+	SpawnRate = 0.2f;
 	NoiseScale = 0.05f;
 	MinDistance = 8;
 	MinRadius = 4.f;
@@ -28,7 +28,9 @@ void UVoxelLakeGenerator::Generate(AVoxelChunk* InChunk)
 
 void UVoxelLakeGenerator::GenerateLake(FIndex InIndex)
 {
-	if(FMathHelper::HashRand(InIndex.ToVector2D(), Seed) < SpawnRate) return;
+	const float Possible = FMathHelper::HashRand(InIndex.ToVector2D(), Seed);
+
+	if((1.f - Possible) > SpawnRate) return;
 
 	const float LakeRadius = FMathHelper::HashRandRange(InIndex.ToVector2D(), MinRadius, MaxRadius, Seed);
 	const float LakeDepth = FMathHelper::HashRandRange(InIndex.ToVector2D(), MinDepth, MaxDepth, Seed);

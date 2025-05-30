@@ -88,6 +88,12 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "World")
 	FVoxelWorldBasicSaveData WorldBasicData;
 	
+	UPROPERTY(VisibleAnywhere, Category = "World")
+	FIndex WorldCenterIndex;
+	
+	UPROPERTY(VisibleAnywhere, Category = "World")
+	FIndex WorldAgentIndex;
+
 public:
 	UFUNCTION(BlueprintPure)
 	EVoxelWorldMode GetWorldMode() const { return WorldMode; }
@@ -101,6 +107,12 @@ public:
 	UFUNCTION(BlueprintPure)
 	FVoxelWorldBasicSaveData& GetWorldBasicData() { return WorldBasicData; }
 
+	UFUNCTION(BlueprintPure)
+	FIndex GetWorldCenterIndex() const { return WorldCenterIndex; }
+
+	UFUNCTION(BlueprintPure)
+	FIndex GetWorldAgentIndex() const { return WorldAgentIndex; }
+
 protected:
 	UFUNCTION(BlueprintCallable)
 	void SetWorldState(EVoxelWorldState InWorldState);
@@ -111,6 +123,8 @@ protected:
 	virtual void OnWorldStateChanged();
 
 	virtual void OnWorldCenterChanged();
+
+	virtual void OnWorldAgentMoved();
 
 protected:
 	FVoxelWorldSaveData* WorldData;
@@ -262,9 +276,6 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere, Category = "Chunk")
 	int32 ChunkSpawnBatch;
-
-	UPROPERTY(VisibleAnywhere, Category = "Chunk")
-	FIndex ChunkGenerateIndex;
 
 	UPROPERTY(Transient)
 	TMap<FIndex, AVoxelChunk*> ChunkMap;

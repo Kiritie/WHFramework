@@ -10,7 +10,7 @@
 UVoxelRainGenerator::UVoxelRainGenerator()
 {
 	Seed = 2183;
-	SpawnRate = 0.98f;
+	SpawnRate = 0.02f;
 	MaxDistance = 40.f;
 	
 	_Waters = TSet<FIndex>();
@@ -21,12 +21,13 @@ void UVoxelRainGenerator::Generate(AVoxelChunk* InChunk)
 	FScopeLock ScopeLock(&CriticalSection);
 
 	const float Possible = FMathHelper::HashRand(InChunk->GetIndex().ToVector2D() + FVector2D(13.51f, 2.16f), Seed);
-	if(Possible <= SpawnRate) return;
+	
+	if((1.f - Possible) > SpawnRate) return;
 
 	_Waters.Reset();
 
 	const int32 X = FMathHelper::HashRandInt(InChunk->GetIndex().ToVector2D(), Seed) % (int32)(Module->GetWorldData().ChunkSize.X - 1) + 1;
-	const int32 Y = FMathHelper::HashRandInt(InChunk->GetIndex().ToVector2D() + FVector2D(-1.512f, 41.421f), Seed) %(int32)(Module->GetWorldData().ChunkSize.Y - 1) + 1;
+	const int32 Y = FMathHelper::HashRandInt(InChunk->GetIndex().ToVector2D() + FVector2D(-1.512f, 41.421f), Seed) % (int32)(Module->GetWorldData().ChunkSize.Y - 1) + 1;
 	const int32 Z = InChunk->GetTopography(FIndex(X, Y)).Height + 1;
 	if(Module->HasVoxelByIndex(FIndex(X, Y, Z), true))
 	{
