@@ -186,7 +186,7 @@ protected:
 	TArray<EVoxelNature> MeshVoxelNatures;
 
 public:
-	void SpawnMeshComponents(int32 InStage = 1 | 2);
+	void SpawnMeshComponents(int32 InStage);
 
 	void DestroyMeshComponents();
 
@@ -219,6 +219,8 @@ protected:
 	FVoxelMaps VoxelMaps;
 
 	TMap<FIndex, FVoxelTopography> TopographyMap;
+
+	bool bNeedCreateMesh;
 
 public:
 	FIndex GetIndex() const { return Index; }

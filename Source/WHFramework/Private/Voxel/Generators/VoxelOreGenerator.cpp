@@ -22,7 +22,7 @@ UVoxelOreGenerator::UVoxelOreGenerator()
 void UVoxelOreGenerator::Generate(AVoxelChunk* InChunk)
 {
     ITER_INDEX2D(Index, Module->GetWorldData().ChunkSize, false,
-		const int32 Height = InChunk->GetTopography(Index).Height - 1;
+		const int32 Height = InChunk->GetTopography(Index).Height - 2;
 		for(int Z = 0; Z < Height; Z++)
 		{
 			const FIndex WorldIndex = InChunk->LocalIndexToWorld(FIndex(Index.X, Index.Y, Z));
