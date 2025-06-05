@@ -17,7 +17,7 @@ void UVoxelTerrainGenerator::Generate(AVoxelChunk* InChunk)
 	//载入地形方块
 	ITER_INDEX2D(Index, Module->GetWorldData().ChunkSize, false,
 		DON_WITHINDEX(FMath::Max(InChunk->GetTopography(Index).Height, Module->GetWorldData().SeaLevel) + 1, Z,
-			FIndex _Index = FIndex(Index.X, Index.Y, Z);
+			const FIndex _Index = FIndex(Index.X, Index.Y, Z);
 			if(!InChunk->HasVoxel(_Index))
 			{
 				const EVoxelType VoxelType = CalculateVoxelType(InChunk, _Index);

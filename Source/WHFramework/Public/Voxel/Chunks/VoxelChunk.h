@@ -5,6 +5,7 @@
 #include "Common/Base/WHActor.h"
 #include "GameFramework/Actor.h"
 #include "Scene/Container/SceneContainerInterface.h"
+#include "Thread/IThreadSafeInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "VoxelChunk.generated.h"
 
@@ -20,7 +21,7 @@ class UVoxelMeshComponent;
  * 体素块
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelChunk : public AWHActor, public ISceneContainerInterface
+class WHFRAMEWORK_API AVoxelChunk : public AWHActor, public ISceneContainerInterface, public IThreadSafeInterface
 {
 	GENERATED_BODY()
 
@@ -125,7 +126,7 @@ public:
 
 	virtual bool SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem, bool bGenerate = false, IVoxelAgentInterface* InAgent = nullptr);
 
-	virtual bool SetVoxelComplex(const TMap<FIndex, FVoxelItem>& InVoxelItems, bool bGenerate = false, bool bFirstSample = false, IVoxelAgentInterface* InAgent = nullptr);
+	virtual bool SetVoxelComplex(const FVoxelMap& InVoxelMap, bool bGenerate = false, bool bFirstSample = false, IVoxelAgentInterface* InAgent = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Topography
@@ -215,7 +216,7 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Stats")
 	UVoxelModule* Module;
 
-	TMap<FIndex, FVoxelItem> VoxelMap;
+	FVoxelMaps VoxelMaps;
 
 	TMap<FIndex, FVoxelTopography> TopographyMap;
 

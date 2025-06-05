@@ -297,6 +297,9 @@ protected:
 	UPROPERTY(Transient)
 	TMap<TSubclassOf<UVoxelGenerator>, UVoxelGenerator*> VoxelGeneratorMap;
 
+	UPROPERTY(Transient)
+	TMap<EVoxelType, FPrimaryAssetId> VoxelAssetIDMap;
+
 public:
 	template<class T>
 	T* GetVoxelGenerator() const
@@ -304,4 +307,7 @@ public:
 		return Cast<T>(GetVoxelGenerator(T::StaticClass()));
 	}
 	virtual UVoxelGenerator* GetVoxelGenerator(const TSubclassOf<UVoxelGenerator>& InClass) const;
+
+	UFUNCTION(BlueprintPure)
+	FPrimaryAssetId VoxelTypeToAssetID(EVoxelType InVoxelType) const;
 };

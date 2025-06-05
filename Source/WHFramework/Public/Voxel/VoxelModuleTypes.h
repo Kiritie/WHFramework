@@ -524,6 +524,127 @@ public:
 };
 
 USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelTopography
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FVoxelTopography()
+	{
+		Index = FIndex::ZeroIndex;
+		Height = 0;
+		Temperature = 0.f;
+		Humidity = 0.f;
+		BiomeType = EVoxelBiomeType::None;
+	}
+
+	FORCEINLINE FVoxelTopography(const FString& InSaveData);
+
+public:
+	FString ToSaveData() const;
+
+public:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	FIndex Index;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	int32 Height;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	float Temperature;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	float Humidity;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	EVoxelBiomeType BiomeType;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelMap
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FVoxelMap()
+	{
+		Map = TMap<FIndex, FVoxelItem>();
+	}
+
+public:
+	TMap<FIndex, FVoxelItem> Map;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelMaps
+{
+	GENERATED_BODY()
+
+public:
+	FORCEINLINE FVoxelMaps()
+	{
+		Maps = TArray<FVoxelMap*>();
+		SizeZ = 16;
+	}
+
+public:
+	TArray<FVoxelMap*> Maps;
+
+	int32 SizeZ;
+
+public:
+	bool Has(FIndex InIndex)
+	{
+		const int32 Z = InIndex.Z / SizeZ;
+		if(Maps.IsValidIndex(Z) && Maps[Z])
+		{
+			InIndex.Z %= SizeZ;
+			return Maps[Z]->Map.Contains(InIndex);
+		}
+		return false;
+	}
+
+	FVoxelItem& Get(FIndex InIndex)
+	{
+		const int32 Z = InIndex.Z / SizeZ;
+		InIndex.Z %= SizeZ;
+		return Maps[Z]->Map[InIndex];
+	}
+
+	void Set(FIndex InIndex, const FVoxelItem& InItem)
+	{
+		const int32 Z = InIndex.Z / SizeZ;
+		InIndex.Z %= SizeZ;
+		if(Maps.Num() < Z + 1) Maps.SetNumZeroed(Z + 1);
+		if(!Maps[Z]) Maps[Z] = new FVoxelMap();
+		Maps[Z]->Map.Emplace(InIndex, InItem);
+	}
+
+	void Remove(FIndex InIndex)
+	{
+		const int32 Z = InIndex.Z / SizeZ;
+		InIndex.Z %= SizeZ;
+		Maps[Z]->Map.Remove(InIndex);
+	}
+
+	void Clear()
+	{
+		ITER_ARRAY(Maps, Iter, delete Iter;)
+		Maps.Empty();
+	}
+
+	void Iter(const TFunction<void(FVoxelItem&)>& InFunc, bool bCopyData = false)
+	{
+		ITER_ARRAY(bCopyData ? TArray(Maps) : Maps, Iter1,
+			if(!Iter1) continue;
+			ITER_MAP(bCopyData ? TMap(Iter1->Map) : Iter1->Map, Iter2,
+				InFunc(Iter2.Value);
+			)
+		)
+	}
+};
+
+USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelHitResult
 {
 	GENERATED_BODY()
@@ -617,43 +738,6 @@ public:
 public:
 	UPROPERTY(BlueprintReadWrite)
 	FString VoxelDatas;
-};
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelTopography
-{
-	GENERATED_BODY()
-
-public:
-	FORCEINLINE FVoxelTopography()
-	{
-		Index = FIndex::ZeroIndex;
-		Height = 0;
-		Temperature = 0.f;
-		Humidity = 0.f;
-		BiomeType = EVoxelBiomeType::None;
-	}
-
-	FORCEINLINE FVoxelTopography(const FString& InSaveData);
-
-public:
-	FString ToSaveData() const;
-
-public:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	FIndex Index;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	int32 Height;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	float Temperature;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	float Humidity;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	EVoxelBiomeType BiomeType;
 };
 
 USTRUCT(BlueprintType)

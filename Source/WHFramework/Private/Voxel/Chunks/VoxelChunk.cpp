@@ -43,7 +43,7 @@ AVoxelChunk::AVoxelChunk()
 	bGenerated = false;
 	bChanged = false;
 	Module = nullptr;
-	VoxelMap = TMap<FIndex, FVoxelItem>();
+	VoxelMaps = FVoxelMaps();
 	TopographyMap = TMap<FIndex, FVoxelTopography>();
 	Neighbors = TMap<EDirection, AVoxelChunk*>();
 	ITER_DIRECTION(Iter, Neighbors.Add(Iter); )
@@ -70,10 +70,10 @@ void AVoxelChunk::OnDespawn_Implementation(bool bRecovery)
 
 	BreakNeighbors();
 
-	ITER_MAP(VoxelMap, Iter,
-		DestroyAuxiliary(Iter.Value);
-	)
-	VoxelMap.Empty();
+	VoxelMaps.Iter([this](FVoxelItem& Item){
+		DestroyAuxiliary(Item);
+	});
+	VoxelMaps.Clear();
 
 	TopographyMap.Empty();
 
@@ -118,19 +118,19 @@ FSaveData* AVoxelChunk::ToData()
 	SaveData.Index = Index;
 	SaveData.bGenerated = bGenerated;
 
-	ITER_MAP(VoxelMap, Iter,
-		if(Iter.Value.IsValid())
+	VoxelMaps.Iter([this](FVoxelItem& Item){
+		if(Item.IsValid())
 		{
 			if(bChanged)
 			{
-				SaveData.VoxelDatas.Appendf(TEXT("%s|"), *Iter.Value.ToSaveData(false, true));
+				SaveData.VoxelDatas.Appendf(TEXT("%s|"), *Item.ToSaveData(false, true));
 			}
-			if(Iter.Value.Auxiliary)
+			if(Item.Auxiliary)
 			{
-				SaveData.AuxiliaryDatas.Add(Iter.Value.Auxiliary->GetSaveDataRef<FVoxelAuxiliarySaveData>(true));
+				SaveData.AuxiliaryDatas.Add(Item.Auxiliary->GetSaveDataRef<FVoxelAuxiliarySaveData>(true));
 			}
 		}
-	)
+	});
 	if(bChanged)
 	{
 		SaveData.VoxelDatas.RemoveFromEnd(TEXT("|"));
@@ -163,6 +163,7 @@ void AVoxelChunk::Initialize(UVoxelModule* InModule, FIndex InIndex, int32 InBat
 	Module = InModule;
 	Index = InIndex;
 	Batch = InBatch;
+	
 	ITER_INDEX2D(VoxelIndex, Module->GetWorldData().ChunkSize, false,
 		FVoxelTopography Topography;
 		Topography.Index = VoxelIndex;
@@ -180,12 +181,12 @@ void AVoxelChunk::Generate(EPhase InPhase)
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
 		CreateMesh();
-		ITER_MAP(VoxelMap, Iter,
-			if(Iter.Value.IsValid())
+		VoxelMaps.Iter([this](FVoxelItem& Item){
+			if(Item.IsValid())
 			{
-				Iter.Value.OnGenerate();
+				Item.OnGenerate();
 			}
-		)
+		});
 		GenerateSceneActors();
 		bGenerated = true;
 	}
@@ -207,10 +208,10 @@ void AVoxelChunk::CreateMesh()
 
 void AVoxelChunk::ClearMap(bool bGenerate)
 {
-	ITER_MAP(VoxelMap, Iter,
-		DestroyAuxiliary(Iter.Value);
-	)
-	VoxelMap.Empty();
+	VoxelMaps.Iter([this](FVoxelItem& Item){
+		DestroyAuxiliary(Item);
+	});
+	VoxelMaps.Clear();
 	Generate(EPhase::Lesser);
 }
 
@@ -234,11 +235,35 @@ void AVoxelChunk::BuildMap(int32 InStage)
 		case 3:
 		{
 			Module->GenerateVoxel<UVoxelCaveGenerator>(this);
+			break;
+		}
+		case 4:
+		{
 			Module->GenerateVoxel<UVoxelHoleGenerator>(this);
+			break;
+		}
+		case 5:
+		{
 			Module->GenerateVoxel<UVoxelOreGenerator>(this);
+			break;
+		}
+		case 6:
+		{
 			Module->GenerateVoxel<UVoxelTerrainGenerator>(this);
+			break;
+		}
+		case 7:
+		{
 			Module->GenerateVoxel<UVoxelRainGenerator>(this);
+			break;
+		}
+		case 8:
+		{
 			Module->GenerateVoxel<UVoxelFoliageGenerator>(this);
+			break;
+		}
+		case 9:
+		{
 			Module->GenerateVoxel<UVoxelVillageGenerator>(this);
 		}
 		default:
@@ -259,13 +284,12 @@ void AVoxelChunk::BuildPrefabMap()
 
 void AVoxelChunk::BuildMesh()
 {
-	ITER_MAP(TMap(VoxelMap), Iter,
-		const FVoxelItem& VoxelItem = Iter.Value;
-		if(VoxelItem.IsValid())
+	VoxelMaps.Iter([this](FVoxelItem& Item){
+		if(Item.IsValid())
 		{
-			GetMeshComponent(VoxelItem.GetData().Nature)->BuildVoxel(VoxelItem);
+			GetMeshComponent(Item.GetData().Nature)->BuildVoxel(Item);
 		}
-	)
+	}, true);
 }
 
 void AVoxelChunk::GenerateNeighbors(FIndex InIndex, EPhase InPhase)
@@ -393,7 +417,9 @@ bool AVoxelChunk::LocalIndexToNeighbor(FIndex InIndex, EDirection& OutDirection)
 
 bool AVoxelChunk::HasVoxel(FIndex InIndex, bool bSafe)
 {
-	return VoxelMap.Contains(InIndex) && (!bSafe || VoxelMap[InIndex].IsValid());
+	FScopeLock ScopeLock(&CriticalSection);
+
+	return VoxelMaps.Has(InIndex) && (!bSafe || VoxelMaps.Get(InIndex).IsValid());
 }
 
 bool AVoxelChunk::HasVoxel(int32 InX, int32 InY, int32 InZ, bool bSafe)
@@ -451,11 +477,13 @@ FVoxelItem& AVoxelChunk::GetVoxel(FIndex InIndex, bool bMainPart)
 
 FVoxelItem& AVoxelChunk::GetVoxel(int32 InX, int32 InY, int32 InZ, bool bMainPart)
 {
+	FScopeLock ScopeLock(&CriticalSection);
+
 	if(HasVoxel(InX, InY, InZ))
 	{
 		const FIndex VoxelIndex = FIndex(InX, InY, InZ);
-		if(bMainPart) return VoxelMap[VoxelIndex].GetMain();
-		return VoxelMap[VoxelIndex];
+		if(bMainPart) return VoxelMaps.Get(VoxelIndex).GetMain();
+		return VoxelMaps.Get(VoxelIndex);
 	}
 	return FVoxelItem::Empty;
 }
@@ -647,16 +675,18 @@ bool AVoxelChunk::CheckVoxelNeighbors(FIndex InIndex, EVoxelType InVoxelType, FV
 
 void AVoxelChunk::SetVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bSafe)
 {
+	FScopeLock ScopeLock(&CriticalSection);
+
 	if(!bSafe || InVoxelItem.IsValid())
 	{
 		FVoxelItem VoxelItem = InVoxelItem;
 		VoxelItem.Chunk = this;
 		VoxelItem.Index = InIndex;
-		VoxelMap.Emplace(InIndex, VoxelItem);
+		VoxelMaps.Set(InIndex, VoxelItem);
 	}
 	else if(HasVoxel(InIndex))
 	{
-		VoxelMap.Remove(InIndex);
+		VoxelMaps.Remove(InIndex);
 	}
 }
 
@@ -673,7 +703,7 @@ bool AVoxelChunk::SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, 
 		if(IsOnTheChunk(InIndex))
 		{
 			SetVoxel(InIndex, InVoxelItem);
-			if(bGenerate) VoxelMap[InIndex].OnGenerate(InAgent);
+			if(bGenerate) VoxelMaps.Get(InIndex).OnGenerate(InAgent);
 			bSuccess = true;
 		}
 	}
@@ -681,8 +711,8 @@ bool AVoxelChunk::SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, 
 	{
 		if(HasVoxel(InIndex))
 		{
-			FVoxelItem VoxelItem = VoxelMap[InIndex];
-			VoxelMap.Remove(InIndex);
+			FVoxelItem VoxelItem = VoxelMaps.Get(InIndex);
+			VoxelMaps.Remove(InIndex);
 			if(bGenerate) VoxelItem.OnDestroy(InAgent);
 			bSuccess = true;
 		}
@@ -753,8 +783,8 @@ bool AVoxelChunk::SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelI
 			const FVector VoxelRange = VoxelData.GetRange(VoxelItem.Angle);
 			if(VoxelData.IsMainPart() && VoxelRange != FVector::OneVector)
 			{
-				TMap<FIndex, FVoxelItem> VoxelItems;
-				VoxelItems.Emplace(VoxelIndex, InVoxelItem);
+				FVoxelMap VoxelMap;
+				VoxelMap.Map.Emplace(VoxelIndex, InVoxelItem);
 				ITER_ARRAY(VoxelData.PartDatas, PartData,
 					FVoxelItem PartItem = FVoxelItem::Empty;
 					if(InVoxelItem.IsValid())
@@ -762,9 +792,9 @@ bool AVoxelChunk::SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelI
 						PartItem.ID = PartData->GetPrimaryAssetId();
 						PartItem.Angle = InVoxelItem.Angle;
 					}
-					VoxelItems.Emplace(VoxelIndex + FMathHelper::RotateIndex(PartData->PartIndex, VoxelItem.Angle), PartItem);
+					VoxelMap.Map.Emplace(VoxelIndex + FMathHelper::RotateIndex(PartData->PartIndex, VoxelItem.Angle), PartItem);
 				)
-				return SetVoxelComplex(VoxelItems, bGenerate, true, InAgent);
+				return SetVoxelComplex(VoxelMap, bGenerate, true, InAgent);
 			}
 			else
 			{
@@ -775,11 +805,11 @@ bool AVoxelChunk::SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelI
 	return false;
 }
 
-bool AVoxelChunk::SetVoxelComplex(const TMap<FIndex, FVoxelItem>& InVoxelItems, bool bGenerate, bool bFirstSample, IVoxelAgentInterface* InAgent)
+bool AVoxelChunk::SetVoxelComplex(const FVoxelMap& InVoxelMap, bool bGenerate, bool bFirstSample, IVoxelAgentInterface* InAgent)
 {
 	bool bSuccess = true;
 	TArray<EDirection> _Neighbors;
-	for(auto& Iter : InVoxelItems)
+	for(auto& Iter : InVoxelMap.Map)
 	{
 		FVoxelItem VoxelItem = GetVoxelComplex(Iter.Key);
 		if(bFirstSample ? !SetVoxelSample(Iter.Key, Iter.Value, false, InAgent) :
@@ -985,19 +1015,16 @@ void AVoxelChunk::SpawnMeshComponents(int32 InStage)
 {
 	if(InStage & 1)
 	{
-		TArray<EVoxelNature> _MeshVoxelNatures;
-		ITER_MAP(TMap(VoxelMap), Iter,
-			const FVoxelItem& VoxelItem = Iter.Value;
-			if(VoxelItem.IsValid())
+		VoxelMaps.Iter([this](FVoxelItem& Item){
+			if(Item.IsValid())
 			{
-				const UVoxelData& VoxelData = VoxelItem.GetData();
-				if(!_MeshVoxelNatures.Contains(VoxelData.Nature))
+				const UVoxelData& VoxelData = Item.GetData();
+				if(!MeshVoxelNatures.Contains(VoxelData.Nature))
 				{
-					_MeshVoxelNatures.Add(VoxelData.Nature);
+					MeshVoxelNatures.Add(VoxelData.Nature);
 				}
 			}
-		)
-		MeshVoxelNatures = _MeshVoxelNatures;
+		}, true);
 	}
 	if(InStage & 2)
 	{

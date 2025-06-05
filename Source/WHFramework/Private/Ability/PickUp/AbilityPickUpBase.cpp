@@ -33,6 +33,8 @@ AAbilityPickUpBase::AAbilityPickUpBase()
 	RotatingMovement->RotationRate = FRotator(0.f, 180.f, 0.f);
 
 	FallingMovement = CreateDefaultSubobject<UFallingMovementComponent>(FName("FallingMovement"));
+	FallingMovement->SetFallingSpeed(100.f);
+	FallingMovement->SetAcceleratedSpeed(150.f);
 	
 	FollowingMovement = CreateDefaultSubobject<UFollowingMovementComponent>(FName("FollowingMovement"));
 

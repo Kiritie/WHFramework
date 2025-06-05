@@ -87,7 +87,13 @@ UVoxelModule::UVoxelModule()
 		})}, { EVoxelWorldState::MapBuilding, FVoxelChunkQueues({
 			FVoxelChunkQueue(true, 100),
 			FVoxelChunkQueue(true, 100),
-			FVoxelChunkQueue(true, 1000)
+			FVoxelChunkQueue(true, 100),
+			FVoxelChunkQueue(true, 100),
+			FVoxelChunkQueue(true, 100),
+			FVoxelChunkQueue(true, 100),
+			FVoxelChunkQueue(true, 100),
+			FVoxelChunkQueue(true, 100),
+			FVoxelChunkQueue(true, 100)
 		})}, { EVoxelWorldState::MeshSpawning, FVoxelChunkQueues({
 			FVoxelChunkQueue(true, 100),
 			FVoxelChunkQueue(false, 50)
@@ -112,6 +118,7 @@ UVoxelModule::UVoxelModule()
 	VoxelClasses.Add(UVoxelWater::StaticClass());
 	
 	VoxelGeneratorMap = TMap<TSubclassOf<UVoxelGenerator>, UVoxelGenerator*>();
+	VoxelAssetIDMap = TMap<EVoxelType, FPrimaryAssetId>();
 
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> TransMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_Trans.M_Voxel_Trans'"));
 
@@ -422,6 +429,11 @@ void UVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		
 		int32 ItemIndex = 0;
 		ITER_ARRAY(UAssetModuleStatics::LoadPrimaryAssets<UVoxelData>(FName("Voxel")), Item,
+			if(!VoxelAssetIDMap.Contains(Item->VoxelType))
+			{
+				VoxelAssetIDMap.Add(Item->VoxelType, Item->GetPrimaryAssetId());
+			}
+		
 			if(Item->IsUnknown() || !Item->IsMainPart()) continue;
 			
 			AVoxelEntityCapture* VoxelEntity;
@@ -503,6 +515,8 @@ void UVoxelModule::UnloadData(EPhase InPhase)
 		WorldData = NewWorldData();
 
 		VoxelCapture->GetCapture()->SetActive(false);
+		
+		VoxelAssetIDMap.Empty();
 	}
 }
 
@@ -512,19 +526,11 @@ void UVoxelModule::LoadPrefabData(const FVoxelPrefabSaveData& InPrefabData)
 	
 	TArray<AVoxelChunk*> GenerateChunks;
 	ITER_MAP(ChunkMap, Iter,
-		if(Iter.Value->IsGenerated() && !Iter.Value->VoxelMap.IsEmpty())
+		if(Iter.Value->IsGenerated() && Iter.Value->IsChanged())
 		{
-			if(Iter.Key.Z > 0)
-			{
-				Iter.Value->ClearMap();
-				GenerateChunks.Add(Iter.Value);
-			}
-			else if(Iter.Value->VoxelMap.Num() != WorldData->ChunkSize.X * WorldData->ChunkSize.Y)
-			{
-				Iter.Value->ClearMap();
-				Iter.Value->BuildPrefabMap();
-				GenerateChunks.Add(Iter.Value);
-			}
+			Iter.Value->ClearMap();
+			Iter.Value->BuildPrefabMap();
+			GenerateChunks.Add(Iter.Value);
 		}
 	)
 	if(!InPrefabData.VoxelDatas.IsEmpty())
@@ -552,15 +558,15 @@ FVoxelPrefabSaveData UVoxelModule::GetPrefabData()
 	if(WorldMode != EVoxelWorldMode::Prefab || GetWorldGeneratePercent() < 1.f) return FVoxelPrefabSaveData();
 	
 	FVoxelPrefabSaveData PrefabData;
-	ITER_MAP(ChunkMap, Iter1,
-		if(Iter1.Value->IsGenerated())
+	ITER_MAP(ChunkMap, Iter,
+		if(Iter.Value->IsGenerated() && Iter.Value->IsChanged())
 		{
-			ITER_MAP(Iter1.Value->VoxelMap, Iter2,
-				if((Iter1.Key.Z > 0 || Iter2.Key.Z > 0) && Iter2.Value.IsValid())
+			Iter.Value->VoxelMaps.Iter([&, this](FVoxelItem& Item){
+				if((Iter.Key.Z > 0 || Item.Index.Z > 0) && Item.IsValid())
 				{
-					PrefabData.VoxelDatas.Appendf(TEXT("%s|"), *Iter2.Value.ToSaveData(true, true));
+					PrefabData.VoxelDatas.Appendf(TEXT("%s|"), *Item.ToSaveData(true, true));
 				}
-			)
+			});
 		}
 	)
 	PrefabData.VoxelDatas.RemoveFromEnd(TEXT("|"));
@@ -1183,4 +1189,13 @@ UVoxelGenerator* UVoxelModule::GetVoxelGenerator(const TSubclassOf<UVoxelGenerat
 		return VoxelGeneratorMap[InClass];
 	}
 	return nullptr;
+}
+
+FPrimaryAssetId UVoxelModule::VoxelTypeToAssetID(EVoxelType InVoxelType) const
+{
+	if(VoxelAssetIDMap.Contains(InVoxelType))
+	{
+		return VoxelAssetIDMap[InVoxelType];
+	}
+	return FPrimaryAssetId(FName("Voxel"), *FString::Printf(TEXT("DA_%s"), *UCommonStatics::GetEnumAuthoredNameByValue(TEXT("/Script/WHFramework.EVoxelType"), (int32)InVoxelType)));
 }

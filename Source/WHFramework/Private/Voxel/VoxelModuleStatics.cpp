@@ -4,14 +4,13 @@
 #include "Voxel/VoxelModuleStatics.h"
 
 #include "Asset/AssetModuleStatics.h"
-#include "Common/CommonStatics.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Voxels/Data/VoxelData.h"
 #include "Voxel/Voxels/Voxel.h"
 
 FPrimaryAssetId UVoxelModuleStatics::VoxelTypeToAssetID(EVoxelType InVoxelType)
 {
-	return FPrimaryAssetId(FName("Voxel"), *FString::Printf(TEXT("DA_%s"), *UCommonStatics::GetEnumAuthoredNameByValue(TEXT("/Script/WHFramework.EVoxelType"), (int32)InVoxelType)));
+	return UVoxelModule::Get().VoxelTypeToAssetID(InVoxelType);
 }
 
 EVoxelTransparency UVoxelModuleStatics::VoxelNatureToTransparency(EVoxelNature InVoxelNature)

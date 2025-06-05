@@ -26,7 +26,6 @@ TArray<FVector2D> FPathFinder::FindPath(FVector2D StartPos, FVector2D EndPos)
 	}
 	Depth = 0;
 
-	TArray<FVector2D> PathList;
 	Openlist.push(CreateOpenNode(StartPos, EndPos, 0, nullptr));
 
 	FOpenNode* ToOpen = nullptr;
@@ -47,11 +46,13 @@ TArray<FVector2D> FPathFinder::FindPath(FVector2D StartPos, FVector2D EndPos)
 		Open(*ToOpen, EndPos);
 	}
 
+	TArray<FVector2D> PathList;
+
 	if (bFound)
 	{
 		while (ToOpen)
 		{
-			PathList.Push(ToOpen->Pos);
+			PathList.Push(MoveTemp(ToOpen->Pos));
 			ToOpen = ToOpen->Father;
 		}
 	}
