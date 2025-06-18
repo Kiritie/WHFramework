@@ -45,6 +45,8 @@ protected:
 
 	virtual FSaveData* ToData() override;
 
+	virtual void SaveData();
+
 	//////////////////////////////////////////////////////////////////////////
 	// Chunk
 public:

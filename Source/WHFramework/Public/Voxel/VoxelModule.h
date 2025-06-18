@@ -163,10 +163,6 @@ protected:
 public:
 	virtual AVoxelChunk* SpawnChunk(FIndex InIndex, bool bAddToQueue = true);
 
-	virtual void GenerateChunk(FIndex InIndex);
-
-	virtual void DestroyChunk(FIndex InIndex);
-
 	virtual void LoadChunkMap(FIndex InIndex);
 
 	virtual void BuildChunkMap(FIndex InIndex, int32 InStage);
@@ -174,6 +170,12 @@ public:
 	virtual void SpawnChunkMesh(FIndex InIndex, int32 InStage);
 
 	virtual void BuildChunkMesh(FIndex InIndex);
+
+	virtual void GenerateChunk(FIndex InIndex);
+
+	virtual void SaveChunk(FIndex InIndex);
+
+	virtual void DestroyChunk(FIndex InIndex);
 	
 public:
 	virtual void GenerateChunkQueues(bool bFromAgent = true, bool bForce = false);

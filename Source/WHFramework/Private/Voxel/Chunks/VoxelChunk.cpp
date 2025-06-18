@@ -58,8 +58,8 @@ void AVoxelChunk::OnSpawn_Implementation(UObject* InOwner, const TArray<FParamet
 
 void AVoxelChunk::OnDespawn_Implementation(bool bRecovery)
 {
-	Module->GetWorldData().SetChunkData(Index, GetSaveData<FVoxelChunkSaveData>(true));
-
+	SaveData();
+	
 	Index = FIndex::ZeroIndex;
 	Batch = -1;
 	bBuilded = false;
@@ -118,7 +118,7 @@ FSaveData* AVoxelChunk::ToData()
 	SaveData = FVoxelChunkSaveData();
 
 	SaveData.Index = Index;
-	SaveData.bGenerated = bGenerated;
+	SaveData.bChanged = bChanged;
 
 	VoxelMaps.Iter([this](FVoxelItem& Item){
 		if(Item.IsValid())
@@ -143,11 +143,6 @@ FSaveData* AVoxelChunk::ToData()
 		}
 		SaveData.TopographyDatas.RemoveFromEnd(TEXT("|"));
 	}
-	else if(Module->GetWorldData().IsExistChunkData(Index))
-	{
-		SaveData.VoxelDatas = Module->GetWorldData().GetChunkData(Index)->VoxelDatas;
-		SaveData.TopographyDatas = Module->GetWorldData().GetChunkData(Index)->TopographyDatas;
-	}
 
 	for(auto& Iter : SceneActorMap)
 	{
@@ -158,6 +153,14 @@ FSaveData* AVoxelChunk::ToData()
 	}
 
 	return &SaveData;
+}
+
+void AVoxelChunk::SaveData()
+{
+	if(bGenerated)
+	{
+		Module->GetWorldData().SetChunkData(Index, GetSaveData<FVoxelChunkSaveData>(true));
+	}
 }
 
 void AVoxelChunk::Initialize(UVoxelModule* InModule, FIndex InIndex, int32 InBatch)
@@ -951,7 +954,7 @@ void AVoxelChunk::GenerateSceneActors()
 {
 	auto& WorldData = Module->GetWorldData();
 	
-	if(WorldData.IsChunkGenerated(Index))
+	if(WorldData.IsExistChunkData(Index))
 	{
 		LoadSceneActors(WorldData.GetChunkData(Index));
 	}

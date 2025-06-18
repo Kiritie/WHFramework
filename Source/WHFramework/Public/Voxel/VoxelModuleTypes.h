@@ -39,12 +39,12 @@ enum class EVoxelWorldState : uint8
 {
 	None,
 	Spawning,
-	Destroying,
-	Generating,
 	MapLoading,
 	MapBuilding,
 	MeshSpawning,
-	MeshBuilding
+	MeshBuilding,
+	Generating,
+	Destroying
 };
 
 /**
@@ -584,47 +584,47 @@ public:
 	FORCEINLINE FVoxelMaps()
 	{
 		Maps = TArray<FVoxelMap*>();
-		SizeZ = 16;
+		SplitSize = 16;
 	}
 
 public:
 	TArray<FVoxelMap*> Maps;
 
-	int32 SizeZ;
+	int32 SplitSize;
 
 public:
 	bool Has(FIndex InIndex)
 	{
-		const int32 Z = InIndex.Z / SizeZ;
-		if(Maps.IsValidIndex(Z) && Maps[Z])
+		const int32 Size = InIndex.Z / SplitSize;
+		if(Maps.IsValidIndex(Size) && Maps[Size])
 		{
-			InIndex.Z %= SizeZ;
-			return Maps[Z]->Map.Contains(InIndex);
+			InIndex.Z %= SplitSize;
+			return Maps[Size]->Map.Contains(InIndex);
 		}
 		return false;
 	}
 
 	FVoxelItem& Get(FIndex InIndex)
 	{
-		const int32 Z = InIndex.Z / SizeZ;
-		InIndex.Z %= SizeZ;
-		return Maps[Z]->Map[InIndex];
+		const int32 Size = InIndex.Z / SplitSize;
+		InIndex.Z %= SplitSize;
+		return Maps[Size]->Map[InIndex];
 	}
 
 	void Set(FIndex InIndex, const FVoxelItem& InItem)
 	{
-		const int32 Z = InIndex.Z / SizeZ;
-		InIndex.Z %= SizeZ;
-		if(Maps.Num() < Z + 1) Maps.SetNumZeroed(Z + 1);
-		if(!Maps[Z]) Maps[Z] = new FVoxelMap();
-		Maps[Z]->Map.Emplace(InIndex, InItem);
+		const int32 Size = InIndex.Z / SplitSize;
+		InIndex.Z %= SplitSize;
+		if(Maps.Num() < Size + 1) Maps.SetNumZeroed(Size + 1);
+		if(!Maps[Size]) Maps[Size] = new FVoxelMap();
+		Maps[Size]->Map.Emplace(InIndex, InItem);
 	}
 
 	void Remove(FIndex InIndex)
 	{
-		const int32 Z = InIndex.Z / SizeZ;
-		InIndex.Z %= SizeZ;
-		Maps[Z]->Map.Remove(InIndex);
+		const int32 Size = InIndex.Z / SplitSize;
+		InIndex.Z %= SplitSize;
+		Maps[Size]->Map.Remove(InIndex);
 	}
 
 	void Clear()
@@ -753,7 +753,7 @@ public:
 		TopographyDatas = TEXT("");
 		PickUpDatas = TArray<FPickUpSaveData>();
 		AuxiliaryDatas = TArray<FVoxelAuxiliarySaveData>();
-		bGenerated = false;
+		bChanged = false;
 	}
 
 public:
@@ -773,7 +773,7 @@ public:
 	TArray<FVoxelAuxiliarySaveData> AuxiliaryDatas;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
-	bool bGenerated;
+	bool bChanged;
 
 public:
 	virtual void MakeSaved() override
@@ -829,7 +829,7 @@ public:
 		ChunkSize = FVector2D(16.f);
 		
 		WorldSize = FVector2D(-1.f);
-		WorldRange = FVector2D(15.f);
+		WorldRange = FVector2D(30.f);
 
 		SeaLevel = 32;
 		SkyHeight = 100;
@@ -946,20 +946,11 @@ public:
 
 	virtual void SetChunkData(FIndex InChunkIndex, FVoxelChunkSaveData* InChunkData) { }
 	
-	virtual bool IsChunkGenerated(FIndex InChunkIndex)
+	virtual bool IsChunkDataChanged(FIndex InChunkIndex)
 	{
 		if(const auto ChunkData = GetChunkData(InChunkIndex))
 		{
-			return ChunkData->bGenerated;
-		}
-		return false;
-	}
-	
-	virtual bool IsChunkHasVoxelData(FIndex InChunkIndex)
-	{
-		if(const auto ChunkData = GetChunkData(InChunkIndex))
-		{
-			return !ChunkData->VoxelDatas.IsEmpty();
+			return ChunkData->bChanged;
 		}
 		return false;
 	}

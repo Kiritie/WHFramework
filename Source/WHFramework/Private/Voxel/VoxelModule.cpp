@@ -76,30 +76,50 @@ UVoxelModule::UVoxelModule()
 	
 	ChunkSpawnDistance = 0.35f;
 	ChunkQueues = {
-		{ EVoxelWorldState::Spawning, FVoxelChunkQueues({
-			FVoxelChunkQueue(false, 100)
-		})}, { EVoxelWorldState::Destroying, FVoxelChunkQueues({
-			FVoxelChunkQueue(false, 10)
-		})}, { EVoxelWorldState::Generating, FVoxelChunkQueues({
-			FVoxelChunkQueue(false, 1)
-		})}, { EVoxelWorldState::MapLoading, FVoxelChunkQueues({
-			FVoxelChunkQueue(true, 100)
-		})}, { EVoxelWorldState::MapBuilding, FVoxelChunkQueues({
-			FVoxelChunkQueue(true, 100),
-			FVoxelChunkQueue(true, 100),
-			FVoxelChunkQueue(true, 100),
-			FVoxelChunkQueue(true, 100),
-			FVoxelChunkQueue(true, 100),
-			FVoxelChunkQueue(true, 100),
-			FVoxelChunkQueue(true, 100),
-			FVoxelChunkQueue(true, 100),
-			FVoxelChunkQueue(true, 100)
-		})}, { EVoxelWorldState::MeshSpawning, FVoxelChunkQueues({
-			FVoxelChunkQueue(true, 100),
-			FVoxelChunkQueue(false, 50)
-		})}, { EVoxelWorldState::MeshBuilding, FVoxelChunkQueues({
-			FVoxelChunkQueue(true, 100)
-		})}
+		{
+			EVoxelWorldState::Spawning, FVoxelChunkQueues({
+				FVoxelChunkQueue(false, 100)
+			}
+		)},
+		{
+			EVoxelWorldState::MapLoading, FVoxelChunkQueues({
+				FVoxelChunkQueue(true, 100)
+			}
+		)},
+		{
+			EVoxelWorldState::MapBuilding, FVoxelChunkQueues({
+				FVoxelChunkQueue(true, 100),
+				FVoxelChunkQueue(true, 100),
+				FVoxelChunkQueue(true, 100),
+				FVoxelChunkQueue(true, 100),
+				FVoxelChunkQueue(true, 100),
+				FVoxelChunkQueue(true, 100),
+				FVoxelChunkQueue(true, 100),
+				FVoxelChunkQueue(true, 100),
+				FVoxelChunkQueue(true, 100)
+			}
+		)},
+		{
+			EVoxelWorldState::MeshSpawning, FVoxelChunkQueues({
+				FVoxelChunkQueue(true, 100),
+				FVoxelChunkQueue(false, 10)
+			}
+		)},
+		{
+			EVoxelWorldState::MeshBuilding, FVoxelChunkQueues({
+				FVoxelChunkQueue(true, 100)
+			}
+		)},
+		{
+			EVoxelWorldState::Generating, FVoxelChunkQueues({
+				FVoxelChunkQueue(false, 1)
+			}
+		)},
+		{
+			EVoxelWorldState::Destroying, FVoxelChunkQueues({
+				FVoxelChunkQueue(false, 10)
+			}
+		)}
 	};
 
 	ChunkSpawnBatch = 0;
@@ -631,7 +651,7 @@ AVoxelChunk* UVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 	{
 		if(!Chunk->IsBuilded())
 		{
-			if(WorldData->IsChunkHasVoxelData(InIndex))
+			if(WorldData->IsChunkDataChanged(InIndex))
 			{
 				AddToChunkQueue(EVoxelWorldState::MapLoading, InIndex);
 			}
@@ -666,38 +686,6 @@ AVoxelChunk* UVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 	return Chunk;
 }
 
-void UVoxelModule::GenerateChunk(FIndex InIndex)
-{
-	if(AVoxelChunk* Chunk = GetChunkByIndex(InIndex))
-	{
-		Chunk->Generate(EPhase::Primary);
-	}
-}
-
-void UVoxelModule::DestroyChunk(FIndex InIndex)
-{
-	if(AVoxelChunk* Chunk = GetChunkByIndex(InIndex))
-	{
-		if(!Chunk->IsGenerated())
-		{
-			TArray<AVoxelChunk*> DestroyChunks;
-			Chunk->GetNeighbors().GenerateValueArray(DestroyChunks);
-			DestroyChunks.Add(Chunk);
-			for(auto Iter : DestroyChunks)
-			{
-				if(Iter && (Iter == Chunk || Iter->GetBatch() != Chunk->GetBatch()))
-				{
-					RemoveFromChunkQueue(EVoxelWorldState::MeshSpawning, Iter->GetIndex());
-					RemoveFromChunkQueue(EVoxelWorldState::MeshBuilding, Iter->GetIndex());
-					RemoveFromChunkQueue(EVoxelWorldState::Generating, Iter->GetIndex());
-				}
-			}
-		}
-		UObjectPoolModuleStatics::DespawnObject(Chunk);
-		ChunkMap.Remove(InIndex);
-	}
-}
-
 void UVoxelModule::LoadChunkMap(FIndex InIndex)
 {
 	if(AVoxelChunk* Chunk = GetChunkByIndex(InIndex))
@@ -727,6 +715,46 @@ void UVoxelModule::BuildChunkMesh(FIndex InIndex)
 	if(AVoxelChunk* Chunk = GetChunkByIndex(InIndex))
 	{
 		Chunk->BuildMesh();
+	}
+}
+
+void UVoxelModule::GenerateChunk(FIndex InIndex)
+{
+	if(AVoxelChunk* Chunk = GetChunkByIndex(InIndex))
+	{
+		Chunk->Generate(EPhase::Primary);
+	}
+}
+
+void UVoxelModule::SaveChunk(FIndex InIndex)
+{
+	if(AVoxelChunk* Chunk = GetChunkByIndex(InIndex))
+	{
+		Chunk->SaveData();
+	}
+}
+
+void UVoxelModule::DestroyChunk(FIndex InIndex)
+{
+	if(AVoxelChunk* Chunk = GetChunkByIndex(InIndex))
+	{
+		if(!Chunk->IsGenerated())
+		{
+			TArray<AVoxelChunk*> DestroyChunks;
+			Chunk->GetNeighbors().GenerateValueArray(DestroyChunks);
+			DestroyChunks.Add(Chunk);
+			for(auto Iter : DestroyChunks)
+			{
+				if(Iter && (Iter == Chunk || Iter->GetBatch() != Chunk->GetBatch()))
+				{
+					RemoveFromChunkQueue(EVoxelWorldState::MeshSpawning, Iter->GetIndex());
+					RemoveFromChunkQueue(EVoxelWorldState::MeshBuilding, Iter->GetIndex());
+					RemoveFromChunkQueue(EVoxelWorldState::Generating, Iter->GetIndex());
+				}
+			}
+		}
+		UObjectPoolModuleStatics::DespawnObject(Chunk);
+		ChunkMap.Remove(InIndex);
 	}
 }
 
@@ -764,7 +792,9 @@ void UVoxelModule::GenerateChunkQueues(bool bFromAgent, bool bForce)
 				}
 			}
 		}
-		ITER_ARRAY(DestroyQueue, Item, AddToChunkQueue(EVoxelWorldState::Destroying, Item);)
+		ITER_ARRAY(DestroyQueue, Item,
+			AddToChunkQueue(EVoxelWorldState::Destroying, Item);
+		)
 		WorldCenterIndex = GenerateIndex;
 		ChunkSpawnBatch++;
 		
