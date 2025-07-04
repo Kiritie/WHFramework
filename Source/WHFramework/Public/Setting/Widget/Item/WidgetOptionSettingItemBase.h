@@ -51,7 +51,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
 	UCommonButton* Btn_Next;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn))
+	bool bEditable;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn))
 	TArray<FString> OptionNames;
 
 public:
@@ -60,4 +63,10 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void SetOptionNames(const TArray<FString>& InOptionNames);
+
+	UFUNCTION(BlueprintPure)
+	int32 GetOptionIndex() const;
+
+	UFUNCTION(BlueprintCallable)
+	void SetOptionIndex(int32 InOptionIndex);
 };

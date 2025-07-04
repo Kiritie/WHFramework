@@ -6,6 +6,7 @@
 
 UWidgetOptionSettingItemBase::UWidgetOptionSettingItemBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
+	bEditable = false;
 }
 
 void UWidgetOptionSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -21,7 +22,14 @@ void UWidgetOptionSettingItemBase::OnSpawn_Implementation(UObject* InOwner, cons
 	{
 		OptionNames = InParams[1].GetPointerValueRef<TArray<FString>>();
 	}
+	if(InParams.IsValidIndex(2))
+	{
+		bEditable = InParams[2];
+	}
+
 	SetOptionNames(OptionNames);
+
+	TxtBox_Value->SetVisibility(bEditable ? ESlateVisibility::Visible : ESlateVisibility::HitTestInvisible);
 }
 
 void UWidgetOptionSettingItemBase::OnDespawn_Implementation(bool bRecovery)
@@ -85,9 +93,9 @@ void UWidgetOptionSettingItemBase::SetValue(const FParameter& InValue)
 	}
 	TxtBox_Value->SetText(FText::FromString(Value));
 	
-	const int32 Index = OptionNames.Find(GetValue());
-	Btn_Last->SetIsEnabled(Index > 0);
-	Btn_Next->SetIsEnabled(Index < OptionNames.Num() - 1);
+	const int32 Index = OptionNames.Find(Value);
+	Btn_Last->SetIsEnabledN(Index > 0);
+	Btn_Next->SetIsEnabledN(Index < OptionNames.Num() - 1);
 
 	Super::SetValue(InValue);
 }
@@ -98,5 +106,18 @@ void UWidgetOptionSettingItemBase::SetOptionNames(const TArray<FString>& InOptio
 	if(OptionNames.IsValidIndex(0))
 	{
 		SetValue(OptionNames[0]);
+	}
+}
+
+int32 UWidgetOptionSettingItemBase::GetOptionIndex() const
+{
+	return OptionNames.Find(GetValue());
+}
+
+void UWidgetOptionSettingItemBase::SetOptionIndex(int32 InOptionIndex)
+{
+	if(OptionNames.IsValidIndex(InOptionIndex))
+	{
+		SetValue(OptionNames[InOptionIndex]);
 	}
 }

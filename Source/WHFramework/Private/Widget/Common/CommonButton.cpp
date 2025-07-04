@@ -550,3 +550,9 @@ void UCommonButton::SetMinHeight(int32 InValue)
 {
 	MinHeight = InValue;
 }
+
+void UCommonButton::SetIsEnabledN(bool bEnable)
+{
+	SetRenderOpacity(bEnable ? 1.f : 0.5f);
+	SetVisibility(bEnable ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::HitTestInvisible);
+}

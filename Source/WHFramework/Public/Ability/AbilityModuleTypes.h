@@ -1203,6 +1203,11 @@ public:
 	FTransform BirthTransform;
 
 public:
+	virtual bool IsValid() const override
+	{
+		return AssetID.IsValid();
+	}
+	
 	virtual void MakeSaved() override
 	{
 		Super::MakeSaved();

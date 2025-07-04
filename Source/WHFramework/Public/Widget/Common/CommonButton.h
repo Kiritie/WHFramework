@@ -251,4 +251,7 @@ public:
 	virtual TArray<FParameter> GetWidgetParams() const { return WidgetParams; }
 
 	virtual TArray<FParameter> GetSpawnParams_Implementation() const override { return WidgetParams; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetIsEnabledN(bool bEnable);
 };
