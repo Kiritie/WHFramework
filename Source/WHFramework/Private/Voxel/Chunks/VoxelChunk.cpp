@@ -120,21 +120,14 @@ FSaveData* AVoxelChunk::ToData()
 	SaveData.Index = Index;
 	SaveData.bChanged = bChanged;
 
-	VoxelMaps.Iter([this](FVoxelItem& Item){
-		if(Item.IsValid())
-		{
-			if(bChanged)
+	if(bChanged)
+	{
+		VoxelMaps.Iter([this](FVoxelItem& Item){
+			if(Item.IsValid())
 			{
 				SaveData.VoxelDatas.Appendf(TEXT("%s|"), *Item.ToSaveData(false, true));
 			}
-			if(Item.Auxiliary)
-			{
-				SaveData.AuxiliaryDatas.Add(Item.Auxiliary->GetSaveDataRef<FVoxelAuxiliarySaveData>(true));
-			}
-		}
-	});
-	if(bChanged)
-	{
+		});
 		SaveData.VoxelDatas.RemoveFromEnd(TEXT("|"));
 
 		for(auto& Iter : TopographyMap)
@@ -143,10 +136,19 @@ FSaveData* AVoxelChunk::ToData()
 		}
 		SaveData.TopographyDatas.RemoveFromEnd(TEXT("|"));
 	}
+	else if(const auto ChunkData = Module->GetWorldData().GetChunkData(Index))
+	{
+		SaveData.VoxelDatas = ChunkData->VoxelDatas;
+		SaveData.TopographyDatas = ChunkData->TopographyDatas;
+	}
 
 	for(auto& Iter : SceneActorMap)
 	{
-		if(AAbilityPickUpBase* PickUp = Cast<AAbilityPickUpBase>(Iter.Value))
+		if(AVoxelAuxiliary* Auxiliary = Cast<AVoxelAuxiliary>(Iter.Value))
+		{
+			SaveData.AuxiliaryDatas.Add(Auxiliary->GetSaveDataRef<FVoxelAuxiliarySaveData>(true));
+		}
+		else if(AAbilityPickUpBase* PickUp = Cast<AAbilityPickUpBase>(Iter.Value))
 		{
 			SaveData.PickUpDatas.Add(PickUp->GetSaveDataRef<FPickUpSaveData>(true));
 		}

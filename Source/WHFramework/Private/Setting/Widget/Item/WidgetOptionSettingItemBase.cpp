@@ -39,7 +39,7 @@ void UWidgetOptionSettingItemBase::OnDespawn_Implementation(bool bRecovery)
 	TxtBox_Value->OnTextChanged.RemoveDynamic(this, &UWidgetOptionSettingItemBase::OnTextBoxValueChanged);
 	Btn_Last->OnClicked().RemoveAll(this);
 	Btn_Next->OnClicked().RemoveAll(this);
-
+	
 	OptionNames.Empty();
 }
 

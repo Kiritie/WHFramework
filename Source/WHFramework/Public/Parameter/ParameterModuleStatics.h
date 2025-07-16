@@ -46,76 +46,76 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Parameter
 public:
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (AdvancedDisplay = "InDescription"), Category = "ParameterModuleStatics")
 	static FParameter MakeIntegerParameter(int32 InValue, const FText InDescription = FText::GetEmpty());
 
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (AdvancedDisplay = "InDescription"), Category = "ParameterModuleStatics")
 	static FParameter MakeFloatParameter(float InValue, const FText InDescription = FText::GetEmpty());
 
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (AdvancedDisplay = "InDescription"), Category = "ParameterModuleStatics")
 	static FParameter MakeByteParameter(uint8 InValue, const FText InDescription = FText::GetEmpty());
 
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (AdvancedDisplay = "InDescription"), Category = "ParameterModuleStatics")
 	static FParameter MakeStringParameter(const FString& InValue, const FText InDescription = FText::GetEmpty());
 	
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (AdvancedDisplay = "InDescription"), Category = "ParameterModuleStatics")
 	static FParameter MakeNameParameter(const FName InValue, const FText InDescription = FText::GetEmpty());
 
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (AdvancedDisplay = "InDescription"), Category = "ParameterModuleStatics")
 	static FParameter MakeTextParameter(const FText InValue, const FText InDescription = FText::GetEmpty());
 
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (AdvancedDisplay = "InDescription"), Category = "ParameterModuleStatics")
 	static FParameter MakeBooleanParameter(bool InValue, const FText InDescription = FText::GetEmpty());
 
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (AdvancedDisplay = "InDescription"), Category = "ParameterModuleStatics")
 	static FParameter MakeVectorParameter(const FVector InValue, const FText InDescription = FText::GetEmpty());
 
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (AdvancedDisplay = "InDescription"), Category = "ParameterModuleStatics")
 	static FParameter MakeRotatorParameter(const FRotator InValue, const FText InDescription = FText::GetEmpty());
 
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (AdvancedDisplay = "InDescription"), Category = "ParameterModuleStatics")
 	static FParameter MakeTransformParameter(const FTransform InValue, const FText InDescription = FText::GetEmpty());
 
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (AdvancedDisplay = "InDescription"), Category = "ParameterModuleStatics")
 	static FParameter MakeColorParameter(const FColor InValue, const FText InDescription = FText::GetEmpty());
 
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (AdvancedDisplay = "InDescription"), Category = "ParameterModuleStatics")
 	static FParameter MakeLinearColorParameter(const FLinearColor InValue, const FText& InDescription = FText::GetEmpty());
 
-	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InValue"), Category = "ParameterModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InValue", AdvancedDisplay = "InDescription"), Category = "ParameterModuleStatics")
 	static FParameter MakeKeyParameter(const FKey& InValue, const FText InDescription = FText::GetEmpty());
 
-	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InValue"), Category = "ParameterModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InValue", AdvancedDisplay = "InDescription"), Category = "ParameterModuleStatics")
 	static FParameter MakeTagParameter(const FGameplayTag& InValue, const FText InDescription = FText::GetEmpty());
 
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (AdvancedDisplay = "InDescription"), Category = "ParameterModuleStatics")
 	static FParameter MakeTagsParameter(const FGameplayTagContainer& InValue, const FText InDescription = FText::GetEmpty());
 
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (AdvancedDisplay = "InDescription"), Category = "ParameterModuleStatics")
 	static FParameter MakeBrushParameter(const FSlateBrush& InValue, const FText InDescription = FText::GetEmpty());
 
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (AdvancedDisplay = "InDescription"), Category = "ParameterModuleStatics")
 	static FParameter MakeAssetIDParameter(const FPrimaryAssetId& InValue, const FText InDescription = FText::GetEmpty());
 
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (AdvancedDisplay = "InDescription"), Category = "ParameterModuleStatics")
 	static FParameter MakeClassParameter(UClass* InValue, const FText InDescription = FText::GetEmpty());
 
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (AdvancedDisplay = "InDescription"), Category = "ParameterModuleStatics")
 	static FParameter MakeClassPtrParameter(const TSoftClassPtr<UObject> InValue, const FText InDescription = FText::GetEmpty());
 
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (AdvancedDisplay = "InDescription"), Category = "ParameterModuleStatics")
 	static FParameter MakeObjectParameter(UObject* InValue, const FText InDescription = FText::GetEmpty());
 
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (AdvancedDisplay = "InDescription"), Category = "ParameterModuleStatics")
 	static FParameter MakeObjectInstParameter(UObject* InValue, const FText InDescription = FText::GetEmpty());
 
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (AdvancedDisplay = "InDescription"), Category = "ParameterModuleStatics")
 	static FParameter MakeObjectPtrParameter(const TSoftObjectPtr<UObject> InValue, const FText InDescription = FText::GetEmpty());
 
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (AdvancedDisplay = "InDescription"), Category = "ParameterModuleStatics")
 	static FParameter MakeActorPtrParameter(const TSoftObjectPtr<AActor> InValue, const FText InDescription = FText::GetEmpty());
 
-	UFUNCTION(BlueprintPure, Category = "ParameterModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (AdvancedDisplay = "InDescription"), Category = "ParameterModuleStatics")
 	static FParameter MakeDelegateParameter(const FSimpleDynamicDelegate& InValue, const FText InDescription = FText::GetEmpty());
 
 public:
