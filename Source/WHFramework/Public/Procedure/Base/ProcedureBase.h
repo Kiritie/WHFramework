@@ -215,6 +215,16 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void ResetCameraView();
 	/**
+	* 获取操作目标
+	*/
+	template<class T>
+	T* GetOperationTarget() const
+	{
+		return Cast<T>(GetOperationTarget(T::StaticClass()));
+	}
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	AActor* GetOperationTarget(TSubclassOf<AActor> InClass) const;
+	/**
 	* 设置操作目标
 	*/
 	UFUNCTION(BlueprintCallable)

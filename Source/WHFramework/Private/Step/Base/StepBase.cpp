@@ -411,6 +411,11 @@ void UStepBase::ResetCameraView()
 	}
 }
 
+AActor* UStepBase::GetOperationTarget(TSubclassOf<AActor> InClass) const
+{
+	return OperationTarget.LoadSynchronous();
+}
+
 void UStepBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCameraView)
 {
 	OperationTarget = InOperationTarget;
