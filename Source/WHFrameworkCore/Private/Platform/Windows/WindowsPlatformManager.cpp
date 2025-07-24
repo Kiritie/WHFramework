@@ -12,7 +12,6 @@
 #include "Windows/MinWindows.h"
 #endif
 #include<windows.h>
-#include <string>
 #include <shellapi.h>
 #include <shlobj.h>
 

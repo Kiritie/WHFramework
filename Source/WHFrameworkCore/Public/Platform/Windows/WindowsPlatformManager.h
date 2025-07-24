@@ -1,5 +1,8 @@
 
 #pragma once
+#include <string>
+#include <vector>
+
 #include "SceneTypes.h"
 #include "WHFrameworkCoreTypes.h"
 #include "Main/MainTypes.h"
