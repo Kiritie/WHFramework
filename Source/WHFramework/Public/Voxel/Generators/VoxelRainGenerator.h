@@ -29,13 +29,11 @@ protected:
 	int32 Seed;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 MaxNum;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float SpawnRate;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float MaxDepth;
+	float MaxDistance;
 
-	TSet<FIndex> Waters;
+private:
+	TSet<FIndex> _Waters;
 };

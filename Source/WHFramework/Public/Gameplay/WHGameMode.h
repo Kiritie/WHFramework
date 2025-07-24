@@ -7,6 +7,7 @@
 #include "Common/Base/WHActor.h"
 #include "WHGameMode.generated.h"
 
+class AWHGameManager;
 /**
  * 游戏模式基类
  */
@@ -23,11 +24,11 @@ public:
 public:
 	virtual void OnInitialize_Implementation() override;
 
-	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
+	virtual void OnPreparatory_Implementation() override;
 
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
-	virtual void OnTermination_Implementation(EPhase InPhase) override;
+	virtual void OnTermination_Implementation() override;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "WHActor")
@@ -62,4 +63,43 @@ protected:
 
 public:
 	virtual void Tick(float DeltaSeconds) override;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Manager
+
+protected:
+	UPROPERTY(EditAnywhere, Category = "Manager")
+	TSubclassOf<AWHGameManager> DefaultManagerClass;
+
+	UPROPERTY(VisibleAnywhere, Category = "Manager")
+	TArray<AWHGameManager*> Managers;
+
+private:
+	TMap<FName, AWHGameManager*> ManagerMap;
+
+public:
+	template<class T>
+	T* GetManagerByClass(TSubclassOf<AWHGameManager> InClass = T::StaticClass())
+	{
+		return Cast<T>(GetManagerByClass(InClass));
+	}
+
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"))
+	AWHGameManager* GetManagerByClass(TSubclassOf<AWHGameManager> InClass);
+
+	template<class T>
+	T* GetManagerByName(const FName InName)
+	{
+		return Cast<T>(GetManagerByName(InName));
+	}
+
+	UFUNCTION(BlueprintPure)
+	AWHGameManager* GetManagerByName(const FName InName) const;
+
+public:
+	UFUNCTION(BlueprintCallable)
+	void AddManagerToList(AWHGameManager* InManager);
+
+	UFUNCTION(BlueprintCallable)
+	void RemoveManagerFromList(AWHGameManager* InManager);
 };

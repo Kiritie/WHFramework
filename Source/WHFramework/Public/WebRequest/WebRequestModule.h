@@ -6,7 +6,6 @@
 #include "WebRequest/WebRequestManager.h"
 #include "Interfaces/IHttpRequest.h"
 #include "Main/Base/ModuleBase.h"
-#include "Parameter/ParameterModuleTypes.h"
 
 #include "WebRequestModule.generated.h"
 
@@ -53,7 +52,7 @@ protected:
 	bool bLocalMode;
 
 	UPROPERTY(EditAnywhere)
-	FString ServerURL;
+	FString ServerIP;
 
 	UPROPERTY(EditAnywhere)
 	int32 ServerPort;
@@ -62,27 +61,39 @@ public:
 	bool IsLocalMode() const { return bLocalMode; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetLocalMode(bool bInLocalMode) { this->bLocalMode = bInLocalMode; }
+	void SetLocalMode(bool bInLocalMode);
 
 	UFUNCTION(BlueprintPure)
-	FString GetServerURL() const;
+	FString GetServerIP() const { return ServerIP; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetServerURL(const FString& InServerURL) { this->ServerURL = InServerURL; }
+	void SetServerIP(const FString& InServerIP);
 
 	UFUNCTION(BlueprintPure)
 	int32 GetServerPort() const { return ServerPort; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetServerPort(int32 InServerPort) { this->ServerPort = InServerPort; }
+	void SetServerPort(int32 InServerPort);
+
+	UFUNCTION(BlueprintPure)
+	FString GetServerURL() const;
+
+	UFUNCTION(BlueprintCallable)
+	void SetServerURL(const FString& InServerURL);
 
 protected:
 	UPROPERTY(EditAnywhere, Instanced)
 	TArray<UWebInterfaceBase*> WebInterfaces;
 
+	UPROPERTY(EditAnywhere)
+	TArray<FWebRequestConfig> WebRequestConfigs;
+
 protected:
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(Transient)
 	TMap<FName, UWebInterfaceBase*> WebInterfaceMap;
+
+	UPROPERTY(Transient)
+	TMap<FName, FWebRequestConfig> WebRequestConfigMap;
 
 public:
 	UFUNCTION(BlueprintPure)
@@ -121,6 +132,25 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void ClearAllWebInterface();
 
+	UFUNCTION(BlueprintPure)
+	bool HasWebRequestConfig(const FName InName);
+
+	UFUNCTION(BlueprintPure)
+	FWebRequestConfig GetWebRequestConfig(const FName InName);
+
+	FWebRequestConfig CreateWebRequestConfig(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>* InParams = nullptr, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent(), EWebRequestTriggerType InTriggerType = EWebRequestTriggerType::None, float InTriggerTime = 0.f);
+
+	FWebRequestConfig CreateWebRequestConfig(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent(), EWebRequestTriggerType InTriggerType = EWebRequestTriggerType::None, float InTriggerTime = 0.f);
+
+	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Create Web Request Config"))
+	FWebRequestConfig K2_CreateWebRequestConfig(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent, EWebRequestTriggerType InTriggerType, float InTriggerTime);
+
+	UFUNCTION(BlueprintCallable)
+	bool ClearWebRequestConfig(const FName InName);
+
+	UFUNCTION(BlueprintCallable)
+	void ClearAllWebRequestConfig();
+
 public:
 	bool SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>* InParams = nullptr, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent());
 
@@ -128,6 +158,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Send Web Request"))
 	bool K2_SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent);
+
+	UFUNCTION(BlueprintCallable)
+	bool SendWebRequestByConfig(const FName InName);
 
 protected:
 	void OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, UWebInterfaceBase* InWebInterface, const FString InContent, const TArray<FParameter> InParams);

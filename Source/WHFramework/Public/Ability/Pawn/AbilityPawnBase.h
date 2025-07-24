@@ -52,11 +52,11 @@ public:
 public:
 	virtual void OnInitialize_Implementation() override;
 
-	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
+	virtual void OnPreparatory_Implementation() override;
 
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
-	virtual void OnTermination_Implementation(EPhase InPhase) override;
+	virtual void OnTermination_Implementation() override;
 
 protected:
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
@@ -132,6 +132,11 @@ public:
 	virtual void OnSelectItem(const FAbilityItem& InItem) override;
 
 	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
+
+protected:
+	virtual bool OnGenerateVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult) override;
+
+	virtual bool OnDestroyVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult) override;
 
 protected:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
@@ -249,7 +254,7 @@ public:
 	virtual bool IsEnemy(IAbilityPawnInterface* InTarget) const override;
 
 	UFUNCTION(BlueprintPure)
-	virtual bool IsActive(bool bNeedNotDead = false) const override;
+	virtual bool IsActive() const override;
 	
 	UFUNCTION(BlueprintPure)
 	virtual bool IsDead(bool bCheckDying = true) const override;

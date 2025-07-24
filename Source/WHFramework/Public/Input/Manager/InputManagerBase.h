@@ -9,7 +9,7 @@
 
 class UInputComponentBase;
 
-UCLASS()
+UCLASS(EditInlineNew)
 class WHFRAMEWORK_API UInputManagerBase : public UWHObject, public IInputManagerInterface
 {
 	GENERATED_BODY()
@@ -61,9 +61,15 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FName InputManagerName;
 
+	UPROPERTY(BlueprintReadOnly)
+	int32 LocalPlayerIndex;
+ 
 public:
 	UFUNCTION(BlueprintPure)
 	FName GetInputManagerName() const { return InputManagerName; }
+
+	UFUNCTION(BlueprintPure)
+	int32 GetLocalPlayerIndex() const { return LocalPlayerIndex; }
 
 	UFUNCTION(BlueprintNativeEvent)
 	int32 GetNativeInputPriority() const override;

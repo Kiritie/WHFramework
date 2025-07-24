@@ -6,7 +6,7 @@
 
 //////////////////////////////////////////////////////////////////////////
 // GUID
-namespace VigmaPrivate
+namespace AssetPrivate
 {
 	FGuid FGUIDHelper::EmptyGUID = FGuid();
 

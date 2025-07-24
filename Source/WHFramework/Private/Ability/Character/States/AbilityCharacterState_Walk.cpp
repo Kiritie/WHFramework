@@ -3,6 +3,7 @@
 #include "Ability/Character/States/AbilityCharacterState_Walk.h"
 
 #include "Ability/Character/AbilityCharacterBase.h"
+#include "Ability/Character/States/AbilityCharacterState_Fall.h"
 #include "Ability/Effects/EffectBase.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
@@ -39,20 +40,24 @@ void UAbilityCharacterState_Walk::OnEnter(UFiniteStateBase* InLastState, const T
 
 	if(InLastState && InLastState->IsA<UAbilityCharacterState_Fall>())
 	{
-		UEffectBase* Effect = UObjectPoolModuleStatics::SpawnObject<UEffectBase>();
+		const float FallHeight = Cast<UAbilityCharacterState_Fall>(InLastState)->GetFallHeight();
+		if(FallHeight > 350.f)
+		{
+			UEffectBase* Effect = UObjectPoolModuleStatics::SpawnObject<UEffectBase>();
 
-		FGameplayModifierInfo ModifierInfo;
-		ModifierInfo.Attribute = GET_GAMEPLAYATTRIBUTE(UVitalityAttributeSetBase, FallDamage);
-		ModifierInfo.ModifierOp = EGameplayModOp::Override;
-		ModifierInfo.ModifierMagnitude = FGameplayEffectModifierMagnitude(1.f);
+			FGameplayModifierInfo ModifierInfo;
+			ModifierInfo.Attribute = GET_GAMEPLAYATTRIBUTE(UVitalityAttributeSetBase, FallDamage);
+			ModifierInfo.ModifierOp = EGameplayModOp::Override;
+			ModifierInfo.ModifierMagnitude = FGameplayEffectModifierMagnitude(1.f);
 
-		Effect->Modifiers.Add(ModifierInfo);
+			Effect->Modifiers.Add(ModifierInfo);
 		
-		FGameplayEffectContextHandle EffectContext = Character->GetAbilitySystemComponent()->MakeEffectContext();
-		EffectContext.AddSourceObject(Character);
-		Character->GetAbilitySystemComponent()->ApplyGameplayEffectToSelf(Effect, 0, EffectContext);
+			FGameplayEffectContextHandle EffectContext = Character->GetAbilitySystemComponent()->MakeEffectContext();
+			EffectContext.AddSourceObject(Character);
+			Character->GetAbilitySystemComponent()->ApplyGameplayEffectToSelf(Effect, 0, EffectContext);
 
-		UObjectPoolModuleStatics::DespawnObject(Effect);
+			UObjectPoolModuleStatics::DespawnObject(Effect);
+		}
 	}
 }
 

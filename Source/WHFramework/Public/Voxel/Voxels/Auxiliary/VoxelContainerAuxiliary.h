@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "VoxelInteractAuxiliary.h"
+#include "VoxelSwitchAuxiliary.h"
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
 #include "VoxelContainerAuxiliary.generated.h"
 
@@ -11,7 +11,7 @@ class UVoxel;
 /**
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelContainerAuxiliary : public AVoxelInteractAuxiliary, public IAbilityInventoryAgentInterface
+class WHFRAMEWORK_API AVoxelContainerAuxiliary : public AVoxelSwitchAuxiliary, public IAbilityInventoryAgentInterface
 {
 	GENERATED_BODY()
 	

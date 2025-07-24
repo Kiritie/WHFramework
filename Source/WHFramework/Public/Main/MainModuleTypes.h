@@ -34,35 +34,6 @@ public: \
 	static ModuleClass& Get(bool bInEditor = false, bool bForce = false); \
 	static ModuleClass* GetPtr(bool bInEditor = false, bool bForce = false);
 
-#define GENERATED_MODULE(ModuleClass) \
-protected: \
-	static ModuleClass* Instance; \
-	static ModuleClass* InstanceEditor; \
-public: \
-	static bool IsValid(bool bInEditor = false); \
-	static ModuleClass& Get(bool bInEditor = false); \
-	static ModuleClass* GetPtr(bool bInEditor = false); \
-
-#define TERMINATION_MAIN_MODULE(ModuleClass) \
-	if(ModuleClass::Instance == this) \
-	{ \
-		ModuleClass::Instance = nullptr; \
-	} \
-	if(ModuleClass::InstanceEditor == this) \
-	{ \
-		ModuleClass::InstanceEditor = nullptr; \
-	} \
-
-#define TERMINATION_MODULE(ModuleClass) \
-	if(ModuleClass::Instance == this) \
-	{ \
-		ModuleClass::Instance = nullptr; \
-	} \
-	if(ModuleClass::InstanceEditor == this) \
-	{ \
-		ModuleClass::InstanceEditor = nullptr; \
-	} \
-
 #define IMPLEMENTATION_MAIN_MODULE(ModuleClass) \
 ModuleClass* ModuleClass::Instance = nullptr; \
 ModuleClass* ModuleClass::InstanceEditor = nullptr; \
@@ -94,6 +65,25 @@ ModuleClass* ModuleClass::GetPtr(bool bInEditor, bool bForce) \
 	} \
 }
 
+#define TERMINATION_MAIN_MODULE(ModuleClass) \
+	if(ModuleClass::Instance == this) \
+	{ \
+		ModuleClass::Instance = nullptr; \
+	} \
+	if(ModuleClass::InstanceEditor == this) \
+	{ \
+		ModuleClass::InstanceEditor = nullptr; \
+	} \
+
+#define GENERATED_MODULE(ModuleClass) \
+protected: \
+	static ModuleClass* Instance; \
+	static ModuleClass* InstanceEditor; \
+public: \
+	static bool IsValid(bool bInEditor = false); \
+	static ModuleClass& Get(bool bInEditor = false); \
+	static ModuleClass* GetPtr(bool bInEditor = false); \
+
 #define IMPLEMENTATION_MODULE(ModuleClass) \
 ModuleClass* ModuleClass::Instance = nullptr; \
 ModuleClass* ModuleClass::InstanceEditor = nullptr; \
@@ -124,3 +114,13 @@ ModuleClass* ModuleClass::GetPtr(bool bInEditor) \
 		return InstanceEditor; \
 	} \
 }
+
+#define TERMINATION_MODULE(ModuleClass) \
+	if(ModuleClass::Instance == this) \
+	{ \
+		ModuleClass::Instance = nullptr; \
+	} \
+	if(ModuleClass::InstanceEditor == this) \
+	{ \
+		ModuleClass::InstanceEditor = nullptr; \
+	} \

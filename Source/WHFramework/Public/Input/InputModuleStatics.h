@@ -48,16 +48,16 @@ public:
 
 public:
 	template<class T>
-	static T* GetInputManager()
+	static T* GetInputManager(int32 InPlayerIndex = 0)
 	{
-		return Cast<T>(GetInputManager(T::StaticClass()));
+		return Cast<T>(GetInputManager(T::StaticClass(), InPlayerIndex));
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "InputModuleStatics")
-	static UInputManagerBase* GetInputManager(TSubclassOf<UInputManagerBase> InClass);
+	static UInputManagerBase* GetInputManager(TSubclassOf<UInputManagerBase> InClass, int32 InPlayerIndex = 0);
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "InputModuleStatics")
-	static UInputManagerBase* GetInputManagerByName(const FName InName, TSubclassOf<UInputManagerBase> InClass = nullptr);
+	static UInputManagerBase* GetInputManagerByName(const FName InName, int32 InPlayerIndex = 0, TSubclassOf<UInputManagerBase> InClass = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	// InputShortcuts
@@ -83,6 +83,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")
 	static void AddTouchMapping(const FInputTouchMapping& InTouchMapping);
 
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InTag"), Category = "InputModuleStatics")
+	static FName GetPlayerKeyMappingName(const FGameplayTag& InTag);
+
 	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")
 	static void AddPlayerKeyMapping(const FName InName, const FKey InKey, int32 InSlot = 0, int32 InPlayerIndex = 0);
 	
@@ -98,6 +101,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "InputModuleStatics")
 	static bool IsPlayerMappedKeyByName(const FName InName, const FKey& InKey, int32 InPlayerIndex = 0);
 
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"), Category = "InputModuleStatics")
+	static bool IsPlayerMappedKeyByTag(const FGameplayTag& InTag, const FKey& InKey, int32 InPlayerIndex = 0);
+
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InTag"), Category = "InputModuleStatics")
 	static const UInputActionBase* GetInputActionByTag(const FGameplayTag& InTag, bool bEnsured = true);
 
@@ -110,6 +116,12 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// InputMode
 public:
+	UFUNCTION(BlueprintPure, Category = "InputModuleStatics")
+	static EInputMode GetNativeInputMode();
+
+	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")
+	static void SetNativeInputMode(EInputMode InInputMode);
+
 	UFUNCTION(BlueprintPure, Category = "InputModuleStatics")
 	static EInputMode GetGlobalInputMode();
 

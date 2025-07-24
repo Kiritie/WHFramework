@@ -8,7 +8,7 @@
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Components/VoxelMeshComponent.h"
-#include "Voxel/Datas/VoxelData.h"
+#include "Voxel/Voxels/Data/VoxelData.h"
 
 AAbilityPickUpVoxel::AAbilityPickUpVoxel()
 {

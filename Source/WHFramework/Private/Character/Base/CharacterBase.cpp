@@ -28,6 +28,8 @@
 ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer) :
 	Super(ObjectInitializer)
 {
+	PrimaryActorTick.bCanEverTick = true;
+
 	bReplicates = true;
 
 	GetCapsuleComponent()->InitCapsuleSize(30.f, 89.f);
@@ -65,6 +67,7 @@ ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer) :
 	DefaultController = nullptr;
 
 	bInitialized = false;
+	bBlockAllInput = false;
 
 	ActorID = FGuid::NewGuid();
 	bVisible = true;
@@ -79,7 +82,20 @@ void ACharacterBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FPara
 	
 	if(InParams.IsValidIndex(0))
 	{
-		ActorID = InParams[0];
+		switch(InParams[0].GetParameterType())
+		{
+			case EParameterType::Transform:
+			{
+				SetActorTransform(InParams[0]);
+				break;
+			}
+			case EParameterType::Guid:
+			{
+				ActorID = InParams[0];
+				break;
+			}
+			default: break;
+		}
 	}
 	if(InParams.IsValidIndex(1))
 	{
@@ -120,7 +136,7 @@ void ACharacterBase::OnInitialize_Implementation()
 	Anim = Cast<UCharacterAnimBase>(GetMesh()->GetAnimInstance());
 }
 
-void ACharacterBase::OnPreparatory_Implementation(EPhase InPhase)
+void ACharacterBase::OnPreparatory_Implementation()
 {
 	
 }
@@ -129,7 +145,7 @@ void ACharacterBase::OnRefresh_Implementation(float DeltaSeconds)
 {
 	if(AMainModule::IsExistModuleByClass<UVoxelModule>())
 	{
-		if(AVoxelChunk* Chunk = UVoxelModuleStatics::FindChunkByLocation(GetActorLocation()))
+		if(AVoxelChunk* Chunk = UVoxelModuleStatics::GetChunkByLocation(GetActorLocation()))
 		{
 			Chunk->AddSceneActor(this);
 		}
@@ -140,7 +156,7 @@ void ACharacterBase::OnRefresh_Implementation(float DeltaSeconds)
 	}
 }
 
-void ACharacterBase::OnTermination_Implementation(EPhase InPhase)
+void ACharacterBase::OnTermination_Implementation()
 {
 	USceneModuleStatics::RemoveSceneActor(this);
 }
@@ -177,7 +193,7 @@ void ACharacterBase::BeginPlay()
 		{
 			Execute_OnInitialize(this);
 		}
-		Execute_OnPreparatory(this, EPhase::All);
+		Execute_OnPreparatory(this);
 	}
 }
 
@@ -187,7 +203,7 @@ void ACharacterBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	if(Execute_IsUseDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this, EPhase::All);
+		Execute_OnTermination(this);
 	}
 }
 
@@ -330,16 +346,6 @@ void ACharacterBase::SetUseControllerRotation(bool bValue)
 {
 	bUseControllerRotationYaw = bValue;
 	GetCharacterMovement()->bOrientRotationToMovement = !bValue;
-}
-
-bool ACharacterBase::OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
-{
-	return IVoxelAgentInterface::OnGenerateVoxel(InVoxelHitResult);
-}
-
-bool ACharacterBase::OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
-{
-	return IVoxelAgentInterface::OnDestroyVoxel(InVoxelHitResult);
 }
 
 void ACharacterBase::PlaySound(USoundBase* InSound, float InVolume, bool bMulticast)

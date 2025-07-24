@@ -5,6 +5,8 @@
 
 #include "VoxelAgentInterface.generated.h"
 
+class AVoxelEntityPreview;
+
 UINTERFACE()
 class WHFRAMEWORK_API UVoxelAgentInterface : public UInterface
 {
@@ -15,17 +17,38 @@ class WHFRAMEWORK_API IVoxelAgentInterface
 {
 	GENERATED_BODY()
 
-public:
-	virtual bool OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult);
-
-	virtual bool OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult);
-
-	virtual bool OnInteractVoxel(const FVoxelHitResult& InVoxelHitResult, EInputInteractAction InInteractAction);
+	friend class UVoxel;
 
 public:
-	virtual FVector GetVoxelAgentLocation() const = 0;
+	IVoxelAgentInterface();
 
-	virtual FPrimaryAssetId GetGenerateVoxelID() const { return FPrimaryAssetId(); };
+public:
+	virtual bool InteractVoxel(EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult);
 
-	virtual void SetGenerateVoxelID(const FPrimaryAssetId& InGenerateVoxelID) { };
+	virtual void UnInteractVoxel(EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent);
+
+protected:
+	virtual bool OnGenerateVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult);
+
+	virtual bool OnDestroyVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult);
+
+public:
+	virtual FVector GetVoxelAgentLocation() const { return FVector::ZeroVector; }
+
+	virtual FPrimaryAssetId GetGenerateVoxelID() const { return FPrimaryAssetId(); }
+
+	virtual void SetGenerateVoxelID(const FPrimaryAssetId& InGenerateVoxelID) { }
+
+	virtual EVoxelGenerateToolType GetGenerateToolType() const { return EVoxelGenerateToolType::None; }
+
+	virtual void SetGenerateToolType(EVoxelGenerateToolType InGenerateToolType) { }
+
+	virtual float GetDestroyVoxelRate() const { return 1.f; }
+
+protected:
+	bool bCanGenerateVoxel;
+	FVoxelItem GenerateVoxelItem;
+	TObjectPtr<AVoxelEntityPreview> GeneratePreviewVoxel;
+	
+	FVoxelItem DestroyVoxelItem;
 };

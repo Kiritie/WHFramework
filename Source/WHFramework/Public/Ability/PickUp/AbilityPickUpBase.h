@@ -5,8 +5,6 @@
 #include "Ability/AbilityModuleTypes.h"
 #include "Common/Base/WHActor.h"
 #include "Common/Interaction/InteractionAgentInterface.h"
-#include "SaveGame/Base/SaveDataAgentInterface.h"
-#include "Scene/Actor/SceneActorInterface.h"
 
 #include "AbilityPickUpBase.generated.h"
 

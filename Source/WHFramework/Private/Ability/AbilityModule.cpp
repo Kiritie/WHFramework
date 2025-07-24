@@ -5,6 +5,7 @@
 
 #include "Ability/Actor/AbilityActorBase.h"
 #include "Ability/Actor/AbilityActorDataBase.h"
+#include "Ability/Attributes/VitalityAttributeSetBase.h"
 #include "Ability/Item/AbilityItemBase.h"
 #include "Ability/Item/Equip/AbilityEquipDataBase.h"
 #include "Ability/Item/Prop/AbilityPropDataBase.h"
@@ -27,6 +28,11 @@ UAbilityModule::UAbilityModule()
 {
 	ModuleName = FName("AbilityModule");
 	ModuleDisplayName = FText::FromString(TEXT("Ability Module"));
+	
+	AttributeColorMap.Add(GET_GAMEPLAYATTRIBUTE(UVitalityAttributeSetBase, PhysicsDamage), FLinearColor::Red);
+	AttributeColorMap.Add(GET_GAMEPLAYATTRIBUTE(UVitalityAttributeSetBase, MagicDamage), FLinearColor(0.45f, 0.f, 1.f));
+	AttributeColorMap.Add(GET_GAMEPLAYATTRIBUTE(UVitalityAttributeSetBase, FallDamage), FLinearColor::Red);
+	AttributeColorMap.Add(GET_GAMEPLAYATTRIBUTE(UVitalityAttributeSetBase, RealDamage), FLinearColor::White);
 }
 
 UAbilityModule::~UAbilityModule()
@@ -78,6 +84,20 @@ void UAbilityModule::OnUnPause()
 void UAbilityModule::OnTermination(EPhase InPhase)
 {
 	Super::OnTermination(InPhase);
+}
+
+FLinearColor UAbilityModule::GetAttributeColor(const FGameplayAttribute& InAttribute) const
+{
+	if(AttributeColorMap.Contains(InAttribute))
+	{
+		return AttributeColorMap[InAttribute];
+	}
+	return FLinearColor();
+}
+
+void UAbilityModule::SetAttributeColor(const FGameplayAttribute& InAttribute, const FLinearColor& InColor)
+{
+	AttributeColorMap.Emplace(InAttribute, InColor);
 }
 
 AAbilityItemBase* UAbilityModule::SpawnAbilityItem(FAbilityItem InItem, FVector InLocation, FRotator InRotation, ISceneContainerInterface* InContainer)

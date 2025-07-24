@@ -5,7 +5,6 @@
 #include "Editor.h"
 #include "IAssetViewport.h"
 #include "LevelEditor.h"
-#include "LevelEditorViewport.h"
 #include "SceneViewExtension.h"
 #include "Selection.h"
 #include "SLevelViewport.h"

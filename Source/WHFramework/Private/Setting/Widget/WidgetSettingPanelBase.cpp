@@ -69,7 +69,7 @@ void UWidgetSettingPanelBase::OnClose(bool bInstant)
 	Super::OnClose(bInstant);
 }
 
-void UWidgetSettingPanelBase::OnPageItemSelected_Implementation(UCommonButtonBase* SelectedTabButton, int32 ButtonIndex)
+void UWidgetSettingPanelBase::OnPageItemSelected_Implementation(UCommonButtonBase* AssociatedButton, int32 ButtonIndex)
 {
 	Switcher_Page->SetActiveWidgetIndex(ButtonIndex);
 }

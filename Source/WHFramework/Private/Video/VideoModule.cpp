@@ -16,6 +16,7 @@
 #include "SaveGame/Module/VideoSaveGame.h"
 #include "Video/VideoModuleNetworkComponent.h"
 #include "Video/MediaPlayer/MediaPlayerBase.h"
+#include <Windows.h>
 
 IMPLEMENTATION_MODULE(UVideoModule)
 
@@ -31,7 +32,22 @@ UVideoModule::UVideoModule()
 
 	MediaPlayers = TArray<AMediaPlayerBase*>();
 
+	WindowMode = EWindowModeN::Fullscreen;
+	WindowResolution = EWindowResolution::WR_ScreenSize;
+	bEnableVSync = false;
+	bEnableDynamicResolution = false;
+	
 	GlobalVideoQuality = EVideoQuality::Epic;
+	ViewDistanceQuality = EVideoQuality::Epic;
+	ShadowQuality = EVideoQuality::Epic;
+	GlobalIlluminationQuality = EVideoQuality::Epic;
+	ReflectionQuality = EVideoQuality::Epic;
+	AntiAliasingQuality = EVideoQuality::Epic;
+	TextureQuality = EVideoQuality::Epic;
+	VisualEffectQuality = EVideoQuality::Epic;
+	PostProcessingQuality = EVideoQuality::Epic;
+	FoliageQuality = EVideoQuality::Epic;
+	ShadingQuality = EVideoQuality::Epic;
 }
 
 UVideoModule::~UVideoModule()
@@ -71,6 +87,27 @@ void UVideoModule::OnInitialize()
 void UVideoModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
+
+	if(PHASEC(InPhase, EPhase::Final))
+	{
+		SetWindowMode(WindowMode, false);
+		SetWindowResolution(WindowResolution, false);
+		SetEnableVSync(bEnableVSync, false);
+		SetEnableDynamicResolution(bEnableDynamicResolution, false);
+		SetGlobalVideoQuality(GlobalVideoQuality, false);
+		SetViewDistanceQuality(ViewDistanceQuality, false);
+		SetShadowQuality(ShadowQuality, false);
+		SetGlobalIlluminationQuality(GlobalIlluminationQuality, false);
+		SetReflectionQuality(ReflectionQuality, false);
+		SetAntiAliasingQuality(AntiAliasingQuality, false);
+		SetTextureQuality(TextureQuality, false);
+		SetVisualEffectQuality(VisualEffectQuality, false);
+		SetPostProcessingQuality(PostProcessingQuality, false);
+		SetFoliageQuality(FoliageQuality, false);
+		SetShadingQuality(ShadingQuality, false);
+
+		ApplyVideoSettings();
+	}
 }
 
 void UVideoModule::OnRefresh(float DeltaSeconds, bool bInEditor)
@@ -97,19 +134,26 @@ void UVideoModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	const auto& SaveData = InSaveData->CastRef<FVideoModuleSaveData>();
 
-	SetGlobalVideoQuality(SaveData.GlobalVideoQuality, false);
-	SetViewDistanceQuality(SaveData.ViewDistanceQuality, false);
-	SetShadowQuality(SaveData.ShadowQuality, false);
-	SetGlobalIlluminationQuality(SaveData.GlobalIlluminationQuality, false);
-	SetReflectionQuality(SaveData.ReflectionQuality, false);
-	SetAntiAliasingQuality(SaveData.AntiAliasingQuality, false);
-	SetTextureQuality(SaveData.TextureQuality, false);
-	SetVisualEffectQuality(SaveData.VisualEffectQuality, false);
-	SetPostProcessingQuality(SaveData.PostProcessingQuality, false);
-	SetFoliageQuality(SaveData.FoliageQuality, false);
-	SetShadingQuality(SaveData.ShadingQuality, false);
+	if(SaveData.IsSaved())
+	{
+		SetWindowMode(SaveData.WindowMode, false);
+		SetWindowResolution(SaveData.WindowResolution, false);
+		SetEnableVSync(SaveData.bEnableVSync, false);
+		SetEnableDynamicResolution(SaveData.bEnableDynamicResolution, false);
+		SetGlobalVideoQuality(SaveData.GlobalVideoQuality, false);
+		SetViewDistanceQuality(SaveData.ViewDistanceQuality, false);
+		SetShadowQuality(SaveData.ShadowQuality, false);
+		SetGlobalIlluminationQuality(SaveData.GlobalIlluminationQuality, false);
+		SetReflectionQuality(SaveData.ReflectionQuality, false);
+		SetAntiAliasingQuality(SaveData.AntiAliasingQuality, false);
+		SetTextureQuality(SaveData.TextureQuality, false);
+		SetVisualEffectQuality(SaveData.VisualEffectQuality, false);
+		SetPostProcessingQuality(SaveData.PostProcessingQuality, false);
+		SetFoliageQuality(SaveData.FoliageQuality, false);
+		SetShadingQuality(SaveData.ShadingQuality, false);
 
-	ApplyVideoQualitySettings();
+		ApplyVideoSettings();
+	}
 }
 
 void UVideoModule::UnloadData(EPhase InPhase)
@@ -122,17 +166,21 @@ FSaveData* UVideoModule::ToData()
 	static FVideoModuleSaveData SaveData;
 	SaveData = FVideoModuleSaveData();
 	
+	SaveData.WindowMode = GetWindowMode();
+	SaveData.WindowResolution = GetWindowResolution();
+	SaveData.bEnableVSync = IsEnableVSync();
+	SaveData.bEnableDynamicResolution = IsEnableDynamicResolution();
 	SaveData.GlobalVideoQuality = GetGlobalVideoQuality();
-	SaveData.ViewDistanceQuality = GetGlobalVideoQuality() == EVideoQuality::Custom ? GetViewDistanceQuality() : GetGlobalVideoQuality();
-	SaveData.ShadowQuality = GetGlobalVideoQuality() == EVideoQuality::Custom ? GetShadowQuality() : GetGlobalVideoQuality();
-	SaveData.GlobalIlluminationQuality = GetGlobalVideoQuality() == EVideoQuality::Custom ? GetGlobalIlluminationQuality() : GetGlobalVideoQuality();
-	SaveData.ReflectionQuality = GetGlobalVideoQuality() == EVideoQuality::Custom ? GetReflectionQuality() : GetGlobalVideoQuality();
-	SaveData.AntiAliasingQuality = GetGlobalVideoQuality() == EVideoQuality::Custom ? GetAntiAliasingQuality() : GetGlobalVideoQuality();
-	SaveData.TextureQuality = GetGlobalVideoQuality() == EVideoQuality::Custom ? GetTextureQuality() : GetGlobalVideoQuality();
-	SaveData.VisualEffectQuality = GetGlobalVideoQuality() == EVideoQuality::Custom ? GetVisualEffectQuality() : GetGlobalVideoQuality();
-	SaveData.PostProcessingQuality = GetGlobalVideoQuality() == EVideoQuality::Custom ? GetPostProcessingQuality() : GetGlobalVideoQuality();
-	SaveData.FoliageQuality = GetGlobalVideoQuality() == EVideoQuality::Custom ? GetFoliageQuality() : GetGlobalVideoQuality();
-	SaveData.ShadingQuality = GetGlobalVideoQuality() == EVideoQuality::Custom ? GetShadingQuality() : GetGlobalVideoQuality();
+	SaveData.ViewDistanceQuality = GetViewDistanceQuality();
+	SaveData.ShadowQuality = GetShadowQuality();
+	SaveData.GlobalIlluminationQuality = GetGlobalIlluminationQuality();
+	SaveData.ReflectionQuality = GetReflectionQuality();
+	SaveData.AntiAliasingQuality = GetAntiAliasingQuality();
+	SaveData.TextureQuality = GetTextureQuality();
+	SaveData.VisualEffectQuality = GetVisualEffectQuality();
+	SaveData.PostProcessingQuality = GetPostProcessingQuality();
+	SaveData.FoliageQuality = GetFoliageQuality();
+	SaveData.ShadingQuality = GetShadingQuality();
 
 	return &SaveData;
 }
@@ -240,16 +288,147 @@ void UVideoModule::StopMovieForMediaPlayer(const FName InName, bool bSkip, bool 
 	}
 }
 
-void UVideoModule::ApplyVideoQualitySettings()
+void UVideoModule::ApplyVideoSettings()
 {
-	GetGameUserSettings()->ApplySettings(false);
+	GetGameUserSettings()->ApplySettings(true);
+}
+
+#if WITH_EDITOR
+void UVideoModule::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	const FProperty* Property = PropertyChangedEvent.MemberProperty;
+
+	if(Property && PropertyChangedEvent.ChangeType != EPropertyChangeType::Interactive)
+	{
+		const FName PropertyName = Property->GetFName();
+
+		bool bApplySetting = UCommonStatics::IsPlaying();
+		
+		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UVideoModule, bEnableVSync) ||
+			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UVideoModule, bEnableDynamicResolution))
+		{
+			bApplySetting = true;
+		}
+		else if(PropertyName.ToString().EndsWith(TEXT("Quality")))
+		{
+			const EVideoQuality Quality = *Property->ContainerPtrToValuePtr<EVideoQuality>(this);
+			if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UVideoModule, GlobalVideoQuality))
+			{
+				if(Quality != EVideoQuality::Custom)
+				{
+					ViewDistanceQuality = Quality;
+					ShadowQuality = Quality;
+					GlobalIlluminationQuality = Quality;
+					ReflectionQuality = Quality;
+					AntiAliasingQuality = Quality;
+					TextureQuality = Quality;
+					VisualEffectQuality = Quality;
+					PostProcessingQuality = Quality;
+					FoliageQuality = Quality;
+					ShadingQuality = Quality;
+				}
+			}
+			else if(Quality != GlobalVideoQuality)
+			{
+				GlobalVideoQuality = EVideoQuality::Custom;
+			}
+			bApplySetting = true;
+		}
+		if(bApplySetting)
+		{
+			ApplyVideoSettings();
+		}
+	}
+}
+#endif
+
+void UVideoModule::SetWindowMode(EWindowModeN InMode, bool bApply)
+{
+	WindowMode = InMode;
+	GetGameUserSettings()->SetFullscreenMode((EWindowMode::Type)InMode);
+	if(bApply) GetGameUserSettings()->ApplySettings(false);
+}
+
+void UVideoModule::SetWindowResolution(EWindowResolution InResolution, bool bApply)
+{
+	WindowResolution = InResolution;
+	switch (InResolution)
+	{
+		case EWindowResolution::WR_ScreenSize:
+		{
+			GetGameUserSettings()->SetScreenResolution(GetDesktopResolution());
+			break;
+		}
+		case EWindowResolution::WR_3840_2160:
+		{
+			GetGameUserSettings()->SetScreenResolution(FIntPoint(3840, 2160));
+			break;
+		}
+		case EWindowResolution::WR_2560_1440:
+		{
+			GetGameUserSettings()->SetScreenResolution(FIntPoint(2560, 1440));
+			break;
+		}
+		case EWindowResolution::WR_1920_1080:
+		{
+			GetGameUserSettings()->SetScreenResolution(FIntPoint(1920, 1080));
+			break;
+		}
+		case EWindowResolution::WR_1600_900:
+		{
+			GetGameUserSettings()->SetScreenResolution(FIntPoint(1600, 900));
+			break;
+		}
+		case EWindowResolution::WR_1366_768:
+		{
+			GetGameUserSettings()->SetScreenResolution(FIntPoint(1366, 768));
+			break;
+		}
+		case EWindowResolution::WR_1280_720:
+		{
+			GetGameUserSettings()->SetScreenResolution(FIntPoint(1280, 720));
+			break;
+		}
+		case EWindowResolution::WR_1024_576:
+		{
+			GetGameUserSettings()->SetScreenResolution(FIntPoint(1024, 576));
+			break;
+		}
+		case EWindowResolution::WR_960_540:
+		{
+			GetGameUserSettings()->SetScreenResolution(FIntPoint(960, 540));
+			break;
+		}
+		default: break;
+	}
+	if(bApply) GetGameUserSettings()->ApplySettings(false);
+}
+
+FIntPoint UVideoModule::GetDesktopResolution() const
+{
+	return GetGameUserSettings()->GetDesktopResolution();
+}
+
+void UVideoModule::SetEnableVSync(bool bInValue, bool bApply)
+{
+	bEnableVSync = bInValue;
+	GetGameUserSettings()->SetVSyncEnabled(bInValue);
+	if(bApply) GetGameUserSettings()->ApplySettings(false);
+}
+
+void UVideoModule::SetEnableDynamicResolution(bool bInValue, bool bApply)
+{
+	bEnableDynamicResolution = bInValue;
+	GetGameUserSettings()->SetDynamicResolutionEnabled(bInValue);
+	if(bApply) GetGameUserSettings()->ApplySettings(false);
 }
 
 void UVideoModule::SetGlobalVideoQuality(EVideoQuality InQuality, bool bApply)
 {
 	GlobalVideoQuality = InQuality;
-
-	if(GlobalVideoQuality != EVideoQuality::Custom)
+	if(InQuality != EVideoQuality::Custom)
 	{
 		SetViewDistanceQuality(InQuality, false);
 		SetShadowQuality(InQuality, false);
@@ -267,122 +446,82 @@ void UVideoModule::SetGlobalVideoQuality(EVideoQuality InQuality, bool bApply)
 
 void UVideoModule::SetViewDistanceQuality(EVideoQuality InQuality, bool bApply)
 {
+	ViewDistanceQuality = InQuality;
 	if(InQuality != GlobalVideoQuality) GlobalVideoQuality = EVideoQuality::Custom;
 	GetGameUserSettings()->SetViewDistanceQuality((int32)InQuality);
 	if(bApply) GetGameUserSettings()->ApplySettings(false);
 }
 
-EVideoQuality UVideoModule::GetViewDistanceQuality() const
-{
-	return (EVideoQuality)GetGameUserSettings()->GetViewDistanceQuality();
-}
-
 void UVideoModule::SetShadowQuality(EVideoQuality InQuality, bool bApply)
 {
+	ShadowQuality = InQuality;
 	if(InQuality != GlobalVideoQuality) GlobalVideoQuality = EVideoQuality::Custom;
 	GetGameUserSettings()->SetShadowQuality((int32)InQuality);
 	if(bApply) GetGameUserSettings()->ApplySettings(false);
 }
 
-EVideoQuality UVideoModule::GetShadowQuality() const
-{
-	return (EVideoQuality)GetGameUserSettings()->GetShadowQuality();
-}
-
 void UVideoModule::SetGlobalIlluminationQuality(EVideoQuality InQuality, bool bApply)
 {
+	GlobalIlluminationQuality = InQuality;
 	if(InQuality != GlobalVideoQuality) GlobalVideoQuality = EVideoQuality::Custom;
 	GetGameUserSettings()->SetGlobalIlluminationQuality((int32)InQuality);
 	if(bApply) GetGameUserSettings()->ApplySettings(false);
 }
 
-EVideoQuality UVideoModule::GetGlobalIlluminationQuality() const
-{
-	return (EVideoQuality)GetGameUserSettings()->GetGlobalIlluminationQuality();
-}
-
 void UVideoModule::SetReflectionQuality(EVideoQuality InQuality, bool bApply)
 {
+	ReflectionQuality = InQuality;
 	if(InQuality != GlobalVideoQuality) GlobalVideoQuality = EVideoQuality::Custom;
 	GetGameUserSettings()->SetReflectionQuality((int32)InQuality);
 	if(bApply) GetGameUserSettings()->ApplySettings(false);
 }
 
-EVideoQuality UVideoModule::GetReflectionQuality() const
-{
-	return (EVideoQuality)GetGameUserSettings()->GetReflectionQuality();
-}
-
 void UVideoModule::SetAntiAliasingQuality(EVideoQuality InQuality, bool bApply)
 {
+	AntiAliasingQuality = InQuality;
 	if(InQuality != GlobalVideoQuality) GlobalVideoQuality = EVideoQuality::Custom;
 	GetGameUserSettings()->SetAntiAliasingQuality((int32)InQuality);
 	if(bApply) GetGameUserSettings()->ApplySettings(false);
 }
 
-EVideoQuality UVideoModule::GetAntiAliasingQuality() const
-{
-	return (EVideoQuality)GetGameUserSettings()->GetAntiAliasingQuality();
-}
-
 void UVideoModule::SetTextureQuality(EVideoQuality InQuality, bool bApply)
 {
+	TextureQuality = InQuality;
 	if(InQuality != GlobalVideoQuality) GlobalVideoQuality = EVideoQuality::Custom;
 	GetGameUserSettings()->SetTextureQuality((int32)InQuality);
 	if(bApply) GetGameUserSettings()->ApplySettings(false);
 }
 
-EVideoQuality UVideoModule::GetTextureQuality() const
-{
-	return (EVideoQuality)GetGameUserSettings()->GetTextureQuality();
-}
-
 void UVideoModule::SetVisualEffectQuality(EVideoQuality InQuality, bool bApply)
 {
+	VisualEffectQuality = InQuality;
 	if(InQuality != GlobalVideoQuality) GlobalVideoQuality = EVideoQuality::Custom;
 	GetGameUserSettings()->SetVisualEffectQuality((int32)InQuality);
 	if(bApply) GetGameUserSettings()->ApplySettings(false);
 }
 
-EVideoQuality UVideoModule::GetVisualEffectQuality() const
-{
-	return (EVideoQuality)GetGameUserSettings()->GetVisualEffectQuality();
-}
-
 void UVideoModule::SetPostProcessingQuality(EVideoQuality InQuality, bool bApply)
 {
+	PostProcessingQuality = InQuality;
 	if(InQuality != GlobalVideoQuality) GlobalVideoQuality = EVideoQuality::Custom;
 	GetGameUserSettings()->SetPostProcessingQuality((int32)InQuality);
 	if(bApply) GetGameUserSettings()->ApplySettings(false);
 }
 
-EVideoQuality UVideoModule::GetPostProcessingQuality() const
-{
-	return (EVideoQuality)GetGameUserSettings()->GetPostProcessingQuality();
-}
-
 void UVideoModule::SetFoliageQuality(EVideoQuality InQuality, bool bApply)
 {
+	FoliageQuality = InQuality;
 	if(InQuality != GlobalVideoQuality) GlobalVideoQuality = EVideoQuality::Custom;
 	GetGameUserSettings()->SetFoliageQuality((int32)InQuality);
 	if(bApply) GetGameUserSettings()->ApplySettings(false);
 }
 
-EVideoQuality UVideoModule::GetFoliageQuality() const
-{
-	return (EVideoQuality)GetGameUserSettings()->GetFoliageQuality();
-}
-
 void UVideoModule::SetShadingQuality(EVideoQuality InQuality, bool bApply)
 {
+	ShadingQuality = InQuality;
 	if(InQuality != GlobalVideoQuality) GlobalVideoQuality = EVideoQuality::Custom;
 	GetGameUserSettings()->SetShadingQuality((int32)InQuality);
 	if(bApply) GetGameUserSettings()->ApplySettings(false);
-}
-
-EVideoQuality UVideoModule::GetShadingQuality() const
-{
-	return (EVideoQuality)GetGameUserSettings()->GetShadingQuality();
 }
 
 UGameUserSettings* UVideoModule::GetGameUserSettings() const

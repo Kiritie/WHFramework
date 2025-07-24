@@ -6,6 +6,7 @@
 #include "IImageWrapper.h"
 #include "IImageWrapperModule.h"
 #include "Interfaces/IHttpResponse.h"
+#include "Engine/Texture.h"
 
 UWebRequestHandle_GetTexture::UWebRequestHandle_GetTexture()
 {
@@ -69,7 +70,7 @@ void UWebRequestHandle_GetTexture::Parse(const FWebRequestResult& InResult, cons
                         FMemory::Memcpy(TextureData, RawData.GetData(), RawData.Num());
                         Mip->BulkData.Unlock();
                         
-                        Texture->UpdateResource();
+                        // Texture->UpdateResource(); 
                     }
                 }
                 break;

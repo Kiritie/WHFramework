@@ -15,29 +15,37 @@ UVoxelTerrainGenerator::UVoxelTerrainGenerator()
 void UVoxelTerrainGenerator::Generate(AVoxelChunk* InChunk)
 {
 	//载入地形方块
-	const FVector Range = FVector(Module->GetWorldData().ChunkSize.X, Module->GetWorldData().ChunkSize.Y, Module->GetWorldData().ChunkSize.Z * Module->GetWorldData().WorldSize.Z);
-	ITER_INDEX(Index, Range, false,
-		const FIndex _Index = InChunk->LocalIndexToWorld(Index);
-		if(!Module->HasVoxelByIndex(_Index))
-		{
-			const EVoxelType VoxelType = CalculateVoxelType(_Index);
-			if(VoxelType != EVoxelType::Empty)
+	ITER_INDEX2D(Index, Module->GetWorldData().ChunkSize, false,
+		DON_WITHINDEX(FMath::Max(InChunk->GetTopography(Index).Height, Module->GetWorldData().SeaLevel) + 1, Z,
+			const FIndex _Index = FIndex(Index.X, Index.Y, Z);
+			if(!InChunk->HasVoxel(_Index))
 			{
-				Module->SetVoxelByIndex(_Index, VoxelType);
+				const EVoxelType VoxelType = CalculateVoxelType(InChunk, _Index);
+				if(VoxelType != EVoxelType::Empty)
+				{
+					InChunk->SetVoxel(_Index, VoxelType);
+				}
 			}
-		}
-		else if(!Module->GetVoxelByIndex(_Index).IsValid())
-		{
-			Module->SetVoxelByIndex(_Index, FVoxelItem::Empty, true);
-		}
+			else if(!InChunk->GetVoxel(_Index).IsValid())
+			{
+				if(_Index.Z < BaseHeight)
+				{
+					InChunk->SetVoxel(_Index, EVoxelType::Bedrock);
+				}
+				else
+				{
+					InChunk->SetVoxel(_Index, FVoxelItem::Empty, true);
+				}
+			}
+		)
 	)
 }
 
-EVoxelType UVoxelTerrainGenerator::CalculateVoxelType(FIndex InIndex) const
+EVoxelType UVoxelTerrainGenerator::CalculateVoxelType(AVoxelChunk* InChunk, FIndex InIndex) const
 {
-	const FVoxelTopography& Topography = Module->GetTopographyByIndex(InIndex);
-
 	if(InIndex.Z < BaseHeight) return EVoxelType::Bedrock;
+
+	const FVoxelTopography& Topography = InChunk->GetTopography(FIndex(InIndex.X, InIndex.Y));
 
 	const int32 SeaLevel = Module->GetWorldData().SeaLevel;
 

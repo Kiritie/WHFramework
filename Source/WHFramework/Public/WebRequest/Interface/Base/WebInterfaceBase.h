@@ -42,7 +42,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSubclassOf<UWebRequestHandleBase> HandleClass;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(Transient)
 	TMap<FString, UWebRequestHandleBase*> HandleMap;
 
 	FOnWebRequestCompleteMulti OnWebRequestComplete;

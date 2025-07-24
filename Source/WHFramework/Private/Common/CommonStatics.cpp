@@ -22,6 +22,7 @@
 #include "Main/MainModule.h"
 #include "Main/MainModuleStatics.h"
 #include "Widgets/SViewport.h"
+#include "Windows/WindowsPlatformApplicationMisc.h"
 
 bool UCommonStatics::IsPaused()
 {
@@ -132,6 +133,16 @@ bool UCommonStatics::IsInScreenViewport(const FVector& InWorldLocation)
 		}
 	}
 	return false;
+}
+
+void UCommonStatics::ClipboardCopy(const FString& InStr)
+{
+	FPlatformApplicationMisc::ClipboardCopy(*InStr);
+}
+
+void UCommonStatics::ClipboardPaste(FString& OutStr)
+{
+	FPlatformApplicationMisc::ClipboardPaste(OutStr);
 }
 
 int32 UCommonStatics::GetEnumItemNum(const FString& InEnumName)
@@ -482,6 +493,24 @@ AWHGameMode* UCommonStatics::GetGameMode(TSubclassOf<AWHGameMode> InClass)
 AWHGameState* UCommonStatics::GetGameState(TSubclassOf<AWHGameState> InClass)
 {
 	return GetDeterminesOutputObject(Cast<AWHGameState>(UGameplayStatics::GetGameState(GetWorldContext())), InClass);
+}
+
+AWHGameManager* UCommonStatics::GetGameManagerByClass(TSubclassOf<AWHGameManager> InClass)
+{
+	if(AWHGameMode* GameMode = GetGameMode())
+	{
+		return GameMode->GetManagerByClass(InClass);
+	}
+	return nullptr;
+}
+
+AWHGameManager* UCommonStatics::GetGameManagerByName(const FName InName)
+{
+	if(AWHGameMode* GameMode = GetGameMode())
+	{
+		return GameMode->GetManagerByName(InName);
+	}
+	return nullptr;
 }
 
 AWHPlayerController* UCommonStatics::GetPlayerController(int32 InPlayerIndex, TSubclassOf<AWHPlayerController> InClass)

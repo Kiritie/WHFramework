@@ -160,16 +160,12 @@ public:
 		return LoadedAssets;
 	}
 
-#if WITH_ENGINE
 	virtual UTexture2D* LoadTextureByPath(const FString& InTexturePath, bool bEnsured = true);
-#endif
 
 	virtual void ReleaseRuntimeData();
 
 protected:
 	TMap<FUniqueAssetID, FUniqueAssetData*> AssetMap;
 
-#if WITH_ENGINE
 	TMap<FString, UTexture2D*> TextureMap;
-#endif
 };

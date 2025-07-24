@@ -3,14 +3,14 @@
 #pragma once
 
 #include "Voxel.h"
-#include "VoxelInteract.h"
+#include "VoxelSwitch.h"
 #include "VoxelDoor.generated.h"
 
 /**
  * ������
  */
 UCLASS()
-class WHFRAMEWORK_API UVoxelDoor : public UVoxelInteract
+class WHFRAMEWORK_API UVoxelDoor : public UVoxelSwitch
 {
 	GENERATED_BODY()
 
@@ -39,7 +39,7 @@ public:
 
 	virtual void OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult) override;
 
-	virtual bool OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, const FVoxelHitResult& InHitResult) override;
+	virtual bool OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Door

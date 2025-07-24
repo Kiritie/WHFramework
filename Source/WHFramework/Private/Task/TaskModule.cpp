@@ -316,6 +316,10 @@ void UTaskModule::LeaveTask(UTaskBase* InTask)
 		{
 			SetCurrentTask(nullptr);
 		}
+		if(InTask->ParentTask && InTask->ParentTask->HasSubTask() && InTask->ParentTask->IsAllSubLeaved())
+		{
+			LeaveTask(InTask->ParentTask);
+		}
 	}
 }
 

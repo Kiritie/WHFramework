@@ -3,32 +3,27 @@
 
 #include "Voxel/Voxels/VoxelInteract.h"
 
-#include "Audio/AudioModuleStatics.h"
+#include "Common/Interaction/InteractionAgentInterface.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
-#include "Voxel/Chunks/VoxelChunk.h"
-#include "Voxel/Datas/VoxelData.h"
 #include "Voxel/Voxels/Auxiliary/VoxelInteractAuxiliary.h"
 
 UVoxelInteract::UVoxelInteract()
 {
-	bOpened = false;
 }
 
 void UVoxelInteract::OnReset_Implementation()
 {
 	Super::OnReset_Implementation();
-
-	bOpened = false;
 }
 
 void UVoxelInteract::LoadData(const FString& InData)
 {
-	bOpened = (bool)FCString::Atoi(*InData);
+	Super::LoadData(InData);
 }
 
 FString UVoxelInteract::ToData()
 {
-	return FString::FromInt(bOpened);
+	return Super::ToData();
 }
 
 void UVoxelInteract::OnGenerate(IVoxelAgentInterface* InAgent)
@@ -61,70 +56,48 @@ void UVoxelInteract::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitR
 	Super::OnAgentExit(InAgent, InHitResult);
 }
 
-bool UVoxelInteract::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, const FVoxelHitResult& InHitResult)
+bool UVoxelInteract::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
 {
 	switch (InInteractAction)
 	{
 		case EInputInteractAction::Primary:
 		{
-			return Super::OnAgentInteract(InAgent, InInteractAction, InHitResult);
+			return Super::OnAgentInteract(InAgent, InInteractAction, InInteractEvent, InHitResult);
 		}
 		case EInputInteractAction::Secondary:
 		{
-			Toggle(InAgent);
-			break;
+			if(InInteractEvent == EInputInteractEvent::Started)
+			{
+				Interact(InAgent);
+			}
+			return true;
 		}
 		default: break;
 	}
 	return false;
 }
 
-void UVoxelInteract::Toggle(IVoxelAgentInterface* InAgent)
-{
-	if(!bOpened) Open(InAgent);
-	else Close(InAgent);
-}
-
-void UVoxelInteract::Open(IVoxelAgentInterface* InAgent)
+bool UVoxelInteract::Interact(IVoxelAgentInterface* InAgent)
 {
 	if(IInteractionAgentInterface* InteractionAgent = Cast<IInteractionAgentInterface>(InAgent))
 	{
-		if(AVoxelInteractAuxiliary* InteractAuxiliary = Cast<AVoxelInteractAuxiliary>(GetItem().Auxiliary))
+		if(AVoxelInteractAuxiliary* InteractAuxiliary = Cast<AVoxelInteractAuxiliary>(GetItem().GetMain().Auxiliary))
 		{
 			InteractionAgent->SetInteractingAgent(InteractAuxiliary);
-			InteractionAgent->DoInteract((EInteractAction)EVoxelInteractAction::Open, InteractAuxiliary);
+			InteractionAgent->DoInteract((EInteractAction)EVoxelInteractAction::Interact, InteractAuxiliary);
 		}
 	}
-	SetOpened(true);
-	if(GetData().bMainPart)
-	{
-		for(auto& Iter : GetItem().GetParts())
-		{
-			Iter.GetVoxel<ThisClass>().Open(InAgent);
-		}
-		GetOwner()->Generate(EPhase::Lesser);
-		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Open), GetLocation());
-	}
+	return false;
 }
 
-void UVoxelInteract::Close(IVoxelAgentInterface* InAgent)
+void UVoxelInteract::UnInteract(IVoxelAgentInterface* InAgent)
 {
 	if(IInteractionAgentInterface* InteractionAgent = Cast<IInteractionAgentInterface>(InAgent))
 	{
-		if(AVoxelInteractAuxiliary* InteractAuxiliary = Cast<AVoxelInteractAuxiliary>(GetItem().Auxiliary))
+		if(AVoxelInteractAuxiliary* InteractAuxiliary = Cast<AVoxelInteractAuxiliary>(GetItem().GetMain().Auxiliary))
 		{
 			InteractionAgent->SetInteractingAgent(InteractAuxiliary);
-			InteractionAgent->DoInteract((EInteractAction)EVoxelInteractAction::Close, InteractAuxiliary);
+			InteractionAgent->DoInteract((EInteractAction)EVoxelInteractAction::UnInteract, InteractAuxiliary);
 		}
-	}
-	SetOpened(false);
-	if(GetData().bMainPart)
-	{
-		for(auto& Iter : GetItem().GetParts())
-		{ 
-			Iter.GetVoxel<ThisClass>().Close(InAgent);
-		}
-		GetOwner()->Generate(EPhase::Lesser);
-		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Close), GetLocation());
 	}
 }

@@ -20,6 +20,7 @@ class AWHGameState;
 class AWHGameMode;
 class UWHGameInstance;
 class UWHLocalPlayer;
+class AWHGameManager;
 /**
  * 
  */
@@ -91,6 +92,14 @@ public:
 	// Viewport
 	UFUNCTION(BlueprintPure, Category = "CommonStatics")
 	static bool IsInScreenViewport(const FVector& InWorldLocation);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Clipboard
+	UFUNCTION(BlueprintCallable, Category = "CommonStatics")
+	static void ClipboardCopy(const FString& InStr);
+
+	UFUNCTION(BlueprintCallable, Category = "CommonStatics")
+	static void ClipboardPaste(FString& OutStr);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Phase
@@ -320,6 +329,12 @@ public:
 		return GetWorldFromObjectExisted(GetWorldContext(bInEditor));
 	}
 
+	UFUNCTION(BlueprintPure, Category = "CommonStatics")
+	static float GetCurrentDeltaSeconds(bool bInEditor = false)
+	{
+		return GetCurrentWorld(bInEditor)->GetDeltaSeconds();
+	}
+
 	static FTimerManager& GetCurrentTimerManager(bool bInEditor = false)
 	{
 		return GetCurrentWorld(bInEditor)->GetTimerManager();
@@ -380,6 +395,24 @@ public:
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonStatics")
 	static AWHGameState* GetGameState(TSubclassOf<AWHGameState> InClass = nullptr);
+	
+	template<class T>
+	T* GetGameManagerByClass(TSubclassOf<AWHGameManager> InClass = T::StaticClass())
+	{
+		return Cast<T>(GetGameManagerByClass(InClass));
+	}
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonStatics")
+	static AWHGameManager* GetGameManagerByClass(TSubclassOf<AWHGameManager> InClass);
+
+	template<class T>
+	T* GetGameManagerByName(const FName InName)
+	{
+		return Cast<T>(GetGameManagerByName(InName));
+	}
+
+	UFUNCTION(BlueprintPure, Category = "CommonStatics")
+	static AWHGameManager* GetGameManagerByName(const FName InName);
 
 	template<class T>
 	static T* GetPlayerController(int32 InPlayerIndex = 0)

@@ -5,7 +5,10 @@
 
 #include "Ability/AbilityModuleStatics.h"
 #include "Audio/AudioModuleStatics.h"
-#include "Voxel/Datas/VoxelData.h"
+#include "Event/EventModuleStatics.h"
+#include "Event/Handle/Voxel/EventHandle_VoxelDestroyed.h"
+#include "Event/Handle/Voxel/EventHandle_VoxelGenerated.h"
+#include "Voxel/Voxels/Data/VoxelData.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
@@ -48,11 +51,12 @@ void UVoxel::RefreshData()
 
 void UVoxel::OnGenerate(IVoxelAgentInterface* InAgent)
 {
-	if(InAgent) return;
-	
-	if(GetData().bMainPart)
+	if(!InAgent) return;
+
+	if(GetData().IsMainPart())
 	{
 		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Generate), GetLocation());
+		UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelGenerated>(Cast<UObject>(InAgent), { &Item, Cast<UObject>(InAgent) });
 	}
 }
 
@@ -60,26 +64,32 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 {
 	if(!InAgent) return;
 	
-	if(GetData().bMainPart)
+	if(GetData().IsMainPart())
 	{
 		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Destroy), GetLocation());
-		UAbilityModuleStatics::SpawnAbilityPickUp(FAbilityItem(GetData().GatherData ? GetData().GatherData->GetPrimaryAssetId() : GetData().GetPrimaryAssetId(), 1), GetLocation() + GetData().GetRange(GetAngle()) * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f, GetOwner());
+		if(UVoxelModuleStatics::GetVoxelWorldMode() != EVoxelWorldMode::Prefab)
+		{
+			UAbilityModuleStatics::SpawnAbilityPickUp(FAbilityItem(GetData().GatherData ? GetData().GatherData->GetPrimaryAssetId() : GetData().GetPrimaryAssetId(), 1), GetLocation() + GetData().GetRange(GetAngle()) * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f, GetOwner());
+		}
+		UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelDestroyed>(Cast<UObject>(InAgent), { &Item, Cast<UObject>(InAgent) });
 	}
 	if(GetOwner())
 	{
-		TMap<FIndex, FVoxelItem> VoxelItems;
-		ITER_ARRAY({ EVoxelType::Water }, WaterType,
+		FVoxelMap VoxelMap;
+		const TArray WaterTypes = { EVoxelType::Water };
+		ITER_ARRAY(WaterTypes, WaterType,
 			if(GetOwner()->CheckVoxelNeighbors(GetIndex(), WaterType, FVector::OneVector, false, true))
 			{
-				VoxelItems.Emplace(GetIndex(), UVoxelModuleStatics::VoxelTypeToAssetID(WaterType));
+				VoxelMap.Map.Emplace(GetIndex(), UVoxelModuleStatics::VoxelTypeToAssetID(WaterType));
 				break;
 			}
 		)
-		if(GetOwner()->HasVoxelComplex(UMathStatics::GetAdjacentIndex(GetIndex(), EDirection::Up)) && !GetOwner()->CheckVoxelAdjacent(Item, EDirection::Up))
+		const FIndex UpperIndex = FMathHelper::GetAdjacentIndex(GetIndex(), EDirection::Up);
+		if(GetOwner()->HasVoxelComplex(UpperIndex) && GetOwner()->GetVoxelComplex(UpperIndex).GetData().GetTransparency() == EVoxelTransparency::Trans)
 		{
-			VoxelItems.Emplace(UMathStatics::GetAdjacentIndex(GetIndex(), EDirection::Up), FVoxelItem::Empty);
+			VoxelMap.Map.Emplace(UpperIndex, FVoxelItem::Empty);
 		}
-		GetOwner()->SetVoxelComplex(VoxelItems, true, false, InAgent);
+		GetOwner()->SetVoxelComplex(VoxelMap, true, false, InAgent);
 	}
 }
 
@@ -103,17 +113,21 @@ void UVoxel::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& I
 	
 }
 
-bool UVoxel::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, const FVoxelHitResult& InHitResult)
+bool UVoxel::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
 {
 	switch (InInteractAction)
 	{
 		case EInputInteractAction::Primary:
 		{
-			return InAgent->OnDestroyVoxel(InHitResult);
+			return InAgent->OnDestroyVoxel(InInteractEvent, InHitResult);
 		}
 		case EInputInteractAction::Secondary:
 		{
-			return InAgent->OnGenerateVoxel(InHitResult);
+			return InAgent->OnGenerateVoxel(InInteractEvent, InHitResult);
+		}
+		case EInputInteractAction::Third:
+		{
+			break;
 		}
 		default: break;
 	}
@@ -133,4 +147,9 @@ bool UVoxel::IsEmpty() const
 bool UVoxel::IsUnknown() const
 {
 	return &UVoxel::GetUnknown() == this;
+}
+
+AVoxelChunk* UVoxel::GetOwner() const
+{
+	return Item.Chunk;
 }

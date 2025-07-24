@@ -1,0 +1,267 @@
+// Fill out your copyright notice in the Description page of Project Settings.
+
+#pragma once
+
+
+#include "MathTypes.generated.h"
+
+#define DEG_2_RAD (0.01745329f)
+
+#define UNDER_Vector FVector(0.f, 0.f, -1000000.f)
+#define EMPTY_Vector FVector(MAX_flt)
+#define EMPTY_Rotator FRotator(MAX_flt)
+#define EMPTY_Index FIndex(MAX_int32)
+#define EMPTY_Int MAX_int32
+#define EMPTY_Flt MAX_flt
+
+UENUM(BlueprintType)
+enum class EEaseType : uint8
+{
+	Linear = 0,
+	InSine = 1,
+	InQuad = 2,
+	InCubic = 3,
+	InQuart = 4,
+	InQuint = 5,
+	InExpo = 6,
+	InCirc = 7,
+	InElastic = 8,
+	InBack = 9,
+	InBounce = 10,
+	OutQuad = 31,
+	OutSine = 32,
+	OutCubic = 33,
+	OutQuart = 34,
+	OutQuint = 35,
+	OutExpo = 36,
+	OutCirc = 37,
+	OutElastic = 38,
+	OutBack = 39,
+	OutBounce = 40,
+	InOutQuad = 61,
+	InOutSine = 62,
+	InOutCubic = 63,
+	InOutQuart = 64,
+	InOutQuint = 65,
+	InOutExpo = 66,
+	InOutCirc = 67,
+	InOutElastic = 68,
+	InOutBack = 69,
+	InOutBounce = 70
+};
+
+/**
+ * 方向
+ */
+UENUM(BlueprintType)
+enum class EDirection : uint8
+{
+	Forward,
+	Right,
+	Backward,
+	Left,
+	Up,
+	Down
+};
+
+/**
+ * 直角
+ */
+UENUM(BlueprintType)
+enum class ERightAngle : uint8
+{
+	RA_0 UMETA(DisplayName = "0"),
+	RA_90 UMETA(DisplayName = "90"),
+	RA_180 UMETA(DisplayName = "180"),
+	RA_270 UMETA(DisplayName = "270")
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORKCORE_API FIndex
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 X;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Y;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Z;
+
+	static const FIndex ZeroIndex;
+
+	static const FIndex OneIndex;
+
+	FORCEINLINE FIndex()
+	{
+		X = 0;
+		Y = 0;
+		Z = 0;
+	}
+
+	FIndex(int64 InValue);
+
+	FORCEINLINE FIndex(int32 InValue)
+	{
+		X = InValue;
+		Y = InValue;
+		Z = InValue;
+	}
+
+	FORCEINLINE FIndex(int32 InX, int32 InY)
+	{
+		X = InX;
+		Y = InY;
+		Z = 0;
+	}
+
+	FORCEINLINE FIndex(int32 InX, int32 InY, int32 InZ)
+	{
+		X = InX;
+		Y = InY;
+		Z = InZ;
+	}
+
+	FORCEINLINE FIndex(const FVector& InVector)
+	{
+		X = FMath::RoundToInt32(InVector.X);
+		Y = FMath::RoundToInt32(InVector.Y);
+		Z = FMath::RoundToInt32(InVector.Z);
+	}
+
+	FORCEINLINE FIndex(const FVector2D& InVector)
+	{
+		X = FMath::RoundToInt32(InVector.X);
+		Y = FMath::RoundToInt32(InVector.Y);
+		Z = 0;
+	}
+
+	FORCEINLINE FIndex(const FString& InValue)
+	{
+		TArray<FString> Arr;
+		InValue.ParseIntoArray(Arr, TEXT(","));
+		X = FCString::Atoi(*Arr[0]);
+		Y = FCString::Atoi(*Arr[1]);
+		Z = FCString::Atoi(*Arr[2]);
+	}
+
+	int64 ToInt64() const;
+
+	FORCEINLINE FVector ToVector() const
+	{
+		return FVector(X, Y, Z);
+	}
+
+	FORCEINLINE FVector2D ToVector2D() const
+	{
+		return FVector2D(X, Y);
+	}
+
+	FORCEINLINE FString ToString() const
+	{
+		return FString::Printf(TEXT("%d,%d,%d"), X, Y, Z);
+	}
+
+	FORCEINLINE float DistanceTo(const FIndex& Index, bool bIgnoreZ = false, bool bFromCenter = false) const
+	{
+		const FVector VectorA = ToVector() + (bFromCenter ? FVector(0.5f) : FVector::ZeroVector);
+		const FVector VectorB = Index.ToVector() + (bFromCenter ? FVector(0.5f) : FVector::ZeroVector);
+		return FVector::Distance(FVector(VectorA.X, VectorA.Y, bIgnoreZ ? 0.f : VectorA.Z), FVector(VectorB.X, VectorB.Y, bIgnoreZ ? 0.f : VectorB.Z));
+	}
+
+	FORCEINLINE static float Distance(const FIndex& A, const FIndex& B, bool bIgnoreZ = false)
+	{
+		const FVector VectorA = A.ToVector();
+		const FVector VectorB = B.ToVector();
+		return FVector::Distance(FVector(VectorA.X, VectorA.Y, bIgnoreZ ? 0.f : VectorA.Z), FVector(VectorB.X, VectorB.Y, bIgnoreZ ? 0.f : VectorB.Z));
+	}
+
+	FORCEINLINE friend bool operator==(const FIndex& A, const FIndex& B)
+	{
+		return (A.X == B.X) && (A.Y == B.Y) && (A.Z == B.Z);
+	}
+
+	FORCEINLINE friend bool operator!=(const FIndex& A, const FIndex& B)
+	{
+		return (A.X != B.X) || (A.Y != B.Y) || (A.Z != B.Z);
+	}
+
+	FORCEINLINE FIndex operator+(const FIndex& InIndex) const
+	{
+		return FIndex(X + InIndex.X, Y + InIndex.Y, Z + InIndex.Z);
+	}
+
+	FORCEINLINE FIndex operator-(const FIndex& InIndex) const
+	{
+		return FIndex(X - InIndex.X, Y - InIndex.Y, Z - InIndex.Z);
+	}
+
+	FORCEINLINE FIndex operator*(const FIndex& InIndex) const
+	{
+		return FIndex(X * InIndex.X, Y * InIndex.Y, Z * InIndex.Z);
+	}
+
+	FORCEINLINE FIndex operator/(const FIndex& InIndex) const
+	{
+		return FIndex(X / InIndex.X, Y / InIndex.Y, Z / InIndex.Z);
+	}
+
+	FORCEINLINE FIndex operator*(const int& InValue) const
+	{
+		return FIndex(X * InValue, Y * InValue, Z * InValue);
+	}
+
+	FORCEINLINE FIndex operator/(const int& InValue) const
+	{
+		return FIndex(X / InValue, Y / InValue, Z / InValue);
+	}
+	
+	FORCEINLINE operator FVector() const { return ToVector(); }
+
+	friend void operator<<(FStructuredArchive::FSlot Slot, FIndex& InValue)
+	{
+		FStructuredArchive::FRecord Record = Slot.EnterRecord();
+		Record << SA_VALUE(TEXT("X"), InValue.X);
+		Record << SA_VALUE(TEXT("Y"), InValue.Y);
+		Record << SA_VALUE(TEXT("Z"), InValue.Z);
+	}
+};
+
+FORCEINLINE uint32 GetTypeHash(const FIndex& InIndex)
+{
+	return FCrc::MemCrc_DEPRECATED(&InIndex, sizeof(InIndex));
+}
+
+#define ITER_INDEX(Iter, Range, bFromCenter, Expression) \
+	FIndex Iter; \
+	for(Iter.X = (bFromCenter ? -Range.X * 0.5f : 0.f); Iter.X < (bFromCenter ? Range.X * 0.5f : Range.X); Iter.X++) \
+	{ \
+		for(Iter.Y = (bFromCenter ? -Range.Y * 0.5f : 0.f); Iter.Y < (bFromCenter ? Range.Y * 0.5f : Range.Y); Iter.Y++) \
+		{ \
+			for(Iter.Z = 0.f; Iter.Z < Range.Z; Iter.Z++) \
+			{ \
+				Expression \
+			} \
+		} \
+	}
+
+#define ITER_INDEX2D(Iter, Range, bFromCenter, Expression) \
+	FIndex Iter; \
+	for(Iter.X = (bFromCenter ? -Range.X * 0.5f : 0.f); Iter.X < (bFromCenter ? Range.X * 0.5f : Range.X); Iter.X++) \
+	{ \
+		for(Iter.Y = (bFromCenter ? -Range.Y * 0.5f : 0.f); Iter.Y < (bFromCenter ? Range.Y * 0.5f : Range.Y); Iter.Y++) \
+		{ \
+			Expression \
+		} \
+	}
+
+#define ITER_DIRECTION(Iter, Expression) \
+	EDirection Iter; \
+	for(int32 _Index = 0; _Index < 6; _Index++) \
+	{ \
+		Iter = (EDirection)_Index; \
+		Expression \
+	}

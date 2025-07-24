@@ -75,19 +75,29 @@ FParameter UParameterModuleStatics::MakeBooleanParameter(bool InValue, const FTe
 	return FParameter::MakeBoolean(InValue, InDescription);
 }
 
-FParameter UParameterModuleStatics::MakeVectorParameter(const FVector& InValue, const FText InDescription)
+FParameter UParameterModuleStatics::MakeVectorParameter(const FVector InValue, const FText InDescription)
 {
 	return FParameter::MakeVector(InValue, InDescription);
 }
 
-FParameter UParameterModuleStatics::MakeRotatorParameter(const FRotator& InValue, const FText InDescription)
+FParameter UParameterModuleStatics::MakeRotatorParameter(const FRotator InValue, const FText InDescription)
 {
 	return FParameter::MakeRotator(InValue, InDescription);
 }
 
-FParameter UParameterModuleStatics::MakeColorParameter(FColor InValue, const FText InDescription)
+FParameter UParameterModuleStatics::MakeTransformParameter(const FTransform InValue, const FText InDescription)
+{
+	return FParameter::MakeTransform(InValue, InDescription);
+}
+
+FParameter UParameterModuleStatics::MakeColorParameter(const FColor InValue, const FText InDescription)
 {
 	return FParameter::MakeColor(InValue, InDescription);
+}
+
+FParameter UParameterModuleStatics::MakeLinearColorParameter(const FLinearColor InValue, const FText& InDescription)
+{
+	return FParameter::MakeLinearColor(InValue, InDescription);
 }
 
 FParameter UParameterModuleStatics::MakeKeyParameter(const FKey& InValue, const FText InDescription)
@@ -148,4 +158,33 @@ FParameter UParameterModuleStatics::MakeActorPtrParameter(const TSoftObjectPtr<A
 FParameter UParameterModuleStatics::MakeDelegateParameter(const FSimpleDynamicDelegate& InValue, const FText InDescription)
 {
 	return FParameter::MakeDelegate(InValue, InDescription);
+}
+
+FParameterMap UParameterModuleStatics::MakeParameterMap(const TMap<FString, FString>& InParameterMap)
+{
+	return InParameterMap;
+}
+
+FParameterMap& UParameterModuleStatics::AddParameterMapValue(FParameterMap& InParameterMap, const FString& InKey, const FString& InValue)
+{
+	InParameterMap.Add(InKey, InValue);
+	return InParameterMap;
+}
+
+FParameterMap& UParameterModuleStatics::SetParameterMapValue(FParameterMap& InParameterMap, const FString& InKey, const FString& InValue)
+{
+	InParameterMap.Set(InKey, InValue);
+	return InParameterMap;
+}
+
+FParameterMap& UParameterModuleStatics::RemoveParameterMapKey(FParameterMap& InParameterMap, const FString& InKey)
+{
+	InParameterMap.Remove(InKey);
+	return InParameterMap;
+}
+
+FParameterMap& UParameterModuleStatics::ClearParameterMap(FParameterMap& InParameterMap)
+{
+	InParameterMap.Clear();
+	return InParameterMap;
 }

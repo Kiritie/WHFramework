@@ -25,11 +25,11 @@ public:
 public:
 	virtual void OnInitialize_Implementation() override;
 
-	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
+	virtual void OnPreparatory_Implementation() override;
 
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
-	virtual void OnTermination_Implementation(EPhase InPhase) override;
+	virtual void OnTermination_Implementation() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Debugger
@@ -53,12 +53,6 @@ public:
 	void OnUnSwitch();
 
 public:
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	void Switch();
-
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	void UnSwitch();
-
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 	bool IsCurrent() const;
 

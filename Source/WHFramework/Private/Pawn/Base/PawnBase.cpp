@@ -24,6 +24,8 @@
 APawnBase::APawnBase(const FObjectInitializer& ObjectInitializer) :
 	Super(ObjectInitializer)
 {
+	PrimaryActorTick.bCanEverTick = true;
+
 	bReplicates = true;
 
 	BoxComponent = CreateDefaultSubobject<UBoxComponent>(FName("BoxComponent"));
@@ -46,6 +48,7 @@ APawnBase::APawnBase(const FObjectInitializer& ObjectInitializer) :
 	DefaultController = nullptr;
 
 	bInitialized = false;
+	bBlockAllInput = false;
 
 	ActorID = FGuid::NewGuid();
 	bVisible = true;
@@ -60,7 +63,20 @@ void APawnBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter
 	
 	if(InParams.IsValidIndex(0))
 	{
-		ActorID = InParams[0];
+		switch(InParams[0].GetParameterType())
+		{
+			case EParameterType::Transform:
+			{
+				SetActorTransform(InParams[0]);
+				break;
+			}
+			case EParameterType::Guid:
+			{
+				ActorID = InParams[0];
+				break;
+			}
+			default: break;
+		}
 	}
 	if(InParams.IsValidIndex(1))
 	{
@@ -99,7 +115,7 @@ void APawnBase::OnInitialize_Implementation()
 	USceneModuleStatics::AddSceneActor(this);
 }
 
-void APawnBase::OnPreparatory_Implementation(EPhase InPhase)
+void APawnBase::OnPreparatory_Implementation()
 {
 	
 }
@@ -108,7 +124,7 @@ void APawnBase::OnRefresh_Implementation(float DeltaSeconds)
 {
 	if(AMainModule::IsExistModuleByClass<UVoxelModule>())
 	{
-		if(AVoxelChunk* Chunk = UVoxelModuleStatics::FindChunkByLocation(GetActorLocation()))
+		if(AVoxelChunk* Chunk = UVoxelModuleStatics::GetChunkByLocation(GetActorLocation()))
 		{
 			Chunk->AddSceneActor(this);
 		}
@@ -119,7 +135,7 @@ void APawnBase::OnRefresh_Implementation(float DeltaSeconds)
 	}
 }
 
-void APawnBase::OnTermination_Implementation(EPhase InPhase)
+void APawnBase::OnTermination_Implementation()
 {
 	USceneModuleStatics::RemoveSceneActor(this);
 }
@@ -156,7 +172,7 @@ void APawnBase::BeginPlay()
 		{
 			Execute_OnInitialize(this);
 		}
-		Execute_OnPreparatory(this, EPhase::All);
+		Execute_OnPreparatory(this);
 	}
 }
 
@@ -166,7 +182,7 @@ void APawnBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	if(Execute_IsUseDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this, EPhase::All);
+		Execute_OnTermination(this);
 	}
 }
 
@@ -306,16 +322,6 @@ bool APawnBase::IsUseControllerRotation() const
 void APawnBase::SetUseControllerRotation(bool bValue)
 {
 	bUseControllerRotationYaw = bValue;
-}
-
-bool APawnBase::OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult)
-{
-	return IVoxelAgentInterface::OnGenerateVoxel(InVoxelHitResult);
-}
-
-bool APawnBase::OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult)
-{
-	return IVoxelAgentInterface::OnDestroyVoxel(InVoxelHitResult);
 }
 
 void APawnBase::TransformTowards(FTransform InTransform, float InDuration, bool bMulticast)

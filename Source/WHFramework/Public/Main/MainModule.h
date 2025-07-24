@@ -36,11 +36,11 @@ public:
 	
 	virtual void OnInitialize_Implementation() override;
 
-	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
+	virtual void OnPreparatory_Implementation() override;
 
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
-	virtual void OnTermination_Implementation(EPhase InPhase) override;
+	virtual void OnTermination_Implementation() override;
 
 protected:
 	virtual bool IsUseDefaultLifecycle_Implementation() const override { return false; }
@@ -252,8 +252,8 @@ public:
 			{
 				return Cast<T>(MainModule->ModuleMap[InName]);
 			}
-			ensureEditorMsgf(false, FString::Printf(TEXT("Failed to get module, module name: %s"), *InName.ToString()), EDC_Default, EDV_Error); \
 		}
+		ensureEditorMsgf(false, FString::Printf(TEXT("Failed to get module, module name: %s"), *InName.ToString()), EDC_Default, EDV_Error); \
 		return NewObject<T>();
 	}
 	/**

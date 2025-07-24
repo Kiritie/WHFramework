@@ -8,6 +8,7 @@
 
 #include "SceneModuleStatics.generated.h"
 
+class AMiniMapCapture;
 class UWorldWeather;
 class UWorldTimer;
 class APhysicsVolumeBase;
@@ -22,7 +23,7 @@ class WHFRAMEWORK_API USceneModuleStatics : public UBlueprintFunctionLibrary
 
 public:
 	//////////////////////////////////////////////////////////////////////////
-	/// World
+	// Coordinate
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
 	static float GetSeaLevel();
 
@@ -32,6 +33,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
 	static float GetAltitude(bool bUnsigned = false, bool bRefresh = false);
 
+	//////////////////////////////////////////////////////////////////////////
+	// MiniMap
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
 	static AMiniMapCapture* GetMiniMapCapture();
 
@@ -58,7 +61,30 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
 	static void SetMiniMapTexture(UTextureRenderTarget2D* InMiniMapTexture);
+
+	//////////////////////////////////////////////////////////////////////////
+	// MaxMap
+	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
+	static bool HasMaxMapArea(const FName InName);
+
+	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
+	static FWorldMaxMapArea GetMaxMapArea(const FName InName);
+
+	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
+	static FWorldMaxMapArea GetMaxMapAreaByPoint(const FVector2D& InPoint);
+
+	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
+	static TArray<FWorldMaxMapArea> GetMaxMapAreas();
+
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
+	static void AddMaxMapArea(const FWorldMaxMapArea& InArea);
 	
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
+	static void RemoveMaxMapArea(const FName InName);
+		
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
+	static void ClearMaxMapArea();
+
 	//////////////////////////////////////////////////////////////////////////
 	/// WorldTimer
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "SceneModuleStatics")
@@ -189,5 +215,5 @@ public:
 	//////////////////////////////////////////////////////////////////////////
     /// World Text
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
-	static void SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetMapping InMapping, FVector InOffsetRange = FVector::ZeroVector);
+	static void SpawnWorldText(const FString& InText, const FLinearColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetMapping InMapping, FVector InOffsetRange = FVector::ZeroVector);
 };

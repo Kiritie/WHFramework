@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Common/Base/WHObject.h"
+#include "Thread/IThreadSafeInterface.h"
 #include "VoxelGenerator.generated.h"
 
 class UVoxelModule;
@@ -13,7 +14,7 @@ class AVoxelChunk;
  *
  */
 UCLASS(Abstract, Blueprintable, BlueprintType, EditInlineNew)
-class WHFRAMEWORK_API UVoxelGenerator : public UWHObject
+class WHFRAMEWORK_API UVoxelGenerator : public UWHObject, public IThreadSafeInterface
 {
 	GENERATED_BODY()
 	
@@ -28,4 +29,7 @@ public:
 protected:
 	UPROPERTY(BlueprintReadOnly)
 	UVoxelModule* Module;
+
+public:
+	UVoxelModule* GetModule() const { return Module; }
 };

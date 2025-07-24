@@ -29,6 +29,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE( FSimpleDynamicMulticastDelegate );
 #define PHASEC(A, B) \
 ((uint8)A & (uint8)B) != 0
 
+#define NUMWITH(A, B) \
+(A & B) != 0
+
 #define ENUMWITH(A, B) \
 ((uint8)A & (uint8)B) != 0
 
@@ -98,11 +101,11 @@ InstanceClass* InstanceClass::GetPtr() \
 // ROB
 #define DECLARE_PROPERTY_ROB_GETTER(ClassName, PropertyName, PropertyClassName) \
 	PropertyClassName ClassName::*Get##PropertyName(); \
-	template <PropertyClassName ClassName::*M> \
-	struct ClassName##Rob { \
-		friend PropertyClassName ClassName::*Get##PropertyName() { return M; } \
+	template <PropertyClassName ClassName::*_##PropertyName> \
+	struct ClassName##Rob_##PropertyName { \
+		friend PropertyClassName ClassName::*Get##PropertyName() { return _##PropertyName; } \
 	}; \
-	template struct ClassName##Rob<&ClassName::PropertyName>;
+	template struct ClassName##Rob_##PropertyName<&ClassName::PropertyName>;
 
 // INI
 #define GET_STRING_CONFIG(IniFilename, IniSection, IniKey, OutValue, DefaultValue) \

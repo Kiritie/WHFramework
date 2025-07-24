@@ -4,12 +4,10 @@
 
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/AbilityModuleTypes.h"
-#include "Ability/Actor/AbilityActorBase.h"
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Character/AbilityCharacterDataBase.h"
 #include "Components/ArrowComponent.h"
 #include "Components/BillboardComponent.h"
-#include "Components/CapsuleComponent.h"
 
 AAbilityCharacterSpawner::AAbilityCharacterSpawner()
 {

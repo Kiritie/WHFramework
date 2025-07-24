@@ -36,7 +36,7 @@ void UAbilityVitalityState_Spawn::OnEnter(UFiniteStateBase* InLastState, const T
 		Rescuer = InParams[0].GetPointerValue<IAbilityVitalityInterface>();
 	}
 	
-	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalitySpawned>(Cast<UObject>(this), { GetAgent(), Cast<UObject>(Rescuer) });
+	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalitySpawned>(this, { GetAgent(), Cast<UObject>(Rescuer) });
 
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 

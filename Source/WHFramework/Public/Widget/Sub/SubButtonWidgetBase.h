@@ -78,9 +78,6 @@ public:
 	virtual void Destroy(bool bRecovery = false) override;
 
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn))
-	TArray<FParameter> WidgetParams;
-
 	IPanelWidgetInterface* OwnerWidget;
 
 public:
@@ -93,8 +90,7 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	virtual UUserWidget* GetOwnerWidget(TSubclassOf<UUserWidget> InClass = nullptr) const override;
 
-	UFUNCTION(BlueprintPure)
-	virtual TArray<FParameter> GetWidgetParams() const override { return WidgetParams; }
+	virtual TArray<FParameter> GetWidgetParams() const override { return Super::GetWidgetParams(); }
 
 	UFUNCTION(BlueprintPure)
 	TArray<UWidget*> GetPoolWidgets() const;

@@ -3,11 +3,15 @@
 
 #include "Voxel/Voxels/Auxiliary/VoxelAuxiliary.h"
 
+#include "Math/MathHelper.h"
 #include "Voxel/VoxelModule.h"
 
 AVoxelAuxiliary::AVoxelAuxiliary()
 {
+	PrimaryActorTick.bCanEverTick = false;
+
 	VoxelItem = FVoxelItem::Empty;
+	VoxelScope = EVoxelScope::None;
 }
 
 void AVoxelAuxiliary::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -20,6 +24,7 @@ void AVoxelAuxiliary::OnDespawn_Implementation(bool bRecovery)
 	Super::OnDespawn_Implementation(bRecovery);
 
 	VoxelItem = FVoxelItem::Empty;
+	VoxelScope = EVoxelScope::None;
 }
 
 void AVoxelAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -29,11 +34,18 @@ void AVoxelAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	if(PHASEC(InPhase, EPhase::All))
 	{
 		VoxelItem = SaveData.VoxelItem;
-		switch(SaveData.MeshNature)
+		VoxelScope = SaveData.VoxelScope;
+		switch(VoxelScope)
 		{
 			case EVoxelScope::Chunk:
+			case EVoxelScope::Prefab:
 			{
-				SetActorRelativeLocation(VoxelItem.GetLocation() + VoxelItem.GetRange() * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f);
+				SetActorRelativeLocation(VoxelItem.GetLocation() + VoxelItem.GetRange(true, true) * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f);
+				break;
+			}
+			case EVoxelScope::Preview:
+			{
+				SetActorRelativeLocation(VoxelItem.GetRange(true, true) * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f);
 				break;
 			}
 			case EVoxelScope::Vitality:
@@ -43,6 +55,8 @@ void AVoxelAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			}
 			default: break;
 		}
+		SetActorRelativeRotation(FRotator(0.f, FMathHelper::RightAngleToFloat(VoxelItem.Angle), 0.f));
+		SetActorRelativeScale3D(FVector::OneVector);
 	}
 }
 
@@ -52,6 +66,7 @@ FSaveData* AVoxelAuxiliary::ToData()
 	SaveData = FVoxelAuxiliarySaveData();
 
 	SaveData.VoxelItem = VoxelItem;
+	SaveData.VoxelScope = VoxelScope;
 
 	return &SaveData;
 }

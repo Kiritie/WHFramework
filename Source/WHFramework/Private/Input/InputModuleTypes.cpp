@@ -3,6 +3,7 @@
 
 #include "Input/InputModuleTypes.h"
 
+#include "Input/Manager/DefaultInputManagerBase.h"
 #include "Widgets/SViewport.h"
 
 bool FInputKeyShortcut::IsPressed(APlayerController* InPlayerController, bool bAllowInvalid) const

@@ -40,8 +40,13 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	FVoxelItem VoxelItem;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	EVoxelScope VoxelScope;
+
 public:
 	FVoxelItem& GetVoxelItem(bool bRefresh = false);
+
+	EVoxelScope GetVoxelScope() const { return VoxelScope; }
 
 	virtual FPrimaryAssetId GetAssetID_Implementation() const override { return VoxelItem.ID; }
 

@@ -4,36 +4,38 @@
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/Abilities/ItemAbilityBase.h"
 #include "Ability/Actor/AbilityActorInterface.h"
+#include "Ability/Inventory/AbilityInventoryBase.h"
+#include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
 #include "Common/CommonStatics.h"
 
 UAbilityItemDataBase::UAbilityItemDataBase()
 {
-	Type = FName("None");
+	Type = FName("Misc");
 
 	Name = FText::GetEmpty();
 	Detail = FText::GetEmpty();
 	Rarity = EAbilityItemRarity::None;
 	Icon = nullptr;
-	MaxCount = 1;
+	MaxCount = 0;
 	MaxLevel = 0;
 	AbilityClass = nullptr;
 	PickUpClass = nullptr;
 
-	InitIcon = nullptr;
+	_Icon = nullptr;
 }
 
 void UAbilityItemDataBase::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
 
-	InitIcon = Icon;
+	_Icon = Icon;
 }
 
 void UAbilityItemDataBase::OnReset_Implementation()
 {
 	Super::OnReset_Implementation();
 
-	Icon = InitIcon;
+	Icon = _Icon;
 }
 
 int32 UAbilityItemDataBase::ClampCount(int32 InCount) const
@@ -99,14 +101,17 @@ FString UAbilityItemDataBase::GetItemAbilityInfo(int32 InLevel) const
 	return TEXT("");
 }
 
-FString UAbilityItemDataBase::GetItemErrorInfo(AActor* InOwner, int32 InLevel) const
+FString UAbilityItemDataBase::GetItemErrorInfo(FAbilityItem InItem) const
 {
 	FString ErrorInfo;
-	if(IAbilityActorInterface* AbilityActor = Cast<IAbilityActorInterface>(InOwner))
+	if(UAbilityInventorySlotBase* InventorySlot = InItem.GetPayload<UAbilityInventorySlotBase>())
 	{
-		if(AbilityActor->GetLevelA() < InLevel)
+		if(IAbilityActorInterface* AbilityActor = InventorySlot->GetInventory()->GetOwnerAgent<IAbilityActorInterface>())
 		{
-			ErrorInfo = FString::Printf(TEXT("角色未达到[%d]级"), InLevel);
+			if(AbilityActor->GetLevelA() < InItem.Level)
+			{
+				ErrorInfo = FString::Printf(TEXT("角色未达到[%d]级"), InItem.Level);
+			}
 		}
 	}
 	return ErrorInfo;

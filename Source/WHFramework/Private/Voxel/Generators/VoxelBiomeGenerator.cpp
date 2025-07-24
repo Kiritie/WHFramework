@@ -12,32 +12,29 @@ UVoxelBiomeGenerator::UVoxelBiomeGenerator()
 void UVoxelBiomeGenerator::Generate(AVoxelChunk* InChunk)
 {
 	ITER_INDEX2D(Index, Module->GetWorldData().ChunkSize, false,
-		const float Temperature = InChunk->GetTopography(Index).Temperature;
-		const float Humidity = InChunk->GetTopography(Index).Humidity;
+		FVoxelTopography Topography = InChunk->GetTopography(Index);
 
-		EVoxelBiomeType VoxelBiome;
-
-		if(Temperature < -0.2f)
+		if(Topography.Temperature < -0.2f)
 		{
-			VoxelBiome = EVoxelBiomeType::Snow;
+			Topography.BiomeType = EVoxelBiomeType::Snow;
 		}
-		else if(Temperature < 0.2f && Humidity < 0.05f)
+		else if(Topography.Temperature < 0.2f && Topography.Humidity < 0.05f)
 		{
-			VoxelBiome = EVoxelBiomeType::Stone;
+			Topography.BiomeType = EVoxelBiomeType::Stone;
 		}
-		else if(Temperature < 0.2f && Humidity < 0.1f)
+		else if(Topography.Temperature < 0.2f && Topography.Humidity < 0.1f)
 		{
-			VoxelBiome = EVoxelBiomeType::Dry;
+			Topography.BiomeType = EVoxelBiomeType::Dry;
 		}
-		else if(Temperature < 0.2f || Humidity > 0.7f)
+		else if(Topography.Temperature < 0.2f || Topography.Humidity > 0.7f)
 		{
-			VoxelBiome = EVoxelBiomeType::Green;
+			Topography.BiomeType = EVoxelBiomeType::Green;
 		}
 		else
 		{
-			VoxelBiome = EVoxelBiomeType::Desert;
+			Topography.BiomeType = EVoxelBiomeType::Desert;
 		}
 
-		InChunk->GetTopography(Index).BiomeType = VoxelBiome;
+		InChunk->SetTopography(Index, Topography);
 	)
 }

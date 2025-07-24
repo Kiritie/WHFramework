@@ -51,7 +51,7 @@ public:
 
 	virtual EInputMode GetNativeInputMode() const override { return NativeInputMode; }
 
-	virtual void SetNativeInputMode(EInputMode InInputMode) override { NativeInputMode = InInputMode; }
+	virtual void SetNativeInputMode(EInputMode InInputMode) override;
 
 	virtual EInputMode GetGlobalInputMode() const { return GlobalInputMode; }
 };

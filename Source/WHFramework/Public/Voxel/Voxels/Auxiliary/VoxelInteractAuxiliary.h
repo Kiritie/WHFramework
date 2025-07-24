@@ -41,6 +41,9 @@ protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UInteractionComponent* Interaction;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool bInteracting;
+	
 public:
 	template<class T>
 	T* GetInteractingAgent() const

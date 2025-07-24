@@ -35,7 +35,7 @@ void USubButtonWidgetBase::OnCreate(UUserWidget* InOwner, const TArray<FParamete
 
 	for(auto Iter : GetPoolWidgets())
 	{
-		IObjectPoolInterface::Execute_OnSpawn(Iter, nullptr, {});
+		IObjectPoolInterface::Execute_OnSpawn(Iter, this, IObjectPoolInterface::Execute_GetSpawnParams(Iter));
 	}
 
 	K2_OnCreate(InOwner, InParams);

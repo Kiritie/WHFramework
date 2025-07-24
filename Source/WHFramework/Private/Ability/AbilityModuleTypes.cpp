@@ -9,6 +9,8 @@
 #include "Ability/Vitality/AbilityVitalityInterface.h"
 #include "Common/CommonStatics.h"
 
+FPrimaryAssetId PAID_EXP = FPrimaryAssetId(TEXT("Misc:DA_Exp"));
+
 bool FGameplayEffectContextBase::NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuccess)
 {
 	return Super::NetSerialize(Ar, Map, bOutSuccess) && TargetData.NetSerialize(Ar, Map, bOutSuccess);
@@ -37,6 +39,11 @@ void UTargetType_UseEventData::GetTargets_Implementation(AActor* OwningActor, AA
 	}
 }
 
+void UDamageHandle::OnReset_Implementation()
+{
+	
+}
+
 void UDamageHandle::HandleDamage(AActor* SourceActor, AActor* TargetActor, float DamageValue, const FGameplayAttribute& DamageAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
 {
 	IAbilityVitalityInterface* TargetVitality = Cast<IAbilityVitalityInterface>(TargetActor);
@@ -50,6 +57,11 @@ void UDamageHandle::HandleDamage(AActor* SourceActor, AActor* TargetActor, float
 	}
 }
 
+void URecoveryHandle::OnReset_Implementation()
+{
+	
+}
+
 void URecoveryHandle::HandleRecovery(AActor* SourceActor, AActor* TargetActor, float RecoveryValue, const FGameplayAttribute& RecoveryAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
 {
 	IAbilityVitalityInterface* TargetVitality = Cast<IAbilityVitalityInterface>(TargetActor);
@@ -61,6 +73,11 @@ void URecoveryHandle::HandleRecovery(AActor* SourceActor, AActor* TargetActor, f
 			TargetVitality->HandleRecovery(RecoveryAttribute, RecoveryValue, HitResult, SourceTags, SourceActor);
 		}
 	}
+}
+
+void UInterruptHandle::OnReset_Implementation()
+{
+	
 }
 
 void UInterruptHandle::HandleInterrupt(AActor* SourceActor, AActor* TargetActor, float InterruptDuration, const FGameplayAttribute& InterruptAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
@@ -111,25 +128,6 @@ EAbilityItemType FAbilityItem::GetType() const
 	return GetData().GetItemType();
 }
 
-UAbilityInventoryBase* FAbilityItem::GetInventory() const
-{
-	if(InventorySlot)
-	{
-		return InventorySlot->GetInventory();
-	}
-	return nullptr;
-}
-
-UAbilityInventorySlotBase* FAbilityItem::GetSlot() const
-{
-	return InventorySlot;
-}
-
-FGameplayAbilitySpecHandle FAbilityItem::GetHandle() const
-{
-	return AbilityHandle;
-}
-
 UPrimaryAssetBase& FAbilityData::GetData() const
 {
 	return UAssetModuleStatics::LoadPrimaryAssetRef<UPrimaryAssetBase>(ID);
@@ -178,7 +176,7 @@ void FInventorySaveData::FillItems(int32 InLevel, FRandomStream InRandomStream)
 					case EAbilityItemFillType::Rate:
 					{
 						const float ItemRate = InRandomStream.FRand();
-						for(auto& Iter3 : Iter2.Value.Items)
+						for(auto& Iter3 : Iter2.Value.Rows)
 						{
 							if(ItemRate < Iter3.Rate)
 							{

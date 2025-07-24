@@ -48,13 +48,13 @@ void UVoxelPlant::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResu
 	Super::OnAgentExit(InAgent, InHitResult);
 }
 
-bool UVoxelPlant::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, const FVoxelHitResult& InHitResult)
+bool UVoxelPlant::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
 {
 	switch (InInteractAction)
 	{
 		case EInputInteractAction::Primary:
 		{
-			return Super::OnAgentInteract(InAgent, InInteractAction, InHitResult);
+			return Super::OnAgentInteract(InAgent, InInteractAction, InInteractEvent, InHitResult);
 		}
 		default: break;
 	}

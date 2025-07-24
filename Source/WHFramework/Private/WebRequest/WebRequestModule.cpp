@@ -17,11 +17,13 @@ UWebRequestModule::UWebRequestModule()
 	ModuleDisplayName = FText::FromString(TEXT("Web Request Module"));
 
 	bLocalMode = false;
-	ServerURL = TEXT("");
+	ServerIP = TEXT("");
 	ServerPort = 8080;
 	
 	WebInterfaces = TArray<UWebInterfaceBase*>();
+	WebRequestConfigs = TArray<FWebRequestConfig>();
 	WebInterfaceMap = TMap<FName, UWebInterfaceBase*>();
+	WebRequestConfigMap = TMap<FName, FWebRequestConfig>();
 }
 
 UWebRequestModule::~UWebRequestModule()
@@ -47,9 +49,17 @@ void UWebRequestModule::OnInitialize()
 {
 	Super::OnInitialize();
 
+	FWebRequestManager::Get().SetLocalMode(bLocalMode);
+	FWebRequestManager::Get().SetServerIP(ServerIP);
+	FWebRequestManager::Get().SetServerPort(ServerPort);
+
 	for(auto& Iter : WebInterfaces)
 	{
 		CreateWebInterface(Iter);
+	}
+	for(auto& Iter : WebRequestConfigs)
+	{
+		CreateWebRequestConfig(Iter.Name, Iter.Method, Iter.Params, Iter.HeadMap, Iter.Content, Iter.TriggerType, Iter.TriggerTime);
 	}
 }
 
@@ -88,12 +98,34 @@ FString UWebRequestModule::GetModuleDebugMessage()
 	return Super::GetModuleDebugMessage();
 }
 
+void UWebRequestModule::SetLocalMode(bool bInLocalMode)
+{
+	bLocalMode = bInLocalMode;
+	FWebRequestManager::Get().SetLocalMode(bLocalMode);
+}
+
+void UWebRequestModule::SetServerIP(const FString& InServerIP)
+{
+	ServerIP = InServerIP;
+	FWebRequestManager::Get().SetServerIP(ServerIP);
+}
+
+void UWebRequestModule::SetServerPort(int32 InServerPort)
+{
+	ServerPort = InServerPort;
+	FWebRequestManager::Get().SetServerPort(ServerPort);
+}
+
 FString UWebRequestModule::GetServerURL() const
 {
-	const int32 MidIndex = ServerURL.Find(TEXT("/"), ESearchCase::IgnoreCase, ESearchDir::FromStart, 7);
-	const FString BeginURL = !bLocalMode ? ServerURL.Mid(0, MidIndex) : TEXT("http://127.0.0.1");
-	const FString EndURL = ServerURL.Mid(MidIndex, ServerURL.Len() - MidIndex);
-	return FString::Printf(TEXT("%s:%d%s"), *BeginURL, ServerPort, *EndURL);
+	return FWebRequestManager::Get().GetServerURL();
+}
+
+void UWebRequestModule::SetServerURL(const FString& InServerURL)
+{
+	FWebRequestManager::Get().SetServerURL(InServerURL);
+	ServerIP = FWebRequestManager::Get().GetServerIP();
+	ServerPort = FWebRequestManager::Get().GetServerPort();
 }
 
 bool UWebRequestModule::HasWebInterface(const FName InName)
@@ -200,6 +232,91 @@ void UWebRequestModule::ClearAllWebInterface()
 	WebInterfaceMap.Empty();
 }
 
+bool UWebRequestModule::HasWebRequestConfig(const FName InName)
+{
+	return WebRequestConfigMap.Contains(InName);
+}
+
+FWebRequestConfig UWebRequestModule::GetWebRequestConfig(const FName InName)
+{
+	if(HasWebRequestConfig(InName))
+	{
+		return WebRequestConfigMap[InName];
+	}
+	return FWebRequestConfig();
+}
+
+FWebRequestConfig UWebRequestModule::CreateWebRequestConfig(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>* InParams, FParameterMap InHeadMap, FWebContent InContent, EWebRequestTriggerType InTriggerType, float InTriggerTime)
+{
+	return CreateWebRequestConfig(InName, InMethod, InParams ? *InParams : TArray<FParameter>(), InHeadMap, InContent, InTriggerType, InTriggerTime);
+}
+
+FWebRequestConfig UWebRequestModule::CreateWebRequestConfig(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent, EWebRequestTriggerType InTriggerType, float InTriggerTime)
+{
+	FWebRequestConfig Config;
+	if(!HasWebRequestConfig(InName))
+	{
+		Config.Name = InName;
+		Config.Method = InMethod;
+		Config.Params = InParams;
+		Config.HeadMap = InHeadMap;
+		Config.Content = InContent;
+		Config.TriggerType = InTriggerType;
+		Config.TriggerTime = InTriggerTime;
+
+		switch(Config.TriggerType)
+		{
+			case EWebRequestTriggerType::Timer:
+			{
+				GetWorld()->GetTimerManager().SetTimer(Config.TriggerTimerHandle, FTimerDelegate::CreateLambda([this, Config]()
+				{
+					SendWebRequest(Config.Name, Config.Method, Config.Params, Config.HeadMap, Config.Content);
+				}), Config.TriggerTime, true);
+			}
+			case EWebRequestTriggerType::Default:
+			{
+				GetWorld()->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateLambda([this, Config]()
+				{
+					SendWebRequest(Config.Name, Config.Method, Config.Params, Config.HeadMap, Config.Content);
+				}));
+				break;
+			}
+			default: break;
+		}
+
+		WebRequestConfigMap.Add(Config.Name, Config);
+	}
+	return Config;
+}
+
+FWebRequestConfig UWebRequestModule::K2_CreateWebRequestConfig(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent, EWebRequestTriggerType InTriggerType, float InTriggerTime)
+{
+	return CreateWebRequestConfig(InName, InMethod, InParams, InHeadMap, InContent, InTriggerType, InTriggerTime);
+}
+
+bool UWebRequestModule::ClearWebRequestConfig(const FName InName)
+{
+	if(HasWebRequestConfig(InName))
+	{
+		FWebRequestConfig& Config = WebRequestConfigMap[InName];
+		if(Config.TriggerType == EWebRequestTriggerType::Timer)
+		{
+			GetWorld()->GetTimerManager().ClearTimer(Config.TriggerTimerHandle);
+		}
+		WebRequestConfigMap.Remove(InName);
+		return true;
+	}
+	return false;
+}
+
+void UWebRequestModule::ClearAllWebRequestConfig()
+{
+	for(auto& Iter : WebRequestConfigMap)
+	{
+		ClearWebRequestConfig(Iter.Key);
+	}
+}
+
 bool UWebRequestModule::SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>* InParams, FParameterMap InHeadMap, FWebContent InContent)
 {
 	return SendWebRequest(InName, InMethod, InParams ? *InParams : TArray<FParameter>(), InHeadMap, InContent);
@@ -211,12 +328,15 @@ bool UWebRequestModule::SendWebRequest(const FName InName, EWebRequestMethod InM
 	{
 		return FWebRequestManager::Get().SendWebRequest(WebInterface->GetFullUrl(), InMethod, InHeadMap, InContent, [this, WebInterface, InContent, InParams](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess)
 		{
-			OnWebRequestComplete(Request, Response, bSuccess, WebInterface, InContent.ToString(), InParams);
+			if(UCommonStatics::IsPlaying())
+			{
+				OnWebRequestComplete(Request, Response, bSuccess, WebInterface, InContent.ToString(), InParams);
+			}
 		});
 	}
 	else
 	{
-		ensureEditorMsgf(false, FString::Printf(TEXT("Send seb request failed, interface dose not exist: %s"), *WebInterface->GetNameN().ToString()), EDC_WebRequest, EDV_Error);
+		ensureEditorMsgf(false, FString::Printf(TEXT("Send seb request failed, interface dose not exist: %s"), *InName.ToString()), EDC_WebRequest, EDV_Error);
 	}
 	return false;
 }
@@ -224,6 +344,19 @@ bool UWebRequestModule::SendWebRequest(const FName InName, EWebRequestMethod InM
 bool UWebRequestModule::K2_SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent)
 {
 	return SendWebRequest(InName, InMethod, InParams, InHeadMap, InContent);
+}
+
+bool UWebRequestModule::SendWebRequestByConfig(const FName InName)
+{
+	if(WebRequestConfigMap.Contains(InName))
+	{
+		const FWebRequestConfig& Config = WebRequestConfigMap[InName];
+		if(Config.TriggerType == EWebRequestTriggerType::Procedure)
+		{
+			return SendWebRequest(InName, Config.Method, Config.Params, Config.HeadMap, Config.Content);
+		}
+	}
+	return false;
 }
 
 void UWebRequestModule::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, UWebInterfaceBase* InWebInterface, const FString InContent, const TArray<FParameter> InParams)

@@ -44,9 +44,9 @@ void ACameraPointBase::OnInitialize_Implementation()
 	}
 }
 
-void ACameraPointBase::OnPreparatory_Implementation(EPhase InPhase)
+void ACameraPointBase::OnPreparatory_Implementation()
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory_Implementation();
 }
 
 void ACameraPointBase::OnRefresh_Implementation(float DeltaSeconds)
@@ -54,9 +54,9 @@ void ACameraPointBase::OnRefresh_Implementation(float DeltaSeconds)
 	Super::OnRefresh_Implementation(DeltaSeconds);
 }
 
-void ACameraPointBase::OnTermination_Implementation(EPhase InPhase)
+void ACameraPointBase::OnTermination_Implementation()
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination_Implementation();
 }
 
 void ACameraPointBase::OnConstruction(const FTransform& Transform)

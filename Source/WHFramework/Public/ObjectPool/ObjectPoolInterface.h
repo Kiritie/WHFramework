@@ -30,4 +30,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void OnDespawn(bool bRecovery);
+
+public:
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	TArray<FParameter> GetSpawnParams() const;
 };

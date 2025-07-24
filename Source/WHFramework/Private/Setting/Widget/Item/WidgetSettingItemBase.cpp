@@ -6,6 +6,7 @@
 
 UWidgetSettingItemBase::UWidgetSettingItemBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
+	WidgetParams.Add(FParameter::MakeText(FText::GetEmpty(), FText::FromString(TEXT("标题"))));
 }
 
 void UWidgetSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -63,4 +64,9 @@ void UWidgetSettingItemBase::SetValues(const TArray<FParameter>& InValues)
 		OnValuesChanged.Broadcast(this, InValues);
 	}
 	Refresh();
+}
+
+void UWidgetSettingItemBase::SetVisible(bool bVisible)
+{
+	SetVisibility(bVisible ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 }

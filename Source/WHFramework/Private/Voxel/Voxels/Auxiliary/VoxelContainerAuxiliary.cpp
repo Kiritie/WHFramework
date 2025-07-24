@@ -7,7 +7,7 @@
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
 #include "Common/Interaction/InteractionComponent.h"
-#include "Voxel/Datas/VoxelContainerData.h"
+#include "Voxel/Voxels/Data/VoxelContainerData.h"
 
 // Sets default values
 AVoxelContainerAuxiliary::AVoxelContainerAuxiliary()
@@ -30,7 +30,7 @@ void AVoxelContainerAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 	if(!SaveData.InventoryData.IsSaved())
 	{
-		SaveData.InventoryData = VoxelItem.GetVoxelData<UVoxelContainerData>().InventoryData;
+		SaveData.InventoryData = VoxelItem.GetData<UVoxelContainerData>().InventoryData;
 	}
 
 	if(PHASEC(InPhase, EPhase::All))

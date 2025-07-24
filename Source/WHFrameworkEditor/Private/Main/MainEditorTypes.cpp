@@ -14,8 +14,7 @@ FModuleClassFilter::FModuleClassFilter()
 	DisallowedClassFlags = CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists | CLASS_HideDropDown;
 	AllowedChildrenOfClasses.Add(UModuleBase::StaticClass());
 	bIncludeBaseClasses = false;
-	bIncludeParentClasses = false;
-		
+	
 	MainModule = nullptr;
 	EditingModuleClass = nullptr;
 }

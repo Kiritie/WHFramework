@@ -36,6 +36,8 @@ void UAttributeSetBase::SerializeAttributes(FArchive& Ar)
 void UAttributeSetBase::PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const
 {
 	Super::PreAttributeBaseChange(Attribute, NewValue);
+
+	const_cast<ThisClass*>(this)->PreAttributeChange(Attribute, NewValue);
 }
 
 void UAttributeSetBase::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
@@ -88,6 +90,8 @@ void UAttributeSetBase::SetAttributeValue(FGameplayAttribute InAttribute, float 
 
 void UAttributeSetBase::ModifyAttributeValue(FGameplayAttribute InAttribute, float InDeltaValue)
 {
+	if(InDeltaValue == 0.f) return;
+	
 	UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();
 	
 	AbilityComp->ApplyModToAttributeUnsafe(InAttribute, EGameplayModOp::Additive, InDeltaValue);

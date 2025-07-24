@@ -102,7 +102,7 @@ void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPar
 
 	for(auto Iter : GetPoolWidgets())
 	{
-		IObjectPoolInterface::Execute_OnSpawn(Iter, this, {});
+		IObjectPoolInterface::Execute_OnSpawn(Iter, this, IObjectPoolInterface::Execute_GetSpawnParams(Iter));
 	}
 
 	K2_OnCreate(InOwner, InParams);
@@ -156,6 +156,26 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 	OnStateChanged(WidgetState);
 
 	K2_OnOpen(InParams, bInstant);
+
+	switch(WidgetOpenType)
+	{
+		case EWidgetOpenType::Visible:
+		{
+			SetVisibility(ESlateVisibility::Visible);
+			break;
+		}
+		case EWidgetOpenType::HitTestInvisible:
+		{
+			SetVisibility(ESlateVisibility::HitTestInvisible);
+			break;
+		}
+		case EWidgetOpenType::SelfHitTestInvisible:
+		{
+			SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+			break;
+		}
+		default: break;
+	}
 
 	switch(WidgetOpenFinishType)
 	{
@@ -223,31 +243,25 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 			}
 		}
 	}
-	switch(WidgetOpenType)
+
+	switch(WidgetRefreshType)
 	{
-		case EWidgetOpenType::Visible:
+		case EWidgetRefreshType::Timer:
 		{
-			SetVisibility(ESlateVisibility::Visible);
+			GetWorld()->GetTimerManager().SetTimer(WidgetRefreshTimerHandle, this, &UUserWidgetBase::Refresh, WidgetRefreshTime, true);
 			break;
 		}
-		case EWidgetOpenType::HitTestInvisible:
+		case EWidgetRefreshType::Procedure:
 		{
-			SetVisibility(ESlateVisibility::HitTestInvisible);
-			break;
-		}
-		case EWidgetOpenType::SelfHitTestInvisible:
-		{
-			SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+			Refresh();
 			break;
 		}
 		default: break;
 	}
-		
-	Refresh();
 
-	if(WidgetRefreshType == EWidgetRefreshType::Timer)
+	if(bWidgetAutoFocus)
 	{
-		GetWorld()->GetTimerManager().SetTimer(WidgetRefreshTimerHandle, this, &UUserWidgetBase::Refresh, WidgetRefreshTime, true);
+		SetFocus();
 	}
 
 	UInputModuleStatics::UpdateGlobalInputMode();
@@ -438,11 +452,6 @@ void UUserWidgetBase::FinishOpen(bool bInstant)
 
 	WidgetState = EScreenWidgetState::Opened;
 	OnStateChanged(WidgetState);
-
-	if(bWidgetAutoFocus)
-	{
-		SetFocus();
-	}
 }
 
 void UUserWidgetBase::FinishClose(bool bInstant)

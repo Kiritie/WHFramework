@@ -6,6 +6,7 @@
 #include "Voxel/VoxelModuleTypes.h"
 #include "Common/Base/WHObject.h"
 #include "ReferencePool/ReferencePoolInterface.h"
+#include "Asset/Primary/PrimaryEntityInterface.h"
 
 #include "Voxel.generated.h"
 
@@ -17,7 +18,7 @@ class UVoxelData;
  * ����
  */
 UCLASS()
-class WHFRAMEWORK_API UVoxel : public UWHObject, public IReferencePoolInterface
+class WHFRAMEWORK_API UVoxel : public UWHObject, public IReferencePoolInterface, public IPrimaryEntityInterface
 {
 private:
 	GENERATED_BODY()
@@ -57,7 +58,7 @@ public:
 
 	virtual void OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult);
 
-	virtual bool OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, const FVoxelHitResult& InHitResult);
+	virtual bool OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult);
 
 protected:
 	UPROPERTY(VisibleAnywhere)
@@ -69,8 +70,6 @@ public:
 	bool IsEmpty() const;
 
 	bool IsUnknown() const;
-
-	bool IsGenerated() const { return Item.bGenerated; }
 
 	FVoxelItem& GetItem() { return Item; }
 
@@ -87,9 +86,9 @@ public:
 	template<class T>
 	T* GetOwner() const
 	{
-		return Cast<T>(Item.Owner);
+		return Cast<T>(GetOwner());
 	}
-	AVoxelChunk* GetOwner() const { return Item.Owner; }
+	AVoxelChunk* GetOwner() const;
 
 	template<class T>
 	T* GetAuxiliary() const
@@ -103,7 +102,12 @@ public:
 	{
 		return static_cast<T&>(GetData());
 	}
-	UVoxelData& GetData() const { return Item.GetVoxelData(); }
+	UVoxelData& GetData() const { return Item.GetData(); }
+
+public:
+	virtual FPrimaryAssetId GetAssetID_Implementation() const override { return Item.ID; }
+
+	virtual void SetAssetID_Implementation(const FPrimaryAssetId& InID) override { Item.ID = InID; }
 };
 
 UCLASS()

@@ -6,6 +6,7 @@
 #include "SaveGame/Base/SaveDataAgentInterface.h"
 #include "Ability/AbilityModuleTypes.h"
 #include "ReferencePool/ReferencePoolInterface.h"
+#include "Thread/IThreadSafeInterface.h"
 #include "AbilityInventoryBase.generated.h"
 
 class IAbilityInventoryAgentInterface;
@@ -18,7 +19,7 @@ class UAbilityInventorySkillSlotBase;
  * ��Ʒ��
  */
 UCLASS(DefaultToInstanced, Blueprintable)
-class WHFRAMEWORK_API UAbilityInventoryBase : public UWHObject, public ISaveDataAgentInterface, public IReferencePoolInterface
+class WHFRAMEWORK_API UAbilityInventoryBase : public UWHObject, public ISaveDataAgentInterface, public IReferencePoolInterface, public IThreadSafeInterface
 {
 	GENERATED_BODY()
 
@@ -166,12 +167,9 @@ public:
 				
 	UFUNCTION(BlueprintPure)
 	TArray<UAbilityInventorySlotBase*> GetAllSlots() const;
-				
+	
 	UFUNCTION(BlueprintPure)
-	TArray<FAbilityItem> GetAllItems() const;
-				
-	UFUNCTION(BlueprintPure)
-	TMap<EAbilityItemType, FAbilityItems> GetAllItemMap() const;
+	TArray<FAbilityItem> GetAllItems(bool bMerge = false) const;
 
 	UFUNCTION(BlueprintPure)
 	TArray<UAbilityInventorySlotBase*> GetSlotsBySplitType(ESlotSplitType InSplitType) const;

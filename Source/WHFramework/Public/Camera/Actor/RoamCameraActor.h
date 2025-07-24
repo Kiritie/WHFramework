@@ -24,6 +24,16 @@ protected:
 public:
 	virtual void SetCameraCollisionMode(ECameraCollisionMode InCameraCollisionMode) override;
 
+	//////////////////////////////////////////////////////////////////////////
+	/// Voxel
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
+	FPrimaryAssetId GenerateVoxelID;
+
 public:
 	virtual FVector GetVoxelAgentLocation() const override { return GetActorLocation(); }
+
+	virtual FPrimaryAssetId GetGenerateVoxelID() const override { return GenerateVoxelID; }
+
+	virtual void SetGenerateVoxelID(const FPrimaryAssetId& InGenerateVoxelID) override { GenerateVoxelID = InGenerateVoxelID; }
 };

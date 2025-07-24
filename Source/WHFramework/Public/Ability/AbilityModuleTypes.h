@@ -6,6 +6,7 @@
 #include "GameplayTagContainer.h"
 #include "Asset/AssetModuleTypes.h"
 #include "Common/CommonTypes.h"
+#include "ReferencePool/ReferencePoolInterface.h"
 #include "Scene/SceneModuleTypes.h"
 
 #include "AbilityModuleTypes.generated.h"
@@ -22,7 +23,11 @@ class AAbilityEquipBase;
 class UWidgetAbilityInventorySlotBase;
 class UAbilityInventorySlotBase;
 
+extern WHFRAMEWORK_API FPrimaryAssetId PAID_EXP;
+
 DECLARE_PROPERTY_ROB_GETTER(FGameplayEffectModifierMagnitude, AttributeBasedMagnitude, FAttributeBasedFloat)
+
+DECLARE_PROPERTY_ROB_GETTER(FGameplayEffectModifierMagnitude, CustomMagnitude, FCustomCalculationBasedFloat)
 
 #define GET_GAMEPLAYATTRIBUTE(ClassName, PropertyName) \
 	FGameplayAttribute(GET_MEMBER_PROPERTY(ClassName, PropertyName))
@@ -234,12 +239,14 @@ public:
  * 伤害处理类
  */
 UCLASS(Blueprintable)
-class WHFRAMEWORK_API UDamageHandle : public UWHObject
+class WHFRAMEWORK_API UDamageHandle : public UWHObject, public IReferencePoolInterface
 {
 	GENERATED_BODY()
 
 public:
 	UDamageHandle() {}
+
+	virtual void OnReset_Implementation() override;
 
 	virtual void HandleDamage(AActor* SourceActor, AActor* TargetActor, float DamageValue, const FGameplayAttribute& DamageAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
 };
@@ -248,12 +255,14 @@ public:
  * 伤害处理类
  */
 UCLASS(Blueprintable)
-class WHFRAMEWORK_API URecoveryHandle : public UWHObject
+class WHFRAMEWORK_API URecoveryHandle : public UWHObject, public IReferencePoolInterface
 {
 	GENERATED_BODY()
 
 public:
 	URecoveryHandle() {}
+
+	virtual void OnReset_Implementation() override;
 
 	virtual void HandleRecovery(AActor* SourceActor, AActor* TargetActor, float RecoveryValue, const FGameplayAttribute& RecoveryAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
 };
@@ -262,12 +271,14 @@ public:
  * 伤害处理类
  */
 UCLASS(Blueprintable)
-class WHFRAMEWORK_API UInterruptHandle : public UWHObject
+class WHFRAMEWORK_API UInterruptHandle : public UWHObject, public IReferencePoolInterface
 {
 	GENERATED_BODY()
 
 public:
 	UInterruptHandle() {}
+
+	virtual void OnReset_Implementation() override;
 
 	virtual void HandleInterrupt(AActor* SourceActor, AActor* TargetActor, float InterruptDuration, const FGameplayAttribute& InterruptAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
 };
@@ -330,29 +341,29 @@ UENUM(BlueprintType)
 enum class EAbilityItemType : uint8
 {
 	// 无
-	None UMETA(DisplayName="无"),
+	None,
 	// 货币
-	Coin UMETA(DisplayName="货币"),
+	Coin,
 	// 体素
-	Voxel UMETA(DisplayName="体素"),
+	Voxel,
 	// 材料
-	Raw UMETA(DisplayName="材料"),
+	Raw,
 	// 道具
-	Prop UMETA(DisplayName="道具"),
+	Prop,
 	// 装备
-	Equip UMETA(DisplayName="装备"),
+	Equip,
 	// 技能
-	Skill UMETA(DisplayName="技能"),
+	Skill,
 	// 物体
-	Actor UMETA(DisplayName="物体"),
+	Actor,
 	// 生命体
-	Vitality UMETA(DisplayName="生命体"),
+	Vitality,
 	// 对象
-	Pawn UMETA(DisplayName="对象"),
+	Pawn,
 	// 角色
-	Character UMETA(DisplayName="角色"),
+	Character,
 	// 混杂
-	Misc UMETA(DisplayName="混杂")
+	Misc
 };
 
 /**
@@ -416,8 +427,8 @@ public:
 		ID = FPrimaryAssetId();
 		Count = 0;
 		Level = 0;
-		InventorySlot = nullptr;
-		AbilityHandle = FGameplayAbilitySpecHandle();
+		Payload = nullptr;
+		Handle = FGameplayAbilitySpecHandle();
 	}
 	
 	FORCEINLINE FAbilityItem(const FPrimaryAssetId& InID, int32 InCount = 1, int32 InLevel = 0)
@@ -425,8 +436,8 @@ public:
 		ID = InID;
 		Count = InCount;
 		Level = InLevel;
-		InventorySlot = nullptr;
-		AbilityHandle = FGameplayAbilitySpecHandle();
+		Payload = nullptr;
+		Handle = FGameplayAbilitySpecHandle();
 	}
 	
 	FORCEINLINE FAbilityItem(const FAbilityItem& InItem, int32 InCount = -1, bool bClearCaches = false)
@@ -436,13 +447,13 @@ public:
 		Level = InItem.Level;
 		if(!bClearCaches)
 		{
-			InventorySlot = InItem.InventorySlot;
-			AbilityHandle = InItem.AbilityHandle;
+			Payload = InItem.Payload;
+			Handle = InItem.Handle;
 		}
 		else
 		{
-			InventorySlot = nullptr;
-			AbilityHandle = FGameplayAbilitySpecHandle();
+			Payload = nullptr;
+			Handle = FGameplayAbilitySpecHandle();
 		}
 	}
 
@@ -459,10 +470,10 @@ public:
 	int32 Level;
 
 	UPROPERTY(Transient)
-	UAbilityInventorySlotBase* InventorySlot;
+	UObject* Payload;
 	
 	UPROPERTY(Transient)
-	FGameplayAbilitySpecHandle AbilityHandle;
+	FGameplayAbilitySpecHandle Handle;
 	
 	static FAbilityItem Empty;
 
@@ -484,12 +495,16 @@ public:
 	bool IsDataType(TSubclassOf<UAbilityItemDataBase> InType) const;
 
 	EAbilityItemType GetType() const;
+	
+	template<class T>
+	T* GetPayload() const
+	{
+		return ::Cast<T>(GetPayload());
+	}
 
-	UAbilityInventoryBase* GetInventory() const;
+	FORCEINLINE UObject* GetPayload() const { return Payload; }
 
-	UAbilityInventorySlotBase* GetSlot() const;
-
-	FGameplayAbilitySpecHandle GetHandle() const;
+	FORCEINLINE FGameplayAbilitySpecHandle GetHandle() const { return Handle; }
 
 	FORCEINLINE virtual bool IsValid() const override
 	{
@@ -506,19 +521,19 @@ public:
 		return *this == Empty;
 	}
 
-	FORCEINLINE bool Match(const FAbilityItem& InItem) const
+	FORCEINLINE virtual bool Match(const FAbilityItem& InItem) const
 	{
 		return InItem.IsValid() && InItem.ID == ID && InItem.Level == Level;
 	}
 
-	FORCEINLINE bool Equal(const FAbilityItem& InItem) const
+	FORCEINLINE virtual bool Equal(const FAbilityItem& InItem) const
 	{
-		return (InItem.ID == ID) && (InItem.Count == Count) && (InItem.Level == Level);
+		return InItem.ID == ID && InItem.Count == Count && InItem.Level == Level;
 	}
 
 	FORCEINLINE bool EqualID(const FAbilityItem& InItem) const
 	{
-		return (InItem.ID == ID);
+		return InItem.ID == ID;
 	}
 
 	FORCEINLINE friend bool operator==(const FAbilityItem& A, const FAbilityItem& B)
@@ -873,12 +888,12 @@ enum class EAbilityItemFillType : uint8
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FAbilityItemFillItem
+struct WHFRAMEWORK_API FItemFillRow
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FAbilityItemFillItem()
+	FORCEINLINE FItemFillRow()
 	{
 		Rate = 0.f;
 		Num = 0;
@@ -892,19 +907,19 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FAbilityItemFillRule
+struct WHFRAMEWORK_API FItemFillRule
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FAbilityItemFillRule()
+	FORCEINLINE FItemFillRule()
 	{
 		Rate = 0.f;
 		Type = EAbilityItemFillType::Fixed;
 		Num = 0;
 		MinNum = 0;
 		MaxNum = 0;
-		Items = TArray<FAbilityItemFillItem>();
+		Rows = TArray<FItemFillRow>();
 	}
 
 	UPROPERTY(BlueprintReadOnly, EditAnywhere)
@@ -923,22 +938,22 @@ public:
 	int32 MaxNum;
 
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, meta = (EditConditionHides, EditCondition = "Type==EAbilityItemFillType::Rate"))
-	TArray<FAbilityItemFillItem> Items;
+	TArray<FItemFillRow> Rows;
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FAbilityItemFillRules
+struct WHFRAMEWORK_API FItemFillRules
 {
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FAbilityItemFillRules()
+	FORCEINLINE FItemFillRules()
 	{
-		Rules = TMap<EAbilityItemRarity, FAbilityItemFillRule>();
+		Rules = TMap<EAbilityItemRarity, FItemFillRule>();
 	}
 
 	UPROPERTY(BlueprintReadOnly, EditAnywhere)
-	TMap<EAbilityItemRarity, FAbilityItemFillRule> Rules;
+	TMap<EAbilityItemRarity, FItemFillRule> Rules;
 };
 
 USTRUCT(BlueprintType)
@@ -952,7 +967,7 @@ public:
 		InventoryClass = nullptr;
 		SplitItems = TMap<ESlotSplitType, FAbilityItems>();
 		SelectedIndexs = TMap<ESlotSplitType, int32>();
-		FillRules = TMap<EAbilityItemType, FAbilityItemFillRules>();
+		FillRules = TMap<EAbilityItemType, FItemFillRules>();
 	}
 
 public:
@@ -963,7 +978,7 @@ public:
 	TMap<ESlotSplitType, FAbilityItems> SplitItems;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TMap<EAbilityItemType, FAbilityItemFillRules> FillRules;
+	TMap<EAbilityItemType, FItemFillRules> FillRules;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	TMap<ESlotSplitType, int32> SelectedIndexs;
@@ -1188,6 +1203,11 @@ public:
 	FTransform BirthTransform;
 
 public:
+	virtual bool IsValid() const override
+	{
+		return AssetID.IsValid();
+	}
+	
 	virtual void MakeSaved() override
 	{
 		Super::MakeSaved();

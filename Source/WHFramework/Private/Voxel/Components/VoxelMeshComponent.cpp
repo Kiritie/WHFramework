@@ -3,12 +3,11 @@
 
 #include "Voxel/Components/VoxelMeshComponent.h"
 
-#include "Materials/MaterialInstanceDynamic.h"
-#include "Math/MathStatics.h"
+#include "Math/MathHelper.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
-#include "Voxel/Datas/VoxelData.h"
+#include "Voxel/Voxels/Data/VoxelData.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Voxels/Voxel.h"
 
@@ -54,39 +53,51 @@ void UVoxelMeshComponent::Initialize(EVoxelScope InScope, EVoxelNature InNature)
 	switch (Scope)
 	{
 		case EVoxelScope::Chunk:
+		case EVoxelScope::Prefab:
 		{
 			OffsetScale = FVector::OneVector;
 			CenterOffset = FVector(0.5f);
+			SetCastShadow(true);
 			SetCollisionEnabled(true);
-			break;
-		}
-		case EVoxelScope::PickUp:
-		{
-			OffsetScale = FVector::ZeroVector;
-			CenterOffset = FVector(0.5f);
-			SetCollisionEnabled(false);
 			break;
 		}
 		case EVoxelScope::Entity:
 		{
-			OffsetScale = FVector(0.f, 0.f, 1.f);
-			CenterOffset = FVector(0.f, 0.f, 0.5f);
+			OffsetScale = FVector::UpVector;
+			CenterOffset = FVector::ZeroVector;
+			SetCastShadow(false);
+			SetCollisionEnabled(false);
+			break;
+		}
+		case EVoxelScope::Capture:
+		{
+			OffsetScale = FVector::ZeroVector;
+			CenterOffset = FVector::ZeroVector;
 			SetCastShadow(false);
 			SetCollisionEnabled(false);
 			break;
 		}
 		case EVoxelScope::Preview:
 		{
-			OffsetScale = FVector::ZeroVector;
+			OffsetScale = FVector::OneVector;
 			CenterOffset = FVector(0.5f);
 			SetCastShadow(false);
+			SetCollisionEnabled(false);
+			break;
+		}
+		case EVoxelScope::PickUp:
+		{
+			OffsetScale = FVector::ZeroVector;
+			CenterOffset = FVector::ZeroVector;
+			SetCastShadow(true);
 			SetCollisionEnabled(false);
 			break;
 		}
 		case EVoxelScope::Vitality:
 		{
 			OffsetScale = FVector::OneVector;
-			CenterOffset = FVector(0.f, 0.f, 0.5f);
+			CenterOffset = FVector::ZeroVector;
+			SetCastShadow(true);
 			SetCollisionEnabled(false);
 			break;
 		}
@@ -107,7 +118,7 @@ void UVoxelMeshComponent::UnRegister()
 
 void UVoxelMeshComponent::BuildVoxel(const FVoxelItem& InVoxelItem)
 {
-	const UVoxelData& VoxelData = InVoxelItem.GetVoxelData();
+	const UVoxelData& VoxelData = InVoxelItem.GetData();
 	const FVoxelMeshData& MeshData = VoxelData.GetMeshData(InVoxelItem);
 	if(MeshData.bCustomMesh)
 	{
@@ -139,20 +150,21 @@ void UVoxelMeshComponent::CreateVoxel(const FVoxelItem& InVoxelItem)
 {
 	if(InVoxelItem.IsValid())
 	{
-		UVoxelData& VoxelData = InVoxelItem.GetVoxelData();
-		const FVector Range = VoxelData.GetRange();
+		UVoxelData& VoxelData = InVoxelItem.GetData();
 		SetNature(VoxelData.Nature);
-		CenterOffset = FVector(0.f, 0.f, -Range.Z * 0.5f + 0.5f);
-		ITER_INDEX(PartIndex, Range, false,
-			UVoxelData& PartData = VoxelData.GetPartData(PartIndex);
-			if(PartData.IsValid())
-			{
-				FVoxelItem PartItem;
-				PartItem.ID = PartData.GetPrimaryAssetId();
-				PartItem.Index = PartIndex;
-				BuildVoxel(PartItem);
-			}
-		)
+		const FVector Range = VoxelData.GetRange(InVoxelItem.Angle);
+		if(Scope == EVoxelScope::Capture)
+		{
+			CenterOffset = -(Range - 1.f) * 0.5f;
+		}
+		for(auto Iter : VoxelData.GetPartDatas())
+		{
+			FVoxelItem PartItem;
+			PartItem.ID = Iter->GetPrimaryAssetId();
+			PartItem.Index = FMathHelper::RotateIndex(Iter->PartIndex, InVoxelItem.Angle);
+			PartItem.Angle = InVoxelItem.Angle;
+			BuildVoxel(PartItem);
+		}
 		CreateMesh(0, false);
 	}
 	else
@@ -169,16 +181,22 @@ void UVoxelMeshComponent::CreateMesh(int32 InSectionIndex /*= 0*/, bool bHasColl
 		switch (Scope)
 		{
 			case EVoxelScope::Chunk:
-			case EVoxelScope::PickUp:
+			case EVoxelScope::Prefab:
 			case EVoxelScope::Entity:
+			case EVoxelScope::PickUp:
 			case EVoxelScope::Vitality:
 			{
 				SetMaterial(InSectionIndex, UVoxelModule::Get().GetWorldData().GetRenderData(Nature).MaterialInst);
 				break;
 			}
-			case EVoxelScope::Preview:
+			case EVoxelScope::Capture:
 			{
 				SetMaterial(InSectionIndex, UVoxelModule::Get().GetWorldData().GetRenderData(Nature).UnlitMaterialInst);
+				break;
+			}
+			case EVoxelScope::Preview:
+			{
+				SetMaterial(InSectionIndex, DuplicateObject<UMaterialInstance>(UVoxelModule::Get().GetWorldData().GetRenderData(Nature).TransMaterialInst, this));
 				break;
 			}
 			default: break;
@@ -290,26 +308,25 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EDirection In
 		default: break;
 	}
 
-	BuildFace(InVoxelItem, Vers, (int32)InFacing, UMathStatics::DirectionToVector(InFacing, InVoxelItem.Angle));
+	BuildFace(InVoxelItem, Vers, (int32)InFacing, FMathHelper::DirectionToVector(InFacing, InVoxelItem.Angle));
 }
 
 void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVertices[4], int32 InFaceIndex, FVector InNormal)
 {
 	const int32 VerNum = Vertices.Num();
-	const UVoxelData& VoxelData = InVoxelItem.GetVoxelData();
+	const UVoxelData& VoxelData = InVoxelItem.GetData();
 	const FVoxelMeshData& MeshData = VoxelData.GetMeshData(InVoxelItem);
 	const FVoxelMeshUVData& MeshUVData = MeshData.MeshUVDatas[InFaceIndex];
 	const FVoxelRenderData& RenderData = UVoxelModule::Get().GetWorldData().GetRenderData(Nature);
-	const FVector Scale = UMathStatics::RotatorVector(MeshData.MeshScale, InVoxelItem.Angle, false, true);
-	const FVector Offset = CenterOffset + UMathStatics::RotatorVector(MeshData.MeshOffset, InVoxelItem.Angle) * OffsetScale;
+	const FVector Scale = FMathHelper::RotateVector(MeshData.MeshScale, InVoxelItem.Angle, false, true);
+	const FVector Offset = CenterOffset + FMathHelper::RotateVector(MeshData.MeshOffset, InVoxelItem.Angle) * OffsetScale;
 	const FVector2D UVSize = FVector2D(RenderData.PixelSize / RenderData.TextureSize.X, RenderData.PixelSize / RenderData.TextureSize.Y);
-	const FVector2D UVCorner = FVector2D((MeshUVData.UVCorner.X + MeshUVData.UVOffset.X) * UVSize.X,
-		(1.f / UVSize.Y - (RenderData.TextureSize.Y / RenderData.PixelSize - (-MeshUVData.UVCorner.Y + MeshUVData.UVOffset.Y) - 1.f) - MeshUVData.UVSpan.Y) * UVSize.Y);
+	const FVector2D UVCorner = FVector2D((MeshUVData.UVCorner.X + MeshUVData.UVOffset.X) * UVSize.X, (1.f / UVSize.Y - (RenderData.TextureSize.Y / RenderData.PixelSize - (-MeshUVData.UVCorner.Y + MeshUVData.UVOffset.Y) - 1.f) - MeshUVData.UVSpan.Y) * UVSize.Y);
 	const FVector2D UVSpan = FVector2D(MeshUVData.UVSpan.X * UVSize.X, MeshUVData.UVSpan.Y * UVSize.Y);
 
 	for (int32 i = 0; i < 4; i++)
 	{
-		Vertices.Add((InVoxelItem.Index.ToVector() + UMathStatics::RotatorVector(InVertices[i], InVoxelItem.Angle) * Scale + Offset) * UVoxelModule::Get().GetWorldData().BlockSize);
+		Vertices.Add((InVoxelItem.Index.ToVector() + FMathHelper::RotateVector(InVertices[i], InVoxelItem.Angle) * Scale + Offset) * UVoxelModule::Get().GetWorldData().BlockSize);
 	}
 
 	UVs.Add(FVector2D(UVCorner.X, UVCorner.Y + UVSpan.Y));
@@ -346,13 +363,11 @@ void UVoxelMeshComponent::OnCollision(UPrimitiveComponent* HitComponent, AActor*
 
 void UVoxelMeshComponent::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	if(!GetOwnerChunk()) return;
 	
 }
 
 void UVoxelMeshComponent::OnEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
-	if(!GetOwnerChunk()) return;
 	
 }
 

@@ -16,7 +16,7 @@ class UVoxelData;
 class ACharacterBase;
 class UWorldTimer;
 class UWorldWeather;
-class AVoxelEntityPreview;
+class AVoxelEntityCapture;
 
 /**
  * 体素模块
@@ -70,13 +70,16 @@ protected:
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Capture")
 	AVoxelCapture* VoxelCapture;
 
+	UPROPERTY(Transient)
+	TArray<AVoxelEntityCapture*> CaptureVoxels;
+
 	//////////////////////////////////////////////////////////////////////////
-	// Voxel
+	// World
 protected:
 	UPROPERTY(EditAnywhere, Category = "World")
 	bool bAutoGenerate;
 
-	UPROPERTY(VisibleAnywhere, Category = "World")
+	UPROPERTY(EditAnywhere, Category = "World")
 	EVoxelWorldMode WorldMode;
 
 	UPROPERTY(VisibleAnywhere, Category = "World")
@@ -84,9 +87,19 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "World")
 	FVoxelWorldBasicSaveData WorldBasicData;
+	
+	UPROPERTY(VisibleAnywhere, Category = "World")
+	FIndex WorldCenterIndex;
+	
+	UPROPERTY(VisibleAnywhere, Category = "World")
+	FIndex WorldAgentIndex;
+
 public:
 	UFUNCTION(BlueprintPure)
 	EVoxelWorldMode GetWorldMode() const { return WorldMode; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetWorldMode(EVoxelWorldMode InWorldMode);
 
 	UFUNCTION(BlueprintPure)
 	EVoxelWorldState GetWorldState() const { return WorldState; }
@@ -94,17 +107,28 @@ public:
 	UFUNCTION(BlueprintPure)
 	FVoxelWorldBasicSaveData& GetWorldBasicData() { return WorldBasicData; }
 
-protected:
-	void SetWorldMode(EVoxelWorldMode InWorldMode);
+	UFUNCTION(BlueprintPure)
+	FIndex GetWorldCenterIndex() const { return WorldCenterIndex; }
 
+	UFUNCTION(BlueprintPure)
+	FIndex GetWorldAgentIndex() const { return WorldAgentIndex; }
+
+protected:
+	UFUNCTION(BlueprintCallable)
 	void SetWorldState(EVoxelWorldState InWorldState);
 
+protected:
 	virtual void OnWorldModeChanged();
 
 	virtual void OnWorldStateChanged();
 
+	virtual void OnWorldCenterChanged();
+
+	virtual void OnWorldAgentMoved();
+
 protected:
 	FVoxelWorldSaveData* WorldData;
+	
 public:
 	template<class T>
 	T& GetWorldData() const
@@ -115,6 +139,10 @@ public:
 
 	virtual FVoxelWorldSaveData* NewWorldData(FSaveData* InBasicData = nullptr) const;
 
+	virtual float GetWorldGeneratePercent() const;
+	
+	virtual FBox GetWorldBounds(float InRadius = 0.f, float InHalfHeight = 0.f) const;
+
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
@@ -124,15 +152,16 @@ protected:
 
 	virtual void UnloadData(EPhase InPhase) override;
 
+public:
+	virtual void LoadPrefabData(const FVoxelPrefabSaveData& InPrefabData);
+
+	virtual FVoxelPrefabSaveData GetPrefabData();
+
 protected:
 	virtual void GenerateWorld();
 	
 public:
 	virtual AVoxelChunk* SpawnChunk(FIndex InIndex, bool bAddToQueue = true);
-
-	virtual void GenerateChunk(FIndex InIndex);
-
-	virtual void DestroyChunk(FIndex InIndex);
 
 	virtual void LoadChunkMap(FIndex InIndex);
 
@@ -141,6 +170,12 @@ public:
 	virtual void SpawnChunkMesh(FIndex InIndex, int32 InStage);
 
 	virtual void BuildChunkMesh(FIndex InIndex);
+
+	virtual void GenerateChunk(FIndex InIndex);
+
+	virtual void SaveChunk(FIndex InIndex);
+
+	virtual void DestroyChunk(FIndex InIndex);
 	
 public:
 	virtual void GenerateChunkQueues(bool bFromAgent = true, bool bForce = false);
@@ -186,13 +221,13 @@ public:
 	virtual void SetVoxelByLocation(FVector InLocation, const FVoxelItem& InVoxelItem, bool bSafe = false);
 
 public:
-	virtual FVoxelTopography& GetTopographyByIndex(FIndex InIndex);
+	virtual const FVoxelTopography& GetTopographyByIndex(FIndex InIndex);
 
-	virtual FVoxelTopography& GetTopographyByLocation(FVector InLocation);
+	virtual const FVoxelTopography& GetTopographyByLocation(FVector InLocation);
 
 	virtual void SetTopographyByIndex(FIndex InIndex, const FVoxelTopography& InTopography);
 
-	virtual void SetTopographyLocation(FVector InLocation, const FVoxelTopography& InTopography);
+	virtual void SetTopographyByLocation(FVector InLocation, const FVoxelTopography& InTopography);
 
 public:
 	virtual float GetVoxelNoise1D(float InValue, bool bAbs = false, bool bUnsigned = false) const;
@@ -202,21 +237,21 @@ public:
 	virtual float GetVoxelNoise3D(FVector InLocation, bool bAbs = false, bool bUnsigned = false) const;
 
 public:
-	virtual FIndex LocationToChunkIndex(FVector InLocation, bool bIgnoreZ = false) const;
+	virtual FIndex LocationToChunkIndex(FVector InLocation) const;
 
 	virtual FVector ChunkIndexToLocation(FIndex InIndex) const;
 
 	virtual FIndex ChunkIndexToVoxelIndex(FIndex InIndex) const;
 
-	virtual FIndex LocationToVoxelIndex(FVector InLocation, bool bIgnoreZ = false) const;
+	virtual FIndex LocationToVoxelIndex(FVector InLocation) const;
 
 	virtual FVector VoxelIndexToLocation(FIndex InIndex) const;
 
 	virtual FIndex VoxelIndexToChunkIndex(FIndex InIndex) const;
 
-	virtual int32 VoxelIndexToNumber(FIndex InIndex) const;
+	virtual uint64 VoxelIndexToNumber(FIndex InIndex, bool bWorldSpace = false) const;
 
-	virtual FIndex NumberToVoxelIndex(int32 InNumber) const;
+	virtual FIndex NumberToVoxelIndex(uint64 InNumber, bool bWorldSpace = false) const;
 
 public:
 	virtual bool VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult);
@@ -241,41 +276,40 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	TMap<EVoxelWorldState, FVoxelChunkQueues> ChunkQueues;
 	
-	UPROPERTY(EditAnywhere, Category = "Voxel")
-	TArray<TSubclassOf<UVoxel>> VoxelClasses;
-	
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, Category = "Chunk")
 	int32 ChunkSpawnBatch;
-
-	UPROPERTY(VisibleAnywhere)
-	FIndex ChunkGenerateIndex;
 
 	UPROPERTY(Transient)
 	TMap<FIndex, AVoxelChunk*> ChunkMap;
 
-	UPROPERTY(Transient)
-	TArray<AVoxelEntityPreview*> PreviewVoxels;
+public:
+	virtual int32 GetChunkNum(bool bNeedGenerated = false) const;
+
+	virtual bool IsChunkGenerated(FIndex InIndex) const;
+	
+	virtual FVoxelChunkQueues GetChunkQueues(EVoxelWorldState InWorldState) const;
+
+protected:
+	UPROPERTY(EditAnywhere, Category = "Voxel")
+	TArray<TSubclassOf<UVoxel>> VoxelClasses;
+
+	UPROPERTY(EditAnywhere, Instanced, Category = "Voxel")
+	TArray<UVoxelGenerator*> VoxelGenerators;
 
 	UPROPERTY(Transient)
-	TMap<TSubclassOf<UVoxelGenerator>, UVoxelGenerator*> VoxelGenerators;
+	TMap<TSubclassOf<UVoxelGenerator>, UVoxelGenerator*> VoxelGeneratorMap;
+
+	UPROPERTY(Transient)
+	TMap<EVoxelType, FPrimaryAssetId> VoxelAssetIDMap;
 
 public:
-	bool IsBasicGenerated() const;
-	
-	FBox GetWorldBounds(float InRadius = 0.f, float InHalfHeight = 0.f) const;
-
-	int32 GetChunkNum(bool bNeedGenerated = false) const;
-
-	bool IsChunkGenerated(FIndex InIndex, bool bCheckVerticals = false) const;
-	
-	TArray<AVoxelChunk*> GetVerticalChunks(FIndex InIndex) const;
-	
-	FVoxelChunkQueues GetChunkQueues(EVoxelWorldState InWorldState) const;
-
 	template<class T>
 	T* GetVoxelGenerator() const
 	{
 		return Cast<T>(GetVoxelGenerator(T::StaticClass()));
 	}
-	UVoxelGenerator* GetVoxelGenerator(const TSubclassOf<UVoxelGenerator>& InClass) const;
+	virtual UVoxelGenerator* GetVoxelGenerator(const TSubclassOf<UVoxelGenerator>& InClass) const;
+
+	UFUNCTION(BlueprintPure)
+	FPrimaryAssetId VoxelTypeToAssetID(EVoxelType InVoxelType) const;
 };

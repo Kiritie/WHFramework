@@ -3,7 +3,7 @@
 #pragma once
 
 #include "Common/Base/WHActor.h"
-#include "ObjectPool/ObjectPoolInterface.h"
+#include "Voxel/VoxelModuleTypes.h"
 
 #include "VoxelEntity.generated.h"
 
@@ -32,11 +32,17 @@ public:
 		
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
+public:
+	virtual void OnInitialize_Implementation() override;
+
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
 	virtual FSaveData* ToData() override;
-	
+
+public:
+	virtual void SpawnAuxiliary();
+
 	virtual void DestroyAuxiliary();
 
 protected:
@@ -44,15 +50,13 @@ protected:
 	UVoxelMeshComponent* MeshComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	FPrimaryAssetId VoxelID;
+	FVoxelItem VoxelItem;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	AVoxelAuxiliary* Auxiliary;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	EVoxelScope VoxelScope;
 
 public:
 	UVoxelMeshComponent* GetMeshComponent() const { return MeshComponent; }
 
-	FPrimaryAssetId GetVoxelID() const { return VoxelID; }
-
-	AVoxelAuxiliary* GetAuxiliary() const { return Auxiliary; }
+	FVoxelItem GetVoxelItem() const { return VoxelItem; }
 };

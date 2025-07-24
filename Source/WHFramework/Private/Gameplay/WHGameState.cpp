@@ -12,7 +12,7 @@ void AWHGameState::OnInitialize_Implementation()
 	bInitialized = true;
 }
 
-void AWHGameState::OnPreparatory_Implementation(EPhase InPhase)
+void AWHGameState::OnPreparatory_Implementation()
 {
 	
 }
@@ -22,7 +22,7 @@ void AWHGameState::OnRefresh_Implementation(float DeltaSeconds)
 	
 }
 
-void AWHGameState::OnTermination_Implementation(EPhase InPhase)
+void AWHGameState::OnTermination_Implementation()
 {
 	
 }
@@ -37,7 +37,7 @@ void AWHGameState::BeginPlay()
 		{
 			Execute_OnInitialize(this);
 		}
-		Execute_OnPreparatory(this, EPhase::All);
+		Execute_OnPreparatory(this);
 	}
 }
 
@@ -47,7 +47,7 @@ void AWHGameState::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	if(Execute_IsUseDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this, EPhase::All);
+		Execute_OnTermination(this);
 	}
 }
 

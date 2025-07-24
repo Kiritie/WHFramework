@@ -21,11 +21,6 @@ void UActorAttributeSetBase::SerializeAttributes(FArchive& Ar)
 	}
 }
 
-void UActorAttributeSetBase::PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const
-{
-	Super::PreAttributeBaseChange(Attribute, NewValue);
-}
-
 void UActorAttributeSetBase::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
 {
 	Super::PreAttributeChange(Attribute, NewValue);

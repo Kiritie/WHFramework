@@ -41,4 +41,11 @@ public:
 
 	UFUNCTION(BlueprintNativeEvent)
 	void JumpN();
+
+public:
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	bool IsBlockAllInput() const;
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	void SetBlockAllInput(bool bInValue);
 };

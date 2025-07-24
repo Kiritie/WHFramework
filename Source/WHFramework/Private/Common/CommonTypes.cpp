@@ -74,6 +74,10 @@ namespace GameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_MoveRightPlayer, "Input.Player.MoveRight", "Move Right Player");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_MoveUpPlayer, "Input.Player.MoveUp", "Move Up Player");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_JumpPlayer, "Input.Player.Jump", "Jump Player");
+	
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_Primary, "Input.Player.Primary", "Primary");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_Secondary, "Input.Player.Secondary", "Secondary");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_Third, "Input.Player.Third", "Third");
 
 	////////////////////////////////////////////////////
 	// Input_System

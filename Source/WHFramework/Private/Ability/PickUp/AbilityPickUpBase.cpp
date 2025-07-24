@@ -15,7 +15,7 @@
 
 AAbilityPickUpBase::AAbilityPickUpBase()
 {
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 
 	BoxComponent = CreateDefaultSubobject<UBoxComponent>(FName("BoxComponent"));
 	BoxComponent->SetupAttachment(RootComponent);
@@ -33,6 +33,8 @@ AAbilityPickUpBase::AAbilityPickUpBase()
 	RotatingMovement->RotationRate = FRotator(0.f, 180.f, 0.f);
 
 	FallingMovement = CreateDefaultSubobject<UFallingMovementComponent>(FName("FallingMovement"));
+	FallingMovement->SetFallingSpeed(50.f);
+	FallingMovement->SetAcceleratedSpeed(500.f);
 	
 	FollowingMovement = CreateDefaultSubobject<UFollowingMovementComponent>(FName("FollowingMovement"));
 
@@ -65,6 +67,7 @@ void AAbilityPickUpBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	const auto& SaveData = InSaveData->CastRef<FPickUpSaveData>();
 
 	Item = SaveData.Item;
+	Item.Payload = this;
 	SetActorLocationAndRotation(SaveData.Location, FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f));
 }
 
@@ -81,10 +84,11 @@ FSaveData* AAbilityPickUpBase::ToData()
 
 void AAbilityPickUpBase::OnPickUp(IAbilityPickerInterface* InPicker)
 {
-	if(InPicker && InPicker->OnPickUp(this))
+	if(InPicker)
 	{
-		UObjectPoolModuleStatics::DespawnObject(this);
+		InPicker->OnPickUp(this);
 	}
+	UObjectPoolModuleStatics::DespawnObject(this);
 }
 
 bool AAbilityPickUpBase::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)

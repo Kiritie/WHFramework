@@ -142,16 +142,18 @@ void UAudioModule::OnTermination(EPhase InPhase)
 void UAudioModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData->CastRef<FAudioModuleSaveData>();
+	if(SaveData.IsSaved())
+	{
+		GlobalSoundParams = SaveData.GlobalSoundParams;
+		BackgroundSoundParams = SaveData.BackgroundSoundParams;
+		EnvironmentSoundParams = SaveData.EnvironmentSoundParams;
+		EffectSoundParams = SaveData.EffectSoundParams;
 
-	GlobalSoundParams = SaveData.GlobalSoundParams;
-	BackgroundSoundParams = SaveData.BackgroundSoundParams;
-	EnvironmentSoundParams = SaveData.EnvironmentSoundParams;
-	EffectSoundParams = SaveData.EffectSoundParams;
-
-	SetSoundParams(GlobalSoundMix, GlobalSoundClass, GlobalSoundParams, 0.f);
-	SetSoundParams(BackgroundSoundMix, BackgroundSoundClass, BackgroundSoundParams, 0.f);
-	SetSoundParams(EnvironmentSoundMix, EnvironmentSoundClass, EnvironmentSoundParams, 0.f);
-	SetSoundParams(EffectSoundMix, EffectSoundClass, EffectSoundParams, 0.f);
+		SetSoundParams(GlobalSoundMix, GlobalSoundClass, GlobalSoundParams, 0.f);
+		SetSoundParams(BackgroundSoundMix, BackgroundSoundClass, BackgroundSoundParams, 0.f);
+		SetSoundParams(EnvironmentSoundMix, EnvironmentSoundClass, EnvironmentSoundParams, 0.f);
+		SetSoundParams(EffectSoundMix, EffectSoundClass, EffectSoundParams, 0.f);
+	}
 }
 
 void UAudioModule::UnloadData(EPhase InPhase)

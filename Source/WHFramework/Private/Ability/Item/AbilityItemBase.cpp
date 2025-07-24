@@ -37,17 +37,17 @@ void AAbilityItemBase::OnDespawn_Implementation(bool bRecovery)
 
 bool AAbilityItemBase::Active_Implementation()
 {
-	if(Item.InventorySlot)
+	if(Item.GetPayload<UAbilityInventorySlotBase>())
 	{
-		return Item.InventorySlot->ActiveItem();
+		return Item.GetPayload<UAbilityInventorySlotBase>()->ActiveItem();
 	}
 	return false;
 }
 
 void AAbilityItemBase::Deactive_Implementation()
 {
-	if(Item.InventorySlot)
+	if(Item.GetPayload<UAbilityInventorySlotBase>())
 	{
-		Item.InventorySlot->DeactiveItem();
+		Item.GetPayload<UAbilityInventorySlotBase>()->DeactiveItem();
 	}
 }

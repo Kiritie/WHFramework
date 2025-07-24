@@ -16,6 +16,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FName RaceID;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (TitleProperty = "AbilityClass"))
 	TArray<FVitalityActionAbilityData> ActionAbilities;
 };

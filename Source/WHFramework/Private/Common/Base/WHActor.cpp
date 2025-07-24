@@ -8,6 +8,8 @@
 
 AWHActor::AWHActor()
 {
+	PrimaryActorTick.bCanEverTick = true;
+
 	InitializeDefaults();
 }
 
@@ -33,7 +35,20 @@ void AWHActor::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>
 	
 	if(InParams.IsValidIndex(0))
 	{
-		ActorID = InParams[0];
+		switch(InParams[0].GetParameterType())
+		{
+			case EParameterType::Transform:
+			{
+				SetActorTransform(InParams[0]);
+				break;
+			}
+			case EParameterType::Guid:
+			{
+				ActorID = InParams[0];
+				break;
+			}
+			default: break;
+		}
 	}
 
 	Execute_SetActorVisible(this, true);
@@ -65,7 +80,7 @@ void AWHActor::OnInitialize_Implementation()
 	USceneModuleStatics::AddSceneActor(this);
 }
 
-void AWHActor::OnPreparatory_Implementation(EPhase InPhase)
+void AWHActor::OnPreparatory_Implementation()
 {
 	
 }
@@ -75,7 +90,7 @@ void AWHActor::OnRefresh_Implementation(float DeltaSeconds)
 	
 }
 
-void AWHActor::OnTermination_Implementation(EPhase InPhase)
+void AWHActor::OnTermination_Implementation()
 {
 	USceneModuleStatics::RemoveSceneActor(this);
 }
@@ -110,7 +125,7 @@ void AWHActor::SetActorVisible_Implementation(bool bInVisible)
 	GetAttachedActors(AttachedActors);
 	for(auto Iter : AttachedActors)
 	{
-		ISceneActorInterface::Execute_SetActorVisible(Iter, bInVisible);
+		Execute_SetActorVisible(Iter, bInVisible);
 	}
 }
 
@@ -124,7 +139,7 @@ void AWHActor::BeginPlay()
 		{
 			Execute_OnInitialize(this);
 		}
-		Execute_OnPreparatory(this, EPhase::All);
+		Execute_OnPreparatory(this);
 	}
 }
 
@@ -134,7 +149,7 @@ void AWHActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	
 	if(Execute_IsUseDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this, EPhase::All);
+		Execute_OnTermination(this);
 	}
 }
 

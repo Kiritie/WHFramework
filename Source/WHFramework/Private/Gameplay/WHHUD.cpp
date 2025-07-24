@@ -12,7 +12,7 @@ void AWHHUD::OnInitialize_Implementation()
 	bInitialized = true;
 }
 
-void AWHHUD::OnPreparatory_Implementation(EPhase InPhase)
+void AWHHUD::OnPreparatory_Implementation()
 {
 	
 }
@@ -22,7 +22,7 @@ void AWHHUD::OnRefresh_Implementation(float DeltaSeconds)
 	
 }
 
-void AWHHUD::OnTermination_Implementation(EPhase InPhase)
+void AWHHUD::OnTermination_Implementation()
 {
 	
 }
@@ -37,7 +37,7 @@ void AWHHUD::BeginPlay()
 		{
 			Execute_OnInitialize(this);
 		}
-		Execute_OnPreparatory(this, EPhase::All);
+		Execute_OnPreparatory(this);
 	}
 }
 
@@ -47,7 +47,7 @@ void AWHHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	if(Execute_IsUseDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this, EPhase::All);
+		Execute_OnTermination(this);
 	}
 }
 

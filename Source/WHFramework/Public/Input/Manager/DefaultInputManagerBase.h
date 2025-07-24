@@ -20,8 +20,14 @@ public:
 	/// Defaults
 public:
 	virtual void OnInitialize() override;
+
+	virtual void OnReset() override;
+
+	virtual void OnRefresh(float DeltaSeconds) override;
 	
 	virtual void OnBindAction(UInputComponentBase* InInputComponent) override;
+
+	virtual void OnTermination() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// System
@@ -33,53 +39,80 @@ protected:
 	/// Camera
 protected:
 	UFUNCTION(BlueprintNativeEvent)
-	void TurnCamera(const FInputActionValue& InValue);
+	void OnTurnCamera(const FInputActionValue& InValue);
 
 	UFUNCTION(BlueprintNativeEvent)
-	void LookUpCamera(const FInputActionValue& InValue);
+	void OnLookUpCamera(const FInputActionValue& InValue);
 	
 	UFUNCTION(BlueprintNativeEvent)
-	void PanHCamera(const FInputActionValue& InValue);
+	void OnPanHCamera(const FInputActionValue& InValue);
 
 	UFUNCTION(BlueprintNativeEvent)
-	void PanVCamera(const FInputActionValue& InValue);
+	void OnPanVCamera(const FInputActionValue& InValue);
 
 	UFUNCTION(BlueprintNativeEvent)
-	void ZoomCamera(const FInputActionValue& InValue);
+	void OnZoomCamera(const FInputActionValue& InValue);
 	
 	UFUNCTION(BlueprintNativeEvent)
-	void MoveForwardCamera(const FInputActionValue& InValue);
+	void OnMoveForwardCamera(const FInputActionValue& InValue);
 
 	UFUNCTION(BlueprintNativeEvent)
-	void MoveRightCamera(const FInputActionValue& InValue);
+	void OnMoveRightCamera(const FInputActionValue& InValue);
 
 	UFUNCTION(BlueprintNativeEvent)
-	void MoveUpCamera(const FInputActionValue& InValue);
+	void OnMoveUpCamera(const FInputActionValue& InValue);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Player
 protected:
 	UFUNCTION(BlueprintNativeEvent)
-	void TurnPlayer(const FInputActionValue& InValue);
+	void OnTurnPlayer(const FInputActionValue& InValue);
 
 	UFUNCTION(BlueprintNativeEvent)
-	void MoveForwardPlayer(const FInputActionValue& InValue);
+	void OnMoveForwardPlayer(const FInputActionValue& InValue);
 
 	UFUNCTION(BlueprintNativeEvent)
-	void ActionForwardPlayer(const FInputActionValue& InValue);
+	void OnActionForwardPlayer(const FInputActionValue& InValue);
 
 	UFUNCTION(BlueprintNativeEvent)
-	void MoveRightPlayer(const FInputActionValue& InValue);
+	void OnMoveRightPlayer(const FInputActionValue& InValue);
 
 	UFUNCTION(BlueprintNativeEvent)
-	void ActionRightPlayer(const FInputActionValue& InValue);
+	void OnActionRightPlayer(const FInputActionValue& InValue);
 
 	UFUNCTION(BlueprintNativeEvent)
-	void MoveUpPlayer(const FInputActionValue& InValue);
+	void OnMoveUpPlayer(const FInputActionValue& InValue);
 
 	UFUNCTION(BlueprintNativeEvent)
-	void ActionUpPlayer(const FInputActionValue& InValue);
+	void OnActionUpPlayer(const FInputActionValue& InValue);
 
 	UFUNCTION(BlueprintNativeEvent)
-	void JumpPlayer();
+	void OnJumpPlayer();
+
+	UFUNCTION(BlueprintNativeEvent)
+	void OnPrimaryPressed();
+
+	UFUNCTION(BlueprintNativeEvent)
+	void OnPrimaryRepeated();
+
+	UFUNCTION(BlueprintNativeEvent)
+	void OnPrimaryReleased();
+
+	UFUNCTION(BlueprintNativeEvent)
+	void OnSecondaryPressed();
+
+	UFUNCTION(BlueprintNativeEvent)
+	void OnSecondaryRepeated();
+
+	UFUNCTION(BlueprintNativeEvent)
+	void OnSecondaryReleased();
+
+	UFUNCTION(BlueprintNativeEvent)
+	void OnThirdPressed();
+
+	UFUNCTION(BlueprintNativeEvent)
+	void OnThirdRepeated();
+
+	UFUNCTION(BlueprintNativeEvent)
+	void OnThirdReleased();
 };

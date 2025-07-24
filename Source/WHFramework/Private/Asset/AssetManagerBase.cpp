@@ -33,6 +33,7 @@ void UAssetManagerBase::ReleaseRuntimeData()
 			Iter2.Value->OnReset();
 		}
 	}
+	PrimaryAssetMap.Empty();
 }
 
 TSharedPtr<FStreamableHandle> UAssetManagerBase::LoadPrimaryAsset(const FPrimaryAssetId& AssetToLoad, const TArray<FName>& LoadBundles, FStreamableDelegate DelegateToCall, TAsyncLoadPriority Priority)

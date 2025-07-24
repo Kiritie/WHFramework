@@ -370,7 +370,7 @@ public:
 	{
 		if(UUserWidgetBase* UserWidget = HasUserWidgetByName(InName) ? GetUserWidgetByName<UUserWidgetBase>(InName) : CreateUserWidgetByName<UUserWidgetBase>(InName))
 		{
-			if(!UserWidget->CanOpen()) return false;
+			if(!UserWidget->CanOpen() || UserWidget->GetWidgetState() == EScreenWidgetState::Closing) return false;
 			if(bForce) CloseUserWidgetByName(InName, true);
 			if(UserWidget->GetWidgetState() != EScreenWidgetState::Opening && UserWidget->GetWidgetState() != EScreenWidgetState::Opened)
 			{
@@ -483,7 +483,7 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable)
-	bool DestroyUserWidget(TSubclassOf<UUserWidgetBase> InClass,  bool bRecovery = false);
+	bool DestroyUserWidget(TSubclassOf<UUserWidgetBase> InClass, bool bRecovery = false);
 
 	UFUNCTION(BlueprintCallable)
 	bool DestroyUserWidgetByName(FName InName,  bool bRecovery = false)

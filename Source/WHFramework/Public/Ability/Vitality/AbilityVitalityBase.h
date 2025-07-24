@@ -43,6 +43,17 @@ public:
 		
 	virtual void OnDespawn_Implementation(bool bRecovery) override;
 
+	//////////////////////////////////////////////////////////////////////////
+	/// WHActor
+public:
+	virtual void OnInitialize_Implementation() override;
+
+	virtual void OnPreparatory_Implementation() override;
+
+	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
+
+	virtual void OnTermination_Implementation() override;
+
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 
@@ -107,10 +118,10 @@ public:
 
 	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
 
-public:
-	virtual bool OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult) override;
+protected:
+	virtual bool OnGenerateVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult) override;
 
-	virtual bool OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult) override;
+	virtual bool OnDestroyVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult) override;
 
 protected:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
@@ -162,7 +173,7 @@ public:
 
 public:
 	UFUNCTION(BlueprintPure)
-	virtual bool IsActive(bool bNeedNotDead = false) const override;
+	virtual bool IsActive() const override;
 	
 	UFUNCTION(BlueprintPure)
 	virtual bool IsDead(bool bCheckDying = true) const override;

@@ -42,7 +42,7 @@ void AAIControllerBase::OnInitialize_Implementation()
 	bInitialized = true;
 }
 
-void AAIControllerBase::OnPreparatory_Implementation(EPhase InPhase)
+void AAIControllerBase::OnPreparatory_Implementation()
 {
 	
 }
@@ -62,7 +62,7 @@ void AAIControllerBase::OnRefresh_Implementation(float DeltaSeconds)
 	}
 }
 
-void AAIControllerBase::OnTermination_Implementation(EPhase InPhase)
+void AAIControllerBase::OnTermination_Implementation()
 {
 	
 }
@@ -77,7 +77,7 @@ void AAIControllerBase::BeginPlay()
 		{
 			Execute_OnInitialize(this);
 		}
-		Execute_OnPreparatory(this, EPhase::All);
+		Execute_OnPreparatory(this);
 	}
 }
 
@@ -87,7 +87,7 @@ void AAIControllerBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	if(Execute_IsUseDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this, EPhase::All);
+		Execute_OnTermination(this);
 	}
 }
 
@@ -107,7 +107,7 @@ void AAIControllerBase::OnUnPossess()
 
 void AAIControllerBase::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
-	const APawn* OwnerAgent = GetPawn();
+	APawn* OwnerAgent = GetPawn();
 	APawn* TargetAgent = Cast<APawn>(Actor);
 
 	if (!OwnerAgent || !TargetAgent || TargetAgent == OwnerAgent) return;

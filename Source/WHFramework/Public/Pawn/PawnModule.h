@@ -89,7 +89,7 @@ public:
 	template<class T>
 	void SwitchPawnByClass(bool bResetCamera = true, bool bInstant = false, TSubclassOf<APawnBase> InClass = T::StaticClass())
 	{
-		SwitchPawnByClass(InClass, bResetCamera);
+		SwitchPawnByClass(InClass, bInstant, bResetCamera);
 	}
 
 	UFUNCTION(BlueprintCallable)

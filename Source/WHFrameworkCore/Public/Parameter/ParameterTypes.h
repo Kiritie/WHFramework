@@ -23,7 +23,9 @@ enum class EParameterType : uint8
 	Boolean,
 	Vector,
 	Rotator,
+	Transform,
 	Color,
+	LinearColor,
 	Key,
 	Tag,
 	Tags,
@@ -119,7 +121,9 @@ public:
 		BooleanValue = false;
 		VectorValue = FVector::ZeroVector;
 		RotatorValue = FRotator::ZeroRotator;
+		TransformValue = FTransform::Identity;
 		ColorValue = FColor::Transparent;
+		LinearColorValue = FLinearColor::Transparent;
 		KeyValue = FKey();
 		TagValue = FGameplayTag();
 		TagsValue = FGameplayTagContainer();
@@ -199,6 +203,11 @@ public:
 		*this = MakeRotator(InValue);
 	}
 	
+	FParameter(const FTransform& InValue)
+	{
+		*this = MakeTransform(InValue);
+	}
+
 	FParameter(FColor InValue)
 	{
 		*this = MakeColor(InValue);
@@ -206,7 +215,7 @@ public:
 		
 	FParameter(FLinearColor InValue)
 	{
-		*this = MakeColor(InValue);
+		*this = MakeLinearColor(InValue);
 	}
 	
 	FParameter(const FKey& InValue)
@@ -302,9 +311,13 @@ public:
 	FORCEINLINE operator FVector() const { return VectorValue; }
 	
 	FORCEINLINE operator FRotator() const { return RotatorValue; }
-	
+		
+	FORCEINLINE operator FTransform() const { return TransformValue; }
+
 	FORCEINLINE operator FColor() const { return ColorValue; }
-	
+		
+	FORCEINLINE operator FLinearColor() const { return LinearColorValue; }
+
 	FORCEINLINE operator FKey() const { return KeyValue; }
 	
 	FORCEINLINE operator FGameplayTag() const { return TagValue; }
@@ -353,7 +366,9 @@ public:
 			case EParameterType::Boolean: return A.BooleanValue == B.BooleanValue;
 			case EParameterType::Vector: return A.VectorValue == B.VectorValue;
 			case EParameterType::Rotator: return A.RotatorValue == B.RotatorValue;
+			case EParameterType::Transform: return A.TransformValue.Equals(B.TransformValue);
 			case EParameterType::Color: return A.ColorValue == B.ColorValue;
+			case EParameterType::LinearColor: return A.LinearColorValue == B.LinearColorValue;
 			case EParameterType::Tag: return A.TagValue == B.TagValue;
 			case EParameterType::Tags: return A.TagsValue == B.TagsValue;
 			case EParameterType::Brush: return A.BrushValue == B.BrushValue;
@@ -385,7 +400,9 @@ public:
 			case EParameterType::Boolean: return A.BooleanValue != B.BooleanValue;
 			case EParameterType::Vector: return A.VectorValue != B.VectorValue;
 			case EParameterType::Rotator: return A.RotatorValue != B.RotatorValue;
+			case EParameterType::Transform: return !A.TransformValue.Equals(B.TransformValue);
 			case EParameterType::Color: return A.ColorValue != B.ColorValue;
+			case EParameterType::LinearColor: return A.LinearColorValue != B.LinearColorValue;
 			case EParameterType::Tag: return A.TagValue != B.TagValue;
 			case EParameterType::Tags: return A.TagsValue != B.TagsValue;
 			case EParameterType::Brush: return A.BrushValue != B.BrushValue;
@@ -441,7 +458,13 @@ protected:
 	FRotator RotatorValue;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FTransform TransformValue;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FColor ColorValue;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FLinearColor LinearColorValue;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FKey KeyValue;
@@ -553,11 +576,19 @@ public:
 	void SetRotatorValue(const FRotator& InValue) { RotatorValue = InValue; }
 
 	//////////////////////////////////////////////////////////////////////////
+	FTransform GetTransformValue() const { return TransformValue; }
+
+	void SetTransformValue(const FTransform& InValue) { TransformValue = InValue; }
+
+	//////////////////////////////////////////////////////////////////////////
 	FColor GetColorValue() const { return ColorValue; }
 
 	void SetColorValue(const FColor& InValue) { ColorValue = InValue; }
 
-	void SetColorValue(const FLinearColor& InValue) { ColorValue = InValue.ToFColorSRGB(); }
+	//////////////////////////////////////////////////////////////////////////
+	FLinearColor GetLinearColorValue() const { return LinearColorValue; }
+
+	void SetLinearColorValue(const FLinearColor& InValue) { LinearColorValue = InValue; }
 
 	//////////////////////////////////////////////////////////////////////////
 	FKey GetKeyValue() const { return KeyValue; }
@@ -745,6 +776,15 @@ public:
 		return Parameter;
 	}
 
+	static FParameter MakeTransform(const FTransform& InValue, const FText& InDescription = FText::GetEmpty())
+	{
+		FParameter Parameter = FParameter();
+		Parameter.ParameterType = EParameterType::Transform;
+		Parameter.Description = InDescription;
+		Parameter.SetTransformValue(InValue);
+		return Parameter;
+	}
+
 	static FParameter MakeColor(const FColor& InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
@@ -754,12 +794,12 @@ public:
 		return Parameter;
 	}
 
-	static FParameter MakeColor(const FLinearColor& InValue, const FText& InDescription = FText::GetEmpty())
+	static FParameter MakeLinearColor(const FLinearColor& InValue, const FText& InDescription = FText::GetEmpty())
 	{
 		FParameter Parameter = FParameter();
-		Parameter.ParameterType = EParameterType::Color;
+		Parameter.ParameterType = EParameterType::LinearColor;
 		Parameter.Description = InDescription;
-		Parameter.SetColorValue(InValue);
+		Parameter.SetLinearColorValue(InValue);
 		return Parameter;
 	}
 
@@ -1009,10 +1049,7 @@ public:
 
 	void Set(const FString& Key, const FString& Value)
 	{
-		if(Contains(Key))
-		{
-			Map[Key] = Value;
-		}
+		Map.Emplace(Key, Value);
 	}
 
 	void Remove(const FString& Key)
@@ -1043,7 +1080,7 @@ public:
 		return TEXT("");
 	}
 
-	const TMap<FString, FString>& GetMap() const
+	const TMap<FString, FString>& GetSource() const
 	{
 		return Map;
 	}

@@ -425,6 +425,7 @@ UCommonButton::UCommonButton(const FObjectInitializer& ObjectInitializer) : Supe
 	Txt_Title = nullptr;
 
 	bStandalone = false;
+	WidgetParams = TArray<FParameter>();
 
 	static ConstructorHelpers::FClassFinder<UCommonButtonStyle> StyleClassFinder(TEXT("/Script/Engine.Blueprint'/WHFramework/Widget/Blueprints/Common/_Style/Button/CBS_Default.CBS_Default_C'"));
 	if(StyleClassFinder.Succeeded())
@@ -548,4 +549,10 @@ void UCommonButton::SetMinWidth(int32 InValue)
 void UCommonButton::SetMinHeight(int32 InValue)
 {
 	MinHeight = InValue;
+}
+
+void UCommonButton::SetIsEnabledN(bool bEnable)
+{
+	SetRenderOpacity(bEnable ? 1.f : 0.5f);
+	SetVisibility(bEnable ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::HitTestInvisible);
 }

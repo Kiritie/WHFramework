@@ -37,4 +37,7 @@ public:
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
 	UComboBoxString* ComboBox_Value;
+
+	UPROPERTY()
+	TArray<FString> EnumNames;
 };

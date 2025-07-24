@@ -4,7 +4,7 @@
 
 //////////////////////////////////////////////////////////////////////////
 // GUID
-namespace VigmaPrivate
+namespace AssetPrivate
 {
 	struct WHFRAMEWORKCORE_API FGUIDHelper
 	{
@@ -15,9 +15,9 @@ namespace VigmaPrivate
 	};
 }
 
-#define EMPGUID VigmaPrivate::FGUIDHelper::EmptyGUID
+#define EMPGUID AssetPrivate::FGUIDHelper::EmptyGUID
 
-#define NEWGUID(Name) VigmaPrivate::FGUIDHelper::NewGUID(#Name)
+#define NEWGUID(Name) AssetPrivate::FGUIDHelper::NewGUID(#Name)
 
 /*
  * FVigmaAssetID

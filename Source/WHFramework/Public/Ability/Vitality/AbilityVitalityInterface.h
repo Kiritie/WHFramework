@@ -43,7 +43,7 @@ public:
 	virtual void ModifyHealth(float InDeltaValue) = 0;
 
 public:
-	virtual bool IsActive(bool bNeedNotDead = false) const = 0;
+	virtual bool IsActive() const = 0;
 
 	virtual bool IsDead(bool bCheckDying = true) const = 0;
 	

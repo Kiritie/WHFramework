@@ -31,21 +31,11 @@ public class WHFrameworkCore : ModuleRules
 				"InputCore",
 				"zlib",
 				"ImageWrapper",
-				// "Engine",
-				// "GameplayTags",
+				"Engine",
+				"GameplayTags",
 				"EngineSettings"
 			}
 		);
-		
-		if (Target.bCompileAgainstEngine)
-		{
-			PrivateDependencyModuleNames.AddRange(
-				new string[] {
-					"Engine",
-					"GameplayTags",
-				}
-			);
-		}
 
 		string externalLib = Path.Combine(ModuleDirectory, "ThirdParty", "Library");
 		string externalSource = Path.Combine(ModuleDirectory, "ThirdParty", "Include");

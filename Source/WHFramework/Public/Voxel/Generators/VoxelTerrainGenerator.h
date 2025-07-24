@@ -22,7 +22,7 @@ public:
 	virtual void Generate(AVoxelChunk* InChunk) override;
 
 public:
-	virtual EVoxelType CalculateVoxelType(FIndex InIndex) const;
+	virtual EVoxelType CalculateVoxelType(AVoxelChunk* InChunk, FIndex InIndex) const;
 
 	virtual EVoxelType GetBiomeVoxelType(EVoxelBiomeType InBiomeType, bool bUnderGround) const;
 

@@ -8,6 +8,7 @@
 #include "Ability/Inventory/Slot/AbilityInventoryEquipSlotBase.h"
 #include "Ability/Inventory/Slot/AbilityInventoryShortcutSlotBase.h"
 #include "Ability/Inventory/Slot/AbilityInventorySkillSlotBase.h"
+#include "Ability/Item/AbilityItemDataBase.h"
 #include "Common/CommonStatics.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 
@@ -406,7 +407,7 @@ void UAbilityInventoryBase::AddItemBySlots(FAbilityItem& InItem, const TArray<UA
 	if(InSlots.Num() == 0) return;
 	
 	auto _Item = InItem;
-	if(InItem.GetType() != EAbilityItemType::Misc)
+	if(InItem.GetData().MaxCount > 0)
 	{
 		for(int i = 0; i < InSlots.Num(); i++)
 		{
@@ -418,6 +419,8 @@ void UAbilityInventoryBase::AddItemBySlots(FAbilityItem& InItem, const TArray<UA
 	if(auto Agent = GetOwnerAgent())
 	{
 		if(bBroadcast) Agent->OnAdditionItem(_Item);
+
+		if(InItem.Count > 0) Agent->OnDiscardItem(InItem, false);
 	}
 }
 
@@ -426,7 +429,7 @@ void UAbilityInventoryBase::RemoveItemBySlots(FAbilityItem& InItem, const TArray
 	if(InSlots.Num() == 0) return;
 	
 	auto _Item = InItem;
-	if(InItem.GetType() != EAbilityItemType::Misc)
+	if(InItem.GetData().MaxCount > 0)
 	{
 		for (int i = 0; i < InSlots.Num(); i++)
 		{
@@ -511,55 +514,35 @@ TArray<UAbilityInventorySlotBase*> UAbilityInventoryBase::GetAllSlots() const
 	return Slots;
 }
 
-TArray<FAbilityItem> UAbilityInventoryBase::GetAllItems() const
+TArray<FAbilityItem> UAbilityInventoryBase::GetAllItems(bool bMerge) const
 {
 	TArray<FAbilityItem> Items;
 	for(auto Iter1 : GetAllSlots())
 	{
-		bool bMatched = false;
-		for(auto& Iter2 : Items)
+		if(Iter1->IsEmpty()) continue;
+		if(bMerge)
 		{
-			if(Iter2.Match(Iter1->GetItem()))
+			bool bMatched = false;
+			for(auto& Iter2 : Items)
 			{
-				Iter2 += Iter1->GetItem();
-				bMatched = true;
-				break;
+				if(Iter2.Match(Iter1->GetItem()))
+				{
+					Iter2 += Iter1->GetItem();
+					bMatched = true;
+					break;
+				}
+			}
+			if(!bMatched)
+			{
+				Items.Add(Iter1->GetItem());
 			}
 		}
-		if(!bMatched)
+		else
 		{
 			Items.Add(Iter1->GetItem());
 		}
 	}
 	return Items;
-}
-
-TMap<EAbilityItemType, FAbilityItems> UAbilityInventoryBase::GetAllItemMap() const
-{
-	TMap<EAbilityItemType, FAbilityItems> ItemMap;
-	for(int32 i = 1; i < UCommonStatics::GetEnumItemNum(TEXT("/Script/WHFramework.EAbilityItemType")); i++)
-	{
-		ItemMap.Add((EAbilityItemType)i);
-	}
-	for(auto Iter1 : GetAllSlots())
-	{
-		bool bMatched = false;
-		FAbilityItems& Items = ItemMap[Iter1->GetItem().GetType()];
-		for(auto& Iter2 : Items.Items)
-		{
-			if(Iter2.Match(Iter1->GetItem()))
-			{
-				Iter2 += Iter1->GetItem();
-				bMatched = true;
-				break;
-			}
-		}
-		if(!bMatched)
-		{
-			Items.Items.Add(Iter1->GetItem());
-		}
-	}
-	return ItemMap;
 }
 
 TArray<UAbilityInventorySlotBase*> UAbilityInventoryBase::GetSlotsBySplitType(ESlotSplitType InSplitType) const

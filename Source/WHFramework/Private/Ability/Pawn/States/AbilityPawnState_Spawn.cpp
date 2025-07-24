@@ -38,7 +38,7 @@ void UAbilityPawnState_Spawn::OnEnter(UFiniteStateBase* InLastState, const TArra
 		Rescuer = InParams[0].GetPointerValue<IAbilityVitalityInterface>();
 	}
 	
-	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalitySpawned>(Cast<UObject>(this), { GetAgent(), Cast<UObject>(Rescuer) });
+	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalitySpawned>(this, { GetAgent(), Cast<UObject>(Rescuer) });
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 

@@ -2,10 +2,8 @@
 
 #include "IImageWrapperModule.h"
 #include "WHFrameworkCoreTypes.h"
-#if WITH_ENGINE
 #include "ImageUtils.h"
 #include "Engine/Texture.h"
-#endif
 #include<string>
 #include<stdio.h>
 #include<assert.h>
@@ -204,7 +202,6 @@ FString FCoreStatics::UrlDecode(const FString& InUrl)
 	return strTemp.c_str();
 }
 
-#if WITH_ENGINE
 UTexture2D* FCoreStatics::LoadTextureFromFile(const FString& InFilePath)
 {
 	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
@@ -413,4 +410,3 @@ UTexture2D* FCoreStatics::CompositeTextures(const TArray<UTexture2D*>& InTexture
 	}
 	return nullptr;
 }
-#endif

@@ -33,7 +33,7 @@ void AWHPlayerController::OnInitialize_Implementation()
 	bInitialized = true;
 }
 
-void AWHPlayerController::OnPreparatory_Implementation(EPhase InPhase)
+void AWHPlayerController::OnPreparatory_Implementation()
 {
 	for(const auto Iter : AMainModule::GetAllModule())
 	{
@@ -50,7 +50,7 @@ void AWHPlayerController::OnRefresh_Implementation(float DeltaSeconds)
 	RefreshInteraction();
 }
 
-void AWHPlayerController::OnTermination_Implementation(EPhase InPhase)
+void AWHPlayerController::OnTermination_Implementation()
 {
 	
 }
@@ -65,7 +65,7 @@ void AWHPlayerController::BeginPlay()
 		{
 			Execute_OnInitialize(this);
 		}
-		Execute_OnPreparatory(this, EPhase::All);
+		Execute_OnPreparatory(this);
 	}
 }
 
@@ -75,7 +75,7 @@ void AWHPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	if(Execute_IsUseDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this, EPhase::All);
+		Execute_OnTermination(this);
 	}
 }
 

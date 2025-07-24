@@ -20,7 +20,6 @@ ARoamCameraActor::ARoamCameraActor()
 	
 	CameraBoom->SetupAttachment(RootComponent);
 	CameraBoom->SetRelativeTransform(FTransform::Identity);
-	CameraBoom->bDoCollisionTest = false;
 
 	Camera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	Camera->SetRelativeLocationAndRotation(FVector(0, 0, 0), FRotator(0, 0, 0));

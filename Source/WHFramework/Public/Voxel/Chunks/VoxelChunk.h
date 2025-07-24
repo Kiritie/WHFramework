@@ -5,6 +5,7 @@
 #include "Common/Base/WHActor.h"
 #include "GameFramework/Actor.h"
 #include "Scene/Container/SceneContainerInterface.h"
+#include "Thread/IThreadSafeInterface.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "VoxelChunk.generated.h"
 
@@ -20,7 +21,7 @@ class UVoxelMeshComponent;
  * 体素块
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelChunk : public AWHActor, public ISceneContainerInterface
+class WHFRAMEWORK_API AVoxelChunk : public AWHActor, public ISceneContainerInterface, public IThreadSafeInterface
 {
 	GENERATED_BODY()
 
@@ -44,6 +45,8 @@ protected:
 
 	virtual FSaveData* ToData() override;
 
+	virtual void SaveData();
+
 	//////////////////////////////////////////////////////////////////////////
 	// Chunk
 public:
@@ -53,14 +56,18 @@ public:
 
 	virtual void CreateMesh();
 
+	virtual void ClearMap(bool bGenerate = false);
+
 	virtual void BuildMap(int32 InStage);
+
+	virtual void BuildPrefabMap();
 
 	virtual void BuildMesh();
 
 protected:
 	virtual void GenerateNeighbors(FIndex InIndex, EPhase InPhase = EPhase::Primary);
 
-	virtual void GenerateNeighbors(int32 InX, int32 InY, int32 InZ, EPhase InPhase = EPhase::Primary);
+	virtual void GenerateNeighbors(int32 InX, int32 InY, EPhase InPhase = EPhase::Primary);
 
 	virtual void UpdateNeighbors();
 
@@ -121,7 +128,7 @@ public:
 
 	virtual bool SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem, bool bGenerate = false, IVoxelAgentInterface* InAgent = nullptr);
 
-	virtual bool SetVoxelComplex(const TMap<FIndex, FVoxelItem>& InVoxelItems, bool bGenerate = false, bool bFirstSample = false, IVoxelAgentInterface* InAgent = nullptr);
+	virtual bool SetVoxelComplex(const FVoxelMap& InVoxelMap, bool bGenerate = false, bool bFirstSample = false, IVoxelAgentInterface* InAgent = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Topography
@@ -164,22 +171,6 @@ public:
 	virtual void SpawnSceneActors() override;
 
 	virtual void DestroySceneActors() override;
-	
-	//////////////////////////////////////////////////////////////////////////
-	// Building
-protected:
-	virtual void GenerateBuildings();
-
-	virtual void SpawnBuilding(FVoxelBuildingSaveData& InBuildingData);
-	
-	virtual void DestroyBuilding(FVoxelBuildingSaveData& InBuildingData);
-
-	virtual void DestroyBuildings();
-
-public:
-	virtual void AddBuilding(const FVoxelBuildingSaveData& InBuildingData);
-	
-	virtual TSubclassOf<AActor> GetBuildingClassByID(int32 InID) const;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Auxiliary
@@ -197,7 +188,7 @@ protected:
 	TArray<EVoxelNature> MeshVoxelNatures;
 
 public:
-	void SpawnMeshComponents(int32 InStage = 1 | 2);
+	void SpawnMeshComponents(int32 InStage);
 
 	void DestroyMeshComponents();
 
@@ -227,11 +218,11 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Stats")
 	UVoxelModule* Module;
 
-	TMap<FIndex, FVoxelItem> VoxelMap;
+	FVoxelMaps VoxelMaps;
 
 	TMap<FIndex, FVoxelTopography> TopographyMap;
 
-	TArray<FVoxelBuildingSaveData> BuildingDatas;
+	bool bNeedCreateMesh;
 
 public:
 	FIndex GetIndex() const { return Index; }

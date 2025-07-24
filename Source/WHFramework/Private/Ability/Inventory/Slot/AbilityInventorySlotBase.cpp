@@ -14,7 +14,7 @@
 UAbilityInventorySlotBase::UAbilityInventorySlotBase()
 {
 	Item = FAbilityItem::Empty;
-	Item.InventorySlot = this;
+	Item.Payload = this;
 	Inventory = nullptr;
 	LimitType = EAbilityItemType::None;
 	SplitType = ESlotSplitType::Default;
@@ -53,8 +53,8 @@ bool UAbilityInventorySlotBase::ContainsItem(FAbilityItem InItem) const
 
 bool UAbilityInventorySlotBase::MatchItem(FAbilityItem InItem, bool bPutIn) const
 {
-	return bPutIn ? (IsEmpty() && MatchItemLimit(InItem, true) || Item.Match(InItem) && GetRemainVolume(InItem) > 0) :
-		(!IsEmpty() && MatchItemSplit(InItem) && MatchItemLimit(InItem));
+	return bPutIn ? IsEnabled() && (IsEmpty() && MatchItemLimit(InItem, true) || Item.Match(InItem) && GetRemainVolume(InItem) > 0) :
+		IsEnabled() && (!IsEmpty() && MatchItemSplit(InItem) && MatchItemLimit(InItem));
 }
 
 bool UAbilityInventorySlotBase::MatchItemSplit(FAbilityItem InItem, bool bForce) const
@@ -107,7 +107,7 @@ void UAbilityInventorySlotBase::Refresh()
 
 void UAbilityInventorySlotBase::OnItemPreChange(FAbilityItem& InNewItem, bool bBroadcast)
 {
-	if(bBroadcast)
+	if(bBroadcast && IsEnabled())
 	{
 		if(const auto Agent = Inventory->GetOwnerAgent())
 		{
@@ -123,14 +123,14 @@ void UAbilityInventorySlotBase::OnItemChanged(FAbilityItem& InOldItem, bool bBro
 		const auto Actor = Inventory->GetOwnerAgent<IAbilityActorInterface>();
 		if (Actor && Item.GetData().AbilityClass)
 		{
-			Item.AbilityHandle = Actor->GetAbilitySystemComponent()->K2_GiveAbility(Item.GetData().AbilityClass, Item.Level);
+			Item.Handle = Actor->GetAbilitySystemComponent()->K2_GiveAbility(Item.GetData().AbilityClass, Item.Level);
 		}
 	}
 	else
 	{
-		Item.AbilityHandle = FGameplayAbilitySpecHandle();
+		Item.Handle = FGameplayAbilitySpecHandle();
 	}
-	if(bBroadcast)
+	if(bBroadcast && IsEnabled())
 	{
 		if(const auto Agent = Inventory->GetOwnerAgent())
 		{
@@ -166,7 +166,7 @@ void UAbilityInventorySlotBase::SetItem(FAbilityItem& InItem, bool bRefresh)
 	Item = InItem;
 	Item.Count = FMath::Clamp(Item.Count, 0, GetMaxVolume(InItem));
 	Item.Level = FMath::Clamp(Item.Level, 0, GetMaxLevel(InItem));
-	Item.InventorySlot = this;
+	Item.Payload = this;
 	
 	OnItemChanged(OldItem, true);
 	
@@ -197,11 +197,17 @@ void UAbilityInventorySlotBase::SubItem(FAbilityItem& InItem)
 {
 	if (ContainsItem(InItem))
 	{
-		int32 Num = InItem.Count - Item.Count;
+		const int32 Num = InItem.Count - Item.Count;
 		Item.Count = FMath::Clamp(Item.Count - InItem.Count, 0, GetMaxVolume(InItem));
 		InItem.Count = FMath::Max(Num, 0);
 		Refresh();
 	}
+}
+
+void UAbilityInventorySlotBase::SubItem(int32 InCount)
+{
+	FAbilityItem _Item = FAbilityItem(Item, InCount);
+	SubItem(_Item);
 }
 
 void UAbilityInventorySlotBase::SplitItem(int32 InCount /*= -1*/)
@@ -239,23 +245,23 @@ void UAbilityInventorySlotBase::MoveItem(int32 InCount /*= -1*/)
 		{
 			case ESlotSplitType::Default:
 			{
-				Inventory->AddItemBySplitTypes(_Item, {ESlotSplitType::Shortcut, ESlotSplitType::Auxiliary}, false);
+				Inventory->AddItemBySplitTypes(_Item, { ESlotSplitType::Shortcut, ESlotSplitType::Auxiliary }, false);
 				break;
 			}
 			case ESlotSplitType::Shortcut:
 			{
-				Inventory->AddItemBySplitTypes(_Item, {ESlotSplitType::Default, ESlotSplitType::Auxiliary}, false);
+				Inventory->AddItemBySplitTypes(_Item, { ESlotSplitType::Default, ESlotSplitType::Auxiliary }, false);
 				break;
 			}
 			case ESlotSplitType::Auxiliary:
 			{
-				Inventory->AddItemBySplitTypes(_Item, {ESlotSplitType::Default, ESlotSplitType::Shortcut}, false);
+				Inventory->AddItemBySplitTypes(_Item, { ESlotSplitType::Default, ESlotSplitType::Shortcut }, false);
 				break;
 			}
 			case ESlotSplitType::Equip:
 			case ESlotSplitType::Skill:
 			{
-				Inventory->AddItemBySplitTypes(_Item, {ESlotSplitType::Default, ESlotSplitType::Shortcut, ESlotSplitType::Auxiliary}, false);
+				Inventory->AddItemBySplitTypes(_Item, { ESlotSplitType::Default, ESlotSplitType::Shortcut, ESlotSplitType::Auxiliary }, false);
 				break;
 			}
 			default: break;
@@ -321,7 +327,7 @@ bool UAbilityInventorySlotBase::ActiveItem(bool bPassive /*= false*/)
 	bool bSuccess = false;
 	if(auto Actor = GetInventory()->GetOwnerAgent<IAbilityActorInterface>())
 	{
-		if(Actor->GetLevelA() >= Item.Level && Actor->GetAbilitySystemComponent()->TryActivateAbility(Item.AbilityHandle))
+		if(Actor->GetLevelA() >= Item.Level && Actor->GetAbilitySystemComponent()->TryActivateAbility(Item.Handle))
 		{
 			OnSlotActivated.Broadcast();
 			for(auto Iter : GetInventory()->QueryItemByRange(EItemQueryType::Get, Item).Slots)
@@ -347,7 +353,7 @@ void UAbilityInventorySlotBase::DeactiveItem(bool bPassive /*= false*/)
 	
 	if(auto Actor = GetInventory()->GetOwnerAgent<IAbilityActorInterface>())
 	{
-		Actor->GetAbilitySystemComponent()->CancelAbilityHandle(Item.AbilityHandle);
+		Actor->GetAbilitySystemComponent()->CancelAbilityHandle(Item.Handle);
 		OnSlotDeactived.Broadcast();
 	}
 	if(auto Agent = GetInventory()->GetOwnerAgent())
@@ -366,6 +372,11 @@ void UAbilityInventorySlotBase::ClearItem()
 bool UAbilityInventorySlotBase::IsEmpty() const
 {
 	return Item.IsEmpty();
+}
+
+bool UAbilityInventorySlotBase::IsEnabled() const
+{
+	return true;
 }
 
 bool UAbilityInventorySlotBase::IsSelected() const
@@ -414,13 +425,13 @@ int32 UAbilityInventorySlotBase::GetMaxLevel(FAbilityItem InItem) const
 
 FAbilityInfo UAbilityInventorySlotBase::GetAbilityInfo() const
 {
-	if(IsEmpty() || !Item.AbilityHandle.IsValid()) return FAbilityInfo();
+	if(IsEmpty() || !Item.Handle.IsValid()) return FAbilityInfo();
 	
 	if(IAbilityActorInterface* AbilityActor = Inventory->GetOwnerAgent<IAbilityActorInterface>())
 	{
 		if(UAbilitySystemComponentBase* AbilitySystemComp = Cast<UAbilitySystemComponentBase>(AbilityActor->GetAbilitySystemComponent()))
 		{
-			return AbilitySystemComp->GetAbilityInfoByHandle(Item.AbilityHandle);
+			return AbilitySystemComp->GetAbilityInfoByHandle(Item.Handle);
 		}
 	}
 	return FAbilityInfo();

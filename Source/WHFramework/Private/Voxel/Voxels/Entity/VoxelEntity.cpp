@@ -6,7 +6,7 @@
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Components/VoxelMeshComponent.h"
-#include "Voxel/Datas/VoxelData.h"
+#include "Voxel/Voxels/Data/VoxelData.h"
 #include "Voxel/Voxels/Auxiliary/VoxelAuxiliary.h"
 
 // Sets default values
@@ -16,10 +16,9 @@ AVoxelEntity::AVoxelEntity()
 	
 	MeshComponent = CreateDefaultSubobject<UVoxelMeshComponent>(FName("MeshComponent"));
 	MeshComponent->SetupAttachment(RootComponent);
-	MeshComponent->Initialize(EVoxelScope::Entity);
 
-	VoxelID = FPrimaryAssetId();
-	Auxiliary = nullptr;
+	VoxelItem = FVoxelItem::Empty;
+	VoxelScope = EVoxelScope::Entity;
 }
 
 void AVoxelEntity::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -31,50 +30,45 @@ void AVoxelEntity::OnDespawn_Implementation(bool bRecovery)
 {
 	Super::OnDespawn_Implementation(bRecovery);
 	
-	VoxelID = FPrimaryAssetId();
-	MeshComponent->ClearMesh();
 	DestroyAuxiliary();
+	MeshComponent->ClearMesh();
+
+	VoxelItem = FVoxelItem::Empty;
+}
+
+void AVoxelEntity::OnInitialize_Implementation()
+{
+	Super::OnInitialize_Implementation();
+
+	MeshComponent->Initialize(VoxelScope);
 }
 
 void AVoxelEntity::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	const auto& SaveData = InSaveData->CastRef<FVoxelItem>();
 
-	if(VoxelID == SaveData.ID) return;
+	DestroyAuxiliary();
 
-	VoxelID = SaveData.ID;
-	
-	MeshComponent->CreateVoxel(SaveData);
+	VoxelItem = SaveData;
 
-	if(VoxelID.IsValid())
+	if(VoxelItem.IsValid())
 	{
-		const UVoxelData& VoxelData = SaveData.GetVoxelData();
+		const UVoxelData& VoxelData = VoxelItem.GetData();
 		if(VoxelData.AuxiliaryClass)
 		{
-			if(Auxiliary && Auxiliary->GetClass() != VoxelData.AuxiliaryClass)
-			{
-				DestroyAuxiliary();
-			}
-			if(!Auxiliary)
-			{
-				Auxiliary = UObjectPoolModuleStatics::SpawnObject<AVoxelAuxiliary>(nullptr, nullptr, VoxelData.AuxiliaryClass);
-				Auxiliary->AttachToComponent(MeshComponent, FAttachmentTransformRules::SnapToTargetIncludingScale);
-				Auxiliary->Execute_SetActorVisible(Auxiliary, Execute_IsVisible(this));
-			}
-			if(Auxiliary)
-			{
-				Auxiliary->LoadSaveData(new FVoxelAuxiliarySaveData(SaveData, EVoxelScope::Entity));
-			}
+			SpawnAuxiliary();
 		}
-		else if(Auxiliary)
+		else
 		{
 			DestroyAuxiliary();
 		}
 	}
-	else if(Auxiliary)
+	else
 	{
 		DestroyAuxiliary();
 	}
+
+	MeshComponent->CreateVoxel(VoxelItem);
 }
 
 FSaveData* AVoxelEntity::ToData()
@@ -82,11 +76,31 @@ FSaveData* AVoxelEntity::ToData()
 	return nullptr;
 }
 
+void AVoxelEntity::SpawnAuxiliary()
+{
+	if(VoxelItem.IsValid() && !VoxelItem.Auxiliary)
+	{
+		const UVoxelData& VoxelData = VoxelItem.GetData();
+		if(VoxelData.AuxiliaryClass)
+		{
+			if(AVoxelAuxiliary* Auxiliary = UObjectPoolModuleStatics::SpawnObject<AVoxelAuxiliary>(nullptr, nullptr, VoxelData.AuxiliaryClass))
+			{
+				Auxiliary->AttachToComponent(RootComponent, FAttachmentTransformRules::SnapToTargetIncludingScale);
+				Auxiliary->Execute_SetActorVisible(Auxiliary, Execute_IsVisible(this));
+				auto SaveData = FVoxelAuxiliarySaveData(VoxelItem, VoxelScope);
+				Auxiliary->LoadSaveData(&SaveData);
+				VoxelItem.Auxiliary = Auxiliary;
+			}
+		}
+	}
+}
+
 void AVoxelEntity::DestroyAuxiliary()
 {
-	if(!Auxiliary) return;
-	
-	Auxiliary->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-	UObjectPoolModuleStatics::DespawnObject(Auxiliary);
-	Auxiliary = nullptr;
+	if(VoxelItem.IsValid() && VoxelItem.Auxiliary)
+	{
+		VoxelItem.Auxiliary->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+		UObjectPoolModuleStatics::DespawnObject(VoxelItem.Auxiliary);
+		VoxelItem.Auxiliary = nullptr;
+	}
 }

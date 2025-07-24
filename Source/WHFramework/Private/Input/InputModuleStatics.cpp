@@ -38,19 +38,29 @@ UInputComponentBase* UInputModuleStatics::GetInputComponent(int32 InPlayerIndex,
 	return nullptr;
 }
 
-UInputManagerBase* UInputModuleStatics::GetInputManager(TSubclassOf<UInputManagerBase> InClass)
+UInputManagerBase* UInputModuleStatics::GetInputManager(TSubclassOf<UInputManagerBase> InClass, int32 InPlayerIndex)
 {
-	return UInputModule::Get().GetInputManager(InClass);
+	return UInputModule::Get().GetInputManager(InClass, InPlayerIndex);
 }
 
-UInputManagerBase* UInputModuleStatics::GetInputManagerByName(const FName InName, TSubclassOf<UInputManagerBase> InClass)
+UInputManagerBase* UInputModuleStatics::GetInputManagerByName(const FName InName, int32 InPlayerIndex, TSubclassOf<UInputManagerBase> InClass)
 {
-	return UInputModule::Get().GetInputManagerByName(InName, InClass);
+	return UInputModule::Get().GetInputManagerByName(InName, InPlayerIndex, InClass);
 }
 
 int32 UInputModuleStatics::GetTouchPressedCount()
 {
 	return UInputModule::Get().GetTouchPressedCount();
+}
+
+EInputMode UInputModuleStatics::GetNativeInputMode()
+{
+	return UInputModule::Get().GetNativeInputMode();
+}
+
+void UInputModuleStatics::SetNativeInputMode(EInputMode InInputMode)
+{
+	UInputModule::Get().SetNativeInputMode(InInputMode);
 }
 
 void UInputModuleStatics::AddKeyShortcut(const FGameplayTag& InTag, const FInputKeyShortcut& InKeyShortcut)
@@ -83,6 +93,12 @@ void UInputModuleStatics::AddTouchMapping(const FInputTouchMapping& InTouchMappi
 	UInputModule::Get().AddTouchMapping(InTouchMapping);
 }
 
+FName UInputModuleStatics::GetPlayerKeyMappingName(const FGameplayTag& InTag)
+{
+	const FString TagName = InTag.ToString();
+	return *TagName.Mid(TagName.Find(".", ESearchCase::IgnoreCase, ESearchDir::FromEnd) + 1, TagName.Len());
+}
+
 void UInputModuleStatics::AddPlayerKeyMapping(const FName InName, const FKey InKey, int32 InSlot, int32 InPlayerIndex)
 {
 	UInputModule::Get().AddPlayerKeyMapping(InName, InKey, InSlot, InPlayerIndex);
@@ -106,6 +122,11 @@ FPlayerKeyMappingInfo UInputModuleStatics::GetPlayerKeyMappingInfoByName(const F
 bool UInputModuleStatics::IsPlayerMappedKeyByName(const FName InName, const FKey& InKey, int32 InPlayerIndex)
 {
 	return UInputModule::Get().IsPlayerMappedKeyByName(InName, InKey, InPlayerIndex);
+}
+
+bool UInputModuleStatics::IsPlayerMappedKeyByTag(const FGameplayTag& InTag, const FKey& InKey, int32 InPlayerIndex)
+{
+	return UInputModule::Get().IsPlayerMappedKeyByTag(InTag, InKey, InPlayerIndex);
 }
 
 const UInputActionBase* UInputModuleStatics::GetInputActionByTag(const FGameplayTag& InTag, bool bEnsured)

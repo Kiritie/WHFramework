@@ -4,9 +4,10 @@
 #include "Voxel/Voxels/VoxelWater.h"
 
 #include "Components/SkeletalMeshComponent.h"
+#include "Math/MathHelper.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Chunks/VoxelChunk.h"
-#include "Voxel/Datas/VoxelData.h"
+#include "Voxel/Voxels/Data/VoxelData.h"
 
 UVoxelWater::UVoxelWater()
 {
@@ -31,14 +32,14 @@ void UVoxelWater::OnGenerate(IVoxelAgentInterface* InAgent)
 	
 	if(GetOwner())
 	{
-		// TMap<FIndex, FVoxelItem> VoxelItems;
-		// ITER_DIRECTION(Iter, 
-		// 	if(Iter != EDirection::Up && !GetOwner()->CheckVoxelAdjacent(Item, Iter))
-		// 	{
-		// 		VoxelItems.Emplace(GetIndex() + UMathStatics::DirectionToIndex(Iter), GetData().VoxelType);
-		// 	}
-		// )
-		// GetOwner()->SetVoxelComplex(VoxelItems, true, false, InAgent);
+		FVoxelMap VoxelMap;
+		ITER_DIRECTION(Iter, 
+			if(Iter != EDirection::Up && !GetOwner()->CheckVoxelAdjacent(Item, Iter))
+			{
+				VoxelMap.Map.Emplace(GetIndex() + FMathHelper::DirectionToIndex(Iter), GetData().VoxelType);
+			}
+		)
+		GetOwner()->SetVoxelComplex(VoxelMap, true, false, InAgent);
 	}
 }
 
@@ -67,7 +68,7 @@ void UVoxelWater::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResu
 	Super::OnAgentExit(InAgent, InHitResult);
 }
 
-bool UVoxelWater::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, const FVoxelHitResult& InHitResult)
+bool UVoxelWater::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
 {
 	return false;
 }

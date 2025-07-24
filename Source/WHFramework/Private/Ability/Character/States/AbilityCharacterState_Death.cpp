@@ -40,10 +40,11 @@ void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastState, const 
 		Killer = InParams[0].GetPointerValue<IAbilityVitalityInterface>();
 	}
 	
-	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalityDead>(Cast<UObject>(this), { GetAgent(), Cast<UObject>(Killer) });
+	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalityDead>(this, { GetAgent(), Cast<UObject>(Killer) });
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
+	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Active);
 	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dying);
 
 	Character->GetInteractionComponent()->SetInteractable(false);
@@ -51,11 +52,6 @@ void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastState, const 
 	if(Character->GetController<AAIControllerBase>())
 	{
 		Character->GetController<AAIControllerBase>()->StopBehaviorTree();
-	}
-
-	if(Killer && Killer != Character)
-	{
-		Killer->ModifyExp(Character->GetLevelA() * 10.f);
 	}
 
 	Character->SetExp(0.f);
@@ -95,6 +91,7 @@ void UAbilityCharacterState_Death::OnLeave(UFiniteStateBase* InNextState)
 
 	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dying);
 	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dead);
+	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Active);
 
 	Character->StopAction(GameplayTags::Ability_Vitality_Action_Death);
 

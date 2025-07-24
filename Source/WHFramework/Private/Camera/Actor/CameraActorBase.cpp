@@ -23,6 +23,7 @@ ACameraActorBase::ACameraActorBase()
 	CameraBoom->SetRelativeTransform(FTransform::Identity);
 	CameraBoom->bUsePawnControlRotation = false;
 	CameraBoom->bDoCollisionTest = false;
+	CameraBoom->TargetArmLength = 0.f;
 
 	Camera = CreateDefaultSubobject<UCameraComponent>(FName("Camera"));
 	Camera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
@@ -52,9 +53,9 @@ void ACameraActorBase::OnInitialize_Implementation()
 	SetCameraCollisionMode(CameraCollisionMode);
 }
 
-void ACameraActorBase::OnPreparatory_Implementation(EPhase InPhase)
+void ACameraActorBase::OnPreparatory_Implementation()
 {
-	AWHActor::OnPreparatory_Implementation(InPhase);
+	AWHActor::OnPreparatory_Implementation();
 	
 	LastCameraLocation = GetActorLocation();
 }
@@ -90,9 +91,9 @@ void ACameraActorBase::OnRefresh_Implementation(float DeltaSeconds)
 	LastCameraLocation = GetActorLocation();
 }
 
-void ACameraActorBase::OnTermination_Implementation(EPhase InPhase)
+void ACameraActorBase::OnTermination_Implementation()
 {
-	AWHActor::OnTermination_Implementation(InPhase);
+	AWHActor::OnTermination_Implementation();
 
 	IDebuggerInterface::UnRegister();
 }
@@ -112,19 +113,6 @@ void ACameraActorBase::OnSwitch_Implementation()
 void ACameraActorBase::OnUnSwitch_Implementation()
 {
 	StreamingSource->DisableStreamingSource();
-}
-
-void ACameraActorBase::Switch_Implementation()
-{
-	UCameraModuleStatics::SwitchCamera(this);
-}
-
-void ACameraActorBase::UnSwitch_Implementation()
-{
-	if(IsCurrent())
-	{
-		UCameraModuleStatics::SwitchCamera(nullptr);
-	}
 }
 
 bool ACameraActorBase::IsCurrent_Implementation() const

@@ -20,4 +20,8 @@ public:
 
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+
+public:
+	UFUNCTION(BlueprintCallable)
+	void SetMaterialColor(FLinearColor InColor);
 };

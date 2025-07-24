@@ -142,7 +142,7 @@ void UProcedureBase::UnSwitch_Implementation()
 
 void UProcedureBase::Guide_Implementation()
 {
-	if(ProcedureState == EProcedureState::Entered)
+	if(IsCurrent())
 	{
 		OnGuide();
 	}
@@ -186,12 +186,15 @@ void UProcedureBase::SetCameraView(const FCameraParams& InCameraParams)
 
 void UProcedureBase::ResetCameraView()
 {
-	if(ProcedureState != EProcedureState::Entered) return;
-
-	if(CameraViewParams.IsValid())
+	if(IsCurrent() && CameraViewParams.IsValid())
 	{
 		UCameraModuleStatics::SetCameraView(FCameraViewData(OperationTarget.LoadSynchronous(), bTrackTarget, TrackTargetMode, CameraViewParams));
 	}
+}
+
+AActor* UProcedureBase::GetOperationTarget(TSubclassOf<AActor> InClass) const
+{
+	return OperationTarget.LoadSynchronous();
 }
 
 void UProcedureBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCameraView)

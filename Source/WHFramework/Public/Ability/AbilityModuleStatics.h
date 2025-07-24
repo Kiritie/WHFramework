@@ -5,7 +5,7 @@
 #include "AbilityModuleTypes.h"
 #include "Asset/AssetModuleStatics.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
-#include "Math/MathStatics.h"
+#include "Math/MathHelper.h"
 #include "AbilityModuleStatics.generated.h"
 
 class UAbilityBase;
@@ -51,8 +51,8 @@ public:
 			for(int32 i = 0; i < RaceDatas.Num(); i++)
 			{
 				const auto& RaceData = RaceDatas[i];
-				const float NoiseHeight = UMathStatics::GetNoise2D(FVector2D(InLocation.X * RaceData.NoiseScale.X, InLocation.Y * RaceData.NoiseScale.Y), InOffset * (i + 1));
-				if(FMath::Abs(NoiseHeight) >= RaceData.NoiseScale.Z)
+				const float NoiseValue = FMathHelper::GetNoise2D(FVector2D(InLocation.X * RaceData.NoiseScale.X, InLocation.Y * RaceData.NoiseScale.Y), InOffset * (i + 1));
+				if(FMath::Abs(NoiseValue) >= RaceData.NoiseScale.Z)
 				{
 					OutDatas.Add(RaceData);
 				}
@@ -61,6 +61,14 @@ public:
 		return OutDatas.Num() > 0;
 	}
 	
+	//////////////////////////////////////////////////////////////////////////
+	// Attribute
+	UFUNCTION(BlueprintPure, Category = "Ability|GameplayAbility")
+	static FLinearColor GetAttributeColor(const FGameplayAttribute& InAttribute);
+
+	UFUNCTION(BlueprintCallable, Category = "Ability|GameplayAbility")
+	static void SetAttributeColor(const FGameplayAttribute& InAttribute, const FLinearColor& InColor);
+
 	//////////////////////////////////////////////////////////////////////////
 	// Item
 	static AAbilityItemBase* SpawnAbilityItem(FAbilityItem InItem, FVector InLocation, FRotator InRotation, ISceneContainerInterface* InContainer = nullptr);

@@ -55,9 +55,9 @@ void UVoxelDoor::OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResul
 	Super::OnAgentExit(InAgent, InHitResult);
 }
 
-bool UVoxelDoor::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, const FVoxelHitResult& InHitResult)
+bool UVoxelDoor::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
 {
-	return Super::OnAgentInteract(InAgent, InInteractAction, InHitResult);
+	return Super::OnAgentInteract(InAgent, InInteractAction, InInteractEvent, InHitResult);
 }
 
 void UVoxelDoor::Open(IVoxelAgentInterface* InAgent)

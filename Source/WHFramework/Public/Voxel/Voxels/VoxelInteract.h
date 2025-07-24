@@ -38,23 +38,12 @@ public:
 
 	virtual void OnAgentExit(IVoxelAgentInterface* InAgent, const FVoxelHitResult& InHitResult) override;
 
-	virtual bool OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, const FVoxelHitResult& InHitResult) override;
+	virtual bool OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Interact
 public:
-	virtual void Toggle(IVoxelAgentInterface* InAgent);
+	virtual bool Interact(IVoxelAgentInterface* InAgent);
 
-	virtual void Open(IVoxelAgentInterface* InAgent);
-
-	virtual void Close(IVoxelAgentInterface* InAgent);
-
-protected:
-	UPROPERTY(VisibleAnywhere)
-	bool bOpened;
-
-public:
-	bool IsOpened() const { return bOpened; }
-
-	void SetOpened(bool bInOpened) { bOpened = bInOpened; RefreshData(); }
+	virtual void UnInteract(IVoxelAgentInterface* InAgent);
 };

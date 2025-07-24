@@ -12,7 +12,7 @@ void AWHPlayerState::OnInitialize_Implementation()
 	bInitialized = true;
 }
 
-void AWHPlayerState::OnPreparatory_Implementation(EPhase InPhase)
+void AWHPlayerState::OnPreparatory_Implementation()
 {
 	
 }
@@ -22,7 +22,7 @@ void AWHPlayerState::OnRefresh_Implementation(float DeltaSeconds)
 	
 }
 
-void AWHPlayerState::OnTermination_Implementation(EPhase InPhase)
+void AWHPlayerState::OnTermination_Implementation()
 {
 	
 }
@@ -37,7 +37,7 @@ void AWHPlayerState::BeginPlay()
 		{
 			Execute_OnInitialize(this);
 		}
-		Execute_OnPreparatory(this, EPhase::All);
+		Execute_OnPreparatory(this);
 	}
 }
 
@@ -47,7 +47,7 @@ void AWHPlayerState::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	if(Execute_IsUseDefaultLifecycle(this))
 	{
-		Execute_OnTermination(this, EPhase::All);
+		Execute_OnTermination(this);
 	}
 }
 

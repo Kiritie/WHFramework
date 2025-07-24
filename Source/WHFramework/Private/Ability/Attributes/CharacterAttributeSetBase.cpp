@@ -13,32 +13,6 @@ UCharacterAttributeSetBase::UCharacterAttributeSetBase()
 {
 }
 
-void UCharacterAttributeSetBase::PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const
-{
-	Super::PreAttributeBaseChange(Attribute, NewValue);
-	
-	if (Attribute == GetMoveSpeedAttribute())
-	{
-		NewValue = FMath::Clamp(NewValue, 0.f, NewValue);
-	}
-	else if (Attribute == GetRotationSpeedAttribute())
-	{
-		NewValue = FMath::Clamp(NewValue, 0.f, NewValue);
-	}
-	else if (Attribute == GetSwimSpeedAttribute())
-	{
-		NewValue = FMath::Clamp(NewValue, 0.f, NewValue);
-	}
-	else if (Attribute == GetFlySpeedAttribute())
-	{
-		NewValue = FMath::Clamp(NewValue, 0.f, NewValue);
-	}
-	else if (Attribute == GetJumpForceAttribute())
-	{
-		NewValue = FMath::Clamp(NewValue, 0.f, NewValue);
-	}
-}
-
 void UCharacterAttributeSetBase::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
 {
 	Super::PreAttributeChange(Attribute, NewValue);

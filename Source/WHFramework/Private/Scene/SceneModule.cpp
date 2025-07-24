@@ -24,6 +24,7 @@
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Main/MainModule.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Math/MathHelper.h"
 #include "Runtime/LevelSequence/Public/LevelSequenceActor.h"
 #include "Runtime/LevelSequence/Public/LevelSequencePlayer.h"
 #include "SaveGame/Module/SceneSaveGame.h"
@@ -68,6 +69,11 @@ USceneModule::USceneModule()
 	{
 		MiniMapTexture = MiniMapTexFinder.Object;
 	}
+
+	MaxMapAreas = TArray<FWorldMaxMapArea>();
+	bDrawMaxMapArea = false;
+	MaxMapAreaScale = 1.f;
+	MaxMapAreaHeight = 1000.f;
 	
 	WorldTimer = nullptr;
 	WorldWeather = nullptr;
@@ -155,6 +161,8 @@ void USceneModule::OnDestroy()
 void USceneModule::OnInitialize()
 {
 	Super::OnInitialize();
+
+	IDebuggerInterface::Register();
 
 	UEventModuleStatics::SubscribeEvent<UEventHandle_AsyncLoadLevels>(this, GET_FUNCTION_NAME_THISCLASS(OnAsyncLoadLevels));
 	UEventModuleStatics::SubscribeEvent<UEventHandle_AsyncUnloadLevels>(this, GET_FUNCTION_NAME_THISCLASS(OnAsyncUnloadLevels));
@@ -400,6 +408,11 @@ void USceneModule::OnUnPause()
 void USceneModule::OnTermination(EPhase InPhase)
 {
 	Super::OnTermination(InPhase);
+
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		IDebuggerInterface::UnRegister();
+	}
 }
 
 void USceneModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -411,6 +424,7 @@ void USceneModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		if(SaveData.IsSaved())
 		{
 			MiniMapRange = SaveData.MiniMapRange;
+			MaxMapAreas = SaveData.MaxMapAreas;
 		}
 		
 		if(WorldTimer && WorldTimer->IsAutoSave())
@@ -442,6 +456,7 @@ FSaveData* USceneModule::ToData()
 	SaveData = new FSceneModuleSaveData();
 
 	SaveData->MiniMapRange = MiniMapRange;
+	SaveData->MaxMapAreas = MaxMapAreas;
 	
 	if(WorldTimer && WorldTimer->IsAutoSave())
 	{
@@ -473,6 +488,37 @@ FSaveData* USceneModule::ToData()
 FString USceneModule::GetModuleDebugMessage()
 {
 	return Super::GetModuleDebugMessage();
+}
+
+void USceneModule::OnDrawDebug(UCanvas* InCanvas, APlayerController* InPC)
+{
+	if(bDrawMaxMapArea)
+	{
+		for(auto& Iter1 : MaxMapAreas)
+		{
+			switch(Iter1.AreaShape)
+			{
+				case EWorldMaxMapAreaShape::Box:
+				{
+					UKismetSystemLibrary::DrawDebugBox(this, FVector(Iter1.AreaCenter.X * MaxMapAreaScale, Iter1.AreaCenter.Y * MaxMapAreaScale, MaxMapAreaHeight * 0.5f), FVector(Iter1.AreaRadius.X * MaxMapAreaScale, Iter1.AreaRadius.Y * MaxMapAreaScale, MaxMapAreaHeight * 0.5f), FLinearColor::Red);
+					break;
+				}
+				case EWorldMaxMapAreaShape::Ellipse:
+				{
+					UKismetSystemLibrary::DrawDebugCylinder(this, FVector(Iter1.AreaCenter.X * MaxMapAreaScale, Iter1.AreaCenter.Y * MaxMapAreaScale, 0.f), FVector(Iter1.AreaCenter.X * MaxMapAreaScale, Iter1.AreaCenter.Y * MaxMapAreaScale, MaxMapAreaHeight), Iter1.AreaRadius.GetMax() * MaxMapAreaScale, 12, FLinearColor::Red);
+					break;
+				}
+				case EWorldMaxMapAreaShape::Polygon:
+				{
+					for(auto& Iter2 : Iter1.AreaPoints)
+					{
+						UKismetSystemLibrary::DrawDebugLine(this, FVector(Iter2.X * MaxMapAreaScale, Iter2.Y * MaxMapAreaScale, 0.f), FVector(Iter2.X * MaxMapAreaScale, Iter2.Y * MaxMapAreaScale, MaxMapAreaHeight), FLinearColor::Red);
+					}
+					break;
+				}
+			}
+		}
+	}
 }
 
 #if WITH_EDITOR
@@ -528,6 +574,95 @@ void USceneModule::SetMiniMapTexture(UTextureRenderTarget2D* InMiniMapTexture)
 	MiniMapCapture->GetCapture()->TextureTarget = MiniMapTexture;
 }
 
+bool USceneModule::HasMaxMapArea(const FName InName) const
+{
+	for(auto& Iter : MaxMapAreas)
+	{
+		if(Iter.AreaName == InName)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+FWorldMaxMapArea USceneModule::GetMaxMapArea(const FName InName) const
+{
+	for(auto& Iter : MaxMapAreas)
+	{
+		if(Iter.AreaName == InName)
+		{
+			return Iter;
+		}
+	}
+	return FWorldMaxMapArea();
+}
+
+FWorldMaxMapArea USceneModule::GetMaxMapAreaByPoint(const FVector2D& InPoint) const
+{
+	for(auto& Iter : MaxMapAreas)
+	{
+		switch(Iter.AreaShape)
+		{
+			case EWorldMaxMapAreaShape::Box:
+			{
+				if(FMathHelper::IsPointInBox2D(InPoint, Iter.AreaCenter, Iter.AreaRadius))
+				{
+					return Iter;
+				}
+				break;
+			}
+			case EWorldMaxMapAreaShape::Ellipse:
+			{
+				if(FMathHelper::IsPointInEllipse2D(InPoint, Iter.AreaCenter, Iter.AreaRadius))
+				{
+					return Iter;
+				}
+				break;
+			}
+			case EWorldMaxMapAreaShape::Polygon:
+			{
+				if(FMathHelper::IsPointInPolygon2D(InPoint, Iter.AreaPoints))
+				{
+					return Iter;
+				}
+				break;
+			}
+		}
+	}
+	return FWorldMaxMapArea();
+}
+
+void USceneModule::AddMaxMapArea(const FWorldMaxMapArea& InArea)
+{
+	FWorldMaxMapArea Area = InArea;
+	if(Area.AreaName.IsNone())
+	{
+		Area.AreaName = *FString::Printf(TEXT("Area_%d"), MaxMapAreas.Num());
+	}
+	if(!HasMaxMapArea(Area.AreaName))
+	{
+		MaxMapAreas.Add(Area);
+	}
+}
+
+void USceneModule::RemoveMaxMapArea(const FName InName)
+{
+	for(int32 i = 0; i < MaxMapAreas.Num(); i++)
+	{
+		if(MaxMapAreas[i].AreaName == InName)
+		{
+			MaxMapAreas.RemoveAt(i);
+			break;
+		}
+	}
+}
+
+void USceneModule::ClearMaxMapArea()
+{
+	MaxMapAreas.Empty();
+}
+
 UWorldTimer* USceneModule::GetWorldTimer(TSubclassOf<UWorldTimer> InClass) const
 {
 	return GetDeterminesOutputObject(WorldTimer, InClass);
@@ -542,14 +677,6 @@ void USceneModule::OnAsyncLoadLevels(UObject* InSender, UEventHandle_AsyncLoadLe
 {
 	for(auto& Iter : InEventHandle->SoftLevelPaths)
 	{
-		if (Iter.LevelPath.ToString().EndsWith(TEXT("Sub_SCZ_Building")))
-		{
-			for (auto Iter1 : UCommonStatics::GetAllActorsOfLevel(Iter.LevelPath))
-			{
-				Iter1->SetActorHiddenInGame(false);
-			}
-			continue;
-		}
 		FOnAsyncLoadLevelFinished OnAsyncLoadLevelFinished;
 		if(Iter.LevelObjectPtr)
 		{
@@ -566,14 +693,6 @@ void USceneModule::OnAsyncUnloadLevels(UObject* InSender, UEventHandle_AsyncUnlo
 {
 	for(auto& Iter : InEventHandle->SoftLevelPaths)
 	{
-		if (Iter.LevelPath.ToString().EndsWith(TEXT("Sub_SCZ_Building")))
-		{
-			for (auto Iter1 : UCommonStatics::GetAllActorsOfLevel(Iter.LevelPath))
-			{
-				Iter1->SetActorHiddenInGame(true);
-			}
-			continue;
-		}
 		FOnAsyncLoadLevelFinished OnAsyncUnloadLevelFinished;
 		if(Iter.LevelObjectPtr)
 		{
@@ -894,7 +1013,7 @@ void USceneModule::RemovePhysicsVolumeByName(const FName InName)
 	}
 }
 
-void USceneModule::SpawnWorldText(const FString& InText, const FColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetMapping InMapping, FVector InOffsetRange)
+void USceneModule::SpawnWorldText(const FString& InText, const FLinearColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetMapping InMapping, FVector InOffsetRange)
 {
 	if(InOffsetRange != FVector::ZeroVector)
 	{

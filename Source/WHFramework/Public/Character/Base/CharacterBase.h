@@ -45,11 +45,11 @@ public:
 public:
 	virtual void OnInitialize_Implementation() override;
 
-	virtual void OnPreparatory_Implementation(EPhase InPhase) override;
+	virtual void OnPreparatory_Implementation() override;
 
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
-	virtual void OnTermination_Implementation(EPhase InPhase) override;
+	virtual void OnTermination_Implementation() override;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "WHActor")
@@ -110,6 +110,10 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Player
 protected:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PlayerStats")
+	bool bBlockAllInput;
+
+protected:
 	virtual void Turn_Implementation(float InValue) override;
 
 	virtual void MoveForward_Implementation(float InValue) override;
@@ -119,6 +123,11 @@ protected:
 	virtual void MoveUp_Implementation(float InValue) override;
 
 	virtual void JumpN_Implementation() override;
+
+protected:
+	virtual bool IsBlockAllInput_Implementation() const override { return bBlockAllInput; }
+
+	virtual void SetBlockAllInput_Implementation(bool bInValue) override { bBlockAllInput = bInValue; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Camera
@@ -202,11 +211,6 @@ public:
 	virtual FPrimaryAssetId GetGenerateVoxelID() const override { return GenerateVoxelID; }
 
 	virtual void SetGenerateVoxelID(const FPrimaryAssetId& InGenerateVoxelID) override { GenerateVoxelID = InGenerateVoxelID; }
-
-public:
-	virtual bool OnGenerateVoxel(const FVoxelHitResult& InVoxelHitResult) override;
-
-	virtual bool OnDestroyVoxel(const FVoxelHitResult& InVoxelHitResult) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Sound

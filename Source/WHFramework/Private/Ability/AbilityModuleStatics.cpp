@@ -3,9 +3,11 @@
 
 #include "Ability/AbilityModuleStatics.h"
 
+#include "GameplayModMagnitudeCalculation.h"
 #include "Ability/AbilityModule.h"
 #include "Ability/Abilities/AbilityBase.h"
 #include "Ability/Effects/EffectBase.h"
+#include "Ability/Effects/Calculation/UEffectCalculation_Level.h"
 
 const UAbilityBase* UAbilityModuleStatics::GetAbilityBySpec(const FGameplayAbilitySpec& InAbilitySpec, bool& bInstance)
 {
@@ -68,6 +70,16 @@ FEffectInfo UAbilityModuleStatics::GetEffectInfoByClass(TSubclassOf<UEffectBase>
 					AttributeInfo.Value = BasedMagnitude.Coefficient.GetValueAtLevel(InLevel);
 					break;
 				}
+				case EGameplayEffectMagnitudeCalculation::CustomCalculationClass:
+				{
+					FCustomCalculationBasedFloat CustomCalculation = Iter.ModifierMagnitude.*GetCustomMagnitude();
+					AttributeInfo.Value = CustomCalculation.Coefficient.GetValueAtLevel(InLevel);
+					if(CustomCalculation.CalculationClassMagnitude == UUEffectCalculation_Level::StaticClass())
+					{
+						AttributeInfo.Value *= InLevel;
+					}
+					break;
+				}
 				default: break;
 			}
 			EffectInfo.Attributes.Add(AttributeInfo);
@@ -76,6 +88,16 @@ FEffectInfo UAbilityModuleStatics::GetEffectInfoByClass(TSubclassOf<UEffectBase>
 		EffectInfo.Period = Effect->Period.GetValueAtLevel(InLevel);
 	}
 	return EffectInfo;
+}
+
+FLinearColor UAbilityModuleStatics::GetAttributeColor(const FGameplayAttribute& InAttribute)
+{
+	return UAbilityModule::Get().GetAttributeColor(InAttribute);
+}
+
+void UAbilityModuleStatics::SetAttributeColor(const FGameplayAttribute& InAttribute, const FLinearColor& InColor)
+{
+	UAbilityModule::Get().SetAttributeColor(InAttribute, InColor);
 }
 
 AAbilityItemBase* UAbilityModuleStatics::SpawnAbilityItem(FAbilityItem InItem, FVector InLocation, FRotator InRotation, ISceneContainerInterface* InContainer)

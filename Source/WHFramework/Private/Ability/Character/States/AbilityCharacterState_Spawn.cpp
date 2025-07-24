@@ -38,7 +38,7 @@ void UAbilityCharacterState_Spawn::OnEnter(UFiniteStateBase* InLastState, const 
 		Rescuer = InParams[0].GetPointerValue<IAbilityVitalityInterface>();
 	}
 	
-	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalitySpawned>(Cast<UObject>(this), { GetAgent(), Cast<UObject>(Rescuer) });
+	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalitySpawned>(this, { GetAgent(), Cast<UObject>(Rescuer) });
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 
@@ -94,5 +94,5 @@ void UAbilityCharacterState_Spawn::OnTermination()
 
 void UAbilityCharacterState_Spawn::TryLeave()
 {
-	FSM->SwitchStateByClass<UAbilityCharacterState_Walk>();
+	Switch(nullptr);
 }

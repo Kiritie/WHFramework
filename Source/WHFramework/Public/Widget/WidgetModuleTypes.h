@@ -14,17 +14,19 @@ enum class EWorldWidgetVisibility : uint8
 	/// 无
 	None,
 	/// 始终显示
-	AlwaysShow,
+	AlwaysShow = 1 << 0,
 	/// 仅渲染
-	RenderOnly,
+	RenderOnly = 1 << 1,
 	/// 仅屏幕
-	ScreenOnly,
+	ScreenOnly = 1 << 2,
 	/// 仅距离
-	DistanceOnly,
+	DistanceOnly = 1 << 3,
 	/// 渲染和距离
-	RenderAndDistance,
+	RenderAndDistance = RenderOnly | DistanceOnly,
 	/// 屏幕和距离
-	ScreenAndDistance
+	ScreenAndDistance = ScreenOnly | DistanceOnly,
+	/// 屏幕渲染和距离
+	RenderScreenAndDistance = RenderOnly | ScreenOnly | DistanceOnly
 };
 
 USTRUCT(BlueprintType)

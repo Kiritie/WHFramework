@@ -35,9 +35,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = BaseButtonGroup)
 	void SetSelectionRequiredN(bool bRequireSelection);
 
-	UFUNCTION(BlueprintCallable, Category = BaseButtonGroup)
-	void DeselectAllN();
-	
 protected:
 	UPROPERTY()
 	bool bBroadcastOnDeselected;

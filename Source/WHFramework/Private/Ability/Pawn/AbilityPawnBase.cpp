@@ -23,8 +23,6 @@
 AAbilityPawnBase::AAbilityPawnBase(const FObjectInitializer& ObjectInitializer) :
 	Super(ObjectInitializer)
 {
-	PrimaryActorTick.bCanEverTick = true;
-
 	AutoPossessAI = EAutoPossessAI::Disabled;
 
 	AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
@@ -38,6 +36,8 @@ AAbilityPawnBase::AAbilityPawnBase(const FObjectInitializer& ObjectInitializer) 
 	Interaction = CreateDefaultSubobject<UInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);
 	Interaction->SetInteractable(false);
+
+	Interaction->AddInteractAction(EInteractAction::Revive);
 
 	FSM = CreateDefaultSubobject<UFSMComponent>(FName("FSM"));
 	FSM->GroupName = FName("Vitality");
@@ -71,7 +71,7 @@ void AAbilityPawnBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FPa
 
 	SpawnDefaultController();
 
-	FSM->SwitchDefaultState();
+	SwitchDefaultFiniteState();
 }
 
 void AAbilityPawnBase::OnDespawn_Implementation(bool bRecovery)
@@ -89,24 +89,21 @@ void AAbilityPawnBase::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
-void AAbilityPawnBase::OnPreparatory_Implementation(EPhase InPhase)
+void AAbilityPawnBase::OnPreparatory_Implementation()
 {
-	Super::OnPreparatory_Implementation(InPhase);
+	Super::OnPreparatory_Implementation();
 
-	if(PHASEC(InPhase, EPhase::Primary))
-	{
-		RefreshAttributes();
-	}
+	RefreshAttributes();
 }
 
 void AAbilityPawnBase::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);
 
-	if(IsDead()) return;
-
 	if(IsActive())
 	{
+		ModifyHealth(ATTRIBUTE_DELTAVALUE_CLAMP(this, Health, GetHealthRegenSpeed() * DeltaSeconds));
+
 		if(GetMoveVelocity(true).Size() > 0.2f)
 		{
 			if(!IsMoving())
@@ -121,9 +118,9 @@ void AAbilityPawnBase::OnRefresh_Implementation(float DeltaSeconds)
 	}
 }
 
-void AAbilityPawnBase::OnTermination_Implementation(EPhase InPhase)
+void AAbilityPawnBase::OnTermination_Implementation()
 {
-	Super::OnTermination_Implementation(InPhase);
+	Super::OnTermination_Implementation();
 }
 
 void AAbilityPawnBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -234,47 +231,51 @@ void AAbilityPawnBase::ResetData()
 
 void AAbilityPawnBase::OnFiniteStateRefresh(UFiniteStateBase* InCurrentState)
 {
-	FSM->SwitchStateByClass<UAbilityPawnState_Walk>();
+	SwitchFiniteStateByClass<UAbilityPawnState_Walk>();
 }
 
 void AAbilityPawnBase::Death(IAbilityVitalityInterface* InKiller)
 {
-	FSM->SwitchFinalState({ InKiller });
+	SwitchFinalFiniteState({ InKiller });
 }
 
 void AAbilityPawnBase::Kill(IAbilityVitalityInterface* InTarget)
 {
+	if(InTarget != this)
+	{
+		ModifyExp(InTarget->GetLevelA() * 10.f);
+	}
 	InTarget->Death(this);
 }
 
 void AAbilityPawnBase::Revive(IAbilityVitalityInterface* InRescuer)
 {
-	FSM->SwitchDefaultState({ InRescuer });
+	SwitchDefaultFiniteState({ InRescuer });
 }
 
 void AAbilityPawnBase::Static()
 {
-	FSM->SwitchStateByClass<UAbilityPawnState_Static>();
+	SwitchFiniteStateByClass<UAbilityPawnState_Static>();
 }
 
 void AAbilityPawnBase::UnStatic()
 {
-	if(FSM->IsCurrentStateClass<UAbilityPawnState_Static>())
+	if(IsCurrentFiniteStateClass<UAbilityPawnState_Static>())
 	{
-		FSM->SwitchState(nullptr);
+		SwitchFiniteState(nullptr);
 	}
 }
 
 void AAbilityPawnBase::Interrupt(float InDuration /*= -1*/)
 {
-	FSM->SwitchStateByClass<UAbilityPawnState_Interrupt>({ InDuration });
+	SwitchFiniteStateByClass<UAbilityPawnState_Interrupt>({ InDuration });
 }
 
 void AAbilityPawnBase::UnInterrupt()
 {
-	if(FSM->IsCurrentStateClass<UAbilityPawnState_Interrupt>())
+	if(IsCurrentFiniteStateClass<UAbilityPawnState_Interrupt>())
 	{
-		FSM->SwitchState(nullptr);
+		SwitchFiniteState(nullptr);
 	}
 }
 
@@ -306,7 +307,7 @@ void AAbilityPawnBase::EndAction(const FGameplayTag& InActionTag, bool bWasCance
 {
 	if(InActionTag.MatchesTag(GameplayTags::Ability_Vitality_Action_Death))
 	{
-		if(FSM->IsCurrentStateClass<UAbilityPawnState_Death>())
+		if(IsCurrentFiniteStateClass<UAbilityPawnState_Death>())
 		{
 			FSM->GetCurrentState<UAbilityPawnState_Death>()->DeathEnd();
 		}
@@ -323,6 +324,14 @@ void AAbilityPawnBase::EndAction(const FGameplayTag& InActionTag, bool bWasCance
 
 bool AAbilityPawnBase::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
 {
+	switch (InInteractAction)
+	{
+		case EInteractAction::Revive:
+		{
+			return IsDead();
+		}
+		default: break;
+	}
 	return false;
 }
 
@@ -336,12 +345,25 @@ void AAbilityPawnBase::OnLeaveInteract(IInteractionAgentInterface* InInteraction
 
 void AAbilityPawnBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive)
 {
-	
+	if(bPassive)
+	{
+		switch (InInteractAction)
+		{
+			case EInteractAction::Revive:
+			{
+				Revive(Cast<IAbilityVitalityInterface>(InInteractionAgent));
+			}
+			default: break;
+		}
+	}
 }
 
 void AAbilityPawnBase::OnAdditionItem(const FAbilityItem& InItem)
 {
-	
+	if(InItem.ID == PAID_EXP)
+    {
+    	ModifyExp(InItem.Count);
+    }
 }
 
 void AAbilityPawnBase::OnRemoveItem(const FAbilityItem& InItem)
@@ -378,7 +400,7 @@ void AAbilityPawnBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPlace)
 
 void AAbilityPawnBase::OnSelectItem(const FAbilityItem& InItem)
 {
-	if(InItem.InventorySlot->GetSplitType() == ESlotSplitType::Shortcut)
+	if(InItem.GetPayload<UAbilityInventorySlotBase>()->GetSplitType() == ESlotSplitType::Shortcut)
 	{
 		if(InItem.IsValid() && InItem.GetType() == EAbilityItemType::Voxel)
 		{
@@ -394,6 +416,38 @@ void AAbilityPawnBase::OnSelectItem(const FAbilityItem& InItem)
 void AAbilityPawnBase::OnAuxiliaryItem(const FAbilityItem& InItem)
 {
 
+}
+
+bool AAbilityPawnBase::OnGenerateVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
+{
+	switch(InInteractEvent)
+	{
+		case EInputInteractEvent::Started:
+		{
+			return IVoxelAgentInterface::OnGenerateVoxel(InInteractEvent, InHitResult);
+		}
+		case EInputInteractEvent::Triggered:
+		{
+			return IVoxelAgentInterface::OnGenerateVoxel(InInteractEvent, InHitResult);
+		}
+		case EInputInteractEvent::Completed:
+		{
+			FItemQueryData ItemQueryData = Inventory->QueryItemByRange(EItemQueryType::Remove, GenerateVoxelItem.ID, -1);
+			if(!ItemQueryData.IsValid()) bCanGenerateVoxel = false;
+			if(IVoxelAgentInterface::OnGenerateVoxel(InInteractEvent, InHitResult))
+			{
+				Inventory->RemoveItemByQueryData(ItemQueryData);
+				return true;
+			}
+			break;
+		}
+	}
+	return false;
+}
+
+bool AAbilityPawnBase::OnDestroyVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
+{
+	return IVoxelAgentInterface::OnDestroyVoxel(InInteractEvent, InHitResult);
 }
 
 void AAbilityPawnBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
@@ -437,11 +491,11 @@ void AAbilityPawnBase::HandleDamage(const FGameplayAttribute& DamageAttribute, f
 
 	if(DamageValue >= 1.f)
 	{
-		USceneModuleStatics::SpawnWorldText(FString::FromInt(DamageValue), DamageAttribute != GetMagicDamageAttribute() ? FColor::Red : FColor::Cyan, !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
+		USceneModuleStatics::SpawnWorldText(FString::FromInt(DamageValue), UAbilityModuleStatics::GetAttributeColor(DamageAttribute), !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
 	}
 	if(DefendValue >= 1.f)
 	{
-		USceneModuleStatics::SpawnWorldText(FString::FromInt(DefendValue), FColor::White, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
+		USceneModuleStatics::SpawnWorldText(FString::FromInt(DefendValue), FColor::Cyan, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
 	}
 }
 
@@ -503,14 +557,14 @@ bool AAbilityPawnBase::IsEnemy(IAbilityPawnInterface* InTarget) const
 	return !InTarget->GetRaceID().IsEqual(RaceID);
 }
 
-bool AAbilityPawnBase::IsActive(bool bNeedNotDead) const
+bool AAbilityPawnBase::IsActive() const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Active) && (!bNeedNotDead || !IsDead());
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Active);
 }
 
 bool AAbilityPawnBase::IsDead(bool bCheckDying) const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Dead) || bCheckDying && IsDying();
+	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Dead) || (bCheckDying && IsDying());
 }
 
 bool AAbilityPawnBase::IsDying() const

@@ -16,25 +16,35 @@ public:
 	FVoxelOreGenerateData()
 	{
 		VoxelType = EVoxelType::Empty;
-		CrystalSize = 2.f;
 		MaxHeight = -1;
+		SpawnRate = 0.f;
+		MinSize = 1;
+		MaxSize = 1;
 	}
 
-	FVoxelOreGenerateData(const EVoxelType VoxelType, const float CrystalSize, const int32 MaxHeight)
+	FVoxelOreGenerateData(const EVoxelType VoxelType, int32 HeightRange, const float SpawnRate, const int MinSize, const int MaxSize)
 		: VoxelType(VoxelType),
-		  CrystalSize(CrystalSize),
-		  MaxHeight(MaxHeight)
+		  MaxHeight(HeightRange),
+		  SpawnRate(SpawnRate),
+		  MinSize(MinSize),
+		  MaxSize(MaxSize)
 	{
 	}
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EVoxelType VoxelType;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float CrystalSize;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MaxHeight;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float SpawnRate;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int MinSize;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int MaxSize;
 };
 
 /**
@@ -52,6 +62,15 @@ public:
 	virtual void Generate(AVoxelChunk* InChunk) override;
 
 protected:
+	void GenerateOre(FIndex InIndex, const FVoxelOreGenerateData& InGenerateData);
+
+protected:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Seed;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float SpawnRate;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FVoxelOreGenerateData> GenerateDatas;
 };
