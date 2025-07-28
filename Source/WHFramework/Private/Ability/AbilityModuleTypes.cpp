@@ -274,7 +274,7 @@ UAbilityItemDataBase& FRaceItem::GetData() const
 	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityItemDataBase>(ID);
 }
 
-void FActorSaveData::InitInventoryData(FRandomStream InRandomStream)
+void FActorSaveData::InitData(FRandomStream InRandomStream)
 {
 	InventoryData = GetData().InventoryData;
 	InventoryData.FillItems(Level, InRandomStream);

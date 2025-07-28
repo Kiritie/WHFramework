@@ -36,7 +36,7 @@ public:
 	void TargetLookingOn(AActor* InTargetActor);
 
 	UFUNCTION(BlueprintCallable)
-	void TargetLookingOff();
+	void TargetLookingOff(bool bReset = true);
 
 	UFUNCTION(BlueprintPure)
 	bool TargetIsLookAtAble(AActor* InTargetActor) const;
@@ -72,6 +72,9 @@ protected:
 	
 	UPROPERTY()
 	AActor* OwnerActor;
+	
+	UPROPERTY()
+	bool bTargetLooked;
 
 public:
 	UFUNCTION(BlueprintPure)

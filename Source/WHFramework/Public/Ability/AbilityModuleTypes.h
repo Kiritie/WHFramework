@@ -1215,7 +1215,7 @@ public:
 		InventoryData.MakeSaved();
 	}
 
-	virtual void InitInventoryData(FRandomStream InRandomStream = FRandomStream());
+	virtual void InitData(FRandomStream InRandomStream = FRandomStream());
 
 	template<class T>
 	T& GetData() const
