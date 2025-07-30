@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "Common/Components/FollowingMovementComponent.h"
+#include "Common/Movement/FollowingMovementComponent.h"
 
 UFollowingMovementComponent::UFollowingMovementComponent(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)

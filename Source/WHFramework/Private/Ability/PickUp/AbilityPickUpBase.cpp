@@ -5,8 +5,8 @@
 
 #include "Ability/AbilityModule.h"
 #include "Ability/PickUp/AbilityPickerInterface.h"
-#include "Common/Components/FallingMovementComponent.h"
-#include "Common/Components/FollowingMovementComponent.h"
+#include "Common/Movement/FallingMovementComponent.h"
+#include "Common/Movement/FollowingMovementComponent.h"
 #include "Common/Interaction/InteractionComponent.h"
 #include "GameFramework/RotatingMovementComponent.h"
 #include "Components/BoxComponent.h"

@@ -1,8 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "Common/Components/FallingMovementComponent.h"
+#include "Common/Movement/FallingMovementComponent.h"
 
-#include "Common/CommonStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
 
 UFallingMovementComponent::UFallingMovementComponent(const FObjectInitializer& ObjectInitializer)
