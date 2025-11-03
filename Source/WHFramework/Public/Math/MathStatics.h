@@ -20,7 +20,13 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Index
 	UFUNCTION(BlueprintPure, Category = "MathStatics")
-	static FIndex RotateIndex(const FIndex& InIndex, const FRotator& InRotator, bool bRound = false, bool bAbsolute = false);
+	static int64 CompressIndex(FIndex InIndex);
+
+	UFUNCTION(BlueprintPure, Category = "MathStatics")
+	static FIndex UnCompressIndex(int64 InIndex);
+
+	UFUNCTION(BlueprintPure, Category = "MathStatics")
+	static FIndex RotateIndex(const FIndex& InIndex, ERightAngle InAngle, bool bAbsolute = false);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Vector

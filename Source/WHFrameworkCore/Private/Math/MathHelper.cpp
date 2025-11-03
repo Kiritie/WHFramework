@@ -2,22 +2,17 @@
 
 #include "Math/MathHelper.h"
 
-uint64 FMathHelper::Index(int32 InX, int32 InY, int32 InZ)
+int64 FMathHelper::CompressIndex(int32 InX, int32 InY, int32 InZ)
 {
-	const int32 Offset = 16384;
-	uint64 T =
-		uint64(InX + Offset) << 40 |
-		uint64(InY + Offset) << 20 |
-		uint64(InZ + Offset);
-	return T;
+	return CompressIndex(FIndex(InX, InY, InZ));
 }
 
-uint64 FMathHelper::Index(FIndex InIndex)
+int64 FMathHelper::CompressIndex(FIndex InIndex)
 {
-	return Index(InIndex.X, InIndex.Y, InIndex.Z);
+	return InIndex.ToInt64();
 }
 
-FIndex FMathHelper::UnIndex(uint64 InIndex)
+FIndex FMathHelper::UnCompressIndex(int64 InIndex)
 {
 	const int32 Offset = 16384;
 	return FIndex(
@@ -25,6 +20,8 @@ FIndex FMathHelper::UnIndex(uint64 InIndex)
 		int32((InIndex >> 20) & 0xFFFFF) - Offset,
 		int32(InIndex & 0xFFFFF) - Offset
 	);
+	//
+	// return FIndex(InIndex);
 }
 
 FIndex FMathHelper::RotateIndex(const FIndex& InIndex, ERightAngle InAngle, bool bAbsolute)

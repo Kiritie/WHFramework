@@ -722,11 +722,11 @@ void USceneModule::OnPlayLevelSequence(UObject* InSender, UEventHandle_PlayLevel
 		{
 			if(!InEventHandle->bReverse)
 			{
-				Actor->SequencePlayer->Play();
+				Actor->GetSequencePlayer()->Play();
 			}
 			else
 			{
-				Actor->SequencePlayer->PlayReverse();
+				Actor->GetSequencePlayer()->PlayReverse();
 			}
 		};
 		if(InEventHandle->Delay > 0.f)
@@ -752,11 +752,11 @@ void USceneModule::OnStopLevelSequence(UObject* InSender, UEventHandle_StopLevel
 		{
 			if(!InEventHandle->bKeepState)
 			{
-				Actor->SequencePlayer->Stop();
+				Actor->GetSequencePlayer()->Stop();
 			}
 			else
 			{
-				Actor->SequencePlayer->StopAtCurrentTime();
+				Actor->GetSequencePlayer()->StopAtCurrentTime();
 			}
 		};
 		if(InEventHandle->Delay > 0.f)

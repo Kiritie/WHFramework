@@ -4,9 +4,19 @@
 
 #include "Math/MathHelper.h"
 
-FIndex UMathStatics::RotateIndex(const FIndex& InIndex, const FRotator& InRotator, bool bRound, bool bAbsolute)
+int64 UMathStatics::CompressIndex(FIndex InIndex)
 {
-	return RotateVector(InIndex, InRotator, bRound, bAbsolute);
+	return FMathHelper::CompressIndex(InIndex);
+}
+
+FIndex UMathStatics::UnCompressIndex(int64 InIndex)
+{
+	return FMathHelper::UnCompressIndex(InIndex);
+}
+
+FIndex UMathStatics::RotateIndex(const FIndex& InIndex, ERightAngle InAngle, bool bAbsolute)
+{
+	return FMathHelper::RotateIndex(InIndex, InAngle, bAbsolute);
 }
 
 FVector UMathStatics::RotateVector(const FVector& InVector, const FRotator& InRotator, bool bRound, bool bAbsolute)

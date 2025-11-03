@@ -91,7 +91,7 @@ void UVoxelVillageGenerator::DevelopeDomains(AVoxelChunk* InChunk)
 
 		for(int d = 0; d < 9; ++d)
 		{
-			_Domains.Emplace(FMathHelper::Index(P.X + Dx[d], P.Y + Dy[d]));
+			_Domains.Emplace(FMathHelper::CompressIndex(P.X + Dx[d], P.Y + Dy[d]));
 		}
 
 		if(Cost > 7) break;
@@ -106,7 +106,7 @@ void UVoxelVillageGenerator::DevelopeDomains(AVoxelChunk* InChunk)
 			int32 x = P.X + Dx1[d] * 3;
 			int32 y = P.Y + Dy1[d] * 3;
 
-			if(_Domains.Find(FMathHelper::Index(x, y))) continue;
+			if(_Domains.Find(FMathHelper::CompressIndex(x, y))) continue;
 
 			int32 Height = Module->GetTopographyByIndex(FIndex(x, y)).Height;
 			if(Height <= Module->GetWorldData().SeaLevel) continue;
@@ -166,7 +166,7 @@ bool UVoxelVillageGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InInde
 	{
 		for(int j = -LeftRight; j < LeftRight; ++j)
 		{
-			if(!_Domains.Find(FMathHelper::Index(InX + i, InY + j))) return false;
+			if(!_Domains.Find(FMathHelper::CompressIndex(InX + i, InY + j))) return false;
 
 			FIndex Index = FIndex(InX + i, InY + j, Module->GetTopographyByIndex(FIndex(InX + i, InY + j)).Height);
 			if(!Module->HasVoxelByIndex(Index, true)) return false;
@@ -189,7 +189,7 @@ bool UVoxelVillageGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InInde
 				const FIndex Index = FIndex(InX + i, InY + j, k);
 				Module->SetVoxelByIndex(Index, EVoxelType::Cobble_Stone);
 			}
-			_Domains.Remove(FMathHelper::Index(InX + i, InY + j));
+			_Domains.Remove(FMathHelper::CompressIndex(InX + i, InY + j));
 		}
 	}
 
@@ -218,7 +218,7 @@ bool UVoxelVillageGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InInde
 		Module->SetVoxelByIndex(Index, VoxelItem);
 	}
 
-	_Domains.Emplace(FMathHelper::Index(InX - FrontBack, InY - LeftRight));
+	_Domains.Emplace(FMathHelper::CompressIndex(InX - FrontBack, InY - LeftRight));
 	_BuildingPos.Push(FVector2D(InX - FrontBack, InY - LeftRight));
 
 	return true;
@@ -234,7 +234,7 @@ void UVoxelVillageGenerator::PlacePaths()
 
 			for(FVector2D Pos : Path)
 			{
-				_Roads.Emplace(FMathHelper::Index(Pos.X, Pos.Y));
+				_Roads.Emplace(FMathHelper::CompressIndex(Pos.X, Pos.Y));
 				const FIndex Index = FIndex(Pos.X, Pos.Y, Module->GetTopographyByIndex(FIndex(Pos.X, Pos.Y)).Height);
 
 				if(!Module->HasVoxelByIndex(Index, true)) continue;
@@ -248,12 +248,12 @@ void UVoxelVillageGenerator::PlacePaths()
 
 bool UVoxelVillageGenerator::InBarrier(FVector2D InPos)
 {
-	return !_Domains.Contains(FMathHelper::Index(InPos.X, InPos.Y));
+	return !_Domains.Contains(FMathHelper::CompressIndex(InPos.X, InPos.Y));
 }
 
 TPair<float, float> UVoxelVillageGenerator::WeightFormula(FVector2D InStartPos, FVector2D InEndPos, float InCost)
 {
-	if(_Roads.Contains(FMathHelper::Index(InStartPos.X, InStartPos.Y)))
+	if(_Roads.Contains(FMathHelper::CompressIndex(InStartPos.X, InStartPos.Y)))
 	{
 		InCost -= 0.5f;
 	}

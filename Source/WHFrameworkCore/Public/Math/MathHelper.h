@@ -12,14 +12,11 @@ class WHFRAMEWORKCORE_API FMathHelper
 public:
 	//////////////////////////////////////////////////////////////////////////
 	// Index
-	//Three-dimensional to one-dimensional coordinates (compressed)
-	static uint64 Index(int32 InX, int32 InY, int32 InZ = 0);
+	static int64 CompressIndex(int32 InX, int32 InY, int32 InZ = 0);
 
-	//Three-dimensional to one-dimensional coordinates (compressed)
-	static uint64 Index(FIndex InIndex);
+	static int64 CompressIndex(FIndex InIndex);
 
-	//One-dimensional to three-dimensional coordinates (decompression coordinates)
-	static FIndex UnIndex(uint64 InIndex);
+	static FIndex UnCompressIndex(int64 InIndex);
 
 	static FIndex RotateIndex(const FIndex& InIndex, ERightAngle InAngle, bool bAbsolute = false);
 

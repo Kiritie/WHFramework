@@ -2,7 +2,6 @@
 
 #pragma once
 
-
 #include "MathTypes.generated.h"
 
 #define DEG_2_RAD (0.01745329f)
@@ -95,6 +94,10 @@ public:
 
 	static const FIndex OneIndex;
 
+private:
+	int32 Offset = 32768;
+
+public:
 	FORCEINLINE FIndex()
 	{
 		X = 0;
@@ -102,7 +105,12 @@ public:
 		Z = 0;
 	}
 
-	FIndex(int64 InValue);
+	FORCEINLINE FIndex(int64 InValue)
+	{
+		X = int32(InValue >> 34) - Offset;
+		Y = int32((InValue >> 17) & 0x1FFFF) - Offset;
+		Z = int32(InValue & 0x1FFFF) - Offset;
+	}
 
 	FORCEINLINE FIndex(int32 InValue)
 	{
@@ -148,7 +156,12 @@ public:
 		Z = FCString::Atoi(*Arr[2]);
 	}
 
-	int64 ToInt64() const;
+	FORCEINLINE int64 ToInt64() const
+	{
+		return uint64(X + Offset) << 34 |
+           uint64(Y + Offset) << 17 |
+           uint64(Z + Offset);
+	}
 
 	FORCEINLINE FVector ToVector() const
 	{

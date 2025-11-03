@@ -1072,10 +1072,10 @@ uint64 UVoxelModule::VoxelIndexToNumber(FIndex InIndex, bool bWorldSpace) const
 {
 	if(!bWorldSpace)
 	{
-		const int32 Num = (int32)WorldData->ChunkSize.X;
-		return InIndex.X + InIndex.Y * Num + InIndex.Z * Num * (int32)WorldData->ChunkSize.Y;
+		const int32 SizeX = (int32)WorldData->ChunkSize.X;
+		return InIndex.X + InIndex.Y * SizeX + InIndex.Z * SizeX * (int32)WorldData->ChunkSize.Y;
 	}
-	return FMathHelper::Index(InIndex);
+	return FMathHelper::CompressIndex(InIndex);
 }
 
 FIndex UVoxelModule::NumberToVoxelIndex(uint64 InNumber, bool bWorldSpace) const
@@ -1087,7 +1087,7 @@ FIndex UVoxelModule::NumberToVoxelIndex(uint64 InNumber, bool bWorldSpace) const
 		const int32 Num3 = InNumber % Num2;
 		return FIndex(Num3 % Num1, Num3 / Num1, InNumber / Num2);
 	}
-	return FMathHelper::UnIndex(InNumber);
+	return FMathHelper::UnCompressIndex(InNumber);
 }
 
 bool UVoxelModule::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)

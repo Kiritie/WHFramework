@@ -188,7 +188,7 @@ protected:
 	TArray<EVoxelNature> MeshVoxelNatures;
 
 public:
-	void SpawnMeshComponents(int32 InStage);
+	void SpawnMeshComponents(int32 InStage = 1 | 2);
 
 	void DestroyMeshComponents();
 
