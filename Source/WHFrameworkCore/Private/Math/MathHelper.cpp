@@ -14,14 +14,7 @@ int64 FMathHelper::CompressIndex(FIndex InIndex)
 
 FIndex FMathHelper::UnCompressIndex(int64 InIndex)
 {
-	const int32 Offset = 16384;
-	return FIndex(
-		int32(InIndex >> 40) - Offset,
-		int32((InIndex >> 20) & 0xFFFFF) - Offset,
-		int32(InIndex & 0xFFFFF) - Offset
-	);
-	//
-	// return FIndex(InIndex);
+	return FIndex(InIndex);
 }
 
 FIndex FMathHelper::RotateIndex(const FIndex& InIndex, ERightAngle InAngle, bool bAbsolute)

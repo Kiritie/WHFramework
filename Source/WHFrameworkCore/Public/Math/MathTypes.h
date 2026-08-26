@@ -95,7 +95,7 @@ public:
 	static const FIndex OneIndex;
 
 private:
-	int32 Offset = 32768;
+	static const int32 NumOffset;
 
 public:
 	FORCEINLINE FIndex()
@@ -107,9 +107,9 @@ public:
 
 	FORCEINLINE FIndex(int64 InValue)
 	{
-		X = int32(InValue >> 34) - Offset;
-		Y = int32((InValue >> 17) & 0x1FFFF) - Offset;
-		Z = int32(InValue & 0x1FFFF) - Offset;
+		X = int32((InValue >> 20) & 0x3FF) - NumOffset;
+		Y = int32((InValue >> 10) & 0x3FF) - NumOffset;
+		Z = int32(InValue & 0x3FF) - NumOffset;
 	}
 
 	FORCEINLINE FIndex(int32 InValue)
@@ -158,9 +158,9 @@ public:
 
 	FORCEINLINE int64 ToInt64() const
 	{
-		return uint64(X + Offset) << 34 |
-           uint64(Y + Offset) << 17 |
-           uint64(Z + Offset);
+		return (int64)((uint32(X + NumOffset) << 20) |
+			(uint32(Y + NumOffset) << 10) |
+			uint32(Z + NumOffset));
 	}
 
 	FORCEINLINE FVector ToVector() const

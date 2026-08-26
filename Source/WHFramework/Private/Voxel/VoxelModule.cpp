@@ -570,6 +570,7 @@ void UVoxelModule::LoadPrefabData(const FVoxelPrefabSaveData& InPrefabData)
 	for(auto Iter : GenerateChunks)
 	{
 		Iter->Generate(EPhase::Lesser);
+		Iter->SetChanged(true);
 	}
 }
 

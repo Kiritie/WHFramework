@@ -30,7 +30,7 @@ void ULookingComponent::TickComponent(const float DeltaTime, const ELevelTick Ti
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	if (!LookingTarget || !bTargetLooked) return;
+	if (!(LookingTarget && bTargetLooked)) return;
 
 	if (!TargetIsLookAtAble(LookingTarget))
 	{
