@@ -19,7 +19,7 @@ UVoxelLakeGenerator::UVoxelLakeGenerator()
 	MaxDepth = 5.f;
 }
 
-void UVoxelLakeGenerator::Generate(AVoxelChunk* InChunk)
+void UVoxelLakeGenerator::Generate(UVoxelChunk* InChunk)
 {
 	if(InChunk->GetIndex().X % MinDistance != 0 || InChunk->GetIndex().Y % MinDistance != 0) return;
 

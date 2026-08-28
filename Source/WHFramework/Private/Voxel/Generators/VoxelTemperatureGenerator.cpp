@@ -14,7 +14,7 @@ UVoxelTemperatureGenerator::UVoxelTemperatureGenerator()
 	CrystalSize  = 64;
 }
 
-void UVoxelTemperatureGenerator::Generate(AVoxelChunk* InChunk)
+void UVoxelTemperatureGenerator::Generate(UVoxelChunk* InChunk)
 {
 	int32 _CrystalSize  = CrystalSize;
 

@@ -37,6 +37,15 @@ void UVoxelMeshComponent::OnSpawn_Implementation(UObject* InOwner, const TArray<
 		Register(InActor);
 		AttachToComponent(InActor->GetRootComponent(), FAttachmentTransformRules::SnapToTargetIncludingScale);
 	}
+	if (InParams.IsValidIndex(0))
+	{
+		Chunk = InParams[0].GetObjectValue<UVoxelChunk>();
+		if (Chunk)
+		{
+			SetRelativeLocation(FVector(Chunk->GetIndex().X * UVoxelModule::Get().GetWorldData().GetChunkRealSize().X,
+				Chunk->GetIndex().Y * UVoxelModule::Get().GetWorldData().GetChunkRealSize().Y, 0.f));
+		}
+	}
 }
 
 void UVoxelMeshComponent::OnDespawn_Implementation(bool bRecovery)
@@ -138,7 +147,7 @@ void UVoxelMeshComponent::BuildVoxel(const FVoxelItem& InVoxelItem)
 	else
 	{
 		ITER_DIRECTION(Iter,
-			if (!GetOwnerChunk() || !GetOwnerChunk()->CheckVoxelAdjacent(InVoxelItem, Iter))
+			if (!GetChunk() || !GetChunk()->CheckVoxelAdjacent(InVoxelItem, Iter))
 			{
 				BuildFace(InVoxelItem, Iter);
 			}
@@ -349,11 +358,11 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVer
 
 void UVoxelMeshComponent::OnCollision(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
-	if(!GetOwnerChunk()) return;
+	if(!GetChunk()) return;
 	
 	if(IVoxelAgentInterface* VoxelAgent = Cast<IVoxelAgentInterface>(OtherActor))
 	{
-		const FVoxelItem& VoxelItem = GetOwnerChunk()->GetVoxelComplex(GetOwnerChunk()->LocationToIndex(Hit.ImpactPoint - UVoxelModule::Get().GetWorldData().GetBlockSizedNormal(Hit.ImpactNormal)), true);
+		const FVoxelItem& VoxelItem = GetChunk()->GetVoxelComplex(GetChunk()->LocationToIndex(Hit.ImpactPoint - UVoxelModule::Get().GetWorldData().GetBlockSizedNormal(Hit.ImpactNormal)), true);
 		if(VoxelItem.IsValid())
 		{
 			VoxelItem.GetVoxel().OnAgentHit(VoxelAgent, FVoxelHitResult(VoxelItem, Hit.ImpactPoint, Hit.ImpactNormal));
@@ -413,9 +422,4 @@ void UVoxelMeshComponent::SetNature(EVoxelNature InNature)
 		}
 		default: break;
 	}
-}
-
-AVoxelChunk* UVoxelMeshComponent::GetOwnerChunk() const
-{
-	return Cast<AVoxelChunk>(GetOwner());
 }

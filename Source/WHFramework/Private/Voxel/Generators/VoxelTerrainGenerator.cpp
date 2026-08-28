@@ -12,7 +12,7 @@ UVoxelTerrainGenerator::UVoxelTerrainGenerator()
 	UnderDepth = 3;
 }
 
-void UVoxelTerrainGenerator::Generate(AVoxelChunk* InChunk)
+void UVoxelTerrainGenerator::Generate(UVoxelChunk* InChunk)
 {
 	//载入地形方块
 	ITER_INDEX2D(Index, Module->GetWorldData().ChunkSize, false,
@@ -41,7 +41,7 @@ void UVoxelTerrainGenerator::Generate(AVoxelChunk* InChunk)
 	)
 }
 
-EVoxelType UVoxelTerrainGenerator::CalculateVoxelType(AVoxelChunk* InChunk, FIndex InIndex) const
+EVoxelType UVoxelTerrainGenerator::CalculateVoxelType(UVoxelChunk* InChunk, FIndex InIndex) const
 {
 	if(InIndex.Z < BaseHeight) return EVoxelType::Bedrock;
 

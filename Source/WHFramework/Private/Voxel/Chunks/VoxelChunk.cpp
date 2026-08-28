@@ -9,6 +9,7 @@
 #include "Common/CommonStatics.h"
 #include "Common/CommonTypes.h"
 #include "Debug/DebugModuleTypes.h"
+#include "Main/MainModule.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Voxel/Voxels/Data/VoxelData.h"
@@ -28,13 +29,11 @@
 #include "Voxel/Generators/VoxelHoleGenerator.h"
 #include "Voxel/Generators/VoxelLakeGenerator.h"
 #include "Voxel/Generators/VoxelOreGenerator.h"
+#include "Voxel/Root/VoxelRoot.h"
 
 // Sets default values
-AVoxelChunk::AVoxelChunk()
+UVoxelChunk::UVoxelChunk()
 {
-	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = false;
-
 	MeshComponents = TMap<EVoxelNature, UVoxelMeshComponent*>();
 
 	Batch = -1;
@@ -45,18 +44,18 @@ AVoxelChunk::AVoxelChunk()
 	Module = nullptr;
 	VoxelMaps = FVoxelMaps();
 	TopographyMap = TMap<FIndex, FVoxelTopography>();
-	Neighbors = TMap<EDirection, AVoxelChunk*>();
+	Neighbors = TMap<EDirection, UVoxelChunk*>();
 	ITER_DIRECTION(Iter, Neighbors.Add(Iter); )
 
 	bNeedCreateMesh = false;
 }
 
-void AVoxelChunk::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UVoxelChunk::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	
 }
 
-void AVoxelChunk::OnDespawn_Implementation(bool bRecovery)
+void UVoxelChunk::OnDespawn_Implementation(bool bRecovery)
 {
 	SaveData();
 	
@@ -78,13 +77,9 @@ void AVoxelChunk::OnDespawn_Implementation(bool bRecovery)
 	VoxelMaps.Clear();
 
 	TopographyMap.Empty();
-
-	SetActorLocationAndRotation(UNDER_Vector, FRotator::ZeroRotator);
-
-	Execute_SetActorVisible(this, false);
 }
 
-void AVoxelChunk::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UVoxelChunk::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData->CastRef<FVoxelChunkSaveData>();
 	
@@ -112,7 +107,7 @@ void AVoxelChunk::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	bBuilded = true;
 }
 
-FSaveData* AVoxelChunk::ToData()
+FSaveData* UVoxelChunk::ToData()
 {
 	static FVoxelChunkSaveData SaveData;
 	SaveData = FVoxelChunkSaveData();
@@ -157,7 +152,7 @@ FSaveData* AVoxelChunk::ToData()
 	return &SaveData;
 }
 
-void AVoxelChunk::SaveData()
+void UVoxelChunk::SaveData()
 {
 	if(bGenerated)
 	{
@@ -165,7 +160,7 @@ void AVoxelChunk::SaveData()
 	}
 }
 
-void AVoxelChunk::Initialize(UVoxelModule* InModule, FIndex InIndex, int32 InBatch)
+void UVoxelChunk::Initialize(UVoxelModule* InModule, FIndex InIndex, int32 InBatch)
 {
 	Module = InModule;
 	Index = InIndex;
@@ -179,12 +174,8 @@ void AVoxelChunk::Initialize(UVoxelModule* InModule, FIndex InIndex, int32 InBat
 	UpdateNeighbors();
 }
 
-void AVoxelChunk::Generate(EPhase InPhase)
+void UVoxelChunk::Generate(EPhase InPhase)
 {
-	if(!Execute_IsVisible(this))
-	{
-		Execute_SetActorVisible(this, true);
-	}
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
 		CreateMesh();
@@ -217,7 +208,7 @@ void AVoxelChunk::Generate(EPhase InPhase)
 	}
 }
 
-void AVoxelChunk::CreateMesh()
+void UVoxelChunk::CreateMesh()
 {
 	for(auto& Iter : MeshComponents)
 	{
@@ -225,7 +216,7 @@ void AVoxelChunk::CreateMesh()
 	}
 }
 
-void AVoxelChunk::ClearMap(bool bGenerate)
+void UVoxelChunk::ClearMap(bool bGenerate)
 {
 	VoxelMaps.Iter([this](FVoxelItem& Item){
 		DestroyAuxiliary(Item);
@@ -234,7 +225,7 @@ void AVoxelChunk::ClearMap(bool bGenerate)
 	Generate(EPhase::Lesser);
 }
 
-void AVoxelChunk::BuildMap(int32 InStage)
+void UVoxelChunk::BuildMap(int32 InStage)
 {
 	switch (InStage)
 	{
@@ -293,7 +284,7 @@ void AVoxelChunk::BuildMap(int32 InStage)
 	}
 }
 
-void AVoxelChunk::BuildPrefabMap()
+void UVoxelChunk::BuildPrefabMap()
 {
 	ITER_INDEX2D(_Index, Module->GetWorldData().ChunkSize, false,
 		SetVoxel(_Index, EVoxelType::Grass);
@@ -301,7 +292,7 @@ void AVoxelChunk::BuildPrefabMap()
 	bBuilded = true;
 }
 
-void AVoxelChunk::BuildMesh()
+void UVoxelChunk::BuildMesh()
 {
 	VoxelMaps.Iter([this](FVoxelItem& Item){
 		if(Item.IsValid())
@@ -311,45 +302,45 @@ void AVoxelChunk::BuildMesh()
 	}, true);
 }
 
-void AVoxelChunk::GenerateNeighbors(FIndex InIndex, EPhase InPhase)
+void UVoxelChunk::GenerateNeighbors(FIndex InIndex, EPhase InPhase)
 {
 	GenerateNeighbors(InIndex.X, InIndex.Y, InPhase);
 }
 
-void AVoxelChunk::GenerateNeighbors(int32 InX, int32 InY, EPhase InPhase)
+void UVoxelChunk::GenerateNeighbors(int32 InX, int32 InY, EPhase InPhase)
 {
 	const auto& WorldData = Module->GetWorldData();
 	if(InX <= 0)
 	{
-		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Backward))
+		if(UVoxelChunk* Chunk = GetNeighbor(EDirection::Backward))
 		{
 			Chunk->Generate(InPhase);
 		}
 	}
 	else if(InX >= WorldData.ChunkSize.X - 1)
 	{
-		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Forward))
+		if(UVoxelChunk* Chunk = GetNeighbor(EDirection::Forward))
 		{
 			Chunk->Generate(InPhase);
 		}
 	}
 	if(InY <= 0)
 	{
-		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Left))
+		if(UVoxelChunk* Chunk = GetNeighbor(EDirection::Left))
 		{
 			Chunk->Generate(InPhase);
 		}
 	}
 	else if(InY >= WorldData.ChunkSize.Y - 1)
 	{
-		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Right))
+		if(UVoxelChunk* Chunk = GetNeighbor(EDirection::Right))
 		{
 			Chunk->Generate(InPhase);
 		}
 	}
 }
 
-void AVoxelChunk::UpdateNeighbors()
+void UVoxelChunk::UpdateNeighbors()
 {
 	ITER_DIRECTION(Direction,
 		Neighbors[Direction] = Module->GetChunkByIndex(Index + FMathHelper::DirectionToIndex(Direction));
@@ -360,7 +351,7 @@ void AVoxelChunk::UpdateNeighbors()
 	)
 }
 
-void AVoxelChunk::BreakNeighbors()
+void UVoxelChunk::BreakNeighbors()
 {
 	ITER_DIRECTION(Direction,
 		if(Neighbors[Direction])
@@ -371,7 +362,7 @@ void AVoxelChunk::BreakNeighbors()
 	)
 }
 
-bool AVoxelChunk::IsOnTheChunk(FIndex InIndex) const
+bool UVoxelChunk::IsOnTheChunk(FIndex InIndex) const
 {
 	const auto& WorldData = Module->GetWorldData();
 	return InIndex.X >= 0 && InIndex.X < WorldData.ChunkSize.X &&
@@ -379,7 +370,7 @@ bool AVoxelChunk::IsOnTheChunk(FIndex InIndex) const
 		InIndex.Z >= 0 && InIndex.Z < WorldData.SkyHeight;
 }
 
-bool AVoxelChunk::IsOnTheChunk(FVector InLocation) const
+bool UVoxelChunk::IsOnTheChunk(FVector InLocation) const
 {
 	const auto& WorldData = Module->GetWorldData();
 	return InLocation.X >= GetWorldLocation().X && InLocation.X < GetWorldLocation().X + WorldData.GetChunkRealSize().X &&
@@ -387,28 +378,28 @@ bool AVoxelChunk::IsOnTheChunk(FVector InLocation) const
 		InLocation.Z >= GetWorldLocation().Z && InLocation.Z < GetWorldLocation().Z + WorldData.GetWorldRealHeight();
 }
 
-FIndex AVoxelChunk::LocationToIndex(FVector InLocation, bool bWorldSpace /*= true*/) const
+FIndex UVoxelChunk::LocationToIndex(FVector InLocation, bool bWorldSpace /*= true*/) const
 {
 	InLocation = (InLocation - (bWorldSpace ? GetWorldLocation() : FVector::ZeroVector)) / Module->GetWorldData().BlockSize;
 	return FIndex(FMath::FloorToInt(InLocation.X), FMath::FloorToInt(InLocation.Y), FMath::FloorToInt(InLocation.Z));
 }
 
-FVector AVoxelChunk::IndexToLocation(FIndex InIndex, bool bWorldSpace /*= true*/) const
+FVector UVoxelChunk::IndexToLocation(FIndex InIndex, bool bWorldSpace /*= true*/) const
 {
 	return InIndex.ToVector() * Module->GetWorldData().BlockSize + (bWorldSpace ? GetWorldLocation() : FVector::ZeroVector);
 }
 
-FIndex AVoxelChunk::LocalIndexToWorld(FIndex InIndex) const
+FIndex UVoxelChunk::LocalIndexToWorld(FIndex InIndex) const
 {
 	return InIndex + Index * Module->GetWorldData().ChunkSize;
 }
 
-FIndex AVoxelChunk::WorldIndexToLocal(FIndex InIndex) const
+FIndex UVoxelChunk::WorldIndexToLocal(FIndex InIndex) const
 {
 	return InIndex - Index * Module->GetWorldData().ChunkSize;
 }
 
-bool AVoxelChunk::LocalIndexToNeighbor(FIndex InIndex, EDirection& OutDirection) const
+bool UVoxelChunk::LocalIndexToNeighbor(FIndex InIndex, EDirection& OutDirection) const
 {
 	const auto& WorldData = Module->GetWorldData();
 	if(InIndex.X < 0)
@@ -434,50 +425,50 @@ bool AVoxelChunk::LocalIndexToNeighbor(FIndex InIndex, EDirection& OutDirection)
 	return false;
 }
 
-bool AVoxelChunk::HasVoxel(FIndex InIndex, bool bSafe)
+bool UVoxelChunk::HasVoxel(FIndex InIndex, bool bSafe)
 {
 	FScopeLock ScopeLock(&CriticalSection);
 
 	return VoxelMaps.Has(InIndex) && (!bSafe || VoxelMaps.Get(InIndex).IsValid());
 }
 
-bool AVoxelChunk::HasVoxel(int32 InX, int32 InY, int32 InZ, bool bSafe)
+bool UVoxelChunk::HasVoxel(int32 InX, int32 InY, int32 InZ, bool bSafe)
 {
 	return HasVoxel(FIndex(InX, InY, InZ), bSafe);
 }
 
-bool AVoxelChunk::HasVoxelComplex(FIndex InIndex, bool bSafe)
+bool UVoxelChunk::HasVoxelComplex(FIndex InIndex, bool bSafe)
 {
 	return HasVoxelComplex(InIndex.X, InIndex.Y, InIndex.Z, bSafe);
 }
 
-bool AVoxelChunk::HasVoxelComplex(int32 InX, int32 InY, int32 InZ, bool bSafe)
+bool UVoxelChunk::HasVoxelComplex(int32 InX, int32 InY, int32 InZ, bool bSafe)
 {
 	const auto& WorldData = Module->GetWorldData();
 	if(InX < 0)
 	{
-		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Backward))
+		if(UVoxelChunk* Chunk = GetNeighbor(EDirection::Backward))
 		{
 			return Chunk->HasVoxel(InX + WorldData.ChunkSize.X, InY, InZ, bSafe);
 		}
 	}
 	else if(InX >= WorldData.ChunkSize.X)
 	{
-		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Forward))
+		if(UVoxelChunk* Chunk = GetNeighbor(EDirection::Forward))
 		{
 			return Chunk->HasVoxel(InX - WorldData.ChunkSize.X, InY, InZ, bSafe);
 		}
 	}
 	else if(InY < 0)
 	{
-		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Left))
+		if(UVoxelChunk* Chunk = GetNeighbor(EDirection::Left))
 		{
 			return Chunk->HasVoxel(InX, InY + WorldData.ChunkSize.Y, InZ, bSafe);
 		}
 	}
 	else if(InY >= WorldData.ChunkSize.Y)
 	{
-		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Right))
+		if(UVoxelChunk* Chunk = GetNeighbor(EDirection::Right))
 		{
 			return Chunk->HasVoxel(InX, InY - WorldData.ChunkSize.Y, InZ, bSafe);
 		}
@@ -489,12 +480,12 @@ bool AVoxelChunk::HasVoxelComplex(int32 InX, int32 InY, int32 InZ, bool bSafe)
 	return false;
 }
 
-FVoxelItem& AVoxelChunk::GetVoxel(FIndex InIndex, bool bMainPart)
+FVoxelItem& UVoxelChunk::GetVoxel(FIndex InIndex, bool bMainPart)
 {
 	return GetVoxel(InIndex.X, InIndex.Y, InIndex.Z, bMainPart);
 }
 
-FVoxelItem& AVoxelChunk::GetVoxel(int32 InX, int32 InY, int32 InZ, bool bMainPart)
+FVoxelItem& UVoxelChunk::GetVoxel(int32 InX, int32 InY, int32 InZ, bool bMainPart)
 {
 	FScopeLock ScopeLock(&CriticalSection);
 
@@ -507,17 +498,17 @@ FVoxelItem& AVoxelChunk::GetVoxel(int32 InX, int32 InY, int32 InZ, bool bMainPar
 	return FVoxelItem::Empty;
 }
 
-FVoxelItem& AVoxelChunk::GetVoxelComplex(FIndex InIndex, bool bMainPart)
+FVoxelItem& UVoxelChunk::GetVoxelComplex(FIndex InIndex, bool bMainPart)
 {
 	return GetVoxelComplex(InIndex.X, InIndex.Y, InIndex.Z, bMainPart);
 }
 
-FVoxelItem& AVoxelChunk::GetVoxelComplex(int32 InX, int32 InY, int32 InZ, bool bMainPart)
+FVoxelItem& UVoxelChunk::GetVoxelComplex(int32 InX, int32 InY, int32 InZ, bool bMainPart)
 {
 	const auto& WorldData = Module->GetWorldData();
 	if(InX < 0)
 	{
-		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Backward))
+		if(UVoxelChunk* Chunk = GetNeighbor(EDirection::Backward))
 		{
 			return Chunk->GetVoxel(InX + WorldData.ChunkSize.X, InY, InZ, bMainPart);
 		}
@@ -528,7 +519,7 @@ FVoxelItem& AVoxelChunk::GetVoxelComplex(int32 InX, int32 InY, int32 InZ, bool b
 	}
 	else if(InX >= WorldData.ChunkSize.X)
 	{
-		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Forward))
+		if(UVoxelChunk* Chunk = GetNeighbor(EDirection::Forward))
 		{
 			return Chunk->GetVoxel(InX - WorldData.ChunkSize.X, InY, InZ, bMainPart);
 		}
@@ -539,7 +530,7 @@ FVoxelItem& AVoxelChunk::GetVoxelComplex(int32 InX, int32 InY, int32 InZ, bool b
 	}
 	else if(InY < 0)
 	{
-		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Left))
+		if(UVoxelChunk* Chunk = GetNeighbor(EDirection::Left))
 		{
 			return Chunk->GetVoxel(InX, InY + WorldData.ChunkSize.Y, InZ, bMainPart);
 		}
@@ -550,7 +541,7 @@ FVoxelItem& AVoxelChunk::GetVoxelComplex(int32 InX, int32 InY, int32 InZ, bool b
 	}
 	else if(InY >= WorldData.ChunkSize.Y)
 	{
-		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Right))
+		if(UVoxelChunk* Chunk = GetNeighbor(EDirection::Right))
 		{
 			return Chunk->GetVoxel(InX, InY - WorldData.ChunkSize.Y, InZ, bMainPart);
 		}
@@ -566,7 +557,7 @@ FVoxelItem& AVoxelChunk::GetVoxelComplex(int32 InX, int32 InY, int32 InZ, bool b
 	return FVoxelItem::Empty;
 }
 
-bool AVoxelChunk::CheckVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem, FVector InRange/* = FVector::OneVector*/)
+bool UVoxelChunk::CheckVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem, FVector InRange/* = FVector::OneVector*/)
 {
 	ITER_INDEX(Iter, InRange, false,
 		if(!GetVoxelComplex(InIndex + Iter).IsReplaceable(InVoxelItem))
@@ -577,12 +568,12 @@ bool AVoxelChunk::CheckVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem, FVec
 	return false;
 }
 
-bool AVoxelChunk::CheckVoxelAdjacent(FIndex InIndex, EDirection InDirection)
+bool UVoxelChunk::CheckVoxelAdjacent(FIndex InIndex, EDirection InDirection)
 {
 	return CheckVoxelAdjacent(GetVoxel(InIndex), InDirection);
 }
 
-bool AVoxelChunk::CheckVoxelAdjacent(const FVoxelItem& InVoxelItem, EDirection InDirection)
+bool UVoxelChunk::CheckVoxelAdjacent(const FVoxelItem& InVoxelItem, EDirection InDirection)
 {
 	const FIndex AdjacentIndex = FMathHelper::GetAdjacentIndex(InVoxelItem.Index, InDirection, InVoxelItem.Angle);
 	
@@ -671,7 +662,7 @@ bool AVoxelChunk::CheckVoxelAdjacent(const FVoxelItem& InVoxelItem, EDirection I
 	return false;
 }
 
-bool AVoxelChunk::CheckVoxelNeighbors(FIndex InIndex, EVoxelType InVoxelType, FVector InRange, bool bFromCenter, bool bIgnoreBottom, bool bOnTheChunk)
+bool UVoxelChunk::CheckVoxelNeighbors(FIndex InIndex, EVoxelType InVoxelType, FVector InRange, bool bFromCenter, bool bIgnoreBottom, bool bOnTheChunk)
 {
 	ITER_INDEX(Iter1, InRange, bFromCenter,
 		ITER_DIRECTION(Iter2, 
@@ -692,7 +683,7 @@ bool AVoxelChunk::CheckVoxelNeighbors(FIndex InIndex, EVoxelType InVoxelType, FV
 	return false;
 }
 
-void AVoxelChunk::SetVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bSafe)
+void UVoxelChunk::SetVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bSafe)
 {
 	FScopeLock ScopeLock(&CriticalSection);
 
@@ -709,12 +700,12 @@ void AVoxelChunk::SetVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem, bool b
 	}
 }
 
-void AVoxelChunk::SetVoxel(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem, bool bSafe)
+void UVoxelChunk::SetVoxel(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem, bool bSafe)
 {
 	return SetVoxel(FIndex(InX, InY, InZ), InVoxelItem, bSafe);
 }
 
-bool AVoxelChunk::SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bGenerate, IVoxelAgentInterface* InAgent)
+bool UVoxelChunk::SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bGenerate, IVoxelAgentInterface* InAgent)
 {
 	bool bSuccess = false;
 	if(InVoxelItem.IsValid())
@@ -751,43 +742,43 @@ bool AVoxelChunk::SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, 
 	return bSuccess;
 }
 
-bool AVoxelChunk::SetVoxelSample(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem, bool bGenerate, IVoxelAgentInterface* InAgent)
+bool UVoxelChunk::SetVoxelSample(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem, bool bGenerate, IVoxelAgentInterface* InAgent)
 {
 	return SetVoxelSample(FIndex(InX, InY, InZ), InVoxelItem, bGenerate, InAgent);
 }
 
-bool AVoxelChunk::SetVoxelComplex(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bGenerate, IVoxelAgentInterface* InAgent)
+bool UVoxelChunk::SetVoxelComplex(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bGenerate, IVoxelAgentInterface* InAgent)
 {
 	return SetVoxelComplex(InIndex.X, InIndex.Y, InIndex.Z, InVoxelItem, bGenerate, InAgent);
 }
 
-bool AVoxelChunk::SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem, bool bGenerate, IVoxelAgentInterface* InAgent)
+bool UVoxelChunk::SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem, bool bGenerate, IVoxelAgentInterface* InAgent)
 {
 	const auto& WorldData = Module->GetWorldData();
 	if(InX < 0)
 	{
-		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Backward))
+		if(UVoxelChunk* Chunk = GetNeighbor(EDirection::Backward))
 		{
 			return Chunk->SetVoxelComplex(InX + WorldData.ChunkSize.X, InY, InZ, InVoxelItem, bGenerate, InAgent);
 		}
 	}
 	else if(InX >= WorldData.ChunkSize.X)
 	{
-		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Forward))
+		if(UVoxelChunk* Chunk = GetNeighbor(EDirection::Forward))
 		{
 			return Chunk->SetVoxelComplex(InX - WorldData.ChunkSize.X, InY, InZ, InVoxelItem, bGenerate, InAgent);
 		}
 	}
 	else if(InY < 0)
 	{
-		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Left))
+		if(UVoxelChunk* Chunk = GetNeighbor(EDirection::Left))
 		{
 			return Chunk->SetVoxelComplex(InX, InY + WorldData.ChunkSize.Y, InZ, InVoxelItem, bGenerate, InAgent);
 		}
 	}
 	else if(InY >= WorldData.ChunkSize.Y)
 	{
-		if(AVoxelChunk* Chunk = GetNeighbor(EDirection::Right))
+		if(UVoxelChunk* Chunk = GetNeighbor(EDirection::Right))
 		{
 			return Chunk->SetVoxelComplex(InX, InY - WorldData.ChunkSize.Y, InZ, InVoxelItem, bGenerate, InAgent);
 		}
@@ -824,7 +815,7 @@ bool AVoxelChunk::SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelI
 	return false;
 }
 
-bool AVoxelChunk::SetVoxelComplex(const FVoxelMap& InVoxelMap, bool bGenerate, bool bFirstSample, IVoxelAgentInterface* InAgent)
+bool UVoxelChunk::SetVoxelComplex(const FVoxelMap& InVoxelMap, bool bGenerate, bool bFirstSample, IVoxelAgentInterface* InAgent)
 {
 	bool bSuccess = true;
 	TArray<EDirection> _Neighbors;
@@ -868,7 +859,7 @@ bool AVoxelChunk::SetVoxelComplex(const FVoxelMap& InVoxelMap, bool bGenerate, b
 	return bSuccess;
 }
 
-FVoxelTopography& AVoxelChunk::GetTopography(FIndex InIndex)
+FVoxelTopography& UVoxelChunk::GetTopography(FIndex InIndex)
 {
 	if(TopographyMap.Contains(InIndex))
 	{
@@ -878,35 +869,29 @@ FVoxelTopography& AVoxelChunk::GetTopography(FIndex InIndex)
 	return Temp;
 }
 
-FVoxelTopography& AVoxelChunk::GetTopography(int32 InX, int32 InY, int32 InZ)
+FVoxelTopography& UVoxelChunk::GetTopography(int32 InX, int32 InY, int32 InZ)
 {
 	return GetTopography(FIndex(InX, InY, InZ));
 }
 
-void AVoxelChunk::SetTopography(FIndex InIndex, const FVoxelTopography& InTopography)
+void UVoxelChunk::SetTopography(FIndex InIndex, const FVoxelTopography& InTopography)
 {
 	TopographyMap.Emplace(InIndex, InTopography);
 }
 
-void AVoxelChunk::SetTopography(int32 InX, int32 InY, int32 InZ, const FVoxelTopography& InTopography)
+void UVoxelChunk::SetTopography(int32 InX, int32 InY, int32 InZ, const FVoxelTopography& InTopography)
 {
 	SetTopography(FIndex(InX, InY, InZ), InTopography);
 }
 
-void AVoxelChunk::SetActorVisible_Implementation(bool bInVisible)
-{
-	bVisible = bInVisible;
-	GetRootComponent()->SetVisibility(bInVisible, true);
-}
-
-bool AVoxelChunk::HasSceneActor(const FString& InID, bool bEnsured) const
+bool UVoxelChunk::HasSceneActor(const FString& InID, bool bEnsured) const
 {
 	if(SceneActorMap.Contains(FGuid(InID))) return true;
 	ensureEditorMsgf(!bEnsured, FString::Printf(TEXT("No SceneActor, Actor name: %s"), *InID), EDC_Voxel, EDV_Error);
 	return false;
 }
 
-AActor* AVoxelChunk::GetSceneActor(const FString& InID, TSubclassOf<AActor> InClass, bool bEnsured) const
+AActor* UVoxelChunk::GetSceneActor(const FString& InID, TSubclassOf<AActor> InClass, bool bEnsured) const
 {
 	if(HasSceneActor(InID, bEnsured))
 	{
@@ -915,43 +900,43 @@ AActor* AVoxelChunk::GetSceneActor(const FString& InID, TSubclassOf<AActor> InCl
 	return nullptr;
 }
 
-bool AVoxelChunk::AddSceneActor(AActor* InActor)
+bool UVoxelChunk::AddSceneActor(AActor* InActor)
 {
 	if(!InActor || !InActor->Implements<USceneActorInterface>()) return false;
 
-	if(!SceneActorMap.Contains(Execute_GetActorID(InActor)))
+	if(!SceneActorMap.Contains(ISceneActorInterface::Execute_GetActorID(InActor)))
 	{
-		SceneActorMap.Add(Execute_GetActorID(InActor), InActor);
-		if(Execute_GetContainer(InActor) != this)
+		SceneActorMap.Add(ISceneActorInterface::Execute_GetActorID(InActor), InActor);
+		if(ISceneActorInterface::Execute_GetContainer(InActor) != this)
 		{
-			if(Execute_GetContainer(InActor))
+			if(ISceneActorInterface::Execute_GetContainer(InActor))
 			{
-				Execute_GetContainer(InActor)->RemoveSceneActor(InActor);
+				ISceneActorInterface::Execute_GetContainer(InActor)->RemoveSceneActor(InActor);
 			}
-			Execute_SetContainer(InActor, this);
+			ISceneActorInterface::Execute_SetContainer(InActor, this);
 		}
 		return true;
 	}
 	return false;
 }
 
-bool AVoxelChunk::RemoveSceneActor(AActor* InActor)
+bool UVoxelChunk::RemoveSceneActor(AActor* InActor)
 {
 	if(!InActor || !InActor->Implements<USceneActorInterface>()) return false;
 
-	if(SceneActorMap.Contains(Execute_GetActorID(InActor)))
+	if(SceneActorMap.Contains(ISceneActorInterface::Execute_GetActorID(InActor)))
 	{
-		SceneActorMap.Remove(Execute_GetActorID(InActor));
-		if(Execute_GetContainer(InActor) == this)
+		SceneActorMap.Remove(ISceneActorInterface::Execute_GetActorID(InActor));
+		if(ISceneActorInterface::Execute_GetContainer(InActor) == this)
 		{
-			Execute_SetContainer(InActor, nullptr);
+			ISceneActorInterface::Execute_SetContainer(InActor, nullptr);
 		}
 		return true;
 	}
 	return false;
 }
 
-void AVoxelChunk::GenerateSceneActors()
+void UVoxelChunk::GenerateSceneActors()
 {
 	auto& WorldData = Module->GetWorldData();
 	
@@ -968,7 +953,7 @@ void AVoxelChunk::GenerateSceneActors()
 	}
 }
 
-void AVoxelChunk::LoadSceneActors(FSaveData* InSaveData)
+void UVoxelChunk::LoadSceneActors(FSaveData* InSaveData)
 {
 	auto& SaveData = InSaveData->CastRef<FVoxelChunkSaveData>();
 
@@ -978,12 +963,12 @@ void AVoxelChunk::LoadSceneActors(FSaveData* InSaveData)
 	}
 }
 
-void AVoxelChunk::SpawnSceneActors()
+void UVoxelChunk::SpawnSceneActors()
 {
 	
 }
 
-void AVoxelChunk::DestroySceneActors()
+void UVoxelChunk::DestroySceneActors()
 {
 	for(auto& Iter : TMap(SceneActorMap))
 	{
@@ -995,7 +980,7 @@ void AVoxelChunk::DestroySceneActors()
 	}
 }
 
-AVoxelAuxiliary* AVoxelChunk::SpawnAuxiliary(FVoxelItem& InVoxelItem)
+AVoxelAuxiliary* UVoxelChunk::SpawnAuxiliary(FVoxelItem& InVoxelItem)
 {
 	if(InVoxelItem.IsValid() && !InVoxelItem.Auxiliary)
 	{
@@ -1021,7 +1006,7 @@ AVoxelAuxiliary* AVoxelChunk::SpawnAuxiliary(FVoxelItem& InVoxelItem)
 	return nullptr;
 }
 
-void AVoxelChunk::DestroyAuxiliary(FVoxelItem& InVoxelItem)
+void UVoxelChunk::DestroyAuxiliary(FVoxelItem& InVoxelItem)
 {
 	if(InVoxelItem.IsValid() && InVoxelItem.Auxiliary)
 	{
@@ -1030,7 +1015,7 @@ void AVoxelChunk::DestroyAuxiliary(FVoxelItem& InVoxelItem)
 	}
 }
 
-void AVoxelChunk::SpawnMeshComponents(int32 InStage)
+void UVoxelChunk::SpawnMeshComponents(int32 InStage)
 {
 	if(InStage & 1)
 	{
@@ -1060,7 +1045,7 @@ void AVoxelChunk::SpawnMeshComponents(int32 InStage)
 			}
 			else
 			{
-				MeshComponent = UObjectPoolModuleStatics::SpawnObject<UVoxelMeshComponent>(this);
+				MeshComponent = UObjectPoolModuleStatics::SpawnObject<UVoxelMeshComponent>(Module->GetVoxelRoot(), { this });
 				MeshComponent->Initialize(EVoxelScope::Chunk, Iter);
 			}
 			_MeshComponents.Add(Iter, MeshComponent);
@@ -1078,7 +1063,7 @@ void AVoxelChunk::SpawnMeshComponents(int32 InStage)
 	}
 }
 
-void AVoxelChunk::DestroyMeshComponents()
+void UVoxelChunk::DestroyMeshComponents()
 {
 	for(auto& Iter : MeshComponents)
 	{
@@ -1087,22 +1072,22 @@ void AVoxelChunk::DestroyMeshComponents()
 	MeshComponents.Empty();
 }
 
-UVoxelMeshComponent* AVoxelChunk::GetMeshComponent(EVoxelNature InVoxelNature)
+UVoxelMeshComponent* UVoxelChunk::GetMeshComponent(EVoxelNature InVoxelNature)
 {
 	return MeshComponents[InVoxelNature];
 }
 
-AVoxelChunk* AVoxelChunk::GetOrSpawnNeighbor(EDirection InDirection, bool bAddToQueue)
+UVoxelChunk* UVoxelChunk::GetOrSpawnNeighbor(EDirection InDirection, bool bAddToQueue)
 {
 	return Neighbors[InDirection] ? Neighbors[InDirection] : Module->SpawnChunk(Index + FMathHelper::DirectionToIndex(InDirection), bAddToQueue);
 }
 
-FIndex AVoxelChunk::GetWorldIndex() const
+FIndex UVoxelChunk::GetWorldIndex() const
 {
 	return Index * Module->GetWorldData().ChunkSize;
 }
 
-FVector AVoxelChunk::GetWorldLocation() const
+FVector UVoxelChunk::GetWorldLocation() const
 {
 	return UVoxelModuleStatics::ChunkIndexToLocation(Index);
 }

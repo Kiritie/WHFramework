@@ -12,7 +12,7 @@ void UVoxelGenerator::Initialize(UVoxelModule* InModule)
 	Module = InModule;
 }
 
-void UVoxelGenerator::Generate(AVoxelChunk* InChunk)
+void UVoxelGenerator::Generate(UVoxelChunk* InChunk)
 {
 	
 }

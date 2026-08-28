@@ -15,7 +15,7 @@ UVoxelHumidityGenerator::UVoxelHumidityGenerator()
 	CrystalSize  = 64;
 }
 
-void UVoxelHumidityGenerator::Generate(AVoxelChunk* InChunk)
+void UVoxelHumidityGenerator::Generate(UVoxelChunk* InChunk)
 {
 	int32 _CrystalSize  = CrystalSize;
 

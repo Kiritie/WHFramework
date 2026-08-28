@@ -21,7 +21,7 @@ class UVoxelMeshComponent;
  * 体素块
  */
 UCLASS()
-class WHFRAMEWORK_API AVoxelChunk : public AWHActor, public ISceneContainerInterface, public IThreadSafeInterface
+class WHFRAMEWORK_API UVoxelChunk : public UWHObject, public ISaveDataAgentInterface, public ISceneContainerInterface, public IThreadSafeInterface
 {
 	GENERATED_BODY()
 
@@ -29,7 +29,7 @@ class WHFRAMEWORK_API AVoxelChunk : public AWHActor, public ISceneContainerInter
 
 public:	
 	// Sets default values for this actor's properties
-	AVoxelChunk();
+	UVoxelChunk();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
@@ -148,8 +148,6 @@ protected:
 	TMap<FGuid, AActor*> SceneActorMap;
 
 public:
-	virtual void SetActorVisible_Implementation(bool bInVisible) override;
-	
 	virtual bool HasSceneActor(const FString& InID, bool bEnsured) const override;
 
 	template<class T>
@@ -213,7 +211,7 @@ protected:
 	bool bChanged;
 
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
-	TMap<EDirection, AVoxelChunk*> Neighbors;
+	TMap<EDirection, UVoxelChunk*> Neighbors;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Stats")
 	UVoxelModule* Module;
@@ -237,11 +235,11 @@ public:
 	
 	void SetChanged(bool bInChanged) { bChanged = bInChanged; }
 
-	AVoxelChunk* GetNeighbor(EDirection InDirection) const { return Neighbors[InDirection]; }
+	UVoxelChunk* GetNeighbor(EDirection InDirection) const { return Neighbors[InDirection]; }
 
-	AVoxelChunk* GetOrSpawnNeighbor(EDirection InDirection, bool bAddToQueue = true);
+	UVoxelChunk* GetOrSpawnNeighbor(EDirection InDirection, bool bAddToQueue = true);
 
-	TMap<EDirection, AVoxelChunk*> GetNeighbors() const { return Neighbors; }
+	TMap<EDirection, UVoxelChunk*> GetNeighbors() const { return Neighbors; }
 
 	FIndex GetWorldIndex() const;
 

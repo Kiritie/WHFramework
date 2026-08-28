@@ -19,7 +19,7 @@ UVoxelOreGenerator::UVoxelOreGenerator()
 	};
 }
 
-void UVoxelOreGenerator::Generate(AVoxelChunk* InChunk)
+void UVoxelOreGenerator::Generate(UVoxelChunk* InChunk)
 {
     ITER_INDEX2D(Index, Module->GetWorldData().ChunkSize, false,
 		const int32 Height = InChunk->GetTopography(Index).Height - 2;

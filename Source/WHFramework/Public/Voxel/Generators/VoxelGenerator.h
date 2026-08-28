@@ -8,7 +8,7 @@
 #include "VoxelGenerator.generated.h"
 
 class UVoxelModule;
-class AVoxelChunk;
+class UVoxelChunk;
 
 /**
  *
@@ -24,7 +24,7 @@ public:
 public:
 	virtual void Initialize(UVoxelModule* InModule);
 
-	virtual void Generate(AVoxelChunk* InChunk);
+	virtual void Generate(UVoxelChunk* InChunk);
 
 protected:
 	UPROPERTY(BlueprintReadOnly)

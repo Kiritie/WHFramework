@@ -76,6 +76,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	EVoxelNature Nature;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	UVoxelChunk* Chunk;
+
 protected:
 	TArray<FVector> Vertices;
 
@@ -104,5 +107,5 @@ public:
 
 	void SetNature(EVoxelNature InNature);
 
-	AVoxelChunk* GetOwnerChunk() const;
+	UVoxelChunk* GetChunk() const { return Chunk; }
 };

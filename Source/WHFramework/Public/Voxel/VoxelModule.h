@@ -9,9 +9,10 @@
 
 #include "VoxelModule.generated.h"
 
+class AVoxelRoot;
 class UVoxelGenerator;
 class AVoxelCapture;
-class AVoxelChunk;
+class UVoxelChunk;
 class UVoxelData;
 class ACharacterBase;
 class UWorldTimer;
@@ -26,7 +27,7 @@ class WHFRAMEWORK_API UVoxelModule : public UModuleBase
 {
 	GENERATED_BODY()
 
-	friend class AVoxelChunk;
+	friend class UVoxelChunk;
 	
 	GENERATED_MODULE(UVoxelModule)
 
@@ -65,6 +66,16 @@ public:
 	virtual FString GetModuleDebugMessage() override;
 
 	//////////////////////////////////////////////////////////////////////////
+	// Root
+protected:
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Root")
+	AVoxelRoot* VoxelRoot;
+
+public:
+	UFUNCTION(BlueprintPure)
+	AVoxelRoot* GetVoxelRoot() const { return VoxelRoot; }
+	
+	//////////////////////////////////////////////////////////////////////////
 	// Capture
 protected:
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Capture")
@@ -72,6 +83,10 @@ protected:
 
 	UPROPERTY(Transient)
 	TArray<AVoxelEntityCapture*> CaptureVoxels;
+
+public:
+	UFUNCTION(BlueprintPure)
+	AVoxelCapture* GetVoxelCapture() const { return VoxelCapture; }
 
 	//////////////////////////////////////////////////////////////////////////
 	// World
@@ -161,7 +176,7 @@ protected:
 	virtual void GenerateWorld();
 	
 public:
-	virtual AVoxelChunk* SpawnChunk(FIndex InIndex, bool bAddToQueue = true);
+	virtual UVoxelChunk* SpawnChunk(FIndex InIndex, bool bAddToQueue = true);
 
 	virtual void LoadChunkMap(FIndex InIndex);
 
@@ -193,20 +208,20 @@ protected:
 	
 public:
 	template<class T>
-	bool GenerateVoxel(AVoxelChunk* InChunk) const
+	bool GenerateVoxel(UVoxelChunk* InChunk) const
 	{
 		return GenerateVoxel(InChunk, T::StaticClass());
 	}
-	virtual bool GenerateVoxel(AVoxelChunk* InChunk, const TSubclassOf<UVoxelGenerator>& InClass) const;
+	virtual bool GenerateVoxel(UVoxelChunk* InChunk, const TSubclassOf<UVoxelGenerator>& InClass) const;
 
 public:
 	virtual bool IsOnTheWorld(FIndex InIndex, bool bIgnoreZ = true) const;
 
-	virtual AVoxelChunk* GetChunkByIndex(FIndex InIndex) const;
+	virtual UVoxelChunk* GetChunkByIndex(FIndex InIndex) const;
 
-	virtual AVoxelChunk* GetChunkByLocation(FVector InLocation) const;
+	virtual UVoxelChunk* GetChunkByLocation(FVector InLocation) const;
 
-	virtual AVoxelChunk* GetChunkByVoxelIndex(FIndex InIndex) const;
+	virtual UVoxelChunk* GetChunkByVoxelIndex(FIndex InIndex) const;
 		
 	virtual bool HasVoxelByIndex(FIndex InIndex, bool bSafe = false);
 
@@ -268,7 +283,7 @@ public:
 
 protected:
 	UPROPERTY(EditAnywhere, Category = "Chunk")
-	TSubclassOf<AVoxelChunk> ChunkSpawnClass;
+	TSubclassOf<UVoxelChunk> ChunkSpawnClass;
 
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	float ChunkSpawnDistance;
@@ -280,7 +295,7 @@ protected:
 	int32 ChunkSpawnBatch;
 
 	UPROPERTY(Transient)
-	TMap<FIndex, AVoxelChunk*> ChunkMap;
+	TMap<FIndex, UVoxelChunk*> ChunkMap;
 
 public:
 	virtual int32 GetChunkNum(bool bNeedGenerated = false) const;

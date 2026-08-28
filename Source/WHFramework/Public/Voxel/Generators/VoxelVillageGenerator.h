@@ -23,12 +23,12 @@ public:
 public:
 	virtual void Initialize(UVoxelModule* InModule) override;
 	
-	virtual void Generate(AVoxelChunk* InChunk) override;
+	virtual void Generate(UVoxelChunk* InChunk) override;
 
 public:
-	void DevelopeDomains(AVoxelChunk* InChunk);
+	void DevelopeDomains(UVoxelChunk* InChunk);
 
-	void PlaceBuildings(AVoxelChunk* InChunk);
+	void PlaceBuildings(UVoxelChunk* InChunk);
 
 	void PlacePaths();
 

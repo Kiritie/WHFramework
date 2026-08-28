@@ -18,5 +18,5 @@ public:
 	UVoxelBiomeGenerator();
 	
 public:
-	virtual void Generate(AVoxelChunk* InChunk) override;
+	virtual void Generate(UVoxelChunk* InChunk) override;
 };

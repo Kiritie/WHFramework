@@ -15,7 +15,7 @@ UVoxelHeightGenerator::UVoxelHeightGenerator()
 	};
 }
 
-void UVoxelHeightGenerator::Generate(AVoxelChunk* InChunk)
+void UVoxelHeightGenerator::Generate(UVoxelChunk* InChunk)
 {
 	ITER_ARRAY(GenerateDatas, Iter,
 		ITER_INDEX2D(Index, Module->GetWorldData().ChunkSize, false,

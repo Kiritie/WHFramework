@@ -13,7 +13,7 @@ UVoxelCaveGenerator::UVoxelCaveGenerator()
 	MaxDepth = 5;
 }
 
-void UVoxelCaveGenerator::Generate(AVoxelChunk* InChunk)
+void UVoxelCaveGenerator::Generate(UVoxelChunk* InChunk)
 {
 	ITER_INDEX2D(Index, Module->GetWorldData().ChunkSize, false,
 		const int32 Height = InChunk->GetTopography(Index).Height - 10;

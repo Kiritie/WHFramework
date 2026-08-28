@@ -17,7 +17,7 @@ UVoxelHoleGenerator::UVoxelHoleGenerator()
 	MaxRadius = 3.f;
 }
 
-void UVoxelHoleGenerator::Generate(AVoxelChunk* InChunk)
+void UVoxelHoleGenerator::Generate(UVoxelChunk* InChunk)
 {
 	GenerateHole(InChunk->GetWorldIndex());
 }

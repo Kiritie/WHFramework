@@ -18,7 +18,7 @@ public:
 	UVoxelHumidityGenerator();
 	
 public:
-	virtual void Generate(AVoxelChunk* InChunk) override;
+	virtual void Generate(UVoxelChunk* InChunk) override;
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

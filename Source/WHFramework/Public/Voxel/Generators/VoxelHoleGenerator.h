@@ -19,7 +19,7 @@ public:
 	UVoxelHoleGenerator();
 
 public:
-	virtual void Generate(AVoxelChunk* InChunk) override;
+	virtual void Generate(UVoxelChunk* InChunk) override;
 
 protected:
 	void GenerateHole(FIndex InIndex) const;

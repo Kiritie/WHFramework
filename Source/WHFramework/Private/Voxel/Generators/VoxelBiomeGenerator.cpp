@@ -9,7 +9,7 @@ UVoxelBiomeGenerator::UVoxelBiomeGenerator()
 {
 }
 
-void UVoxelBiomeGenerator::Generate(AVoxelChunk* InChunk)
+void UVoxelBiomeGenerator::Generate(UVoxelChunk* InChunk)
 {
 	ITER_INDEX2D(Index, Module->GetWorldData().ChunkSize, false,
 		FVoxelTopography Topography = InChunk->GetTopography(Index);

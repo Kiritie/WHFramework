@@ -11,7 +11,7 @@
 #include "Voxel.generated.h"
 
 class IVoxelAgentInterface;
-class AVoxelChunk;
+class UVoxelChunk;
 class UVoxelData;
 
 /**
@@ -88,7 +88,7 @@ public:
 	{
 		return Cast<T>(GetOwner());
 	}
-	AVoxelChunk* GetOwner() const;
+	UVoxelChunk* GetOwner() const;
 
 	template<class T>
 	T* GetAuxiliary() const

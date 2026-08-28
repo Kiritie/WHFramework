@@ -21,7 +21,7 @@ UVoxelFoliageGenerator::UVoxelFoliageGenerator()
 	_Seed = 0;
 }
 
-void UVoxelFoliageGenerator::Generate(AVoxelChunk* InChunk)
+void UVoxelFoliageGenerator::Generate(UVoxelChunk* InChunk)
 {
 	_Seed = FMathHelper::Hash21(InChunk->GetIndex().ToVector2D()) + Seed;
 	
@@ -40,7 +40,7 @@ void UVoxelFoliageGenerator::Generate(AVoxelChunk* InChunk)
 	)
 }
 
-bool UVoxelFoliageGenerator::GeneratePlant(AVoxelChunk* InChunk, FIndex InIndex, int32 InCrystalSize)
+bool UVoxelFoliageGenerator::GeneratePlant(UVoxelChunk* InChunk, FIndex InIndex, int32 InCrystalSize)
 {
 	const FVoxelTopography& Topography = InChunk->GetTopography(InIndex);
 	
@@ -69,7 +69,7 @@ bool UVoxelFoliageGenerator::GeneratePlant(AVoxelChunk* InChunk, FIndex InIndex,
 	return true;
 }
 
-bool UVoxelFoliageGenerator::GenerateTree(AVoxelChunk* InChunk, FIndex InIndex, int32 InCrystalSize)
+bool UVoxelFoliageGenerator::GenerateTree(UVoxelChunk* InChunk, FIndex InIndex, int32 InCrystalSize)
 {
 	const FVoxelTopography& Topography = InChunk->GetTopography(InIndex);
 	
@@ -123,7 +123,7 @@ bool UVoxelFoliageGenerator::GenerateTree(AVoxelChunk* InChunk, FIndex InIndex, 
 	return true;
 }
 
-void UVoxelFoliageGenerator::GenerateLeaves(AVoxelChunk* InChunk, FIndex InIndex, int32 InHeight, int32 InRadius, EVoxelType InLeafType)
+void UVoxelFoliageGenerator::GenerateLeaves(UVoxelChunk* InChunk, FIndex InIndex, int32 InHeight, int32 InRadius, EVoxelType InLeafType)
 {
 	for(int i = 0; i < InRadius; ++i)
 	{

@@ -19,7 +19,7 @@ public:
 	UVoxelCaveGenerator();
 
 public:
-	virtual void Generate(AVoxelChunk* InChunk) override;
+	virtual void Generate(UVoxelChunk* InChunk) override;
 
 public:
 	bool IsCave(FIndex InIndex) const;

@@ -181,12 +181,12 @@ UVoxelGenerator* UVoxelModuleStatics::GetVoxelGenerator(const TSubclassOf<UVoxel
 	return UVoxelModule::Get().GetVoxelGenerator(InClass);
 }
 
-AVoxelChunk* UVoxelModuleStatics::GetChunkByIndex(FIndex InIndex)
+UVoxelChunk* UVoxelModuleStatics::GetChunkByIndex(FIndex InIndex)
 {
 	return UVoxelModule::Get().GetChunkByIndex(InIndex);
 }
 
-AVoxelChunk* UVoxelModuleStatics::GetChunkByLocation(FVector InLocation)
+UVoxelChunk* UVoxelModuleStatics::GetChunkByLocation(FVector InLocation)
 {
 	return UVoxelModule::Get().GetChunkByLocation(InLocation);
 }

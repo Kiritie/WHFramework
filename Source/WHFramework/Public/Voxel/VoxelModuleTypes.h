@@ -14,7 +14,7 @@
 class UVoxelGenerator;
 class IVoxelAgentInterface;
 class UVoxelData;
-class AVoxelChunk;
+class UVoxelChunk;
 class AVoxelAuxiliary;
 class UVoxel;
 
@@ -407,7 +407,7 @@ public:
 	FString Data;
 
 	UPROPERTY(BlueprintReadOnly)
-	AVoxelChunk* Chunk;
+	UVoxelChunk* Chunk;
 
 	UPROPERTY(BlueprintReadOnly)
 	AVoxelAuxiliary* Auxiliary;
@@ -442,9 +442,9 @@ public:
 		AuxiliaryData = nullptr;
 	}
 
-	FVoxelItem(const FPrimaryAssetId& InID, FIndex InIndex = FIndex::ZeroIndex, AVoxelChunk* InOwner = nullptr, const FString& InData = TEXT(""));
+	FVoxelItem(const FPrimaryAssetId& InID, FIndex InIndex = FIndex::ZeroIndex, UVoxelChunk* InOwner = nullptr, const FString& InData = TEXT(""));
 
-	FVoxelItem(EVoxelType InVoxelType, FIndex InIndex = FIndex::ZeroIndex, AVoxelChunk* InOwner = nullptr, const FString& InData = TEXT(""));
+	FVoxelItem(EVoxelType InVoxelType, FIndex InIndex = FIndex::ZeroIndex, UVoxelChunk* InOwner = nullptr, const FString& InData = TEXT(""));
 
 	FVoxelItem(const FString& InSaveData, bool bWorldSpace = false);
 
@@ -682,7 +682,7 @@ public:
 
 	UVoxel& GetVoxel() const;
 
-	AVoxelChunk* GetChunk() const;
+	UVoxelChunk* GetChunk() const;
 };
 
 USTRUCT(BlueprintType)

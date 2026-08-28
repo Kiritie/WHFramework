@@ -14,7 +14,7 @@
 FVoxelItem FVoxelItem::Empty = FVoxelItem(FPrimaryAssetId(FName("Voxel"), FName("DA_Empty")));
 FVoxelItem FVoxelItem::Unknown = FVoxelItem(FPrimaryAssetId(FName("Voxel"), FName("DA_Unknown")));
 
-FVoxelItem::FVoxelItem(const FPrimaryAssetId& InID, FIndex InIndex, AVoxelChunk* InOwner, const FString& InData) : FVoxelItem()
+FVoxelItem::FVoxelItem(const FPrimaryAssetId& InID, FIndex InIndex, UVoxelChunk* InOwner, const FString& InData) : FVoxelItem()
 {
 	ID = InID;
 	Index = InIndex;
@@ -22,7 +22,7 @@ FVoxelItem::FVoxelItem(const FPrimaryAssetId& InID, FIndex InIndex, AVoxelChunk*
 	Data = InData;
 }
 
-FVoxelItem::FVoxelItem(EVoxelType InVoxelType, FIndex InIndex, AVoxelChunk* InOwner, const FString& InData)
+FVoxelItem::FVoxelItem(EVoxelType InVoxelType, FIndex InIndex, UVoxelChunk* InOwner, const FString& InData)
 	: FVoxelItem(UVoxelModuleStatics::VoxelTypeToAssetID(InVoxelType), InIndex, InOwner, InData)
 {
 }
@@ -202,13 +202,9 @@ UVoxel& FVoxelItem::GetVoxel() const
 
 FVoxelHitResult::FVoxelHitResult(const FHitResult& InHitResult)
 {
-	if(AVoxelChunk* InChunk = Cast<AVoxelChunk>(InHitResult.GetActor()))
-	{
-		const FVoxelItem _VoxelItem = InChunk->GetVoxelComplex(InChunk->LocationToIndex(InHitResult.ImpactPoint - UVoxelModule::Get().GetWorldData().GetBlockSizedNormal(InHitResult.ImpactNormal, 0.01f)), true);
-		VoxelItem = _VoxelItem.IsMain() ? _VoxelItem : _VoxelItem.GetMain();
-		Point = InHitResult.ImpactPoint;
-		Normal = InHitResult.ImpactNormal;
-	}
+	VoxelItem = UVoxelModule::Get().GetVoxelByLocation(InHitResult.ImpactPoint - UVoxelModule::Get().GetWorldData().GetBlockSizedNormal(InHitResult.ImpactNormal, 0.01f), true);
+	Point = InHitResult.ImpactPoint;
+	Normal = InHitResult.ImpactNormal;
 }
 
 FVoxelHitResult::FVoxelHitResult(const FVoxelItem& InVoxelItem, FVector InPoint, FVector InNormal)
@@ -228,7 +224,7 @@ UVoxel& FVoxelHitResult::GetVoxel() const
 	return VoxelItem.GetVoxel();
 }
 
-AVoxelChunk* FVoxelHitResult::GetChunk() const
+UVoxelChunk* FVoxelHitResult::GetChunk() const
 {
 	return VoxelItem.Chunk;
 }

@@ -16,7 +16,7 @@ UVoxelRainGenerator::UVoxelRainGenerator()
 	_Waters = TSet<FIndex>();
 }
 
-void UVoxelRainGenerator::Generate(AVoxelChunk* InChunk)
+void UVoxelRainGenerator::Generate(UVoxelChunk* InChunk)
 {
 	FScopeLock ScopeLock(&CriticalSection);
 
@@ -35,7 +35,7 @@ void UVoxelRainGenerator::Generate(AVoxelChunk* InChunk)
 	}
 }
 
-void UVoxelRainGenerator::Flow(AVoxelChunk* InChunk, float InRain, int InX, int InY, int InZ)
+void UVoxelRainGenerator::Flow(UVoxelChunk* InChunk, float InRain, int InX, int InY, int InZ)
 {
 	if(InRain < 0.5f) return;
 

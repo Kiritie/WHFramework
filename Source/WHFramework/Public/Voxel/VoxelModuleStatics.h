@@ -124,10 +124,10 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Chunk
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static AVoxelChunk* GetChunkByIndex(FIndex InIndex);
+	static UVoxelChunk* GetChunkByIndex(FIndex InIndex);
 
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
-	static AVoxelChunk* GetChunkByLocation(FVector InLocation);
+	static UVoxelChunk* GetChunkByLocation(FVector InLocation);
 		
 	UFUNCTION(BlueprintPure, Category = "VoxelModuleStatics")
 	static FVoxelItem& GetVoxelByIndex(FIndex InIndex);

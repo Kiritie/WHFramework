@@ -42,7 +42,7 @@ void UVoxelVillageGenerator::Initialize(UVoxelModule* InModule)
 	}
 }
 
-void UVoxelVillageGenerator::Generate(AVoxelChunk* InChunk)
+void UVoxelVillageGenerator::Generate(UVoxelChunk* InChunk)
 {
 	FScopeLock ScopeLock(&CriticalSection);
 
@@ -67,7 +67,7 @@ void UVoxelVillageGenerator::Generate(AVoxelChunk* InChunk)
 	USceneModuleStatics::AddMaxMapArea(MaxMapArea);
 }
 
-void UVoxelVillageGenerator::DevelopeDomains(AVoxelChunk* InChunk)
+void UVoxelVillageGenerator::DevelopeDomains(UVoxelChunk* InChunk)
 {
 	_StartPoint = FVector2D(InChunk->GetWorldIndex().X + 7, InChunk->GetWorldIndex().Y + 7);
 	
@@ -118,7 +118,7 @@ void UVoxelVillageGenerator::DevelopeDomains(AVoxelChunk* InChunk)
 	}
 }
 
-void UVoxelVillageGenerator::PlaceBuildings(AVoxelChunk* InChunk)
+void UVoxelVillageGenerator::PlaceBuildings(UVoxelChunk* InChunk)
 {
 	const int32 Dx[4] = {1, -1, 0, 0};
 	const int32 Dy[4] = {0, 0, 1, -1};

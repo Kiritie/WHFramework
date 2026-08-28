@@ -59,7 +59,7 @@ public:
 	UVoxelOreGenerator();
 	
 public:
-	virtual void Generate(AVoxelChunk* InChunk) override;
+	virtual void Generate(UVoxelChunk* InChunk) override;
 
 protected:
 	void GenerateOre(FIndex InIndex, const FVoxelOreGenerateData& InGenerateData);

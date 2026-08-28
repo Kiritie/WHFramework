@@ -19,10 +19,10 @@ public:
 	UVoxelRainGenerator();
 
 public:
-	virtual void Generate(AVoxelChunk* InChunk) override;
+	virtual void Generate(UVoxelChunk* InChunk) override;
 
 public:
-	void Flow(AVoxelChunk* InChunk, float InRain, int InX, int InY, int InZ);
+	void Flow(UVoxelChunk* InChunk, float InRain, int InX, int InY, int InZ);
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

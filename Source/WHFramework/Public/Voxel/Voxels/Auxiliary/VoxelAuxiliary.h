@@ -8,7 +8,7 @@
 
 #include "VoxelAuxiliary.generated.h"
 
-class AVoxelChunk;
+class UVoxelChunk;
 class UVoxel;
 
 /**

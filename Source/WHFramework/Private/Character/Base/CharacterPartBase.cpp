@@ -34,7 +34,7 @@ void UCharacterPartBase::UpdateVoxelOverlap()
 {
 	if(!GetOwnerCharacter()) return;
 	
-	if(AVoxelChunk* Chunk = Cast<AVoxelChunk>(ISceneActorInterface::Execute_GetContainer(GetOwnerCharacter()).GetObject()))
+	if(UVoxelChunk* Chunk = Cast<UVoxelChunk>(ISceneActorInterface::Execute_GetContainer(GetOwnerCharacter()).GetObject()))
 	{
 		const FVoxelItem& StayingVoxel = Chunk->GetVoxelComplex(Chunk->LocationToIndex(GetComponentLocation()), true);
 		const FVoxelHitResult VoxelHitResult = FVoxelHitResult(StayingVoxel, GetComponentLocation(), GetOwnerCharacter()->GetMoveDirection());

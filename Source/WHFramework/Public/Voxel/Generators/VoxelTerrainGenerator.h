@@ -19,10 +19,10 @@ public:
 	UVoxelTerrainGenerator();
 	
 public:
-	virtual void Generate(AVoxelChunk* InChunk) override;
+	virtual void Generate(UVoxelChunk* InChunk) override;
 
 public:
-	virtual EVoxelType CalculateVoxelType(AVoxelChunk* InChunk, FIndex InIndex) const;
+	virtual EVoxelType CalculateVoxelType(UVoxelChunk* InChunk, FIndex InIndex) const;
 
 	virtual EVoxelType GetBiomeVoxelType(EVoxelBiomeType InBiomeType, bool bUnderGround) const;
 

@@ -149,7 +149,7 @@ bool UVoxel::IsUnknown() const
 	return &UVoxel::GetUnknown() == this;
 }
 
-AVoxelChunk* UVoxel::GetOwner() const
+UVoxelChunk* UVoxel::GetOwner() const
 {
 	return Item.Chunk;
 }

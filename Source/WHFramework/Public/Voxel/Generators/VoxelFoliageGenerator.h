@@ -19,17 +19,17 @@ public:
 	UVoxelFoliageGenerator();
 
 public:
-	virtual void Generate(AVoxelChunk* InChunk) override;
+	virtual void Generate(UVoxelChunk* InChunk) override;
 
 public:
 	//生成植物
-	bool GeneratePlant(AVoxelChunk* InChunk, FIndex InIndex, int32 InCrystalSize);
+	bool GeneratePlant(UVoxelChunk* InChunk, FIndex InIndex, int32 InCrystalSize);
 
 	//生成树
-	bool GenerateTree(AVoxelChunk* InChunk, FIndex InIndex, int32 InCrystalSize);
+	bool GenerateTree(UVoxelChunk* InChunk, FIndex InIndex, int32 InCrystalSize);
 
 	//生成树叶
-	void GenerateLeaves(AVoxelChunk* InChunk, FIndex InIndex, int32 InHeight, int32 InRadius, EVoxelType InLeafType);
+	void GenerateLeaves(UVoxelChunk* InChunk, FIndex InIndex, int32 InHeight, int32 InRadius, EVoxelType InLeafType);
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
