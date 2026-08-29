@@ -18,6 +18,7 @@
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Generators/VoxelBiomeGenerator.h"
+#include "Voxel/Generators/VoxelBuildingGenerator.h"
 #include "Voxel/Generators/VoxelVillageGenerator.h"
 #include "Voxel/Generators/VoxelCaveGenerator.h"
 #include "Voxel/Generators/VoxelHeightGenerator.h"
@@ -275,6 +276,7 @@ void UVoxelChunk::BuildMap(int32 InStage)
 		case 9:
 		{
 			Module->GenerateVoxel<UVoxelVillageGenerator>(this);
+			Module->GenerateVoxel<UVoxelBuildingGenerator>(this);
 		}
 		default:
 		{

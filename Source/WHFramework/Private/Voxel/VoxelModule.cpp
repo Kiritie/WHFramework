@@ -36,6 +36,7 @@
 #include "Voxel/Capture/VoxelCapture.h"
 #include "Voxel/Components/VoxelMeshComponent.h"
 #include "Voxel/Generators/VoxelBiomeGenerator.h"
+#include "Voxel/Generators/VoxelBuildingGenerator.h"
 #include "Voxel/Generators/VoxelVillageGenerator.h"
 #include "Voxel/Generators/VoxelCaveGenerator.h"
 #include "Voxel/Generators/VoxelGenerator.h"
@@ -195,6 +196,7 @@ void UVoxelModule::OnGenerate()
 		VoxelGenerators.Add(NewObject<UVoxelRainGenerator>(this));
 		VoxelGenerators.Add(NewObject<UVoxelFoliageGenerator>(this));
 		VoxelGenerators.Add(NewObject<UVoxelVillageGenerator>(this));
+		VoxelGenerators.Add(NewObject<UVoxelBuildingGenerator>(this));
 	}
 
 	if(!VoxelRoot)
