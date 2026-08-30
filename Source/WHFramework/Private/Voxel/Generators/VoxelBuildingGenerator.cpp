@@ -138,9 +138,9 @@ void UVoxelBuildingGenerator::Generate(UVoxelChunk* InChunk)
 				FSceneArea Area;
 				Area.AreaName = *FString::Printf(TEXT("Structure_%d_%d"), AnchorChunkIndex.X, AnchorChunkIndex.Y);
 				const FText BuildingDisplayName = _PrefabAssets[BuildingIndex]->DisplayName.IsEmpty()
-					? Module->GetWorldRegionDisplayName(EVoxelWorldRegionType::Building)
+					? Module->GetWorldRegionDisplayName(EVoxelRegionType::Building)
 					: _PrefabAssets[BuildingIndex]->DisplayName;
-				Area.AreaDisplayName = Module->GetWorldAreaDisplayName(FIndex(CenterX, CenterY, Plan.GroundHeight), EVoxelSceneAreaNameType::Building, BuildingDisplayName);
+				Area.AreaDisplayName = Module->GetWorldAreaDisplayName(FIndex(CenterX, CenterY, Plan.GroundHeight), EVoxelAreaType::Building, BuildingDisplayName);
 				Area.AreaType = ESceneAreaType::Default;
 				Area.AreaShape = ESceneAreaShape::Box;
 				Area.AreaCenter = FVector2D(CenterX + (RotationCache.MinX + RotationCache.MaxX) * 0.5f,
@@ -223,7 +223,7 @@ FVoxelBuildingPlacementPlan UVoxelBuildingGenerator::BuildPlacementPlan(int32 In
 			{
 				const FIndex SampleIndex(InX + X, InY + Y, 0);
 				const FVoxelTopography Topography = Module->SampleTopographyByIndex(SampleIndex);
-				if(Topography.BiomeType == EVoxelBiomeType::Ocean || Topography.BiomeType == EVoxelBiomeType::River || Topography.RegionType == EVoxelWorldRegionType::Ocean || Topography.RegionType == EVoxelWorldRegionType::River || Topography.RegionType == EVoxelWorldRegionType::Lake)
+				if(Topography.BiomeType == EVoxelBiomeType::Ocean || Topography.BiomeType == EVoxelBiomeType::River || Topography.RegionType == EVoxelRegionType::Ocean || Topography.RegionType == EVoxelRegionType::River || Topography.RegionType == EVoxelRegionType::Lake)
 				{
 					bInvalidTerrain = true;
 					break;

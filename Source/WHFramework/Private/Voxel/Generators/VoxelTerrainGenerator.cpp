@@ -18,7 +18,7 @@ void UVoxelTerrainGenerator::Generate(UVoxelChunk* InChunk)
 		const FVoxelTopography& Topography = InChunk->GetTopography(Index);
 		const int32 TopographyHeight = Topography.Height;
 		const int32 WaterHeight = Topography.WaterHeight;
-		const bool bRiverSand = Topography.RegionType == EVoxelWorldRegionType::River && Topography.BiomeType == EVoxelBiomeType::Desert;
+		const bool bRiverSand = Topography.RegionType == EVoxelRegionType::River && Topography.BiomeType == EVoxelBiomeType::Desert;
 		const int32 ColumnHeight = FMath::Max3(TopographyHeight, Module->GetWorldData().SeaLevel, WaterHeight);
 		DON_WITHINDEX(ColumnHeight + 1, Z,
 			const FIndex _Index = FIndex(Index.X, Index.Y, Z);
@@ -61,7 +61,7 @@ EVoxelType UVoxelTerrainGenerator::CalculateVoxelType(UVoxelChunk* InChunk, FInd
 
 	const int32 SeaLevel = Module->GetWorldData().SeaLevel;
 	const int32 WaterHeight = Topography.WaterHeight;
-	const bool bRiverSand = Topography.RegionType == EVoxelWorldRegionType::River && Topography.BiomeType == EVoxelBiomeType::Desert;
+	const bool bRiverSand = Topography.RegionType == EVoxelRegionType::River && Topography.BiomeType == EVoxelBiomeType::Desert;
 	if(WaterHeight != INDEX_NONE && InIndex.Z >= Topography.Height + (bRiverSand ? 1 : 0) && InIndex.Z <= WaterHeight)
 	{
 		return EVoxelType::Water;

@@ -131,12 +131,12 @@ int32 UVoxelSurfaceGenerator::SampleHeight(FIndex InWorldIndex, float InContinen
 
 EVoxelBiomeType UVoxelSurfaceGenerator::SampleBiome(const FVoxelTopography& InTopography) const
 {
-	if(InTopography.RegionType == EVoxelWorldRegionType::Ocean) return EVoxelBiomeType::Ocean;
-	if(InTopography.RegionType == EVoxelWorldRegionType::Mountain)
+	if(InTopography.RegionType == EVoxelRegionType::Ocean) return EVoxelBiomeType::Ocean;
+	if(InTopography.RegionType == EVoxelRegionType::Mountain)
 	{
 		return InTopography.Temperature < -0.25f ? EVoxelBiomeType::Snow : EVoxelBiomeType::Mountains;
 	}
-	if(InTopography.RegionType == EVoxelWorldRegionType::Hills) return EVoxelBiomeType::Hills;
+	if(InTopography.RegionType == EVoxelRegionType::Hills) return EVoxelBiomeType::Hills;
 
 	if(InTopography.Temperature < -0.35f) return InTopography.Humidity > 0.45f ? EVoxelBiomeType::Taiga : EVoxelBiomeType::Snow;
 	if(InTopography.Temperature > 0.45f)
@@ -150,12 +150,14 @@ EVoxelBiomeType UVoxelSurfaceGenerator::SampleBiome(const FVoxelTopography& InTo
 	return EVoxelBiomeType::Plains;
 }
 
-EVoxelWorldRegionType UVoxelSurfaceGenerator::SampleRegion(const FVoxelTopography& InTopography) const
+EVoxelRegionType UVoxelSurfaceGenerator::SampleRegion(const FVoxelTopography& InTopography) const
 {
-	if(InTopography.Height <= Module->GetWorldData().SeaLevel) return EVoxelWorldRegionType::Ocean;
+	if(InTopography.Height <= Module->GetWorldData().SeaLevel) return EVoxelRegionType::Ocean;
 	const float MountainScore = InTopography.PeaksAndValleys * (1.f - InTopography.Erosion) * FMath::Max(InTopography.Continentalness, 0.f);
-	if(MountainScore > 0.27f) return EVoxelWorldRegionType::Mountain;
-	if(MountainScore > 0.1f || InTopography.Height > Module->GetWorldData().SeaLevel + 15) return EVoxelWorldRegionType::Hills;
-	if(InTopography.Erosion > 0.42f) return EVoxelWorldRegionType::Plain;
-	return EVoxelWorldRegionType::Wilderness;
+	if(MountainScore > 0.27f) return EVoxelRegionType::Mountain;
+	if(InTopography.Temperature < -0.35f) return EVoxelRegionType::Icefield;
+	if(InTopography.Temperature > 0.45f && InTopography.Humidity < 0.28f) return EVoxelRegionType::Desert;
+	if(MountainScore > 0.1f || InTopography.Height > Module->GetWorldData().SeaLevel + 15) return EVoxelRegionType::Hills;
+	if(InTopography.Erosion > 0.42f) return EVoxelRegionType::Plain;
+	return EVoxelRegionType::Wilderness;
 }

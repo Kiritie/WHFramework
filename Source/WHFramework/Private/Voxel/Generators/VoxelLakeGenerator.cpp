@@ -42,7 +42,7 @@ void UVoxelLakeGenerator::Generate(UVoxelChunk* InChunk)
 			if(EvaluateLake(Feature, WorldIndex, BedHeight, FeatureWaterHeight))
 			{
 				Topography.Height = FMath::Min(Topography.Height, BedHeight);
-				Topography.RegionType = EVoxelWorldRegionType::Lake;
+				Topography.RegionType = EVoxelRegionType::Lake;
 				Topography.BiomeType = EVoxelBiomeType::River;
 				Topography.Fertility = FMath::Max(Topography.Fertility, 0.8f);
 				WaterHeight = FMath::Max(WaterHeight, FeatureWaterHeight);
@@ -70,7 +70,7 @@ bool UVoxelLakeGenerator::ApplyToTopography(FIndex InWorldIndex, FVoxelTopograph
 		{
 			InOutTopography.Height = FMath::Min(InOutTopography.Height, BedHeight);
 			InOutTopography.WaterHeight = FMath::Max(InOutTopography.WaterHeight, WaterHeight);
-			InOutTopography.RegionType = EVoxelWorldRegionType::Lake;
+			InOutTopography.RegionType = EVoxelRegionType::Lake;
 			InOutTopography.BiomeType = EVoxelBiomeType::River;
 			InOutTopography.Fertility = FMath::Max(InOutTopography.Fertility, 0.8f);
 			bAffected = true;

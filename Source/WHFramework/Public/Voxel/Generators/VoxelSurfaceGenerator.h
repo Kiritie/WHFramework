@@ -53,7 +53,7 @@ protected:
 
 	EVoxelBiomeType SampleBiome(const FVoxelTopography& InTopography) const;
 
-	EVoxelWorldRegionType SampleRegion(const FVoxelTopography& InTopography) const;
+	EVoxelRegionType SampleRegion(const FVoxelTopography& InTopography) const;
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

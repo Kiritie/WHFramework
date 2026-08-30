@@ -72,8 +72,8 @@ void UVoxelTownGenerator::Generate(UVoxelChunk* InChunk)
 			if((1.f - FMathHelper::HashRand(AnchorChunkIndex.ToVector2D(), Seed)) > SpawnRate) continue;
 			const FIndex AnchorOrigin = Module->ChunkIndexToVoxelIndex(AnchorChunkIndex);
 			const FVoxelTopography AnchorTopography = Module->SampleTopographyByIndex(FIndex(AnchorOrigin.X + ChunkSize.X / 2, AnchorOrigin.Y + ChunkSize.Y / 2, 0));
-			if(AnchorTopography.Height <= Module->GetWorldData().SeaLevel + 1 || AnchorTopography.RegionType == EVoxelWorldRegionType::Mountain ||
-				AnchorTopography.RegionType == EVoxelWorldRegionType::River || AnchorTopography.RegionType == EVoxelWorldRegionType::Lake || AnchorTopography.RegionType == EVoxelWorldRegionType::Ocean || AnchorTopography.BiomeType == EVoxelBiomeType::Ocean || AnchorTopography.BiomeType == EVoxelBiomeType::River) continue;
+			if(AnchorTopography.Height <= Module->GetWorldData().SeaLevel + 1 || AnchorTopography.RegionType == EVoxelRegionType::Mountain ||
+				AnchorTopography.RegionType == EVoxelRegionType::River || AnchorTopography.RegionType == EVoxelRegionType::Lake || AnchorTopography.RegionType == EVoxelRegionType::Ocean || AnchorTopography.BiomeType == EVoxelBiomeType::Ocean || AnchorTopography.BiomeType == EVoxelBiomeType::River) continue;
 			TSharedPtr<TMap<FIndex, FVoxelItem>> Plan;
 			{
 				FReadScopeLock ReadLock(_TownPlanCacheLock);
@@ -110,8 +110,8 @@ void UVoxelTownGenerator::Generate(UVoxelChunk* InChunk)
 				}
 				FSceneArea SceneArea;
 				SceneArea.AreaName = *FString::Printf(TEXT("Town_%d_%d"), AnchorChunkIndex.X, AnchorChunkIndex.Y);
-				SceneArea.AreaDisplayName = Module->GetWorldAreaDisplayName(AnchorOrigin, EVoxelSceneAreaNameType::Town,
-					Module->GetWorldRegionDisplayName(EVoxelWorldRegionType::Town));
+				SceneArea.AreaDisplayName = Module->GetWorldAreaDisplayName(AnchorOrigin, EVoxelAreaType::Town,
+					Module->GetWorldRegionDisplayName(EVoxelRegionType::Town));
 				SceneArea.AreaType = ESceneAreaType::Default;
 				SceneArea.AreaShape = ESceneAreaShape::Box;
 				SceneArea.AreaCenter = TownBounds.GetCenter();
@@ -202,7 +202,7 @@ void UVoxelTownGenerator::DevelopeDomains(FIndex InAnchorChunkIndex)
 
 			const FVoxelTopography Topography = Module->SampleTopographyByIndex(FIndex(x, y, 0));
 			int32 Height = SamplePlannedHeight(FIndex(x, y));
-			if(Height <= Module->GetWorldData().SeaLevel || Topography.RegionType == EVoxelWorldRegionType::River || Topography.RegionType == EVoxelWorldRegionType::Lake || Topography.RegionType == EVoxelWorldRegionType::Ocean || Topography.BiomeType == EVoxelBiomeType::River || Topography.BiomeType == EVoxelBiomeType::Ocean) continue;
+			if(Height <= Module->GetWorldData().SeaLevel || Topography.RegionType == EVoxelRegionType::River || Topography.RegionType == EVoxelRegionType::Lake || Topography.RegionType == EVoxelRegionType::Ocean || Topography.BiomeType == EVoxelBiomeType::River || Topography.BiomeType == EVoxelBiomeType::Ocean) continue;
 
 			int32 DeltaHeight = FMath::Abs(CenterHeight - Height);
 
@@ -260,8 +260,8 @@ bool UVoxelTownGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, 
 		for(int j = -LeftRight - 1; j <= LeftRight; ++j)
 		{
 			const FVoxelTopography Topography = Module->SampleTopographyByIndex(FIndex(InX + i, InY + j, 0));
-			if(Topography.RegionType == EVoxelWorldRegionType::Ocean || Topography.RegionType == EVoxelWorldRegionType::River ||
-				Topography.RegionType == EVoxelWorldRegionType::Lake || Topography.BiomeType == EVoxelBiomeType::Ocean || Topography.BiomeType == EVoxelBiomeType::River) return false;
+			if(Topography.RegionType == EVoxelRegionType::Ocean || Topography.RegionType == EVoxelRegionType::River ||
+				Topography.RegionType == EVoxelRegionType::Lake || Topography.BiomeType == EVoxelBiomeType::Ocean || Topography.BiomeType == EVoxelBiomeType::River) return false;
 		}
 	}
 	for(int i = -FrontBack; i < FrontBack; ++i)
@@ -321,11 +321,11 @@ bool UVoxelTownGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, 
 	_BuildingPos.Push(FVector2D(InX - FrontBack, InY - LeftRight));
 
 	const FText BuildingDisplayName = _PrefabAssets[InIndex]->DisplayName.IsEmpty()
-		? Module->GetWorldRegionDisplayName(EVoxelWorldRegionType::Building)
+		? Module->GetWorldRegionDisplayName(EVoxelRegionType::Building)
 		: _PrefabAssets[InIndex]->DisplayName;
 	FSceneArea BuildingArea;
 	BuildingArea.AreaName = *FString::Printf(TEXT("TownBuilding_%d_%d"), InX, InY);
-	BuildingArea.AreaDisplayName = Module->GetWorldAreaDisplayName(FIndex(InX, InY, Aver), EVoxelSceneAreaNameType::Building, BuildingDisplayName);
+	BuildingArea.AreaDisplayName = Module->GetWorldAreaDisplayName(FIndex(InX, InY, Aver), EVoxelAreaType::Building, BuildingDisplayName);
 	BuildingArea.AreaType = ESceneAreaType::Default;
 	BuildingArea.AreaShape = ESceneAreaShape::Box;
 	BuildingArea.AreaCenter = FVector2D(InX, InY);
@@ -361,7 +361,7 @@ bool UVoxelTownGenerator::InBarrier(FVector2D InPos)
 {
 	if(!_Domains.Contains(FMathHelper::CompressIndex(InPos.X, InPos.Y))) return true;
 	const FVoxelTopography Topography = Module->SampleTopographyByIndex(FIndex(InPos.X, InPos.Y, 0));
-	if(Topography.BiomeType == EVoxelBiomeType::River || Topography.BiomeType == EVoxelBiomeType::Ocean || Topography.RegionType == EVoxelWorldRegionType::River || Topography.RegionType == EVoxelWorldRegionType::Lake || Topography.RegionType == EVoxelWorldRegionType::Ocean) return true;
+	if(Topography.BiomeType == EVoxelBiomeType::River || Topography.BiomeType == EVoxelBiomeType::Ocean || Topography.RegionType == EVoxelRegionType::River || Topography.RegionType == EVoxelRegionType::Lake || Topography.RegionType == EVoxelRegionType::Ocean) return true;
 	const int32 Height = Topography.Height;
 	static const FIndex Offsets[] = { FIndex(1, 0, 0), FIndex(-1, 0, 0), FIndex(0, 1, 0), FIndex(0, -1, 0) };
 	for(const FIndex& Offset : Offsets)

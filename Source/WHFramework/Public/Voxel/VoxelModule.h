@@ -173,7 +173,7 @@ protected:
 
 	FSceneArea ResolveChunkSceneArea(const FSceneArea& InArea, const FVector2D& InPoint) const;
 
-	TMap<EVoxelSceneAreaNameType, TArray<FText>> SceneAreaNamePrefixes;
+	TMap<EVoxelAreaType, TArray<FText>> SceneAreaNamePrefixes;
 
 public:
 	virtual void LoadPrefabData(const FVoxelPrefabSaveData& InPrefabData);
@@ -254,15 +254,15 @@ public:
 	FVoxelTopography SampleTopographyByIndex(FIndex InIndex) const;
 
 	UFUNCTION(BlueprintPure)
-	EVoxelWorldRegionType GetWorldRegionByIndex(FIndex InIndex) const;
+	EVoxelRegionType GetWorldRegionByIndex(FIndex InIndex) const;
 
 	UFUNCTION(BlueprintPure)
-	FText GetWorldAreaPrefix(FIndex InIndex, EVoxelSceneAreaNameType InNameType) const;
+	FText GetWorldAreaPrefix(FIndex InIndex, EVoxelAreaType InNameType) const;
 
 	UFUNCTION(BlueprintPure)
-	FText GetWorldRegionDisplayName(EVoxelWorldRegionType InRegionType) const;
+	FText GetWorldRegionDisplayName(EVoxelRegionType InRegionType) const;
 
-	FText GetWorldAreaDisplayName(FIndex InIndex, EVoxelSceneAreaNameType InNameType, const FText& InAreaTypeName) const;
+	FText GetWorldAreaDisplayName(FIndex InIndex, EVoxelAreaType InNameType, const FText& InAreaTypeName) const;
 
 	UFUNCTION(BlueprintPure)
 	FText GetWorldAreaDisplayNameByIndex(FIndex InIndex) const;

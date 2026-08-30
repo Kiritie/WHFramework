@@ -68,7 +68,7 @@ UVoxelModule::UVoxelModule()
 
 	WorldData = nullptr;
 	SceneAreaNameTable = nullptr;
-	SceneAreaNamePrefixes = TMap<EVoxelSceneAreaNameType, TArray<FText>>();
+	SceneAreaNamePrefixes = TMap<EVoxelAreaType, TArray<FText>>();
 
 	ChunkSpawnClass = UVoxelChunk::StaticClass();
 	
@@ -548,11 +548,11 @@ void UVoxelModule::InitializeSceneAreaNames()
 {
 	if(SceneAreaNameTable)
 	{
-		TArray<FVoxelSceneAreaNameRow*> Rows;
+		TArray<FVoxelAreaNameData*> Rows;
 		SceneAreaNameTable->GetAllRows(TEXT("VoxelSceneAreaNames"), Rows);
-		for(const FVoxelSceneAreaNameRow* Row : Rows)
+		for(const FVoxelAreaNameData* Row : Rows)
 		{
-			if(Row && !Row->Prefix.IsEmpty()) SceneAreaNamePrefixes.FindOrAdd(Row->AreaNameType).Add(Row->Prefix);
+			if(Row && !Row->AreaName.IsEmpty()) SceneAreaNamePrefixes.FindOrAdd(Row->AreaType).Add(Row->AreaName);
 		}
 	}
 }
@@ -563,7 +563,7 @@ FSceneArea UVoxelModule::ResolveChunkSceneArea(const FSceneArea& InArea, const F
 	const FText RegionDisplayName = GetWorldRegionDisplayName(SampleTopographyByIndex(Index).RegionType);
 	FSceneArea Area = InArea;
 	Area.AreaDisplayName = InArea.AreaDisplayName.IsEmpty()
-		? GetWorldAreaDisplayName(Index, EVoxelSceneAreaNameType::Continent, RegionDisplayName)
+		? GetWorldAreaDisplayName(Index, EVoxelAreaType::Continent, RegionDisplayName)
 		: FText::Format(FText::FromString(TEXT("{0}{1}")), InArea.AreaDisplayName, RegionDisplayName);
 	return Area;
 }
@@ -1072,12 +1072,12 @@ FVoxelTopography UVoxelModule::SampleTopographyByIndex(FIndex InIndex) const
 	return Topography;
 }
 
-EVoxelWorldRegionType UVoxelModule::GetWorldRegionByIndex(FIndex InIndex) const
+EVoxelRegionType UVoxelModule::GetWorldRegionByIndex(FIndex InIndex) const
 {
 	return SampleTopographyByIndex(InIndex).RegionType;
 }
 
-FText UVoxelModule::GetWorldAreaPrefix(FIndex InIndex, EVoxelSceneAreaNameType InNameType) const
+FText UVoxelModule::GetWorldAreaPrefix(FIndex InIndex, EVoxelAreaType InNameType) const
 {
 	const TArray<FText>* Candidates = SceneAreaNamePrefixes.Find(InNameType);
 	if(!Candidates || Candidates->IsEmpty()) return FText::GetEmpty();
@@ -1087,12 +1087,12 @@ FText UVoxelModule::GetWorldAreaPrefix(FIndex InIndex, EVoxelSceneAreaNameType I
 	return (*Candidates)[Hash % Candidates->Num()];
 }
 
-FText UVoxelModule::GetWorldRegionDisplayName(EVoxelWorldRegionType InRegionType) const
+FText UVoxelModule::GetWorldRegionDisplayName(EVoxelRegionType InRegionType) const
 {
-	return UCommonStatics::GetEnumDisplayNameByValue(TEXT("/Script/WHFramework.EVoxelWorldRegionType"), static_cast<int32>(InRegionType));
+	return UCommonStatics::GetEnumDisplayNameByValue(TEXT("/Script/WHFramework.EVoxelRegionType"), static_cast<int32>(InRegionType));
 }
 
-FText UVoxelModule::GetWorldAreaDisplayName(FIndex InIndex, EVoxelSceneAreaNameType InNameType, const FText& InAreaTypeName) const
+FText UVoxelModule::GetWorldAreaDisplayName(FIndex InIndex, EVoxelAreaType InNameType, const FText& InAreaTypeName) const
 {
 	const FText Prefix = GetWorldAreaPrefix(InIndex, InNameType);
 	if(Prefix.IsEmpty()) return InAreaTypeName;
@@ -1109,7 +1109,7 @@ FText UVoxelModule::GetWorldAreaDisplayNameByIndex(FIndex InIndex) const
 		if(!Area.AreaName.IsNone() && !Area.AreaDisplayName.IsEmpty()) return Area.AreaDisplayName;
 	}
 	const FText RegionDisplayName = GetWorldRegionDisplayName(SampleTopographyByIndex(InIndex).RegionType);
-	return GetWorldAreaDisplayName(InIndex, EVoxelSceneAreaNameType::Continent, RegionDisplayName);
+	return GetWorldAreaDisplayName(InIndex, EVoxelAreaType::Continent, RegionDisplayName);
 }
 
 float UVoxelModule::GetVoxelNoise1D(float InValue, bool bAbs, bool bUnsigned) const

@@ -121,7 +121,7 @@ bool UVoxelRiverGenerator::ApplyRiverProfile(FIndex InWorldIndex, float InRiverD
 		const float SandSlope = FMath::SmoothStep(0.35f, 1.f, BankAlpha);
 		InOutTopography.Height = FMath::RoundToInt(FMath::Lerp(static_cast<float>(BedHeight), static_cast<float>(InWaterHeight), SandSlope));
 		InOutTopography.WaterHeight = InWaterHeight;
-		InOutTopography.RegionType = EVoxelWorldRegionType::River;
+		InOutTopography.RegionType = EVoxelRegionType::River;
 		InOutTopography.BiomeType = EVoxelBiomeType::Desert;
 		InOutTopography.Fertility = 0.f;
 		return true;
@@ -137,7 +137,7 @@ bool UVoxelRiverGenerator::ApplyRiverProfile(FIndex InWorldIndex, float InRiverD
 	InOutTopography.Height = FMath::RoundToInt(FMath::Lerp(static_cast<float>(OriginalHeight), static_cast<float>(FMath::Min(OriginalHeight, BedHeight)), Strength));
 	if(Strength > 0.2f)
 	{
-		InOutTopography.RegionType = EVoxelWorldRegionType::River;
+		InOutTopography.RegionType = EVoxelRegionType::River;
 		InOutTopography.BiomeType = EVoxelBiomeType::River;
 		InOutTopography.Fertility = FMath::Max(InOutTopography.Fertility, 0.75f * Strength);
 	}
@@ -174,8 +174,8 @@ float UVoxelRiverGenerator::CalculateTerrainDifficulty(FIndex InWorldIndex, cons
 	const float ReliefPenalty = FMath::Clamp((MaxHeight - MinHeight - 2.f) / 7.f, 0.f, 1.f);
 	const float AltitudeAboveSea = static_cast<float>(CenterHeight - Module->GetWorldData().SeaLevel);
 	const float AltitudePenalty = FMath::Clamp((AltitudeAboveSea - 16.f) / 28.f, 0.f, 1.f);
-	const EVoxelWorldRegionType RegionType = Module->SampleBaseTopographyByIndex(InWorldIndex).RegionType;
-	const float RegionPenalty = RegionType == EVoxelWorldRegionType::Mountain ? 1.f : RegionType == EVoxelWorldRegionType::Hills ? 0.72f : 0.f;
+	const EVoxelRegionType RegionType = Module->SampleBaseTopographyByIndex(InWorldIndex).RegionType;
+	const float RegionPenalty = RegionType == EVoxelRegionType::Mountain ? 1.f : RegionType == EVoxelRegionType::Hills ? 0.72f : 0.f;
 	return FMath::Max3(ReliefPenalty, AltitudePenalty * 0.65f, RegionPenalty);
 }
 

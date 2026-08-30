@@ -239,7 +239,7 @@ FVoxelTopography::FVoxelTopography(const FString& InSaveData)
 	Temperature = FCString::Atof(*DataStrs[2]);
 	Humidity = FCString::Atof(*DataStrs[3]);
 	BiomeType = (EVoxelBiomeType)FCString::Atoi(*DataStrs[4]);
-	if(DataStrs.IsValidIndex(5)) RegionType = (EVoxelWorldRegionType)FCString::Atoi(*DataStrs[5]);
+	if(DataStrs.IsValidIndex(5)) RegionType = (EVoxelRegionType)FCString::Atoi(*DataStrs[5]);
 	if(DataStrs.IsValidIndex(6)) Continentalness = FCString::Atof(*DataStrs[6]);
 	if(DataStrs.IsValidIndex(7)) Erosion = FCString::Atof(*DataStrs[7]);
 	if(DataStrs.IsValidIndex(8)) PeaksAndValleys = FCString::Atof(*DataStrs[8]);

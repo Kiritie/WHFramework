@@ -275,22 +275,24 @@ enum class EVoxelBiomeType: uint8
 };
 
 UENUM(BlueprintType)
-enum class EVoxelWorldRegionType : uint8
+enum class EVoxelRegionType : uint8
 {
 	None, // 区域
 	Wilderness, // 荒野
 	Plain, // 平原
 	Mountain, // 山脉
+	Hills, // 丘陵
 	River, // 河流
 	Lake, // 湖泊
+	Ocean, // 海域
 	Town, // 小镇
 	Building, // 建筑
-	Ocean, // 海域
-	Hills // 丘陵
+	Desert, // 沙漠
+	Icefield // 冰原
 };
 
 UENUM(BlueprintType)
-enum class EVoxelSceneAreaNameType : uint8
+enum class EVoxelAreaType : uint8
 {
 	Continent, // 大陆
 	Town, // 小镇
@@ -298,23 +300,23 @@ enum class EVoxelSceneAreaNameType : uint8
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelSceneAreaNameRow : public FDataTableRowBase
+struct WHFRAMEWORK_API FVoxelAreaNameData : public FDataTableRowBase
 {
 	GENERATED_BODY()
 
 public:
-	FVoxelSceneAreaNameRow()
+	FVoxelAreaNameData()
 	{
-		AreaNameType = EVoxelSceneAreaNameType::Continent;
-		Prefix = FText::GetEmpty();
+		AreaType = EVoxelAreaType::Continent;
+		AreaName = FText::GetEmpty();
 	}
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	EVoxelSceneAreaNameType AreaNameType;
+	EVoxelAreaType AreaType;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FText Prefix;
+	FText AreaName;
 };
 
 USTRUCT(BlueprintType)
@@ -591,7 +593,7 @@ public:
 		Temperature = 0.f;
 		Humidity = 0.f;
 		BiomeType = EVoxelBiomeType::None;
-		RegionType = EVoxelWorldRegionType::None;
+		RegionType = EVoxelRegionType::None;
 		Continentalness = 0.f;
 		Erosion = 0.f;
 		PeaksAndValleys = 0.f;
@@ -623,7 +625,7 @@ public:
 	EVoxelBiomeType BiomeType;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	EVoxelWorldRegionType RegionType;
+	EVoxelRegionType RegionType;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	float Continentalness;
