@@ -1,4 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Scene/SceneModuleStatics.h"
@@ -65,39 +64,39 @@ void USceneModuleStatics::SetMiniMapTexture(UTextureRenderTarget2D* InMiniMapTex
 	USceneModule::Get().SetMiniMapTexture(InMiniMapTexture);
 }
 
-FWorldMaxMapArea USceneModuleStatics::GetMaxMapArea(const FName InName)
+FSceneArea USceneModuleStatics::GetSceneArea(const FName InName)
 {
-	return USceneModule::Get().GetMaxMapArea(InName);
+	return USceneModule::Get().GetSceneArea(InName);
 }
 
-FWorldMaxMapArea USceneModuleStatics::GetMaxMapAreaByPoint(const FVector2D& InPoint)
+FSceneArea USceneModuleStatics::GetSceneAreaByPoint(const FVector2D& InPoint)
 {
-	return USceneModule::Get().GetMaxMapAreaByPoint(InPoint);
+	return USceneModule::Get().GetSceneAreaByPoint(InPoint);
 }
 
-TArray<FWorldMaxMapArea> USceneModuleStatics::GetMaxMapAreas()
+TArray<FSceneArea> USceneModuleStatics::GetSceneAreas()
 {
-	return USceneModule::Get().GetMaxMapAreas();
+	return USceneModule::Get().GetSceneAreas();
 }
 
-void USceneModuleStatics::AddMaxMapArea(const FWorldMaxMapArea& InArea)
+void USceneModuleStatics::AddSceneArea(const FSceneArea& InArea, bool bThreadSafe)
 {
-	USceneModule::Get().AddMaxMapArea(InArea);
+	USceneModule::Get().AddSceneArea(InArea, bThreadSafe);
 }
 
-void USceneModuleStatics::RemoveMaxMapArea(const FName InName)
+void USceneModuleStatics::RemoveSceneArea(const FName InName)
 {
-	USceneModule::Get().RemoveMaxMapArea(InName);
+	USceneModule::Get().RemoveSceneArea(InName);
 }
 
-void USceneModuleStatics::ClearMaxMapArea()
+void USceneModuleStatics::ClearSceneArea()
 {
-	USceneModule::Get().ClearMaxMapArea();
+	USceneModule::Get().ClearSceneArea();
 }
 
-bool USceneModuleStatics::HasMaxMapArea(const FName InName)
+bool USceneModuleStatics::HasSceneArea(const FName InName)
 {
-	return USceneModule::Get().HasMaxMapArea(InName);
+	return USceneModule::Get().HasSceneArea(InName);
 }
 
 UWorldTimer* USceneModuleStatics::GetWorldTimer(TSubclassOf<UWorldTimer> InClass)

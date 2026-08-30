@@ -1,5 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "SceneModuleTypes.h"
@@ -22,9 +20,7 @@ class AMiniMapCapture;
 class UEventHandle_SetDataLayerRuntimeState;
 class UWorldWeather;
 class UWorldTimer;
-/**
- * 
- */
+/** 场景模块 */
 UCLASS()
 class WHFRAMEWORK_API USceneModule : public UModuleBase, public ISceneContainerInterface, public IDebuggerInterface
 {
@@ -38,7 +34,6 @@ public:
 	~USceneModule();
 
 	//////////////////////////////////////////////////////////////////////////
-	/// ModuleBase
 public:
 #if WITH_EDITOR
 	virtual void OnGenerate() override;
@@ -67,7 +62,6 @@ public:
 	virtual FString GetModuleDebugMessage() override;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Debugger
 protected:
 	virtual void OnDrawDebug(UCanvas* InCanvas, APlayerController* InPC) override;
 
@@ -77,13 +71,11 @@ protected:
 #endif
 
 	//////////////////////////////////////////////////////////////////////////
-	// Module
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "bModuleAutoSave == true"))
 	bool bSaveActorDatas;
 
 	//////////////////////////////////////////////////////////////////////////
-	// Coordinate
 protected:
 	UPROPERTY(EditAnywhere, Category = "Coordinate")
 	float SeaLevel;
@@ -102,7 +94,6 @@ public:
 	float GetAltitude(bool bUnsigned = false, bool bRefresh = false) const;
 	
 	//////////////////////////////////////////////////////////////////////////
-	// MiniMap
 protected:
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "MiniMap")
 	AMiniMapCapture* MiniMapCapture;
@@ -157,44 +148,50 @@ public:
 	void SetMiniMapTexture(UTextureRenderTarget2D* InMiniMapTexture);
 
 	//////////////////////////////////////////////////////////////////////////
-	// MaxMap
 protected:
-	UPROPERTY(EditAnywhere, Category = "MaxMap")
-	TArray<FWorldMaxMapArea> MaxMapAreas;
+	UPROPERTY(EditAnywhere, Category = "SceneArea")
+	TArray<FSceneArea> SceneAreas;
 
-	UPROPERTY(EditAnywhere, Category = "MaxMap")
-	bool bDrawMaxMapArea;
+	TQueue<FSceneArea, EQueueMode::Mpsc> PendingSceneAreas;
 
-	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bDrawMaxMapArea == true"), Category = "MaxMap")
-	float MaxMapAreaScale;
+	UPROPERTY(EditAnywhere, Category = "SceneArea")
+	bool bDrawSceneArea;
 
-	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bDrawMaxMapArea == true"), Category = "MaxMap")
-	float MaxMapAreaHeight;
+	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bDrawSceneArea == true"), Category = "SceneArea")
+	float SceneAreaScale;
+
+	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bDrawSceneArea == true"), Category = "SceneArea")
+	float SceneAreaHeight;
+
+	TMap<ESceneAreaType, FSceneAreaResolver> SceneAreaResolvers;
 
 public:
 	UFUNCTION(BlueprintPure)
-	bool HasMaxMapArea(const FName InName) const;
+	bool HasSceneArea(const FName InName) const;
 
 	UFUNCTION(BlueprintPure)
-	FWorldMaxMapArea GetMaxMapArea(const FName InName) const;
+	FSceneArea GetSceneArea(const FName InName) const;
 
 	UFUNCTION(BlueprintPure)
-	FWorldMaxMapArea GetMaxMapAreaByPoint(const FVector2D& InPoint) const;
+	FSceneArea GetSceneAreaByPoint(const FVector2D& InPoint) const;
 
 	UFUNCTION(BlueprintPure)
-	TArray<FWorldMaxMapArea> GetMaxMapAreas() const { return MaxMapAreas; }
+	TArray<FSceneArea> GetSceneAreas() const { return SceneAreas; }
+
+	void RegisterSceneAreaResolver(ESceneAreaType InType, const FSceneAreaResolver& InResolver);
+
+	void UnregisterSceneAreaResolver(ESceneAreaType InType);
 
 	UFUNCTION(BlueprintCallable)
-	void AddMaxMapArea(const FWorldMaxMapArea& InArea);
+	void AddSceneArea(const FSceneArea& InArea, bool bThreadSafe = false);
 	
 	UFUNCTION(BlueprintCallable)
-	void RemoveMaxMapArea(const FName InName);
+	void RemoveSceneArea(const FName InName);
 		
 	UFUNCTION(BlueprintCallable)
-	void ClearMaxMapArea();
+	void ClearSceneArea();
 
 	//////////////////////////////////////////////////////////////////////////
-	// WorldTimer
 protected:
 	UPROPERTY(EditAnywhere, Instanced, Category = "WorldTimer")
 	UWorldTimer* WorldTimer;
@@ -204,7 +201,6 @@ public:
 	UWorldTimer* GetWorldTimer(TSubclassOf<UWorldTimer> InClass = nullptr) const;
 
 	//////////////////////////////////////////////////////////////////////////
-	// WorldWeather
 protected:
 	UPROPERTY(EditAnywhere, Instanced, Category = "WorldWeather")
 	UWorldWeather* WorldWeather;
@@ -214,7 +210,6 @@ public:
 	UWorldWeather* GetWorldWeather(TSubclassOf<UWorldWeather> InClass = nullptr) const;
 
 	//////////////////////////////////////////////////////////////////////////
-	// DataLayer
 protected:
 	UPROPERTY(EditAnywhere, Category = "DataLayer")
 	TMap<UDataLayerAsset*, int32> DataLayerPlayerMappings;
@@ -248,7 +243,6 @@ protected:
 	void OnSetLevelOwnerPlayer(UObject* InSender, UEventHandle_SetLevelOwnerPlayer* InEventHandle);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Traces
 protected:
 	UPROPERTY(EditAnywhere, Category = "Traces")
 	TMap<FName, FTraceMapping> TraceMappings;
@@ -267,7 +261,6 @@ public:
 	virtual void RemoveTraceMapping(const FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
-    /// Scene Actor
 protected:
 	UPROPERTY(EditAnywhere, Category = "SceneActor")
 	TArray<AActor*> SceneActors;
@@ -295,7 +288,6 @@ public:
 	virtual bool RemoveSceneActor(AActor* InActor) override;
 
 	//////////////////////////////////////////////////////////////////////////
-    /// Target Point
 protected:
 	UPROPERTY(EditAnywhere, Category = "TargetPoint")
 	TMap<FName, ATargetPoint*> TargetPoints;
@@ -314,7 +306,6 @@ public:
 	void RemoveTargetPointByName(const FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Scene Point
 protected:
 	UPROPERTY(EditAnywhere, Category = "ScenePoint")
 	TMap<FName, USceneComponent*> ScenePoints;
@@ -333,7 +324,6 @@ public:
 	void RemoveScenePointByName(const FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
-    /// Physics Volume
 protected:
 	UPROPERTY(EditAnywhere, Category = "PhysicsVolumes")
 	TMap<FName, APhysicsVolumeBase*> PhysicsVolumes;
@@ -367,13 +357,11 @@ public:
 	void RemovePhysicsVolumeByName(const FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
-    /// World Text
 public:
 	UFUNCTION(BlueprintCallable)
 	void SpawnWorldText(const FString& InText, const FLinearColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetMapping InMapping, FVector InOffsetRange = FVector::ZeroVector);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Outline
 protected:
 	UPROPERTY(EditAnywhere, Category = "Outline")
 	UMaterialInterface* OutlineMat;
@@ -392,7 +380,6 @@ public:
 	void SetOutlineColor(const FLinearColor& InColor);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Level
 protected:
 	UPROPERTY(VisibleAnywhere, Category = "Level")
 	TArray<FAsyncLoadLevelTask> AsyncLoadLevelQueue;

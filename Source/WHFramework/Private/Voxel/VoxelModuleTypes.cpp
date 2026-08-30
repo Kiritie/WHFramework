@@ -1,4 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Voxel/VoxelModuleTypes.h"
@@ -231,16 +230,25 @@ UVoxelChunk* FVoxelHitResult::GetChunk() const
 
 FVoxelTopography::FVoxelTopography(const FString& InSaveData)
 {
+	*this = FVoxelTopography();
 	TArray<FString> DataStrs;
 	InSaveData.ParseIntoArray(DataStrs, TEXT(";"));
+	if(DataStrs.Num() < 5) return;
 	Index = UVoxelModuleStatics::NumberToVoxelIndex(FCString::Atoi(*DataStrs[0]));
 	Height = FCString::Atoi(*DataStrs[1]);
 	Temperature = FCString::Atof(*DataStrs[2]);
 	Humidity = FCString::Atof(*DataStrs[3]);
 	BiomeType = (EVoxelBiomeType)FCString::Atoi(*DataStrs[4]);
+	if(DataStrs.IsValidIndex(5)) RegionType = (EVoxelWorldRegionType)FCString::Atoi(*DataStrs[5]);
+	if(DataStrs.IsValidIndex(6)) Continentalness = FCString::Atof(*DataStrs[6]);
+	if(DataStrs.IsValidIndex(7)) Erosion = FCString::Atof(*DataStrs[7]);
+	if(DataStrs.IsValidIndex(8)) PeaksAndValleys = FCString::Atof(*DataStrs[8]);
+	if(DataStrs.IsValidIndex(9)) Fertility = FCString::Atof(*DataStrs[9]);
+	if(DataStrs.IsValidIndex(10)) WaterHeight = FCString::Atoi(*DataStrs[10]);
 }
 
 FString FVoxelTopography::ToSaveData() const
 {
-	return FString::Printf(TEXT("%lld;%d;%f;%f;%d"), UVoxelModuleStatics::VoxelIndexToNumber(Index), Height, Temperature, Humidity, (int32)BiomeType);
+	return FString::Printf(TEXT("%lld;%d;%f;%f;%d;%d;%f;%f;%f;%f;%d"), UVoxelModuleStatics::VoxelIndexToNumber(Index), Height, Temperature, Humidity,
+		(int32)BiomeType, (int32)RegionType, Continentalness, Erosion, PeaksAndValleys, Fertility, WaterHeight);
 }

@@ -1,4 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -23,7 +22,6 @@ class WHFRAMEWORK_API USceneModuleStatics : public UBlueprintFunctionLibrary
 
 public:
 	//////////////////////////////////////////////////////////////////////////
-	// Coordinate
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
 	static float GetSeaLevel();
 
@@ -34,7 +32,6 @@ public:
 	static float GetAltitude(bool bUnsigned = false, bool bRefresh = false);
 
 	//////////////////////////////////////////////////////////////////////////
-	// MiniMap
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
 	static AMiniMapCapture* GetMiniMapCapture();
 
@@ -63,40 +60,36 @@ public:
 	static void SetMiniMapTexture(UTextureRenderTarget2D* InMiniMapTexture);
 
 	//////////////////////////////////////////////////////////////////////////
-	// MaxMap
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
-	static bool HasMaxMapArea(const FName InName);
+	static bool HasSceneArea(const FName InName);
 
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
-	static FWorldMaxMapArea GetMaxMapArea(const FName InName);
+	static FSceneArea GetSceneArea(const FName InName);
 
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
-	static FWorldMaxMapArea GetMaxMapAreaByPoint(const FVector2D& InPoint);
+	static FSceneArea GetSceneAreaByPoint(const FVector2D& InPoint);
 
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
-	static TArray<FWorldMaxMapArea> GetMaxMapAreas();
+	static TArray<FSceneArea> GetSceneAreas();
 
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
-	static void AddMaxMapArea(const FWorldMaxMapArea& InArea);
+	static void AddSceneArea(const FSceneArea& InArea, bool bThreadSafe = false);
 	
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
-	static void RemoveMaxMapArea(const FName InName);
+	static void RemoveSceneArea(const FName InName);
 		
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
-	static void ClearMaxMapArea();
+	static void ClearSceneArea();
 
 	//////////////////////////////////////////////////////////////////////////
-	/// WorldTimer
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "SceneModuleStatics")
 	static UWorldTimer* GetWorldTimer(TSubclassOf<UWorldTimer> InClass = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// WorldWeather
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "SceneModuleStatics")
 	static UWorldWeather* GetWorldWeather(TSubclassOf<UWorldWeather> InClass = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Traces
 	UFUNCTION(BlueprintPure)
 	static bool HasTraceMapping(const FName InName, bool bEnsured = true);
 
@@ -110,7 +103,6 @@ public:
 	static void RemoveTraceMapping(const FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Level
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InOnLoadFinished"), Category = "SceneModuleStatics")
 	static void AsyncLoadLevel(const FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnLoadFinished, float InFinishDelayTime = 1.f, bool bCreateLoadingWidget = true);
 
@@ -136,7 +128,6 @@ public:
 	static float GetAsyncUnloadLevelProgressByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Scene Actor
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
 	static bool HasSceneActor(const FString& InID, bool bEnsured = true);
 
@@ -156,7 +147,6 @@ public:
 	static bool RemoveSceneActor(AActor* InActor);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Target Point
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
 	static bool HasTargetPointByName(const FName InName, bool bEnsured = true);
 
@@ -170,7 +160,6 @@ public:
 	static void RemoveTargetPointByName(const FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Scene Point
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
 	static bool HasScenePointByName(const FName InName, bool bEnsured = true);
 
@@ -184,7 +173,6 @@ public:
 	static void RemoveScenePointByName(const FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Physics Volume
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
 	static APhysicsVolume* GetDefaultPhysicsVolume();
 	
@@ -213,7 +201,6 @@ public:
 	static void RemovePhysicsVolumeByName(const FName InName);
 
 	//////////////////////////////////////////////////////////////////////////
-    /// World Text
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
 	static void SpawnWorldText(const FString& InText, const FLinearColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetMapping InMapping, FVector InOffsetRange = FVector::ZeroVector);
 };

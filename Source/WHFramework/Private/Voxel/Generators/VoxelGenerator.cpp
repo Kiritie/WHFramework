@@ -1,10 +1,10 @@
-// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Voxel/Generators/VoxelGenerator.h"
 
 UVoxelGenerator::UVoxelGenerator()
 {
 	Module = nullptr;
+	bGenerationEnabled = true;
 }
 
 void UVoxelGenerator::Initialize(UVoxelModule* InModule)

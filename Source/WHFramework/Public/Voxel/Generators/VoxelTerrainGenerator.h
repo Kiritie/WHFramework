@@ -1,4 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -7,9 +6,7 @@
 #include "Voxel/VoxelModuleTypes.h"
 #include "VoxelTerrainGenerator.generated.h"
 
-/**
- *
- */
+/** 体素地形生成器 */
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UVoxelTerrainGenerator : public UVoxelGenerator
 {

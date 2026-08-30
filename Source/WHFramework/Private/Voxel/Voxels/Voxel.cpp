@@ -75,19 +75,19 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 	}
 	if(GetOwner())
 	{
-		FVoxelMap VoxelMap;
+		TMap<FIndex, FVoxelItem> VoxelMap;
 		const TArray WaterTypes = { EVoxelType::Water };
 		ITER_ARRAY(WaterTypes, WaterType,
 			if(GetOwner()->CheckVoxelNeighbors(GetIndex(), WaterType, FVector::OneVector, false, true))
 			{
-				VoxelMap.Map.Emplace(GetIndex(), UVoxelModuleStatics::VoxelTypeToAssetID(WaterType));
+				VoxelMap.Emplace(GetIndex(), UVoxelModuleStatics::VoxelTypeToAssetID(WaterType));
 				break;
 			}
 		)
 		const FIndex UpperIndex = FMathHelper::GetAdjacentIndex(GetIndex(), EDirection::Up);
 		if(GetOwner()->HasVoxelComplex(UpperIndex) && GetOwner()->GetVoxelComplex(UpperIndex).GetData().GetTransparency() == EVoxelTransparency::Trans)
 		{
-			VoxelMap.Map.Emplace(UpperIndex, FVoxelItem::Empty);
+			VoxelMap.Emplace(UpperIndex, FVoxelItem::Empty);
 		}
 		GetOwner()->SetVoxelComplex(VoxelMap, true, false, InAgent);
 	}

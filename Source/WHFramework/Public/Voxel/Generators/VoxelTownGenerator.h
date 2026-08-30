@@ -1,4 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -6,19 +5,17 @@
 #include "VoxelGenerator.h"
 #include "Math/MathTypes.h"
 #include "Tool/PathFinder.h"
-#include "VoxelVillageGenerator.generated.h"
+#include "VoxelTownGenerator.generated.h"
 
 class UVoxelPrefabData;
-/**
- *
- */
+/** 体素小镇生成器 */
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UVoxelVillageGenerator : public UVoxelGenerator
+class WHFRAMEWORK_API UVoxelTownGenerator : public UVoxelGenerator
 {
 	GENERATED_BODY()
 
 public:
-	UVoxelVillageGenerator();
+	UVoxelTownGenerator();
 
 public:
 	virtual void Initialize(UVoxelModule* InModule) override;
@@ -26,9 +23,9 @@ public:
 	virtual void Generate(UVoxelChunk* InChunk) override;
 
 public:
-	void DevelopeDomains(UVoxelChunk* InChunk);
+	void DevelopeDomains(FIndex InAnchorChunkIndex);
 
-	void PlaceBuildings(UVoxelChunk* InChunk);
+	void PlaceBuildings(FIndex InAnchorChunkIndex);
 
 	void PlacePaths();
 
@@ -40,12 +37,23 @@ public:
 
 	bool PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, int32 InRotate);
 
+	void PlanTown(FIndex InAnchorChunkIndex);
+
+	void ApplyTownSlice(UVoxelChunk* InChunk, const TMap<FIndex, FVoxelItem>& InPlan) const;
+
+	void SetPlannedVoxel(FIndex InWorldIndex, const FVoxelItem& InVoxelItem);
+
+	int32 SamplePlannedHeight(FIndex InWorldIndex);
+
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Seed;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float SpawnRate;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "1"))
+	int32 InfluenceRadius;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FPrimaryAssetId> PrefabAssets;
@@ -63,4 +71,10 @@ private:
 	TArray<FVector2D> _BuildingPos;
 	//所有建筑预制体
 	TArray<UVoxelPrefabData*> _PrefabAssets;
+	//世界坐标下的确定性小镇规划，生成时仅写入当前区块切片
+	TMap<FIndex, FVoxelItem> _PlannedVoxels;
+	TMap<FIndex, TSharedPtr<TMap<FIndex, FVoxelItem>>> _TownPlanCache;
+	TArray<FIndex> _TownPlanCacheOrder;
+	TMap<FIndex, int32> _TopographyHeightCache;
+	mutable FRWLock _TownPlanCacheLock;
 };

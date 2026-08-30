@@ -1,4 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -28,11 +27,9 @@ class WHFRAMEWORK_API UVoxelChunk : public UWHObject, public ISaveDataAgentInter
 	friend class UVoxelModule;
 
 public:	
-	// Sets default values for this actor's properties
 	UVoxelChunk();
 
 	//////////////////////////////////////////////////////////////////////////
-	/// ObjectPool
 public:
 	virtual int32 GetLimit_Implementation() const override { return -1; }
 
@@ -47,8 +44,9 @@ protected:
 
 	virtual void SaveData();
 
+protected:
+
 	//////////////////////////////////////////////////////////////////////////
-	// Chunk
 public:
 	virtual void Initialize(UVoxelModule* InModule, FIndex InIndex, int32 InBatch);
 
@@ -89,7 +87,6 @@ public:
 	virtual bool LocalIndexToNeighbor(FIndex InIndex, EDirection& OutDirection) const;
 
 	//////////////////////////////////////////////////////////////////////////
-	// Voxel
 public:
 	virtual bool HasVoxel(FIndex InIndex, bool bSafe = false);
 
@@ -128,10 +125,9 @@ public:
 
 	virtual bool SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem, bool bGenerate = false, IVoxelAgentInterface* InAgent = nullptr);
 
-	virtual bool SetVoxelComplex(const FVoxelMap& InVoxelMap, bool bGenerate = false, bool bFirstSample = false, IVoxelAgentInterface* InAgent = nullptr);
+	virtual bool SetVoxelComplex(const TMap<FIndex, FVoxelItem>& InVoxelMap, bool bGenerate = false, bool bFirstSample = false, IVoxelAgentInterface* InAgent = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
-	// Topography
 public:
 	virtual FVoxelTopography& GetTopography(FIndex InIndex);
 
@@ -142,7 +138,6 @@ public:
 	virtual void SetTopography(int32 InX, int32 InY, int32 InZ, const FVoxelTopography& InTopography);
 
 	//////////////////////////////////////////////////////////////////////////
-	// SceneActor
 protected:
 	UPROPERTY(VisibleAnywhere, Category = "SceneActor")
 	TMap<FGuid, AActor*> SceneActorMap;
@@ -171,14 +166,12 @@ public:
 	virtual void DestroySceneActors() override;
 
 	//////////////////////////////////////////////////////////////////////////
-	// Auxiliary
 public:
 	virtual AVoxelAuxiliary* SpawnAuxiliary(FVoxelItem& InVoxelItem);
 
 	virtual void DestroyAuxiliary(FVoxelItem& InVoxelItem);
 	
 	//////////////////////////////////////////////////////////////////////////
-	// Components
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TMap<EVoxelNature, UVoxelMeshComponent*> MeshComponents;
@@ -193,7 +186,6 @@ public:
 	UVoxelMeshComponent* GetMeshComponent(EVoxelNature InVoxelNature);
 
 	//////////////////////////////////////////////////////////////////////////
-	// Stats
 protected:
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
 	FIndex Index;
@@ -216,7 +208,7 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Stats")
 	UVoxelModule* Module;
 
-	FVoxelMaps VoxelMaps;
+	TMap<FIndex, FVoxelItem> VoxelMap;
 
 	TMap<FIndex, FVoxelTopography> TopographyMap;
 

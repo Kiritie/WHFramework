@@ -1,4 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Voxel/Generators/VoxelTerrainGenerator.h"
@@ -16,8 +15,21 @@ void UVoxelTerrainGenerator::Generate(UVoxelChunk* InChunk)
 {
 	//载入地形方块
 	ITER_INDEX2D(Index, Module->GetWorldData().ChunkSize, false,
-		DON_WITHINDEX(FMath::Max(InChunk->GetTopography(Index).Height, Module->GetWorldData().SeaLevel) + 1, Z,
+		const FVoxelTopography& Topography = InChunk->GetTopography(Index);
+		const int32 TopographyHeight = Topography.Height;
+		const int32 WaterHeight = Topography.WaterHeight;
+		const bool bRiverSand = Topography.RegionType == EVoxelWorldRegionType::River && Topography.BiomeType == EVoxelBiomeType::Desert;
+		const int32 ColumnHeight = FMath::Max3(TopographyHeight, Module->GetWorldData().SeaLevel, WaterHeight);
+		DON_WITHINDEX(ColumnHeight + 1, Z,
 			const FIndex _Index = FIndex(Index.X, Index.Y, Z);
+			if(WaterHeight != INDEX_NONE && Z >= TopographyHeight + (bRiverSand ? 1 : 0) && Z <= WaterHeight)
+			{
+				if(!InChunk->HasVoxel(_Index, true) || InChunk->GetVoxel(_Index).GetVoxelType() != EVoxelType::Water)
+				{
+					InChunk->SetVoxel(_Index, EVoxelType::Water);
+				}
+				continue;
+			}
 			if(!InChunk->HasVoxel(_Index))
 			{
 				const EVoxelType VoxelType = CalculateVoxelType(InChunk, _Index);
@@ -48,6 +60,12 @@ EVoxelType UVoxelTerrainGenerator::CalculateVoxelType(UVoxelChunk* InChunk, FInd
 	const FVoxelTopography& Topography = InChunk->GetTopography(FIndex(InIndex.X, InIndex.Y));
 
 	const int32 SeaLevel = Module->GetWorldData().SeaLevel;
+	const int32 WaterHeight = Topography.WaterHeight;
+	const bool bRiverSand = Topography.RegionType == EVoxelWorldRegionType::River && Topography.BiomeType == EVoxelBiomeType::Desert;
+	if(WaterHeight != INDEX_NONE && InIndex.Z >= Topography.Height + (bRiverSand ? 1 : 0) && InIndex.Z <= WaterHeight)
+	{
+		return EVoxelType::Water;
+	}
 
 	const int32 Depth = Topography.Height - InIndex.Z;
 	
@@ -79,28 +97,23 @@ EVoxelType UVoxelTerrainGenerator::CalculateVoxelType(UVoxelChunk* InChunk, FInd
 
 EVoxelType UVoxelTerrainGenerator::GetBiomeVoxelType(EVoxelBiomeType InBiomeType, bool bUnderGround) const
 {
-	if(!bUnderGround)
+	switch(InBiomeType)
 	{
-		switch(InBiomeType)
-		{
-			case EVoxelBiomeType::Snow:		return EVoxelType::Snow;
-			case EVoxelBiomeType::Green:	return EVoxelType::Grass;
-			case EVoxelBiomeType::Dry:		return EVoxelType::Dirt;
-			case EVoxelBiomeType::Stone:	return EVoxelType::Stone;
-			case EVoxelBiomeType::Desert:	return EVoxelType::Sand;
-			default:						return EVoxelType::Empty;
-		}
-	}
-	else
-	{
-		switch(InBiomeType)
-		{
-			case EVoxelBiomeType::Snow:		return EVoxelType::Dirt;
-			case EVoxelBiomeType::Green:	return EVoxelType::Dirt;
-			case EVoxelBiomeType::Dry:		return EVoxelType::Dirt;
-			case EVoxelBiomeType::Stone:	return EVoxelType::Stone;
-			case EVoxelBiomeType::Desert:	return EVoxelType::Sand;
-			default:						return EVoxelType::Empty;
-		}
+		case EVoxelBiomeType::Snow:		return bUnderGround ? EVoxelType::Dirt : EVoxelType::Snow;
+		case EVoxelBiomeType::Green:	return bUnderGround ? EVoxelType::Dirt : EVoxelType::Grass;
+		case EVoxelBiomeType::Dry:		return EVoxelType::Dirt;
+		case EVoxelBiomeType::Stone:	return EVoxelType::Stone;
+		case EVoxelBiomeType::Desert:	return EVoxelType::Sand;
+		case EVoxelBiomeType::Ocean:	return EVoxelType::Sand;
+		case EVoxelBiomeType::River:	return EVoxelType::Dirt;
+		case EVoxelBiomeType::Plains:	return bUnderGround ? EVoxelType::Dirt : EVoxelType::Grass;
+		case EVoxelBiomeType::Forest:	return bUnderGround ? EVoxelType::Dirt : EVoxelType::Grass;
+		case EVoxelBiomeType::Taiga:	return bUnderGround ? EVoxelType::Dirt : EVoxelType::Grass;
+		case EVoxelBiomeType::Savanna:	return bUnderGround ? EVoxelType::Dirt : EVoxelType::Grass;
+		case EVoxelBiomeType::Swamp:	return bUnderGround ? EVoxelType::Dirt : EVoxelType::Grass;
+		case EVoxelBiomeType::Mountains:return EVoxelType::Stone;
+		case EVoxelBiomeType::Badlands:	return EVoxelType::Sand_Stone;
+		case EVoxelBiomeType::Hills:		return bUnderGround ? EVoxelType::Dirt : EVoxelType::Grass;
+		default:						return EVoxelType::Empty;
 	}
 }

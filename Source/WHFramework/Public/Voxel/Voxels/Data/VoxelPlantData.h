@@ -4,6 +4,7 @@
 
 #include "VoxelPlantData.generated.h"
 
+/** 体素植物数据 */
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UVoxelPlantData : public UVoxelData
 {

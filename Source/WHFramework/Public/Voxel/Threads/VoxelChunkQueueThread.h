@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+﻿
 
 #pragma once
 
@@ -12,23 +12,20 @@ public:
 	virtual ~FVoxelChunkQueueThread() override;
 
 public:
-	virtual bool Init() override;
-	
 	virtual uint32 Run() override;
 	
-	virtual void Stop()override;
-	
-	virtual void Exit() override;
+	virtual void Stop() override;
 	
 protected:
 	TArray<FIndex> ChunkQueue;
 	TFunction<void(FIndex, int32)> Func;
 	int32 Stage;
-	bool bFinished;
+	TAtomic<bool> bFinished;
+	TAtomic<bool> bStopRequested;
 	FRunnableThread* Thread;
 
 public:
-	TArray<FIndex>& GetChunkQueue() { return ChunkQueue; }
+	const TArray<FIndex>& GetChunkQueue() const { return ChunkQueue; }
 
-	bool IsFinished() const { return bFinished; }
+	bool IsFinished() const { return bFinished.Load(); }
 };

@@ -1,4 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -22,12 +21,12 @@ public:
 		MaxSize = 1;
 	}
 
-	FVoxelOreGenerateData(const EVoxelType VoxelType, int32 HeightRange, const float SpawnRate, const int MinSize, const int MaxSize)
-		: VoxelType(VoxelType),
-		  MaxHeight(HeightRange),
-		  SpawnRate(SpawnRate),
-		  MinSize(MinSize),
-		  MaxSize(MaxSize)
+	FVoxelOreGenerateData(EVoxelType InVoxelType, int32 InMaxHeight, float InSpawnRate, int32 InMinSize, int32 InMaxSize)
+		: VoxelType(InVoxelType),
+		  MaxHeight(InMaxHeight),
+		  SpawnRate(InSpawnRate),
+		  MinSize(InMinSize),
+		  MaxSize(InMaxSize)
 	{
 	}
 	
@@ -41,15 +40,13 @@ public:
 	float SpawnRate;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int MinSize;
+	int32 MinSize;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int MaxSize;
+	int32 MaxSize;
 };
 
-/**
- *
- */
+/** 体素矿物生成器 */
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UVoxelOreGenerator : public UVoxelGenerator
 {
@@ -60,9 +57,6 @@ public:
 	
 public:
 	virtual void Generate(UVoxelChunk* InChunk) override;
-
-protected:
-	void GenerateOre(FIndex InIndex, const FVoxelOreGenerateData& InGenerateData);
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

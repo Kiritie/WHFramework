@@ -1,5 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 #include "Parameter/ParameterModuleTypes.h"
 
@@ -73,7 +71,7 @@ enum class EWorldTextStyle : uint8
 * 世界大地图区域形状
 */
 UENUM(BlueprintType)
-enum class EWorldMaxMapAreaShape : uint8
+enum class ESceneAreaShape : uint8
 {
 	// 方形
 	Box,
@@ -87,45 +85,27 @@ enum class EWorldMaxMapAreaShape : uint8
 * 世界大地图区域类型
 */
 UENUM(BlueprintType)
-enum class EWorldMaxMapAreaType : uint8
+enum class ESceneAreaType : uint8
 {
-	// 区域1
-	Area1,
-	// 区域2
-	Area2,
-	// 区域3
-	Area3,
-	// 区域4
-	Area4,
-	// 区域5
-	Area5,
-	// 区域6
-	Area6,
-	// 区域7
-	Area7,
-	// 区域8
-	Area8,
-	// 区域9
-	Area9,
-	// 区域10
-	Area10
+	Default,
+	Chunk
 };
 
 /**
  *
  */
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FWorldMaxMapArea
+struct WHFRAMEWORK_API FSceneArea
 {
 	GENERATED_BODY()
 
 public:
-	FWorldMaxMapArea()
+	FSceneArea()
 	{
 		AreaName = NAME_None;
 		AreaDisplayName = FText::GetEmpty();
-		AreaType = EWorldMaxMapAreaType::Area1;
-		AreaShape = EWorldMaxMapAreaShape::Box;
+		AreaType = ESceneAreaType::Default;
+		AreaShape = ESceneAreaShape::Box;
 		AreaCenter = FVector2D::ZeroVector;
 		AreaRadius = FVector2D::ZeroVector;
 		AreaPoints = TArray<FVector2D>();
@@ -139,20 +119,22 @@ public:
 	FText AreaDisplayName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	EWorldMaxMapAreaType AreaType;
+	ESceneAreaType AreaType;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	EWorldMaxMapAreaShape AreaShape;
+	ESceneAreaShape AreaShape;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(EditConditionHides, EditCondition = "AreaShape == EWorldMaxMapAreaShape::Box || AreaShape == EWorldMaxMapAreaShape::Ellipse"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(EditConditionHides, EditCondition = "AreaShape == ESceneAreaShape::Box || AreaShape == ESceneAreaShape::Ellipse"))
 	FVector2D AreaCenter;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(EditConditionHides, EditCondition = "AreaShape == EWorldMaxMapAreaShape::Box || AreaShape == EWorldMaxMapAreaShape::Ellipse"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(EditConditionHides, EditCondition = "AreaShape == ESceneAreaShape::Box || AreaShape == ESceneAreaShape::Ellipse"))
 	FVector2D AreaRadius;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(EditConditionHides, EditCondition = "AreaShape == EWorldMaxMapAreaShape::Polygon"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(EditConditionHides, EditCondition = "AreaShape == ESceneAreaShape::Polygon"))
 	TArray<FVector2D> AreaPoints;
 };
+
+DECLARE_DELEGATE_RetVal_TwoParams(FSceneArea, FSceneAreaResolver, const FSceneArea&, const FVector2D&);
 
 /**
  *
@@ -322,7 +304,7 @@ public:
 	FORCEINLINE FSceneModuleSaveData()
 	{
 		MiniMapRange = 512.f;
-		MaxMapAreas = TArray<FWorldMaxMapArea>();
+		SceneAreas = TArray<FSceneArea>();
 		TimerData = FWorldTimerSaveData();
 		WeatherData = FWorldWeatherSaveData();
 		ActorSaveDatas = TArray<FSceneActorSaveData>();
@@ -333,7 +315,7 @@ public:
 	float MiniMapRange;
 				
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<FWorldMaxMapArea> MaxMapAreas;
+	TArray<FSceneArea> SceneAreas;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FWorldTimerSaveData TimerData;

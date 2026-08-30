@@ -1,8 +1,7 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "Ability/AbilityModuleTypes.h"
+#include "Asset/AssetModuleTypes.h"
 #include "Common/CommonTypes.h"
 #include "Math/MathTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
@@ -44,7 +43,21 @@ enum class EVoxelWorldState : uint8
 	MeshSpawning,
 	MeshBuilding,
 	Generating,
-	Destroying
+	Unloading
+};
+
+UENUM(BlueprintType)
+enum class EVoxelGenerationStage : uint8
+{
+	Climate,
+	Hydrology,
+	Carving,
+	Material,
+	Terrain,
+	Vegetation,
+	Settlement,
+	Landmark,
+	None = 255
 };
 
 /**
@@ -240,27 +253,68 @@ enum class EVoxelInteractAction : uint8
 	Close = EInteractAction::Custom2,
 };
 
-/**
-* 体素世界大地图区域类型
-*/
-UENUM(BlueprintType)
-enum class EVoxelWorldMaxMapAreaType : uint8
-{
-	// 湖泊
-	Lake = EWorldMaxMapAreaType::Area1,
-	// 村庄
-	Village = EWorldMaxMapAreaType::Area2
-};
-
 UENUM(BlueprintType)
 enum class EVoxelBiomeType: uint8
 {
-	None,
-	Snow,
-	Green,
-	Dry,
-	Stone,
-	Desert
+	None, // 无
+	Snow, // 冰原
+	Green, // 绿地
+	Dry, // 荒地
+	Stone, // 石地
+	Desert, // 沙漠
+	Ocean, // 海洋
+	River, // 河流
+	Plains, // 平原
+	Forest, // 森林
+	Taiga, // 针叶林
+	Savanna, // 热带草原
+	Swamp, // 沼泽
+	Mountains, // 山地
+	Badlands, // 恶地
+	Hills // 丘陵
+};
+
+UENUM(BlueprintType)
+enum class EVoxelWorldRegionType : uint8
+{
+	None, // 区域
+	Wilderness, // 荒野
+	Plain, // 平原
+	Mountain, // 山脉
+	River, // 河流
+	Lake, // 湖泊
+	Town, // 小镇
+	Building, // 建筑
+	Ocean, // 海域
+	Hills // 丘陵
+};
+
+UENUM(BlueprintType)
+enum class EVoxelSceneAreaNameType : uint8
+{
+	Continent, // 大陆
+	Town, // 小镇
+	Building // 建筑
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelSceneAreaNameRow : public FDataTableRowBase
+{
+	GENERATED_BODY()
+
+public:
+	FVoxelSceneAreaNameRow()
+	{
+		AreaNameType = EVoxelSceneAreaNameType::Continent;
+		Prefix = FText::GetEmpty();
+	}
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EVoxelSceneAreaNameType AreaNameType;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FText Prefix;
 };
 
 USTRUCT(BlueprintType)
@@ -533,9 +587,15 @@ public:
 	{
 		Index = FIndex::ZeroIndex;
 		Height = 0;
+		WaterHeight = INDEX_NONE;
 		Temperature = 0.f;
 		Humidity = 0.f;
 		BiomeType = EVoxelBiomeType::None;
+		RegionType = EVoxelWorldRegionType::None;
+		Continentalness = 0.f;
+		Erosion = 0.f;
+		PeaksAndValleys = 0.f;
+		Fertility = 0.f;
 	}
 
 	FORCEINLINE FVoxelTopography(const FString& InSaveData);
@@ -551,6 +611,9 @@ public:
 	int32 Height;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	int32 WaterHeight;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	float Temperature;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
@@ -558,90 +621,21 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	EVoxelBiomeType BiomeType;
-};
 
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelMap
-{
-	GENERATED_BODY()
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	EVoxelWorldRegionType RegionType;
 
-public:
-	FORCEINLINE FVoxelMap()
-	{
-		Map = TMap<FIndex, FVoxelItem>();
-	}
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	float Continentalness;
 
-public:
-	TMap<FIndex, FVoxelItem> Map;
-};
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	float Erosion;
 
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelMaps
-{
-	GENERATED_BODY()
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	float PeaksAndValleys;
 
-public:
-	FORCEINLINE FVoxelMaps()
-	{
-		Maps = TArray<FVoxelMap*>();
-		SplitSize = 16;
-	}
-
-public:
-	TArray<FVoxelMap*> Maps;
-
-	int32 SplitSize;
-
-public:
-	bool Has(FIndex InIndex)
-	{
-		const int32 Size = InIndex.Z / SplitSize;
-		if(Maps.IsValidIndex(Size) && Maps[Size])
-		{
-			InIndex.Z %= SplitSize;
-			return Maps[Size]->Map.Contains(InIndex);
-		}
-		return false;
-	}
-
-	FVoxelItem& Get(FIndex InIndex)
-	{
-		const int32 Size = InIndex.Z / SplitSize;
-		InIndex.Z %= SplitSize;
-		return Maps[Size]->Map[InIndex];
-	}
-
-	void Set(FIndex InIndex, const FVoxelItem& InItem)
-	{
-		const int32 Size = InIndex.Z / SplitSize;
-		InIndex.Z %= SplitSize;
-		if(Maps.Num() < Size + 1) Maps.SetNumZeroed(Size + 1);
-		if(!Maps[Size]) Maps[Size] = new FVoxelMap();
-		Maps[Size]->Map.Emplace(InIndex, InItem);
-	}
-
-	void Remove(FIndex InIndex)
-	{
-		const int32 Size = InIndex.Z / SplitSize;
-		InIndex.Z %= SplitSize;
-		Maps[Size]->Map.Remove(InIndex);
-	}
-
-	void Clear()
-	{
-		ITER_ARRAY(Maps, Iter, delete Iter;)
-		Maps.Empty();
-	}
-
-	void Iter(const TFunction<void(FVoxelItem&)>& InFunc, bool bCopyData = false)
-	{
-		ITER_ARRAY(bCopyData ? TArray(Maps) : Maps, Iter1,
-			if(!Iter1) continue;
-			ITER_MAP(bCopyData ? TMap(Iter1->Map) : Iter1->Map, Iter2,
-				InFunc(Iter2.Value);
-			)
-		)
-	}
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	float Fertility;
 };
 
 USTRUCT(BlueprintType)
@@ -1008,14 +1002,17 @@ struct WHFRAMEWORK_API FVoxelChunkQueue
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(VisibleAnywhere)
 	bool bAsync;
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(VisibleAnywhere)
 	int32 Speed;
 
 	UPROPERTY(VisibleAnywhere)
 	TArray<FIndex> Queue;
+
+	UPROPERTY(EditAnywhere, Instanced)
+	TArray<UVoxelGenerator*> Generators;
 		
 	TArray<FVoxelChunkQueueThread*> Threads;
 
@@ -1024,6 +1021,7 @@ public:
 		bAsync = false;
 		Speed = 100;
 		Queue = TArray<FIndex>();
+		Generators = TArray<UVoxelGenerator*>();
 		Threads = TArray<FVoxelChunkQueueThread*>();
 	}
 
@@ -1032,6 +1030,7 @@ public:
 		bAsync = bInAsync;
 		Speed = InSpeed;
 		Queue = TArray<FIndex>();
+		Generators = TArray<UVoxelGenerator*>();
 		Threads = TArray<FVoxelChunkQueueThread*>();
 	}
 };
@@ -1042,7 +1041,7 @@ struct WHFRAMEWORK_API FVoxelChunkQueues
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, meta = (EditFixedSize))
 	TArray<FVoxelChunkQueue> Queues;
 
 	UPROPERTY(VisibleAnywhere)

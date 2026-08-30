@@ -70,10 +70,10 @@ USceneModule::USceneModule()
 		MiniMapTexture = MiniMapTexFinder.Object;
 	}
 
-	MaxMapAreas = TArray<FWorldMaxMapArea>();
-	bDrawMaxMapArea = false;
-	MaxMapAreaScale = 1.f;
-	MaxMapAreaHeight = 1000.f;
+	SceneAreas = TArray<FSceneArea>();
+	bDrawSceneArea = false;
+	SceneAreaScale = 1.f;
+	SceneAreaHeight = 1000.f;
 	
 	WorldTimer = nullptr;
 	WorldWeather = nullptr;
@@ -280,6 +280,12 @@ void USceneModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 	
 	if(bInEditor) return;
 
+	FSceneArea PendingSceneArea;
+	while(PendingSceneAreas.Dequeue(PendingSceneArea))
+	{
+		AddSceneArea(PendingSceneArea);
+	}
+
 	Altitude = UCameraModuleStatics::GetCameraLocation(true).Z - SeaLevel;
 
 	if(MiniMapCapture)
@@ -412,6 +418,9 @@ void USceneModule::OnTermination(EPhase InPhase)
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
 		IDebuggerInterface::UnRegister();
+
+		FSceneArea Area;
+		while(PendingSceneAreas.Dequeue(Area)) { }
 	}
 }
 
@@ -424,7 +433,7 @@ void USceneModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		if(SaveData.IsSaved())
 		{
 			MiniMapRange = SaveData.MiniMapRange;
-			MaxMapAreas = SaveData.MaxMapAreas;
+			SceneAreas = SaveData.SceneAreas;
 		}
 		
 		if(WorldTimer && WorldTimer->IsAutoSave())
@@ -456,7 +465,7 @@ FSaveData* USceneModule::ToData()
 	SaveData = new FSceneModuleSaveData();
 
 	SaveData->MiniMapRange = MiniMapRange;
-	SaveData->MaxMapAreas = MaxMapAreas;
+	SaveData->SceneAreas = SceneAreas;
 	
 	if(WorldTimer && WorldTimer->IsAutoSave())
 	{
@@ -492,27 +501,27 @@ FString USceneModule::GetModuleDebugMessage()
 
 void USceneModule::OnDrawDebug(UCanvas* InCanvas, APlayerController* InPC)
 {
-	if(bDrawMaxMapArea)
+	if(bDrawSceneArea)
 	{
-		for(auto& Iter1 : MaxMapAreas)
+		for(auto& Iter1 : SceneAreas)
 		{
 			switch(Iter1.AreaShape)
 			{
-				case EWorldMaxMapAreaShape::Box:
+				case ESceneAreaShape::Box:
 				{
-					UKismetSystemLibrary::DrawDebugBox(this, FVector(Iter1.AreaCenter.X * MaxMapAreaScale, Iter1.AreaCenter.Y * MaxMapAreaScale, MaxMapAreaHeight * 0.5f), FVector(Iter1.AreaRadius.X * MaxMapAreaScale, Iter1.AreaRadius.Y * MaxMapAreaScale, MaxMapAreaHeight * 0.5f), FLinearColor::Red);
+					UKismetSystemLibrary::DrawDebugBox(this, FVector(Iter1.AreaCenter.X * SceneAreaScale, Iter1.AreaCenter.Y * SceneAreaScale, SceneAreaHeight * 0.5f), FVector(Iter1.AreaRadius.X * SceneAreaScale, Iter1.AreaRadius.Y * SceneAreaScale, SceneAreaHeight * 0.5f), FLinearColor::Red);
 					break;
 				}
-				case EWorldMaxMapAreaShape::Ellipse:
+				case ESceneAreaShape::Ellipse:
 				{
-					UKismetSystemLibrary::DrawDebugCylinder(this, FVector(Iter1.AreaCenter.X * MaxMapAreaScale, Iter1.AreaCenter.Y * MaxMapAreaScale, 0.f), FVector(Iter1.AreaCenter.X * MaxMapAreaScale, Iter1.AreaCenter.Y * MaxMapAreaScale, MaxMapAreaHeight), Iter1.AreaRadius.GetMax() * MaxMapAreaScale, 12, FLinearColor::Red);
+					UKismetSystemLibrary::DrawDebugCylinder(this, FVector(Iter1.AreaCenter.X * SceneAreaScale, Iter1.AreaCenter.Y * SceneAreaScale, 0.f), FVector(Iter1.AreaCenter.X * SceneAreaScale, Iter1.AreaCenter.Y * SceneAreaScale, SceneAreaHeight), Iter1.AreaRadius.GetMax() * SceneAreaScale, 12, FLinearColor::Red);
 					break;
 				}
-				case EWorldMaxMapAreaShape::Polygon:
+				case ESceneAreaShape::Polygon:
 				{
 					for(auto& Iter2 : Iter1.AreaPoints)
 					{
-						UKismetSystemLibrary::DrawDebugLine(this, FVector(Iter2.X * MaxMapAreaScale, Iter2.Y * MaxMapAreaScale, 0.f), FVector(Iter2.X * MaxMapAreaScale, Iter2.Y * MaxMapAreaScale, MaxMapAreaHeight), FLinearColor::Red);
+						UKismetSystemLibrary::DrawDebugLine(this, FVector(Iter2.X * SceneAreaScale, Iter2.Y * SceneAreaScale, 0.f), FVector(Iter2.X * SceneAreaScale, Iter2.Y * SceneAreaScale, SceneAreaHeight), FLinearColor::Red);
 					}
 					break;
 				}
@@ -574,9 +583,9 @@ void USceneModule::SetMiniMapTexture(UTextureRenderTarget2D* InMiniMapTexture)
 	MiniMapCapture->GetCapture()->TextureTarget = MiniMapTexture;
 }
 
-bool USceneModule::HasMaxMapArea(const FName InName) const
+bool USceneModule::HasSceneArea(const FName InName) const
 {
-	for(auto& Iter : MaxMapAreas)
+	for(auto& Iter : SceneAreas)
 	{
 		if(Iter.AreaName == InName)
 		{
@@ -586,81 +595,112 @@ bool USceneModule::HasMaxMapArea(const FName InName) const
 	return false;
 }
 
-FWorldMaxMapArea USceneModule::GetMaxMapArea(const FName InName) const
+FSceneArea USceneModule::GetSceneArea(const FName InName) const
 {
-	for(auto& Iter : MaxMapAreas)
+	for(auto& Iter : SceneAreas)
 	{
 		if(Iter.AreaName == InName)
 		{
 			return Iter;
 		}
 	}
-	return FWorldMaxMapArea();
+	return FSceneArea();
 }
 
-FWorldMaxMapArea USceneModule::GetMaxMapAreaByPoint(const FVector2D& InPoint) const
+FSceneArea USceneModule::GetSceneAreaByPoint(const FVector2D& InPoint) const
 {
-	for(auto& Iter : MaxMapAreas)
+	const FSceneArea* BestArea = nullptr;
+	double BestAreaSize = TNumericLimits<double>::Max();
+	for(const FSceneArea& Iter : SceneAreas)
 	{
+		bool bContains = false;
+		double AreaSize = TNumericLimits<double>::Max();
 		switch(Iter.AreaShape)
 		{
-			case EWorldMaxMapAreaShape::Box:
+			case ESceneAreaShape::Box:
 			{
-				if(FMathHelper::IsPointInBox2D(InPoint, Iter.AreaCenter, Iter.AreaRadius))
-				{
-					return Iter;
-				}
+				bContains = FMathHelper::IsPointInBox2D(InPoint, Iter.AreaCenter, Iter.AreaRadius);
+				AreaSize = Iter.AreaRadius.X * Iter.AreaRadius.Y * 4.0;
 				break;
 			}
-			case EWorldMaxMapAreaShape::Ellipse:
+			case ESceneAreaShape::Ellipse:
 			{
-				if(FMathHelper::IsPointInEllipse2D(InPoint, Iter.AreaCenter, Iter.AreaRadius))
-				{
-					return Iter;
-				}
+				bContains = FMathHelper::IsPointInEllipse2D(InPoint, Iter.AreaCenter, Iter.AreaRadius);
+				AreaSize = Iter.AreaRadius.X * Iter.AreaRadius.Y * PI;
 				break;
 			}
-			case EWorldMaxMapAreaShape::Polygon:
+			case ESceneAreaShape::Polygon:
 			{
-				if(FMathHelper::IsPointInPolygon2D(InPoint, Iter.AreaPoints))
+				bContains = FMathHelper::IsPointInPolygon2D(InPoint, Iter.AreaPoints);
+				if(!Iter.AreaPoints.IsEmpty())
 				{
-					return Iter;
+					const FBox2D Bounds(Iter.AreaPoints);
+					AreaSize = Bounds.GetArea();
 				}
 				break;
 			}
 		}
+		if(bContains && AreaSize < BestAreaSize)
+		{
+			BestArea = &Iter;
+			BestAreaSize = AreaSize;
+		}
 	}
-	return FWorldMaxMapArea();
+	if(!BestArea) return FSceneArea();
+	if(const FSceneAreaResolver* Resolver = SceneAreaResolvers.Find(BestArea->AreaType))
+	{
+		if(Resolver->IsBound()) return Resolver->Execute(*BestArea, InPoint);
+	}
+	return *BestArea;
 }
 
-void USceneModule::AddMaxMapArea(const FWorldMaxMapArea& InArea)
+void USceneModule::RegisterSceneAreaResolver(ESceneAreaType InType, const FSceneAreaResolver& InResolver)
 {
-	FWorldMaxMapArea Area = InArea;
+	SceneAreaResolvers.Add(InType, InResolver);
+}
+
+void USceneModule::UnregisterSceneAreaResolver(ESceneAreaType InType)
+{
+	SceneAreaResolvers.Remove(InType);
+}
+
+void USceneModule::AddSceneArea(const FSceneArea& InArea, bool bThreadSafe)
+{
+	if(bThreadSafe)
+	{
+		PendingSceneAreas.Enqueue(InArea);
+		return;
+	}
+
+	FSceneArea Area = InArea;
 	if(Area.AreaName.IsNone())
 	{
-		Area.AreaName = *FString::Printf(TEXT("Area_%d"), MaxMapAreas.Num());
+		Area.AreaName = *FString::Printf(TEXT("Area_%d"), SceneAreas.Num());
 	}
-	if(!HasMaxMapArea(Area.AreaName))
+	if(!HasSceneArea(Area.AreaName))
 	{
-		MaxMapAreas.Add(Area);
+		SceneAreas.Add(Area);
 	}
 }
 
-void USceneModule::RemoveMaxMapArea(const FName InName)
+void USceneModule::RemoveSceneArea(const FName InName)
 {
-	for(int32 i = 0; i < MaxMapAreas.Num(); i++)
+	for(int32 i = 0; i < SceneAreas.Num(); i++)
 	{
-		if(MaxMapAreas[i].AreaName == InName)
+		if(SceneAreas[i].AreaName == InName)
 		{
-			MaxMapAreas.RemoveAt(i);
+			SceneAreas.RemoveAt(i);
 			break;
 		}
 	}
 }
 
-void USceneModule::ClearMaxMapArea()
+void USceneModule::ClearSceneArea()
 {
-	MaxMapAreas.Empty();
+	SceneAreas.Empty();
+
+	FSceneArea Area;
+	while(PendingSceneAreas.Dequeue(Area)) { }
 }
 
 UWorldTimer* USceneModule::GetWorldTimer(TSubclassOf<UWorldTimer> InClass) const
@@ -1110,8 +1150,6 @@ void USceneModule::AsyncUnloadLevelByObjectPtr(const TSoftObjectPtr<UWorld> InLe
 
 float USceneModule::GetAsyncLoadLevelProgress(const FName InLevelPath) const
 {
-	// const FString LoadPackagePath = FPaths::GetBaseFilename(InLevelPath.ToString(), false);
-	// return GetAsyncLoadPercentage(*LoadPackagePath) / 100.f;
 	return 1.f;
 }
 

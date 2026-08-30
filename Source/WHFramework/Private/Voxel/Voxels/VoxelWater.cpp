@@ -32,11 +32,11 @@ void UVoxelWater::OnGenerate(IVoxelAgentInterface* InAgent)
 	
 	if(GetOwner())
 	{
-		FVoxelMap VoxelMap;
+		TMap<FIndex, FVoxelItem> VoxelMap;
 		ITER_DIRECTION(Iter, 
 			if(Iter != EDirection::Up && !GetOwner()->CheckVoxelAdjacent(Item, Iter))
 			{
-				VoxelMap.Map.Emplace(GetIndex() + FMathHelper::DirectionToIndex(Iter), GetData().VoxelType);
+				VoxelMap.Emplace(GetIndex() + FMathHelper::DirectionToIndex(Iter), GetData().VoxelType);
 			}
 		)
 		GetOwner()->SetVoxelComplex(VoxelMap, true, false, InAgent);

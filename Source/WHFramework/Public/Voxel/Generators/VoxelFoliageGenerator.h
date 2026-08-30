@@ -1,4 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -7,9 +6,16 @@
 #include "Voxel/VoxelModuleTypes.h"
 #include "VoxelFoliageGenerator.generated.h"
 
-/**
- *
- */
+struct FVoxelTreeFeature
+{
+	FIndex Root;
+	int32 Height = 4;
+	int32 LeafRadius = 2;
+	EVoxelType WoodType = EVoxelType::Oak;
+	EVoxelType LeafType = EVoxelType::Oak_Leaves;
+};
+
+/** 体素植被生成器 */
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UVoxelFoliageGenerator : public UVoxelGenerator
 {
@@ -21,22 +27,18 @@ public:
 public:
 	virtual void Generate(UVoxelChunk* InChunk) override;
 
-public:
-	//生成植物
-	bool GeneratePlant(UVoxelChunk* InChunk, FIndex InIndex, int32 InCrystalSize);
+protected:
+	void GeneratePlants(UVoxelChunk* InChunk) const;
 
-	//生成树
-	bool GenerateTree(UVoxelChunk* InChunk, FIndex InIndex, int32 InCrystalSize);
+	void GenerateTrees(UVoxelChunk* InChunk) const;
 
-	//生成树叶
-	void GenerateLeaves(UVoxelChunk* InChunk, FIndex InIndex, int32 InHeight, int32 InRadius, EVoxelType InLeafType);
+	bool TryCreateTreeFeature(FIndex InWorldIndex, FVoxelTreeFeature& OutFeature) const;
+
+	void PlaceTreeSlice(UVoxelChunk* InChunk, const FVoxelTreeFeature& InFeature) const;
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Seed;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float CrystalSize;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float GrassRate;
@@ -45,17 +47,5 @@ protected:
 	float FlowerRate;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float FlowerFixedRate;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float TreeRate;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float TreeFixedRate;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float TreeRandomRate;
-
-private:
-	int32 _Seed;
 };

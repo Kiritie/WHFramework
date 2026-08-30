@@ -1,4 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Voxel/Generators/VoxelOreGenerator.h"
 
@@ -21,38 +20,29 @@ UVoxelOreGenerator::UVoxelOreGenerator()
 
 void UVoxelOreGenerator::Generate(UVoxelChunk* InChunk)
 {
-    ITER_INDEX2D(Index, Module->GetWorldData().ChunkSize, false,
+	ITER_INDEX2D(Index, Module->GetWorldData().ChunkSize, false,
 		const int32 Height = InChunk->GetTopography(Index).Height - 2;
-		for(int Z = 0; Z < Height; Z++)
+		for(int32 Z = 1; Z < Height; ++Z)
 		{
+			const FIndex LocalIndex(Index.X, Index.Y, Z);
+			if(InChunk->HasVoxel(LocalIndex)) continue;
 			const FIndex WorldIndex = InChunk->LocalIndexToWorld(FIndex(Index.X, Index.Y, Z));
-			ITER_ARRAY_WITHINDEX(GenerateDatas, i, Iter,
-				if(Iter.MaxHeight != -1 && WorldIndex.Z > Iter.MaxHeight) continue;
-
-				const float Noise = Module->GetVoxelNoise3D(FVector(WorldIndex.X + i * Seed, WorldIndex.Y + i * Seed, WorldIndex.Z) * 0.1f);
-				if(Noise >= SpawnRate && (1.f - FMathHelper::HashRand(WorldIndex.ToVector2D(), Seed)) <= Iter.SpawnRate)
+			for(int32 DataIndex = 0; DataIndex < GenerateDatas.Num(); ++DataIndex)
+			{
+				const FVoxelOreGenerateData& Data = GenerateDatas[DataIndex];
+				if(Data.MaxHeight != -1 && WorldIndex.Z > Data.MaxHeight) continue;
+				const float AverageSize = FMath::Max((Data.MinSize + Data.MaxSize) * 0.5f, 1.f);
+				const float Scale = 0.13f / FMath::Sqrt(AverageSize);
+				const FVector NoisePosition = WorldIndex.ToVector() * Scale + FVector(DataIndex * 31.7f, Seed * 0.001f, -DataIndex * 17.3f);
+				const float VeinNoise = Module->GetVoxelNoise3D(NoisePosition);
+				const int32 Hash = FMathHelper::Hash31(FVector(WorldIndex.X + Seed, WorldIndex.Y - Seed, WorldIndex.Z + DataIndex * 7919));
+				const float Random = static_cast<float>(FMath::Abs(Hash % 10000)) / 9999.f;
+				if(VeinNoise >= SpawnRate && Random <= Data.SpawnRate)
 				{
-					GenerateOre(WorldIndex, Iter);
+					InChunk->SetVoxel(LocalIndex, Data.VoxelType);
 					break;
 				}
-			)
+			}
 		}
 	)
-}
-
-void UVoxelOreGenerator::GenerateOre(FIndex InIndex, const FVoxelOreGenerateData& InGenerateData)
-{
-	const int Size = FMathHelper::HashRandRange(InIndex.ToVector2D(), InGenerateData.MinSize, InGenerateData.MaxSize, Seed);
-	for(int i = 0; i < Size; i++)
-	{
-		const FIndex Offset = FIndex(
-			FMathHelper::HashRandRange(InIndex.ToVector2D(), -1, 1, Seed),
-			FMathHelper::HashRandRange(InIndex.ToVector2D(), -1, 1, Seed),
-			FMathHelper::HashRandRange(InIndex.ToVector2D(), -1, 1, Seed)
-		);
-		if(!Module->HasVoxelByIndex(InIndex + Offset))
-		{
-			Module->SetVoxelByIndex(InIndex + Offset, InGenerateData.VoxelType);
-		}
-	}
 }

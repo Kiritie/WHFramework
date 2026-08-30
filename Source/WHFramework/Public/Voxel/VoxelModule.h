@@ -1,7 +1,6 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
+#include "Containers/Queue.h"
 #include "VoxelModuleTypes.h"
 #include "Chunks/VoxelChunk.h"
 #include "Common/CommonTypes.h"
@@ -18,6 +17,7 @@ class ACharacterBase;
 class UWorldTimer;
 class UWorldWeather;
 class AVoxelEntityCapture;
+class UDataTable;
 
 /**
  * 体素模块
@@ -37,7 +37,6 @@ public:
 	~UVoxelModule();
 
 	//////////////////////////////////////////////////////////////////////////
-	/// ModuleBase
 public:
 #if WITH_EDITOR
 	virtual void OnGenerate() override;
@@ -66,7 +65,6 @@ public:
 	virtual FString GetModuleDebugMessage() override;
 
 	//////////////////////////////////////////////////////////////////////////
-	// Root
 protected:
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Root")
 	AVoxelRoot* VoxelRoot;
@@ -76,7 +74,6 @@ public:
 	AVoxelRoot* GetVoxelRoot() const { return VoxelRoot; }
 	
 	//////////////////////////////////////////////////////////////////////////
-	// Capture
 protected:
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Capture")
 	AVoxelCapture* VoxelCapture;
@@ -89,7 +86,6 @@ public:
 	AVoxelCapture* GetVoxelCapture() const { return VoxelCapture; }
 
 	//////////////////////////////////////////////////////////////////////////
-	// World
 protected:
 	UPROPERTY(EditAnywhere, Category = "World")
 	bool bAutoGenerate;
@@ -99,6 +95,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, Category = "World")
 	EVoxelWorldState WorldState;
+
+	UPROPERTY(VisibleAnywhere, Category = "World")
+	EVoxelGenerationStage WorldGenerationStage;
 
 	UPROPERTY(EditAnywhere, Category = "World")
 	FVoxelWorldBasicSaveData WorldBasicData;
@@ -118,6 +117,9 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	EVoxelWorldState GetWorldState() const { return WorldState; }
+
+	UFUNCTION(BlueprintPure)
+	EVoxelGenerationStage GetWorldGenerationStage() const { return WorldGenerationStage; }
 
 	UFUNCTION(BlueprintPure)
 	FVoxelWorldBasicSaveData& GetWorldBasicData() { return WorldBasicData; }
@@ -167,6 +169,12 @@ protected:
 
 	virtual void UnloadData(EPhase InPhase) override;
 
+	void InitializeSceneAreaNames();
+
+	FSceneArea ResolveChunkSceneArea(const FSceneArea& InArea, const FVector2D& InPoint) const;
+
+	TMap<EVoxelSceneAreaNameType, TArray<FText>> SceneAreaNamePrefixes;
+
 public:
 	virtual void LoadPrefabData(const FVoxelPrefabSaveData& InPrefabData);
 
@@ -190,12 +198,12 @@ public:
 
 	virtual void SaveChunk(FIndex InIndex);
 
-	virtual void DestroyChunk(FIndex InIndex);
+	virtual void UnloadChunk(FIndex InIndex);
 	
 public:
 	virtual void GenerateChunkQueues(bool bFromAgent = true, bool bForce = false);
 
-	virtual void DestroyChunkQueues();
+	virtual void ResetChunkQueues();
 
 protected:
 	virtual bool UpdateChunkQueue(EVoxelWorldState InState, TFunction<void(FIndex)> InFunc);
@@ -205,14 +213,11 @@ protected:
 	virtual void AddToChunkQueue(EVoxelWorldState InState, FIndex InIndex);
 	
 	virtual void RemoveFromChunkQueue(EVoxelWorldState InState, FIndex InIndex);
-	
+
+	FVoxelChunkQueues& GetMutableChunkQueues(EVoxelWorldState InWorldState);
+
 public:
-	template<class T>
-	bool GenerateVoxel(UVoxelChunk* InChunk) const
-	{
-		return GenerateVoxel(InChunk, T::StaticClass());
-	}
-	virtual bool GenerateVoxel(UVoxelChunk* InChunk, const TSubclassOf<UVoxelGenerator>& InClass) const;
+	virtual void GenerateVoxelStage(UVoxelChunk* InChunk, int32 InStage) const;
 
 public:
 	virtual bool IsOnTheWorld(FIndex InIndex, bool bIgnoreZ = true) const;
@@ -243,6 +248,24 @@ public:
 	virtual void SetTopographyByIndex(FIndex InIndex, const FVoxelTopography& InTopography);
 
 	virtual void SetTopographyByLocation(FVector InLocation, const FVoxelTopography& InTopography);
+
+	FVoxelTopography SampleBaseTopographyByIndex(FIndex InIndex) const;
+
+	FVoxelTopography SampleTopographyByIndex(FIndex InIndex) const;
+
+	UFUNCTION(BlueprintPure)
+	EVoxelWorldRegionType GetWorldRegionByIndex(FIndex InIndex) const;
+
+	UFUNCTION(BlueprintPure)
+	FText GetWorldAreaPrefix(FIndex InIndex, EVoxelSceneAreaNameType InNameType) const;
+
+	UFUNCTION(BlueprintPure)
+	FText GetWorldRegionDisplayName(EVoxelWorldRegionType InRegionType) const;
+
+	FText GetWorldAreaDisplayName(FIndex InIndex, EVoxelSceneAreaNameType InNameType, const FText& InAreaTypeName) const;
+
+	UFUNCTION(BlueprintPure)
+	FText GetWorldAreaDisplayNameByIndex(FIndex InIndex) const;
 
 public:
 	virtual float GetVoxelNoise1D(float InValue, bool bAbs = false, bool bUnsigned = false) const;
@@ -288,8 +311,26 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	float ChunkSpawnDistance;
 
-	UPROPERTY(EditAnywhere, Category = "Chunk")
-	TMap<EVoxelWorldState, FVoxelChunkQueues> ChunkQueues;
+	UPROPERTY(VisibleAnywhere, Category = "Chunk|Pipeline")
+	FVoxelChunkQueues SpawningQueues;
+
+	UPROPERTY(VisibleAnywhere, Category = "Chunk|Pipeline")
+	FVoxelChunkQueues MapLoadingQueues;
+
+	UPROPERTY(EditAnywhere, Category = "Chunk|Pipeline")
+	FVoxelChunkQueues MapBuildingQueues;
+
+	UPROPERTY(VisibleAnywhere, Category = "Chunk|Pipeline")
+	FVoxelChunkQueues MeshSpawningQueues;
+
+	UPROPERTY(VisibleAnywhere, Category = "Chunk|Pipeline")
+	FVoxelChunkQueues MeshBuildingQueues;
+
+	UPROPERTY(VisibleAnywhere, Category = "Chunk|Pipeline")
+	FVoxelChunkQueues GeneratingQueues;
+
+	UPROPERTY(VisibleAnywhere, Category = "Chunk|Pipeline")
+	FVoxelChunkQueues UnloadingQueues;
 	
 	UPROPERTY(VisibleAnywhere, Category = "Chunk")
 	int32 ChunkSpawnBatch;
@@ -305,11 +346,11 @@ public:
 	virtual FVoxelChunkQueues GetChunkQueues(EVoxelWorldState InWorldState) const;
 
 protected:
+	UPROPERTY(EditAnywhere, Category = "World|Area")
+	UDataTable* SceneAreaNameTable;
+
 	UPROPERTY(EditAnywhere, Category = "Voxel")
 	TArray<TSubclassOf<UVoxel>> VoxelClasses;
-
-	UPROPERTY(EditAnywhere, Instanced, Category = "Voxel")
-	TArray<UVoxelGenerator*> VoxelGenerators;
 
 	UPROPERTY(Transient)
 	TMap<TSubclassOf<UVoxelGenerator>, UVoxelGenerator*> VoxelGeneratorMap;
