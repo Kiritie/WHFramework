@@ -8,6 +8,7 @@
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Voxel/EventHandle_VoxelDestroyed.h"
 #include "Event/Handle/Voxel/EventHandle_VoxelGenerated.h"
+#include "Math/MathHelper.h"
 #include "Voxel/Voxels/Data/VoxelData.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
@@ -36,12 +37,12 @@ void UVoxel::OnReset_Implementation()
 
 void UVoxel::LoadData(const FString& InData)
 {
-	
+	Item.Data = InData;
 }
 
 FString UVoxel::ToData()
 {
-	return TEXT("");
+	return Item.Data;
 }
 
 void UVoxel::RefreshData()
@@ -67,29 +68,24 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 	if(GetData().IsMainPart())
 	{
 		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Destroy), GetLocation());
-		if(UVoxelModuleStatics::GetVoxelWorldMode() != EVoxelWorldMode::Prefab)
+		const bool bCanPickUp = Item.GetVoxelType() != EVoxelType::Water || FVoxelLiquidState(Item.Data).IsSource();
+		if(bCanPickUp && UVoxelModuleStatics::GetVoxelWorldMode() != EVoxelWorldMode::Prefab)
 		{
 			UAbilityModuleStatics::SpawnAbilityPickUp(FAbilityItem(GetData().GatherData ? GetData().GatherData->GetPrimaryAssetId() : GetData().GetPrimaryAssetId(), 1), GetLocation() + GetData().GetRange(GetAngle()) * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f, GetOwner());
 		}
 		UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelDestroyed>(Cast<UObject>(InAgent), { &Item, Cast<UObject>(InAgent) });
 	}
+	if(GetOwner() && (Item.GetVoxelType() == EVoxelType::Oak || Item.GetVoxelType() == EVoxelType::Birch) && Item.Data.StartsWith(TEXT("R")))
+	{
+		GetOwner()->DestroyTree(GetIndex());
+	}
 	if(GetOwner())
 	{
-		TMap<FIndex, FVoxelItem> VoxelMap;
-		const TArray WaterTypes = { EVoxelType::Water };
-		ITER_ARRAY(WaterTypes, WaterType,
-			if(GetOwner()->CheckVoxelNeighbors(GetIndex(), WaterType, FVector::OneVector, false, true))
-			{
-				VoxelMap.Emplace(GetIndex(), UVoxelModuleStatics::VoxelTypeToAssetID(WaterType));
-				break;
-			}
-		)
 		const FIndex UpperIndex = FMathHelper::GetAdjacentIndex(GetIndex(), EDirection::Up);
 		if(GetOwner()->HasVoxelComplex(UpperIndex) && GetOwner()->GetVoxelComplex(UpperIndex).GetData().GetTransparency() == EVoxelTransparency::Trans)
 		{
-			VoxelMap.Emplace(UpperIndex, FVoxelItem::Empty);
+			GetOwner()->SetVoxelComplex(UpperIndex, FVoxelItem::Empty, true, InAgent);
 		}
-		GetOwner()->SetVoxelComplex(VoxelMap, true, false, InAgent);
 	}
 }
 

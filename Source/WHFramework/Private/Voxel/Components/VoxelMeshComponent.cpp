@@ -7,9 +7,9 @@
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
-#include "Voxel/Voxels/Data/VoxelData.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Voxels/Voxel.h"
+#include "Voxel/Voxels/Data/VoxelWaterData.h"
 
 UVoxelMeshComponent::UVoxelMeshComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
@@ -129,7 +129,14 @@ void UVoxelMeshComponent::BuildVoxel(const FVoxelItem& InVoxelItem)
 {
 	const UVoxelData& VoxelData = InVoxelItem.GetData();
 	const FVoxelMeshData& MeshData = VoxelData.GetMeshData(InVoxelItem);
-	if(MeshData.bCustomMesh)
+	if(InVoxelItem.GetVoxelType() == EVoxelType::Water)
+	{
+		const UVoxelWaterData& WaterData = static_cast<const UVoxelWaterData&>(VoxelData);
+		ITER_DIRECTION(Iter,
+			if(WaterData.ShouldBuildWaterFace(InVoxelItem, Iter)) BuildFace(InVoxelItem, Iter);
+		)
+	}
+	else if(MeshData.bCustomMesh)
 	{
 		for (int i = 0; i < MeshData.MeshVertices.Num(); i++)
 		{
@@ -317,10 +324,54 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EDirection In
 		default: break;
 	}
 
-	BuildFace(InVoxelItem, Vers, (int32)InFacing, FMathHelper::DirectionToVector(InFacing, InVoxelItem.Angle));
+	FVector Normal = FMathHelper::DirectionToVector(InFacing, InVoxelItem.Angle);
+	FVector FaceNormals[4] = { Normal, Normal, Normal, Normal };
+	bool bReverseDiagonal = false;
+	if(InVoxelItem.GetVoxelType() == EVoxelType::Water && InFacing != EDirection::Down)
+	{
+		const UVoxelWaterData& WaterData = static_cast<const UVoxelWaterData&>(InVoxelItem.GetData());
+		const FVoxelItem* AdjacentItem = nullptr;
+		if(InVoxelItem.Chunk && FVoxelLiquidState(InVoxelItem.Data).IsFalling() &&
+			(InFacing == EDirection::Forward || InFacing == EDirection::Right || InFacing == EDirection::Backward || InFacing == EDirection::Left))
+		{
+			const FVoxelItem& Item = InVoxelItem.Chunk->GetVoxelComplex(InVoxelItem.Index + FMathHelper::DirectionToIndex(InFacing));
+			if(Item.GetVoxelType() == EVoxelType::Water && !FVoxelLiquidState(Item.Data).IsFalling()) AdjacentItem = &Item;
+		}
+		for(FVector& Vertex : Vers)
+		{
+			if(Vertex.Z > 0.f)
+			{
+				const float CornerHeight = WaterData.GetWaterCornerHeight(InVoxelItem, Vertex.X > 0.f ? 1 : -1, Vertex.Y > 0.f ? 1 : -1);
+				Vertex.Z = -0.5f + CornerHeight;
+			}
+			else if(AdjacentItem)
+			{
+				const int32 WorldVertexX = InVoxelItem.Index.X + (Vertex.X > 0.f ? 1 : 0);
+				const int32 WorldVertexY = InVoxelItem.Index.Y + (Vertex.Y > 0.f ? 1 : 0);
+				const float CornerHeight = WaterData.GetWaterCornerHeight(*AdjacentItem, WorldVertexX > AdjacentItem->Index.X ? 1 : -1,
+					WorldVertexY > AdjacentItem->Index.Y ? 1 : -1);
+				Vertex.Z = -0.5f + CornerHeight;
+			}
+		}
+		bReverseDiagonal = FMath::Abs(Vers[0].Z - Vers[2].Z) > FMath::Abs(Vers[1].Z - Vers[3].Z);
+		if(InFacing == EDirection::Up)
+		{
+			FaceNormals[0] = FVector(Vers[0].Z - Vers[1].Z, Vers[0].Z - Vers[3].Z, 1.f).GetSafeNormal();
+			FaceNormals[1] = FVector(Vers[0].Z - Vers[1].Z, Vers[1].Z - Vers[2].Z, 1.f).GetSafeNormal();
+			FaceNormals[2] = FVector(Vers[3].Z - Vers[2].Z, Vers[1].Z - Vers[2].Z, 1.f).GetSafeNormal();
+			FaceNormals[3] = FVector(Vers[3].Z - Vers[2].Z, Vers[0].Z - Vers[3].Z, 1.f).GetSafeNormal();
+		}
+	}
+	BuildFace(InVoxelItem, Vers, (int32)InFacing, FaceNormals, bReverseDiagonal);
 }
 
-void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVertices[4], int32 InFaceIndex, FVector InNormal)
+void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVertices[4], int32 InFaceIndex, FVector InNormal, bool bReverseDiagonal)
+{
+	FVector FaceNormals[4] = { InNormal, InNormal, InNormal, InNormal };
+	BuildFace(InVoxelItem, InVertices, InFaceIndex, FaceNormals, bReverseDiagonal);
+}
+
+void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVertices[4], int32 InFaceIndex, const FVector InNormals[4], bool bReverseDiagonal)
 {
 	const int32 VerNum = Vertices.Num();
 	const UVoxelData& VoxelData = InVoxelItem.GetData();
@@ -343,17 +394,26 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, FVector InVer
 	UVs.Add(FVector2D(UVCorner.X + UVSpan.X, UVCorner.Y));
 	UVs.Add(FVector2D(UVCorner.X + UVSpan.X, UVCorner.Y + UVSpan.Y));
 
-	Triangles.Add(VerNum + 1);
-	Triangles.Add(VerNum + 0);
-	Triangles.Add(VerNum + 2);
-	Triangles.Add(VerNum + 3);
-	Triangles.Add(VerNum + 2);
-	Triangles.Add(VerNum + 0);
+	if(bReverseDiagonal)
+	{
+		Triangles.Add(VerNum + 0);
+		Triangles.Add(VerNum + 3);
+		Triangles.Add(VerNum + 1);
+		Triangles.Add(VerNum + 2);
+		Triangles.Add(VerNum + 1);
+		Triangles.Add(VerNum + 3);
+	}
+	else
+	{
+		Triangles.Add(VerNum + 1);
+		Triangles.Add(VerNum + 0);
+		Triangles.Add(VerNum + 2);
+		Triangles.Add(VerNum + 3);
+		Triangles.Add(VerNum + 2);
+		Triangles.Add(VerNum + 0);
+	}
 
-	Normals.Add(InNormal);
-	Normals.Add(InNormal);
-	Normals.Add(InNormal);
-	Normals.Add(InNormal);
+	for(int32 i = 0; i < 4; ++i) Normals.Add(InNormals[i]);
 }
 
 void UVoxelMeshComponent::OnCollision(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)

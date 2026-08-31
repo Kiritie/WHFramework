@@ -4,6 +4,8 @@
 #include "Voxel/VoxelModuleStatics.h"
 
 #include "Asset/AssetModuleStatics.h"
+#include "Containers/Queue.h"
+#include "Math/MathHelper.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Voxels/Data/VoxelData.h"
 #include "Voxel/Voxels/Voxel.h"
@@ -37,6 +39,287 @@ EVoxelTransparency UVoxelModuleStatics::VoxelNatureToTransparency(EVoxelNature I
 		default: break;
 	}
 	return EVoxelTransparency::Solid;
+}
+
+TMap<FIndex, FVoxelLiquidUpdate> UVoxelModuleStatics::CalculateVoxelLiquidUpdates(const TMap<FIndex, FVoxelLiquidSnapshot>& InSnapshots, const TSet<FIndex>& InProtectedIndices)
+{
+	TMap<FIndex, FVoxelLiquidUpdate> Updates;
+	TMap<FIndex, FVoxelLiquidState> DesiredStates;
+	TQueue<FIndex> PendingIndices;
+	auto IsOpen = [](const FVoxelLiquidSnapshot* InSnapshot)
+	{
+		return InSnapshot && InSnapshot->bGenerated &&
+			(InSnapshot->VoxelType == EVoxelType::Empty || InSnapshot->bCanFlowThrough);
+	};
+	auto CanFlowInto = [&IsOpen](const FVoxelLiquidSnapshot* InSnapshot)
+	{
+		return IsOpen(InSnapshot) || InSnapshot && InSnapshot->bGenerated &&
+			InSnapshot->VoxelType == EVoxelType::Water && !FVoxelLiquidState(InSnapshot->Data).IsSource();
+	};
+	auto GetOpenDepth = [&InSnapshots, &CanFlowInto](FIndex InIndex) -> int32
+	{
+		int32 Depth = 0;
+		for(int32 Z = 1; Z <= 2; ++Z)
+		{
+			const FVoxelLiquidSnapshot* Below = InSnapshots.Find(InIndex + FIndex(0, 0, -Z));
+			if(!Below || !Below->bGenerated) return INDEX_NONE;
+			if(!CanFlowInto(Below)) break;
+			++Depth;
+		}
+		return Depth;
+	};
+	auto AddDesiredState = [&InSnapshots, &DesiredStates, &PendingIndices](FIndex InIndex, const FVoxelLiquidState& InState)
+	{
+		const FVoxelLiquidSnapshot* Snapshot = InSnapshots.Find(InIndex);
+		if(!Snapshot || !Snapshot->bGenerated) return;
+		if(Snapshot->VoxelType == EVoxelType::Water)
+		{
+			const FVoxelLiquidState SnapshotState(Snapshot->Data);
+			if(SnapshotState.IsSource())
+			{
+				if(!DesiredStates.Contains(InIndex))
+				{
+					DesiredStates.Add(InIndex, SnapshotState);
+					PendingIndices.Enqueue(InIndex);
+				}
+				return;
+			}
+		}
+		else if(Snapshot->VoxelType != EVoxelType::Empty && !Snapshot->bCanFlowThrough) return;
+
+		FVoxelLiquidState* State = DesiredStates.Find(InIndex);
+		if(State)
+		{
+			if(State->IsSource()) return;
+			if(State->IsFalling() && !InState.IsFalling()) return;
+			if(State->IsFalling() == InState.IsFalling() && State->GetLevel() <= InState.GetLevel()) return;
+		}
+		DesiredStates.Add(InIndex, InState);
+		PendingIndices.Enqueue(InIndex);
+	};
+
+	for(const auto& Iter : InSnapshots)
+	{
+		if(Iter.Value.bGenerated && Iter.Value.VoxelType == EVoxelType::Water)
+		{
+			const FVoxelLiquidState State(Iter.Value.Data);
+			if(State.IsSource())
+			{
+				for(const EDirection Direction : { EDirection::Forward, EDirection::Right, EDirection::Backward, EDirection::Left, EDirection::Down })
+				{
+					const FIndex NeighborIndex = Iter.Key + FMathHelper::DirectionToIndex(Direction);
+					const FVoxelLiquidSnapshot* Neighbor = InSnapshots.Find(NeighborIndex);
+					if(CanFlowInto(Neighbor))
+					{
+						AddDesiredState(Iter.Key, State);
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	FIndex Index;
+	while(PendingIndices.Dequeue(Index))
+	{
+		const FVoxelLiquidState State = *DesiredStates.Find(Index);
+		const int32 OpenDepth = GetOpenDepth(Index);
+		if(OpenDepth == INDEX_NONE) continue;
+		const FIndex BelowIndex = Index + FIndex(0, 0, -1);
+		if(State.IsFalling())
+		{
+			if(OpenDepth > 0)
+			{
+				AddDesiredState(BelowIndex, FVoxelLiquidState(0, true));
+				continue;
+			}
+		}
+		else if(OpenDepth > 0)
+		{
+			if(State.IsSource())
+			{
+				AddDesiredState(BelowIndex, FVoxelLiquidState(0, true));
+			}
+			else if(OpenDepth == 1 && State.GetLevel() < FVoxelLiquidState::MaxLevel)
+			{
+				AddDesiredState(BelowIndex, FVoxelLiquidState(State.GetLevel() + 1));
+			}
+			continue;
+		}
+
+		const uint8 NextLevel = State.GetLevel() + 1;
+		if(NextLevel <= FVoxelLiquidState::MaxLevel)
+		{
+			for(const EDirection Direction : { EDirection::Forward, EDirection::Right, EDirection::Backward, EDirection::Left })
+			{
+				const FIndex NeighborIndex = Index + FMathHelper::DirectionToIndex(Direction);
+				const FVoxelLiquidSnapshot* Neighbor = InSnapshots.Find(NeighborIndex);
+				if(!CanFlowInto(Neighbor)) continue;
+				const int32 NeighborOpenDepth = GetOpenDepth(NeighborIndex);
+				if(NeighborOpenDepth == INDEX_NONE) continue;
+				if(NeighborOpenDepth == 1)
+				{
+					const FIndex DropIndex = NeighborIndex + FIndex(0, 0, -1);
+					AddDesiredState(DropIndex, FVoxelLiquidState(NextLevel));
+				}
+				else if(NeighborOpenDepth > 1)
+				{
+					if(State.IsSource()) AddDesiredState(NeighborIndex, FVoxelLiquidState(0, true));
+				}
+				else
+				{
+					AddDesiredState(NeighborIndex, FVoxelLiquidState(NextLevel));
+				}
+			}
+		}
+	}
+
+	for(const auto& Iter : InSnapshots)
+	{
+		if(!Iter.Value.bGenerated) continue;
+		const bool bWater = Iter.Value.VoxelType == EVoxelType::Water;
+		if(bWater && FVoxelLiquidState(Iter.Value.Data).IsSource()) continue;
+		if(const FVoxelLiquidState* State = DesiredStates.Find(Iter.Key))
+		{
+			const FString Data = State->ToData();
+			if(!bWater || Iter.Value.Data != Data)
+			{
+				FVoxelLiquidUpdate Update;
+				Update.Data = Data;
+				Updates.Add(Iter.Key, MoveTemp(Update));
+			}
+		}
+		else if(bWater && !InProtectedIndices.Contains(Iter.Key))
+		{
+			FVoxelLiquidUpdate Update;
+			Update.bRemove = true;
+			Updates.Add(Iter.Key, MoveTemp(Update));
+		}
+	}
+	return Updates;
+}
+
+bool UVoxelModuleStatics::CalculateVoxelLiquidUpdate(FIndex InIndex, const TMap<FIndex, FVoxelLiquidSnapshot>& InSnapshots, FVoxelLiquidUpdate& OutUpdate)
+{
+	const FVoxelLiquidSnapshot* Current = InSnapshots.Find(InIndex);
+	if(!Current || !Current->bGenerated) return false;
+	const bool bWater = Current->VoxelType == EVoxelType::Water;
+	if(bWater && FVoxelLiquidState(Current->Data).IsSource()) return false;
+	if(!bWater && Current->VoxelType != EVoxelType::Empty && !Current->bCanFlowThrough) return false;
+
+	bool bHasState = false;
+	FVoxelLiquidState DesiredState;
+	auto IsOpen = [](const FVoxelLiquidSnapshot* InSnapshot)
+	{
+		return InSnapshot && InSnapshot->bGenerated &&
+			(InSnapshot->VoxelType == EVoxelType::Empty || InSnapshot->bCanFlowThrough ||
+				InSnapshot->VoxelType == EVoxelType::Water && !FVoxelLiquidState(InSnapshot->Data).IsSource());
+	};
+	auto GetOpenDepth = [&InSnapshots, &IsOpen](FIndex InVoxelIndex) -> int32
+	{
+		int32 Depth = 0;
+		for(int32 Z = 1; Z <= 2; ++Z)
+		{
+			const FVoxelLiquidSnapshot* Below = InSnapshots.Find(InVoxelIndex + FIndex(0, 0, -Z));
+			if(!Below || !Below->bGenerated) return INDEX_NONE;
+			if(!IsOpen(Below)) break;
+			++Depth;
+		}
+		return Depth;
+	};
+
+	const FIndex AboveIndex = InIndex + FIndex(0, 0, 1);
+	const int32 OpenDepth = GetOpenDepth(InIndex);
+	const FVoxelLiquidSnapshot* Above = InSnapshots.Find(AboveIndex);
+	if(Above && Above->bGenerated && Above->VoxelType == EVoxelType::Water)
+	{
+		const FVoxelLiquidState AboveState(Above->Data);
+		if(AboveState.IsSource() || AboveState.IsFalling())
+		{
+			DesiredState = FVoxelLiquidState(0, true);
+			bHasState = true;
+		}
+	}
+	if(!bHasState && OpenDepth > 1)
+	{
+		for(const EDirection Direction : { EDirection::Forward, EDirection::Right, EDirection::Backward, EDirection::Left })
+		{
+			const FIndex NeighborIndex = InIndex + FMathHelper::DirectionToIndex(Direction);
+			const FVoxelLiquidSnapshot* Neighbor = InSnapshots.Find(NeighborIndex);
+			if(!Neighbor || !Neighbor->bGenerated || Neighbor->VoxelType != EVoxelType::Water ||
+				!FVoxelLiquidState(Neighbor->Data).IsSource() || GetOpenDepth(NeighborIndex) != 0) continue;
+			DesiredState = FVoxelLiquidState(0, true);
+			bHasState = true;
+			break;
+		}
+	}
+	if(!bHasState && Above && Above->bGenerated && Above->VoxelType == EVoxelType::Water)
+	{
+		const FVoxelLiquidState AboveState(Above->Data);
+		if(!AboveState.IsSource() && !AboveState.IsFalling() && GetOpenDepth(AboveIndex) == 1 && AboveState.GetLevel() < FVoxelLiquidState::MaxLevel)
+		{
+			DesiredState = FVoxelLiquidState(AboveState.GetLevel() + 1);
+			bHasState = true;
+		}
+	}
+	if(!bHasState)
+	{
+		uint8 Level = FVoxelLiquidState::MaxLevel + 1;
+		const FIndex DropTopIndex = InIndex + FIndex(0, 0, 1);
+		const int32 DropDepth = GetOpenDepth(DropTopIndex);
+		if(DropDepth == 1)
+		{
+			for(const EDirection Direction : { EDirection::Forward, EDirection::Right, EDirection::Backward, EDirection::Left })
+			{
+				const FIndex UpperNeighborIndex = DropTopIndex + FMathHelper::DirectionToIndex(Direction);
+				const FVoxelLiquidSnapshot* UpperNeighbor = InSnapshots.Find(UpperNeighborIndex);
+				if(!UpperNeighbor || !UpperNeighbor->bGenerated || UpperNeighbor->VoxelType != EVoxelType::Water ||
+					GetOpenDepth(UpperNeighborIndex) != 0) continue;
+				const FVoxelLiquidState UpperNeighborState(UpperNeighbor->Data);
+				Level = FMath::Min<uint8>(Level, UpperNeighborState.GetLevel() + 1);
+			}
+		}
+		if(!bHasState && Level <= FVoxelLiquidState::MaxLevel)
+		{
+			DesiredState = FVoxelLiquidState(Level);
+			bHasState = true;
+		}
+	}
+	if(!bHasState)
+	{
+		if(OpenDepth == 0)
+		{
+			uint8 Level = FVoxelLiquidState::MaxLevel + 1;
+			for(const EDirection Direction : { EDirection::Forward, EDirection::Right, EDirection::Backward, EDirection::Left })
+			{
+				const FIndex NeighborIndex = InIndex + FMathHelper::DirectionToIndex(Direction);
+				const FVoxelLiquidSnapshot* Neighbor = InSnapshots.Find(NeighborIndex);
+				if(!Neighbor || !Neighbor->bGenerated || Neighbor->VoxelType != EVoxelType::Water || GetOpenDepth(NeighborIndex) != 0) continue;
+				Level = FMath::Min<uint8>(Level, FVoxelLiquidState(Neighbor->Data).GetLevel() + 1);
+			}
+			if(Level <= FVoxelLiquidState::MaxLevel)
+			{
+				DesiredState = FVoxelLiquidState(Level);
+				bHasState = true;
+			}
+		}
+	}
+
+	if(bHasState)
+	{
+		const FString Data = DesiredState.ToData();
+		if(!bWater || Current->Data != Data)
+		{
+			OutUpdate.Data = Data;
+			return true;
+		}
+	}
+	else if(bWater)
+	{
+		OutUpdate.bRemove = true;
+		return true;
+	}
+	return false;
 }
 
 FIndex UVoxelModuleStatics::LocationToChunkIndex(FVector InLocation)

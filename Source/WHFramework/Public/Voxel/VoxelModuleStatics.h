@@ -137,6 +137,10 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Voxel
+	static TMap<FIndex, FVoxelLiquidUpdate> CalculateVoxelLiquidUpdates(const TMap<FIndex, FVoxelLiquidSnapshot>& InSnapshots, const TSet<FIndex>& InProtectedIndices);
+
+	static bool CalculateVoxelLiquidUpdate(FIndex InIndex, const TMap<FIndex, FVoxelLiquidSnapshot>& InSnapshots, FVoxelLiquidUpdate& OutUpdate);
+
 	template<class T>
 	static T& GetVoxel(EVoxelType InVoxelType)
 	{

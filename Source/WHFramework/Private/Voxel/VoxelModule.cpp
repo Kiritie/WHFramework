@@ -1,5 +1,8 @@
 #include "Voxel/VoxelModule.h"
+#include "Voxel/VoxelModuleStatics.h"
 
+#include "Ability/AbilityModuleStatics.h"
+#include "Async/Async.h"
 #include "Asset/AssetModuleStatics.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Engine/TextureRenderTarget2D.h"
@@ -38,6 +41,7 @@
 #include "Voxel/Generators/VoxelGenerator.h"
 #include "Voxel/Generators/VoxelFoliageGenerator.h"
 #include "Voxel/Generators/VoxelLakeGenerator.h"
+#include "Voxel/Generators/VoxelLiquidGenerator.h"
 #include "Voxel/Generators/VoxelOreGenerator.h"
 #include "Voxel/Generators/VoxelRegionGenerator.h"
 #include "Voxel/Generators/VoxelRiverGenerator.h"
@@ -82,6 +86,10 @@ UVoxelModule::UVoxelModule()
 
 	ChunkSpawnBatch = 0;
 	ChunkMap = TMap<FIndex, UVoxelChunk*>();
+	VoxelUpdateChunkIndices = TSet<FIndex>();
+	VoxelLiquidUpdateIndices = TSet<FIndex>();
+	VoxelUpdateTime = 0.f;
+	bVoxelUpdateRunning = false;
 
 	VoxelClasses = TArray<TSubclassOf<UVoxel>>();
 	VoxelClasses.Add(UVoxel::StaticClass());
@@ -146,6 +154,7 @@ void UVoxelModule::OnGenerate()
 		FVoxelChunkQueue(true, 100),
 		FVoxelChunkQueue(true, 100),
 		FVoxelChunkQueue(true, 100),
+		FVoxelChunkQueue(true, 100),
 		FVoxelChunkQueue(true, 100)
 	};
 
@@ -159,6 +168,7 @@ void UVoxelModule::OnGenerate()
 	MapBuildingQueues.Queues[static_cast<int32>(EVoxelGenerationStage::Vegetation)].Generators.Add(NewObject<UVoxelFoliageGenerator>(this));
 	MapBuildingQueues.Queues[static_cast<int32>(EVoxelGenerationStage::Settlement)].Generators.Add(NewObject<UVoxelTownGenerator>(this));
 	MapBuildingQueues.Queues[static_cast<int32>(EVoxelGenerationStage::Landmark)].Generators.Add(NewObject<UVoxelBuildingGenerator>(this));
+	MapBuildingQueues.Queues[static_cast<int32>(EVoxelGenerationStage::Liquid)].Generators.Add(NewObject<UVoxelLiquidGenerator>(this));
 
 	if(!VoxelRoot)
 	{
@@ -312,6 +322,14 @@ void UVoxelModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 	{
 		GenerateChunkQueues();
 		GenerateWorld();
+		FIndex VoxelUpdateIndex;
+		while(VoxelUpdateQueue.Dequeue(VoxelUpdateIndex)) AddVoxelUpdate(VoxelUpdateIndex);
+		VoxelUpdateTime += DeltaSeconds;
+		if(VoxelUpdateTime >= 0.2f && !bVoxelUpdateRunning)
+		{
+			VoxelUpdateTime = 0.f;
+			UpdateVoxels();
+		}
 	}
 }
 
@@ -333,6 +351,13 @@ void UVoxelModule::OnTermination(EPhase InPhase)
 	{
 		USceneModule::Get().UnregisterSceneAreaResolver(ESceneAreaType::Chunk);
 		ResetChunkQueues();
+		VoxelUpdateChunkIndices.Empty();
+		VoxelLiquidUpdateIndices.Empty();
+		FIndex VoxelUpdateIndex;
+		while(VoxelUpdateQueue.Dequeue(VoxelUpdateIndex)) { }
+		while(VoxelLiquidUpdateQueue.Dequeue(VoxelUpdateIndex)) { }
+		VoxelUpdateTime = 0.f;
+		bVoxelUpdateRunning = false;
 	}
 }
 
@@ -657,6 +682,203 @@ void UVoxelModule::GenerateWorld()
 	else
 	{
 		SetWorldState(EVoxelWorldState::None);
+	}
+}
+
+void UVoxelModule::AddVoxelUpdate(FIndex InIndex)
+{
+	if(!IsInGameThread())
+	{
+		VoxelUpdateQueue.Enqueue(InIndex);
+		return;
+	}
+	if(UVoxelChunk* Chunk = GetChunkByVoxelIndex(InIndex))
+	{
+		Chunk->VoxelUpdateIndices.Add(Chunk->WorldIndexToLocal(InIndex));
+		VoxelUpdateChunkIndices.Add(Chunk->GetIndex());
+	}
+}
+
+void UVoxelModule::AddVoxelLiquidUpdate(FIndex InIndex)
+{
+	if(!VoxelLiquidUpdateIndices.Contains(InIndex))
+	{
+		VoxelLiquidUpdateIndices.Add(InIndex);
+		VoxelLiquidUpdateQueue.Enqueue(InIndex);
+	}
+}
+
+void UVoxelModule::UpdateVoxels()
+{
+	TArray<FIndex> ChunkIndices = VoxelUpdateChunkIndices.Array();
+	TSet<FIndex> LiquidUpdateIndexSet;
+	FIndex LiquidUpdateIndex;
+	const int32 LiquidUpdateCount = VoxelLiquidUpdateIndices.Num();
+	while(LiquidUpdateIndexSet.Num() < LiquidUpdateCount && VoxelLiquidUpdateQueue.Dequeue(LiquidUpdateIndex))
+	{
+		VoxelLiquidUpdateIndices.Remove(LiquidUpdateIndex);
+		LiquidUpdateIndexSet.Add(LiquidUpdateIndex);
+	}
+	TArray<FIndex> LiquidUpdateIndices = LiquidUpdateIndexSet.Array();
+	TSet<FIndex> ChangedChunkIndices;
+	int32 RemainingUpdates = 256;
+	for(const FIndex& ChunkIndex : ChunkIndices)
+	{
+		UVoxelChunk* Chunk = GetChunkByIndex(ChunkIndex);
+		if(!Chunk)
+		{
+			VoxelUpdateChunkIndices.Remove(ChunkIndex);
+			continue;
+		}
+		if(!Chunk->IsGenerated()) continue;
+
+		RemainingUpdates -= Chunk->UpdateVoxels(FMath::Min(RemainingUpdates, 32), ChangedChunkIndices);
+		if(Chunk->VoxelUpdateIndices.IsEmpty()) VoxelUpdateChunkIndices.Remove(ChunkIndex);
+		if(RemainingUpdates <= 0) break;
+	}
+
+	for(const FIndex& ChunkIndex : ChangedChunkIndices)
+	{
+		if(UVoxelChunk* Chunk = GetChunkByIndex(ChunkIndex); Chunk && Chunk->IsGenerated()) Chunk->Generate(EPhase::Lesser);
+	}
+	if(LiquidUpdateIndices.IsEmpty()) return;
+
+	TSet<FIndex> LiquidEvaluationIndexSet = LiquidUpdateIndexSet;
+	for(const FIndex& Index : LiquidUpdateIndices)
+	{
+		ITER_DIRECTION(Direction, LiquidEvaluationIndexSet.Add(Index + FMathHelper::DirectionToIndex(Direction)); )
+		for(const EDirection Iter : { EDirection::Forward, EDirection::Right, EDirection::Backward, EDirection::Left })
+		{
+			LiquidEvaluationIndexSet.Add(Index + FMathHelper::DirectionToIndex(Iter) + FIndex(0, 0, -1));
+		}
+	}
+	TMap<FIndex, FVoxelLiquidSnapshot> LiquidSnapshots;
+	for(const FIndex& Index : LiquidEvaluationIndexSet)
+	{
+		TSet<FIndex> SnapshotIndices;
+		SnapshotIndices.Add(Index);
+		ITER_DIRECTION(Direction, SnapshotIndices.Add(Index + FMathHelper::DirectionToIndex(Direction)); )
+		SnapshotIndices.Add(Index + FIndex(0, 0, -2));
+		for(const EDirection Iter : { EDirection::Forward, EDirection::Right, EDirection::Backward, EDirection::Left })
+		{
+			const FIndex NeighborIndex = Index + FMathHelper::DirectionToIndex(Iter);
+			SnapshotIndices.Add(NeighborIndex + FIndex(0, 0, 1));
+			SnapshotIndices.Add(NeighborIndex + FIndex(0, 0, -1));
+			SnapshotIndices.Add(NeighborIndex + FIndex(0, 0, -2));
+		}
+		for(const FIndex& SnapshotIndex : SnapshotIndices)
+		{
+			if(LiquidSnapshots.Contains(SnapshotIndex)) continue;
+			FVoxelLiquidSnapshot Snapshot;
+			if(const UVoxelChunk* Chunk = GetChunkByVoxelIndex(SnapshotIndex); Chunk && Chunk->IsGenerated())
+			{
+				Snapshot.bGenerated = true;
+				const FVoxelItem& Item = GetVoxelByIndex(SnapshotIndex);
+				Snapshot.VoxelType = Item.IsUnknown() ? EVoxelType::Unknown : Item.IsValid() ? Item.GetVoxelType() : EVoxelType::Empty;
+				Snapshot.Data = Item.Data;
+				Snapshot.bCanFlowThrough = Item.IsValid() && (Item.GetData().Nature == EVoxelNature::Foliage || Item.GetData().Nature == EVoxelNature::SemiFoliage);
+			}
+			LiquidSnapshots.Add(SnapshotIndex, MoveTemp(Snapshot));
+		}
+	}
+
+	bVoxelUpdateRunning = true;
+	TWeakObjectPtr<UVoxelModule> Module(this);
+	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [Module, LiquidEvaluationIndices = LiquidEvaluationIndexSet.Array(), LiquidSnapshots = MoveTemp(LiquidSnapshots)]() mutable
+	{
+		TMap<FIndex, FVoxelLiquidUpdate> LiquidUpdates;
+		for(const FIndex& Index : LiquidEvaluationIndices)
+		{
+			FVoxelLiquidUpdate Update;
+			if(UVoxelModuleStatics::CalculateVoxelLiquidUpdate(Index, LiquidSnapshots, Update)) LiquidUpdates.Add(Index, MoveTemp(Update));
+		}
+		AsyncTask(ENamedThreads::GameThread, [Module, LiquidSnapshots = MoveTemp(LiquidSnapshots), LiquidUpdates = MoveTemp(LiquidUpdates)]() mutable
+		{
+			if(!Module.IsValid()) return;
+			Module->bVoxelUpdateRunning = false;
+			if(Module->WorldMode == EVoxelWorldMode::None) return;
+			TMap<FIndex, FVoxelItem> VoxelUpdates;
+			TSet<FIndex> VegetationChangedChunkIndices;
+			for(const auto& Iter : LiquidUpdates)
+			{
+				const FVoxelLiquidSnapshot* Snapshot = LiquidSnapshots.Find(Iter.Key);
+				if(!Snapshot || !Snapshot->bGenerated) continue;
+				const FVoxelItem& CurrentItem = Module->GetVoxelByIndex(Iter.Key);
+				const EVoxelType CurrentType = CurrentItem.IsUnknown() ? EVoxelType::Unknown : CurrentItem.IsValid() ? CurrentItem.GetVoxelType() : EVoxelType::Empty;
+				if(CurrentType != Snapshot->VoxelType || CurrentItem.Data != Snapshot->Data)
+				{
+					Module->AddVoxelLiquidUpdate(Iter.Key);
+					continue;
+				}
+				if(Iter.Value.bRemove)
+				{
+					VoxelUpdates.Add(Iter.Key, FVoxelItem::Empty);
+				}
+				else
+				{
+					if(Snapshot->bCanFlowThrough)
+					{
+						if(UVoxelModuleStatics::GetVoxelWorldMode() != EVoxelWorldMode::Prefab)
+						{
+							const UVoxelData& VoxelData = CurrentItem.GetData();
+							UAbilityModuleStatics::SpawnAbilityPickUp(FAbilityItem(VoxelData.GatherData ? VoxelData.GatherData->GetPrimaryAssetId() : VoxelData.GetPrimaryAssetId(), 1),
+								CurrentItem.GetLocation() + VoxelData.GetRange(CurrentItem.Angle) * Module->GetWorldData().BlockSize * 0.5f, CurrentItem.Chunk);
+						}
+						VegetationChangedChunkIndices.Add(CurrentItem.Chunk->GetIndex());
+					}
+					FVoxelItem Item = CurrentItem;
+					if(CurrentType != EVoxelType::Water) Item = FVoxelItem(EVoxelType::Water);
+					Item.Data = Iter.Value.Data;
+					VoxelUpdates.Add(Iter.Key, Item);
+				}
+			}
+			TSet<FIndex> ChangedChunkIndices;
+			Module->ApplyVoxelUpdates(VoxelUpdates, ChangedChunkIndices);
+			for(const auto& Iter : VoxelUpdates) Module->AddVoxelLiquidUpdate(Iter.Key);
+			for(const FIndex& ChunkIndex : ChangedChunkIndices)
+			{
+				if(UVoxelChunk* Chunk = Module->GetChunkByIndex(ChunkIndex))
+				{
+					Chunk->BuildMesh(EVoxelNature::Liquid);
+					Chunk->CreateMesh(EVoxelNature::Liquid);
+				}
+			}
+			for(const FIndex& ChunkIndex : VegetationChangedChunkIndices)
+			{
+				if(UVoxelChunk* Chunk = Module->GetChunkByIndex(ChunkIndex))
+				{
+					Chunk->BuildMesh(EVoxelNature::Foliage);
+					Chunk->CreateMesh(EVoxelNature::Foliage);
+					Chunk->BuildMesh(EVoxelNature::SemiFoliage);
+					Chunk->CreateMesh(EVoxelNature::SemiFoliage);
+				}
+			}
+		});
+	});
+}
+
+void UVoxelModule::ApplyVoxelUpdates(const TMap<FIndex, FVoxelItem>& InVoxelMap, TSet<FIndex>& OutChangedChunkIndices)
+{
+	for(const auto& Iter : InVoxelMap)
+	{
+		if(UVoxelChunk* Chunk = GetChunkByVoxelIndex(Iter.Key); Chunk && Chunk->IsGenerated())
+		{
+			const FIndex LocalIndex = Chunk->WorldIndexToLocal(Iter.Key);
+			const FVoxelItem& CurrentItem = Chunk->GetVoxel(LocalIndex);
+			if(CurrentItem.ID == Iter.Value.ID && CurrentItem.Data == Iter.Value.Data) continue;
+			Chunk->SetVoxel(LocalIndex, Iter.Value, true);
+			Chunk->SetChanged(true);
+			for(int32 X = -1; X <= 1; ++X)
+			{
+				for(int32 Y = -1; Y <= 1; ++Y)
+				{
+					if(UVoxelChunk* ChangedChunk = GetChunkByVoxelIndex(Iter.Key + FIndex(X, Y, 0)); ChangedChunk && ChangedChunk->IsGenerated())
+					{
+						OutChangedChunkIndices.Add(ChangedChunk->GetIndex());
+					}
+				}
+			}
+		}
 	}
 }
 

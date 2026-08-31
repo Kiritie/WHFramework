@@ -31,6 +31,8 @@ public:
 
 	bool ApplyToTopography(FIndex InWorldIndex, FVoxelTopography& InOutTopography) const;
 
+	void GenerateSprings(UVoxelChunk* InChunk) const;
+
 protected:
 	bool TryCreateLakeFeature(FIndex InChunkIndex, FVoxelLakeFeature& OutFeature) const;
 
@@ -41,8 +43,6 @@ protected:
 	bool EvaluateLake(const FVoxelLakeFeature& InFeature, FIndex InWorldIndex, int32& OutBedHeight, int32& OutWaterHeight) const;
 
 	float CalculateShapeAlpha(const FVoxelLakeFeature& InFeature, FIndex InWorldIndex) const;
-
-	void GenerateSprings(UVoxelChunk* InChunk) const;
 
 	bool TryGetSpringSource(FIndex InChunkIndex, FIndex& OutSource) const;
 

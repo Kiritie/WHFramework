@@ -30,6 +30,9 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "PawnModuleStatics")
 	static APawnBase* GetCurrentPawn(TSubclassOf<APawnBase> InClass);
 
+	UFUNCTION(BlueprintPure, Category = "PawnModuleStatics")
+	static TArray<APawnBase*> GetAllPawn();
+
 	UFUNCTION(BlueprintCallable, Category = "PawnModuleStatics")
 	static void SwitchPawn(APawnBase* InPawn, bool bResetCamera = true, bool bInstant = false);
 
@@ -66,7 +69,7 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "PawnModuleStatics")
 	static APawnBase* GetPawnByClass(TSubclassOf<APawnBase> InClass);
 
-	UFUNCTION(BlueprintPure)
+	UFUNCTION(BlueprintPure, Category = "PawnModuleStatics")
 	static APawnBase* GetPawnByName(FName InName);
 
 public:

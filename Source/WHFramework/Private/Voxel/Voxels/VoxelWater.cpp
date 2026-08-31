@@ -3,12 +3,6 @@
 
 #include "Voxel/Voxels/VoxelWater.h"
 
-#include "Components/SkeletalMeshComponent.h"
-#include "Math/MathHelper.h"
-#include "Voxel/VoxelModule.h"
-#include "Voxel/Chunks/VoxelChunk.h"
-#include "Voxel/Voxels/Data/VoxelData.h"
-
 UVoxelWater::UVoxelWater()
 {
 	
@@ -27,20 +21,6 @@ FString UVoxelWater::ToData()
 void UVoxelWater::OnGenerate(IVoxelAgentInterface* InAgent)
 {
 	Super::OnGenerate(InAgent);
-	
-	if(!InAgent) return;
-	
-	if(GetOwner())
-	{
-		TMap<FIndex, FVoxelItem> VoxelMap;
-		ITER_DIRECTION(Iter, 
-			if(Iter != EDirection::Up && !GetOwner()->CheckVoxelAdjacent(Item, Iter))
-			{
-				VoxelMap.Emplace(GetIndex() + FMathHelper::DirectionToIndex(Iter), GetData().VoxelType);
-			}
-		)
-		GetOwner()->SetVoxelComplex(VoxelMap, true, false, InAgent);
-	}
 }
 
 void UVoxelWater::OnDestroy(IVoxelAgentInterface* InAgent)

@@ -182,6 +182,16 @@ public:
 
 protected:
 	virtual void GenerateWorld();
+
+public:
+	void AddVoxelUpdate(FIndex InIndex);
+
+	void AddVoxelLiquidUpdate(FIndex InIndex);
+
+protected:
+	void UpdateVoxels();
+
+	void ApplyVoxelUpdates(const TMap<FIndex, FVoxelItem>& InVoxelMap, TSet<FIndex>& OutChangedChunkIndices);
 	
 public:
 	virtual UVoxelChunk* SpawnChunk(FIndex InIndex, bool bAddToQueue = true);
@@ -337,6 +347,18 @@ protected:
 
 	UPROPERTY(Transient)
 	TMap<FIndex, UVoxelChunk*> ChunkMap;
+
+	TSet<FIndex> VoxelUpdateChunkIndices;
+
+	TQueue<FIndex, EQueueMode::Mpsc> VoxelUpdateQueue;
+
+	TSet<FIndex> VoxelLiquidUpdateIndices;
+
+	TQueue<FIndex, EQueueMode::Mpsc> VoxelLiquidUpdateQueue;
+
+	float VoxelUpdateTime;
+
+	bool bVoxelUpdateRunning;
 
 public:
 	virtual int32 GetChunkNum(bool bNeedGenerated = false) const;

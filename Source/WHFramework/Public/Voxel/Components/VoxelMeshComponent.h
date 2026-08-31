@@ -50,7 +50,9 @@ public:
 protected:
 	virtual void BuildFace(const FVoxelItem& InVoxelItem, EDirection InFacing);
 
-	virtual void BuildFace(const FVoxelItem& InVoxelItem, FVector InVertices[4], int32 InFaceIndex, FVector InNormal);
+	virtual void BuildFace(const FVoxelItem& InVoxelItem, FVector InVertices[4], int32 InFaceIndex, FVector InNormal, bool bReverseDiagonal = false);
+
+	virtual void BuildFace(const FVoxelItem& InVoxelItem, FVector InVertices[4], int32 InFaceIndex, const FVector InNormals[4], bool bReverseDiagonal = false);
 
 protected:
 	UFUNCTION()

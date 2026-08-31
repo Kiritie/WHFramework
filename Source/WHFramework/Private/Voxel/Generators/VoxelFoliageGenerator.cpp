@@ -90,8 +90,8 @@ bool UVoxelFoliageGenerator::TryCreateTreeFeature(FIndex InWorldIndex, FVoxelTre
 	if(Random > TreeRate * ClimateFactor) return false;
 
 	OutFeature.Root = FIndex(InWorldIndex.X, InWorldIndex.Y, Topography.Height + 1);
-	OutFeature.Height = FMathHelper::HashRandRange(InWorldIndex.ToVector2D(), 4, 7, Seed + 101);
-	OutFeature.LeafRadius = OutFeature.Height >= 6 ? 3 : 2;
+	OutFeature.Height = FMathHelper::HashRandRange(InWorldIndex.ToVector2D(), 4, 9, Seed + 101);
+	OutFeature.LeafRadius = OutFeature.Height >= 7 ? 3 : 2;
 	if(Topography.Temperature < -0.3f)
 	{
 		OutFeature.WoodType = EVoxelType::Birch;
@@ -118,8 +118,12 @@ void UVoxelFoliageGenerator::PlaceTreeSlice(UVoxelChunk* InChunk, const FVoxelTr
 	{
 		for(int32 Z = 0; Z < InFeature.Height; ++Z)
 		{
+			const FIndex WorldIndex(InFeature.Root.X, InFeature.Root.Y, InFeature.Root.Z + Z);
 			const FIndex LocalIndex(InFeature.Root.X - ChunkOrigin.X, InFeature.Root.Y - ChunkOrigin.Y, InFeature.Root.Z + Z);
-			if(!InChunk->HasVoxel(LocalIndex, true)) InChunk->SetVoxel(LocalIndex, InFeature.WoodType);
+			if(!InChunk->HasVoxel(LocalIndex, true))
+			{
+				InChunk->SetVoxel(LocalIndex, FVoxelItem(InFeature.WoodType, FIndex::ZeroIndex, nullptr, Z == 0 ? FString(TEXT("R")) : FString::Printf(TEXT("T%s"), *(InFeature.Root - WorldIndex).ToString())));
+			}
 		}
 	}
 
@@ -135,8 +139,9 @@ void UVoxelFoliageGenerator::PlaceTreeSlice(UVoxelChunk* InChunk, const FVoxelTr
 				const int32 WorldX = InFeature.Root.X + X;
 				const int32 WorldY = InFeature.Root.Y + Y;
 				if(!IsInsideChunk(WorldX, WorldY)) continue;
+				const FIndex WorldIndex(WorldX, WorldY, CanopyCenterZ + Z);
 				const FIndex LocalIndex(WorldX - ChunkOrigin.X, WorldY - ChunkOrigin.Y, CanopyCenterZ + Z);
-				if(!InChunk->HasVoxel(LocalIndex, true)) InChunk->SetVoxel(LocalIndex, InFeature.LeafType);
+				if(!InChunk->HasVoxel(LocalIndex, true)) InChunk->SetVoxel(LocalIndex, FVoxelItem(InFeature.LeafType, FIndex::ZeroIndex, nullptr, FString::Printf(TEXT("T%s"), *(InFeature.Root - WorldIndex).ToString())));
 			}
 		}
 	}

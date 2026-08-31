@@ -30,6 +30,9 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CharacterModuleStatics")
 	static ACharacterBase* GetCurrentCharacter(TSubclassOf<ACharacterBase> InClass);
 
+	UFUNCTION(BlueprintPure, Category = "CharacterModuleStatics")
+	static TArray<ACharacterBase*> GetAllCharacter();
+
 	UFUNCTION(BlueprintCallable, Category = "CharacterModuleStatics")
 	static void SwitchCharacter(ACharacterBase* InCharacter, bool bResetCamera = true, bool bInstant = false);
 
@@ -66,7 +69,7 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CharacterModuleStatics")
 	static ACharacterBase* GetCharacterByClass(TSubclassOf<ACharacterBase> InClass);
 
-	UFUNCTION(BlueprintPure)
+	UFUNCTION(BlueprintPure, Category = "CharacterModuleStatics")
 	static ACharacterBase* GetCharacterByName(FName InName);
 
 public:

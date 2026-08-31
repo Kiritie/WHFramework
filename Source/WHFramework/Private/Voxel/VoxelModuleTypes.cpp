@@ -13,6 +13,29 @@
 FVoxelItem FVoxelItem::Empty = FVoxelItem(FPrimaryAssetId(FName("Voxel"), FName("DA_Empty")));
 FVoxelItem FVoxelItem::Unknown = FVoxelItem(FPrimaryAssetId(FName("Voxel"), FName("DA_Unknown")));
 
+FVoxelLiquidState::FVoxelLiquidState(const FString& InData)
+{
+	const uint8 State = FMath::Clamp(FCString::Atoi(*InData), 0, 15);
+	Level = State & MaxLevel;
+	bFalling = (State & 8) != 0;
+}
+
+FVoxelLiquidState::FVoxelLiquidState(uint8 InLevel, bool bInFalling)
+{
+	Level = FMath::Clamp<uint8>(InLevel, 0, MaxLevel);
+	bFalling = bInFalling;
+}
+
+float FVoxelLiquidState::GetHeight() const
+{
+	return IsSource() || IsFalling() ? 1.f : (8.f - GetLevel()) / 8.f;
+}
+
+FString FVoxelLiquidState::ToData() const
+{
+	return IsSource() ? TEXT("") : FString::FromInt(Level | (bFalling ? 8 : 0));
+}
+
 FVoxelItem::FVoxelItem(const FPrimaryAssetId& InID, FIndex InIndex, UVoxelChunk* InOwner, const FString& InData) : FVoxelItem()
 {
 	ID = InID;

@@ -15,6 +15,11 @@ ACharacterBase* UCharacterModuleStatics::GetCurrentCharacter(TSubclassOf<ACharac
 	return UCharacterModule::Get().GetCurrentCharacter(InClass);
 }
 
+TArray<ACharacterBase*> UCharacterModuleStatics::GetAllCharacter()
+{
+	return UCharacterModule::Get().GetAllCharacter();
+}
+
 void UCharacterModuleStatics::SwitchCharacter(ACharacterBase* InCharacter, bool bResetCamera, bool bInstant)
 {
 	UCharacterModule::Get().SwitchCharacter(InCharacter, bResetCamera, bInstant);

@@ -7,6 +7,7 @@
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Generators/VoxelRiverGenerator.h"
+#include "Voxel/Voxels/Data/VoxelData.h"
 
 UVoxelLakeGenerator::UVoxelLakeGenerator()
 {
@@ -53,8 +54,6 @@ void UVoxelLakeGenerator::Generate(UVoxelChunk* InChunk)
 		if(WaterHeight != INDEX_NONE) Topography.WaterHeight = WaterHeight;
 		InChunk->SetTopography(LocalIndex, Topography);
 	)
-
-	GenerateSprings(InChunk);
 }
 
 bool UVoxelLakeGenerator::ApplyToTopography(FIndex InWorldIndex, FVoxelTopography& InOutTopography) const
@@ -300,19 +299,29 @@ void UVoxelLakeGenerator::GenerateSpringSlice(UVoxelChunk* InChunk, FIndex InSou
 	FIndex Current = InSource;
 	TSet<FIndex> Visited;
 	static const FIndex Directions[] = {
-		FIndex(1, 0, 0), FIndex(-1, 0, 0), FIndex(0, 1, 0), FIndex(0, -1, 0),
-		FIndex(1, 1, 0), FIndex(-1, 1, 0), FIndex(1, -1, 0), FIndex(-1, -1, 0)
+		FIndex(1, 0, 0), FIndex(-1, 0, 0), FIndex(0, 1, 0), FIndex(0, -1, 0)
 	};
+	int32 PreviousWaterHeight = INDEX_NONE;
 	for(int32 Step = 0; Step < FMath::FloorToInt(SpringMaxDistance); ++Step)
 	{
 		if(Visited.Contains(Current)) break;
 		Visited.Add(Current);
 		const FVoxelTopography CurrentTopography = Module->SampleTopographyByIndex(Current);
+		const int32 WaterHeight = CurrentTopography.Height + 1;
 		if(Current.X >= ChunkOrigin.X && Current.X < ChunkOrigin.X + ChunkSize.X && Current.Y >= ChunkOrigin.Y && Current.Y < ChunkOrigin.Y + ChunkSize.Y)
 		{
-			const FIndex LocalIndex(Current.X - ChunkOrigin.X, Current.Y - ChunkOrigin.Y, CurrentTopography.Height + 1);
-			if(!InChunk->HasVoxel(LocalIndex, true)) InChunk->SetVoxel(LocalIndex, EVoxelType::Water);
+			const int32 Top = PreviousWaterHeight == INDEX_NONE ? WaterHeight : FMath::Max(WaterHeight, PreviousWaterHeight);
+			for(int32 Z = WaterHeight; Z <= Top; ++Z)
+			{
+				const FIndex LocalIndex(Current.X - ChunkOrigin.X, Current.Y - ChunkOrigin.Y, Z);
+				const FVoxelItem& Item = InChunk->GetVoxel(LocalIndex);
+				if(!Item.IsValid() || Item.GetData().Nature == EVoxelNature::Foliage || Item.GetData().Nature == EVoxelNature::SemiFoliage)
+				{
+					InChunk->SetVoxel(LocalIndex, EVoxelType::Water);
+				}
+			}
 		}
+		PreviousWaterHeight = WaterHeight;
 		if(CurrentTopography.Height <= Module->GetWorldData().SeaLevel) break;
 		FIndex Next = Current;
 		int32 NextHeight = CurrentTopography.Height;

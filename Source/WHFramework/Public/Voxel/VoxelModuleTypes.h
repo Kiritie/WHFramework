@@ -57,6 +57,7 @@ enum class EVoxelGenerationStage : uint8
 	Vegetation,
 	Settlement,
 	Landmark,
+	Liquid,
 	None = 255
 };
 
@@ -88,12 +89,14 @@ enum class EVoxelType : uint8
 	Diamond_Ore, //??
 	Oak, //???
 	Oak_Leaves, //?????
+	Oak_Sapling, // 橡树苗
 	Oak_Plank, //?????
 	Oak_Stair, //?????
 	Oak_Door, //?????
 	Oak_Door_Upper, //?????
 	Birch, //?????
 	Birch_Leaves, //???????
+	Birch_Sapling, // 白桦树苗
 	Birch_Plank, //???????
 	Birch_Stair, //???????
 	Birch_Door, //???????
@@ -439,6 +442,40 @@ public:
 
 	UPROPERTY(Transient)
 	UMaterialInstance* TransMaterialInst;
+};
+
+/** 体素液体状态 */
+struct WHFRAMEWORK_API FVoxelLiquidState
+{
+	static constexpr uint8 MaxLevel = 7;
+
+	uint8 Level;
+	bool bFalling;
+
+	FVoxelLiquidState(const FString& InData = TEXT(""));
+	FVoxelLiquidState(uint8 InLevel, bool bInFalling = false);
+
+	bool IsSource() const { return Level == 0 && !bFalling; }
+	bool IsFalling() const { return bFalling; }
+	uint8 GetLevel() const { return Level; }
+	float GetHeight() const;
+	FString ToData() const;
+};
+
+/** 体素液体快照 */
+struct WHFRAMEWORK_API FVoxelLiquidSnapshot
+{
+	EVoxelType VoxelType = EVoxelType::Unknown;
+	FString Data;
+	bool bGenerated = false;
+	bool bCanFlowThrough = false;
+};
+
+/** 体素液体更新 */
+struct WHFRAMEWORK_API FVoxelLiquidUpdate
+{
+	FString Data;
+	bool bRemove = false;
 };
 
 USTRUCT(BlueprintType)

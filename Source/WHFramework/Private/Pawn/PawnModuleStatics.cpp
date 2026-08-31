@@ -15,6 +15,11 @@ APawnBase* UPawnModuleStatics::GetCurrentPawn(TSubclassOf<APawnBase> InClass)
 	return UPawnModule::Get().GetCurrentPawn(InClass);
 }
 
+TArray<APawnBase*> UPawnModuleStatics::GetAllPawn()
+{
+	return UPawnModule::Get().GetAllPawn();
+}
+
 void UPawnModuleStatics::SwitchPawn(APawnBase* InPawn, bool bResetCamera, bool bInstant)
 {
 	UPawnModule::Get().SwitchPawn(InPawn, bResetCamera, bInstant);

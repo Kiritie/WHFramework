@@ -54,6 +54,8 @@ public:
 
 	virtual void CreateMesh();
 
+	virtual void CreateMesh(EVoxelNature InNature);
+
 	virtual void ClearMap(bool bGenerate = false);
 
 	virtual void BuildMap(int32 InStage);
@@ -61,6 +63,8 @@ public:
 	virtual void BuildPrefabMap();
 
 	virtual void BuildMesh();
+
+	virtual void BuildMesh(EVoxelNature InNature);
 
 protected:
 	virtual void GenerateNeighbors(FIndex InIndex, EPhase InPhase = EPhase::Primary);
@@ -100,6 +104,8 @@ public:
 
 	virtual FVoxelItem& GetVoxel(int32 InX, int32 InY, int32 InZ, bool bMainPart = false);
 
+	virtual FVoxelItem GetVoxelSnapshot(FIndex InIndex);
+
 	virtual FVoxelItem& GetVoxelComplex(FIndex InIndex, bool bMainPart = false);
 
 	virtual FVoxelItem& GetVoxelComplex(int32 InX, int32 InY, int32 InZ, bool bMainPart = false);
@@ -126,6 +132,13 @@ public:
 	virtual bool SetVoxelComplex(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem, bool bGenerate = false, IVoxelAgentInterface* InAgent = nullptr);
 
 	virtual bool SetVoxelComplex(const TMap<FIndex, FVoxelItem>& InVoxelMap, bool bGenerate = false, bool bFirstSample = false, IVoxelAgentInterface* InAgent = nullptr);
+
+	virtual void DestroyTree(FIndex InIndex);
+
+protected:
+	int32 UpdateVoxels(int32 InMaxCount, TSet<FIndex>& OutChangedChunkIndices);
+
+	void UpdateSapling(FIndex InIndex, EVoxelType InVoxelType, TSet<FIndex>& OutChangedChunkIndices);
 
 	//////////////////////////////////////////////////////////////////////////
 public:
@@ -196,6 +209,8 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
 	bool bBuilded;
 
+	TAtomic<int32> MapBuildStage;
+
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
 	bool bGenerated;
 
@@ -212,6 +227,8 @@ protected:
 
 	TMap<FIndex, FVoxelTopography> TopographyMap;
 
+	TSet<FIndex> VoxelUpdateIndices;
+
 	bool bNeedCreateMesh;
 
 public:
@@ -220,6 +237,8 @@ public:
 	int32 GetBatch() const { return Batch; }
 
 	bool IsBuilded() const { return bBuilded; }
+
+	bool IsMapBuildStageCompleted(int32 InStage) const { return MapBuildStage.Load() >= InStage; }
 
 	bool IsGenerated() const { return bGenerated; }
 	
