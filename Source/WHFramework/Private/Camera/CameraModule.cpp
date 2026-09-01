@@ -69,10 +69,10 @@ UCameraModule::UCameraModule()
 	bCameraRotateAble = true;
 	bCameraRotateControlAble = true;
 	bReverseCameraPitch = false;
-	CameraTurnRate = 90.f;
-	CameraLookUpRate = 90.f;
+	CameraTurnRate = 30.f;
+	CameraLookUpRate = 30.f;
 	bSmoothCameraRotate = true;
-	CameraRotateSpeed = 5.f;
+	CameraRotateSpeed = 7.f;
 	MinCameraPitch = -90.f;
 	MaxCameraPitch = 90.f;
 	InitCameraPitch = -1.f;

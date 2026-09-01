@@ -98,7 +98,8 @@ bool IVoxelAgentInterface::OnDestroyVoxel(EInputInteractEvent InInteractEvent, c
 	{
 		case EInputInteractEvent::Started:
 		{
-			if(InHitResult.VoxelItem.GetIndex().Z > 0)
+			const int32 VoxelZ = InHitResult.VoxelItem.GetIndex().Z;
+			if(VoxelZ > 0 || (VoxelZ == 0 && UVoxelModuleStatics::GetVoxelWorldMode() == EVoxelWorldMode::Prefab))
 			{
 				DestroyVoxelItem = InHitResult.VoxelItem;
 			}

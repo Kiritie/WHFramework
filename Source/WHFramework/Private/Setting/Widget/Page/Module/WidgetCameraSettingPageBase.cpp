@@ -20,11 +20,11 @@ UWidgetCameraSettingPageBase::UWidgetCameraSettingPageBase(const FObjectInitiali
 	MinCameraMoveSpeed = 1.f;
 	MaxCameraMoveSpeed = 10.f;
 
-	MinCameraTurnRate = 30.f;
-	MaxCameraTurnRate = 150.f;
+	MinCameraTurnRate = 5.f;
+	MaxCameraTurnRate = 90.f;
 
-	MinCameraLookUpRate = 30.f;
-	MaxCameraLookUpRate = 150.f;
+	MinCameraLookUpRate = 5.f;
+	MaxCameraLookUpRate = 90.f;
 
 	MinCameraRotateSpeed = 1.f;
 	MaxCameraRotateSpeed = 10.f;

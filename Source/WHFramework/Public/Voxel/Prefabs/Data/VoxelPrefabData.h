@@ -26,4 +26,11 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FVector VoxelSize;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FVector CenterOffset;
+
+public:
+	UFUNCTION(BlueprintPure)
+	FBox GetVoxelBounds() const;
 };

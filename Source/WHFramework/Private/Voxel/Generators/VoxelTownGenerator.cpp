@@ -54,6 +54,15 @@ void UVoxelTownGenerator::Initialize(UVoxelModule* InModule)
 		if(UVoxelPrefabData* Prefab = UAssetModuleStatics::LoadPrimaryAsset<UVoxelPrefabData>(PrefabAsset))
 		{
 			_PrefabAssets.Add(Prefab);
+			TArray<FString> VoxelDatas;
+			Prefab->VoxelDatas.ParseIntoArray(VoxelDatas, TEXT("|"));
+			int32 MinZ = MAX_int32;
+			for(const FString& VoxelData : VoxelDatas)
+			{
+				const FVoxelItem VoxelItem(VoxelData, true);
+				if(VoxelItem.IsValid()) MinZ = FMath::Min(MinZ, VoxelItem.Index.Z);
+			}
+			_PrefabGroundOffsets.Add(MinZ == MAX_int32 ? 0 : 1 - MinZ);
 		}
 	}
 }
@@ -253,6 +262,7 @@ bool UVoxelTownGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, 
 	const int FrontBack = _PrefabAssets[InIndex]->VoxelSize[RotateIndex] / 2;
 	const int LeftRight = _PrefabAssets[InIndex]->VoxelSize[!RotateIndex] / 2;
 	const int UpDown = _PrefabAssets[InIndex]->VoxelSize[2];
+	const int32 GroundOffset = _PrefabGroundOffsets.IsValidIndex(InIndex) ? _PrefabGroundOffsets[InIndex] : 0;
 
 	float Aver = 0;
 	for(int i = -FrontBack - 1; i <= FrontBack; ++i)
@@ -309,11 +319,15 @@ bool UVoxelTownGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, 
 	for(auto& Iter : VoxelDatas)
 	{
 		FVoxelItem VoxelItem = FVoxelItem(Iter, true);
+		VoxelItem.Index = VoxelItem.Index - FIndex(
+			FMath::FloorToInt(_PrefabAssets[InIndex]->CenterOffset.X),
+			FMath::FloorToInt(_PrefabAssets[InIndex]->CenterOffset.Y),
+			0);
 		if(VoxelItem.GetData().bRotatable)
 		{
 			VoxelItem.Angle = FMathHelper::CombineRightAngle(VoxelItem.Angle, (ERightAngle)InRotate);
 		}
-		const FIndex Index = FIndex(InX, InY, Aver) + FMathHelper::RotateIndex(VoxelItem.Index, (ERightAngle)InRotate) + UVoxelModuleStatics::RightAngleToVoxelIndex((ERightAngle)InRotate);
+		const FIndex Index = FIndex(InX, InY, Aver + GroundOffset) + FMathHelper::RotateIndex(VoxelItem.Index, (ERightAngle)InRotate) + UVoxelModuleStatics::RightAngleToVoxelIndex((ERightAngle)InRotate);
 		SetPlannedVoxel(Index, VoxelItem);
 	}
 

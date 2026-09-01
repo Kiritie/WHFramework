@@ -15,6 +15,7 @@ struct FVoxelBuildingRotationCache
 	int32 MaxX = -1;
 	int32 MinY = 0;
 	int32 MaxY = -1;
+	int32 MinZ = 0;
 	int32 MaxZ = 0;
 };
 
@@ -22,6 +23,7 @@ struct FVoxelBuildingPrefabCache
 {
 	TArray<FVoxelBuildingRotationCache> Rotations;
 	int32 ClearHeight = 0;
+	int32 GroundOffset = 0;
 };
 
 struct FVoxelBuildingPlacementPlan
@@ -41,13 +43,12 @@ public:
 	{
 		PrefabAsset = FPrimaryAssetId();
 		Chance = 1.f;
-		FrontDirection = ERightAngle::RA_270;
 		MaxTerrainSlope = 4;
 		MinHeightAboveSeaLevel = 1;
 	}
 
-	FVoxelBuildingGenerateData(const FPrimaryAssetId& InPrefabAsset, const float InChance, const ERightAngle InFrontDirection = ERightAngle::RA_270)
-		: PrefabAsset(InPrefabAsset), Chance(InChance), FrontDirection(InFrontDirection), MaxTerrainSlope(4), MinHeightAboveSeaLevel(1)
+	FVoxelBuildingGenerateData(const FPrimaryAssetId& InPrefabAsset, const float InChance)
+		: PrefabAsset(InPrefabAsset), Chance(InChance), MaxTerrainSlope(4), MinHeightAboveSeaLevel(1)
 	{
 	}
 
@@ -57,9 +58,6 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0"))
 	float Chance;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	ERightAngle FrontDirection;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
 	int32 MaxTerrainSlope;

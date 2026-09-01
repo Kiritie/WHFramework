@@ -3,6 +3,7 @@
 #include "Voxel/VoxelModuleTypes.h"
 
 #include "Asset/AssetModuleStatics.h"
+#include "GameFramework/Actor.h"
 #include "Math/MathHelper.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
@@ -224,7 +225,19 @@ UVoxel& FVoxelItem::GetVoxel() const
 
 FVoxelHitResult::FVoxelHitResult(const FHitResult& InHitResult)
 {
-	VoxelItem = UVoxelModule::Get().GetVoxelByLocation(InHitResult.ImpactPoint - UVoxelModule::Get().GetWorldData().GetBlockSizedNormal(InHitResult.ImpactNormal, 0.01f), true);
+	UVoxelModule& VoxelModule = UVoxelModule::Get();
+	const FVector HitLocation = InHitResult.ImpactPoint - VoxelModule.GetWorldData().GetBlockSizedNormal(InHitResult.ImpactNormal, 0.01f);
+	if(InHitResult.GetActor() && InHitResult.GetActor()->ActorHasTag(TEXT("PrefabGround")))
+	{
+		if(UVoxelChunk* Chunk = VoxelModule.GetChunkByLocation(HitLocation))
+		{
+			VoxelItem = FVoxelItem(EVoxelType::Grass, Chunk->LocationToIndex(HitLocation), Chunk);
+		}
+	}
+	else
+	{
+		VoxelItem = VoxelModule.GetVoxelByLocation(HitLocation, true);
+	}
 	Point = InHitResult.ImpactPoint;
 	Normal = InHitResult.ImpactNormal;
 }

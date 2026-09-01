@@ -16,7 +16,7 @@ UVoxelBuildingGenerator::UVoxelBuildingGenerator()
 	SpawnRate = 0.00025f;
 
 	GenerateDatas = {
-		FVoxelBuildingGenerateData(FPrimaryAssetId(TEXT("VoxelPrefab:DA_Dungeon_1")), 1.f),
+		FVoxelBuildingGenerateData(FPrimaryAssetId(TEXT("VoxelPrefab:DA_Ruin_1")), 1.f),
 	};
 }
 
@@ -38,6 +38,12 @@ void UVoxelBuildingGenerator::Initialize(UVoxelModule* InModule)
 		_PrefabAssets.Add(Prefab);
 		if(IsValid(Prefab))
 		{
+			const bool bUnderground = Prefab->CenterOffset.Z < 0.f;
+			const int32 VerticalOffset = bUnderground ? FMath::FloorToInt(Prefab->CenterOffset.Z) : 0;
+			const FIndex CenterOffset(
+				FMath::FloorToInt(Prefab->CenterOffset.X),
+				FMath::FloorToInt(Prefab->CenterOffset.Y),
+				0);
 			TArray<FString> SerializedVoxelDatas;
 			Prefab->VoxelDatas.ParseIntoArray(SerializedVoxelDatas, TEXT("|"));
 			TArray<FVoxelItem> SourceItems;
@@ -45,29 +51,57 @@ void UVoxelBuildingGenerator::Initialize(UVoxelModule* InModule)
 			int32 SourceMaxX = MIN_int32;
 			int32 SourceMinY = MAX_int32;
 			int32 SourceMaxY = MIN_int32;
+			int32 SourceMinZ = MAX_int32;
+			int32 EntranceBorderMinX = MAX_int32;
+			int32 EntranceBorderMaxX = MIN_int32;
+			int32 EntranceBorderMinY = MAX_int32;
+			int32 EntranceBorderMaxY = MIN_int32;
 			for(const FString& SerializedVoxelData : SerializedVoxelDatas)
 			{
 				FVoxelItem Item(SerializedVoxelData, true);
 				if(!Item.IsValid()) continue;
+				Item.Index = Item.Index - CenterOffset;
 				SourceItems.Add(Item);
 				SourceMinX = FMath::Min(SourceMinX, Item.Index.X);
 				SourceMaxX = FMath::Max(SourceMaxX, Item.Index.X);
 				SourceMinY = FMath::Min(SourceMinY, Item.Index.Y);
 				SourceMaxY = FMath::Max(SourceMaxY, Item.Index.Y);
+				SourceMinZ = FMath::Min(SourceMinZ, Item.Index.Z);
+				if(bUnderground && Item.Index.Z + VerticalOffset == 0)
+				{
+					EntranceBorderMinX = FMath::Min(EntranceBorderMinX, Item.Index.X);
+					EntranceBorderMaxX = FMath::Max(EntranceBorderMaxX, Item.Index.X);
+					EntranceBorderMinY = FMath::Min(EntranceBorderMinY, Item.Index.Y);
+					EntranceBorderMaxY = FMath::Max(EntranceBorderMaxY, Item.Index.Y);
+				}
 			}
 			if(SourceItems.IsEmpty()) continue;
 
 			TArray<FIndex> SourceEntranceIndices;
-			switch(GenerateData.FrontDirection)
+			if(bUnderground)
 			{
-				case ERightAngle::RA_0: for(int32 Y = SourceMinY; Y <= SourceMaxY; ++Y) SourceEntranceIndices.Emplace(SourceMaxX, Y, 0); break;
-				case ERightAngle::RA_90: for(int32 X = SourceMinX; X <= SourceMaxX; ++X) SourceEntranceIndices.Emplace(X, SourceMaxY, 0); break;
-				case ERightAngle::RA_180: for(int32 Y = SourceMinY; Y <= SourceMaxY; ++Y) SourceEntranceIndices.Emplace(SourceMinX, Y, 0); break;
-				default: for(int32 X = SourceMinX; X <= SourceMaxX; ++X) SourceEntranceIndices.Emplace(X, SourceMinY, 0); break;
+				if(EntranceBorderMinX != MAX_int32 && EntranceBorderMinY != MAX_int32)
+				{
+					for(int32 X = EntranceBorderMinX + 1; X < EntranceBorderMaxX; ++X)
+					{
+						for(int32 Y = EntranceBorderMinY + 1; Y < EntranceBorderMaxY; ++Y)
+						{
+							SourceEntranceIndices.Emplace(X, Y, 0);
+						}
+					}
+				}
+			}
+			else
+			{
+				for(int32 Y = SourceMinY; Y <= SourceMaxY; ++Y)
+				{
+					SourceEntranceIndices.Emplace(SourceMinX, Y, 0);
+				}
 			}
 
 			FVoxelBuildingPrefabCache& PrefabCache = _PrefabCaches[DataIndex];
-			PrefabCache.ClearHeight = FMath::CeilToInt(Prefab->VoxelSize.Z);
+			PrefabCache.ClearHeight = bUnderground ? 0 : FMath::CeilToInt(Prefab->VoxelSize.Z);
+			PrefabCache.GroundOffset = bUnderground ? VerticalOffset : 1 - SourceMinZ;
 			PrefabCache.Rotations.SetNum(4);
 			for(int32 Rotation = 0; Rotation < 4; ++Rotation)
 			{
@@ -78,6 +112,7 @@ void UVoxelBuildingGenerator::Initialize(UVoxelModule* InModule)
 				RotationCache.MaxX = MIN_int32;
 				RotationCache.MinY = MAX_int32;
 				RotationCache.MaxY = MIN_int32;
+				RotationCache.MinZ = MAX_int32;
 				for(const FVoxelItem& SourceItem : SourceItems)
 				{
 					FVoxelItem Item = SourceItem;
@@ -91,13 +126,17 @@ void UVoxelBuildingGenerator::Initialize(UVoxelModule* InModule)
 					RotationCache.MaxX = FMath::Max(RotationCache.MaxX, Item.Index.X);
 					RotationCache.MinY = FMath::Min(RotationCache.MinY, Item.Index.Y);
 					RotationCache.MaxY = FMath::Max(RotationCache.MaxY, Item.Index.Y);
+					RotationCache.MinZ = FMath::Min(RotationCache.MinZ, Item.Index.Z);
 					RotationCache.MaxZ = FMath::Max(RotationCache.MaxZ, Item.Index.Z);
 				}
 				for(const FIndex& EntranceIndex : SourceEntranceIndices)
 				{
 					RotationCache.EntranceIndices.Add(FMathHelper::RotateIndex(EntranceIndex, RotationAngle) + RotationOffset);
 				}
-				PrefabCache.ClearHeight = FMath::Max(PrefabCache.ClearHeight, RotationCache.MaxZ);
+				if(!bUnderground)
+				{
+					PrefabCache.ClearHeight = FMath::Max(PrefabCache.ClearHeight, RotationCache.MaxZ + PrefabCache.GroundOffset);
+				}
 				const int32 RotationExtent = FMath::Max(
 					FMath::Max(FMath::Abs(RotationCache.MinX), FMath::Abs(RotationCache.MaxX)),
 					FMath::Max(FMath::Abs(RotationCache.MinY), FMath::Abs(RotationCache.MaxY)));
@@ -290,6 +329,9 @@ bool UVoxelBuildingGenerator::PlaceBuildingSlice(UVoxelChunk* InChunk, FIndex In
 	if(!Plan.bValid || !_PrefabCaches[InBuildingIndex].Rotations.IsValidIndex(Plan.Rotation)) return false;
 	const FVoxelBuildingPrefabCache& PrefabCache = _PrefabCaches[InBuildingIndex];
 	const FVoxelBuildingRotationCache& RotationCache = PrefabCache.Rotations[Plan.Rotation];
+	const bool bUnderground = _PrefabAssets.IsValidIndex(InBuildingIndex)
+		&& IsValid(_PrefabAssets[InBuildingIndex])
+		&& _PrefabAssets[InBuildingIndex]->CenterOffset.Z < 0.f;
 	const FIndex ChunkOrigin = InChunk->GetWorldIndex();
 	const FIndex ChunkSize = Module->GetWorldData().ChunkSize;
 	auto SetSliceVoxel = [InChunk, ChunkOrigin, ChunkSize](const FIndex& WorldIndex, const FVoxelItem& VoxelItem, bool bSafe = false)
@@ -303,29 +345,49 @@ bool UVoxelBuildingGenerator::PlaceBuildingSlice(UVoxelChunk* InChunk, FIndex In
 	const int32 SliceMaxX = FMath::Min(RotationCache.MaxX, ChunkOrigin.X + ChunkSize.X - 1 - InX);
 	const int32 SliceMinY = FMath::Max(RotationCache.MinY, ChunkOrigin.Y - InY);
 	const int32 SliceMaxY = FMath::Min(RotationCache.MaxY, ChunkOrigin.Y + ChunkSize.Y - 1 - InY);
-	for(int32 X = SliceMinX; X <= SliceMaxX; ++X)
+	if(bUnderground)
 	{
-		for(int32 Y = SliceMinY; Y <= SliceMaxY; ++Y)
+		for(int32 X = SliceMinX; X <= SliceMaxX; ++X)
 		{
-			const int32 SurfaceHeight = Module->SampleTopographyByIndex(FIndex(InX + X, InY + Y)).Height;
-			for(int32 Z = SurfaceHeight; Z <= Plan.GroundHeight; ++Z)
+			for(int32 Y = SliceMinY; Y <= SliceMaxY; ++Y)
 			{
-				SetSliceVoxel(FIndex(InX + X, InY + Y, Z), EVoxelType::Cobble_Stone);
+				for(int32 Z = RotationCache.MinZ + PrefabCache.GroundOffset; Z < 0; ++Z)
+				{
+					SetSliceVoxel(FIndex(InX + X, InY + Y, Plan.GroundHeight + Z), FVoxelItem::Empty, true);
+				}
 			}
 		}
-	}
-
-	const int32 ClearMinX = FMath::Max(RotationCache.MinX - 1, ChunkOrigin.X - InX);
-	const int32 ClearMaxX = FMath::Min(RotationCache.MaxX + 1, ChunkOrigin.X + ChunkSize.X - 1 - InX);
-	const int32 ClearMinY = FMath::Max(RotationCache.MinY - 1, ChunkOrigin.Y - InY);
-	const int32 ClearMaxY = FMath::Min(RotationCache.MaxY + 1, ChunkOrigin.Y + ChunkSize.Y - 1 - InY);
-	for(int32 X = ClearMinX; X <= ClearMaxX; ++X)
-	{
-		for(int32 Y = ClearMinY; Y <= ClearMaxY; ++Y)
+		for(const FIndex& EntranceIndex : RotationCache.EntranceIndices)
 		{
-			for(int32 Z = 1; Z <= PrefabCache.ClearHeight; ++Z)
+			SetSliceVoxel(FIndex(InX + EntranceIndex.X, InY + EntranceIndex.Y, Plan.GroundHeight), FVoxelItem::Empty, true);
+		}
+	}
+	else
+	{
+		for(int32 X = SliceMinX; X <= SliceMaxX; ++X)
+		{
+			for(int32 Y = SliceMinY; Y <= SliceMaxY; ++Y)
 			{
-				SetSliceVoxel(FIndex(InX + X, InY + Y, Plan.GroundHeight + Z), FVoxelItem::Empty, true);
+				const int32 SurfaceHeight = Module->SampleTopographyByIndex(FIndex(InX + X, InY + Y)).Height;
+				for(int32 Z = SurfaceHeight; Z <= Plan.GroundHeight; ++Z)
+				{
+					SetSliceVoxel(FIndex(InX + X, InY + Y, Z), EVoxelType::Cobble_Stone);
+				}
+			}
+		}
+
+		const int32 ClearMinX = FMath::Max(RotationCache.MinX - 1, ChunkOrigin.X - InX);
+		const int32 ClearMaxX = FMath::Min(RotationCache.MaxX + 1, ChunkOrigin.X + ChunkSize.X - 1 - InX);
+		const int32 ClearMinY = FMath::Max(RotationCache.MinY - 1, ChunkOrigin.Y - InY);
+		const int32 ClearMaxY = FMath::Min(RotationCache.MaxY + 1, ChunkOrigin.Y + ChunkSize.Y - 1 - InY);
+		for(int32 X = ClearMinX; X <= ClearMaxX; ++X)
+		{
+			for(int32 Y = ClearMinY; Y <= ClearMaxY; ++Y)
+			{
+				for(int32 Z = 1; Z <= PrefabCache.ClearHeight; ++Z)
+				{
+					SetSliceVoxel(FIndex(InX + X, InY + Y, Plan.GroundHeight + Z), FVoxelItem::Empty, true);
+				}
 			}
 		}
 	}
@@ -334,7 +396,7 @@ bool UVoxelBuildingGenerator::PlaceBuildingSlice(UVoxelChunk* InChunk, FIndex In
 	const FIndex SliceIndex = InChunk->GetIndex() - InAnchorChunkIndex;
 	if(const TArray<FVoxelItem>* SliceItems = RotationCache.ChunkSlices.Find(SliceIndex))
 	{
-		for(const FVoxelItem& VoxelItem : *SliceItems) SetSliceVoxel(BuildingOrigin + VoxelItem.Index, VoxelItem);
+		for(const FVoxelItem& VoxelItem : *SliceItems) SetSliceVoxel(BuildingOrigin + VoxelItem.Index + FIndex(0, 0, PrefabCache.GroundOffset), VoxelItem);
 	}
 	return true;
 }

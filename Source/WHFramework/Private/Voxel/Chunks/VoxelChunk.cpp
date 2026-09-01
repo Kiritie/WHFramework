@@ -236,7 +236,7 @@ void UVoxelChunk::ClearMap(bool bGenerate)
 {
 	for(auto& Iter : VoxelMap) DestroyAuxiliary(Iter.Value);
 	VoxelMap.Empty();
-	Generate(EPhase::Lesser);
+	if(bGenerate) Generate(EPhase::Lesser);
 }
 
 void UVoxelChunk::BuildMap(int32 InStage)
@@ -251,9 +251,6 @@ void UVoxelChunk::BuildMap(int32 InStage)
 
 void UVoxelChunk::BuildPrefabMap()
 {
-	ITER_INDEX2D(_Index, Module->GetWorldData().ChunkSize, false,
-		SetVoxel(_Index, EVoxelType::Grass);
-	)
 	bBuilded = true;
 	MapBuildStage.Store(static_cast<int32>(EVoxelGenerationStage::Liquid) + 1);
 }
@@ -577,7 +574,8 @@ bool UVoxelChunk::CheckVoxelAdjacent(const FVoxelItem& InVoxelItem, EDirectionN 
 {
 	const FIndex AdjacentIndex = FMathHelper::GetAdjacentIndex(InVoxelItem.Index, InDirection, InVoxelItem.Angle);
 	
-	if(!InVoxelItem.IsValid() || AdjacentIndex.Z <= 0) return true;
+	if(!InVoxelItem.IsValid() || AdjacentIndex.Z < 0 ||
+		(AdjacentIndex.Z == 0 && UVoxelModuleStatics::GetVoxelWorldMode() != EVoxelWorldMode::Prefab)) return true;
 	
 	const FVoxelItem& AdjacentItem = GetVoxelComplex(AdjacentIndex);
 	if(AdjacentItem.IsValid())

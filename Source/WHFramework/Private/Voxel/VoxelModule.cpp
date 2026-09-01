@@ -9,6 +9,7 @@
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Voxel/EventHandle_VoxelWorldModeChanged.h"
 #include "Event/Handle/Voxel/EventHandle_VoxelWorldStateChanged.h"
+#include "Engine/Texture2D.h"
 #include "Main/MainModuleStatics.h"
 #include "Math/MathHelper.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
@@ -29,6 +30,7 @@
 #include "Event/Handle/Voxel/EventHandle_VoxelWorldCenterChanged.h"
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Main/MainModule.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Math/MathTypes.h"
 #include "SaveGame/SaveGameModuleStatics.h"
 #include "SaveGame/Module/VoxelSaveGame.h"
@@ -610,20 +612,34 @@ void UVoxelModule::LoadPrefabData(const FVoxelPrefabSaveData& InPrefabData)
 	{
 		TArray<FString> VoxelDatas;
 		InPrefabData.VoxelDatas.ParseIntoArray(VoxelDatas, TEXT("|"));
+		TArray<FVoxelItem> VoxelItems;
+		int32 MinZ = MAX_int32;
 		for(auto& Iter : VoxelDatas)
 		{
-			const FVoxelItem VoxelItem = FVoxelItem(Iter, true);
+			const FVoxelItem VoxelItem(Iter, true);
 			if(VoxelItem.IsValid())
 			{
+				VoxelItems.Add(VoxelItem);
+				MinZ = FMath::Min(MinZ, VoxelItem.Index.Z);
+			}
+		}
+		for(FVoxelItem& VoxelItem : VoxelItems)
+		{
+			VoxelItem.Index.Z -= MinZ;
+			if(UVoxelChunk* Chunk = GetChunkByVoxelIndex(VoxelItem.Index))
+			{
 				SetVoxelByIndex(VoxelItem.Index, VoxelItem);
-				GenerateChunks.AddUnique(GetChunkByVoxelIndex(VoxelItem.Index));
+				GenerateChunks.AddUnique(Chunk);
 			}
 		}
 	}
 	for(auto Iter : GenerateChunks)
 	{
-		Iter->Generate(EPhase::Lesser);
-		Iter->SetChanged(true);
+		if(Iter)
+		{
+			Iter->Generate(EPhase::Lesser);
+			Iter->SetChanged(true);
+		}
 	}
 }
 
@@ -638,7 +654,7 @@ FVoxelPrefabSaveData UVoxelModule::GetPrefabData()
 			for(auto& VoxelIter : Iter.Value->VoxelMap)
 			{
 				FVoxelItem& Item = VoxelIter.Value;
-				if((Iter.Key.Z > 0 || Item.Index.Z > 0) && Item.IsValid())
+				if(Item.IsValid())
 				{
 					PrefabData.VoxelDatas.Appendf(TEXT("%s|"), *Item.ToSaveData(true, true));
 				}
