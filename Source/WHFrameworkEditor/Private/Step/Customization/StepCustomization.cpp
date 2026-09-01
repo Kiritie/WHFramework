@@ -46,7 +46,7 @@ void FStepCustomization::CustomizeDetails(IDetailLayoutBuilder& DetailLayoutBuil
 		.WholeRowContent()
 		[
 			SNew(SWrapBox)
-			.UseAllottedWidth(true)
+			.UseAllottedSize(true)
 			+SWrapBox::Slot()
 			[
 				SNew(SButton)

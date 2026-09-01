@@ -117,75 +117,75 @@ ERightAngle FMathHelper::CombineRightAngle(ERightAngle InAngle1, ERightAngle InA
 	return (ERightAngle)(((int32)InAngle1 + (int32)InAngle2) % 4);
 }
 
-EDirection FMathHelper::InvertDirection(EDirection InDirection)
+EDirectionN FMathHelper::InvertDirection(EDirectionN InDirection)
 {
 	switch (InDirection)
 	{
-		case EDirection::Forward:
-			return EDirection::Backward;
-		case EDirection::Right:
-			return EDirection::Left;
-		case EDirection::Backward:
-			return EDirection::Forward;
-		case EDirection::Left:
-			return EDirection::Right;
-		case EDirection::Up:
-			return EDirection::Down;
-		case EDirection::Down:
-			return EDirection::Up;
+		case EDirectionN::Forward:
+			return EDirectionN::Backward;
+		case EDirectionN::Right:
+			return EDirectionN::Left;
+		case EDirectionN::Backward:
+			return EDirectionN::Forward;
+		case EDirectionN::Left:
+			return EDirectionN::Right;
+		case EDirectionN::Up:
+			return EDirectionN::Down;
+		case EDirectionN::Down:
+			return EDirectionN::Up;
 		default: break;
 	}
 	return InDirection;
 }
 
-EDirection FMathHelper::RotateDirection(EDirection InDirection, ERightAngle InAngle)
+EDirectionN FMathHelper::RotateDirection(EDirectionN InDirection, ERightAngle InAngle)
 {
 	switch (InDirection)
 	{
-		case EDirection::Forward:
-		case EDirection::Right:
-		case EDirection::Backward:
-		case EDirection::Left:
+		case EDirectionN::Forward:
+		case EDirectionN::Right:
+		case EDirectionN::Backward:
+		case EDirectionN::Left:
 		{
 			const int32 Direction = (int32)InDirection + (int32)InAngle;
-			return EDirection(Direction < 4 ? Direction : Direction - 4);
+			return EDirectionN(Direction < 4 ? Direction : Direction - 4);
 		}
-		case EDirection::Up:
-			return EDirection::Up;
-		case EDirection::Down:
-			return EDirection::Down;
+		case EDirectionN::Up:
+			return EDirectionN::Up;
+		case EDirectionN::Down:
+			return EDirectionN::Down;
 		default: break;
 	}
 	return InDirection;
 }
 
-FVector FMathHelper::DirectionToVector(EDirection InDirection, ERightAngle InAngle)
+FVector FMathHelper::DirectionToVector(EDirectionN InDirection, ERightAngle InAngle)
 {
 	switch (RotateDirection(InDirection, InAngle))
 	{
-		case EDirection::Forward:
+		case EDirectionN::Forward:
 			return FVector::ForwardVector;
-		case EDirection::Right:
+		case EDirectionN::Right:
 			return FVector::RightVector;
-		case EDirection::Backward:
+		case EDirectionN::Backward:
 			return FVector::BackwardVector;
-		case EDirection::Left:
+		case EDirectionN::Left:
 			return FVector::LeftVector;
-		case EDirection::Up:
+		case EDirectionN::Up:
 			return FVector::UpVector;
-		case EDirection::Down:
+		case EDirectionN::Down:
 			return FVector::DownVector;
 		default: break;
 	}
 	return FVector::ZeroVector;
 }
 
-FIndex FMathHelper::DirectionToIndex(EDirection InDirection, ERightAngle InAngle)
+FIndex FMathHelper::DirectionToIndex(EDirectionN InDirection, ERightAngle InAngle)
 {
 	return FIndex(DirectionToVector(InDirection, InAngle));
 }
 
-FIndex FMathHelper::GetAdjacentIndex(FIndex InIndex, EDirection InDirection, ERightAngle InAngle)
+FIndex FMathHelper::GetAdjacentIndex(FIndex InIndex, EDirectionN InDirection, ERightAngle InAngle)
 {
 	return InIndex + DirectionToIndex(InDirection, InAngle);
 }

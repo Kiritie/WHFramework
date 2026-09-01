@@ -53,15 +53,15 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Direction
-	static EDirection InvertDirection(EDirection InDirection);
+	static EDirectionN InvertDirection(EDirectionN InDirection);
 
-	static EDirection RotateDirection(EDirection InDirection, ERightAngle InAngle);
+	static EDirectionN RotateDirection(EDirectionN InDirection, ERightAngle InAngle);
 
-	static FVector DirectionToVector(EDirection InDirection, ERightAngle InAngle = ERightAngle::RA_0);
+	static FVector DirectionToVector(EDirectionN InDirection, ERightAngle InAngle = ERightAngle::RA_0);
 
-	static FIndex DirectionToIndex(EDirection InDirection, ERightAngle InAngle = ERightAngle::RA_0);
+	static FIndex DirectionToIndex(EDirectionN InDirection, ERightAngle InAngle = ERightAngle::RA_0);
 
-	static FIndex GetAdjacentIndex(FIndex InIndex, EDirection InDirection, ERightAngle InAngle = ERightAngle::RA_0);
+	static FIndex GetAdjacentIndex(FIndex InIndex, EDirectionN InDirection, ERightAngle InAngle = ERightAngle::RA_0);
 	
 	//////////////////////////////////////////////////////////////////////////
 	// Ease

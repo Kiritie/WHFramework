@@ -549,13 +549,13 @@ TFuture<FFileDownloaderResult> FFileDownloader::DownloadFileByChunk(const FStrin
 	const FString RangeHeaderValue = FString::Format(TEXT("bytes={0}-{1}"), {ChunkRange.X, ChunkRange.Y});
 	HttpRequestRef->SetHeader(TEXT("Range"), RangeHeaderValue);
 
-	HttpRequestRef->OnRequestProgress().BindLambda([WeakThisPtr, ContentSize, ChunkRange, ProgressFun](FHttpRequestPtr Request, int32 BytesSent, int32 BytesReceived)
+	HttpRequestRef->OnRequestProgress64().BindLambda([WeakThisPtr, ContentSize, ChunkRange, ProgressFun](FHttpRequestPtr Request, uint64 BytesSent, uint64 BytesReceived)
 	{
 		TSharedPtr<FFileDownloader> SharedThis = WeakThisPtr.Pin();
 		if (SharedThis.IsValid())
 		{
 			const float Progress = ContentSize <= 0 ? 0.0f : static_cast<float>(BytesReceived) / ContentSize;
-			WHLog(FString::Printf(TEXT("Downloaded %d bytes of file InChunk from %s. Range: {%lld; %lld}, Overall: %lld, Progress: %f"), BytesReceived, *Request->GetURL(), ChunkRange.X, ChunkRange.Y, ContentSize, Progress), EDC_WebRequest, EDV_Log);
+			WHLog(FString::Printf(TEXT("Downloaded %llu bytes of file InChunk from %s. Range: {%lld; %lld}, Overall: %lld, Progress: %f"), BytesReceived, *Request->GetURL(), ChunkRange.X, ChunkRange.Y, ContentSize, Progress), EDC_WebRequest, EDV_Log);
 			ProgressFun(BytesSent, BytesReceived, ContentSize);
 		}
 	});
@@ -632,14 +632,14 @@ TFuture<FFileDownloaderResult> FFileDownloader::DownloadFileByPayload(const FStr
 
 	HttpRequestRef->SetTimeout(Timeout);
 
-	HttpRequestRef->OnRequestProgress().BindLambda([WeakThisPtr, URL](FHttpRequestPtr Request, int32 BytesSent, int32 BytesReceived)
+	HttpRequestRef->OnRequestProgress64().BindLambda([WeakThisPtr, URL](FHttpRequestPtr Request, uint64 BytesSent, uint64 BytesReceived)
 	{
 		TSharedPtr<FFileDownloader> SharedThis = WeakThisPtr.Pin();
 		if (SharedThis.IsValid())
 		{
 			const int64 ContentLength = Request->GetContentLength();
 			const float Progress = ContentLength <= 0 ? 0.0f : static_cast<float>(BytesReceived) / ContentLength;
-			WHLog(FString::Printf(TEXT("Downloaded %d bytes of file InChunk from %s by payload. Overall: %lld, Progress: %f"), BytesReceived, *Request->GetURL(), static_cast<int64>(Request->GetContentLength()), Progress), EDC_WebRequest, EDV_Log);
+			WHLog(FString::Printf(TEXT("Downloaded %llu bytes of file InChunk from %s by payload. Overall: %lld, Progress: %f"), BytesReceived, *Request->GetURL(), static_cast<int64>(Request->GetContentLength()), Progress), EDC_WebRequest, EDV_Log);
 			SharedThis->OnProgress.Broadcast(URL, 0, 1, BytesSent, BytesReceived, ContentLength);
 		}
 	});

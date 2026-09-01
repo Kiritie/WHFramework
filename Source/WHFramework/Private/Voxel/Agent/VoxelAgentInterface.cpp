@@ -1,6 +1,6 @@
 #include "Voxel/Agent/VoxelAgentInterface.h"
 
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Math/MathHelper.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Voxel/VoxelModule.h"
@@ -118,7 +118,7 @@ bool IVoxelAgentInterface::OnDestroyVoxel(EInputInteractEvent InInteractEvent, c
 				{
 					DestroyVoxelItem = InHitResult.VoxelItem;
 				}
-				DestroyVoxelItem.Durability -= UCommonStatics::GetCurrentDeltaSeconds() * GetDestroyVoxelRate() * (GetGenerateToolType() != EVoxelGenerateToolType::None && (int32)GetGenerateToolType() == (int32)DestroyVoxelItem.GetData().Element ? 1.7f : 1.f) / DestroyVoxelItem.GetData().Hardness;
+				DestroyVoxelItem.Durability -= UCommonModuleStatics::GetCurrentDeltaSeconds() * GetDestroyVoxelRate() * (GetGenerateToolType() != EVoxelGenerateToolType::None && (int32)GetGenerateToolType() == (int32)DestroyVoxelItem.GetData().Element ? 1.7f : 1.f) / DestroyVoxelItem.GetData().Hardness;
 			}
 			if(DestroyVoxelItem.Durability <= 0.f)
 			{

@@ -8,7 +8,7 @@
 #include "Character/CharacterModuleNetworkComponent.h"
 #include "Character/Base/CharacterBase.h"
 #include "Gameplay/WHPlayerController.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Net/UnrealNetwork.h"
 #include "SaveGame/Module/CharacterSaveGame.h"
 #include "Scene/SceneModuleStatics.h"
@@ -154,7 +154,7 @@ void UCharacterModule::SwitchCharacter(ACharacterBase* InCharacter, bool bResetC
 {
 	if(CurrentCharacter == InCharacter) return;
 
-	AWHPlayerController* PlayerController = UCommonStatics::GetPlayerController<AWHPlayerController>();
+	AWHPlayerController* PlayerController = UCommonModuleStatics::GetPlayerController<AWHPlayerController>();
 	
 	if(InCharacter)
 	{

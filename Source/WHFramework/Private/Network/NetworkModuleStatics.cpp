@@ -4,7 +4,7 @@
 #include "Network/NetworkModuleStatics.h"
 
 #include "Debug/DebugModuleTypes.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Main/MainModule.h"
 #include "Network/NetworkModule.h"
 #include "Network/NetworkModuleNetworkComponent.h"
@@ -70,7 +70,7 @@ void UNetworkModuleStatics::ServerExecuteActorFunc(AActor* InActor, FName InFunc
 	
 	if (InActor->GetWorld()->GetNetMode() != ENetMode::NM_Client)
 	{
-		if (UCommonStatics::ExecuteObjectFunc(InActor, InFuncName, nullptr))
+		if (UCommonModuleStatics::ExecuteObjectFunc(InActor, InFuncName, nullptr))
 		{
 			WHLog(FString::Printf(TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName()), EDC_Network);
 		}
@@ -87,7 +87,7 @@ void UNetworkModuleStatics::ServerExecuteActorFuncOneParam(AActor* InActor, FNam
 	
 	if (InActor->GetWorld()->GetNetMode() != ENetMode::NM_Client)
 	{
-		if (UCommonStatics::ExecuteObjectFunc(InActor, InFuncName, &InParam))
+		if (UCommonModuleStatics::ExecuteObjectFunc(InActor, InFuncName, &InParam))
 		{
 			WHLog(FString::Printf(TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName()), EDC_Network);
 		}
@@ -110,7 +110,7 @@ void UNetworkModuleStatics::ServerExecuteActorFuncTwoParam(AActor* InActor, FNam
 			FParameter Param2;
 		} Params{InParam1, InParam2};
 		
-		if (UCommonStatics::ExecuteObjectFunc(InActor, InFuncName, &Params))
+		if (UCommonModuleStatics::ExecuteObjectFunc(InActor, InFuncName, &Params))
 		{
 			WHLog(FString::Printf(TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName()), EDC_Network);
 		}
@@ -134,7 +134,7 @@ void UNetworkModuleStatics::ServerExecuteActorFuncThreeParam(AActor* InActor, FN
 			FParameter Param3;
 		} Params{InParam1, InParam2, InParam3};
 		
-		if (UCommonStatics::ExecuteObjectFunc(InActor, InFuncName, &Params))
+		if (UCommonModuleStatics::ExecuteObjectFunc(InActor, InFuncName, &Params))
 		{
 			WHLog(FString::Printf(TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName()), EDC_Network);
 		}
@@ -159,7 +159,7 @@ void UNetworkModuleStatics::ServerExecuteActorFuncFourParam(AActor* InActor, FNa
 			FParameter Param4;
 		} Params{InParam1, InParam2, InParam3, InParam4};
 
-		if (UCommonStatics::ExecuteObjectFunc(InActor, InFuncName, &Params))
+		if (UCommonModuleStatics::ExecuteObjectFunc(InActor, InFuncName, &Params))
 		{
 			WHLog(FString::Printf(TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName()), EDC_Network);
 		}
@@ -185,7 +185,7 @@ void UNetworkModuleStatics::ServerExecuteActorFuncFiveParam(AActor* InActor, FNa
 			FParameter Param5;
 		} Params{InParam1, InParam2, InParam3, InParam4, InParam5};
 		
-		if (UCommonStatics::ExecuteObjectFunc(InActor, InFuncName, &Params))
+		if (UCommonModuleStatics::ExecuteObjectFunc(InActor, InFuncName, &Params))
 		{
 			WHLog(FString::Printf(TEXT("ServerExcuteActorFunc : InFuncName : %s, ExecuteActor : %s"), *InFuncName.ToString(), *InActor->GetClass()->GetName()), EDC_Network);
 		}

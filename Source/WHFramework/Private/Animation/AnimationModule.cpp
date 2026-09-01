@@ -4,7 +4,7 @@
 
 #include "DelayAction.h"
 #include "Animation/Widget/WidgetTransitionMaskBase.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Engine/LatentActionManager.h"
 #include "Main/MainModule.h"
 #include "Widget/WidgetModuleStatics.h"

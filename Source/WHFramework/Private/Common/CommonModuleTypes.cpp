@@ -1,9 +1,9 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleTypes.h"
 
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Debug/DebugModuleTypes.h"
 
 #if WITH_EDITOR
@@ -16,12 +16,12 @@ bool GIsSimulating = false;
 
 const UObject* GetWorldContext(bool bInEditor)
 {
-	return UCommonStatics::GetWorldContext(bInEditor);
+	return UCommonModuleStatics::GetWorldContext(bInEditor);
 }
 
 UObject* GetMutableWorldContext(bool bInEditor)
 {
-	return UCommonStatics::GetMutableWorldContext(bInEditor);
+	return UCommonModuleStatics::GetMutableWorldContext(bInEditor);
 }
 
 namespace GameplayTags

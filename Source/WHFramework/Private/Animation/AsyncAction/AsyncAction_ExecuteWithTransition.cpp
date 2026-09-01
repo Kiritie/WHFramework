@@ -3,7 +3,7 @@
 #include "Animation/AsyncAction/AsyncAction_ExecuteWithTransition.h"
 
 #include "Animation/AnimationModuleStatics.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 
 UAsyncAction_ExecuteWithTransition::UAsyncAction_ExecuteWithTransition(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -13,7 +13,7 @@ UAsyncAction_ExecuteWithTransition::UAsyncAction_ExecuteWithTransition(const FOb
 UAsyncAction_ExecuteWithTransition* UAsyncAction_ExecuteWithTransition::ExecuteWithTransition(float Duration)
 {
 	UAsyncAction_ExecuteWithTransition* ThisTask = NewObject<UAsyncAction_ExecuteWithTransition>();
-	ThisTask->RegisterWithGameInstance(UCommonStatics::GetGameInstance());
+	ThisTask->RegisterWithGameInstance(UCommonModuleStatics::GetGameInstance());
 
 	UAnimationModuleStatics::ExecuteWithTransition(Duration, [ThisTask]{ ThisTask->OnFinish.Broadcast(); } );
 	

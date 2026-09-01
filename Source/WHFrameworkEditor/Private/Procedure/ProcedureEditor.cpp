@@ -102,9 +102,9 @@ TSharedRef<FProcedureEditor> FProcedureEditorModule::CreateProcedureEditor(const
 
 void FProcedureEditorModule::OnClickedProcedureEditorButton()
 {
-	if(const UProcedureModule* ProcedureModule = UProcedureModule::GetPtr(!UCommonStatics::IsPlaying()))
+	if(const UProcedureModule* ProcedureModule = UProcedureModule::GetPtr(!UCommonModuleStatics::IsPlaying()))
 	{
-		if(UProcedureAsset* ProcedureAsset = !UCommonStatics::IsPlaying() ? ProcedureModule->GetDefaultAsset() : ProcedureModule->GetCurrentAsset())
+		if(UProcedureAsset* ProcedureAsset = !UCommonModuleStatics::IsPlaying() ? ProcedureModule->GetDefaultAsset() : ProcedureModule->GetCurrentAsset())
 		{
 			GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(ProcedureAsset);
 		}

@@ -3,7 +3,7 @@
 
 #include "Gameplay/WHGameManager.h"
 
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Gameplay/WHGameMode.h"
 
 // Sets default values
@@ -20,7 +20,7 @@ void AWHGameManager::OnInitialize_Implementation()
 {
 	AWHActor::OnInitialize_Implementation();
 
-	if(AWHGameMode* GameMode = UCommonStatics::GetGameMode<AWHGameMode>())
+	if(AWHGameMode* GameMode = UCommonModuleStatics::GetGameMode<AWHGameMode>())
 	{
 		GameMode->AddManagerToList(this);
 	}
@@ -40,7 +40,7 @@ void AWHGameManager::OnTermination_Implementation()
 {
 	AWHActor::OnTermination_Implementation();
 
-	if(AWHGameMode* GameMode = UCommonStatics::GetGameMode<AWHGameMode>())
+	if(AWHGameMode* GameMode = UCommonModuleStatics::GetGameMode<AWHGameMode>())
 	{
 		GameMode->RemoveManagerFromList(this);
 	}

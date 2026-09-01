@@ -38,7 +38,7 @@ void FCameraModuleCustomization::CustomizeDetails(IDetailLayoutBuilder& DetailLa
 		.WholeRowContent()
 		[
 			SNew(SWrapBox)
-			.UseAllottedWidth(true)
+			.UseAllottedSize(true)
 			+SWrapBox::Slot()
 			[
 				SNew(SButton)

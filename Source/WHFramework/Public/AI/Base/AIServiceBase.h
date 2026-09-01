@@ -3,7 +3,7 @@
 #pragma once
 
 #include "BehaviorTree/BTService.h"
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleTypes.h"
 #include "AIServiceBase.generated.h"
 
 class IAIAgentInterface;

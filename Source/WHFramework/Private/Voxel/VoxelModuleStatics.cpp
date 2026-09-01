@@ -105,7 +105,7 @@ TMap<FIndex, FVoxelLiquidUpdate> UVoxelModuleStatics::CalculateVoxelLiquidUpdate
 			const FVoxelLiquidState State(Iter.Value.Data);
 			if(State.IsSource())
 			{
-				for(const EDirection Direction : { EDirection::Forward, EDirection::Right, EDirection::Backward, EDirection::Left, EDirection::Down })
+				for(const EDirectionN Direction : { EDirectionN::Forward, EDirectionN::Right, EDirectionN::Backward, EDirectionN::Left, EDirectionN::Down })
 				{
 					const FIndex NeighborIndex = Iter.Key + FMathHelper::DirectionToIndex(Direction);
 					const FVoxelLiquidSnapshot* Neighbor = InSnapshots.Find(NeighborIndex);
@@ -150,7 +150,7 @@ TMap<FIndex, FVoxelLiquidUpdate> UVoxelModuleStatics::CalculateVoxelLiquidUpdate
 		const uint8 NextLevel = State.GetLevel() + 1;
 		if(NextLevel <= FVoxelLiquidState::MaxLevel)
 		{
-			for(const EDirection Direction : { EDirection::Forward, EDirection::Right, EDirection::Backward, EDirection::Left })
+			for(const EDirectionN Direction : { EDirectionN::Forward, EDirectionN::Right, EDirectionN::Backward, EDirectionN::Left })
 			{
 				const FIndex NeighborIndex = Index + FMathHelper::DirectionToIndex(Direction);
 				const FVoxelLiquidSnapshot* Neighbor = InSnapshots.Find(NeighborIndex);
@@ -242,7 +242,7 @@ bool UVoxelModuleStatics::CalculateVoxelLiquidUpdate(FIndex InIndex, const TMap<
 	}
 	if(!bHasState && OpenDepth > 1)
 	{
-		for(const EDirection Direction : { EDirection::Forward, EDirection::Right, EDirection::Backward, EDirection::Left })
+		for(const EDirectionN Direction : { EDirectionN::Forward, EDirectionN::Right, EDirectionN::Backward, EDirectionN::Left })
 		{
 			const FIndex NeighborIndex = InIndex + FMathHelper::DirectionToIndex(Direction);
 			const FVoxelLiquidSnapshot* Neighbor = InSnapshots.Find(NeighborIndex);
@@ -269,7 +269,7 @@ bool UVoxelModuleStatics::CalculateVoxelLiquidUpdate(FIndex InIndex, const TMap<
 		const int32 DropDepth = GetOpenDepth(DropTopIndex);
 		if(DropDepth == 1)
 		{
-			for(const EDirection Direction : { EDirection::Forward, EDirection::Right, EDirection::Backward, EDirection::Left })
+			for(const EDirectionN Direction : { EDirectionN::Forward, EDirectionN::Right, EDirectionN::Backward, EDirectionN::Left })
 			{
 				const FIndex UpperNeighborIndex = DropTopIndex + FMathHelper::DirectionToIndex(Direction);
 				const FVoxelLiquidSnapshot* UpperNeighbor = InSnapshots.Find(UpperNeighborIndex);
@@ -290,7 +290,7 @@ bool UVoxelModuleStatics::CalculateVoxelLiquidUpdate(FIndex InIndex, const TMap<
 		if(OpenDepth == 0)
 		{
 			uint8 Level = FVoxelLiquidState::MaxLevel + 1;
-			for(const EDirection Direction : { EDirection::Forward, EDirection::Right, EDirection::Backward, EDirection::Left })
+			for(const EDirectionN Direction : { EDirectionN::Forward, EDirectionN::Right, EDirectionN::Backward, EDirectionN::Left })
 			{
 				const FIndex NeighborIndex = InIndex + FMathHelper::DirectionToIndex(Direction);
 				const FVoxelLiquidSnapshot* Neighbor = InSnapshots.Find(NeighborIndex);

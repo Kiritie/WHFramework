@@ -9,7 +9,7 @@
 #include "Event/EventModuleNetworkComponent.h"
 #include "Event/Manager/EventManagerBase.h"
 #include "Event/Handle/EventHandleBase.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Event/Manager/DefaultEventManagerBase.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 
@@ -247,7 +247,7 @@ void UEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* 
 		{
 			for (auto& Iter2 : Iter1.Value.FuncNames)
 			{
-				if (EventHandle->Filter(Iter1.Key, Iter2) && UCommonStatics::ExecuteObjectFunc(Iter1.Key, Iter2, &Params))
+				if (EventHandle->Filter(Iter1.Key, Iter2) && UCommonModuleStatics::ExecuteObjectFunc(Iter1.Key, Iter2, &Params))
 				{
 					WHLog(FString::Printf(TEXT("ExecuteEvent : FuncName : %s, EventOwner : %s"), *Iter2.ToString(), *Iter1.Key->GetClass()->GetName()), EDC_Event);
 				}

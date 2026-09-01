@@ -3,7 +3,7 @@
 
 #include "WebRequest/Handle/WebRequestHandle_GetJson.h"
 
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Interfaces/IHttpResponse.h"
 
 UWebRequestHandle_GetJson::UWebRequestHandle_GetJson()
@@ -22,7 +22,7 @@ void UWebRequestHandle_GetJson::Parse(const FWebRequestResult& InResult, const T
 {
 	if(InResult.bSucceeded)
 	{
-		if(UCommonStatics::StringToJsonObject(InResult.HttpResponse->GetContentAsString(), Json))
+		if(UCommonModuleStatics::StringToJsonObject(InResult.HttpResponse->GetContentAsString(), Json))
 		{
 			bSucceeded = true;
 		}

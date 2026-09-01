@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleTypes.h"
 #include "Components/BoxComponent.h"
 #include "InteractionComponent.generated.h"
 

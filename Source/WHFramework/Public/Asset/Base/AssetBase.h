@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleTypes.h"
 #include "AssetBase.generated.h"
 
 /**

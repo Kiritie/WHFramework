@@ -3,7 +3,7 @@
 #pragma once
 
 
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleTypes.h"
 #include "Components/WidgetComponent.h"
 #include "CommonUserWidget.h"
 #include "ObjectPool/ObjectPoolInterface.h"

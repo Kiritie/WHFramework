@@ -102,9 +102,9 @@ TSharedRef<FStepEditor> FStepEditorModule::CreateStepEditor(const EToolkitMode::
 
 void FStepEditorModule::OnClickedStepEditorButton()
 {
-	if(const UStepModule* StepModule = UStepModule::GetPtr(!UCommonStatics::IsPlaying()))
+	if(const UStepModule* StepModule = UStepModule::GetPtr(!UCommonModuleStatics::IsPlaying()))
 	{
-		if(UStepAsset* StepAsset = !UCommonStatics::IsPlaying() ? StepModule->GetDefaultAsset() : StepModule->GetCurrentAsset())
+		if(UStepAsset* StepAsset = !UCommonModuleStatics::IsPlaying() ? StepModule->GetDefaultAsset() : StepModule->GetCurrentAsset())
 		{
 			GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(StepAsset);
 		}

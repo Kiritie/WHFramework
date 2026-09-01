@@ -163,7 +163,7 @@ void SSlateWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 
 	if(WidgetRefreshType == EWidgetRefreshType::Timer)
 	{
-		// UCommonStatics::GetCurrentTimerManager()->GetTimerManager().SetTimer(WidgetRefreshTimerHandle, this, &SSlateWidgetBase::Refresh, WidgetRefreshTime, true);
+		// UCommonModuleStatics::GetCurrentTimerManager()->GetTimerManager().SetTimer(WidgetRefreshTimerHandle, this, &SSlateWidgetBase::Refresh, WidgetRefreshTime, true);
 	}
 	if(bInstant)
 	{

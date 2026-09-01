@@ -15,7 +15,7 @@
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Common/Interaction/InteractionComponent.h"
 #include "FSM/Components/FSMComponent.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/Abilities/VitalityActionAbilityBase.h"
@@ -807,7 +807,7 @@ UAbilityInventoryBase* AAbilityCharacterBase::GetInventory() const
 
 bool AAbilityCharacterBase::IsPlayer() const
 {
-	return UCommonStatics::GetPlayerPawn() == this;
+	return UCommonModuleStatics::GetPlayerPawn() == this;
 }
 
 bool AAbilityCharacterBase::IsEnemy(IAbilityPawnInterface* InTarget) const

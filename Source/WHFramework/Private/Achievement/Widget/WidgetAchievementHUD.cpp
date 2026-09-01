@@ -4,7 +4,7 @@
 
 #include "Achievement/AchievementModule.h"
 #include "Achievement/Widget/WidgetAchievement.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Kismet/GameplayStatics.h"
 #include "UObject/ConstructorHelpers.h"
@@ -72,7 +72,7 @@ void UWidgetAchievementHUD::OnRefresh()
 	{
 		if (MovingUp)
 		{
-			CurrentTime += UCommonStatics::GetDeltaSeconds();
+			CurrentTime += UCommonModuleStatics::GetDeltaSeconds();
 			for (UWidgetAchievement* i : Active)
 			{
 				UCanvasPanelSlot* CSlot = Cast<UCanvasPanelSlot>(i->Slot);

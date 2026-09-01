@@ -6,7 +6,7 @@
 #include "Character/Base/CharacterBase.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 
 UCharacterAnimBase::UCharacterAnimBase()
 {
@@ -37,7 +37,7 @@ void UCharacterAnimBase::NativeUpdateAnimation(float DeltaSeconds)
 
 	ACharacterBase* Character = GetOwnerCharacter<ACharacterBase>();
 
-	if(!Character || !UCommonStatics::IsPlaying()) return;
+	if(!Character || !UCommonModuleStatics::IsPlaying()) return;
 	
 	UCharacterMovementComponent* MovementComponent = Character->GetCharacterMovement();
 	

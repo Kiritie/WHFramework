@@ -6,7 +6,7 @@
 #include "Fonts/SlateFontInfo.h"
 #include "Styling/SlateColor.h"
 #include "Widgets/SWidget.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Slate/Runtime/Interfaces/TickAbleWidgetInterface.h"
 #include "Widget/Pool/PoolWidgetBase.h"
 
@@ -80,7 +80,7 @@ public:
 public:
 	bool IsNumber() const
 	{
-		return UCommonStatics::TextIsNumber(TargetText);
+		return UCommonModuleStatics::TextIsNumber(TargetText);
 	}
 };
 
@@ -117,13 +117,13 @@ public:
 public:
 	FText GetCurrentText() const
 	{
-		return UCommonStatics::NumberToText(TargetNum - CurrentNum > 0.f ? FMath::FloorToInt(CurrentNum) : FMath::CeilToInt(CurrentNum), SymbolInfos);
+		return UCommonModuleStatics::NumberToText(TargetNum - CurrentNum > 0.f ? FMath::FloorToInt(CurrentNum) : FMath::CeilToInt(CurrentNum), SymbolInfos);
 	}
 
 	void SetTargetText(FText InTargetText)
 	{
 		TargetText = InTargetText;
-		TargetNum = UCommonStatics::TextToNumber(TargetText, SymbolInfos);
+		TargetNum = UCommonModuleStatics::TextToNumber(TargetText, SymbolInfos);
 		AnimSpeed = FMath::Abs(TargetNum - CurrentNum);
 	}
 };

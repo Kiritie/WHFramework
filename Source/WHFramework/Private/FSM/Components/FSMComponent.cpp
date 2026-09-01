@@ -3,7 +3,7 @@
 
 #include "FSM/Components/FSMComponent.h"
 
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Debug/DebugModuleTypes.h"
 #include "FSM/FSMModuleStatics.h"
 #include "FSM/Base/FSMAgentInterface.h"
@@ -40,7 +40,7 @@ void UFSMComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
-	if(UCommonStatics::IsPlaying())
+	if(UCommonModuleStatics::IsPlaying())
 	{
 		OnTermination();
 	}

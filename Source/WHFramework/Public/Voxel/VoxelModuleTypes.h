@@ -2,7 +2,7 @@
 
 #include "Ability/AbilityModuleTypes.h"
 #include "Asset/AssetModuleTypes.h"
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleTypes.h"
 #include "Math/MathTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "Scene/SceneModuleTypes.h"
@@ -67,69 +67,69 @@ enum class EVoxelGenerationStage : uint8
 UENUM(BlueprintType)
 enum class EVoxelType : uint8
 {
-	Empty, //??
-	Unknown,
-	Bedrock, //????
-	Dirt, //????
-	Red_Brick, //???
-	Stone, //??
-	Cobble_Stone, //??
-	Stone_Brick, //??
-	Stone_Stair, //?????
-	Sand, //???
-	Sand_Stone, //??
-	Glass, //????
-	Grass, //???
-	Snow, //???
-	Ice, //????
-	Coal_Ore, //??
-	Iron_Ore, //??
-	Gold_Ore, //??
-	Emerald_Ore, //??
-	Diamond_Ore, //??
-	Oak, //???
-	Oak_Leaves, //?????
-	Oak_Sapling, // 橡树苗
-	Oak_Plank, //?????
-	Oak_Stair, //?????
-	Oak_Door, //?????
-	Oak_Door_Upper, //?????
-	Birch, //?????
-	Birch_Leaves, //???????
-	Birch_Sapling, // 白桦树苗
-	Birch_Plank, //???????
-	Birch_Stair, //???????
-	Birch_Door, //???????
-	Birch_Door_Upper, //???????
-	Bed, //?????
-	Bed_Upper, //?????
-	Furnace,
-	Crafting_Table, // ?
-	Chest, // ?
-	Torch, //???
-	Water, // ?
-	Tall_Grass, //?????
-	Flower_Allium,
-	Flower_Blue_Orchid,
-	Flower_Dandelion,
-	Flower_Houstonia,
-	Flower_Oxeye_Daisy,
-	Flower_Paeonia,
-	Flower_Rose,
-	Flower_Tulip_Orange,
-	Flower_Tulip_Pink,
-	Flower_Tulip_Red,
-	Flower_Tulip_White,
-	Custom1,
-	Custom2,
-	Custom3,
-	Custom4,
-	Custom5,
-	Custom6,
-	Custom7,
-	Custom8,
-	Custom9,
-	Custom10
+	Empty = 0, //??
+	Unknown = 1,
+	Bedrock = 2, //????
+	Dirt = 3, //????
+	Red_Brick = 4, //???
+	Stone = 5, //??
+	Cobble_Stone = 6, //??
+	Stone_Brick = 7, //??
+	Stone_Stair = 8, //?????
+	Sand = 9, //???
+	Sand_Stone = 10, //??
+	Glass = 11, //????
+	Grass = 12, //???
+	Snow = 13, //???
+	Ice = 14, //????
+	Coal_Ore = 15, //??
+	Iron_Ore = 16, //??
+	Gold_Ore = 17, //??
+	Emerald_Ore = 18, //??
+	Diamond_Ore = 19, //??
+	Oak = 20, //???
+	Oak_Leaves = 21, //?????
+	Oak_Sapling = 51, // 橡树苗
+	Oak_Plank = 22, //?????
+	Oak_Stair = 23, //?????
+	Oak_Door = 24, //?????
+	Oak_Door_Upper = 25, //?????
+	Birch = 26, //?????
+	Birch_Leaves = 27, //???????
+	Birch_Sapling = 52, // 白桦树苗
+	Birch_Plank = 28, //???????
+	Birch_Stair = 29, //???????
+	Birch_Door = 30, //???????
+	Birch_Door_Upper = 31, //???????
+	Bed = 32, //?????
+	Bed_Upper = 33, //?????
+	Furnace = 34,
+	Crafting_Table = 35, // ?
+	Chest = 36, // ?
+	Torch = 37, //???
+	Water = 38, // ?
+	Tall_Grass = 39, //?????
+	Flower_Allium = 40,
+	Flower_Blue_Orchid = 41,
+	Flower_Dandelion = 42,
+	Flower_Houstonia = 43,
+	Flower_Oxeye_Daisy = 44,
+	Flower_Paeonia = 45,
+	Flower_Rose = 46,
+	Flower_Tulip_Orange = 47,
+	Flower_Tulip_Pink = 48,
+	Flower_Tulip_Red = 49,
+	Flower_Tulip_White = 50,
+	Custom1 = 100,
+	Custom2 = 101,
+	Custom3 = 102,
+	Custom4 = 103,
+	Custom5 = 104,
+	Custom6 = 105,
+	Custom7 = 106,
+	Custom8 = 107,
+	Custom9 = 108,
+	Custom10 = 109
 };
 
 /**

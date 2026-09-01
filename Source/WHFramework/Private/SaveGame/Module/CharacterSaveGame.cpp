@@ -2,7 +2,7 @@
 
 #include "SaveGame/Module/CharacterSaveGame.h"
 
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Character/CharacterModule.h"
 
 UCharacterSaveGame::UCharacterSaveGame()

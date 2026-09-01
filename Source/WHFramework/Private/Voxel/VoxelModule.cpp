@@ -23,8 +23,8 @@
 #include "Voxel/Voxels/VoxelTorch.h"
 #include "Voxel/Voxels/VoxelWater.h"
 #include "Voxel/Voxels/Entity/VoxelEntityCapture.h"
-#include "Common/CommonStatics.h"
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleStatics.h"
+#include "Common/CommonModuleTypes.h"
 #include "Event/Handle/Voxel/EventHandle_VoxelWorldAgentMoved.h"
 #include "Event/Handle/Voxel/EventHandle_VoxelWorldCenterChanged.h"
 #include "Kismet/KismetMaterialLibrary.h"
@@ -274,7 +274,7 @@ void UVoxelModule::OnInitialize()
 	{
 		Iter.Value.TextureSize = FVector2D(Iter.Value.PixelSize, Iter.Value.Textures.Num() * Iter.Value.PixelSize);
 
-		if(UTexture2D* Texture = UCommonStatics::CompositeTextures(Iter.Value.Textures, Iter.Value.TextureSize))
+		if(UTexture2D* Texture = UCommonModuleStatics::CompositeTextures(Iter.Value.Textures, Iter.Value.TextureSize))
 		{
 			Iter.Value.CombineTexture = Texture;
 				
@@ -380,9 +380,9 @@ void UVoxelModule::Save_Implementation()
 
 FString UVoxelModule::GetModuleDebugMessage()
 {
-	const FString StateName = UCommonStatics::GetEnumAuthoredNameByValue(TEXT("/Script/WHFramework.EVoxelWorldState"), static_cast<int32>(WorldState));
+	const FString StateName = UCommonModuleStatics::GetEnumAuthoredNameByValue(TEXT("/Script/WHFramework.EVoxelWorldState"), static_cast<int32>(WorldState));
 	const FString StageName = WorldState == EVoxelWorldState::MapBuilding && WorldGenerationStage != EVoxelGenerationStage::None
-		? UCommonStatics::GetEnumAuthoredNameByValue(TEXT("/Script/WHFramework.EVoxelGenerationStage"), static_cast<int32>(WorldGenerationStage))
+		? UCommonModuleStatics::GetEnumAuthoredNameByValue(TEXT("/Script/WHFramework.EVoxelGenerationStage"), static_cast<int32>(WorldGenerationStage))
 		: TEXT("");
 	return FString::Printf(TEXT("WorldState: %s%s"), *StateName, StageName.IsEmpty() ? TEXT("") : *FString::Printf(TEXT("_%s"), *StageName));
 }
@@ -747,7 +747,7 @@ void UVoxelModule::UpdateVoxels()
 	for(const FIndex& Index : LiquidUpdateIndices)
 	{
 		ITER_DIRECTION(Direction, LiquidEvaluationIndexSet.Add(Index + FMathHelper::DirectionToIndex(Direction)); )
-		for(const EDirection Iter : { EDirection::Forward, EDirection::Right, EDirection::Backward, EDirection::Left })
+		for(const EDirectionN Iter : { EDirectionN::Forward, EDirectionN::Right, EDirectionN::Backward, EDirectionN::Left })
 		{
 			LiquidEvaluationIndexSet.Add(Index + FMathHelper::DirectionToIndex(Iter) + FIndex(0, 0, -1));
 		}
@@ -759,7 +759,7 @@ void UVoxelModule::UpdateVoxels()
 		SnapshotIndices.Add(Index);
 		ITER_DIRECTION(Direction, SnapshotIndices.Add(Index + FMathHelper::DirectionToIndex(Direction)); )
 		SnapshotIndices.Add(Index + FIndex(0, 0, -2));
-		for(const EDirection Iter : { EDirection::Forward, EDirection::Right, EDirection::Backward, EDirection::Left })
+		for(const EDirectionN Iter : { EDirectionN::Forward, EDirectionN::Right, EDirectionN::Backward, EDirectionN::Left })
 		{
 			const FIndex NeighborIndex = Index + FMathHelper::DirectionToIndex(Iter);
 			SnapshotIndices.Add(NeighborIndex + FIndex(0, 0, 1));
@@ -1008,7 +1008,7 @@ void UVoxelModule::GenerateChunkQueues(bool bFromAgent, bool bForce)
 	if(bForce) ResetChunkQueues();
 	FIndex GenerateIndex = FIndex::ZeroIndex;
 	FVector2D GenerateOffset = FVector2D::ZeroVector;
-	const auto VoxelAgent  = Cast<IVoxelAgentInterface>(UCommonStatics::GetPlayerPawn() ? UCommonStatics::GetPlayerPawn() : UCommonStatics::GetPlayerController()->GetViewTarget());
+	const auto VoxelAgent  = Cast<IVoxelAgentInterface>(UCommonModuleStatics::GetPlayerPawn() ? UCommonModuleStatics::GetPlayerPawn() : UCommonModuleStatics::GetPlayerController()->GetViewTarget());
 	if(bFromAgent && VoxelAgent)
 	{
 		const FVector2D AgentLocation = FVector2D(WorldData->WorldRange.X != 0.f ? VoxelAgent->GetVoxelAgentLocation().X : 0.f, WorldData->WorldRange.Y != 0.f ? VoxelAgent->GetVoxelAgentLocation().Y : 0.f);
@@ -1311,7 +1311,7 @@ FText UVoxelModule::GetWorldAreaPrefix(FIndex InIndex, EVoxelAreaType InNameType
 
 FText UVoxelModule::GetWorldRegionDisplayName(EVoxelRegionType InRegionType) const
 {
-	return UCommonStatics::GetEnumDisplayNameByValue(TEXT("/Script/WHFramework.EVoxelRegionType"), static_cast<int32>(InRegionType));
+	return UCommonModuleStatics::GetEnumDisplayNameByValue(TEXT("/Script/WHFramework.EVoxelRegionType"), static_cast<int32>(InRegionType));
 }
 
 FText UVoxelModule::GetWorldAreaDisplayName(FIndex InIndex, EVoxelAreaType InNameType, const FText& InAreaTypeName) const
@@ -1416,7 +1416,7 @@ bool UVoxelModule::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const
 
 bool UVoxelModule::VoxelRaycastSinge(EVoxelRaycastType InRaycastType, float InDistance, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
 {
-	if(AWHPlayerController* PlayerController = UCommonStatics::GetPlayerController())
+	if(AWHPlayerController* PlayerController = UCommonModuleStatics::GetPlayerController())
 	{
 		FHitResult HitResult;
 		switch (InRaycastType)
@@ -1557,5 +1557,5 @@ FPrimaryAssetId UVoxelModule::VoxelTypeToAssetID(EVoxelType InVoxelType) const
 	{
 		return VoxelAssetIDMap[InVoxelType];
 	}
-	return FPrimaryAssetId(FName("Voxel"), *FString::Printf(TEXT("DA_%s"), *UCommonStatics::GetEnumAuthoredNameByValue(TEXT("/Script/WHFramework.EVoxelType"), (int32)InVoxelType)));
+	return FPrimaryAssetId(FName("Voxel"), *FString::Printf(TEXT("DA_%s"), *UCommonModuleStatics::GetEnumAuthoredNameByValue(TEXT("/Script/WHFramework.EVoxelType"), (int32)InVoxelType)));
 }

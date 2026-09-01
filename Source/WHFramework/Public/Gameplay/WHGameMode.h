@@ -3,7 +3,7 @@
 #pragma once
 
 #include "GameFramework/GameModeBase.h"
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleTypes.h"
 #include "Common/Base/WHActor.h"
 #include "WHGameMode.generated.h"
 

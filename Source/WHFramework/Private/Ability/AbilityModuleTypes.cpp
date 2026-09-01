@@ -7,7 +7,7 @@
 #include "Ability/Inventory/AbilityInventoryBase.h"
 #include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
 #include "Ability/Vitality/AbilityVitalityInterface.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 
 FPrimaryAssetId PAID_EXP = FPrimaryAssetId(TEXT("Misc:DA_Exp"));
 
@@ -151,7 +151,7 @@ void FInventorySaveData::FillItems(int32 InLevel, FRandomStream InRandomStream)
 	{
 		if(Iter1.Key == EAbilityItemType::None) continue;
 
-		const FName ItemType = *UCommonStatics::GetEnumAuthoredNameByValue(TEXT("/Script/WHFramework.EAbilityItemType"), (int32)Iter1.Key);
+		const FName ItemType = *UCommonModuleStatics::GetEnumAuthoredNameByValue(TEXT("/Script/WHFramework.EAbilityItemType"), (int32)Iter1.Key);
 
 		int32 ItemNum = 0;
 		EAbilityItemRarity ItemParity = EAbilityItemRarity::None;

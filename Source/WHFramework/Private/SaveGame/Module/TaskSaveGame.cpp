@@ -2,7 +2,7 @@
 
 #include "SaveGame/Module/TaskSaveGame.h"
 
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Task/TaskModule.h"
 
 UTaskSaveGame::UTaskSaveGame()

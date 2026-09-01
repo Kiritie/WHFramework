@@ -3,7 +3,7 @@
 #include "Widget/World/WorldWidgetActor.h"
 
 #include "WHFrameworkCoreActions.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Widget/World/WorldWidgetComponent.h"
 
 AWorldWidgetActor::AWorldWidgetActor()
@@ -67,7 +67,7 @@ void AWorldWidgetActor::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 
-	if(!GIsPlaying && UCommonStatics::GetWorldContext(true))
+	if(!GIsPlaying && UCommonModuleStatics::GetWorldContext(true))
 	{
 		if(bShowInEditor)
 		{
@@ -84,7 +84,7 @@ void AWorldWidgetActor::Destroyed()
 {
 	Super::Destroyed();
 
-	if(!GIsPlaying && UCommonStatics::GetWorldContext(true) && bShowInEditor)
+	if(!GIsPlaying && UCommonModuleStatics::GetWorldContext(true) && bShowInEditor)
 	{
 		DestroyWorldWidget(false, true);
 	}
@@ -93,7 +93,7 @@ void AWorldWidgetActor::Destroyed()
 #if WITH_EDITOR
 void AWorldWidgetActor::OnRefreshWorldWidget()
 {
-	if(!GIsPlaying && UCommonStatics::GetWorldContext(true) && bShowInEditor)
+	if(!GIsPlaying && UCommonModuleStatics::GetWorldContext(true) && bShowInEditor)
 	{
 		CreateWorldWidget(true);
 	}

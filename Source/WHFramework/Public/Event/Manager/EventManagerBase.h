@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleTypes.h"
 #include "Common/Base/WHObject.h"
 #include "Event/EventModuleTypes.h"
 

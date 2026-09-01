@@ -5,7 +5,7 @@
 #include "FileHelpers.h"
 #include "SlateOptMacros.h"
 #include "SPrimaryButton.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Kismet2/SClassPickerDialog.h"
 #include "Main/MainModule.h"
 #include "Subsystems/EditorActorSubsystem.h"
@@ -285,7 +285,7 @@ TSharedRef<SWidget> SModuleEditorWidget::CreateMainWidget()
 
 	bNeedRebuild = false;
 	
-	SetIsPreview(UCommonStatics::IsPlaying());
+	SetIsPreview(UCommonModuleStatics::IsPlaying());
 
 	return SMainEditorWidgetBase::CreateMainWidget();
 }

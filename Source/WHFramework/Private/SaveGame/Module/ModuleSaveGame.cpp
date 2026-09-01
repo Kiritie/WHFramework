@@ -2,7 +2,7 @@
 
 #include "SaveGame/Module/ModuleSaveGame.h"
 
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Main/MainModule.h"
 
 UModuleSaveGame::UModuleSaveGame()

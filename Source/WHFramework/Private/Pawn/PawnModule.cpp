@@ -8,7 +8,7 @@
 #include "Pawn/PawnModuleNetworkComponent.h"
 #include "Pawn/Base/PawnBase.h"
 #include "Gameplay/WHPlayerController.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Net/UnrealNetwork.h"
 		
 IMPLEMENTATION_MODULE(UPawnModule)
@@ -127,7 +127,7 @@ void UPawnModule::SwitchPawn(APawnBase* InPawn, bool bResetCamera, bool bInstant
 {
 	if(CurrentPawn == InPawn) return;
 
-	AWHPlayerController* PlayerController = UCommonStatics::GetPlayerController<AWHPlayerController>();
+	AWHPlayerController* PlayerController = UCommonModuleStatics::GetPlayerController<AWHPlayerController>();
 	
 	if(InPawn)
 	{

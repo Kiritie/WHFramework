@@ -6,7 +6,7 @@
 #include "SourceCodeNavigation.h"
 #include "WHFrameworkCoreStatics.h"
 #include "WHFrameworkEditorStatics.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Procedure/ProcedureEditorTypes.h"
 #include "Procedure/Base/ProcedureAsset.h"
 #include "Procedure/Base/ProcedureBase.h"

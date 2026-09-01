@@ -3,7 +3,7 @@
 #pragma once
 
 #include "GameFramework/SaveGame.h"
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "SaveGameBase.generated.h"
 

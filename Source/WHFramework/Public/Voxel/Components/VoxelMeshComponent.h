@@ -48,7 +48,7 @@ public:
 	virtual void SetCollisionEnabled(bool bEnable);
 
 protected:
-	virtual void BuildFace(const FVoxelItem& InVoxelItem, EDirection InFacing);
+	virtual void BuildFace(const FVoxelItem& InVoxelItem, EDirectionN InFacing);
 
 	virtual void BuildFace(const FVoxelItem& InVoxelItem, FVector InVertices[4], int32 InFaceIndex, FVector InNormal, bool bReverseDiagonal = false);
 

@@ -3,7 +3,7 @@
 
 #include "Camera/CameraModuleStatics.h"
 #include "Camera/Actor/CameraActorBase.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Engine/PostProcessVolume.h"
@@ -299,7 +299,7 @@ void USceneModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 			}
 			case EWorldMiniMapMode::ViewPoint:
 			{
-				if(const AActor* ViewTarget = UCommonStatics::GetPlayerController()->GetViewTarget())
+				if(const AActor* ViewTarget = UCommonModuleStatics::GetPlayerController()->GetViewTarget())
 				{
 					MiniMapCapture->SetActorLocationAndRotation(ViewTarget->GetActorLocation(), bMiniMapRotatable ? FRotator(0.f, ViewTarget->GetActorRotation().Yaw, 0.f) : FRotator::ZeroRotator);
 				}
@@ -352,8 +352,8 @@ void USceneModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 
 	for(const auto& Iter : DataLayerPlayerMappings)
 	{
-		TArray<AActor*> Actors = UCommonStatics::GetAllActorsOfDataLayer(Iter.Key);
-		const AWHPlayerController* PlayerController = UCommonStatics::GetPlayerController(Iter.Value);
+		TArray<AActor*> Actors = UCommonModuleStatics::GetAllActorsOfDataLayer(Iter.Key);
+		const AWHPlayerController* PlayerController = UCommonModuleStatics::GetPlayerController(Iter.Value);
 		for(const auto Iter1 : Actors)
 		{
 			Iter1->SetOwner(PlayerController->GetViewTarget());
@@ -368,8 +368,8 @@ void USceneModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 
 	for(const auto& Iter : LevelPlayerMappings)
 	{
-		TArray<AActor*> Actors = UCommonStatics::GetAllActorsOfLevel(Iter.Key);
-		const AWHPlayerController* PlayerController = UCommonStatics::GetPlayerController(Iter.Value);
+		TArray<AActor*> Actors = UCommonModuleStatics::GetAllActorsOfLevel(Iter.Key);
+		const AWHPlayerController* PlayerController = UCommonModuleStatics::GetPlayerController(Iter.Value);
 		for(const auto Iter1 : Actors)
 		{
 			Iter1->SetOwner(PlayerController->GetViewTarget());

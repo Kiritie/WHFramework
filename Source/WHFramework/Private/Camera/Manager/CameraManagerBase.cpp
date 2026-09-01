@@ -7,7 +7,7 @@
 #include "Camera/CameraModule.h"
 #include "Camera/Actor/CameraActorBase.h"
 #include "Camera/Interface/CameraTrackableInterface.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Camera/EventHandle_CameraPointChanged.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -124,7 +124,7 @@ void ACameraManagerBase::UpdateCamera(float DeltaTime)
 {
 	Super::UpdateCamera(DeltaTime);
 
-	DeltaTime /= UCommonStatics::GetTimeScale();
+	DeltaTime /= UCommonModuleStatics::GetTimeScale();
 
 	DoTrackTarget();
 
@@ -778,7 +778,7 @@ void ACameraManagerBase::AddCameraMovementInput(FVector InDirection, float InVal
 {
 	if(UCameraModule::Get().GetModuleState() != EModuleState::Running || !UCameraModule::Get().IsCameraControlAble() || !UCameraModule::Get().IsCameraMoveControlAble() || (IsTrackingTarget() && !ENUMWITH(TrackControlMode, ECameraControlMode::LocationOnly))) return;
 
-	SetCameraLocation(TargetCameraLocation + InDirection * InValue * UCameraModule::Get().GetCameraMoveRate() * (1.f + (UCameraModule::Get().GetCameraMoveAltitude() != 0.f ? (UCommonStatics::GetPossessedPawn() ? 0.f : FMath::Abs(USceneModuleStatics::GetAltitude(false, true)) / UCameraModule::Get().GetCameraMoveAltitude()) : 0.f)) * GetWorld()->GetDeltaSeconds(), false);
+	SetCameraLocation(TargetCameraLocation + InDirection * InValue * UCameraModule::Get().GetCameraMoveRate() * (1.f + (UCameraModule::Get().GetCameraMoveAltitude() != 0.f ? (UCommonModuleStatics::GetPossessedPawn() ? 0.f : FMath::Abs(USceneModuleStatics::GetAltitude(false, true)) / UCameraModule::Get().GetCameraMoveAltitude()) : 0.f)) * GetWorld()->GetDeltaSeconds(), false);
 }
 
 void ACameraManagerBase::AddCameraRotationInput(float InYaw, float InPitch)
@@ -792,7 +792,7 @@ void ACameraManagerBase::AddCameraDistanceInput(float InValue)
 {
 	if(UCameraModule::Get().GetModuleState() != EModuleState::Running || !UCameraModule::Get().IsCameraControlAble() || !UCameraModule::Get().IsCameraZoomControlAble() || (IsTrackingTarget() && !ENUMWITH(TrackControlMode, ECameraControlMode::DistanceOnly))) return;
 
-	SetCameraDistance(TargetCameraDistance + InValue * UCameraModule::Get().GetCameraZoomRate() * (2.f + (UCameraModule::Get().GetCameraZoomAltitude() != 0.f ? (UCommonStatics::GetPossessedPawn() ? 0.f : FMath::Abs(FMath::Max(USceneModuleStatics::GetAltitude(false, true), CurrentCameraDistance)) / UCameraModule::Get().GetCameraZoomAltitude()) : 0.f)) * GetWorld()->GetDeltaSeconds(), false);
+	SetCameraDistance(TargetCameraDistance + InValue * UCameraModule::Get().GetCameraZoomRate() * (2.f + (UCameraModule::Get().GetCameraZoomAltitude() != 0.f ? (UCommonModuleStatics::GetPossessedPawn() ? 0.f : FMath::Abs(FMath::Max(USceneModuleStatics::GetAltitude(false, true), CurrentCameraDistance)) / UCameraModule::Get().GetCameraZoomAltitude()) : 0.f)) * GetWorld()->GetDeltaSeconds(), false);
 
 	if(UCameraModule::Get().IsCameraZoomMoveAble() && !IsTrackingTarget() && InValue < 0.f && TargetCameraDistance == 0.f)
 	{

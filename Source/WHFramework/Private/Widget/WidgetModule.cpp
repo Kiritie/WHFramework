@@ -6,7 +6,7 @@
 #include "WHFrameworkCoreStatics.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Blueprint/WidgetTree.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Widget/EventHandle_CloseUserWidget.h"
 #include "Event/Handle/Widget/EventHandle_OpenUserWidget.h"

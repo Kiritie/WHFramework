@@ -9,7 +9,7 @@
 #include "Ability/Inventory/Slot/AbilityInventoryShortcutSlotBase.h"
 #include "Ability/Inventory/Slot/AbilityInventorySkillSlotBase.h"
 #include "Ability/Item/AbilityItemDataBase.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 
 UAbilityInventoryBase::UAbilityInventoryBase()

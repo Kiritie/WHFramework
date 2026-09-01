@@ -1,7 +1,7 @@
 #include "Ability/Attributes/AttributeSetBase.h"
 #include "GameplayEffectExtension.h"
 #include "AbilitySystemComponent.h"
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleTypes.h"
 
 UAttributeSetBase::UAttributeSetBase()
 {

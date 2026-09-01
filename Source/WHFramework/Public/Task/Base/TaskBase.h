@@ -4,7 +4,7 @@
 
 
 #include "Task/TaskModuleTypes.h"
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleTypes.h"
 #include "Common/Base/WHObject.h"
 #include "SaveGame/Base/SaveDataAgentInterface.h"
 

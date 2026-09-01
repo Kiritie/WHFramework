@@ -268,12 +268,12 @@ void UVoxelMeshComponent::SetCollisionEnabled(bool bEnable)
 	}
 }
 
-void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EDirection InFacing)
+void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EDirectionN InFacing)
 {
 	FVector Vers[4];
 	switch (InFacing)
 	{
-		case EDirection::Forward:
+		case EDirectionN::Forward:
 		{
 			Vers[0] = FVector(0.5f, 0.5f, -0.5f);
 			Vers[1] = FVector(0.5f, 0.5f, 0.5f);
@@ -281,7 +281,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EDirection In
 			Vers[3] = FVector(0.5f, -0.5f, -0.5f);
 			break;
 		}
-		case EDirection::Right:
+		case EDirectionN::Right:
 		{
 			Vers[0] = FVector(-0.5f, 0.5f, -0.5f);
 			Vers[1] = FVector(-0.5f, 0.5f, 0.5f);
@@ -289,7 +289,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EDirection In
 			Vers[3] = FVector(0.5f, 0.5f, -0.5f);
 			break;
 		}
-		case EDirection::Backward:
+		case EDirectionN::Backward:
 		{
 			Vers[0] = FVector(-0.5f, -0.5f, -0.5f);
 			Vers[1] = FVector(-0.5f, -0.5f, 0.5f);
@@ -297,7 +297,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EDirection In
 			Vers[3] = FVector(-0.5f, 0.5f, -0.5f);
 			break;
 		}
-		case EDirection::Left:
+		case EDirectionN::Left:
 		{
 			Vers[0] = FVector(0.5f, -0.5f, -0.5f);
 			Vers[1] = FVector(0.5f, -0.5f, 0.5f);
@@ -305,7 +305,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EDirection In
 			Vers[3] = FVector(-0.5f, -0.5f, -0.5f);
 			break;
 		}
-		case EDirection::Up:
+		case EDirectionN::Up:
 		{
 			Vers[0] = FVector(-0.5f, -0.5f, 0.5f);
 			Vers[1] = FVector(0.5f, -0.5f, 0.5f);
@@ -313,7 +313,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EDirection In
 			Vers[3] = FVector(-0.5f, 0.5f, 0.5f);
 			break;
 		}
-		case EDirection::Down:
+		case EDirectionN::Down:
 		{
 			Vers[0] = FVector(-0.5f, 0.5f, -0.5f);
 			Vers[1] = FVector(0.5f, 0.5f, -0.5f);
@@ -327,12 +327,12 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EDirection In
 	FVector Normal = FMathHelper::DirectionToVector(InFacing, InVoxelItem.Angle);
 	FVector FaceNormals[4] = { Normal, Normal, Normal, Normal };
 	bool bReverseDiagonal = false;
-	if(InVoxelItem.GetVoxelType() == EVoxelType::Water && InFacing != EDirection::Down)
+	if(InVoxelItem.GetVoxelType() == EVoxelType::Water && InFacing != EDirectionN::Down)
 	{
 		const UVoxelWaterData& WaterData = static_cast<const UVoxelWaterData&>(InVoxelItem.GetData());
 		const FVoxelItem* AdjacentItem = nullptr;
 		if(InVoxelItem.Chunk && FVoxelLiquidState(InVoxelItem.Data).IsFalling() &&
-			(InFacing == EDirection::Forward || InFacing == EDirection::Right || InFacing == EDirection::Backward || InFacing == EDirection::Left))
+			(InFacing == EDirectionN::Forward || InFacing == EDirectionN::Right || InFacing == EDirectionN::Backward || InFacing == EDirectionN::Left))
 		{
 			const FVoxelItem& Item = InVoxelItem.Chunk->GetVoxelComplex(InVoxelItem.Index + FMathHelper::DirectionToIndex(InFacing));
 			if(Item.GetVoxelType() == EVoxelType::Water && !FVoxelLiquidState(Item.Data).IsFalling()) AdjacentItem = &Item;
@@ -354,7 +354,7 @@ void UVoxelMeshComponent::BuildFace(const FVoxelItem& InVoxelItem, EDirection In
 			}
 		}
 		bReverseDiagonal = FMath::Abs(Vers[0].Z - Vers[2].Z) > FMath::Abs(Vers[1].Z - Vers[3].Z);
-		if(InFacing == EDirection::Up)
+		if(InFacing == EDirectionN::Up)
 		{
 			FaceNormals[0] = FVector(Vers[0].Z - Vers[1].Z, Vers[0].Z - Vers[3].Z, 1.f).GetSafeNormal();
 			FaceNormals[1] = FVector(Vers[0].Z - Vers[1].Z, Vers[1].Z - Vers[2].Z, 1.f).GetSafeNormal();

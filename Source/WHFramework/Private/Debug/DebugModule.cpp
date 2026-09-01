@@ -3,7 +3,7 @@
 
 #include "Debug/DebugModule.h"
 
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Debug/DebugManager.h"
 
 IMPLEMENTATION_MODULE(UDebugModule)

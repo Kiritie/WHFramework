@@ -7,7 +7,7 @@
 #include "NativeGameplayTags.h"
 #include "WHFrameworkCoreTypes.h"
 
-#include "CommonTypes.generated.h"
+#include "CommonModuleTypes.generated.h"
 
 //////////////////////////////////////////////////////////////////////////
 // Variables

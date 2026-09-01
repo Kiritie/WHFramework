@@ -102,9 +102,9 @@ TSharedRef<FTaskEditor> FTaskEditorModule::CreateTaskEditor(const EToolkitMode::
 
 void FTaskEditorModule::OnClickedTaskEditorButton()
 {
-	if(const UTaskModule* TaskModule = UTaskModule::GetPtr(!UCommonStatics::IsPlaying()))
+	if(const UTaskModule* TaskModule = UTaskModule::GetPtr(!UCommonModuleStatics::IsPlaying()))
 	{
-		for(auto Iter : !UCommonStatics::IsPlaying() ? TaskModule->GetDefaultAssets() : TaskModule->GetAssets())
+		for(auto Iter : !UCommonModuleStatics::IsPlaying() ? TaskModule->GetDefaultAssets() : TaskModule->GetAssets())
 		{
 			GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(Iter);
 		}

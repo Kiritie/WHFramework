@@ -6,7 +6,7 @@
 #include "Ability/Actor/AbilityActorInterface.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
 #include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 
 UAbilityItemDataBase::UAbilityItemDataBase()
 {
@@ -50,7 +50,7 @@ int32 UAbilityItemDataBase::ClampLevel(int32 InLevel) const
 
 EAbilityItemType UAbilityItemDataBase::GetItemType() const
 {
-	return (EAbilityItemType)UCommonStatics::GetEnumValueByAuthoredName(TEXT("/Script/WHFramework.EAbilityItemType"), Type.ToString());
+	return (EAbilityItemType)UCommonModuleStatics::GetEnumValueByAuthoredName(TEXT("/Script/WHFramework.EAbilityItemType"), Type.ToString());
 }
 
 FString UAbilityItemDataBase::GetItemAbilityInfo(int32 InLevel) const
@@ -63,35 +63,35 @@ FString UAbilityItemDataBase::GetItemAbilityInfo(int32 InLevel) const
 		{
 			for(auto& Iter2 : Iter1.Attributes)
 			{
-				FText AttributeName = UCommonStatics::GetPropertyDisplayName(Iter2.Attribute.GetUProperty());
+				FText AttributeName = UCommonModuleStatics::GetPropertyDisplayName(Iter2.Attribute.GetUProperty());
 				if(Iter2.BaseAttribute.IsValid())
 				{
-					FText BaseAttributeName = UCommonStatics::GetPropertyDisplayName(Iter2.BaseAttribute.GetUProperty());
+					FText BaseAttributeName = UCommonModuleStatics::GetPropertyDisplayName(Iter2.BaseAttribute.GetUProperty());
 					AbilityInfoStr.Appendf(TEXT("%s: %s%s%s\n"), *AttributeName.ToString(), *FString::Printf(TEXT("%d%%"), (int32)(Iter2.Value * 100)), Iter2.AttributeSource == EGameplayEffectAttributeCaptureSource::Source ? TEXT("自身") : TEXT("目标"), *BaseAttributeName.ToString());
 				}
 				else
 				{
-					AbilityInfoStr.Appendf(TEXT("%s: %s%s\n"), *AttributeName.ToString(), (Iter2.Attribute.GetName().EndsWith(TEXT("Rate")) ? *FString::Printf(TEXT("%s%%"), *UCommonStatics::SanitizeFloat(Iter2.Value * 100, 2)) : *UCommonStatics::SanitizeFloat(Iter2.Value, 2)),
+					AbilityInfoStr.Appendf(TEXT("%s: %s%s\n"), *AttributeName.ToString(), (Iter2.Attribute.GetName().EndsWith(TEXT("Rate")) ? *FString::Printf(TEXT("%s%%"), *UCommonModuleStatics::SanitizeFloat(Iter2.Value * 100, 2)) : *UCommonModuleStatics::SanitizeFloat(Iter2.Value, 2)),
 						(Iter2.Attribute.GetName().EndsWith(TEXT("Time")) || Iter2.Attribute.GetName().EndsWith(TEXT("Interrupt")) ? TEXT("s") : TEXT("")));
 				}
 			}
 			if(Iter1.Period > 0.f)
 			{
-				AbilityInfoStr.Appendf(TEXT("%触发周期: %ss\n"), *UCommonStatics::SanitizeFloat(Iter1.Period, 2));
+				AbilityInfoStr.Appendf(TEXT("%%触发周期: %ss\n"), *UCommonModuleStatics::SanitizeFloat(Iter1.Period, 2));
 			}
 			if(Iter1.Duration > 0.f)
 			{
-				AbilityInfoStr.Appendf(TEXT("%持续时间: %ss\n"), *UCommonStatics::SanitizeFloat(Iter1.Duration, 2));
+				AbilityInfoStr.Appendf(TEXT("%%持续时间: %ss\n"), *UCommonModuleStatics::SanitizeFloat(Iter1.Duration, 2));
 			}
 		}
 		if(AbilityInfo.CooldownDuration > 0.f)
 		{
-			AbilityInfoStr.Appendf(TEXT("冷却时间: %ss\n"), *UCommonStatics::SanitizeFloat(AbilityInfo.CooldownDuration, 2));
+			AbilityInfoStr.Appendf(TEXT("冷却时间: %ss\n"), *UCommonModuleStatics::SanitizeFloat(AbilityInfo.CooldownDuration, 2));
 		}
 		if(FMath::Abs(AbilityInfo.CostValue) > 0.f)
 		{
-			FText AttributeName = UCommonStatics::GetPropertyDisplayName(AbilityInfo.CostAttribute.GetUProperty());
-			AbilityInfoStr.Appendf(TEXT("消耗: %s%s\n"), *UCommonStatics::SanitizeFloat(FMath::Abs(AbilityInfo.CostValue), 2), *AttributeName.ToString());
+			FText AttributeName = UCommonModuleStatics::GetPropertyDisplayName(AbilityInfo.CostAttribute.GetUProperty());
+			AbilityInfoStr.Appendf(TEXT("消耗: %s%s\n"), *UCommonModuleStatics::SanitizeFloat(FMath::Abs(AbilityInfo.CostValue), 2), *AttributeName.ToString());
 		}
 		
 		AbilityInfoStr.RemoveFromEnd(TEXT("\n"));

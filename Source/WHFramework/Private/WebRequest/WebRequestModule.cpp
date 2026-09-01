@@ -4,7 +4,7 @@
 #include "WebRequest/WebRequestModule.h"
 
 #include "Debug/DebugModuleTypes.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "WebRequest/Interface/Base/WebInterfaceBase.h"
 		
@@ -328,7 +328,7 @@ bool UWebRequestModule::SendWebRequest(const FName InName, EWebRequestMethod InM
 	{
 		return FWebRequestManager::Get().SendWebRequest(WebInterface->GetFullUrl(), InMethod, InHeadMap, InContent, [this, WebInterface, InContent, InParams](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess)
 		{
-			if(UCommonStatics::IsPlaying())
+			if(UCommonModuleStatics::IsPlaying())
 			{
 				OnWebRequestComplete(Request, Response, bSuccess, WebInterface, InContent.ToString(), InParams);
 			}

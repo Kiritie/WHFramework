@@ -2,7 +2,7 @@
 
 #include "SaveGame/Module/SceneSaveGame.h"
 
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Scene/SceneModule.h"
 
 USceneSaveGame::USceneSaveGame()

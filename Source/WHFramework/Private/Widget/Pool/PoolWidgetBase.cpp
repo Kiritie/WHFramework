@@ -2,7 +2,7 @@
 
 #include "Widget/Pool/PoolWidgetBase.h"
 
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleTypes.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 
 UPoolWidgetBase::UPoolWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)

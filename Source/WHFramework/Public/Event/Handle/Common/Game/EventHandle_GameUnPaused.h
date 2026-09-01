@@ -3,7 +3,7 @@
 #pragma once
 
 #include "Event/Handle/EventHandleBase.h"
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleTypes.h"
 #include "Parameter/ParameterModuleTypes.h"
 
 #include "EventHandle_GameUnPaused.generated.h"

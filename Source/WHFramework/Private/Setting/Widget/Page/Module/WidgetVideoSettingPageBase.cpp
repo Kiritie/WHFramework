@@ -2,7 +2,7 @@
 
 #include "Setting/Widget/Page/Module/WidgetVideoSettingPageBase.h"
 
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "SaveGame/SaveGameModuleStatics.h"
 #include "SaveGame/Module/SettingSaveGame.h"
 #include "Setting/SettingModule.h"
@@ -24,10 +24,10 @@ void UWidgetVideoSettingPageBase::OnCreate(UUserWidget* InOwner, const TArray<FP
 	AddSettingItem(FName("WindowMode"), SettingItem_WindowMode, FText::FromString(TEXT("通用")));
 
 	TArray<int32> TmpArr1;
-	for(int32 i = 1; i < UCommonStatics::GetEnumItemNum(FString("/Script/WHFramework.EWindowResolution")); i++)
+	for(int32 i = 1; i < UCommonModuleStatics::GetEnumItemNum(FString("/Script/WHFramework.EWindowResolution")); i++)
 	{
 		FString StrX, StrY;
-		UCommonStatics::GetEnumDisplayNameByValue(FString("/Script/WHFramework.EWindowResolution"), i).ToString().Split(TEXT("x"), &StrX, &StrY);
+		UCommonModuleStatics::GetEnumDisplayNameByValue(FString("/Script/WHFramework.EWindowResolution"), i).ToString().Split(TEXT("x"), &StrX, &StrY);
 		if(FCString::Atoi(*StrX) > UVideoModule::Get().GetDesktopResolution().X || FCString::Atoi(*StrY) > UVideoModule::Get().GetDesktopResolution().Y)
 		{
 			TmpArr1.Add(i);

@@ -3,7 +3,7 @@
 #include "Containers/Queue.h"
 #include "VoxelModuleTypes.h"
 #include "Chunks/VoxelChunk.h"
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleTypes.h"
 #include "Main/Base/ModuleBase.h"
 
 #include "VoxelModule.generated.h"

@@ -4,7 +4,7 @@
 
 
 #include "Audio/AudioModuleTypes.h"
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleTypes.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "AudioModuleStatics.generated.h"
 

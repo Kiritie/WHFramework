@@ -4,7 +4,7 @@
 
 
 #include "GameFramework/Actor.h"
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleTypes.h"
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "SaveGame/Base/SaveDataAgentInterface.h"
 #include "Scene/Actor/SceneActorInterface.h"

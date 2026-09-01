@@ -47,7 +47,7 @@ ModuleClass* ModuleClass::GetPtr(bool bInEditor, bool bForce) \
 	{ \
 		if(!Instance || bForce) \
 		{ \
-			Instance = UCommonStatics::GetObjectInExistedWorld<ModuleClass>([](const UWorld* World) { \
+			Instance = UCommonModuleStatics::GetObjectInExistedWorld<ModuleClass>([](const UWorld* World) { \
 													return UGameplayStatics::GetActorOfClass(World, ModuleClass::StaticClass()); \
 												}, false); \
 		} \
@@ -57,7 +57,7 @@ ModuleClass* ModuleClass::GetPtr(bool bInEditor, bool bForce) \
 	{ \
 		if(!InstanceEditor || bForce) \
 		{ \
-			InstanceEditor = UCommonStatics::GetObjectInExistedWorld<ModuleClass>([](const UWorld* World) { \
+			InstanceEditor = UCommonModuleStatics::GetObjectInExistedWorld<ModuleClass>([](const UWorld* World) { \
                              						return UGameplayStatics::GetActorOfClass(World, ModuleClass::StaticClass()); \
                              					}, true); \
 		} \

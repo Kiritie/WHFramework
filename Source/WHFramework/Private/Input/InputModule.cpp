@@ -9,7 +9,7 @@
 #include "Main/Base/ModuleBase.h"
 #include "Event/Handle/Input/EventHandle_InputModeChanged.h"
 #include "Gameplay/WHPlayerController.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Main/MainModuleStatics.h"
 #include "InputMappingContext.h"
 #include "EnhancedInputSubsystems.h"
@@ -198,14 +198,14 @@ void UInputModule::OnPause()
 {
 	Super::OnPause();
 
-	UCommonStatics::GetPlayerController()->DisableInput(nullptr);
+	UCommonModuleStatics::GetPlayerController()->DisableInput(nullptr);
 }
 
 void UInputModule::OnUnPause()
 {
 	Super::OnUnPause();
 
-	UCommonStatics::GetPlayerController()->EnableInput(nullptr);
+	UCommonModuleStatics::GetPlayerController()->EnableInput(nullptr);
 }
 
 void UInputModule::OnTermination(EPhase InPhase)
@@ -235,7 +235,7 @@ void UInputModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 		UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>();
 
-		UCommonStatics::LoadObjectDataFromMemory(Settings, SaveData.GetDatas());
+		UCommonModuleStatics::LoadObjectDataFromMemory(Settings, SaveData.GetDatas());
 
 		for(auto& Iter : SaveData.KeyMappings)
 		{
@@ -278,7 +278,7 @@ FSaveData* UInputModule::ToData()
 
 	UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>();
 
-	UCommonStatics::SaveObjectDataToMemory(Settings, SaveData.GetDatas());
+	UCommonModuleStatics::SaveObjectDataToMemory(Settings, SaveData.GetDatas());
 
 	for(auto& Iter : KeyMappings)
 	{
@@ -302,7 +302,7 @@ FSaveData* UInputModule::GetData()
 
 FString UInputModule::GetModuleDebugMessage()
 {
-	return FString::Printf(TEXT("GlobalInputMode: %s"), *UCommonStatics::GetEnumAuthoredNameByValue(TEXT("/Script/WHFrameworkCore.EInputMode"), (int32)UInputModuleStatics::GetGlobalInputMode()));
+	return FString::Printf(TEXT("GlobalInputMode: %s"), *UCommonModuleStatics::GetEnumAuthoredNameByValue(TEXT("/Script/WHFrameworkCore.EInputMode"), (int32)UInputModuleStatics::GetGlobalInputMode()));
 }
 
 void UInputModule::SetNativeInputMode(EInputMode InInputMode)
@@ -394,28 +394,28 @@ void UInputModule::AddPlayerKeyMapping(const FName InName, const FKey InKey, int
 
 void UInputModule::ApplyKeyMappings()
 {
-	UCommonStatics::GetPlayerController()->InputComponent->KeyBindings.Empty();
+	UCommonModuleStatics::GetPlayerController()->InputComponent->KeyBindings.Empty();
 	for(auto& Iter : KeyMappings)
 	{
 		FInputKeyBinding KB(FInputChord(Iter.Value.Key, false, false, false, false), Iter.Value.Event);
 		KB.KeyDelegate.BindDelegate(Iter.Value.Delegate.IsBound() ? Iter.Value.Delegate.GetUObject() : Iter.Value.Delegate.GetUObject(), Iter.Value.Delegate.GetFunctionName());
-		UCommonStatics::GetPlayerController()->InputComponent->KeyBindings.Emplace(MoveTemp(KB));
+		UCommonModuleStatics::GetPlayerController()->InputComponent->KeyBindings.Emplace(MoveTemp(KB));
 	}
 }
 
 void UInputModule::ApplyTouchMappings()
 {
-	// UCommonStatics::GetPlayerController()->InputComponent->TouchBindings.Empty();
+	// UCommonModuleStatics::GetPlayerController()->InputComponent->TouchBindings.Empty();
 	// for(auto& Iter : TouchMappings)
 	// {
 	// 	FInputTouchBinding TB(Iter.Event);
 	// 	TB.TouchDelegate.BindDelegate(Iter.Delegate.IsBound() ? Iter.Delegate.GetUObject() : Iter.DynamicDelegate.GetUObject(), Iter.Delegate.IsBound() ? Iter.Delegate.TryGetBoundFunctionName() : Iter.DynamicDelegate.GetFunctionName());
-	// 	UCommonStatics::GetPlayerController()->InputComponent->TouchBindings.Emplace(MoveTemp(TB));
+	// 	UCommonModuleStatics::GetPlayerController()->InputComponent->TouchBindings.Emplace(MoveTemp(TB));
 	// }
 
-	UCommonStatics::GetPlayerController()->InputComponent->BindTouch(EInputEvent::IE_Pressed, this, &UInputModule::TouchPressed);
-	UCommonStatics::GetPlayerController()->InputComponent->BindTouch(EInputEvent::IE_Released, this, &UInputModule::TouchReleased);
-	UCommonStatics::GetPlayerController()->InputComponent->BindTouch(EInputEvent::IE_Repeat, this, &UInputModule::TouchMoved);
+	UCommonModuleStatics::GetPlayerController()->InputComponent->BindTouch(EInputEvent::IE_Pressed, this, &UInputModule::TouchPressed);
+	UCommonModuleStatics::GetPlayerController()->InputComponent->BindTouch(EInputEvent::IE_Released, this, &UInputModule::TouchReleased);
+	UCommonModuleStatics::GetPlayerController()->InputComponent->BindTouch(EInputEvent::IE_Repeat, this, &UInputModule::TouchMoved);
 }
 
 TArray<FEnhancedActionKeyMapping> UInputModule::GetAllActionKeyMappings(int32 InPlayerIndex)
@@ -699,7 +699,7 @@ void UInputModule::TouchMoved_Implementation(ETouchIndex::Type InTouchIndex, FVe
 		float TouchLocationX = 0.f;
 		float TouchLocationY = 0.f;
 		bool bIsCurrentPressed = false;
-		UCommonStatics::GetPlayerController()->GetInputTouchState(InTouchIndex, TouchLocationX, TouchLocationY, bIsCurrentPressed);
+		UCommonModuleStatics::GetPlayerController()->GetInputTouchState(InTouchIndex, TouchLocationX, TouchLocationY, bIsCurrentPressed);
 		
 		if(TouchLocationPrevious != FVector2D(-1.f, -1.f))
 		{
@@ -712,12 +712,12 @@ void UInputModule::TouchMoved_Implementation(ETouchIndex::Type InTouchIndex, FVe
 		float TouchLocationX1 = 0.f;
 		float TouchLocationY1 = 0.f;
 		bool bIsCurrentPressed1 = false;
-		UCommonStatics::GetPlayerController()->GetInputTouchState(ETouchIndex::Touch1, TouchLocationX1, TouchLocationY1, bIsCurrentPressed1);
+		UCommonModuleStatics::GetPlayerController()->GetInputTouchState(ETouchIndex::Touch1, TouchLocationX1, TouchLocationY1, bIsCurrentPressed1);
 		
 		float TouchLocationX2;
 		float TouchLocationY2;
 		bool bIsCurrentPressed2;
-		UCommonStatics::GetPlayerController()->GetInputTouchState(ETouchIndex::Touch2, TouchLocationX2, TouchLocationY2, bIsCurrentPressed2);
+		UCommonModuleStatics::GetPlayerController()->GetInputTouchState(ETouchIndex::Touch2, TouchLocationX2, TouchLocationY2, bIsCurrentPressed2);
 		
 		const float TouchCurrentPinchValue = FVector2D::Distance(FVector2D(TouchLocationX1, TouchLocationY1), FVector2D(TouchLocationX2, TouchLocationY2));
 		if(TouchPinchValuePrevious != -1.f)
@@ -731,11 +731,11 @@ void UInputModule::TouchMoved_Implementation(ETouchIndex::Type InTouchIndex, FVe
 		float TouchLocationX = 0.f;
 		float TouchLocationY = 0.f;
 		bool bIsCurrentPressed = false;
-		UCommonStatics::GetPlayerController()->GetInputTouchState(ETouchIndex::Touch1, TouchLocationX, TouchLocationY, bIsCurrentPressed);
+		UCommonModuleStatics::GetPlayerController()->GetInputTouchState(ETouchIndex::Touch1, TouchLocationX, TouchLocationY, bIsCurrentPressed);
 		
 		if(TouchLocationPrevious != FVector2D(-1.f, -1.f))
 		{
-			const FRotator Rotation = UCommonStatics::GetPlayerController()->GetControlRotation();
+			const FRotator Rotation = UCommonModuleStatics::GetPlayerController()->GetControlRotation();
 			const FVector DirectionH = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * (TouchLocationX - TouchLocationPrevious.X);
 			const FVector DirectionV = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * -(TouchLocationY - TouchLocationPrevious.Y);
 			UCameraModule::Get().AddCameraMovementInput(DirectionH + DirectionV, TouchInputRate * (UCameraModule::Get().IsReverseCameraPanMove() ? -1.f : 1.f));

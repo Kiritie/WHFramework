@@ -35,8 +35,9 @@ void FCoreStatics::ImportExposedProperties(UObject* InObject, TSharedPtr<FJsonOb
     for(auto& Iter: InJsonObject->Values)
     {
         FString TempStr, PropertyName, PropertyType;
-        Iter.Key.Split("> ",&TempStr,& PropertyName);
-        TempStr.Split("<",&TempStr,&PropertyType);
+        const FString Key(Iter.Key.ToView());
+        Key.Split(TEXT("> "),&TempStr,& PropertyName);
+        TempStr.Split(TEXT("<"),&TempStr,&PropertyType);
         if(FProperty* Property = FindFProperty<FProperty>(InObject->GetClass(), * PropertyName))
         {
             if(Property->IsA<FObjectProperty>() && Iter.Value->Type == EJson::Object)

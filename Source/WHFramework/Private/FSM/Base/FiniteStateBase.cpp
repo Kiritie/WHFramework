@@ -5,7 +5,7 @@
 #include "Debug/DebugModuleTypes.h"
 #include "Event/EventModuleStatics.h"
 #include "FSM/Components/FSMComponent.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Event/Handle/FSM/EventHandle_FiniteStateEntered.h"
 #include "Event/Handle/FSM/EventHandle_FiniteStateLeaved.h"
 
@@ -16,10 +16,10 @@ UFiniteStateBase::UFiniteStateBase()
 	FSM = nullptr;
 
 	const UFunction* OnPreEnterFunction = GetClass()->FindFunctionByName(FName(TEXT("K2_OnPreEnter")));
-	bHasBlueprintOnPreEnter = UCommonStatics::IsImplementedInBlueprint(OnPreEnterFunction);
+	bHasBlueprintOnPreEnter = UCommonModuleStatics::IsImplementedInBlueprint(OnPreEnterFunction);
 
 	const UFunction* OnPreLeaveFunction = GetClass()->FindFunctionByName(FName(TEXT("K2_OnPreLeave")));
-	bHasBlueprintOnPreLeave = UCommonStatics::IsImplementedInBlueprint(OnPreLeaveFunction);
+	bHasBlueprintOnPreLeave = UCommonModuleStatics::IsImplementedInBlueprint(OnPreLeaveFunction);
 }
 
 void UFiniteStateBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)

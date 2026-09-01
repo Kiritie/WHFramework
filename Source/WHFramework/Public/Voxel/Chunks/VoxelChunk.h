@@ -88,7 +88,7 @@ public:
 
 	virtual FIndex WorldIndexToLocal(FIndex InIndex) const;
 
-	virtual bool LocalIndexToNeighbor(FIndex InIndex, EDirection& OutDirection) const;
+	virtual bool LocalIndexToNeighbor(FIndex InIndex, EDirectionN& OutDirection) const;
 
 	//////////////////////////////////////////////////////////////////////////
 public:
@@ -113,9 +113,9 @@ public:
 public:
 	virtual bool CheckVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem, FVector InRange = FVector::OneVector);
 
-	virtual bool CheckVoxelAdjacent(FIndex InIndex, EDirection InDirection);
+	virtual bool CheckVoxelAdjacent(FIndex InIndex, EDirectionN InDirection);
 
-	virtual bool CheckVoxelAdjacent(const FVoxelItem& InVoxelItem, EDirection InDirection);
+	virtual bool CheckVoxelAdjacent(const FVoxelItem& InVoxelItem, EDirectionN InDirection);
 
 	virtual bool CheckVoxelNeighbors(FIndex InIndex, EVoxelType InVoxelType, FVector InRange = FVector::OneVector, bool bFromCenter = false, bool bIgnoreBottom = false, bool bOnTheChunk = false);
 
@@ -218,7 +218,7 @@ protected:
 	bool bChanged;
 
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
-	TMap<EDirection, UVoxelChunk*> Neighbors;
+	TMap<EDirectionN, UVoxelChunk*> Neighbors;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Stats")
 	UVoxelModule* Module;
@@ -246,11 +246,11 @@ public:
 	
 	void SetChanged(bool bInChanged) { bChanged = bInChanged; }
 
-	UVoxelChunk* GetNeighbor(EDirection InDirection) const { return Neighbors[InDirection]; }
+	UVoxelChunk* GetNeighbor(EDirectionN InDirection) const { return Neighbors[InDirection]; }
 
-	UVoxelChunk* GetOrSpawnNeighbor(EDirection InDirection, bool bAddToQueue = true);
+	UVoxelChunk* GetOrSpawnNeighbor(EDirectionN InDirection, bool bAddToQueue = true);
 
-	TMap<EDirection, UVoxelChunk*> GetNeighbors() const { return Neighbors; }
+	TMap<EDirectionN, UVoxelChunk*> GetNeighbors() const { return Neighbors; }
 
 	FIndex GetWorldIndex() const;
 

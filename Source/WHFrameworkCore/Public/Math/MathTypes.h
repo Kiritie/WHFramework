@@ -53,7 +53,7 @@ enum class EEaseType : uint8
  * 方向
  */
 UENUM(BlueprintType)
-enum class EDirection : uint8
+enum class EDirectionN : uint8
 {
 	Forward,
 	Right,
@@ -272,9 +272,9 @@ FORCEINLINE uint32 GetTypeHash(const FIndex& InIndex)
 	}
 
 #define ITER_DIRECTION(Iter, Expression) \
-	EDirection Iter; \
+	EDirectionN Iter; \
 	for(int32 _Index = 0; _Index < 6; _Index++) \
 	{ \
-		Iter = (EDirection)_Index; \
+		Iter = (EDirectionN)_Index; \
 		Expression \
 	}

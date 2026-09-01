@@ -3,7 +3,7 @@
 
 #include "Input/InputModuleStatics.h"
 
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Gameplay/WHLocalPlayer.h"
 #include "Input/InputModule.h"
 #include "EnhancedInputSubsystems.h"
@@ -13,7 +13,7 @@
 
 UEnhancedInputLocalPlayerSubsystem* UInputModuleStatics::GetInputSubsystem(int32 InPlayerIndex)
 {
-	if(UWHLocalPlayer* LocalPlayer = UCommonStatics::GetLocalPlayer(InPlayerIndex))
+	if(UWHLocalPlayer* LocalPlayer = UCommonModuleStatics::GetLocalPlayer(InPlayerIndex))
 	{
 		return LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
 	}
@@ -31,7 +31,7 @@ UInputUserSettingsBase* UInputModuleStatics::GetInputUserSettings(int32 InPlayer
 
 UInputComponentBase* UInputModuleStatics::GetInputComponent(int32 InPlayerIndex, TSubclassOf<UInputComponentBase> InClass)
 {
-	if(AWHPlayerController* PlayerController = UCommonStatics::GetLocalPlayerController(InPlayerIndex))
+	if(AWHPlayerController* PlayerController = UCommonModuleStatics::GetLocalPlayerController(InPlayerIndex))
 	{
 		return GetDeterminesOutputObject(Cast<UInputComponentBase>(PlayerController->InputComponent), InClass);
 	}

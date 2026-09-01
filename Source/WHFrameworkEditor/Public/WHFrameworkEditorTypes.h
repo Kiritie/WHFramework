@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "Framework/Commands/Commands.h"
 #include "ClassViewerFilter.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Kismet2/KismetEditorUtilities.h"
 
 #define GENERATED_EDITOR_MODULE(ModuleClass) \
@@ -54,7 +54,7 @@ public:
 			&& InClass->CanCreateAssetOfClass()
 			&& InFilterFuncs->IfInChildOfClassesSet(AllowedChildrenOfClasses, InClass) != EFilterReturn::Failed
 			&& (bIncludeBaseClasses || InFilterFuncs->IfInClassesSet(AllowedChildrenOfClasses, InClass) == EFilterReturn::Failed)
-			&& (bIncludeParentClasses || !UCommonStatics::IsClassHasChildren(InClass))
+			&& (bIncludeParentClasses || !UCommonModuleStatics::IsClassHasChildren(InClass))
 			&& IsClassAllowed(const_cast<UClass*>(InClass));
 
 		if (bAllowed && bDisallowBlueprintBase)

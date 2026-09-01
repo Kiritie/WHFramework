@@ -3,7 +3,7 @@
 #pragma once
 
 #include "BehaviorTree/BTDecorator.h"
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleTypes.h"
 #include "AIDecoratorBase.generated.h"
 
 class IAIAgentInterface;

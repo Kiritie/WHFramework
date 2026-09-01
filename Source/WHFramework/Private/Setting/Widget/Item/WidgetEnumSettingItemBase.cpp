@@ -2,7 +2,7 @@
 
 #include "Setting/Widget/Item/WidgetEnumSettingItemBase.h"
 
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Components/ComboBoxString.h"
 #include "Widget/WidgetModuleStatics.h"
 
@@ -20,9 +20,9 @@ void UWidgetEnumSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const 
 	{
 		if(InParams[1].GetParameterType() == EParameterType::String)
 		{
-			for(int32 i = 0; i < UCommonStatics::GetEnumItemNum(InParams[1]); i++)
+			for(int32 i = 0; i < UCommonModuleStatics::GetEnumItemNum(InParams[1]); i++)
 			{
-				EnumNames.Add(UCommonStatics::GetEnumDisplayNameByValue(InParams[1], i).ToString());
+				EnumNames.Add(UCommonModuleStatics::GetEnumDisplayNameByValue(InParams[1], i).ToString());
 			}
 		}
 		else

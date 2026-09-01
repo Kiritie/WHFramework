@@ -1019,7 +1019,7 @@ void FPlatformManager::CheckForLauncherEngineInstallation(const FString &AppId, 
 			TSharedPtr<FJsonObject> CustomFieldsObject = RootObject->GetObjectField(TEXT("CustomFields"));
 			if (CustomFieldsObject.IsValid())
 			{
-				FString InstallLocation = CustomFieldsObject->GetStringField("InstallLocation");
+				FString InstallLocation = CustomFieldsObject->GetStringField(TEXT("InstallLocation"));
 				if (InstallLocation.Len() > 0)
 				{
 					OutInstallations.Add(Identifier, InstallLocation);
@@ -1177,12 +1177,12 @@ bool FPlatformManager::EnumerateProjectsKnownByEngine(const FString &Identifier,
 	FConfigCacheIni::LoadExternalIniFile(GameAgnosticConfig, TEXT("EditorSettings"), NULL, *GameAgnosticConfigDir, false);
 
 	// Find the editor game-agnostic settings
-	FConfigSection* Section = GameAgnosticConfig.Find(TEXT("/Script/UnrealEd.EditorSettings"));
+	const FConfigSection* Section = GameAgnosticConfig.FindSection(TEXT("/Script/UnrealEd.EditorSettings"));
 
 	if (Section == NULL)
 	{
 		FConfigCacheIni::LoadExternalIniFile(GameAgnosticConfig, TEXT("EditorGameAgnostic"), NULL, *GameAgnosticConfigDir, false);
-		Section = GameAgnosticConfig.Find(TEXT("/Script/UnrealEd.EditorGameAgnosticSettings"));
+		Section = GameAgnosticConfig.FindSection(TEXT("/Script/UnrealEd.EditorGameAgnosticSettings"));
 	}
 
 	if(Section != NULL)

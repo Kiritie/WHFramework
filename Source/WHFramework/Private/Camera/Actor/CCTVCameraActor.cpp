@@ -6,7 +6,7 @@
 #include "Animation/AnimationModuleStatics.h"
 #include "Camera/CameraModuleStatics.h"
 #include "Camera/Point/CameraPointBase.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Kismet/GameplayStatics.h"
 
 ACCTVCameraActor::ACCTVCameraActor()

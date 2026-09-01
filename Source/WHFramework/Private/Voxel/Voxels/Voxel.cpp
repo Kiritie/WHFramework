@@ -81,7 +81,7 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 	}
 	if(GetOwner())
 	{
-		const FIndex UpperIndex = FMathHelper::GetAdjacentIndex(GetIndex(), EDirection::Up);
+		const FIndex UpperIndex = FMathHelper::GetAdjacentIndex(GetIndex(), EDirectionN::Up);
 		if(GetOwner()->HasVoxelComplex(UpperIndex) && GetOwner()->GetVoxelComplex(UpperIndex).GetData().GetTransparency() == EVoxelTransparency::Trans)
 		{
 			GetOwner()->SetVoxelComplex(UpperIndex, FVoxelItem::Empty, true, InAgent);

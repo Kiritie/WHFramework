@@ -9,7 +9,7 @@
 #include "Ability/Pawn/States/AbilityPawnState_Spawn.h"
 #include "Components/BoxComponent.h"
 #include "FSM/Components/FSMComponent.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Voxel/VoxelModule.h"
 #include "Ability/AbilityModuleStatics.h"
@@ -549,7 +549,7 @@ UAbilityInventoryBase* AAbilityPawnBase::GetInventory() const
 
 bool AAbilityPawnBase::IsPlayer() const
 {
-	return UCommonStatics::GetPlayerPawn() == this;
+	return UCommonModuleStatics::GetPlayerPawn() == this;
 }
 
 bool AAbilityPawnBase::IsEnemy(IAbilityPawnInterface* InTarget) const

@@ -71,10 +71,10 @@ float UVoxelWaterData::GetWaterCornerHeight(const FVoxelItem& InVoxelItem, int32
 	return Count > 0 ? Height / Count : GetWaterHeight(InVoxelItem);
 }
 
-bool UVoxelWaterData::ShouldBuildWaterFace(const FVoxelItem& InVoxelItem, EDirection InFacing) const
+bool UVoxelWaterData::ShouldBuildWaterFace(const FVoxelItem& InVoxelItem, EDirectionN InFacing) const
 {
 	if(InVoxelItem.Chunk && FVoxelLiquidState(InVoxelItem.Data).IsFalling() &&
-		(InFacing == EDirection::Forward || InFacing == EDirection::Right || InFacing == EDirection::Backward || InFacing == EDirection::Left))
+		(InFacing == EDirectionN::Forward || InFacing == EDirectionN::Right || InFacing == EDirectionN::Backward || InFacing == EDirectionN::Left))
 	{
 		const FVoxelItem& AdjacentItem = InVoxelItem.Chunk->GetVoxelComplex(InVoxelItem.Index + FMathHelper::DirectionToIndex(InFacing));
 		if(AdjacentItem.GetVoxelType() == EVoxelType::Water && !FVoxelLiquidState(AdjacentItem.Data).IsFalling()) return true;

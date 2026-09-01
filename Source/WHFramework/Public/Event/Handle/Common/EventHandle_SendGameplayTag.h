@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleTypes.h"
 #include "Event/Handle/InstancedEventHandleBase.h"
 #include "Parameter/ParameterModuleTypes.h"
 

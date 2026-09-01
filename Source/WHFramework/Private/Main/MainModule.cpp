@@ -4,7 +4,7 @@
 #include "Main/MainModule.h"
 
 #include "Ability/AbilityModule.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Common/Game/EventHandle_GameExited.h"
 #include "Event/Handle/Common/Game/EventHandle_GameInited.h"
@@ -185,7 +185,7 @@ void AMainModule::UnPauseModules_Implementation()
 
 UModuleNetworkComponentBase* AMainModule::GetModuleNetworkComponent(TSubclassOf<UModuleNetworkComponentBase> InClass)
 {
-	if(const AWHPlayerController* PlayerController = UCommonStatics::GetPlayerController<AWHPlayerController>())
+	if(const AWHPlayerController* PlayerController = UCommonModuleStatics::GetPlayerController<AWHPlayerController>())
 	{
 		return Cast<UModuleNetworkComponentBase>(PlayerController->GetComponentByClass(InClass));
 	}

@@ -3,7 +3,7 @@
 
 #include "Asset/Data/DataAssetBase.h"
 
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 
 UDataAssetBase::UDataAssetBase()
 {

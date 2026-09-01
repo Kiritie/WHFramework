@@ -110,7 +110,7 @@ FVector UVoxelData::GetRange(ERightAngle InAngle, bool bIncludeDirection) const
 	FVector Range = FVector::OneVector;
 	if(PartDatas.Num() > 0)
 	{
-		FVector PartRange;
+		FVector PartRange = FVector::ZeroVector;
 		for(const auto Iter : PartDatas)
 		{
 			PartRange.X = FMath::Max(Iter->PartIndex.X, PartRange.X);

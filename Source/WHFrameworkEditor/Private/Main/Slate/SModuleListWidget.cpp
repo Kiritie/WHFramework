@@ -6,7 +6,7 @@
 #include "SourceCodeNavigation.h"
 #include "WHFrameworkCoreStatics.h"
 #include "WHFrameworkEditorStatics.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Main/MainModule.h"
 #include "Main/Base/ModuleBase.h"
 #include "Main/Blueprint/ModuleBlueprintFactory.h"
@@ -545,9 +545,9 @@ int32 SModuleListWidget::GetSelectedModuleNum() const
 TArray<UClass*> SModuleListWidget::GetUnAddedModuleClasses() const
 {
 	TArray<UClass*> ReturnValues;
-	for (auto Iter : UCommonStatics::GetClassChildren(UModuleBase::StaticClass()))
+	for (auto Iter : UCommonModuleStatics::GetClassChildren(UModuleBase::StaticClass()))
 	{
-		if (ModuleClassFilter->IsClassAllowed(Iter) && !FKismetEditorUtilities::IsClassABlueprintSkeleton(Iter) && !UCommonStatics::IsClassHasChildren(Iter))
+		if (ModuleClassFilter->IsClassAllowed(Iter) && !FKismetEditorUtilities::IsClassABlueprintSkeleton(Iter) && !UCommonModuleStatics::IsClassHasChildren(Iter))
 		{
 			ReturnValues.Add(Iter);
 		}

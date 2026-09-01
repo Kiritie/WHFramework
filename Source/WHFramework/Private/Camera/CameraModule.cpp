@@ -10,7 +10,7 @@
 #include "Camera/Manager/CameraManagerBase.h"
 #include "Camera/Point/CameraPointBase.h"
 #include "Gameplay/WHGameMode.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Camera/EventHandle_ResetCameraView.h"
 #include "Event/Handle/Camera/EventHandle_SetCameraView.h"

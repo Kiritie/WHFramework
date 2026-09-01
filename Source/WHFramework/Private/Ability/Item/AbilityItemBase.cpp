@@ -6,7 +6,7 @@
 #include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 
 // Sets default values
 AAbilityItemBase::AAbilityItemBase()

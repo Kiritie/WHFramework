@@ -9,7 +9,7 @@
 #include "MediaPlayer.h"
 #include "MediaPlayerFacade.h"
 #include "Asset/AssetModuleStatics.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "GameFramework/GameUserSettings.h"
 #include "Net/UnrealNetwork.h"
 #include "SaveGame/SaveGameModuleStatics.h"
@@ -304,7 +304,7 @@ void UVideoModule::PostEditChangeProperty(FPropertyChangedEvent& PropertyChanged
 	{
 		const FName PropertyName = Property->GetFName();
 
-		bool bApplySetting = UCommonStatics::IsPlaying();
+		bool bApplySetting = UCommonModuleStatics::IsPlaying();
 		
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UVideoModule, bEnableVSync) ||
 			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UVideoModule, bEnableDynamicResolution))

@@ -27,7 +27,7 @@ void SDebugPanelWidget::OnCreate(UObject* InOwner, const TArray<FParameter>& InP
 
 	const TSharedPtr<SWrapBox> MessageBox = SNew(SWrapBox)
 		.Orientation(Orient_Vertical)
-		.UseAllottedWidth(true);
+		.UseAllottedSize(true);
 
 	for(auto Iter : UMainModuleStatics::GetAllModule())
 	{

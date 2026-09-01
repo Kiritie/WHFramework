@@ -8,7 +8,7 @@
 #include "Camera/CameraModuleStatics.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/PanelWidget.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Input/InputModuleStatics.h"
 #include "Scene/SceneManager.h"
 #include "Slate/Runtime/Interfaces/SubWidgetInterface.h"
@@ -275,7 +275,7 @@ void UWorldWidgetBase::RefreshLocation_Implementation(UWidget* InWidget, FWorldW
 	{
 		FVector2D ScreenPos;
 		const FVector Location = InMapping.GetLocation();
-		if(UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(UCommonStatics::GetPlayerController(), Location, ScreenPos, false) && Location != FVector(-1.f))
+		if(UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(UCommonModuleStatics::GetPlayerController(), Location, ScreenPos, false) && Location != FVector(-1.f))
 		{
 			CanvasPanelSlot->SetPosition(ScreenPos);
 		}
@@ -339,7 +339,7 @@ bool UWorldWidgetBase::IsWidgetVisible_Implementation(bool bRefresh)
 	if(bRefresh)
 	{
 		bool bVisible = false;
-		if(UCommonStatics::GetLocalPlayerNum() == 1 && UWidgetModuleStatics::GetWorldWidgetVisible(GetClass()))
+		if(UCommonModuleStatics::GetLocalPlayerNum() == 1 && UWidgetModuleStatics::GetWorldWidgetVisible(GetClass()))
 		{
 			FWorldWidgetMapping Mapping;
 			const auto OwnerActor = Cast<AActor>(OwnerObject);
@@ -367,7 +367,7 @@ bool UWorldWidgetBase::IsWidgetVisible_Implementation(bool bRefresh)
 					}
 					if(ENUMWITH(WidgetVisibility, EWorldWidgetVisibility::ScreenOnly))
 					{
-						bVisible = bVisible && (Location != FVector(-1.f) && UCommonStatics::IsInScreenViewport(Location));
+						bVisible = bVisible && (Location != FVector(-1.f) && UCommonModuleStatics::IsInScreenViewport(Location));
 					}
 					if(ENUMWITH(WidgetVisibility, EWorldWidgetVisibility::DistanceOnly))
 					{

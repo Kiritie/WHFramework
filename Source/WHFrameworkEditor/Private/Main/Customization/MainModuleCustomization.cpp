@@ -36,7 +36,7 @@ void FMainModuleCustomization::CustomizeDetails(IDetailLayoutBuilder& DetailLayo
 		.WholeRowContent()
 		[
 			SNew(SWrapBox)
-			.UseAllottedWidth(true)
+			.UseAllottedSize(true)
 			+SWrapBox::Slot()
 			[
 				SNew(SButton)

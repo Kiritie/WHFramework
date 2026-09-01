@@ -4,7 +4,7 @@
 #include "Widget/World/WorldWidgetComponent.h"
 
 #include "Camera/CameraModuleStatics.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Scene/SceneManager.h"
 #include "Widget/WidgetModuleStatics.h"
 #include "Widget/World/WorldWidgetActor.h"
@@ -54,7 +54,7 @@ void UWorldWidgetComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
-	if(UCommonStatics::IsPlaying() && EndPlayReason == EEndPlayReason::Type::Destroyed)
+	if(UCommonModuleStatics::IsPlaying() && EndPlayReason == EEndPlayReason::Type::Destroyed)
 	{
 		DestroyWorldWidget();
 	}
@@ -78,7 +78,7 @@ void UWorldWidgetComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 		SetRelativeScale3D(WidgetScale);
 	}
 
-	if(UCommonStatics::IsPlaying())
+	if(UCommonModuleStatics::IsPlaying())
 	{
 		if(WorldWidget && GetWidgetSpace() == EWidgetSpace::World)
 		{

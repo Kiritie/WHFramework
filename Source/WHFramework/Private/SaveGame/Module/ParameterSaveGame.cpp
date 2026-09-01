@@ -2,7 +2,7 @@
 
 #include "SaveGame/Module/ParameterSaveGame.h"
 
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Parameter/ParameterModule.h"
 
 UParameterSaveGame::UParameterSaveGame()

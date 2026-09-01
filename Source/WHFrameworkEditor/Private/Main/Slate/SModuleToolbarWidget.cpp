@@ -58,7 +58,7 @@ void SModuleToolbarWidget::OnCreate()
 				FExecuteAction::CreateRaw(this, &SModuleToolbarWidget::OnPreviewToggled),
 				FCanExecuteAction::CreateLambda([]() -> bool
 				{
-					return UCommonStatics::IsPlaying();
+					return UCommonModuleStatics::IsPlaying();
 				}),
 				FGetActionCheckState::CreateLambda([this](){
 					return GetParentWidgetN<SModuleEditorWidget>()->bPreview ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
@@ -108,7 +108,7 @@ void SModuleToolbarWidget::OnCreate()
 				FExecuteAction::CreateRaw(this, &SModuleToolbarWidget::OnDeleteClicked),
 				FCanExecuteAction::CreateLambda([]() -> bool
 				{
-					return !UCommonStatics::IsPlaying();
+					return !UCommonModuleStatics::IsPlaying();
 				})
 			),
 			NAME_None,

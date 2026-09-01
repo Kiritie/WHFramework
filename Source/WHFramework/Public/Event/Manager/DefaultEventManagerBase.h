@@ -3,7 +3,7 @@
 #pragma once
 
 #include "EventManagerBase.h"
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleTypes.h"
 #include "Event/EventModuleTypes.h"
 
 #include "DefaultEventManagerBase.generated.h"

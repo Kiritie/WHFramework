@@ -54,27 +54,27 @@ ERightAngle UMathStatics::GetOffsetRightAngle(ERightAngle InAngle, int32 InOffse
 	return FMathHelper::OffsetRightAngle(InAngle, InOffset);
 }
 
-EDirection UMathStatics::InvertDirection(EDirection InDirection)
+EDirectionN UMathStatics::InvertDirection(EDirectionN InDirection)
 {
 	return FMathHelper::InvertDirection(InDirection);
 }
 
-EDirection UMathStatics::RotateDirection(EDirection InDirection, ERightAngle InAngle)
+EDirectionN UMathStatics::RotateDirection(EDirectionN InDirection, ERightAngle InAngle)
 {
 	return FMathHelper::RotateDirection(InDirection, InAngle);
 }
 
-FVector UMathStatics::DirectionToVector(EDirection InDirection, ERightAngle InAngle)
+FVector UMathStatics::DirectionToVector(EDirectionN InDirection, ERightAngle InAngle)
 {
 	return FMathHelper::DirectionToVector(InDirection, InAngle);
 }
 
-FIndex UMathStatics::DirectionToIndex(EDirection InDirection, ERightAngle InAngle)
+FIndex UMathStatics::DirectionToIndex(EDirectionN InDirection, ERightAngle InAngle)
 {
 	return FMathHelper::DirectionToIndex(InDirection, InAngle);
 }
 
-FIndex UMathStatics::GetAdjacentIndex(FIndex InIndex, EDirection InDirection, ERightAngle InAngle)
+FIndex UMathStatics::GetAdjacentIndex(FIndex InIndex, EDirectionN InDirection, ERightAngle InAngle)
 {
 	return FMathHelper::GetAdjacentIndex(InIndex, InDirection, InAngle);
 }

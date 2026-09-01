@@ -4,7 +4,7 @@
 
 
 #include "ParameterModuleTypes.h"
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleTypes.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "ParameterModuleStatics.generated.h"
 

@@ -2,7 +2,7 @@
 
 #include "SaveGame/Module/InputSaveGame.h"
 
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Input/InputModule.h"
 #include "Main/MainModule.h"
 

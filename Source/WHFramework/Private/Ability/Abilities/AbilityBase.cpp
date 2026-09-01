@@ -2,7 +2,7 @@
 
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Ability/Effects/EffectBase.h"
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleTypes.h"
 
 UAbilityBase::UAbilityBase()
 {

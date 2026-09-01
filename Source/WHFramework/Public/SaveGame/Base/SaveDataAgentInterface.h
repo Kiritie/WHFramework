@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 
 #include "SaveDataAgentInterface.generated.h"

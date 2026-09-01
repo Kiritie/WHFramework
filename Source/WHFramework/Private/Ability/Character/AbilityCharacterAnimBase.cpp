@@ -4,7 +4,7 @@
 #include "Ability/Character/AbilityCharacterAnimBase.h"
 
 #include "Ability/Character/AbilityCharacterBase.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 
 UAbilityCharacterAnimBase::UAbilityCharacterAnimBase()
 {
@@ -21,7 +21,7 @@ void UAbilityCharacterAnimBase::NativeUpdateAnimation(float DeltaSeconds)
 	
 	AAbilityCharacterBase* Character = GetOwnerCharacter<AAbilityCharacterBase>();
 
-	if(!Character || !Character->Execute_GetAssetID(Character).IsValid() || !UCommonStatics::IsPlaying()) return;
+	if(!Character || !Character->Execute_GetAssetID(Character).IsValid() || !UCommonModuleStatics::IsPlaying()) return;
 
 	bFalling = Character->IsFalling();
 

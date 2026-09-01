@@ -6,7 +6,7 @@
 #include "Camera/Manager/CameraManagerBase.h"
 #include "Components/WidgetInteractionComponent.h"
 #include "Gameplay/WHPlayerInterface.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Common/Interaction/InteractionAgentInterface.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Gameplay/WHPlayerState.h"
@@ -122,7 +122,7 @@ void AWHPlayerController::Tick(float DeltaSeconds)
 
 void AWHPlayerController::RefreshInteraction_Implementation()
 {
-	if(UCommonStatics::GetLocalPlayerNum() > 1) return;
+	if(UCommonModuleStatics::GetLocalPlayerNum() > 1) return;
 	
 	FHitResult HitResult;
 
@@ -196,7 +196,7 @@ void AWHPlayerController::RefreshInteraction_Implementation()
 			}
 		}
 
-		if(UCommonStatics::HasMouseCapture() && HoveringInteraction.GetObject())
+		if(UCommonModuleStatics::HasMouseCapture() && HoveringInteraction.GetObject())
 		{
 			IInteractionAgentInterface::Execute_OnEndHover(HoveringInteraction.GetObject());
 			HoveringInteraction = nullptr;

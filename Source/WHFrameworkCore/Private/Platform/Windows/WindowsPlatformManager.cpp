@@ -462,7 +462,7 @@ bool FWindowsPlatformManager::FileDialogShared(bool bSave, const void* ParentWin
 								int32 WildCardIndex = INDEX_NONE;
 								if (CleanExtension.FindChar(TEXT('*'), WildCardIndex))
 								{
-									CleanExtension.RightChopInline(WildCardIndex + 1, false);
+									CleanExtension.RightChopInline(WildCardIndex + 1, EAllowShrinking::No);
 								}
 							}
 

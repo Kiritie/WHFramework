@@ -6,7 +6,7 @@
 #include "Components/AudioComponent.h"
 #include "Audio/AudioModuleStatics.h"
 #include "Audio/AudioModuleNetworkComponent.h"
-#include "Common/CommonStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Audio/EventHandle_SoundParamsChanged.h"
 #include "Kismet/GameplayStatics.h"
@@ -178,7 +178,7 @@ FString UAudioModule::GetModuleDebugMessage()
 	FString DebugMessage;
 	for(auto Iter : SingleSoundInfos)
 	{
-		DebugMessage.Appendf(TEXT("%s-%s(%s)\n"), *Iter.Key.ToString(), *Iter.Value.Sound->GetName(), *UCommonStatics::GetEnumAuthoredNameByValue(TEXT("/Script/Engine.EAudioComponentPlayState"), (int32)Iter.Value.Audio->GetPlayState()));
+		DebugMessage.Appendf(TEXT("%s-%s(%s)\n"), *Iter.Key.ToString(), *Iter.Value.Sound->GetName(), *UCommonModuleStatics::GetEnumAuthoredNameByValue(TEXT("/Script/Engine.EAudioComponentPlayState"), (int32)Iter.Value.Audio->GetPlayState()));
 	}
 	DebugMessage.RemoveFromEnd(TEXT("\n"));
 	if(!DebugMessage.IsEmpty())

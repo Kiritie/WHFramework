@@ -10,7 +10,7 @@
 
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
-class USubWidgetInterface : public UPanelWidgetInterface
+class USubWidgetInterface : public UBaseWidgetInterface
 {
 	GENERATED_BODY()
 };

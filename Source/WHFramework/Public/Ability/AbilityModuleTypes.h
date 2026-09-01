@@ -5,7 +5,7 @@
 #include "Common/Base/WHObject.h"
 #include "GameplayTagContainer.h"
 #include "Asset/AssetModuleTypes.h"
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleTypes.h"
 #include "ReferencePool/ReferencePoolInterface.h"
 #include "Scene/SceneModuleTypes.h"
 

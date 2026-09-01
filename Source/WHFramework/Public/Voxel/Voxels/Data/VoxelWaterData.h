@@ -17,5 +17,5 @@ public:
 
 	float GetWaterCornerHeight(const FVoxelItem& InVoxelItem, int32 InX, int32 InY) const;
 
-	bool ShouldBuildWaterFace(const FVoxelItem& InVoxelItem, EDirection InFacing) const;
+	bool ShouldBuildWaterFace(const FVoxelItem& InVoxelItem, EDirectionN InFacing) const;
 };

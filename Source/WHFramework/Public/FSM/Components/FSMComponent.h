@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Common/CommonTypes.h"
+#include "Common/CommonModuleTypes.h"
 #include "FSM/FSMModuleTypes.h"
 #include "FSM/Base/FiniteStateBase.h"
 
