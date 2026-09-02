@@ -1,6 +1,7 @@
 #include "Voxel/Generators/VoxelBuildingGenerator.h"
 
 #include "Asset/AssetModuleStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Math/MathHelper.h"
 #include "Misc/ScopeRWLock.h"
 #include "Scene/SceneModuleStatics.h"
@@ -20,9 +21,9 @@ UVoxelBuildingGenerator::UVoxelBuildingGenerator()
 	};
 }
 
-void UVoxelBuildingGenerator::Initialize(UVoxelModule* InModule)
+void UVoxelBuildingGenerator::Initialize(UVoxelModule* InModule, int32 InStage)
 {
-	Super::Initialize(InModule);
+	Super::Initialize(InModule, InStage);
 	const FIndex ChunkSize = Module->GetWorldData().ChunkSize;
 	const int32 HalfChunkX = FMath::FloorToInt(ChunkSize.X * 0.5f);
 	const int32 HalfChunkY = FMath::FloorToInt(ChunkSize.Y * 0.5f);
@@ -177,9 +178,9 @@ void UVoxelBuildingGenerator::Generate(UVoxelChunk* InChunk)
 				FSceneArea Area;
 				Area.AreaName = *FString::Printf(TEXT("Structure_%d_%d"), AnchorChunkIndex.X, AnchorChunkIndex.Y);
 				const FText BuildingDisplayName = _PrefabAssets[BuildingIndex]->DisplayName.IsEmpty()
-					? Module->GetWorldRegionDisplayName(EVoxelRegionType::Building)
+					? UCommonModuleStatics::GetEnumDisplayNameByValue(TEXT("/Script/WHFramework.EVoxelRegionType"), static_cast<int32>(EVoxelRegionType::Building))
 					: _PrefabAssets[BuildingIndex]->DisplayName;
-				Area.AreaDisplayName = Module->GetWorldAreaDisplayName(FIndex(CenterX, CenterY, Plan.GroundHeight), EVoxelAreaType::Building, BuildingDisplayName);
+				Area.AreaDisplayName = Module->GetVoxelAreaName(FIndex(CenterX, CenterY, Plan.GroundHeight), EVoxelAreaType::Building, BuildingDisplayName);
 				Area.AreaType = ESceneAreaType::Default;
 				Area.AreaShape = ESceneAreaShape::Box;
 				Area.AreaCenter = FVector2D(CenterX + (RotationCache.MinX + RotationCache.MaxX) * 0.5f,

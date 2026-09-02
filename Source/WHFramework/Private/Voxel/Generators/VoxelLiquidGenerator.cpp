@@ -23,7 +23,7 @@ void UVoxelLiquidGenerator::GenerateLiquid(UVoxelChunk* InChunk) const
 			const FIndex ColumnIndex(X, Y, 0);
 			const bool bOnTheChunk = InChunk->IsOnTheChunk(ColumnIndex);
 			UVoxelChunk* Chunk = bOnTheChunk ? InChunk : Module->GetChunkByVoxelIndex(InChunk->LocalIndexToWorld(ColumnIndex));
-			if(!Chunk || (!bOnTheChunk && !Chunk->IsMapBuildStageCompleted(static_cast<int32>(EVoxelGenerationStage::Landmark) + 1))) continue;
+			if(!Chunk || (!bOnTheChunk && Chunk->GetBuildStage() != Stage)) continue;
 			const FVoxelTopography& Topography = Chunk->GetTopography(Chunk->WorldIndexToLocal(InChunk->LocalIndexToWorld(ColumnIndex)));
 			LiquidMaxHeight = FMath::Max(LiquidMaxHeight, Topography.Height + 2);
 			if(Topography.WaterHeight != INDEX_NONE) LiquidMaxHeight = FMath::Max(LiquidMaxHeight, Topography.WaterHeight + 1);
@@ -38,7 +38,7 @@ void UVoxelLiquidGenerator::GenerateLiquid(UVoxelChunk* InChunk) const
 			const FIndex ColumnIndex(X, Y, 0);
 			const bool bOnTheChunk = InChunk->IsOnTheChunk(ColumnIndex);
 			UVoxelChunk* Chunk = bOnTheChunk ? InChunk : Module->GetChunkByVoxelIndex(InChunk->LocalIndexToWorld(ColumnIndex));
-			if(!Chunk || (!bOnTheChunk && !Chunk->IsMapBuildStageCompleted(static_cast<int32>(EVoxelGenerationStage::Landmark) + 1))) continue;
+			if(!Chunk || (!bOnTheChunk && Chunk->GetBuildStage() != Stage)) continue;
 			for(int32 Z = 0; Z < LiquidMaxHeight; ++Z)
 			{
 				const FIndex VoxelIndex(X, Y, Z);
@@ -66,7 +66,7 @@ void UVoxelLiquidGenerator::GenerateLiquid(UVoxelChunk* InChunk) const
 		const bool bOnTheChunk = InChunk->IsOnTheChunk(Iter.Key);
 		const FIndex WorldIndex = InChunk->LocalIndexToWorld(Iter.Key);
 		UVoxelChunk* Chunk = bOnTheChunk ? InChunk : Module->GetChunkByVoxelIndex(WorldIndex);
-		if(!Chunk || (!bOnTheChunk && (!Chunk->IsMapBuildStageCompleted(static_cast<int32>(EVoxelGenerationStage::Liquid) + 1) || Iter.Value.bRemove))) continue;
+		if(!Chunk || (!bOnTheChunk && (Chunk->GetBuildStage() != Stage || Iter.Value.bRemove))) continue;
 		const FIndex LocalIndex = Chunk->WorldIndexToLocal(WorldIndex);
 		if(Iter.Value.bRemove)
 		{

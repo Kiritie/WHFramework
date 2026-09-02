@@ -22,7 +22,7 @@ void UVoxelRegionGenerator::Generate(UVoxelChunk* InChunk)
 
 	FSceneArea SceneArea;
 	SceneArea.AreaName = *FString::Printf(TEXT("VoxelArea_%d_%d"), Anchor.X, Anchor.Y);
-	SceneArea.AreaDisplayName = Module->GetWorldAreaPrefix(RegionOrigin, EVoxelAreaType::Continent);
+	SceneArea.AreaDisplayName = Module->GetVoxelAreaName(RegionOrigin, EVoxelAreaType::Continent);
 	SceneArea.AreaType = ESceneAreaType::Chunk;
 	SceneArea.AreaShape = ESceneAreaShape::Box;
 	SceneArea.AreaCenter = (RegionMin + RegionMax) * 0.5f;

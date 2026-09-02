@@ -67,24 +67,56 @@ UVoxelModule::UVoxelModule()
 	bAutoGenerate = false;
 	WorldMode = EVoxelWorldMode::None;
 	WorldState = EVoxelWorldState::None;
-	WorldGenerationStage = EVoxelGenerationStage::None;
 	WorldBasicData = FVoxelWorldBasicSaveData();
 	WorldCenterIndex = EMPTY_Index;
 	WorldAgentIndex = EMPTY_Index;
 
 	WorldData = nullptr;
-	SceneAreaNameTable = nullptr;
-	SceneAreaNamePrefixes = TMap<EVoxelAreaType, TArray<FText>>();
+	VoxelAreaNameTable = nullptr;
+	VoxelAreaNames = TMap<EVoxelAreaType, TArray<FText>>();
 
 	ChunkSpawnClass = UVoxelChunk::StaticClass();
 	
 	ChunkSpawnDistance = 0.35f;
-	SpawningQueues = FVoxelChunkQueues({ FVoxelChunkQueue(false, 1000) });
-	MapLoadingQueues = FVoxelChunkQueues({ FVoxelChunkQueue(true, 100) });
-	MeshSpawningQueues = FVoxelChunkQueues({ FVoxelChunkQueue(true, 100), FVoxelChunkQueue(false, 30) });
-	MeshBuildingQueues = FVoxelChunkQueues({ FVoxelChunkQueue(true, 100) });
-	GeneratingQueues = FVoxelChunkQueues({ FVoxelChunkQueue(false, 1) });
-	UnloadingQueues = FVoxelChunkQueues({ FVoxelChunkQueue(false, 10) });
+	ChunkQueues = {
+		{ EVoxelWorldState::Spawning, FVoxelChunkQueues({
+			FVoxelChunkQueue(false, 1000)
+		}) },
+		{ EVoxelWorldState::MapLoading, FVoxelChunkQueues({
+			FVoxelChunkQueue(true, 512)
+		}) },
+		{ EVoxelWorldState::MapBuilding, FVoxelChunkQueues({
+			FVoxelChunkQueue(true, 256, {
+				CreateDefaultSubobject<UVoxelSurfaceGenerator>(FName("SurfaceGenerator")),
+				CreateDefaultSubobject<UVoxelRiverGenerator>(FName("RiverGenerator")),
+				CreateDefaultSubobject<UVoxelLakeGenerator>(FName("LakeGenerator")),
+				CreateDefaultSubobject<UVoxelRegionGenerator>(FName("RegionGenerator")),
+				CreateDefaultSubobject<UVoxelCaveGenerator>(FName("CaveGenerator")),
+				CreateDefaultSubobject<UVoxelOreGenerator>(FName("OreGenerator")),
+				CreateDefaultSubobject<UVoxelTerrainGenerator>(FName("TerrainGenerator")),
+				CreateDefaultSubobject<UVoxelFoliageGenerator>(FName("FoliageGenerator")),
+				CreateDefaultSubobject<UVoxelTownGenerator>(FName("TownGenerator")),
+				CreateDefaultSubobject<UVoxelBuildingGenerator>(FName("BuildingGenerator"))
+			}),
+			FVoxelChunkQueue(true, 256, {
+				CreateDefaultSubobject<UVoxelLiquidGenerator>(FName("LiquidGenerator"))
+			})
+		}) },
+		{ EVoxelWorldState::MeshSpawning, FVoxelChunkQueues({
+			FVoxelChunkQueue(true, 512),
+			FVoxelChunkQueue(false, 30)
+		}) },
+		{ EVoxelWorldState::MeshBuilding, FVoxelChunkQueues({
+			FVoxelChunkQueue(true, 256)
+		}) },
+		{ EVoxelWorldState::Generating, FVoxelChunkQueues({
+			FVoxelChunkQueue(false, 1)
+		}) },
+		{ EVoxelWorldState::Unloading, FVoxelChunkQueues({
+			FVoxelChunkQueue(false, 10)
+		}) }
+	};
+
 	ChunkQueueThreads = TArray<FVoxelChunkQueueThread*>();
 	ActiveChunkQueueBatch.Reset();
 	ActiveChunkQueue = nullptr;
@@ -146,37 +178,12 @@ UVoxelModule::UVoxelModule()
 
 UVoxelModule::~UVoxelModule()
 {
-	ShutdownChunkQueueThreads();
 	TERMINATION_MODULE(UVoxelModule)
 }
 
 #if WITH_EDITOR
 void UVoxelModule::OnGenerate()
 {
-	MapBuildingQueues.Queues = {
-		FVoxelChunkQueue(true, 100),
-		FVoxelChunkQueue(true, 100),
-		FVoxelChunkQueue(true, 100),
-		FVoxelChunkQueue(true, 100),
-		FVoxelChunkQueue(true, 100),
-		FVoxelChunkQueue(true, 100),
-		FVoxelChunkQueue(true, 100),
-		FVoxelChunkQueue(true, 100),
-		FVoxelChunkQueue(true, 100)
-	};
-
-	MapBuildingQueues.Queues[static_cast<int32>(EVoxelGenerationStage::Climate)].Generators.Add(NewObject<UVoxelSurfaceGenerator>(this));
-	MapBuildingQueues.Queues[static_cast<int32>(EVoxelGenerationStage::Hydrology)].Generators.Add(NewObject<UVoxelRiverGenerator>(this));
-	MapBuildingQueues.Queues[static_cast<int32>(EVoxelGenerationStage::Hydrology)].Generators.Add(NewObject<UVoxelLakeGenerator>(this));
-	MapBuildingQueues.Queues[static_cast<int32>(EVoxelGenerationStage::Hydrology)].Generators.Add(NewObject<UVoxelRegionGenerator>(this));
-	MapBuildingQueues.Queues[static_cast<int32>(EVoxelGenerationStage::Carving)].Generators.Add(NewObject<UVoxelCaveGenerator>(this));
-	MapBuildingQueues.Queues[static_cast<int32>(EVoxelGenerationStage::Material)].Generators.Add(NewObject<UVoxelOreGenerator>(this));
-	MapBuildingQueues.Queues[static_cast<int32>(EVoxelGenerationStage::Terrain)].Generators.Add(NewObject<UVoxelTerrainGenerator>(this));
-	MapBuildingQueues.Queues[static_cast<int32>(EVoxelGenerationStage::Vegetation)].Generators.Add(NewObject<UVoxelFoliageGenerator>(this));
-	MapBuildingQueues.Queues[static_cast<int32>(EVoxelGenerationStage::Settlement)].Generators.Add(NewObject<UVoxelTownGenerator>(this));
-	MapBuildingQueues.Queues[static_cast<int32>(EVoxelGenerationStage::Landmark)].Generators.Add(NewObject<UVoxelBuildingGenerator>(this));
-	MapBuildingQueues.Queues[static_cast<int32>(EVoxelGenerationStage::Liquid)].Generators.Add(NewObject<UVoxelLiquidGenerator>(this));
-
 	if(!VoxelRoot)
 	{
 		TArray<AActor*> ChildActors;
@@ -253,9 +260,17 @@ void UVoxelModule::OnInitialize()
 {
 	Super::OnInitialize();
 
-	InitializeSceneAreaNames();
-	USceneModule::Get().RegisterSceneAreaResolver(ESceneAreaType::Chunk,
-		FSceneAreaResolver::CreateUObject(this, &UVoxelModule::ResolveChunkSceneArea));
+	if(VoxelAreaNameTable)
+	{
+		TArray<FVoxelAreaNameData*> Rows;
+		VoxelAreaNameTable->GetAllRows(TEXT("VoxelAreaNames"), Rows);
+		for(const FVoxelAreaNameData* Row : Rows)
+		{
+			if(Row && !Row->AreaName.IsEmpty()) VoxelAreaNames.FindOrAdd(Row->AreaType).Add(Row->AreaName);
+		}
+	}
+	
+	USceneModule::Get().RegisterSceneAreaResolver(ESceneAreaType::Chunk, FSceneAreaResolver::CreateUObject(this, &UVoxelModule::ResolveVoxelArea));
 
 	UAssetModuleStatics::AddStaticObject(FName("EVoxelType"), FStaticObject(UEnum::StaticClass(), TEXT("/Script/WHFramework.EVoxelType")));
 
@@ -305,13 +320,15 @@ void UVoxelModule::OnInitialize()
 		UReferencePoolModuleStatics::CreateReference(nullptr, Iter);
 	}
 		
-	for(FVoxelChunkQueue& Queue : MapBuildingQueues.Queues)
+	for(auto& Iter : ChunkQueues)
 	{
-		for(UVoxelGenerator* Generator : Queue.Generators)
-		{
-			Generator->Initialize(this);
-			VoxelGeneratorMap.Add(Generator->GetClass(), Generator);
-		}
+		ITER_ARRAY_WITHINDEX(Iter.Value.Queues, i, Queue,
+			for(UVoxelGenerator* Generator : Queue.Generators)
+			{
+				Generator->Initialize(this, i + 1);
+				VoxelGeneratorMap.Add(Generator->GetClass(), Generator);
+			}
+		)
 	}
 }
 
@@ -331,12 +348,12 @@ void UVoxelModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 		GenerateChunkQueues();
 		GenerateWorld();
 		FIndex VoxelUpdateIndex;
-		while(VoxelUpdateQueue.Dequeue(VoxelUpdateIndex)) AddVoxelUpdate(VoxelUpdateIndex);
+		while(VoxelUpdateQueue.Dequeue(VoxelUpdateIndex)) AddToVoxelUpdateQueue(VoxelUpdateIndex);
 		VoxelUpdateTime += DeltaSeconds;
 		if(VoxelUpdateTime >= 0.2f && !bVoxelUpdateRunning)
 		{
 			VoxelUpdateTime = 0.f;
-			UpdateVoxels();
+			UpdateVoxelQueue();
 		}
 	}
 }
@@ -357,16 +374,7 @@ void UVoxelModule::OnTermination(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		USceneModule::Get().UnregisterSceneAreaResolver(ESceneAreaType::Chunk);
-		ResetChunkQueues();
 		ShutdownChunkQueueThreads();
-		VoxelUpdateChunkIndices.Empty();
-		VoxelLiquidUpdateIndices.Empty();
-		FIndex VoxelUpdateIndex;
-		while(VoxelUpdateQueue.Dequeue(VoxelUpdateIndex)) { }
-		while(VoxelLiquidUpdateQueue.Dequeue(VoxelUpdateIndex)) { }
-		VoxelUpdateTime = 0.f;
-		bVoxelUpdateRunning = false;
 	}
 }
 
@@ -390,10 +398,7 @@ void UVoxelModule::Save_Implementation()
 FString UVoxelModule::GetModuleDebugMessage()
 {
 	const FString StateName = UCommonModuleStatics::GetEnumAuthoredNameByValue(TEXT("/Script/WHFramework.EVoxelWorldState"), static_cast<int32>(WorldState));
-	const FString StageName = WorldState == EVoxelWorldState::MapBuilding && WorldGenerationStage != EVoxelGenerationStage::None
-		? UCommonModuleStatics::GetEnumAuthoredNameByValue(TEXT("/Script/WHFramework.EVoxelGenerationStage"), static_cast<int32>(WorldGenerationStage))
-		: TEXT("");
-	return FString::Printf(TEXT("WorldState: %s%s"), *StateName, StageName.IsEmpty() ? TEXT("") : *FString::Printf(TEXT("_%s"), *StageName));
+	return FString::Printf(TEXT("WorldState: %s"), *StateName);
 }
 
 void UVoxelModule::SetWorldMode(EVoxelWorldMode InWorldMode)
@@ -578,30 +583,6 @@ void UVoxelModule::UnloadData(EPhase InPhase)
 	}
 }
 
-void UVoxelModule::InitializeSceneAreaNames()
-{
-	if(SceneAreaNameTable)
-	{
-		TArray<FVoxelAreaNameData*> Rows;
-		SceneAreaNameTable->GetAllRows(TEXT("VoxelSceneAreaNames"), Rows);
-		for(const FVoxelAreaNameData* Row : Rows)
-		{
-			if(Row && !Row->AreaName.IsEmpty()) SceneAreaNamePrefixes.FindOrAdd(Row->AreaType).Add(Row->AreaName);
-		}
-	}
-}
-
-FSceneArea UVoxelModule::ResolveChunkSceneArea(const FSceneArea& InArea, const FVector2D& InPoint) const
-{
-	const FIndex Index(FMath::FloorToInt(InPoint.X), FMath::FloorToInt(InPoint.Y), 0);
-	const FText RegionDisplayName = GetWorldRegionDisplayName(SampleTopographyByIndex(Index).RegionType);
-	FSceneArea Area = InArea;
-	Area.AreaDisplayName = InArea.AreaDisplayName.IsEmpty()
-		? GetWorldAreaDisplayName(Index, EVoxelAreaType::Continent, RegionDisplayName)
-		: FText::Format(FText::FromString(TEXT("{0}{1}")), InArea.AreaDisplayName, RegionDisplayName);
-	return Area;
-}
-
 void UVoxelModule::LoadPrefabData(const FVoxelPrefabSaveData& InPrefabData)
 {
 	if(WorldMode != EVoxelWorldMode::Prefab || GetWorldGeneratePercent() < 1.f) return;
@@ -611,7 +592,6 @@ void UVoxelModule::LoadPrefabData(const FVoxelPrefabSaveData& InPrefabData)
 		if(Iter.Value->IsGenerated() && Iter.Value->IsChanged())
 		{
 			Iter.Value->ClearMap();
-			Iter.Value->BuildPrefabMap();
 			GenerateChunks.Add(Iter.Value);
 		}
 	)
@@ -710,203 +690,6 @@ void UVoxelModule::GenerateWorld()
 	}
 }
 
-void UVoxelModule::AddVoxelUpdate(FIndex InIndex)
-{
-	if(!IsInGameThread())
-	{
-		VoxelUpdateQueue.Enqueue(InIndex);
-		return;
-	}
-	if(UVoxelChunk* Chunk = GetChunkByVoxelIndex(InIndex))
-	{
-		Chunk->VoxelUpdateIndices.Add(Chunk->WorldIndexToLocal(InIndex));
-		VoxelUpdateChunkIndices.Add(Chunk->GetIndex());
-	}
-}
-
-void UVoxelModule::AddVoxelLiquidUpdate(FIndex InIndex)
-{
-	if(!VoxelLiquidUpdateIndices.Contains(InIndex))
-	{
-		VoxelLiquidUpdateIndices.Add(InIndex);
-		VoxelLiquidUpdateQueue.Enqueue(InIndex);
-	}
-}
-
-void UVoxelModule::UpdateVoxels()
-{
-	TArray<FIndex> ChunkIndices = VoxelUpdateChunkIndices.Array();
-	TSet<FIndex> LiquidUpdateIndexSet;
-	FIndex LiquidUpdateIndex;
-	const int32 LiquidUpdateCount = VoxelLiquidUpdateIndices.Num();
-	while(LiquidUpdateIndexSet.Num() < LiquidUpdateCount && VoxelLiquidUpdateQueue.Dequeue(LiquidUpdateIndex))
-	{
-		VoxelLiquidUpdateIndices.Remove(LiquidUpdateIndex);
-		LiquidUpdateIndexSet.Add(LiquidUpdateIndex);
-	}
-	TArray<FIndex> LiquidUpdateIndices = LiquidUpdateIndexSet.Array();
-	TSet<FIndex> ChangedChunkIndices;
-	int32 RemainingUpdates = 256;
-	for(const FIndex& ChunkIndex : ChunkIndices)
-	{
-		UVoxelChunk* Chunk = GetChunkByIndex(ChunkIndex);
-		if(!Chunk)
-		{
-			VoxelUpdateChunkIndices.Remove(ChunkIndex);
-			continue;
-		}
-		if(!Chunk->IsGenerated()) continue;
-
-		RemainingUpdates -= Chunk->UpdateVoxels(FMath::Min(RemainingUpdates, 32), ChangedChunkIndices);
-		if(Chunk->VoxelUpdateIndices.IsEmpty()) VoxelUpdateChunkIndices.Remove(ChunkIndex);
-		if(RemainingUpdates <= 0) break;
-	}
-
-	for(const FIndex& ChunkIndex : ChangedChunkIndices)
-	{
-		if(UVoxelChunk* Chunk = GetChunkByIndex(ChunkIndex); Chunk && Chunk->IsGenerated()) Chunk->Generate(EPhase::Lesser);
-	}
-	if(LiquidUpdateIndices.IsEmpty()) return;
-
-	TSet<FIndex> LiquidEvaluationIndexSet = LiquidUpdateIndexSet;
-	for(const FIndex& Index : LiquidUpdateIndices)
-	{
-		ITER_DIRECTION(Direction, LiquidEvaluationIndexSet.Add(Index + FMathHelper::DirectionToIndex(Direction)); )
-		for(const EDirectionN Iter : { EDirectionN::Forward, EDirectionN::Right, EDirectionN::Backward, EDirectionN::Left })
-		{
-			LiquidEvaluationIndexSet.Add(Index + FMathHelper::DirectionToIndex(Iter) + FIndex(0, 0, -1));
-		}
-	}
-	TMap<FIndex, FVoxelLiquidSnapshot> LiquidSnapshots;
-	for(const FIndex& Index : LiquidEvaluationIndexSet)
-	{
-		TSet<FIndex> SnapshotIndices;
-		SnapshotIndices.Add(Index);
-		ITER_DIRECTION(Direction, SnapshotIndices.Add(Index + FMathHelper::DirectionToIndex(Direction)); )
-		SnapshotIndices.Add(Index + FIndex(0, 0, -2));
-		for(const EDirectionN Iter : { EDirectionN::Forward, EDirectionN::Right, EDirectionN::Backward, EDirectionN::Left })
-		{
-			const FIndex NeighborIndex = Index + FMathHelper::DirectionToIndex(Iter);
-			SnapshotIndices.Add(NeighborIndex + FIndex(0, 0, 1));
-			SnapshotIndices.Add(NeighborIndex + FIndex(0, 0, -1));
-			SnapshotIndices.Add(NeighborIndex + FIndex(0, 0, -2));
-		}
-		for(const FIndex& SnapshotIndex : SnapshotIndices)
-		{
-			if(LiquidSnapshots.Contains(SnapshotIndex)) continue;
-			FVoxelLiquidSnapshot Snapshot;
-			if(const UVoxelChunk* Chunk = GetChunkByVoxelIndex(SnapshotIndex); Chunk && Chunk->IsGenerated())
-			{
-				Snapshot.bGenerated = true;
-				const FVoxelItem& Item = GetVoxelByIndex(SnapshotIndex);
-				Snapshot.VoxelType = Item.IsUnknown() ? EVoxelType::Unknown : Item.IsValid() ? Item.GetVoxelType() : EVoxelType::Empty;
-				Snapshot.Data = Item.Data;
-				Snapshot.bCanFlowThrough = Item.IsValid() && (Item.GetData().Nature == EVoxelNature::Foliage || Item.GetData().Nature == EVoxelNature::SemiFoliage);
-			}
-			LiquidSnapshots.Add(SnapshotIndex, MoveTemp(Snapshot));
-		}
-	}
-
-	bVoxelUpdateRunning = true;
-	TWeakObjectPtr<UVoxelModule> Module(this);
-	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [Module, LiquidEvaluationIndices = LiquidEvaluationIndexSet.Array(), LiquidSnapshots = MoveTemp(LiquidSnapshots)]() mutable
-	{
-		TMap<FIndex, FVoxelLiquidUpdate> LiquidUpdates;
-		for(const FIndex& Index : LiquidEvaluationIndices)
-		{
-			FVoxelLiquidUpdate Update;
-			if(UVoxelModuleStatics::CalculateVoxelLiquidUpdate(Index, LiquidSnapshots, Update)) LiquidUpdates.Add(Index, MoveTemp(Update));
-		}
-		AsyncTask(ENamedThreads::GameThread, [Module, LiquidSnapshots = MoveTemp(LiquidSnapshots), LiquidUpdates = MoveTemp(LiquidUpdates)]() mutable
-		{
-			if(!Module.IsValid()) return;
-			Module->bVoxelUpdateRunning = false;
-			if(Module->WorldMode == EVoxelWorldMode::None) return;
-			TMap<FIndex, FVoxelItem> VoxelUpdates;
-			TSet<FIndex> VegetationChangedChunkIndices;
-			for(const auto& Iter : LiquidUpdates)
-			{
-				const FVoxelLiquidSnapshot* Snapshot = LiquidSnapshots.Find(Iter.Key);
-				if(!Snapshot || !Snapshot->bGenerated) continue;
-				const FVoxelItem& CurrentItem = Module->GetVoxelByIndex(Iter.Key);
-				const EVoxelType CurrentType = CurrentItem.IsUnknown() ? EVoxelType::Unknown : CurrentItem.IsValid() ? CurrentItem.GetVoxelType() : EVoxelType::Empty;
-				if(CurrentType != Snapshot->VoxelType || CurrentItem.Data != Snapshot->Data)
-				{
-					Module->AddVoxelLiquidUpdate(Iter.Key);
-					continue;
-				}
-				if(Iter.Value.bRemove)
-				{
-					VoxelUpdates.Add(Iter.Key, FVoxelItem::Empty);
-				}
-				else
-				{
-					if(Snapshot->bCanFlowThrough)
-					{
-						if(UVoxelModuleStatics::GetVoxelWorldMode() != EVoxelWorldMode::Prefab)
-						{
-							const UVoxelData& VoxelData = CurrentItem.GetData();
-							UAbilityModuleStatics::SpawnAbilityPickUp(FAbilityItem(VoxelData.GatherData ? VoxelData.GatherData->GetPrimaryAssetId() : VoxelData.GetPrimaryAssetId(), 1),
-								CurrentItem.GetLocation() + VoxelData.GetRange(CurrentItem.Angle) * Module->GetWorldData().BlockSize * 0.5f, CurrentItem.Chunk);
-						}
-						VegetationChangedChunkIndices.Add(CurrentItem.Chunk->GetIndex());
-					}
-					FVoxelItem Item = CurrentItem;
-					if(CurrentType != EVoxelType::Water) Item = FVoxelItem(EVoxelType::Water);
-					Item.Data = Iter.Value.Data;
-					VoxelUpdates.Add(Iter.Key, Item);
-				}
-			}
-			TSet<FIndex> ChangedChunkIndices;
-			Module->ApplyVoxelUpdates(VoxelUpdates, ChangedChunkIndices);
-			for(const auto& Iter : VoxelUpdates) Module->AddVoxelLiquidUpdate(Iter.Key);
-			for(const FIndex& ChunkIndex : ChangedChunkIndices)
-			{
-				if(UVoxelChunk* Chunk = Module->GetChunkByIndex(ChunkIndex))
-				{
-					Chunk->BuildMesh(EVoxelNature::Liquid);
-					Chunk->CreateMesh(EVoxelNature::Liquid);
-				}
-			}
-			for(const FIndex& ChunkIndex : VegetationChangedChunkIndices)
-			{
-				if(UVoxelChunk* Chunk = Module->GetChunkByIndex(ChunkIndex))
-				{
-					Chunk->BuildMesh(EVoxelNature::Foliage);
-					Chunk->CreateMesh(EVoxelNature::Foliage);
-					Chunk->BuildMesh(EVoxelNature::SemiFoliage);
-					Chunk->CreateMesh(EVoxelNature::SemiFoliage);
-				}
-			}
-		});
-	});
-}
-
-void UVoxelModule::ApplyVoxelUpdates(const TMap<FIndex, FVoxelItem>& InVoxelMap, TSet<FIndex>& OutChangedChunkIndices)
-{
-	for(const auto& Iter : InVoxelMap)
-	{
-		if(UVoxelChunk* Chunk = GetChunkByVoxelIndex(Iter.Key); Chunk && Chunk->IsGenerated())
-		{
-			const FIndex LocalIndex = Chunk->WorldIndexToLocal(Iter.Key);
-			const FVoxelItem& CurrentItem = Chunk->GetVoxel(LocalIndex);
-			if(CurrentItem.ID == Iter.Value.ID && CurrentItem.Data == Iter.Value.Data) continue;
-			Chunk->SetVoxel(LocalIndex, Iter.Value, true);
-			Chunk->SetChanged(true);
-			for(int32 X = -1; X <= 1; ++X)
-			{
-				for(int32 Y = -1; Y <= 1; ++Y)
-				{
-					if(UVoxelChunk* ChangedChunk = GetChunkByVoxelIndex(Iter.Key + FIndex(X, Y, 0)); ChangedChunk && ChangedChunk->IsGenerated())
-					{
-						OutChangedChunkIndices.Add(ChangedChunk->GetIndex());
-					}
-				}
-			}
-		}
-	}
-}
-
 UVoxelChunk* UVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 {
 	UVoxelChunk* Chunk = GetChunkByIndex(InIndex);
@@ -927,14 +710,7 @@ UVoxelChunk* UVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 			}
 			else
 			{
-				if(WorldMode != EVoxelWorldMode::Prefab)
-				{
-					AddToChunkQueue(EVoxelWorldState::MapBuilding, InIndex);
-				}
-				else
-				{
-					Chunk->BuildPrefabMap();
-				}
+				AddToChunkQueue(EVoxelWorldState::MapBuilding, InIndex);
 			}
 		}
 		if(!Chunk->IsGenerated())
@@ -1076,16 +852,13 @@ void UVoxelModule::ResetChunkQueues()
 {
 	CancelChunkQueueBatch();
 
-	FVoxelChunkQueues* QueueGroups[] = { &SpawningQueues, &MapLoadingQueues, &MapBuildingQueues, &MeshSpawningQueues, &MeshBuildingQueues, &GeneratingQueues, &UnloadingQueues };
-	for(FVoxelChunkQueues* QueueGroup : QueueGroups)
+	for(auto& Iter : ChunkQueues)
 	{
-		if(!QueueGroup) continue;
-		ITER_ARRAY(QueueGroup->Queues, Item2,
-			Item2.Queue.Empty();
+		ITER_ARRAY(Iter.Value.Queues, Queue,
+			Queue.Queue.Empty();
 		)
-		QueueGroup->Stage = 0;
+		Iter.Value.Stage = 0;
 	}
-	WorldGenerationStage = EVoxelGenerationStage::None;
 }
 
 void UVoxelModule::UpdateChunkQueueThreads()
@@ -1169,41 +942,43 @@ bool UVoxelModule::UpdateChunkQueue(EVoxelWorldState InState, TFunction<void(FIn
 
 bool UVoxelModule::UpdateChunkQueue(EVoxelWorldState InState, TFunction<void(FIndex, int32)> InFunc)
 {
-	FVoxelChunkQueues& QueueGroup = GetMutableChunkQueues(InState);
+	FVoxelChunkQueues& QueueGroup = ChunkQueues[InState];
 	ITER_ARRAY_WITHINDEX(QueueGroup.Queues, i, Item,
 		QueueGroup.Stage = i + 1;
-		if(InState == EVoxelWorldState::MapBuilding) WorldGenerationStage = static_cast<EVoxelGenerationStage>(i);
-		if(Item.bAsync)
+		if(Item.Queue.Num() > 0)
 		{
-			if(Item.Queue.Num() > 0)
+			if(Item.bAsync && ActiveChunkQueueBatch) return true;
+
+			const TFunction<void(FIndex, int32)> Func([this, InState, InFunc, Generators = Item.Generators](FIndex Index, int32 Stage)
 			{
-				if(!ActiveChunkQueueBatch && !DispatchChunkQueue(Item, InFunc, i + 1))
+				if(InState == EVoxelWorldState::Spawning) InFunc(Index, Stage);
+				if(UVoxelChunk* Chunk = GetChunkByIndex(Index))
 				{
-					const int32 Num = FMath::Min(FMath::Max(1, Item.Speed), Item.Queue.Num());
-					DON_WITHINDEX(Num, j, InFunc(Item.Queue[j], i + 1); )
-					Item.Queue.RemoveAt(0, Num, EAllowShrinking::No);
+					for(UVoxelGenerator* Generator : Generators)
+					{
+						if(Generator) Generator->Generate(Chunk);
+					}
 				}
-				return true;
-			}
-		}
-		else
-		{
+				if(InState != EVoxelWorldState::Spawning) InFunc(Index, Stage);
+			});
+
+			if(Item.bAsync && DispatchChunkQueue(Item, Func, i + 1)) return true;
+
 			const int32 Num = FMath::Min(FMath::Max(1, Item.Speed), Item.Queue.Num());
-			DON_WITHINDEX(Num, j, InFunc(Item.Queue[j], i + 1); )
+			DON_WITHINDEX(Num, j, Func(Item.Queue[j], i + 1); )
 			Item.Queue.RemoveAt(0, Num, EAllowShrinking::No);
-			if(Item.Queue.Num() > 0)
+			if(Item.bAsync || Item.Queue.Num() > 0)
 			{
 				return true;
 			}
 		}
 	)
-	if(InState == EVoxelWorldState::MapBuilding) WorldGenerationStage = EVoxelGenerationStage::None;
 	return false;
 }
 
 void UVoxelModule::AddToChunkQueue(EVoxelWorldState InState, FIndex InIndex)
 {
-	ITER_ARRAY(GetMutableChunkQueues(InState).Queues, Item,
+	ITER_ARRAY(ChunkQueues[InState].Queues, Item,
 		if(!Item.Queue.Contains(InIndex) && (InState == EVoxelWorldState::Spawning ? !ChunkMap.Contains(InIndex) : ChunkMap.Contains(InIndex)))
 		{
 			Item.Queue.Add(InIndex);
@@ -1235,22 +1010,12 @@ void UVoxelModule::AddToChunkQueue(EVoxelWorldState InState, FIndex InIndex)
 
 void UVoxelModule::RemoveFromChunkQueue(EVoxelWorldState InState, FIndex InIndex)
 {
-	ITER_ARRAY(GetMutableChunkQueues(InState).Queues, Item,
+	ITER_ARRAY(ChunkQueues[InState].Queues, Item,
 		if(Item.Queue.Contains(InIndex))
 		{
 			Item.Queue.Remove(InIndex);
 		}
 	)
-}
-
-void UVoxelModule::GenerateVoxelStage(UVoxelChunk* InChunk, int32 InStage) const
-{
-	const int32 QueueIndex = InStage - 1;
-	if(!MapBuildingQueues.Queues.IsValidIndex(QueueIndex)) return;
-	for(UVoxelGenerator* Generator : MapBuildingQueues.Queues[QueueIndex].Generators)
-	{
-		if(Generator && Generator->IsGenerationEnabled()) Generator->Generate(InChunk);
-	}
 }
 
 bool UVoxelModule::IsOnTheWorld(FIndex InIndex, bool bIgnoreZ) const
@@ -1321,6 +1086,203 @@ void UVoxelModule::SetVoxelByLocation(FVector InLocation, const FVoxelItem& InVo
 	SetVoxelByIndex(LocationToVoxelIndex(InLocation), InVoxelItem, bSafe);
 }
 
+void UVoxelModule::AddToVoxelUpdateQueue(FIndex InIndex)
+{
+	if(!IsInGameThread())
+	{
+		VoxelUpdateQueue.Enqueue(InIndex);
+		return;
+	}
+	if(UVoxelChunk* Chunk = GetChunkByVoxelIndex(InIndex))
+	{
+		Chunk->VoxelUpdateIndices.Add(Chunk->WorldIndexToLocal(InIndex));
+		VoxelUpdateChunkIndices.Add(Chunk->GetIndex());
+	}
+}
+
+void UVoxelModule::AddToVoxelLiquidUpdateQueue(FIndex InIndex)
+{
+	if(!VoxelLiquidUpdateIndices.Contains(InIndex))
+	{
+		VoxelLiquidUpdateIndices.Add(InIndex);
+		VoxelLiquidUpdateQueue.Enqueue(InIndex);
+	}
+}
+
+void UVoxelModule::UpdateVoxelQueue()
+{
+	TArray<FIndex> ChunkIndices = VoxelUpdateChunkIndices.Array();
+	TSet<FIndex> LiquidUpdateIndexSet;
+	FIndex LiquidUpdateIndex;
+	const int32 LiquidUpdateCount = VoxelLiquidUpdateIndices.Num();
+	while(LiquidUpdateIndexSet.Num() < LiquidUpdateCount && VoxelLiquidUpdateQueue.Dequeue(LiquidUpdateIndex))
+	{
+		VoxelLiquidUpdateIndices.Remove(LiquidUpdateIndex);
+		LiquidUpdateIndexSet.Add(LiquidUpdateIndex);
+	}
+	TArray<FIndex> LiquidUpdateIndices = LiquidUpdateIndexSet.Array();
+	TSet<FIndex> ChangedChunkIndices;
+	int32 RemainingUpdates = 256;
+	for(const FIndex& ChunkIndex : ChunkIndices)
+	{
+		UVoxelChunk* Chunk = GetChunkByIndex(ChunkIndex);
+		if(!Chunk)
+		{
+			VoxelUpdateChunkIndices.Remove(ChunkIndex);
+			continue;
+		}
+		if(!Chunk->IsGenerated()) continue;
+
+		RemainingUpdates -= Chunk->UpdateVoxels(FMath::Min(RemainingUpdates, 32), ChangedChunkIndices);
+		if(Chunk->VoxelUpdateIndices.IsEmpty()) VoxelUpdateChunkIndices.Remove(ChunkIndex);
+		if(RemainingUpdates <= 0) break;
+	}
+
+	for(const FIndex& ChunkIndex : ChangedChunkIndices)
+	{
+		if(UVoxelChunk* Chunk = GetChunkByIndex(ChunkIndex); Chunk && Chunk->IsGenerated()) Chunk->Generate(EPhase::Lesser);
+	}
+	if(LiquidUpdateIndices.IsEmpty()) return;
+
+	TSet<FIndex> LiquidEvaluationIndexSet = LiquidUpdateIndexSet;
+	for(const FIndex& Index : LiquidUpdateIndices)
+	{
+		ITER_DIRECTION(Direction, LiquidEvaluationIndexSet.Add(Index + FMathHelper::DirectionToIndex(Direction)); )
+		for(const EDirectionN Iter : { EDirectionN::Forward, EDirectionN::Right, EDirectionN::Backward, EDirectionN::Left })
+		{
+			LiquidEvaluationIndexSet.Add(Index + FMathHelper::DirectionToIndex(Iter) + FIndex(0, 0, -1));
+		}
+	}
+	TMap<FIndex, FVoxelLiquidSnapshot> LiquidSnapshots;
+	for(const FIndex& Index : LiquidEvaluationIndexSet)
+	{
+		TSet<FIndex> SnapshotIndices;
+		SnapshotIndices.Add(Index);
+		ITER_DIRECTION(Direction, SnapshotIndices.Add(Index + FMathHelper::DirectionToIndex(Direction)); )
+		SnapshotIndices.Add(Index + FIndex(0, 0, -2));
+		for(const EDirectionN Iter : { EDirectionN::Forward, EDirectionN::Right, EDirectionN::Backward, EDirectionN::Left })
+		{
+			const FIndex NeighborIndex = Index + FMathHelper::DirectionToIndex(Iter);
+			SnapshotIndices.Add(NeighborIndex + FIndex(0, 0, 1));
+			SnapshotIndices.Add(NeighborIndex + FIndex(0, 0, -1));
+			SnapshotIndices.Add(NeighborIndex + FIndex(0, 0, -2));
+		}
+		for(const FIndex& SnapshotIndex : SnapshotIndices)
+		{
+			if(LiquidSnapshots.Contains(SnapshotIndex)) continue;
+			FVoxelLiquidSnapshot Snapshot;
+			if(const UVoxelChunk* Chunk = GetChunkByVoxelIndex(SnapshotIndex); Chunk && Chunk->IsGenerated())
+			{
+				Snapshot.bGenerated = true;
+				const FVoxelItem& Item = GetVoxelByIndex(SnapshotIndex);
+				Snapshot.VoxelType = Item.IsUnknown() ? EVoxelType::Unknown : Item.IsValid() ? Item.GetVoxelType() : EVoxelType::Empty;
+				Snapshot.Data = Item.Data;
+				Snapshot.bCanFlowThrough = Item.IsValid() && (Item.GetData().Nature == EVoxelNature::Foliage || Item.GetData().Nature == EVoxelNature::SemiFoliage);
+			}
+			LiquidSnapshots.Add(SnapshotIndex, MoveTemp(Snapshot));
+		}
+	}
+
+	bVoxelUpdateRunning = true;
+	TWeakObjectPtr<UVoxelModule> Module(this);
+	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [Module, LiquidEvaluationIndices = LiquidEvaluationIndexSet.Array(), LiquidSnapshots = MoveTemp(LiquidSnapshots)]() mutable
+	{
+		TMap<FIndex, FVoxelLiquidUpdate> LiquidUpdates;
+		for(const FIndex& Index : LiquidEvaluationIndices)
+		{
+			FVoxelLiquidUpdate Update;
+			if(UVoxelModuleStatics::CalculateVoxelLiquidUpdate(Index, LiquidSnapshots, Update)) LiquidUpdates.Add(Index, MoveTemp(Update));
+		}
+		AsyncTask(ENamedThreads::GameThread, [Module, LiquidSnapshots = MoveTemp(LiquidSnapshots), LiquidUpdates = MoveTemp(LiquidUpdates)]() mutable
+		{
+			if(!Module.IsValid()) return;
+			Module->bVoxelUpdateRunning = false;
+			if(Module->WorldMode == EVoxelWorldMode::None) return;
+			TMap<FIndex, FVoxelItem> VoxelUpdates;
+			TSet<FIndex> VegetationChangedChunkIndices;
+			for(const auto& Iter : LiquidUpdates)
+			{
+				const FVoxelLiquidSnapshot* Snapshot = LiquidSnapshots.Find(Iter.Key);
+				if(!Snapshot || !Snapshot->bGenerated) continue;
+				const FVoxelItem& CurrentItem = Module->GetVoxelByIndex(Iter.Key);
+				const EVoxelType CurrentType = CurrentItem.IsUnknown() ? EVoxelType::Unknown : CurrentItem.IsValid() ? CurrentItem.GetVoxelType() : EVoxelType::Empty;
+				if(CurrentType != Snapshot->VoxelType || CurrentItem.Data != Snapshot->Data)
+				{
+					Module->AddToVoxelLiquidUpdateQueue(Iter.Key);
+					continue;
+				}
+				if(Iter.Value.bRemove)
+				{
+					VoxelUpdates.Add(Iter.Key, FVoxelItem::Empty);
+				}
+				else
+				{
+					if(Snapshot->bCanFlowThrough)
+					{
+						if(UVoxelModuleStatics::GetVoxelWorldMode() != EVoxelWorldMode::Prefab)
+						{
+							const UVoxelData& VoxelData = CurrentItem.GetData();
+							UAbilityModuleStatics::SpawnAbilityPickUp(FAbilityItem(VoxelData.GatherData ? VoxelData.GatherData->GetPrimaryAssetId() : VoxelData.GetPrimaryAssetId(), 1),
+								CurrentItem.GetLocation() + VoxelData.GetRange(CurrentItem.Angle) * Module->GetWorldData().BlockSize * 0.5f, CurrentItem.Chunk);
+						}
+						VegetationChangedChunkIndices.Add(CurrentItem.Chunk->GetIndex());
+					}
+					FVoxelItem Item = CurrentItem;
+					if(CurrentType != EVoxelType::Water) Item = FVoxelItem(EVoxelType::Water);
+					Item.Data = Iter.Value.Data;
+					VoxelUpdates.Add(Iter.Key, Item);
+				}
+			}
+			TSet<FIndex> ChangedChunkIndices;
+			Module->ApplyVoxelUpdates(VoxelUpdates, ChangedChunkIndices);
+			for(const auto& Iter : VoxelUpdates) Module->AddToVoxelLiquidUpdateQueue(Iter.Key);
+			for(const FIndex& ChunkIndex : ChangedChunkIndices)
+			{
+				if(UVoxelChunk* Chunk = Module->GetChunkByIndex(ChunkIndex))
+				{
+					Chunk->BuildMesh(EVoxelNature::Liquid);
+					Chunk->CreateMesh(EVoxelNature::Liquid);
+				}
+			}
+			for(const FIndex& ChunkIndex : VegetationChangedChunkIndices)
+			{
+				if(UVoxelChunk* Chunk = Module->GetChunkByIndex(ChunkIndex))
+				{
+					Chunk->BuildMesh(EVoxelNature::Foliage);
+					Chunk->CreateMesh(EVoxelNature::Foliage);
+					Chunk->BuildMesh(EVoxelNature::SemiFoliage);
+					Chunk->CreateMesh(EVoxelNature::SemiFoliage);
+				}
+			}
+		});
+	});
+}
+
+void UVoxelModule::ApplyVoxelUpdates(const TMap<FIndex, FVoxelItem>& InVoxelMap, TSet<FIndex>& OutChangedChunkIndices)
+{
+	for(const auto& Iter : InVoxelMap)
+	{
+		if(UVoxelChunk* Chunk = GetChunkByVoxelIndex(Iter.Key); Chunk && Chunk->IsGenerated())
+		{
+			const FIndex LocalIndex = Chunk->WorldIndexToLocal(Iter.Key);
+			const FVoxelItem& CurrentItem = Chunk->GetVoxel(LocalIndex);
+			if(CurrentItem.ID == Iter.Value.ID && CurrentItem.Data == Iter.Value.Data) continue;
+			Chunk->SetVoxel(LocalIndex, Iter.Value, true);
+			Chunk->SetChanged(true);
+			for(int32 X = -1; X <= 1; ++X)
+			{
+				for(int32 Y = -1; Y <= 1; ++Y)
+				{
+					if(UVoxelChunk* ChangedChunk = GetChunkByVoxelIndex(Iter.Key + FIndex(X, Y, 0)); ChangedChunk && ChangedChunk->IsGenerated())
+					{
+						OutChangedChunkIndices.Add(ChangedChunk->GetIndex());
+					}
+				}
+			}
+		}
+	}
+}
+
 const FVoxelTopography& UVoxelModule::GetTopographyByIndex(FIndex InIndex)
 {
 	if(UVoxelChunk* Chunk = GetChunkByVoxelIndex(FIndex(InIndex.X, InIndex.Y, 0)))
@@ -1375,41 +1337,6 @@ FVoxelTopography UVoxelModule::SampleTopographyByIndex(FIndex InIndex) const
 EVoxelRegionType UVoxelModule::GetWorldRegionByIndex(FIndex InIndex) const
 {
 	return SampleTopographyByIndex(InIndex).RegionType;
-}
-
-FText UVoxelModule::GetWorldAreaPrefix(FIndex InIndex, EVoxelAreaType InNameType) const
-{
-	const TArray<FText>* Candidates = SceneAreaNamePrefixes.Find(InNameType);
-	if(!Candidates || Candidates->IsEmpty()) return FText::GetEmpty();
-
-	const int32 WorldSeed = WorldData ? WorldData->WorldSeed : 0;
-	const uint32 Hash = static_cast<uint32>(FMathHelper::Hash31(FVector(InIndex.X + WorldSeed, InIndex.Y - WorldSeed, static_cast<int32>(InNameType) * 131)));
-	return (*Candidates)[Hash % Candidates->Num()];
-}
-
-FText UVoxelModule::GetWorldRegionDisplayName(EVoxelRegionType InRegionType) const
-{
-	return UCommonModuleStatics::GetEnumDisplayNameByValue(TEXT("/Script/WHFramework.EVoxelRegionType"), static_cast<int32>(InRegionType));
-}
-
-FText UVoxelModule::GetWorldAreaDisplayName(FIndex InIndex, EVoxelAreaType InNameType, const FText& InAreaTypeName) const
-{
-	const FText Prefix = GetWorldAreaPrefix(InIndex, InNameType);
-	if(Prefix.IsEmpty()) return InAreaTypeName;
-	if(InAreaTypeName.IsEmpty()) return Prefix;
-
-	return FText::Format(FText::FromString(TEXT("{0}{1}")), Prefix, InAreaTypeName);
-}
-
-FText UVoxelModule::GetWorldAreaDisplayNameByIndex(FIndex InIndex) const
-{
-	if(IsInGameThread())
-	{
-		const FSceneArea Area = USceneModule::Get().GetSceneAreaByPoint(InIndex.ToVector2D());
-		if(!Area.AreaName.IsNone() && !Area.AreaDisplayName.IsEmpty()) return Area.AreaDisplayName;
-	}
-	const FText RegionDisplayName = GetWorldRegionDisplayName(SampleTopographyByIndex(InIndex).RegionType);
-	return GetWorldAreaDisplayName(InIndex, EVoxelAreaType::Continent, RegionDisplayName);
 }
 
 float UVoxelModule::GetVoxelNoise1D(float InValue, bool bAbs, bool bUnsigned) const
@@ -1596,32 +1523,7 @@ bool UVoxelModule::IsChunkGenerated(FIndex InIndex) const
 
 FVoxelChunkQueues UVoxelModule::GetChunkQueues(EVoxelWorldState InWorldState) const
 {
-	switch(InWorldState)
-	{
-		case EVoxelWorldState::Spawning: return SpawningQueues;
-		case EVoxelWorldState::MapLoading: return MapLoadingQueues;
-		case EVoxelWorldState::MapBuilding: return MapBuildingQueues;
-		case EVoxelWorldState::MeshSpawning: return MeshSpawningQueues;
-		case EVoxelWorldState::MeshBuilding: return MeshBuildingQueues;
-		case EVoxelWorldState::Generating: return GeneratingQueues;
-		case EVoxelWorldState::Unloading: return UnloadingQueues;
-		default: return FVoxelChunkQueues();
-	}
-}
-
-FVoxelChunkQueues& UVoxelModule::GetMutableChunkQueues(EVoxelWorldState InWorldState)
-{
-	switch(InWorldState)
-	{
-		case EVoxelWorldState::Spawning: return SpawningQueues;
-		case EVoxelWorldState::MapLoading: return MapLoadingQueues;
-		case EVoxelWorldState::MapBuilding: return MapBuildingQueues;
-		case EVoxelWorldState::MeshSpawning: return MeshSpawningQueues;
-		case EVoxelWorldState::MeshBuilding: return MeshBuildingQueues;
-		case EVoxelWorldState::Generating: return GeneratingQueues;
-		case EVoxelWorldState::Unloading: return UnloadingQueues;
-		default: return SpawningQueues;
-	}
+	return ChunkQueues.FindRef(InWorldState);
 }
 
 UVoxelGenerator* UVoxelModule::GetVoxelGenerator(const TSubclassOf<UVoxelGenerator>& InClass) const
@@ -1636,4 +1538,45 @@ FPrimaryAssetId UVoxelModule::VoxelTypeToAssetID(EVoxelType InVoxelType) const
 		return VoxelAssetIDMap[InVoxelType];
 	}
 	return FPrimaryAssetId(FName("Voxel"), *FString::Printf(TEXT("DA_%s"), *UCommonModuleStatics::GetEnumAuthoredNameByValue(TEXT("/Script/WHFramework.EVoxelType"), (int32)InVoxelType)));
+}
+
+FSceneArea UVoxelModule::ResolveVoxelArea(const FSceneArea& InArea, const FVector2D& InPoint) const
+{
+	const FIndex Index(FMath::FloorToInt(InPoint.X), FMath::FloorToInt(InPoint.Y), 0);
+	const FText RegionDisplayName = UCommonModuleStatics::GetEnumDisplayNameByValue(TEXT("/Script/WHFramework.EVoxelRegionType"), static_cast<int32>(SampleTopographyByIndex(Index).RegionType));
+	FSceneArea Area = InArea;
+	Area.AreaDisplayName = InArea.AreaDisplayName.IsEmpty()
+		? GetVoxelAreaName(Index, EVoxelAreaType::Continent, RegionDisplayName)
+		: FText::Format(FText::FromString(TEXT("{0}{1}")), InArea.AreaDisplayName, RegionDisplayName);
+	return Area;
+}
+
+FText UVoxelModule::GetVoxelAreaName(FIndex InIndex) const
+{
+	if(IsInGameThread())
+	{
+		const FSceneArea Area = USceneModule::Get().GetSceneAreaByPoint(InIndex.ToVector2D());
+		if(!Area.AreaName.IsNone() && !Area.AreaDisplayName.IsEmpty()) return Area.AreaDisplayName;
+	}
+	const FText RegionDisplayName = UCommonModuleStatics::GetEnumDisplayNameByValue(TEXT("/Script/WHFramework.EVoxelRegionType"), static_cast<int32>(SampleTopographyByIndex(InIndex).RegionType));
+	return GetVoxelAreaName(InIndex, EVoxelAreaType::Continent, RegionDisplayName);
+}
+
+FText UVoxelModule::GetVoxelAreaName(FIndex InIndex, EVoxelAreaType InAreaType) const
+{
+	const TArray<FText>* Candidates = VoxelAreaNames.Find(InAreaType);
+	if(!Candidates || Candidates->IsEmpty()) return FText::GetEmpty();
+
+	const int32 WorldSeed = WorldData ? WorldData->WorldSeed : 0;
+	const uint32 Hash = static_cast<uint32>(FMathHelper::Hash31(FVector(InIndex.X + WorldSeed, InIndex.Y - WorldSeed, static_cast<int32>(InAreaType) * 131)));
+	return (*Candidates)[Hash % Candidates->Num()];
+}
+
+FText UVoxelModule::GetVoxelAreaName(FIndex InIndex, EVoxelAreaType InAreaType, const FText& InAreaName) const
+{
+	const FText Prefix = GetVoxelAreaName(InIndex, InAreaType);
+	if(Prefix.IsEmpty()) return InAreaName;
+	if(InAreaName.IsEmpty()) return Prefix;
+
+	return FText::Format(FText::FromString(TEXT("{0}{1}")), Prefix, InAreaName);
 }

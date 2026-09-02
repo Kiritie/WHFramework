@@ -46,21 +46,6 @@ enum class EVoxelWorldState : uint8
 	Unloading
 };
 
-UENUM(BlueprintType)
-enum class EVoxelGenerationStage : uint8
-{
-	Climate,
-	Hydrology,
-	Carving,
-	Material,
-	Terrain,
-	Vegetation,
-	Settlement,
-	Landmark,
-	Liquid,
-	None = 255
-};
-
 /**
  * ????????
  */
@@ -1107,12 +1092,12 @@ public:
 		Generators = TArray<UVoxelGenerator*>();
 	}
 
-	FORCEINLINE FVoxelChunkQueue(bool bInAsync, int32 InSpeed)
+	FORCEINLINE FVoxelChunkQueue(bool bInAsync, int32 InSpeed, const TArray<UVoxelGenerator*>& InGenerators = { })
 	{
 		bAsync = bInAsync;
 		Speed = InSpeed;
 		Queue = TArray<FIndex>();
-		Generators = TArray<UVoxelGenerator*>();
+		Generators = InGenerators;
 	}
 };
 

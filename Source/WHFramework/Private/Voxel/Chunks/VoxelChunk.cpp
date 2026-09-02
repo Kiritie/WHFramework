@@ -18,13 +18,6 @@
 #include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Generators/VoxelBuildingGenerator.h"
 #include "Voxel/Generators/VoxelTownGenerator.h"
-#include "Voxel/Generators/VoxelCaveGenerator.h"
-#include "Voxel/Generators/VoxelTerrainGenerator.h"
-#include "Voxel/Generators/VoxelFoliageGenerator.h"
-#include "Voxel/Generators/VoxelLakeGenerator.h"
-#include "Voxel/Generators/VoxelOreGenerator.h"
-#include "Voxel/Generators/VoxelRiverGenerator.h"
-#include "Voxel/Generators/VoxelSurfaceGenerator.h"
 #include "Voxel/Root/VoxelRoot.h"
 
 UVoxelChunk::UVoxelChunk()
@@ -34,7 +27,7 @@ UVoxelChunk::UVoxelChunk()
 	Batch = -1;
 	Index = FIndex::ZeroIndex;
 	bBuilded = false;
-	MapBuildStage.Store(0);
+	BuildStage.Store(0);
 	bGenerated = false;
 	bChanged = false;
 	Module = nullptr;
@@ -60,7 +53,7 @@ void UVoxelChunk::OnDespawn_Implementation(bool bRecovery)
 	Index = FIndex::ZeroIndex;
 	Batch = -1;
 	bBuilded = false;
-	MapBuildStage.Store(0);
+	BuildStage.Store(0);
 	bGenerated = false;
 	bChanged = false;
 
@@ -104,7 +97,7 @@ void UVoxelChunk::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		VoxelItem.AuxiliaryData = &Iter;
 	}
 	bBuilded = true;
-	MapBuildStage.Store(static_cast<int32>(EVoxelGenerationStage::Liquid) + 1);
+	BuildStage.Store(Module->ChunkQueues[EVoxelWorldState::MapBuilding].Queues.Num());
 }
 
 FSaveData* UVoxelChunk::ToData()
@@ -241,18 +234,11 @@ void UVoxelChunk::ClearMap(bool bGenerate)
 
 void UVoxelChunk::BuildMap(int32 InStage)
 {
-	Module->GenerateVoxelStage(this, InStage);
-	MapBuildStage.Store(InStage);
-	if(InStage == static_cast<int32>(EVoxelGenerationStage::Liquid) + 1)
+	BuildStage.Store(InStage);
+	if(InStage == Module->GetChunkQueues(EVoxelWorldState::MapBuilding).Queues.Num())
 	{
 		bBuilded = true;
 	}
-}
-
-void UVoxelChunk::BuildPrefabMap()
-{
-	bBuilded = true;
-	MapBuildStage.Store(static_cast<int32>(EVoxelGenerationStage::Liquid) + 1);
 }
 
 void UVoxelChunk::BuildMesh()
@@ -740,7 +726,7 @@ bool UVoxelChunk::SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, 
 					}
 				)
 			}
-			if(bUpdateLiquid) Module->AddVoxelLiquidUpdate(LocalIndexToWorld(InIndex));
+			if(bUpdateLiquid) Module->AddToVoxelLiquidUpdateQueue(LocalIndexToWorld(InIndex));
 			Generate(EPhase::Lesser);
 			GenerateNeighbors(InIndex, EPhase::Lesser);
 			if(InAgent) bChanged = true;
@@ -897,14 +883,14 @@ void UVoxelChunk::UpdateSapling(FIndex InIndex, EVoxelType InVoxelType, TSet<FIn
 	auto& WorldData = Module->GetWorldData();
 	if(WorldData.RandomStream.FRand() > 0.001f)
 	{
-		Module->AddVoxelUpdate(InIndex);
+		Module->AddToVoxelUpdateQueue(InIndex);
 		return;
 	}
 
 	const FVoxelItem& GroundItem = Module->GetVoxelByIndex(InIndex + FIndex(0, 0, -1));
 	if(GroundItem.GetVoxelType() != EVoxelType::Grass && GroundItem.GetVoxelType() != EVoxelType::Dirt)
 	{
-		Module->AddVoxelUpdate(InIndex);
+		Module->AddToVoxelUpdateQueue(InIndex);
 		return;
 	}
 
@@ -918,7 +904,7 @@ void UVoxelChunk::UpdateSapling(FIndex InIndex, EVoxelType InVoxelType, TSet<FIn
 		const UVoxelChunk* TreeChunk = Module->GetChunkByVoxelIndex(TreeIndex);
 		if(!TreeChunk || !TreeChunk->IsGenerated() || (Z > 0 && Module->GetVoxelByIndex(TreeIndex).IsValid()))
 		{
-			Module->AddVoxelUpdate(InIndex);
+			Module->AddToVoxelUpdateQueue(InIndex);
 			return;
 		}
 	}
@@ -934,7 +920,7 @@ void UVoxelChunk::UpdateSapling(FIndex InIndex, EVoxelType InVoxelType, TSet<FIn
 				const UVoxelChunk* LeafChunk = Module->GetChunkByVoxelIndex(LeafIndex);
 				if(!LeafChunk || !LeafChunk->IsGenerated())
 				{
-					Module->AddVoxelUpdate(InIndex);
+					Module->AddToVoxelUpdateQueue(InIndex);
 					return;
 				}
 			}

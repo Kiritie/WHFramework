@@ -96,9 +96,6 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "World")
 	EVoxelWorldState WorldState;
 
-	UPROPERTY(VisibleAnywhere, Category = "World")
-	EVoxelGenerationStage WorldGenerationStage;
-
 	UPROPERTY(EditAnywhere, Category = "World")
 	FVoxelWorldBasicSaveData WorldBasicData;
 	
@@ -117,9 +114,6 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	EVoxelWorldState GetWorldState() const { return WorldState; }
-
-	UFUNCTION(BlueprintPure)
-	EVoxelGenerationStage GetWorldGenerationStage() const { return WorldGenerationStage; }
 
 	UFUNCTION(BlueprintPure)
 	FVoxelWorldBasicSaveData& GetWorldBasicData() { return WorldBasicData; }
@@ -169,12 +163,6 @@ protected:
 
 	virtual void UnloadData(EPhase InPhase) override;
 
-	void InitializeSceneAreaNames();
-
-	FSceneArea ResolveChunkSceneArea(const FSceneArea& InArea, const FVector2D& InPoint) const;
-
-	TMap<EVoxelAreaType, TArray<FText>> SceneAreaNamePrefixes;
-
 public:
 	virtual void LoadPrefabData(const FVoxelPrefabSaveData& InPrefabData);
 
@@ -182,16 +170,6 @@ public:
 
 protected:
 	virtual void GenerateWorld();
-
-public:
-	void AddVoxelUpdate(FIndex InIndex);
-
-	void AddVoxelLiquidUpdate(FIndex InIndex);
-
-protected:
-	void UpdateVoxels();
-
-	void ApplyVoxelUpdates(const TMap<FIndex, FVoxelItem>& InVoxelMap, TSet<FIndex>& OutChangedChunkIndices);
 	
 public:
 	virtual UVoxelChunk* SpawnChunk(FIndex InIndex, bool bAddToQueue = true);
@@ -232,11 +210,6 @@ protected:
 	
 	virtual void RemoveFromChunkQueue(EVoxelWorldState InState, FIndex InIndex);
 
-	FVoxelChunkQueues& GetMutableChunkQueues(EVoxelWorldState InWorldState);
-
-public:
-	virtual void GenerateVoxelStage(UVoxelChunk* InChunk, int32 InStage) const;
-
 public:
 	virtual bool IsOnTheWorld(FIndex InIndex, bool bIgnoreZ = true) const;
 
@@ -259,6 +232,16 @@ public:
 	virtual void SetVoxelByLocation(FVector InLocation, const FVoxelItem& InVoxelItem, bool bSafe = false);
 
 public:
+	virtual void AddToVoxelUpdateQueue(FIndex InIndex);
+
+	virtual void AddToVoxelLiquidUpdateQueue(FIndex InIndex);
+
+protected:
+	virtual void UpdateVoxelQueue();
+
+	virtual void ApplyVoxelUpdates(const TMap<FIndex, FVoxelItem>& InVoxelMap, TSet<FIndex>& OutChangedChunkIndices);
+
+public:
 	virtual const FVoxelTopography& GetTopographyByIndex(FIndex InIndex);
 
 	virtual const FVoxelTopography& GetTopographyByLocation(FVector InLocation);
@@ -273,17 +256,6 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	EVoxelRegionType GetWorldRegionByIndex(FIndex InIndex) const;
-
-	UFUNCTION(BlueprintPure)
-	FText GetWorldAreaPrefix(FIndex InIndex, EVoxelAreaType InNameType) const;
-
-	UFUNCTION(BlueprintPure)
-	FText GetWorldRegionDisplayName(EVoxelRegionType InRegionType) const;
-
-	FText GetWorldAreaDisplayName(FIndex InIndex, EVoxelAreaType InNameType, const FText& InAreaTypeName) const;
-
-	UFUNCTION(BlueprintPure)
-	FText GetWorldAreaDisplayNameByIndex(FIndex InIndex) const;
 
 public:
 	virtual float GetVoxelNoise1D(float InValue, bool bAbs = false, bool bUnsigned = false) const;
@@ -329,26 +301,8 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	float ChunkSpawnDistance;
 
-	UPROPERTY(EditAnywhere, Category = "Chunk|Pipeline")
-	FVoxelChunkQueues SpawningQueues;
-
-	UPROPERTY(EditAnywhere, Category = "Chunk|Pipeline")
-	FVoxelChunkQueues MapLoadingQueues;
-
-	UPROPERTY(EditAnywhere, Category = "Chunk|Pipeline")
-	FVoxelChunkQueues MapBuildingQueues;
-
-	UPROPERTY(EditAnywhere, Category = "Chunk|Pipeline")
-	FVoxelChunkQueues MeshSpawningQueues;
-
-	UPROPERTY(EditAnywhere, Category = "Chunk|Pipeline")
-	FVoxelChunkQueues MeshBuildingQueues;
-
-	UPROPERTY(EditAnywhere, Category = "Chunk|Pipeline")
-	FVoxelChunkQueues GeneratingQueues;
-
-	UPROPERTY(EditAnywhere, Category = "Chunk|Pipeline")
-	FVoxelChunkQueues UnloadingQueues;
+	UPROPERTY(EditAnywhere, Category = "Chunk")
+	TMap<EVoxelWorldState, FVoxelChunkQueues> ChunkQueues;
 
 	TArray<FVoxelChunkQueueThread*> ChunkQueueThreads;
 
@@ -384,9 +338,6 @@ public:
 	virtual FVoxelChunkQueues GetChunkQueues(EVoxelWorldState InWorldState) const;
 
 protected:
-	UPROPERTY(EditAnywhere, Category = "World|Area")
-	UDataTable* SceneAreaNameTable;
-
 	UPROPERTY(EditAnywhere, Category = "Voxel")
 	TArray<TSubclassOf<UVoxel>> VoxelClasses;
 
@@ -406,4 +357,19 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	FPrimaryAssetId VoxelTypeToAssetID(EVoxelType InVoxelType) const;
+
+protected:
+	UPROPERTY(EditAnywhere, Category = "Area")
+	UDataTable* VoxelAreaNameTable;
+
+	TMap<EVoxelAreaType, TArray<FText>> VoxelAreaNames;
+
+	FSceneArea ResolveVoxelArea(const FSceneArea& InArea, const FVector2D& InPoint) const;
+
+public:
+	FText GetVoxelAreaName(FIndex InIndex) const;
+
+	FText GetVoxelAreaName(FIndex InIndex, EVoxelAreaType InAreaType) const;
+
+	FText GetVoxelAreaName(FIndex InIndex, EVoxelAreaType InAreaType, const FText& InAreaName) const;
 };

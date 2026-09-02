@@ -20,7 +20,7 @@ public:
 	UVoxelGenerator();
 	
 public:
-	virtual void Initialize(UVoxelModule* InModule);
+	virtual void Initialize(UVoxelModule* InModule, int32 InStage);
 
 	virtual void Generate(UVoxelChunk* InChunk);
 
@@ -28,10 +28,10 @@ protected:
 	UPROPERTY(BlueprintReadOnly)
 	UVoxelModule* Module;
 
-public:
-	bool IsGenerationEnabled() const { return bGenerationEnabled; }
-
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	bool bGenerationEnabled;
+	UPROPERTY(BlueprintReadOnly)
+	int32 Stage;
+
+public:
+	int32 GetStage() const { return Stage; }
 };

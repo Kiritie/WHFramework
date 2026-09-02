@@ -60,8 +60,6 @@ public:
 
 	virtual void BuildMap(int32 InStage);
 
-	virtual void BuildPrefabMap();
-
 	virtual void BuildMesh();
 
 	virtual void BuildMesh(EVoxelNature InNature);
@@ -209,7 +207,7 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
 	bool bBuilded;
 
-	TAtomic<int32> MapBuildStage;
+	TAtomic<int32> BuildStage;
 
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
 	bool bGenerated;
@@ -236,9 +234,9 @@ public:
 
 	int32 GetBatch() const { return Batch; }
 
-	bool IsBuilded() const { return bBuilded; }
+	int32 GetBuildStage() const { return BuildStage.Load(); }
 
-	bool IsMapBuildStageCompleted(int32 InStage) const { return MapBuildStage.Load() >= InStage; }
+	bool IsBuilded() const { return bBuilded; }
 
 	bool IsGenerated() const { return bGenerated; }
 	

@@ -18,7 +18,7 @@ public:
 	UVoxelTownGenerator();
 
 public:
-	virtual void Initialize(UVoxelModule* InModule) override;
+	virtual void Initialize(UVoxelModule* InModule, int32 InStage) override;
 	
 	virtual void Generate(UVoxelChunk* InChunk) override;
 

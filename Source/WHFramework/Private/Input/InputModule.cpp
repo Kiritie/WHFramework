@@ -449,7 +449,7 @@ TArray<FPlayerKeyMapping> UInputModule::GetAllPlayerKeyMappings(int32 InPlayerIn
 	TArray<FPlayerKeyMapping> Mappings;
 	if(const UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>(InPlayerIndex))
 	{
-		for (auto& Iter1 : Settings->GetAllSavedKeyProfiles())
+		for (auto& Iter1 : Settings->GetAllAvailableKeyProfiles())
 		{
 			for (const auto& Iter2 : Iter1.Value->GetPlayerMappingRows())
 			{
@@ -495,7 +495,7 @@ TArray<FPlayerKeyMapping> UInputModule::GetPlayerKeyMappingsByName(const FName I
 	TArray<FPlayerKeyMapping> Mappings;
 	if(const UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>(InPlayerIndex))
 	{
-		for (auto& Iter1 : Settings->GetAllSavedKeyProfiles())
+		for (auto& Iter1 : Settings->GetAllAvailableKeyProfiles())
 		{
 			if(Iter1.Value->GetPlayerMappingRows().Contains(InName))
 			{

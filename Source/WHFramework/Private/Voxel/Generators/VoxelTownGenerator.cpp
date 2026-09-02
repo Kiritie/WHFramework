@@ -2,6 +2,7 @@
 #include "Voxel/Generators/VoxelTownGenerator.h"
 
 #include "Asset/AssetModuleStatics.h"
+#include "Common/CommonModuleStatics.h"
 #include "Math/MathHelper.h"
 #include "Misc/ScopeRWLock.h"
 #include "Scene/SceneModuleStatics.h"
@@ -45,9 +46,9 @@ UVoxelTownGenerator::UVoxelTownGenerator()
 	_StartPoint = FVector2D::ZeroVector;
 }
 
-void UVoxelTownGenerator::Initialize(UVoxelModule* InModule)
+void UVoxelTownGenerator::Initialize(UVoxelModule* InModule, int32 InStage)
 {
-	Super::Initialize(InModule);
+	Super::Initialize(InModule, InStage);
 
 	for(const FPrimaryAssetId& PrefabAsset : PrefabAssets)
 	{
@@ -119,8 +120,8 @@ void UVoxelTownGenerator::Generate(UVoxelChunk* InChunk)
 				}
 				FSceneArea SceneArea;
 				SceneArea.AreaName = *FString::Printf(TEXT("Town_%d_%d"), AnchorChunkIndex.X, AnchorChunkIndex.Y);
-				SceneArea.AreaDisplayName = Module->GetWorldAreaDisplayName(AnchorOrigin, EVoxelAreaType::Town,
-					Module->GetWorldRegionDisplayName(EVoxelRegionType::Town));
+				SceneArea.AreaDisplayName = Module->GetVoxelAreaName(AnchorOrigin, EVoxelAreaType::Town,
+					UCommonModuleStatics::GetEnumDisplayNameByValue(TEXT("/Script/WHFramework.EVoxelRegionType"), static_cast<int32>(EVoxelRegionType::Town)));
 				SceneArea.AreaType = ESceneAreaType::Default;
 				SceneArea.AreaShape = ESceneAreaShape::Box;
 				SceneArea.AreaCenter = TownBounds.GetCenter();
@@ -335,11 +336,11 @@ bool UVoxelTownGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, 
 	_BuildingPos.Push(FVector2D(InX - FrontBack, InY - LeftRight));
 
 	const FText BuildingDisplayName = _PrefabAssets[InIndex]->DisplayName.IsEmpty()
-		? Module->GetWorldRegionDisplayName(EVoxelRegionType::Building)
+		? UCommonModuleStatics::GetEnumDisplayNameByValue(TEXT("/Script/WHFramework.EVoxelRegionType"), static_cast<int32>(EVoxelRegionType::Building))
 		: _PrefabAssets[InIndex]->DisplayName;
 	FSceneArea BuildingArea;
 	BuildingArea.AreaName = *FString::Printf(TEXT("TownBuilding_%d_%d"), InX, InY);
-	BuildingArea.AreaDisplayName = Module->GetWorldAreaDisplayName(FIndex(InX, InY, Aver), EVoxelAreaType::Building, BuildingDisplayName);
+	BuildingArea.AreaDisplayName = Module->GetVoxelAreaName(FIndex(InX, InY, Aver), EVoxelAreaType::Building, BuildingDisplayName);
 	BuildingArea.AreaType = ESceneAreaType::Default;
 	BuildingArea.AreaShape = ESceneAreaShape::Box;
 	BuildingArea.AreaCenter = FVector2D(InX, InY);

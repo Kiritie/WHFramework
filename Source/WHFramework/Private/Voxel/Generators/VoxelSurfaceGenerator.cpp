@@ -58,7 +58,7 @@ float UVoxelSurfaceGenerator::SampleTemperature(FIndex InWorldIndex, int32 InHei
 	const int32 Octaves = FMath::Max(ClimateOctaves, 1);
 	for(int32 Octave = 0; Octave < Octaves; ++Octave)
 	{
-		const FVector2D Position(InWorldIndex.X / ChunkSize.X / Scale, InWorldIndex.Y / ChunkSize.Y / Scale);
+		const FVector2D Position(InWorldIndex.X / ChunkSize.X / Scale + TemperatureSeed, InWorldIndex.Y / ChunkSize.Y / Scale - TemperatureSeed);
 		const float Value = Module->GetVoxelNoise2D(Position) + (FMathHelper::HashRand(Position, TemperatureSeed + Octave * 31) - 0.5f) * 0.05f;
 		Result += FMath::Clamp(Value, -1.f, 1.f) / Octaves;
 		Scale *= 2.f;
@@ -75,12 +75,12 @@ float UVoxelSurfaceGenerator::SampleHumidity(FIndex InWorldIndex) const
 	const int32 Octaves = FMath::Max(ClimateOctaves, 1);
 	for(int32 Octave = 0; Octave < Octaves; ++Octave)
 	{
-		const FVector2D Position(InWorldIndex.X / ChunkSize.X / Scale, InWorldIndex.Y / ChunkSize.Y / Scale);
-		const float Value = Module->GetVoxelNoise2D(Position, true) + FMathHelper::HashRand(Position, HumiditySeed + Octave * 37) * 0.05f;
-		Result += FMath::Clamp(Value, 0.f, 1.f) / Octaves;
+		const FVector2D Position(InWorldIndex.X / ChunkSize.X / Scale + HumiditySeed, InWorldIndex.Y / ChunkSize.Y / Scale - HumiditySeed);
+		const float Value = Module->GetVoxelNoise2D(Position) + (FMathHelper::HashRand(Position, HumiditySeed + Octave * 37) - 0.5f) * 0.05f;
+		Result += FMath::Clamp(Value, -1.f, 1.f) / Octaves;
 		Scale *= 2.f;
 	}
-	return FMath::Clamp(Result, 0.f, 1.f);
+	return FMath::SmoothStep(-0.5f, 0.5f, Result);
 }
 
 float UVoxelSurfaceGenerator::SampleContinentalness(FIndex InWorldIndex) const
