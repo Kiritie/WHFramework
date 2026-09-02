@@ -220,6 +220,14 @@ protected:
 	
 	virtual bool UpdateChunkQueue(EVoxelWorldState InState, TFunction<void(FIndex, int32)> InFunc);
 
+	virtual void UpdateChunkQueueThreads();
+
+	virtual bool DispatchChunkQueue(FVoxelChunkQueue& InQueue, const TFunction<void(FIndex, int32)>& InFunc, int32 InStage);
+
+	virtual void CancelChunkQueueBatch();
+
+	virtual void ShutdownChunkQueueThreads();
+
 	virtual void AddToChunkQueue(EVoxelWorldState InState, FIndex InIndex);
 	
 	virtual void RemoveFromChunkQueue(EVoxelWorldState InState, FIndex InIndex);
@@ -321,27 +329,35 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	float ChunkSpawnDistance;
 
-	UPROPERTY(VisibleAnywhere, Category = "Chunk|Pipeline")
+	UPROPERTY(EditAnywhere, Category = "Chunk|Pipeline")
 	FVoxelChunkQueues SpawningQueues;
 
-	UPROPERTY(VisibleAnywhere, Category = "Chunk|Pipeline")
+	UPROPERTY(EditAnywhere, Category = "Chunk|Pipeline")
 	FVoxelChunkQueues MapLoadingQueues;
 
 	UPROPERTY(EditAnywhere, Category = "Chunk|Pipeline")
 	FVoxelChunkQueues MapBuildingQueues;
 
-	UPROPERTY(VisibleAnywhere, Category = "Chunk|Pipeline")
+	UPROPERTY(EditAnywhere, Category = "Chunk|Pipeline")
 	FVoxelChunkQueues MeshSpawningQueues;
 
-	UPROPERTY(VisibleAnywhere, Category = "Chunk|Pipeline")
+	UPROPERTY(EditAnywhere, Category = "Chunk|Pipeline")
 	FVoxelChunkQueues MeshBuildingQueues;
 
-	UPROPERTY(VisibleAnywhere, Category = "Chunk|Pipeline")
+	UPROPERTY(EditAnywhere, Category = "Chunk|Pipeline")
 	FVoxelChunkQueues GeneratingQueues;
 
-	UPROPERTY(VisibleAnywhere, Category = "Chunk|Pipeline")
+	UPROPERTY(EditAnywhere, Category = "Chunk|Pipeline")
 	FVoxelChunkQueues UnloadingQueues;
-	
+
+	TArray<FVoxelChunkQueueThread*> ChunkQueueThreads;
+
+	TSharedPtr<FVoxelChunkQueueBatch, ESPMode::ThreadSafe> ActiveChunkQueueBatch;
+
+	FVoxelChunkQueue* ActiveChunkQueue;
+
+	TArray<FVoxelChunkQueueThread*> ActiveChunkQueueThreads;
+
 	UPROPERTY(VisibleAnywhere, Category = "Chunk")
 	int32 ChunkSpawnBatch;
 

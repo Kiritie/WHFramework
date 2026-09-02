@@ -2,10 +2,10 @@
 #include "Voxel/VoxelModuleStatics.h"
 
 #include "Ability/AbilityModuleStatics.h"
-#include "Async/Async.h"
 #include "Asset/AssetModuleStatics.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Engine/TextureRenderTarget2D.h"
+#include "HAL/PlatformMisc.h"
 #include "Event/EventModuleStatics.h"
 #include "Event/Handle/Voxel/EventHandle_VoxelWorldModeChanged.h"
 #include "Event/Handle/Voxel/EventHandle_VoxelWorldStateChanged.h"
@@ -85,6 +85,10 @@ UVoxelModule::UVoxelModule()
 	MeshBuildingQueues = FVoxelChunkQueues({ FVoxelChunkQueue(true, 100) });
 	GeneratingQueues = FVoxelChunkQueues({ FVoxelChunkQueue(false, 1) });
 	UnloadingQueues = FVoxelChunkQueues({ FVoxelChunkQueue(false, 10) });
+	ChunkQueueThreads = TArray<FVoxelChunkQueueThread*>();
+	ActiveChunkQueueBatch.Reset();
+	ActiveChunkQueue = nullptr;
+	ActiveChunkQueueThreads = TArray<FVoxelChunkQueueThread*>();
 
 	ChunkSpawnBatch = 0;
 	ChunkMap = TMap<FIndex, UVoxelChunk*>();
@@ -142,6 +146,7 @@ UVoxelModule::UVoxelModule()
 
 UVoxelModule::~UVoxelModule()
 {
+	ShutdownChunkQueueThreads();
 	TERMINATION_MODULE(UVoxelModule)
 }
 
@@ -229,6 +234,7 @@ void UVoxelModule::OnDestroy()
 {
 	Super::OnDestroy();
 
+	ShutdownChunkQueueThreads();
 	TERMINATION_MODULE(UVoxelModule)
 
 	if(VoxelRoot)
@@ -353,6 +359,7 @@ void UVoxelModule::OnTermination(EPhase InPhase)
 	{
 		USceneModule::Get().UnregisterSceneAreaResolver(ESceneAreaType::Chunk);
 		ResetChunkQueues();
+		ShutdownChunkQueueThreads();
 		VoxelUpdateChunkIndices.Empty();
 		VoxelLiquidUpdateIndices.Empty();
 		FIndex VoxelUpdateIndex;
@@ -667,6 +674,8 @@ FVoxelPrefabSaveData UVoxelModule::GetPrefabData()
 
 void UVoxelModule::GenerateWorld()
 {
+	UpdateChunkQueueThreads();
+
 	if(UpdateChunkQueue(EVoxelWorldState::Unloading, [this](FIndex Index){ UnloadChunk(Index); }))
 	{
 		SetWorldState(EVoxelWorldState::Unloading);
@@ -1065,20 +1074,92 @@ void UVoxelModule::GenerateChunkQueues(bool bFromAgent, bool bForce)
 
 void UVoxelModule::ResetChunkQueues()
 {
+	CancelChunkQueueBatch();
+
 	FVoxelChunkQueues* QueueGroups[] = { &SpawningQueues, &MapLoadingQueues, &MapBuildingQueues, &MeshSpawningQueues, &MeshBuildingQueues, &GeneratingQueues, &UnloadingQueues };
 	for(FVoxelChunkQueues* QueueGroup : QueueGroups)
 	{
 		if(!QueueGroup) continue;
 		ITER_ARRAY(QueueGroup->Queues, Item2,
 			Item2.Queue.Empty();
-			ITER_ARRAY(Item2.Threads, Item3,
-				delete Item3;
-			)
-			Item2.Threads.Empty();
 		)
 		QueueGroup->Stage = 0;
 	}
 	WorldGenerationStage = EVoxelGenerationStage::None;
+}
+
+void UVoxelModule::UpdateChunkQueueThreads()
+{
+	if(!ActiveChunkQueueBatch) return;
+
+	for(const FVoxelChunkQueueThread* Thread : ActiveChunkQueueThreads)
+	{
+		if(Thread && !Thread->IsIdle()) return;
+	}
+
+	if(ActiveChunkQueue)
+	{
+		TSet<FIndex> CompletedIndices;
+		CompletedIndices.Reserve(ActiveChunkQueueBatch->GetQueue().Num());
+		for(const FIndex& Index : ActiveChunkQueueBatch->GetQueue()) CompletedIndices.Add(Index);
+		ActiveChunkQueue->Queue.RemoveAll([&CompletedIndices](const FIndex& Index){ return CompletedIndices.Contains(Index); });
+	}
+	ActiveChunkQueueBatch.Reset();
+	ActiveChunkQueue = nullptr;
+	ActiveChunkQueueThreads.Empty();
+}
+
+bool UVoxelModule::DispatchChunkQueue(FVoxelChunkQueue& InQueue, const TFunction<void(FIndex, int32)>& InFunc, int32 InStage)
+{
+	if(ActiveChunkQueueBatch || InQueue.Queue.Num() == 0) return false;
+
+	const int32 BatchCount = FMath::Min(FMath::Max(1, InQueue.Speed), InQueue.Queue.Num());
+	const int32 WorkerCount = FMath::Min(FMath::Max(1, FPlatformMisc::NumberOfWorkerThreadsToSpawn()), BatchCount);
+	while(ChunkQueueThreads.Num() < WorkerCount)
+	{
+		FVoxelChunkQueueThread* Thread = new FVoxelChunkQueueThread();
+		if(!Thread->IsValid())
+		{
+			delete Thread;
+			break;
+		}
+		ChunkQueueThreads.Add(Thread);
+	}
+	if(ChunkQueueThreads.Num() == 0) return false;
+
+	TArray<FIndex> Queue;
+	Queue.Append(InQueue.Queue.GetData(), BatchCount);
+	const TSharedRef<FVoxelChunkQueueBatch, ESPMode::ThreadSafe> Batch = MakeShared<FVoxelChunkQueueBatch, ESPMode::ThreadSafe>(MoveTemp(Queue));
+	const int32 DispatchCount = FMath::Min(WorkerCount, ChunkQueueThreads.Num());
+	ActiveChunkQueueThreads.Empty(DispatchCount);
+	for(int32 i = 0; i < DispatchCount; i++)
+	{
+		if(ChunkQueueThreads[i]->Dispatch(Batch, InFunc, InStage)) ActiveChunkQueueThreads.Add(ChunkQueueThreads[i]);
+	}
+	if(ActiveChunkQueueThreads.Num() == 0) return false;
+
+	ActiveChunkQueueBatch = Batch;
+	ActiveChunkQueue = &InQueue;
+	return true;
+}
+
+void UVoxelModule::CancelChunkQueueBatch()
+{
+	if(ActiveChunkQueueBatch) ActiveChunkQueueBatch->Cancel();
+	for(FVoxelChunkQueueThread* Thread : ActiveChunkQueueThreads)
+	{
+		if(Thread) Thread->WaitForIdle();
+	}
+	ActiveChunkQueueBatch.Reset();
+	ActiveChunkQueue = nullptr;
+	ActiveChunkQueueThreads.Empty();
+}
+
+void UVoxelModule::ShutdownChunkQueueThreads()
+{
+	CancelChunkQueueBatch();
+	for(FVoxelChunkQueueThread* Thread : ChunkQueueThreads) delete Thread;
+	ChunkQueueThreads.Empty();
 }
 
 bool UVoxelModule::UpdateChunkQueue(EVoxelWorldState InState, TFunction<void(FIndex)> InFunc)
@@ -1094,41 +1175,22 @@ bool UVoxelModule::UpdateChunkQueue(EVoxelWorldState InState, TFunction<void(FIn
 		if(InState == EVoxelWorldState::MapBuilding) WorldGenerationStage = static_cast<EVoxelGenerationStage>(i);
 		if(Item.bAsync)
 		{
-			if(Item.Threads.Num() == 0 && Item.Queue.Num() > 0)
+			if(Item.Queue.Num() > 0)
 			{
-				DON_WITHINDEX(FMath::Min(FMath::CeilToInt((float)Item.Queue.Num() / Item.Speed), FPlatformMisc::NumberOfWorkerThreadsToSpawn()), j,
-					TArray<FIndex> Queue;
-					DON_WITHINDEX(FMath::Min(Item.Speed, Item.Queue.Num() - j * Item.Speed), k,
-						Queue.Add(Item.Queue[j * Item.Speed + k]);
-					)
-					const auto Thread = new FVoxelChunkQueueThread(Queue, InFunc, i + 1);
-					Item.Threads.Add(Thread);
-				)
-			}
-			else if(Item.Threads.Num() > 0)
-			{
-				const auto Threads = Item.Threads;
-				ITER_ARRAY(Threads, Thread,
-					if(Thread->IsFinished())
-					{
-						ITER_ARRAY(Thread->GetChunkQueue(), Index,
-							Item.Queue.Remove(Index);
-						)
-						Item.Threads.Remove(Thread);
-						delete Thread;
-					}
-				)
-			}
-			if(Item.Queue.Num() > 0 || Item.Threads.Num() > 0)
-			{
+				if(!ActiveChunkQueueBatch && !DispatchChunkQueue(Item, InFunc, i + 1))
+				{
+					const int32 Num = FMath::Min(FMath::Max(1, Item.Speed), Item.Queue.Num());
+					DON_WITHINDEX(Num, j, InFunc(Item.Queue[j], i + 1); )
+					Item.Queue.RemoveAt(0, Num, EAllowShrinking::No);
+				}
 				return true;
 			}
 		}
 		else
 		{
-			const int32 Num = FMath::Min(Item.Speed, Item.Queue.Num());
+			const int32 Num = FMath::Min(FMath::Max(1, Item.Speed), Item.Queue.Num());
 			DON_WITHINDEX(Num, j, InFunc(Item.Queue[j], i + 1); )
-			Item.Queue.RemoveAt(0, Num);
+			Item.Queue.RemoveAt(0, Num, EAllowShrinking::No);
 			if(Item.Queue.Num() > 0)
 			{
 				return true;

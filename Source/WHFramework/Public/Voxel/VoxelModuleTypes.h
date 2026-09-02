@@ -471,6 +471,52 @@ struct WHFRAMEWORK_API FVoxelLiquidSnapshot
 	bool bCanFlowThrough = false;
 };
 
+/** 连续存储的体素液体快照 */
+struct WHFRAMEWORK_API FVoxelLiquidSnapshotGrid
+{
+	FIndex MinIndex;
+	FIndex Size;
+	TArray<FVoxelLiquidSnapshot> Snapshots;
+
+	FVoxelLiquidSnapshotGrid(FIndex InMinIndex, FIndex InSize)
+		: MinIndex(InMinIndex), Size(InSize)
+	{
+		Snapshots.SetNum(Size.X * Size.Y * Size.Z);
+	}
+
+	bool IsValidIndex(FIndex InIndex) const
+	{
+		return InIndex.X >= MinIndex.X && InIndex.X < MinIndex.X + Size.X &&
+			InIndex.Y >= MinIndex.Y && InIndex.Y < MinIndex.Y + Size.Y &&
+			InIndex.Z >= MinIndex.Z && InIndex.Z < MinIndex.Z + Size.Z;
+	}
+
+	int32 GetLinearIndex(FIndex InIndex) const
+	{
+		const FIndex LocalIndex = InIndex - MinIndex;
+		return (LocalIndex.Z * Size.Y + LocalIndex.Y) * Size.X + LocalIndex.X;
+	}
+
+	FVoxelLiquidSnapshot* Find(FIndex InIndex)
+	{
+		return IsValidIndex(InIndex) ? &Snapshots[GetLinearIndex(InIndex)] : nullptr;
+	}
+
+	const FVoxelLiquidSnapshot* Find(FIndex InIndex) const
+	{
+		return IsValidIndex(InIndex) ? &Snapshots[GetLinearIndex(InIndex)] : nullptr;
+	}
+
+	FIndex GetIndex(int32 InLinearIndex) const
+	{
+		const int32 PlaneSize = Size.X * Size.Y;
+		const int32 Z = InLinearIndex / PlaneSize;
+		const int32 PlaneIndex = InLinearIndex - Z * PlaneSize;
+		return MinIndex + FIndex(PlaneIndex % Size.X, PlaneIndex / Size.X, Z);
+	}
+
+};
+
 /** 体素液体更新 */
 struct WHFRAMEWORK_API FVoxelLiquidUpdate
 {
@@ -1044,7 +1090,7 @@ public:
 	UPROPERTY(VisibleAnywhere)
 	bool bAsync;
 
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "1"))
 	int32 Speed;
 
 	UPROPERTY(VisibleAnywhere)
@@ -1053,15 +1099,12 @@ public:
 	UPROPERTY(EditAnywhere, Instanced)
 	TArray<UVoxelGenerator*> Generators;
 		
-	TArray<FVoxelChunkQueueThread*> Threads;
-
 	FORCEINLINE FVoxelChunkQueue()
 	{
 		bAsync = false;
 		Speed = 100;
 		Queue = TArray<FIndex>();
 		Generators = TArray<UVoxelGenerator*>();
-		Threads = TArray<FVoxelChunkQueueThread*>();
 	}
 
 	FORCEINLINE FVoxelChunkQueue(bool bInAsync, int32 InSpeed)
@@ -1070,7 +1113,6 @@ public:
 		Speed = InSpeed;
 		Queue = TArray<FIndex>();
 		Generators = TArray<UVoxelGenerator*>();
-		Threads = TArray<FVoxelChunkQueueThread*>();
 	}
 };
 

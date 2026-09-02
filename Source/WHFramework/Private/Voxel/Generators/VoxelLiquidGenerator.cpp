@@ -14,7 +14,6 @@ void UVoxelLiquidGenerator::Generate(UVoxelChunk* InChunk)
 void UVoxelLiquidGenerator::GenerateLiquid(UVoxelChunk* InChunk) const
 {
 	constexpr int32 LiquidRange = FVoxelLiquidState::MaxLevel;
-	TMap<FIndex, FVoxelLiquidSnapshot> LiquidSnapshots;
 	const FIndex ChunkSize = Module->GetWorldData().ChunkSize;
 	int32 LiquidMaxHeight = Module->GetWorldData().SeaLevel + 1;
 	for(int32 X = -LiquidRange - 1; X <= ChunkSize.X + LiquidRange; ++X)
@@ -31,6 +30,7 @@ void UVoxelLiquidGenerator::GenerateLiquid(UVoxelChunk* InChunk) const
 		}
 	}
 	LiquidMaxHeight = FMath::Min(LiquidMaxHeight, Module->GetWorldData().SkyHeight);
+	FVoxelLiquidSnapshotGrid LiquidSnapshots(FIndex(-LiquidRange, -LiquidRange, 0), FIndex(ChunkSize.X + LiquidRange * 2, ChunkSize.Y + LiquidRange * 2, LiquidMaxHeight));
 	for(int32 X = -LiquidRange; X < ChunkSize.X + LiquidRange; ++X)
 	{
 		for(int32 Y = -LiquidRange; Y < ChunkSize.Y + LiquidRange; ++Y)
@@ -44,7 +44,7 @@ void UVoxelLiquidGenerator::GenerateLiquid(UVoxelChunk* InChunk) const
 				const FIndex VoxelIndex(X, Y, Z);
 				const FIndex WorldIndex = InChunk->LocalIndexToWorld(VoxelIndex);
 				const FVoxelItem Item = bOnTheChunk ? InChunk->GetVoxel(VoxelIndex) : Chunk->GetVoxelSnapshot(Chunk->WorldIndexToLocal(WorldIndex));
-				FVoxelLiquidSnapshot Snapshot;
+				FVoxelLiquidSnapshot& Snapshot = *LiquidSnapshots.Find(VoxelIndex);
 				Snapshot.bGenerated = true;
 				if(Item.IsValid() && !Item.IsUnknown())
 				{
@@ -56,7 +56,6 @@ void UVoxelLiquidGenerator::GenerateLiquid(UVoxelChunk* InChunk) const
 				{
 					Snapshot.VoxelType = EVoxelType::Empty;
 				}
-				LiquidSnapshots.Add(VoxelIndex, MoveTemp(Snapshot));
 			}
 		}
 	}
