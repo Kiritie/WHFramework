@@ -360,9 +360,7 @@ public:
 
 protected:
 	UPROPERTY(EditAnywhere, Category = "Area")
-	UDataTable* VoxelAreaNameTable;
-
-	TMap<EVoxelAreaType, TArray<FText>> VoxelAreaNames;
+	FName VoxelAreaNamespace;
 
 	FSceneArea ResolveVoxelArea(const FSceneArea& InArea, const FVector2D& InPoint) const;
 

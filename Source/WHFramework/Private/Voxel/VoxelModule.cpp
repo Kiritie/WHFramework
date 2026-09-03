@@ -72,8 +72,7 @@ UVoxelModule::UVoxelModule()
 	WorldAgentIndex = EMPTY_Index;
 
 	WorldData = nullptr;
-	VoxelAreaNameTable = nullptr;
-	VoxelAreaNames = TMap<EVoxelAreaType, TArray<FText>>();
+	VoxelAreaNamespace = NAME_None;
 
 	ChunkSpawnClass = UVoxelChunk::StaticClass();
 	
@@ -260,15 +259,7 @@ void UVoxelModule::OnInitialize()
 {
 	Super::OnInitialize();
 
-	if(VoxelAreaNameTable)
-	{
-		TArray<FVoxelAreaNameData*> Rows;
-		VoxelAreaNameTable->GetAllRows(TEXT("VoxelAreaNames"), Rows);
-		for(const FVoxelAreaNameData* Row : Rows)
-		{
-			if(Row && !Row->AreaName.IsEmpty()) VoxelAreaNames.FindOrAdd(Row->AreaType).Add(Row->AreaName);
-		}
-	}
+
 	
 	USceneModule::Get().RegisterSceneAreaResolver(ESceneAreaType::Chunk, FSceneAreaResolver::CreateUObject(this, &UVoxelModule::ResolveVoxelArea));
 
@@ -1564,12 +1555,11 @@ FText UVoxelModule::GetVoxelAreaName(FIndex InIndex) const
 
 FText UVoxelModule::GetVoxelAreaName(FIndex InIndex, EVoxelAreaType InAreaType) const
 {
-	const TArray<FText>* Candidates = VoxelAreaNames.Find(InAreaType);
-	if(!Candidates || Candidates->IsEmpty()) return FText::GetEmpty();
-
 	const int32 WorldSeed = WorldData ? WorldData->WorldSeed : 0;
-	const uint32 Hash = static_cast<uint32>(FMathHelper::Hash31(FVector(InIndex.X + WorldSeed, InIndex.Y - WorldSeed, static_cast<int32>(InAreaType) * 131)));
-	return (*Candidates)[Hash % Candidates->Num()];
+	const uint32 Hash = HashCombine(HashCombine(GetTypeHash(WorldSeed), GetTypeHash(InIndex.X)), HashCombine(GetTypeHash(InIndex.Y), GetTypeHash(static_cast<uint8>(InAreaType))));
+	const FString Prefix = StaticEnum<EVoxelAreaType>()->GetNameStringByValue(static_cast<int64>(InAreaType)) + TEXT(".");
+	const FName Key = UAssetModuleStatics::GetRandomTextKey(VoxelAreaNamespace, Prefix, Hash);
+	return Key.IsNone() ? FText::GetEmpty() : UAssetModuleStatics::GetLocalizedText(VoxelAreaNamespace, Key.ToString());
 }
 
 FText UVoxelModule::GetVoxelAreaName(FIndex InIndex, EVoxelAreaType InAreaType, const FText& InAreaName) const

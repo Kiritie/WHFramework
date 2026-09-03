@@ -5,6 +5,8 @@
 
 #include "Asset/AssetManagerBase.h"
 #include "Asset/AssetModuleTypes.h"
+#include "Internationalization/StringTable.h"
+#include "Internationalization/StringTableCore.h"
 		
 IMPLEMENTATION_MODULE(UAssetModule)
 
@@ -170,6 +172,28 @@ UObject* UAssetModule::LoadObject(UClass* InClass, const FString& InName)
 		ObjectMappings.Add(InName, StaticLoadObject(InClass, nullptr, *InName));
 	}
 	return ObjectMappings[InName];
+}
+
+FText UAssetModule::GetLocalizedText(FName InNamespace, const FString& InKey) const
+{
+	const FStaticObject* Object = StaticObjects.Find(InNamespace);
+	const UStringTable* Table = Object ? Cast<UStringTable>(Object->LoadedObject) : nullptr;
+	return Table && !InKey.IsEmpty() ? FText::FromStringTable(Table->GetStringTableId(), InKey) : FText::GetEmpty();
+}
+
+FName UAssetModule::GetRandomTextKey(FName InNamespace, const FString& InPrefix, int32 InSeed) const
+{
+	const FStaticObject* Object = StaticObjects.Find(InNamespace);
+	const UStringTable* Table = Object ? Cast<UStringTable>(Object->LoadedObject) : nullptr;
+	if(!Table) return NAME_None;
+	TArray<FString> Keys;
+	Table->GetStringTable()->EnumerateSourceStrings([&](const FString& Key, const FString& Source)
+	{
+		if(Key.StartsWith(InPrefix, ESearchCase::CaseSensitive) && !Source.IsEmpty()) Keys.Add(Key);
+		return true;
+	});
+	Keys.Sort();
+	return Keys.IsEmpty() ? NAME_None : FName(*Keys[FRandomStream(InSeed).RandRange(0, Keys.Num() - 1)]);
 }
 
 UEnum* UAssetModule::FindEnumByValue(const FString& InEnumName, int32 InEnumValue, bool bExactClass)

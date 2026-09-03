@@ -73,6 +73,15 @@ public:
 	static UObject* LoadObject(UClass* InClass, const FString& InName);
 
 	//////////////////////////////////////////////////////////////////////////
+	/// 本地化文本
+public:
+	UFUNCTION(BlueprintPure)
+	static FText GetLocalizedText(FName InNamespace, const FString& InKey);
+
+	UFUNCTION(BlueprintPure)
+	static FName GetRandomTextKey(FName InNamespace, const FString& InPrefix, int32 InSeed);
+
+	//////////////////////////////////////////////////////////////////////////
 	/// Enums
 public:
 	UFUNCTION(BlueprintPure, Category = "AssetModuleStatics")

@@ -115,6 +115,15 @@ public:
 	UObject* LoadObject(UClass* InClass, const FString& InName);
 
 	//////////////////////////////////////////////////////////////////////////
+	/// 本地化文本
+public:
+	UFUNCTION(BlueprintPure)
+	FText GetLocalizedText(FName InNamespace, const FString& InKey) const;
+
+	UFUNCTION(BlueprintPure)
+	FName GetRandomTextKey(FName InNamespace, const FString& InPrefix, int32 InSeed) const;
+
+	//////////////////////////////////////////////////////////////////////////
 	/// Enums
 protected:
 	UPROPERTY(EditAnywhere, Category = "Enums")

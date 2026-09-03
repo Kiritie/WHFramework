@@ -288,26 +288,6 @@ enum class EVoxelAreaType : uint8
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelAreaNameData : public FDataTableRowBase
-{
-	GENERATED_BODY()
-
-public:
-	FVoxelAreaNameData()
-	{
-		AreaType = EVoxelAreaType::Continent;
-		AreaName = FText::GetEmpty();
-	}
-
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	EVoxelAreaType AreaType;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FText AreaName;
-};
-
-USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelMeshUVData
 {
 	GENERATED_BODY()

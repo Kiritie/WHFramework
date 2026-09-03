@@ -45,6 +45,16 @@ UObject* UAssetModuleStatics::LoadObject(UClass* InClass, const FString& InName)
 	return UAssetModule::Get().LoadObject(InClass, InName);
 }
 
+FText UAssetModuleStatics::GetLocalizedText(FName InNamespace, const FString& InKey)
+{
+	return UAssetModule::Get().GetLocalizedText(InNamespace, InKey);
+}
+
+FName UAssetModuleStatics::GetRandomTextKey(FName InNamespace, const FString& InPrefix, int32 InSeed)
+{
+	return UAssetModule::Get().GetRandomTextKey(InNamespace, InPrefix, InSeed);
+}
+
 UEnum* UAssetModuleStatics::FindEnumByValue(const FString& InEnumName, int32 InEnumValue, bool bExactClass)
 {
 	return UAssetModule::Get().FindEnumByValue(InEnumName, InEnumValue, bExactClass);
