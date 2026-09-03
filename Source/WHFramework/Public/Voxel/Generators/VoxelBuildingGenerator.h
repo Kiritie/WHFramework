@@ -44,7 +44,7 @@ public:
 	FVoxelBuildingGenerateData()
 	{
 		PrefabAsset = FPrimaryAssetId();
-		SpawnRange = 1024.f;
+		SpawnInterval = 1024.f;
 		SpawnChance = 1.f;
 		bAllowTerrainAdaptation = false;
 		MaxTerrainSlope = 4;
@@ -55,13 +55,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowedTypes = "VoxelPrefab"))
 	FPrimaryAssetId PrefabAsset;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "1.0", ToolTip = "每个生成分区的边长，单位为格，按区块大小向上对齐；每种建筑每个分区最多一座"))
-	float SpawnRange;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "1.0", ToolTip = "相邻候选点的生成间隔，单位为格；按区块对齐并隔行错开，间距不会小于配置值"))
+	float SpawnInterval;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0", ClampMax = "1.0", ToolTip = "每个固定候选点的生成几率；1 为必定尝试生成，0 为不生成"))
 	float SpawnChance;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ToolTip = "没有合适陆地时允许整平地面或抬高地基；概率为 1 时每个分区都有建筑"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ToolTip = "固定候选点地形不合适时允许整平地面或抬高地基；不改变候选点位置"))
 	bool bAllowTerrainAdaptation;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
@@ -86,6 +86,8 @@ public:
 	virtual void Generate(UVoxelChunk* InChunk) override;
 
 protected:
+	void GetPlacementGrid(int32 InBuildingIndex, FIndex& OutInterval, FIndex& OutOffset) const;
+
 	bool PlaceBuildingSlice(UVoxelChunk* InChunk, int32 InBuildingIndex, const FVoxelBuildingPlacementPlan& InPlan);
 
 	FVoxelBuildingPlacementPlan BuildPlacementPlan(int32 InX, int32 InY, int32 InBuildingIndex, bool bInAdaptTerrain) const;

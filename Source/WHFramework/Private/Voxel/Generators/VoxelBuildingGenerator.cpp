@@ -143,34 +143,55 @@ void UVoxelBuildingGenerator::Initialize(UVoxelModule* InModule, int32 InStage)
 	}
 }
 
+void UVoxelBuildingGenerator::GetPlacementGrid(int32 InBuildingIndex, FIndex& OutInterval, FIndex& OutOffset) const
+{
+	const auto& WorldData = Module->GetWorldData();
+	const auto& Data = GenerateDatas[InBuildingIndex];
+	const int32 Extent = _PrefabCaches[InBuildingIndex].Extent;
+	OutInterval.X = FMath::Max(2, FMath::CeilToInt(FMath::Max(Data.SpawnInterval, float(Extent * 2 + WorldData.ChunkSize.X)) / (WorldData.ChunkSize.X * 2.f)) * 2);
+	OutInterval.Y = FMath::Max(FMath::CeilToInt(OutInterval.X * WorldData.ChunkSize.X * FMath::Sqrt(3.f) * 0.5f / WorldData.ChunkSize.Y),
+		FMath::DivideAndRoundUp(Extent * 2 + WorldData.ChunkSize.Y, WorldData.ChunkSize.Y));
+	OutInterval.Z = 0;
+	FRandomStream Random(HashCombineFast(GetTypeHash(WorldData.WorldSeed ^ Seed), FCrc::StrCrc32(*Data.PrefabAsset.ToString())));
+	OutOffset = FIndex(Random.RandRange(0, OutInterval.X - 1), Random.RandRange(0, OutInterval.Y - 1), 0);
+}
+
 void UVoxelBuildingGenerator::Generate(UVoxelChunk* InChunk)
 {
 	if(!InChunk || !Module) return;
 	const FIndex ChunkSize = Module->GetWorldData().ChunkSize;
 	for(int32 BuildingIndex = 0; BuildingIndex < GenerateDatas.Num(); ++BuildingIndex)
 	{
-		if(!_PrefabAssets[BuildingIndex]) continue;
-		const auto& Data = GenerateDatas[BuildingIndex];
+		if(!_PrefabAssets[BuildingIndex] || GenerateDatas[BuildingIndex].SpawnChance <= 0.f) continue;
 		const int32 Extent = _PrefabCaches[BuildingIndex].Extent;
-		const int32 RangeX = FMath::Max(FMath::CeilToInt(Data.SpawnRange / ChunkSize.X), FMath::DivideAndRoundUp(Extent * 2, ChunkSize.X) + 1);
-		const int32 RangeY = FMath::Max(FMath::CeilToInt(Data.SpawnRange / ChunkSize.Y), FMath::DivideAndRoundUp(Extent * 2, ChunkSize.Y) + 1);
-		const FIndex CellIndex(FMath::FloorToInt(double(InChunk->GetIndex().X) / RangeX), FMath::FloorToInt(double(InChunk->GetIndex().Y) / RangeY), 0);
-		const FVoxelBuildingPlacementPlan Plan = GetOrBuildPlacementPlan(CellIndex, BuildingIndex);
-		if(!Plan.bValid || !PlaceBuildingSlice(InChunk, BuildingIndex, Plan)) continue;
-		if(Plan.AnchorChunkIndex == InChunk->GetIndex())
+		FIndex Interval, Offset;
+		GetPlacementGrid(BuildingIndex, Interval, Offset);
+		const FIndex Margin(FMath::DivideAndRoundUp(Extent, ChunkSize.X), FMath::DivideAndRoundUp(Extent, ChunkSize.Y), 0);
+		const FIndex ChunkIndex = InChunk->GetIndex();
+		for(int32 Y = FMath::CeilToInt(double(ChunkIndex.Y - Margin.Y - Offset.Y) / Interval.Y); Y <= FMath::FloorToInt(double(ChunkIndex.Y + Margin.Y - Offset.Y) / Interval.Y); ++Y)
 		{
-			const FIndex Center = Module->ChunkIndexToVoxelIndex(Plan.AnchorChunkIndex) + FIndex(ChunkSize.X / 2, ChunkSize.Y / 2, 0);
-			const auto& Rotation = _PrefabCaches[BuildingIndex].Rotations[Plan.Rotation];
-			FSceneArea Area;
-			Area.AreaName = *FString::Printf(TEXT("Structure_%d_%d_%d"), BuildingIndex, CellIndex.X, CellIndex.Y);
-			const FText DisplayName = _PrefabAssets[BuildingIndex]->DisplayName.IsEmpty()
-				? UCommonModuleStatics::GetEnumDisplayNameByValue(TEXT("/Script/WHFramework.EVoxelRegionType"), static_cast<int32>(EVoxelRegionType::Building))
-				: _PrefabAssets[BuildingIndex]->DisplayName;
-			Area.AreaDisplayName = Module->GetVoxelAreaName(FIndex(Center.X, Center.Y, Plan.GroundHeight), EVoxelAreaType::Building, DisplayName);
-			Area.AreaShape = ESceneAreaShape::Box;
-			Area.AreaCenter = FVector2D(Center.X + (Rotation.MinX + Rotation.MaxX) * 0.5f, Center.Y + (Rotation.MinY + Rotation.MaxY) * 0.5f);
-			Area.AreaRadius = FVector2D((Rotation.MaxX - Rotation.MinX) * 0.5f + 4.f, (Rotation.MaxY - Rotation.MinY) * 0.5f + 4.f);
-			USceneModuleStatics::AddSceneArea(Area, true);
+			const int32 RowOffset = Offset.X + (Y & 1) * (Interval.X / 2);
+			for(int32 X = FMath::CeilToInt(double(ChunkIndex.X - Margin.X - RowOffset) / Interval.X); X <= FMath::FloorToInt(double(ChunkIndex.X + Margin.X - RowOffset) / Interval.X); ++X)
+			{
+				const FIndex CellIndex(X, Y, 0);
+				const FVoxelBuildingPlacementPlan Plan = GetOrBuildPlacementPlan(CellIndex, BuildingIndex);
+				if(!Plan.bValid || !PlaceBuildingSlice(InChunk, BuildingIndex, Plan)) continue;
+				if(Plan.AnchorChunkIndex == InChunk->GetIndex())
+				{
+					const FIndex Center = Module->ChunkIndexToVoxelIndex(Plan.AnchorChunkIndex) + FIndex(ChunkSize.X / 2, ChunkSize.Y / 2, 0);
+					const auto& Rotation = _PrefabCaches[BuildingIndex].Rotations[Plan.Rotation];
+					FSceneArea Area;
+					Area.AreaName = *FString::Printf(TEXT("Structure_%d_%d_%d"), BuildingIndex, CellIndex.X, CellIndex.Y);
+					const FText DisplayName = _PrefabAssets[BuildingIndex]->DisplayName.IsEmpty()
+						? UCommonModuleStatics::GetEnumDisplayNameByValue(TEXT("/Script/WHFramework.EVoxelRegionType"), static_cast<int32>(EVoxelRegionType::Building))
+						: _PrefabAssets[BuildingIndex]->DisplayName;
+					Area.AreaDisplayName = Module->GetVoxelAreaName(FIndex(Center.X, Center.Y, Plan.GroundHeight), EVoxelAreaType::Building, DisplayName);
+					Area.AreaShape = ESceneAreaShape::Box;
+					Area.AreaCenter = FVector2D(Center.X + (Rotation.MinX + Rotation.MaxX) * 0.5f, Center.Y + (Rotation.MinY + Rotation.MaxY) * 0.5f);
+					Area.AreaRadius = FVector2D((Rotation.MaxX - Rotation.MinX) * 0.5f + 4.f, (Rotation.MaxY - Rotation.MinY) * 0.5f + 4.f);
+					USceneModuleStatics::AddSceneArea(Area, true);
+				}
+			}
 		}
 	}
 }
@@ -267,27 +288,25 @@ FVoxelBuildingPlacementPlan UVoxelBuildingGenerator::GetOrBuildPlacementPlan(FIn
 	const auto& Data = GenerateDatas[InBuildingIndex];
 	const auto& Cache = _PrefabCaches[InBuildingIndex];
 	const FIndex ChunkSize = WorldData.ChunkSize;
-	const int32 RangeX = FMath::Max(FMath::CeilToInt(Data.SpawnRange / ChunkSize.X), FMath::DivideAndRoundUp(Cache.Extent * 2, ChunkSize.X) + 1);
-	const int32 RangeY = FMath::Max(FMath::CeilToInt(Data.SpawnRange / ChunkSize.Y), FMath::DivideAndRoundUp(Cache.Extent * 2, ChunkSize.Y) + 1);
-	const int32 MarginX = FMath::Max(0, FMath::DivideAndRoundUp(Cache.Extent - ChunkSize.X / 2, ChunkSize.X));
-	const int32 MarginY = FMath::Max(0, FMath::DivideAndRoundUp(Cache.Extent - ChunkSize.Y / 2, ChunkSize.Y));
-	uint32 RandomSeed = HashCombineFast(GetTypeHash(Key), FCrc::StrCrc32(*Data.PrefabAsset.ToString()));
-	FRandomStream Random(RandomSeed ^ Seed);
+	FIndex Interval, Offset;
+	GetPlacementGrid(InBuildingIndex, Interval, Offset);
+	FRandomStream Random(HashCombineFast(GetTypeHash(Key), FCrc::StrCrc32(*Data.PrefabAsset.ToString())) ^ Seed);
 	if(Random.FRand() < Data.SpawnChance && Cache.Rotations.Num() == 4)
 	{
-		for(int32 Attempt = 0; Attempt < 16 && !Plan.bValid; ++Attempt)
+		const FIndex Anchor(InCellIndex.X * Interval.X + Offset.X + (InCellIndex.Y & 1) * (Interval.X / 2), InCellIndex.Y * Interval.Y + Offset.Y, 0);
+		const FIndex Center = Module->ChunkIndexToVoxelIndex(Anchor) + FIndex(ChunkSize.X / 2, ChunkSize.Y / 2, 0);
+		bool bOverlaps = false;
+		for(int32 Other = 0; Other < InBuildingIndex && !bOverlaps; ++Other)
 		{
-			const FIndex Anchor(InCellIndex.X * RangeX + Random.RandRange(MarginX, RangeX - MarginX - 1), InCellIndex.Y * RangeY + Random.RandRange(MarginY, RangeY - MarginY - 1), 0);
-			const FIndex Center = Module->ChunkIndexToVoxelIndex(Anchor) + FIndex(ChunkSize.X / 2, ChunkSize.Y / 2, 0);
-			bool bOverlaps = false;
-			for(int32 Other = 0; Other < InBuildingIndex && !bOverlaps; ++Other)
+			if(!_PrefabAssets[Other] || GenerateDatas[Other].SpawnChance <= 0.f) continue;
+			const auto& OtherCache = _PrefabCaches[Other];
+			FIndex OtherInterval, OtherOffset;
+			GetPlacementGrid(Other, OtherInterval, OtherOffset);
+			const FIndex Margin(FMath::DivideAndRoundUp(Cache.Extent + OtherCache.Extent, ChunkSize.X), FMath::DivideAndRoundUp(Cache.Extent + OtherCache.Extent, ChunkSize.Y), 0);
+			for(int32 Y = FMath::CeilToInt(double(Anchor.Y - Margin.Y - OtherOffset.Y) / OtherInterval.Y); Y <= FMath::FloorToInt(double(Anchor.Y + Margin.Y - OtherOffset.Y) / OtherInterval.Y) && !bOverlaps; ++Y)
 			{
-				if(!_PrefabAssets[Other]) continue;
-				const auto& OtherCache = _PrefabCaches[Other];
-				const int32 OtherRangeX = FMath::Max(FMath::CeilToInt(GenerateDatas[Other].SpawnRange / ChunkSize.X), FMath::DivideAndRoundUp(OtherCache.Extent * 2, ChunkSize.X) + 1) * ChunkSize.X;
-				const int32 OtherRangeY = FMath::Max(FMath::CeilToInt(GenerateDatas[Other].SpawnRange / ChunkSize.Y), FMath::DivideAndRoundUp(OtherCache.Extent * 2, ChunkSize.Y) + 1) * ChunkSize.Y;
-				for(int32 X = FMath::FloorToInt(double(Center.X - Cache.Extent) / OtherRangeX); X <= FMath::FloorToInt(double(Center.X + Cache.Extent) / OtherRangeX) && !bOverlaps; ++X)
-				for(int32 Y = FMath::FloorToInt(double(Center.Y - Cache.Extent) / OtherRangeY); Y <= FMath::FloorToInt(double(Center.Y + Cache.Extent) / OtherRangeY) && !bOverlaps; ++Y)
+				const int32 RowOffset = OtherOffset.X + (Y & 1) * (OtherInterval.X / 2);
+				for(int32 X = FMath::CeilToInt(double(Anchor.X - Margin.X - RowOffset) / OtherInterval.X); X <= FMath::FloorToInt(double(Anchor.X + Margin.X - RowOffset) / OtherInterval.X) && !bOverlaps; ++X)
 				{
 					const auto OtherPlan = GetOrBuildPlacementPlan(FIndex(X, Y, 0), Other);
 					if(!OtherPlan.bValid) continue;
@@ -295,8 +314,11 @@ FVoxelBuildingPlacementPlan UVoxelBuildingGenerator::GetOrBuildPlacementPlan(FIn
 					bOverlaps = FMath::Abs(Center.X - OtherCenter.X) < Cache.Extent + OtherCache.Extent && FMath::Abs(Center.Y - OtherCenter.Y) < Cache.Extent + OtherCache.Extent;
 				}
 			}
-			if(bOverlaps) continue;
-			Plan = BuildPlacementPlan(Center.X, Center.Y, InBuildingIndex, Attempt == 15 && Data.bAllowTerrainAdaptation);
+		}
+		if(!bOverlaps)
+		{
+			Plan = BuildPlacementPlan(Center.X, Center.Y, InBuildingIndex, false);
+			if(!Plan.bValid && Data.bAllowTerrainAdaptation) Plan = BuildPlacementPlan(Center.X, Center.Y, InBuildingIndex, true);
 			Plan.AnchorChunkIndex = Anchor;
 		}
 	}
