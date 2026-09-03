@@ -1,7 +1,6 @@
 
 #include "Voxel/Generators/VoxelSurfaceGenerator.h"
 
-#include "Math/MathHelper.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 
@@ -59,7 +58,7 @@ float UVoxelSurfaceGenerator::SampleTemperature(FIndex InWorldIndex, int32 InHei
 	for(int32 Octave = 0; Octave < Octaves; ++Octave)
 	{
 		const FVector2D Position(InWorldIndex.X / ChunkSize.X / Scale + TemperatureSeed, InWorldIndex.Y / ChunkSize.Y / Scale - TemperatureSeed);
-		const float Value = Module->GetVoxelNoise2D(Position) + (FMathHelper::HashRand(Position, TemperatureSeed + Octave * 31) - 0.5f) * 0.05f;
+		const float Value = Module->GetVoxelNoise2D(Position);
 		Result += FMath::Clamp(Value, -1.f, 1.f) / Octaves;
 		Scale *= 2.f;
 	}
@@ -76,7 +75,7 @@ float UVoxelSurfaceGenerator::SampleHumidity(FIndex InWorldIndex) const
 	for(int32 Octave = 0; Octave < Octaves; ++Octave)
 	{
 		const FVector2D Position(InWorldIndex.X / ChunkSize.X / Scale + HumiditySeed, InWorldIndex.Y / ChunkSize.Y / Scale - HumiditySeed);
-		const float Value = Module->GetVoxelNoise2D(Position) + (FMathHelper::HashRand(Position, HumiditySeed + Octave * 37) - 0.5f) * 0.05f;
+		const float Value = Module->GetVoxelNoise2D(Position);
 		Result += FMath::Clamp(Value, -1.f, 1.f) / Octaves;
 		Scale *= 2.f;
 	}

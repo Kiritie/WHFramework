@@ -82,11 +82,12 @@ bool UVoxelLakeGenerator::TryCreateLakeFeature(FIndex InChunkIndex, FVoxelLakeFe
 {
 	const int32 Distance = FMath::Max(MinDistance, 1);
 	if(InChunkIndex.X % Distance != 0 || InChunkIndex.Y % Distance != 0) return false;
+	const FIndex CacheKey(InChunkIndex.X, InChunkIndex.Y, Module->GetWorldData().WorldSeed);
 	{
 		FRWScopeLock Lock(LakeFeatureCacheLock, SLT_ReadOnly);
-		if(EvaluatedLakeAnchors.Contains(InChunkIndex))
+		if(EvaluatedLakeAnchors.Contains(CacheKey))
 		{
-			if(const FVoxelLakeFeature* CachedFeature = LakeFeatureCache.Find(InChunkIndex))
+			if(const FVoxelLakeFeature* CachedFeature = LakeFeatureCache.Find(CacheKey))
 			{
 				OutFeature = *CachedFeature;
 				return true;
@@ -99,9 +100,9 @@ bool UVoxelLakeGenerator::TryCreateLakeFeature(FIndex InChunkIndex, FVoxelLakeFe
 	const bool bCreated = BuildLakeFeature(InChunkIndex, Feature);
 	{
 		FRWScopeLock Lock(LakeFeatureCacheLock, SLT_Write);
-		if(EvaluatedLakeAnchors.Contains(InChunkIndex))
+		if(EvaluatedLakeAnchors.Contains(CacheKey))
 		{
-			if(const FVoxelLakeFeature* CachedFeature = LakeFeatureCache.Find(InChunkIndex))
+			if(const FVoxelLakeFeature* CachedFeature = LakeFeatureCache.Find(CacheKey))
 			{
 				OutFeature = *CachedFeature;
 				return true;
@@ -113,8 +114,8 @@ bool UVoxelLakeGenerator::TryCreateLakeFeature(FIndex InChunkIndex, FVoxelLakeFe
 			EvaluatedLakeAnchors.Reset();
 			LakeFeatureCache.Reset();
 		}
-		EvaluatedLakeAnchors.Add(InChunkIndex);
-		if(bCreated) LakeFeatureCache.Add(InChunkIndex, Feature);
+		EvaluatedLakeAnchors.Add(CacheKey);
+		if(bCreated) LakeFeatureCache.Add(CacheKey, Feature);
 	}
 	if(bCreated) OutFeature = Feature;
 	return bCreated;
@@ -149,6 +150,7 @@ bool UVoxelLakeGenerator::BuildLakeFeature(FIndex InChunkIndex, FVoxelLakeFeatur
 			const FIndex Candidate(X, Y, 0);
 			const float RiverDistance = RiverGenerator->SampleNormalizedRiverDistance(Candidate);
 			const int32 Height = Module->SampleBaseTopographyByIndex(Candidate).Height;
+			if(Height <= Module->GetWorldData().SeaLevel) continue;
 			const float Score = Height + RiverDistance * 10.f;
 			if(Score < BestScore)
 			{
@@ -174,7 +176,9 @@ bool UVoxelLakeGenerator::BuildLakeFeature(FIndex InChunkIndex, FVoxelLakeFeatur
 			{
 				const FIndex Candidate = BestCenter + Direction * StepSize;
 				const float RiverDistance = RiverGenerator->SampleNormalizedRiverDistance(Candidate);
-				const float Score = Module->SampleBaseTopographyByIndex(Candidate).Height + RiverDistance * 8.f;
+				const int32 Height = Module->SampleBaseTopographyByIndex(Candidate).Height;
+				if(Height <= Module->GetWorldData().SeaLevel) continue;
+				const float Score = Height + RiverDistance * 8.f;
 				if(Score < NextScore)
 				{
 					Next = Candidate;
@@ -196,7 +200,7 @@ bool UVoxelLakeGenerator::BuildLakeFeature(FIndex InChunkIndex, FVoxelLakeFeatur
 	const float DirectionJitter = FMathHelper::HashRandRange(Key + FVector2D(-37.f, 41.f), -0.35f, 0.35f, Seed + 457);
 	const float Rotation = FMath::Atan2(RiverDirection.Y, RiverDirection.X) + DirectionJitter;
 	const int32 WaterHeight = RiverGenerator->SampleRiverWaterHeight(BestCenter);
-	if(WaterHeight <= 0) return false;
+	if(WaterHeight <= Module->GetWorldData().SeaLevel) return false;
 
 	OutFeature.Center = FIndex(BestCenter.X, BestCenter.Y, WaterHeight);
 	OutFeature.MajorRadius = MajorRadius;
@@ -236,6 +240,7 @@ bool UVoxelLakeGenerator::EvaluateLake(const FVoxelLakeFeature& InFeature, FInde
 	if(Alpha >= 1.f) return false;
 
 	const int32 BaseHeight = Module->SampleBaseTopographyByIndex(InWorldIndex).Height;
+	if(BaseHeight <= Module->GetWorldData().SeaLevel) return false;
 	const float HeightAboveWater = FMath::Max(static_cast<float>(BaseHeight - InFeature.Center.Z), 0.f);
 	Alpha += HeightAboveWater * 0.16f;
 	if(Alpha >= 1.f) return false;

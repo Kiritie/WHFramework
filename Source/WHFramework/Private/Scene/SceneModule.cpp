@@ -619,7 +619,9 @@ FSceneArea USceneModule::GetSceneAreaByPoint(const FVector2D& InPoint) const
 		{
 			case ESceneAreaShape::Box:
 			{
-				bContains = FMathHelper::IsPointInBox2D(InPoint, Iter.AreaCenter, Iter.AreaRadius);
+				const FVector2D Min = Iter.AreaCenter - Iter.AreaRadius;
+				const FVector2D Max = Iter.AreaCenter + Iter.AreaRadius;
+				bContains = InPoint.X >= Min.X && InPoint.X < Max.X && InPoint.Y >= Min.Y && InPoint.Y < Max.Y;
 				AreaSize = Iter.AreaRadius.X * Iter.AreaRadius.Y * 4.0;
 				break;
 			}
