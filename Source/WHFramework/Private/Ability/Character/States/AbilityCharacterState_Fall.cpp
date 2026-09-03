@@ -3,6 +3,7 @@
 #include "Ability/Character/States/AbilityCharacterState_Fall.h"
 
 #include "Ability/Character/AbilityCharacterBase.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 UAbilityCharacterState_Fall::UAbilityCharacterState_Fall()
 {
@@ -35,7 +36,11 @@ void UAbilityCharacterState_Fall::OnEnter(UFiniteStateBase* InLastState, const T
 	
 	Character->LimitToAnim();
 
-	MaxPosZ = 0.f;
+	MaxPosZ = Character->GetActorLocation().Z;
+	if(Character->GetCharacterMovement()->MovementMode != MOVE_Falling)
+	{
+		Character->GetCharacterMovement()->SetMovementMode(MOVE_Falling);
+	}
 }
 
 void UAbilityCharacterState_Fall::OnRefresh(float DeltaSeconds)

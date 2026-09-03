@@ -270,11 +270,15 @@ void AAbilityCharacterBase::ResetData()
 
 void AAbilityCharacterBase::OnFiniteStateRefresh(UFiniteStateBase* InCurrentState)
 {
+	if(!IsActive()) return;
+	if(InCurrentState && !IsWalking() && !IsJumping() && !IsFalling() && !IsSwimming() && !IsFloating() && !IsFlying()) return;
+
 	switch (GetCharacterMovement()->MovementMode)
 	{
 		case MOVE_Walking:
+		case MOVE_NavWalking:
 		{
-			if(!IsJumping())
+			if(!IsJumping() && !IsWalking())
 			{
 				SwitchFiniteStateByClass<UAbilityCharacterState_Walk>();
 			}
@@ -282,7 +286,31 @@ void AAbilityCharacterBase::OnFiniteStateRefresh(UFiniteStateBase* InCurrentStat
 		}
 		case MOVE_Falling:
 		{
-			SwitchFiniteStateByClass<UAbilityCharacterState_Fall>();
+			if(!IsFalling()) SwitchFiniteStateByClass<UAbilityCharacterState_Fall>();
+			break;
+		}
+		case MOVE_Swimming:
+		{
+			if(!InCurrentState)
+			{
+				SwitchFiniteStateByClass<UAbilityCharacterState_Fall>();
+			}
+			else if(!IsSwimming() && !IsFloating())
+			{
+				Swim();
+			}
+			break;
+		}
+		case MOVE_Flying:
+		{
+			if(!InCurrentState)
+			{
+				SwitchFiniteStateByClass<UAbilityCharacterState_Fall>();
+			}
+			else if(!IsFlying())
+			{
+				Fly();
+			}
 			break;
 		}
 		default: break;
@@ -294,37 +322,16 @@ void AAbilityCharacterBase::OnMovementModeChanged(EMovementMode PrevMovementMode
 	Super::OnMovementModeChanged(PrevMovementMode, PreviousCustomMode);
 
 	if(!IsActive()) return;
-	
-	RefreshFiniteState();
 
-	switch (GetCharacterMovement()->MovementMode)
+	UCharacterMovementComponent* Movement = GetCharacterMovement();
+	APhysicsVolume* PhysicsVolume = Movement->MovementMode == MOVE_Swimming ?
+		USceneModuleStatics::GetPhysicsVolumeByName(FName("Water")) : USceneModuleStatics::GetDefaultPhysicsVolume();
+	if(Movement->UpdatedComponent && PhysicsVolume && Movement->GetPhysicsVolume() != PhysicsVolume)
 	{
-		case MOVE_Walking:
-		{
-			if(GetCharacterMovement()->UpdatedComponent && USceneModuleStatics::GetDefaultPhysicsVolume())
-			{
-				GetCharacterMovement()->UpdatedComponent->SetPhysicsVolume(USceneModuleStatics::GetDefaultPhysicsVolume(), true);
-			}
-			break;
-		}
-		case MOVE_Swimming:
-		{
-			if(GetCharacterMovement()->UpdatedComponent && USceneModuleStatics::HasPhysicsVolumeByName(FName("Water")))
-			{
-				GetCharacterMovement()->UpdatedComponent->SetPhysicsVolume(USceneModuleStatics::GetPhysicsVolumeByName(FName("Water")), true);
-			}
-			break;
-		}
-		case MOVE_Flying:
-		{
-			// if(GetCharacterMovement()->UpdatedComponent && USceneModuleStatics::HasPhysicsVolumeByName(FName("Sky")))
-			// {
-			// 	GetCharacterMovement()->UpdatedComponent->SetPhysicsVolume(USceneModuleStatics::GetPhysicsVolumeByName(FName("Sky")), true);
-			// }
-			break;
-		}
-		default: break;
+		Movement->UpdatedComponent->SetPhysicsVolume(PhysicsVolume, true);
 	}
+
+	RefreshFiniteState();
 }
 
 void AAbilityCharacterBase::Death(IAbilityVitalityInterface* InKiller)

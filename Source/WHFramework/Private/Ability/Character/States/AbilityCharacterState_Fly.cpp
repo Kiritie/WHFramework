@@ -36,7 +36,6 @@ void UAbilityCharacterState_Fly::OnEnter(UFiniteStateBase* InLastState, const TA
 	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Character_Flying);
 
 	Character->LimitToAnim();
-	Character->GetCharacterMovement()->SetMovementMode(MOVE_Flying);
 	Character->GetCharacterMovement()->Velocity = FVector::ZeroVector;
 
 	if(Character->GetCharacterMovement()->MovementMode != MOVE_Flying)
@@ -73,7 +72,10 @@ void UAbilityCharacterState_Fly::OnLeave(UFiniteStateBase* InNextState)
 	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Character_Flying);
 
 	Character->FreeToAnim();
-	Character->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	if(Character->GetCharacterMovement()->MovementMode == MOVE_Flying)
+	{
+		Character->GetCharacterMovement()->SetMovementMode(MOVE_Falling);
+	}
 }
 
 void UAbilityCharacterState_Fly::OnTermination()

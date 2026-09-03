@@ -19,7 +19,7 @@ UFSMComponent::UFSMComponent()
 	DefaultState = nullptr;
 	FinalState = nullptr;
 	CurrentState = nullptr;
-	TargetState = nullptr;
+	bSwitchingState = false;
 
 	States = TArray<TSubclassOf<UFiniteStateBase>>();
 	StateMap = TMap<FName, UFiniteStateBase*>();
@@ -109,37 +109,31 @@ void UFSMComponent::OnTermination()
 
 bool UFSMComponent::SwitchState(UFiniteStateBase* InState, const TArray<FParameter>& InParams)
 {
-	if(!bInitialized || InState == CurrentState || (InState && !HasState(InState)) || CurrentState != TargetState) return false;
-	
-	UFiniteStateBase* LastState = CurrentState;
+	if(!bInitialized || bSwitchingState || InState == CurrentState || (InState && !HasState(InState))) return false;
 
-	if(!LastState || LastState->OnPreLeave(InState))
+	UFiniteStateBase* LastState = CurrentState;
 	{
-		if(!InState || InState->OnPreEnter(LastState, InParams))
+		TGuardValue<bool> SwitchingGuard(bSwitchingState, true);
+		if(LastState && !LastState->OnPreLeave(InState)) return false;
+		if(InState && !InState->OnPreEnter(LastState, InParams)) return false;
+
+		if(LastState)
 		{
-			TargetState = InState;
-			if(LastState)
-			{
-				LastState->OnLeave(InState);
-			}
-			CurrentState = TargetState;
-			if(InState)
-			{
-				InState->OnEnter(LastState, InParams);
-			}
+			LastState->OnLeave(InState);
+		}
+		CurrentState = InState;
+		if(CurrentState)
+		{
+			CurrentState->OnEnter(LastState, InParams);
 		}
 	}
-	if(CurrentState != LastState)
+	GetAgent<IFSMAgentInterface>()->OnFiniteStateChanged(InState, LastState);
+	OnStateChanged.Broadcast(InState, LastState);
+	if(!CurrentState)
 	{
-		GetAgent<IFSMAgentInterface>()->OnFiniteStateChanged(CurrentState, LastState);
-		OnStateChanged.Broadcast(CurrentState, LastState);
-		if(!CurrentState)
-		{
-			RefreshState();
-		}
-		return true;
+		RefreshState();
 	}
-	return false;
+	return true;
 }
 
 bool UFSMComponent::SwitchStateByIndex(int32 InStateIndex, const TArray<FParameter>& InParams)
@@ -228,6 +222,8 @@ bool UFSMComponent::SwitchNextState(const TArray<FParameter>& InParams)
 
 void UFSMComponent::RefreshState()
 {
+	if(!bInitialized || bSwitchingState) return;
+
 	GetAgent<IFSMAgentInterface>()->OnFiniteStateRefresh(CurrentState);
 }
 

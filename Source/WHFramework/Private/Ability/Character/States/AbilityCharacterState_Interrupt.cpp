@@ -33,11 +33,8 @@ void UAbilityCharacterState_Interrupt::OnEnter(UFiniteStateBase* InLastState, co
 {
 	Super::OnEnter(InLastState, InParams);
 
-	if(InParams.IsValidIndex(0))
-	{
-		Duration = InParams[0];
-		RemainTime = Duration;
-	}
+	Duration = InParams.IsValidIndex(0) ? InParams[0].GetFloatValue() : -1.f;
+	RemainTime = Duration;
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 	
@@ -52,10 +49,13 @@ void UAbilityCharacterState_Interrupt::OnRefresh(float DeltaSeconds)
 {
 	Super::OnRefresh(DeltaSeconds);
 
-	RemainTime -= GetWorld()->GetDeltaSeconds();
-	if (RemainTime <= 0.f)
+	if(Duration >= 0.f)
 	{
-		FSM->RefreshState();
+		RemainTime -= DeltaSeconds;
+		if(RemainTime <= 0.f)
+		{
+			GetAgent<AAbilityCharacterBase>()->UnInterrupt();
+		}
 	}
 }
 

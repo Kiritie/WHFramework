@@ -154,7 +154,7 @@ protected:
 	UPROPERTY()
 	TMap<FName, UFiniteStateBase*> StateMap;
 	UPROPERTY()
-	UFiniteStateBase* TargetState;
+	bool bSwitchingState;
 	UPROPERTY()
 	bool bInitialized;
 

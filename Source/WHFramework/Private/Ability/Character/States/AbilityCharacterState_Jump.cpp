@@ -4,7 +4,6 @@
 
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "GameFramework/CharacterMovementComponent.h"
-#include "Scene/SceneModuleStatics.h"
 
 UAbilityCharacterState_Jump::UAbilityCharacterState_Jump()
 {
@@ -38,10 +37,6 @@ void UAbilityCharacterState_Jump::OnEnter(UFiniteStateBase* InLastState, const T
 	if(Character->GetCharacterMovement()->MovementMode != MOVE_Walking)
 	{
 		Character->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
-		if(Character->GetCharacterMovement()->UpdatedComponent)
-		{
-			Character->GetCharacterMovement()->UpdatedComponent->SetPhysicsVolume(USceneModuleStatics::GetDefaultPhysicsVolume(), true);
-		}
 	}
 
 	Character->Jump();
