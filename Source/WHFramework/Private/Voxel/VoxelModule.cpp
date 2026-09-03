@@ -1142,6 +1142,13 @@ void UVoxelModule::UpdateVoxelQueue()
 		for(const EDirectionN Iter : { EDirectionN::Forward, EDirectionN::Right, EDirectionN::Backward, EDirectionN::Left })
 		{
 			LiquidEvaluationIndexSet.Add(Index + FMathHelper::DirectionToIndex(Iter) + FIndex(0, 0, -1));
+			LiquidEvaluationIndexSet.Add(Index + FMathHelper::DirectionToIndex(Iter) + FIndex(0, 0, 1));
+		}
+		for(const int32 X : { -1, 1 })
+		for(const int32 Y : { -1, 1 })
+		{
+			LiquidEvaluationIndexSet.Add(Index + FIndex(X, Y, 0));
+			LiquidEvaluationIndexSet.Add(Index + FIndex(X, Y, 1));
 		}
 	}
 	TMap<FIndex, FVoxelLiquidSnapshot> LiquidSnapshots;
@@ -1157,6 +1164,13 @@ void UVoxelModule::UpdateVoxelQueue()
 			SnapshotIndices.Add(NeighborIndex + FIndex(0, 0, 1));
 			SnapshotIndices.Add(NeighborIndex + FIndex(0, 0, -1));
 			SnapshotIndices.Add(NeighborIndex + FIndex(0, 0, -2));
+		}
+		for(const int32 X : { -1, 1 })
+		for(const int32 Y : { -1, 1 })
+		{
+			SnapshotIndices.Add(Index + FIndex(X, Y, 0));
+			SnapshotIndices.Add(Index + FIndex(X, Y, -1));
+			SnapshotIndices.Add(Index + FIndex(X, Y, -2));
 		}
 		for(const FIndex& SnapshotIndex : SnapshotIndices)
 		{

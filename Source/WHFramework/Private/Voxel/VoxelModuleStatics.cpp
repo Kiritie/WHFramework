@@ -18,6 +18,26 @@ namespace
 		TMap<FIndex, FVoxelLiquidUpdate> Updates;
 		TMap<FIndex, FVoxelLiquidState> DesiredStates;
 		TQueue<FIndex> PendingIndices;
+		auto IsSource = [](const FVoxelLiquidSnapshot* InSnapshot)
+		{
+			return InSnapshot && InSnapshot->bGenerated && InSnapshot->VoxelType == EVoxelType::Water && FVoxelLiquidState(InSnapshot->Data).IsSource();
+		};
+		auto HasSourceNeighbor = [&IsSource, &InFindSnapshot](FIndex InIndex, bool bIncludeCorners = false)
+		{
+			for(const EDirectionN Direction : { EDirectionN::Forward, EDirectionN::Right, EDirectionN::Backward, EDirectionN::Left })
+			{
+				if(IsSource(InFindSnapshot(InIndex + FMathHelper::DirectionToIndex(Direction)))) return true;
+			}
+			if(bIncludeCorners)
+			{
+				for(const int32 X : { -1, 1 })
+				for(const int32 Y : { -1, 1 })
+				{
+					if(IsSource(InFindSnapshot(InIndex + FIndex(X, Y, 0)))) return true;
+				}
+			}
+			return false;
+		};
 		auto IsOpen = [](const FVoxelLiquidSnapshot* InSnapshot)
 		{
 			return InSnapshot && InSnapshot->bGenerated &&
@@ -40,7 +60,7 @@ namespace
 			}
 			return Depth;
 		};
-		auto AddDesiredState = [&InFindSnapshot, &DesiredStates, &PendingIndices](FIndex InIndex, const FVoxelLiquidState& InState)
+		auto AddDesiredState = [&InFindSnapshot, &DesiredStates, &PendingIndices, &IsSource, &HasSourceNeighbor](FIndex InIndex, const FVoxelLiquidState& InState)
 		{
 			const FVoxelLiquidSnapshot* Snapshot = InFindSnapshot(InIndex);
 			if(!Snapshot || !Snapshot->bGenerated) return;
@@ -58,6 +78,9 @@ namespace
 				}
 			}
 			else if(Snapshot->VoxelType != EVoxelType::Empty && !Snapshot->bCanFlowThrough) return;
+
+			if(!InState.IsFalling() && InState.GetLevel() > FVoxelLiquidState::MaxSurfaceLevel &&
+				IsSource(InFindSnapshot(InIndex + FIndex(0, 0, -1)))) return;
 
 			FVoxelLiquidState* State = DesiredStates.Find(InIndex);
 			if(State)
@@ -98,6 +121,9 @@ namespace
 			const int32 OpenDepth = GetOpenDepth(Index);
 			if(OpenDepth == INDEX_NONE) continue;
 			const FIndex BelowIndex = Index + FIndex(0, 0, -1);
+			const bool bSourceBelow = IsSource(InFindSnapshot(BelowIndex));
+			if(!State.IsSource() && OpenDepth > 0 && HasSourceNeighbor(BelowIndex)) continue;
+			if(!State.IsSource() && bSourceBelow && (State.IsFalling() || State.GetLevel() >= FVoxelLiquidState::MaxSurfaceLevel)) continue;
 			if(State.IsFalling())
 			{
 				if(OpenDepth > 0)
@@ -119,6 +145,20 @@ namespace
 				continue;
 			}
 
+			if(!State.IsFalling() && State.GetLevel() < FVoxelLiquidState::MaxSurfaceLevel)
+			{
+				for(const int32 X : { -1, 1 })
+				for(const int32 Y : { -1, 1 })
+				{
+					const FIndex CornerIndex = Index + FIndex(X, Y, 0);
+					if(IsSource(InFindSnapshot(CornerIndex + FIndex(0, 0, -1))) &&
+						CanFlowInto(InFindSnapshot(Index + FIndex(X, 0, 0))) && CanFlowInto(InFindSnapshot(Index + FIndex(0, Y, 0))))
+					{
+						AddDesiredState(CornerIndex, FVoxelLiquidState(State.GetLevel() + 1));
+					}
+				}
+			}
+
 			const uint8 NextLevel = State.GetLevel() + 1;
 			if(NextLevel <= FVoxelLiquidState::MaxLevel)
 			{
@@ -132,7 +172,7 @@ namespace
 					if(NeighborOpenDepth == 1)
 					{
 						const FIndex DropIndex = NeighborIndex + FIndex(0, 0, -1);
-						AddDesiredState(DropIndex, FVoxelLiquidState(NextLevel));
+						if(!HasSourceNeighbor(DropIndex)) AddDesiredState(DropIndex, FVoxelLiquidState(NextLevel));
 					}
 					else if(NeighborOpenDepth > 1)
 					{
@@ -235,6 +275,18 @@ bool UVoxelModuleStatics::CalculateVoxelLiquidUpdate(FIndex InIndex, const TMap<
 
 	bool bHasState = false;
 	FVoxelLiquidState DesiredState;
+	auto IsSource = [](const FVoxelLiquidSnapshot* InSnapshot)
+	{
+		return InSnapshot && InSnapshot->bGenerated && InSnapshot->VoxelType == EVoxelType::Water && FVoxelLiquidState(InSnapshot->Data).IsSource();
+	};
+	auto HasSourceNeighbor = [&IsSource, &InSnapshots](FIndex InIndex)
+	{
+		for(const EDirectionN Direction : { EDirectionN::Forward, EDirectionN::Right, EDirectionN::Backward, EDirectionN::Left })
+		{
+			if(IsSource(InSnapshots.Find(InIndex + FMathHelper::DirectionToIndex(Direction)))) return true;
+		}
+		return false;
+	};
 	auto IsOpen = [](const FVoxelLiquidSnapshot* InSnapshot)
 	{
 		return InSnapshot && InSnapshot->bGenerated &&
@@ -256,11 +308,13 @@ bool UVoxelModuleStatics::CalculateVoxelLiquidUpdate(FIndex InIndex, const TMap<
 
 	const FIndex AboveIndex = InIndex + FIndex(0, 0, 1);
 	const int32 OpenDepth = GetOpenDepth(InIndex);
+	const bool bSourceBelow = IsSource(InSnapshots.Find(InIndex + FIndex(0, 0, -1)));
+	const bool bSourceBeside = HasSourceNeighbor(InIndex);
 	const FVoxelLiquidSnapshot* Above = InSnapshots.Find(AboveIndex);
 	if(Above && Above->bGenerated && Above->VoxelType == EVoxelType::Water)
 	{
 		const FVoxelLiquidState AboveState(Above->Data);
-		if(AboveState.IsSource() || AboveState.IsFalling())
+		if(AboveState.IsSource() || AboveState.IsFalling() && !bSourceBeside)
 		{
 			DesiredState = FVoxelLiquidState(0, true);
 			bHasState = true;
@@ -279,7 +333,7 @@ bool UVoxelModuleStatics::CalculateVoxelLiquidUpdate(FIndex InIndex, const TMap<
 			break;
 		}
 	}
-	if(!bHasState && Above && Above->bGenerated && Above->VoxelType == EVoxelType::Water)
+	if(!bHasState && !bSourceBelow && !bSourceBeside && Above && Above->bGenerated && Above->VoxelType == EVoxelType::Water)
 	{
 		const FVoxelLiquidState AboveState(Above->Data);
 		if(!AboveState.IsSource() && !AboveState.IsFalling() && GetOpenDepth(AboveIndex) == 1 && AboveState.GetLevel() < FVoxelLiquidState::MaxLevel)
@@ -293,7 +347,7 @@ bool UVoxelModuleStatics::CalculateVoxelLiquidUpdate(FIndex InIndex, const TMap<
 		uint8 Level = FVoxelLiquidState::MaxLevel + 1;
 		const FIndex DropTopIndex = InIndex + FIndex(0, 0, 1);
 		const int32 DropDepth = GetOpenDepth(DropTopIndex);
-		if(DropDepth == 1)
+		if(!bSourceBelow && !bSourceBeside && DropDepth == 1 && IsOpen(InSnapshots.Find(DropTopIndex)))
 		{
 			for(const EDirectionN Direction : { EDirectionN::Forward, EDirectionN::Right, EDirectionN::Backward, EDirectionN::Left })
 			{
@@ -302,6 +356,7 @@ bool UVoxelModuleStatics::CalculateVoxelLiquidUpdate(FIndex InIndex, const TMap<
 				if(!UpperNeighbor || !UpperNeighbor->bGenerated || UpperNeighbor->VoxelType != EVoxelType::Water ||
 					GetOpenDepth(UpperNeighborIndex) != 0) continue;
 				const FVoxelLiquidState UpperNeighborState(UpperNeighbor->Data);
+				if(!UpperNeighborState.IsSource() && IsSource(InSnapshots.Find(UpperNeighborIndex + FIndex(0, 0, -1)))) continue;
 				Level = FMath::Min<uint8>(Level, UpperNeighborState.GetLevel() + 1);
 			}
 		}
@@ -321,9 +376,29 @@ bool UVoxelModuleStatics::CalculateVoxelLiquidUpdate(FIndex InIndex, const TMap<
 				const FIndex NeighborIndex = InIndex + FMathHelper::DirectionToIndex(Direction);
 				const FVoxelLiquidSnapshot* Neighbor = InSnapshots.Find(NeighborIndex);
 				if(!Neighbor || !Neighbor->bGenerated || Neighbor->VoxelType != EVoxelType::Water || GetOpenDepth(NeighborIndex) != 0) continue;
-				Level = FMath::Min<uint8>(Level, FVoxelLiquidState(Neighbor->Data).GetLevel() + 1);
+				const FVoxelLiquidState NeighborState(Neighbor->Data);
+				const bool bNeighborSourceBelow = IsSource(InSnapshots.Find(NeighborIndex + FIndex(0, 0, -1)));
+				if(bSourceBelow && !NeighborState.IsSource() && (NeighborState.IsFalling() || !bNeighborSourceBelow || NeighborState.GetLevel() >= FVoxelLiquidState::MaxSurfaceLevel)) continue;
+				if(!bSourceBelow && !NeighborState.IsSource() && bNeighborSourceBelow) continue;
+				Level = FMath::Min<uint8>(Level, NeighborState.GetLevel() + 1);
 			}
-			if(Level <= FVoxelLiquidState::MaxLevel)
+			if(bSourceBelow)
+			{
+				for(const int32 X : { -1, 1 })
+				for(const int32 Y : { -1, 1 })
+				{
+					const FIndex NeighborIndex = InIndex + FIndex(X, Y, 0);
+					const FVoxelLiquidSnapshot* Neighbor = InSnapshots.Find(NeighborIndex);
+					if(!Neighbor || !Neighbor->bGenerated || Neighbor->VoxelType != EVoxelType::Water || GetOpenDepth(NeighborIndex) != 0 ||
+						!IsOpen(InSnapshots.Find(InIndex + FIndex(X, 0, 0))) || !IsOpen(InSnapshots.Find(InIndex + FIndex(0, Y, 0)))) continue;
+					const FVoxelLiquidState NeighborState(Neighbor->Data);
+					if(!NeighborState.IsSource() && (NeighborState.IsFalling() ||
+						!IsSource(InSnapshots.Find(NeighborIndex + FIndex(0, 0, -1))) || NeighborState.GetLevel() >= FVoxelLiquidState::MaxSurfaceLevel)) continue;
+					Level = FMath::Min<uint8>(Level, NeighborState.GetLevel() + 1);
+				}
+			}
+			const uint8 MaxLevel = bSourceBelow ? FVoxelLiquidState::MaxSurfaceLevel : FVoxelLiquidState::MaxLevel;
+			if(Level <= MaxLevel)
 			{
 				DesiredState = FVoxelLiquidState(Level);
 				bHasState = true;

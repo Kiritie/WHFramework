@@ -413,6 +413,7 @@ public:
 struct WHFRAMEWORK_API FVoxelLiquidState
 {
 	static constexpr uint8 MaxLevel = 7;
+	static constexpr uint8 MaxSurfaceLevel = 3;
 
 	uint8 Level;
 	bool bFalling;
