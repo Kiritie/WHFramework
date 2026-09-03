@@ -67,7 +67,7 @@ FString UAbilityItemDataBase::GetItemAbilityInfo(int32 InLevel) const
 				if(Iter2.BaseAttribute.IsValid())
 				{
 					FText BaseAttributeName = UCommonModuleStatics::GetPropertyDisplayName(Iter2.BaseAttribute.GetUProperty());
-					AbilityInfoStr.Appendf(TEXT("%s: %s%s%s\n"), *AttributeName.ToString(), *FString::Printf(TEXT("%d%%"), (int32)(Iter2.Value * 100)), Iter2.AttributeSource == EGameplayEffectAttributeCaptureSource::Source ? TEXT("自身") : TEXT("目标"), *BaseAttributeName.ToString());
+					AbilityInfoStr += (Iter2.AttributeSource == EGameplayEffectAttributeCaptureSource::Source ? FText::Format(NSLOCTEXT("WH.AbilityItem", "SourceAttribute", "{0}: {1}%自身{2}\n"), AttributeName, FText::AsNumber((int32)(Iter2.Value * 100)), BaseAttributeName) : FText::Format(NSLOCTEXT("WH.AbilityItem", "TargetAttribute", "{0}: {1}%目标{2}\n"), AttributeName, FText::AsNumber((int32)(Iter2.Value * 100)), BaseAttributeName)).ToString();
 				}
 				else
 				{
@@ -77,21 +77,21 @@ FString UAbilityItemDataBase::GetItemAbilityInfo(int32 InLevel) const
 			}
 			if(Iter1.Period > 0.f)
 			{
-				AbilityInfoStr.Appendf(TEXT("%%触发周期: %ss\n"), *UCommonModuleStatics::SanitizeFloat(Iter1.Period, 2));
+				AbilityInfoStr += FText::Format(NSLOCTEXT("WH.AbilityItem", "Period", "触发周期: {0}s\n"), FText::FromString(UCommonModuleStatics::SanitizeFloat(Iter1.Period, 2))).ToString();
 			}
 			if(Iter1.Duration > 0.f)
 			{
-				AbilityInfoStr.Appendf(TEXT("%%持续时间: %ss\n"), *UCommonModuleStatics::SanitizeFloat(Iter1.Duration, 2));
+				AbilityInfoStr += FText::Format(NSLOCTEXT("WH.AbilityItem", "Duration", "持续时间: {0}s\n"), FText::FromString(UCommonModuleStatics::SanitizeFloat(Iter1.Duration, 2))).ToString();
 			}
 		}
 		if(AbilityInfo.CooldownDuration > 0.f)
 		{
-			AbilityInfoStr.Appendf(TEXT("冷却时间: %ss\n"), *UCommonModuleStatics::SanitizeFloat(AbilityInfo.CooldownDuration, 2));
+			AbilityInfoStr += FText::Format(NSLOCTEXT("WH.AbilityItem", "Cooldown", "冷却时间: {0}s\n"), FText::FromString(UCommonModuleStatics::SanitizeFloat(AbilityInfo.CooldownDuration, 2))).ToString();
 		}
 		if(FMath::Abs(AbilityInfo.CostValue) > 0.f)
 		{
 			FText AttributeName = UCommonModuleStatics::GetPropertyDisplayName(AbilityInfo.CostAttribute.GetUProperty());
-			AbilityInfoStr.Appendf(TEXT("消耗: %s%s\n"), *UCommonModuleStatics::SanitizeFloat(FMath::Abs(AbilityInfo.CostValue), 2), *AttributeName.ToString());
+			AbilityInfoStr += FText::Format(NSLOCTEXT("WH.AbilityItem", "Cost", "消耗: {0}{1}\n"), FText::FromString(UCommonModuleStatics::SanitizeFloat(FMath::Abs(AbilityInfo.CostValue), 2)), AttributeName).ToString();
 		}
 		
 		AbilityInfoStr.RemoveFromEnd(TEXT("\n"));
@@ -110,7 +110,7 @@ FString UAbilityItemDataBase::GetItemErrorInfo(FAbilityItem InItem) const
 		{
 			if(AbilityActor->GetLevelA() < InItem.Level)
 			{
-				ErrorInfo = FString::Printf(TEXT("角色未达到[%d]级"), InItem.Level);
+				ErrorInfo = FText::Format(NSLOCTEXT("WH.AbilityItem", "RequiredLevel", "角色未达到[{0}]级"), FText::AsNumber(InItem.Level)).ToString();
 			}
 		}
 	}

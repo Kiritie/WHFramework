@@ -11,7 +11,7 @@
 
 UWidgetWidgetSettingPageBase::UWidgetWidgetSettingPageBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	Title = FText::FromString(TEXT("界面"));
+	Title = NSLOCTEXT("WH.WidgetWidgetSettingPageBase", "Interface", "界面");
 }
 
 void UWidgetWidgetSettingPageBase::OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams)
@@ -20,13 +20,13 @@ void UWidgetWidgetSettingPageBase::OnCreate(UUserWidget* InOwner, const TArray<F
 
 	TArray<FString> LanguageNames;
 	ITER_ARRAY(UWidgetModuleStatics::GetWidgetLanguageTypes(), Item, LanguageNames.Add(Item.DisplayName); )
-	SettingItem_LanguageType = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { FText::FromString(TEXT("界面语言")), &LanguageNames }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_LanguageType = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetWidgetSettingPageBase", "InterfaceLanguage", "界面语言"), &LanguageNames }, USettingModule::Get().GetEnumSettingItemClass());
 	SettingItem_LanguageType->SetValue(UWidgetModuleStatics::GetWidgetLanguageType());
-	AddSettingItem(FName("LanguageType"), SettingItem_LanguageType, FText::FromString(TEXT("全局")));
+	AddSettingItem(FName("LanguageType"), SettingItem_LanguageType, NSLOCTEXT("WH.WidgetWidgetSettingPageBase", "Global", "全局"));
 
-	SettingItem_GlobalScale = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(nullptr, { FText::FromString(TEXT("界面缩放")), 0.f, 2.f, 0.f, 100.f }, USettingModule::Get().GetFloatSettingItemClass());
+	SettingItem_GlobalScale = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetWidgetSettingPageBase", "UiScale", "界面缩放"), 0.f, 2.f, 0.f, 100.f }, USettingModule::Get().GetFloatSettingItemClass());
 	SettingItem_GlobalScale->SetValue(UWidgetModuleStatics::GetWidgetGlobalScale());
-	AddSettingItem(FName("GlobalScale"), SettingItem_GlobalScale, FText::FromString(TEXT("全局")));
+	AddSettingItem(FName("GlobalScale"), SettingItem_GlobalScale, NSLOCTEXT("WH.WidgetWidgetSettingPageBase", "Global", "全局"));
 }
 
 void UWidgetWidgetSettingPageBase::OnApply()

@@ -14,7 +14,7 @@
 
 UWidgetParameterSettingPageBase::UWidgetParameterSettingPageBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	Title = FText::FromString(TEXT("参数"));
+	Title = NSLOCTEXT("WH.WidgetParameterSettingPageBase", "Parameters", "参数");
 }
 
 void UWidgetParameterSettingPageBase::OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams)

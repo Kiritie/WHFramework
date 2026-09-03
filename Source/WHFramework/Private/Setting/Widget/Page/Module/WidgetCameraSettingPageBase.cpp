@@ -12,7 +12,7 @@
 
 UWidgetCameraSettingPageBase::UWidgetCameraSettingPageBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	Title = FText::FromString(TEXT("摄像机"));
+	Title = NSLOCTEXT("WH.WidgetCameraSettingPageBase", "Camera", "摄像机");
 
 	MinCameraMoveRate = 100.f;
 	MaxCameraMoveRate = 1000.f;
@@ -40,57 +40,57 @@ void UWidgetCameraSettingPageBase::OnCreate(UUserWidget* InOwner, const TArray<F
 {
 	Super::OnCreate(InOwner, InParams);
 	
-	SettingItem_EnableCameraPanZMove = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { FText::FromString(TEXT("垂直平移")) }, USettingModule::Get().GetBoolSettingItemClass());
+	SettingItem_EnableCameraPanZMove = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetCameraSettingPageBase", "VerticalPanning", "垂直平移") }, USettingModule::Get().GetBoolSettingItemClass());
 	SettingItem_EnableCameraPanZMove->SetValue(UCameraModule::Get().IsEnableCameraPanZMove());
-	AddSettingItem(FName("EnableCameraPanZMove"), SettingItem_EnableCameraPanZMove, FText::FromString(TEXT("移动")));
+	AddSettingItem(FName("EnableCameraPanZMove"), SettingItem_EnableCameraPanZMove, NSLOCTEXT("WH.WidgetCameraSettingPageBase", "Movement", "移动"));
 	
-	SettingItem_ReverseCameraPanMove = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { FText::FromString(TEXT("平移反转")) }, USettingModule::Get().GetBoolSettingItemClass());
+	SettingItem_ReverseCameraPanMove = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetCameraSettingPageBase", "InvertPanning", "平移反转") }, USettingModule::Get().GetBoolSettingItemClass());
 	SettingItem_ReverseCameraPanMove->SetValue(UCameraModule::Get().IsReverseCameraPanMove());
-	AddSettingItem(FName("ReverseCameraPanMove"), SettingItem_ReverseCameraPanMove, FText::FromString(TEXT("移动")));
+	AddSettingItem(FName("ReverseCameraPanMove"), SettingItem_ReverseCameraPanMove, NSLOCTEXT("WH.WidgetCameraSettingPageBase", "Movement", "移动"));
 
-	SettingItem_CameraMoveRate = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(nullptr, { FText::FromString(TEXT("移动速度")), MinCameraMoveRate, MaxCameraMoveRate, 0 }, USettingModule::Get().GetFloatSettingItemClass());
+	SettingItem_CameraMoveRate = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetCameraSettingPageBase", "MovementSpeed", "移动速度"), MinCameraMoveRate, MaxCameraMoveRate, 0 }, USettingModule::Get().GetFloatSettingItemClass());
 	SettingItem_CameraMoveRate->SetValue(UCameraModule::Get().GetCameraMoveRate());
-	AddSettingItem(FName("CameraMoveRate"), SettingItem_CameraMoveRate, FText::FromString(TEXT("移动")));
+	AddSettingItem(FName("CameraMoveRate"), SettingItem_CameraMoveRate, NSLOCTEXT("WH.WidgetCameraSettingPageBase", "Movement", "移动"));
 
-	SettingItem_SmoothCameraMove = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { FText::FromString(TEXT("平滑移动")) }, USettingModule::Get().GetBoolSettingItemClass());
+	SettingItem_SmoothCameraMove = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetCameraSettingPageBase", "SmoothMovement", "平滑移动") }, USettingModule::Get().GetBoolSettingItemClass());
 	SettingItem_SmoothCameraMove->SetValue(UCameraModule::Get().IsSmoothCameraMove());
-	AddSettingItem(FName("SmoothCameraMove"), SettingItem_SmoothCameraMove, FText::FromString(TEXT("移动")));
+	AddSettingItem(FName("SmoothCameraMove"), SettingItem_SmoothCameraMove, NSLOCTEXT("WH.WidgetCameraSettingPageBase", "Movement", "移动"));
 
-	SettingItem_CameraMoveSpeed = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(nullptr, { FText::FromString(TEXT("平滑速率")), MinCameraMoveSpeed, MaxCameraMoveSpeed, 0 }, USettingModule::Get().GetFloatSettingItemClass());
+	SettingItem_CameraMoveSpeed = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetCameraSettingPageBase", "SmoothingSpeed", "平滑速率"), MinCameraMoveSpeed, MaxCameraMoveSpeed, 0 }, USettingModule::Get().GetFloatSettingItemClass());
 	SettingItem_CameraMoveSpeed->SetValue(UCameraModule::Get().GetCameraMoveSpeed());
-	AddSettingItem(FName("CameraMoveSpeed"), SettingItem_CameraMoveSpeed, FText::FromString(TEXT("移动")));
+	AddSettingItem(FName("CameraMoveSpeed"), SettingItem_CameraMoveSpeed, NSLOCTEXT("WH.WidgetCameraSettingPageBase", "Movement", "移动"));
 
-	SettingItem_ReverseCameraPitch = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { FText::FromString(TEXT("垂直反转")) }, USettingModule::Get().GetBoolSettingItemClass());
+	SettingItem_ReverseCameraPitch = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetCameraSettingPageBase", "InvertVerticalLook", "垂直反转") }, USettingModule::Get().GetBoolSettingItemClass());
 	SettingItem_ReverseCameraPitch->SetValue(UCameraModule::Get().IsReverseCameraPitch());
-	AddSettingItem(FName("ReverseCameraPitch"), SettingItem_ReverseCameraPitch, FText::FromString(TEXT("旋转")));
+	AddSettingItem(FName("ReverseCameraPitch"), SettingItem_ReverseCameraPitch, NSLOCTEXT("WH.WidgetCameraSettingPageBase", "Rotation", "旋转"));
 
-	SettingItem_CameraTurnRate = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(nullptr, { FText::FromString(TEXT("水平速度")), MinCameraTurnRate, MaxCameraTurnRate, 0 }, USettingModule::Get().GetFloatSettingItemClass());
+	SettingItem_CameraTurnRate = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetCameraSettingPageBase", "HorizontalSensitivity", "水平速度"), MinCameraTurnRate, MaxCameraTurnRate, 0 }, USettingModule::Get().GetFloatSettingItemClass());
 	SettingItem_CameraTurnRate->SetValue(UCameraModule::Get().GetCameraTurnRate());
-	AddSettingItem(FName("CameraTurnRate"), SettingItem_CameraTurnRate, FText::FromString(TEXT("旋转")));
+	AddSettingItem(FName("CameraTurnRate"), SettingItem_CameraTurnRate, NSLOCTEXT("WH.WidgetCameraSettingPageBase", "Rotation", "旋转"));
 
-	SettingItem_CameraLookUpRate = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(nullptr, { FText::FromString(TEXT("垂直速度")), MinCameraLookUpRate, MaxCameraLookUpRate, 0 }, USettingModule::Get().GetFloatSettingItemClass());
+	SettingItem_CameraLookUpRate = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetCameraSettingPageBase", "VerticalSensitivity", "垂直速度"), MinCameraLookUpRate, MaxCameraLookUpRate, 0 }, USettingModule::Get().GetFloatSettingItemClass());
 	SettingItem_CameraLookUpRate->SetValue(UCameraModule::Get().GetCameraLookUpRate());
-	AddSettingItem(FName("CameraLookUpRate"), SettingItem_CameraLookUpRate, FText::FromString(TEXT("旋转")));
+	AddSettingItem(FName("CameraLookUpRate"), SettingItem_CameraLookUpRate, NSLOCTEXT("WH.WidgetCameraSettingPageBase", "Rotation", "旋转"));
 
-	SettingItem_SmoothCameraRotate = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { FText::FromString(TEXT("平滑旋转")) }, USettingModule::Get().GetBoolSettingItemClass());
+	SettingItem_SmoothCameraRotate = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetCameraSettingPageBase", "SmoothRotation", "平滑旋转") }, USettingModule::Get().GetBoolSettingItemClass());
 	SettingItem_SmoothCameraRotate->SetValue(UCameraModule::Get().IsSmoothCameraRotate());
-	AddSettingItem(FName("SmoothCameraRotate"), SettingItem_SmoothCameraRotate, FText::FromString(TEXT("旋转")));
+	AddSettingItem(FName("SmoothCameraRotate"), SettingItem_SmoothCameraRotate, NSLOCTEXT("WH.WidgetCameraSettingPageBase", "Rotation", "旋转"));
 
-	SettingItem_CameraRotateSpeed = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(nullptr, { FText::FromString(TEXT("平滑速率")), MinCameraRotateSpeed, MaxCameraRotateSpeed, 0 }, USettingModule::Get().GetFloatSettingItemClass());
+	SettingItem_CameraRotateSpeed = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetCameraSettingPageBase", "SmoothingSpeed", "平滑速率"), MinCameraRotateSpeed, MaxCameraRotateSpeed, 0 }, USettingModule::Get().GetFloatSettingItemClass());
 	SettingItem_CameraRotateSpeed->SetValue(UCameraModule::Get().GetCameraRotateSpeed());
-	AddSettingItem(FName("CameraRotateSpeed"), SettingItem_CameraRotateSpeed, FText::FromString(TEXT("旋转")));
+	AddSettingItem(FName("CameraRotateSpeed"), SettingItem_CameraRotateSpeed, NSLOCTEXT("WH.WidgetCameraSettingPageBase", "Rotation", "旋转"));
 
-	SettingItem_CameraZoomRate = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(nullptr, { FText::FromString(TEXT("缩放速度")), MinCameraZoomRate, MaxCameraZoomRate, 0 }, USettingModule::Get().GetFloatSettingItemClass());
+	SettingItem_CameraZoomRate = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetCameraSettingPageBase", "ZoomSpeed", "缩放速度"), MinCameraZoomRate, MaxCameraZoomRate, 0 }, USettingModule::Get().GetFloatSettingItemClass());
 	SettingItem_CameraZoomRate->SetValue(UCameraModule::Get().GetCameraZoomRate());
-	AddSettingItem(FName("CameraZoomRate"), SettingItem_CameraZoomRate, FText::FromString(TEXT("缩放")));
+	AddSettingItem(FName("CameraZoomRate"), SettingItem_CameraZoomRate, NSLOCTEXT("WH.WidgetCameraSettingPageBase", "Zoom", "缩放"));
 
-	SettingItem_SmoothCameraZoom = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { FText::FromString(TEXT("平滑缩放")) }, USettingModule::Get().GetBoolSettingItemClass());
+	SettingItem_SmoothCameraZoom = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetCameraSettingPageBase", "SmoothZoom", "平滑缩放") }, USettingModule::Get().GetBoolSettingItemClass());
 	SettingItem_SmoothCameraZoom->SetValue(UCameraModule::Get().IsSmoothCameraZoom());
-	AddSettingItem(FName("SmoothCameraZoom"), SettingItem_SmoothCameraZoom, FText::FromString(TEXT("缩放")));
+	AddSettingItem(FName("SmoothCameraZoom"), SettingItem_SmoothCameraZoom, NSLOCTEXT("WH.WidgetCameraSettingPageBase", "Zoom", "缩放"));
 
-	SettingItem_CameraZoomSpeed = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(nullptr, { FText::FromString(TEXT("平滑速率")), MinCameraZoomSpeed, MaxCameraZoomSpeed, 0 }, USettingModule::Get().GetFloatSettingItemClass());
+	SettingItem_CameraZoomSpeed = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetCameraSettingPageBase", "SmoothingSpeed", "平滑速率"), MinCameraZoomSpeed, MaxCameraZoomSpeed, 0 }, USettingModule::Get().GetFloatSettingItemClass());
 	SettingItem_CameraZoomSpeed->SetValue(UCameraModule::Get().GetCameraZoomSpeed());
-	AddSettingItem(FName("CameraZoomSpeed"), SettingItem_CameraZoomSpeed, FText::FromString(TEXT("缩放")));
+	AddSettingItem(FName("CameraZoomSpeed"), SettingItem_CameraZoomSpeed, NSLOCTEXT("WH.WidgetCameraSettingPageBase", "Zoom", "缩放"));
 }
 
 void UWidgetCameraSettingPageBase::OnApply()

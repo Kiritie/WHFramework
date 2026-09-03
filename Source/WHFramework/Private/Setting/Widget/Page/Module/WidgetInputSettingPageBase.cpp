@@ -13,7 +13,7 @@
 
 UWidgetInputSettingPageBase::UWidgetInputSettingPageBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	Title = FText::FromString(TEXT("输入"));
+	Title = NSLOCTEXT("WH.WidgetInputSettingPageBase", "Input", "输入");
 }
 
 void UWidgetInputSettingPageBase::OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams)
