@@ -148,6 +148,18 @@ void UVoxelTownGenerator::ApplyTownSlice(UVoxelChunk* InChunk, const TMap<FIndex
 {
 	const FIndex ChunkOrigin = InChunk->GetWorldIndex();
 	const FIndex ChunkSize = Module->GetWorldData().ChunkSize;
+	FBox2D TownBounds(ForceInit);
+	for(const auto& Iter : InPlan) TownBounds += Iter.Key.ToVector2D();
+	if(TownBounds.bIsValid)
+	{
+		for(int32 X = FMath::Max(ChunkOrigin.X, FMath::FloorToInt(TownBounds.Min.X) - 6); X <= FMath::Min(ChunkOrigin.X + ChunkSize.X - 1, FMath::CeilToInt(TownBounds.Max.X) + 6); ++X)
+		{
+			for(int32 Y = FMath::Max(ChunkOrigin.Y, FMath::FloorToInt(TownBounds.Min.Y) - 6); Y <= FMath::Min(ChunkOrigin.Y + ChunkSize.Y - 1, FMath::CeilToInt(TownBounds.Max.Y) + 6); ++Y)
+			{
+				InChunk->GetTopography(FIndex(X - ChunkOrigin.X, Y - ChunkOrigin.Y, 0)).RegionType = EVoxelRegionType::Town;
+			}
+		}
+	}
 	for(const auto& Iter : InPlan)
 	{
 		const FIndex& WorldIndex = Iter.Key;

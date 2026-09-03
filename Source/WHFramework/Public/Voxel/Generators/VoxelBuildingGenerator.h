@@ -24,11 +24,13 @@ struct FVoxelBuildingPrefabCache
 	TArray<FVoxelBuildingRotationCache> Rotations;
 	int32 ClearHeight = 0;
 	int32 GroundOffset = 0;
+	int32 Extent = 1;
 };
 
 struct FVoxelBuildingPlacementPlan
 {
 	bool bValid = false;
+	FIndex AnchorChunkIndex;
 	int32 Rotation = INDEX_NONE;
 	int32 GroundHeight = 0;
 };
@@ -42,22 +44,25 @@ public:
 	FVoxelBuildingGenerateData()
 	{
 		PrefabAsset = FPrimaryAssetId();
-		Chance = 1.f;
+		SpawnRange = 1024.f;
+		SpawnChance = 1.f;
+		bAllowTerrainAdaptation = false;
 		MaxTerrainSlope = 4;
 		MinHeightAboveSeaLevel = 1;
-	}
-
-	FVoxelBuildingGenerateData(const FPrimaryAssetId& InPrefabAsset, const float InChance)
-		: PrefabAsset(InPrefabAsset), Chance(InChance), MaxTerrainSlope(4), MinHeightAboveSeaLevel(1)
-	{
 	}
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowedTypes = "VoxelPrefab"))
 	FPrimaryAssetId PrefabAsset;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0"))
-	float Chance;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "1.0", ToolTip = "每个生成分区的边长，单位为格，按区块大小向上对齐；每种建筑每个分区最多一座"))
+	float SpawnRange;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float SpawnChance;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ToolTip = "没有合适陆地时允许整平地面或抬高地基；概率为 1 时每个分区都有建筑"))
+	bool bAllowTerrainAdaptation;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
 	int32 MaxTerrainSlope;
@@ -81,20 +86,15 @@ public:
 	virtual void Generate(UVoxelChunk* InChunk) override;
 
 protected:
-	int32 SelectBuildingIndex(const FVector2D& InRandomPosition) const;
+	bool PlaceBuildingSlice(UVoxelChunk* InChunk, int32 InBuildingIndex, const FVoxelBuildingPlacementPlan& InPlan);
 
-	bool PlaceBuildingSlice(UVoxelChunk* InChunk, FIndex InAnchorChunkIndex, int32 InX, int32 InY, int32 InBuildingIndex);
+	FVoxelBuildingPlacementPlan BuildPlacementPlan(int32 InX, int32 InY, int32 InBuildingIndex, bool bInAdaptTerrain) const;
 
-	FVoxelBuildingPlacementPlan BuildPlacementPlan(int32 InX, int32 InY, int32 InBuildingIndex) const;
-
-	FVoxelBuildingPlacementPlan GetOrBuildPlacementPlan(FIndex InAnchorChunkIndex, int32 InX, int32 InY, int32 InBuildingIndex);
+	FVoxelBuildingPlacementPlan GetOrBuildPlacementPlan(FIndex InCellIndex, int32 InBuildingIndex);
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Seed;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0", ClampMax = "1.0"))
-	float SpawnRate;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FVoxelBuildingGenerateData> GenerateDatas;
@@ -103,9 +103,8 @@ private:
 	UPROPERTY(Transient)
 	TArray<UVoxelPrefabData*> _PrefabAssets;
 
-	int32 _MaxBuildingExtent = 1;
 	TArray<FVoxelBuildingPrefabCache> _PrefabCaches;
-	TMap<FIndex, FVoxelBuildingPlacementPlan> _BuildingPlanCache;
-	TArray<FIndex> _BuildingPlanCacheOrder;
+	TMap<FIntVector4, FVoxelBuildingPlacementPlan> _BuildingPlanCache;
+	TArray<FIntVector4> _BuildingPlanCacheOrder;
 	mutable FRWLock _BuildingPlanCacheLock;
 };

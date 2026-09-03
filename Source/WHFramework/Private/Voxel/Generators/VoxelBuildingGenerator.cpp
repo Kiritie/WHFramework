@@ -14,11 +14,7 @@
 UVoxelBuildingGenerator::UVoxelBuildingGenerator()
 {
 	Seed = 673;
-	SpawnRate = 0.00025f;
 
-	GenerateDatas = {
-		FVoxelBuildingGenerateData(FPrimaryAssetId(TEXT("VoxelPrefab:DA_Ruin_1")), 1.f),
-	};
 }
 
 void UVoxelBuildingGenerator::Initialize(UVoxelModule* InModule, int32 InStage)
@@ -141,7 +137,7 @@ void UVoxelBuildingGenerator::Initialize(UVoxelModule* InModule, int32 InStage)
 				const int32 RotationExtent = FMath::Max(
 					FMath::Max(FMath::Abs(RotationCache.MinX), FMath::Abs(RotationCache.MaxX)),
 					FMath::Max(FMath::Abs(RotationCache.MinY), FMath::Abs(RotationCache.MaxY)));
-				_MaxBuildingExtent = FMath::Max(_MaxBuildingExtent, RotationExtent + 2);
+				PrefabCache.Extent = FMath::Max(PrefabCache.Extent, RotationExtent + 4);
 			}
 		}
 	}
@@ -149,84 +145,37 @@ void UVoxelBuildingGenerator::Initialize(UVoxelModule* InModule, int32 InStage)
 
 void UVoxelBuildingGenerator::Generate(UVoxelChunk* InChunk)
 {
-	if(!InChunk || !Module || GenerateDatas.IsEmpty() || _PrefabAssets.IsEmpty()) return;
-
+	if(!InChunk || !Module) return;
 	const FIndex ChunkSize = Module->GetWorldData().ChunkSize;
-	const int32 MarginX = FMath::CeilToInt(static_cast<float>(_MaxBuildingExtent) / FMath::Max(ChunkSize.X, 1)) + 1;
-	const int32 MarginY = FMath::CeilToInt(static_cast<float>(_MaxBuildingExtent) / FMath::Max(ChunkSize.Y, 1)) + 1;
-	for(int32 AnchorX = InChunk->GetIndex().X - MarginX; AnchorX <= InChunk->GetIndex().X + MarginX; ++AnchorX)
+	for(int32 BuildingIndex = 0; BuildingIndex < GenerateDatas.Num(); ++BuildingIndex)
 	{
-		for(int32 AnchorY = InChunk->GetIndex().Y - MarginY; AnchorY <= InChunk->GetIndex().Y + MarginY; ++AnchorY)
+		if(!_PrefabAssets[BuildingIndex]) continue;
+		const auto& Data = GenerateDatas[BuildingIndex];
+		const int32 Extent = _PrefabCaches[BuildingIndex].Extent;
+		const int32 RangeX = FMath::Max(FMath::CeilToInt(Data.SpawnRange / ChunkSize.X), FMath::DivideAndRoundUp(Extent * 2, ChunkSize.X) + 1);
+		const int32 RangeY = FMath::Max(FMath::CeilToInt(Data.SpawnRange / ChunkSize.Y), FMath::DivideAndRoundUp(Extent * 2, ChunkSize.Y) + 1);
+		const FIndex CellIndex(FMath::FloorToInt(double(InChunk->GetIndex().X) / RangeX), FMath::FloorToInt(double(InChunk->GetIndex().Y) / RangeY), 0);
+		const FVoxelBuildingPlacementPlan Plan = GetOrBuildPlacementPlan(CellIndex, BuildingIndex);
+		if(!Plan.bValid || !PlaceBuildingSlice(InChunk, BuildingIndex, Plan)) continue;
+		if(Plan.AnchorChunkIndex == InChunk->GetIndex())
 		{
-			const FIndex AnchorChunkIndex(AnchorX, AnchorY, 0);
-			const FVector2D RandomKey = AnchorChunkIndex.ToVector2D();
-			if(FMathHelper::HashRand(RandomKey, Seed) >= FMath::Clamp(SpawnRate, 0.f, 1.f)) continue;
-			const int32 BuildingIndex = SelectBuildingIndex(RandomKey + FVector2D(37.f, -71.f));
-			if(BuildingIndex == INDEX_NONE) continue;
-			const FIndex AnchorOrigin = Module->ChunkIndexToVoxelIndex(AnchorChunkIndex);
-			const int32 CenterX = AnchorOrigin.X + FMath::FloorToInt(ChunkSize.X * 0.5f);
-			const int32 CenterY = AnchorOrigin.Y + FMath::FloorToInt(ChunkSize.Y * 0.5f);
-			const bool bPlaced = PlaceBuildingSlice(InChunk, AnchorChunkIndex,
-				CenterX,
-				CenterY,
-				BuildingIndex);
-			if(bPlaced && AnchorChunkIndex == InChunk->GetIndex())
-			{
-				const FVoxelBuildingPlacementPlan Plan = GetOrBuildPlacementPlan(AnchorChunkIndex, CenterX, CenterY, BuildingIndex);
-				if(!Plan.bValid) continue;
-				const FVoxelBuildingRotationCache& RotationCache = _PrefabCaches[BuildingIndex].Rotations[Plan.Rotation];
-				FSceneArea Area;
-				Area.AreaName = *FString::Printf(TEXT("Structure_%d_%d"), AnchorChunkIndex.X, AnchorChunkIndex.Y);
-				const FText BuildingDisplayName = _PrefabAssets[BuildingIndex]->DisplayName.IsEmpty()
-					? UCommonModuleStatics::GetEnumDisplayNameByValue(TEXT("/Script/WHFramework.EVoxelRegionType"), static_cast<int32>(EVoxelRegionType::Building))
-					: _PrefabAssets[BuildingIndex]->DisplayName;
-				Area.AreaDisplayName = Module->GetVoxelAreaName(FIndex(CenterX, CenterY, Plan.GroundHeight), EVoxelAreaType::Building, BuildingDisplayName);
-				Area.AreaType = ESceneAreaType::Default;
-				Area.AreaShape = ESceneAreaShape::Box;
-				Area.AreaCenter = FVector2D(CenterX + (RotationCache.MinX + RotationCache.MaxX) * 0.5f,
-					CenterY + (RotationCache.MinY + RotationCache.MaxY) * 0.5f);
-				Area.AreaRadius = FVector2D((RotationCache.MaxX - RotationCache.MinX) * 0.5f + 4.f,
-					(RotationCache.MaxY - RotationCache.MinY) * 0.5f + 4.f);
-				USceneModuleStatics::AddSceneArea(Area, true);
-			}
+			const FIndex Center = Module->ChunkIndexToVoxelIndex(Plan.AnchorChunkIndex) + FIndex(ChunkSize.X / 2, ChunkSize.Y / 2, 0);
+			const auto& Rotation = _PrefabCaches[BuildingIndex].Rotations[Plan.Rotation];
+			FSceneArea Area;
+			Area.AreaName = *FString::Printf(TEXT("Structure_%d_%d_%d"), BuildingIndex, CellIndex.X, CellIndex.Y);
+			const FText DisplayName = _PrefabAssets[BuildingIndex]->DisplayName.IsEmpty()
+				? UCommonModuleStatics::GetEnumDisplayNameByValue(TEXT("/Script/WHFramework.EVoxelRegionType"), static_cast<int32>(EVoxelRegionType::Building))
+				: _PrefabAssets[BuildingIndex]->DisplayName;
+			Area.AreaDisplayName = Module->GetVoxelAreaName(FIndex(Center.X, Center.Y, Plan.GroundHeight), EVoxelAreaType::Building, DisplayName);
+			Area.AreaShape = ESceneAreaShape::Box;
+			Area.AreaCenter = FVector2D(Center.X + (Rotation.MinX + Rotation.MaxX) * 0.5f, Center.Y + (Rotation.MinY + Rotation.MaxY) * 0.5f);
+			Area.AreaRadius = FVector2D((Rotation.MaxX - Rotation.MinX) * 0.5f + 4.f, (Rotation.MaxY - Rotation.MinY) * 0.5f + 4.f);
+			USceneModuleStatics::AddSceneArea(Area, true);
 		}
 	}
 }
 
-int32 UVoxelBuildingGenerator::SelectBuildingIndex(const FVector2D& InRandomPosition) const
-{
-	float TotalChance = 0.f;
-	for(int32 i = 0; i < GenerateDatas.Num(); ++i)
-	{
-		if(_PrefabAssets.IsValidIndex(i) && IsValid(_PrefabAssets[i]))
-		{
-			TotalChance += FMath::Max(GenerateDatas[i].Chance, 0.f);
-		}
-	}
-
-	if(TotalChance <= 0.f) return INDEX_NONE;
-
-	const float RandomChance = FMathHelper::HashRand(InRandomPosition, Seed + 1) * TotalChance;
-	float AccumulatedChance = 0.f;
-	int32 LastValidIndex = INDEX_NONE;
-	for(int32 i = 0; i < GenerateDatas.Num(); ++i)
-	{
-		if(!_PrefabAssets.IsValidIndex(i) || !IsValid(_PrefabAssets[i])) continue;
-
-		const float Chance = FMath::Max(GenerateDatas[i].Chance, 0.f);
-		if(Chance <= 0.f) continue;
-
-		LastValidIndex = i;
-		AccumulatedChance += Chance;
-		if(RandomChance < AccumulatedChance)
-		{
-			return i;
-		}
-	}
-	return LastValidIndex;
-}
-
-FVoxelBuildingPlacementPlan UVoxelBuildingGenerator::BuildPlacementPlan(int32 InX, int32 InY, int32 InBuildingIndex) const
+FVoxelBuildingPlacementPlan UVoxelBuildingGenerator::BuildPlacementPlan(int32 InX, int32 InY, int32 InBuildingIndex, bool bInAdaptTerrain) const
 {
 	FVoxelBuildingPlacementPlan Plan;
 	if(!_PrefabCaches.IsValidIndex(InBuildingIndex)) return Plan;
@@ -263,7 +212,7 @@ FVoxelBuildingPlacementPlan UVoxelBuildingGenerator::BuildPlacementPlan(int32 In
 			{
 				const FIndex SampleIndex(InX + X, InY + Y, 0);
 				const FVoxelTopography Topography = Module->SampleTopographyByIndex(SampleIndex);
-				if(Topography.BiomeType == EVoxelBiomeType::Ocean || Topography.BiomeType == EVoxelBiomeType::River || Topography.RegionType == EVoxelRegionType::Ocean || Topography.RegionType == EVoxelRegionType::River || Topography.RegionType == EVoxelRegionType::Lake)
+				if(!bInAdaptTerrain && (Topography.BiomeType == EVoxelBiomeType::Ocean || Topography.BiomeType == EVoxelBiomeType::River || Topography.RegionType == EVoxelRegionType::Ocean || Topography.RegionType == EVoxelRegionType::River || Topography.RegionType == EVoxelRegionType::Lake))
 				{
 					bInvalidTerrain = true;
 					break;
@@ -273,15 +222,17 @@ FVoxelBuildingPlacementPlan UVoxelBuildingGenerator::BuildPlacementPlan(int32 In
 					const int32 Height = SampleHeight(SampleIndex);
 					AverageHeight += Height;
 					MinHeight = FMath::Min(MinHeight, Height);
-					MaxHeight = FMath::Max(MaxHeight, Height);
+					MaxHeight = FMath::Max(MaxHeight, FMath::Max(Height, Topography.WaterHeight));
 					++FootprintCount;
 				}
 			}
 			if(bInvalidTerrain) break;
 		}
-		if(bInvalidTerrain || FootprintCount <= 0 || MaxHeight - MinHeight > GenerateData.MaxTerrainSlope) continue;
-		const int32 GroundHeight = FMath::RoundToInt(AverageHeight / FootprintCount);
-		if(GroundHeight < Module->GetWorldData().SeaLevel + GenerateData.MinHeightAboveSeaLevel) continue;
+		if(bInvalidTerrain || FootprintCount <= 0 || (!bInAdaptTerrain && MaxHeight - MinHeight > GenerateData.MaxTerrainSlope)) continue;
+		const int32 GroundHeight = bInAdaptTerrain
+			? FMath::Min(FMath::Max(MaxHeight, Module->GetWorldData().SeaLevel + GenerateData.MinHeightAboveSeaLevel), Module->GetWorldData().SkyHeight - PrefabCache.ClearHeight - 2)
+			: FMath::RoundToInt(AverageHeight / FootprintCount);
+		if(GroundHeight < Module->GetWorldData().SeaLevel + GenerateData.MinHeightAboveSeaLevel || GroundHeight + RotationCache.MinZ + PrefabCache.GroundOffset < 1 || GroundHeight + RotationCache.MaxZ + PrefabCache.GroundOffset >= Module->GetWorldData().SkyHeight) continue;
 
 		int32 EntranceMaxDrop = 0;
 		int64 EntranceTotalDrop = 0;
@@ -304,29 +255,66 @@ FVoxelBuildingPlacementPlan UVoxelBuildingGenerator::BuildPlacementPlan(int32 In
 	return Plan;
 }
 
-FVoxelBuildingPlacementPlan UVoxelBuildingGenerator::GetOrBuildPlacementPlan(FIndex InAnchorChunkIndex, int32 InX, int32 InY, int32 InBuildingIndex)
+FVoxelBuildingPlacementPlan UVoxelBuildingGenerator::GetOrBuildPlacementPlan(FIndex InCellIndex, int32 InBuildingIndex)
 {
+	const auto& WorldData = Module->GetWorldData();
+	const FIntVector4 Key(InCellIndex.X, InCellIndex.Y, InBuildingIndex, WorldData.WorldSeed);
 	{
 		FReadScopeLock ReadLock(_BuildingPlanCacheLock);
-		if(const FVoxelBuildingPlacementPlan* CachedPlan = _BuildingPlanCache.Find(InAnchorChunkIndex)) return *CachedPlan;
+		if(const auto* Cached = _BuildingPlanCache.Find(Key)) return *Cached;
 	}
-	const FVoxelBuildingPlacementPlan NewPlan = BuildPlacementPlan(InX, InY, InBuildingIndex);
+	FVoxelBuildingPlacementPlan Plan;
+	const auto& Data = GenerateDatas[InBuildingIndex];
+	const auto& Cache = _PrefabCaches[InBuildingIndex];
+	const FIndex ChunkSize = WorldData.ChunkSize;
+	const int32 RangeX = FMath::Max(FMath::CeilToInt(Data.SpawnRange / ChunkSize.X), FMath::DivideAndRoundUp(Cache.Extent * 2, ChunkSize.X) + 1);
+	const int32 RangeY = FMath::Max(FMath::CeilToInt(Data.SpawnRange / ChunkSize.Y), FMath::DivideAndRoundUp(Cache.Extent * 2, ChunkSize.Y) + 1);
+	const int32 MarginX = FMath::Max(0, FMath::DivideAndRoundUp(Cache.Extent - ChunkSize.X / 2, ChunkSize.X));
+	const int32 MarginY = FMath::Max(0, FMath::DivideAndRoundUp(Cache.Extent - ChunkSize.Y / 2, ChunkSize.Y));
+	uint32 RandomSeed = HashCombineFast(GetTypeHash(Key), FCrc::StrCrc32(*Data.PrefabAsset.ToString()));
+	FRandomStream Random(RandomSeed ^ Seed);
+	if(Random.FRand() < Data.SpawnChance && Cache.Rotations.Num() == 4)
+	{
+		for(int32 Attempt = 0; Attempt < 16 && !Plan.bValid; ++Attempt)
+		{
+			const FIndex Anchor(InCellIndex.X * RangeX + Random.RandRange(MarginX, RangeX - MarginX - 1), InCellIndex.Y * RangeY + Random.RandRange(MarginY, RangeY - MarginY - 1), 0);
+			const FIndex Center = Module->ChunkIndexToVoxelIndex(Anchor) + FIndex(ChunkSize.X / 2, ChunkSize.Y / 2, 0);
+			bool bOverlaps = false;
+			for(int32 Other = 0; Other < InBuildingIndex && !bOverlaps; ++Other)
+			{
+				if(!_PrefabAssets[Other]) continue;
+				const auto& OtherCache = _PrefabCaches[Other];
+				const int32 OtherRangeX = FMath::Max(FMath::CeilToInt(GenerateDatas[Other].SpawnRange / ChunkSize.X), FMath::DivideAndRoundUp(OtherCache.Extent * 2, ChunkSize.X) + 1) * ChunkSize.X;
+				const int32 OtherRangeY = FMath::Max(FMath::CeilToInt(GenerateDatas[Other].SpawnRange / ChunkSize.Y), FMath::DivideAndRoundUp(OtherCache.Extent * 2, ChunkSize.Y) + 1) * ChunkSize.Y;
+				for(int32 X = FMath::FloorToInt(double(Center.X - Cache.Extent) / OtherRangeX); X <= FMath::FloorToInt(double(Center.X + Cache.Extent) / OtherRangeX) && !bOverlaps; ++X)
+				for(int32 Y = FMath::FloorToInt(double(Center.Y - Cache.Extent) / OtherRangeY); Y <= FMath::FloorToInt(double(Center.Y + Cache.Extent) / OtherRangeY) && !bOverlaps; ++Y)
+				{
+					const auto OtherPlan = GetOrBuildPlacementPlan(FIndex(X, Y, 0), Other);
+					if(!OtherPlan.bValid) continue;
+					const FIndex OtherCenter = Module->ChunkIndexToVoxelIndex(OtherPlan.AnchorChunkIndex) + FIndex(ChunkSize.X / 2, ChunkSize.Y / 2, 0);
+					bOverlaps = FMath::Abs(Center.X - OtherCenter.X) < Cache.Extent + OtherCache.Extent && FMath::Abs(Center.Y - OtherCenter.Y) < Cache.Extent + OtherCache.Extent;
+				}
+			}
+			if(bOverlaps) continue;
+			Plan = BuildPlacementPlan(Center.X, Center.Y, InBuildingIndex, Attempt == 15 && Data.bAllowTerrainAdaptation);
+			Plan.AnchorChunkIndex = Anchor;
+		}
+	}
 	FWriteScopeLock WriteLock(_BuildingPlanCacheLock);
-	if(const FVoxelBuildingPlacementPlan* CachedPlan = _BuildingPlanCache.Find(InAnchorChunkIndex)) return *CachedPlan;
-	_BuildingPlanCache.Add(InAnchorChunkIndex, NewPlan);
-	_BuildingPlanCacheOrder.Add(InAnchorChunkIndex);
+	if(const auto* Cached = _BuildingPlanCache.Find(Key)) return *Cached;
+	_BuildingPlanCache.Add(Key, Plan);
+	_BuildingPlanCacheOrder.Add(Key);
 	while(_BuildingPlanCacheOrder.Num() > 128)
 	{
 		_BuildingPlanCache.Remove(_BuildingPlanCacheOrder[0]);
 		_BuildingPlanCacheOrder.RemoveAt(0);
 	}
-	return NewPlan;
+	return Plan;
 }
 
-bool UVoxelBuildingGenerator::PlaceBuildingSlice(UVoxelChunk* InChunk, FIndex InAnchorChunkIndex, int32 InX, int32 InY, int32 InBuildingIndex)
+bool UVoxelBuildingGenerator::PlaceBuildingSlice(UVoxelChunk* InChunk, int32 InBuildingIndex, const FVoxelBuildingPlacementPlan& Plan)
 {
 	if(!InChunk || !_PrefabCaches.IsValidIndex(InBuildingIndex)) return false;
-	const FVoxelBuildingPlacementPlan Plan = GetOrBuildPlacementPlan(InAnchorChunkIndex, InX, InY, InBuildingIndex);
 	if(!Plan.bValid || !_PrefabCaches[InBuildingIndex].Rotations.IsValidIndex(Plan.Rotation)) return false;
 	const FVoxelBuildingPrefabCache& PrefabCache = _PrefabCaches[InBuildingIndex];
 	const FVoxelBuildingRotationCache& RotationCache = PrefabCache.Rotations[Plan.Rotation];
@@ -335,12 +323,48 @@ bool UVoxelBuildingGenerator::PlaceBuildingSlice(UVoxelChunk* InChunk, FIndex In
 		&& _PrefabAssets[InBuildingIndex]->CenterOffset.Z < 0.f;
 	const FIndex ChunkOrigin = InChunk->GetWorldIndex();
 	const FIndex ChunkSize = Module->GetWorldData().ChunkSize;
+	const FIndex Center = Module->ChunkIndexToVoxelIndex(Plan.AnchorChunkIndex) + FIndex(ChunkSize.X / 2, ChunkSize.Y / 2, 0);
+	const int32 InX = Center.X, InY = Center.Y;
+	if(ChunkOrigin.X > InX + RotationCache.MaxX + 4 || ChunkOrigin.X + ChunkSize.X <= InX + RotationCache.MinX - 4 ||
+		ChunkOrigin.Y > InY + RotationCache.MaxY + 4 || ChunkOrigin.Y + ChunkSize.Y <= InY + RotationCache.MinY - 4) return false;
 	auto SetSliceVoxel = [InChunk, ChunkOrigin, ChunkSize](const FIndex& WorldIndex, const FVoxelItem& VoxelItem, bool bSafe = false)
 	{
 		if(WorldIndex.X < ChunkOrigin.X || WorldIndex.X >= ChunkOrigin.X + ChunkSize.X ||
 			WorldIndex.Y < ChunkOrigin.Y || WorldIndex.Y >= ChunkOrigin.Y + ChunkSize.Y) return;
 		InChunk->SetVoxel(FIndex(WorldIndex.X - ChunkOrigin.X, WorldIndex.Y - ChunkOrigin.Y, WorldIndex.Z), VoxelItem, bSafe);
 	};
+
+	const TSet<FIndex> EntranceColumns(RotationCache.EntranceIndices);
+	auto IsClearedRoot = [&](FIndex WorldIndex)
+	{
+		const FIndex RelativeIndex(WorldIndex.X - InX, WorldIndex.Y - InY, 0);
+		if(bUnderground)
+		{
+			return EntranceColumns.Contains(RelativeIndex) ||
+				WorldIndex.Z <= Plan.GroundHeight && WorldIndex.Z > Plan.GroundHeight + RotationCache.MinZ + PrefabCache.GroundOffset &&
+				RelativeIndex.X >= RotationCache.MinX && RelativeIndex.X <= RotationCache.MaxX &&
+				RelativeIndex.Y >= RotationCache.MinY && RelativeIndex.Y <= RotationCache.MaxY;
+		}
+		return RelativeIndex.X >= RotationCache.MinX - 1 && RelativeIndex.X <= RotationCache.MaxX + 1 &&
+			RelativeIndex.Y >= RotationCache.MinY - 1 && RelativeIndex.Y <= RotationCache.MaxY + 1;
+	};
+	for(int32 X = FMath::Max(InX + RotationCache.MinX - 4, ChunkOrigin.X); X <= FMath::Min(InX + RotationCache.MaxX + 4, ChunkOrigin.X + ChunkSize.X - 1); ++X)
+	{
+		for(int32 Y = FMath::Max(InY + RotationCache.MinY - 4, ChunkOrigin.Y); Y <= FMath::Min(InY + RotationCache.MaxY + 4, ChunkOrigin.Y + ChunkSize.Y - 1); ++Y)
+		{
+			for(int32 Z = 1; Z < Module->GetWorldData().SkyHeight; ++Z)
+			{
+				const FIndex WorldIndex(X, Y, Z);
+				const FIndex LocalIndex(X - ChunkOrigin.X, Y - ChunkOrigin.Y, Z);
+				const FVoxelItem& Item = InChunk->GetVoxel(LocalIndex);
+				if(!Item.IsValid()) continue;
+				const bool bTreePart = Item.Data == TEXT("R") || Item.Data.StartsWith(TEXT("T"));
+				if(!bTreePart && Item.GetData().Nature != EVoxelNature::Foliage && Item.GetData().Nature != EVoxelNature::SemiFoliage) continue;
+				const FIndex RootIndex = Item.Data.StartsWith(TEXT("T")) ? WorldIndex + FIndex(Item.Data.Mid(1)) : WorldIndex;
+				if(IsClearedRoot(RootIndex)) InChunk->SetVoxel(LocalIndex, FVoxelItem::Empty, true);
+			}
+		}
+	}
 
 	const int32 SliceMinX = FMath::Max(RotationCache.MinX, ChunkOrigin.X - InX);
 	const int32 SliceMaxX = FMath::Min(RotationCache.MaxX, ChunkOrigin.X + ChunkSize.X - 1 - InX);
@@ -360,7 +384,14 @@ bool UVoxelBuildingGenerator::PlaceBuildingSlice(UVoxelChunk* InChunk, FIndex In
 		}
 		for(const FIndex& EntranceIndex : RotationCache.EntranceIndices)
 		{
-			SetSliceVoxel(FIndex(InX + EntranceIndex.X, InY + EntranceIndex.Y, Plan.GroundHeight), FVoxelItem::Empty, true);
+			const FIndex WorldIndex(InX + EntranceIndex.X, InY + EntranceIndex.Y, 0);
+			if(WorldIndex.X < ChunkOrigin.X || WorldIndex.X >= ChunkOrigin.X + ChunkSize.X ||
+				WorldIndex.Y < ChunkOrigin.Y || WorldIndex.Y >= ChunkOrigin.Y + ChunkSize.Y) continue;
+			const int32 SurfaceHeight = InChunk->GetTopography(FIndex(WorldIndex.X - ChunkOrigin.X, WorldIndex.Y - ChunkOrigin.Y, 0)).Height;
+			for(int32 Z = Plan.GroundHeight; Z <= FMath::Max(Plan.GroundHeight, SurfaceHeight); ++Z)
+			{
+				SetSliceVoxel(FIndex(WorldIndex.X, WorldIndex.Y, Z), FVoxelItem::Empty, true);
+			}
 		}
 	}
 	else
@@ -385,7 +416,8 @@ bool UVoxelBuildingGenerator::PlaceBuildingSlice(UVoxelChunk* InChunk, FIndex In
 		{
 			for(int32 Y = ClearMinY; Y <= ClearMaxY; ++Y)
 			{
-				for(int32 Z = 1; Z <= PrefabCache.ClearHeight; ++Z)
+				const int32 ClearHeight = FMath::Max(PrefabCache.ClearHeight, Module->SampleTopographyByIndex(FIndex(InX + X, InY + Y)).Height - Plan.GroundHeight);
+				for(int32 Z = 1; Z <= ClearHeight; ++Z)
 				{
 					SetSliceVoxel(FIndex(InX + X, InY + Y, Plan.GroundHeight + Z), FVoxelItem::Empty, true);
 				}
@@ -393,8 +425,22 @@ bool UVoxelBuildingGenerator::PlaceBuildingSlice(UVoxelChunk* InChunk, FIndex In
 		}
 	}
 
+	for(int32 X = FMath::Max(RotationCache.MinX - 4, ChunkOrigin.X - InX); X <= FMath::Min(RotationCache.MaxX + 4, ChunkOrigin.X + ChunkSize.X - 1 - InX); ++X)
+	{
+		for(int32 Y = FMath::Max(RotationCache.MinY - 4, ChunkOrigin.Y - InY); Y <= FMath::Min(RotationCache.MaxY + 4, ChunkOrigin.Y + ChunkSize.Y - 1 - InY); ++Y)
+		{
+			FVoxelTopography& Topography = InChunk->GetTopography(FIndex(InX + X - ChunkOrigin.X, InY + Y - ChunkOrigin.Y, 0));
+			Topography.RegionType = EVoxelRegionType::Building;
+			if(!bUnderground && X >= RotationCache.MinX && X <= RotationCache.MaxX && Y >= RotationCache.MinY && Y <= RotationCache.MaxY)
+			{
+				Topography.Height = Plan.GroundHeight;
+				Topography.WaterHeight = 0;
+			}
+		}
+	}
+
 	const FIndex BuildingOrigin(InX, InY, Plan.GroundHeight);
-	const FIndex SliceIndex = InChunk->GetIndex() - InAnchorChunkIndex;
+	const FIndex SliceIndex = InChunk->GetIndex() - Plan.AnchorChunkIndex;
 	if(const TArray<FVoxelItem>* SliceItems = RotationCache.ChunkSlices.Find(SliceIndex))
 	{
 		for(const FVoxelItem& VoxelItem : *SliceItems) SetSliceVoxel(BuildingOrigin + VoxelItem.Index + FIndex(0, 0, PrefabCache.GroundOffset), VoxelItem);
