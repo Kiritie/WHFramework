@@ -472,7 +472,7 @@ void UVoxelMeshComponent::SetNature(EVoxelNature InNature)
 		}
 		case EVoxelTransparency::Semi:
 		{
-			SetCollisionProfileName(TEXT("SemiVoxel"));
+			SetCollisionProfileName(Nature == EVoxelNature::SemiSolid ? TEXT("SemiSolidVoxel") : TEXT("SemiVoxel"));
 			break;
 		}
 		case EVoxelTransparency::Trans:

@@ -45,6 +45,7 @@ UWidgetModule::UWidgetModule()
 		WorldWidgetContainerClass = WorldWidgetContainerClassFinder.Class;
 	}
 	WorldWidgetContainerZOrder = -1;
+	WorldWidgetTraceType = UEngineTypes::ConvertToTraceType(ECC_Visibility);
 	AllWorldWidget = TMap<FName, FWorldWidgets>();
 	WorldWidgetContainer = nullptr;
 	WorldWidgetClassMap = TMap<FName, TSubclassOf<UWorldWidgetBase>>();

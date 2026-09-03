@@ -525,6 +525,9 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "WorldWidget")
 	int32 WorldWidgetContainerZOrder;
 
+	UPROPERTY(EditAnywhere, Category = "WorldWidget")
+	TEnumAsByte<ETraceTypeQuery> WorldWidgetTraceType;
+
 private:
 	UPROPERTY(VisibleAnywhere, Transient, Category = "WorldWidget")
 	UWorldWidgetContainer* WorldWidgetContainer;
@@ -542,6 +545,9 @@ protected:
 public:
 	UFUNCTION(BlueprintPure)
 	UWorldWidgetContainer* GetWorldWidgetContainer() const { return WorldWidgetContainer; }
+
+	UFUNCTION(BlueprintPure)
+	ETraceTypeQuery GetWorldWidgetTraceType() const { return WorldWidgetTraceType; }
 
 	UFUNCTION(BlueprintPure)
 	bool GetWorldWidgetVisible(TSubclassOf<UWorldWidgetBase> InClass = nullptr);

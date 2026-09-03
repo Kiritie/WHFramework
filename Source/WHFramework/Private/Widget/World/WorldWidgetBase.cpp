@@ -345,7 +345,8 @@ bool UWorldWidgetBase::IsWidgetVisible_Implementation(bool bRefresh)
 			const auto OwnerActor = Cast<AActor>(OwnerObject);
 			
 			const FVector Location = GetWidgetMapping(this, Mapping) ? Mapping.GetLocation() : (OwnerActor ? OwnerActor->GetActorLocation() : FVector(-1.f));
-			const float Distance = FVector::Distance(Location, UCameraModuleStatics::GetCameraLocation(true));
+			const FVector CameraLocation = UCameraModuleStatics::GetCameraLocation(true);
+			const float Distance = FVector::Distance(Location, CameraLocation);
 			switch(WidgetVisibility)
 			{
 				case EWorldWidgetVisibility::AlwaysShow:
@@ -363,7 +364,7 @@ bool UWorldWidgetBase::IsWidgetVisible_Implementation(bool bRefresh)
 					bVisible = true;
 					if(ENUMWITH(WidgetVisibility, EWorldWidgetVisibility::RenderOnly))
 					{
-						bVisible = bVisible && (!OwnerActor || OwnerActor->WasRecentlyRendered());
+						bVisible = bVisible && (!OwnerActor || !OwnerActor->IsHidden());
 					}
 					if(ENUMWITH(WidgetVisibility, EWorldWidgetVisibility::ScreenOnly))
 					{
@@ -372,6 +373,17 @@ bool UWorldWidgetBase::IsWidgetVisible_Implementation(bool bRefresh)
 					if(ENUMWITH(WidgetVisibility, EWorldWidgetVisibility::DistanceOnly))
 					{
 						bVisible = bVisible && (WidgetShowDistance == -1 || (WidgetShowDistance >= 0.f ? Distance < WidgetShowDistance : Distance > FMath::Abs(WidgetShowDistance)));
+					}
+					if(bVisible && ENUMWITH(WidgetVisibility, EWorldWidgetVisibility::RenderOnly))
+					{
+						bVisible = Location != FVector(-1.f);
+						if(bVisible)
+						{
+							FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(WorldWidgetVisibility), true, OwnerActor);
+							if(Mapping.SceneComp) QueryParams.AddIgnoredActor(Mapping.SceneComp->GetOwner());
+							QueryParams.AddIgnoredActor(UCommonModuleStatics::GetPlayerPawn());
+							bVisible = !GetWorld()->LineTraceTestByChannel(CameraLocation, Location, UEngineTypes::ConvertToCollisionChannel(UWidgetModule::Get().GetWorldWidgetTraceType()), QueryParams);
+						}
 					}
 					break;
 				}
