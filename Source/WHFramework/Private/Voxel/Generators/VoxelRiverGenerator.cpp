@@ -13,7 +13,7 @@ UVoxelRiverGenerator::UVoxelRiverGenerator()
 	RiverWidth = 0.035f;
 	BankWidth = 0.035f;
 	RiverDepth = 4;
-	MinAltitudeAboveSea = 1;
+	RiverHeightAboveSea = 4;
 }
 
 void UVoxelRiverGenerator::Generate(UVoxelChunk* InChunk)
@@ -43,11 +43,12 @@ void UVoxelRiverGenerator::Generate(UVoxelChunk* InChunk)
 
 bool UVoxelRiverGenerator::ApplyToTopography(FIndex InWorldIndex, FVoxelTopography& InOutTopography) const
 {
-	if(InOutTopography.Height <= Module->GetWorldData().SeaLevel + MinAltitudeAboveSea) return false;
+	if(InOutTopography.RegionType == EVoxelRegionType::Ocean || InOutTopography.Height <= Module->GetWorldData().SeaLevel) return false;
 	const float Distance = GetRiverDistance(InWorldIndex);
 	const float OuterWidth = RiverWidth + BankWidth;
-	if(Distance >= OuterWidth) return false;
-	return ApplyRiverProfile(InWorldIndex, Distance, InOutTopography, CalculateWaterHeight(InWorldIndex));
+	const int32 WaterHeight = CalculateWaterHeight();
+	return Distance < OuterWidth ? ApplyRiverProfile(InWorldIndex, Distance, InOutTopography, WaterHeight) :
+		ApplyRiverShore(InWorldIndex, Distance, InOutTopography, WaterHeight);
 }
 
 float UVoxelRiverGenerator::SampleNormalizedRiverDistance(FIndex InWorldIndex) const
@@ -68,35 +69,21 @@ FVector2D UVoxelRiverGenerator::SampleRiverDirection(FIndex InWorldIndex) const
 
 int32 UVoxelRiverGenerator::SampleRiverWaterHeight(FIndex InWorldIndex) const
 {
-	return CalculateWaterHeight(InWorldIndex);
+	return CalculateWaterHeight();
 }
 
 bool UVoxelRiverGenerator::ApplyToTopographyCached(FIndex InWorldIndex, FVoxelTopography& InOutTopography, const TMap<FIndex, int32>& InHeightCache) const
 {
-	if(InOutTopography.Height <= Module->GetWorldData().SeaLevel + MinAltitudeAboveSea) return false;
+	if(InOutTopography.RegionType == EVoxelRegionType::Ocean || InOutTopography.Height <= Module->GetWorldData().SeaLevel) return false;
 	const float Distance = GetRiverDistance(InWorldIndex, &InHeightCache);
-	if(Distance >= RiverWidth + BankWidth) return false;
-	return ApplyRiverProfile(InWorldIndex, Distance, InOutTopography, CalculateWaterHeight(InWorldIndex, &InHeightCache));
+	const int32 WaterHeight = CalculateWaterHeight();
+	return Distance < RiverWidth + BankWidth ? ApplyRiverProfile(InWorldIndex, Distance, InOutTopography, WaterHeight) :
+		ApplyRiverShore(InWorldIndex, Distance, InOutTopography, WaterHeight);
 }
 
-int32 UVoxelRiverGenerator::CalculateWaterHeight(FIndex InWorldIndex, const TMap<FIndex, int32>* InHeightCache) const
+int32 UVoxelRiverGenerator::CalculateWaterHeight() const
 {
-	auto SampleHeight = [this, InHeightCache](FIndex Index)
-	{
-		Index.Z = 0;
-		if(InHeightCache)
-		{
-			if(const int32* Height = InHeightCache->Find(Index)) return *Height;
-		}
-		return Module->SampleBaseTopographyByIndex(Index).Height;
-	};
-	int32 WaterHeight = SampleHeight(InWorldIndex) - 1;
-	static const FIndex WaterSamples[] = {
-		FIndex(4, 0, 0), FIndex(-4, 0, 0), FIndex(0, 4, 0), FIndex(0, -4, 0),
-		FIndex(3, 3, 0), FIndex(-3, 3, 0), FIndex(3, -3, 0), FIndex(-3, -3, 0)
-	};
-	for(const FIndex& Offset : WaterSamples) WaterHeight = FMath::Min(WaterHeight, SampleHeight(InWorldIndex + Offset) - 1);
-	return FMath::Max(WaterHeight, Module->GetWorldData().SeaLevel);
+	return Module->GetWorldData().SeaLevel + RiverHeightAboveSea;
 }
 
 bool UVoxelRiverGenerator::ApplyRiverProfile(FIndex InWorldIndex, float InRiverDistance, FVoxelTopography& InOutTopography, int32 InWaterHeight) const
@@ -109,39 +96,49 @@ bool UVoxelRiverGenerator::ApplyRiverProfile(FIndex InWorldIndex, float InRiverD
 	const float DepthNoise = FMath::Clamp(Module->GetVoxelNoise2D(DepthPosition) * 0.5f + 0.5f, 0.f, 1.f);
 	const int32 MinRiverDepth = FMath::Max(RiverDepth - 2, 1);
 	const int32 LocalRiverDepth = FMath::RoundToInt(FMath::Lerp(static_cast<float>(MinRiverDepth), static_cast<float>(RiverDepth), DepthNoise));
-	const float RiverDepthAlpha = RiverDepth > MinRiverDepth ? static_cast<float>(LocalRiverDepth - MinRiverDepth) / (RiverDepth - MinRiverDepth) : 1.f;
 	const int32 BedHeight = FMath::Max(InWaterHeight - LocalRiverDepth, 1);
 
 	const float CoreAlpha = FMath::Clamp(RiverWidth / OuterWidth, 0.f, 0.95f);
 	const float BankAlpha = FMath::Clamp((CrossSectionAlpha - CoreAlpha) / FMath::Max(1.f - CoreAlpha, KINDA_SMALL_NUMBER), 0.f, 1.f);
-	const FIndex SandPatchIndex(FMath::FloorToInt(InWorldIndex.X * 0.25f), FMath::FloorToInt(InWorldIndex.Y * 0.25f), 0);
-	if(CrossSectionAlpha > CoreAlpha && BankAlpha > 0.35f && OriginalHeight - InWaterHeight <= 2 &&
-		FMathHelper::HashRand(SandPatchIndex.ToVector2D(), Seed + 791) < 0.06f)
+	const int32 BankHeight = BedHeight + FMath::RoundToInt(BankAlpha * (LocalRiverDepth + 1));
+	InOutTopography.Height = CrossSectionAlpha <= CoreAlpha ? FMath::Min(OriginalHeight, BedHeight) : FMath::Min3(OriginalHeight, BankHeight, InWaterHeight);
+	const float Strength = CrossSectionAlpha <= CoreAlpha ? 1.f : 1.f - BankAlpha;
+	const FIndex SandPatchIndex(FMath::FloorToInt(InWorldIndex.X / 6.f), FMath::FloorToInt(InWorldIndex.Y / 6.f), 0);
+	const bool bSandBank = CrossSectionAlpha > CoreAlpha && BankAlpha > 0.25f && InOutTopography.Height >= InWaterHeight - 1 &&
+		FMathHelper::HashRand(SandPatchIndex.ToVector2D(), Seed + 791) < 0.08f;
+	if(Strength > 0.2f || bSandBank)
 	{
-		const float SandSlope = FMath::SmoothStep(0.35f, 1.f, BankAlpha);
-		InOutTopography.Height = FMath::RoundToInt(FMath::Lerp(static_cast<float>(BedHeight), static_cast<float>(InWaterHeight), SandSlope));
-		InOutTopography.WaterHeight = InWaterHeight;
+		InOutTopography.RegionType = EVoxelRegionType::River;
+		InOutTopography.BiomeType = bSandBank ? EVoxelBiomeType::Desert : EVoxelBiomeType::River;
+		InOutTopography.Fertility = bSandBank ? 0.f : FMath::Max(InOutTopography.Fertility, 0.75f * Strength);
+	}
+	if(InOutTopography.Height <= InWaterHeight) InOutTopography.WaterHeight = InWaterHeight;
+	return true;
+}
+
+bool UVoxelRiverGenerator::ApplyRiverShore(FIndex InWorldIndex, float InRiverDistance, FVoxelTopography& InOutTopography, int32 InWaterHeight) const
+{
+	const float OuterWidth = FMath::Max(RiverWidth + BankWidth, KINDA_SMALL_NUMBER);
+	const float ShoreStepWidth = OuterWidth / 10.f;
+	int32 ShoreStep = FMath::Max(FMath::CeilToInt((InRiverDistance - OuterWidth) / ShoreStepWidth), 1);
+	for(const FIndex Offset : { FIndex(1, 0, 0), FIndex(-1, 0, 0), FIndex(0, 1, 0), FIndex(0, -1, 0) })
+	{
+		if(GetRiverDistance(InWorldIndex + Offset) < OuterWidth)
+		{
+			ShoreStep = 1;
+			break;
+		}
+	}
+	if(ShoreStep > RiverDepth + 2) return false;
+
+	InOutTopography.Height = FMath::Min(InOutTopography.Height, InWaterHeight + ShoreStep);
+	const FIndex SandPatchIndex(FMath::FloorToInt(InWorldIndex.X / 6.f), FMath::FloorToInt(InWorldIndex.Y / 6.f), 0);
+	if(FMathHelper::HashRand(SandPatchIndex.ToVector2D(), Seed + 791) < 0.08f)
+	{
 		InOutTopography.RegionType = EVoxelRegionType::River;
 		InOutTopography.BiomeType = EVoxelBiomeType::Desert;
 		InOutTopography.Fertility = 0.f;
-		return true;
 	}
-
-	float Strength = 1.f;
-	if(CrossSectionAlpha > CoreAlpha)
-	{
-		const float SmoothBankAlpha = BankAlpha * BankAlpha * (3.f - 2.f * BankAlpha);
-		const float BankExponent = FMath::Lerp(4.f, 2.4f, RiverDepthAlpha);
-		Strength = 1.f - FMath::Pow(SmoothBankAlpha, BankExponent);
-	}
-	InOutTopography.Height = FMath::RoundToInt(FMath::Lerp(static_cast<float>(OriginalHeight), static_cast<float>(FMath::Min(OriginalHeight, BedHeight)), Strength));
-	if(Strength > 0.2f)
-	{
-		InOutTopography.RegionType = EVoxelRegionType::River;
-		InOutTopography.BiomeType = EVoxelBiomeType::River;
-		InOutTopography.Fertility = FMath::Max(InOutTopography.Fertility, 0.75f * Strength);
-	}
-	if(InWaterHeight < OriginalHeight && InOutTopography.Height <= InWaterHeight) InOutTopography.WaterHeight = InWaterHeight;
 	return true;
 }
 
@@ -207,7 +204,7 @@ float UVoxelRiverGenerator::GetRiverDistance(FIndex InWorldIndex, const TMap<FIn
 	const float ChannelDistance = FMath::Abs(GetTerrainAwareRiverField(InWorldIndex, InHeightCache));
 
 	constexpr int32 GradientSampleRadius = 2;
-	constexpr float MaxRiverHalfWidthInVoxels = 8.f;
+	constexpr float MaxRiverHalfWidthInVoxels = 10.f;
 	const float GradientX = (GetBaseRiverField(InWorldIndex + FIndex(GradientSampleRadius, 0, 0)) -
 		GetBaseRiverField(InWorldIndex - FIndex(GradientSampleRadius, 0, 0))) / (GradientSampleRadius * 2.f);
 	const float GradientY = (GetBaseRiverField(InWorldIndex + FIndex(0, GradientSampleRadius, 0)) -

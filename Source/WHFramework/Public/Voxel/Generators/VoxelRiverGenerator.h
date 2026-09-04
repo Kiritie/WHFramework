@@ -35,11 +35,13 @@ protected:
 
 	float CalculateTerrainDifficulty(FIndex InWorldIndex, const TMap<FIndex, int32>* InHeightCache = nullptr) const;
 
-	int32 CalculateWaterHeight(FIndex InWorldIndex, const TMap<FIndex, int32>* InHeightCache = nullptr) const;
+	int32 CalculateWaterHeight() const;
 
 	bool ApplyToTopographyCached(FIndex InWorldIndex, FVoxelTopography& InOutTopography, const TMap<FIndex, int32>& InHeightCache) const;
 
 	bool ApplyRiverProfile(FIndex InWorldIndex, float InRiverDistance, FVoxelTopography& InOutTopography, int32 InWaterHeight) const;
+
+	bool ApplyRiverShore(FIndex InWorldIndex, float InRiverDistance, FVoxelTopography& InOutTopography, int32 InWaterHeight) const;
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -61,5 +63,5 @@ protected:
 	int32 RiverDepth;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
-	int32 MinAltitudeAboveSea;
+	int32 RiverHeightAboveSea;
 };
