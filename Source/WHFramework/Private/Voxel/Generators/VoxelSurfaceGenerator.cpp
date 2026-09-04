@@ -9,17 +9,18 @@ UVoxelSurfaceGenerator::UVoxelSurfaceGenerator()
 	TemperatureSeed = 143;
 	HumiditySeed = 201;
 	ClimateOctaves = 3;
-	ClimateScale = 28.f;
+	ClimateScale = 40.f;
 	HeightLayers = {
+		FVoxelSurfaceNoiseLayer(3.f, 0.5f),
 		FVoxelSurfaceNoiseLayer(6.f, 0.2f),
 		FVoxelSurfaceNoiseLayer(12.f, 0.3f),
 		FVoxelSurfaceNoiseLayer(32.f, 0.4f)
 	};
-	ContinentScale = 28.f;
-	ErosionScale = 14.f;
-	RidgeScale = 7.f;
+	ContinentScale = 40.f;
+	ErosionScale = 20.f;
+	RidgeScale = 12.f;
 	ContinentHeight = 16.f;
-	MountainHeight = 38.f;
+	MountainHeight = 56.f;
 }
 
 void UVoxelSurfaceGenerator::Generate(UVoxelChunk* InChunk)
@@ -116,13 +117,13 @@ int32 UVoxelSurfaceGenerator::SampleHeight(FIndex InWorldIndex, float InContinen
 		Detail += Module->GetVoxelNoise2D(InWorldIndex.ToVector2D() / Scale) * Layer.Weight;
 	}
 
-	const float LandAlpha = FMath::SmoothStep(-0.35f, 0.15f, InContinentalness);
+	const float LandAlpha = FMath::SmoothStep(-0.75f, -0.3f, InContinentalness);
 	const float OceanFloor = SeaLevel - 8.f + InContinentalness * 8.f;
-	const float Plains = SeaLevel + 3.f + InContinentalness * ContinentHeight + Detail * 3.5f;
+	const float Plains = SeaLevel + 7.f + InContinentalness * ContinentHeight + Detail * 3.5f;
 	const float Relief = 1.f - InErosion;
 	const float HillMask = FMath::SmoothStep(-0.05f, 0.4f, InContinentalness) * FMath::SmoothStep(0.2f, 0.65f, Relief);
 	const float MountainMask = FMath::SmoothStep(0.18f, 0.62f, InContinentalness) * FMath::SmoothStep(0.48f, 0.9f, Relief);
-	const float Hills = FMath::Pow(InPeaksAndValleys, 1.15f) * HillMask * 9.f;
+	const float Hills = FMath::Pow(InPeaksAndValleys, 1.15f) * HillMask * 14.f;
 	const float Mountain = FMath::Pow(InPeaksAndValleys, 1.35f) * MountainMask * MountainHeight;
 	const float Height = FMath::Lerp(OceanFloor, Plains + Hills + Mountain, LandAlpha);
 	return FMath::Clamp(FMath::RoundToInt(Height), 1, Module->GetWorldData().SkyHeight - 1);

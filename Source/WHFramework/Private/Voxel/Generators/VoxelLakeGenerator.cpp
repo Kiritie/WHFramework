@@ -207,6 +207,29 @@ bool UVoxelLakeGenerator::BuildLakeFeature(FIndex InChunkIndex, FVoxelLakeFeatur
 	OutFeature.MinorRadius = MinorRadius;
 	OutFeature.Rotation = Rotation;
 	OutFeature.Depth = Depth;
+
+	const int32 BoundaryReach = FMath::CeilToInt(MajorRadius * 1.25f) + 2;
+	for(int32 Y = BestCenter.Y - BoundaryReach; Y <= BestCenter.Y + BoundaryReach; ++Y)
+	for(int32 X = BestCenter.X - BoundaryReach; X <= BestCenter.X + BoundaryReach; ++X)
+	{
+		const FIndex ShoreIndex(X, Y, 0);
+		if(CalculateShapeAlpha(OutFeature, ShoreIndex) < 1.f) continue;
+		bool bTouchesLake = false;
+		for(const FIndex& Direction : Directions)
+		{
+			if(Direction.X != 0 && Direction.Y != 0) continue;
+			if(CalculateShapeAlpha(OutFeature, ShoreIndex + Direction) < 1.f)
+			{
+				bTouchesLake = true;
+				break;
+			}
+		}
+		if(!bTouchesLake) continue;
+
+		FVoxelTopography Shore = Module->SampleBaseTopographyByIndex(ShoreIndex);
+		RiverGenerator->ApplyToTopography(ShoreIndex, Shore);
+		if(Shore.WaterHeight != WaterHeight && Shore.Height < WaterHeight) return false;
+	}
 	return true;
 }
 

@@ -29,6 +29,8 @@ public:
 protected:
 	float GetRiverDistance(FIndex InWorldIndex, const TMap<FIndex, int32>* InHeightCache = nullptr) const;
 
+	float GetClosedRiverDistance(FIndex InWorldIndex, const TMap<FIndex, int32>* InHeightCache = nullptr) const;
+
 	float GetBaseRiverField(FIndex InWorldIndex) const;
 
 	float GetTerrainAwareRiverField(FIndex InWorldIndex, const TMap<FIndex, int32>* InHeightCache = nullptr) const;
@@ -37,11 +39,14 @@ protected:
 
 	int32 CalculateWaterHeight() const;
 
+	float SampleBankNoise(FIndex InWorldIndex) const;
+
 	bool ApplyToTopographyCached(FIndex InWorldIndex, FVoxelTopography& InOutTopography, const TMap<FIndex, int32>& InHeightCache) const;
 
 	bool ApplyRiverProfile(FIndex InWorldIndex, float InRiverDistance, FVoxelTopography& InOutTopography, int32 InWaterHeight) const;
 
-	bool ApplyRiverShore(FIndex InWorldIndex, float InRiverDistance, FVoxelTopography& InOutTopography, int32 InWaterHeight) const;
+	bool ApplyRiverShore(FIndex InWorldIndex, float InRiverDistance, FVoxelTopography& InOutTopography, int32 InWaterHeight,
+		const TMap<FIndex, int32>* InHeightCache = nullptr) const;
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -53,10 +58,12 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0001"))
 	float WarpScale;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.001"))
-	float RiverWidth;
+	/** 河心半宽（格） */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "1", Delta = "1"))
+	float RiverHalfWidth;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.001"))
+	/** 单侧河岸宽度（格） */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "1", Delta = "1"))
 	float BankWidth;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "1"))

@@ -32,6 +32,7 @@ float UVoxelWaterData::GetWaterCornerHeight(const FVoxelItem& InVoxelItem, int32
 	bool bUpperFlow = false;
 	bool bLowerFlow = false;
 	bool bSourceFlow = false;
+	bool bSameLevelSource = false;
 	const int32 VertexX = InX > 0 ? 1 : 0;
 	const int32 VertexY = InY > 0 ? 1 : 0;
 	for(int32 X = VertexX - 1; X <= VertexX; ++X)
@@ -45,6 +46,7 @@ float UVoxelWaterData::GetWaterCornerHeight(const FVoxelItem& InVoxelItem, int32
 				const FVoxelLiquidState State(Item.Data);
 				if(State.IsFalling()) continue;
 				bSourceFlow |= State.IsSource();
+				bSameLevelSource |= State.IsSource();
 				Height += GetWaterHeight(Item);
 				++Count;
 			}
@@ -65,6 +67,7 @@ float UVoxelWaterData::GetWaterCornerHeight(const FVoxelItem& InVoxelItem, int32
 			}
 		}
 	}
+	if(bSameLevelSource) return 1.f;
 	if(bUpperFlow) return bSourceFlow ? 1.f : 1.1f;
 	if(bLowerFlow) return bSourceFlow ? 0.f : 0.1f;
 	return Count > 0 ? Height / Count : GetWaterHeight(InVoxelItem);
