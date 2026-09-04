@@ -277,7 +277,7 @@ bool UVoxelTownGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, 
 	const int UpDown = _PrefabAssets[InIndex]->VoxelSize[2];
 	const int32 GroundOffset = _PrefabGroundOffsets.IsValidIndex(InIndex) ? _PrefabGroundOffsets[InIndex] : 0;
 
-	float Aver = 0;
+	int32 GroundHeight = MIN_int32;
 	for(int i = -FrontBack - 1; i <= FrontBack; ++i)
 	{
 		for(int j = -LeftRight - 1; j <= LeftRight; ++j)
@@ -285,6 +285,7 @@ bool UVoxelTownGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, 
 			const FVoxelTopography Topography = Module->SampleTopographyByIndex(FIndex(InX + i, InY + j, 0));
 			if(Topography.RegionType == EVoxelRegionType::Ocean || Topography.RegionType == EVoxelRegionType::River ||
 				Topography.RegionType == EVoxelRegionType::Lake || Topography.BiomeType == EVoxelBiomeType::Ocean || Topography.BiomeType == EVoxelBiomeType::River) return false;
+			GroundHeight = FMath::Max(GroundHeight, SamplePlannedHeight(FIndex(InX + i, InY + j)));
 		}
 	}
 	for(int i = -FrontBack; i < FrontBack; ++i)
@@ -293,20 +294,16 @@ bool UVoxelTownGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, 
 		{
 			if(!_Domains.Find(FMathHelper::CompressIndex(InX + i, InY + j))) return false;
 
-			Aver += SamplePlannedHeight(FIndex(InX + i, InY + j));
 		}
 	}
 
-	Aver /= _PrefabAssets[InIndex]->VoxelSize[0] * _PrefabAssets[InIndex]->VoxelSize[1];
-	Aver = floor(Aver + 0.5f);
-
-	if(Aver <= Module->GetWorldData().SeaLevel) return false;
+	if(GroundHeight == MIN_int32 || GroundHeight <= Module->GetWorldData().SeaLevel) return false;
 
 	for(int i = -FrontBack; i < FrontBack; ++i)
 	{
 		for(int j = -LeftRight; j < LeftRight; ++j)
 		{
-			for(int k = SamplePlannedHeight(FIndex(InX + i, InY + j)); k <= Aver; ++k)
+			for(int k = SamplePlannedHeight(FIndex(InX + i, InY + j)); k <= GroundHeight; ++k)
 			{
 				const FIndex Index = FIndex(InX + i, InY + j, k);
 				SetPlannedVoxel(Index, EVoxelType::Cobble_Stone);
@@ -321,7 +318,7 @@ bool UVoxelTownGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, 
 		{
 			for(int k = 0; k < UpDown; ++k)
 			{
-				const FIndex Index = FIndex(InX + i, InY + j, Aver + k + 1);
+				const FIndex Index = FIndex(InX + i, InY + j, GroundHeight + k + 1);
 				SetPlannedVoxel(Index, FVoxelItem::Empty);
 			}
 		}
@@ -340,7 +337,7 @@ bool UVoxelTownGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, 
 		{
 			VoxelItem.Angle = FMathHelper::CombineRightAngle(VoxelItem.Angle, (ERightAngle)InRotate);
 		}
-		const FIndex Index = FIndex(InX, InY, Aver + GroundOffset) + FMathHelper::RotateIndex(VoxelItem.Index, (ERightAngle)InRotate) + UVoxelModuleStatics::RightAngleToVoxelIndex((ERightAngle)InRotate);
+		const FIndex Index = FIndex(InX, InY, GroundHeight + GroundOffset) + FMathHelper::RotateIndex(VoxelItem.Index, (ERightAngle)InRotate) + UVoxelModuleStatics::RightAngleToVoxelIndex((ERightAngle)InRotate);
 		SetPlannedVoxel(Index, VoxelItem);
 	}
 
@@ -352,7 +349,7 @@ bool UVoxelTownGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, 
 		: _PrefabAssets[InIndex]->DisplayName;
 	FSceneArea BuildingArea;
 	BuildingArea.AreaName = *FString::Printf(TEXT("TownBuilding_%d_%d"), InX, InY);
-	BuildingArea.AreaDisplayName = Module->GetVoxelAreaName(FIndex(InX, InY, Aver), EVoxelAreaType::Building, BuildingDisplayName);
+	BuildingArea.AreaDisplayName = Module->GetVoxelAreaName(FIndex(InX, InY, GroundHeight), EVoxelAreaType::Building, BuildingDisplayName);
 	BuildingArea.AreaType = ESceneAreaType::Default;
 	BuildingArea.AreaShape = ESceneAreaShape::Box;
 	BuildingArea.AreaCenter = FVector2D(InX, InY);
