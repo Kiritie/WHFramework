@@ -3,7 +3,8 @@
 #include "Task/Slate/STaskDetailsWidget.h"
 
 #include "SlateOptMacros.h"
-#include "Task/Slate/STaskListWidget.h"
+#include "Task/Slate/STaskGraphWidget.h"
+#include "Task/Base/TaskBase.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
@@ -38,7 +39,6 @@ void STaskDetailsWidget::Construct(const FArguments& InArgs)
 		.BorderImage(FCoreStyle::Get().GetBrush("ToolPanel.GroupBorder"))
 		[
 			SNew(SBox)
-			.WidthOverride(420)
 			[
 				SNew(SVerticalBox)
 
@@ -74,27 +74,13 @@ void STaskDetailsWidget::OnReset()
 void STaskDetailsWidget::OnRefresh()
 {
 	SEditorWidgetBase::OnRefresh();
-
-	if(TaskEditor.Pin()->ListWidget->bDefaults)
-	{
-		DetailsView->SetObject(TaskEditor.Pin()->GetEditingAsset());
-	}
-	else if(TaskEditor.Pin()->ListWidget->SelectedTaskListItems.Num() > 0)
-	{
-		TArray<UObject*> Tasks = TArray<UObject*>();
-		for(auto Iter : TaskEditor.Pin()->ListWidget->SelectedTaskListItems)
-		{
-			if(Iter->Task)
-			{
-				Tasks.Add(Iter->Task);
-			}
-		}
-		DetailsView->SetObjects(Tasks);
-	}
-	else
-	{
-		DetailsView->SetObject(nullptr);
-	}
+	const TSharedPtr<FTaskEditor> Editor = TaskEditor.Pin();
+	if (!Editor) return;
+	TArray<UObject*> Objects;
+	if (Editor->GraphWidget)
+		for (UTaskBase* Task : Editor->GraphWidget->GetSelectedTasks()) Objects.Add(Task);
+	if (Objects.IsEmpty()) Objects.Add(Editor->GetEditingAsset());
+	DetailsView->SetObjects(Objects);
 }
 
 void STaskDetailsWidget::OnDestroy()

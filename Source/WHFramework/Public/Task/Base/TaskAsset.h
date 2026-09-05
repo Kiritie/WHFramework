@@ -20,12 +20,15 @@ public:
 
 public:
 	virtual void Initialize() override;
+	virtual UWorld* GetWorld() const override;
+	bool RebuildTaskMap(bool bValidateDefinition = true);
+	bool ValidateTasks(TArray<FText>& OutErrors) const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Task Stats
 public:
 	/// 根任务
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, Instanced)
 	TArray<UTaskBase*> RootTasks;
 	/// 任务Map
 	UPROPERTY(Transient)
@@ -40,9 +43,7 @@ public:
 	/// Editor
 public:
 #if WITH_EDITOR
-	void GenerateTaskListItem(TArray<TSharedPtr<struct FTaskListItem>>& OutTaskListItems, const FString& InFilterText = TEXT(""));
-
-	void UpdateTaskListItem(TArray<TSharedPtr<struct FTaskListItem>>& OutTaskListItems);
+	virtual EDataValidationResult IsDataValid(class FDataValidationContext& Context) const override;
 
 	bool CanAddTask(TSubclassOf<UTaskBase> InTaskClass);
 

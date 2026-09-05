@@ -69,7 +69,7 @@ public:
 protected:
 	TArray<IInteractionAgentInterface*> OverlappingAgents;
 	
-	IInteractionAgentInterface* InteractingAgent;
+	IInteractionAgentInterface* InteractingAgent = nullptr;
 	
 public:
 	virtual EInteractAgentType GetInteractAgentType() const { return EInteractAgentType::None; }

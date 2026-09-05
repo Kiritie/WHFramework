@@ -3,6 +3,7 @@
 #pragma once
 
 #include "SaveGame/SaveGameModuleTypes.h"
+#include "GameplayTagContainer.h"
 #include "TaskModuleTypes.generated.h"
 
 class UTaskBase;
@@ -19,6 +20,7 @@ enum class ETaskState : uint8
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTaskStateChanged, ETaskState, InTaskState);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnTaskAssetsChanged);
 
 UENUM(BlueprintType)
 enum class ETaskExecuteType : uint8
@@ -79,37 +81,100 @@ enum class ETaskTaskState : uint8
 	Completed
 };
 
+UENUM(BlueprintType)
+enum class ETaskStage : uint8
+{
+	Locked,
+	Available,
+	Active,
+	ReadyToTurnIn,
+	Finished,
+	Failed
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FTaskReference
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSoftObjectPtr<UTaskAsset> Asset;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FString TaskGUID;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FTaskObjective
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FName ObjectiveID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FText Description;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FGameplayTag EventTag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FGameplayTag TargetTag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FPrimaryAssetId TargetAssetID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1"))
+	int32 RequiredCount = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	bool bOptional = false;
+};
+
+USTRUCT()
+struct WHFRAMEWORK_API FTaskRuntimeSaveData
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FSaveData Archive;
+
+	UPROPERTY()
+	float ExecuteRemaining = -1.f;
+
+	UPROPERTY()
+	float CompleteRemaining = -1.f;
+
+	UPROPERTY()
+	float LeaveRemaining = -1.f;
+
+	UPROPERTY()
+	float GuideRemaining = -1.f;
+};
+
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FTaskModuleSaveData : public FSaveData
 {
 	GENERATED_BODY()
 
-public:
-	FORCEINLINE FTaskModuleSaveData()
-	{
-		Assets = TArray<UTaskAsset*>();
-		CurrentTask = nullptr;
-		TaskDataMap = TMap<FString, FSaveData>();
-	}
-
-public:
 	UPROPERTY()
-	TArray<UTaskAsset*> Assets;
+	TArray<TSoftObjectPtr<UTaskAsset>> AssetPaths;
 
 	UPROPERTY()
-	UTaskBase* CurrentTask;
+	FString CurrentTaskAssetPath;
 
 	UPROPERTY()
-	TMap<FString, FSaveData> TaskDataMap;
+	FString CurrentTaskGUID;
 
-public:
+	UPROPERTY()
+	TMap<FString, FTaskRuntimeSaveData> TaskRecords;
+
 	virtual void MakeSaved() override
 	{
 		Super::MakeSaved();
-
-		for(auto& Iter : TaskDataMap)
+		for (auto& Iter : TaskRecords)
 		{
-			Iter.Value.MakeSaved();
+			Iter.Value.Archive.MakeSaved();
 		}
 	}
 };

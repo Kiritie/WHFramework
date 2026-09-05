@@ -27,6 +27,9 @@ public:
 	// ParamSets default values for this actor's properties
 	UTaskModule();
 
+	UPROPERTY(BlueprintAssignable)
+	FOnTaskAssetsChanged OnTaskAssetsChanged;
+
 	~UTaskModule();
 
 	//////////////////////////////////////////////////////////////////////////
@@ -114,6 +117,18 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void LeaveTaskByGUID(const FString& InTaskGUID);
 
+	UFUNCTION(BlueprintPure)
+	UTaskBase* ResolveTask(const FTaskReference& Reference) const;
+
+	UFUNCTION(BlueprintCallable)
+	UTaskBase* EnsureTask(const FTaskReference& Reference);
+
+	UFUNCTION(BlueprintCallable)
+	bool TurnInTask(UTaskBase* InTask, AActor* InTarget);
+
+	UFUNCTION(BlueprintCallable)
+	void ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTargetTag, int32 InCount = 1, FPrimaryAssetId InTargetAssetID = FPrimaryAssetId());
+
 public:
 	UFUNCTION(BlueprintPure)
 	bool IsAllTaskCompleted() const;
@@ -130,6 +145,16 @@ protected:
 	/// 当前任务 
 	UPROPERTY(VisibleAnywhere, Category = "TaskModule|Task Stats")
 	UTaskBase* CurrentTask;
+
+	UPROPERTY(Transient)
+	FTaskModuleSaveData CachedSaveData;
+	UPROPERTY(Transient)
+	TMap<UTaskBase*, FTaskRuntimeSaveData> PendingResume;
+	bool bLoadingTasks = false;
+	UTaskBase* TurningInTask = nullptr;
+	void ClearRuntimeAssets();
+	UTaskBase* ResolveRuntimeTask(UTaskBase* Task) const;
+	static FString GetSaveKey(const UTaskAsset* Asset, const FString& GUID);
 
 public:
 	/**

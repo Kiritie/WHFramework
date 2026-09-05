@@ -6,9 +6,7 @@
 #include "TaskEditor.h"
 #include "WHFrameworkEditorStyle.h"
 #include "Styling/SlateStyle.h"
-#include "TaskEditorTypes.generated.h"
 
-FString GTaskEditorIni;
 
 //////////////////////////////////////////////////////////////////////////
 // ClassFilter
@@ -39,22 +37,4 @@ public:
 
 public:
 	TSharedPtr< FUICommandInfo > OpenTaskEditorWindow;
-};
-
-//////////////////////////////////////////////////////////////////////////
-// EditorSettings
-UCLASS(config = TaskEditor, configdonotcheckdefaults)
-class WHFRAMEWORKEDITOR_API UTaskEditorSettings : public UObject
-{
-	GENERATED_BODY()
-
-public:
-	UTaskEditorSettings();
-
-public:
-	UPROPERTY(Config, EditAnywhere, Category = "List")
-	bool bDefaultIsDefaults;
-
-	UPROPERTY(Config, EditAnywhere, Category = "List")
-	bool bDefaultIsEditing;
 };

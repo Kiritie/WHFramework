@@ -26,12 +26,7 @@ public:
 	virtual void ShutdownModule() override;
 
 public:
-	virtual void RegisterSettings(ISettingsModule* SettingsModule) override;
 
-	virtual void UnRegisterSettings(ISettingsModule* SettingsModule) override;
-
-	virtual bool HandleSettingsSaved() override;
-	
 	virtual void RegisterCommands(const TSharedPtr<FUICommandList>& Commands) override;
 
 	virtual void RegisterMenus(const TSharedPtr<FUICommandList>& Commands) override;
@@ -47,6 +42,7 @@ public:
 
 private:
 	void OnClickedTaskEditorButton();
+	TSharedPtr<struct FGraphPanelNodeFactory> GraphNodeFactory;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -67,17 +63,17 @@ public:
 
 	virtual TSharedRef<FTabManager::FLayout> CreateDefaultLayout() override;
 
-	virtual void ExtendToolbar(FToolBarBuilder& ToolbarBuilder) override;
-
 	virtual void PostUndo(bool bSuccess) override;
 	
 	virtual void PostRedo(bool bSuccess) override;
 
 public:
 	virtual FEditorModuleBase* GetEditorModule() const override;
+	void RefreshDetails();
+	void OnTaskPropertyChanged(const FPropertyChangedEvent& Event);
 
 protected:
-	TSharedRef<SDockTab> SpawnListWidgetTab(const FSpawnTabArgs& Args);
+	TSharedRef<SDockTab> SpawnGraphWidgetTab(const FSpawnTabArgs& Args);
 
 	TSharedRef<SDockTab> SpawnDetailsWidgetTab(const FSpawnTabArgs& Args);
 
@@ -86,14 +82,10 @@ protected:
 protected:
 	virtual void OnBlueprintCompiled() override;
 
-	virtual void OnDefaultsToggled();
-
-	virtual void OnEditingToggled();
-	
 	//////////////////////////////////////////////////////////////////////////
 	/// Widgets
 public:
-	TSharedPtr<class STaskListWidget> ListWidget;
+	TSharedPtr<class STaskGraphWidget> GraphWidget;
 
 	TSharedPtr<class STaskDetailsWidget> DetailsWidget;
 

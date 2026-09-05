@@ -7,7 +7,6 @@
 
 #include "Slate/Editor/Base/SEditorWidgetBase.h"
 
-class STaskListWidget;
 class UTaskModule;
 /**
  * 

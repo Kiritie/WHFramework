@@ -28,6 +28,7 @@
 #include "Scene/SceneEditor.h"
 #include "Step/StepEditor.h"
 #include "Task/TaskEditor.h"
+#include "Dialogue/DialogueEditor.h"
 
 #define LOCTEXT_NAMESPACE "FWHFrameworkEditorModule"
 
@@ -94,6 +95,7 @@ void FWHFrameworkEditorModule::StartupEditorModules()
 	STARTUP_MODULE(FSceneEditorModule);
 	STARTUP_MODULE(FStepEditorModule);
 	STARTUP_MODULE(FTaskEditorModule);
+	STARTUP_MODULE(FDialogueEditorModule);
 
 	PropertyEditorModule.NotifyCustomizationModuleChanged();
 }
@@ -121,6 +123,7 @@ void FWHFrameworkEditorModule::ShutdownEditorModules()
 	SHUTDOWN_MODULE(FSceneEditorModule);
 	SHUTDOWN_MODULE(FStepEditorModule);
 	SHUTDOWN_MODULE(FTaskEditorModule);
+	SHUTDOWN_MODULE(FDialogueEditorModule);
 
 	if(FModuleManager::Get().IsModuleLoaded(TEXT("AssetTools")))
 	{

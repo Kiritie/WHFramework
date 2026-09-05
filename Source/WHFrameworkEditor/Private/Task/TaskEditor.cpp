@@ -1,9 +1,11 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Task/TaskEditor.h"
+#include "Task/Slate/STaskGraphWidget.h"
+#include "Task/Graph/TaskAssetGraphNode.h"
+#include "EdGraphUtilities.h"
 
 #include "Editor.h"
-#include "ISettingsSection.h"
 #include "WHFrameworkSlateStatics.h"
 #include "Task/TaskModule.h"
 #include "Task/Base/TaskAsset.h"
@@ -13,7 +15,7 @@
 #include "Task/Customization/TaskCustomization.h"
 #include "Task/TaskEditorTypes.h"
 #include "Task/Slate/STaskDetailsWidget.h"
-#include "Task/Slate/STaskListWidget.h"
+#include "IDetailsView.h"
 #include "Task/Slate/STaskStatusWidget.h"
 
 #define LOCTEXT_NAMESPACE "FTaskEditor"
@@ -30,33 +32,15 @@ FTaskEditorModule::FTaskEditorModule()
 void FTaskEditorModule::StartupModule()
 {
 	FTaskEditorCommands::Register();
+	GraphNodeFactory = CreateTaskGraphNodeFactory();
+	FEdGraphUtilities::RegisterVisualNodeFactory(GraphNodeFactory);
 }
 
 void FTaskEditorModule::ShutdownModule()
 {
+	FEdGraphUtilities::UnregisterVisualNodeFactory(GraphNodeFactory);
+	GraphNodeFactory.Reset();
 	FTaskEditorCommands::Unregister();
-}
-
-void FTaskEditorModule::RegisterSettings(ISettingsModule* SettingsModule)
-{
-	GTaskEditorIni = GConfig->GetDestIniFilename(TEXT("TaskEditor"), *UGameplayStatics::GetPlatformName(), *FPaths::GeneratedConfigDir());
-	const ISettingsSectionPtr SettingsSection = SettingsModule->RegisterSettings(FName("Project"), FName("WHFramework"), FName("Task Editor"), FText::FromString(TEXT("Task Editor")), FText::FromString(TEXT("Configure the Task editor plugin")), GetMutableDefault<UTaskEditorSettings>());
-	if(SettingsSection.IsValid())
-	{
-		SettingsSection->OnModified().BindRaw(this, &FTaskEditorModule::HandleSettingsSaved);
-	}
-}
-
-void FTaskEditorModule::UnRegisterSettings(ISettingsModule* SettingsModule)
-{
-	SettingsModule->UnregisterSettings(FName("Project"), FName("Plugins"), FName("Task Editor"));
-}
-
-bool FTaskEditorModule::HandleSettingsSaved()
-{
-	UTaskEditorSettings* TaskEditorSetting = GetMutableDefault<UTaskEditorSettings>();
-	TaskEditorSetting->SaveConfig();
-	return true;
 }
 
 void FTaskEditorModule::RegisterCommands(const TSharedPtr<FUICommandList>& Commands)
@@ -118,7 +102,7 @@ FTaskEditor::FTaskEditor()
 	ToolkitFName = FName("TaskEditor");
 	BaseToolkitName =  LOCTEXT("AppLabel", "Task Editor");
 	MenuCategory = LOCTEXT("TaskEditor", "Task Editor");
-	DefaultLayoutName = FName("TaskEditor_Layout");
+	DefaultLayoutName = FName("TaskEditor_ContextGraphLayout_v2");
 	WorldCentricTabPrefix =  LOCTEXT("WorldCentricTabPrefix", "Task ").ToString();
 	WorldCentricTabColorScale =  FLinearColor( 0.0f, 0.0f, 0.2f, 0.5f );
 }
@@ -130,6 +114,8 @@ FTaskEditor::~FTaskEditor()
 
 void FTaskEditor::InitAssetEditorBase(const EToolkitMode::Type Mode, const TSharedPtr<IToolkitHost>& InitToolkitHost, UObject* Asset)
 {
+	Asset->SetFlags(RF_Transactional);
+	GEditor->RegisterForUndo(this);
 	FAssetEditorBase::InitAssetEditorBase(Mode, InitToolkitHost, Asset);
 }
 
@@ -137,18 +123,20 @@ void FTaskEditor::RegisterTabSpawners(const TSharedRef<class FTabManager>& InTab
 {
 	FAssetEditorBase::RegisterTabSpawners(InTabManager);
 
-	SAssignNewEd(ListWidget, STaskListWidget, true)
-		.TaskEditor(SharedThis(this));
-
 	SAssignNewEd(DetailsWidget, STaskDetailsWidget, true)
 		.TaskEditor(SharedThis(this));
 
 	SAssignNewEd(StatusWidget, STaskStatusWidget, true)
 		.TaskEditor(SharedThis(this));
 
-	RegisterTrackedTabSpawner(InTabManager, "List", FOnSpawnTab::CreateSP(this, &FTaskEditor::SpawnListWidgetTab))
-		.SetDisplayName(LOCTEXT("ListTab", "List"))
-		.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Outliner"));
+	SAssignNew(GraphWidget, STaskGraphWidget).TaskEditor(SharedThis(this));
+	GetToolkitCommands()->Append(GraphWidget->GetCommands().ToSharedRef());
+	DetailsWidget->DetailsView->OnFinishedChangingProperties().AddSP(this, &FTaskEditor::OnTaskPropertyChanged);
+	DetailsWidget->DetailsView->SetIsPropertyEditingEnabledDelegate(FIsPropertyEditingEnabled::CreateSP(GraphWidget.ToSharedRef(), &STaskGraphWidget::CanEdit));
+	RefreshDetails();
+	RegisterTrackedTabSpawner(InTabManager, "Graph", FOnSpawnTab::CreateSP(this, &FTaskEditor::SpawnGraphWidgetTab))
+		.SetDisplayName(LOCTEXT("GraphTab", "Task Graph"))
+		.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "GraphEditor.EventGraph_16x"));
 
 	RegisterTrackedTabSpawner(InTabManager, "Details", FOnSpawnTab::CreateSP(this, &FTaskEditor::SpawnDetailsWidgetTab))
 		.SetDisplayName(LOCTEXT("DetailsTab", "Details"))
@@ -163,97 +151,24 @@ void FTaskEditor::UnregisterTabSpawners(const TSharedRef<class FTabManager>& InT
 {
 	FAssetEditorToolkit::UnregisterTabSpawners(InTabManager);
 
-	InTabManager->UnregisterTabSpawner("List");
+	InTabManager->UnregisterTabSpawner("Graph");
 	InTabManager->UnregisterTabSpawner("Details");
 	InTabManager->UnregisterTabSpawner("Status");
 }
 
 TSharedRef<FTabManager::FLayout> FTaskEditor::CreateDefaultLayout()
 {
-	const TSharedRef<FTabManager::FLayout> DefaultLayout = FAssetEditorBase::CreateDefaultLayout();
-
-	DefaultLayout->AddArea
-	(
-		FTabManager::NewPrimaryArea()
-		->SetOrientation(Orient_Vertical)
-		->Split
-		(
-			// Main application area
-			FTabManager::NewSplitter()
-			->SetOrientation(Orient_Horizontal)
-			->SetSizeCoefficient(0.9f)
-			->Split
-			(
-				FTabManager::NewStack()
-				->SetHideTabWell(false)
-				->SetSizeCoefficient(0.5f)
-				->AddTab("List", ETabState::OpenedTab)
-			)
-			->Split
-			(
-				FTabManager::NewStack()
-				->SetHideTabWell(false)
-				->SetSizeCoefficient(0.5f)
-				->AddTab("Details", ETabState::OpenedTab)
-			)
-		)
-		->Split
-		(
-			FTabManager::NewStack()
-			->SetHideTabWell(true)
-			->SetSizeCoefficient(0.1f)
-			->AddTab("Status", ETabState::OpenedTab)
-		)
-	);
-
-	return DefaultLayout;
+	return FTabManager::NewLayout(DefaultLayoutName)->AddArea(
+		FTabManager::NewPrimaryArea()->SetOrientation(Orient_Vertical)
+		->Split(FTabManager::NewSplitter()->SetOrientation(Orient_Horizontal)->SetSizeCoefficient(0.95f)
+			->Split(FTabManager::NewStack()->SetHideTabWell(true)->SetSizeCoefficient(0.75f)->AddTab("Graph", ETabState::OpenedTab))
+			->Split(FTabManager::NewStack()->SetHideTabWell(true)->SetSizeCoefficient(0.25f)->AddTab("Details", ETabState::OpenedTab)))
+		->Split(FTabManager::NewStack()->SetHideTabWell(true)->SetSizeCoefficient(0.05f)->AddTab("Status", ETabState::OpenedTab)));
 }
 
-void FTaskEditor::ExtendToolbar(FToolBarBuilder& ToolbarBuilder)
+TSharedRef<SDockTab> FTaskEditor::SpawnGraphWidgetTab(const FSpawnTabArgs& Args)
 {
-	ToolbarBuilder.BeginSection("List");
-	{
-		ToolbarBuilder.AddToolBarButton(
-			FUIAction(
-				FExecuteAction::CreateRaw(this, &FTaskEditor::OnDefaultsToggled),
-				FCanExecuteAction(),
-				FGetActionCheckState::CreateLambda([this](){
-					return ListWidget->bDefaults ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
-				})
-			),
-			NAME_None,
-			FText::FromString(TEXT("Defaults")),
-			FText::FromString(TEXT("Toggle Defaults")),
-			FSlateIcon(FAppStyle::GetAppStyleSetName(), "FullBlueprintEditor.EditGlobalOptions"),
-			EUserInterfaceActionType::ToggleButton
-		);
-		ToolbarBuilder.AddToolBarButton(
-			FUIAction(
-				FExecuteAction::CreateRaw(this, &FTaskEditor::OnEditingToggled),
-				FCanExecuteAction(),
-				FGetActionCheckState::CreateLambda([this](){
-					return ListWidget->bEditing ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
-				})
-			),
-			NAME_None,
-			FText::FromString(TEXT("Editing")),
-			FText::FromString(TEXT("Toggle Editing")),
-			FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Details"),
-			EUserInterfaceActionType::ToggleButton
-		);
-	}
-	ToolbarBuilder.EndSection();
-}
-
-TSharedRef<SDockTab> FTaskEditor::SpawnListWidgetTab(const FSpawnTabArgs& Args)
-{
-	TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab)
-		.Label(LOCTEXT("ListTab", "List"))
-		.ShouldAutosize(false)
-		[
-			ListWidget->TakeWidget()
-		];
-	return SpawnedTab;
+	return SNew(SDockTab)[GraphWidget.ToSharedRef()];
 }
 
 TSharedRef<SDockTab> FTaskEditor::SpawnDetailsWidgetTab(const FSpawnTabArgs& Args)
@@ -281,11 +196,13 @@ TSharedRef<SDockTab> FTaskEditor::SpawnStatusWidgetTab(const FSpawnTabArgs& Args
 void FTaskEditor::PostUndo(bool bSuccess)
 {
 	FAssetEditorBase::PostUndo(bSuccess);
+	if (bSuccess && GraphWidget) GraphWidget->Rebuild();
 }
 
 void FTaskEditor::PostRedo(bool bSuccess)
 {
 	FAssetEditorBase::PostRedo(bSuccess);
+	if (bSuccess && GraphWidget) GraphWidget->Rebuild();
 }
 
 FEditorModuleBase* FTaskEditor::GetEditorModule() const
@@ -297,17 +214,17 @@ void FTaskEditor::OnBlueprintCompiled()
 {
 	FAssetEditorBase::OnBlueprintCompiled();
 
-	ListWidget->Refresh();
+	if (GraphWidget) GraphWidget->Rebuild();
 }
 
-void FTaskEditor::OnDefaultsToggled()
+void FTaskEditor::RefreshDetails()
 {
-	ListWidget->ToggleDefaults();
+	if (DetailsWidget) DetailsWidget->Refresh();
 }
 
-void FTaskEditor::OnEditingToggled()
+void FTaskEditor::OnTaskPropertyChanged(const FPropertyChangedEvent& Event)
 {
-	ListWidget->ToggleEditing();
+	if (GraphWidget) GraphWidget->Rebuild();
 }
 
 //////////////////////////////////////////////////////////////////////////

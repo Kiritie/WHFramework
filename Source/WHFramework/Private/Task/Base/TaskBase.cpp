@@ -12,6 +12,9 @@
 #include "Event/Handle/Task/EventHandle_TaskStateChanged.h"
 #include "Task/TaskModule.h"
 #include "Task/TaskModuleStatics.h"
+#include "Task/Base/TaskAsset.h"
+#include "Engine/World.h"
+#include "TimerManager.h"
 
 UTaskBase::UTaskBase()
 {
@@ -86,6 +89,10 @@ void UTaskBase::OnInitialize()
 
 void UTaskBase::OnRestore()
 {
+	OnSuspend();
+	TaskExecuteResult = ETaskExecuteResult::None;
+	ObjectiveProgress.Reset();
+	bRewardsGranted = false;
 	TaskState = ETaskState::None;
 	OnStateChanged(TaskState);
 
@@ -102,22 +109,25 @@ void UTaskBase::OnRestore()
 
 void UTaskBase::OnEnter()
 {
+	ClearTaskTimers();
+	TaskExecuteResult = ETaskExecuteResult::None;
 	TaskState = ETaskState::Entered;
 	OnStateChanged(TaskState);
 
-	GetWorld()->GetTimerManager().ClearTimer(AutoExecuteTimerHandle);
+	if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(AutoExecuteTimerHandle);
 
 	TaskExecuteResult = ETaskExecuteResult::None;
 
 	WHDebug(FString::Printf(TEXT("进入任务: %s"), *TaskDisplayName.ToString()), EDM_All, EDC_Task, EDV_Log, FColor::Cyan, 5.f);
 
 	K2_OnEnter();
+	if (TaskState != ETaskState::Entered) return;
 
 	switch(TaskGuideType)
 	{
 		case ETaskGuideType::TimerOnce:
 		{
-			GetWorld()->GetTimerManager().SetTimer(StartGuideTimerHandle, this, &UTaskBase::Guide, TaskGuideIntervalTime, false);
+			if (GetWorld()) GetWorld()->GetTimerManager().SetTimer(StartGuideTimerHandle, this, &UTaskBase::Guide, TaskGuideIntervalTime, false);
 			break;
 		}
 		default: break;
@@ -131,16 +141,16 @@ void UTaskBase::OnEnter()
 		{
 			if(Iter)
 			{
-				Iter->OnEnter();
+				Iter->Enter();
 			}
 		}
 	}
 
-	if(TaskExecuteType == ETaskExecuteType::Automatic && TaskState != ETaskState::Executing)
+	if(TaskExecuteType == ETaskExecuteType::Automatic && TaskState == ETaskState::Entered)
 	{
 		if(AutoExecuteTaskTime > 0.f)
 		{
-			GetWorld()->GetTimerManager().SetTimer(AutoExecuteTimerHandle, this, &UTaskBase::Execute, AutoExecuteTaskTime, false);
+			if (GetWorld()) GetWorld()->GetTimerManager().SetTimer(AutoExecuteTimerHandle, this, &UTaskBase::Execute, AutoExecuteTaskTime, false);
 		}
 		else
 		{
@@ -151,7 +161,7 @@ void UTaskBase::OnEnter()
 
 void UTaskBase::OnRefresh()
 {
-	K2_OnRefresh();
+	if (bTaskTickEnabled) K2_OnRefresh();
 
 	for (auto Iter : SubTasks)
 	{
@@ -168,7 +178,7 @@ void UTaskBase::OnGuide()
 	{
 		case ETaskGuideType::TimerLoop:
 		{
-			GetWorld()->GetTimerManager().SetTimer(StartGuideTimerHandle, this, &UTaskBase::OnGuide, TaskGuideIntervalTime, false);
+			if (GetWorld()) GetWorld()->GetTimerManager().SetTimer(StartGuideTimerHandle, this, &UTaskBase::Guide, TaskGuideIntervalTime, false);
 			break;
 		}
 		default: break;
@@ -182,23 +192,24 @@ void UTaskBase::OnExecute()
 	TaskState = ETaskState::Executing;
 	OnStateChanged(TaskState);
 
-	GetWorld()->GetTimerManager().ClearTimer(AutoExecuteTimerHandle);
+	if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(AutoExecuteTimerHandle);
 
 	K2_OnExecute();
+	if (TaskState != ETaskState::Executing) return;
 
 	UEventModuleStatics::BroadcastEvent(UEventHandle_TaskExecuted::StaticClass(), this, {this});
 
-	if(TaskState != ETaskState::Completed)
+	if(TaskState == ETaskState::Executing)
 	{
 		switch(TaskCompleteType)
 		{
 			case ETaskCompleteType::Automatic:
 			{
-				if(!HasSubTask(false))
+				if(!HasSubTask(false) && Objectives.IsEmpty())
 				{
 					if(AutoCompleteTaskTime > 0.f)
 					{
-						GetWorld()->GetTimerManager().SetTimer(AutoCompleteTimerHandle, FTimerDelegate::CreateUObject(this, &UTaskBase::Complete, ETaskExecuteResult::Succeed), AutoCompleteTaskTime, false);
+						if (GetWorld()) GetWorld()->GetTimerManager().SetTimer(AutoCompleteTimerHandle, FTimerDelegate::CreateUObject(this, &UTaskBase::Complete, ETaskExecuteResult::Succeed), AutoCompleteTaskTime, false);
 					}
 					else
 					{
@@ -218,6 +229,9 @@ void UTaskBase::OnExecute()
 
 void UTaskBase::OnComplete(ETaskExecuteResult InTaskExecuteResult)
 {
+	TaskExecuteResult = InTaskExecuteResult;
+	TaskState = ETaskState::Completed;
+	ClearTaskTimers();
 	for(auto Iter : SubTasks)
 	{
 		if(Iter)
@@ -226,14 +240,11 @@ void UTaskBase::OnComplete(ETaskExecuteResult InTaskExecuteResult)
 		}
 	}
 
-	TaskExecuteResult = InTaskExecuteResult;
-
-	TaskState = ETaskState::Completed;
 	OnStateChanged(TaskState);
 
-	GetWorld()->GetTimerManager().ClearTimer(AutoCompleteTimerHandle);
+	if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(AutoCompleteTimerHandle);
 
-	GetWorld()->GetTimerManager().ClearTimer(StartGuideTimerHandle);
+	if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(StartGuideTimerHandle);
 	
 	K2_OnComplete(InTaskExecuteResult);
 
@@ -244,11 +255,11 @@ void UTaskBase::OnComplete(ETaskExecuteResult InTaskExecuteResult)
 		WHDebug(FString::Printf(TEXT("任务%s: %s"), TaskExecuteResult != ETaskExecuteResult::Skipped ? TEXT("完成") : TEXT("失败"), *TaskDisplayName.ToString()), EDM_All, EDC_Task, EDV_Log, FColor::Green, 5.f);
 	}
 
-	if(TaskLeaveType == ETaskLeaveType::Automatic && TaskState != ETaskState::Leaved)
+	if(TaskLeaveType == ETaskLeaveType::Automatic && TaskState == ETaskState::Completed)
 	{
 		if(TaskExecuteResult != ETaskExecuteResult::Skipped && AutoLeaveTaskTime > 0.f)
 		{
-			GetWorld()->GetTimerManager().SetTimer(AutoLeaveTimerHandle, this, &UTaskBase::Leave, AutoLeaveTaskTime, false);
+			if (GetWorld()) GetWorld()->GetTimerManager().SetTimer(AutoLeaveTimerHandle, this, &UTaskBase::Leave, AutoLeaveTaskTime, false);
 		}
 		else
 		{
@@ -259,6 +270,8 @@ void UTaskBase::OnComplete(ETaskExecuteResult InTaskExecuteResult)
 
 void UTaskBase::OnLeave()
 {
+	TaskState = ETaskState::Leaved;
+	ClearTaskTimers();
 	for(auto Iter : SubTasks)
 	{
 		if(Iter)
@@ -267,10 +280,10 @@ void UTaskBase::OnLeave()
 		}
 	}
 
-	TaskState = ETaskState::Leaved;
+	GrantRewards();
 	OnStateChanged(TaskState);
 
-	GetWorld()->GetTimerManager().ClearTimer(AutoLeaveTimerHandle);
+	if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(AutoLeaveTimerHandle);
 	
 	WHDebug(FString::Printf(TEXT("%s任务: %s"), TaskExecuteResult != ETaskExecuteResult::Skipped ? TEXT("离开") : TEXT("跳过"), *TaskDisplayName.ToString()), EDM_All, EDC_Task, EDV_Log, FColor::Orange, 5.f);
 
@@ -281,7 +294,7 @@ void UTaskBase::OnLeave()
 
 UTaskAsset* UTaskBase::GetTaskAsset() const
 {
-	return Cast<UTaskAsset>(GetOuter());
+	return GetTypedOuter<UTaskAsset>();
 }
 
 bool UTaskBase::IsCurrent() const
@@ -327,12 +340,25 @@ bool UTaskBase::CheckTaskSkipAble_Implementation(FString& OutInfo) const
 float UTaskBase::CheckTaskProgress_Implementation(FString& OutInfo) const
 {
 	float Progress = 0.f;
+	if (!Objectives.IsEmpty())
+	{
+		int32 Current = 0;
+		int32 Required = 0;
+		for (const FTaskObjective& Objective : Objectives)
+		{
+			if (Objective.bOptional) continue;
+			Required += FMath::Max(1, Objective.RequiredCount);
+			Current += FMath::Clamp(GetObjectiveProgress(Objective.ObjectiveID), 0, FMath::Max(1, Objective.RequiredCount));
+		}
+		OutInfo = FString::Printf(TEXT("%d/%d"), Current, Required);
+		return Required > 0 ? (float)Current / Required : 1.f;
+	}
 	if(HasSubTask())
 	{
 		int32 Num = 0;
 		for(auto Iter : SubTasks)
 		{
-			if(Iter->IsCompleted())
+			if(Iter && Iter->IsCompleted())
 			{
 				Num++;
 			}
@@ -403,50 +429,102 @@ void UTaskBase::Serialize(FArchive& Ar)
 		{
 			Ar << TaskState;
 			Ar << TaskExecuteResult;
+			Ar << ObjectiveProgress;
+			Ar << bRewardsGranted;
 		}
 		else if(Ar.IsSaving())
 		{
 			Ar << TaskState;
 			Ar << TaskExecuteResult;
+			Ar << ObjectiveProgress;
+			Ar << bRewardsGranted;
 		}
 	}
 }
 
 void UTaskBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
-	switch(TaskState)
-	{
-		case ETaskState::Entered:
-		{
-			OnEnter();
-			break;
-		}
-		case ETaskState::Executing:
-		{
-			OnExecute();
-			break;
-		}
-		case ETaskState::Completed:
-		{
-			OnComplete(TaskExecuteResult);
-			break;
-		}
-		case ETaskState::Leaved:
-		{
-			OnLeave();
-			break;
-		}
-		default: break;
-	}
-
 }
 
 FSaveData* UTaskBase::ToData()
 {
-	static FSaveData SaveData;
-	SaveData = FSaveData();
+	CachedSaveData = FSaveData();
+	return &CachedSaveData;
+}
 
-	return &SaveData;
+void UTaskBase::ClearTaskTimers()
+{
+	if (UWorld* World = GetWorld())
+	{
+		auto& Timers = World->GetTimerManager();
+		Timers.ClearTimer(AutoExecuteTimerHandle);
+		Timers.ClearTimer(AutoCompleteTimerHandle);
+		Timers.ClearTimer(AutoLeaveTimerHandle);
+		Timers.ClearTimer(StartGuideTimerHandle);
+	}
+}
+
+void UTaskBase::OnSuspend()
+{
+	ClearTaskTimers();
+	K2_OnSuspend();
+}
+
+void UTaskBase::OnResume()
+{
+	K2_OnResume();
+}
+
+void UTaskBase::BeginDestroy()
+{
+	ClearTaskTimers();
+	Super::BeginDestroy();
+}
+
+void UTaskBase::SetTaskTimersPaused(bool bPaused)
+{
+	if (UWorld* World = GetWorld())
+	{
+		for (const FTimerHandle Handle : {AutoExecuteTimerHandle, AutoCompleteTimerHandle, AutoLeaveTimerHandle, StartGuideTimerHandle})
+		{
+			if (bPaused) World->GetTimerManager().PauseTimer(Handle);
+			else World->GetTimerManager().UnPauseTimer(Handle);
+		}
+	}
+}
+
+FTaskRuntimeSaveData UTaskBase::CaptureRuntimeData()
+{
+	FTaskRuntimeSaveData Data;
+	Data.Archive = GetSaveDataRef<FSaveData>(true);
+	if (UWorld* World = GetWorld())
+	{
+		auto& Timers = World->GetTimerManager();
+		Data.ExecuteRemaining = Timers.GetTimerRemaining(AutoExecuteTimerHandle);
+		Data.CompleteRemaining = Timers.GetTimerRemaining(AutoCompleteTimerHandle);
+		Data.LeaveRemaining = Timers.GetTimerRemaining(AutoLeaveTimerHandle);
+		Data.GuideRemaining = Timers.GetTimerRemaining(StartGuideTimerHandle);
+	}
+	return Data;
+}
+
+void UTaskBase::ResumeRuntimeData(const FTaskRuntimeSaveData& Data)
+{
+	ClearTaskTimers();
+	if (UWorld* World = GetWorld())
+	{
+		auto& Timers = World->GetTimerManager();
+		if (TaskState == ETaskState::Entered && Data.ExecuteRemaining >= 0.f)
+			Timers.SetTimer(AutoExecuteTimerHandle, this, &UTaskBase::Execute, FMath::Max(Data.ExecuteRemaining, KINDA_SMALL_NUMBER), false);
+		if (TaskState == ETaskState::Executing && Data.CompleteRemaining >= 0.f)
+			Timers.SetTimer(AutoCompleteTimerHandle, FTimerDelegate::CreateUObject(this, &UTaskBase::Complete, ETaskExecuteResult::Succeed), FMath::Max(Data.CompleteRemaining, KINDA_SMALL_NUMBER), false);
+		if (TaskState == ETaskState::Completed && Data.LeaveRemaining >= 0.f)
+			Timers.SetTimer(AutoLeaveTimerHandle, this, &UTaskBase::Leave, FMath::Max(Data.LeaveRemaining, KINDA_SMALL_NUMBER), false);
+		if (IsEntered() && Data.GuideRemaining >= 0.f)
+			Timers.SetTimer(StartGuideTimerHandle, this, &UTaskBase::Guide, FMath::Max(Data.GuideRemaining, KINDA_SMALL_NUMBER), false);
+	}
+	OnResume();
+	OnStateChanged(TaskState);
 }
 
 bool UTaskBase::HasSubTask(bool bIgnoreMerge) const
@@ -513,45 +591,6 @@ bool UTaskBase::IsAllSubLeaved() const
 }
 
 #if WITH_EDITOR
-bool UTaskBase::GenerateListItem(TSharedPtr<FTaskListItem> OutTaskListItem, const FString& InFilterText)
-{
-	OutTaskListItem->Task = this;
-	for (int32 i = 0; i < SubTasks.Num(); i++)
-	{
-		if(SubTasks[i])
-		{
-			auto Item = MakeShared<FTaskListItem>();
-			Item->ParentListItem = OutTaskListItem;
-			if(SubTasks[i]->GenerateListItem(Item, InFilterText))
-			{
-				OutTaskListItem->SubListItems.Add(Item);
-			}
-		}
-	}
-	if(!InFilterText.IsEmpty())
-	{
-		OutTaskListItem->GetStates().bExpanded = true;
-		return TaskDisplayName.ToString().Contains(InFilterText);
-	}
-	return true;
-}
-
-void UTaskBase::UpdateListItem(TSharedPtr<FTaskListItem> OutTaskListItem)
-{
-	OutTaskListItem->Task = this;
-	for (int32 i = 0; i < SubTasks.Num(); i++)
-	{
-		if(SubTasks[i])
-		{
-			SubTasks[i]->TaskIndex = i;
-			SubTasks[i]->TaskHierarchy = TaskHierarchy + 1;
-			SubTasks[i]->RootTask = IsRootTask() ? this : RootTask;
-			SubTasks[i]->ParentTask = this;
-			SubTasks[i]->UpdateListItem(OutTaskListItem->SubListItems[i]);
-		}
-	}
-}
-
 bool UTaskBase::CanEditChange(const FProperty* InProperty) const
 {
 	if(InProperty)
@@ -615,3 +654,78 @@ void UTaskBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 }
 #endif
+
+ETaskStage UTaskBase::GetTaskStage() const
+{
+	switch (TaskState)
+	{
+		case ETaskState::None:
+		{
+			FString Info;
+			return ArePrerequisitesMet() && CheckTaskCondition(Info) ? ETaskStage::Available : ETaskStage::Locked;
+		}
+		case ETaskState::Entered:
+		case ETaskState::Executing: return ETaskStage::Active;
+		case ETaskState::Completed: return TaskExecuteResult == ETaskExecuteResult::Failed ? ETaskStage::Failed : ETaskStage::ReadyToTurnIn;
+		case ETaskState::Leaved: return TaskExecuteResult == ETaskExecuteResult::Failed ? ETaskStage::Failed : ETaskStage::Finished;
+		default: return ETaskStage::Locked;
+	}
+}
+
+bool UTaskBase::ArePrerequisitesMet() const
+{
+	if (Prerequisites.IsEmpty()) return true;
+	if (!UTaskModule::IsValid()) return false;
+	for (const FTaskReference& Reference : Prerequisites)
+	{
+		const UTaskBase* Task = UTaskModule::Get().ResolveTask(Reference);
+		if (!Task || Task->TaskState != ETaskState::Leaved || !Task->IsSucceed()) return false;
+	}
+	return true;
+}
+
+int32 UTaskBase::GetObjectiveProgress(FName ObjectiveID) const
+{
+	return ObjectiveProgress.FindRef(ObjectiveID);
+}
+
+bool UTaskBase::AreObjectivesCompleted() const
+{
+	for (const FTaskObjective& Objective : Objectives)
+	{
+		if (!Objective.bOptional && GetObjectiveProgress(Objective.ObjectiveID) < FMath::Max(1, Objective.RequiredCount)) return false;
+	}
+	return true;
+}
+
+void UTaskBase::ApplyObjectiveEvent(FGameplayTag EventTag, FGameplayTag TargetTag, int32 Count, FPrimaryAssetId TargetAssetID)
+{
+	if (!IsExecuting() || Count <= 0) return;
+	bool bChanged = false;
+	for (const FTaskObjective& Objective : Objectives)
+	{
+		if (Objective.EventTag != EventTag || (Objective.TargetTag.IsValid() && !TargetTag.MatchesTag(Objective.TargetTag))) continue;
+		if (Objective.TargetAssetID.IsValid() && Objective.TargetAssetID != TargetAssetID) continue;
+		int32& Progress = ObjectiveProgress.FindOrAdd(Objective.ObjectiveID);
+		const int32 NewProgress = (int32)FMath::Min<int64>((int64)Progress + Count, FMath::Max(1, Objective.RequiredCount));
+		bChanged |= NewProgress != Progress;
+		Progress = NewProgress;
+	}
+	if (bChanged)
+	{
+		Restate();
+		if (AreObjectivesCompleted()) Complete();
+	}
+}
+
+void UTaskBase::OnReward()
+{
+	K2_OnReward();
+}
+
+void UTaskBase::GrantRewards()
+{
+	if (bRewardsGranted || TaskState != ETaskState::Leaved || TaskExecuteResult != ETaskExecuteResult::Succeed) return;
+	bRewardsGranted = true;
+	OnReward();
+}

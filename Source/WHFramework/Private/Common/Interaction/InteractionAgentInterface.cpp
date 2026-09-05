@@ -10,6 +10,7 @@
 
 bool IInteractionAgentInterface::IsInteractable(IInteractionAgentInterface* InInteractionAgent)
 {
+	if (!InInteractionAgent) return false;
 	switch(GetInteractAgentType())
 	{
 		case EInteractAgentType::Passivity:

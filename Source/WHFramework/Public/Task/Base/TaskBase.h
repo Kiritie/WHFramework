@@ -13,25 +13,6 @@
 class UTaskAsset;
 class ACameraActorBase;
 
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FTaskListItemStates
-{
-	GENERATED_BODY()
-
-public:
-	UPROPERTY()
-	bool bExpanded;
-
-	UPROPERTY()
-	bool bSelected;
-
-	FORCEINLINE FTaskListItemStates()
-	{
-		bExpanded = true;
-		bSelected = false;
-	}
-};
-
 /**
  * 任务基类
  */
@@ -122,6 +103,18 @@ public:
 	UFUNCTION()
 	virtual void OnLeave();
 
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnResume")
+	void K2_OnResume();
+	virtual void OnResume();
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnSuspend")
+	void K2_OnSuspend();
+	virtual void OnSuspend();
+	void ClearTaskTimers();
+	FTaskRuntimeSaveData CaptureRuntimeData();
+	void ResumeRuntimeData(const FTaskRuntimeSaveData& Data);
+	void SetTaskTimersPaused(bool bPaused);
+	virtual void BeginDestroy() override;
+
 public:
 	/**
 	* 还原任务
@@ -172,6 +165,7 @@ protected:
 	virtual FSaveData* ToData() override;
 
 	virtual bool HasArchive() const override { return true; }
+	FSaveData CachedSaveData;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Name/Description
@@ -185,6 +179,52 @@ public:
 	/// 任务描述
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (MultiLine = "true"), Category = "Name/Description")
 	FText TaskDescription;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FGameplayTag TaskCategory;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TArray<FTaskReference> Prerequisites;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TArray<FTaskObjective> Objectives;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	bool bSequentialSubTasks = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	bool bRequireExplicitTurnIn = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "bRequireExplicitTurnIn"))
+	FName TurnInActorTag;
+
+	UFUNCTION(BlueprintPure)
+	ETaskStage GetTaskStage() const;
+
+	UFUNCTION(BlueprintPure)
+	int32 GetObjectiveProgress(FName ObjectiveID) const;
+
+	UFUNCTION(BlueprintPure)
+	bool AreObjectivesCompleted() const;
+
+	UFUNCTION(BlueprintPure)
+	bool ArePrerequisitesMet() const;
+
+	void ApplyObjectiveEvent(FGameplayTag EventTag, FGameplayTag TargetTag, int32 Count, FPrimaryAssetId TargetAssetID);
+
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnReward")
+	void K2_OnReward();
+	virtual void OnReward();
+	void GrantRewards();
+
+protected:
+	UPROPERTY(VisibleAnywhere)
+	TMap<FName, int32> ObjectiveProgress;
+
+	UPROPERTY(VisibleAnywhere)
+	bool bRewardsGranted = false;
+
+public:
 	
 	//////////////////////////////////////////////////////////////////////////
 	/// Index/State
@@ -286,6 +326,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
 	float TaskGuideIntervalTime;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
+	bool bTaskTickEnabled = true;
+
 protected:
 	FTimerHandle StartGuideTimerHandle;
 	
@@ -327,7 +370,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SubTask")
 	bool bMergeSubTask;
 	/// 子任务
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SubTask")
+	UPROPERTY(VisibleAnywhere, Instanced, BlueprintReadOnly, Category = "SubTask")
 	TArray<UTaskBase*> SubTasks;
 public:
 	/**
@@ -371,85 +414,16 @@ public:
 	bool bRuntimeSelected;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// TaskListItem
+	/// Graph
 public:
 #if WITH_EDITORONLY_DATA
 	UPROPERTY()
-	FTaskListItemStates TaskListItemStates;
+	FVector2D GraphPosition = FVector2D::ZeroVector;
+	UPROPERTY()
+	bool bHasGraphPosition = false;
 #endif
 #if WITH_EDITOR
-	/**
-	* 构建任务列表项
-	*/
-	virtual bool GenerateListItem(TSharedPtr<struct FTaskListItem> OutTaskListItem, const FString& InFilterText = TEXT(""));
-	/**
-	* 更新任务列表项
-	*/
-	virtual void UpdateListItem(TSharedPtr<struct FTaskListItem> OutTaskListItem);
-
 	virtual bool CanEditChange(const FProperty* InProperty) const override;
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 };
-
-/**
- * 任务列表项
- */ 
-#if WITH_EDITOR
-struct FTaskListItem : public TSharedFromThis<FTaskListItem>
-{
-public:
-	FTaskListItem()
-	{
-		Task = nullptr;
-		ParentListItem = nullptr; 
-		SubListItems = TArray<TSharedPtr<FTaskListItem>>();
-	}
-
-	UTaskBase* Task;
-
-	TSharedPtr<FTaskListItem> ParentListItem;
-
-	TArray<TSharedPtr<FTaskListItem>> SubListItems;
-
-public:
-	FTaskListItemStates& GetStates() const
-	{
-		return Task->TaskListItemStates;
-	}
-
-	int32& GetTaskIndex() const
-	{
-		return Task->TaskIndex;
-	}
-
-	UTaskBase* GetParentTask() const
-	{
-		return Task->ParentTask;
-	}
-	
-	TArray<UTaskBase*>& GetSubTasks()const
-	{
-		return Task->SubTasks;
-	}
-	
-	void GetSubTaskNum(int32& OutNum) const
-	{
-		OutNum += SubListItems.Num();
-		for(auto Iter : SubListItems)
-		{
-			Iter->GetSubTaskNum(OutNum);
-		}
-	}
-
-	TArray<UTaskBase*>& GetParentSubTasks() const
-	{
-		return ParentListItem->GetSubTasks();
-	}
-	
-	TArray<TSharedPtr<FTaskListItem>>& GetParentSubListItems() const
-	{
-		return ParentListItem->SubListItems;
-	}
-};
-#endif

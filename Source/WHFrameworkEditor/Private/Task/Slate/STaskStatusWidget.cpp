@@ -1,90 +1,41 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #include "Task/Slate/STaskStatusWidget.h"
 
-#include "SlateOptMacros.h"
-#include "Task/Slate/STaskListWidget.h"
+#include "Task/TaskEditor.h"
+#include "Task/Slate/STaskGraphWidget.h"
+#include "Task/Base/TaskAsset.h"
+#include "Widgets/Text/STextBlock.h"
+#include "Widgets/Layout/SBorder.h"
 
-BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
+#define LOCTEXT_NAMESPACE "TaskGraphStatus"
 
 const FName STaskStatusWidget::WidgetName = FName("TaskStatusWidget");
 
-STaskStatusWidget::STaskStatusWidget()
-{
-	WidgetType = EEditorWidgetType::Child;
-}
+STaskStatusWidget::STaskStatusWidget() { WidgetType = EEditorWidgetType::Child; }
 
 void STaskStatusWidget::Construct(const FArguments& InArgs)
 {
 	SEditorWidgetBase::Construct(SEditorWidgetBase::FArguments());
-	
 	TaskEditor = InArgs._TaskEditor;
-
-	ChildSlot
-	[
-		SNew(SBorder)
-		.Padding(1.f)
-		.BorderImage(FCoreStyle::Get().GetBrush("ToolPanel.GroupBorder"))
-		[
-			SNew(SVerticalBox)
-
-			+ SVerticalBox::Slot()
-			.VAlign(VAlign_Fill)
-			.HAlign(HAlign_Fill)
-			.FillHeight(1)
-			[
-				SNew(SHorizontalBox)
-
-				+ SHorizontalBox::Slot()
-				.VAlign(VAlign_Fill)
-				.HAlign(HAlign_Left)
-				.AutoWidth()
-				[
-					SNew(STextBlock)
-					.Text(FText::FromString(TEXT("List:  ")))
-					.ColorAndOpacity(FSlateColor(FLinearColor::Yellow))
-				]
-
-				+ SHorizontalBox::Slot()
-				.VAlign(VAlign_Fill)
-				.HAlign(HAlign_Left)
-				.AutoWidth()
-				[
-					SNew(STextBlock)
-					.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("Total Num: %d"), TaskEditor.Pin()->ListWidget->GetTotalTaskNum())); })
-				]
-
-				+ SHorizontalBox::Slot()
-				.VAlign(VAlign_Fill)
-				.HAlign(HAlign_Left)
-				.AutoWidth()
-				[
-					SNew(STextBlock)
-					.Text_Lambda([this](){ return FText::FromString(FString::Printf(TEXT("  Selected Num: %d"), TaskEditor.Pin()->ListWidget->GetSelectedTaskNum())); })
-				]
-			]
+	ChildSlot[
+		SNew(SBorder).Padding(FMargin(10, 4)).BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))[
+			SNew(STextBlock).Text_Lambda([this]
+			{
+				const TSharedPtr<FTaskEditor> Editor = TaskEditor.Pin();
+				if (!Editor || !Editor->GraphWidget) return FText::GetEmpty();
+				const UTaskAsset* Asset = Editor->GetEditingAsset<UTaskAsset>();
+				const bool bEditable = Editor->GraphWidget->CanEdit();
+				return FText::Format(LOCTEXT("Status", "Task Graph  |  Tasks: {0}  |  Selected: {1}  |  Roots: {2}  |  {3}"),
+					FText::AsNumber(Asset->TaskMap.Num()), FText::AsNumber(Editor->GraphWidget->GetSelectedTasks().Num()),
+					FText::AsNumber(Asset->RootTasks.Num()), bEditable ?
+					LOCTEXT("EditHint", "Right-click to edit; Out > In to connect; Ctrl+Z / Ctrl+Y to undo / redo") :
+					LOCTEXT("ReadOnly", "Read only"));
+			})
 		]
 	];
 }
+void STaskStatusWidget::OnCreate() { SEditorWidgetBase::OnCreate(); }
+void STaskStatusWidget::OnReset() { SEditorWidgetBase::OnReset(); }
+void STaskStatusWidget::OnRefresh() { SEditorWidgetBase::OnRefresh(); }
+void STaskStatusWidget::OnDestroy() { SEditorWidgetBase::OnDestroy(); }
 
-void STaskStatusWidget::OnCreate()
-{
-	SEditorWidgetBase::OnCreate();
-}
-
-void STaskStatusWidget::OnReset()
-{
-	SEditorWidgetBase::OnReset();
-}
-
-void STaskStatusWidget::OnRefresh()
-{
-	SEditorWidgetBase::OnRefresh();
-}
-
-void STaskStatusWidget::OnDestroy()
-{
-	SEditorWidgetBase::OnDestroy();
-}
-
-END_SLATE_FUNCTION_BUILD_OPTIMIZATION
+#undef LOCTEXT_NAMESPACE

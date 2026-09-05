@@ -43,7 +43,14 @@ public class WHFrameworkEditor : ModuleRules
 				"UnrealEd",
 				"BlueprintGraph",
 				"LevelEditor",
-				"GraphEditor"
+				"GraphEditor",
+				"WorkspaceMenuStructure",
+				"KismetWidgets",
+				"EditorWidgets",
+				"UMG",
+				"Json",
+				"JsonUtilities",
+				"AnimGraph"
 			});
 	}
 }

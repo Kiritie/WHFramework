@@ -28,15 +28,8 @@ bool FTaskClassFilter::IsClassAllowed(UClass* InClass)
 // Commands
 void FTaskEditorCommands::RegisterCommands()
 {
-	UI_COMMAND(OpenTaskEditorWindow, "Task Editor", "Bring up TaskEditor window", EUserInterfaceActionType::Button, FInputGesture());
+	UI_COMMAND(OpenTaskEditorWindow, "Task Editor", "Bring up TaskEditor window", EUserInterfaceActionType::Button, FInputChord());
 }
 
-//////////////////////////////////////////////////////////////////////////
-// EditorSettings
-UTaskEditorSettings::UTaskEditorSettings()
-{
-	bDefaultIsDefaults = false;
-	bDefaultIsEditing = false;
-}
 
 #undef LOCTEXT_NAMESPACE

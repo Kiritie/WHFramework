@@ -4,9 +4,11 @@
 
 #include "Common/CommonModuleTypes.h"
 #include "Components/BoxComponent.h"
+#include "Common/Interaction/InteractionTypes.h"
 #include "InteractionComponent.generated.h"
 
 class IInteractionAgentInterface;
+class UInteractionOption;
 /**
  * 
  */
@@ -40,9 +42,27 @@ public:
 	
 	virtual void ClearInteractActions();
 
+	UFUNCTION(BlueprintPure)
+	TArray<FInteractionOptionView> GetOptions(AActor* InInteractor) const;
+
+	UFUNCTION(BlueprintCallable)
+	bool ExecuteOption(AActor* InInteractor, FName InOptionID, FText& OutReason);
+
+	UFUNCTION(BlueprintCallable)
+	void NotifyOptionsChanged();
+
+	UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly)
+	TArray<UInteractionOption*> Options;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnInteractionOptionsChanged OnOptionsChanged;
+
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TArray<EInteractAction> InteractActions;
+
+	bool bExecutingOption = false;
+	FInteractionContext MakeInteractionContext(AActor* InInteractor) const;
 
 public:
 	virtual bool IsInteractable() const;
