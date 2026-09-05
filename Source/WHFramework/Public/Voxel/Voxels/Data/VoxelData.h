@@ -38,6 +38,9 @@ public:
 	float Hardness;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bDestroyable;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bRotatable;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

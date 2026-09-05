@@ -71,7 +71,6 @@ private:
 	TArray<FVector2D> _BuildingPos;
 	//所有建筑预制体
 	TArray<UVoxelPrefabData*> _PrefabAssets;
-	TArray<int32> _PrefabGroundOffsets;
 	//世界坐标下的确定性小镇规划，生成时仅写入当前区块切片
 	TMap<FIndex, FVoxelItem> _PlannedVoxels;
 	TMap<FIndex, TSharedPtr<TMap<FIndex, FVoxelItem>>> _TownPlanCache;

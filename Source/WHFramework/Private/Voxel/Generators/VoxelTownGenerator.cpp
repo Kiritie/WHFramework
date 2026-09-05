@@ -55,15 +55,6 @@ void UVoxelTownGenerator::Initialize(UVoxelModule* InModule, int32 InStage)
 		if(UVoxelPrefabData* Prefab = UAssetModuleStatics::LoadPrimaryAsset<UVoxelPrefabData>(PrefabAsset))
 		{
 			_PrefabAssets.Add(Prefab);
-			TArray<FString> VoxelDatas;
-			Prefab->VoxelDatas.ParseIntoArray(VoxelDatas, TEXT("|"));
-			int32 MinZ = MAX_int32;
-			for(const FString& VoxelData : VoxelDatas)
-			{
-				const FVoxelItem VoxelItem(VoxelData, true);
-				if(VoxelItem.IsValid()) MinZ = FMath::Min(MinZ, VoxelItem.Index.Z);
-			}
-			_PrefabGroundOffsets.Add(MinZ == MAX_int32 ? 0 : 1 - MinZ);
 		}
 	}
 }
@@ -275,7 +266,7 @@ bool UVoxelTownGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, 
 	const int FrontBack = _PrefabAssets[InIndex]->VoxelSize[RotateIndex] / 2;
 	const int LeftRight = _PrefabAssets[InIndex]->VoxelSize[!RotateIndex] / 2;
 	const int UpDown = _PrefabAssets[InIndex]->VoxelSize[2];
-	const int32 GroundOffset = _PrefabGroundOffsets.IsValidIndex(InIndex) ? _PrefabGroundOffsets[InIndex] : 0;
+	const int32 VoxelOffsetZ = FMath::FloorToInt(_PrefabAssets[InIndex]->CenterOffset.Z);
 
 	int32 GroundHeight = MIN_int32;
 	for(int i = -FrontBack - 1; i <= FrontBack; ++i)
@@ -337,7 +328,7 @@ bool UVoxelTownGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, 
 		{
 			VoxelItem.Angle = FMathHelper::CombineRightAngle(VoxelItem.Angle, (ERightAngle)InRotate);
 		}
-		const FIndex Index = FIndex(InX, InY, GroundHeight + GroundOffset) + FMathHelper::RotateIndex(VoxelItem.Index, (ERightAngle)InRotate) + UVoxelModuleStatics::RightAngleToVoxelIndex((ERightAngle)InRotate);
+		const FIndex Index = FIndex(InX, InY, GroundHeight + VoxelOffsetZ) + FMathHelper::RotateIndex(VoxelItem.Index, (ERightAngle)InRotate) + UVoxelModuleStatics::RightAngleToVoxelIndex((ERightAngle)InRotate);
 		SetPlannedVoxel(Index, VoxelItem);
 	}
 

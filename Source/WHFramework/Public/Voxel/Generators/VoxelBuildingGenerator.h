@@ -23,7 +23,7 @@ struct FVoxelBuildingPrefabCache
 {
 	TArray<FVoxelBuildingRotationCache> Rotations;
 	int32 ClearHeight = 0;
-	int32 GroundOffset = 0;
+	int32 VoxelOffsetZ = 0;
 	int32 Extent = 1;
 };
 

@@ -226,8 +226,9 @@ UVoxel& FVoxelItem::GetVoxel() const
 FVoxelHitResult::FVoxelHitResult(const FHitResult& InHitResult)
 {
 	UVoxelModule& VoxelModule = UVoxelModule::Get();
+	Actor = InHitResult.GetActor();
 	const FVector HitLocation = InHitResult.ImpactPoint - VoxelModule.GetWorldData().GetBlockSizedNormal(InHitResult.ImpactNormal, 0.01f);
-	if(InHitResult.GetActor() && InHitResult.GetActor()->ActorHasTag(TEXT("PrefabGround")))
+	if(IsGround())
 	{
 		if(UVoxelChunk* Chunk = VoxelModule.GetChunkByLocation(HitLocation))
 		{
@@ -244,6 +245,7 @@ FVoxelHitResult::FVoxelHitResult(const FHitResult& InHitResult)
 
 FVoxelHitResult::FVoxelHitResult(const FVoxelItem& InVoxelItem, FVector InPoint, FVector InNormal)
 {
+	Actor = nullptr;
 	VoxelItem = InVoxelItem;
 	Point = InPoint;
 	Normal = InNormal;
@@ -252,6 +254,11 @@ FVoxelHitResult::FVoxelHitResult(const FVoxelItem& InVoxelItem, FVector InPoint,
 bool FVoxelHitResult::IsValid() const
 {
 	return VoxelItem.IsValid();
+}
+
+bool FVoxelHitResult::IsGround() const
+{
+	return Actor && Actor->ActorHasTag(TEXT("Ground"));
 }
 
 UVoxel& FVoxelHitResult::GetVoxel() const

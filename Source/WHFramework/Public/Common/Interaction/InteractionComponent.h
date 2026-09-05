@@ -4,7 +4,6 @@
 
 #include "Common/CommonModuleTypes.h"
 #include "Components/BoxComponent.h"
-#include "Common/Interaction/InteractionTypes.h"
 #include "InteractionComponent.generated.h"
 
 class IInteractionAgentInterface;

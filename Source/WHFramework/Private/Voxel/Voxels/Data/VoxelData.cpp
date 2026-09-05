@@ -17,6 +17,7 @@ UVoxelData::UVoxelData()
 	Element = EVoxelElement::None;
 	Nature = EVoxelNature::None;
 	Hardness = 1.f;
+	bDestroyable = true;
 	bRotatable = false;
 	bMainPart = true;
 	PartDatas = TArray<UVoxelData*>();

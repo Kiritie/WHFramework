@@ -590,24 +590,16 @@ void UVoxelModule::LoadPrefabData(const FVoxelPrefabSaveData& InPrefabData)
 	{
 		TArray<FString> VoxelDatas;
 		InPrefabData.VoxelDatas.ParseIntoArray(VoxelDatas, TEXT("|"));
-		TArray<FVoxelItem> VoxelItems;
-		int32 MinZ = MAX_int32;
 		for(auto& Iter : VoxelDatas)
 		{
-			const FVoxelItem VoxelItem(Iter, true);
+			FVoxelItem VoxelItem(Iter, true);
 			if(VoxelItem.IsValid())
 			{
-				VoxelItems.Add(VoxelItem);
-				MinZ = FMath::Min(MinZ, VoxelItem.Index.Z);
-			}
-		}
-		for(FVoxelItem& VoxelItem : VoxelItems)
-		{
-			VoxelItem.Index.Z -= MinZ;
-			if(UVoxelChunk* Chunk = GetChunkByVoxelIndex(VoxelItem.Index))
-			{
-				SetVoxelByIndex(VoxelItem.Index, VoxelItem);
-				GenerateChunks.AddUnique(Chunk);
+				if(UVoxelChunk* Chunk = GetChunkByVoxelIndex(VoxelItem.Index))
+				{
+					SetVoxelByIndex(VoxelItem.Index, VoxelItem);
+					GenerateChunks.AddUnique(Chunk);
+				}
 			}
 		}
 	}

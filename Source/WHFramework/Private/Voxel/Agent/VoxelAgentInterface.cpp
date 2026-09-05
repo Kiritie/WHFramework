@@ -42,6 +42,10 @@ bool IVoxelAgentInterface::OnGenerateVoxel(EInputInteractEvent InInteractEvent, 
 			GenerateVoxelItem.Index = InHitResult.GetChunk()->LocationToIndex(InHitResult.Point - UVoxelModule::Get().GetWorldData().GetBlockSizedNormal(InHitResult.Normal)) + FIndex(InHitResult.Normal);
 
 			TArray<AActor*> IgnoreActors;
+			if(InHitResult.IsGround())
+			{
+				IgnoreActors.Add(InHitResult.Actor);
+			}
 			if(GenerateVoxelItem.Auxiliary)
 			{
 				IgnoreActors.Add(GenerateVoxelItem.Auxiliary);
@@ -98,12 +102,12 @@ bool IVoxelAgentInterface::OnDestroyVoxel(EInputInteractEvent InInteractEvent, c
 	{
 		case EInputInteractEvent::Started:
 		{
-			const int32 VoxelZ = InHitResult.VoxelItem.GetIndex().Z;
-			if(VoxelZ > 0 || (VoxelZ == 0 && UVoxelModuleStatics::GetVoxelWorldMode() == EVoxelWorldMode::Prefab))
+			if(UVoxelModuleStatics::GetVoxelWorldMode() != EVoxelWorldMode::Default || InHitResult.VoxelItem.GetData().bDestroyable)
 			{
 				DestroyVoxelItem = InHitResult.VoxelItem;
+				return true;
 			}
-			return true;
+			return false;
 		}
 		case EInputInteractEvent::Triggered:
 		{
@@ -148,6 +152,21 @@ bool IVoxelAgentInterface::OnDestroyVoxel(EInputInteractEvent InInteractEvent, c
 
 bool IVoxelAgentInterface::InteractVoxel(EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
 {
+	if(InHitResult.IsGround())
+	{
+		switch(InInteractAction)
+		{
+			case EInputInteractAction::Primary:
+			{
+				return false;
+			}
+			case EInputInteractAction::Secondary:
+			{
+				return OnGenerateVoxel(InInteractEvent, InHitResult);
+			}
+			default: break;
+		}
+	}
 	return InHitResult.GetVoxel().OnAgentInteract(this, InInteractAction, InInteractEvent, InHitResult);
 }
 

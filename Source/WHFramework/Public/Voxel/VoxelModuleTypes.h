@@ -16,6 +16,7 @@ class UVoxelData;
 class UVoxelChunk;
 class AVoxelAuxiliary;
 class UVoxel;
+class AActor;
 
 UENUM(BlueprintType)
 enum class EVoxelRaycastType : uint8
@@ -696,6 +697,7 @@ struct WHFRAMEWORK_API FVoxelHitResult
 public:
 	FVoxelHitResult()
 	{
+		Actor = nullptr;
 		VoxelItem = FVoxelItem();
 		Point = FVector();
 		Normal = FVector();
@@ -713,10 +715,15 @@ public:
 	FVector Normal;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	AActor* Actor;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	FVoxelItem VoxelItem;
 
 public:
 	bool IsValid() const;
+
+	bool IsGround() const;
 
 	template<class T>
 	T& GetVoxel() const

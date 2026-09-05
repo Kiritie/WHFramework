@@ -36,7 +36,7 @@ void UVoxelBuildingGenerator::Initialize(UVoxelModule* InModule, int32 InStage)
 		if(IsValid(Prefab))
 		{
 			const bool bUnderground = Prefab->CenterOffset.Z < 0.f;
-			const int32 VerticalOffset = bUnderground ? FMath::FloorToInt(Prefab->CenterOffset.Z) : 0;
+			const int32 VoxelOffsetZ = FMath::FloorToInt(Prefab->CenterOffset.Z);
 			const FIndex CenterOffset(
 				FMath::FloorToInt(Prefab->CenterOffset.X),
 				FMath::FloorToInt(Prefab->CenterOffset.Y),
@@ -48,7 +48,6 @@ void UVoxelBuildingGenerator::Initialize(UVoxelModule* InModule, int32 InStage)
 			int32 SourceMaxX = MIN_int32;
 			int32 SourceMinY = MAX_int32;
 			int32 SourceMaxY = MIN_int32;
-			int32 SourceMinZ = MAX_int32;
 			int32 EntranceBorderMinX = MAX_int32;
 			int32 EntranceBorderMaxX = MIN_int32;
 			int32 EntranceBorderMinY = MAX_int32;
@@ -63,8 +62,7 @@ void UVoxelBuildingGenerator::Initialize(UVoxelModule* InModule, int32 InStage)
 				SourceMaxX = FMath::Max(SourceMaxX, Item.Index.X);
 				SourceMinY = FMath::Min(SourceMinY, Item.Index.Y);
 				SourceMaxY = FMath::Max(SourceMaxY, Item.Index.Y);
-				SourceMinZ = FMath::Min(SourceMinZ, Item.Index.Z);
-				if(bUnderground && Item.Index.Z + VerticalOffset == 0)
+				if(bUnderground && Item.Index.Z + VoxelOffsetZ == 0)
 				{
 					EntranceBorderMinX = FMath::Min(EntranceBorderMinX, Item.Index.X);
 					EntranceBorderMaxX = FMath::Max(EntranceBorderMaxX, Item.Index.X);
@@ -98,7 +96,7 @@ void UVoxelBuildingGenerator::Initialize(UVoxelModule* InModule, int32 InStage)
 
 			FVoxelBuildingPrefabCache& PrefabCache = _PrefabCaches[DataIndex];
 			PrefabCache.ClearHeight = bUnderground ? 0 : FMath::CeilToInt(Prefab->VoxelSize.Z);
-			PrefabCache.GroundOffset = bUnderground ? VerticalOffset : 1 - SourceMinZ;
+			PrefabCache.VoxelOffsetZ = VoxelOffsetZ;
 			PrefabCache.Rotations.SetNum(4);
 			for(int32 Rotation = 0; Rotation < 4; ++Rotation)
 			{
@@ -132,7 +130,7 @@ void UVoxelBuildingGenerator::Initialize(UVoxelModule* InModule, int32 InStage)
 				}
 				if(!bUnderground)
 				{
-					PrefabCache.ClearHeight = FMath::Max(PrefabCache.ClearHeight, RotationCache.MaxZ + PrefabCache.GroundOffset);
+					PrefabCache.ClearHeight = FMath::Max(PrefabCache.ClearHeight, RotationCache.MaxZ + PrefabCache.VoxelOffsetZ);
 				}
 				const int32 RotationExtent = FMath::Max(
 					FMath::Max(FMath::Abs(RotationCache.MinX), FMath::Abs(RotationCache.MaxX)),
@@ -253,7 +251,7 @@ FVoxelBuildingPlacementPlan UVoxelBuildingGenerator::BuildPlacementPlan(int32 In
 		const int32 GroundHeight = bInAdaptTerrain
 			? FMath::Min(FMath::Max(MaxHeight, Module->GetWorldData().SeaLevel + GenerateData.MinHeightAboveSeaLevel), Module->GetWorldData().SkyHeight - PrefabCache.ClearHeight - 2)
 			: FMath::RoundToInt(AverageHeight / FootprintCount);
-		if(GroundHeight < Module->GetWorldData().SeaLevel + GenerateData.MinHeightAboveSeaLevel || GroundHeight + RotationCache.MinZ + PrefabCache.GroundOffset < 1 || GroundHeight + RotationCache.MaxZ + PrefabCache.GroundOffset >= Module->GetWorldData().SkyHeight) continue;
+		if(GroundHeight < Module->GetWorldData().SeaLevel + GenerateData.MinHeightAboveSeaLevel || GroundHeight + RotationCache.MinZ + PrefabCache.VoxelOffsetZ < 1 || GroundHeight + RotationCache.MaxZ + PrefabCache.VoxelOffsetZ >= Module->GetWorldData().SkyHeight) continue;
 
 		int32 EntranceMaxDrop = 0;
 		int64 EntranceTotalDrop = 0;
@@ -363,7 +361,7 @@ bool UVoxelBuildingGenerator::PlaceBuildingSlice(UVoxelChunk* InChunk, int32 InB
 		if(bUnderground)
 		{
 			return EntranceColumns.Contains(RelativeIndex) ||
-				WorldIndex.Z <= Plan.GroundHeight && WorldIndex.Z > Plan.GroundHeight + RotationCache.MinZ + PrefabCache.GroundOffset &&
+				WorldIndex.Z <= Plan.GroundHeight && WorldIndex.Z > Plan.GroundHeight + RotationCache.MinZ + PrefabCache.VoxelOffsetZ &&
 				RelativeIndex.X >= RotationCache.MinX && RelativeIndex.X <= RotationCache.MaxX &&
 				RelativeIndex.Y >= RotationCache.MinY && RelativeIndex.Y <= RotationCache.MaxY;
 		}
@@ -398,7 +396,7 @@ bool UVoxelBuildingGenerator::PlaceBuildingSlice(UVoxelChunk* InChunk, int32 InB
 		{
 			for(int32 Y = SliceMinY; Y <= SliceMaxY; ++Y)
 			{
-				for(int32 Z = RotationCache.MinZ + PrefabCache.GroundOffset; Z < 0; ++Z)
+				for(int32 Z = RotationCache.MinZ + PrefabCache.VoxelOffsetZ; Z < 0; ++Z)
 				{
 					SetSliceVoxel(FIndex(InX + X, InY + Y, Plan.GroundHeight + Z), FVoxelItem::Empty, true);
 				}
@@ -465,7 +463,7 @@ bool UVoxelBuildingGenerator::PlaceBuildingSlice(UVoxelChunk* InChunk, int32 InB
 	const FIndex SliceIndex = InChunk->GetIndex() - Plan.AnchorChunkIndex;
 	if(const TArray<FVoxelItem>* SliceItems = RotationCache.ChunkSlices.Find(SliceIndex))
 	{
-		for(const FVoxelItem& VoxelItem : *SliceItems) SetSliceVoxel(BuildingOrigin + VoxelItem.Index + FIndex(0, 0, PrefabCache.GroundOffset), VoxelItem);
+		for(const FVoxelItem& VoxelItem : *SliceItems) SetSliceVoxel(BuildingOrigin + VoxelItem.Index + FIndex(0, 0, PrefabCache.VoxelOffsetZ), VoxelItem);
 	}
 	return true;
 }

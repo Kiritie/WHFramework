@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Common/Interaction/InteractionTypes.h"
+#include "Common/CommonModuleTypes.h"
 #include "UObject/Object.h"
 #include "InteractionCondition.generated.h"
 
