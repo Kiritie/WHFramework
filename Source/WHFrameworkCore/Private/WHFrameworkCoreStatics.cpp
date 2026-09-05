@@ -275,24 +275,30 @@ UTexture2D* FCoreStatics::CompositeTextures(const TArray<UTexture2D*>& InTexture
 
     // 获取模板纹理
     UTexture2D* TemplateTexture = InTemplate ? InTemplate : InTextures[0];
+	if(!TemplateTexture) return nullptr;
 
     // 得到模板纹理的平台数据
     FTexturePlatformData* TemplatePlatformData = TemplateTexture->GetPlatformData();
+	if(!TemplatePlatformData || TemplatePlatformData->SizeX <= 0 || TemplatePlatformData->SizeY <= 0 || TemplatePlatformData->Mips.IsEmpty()) return nullptr;
 
 	const int32 TemplateSizeX = TemplatePlatformData->SizeX;
 	const int32 TemplateSizeY = TemplatePlatformData->SizeY;
 
 	// 取得模板纹理的像素格式
 	const EPixelFormat PixelFormat = TemplatePlatformData->PixelFormat;
+	if(PixelFormat <= PF_Unknown || PixelFormat >= PF_MAX) return nullptr;
 	const FPixelFormatInfo& PixelFormatInfo = GPixelFormats[PixelFormat];
+	if(PixelFormatInfo.BlockSizeX <= 0 || PixelFormatInfo.BlockSizeY <= 0 || PixelFormatInfo.BlockBytes <= 0) return nullptr;
 
     // 取得模板纹理的长宽
     const int32 SizeX = InTexSize.X;
     const int32 SizeY = InTexSize.Y;
 
-	if(ensure(SizeX > 0 && SizeY > 0 &&
+	if(SizeX > 0 && SizeY > 0 &&
 		(SizeX % PixelFormatInfo.BlockSizeX) == 0 &&
-		(SizeY % PixelFormatInfo.BlockSizeY) == 0))
+		(SizeY % PixelFormatInfo.BlockSizeY) == 0 &&
+		(SizeX % TemplateSizeX) == 0 &&
+		(SizeY % TemplateSizeY) == 0)
 	{
 		UTexture2D* Texture = NewObject<UTexture2D>(GetTransientPackage(), NAME_None, RF_Transient );
 
@@ -321,7 +327,9 @@ UTexture2D* FCoreStatics::CompositeTextures(const TArray<UTexture2D*>& InTexture
 		// 筛选有效的纹理
 		for (auto Item : InTextures)
 		{
+			if(!Item) continue;
 			const FTexturePlatformData* SourcePlatformData = Item->GetPlatformData();
+			if(!SourcePlatformData) continue;
 
 			bool bIsInvalid = false;
 

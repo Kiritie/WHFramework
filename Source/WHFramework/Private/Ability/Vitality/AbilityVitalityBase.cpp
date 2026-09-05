@@ -2,6 +2,7 @@
 
 #include "Ability/Vitality/AbilityVitalityBase.h"
 
+#include "Ability/Interaction/AbilityInteractionOptions.h"
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/Abilities/VitalityActionAbilityBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
@@ -35,7 +36,7 @@ AAbilityVitalityBase::AAbilityVitalityBase(const FObjectInitializer& ObjectIniti
 	FSM->States.Add(UAbilityVitalityState_Static::StaticClass());
 	FSM->States.Add(UAbilityVitalityState_Walk::StaticClass());
 
-	Interaction->AddInteractAction(EInteractAction::Revive);
+	Interaction->Options.Add(CreateDefaultSubobject<UInteractionOption_AbilityRevive>(TEXT("ReviveOption")));
 
 	// stats
 	RaceID = NAME_None;
@@ -232,19 +233,6 @@ void AAbilityVitalityBase::EndAction(const FGameplayTag& InActionTag, bool bWasC
 	}
 }
 
-bool AAbilityVitalityBase::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
-{
-	switch (InInteractAction)
-	{
-		case EInteractAction::Revive:
-		{
-			return IsDead();
-		}
-		default: break;
-	}
-	return Super::CanInteract(InInteractAction, InInteractionAgent);
-}
-
 void AAbilityVitalityBase::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
 {
 	Super::OnEnterInteract(InInteractionAgent);
@@ -253,24 +241,6 @@ void AAbilityVitalityBase::OnEnterInteract(IInteractionAgentInterface* InInterac
 void AAbilityVitalityBase::OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent)
 {
 	Super::OnLeaveInteract(InInteractionAgent);
-}
-
-void AAbilityVitalityBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive)
-{
-	Super::OnInteract(InInteractAction, InInteractionAgent, bPassive);
-
-	if(bPassive)
-	{
-		switch (InInteractAction)
-		{
-			case EInteractAction::Revive:
-			{
-				Revive(Cast<IAbilityVitalityInterface>(InInteractionAgent));
-				break;
-			}
-			default: break;
-		}
-	}
 }
 
 void AAbilityVitalityBase::OnPreChangeItem(const FAbilityItem& InOldItem)

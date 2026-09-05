@@ -242,15 +242,29 @@ void UEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* 
 			UEventHandleBase* EventHandle;
 		} Params { InSender, EventHandle };
 
-		const FEventMapping& Mapping = EventMappings[InClass];
-		for (auto& Iter1 : Mapping.FuncMap)
+		TArray<TPair<TWeakObjectPtr<UObject>, FName>> FuncEntries;
+		if(const FEventMapping* Mapping = EventMappings.Find(InClass))
 		{
-			for (auto& Iter2 : Iter1.Value.FuncNames)
+			for (const auto& Iter1 : Mapping->FuncMap)
 			{
-				if (EventHandle->Filter(Iter1.Key, Iter2) && UCommonModuleStatics::ExecuteObjectFunc(Iter1.Key, Iter2, &Params))
+				for (const auto& Iter2 : Iter1.Value.FuncNames)
 				{
-					WHLog(FString::Printf(TEXT("ExecuteEvent : FuncName : %s, EventOwner : %s"), *Iter2.ToString(), *Iter1.Key->GetClass()->GetName()), EDC_Event);
+					FuncEntries.Emplace(Iter1.Key, Iter2);
 				}
+			}
+		}
+
+		for (const auto& Iter : FuncEntries)
+		{
+			UObject* Owner = Iter.Key.Get();
+			const FEventMapping* CurrentMapping = EventMappings.Find(InClass);
+			const FEventFuncs* CurrentFuncs = Owner && CurrentMapping ? CurrentMapping->FuncMap.Find(Owner) : nullptr;
+			if(!CurrentFuncs || !CurrentFuncs->FuncNames.Contains(Iter.Value)) continue;
+
+			const FString OwnerClassName = Owner->GetClass()->GetName();
+			if (EventHandle->Filter(Owner, Iter.Value) && UCommonModuleStatics::ExecuteObjectFunc(Owner, Iter.Value, &Params))
+			{
+				WHLog(FString::Printf(TEXT("ExecuteEvent : FuncName : %s, EventOwner : %s"), *Iter.Value.ToString(), *OwnerClassName), EDC_Event);
 			}
 		}
 

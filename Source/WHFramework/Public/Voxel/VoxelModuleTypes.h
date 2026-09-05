@@ -224,23 +224,15 @@ enum class EVoxelGenerateToolType : uint8
 	Shovel
 };
 
-/**
- * 体术交互选项
- */
-UENUM(BlueprintType)
-enum class EVoxelInteractAction : uint8
+namespace GameplayTags
 {
-	// 无
-	None = EInteractAction::None,
-	// 交互
-	Interact = EInteractAction::Interact,
-	// 退出
-	UnInteract = EInteractAction::UnInteract,
-	// 打开
-	Open = EInteractAction::Custom1,
-	// 关闭
-	Close = EInteractAction::Custom2,
-};
+	////////////////////////////////////////////////////
+	// Voxel_Interaction_Option
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Voxel_Interaction_Option_Interact);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Voxel_Interaction_Option_UnInteract);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Voxel_Interaction_Option_Open);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Voxel_Interaction_Option_Close);
+}
 
 UENUM(BlueprintType)
 enum class EVoxelBiomeType: uint8

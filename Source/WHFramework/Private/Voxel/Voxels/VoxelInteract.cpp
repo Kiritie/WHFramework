@@ -4,6 +4,7 @@
 #include "Voxel/Voxels/VoxelInteract.h"
 
 #include "Common/Interaction/InteractionAgentInterface.h"
+#include "Common/Interaction/InteractionComponent.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Voxel/Voxels/Auxiliary/VoxelInteractAuxiliary.h"
 
@@ -79,12 +80,14 @@ bool UVoxelInteract::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputIntera
 
 bool UVoxelInteract::Interact(IVoxelAgentInterface* InAgent)
 {
-	if(IInteractionAgentInterface* InteractionAgent = Cast<IInteractionAgentInterface>(InAgent))
+	AActor* Interactor = Cast<AActor>(InAgent);
+	if(IInteractionAgentInterface* InteractionAgent = Cast<IInteractionAgentInterface>(Interactor))
 	{
 		if(AVoxelInteractAuxiliary* InteractAuxiliary = Cast<AVoxelInteractAuxiliary>(GetItem().GetMain().Auxiliary))
 		{
 			InteractionAgent->SetInteractingAgent(InteractAuxiliary);
-			InteractionAgent->DoInteract((EInteractAction)EVoxelInteractAction::Interact, InteractAuxiliary);
+			FText Reason;
+			return InteractAuxiliary->GetInteractionComponent()->ExecuteOption(Interactor, GameplayTags::Voxel_Interaction_Option_Interact, Reason);
 		}
 	}
 	return false;
@@ -92,12 +95,14 @@ bool UVoxelInteract::Interact(IVoxelAgentInterface* InAgent)
 
 void UVoxelInteract::UnInteract(IVoxelAgentInterface* InAgent)
 {
-	if(IInteractionAgentInterface* InteractionAgent = Cast<IInteractionAgentInterface>(InAgent))
+	AActor* Interactor = Cast<AActor>(InAgent);
+	if(IInteractionAgentInterface* InteractionAgent = Cast<IInteractionAgentInterface>(Interactor))
 	{
 		if(AVoxelInteractAuxiliary* InteractAuxiliary = Cast<AVoxelInteractAuxiliary>(GetItem().GetMain().Auxiliary))
 		{
 			InteractionAgent->SetInteractingAgent(InteractAuxiliary);
-			InteractionAgent->DoInteract((EInteractAction)EVoxelInteractAction::UnInteract, InteractAuxiliary);
+			FText Reason;
+			InteractAuxiliary->GetInteractionComponent()->ExecuteOption(Interactor, GameplayTags::Voxel_Interaction_Option_UnInteract, Reason);
 		}
 	}
 }

@@ -2,6 +2,7 @@
 
 #include "Ability/Pawn/AbilityPawnBase.h"
 
+#include "Ability/Interaction/AbilityInteractionOptions.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Common/Interaction/InteractionComponent.h"
 #include "Ability/Pawn/AbilityPawnDataBase.h"
@@ -37,7 +38,7 @@ AAbilityPawnBase::AAbilityPawnBase(const FObjectInitializer& ObjectInitializer) 
 	Interaction->SetupAttachment(RootComponent);
 	Interaction->SetInteractable(false);
 
-	Interaction->AddInteractAction(EInteractAction::Revive);
+	Interaction->Options.Add(CreateDefaultSubobject<UInteractionOption_AbilityRevive>(TEXT("ReviveOption")));
 
 	FSM = CreateDefaultSubobject<UFSMComponent>(FName("FSM"));
 	FSM->GroupName = FName("Vitality");
@@ -322,40 +323,12 @@ void AAbilityPawnBase::EndAction(const FGameplayTag& InActionTag, bool bWasCance
 	}
 }
 
-bool AAbilityPawnBase::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
-{
-	switch (InInteractAction)
-	{
-		case EInteractAction::Revive:
-		{
-			return IsDead();
-		}
-		default: break;
-	}
-	return false;
-}
-
 void AAbilityPawnBase::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
 {
 }
 
 void AAbilityPawnBase::OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent)
 {
-}
-
-void AAbilityPawnBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive)
-{
-	if(bPassive)
-	{
-		switch (InInteractAction)
-		{
-			case EInteractAction::Revive:
-			{
-				Revive(Cast<IAbilityVitalityInterface>(InInteractionAgent));
-			}
-			default: break;
-		}
-	}
 }
 
 void AAbilityPawnBase::OnAdditionItem(const FAbilityItem& InItem)

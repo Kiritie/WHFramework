@@ -6,6 +6,7 @@
 #include "VoxelAgentInterface.generated.h"
 
 class AVoxelEntityPreview;
+class AVoxelInteractAuxiliary;
 
 UINTERFACE()
 class WHFRAMEWORK_API UVoxelAgentInterface : public UInterface
@@ -26,6 +27,14 @@ public:
 	virtual bool InteractVoxel(EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult);
 
 	virtual void UnInteractVoxel(EInputInteractAction InInteractAction, EInputInteractEvent InInteractEvent);
+
+	virtual void OnVoxelInteract(AVoxelInteractAuxiliary* InAuxiliary) { }
+
+	virtual void OnVoxelUnInteract(AVoxelInteractAuxiliary* InAuxiliary) { }
+
+	virtual void OnVoxelOpen(AVoxelInteractAuxiliary* InAuxiliary) { }
+
+	virtual void OnVoxelClose(AVoxelInteractAuxiliary* InAuxiliary) { }
 
 protected:
 	virtual bool OnGenerateVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult);

@@ -55,21 +55,6 @@ bool IInteractionAgentInterface::EnterInteract(IInteractionAgentInterface* InInt
 	return GetInteractionComponent()->OnAgentEnter(InInteractionAgent);
 }
 
-bool IInteractionAgentInterface::DoInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
-{
-	if(!InInteractionAgent) InInteractionAgent = InteractingAgent;
-
-	if(!InInteractionAgent) return false;
-	
-	if(InInteractionAgent->CanInteract(InInteractAction, this))
-	{
-		InInteractionAgent->OnInteract(InInteractAction, this, true);
-		OnInteract(InInteractAction, InInteractionAgent, false);
-		return true;
-	}
-	return false;
-}
-
 bool IInteractionAgentInterface::LeaveInteract(IInteractionAgentInterface* InInteractionAgent)
 {
 	if(!InInteractionAgent) InInteractionAgent = InteractingAgent;
@@ -107,21 +92,4 @@ bool IInteractionAgentInterface::SetInteractingAgent(IInteractionAgentInterface*
 		}
 	}
 	return false;
-}
-
-TArray<EInteractAction> IInteractionAgentInterface::GetInteractableActions(IInteractionAgentInterface* InInteractionAgent)
-{
-	if(!InInteractionAgent) InInteractionAgent = InteractingAgent;
-
-	if(!InInteractionAgent) return TArray<EInteractAction>();
-	
-	TArray<EInteractAction> ReturnValues;
-	for(auto Iter : InInteractionAgent->GetInteractionComponent()->GetInteractActions())
-	{
-		if(InInteractionAgent->CanInteract(Iter, this))
-		{
-			ReturnValues.Add(Iter);
-		}
-	}
-	return ReturnValues;
 }

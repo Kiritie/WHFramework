@@ -5,7 +5,6 @@
 
 #include "Common/Interaction/InteractionAgentInterface.h"
 #include "Common/Interaction/InteractionOption.h"
-#include "Common/CommonModuleStatics.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 
@@ -74,34 +73,6 @@ bool UInteractionComponent::OnAgentLeave(IInteractionAgentInterface* InInteracti
 	return true;
 }
 
-bool UInteractionComponent::AddInteractAction(EInteractAction InInteractAction)
-{
-	if(!InteractActions.Contains(InInteractAction))
-	{
-		InteractActions.Add(InInteractAction);
-		NotifyOptionsChanged();
-		return true;
-	}
-	return false;
-}
-
-bool UInteractionComponent::RemoveInteractAction(EInteractAction InInteractAction)
-{
-	if(InteractActions.Contains(InInteractAction))
-	{
-		InteractActions.Remove(InInteractAction);
-		NotifyOptionsChanged();
-		return true;
-	}
-	return false;
-}
-
-void UInteractionComponent::ClearInteractActions()
-{
-	InteractActions.Empty();
-	NotifyOptionsChanged();
-}
-
 bool UInteractionComponent::IsInteractable() const
 {
 	return GetGenerateOverlapEvents();
@@ -132,39 +103,24 @@ TArray<FInteractionOptionView> UInteractionComponent::GetOptions(AActor* InInter
 	TArray<FInteractionOptionView> Views;
 	if (!InInteractor || !IsInteractable()) return Views;
 	const FInteractionContext Context = MakeInteractionContext(InInteractor);
-	TSet<FName> IDs;
+	TSet<FGameplayTag> IDs;
 	for (const UInteractionOption* Option : Options)
 	{
-		if (!Option || Option->OptionID.IsNone() || IDs.Contains(Option->OptionID) || Option->OptionID.ToString().StartsWith(TEXT("Legacy."))) continue;
-		IDs.Add(Option->OptionID);
+		if (!Option || !Option->OptionTag.IsValid() || IDs.Contains(Option->OptionTag)) continue;
+		IDs.Add(Option->OptionTag);
 		if (!Option->IsVisible(Context)) continue;
 		FInteractionOptionView View;
-		View.OptionID = Option->OptionID;
+		View.OptionTag = Option->OptionTag;
 		View.DisplayName = Option->DisplayName;
 		View.Priority = Option->Priority;
 		View.bEnabled = Option->IsEnabled(Context, View.DisabledReason);
 		Views.Add(View);
 	}
-	IInteractionAgentInterface* TargetAgent = GetInteractionAgent();
-	IInteractionAgentInterface* InteractorAgent = Cast<IInteractionAgentInterface>(InInteractor);
-	if (TargetAgent && InteractorAgent)
-	{
-		for (EInteractAction Action : InteractActions)
-		{
-			if (!TargetAgent->CanInteract(Action, InteractorAgent)) continue;
-			FInteractionOptionView View;
-			View.OptionID = FName(*FString::Printf(TEXT("Legacy.%d"), (int32)Action));
-			View.DisplayName = UCommonModuleStatics::GetEnumDisplayNameByValue(TEXT("/Script/WHFramework.EInteractAction"), (int32)Action);
-			View.bEnabled = true;
-			View.LegacyAction = Action;
-			Views.Add(View);
-		}
-	}
 	Views.StableSort([](const FInteractionOptionView& A, const FInteractionOptionView& B) { return A.Priority > B.Priority; });
 	return Views;
 }
 
-bool UInteractionComponent::ExecuteOption(AActor* InInteractor, FName InOptionID, FText& OutReason)
+bool UInteractionComponent::ExecuteOption(AActor* InInteractor, FGameplayTag InOptionTag, FText& OutReason)
 {
 	if (!InInteractor || bExecutingOption || !IsInteractable()) return false;
 	IInteractionAgentInterface* InteractorAgent = Cast<IInteractionAgentInterface>(InInteractor);
@@ -175,7 +131,7 @@ bool UInteractionComponent::ExecuteOption(AActor* InInteractor, FName InOptionID
 		return false;
 	}
 	const auto Views = GetOptions(InInteractor);
-	const FInteractionOptionView* View = Views.FindByPredicate([InOptionID](const FInteractionOptionView& Item) { return Item.OptionID == InOptionID; });
+	const FInteractionOptionView* View = Views.FindByPredicate([InOptionTag](const FInteractionOptionView& Item) { return Item.OptionTag == InOptionTag; });
 	if (!View || !View->bEnabled)
 	{
 		OutReason = View ? View->DisabledReason : NSLOCTEXT("Interaction", "Unavailable", "选项已不可用。");
@@ -183,19 +139,12 @@ bool UInteractionComponent::ExecuteOption(AActor* InInteractor, FName InOptionID
 	}
 	TGuardValue<bool> Guard(bExecutingOption, true);
 	bool bSucceeded = false;
-	if (View->LegacyAction != EInteractAction::None)
+	for (const UInteractionOption* Option : Options)
 	{
-		bSucceeded = InteractorAgent->DoInteract(View->LegacyAction, TargetAgent);
-	}
-	else
-	{
-		for (const UInteractionOption* Option : Options)
+		if (Option && Option->OptionTag == InOptionTag)
 		{
-			if (Option && Option->OptionID == InOptionID)
-			{
-				bSucceeded = Option->Execute(MakeInteractionContext(InInteractor), OutReason);
-				break;
-			}
+			bSucceeded = Option->Execute(MakeInteractionContext(InInteractor), OutReason);
+			break;
 		}
 	}
 	NotifyOptionsChanged();

@@ -30,18 +30,12 @@ public:
 
 	virtual bool EnterInteract(IInteractionAgentInterface* InInteractionAgent);
 
-	virtual bool CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent) = 0;
-
-	virtual bool DoInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent = nullptr);
-
 	virtual bool LeaveInteract(IInteractionAgentInterface* InInteractionAgent = nullptr);
 
 protected:
 	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) = 0;
 
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) = 0;
-
-	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive) = 0;
 
 protected:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
@@ -79,8 +73,6 @@ public:
 	virtual IInteractionAgentInterface* GetInteractingAgent() const { return InteractingAgent; }
 
 	virtual bool SetInteractingAgent(IInteractionAgentInterface* InInteractionAgent, bool bForce = false);
-
-	virtual TArray<EInteractAction> GetInteractableActions(IInteractionAgentInterface* InInteractionAgent = nullptr);
 
 	virtual UInteractionComponent* GetInteractionComponent() const = 0;
 };

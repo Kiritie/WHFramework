@@ -2,6 +2,8 @@
 
 #include "Platform/Windows/WindowsPlatformManager.h"
 
+#include "Misc/App.h"
+
 #include "GeneralProjectSettings.h"
 #include "WHFrameworkCoreTypes.h"
 #include "Main/MainManager.h"
@@ -196,9 +198,12 @@ void FWindowsPlatformManager::OnInitialize()
 	FManagerBase::OnInitialize();
 
 	// register our handler
-	if (FWindowsApplication* Application = GetApplication())
+	if (!FApp::IsUnattended())
 	{
-		Application->AddMessageHandler(Handler);
+		if (FWindowsApplication* Application = GetApplication())
+		{
+			Application->AddMessageHandler(Handler);
+		}
 	}
 
 	bool bAutoRun = false;
@@ -218,9 +223,12 @@ void FWindowsPlatformManager::OnTermination()
 	FManagerBase::OnTermination();
 
 	// unregister our handler
-	if (FWindowsApplication* Application = GetApplication())
+	if (!FApp::IsUnattended())
 	{
-		Application->RemoveMessageHandler(Handler);
+		if (FWindowsApplication* Application = GetApplication())
+		{
+			Application->RemoveMessageHandler(Handler);
+		}
 	}
 }
 

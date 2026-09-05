@@ -12,8 +12,4 @@ class WHFRAMEWORK_API UVoxelInteractData : public UVoxelData
 
 public:
 	UVoxelInteractData();
-
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TArray<EVoxelInteractAction> InteractActions;
 };

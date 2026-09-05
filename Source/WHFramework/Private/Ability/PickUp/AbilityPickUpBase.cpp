@@ -4,6 +4,7 @@
 #include "Ability/PickUp/AbilityPickUpBase.h"
 
 #include "Ability/AbilityModule.h"
+#include "Ability/Interaction/AbilityInteractionOptions.h"
 #include "Ability/PickUp/AbilityPickerInterface.h"
 #include "Common/Movement/FallingMovementComponent.h"
 #include "Common/Movement/FollowingMovementComponent.h"
@@ -27,7 +28,7 @@ AAbilityPickUpBase::AAbilityPickUpBase()
 	Interaction->SetupAttachment(RootComponent);
 	Interaction->SetBoxExtent(FVector(50.f));
 	Interaction->SetInteractable(false);
-	Interaction->AddInteractAction(EInteractAction::PickUp);
+	Interaction->Options.Add(CreateDefaultSubobject<UInteractionOption_AbilityPickUp>(TEXT("PickUpOption")));
 
 	RotatingMovement = CreateDefaultSubobject<URotatingMovementComponent>(FName("RotatingMovement"));
 	RotatingMovement->RotationRate = FRotator(0.f, 180.f, 0.f);
@@ -91,22 +92,6 @@ void AAbilityPickUpBase::OnPickUp(IAbilityPickerInterface* InPicker)
 	UObjectPoolModuleStatics::DespawnObject(this);
 }
 
-bool AAbilityPickUpBase::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
-{
-	switch (InInteractAction)
-	{
-		case EInteractAction::PickUp:
-		{
-			if(IAbilityPickerInterface* Picker = Cast<IAbilityPickerInterface>(InInteractionAgent))
-			{
-				return Item.IsValid() && !Picker->IsAutoPickUp();
-			}
-		}
-		default: break;
-	}
-	return false;
-}
-
 void AAbilityPickUpBase::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
 {
 	if(!Item.IsValid()) return;
@@ -123,25 +108,6 @@ void AAbilityPickUpBase::OnEnterInteract(IInteractionAgentInterface* InInteracti
 
 void AAbilityPickUpBase::OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent)
 {
-}
-
-void AAbilityPickUpBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive)
-{
-	if(bPassive)
-	{
-		switch (InInteractAction)
-		{
-			case EInteractAction::PickUp:
-			{
-				if(IAbilityPickerInterface* Picker = Cast<IAbilityPickerInterface>(InInteractionAgent))
-				{
-					OnPickUp(Picker);
-				}
-				break;
-			}
-			default: break;
-		}
-	}
 }
 
 void AAbilityPickUpBase::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)

@@ -1,6 +1,8 @@
 // Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 
 #include "Ability/Character/AbilityCharacterBase.h"
+
+#include "Ability/Interaction/AbilityInteractionOptions.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Ability/Abilities/AbilityBase.h"
@@ -50,7 +52,7 @@ AAbilityCharacterBase::AAbilityCharacterBase(const FObjectInitializer& ObjectIni
 	Interaction->SetupAttachment(RootComponent);
 	Interaction->SetInteractable(false);
 
-	Interaction->AddInteractAction(EInteractAction::Revive);
+	Interaction->Options.Add(CreateDefaultSubobject<UInteractionOption_AbilityRevive>(TEXT("ReviveOption")));
 
 	FSM = CreateDefaultSubobject<UFSMComponent>(FName("FSM"));
 	FSM->GroupName = FName("Character");
@@ -574,40 +576,12 @@ void AAbilityCharacterBase::OnPickUp(AAbilityPickUpBase* InPickUp)
 	}
 }
 
-bool AAbilityCharacterBase::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
-{
-	switch (InInteractAction)
-	{
-		case EInteractAction::Revive:
-		{
-			return IsDead();
-		}
-		default: break;
-	}
-	return false;
-}
-
 void AAbilityCharacterBase::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
 {
 }
 
 void AAbilityCharacterBase::OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent)
 {
-}
-
-void AAbilityCharacterBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive)
-{
-	if(bPassive)
-	{
-		switch (InInteractAction)
-		{
-			case EInteractAction::Revive:
-			{
-				Revive(Cast<IAbilityVitalityInterface>(InInteractionAgent));
-			}
-			default: break;
-		}
-	}
 }
 
 void AAbilityCharacterBase::OnAdditionItem(const FAbilityItem& InItem)

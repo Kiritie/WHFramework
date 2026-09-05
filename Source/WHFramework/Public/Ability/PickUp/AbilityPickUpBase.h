@@ -23,6 +23,8 @@ UCLASS()
 class WHFRAMEWORK_API AAbilityPickUpBase : public AWHActor, public IInteractionAgentInterface
 {
 	GENERATED_BODY()
+
+	friend class UInteractionAction_AbilityPickUp;
 	
 public:	
 	AAbilityPickUpBase();
@@ -47,13 +49,9 @@ protected:
 protected:
 	virtual void OnPickUp(IAbilityPickerInterface* InPicker);
 
-	virtual bool CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent) override;
-
 	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
-
-	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive) override;
 
 protected:
 	UFUNCTION()

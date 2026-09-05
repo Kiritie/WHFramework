@@ -39,41 +39,6 @@ enum class EPhase : uint8
 };
 
 /**
- * 交互选项
- */
-UENUM(BlueprintType)
-enum class EInteractAction : uint8
-{
-	// 无
-	None = 0,
-	// 交互
-	Interact = 1,
-	// 退出
-	UnInteract = 2,
-	// 复活
-	Revive = 3,
-	// 战斗
-	Fight = 4,
-	// 对话
-	Dialogue = 5,
-	// 交易
-	Transaction = 6,
-	// 拾取
-	PickUp = 7,
-
-	Custom1 = 10,
-	Custom2 = 11,
-	Custom3 = 12,
-	Custom4 = 13,
-	Custom5 = 14,
-	Custom6 = 15,
-	Custom7 = 16,
-	Custom8 = 17,
-	Custom9 = 18,
-	Custom10 = 19
-};
-
-/**
  * ???????????
  */
 UENUM(BlueprintType)
@@ -122,7 +87,7 @@ struct WHFRAMEWORK_API FInteractionOptionView
 	GENERATED_BODY()
 
 	UPROPERTY(BlueprintReadOnly)
-	FName OptionID;
+	FGameplayTag OptionTag;
 
 	UPROPERTY(BlueprintReadOnly)
 	FText DisplayName;
@@ -136,8 +101,6 @@ struct WHFRAMEWORK_API FInteractionOptionView
 	UPROPERTY(BlueprintReadOnly)
 	int32 Priority = 0;
 
-	UPROPERTY(BlueprintReadOnly)
-	EInteractAction LegacyAction = EInteractAction::None;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInteractionOptionsChanged);
@@ -202,6 +165,16 @@ extern T* GetDeterminesOutputObject(T* Value, UClass* Class)
 namespace GameplayTags
 {
 	WHFRAMEWORK_API	FGameplayTag FindTagByString(const FString& TagString, bool bMatchPartialString = false);
+
+	////////////////////////////////////////////////////
+	// Interaction_Option
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Option_Interact);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Option_UnInteract);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Option_Revive);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Option_Fight);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Option_PickUp);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Option_Dialogue);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Option_Transaction);
 	
 	////////////////////////////////////////////////////
 	// Input_Shortcut

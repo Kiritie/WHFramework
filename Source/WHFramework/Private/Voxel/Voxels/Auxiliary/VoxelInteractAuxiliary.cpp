@@ -5,6 +5,7 @@
 #include "Voxel/Voxels/Auxiliary/VoxelInteractAuxiliary.h"
 
 #include "Common/Interaction/InteractionComponent.h"
+#include "Voxel/Interaction/VoxelInteractionOptions.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Voxel/Voxels/Data/VoxelInteractData.h"
@@ -20,6 +21,8 @@ AVoxelInteractAuxiliary::AVoxelInteractAuxiliary()
 	Interaction = CreateDefaultSubobject<UInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);
 	Interaction->SetInteractable(false);
+	Interaction->Options.Add(CreateDefaultSubobject<UInteractionOption_VoxelInteract>(TEXT("InteractOption")));
+	Interaction->Options.Add(CreateDefaultSubobject<UInteractionOption_VoxelUnInteract>(TEXT("UnInteractOption")));
 	
 	bInteracting = false;
 }
@@ -28,12 +31,10 @@ void AVoxelInteractAuxiliary::OnDespawn_Implementation(bool bRecovery)
 {
 	if(bInteracting && InteractingAgent)
 	{
-		InteractingAgent->DoInteract((EInteractAction)EVoxelInteractAction::UnInteract);
+		SetInteracting(false, Cast<IVoxelAgentInterface>(Cast<AActor>(InteractingAgent)));
 	}
 
 	Super::OnDespawn_Implementation(bRecovery);
-
-	Interaction->ClearInteractActions();
 }
 
 void AVoxelInteractAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -50,10 +51,6 @@ void AVoxelInteractAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			case EVoxelScope::Chunk:
 			case EVoxelScope::Prefab:
 			{
-				for(const auto& Iter : VoxelItem.GetData<UVoxelInteractData>().InteractActions)
-				{
-					Interaction->AddInteractAction((EInteractAction)Iter);
-				}
 				BoxComponent->SetGenerateOverlapEvents(true);
 				break;
 			}
@@ -66,23 +63,6 @@ void AVoxelInteractAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-bool AVoxelInteractAuxiliary::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
-{
-	switch ((EVoxelInteractAction)InInteractAction)
-	{
-		case EVoxelInteractAction::Interact:
-		{
-			return !bInteracting;
-		}
-		case EVoxelInteractAction::UnInteract:
-		{
-			return bInteracting;
-		}
-		default: break;
-	}
-	return false;
-}
-
 void AVoxelInteractAuxiliary::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
 {
 }
@@ -91,35 +71,20 @@ void AVoxelInteractAuxiliary::OnLeaveInteract(IInteractionAgentInterface* InInte
 {
 }
 
-void AVoxelInteractAuxiliary::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive)
-{
-	if(bPassive)
-	{
-		switch ((EVoxelInteractAction)InInteractAction)
-		{
-			case EVoxelInteractAction::Interact:
-			{
-				if(!GetVoxelItem().GetVoxel<UVoxelInteract>().Interact(nullptr))
-				{
-					bInteracting = true;
-				}
-				break;
-			}
-			case EVoxelInteractAction::UnInteract:
-			{
-				if(bInteracting)
-				{
-					bInteracting = false;
-					GetVoxelItem().GetVoxel<UVoxelInteract>().UnInteract(nullptr);
-				}
-				break;
-			}
-			default: break;
-		}
-	}
-}
-
 UInteractionComponent* AVoxelInteractAuxiliary::GetInteractionComponent() const
 {
 	return Interaction;
+}
+
+bool AVoxelInteractAuxiliary::SetInteracting(bool bValue, IVoxelAgentInterface* InInteractionAgent)
+{
+	if (bInteracting == bValue) return false;
+	bInteracting = bValue;
+	if (InInteractionAgent)
+	{
+		if (bInteracting) InInteractionAgent->OnVoxelInteract(this);
+		else InInteractionAgent->OnVoxelUnInteract(this);
+	}
+	Interaction->NotifyOptionsChanged();
+	return true;
 }

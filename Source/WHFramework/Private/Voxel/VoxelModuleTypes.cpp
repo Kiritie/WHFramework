@@ -11,6 +11,16 @@
 #include "Voxel/Voxels/Data/VoxelData.h"
 #include "Voxel/Voxels/Voxel.h"
 
+namespace GameplayTags
+{
+	////////////////////////////////////////////////////
+	// Voxel_Interaction_Option
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Voxel_Interaction_Option_Interact, "Voxel.Interaction.Option.Interact", "Voxel interact option");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Voxel_Interaction_Option_UnInteract, "Voxel.Interaction.Option.UnInteract", "Voxel stop interacting option");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Voxel_Interaction_Option_Open, "Voxel.Interaction.Option.Open", "Voxel open option");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Voxel_Interaction_Option_Close, "Voxel.Interaction.Option.Close", "Voxel close option");
+}
+
 FVoxelItem FVoxelItem::Empty = FVoxelItem(FPrimaryAssetId(FName("Voxel"), FName("DA_Empty")));
 FVoxelItem FVoxelItem::Unknown = FVoxelItem(FPrimaryAssetId(FName("Voxel"), FName("DA_Unknown")));
 

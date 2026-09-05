@@ -157,22 +157,12 @@ void AAbilityActorBase::ResetData()
 {
 }
 
-bool AAbilityActorBase::CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent)
-{
-	return false;
-}
-
 void AAbilityActorBase::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
 {
 }
 
 void AAbilityActorBase::OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent)
 {
-}
-
-void AAbilityActorBase::OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive)
-{
-	
 }
 
 void AAbilityActorBase::OnAdditionItem(const FAbilityItem& InItem)

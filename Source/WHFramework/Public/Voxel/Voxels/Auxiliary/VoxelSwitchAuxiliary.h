@@ -18,13 +18,4 @@ class WHFRAMEWORK_API AVoxelSwitchAuxiliary : public AVoxelInteractAuxiliary
 	
 public:
 	AVoxelSwitchAuxiliary();
-	
-public:
-	virtual bool CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent) override;
-
-	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) override;
-
-	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
-
-	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive) override;
 };

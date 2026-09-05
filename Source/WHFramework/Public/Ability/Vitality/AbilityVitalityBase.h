@@ -94,13 +94,9 @@ public:
 	virtual void EndAction(const FGameplayTag& InActionTag, bool bWasCancelled) override;
 
 public:
-	virtual bool CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent) override;
-
 	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
-
-	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive) override;
 
 	virtual void OnPreChangeItem(const FAbilityItem& InOldItem) override;
 

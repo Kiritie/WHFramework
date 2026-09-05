@@ -35,17 +35,11 @@ public:
 	virtual bool OnAgentLeave(IInteractionAgentInterface* InInteractionAgent, bool bPassive = false);
 
 public:
-	virtual bool AddInteractAction(EInteractAction InInteractAction);
-		
-	virtual bool RemoveInteractAction(EInteractAction InInteractAction);
-	
-	virtual void ClearInteractActions();
-
 	UFUNCTION(BlueprintPure)
 	TArray<FInteractionOptionView> GetOptions(AActor* InInteractor) const;
 
 	UFUNCTION(BlueprintCallable)
-	bool ExecuteOption(AActor* InInteractor, FName InOptionID, FText& OutReason);
+	bool ExecuteOption(AActor* InInteractor, FGameplayTag InOptionTag, FText& OutReason);
 
 	UFUNCTION(BlueprintCallable)
 	void NotifyOptionsChanged();
@@ -57,9 +51,6 @@ public:
 	FOnInteractionOptionsChanged OnOptionsChanged;
 
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TArray<EInteractAction> InteractActions;
-
 	bool bExecutingOption = false;
 	FInteractionContext MakeInteractionContext(AActor* InInteractor) const;
 
@@ -69,6 +60,4 @@ public:
 	virtual void SetInteractable(bool bValue);
 
 	virtual IInteractionAgentInterface* GetInteractionAgent() const;
-
-	virtual TArray<EInteractAction> GetInteractActions() const { return InteractActions; }
 };

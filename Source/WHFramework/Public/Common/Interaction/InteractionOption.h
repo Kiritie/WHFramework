@@ -11,7 +11,7 @@ class WHFRAMEWORK_API UInteractionOption : public UObject
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FName OptionID;
+	FGameplayTag OptionTag;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FText DisplayName;

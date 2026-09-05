@@ -9,6 +9,7 @@
 class UBoxComponent;
 class UVoxel;
 class UInteractionComponent;
+class IVoxelAgentInterface;
 
 /**
  */
@@ -26,13 +27,9 @@ protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 	
 public:
-	virtual bool CanInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent) override;
-
 	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
-
-	virtual void OnInteract(EInteractAction InInteractAction, IInteractionAgentInterface* InInteractionAgent, bool bPassive) override;
 
 protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
@@ -59,4 +56,8 @@ public:
 	virtual EInteractAgentType GetInteractAgentType() const override { return EInteractAgentType::Passivity; }
 	
 	virtual UInteractionComponent* GetInteractionComponent() const override;
+
+	bool IsInteracting() const { return bInteracting; }
+
+	bool SetInteracting(bool bValue, IVoxelAgentInterface* InInteractionAgent);
 };

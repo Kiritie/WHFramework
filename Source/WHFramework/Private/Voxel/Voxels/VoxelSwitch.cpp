@@ -3,6 +3,8 @@
 #include "Voxel/Voxels/VoxelSwitch.h"
 
 #include "Audio/AudioModuleStatics.h"
+#include "Common/Interaction/InteractionAgentInterface.h"
+#include "Common/Interaction/InteractionComponent.h"
 #include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Voxel/Chunks/VoxelChunk.h"
 #include "Voxel/Voxels/Data/VoxelData.h"
@@ -83,20 +85,23 @@ bool UVoxelSwitch::OnAgentInteract(IVoxelAgentInterface* InAgent, EInputInteract
 
 void UVoxelSwitch::Toggle(IVoxelAgentInterface* InAgent)
 {
-	if(!bOpened) Open(InAgent);
-	else Close(InAgent);
-}
-
-void UVoxelSwitch::Open(IVoxelAgentInterface* InAgent)
-{
-	if(IInteractionAgentInterface* InteractionAgent = Cast<IInteractionAgentInterface>(InAgent))
+	AActor* Interactor = Cast<AActor>(InAgent);
+	if(IInteractionAgentInterface* InteractionAgent = Cast<IInteractionAgentInterface>(Interactor))
 	{
 		if(AVoxelInteractAuxiliary* InteractAuxiliary = Cast<AVoxelInteractAuxiliary>(GetItem().GetMain().Auxiliary))
 		{
 			InteractionAgent->SetInteractingAgent(InteractAuxiliary);
-			InteractionAgent->DoInteract((EInteractAction)EVoxelInteractAction::Open, InteractAuxiliary);
+			FText Reason;
+			InteractAuxiliary->GetInteractionComponent()->ExecuteOption(Interactor, !bOpened ? GameplayTags::Voxel_Interaction_Option_Open : GameplayTags::Voxel_Interaction_Option_Close, Reason);
+			return;
 		}
 	}
+	if(!bOpened) Open(nullptr);
+	else Close(nullptr);
+}
+
+void UVoxelSwitch::Open(IVoxelAgentInterface* InAgent)
+{
 	SetOpened(true);
 	if(GetData().IsMainPart())
 	{
@@ -105,20 +110,13 @@ void UVoxelSwitch::Open(IVoxelAgentInterface* InAgent)
 			Iter.GetVoxel<ThisClass>().Open(InAgent);
 		}
 		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Open), GetLocation());
+		if(InAgent) InAgent->OnVoxelOpen(Cast<AVoxelInteractAuxiliary>(GetItem().GetMain().Auxiliary));
 	}
 	GetOwner()->Generate(EPhase::Lesser);
 }
 
 void UVoxelSwitch::Close(IVoxelAgentInterface* InAgent)
 {
-	if(IInteractionAgentInterface* InteractionAgent = Cast<IInteractionAgentInterface>(InAgent))
-	{
-		if(AVoxelInteractAuxiliary* InteractAuxiliary = Cast<AVoxelInteractAuxiliary>(GetItem().GetMain().Auxiliary))
-		{
-			InteractionAgent->SetInteractingAgent(InteractAuxiliary);
-			InteractionAgent->DoInteract((EInteractAction)EVoxelInteractAction::Close, InteractAuxiliary);
-		}
-	}
 	SetOpened(false);
 	if(GetData().IsMainPart())
 	{
@@ -127,6 +125,7 @@ void UVoxelSwitch::Close(IVoxelAgentInterface* InAgent)
 			Iter.GetVoxel<ThisClass>().Close(InAgent);
 		}
 		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Close), GetLocation());
+		if(InAgent) InAgent->OnVoxelClose(Cast<AVoxelInteractAuxiliary>(GetItem().GetMain().Auxiliary));
 	}
 	GetOwner()->Generate(EPhase::Lesser);
 }
