@@ -148,6 +148,34 @@ public:
 	void SetMiniMapTexture(UTextureRenderTarget2D* InMiniMapTexture);
 
 	//////////////////////////////////////////////////////////////////////////
+	/// 世界地图
+protected:
+	UPROPERTY(EditAnywhere, Category = "WorldMap")
+	FVector2D WorldMapCenter;
+
+	UPROPERTY(EditAnywhere, Category = "WorldMap")
+	float WorldMapRange;
+
+	UPROPERTY(EditAnywhere, Category = "WorldMap")
+	float WorldMapMinRange;
+
+	UPROPERTY(EditAnywhere, Category = "WorldMap")
+	float WorldMapMaxRange;
+
+public:
+	UFUNCTION(BlueprintPure)
+	FVector2D GetWorldMapCenter() const { return WorldMapCenter; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetWorldMapCenter(FVector2D InCenter) { WorldMapCenter = InCenter; }
+
+	UFUNCTION(BlueprintPure)
+	float GetWorldMapRange() const { return WorldMapRange; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetWorldMapRange(float InRange) { WorldMapRange = FMath::Clamp(InRange, WorldMapMinRange, WorldMapMaxRange); }
+
+	//////////////////////////////////////////////////////////////////////////
 protected:
 	UPROPERTY(EditAnywhere, Category = "SceneArea")
 	TArray<FSceneArea> SceneAreas;
@@ -158,14 +186,13 @@ protected:
 	bool bDrawSceneArea;
 
 	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bDrawSceneArea == true"), Category = "SceneArea")
-	float SceneAreaScale;
-
-	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bDrawSceneArea == true"), Category = "SceneArea")
 	float SceneAreaHeight;
 
 	TMap<ESceneAreaType, FSceneAreaResolver> SceneAreaResolvers;
 
 public:
+	FOnSceneAreaAdded OnSceneAreaAdded;
+
 	UFUNCTION(BlueprintPure)
 	bool HasSceneArea(const FName InName) const;
 
@@ -190,6 +217,51 @@ public:
 		
 	UFUNCTION(BlueprintCallable)
 	void ClearSceneArea();
+
+	//////////////////////////////////////////////////////////////////////////
+	/// 标记
+protected:
+	UPROPERTY(VisibleAnywhere, Category = "Marker")
+	TMap<FGuid, FSceneMarker> Markers;
+
+	UPROPERTY(VisibleAnywhere, Category = "Marker")
+	FGuid TrackedMarkerID;
+
+public:
+	UPROPERTY(BlueprintAssignable)
+	FOnSceneMarkersChanged OnSceneMarkersChanged;
+
+	UFUNCTION(BlueprintCallable)
+	FGuid AddMarker(const FSceneMarker& InMarker);
+
+	UFUNCTION(BlueprintCallable)
+	bool UpdateMarker(const FSceneMarker& InMarker);
+
+	UFUNCTION(BlueprintCallable)
+	bool RemoveMarker(FGuid InMarkerID);
+
+	UFUNCTION(BlueprintCallable)
+	void ClearMarkers(bool bIncludePersistent = true);
+
+	UFUNCTION(BlueprintPure)
+	bool HasMarker(FGuid InMarkerID) const { return Markers.Contains(InMarkerID); }
+
+	UFUNCTION(BlueprintPure)
+	FSceneMarker GetMarker(FGuid InMarkerID) const;
+
+	UFUNCTION(BlueprintPure)
+	TArray<FSceneMarkerView> GetMarkerViews(ESceneMarkerChannel InChannel, FVector InViewLocation, float InViewYaw = 0.f) const;
+
+	UFUNCTION(BlueprintCallable)
+	bool SetTrackedMarker(FGuid InMarkerID);
+
+	UFUNCTION(BlueprintPure)
+	FGuid GetTrackedMarker() const { return TrackedMarkerID; }
+
+private:
+	FSceneMarkerView ResolveMarker(const FSceneMarker& InMarker, const FVector& InViewLocation, float InViewYaw) const;
+	UPROPERTY(Transient)
+	FSceneModuleSaveData CachedSaveData;
 
 	//////////////////////////////////////////////////////////////////////////
 protected:

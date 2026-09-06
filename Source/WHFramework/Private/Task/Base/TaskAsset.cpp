@@ -3,6 +3,7 @@
 #include "Task/Base/TaskAsset.h"
 #include "AssetRegistry/AssetData.h"
 #include "Task/Base/TaskBase.h"
+#include "Task/TaskModuleTypes.h"
 #if WITH_EDITOR
 #include "Misc/DataValidation.h"
 #endif
@@ -52,7 +53,8 @@ bool UTaskAsset::ValidateTasks(TArray<FText>& OutErrors) const
 			TSet<FName> ObjectiveIDs;
 			for (const FTaskObjective& Objective : Task->Objectives)
 			{
-				if (Objective.ObjectiveID.IsNone() || ObjectiveIDs.Contains(Objective.ObjectiveID) || !Objective.EventTag.IsValid() || Objective.RequiredCount < 1)
+				if (Objective.ObjectiveID.IsNone() || ObjectiveIDs.Contains(Objective.ObjectiveID) || !Objective.EventTag.IsValid() || Objective.RequiredCount < 1 ||
+					(Objective.RequiredCountRange != FIntPoint::ZeroValue && (Objective.RequiredCountRange.X < 1 || Objective.RequiredCountRange.Y < Objective.RequiredCountRange.X)))
 				{
 					OutErrors.Add(FText::Format(NSLOCTEXT("Task", "InvalidObjective", "Invalid objective in task: {0}"), Task->TaskDisplayName));
 				}
@@ -135,6 +137,15 @@ bool UTaskAsset::IsAllTaskLeaved() const
 		}
 	}
 	return true;
+}
+
+FTaskReference UTaskAsset::MakeTaskReference(const FString& InTaskGUID) const
+{
+	FTaskReference Reference;
+	Reference.Asset = Cast<UTaskAsset>(SourceObject ? SourceObject : const_cast<UTaskAsset*>(this));
+	Reference.InstanceID = InstanceID;
+	Reference.TaskGUID = InTaskGUID;
+	return Reference;
 }
 
 #if WITH_EDITOR

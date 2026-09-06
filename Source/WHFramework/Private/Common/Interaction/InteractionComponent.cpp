@@ -211,7 +211,7 @@ TArray<FInteractionOptionView> UInteractionComponent::GetOptions(AActor* InInter
 		if (!Option->IsVisible(Context)) continue;
 		FInteractionOptionView View;
 		View.OptionTag = Option->OptionTag;
-		View.DisplayName = Option->DisplayName;
+		View.DisplayName = Option->GetDisplayName(Context);
 		View.Priority = Option->Priority;
 		View.bEnabled = Option->IsEnabled(Context, View.DisabledReason);
 		Views.Add(View);

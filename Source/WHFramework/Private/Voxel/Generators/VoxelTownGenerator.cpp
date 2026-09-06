@@ -4,6 +4,7 @@
 #include "Asset/AssetModuleStatics.h"
 #include "Common/CommonModuleStatics.h"
 #include "Math/MathHelper.h"
+#include "Misc/Crc.h"
 #include "Misc/ScopeRWLock.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Voxel/VoxelModule.h"
@@ -110,13 +111,18 @@ void UVoxelTownGenerator::Generate(UVoxelChunk* InChunk)
 					TownBounds += Iter.Key.ToVector2D();
 				}
 				FSceneArea SceneArea;
+				const float BlockSize = Module->GetWorldData().BlockSize;
+				const FString StableKey = FString::Printf(TEXT("Town:%d:%d:%d"), AnchorChunkIndex.X, AnchorChunkIndex.Y, Module->GetWorldData().WorldSeed);
 				SceneArea.AreaName = *FString::Printf(TEXT("Town_%d_%d"), AnchorChunkIndex.X, AnchorChunkIndex.Y);
 				SceneArea.AreaDisplayName = Module->GetVoxelAreaName(AnchorOrigin, EVoxelAreaType::Town,
 					UCommonModuleStatics::GetEnumDisplayNameByValue(TEXT("/Script/WHFramework.EVoxelRegionType"), static_cast<int32>(EVoxelRegionType::Town)));
 				SceneArea.AreaType = ESceneAreaType::Default;
 				SceneArea.AreaShape = ESceneAreaShape::Box;
-				SceneArea.AreaCenter = TownBounds.GetCenter();
-				SceneArea.AreaRadius = TownBounds.GetExtent() + FVector2D(6.f);
+				SceneArea.AreaCenter = TownBounds.GetCenter() * BlockSize;
+				SceneArea.AreaRadius = (TownBounds.GetExtent() + FVector2D(6.f)) * BlockSize;
+				SceneArea.EntranceLocation = FVector(SceneArea.AreaCenter, (AnchorTopography.Height + 1.f) * BlockSize);
+				SceneArea.FeatureTags.AddTag(SceneTags::Feature_Town);
+				SceneArea.EncounterID = FGuid(FCrc::StrCrc32(*StableKey), FCrc::StrCrc32(*(StableKey + TEXT(".B"))), FCrc::StrCrc32(*(StableKey + TEXT(".C"))), FCrc::StrCrc32(*(StableKey + TEXT(".D"))));
 				USceneModuleStatics::AddSceneArea(SceneArea, true);
 			}
 		}
@@ -339,12 +345,18 @@ bool UVoxelTownGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, 
 		? UCommonModuleStatics::GetEnumDisplayNameByValue(TEXT("/Script/WHFramework.EVoxelRegionType"), static_cast<int32>(EVoxelRegionType::Building))
 		: _PrefabAssets[InIndex]->DisplayName;
 	FSceneArea BuildingArea;
-	BuildingArea.AreaName = *FString::Printf(TEXT("TownBuilding_%d_%d"), InX, InY);
+	const float BlockSize = Module->GetWorldData().BlockSize;
+	const FString StableKey = FString::Printf(TEXT("%s:%d:%d:%d"), *PrefabAssets[InIndex].ToString(), InX, InY, Module->GetWorldData().WorldSeed);
+	BuildingArea.AreaName = *FString::Printf(TEXT("TownBuilding_%08X_%d_%d"), FCrc::StrCrc32(*PrefabAssets[InIndex].ToString()), InX, InY);
 	BuildingArea.AreaDisplayName = Module->GetVoxelAreaName(FIndex(InX, InY, GroundHeight), EVoxelAreaType::Building, BuildingDisplayName);
 	BuildingArea.AreaType = ESceneAreaType::Default;
 	BuildingArea.AreaShape = ESceneAreaShape::Box;
-	BuildingArea.AreaCenter = FVector2D(InX, InY);
-	BuildingArea.AreaRadius = FVector2D(FrontBack + 1, LeftRight + 1);
+	BuildingArea.AreaCenter = FVector2D(InX, InY) * BlockSize;
+	BuildingArea.AreaRadius = FVector2D(FrontBack + 1, LeftRight + 1) * BlockSize;
+	BuildingArea.EntranceLocation = FVector((InX - FrontBack + 0.5f) * BlockSize, (InY - LeftRight + 0.5f) * BlockSize, (GroundHeight + 1.f) * BlockSize);
+	BuildingArea.FeatureTags.AddTag(SceneTags::Feature_Building);
+	BuildingArea.SourceAssetID = PrefabAssets[InIndex];
+	BuildingArea.EncounterID = FGuid(FCrc::StrCrc32(*StableKey), FCrc::StrCrc32(*(StableKey + TEXT(".B"))), FCrc::StrCrc32(*(StableKey + TEXT(".C"))), FCrc::StrCrc32(*(StableKey + TEXT(".D"))));
 	USceneModuleStatics::AddSceneArea(BuildingArea, true);
 
 	return true;

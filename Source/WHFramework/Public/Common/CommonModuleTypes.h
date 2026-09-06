@@ -192,6 +192,7 @@ namespace GameplayTags
 	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Option_PickUp);
 	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Option_Dialogue);
 	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Option_Transaction);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Option_Task);
 	
 	////////////////////////////////////////////////////
 	// Input_Shortcut

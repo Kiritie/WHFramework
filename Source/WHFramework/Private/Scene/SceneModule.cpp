@@ -63,6 +63,11 @@ USceneModule::USceneModule()
 	MiniMapRange = 512.f;
 	MiniMapMinRange = 128.f;
 	MiniMapMaxRange = -1.f;
+
+	WorldMapCenter = FVector2D::ZeroVector;
+	WorldMapRange = 4096.f;
+	WorldMapMinRange = 512.f;
+	WorldMapMaxRange = 262144.f;
 	
 	static ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> MiniMapTexFinder(TEXT("/Script/Engine.TextureRenderTarget2D'/WHFramework/Scene/Textures/Render/RT_MiniMap_Default.RT_MiniMap_Default'"));
 	if(MiniMapTexFinder.Succeeded())
@@ -71,8 +76,9 @@ USceneModule::USceneModule()
 	}
 
 	SceneAreas = TArray<FSceneArea>();
+	Markers = TMap<FGuid, FSceneMarker>();
+	TrackedMarkerID.Invalidate();
 	bDrawSceneArea = false;
-	SceneAreaScale = 1.f;
 	SceneAreaHeight = 1000.f;
 	
 	WorldTimer = nullptr;
@@ -421,6 +427,7 @@ void USceneModule::OnTermination(EPhase InPhase)
 
 		FSceneArea Area;
 		while(PendingSceneAreas.Dequeue(Area)) { }
+		ClearMarkers(true);
 	}
 }
 
@@ -433,7 +440,16 @@ void USceneModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		if(SaveData.IsSaved())
 		{
 			MiniMapRange = SaveData.MiniMapRange;
+			WorldMapCenter = SaveData.WorldMapCenter;
+			WorldMapRange = SaveData.WorldMapRange;
 			SceneAreas = SaveData.SceneAreas;
+			Markers.Reset();
+			for(const FSceneMarker& Marker : SaveData.Markers)
+			{
+				if(Marker.MarkerID.IsValid()) Markers.Add(Marker.MarkerID, Marker);
+			}
+			TrackedMarkerID = Markers.Contains(SaveData.TrackedMarkerID) ? SaveData.TrackedMarkerID : FGuid();
+			OnSceneMarkersChanged.Broadcast();
 		}
 		
 		if(WorldTimer && WorldTimer->IsAutoSave())
@@ -461,11 +477,18 @@ void USceneModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* USceneModule::ToData()
 {
-	static FSceneModuleSaveData* SaveData;
-	SaveData = new FSceneModuleSaveData();
+	CachedSaveData = FSceneModuleSaveData();
+	FSceneModuleSaveData* SaveData = &CachedSaveData;
 
 	SaveData->MiniMapRange = MiniMapRange;
+	SaveData->WorldMapCenter = WorldMapCenter;
+	SaveData->WorldMapRange = WorldMapRange;
+	SaveData->TrackedMarkerID = TrackedMarkerID;
 	SaveData->SceneAreas = SceneAreas;
+	for(const auto& Iter : Markers)
+	{
+		if(Iter.Value.bPersistent) SaveData->Markers.Add(Iter.Value);
+	}
 	
 	if(WorldTimer && WorldTimer->IsAutoSave())
 	{
@@ -509,19 +532,19 @@ void USceneModule::OnDrawDebug(UCanvas* InCanvas, APlayerController* InPC)
 			{
 				case ESceneAreaShape::Box:
 				{
-					UKismetSystemLibrary::DrawDebugBox(this, FVector(Iter1.AreaCenter.X * SceneAreaScale, Iter1.AreaCenter.Y * SceneAreaScale, SceneAreaHeight * 0.5f), FVector(Iter1.AreaRadius.X * SceneAreaScale, Iter1.AreaRadius.Y * SceneAreaScale, SceneAreaHeight * 0.5f), FLinearColor::Red);
+					UKismetSystemLibrary::DrawDebugBox(this, FVector(Iter1.AreaCenter.X, Iter1.AreaCenter.Y, SceneAreaHeight * 0.5f), FVector(Iter1.AreaRadius.X, Iter1.AreaRadius.Y, SceneAreaHeight * 0.5f), FLinearColor::Red);
 					break;
 				}
 				case ESceneAreaShape::Ellipse:
 				{
-					UKismetSystemLibrary::DrawDebugCylinder(this, FVector(Iter1.AreaCenter.X * SceneAreaScale, Iter1.AreaCenter.Y * SceneAreaScale, 0.f), FVector(Iter1.AreaCenter.X * SceneAreaScale, Iter1.AreaCenter.Y * SceneAreaScale, SceneAreaHeight), Iter1.AreaRadius.GetMax() * SceneAreaScale, 12, FLinearColor::Red);
+					UKismetSystemLibrary::DrawDebugCylinder(this, FVector(Iter1.AreaCenter.X, Iter1.AreaCenter.Y, 0.f), FVector(Iter1.AreaCenter.X, Iter1.AreaCenter.Y, SceneAreaHeight), Iter1.AreaRadius.GetMax(), 12, FLinearColor::Red);
 					break;
 				}
 				case ESceneAreaShape::Polygon:
 				{
 					for(auto& Iter2 : Iter1.AreaPoints)
 					{
-						UKismetSystemLibrary::DrawDebugLine(this, FVector(Iter2.X * SceneAreaScale, Iter2.Y * SceneAreaScale, 0.f), FVector(Iter2.X * SceneAreaScale, Iter2.Y * SceneAreaScale, SceneAreaHeight), FLinearColor::Red);
+						UKismetSystemLibrary::DrawDebugLine(this, FVector(Iter2.X, Iter2.Y, 0.f), FVector(Iter2.X, Iter2.Y, SceneAreaHeight), FLinearColor::Red);
 					}
 					break;
 				}
@@ -682,6 +705,7 @@ void USceneModule::AddSceneArea(const FSceneArea& InArea, bool bThreadSafe)
 	if(!HasSceneArea(Area.AreaName))
 	{
 		SceneAreas.Add(Area);
+		OnSceneAreaAdded.Broadcast(Area);
 	}
 }
 
@@ -703,6 +727,116 @@ void USceneModule::ClearSceneArea()
 
 	FSceneArea Area;
 	while(PendingSceneAreas.Dequeue(Area)) { }
+}
+
+FGuid USceneModule::AddMarker(const FSceneMarker& InMarker)
+{
+	FSceneMarker Marker = InMarker;
+	if(!Marker.MarkerID.IsValid()) Marker.MarkerID = FGuid::NewGuid();
+	if(Markers.Contains(Marker.MarkerID)) return FGuid();
+	Markers.Add(Marker.MarkerID, Marker);
+	OnSceneMarkersChanged.Broadcast();
+	return Marker.MarkerID;
+}
+
+bool USceneModule::UpdateMarker(const FSceneMarker& InMarker)
+{
+	FSceneMarker* Existing = InMarker.MarkerID.IsValid() ? Markers.Find(InMarker.MarkerID) : nullptr;
+	if(!Existing) return false;
+	if(Existing->MarkerTag == InMarker.MarkerTag && Existing->DisplayName.EqualTo(InMarker.DisplayName) && Existing->Icon == InMarker.Icon &&
+		Existing->Color.Equals(InMarker.Color) && Existing->Location.Equals(InMarker.Location) && Existing->Offset.Equals(InMarker.Offset) &&
+		Existing->ActorID == InMarker.ActorID && Existing->AreaName == InMarker.AreaName && Existing->Channels == InMarker.Channels &&
+		Existing->Priority == InMarker.Priority && FMath::IsNearlyEqual(Existing->MinDistance, InMarker.MinDistance) &&
+		FMath::IsNearlyEqual(Existing->MaxDistance, InMarker.MaxDistance) && Existing->bPersistent == InMarker.bPersistent) return true;
+	*Existing = InMarker;
+	OnSceneMarkersChanged.Broadcast();
+	return true;
+}
+
+bool USceneModule::RemoveMarker(FGuid InMarkerID)
+{
+	if(!Markers.Remove(InMarkerID)) return false;
+	if(TrackedMarkerID == InMarkerID) TrackedMarkerID.Invalidate();
+	OnSceneMarkersChanged.Broadcast();
+	return true;
+}
+
+void USceneModule::ClearMarkers(bool bIncludePersistent)
+{
+	bool bChanged = false;
+	for(auto Iter = Markers.CreateIterator(); Iter; ++Iter)
+	{
+		if(bIncludePersistent || !Iter.Value().bPersistent)
+		{
+			if(TrackedMarkerID == Iter.Key()) TrackedMarkerID.Invalidate();
+			Iter.RemoveCurrent();
+			bChanged = true;
+		}
+	}
+	if(bChanged) OnSceneMarkersChanged.Broadcast();
+}
+
+FSceneMarker USceneModule::GetMarker(FGuid InMarkerID) const
+{
+	if(const FSceneMarker* Marker = Markers.Find(InMarkerID)) return *Marker;
+	return FSceneMarker();
+}
+
+FSceneMarkerView USceneModule::ResolveMarker(const FSceneMarker& InMarker, const FVector& InViewLocation, float InViewYaw) const
+{
+	FSceneMarkerView View;
+	View.Marker = InMarker;
+	View.Location = InMarker.Location;
+	if(InMarker.ActorID.IsValid())
+	{
+		if(AActor* const* Actor = SceneActorMap.Find(InMarker.ActorID); Actor != nullptr && ::IsValid(*Actor))
+		{
+			View.Location = (*Actor)->GetActorLocation();
+			View.bTargetLoaded = true;
+		}
+	}
+	else if(!InMarker.AreaName.IsNone())
+	{
+		const FSceneArea Area = GetSceneArea(InMarker.AreaName);
+		if(!Area.AreaName.IsNone())
+		{
+			View.Location = Area.EntranceLocation.IsNearlyZero() ? FVector(Area.AreaCenter, InMarker.Location.Z) : Area.EntranceLocation;
+			View.bTargetLoaded = true;
+		}
+	}
+	View.Location += InMarker.Offset;
+	const FVector2D Delta = FVector2D(View.Location - InViewLocation);
+	View.Distance = Delta.Size();
+	const float DirectionYaw = FMath::RadiansToDegrees(FMath::Atan2(Delta.Y, Delta.X));
+	View.Bearing = FMath::FindDeltaAngleDegrees(InViewYaw, DirectionYaw);
+	View.bTracked = TrackedMarkerID == InMarker.MarkerID;
+	return View;
+}
+
+TArray<FSceneMarkerView> USceneModule::GetMarkerViews(ESceneMarkerChannel InChannel, FVector InViewLocation, float InViewYaw) const
+{
+	TArray<FSceneMarkerView> Views;
+	for(const auto& Iter : Markers)
+	{
+		if(!Iter.Value.HasChannel(InChannel)) continue;
+		FSceneMarkerView View = ResolveMarker(Iter.Value, InViewLocation, InViewYaw);
+		if(View.Distance < Iter.Value.MinDistance || (Iter.Value.MaxDistance > 0.f && View.Distance > Iter.Value.MaxDistance)) continue;
+		Views.Add(MoveTemp(View));
+	}
+	Views.StableSort([](const FSceneMarkerView& A, const FSceneMarkerView& B)
+	{
+		return A.Marker.Priority == B.Marker.Priority ? A.Distance < B.Distance : A.Marker.Priority > B.Marker.Priority;
+	});
+	return Views;
+}
+
+bool USceneModule::SetTrackedMarker(FGuid InMarkerID)
+{
+	if(InMarkerID.IsValid() && !Markers.Contains(InMarkerID)) return false;
+	if(TrackedMarkerID == InMarkerID) return true;
+	TrackedMarkerID = InMarkerID;
+	OnSceneMarkersChanged.Broadcast();
+	return true;
 }
 
 UWorldTimer* USceneModule::GetWorldTimer(TSubclassOf<UWorldTimer> InClass) const
@@ -900,6 +1034,14 @@ bool USceneModule::AddSceneActor(AActor* InActor)
 	if(!SceneActorMap.Contains(ISceneActorInterface::Execute_GetActorID(InActor)))
 	{
 		SceneActorMap.Add(ISceneActorInterface::Execute_GetActorID(InActor), InActor);
+		for(const auto& Iter : Markers)
+		{
+			if(Iter.Value.ActorID == ISceneActorInterface::Execute_GetActorID(InActor))
+			{
+				OnSceneMarkersChanged.Broadcast();
+				break;
+			}
+		}
 		return true;
 	}
 	return false;
@@ -911,7 +1053,18 @@ bool USceneModule::RemoveSceneActor(AActor* InActor)
 
 	if(SceneActorMap.Contains(ISceneActorInterface::Execute_GetActorID(InActor)))
 	{
-		SceneActorMap.Remove(ISceneActorInterface::Execute_GetActorID(InActor));
+		const FGuid ActorID = ISceneActorInterface::Execute_GetActorID(InActor);
+		bool bMarkerChanged = false;
+		for(auto& Iter : Markers)
+		{
+			if(Iter.Value.ActorID == ActorID)
+			{
+				Iter.Value.Location = InActor->GetActorLocation();
+				bMarkerChanged = true;
+			}
+		}
+		SceneActorMap.Remove(ActorID);
+		if(bMarkerChanged) OnSceneMarkersChanged.Broadcast();
 		return true;
 	}
 	return false;

@@ -59,6 +59,7 @@ namespace GameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Interaction_Option_PickUp, "Interaction.Option.PickUp", "Pick up interaction option");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Interaction_Option_Dialogue, "Interaction.Option.Dialogue", "Dialogue interaction option");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Interaction_Option_Transaction, "Interaction.Option.Transaction", "Transaction interaction option");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Interaction_Option_Task, "Interaction.Option.Task", "Task interaction option");
 
 	////////////////////////////////////////////////////
 	// Input_Shortcut

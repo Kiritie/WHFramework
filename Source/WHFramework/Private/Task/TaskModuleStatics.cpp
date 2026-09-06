@@ -35,9 +35,14 @@ UTaskAsset* UTaskModuleStatics::GetTaskAsset(UTaskAsset* InAsset)
 	return UTaskModule::Get().GetAsset(InAsset);
 }
 
-void UTaskModuleStatics::AddTaskAsset(UTaskAsset* InAsset)
+UTaskAsset* UTaskModuleStatics::AddTaskAsset(UTaskAsset* InAsset)
 {
-	UTaskModule::Get().AddAsset(InAsset);
+	return UTaskModule::Get().AddAsset(InAsset);
+}
+
+UTaskAsset* UTaskModuleStatics::CreateTaskAsset(UTaskAsset* InAsset, FGuid InAgentID)
+{
+	return UTaskModule::Get().CreateAsset(InAsset, InAgentID);
 }
 
 void UTaskModuleStatics::RemoveTaskAsset(UTaskAsset* InAsset)
@@ -113,4 +118,19 @@ void UTaskModuleStatics::LeaveTask(UTaskBase* InTask)
 void UTaskModuleStatics::LeaveTaskByGUID(const FString& InTaskGUID)
 {
 	UTaskModule::Get().LeaveTaskByGUID(InTaskGUID);
+}
+
+UTaskBase* UTaskModuleStatics::ResolveTask(const FTaskReference& InReference)
+{
+	return UTaskModule::Get().ResolveTask(InReference);
+}
+
+bool UTaskModuleStatics::TurnInTask(UTaskBase* InTask, AActor* InTarget)
+{
+	return UTaskModule::Get().TurnInTask(InTask, InTarget);
+}
+
+void UTaskModuleStatics::ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTargetTag, int32 InCount, FPrimaryAssetId InTargetAssetID, FName InTargetName)
+{
+	UTaskModule::Get().ReportTaskEvent(InEventTag, InTargetTag, InCount, InTargetAssetID, InTargetName);
 }

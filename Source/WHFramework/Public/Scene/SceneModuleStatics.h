@@ -12,6 +12,7 @@ class UWorldWeather;
 class UWorldTimer;
 class APhysicsVolumeBase;
 class APhysicsVolume;
+class APlayerController;
 /**
  * 
  */
@@ -59,6 +60,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
 	static void SetMiniMapTexture(UTextureRenderTarget2D* InMiniMapTexture);
 
+	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
+	static FVector2D GetWorldMapCenter();
+
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
+	static void SetWorldMapCenter(FVector2D InCenter);
+
+	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
+	static float GetWorldMapRange();
+
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
+	static void SetWorldMapRange(float InRange);
+
 	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics")
 	static bool HasSceneArea(const FName InName);
@@ -80,6 +93,42 @@ public:
 		
 	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics")
 	static void ClearSceneArea();
+
+	//////////////////////////////////////////////////////////////////////////
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics|Marker")
+	static FGuid AddMarker(const FSceneMarker& InMarker);
+
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics|Marker")
+	static bool UpdateMarker(const FSceneMarker& InMarker);
+
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics|Marker")
+	static bool RemoveMarker(FGuid InMarkerID);
+
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics|Marker")
+	static void ClearMarkers(bool bIncludePersistent = true);
+
+	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics|Marker")
+	static FSceneMarker GetMarker(FGuid InMarkerID);
+
+	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics|Marker")
+	static TArray<FSceneMarkerView> GetMarkerViews(ESceneMarkerChannel InChannel, FVector InViewLocation, float InViewYaw = 0.f);
+
+	UFUNCTION(BlueprintCallable, Category = "SceneModuleStatics|Marker")
+	static bool SetTrackedMarker(FGuid InMarkerID);
+
+	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics|Marker")
+	static FGuid GetTrackedMarker();
+
+	/** 将世界标记投影到以指定位置为中心的地图面板，范围表示可见世界宽度 */
+	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics|Marker")
+	static bool ProjectMarkerToMap(const FSceneMarkerView& InMarker, FVector2D InCenter, float InRange, FVector2D InSize, float InYaw, bool bClamp, FVector2D& OutPosition);
+
+	/** 将标记方位投影到水平罗盘条 */
+	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics|Marker")
+	static bool ProjectMarkerToCompass(const FSceneMarkerView& InMarker, float InFieldOfView, float InWidth, bool bClamp, float& OutPosition);
+
+	UFUNCTION(BlueprintPure, Category = "SceneModuleStatics|Marker")
+	static bool ProjectMarkerToScreen(APlayerController* InPlayer, const FSceneMarkerView& InMarker, bool bPlayerViewportRelative, FVector2D& OutPosition);
 
 	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "SceneModuleStatics")

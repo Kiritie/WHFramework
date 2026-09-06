@@ -10,7 +10,10 @@
 #include "Event/Handle/Task/EventHandle_CurrentTaskChanged.h"
 #include "SaveGame/SaveGameModuleStatics.h"
 #include "SaveGame/Module/TaskSaveGame.h"
+#include "Scene/Actor/SceneActorInterface.h"
+#include "Scene/SceneModule.h"
 #include "Task/TaskModuleNetworkComponent.h"
+#include "Misc/Crc.h"
 
 IMPLEMENTATION_MODULE(UTaskModule)
 
@@ -77,9 +80,10 @@ void UTaskModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 		for (UTaskBase* Task : Roots)
 		{
 			if (!Task || Task->IsCompleted()) continue;
+			const bool bSelectNextTask = !CurrentTask || CurrentTask->IsCompleted();
 			if (Task->TaskEnterType == ETaskEnterType::Automatic)
-				EnterTask(Task, !CurrentTask);
-			if (Task->IsEntered()) EnterTask(Task, false);
+				EnterTask(Task, bSelectNextTask);
+			if (Task->IsEntered()) EnterTask(Task, bSelectNextTask);
 			if (Assets.Contains(Asset)) RefreshTask(Task);
 		}
 	}
@@ -106,17 +110,26 @@ void UTaskModule::OnTermination(EPhase InPhase)
 FString UTaskModule::GetSaveKey(const UTaskAsset* Asset, const FString& GUID)
 {
 	const UObject* Source = Asset && Asset->SourceObject ? Asset->SourceObject : Asset;
-	return (Source ? Source->GetPathName() : FString()) + TEXT(":") + GUID;
+	return FString::Printf(TEXT("%s:%s:%s"), Source ? *Source->GetPathName() : TEXT(""), Asset ? *Asset->InstanceID.ToString(EGuidFormats::Digits) : TEXT(""), *GUID);
+}
+
+FGuid UTaskModule::MakeTaskMarkerID(const UTaskAsset* Asset, const FString& GUID)
+{
+	const FString Key = GetSaveKey(Asset, GUID);
+	return FGuid(FCrc::StrCrc32(*Key), FCrc::StrCrc32(*(Key + TEXT(".B"))), FCrc::StrCrc32(*(Key + TEXT(".C"))), FCrc::StrCrc32(*(Key + TEXT(".D"))));
 }
 
 void UTaskModule::ClearRuntimeAssets()
 {
+	RemoveTaskMarkers();
 	for (UTaskAsset* Asset : Assets)
 		if (Asset) for (const auto& Pair : Asset->TaskMap)
 			if (Pair.Value) Pair.Value->OnSuspend();
-	SetCurrentTask(nullptr);
+	const bool bHadCurrentTask = CurrentTask != nullptr;
+	CurrentTask = nullptr;
 	Assets.Reset();
 	PendingResume.Reset();
+	if(bHadCurrentTask) UEventModuleStatics::BroadcastEvent(UEventHandle_CurrentTaskChanged::StaticClass(), this, {FParameter(static_cast<UObject*>(nullptr))});
 }
 
 void UTaskModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -128,15 +141,18 @@ void UTaskModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	{
 		bLoadingTasks = true;
 		ClearRuntimeAssets();
-		for (const auto& Path : Data.AssetPaths)
+		for (const FTaskAssetSaveData& AssetData : Data.Assets)
 		{
-			if (UTaskAsset* Source = Path.LoadSynchronous())
+			if (UTaskAsset* Source = AssetData.Asset.LoadSynchronous())
 			{
-				AddAsset(Source);
+				if(UTaskAsset* RuntimeAsset = AddAssetInternal(Source, AssetData.InstanceID, AssetData.AgentID))
+				{
+					RuntimeAsset->AgentLocation = AssetData.AgentLocation;
+				}
 			}
 			else
 			{
-				UE_LOG(LogTemp, Warning, TEXT("Missing task asset in save: %s"), *Path.ToString());
+				UE_LOG(LogTemp, Warning, TEXT("Missing task asset in save: %s"), *AssetData.Asset.ToString());
 			}
 		}
 		for (UTaskAsset* Source : DefaultAssets) AddAsset(Source);
@@ -153,14 +169,7 @@ void UTaskModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 			}
 		}
-		CurrentTask = nullptr;
-		for (UTaskAsset* Asset : Assets)
-		{
-			if (Asset->SourceObject && Asset->SourceObject->GetPathName() == Data.CurrentTaskAssetPath)
-			{
-				CurrentTask = Asset->TaskMap.FindRef(Data.CurrentTaskGUID);
-			}
-		}
+		CurrentTask = ResolveTask(Data.CurrentTask);
 		if (CurrentTask && CurrentTask->IsLeaved()) CurrentTask = nullptr;
 	}
 	if (PHASEC(InPhase, EPhase::Final))
@@ -174,7 +183,7 @@ void UTaskModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 				Pair.Key->SetTaskTimersPaused(ModuleState == EModuleState::Paused);
 			}
 		bLoadingTasks = false;
-		OnTaskAssetsChanged.Broadcast();
+		RefreshTaskMarkers();
 		UEventModuleStatics::BroadcastEvent(UEventHandle_CurrentTaskChanged::StaticClass(), this, {CurrentTask});
 	}
 }
@@ -194,14 +203,18 @@ FSaveData* UTaskModule::ToData()
 	for (UTaskAsset* Asset : Assets)
 	{
 		if (!Asset || !Asset->SourceObject) continue;
-		CachedSaveData.AssetPaths.Add(Cast<UTaskAsset>(Asset->SourceObject));
+		FTaskAssetSaveData AssetData;
+		AssetData.Asset = Cast<UTaskAsset>(Asset->SourceObject);
+		AssetData.InstanceID = Asset->InstanceID;
+		AssetData.AgentID = Asset->AgentID;
+		AssetData.AgentLocation = Asset->AgentLocation;
+		CachedSaveData.Assets.Add(AssetData);
 		for (const auto& Pair : Asset->TaskMap)
 			if (Pair.Value) CachedSaveData.TaskRecords.Add(GetSaveKey(Asset, Pair.Key), Pair.Value->CaptureRuntimeData());
 	}
 	if (CurrentTask && CurrentTask->GetTaskAsset())
 	{
-		CachedSaveData.CurrentTaskGUID = CurrentTask->TaskGUID;
-		CachedSaveData.CurrentTaskAssetPath = CurrentTask->GetTaskAsset()->SourceObject->GetPathName();
+		CachedSaveData.CurrentTask = CurrentTask->GetTaskAsset()->MakeTaskReference(CurrentTask->TaskGUID);
 	}
 	return &CachedSaveData;
 }
@@ -213,29 +226,87 @@ FString UTaskModule::GetModuleDebugMessage()
 
 UTaskAsset* UTaskModule::GetAsset(UTaskAsset* InAsset) const
 {
-	if (!InAsset) return nullptr;
-	for (UTaskAsset* Asset : Assets)
-		if (Asset && (Asset == InAsset || Asset->SourceObject == InAsset)) return Asset;
+	if(Assets.Contains(InAsset)) return InAsset;
+	return GetAssetByInstance(InAsset, FGuid());
+}
+
+UTaskAsset* UTaskModule::GetAssetByInstance(UTaskAsset* InAsset, FGuid InInstanceID) const
+{
+	if(!InAsset) return nullptr;
+	const UObject* Source = InAsset->SourceObject ? InAsset->SourceObject : InAsset;
+	for(UTaskAsset* Asset : Assets)
+	{
+		if(Asset && (Asset == InAsset || Asset->SourceObject == Source) && Asset->InstanceID == InInstanceID) return Asset;
+	}
 	return nullptr;
+}
+
+TArray<UTaskAsset*> UTaskModule::GetAssetsByAgent(FGuid InAgentID) const
+{
+	TArray<UTaskAsset*> Result;
+	if(!InAgentID.IsValid()) return Result;
+	for(UTaskAsset* Asset : Assets)
+	{
+		if(Asset && Asset->AgentID == InAgentID) Result.Add(Asset);
+	}
+	return Result;
 }
 
 UTaskBase* UTaskModule::ResolveRuntimeTask(UTaskBase* Task) const
 {
 	if (!Task) return nullptr;
-	if (UTaskAsset* Asset = GetAsset(Task->GetTaskAsset())) return Asset->TaskMap.FindRef(Task->TaskGUID);
+	UTaskAsset* TaskAsset = Task->GetTaskAsset();
+	if(Assets.Contains(TaskAsset)) return Task;
+	if (UTaskAsset* Asset = GetAsset(TaskAsset)) return Asset->TaskMap.FindRef(Task->TaskGUID);
 	return nullptr;
 }
 
-void UTaskModule::AddAsset(UTaskAsset* InAsset)
+UTaskAsset* UTaskModule::AddAsset(UTaskAsset* InAsset)
 {
-	if (!InAsset || GetAsset(InAsset)) return;
+	return AddAssetInternal(InAsset, FGuid(), FGuid());
+}
+
+UTaskAsset* UTaskModule::CreateAsset(UTaskAsset* InAsset, FGuid InAgentID)
+{
+	if(!InAsset || !InAgentID.IsValid()) return nullptr;
+	FGuid InstanceID = FGuid::NewGuid();
+	while(GetAssetByInstance(InAsset, InstanceID)) InstanceID = FGuid::NewGuid();
+	return AddAssetInternal(InAsset, InstanceID, InAgentID);
+}
+
+UTaskAsset* UTaskModule::AddAssetInternal(UTaskAsset* InAsset, FGuid InInstanceID, FGuid InAgentID)
+{
+	if(!InAsset) return nullptr;
+	UTaskAsset* Source = Cast<UTaskAsset>(InAsset->SourceObject ? InAsset->SourceObject : InAsset);
+	if(!Source) return nullptr;
+	if(UTaskAsset* Existing = GetAssetByInstance(Source, InInstanceID)) return Existing;
 	TArray<FText> Errors;
-	if (!InAsset->ValidateTasks(Errors)) return;
-	UTaskAsset* RuntimeAsset = DuplicateObject<UTaskAsset>(InAsset, this);
-	RuntimeAsset->SourceObject = InAsset;
+	if(!Source->ValidateTasks(Errors)) return nullptr;
+	UTaskAsset* RuntimeAsset = DuplicateObject<UTaskAsset>(Source, this);
+	RuntimeAsset->SourceObject = Source;
+	RuntimeAsset->InstanceID = InInstanceID;
+	RuntimeAsset->AgentID = InAgentID;
 	Assets.Add(RuntimeAsset);
 	RuntimeAsset->Initialize();
-	if (!bLoadingTasks) OnTaskAssetsChanged.Broadcast();
+	if(InInstanceID.IsValid())
+	{
+		for(const auto& Pair : RuntimeAsset->TaskMap)
+		{
+			UTaskBase* Task = Pair.Value;
+			if(!Task) continue;
+			for(FTaskObjective& Objective : Task->Objectives)
+			{
+				if(Objective.RequiredCountRange == FIntPoint::ZeroValue) continue;
+				const uint32 Seed = HashCombineFast(GetTypeHash(InInstanceID), HashCombineFast(GetTypeHash(Pair.Key), GetTypeHash(Objective.ObjectiveID)));
+				Objective.RequiredCount = FRandomStream(Seed).RandRange(Objective.RequiredCountRange.X, Objective.RequiredCountRange.Y);
+			}
+		}
+	}
+	if(!bLoadingTasks)
+	{
+		RefreshTaskMarkers();
+	}
+	return RuntimeAsset;
 }
 
 void UTaskModule::RemoveAsset(UTaskAsset* InAsset)
@@ -250,7 +321,10 @@ void UTaskModule::RemoveAsset(UTaskAsset* InAsset)
 		const bool bClearCurrentTask = CurrentTask && CurrentTask->GetTaskAsset() == Asset;
 		Assets.Remove(Asset);
 		if (bClearCurrentTask) SetCurrentTask(nullptr);
-		if (!bLoadingTasks) OnTaskAssetsChanged.Broadcast();
+		if (!bLoadingTasks)
+		{
+			RefreshTaskMarkers();
+		}
 	}
 }
 
@@ -261,6 +335,7 @@ void UTaskModule::RestoreTask(UTaskBase* InTask)
 	{
 		if (CurrentTask == InTask || (CurrentTask && InTask->IsParentOf(CurrentTask))) SetCurrentTask(nullptr);
 		InTask->OnRestore();
+		RefreshTaskMarkers();
 	}
 }
 
@@ -300,6 +375,7 @@ void UTaskModule::EnterTask(UTaskBase* InTask, bool bSetAsCurrent)
 			if (Child && Child->TaskEnterType == ETaskEnterType::Automatic) EnterTask(Child, bSetAsCurrent);
 		}
 	}
+	RefreshTaskMarkers();
 }
 
 void UTaskModule::EnterTaskByGUID(const FString& InTaskGUID, bool bSetAsCurrent)
@@ -346,6 +422,7 @@ void UTaskModule::ExecuteTask(UTaskBase* InTask)
 	if(InTask && InTask->GetTaskState() == ETaskState::Entered)
 	{
 		InTask->OnExecute();
+		RefreshTaskMarkers();
 	}
 }
 
@@ -374,6 +451,7 @@ void UTaskModule::CompleteTask(UTaskBase* InTask, ETaskExecuteResult InTaskExecu
 		{
 			CompleteTask(InTask->ParentTask, InTask->ParentTask->IsAllSubSucceed() ? ETaskExecuteResult::Succeed : ETaskExecuteResult::Failed);
 		}
+		RefreshTaskMarkers();
 	}
 }
 
@@ -399,6 +477,7 @@ void UTaskModule::LeaveTask(UTaskBase* InTask)
 		{
 			LeaveTask(InTask->ParentTask);
 		}
+		RefreshTaskMarkers();
 	}
 }
 
@@ -427,6 +506,7 @@ void UTaskModule::SetCurrentTask(UTaskBase* InTask)
 	InTask = ResolveRuntimeTask(InTask);
 	if (CurrentTask == InTask) return;
 	CurrentTask = InTask;
+	RefreshTaskMarkers();
 	UEventModuleStatics::BroadcastEvent(UEventHandle_CurrentTaskChanged::StaticClass(), this, {CurrentTask});
 }
 
@@ -449,11 +529,17 @@ UTaskBase* UTaskModule::GetTaskByGUID(const FString& InTaskGUID) const
 	return Result;
 }
 
-UTaskBase* UTaskModule::ResolveTask(const FTaskReference& Reference) const
+UTaskBase* UTaskModule::ResolveTask(const FTaskReference& Reference, UTaskAsset* InContext) const
 {
+	FGuid InstanceID = Reference.InstanceID;
+	if(!InstanceID.IsValid() && InContext)
+	{
+		const UObject* ContextSource = InContext->SourceObject ? InContext->SourceObject : InContext;
+		if(FSoftObjectPath(ContextSource) == Reference.Asset.ToSoftObjectPath()) InstanceID = InContext->InstanceID;
+	}
 	for (UTaskAsset* Asset : Assets)
 	{
-		if (Asset == Reference.Asset.Get() || (Asset->SourceObject && FSoftObjectPath(Asset->SourceObject) == Reference.Asset.ToSoftObjectPath()))
+		if (Asset->InstanceID == InstanceID && (Asset == Reference.Asset.Get() || (Asset->SourceObject && FSoftObjectPath(Asset->SourceObject) == Reference.Asset.ToSoftObjectPath())))
 		{
 			return Asset->TaskMap.FindRef(Reference.TaskGUID);
 		}
@@ -464,7 +550,7 @@ UTaskBase* UTaskModule::ResolveTask(const FTaskReference& Reference) const
 UTaskBase* UTaskModule::EnsureTask(const FTaskReference& Reference)
 {
 	if (UTaskBase* Task = ResolveTask(Reference)) return Task;
-	if (UTaskAsset* Asset = Reference.Asset.LoadSynchronous()) AddAsset(Asset);
+	if (UTaskAsset* Asset = Reference.Asset.LoadSynchronous()) AddAssetInternal(Asset, Reference.InstanceID, FGuid());
 	return ResolveTask(Reference);
 }
 
@@ -472,13 +558,19 @@ bool UTaskModule::TurnInTask(UTaskBase* InTask, AActor* InTarget)
 {
 	InTask = ResolveRuntimeTask(InTask);
 	if (!InTask || InTask->TaskState != ETaskState::Completed || InTask->TaskExecuteResult != ETaskExecuteResult::Succeed) return false;
-	if (InTask->bRequireExplicitTurnIn && (!InTarget || (!InTask->TurnInActorTag.IsNone() && !InTarget->ActorHasTag(InTask->TurnInActorTag)))) return false;
+	UTaskAsset* Asset = InTask->GetTaskAsset();
+	if (InTask->bRequireExplicitTurnIn)
+	{
+		if(!InTarget || !Asset || !Asset->AgentID.IsValid() || !InTarget->Implements<USceneActorInterface>() || ISceneActorInterface::Execute_GetActorID(InTarget) != Asset->AgentID) return false;
+		FText Reason;
+		if(!InTask->CanTurnIn(InTarget, Reason) || !InTask->CommitTurnIn(InTarget)) return false;
+	}
 	TGuardValue<UTaskBase*> Guard(TurningInTask, InTask);
 	LeaveTask(InTask);
 	return InTask->TaskState == ETaskState::Leaved;
 }
 
-void UTaskModule::ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTargetTag, int32 InCount, FPrimaryAssetId InTargetAssetID)
+void UTaskModule::ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTargetTag, int32 InCount, FPrimaryAssetId InTargetAssetID, FName InTargetName)
 {
 	if (!InEventTag.IsValid() || InCount <= 0 || bLoadingTasks || ModuleState == EModuleState::Paused) return;
 	TArray<UTaskBase*> ExecutingTasks;
@@ -491,6 +583,90 @@ void UTaskModule::ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTarget
 	}
 	for (UTaskBase* Task : ExecutingTasks)
 	{
-		if (ResolveRuntimeTask(Task)) Task->ApplyObjectiveEvent(InEventTag, InTargetTag, InCount, InTargetAssetID);
+		if (ResolveRuntimeTask(Task)) Task->ApplyObjectiveEvent(InEventTag, InTargetTag, InCount, InTargetAssetID, InTargetName);
 	}
+	RefreshTaskMarkers();
+}
+
+void UTaskModule::RemoveTaskMarkers(const UTaskAsset* InAsset)
+{
+	if(!USceneModule::IsValid())
+	{
+		if(!InAsset) TaskMarkerIDs.Reset();
+		return;
+	}
+	TSet<FGuid> Removed;
+	if(InAsset)
+	{
+		for(const auto& Pair : InAsset->TaskMap) Removed.Add(MakeTaskMarkerID(InAsset, Pair.Key));
+	}
+	else
+	{
+		Removed = TaskMarkerIDs;
+	}
+	for(const FGuid& MarkerID : Removed)
+	{
+		USceneModule::Get().RemoveMarker(MarkerID);
+		TaskMarkerIDs.Remove(MarkerID);
+	}
+}
+
+void UTaskModule::RefreshTaskMarkers()
+{
+	if(bLoadingTasks) return;
+	if(!USceneModule::IsValid())
+	{
+		OnTaskAssetsChanged.Broadcast();
+		return;
+	}
+	USceneModule& Scene = USceneModule::Get();
+	TSet<FGuid> DesiredIDs;
+	FGuid CurrentMarkerID;
+	for(UTaskAsset* Asset : Assets)
+	{
+		if(!Asset) continue;
+		for(const auto& Pair : Asset->TaskMap)
+		{
+			UTaskBase* Task = Pair.Value;
+			if(!Task || !Task->Marker.bVisible) continue;
+			const ETaskStage Stage = Task->GetTaskStage();
+			if(Stage != ETaskStage::Active && Stage != ETaskStage::Deliverable) continue;
+			FTaskTarget Target = Task->Target;
+			if(Stage == ETaskStage::Deliverable && Task->bRequireExplicitTurnIn && Asset->AgentID.IsValid())
+			{
+				Target.ActorID = Asset->AgentID;
+				Target.AreaName = NAME_None;
+				Target.Location = Asset->AgentLocation;
+			}
+			if(!Target.IsValid()) continue;
+			FSceneMarker Marker;
+			Marker.MarkerID = MakeTaskMarkerID(Asset, Pair.Key);
+			Marker.MarkerTag = Stage == ETaskStage::Deliverable ? TaskTags::Marker_Deliverable : TaskTags::Marker_Active;
+			Marker.DisplayName = Task->TaskDisplayName;
+			Marker.Icon = Task->Marker.Icon;
+			Marker.Color = Task->Marker.Color;
+			Marker.Location = Target.Location;
+			Marker.Offset = Target.Offset;
+			Marker.ActorID = Target.ActorID;
+			Marker.AreaName = Target.AreaName;
+			Marker.Priority = Task->Marker.Priority;
+			Marker.Channels = static_cast<int32>(ESceneMarkerChannel::Map);
+			if(Stage == ETaskStage::Active) Marker.Channels |= static_cast<int32>(ESceneMarkerChannel::World);
+			if(CurrentTask == Task)
+			{
+				Marker.Channels |= static_cast<int32>(ESceneMarkerChannel::MiniMap | ESceneMarkerChannel::Compass);
+				CurrentMarkerID = Marker.MarkerID;
+			}
+			DesiredIDs.Add(Marker.MarkerID);
+			if(!Scene.UpdateMarker(Marker)) Scene.AddMarker(Marker);
+		}
+	}
+	const TSet<FGuid> PreviousIDs = TaskMarkerIDs;
+	for(const FGuid& MarkerID : PreviousIDs)
+	{
+		if(!DesiredIDs.Contains(MarkerID)) Scene.RemoveMarker(MarkerID);
+	}
+	TaskMarkerIDs = MoveTemp(DesiredIDs);
+	Scene.SetTrackedMarker(CurrentMarkerID);
+	OnTaskAssetsChanged.Broadcast();
 }

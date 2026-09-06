@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
 #include "Math/MathTypes.h"
 #include "VoxelGenerator.h"
 #include "VoxelBuildingGenerator.generated.h"
@@ -54,6 +55,10 @@ public:
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowedTypes = "VoxelPrefab"))
 	FPrimaryAssetId PrefabAsset;
+
+	/** 供任务与地图筛选使用的建筑分类标签 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FGameplayTagContainer FeatureTags;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "1.0", ToolTip = "相邻候选点的生成间隔，单位为格；按区块对齐并隔行错开，间距不会小于配置值"))
 	float SpawnInterval;

@@ -497,6 +497,12 @@ FTaskRuntimeSaveData UTaskBase::CaptureRuntimeData()
 {
 	FTaskRuntimeSaveData Data;
 	Data.Archive = GetSaveDataRef<FSaveData>(true);
+	Data.Target = Target;
+	for (const FTaskObjective& Objective : Objectives)
+	{
+		Data.ObjectiveRequiredCounts.Add(Objective.ObjectiveID, Objective.RequiredCount);
+		Data.ObjectiveTargetNames.Add(Objective.ObjectiveID, Objective.TargetName);
+	}
 	if (UWorld* World = GetWorld())
 	{
 		auto& Timers = World->GetTimerManager();
@@ -511,6 +517,15 @@ FTaskRuntimeSaveData UTaskBase::CaptureRuntimeData()
 void UTaskBase::ResumeRuntimeData(const FTaskRuntimeSaveData& Data)
 {
 	ClearTaskTimers();
+	Target = Data.Target;
+	for (FTaskObjective& Objective : Objectives)
+	{
+		if (const int32* RequiredCount = Data.ObjectiveRequiredCounts.Find(Objective.ObjectiveID))
+		{
+			Objective.RequiredCount = FMath::Max(1, *RequiredCount);
+		}
+		if(const FName* TargetName = Data.ObjectiveTargetNames.Find(Objective.ObjectiveID)) Objective.TargetName = *TargetName;
+	}
 	if (UWorld* World = GetWorld())
 	{
 		auto& Timers = World->GetTimerManager();
@@ -666,7 +681,7 @@ ETaskStage UTaskBase::GetTaskStage() const
 		}
 		case ETaskState::Entered:
 		case ETaskState::Executing: return ETaskStage::Active;
-		case ETaskState::Completed: return TaskExecuteResult == ETaskExecuteResult::Failed ? ETaskStage::Failed : ETaskStage::ReadyToTurnIn;
+		case ETaskState::Completed: return TaskExecuteResult == ETaskExecuteResult::Failed ? ETaskStage::Failed : ETaskStage::Deliverable;
 		case ETaskState::Leaved: return TaskExecuteResult == ETaskExecuteResult::Failed ? ETaskStage::Failed : ETaskStage::Finished;
 		default: return ETaskStage::Locked;
 	}
@@ -678,7 +693,7 @@ bool UTaskBase::ArePrerequisitesMet() const
 	if (!UTaskModule::IsValid()) return false;
 	for (const FTaskReference& Reference : Prerequisites)
 	{
-		const UTaskBase* Task = UTaskModule::Get().ResolveTask(Reference);
+		const UTaskBase* Task = UTaskModule::Get().ResolveTask(Reference, GetTaskAsset());
 		if (!Task || Task->TaskState != ETaskState::Leaved || !Task->IsSucceed()) return false;
 	}
 	return true;
@@ -698,7 +713,7 @@ bool UTaskBase::AreObjectivesCompleted() const
 	return true;
 }
 
-void UTaskBase::ApplyObjectiveEvent(FGameplayTag EventTag, FGameplayTag TargetTag, int32 Count, FPrimaryAssetId TargetAssetID)
+void UTaskBase::ApplyObjectiveEvent(FGameplayTag EventTag, FGameplayTag TargetTag, int32 Count, FPrimaryAssetId TargetAssetID, FName TargetName)
 {
 	if (!IsExecuting() || Count <= 0) return;
 	bool bChanged = false;
@@ -706,6 +721,7 @@ void UTaskBase::ApplyObjectiveEvent(FGameplayTag EventTag, FGameplayTag TargetTa
 	{
 		if (Objective.EventTag != EventTag || (Objective.TargetTag.IsValid() && !TargetTag.MatchesTag(Objective.TargetTag))) continue;
 		if (Objective.TargetAssetID.IsValid() && Objective.TargetAssetID != TargetAssetID) continue;
+		if (!Objective.TargetName.IsNone() && Objective.TargetName != TargetName) continue;
 		int32& Progress = ObjectiveProgress.FindOrAdd(Objective.ObjectiveID);
 		const int32 NewProgress = (int32)FMath::Min<int64>((int64)Progress + Count, FMath::Max(1, Objective.RequiredCount));
 		bChanged |= NewProgress != Progress;
@@ -716,6 +732,16 @@ void UTaskBase::ApplyObjectiveEvent(FGameplayTag EventTag, FGameplayTag TargetTa
 		Restate();
 		if (AreObjectivesCompleted()) Complete();
 	}
+}
+
+bool UTaskBase::CanTurnIn_Implementation(AActor* InTarget, FText& OutReason) const
+{
+	return true;
+}
+
+bool UTaskBase::CommitTurnIn_Implementation(AActor* InTarget)
+{
+	return true;
 }
 
 void UTaskBase::OnReward()

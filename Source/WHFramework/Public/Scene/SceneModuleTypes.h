@@ -1,9 +1,20 @@
 #pragma once
 #include "Parameter/ParameterModuleTypes.h"
+#include "GameplayTagContainer.h"
+#include "NativeGameplayTags.h"
 
 #include "SceneModuleTypes.generated.h"
 
+class UTexture2D;
+
+namespace SceneTags
+{
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Feature_Town);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Feature_Building);
+}
+
 DECLARE_DYNAMIC_DELEGATE_OneParam(FOnAsyncLoadLevelFinished, FName, InLevelPath);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnSceneMarkersChanged);
 
 /**
  * 时间阶段
@@ -91,6 +102,17 @@ enum class ESceneAreaType : uint8
 	Chunk
 };
 
+UENUM(BlueprintType, meta = (Bitflags))
+enum class ESceneMarkerChannel : uint8
+{
+	None = 0,
+	Map = 1 << 0,
+	MiniMap = 1 << 1,
+	Compass = 1 << 2,
+	World = 1 << 3
+};
+ENUM_CLASS_FLAGS(ESceneMarkerChannel);
+
 /**
  *
  */
@@ -132,9 +154,104 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(EditConditionHides, EditCondition = "AreaShape == ESceneAreaShape::Polygon"))
 	TArray<FVector2D> AreaPoints;
+
+	/** 生成结构的首选世界空间导航点 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FVector EntranceLocation = FVector::ZeroVector;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FGameplayTagContainer FeatureTags;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FPrimaryAssetId SourceAssetID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FGuid EncounterID;
 };
 
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnSceneAreaAdded, const FSceneArea&);
 DECLARE_DELEGATE_RetVal_TwoParams(FSceneArea, FSceneAreaResolver, const FSceneArea&, const FVector2D&);
+
+/** 世界地图、小地图、罗盘与世界空间界面共用的标记 */
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSceneMarker
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FGuid MarkerID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FGameplayTag MarkerTag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FText DisplayName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSoftObjectPtr<UTexture2D> Icon;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FLinearColor Color = FLinearColor::White;
+
+	/** 世界空间备用位置，绑定角色卸载时更新 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector Location = FVector::ZeroVector;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector Offset = FVector::ZeroVector;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FGuid ActorID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FName AreaName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (Bitmask, BitmaskEnum = "/Script/WHFramework.ESceneMarkerChannel"))
+	int32 Channels = static_cast<int32>(ESceneMarkerChannel::Map);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Priority = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float MinDistance = 0.f;
+
+	/** 零表示不限制 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float MaxDistance = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bPersistent = false;
+
+	bool HasChannel(ESceneMarkerChannel InChannel) const
+	{
+		return EnumHasAnyFlags(static_cast<ESceneMarkerChannel>(Channels), InChannel);
+	}
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSceneMarkerView
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly)
+	FSceneMarker Marker;
+
+	UPROPERTY(BlueprintReadOnly)
+	FVector Location = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadOnly)
+	float Distance = 0.f;
+
+	/** 相对给定视角偏航的有符号角度 */
+	UPROPERTY(BlueprintReadOnly)
+	float Bearing = 0.f;
+
+	UPROPERTY(BlueprintReadOnly)
+	bool bTargetLoaded = false;
+
+	UPROPERTY(BlueprintReadOnly)
+	bool bTracked = false;
+};
 
 /**
  *
@@ -304,6 +421,8 @@ public:
 	FORCEINLINE FSceneModuleSaveData()
 	{
 		MiniMapRange = 512.f;
+		WorldMapCenter = FVector2D::ZeroVector;
+		WorldMapRange = 4096.f;
 		SceneAreas = TArray<FSceneArea>();
 		TimerData = FWorldTimerSaveData();
 		WeatherData = FWorldWeatherSaveData();
@@ -313,6 +432,18 @@ public:
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float MiniMapRange;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector2D WorldMapCenter;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float WorldMapRange;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FGuid TrackedMarkerID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FSceneMarker> Markers;
 				
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FSceneArea> SceneAreas;

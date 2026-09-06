@@ -17,8 +17,9 @@ void UVoxelRegionGenerator::Generate(UVoxelChunk* InChunk)
 		FMath::FloorToInt(static_cast<float>(ChunkIndex.Y) / RegionSize) * RegionSize, 0);
 	const FIndex ChunkSize = Module->GetWorldData().ChunkSize;
 	const FIndex RegionOrigin = Module->ChunkIndexToVoxelIndex(Anchor);
-	const FVector2D RegionMin(RegionOrigin.X, RegionOrigin.Y);
-	const FVector2D RegionMax(RegionOrigin.X + ChunkSize.X * RegionSize, RegionOrigin.Y + ChunkSize.Y * RegionSize);
+	const float BlockSize = Module->GetWorldData().BlockSize;
+	const FVector2D RegionMin(RegionOrigin.X * BlockSize, RegionOrigin.Y * BlockSize);
+	const FVector2D RegionMax((RegionOrigin.X + ChunkSize.X * RegionSize) * BlockSize, (RegionOrigin.Y + ChunkSize.Y * RegionSize) * BlockSize);
 
 	FSceneArea SceneArea;
 	SceneArea.AreaName = *FString::Printf(TEXT("VoxelArea_%d_%d"), Anchor.X, Anchor.Y);

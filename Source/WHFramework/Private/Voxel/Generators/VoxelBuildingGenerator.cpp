@@ -3,6 +3,7 @@
 #include "Asset/AssetModuleStatics.h"
 #include "Common/CommonModuleStatics.h"
 #include "Math/MathHelper.h"
+#include "Misc/Crc.h"
 #include "Misc/ScopeRWLock.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Voxel/VoxelModule.h"
@@ -178,15 +179,24 @@ void UVoxelBuildingGenerator::Generate(UVoxelChunk* InChunk)
 				{
 					const FIndex Center = Module->ChunkIndexToVoxelIndex(Plan.AnchorChunkIndex) + FIndex(ChunkSize.X / 2, ChunkSize.Y / 2, 0);
 					const auto& Rotation = _PrefabCaches[BuildingIndex].Rotations[Plan.Rotation];
+					const float BlockSize = Module->GetWorldData().BlockSize;
+					const FString StableKey = FString::Printf(TEXT("%s:%d:%d:%d"), *GenerateDatas[BuildingIndex].PrefabAsset.ToString(), CellIndex.X, CellIndex.Y, Module->GetWorldData().WorldSeed);
+					const uint32 StableHash = FCrc::StrCrc32(*StableKey);
 					FSceneArea Area;
-					Area.AreaName = *FString::Printf(TEXT("Structure_%d_%d_%d"), BuildingIndex, CellIndex.X, CellIndex.Y);
+					Area.AreaName = *FString::Printf(TEXT("Structure_%08X_%d_%d"), FCrc::StrCrc32(*GenerateDatas[BuildingIndex].PrefabAsset.ToString()), CellIndex.X, CellIndex.Y);
 					const FText DisplayName = _PrefabAssets[BuildingIndex]->DisplayName.IsEmpty()
 						? UCommonModuleStatics::GetEnumDisplayNameByValue(TEXT("/Script/WHFramework.EVoxelRegionType"), static_cast<int32>(EVoxelRegionType::Building))
 						: _PrefabAssets[BuildingIndex]->DisplayName;
 					Area.AreaDisplayName = Module->GetVoxelAreaName(FIndex(Center.X, Center.Y, Plan.GroundHeight), EVoxelAreaType::Building, DisplayName);
 					Area.AreaShape = ESceneAreaShape::Box;
-					Area.AreaCenter = FVector2D(Center.X + (Rotation.MinX + Rotation.MaxX) * 0.5f, Center.Y + (Rotation.MinY + Rotation.MaxY) * 0.5f);
-					Area.AreaRadius = FVector2D((Rotation.MaxX - Rotation.MinX) * 0.5f + 4.f, (Rotation.MaxY - Rotation.MinY) * 0.5f + 4.f);
+					Area.AreaCenter = FVector2D(Center.X + (Rotation.MinX + Rotation.MaxX) * 0.5f, Center.Y + (Rotation.MinY + Rotation.MaxY) * 0.5f) * BlockSize;
+					Area.AreaRadius = FVector2D((Rotation.MaxX - Rotation.MinX) * 0.5f + 4.f, (Rotation.MaxY - Rotation.MinY) * 0.5f + 4.f) * BlockSize;
+					const FIndex Entrance = Rotation.EntranceIndices.IsEmpty() ? Center : Center + Rotation.EntranceIndices[Rotation.EntranceIndices.Num() / 2];
+					Area.EntranceLocation = FVector((Entrance.X + 0.5f) * BlockSize, (Entrance.Y + 0.5f) * BlockSize, (Plan.GroundHeight + 1.f) * BlockSize);
+					Area.FeatureTags = GenerateDatas[BuildingIndex].FeatureTags;
+					Area.FeatureTags.AddTag(SceneTags::Feature_Building);
+					Area.SourceAssetID = GenerateDatas[BuildingIndex].PrefabAsset;
+					Area.EncounterID = FGuid(StableHash, FCrc::StrCrc32(*(StableKey + TEXT(".B"))), FCrc::StrCrc32(*(StableKey + TEXT(".C"))), FCrc::StrCrc32(*(StableKey + TEXT(".D"))));
 					USceneModuleStatics::AddSceneArea(Area, true);
 				}
 			}

@@ -1523,7 +1523,8 @@ FPrimaryAssetId UVoxelModule::VoxelTypeToAssetID(EVoxelType InVoxelType) const
 
 FSceneArea UVoxelModule::ResolveVoxelArea(const FSceneArea& InArea, const FVector2D& InPoint) const
 {
-	const FIndex Index(FMath::FloorToInt(InPoint.X), FMath::FloorToInt(InPoint.Y), 0);
+	const float BlockSize = FMath::Max(GetWorldData().BlockSize, UE_SMALL_NUMBER);
+	const FIndex Index(FMath::FloorToInt(InPoint.X / BlockSize), FMath::FloorToInt(InPoint.Y / BlockSize), 0);
 	const FText RegionDisplayName = UCommonModuleStatics::GetEnumDisplayNameByValue(TEXT("/Script/WHFramework.EVoxelRegionType"), static_cast<int32>(SampleTopographyByIndex(Index).RegionType));
 	FSceneArea Area = InArea;
 	Area.AreaDisplayName = InArea.AreaDisplayName.IsEmpty()
@@ -1536,7 +1537,7 @@ FText UVoxelModule::GetVoxelAreaName(FIndex InIndex) const
 {
 	if(IsInGameThread())
 	{
-		const FSceneArea Area = USceneModule::Get().GetSceneAreaByPoint(InIndex.ToVector2D());
+		const FSceneArea Area = USceneModule::Get().GetSceneAreaByPoint(InIndex.ToVector2D() * GetWorldData().BlockSize);
 		if(!Area.AreaName.IsNone() && !Area.AreaDisplayName.IsEmpty()) return Area.AreaDisplayName;
 	}
 	const FText RegionDisplayName = UCommonModuleStatics::GetEnumDisplayNameByValue(TEXT("/Script/WHFramework.EVoxelRegionType"), static_cast<int32>(SampleTopographyByIndex(InIndex).RegionType));

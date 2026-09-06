@@ -68,9 +68,19 @@ public:
 public:
 	UFUNCTION(BlueprintPure)
 	UTaskAsset* GetAsset(UTaskAsset* InAsset) const;
+
+	UFUNCTION(BlueprintPure)
+	UTaskAsset* GetAssetByInstance(UTaskAsset* InAsset, FGuid InInstanceID) const;
+
+	UFUNCTION(BlueprintPure)
+	TArray<UTaskAsset*> GetAssetsByAgent(FGuid InAgentID) const;
 	
 	UFUNCTION(BlueprintCallable)
-	void AddAsset(UTaskAsset* InAsset);
+	UTaskAsset* AddAsset(UTaskAsset* InAsset);
+
+	/** 根据任务资产模板创建独立运行时副本 */
+	UFUNCTION(BlueprintCallable)
+	UTaskAsset* CreateAsset(UTaskAsset* InAsset, FGuid InAgentID);
 	
 	UFUNCTION(BlueprintCallable)
 	void RemoveAsset(UTaskAsset* InAsset);
@@ -118,7 +128,7 @@ public:
 	void LeaveTaskByGUID(const FString& InTaskGUID);
 
 	UFUNCTION(BlueprintPure)
-	UTaskBase* ResolveTask(const FTaskReference& Reference) const;
+	UTaskBase* ResolveTask(const FTaskReference& Reference, UTaskAsset* InContext = nullptr) const;
 
 	UFUNCTION(BlueprintCallable)
 	UTaskBase* EnsureTask(const FTaskReference& Reference);
@@ -127,7 +137,10 @@ public:
 	bool TurnInTask(UTaskBase* InTask, AActor* InTarget);
 
 	UFUNCTION(BlueprintCallable)
-	void ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTargetTag, int32 InCount = 1, FPrimaryAssetId InTargetAssetID = FPrimaryAssetId());
+	void ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTargetTag, int32 InCount = 1, FPrimaryAssetId InTargetAssetID = FPrimaryAssetId(), FName InTargetName = NAME_None);
+
+	UFUNCTION(BlueprintCallable)
+	void RefreshMarkers() { RefreshTaskMarkers(); }
 
 public:
 	UFUNCTION(BlueprintPure)
@@ -152,8 +165,13 @@ protected:
 	TMap<UTaskBase*, FTaskRuntimeSaveData> PendingResume;
 	bool bLoadingTasks = false;
 	UTaskBase* TurningInTask = nullptr;
+	TSet<FGuid> TaskMarkerIDs;
 	void ClearRuntimeAssets();
 	UTaskBase* ResolveRuntimeTask(UTaskBase* Task) const;
+	UTaskAsset* AddAssetInternal(UTaskAsset* InAsset, FGuid InInstanceID, FGuid InAgentID);
+	void RefreshTaskMarkers();
+	void RemoveTaskMarkers(const UTaskAsset* InAsset = nullptr);
+	static FGuid MakeTaskMarkerID(const UTaskAsset* Asset, const FString& GUID);
 	static FString GetSaveKey(const UTaskAsset* Asset, const FString& GUID);
 
 public:

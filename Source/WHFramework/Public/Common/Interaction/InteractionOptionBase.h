@@ -28,6 +28,8 @@ public:
 	UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly)
 	TArray<UInteractionActionBase*> Actions;
 
+	virtual FText GetDisplayName(const FInteractionContext& InContext) const { return DisplayName; }
+
 	bool IsVisible(const FInteractionContext& InContext) const;
 	bool IsEnabled(const FInteractionContext& InContext, FText& OutReason) const;
 };

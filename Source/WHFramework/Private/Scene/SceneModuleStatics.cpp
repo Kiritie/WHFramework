@@ -3,6 +3,7 @@
 #include "Scene/SceneModuleStatics.h"
 
 #include "Scene/SceneModule.h"
+#include "Blueprint/WidgetLayoutLibrary.h"
 
 float USceneModuleStatics::GetSeaLevel()
 {
@@ -69,6 +70,26 @@ FSceneArea USceneModuleStatics::GetSceneArea(const FName InName)
 	return USceneModule::Get().GetSceneArea(InName);
 }
 
+FVector2D USceneModuleStatics::GetWorldMapCenter()
+{
+	return USceneModule::Get().GetWorldMapCenter();
+}
+
+void USceneModuleStatics::SetWorldMapCenter(FVector2D InCenter)
+{
+	USceneModule::Get().SetWorldMapCenter(InCenter);
+}
+
+float USceneModuleStatics::GetWorldMapRange()
+{
+	return USceneModule::Get().GetWorldMapRange();
+}
+
+void USceneModuleStatics::SetWorldMapRange(float InRange)
+{
+	USceneModule::Get().SetWorldMapRange(InRange);
+}
+
 FSceneArea USceneModuleStatics::GetSceneAreaByPoint(const FVector2D& InPoint)
 {
 	return USceneModule::Get().GetSceneAreaByPoint(InPoint);
@@ -92,6 +113,77 @@ void USceneModuleStatics::RemoveSceneArea(const FName InName)
 void USceneModuleStatics::ClearSceneArea()
 {
 	USceneModule::Get().ClearSceneArea();
+}
+
+FGuid USceneModuleStatics::AddMarker(const FSceneMarker& InMarker)
+{
+	return USceneModule::Get().AddMarker(InMarker);
+}
+
+bool USceneModuleStatics::UpdateMarker(const FSceneMarker& InMarker)
+{
+	return USceneModule::Get().UpdateMarker(InMarker);
+}
+
+bool USceneModuleStatics::RemoveMarker(FGuid InMarkerID)
+{
+	return USceneModule::Get().RemoveMarker(InMarkerID);
+}
+
+void USceneModuleStatics::ClearMarkers(bool bIncludePersistent)
+{
+	USceneModule::Get().ClearMarkers(bIncludePersistent);
+}
+
+FSceneMarker USceneModuleStatics::GetMarker(FGuid InMarkerID)
+{
+	return USceneModule::Get().GetMarker(InMarkerID);
+}
+
+TArray<FSceneMarkerView> USceneModuleStatics::GetMarkerViews(ESceneMarkerChannel InChannel, FVector InViewLocation, float InViewYaw)
+{
+	return USceneModule::Get().GetMarkerViews(InChannel, InViewLocation, InViewYaw);
+}
+
+bool USceneModuleStatics::SetTrackedMarker(FGuid InMarkerID)
+{
+	return USceneModule::Get().SetTrackedMarker(InMarkerID);
+}
+
+FGuid USceneModuleStatics::GetTrackedMarker()
+{
+	return USceneModule::Get().GetTrackedMarker();
+}
+
+bool USceneModuleStatics::ProjectMarkerToMap(const FSceneMarkerView& InMarker, FVector2D InCenter, float InRange, FVector2D InSize, float InYaw, bool bClamp, FVector2D& OutPosition)
+{
+	if(InRange <= UE_SMALL_NUMBER || InSize.X <= 0.f || InSize.Y <= 0.f) return false;
+	FVector2D Delta = FVector2D(InMarker.Location) - InCenter;
+	Delta = Delta.GetRotated(-InYaw);
+	FVector2D Normalized(Delta.X / InRange, -Delta.Y / InRange);
+	const bool bInside = FMath::Abs(Normalized.X) <= 0.5f && FMath::Abs(Normalized.Y) <= 0.5f;
+	if(!bInside && !bClamp) return false;
+	if(bClamp)
+	{
+		Normalized.X = FMath::Clamp(Normalized.X, -0.5f, 0.5f);
+		Normalized.Y = FMath::Clamp(Normalized.Y, -0.5f, 0.5f);
+	}
+	OutPosition = InSize * 0.5f + Normalized * InSize;
+	return true;
+}
+
+bool USceneModuleStatics::ProjectMarkerToCompass(const FSceneMarkerView& InMarker, float InFieldOfView, float InWidth, bool bClamp, float& OutPosition)
+{
+	if(InFieldOfView <= UE_SMALL_NUMBER || InWidth <= 0.f) return false;
+	const float Normalized = InMarker.Bearing / InFieldOfView;
+	if(FMath::Abs(Normalized) > 0.5f && !bClamp) return false;
+	OutPosition = (FMath::Clamp(Normalized, -0.5f, 0.5f) + 0.5f) * InWidth;
+	return true;
+}
+
+bool USceneModuleStatics::ProjectMarkerToScreen(APlayerController* InPlayer, const FSceneMarkerView& InMarker, bool bPlayerViewportRelative, FVector2D& OutPosition)
+{
+	return InPlayer && UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(InPlayer, InMarker.Location, OutPosition, bPlayerViewportRelative);
 }
 
 bool USceneModuleStatics::HasSceneArea(const FName InName)

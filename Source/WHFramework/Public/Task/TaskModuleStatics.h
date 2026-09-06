@@ -10,6 +10,7 @@
 
 class UTaskBase;
 class UTaskAsset;
+class AActor;
 /**
  * 
  */
@@ -39,7 +40,10 @@ public:
 	static UTaskAsset* GetTaskAsset(UTaskAsset* InAsset);
 	
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
-	static void AddTaskAsset(UTaskAsset* InAsset);
+	static UTaskAsset* AddTaskAsset(UTaskAsset* InAsset);
+
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static UTaskAsset* CreateTaskAsset(UTaskAsset* InAsset, FGuid InAgentID);
 	
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
 	static void RemoveTaskAsset(UTaskAsset* InAsset);
@@ -85,4 +89,13 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
 	static void LeaveTaskByGUID(const FString& InTaskGUID);
+
+	UFUNCTION(BlueprintPure, Category = "TaskModuleStatics")
+	static UTaskBase* ResolveTask(const FTaskReference& InReference);
+
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static bool TurnInTask(UTaskBase* InTask, AActor* InTarget);
+
+	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
+	static void ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTargetTag, int32 InCount = 1, FPrimaryAssetId InTargetAssetID = FPrimaryAssetId(), FName InTargetName = NAME_None);
 };

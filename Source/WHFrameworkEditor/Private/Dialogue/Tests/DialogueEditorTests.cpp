@@ -35,7 +35,7 @@ bool FDialogueEditorTest::RunTest(const FString& Parameters)
 	First.Events.Add(Event);
 	UDialogueCondition_And* All = NewObject<UDialogueCondition_And>(Source.Get());
 	UDialogueCondition_Task* Condition = NewObject<UDialogueCondition_Task>(All);
-	Condition->RequiredStage = ETaskStage::ReadyToTurnIn;
+	Condition->RequiredStage = ETaskStage::Deliverable;
 	All->AndConditions.Add(Condition);
 	First.Conditions.Add(All);
 	FDialogueNode External; External.id = 3; External.isPlayer = true; External.Coordinates = FVector2D(750, 330);

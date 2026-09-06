@@ -195,8 +195,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	bool bRequireExplicitTurnIn = false;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "bRequireExplicitTurnIn"))
-	FName TurnInActorTag;
+	/** 运行时可解析的目标位置，角色与区域标识不受世界流送影响 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FTaskTarget Target;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FTaskMarkerData Marker;
 
 	UFUNCTION(BlueprintPure)
 	ETaskStage GetTaskStage() const;
@@ -210,7 +214,13 @@ public:
 	UFUNCTION(BlueprintPure)
 	bool ArePrerequisitesMet() const;
 
-	void ApplyObjectiveEvent(FGameplayTag EventTag, FGameplayTag TargetTag, int32 Count, FPrimaryAssetId TargetAssetID);
+	void ApplyObjectiveEvent(FGameplayTag EventTag, FGameplayTag TargetTag, int32 Count, FPrimaryAssetId TargetAssetID, FName TargetName);
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintPure)
+	bool CanTurnIn(AActor* InTarget, FText& OutReason) const;
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	bool CommitTurnIn(AActor* InTarget);
 
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnReward")
 	void K2_OnReward();
