@@ -16,7 +16,6 @@
 #include "SaveGame/Module/VideoSaveGame.h"
 #include "Video/VideoModuleNetworkComponent.h"
 #include "Video/MediaPlayer/MediaPlayerBase.h"
-#include <Windows.h>
 
 IMPLEMENTATION_MODULE(UVideoModule)
 
