@@ -33,6 +33,10 @@ public:
 	virtual bool LeaveInteract(IInteractionAgentInterface* InInteractionAgent = nullptr);
 
 protected:
+	virtual void OnInteractionTargetChanged(AActor* InTarget) {}
+	virtual void OnEnterInteractionRange(IInteractionAgentInterface* InAgent) {}
+	virtual void OnLeaveInteractionRange(IInteractionAgentInterface* InAgent) {}
+
 	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) = 0;
 
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) = 0;

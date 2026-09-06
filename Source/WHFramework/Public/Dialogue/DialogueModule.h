@@ -5,6 +5,8 @@
 #include "Dialogue/DialogueModuleTypes.h"
 #include "DialogueModule.generated.h"
 
+class UInteractionComponent;
+
 UCLASS()
 class WHFRAMEWORK_API UDialogueModule : public UModuleBase
 {
@@ -32,10 +34,22 @@ public:
 	TArray<FDialogueNode> GetAvailableNodes() const;
 
 	UFUNCTION(BlueprintPure)
+	TArray<FDialogueNode> GetAvailableChoices() const;
+
+	UFUNCTION(BlueprintCallable)
+	bool ContinueDialogue();
+
+	UFUNCTION(BlueprintPure)
 	bool IsDialogueActive() const { return CurrentDialogue != nullptr; }
 
 	UFUNCTION(BlueprintPure)
 	UDialogueAsset* GetCurrentDialogue() const { return CurrentDialogue; }
+
+	UFUNCTION(BlueprintPure)
+	AActor* GetNPCActor() const { return NPCActor; }
+
+	UFUNCTION(BlueprintPure)
+	APlayerController* GetConsideringPlayer() const { return ConsideringPlayer; }
 
 	UPROPERTY(BlueprintAssignable)
 	FOnDialogueChanged OnDialogueChanged;
@@ -69,4 +83,9 @@ protected:
 	bool bSelectingNode = false;
 	bool IsNodeAvailable(const FDialogueNode& Node) const;
 	bool EnterNode(int32 InNodeID, bool bRunEvents);
+
+	TWeakObjectPtr<UInteractionComponent> Interaction;
+
+	UFUNCTION()
+	void OnParticipantDestroyed(AActor* InActor);
 };

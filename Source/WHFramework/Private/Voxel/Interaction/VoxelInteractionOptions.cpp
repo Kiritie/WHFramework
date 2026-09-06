@@ -88,6 +88,12 @@ UInteractionOption_VoxelOpen::UInteractionOption_VoxelOpen()
 	Actions.Add(CreateDefaultSubobject<UInteractionAction_VoxelOpen>(TEXT("OpenAction")));
 }
 
+void UInteractionAction_VoxelOpen::Finish_Implementation(const FInteractionContext& InContext, EInteractionActionState InState) const
+{
+	if (InState == EInteractionActionState::Completed || !IsValid(InContext.Target)) return;
+	if (UVoxelSwitch* Voxel = GetVoxelSwitch(InContext); Voxel && Voxel->IsOpened()) Voxel->Close(GetVoxelInteractor(InContext));
+}
+
 bool UInteractionCondition_VoxelClose::Evaluate_Implementation(const FInteractionContext& InContext, FText& OutReason) const
 {
 	const UVoxelSwitch* Voxel = GetVoxelSwitch(InContext);

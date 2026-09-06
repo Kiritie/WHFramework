@@ -2,10 +2,10 @@
 
 #include "Common/CommonModuleTypes.h"
 #include "UObject/Object.h"
-#include "InteractionCondition.generated.h"
+#include "InteractionConditionBase.generated.h"
 
 UCLASS(Abstract, Blueprintable, EditInlineNew, DefaultToInstanced)
-class WHFRAMEWORK_API UInteractionCondition : public UObject
+class WHFRAMEWORK_API UInteractionConditionBase : public UObject
 {
 	GENERATED_BODY()
 

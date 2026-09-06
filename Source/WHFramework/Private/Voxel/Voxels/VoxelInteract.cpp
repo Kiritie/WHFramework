@@ -85,7 +85,7 @@ bool UVoxelInteract::Interact(IVoxelAgentInterface* InAgent)
 	{
 		if(AVoxelInteractAuxiliary* InteractAuxiliary = Cast<AVoxelInteractAuxiliary>(GetItem().GetMain().Auxiliary))
 		{
-			InteractionAgent->SetInteractingAgent(InteractAuxiliary);
+			InteractionAgent->GetInteractionComponent()->SetSelectedTarget(InteractAuxiliary);
 			FText Reason;
 			return InteractAuxiliary->GetInteractionComponent()->ExecuteOption(Interactor, GameplayTags::Voxel_Interaction_Option_Interact, Reason);
 		}
@@ -100,7 +100,7 @@ void UVoxelInteract::UnInteract(IVoxelAgentInterface* InAgent)
 	{
 		if(AVoxelInteractAuxiliary* InteractAuxiliary = Cast<AVoxelInteractAuxiliary>(GetItem().GetMain().Auxiliary))
 		{
-			InteractionAgent->SetInteractingAgent(InteractAuxiliary);
+			InteractionAgent->GetInteractionComponent()->SetSelectedTarget(InteractAuxiliary);
 			FText Reason;
 			InteractAuxiliary->GetInteractionComponent()->ExecuteOption(Interactor, GameplayTags::Voxel_Interaction_Option_UnInteract, Reason);
 		}

@@ -50,6 +50,7 @@ protected:
 	virtual void OnPickUp(IAbilityPickerInterface* InPicker);
 
 	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) override;
+	virtual void OnEnterInteractionRange(IInteractionAgentInterface* InAgent) override { OnEnterInteract(InAgent); }
 
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
 

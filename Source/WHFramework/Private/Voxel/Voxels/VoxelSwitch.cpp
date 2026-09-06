@@ -90,7 +90,7 @@ void UVoxelSwitch::Toggle(IVoxelAgentInterface* InAgent)
 	{
 		if(AVoxelInteractAuxiliary* InteractAuxiliary = Cast<AVoxelInteractAuxiliary>(GetItem().GetMain().Auxiliary))
 		{
-			InteractionAgent->SetInteractingAgent(InteractAuxiliary);
+			InteractionAgent->GetInteractionComponent()->SetSelectedTarget(InteractAuxiliary);
 			FText Reason;
 			InteractAuxiliary->GetInteractionComponent()->ExecuteOption(Interactor, !bOpened ? GameplayTags::Voxel_Interaction_Option_Open : GameplayTags::Voxel_Interaction_Option_Close, Reason);
 			return;

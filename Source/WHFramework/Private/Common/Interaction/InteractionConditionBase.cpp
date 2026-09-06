@@ -1,14 +1,14 @@
-#include "Common/Interaction/InteractionAction.h"
+#include "Common/Interaction/InteractionConditionBase.h"
 
 #include "Components/ActorComponent.h"
 #include "GameFramework/Actor.h"
 
-bool UInteractionAction::Execute_Implementation(const FInteractionContext& InContext, FText& OutReason) const
+bool UInteractionConditionBase::Evaluate_Implementation(const FInteractionContext& InContext, FText& OutReason) const
 {
 	return true;
 }
 
-UWorld* UInteractionAction::GetWorld() const
+UWorld* UInteractionConditionBase::GetWorld() const
 {
 	if (HasAnyFlags(RF_ClassDefaultObject)) return nullptr;
 	if (const UActorComponent* Component = GetTypedOuter<UActorComponent>()) return Component->GetWorld();

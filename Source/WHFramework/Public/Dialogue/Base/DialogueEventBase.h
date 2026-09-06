@@ -2,11 +2,11 @@
 
 #pragma once
 
-#include "Common/Interaction/InteractionAction.h"
+#include "Common/Interaction/InteractionActionBase.h"
 #include "DialogueEventBase.generated.h"
 
 UCLASS(Blueprintable, BlueprintType, abstract, EditInlineNew, HideCategories = ("DoNotShow"), CollapseCategories, AutoExpandCategories = ("Default"))
-class WHFRAMEWORK_API UDialogueEventBase : public UInteractionAction
+class WHFRAMEWORK_API UDialogueEventBase : public UInteractionActionBase
 {
 	GENERATED_BODY()
 

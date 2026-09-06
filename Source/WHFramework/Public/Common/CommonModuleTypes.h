@@ -66,6 +66,18 @@ enum class EInteractAgentType : uint8
 	Initiative
 };
 
+class UInteractionActionExecution;
+
+UENUM(BlueprintType)
+enum class EInteractionActionState : uint8
+{
+	None,
+	Running,
+	Completed,
+	Failed,
+	Cancelled
+};
+
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FInteractionContext
 {
@@ -79,6 +91,9 @@ struct WHFRAMEWORK_API FInteractionContext
 
 	UPROPERTY(BlueprintReadOnly)
 	APlayerController* Player = nullptr;
+
+	UPROPERTY(BlueprintReadOnly)
+	UInteractionActionExecution* Execution = nullptr;
 };
 
 USTRUCT(BlueprintType)
@@ -104,6 +119,8 @@ struct WHFRAMEWORK_API FInteractionOptionView
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInteractionOptionsChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInteractionTargetsChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInteractionCancelled);
 
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FLanguageType

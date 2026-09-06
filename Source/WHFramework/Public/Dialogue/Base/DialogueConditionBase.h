@@ -2,11 +2,11 @@
 
 #pragma once
 
-#include "Common/Interaction/InteractionCondition.h"
+#include "Common/Interaction/InteractionConditionBase.h"
 #include "DialogueConditionBase.generated.h"
 
 UCLASS(Blueprintable, BlueprintType, abstract, EditInlineNew, HideCategories = ("DoNotShow"), CollapseCategories, AutoExpandCategories = ("Default"))
-class WHFRAMEWORK_API UDialogueConditionBase : public UInteractionCondition
+class WHFRAMEWORK_API UDialogueConditionBase : public UInteractionConditionBase
 {
 	GENERATED_BODY()
 

@@ -1,12 +1,12 @@
 #pragma once
 
-#include "Common/Interaction/InteractionAction.h"
+#include "Common/Interaction/InteractionActionBase.h"
 #include "InteractionAction_Dialogue.generated.h"
 
 class UDialogueAsset;
 
 UCLASS(EditInlineNew)
-class WHFRAMEWORK_API UInteractionAction_Dialogue : public UInteractionAction
+class WHFRAMEWORK_API UInteractionAction_Dialogue : public UInteractionActionBase
 {
 	GENERATED_BODY()
 

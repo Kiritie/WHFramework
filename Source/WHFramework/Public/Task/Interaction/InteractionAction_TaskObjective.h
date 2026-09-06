@@ -1,11 +1,11 @@
 #pragma once
 
-#include "Common/Interaction/InteractionAction.h"
+#include "Common/Interaction/InteractionActionBase.h"
 #include "GameplayTagContainer.h"
 #include "InteractionAction_TaskObjective.generated.h"
 
 UCLASS(EditInlineNew)
-class WHFRAMEWORK_API UInteractionAction_TaskObjective : public UInteractionAction
+class WHFRAMEWORK_API UInteractionAction_TaskObjective : public UInteractionActionBase
 {
 	GENERATED_BODY()
 

@@ -7,7 +7,8 @@
 #include "InteractionComponent.generated.h"
 
 class IInteractionAgentInterface;
-class UInteractionOption;
+class UInteractionOptionBase;
+class UInteractionActionExecution;
 /**
  * 
  */
@@ -22,6 +23,7 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	UFUNCTION()
 	virtual void OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
@@ -36,6 +38,36 @@ public:
 
 public:
 	UFUNCTION(BlueprintPure)
+	TArray<AActor*> GetAvailableTargets() const;
+
+	UFUNCTION(BlueprintCallable)
+	bool NextTarget();
+
+	UFUNCTION(BlueprintPure)
+	AActor* GetSelectedTarget() const { return SelectedTarget.Get(); }
+
+	UFUNCTION(BlueprintCallable)
+	void SetSelectedTarget(AActor* InTarget);
+
+	UPROPERTY(EditAnywhere)
+	bool bAutoSelectTarget = false;
+
+	bool BeginInteraction(AActor* InInteractor, UObject* InOwner);
+	bool CanBeginInteraction(AActor* InInteractor) const;
+	void EndInteraction(UObject* InOwner);
+	void RefreshTargets();
+	void OnActionEnded(UInteractionActionExecution* InExecution);
+	void CancelInteractions();
+	void FinishActions(FGameplayTag InOptionTag);
+	UInteractionActionExecution* GetRunningAction(FGameplayTag InOptionTag) const;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnInteractionTargetsChanged OnTargetsChanged;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnInteractionCancelled OnInteractionCancelled;
+
+	UFUNCTION(BlueprintPure)
 	TArray<FInteractionOptionView> GetOptions(AActor* InInteractor) const;
 
 	UFUNCTION(BlueprintCallable)
@@ -45,13 +77,20 @@ public:
 	void NotifyOptionsChanged();
 
 	UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly)
-	TArray<UInteractionOption*> Options;
+	TArray<UInteractionOptionBase*> Options;
 
 	UPROPERTY(BlueprintAssignable)
 	FOnInteractionOptionsChanged OnOptionsChanged;
 
 protected:
-	bool bExecutingOption = false;
+	TSet<FGameplayTag> ExecutingOptions;
+	TSet<TWeakObjectPtr<UObject>> InteractionOwners;
+	UPROPERTY(Transient)
+	TArray<UInteractionActionExecution*> ActiveActions;
+	bool bEndingPlay = false;
+	bool bCancelling = false;
+	TWeakObjectPtr<AActor> SelectedTarget;
+	void NotifyAvailabilityChanged();
 	FInteractionContext MakeInteractionContext(AActor* InInteractor) const;
 
 public:

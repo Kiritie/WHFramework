@@ -6,6 +6,9 @@
 #include "SaveGame/Module/DialogueSaveGame.h"
 #include "GameFramework/PlayerController.h"
 #include "Engine/GameInstance.h"
+#include "Common/Interaction/InteractionComponent.h"
+#include "Common/Interaction/InteractionAgentInterface.h"
+#include "GameFramework/Pawn.h"
 
 IMPLEMENTATION_MODULE(UDialogueModule)
 
@@ -41,6 +44,12 @@ bool UDialogueModule::StartDialogue(UDialogueAsset* InDialogue, APlayerControlle
 	if (!InDialogue->ValidateDialogue(Errors)) return false;
 	const FDialogueModuleSaveData ResumeData = CurrentDialogue ? FDialogueModuleSaveData() : SavedDialogue;
 	EndDialogue();
+	if (IInteractionAgentInterface* Agent = Cast<IInteractionAgentInterface>(InNPC))
+	{
+		Interaction = Agent->GetInteractionComponent();
+		if (!Interaction->BeginInteraction(InPlayer->GetPawn(), this)) { Interaction.Reset(); return false; }
+		Interaction->OnInteractionCancelled.AddUniqueDynamic(this, &UDialogueModule::EndDialogue);
+	}
 	SavedDialogue = ResumeData;
 	SourceDialogue = InDialogue;
 	CurrentDialogue = DuplicateObject<UDialogueAsset>(InDialogue, this);
@@ -48,6 +57,8 @@ bool UDialogueModule::StartDialogue(UDialogueAsset* InDialogue, APlayerControlle
 	CurrentDialogue->AssignPersistentOuter(InPlayer->GetGameInstance());
 	ConsideringPlayer = InPlayer;
 	NPCActor = InNPC;
+	if (NPCActor) NPCActor->OnDestroyed.AddUniqueDynamic(this, &UDialogueModule::OnParticipantDestroyed);
+	if (InPlayer->GetPawn()) InPlayer->GetPawn()->OnDestroyed.AddUniqueDynamic(this, &UDialogueModule::OnParticipantDestroyed);
 	if (SavedDialogue.DialogueAsset.ToSoftObjectPath() == FSoftObjectPath(InDialogue) && SavedDialogue.NodeID > 0)
 	{
 		const int32 ResumeNodeID = SavedDialogue.NodeID;
@@ -81,6 +92,11 @@ bool UDialogueModule::EnterNode(int32 InNodeID, bool bRunEvents)
 			if (Event) Event->RecieveEventTriggered(ConsideringPlayer, NPCActor);
 			if (CurrentDialogue != Dialogue) return true;
 		}
+	}
+	if (Node.isPlayer && GetAvailableNodes().IsEmpty())
+	{
+		EndDialogue();
+		return true;
 	}
 	OnDialogueChanged.Broadcast();
 	return true;
@@ -123,9 +139,27 @@ TArray<FDialogueNode> UDialogueModule::GetAvailableNodes() const
 	return Nodes;
 }
 
+TArray<FDialogueNode> UDialogueModule::GetAvailableChoices() const
+{
+	return GetAvailableNodes().FilterByPredicate([](const FDialogueNode& Node) { return Node.isPlayer; });
+}
+
+bool UDialogueModule::ContinueDialogue()
+{
+	if (!CurrentDialogue || bSelectingNode || !GetAvailableChoices().IsEmpty()) return false;
+	for (const FDialogueNode& Node : GetAvailableNodes())
+	{
+		if (!Node.isPlayer) return SelectDialogueNode(Node.id);
+	}
+	EndDialogue();
+	return true;
+}
+
 void UDialogueModule::EndDialogue()
 {
 	const bool bWasActive = CurrentDialogue != nullptr;
+	if (NPCActor) NPCActor->OnDestroyed.RemoveDynamic(this, &UDialogueModule::OnParticipantDestroyed);
+	if (ConsideringPlayer && ConsideringPlayer->GetPawn()) ConsideringPlayer->GetPawn()->OnDestroyed.RemoveDynamic(this, &UDialogueModule::OnParticipantDestroyed);
 	SavedDialogue = FDialogueModuleSaveData();
 	if (CurrentDialogue) CurrentDialogue->CleanOuter();
 	CurrentDialogue = nullptr;
@@ -133,11 +167,22 @@ void UDialogueModule::EndDialogue()
 	CurrentNodeID = INDEX_NONE;
 	ConsideringPlayer = nullptr;
 	NPCActor = nullptr;
+	if (Interaction.IsValid())
+	{
+		Interaction->OnInteractionCancelled.RemoveDynamic(this, &UDialogueModule::EndDialogue);
+		Interaction->EndInteraction(this);
+	}
+	Interaction.Reset();
 	if (bWasActive)
 	{
 		OnDialogueEnded.Broadcast();
 		OnDialogueChanged.Broadcast();
 	}
+}
+
+void UDialogueModule::OnParticipantDestroyed(AActor* InActor)
+{
+	EndDialogue();
 }
 
 void UDialogueModule::OnTermination(EPhase InPhase)

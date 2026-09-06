@@ -1,12 +1,12 @@
 #pragma once
 
-#include "Common/Interaction/InteractionAction.h"
-#include "Common/Interaction/InteractionCondition.h"
-#include "Common/Interaction/InteractionOption.h"
+#include "Common/Interaction/InteractionActionBase.h"
+#include "Common/Interaction/InteractionConditionBase.h"
+#include "Common/Interaction/InteractionOptionBase.h"
 #include "AbilityInteractionOptions.generated.h"
 
 UCLASS(EditInlineNew)
-class WHFRAMEWORK_API UInteractionCondition_AbilityRevive : public UInteractionCondition
+class WHFRAMEWORK_API UInteractionCondition_AbilityRevive : public UInteractionConditionBase
 {
 	GENERATED_BODY()
 
@@ -15,7 +15,7 @@ public:
 };
 
 UCLASS(EditInlineNew)
-class WHFRAMEWORK_API UInteractionAction_AbilityRevive : public UInteractionAction
+class WHFRAMEWORK_API UInteractionAction_AbilityRevive : public UInteractionActionBase
 {
 	GENERATED_BODY()
 
@@ -24,7 +24,7 @@ public:
 };
 
 UCLASS(EditInlineNew)
-class WHFRAMEWORK_API UInteractionOption_AbilityRevive : public UInteractionOption
+class WHFRAMEWORK_API UInteractionOption_AbilityRevive : public UInteractionOptionBase
 {
 	GENERATED_BODY()
 
@@ -33,7 +33,7 @@ public:
 };
 
 UCLASS(EditInlineNew)
-class WHFRAMEWORK_API UInteractionCondition_AbilityPickUp : public UInteractionCondition
+class WHFRAMEWORK_API UInteractionCondition_AbilityPickUp : public UInteractionConditionBase
 {
 	GENERATED_BODY()
 
@@ -42,7 +42,7 @@ public:
 };
 
 UCLASS(EditInlineNew)
-class WHFRAMEWORK_API UInteractionAction_AbilityPickUp : public UInteractionAction
+class WHFRAMEWORK_API UInteractionAction_AbilityPickUp : public UInteractionActionBase
 {
 	GENERATED_BODY()
 
@@ -51,7 +51,7 @@ public:
 };
 
 UCLASS(EditInlineNew)
-class WHFRAMEWORK_API UInteractionOption_AbilityPickUp : public UInteractionOption
+class WHFRAMEWORK_API UInteractionOption_AbilityPickUp : public UInteractionOptionBase
 {
 	GENERATED_BODY()
 
