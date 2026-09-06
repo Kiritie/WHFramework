@@ -26,6 +26,8 @@ public:
 public:
 	virtual void OnRefresh() override;
 
+	virtual void NativeOnCurrentTextStyleChanged() override;
+
 protected:
 	UFUNCTION()
 	virtual void OnTextBoxValueChanged(const FText& InText);
