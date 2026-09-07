@@ -636,6 +636,7 @@ public:
 		if(!InClass) return nullptr;
 		
 		const FName WidgetName = InClass.GetDefaultObject()->GetWidgetName();
+		if(!WorldWidgetClasses.Contains(InClass)) WorldWidgetClasses.Add(InClass);
 		
 		return CreateWorldWidgetByName<T>(WidgetName, InOwner, InMapping, InParams);
 	}

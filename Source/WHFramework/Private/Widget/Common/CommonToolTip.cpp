@@ -31,7 +31,7 @@ void UCommonToolTip::OnDespawn_Implementation(bool bRecovery)
 		OwnerWidget->SetToolTip(nullptr);
 	}
 	
-	OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(bRecovery);
 }
 
 FText UCommonToolTip::GetContent() const

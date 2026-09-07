@@ -9,6 +9,7 @@
 #include "Task/Slate/STaskDetailsWidget.h"
 #include "Task/Base/TaskAsset.h"
 #include "Task/Base/TaskBase.h"
+#include "Task/Base/TaskAssetReferenceTask.h"
 #include "Task/Blueprint/TaskBlueprintFactory.h"
 #include "WHFrameworkEditorStatics.h"
 #include "Framework/Commands/GenericCommands.h"
@@ -304,7 +305,8 @@ FActionMenuContent STaskGraphWidget::CreateNodeMenu(UEdGraph* InGraph, const UEd
 		{
 			Sub.AddWidget(CreateClassPicker(true, Task, EGPD_MAX, FVector2D::ZeroVector), FText::GetEmpty(), true);
 		}), FUIAction(FExecuteAction(), FCanExecuteAction::CreateSP(this, &STaskGraphWidget::CanEdit)), NAME_None, EUserInterfaceActionType::Button);
-	Builder->AddMenuEntry(Task->GetClass()->ClassGeneratedBy ? LOCTEXT("EditBlueprint", "Edit Task Blueprint") : LOCTEXT("EditCode", "Go to Task Code"),
+	Builder->AddMenuEntry(Task->IsA<UTaskAssetReferenceTask>() ? LOCTEXT("OpenReferencedAsset", "Open Referenced Task Asset") :
+		(Task->GetClass()->ClassGeneratedBy ? LOCTEXT("EditBlueprint", "Edit Task Blueprint") : LOCTEXT("EditCode", "Go to Task Code")),
 		FText::GetEmpty(), FSlateIcon(), FUIAction(FExecuteAction::CreateLambda([this, Task] { if (Task.IsValid()) EditTaskSource(Task.Get()); })));
 	Builder->AddMenuEntry(LOCTEXT("DisconnectNode", "Disconnect Node"), LOCTEXT("DisconnectNodeTip", "Disconnect In and Out without deleting tasks"), FSlateIcon(),
 		FUIAction(FExecuteAction::CreateLambda([this, Task]
@@ -342,6 +344,14 @@ void STaskGraphWidget::OnClassPicked(UClass* Class, bool bChangeType, TWeakObjec
 }
 void STaskGraphWidget::EditTaskSource(UTaskBase* Task)
 {
+	if(UTaskAssetReferenceTask* ReferenceTask = Cast<UTaskAssetReferenceTask>(Task))
+	{
+		if(UTaskAsset* ReferencedAsset = ReferenceTask->ReferencedAsset.LoadSynchronous())
+		{
+			GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(ReferencedAsset);
+		}
+		return;
+	}
 	if (Task->GetClass()->ClassGeneratedBy) GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(Task->GetClass()->ClassGeneratedBy);
 	else FSourceCodeNavigation::NavigateToClass(Task->GetClass());
 }

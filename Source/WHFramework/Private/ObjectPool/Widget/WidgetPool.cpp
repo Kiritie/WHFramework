@@ -4,6 +4,7 @@
 #include "ObjectPool/Widget/WidgetPool.h"
 
 #include "Blueprint/UserWidget.h"
+#include "Blueprint/WidgetTree.h"
 
 UWidgetPool::UWidgetPool()
 {
@@ -11,9 +12,35 @@ UWidgetPool::UWidgetPool()
 
 UObject* UWidgetPool::OnSpawn(UObject* InOwner, UObject* InObject)
 {
+	UWidget* OwningWidget = Cast<UWidget>(InOwner);
+	UWidgetTree* OwningWidgetTree = nullptr;
+	if(UUserWidget* OwningUserWidget = Cast<UUserWidget>(OwningWidget))
+	{
+		OwningWidgetTree = OwningUserWidget->WidgetTree;
+	}
+	else if(OwningWidget)
+	{
+		OwningWidgetTree = OwningWidget->GetTypedOuter<UWidgetTree>();
+	}
+	UWorld* OwningWorld = InOwner ? InOwner->GetWorld() : GetWorld();
+	if(UUserWidget* PooledWidget = Cast<UUserWidget>(InObject))
+	{
+		if(!PooledWidget->WidgetTree || (OwningWorld && PooledWidget->GetWorld() != OwningWorld) || (OwningWidgetTree && PooledWidget->GetOuter() != OwningWidgetTree))
+		{
+			if(PooledWidget->IsRooted())
+			{
+				PooledWidget->RemoveFromRoot();
+			}
+			InObject = nullptr;
+		}
+	}
 	if(!InObject)
 	{
-		if(APlayerController* PlayerController = Cast<APlayerController>(InOwner))
+		if(OwningWidget)
+		{
+			InObject = CreateWidget<UUserWidget>(OwningWidget, Type.Get());
+		}
+		else if(APlayerController* PlayerController = Cast<APlayerController>(InOwner))
 		{
 			InObject = CreateWidget(PlayerController, Type.Get());
 		}
@@ -28,9 +55,9 @@ UObject* UWidgetPool::OnSpawn(UObject* InOwner, UObject* InObject)
 				InObject = CreateWidget(World, Type.Get());
 			}
 		}
-		else if(!GetWorld()->bIsTearingDown)
+		else if(OwningWorld && !OwningWorld->bIsTearingDown)
 		{
-			InObject = CreateWidget(GetWorld(), Type.Get());
+			InObject = CreateWidget(OwningWorld, Type.Get());
 		}
 	}
 	else if(InObject->IsRooted())

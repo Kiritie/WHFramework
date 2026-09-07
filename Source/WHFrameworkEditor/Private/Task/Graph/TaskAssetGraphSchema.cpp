@@ -5,6 +5,7 @@
 #include "Task/Graph/TaskGraphOperations.h"
 #include "Task/Base/TaskAsset.h"
 #include "Task/Base/TaskBase.h"
+#include "Task/Base/TaskAssetReferenceTask.h"
 #include "ScopedTransaction.h"
 #include "UObject/UObjectIterator.h"
 
@@ -18,6 +19,8 @@ const FPinConnectionResponse UTaskAssetGraphSchema::CanCreateConnection(const UE
 	const UTaskAssetGraphNode* Child = Cast<UTaskAssetGraphNode>((A->Direction == EGPD_Input ? A : B)->GetOwningNode());
 	if (!Parent || !Child || !Parent->Task || !Child->Task || Parent == Child || Child->Task->IsParentOf(Parent->Task))
 		return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW, LOCTEXT("Cycle", "A task cannot contain itself or an ancestor."));
+	if(Parent->Task->IsA<UTaskAssetReferenceTask>())
+		return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW, LOCTEXT("ReferenceChildren", "Task asset reference nodes receive children from their referenced asset at runtime."));
 	return FPinConnectionResponse(CONNECT_RESPONSE_MAKE, LOCTEXT("Reparent", "Set parent task."));
 }
 
@@ -41,6 +44,7 @@ bool UTaskAssetGraphSchema::TryCreateConnection(UEdGraphPin* A, UEdGraphPin* B) 
 	Graph->TaskAsset->RootTasks.Remove(Child);
 	Parent->SubTasks.Add(Child);
 	Graph->TaskAsset->RebuildTaskMap(false);
+	FTaskGraphOperations::SortSiblings(Graph->TaskAsset, Child);
 	Graph->OnTasksChanged.ExecuteIfBound();
 	return true;
 }
@@ -54,6 +58,7 @@ void UTaskAssetGraphSchema::BreakPinLinks(UEdGraphPin& Pin, bool bSendsNodeNotif
 	Graph->TaskAsset->Modify();
 	for (const auto& Pair : Graph->TaskAsset->TaskMap) Pair.Value->Modify();
 	Task->Modify();
+	UTaskBase* SortTask = Task;
 	if (Pin.Direction == EGPD_Input && Task->ParentTask)
 	{
 		Task->ParentTask->Modify();
@@ -62,6 +67,7 @@ void UTaskAssetGraphSchema::BreakPinLinks(UEdGraphPin& Pin, bool bSendsNodeNotif
 	}
 	else if (Pin.Direction == EGPD_Output)
 	{
+		if(!Task->SubTasks.IsEmpty()) SortTask = Task->SubTasks[0];
 		for (UTaskBase* Child : Task->SubTasks)
 		{
 			Child->Modify();
@@ -70,6 +76,7 @@ void UTaskAssetGraphSchema::BreakPinLinks(UEdGraphPin& Pin, bool bSendsNodeNotif
 		Task->SubTasks.Reset();
 	}
 	Graph->TaskAsset->RebuildTaskMap(false);
+	FTaskGraphOperations::SortSiblings(Graph->TaskAsset, SortTask);
 	Graph->OnTasksChanged.ExecuteIfBound();
 }
 
@@ -89,6 +96,7 @@ void UTaskAssetGraphSchema::BreakNodeLinks(UEdGraphNode& TargetNode) const
 	for (UTaskBase* Child : Task->SubTasks) Graph->TaskAsset->RootTasks.AddUnique(Child);
 	Task->SubTasks.Reset();
 	Graph->TaskAsset->RebuildTaskMap(false);
+	FTaskGraphOperations::SortSiblings(Graph->TaskAsset, Task);
 	Graph->OnTasksChanged.ExecuteIfBound();
 }
 

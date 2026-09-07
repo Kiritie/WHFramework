@@ -190,6 +190,9 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	UTaskBase* GetCurrentTask() const { return CurrentTask; }
+
+	UFUNCTION(BlueprintPure)
+	UTaskBase* GetGuidanceTask() const;
 	/**
 	* 设置当前任务
 	*/

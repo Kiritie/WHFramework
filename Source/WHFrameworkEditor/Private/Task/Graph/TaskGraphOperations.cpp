@@ -2,6 +2,7 @@
 
 #include "Task/Base/TaskAsset.h"
 #include "Task/Base/TaskBase.h"
+#include "Task/Base/TaskAssetReferenceTask.h"
 #include "Editor.h"
 #include "Engine/Engine.h"
 #include "JsonObjectConverter.h"
@@ -40,7 +41,7 @@ UTaskBase* FTaskGraphOperations::AddTask(UTaskAsset* Asset, UClass* TaskClass, F
 	if (!CanEdit(Asset) || !TaskClass || !TaskClass->IsChildOf(UTaskBase::StaticClass()) ||
 		TaskClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists) || !Asset->CanAddTask(TaskClass)) return nullptr;
 	if ((Parent && Asset->TaskMap.FindRef(Parent->TaskGUID) != Parent) ||
-		(Child && Asset->TaskMap.FindRef(Child->TaskGUID) != Child) || (Parent && Child)) return nullptr;
+		(Child && Asset->TaskMap.FindRef(Child->TaskGUID) != Child) || (Parent && Child) || Parent && Parent->IsA<UTaskAssetReferenceTask>()) return nullptr;
 	const FScopedTransaction Transaction(LOCTEXT("Add", "Add Task"));
 	Asset->Modify();
 	UTaskBase* Task = NewObject<UTaskBase>(Asset, TaskClass, NAME_None, RF_Transactional);
@@ -69,6 +70,7 @@ UTaskBase* FTaskGraphOperations::AddTask(UTaskAsset* Asset, UClass* TaskClass, F
 	else Siblings->Add(Task);
 	Task->OnGenerate();
 	Asset->RebuildTaskMap(false);
+	SortSiblings(Asset, Task);
 	return Task;
 }
 
@@ -110,7 +112,8 @@ UTaskBase* FTaskGraphOperations::ChangeTaskType(UTaskAsset* Asset, UTaskBase* Ta
 {
 	if (!CanEdit(Asset) || !Task || Task->GetClass() == TaskClass || !TaskClass ||
 		!TaskClass->IsChildOf(UTaskBase::StaticClass()) || TaskClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists) ||
-		!Asset->CanAddTask(TaskClass) || Asset->TaskMap.FindRef(Task->TaskGUID) != Task) return nullptr;
+		!Asset->CanAddTask(TaskClass) || Asset->TaskMap.FindRef(Task->TaskGUID) != Task ||
+		(TaskClass->IsChildOf(UTaskAssetReferenceTask::StaticClass()) && !Task->SubTasks.IsEmpty())) return nullptr;
 	const FScopedTransaction Transaction(LOCTEXT("ChangeType", "Change Task Type"));
 	Asset->Modify();
 	Task->Modify();
@@ -232,6 +235,7 @@ TArray<UTaskBase*> FTaskGraphOperations::ImportTasks(UTaskAsset* Asset, const FS
 	}
 	Asset->RootTasks.Append(Roots);
 	Asset->RebuildTaskMap(false);
+	if(!Roots.IsEmpty()) SortSiblings(Asset, Roots[0]);
 	return Roots;
 }
 

@@ -20,6 +20,7 @@ class AMiniMapCapture;
 class UEventHandle_SetDataLayerRuntimeState;
 class UWorldWeather;
 class UWorldTimer;
+class UWidgetSceneWorldMarker;
 /** 场景模块 */
 UCLASS()
 class WHFRAMEWORK_API USceneModule : public UModuleBase, public ISceneContainerInterface, public IDebuggerInterface
@@ -227,6 +228,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "Marker")
 	FGuid TrackedMarkerID;
 
+	UPROPERTY(Transient)
+	TMap<FGuid, UWidgetSceneWorldMarker*> WorldMarkerWidgets;
+
 public:
 	UPROPERTY(BlueprintAssignable)
 	FOnSceneMarkersChanged OnSceneMarkersChanged;
@@ -260,6 +264,8 @@ public:
 
 private:
 	FSceneMarkerView ResolveMarker(const FSceneMarker& InMarker, const FVector& InViewLocation, float InViewYaw) const;
+	void RefreshWorldMarkerWidgets();
+	void ClearWorldMarkerWidgets();
 	UPROPERTY(Transient)
 	FSceneModuleSaveData CachedSaveData;
 

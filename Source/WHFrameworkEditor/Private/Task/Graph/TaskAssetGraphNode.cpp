@@ -1,10 +1,32 @@
 #include "Task/Graph/TaskAssetGraphNode.h"
 
 #include "Task/Base/TaskBase.h"
+#include "Task/Base/TaskAsset.h"
+#include "Task/Base/TaskAssetReferenceTask.h"
 #include "Task/Graph/TaskAssetGraph.h"
 #include "Task/Graph/TaskGraphOperations.h"
 #include "EdGraphUtilities.h"
 #include "SGraphNodeDefault.h"
+
+namespace
+{
+	FString GetTaskOrderLabel(const UTaskBase* Task)
+	{
+		const UTaskAsset* Asset = Task ? Task->GetTaskAsset() : nullptr;
+		if(!Task || !Asset) return FString();
+		TArray<int32> Segments;
+		for(const UTaskBase* Item = Task; Item; Item = Item->ParentTask)
+		{
+			const TArray<UTaskBase*>& Siblings = Item->ParentTask ? Item->ParentTask->SubTasks : Asset->RootTasks;
+			const int32 Index = Siblings.IndexOfByKey(Item);
+			if(Index == INDEX_NONE) return FString();
+			Segments.Insert(Index + 1, 0);
+		}
+		TArray<FString> Parts;
+		for(const int32 Segment : Segments) Parts.Add(FString::FromInt(Segment));
+		return FString::Join(Parts, TEXT("."));
+	}
+}
 
 void UTaskAssetGraphNode::AllocateDefaultPins()
 {
@@ -14,17 +36,31 @@ void UTaskAssetGraphNode::AllocateDefaultPins()
 
 FText UTaskAssetGraphNode::GetNodeTitle(ENodeTitleType::Type TitleType) const
 {
-	return Task ? Task->TaskDisplayName : FText::GetEmpty();
+	if(!Task) return FText::GetEmpty();
+	const FText Order = FText::FromString(GetTaskOrderLabel(Task));
+	if(const UTaskAssetReferenceTask* ReferenceTask = Cast<UTaskAssetReferenceTask>(Task))
+	{
+		const FString AssetName = ReferenceTask->ReferencedAsset.IsNull() ? TEXT("None") : ReferenceTask->ReferencedAsset.ToSoftObjectPath().GetAssetName();
+		return FText::Format(NSLOCTEXT("TaskGraph", "OrderedReferenceTitle", "[{0}] {1}  [{2}]"),
+			Order, Task->TaskDisplayName, FText::FromString(AssetName));
+	}
+	return FText::Format(NSLOCTEXT("TaskGraph", "OrderedTaskTitle", "[{0}] {1}"), Order, Task->TaskDisplayName);
 }
 
 FText UTaskAssetGraphNode::GetTooltipText() const
 {
+	if(const UTaskAssetReferenceTask* ReferenceTask = Cast<UTaskAssetReferenceTask>(Task))
+	{
+		return FText::Format(NSLOCTEXT("TaskGraph", "ReferenceTooltip", "{0}\nReferenced asset: {1}\nDouble-click to open the referenced task graph."),
+			Task->TaskDescription, FText::FromString(ReferenceTask->ReferencedAsset.ToSoftObjectPath().ToString()));
+	}
 	return Task ? Task->TaskDescription : FText::GetEmpty();
 }
 
 FLinearColor UTaskAssetGraphNode::GetNodeTitleColor() const
 {
 	if (!Task) return FLinearColor::Gray;
+	if(Task->IsA<UTaskAssetReferenceTask>()) return FLinearColor(0.12f, 0.48f, 0.52f);
 	switch (Task->TaskState)
 	{
 		case ETaskState::Entered: return FLinearColor(0.1f, 0.45f, 0.8f);

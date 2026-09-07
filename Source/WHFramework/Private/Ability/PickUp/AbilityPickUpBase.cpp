@@ -49,6 +49,8 @@ void AAbilityPickUpBase::OnSpawn_Implementation(UObject* InOwner, const TArray<F
 
 void AAbilityPickUpBase::OnDespawn_Implementation(bool bRecovery)
 {
+	Interaction->SetInteractable(false);
+
 	Super::OnDespawn_Implementation(bRecovery);
 
 	Item = FAbilityItem::Empty;
@@ -69,6 +71,7 @@ void AAbilityPickUpBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 	Item = SaveData.Item;
 	Item.Payload = this;
+	Interaction->SetInteractable(Item.IsValid());
 	SetActorLocationAndRotation(SaveData.Location, FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f));
 }
 

@@ -286,6 +286,13 @@ UTaskAsset* UTaskModule::AddAssetInternal(UTaskAsset* InAsset, FGuid InInstanceI
 	RuntimeAsset->SourceObject = Source;
 	RuntimeAsset->InstanceID = InInstanceID;
 	RuntimeAsset->AgentID = InAgentID;
+	TArray<FText> ExpansionErrors;
+	if(!RuntimeAsset->ExpandTaskAssetReferences(ExpansionErrors))
+	{
+		for(const FText& Error : ExpansionErrors) UE_LOG(LogTemp, Warning, TEXT("%s"), *Error.ToString());
+		return nullptr;
+	}
+	if(!RuntimeAsset->RebuildTaskMap()) return nullptr;
 	Assets.Add(RuntimeAsset);
 	RuntimeAsset->Initialize();
 	if(InInstanceID.IsValid())
@@ -358,7 +365,7 @@ void UTaskModule::EnterTask(UTaskBase* InTask, bool bSetAsCurrent)
 				for (UTaskBase* Sibling : InTask->ParentTask->SubTasks)
 				{
 					if (Sibling == InTask) break;
-					if (!Sibling->IsCompleted() || !Sibling->IsSucceed()) return;
+					if (!Sibling->IsLeaved() || !Sibling->IsSucceed()) return;
 				}
 			}
 		}
@@ -473,7 +480,7 @@ void UTaskModule::LeaveTask(UTaskBase* InTask)
 		{
 			SetCurrentTask(nullptr);
 		}
-		if(InTask->ParentTask && InTask->ParentTask->HasSubTask() && InTask->ParentTask->IsAllSubLeaved())
+		if(InTask->ParentTask && InTask->ParentTask->IsCompleted() && InTask->ParentTask->HasSubTask() && InTask->ParentTask->IsAllSubLeaved())
 		{
 			LeaveTask(InTask->ParentTask);
 		}
@@ -508,6 +515,28 @@ void UTaskModule::SetCurrentTask(UTaskBase* InTask)
 	CurrentTask = InTask;
 	RefreshTaskMarkers();
 	UEventModuleStatics::BroadcastEvent(UEventHandle_CurrentTaskChanged::StaticClass(), this, {CurrentTask});
+}
+
+UTaskBase* UTaskModule::GetGuidanceTask() const
+{
+	TFunction<UTaskBase*(UTaskBase*)> Resolve = [&](UTaskBase* Task) -> UTaskBase*
+	{
+		if(!Task || Task->IsLeaved()) return nullptr;
+		for(UTaskBase* Child : Task->SubTasks)
+		{
+			if(Child && Child->bRuntimeSelected)
+			{
+				if(UTaskBase* Result = Resolve(Child)) return Result;
+			}
+		}
+		for(UTaskBase* Child : Task->SubTasks)
+		{
+			if(UTaskBase* Result = Resolve(Child)) return Result;
+		}
+		const ETaskStage Stage = Task->GetTaskStage();
+		return Task->Marker.bVisible && Task->Target.IsValid() && (Stage == ETaskStage::Active || Stage == ETaskStage::Deliverable) ? Task : nullptr;
+	};
+	return Resolve(CurrentTask);
 }
 
 bool UTaskModule::IsExistTaskByGUID(const FString& InTaskGUID) const
@@ -622,6 +651,7 @@ void UTaskModule::RefreshTaskMarkers()
 	USceneModule& Scene = USceneModule::Get();
 	TSet<FGuid> DesiredIDs;
 	FGuid CurrentMarkerID;
+	UTaskBase* GuidanceTask = GetGuidanceTask();
 	for(UTaskAsset* Asset : Assets)
 	{
 		if(!Asset) continue;
@@ -650,11 +680,13 @@ void UTaskModule::RefreshTaskMarkers()
 			Marker.ActorID = Target.ActorID;
 			Marker.AreaName = Target.AreaName;
 			Marker.Priority = Task->Marker.Priority;
-			Marker.Channels = static_cast<int32>(ESceneMarkerChannel::Map);
-			if(Stage == ETaskStage::Active) Marker.Channels |= static_cast<int32>(ESceneMarkerChannel::World);
-			if(CurrentTask == Task)
+			Marker.Channels = Task->Marker.Channels;
+			if(Task->Marker.bOnlyShowNavigationWhenTracked && GuidanceTask != Task)
 			{
-				Marker.Channels |= static_cast<int32>(ESceneMarkerChannel::MiniMap | ESceneMarkerChannel::Compass);
+				Marker.Channels &= ~static_cast<int32>(ESceneMarkerChannel::MiniMap | ESceneMarkerChannel::Compass | ESceneMarkerChannel::World);
+			}
+			if(GuidanceTask == Task)
+			{
 				CurrentMarkerID = Marker.MarkerID;
 			}
 			DesiredIDs.Add(Marker.MarkerID);

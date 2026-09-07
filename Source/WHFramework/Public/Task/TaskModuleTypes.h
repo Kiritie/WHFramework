@@ -3,6 +3,7 @@
 #pragma once
 
 #include "SaveGame/SaveGameModuleTypes.h"
+#include "Scene/SceneModuleTypes.h"
 #include "GameplayTagContainer.h"
 #include "NativeGameplayTags.h"
 #include "TaskModuleTypes.generated.h"
@@ -149,6 +150,9 @@ struct WHFRAMEWORK_API FTaskTarget
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FGameplayTag FeatureTag;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool bResolvedByFeature = false;
+
 	bool IsValid() const { return ActorID.IsValid() || !AreaName.IsNone() || !Location.IsNearlyZero(); }
 };
 
@@ -168,6 +172,13 @@ struct WHFRAMEWORK_API FTaskMarkerData
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 Priority = 100;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (Bitmask, BitmaskEnum = "/Script/WHFramework.ESceneMarkerChannel"))
+	int32 Channels = static_cast<int32>(ESceneMarkerChannel::Map | ESceneMarkerChannel::MiniMap |
+		ESceneMarkerChannel::Compass | ESceneMarkerChannel::World);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	bool bOnlyShowNavigationWhenTracked = true;
 };
 
 USTRUCT(BlueprintType)

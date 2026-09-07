@@ -510,7 +510,7 @@ ISubWidgetInterface* UUserWidgetBase::CreateSubWidget(TSubclassOf<UUserWidget> I
 
 ISubWidgetInterface* UUserWidgetBase::CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams)
 {
-	if(ISubWidgetInterface* SubWidget = UObjectPoolModuleStatics::SpawnObject<ISubWidgetInterface>(nullptr, nullptr, InClass))
+	if(ISubWidgetInterface* SubWidget = UObjectPoolModuleStatics::SpawnObject<ISubWidgetInterface>(this, nullptr, InClass))
 	{
 		SubWidget->OnCreate(this, InParams);
 		return SubWidget;

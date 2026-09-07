@@ -34,7 +34,9 @@
 #include "Scene/Actor/PhysicsVolume/PhysicsVolumeBase.h"
 #include "Scene/Capture/MiniMapCapture.h"
 #include "Scene/Widget/WidgetLoadingLevelPanel.h"
+#include "Scene/Widget/WidgetSceneWorldMarker.h"
 #include "Scene/Widget/WidgetWorldText.h"
+#include "Widget/WidgetModule.h"
 #include "Widget/WidgetModuleStatics.h"
 #include "WorldPartition/DataLayer/DataLayerSubsystem.h"
 
@@ -78,6 +80,7 @@ USceneModule::USceneModule()
 	SceneAreas = TArray<FSceneArea>();
 	Markers = TMap<FGuid, FSceneMarker>();
 	TrackedMarkerID.Invalidate();
+	WorldMarkerWidgets.Reset();
 	bDrawSceneArea = false;
 	SceneAreaHeight = 1000.f;
 	
@@ -293,6 +296,7 @@ void USceneModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 	}
 
 	Altitude = UCameraModuleStatics::GetCameraLocation(true).Z - SeaLevel;
+	RefreshWorldMarkerWidgets();
 
 	if(MiniMapCapture)
 	{
@@ -427,6 +431,7 @@ void USceneModule::OnTermination(EPhase InPhase)
 
 		FSceneArea Area;
 		while(PendingSceneAreas.Dequeue(Area)) { }
+		ClearWorldMarkerWidgets();
 		ClearMarkers(true);
 	}
 }
@@ -828,6 +833,55 @@ TArray<FSceneMarkerView> USceneModule::GetMarkerViews(ESceneMarkerChannel InChan
 		return A.Marker.Priority == B.Marker.Priority ? A.Distance < B.Distance : A.Marker.Priority > B.Marker.Priority;
 	});
 	return Views;
+}
+
+void USceneModule::RefreshWorldMarkerWidgets()
+{
+	if(!UWidgetModule::IsValid()) return;
+	const FVector ViewLocation = UCameraModuleStatics::GetCameraLocation(true);
+	float ViewYaw = 0.f;
+	if(const APlayerController* PlayerController = UCommonModuleStatics::GetPlayerController())
+	{
+		ViewYaw = PlayerController->GetControlRotation().Yaw;
+	}
+
+	TSet<FGuid> DesiredIDs;
+	for(const FSceneMarkerView& View : GetMarkerViews(ESceneMarkerChannel::World, ViewLocation, ViewYaw))
+	{
+		if(!View.Marker.MarkerID.IsValid()) continue;
+		DesiredIDs.Add(View.Marker.MarkerID);
+		UWidgetSceneWorldMarker*& Widget = WorldMarkerWidgets.FindOrAdd(View.Marker.MarkerID);
+		if(!::IsValid(Widget))
+		{
+			Widget = UWidgetModule::Get().CreateWorldWidget<UWidgetSceneWorldMarker>(
+				this, FWorldWidgetMapping(View.Location), nullptr, UWidgetSceneWorldMarker::StaticClass());
+		}
+		if(Widget) Widget->SetMarkerView(View);
+	}
+
+	TArray<FGuid> ExistingIDs;
+	WorldMarkerWidgets.GetKeys(ExistingIDs);
+	for(const FGuid& MarkerID : ExistingIDs)
+	{
+		if(DesiredIDs.Contains(MarkerID)) continue;
+		if(UWidgetSceneWorldMarker* Widget = WorldMarkerWidgets.FindRef(MarkerID); ::IsValid(Widget))
+		{
+			UWidgetModule::Get().DestroyWorldWidget(Widget, true);
+		}
+		WorldMarkerWidgets.Remove(MarkerID);
+	}
+}
+
+void USceneModule::ClearWorldMarkerWidgets()
+{
+	if(UWidgetModule::IsValid())
+	{
+		for(const auto& Pair : WorldMarkerWidgets)
+		{
+			if(::IsValid(Pair.Value)) UWidgetModule::Get().DestroyWorldWidget(Pair.Value, true);
+		}
+	}
+	WorldMarkerWidgets.Reset();
 }
 
 bool USceneModule::SetTrackedMarker(FGuid InMarkerID)

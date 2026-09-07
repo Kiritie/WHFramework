@@ -69,8 +69,9 @@ bool FTaskEditorTest::RunTest(const FString& Parameters)
 	auto Graph = [&] { return CastChecked<UTaskAssetGraph>(View->GetGraphEditor()->GetGraphPanel()->GetGraphObj()); };
 	auto Node = [&](UTaskBase* Task) -> UTaskAssetGraphNode*
 	{
+		const FString TaskID = Task ? Task->TaskGUID : FString();
 		for (UEdGraphNode* Item : Graph()->Nodes)
-			if (UTaskAssetGraphNode* Found = Cast<UTaskAssetGraphNode>(Item); Found && Found->Task == Task) return Found;
+			if (UTaskAssetGraphNode* Found = Cast<UTaskAssetGraphNode>(Item); Found && Found->Task && Found->Task->TaskGUID == TaskID) return Found;
 		return nullptr;
 	};
 	const UTaskAssetGraphSchema* Schema = GetDefault<UTaskAssetGraphSchema>();
@@ -79,6 +80,8 @@ bool FTaskEditorTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("输入端口 In"), Node(Child)->FindPin(TEXT("In")));
 	TestNotNull(TEXT("输出端口 Out"), Node(Child)->FindPin(TEXT("Out")));
 	TestNull(TEXT("旧端口 Parent 已移除"), Node(Child)->FindPin(TEXT("Parent")));
+	TestTrue(TEXT("节点标题显示层级执行序号"), Node(Child)->GetNodeTitle(ENodeTitleType::FullTitle).ToString().StartsWith(TEXT("[1.1]")));
+	TestTrue(TEXT("创建节点立即按纵向位置排序"), Root->SubTasks == TArray<UTaskBase*>{Child, Other});
 
 	UTaskBase* Inserted = FTaskGraphOperations::AddTask(Asset.Get(), UTaskBase::StaticClass(), FVector2D(560, 180), nullptr, Leaf);
 	View->Rebuild();
@@ -157,18 +160,28 @@ bool FTaskEditorTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("跨资产粘贴重做"), Destination->RootTasks.Num(), 2);
 	TestTrue(TEXT("无关剪贴板不修改资产"), FTaskGraphOperations::ImportTasks(Destination.Get(), TEXT("{}"), FVector2D::ZeroVector).IsEmpty());
 
-	View->SelectTasks({Child});
 	FString PreviousClipboard;
 	FPlatformApplicationMisc::ClipboardPaste(PreviousClipboard);
-	ON_SCOPE_EXIT { FPlatformApplicationMisc::ClipboardCopy(*PreviousClipboard); };
-	TestTrue(TEXT("右键复制命令"), Commands->ExecuteAction(FGenericCommands::Get().Copy.ToSharedRef()));
-	TestTrue(TEXT("右键粘贴命令"), Commands->ExecuteAction(FGenericCommands::Get().Paste.ToSharedRef()));
-	TestEqual(TEXT("同资产粘贴名称不冲突"), Asset->TaskMap.Num(), 6);
-	Undo();
-	TestEqual(TEXT("粘贴撤销"), Asset->TaskMap.Num(), 4);
-	Redo();
-	TestEqual(TEXT("粘贴重做"), Asset->TaskMap.Num(), 6);
-	Undo();
+	const FString ClipboardProbe = FString::Printf(TEXT("WHFrameworkTaskEditorTest_%s"), *FGuid::NewGuid().ToString());
+	FPlatformApplicationMisc::ClipboardCopy(*ClipboardProbe);
+	FString ClipboardProbeResult;
+	FPlatformApplicationMisc::ClipboardPaste(ClipboardProbeResult);
+	const bool bClipboardAvailable = ClipboardProbeResult == ClipboardProbe;
+	ON_SCOPE_EXIT { if (bClipboardAvailable) FPlatformApplicationMisc::ClipboardCopy(*PreviousClipboard); };
+	if (bClipboardAvailable)
+	{
+		View->SelectTasks({Child});
+		TestTrue(TEXT("右键复制命令"), Commands->ExecuteAction(FGenericCommands::Get().Copy.ToSharedRef()));
+		TestTrue(TEXT("右键粘贴命令"), Commands->ExecuteAction(FGenericCommands::Get().Paste.ToSharedRef()));
+		TestEqual(TEXT("同资产粘贴名称不冲突"), Asset->TaskMap.Num(), 6);
+		Undo();
+		TestEqual(TEXT("粘贴撤销"), Asset->TaskMap.Num(), 4);
+		Redo();
+		TestEqual(TEXT("粘贴重做"), Asset->TaskMap.Num(), 6);
+		Undo();
+	}
+	else AddInfo(TEXT("系统剪贴板不可用，跳过依赖系统剪贴板的复制、粘贴和剪切命令检查"));
+
 	View->SelectTasks({Child});
 	Commands->ExecuteAction(FGenericCommands::Get().Duplicate.ToSharedRef());
 	TestEqual(TEXT("副本命令复制完整子树"), Asset->TaskMap.Num(), 6);
@@ -178,15 +191,18 @@ bool FTaskEditorTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("副本重做"), Asset->TaskMap.Num(), 6);
 	Undo();
 
-	View->SelectTasks({Child});
-	Commands->ExecuteAction(FGenericCommands::Get().Cut.ToSharedRef());
-	TestEqual(TEXT("剪切删除子树"), Asset->TaskMap.Num(), 2);
-	TestTrue(TEXT("删除清理本地前置依赖"), Other->Prerequisites.IsEmpty());
-	Undo();
-	TestTrue(TEXT("剪切撤销恢复依赖和子树"), Asset->TaskMap.Num() == 4 && Other->Prerequisites.Num() == 1);
-	Redo();
-	TestEqual(TEXT("剪切重做"), Asset->TaskMap.Num(), 2);
-	Undo();
+	if (bClipboardAvailable)
+	{
+		View->SelectTasks({Child});
+		Commands->ExecuteAction(FGenericCommands::Get().Cut.ToSharedRef());
+		TestEqual(TEXT("剪切删除子树"), Asset->TaskMap.Num(), 2);
+		TestTrue(TEXT("删除清理本地前置依赖"), Other->Prerequisites.IsEmpty());
+		Undo();
+		TestTrue(TEXT("剪切撤销恢复依赖和子树"), Asset->TaskMap.Num() == 4 && Other->Prerequisites.Num() == 1);
+		Redo();
+		TestEqual(TEXT("剪切重做"), Asset->TaskMap.Num(), 2);
+		Undo();
+	}
 	View->SelectTasks({Leaf});
 	Commands->ExecuteAction(FGenericCommands::Get().Delete.ToSharedRef());
 	TestEqual(TEXT("删除命令"), Asset->TaskMap.Num(), 3);
@@ -196,7 +212,11 @@ bool FTaskEditorTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("删除重做"), Asset->TaskMap.Num(), 3);
 	Undo();
 
-	Schema->TryCreateConnection(Node(Other)->FindPinChecked(TEXT("Out")), Node(Leaf)->FindPinChecked(TEXT("In")));
+	TestEqual(TEXT("删除撤销后图同步重建"), Graph()->Nodes.Num(), 4);
+	UTaskAssetGraphNode* OtherNode = Node(Other);
+	UTaskAssetGraphNode* LeafNode = Node(Leaf);
+	if (!TestNotNull(TEXT("删除撤销后保留 Other 图节点"), OtherNode) || !TestNotNull(TEXT("删除撤销后恢复 Leaf 图节点"), LeafNode)) return false;
+	Schema->TryCreateConnection(OtherNode->FindPinChecked(TEXT("Out")), LeafNode->FindPinChecked(TEXT("In")));
 	TestEqual(TEXT("连线修改父节点"), Leaf->ParentTask, Other);
 	Undo();
 	TestEqual(TEXT("连线撤销"), Leaf->ParentTask, Child);
@@ -233,6 +253,8 @@ bool FTaskEditorTest::RunTest(const FString& Parameters)
 		View->GetGraphEditor()->GetGraphPanel()->GetNodeWidgetFromGuid(Node(Other)->NodeGuid)->MoveTo(FVector2f(400, -80), Filter);
 	}
 	TestTrue(TEXT("实际 Slate 节点拖动写入资产并排序"), Other->GraphPosition.Y == -80 && Root->SubTasks[0] == Other);
+	TestTrue(TEXT("拖动排序后节点序号同步更新"), Node(Other)->GetNodeTitle(ENodeTitleType::FullTitle).ToString().StartsWith(TEXT("[1.1]")) &&
+		Node(Child)->GetNodeTitle(ENodeTitleType::FullTitle).ToString().StartsWith(TEXT("[1.2]")));
 	Undo();
 	TestTrue(TEXT("拖动撤销恢复位置和执行顺序"), Other->GraphPosition == BeforeMove && Root->SubTasks[0] == Child);
 	Redo();
