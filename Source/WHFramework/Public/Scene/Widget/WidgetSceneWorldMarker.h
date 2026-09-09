@@ -21,6 +21,7 @@ public:
 
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
+	virtual void RefreshLocation_Implementation(UWidget* InWidget, FWorldWidgetMapping InMapping) override;
 
 	UPROPERTY(Transient)
 	UWidgetSceneMarkerItem* MarkerItem = nullptr;

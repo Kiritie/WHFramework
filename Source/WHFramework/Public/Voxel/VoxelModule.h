@@ -215,6 +215,8 @@ public:
 
 	virtual UVoxelChunk* GetChunkByIndex(FIndex InIndex) const;
 
+	void ForEachChunk(TFunctionRef<void(const UVoxelChunk&)> InVisitor) const;
+
 	virtual UVoxelChunk* GetChunkByLocation(FVector InLocation) const;
 
 	virtual UVoxelChunk* GetChunkByVoxelIndex(FIndex InIndex) const;

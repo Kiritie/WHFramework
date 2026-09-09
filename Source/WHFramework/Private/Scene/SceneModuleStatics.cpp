@@ -160,15 +160,15 @@ bool USceneModuleStatics::ProjectMarkerToMap(const FSceneMarkerView& InMarker, F
 	if(InRange <= UE_SMALL_NUMBER || InSize.X <= 0.f || InSize.Y <= 0.f) return false;
 	FVector2D Delta = FVector2D(InMarker.Location) - InCenter;
 	Delta = Delta.GetRotated(-InYaw);
-	FVector2D Normalized(Delta.X / InRange, -Delta.Y / InRange);
-	const bool bInside = FMath::Abs(Normalized.X) <= 0.5f && FMath::Abs(Normalized.Y) <= 0.5f;
+	const float PixelsPerWorldUnit = InSize.X / InRange;
+	OutPosition = InSize * 0.5f + FVector2D(Delta.X, -Delta.Y) * PixelsPerWorldUnit;
+	const bool bInside = OutPosition.X >= 0.f && OutPosition.X <= InSize.X && OutPosition.Y >= 0.f && OutPosition.Y <= InSize.Y;
 	if(!bInside && !bClamp) return false;
 	if(bClamp)
 	{
-		Normalized.X = FMath::Clamp(Normalized.X, -0.5f, 0.5f);
-		Normalized.Y = FMath::Clamp(Normalized.Y, -0.5f, 0.5f);
+		OutPosition.X = FMath::Clamp(OutPosition.X, 0.f, InSize.X);
+		OutPosition.Y = FMath::Clamp(OutPosition.Y, 0.f, InSize.Y);
 	}
-	OutPosition = InSize * 0.5f + Normalized * InSize;
 	return true;
 }
 

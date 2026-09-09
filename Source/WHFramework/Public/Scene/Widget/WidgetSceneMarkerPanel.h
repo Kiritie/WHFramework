@@ -5,6 +5,7 @@
 #include "WidgetSceneMarkerPanel.generated.h"
 
 class UCanvasPanel;
+class UWidgetSceneMapBase;
 class UWidgetSceneMarkerItem;
 
 /** 世界地图、小地图与罗盘共用的标记面板 */
@@ -34,6 +35,8 @@ public:
 	int32 GetMarkerItemCount() const { return MarkerItems.Num(); }
 	bool IsShowingMarkerNames() const { return bShowMarkerNames; }
 	bool IsShowingMarkerDistance() const { return bShowMarkerDistance; }
+	bool IsShowingPlayerMarker() const { return bShowPlayerMarker; }
+	const FSceneMapView& GetMapView() const { return MapView; }
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Marker")
@@ -62,13 +65,23 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Marker")
 	bool bShowMarkerDistance = false;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Marker")
+	bool bShowPlayerMarker = false;
+
 	UPROPERTY(Transient)
 	TMap<FGuid, UWidgetSceneMarkerItem*> MarkerItems;
+
+	UPROPERTY(Transient)
+	UWidgetSceneMapBase* MapBackground = nullptr;
+
+	FSceneMapView MapView;
 
 	virtual FVector GetMarkerViewLocation() const;
 	virtual float GetMarkerViewYaw() const;
 	virtual bool ProjectMarker(const FSceneMarkerView& InMarker, FVector2D InPanelSize, FVector2D& OutPosition) const;
 	void ResolveMarkerCanvas();
+	void ResolveMapBackground();
+	void AddPlayerMarker();
 	void UpdateMarkerItems();
 	void DestroyMarkerItems();
 };

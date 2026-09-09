@@ -26,7 +26,7 @@ TSharedRef<SWidget> UWidgetSceneMarkerItem::RebuildWidget()
 	if(WidgetTree && !WidgetTree->RootWidget)
 	{
 		UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("MarkerRow"));
-		USizeBox* IconSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("IconSize"));
+		USizeBox* IconSizeBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("IconSize"));
 		UOverlay* IconLayer = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("IconLayer"));
 		ImgIcon = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("ImgIcon"));
 		TxtSymbol = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("TxtSymbol"));
@@ -34,9 +34,9 @@ TSharedRef<SWidget> UWidgetSceneMarkerItem::RebuildWidget()
 		TxtDistance = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("TxtDistance"));
 
 		WidgetTree->RootWidget = Row;
-		IconSize->SetWidthOverride(24.f);
-		IconSize->SetHeightOverride(24.f);
-		IconSize->AddChild(IconLayer);
+		IconSizeBox->SetWidthOverride(UWidgetSceneMarkerItem::IconSize);
+		IconSizeBox->SetHeightOverride(UWidgetSceneMarkerItem::IconSize);
+		IconSizeBox->AddChild(IconLayer);
 		IconLayer->AddChild(ImgIcon);
 		IconLayer->AddChild(TxtSymbol);
 		TxtSymbol->SetText(NSLOCTEXT("SceneMarker", "FallbackSymbol", "◆"));
@@ -51,7 +51,7 @@ TSharedRef<SWidget> UWidgetSceneMarkerItem::RebuildWidget()
 			Text->SetShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.85f));
 		}
 
-		if(UHorizontalBoxSlot* IconSlot = Row->AddChildToHorizontalBox(IconSize))
+		if(UHorizontalBoxSlot* IconSlot = Row->AddChildToHorizontalBox(IconSizeBox))
 		{
 			IconSlot->SetVerticalAlignment(VAlign_Center);
 			IconSlot->SetPadding(FMargin(0.f, 0.f, 5.f, 0.f));

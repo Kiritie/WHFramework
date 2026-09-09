@@ -20,6 +20,26 @@
 #include "Voxel/Generators/VoxelTownGenerator.h"
 #include "Voxel/Root/VoxelRoot.h"
 
+bool UVoxelChunk::TryMakeVoxelMapCell(const FVoxelItem& InItem, int32 InHeight, FVoxelMapCell& OutCell)
+{
+	OutCell = FVoxelMapCell();
+	if(InItem.IsUnknown() || !InItem.IsValid()) return false;
+
+	const UVoxelData& VoxelData = InItem.GetData();
+	if(VoxelData.MeshDatas.IsEmpty()) return false;
+	const FVoxelMeshData& MeshData = VoxelData.GetMeshData(InItem);
+	const int32 UpFace = static_cast<int32>(EDirectionN::Up);
+	if(MeshData.bCustomMesh || !MeshData.MeshUVDatas.IsValidIndex(UpFace) || !MeshData.MeshUVDatas[UpFace].Texture) return false;
+
+	const FVoxelMeshUVData& UVData = MeshData.MeshUVDatas[UpFace];
+	OutCell.Texture = UVData.Texture;
+	OutCell.UVCorner = UVData.UVCorner;
+	OutCell.UVSpan = UVData.UVSpan;
+	OutCell.Angle = InItem.Angle;
+	OutCell.Height = InHeight;
+	return true;
+}
+
 UVoxelChunk::UVoxelChunk()
 {
 	MeshComponents = TMap<EVoxelNature, UVoxelMeshComponent*>();
@@ -32,6 +52,7 @@ UVoxelChunk::UVoxelChunk()
 	bChanged = false;
 	Module = nullptr;
 	VoxelMap = TMap<FIndex, FVoxelItem>();
+	VoxelMapChunk = FVoxelMapChunk();
 	TopographyMap = TMap<FIndex, FVoxelTopography>();
 	VoxelUpdateIndices = TSet<FIndex>();
 	Neighbors = TMap<EDirectionN, UVoxelChunk*>();
@@ -65,6 +86,10 @@ void UVoxelChunk::OnDespawn_Implementation(bool bRecovery)
 
 	for(auto& Iter : VoxelMap) DestroyAuxiliary(Iter.Value);
 	VoxelMap.Empty();
+	{
+		FScopeLock ScopeLock(&VoxelMapCriticalSection);
+		VoxelMapChunk = FVoxelMapChunk();
+	}
 
 	TopographyMap.Empty();
 	VoxelUpdateIndices.Empty();
@@ -97,6 +122,7 @@ void UVoxelChunk::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		VoxelItem.AuxiliaryData = &Iter;
 	}
 	bBuilded = true;
+	RebuildVoxelMap();
 	BuildStage.Store(Module->ChunkQueues[EVoxelWorldState::MapBuilding].Queues.Num());
 }
 
@@ -164,6 +190,15 @@ void UVoxelChunk::Initialize(UVoxelModule* InModule, FIndex InIndex, int32 InBat
 	Batch = InBatch;
 	const int32 ExpectedColumnHeight = FMath::Min(Module->GetWorldData().SkyHeight, FMath::Max(Module->GetWorldData().SeaLevel + 8, 32));
 	VoxelMap.Reserve(FMath::Max(FMath::RoundToInt(Module->GetWorldData().ChunkSize.X * Module->GetWorldData().ChunkSize.Y) * ExpectedColumnHeight, 1));
+	{
+		FScopeLock ScopeLock(&VoxelMapCriticalSection);
+		VoxelMapChunk.Size = FIntPoint(
+			FMath::RoundToInt(Module->GetWorldData().ChunkSize.X),
+			FMath::RoundToInt(Module->GetWorldData().ChunkSize.Y));
+		VoxelMapChunk.CellSize = Module->GetWorldData().BlockSize;
+		VoxelMapChunk.Origin = FVector2D(Index.X * VoxelMapChunk.Size.X, Index.Y * VoxelMapChunk.Size.Y) * VoxelMapChunk.CellSize;
+		VoxelMapChunk.Cells.SetNum(FMath::Max(VoxelMapChunk.Size.X * VoxelMapChunk.Size.Y, 0));
+	}
 	
 	ITER_INDEX2D(VoxelIndex, Module->GetWorldData().ChunkSize, false,
 		FVoxelTopography Topography;
@@ -229,6 +264,10 @@ void UVoxelChunk::ClearMap(bool bGenerate)
 {
 	for(auto& Iter : VoxelMap) DestroyAuxiliary(Iter.Value);
 	VoxelMap.Empty();
+	{
+		FScopeLock ScopeLock(&VoxelMapCriticalSection);
+		for(FVoxelMapCell& Cell : VoxelMapChunk.Cells) Cell = FVoxelMapCell();
+	}
 	if(bGenerate) Generate(EPhase::Lesser);
 }
 
@@ -238,6 +277,7 @@ void UVoxelChunk::BuildMap(int32 InStage)
 	if(InStage == Module->GetChunkQueues(EVoxelWorldState::MapBuilding).Queues.Num())
 	{
 		bBuilded = true;
+		RebuildVoxelMap();
 	}
 }
 
@@ -681,11 +721,73 @@ void UVoxelChunk::SetVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem, bool b
 	{
 		VoxelMap.Remove(InIndex);
 	}
+	if(bBuilded || bGenerated)
+	{
+		const FVoxelItem* StoredItem = VoxelMap.Find(InIndex);
+		UpdateVoxelMapColumn(InIndex, StoredItem ? *StoredItem : InVoxelItem);
+	}
 }
 
 void UVoxelChunk::SetVoxel(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem, bool bSafe)
 {
 	return SetVoxel(FIndex(InX, InY, InZ), InVoxelItem, bSafe);
+}
+
+void UVoxelChunk::ReadVoxelMap(TFunctionRef<void(const FVoxelMapChunk&)> InReader) const
+{
+	FScopeLock ScopeLock(&VoxelMapCriticalSection);
+	InReader(VoxelMapChunk);
+}
+
+void UVoxelChunk::RebuildVoxelMap()
+{
+	FScopeLock VoxelScopeLock(&CriticalSection);
+	FScopeLock MapScopeLock(&VoxelMapCriticalSection);
+	for(FVoxelMapCell& Cell : VoxelMapChunk.Cells) Cell = FVoxelMapCell();
+	for(const auto& Pair : VoxelMap)
+	{
+		const FIndex& LocalIndex = Pair.Key;
+		if(LocalIndex.X < 0 || LocalIndex.Y < 0 || LocalIndex.X >= VoxelMapChunk.Size.X || LocalIndex.Y >= VoxelMapChunk.Size.Y) continue;
+		const int32 CellIndex = LocalIndex.Y * VoxelMapChunk.Size.X + LocalIndex.X;
+		FVoxelMapCell Candidate;
+		if(TryMakeVoxelMapCell(Pair.Value, LocalIndex.Z, Candidate) &&
+			VoxelMapChunk.Cells.IsValidIndex(CellIndex) && Candidate.Height > VoxelMapChunk.Cells[CellIndex].Height)
+		{
+			VoxelMapChunk.Cells[CellIndex] = Candidate;
+		}
+	}
+}
+
+void UVoxelChunk::UpdateVoxelMapColumn(const FIndex& InIndex, const FVoxelItem& InVoxelItem)
+{
+	if(InIndex.X < 0 || InIndex.Y < 0 || InIndex.X >= VoxelMapChunk.Size.X || InIndex.Y >= VoxelMapChunk.Size.Y) return;
+
+	FScopeLock ScopeLock(&VoxelMapCriticalSection);
+	const int32 CellIndex = InIndex.Y * VoxelMapChunk.Size.X + InIndex.X;
+	if(!VoxelMapChunk.Cells.IsValidIndex(CellIndex)) return;
+
+	FVoxelMapCell& Cell = VoxelMapChunk.Cells[CellIndex];
+	if(InIndex.Z < Cell.Height) return;
+
+	FVoxelMapCell ChangedCell;
+	const bool bVisible = TryMakeVoxelMapCell(InVoxelItem, InIndex.Z, ChangedCell);
+	if(InIndex.Z > Cell.Height)
+	{
+		if(bVisible) Cell = ChangedCell;
+	}
+	else if(bVisible)
+	{
+		Cell = ChangedCell;
+	}
+	else
+	{
+		Cell = FVoxelMapCell();
+		for(int32 Height = InIndex.Z - 1; Height >= 0; --Height)
+		{
+			const FVoxelItem* Item = VoxelMap.Find(FIndex(InIndex.X, InIndex.Y, Height));
+			if(Item && TryMakeVoxelMapCell(*Item, Height, Cell)) break;
+		}
+	}
 }
 
 bool UVoxelChunk::SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bGenerate, IVoxelAgentInterface* InAgent)

@@ -17,6 +17,7 @@ class UVoxelChunk;
 class AVoxelAuxiliary;
 class UVoxel;
 class AActor;
+class UTexture2D;
 
 UENUM(BlueprintType)
 enum class EVoxelRaycastType : uint8
@@ -340,6 +341,45 @@ public:
 		MeshNormals = TArray<FVector>();
 		MeshUVDatas.SetNum(6);
 	}
+};
+
+USTRUCT()
+struct WHFRAMEWORK_API FVoxelMapCell
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TObjectPtr<UTexture2D> Texture = nullptr;
+
+	UPROPERTY()
+	FVector2D UVCorner = FVector2D::ZeroVector;
+
+	UPROPERTY()
+	FVector2D UVSpan = FVector2D::UnitVector;
+
+	UPROPERTY()
+	ERightAngle Angle = ERightAngle::RA_0;
+
+	UPROPERTY()
+	int32 Height = INDEX_NONE;
+};
+
+USTRUCT()
+struct WHFRAMEWORK_API FVoxelMapChunk
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FVector2D Origin = FVector2D::ZeroVector;
+
+	UPROPERTY()
+	FIntPoint Size = FIntPoint::ZeroValue;
+
+	UPROPERTY()
+	float CellSize = 0.f;
+
+	UPROPERTY()
+	TArray<FVoxelMapCell> Cells;
 };
 
 USTRUCT(BlueprintType)

@@ -66,6 +66,29 @@ enum class EWorldMiniMapMode : uint8
 	CameraPoint
 };
 
+UENUM(BlueprintType)
+enum class EWorldMiniMapSource : uint8
+{
+	None,
+	SceneCapture,
+	Widget
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSceneMapView
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector2D Center = FVector2D::ZeroVector;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float Range = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float Yaw = 0.f;
+};
+
 /**
 * 世界文本风格
 */

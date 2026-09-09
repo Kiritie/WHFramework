@@ -21,6 +21,7 @@ class UEventHandle_SetDataLayerRuntimeState;
 class UWorldWeather;
 class UWorldTimer;
 class UWidgetSceneWorldMarker;
+class UWidgetSceneMapBase;
 /** 场景模块 */
 UCLASS()
 class WHFRAMEWORK_API USceneModule : public UModuleBase, public ISceneContainerInterface, public IDebuggerInterface
@@ -103,6 +104,12 @@ protected:
 	bool bMiniMapRotatable;
 
 	UPROPERTY(EditAnywhere, Category = "MiniMap")
+	EWorldMiniMapSource MiniMapSource;
+
+	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "MiniMapSource == EWorldMiniMapSource::Widget"), Category = "MiniMap")
+	TSubclassOf<UWidgetSceneMapBase> MapBackgroundWidgetClass;
+
+	UPROPERTY(EditAnywhere, Category = "MiniMap")
 	EWorldMiniMapMode MiniMapMode;
 
 	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "MiniMapMode == EWorldMiniMapMode::FixedPoint"), Category = "MiniMap")
@@ -123,6 +130,12 @@ protected:
 public:
 	UFUNCTION(BlueprintPure)
 	AMiniMapCapture* GetMiniMapCapture() const { return MiniMapCapture; }
+
+	UFUNCTION(BlueprintPure)
+	EWorldMiniMapSource GetMiniMapSource() const { return MiniMapSource; }
+
+	UFUNCTION(BlueprintPure)
+	TSubclassOf<UWidgetSceneMapBase> GetMapBackgroundWidgetClass() const { return MapBackgroundWidgetClass; }
 
 	UFUNCTION(BlueprintPure)
 	EWorldMiniMapMode GetMiniMapMode() const { return MiniMapMode; }
@@ -175,6 +188,9 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void SetWorldMapRange(float InRange) { WorldMapRange = FMath::Clamp(InRange, WorldMapMinRange, WorldMapMaxRange); }
+
+	UFUNCTION(BlueprintPure)
+	FSceneMapView GetMapView(ESceneMarkerChannel InChannel) const;
 
 	//////////////////////////////////////////////////////////////////////////
 protected:

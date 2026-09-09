@@ -1,6 +1,7 @@
 #include "Scene/Widget/WidgetSceneWorldMarker.h"
 
 #include "Blueprint/WidgetTree.h"
+#include "Components/CanvasPanelSlot.h"
 #include "Scene/Widget/WidgetSceneMarkerItem.h"
 
 UWidgetSceneWorldMarker::UWidgetSceneWorldMarker(const FObjectInitializer& ObjectInitializer)
@@ -10,9 +11,18 @@ UWidgetSceneWorldMarker::UWidgetSceneWorldMarker(const FObjectInitializer& Objec
 	WidgetSpace = EWidgetSpace::Screen;
 	WidgetZOrder = 2;
 	bWidgetAutoSize = true;
-	WidgetAlignment = FVector2D(0.5f, 1.f);
+	WidgetAlignment = FVector2D(0.f, 0.5f);
 	WidgetRefreshType = EWidgetRefreshType::Procedure;
 	WidgetVisibility = EWorldWidgetVisibility::ScreenOnly;
+}
+
+void UWidgetSceneWorldMarker::RefreshLocation_Implementation(UWidget* InWidget, FWorldWidgetMapping InMapping)
+{
+	Super::RefreshLocation_Implementation(InWidget, InMapping);
+	if(UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(InWidget ? InWidget->Slot : nullptr))
+	{
+		CanvasSlot->SetPosition(CanvasSlot->GetPosition() - FVector2D(UWidgetSceneMarkerItem::IconSize * 0.5f, 0.f));
+	}
 }
 
 TSharedRef<SWidget> UWidgetSceneWorldMarker::RebuildWidget()
@@ -30,7 +40,6 @@ TSharedRef<SWidget> UWidgetSceneWorldMarker::RebuildWidget()
 void UWidgetSceneWorldMarker::SetMarkerView(const FSceneMarkerView& InMarkerView)
 {
 	MarkerView = InMarkerView;
-	BindWidgetMap.FindOrAdd(this) = FWorldWidgetMapping(MarkerView.Location);
 	if(MarkerItem) MarkerItem->SetMarkerView(MarkerView, true, true);
 	RefreshLocationAndVisibility();
 }

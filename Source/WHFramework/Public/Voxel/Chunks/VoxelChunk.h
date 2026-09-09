@@ -121,6 +121,8 @@ public:
 
 	virtual void SetVoxel(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem, bool bSafe = false);
 
+	void ReadVoxelMap(TFunctionRef<void(const FVoxelMapChunk&)> InReader) const;
+
 	virtual bool SetVoxelSample(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bGenerate = false, IVoxelAgentInterface* InAgent = nullptr);
 
 	virtual bool SetVoxelSample(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem, bool bGenerate = false, IVoxelAgentInterface* InAgent = nullptr);
@@ -223,11 +225,23 @@ protected:
 
 	TMap<FIndex, FVoxelItem> VoxelMap;
 
+	UPROPERTY(Transient)
+	FVoxelMapChunk VoxelMapChunk;
+
+	mutable FCriticalSection VoxelMapCriticalSection;
+
 	TMap<FIndex, FVoxelTopography> TopographyMap;
 
 	TSet<FIndex> VoxelUpdateIndices;
 
 	bool bNeedCreateMesh;
+
+private:
+	static bool TryMakeVoxelMapCell(const FVoxelItem& InItem, int32 InHeight, FVoxelMapCell& OutCell);
+
+	void RebuildVoxelMap();
+
+	void UpdateVoxelMapColumn(const FIndex& InIndex, const FVoxelItem& InVoxelItem);
 
 public:
 	FIndex GetIndex() const { return Index; }

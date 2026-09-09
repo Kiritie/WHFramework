@@ -15,6 +15,7 @@ class WHFRAMEWORK_API UWidgetSceneMarkerItem : public USubWidgetBase
 
 public:
 	UWidgetSceneMarkerItem(const FObjectInitializer& ObjectInitializer);
+	static constexpr float IconSize = 24.f;
 
 	void SetMarkerView(const FSceneMarkerView& InMarkerView, bool bInShowName, bool bInShowDistance);
 

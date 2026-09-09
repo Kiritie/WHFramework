@@ -1016,6 +1016,14 @@ UVoxelChunk* UVoxelModule::GetChunkByIndex(FIndex InIndex) const
 	return nullptr;
 }
 
+void UVoxelModule::ForEachChunk(TFunctionRef<void(const UVoxelChunk&)> InVisitor) const
+{
+	for(const auto& Iter : ChunkMap)
+	{
+		if(Iter.Value) InVisitor(*Iter.Value);
+	}
+}
+
 UVoxelChunk* UVoxelModule::GetChunkByLocation(FVector InLocation) const
 {
 	return GetChunkByIndex(LocationToChunkIndex(InLocation));
