@@ -77,7 +77,7 @@ void AAbilityPickUpBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* AAbilityPickUpBase::ToData()
 {
-	static FPickUpSaveData SaveData;
+	FPickUpSaveData& SaveData = GetMutableSaveData<FPickUpSaveData>();
 	SaveData = FPickUpSaveData();
 
 	SaveData.Item = Item;

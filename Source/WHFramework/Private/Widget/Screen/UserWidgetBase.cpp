@@ -18,6 +18,7 @@
 #include "Input/InputModuleStatics.h"
 #include "Slate/Runtime/Interfaces/SubWidgetInterface.h"
 #include "Widget/Animator/WidgetAnimatorBase.h"
+#include "Widget/WidgetModule.h"
 
 UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
@@ -73,6 +74,8 @@ void UUserWidgetBase::OnTick_Implementation(float DeltaSeconds)
 
 void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
 {
+	if(UWidgetModule::IsValid()) UWidgetModule::Get().RegisterTickableWidget(this);
+
 	if(ParentWidget)
 	{
 		ParentWidget->RemoveChildWidget(this);
@@ -338,6 +341,8 @@ void UUserWidgetBase::OnRefresh()
 
 void UUserWidgetBase::OnDestroy(bool bRecovery)
 {
+	if(UWidgetModule::IsValid()) UWidgetModule::Get().UnregisterTickableWidget(this);
+
 	K2_OnDestroy(bRecovery);
 
 	if(IsInViewport())

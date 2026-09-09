@@ -24,6 +24,7 @@ bool FDialogueEditorTest::RunTest(const FString& Parameters)
 {
 	TStrongObjectPtr<UDialogueAsset> Source(NewObject<UDialogueAsset>(GetTransientPackage(), NAME_None, RF_Transactional));
 	TStrongObjectPtr<UDialogueAsset> Destination(NewObject<UDialogueAsset>(GetTransientPackage(), NAME_None, RF_Transactional));
+	TStrongObjectPtr<UDialogueAsset> Deletion(NewObject<UDialogueAsset>(GetTransientPackage(), NAME_None, RF_Transactional));
 	FDialogueNode Start; Start.id = 0; Start.Links = {1}; Start.Coordinates = FVector2D(130, 150);
 	FDialogueNode First; First.id = 1; First.Links = {2, 3}; First.Coordinates = FVector2D(420, 150);
 	First.Text = NSLOCTEXT("DialogueEditorTest", "Line", "A preserved dialogue line");
@@ -45,6 +46,12 @@ bool FDialogueEditorTest::RunTest(const FString& Parameters)
 	Destination->Data = {Start};
 	Destination->Data[0].Links.Reset();
 	Destination->NextNodeId = 2;
+	FDialogueNode DeleteStart; DeleteStart.id = 0; DeleteStart.Links = {10, 20, 30};
+	FDialogueNode DeleteFirst; DeleteFirst.id = 10; DeleteFirst.Links = {20};
+	FDialogueNode DeleteSecond; DeleteSecond.id = 20; DeleteSecond.Links = {30};
+	FDialogueNode DeleteThird; DeleteThird.id = 30; DeleteThird.Links = {10};
+	Deletion->Data = {DeleteStart, DeleteFirst, DeleteSecond, DeleteThird};
+	Deletion->NextNodeId = 31;
 
 	FString Clipboard;
 	TestTrue(TEXT("复制节点与内嵌对象"), FDialogueGraphClipboard::ExportNodes(Source.Get(), {1, 2}, Clipboard));
@@ -91,6 +98,7 @@ bool FDialogueEditorTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("忽略无关剪贴板"), FDialogueGraphClipboard::ImportNodes(Destination.Get(), TEXT("{}"), FVector2D::ZeroVector, IDs));
 	TSharedRef<FDialogueEditor> FirstEditor = FDialogueEditorModule::Get().CreateDialogueEditor(EToolkitMode::Standalone, nullptr, Source.Get());
 	TSharedRef<FDialogueEditor> SecondEditor = FDialogueEditorModule::Get().CreateDialogueEditor(EToolkitMode::Standalone, nullptr, Destination.Get());
+	TSharedRef<FDialogueEditor> DeletionEditor = FDialogueEditorModule::Get().CreateDialogueEditor(EToolkitMode::Standalone, nullptr, Deletion.Get());
 	if (TestTrue(TEXT("框架对话图窗口创建"), FirstEditor->DialogueViewportWidget.IsValid() && SecondEditor->DialogueViewportWidget.IsValid()))
 	{
 		FirstEditor->DialogueViewportWidget->SelectNodes(1);
@@ -110,8 +118,30 @@ bool FDialogueEditorTest::RunTest(const FString& Parameters)
 			}
 		}
 	}
+	if (TestTrue(TEXT("非连续 ID 删除窗口创建"), DeletionEditor->DialogueViewportWidget.IsValid()))
+	{
+		DeletionEditor->DialogueViewportWidget->SelectNodes(TArray<int32>{10, 30});
+		DeletionEditor->DialogueViewportWidget->DeleteSelected();
+		TestEqual(TEXT("多选删除保留节点数量"), Deletion->Data.Num(), 2);
+		if (Deletion->Data.Num() == 2)
+		{
+			TestEqual(TEXT("多选删除保留起始节点"), Deletion->Data[0].id, 0);
+			TestEqual(TEXT("多选删除保留中间节点"), Deletion->Data[1].id, 20);
+			TestTrue(TEXT("删除节点的入链一次清理"), Deletion->Data[0].Links == TArray<int32>{20});
+			TestTrue(TEXT("保留节点的陈旧出链清理"), Deletion->Data[1].Links.IsEmpty());
+		}
+		GEditor->UndoTransaction();
+		TestEqual(TEXT("多选删除撤销恢复节点"), Deletion->Data.Num(), 4);
+		if (Deletion->Data.Num() == 4)
+		{
+			TestTrue(TEXT("多选删除撤销恢复链接"), Deletion->Data[0].Links == TArray<int32>{10, 20, 30});
+		}
+		GEditor->RedoTransaction();
+		TestEqual(TEXT("多选删除重做"), Deletion->Data.Num(), 2);
+	}
 	GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->CloseAllEditorsForAsset(Source.Get());
 	GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->CloseAllEditorsForAsset(Destination.Get());
+	GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->CloseAllEditorsForAsset(Deletion.Get());
 	return true;
 }
 

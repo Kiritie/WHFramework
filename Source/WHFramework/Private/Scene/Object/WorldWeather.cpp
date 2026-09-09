@@ -36,11 +36,11 @@ void UWorldWeather::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* UWorldWeather::ToData()
 {
-	static FWorldWeatherSaveData* SaveData;
-	SaveData = new FWorldWeatherSaveData();
+	FWorldWeatherSaveData& SaveData = GetMutableSaveData<FWorldWeatherSaveData>();
+	SaveData = FWorldWeatherSaveData();
 
-	SaveData->WeatherSeed = GetWeatherSeed();
-	SaveData->WeatherParams = GetWeatherParams();
+	SaveData.WeatherSeed = GetWeatherSeed();
+	SaveData.WeatherParams = GetWeatherParams();
 
-	return SaveData;
+	return &SaveData;
 }

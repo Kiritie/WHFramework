@@ -246,7 +246,7 @@ void AAbilityCharacterBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* AAbilityCharacterBase::ToData()
 {
-	static FCharacterSaveData SaveData;
+	FCharacterSaveData& SaveData = GetMutableSaveData<FCharacterSaveData>();
 	SaveData = FCharacterSaveData();
 
 	SaveData.ActorID = ActorID;

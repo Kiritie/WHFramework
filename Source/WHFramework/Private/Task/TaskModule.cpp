@@ -14,6 +14,7 @@
 #include "Scene/SceneModule.h"
 #include "Task/TaskModuleNetworkComponent.h"
 #include "Misc/Crc.h"
+#include "Misc/ScopeExit.h"
 
 IMPLEMENTATION_MODULE(UTaskModule)
 
@@ -72,6 +73,8 @@ void UTaskModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 	if(bInEditor) return;
 
 	if (bLoadingTasks) return;
+	BeginTaskMutation();
+	ON_SCOPE_EXIT { EndTaskMutation(); };
 	const TArray<UTaskAsset*> Snapshot = Assets;
 	for (UTaskAsset* Asset : Snapshot)
 	{
@@ -79,12 +82,7 @@ void UTaskModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 		const TArray<UTaskBase*> Roots = Asset->RootTasks;
 		for (UTaskBase* Task : Roots)
 		{
-			if (!Task || Task->IsCompleted()) continue;
-			const bool bSelectNextTask = !CurrentTask || CurrentTask->IsCompleted();
-			if (Task->TaskEnterType == ETaskEnterType::Automatic)
-				EnterTask(Task, bSelectNextTask);
-			if (Task->IsEntered()) EnterTask(Task, bSelectNextTask);
-			if (Assets.Contains(Asset)) RefreshTask(Task);
+			if(Task && Assets.Contains(Asset)) RefreshTask(Task);
 		}
 	}
 }
@@ -183,7 +181,7 @@ void UTaskModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 				Pair.Key->SetTaskTimersPaused(ModuleState == EModuleState::Paused);
 			}
 		bLoadingTasks = false;
-		RefreshTaskMarkers();
+		RequestTaskMarkersRefresh();
 		UEventModuleStatics::BroadcastEvent(UEventHandle_CurrentTaskChanged::StaticClass(), this, {CurrentTask});
 	}
 }
@@ -280,6 +278,8 @@ UTaskAsset* UTaskModule::AddAssetInternal(UTaskAsset* InAsset, FGuid InInstanceI
 	UTaskAsset* Source = Cast<UTaskAsset>(InAsset->SourceObject ? InAsset->SourceObject : InAsset);
 	if(!Source) return nullptr;
 	if(UTaskAsset* Existing = GetAssetByInstance(Source, InInstanceID)) return Existing;
+	BeginTaskMutation();
+	ON_SCOPE_EXIT { EndTaskMutation(); };
 	TArray<FText> Errors;
 	if(!Source->ValidateTasks(Errors)) return nullptr;
 	UTaskAsset* RuntimeAsset = DuplicateObject<UTaskAsset>(Source, this);
@@ -292,9 +292,12 @@ UTaskAsset* UTaskModule::AddAssetInternal(UTaskAsset* InAsset, FGuid InInstanceI
 		for(const FText& Error : ExpansionErrors) UE_LOG(LogTemp, Warning, TEXT("%s"), *Error.ToString());
 		return nullptr;
 	}
-	if(!RuntimeAsset->RebuildTaskMap()) return nullptr;
 	Assets.Add(RuntimeAsset);
-	RuntimeAsset->Initialize();
+	if(!RuntimeAsset->InitializeRuntimeTasks())
+	{
+		Assets.Remove(RuntimeAsset);
+		return nullptr;
+	}
 	if(InInstanceID.IsValid())
 	{
 		for(const auto& Pair : RuntimeAsset->TaskMap)
@@ -309,15 +312,14 @@ UTaskAsset* UTaskModule::AddAssetInternal(UTaskAsset* InAsset, FGuid InInstanceI
 			}
 		}
 	}
-	if(!bLoadingTasks)
-	{
-		RefreshTaskMarkers();
-	}
+	RequestTaskMarkersRefresh();
 	return RuntimeAsset;
 }
 
 void UTaskModule::RemoveAsset(UTaskAsset* InAsset)
 {
+	BeginTaskMutation();
+	ON_SCOPE_EXIT { EndTaskMutation(); };
 	if (UTaskAsset* Asset = GetAsset(InAsset))
 	{
 		for (const auto& Pair : Asset->TaskMap)
@@ -328,21 +330,20 @@ void UTaskModule::RemoveAsset(UTaskAsset* InAsset)
 		const bool bClearCurrentTask = CurrentTask && CurrentTask->GetTaskAsset() == Asset;
 		Assets.Remove(Asset);
 		if (bClearCurrentTask) SetCurrentTask(nullptr);
-		if (!bLoadingTasks)
-		{
-			RefreshTaskMarkers();
-		}
+		RequestTaskMarkersRefresh();
 	}
 }
 
 void UTaskModule::RestoreTask(UTaskBase* InTask)
 {
+	BeginTaskMutation();
+	ON_SCOPE_EXIT { EndTaskMutation(); };
 	InTask = ResolveRuntimeTask(InTask);
 	if(InTask && InTask->GetTaskState() != ETaskState::None)
 	{
 		if (CurrentTask == InTask || (CurrentTask && InTask->IsParentOf(CurrentTask))) SetCurrentTask(nullptr);
 		InTask->OnRestore();
-		RefreshTaskMarkers();
+		RequestTaskMarkersRefresh();
 	}
 }
 
@@ -353,8 +354,11 @@ void UTaskModule::RestoreTaskByGUID(const FString& InTaskGUID)
 
 void UTaskModule::EnterTask(UTaskBase* InTask, bool bSetAsCurrent)
 {
+	BeginTaskMutation();
+	ON_SCOPE_EXIT { EndTaskMutation(); };
 	InTask = ResolveRuntimeTask(InTask);
 	if (!InTask || InTask->TaskEnterType == ETaskEnterType::None || InTask->IsCompleted()) return;
+	const ETaskState PreviousState = InTask->TaskState;
 	if (InTask->TaskState == ETaskState::None)
 	{
 		if (InTask->ParentTask)
@@ -382,7 +386,7 @@ void UTaskModule::EnterTask(UTaskBase* InTask, bool bSetAsCurrent)
 			if (Child && Child->TaskEnterType == ETaskEnterType::Automatic) EnterTask(Child, bSetAsCurrent);
 		}
 	}
-	RefreshTaskMarkers();
+	if(InTask->TaskState != PreviousState) RequestTaskMarkersRefresh();
 }
 
 void UTaskModule::EnterTaskByGUID(const FString& InTaskGUID, bool bSetAsCurrent)
@@ -395,12 +399,9 @@ void UTaskModule::RefreshTask(UTaskBase* InTask)
 	InTask = ResolveRuntimeTask(InTask);
 	if (InTask && InTask->IsEntered())
 	{
-		if (InTask->IsExecuting()) InTask->OnRefresh();
-		else
-		{
-			const TArray<UTaskBase*> Children = InTask->SubTasks;
-			for (UTaskBase* Child : Children) RefreshTask(Child);
-		}
+		if(InTask->IsExecuting() && InTask->bTaskTickEnabled) InTask->OnRefresh();
+		const TArray<UTaskBase*> Children = InTask->SubTasks;
+		for(UTaskBase* Child : Children) RefreshTask(Child);
 	}
 }
 
@@ -425,11 +426,13 @@ void UTaskModule::GuideTaskByGUID(const FString& InTaskGUID)
 
 void UTaskModule::ExecuteTask(UTaskBase* InTask)
 {
+	BeginTaskMutation();
+	ON_SCOPE_EXIT { EndTaskMutation(); };
 	InTask = ResolveRuntimeTask(InTask);
 	if(InTask && InTask->GetTaskState() == ETaskState::Entered)
 	{
 		InTask->OnExecute();
-		RefreshTaskMarkers();
+		RequestTaskMarkersRefresh();
 	}
 }
 
@@ -440,6 +443,8 @@ void UTaskModule::ExecuteTaskByGUID(const FString& InTaskGUID)
 
 void UTaskModule::CompleteTask(UTaskBase* InTask, ETaskExecuteResult InTaskExecuteResult)
 {
+	BeginTaskMutation();
+	ON_SCOPE_EXIT { EndTaskMutation(); };
 	InTask = ResolveRuntimeTask(InTask);
 	if(!InTask || InTaskExecuteResult == ETaskExecuteResult::None) return;
 
@@ -462,7 +467,7 @@ void UTaskModule::CompleteTask(UTaskBase* InTask, ETaskExecuteResult InTaskExecu
 		{
 			CompleteTask(InTask->ParentTask, InTask->ParentTask->IsAllSubSucceed() ? ETaskExecuteResult::Succeed : ETaskExecuteResult::Failed);
 		}
-		RefreshTaskMarkers();
+		RequestTaskMarkersRefresh();
 	}
 }
 
@@ -473,6 +478,8 @@ void UTaskModule::CompleteTaskByGUID(const FString& InTaskGUID, ETaskExecuteResu
 
 void UTaskModule::LeaveTask(UTaskBase* InTask)
 {
+	BeginTaskMutation();
+	ON_SCOPE_EXIT { EndTaskMutation(); };
 	InTask = ResolveRuntimeTask(InTask);
 	if(!InTask) return;
 	
@@ -493,7 +500,7 @@ void UTaskModule::LeaveTask(UTaskBase* InTask)
 		{
 			LeaveTask(ParentTask);
 		}
-		RefreshTaskMarkers();
+		RequestTaskMarkersRefresh();
 	}
 }
 
@@ -519,10 +526,12 @@ bool UTaskModule::IsAllTaskCompleted() const
 
 void UTaskModule::SetCurrentTask(UTaskBase* InTask)
 {
+	BeginTaskMutation();
+	ON_SCOPE_EXIT { EndTaskMutation(); };
 	InTask = ResolveRuntimeTask(InTask);
 	if (CurrentTask == InTask) return;
 	CurrentTask = InTask;
-	RefreshTaskMarkers();
+	RequestTaskMarkersRefresh();
 	UEventModuleStatics::BroadcastEvent(UEventHandle_CurrentTaskChanged::StaticClass(), this, {CurrentTask});
 }
 
@@ -611,6 +620,8 @@ bool UTaskModule::TurnInTask(UTaskBase* InTask, AActor* InTarget)
 void UTaskModule::ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTargetTag, int32 InCount, FPrimaryAssetId InTargetAssetID, FName InTargetName)
 {
 	if (!InEventTag.IsValid() || InCount <= 0 || bLoadingTasks || ModuleState == EModuleState::Paused) return;
+	BeginTaskMutation();
+	ON_SCOPE_EXIT { EndTaskMutation(); };
 	TArray<UTaskBase*> ExecutingTasks;
 	for (UTaskAsset* Asset : Assets)
 	{
@@ -623,7 +634,79 @@ void UTaskModule::ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTarget
 	{
 		if (ResolveRuntimeTask(Task)) Task->ApplyObjectiveEvent(InEventTag, InTargetTag, InCount, InTargetAssetID, InTargetName);
 	}
-	RefreshTaskMarkers();
+	RequestTaskMarkersRefresh();
+}
+
+void UTaskModule::BeginTaskMutation()
+{
+	++TaskMutationDepth;
+}
+
+void UTaskModule::EndTaskMutation()
+{
+	if(!ensure(TaskMutationDepth > 0)) return;
+	--TaskMutationDepth;
+	if(TaskMutationDepth > 0 || bLoadingTasks) return;
+
+	if(bAutomaticTaskEntryDirty && !bResolvingAutomaticTasks)
+	{
+		bResolvingAutomaticTasks = true;
+		++TaskMutationDepth;
+		do
+		{
+			bAutomaticTaskEntryDirty = false;
+			EnterEligibleAutomaticTasks();
+		}
+		while(bAutomaticTaskEntryDirty);
+		--TaskMutationDepth;
+		bResolvingAutomaticTasks = false;
+	}
+
+	if(bTaskMarkersDirty)
+	{
+		bTaskMarkersDirty = false;
+		RefreshTaskMarkers();
+	}
+}
+
+void UTaskModule::RequestTaskMarkersRefresh()
+{
+	bTaskMarkersDirty = true;
+	bAutomaticTaskEntryDirty = true;
+	if(TaskMutationDepth == 0 && !bLoadingTasks)
+	{
+		BeginTaskMutation();
+		EndTaskMutation();
+	}
+}
+
+void UTaskModule::EnterEligibleAutomaticTasks()
+{
+	const TArray<UTaskAsset*> AssetSnapshot = Assets;
+	for(UTaskAsset* Asset : AssetSnapshot)
+	{
+		if(!Asset || !Assets.Contains(Asset)) continue;
+		const TArray<UTaskBase*> RootSnapshot = Asset->RootTasks;
+		for(UTaskBase* Task : RootSnapshot)
+		{
+			EnterEligibleAutomaticTasks(Task);
+		}
+	}
+}
+
+void UTaskModule::EnterEligibleAutomaticTasks(UTaskBase* InTask)
+{
+	if(!InTask) return;
+	if(InTask->TaskState == ETaskState::None && InTask->TaskEnterType == ETaskEnterType::Automatic)
+	{
+		EnterTask(InTask, !CurrentTask || CurrentTask->IsCompleted());
+	}
+	if(!InTask->IsEntered()) return;
+	const TArray<UTaskBase*> ChildSnapshot = InTask->SubTasks;
+	for(UTaskBase* Child : ChildSnapshot)
+	{
+		EnterEligibleAutomaticTasks(Child);
+	}
 }
 
 void UTaskModule::RemoveTaskMarkers(const UTaskAsset* InAsset)

@@ -5,6 +5,8 @@
 #include "Task/TaskModuleTypes.h"
 #include "DialogueEvent_Task.generated.h"
 
+class UTaskAsset;
+
 UENUM(BlueprintType)
 enum class EDialogueTaskAction : uint8
 {
@@ -22,6 +24,8 @@ class WHFRAMEWORK_API UDialogueEvent_Task : public UDialogueEventBase
 	GENERATED_BODY()
 
 public:
+	virtual void PostLoad() override;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FTaskReference Task;
 
@@ -30,8 +34,11 @@ public:
 
 	virtual bool Execute_Implementation(const FInteractionContext& InContext, FText& OutReason) const override;
 
-	virtual void RecieveEventTriggered_Implementation(APlayerController* ConsideringPlayer, AActor* NPCActor) override;
+	virtual void ReceiveEventTriggered_Implementation(APlayerController* ConsideringPlayer, AActor* NPCActor) override;
 
 private:
 	bool ApplyTaskAction(AActor* InTarget) const;
+
+	UPROPERTY(Transient)
+	UTaskAsset* ResolvedTaskAsset = nullptr;
 };

@@ -4,7 +4,6 @@
 #include "Widget/WidgetModule.h"
 
 #include "WHFrameworkCoreStatics.h"
-#include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Blueprint/WidgetTree.h"
 #include "Common/CommonModuleStatics.h"
 #include "Event/EventModuleStatics.h"
@@ -146,13 +145,17 @@ void UWidgetModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 
 	if(bInEditor) return;
 
-	TArray<UUserWidget*> TickAbleWidgets;
-	UWidgetBlueprintLibrary::GetAllWidgetsWithInterface(this, TickAbleWidgets, UTickAbleWidgetInterface::StaticClass(), false);
-	for (auto Iter : TickAbleWidgets)
+	for(auto Iter = TickableWidgets.CreateIterator(); Iter; ++Iter)
 	{
-		if((Iter->IsInViewport() || Iter->GetParent()) && ITickAbleWidgetInterface::Execute_IsTickAble(Iter))
+		UUserWidget* Widget = *Iter;
+		if(!::IsValid(Widget))
 		{
-			ITickAbleWidgetInterface::Execute_OnTick(Iter, DeltaSeconds);
+			Iter.RemoveCurrent();
+			continue;
+		}
+		if((Widget->IsInViewport() || Widget->GetParent()) && ITickAbleWidgetInterface::Execute_IsTickAble(Widget))
+		{
+			ITickAbleWidgetInterface::Execute_OnTick(Widget, DeltaSeconds);
 		}
 	}
 	
@@ -182,6 +185,19 @@ void UWidgetModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 	}
 }
 
+void UWidgetModule::RegisterTickableWidget(UUserWidget* InWidget)
+{
+	if(InWidget && InWidget->Implements<UTickAbleWidgetInterface>())
+	{
+		TickableWidgets.Add(InWidget);
+	}
+}
+
+void UWidgetModule::UnregisterTickableWidget(UUserWidget* InWidget)
+{
+	TickableWidgets.Remove(InWidget);
+}
+
 void UWidgetModule::OnPause()
 {
 	Super::OnPause();
@@ -200,6 +216,7 @@ void UWidgetModule::OnTermination(EPhase InPhase)
 	{
 		ClearAllUserWidget();
 		ClearAllWorldWidget();
+		TickableWidgets.Reset();
 	}
 	if(PHASEC(InPhase, EPhase::Final))
 	{
@@ -221,7 +238,7 @@ void UWidgetModule::UnloadData(EPhase InPhase)
 
 FSaveData* UWidgetModule::ToData()
 {
-	static FWidgetModuleSaveData SaveData;
+	FWidgetModuleSaveData& SaveData = GetMutableSaveData<FWidgetModuleSaveData>();
 	SaveData = FWidgetModuleSaveData();
 
 	SaveData.LanguageType = LanguageType;

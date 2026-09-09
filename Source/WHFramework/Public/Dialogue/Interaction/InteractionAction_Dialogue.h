@@ -11,8 +11,13 @@ class WHFRAMEWORK_API UInteractionAction_Dialogue : public UInteractionActionBas
 	GENERATED_BODY()
 
 public:
+	virtual void PostLoad() override;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSoftObjectPtr<UDialogueAsset> Dialogue;
+
+	UPROPERTY(Transient)
+	UDialogueAsset* ResolvedDialogue = nullptr;
 
 	virtual bool Execute_Implementation(const FInteractionContext& InContext, FText& OutReason) const override;
 };

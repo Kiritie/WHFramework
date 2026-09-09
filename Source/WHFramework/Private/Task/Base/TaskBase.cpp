@@ -162,14 +162,6 @@ void UTaskBase::OnEnter()
 void UTaskBase::OnRefresh()
 {
 	if (bTaskTickEnabled) K2_OnRefresh();
-
-	for (auto Iter : SubTasks)
-	{
-		if(Iter)
-		{
-			Iter->Refresh();
-		}
-	}
 }
 
 void UTaskBase::OnGuide()
@@ -252,7 +244,8 @@ void UTaskBase::OnComplete(ETaskExecuteResult InTaskExecuteResult)
 
 	if(InTaskExecuteResult != ETaskExecuteResult::Skipped)
 	{
-		WHDebug(FString::Printf(TEXT("任务%s: %s"), TaskExecuteResult != ETaskExecuteResult::Skipped ? TEXT("完成") : TEXT("失败"), *TaskDisplayName.ToString()), EDM_All, EDC_Task, EDV_Log, FColor::Green, 5.f);
+		const bool bSucceeded = TaskExecuteResult == ETaskExecuteResult::Succeed;
+		WHDebug(FString::Printf(TEXT("任务%s: %s"), bSucceeded ? TEXT("完成") : TEXT("失败"), *TaskDisplayName.ToString()), EDM_All, EDC_Task, EDV_Log, bSucceeded ? FColor::Green : FColor::Red, 5.f);
 	}
 
 	if(TaskLeaveType == ETaskLeaveType::Automatic && TaskState == ETaskState::Completed)

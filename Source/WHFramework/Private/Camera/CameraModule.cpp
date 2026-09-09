@@ -250,7 +250,7 @@ void UCameraModule::UnloadData(EPhase InPhase)
 
 FSaveData* UCameraModule::ToData()
 {
-	static FCameraModuleSaveData SaveData;
+	FCameraModuleSaveData& SaveData = GetMutableSaveData<FCameraModuleSaveData>();
 	SaveData = FCameraModuleSaveData();
 
 	SaveData.bEnableCameraPanZMove = bEnableCameraPanZMove;

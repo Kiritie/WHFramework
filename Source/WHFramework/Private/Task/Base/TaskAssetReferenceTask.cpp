@@ -17,12 +17,6 @@ void UTaskAssetReferenceTask::OnEnter()
 	EnterReferencedRoots();
 }
 
-void UTaskAssetReferenceTask::OnRefresh()
-{
-	EnterReferencedRoots();
-	Super::OnRefresh();
-}
-
 bool UTaskAssetReferenceTask::AreSubTasksReadyToComplete() const
 {
 	if(SubTasks.IsEmpty()) return false;

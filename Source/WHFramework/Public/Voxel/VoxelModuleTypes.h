@@ -1102,6 +1102,9 @@ public:
 
 	UPROPERTY(EditAnywhere, Instanced)
 	TArray<UVoxelGenerator*> Generators;
+
+	TSet<FIndex> Indices;
+	bool bSortRequired;
 		
 	FORCEINLINE FVoxelChunkQueue()
 	{
@@ -1109,6 +1112,8 @@ public:
 		Speed = 100;
 		Queue = TArray<FIndex>();
 		Generators = TArray<UVoxelGenerator*>();
+		Indices = TSet<FIndex>();
+		bSortRequired = false;
 	}
 
 	FORCEINLINE FVoxelChunkQueue(bool bInAsync, int32 InSpeed, const TArray<UVoxelGenerator*>& InGenerators = { })
@@ -1117,6 +1122,44 @@ public:
 		Speed = InSpeed;
 		Queue = TArray<FIndex>();
 		Generators = InGenerators;
+		Indices = TSet<FIndex>();
+		bSortRequired = false;
+	}
+
+	bool Add(FIndex InIndex)
+	{
+		if(Indices.Contains(InIndex)) return false;
+		Indices.Add(InIndex);
+		Queue.Add(InIndex);
+		bSortRequired = true;
+		return true;
+	}
+
+	bool Remove(FIndex InIndex)
+	{
+		if(Indices.Remove(InIndex) == 0) return false;
+		Queue.Remove(InIndex);
+		return true;
+	}
+
+	void RemoveBatch(const TSet<FIndex>& InIndices)
+	{
+		Queue.RemoveAll([&InIndices](const FIndex& Index) { return InIndices.Contains(Index); });
+		for(const FIndex& Index : InIndices) Indices.Remove(Index);
+	}
+
+	void RemoveFront(int32 InCount)
+	{
+		const int32 Count = FMath::Min(InCount, Queue.Num());
+		for(int32 Index = 0; Index < Count; ++Index) Indices.Remove(Queue[Index]);
+		Queue.RemoveAt(0, Count, EAllowShrinking::No);
+	}
+
+	void Reset()
+	{
+		Queue.Reset();
+		Indices.Reset();
+		bSortRequired = false;
 	}
 };
 

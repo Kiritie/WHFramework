@@ -207,9 +207,10 @@ TArray<FInteractionOptionView> UInteractionComponent::GetOptions(AActor* InInter
 	for (const UInteractionOptionBase* Option : Options)
 	{
 		if (!Option || !Option->OptionTag.IsValid() || IDs.Contains(Option->OptionTag)) continue;
-		IDs.Add(Option->OptionTag);
 		if (!Option->IsVisible(Context)) continue;
+		IDs.Add(Option->OptionTag);
 		FInteractionOptionView View;
+		View.Option = const_cast<UInteractionOptionBase*>(Option);
 		View.OptionTag = Option->OptionTag;
 		View.DisplayName = Option->GetDisplayName(Context);
 		View.Priority = Option->Priority;
@@ -237,30 +238,66 @@ bool UInteractionComponent::ExecuteOption(AActor* InInteractor, FGameplayTag InO
 		OutReason = View ? View->DisabledReason : NSLOCTEXT("Interaction", "Unavailable", "选项已不可用。");
 		return false;
 	}
-	bool bSucceeded = false;
-	for (const UInteractionOptionBase* Option : Options)
+	return ExecuteOptionObject(InInteractor, View->Option, OutReason);
+}
+
+bool UInteractionComponent::ExecuteOptionObject(AActor* InInteractor, const UInteractionOptionBase* InOption, FText& OutReason)
+{
+	const FGameplayTag OptionTag = InOption ? InOption->OptionTag : FGameplayTag();
+	if (!InInteractor || !InOption || !OptionTag.IsValid() || ExecutingOptions.Contains(OptionTag) || GetRunningAction(OptionTag) || !IsInteractable() || bEndingPlay) return false;
+	IInteractionAgentInterface* InteractorAgent = Cast<IInteractionAgentInterface>(InInteractor);
+	IInteractionAgentInterface* TargetAgent = GetInteractionAgent();
+	if (!InteractorAgent || !TargetAgent || !TargetAgent->IsOverlapping(InteractorAgent))
 	{
-		if (Option && Option->OptionTag == InOptionTag)
+		OutReason = NSLOCTEXT("Interaction", "OutOfRange", "目标已离开交互范围。");
+		return false;
+	}
+
+	const FInteractionContext Context = MakeInteractionContext(InInteractor);
+	TSet<FGameplayTag> VisibleTags;
+	const UInteractionOptionBase* ValidatedOption = nullptr;
+	for(const UInteractionOptionBase* Option : Options)
+	{
+		if(!Option || !Option->OptionTag.IsValid() || !Option->IsVisible(Context) || VisibleTags.Contains(Option->OptionTag)) continue;
+		VisibleTags.Add(Option->OptionTag);
+		if(Option == InOption)
 		{
-			ExecutingOptions.Add(InOptionTag);
-			ON_SCOPE_EXIT
-			{
-				ExecutingOptions.Remove(InOptionTag);
-			};
-			TArray<UInteractionActionExecution*> Started;
-			bSucceeded = true;
-			for (UInteractionActionBase* Action : Option->Actions)
-			{
-				if (!Action) { bSucceeded = false; break; }
-				UInteractionActionExecution* Execution = NewObject<UInteractionActionExecution>(this);
-				ActiveActions.Add(Execution);
-				Started.Add(Execution);
-				if (!Execution->Start(Action, MakeInteractionContext(InInteractor), InOptionTag, OutReason)) { bSucceeded = false; break; }
-			}
-			if (!bSucceeded) for (UInteractionActionExecution* Execution : Started) Execution->Cancel();
+			ValidatedOption = Option;
 			break;
 		}
 	}
+	if(!ValidatedOption)
+	{
+		OutReason = NSLOCTEXT("Interaction", "Unavailable", "选项已不可用。");
+		return false;
+	}
+	if(!ValidatedOption->IsEnabled(Context, OutReason)) return false;
+
+	bool bSucceeded = false;
+	ExecutingOptions.Add(OptionTag);
+	ON_SCOPE_EXIT
+	{
+		ExecutingOptions.Remove(OptionTag);
+	};
+	TArray<UInteractionActionExecution*> Started;
+	bSucceeded = true;
+	for (UInteractionActionBase* Action : ValidatedOption->Actions)
+	{
+		if (!Action)
+		{
+			bSucceeded = false;
+			break;
+		}
+		UInteractionActionExecution* Execution = NewObject<UInteractionActionExecution>(this);
+		ActiveActions.Add(Execution);
+		Started.Add(Execution);
+		if (!Execution->Start(Action, Context, OptionTag, OutReason))
+		{
+			bSucceeded = false;
+			break;
+		}
+	}
+	if (!bSucceeded) for (UInteractionActionExecution* Execution : Started) Execution->Cancel();
 	NotifyOptionsChanged();
 	return bSucceeded;
 }

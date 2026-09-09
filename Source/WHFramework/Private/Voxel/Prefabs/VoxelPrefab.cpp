@@ -66,7 +66,7 @@ void AVoxelPrefab::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* AVoxelPrefab::ToData()
 {
-	static FVoxelPrefabSaveData SaveData;
+	FVoxelPrefabSaveData& SaveData = GetMutableSaveData<FVoxelPrefabSaveData>();
 	SaveData = FVoxelPrefabSaveData();
 
 	ITER_MAP(VoxelMap, Iter,

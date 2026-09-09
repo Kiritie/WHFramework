@@ -17,6 +17,7 @@ void UTaskComponent::BeginPlay()
 {
 	Super::BeginPlay();
 	ResolveAgentID();
+	ResolveTaskAssets();
 	if(UTaskModule::IsValid()) UTaskModule::Get().OnTaskAssetsChanged.AddUniqueDynamic(this, &UTaskComponent::OnTaskAssetsChanged);
 	RefreshTaskMarker();
 }
@@ -32,6 +33,7 @@ void UTaskComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		}
 	}
 	if(USceneModule::IsValid() && MarkerID.IsValid()) USceneModule::Get().RemoveMarker(MarkerID);
+	ResolvedTaskAssets.Reset();
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -55,6 +57,7 @@ void UTaskComponent::SetTaskAssets(const TArray<TSoftObjectPtr<UTaskAsset>>& InA
 	{
 		if(!Asset.IsNull()) TaskAssets.AddUnique(Asset);
 	}
+	ResolveTaskAssets();
 	RefreshTaskMarker();
 	if(UInteractionComponent* Interaction = GetOwner()->FindComponentByClass<UInteractionComponent>()) Interaction->NotifyOptionsChanged();
 }
@@ -78,13 +81,23 @@ bool UTaskComponent::HasRuntimeAsset(UTaskAsset* InSource) const
 TArray<UTaskAsset*> UTaskComponent::GetOfferedAssets() const
 {
 	TArray<UTaskAsset*> Result;
-	for(const TSoftObjectPtr<UTaskAsset>& AssetPtr : TaskAssets)
+	for(UTaskAsset* Asset : ResolvedTaskAssets)
 	{
-		UTaskAsset* Asset = AssetPtr.Get();
-		if(!Asset) Asset = AssetPtr.LoadSynchronous();
 		if(Asset && !HasRuntimeAsset(Asset)) Result.Add(Asset);
 	}
 	return Result;
+}
+
+void UTaskComponent::ResolveTaskAssets()
+{
+	ResolvedTaskAssets.Reset();
+	for(const TSoftObjectPtr<UTaskAsset>& AssetPtr : TaskAssets)
+	{
+		if(UTaskAsset* Asset = AssetPtr.LoadSynchronous())
+		{
+			ResolvedTaskAssets.AddUnique(Asset);
+		}
+	}
 }
 
 UTaskBase* UTaskComponent::GetTask(ETaskStage InStage) const

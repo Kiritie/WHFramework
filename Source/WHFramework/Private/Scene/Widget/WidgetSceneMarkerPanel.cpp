@@ -28,6 +28,8 @@ void UWidgetSceneMarkerPanel::OnInitialize(UObject* InOwner, const TArray<FParam
 	ResolveMarkerCanvas();
 	ResolveMapBackground();
 	Super::OnInitialize(InOwner, InParams);
+	if(USceneModule::IsValid()) USceneModule::Get().OnSceneMarkersChanged.AddUniqueDynamic(this, &UWidgetSceneMarkerPanel::RefreshMarkerMembership);
+	RefreshMarkerMembership();
 	OnRefresh();
 }
 
@@ -36,9 +38,12 @@ void UWidgetSceneMarkerPanel::OnRefresh()
 	Super::OnRefresh();
 	if(!USceneModule::IsValid())
 	{
-		Markers.Reset();
-		K2_OnMarkersUpdated(Markers);
-		DestroyMarkerItems();
+		if(!Markers.IsEmpty() || !MarkerItems.IsEmpty())
+		{
+			Markers.Reset();
+			K2_OnMarkersUpdated(Markers);
+			DestroyMarkerItems();
+		}
 		return;
 	}
 	MapView = USceneModule::Get().GetMapView(MarkerChannel);
@@ -48,14 +53,15 @@ void UWidgetSceneMarkerPanel::OnRefresh()
 		MapBackground->SetMapView(MapView, MarkerChannel);
 		MapBackground->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	}
-	Markers = USceneModule::Get().GetMarkerViews(MarkerChannel, GetMarkerViewLocation(), GetMarkerViewYaw());
-	AddPlayerMarker();
-	K2_OnMarkersUpdated(Markers);
-	UpdateMarkerItems();
+	const bool bShouldHavePlayerMarker = bShowPlayerMarker &&
+		(MarkerChannel == ESceneMarkerChannel::Map || MarkerChannel == ESceneMarkerChannel::MiniMap) && UCommonModuleStatics::GetPlayerPawn() != nullptr;
+	if(bShouldHavePlayerMarker != bPlayerMarkerPresent) RefreshMarkerMembership();
+	UpdateMarkerStates();
 }
 
 void UWidgetSceneMarkerPanel::OnDestroy(bool bRecovery)
 {
+	if(USceneModule::IsValid()) USceneModule::Get().OnSceneMarkersChanged.RemoveDynamic(this, &UWidgetSceneMarkerPanel::RefreshMarkerMembership);
 	DestroyMarkerItems();
 	Super::OnDestroy(bRecovery);
 }
@@ -104,11 +110,28 @@ bool UWidgetSceneMarkerPanel::ProjectMarker(const FSceneMarkerView& InMarker, FV
 	}
 }
 
-void UWidgetSceneMarkerPanel::UpdateMarkerItems()
+void UWidgetSceneMarkerPanel::RefreshMarkerMembership()
+{
+	if(!USceneModule::IsValid())
+	{
+		Markers.Reset();
+		bPlayerMarkerPresent = false;
+		K2_OnMarkersUpdated(Markers);
+		DestroyMarkerItems();
+		return;
+	}
+	Markers = USceneModule::Get().GetMarkerViews(MarkerChannel, GetMarkerViewLocation(), GetMarkerViewYaw(), false);
+	AddPlayerMarker();
+	bPlayerMarkerPresent = bShowPlayerMarker &&
+		(MarkerChannel == ESceneMarkerChannel::Map || MarkerChannel == ESceneMarkerChannel::MiniMap) && UCommonModuleStatics::GetPlayerPawn() != nullptr;
+	K2_OnMarkersUpdated(Markers);
+	RebuildMarkerItems();
+}
+
+void UWidgetSceneMarkerPanel::RebuildMarkerItems()
 {
 	ResolveMarkerCanvas();
 	if(!MarkerCanvas || !MarkerItemClass) return;
-	const FVector2D PanelSize = MarkerCanvas->GetCachedGeometry().GetLocalSize();
 	TSet<FGuid> DesiredIDs;
 	for(const FSceneMarkerView& Marker : Markers)
 	{
@@ -130,15 +153,6 @@ void UWidgetSceneMarkerPanel::UpdateMarkerItems()
 			}
 		}
 		Item->SetMarkerView(Marker, bShowMarkerNames, bShowMarkerDistance);
-
-		FVector2D Position;
-		if(PanelSize.IsNearlyZero() || !ProjectMarker(Marker, PanelSize, Position))
-		{
-			Item->SetVisibility(ESlateVisibility::Collapsed);
-			continue;
-		}
-		Item->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-		if(UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Item->Slot)) CanvasSlot->SetPosition(Position - FVector2D(UWidgetSceneMarkerItem::IconSize * 0.5f, 0.f));
 	}
 	TArray<FGuid> RemovedIDs;
 	MarkerItems.GetKeys(RemovedIDs);
@@ -147,6 +161,45 @@ void UWidgetSceneMarkerPanel::UpdateMarkerItems()
 		if(DesiredIDs.Contains(MarkerID)) continue;
 		if(UWidgetSceneMarkerItem* Item = MarkerItems.FindRef(MarkerID)) DestroySubWidget(Item, true);
 		MarkerItems.Remove(MarkerID);
+	}
+}
+
+void UWidgetSceneMarkerPanel::UpdateMarkerStates()
+{
+	if(!USceneModule::IsValid() || !MarkerCanvas) return;
+	const FVector ViewLocation = GetMarkerViewLocation();
+	const float ViewYaw = GetMarkerViewYaw();
+	const FVector2D PanelSize = MarkerCanvas->GetCachedGeometry().GetLocalSize();
+	const APawn* Player = UCommonModuleStatics::GetPlayerPawn();
+	for(FSceneMarkerView& Marker : Markers)
+	{
+		if(Marker.Marker.MarkerID == FGuid(0x504C4159u, 0x45524D41u, 0x504D4152u, 0x4B455231u))
+		{
+			if(Player)
+			{
+				Marker.Marker.Location = Player->GetActorLocation();
+				Marker.Location = Marker.Marker.Location;
+				Marker.Distance = FVector2D(Marker.Location - ViewLocation).Size();
+				Marker.Bearing = FMath::FindDeltaAngleDegrees(ViewYaw, (Marker.Location - ViewLocation).Rotation().Yaw);
+			}
+		}
+		else
+		{
+			Marker = USceneModule::Get().GetMarkerView(Marker.Marker.MarkerID, ViewLocation, ViewYaw);
+		}
+		UWidgetSceneMarkerItem* Item = MarkerItems.FindRef(Marker.Marker.MarkerID);
+		if(!Item) continue;
+		Item->UpdateMarkerState(Marker);
+		const bool bInRange = Marker.Distance >= Marker.Marker.MinDistance &&
+			(Marker.Marker.MaxDistance <= 0.f || Marker.Distance <= Marker.Marker.MaxDistance);
+		FVector2D Position;
+		if(!bInRange || PanelSize.IsNearlyZero() || !ProjectMarker(Marker, PanelSize, Position))
+		{
+			Item->SetVisibility(ESlateVisibility::Collapsed);
+			continue;
+		}
+		Item->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+		if(UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Item->Slot)) CanvasSlot->SetPosition(Position - FVector2D(UWidgetSceneMarkerItem::IconSize * 0.5f, 0.f));
 	}
 }
 

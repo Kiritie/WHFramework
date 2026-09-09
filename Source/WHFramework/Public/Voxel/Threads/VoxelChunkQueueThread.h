@@ -20,6 +20,7 @@ public:
 	void Cancel();
 
 	const TArray<FIndex>& GetQueue() const { return Queue; }
+	bool IsCancelled() const { return bCancelled.Load(); }
 
 protected:
 	TArray<FIndex> Queue;

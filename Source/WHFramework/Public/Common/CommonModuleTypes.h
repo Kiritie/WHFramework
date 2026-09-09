@@ -9,6 +9,8 @@
 
 #include "CommonModuleTypes.generated.h"
 
+class UInteractionOptionBase;
+
 //////////////////////////////////////////////////////////////////////////
 // Variables
 extern WHFRAMEWORK_API bool GIsPlaying;
@@ -100,6 +102,9 @@ USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FInteractionOptionView
 {
 	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly)
+	UInteractionOptionBase* Option = nullptr;
 
 	UPROPERTY(BlueprintReadOnly)
 	FGameplayTag OptionTag;

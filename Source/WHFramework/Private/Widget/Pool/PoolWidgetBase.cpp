@@ -4,6 +4,7 @@
 
 #include "Common/CommonModuleTypes.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
+#include "Widget/WidgetModule.h"
 
 UPoolWidgetBase::UPoolWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
@@ -14,6 +15,8 @@ UPoolWidgetBase::UPoolWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 
 void UPoolWidgetBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
 {
+	if(UWidgetModule::IsValid()) UWidgetModule::Get().RegisterTickableWidget(this);
+
 	OwnerWidget = Cast<UUserWidget>(InOwner);
 	WidgetParams = InParams;
 
@@ -22,6 +25,8 @@ void UPoolWidgetBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FPar
 
 void UPoolWidgetBase::OnDespawn_Implementation(bool bRecovery)
 {
+	if(UWidgetModule::IsValid()) UWidgetModule::Get().UnregisterTickableWidget(this);
+
 	OwnerWidget = nullptr;
 	WidgetParams.Empty();
 

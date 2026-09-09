@@ -106,7 +106,7 @@ void UAbilityInventoryBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* UAbilityInventoryBase::ToData()
 {
-	static FInventorySaveData SaveData;
+	FInventorySaveData& SaveData = GetMutableSaveData<FInventorySaveData>();
 	SaveData = FInventorySaveData();
 
 	SaveData.InventoryClass = GetClass();

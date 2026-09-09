@@ -13,7 +13,15 @@ void UVoxelGenerator::Initialize(UVoxelModule* InModule, int32 InStage)
 	Stage = InStage;
 }
 
+void UVoxelGenerator::PrepareBatch(const TArray<FIndex>& InChunkIndices)
+{
+}
+
 void UVoxelGenerator::Generate(UVoxelChunk* InChunk)
 {
 	
+}
+
+void UVoxelGenerator::CompleteBatch(bool bCancelled)
+{
 }

@@ -75,13 +75,19 @@ protected:
 	UWidgetSceneMapBase* MapBackground = nullptr;
 
 	FSceneMapView MapView;
+	bool bPlayerMarkerPresent = false;
 
 	virtual FVector GetMarkerViewLocation() const;
 	virtual float GetMarkerViewYaw() const;
 	virtual bool ProjectMarker(const FSceneMarkerView& InMarker, FVector2D InPanelSize, FVector2D& OutPosition) const;
+
+	UFUNCTION()
+	void RefreshMarkerMembership();
+
 	void ResolveMarkerCanvas();
 	void ResolveMapBackground();
 	void AddPlayerMarker();
-	void UpdateMarkerItems();
+	void RebuildMarkerItems();
+	void UpdateMarkerStates();
 	void DestroyMarkerItems();
 };

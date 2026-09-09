@@ -153,7 +153,7 @@ void APawnBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* APawnBase::ToData()
 {
-	static FSceneActorSaveData SaveData;
+	FSceneActorSaveData& SaveData = GetMutableSaveData<FSceneActorSaveData>();
 	SaveData = FSceneActorSaveData();
 
 	SaveData.ActorID = ActorID;

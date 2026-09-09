@@ -28,6 +28,17 @@ void UTaskAsset::Initialize()
 	for (UTaskBase* Task : RootTasks) Task->OnInitialize();
 }
 
+bool UTaskAsset::InitializeRuntimeTasks()
+{
+	if(!RebuildTaskMap(false)) return false;
+	Super::Initialize();
+	for(UTaskBase* Task : RootTasks)
+	{
+		if(Task) Task->OnInitialize();
+	}
+	return true;
+}
+
 UWorld* UTaskAsset::GetWorld() const
 {
 	return SourceObject && GetOuter() ? GetOuter()->GetWorld() : nullptr;
@@ -160,7 +171,7 @@ bool UTaskAsset::ExpandTaskAssetReferences(TArray<FText>& OutErrors)
 				TaskAssetReferences::AddError(OutErrors, DefinitionAsset, FString::Printf(TEXT("Task asset reference must not have authored child tasks: %s"), *Task->TaskDisplayName.ToString()));
 				return false;
 			}
-			UTaskAsset* ReferencedAsset = ReferenceTask->ReferencedAsset.LoadSynchronous();
+			UTaskAsset* ReferencedAsset = ReferenceTask->ReferencedAsset.Get();
 			if(!ReferencedAsset || ReferencedAsset->RootTasks.IsEmpty())
 			{
 				TaskAssetReferences::AddError(OutErrors, DefinitionAsset, FString::Printf(TEXT("Task asset reference is empty, missing, or has no roots: %s"), *Task->TaskDisplayName.ToString()));

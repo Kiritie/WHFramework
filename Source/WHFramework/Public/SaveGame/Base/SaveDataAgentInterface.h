@@ -35,6 +35,14 @@ public:
 	void UnloadSaveData(EPhase InPhase = EPhase::All);
 
 protected:
+	template<class T>
+	T& GetMutableSaveData() const
+	{
+		TSharedPtr<FSaveData>& SaveData = SaveDataCache.FindOrAdd(T::StaticStruct());
+		if(!SaveData.IsValid()) SaveData = MakeShared<T>();
+		return *static_cast<T*>(SaveData.Get());
+	}
+
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) = 0;
 
 	virtual FSaveData* ToData() = 0;
@@ -46,4 +54,7 @@ protected:
 	virtual FSaveData* GetData() { return nullptr; }
 
 	virtual bool HasArchive() const { return false; }
+
+private:
+	mutable TMap<const UScriptStruct*, TSharedPtr<FSaveData>> SaveDataCache;
 };

@@ -57,6 +57,8 @@ void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
 
 void UWorldWidgetBase::OnCreate(UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams)
 {
+	if(UWidgetModule::IsValid()) UWidgetModule::Get().RegisterTickableWidget(this);
+
 	OwnerObject = InOwner;
 
 	if(WidgetRefreshType == EWidgetRefreshType::Timer)
@@ -163,6 +165,8 @@ void UWorldWidgetBase::OnRefresh()
 
 void UWorldWidgetBase::OnDestroy(bool bRecovery)
 {
+	if(UWidgetModule::IsValid()) UWidgetModule::Get().UnregisterTickableWidget(this);
+
 	if(IsWidgetInEditor())
 	{
 #if WITH_EDITOR

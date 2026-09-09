@@ -16,12 +16,16 @@ public:
 	UWidgetSceneWorldMarker(const FObjectInitializer& ObjectInitializer);
 
 	void SetMarkerView(const FSceneMarkerView& InMarkerView);
+	void UpdateMarkerState(const FSceneMarkerView& InMarkerView);
 	FGuid GetMarkerID() const { return MarkerView.Marker.MarkerID; }
 	const FSceneMarkerView& GetMarkerView() const { return MarkerView; }
 
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 	virtual void RefreshLocation_Implementation(UWidget* InWidget, FWorldWidgetMapping InMapping) override;
+	virtual bool IsWidgetVisible_Implementation(bool bRefresh) override;
+
+	bool bMarkerInRange = true;
 
 	UPROPERTY(Transient)
 	UWidgetSceneMarkerItem* MarkerItem = nullptr;

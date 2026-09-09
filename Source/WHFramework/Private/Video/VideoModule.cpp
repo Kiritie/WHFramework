@@ -162,7 +162,7 @@ void UVideoModule::UnloadData(EPhase InPhase)
 
 FSaveData* UVideoModule::ToData()
 {
-	static FVideoModuleSaveData SaveData;
+	FVideoModuleSaveData& SaveData = GetMutableSaveData<FVideoModuleSaveData>();
 	SaveData = FVideoModuleSaveData();
 	
 	SaveData.WindowMode = GetWindowMode();

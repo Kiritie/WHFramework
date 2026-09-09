@@ -120,6 +120,7 @@ UVoxelModule::UVoxelModule()
 	ActiveChunkQueueBatch.Reset();
 	ActiveChunkQueue = nullptr;
 	ActiveChunkQueueThreads = TArray<FVoxelChunkQueueThread*>();
+	ActiveChunkQueueGenerators = TArray<UVoxelGenerator*>();
 
 	ChunkSpawnBatch = 0;
 	ChunkMap = TMap<FIndex, UVoxelChunk*>();
@@ -450,12 +451,12 @@ FBox UVoxelModule::GetWorldBounds(float InRadius, float InHalfHeight) const
 
 FVoxelWorldSaveData& UVoxelModule::GetWorldData() const
 {
-	return WorldData ? *WorldData : *new FVoxelWorldSaveData();
+	return WorldData ? *WorldData : GetMutableSaveData<FVoxelWorldSaveData>();
 }
 
 FVoxelWorldSaveData* UVoxelModule::NewWorldData(FSaveData* InBasicData) const
 {
-	static FVoxelModuleSaveData SaveData;
+	FVoxelModuleSaveData& SaveData = GetMutableSaveData<FVoxelModuleSaveData>();
 	SaveData = !InBasicData ? FVoxelModuleSaveData(WorldBasicData) : InBasicData->CastRef<FVoxelModuleSaveData>();
 	return &SaveData;
 }
@@ -532,8 +533,7 @@ void UVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* UVoxelModule::ToData()
 {
-	static FVoxelWorldSaveData* SaveData;
-	SaveData = NewWorldData(WorldData);
+	FVoxelWorldSaveData* SaveData = NewWorldData(WorldData);
 	
 	ITER_MAP(ChunkMap, Iter,
 		if(Iter.Value->IsGenerated())
@@ -636,6 +636,7 @@ FVoxelPrefabSaveData UVoxelModule::GetPrefabData()
 void UVoxelModule::GenerateWorld()
 {
 	UpdateChunkQueueThreads();
+	if(ActiveChunkQueueBatch) return;
 
 	if(UpdateChunkQueue(EVoxelWorldState::Unloading, [this](FIndex Index){ UnloadChunk(Index); }))
 	{
@@ -790,7 +791,12 @@ void UVoxelModule::GenerateChunkQueues(bool bFromAgent, bool bForce)
 	if(bForce) ResetChunkQueues();
 	FIndex GenerateIndex = FIndex::ZeroIndex;
 	FVector2D GenerateOffset = FVector2D::ZeroVector;
-	const auto VoxelAgent  = Cast<IVoxelAgentInterface>(UCommonModuleStatics::GetPlayerPawn() ? UCommonModuleStatics::GetPlayerPawn() : UCommonModuleStatics::GetPlayerController()->GetViewTarget());
+	AActor* VoxelAgentActor = UCommonModuleStatics::GetPlayerPawn();
+	if(!VoxelAgentActor)
+	{
+		if(APlayerController* PlayerController = UCommonModuleStatics::GetPlayerController()) VoxelAgentActor = PlayerController->GetViewTarget();
+	}
+	const auto VoxelAgent = Cast<IVoxelAgentInterface>(VoxelAgentActor);
 	if(bFromAgent && VoxelAgent)
 	{
 		const FVector2D AgentLocation = FVector2D(WorldData->WorldRange.X != 0.f ? VoxelAgent->GetVoxelAgentLocation().X : 0.f, WorldData->WorldRange.Y != 0.f ? VoxelAgent->GetVoxelAgentLocation().Y : 0.f);
@@ -804,8 +810,8 @@ void UVoxelModule::GenerateChunkQueues(bool bFromAgent, bool bForce)
 	}
 	if(bForce || WorldCenterIndex == EMPTY_Index || (WorldData->WorldRange.X != 0.f && GenerateOffset.X > WorldData->GetWorldSize().X * ChunkSpawnDistance * 0.5f) || (WorldData->WorldRange.Y != 0.f && GenerateOffset.Y > WorldData->GetWorldSize().Y * ChunkSpawnDistance * 0.5f))
 	{
-		TArray<FIndex> UnloadQueue;
-		ChunkMap.GenerateKeyArray(UnloadQueue);
+		TSet<FIndex> UnloadIndices;
+		for(const auto& Iter : ChunkMap) UnloadIndices.Add(Iter.Key);
 		const FVector2D SpawnRange = WorldData->GetWorldSize() * 0.5f;
 		for(int32 x = GenerateIndex.X - SpawnRange.X; x < GenerateIndex.X + SpawnRange.X; x++)
 		{
@@ -814,15 +820,17 @@ void UVoxelModule::GenerateChunkQueues(bool bFromAgent, bool bForce)
 				const FIndex Index = FIndex(x, y, 0);
 				if(FMathHelper::IsPointInEllipse2D(Index.ToVector2D() + FVector2D(0.5f), GenerateIndex.ToVector2D(), FVector2D(FMath::CeilToInt(SpawnRange.X), FMath::CeilToInt(SpawnRange.Y))))
 				{
-					if(UnloadQueue.Contains(Index)) UnloadQueue.Remove(Index);
+					UnloadIndices.Remove(Index);
 					AddToChunkQueue(EVoxelWorldState::Spawning, Index);
 				}
 			}
 		}
-		ITER_ARRAY(UnloadQueue, Item,
+		ITER_ARRAY(UnloadIndices, Item,
 			AddToChunkQueue(EVoxelWorldState::Unloading, Item);
 		)
 		WorldCenterIndex = GenerateIndex;
+		ITER_ARRAY(ChunkQueues[EVoxelWorldState::Generating].Queues, Queue, Queue.bSortRequired = true; )
+		ITER_ARRAY(ChunkQueues[EVoxelWorldState::Unloading].Queues, Queue, Queue.bSortRequired = true; )
 		ChunkSpawnBatch++;
 		
 		OnWorldCenterChanged();
@@ -836,7 +844,7 @@ void UVoxelModule::ResetChunkQueues()
 	for(auto& Iter : ChunkQueues)
 	{
 		ITER_ARRAY(Iter.Value.Queues, Queue,
-			Queue.Queue.Empty();
+			Queue.Reset();
 		)
 		Iter.Value.Stage = 0;
 	}
@@ -851,19 +859,25 @@ void UVoxelModule::UpdateChunkQueueThreads()
 		if(Thread && !Thread->IsIdle()) return;
 	}
 
-	if(ActiveChunkQueue)
+	const bool bCancelled = ActiveChunkQueueBatch->IsCancelled();
+	for(UVoxelGenerator* Generator : ActiveChunkQueueGenerators)
+	{
+		if(Generator) Generator->CompleteBatch(bCancelled);
+	}
+	if(ActiveChunkQueue && !bCancelled)
 	{
 		TSet<FIndex> CompletedIndices;
 		CompletedIndices.Reserve(ActiveChunkQueueBatch->GetQueue().Num());
 		for(const FIndex& Index : ActiveChunkQueueBatch->GetQueue()) CompletedIndices.Add(Index);
-		ActiveChunkQueue->Queue.RemoveAll([&CompletedIndices](const FIndex& Index){ return CompletedIndices.Contains(Index); });
+		ActiveChunkQueue->RemoveBatch(CompletedIndices);
 	}
 	ActiveChunkQueueBatch.Reset();
 	ActiveChunkQueue = nullptr;
 	ActiveChunkQueueThreads.Empty();
+	ActiveChunkQueueGenerators.Empty();
 }
 
-bool UVoxelModule::DispatchChunkQueue(FVoxelChunkQueue& InQueue, const TFunction<void(FIndex, int32)>& InFunc, int32 InStage)
+bool UVoxelModule::DispatchChunkQueue(FVoxelChunkQueue& InQueue, const TFunction<void(FIndex, int32)>& InFunc, int32 InStage, const TArray<UVoxelGenerator*>& InGenerators)
 {
 	if(ActiveChunkQueueBatch || InQueue.Queue.Num() == 0) return false;
 
@@ -883,6 +897,15 @@ bool UVoxelModule::DispatchChunkQueue(FVoxelChunkQueue& InQueue, const TFunction
 
 	TArray<FIndex> Queue;
 	Queue.Append(InQueue.Queue.GetData(), BatchCount);
+	TArray<UVoxelGenerator*> Generators;
+	for(UVoxelGenerator* Generator : InGenerators)
+	{
+		if(Generator)
+		{
+			Generator->PrepareBatch(Queue);
+			Generators.Add(Generator);
+		}
+	}
 	const TSharedRef<FVoxelChunkQueueBatch, ESPMode::ThreadSafe> Batch = MakeShared<FVoxelChunkQueueBatch, ESPMode::ThreadSafe>(MoveTemp(Queue));
 	const int32 DispatchCount = FMath::Min(WorkerCount, ChunkQueueThreads.Num());
 	ActiveChunkQueueThreads.Empty(DispatchCount);
@@ -890,10 +913,15 @@ bool UVoxelModule::DispatchChunkQueue(FVoxelChunkQueue& InQueue, const TFunction
 	{
 		if(ChunkQueueThreads[i]->Dispatch(Batch, InFunc, InStage)) ActiveChunkQueueThreads.Add(ChunkQueueThreads[i]);
 	}
-	if(ActiveChunkQueueThreads.Num() == 0) return false;
+	if(ActiveChunkQueueThreads.Num() == 0)
+	{
+		for(UVoxelGenerator* Generator : Generators) Generator->CompleteBatch(true);
+		return false;
+	}
 
 	ActiveChunkQueueBatch = Batch;
 	ActiveChunkQueue = &InQueue;
+	ActiveChunkQueueGenerators = MoveTemp(Generators);
 	return true;
 }
 
@@ -904,9 +932,44 @@ void UVoxelModule::CancelChunkQueueBatch()
 	{
 		if(Thread) Thread->WaitForIdle();
 	}
+	for(UVoxelGenerator* Generator : ActiveChunkQueueGenerators)
+	{
+		if(Generator) Generator->CompleteBatch(true);
+	}
 	ActiveChunkQueueBatch.Reset();
 	ActiveChunkQueue = nullptr;
 	ActiveChunkQueueThreads.Empty();
+	ActiveChunkQueueGenerators.Empty();
+}
+
+void UVoxelModule::SortChunkQueue(EVoxelWorldState InState, FVoxelChunkQueue& InQueue)
+{
+	if(!InQueue.bSortRequired) return;
+	if(InState == EVoxelWorldState::Generating)
+	{
+		InQueue.Queue.Sort([this](const FIndex& A, const FIndex& B)
+		{
+			const float DistanceA = WorldCenterIndex.DistanceTo(A, false, true);
+			const float DistanceB = WorldCenterIndex.DistanceTo(B, false, true);
+			if(!FMath::IsNearlyEqual(DistanceA, DistanceB)) return DistanceA < DistanceB;
+			if(A.X != B.X) return A.X < B.X;
+			if(A.Y != B.Y) return A.Y < B.Y;
+			return A.Z < B.Z;
+		});
+	}
+	else if(InState == EVoxelWorldState::Unloading)
+	{
+		InQueue.Queue.Sort([this](const FIndex& A, const FIndex& B)
+		{
+			const float DistanceA = WorldCenterIndex.DistanceTo(A, false, true);
+			const float DistanceB = WorldCenterIndex.DistanceTo(B, false, true);
+			if(!FMath::IsNearlyEqual(DistanceA, DistanceB)) return DistanceA > DistanceB;
+			if(A.X != B.X) return A.X < B.X;
+			if(A.Y != B.Y) return A.Y < B.Y;
+			return A.Z < B.Z;
+		});
+	}
+	InQueue.bSortRequired = false;
 }
 
 void UVoxelModule::ShutdownChunkQueueThreads()
@@ -926,6 +989,7 @@ bool UVoxelModule::UpdateChunkQueue(EVoxelWorldState InState, TFunction<void(FIn
 	FVoxelChunkQueues& QueueGroup = ChunkQueues[InState];
 	ITER_ARRAY_WITHINDEX(QueueGroup.Queues, i, Item,
 		QueueGroup.Stage = i + 1;
+		SortChunkQueue(InState, Item);
 		if(Item.Queue.Num() > 0)
 		{
 			if(Item.bAsync && ActiveChunkQueueBatch) return true;
@@ -943,11 +1007,15 @@ bool UVoxelModule::UpdateChunkQueue(EVoxelWorldState InState, TFunction<void(FIn
 				if(InState != EVoxelWorldState::Spawning) InFunc(Index, Stage);
 			});
 
-			if(Item.bAsync && DispatchChunkQueue(Item, Func, i + 1)) return true;
+			if(Item.bAsync && DispatchChunkQueue(Item, Func, i + 1, Item.Generators)) return true;
 
 			const int32 Num = FMath::Min(FMath::Max(1, Item.Speed), Item.Queue.Num());
+			TArray<FIndex> BatchIndices;
+			BatchIndices.Append(Item.Queue.GetData(), Num);
+			for(UVoxelGenerator* Generator : Item.Generators) if(Generator) Generator->PrepareBatch(BatchIndices);
 			DON_WITHINDEX(Num, j, Func(Item.Queue[j], i + 1); )
-			Item.Queue.RemoveAt(0, Num, EAllowShrinking::No);
+			for(UVoxelGenerator* Generator : Item.Generators) if(Generator) Generator->CompleteBatch(false);
+			Item.RemoveFront(Num);
 			if(Item.bAsync || Item.Queue.Num() > 0)
 			{
 				return true;
@@ -960,31 +1028,9 @@ bool UVoxelModule::UpdateChunkQueue(EVoxelWorldState InState, TFunction<void(FIn
 void UVoxelModule::AddToChunkQueue(EVoxelWorldState InState, FIndex InIndex)
 {
 	ITER_ARRAY(ChunkQueues[InState].Queues, Item,
-		if(!Item.Queue.Contains(InIndex) && (InState == EVoxelWorldState::Spawning ? !ChunkMap.Contains(InIndex) : ChunkMap.Contains(InIndex)))
+		if((InState == EVoxelWorldState::Spawning ? !ChunkMap.Contains(InIndex) : ChunkMap.Contains(InIndex)))
 		{
-			Item.Queue.Add(InIndex);
-			switch(InState)
-			{
-				case EVoxelWorldState::Generating:
-				{
-					Item.Queue.Sort([this](const FIndex& A, const FIndex& B){
-						const float LengthA = WorldCenterIndex.DistanceTo(A, false, true);
-						const float LengthB = WorldCenterIndex.DistanceTo(B, false, true);
-						return LengthA < LengthB;
-					});
-					break;
-				}
-				case EVoxelWorldState::Unloading:
-				{
-					Item.Queue.Sort([this](const FIndex& A, const FIndex& B){
-						const float LengthA = WorldCenterIndex.DistanceTo(A, false, true);
-						const float LengthB = WorldCenterIndex.DistanceTo(B, false, true);
-						return LengthA > LengthB;
-					});
-					break;
-				}
-				default: break;
-			}
+			Item.Add(InIndex);
 		}
 	)
 }
@@ -992,10 +1038,7 @@ void UVoxelModule::AddToChunkQueue(EVoxelWorldState InState, FIndex InIndex)
 void UVoxelModule::RemoveFromChunkQueue(EVoxelWorldState InState, FIndex InIndex)
 {
 	ITER_ARRAY(ChunkQueues[InState].Queues, Item,
-		if(Item.Queue.Contains(InIndex))
-		{
-			Item.Queue.Remove(InIndex);
-		}
+		Item.Remove(InIndex);
 	)
 }
 

@@ -162,7 +162,7 @@ void UAudioModule::UnloadData(EPhase InPhase)
 
 FSaveData* UAudioModule::ToData()
 {
-	static FAudioModuleSaveData SaveData;
+	FAudioModuleSaveData& SaveData = GetMutableSaveData<FAudioModuleSaveData>();
 	SaveData = FAudioModuleSaveData();
 
 	SaveData.GlobalSoundParams = GlobalSoundParams;

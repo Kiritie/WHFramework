@@ -22,7 +22,11 @@ public:
 public:
 	virtual void Initialize(UVoxelModule* InModule, int32 InStage);
 
+	virtual void PrepareBatch(const TArray<FIndex>& InChunkIndices);
+
 	virtual void Generate(UVoxelChunk* InChunk);
+
+	virtual void CompleteBatch(bool bCancelled);
 
 protected:
 	UPROPERTY(BlueprintReadOnly)

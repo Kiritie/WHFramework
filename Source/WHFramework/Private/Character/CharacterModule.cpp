@@ -113,12 +113,12 @@ void UCharacterModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* UCharacterModule::ToData()
 {
-	static FCharacterModuleSaveData* SaveData;
-	SaveData = new FCharacterModuleSaveData();
+	FCharacterModuleSaveData& SaveData = GetMutableSaveData<FCharacterModuleSaveData>();
+	SaveData = FCharacterModuleSaveData();
 
-	SaveData->CurrentCharacter = CurrentCharacter;
+	SaveData.CurrentCharacter = CurrentCharacter;
 
-	return SaveData;
+	return &SaveData;
 }
 
 FString UCharacterModule::GetModuleDebugMessage()

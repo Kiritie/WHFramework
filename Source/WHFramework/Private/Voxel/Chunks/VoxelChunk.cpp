@@ -128,7 +128,7 @@ void UVoxelChunk::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* UVoxelChunk::ToData()
 {
-	static FVoxelChunkSaveData SaveData;
+	FVoxelChunkSaveData& SaveData = GetMutableSaveData<FVoxelChunkSaveData>();
 	SaveData = FVoxelChunkSaveData();
 
 	SaveData.Index = Index;
@@ -281,10 +281,16 @@ void UVoxelChunk::BuildMap(int32 InStage)
 	}
 }
 
+void UVoxelChunk::GetVoxelItemsSnapshot(TArray<FVoxelItem>& OutVoxelItems)
+{
+	FScopeLock ScopeLock(&CriticalSection);
+	VoxelMap.GenerateValueArray(OutVoxelItems);
+}
+
 void UVoxelChunk::BuildMesh()
 {
 	TArray<FVoxelItem> VoxelItems;
-	VoxelMap.GenerateValueArray(VoxelItems);
+	GetVoxelItemsSnapshot(VoxelItems);
 	for(FVoxelItem& Item : VoxelItems)
 	{
 		if(Item.IsValid())
@@ -308,7 +314,7 @@ void UVoxelChunk::BuildMesh(EVoxelNature InNature)
 		MeshComponents.Add(InNature, MeshComponent);
 	}
 	TArray<FVoxelItem> VoxelItems;
-	VoxelMap.GenerateValueArray(VoxelItems);
+	GetVoxelItemsSnapshot(VoxelItems);
 	for(FVoxelItem& Item : VoxelItems)
 	{
 		if(Item.IsValid() && Item.GetData().Nature == InNature)
@@ -1248,7 +1254,7 @@ void UVoxelChunk::SpawnMeshComponents(int32 InStage)
 	if(InStage & 1)
 	{
 		TArray<FVoxelItem> VoxelItems;
-		VoxelMap.GenerateValueArray(VoxelItems);
+		GetVoxelItemsSnapshot(VoxelItems);
 		for(FVoxelItem& Item : VoxelItems)
 		{
 			if(Item.IsValid())

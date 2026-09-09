@@ -156,7 +156,7 @@ public:
 	FMargin GetLeftCornerPadding();
 	/** @return zoom level; e.g. values between 0 and 16 */
 	int32 GetZoomLevel() const;
-	FDialogueNode GetNodeById(int32 Id);
+	int32 FindNodeIndex(int32 NodeId) const;
 	void DuplicateSelected();
 	void CopySelected();
 	void CutSelected();

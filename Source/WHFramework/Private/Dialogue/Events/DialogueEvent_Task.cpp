@@ -4,12 +4,18 @@
 #include "Task/TaskComponent.h"
 #include "Task/TaskModule.h"
 
+void UDialogueEvent_Task::PostLoad()
+{
+	Super::PostLoad();
+	ResolvedTaskAsset = Task.Asset.LoadSynchronous();
+}
+
 bool UDialogueEvent_Task::Execute_Implementation(const FInteractionContext& InContext, FText& OutReason) const
 {
 	return ApplyTaskAction(InContext.Target);
 }
 
-void UDialogueEvent_Task::RecieveEventTriggered_Implementation(APlayerController* ConsideringPlayer, AActor* NPCActor)
+void UDialogueEvent_Task::ReceiveEventTriggered_Implementation(APlayerController* ConsideringPlayer, AActor* NPCActor)
 {
 	ApplyTaskAction(NPCActor);
 }
@@ -22,7 +28,7 @@ bool UDialogueEvent_Task::ApplyTaskAction(AActor* InTarget) const
 	if(ITaskAgentInterface* Agent = Cast<ITaskAgentInterface>(InTarget)) Component = Agent->GetTaskComponent();
 	if(Action == EDialogueTaskAction::Accept && Component)
 	{
-		UTaskAsset* Source = Task.Asset.IsNull() ? nullptr : Task.Asset.LoadSynchronous();
+		UTaskAsset* Source = ResolvedTaskAsset ? ResolvedTaskAsset : Task.Asset.Get();
 		return Component->AcceptTask(Source, Task.TaskGUID) != nullptr;
 	}
 	UTaskBase* RuntimeTask = Component ? Component->ResolveTask(Task) : (Action == EDialogueTaskAction::Accept ? Module.EnsureTask(Task) : Module.ResolveTask(Task));

@@ -62,7 +62,7 @@ void AVoxelAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* AVoxelAuxiliary::ToData()
 {
-	static FVoxelAuxiliarySaveData SaveData;
+	FVoxelAuxiliarySaveData& SaveData = GetMutableSaveData<FVoxelAuxiliarySaveData>();
 	SaveData = FVoxelAuxiliarySaveData();
 
 	SaveData.VoxelItem = VoxelItem;

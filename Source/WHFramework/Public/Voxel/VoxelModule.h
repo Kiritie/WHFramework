@@ -200,9 +200,11 @@ protected:
 
 	virtual void UpdateChunkQueueThreads();
 
-	virtual bool DispatchChunkQueue(FVoxelChunkQueue& InQueue, const TFunction<void(FIndex, int32)>& InFunc, int32 InStage);
+	virtual bool DispatchChunkQueue(FVoxelChunkQueue& InQueue, const TFunction<void(FIndex, int32)>& InFunc, int32 InStage, const TArray<UVoxelGenerator*>& InGenerators);
 
 	virtual void CancelChunkQueueBatch();
+
+	virtual void SortChunkQueue(EVoxelWorldState InState, FVoxelChunkQueue& InQueue);
 
 	virtual void ShutdownChunkQueueThreads();
 
@@ -313,6 +315,8 @@ protected:
 	FVoxelChunkQueue* ActiveChunkQueue;
 
 	TArray<FVoxelChunkQueueThread*> ActiveChunkQueueThreads;
+
+	TArray<UVoxelGenerator*> ActiveChunkQueueGenerators;
 
 	UPROPERTY(VisibleAnywhere, Category = "Chunk")
 	int32 ChunkSpawnBatch;

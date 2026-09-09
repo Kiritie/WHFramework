@@ -364,8 +364,8 @@ FCursorReply SDialogueViewportWidget::OnCursorQuery(const FGeometry& MyGeometry,
 		// All selected nodes besides the one under the cursor:
 		for (auto NodeId : SelectedNodes)
 		{
-			int32 NodeIndex = NodeIdsIndexes.FindRef(NodeId);
-			if (draggedNodeIndex != NodeIndex)
+			const int32 NodeIndex = FindNodeIndex(NodeId);
+			if (Dialogue->Data.IsValidIndex(NodeIndex) && draggedNodeIndex != NodeIndex)
 			{
 				// NodeCoord = (MouseCoords + DragOffset) * Zoom - PanOffset + (difference in distance between this node and the node being dragged by the cursor)
 				Dialogue->Data[NodeIndex].Coordinates = (MyGeometry.AbsoluteToLocal(CursorEvent.GetScreenSpacePosition()) + draggingOffset) / GetZoomAmount() - panningOffset + (Dialogue->Data[NodeIndex].Coordinates - Dialogue->Data[draggedNodeIndex].Coordinates);
@@ -442,9 +442,10 @@ FCursorReply SDialogueViewportWidget::OnCursorQuery(const FGeometry& MyGeometry,
 	return FCursorReply::Unhandled();
 }
 
-FDialogueNode SDialogueViewportWidget::GetNodeById(int32 Id)
+int32 SDialogueViewportWidget::FindNodeIndex(int32 NodeId) const
 {
-	return Dialogue->Data[NodeIdsIndexes.FindRef(Id)];
+	const int32* NodeIndex = NodeIdsIndexes.Find(NodeId);
+	return NodeIndex ? *NodeIndex : INDEX_NONE;
 }
 
 void SDialogueViewportWidget::StartDraggingIndex(int32 NodeIndex)
@@ -472,19 +473,20 @@ void SDialogueViewportWidget::StartDraggingIndex(int32 NodeIndex)
 
 void SDialogueViewportWidget::OnIsPlayerCommited(ECheckBoxState NewState)
 {
+	const int32 Index = FindNodeIndex(EditingState->CurrentNodeId);
+	if (!Dialogue->Data.IsValidIndex(Index)) return;
+
 	const FScopedTransaction Transaction(LOCTEXT("EditPcNpc", "Edited PC/NPC"));
 	Dialogue->Modify();
-
-	int32 index = NodeIdsIndexes.FindRef(EditingState->CurrentNodeId);
-	Dialogue->Data[index].isPlayer = (NewState == ECheckBoxState::Checked);
+	Dialogue->Data[Index].isPlayer = (NewState == ECheckBoxState::Checked);
 }
 
 ECheckBoxState SDialogueViewportWidget::GetIsPlayer() const
 {
-	if (EditingState->CurrentNodeId != -1)
+	const int32 Index = FindNodeIndex(EditingState->CurrentNodeId);
+	if (Dialogue->Data.IsValidIndex(Index))
 	{
-		int32 index = NodeIdsIndexes.FindRef(EditingState->CurrentNodeId);
-		if (Dialogue->Data[index].isPlayer) return ECheckBoxState::Checked;
+		if (Dialogue->Data[Index].isPlayer) return ECheckBoxState::Checked;
 	}
 
 	return ECheckBoxState::Unchecked;
@@ -492,23 +494,19 @@ ECheckBoxState SDialogueViewportWidget::GetIsPlayer() const
 
 void SDialogueViewportWidget::OnNodeTextCommited(const FText &InText, ETextCommit::Type)
 {
+	const int32 Index = FindNodeIndex(EditingState->CurrentNodeId);
+	if (!Dialogue->Data.IsValidIndex(Index)) return;
+
 	const FScopedTransaction Transaction(LOCTEXT("EditNodeText", "Edit Node Text"));
 	Dialogue->Modify();
-
-	int32 index = NodeIdsIndexes.FindRef(EditingState->CurrentNodeId);
-	Dialogue->Data[index].Text = InText;
+	Dialogue->Data[Index].Text = InText;
 }
 
 
 FText SDialogueViewportWidget::GetNodeText() const
 {
-	if (EditingState->CurrentNodeId != -1)
-	{
-		int32 index = EditingState->CurrentNodeId;
-		return Dialogue->Data[index].Text;
-	}
-
-	return FText::GetEmpty();
+	const int32 Index = FindNodeIndex(EditingState->CurrentNodeId);
+	return Dialogue->Data.IsValidIndex(Index) ? Dialogue->Data[Index].Text : FText::GetEmpty();
 }
 
 FSlateFontInfo SDialogueViewportWidget::GetNodeFont()
@@ -699,8 +697,8 @@ FReply SDialogueViewportWidget::OnMouseButtonUp(const FGeometry& MyGeometry, con
 			// TODO: this may result in quite a resort due to duplicates. We can drag 5 children of the same parent, and the result is that we'll resort the parent 5 times. Write a method optimizing it in the future.
 			for (auto nodeId : SelectedNodes)
 			{
-				int32 nodeIndex = NodeIdsIndexes.FindRef(nodeId);
-				NodeWidgets[nodeIndex]->SortParentsLinks();
+				const int32 NodeIndex = FindNodeIndex(nodeId);
+				if (NodeWidgets.IsValidIndex(NodeIndex)) NodeWidgets[NodeIndex]->SortParentsLinks();
 			}
 			draggedNodeIndex = -1;
 			return FReply::Handled().ReleaseMouseCapture();
@@ -981,8 +979,8 @@ int32 SDialogueViewportWidget::OnPaint(const FPaintArgs& Args, const FGeometry& 
 
 		for (auto Link : Node.Links) // for each link
 		{
-			int32 linkIndex = NodeIdsIndexes.FindRef(Link);
-			if (linkIndex != -1)
+			const int32 linkIndex = FindNodeIndex(Link);
+			if (Dialogue->Data.IsValidIndex(linkIndex) && NodeWidgets.IsValidIndex(linkIndex))
 			{
 				// If the child node is lower than its parent, we draw a line to it. Otherwise we draw a spline
 
@@ -1127,11 +1125,17 @@ int32 SDialogueViewportWidget::OnPaint(const FPaintArgs& Args, const FGeometry& 
 	if (EditingState->isLinking)
 	{
 		TArray<FVector2D> LinkingPoints;
+		const int32 LinkingFromIndex = FindNodeIndex(EditingState->LinkingFromNodeId);
+		if (!Dialogue->Data.IsValidIndex(LinkingFromIndex) || !NodeWidgets.IsValidIndex(LinkingFromIndex))
+		{
+			EditingState->isLinking = false;
+			return maxLayerId;
+		}
 
-		FVector2D fromNodeSize = NodeWidgets[EditingState->LinkingFromIndex]->NodeSize;
+		FVector2D fromNodeSize = NodeWidgets[LinkingFromIndex]->NodeSize;
 		LinkingPoints.Add(FVector2D(
-			(Dialogue->Data[EditingState->LinkingFromIndex].Coordinates.X + panningOffset.X) * GetZoomAmount(),
-			(Dialogue->Data[EditingState->LinkingFromIndex].Coordinates.Y + panningOffset.Y - 3) * GetZoomAmount() + fromNodeSize.Y / 2
+			(Dialogue->Data[LinkingFromIndex].Coordinates.X + panningOffset.X) * GetZoomAmount(),
+			(Dialogue->Data[LinkingFromIndex].Coordinates.Y + panningOffset.Y - 3) * GetZoomAmount() + fromNodeSize.Y / 2
 		));
 		LinkingPoints.Add(EditingState->LinkingCoords);
 
@@ -1555,20 +1559,23 @@ void SDialogueViewportWidget::SelectNodes(TArray<int32> NodesIds) const
 {
 	for (auto nodeId : SelectedNodes)
 	{
-		int32 nodeIndex = NodeIdsIndexes.FindRef(nodeId);
-		if (nodeIndex != -1) // prevents issues for window draws while undoing/redoing
+		const int32 nodeIndex = FindNodeIndex(nodeId);
+		if (NodeWidgets.IsValidIndex(nodeIndex)) // prevents issues for window draws while undoing/redoing
 		{
 			NodeWidgets[nodeIndex]->isSelected = false;
 		}
 	}
 	SelectedNodes.Empty();
 
-	SelectedNodes = NodesIds;
+	SelectedNodes = NodesIds.FilterByPredicate([this](int32 NodeId)
+	{
+		return FindNodeIndex(NodeId) != INDEX_NONE;
+	});
 
 	for (auto nodeId : SelectedNodes)
 	{
-		int32 nodeIndex = NodeIdsIndexes.FindRef(nodeId);
-		if (nodeIndex != -1) // prevents issues for window draws while undoing/redoing
+		const int32 nodeIndex = FindNodeIndex(nodeId);
+		if (NodeWidgets.IsValidIndex(nodeIndex)) // prevents issues for window draws while undoing/redoing
 		{
 			NodeWidgets[nodeIndex]->isSelected = true;
 		}
@@ -1709,14 +1716,8 @@ void SDialogueViewportWidget::DeleteOneNode(int32 nodeId)
 		return;
 	}
 
-	const FScopedTransaction Transaction(LOCTEXT("DeleteNode", "Delete Node"));
-	Dialogue->Modify();
-
-	int32 Index = NodeIdsIndexes.FindRef(nodeId);
-
-	EditingState->CurrentNodeId = -1;
-	NodeWidgets[Index]->OnDeleteNode(true); // it also calls SpawnNodes()
-	ForceRefresh();
+	SelectNodes(nodeId);
+	DeleteSelected();
 }
 
 void SDialogueViewportWidget::DeleteSelected()
@@ -1727,23 +1728,38 @@ void SDialogueViewportWidget::DeleteSelected()
 		return;
 	}
 
-	const FScopedTransaction Transaction(LOCTEXT("DeleteNodes", "Delete Nodes"));
-	Dialogue->Modify();
-
-	for (int i = SelectedNodes.Num() - 1; i >= 0; i--)
+	TSet<int32> NodeIds;
+	TArray<int32> NodeIndices;
+	for (const int32 NodeId : SelectedNodes)
 	{
-		int32 Id = SelectedNodes[i];
-		int32 Index = NodeIdsIndexes.FindRef(Id);
-
-		// we never delete the first node
-		if (Id == 0)
+		if (NodeId == 0) continue;
+		const int32 NodeIndex = FindNodeIndex(NodeId);
+		if (Dialogue->Data.IsValidIndex(NodeIndex))
 		{
-			continue;
+			NodeIds.Add(NodeId);
+			NodeIndices.Add(NodeIndex);
 		}
-
-		NodeWidgets[Index]->OnDeleteNode(false);
 	}
-	EditingState->CurrentNodeId = -1;
+	if (NodeIndices.IsEmpty()) return;
+
+	const FScopedTransaction Transaction(NodeIndices.Num() == 1 ? LOCTEXT("DeleteNode", "Delete Node") : LOCTEXT("DeleteNodes", "Delete Nodes"));
+	Dialogue->Modify();
+	for (FDialogueNode& Node : Dialogue->Data)
+	{
+		Node.Links.RemoveAll([&NodeIds](int32 LinkedNodeId)
+		{
+			return NodeIds.Contains(LinkedNodeId);
+		});
+	}
+	NodeIndices.Sort(TGreater<int32>());
+	for (const int32 NodeIndex : NodeIndices) Dialogue->Data.RemoveAt(NodeIndex);
+	SelectedNodes.RemoveAll([&NodeIds](int32 NodeId) { return NodeIds.Contains(NodeId); });
+	EditingState->CurrentNodeId = INDEX_NONE;
+	if (NodeIds.Contains(EditingState->LinkingFromNodeId))
+	{
+		EditingState->isLinking = false;
+		EditingState->LinkingFromNodeId = INDEX_NONE;
+	}
 	SpawnNodes();
 	ForceRefresh();
 }

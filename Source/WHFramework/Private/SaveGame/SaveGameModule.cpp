@@ -119,7 +119,7 @@ void USaveGameModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* USaveGameModule::ToData()
 {
-	static FGeneralSaveData SaveData;
+	FGeneralSaveData& SaveData = GetMutableSaveData<FGeneralSaveData>();
 	SaveData = FGeneralSaveData();
 	
 	for(auto& Iter1 : SaveGameInfos)

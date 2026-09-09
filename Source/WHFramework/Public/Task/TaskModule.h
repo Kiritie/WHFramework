@@ -140,7 +140,7 @@ public:
 	void ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTargetTag, int32 InCount = 1, FPrimaryAssetId InTargetAssetID = FPrimaryAssetId(), FName InTargetName = NAME_None);
 
 	UFUNCTION(BlueprintCallable)
-	void RefreshMarkers() { RefreshTaskMarkers(); }
+	void RefreshMarkers() { RequestTaskMarkersRefresh(); }
 
 public:
 	UFUNCTION(BlueprintPure)
@@ -166,9 +166,18 @@ protected:
 	bool bLoadingTasks = false;
 	UTaskBase* TurningInTask = nullptr;
 	TSet<FGuid> TaskMarkerIDs;
+	int32 TaskMutationDepth = 0;
+	bool bTaskMarkersDirty = false;
+	bool bAutomaticTaskEntryDirty = false;
+	bool bResolvingAutomaticTasks = false;
 	void ClearRuntimeAssets();
 	UTaskBase* ResolveRuntimeTask(UTaskBase* Task) const;
 	UTaskAsset* AddAssetInternal(UTaskAsset* InAsset, FGuid InInstanceID, FGuid InAgentID);
+	void BeginTaskMutation();
+	void EndTaskMutation();
+	void RequestTaskMarkersRefresh();
+	void EnterEligibleAutomaticTasks();
+	void EnterEligibleAutomaticTasks(UTaskBase* InTask);
 	void RefreshTaskMarkers();
 	void RemoveTaskMarkers(const UTaskAsset* InAsset = nullptr);
 	static FGuid MakeTaskMarkerID(const UTaskAsset* Asset, const FString& GUID);

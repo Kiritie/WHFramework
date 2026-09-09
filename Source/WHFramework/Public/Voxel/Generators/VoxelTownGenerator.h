@@ -62,19 +62,19 @@ protected:
 	
 private:
 	//发展域初始中心点
-	FVector2D _StartPoint;
+	FVector2D StartPoint;
 	//发展域
-	TSet<uint64> _Domains;
+	TSet<uint64> Domains;
 	//已存在道路
-	TSet<uint64> _Roads;
+	TSet<uint64> Roads;
 	//所有建筑门口点
-	TArray<FVector2D> _BuildingPos;
+	TArray<FVector2D> BuildingPositions;
 	//所有建筑预制体
-	TArray<UVoxelPrefabData*> _PrefabAssets;
+	TArray<UVoxelPrefabData*> PrefabAssetCache;
 	//世界坐标下的确定性小镇规划，生成时仅写入当前区块切片
-	TMap<FIndex, FVoxelItem> _PlannedVoxels;
-	TMap<FIndex, TSharedPtr<TMap<FIndex, FVoxelItem>>> _TownPlanCache;
-	TArray<FIndex> _TownPlanCacheOrder;
-	TMap<FIndex, int32> _TopographyHeightCache;
-	mutable FRWLock _TownPlanCacheLock;
+	TMap<FIndex, FVoxelItem> PlannedVoxels;
+	TMap<FIndex, TSharedPtr<TMap<FIndex, FVoxelItem>>> TownPlanCache;
+	TArray<FIndex> TownPlanCacheOrder;
+	TMap<FIndex, int32> TopographyHeightCache;
+	mutable FRWLock TownPlanCacheLock;
 };

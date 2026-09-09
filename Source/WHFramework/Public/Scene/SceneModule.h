@@ -68,7 +68,6 @@ protected:
 	virtual void OnDrawDebug(UCanvas* InCanvas, APlayerController* InPC) override;
 
 #if WITH_EDITOR
-	virtual bool CanEditChange(const FProperty* InProperty) const override;
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 
@@ -209,6 +208,7 @@ protected:
 
 public:
 	FOnSceneAreaAdded OnSceneAreaAdded;
+	FOnSceneAreasChanged OnSceneAreasChanged;
 
 	UFUNCTION(BlueprintPure)
 	bool HasSceneArea(const FName InName) const;
@@ -247,6 +247,8 @@ protected:
 	UPROPERTY(Transient)
 	TMap<FGuid, UWidgetSceneWorldMarker*> WorldMarkerWidgets;
 
+	bool bWorldMarkerWidgetsDirty;
+
 public:
 	UPROPERTY(BlueprintAssignable)
 	FOnSceneMarkersChanged OnSceneMarkersChanged;
@@ -270,7 +272,10 @@ public:
 	FSceneMarker GetMarker(FGuid InMarkerID) const;
 
 	UFUNCTION(BlueprintPure)
-	TArray<FSceneMarkerView> GetMarkerViews(ESceneMarkerChannel InChannel, FVector InViewLocation, float InViewYaw = 0.f) const;
+	FSceneMarkerView GetMarkerView(FGuid InMarkerID, FVector InViewLocation, float InViewYaw = 0.f) const;
+
+	UFUNCTION(BlueprintPure)
+	TArray<FSceneMarkerView> GetMarkerViews(ESceneMarkerChannel InChannel, FVector InViewLocation, float InViewYaw = 0.f, bool bFilterByDistance = true) const;
 
 	UFUNCTION(BlueprintCallable)
 	bool SetTrackedMarker(FGuid InMarkerID);
@@ -280,6 +285,7 @@ public:
 
 private:
 	FSceneMarkerView ResolveMarker(const FSceneMarker& InMarker, const FVector& InViewLocation, float InViewYaw) const;
+	void NotifySceneMarkersChanged();
 	void RefreshWorldMarkerWidgets();
 	void ClearWorldMarkerWidgets();
 	UPROPERTY(Transient)
@@ -310,6 +316,11 @@ protected:
 	
 	UPROPERTY(EditAnywhere, Category = "DataLayer")
 	TMap<FName, int32> LevelPlayerMappings;
+
+	void ApplyOwnerPlayerToActors(const TArray<AActor*>& InActors, int32 InPlayerIndex) const;
+	void ApplyDataLayerOwnerPlayer(UDataLayerAsset* InDataLayer) const;
+	void ApplyLevelOwnerPlayer(FName InLevelPath) const;
+	void ApplyAllOwnerPlayerMappings() const;
 	
 protected:
 	UFUNCTION()

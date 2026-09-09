@@ -108,7 +108,7 @@ void AWHActor::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* AWHActor::ToData()
 {
-	static FSceneActorSaveData SaveData;
+	FSceneActorSaveData& SaveData = GetMutableSaveData<FSceneActorSaveData>();
 	SaveData = FSceneActorSaveData();
 
 	SaveData.ActorID = ActorID;

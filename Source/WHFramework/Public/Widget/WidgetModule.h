@@ -61,6 +61,13 @@ protected:
 public:
 	virtual FString GetModuleDebugMessage() override;
 
+	void RegisterTickableWidget(UUserWidget* InWidget);
+	void UnregisterTickableWidget(UUserWidget* InWidget);
+
+private:
+	UPROPERTY(Transient)
+	TSet<UUserWidget*> TickableWidgets;
+
 protected:
 	UFUNCTION()
 	void OnOpenUserWidget(UObject* InSender, UEventHandle_OpenUserWidget* InEventHandle);

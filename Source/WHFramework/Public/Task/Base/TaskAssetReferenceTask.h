@@ -27,7 +27,6 @@ public:
 	bool bAutoEnterReferencedRoots = true;
 
 	virtual void OnEnter() override;
-	virtual void OnRefresh() override;
 	virtual bool AreSubTasksReadyToComplete() const override;
 
 	bool IsRuntimeExpanded() const { return bRuntimeExpanded; }

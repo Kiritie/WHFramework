@@ -9,7 +9,7 @@ struct FDialogueEditorState
 	int32 CurrentNodeId = INDEX_NONE;
 	bool isLinking = false;
 	FVector2D LinkingCoords = FVector2D::ZeroVector;
-	int32 LinkingFromIndex = INDEX_NONE;
+	int32 LinkingFromNodeId = INDEX_NONE;
 };
 
 class FDialogueEditorCommands : public TCommands<FDialogueEditorCommands>

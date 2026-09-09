@@ -67,6 +67,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TArray<TSoftObjectPtr<UTaskAsset>> TaskAssets;
 
+	UPROPERTY(Transient)
+	TArray<UTaskAsset*> ResolvedTaskAssets;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSoftObjectPtr<UTexture2D> DeliverableMarkerIcon;
 
@@ -85,5 +88,6 @@ protected:
 	void OnTaskAssetsChanged();
 
 	bool ResolveAgentID();
+	void ResolveTaskAssets();
 	bool HasRuntimeAsset(UTaskAsset* InSource) const;
 };

@@ -21,6 +21,7 @@ public:
 
 public:
 	virtual void Initialize() override;
+	bool InitializeRuntimeTasks();
 	virtual UWorld* GetWorld() const override;
 	/** Expands nested task-asset reference nodes in a runtime duplicate. */
 	bool ExpandTaskAssetReferences(TArray<FText>& OutErrors);

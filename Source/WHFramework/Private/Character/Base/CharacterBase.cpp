@@ -174,7 +174,7 @@ void ACharacterBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* ACharacterBase::ToData()
 {
-	static FSceneActorSaveData SaveData;
+	FSceneActorSaveData& SaveData = GetMutableSaveData<FSceneActorSaveData>();
 	SaveData = FSceneActorSaveData();
 
 	SaveData.ActorID = ActorID;

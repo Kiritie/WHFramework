@@ -93,3 +93,16 @@ void UWidgetSceneMarkerItem::SetMarkerView(const FSceneMarkerView& InMarkerView,
 		TxtDistance->SetVisibility(bInShowDistance ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 	}
 }
+
+void UWidgetSceneMarkerItem::UpdateMarkerState(const FSceneMarkerView& InMarkerView)
+{
+	MarkerView.Location = InMarkerView.Location;
+	MarkerView.Distance = InMarkerView.Distance;
+	MarkerView.Bearing = InMarkerView.Bearing;
+	MarkerView.bTargetLoaded = InMarkerView.bTargetLoaded;
+	MarkerView.bTracked = InMarkerView.bTracked;
+	if(TxtDistance)
+	{
+		TxtDistance->SetText(FText::Format(NSLOCTEXT("SceneMarker", "DistanceMeters", "{0}m"), FText::AsNumber(FMath::RoundToInt(MarkerView.Distance / 100.f))));
+	}
+}

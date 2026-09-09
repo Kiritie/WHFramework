@@ -206,7 +206,7 @@ void AAbilityPawnBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* AAbilityPawnBase::ToData()
 {
-	static FPawnSaveData SaveData;
+	FPawnSaveData& SaveData = GetMutableSaveData<FPawnSaveData>();
 	SaveData = FPawnSaveData();
 
 	SaveData.ActorID = ActorID;

@@ -139,7 +139,8 @@ AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(FAbilityItem InItem, FVec
 {
 	if(!InItem.IsValid()) return nullptr;
 
-	static FPickUpSaveData SaveData;
+	FPickUpSaveData& SaveData = GetMutableSaveData<FPickUpSaveData>();
+	SaveData = FPickUpSaveData();
 	SaveData.Item = InItem;
 	SaveData.Location = InLocation;
 

@@ -89,7 +89,7 @@ bool UDialogueModule::EnterNode(int32 InNodeID, bool bRunEvents)
 	{
 		for (UDialogueEventBase* Event : Node.Events)
 		{
-			if (Event) Event->RecieveEventTriggered(ConsideringPlayer, NPCActor);
+			if (Event) Event->ReceiveEventTriggered(ConsideringPlayer, NPCActor);
 			if (CurrentDialogue != Dialogue) return true;
 		}
 	}

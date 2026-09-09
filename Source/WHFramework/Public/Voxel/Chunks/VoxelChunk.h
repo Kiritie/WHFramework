@@ -237,6 +237,8 @@ protected:
 	bool bNeedCreateMesh;
 
 private:
+	void GetVoxelItemsSnapshot(TArray<FVoxelItem>& OutVoxelItems);
+
 	static bool TryMakeVoxelMapCell(const FVoxelItem& InItem, int32 InHeight, FVoxelMapCell& OutCell);
 
 	void RebuildVoxelMap();

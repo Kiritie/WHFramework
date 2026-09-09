@@ -271,7 +271,7 @@ void UInputModule::RefreshData()
 
 FSaveData* UInputModule::ToData()
 {
-	static FInputModuleSaveData SaveData;
+	FInputModuleSaveData& SaveData = GetMutableSaveData<FInputModuleSaveData>();
 	SaveData = FInputModuleSaveData();
 
 	SaveData.KeyShortcuts = KeyShortcuts;

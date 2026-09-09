@@ -280,16 +280,22 @@ void SDialogueNodeWidget::OnMouseEnter(const FGeometry & MyGeometry, const FPoin
 	// if mouse is over a node widget after we stopped linkingAndPanning, try to link the node
 	if (Owner->GetEditingState()->isLinking && !Owner->isLinkingAndCapturing)
 	{
+		const int32 LinkingFromIndex = Owner->FindNodeIndex(Owner->GetEditingState()->LinkingFromNodeId);
+		if (!Dialogue->Data.IsValidIndex(LinkingFromIndex))
+		{
+			Owner->GetEditingState()->isLinking = false;
+			return;
+		}
 		// we shouldn't link a node to itself
-		if (Id != Dialogue->Data[Owner->GetEditingState()->LinkingFromIndex].id)
+		if (Id != Owner->GetEditingState()->LinkingFromNodeId)
 		{
 			// and we shouldn't link a node that's already linked
-			if (!Dialogue->Data[Owner->GetEditingState()->LinkingFromIndex].Links.Contains(Id))
+			if (!Dialogue->Data[LinkingFromIndex].Links.Contains(Id))
 			{
 				const FScopedTransaction Transaction(LOCTEXT("AddLink", "Add Link"));
 				Dialogue->Modify();
 
-				Dialogue->Data[Owner->GetEditingState()->LinkingFromIndex].Links.Add(Id);
+				Dialogue->Data[LinkingFromIndex].Links.Add(Id);
 				SortParentsLinks();
 			}
 		}
@@ -499,9 +505,11 @@ void SDialogueNodeWidget::BreakLinksMode()
 void SDialogueNodeWidget::BreakLinksWithNode()
 {
 	Owner->bBreakingLinksMode = false;
+	const int32 BreakingFromNodeIndex = Owner->FindNodeIndex(Owner->breakingLinksFromId);
+	if (!Dialogue->Data.IsValidIndex(BreakingFromNodeIndex)) return;
 
 	// if the two nodes aren't linked in any way or we clicked on the same node, just return
-	if (Owner->breakingLinksFromId == Id || (!Dialogue->Data[NodeIndex].Links.Contains(Owner->breakingLinksFromId) && !Owner->GetNodeById(Owner->breakingLinksFromId).Links.Contains(Id)))
+	if (Owner->breakingLinksFromId == Id || (!Dialogue->Data[NodeIndex].Links.Contains(Owner->breakingLinksFromId) && !Dialogue->Data[BreakingFromNodeIndex].Links.Contains(Id)))
 	{
 		return;
 	}
@@ -513,8 +521,6 @@ void SDialogueNodeWidget::BreakLinksWithNode()
 	{
 		return (param1 == Owner->breakingLinksFromId);
 	});
-
-	int32 BreakingFromNodeIndex = Owner->NodeIdsIndexes.FindRef(Owner->breakingLinksFromId);
 
 	Dialogue->Data[BreakingFromNodeIndex].Links.RemoveAll([this](const int32 param1)
 	{
@@ -536,25 +542,6 @@ void SDialogueNodeWidget::OnChangePcNpc()
 	}
 
 	Dialogue->Data[NodeIndex].isPlayer = !Dialogue->Data[NodeIndex].isPlayer;
-}
-
-/* Called when deleting a single node.
-* @param withRefresh - indicates wether a refresh is required after this node is deleted. You don't want to refresh when you're deleting multiple nodes with this method.
-*/
-void SDialogueNodeWidget::OnDeleteNode(bool withRefresh = true)
-{
-	if (Id == 0) return; //can't delete start node
-
-	BreakInLinks();
-
-	Owner->GetEditingState()->CurrentNodeId = -1;
-	Dialogue->Data.RemoveAt(Owner->NodeIdsIndexes.FindRef(Id));
-	Owner->DeselectNode(Id);
-
-	if (withRefresh)
-	{
-		Owner->SpawnNodes();
-	}
 }
 
 void SDialogueNodeWidget::OnBreakOutLinks()
@@ -608,14 +595,14 @@ void SDialogueNodeWidget::OnAddPcAnswer()
 		int32 lastId;
 		int32 linkToLastId = Dialogue->Data[index].Links.FindLastByPredicate([&](const int32 param1)
 		{
-			int tempIndex = Owner->NodeIdsIndexes.FindRef(param1);
-			return Dialogue->Data[tempIndex].Coordinates.Y > Dialogue->Data[index].Coordinates.Y;
+			const int32 TempIndex = Owner->FindNodeIndex(param1);
+			return Dialogue->Data.IsValidIndex(TempIndex) && Dialogue->Data[TempIndex].Coordinates.Y > Dialogue->Data[index].Coordinates.Y;
 		});
 
 		if (linkToLastId != INDEX_NONE)
 		{
 			lastId = Dialogue->Data[index].Links[linkToLastId];
-			lastIndex = Owner->NodeIdsIndexes.FindRef(lastId);
+			lastIndex = Owner->FindNodeIndex(lastId);
 
 			NewNode.Coordinates.X = Dialogue->Data[lastIndex].Coordinates.X + (Owner->NodeWidgets[lastIndex]->NodeSize.X + Owner->NodeWidgets[0]->NodeSize.X) / 2.f / Owner->GetZoomAmount() + 50.f; // half the size of the preceding widget + half the size of the new widget + desired distance
 			NewNode.Coordinates.Y = Dialogue->Data[lastIndex].Coordinates.Y;
@@ -656,14 +643,14 @@ void SDialogueNodeWidget::OnAddNpcAnswer()
 		int32 lastId;
 		int32 linkToLastId = Dialogue->Data[index].Links.FindLastByPredicate([&](const int32 param1)
 		{
-			int tempIndex = Owner->NodeIdsIndexes.FindRef(param1);
-			return Dialogue->Data[tempIndex].Coordinates.Y > Dialogue->Data[index].Coordinates.Y;
+			const int32 TempIndex = Owner->FindNodeIndex(param1);
+			return Dialogue->Data.IsValidIndex(TempIndex) && Dialogue->Data[TempIndex].Coordinates.Y > Dialogue->Data[index].Coordinates.Y;
 		});
 
 		if (linkToLastId != INDEX_NONE)
 		{
 			lastId = Dialogue->Data[index].Links[linkToLastId];
-			lastIndex = Owner->NodeIdsIndexes.FindRef(lastId);
+			lastIndex = Owner->FindNodeIndex(lastId);
 
 			NewNode.Coordinates.X = Dialogue->Data[lastIndex].Coordinates.X + (Owner->NodeWidgets[lastIndex]->NodeSize.X + Owner->NodeWidgets[0]->NodeSize.X) / 2.f / Owner->GetZoomAmount() + 50.f; // half the size of the preceding widget + half the size of the new widget + desired distance
 			NewNode.Coordinates.Y = Dialogue->Data[lastIndex].Coordinates.Y;
@@ -685,7 +672,7 @@ void SDialogueNodeWidget::OnAddLink()
 {
 	Owner->GetEditingState()->isLinking = true;
 	Owner->isLinkingAndCapturing = true;
-	Owner->GetEditingState()->LinkingFromIndex = NodeIndex;
+	Owner->GetEditingState()->LinkingFromNodeId = Id;
 	Owner->GetEditingState()->LinkingCoords = Dialogue->Data[NodeIndex].Coordinates;
 	Owner->ForceSlateToStayAwake();
 }
@@ -705,10 +692,11 @@ void SDialogueNodeWidget::SortParentsLinks()
 			{
 				Dialogue->Data[i].Links.Sort([&](const int32 id1, const int32 id2) // resort them depending on their x coordinate
 				{
-					int32 index1 = Owner->NodeIdsIndexes.FindRef(id1);
-					int32 index2 = Owner->NodeIdsIndexes.FindRef(id2);
-
-					return Dialogue->Data[index1].Coordinates.X < Dialogue->Data[index2].Coordinates.X;
+					const int32 Index1 = Owner->FindNodeIndex(id1);
+					const int32 Index2 = Owner->FindNodeIndex(id2);
+					if (!Dialogue->Data.IsValidIndex(Index1)) return false;
+					if (!Dialogue->Data.IsValidIndex(Index2)) return true;
+					return Dialogue->Data[Index1].Coordinates.X < Dialogue->Data[Index2].Coordinates.X;
 				});
 				break;
 			}

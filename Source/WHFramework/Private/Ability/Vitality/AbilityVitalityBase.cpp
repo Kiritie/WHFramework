@@ -122,7 +122,7 @@ void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* AAbilityVitalityBase::ToData()
 {
-	static FVitalitySaveData SaveData;
+	FVitalitySaveData& SaveData = GetMutableSaveData<FVitalitySaveData>();
 	SaveData = Super::ToData()->CastRef<FActorSaveData>();
 
 	SaveData.RaceID = RaceID;

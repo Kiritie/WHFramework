@@ -11,10 +11,10 @@ UWorld* UDialogueEventBase::GetWorld() const
 	return Dialogue ? Dialogue->GetWorld() : Super::GetWorld();
 }
 
-void UDialogueEventBase::RecieveEventTriggered_Implementation(APlayerController* ConsideringPlayer, AActor* NPCActor) {}
+void UDialogueEventBase::ReceiveEventTriggered_Implementation(APlayerController* ConsideringPlayer, AActor* NPCActor) {}
 
 bool UDialogueEventBase::Execute_Implementation(const FInteractionContext& InContext, FText& OutReason) const
 {
-	const_cast<UDialogueEventBase*>(this)->RecieveEventTriggered(InContext.Player, InContext.Target);
+	const_cast<UDialogueEventBase*>(this)->ReceiveEventTriggered(InContext.Player, InContext.Target);
 	return true;
 }

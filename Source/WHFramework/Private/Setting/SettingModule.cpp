@@ -92,7 +92,7 @@ void USettingModule::UnloadData(EPhase InPhase)
 
 FSaveData* USettingModule::ToData()
 {
-	static FSettingModuleSaveData SaveData;
+	FSettingModuleSaveData& SaveData = GetMutableSaveData<FSettingModuleSaveData>();
 	SaveData = FSettingModuleSaveData();
 
 	SaveData.WidgetData = UWidgetModule::Get().GetSaveDataRef<FWidgetModuleSaveData>(true);

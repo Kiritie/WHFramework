@@ -44,7 +44,7 @@ UVoxelTownGenerator::UVoxelTownGenerator()
 	PrefabAssets.Add(FPrimaryAssetId(TEXT("VoxelPrefab:DA_House_2")));
 	PrefabAssets.Add(FPrimaryAssetId(TEXT("VoxelPrefab:DA_House_3")));
 
-	_StartPoint = FVector2D::ZeroVector;
+	StartPoint = FVector2D::ZeroVector;
 }
 
 void UVoxelTownGenerator::Initialize(UVoxelModule* InModule, int32 InStage)
@@ -55,14 +55,14 @@ void UVoxelTownGenerator::Initialize(UVoxelModule* InModule, int32 InStage)
 	{
 		if(UVoxelPrefabData* Prefab = UAssetModuleStatics::LoadPrimaryAsset<UVoxelPrefabData>(PrefabAsset))
 		{
-			_PrefabAssets.Add(Prefab);
+			PrefabAssetCache.Add(Prefab);
 		}
 	}
 }
 
 void UVoxelTownGenerator::Generate(UVoxelChunk* InChunk)
 {
-	if(!InChunk || !Module || _PrefabAssets.IsEmpty()) return;
+	if(!InChunk || !Module || PrefabAssetCache.IsEmpty()) return;
 	const FIndex ChunkSize = Module->GetWorldData().ChunkSize;
 	const int32 MarginX = FMath::CeilToInt(static_cast<float>(InfluenceRadius) / FMath::Max(ChunkSize.X, 1)) + 1;
 	const int32 MarginY = FMath::CeilToInt(static_cast<float>(InfluenceRadius) / FMath::Max(ChunkSize.Y, 1)) + 1;
@@ -78,27 +78,27 @@ void UVoxelTownGenerator::Generate(UVoxelChunk* InChunk)
 				AnchorTopography.RegionType == EVoxelRegionType::River || AnchorTopography.RegionType == EVoxelRegionType::Lake || AnchorTopography.RegionType == EVoxelRegionType::Ocean || AnchorTopography.BiomeType == EVoxelBiomeType::Ocean || AnchorTopography.BiomeType == EVoxelBiomeType::River) continue;
 			TSharedPtr<TMap<FIndex, FVoxelItem>> Plan;
 			{
-				FReadScopeLock ReadLock(_TownPlanCacheLock);
-				if(const TSharedPtr<TMap<FIndex, FVoxelItem>>* CachedPlan = _TownPlanCache.Find(AnchorChunkIndex)) Plan = *CachedPlan;
+				FReadScopeLock ReadLock(TownPlanCacheLock);
+				if(const TSharedPtr<TMap<FIndex, FVoxelItem>>* CachedPlan = TownPlanCache.Find(AnchorChunkIndex)) Plan = *CachedPlan;
 			}
 			if(!Plan)
 			{
 				FScopeLock PlanningLock(&CriticalSection);
 				{
-					FReadScopeLock ReadLock(_TownPlanCacheLock);
-					if(const TSharedPtr<TMap<FIndex, FVoxelItem>>* CachedPlan = _TownPlanCache.Find(AnchorChunkIndex)) Plan = *CachedPlan;
+					FReadScopeLock ReadLock(TownPlanCacheLock);
+					if(const TSharedPtr<TMap<FIndex, FVoxelItem>>* CachedPlan = TownPlanCache.Find(AnchorChunkIndex)) Plan = *CachedPlan;
 				}
 				if(!Plan)
 				{
 					PlanTown(AnchorChunkIndex);
-					Plan = MakeShared<TMap<FIndex, FVoxelItem>>(MoveTemp(_PlannedVoxels));
-					FWriteScopeLock WriteLock(_TownPlanCacheLock);
-					_TownPlanCache.Add(AnchorChunkIndex, Plan);
-					_TownPlanCacheOrder.Add(AnchorChunkIndex);
-					while(_TownPlanCacheOrder.Num() > 64)
+					Plan = MakeShared<TMap<FIndex, FVoxelItem>>(MoveTemp(PlannedVoxels));
+					FWriteScopeLock WriteLock(TownPlanCacheLock);
+					TownPlanCache.Add(AnchorChunkIndex, Plan);
+					TownPlanCacheOrder.Add(AnchorChunkIndex);
+					while(TownPlanCacheOrder.Num() > 64)
 					{
-						_TownPlanCache.Remove(_TownPlanCacheOrder[0]);
-						_TownPlanCacheOrder.RemoveAt(0);
+						TownPlanCache.Remove(TownPlanCacheOrder[0]);
+						TownPlanCacheOrder.RemoveAt(0);
 					}
 				}
 			}
@@ -131,11 +131,11 @@ void UVoxelTownGenerator::Generate(UVoxelChunk* InChunk)
 
 void UVoxelTownGenerator::PlanTown(FIndex InAnchorChunkIndex)
 {
-	_Domains.Reset();
-	_Roads.Reset();
-	_BuildingPos.Reset();
-	_PlannedVoxels.Reset();
-	_TopographyHeightCache.Reset();
+	Domains.Reset();
+	Roads.Reset();
+	BuildingPositions.Reset();
+	PlannedVoxels.Reset();
+	TopographyHeightCache.Reset();
 	DevelopeDomains(InAnchorChunkIndex);
 	PlaceBuildings(InAnchorChunkIndex);
 	PlacePaths();
@@ -168,26 +168,26 @@ void UVoxelTownGenerator::ApplyTownSlice(UVoxelChunk* InChunk, const TMap<FIndex
 
 void UVoxelTownGenerator::SetPlannedVoxel(FIndex InWorldIndex, const FVoxelItem& InVoxelItem)
 {
-	if(FVector2D::Distance(InWorldIndex.ToVector2D(), _StartPoint) > InfluenceRadius) return;
-	_PlannedVoxels.Add(InWorldIndex, InVoxelItem);
+	if(FVector2D::Distance(InWorldIndex.ToVector2D(), StartPoint) > InfluenceRadius) return;
+	PlannedVoxels.Add(InWorldIndex, InVoxelItem);
 }
 
 int32 UVoxelTownGenerator::SamplePlannedHeight(FIndex InWorldIndex)
 {
 	InWorldIndex.Z = 0;
-	if(const int32* Height = _TopographyHeightCache.Find(InWorldIndex)) return *Height;
+	if(const int32* Height = TopographyHeightCache.Find(InWorldIndex)) return *Height;
 	const int32 Height = Module->SampleTopographyByIndex(InWorldIndex).Height;
-	_TopographyHeightCache.Add(InWorldIndex, Height);
+	TopographyHeightCache.Add(InWorldIndex, Height);
 	return Height;
 }
 
 void UVoxelTownGenerator::DevelopeDomains(FIndex InAnchorChunkIndex)
 {
 	const FIndex AnchorOrigin = Module->ChunkIndexToVoxelIndex(InAnchorChunkIndex);
-	_StartPoint = FVector2D(AnchorOrigin.X + 7, AnchorOrigin.Y + 7);
+	StartPoint = FVector2D(AnchorOrigin.X + 7, AnchorOrigin.Y + 7);
 
 	std::priority_queue<FTownDomainPoint, std::vector<FTownDomainPoint>, FTownDomainPointCompare> Points;
-	Points.push({ 0.f, _StartPoint });
+	Points.push({ 0.f, StartPoint });
 
 	int32 Count = 0;
 	const int32 Dx[9] = {1, -1, 0, 0, 1, -1, 1, -1, 0};
@@ -202,7 +202,7 @@ void UVoxelTownGenerator::DevelopeDomains(FIndex InAnchorChunkIndex)
 
 		for(int d = 0; d < 9; ++d)
 		{
-			_Domains.Emplace(FMathHelper::CompressIndex(P.X + Dx[d], P.Y + Dy[d]));
+			Domains.Emplace(FMathHelper::CompressIndex(P.X + Dx[d], P.Y + Dy[d]));
 		}
 
 		if(Cost > 7) break;
@@ -217,7 +217,7 @@ void UVoxelTownGenerator::DevelopeDomains(FIndex InAnchorChunkIndex)
 			int32 x = P.X + Dx1[d] * 3;
 			int32 y = P.Y + Dy1[d] * 3;
 
-			if(_Domains.Find(FMathHelper::CompressIndex(x, y))) continue;
+			if(Domains.Find(FMathHelper::CompressIndex(x, y))) continue;
 
 			const FVoxelTopography Topography = Module->SampleTopographyByIndex(FIndex(x, y, 0));
 			int32 Height = SamplePlannedHeight(FIndex(x, y));
@@ -238,7 +238,7 @@ void UVoxelTownGenerator::PlaceBuildings(FIndex InAnchorChunkIndex)
 	int32 Count = 0;
 
 	std::queue<FVector2D> Points;
-	Points.push(_StartPoint);
+	Points.push(StartPoint);
 
 	while(!Points.empty())
 	{
@@ -247,7 +247,7 @@ void UVoxelTownGenerator::PlaceBuildings(FIndex InAnchorChunkIndex)
 		const auto Pos = Points.front();
 		Points.pop();
 
-		const int32 Index = FMathHelper::HashRandInt(InAnchorChunkIndex.ToVector2D() + FVector2D(Count, -Count) * 107, Seed) % _PrefabAssets.Num();
+		const int32 Index = FMathHelper::HashRandInt(InAnchorChunkIndex.ToVector2D() + FVector2D(Count, -Count) * 107, Seed) % PrefabAssetCache.Num();
 		const int32 Rotate = FMathHelper::HashRandInt(InAnchorChunkIndex.ToVector2D() + FVector2D(Count, -Count) * 17, Seed) % 4;
 
 		if(!PlaceOneBuilding(Pos.X, Pos.Y, Index, Rotate) || PlaceOneBuilding(Pos.X, Pos.Y, Index, ((Rotate + 1) % 4)))
@@ -261,7 +261,7 @@ void UVoxelTownGenerator::PlaceBuildings(FIndex InAnchorChunkIndex)
 
 		for(int i = 0; i < 4; ++i)
 		{
-			Points.push(FVector2D(Pos.X + Dx[i] * (Offset + _PrefabAssets[Index]->VoxelSize.X) + OffsetX, Pos.Y + Dy[i] * (Offset + _PrefabAssets[Index]->VoxelSize.Y) + OffsetY));
+			Points.push(FVector2D(Pos.X + Dx[i] * (Offset + PrefabAssetCache[Index]->VoxelSize.X) + OffsetX, Pos.Y + Dy[i] * (Offset + PrefabAssetCache[Index]->VoxelSize.Y) + OffsetY));
 		}
 	}
 }
@@ -269,10 +269,10 @@ void UVoxelTownGenerator::PlaceBuildings(FIndex InAnchorChunkIndex)
 bool UVoxelTownGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, int32 InRotate)
 {
 	const int RotateIndex = InRotate % 2;
-	const int FrontBack = _PrefabAssets[InIndex]->VoxelSize[RotateIndex] / 2;
-	const int LeftRight = _PrefabAssets[InIndex]->VoxelSize[!RotateIndex] / 2;
-	const int UpDown = _PrefabAssets[InIndex]->VoxelSize[2];
-	const int32 VoxelOffsetZ = FMath::FloorToInt(_PrefabAssets[InIndex]->CenterOffset.Z);
+	const int FrontBack = PrefabAssetCache[InIndex]->VoxelSize[RotateIndex] / 2;
+	const int LeftRight = PrefabAssetCache[InIndex]->VoxelSize[!RotateIndex] / 2;
+	const int UpDown = PrefabAssetCache[InIndex]->VoxelSize[2];
+	const int32 VoxelOffsetZ = FMath::FloorToInt(PrefabAssetCache[InIndex]->CenterOffset.Z);
 
 	int32 GroundHeight = MIN_int32;
 	for(int i = -FrontBack - 1; i <= FrontBack; ++i)
@@ -289,7 +289,7 @@ bool UVoxelTownGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, 
 	{
 		for(int j = -LeftRight; j < LeftRight; ++j)
 		{
-			if(!_Domains.Find(FMathHelper::CompressIndex(InX + i, InY + j))) return false;
+			if(!Domains.Find(FMathHelper::CompressIndex(InX + i, InY + j))) return false;
 
 		}
 	}
@@ -305,7 +305,7 @@ bool UVoxelTownGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, 
 				const FIndex Index = FIndex(InX + i, InY + j, k);
 				SetPlannedVoxel(Index, EVoxelType::Cobble_Stone);
 			}
-			_Domains.Remove(FMathHelper::CompressIndex(InX + i, InY + j));
+			Domains.Remove(FMathHelper::CompressIndex(InX + i, InY + j));
 		}
 	}
 
@@ -322,13 +322,13 @@ bool UVoxelTownGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, 
 	}
 
 	TArray<FString> VoxelDatas;
-	_PrefabAssets[InIndex]->VoxelDatas.ParseIntoArray(VoxelDatas, TEXT("|"));
+	PrefabAssetCache[InIndex]->VoxelDatas.ParseIntoArray(VoxelDatas, TEXT("|"));
 	for(auto& Iter : VoxelDatas)
 	{
 		FVoxelItem VoxelItem = FVoxelItem(Iter, true);
 		VoxelItem.Index = VoxelItem.Index - FIndex(
-			FMath::FloorToInt(_PrefabAssets[InIndex]->CenterOffset.X),
-			FMath::FloorToInt(_PrefabAssets[InIndex]->CenterOffset.Y),
+			FMath::FloorToInt(PrefabAssetCache[InIndex]->CenterOffset.X),
+			FMath::FloorToInt(PrefabAssetCache[InIndex]->CenterOffset.Y),
 			0);
 		if(VoxelItem.GetData().bRotatable)
 		{
@@ -338,12 +338,12 @@ bool UVoxelTownGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, 
 		SetPlannedVoxel(Index, VoxelItem);
 	}
 
-	_Domains.Emplace(FMathHelper::CompressIndex(InX - FrontBack, InY - LeftRight));
-	_BuildingPos.Push(FVector2D(InX - FrontBack, InY - LeftRight));
+	Domains.Emplace(FMathHelper::CompressIndex(InX - FrontBack, InY - LeftRight));
+	BuildingPositions.Push(FVector2D(InX - FrontBack, InY - LeftRight));
 
-	const FText BuildingDisplayName = _PrefabAssets[InIndex]->DisplayName.IsEmpty()
+	const FText BuildingDisplayName = PrefabAssetCache[InIndex]->DisplayName.IsEmpty()
 		? UCommonModuleStatics::GetEnumDisplayNameByValue(TEXT("/Script/WHFramework.EVoxelRegionType"), static_cast<int32>(EVoxelRegionType::Building))
-		: _PrefabAssets[InIndex]->DisplayName;
+		: PrefabAssetCache[InIndex]->DisplayName;
 	FSceneArea BuildingArea;
 	const float BlockSize = Module->GetWorldData().BlockSize;
 	const FString StableKey = FString::Printf(TEXT("%s:%d:%d:%d"), *PrefabAssets[InIndex].ToString(), InX, InY, Module->GetWorldData().WorldSeed);
@@ -364,29 +364,29 @@ bool UVoxelTownGenerator::PlaceOneBuilding(int32 InX, int32 InY, int32 InIndex, 
 
 void UVoxelTownGenerator::PlacePaths()
 {
-	for(int i = 1; i < _BuildingPos.Num(); ++i)
+	for(int i = 1; i < BuildingPositions.Num(); ++i)
 	{
 		int32 NearestIndex = 0;
-		double NearestDistance = FVector2D::DistSquared(_BuildingPos[i], _BuildingPos[0]);
+		double NearestDistance = FVector2D::DistSquared(BuildingPositions[i], BuildingPositions[0]);
 		for(int j = 1; j < i; ++j)
 		{
-			const double Distance = FVector2D::DistSquared(_BuildingPos[i], _BuildingPos[j]);
+			const double Distance = FVector2D::DistSquared(BuildingPositions[i], BuildingPositions[j]);
 			if(Distance < NearestDistance) { NearestDistance = Distance; NearestIndex = j; }
 		}
-		const auto Path = PathFinder.FindPath(_BuildingPos[i], _BuildingPos[NearestIndex]);
+		const auto Path = PathFinder.FindPath(BuildingPositions[i], BuildingPositions[NearestIndex]);
 		for(FVector2D Pos : Path)
 		{
-			_Roads.Emplace(FMathHelper::CompressIndex(Pos.X, Pos.Y));
+			Roads.Emplace(FMathHelper::CompressIndex(Pos.X, Pos.Y));
 			const FIndex Index = FIndex(Pos.X, Pos.Y, SamplePlannedHeight(FIndex(Pos.X, Pos.Y)));
 			SetPlannedVoxel(Index, EVoxelType::Cobble_Stone);
 		}
 	}
-	_BuildingPos.Reset();
+	BuildingPositions.Reset();
 }
 
 bool UVoxelTownGenerator::InBarrier(FVector2D InPos)
 {
-	if(!_Domains.Contains(FMathHelper::CompressIndex(InPos.X, InPos.Y))) return true;
+	if(!Domains.Contains(FMathHelper::CompressIndex(InPos.X, InPos.Y))) return true;
 	const FVoxelTopography Topography = Module->SampleTopographyByIndex(FIndex(InPos.X, InPos.Y, 0));
 	if(Topography.BiomeType == EVoxelBiomeType::River || Topography.BiomeType == EVoxelBiomeType::Ocean || Topography.RegionType == EVoxelRegionType::River || Topography.RegionType == EVoxelRegionType::Lake || Topography.RegionType == EVoxelRegionType::Ocean) return true;
 	const int32 Height = Topography.Height;
@@ -400,7 +400,7 @@ bool UVoxelTownGenerator::InBarrier(FVector2D InPos)
 
 TPair<float, float> UVoxelTownGenerator::WeightFormula(FVector2D InStartPos, FVector2D InEndPos, float InCost)
 {
-	if(_Roads.Contains(FMathHelper::CompressIndex(InStartPos.X, InStartPos.Y)))
+	if(Roads.Contains(FMathHelper::CompressIndex(InStartPos.X, InStartPos.Y)))
 	{
 		InCost -= 0.5f;
 	}

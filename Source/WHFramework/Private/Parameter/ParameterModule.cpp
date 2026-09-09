@@ -83,7 +83,7 @@ void UParameterModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* UParameterModule::ToData()
 {
-	static FParameterModuleSaveData SaveData;
+	FParameterModuleSaveData& SaveData = GetMutableSaveData<FParameterModuleSaveData>();
 	SaveData = FParameterModuleSaveData();
 	
 	SaveData.Parameters = Parameters;

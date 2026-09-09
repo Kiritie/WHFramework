@@ -108,10 +108,10 @@ protected:
 
 private:
 	UPROPERTY(Transient)
-	TArray<UVoxelPrefabData*> _PrefabAssets;
+	TArray<UVoxelPrefabData*> PrefabAssetCache;
 
-	TArray<FVoxelBuildingPrefabCache> _PrefabCaches;
-	TMap<FIntVector4, FVoxelBuildingPlacementPlan> _BuildingPlanCache;
-	TArray<FIntVector4> _BuildingPlanCacheOrder;
-	mutable FRWLock _BuildingPlanCacheLock;
+	TArray<FVoxelBuildingPrefabCache> PrefabCaches;
+	TMap<FIntVector4, FVoxelBuildingPlacementPlan> BuildingPlanCache;
+	TArray<FIntVector4> BuildingPlanCacheOrder;
+	mutable FRWLock BuildingPlanCacheLock;
 };

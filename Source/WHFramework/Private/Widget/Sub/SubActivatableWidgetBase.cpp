@@ -6,6 +6,7 @@
 #include "Blueprint/WidgetTree.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Widget/Screen/UserWidgetBase.h"
+#include "Widget/WidgetModule.h"
 
 USubActivatableWidgetBase::USubActivatableWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
@@ -31,6 +32,8 @@ void USubActivatableWidgetBase::OnTick_Implementation(float DeltaSeconds)
 
 void USubActivatableWidgetBase::OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams)
 {
+	if(UWidgetModule::IsValid()) UWidgetModule::Get().RegisterTickableWidget(this);
+
 	OwnerWidget = Cast<IPanelWidgetInterface>(InOwner);
 
 	for(auto Iter : GetPoolWidgets())
@@ -63,6 +66,8 @@ void USubActivatableWidgetBase::OnRefresh()
 
 void USubActivatableWidgetBase::OnDestroy(bool bRecovery)
 {
+	if(UWidgetModule::IsValid()) UWidgetModule::Get().UnregisterTickableWidget(this);
+
 	RemoveFromParent();
 
 	K2_OnDestroy(bRecovery);

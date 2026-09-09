@@ -111,7 +111,7 @@ void UAchievementModule::UnloadData(EPhase InPhase)
 
 FSaveData* UAchievementModule::ToData()
 {
-	static FAchievementModuleSaveData SaveData;
+	FAchievementModuleSaveData& SaveData = GetMutableSaveData<FAchievementModuleSaveData>();
 	SaveData = FAchievementModuleSaveData();
 	
 	SaveData.States = States;

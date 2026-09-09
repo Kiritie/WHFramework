@@ -40,6 +40,26 @@ TSharedRef<SWidget> UWidgetSceneWorldMarker::RebuildWidget()
 void UWidgetSceneWorldMarker::SetMarkerView(const FSceneMarkerView& InMarkerView)
 {
 	MarkerView = InMarkerView;
+	BindWidgetMap.FindOrAdd(this) = FWorldWidgetMapping(MarkerView.Location);
+	bMarkerInRange = MarkerView.Distance >= MarkerView.Marker.MinDistance &&
+		(MarkerView.Marker.MaxDistance <= 0.f || MarkerView.Distance <= MarkerView.Marker.MaxDistance);
 	if(MarkerItem) MarkerItem->SetMarkerView(MarkerView, true, true);
-	RefreshLocationAndVisibility();
+}
+
+void UWidgetSceneWorldMarker::UpdateMarkerState(const FSceneMarkerView& InMarkerView)
+{
+	MarkerView.Location = InMarkerView.Location;
+	MarkerView.Distance = InMarkerView.Distance;
+	MarkerView.Bearing = InMarkerView.Bearing;
+	MarkerView.bTargetLoaded = InMarkerView.bTargetLoaded;
+	MarkerView.bTracked = InMarkerView.bTracked;
+	BindWidgetMap.FindOrAdd(this) = FWorldWidgetMapping(MarkerView.Location);
+	bMarkerInRange = MarkerView.Distance >= MarkerView.Marker.MinDistance &&
+		(MarkerView.Marker.MaxDistance <= 0.f || MarkerView.Distance <= MarkerView.Marker.MaxDistance);
+	if(MarkerItem) MarkerItem->UpdateMarkerState(MarkerView);
+}
+
+bool UWidgetSceneWorldMarker::IsWidgetVisible_Implementation(bool bRefresh)
+{
+	return bMarkerInRange && Super::IsWidgetVisible_Implementation(bRefresh);
 }

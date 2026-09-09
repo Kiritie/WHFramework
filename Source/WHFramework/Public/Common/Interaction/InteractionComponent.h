@@ -73,6 +73,8 @@ public:
 	UFUNCTION(BlueprintCallable)
 	bool ExecuteOption(AActor* InInteractor, FGameplayTag InOptionTag, FText& OutReason);
 
+	bool ExecuteOptionObject(AActor* InInteractor, const UInteractionOptionBase* InOption, FText& OutReason);
+
 	UFUNCTION(BlueprintCallable)
 	void NotifyOptionsChanged();
 

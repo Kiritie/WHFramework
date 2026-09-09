@@ -14,7 +14,7 @@ public:
 	UDialogueEventBase();
 	virtual bool Execute_Implementation(const FInteractionContext& InContext, FText& OutReason) const override;
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Dialogue Events")
-	void RecieveEventTriggered(APlayerController* ConsideringPlayer, AActor* NPCActor);
+	void ReceiveEventTriggered(APlayerController* ConsideringPlayer, AActor* NPCActor);
 
 	virtual class UWorld* GetWorld() const override;
 };

@@ -193,6 +193,7 @@ public:
 };
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnSceneAreaAdded, const FSceneArea&);
+DECLARE_MULTICAST_DELEGATE(FOnSceneAreasChanged);
 DECLARE_DELEGATE_RetVal_TwoParams(FSceneArea, FSceneAreaResolver, const FSceneArea&, const FVector2D&);
 
 /** 世界地图、小地图、罗盘与世界空间界面共用的标记 */

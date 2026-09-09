@@ -138,7 +138,7 @@ void AAbilityActorBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* AAbilityActorBase::ToData()
 {
-	static FActorSaveData SaveData;
+	FActorSaveData& SaveData = GetMutableSaveData<FActorSaveData>();
 	SaveData = Super::ToData()->CastRef<FSceneActorSaveData>();
 
 	SaveData.AssetID = AssetID;

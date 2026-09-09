@@ -38,14 +38,14 @@ void UWorldTimer::LoadData(FSaveData* InSaveData, EPhase InPhase)
 
 FSaveData* UWorldTimer::ToData()
 {
-	static FWorldTimerSaveData* SaveData;
-	SaveData = new FWorldTimerSaveData();
+	FWorldTimerSaveData& SaveData = GetMutableSaveData<FWorldTimerSaveData>();
+	SaveData = FWorldTimerSaveData();
 
-	SaveData->DayLength = GetDayLength();
-	SaveData->NightLength = GetNightLength();
-	SaveData->DateTime = GetDateTime();
+	SaveData.DayLength = GetDayLength();
+	SaveData.NightLength = GetNightLength();
+	SaveData.DateTime = GetDateTime();
 
-	return SaveData;
+	return &SaveData;
 }
 
 void UWorldTimer::ResetTimerParams_Implementation() const

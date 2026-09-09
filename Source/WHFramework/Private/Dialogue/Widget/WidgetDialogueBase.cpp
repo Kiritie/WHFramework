@@ -29,7 +29,7 @@ void UWidgetDialogueBase::RunEventsForNode_Implementation(FDialogueNode Node)
 	{
 		if (IsValid(Event))
 		{
-			Event->RecieveEventTriggered(GetOwningPlayer(), NPCActor);
+			Event->ReceiveEventTriggered(GetOwningPlayer(), NPCActor);
 		}
 	}
 }

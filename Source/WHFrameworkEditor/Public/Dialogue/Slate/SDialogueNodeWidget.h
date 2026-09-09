@@ -34,7 +34,6 @@ public:
 	void BreakLinksMode();
 	void BreakLinksWithNode();
 	void SortParentsLinks();
-	void OnDeleteNode(bool);
 	FMargin GetTextMargin() const;
 
 	FVector2D NodeSize = FVector2D(0, 0);
