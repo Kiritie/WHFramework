@@ -82,6 +82,11 @@ bool FTaskAssetReferenceTest::RunTest(const FString& Parameters)
 	UTaskAssetReferenceTask* RuntimeNestedReference = CastChecked<UTaskAssetReferenceTask>(RuntimeReusedRoot->SubTasks[1]);
 	TestTrue(TEXT("二级引用继续展开"), RuntimeNestedReference->IsRuntimeExpanded() && RuntimeNestedReference->SubTasks.Num() == 1);
 	TestEqual(TEXT("展开节点归属最外层运行资产"), RuntimeNestedReference->SubTasks[0]->GetTaskAsset(), RuntimeOne.Get());
+	RuntimeNestedReference->TaskState = ETaskState::Entered;
+	RuntimeNestedReference->SubTasks[0]->TaskState = ETaskState::Completed;
+	TestFalse(TEXT("引用子树在可交付子任务离开前不能完成包装节点"), RuntimeNestedReference->AreSubTasksReadyToComplete());
+	RuntimeNestedReference->SubTasks[0]->TaskState = ETaskState::Leaved;
+	TestTrue(TEXT("引用子树全部离开后才完成包装节点"), RuntimeNestedReference->AreSubTasksReadyToComplete());
 	if(TestEqual(TEXT("本地前置依赖仍存在"), RuntimeReusedLeaf->Prerequisites.Num(), 1))
 	{
 		const FTaskReference& RuntimePrerequisite = RuntimeReusedLeaf->Prerequisites[0];

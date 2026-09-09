@@ -454,7 +454,11 @@ void UTaskModule::CompleteTask(UTaskBase* InTask, ETaskExecuteResult InTaskExecu
 	if(InTask->IsEntered() && !InTask->IsCompleted())
 	{
 		InTask->OnComplete(InTaskExecuteResult);
-		if(InTask->ParentTask && InTask->ParentTask->HasSubTask() && InTask->ParentTask->IsAllSubCompleted())
+		if(InTask->TaskState == ETaskState::Completed && InTask->bRequireExplicitTurnIn && InTaskExecuteResult == ETaskExecuteResult::Succeed)
+		{
+			SetCurrentTask(InTask);
+		}
+		if(InTask->ParentTask && InTask->ParentTask->HasSubTask() && InTask->ParentTask->AreSubTasksReadyToComplete())
 		{
 			CompleteTask(InTask->ParentTask, InTask->ParentTask->IsAllSubSucceed() ? ETaskExecuteResult::Succeed : ETaskExecuteResult::Failed);
 		}
@@ -475,14 +479,19 @@ void UTaskModule::LeaveTask(UTaskBase* InTask)
 	if(!InTask->IsLeaved())
 	{
 		if (InTask->bRequireExplicitTurnIn && InTask->TaskExecuteResult != ETaskExecuteResult::Failed && TurningInTask != InTask) return;
+		UTaskBase* ParentTask = InTask->ParentTask;
 		InTask->OnLeave();
-		if(InTask->IsCurrent())
+		if(CurrentTask && (CurrentTask == InTask || InTask->IsParentOf(CurrentTask)))
 		{
 			SetCurrentTask(nullptr);
 		}
-		if(InTask->ParentTask && InTask->ParentTask->IsCompleted() && InTask->ParentTask->HasSubTask() && InTask->ParentTask->IsAllSubLeaved())
+		if(ParentTask && ParentTask->IsEntered() && ParentTask->HasSubTask() && ParentTask->AreSubTasksReadyToComplete())
 		{
-			LeaveTask(InTask->ParentTask);
+			CompleteTask(ParentTask, ParentTask->IsAllSubSucceed() ? ETaskExecuteResult::Succeed : ETaskExecuteResult::Failed);
+		}
+		if(ParentTask && ParentTask->IsCompleted() && ParentTask->HasSubTask() && ParentTask->IsAllSubLeaved())
+		{
+			LeaveTask(ParentTask);
 		}
 		RefreshTaskMarkers();
 	}

@@ -161,10 +161,13 @@ void UTaskComponent::SetAgentActive(bool bInActive)
 		{
 			if(Asset && GetOwner()) Asset->AgentLocation = GetOwner()->GetActorLocation();
 		}
-		if(USceneModule::IsValid() && MarkerID.IsValid()) USceneModule::Get().RemoveMarker(MarkerID);
-		LastMarkerTag = FGameplayTag();
 	}
-	else RefreshTaskMarker();
+	RefreshTaskMarker();
+}
+
+bool UTaskComponent::HasAvailableTask() const
+{
+	return bAgentActive && !GetOfferedAssets().IsEmpty();
 }
 
 void UTaskComponent::OnTaskAssetsChanged()
@@ -175,7 +178,19 @@ void UTaskComponent::OnTaskAssetsChanged()
 
 void UTaskComponent::RefreshTaskMarker()
 {
-	if(!bAgentActive || !USceneModule::IsValid() || (!AgentID.IsValid() && !ResolveAgentID())) return;
+	const bool bAvailable = HasAvailableTask();
+	if(bHasAvailableTask != bAvailable)
+	{
+		bHasAvailableTask = bAvailable;
+		OnTaskAvailabilityChanged.Broadcast(bAvailable);
+		if(UInteractionComponent* Interaction = GetOwner()->FindComponentByClass<UInteractionComponent>()) Interaction->NotifyOptionsChanged();
+	}
+	if(!bAgentActive || !USceneModule::IsValid() || (!AgentID.IsValid() && !ResolveAgentID()))
+	{
+		if(USceneModule::IsValid() && MarkerID.IsValid()) USceneModule::Get().RemoveMarker(MarkerID);
+		LastMarkerTag = FGameplayTag();
+		return;
+	}
 	for(UTaskAsset* Asset : GetRuntimeAssets())
 	{
 		if(Asset && GetOwner()) Asset->AgentLocation = GetOwner()->GetActorLocation();
@@ -190,13 +205,6 @@ void UTaskComponent::RefreshTaskMarker()
 		Icon = DeliverableMarkerIcon;
 		Color = FLinearColor(1.f, 0.82f, 0.15f);
 		DisplayName = Task->TaskDisplayName;
-	}
-	else if(!GetOfferedAssets().IsEmpty())
-	{
-		MarkerTag = TaskTags::Marker_Available;
-		Icon = AvailableMarkerIcon;
-		Color = FLinearColor(1.f, 0.75f, 0.05f);
-		DisplayName = NSLOCTEXT("Task", "AvailableTask", "Available Task");
 	}
 	else
 	{

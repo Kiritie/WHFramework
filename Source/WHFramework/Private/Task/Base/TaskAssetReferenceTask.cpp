@@ -23,6 +23,16 @@ void UTaskAssetReferenceTask::OnRefresh()
 	Super::OnRefresh();
 }
 
+bool UTaskAssetReferenceTask::AreSubTasksReadyToComplete() const
+{
+	if(SubTasks.IsEmpty()) return false;
+	for(const UTaskBase* Task : SubTasks)
+	{
+		if(!Task || Task->TaskState != ETaskState::Leaved) return false;
+	}
+	return true;
+}
+
 void UTaskAssetReferenceTask::EnterReferencedRoots()
 {
 	if(!bRuntimeExpanded || !bAutoEnterReferencedRoots || !IsEntered() || !UTaskModule::IsValid()) return;

@@ -12,7 +12,8 @@ enum class EDialogueTaskAction : uint8
 	Execute,
 	Complete,
 	TurnIn,
-	Track
+	Track,
+	CompleteAndTurnIn UMETA(DisplayName = "Complete And Turn In")
 };
 
 UCLASS(EditInlineNew)

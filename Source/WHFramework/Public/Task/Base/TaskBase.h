@@ -380,7 +380,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SubTask")
 	bool bMergeSubTask;
 	/// 子任务
-	UPROPERTY(VisibleAnywhere, Instanced, BlueprintReadOnly, Category = "SubTask")
+	UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly, Category = "SubTask")
 	TArray<UTaskBase*> SubTasks;
 public:
 	/**
@@ -404,6 +404,7 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	bool IsAllSubCompleted() const;
+	virtual bool AreSubTasksReadyToComplete() const;
 	/**
 	* 是否已成功执行有子任务
 	*/

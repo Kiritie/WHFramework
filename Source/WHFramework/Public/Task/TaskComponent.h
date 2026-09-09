@@ -49,6 +49,9 @@ public:
 	void SetAgentActive(bool bInActive);
 
 	UFUNCTION(BlueprintPure)
+	bool HasAvailableTask() const;
+
+	UFUNCTION(BlueprintPure)
 	FGuid GetAgentID() const { return AgentID; }
 
 	UFUNCTION(BlueprintCallable)
@@ -57,12 +60,12 @@ public:
 	UPROPERTY(BlueprintAssignable)
 	FOnTaskAccepted OnTaskAccepted;
 
+	UPROPERTY(BlueprintAssignable)
+	FOnTaskAvailabilityChanged OnTaskAvailabilityChanged;
+
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TArray<TSoftObjectPtr<UTaskAsset>> TaskAssets;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TSoftObjectPtr<UTexture2D> AvailableMarkerIcon;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSoftObjectPtr<UTexture2D> DeliverableMarkerIcon;
@@ -76,6 +79,7 @@ protected:
 	FGuid MarkerID;
 	FGameplayTag LastMarkerTag;
 	bool bAgentActive = true;
+	bool bHasAvailableTask = false;
 
 	UFUNCTION()
 	void OnTaskAssetsChanged();

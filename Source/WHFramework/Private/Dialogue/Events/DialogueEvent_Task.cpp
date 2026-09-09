@@ -40,6 +40,13 @@ bool UDialogueEvent_Task::ApplyTaskAction(AActor* InTarget) const
 			Module.SetCurrentTask(RuntimeTask);
 			return Module.GetCurrentTask() == RuntimeTask;
 		}
+		case EDialogueTaskAction::CompleteAndTurnIn:
+		{
+			UTaskBase* RootTask = RuntimeTask->RootTask ? RuntimeTask->RootTask : RuntimeTask;
+			Module.CompleteTask(RuntimeTask);
+			if (!RootTask || RootTask->TaskState != ETaskState::Completed || RootTask->TaskExecuteResult != ETaskExecuteResult::Succeed) return false;
+			return Component ? Component->TurnInTask(RootTask) : Module.TurnInTask(RootTask, InTarget);
+		}
 	}
 	return RuntimeTask->TaskState != PreviousState;
 }

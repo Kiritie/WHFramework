@@ -14,7 +14,6 @@ class UTexture2D;
 
 namespace TaskTags
 {
-	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Marker_Available);
 	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Marker_Active);
 	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Marker_Deliverable);
 }
@@ -32,6 +31,7 @@ enum class ETaskState : uint8
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTaskStateChanged, ETaskState, InTaskState);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnTaskAssetsChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTaskAccepted, UTaskBase*, InTask);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTaskAvailabilityChanged, bool, bAvailable);
 
 UENUM(BlueprintType)
 enum class ETaskExecuteType : uint8

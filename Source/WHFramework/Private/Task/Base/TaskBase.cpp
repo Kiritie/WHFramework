@@ -581,6 +581,11 @@ bool UTaskBase::IsAllSubCompleted() const
 	return true;
 }
 
+bool UTaskBase::AreSubTasksReadyToComplete() const
+{
+	return IsAllSubCompleted();
+}
+
 bool UTaskBase::IsAllSubSucceed() const
 {
 	for (auto Iter : SubTasks)
