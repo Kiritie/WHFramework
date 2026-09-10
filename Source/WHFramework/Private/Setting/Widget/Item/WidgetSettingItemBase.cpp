@@ -6,7 +6,9 @@
 
 UWidgetSettingItemBase::UWidgetSettingItemBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	WidgetParams.Add(FParameter::MakeText(FText::GetEmpty(), NSLOCTEXT("WH.WidgetSettingItemBase", "Title", "标题")));
+	FParameter TitleParameter(FText::GetEmpty());
+	TitleParameter.SetDescription(NSLOCTEXT("WH.WidgetSettingItemBase", "Title", "标题"));
+	WidgetParams.Add(MoveTemp(TitleParameter));
 }
 
 void UWidgetSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -15,7 +17,7 @@ void UWidgetSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArr
 
 	if(InParams.IsValidIndex(0))
 	{
-		SetTitle(InParams[0]);
+		SetTitle(InParams[0].Get<FText>());
 	}
 }
 

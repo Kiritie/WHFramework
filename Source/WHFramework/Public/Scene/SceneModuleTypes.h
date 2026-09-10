@@ -303,6 +303,15 @@ public:
 	FName LevelPath;
 };
 
+USTRUCT()
+struct FSoftLevelPathArrayParameterValue : public FParameterValueBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TArray<FSoftLevelPath> Value;
+};
+
 /**
  *
  */

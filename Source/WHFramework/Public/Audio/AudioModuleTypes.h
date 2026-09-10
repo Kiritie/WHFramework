@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
+#include "Parameter/ParameterValueTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 
 #include "AudioModuleTypes.generated.h"
@@ -107,6 +108,15 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float Pitch;
+};
+
+USTRUCT()
+struct FSoundParamsParameterValue : public FParameterValueBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FSoundParams Value;
 };
 
 USTRUCT(BlueprintType)

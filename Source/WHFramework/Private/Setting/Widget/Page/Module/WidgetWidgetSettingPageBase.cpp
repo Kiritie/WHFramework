@@ -20,7 +20,7 @@ void UWidgetWidgetSettingPageBase::OnCreate(UUserWidget* InOwner, const TArray<F
 
 	TArray<FString> LanguageNames;
 	ITER_ARRAY(UWidgetModuleStatics::GetWidgetLanguageTypes(), Item, LanguageNames.Add(Item.DisplayName); )
-	SettingItem_LanguageType = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetWidgetSettingPageBase", "InterfaceLanguage", "界面语言"), &LanguageNames }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_LanguageType = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetWidgetSettingPageBase", "InterfaceLanguage", "界面语言"), FStringArrayParameterValue(LanguageNames) }, USettingModule::Get().GetEnumSettingItemClass());
 	SettingItem_LanguageType->SetValue(UWidgetModuleStatics::GetWidgetLanguageType());
 	AddSettingItem(FName("LanguageType"), SettingItem_LanguageType, NSLOCTEXT("WH.WidgetWidgetSettingPageBase", "Global", "全局"));
 
@@ -33,8 +33,8 @@ void UWidgetWidgetSettingPageBase::OnApply()
 {
 	Super::OnApply();
 
-	UWidgetModuleStatics::SetWidgetLanguageType(SettingItem_LanguageType->GetValue().GetIntegerValue());
-	UWidgetModuleStatics::SetWidgetGlobalScale(SettingItem_GlobalScale->GetValue().GetFloatValue());
+	UWidgetModuleStatics::SetWidgetLanguageType(SettingItem_LanguageType->GetValue().Get<int32>());
+	UWidgetModuleStatics::SetWidgetGlobalScale(SettingItem_GlobalScale->GetValue().Get<float>());
 }
 
 void UWidgetWidgetSettingPageBase::NativeOnActivated()
@@ -60,8 +60,8 @@ void UWidgetWidgetSettingPageBase::OnReset(bool bForce)
 
 bool UWidgetWidgetSettingPageBase::CanApply_Implementation() const
 {
-	return UWidgetModuleStatics::GetWidgetLanguageType() != SettingItem_LanguageType->GetValue().GetIntegerValue() ||
-		UWidgetModuleStatics::GetWidgetGlobalScale() != SettingItem_GlobalScale->GetValue().GetFloatValue();
+	return UWidgetModuleStatics::GetWidgetLanguageType() != SettingItem_LanguageType->GetValue().Get<int32>() ||
+		UWidgetModuleStatics::GetWidgetGlobalScale() != SettingItem_GlobalScale->GetValue().Get<float>();
 }
 
 bool UWidgetWidgetSettingPageBase::CanReset_Implementation() const

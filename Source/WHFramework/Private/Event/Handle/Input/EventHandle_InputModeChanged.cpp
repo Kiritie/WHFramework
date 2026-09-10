@@ -16,6 +16,6 @@ void UEventHandle_InputModeChanged::Parse_Implementation(const TArray<FParameter
 {
 	if(InParams.IsValidIndex(0))
 	{
-		InputMode = *InParams[0].GetPointerValue<EInputMode>();
+		InputMode = static_cast<EInputMode>(InParams[0].Get<uint8>());
 	}
 }

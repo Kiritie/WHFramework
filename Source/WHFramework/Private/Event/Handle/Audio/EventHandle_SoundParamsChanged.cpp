@@ -20,10 +20,13 @@ void UEventHandle_SoundParamsChanged::Parse_Implementation(const TArray<FParamet
 {
 	if(InParams.IsValidIndex(0))
 	{
-		SoundClass = InParams[0];
+		SoundClass = InParams[0].Get<USoundClass*>();
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		SoundParams = InParams[1].GetPointerValueRef<FSoundParams>();
+		if(const FSoundParamsParameterValue* Value = InParams[1].GetStructPtr<FSoundParamsParameterValue>())
+		{
+			SoundParams = Value->Value;
+		}
 	}
 }

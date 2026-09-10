@@ -37,7 +37,7 @@ void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastState, const 
 
 	if(InParams.IsValidIndex(0))
 	{
-		Killer = InParams[0].GetPointerValue<IAbilityVitalityInterface>();
+		Killer = Cast<IAbilityVitalityInterface>(InParams[0].Get<UObject*>());
 	}
 	
 	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalityDead>(this, { GetAgent(), Cast<UObject>(Killer) });

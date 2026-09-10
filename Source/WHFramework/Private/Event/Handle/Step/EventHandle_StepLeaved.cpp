@@ -17,6 +17,6 @@ void UEventHandle_StepLeaved::Parse_Implementation(const TArray<FParameter>& InP
 {
 	if(InParams.IsValidIndex(0))
 	{
-		Step = InParams[0];
+		Step = InParams[0].Get<UStepBase*>();
 	}
 }

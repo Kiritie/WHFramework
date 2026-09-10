@@ -19,10 +19,10 @@ void UEventHandle_UserWidgetStateChanged::Parse_Implementation(const TArray<FPar
 {
 	if(InParams.IsValidIndex(0))
 	{
-		UserWidget = InParams[0];
+		UserWidget = InParams[0].Get<UUserWidgetBase*>();
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		WidgetState = InParams[1].GetPointerValueRef<EScreenWidgetState>();
+		WidgetState = static_cast<EScreenWidgetState>(InParams[1].Get<uint8>());
 	}
 }

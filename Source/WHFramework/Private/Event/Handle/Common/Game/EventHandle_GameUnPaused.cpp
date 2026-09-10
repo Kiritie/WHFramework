@@ -17,6 +17,6 @@ void UEventHandle_GameUnPaused::Parse_Implementation(const TArray<FParameter>& I
 {
 	if(InParams.IsValidIndex(0))
 	{
-		PauseMode = (EPauseMode)InParams[0].GetIntegerValue();
+		PauseMode = (EPauseMode)InParams[0].Get<int32>();
 	}
 }

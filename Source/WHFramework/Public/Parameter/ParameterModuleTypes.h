@@ -15,10 +15,10 @@ struct WHFRAMEWORK_API FParameterModuleSaveData : public FSaveData
 public:
 	FORCEINLINE FParameterModuleSaveData()
 	{
-		Parameters = FParameters();
+		ParameterSets = FParameterSets();
 	}
 
 public:
 	UPROPERTY(BlueprintReadOnly)
-	FParameters Parameters;
+	FParameterSets ParameterSets;
 };

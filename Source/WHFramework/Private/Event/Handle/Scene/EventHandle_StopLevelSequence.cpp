@@ -23,15 +23,15 @@ void UEventHandle_StopLevelSequence::Parse_Implementation(const TArray<FParamete
 {
 	if(InParams.IsValidIndex(0))
 	{
-		LevelSequence = InParams[0];
+		LevelSequence = InParams[0].Get<TSoftObjectPtr<ALevelSequenceActor>>();
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		Delay = InParams[1];
+		Delay = InParams[1].Get<float>();
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		bKeepState = InParams[2];
+		bKeepState = InParams[2].Get<bool>();
 	}
 }
 

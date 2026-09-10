@@ -58,3 +58,27 @@ public:
 		ParameterData.MakeSaved();
 	}
 };
+
+USTRUCT()
+struct FStringArrayParameterValue : public FParameterValueBase
+{
+	GENERATED_BODY()
+
+	FStringArrayParameterValue() = default;
+	explicit FStringArrayParameterValue(const TArray<FString>& InValue) : Value(InValue) { }
+
+	UPROPERTY()
+	TArray<FString> Value;
+};
+
+USTRUCT()
+struct FInt32ArrayParameterValue : public FParameterValueBase
+{
+	GENERATED_BODY()
+
+	FInt32ArrayParameterValue() = default;
+	explicit FInt32ArrayParameterValue(const TArray<int32>& InValue) : Value(InValue) { }
+
+	UPROPERTY()
+	TArray<int32> Value;
+};

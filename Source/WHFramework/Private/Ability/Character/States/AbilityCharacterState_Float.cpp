@@ -34,7 +34,7 @@ void UAbilityCharacterState_Float::OnEnter(UFiniteStateBase* InLastState, const 
 
 	if(InParams.IsValidIndex(0))
 	{
-		WaterPosZ = InParams[0];
+		WaterPosZ = InParams[0].Get<float>();
 	}
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();

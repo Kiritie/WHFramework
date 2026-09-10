@@ -31,11 +31,11 @@ void UWidgetLoadingLevelPanel::OnOpen(const TArray<FParameter>& InParams, bool b
 
 	if(InParams.IsValidIndex(0))
 	{
-		LevelPath = InParams[0];
+		LevelPath = InParams[0].Get<FName>();
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		bUnloading = InParams[1];
+		bUnloading = InParams[1].Get<bool>();
 	}
 }
 

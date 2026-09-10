@@ -17,6 +17,6 @@ void UEventHandle_GameExited::Parse_Implementation(const TArray<FParameter>& InP
 {
 	if(InParams.IsValidIndex(0))
 	{
-		bIsSimulating = InParams[0];
+		bIsSimulating = InParams[0].Get<bool>();
 	}
 }

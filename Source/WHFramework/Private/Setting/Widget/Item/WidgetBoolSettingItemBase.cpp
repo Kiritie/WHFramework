@@ -43,6 +43,6 @@ FParameter UWidgetBoolSettingItemBase::GetValue() const
 
 void UWidgetBoolSettingItemBase::SetValue(const FParameter& InValue)
 {
-	Btn_Value->SetIsSelected(InValue);
+	Btn_Value->SetIsSelected(InValue.Get<bool>());
 	Super::SetValue(InValue);
 }

@@ -7,6 +7,15 @@
 
 #include "EventHandle_OpenUserWidget.generated.h"
 
+USTRUCT()
+struct FWidgetParameterArrayValue : public FParameterValueBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TArray<FParameter> Value;
+};
+
 /**
  * 
  */

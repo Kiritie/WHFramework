@@ -21,15 +21,15 @@ void UEventHandle_SetLevelOwnerPlayer::Parse_Implementation(const TArray<FParame
 {
 	if(InParams.IsValidIndex(0))
 	{
-		LevelObjectPtr = InParams[0];
+		LevelObjectPtr = InParams[0].Get<TSoftObjectPtr<UWorld>>();
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		LevelPath = InParams[1];
+		LevelPath = InParams[1].Get<FName>();
 	}
 	if(InParams.IsValidIndex(2))
 	{
-		PlayerIndex = InParams[2];
+		PlayerIndex = InParams[2].Get<int32>();
 	}
 }
 

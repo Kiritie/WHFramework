@@ -19,11 +19,11 @@ void UEventHandle_SetActorVisible::Parse_Implementation(const TArray<FParameter>
 {
 	if(InParams.IsValidIndex(0))
 	{
-		ActorPath = InParams[0];
+		ActorPath = InParams[0].Get<TSoftObjectPtr<AActor>>();
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		bVisible = InParams[1];
+		bVisible = InParams[1].Get<bool>();
 	}
 }
 

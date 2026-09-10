@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "WebRequest/Handle/WebRequestHandle_DownloadFile.h"
@@ -22,7 +22,7 @@ void UWebRequestHandle_DownloadFile::Parse(const FWebRequestResult& InResult, co
 {
 	if (InParams.IsValidIndex(0))
 	{
-		FilePath = InParams[0].GetStringValue();
+		FilePath = InParams[0].Get<FString>();
 	}
 	else
 	{

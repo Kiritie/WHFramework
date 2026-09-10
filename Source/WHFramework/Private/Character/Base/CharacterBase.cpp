@@ -84,16 +84,16 @@ void ACharacterBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FPara
 	{
 		if(InParams[0].Is<FTransform>())
 		{
-			SetActorTransform(InParams[0]);
+			SetActorTransform(InParams[0].Get<FTransform>());
 		}
 		else if(InParams[0].Is<FGuid>())
 		{
-			ActorID = InParams[0];
+			ActorID = InParams[0].Get<FGuid>();
 		}
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		AssetID = InParams[1];
+		AssetID = InParams[1].Get<FPrimaryAssetId>();
 	}
 
 	USceneModuleStatics::AddSceneActor(this);

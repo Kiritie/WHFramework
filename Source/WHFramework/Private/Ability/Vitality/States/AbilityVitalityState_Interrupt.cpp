@@ -34,7 +34,7 @@ void UAbilityVitalityState_Interrupt::OnEnter(UFiniteStateBase* InLastState, con
 
 	if(InParams.IsValidIndex(0))
 	{
-		Duration = InParams[0];
+		Duration = InParams[0].Get<float>();
 		RemainTime = Duration;
 	}
 

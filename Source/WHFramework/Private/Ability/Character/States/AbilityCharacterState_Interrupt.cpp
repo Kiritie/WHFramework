@@ -33,7 +33,7 @@ void UAbilityCharacterState_Interrupt::OnEnter(UFiniteStateBase* InLastState, co
 {
 	Super::OnEnter(InLastState, InParams);
 
-	Duration = InParams.IsValidIndex(0) ? InParams[0].GetFloatValue() : -1.f;
+	Duration = InParams.IsValidIndex(0) ? InParams[0].Get<float>() : -1.f;
 	RemainTime = Duration;
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();

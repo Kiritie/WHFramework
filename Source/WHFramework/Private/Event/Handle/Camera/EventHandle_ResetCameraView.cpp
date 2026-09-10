@@ -16,11 +16,11 @@ void UEventHandle_ResetCameraView::Parse_Implementation(const TArray<FParameter>
 {
 	if(InParams.IsValidIndex(0))
 	{
-		CameraResetMode = InParams[0].GetPointerValueRef<ECameraResetMode>();
+		CameraResetMode = static_cast<ECameraResetMode>(InParams[0].Get<uint8>());
 	}
 }
 
 TArray<FParameter> UEventHandle_ResetCameraView::Pack_Implementation()
 {
-	return { &CameraResetMode };
+	return { static_cast<uint8>(CameraResetMode) };
 }

@@ -57,7 +57,9 @@ void UVoxel::OnGenerate(IVoxelAgentInterface* InAgent)
 	if(GetData().IsMainPart())
 	{
 		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Generate), GetLocation());
-		UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelGenerated>(Cast<UObject>(InAgent), { &Item, Cast<UObject>(InAgent) });
+		FVoxelItemParameterValue ItemValue;
+		ItemValue.Value = Item;
+		UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelGenerated>(Cast<UObject>(InAgent), { MoveTemp(ItemValue), Cast<UObject>(InAgent) });
 	}
 }
 
@@ -73,7 +75,9 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 		{
 			UAbilityModuleStatics::SpawnAbilityPickUp(FAbilityItem(GetData().GatherData ? GetData().GatherData->GetPrimaryAssetId() : GetData().GetPrimaryAssetId(), 1), GetLocation() + GetData().GetRange(GetAngle()) * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f, GetOwner());
 		}
-		UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelDestroyed>(Cast<UObject>(InAgent), { &Item, Cast<UObject>(InAgent) });
+		FVoxelItemParameterValue ItemValue;
+		ItemValue.Value = Item;
+		UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelDestroyed>(Cast<UObject>(InAgent), { MoveTemp(ItemValue), Cast<UObject>(InAgent) });
 	}
 	if(GetOwner() && (Item.GetVoxelType() == EVoxelType::Oak || Item.GetVoxelType() == EVoxelType::Birch) && Item.Data.StartsWith(TEXT("R")))
 	{

@@ -18,19 +18,24 @@ void UEventHandle_AsyncLoadLevels::Parse_Implementation(const TArray<FParameter>
 {
 	if(InParams.IsValidIndex(0))
 	{
-		SoftLevelPaths = InParams[0].GetPointerValueRef<TArray<FSoftLevelPath>>();
+		if(const FSoftLevelPathArrayParameterValue* Value = InParams[0].GetStructPtr<FSoftLevelPathArrayParameterValue>())
+		{
+			SoftLevelPaths = Value->Value;
+		}
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		FinishDelayTime = InParams[1];
+		FinishDelayTime = InParams[1].Get<float>();
 	}
 	if(InParams.IsValidIndex(2))
 	{
-		bCreateLoadingWidget = InParams[2];
+		bCreateLoadingWidget = InParams[2].Get<bool>();
 	}
 }
 
 TArray<FParameter> UEventHandle_AsyncLoadLevels::Pack_Implementation()
 {
-	return { &SoftLevelPaths, FinishDelayTime, bCreateLoadingWidget };
+	FSoftLevelPathArrayParameterValue PathsValue;
+	PathsValue.Value = SoftLevelPaths;
+	return { MoveTemp(PathsValue), FinishDelayTime, bCreateLoadingWidget };
 }

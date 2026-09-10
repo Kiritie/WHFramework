@@ -21,11 +21,11 @@ void UEventHandle_SetDataLayerOwnerPlayer::Parse_Implementation(const TArray<FPa
 {
 	if(InParams.IsValidIndex(0))
 	{
-		DataLayer = InParams[0];
+		DataLayer = InParams[0].Get<UDataLayerAsset*>();
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		PlayerIndex = InParams[1];
+		PlayerIndex = InParams[1].Get<int32>();
 	}
 }
 

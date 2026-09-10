@@ -147,7 +147,7 @@ void AAbilityVitalityBase::Serialize(FArchive& Ar)
 
 void AAbilityVitalityBase::Death(IAbilityVitalityInterface* InKiller)
 {
-	SwitchFinalFiniteState({ InKiller });
+	SwitchFinalFiniteState({ Cast<UObject>(InKiller) });
 }
 
 void AAbilityVitalityBase::Kill(IAbilityVitalityInterface* InTarget)
@@ -161,7 +161,7 @@ void AAbilityVitalityBase::Kill(IAbilityVitalityInterface* InTarget)
 
 void AAbilityVitalityBase::Revive(IAbilityVitalityInterface* InRescuer)
 {
-	SwitchDefaultFiniteState({ InRescuer });
+	SwitchDefaultFiniteState({ Cast<UObject>(InRescuer) });
 }
 
 void AAbilityVitalityBase::Static()

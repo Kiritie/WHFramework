@@ -58,7 +58,7 @@ public:
 	/// Parameter
 protected:
 	UPROPERTY(EditAnywhere, Replicated)
-	FParameters Parameters;
+	FParameterSets ParameterSets;
 
 public:
 	UFUNCTION(BlueprintCallable, BlueprintPure)

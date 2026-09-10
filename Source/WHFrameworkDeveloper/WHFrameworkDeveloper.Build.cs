@@ -14,6 +14,9 @@ public class WHFrameworkDeveloper : ModuleRules
 			new string[]
 			{
 				"Core",
+				"BlueprintGraph",
+				"WHFramework",
+				"WHFrameworkCore"
 			});
 			
 		PrivateDependencyModuleNames.AddRange(

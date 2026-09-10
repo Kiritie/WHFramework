@@ -375,7 +375,7 @@ void UUserWidgetBase::OnStateChanged(EScreenWidgetState InWidgetState)
 
 	OnWidgetStateChanged.Broadcast(InWidgetState);
 
-	UEventModuleStatics::BroadcastEvent<UEventHandle_UserWidgetStateChanged>(this, { this, &InWidgetState });
+	UEventModuleStatics::BroadcastEvent<UEventHandle_UserWidgetStateChanged>(this, { this, static_cast<uint8>(InWidgetState) });
 }
 
 void UUserWidgetBase::Init(UObject* InOwner, const TArray<FParameter>* InParams, bool bForce)

@@ -18,7 +18,7 @@ void UWidgetAbilityDragItemBase::OnSpawn_Implementation(UObject* InOwner, const 
 	
 	if(InParams.IsValidIndex(0))
 	{
-		Item = InParams[0].GetPointerValueRef<FAbilityItem>();
+		Item = InParams[0].Get<FAbilityItem>();
 		Item.Payload = this;
 	}
 }

@@ -10,7 +10,8 @@ SEditorEnumSettingItem::SEditorEnumSettingItem()
 
 void SEditorEnumSettingItem::Construct(const FArguments& InArgs)
 {
-	for(auto& Iter : InArgs._SettingItem.ItemValue.GetEnumValue().EnumNames)
+	const FEnumParameterValue EnumValue = InArgs._SettingItem.ItemValue.Get<FEnumParameterValue>();
+	for(const FString& Iter : EnumValue.EnumNames)
 	{
 		EnumNames.Add(MakeShared<FString>(Iter));
 	}
@@ -27,10 +28,10 @@ void SEditorEnumSettingItem::Construct(const FArguments& InArgs)
 				SNew(STextComboBox)
 				.ComboBoxStyle(FWHFrameworkSlateStyle::Get(), "ComboBoxes.SettingItem")
 				.OptionsSource(&EnumNames)
-				.InitiallySelectedItem(EnumNames[InArgs._SettingItem.ItemValue.GetEnumValue().EnumValue])
-				.OnSelectionChanged_Lambda([this, InArgs](TSharedPtr<FString> Selection, ESelectInfo::Type SelectInfo)
+				.InitiallySelectedItem(EnumNames[EnumValue.EnumValue])
+				.OnSelectionChanged_Lambda([this, EnumValue](TSharedPtr<FString> Selection, ESelectInfo::Type SelectInfo)
 				{
-					SetSettingValue(FEnumParameterValue(InArgs._SettingItem.ItemValue.GetEnumValue().EnumNames, EnumNames.Find(Selection)));
+					SetSettingValue(FEnumParameterValue(EnumValue.EnumNames, EnumNames.Find(Selection)));
 				})
 			]
 		]

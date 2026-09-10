@@ -29,22 +29,22 @@ void UWidgetFloatSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const
 
 	if(InParams.IsValidIndex(1))
 	{
-		MinValue = InParams[1];
+		MinValue = InParams[1].Get<float>();
 	}
 
 	if(InParams.IsValidIndex(2))
 	{
-		MaxValue = InParams[2];
+		MaxValue = InParams[2].Get<float>();
 	}
 
 	if(InParams.IsValidIndex(3))
 	{
-		DecimalNum = InParams[3];
+		DecimalNum = InParams[3].Get<int32>();
 	}
 
 	if(InParams.IsValidIndex(4))
 	{
-		ScaleFactor = InParams[4];
+		ScaleFactor = InParams[4].Get<float>();
 	}
 
 	if(Txt_MinValue)
@@ -111,7 +111,7 @@ FParameter UWidgetFloatSettingItemBase::GetValue() const
 
 void UWidgetFloatSettingItemBase::SetValue(const FParameter& InValue)
 {
-	const float Value = (InValue.GetFloatValue() - MinValue) / (MaxValue - MinValue);
+	const float Value = (InValue.Get<float>() - MinValue) / (MaxValue - MinValue);
 	if(Slider_Value->GetValue() == Value)
 	{
 		OnSliderValueChanged(Value);

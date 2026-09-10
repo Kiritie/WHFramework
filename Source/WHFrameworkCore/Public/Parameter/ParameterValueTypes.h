@@ -3,6 +3,7 @@
 #include "GameplayTagContainer.h"
 #include "InputCoreTypes.h"
 #include "Styling/SlateBrush.h"
+#include "StructUtils/InstancedStruct.h"
 #include "UObject/PrimaryAssetId.h"
 #include "WHFrameworkCoreTypes.h"
 #include "ParameterValueTypes.generated.h"
@@ -11,6 +12,15 @@ USTRUCT(BlueprintType)
 struct WHFRAMEWORKCORE_API FParameterValueBase
 {
 	GENERATED_BODY()
+};
+
+USTRUCT(meta = (ParameterHidden))
+struct WHFRAMEWORKCORE_API FParameterStructValue : public FParameterValueBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FInstancedStruct Value;
 };
 
 USTRUCT(BlueprintType)
@@ -42,7 +52,7 @@ struct WHFRAMEWORKCORE_API FEnumParameterValue
 	uint8 EnumValue = 0;
 };
 
-USTRUCT(BlueprintType, meta = (DisplayName = "Integer"))
+USTRUCT(BlueprintType, meta = (DisplayName = "Integer", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterIntValue : public FParameterValueBase
 {
 	GENERATED_BODY()
@@ -50,7 +60,15 @@ struct WHFRAMEWORKCORE_API FParameterIntValue : public FParameterValueBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Value = 0;
 };
-USTRUCT(BlueprintType, meta = (DisplayName = "Float"))
+USTRUCT(BlueprintType, meta = (DisplayName = "Integer 64", ParameterInlineValue))
+struct WHFRAMEWORKCORE_API FParameterInt64Value : public FParameterValueBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int64 Value = 0;
+};
+USTRUCT(BlueprintType, meta = (DisplayName = "Float", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterFloatValue : public FParameterValueBase
 {
 	GENERATED_BODY()
@@ -58,7 +76,15 @@ struct WHFRAMEWORKCORE_API FParameterFloatValue : public FParameterValueBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float Value = 0.f;
 };
-USTRUCT(BlueprintType, meta = (DisplayName = "Byte"))
+USTRUCT(BlueprintType, meta = (DisplayName = "Double", ParameterInlineValue))
+struct WHFRAMEWORKCORE_API FParameterDoubleValue : public FParameterValueBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	double Value = 0.0;
+};
+USTRUCT(BlueprintType, meta = (DisplayName = "Byte", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterByteValue : public FParameterValueBase
 {
 	GENERATED_BODY()
@@ -66,7 +92,7 @@ struct WHFRAMEWORKCORE_API FParameterByteValue : public FParameterValueBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	uint8 Value = 0;
 };
-USTRUCT(BlueprintType, meta = (DisplayName = "Enum"))
+USTRUCT(BlueprintType, meta = (DisplayName = "Enum", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterEnumValue : public FParameterValueBase
 {
 	GENERATED_BODY()
@@ -74,7 +100,7 @@ struct WHFRAMEWORKCORE_API FParameterEnumValue : public FParameterValueBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FEnumParameterValue Value;
 };
-USTRUCT(BlueprintType, meta = (DisplayName = "String"))
+USTRUCT(BlueprintType, meta = (DisplayName = "String", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterStringValue : public FParameterValueBase
 {
 	GENERATED_BODY()
@@ -82,7 +108,7 @@ struct WHFRAMEWORKCORE_API FParameterStringValue : public FParameterValueBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FString Value;
 };
-USTRUCT(BlueprintType, meta = (DisplayName = "Name"))
+USTRUCT(BlueprintType, meta = (DisplayName = "Name", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterNameValue : public FParameterValueBase
 {
 	GENERATED_BODY()
@@ -90,7 +116,7 @@ struct WHFRAMEWORKCORE_API FParameterNameValue : public FParameterValueBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FName Value = NAME_None;
 };
-USTRUCT(BlueprintType, meta = (DisplayName = "Text"))
+USTRUCT(BlueprintType, meta = (DisplayName = "Text", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterTextValue : public FParameterValueBase
 {
 	GENERATED_BODY()
@@ -98,7 +124,7 @@ struct WHFRAMEWORKCORE_API FParameterTextValue : public FParameterValueBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FText Value;
 };
-USTRUCT(BlueprintType, meta = (DisplayName = "Boolean"))
+USTRUCT(BlueprintType, meta = (DisplayName = "Boolean", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterBoolValue : public FParameterValueBase
 {
 	GENERATED_BODY()
@@ -106,7 +132,7 @@ struct WHFRAMEWORKCORE_API FParameterBoolValue : public FParameterValueBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool Value = false;
 };
-USTRUCT(BlueprintType, meta = (DisplayName = "Vector"))
+USTRUCT(BlueprintType, meta = (DisplayName = "Vector", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterVectorValue : public FParameterValueBase
 {
 	GENERATED_BODY()
@@ -114,7 +140,7 @@ struct WHFRAMEWORKCORE_API FParameterVectorValue : public FParameterValueBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector Value = FVector::ZeroVector;
 };
-USTRUCT(BlueprintType, meta = (DisplayName = "Rotator"))
+USTRUCT(BlueprintType, meta = (DisplayName = "Rotator", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterRotatorValue : public FParameterValueBase
 {
 	GENERATED_BODY()
@@ -122,7 +148,7 @@ struct WHFRAMEWORKCORE_API FParameterRotatorValue : public FParameterValueBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FRotator Value = FRotator::ZeroRotator;
 };
-USTRUCT(BlueprintType, meta = (DisplayName = "Transform"))
+USTRUCT(BlueprintType, meta = (DisplayName = "Transform", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterTransformValue : public FParameterValueBase
 {
 	GENERATED_BODY()
@@ -130,7 +156,7 @@ struct WHFRAMEWORKCORE_API FParameterTransformValue : public FParameterValueBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FTransform Value = FTransform::Identity;
 };
-USTRUCT(BlueprintType, meta = (DisplayName = "Color"))
+USTRUCT(BlueprintType, meta = (DisplayName = "Color", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterColorValue : public FParameterValueBase
 {
 	GENERATED_BODY()
@@ -138,7 +164,7 @@ struct WHFRAMEWORKCORE_API FParameterColorValue : public FParameterValueBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FColor Value = FColor::Transparent;
 };
-USTRUCT(BlueprintType, meta = (DisplayName = "Linear Color"))
+USTRUCT(BlueprintType, meta = (DisplayName = "Linear Color", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterLinearColorValue : public FParameterValueBase
 {
 	GENERATED_BODY()
@@ -146,7 +172,7 @@ struct WHFRAMEWORKCORE_API FParameterLinearColorValue : public FParameterValueBa
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FLinearColor Value = FLinearColor::Transparent;
 };
-USTRUCT(BlueprintType, meta = (DisplayName = "Key"))
+USTRUCT(BlueprintType, meta = (DisplayName = "Key", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterKeyValue : public FParameterValueBase
 {
 	GENERATED_BODY()
@@ -154,7 +180,7 @@ struct WHFRAMEWORKCORE_API FParameterKeyValue : public FParameterValueBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FKey Value;
 };
-USTRUCT(BlueprintType, meta = (DisplayName = "Gameplay Tag"))
+USTRUCT(BlueprintType, meta = (DisplayName = "Gameplay Tag", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterTagValue : public FParameterValueBase
 {
 	GENERATED_BODY()
@@ -162,7 +188,7 @@ struct WHFRAMEWORKCORE_API FParameterTagValue : public FParameterValueBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FGameplayTag Value;
 };
-USTRUCT(BlueprintType, meta = (DisplayName = "Gameplay Tags"))
+USTRUCT(BlueprintType, meta = (DisplayName = "Gameplay Tags", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterTagsValue : public FParameterValueBase
 {
 	GENERATED_BODY()
@@ -170,7 +196,7 @@ struct WHFRAMEWORKCORE_API FParameterTagsValue : public FParameterValueBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FGameplayTagContainer Value;
 };
-USTRUCT(BlueprintType, meta = (DisplayName = "Slate Brush"))
+USTRUCT(BlueprintType, meta = (DisplayName = "Slate Brush", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterBrushValue : public FParameterValueBase
 {
 	GENERATED_BODY()
@@ -178,7 +204,7 @@ struct WHFRAMEWORKCORE_API FParameterBrushValue : public FParameterValueBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FSlateBrush Value;
 };
-USTRUCT(BlueprintType, meta = (DisplayName = "Guid"))
+USTRUCT(BlueprintType, meta = (DisplayName = "Guid", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterGuidValue : public FParameterValueBase
 {
 	GENERATED_BODY()
@@ -186,7 +212,7 @@ struct WHFRAMEWORKCORE_API FParameterGuidValue : public FParameterValueBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FGuid Value;
 };
-USTRUCT(BlueprintType, meta = (DisplayName = "Primary Asset Id"))
+USTRUCT(BlueprintType, meta = (DisplayName = "Primary Asset Id", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterAssetIdValue : public FParameterValueBase
 {
 	GENERATED_BODY()
@@ -194,7 +220,7 @@ struct WHFRAMEWORKCORE_API FParameterAssetIdValue : public FParameterValueBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FPrimaryAssetId Value;
 };
-USTRUCT(BlueprintType, meta = (DisplayName = "Class"))
+USTRUCT(BlueprintType, meta = (DisplayName = "Class", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterClassValue : public FParameterValueBase
 {
 	GENERATED_BODY()
@@ -202,7 +228,7 @@ struct WHFRAMEWORKCORE_API FParameterClassValue : public FParameterValueBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TObjectPtr<UClass> Value = nullptr;
 };
-USTRUCT(BlueprintType, meta = (DisplayName = "Soft Class"))
+USTRUCT(BlueprintType, meta = (DisplayName = "Soft Class", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterSoftClassValue : public FParameterValueBase
 {
 	GENERATED_BODY()
@@ -210,7 +236,7 @@ struct WHFRAMEWORKCORE_API FParameterSoftClassValue : public FParameterValueBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSoftClassPtr<UObject> Value;
 };
-USTRUCT(BlueprintType, meta = (DisplayName = "Object"))
+USTRUCT(BlueprintType, meta = (DisplayName = "Object", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterObjectValue : public FParameterValueBase
 {
 	GENERATED_BODY()
@@ -218,7 +244,7 @@ struct WHFRAMEWORKCORE_API FParameterObjectValue : public FParameterValueBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TObjectPtr<UObject> Value = nullptr;
 };
-USTRUCT(BlueprintType, meta = (DisplayName = "Soft Object"))
+USTRUCT(BlueprintType, meta = (DisplayName = "Soft Object", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterSoftObjectValue : public FParameterValueBase
 {
 	GENERATED_BODY()
@@ -227,7 +253,7 @@ struct WHFRAMEWORKCORE_API FParameterSoftObjectValue : public FParameterValueBas
 	TSoftObjectPtr<UObject> Value;
 };
 
-USTRUCT(BlueprintType, meta = (DisplayName = "Object Instance"))
+USTRUCT(BlueprintType, meta = (DisplayName = "Object Instance", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterObjectInstanceValue : public FParameterValueBase
 {
 	GENERATED_BODY()
@@ -236,19 +262,11 @@ struct WHFRAMEWORKCORE_API FParameterObjectInstanceValue : public FParameterValu
 	TObjectPtr<UObject> Value = nullptr;
 };
 
-USTRUCT(BlueprintType, meta = (DisplayName = "Dynamic Delegate"))
+USTRUCT(BlueprintType, meta = (DisplayName = "Dynamic Delegate", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterDelegateValue : public FParameterValueBase
 {
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FSimpleDynamicDelegate Value;
-};
-
-/** Runtime-only compatibility payload. It is hidden from Details and intentionally has no reflected value. */
-USTRUCT(meta = (Hidden))
-struct WHFRAMEWORKCORE_API FParameterPointerValue : public FParameterValueBase
-{
-	GENERATED_BODY()
-	void* Value = nullptr;
 };

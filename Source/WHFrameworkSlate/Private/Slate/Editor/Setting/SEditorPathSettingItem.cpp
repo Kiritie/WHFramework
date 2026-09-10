@@ -1,4 +1,4 @@
-﻿#include "Slate/Editor/Setting/SEditorPathSettingItem.h"
+#include "Slate/Editor/Setting/SEditorPathSettingItem.h"
 
 #include "WHFrameworkSlateStyle.h"
 #include "Platform/PlatformManager.h"
@@ -43,7 +43,7 @@ void SEditorPathSettingItem::Construct(const FArguments& InArgs)
 						.Visibility_Lambda([InArgs](){ return InArgs._Editable.Get() ? EVisibility::Visible : EVisibility::HitTestInvisible; })
 						.Text_Lambda([this]()
 						{
-							return FText::FromString(GetSettingValue().GetStringValue());
+							return FText::FromString(GetSettingValue().Get<FString>());
 						})
 						.OnTextCommitted_Lambda([this](const FText& Val, ETextCommit::Type TextCommitType)
 						{
@@ -82,7 +82,7 @@ void SEditorPathSettingItem::Construct(const FArguments& InArgs)
 							void* ParentWindowHandle = (ParentWindow.IsValid() && ParentWindow->GetNativeWindow().IsValid()) ? ParentWindow->GetNativeWindow()->GetOSWindowHandle() : nullptr;
 
 							FString Path;
-							if(PlatformManager->OpenDirectoryDialog(ParentWindowHandle, GetSettingValue().GetStringValue(), GetSettingValue().GetStringValue(), Path))
+							if(PlatformManager->OpenDirectoryDialog(ParentWindowHandle, GetSettingValue().Get<FString>(), GetSettingValue().Get<FString>(), Path))
 							{
 								SetSettingValue(Path + (!Path.EndsWith(TEXT("/")) ? TEXT("/") : TEXT("")) + InArgs._AdditionPath);
 							}

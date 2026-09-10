@@ -28,7 +28,7 @@ void UWidgetSceneMaskBase::OnOpen(const TArray<FParameter>& InParams, bool bInst
 
 	if(InParams.IsValidIndex(0))
 	{
-		OnMaskClosed = InParams[0];
+		OnMaskClosed = InParams[0].Get<FSimpleDynamicDelegate>();
 	}
 }
 

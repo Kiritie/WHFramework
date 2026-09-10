@@ -338,7 +338,7 @@ void AAbilityCharacterBase::OnMovementModeChanged(EMovementMode PrevMovementMode
 
 void AAbilityCharacterBase::Death(IAbilityVitalityInterface* InKiller)
 {
-	SwitchFinalFiniteState({ InKiller });
+	SwitchFinalFiniteState({ Cast<UObject>(InKiller) });
 }
 
 void AAbilityCharacterBase::Kill(IAbilityVitalityInterface* InTarget)
@@ -352,7 +352,7 @@ void AAbilityCharacterBase::Kill(IAbilityVitalityInterface* InTarget)
 
 void AAbilityCharacterBase::Revive(IAbilityVitalityInterface* InRescuer)
 {
-	SwitchDefaultFiniteState({ InRescuer });
+	SwitchDefaultFiniteState({ Cast<UObject>(InRescuer) });
 }
 
 void AAbilityCharacterBase::Static()

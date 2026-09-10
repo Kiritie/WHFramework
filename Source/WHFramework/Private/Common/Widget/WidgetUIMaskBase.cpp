@@ -27,7 +27,7 @@ void UWidgetUIMaskBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant
 
 	if(InParams.IsValidIndex(0))
 	{
-		OnPressAnyKey = InParams[0];
+		OnPressAnyKey = InParams[0].Get<FSimpleDynamicDelegate>();
 	}
 }
 

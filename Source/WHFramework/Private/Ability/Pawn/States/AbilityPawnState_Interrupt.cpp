@@ -35,7 +35,7 @@ void UAbilityPawnState_Interrupt::OnEnter(UFiniteStateBase* InLastState, const T
 
 	if(InParams.IsValidIndex(0))
 	{
-		Duration = InParams[0];
+		Duration = InParams[0].Get<float>();
 		RemainTime = Duration;
 	}
 

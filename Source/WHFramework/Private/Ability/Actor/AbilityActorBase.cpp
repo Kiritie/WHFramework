@@ -46,7 +46,7 @@ void AAbilityActorBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FP
 {
 	if(InParams.IsValidIndex(1))
 	{
-		AssetID = InParams[1];
+		AssetID = InParams[1].Get<FPrimaryAssetId>();
 	}
 
 	Super::OnSpawn_Implementation(InOwner, InParams);

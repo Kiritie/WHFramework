@@ -411,22 +411,26 @@ void UVoxelModule::SetWorldState(EVoxelWorldState InWorldState)
 
 void UVoxelModule::OnWorldModeChanged()
 {
-	UEventModuleStatics::BroadcastEvent(UEventHandle_VoxelWorldModeChanged::StaticClass(), this, { &WorldMode });
+	UEventModuleStatics::BroadcastEvent(UEventHandle_VoxelWorldModeChanged::StaticClass(), this, { static_cast<uint8>(WorldMode) });
 }
 
 void UVoxelModule::OnWorldStateChanged()
 {
-	UEventModuleStatics::BroadcastEvent(UEventHandle_VoxelWorldStateChanged::StaticClass(), this, { &WorldState });
+	UEventModuleStatics::BroadcastEvent(UEventHandle_VoxelWorldStateChanged::StaticClass(), this, { static_cast<uint8>(WorldState) });
 }
 
 void UVoxelModule::OnWorldCenterChanged()
 {
-	UEventModuleStatics::BroadcastEvent(UEventHandle_VoxelWorldCenterChanged::StaticClass(), this, { &WorldCenterIndex });
+	FVoxelIndexParameterValue CenterValue;
+	CenterValue.Value = WorldCenterIndex;
+	UEventModuleStatics::BroadcastEvent(UEventHandle_VoxelWorldCenterChanged::StaticClass(), this, { MoveTemp(CenterValue) });
 }
 
 void UVoxelModule::OnWorldAgentMoved()
 {
-	UEventModuleStatics::BroadcastEvent(UEventHandle_VoxelWorldAgentMoved::StaticClass(), this, { &WorldAgentIndex });
+	FVoxelIndexParameterValue AgentValue;
+	AgentValue.Value = WorldAgentIndex;
+	UEventModuleStatics::BroadcastEvent(UEventHandle_VoxelWorldAgentMoved::StaticClass(), this, { MoveTemp(AgentValue) });
 }
 
 float UVoxelModule::GetWorldGeneratePercent() const

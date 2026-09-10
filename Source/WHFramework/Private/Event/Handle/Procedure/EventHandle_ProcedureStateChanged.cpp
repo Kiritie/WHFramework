@@ -17,6 +17,6 @@ void UEventHandle_ProcedureStateChanged::Parse_Implementation(const TArray<FPara
 {
 	if(InParams.IsValidIndex(0))
 	{
-		Procedure = InParams[0];
+		Procedure = InParams[0].Get<UProcedureBase*>();
 	}
 }

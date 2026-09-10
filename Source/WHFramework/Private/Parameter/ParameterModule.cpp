@@ -75,7 +75,7 @@ void UParameterModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData->CastRef<FParameterModuleSaveData>();
 
-	for(auto& Iter : SaveData.Parameters.Sets)
+	for(auto& Iter : SaveData.ParameterSets.Sets)
 	{
 		SetParameter(Iter.Name, Iter.Parameter);
 	}
@@ -86,7 +86,7 @@ FSaveData* UParameterModule::ToData()
 	FParameterModuleSaveData& SaveData = GetMutableSaveData<FParameterModuleSaveData>();
 	SaveData = FParameterModuleSaveData();
 	
-	SaveData.Parameters = Parameters;
+	SaveData.ParameterSets = ParameterSets;
 	return &SaveData;
 }
 
@@ -96,62 +96,62 @@ void UParameterModule::Load_Implementation()
 
 	if(!bModuleAutoSave)
 	{
-		for(auto& Iter : Parameters.Sets)
+		for(auto& Iter : ParameterSets.Sets)
 		{
-			UEventModuleStatics::BroadcastEvent<UEventHandle_GlobalParameterChanged>(this, { Iter.Name, &Iter.Parameter });
+			UEventModuleStatics::BroadcastEvent<UEventHandle_GlobalParameterChanged>(this, { Iter.Name, Iter.Parameter });
 		}
 	}
 }
 
 FString UParameterModule::GetModuleDebugMessage()
 {
-	return FString::Printf(TEXT("Parameter Count: %d"), Parameters.Sets.Num());
+	return FString::Printf(TEXT("Parameter Count: %d"), ParameterSets.Sets.Num());
 }
 
 bool UParameterModule::HasParameter(FName InName, bool bEnsured) const
 {
-	return Parameters.HasParameter(InName, bEnsured);
+	return ParameterSets.HasParameter(InName, bEnsured);
 }
 
 void UParameterModule::SetParameter(FName InName, FParameter InParameter)
 {
-	Parameters.SetParameter(InName, InParameter);
-	UEventModuleStatics::BroadcastEvent<UEventHandle_GlobalParameterChanged>(this, { InName, &InParameter });
+	ParameterSets.SetParameter(InName, InParameter);
+	UEventModuleStatics::BroadcastEvent<UEventHandle_GlobalParameterChanged>(this, { InName, InParameter });
 }
 
 FParameter UParameterModule::GetParameter(FName InName, bool bEnsured) const
 {
-	return Parameters.GetParameter(InName, bEnsured);
+	return ParameterSets.GetParameter(InName, bEnsured);
 }
 
 TArray<FParameter> UParameterModule::GetParameters(FName InName, bool bEnsured) const
 {
-	return Parameters.GetParameters(InName, bEnsured);
+	return ParameterSets.GetParameters(InName, bEnsured);
 }
 
 void UParameterModule::RemoveParameter(FName InName)
 {
-	Parameters.RemoveParameter(InName);
+	ParameterSets.RemoveParameter(InName);
 }
 
 void UParameterModule::RemoveParameters(FName InName)
 {
-	Parameters.RemoveParameters(InName);
+	ParameterSets.RemoveParameters(InName);
 }
 
 TArray<FParameterSet> UParameterModule::GetAllParameter()
 {
-	return Parameters.Sets;
+	return ParameterSets.Sets;
 }
 
 void UParameterModule::ClearAllParameter()
 {
-	Parameters.ClearAllParameter();
+	ParameterSets.ClearAllParameter();
 }
 
 void UParameterModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(UParameterModule, Parameters);
+	DOREPLIFETIME(UParameterModule, ParameterSets);
 }

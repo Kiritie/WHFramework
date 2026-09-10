@@ -23,19 +23,19 @@ void UEventHandle_SetDataLayerRuntimeState::Parse_Implementation(const TArray<FP
 {
 	if(InParams.IsValidIndex(0))
 	{
-		DataLayer = InParams[0];
+		DataLayer = InParams[0].Get<UDataLayerAsset*>();
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		State = InParams[1].GetPointerValueRef<EDataLayerRuntimeState>();
+		State = static_cast<EDataLayerRuntimeState>(InParams[1].Get<uint8>());
 	}
 	if(InParams.IsValidIndex(2))
 	{
-		bRecursive = InParams[2];
+		bRecursive = InParams[2].Get<bool>();
 	}
 }
 
 TArray<FParameter> UEventHandle_SetDataLayerRuntimeState::Pack_Implementation()
 {
-	return { DataLayer, &State, bRecursive };
+	return { DataLayer, static_cast<uint8>(State), bRecursive };
 }

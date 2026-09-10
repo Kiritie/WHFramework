@@ -19,10 +19,10 @@ void UEventHandle_FiniteStateEntered::Parse_Implementation(const TArray<FParamet
 {
 	if(InParams.IsValidIndex(0))
 	{
-		State = InParams[0];
+		State = InParams[0].Get<UFiniteStateBase*>();
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		FSM = InParams[1];
+		FSM = InParams[1].Get<UFSMComponent*>();
 	}
 }

@@ -65,7 +65,7 @@ void UWidgetKeySettingItemBase::OnValueButtonClicked(int32 InIndex)
 void UWidgetKeySettingItemBase::OnKeySelected(FKey InKey, UWidgetPressAnyKeyPanelBase* InPressAnyKeyPanel)
 {
 	InPressAnyKeyPanel->OnKeySelected.RemoveAll(this);
-	Keys[InPressAnyKeyPanel->GetWidgetParams()[0]] = InKey;
+	Keys[InPressAnyKeyPanel->GetWidgetParams()[0].Get<int32>()] = InKey;
 	if(OnValuesChanged.IsBound())
 	{
 		OnValuesChanged.Broadcast(this, GetValues());
@@ -93,7 +93,7 @@ void UWidgetKeySettingItemBase::SetValues(const TArray<FParameter>& InValues)
 	Keys.Empty();
 	for(int32 i = 0; i < InValues.Num(); i++)
 	{
-		Keys.Add(InValues[i].GetKeyValue());
+		Keys.Add(InValues[i].Get<FKey>());
 	}
 	Super::SetValues(InValues);
 }

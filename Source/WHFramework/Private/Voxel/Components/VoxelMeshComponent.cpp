@@ -39,7 +39,7 @@ void UVoxelMeshComponent::OnSpawn_Implementation(UObject* InOwner, const TArray<
 	}
 	if (InParams.IsValidIndex(0))
 	{
-		Chunk = InParams[0].GetObjectValue<UVoxelChunk>();
+		Chunk = InParams[0].Get<UVoxelChunk*>();
 		if (Chunk)
 		{
 			SetRelativeLocation(FVector(Chunk->GetIndex().X * UVoxelModule::Get().GetWorldData().GetChunkRealSize().X,

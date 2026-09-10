@@ -77,9 +77,9 @@ void UWidgetInputSettingPageBase::OnApply()
 		TArray<FParameter> Values = Iter.Value->GetValues();
 		for(int32 i = 0; i < Values.Num(); i++)
 		{
-			if(!KeyShortcut.Keys.IsValidIndex(i) || Values[i].GetKeyValue() != KeyShortcut.Keys[i])
+			if(!KeyShortcut.Keys.IsValidIndex(i) || Values[i].Get<FKey>() != KeyShortcut.Keys[i])
 			{
-				KeyShortcut.Keys[i] = Values[i].GetKeyValue();
+				KeyShortcut.Keys[i] = Values[i].Get<FKey>();
 			}
 		}
 	}
@@ -90,9 +90,9 @@ void UWidgetInputSettingPageBase::OnApply()
 		TArray<FParameter> Values = Iter.Value->GetValues();
 		for(int32 i = 0; i < Values.Num(); i++)
 		{
-			if(!Mappings.IsValidIndex(i) || Values[i].GetKeyValue() != Mappings[i].GetCurrentKey())
+			if(!Mappings.IsValidIndex(i) || Values[i].Get<FKey>() != Mappings[i].GetCurrentKey())
 			{
-				UInputModule::Get().AddPlayerKeyMapping(Iter.Key, Values[i].GetKeyValue(), i);
+				UInputModule::Get().AddPlayerKeyMapping(Iter.Key, Values[i].Get<FKey>(), i);
 			}
 		}
 	}
@@ -167,12 +167,12 @@ bool UWidgetInputSettingPageBase::CanApply_Implementation() const
 		{
 			if(!KeyShortcut.Keys.IsValidIndex(i))
 			{
-				if(Values[i].GetKeyValue().IsValid())
+				if(Values[i].Get<FKey>().IsValid())
 				{
 					return true;
 				}
 			}
-			else if(Values[i].GetKeyValue() != KeyShortcut.Keys[i])
+			else if(Values[i].Get<FKey>() != KeyShortcut.Keys[i])
 			{
 				return true;
 			}
@@ -187,12 +187,12 @@ bool UWidgetInputSettingPageBase::CanApply_Implementation() const
 		{
 			if(!Mappings.IsValidIndex(i))
 			{
-				if(Values[i].GetKeyValue().IsValid())
+				if(Values[i].Get<FKey>().IsValid())
 				{
 					return true;
 				}
 			}
-			else if(Values[i].GetKeyValue() != Mappings[i].GetCurrentKey())
+			else if(Values[i].Get<FKey>() != Mappings[i].GetCurrentKey())
 			{
 				return true;
 			}

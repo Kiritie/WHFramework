@@ -18,10 +18,10 @@ void UEventHandle_GlobalParameterChanged::Parse_Implementation(const TArray<FPar
 {
 	if(InParams.IsValidIndex(0))
 	{
-		ParameterName = InParams[0];
+		ParameterName = InParams[0].Get<FName>();
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		Parameter = InParams[1].GetPointerValueRef<FParameter>();
+		Parameter = InParams[1];
 	}
 }

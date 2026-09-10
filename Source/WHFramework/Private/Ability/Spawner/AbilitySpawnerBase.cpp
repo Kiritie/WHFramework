@@ -62,11 +62,11 @@ void AAbilitySpawnerBase::OnSpawn_Implementation(UObject* InOwner, const TArray<
 	{
 		if(InParams[0].Is<FTransform>())
 		{
-			SetActorTransform(InParams[0]);
+			SetActorTransform(InParams[0].Get<FTransform>());
 		}
 		else if(InParams[0].Is<FGuid>())
 		{
-			ActorID = InParams[0];
+			ActorID = InParams[0].Get<FGuid>();
 		}
 	}
 	

@@ -1,4 +1,4 @@
-﻿#include "Slate/Editor/Setting/SEditorTextSettingItem.h"
+#include "Slate/Editor/Setting/SEditorTextSettingItem.h"
 
 #include "WHFrameworkSlateStyle.h"
 #include "Widgets/Input/SEditableTextBox.h"
@@ -20,7 +20,7 @@ void SEditorTextSettingItem::Construct(const FArguments& InArgs)
 			.Style(FWHFrameworkSlateStyle::Get(), "EditableTextBoxes.SettingItem")
 			.Text_Lambda([this]()
 			{
-				return FText::FromString(GetSettingValue().GetStringValue());
+				return FText::FromString(GetSettingValue().Get<FString>());
 			})
 			.OnTextCommitted_Lambda([this](const FText& Val, ETextCommit::Type TextCommitType)
 			{

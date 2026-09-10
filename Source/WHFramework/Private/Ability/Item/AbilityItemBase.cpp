@@ -26,7 +26,7 @@ void AAbilityItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FPa
 	
 	if(InParams.IsValidIndex(0))
 	{
-		Item = InParams[0].GetPointerValueRef<FAbilityItem>();
+		Item = InParams[0].Get<FAbilityItem>();
 	}
 }
 

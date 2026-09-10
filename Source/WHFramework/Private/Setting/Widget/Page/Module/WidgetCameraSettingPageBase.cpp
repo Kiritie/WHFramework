@@ -97,19 +97,19 @@ void UWidgetCameraSettingPageBase::OnApply()
 {
 	Super::OnApply();
 
-	UCameraModule::Get().SetEnableCameraPanZMove(SettingItem_EnableCameraPanZMove->GetValue().GetBooleanValue());
-	UCameraModule::Get().SetReverseCameraPanMove(SettingItem_ReverseCameraPanMove->GetValue().GetBooleanValue());
-	UCameraModule::Get().SetCameraMoveRate(SettingItem_CameraMoveRate->GetValue().GetFloatValue());
-	UCameraModule::Get().SetSmoothCameraMove(SettingItem_SmoothCameraMove->GetValue().GetBooleanValue());
-	UCameraModule::Get().SetCameraMoveSpeed(SettingItem_CameraMoveSpeed->GetValue().GetFloatValue());
-	UCameraModule::Get().SetReverseCameraPitch(SettingItem_ReverseCameraPitch->GetValue().GetBooleanValue());
-	UCameraModule::Get().SetCameraTurnRate(SettingItem_CameraTurnRate->GetValue().GetFloatValue());
-	UCameraModule::Get().SetCameraLookUpRate(SettingItem_CameraLookUpRate->GetValue().GetFloatValue());
-	UCameraModule::Get().SetSmoothCameraRotate(SettingItem_SmoothCameraRotate->GetValue().GetBooleanValue());
-	UCameraModule::Get().SetCameraRotateSpeed(SettingItem_CameraRotateSpeed->GetValue().GetFloatValue());
-	UCameraModule::Get().SetCameraZoomRate(SettingItem_CameraZoomRate->GetValue().GetFloatValue());
-	UCameraModule::Get().SetSmoothCameraZoom(SettingItem_SmoothCameraZoom->GetValue().GetBooleanValue());
-	UCameraModule::Get().SetCameraZoomSpeed(SettingItem_CameraZoomSpeed->GetValue().GetFloatValue());
+	UCameraModule::Get().SetEnableCameraPanZMove(SettingItem_EnableCameraPanZMove->GetValue().Get<bool>());
+	UCameraModule::Get().SetReverseCameraPanMove(SettingItem_ReverseCameraPanMove->GetValue().Get<bool>());
+	UCameraModule::Get().SetCameraMoveRate(SettingItem_CameraMoveRate->GetValue().Get<float>());
+	UCameraModule::Get().SetSmoothCameraMove(SettingItem_SmoothCameraMove->GetValue().Get<bool>());
+	UCameraModule::Get().SetCameraMoveSpeed(SettingItem_CameraMoveSpeed->GetValue().Get<float>());
+	UCameraModule::Get().SetReverseCameraPitch(SettingItem_ReverseCameraPitch->GetValue().Get<bool>());
+	UCameraModule::Get().SetCameraTurnRate(SettingItem_CameraTurnRate->GetValue().Get<float>());
+	UCameraModule::Get().SetCameraLookUpRate(SettingItem_CameraLookUpRate->GetValue().Get<float>());
+	UCameraModule::Get().SetSmoothCameraRotate(SettingItem_SmoothCameraRotate->GetValue().Get<bool>());
+	UCameraModule::Get().SetCameraRotateSpeed(SettingItem_CameraRotateSpeed->GetValue().Get<float>());
+	UCameraModule::Get().SetCameraZoomRate(SettingItem_CameraZoomRate->GetValue().Get<float>());
+	UCameraModule::Get().SetSmoothCameraZoom(SettingItem_SmoothCameraZoom->GetValue().Get<bool>());
+	UCameraModule::Get().SetCameraZoomSpeed(SettingItem_CameraZoomSpeed->GetValue().Get<float>());
 }
 
 void UWidgetCameraSettingPageBase::NativeOnActivated()
@@ -161,33 +161,33 @@ void UWidgetCameraSettingPageBase::OnValueChange(UWidgetSettingItemBase* InSetti
 
 	if(InSettingItem == SettingItem_SmoothCameraMove)
 	{
-		SettingItem_CameraMoveSpeed->SetVisible(InSettingItem->GetValue().GetBooleanValue());
+		SettingItem_CameraMoveSpeed->SetVisible(InSettingItem->GetValue().Get<bool>());
 	}
 	else if(InSettingItem == SettingItem_SmoothCameraRotate)
 	{
-		SettingItem_CameraRotateSpeed->SetVisible(InSettingItem->GetValue().GetBooleanValue());
+		SettingItem_CameraRotateSpeed->SetVisible(InSettingItem->GetValue().Get<bool>());
 	}
 	else if(InSettingItem == SettingItem_SmoothCameraZoom)
 	{
-		SettingItem_CameraZoomSpeed->SetVisible(InSettingItem->GetValue().GetBooleanValue());
+		SettingItem_CameraZoomSpeed->SetVisible(InSettingItem->GetValue().Get<bool>());
 	}
 }
 
 bool UWidgetCameraSettingPageBase::CanApply_Implementation() const
 {
-	return UCameraModule::Get().IsEnableCameraPanZMove() != SettingItem_EnableCameraPanZMove->GetValue().GetBooleanValue() ||
-		UCameraModule::Get().IsReverseCameraPanMove() != SettingItem_ReverseCameraPanMove->GetValue().GetBooleanValue() ||
-		UCameraModule::Get().GetCameraMoveRate() != SettingItem_CameraMoveRate->GetValue().GetFloatValue() ||
-		UCameraModule::Get().IsSmoothCameraMove() != SettingItem_SmoothCameraMove->GetValue().GetBooleanValue() ||
-		UCameraModule::Get().GetCameraMoveSpeed() != SettingItem_CameraMoveSpeed->GetValue().GetFloatValue() ||
-		UCameraModule::Get().IsReverseCameraPitch() != SettingItem_ReverseCameraPitch->GetValue().GetBooleanValue() ||
-		UCameraModule::Get().GetCameraTurnRate() != SettingItem_CameraTurnRate->GetValue().GetFloatValue() ||
-		UCameraModule::Get().GetCameraLookUpRate() != SettingItem_CameraLookUpRate->GetValue().GetFloatValue() ||
-		UCameraModule::Get().IsSmoothCameraRotate() != SettingItem_SmoothCameraRotate->GetValue().GetBooleanValue() ||
-		UCameraModule::Get().GetCameraRotateSpeed() != SettingItem_CameraRotateSpeed->GetValue().GetFloatValue() ||
-		UCameraModule::Get().GetCameraZoomRate() != SettingItem_CameraZoomRate->GetValue().GetFloatValue() ||
-		UCameraModule::Get().IsSmoothCameraZoom() != SettingItem_SmoothCameraZoom->GetValue().GetBooleanValue() ||
-		UCameraModule::Get().GetCameraZoomSpeed() != SettingItem_CameraZoomSpeed->GetValue().GetFloatValue();
+	return UCameraModule::Get().IsEnableCameraPanZMove() != SettingItem_EnableCameraPanZMove->GetValue().Get<bool>() ||
+		UCameraModule::Get().IsReverseCameraPanMove() != SettingItem_ReverseCameraPanMove->GetValue().Get<bool>() ||
+		UCameraModule::Get().GetCameraMoveRate() != SettingItem_CameraMoveRate->GetValue().Get<float>() ||
+		UCameraModule::Get().IsSmoothCameraMove() != SettingItem_SmoothCameraMove->GetValue().Get<bool>() ||
+		UCameraModule::Get().GetCameraMoveSpeed() != SettingItem_CameraMoveSpeed->GetValue().Get<float>() ||
+		UCameraModule::Get().IsReverseCameraPitch() != SettingItem_ReverseCameraPitch->GetValue().Get<bool>() ||
+		UCameraModule::Get().GetCameraTurnRate() != SettingItem_CameraTurnRate->GetValue().Get<float>() ||
+		UCameraModule::Get().GetCameraLookUpRate() != SettingItem_CameraLookUpRate->GetValue().Get<float>() ||
+		UCameraModule::Get().IsSmoothCameraRotate() != SettingItem_SmoothCameraRotate->GetValue().Get<bool>() ||
+		UCameraModule::Get().GetCameraRotateSpeed() != SettingItem_CameraRotateSpeed->GetValue().Get<float>() ||
+		UCameraModule::Get().GetCameraZoomRate() != SettingItem_CameraZoomRate->GetValue().Get<float>() ||
+		UCameraModule::Get().IsSmoothCameraZoom() != SettingItem_SmoothCameraZoom->GetValue().Get<bool>() ||
+		UCameraModule::Get().GetCameraZoomSpeed() != SettingItem_CameraZoomSpeed->GetValue().Get<float>();
 }
 
 bool UWidgetCameraSettingPageBase::CanReset_Implementation() const

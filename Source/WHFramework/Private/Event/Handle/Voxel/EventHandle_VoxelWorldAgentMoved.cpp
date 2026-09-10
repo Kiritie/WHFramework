@@ -12,6 +12,9 @@ void UEventHandle_VoxelWorldAgentMoved::Parse_Implementation(const TArray<FParam
 {
 	if(InParams.IsValidIndex(0))
 	{
-		AgentIndex = InParams[0].GetPointerValueRef<FIndex>();
+		if(const FVoxelIndexParameterValue* Value = InParams[0].GetStructPtr<FVoxelIndexParameterValue>())
+		{
+			AgentIndex = Value->Value;
+		}
 	}
 }

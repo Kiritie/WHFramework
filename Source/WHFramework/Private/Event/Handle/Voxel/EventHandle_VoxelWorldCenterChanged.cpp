@@ -12,6 +12,9 @@ void UEventHandle_VoxelWorldCenterChanged::Parse_Implementation(const TArray<FPa
 {
 	if(InParams.IsValidIndex(0))
 	{
-		WorldCenter = InParams[0].GetPointerValueRef<FIndex>();
+		if(const FVoxelIndexParameterValue* Value = InParams[0].GetStructPtr<FVoxelIndexParameterValue>())
+		{
+			WorldCenter = Value->Value;
+		}
 	}
 }

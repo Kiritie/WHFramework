@@ -20,20 +20,26 @@ void UWidgetEnumSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const 
 	{
 		if(InParams[1].Is<FString>())
 		{
-			for(int32 i = 0; i < UCommonModuleStatics::GetEnumItemNum(InParams[1]); i++)
+			for(int32 i = 0; i < UCommonModuleStatics::GetEnumItemNum(InParams[1].Get<FString>()); i++)
 			{
-				EnumNames.Add(UCommonModuleStatics::GetEnumDisplayNameByValue(InParams[1], i).ToString());
+				EnumNames.Add(UCommonModuleStatics::GetEnumDisplayNameByValue(InParams[1].Get<FString>(), i).ToString());
 			}
 		}
 		else
 		{
-			EnumNames = InParams[1].GetPointerValueRef<TArray<FString>>();
+			if(const FStringArrayParameterValue* Value = InParams[1].GetStructPtr<FStringArrayParameterValue>())
+			{
+				EnumNames = Value->Value;
+			}
 		}
 	}
 	TArray<int32> IgnoreEnumIndexs;
 	if(InParams.IsValidIndex(2))
 	{
-		IgnoreEnumIndexs = InParams[2].GetPointerValueRef<TArray<int32>>();
+		if(const FInt32ArrayParameterValue* Value = InParams[2].GetStructPtr<FInt32ArrayParameterValue>())
+		{
+			IgnoreEnumIndexs = Value->Value;
+		}
 	}
 	for(int32 i = 0; i < EnumNames.Num(); i++)
 	{
@@ -76,6 +82,6 @@ FParameter UWidgetEnumSettingItemBase::GetValue() const
 
 void UWidgetEnumSettingItemBase::SetValue(const FParameter& InValue)
 {
-	ComboBox_Value->SetSelectedOption(EnumNames[FMath::Clamp(0, InValue, EnumNames.Num() - 1)]);
+	ComboBox_Value->SetSelectedOption(EnumNames[FMath::Clamp(InValue.Get<int32>(), 0, EnumNames.Num() - 1)]);
 	Super::SetValue(InValue);
 }

@@ -31,7 +31,7 @@ void UWidgetAbilityItemBase::OnInitialize(const TArray<FParameter>& InParams)
 {
 	if(InParams.IsValidIndex(0))
 	{
-		Item = InParams[0].GetPointerValueRef<FAbilityItem>();
+		Item = InParams[0].Get<FAbilityItem>();
 		Item.Payload = this;
 	}
 	Super::OnInitialize(InParams);

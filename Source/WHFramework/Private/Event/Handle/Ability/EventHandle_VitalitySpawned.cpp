@@ -22,10 +22,10 @@ void UEventHandle_VitalitySpawned::Parse_Implementation(const TArray<FParameter>
 {
 	if(InParams.IsValidIndex(0))
 	{
-		Vitality = InParams[0];
+		Vitality = InParams[0].Get<TScriptInterface<IAbilityVitalityInterface>>();
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		Rescuer = InParams[1];
+		Rescuer = InParams[1].Get<TScriptInterface<IAbilityVitalityInterface>>();
 	}
 }

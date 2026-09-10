@@ -16,6 +16,6 @@ void UEventHandle_CameraTraceEnded::Parse_Implementation(const TArray<FParameter
 {
 	if(InParams.IsValidIndex(0))
 	{
-		TraceTarget = InParams[0];
+		TraceTarget = InParams[0].Get<AActor*>();
 	}
 }

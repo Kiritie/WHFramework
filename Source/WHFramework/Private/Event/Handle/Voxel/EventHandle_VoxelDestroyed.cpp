@@ -21,10 +21,13 @@ void UEventHandle_VoxelDestroyed::Parse_Implementation(const TArray<FParameter>&
 {
 	if(InParams.IsValidIndex(0))
 	{
-		VoxelItem = *InParams[0].GetPointerValue<FVoxelItem>();
+		if(const FVoxelItemParameterValue* Value = InParams[0].GetStructPtr<FVoxelItemParameterValue>())
+		{
+			VoxelItem = Value->Value;
+		}
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		VoxelAgent = InParams[1];
+		VoxelAgent = InParams[1].Get<TScriptInterface<IVoxelAgentInterface>>();
 	}
 }

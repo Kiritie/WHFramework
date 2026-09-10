@@ -1,4 +1,4 @@
-﻿#include "Slate/Editor/Setting/SEditorBoolSettingItem.h"
+#include "Slate/Editor/Setting/SEditorBoolSettingItem.h"
 
 SEditorBoolSettingItem::SEditorBoolSettingItem()
 {
@@ -18,7 +18,7 @@ void SEditorBoolSettingItem::Construct(const FArguments& InArgs)
 			.Padding(FMargin(0.f))
 			.IsChecked_Lambda([this]()
 			{
-				return GetSettingValue().GetBooleanValue() ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+				return GetSettingValue().Get<bool>() ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 			})
 			.OnCheckStateChanged_Lambda([this](ECheckBoxState State)
 			{

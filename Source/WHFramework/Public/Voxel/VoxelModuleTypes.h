@@ -4,6 +4,7 @@
 #include "Asset/AssetModuleTypes.h"
 #include "Common/CommonModuleTypes.h"
 #include "Math/MathTypes.h"
+#include "Parameter/ParameterValueTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "Scene/SceneModuleTypes.h"
 #include "Threads/VoxelChunkQueueThread.h"
@@ -341,6 +342,15 @@ public:
 		MeshNormals = TArray<FVector>();
 		MeshUVDatas.SetNum(6);
 	}
+};
+
+USTRUCT()
+struct FVoxelIndexParameterValue : public FParameterValueBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FIndex Value;
 };
 
 USTRUCT()
@@ -1186,4 +1196,13 @@ public:
 		Queues = InQueues;
 		Stage = 0;
 	}
+};
+
+USTRUCT()
+struct FVoxelItemParameterValue : public FParameterValueBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FVoxelItem Value;
 };

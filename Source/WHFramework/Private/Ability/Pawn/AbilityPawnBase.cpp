@@ -237,7 +237,7 @@ void AAbilityPawnBase::OnFiniteStateRefresh(UFiniteStateBase* InCurrentState)
 
 void AAbilityPawnBase::Death(IAbilityVitalityInterface* InKiller)
 {
-	SwitchFinalFiniteState({ InKiller });
+	SwitchFinalFiniteState({ Cast<UObject>(InKiller) });
 }
 
 void AAbilityPawnBase::Kill(IAbilityVitalityInterface* InTarget)
@@ -251,7 +251,7 @@ void AAbilityPawnBase::Kill(IAbilityVitalityInterface* InTarget)
 
 void AAbilityPawnBase::Revive(IAbilityVitalityInterface* InRescuer)
 {
-	SwitchDefaultFiniteState({ InRescuer });
+	SwitchDefaultFiniteState({ Cast<UObject>(InRescuer) });
 }
 
 void AAbilityPawnBase::Static()

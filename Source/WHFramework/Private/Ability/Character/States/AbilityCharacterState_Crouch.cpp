@@ -31,7 +31,7 @@ void UAbilityCharacterState_Crouch::OnEnter(UFiniteStateBase* InLastState, const
 	
 	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Character_Crouching);
 
-	Character->Crouch(InParams.IsValidIndex(0) ? InParams[0].GetBooleanValue() : false);
+	Character->Crouch(InParams.IsValidIndex(0) ? InParams[0].Get<bool>() : false);
 }
 
 void UAbilityCharacterState_Crouch::OnRefresh(float DeltaSeconds)

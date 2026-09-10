@@ -46,7 +46,7 @@ void UWidgetAbilityInventorySlotBase::OnInitialize(const TArray<FParameter>& InP
 {
 	if(InParams.IsValidIndex(0))
 	{
-		const auto InOwnerSlot = InParams[0].GetObjectValue<UAbilityInventorySlotBase>();
+		const auto InOwnerSlot = InParams[0].Get<UAbilityInventorySlotBase*>();
 		if(InOwnerSlot == OwnerSlot) return;
 	
 		if(OwnerSlot)
@@ -179,7 +179,7 @@ void UWidgetAbilityInventorySlotBase::NativeOnDragDetected(const FGeometry& InGe
 	{
 		OutOperation = UWidgetBlueprintLibrary::CreateDragDropOperation(UDragDropOperation::StaticClass());
 		OutOperation->Payload = this;
-		OutOperation->DefaultDragVisual = UObjectPoolModuleStatics::SpawnObject<UWidgetAbilityDragItemBase>(nullptr, { &GetItem() }, UAssetModuleStatics::GetStaticClass(FName("DragItem")));
+		OutOperation->DefaultDragVisual = UObjectPoolModuleStatics::SpawnObject<UWidgetAbilityDragItemBase>(nullptr, { GetItem() }, UAssetModuleStatics::GetStaticClass(FName("DragItem")));
 	}
 }
 

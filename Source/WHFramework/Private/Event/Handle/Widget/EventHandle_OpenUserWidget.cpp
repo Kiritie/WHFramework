@@ -30,31 +30,36 @@ void UEventHandle_OpenUserWidget::Parse_Implementation(const TArray<FParameter>&
 	{
 		if(InParams[0].Is<UClass*>())
 		{
-			WidgetClass = InParams[0];
+			WidgetClass = InParams[0].Get<TSubclassOf<UUserWidgetBase>>();
 			WidgetName = WidgetClass->GetDefaultObject<UUserWidgetBase>()->GetWidgetName();
 		}
 		else
 		{
-			WidgetName = InParams[0];
+			WidgetName = InParams[0].Get<FName>();
 		}
 	}
 	if(InParams.IsValidIndex(1))
 	{
-		WidgetParams = InParams[1].GetPointerValueRef<TArray<FParameter>>();
+		if(const FWidgetParameterArrayValue* Value = InParams[1].GetStructPtr<FWidgetParameterArrayValue>())
+		{
+			WidgetParams = Value->Value;
+		}
 	}
 	if(InParams.IsValidIndex(2))
 	{
-		bInstant = InParams[2];
+		bInstant = InParams[2].Get<bool>();
 	}
 	if(InParams.IsValidIndex(3))
 	{
-		bForce = InParams[3];
+		bForce = InParams[3].Get<bool>();
 	}
 }
 
 TArray<FParameter> UEventHandle_OpenUserWidget::Pack_Implementation()
 {
-	return { WidgetClass ? FParameter(WidgetClass) : FParameter(WidgetName), &WidgetParams, bInstant, bForce };
+	FWidgetParameterArrayValue ParameterArray;
+	ParameterArray.Value = WidgetParams;
+	return { WidgetClass ? FParameter(WidgetClass) : FParameter(WidgetName), MoveTemp(ParameterArray), bInstant, bForce };
 }
 
 #if WITH_EDITOR

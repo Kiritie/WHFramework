@@ -180,7 +180,7 @@ public:
 	template<class T>
 	static T* CreateUserWidget(UObject* InOwner, const TArray<FParameter>& InParams, bool bForce = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
 	{
-		return CreateUserWidget<T>(InOwner, &InParams, bForce, InClass);
+		return CreateUserWidget<T>(InOwner, InParams, bForce, InClass);
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"), Category = "WidgetModuleStatics")
@@ -195,7 +195,7 @@ public:
 	template<class T>
 	static T* CreateUserWidgetByName(FName InName, UObject* InOwner, const TArray<FParameter>& InParams, bool bForce = false)
 	{
-		return CreateUserWidgetByName<T>(InName, InOwner, &InParams, bForce);
+		return CreateUserWidgetByName<T>(InName, InOwner, InParams, bForce);
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"), Category = "WidgetModuleStatics")
@@ -404,7 +404,7 @@ public:
 	template<class T>
 	static T* CreateWorldWidgetByName(FName InName, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams)
 	{
-		return CreateWorldWidgetByName<T>(InName, InOwner, InMapping, &InParams);
+		return CreateWorldWidgetByName<T>(InName, InOwner, InMapping, InParams);
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"), Category = "WidgetModuleStatics")

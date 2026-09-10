@@ -202,7 +202,7 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FCameraViewData : public FParamData
+struct WHFRAMEWORK_API FCameraViewData
 {
 	GENERATED_BODY()
 
@@ -225,9 +225,9 @@ public:
 	}
 
 public:
-	virtual void FromParams(const TArray<FParameter>& InParams) override;
+	void FromParams(const TArray<FParameter>& InParams);
 
-	virtual TArray<FParameter> ToParams() const override;
+	TArray<FParameter> ToParams() const;
 
 public:
 	bool IsValid() const

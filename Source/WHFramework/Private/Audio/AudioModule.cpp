@@ -436,7 +436,9 @@ void UAudioModule::SetSoundParams(USoundMix* InSoundMix, USoundClass* InSoundCla
 	{
 		UGameplayStatics::SetSoundMixClassOverride(this, InSoundMix, InSoundClass, InParams.Volume, InParams.Pitch, InFadeInTime);
 		UGameplayStatics::PushSoundMixModifier(this, InSoundMix);
-		UEventModuleStatics::BroadcastEvent<UEventHandle_SoundParamsChanged>(this, { InSoundClass, &const_cast<FSoundParams&>(InParams) });
+		FSoundParamsParameterValue ParamsValue;
+		ParamsValue.Value = InParams;
+		UEventModuleStatics::BroadcastEvent<UEventHandle_SoundParamsChanged>(this, { InSoundClass, MoveTemp(ParamsValue) });
 	}
 }
 

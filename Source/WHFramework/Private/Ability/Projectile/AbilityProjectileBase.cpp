@@ -41,7 +41,7 @@ void AAbilityProjectileBase::OnSpawn_Implementation(UObject* InOwner, const TArr
 		{
 			if(UAbilitySystemComponentBase* OwningASC = Cast<UAbilitySystemComponentBase>(AbilityActor->GetAbilitySystemComponent()))
 			{
-				const FGameplayAbilitySpec Spec = OwningASC->FindAbilitySpecForHandle(InParams[0].GetPointerValueRef<FGameplayAbilitySpecHandle>());
+				const FGameplayAbilitySpec Spec = OwningASC->FindAbilitySpecForHandle(InParams[0].Get<FGameplayAbilitySpecHandle>());
 				if(UAbilityBase* Ability = Cast<UAbilityBase>(Spec.GetPrimaryInstance()))
 				{
 					AbilityLevel = Ability->GetAbilityLevel();
