@@ -1,5 +1,9 @@
 #include "Parameter/ParameterValueTypes.h"
 
+FEnumParameterValue::FEnumParameterValue()
+{
+}
+
 FEnumParameterValue::FEnumParameterValue(UEnum* InEnumType, uint8 InEnumValue)
 	: EnumType(InEnumType)
 {
