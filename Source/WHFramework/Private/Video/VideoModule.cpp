@@ -11,6 +11,7 @@
 #include "Asset/AssetModuleStatics.h"
 #include "Common/CommonModuleStatics.h"
 #include "GameFramework/GameUserSettings.h"
+#include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
 #include "SaveGame/SaveGameModuleStatics.h"
 #include "SaveGame/Module/VideoSaveGame.h"
@@ -289,6 +290,11 @@ void UVideoModule::StopMovieForMediaPlayer(const FName InName, bool bSkip, bool 
 
 void UVideoModule::ApplyVideoSettings()
 {
+	if(GetWorld() && GetWorld()->IsPlayInEditor())
+	{
+		GetGameUserSettings()->ApplyNonResolutionSettings();
+		return;
+	}
 	GetGameUserSettings()->ApplySettings(true);
 }
 
@@ -346,6 +352,7 @@ void UVideoModule::PostEditChangeProperty(FPropertyChangedEvent& PropertyChanged
 void UVideoModule::SetWindowMode(EWindowModeN InMode, bool bApply)
 {
 	WindowMode = InMode;
+	if(GetWorld() && GetWorld()->IsPlayInEditor()) return;
 	GetGameUserSettings()->SetFullscreenMode((EWindowMode::Type)InMode);
 	if(bApply) GetGameUserSettings()->ApplySettings(false);
 }
@@ -353,6 +360,7 @@ void UVideoModule::SetWindowMode(EWindowModeN InMode, bool bApply)
 void UVideoModule::SetWindowResolution(EWindowResolution InResolution, bool bApply)
 {
 	WindowResolution = InResolution;
+	if(GetWorld() && GetWorld()->IsPlayInEditor()) return;
 	switch (InResolution)
 	{
 		case EWindowResolution::WR_ScreenSize:

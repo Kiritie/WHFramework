@@ -106,7 +106,7 @@ UVoxelModule::UVoxelModule()
 			FVoxelChunkQueue(false, 30)
 		}) },
 		{ EVoxelWorldState::MeshBuilding, FVoxelChunkQueues({
-			FVoxelChunkQueue(true, 256)
+			FVoxelChunkQueue(false, 4)
 		}) },
 		{ EVoxelWorldState::Generating, FVoxelChunkQueues({
 			FVoxelChunkQueue(false, 1)

@@ -42,6 +42,7 @@ TSharedRef<SWidget> UWidgetSceneMarkerItem::RebuildWidget()
 		TxtSymbol->SetText(NSLOCTEXT("SceneMarker", "FallbackSymbol", "◆"));
 		TxtSymbol->SetJustification(ETextJustify::Center);
 		TxtSymbol->SetFont(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 18));
+		TxtSymbol->SetRenderTransformPivot(FVector2D(0.5f));
 		TxtName->SetFont(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 13));
 		TxtDistance->SetFont(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 11));
 		for(UTextBlock* Text : {TxtSymbol, TxtName, TxtDistance})
@@ -61,31 +62,43 @@ TSharedRef<SWidget> UWidgetSceneMarkerItem::RebuildWidget()
 		if(UVerticalBoxSlot* NameSlot = Labels->AddChildToVerticalBox(TxtName)) NameSlot->SetHorizontalAlignment(HAlign_Left);
 		if(UVerticalBoxSlot* DistanceSlot = Labels->AddChildToVerticalBox(TxtDistance)) DistanceSlot->SetHorizontalAlignment(HAlign_Left);
 	}
-	return Super::RebuildWidget();
+	const TSharedRef<SWidget> Result = Super::RebuildWidget();
+	SetMarkerView(MarkerView, bShowName, bShowDistance);
+	return Result;
 }
 
 void UWidgetSceneMarkerItem::SetMarkerView(const FSceneMarkerView& InMarkerView, bool bInShowName, bool bInShowDistance)
 {
-	const TSoftObjectPtr<UTexture2D> PreviousIcon = MarkerView.Marker.Icon;
 	MarkerView = InMarkerView;
+	bShowName = bInShowName;
+	bShowDistance = bInShowDistance;
 	if(ImgIcon)
 	{
-		ImgIcon->SetColorAndOpacity(MarkerView.Marker.Color);
-		if(PreviousIcon != MarkerView.Marker.Icon || ImgIcon->GetBrush().GetResourceObject() == nullptr)
+		const TSoftObjectPtr<UTexture2D> DesiredIcon = MarkerView.bPlayer && MarkerView.Marker.Icon.IsNull() ? PlayerIcon : MarkerView.Marker.Icon;
+		UTexture2D* DesiredTexture = DesiredIcon.LoadSynchronous();
+		const bool bUsePlayerIcon = MarkerView.bPlayer && DesiredTexture;
+		ImgIcon->SetColorAndOpacity(bUsePlayerIcon ? FLinearColor::White : MarkerView.Marker.Color);
+		if(ImgIcon->GetBrush().GetResourceObject() != DesiredTexture)
 		{
-			ImgIcon->SetBrushResourceObject(MarkerView.Marker.Icon.LoadSynchronous());
+			ImgIcon->SetBrushResourceObject(DesiredTexture);
 		}
-		ImgIcon->SetVisibility(MarkerView.Marker.Icon.IsNull() ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
+		ImgIcon->SetRenderTransformPivot(FVector2D(0.5f));
+		ImgIcon->SetRenderScale(bUsePlayerIcon ? FVector2D(0.9f) : FVector2D(1.f));
+		if(!bUsePlayerIcon) ImgIcon->SetRenderTransformAngle(0.f);
+		ImgIcon->SetVisibility(DesiredTexture ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 	}
 	if(TxtSymbol)
 	{
+		TxtSymbol->SetText(MarkerView.bPlayer ? NSLOCTEXT("SceneMarker", "PlayerSymbol", "▲") : NSLOCTEXT("SceneMarker", "FallbackSymbol", "◆"));
 		TxtSymbol->SetColorAndOpacity(FSlateColor(MarkerView.Marker.Color));
-		TxtSymbol->SetVisibility(MarkerView.Marker.Icon.IsNull() ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+		TxtSymbol->SetRenderScale(MarkerView.bPlayer ? FVector2D(4.f / 3.f) : FVector2D(1.f));
+		if(!MarkerView.bPlayer) TxtSymbol->SetRenderTransformAngle(0.f);
+		TxtSymbol->SetVisibility(ImgIcon && ImgIcon->GetBrush().GetResourceObject() ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
 	}
 	if(TxtName)
 	{
 		TxtName->SetText(MarkerView.Marker.DisplayName);
-		TxtName->SetVisibility(bInShowName ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+		TxtName->SetVisibility(bInShowName && !MarkerView.bPlayer ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 	}
 	if(TxtDistance)
 	{
@@ -104,5 +117,14 @@ void UWidgetSceneMarkerItem::UpdateMarkerState(const FSceneMarkerView& InMarkerV
 	if(TxtDistance)
 	{
 		TxtDistance->SetText(FText::Format(NSLOCTEXT("SceneMarker", "DistanceMeters", "{0}m"), FText::AsNumber(FMath::RoundToInt(MarkerView.Distance / 100.f))));
+	}
+}
+
+void UWidgetSceneMarkerItem::SetPlayerRotation(float InAngle)
+{
+	if(MarkerView.bPlayer)
+	{
+		if(ImgIcon) ImgIcon->SetRenderTransformAngle(InAngle);
+		if(TxtSymbol) TxtSymbol->SetRenderTransformAngle(InAngle);
 	}
 }

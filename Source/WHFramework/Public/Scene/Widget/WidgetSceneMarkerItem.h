@@ -19,11 +19,15 @@ public:
 
 	void SetMarkerView(const FSceneMarkerView& InMarkerView, bool bInShowName, bool bInShowDistance);
 	void UpdateMarkerState(const FSceneMarkerView& InMarkerView);
+	void SetPlayerRotation(float InAngle);
 
 	FGuid GetMarkerID() const { return MarkerView.Marker.MarkerID; }
 
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Scene Marker|Style")
+	TSoftObjectPtr<UTexture2D> PlayerIcon;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
 	UImage* ImgIcon;
@@ -39,4 +43,7 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	FSceneMarkerView MarkerView;
+
+	bool bShowName = false;
+	bool bShowDistance = false;
 };

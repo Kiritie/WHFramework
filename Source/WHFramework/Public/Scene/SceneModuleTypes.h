@@ -275,6 +275,9 @@ struct WHFRAMEWORK_API FSceneMarkerView
 
 	UPROPERTY(BlueprintReadOnly)
 	bool bTracked = false;
+
+	UPROPERTY(BlueprintReadOnly)
+	bool bPlayer = false;
 };
 
 /**

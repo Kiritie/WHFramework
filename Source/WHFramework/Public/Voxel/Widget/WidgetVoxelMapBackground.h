@@ -12,6 +12,12 @@ public:
 	static int32 GetLODStride(float InCellPixelSize);
 
 protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Voxel Map|Style")
+	FLinearColor BackgroundColor = FLinearColor::White;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Voxel Map|Style")
+	FLinearColor MapTintColor = FLinearColor::White;
+
 	virtual int32 NativePaint(
 		const FPaintArgs& Args,
 		const FGeometry& AllottedGeometry,

@@ -190,6 +190,10 @@ void UWidgetSceneMarkerPanel::UpdateMarkerStates()
 		UWidgetSceneMarkerItem* Item = MarkerItems.FindRef(Marker.Marker.MarkerID);
 		if(!Item) continue;
 		Item->UpdateMarkerState(Marker);
+		if(Marker.bPlayer && Player)
+		{
+			Item->SetPlayerRotation(90.f - FMath::FindDeltaAngleDegrees(MapView.Yaw, Player->GetActorRotation().Yaw));
+		}
 		const bool bInRange = Marker.Distance >= Marker.Marker.MinDistance &&
 			(Marker.Marker.MaxDistance <= 0.f || Marker.Distance <= Marker.Marker.MaxDistance);
 		FVector2D Position;
@@ -245,6 +249,7 @@ void UWidgetSceneMarkerPanel::AddPlayerMarker()
 	View.Location = View.Marker.Location;
 	View.Distance = FVector2D(View.Location - GetMarkerViewLocation()).Size();
 	View.bTargetLoaded = true;
+	View.bPlayer = true;
 	Markers.Add(MoveTemp(View));
 }
 

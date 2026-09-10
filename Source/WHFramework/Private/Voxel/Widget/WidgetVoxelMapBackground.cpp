@@ -29,7 +29,7 @@ int32 UWidgetVoxelMapBackground::NativePaint(
 		AllottedGeometry.ToPaintGeometry(),
 		FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")),
 		ESlateDrawEffect::None,
-		FLinearColor::White);
+		BackgroundColor);
 	if(!UVoxelModule::IsValid() || MapView.Range <= UE_SMALL_NUMBER || PanelSize.IsNearlyZero()) return BaseLayer + 1;
 
 	const float PixelsPerWorldUnit = PanelSize.X / MapView.Range;
@@ -95,7 +95,7 @@ int32 UWidgetVoxelMapBackground::NativePaint(
 						Rotation + FMath::DegreesToRadians(static_cast<uint8>(Cell->Angle) * 90.f),
 						FVector2f(DrawSize * 0.5f),
 						FSlateDrawElement::RelativeToElement,
-						FLinearColor::White);
+						MapTintColor);
 				}
 			}
 		});
