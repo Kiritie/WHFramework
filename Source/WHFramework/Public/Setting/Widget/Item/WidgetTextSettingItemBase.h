@@ -39,5 +39,5 @@ protected:
 	UEditableTextBox* TxtBox_Value;
 
 	UPROPERTY(BlueprintReadOnly)
-	EParameterType ParameterType;
+	TObjectPtr<UScriptStruct> ParameterValueType;
 };

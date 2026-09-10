@@ -18,6 +18,7 @@ public class WHFrameworkCore : ModuleRules
 				"CoreUObject",
 				"HTTP",
 				"Json",
+				"StructUtils",
 			}
 		);
 

@@ -18,7 +18,7 @@ void UWidgetEnumSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const 
 	
 	if(InParams.IsValidIndex(1))
 	{
-		if(InParams[1].GetParameterType() == EParameterType::String)
+		if(InParams[1].Is<FString>())
 		{
 			for(int32 i = 0; i < UCommonModuleStatics::GetEnumItemNum(InParams[1]); i++)
 			{

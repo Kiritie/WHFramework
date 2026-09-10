@@ -7,7 +7,7 @@
 
 UWidgetTextSettingItemBase::UWidgetTextSettingItemBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	ParameterType = EParameterType::None;
+	ParameterValueType = nullptr;
 }
 
 void UWidgetTextSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
@@ -21,7 +21,7 @@ void UWidgetTextSettingItemBase::OnDespawn_Implementation(bool bRecovery)
 {
 	TxtBox_Value->KeyboardType = EVirtualKeyboardType::Default;
 
-	ParameterType = EParameterType::None;
+	ParameterValueType = nullptr;
 
 	TxtBox_Value->OnTextChanged.RemoveDynamic(this, &UWidgetTextSettingItemBase::OnTextBoxValueChanged);
 
@@ -45,63 +45,58 @@ void UWidgetTextSettingItemBase::OnTextBoxValueChanged(const FText& InText)
 FParameter UWidgetTextSettingItemBase::GetValue() const
 {
 	FParameter Value;
-	switch (ParameterType)
+	const FString Text = TxtBox_Value->GetText().ToString();
+	if (ParameterValueType == FParameterIntValue::StaticStruct())
 	{
-		case EParameterType::Integer:
-		case EParameterType::Float:
-		{
-			Value = FCString::Atof(*TxtBox_Value->GetText().ToString());
-			break;
-		}
-		case EParameterType::String:
-		case EParameterType::Name:
-		case EParameterType::Text:
-		{
-			Value = TxtBox_Value->GetText().ToString();
-			break;
-		}
-		default: break;
+		Value = FCString::Atoi(*Text);
+	}
+	else if (ParameterValueType == FParameterFloatValue::StaticStruct())
+	{
+		Value = FCString::Atof(*Text);
+	}
+	else if (ParameterValueType == FParameterStringValue::StaticStruct())
+	{
+		Value = Text;
+	}
+	else if (ParameterValueType == FParameterNameValue::StaticStruct())
+	{
+		Value = FName(*Text);
+	}
+	else if (ParameterValueType == FParameterTextValue::StaticStruct())
+	{
+		Value = FText::FromString(Text);
 	}
 	return Value;
 }
 
 void UWidgetTextSettingItemBase::SetValue(const FParameter& InValue)
 {
-	ParameterType = InValue.GetParameterType();
+	ParameterValueType = const_cast<UScriptStruct*>(InValue.GetValueType());
 	FString Text;
-	switch (ParameterType)
+	if (InValue.Is<int32>())
 	{
-		case EParameterType::Integer:
-		{
-			Text = FString::FromInt(InValue.GetIntegerValue());
-			TxtBox_Value->KeyboardType = EVirtualKeyboardType::Number;
-			break;
-		}
-		case EParameterType::Float:
-		{
-			Text = FString::Printf(TEXT("%0.2f"), InValue.GetFloatValue());
-			TxtBox_Value->KeyboardType = EVirtualKeyboardType::Number;
-			break;
-		}
-		case EParameterType::String:
-		{
-			Text = InValue.GetStringValue();
-			TxtBox_Value->KeyboardType = EVirtualKeyboardType::Default;
-			break;
-		}
-		case EParameterType::Name:
-		{
-			Text = InValue.GetNameValue().ToString();
-			TxtBox_Value->KeyboardType = EVirtualKeyboardType::Default;
-			break;
-		}
-		case EParameterType::Text:
-		{
-			Text = InValue.GetTextValue().ToString();
-			TxtBox_Value->KeyboardType = EVirtualKeyboardType::Default;
-			break;
-		}
-		default: break;
+		Text = FString::FromInt(InValue.GetIntegerValue());
+		TxtBox_Value->KeyboardType = EVirtualKeyboardType::Number;
+	}
+	else if (InValue.Is<float>())
+	{
+		Text = FString::Printf(TEXT("%0.2f"), InValue.GetFloatValue());
+		TxtBox_Value->KeyboardType = EVirtualKeyboardType::Number;
+	}
+	else if (InValue.Is<FString>())
+	{
+		Text = InValue.GetStringValue();
+		TxtBox_Value->KeyboardType = EVirtualKeyboardType::Default;
+	}
+	else if (InValue.Is<FName>())
+	{
+		Text = InValue.GetNameValue().ToString();
+		TxtBox_Value->KeyboardType = EVirtualKeyboardType::Default;
+	}
+	else if (InValue.Is<FText>())
+	{
+		Text = InValue.GetTextValue().ToString();
+		TxtBox_Value->KeyboardType = EVirtualKeyboardType::Default;
 	}
 	TxtBox_Value->SetText(FText::FromString(Text));
 	Super::SetValue(InValue);

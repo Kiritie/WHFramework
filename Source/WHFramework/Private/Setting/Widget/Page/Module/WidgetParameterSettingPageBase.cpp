@@ -26,28 +26,18 @@ void UWidgetParameterSettingPageBase::OnCreate(UUserWidget* InOwner, const TArra
 		if (Iter.Name != NAME_None && Iter.bRegistered && !Iter.Parameter.GetDescription().IsEmpty())
 		{
 			UWidgetSettingItemBase* SettingItem = nullptr;
-			switch (Iter.Parameter.GetParameterType())
+			if (Iter.Parameter.Is<int32>() || Iter.Parameter.Is<float>() || Iter.Parameter.Is<FString>() ||
+				Iter.Parameter.Is<FName>() || Iter.Parameter.Is<FText>())
 			{
-				case EParameterType::Integer:
-				case EParameterType::Float:
-				case EParameterType::String:
-				case EParameterType::Name:
-				case EParameterType::Text:
-				{
-					SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetTextSettingItemBase>(nullptr, { Iter.Parameter.GetDescription() }, USettingModule::Get().GetTextSettingItemClass());
-					break;
-				}
-				case EParameterType::Boolean:
-				{
-					SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { Iter.Parameter.GetDescription() }, USettingModule::Get().GetBoolSettingItemClass());
-					break;
-				}
-				case EParameterType::Key:
-				{
-					SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetKeySettingItemBase>(nullptr, { Iter.Parameter.GetDescription(), 1, true }, USettingModule::Get().GetKeySettingItemClass());
-					break;
-				}
-				default: break;
+				SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetTextSettingItemBase>(nullptr, { Iter.Parameter.GetDescription() }, USettingModule::Get().GetTextSettingItemClass());
+			}
+			else if (Iter.Parameter.Is<bool>())
+			{
+				SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { Iter.Parameter.GetDescription() }, USettingModule::Get().GetBoolSettingItemClass());
+			}
+			else if (Iter.Parameter.Is<FKey>())
+			{
+				SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetKeySettingItemBase>(nullptr, { Iter.Parameter.GetDescription(), 1, true }, USettingModule::Get().GetKeySettingItemClass());
 			}
 			AddSettingItem(Iter.Name, SettingItem, Iter.Category);
 		}

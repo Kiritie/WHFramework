@@ -28,7 +28,7 @@ void UEventHandle_OpenUserWidget::Parse_Implementation(const TArray<FParameter>&
 {
 	if(InParams.IsValidIndex(0))
 	{
-		if(InParams[0].GetParameterType() == EParameterType::Class)
+		if(InParams[0].Is<UClass*>())
 		{
 			WidgetClass = InParams[0];
 			WidgetName = WidgetClass->GetDefaultObject<UUserWidgetBase>()->GetWidgetName();

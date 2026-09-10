@@ -19,13 +19,4 @@ public:
 	
 	virtual void CustomizeChildren(TSharedRef<IPropertyHandle> InStructPropertyHandle, IDetailChildrenBuilder& ChildBuilder, IPropertyTypeCustomizationUtils& StructCustomizationUtils) override;
 
-protected:
-	void OnParameterTypeChanged();
-
-private:
-	TSharedPtr<IPropertyHandle> ParameterTypeHandle;
-	
-	TSharedPtr<IPropertyHandle> DescriptionHandle;
-	
-	TMap<EParameterType, TSharedPtr<IPropertyHandle>> ParameterValueHandles;
 };
