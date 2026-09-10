@@ -7,7 +7,7 @@
 #include "Procedure/Base/ProcedureBase.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Procedure/EventHandle_SwitchProcedure.h"
+#include "Event/Events/Procedure/Event_SwitchProcedure.h"
 #include "Procedure/ProcedureModuleNetworkComponent.h"
 
 IMPLEMENTATION_MODULE(UProcedureModule)
@@ -49,7 +49,7 @@ void UProcedureModule::OnInitialize()
 {
 	Super::OnInitialize();
 
-	UEventModuleStatics::SubscribeEvent<UEventHandle_SwitchProcedure>(this, GET_FUNCTION_NAME_THISCLASS(OnSwitchProcedure));
+	UEventModuleStatics::SubscribeEvent<FEventSwitchProcedure>(this, &ThisClass::OnSwitchProcedure);
 
 	if(DefaultAsset)
 	{
@@ -102,9 +102,9 @@ FString UProcedureModule::GetModuleDebugMessage()
 	return FString::Printf(TEXT("CurrentProcedure: %s"), CurrentProcedure ? *CurrentProcedure->ProcedureDisplayName.ToString() : TEXT("None"));
 }
 
-void UProcedureModule::OnSwitchProcedure(UObject* InSender, UEventHandle_SwitchProcedure* InEventHandle)
+void UProcedureModule::OnSwitchProcedure(UObject* InSender, const FEventSwitchProcedure& InEvent)
 {
-	SwitchProcedureByClass(InEventHandle->ProcedureClass);
+	SwitchProcedureByClass(InEvent.ProcedureClass);
 }
 
 UProcedureAsset* UProcedureModule::GetAsset(UProcedureAsset* InAsset) const

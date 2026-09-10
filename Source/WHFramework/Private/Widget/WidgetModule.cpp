@@ -7,9 +7,9 @@
 #include "Blueprint/WidgetTree.h"
 #include "Common/CommonModuleStatics.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Widget/EventHandle_CloseUserWidget.h"
-#include "Event/Handle/Widget/EventHandle_OpenUserWidget.h"
-#include "Event/Handle/Widget/EventHandle_SetWorldWidgetVisible.h"
+#include "Event/Events/Widget/Event_CloseUserWidget.h"
+#include "Event/Events/Widget/Event_OpenUserWidget.h"
+#include "Event/Events/Widget/Event_SetWorldWidgetVisible.h"
 #include "Input/InputManager.h"
 #include "SaveGame/Module/WidgetSaveGame.h"
 #include "Slate/SlateWidgetManager.h"
@@ -75,9 +75,9 @@ void UWidgetModule::OnInitialize()
 
 	FInputManager::Get().AddInputManager(this);
 
-	UEventModuleStatics::SubscribeEvent<UEventHandle_OpenUserWidget>(this, GET_FUNCTION_NAME_THISCLASS(OnOpenUserWidget));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_CloseUserWidget>(this, GET_FUNCTION_NAME_THISCLASS(OnCloseUserWidget));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_SetWorldWidgetVisible>(this, GET_FUNCTION_NAME_THISCLASS(OnSetWorldWidgetVisible));
+	UEventModuleStatics::SubscribeEvent<FEventOpenUserWidget>(this, &ThisClass::OnOpenUserWidget);
+	UEventModuleStatics::SubscribeEvent<FEventCloseUserWidget>(this, &ThisClass::OnCloseUserWidget);
+	UEventModuleStatics::SubscribeEvent<FEventSetWorldWidgetVisible>(this, &ThisClass::OnSetWorldWidgetVisible);
 
 	for(auto& Iter : UserWidgetClasses)
 	{
@@ -252,19 +252,19 @@ FString UWidgetModule::GetModuleDebugMessage()
 	return Super::GetModuleDebugMessage();
 }
 
-void UWidgetModule::OnOpenUserWidget(UObject* InSender, UEventHandle_OpenUserWidget* InEventHandle)
+void UWidgetModule::OnOpenUserWidget(UObject* InSender, const FEventOpenUserWidget& InEvent)
 {
-	if(!InEventHandle->WidgetName.IsNone())
+	if(!InEvent.WidgetName.IsNone())
 	{
-		OpenUserWidgetByName(InEventHandle->WidgetName, InEventHandle->WidgetParams, InEventHandle->bInstant, InEventHandle->bForce);
+		OpenUserWidgetByName(InEvent.WidgetName, InEvent.WidgetParams.Value, InEvent.bInstant, InEvent.bForce);
 	}
 }
 
-void UWidgetModule::OnCloseUserWidget(UObject* InSender, UEventHandle_CloseUserWidget* InEventHandle)
+void UWidgetModule::OnCloseUserWidget(UObject* InSender, const FEventCloseUserWidget& InEvent)
 {
-	if(!InEventHandle->WidgetName.IsNone())
+	if(!InEvent.WidgetName.IsNone())
 	{
-		CloseUserWidgetByName(InEventHandle->WidgetName, InEventHandle->bInstant);
+		CloseUserWidgetByName(InEvent.WidgetName, InEvent.bInstant);
 	}
 }
 
@@ -376,9 +376,9 @@ void UWidgetModule::SortWorldWidgetClasses()
 	Modify();
 }
 
-void UWidgetModule::OnSetWorldWidgetVisible(UObject* InSender, UEventHandle_SetWorldWidgetVisible* InEventHandle)
+void UWidgetModule::OnSetWorldWidgetVisible(UObject* InSender, const FEventSetWorldWidgetVisible& InEvent)
 {
-	SetWorldWidgetVisible(InEventHandle->bVisible, InEventHandle->WidgetClass);
+	SetWorldWidgetVisible(InEvent.bVisible, InEvent.WidgetClass);
 }
 
 bool UWidgetModule::GetWorldWidgetVisible(TSubclassOf<UWorldWidgetBase> InClass)

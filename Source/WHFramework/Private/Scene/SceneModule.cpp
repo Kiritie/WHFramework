@@ -10,16 +10,16 @@
 #include "Engine/TargetPoint.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Scene/EventHandle_AsyncLoadLevels.h"
-#include "Event/Handle/Scene/EventHandle_AsyncLoadLevelFinished.h"
-#include "Event/Handle/Scene/EventHandle_AsyncUnloadLevels.h"
-#include "Event/Handle/Scene/EventHandle_AsyncUnloadLevelFinished.h"
-#include "Event/Handle/Scene/EventHandle_PlayLevelSequence.h"
-#include "Event/Handle/Scene/EventHandle_SetActorVisible.h"
-#include "Event/Handle/Scene/EventHandle_SetDataLayerOwnerPlayer.h"
-#include "Event/Handle/Scene/EventHandle_SetDataLayerRuntimeState.h"
-#include "Event/Handle/Scene/EventHandle_SetLevelOwnerPlayer.h"
-#include "Event/Handle/Scene/EventHandle_StopLevelSequence.h"
+#include "Event/Events/Scene/Event_AsyncLoadLevels.h"
+#include "Event/Events/Scene/Event_AsyncLoadLevelFinished.h"
+#include "Event/Events/Scene/Event_AsyncUnloadLevels.h"
+#include "Event/Events/Scene/Event_AsyncUnloadLevelFinished.h"
+#include "Event/Events/Scene/Event_PlayLevelSequence.h"
+#include "Event/Events/Scene/Event_SetActorVisible.h"
+#include "Event/Events/Scene/Event_SetDataLayerOwnerPlayer.h"
+#include "Event/Events/Scene/Event_SetDataLayerRuntimeState.h"
+#include "Event/Events/Scene/Event_SetLevelOwnerPlayer.h"
+#include "Event/Events/Scene/Event_StopLevelSequence.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Main/MainModule.h"
@@ -176,14 +176,14 @@ void USceneModule::OnInitialize()
 
 	IDebuggerInterface::Register();
 
-	UEventModuleStatics::SubscribeEvent<UEventHandle_AsyncLoadLevels>(this, GET_FUNCTION_NAME_THISCLASS(OnAsyncLoadLevels));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_AsyncUnloadLevels>(this, GET_FUNCTION_NAME_THISCLASS(OnAsyncUnloadLevels));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_SetActorVisible>(this, GET_FUNCTION_NAME_THISCLASS(OnSetActorVisible));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_PlayLevelSequence>(this, GET_FUNCTION_NAME_THISCLASS(OnPlayLevelSequence));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_StopLevelSequence>(this, GET_FUNCTION_NAME_THISCLASS(OnStopLevelSequence));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_SetDataLayerRuntimeState>(this, GET_FUNCTION_NAME_THISCLASS(OnSetDataLayerRuntimeState));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_SetDataLayerOwnerPlayer>(this, GET_FUNCTION_NAME_THISCLASS(OnSetDataLayerOwnerPlayer));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_SetLevelOwnerPlayer>(this, GET_FUNCTION_NAME_THISCLASS(OnSetLevelOwnerPlayer));
+	UEventModuleStatics::SubscribeEvent<FEventAsyncLoadLevels>(this, &ThisClass::OnAsyncLoadLevels);
+	UEventModuleStatics::SubscribeEvent<FEventAsyncUnloadLevels>(this, &ThisClass::OnAsyncUnloadLevels);
+	UEventModuleStatics::SubscribeEvent<FEventSetActorVisible>(this, &ThisClass::OnSetActorVisible);
+	UEventModuleStatics::SubscribeEvent<FEventPlayLevelSequence>(this, &ThisClass::OnPlayLevelSequence);
+	UEventModuleStatics::SubscribeEvent<FEventStopLevelSequence>(this, &ThisClass::OnStopLevelSequence);
+	UEventModuleStatics::SubscribeEvent<FEventSetDataLayerRuntimeState>(this, &ThisClass::OnSetDataLayerRuntimeState);
+	UEventModuleStatics::SubscribeEvent<FEventSetDataLayerOwnerPlayer>(this, &ThisClass::OnSetDataLayerOwnerPlayer);
+	UEventModuleStatics::SubscribeEvent<FEventSetLevelOwnerPlayer>(this, &ThisClass::OnSetLevelOwnerPlayer);
 
 	if(WorldTimer)
 	{
@@ -939,54 +939,54 @@ UWorldWeather* USceneModule::GetWorldWeather(TSubclassOf<UWorldWeather> InClass)
 	return GetDeterminesOutputObject(WorldWeather, InClass);
 }
 
-void USceneModule::OnAsyncLoadLevels(UObject* InSender, UEventHandle_AsyncLoadLevels* InEventHandle)
+void USceneModule::OnAsyncLoadLevels(UObject* InSender, const FEventAsyncLoadLevels& InEvent)
 {
-	for(auto& Iter : InEventHandle->SoftLevelPaths)
+	for(auto& Iter : InEvent.SoftLevelPaths)
 	{
 		FOnAsyncLoadLevelFinished OnAsyncLoadLevelFinished;
 		if(Iter.LevelObjectPtr)
 		{
-			AsyncLoadLevelByObjectPtr(Iter.LevelObjectPtr, OnAsyncLoadLevelFinished, InEventHandle->FinishDelayTime, InEventHandle->bCreateLoadingWidget);
+			AsyncLoadLevelByObjectPtr(Iter.LevelObjectPtr, OnAsyncLoadLevelFinished, InEvent.FinishDelayTime, InEvent.bCreateLoadingWidget);
 		}
 		else
 		{
-			AsyncLoadLevel(Iter.LevelPath, OnAsyncLoadLevelFinished, InEventHandle->FinishDelayTime, InEventHandle->bCreateLoadingWidget);
+			AsyncLoadLevel(Iter.LevelPath, OnAsyncLoadLevelFinished, InEvent.FinishDelayTime, InEvent.bCreateLoadingWidget);
 		}
 	}
 }
 
-void USceneModule::OnAsyncUnloadLevels(UObject* InSender, UEventHandle_AsyncUnloadLevels* InEventHandle)
+void USceneModule::OnAsyncUnloadLevels(UObject* InSender, const FEventAsyncUnloadLevels& InEvent)
 {
-	for(auto& Iter : InEventHandle->SoftLevelPaths)
+	for(auto& Iter : InEvent.SoftLevelPaths)
 	{
 		FOnAsyncLoadLevelFinished OnAsyncUnloadLevelFinished;
 		if(Iter.LevelObjectPtr)
 		{
-			AsyncUnloadLevelByObjectPtr(Iter.LevelObjectPtr, OnAsyncUnloadLevelFinished, InEventHandle->FinishDelayTime, InEventHandle->bCreateLoadingWidget);
+			AsyncUnloadLevelByObjectPtr(Iter.LevelObjectPtr, OnAsyncUnloadLevelFinished, InEvent.FinishDelayTime, InEvent.bCreateLoadingWidget);
 		}
 		else
 		{
-			AsyncUnloadLevel(Iter.LevelPath, OnAsyncUnloadLevelFinished, InEventHandle->FinishDelayTime, InEventHandle->bCreateLoadingWidget);
+			AsyncUnloadLevel(Iter.LevelPath, OnAsyncUnloadLevelFinished, InEvent.FinishDelayTime, InEvent.bCreateLoadingWidget);
 		}
 	}
 }
 
-void USceneModule::OnSetActorVisible(UObject* InSender, UEventHandle_SetActorVisible* InEventHandle)
+void USceneModule::OnSetActorVisible(UObject* InSender, const FEventSetActorVisible& InEvent)
 {
-	if(AActor* Actor = InEventHandle->ActorPath.LoadSynchronous())
+	if(AActor* Actor = InEvent.ActorPath.LoadSynchronous())
 	{
-		Actor->GetRootComponent()->SetVisibility(InEventHandle->bVisible, true);
+		Actor->GetRootComponent()->SetVisibility(InEvent.bVisible, true);
 	}
 }
 
-void USceneModule::OnPlayLevelSequence(UObject* InSender, UEventHandle_PlayLevelSequence* InEventHandle)
+void USceneModule::OnPlayLevelSequence(UObject* InSender, const FEventPlayLevelSequence& InEvent)
 {
-	if(ALevelSequenceActor* Actor = InEventHandle->LevelSequence.LoadSynchronous())
+	if(ALevelSequenceActor* Actor = InEvent.LevelSequence.LoadSynchronous())
 	{
 		FTimerHandle TimerHandle;
-		auto PlaySequence = [Actor, InEventHandle]()
+		auto PlaySequence = [Actor, InEvent]()
 		{
-			if(!InEventHandle->bReverse)
+			if(!InEvent.bReverse)
 			{
 				Actor->GetSequencePlayer()->Play();
 			}
@@ -995,12 +995,12 @@ void USceneModule::OnPlayLevelSequence(UObject* InSender, UEventHandle_PlayLevel
 				Actor->GetSequencePlayer()->PlayReverse();
 			}
 		};
-		if(InEventHandle->Delay > 0.f)
+		if(InEvent.Delay > 0.f)
 		{
 			GetWorld()->GetTimerManager().SetTimer(TimerHandle, [PlaySequence]()
 			{
 				PlaySequence();
-			}, InEventHandle->Delay, false);
+			}, InEvent.Delay, false);
 		}
 		else
 		{
@@ -1009,14 +1009,14 @@ void USceneModule::OnPlayLevelSequence(UObject* InSender, UEventHandle_PlayLevel
 	}
 }
 
-void USceneModule::OnStopLevelSequence(UObject* InSender, UEventHandle_StopLevelSequence* InEventHandle)
+void USceneModule::OnStopLevelSequence(UObject* InSender, const FEventStopLevelSequence& InEvent)
 {
-	if(ALevelSequenceActor* Actor = InEventHandle->LevelSequence.LoadSynchronous())
+	if(ALevelSequenceActor* Actor = InEvent.LevelSequence.LoadSynchronous())
 	{
 		FTimerHandle TimerHandle;
-		auto StopSequence = [Actor, InEventHandle]()
+		auto StopSequence = [Actor, InEvent]()
 		{
-			if(!InEventHandle->bKeepState)
+			if(!InEvent.bKeepState)
 			{
 				Actor->GetSequencePlayer()->Stop();
 			}
@@ -1025,12 +1025,12 @@ void USceneModule::OnStopLevelSequence(UObject* InSender, UEventHandle_StopLevel
 				Actor->GetSequencePlayer()->StopAtCurrentTime();
 			}
 		};
-		if(InEventHandle->Delay > 0.f)
+		if(InEvent.Delay > 0.f)
 		{
 			GetWorld()->GetTimerManager().SetTimer(TimerHandle, [StopSequence]()
 			{
 				StopSequence();
-			}, InEventHandle->Delay, false);
+			}, InEvent.Delay, false);
 		}
 		else
 		{
@@ -1039,35 +1039,35 @@ void USceneModule::OnStopLevelSequence(UObject* InSender, UEventHandle_StopLevel
 	}
 }
 
-void USceneModule::OnSetDataLayerRuntimeState(UObject* InSender, UEventHandle_SetDataLayerRuntimeState* InEventHandle)
+void USceneModule::OnSetDataLayerRuntimeState(UObject* InSender, const FEventSetDataLayerRuntimeState& InEvent)
 {
 	if(UDataLayerManager* DataLayerManager = UDataLayerManager::GetDataLayerManager(this))
 	{
-		DataLayerManager->SetDataLayerRuntimeState(InEventHandle->DataLayer, InEventHandle->State, InEventHandle->bRecursive);
-		ApplyDataLayerOwnerPlayer(InEventHandle->DataLayer);
+		DataLayerManager->SetDataLayerRuntimeState(InEvent.DataLayer, InEvent.State, InEvent.bRecursive);
+		ApplyDataLayerOwnerPlayer(InEvent.DataLayer);
 	}
 }
 
-void USceneModule::OnSetDataLayerOwnerPlayer(UObject* InSender, UEventHandle_SetDataLayerOwnerPlayer* InEventHandle)
+void USceneModule::OnSetDataLayerOwnerPlayer(UObject* InSender, const FEventSetDataLayerOwnerPlayer& InEvent)
 {
-	if(InEventHandle->PlayerIndex != -1)
+	if(InEvent.PlayerIndex != -1)
 	{
-		DataLayerPlayerMappings.Emplace(InEventHandle->DataLayer, InEventHandle->PlayerIndex);
-		ApplyDataLayerOwnerPlayer(InEventHandle->DataLayer);
+		DataLayerPlayerMappings.Emplace(InEvent.DataLayer, InEvent.PlayerIndex);
+		ApplyDataLayerOwnerPlayer(InEvent.DataLayer);
 	}
-	else if(DataLayerPlayerMappings.Contains(InEventHandle->DataLayer))
+	else if(DataLayerPlayerMappings.Contains(InEvent.DataLayer))
 	{
-		DataLayerPlayerMappings.Remove(InEventHandle->DataLayer);
-		ApplyOwnerPlayerToActors(UCommonModuleStatics::GetAllActorsOfDataLayer(InEventHandle->DataLayer), INDEX_NONE);
+		DataLayerPlayerMappings.Remove(InEvent.DataLayer);
+		ApplyOwnerPlayerToActors(UCommonModuleStatics::GetAllActorsOfDataLayer(InEvent.DataLayer), INDEX_NONE);
 	}
 }
 
-void USceneModule::OnSetLevelOwnerPlayer(UObject* InSender, UEventHandle_SetLevelOwnerPlayer* InEventHandle)
+void USceneModule::OnSetLevelOwnerPlayer(UObject* InSender, const FEventSetLevelOwnerPlayer& InEvent)
 {
-	const FName LevelPath = InEventHandle->LevelObjectPtr ? FName(*FPackageName::ObjectPathToPackageName(InEventHandle->LevelObjectPtr.ToString())) : InEventHandle->LevelPath;
-	if(InEventHandle->PlayerIndex != -1)
+	const FName LevelPath = InEvent.LevelObjectPtr ? FName(*FPackageName::ObjectPathToPackageName(InEvent.LevelObjectPtr.ToString())) : InEvent.LevelPath;
+	if(InEvent.PlayerIndex != -1)
 	{
-		LevelPlayerMappings.Emplace(LevelPath, InEventHandle->PlayerIndex);
+		LevelPlayerMappings.Emplace(LevelPath, InEvent.PlayerIndex);
 		ApplyLevelOwnerPlayer(LevelPath);
 	}
 	else if(LevelPlayerMappings.Contains(LevelPath))
@@ -1535,7 +1535,7 @@ void USceneModule::OnAsyncLoadLevelFinished(FAsyncLoadLevelTask InTask)
 	{
 		InTask.OnLoadFinished.Execute(InTask.LevelPath);
 	}
-	UEventModuleStatics::BroadcastEvent(UEventHandle_AsyncLoadLevelFinished::StaticClass(), this, { InTask.LevelPath }, EEventNetType::Multicast);
+	UEventModuleStatics::BroadcastEvent<FEventAsyncLoadLevelFinished>(this, { InTask.LevelPath }, EEventNetType::Multicast);
 }
 
 void USceneModule::OnAsyncUnloadLevelFinished(FAsyncLoadLevelTask InTask)
@@ -1551,7 +1551,7 @@ void USceneModule::OnAsyncUnloadLevelFinished(FAsyncLoadLevelTask InTask)
 	{
 		InTask.OnLoadFinished.Execute(InTask.LevelPath);
 	}
-	UEventModuleStatics::BroadcastEvent(UEventHandle_AsyncUnloadLevelFinished::StaticClass(), this, { InTask.LevelPath }, EEventNetType::Multicast);
+	UEventModuleStatics::BroadcastEvent<FEventAsyncUnloadLevelFinished>(this, { InTask.LevelPath }, EEventNetType::Multicast);
 }
 
 void USceneModule::OnHandleAsyncLoadLevelFinish()

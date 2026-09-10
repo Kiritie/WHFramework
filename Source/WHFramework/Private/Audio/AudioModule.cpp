@@ -8,7 +8,7 @@
 #include "Audio/AudioModuleNetworkComponent.h"
 #include "Common/CommonModuleStatics.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Audio/EventHandle_SoundParamsChanged.h"
+#include "Event/Events/Audio/Event_SoundParamsChanged.h"
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainModule.h"
 #include "Net/UnrealNetwork.h"
@@ -436,9 +436,7 @@ void UAudioModule::SetSoundParams(USoundMix* InSoundMix, USoundClass* InSoundCla
 	{
 		UGameplayStatics::SetSoundMixClassOverride(this, InSoundMix, InSoundClass, InParams.Volume, InParams.Pitch, InFadeInTime);
 		UGameplayStatics::PushSoundMixModifier(this, InSoundMix);
-		FSoundParamsParameterValue ParamsValue;
-		ParamsValue.Value = InParams;
-		UEventModuleStatics::BroadcastEvent<UEventHandle_SoundParamsChanged>(this, { InSoundClass, MoveTemp(ParamsValue) });
+		UEventModuleStatics::BroadcastEvent<FEventSoundParamsChanged>(this, { InSoundClass, InParams });
 	}
 }
 

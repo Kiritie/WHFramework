@@ -1,108 +1,46 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
-#include "NativeGameplayTags.h"
-#include "Parameter/ParameterModuleTypes.h"
+#include "CoreMinimal.h"
+#include "StructUtils/InstancedStruct.h"
+#include "StructUtils/StructView.h"
 
 #include "EventModuleTypes.generated.h"
 
-class UEventHandleBase;
-
-DECLARE_DELEGATE_FourParams(FEventHandleDelegate, TSubclassOf<UEventHandleBase>, UObject*, TArray<FParameter>, bool);
-
-DECLARE_DYNAMIC_DELEGATE_TwoParams(FEventExecuteDynamicDelegate, UObject*, InSender, UEventHandleBase*, InEventHandle);
-
-UENUM(BlueprintType)
-enum class EEventType : uint8
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FEventBase
 {
-	Single,
-	Multicast
+	GENERATED_BODY()
 };
+
+USTRUCT()
+struct WHFRAMEWORK_API FEventNetworkMessage
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FInstancedStruct Event;
+};
+
+DECLARE_DELEGATE_TwoParams(FEventDelegate, UObject*, FConstStructView);
+DECLARE_DYNAMIC_DELEGATE_TwoParams(FEventDynamicDelegate, UObject*, Sender, const FInstancedStruct&, EventData);
 
 UENUM(BlueprintType)
 enum class EEventNetType : uint8
 {
-	Single,
-	Client,
+	Local,
 	Server,
+	Client,
 	Multicast
 };
 
-USTRUCT(BlueprintType)
-struct FEventFuncs
+struct WHFRAMEWORK_API FEventListener
 {
-	GENERATED_BODY()
-
-public:
-	FEventFuncs()
-	{
-		FuncNames = TArray<FName>(); 
-	}
-
-	UPROPERTY()
-	TArray<FName> FuncNames;
+	TWeakObjectPtr<UObject> Owner;
+	FDelegateHandle Handle;
+	FEventDelegate Delegate;
 };
 
-USTRUCT(BlueprintType)
-struct FEventMapping
+struct WHFRAMEWORK_API FEventMapping
 {
-	GENERATED_BODY()
-
-public:
-	FEventMapping()
-	{
-		FuncMap = TMap<UObject*, FEventFuncs>();
-	}
-
-	FEventMapping(const FEventHandleDelegate& InDelegate)
-	{
-		Delegate = InDelegate;
-		FuncMap = TMap<UObject*, FEventFuncs>();
-	}
-	
-	FEventHandleDelegate Delegate;
-
-	UPROPERTY()
-	TMap<UObject*, FEventFuncs> FuncMap;
-};
-
-USTRUCT(BlueprintType)
-struct FEventHandles
-{
-	GENERATED_BODY()
-
-public:
-	FEventHandles()
-	{
-		Handles = TArray<UEventHandleBase*>();
-	}
-
-	UPROPERTY()
-	TArray<UEventHandleBase*> Handles;
-};
-
-USTRUCT(Blueprintable)
-struct FEventInfo
-{
-	GENERATED_BODY()
-
-public:
-	FEventInfo()
-	{
-		Tag = FGameplayTag();
-		Events = TArray<UEventHandleBase*>();
-	}
-
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (Categories = "Event"))
-	FGameplayTag Tag;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Instanced)
-	TArray<UEventHandleBase*> Events;
-};
-
-namespace GameplayTags
-{
-	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_EventRoot);
+	TArray<FEventListener> Listeners;
 };

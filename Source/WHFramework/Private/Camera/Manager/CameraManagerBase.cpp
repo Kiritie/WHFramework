@@ -9,12 +9,12 @@
 #include "Camera/Interface/CameraTrackableInterface.h"
 #include "Common/CommonModuleStatics.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Camera/EventHandle_CameraPointChanged.h"
+#include "Event/Events/Camera/Event_CameraPointChanged.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Math/MathHelper.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Camera/Point/CameraPointBase.h"
-#include "Event/Handle/Camera/EventHandle_CameraTraceEnded.h"
+#include "Event/Events/Camera/Event_CameraTraceEnded.h"
 #include "Input/InputModuleStatics.h"
 #include "Kismet/KismetMathLibrary.h"
 
@@ -333,7 +333,7 @@ void ACameraManagerBase::SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool
 	if(CurrentCameraPoint != InCameraPoint)
 	{
 		CurrentCameraPoint = InCameraPoint;
-		UEventModuleStatics::BroadcastEvent<UEventHandle_CameraPointChanged>(this, { CurrentCameraPoint });
+		UEventModuleStatics::BroadcastEvent<FEventCameraPointChanged>(this, { CurrentCameraPoint });
 	}
 	SetCameraView(InCameraPoint->GetCameraViewData(), true, bInstant);
 	if(bSetAsDefault)
@@ -510,7 +510,7 @@ void ACameraManagerBase::EndTrackTarget(AActor* InTargetActor)
 	{
 		if(TrackCameraViewData.CameraViewParams.CameraViewTarget)
 		{
-			UEventModuleStatics::BroadcastEvent<UEventHandle_CameraTraceEnded>(this, { TrackCameraViewData.CameraViewParams.CameraViewTarget });
+			UEventModuleStatics::BroadcastEvent<FEventCameraTraceEnded>(this, { TrackCameraViewData.CameraViewParams.CameraViewTarget });
 
 			TrackCameraViewData.CameraViewParams.CameraViewTarget = nullptr;
 			SetCameraOffset(InitCameraOffset);

@@ -7,7 +7,7 @@
 #include "Camera/CameraModule.h"
 #include "Camera/CameraModuleStatics.h"
 #include "Main/Base/ModuleBase.h"
-#include "Event/Handle/Input/EventHandle_InputModeChanged.h"
+#include "Event/Events/Input/Event_InputModeChanged.h"
 #include "Gameplay/WHPlayerController.h"
 #include "Common/CommonModuleStatics.h"
 #include "Main/MainModuleStatics.h"

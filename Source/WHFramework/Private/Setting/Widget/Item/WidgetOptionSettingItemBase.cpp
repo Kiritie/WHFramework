@@ -2,7 +2,6 @@
 
 #include "Setting/Widget/Item/WidgetOptionSettingItemBase.h"
 
-#include "CommonTextBlock.h"
 #include "Widget/WidgetModuleStatics.h"
 
 UWidgetOptionSettingItemBase::UWidgetOptionSettingItemBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
@@ -50,35 +49,6 @@ void UWidgetOptionSettingItemBase::OnDespawn_Implementation(bool bRecovery)
 void UWidgetOptionSettingItemBase::OnRefresh()
 {
 	Super::OnRefresh();
-}
-
-void UWidgetOptionSettingItemBase::NativeOnCurrentTextStyleChanged()
-{
-	Super::NativeOnCurrentTextStyleChanged();
-
-	if(!TxtBox_Value)
-	{
-		return;
-	}
-
-	const TSubclassOf<UCommonTextStyle> CurrentTextStyleClass = GetCurrentTextStyleClass();
-	if(!CurrentTextStyleClass)
-	{
-		return;
-	}
-
-	const UCommonTextStyle* CurrentTextStyle = CurrentTextStyleClass->GetDefaultObject<UCommonTextStyle>();
-	FSlateFontInfo Font;
-	FLinearColor Color;
-	CurrentTextStyle->GetFont(Font);
-	CurrentTextStyle->GetColor(Color);
-
-	FEditableTextBoxStyle WidgetStyle = TxtBox_Value->GetWidgetStyle();
-	WidgetStyle.TextStyle.Font = Font;
-	WidgetStyle.TextStyle.ColorAndOpacity = FSlateColor(Color);
-
-	TxtBox_Value->WidgetStyle = MoveTemp(WidgetStyle);
-	TxtBox_Value->SynchronizeProperties();
 }
 
 void UWidgetOptionSettingItemBase::OnTextBoxValueChanged(const FText& InText)

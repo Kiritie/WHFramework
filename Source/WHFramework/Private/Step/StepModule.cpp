@@ -6,8 +6,8 @@
 #include "Main/MainModule.h"
 #include "Step/Base/StepBase.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Step/EventHandle_StepEnded.h"
-#include "Event/Handle/Step/EventHandle_StepStarted.h"
+#include "Event/Events/Step/Event_StepEnded.h"
+#include "Event/Events/Step/Event_StepStarted.h"
 #include "Step/StepModuleNetworkComponent.h"
 
 IMPLEMENTATION_MODULE(UStepModule)
@@ -196,7 +196,7 @@ void UStepModule::StartStep(int32 InRootStepIndex, bool bSkipSteps)
 			if(StepModuleState != EStepModuleState::Running)
 			{
 				StepModuleState = EStepModuleState::Running;
-				UEventModuleStatics::BroadcastEvent(UEventHandle_StepStarted::StaticClass(), this, {InRootStepIndex});
+				UEventModuleStatics::BroadcastEvent<FEventStepStarted>(this, {InRootStepIndex});
 			}
 
             for(int32 i = CurrentRootStepIndex; i <= InRootStepIndex; i++)
@@ -225,7 +225,7 @@ void UStepModule::StartStep(int32 InRootStepIndex, bool bSkipSteps)
 			if(StepModuleState != EStepModuleState::Running)
 			{
 				StepModuleState = EStepModuleState::Running;
-				UEventModuleStatics::BroadcastEvent(UEventHandle_StepStarted::StaticClass(), this, {InRootStepIndex});
+				UEventModuleStatics::BroadcastEvent<FEventStepStarted>(this, {InRootStepIndex});
 			}
 		
 			if(bSkipSteps)
@@ -262,7 +262,7 @@ void UStepModule::EndStep(bool bRestoreSteps)
 	if(StepModuleState == EStepModuleState::Running)
 	{
 		StepModuleState = EStepModuleState::Ended;
-		UEventModuleStatics::BroadcastEvent<UEventHandle_StepEnded>(this);
+		UEventModuleStatics::BroadcastEvent<FEventStepEnded>(this);
 	}
 
 	for(int32 i = CurrentRootStepIndex; i >= 0; i--)

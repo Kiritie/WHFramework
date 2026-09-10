@@ -7,8 +7,8 @@
 #include "Engine/TextureRenderTarget2D.h"
 #include "HAL/PlatformMisc.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Voxel/EventHandle_VoxelWorldModeChanged.h"
-#include "Event/Handle/Voxel/EventHandle_VoxelWorldStateChanged.h"
+#include "Event/Events/Voxel/Event_VoxelWorldModeChanged.h"
+#include "Event/Events/Voxel/Event_VoxelWorldStateChanged.h"
 #include "Engine/Texture2D.h"
 #include "Main/MainModuleStatics.h"
 #include "Math/MathHelper.h"
@@ -26,8 +26,8 @@
 #include "Voxel/Voxels/Entity/VoxelEntityCapture.h"
 #include "Common/CommonModuleStatics.h"
 #include "Common/CommonModuleTypes.h"
-#include "Event/Handle/Voxel/EventHandle_VoxelWorldAgentMoved.h"
-#include "Event/Handle/Voxel/EventHandle_VoxelWorldCenterChanged.h"
+#include "Event/Events/Voxel/Event_VoxelWorldAgentMoved.h"
+#include "Event/Events/Voxel/Event_VoxelWorldCenterChanged.h"
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Main/MainModule.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -411,26 +411,22 @@ void UVoxelModule::SetWorldState(EVoxelWorldState InWorldState)
 
 void UVoxelModule::OnWorldModeChanged()
 {
-	UEventModuleStatics::BroadcastEvent(UEventHandle_VoxelWorldModeChanged::StaticClass(), this, { static_cast<uint8>(WorldMode) });
+	UEventModuleStatics::BroadcastEvent<FEventVoxelWorldModeChanged>(this, { WorldMode });
 }
 
 void UVoxelModule::OnWorldStateChanged()
 {
-	UEventModuleStatics::BroadcastEvent(UEventHandle_VoxelWorldStateChanged::StaticClass(), this, { static_cast<uint8>(WorldState) });
+	UEventModuleStatics::BroadcastEvent<FEventVoxelWorldStateChanged>(this, { WorldState });
 }
 
 void UVoxelModule::OnWorldCenterChanged()
 {
-	FVoxelIndexParameterValue CenterValue;
-	CenterValue.Value = WorldCenterIndex;
-	UEventModuleStatics::BroadcastEvent(UEventHandle_VoxelWorldCenterChanged::StaticClass(), this, { MoveTemp(CenterValue) });
+	UEventModuleStatics::BroadcastEvent<FEventVoxelWorldCenterChanged>(this, { WorldCenterIndex });
 }
 
 void UVoxelModule::OnWorldAgentMoved()
 {
-	FVoxelIndexParameterValue AgentValue;
-	AgentValue.Value = WorldAgentIndex;
-	UEventModuleStatics::BroadcastEvent(UEventHandle_VoxelWorldAgentMoved::StaticClass(), this, { MoveTemp(AgentValue) });
+	UEventModuleStatics::BroadcastEvent<FEventVoxelWorldAgentMoved>(this, { WorldAgentIndex });
 }
 
 float UVoxelModule::GetWorldGeneratePercent() const

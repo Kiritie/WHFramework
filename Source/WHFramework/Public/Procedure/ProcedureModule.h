@@ -8,7 +8,7 @@
 
 #include "ProcedureModule.generated.h"
 
-class UEventHandle_SwitchProcedure;
+struct FEventSwitchProcedure;
 class UProcedureBase;
 
 /**
@@ -94,7 +94,7 @@ public:
 
 protected:
 	UFUNCTION(BlueprintCallable)
-	void OnSwitchProcedure(UObject* InSender, UEventHandle_SwitchProcedure* InEventHandle);
+	void OnSwitchProcedure(UObject* InSender, const FEventSwitchProcedure& InEvent);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Procedure Stats

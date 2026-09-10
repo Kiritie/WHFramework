@@ -1,8 +1,7 @@
 // Fill out your copyright notice in the Description Item of Project Settings.
 
 #pragma once
-#include "WidgetSettingItemBase.h"
-#include "Components/EditableTextBox.h"
+#include "WidgetInputSettingItemBase.h"
 
 #include "WidgetOptionSettingItemBase.generated.h"
 
@@ -11,7 +10,7 @@ class UComboBoxString;
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UWidgetOptionSettingItemBase : public UWidgetSettingItemBase
+class WHFRAMEWORK_API UWidgetOptionSettingItemBase : public UWidgetInputSettingItemBase
 {
 	GENERATED_BODY()
 	
@@ -25,8 +24,6 @@ public:
 
 public:
 	virtual void OnRefresh() override;
-
-	virtual void NativeOnCurrentTextStyleChanged() override;
 
 protected:
 	UFUNCTION()
@@ -44,9 +41,6 @@ public:
 	virtual void SetValue(const FParameter& InValue) override;
 
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
-	UEditableTextBox* TxtBox_Value;
-
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
 	UCommonButton* Btn_Last;
 

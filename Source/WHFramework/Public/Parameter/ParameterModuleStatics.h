@@ -32,7 +32,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "ParameterModule")
 	static void ClearAllGlobalParameter();
 
-	UFUNCTION(BlueprintPure, CustomThunk, meta = (BlueprintInternalUseOnly = "true", CustomStructureParam = "Value", AdvancedDisplay = "Description"), Category = "ParameterModule")
+	UFUNCTION(BlueprintPure, CustomThunk, meta = (BlueprintInternalUseOnly = "true", CustomStructureParam = "Value", AdvancedDisplay = "Description", AutoCreateRefTerm = "Description"), Category = "ParameterModule")
 	static FParameter MakeParameter(const int32& Value, const FText& Description = FText::GetEmpty());
 
 	DECLARE_FUNCTION(execMakeParameter);

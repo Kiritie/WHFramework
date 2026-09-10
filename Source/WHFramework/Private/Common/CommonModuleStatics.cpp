@@ -14,8 +14,8 @@
 #include "Gameplay/WHGameMode.h"
 #include "Gameplay/WHGameState.h"
 #include "Common/CommonModuleTypes.h"
-#include "Event/Handle/Common/Game/EventHandle_GamePaused.h"
-#include "Event/Handle/Common/Game/EventHandle_GameUnPaused.h"
+#include "Event/Events/Common/Game/Event_GamePaused.h"
+#include "Event/Events/Common/Game/Event_GameUnPaused.h"
 #include "Gameplay/WHLocalPlayer.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetStringLibrary.h"
@@ -75,7 +75,7 @@ void UCommonModuleStatics::PauseGame(EPauseMode PauseMode)
 			break;
 		}
 	}
-	UEventModuleStatics::BroadcastEvent<UEventHandle_GamePaused>(nullptr, { (int32)PauseMode } );
+	UEventModuleStatics::BroadcastEvent<FEventGamePaused>(nullptr, { PauseMode } );
 }
 
 void UCommonModuleStatics::UnPauseGame(EPauseMode PauseMode)
@@ -105,7 +105,7 @@ void UCommonModuleStatics::UnPauseGame(EPauseMode PauseMode)
 			break;
 		}
 	}
-	UEventModuleStatics::BroadcastEvent<UEventHandle_GameUnPaused>(nullptr, { (int32)PauseMode } );
+	UEventModuleStatics::BroadcastEvent<FEventGameUnPaused>(nullptr, { PauseMode } );
 }
 
 void UCommonModuleStatics::QuitGame(TEnumAsByte<EQuitPreference::Type> QuitPreference, bool bIgnorePlatformRestrictions)

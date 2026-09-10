@@ -11,7 +11,7 @@
 #include "Common/Interaction/InteractionComponent.h"
 #include "Common/Looking/LookingComponent.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Ability/EventHandle_VitalityDead.h"
+#include "Event/Events/Ability/Event_VitalityDead.h"
 
 UAbilityCharacterState_Death::UAbilityCharacterState_Death()
 {
@@ -40,7 +40,7 @@ void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastState, const 
 		Killer = Cast<IAbilityVitalityInterface>(InParams[0].Get<UObject*>());
 	}
 	
-	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalityDead>(this, { GetAgent(), Cast<UObject>(Killer) });
+	UEventModuleStatics::BroadcastEvent<FEventVitalityDead>(this, { GetAgent(), Cast<UObject>(Killer) });
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 

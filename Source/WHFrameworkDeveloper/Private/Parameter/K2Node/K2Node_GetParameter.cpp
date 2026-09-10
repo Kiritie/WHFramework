@@ -3,6 +3,7 @@
 #include "BlueprintActionDatabaseRegistrar.h"
 #include "BlueprintFieldNodeSpawner.h"
 #include "EdGraphSchema_K2.h"
+#include "K2Node_BreakStruct.h"
 #include "K2Node_CallFunction.h"
 #include "KismetCompiler.h"
 #include "Parameter/ParameterModuleStatics.h"
@@ -22,7 +23,19 @@ void UK2Node_GetParameter::AllocateDefaultPins()
 	CreatePin(EGPD_Input, UEdGraphSchema_K2::PC_Struct, FParameter::StaticStruct(), ParameterPinName);
 	if(ParameterStruct)
 	{
-		CreatePin(EGPD_Output, UEdGraphSchema_K2::PC_Struct, ParameterStruct, ValuePinName);
+		if(ParameterStruct->HasMetaData(TEXT("ParameterInlineValue")))
+		{
+			FEdGraphPinType PinType;
+			if(const FProperty* ValueProperty = FindFProperty<FProperty>(ParameterStruct, ValuePinName);
+				ValueProperty && GetDefault<UEdGraphSchema_K2>()->ConvertPropertyToPinType(ValueProperty, PinType))
+			{
+				CreatePin(EGPD_Output, PinType, ValuePinName);
+			}
+		}
+		else
+		{
+			CreatePin(EGPD_Output, UEdGraphSchema_K2::PC_Struct, ParameterStruct, ValuePinName);
+		}
 	}
 	CreatePin(EGPD_Output, UEdGraphSchema_K2::PC_Boolean, SuccessPinName);
 }
@@ -44,7 +57,20 @@ void UK2Node_GetParameter::ExpandNode(FKismetCompilerContext& CompilerContext, U
 	CallValuePin->PinType.PinCategory = UEdGraphSchema_K2::PC_Struct;
 	CallValuePin->PinType.PinSubCategoryObject = ParameterStruct;
 	CompilerContext.MovePinLinksToIntermediate(*GetParameterPin(), *CallNode->FindPinChecked(ParameterPinName));
-	CompilerContext.MovePinLinksToIntermediate(*GetValuePin(), *CallValuePin);
+	if(ParameterStruct->HasMetaData(TEXT("ParameterInlineValue")))
+	{
+		UK2Node_BreakStruct* BreakStructNode = CompilerContext.SpawnIntermediateNode<UK2Node_BreakStruct>(this, SourceGraph);
+		BreakStructNode->StructType = ParameterStruct;
+		BreakStructNode->bMadeAfterOverridePinRemoval = true;
+		BreakStructNode->AllocateDefaultPins();
+		CompilerContext.MessageLog.NotifyIntermediateObjectCreation(BreakStructNode, this);
+		CallValuePin->MakeLinkTo(BreakStructNode->FindPinChecked(ParameterStruct->GetFName()));
+		CompilerContext.MovePinLinksToIntermediate(*GetValuePin(), *BreakStructNode->FindPinChecked(ValuePinName));
+	}
+	else
+	{
+		CompilerContext.MovePinLinksToIntermediate(*GetValuePin(), *CallValuePin);
+	}
 	CompilerContext.MovePinLinksToIntermediate(*GetSuccessPin(), *CallNode->FindPinChecked(SuccessPinName));
 	BreakAllNodeLinks();
 }

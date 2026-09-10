@@ -7,7 +7,7 @@
 #include "Task/Base/TaskBase.h"
 #include "Character/CharacterModuleTypes.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Task/EventHandle_CurrentTaskChanged.h"
+#include "Event/Events/Task/Event_CurrentTaskChanged.h"
 #include "SaveGame/SaveGameModuleStatics.h"
 #include "SaveGame/Module/TaskSaveGame.h"
 #include "Scene/Actor/SceneActorInterface.h"
@@ -127,7 +127,7 @@ void UTaskModule::ClearRuntimeAssets()
 	CurrentTask = nullptr;
 	Assets.Reset();
 	PendingResume.Reset();
-	if(bHadCurrentTask) UEventModuleStatics::BroadcastEvent(UEventHandle_CurrentTaskChanged::StaticClass(), this, {FParameter(static_cast<UObject*>(nullptr))});
+	if(bHadCurrentTask) UEventModuleStatics::BroadcastEvent<FEventCurrentTaskChanged>(this, { nullptr });
 }
 
 void UTaskModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -182,7 +182,7 @@ void UTaskModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			}
 		bLoadingTasks = false;
 		RequestTaskMarkersRefresh();
-		UEventModuleStatics::BroadcastEvent(UEventHandle_CurrentTaskChanged::StaticClass(), this, {CurrentTask});
+		UEventModuleStatics::BroadcastEvent<FEventCurrentTaskChanged>(this, {CurrentTask});
 	}
 }
 
@@ -532,7 +532,7 @@ void UTaskModule::SetCurrentTask(UTaskBase* InTask)
 	if (CurrentTask == InTask) return;
 	CurrentTask = InTask;
 	RequestTaskMarkersRefresh();
-	UEventModuleStatics::BroadcastEvent(UEventHandle_CurrentTaskChanged::StaticClass(), this, {CurrentTask});
+	UEventModuleStatics::BroadcastEvent<FEventCurrentTaskChanged>(this, {CurrentTask});
 }
 
 UTaskBase* UTaskModule::GetGuidanceTask() const

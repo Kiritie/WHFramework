@@ -1,9 +1,7 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
-
 #include "EventModuleTypes.h"
+
 #include "Main/Base/ModuleBase.h"
 
 #include "EventModule.generated.h"
@@ -14,109 +12,90 @@ UCLASS()
 class WHFRAMEWORK_API UEventModule : public UModuleBase
 {
 	GENERATED_BODY()
-			
+
 	GENERATED_MODULE(UEventModule)
 
 public:
-	// ParamSets default values for this actor's properties
 	UEventModule();
-
 	~UEventModule();
 
-	//////////////////////////////////////////////////////////////////////////
-	/// ModuleBase
-public:
 #if WITH_EDITOR
 	virtual void OnGenerate() override;
-
 	virtual void OnDestroy() override;
 #endif
-
 	virtual void OnInitialize() override;
-
 	virtual void OnPreparatory(EPhase InPhase) override;
-
 	virtual void OnRefresh(float DeltaSeconds, bool bInEditor) override;
-
 	virtual void OnPause() override;
-
 	virtual void OnUnPause() override;
-
 	virtual void OnTermination(EPhase InPhase) override;
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Event
-protected:
-	UPROPERTY(VisibleAnywhere)
-	TMap<TSubclassOf<UEventHandleBase>, FEventMapping> EventMappings;
-
 public:
-	template<class T>
-	void SubscribeEvent(UObject* InOwner, const FName InFuncName)
+	template<typename TEvent>
+	FDelegateHandle SubscribeEvent(UObject* InOwner, TFunction<void(UObject*, const TEvent&)> InCallback)
 	{
-		SubscribeEvent(T::StaticClass(), InOwner, InFuncName);
+		static_assert(TIsDerivedFrom<TEvent, FEventBase>::Value, "Event must inherit FEventBase");
+
+		FEventListener Listener;
+		Listener.Owner = InOwner;
+		Listener.Handle = FDelegateHandle(FDelegateHandle::GenerateNewHandle);
+		Listener.Delegate.BindLambda([Callback = MoveTemp(InCallback)](UObject* InSender, FConstStructView InData)
+		{
+			Callback(InSender, *InData.GetPtr<TEvent>());
+		});
+		EventMappings.FindOrAdd(TEvent::StaticStruct()).Listeners.Add(MoveTemp(Listener));
+		return EventMappings[TEvent::StaticStruct()].Listeners.Last().Handle;
 	}
 
-	template<class T>
-	void SubscribeEvent(const FEventExecuteDynamicDelegate& InDelegate)
+	template<typename TEvent, typename TObject>
+	FDelegateHandle SubscribeEvent(TObject* InOwner, void (TObject::*InCallback)(UObject*, const TEvent&))
 	{
-		SubscribeEvent(T::StaticClass(), InDelegate);
+		return SubscribeEvent<TEvent>(InOwner, [InOwner, InCallback](UObject* InSender, const TEvent& InEvent)
+		{
+			(InOwner->*InCallback)(InSender, InEvent);
+		});
 	}
 
-	UFUNCTION(BlueprintCallable)
-	void SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName);
-
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Subscribe Event"))
-	void SubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate);
-
-	template<class T>
-	void UnsubscribeEvent(UObject* InOwner, const FName InFuncName)
+	template<typename TEvent, typename TCallbackObject>
+	FDelegateHandle SubscribeEvent(UObject* InOwner, void (TCallbackObject::*InCallback)())
 	{
-		UnsubscribeEvent(T::StaticClass(), InOwner, InFuncName);
+		return SubscribeEvent<TEvent>(InOwner, [InOwner, InCallback](UObject*, const TEvent&)
+		{
+			if(TCallbackObject* CallbackOwner = Cast<TCallbackObject>(InOwner))
+			{
+				(CallbackOwner->*InCallback)();
+			}
+		});
 	}
 
-	template<class T>
-	void UnsubscribeEvent(const FEventExecuteDynamicDelegate& InDelegate)
+	FDelegateHandle SubscribeEvent(UObject* InOwner, const UScriptStruct* InEventType, FEventDelegate InCallback);
+
+	void UnsubscribeEvent(FDelegateHandle InHandle);
+
+	template<typename TEvent>
+	void UnsubscribeEvent(UObject* InOwner)
 	{
-		UnsubscribeEvent(T::StaticClass(), InDelegate);
+		static_assert(TIsDerivedFrom<TEvent, FEventBase>::Value, "Event must inherit FEventBase");
+		UnsubscribeEvent(TEvent::StaticStruct(), InOwner);
 	}
 
-	UFUNCTION(BlueprintCallable)
-	void UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName);
-
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Unsubscribe Event"))
-	void UnsubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate);
-
-	UFUNCTION(BlueprintCallable)
 	void UnsubscribeAllEvent();
 
-	template<class T>
-	void BroadcastEvent(UObject* InSender, const TArray<FParameter>* InParams = nullptr, EEventNetType InNetType = EEventNetType::Single, bool bRecovery = true)
+	template<typename TEvent>
+	void BroadcastEvent(UObject* InSender, const TEvent& InEvent = TEvent(), EEventNetType InNetType = EEventNetType::Local)
 	{
-		BroadcastEvent(T::StaticClass(), InSender, InParams ? *InParams : TArray<FParameter>(), InNetType, bRecovery);
+		static_assert(TIsDerivedFrom<TEvent, FEventBase>::Value, "Event must inherit FEventBase");
+		BroadcastEvent(InSender, FConstStructView::Make(InEvent), InNetType);
 	}
 
-	template<class T>
-	void BroadcastEvent(UObject* InSender, const TArray<FParameter>& InParams, EEventNetType InNetType = EEventNetType::Single, bool bRecovery = true)
-	{
-		BroadcastEvent(T::StaticClass(), InSender, InParams, InNetType, bRecovery);
-	}
-
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
-	void BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams, EEventNetType InNetType = EEventNetType::Single, bool bRecovery = true);
-
-	UFUNCTION(BlueprintCallable)
-	void BroadcastEventByHandle(UEventHandleBase* InHandle, UObject* InSender, EEventNetType InNetType = EEventNetType::Single, bool bRecovery = true);
-
-	UFUNCTION(NetMulticast, Reliable)
-	void MultiBroadcastEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams, bool bRecovery = true);
+	void BroadcastEvent(UObject* InSender, FConstStructView InEvent, EEventNetType InNetType = EEventNetType::Local);
+	void BroadcastEventInternal(UObject* InSender, FConstStructView InEvent);
 
 protected:
-	UFUNCTION()
-	void ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams, bool bRecovery = true);
+	void UnsubscribeEvent(const UScriptStruct* InEventType, UObject* InOwner);
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Event Manager
+	TMap<const UScriptStruct*, FEventMapping> EventMappings;
+
 protected:
 	UPROPERTY(EditAnywhere, Instanced)
 	TArray<UEventManagerBase*> EventManagers;
@@ -131,12 +110,11 @@ public:
 		return Cast<T>(GetEventManager(T::StaticClass()));
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	UFUNCTION(BlueprintPure)
 	UEventManagerBase* GetEventManager(TSubclassOf<UEventManagerBase> InClass) const;
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	UFUNCTION(BlueprintPure)
 	UEventManagerBase* GetEventManagerByName(const FName InName, TSubclassOf<UEventManagerBase> InClass = nullptr) const;
 
-public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 };

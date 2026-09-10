@@ -9,10 +9,10 @@
 #include "Components/ContentWidget.h"
 #include "Components/PanelWidget.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Widget/EventHandle_UserWidgetClosed.h"
-#include "Event/Handle/Widget/EventHandle_UserWidgetCreated.h"
-#include "Event/Handle/Widget/EventHandle_UserWidgetOpened.h"
-#include "Event/Handle/Widget/EventHandle_UserWidgetStateChanged.h"
+#include "Event/Events/Widget/Event_UserWidgetClosed.h"
+#include "Event/Events/Widget/Event_UserWidgetCreated.h"
+#include "Event/Events/Widget/Event_UserWidgetOpened.h"
+#include "Event/Events/Widget/Event_UserWidgetStateChanged.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Widget/WidgetModuleStatics.h"
 #include "Input/InputModuleStatics.h"
@@ -110,7 +110,7 @@ void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPar
 
 	K2_OnCreate(InOwner, InParams);
 
-	UEventModuleStatics::BroadcastEvent<UEventHandle_UserWidgetCreated>(this, { this });
+	UEventModuleStatics::BroadcastEvent<FEventUserWidgetCreated>(this, { this });
 
 	for(const auto& Iter : UWidgetModuleStatics::GetUserWidgetChildrenByName(WidgetName))
 	{
@@ -272,7 +272,7 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 	if(K2_OnOpened.IsBound()) K2_OnOpened.Broadcast(InParams, bInstant);
 	if(OnOpened.IsBound()) OnOpened.Broadcast(InParams, bInstant);
 
-	UEventModuleStatics::BroadcastEvent<UEventHandle_UserWidgetOpened>(this, { this });
+	UEventModuleStatics::BroadcastEvent<FEventUserWidgetOpened>(this, { this });
 
 	for(const auto Iter : ChildWidgets)
 	{
@@ -331,7 +331,7 @@ void UUserWidgetBase::OnClose(bool bInstant)
 	if(K2_OnClosed.IsBound()) K2_OnClosed.Broadcast(bInstant);
 	if(OnClosed.IsBound()) OnClosed.Broadcast(bInstant);
 
-	UEventModuleStatics::BroadcastEvent<UEventHandle_UserWidgetClosed>(this, { this });
+	UEventModuleStatics::BroadcastEvent<FEventUserWidgetClosed>(this, { this });
 }
 
 void UUserWidgetBase::OnRefresh()
@@ -375,7 +375,7 @@ void UUserWidgetBase::OnStateChanged(EScreenWidgetState InWidgetState)
 
 	OnWidgetStateChanged.Broadcast(InWidgetState);
 
-	UEventModuleStatics::BroadcastEvent<UEventHandle_UserWidgetStateChanged>(this, { this, static_cast<uint8>(InWidgetState) });
+	UEventModuleStatics::BroadcastEvent<FEventUserWidgetStateChanged>(this, { this, InWidgetState });
 }
 
 void UUserWidgetBase::Init(UObject* InOwner, const TArray<FParameter>* InParams, bool bForce)

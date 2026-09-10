@@ -5,7 +5,7 @@
 #include "Parameter/ParameterModule.h"
 
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Parameter/EventHandle_GlobalParameterChanged.h"
+#include "Event/Events/Parameter/Event_GlobalParameterChanged.h"
 #include "Net/UnrealNetwork.h"
 #include "SaveGame/SaveGameModuleStatics.h"
 #include "SaveGame/Module/ParameterSaveGame.h"
@@ -98,7 +98,7 @@ void UParameterModule::Load_Implementation()
 	{
 		for(auto& Iter : ParameterSets.Sets)
 		{
-			UEventModuleStatics::BroadcastEvent<UEventHandle_GlobalParameterChanged>(this, { Iter.Name, Iter.Parameter });
+			UEventModuleStatics::BroadcastEvent<FEventGlobalParameterChanged>(this, { Iter.Name, Iter.Parameter });
 		}
 	}
 }
@@ -116,7 +116,7 @@ bool UParameterModule::HasParameter(FName InName, bool bEnsured) const
 void UParameterModule::SetParameter(FName InName, FParameter InParameter)
 {
 	ParameterSets.SetParameter(InName, InParameter);
-	UEventModuleStatics::BroadcastEvent<UEventHandle_GlobalParameterChanged>(this, { InName, InParameter });
+	UEventModuleStatics::BroadcastEvent<FEventGlobalParameterChanged>(this, { InName, InParameter });
 }
 
 FParameter UParameterModule::GetParameter(FName InName, bool bEnsured) const

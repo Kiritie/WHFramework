@@ -6,8 +6,8 @@
 #include "Event/EventModuleStatics.h"
 #include "FSM/Components/FSMComponent.h"
 #include "Common/CommonModuleStatics.h"
-#include "Event/Handle/FSM/EventHandle_FiniteStateEntered.h"
-#include "Event/Handle/FSM/EventHandle_FiniteStateLeaved.h"
+#include "Event/Events/FSM/Event_FiniteStateEntered.h"
+#include "Event/Events/FSM/Event_FiniteStateLeaved.h"
 
 UFiniteStateBase::UFiniteStateBase()
 {
@@ -55,7 +55,7 @@ void UFiniteStateBase::OnEnter(UFiniteStateBase* InLastState, const TArray<FPara
 
 	K2_OnEnter(InLastState, InParams);
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_FiniteStateEntered::StaticClass(), this, {this, FSM});
+	UEventModuleStatics::BroadcastEvent<FEventFiniteStateEntered>(this, {this, FSM});
 }
 
 void UFiniteStateBase::OnRefresh(float DeltaSeconds)
@@ -78,7 +78,7 @@ void UFiniteStateBase::OnLeave(UFiniteStateBase* InNextState)
 
 	K2_OnLeave(InNextState);
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_FiniteStateLeaved::StaticClass(), this, {this, FSM});
+	UEventModuleStatics::BroadcastEvent<FEventFiniteStateLeaved>(this, {this, FSM});
 }
 
 void UFiniteStateBase::OnTermination()

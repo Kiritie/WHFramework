@@ -1,80 +1,47 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
-#include "Common/CommonModuleTypes.h"
 #include "Common/Base/WHObject.h"
-#include "Event/EventModuleTypes.h"
+#include "Common/CommonModuleTypes.h"
 
 #include "EventManagerBase.generated.h"
-
-class UEventHandleBase;
 
 UCLASS(EditInlineNew)
 class WHFRAMEWORK_API UEventManagerBase : public UWHObject
 {
 	GENERATED_BODY()
-	
-public:	
-	// ParamSets default values for this object's properties
+
+public:
 	UEventManagerBase();
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Defaults
-public:
-	/**
-	* 当初始化
-	*/
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitialize")
 	void K2_OnInitialize();
+
 	UFUNCTION()
 	virtual void OnInitialize();
-	/**
-	* 当准备
-	*/
+
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnPreparatory")
 	void K2_OnPreparatory();
+
 	UFUNCTION()
 	virtual void OnPreparatory();
-	/**
-	* 当刷新
-	*/
+
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
 	void K2_OnRefresh(float DeltaSeconds);
+
 	UFUNCTION()
 	virtual void OnRefresh(float DeltaSeconds);
-	/**
-	* 当销毁
-	*/
+
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnTermination")
 	void K2_OnTermination(EPhase InPhase);
+
 	UFUNCTION()
 	virtual void OnTermination(EPhase InPhase);
-	/**
-	* 当处理事件
-	*/
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnHandleEvent")
-	void K2_OnHandleEvent(UObject* InSender, UEventHandleBase* InEventHandle);
-	UFUNCTION()
-	virtual void OnHandleEvent(UObject* InSender, UEventHandleBase* InEventHandle);
 
 protected:
 	UPROPERTY(EditAnywhere)
 	FName EventManagerName;
 
-	UPROPERTY(EditAnywhere)
-	TArray<TSubclassOf<UEventHandleBase>> EventHandleClasses;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (TitleProperty = "Tag"))
-	TArray<FEventInfo> EventInfos;
-
 public:
 	UFUNCTION(BlueprintPure)
 	FName GetEventManagerName() const { return EventManagerName; }
-
-	UFUNCTION(BlueprintPure)
-	TArray<TSubclassOf<UEventHandleBase>> GetEventHandleClasses() const { return EventHandleClasses; }
-
-	UFUNCTION(BlueprintPure)
-	bool GetEventInfoByTag(const FGameplayTag& InTag, FEventInfo& OutMenuInfo) const;
 };

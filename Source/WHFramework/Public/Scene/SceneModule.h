@@ -9,15 +9,15 @@
 
 #include "SceneModule.generated.h"
 
-class UEventHandle_StopLevelSequence;
-class UEventHandle_AsyncUnloadLevels;
-class UEventHandle_AsyncLoadLevels;
-class UEventHandle_PlayLevelSequence;
-class UEventHandle_SetActorVisible;
-class UEventHandle_SetDataLayerOwnerPlayer;
+struct FEventStopLevelSequence;
+struct FEventAsyncUnloadLevels;
+struct FEventAsyncLoadLevels;
+struct FEventPlayLevelSequence;
+struct FEventSetActorVisible;
+struct FEventSetDataLayerOwnerPlayer;
 class ATargetPoint;
 class AMiniMapCapture;
-class UEventHandle_SetDataLayerRuntimeState;
+struct FEventSetDataLayerRuntimeState;
 class UWorldWeather;
 class UWorldTimer;
 class UWidgetSceneWorldMarker;
@@ -324,28 +324,28 @@ protected:
 	
 protected:
 	UFUNCTION()
-	void OnAsyncLoadLevels(UObject* InSender, UEventHandle_AsyncLoadLevels* InEventHandle);
+	void OnAsyncLoadLevels(UObject* InSender, const FEventAsyncLoadLevels& InEvent);
 
 	UFUNCTION()
-	void OnAsyncUnloadLevels(UObject* InSender, UEventHandle_AsyncUnloadLevels* InEventHandle);
+	void OnAsyncUnloadLevels(UObject* InSender, const FEventAsyncUnloadLevels& InEvent);
 
 	UFUNCTION()
-	void OnSetActorVisible(UObject* InSender, UEventHandle_SetActorVisible* InEventHandle);
+	void OnSetActorVisible(UObject* InSender, const FEventSetActorVisible& InEvent);
 	
 	UFUNCTION()
-	void OnPlayLevelSequence(UObject* InSender, UEventHandle_PlayLevelSequence* InEventHandle);
+	void OnPlayLevelSequence(UObject* InSender, const FEventPlayLevelSequence& InEvent);
 		
 	UFUNCTION()
-	void OnStopLevelSequence(UObject* InSender, UEventHandle_StopLevelSequence* InEventHandle);
+	void OnStopLevelSequence(UObject* InSender, const FEventStopLevelSequence& InEvent);
 
 	UFUNCTION()
-	void OnSetDataLayerRuntimeState(UObject* InSender, UEventHandle_SetDataLayerRuntimeState* InEventHandle);
+	void OnSetDataLayerRuntimeState(UObject* InSender, const FEventSetDataLayerRuntimeState& InEvent);
 	
 	UFUNCTION()
-	void OnSetDataLayerOwnerPlayer(UObject* InSender, UEventHandle_SetDataLayerOwnerPlayer* InEventHandle);
+	void OnSetDataLayerOwnerPlayer(UObject* InSender, const FEventSetDataLayerOwnerPlayer& InEvent);
 	
 	UFUNCTION()
-	void OnSetLevelOwnerPlayer(UObject* InSender, UEventHandle_SetLevelOwnerPlayer* InEventHandle);
+	void OnSetLevelOwnerPlayer(UObject* InSender, const FEventSetLevelOwnerPlayer& InEvent);
 
 	//////////////////////////////////////////////////////////////////////////
 protected:

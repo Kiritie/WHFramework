@@ -1,30 +1,18 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Event/EventModule.h"
 
-#include "Main/MainModule.h"
-#include "Debug/DebugModuleTypes.h"
-#include "Event/EventModuleStatics.h"
 #include "Event/EventModuleNetworkComponent.h"
-#include "Event/Manager/EventManagerBase.h"
-#include "Event/Handle/EventHandleBase.h"
-#include "Common/CommonModuleStatics.h"
+#include "Event/EventModuleTypes.h"
 #include "Event/Manager/DefaultEventManagerBase.h"
-#include "ObjectPool/ObjectPoolModuleStatics.h"
+#include "Event/Manager/EventManagerBase.h"
 
 IMPLEMENTATION_MODULE(UEventModule)
 
-// ParamSets default values
 UEventModule::UEventModule()
 {
 	ModuleName = FName("EventModule");
 	ModuleDisplayName = FText::FromString(TEXT("Event Module"));
-
 	bModuleRequired = true;
-
 	ModuleNetworkComponent = UEventModuleNetworkComponent::StaticClass();
-
 	EventManagers = TArray<UEventManagerBase*>();
 	EventManagerRefs = TMap<FName, UEventManagerBase*>();
 }
@@ -43,7 +31,6 @@ void UEventModule::OnGenerate()
 void UEventModule::OnDestroy()
 {
 	Super::OnDestroy();
-
 	TERMINATION_MODULE(UEventModule)
 }
 #endif
@@ -51,28 +38,25 @@ void UEventModule::OnDestroy()
 void UEventModule::OnInitialize()
 {
 	Super::OnInitialize();
-	
 	if(EventManagers.IsEmpty())
 	{
 		EventManagers.Add(NewObject<UDefaultEventManagerBase>(this));
 	}
-
-	for(auto Iter : EventManagers)
+	for(UEventManagerBase* EventManager : EventManagers)
 	{
-		Iter->OnInitialize();
-		EventManagerRefs.Add(Iter->GetEventManagerName(), Iter);
+		EventManager->OnInitialize();
+		EventManagerRefs.Add(EventManager->GetEventManagerName(), EventManager);
 	}
 }
 
 void UEventModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
-
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		for(auto Iter : EventManagerRefs)
+		for(const auto& Pair : EventManagerRefs)
 		{
-			Iter.Value->OnPreparatory();
+			Pair.Value->OnPreparatory();
 		}
 	}
 }
@@ -80,12 +64,10 @@ void UEventModule::OnPreparatory(EPhase InPhase)
 void UEventModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
 	Super::OnRefresh(DeltaSeconds, bInEditor);
-
 	if(bInEditor) return;
-
-	for(auto Iter : EventManagerRefs)
+	for(const auto& Pair : EventManagerRefs)
 	{
-		Iter.Value->OnRefresh(DeltaSeconds);
+		Pair.Value->OnRefresh(DeltaSeconds);
 	}
 }
 
@@ -102,77 +84,49 @@ void UEventModule::OnUnPause()
 void UEventModule::OnTermination(EPhase InPhase)
 {
 	Super::OnTermination(InPhase);
-	
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		for(auto Iter : EventManagerRefs)
+		for(const auto& Pair : EventManagerRefs)
 		{
-			Iter.Value->OnTermination(InPhase);
+			Pair.Value->OnTermination(InPhase);
 		}
+		EventMappings.Empty();
 	}
 }
 
-void UEventModule::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName)
+FDelegateHandle UEventModule::SubscribeEvent(UObject* InOwner, const UScriptStruct* InEventType, FEventDelegate InCallback)
 {
-	if(!InClass || !InOwner || InFuncName.IsNone()) return;
+	if(!InOwner || !InEventType || !InEventType->IsChildOf(FEventBase::StaticStruct()) || !InCallback.IsBound()) return {};
 
-	FEventMapping& Mapping = EventMappings.FindOrAdd(InClass);
+	FEventListener Listener;
+	Listener.Owner = InOwner;
+	Listener.Handle = FDelegateHandle(FDelegateHandle::GenerateNewHandle);
+	Listener.Delegate = MoveTemp(InCallback);
+	FEventMapping& Mapping = EventMappings.FindOrAdd(InEventType);
+	Mapping.Listeners.Add(MoveTemp(Listener));
+	return Mapping.Listeners.Last().Handle;
+}
 
-	if(!Mapping.Delegate.IsBoundToObject(this))
+void UEventModule::UnsubscribeEvent(FDelegateHandle InHandle)
+{
+	for(auto& Pair : EventMappings)
 	{
-		Mapping.Delegate.BindUFunction(this, FName("ExecuteEvent"));
-	}
-
-	switch (InClass->GetDefaultObject<UEventHandleBase>()->EventType)
-	{
-		case EEventType::Single:
+		Pair.Value.Listeners.RemoveAll([InHandle](const FEventListener& InListener)
 		{
-			Mapping.FuncMap.Empty();
-		}
-		case EEventType::Multicast:
-		{
-			if(!Mapping.FuncMap.Contains(InOwner))
-			{
-				Mapping.FuncMap.Add(InOwner, FEventFuncs());
-			}
-			Mapping.FuncMap[InOwner].FuncNames.Add(InFuncName);
-			break;
-		}
+			return InListener.Handle == InHandle;
+		});
 	}
 }
 
-void UEventModule::SubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate)
+void UEventModule::UnsubscribeEvent(const UScriptStruct* InEventType, UObject* InOwner)
 {
-	SubscribeEvent(InClass, const_cast<UObject*>(InDelegate.GetUObject()), InDelegate.GetFunctionName());
-}
-
-void UEventModule::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName)
-{
-	if(!InClass || !InOwner || InFuncName.IsNone()) return;
-
-	FEventMapping& Mapping = EventMappings.FindOrAdd(InClass);
-	
-	if(Mapping.FuncMap.Contains(InOwner))
+	if(FEventMapping* Mapping = EventMappings.Find(InEventType))
 	{
-		if(Mapping.FuncMap[InOwner].FuncNames.Contains(InFuncName))
+		Mapping->Listeners.RemoveAll([InOwner](const FEventListener& InListener)
 		{
-			Mapping.FuncMap[InOwner].FuncNames.Remove(InFuncName);
-		}
-		if(Mapping.FuncMap[InOwner].FuncNames.Num() == 0)
-		{
-			Mapping.FuncMap.Remove(InOwner);
-		}
+			return InListener.Owner == InOwner;
+		});
 	}
-
-	if(Mapping.FuncMap.Num() == 0)
-	{
-		Mapping.Delegate.Unbind();
-	}
-}
-
-void UEventModule::UnsubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate)
-{
-	UnsubscribeEvent(InClass, const_cast<UObject*>(InDelegate.GetUObject()), InDelegate.GetFunctionName());
 }
 
 void UEventModule::UnsubscribeAllEvent()
@@ -180,98 +134,48 @@ void UEventModule::UnsubscribeAllEvent()
 	EventMappings.Empty();
 }
 
-void UEventModule::BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams, EEventNetType InNetType, bool bRecovery)
+void UEventModule::BroadcastEvent(UObject* InSender, FConstStructView InEvent, EEventNetType InNetType)
 {
-	if(!InClass) return;
+	if(!InEvent.IsValid() || !InEvent.GetScriptStruct()->IsChildOf(FEventBase::StaticStruct())) return;
+	if(InNetType == EEventNetType::Local)
+	{
+		BroadcastEventInternal(InSender, InEvent);
+		return;
+	}
 
-	const FEventMapping& Mapping = EventMappings.FindOrAdd(InClass);
-
+	UEventModuleNetworkComponent* NetworkComponent = GetModuleNetworkComponent<UEventModuleNetworkComponent>();
+	if(!NetworkComponent) return;
+	FEventNetworkMessage Message;
+	Message.Event = FInstancedStruct(InEvent);
 	switch(InNetType)
 	{
-		case EEventNetType::Client:
-		{
-			if(UEventModuleNetworkComponent* EventModuleNetworkComponent = GetModuleNetworkComponent<UEventModuleNetworkComponent>())
-			{
-				EventModuleNetworkComponent->ClientBroadcastEvent(InSender, InClass, InParams);
-				return;
-			}
-		}
 		case EEventNetType::Server:
-		{
-			if(UEventModuleNetworkComponent* EventModuleNetworkComponent = GetModuleNetworkComponent<UEventModuleNetworkComponent>())
-			{
-				EventModuleNetworkComponent->ServerBroadcastEvent(InSender, InClass, InParams);
-				return;
-			}
-		}
+			NetworkComponent->ServerBroadcastEvent(Message);
+			break;
+		case EEventNetType::Client:
+			NetworkComponent->ClientBroadcastEvent(Message);
+			break;
 		case EEventNetType::Multicast:
-		{
-			if(UEventModuleNetworkComponent* EventModuleNetworkComponent = GetModuleNetworkComponent<UEventModuleNetworkComponent>())
-			{
-				EventModuleNetworkComponent->ServerBroadcastEventMulticast(InSender, InClass, InParams, bRecovery);
-				return;
-			}
-		}
-		default: break;
+			NetworkComponent->MulticastBroadcastEvent(Message);
+			break;
+		default:
+			break;
 	}
-	
-	Mapping.Delegate.ExecuteIfBound(InClass, InSender, InParams, bRecovery);
 }
 
-void UEventModule::BroadcastEventByHandle(UEventHandleBase* InHandle, UObject* InSender, EEventNetType InNetType, bool bRecovery)
+void UEventModule::BroadcastEventInternal(UObject* InSender, FConstStructView InEvent)
 {
-	BroadcastEvent(InHandle->GetClass(), InSender, InHandle->Pack(), InNetType, bRecovery);
-}
-
-void UEventModule::MultiBroadcastEvent_Implementation(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams, bool bRecovery)
-{
-	BroadcastEvent(InClass, InSender, InParams, EEventNetType::Single, bRecovery);
-}
-
-void UEventModule::ExecuteEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams, bool bRecovery)
-{
-	if(!EventMappings.Contains(InClass)) return;
-	
-	if(UEventHandleBase* EventHandle = UObjectPoolModuleStatics::SpawnObject<UEventHandleBase>(nullptr, nullptr, InClass))
+	FEventMapping* Mapping = EventMappings.Find(InEvent.GetScriptStruct());
+	if(!Mapping) return;
+	for(int32 Index = Mapping->Listeners.Num() - 1; Index >= 0; --Index)
 	{
-		EventHandle->Parse(InParams);
-		
-		struct
+		FEventListener& Listener = Mapping->Listeners[Index];
+		if(!Listener.Owner.IsValid())
 		{
-			UObject* Sender;
-			UEventHandleBase* EventHandle;
-		} Params { InSender, EventHandle };
-
-		TArray<TPair<TWeakObjectPtr<UObject>, FName>> FuncEntries;
-		if(const FEventMapping* Mapping = EventMappings.Find(InClass))
-		{
-			for (const auto& Iter1 : Mapping->FuncMap)
-			{
-				for (const auto& Iter2 : Iter1.Value.FuncNames)
-				{
-					FuncEntries.Emplace(Iter1.Key, Iter2);
-				}
-			}
+			Mapping->Listeners.RemoveAt(Index);
+			continue;
 		}
-
-		for (const auto& Iter : FuncEntries)
-		{
-			UObject* Owner = Iter.Key.Get();
-			const FEventMapping* CurrentMapping = EventMappings.Find(InClass);
-			const FEventFuncs* CurrentFuncs = Owner && CurrentMapping ? CurrentMapping->FuncMap.Find(Owner) : nullptr;
-			if(!CurrentFuncs || !CurrentFuncs->FuncNames.Contains(Iter.Value)) continue;
-
-			const FString OwnerClassName = Owner->GetClass()->GetName();
-			if (EventHandle->Filter(Owner, Iter.Value) && UCommonModuleStatics::ExecuteObjectFunc(Owner, Iter.Value, &Params))
-			{
-				WHLog(FString::Printf(TEXT("ExecuteEvent : FuncName : %s, EventOwner : %s"), *Iter.Value.ToString(), *OwnerClassName), EDC_Event);
-			}
-		}
-
-		if(bRecovery && !EventHandle->OnExecute())
-		{
-			UObjectPoolModuleStatics::DespawnObject(EventHandle);
-		}
+		Listener.Delegate.Execute(InSender, InEvent);
 	}
 }
 

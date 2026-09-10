@@ -6,7 +6,7 @@
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "Debug/DebugModuleTypes.h"
-#include "Event/Handle/Common/Game/EventHandle_GameExited.h"
+#include "Event/Events/Common/Game/Event_GameExited.h"
 #include "Scene/SceneModuleStatics.h"
 
 UWidgetLoadingLevelPanel::UWidgetLoadingLevelPanel(const FObjectInitializer& ObjectInitializer) :Super(ObjectInitializer)

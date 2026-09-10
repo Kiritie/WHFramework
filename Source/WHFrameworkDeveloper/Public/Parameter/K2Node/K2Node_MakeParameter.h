@@ -13,6 +13,8 @@ public:
 
 	virtual void ExpandNode(FKismetCompilerContext& CompilerContext, UEdGraph* SourceGraph) override;
 
+	virtual bool IsNodePure() const override { return true; }
+
 	virtual FText GetNodeTitle(ENodeTitleType::Type TitleType) const override;
 
 	virtual FText GetTooltipText() const override;

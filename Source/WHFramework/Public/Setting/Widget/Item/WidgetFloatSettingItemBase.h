@@ -1,18 +1,17 @@
 // Fill out your copyright notice in the Description Item of Project Settings.
 
 #pragma once
-#include "WidgetSettingItemBase.h"
+#include "WidgetInputSettingItemBase.h"
 
 #include "WidgetFloatSettingItemBase.generated.h"
 
-class UEditableTextBox;
 class USlider;
 class UTextBlock;
 /**
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UWidgetFloatSettingItemBase : public UWidgetSettingItemBase
+class WHFRAMEWORK_API UWidgetFloatSettingItemBase : public UWidgetInputSettingItemBase
 {
 	GENERATED_BODY()
 
@@ -51,9 +50,6 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
 	UTextBlock* Txt_Value;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
-	UEditableTextBox* TxtBox_Value;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)

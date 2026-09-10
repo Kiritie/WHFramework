@@ -1,14 +1,7 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Event/Manager/DefaultEventManagerBase.h"
 
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Common/Game/EventHandle_GameStarted.h"
-#include "Event/Handle/Common/Game/EventHandle_GameExited.h"
-#include "Event/Handle/Common/Game/EventHandle_GameInited.h"
 
-// ParamSets default values
 UDefaultEventManagerBase::UDefaultEventManagerBase()
 {
 	EventManagerName = FName("Default");
@@ -17,10 +10,9 @@ UDefaultEventManagerBase::UDefaultEventManagerBase()
 void UDefaultEventManagerBase::OnInitialize()
 {
 	Super::OnInitialize();
-	
-	UEventModuleStatics::SubscribeEvent<UEventHandle_GameInited>(this, GET_FUNCTION_NAME_THISCLASS(OnGameInited));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_GameStarted>(this, GET_FUNCTION_NAME_THISCLASS(OnGameStarted));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_GameExited>(this, GET_FUNCTION_NAME_THISCLASS(OnGameExited));
+	UEventModuleStatics::SubscribeEvent<FEventGameInited>(this, &ThisClass::OnGameInited);
+	UEventModuleStatics::SubscribeEvent<FEventGameStarted>(this, &ThisClass::OnGameStarted);
+	UEventModuleStatics::SubscribeEvent<FEventGameExited>(this, &ThisClass::OnGameExited);
 }
 
 void UDefaultEventManagerBase::OnPreparatory()
@@ -35,22 +27,23 @@ void UDefaultEventManagerBase::OnRefresh(float DeltaSeconds)
 
 void UDefaultEventManagerBase::OnTermination(EPhase InPhase)
 {
+	if(PHASEC(InPhase, EPhase::Final))
+	{
+		UEventModuleStatics::UnsubscribeEvent<FEventGameInited>(this);
+		UEventModuleStatics::UnsubscribeEvent<FEventGameStarted>(this);
+		UEventModuleStatics::UnsubscribeEvent<FEventGameExited>(this);
+	}
 	Super::OnTermination(InPhase);
 }
 
-void UDefaultEventManagerBase::OnHandleEvent(UObject* InSender, UEventHandleBase* InEventHandle)
-{
-	Super::OnHandleEvent(InSender, InEventHandle);
-}
-
-void UDefaultEventManagerBase::OnGameInited_Implementation(UObject* InSender, UEventHandle_GameInited* InEventHandle)
+void UDefaultEventManagerBase::OnGameInited_Implementation(UObject* InSender, const FEventGameInited& InEvent)
 {
 }
 
-void UDefaultEventManagerBase::OnGameExited_Implementation(UObject* InSender, UEventHandle_GameExited* InEventHandle)
+void UDefaultEventManagerBase::OnGameExited_Implementation(UObject* InSender, const FEventGameExited& InEvent)
 {
 }
 
-void UDefaultEventManagerBase::OnGameStarted_Implementation(UObject* InSender, UEventHandle_GameStarted* InEventHandle)
+void UDefaultEventManagerBase::OnGameStarted_Implementation(UObject* InSender, const FEventGameStarted& InEvent)
 {
 }

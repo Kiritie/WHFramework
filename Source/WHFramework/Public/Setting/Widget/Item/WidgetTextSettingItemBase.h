@@ -1,16 +1,15 @@
 // Fill out your copyright notice in the Description Item of Project Settings.
 
 #pragma once
-#include "WidgetSettingItemBase.h"
+#include "WidgetInputSettingItemBase.h"
 
 #include "WidgetTextSettingItemBase.generated.h"
 
-class UEditableTextBox;
 /**
  * 
  */
 UCLASS()
-class WHFRAMEWORK_API UWidgetTextSettingItemBase : public UWidgetSettingItemBase
+class WHFRAMEWORK_API UWidgetTextSettingItemBase : public UWidgetInputSettingItemBase
 {
 	GENERATED_BODY()
 	
@@ -35,9 +34,6 @@ public:
 	virtual void SetValue(const FParameter& InValue) override;
 
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
-	UEditableTextBox* TxtBox_Value;
-
 	UPROPERTY(BlueprintReadOnly)
 	TObjectPtr<UScriptStruct> ParameterValueType;
 };

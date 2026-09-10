@@ -8,7 +8,7 @@
 #include "Common/Interaction/InteractionComponent.h"
 #include "Components/ShapeComponent.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Ability/EventHandle_VitalitySpawned.h"
+#include "Event/Events/Ability/Event_VitalitySpawned.h"
 #include "FSM/Components/FSMComponent.h"
 #include "GameFramework/PawnMovementComponent.h"
 
@@ -38,7 +38,7 @@ void UAbilityPawnState_Spawn::OnEnter(UFiniteStateBase* InLastState, const TArra
 		Rescuer = Cast<IAbilityVitalityInterface>(InParams[0].Get<UObject*>());
 	}
 	
-	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalitySpawned>(this, { GetAgent(), Cast<UObject>(Rescuer) });
+	UEventModuleStatics::BroadcastEvent<FEventVitalitySpawned>(this, { GetAgent(), Cast<UObject>(Rescuer) });
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 

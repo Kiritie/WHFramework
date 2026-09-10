@@ -10,10 +10,10 @@
 
 #include "CameraModule.generated.h"
 
-class UEventHandle_SwitchCameraPoint;
+struct FEventSwitchCameraPoint;
 class ACameraPointBase;
-class UEventHandle_ResetCameraView;
-class UEventHandle_SetCameraView;
+struct FEventResetCameraView;
+struct FEventSetCameraView;
 class UCameraComponent;
 class USpringArmComponent;
 class AWHPlayerController;
@@ -350,13 +350,13 @@ public:
 
 protected:
 	UFUNCTION()
-	void OnSetCameraView(UObject* InSender, UEventHandle_SetCameraView* InEventHandle);
+	void OnSetCameraView(UObject* InSender, const FEventSetCameraView& InEvent);
 	
 	UFUNCTION()
-	void OnResetCameraView(UObject* InSender, UEventHandle_ResetCameraView* InEventHandle);
+	void OnResetCameraView(UObject* InSender, const FEventResetCameraView& InEvent);
 	
 	UFUNCTION()
-	void OnSwitchCameraPoint(UObject* InSender, UEventHandle_SwitchCameraPoint* InEventHandle);
+	void OnSwitchCameraPoint(UObject* InSender, const FEventSwitchCameraPoint& InEvent);
 
 public:
 	UFUNCTION(BlueprintPure)

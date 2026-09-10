@@ -5,11 +5,11 @@
 
 #include "Camera/CameraModuleStatics.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Step/EventHandle_StepCompleted.h"
-#include "Event/Handle/Step/EventHandle_StepEntered.h"
-#include "Event/Handle/Step/EventHandle_StepExecuted.h"
-#include "Event/Handle/Step/EventHandle_StepLeaved.h"
-#include "Event/Handle/Step/EventHandle_StepStateChanged.h"
+#include "Event/Events/Step/Event_StepCompleted.h"
+#include "Event/Events/Step/Event_StepEntered.h"
+#include "Event/Events/Step/Event_StepExecuted.h"
+#include "Event/Events/Step/Event_StepLeaved.h"
+#include "Event/Events/Step/Event_StepStateChanged.h"
 #include "Step/StepModule.h"
 #include "Step/StepModuleStatics.h"
 
@@ -74,7 +74,7 @@ void UStepBase::OnStateChanged(EStepState InStepState)
 	OnStepStateChanged.Broadcast(InStepState);
 	K2_OnStateChanged(InStepState);
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_StepStateChanged::StaticClass(), this, {this});
+	UEventModuleStatics::BroadcastEvent<FEventStepStateChanged>(this, {this});
 }
 
 void UStepBase::OnInitialize()
@@ -146,7 +146,7 @@ void UStepBase::OnEnter(UStepBase* InLastStep)
 		default: break;
 	}
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_StepEntered::StaticClass(), this, {this});
+	UEventModuleStatics::BroadcastEvent<FEventStepEntered>(this, {this});
 
 	if(bMergeSubStep)
 	{
@@ -272,7 +272,7 @@ void UStepBase::OnExecute()
 
 	K2_OnExecute();
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_StepExecuted::StaticClass(), this, {this});
+	UEventModuleStatics::BroadcastEvent<FEventStepExecuted>(this, {this});
 
 	if(StepState != EStepState::Completed)
 	{
@@ -320,7 +320,7 @@ void UStepBase::OnComplete(EStepExecuteResult InStepExecuteResult)
 	
 	K2_OnComplete(InStepExecuteResult);
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_StepCompleted::StaticClass(), this, {this});
+	UEventModuleStatics::BroadcastEvent<FEventStepCompleted>(this, {this});
 
 	if(GetStepLeaveType() == EStepLeaveType::Automatic && StepState != EStepState::Leaved)
 	{
@@ -351,7 +351,7 @@ void UStepBase::OnLeave()
 
 	K2_OnLeave();
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_StepLeaved::StaticClass(), this, {this});
+	UEventModuleStatics::BroadcastEvent<FEventStepLeaved>(this, {this});
 
 	if(bMergeSubStep)
 	{

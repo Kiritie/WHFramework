@@ -4,12 +4,12 @@
 #include "Task/Base/TaskBase.h"
 
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Task/EventHandle_TaskCompleted.h"
-#include "Event/Handle/Task/EventHandle_TaskEntered.h"
-#include "Event/Handle/Task/EventHandle_TaskExecuted.h"
-#include "Event/Handle/Task/EventHandle_TaskLeaved.h"
+#include "Event/Events/Task/Event_TaskCompleted.h"
+#include "Event/Events/Task/Event_TaskEntered.h"
+#include "Event/Events/Task/Event_TaskExecuted.h"
+#include "Event/Events/Task/Event_TaskLeaved.h"
 #include "Debug/DebugModuleTypes.h"
-#include "Event/Handle/Task/EventHandle_TaskStateChanged.h"
+#include "Event/Events/Task/Event_TaskStateChanged.h"
 #include "Task/TaskModule.h"
 #include "Task/TaskModuleStatics.h"
 #include "Task/Base/TaskAsset.h"
@@ -69,7 +69,7 @@ void UTaskBase::OnStateChanged(ETaskState InTaskState)
 	OnTaskStateChanged.Broadcast(InTaskState);
 	K2_OnStateChanged(InTaskState);
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_TaskStateChanged::StaticClass(), this, {this});
+	UEventModuleStatics::BroadcastEvent<FEventTaskStateChanged>(this, {this});
 }
 
 void UTaskBase::OnInitialize()
@@ -133,7 +133,7 @@ void UTaskBase::OnEnter()
 		default: break;
 	}
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_TaskEntered::StaticClass(), this, {this});
+	UEventModuleStatics::BroadcastEvent<FEventTaskEntered>(this, {this});
 
 	if(bMergeSubTask)
 	{
@@ -189,7 +189,7 @@ void UTaskBase::OnExecute()
 	K2_OnExecute();
 	if (TaskState != ETaskState::Executing) return;
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_TaskExecuted::StaticClass(), this, {this});
+	UEventModuleStatics::BroadcastEvent<FEventTaskExecuted>(this, {this});
 
 	if(TaskState == ETaskState::Executing)
 	{
@@ -240,7 +240,7 @@ void UTaskBase::OnComplete(ETaskExecuteResult InTaskExecuteResult)
 	
 	K2_OnComplete(InTaskExecuteResult);
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_TaskCompleted::StaticClass(), this, {this});
+	UEventModuleStatics::BroadcastEvent<FEventTaskCompleted>(this, {this});
 
 	if(InTaskExecuteResult != ETaskExecuteResult::Skipped)
 	{
@@ -282,7 +282,7 @@ void UTaskBase::OnLeave()
 
 	K2_OnLeave();
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_TaskLeaved::StaticClass(), this, {this});
+	UEventModuleStatics::BroadcastEvent<FEventTaskLeaved>(this, {this});
 }
 
 UTaskAsset* UTaskBase::GetTaskAsset() const

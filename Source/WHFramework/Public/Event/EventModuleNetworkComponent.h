@@ -1,17 +1,10 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
-
+#include "Event/EventModuleTypes.h"
 #include "Main/Base/ModuleNetworkComponentBase.h"
-#include "Parameter/ParameterModuleTypes.h"
 
 #include "EventModuleNetworkComponent.generated.h"
 
-class UEventHandleBase;
-/**
-* 
-*/
 UCLASS()
 class WHFRAMEWORK_API UEventModuleNetworkComponent : public UModuleNetworkComponentBase
 {
@@ -19,14 +12,13 @@ class WHFRAMEWORK_API UEventModuleNetworkComponent : public UModuleNetworkCompon
 
 public:
 	UEventModuleNetworkComponent();
-	
-public:
-	UFUNCTION(Client, Reliable, WithValidation)
-	void ClientBroadcastEvent(UObject* InSender, TSubclassOf<UEventHandleBase> InClass, const TArray<FParameter>& InParams);
-	
-	UFUNCTION(Server, Reliable, WithValidation)
-	void ServerBroadcastEvent(UObject* InSender, TSubclassOf<UEventHandleBase> InClass, const TArray<FParameter>& InParams, bool bRecovery = false);
 
-	UFUNCTION(Server, Reliable, WithValidation)
-	void ServerBroadcastEventMulticast(UObject* InSender, TSubclassOf<UEventHandleBase> InClass, const TArray<FParameter>& InParams, bool bRecovery = false);
+	UFUNCTION(Server, Reliable)
+	void ServerBroadcastEvent(const FEventNetworkMessage& Message);
+
+	UFUNCTION(Client, Reliable)
+	void ClientBroadcastEvent(const FEventNetworkMessage& Message);
+
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastBroadcastEvent(const FEventNetworkMessage& Message);
 };

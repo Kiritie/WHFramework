@@ -10,7 +10,7 @@
 #include "AI/Base/AIControllerBase.h"
 #include "Common/Interaction/InteractionComponent.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Ability/EventHandle_VitalityDead.h"
+#include "Event/Events/Ability/Event_VitalityDead.h"
 
 UAbilityPawnState_Death::UAbilityPawnState_Death()
 {
@@ -38,7 +38,7 @@ void UAbilityPawnState_Death::OnEnter(UFiniteStateBase* InLastState, const TArra
 		Killer = Cast<IAbilityVitalityInterface>(InParams[0].Get<UObject*>());
 	}
 	
-	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalityDead>(this, { GetAgent(), Cast<UObject>(Killer) });
+	UEventModuleStatics::BroadcastEvent<FEventVitalityDead>(this, { GetAgent(), Cast<UObject>(Killer) });
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 

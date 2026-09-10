@@ -8,7 +8,7 @@
 #include "Common/Looking/LookingComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Ability/EventHandle_VitalitySpawned.h"
+#include "Event/Events/Ability/Event_VitalitySpawned.h"
 #include "FSM/Components/FSMComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
@@ -38,7 +38,7 @@ void UAbilityCharacterState_Spawn::OnEnter(UFiniteStateBase* InLastState, const 
 		Rescuer = Cast<IAbilityVitalityInterface>(InParams[0].Get<UObject*>());
 	}
 	
-	UEventModuleStatics::BroadcastEvent<UEventHandle_VitalitySpawned>(this, { GetAgent(), Cast<UObject>(Rescuer) });
+	UEventModuleStatics::BroadcastEvent<FEventVitalitySpawned>(this, { GetAgent(), Cast<UObject>(Rescuer) });
 
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
 

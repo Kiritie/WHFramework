@@ -12,10 +12,10 @@
 #include "Gameplay/WHGameMode.h"
 #include "Common/CommonModuleStatics.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Camera/EventHandle_ResetCameraView.h"
-#include "Event/Handle/Camera/EventHandle_SetCameraView.h"
-#include "Event/Handle/Camera/EventHandle_SwitchCameraPoint.h"
-#include "Event/Handle/Camera/EventHandle_CameraTraceEnded.h"
+#include "Event/Events/Camera/Event_ResetCameraView.h"
+#include "Event/Events/Camera/Event_SetCameraView.h"
+#include "Event/Events/Camera/Event_SwitchCameraPoint.h"
+#include "Event/Events/Camera/Event_CameraTraceEnded.h"
 #include "Input/InputModuleStatics.h"
 #include "Main/MainModule.h"
 #include "SaveGame/SaveGameModuleStatics.h"
@@ -188,9 +188,9 @@ void UCameraModule::OnInitialize()
 
 	IDebuggerInterface::Register();
 	
-	UEventModuleStatics::SubscribeEvent<UEventHandle_SetCameraView>(this, GET_FUNCTION_NAME_THISCLASS(OnSetCameraView));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_ResetCameraView>(this, GET_FUNCTION_NAME_THISCLASS(OnResetCameraView));
-	UEventModuleStatics::SubscribeEvent<UEventHandle_SwitchCameraPoint>(this, GET_FUNCTION_NAME_THISCLASS(OnSwitchCameraPoint));
+	UEventModuleStatics::SubscribeEvent<FEventSetCameraView>(this, &ThisClass::OnSetCameraView);
+	UEventModuleStatics::SubscribeEvent<FEventResetCameraView>(this, &ThisClass::OnResetCameraView);
+	UEventModuleStatics::SubscribeEvent<FEventSwitchCameraPoint>(this, &ThisClass::OnSwitchCameraPoint);
 }
 
 void UCameraModule::OnPreparatory(EPhase InPhase)
@@ -635,19 +635,19 @@ void UCameraModule::ResetCameraView(ECameraResetMode InCameraResetMode, bool bIn
 	}
 }
 
-void UCameraModule::OnSetCameraView(UObject* InSender, UEventHandle_SetCameraView* InEventHandle)
+void UCameraModule::OnSetCameraView(UObject* InSender, const FEventSetCameraView& InEvent)
 {
-	SetCameraView(InEventHandle->CameraViewData, InEventHandle->bCacheData);
+	SetCameraView(InEvent.CameraViewData, InEvent.bCacheData);
 }
 
-void UCameraModule::OnResetCameraView(UObject* InSender, UEventHandle_ResetCameraView* InEventHandle)
+void UCameraModule::OnResetCameraView(UObject* InSender, const FEventResetCameraView& InEvent)
 {
-	ResetCameraView(InEventHandle->CameraResetMode);
+	ResetCameraView(InEvent.CameraResetMode);
 }
 
-void UCameraModule::OnSwitchCameraPoint(UObject* InSender, UEventHandle_SwitchCameraPoint* InEventHandle)
+void UCameraModule::OnSwitchCameraPoint(UObject* InSender, const FEventSwitchCameraPoint& InEvent)
 {
-	SwitchCameraPoint(InEventHandle->CameraPoint.LoadSynchronous());
+	SwitchCameraPoint(InEvent.CameraPoint.LoadSynchronous());
 }
 
 bool UCameraModule::IsControllingMove(int32 InPlayerIndex)

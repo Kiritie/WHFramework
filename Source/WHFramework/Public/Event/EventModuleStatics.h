@@ -1,79 +1,66 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
-
-#include "EventModuleTypes.h"
+#include "EventModule.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+
 #include "EventModuleStatics.generated.h"
 
 class UEventManagerBase;
-class UEventHandleBase;
-class UEventModule;
-/**
- * 
- */
+
 UCLASS()
 class WHFRAMEWORK_API UEventModuleStatics : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
 
 public:
-	template<class T>
-	static void SubscribeEvent(UObject* InOwner, const FName InFuncName)
+	template<typename TEvent>
+	static FDelegateHandle SubscribeEvent(UObject* InOwner, TFunction<void(UObject*, const TEvent&)> InCallback)
 	{
-		SubscribeEvent(T::StaticClass(), InOwner, InFuncName);
-	}
-	template<class T>
-	static void SubscribeEvent(const FEventExecuteDynamicDelegate& InDelegate)
-	{
-		SubscribeEvent(T::StaticClass(), InDelegate);
+		return UEventModule::Get().SubscribeEvent<TEvent>(InOwner, MoveTemp(InCallback));
 	}
 
-	UFUNCTION(BlueprintCallable, Category = "EventModuleStatics")
-	static void SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName);
-
-	UFUNCTION(BlueprintCallable, Category = "EventModuleStatics", meta = (DisplayName = "Subscribe Event"))
-	static void SubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate);
-
-	template<class T>
-	static void UnsubscribeEvent(UObject* InOwner, const FName InFuncName)
+	template<typename TEvent, typename TObject>
+	static FDelegateHandle SubscribeEvent(TObject* InOwner, void (TObject::*InCallback)(UObject*, const TEvent&))
 	{
-		UnsubscribeEvent(T::StaticClass(), InOwner, InFuncName);
+		return UEventModule::Get().SubscribeEvent<TEvent>(InOwner, InCallback);
 	}
 
-	template<class T>
-	static void UnsubscribeEvent(const FEventExecuteDynamicDelegate& InDelegate)
+	template<typename TEvent, typename TCallbackObject>
+	static FDelegateHandle SubscribeEvent(UObject* InOwner, void (TCallbackObject::*InCallback)())
 	{
-		UnsubscribeEvent(T::StaticClass(), InDelegate);
+		return UEventModule::Get().SubscribeEvent<TEvent>(InOwner, InCallback);
 	}
 
-	UFUNCTION(BlueprintCallable, Category = "EventModuleStatics")
-	static void UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName);
+	static void UnsubscribeEvent(FDelegateHandle InHandle)
+	{
+		UEventModule::Get().UnsubscribeEvent(InHandle);
+	}
 
-	UFUNCTION(BlueprintCallable, Category = "EventModuleStatics", meta = (DisplayName = "Unsubscribe Event"))
-	static void UnsubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate);
+	template<typename TEvent>
+	static void UnsubscribeEvent(UObject* InOwner)
+	{
+		UEventModule::Get().UnsubscribeEvent<TEvent>(InOwner);
+	}
 
-	UFUNCTION(BlueprintCallable, Category = "EventModuleStatics")
+	UFUNCTION(BlueprintCallable, Category = "EventModule")
 	static void UnsubscribeAllEvent();
 
-	template<class T>
-	static void BroadcastEvent(UObject* InSender, const TArray<FParameter>* InParams = nullptr, EEventNetType InNetType = EEventNetType::Single, bool bRecovery = true)
+	template<typename TEvent>
+	static void BroadcastEvent(UObject* InSender, const TEvent& InEvent = TEvent(), EEventNetType InNetType = EEventNetType::Local)
 	{
-		BroadcastEvent(T::StaticClass(), InSender, InParams ? *InParams : TArray<FParameter>(), InNetType, bRecovery);
+		UEventModule::Get().BroadcastEvent<TEvent>(InSender, InEvent, InNetType);
 	}
 
-	template<class T>
-	static void BroadcastEvent(UObject* InSender, const TArray<FParameter>& InParams, EEventNetType InNetType = EEventNetType::Single, bool bRecovery = true)
-	{
-		BroadcastEvent(T::StaticClass(), InSender, InParams, InNetType, bRecovery);
-	}
+	UFUNCTION(BlueprintCallable, CustomThunk, meta = (BlueprintInternalUseOnly = "true", CustomStructureParam = "Event"), Category = "EventModule")
+	static void K2_BroadcastEvent(UObject* Sender, const int32& Event, EEventNetType NetType = EEventNetType::Local);
+	DECLARE_FUNCTION(execK2_BroadcastEvent);
 
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"), Category = "EventModuleStatics")
-	static void BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams, EEventNetType InNetType = EEventNetType::Single, bool bRecovery = true);
+	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = "true"), Category = "EventModule")
+	static void K2_SubscribeEvent(UObject* Owner, UScriptStruct* EventStruct, FEventDynamicDelegate Callback);
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Broadcast Event"), Category = "EventModuleStatics")
-	static void BroadcastEventByHandle(UEventHandleBase* InHandle, UObject* InSender, EEventNetType InNetType = EEventNetType::Single, bool bRecovery = true);
+	UFUNCTION(BlueprintPure, CustomThunk, meta = (BlueprintInternalUseOnly = "true", CustomStructureParam = "EventData"), Category = "EventModule")
+	static void K2_GetEventData(const FInstancedStruct& Event, int32& EventData);
+	DECLARE_FUNCTION(execK2_GetEventData);
 
 public:
 	template<class T>
@@ -82,9 +69,9 @@ public:
 		return Cast<T>(GetEventManager(T::StaticClass()));
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "EventModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "EventModule")
 	static UEventManagerBase* GetEventManager(TSubclassOf<UEventManagerBase> InClass);
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "EventModuleStatics")
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "EventModule")
 	static UEventManagerBase* GetEventManagerByName(const FName InName, TSubclassOf<UEventManagerBase> InClass = nullptr);
 };

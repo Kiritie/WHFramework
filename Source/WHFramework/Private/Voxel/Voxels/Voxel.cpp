@@ -6,8 +6,8 @@
 #include "Ability/AbilityModuleStatics.h"
 #include "Audio/AudioModuleStatics.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Voxel/EventHandle_VoxelDestroyed.h"
-#include "Event/Handle/Voxel/EventHandle_VoxelGenerated.h"
+#include "Event/Events/Voxel/Event_VoxelDestroyed.h"
+#include "Event/Events/Voxel/Event_VoxelGenerated.h"
 #include "Math/MathHelper.h"
 #include "Voxel/Voxels/Data/VoxelData.h"
 #include "Voxel/VoxelModule.h"
@@ -57,9 +57,7 @@ void UVoxel::OnGenerate(IVoxelAgentInterface* InAgent)
 	if(GetData().IsMainPart())
 	{
 		UAudioModuleStatics::PlaySoundAtLocation(GetData().GetSound(EVoxelSoundType::Generate), GetLocation());
-		FVoxelItemParameterValue ItemValue;
-		ItemValue.Value = Item;
-		UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelGenerated>(Cast<UObject>(InAgent), { MoveTemp(ItemValue), Cast<UObject>(InAgent) });
+		UEventModuleStatics::BroadcastEvent<FEventVoxelGenerated>(Cast<UObject>(InAgent), { Item, Cast<UObject>(InAgent) });
 	}
 }
 
@@ -75,9 +73,7 @@ void UVoxel::OnDestroy(IVoxelAgentInterface* InAgent)
 		{
 			UAbilityModuleStatics::SpawnAbilityPickUp(FAbilityItem(GetData().GatherData ? GetData().GatherData->GetPrimaryAssetId() : GetData().GetPrimaryAssetId(), 1), GetLocation() + GetData().GetRange(GetAngle()) * UVoxelModule::Get().GetWorldData().BlockSize * 0.5f, GetOwner());
 		}
-		FVoxelItemParameterValue ItemValue;
-		ItemValue.Value = Item;
-		UEventModuleStatics::BroadcastEvent<UEventHandle_VoxelDestroyed>(Cast<UObject>(InAgent), { MoveTemp(ItemValue), Cast<UObject>(InAgent) });
+		UEventModuleStatics::BroadcastEvent<FEventVoxelDestroyed>(Cast<UObject>(InAgent), { Item, Cast<UObject>(InAgent) });
 	}
 	if(GetOwner() && (Item.GetVoxelType() == EVoxelType::Oak || Item.GetVoxelType() == EVoxelType::Birch) && Item.Data.StartsWith(TEXT("R")))
 	{

@@ -49,7 +49,7 @@ public:
 
 protected:
 	UFUNCTION()
-	virtual void OnGameExited(UObject* InSender, UEventHandle_GameExited* InEventHandle);
+	virtual void OnGameExited(UObject* InSender, const FEventGameExited& InEvent);
 
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;

@@ -7,9 +7,9 @@
 #include "Camera/CameraModuleStatics.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Event/EventModuleStatics.h"
-#include "Event/Handle/Procedure/EventHandle_ProcedureEntered.h"
-#include "Event/Handle/Procedure/EventHandle_ProcedureLeaved.h"
-#include "Event/Handle/Procedure/EventHandle_ProcedureStateChanged.h"
+#include "Event/Events/Procedure/Event_ProcedureEntered.h"
+#include "Event/Events/Procedure/Event_ProcedureLeaved.h"
+#include "Event/Events/Procedure/Event_ProcedureStateChanged.h"
 #include "Procedure/ProcedureModule.h"
 #include "Procedure/ProcedureModuleStatics.h"
 
@@ -54,7 +54,7 @@ void UProcedureBase::OnStateChanged(EProcedureState InProcedureState)
 	OnProcedureStateChanged.Broadcast(InProcedureState);
 	K2_OnStateChanged(InProcedureState);
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_ProcedureStateChanged::StaticClass(), this, {this});
+	UEventModuleStatics::BroadcastEvent<FEventProcedureStateChanged>(this, {this});
 }
 
 void UProcedureBase::OnInitialize()
@@ -85,7 +85,7 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 		default: break;
 	}
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_ProcedureEntered::StaticClass(), this, {this});
+	UEventModuleStatics::BroadcastEvent<FEventProcedureEntered>(this, {this});
 }
 
 void UProcedureBase::OnRefresh()
@@ -124,7 +124,7 @@ void UProcedureBase::OnLeave(UProcedureBase* InNextProcedure)
 
 	K2_OnLeave(InNextProcedure);
 
-	UEventModuleStatics::BroadcastEvent(UEventHandle_ProcedureLeaved::StaticClass(), this, {this});
+	UEventModuleStatics::BroadcastEvent<FEventProcedureLeaved>(this, {this});
 }
 
 void UProcedureBase::Switch_Implementation()

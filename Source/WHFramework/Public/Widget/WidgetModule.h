@@ -14,9 +14,9 @@
 #include "WidgetModule.generated.h"
 
 class UWorldWidgetContainer;
-class UEventHandle_SetWorldWidgetVisible;
-class UEventHandle_CloseUserWidget;
-class UEventHandle_OpenUserWidget;
+struct FEventSetWorldWidgetVisible;
+struct FEventCloseUserWidget;
+struct FEventOpenUserWidget;
 
 UCLASS()
 class WHFRAMEWORK_API UWidgetModule : public UModuleBase, public IInputManagerInterface
@@ -70,10 +70,10 @@ private:
 
 protected:
 	UFUNCTION()
-	void OnOpenUserWidget(UObject* InSender, UEventHandle_OpenUserWidget* InEventHandle);
+	void OnOpenUserWidget(UObject* InSender, const FEventOpenUserWidget& InEvent);
 
 	UFUNCTION()
-	void OnCloseUserWidget(UObject* InSender, UEventHandle_CloseUserWidget* InEventHandle);
+	void OnCloseUserWidget(UObject* InSender, const FEventCloseUserWidget& InEvent);
 
 	////////////////////////////////////////////////////
 	// GlobalSettings
@@ -547,7 +547,7 @@ protected:
 	void SortWorldWidgetClasses();
 
 	UFUNCTION()
-	void OnSetWorldWidgetVisible(UObject* InSender, UEventHandle_SetWorldWidgetVisible* InEventHandle);
+	void OnSetWorldWidgetVisible(UObject* InSender, const FEventSetWorldWidgetVisible& InEvent);
 
 public:
 	UFUNCTION(BlueprintPure)

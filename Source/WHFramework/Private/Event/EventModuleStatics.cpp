@@ -1,44 +1,66 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Event/EventModuleStatics.h"
-
-#include "Event/EventModule.h"
-#include "Event/EventModuleNetworkComponent.h"
-
-void UEventModuleStatics::SubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName)
-{
-	UEventModule::Get().SubscribeEvent(InClass, InOwner, InFuncName);
-}
-
-void UEventModuleStatics::SubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate)
-{
-	UEventModule::Get().SubscribeEventByDelegate(InClass, InDelegate);
-}
-
-void UEventModuleStatics::UnsubscribeEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InOwner, const FName InFuncName)
-{
-	UEventModule::Get().UnsubscribeEvent(InClass, InOwner, InFuncName);
-}
-
-void UEventModuleStatics::UnsubscribeEventByDelegate(TSubclassOf<UEventHandleBase> InClass, const FEventExecuteDynamicDelegate& InDelegate)
-{
-	UEventModule::Get().UnsubscribeEventByDelegate(InClass, InDelegate);
-}
 
 void UEventModuleStatics::UnsubscribeAllEvent()
 {
 	UEventModule::Get().UnsubscribeAllEvent();
 }
 
-void UEventModuleStatics::BroadcastEvent(TSubclassOf<UEventHandleBase> InClass, UObject* InSender, const TArray<FParameter>& InParams, EEventNetType InNetType, bool bRecovery)
+void UEventModuleStatics::K2_BroadcastEvent(UObject*, const int32&, EEventNetType)
 {
-	UEventModule::Get().BroadcastEvent(InClass, InSender, InParams, InNetType, bRecovery);
+	checkNoEntry();
 }
 
-void UEventModuleStatics::BroadcastEventByHandle(UEventHandleBase* InHandle, UObject* InSender, EEventNetType InNetType, bool bRecovery)
+DEFINE_FUNCTION(UEventModuleStatics::execK2_BroadcastEvent)
 {
-	UEventModule::Get().BroadcastEventByHandle(InHandle, InSender, InNetType, bRecovery);
+	P_GET_OBJECT(UObject, Sender);
+	Stack.MostRecentProperty = nullptr;
+	Stack.StepCompiledIn<FProperty>(nullptr);
+	const FStructProperty* EventProperty = CastField<FStructProperty>(Stack.MostRecentProperty);
+	const void* EventPtr = Stack.MostRecentPropertyAddress;
+	P_GET_ENUM(EEventNetType, NetType);
+	P_FINISH;
+	P_NATIVE_BEGIN;
+	if(EventProperty && EventPtr && EventProperty->Struct->IsChildOf(FEventBase::StaticStruct()))
+	{
+		UEventModule::Get().BroadcastEvent(Sender, FConstStructView(EventProperty->Struct, static_cast<const uint8*>(EventPtr)), static_cast<EEventNetType>(NetType));
+	}
+	P_NATIVE_END;
+}
+
+void UEventModuleStatics::K2_SubscribeEvent(UObject* Owner, UScriptStruct* EventStruct, FEventDynamicDelegate Callback)
+{
+	FEventDelegate NativeCallback;
+	NativeCallback.BindLambda([Callback = MoveTemp(Callback)](UObject* Sender, FConstStructView Event) mutable
+	{
+		FInstancedStruct EventData(Event);
+		Callback.ExecuteIfBound(Sender, EventData);
+	});
+	UEventModule::Get().SubscribeEvent(Owner, EventStruct, MoveTemp(NativeCallback));
+}
+
+void UEventModuleStatics::K2_GetEventData(const FInstancedStruct&, int32&)
+{
+	checkNoEntry();
+}
+
+DEFINE_FUNCTION(UEventModuleStatics::execK2_GetEventData)
+{
+	P_GET_STRUCT_REF(FInstancedStruct, Event);
+	Stack.MostRecentProperty = nullptr;
+	Stack.StepCompiledIn<FProperty>(nullptr);
+	const FStructProperty* EventDataProperty = CastField<FStructProperty>(Stack.MostRecentProperty);
+	void* EventDataPtr = Stack.MostRecentPropertyAddress;
+	P_FINISH;
+	P_NATIVE_BEGIN;
+	if(EventDataProperty && EventDataPtr)
+	{
+		EventDataProperty->Struct->ClearScriptStruct(EventDataPtr);
+		if(Event.IsValid() && Event.GetScriptStruct() == EventDataProperty->Struct)
+		{
+			EventDataProperty->Struct->CopyScriptStruct(EventDataPtr, Event.GetMemory());
+		}
+	}
+	P_NATIVE_END;
 }
 
 UEventManagerBase* UEventModuleStatics::GetEventManager(TSubclassOf<UEventManagerBase> InClass)

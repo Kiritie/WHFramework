@@ -1,55 +1,32 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
+#include "Event/Events/Common/Game/Event_GameExited.h"
+#include "Event/Events/Common/Game/Event_GameInited.h"
+#include "Event/Events/Common/Game/Event_GameStarted.h"
 #include "EventManagerBase.h"
-#include "Common/CommonModuleTypes.h"
-#include "Event/EventModuleTypes.h"
 
 #include "DefaultEventManagerBase.generated.h"
-
-class UEventHandle_GameInited;
-class UEventHandle_GameExited;
-class UEventHandle_GameStarted;
 
 UCLASS(EditInlineNew)
 class WHFRAMEWORK_API UDefaultEventManagerBase : public UEventManagerBase
 {
 	GENERATED_BODY()
-	
-public:	
-	// ParamSets default values for this object's properties
+
+public:
 	UDefaultEventManagerBase();
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Defaults
-public:
 	virtual void OnInitialize() override;
-	
 	virtual void OnPreparatory() override;
-	
 	virtual void OnRefresh(float DeltaSeconds) override;
-	
 	virtual void OnTermination(EPhase InPhase) override;
-	
-	virtual void OnHandleEvent(UObject* InSender, UEventHandleBase* InEventHandle) override;
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Events
 protected:
-	/**
-	* 当初始化游戏
-	*/
 	UFUNCTION(BlueprintNativeEvent)
-	void OnGameInited(UObject* InSender, UEventHandle_GameInited* InEventHandle);
-	/**
-	* 当开始游戏
-	*/
+	void OnGameInited(UObject* InSender, const FEventGameInited& InEvent);
+
 	UFUNCTION(BlueprintNativeEvent)
-	void OnGameStarted(UObject* InSender, UEventHandle_GameStarted* InEventHandle);
-	/**
-	* 当退出游戏
-	*/
+	void OnGameStarted(UObject* InSender, const FEventGameStarted& InEvent);
+
 	UFUNCTION(BlueprintNativeEvent)
-	void OnGameExited(UObject* InSender, UEventHandle_GameExited* InEventHandle);
+	void OnGameExited(UObject* InSender, const FEventGameExited& InEvent);
 };

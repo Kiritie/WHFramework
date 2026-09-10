@@ -132,7 +132,7 @@ void FInputManager::UpdateInputMode()
 			}
 			default: break;
 		}
-		// UEventModuleStatics::BroadcastEvent(UEventHandle_InputModeChanged::StaticClass(), this, { &GlobalInputMode }, EEventNetType::Multicast);
+		// UEventModuleStatics::BroadcastEvent<FEventInputModeChanged>(this, { &GlobalInputMode }, EEventNetType::Multicast);
 	}
 }
 
