@@ -5,11 +5,24 @@
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
 #include "NativeGameplayTags.h"
+#include "ObjectPool/ObjectPoolModuleTypes.h"
 #include "WHFrameworkCoreTypes.h"
 
 #include "CommonModuleTypes.generated.h"
 
 class UInteractionOptionBase;
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FWHActorSpawnParameter : public FActorSpawnParameter
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bOverrideActorID = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FGuid ActorID;
+};
 
 //////////////////////////////////////////////////////////////////////////
 // Variables

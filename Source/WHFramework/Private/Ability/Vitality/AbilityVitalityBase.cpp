@@ -45,16 +45,17 @@ AAbilityVitalityBase::AAbilityVitalityBase(const FObjectInitializer& ObjectIniti
 	ActionAbilities = TMap<FGameplayTag, FVitalityActionAbilityData>();
 }
 
-void AAbilityVitalityBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void AAbilityVitalityBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 
 	SwitchDefaultFiniteState();
 }
 
-void AAbilityVitalityBase::OnDespawn_Implementation(bool bRecovery)
+void AAbilityVitalityBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 
 	SwitchFiniteState(nullptr);
 

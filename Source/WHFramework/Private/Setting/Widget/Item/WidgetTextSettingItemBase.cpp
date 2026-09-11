@@ -10,14 +10,15 @@ UWidgetTextSettingItemBase::UWidgetTextSettingItemBase(const FObjectInitializer&
 	ParameterValueType = nullptr;
 }
 
-void UWidgetTextSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetTextSettingItemBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 
 	TxtBox_Value->OnTextChanged.AddDynamic(this, &UWidgetTextSettingItemBase::OnTextBoxValueChanged);
 }
 
-void UWidgetTextSettingItemBase::OnDespawn_Implementation(bool bRecovery)
+void UWidgetTextSettingItemBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	TxtBox_Value->KeyboardType = EVirtualKeyboardType::Default;
 
@@ -25,7 +26,7 @@ void UWidgetTextSettingItemBase::OnDespawn_Implementation(bool bRecovery)
 
 	TxtBox_Value->OnTextChanged.RemoveDynamic(this, &UWidgetTextSettingItemBase::OnTextBoxValueChanged);
 
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 }
 
 void UWidgetTextSettingItemBase::OnRefresh()

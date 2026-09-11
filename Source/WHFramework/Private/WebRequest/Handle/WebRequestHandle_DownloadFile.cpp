@@ -11,9 +11,9 @@ UWebRequestHandle_DownloadFile::UWebRequestHandle_DownloadFile()
 	FilePath = TEXT("");
 }
 
-void UWebRequestHandle_DownloadFile::OnDespawn_Implementation(bool bRecovery)
+void UWebRequestHandle_DownloadFile::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 
 	FilePath = TEXT("");
 }

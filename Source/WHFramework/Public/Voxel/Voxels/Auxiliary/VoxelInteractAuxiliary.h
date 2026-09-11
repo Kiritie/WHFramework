@@ -22,7 +22,8 @@ public:
 	AVoxelInteractAuxiliary();
 
 protected:
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
+	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode)
+		override;
 	
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
 	

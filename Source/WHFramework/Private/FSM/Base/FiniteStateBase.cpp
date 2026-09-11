@@ -22,12 +22,13 @@ UFiniteStateBase::UFiniteStateBase()
 	bHasBlueprintOnPreLeave = UCommonModuleStatics::IsImplementedInBlueprint(OnPreLeaveFunction);
 }
 
-void UFiniteStateBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UFiniteStateBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
 	
 }
 
-void UFiniteStateBase::OnDespawn_Implementation(bool bRecovery)
+void UFiniteStateBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	StateIndex = 0;
 	FSM = nullptr;

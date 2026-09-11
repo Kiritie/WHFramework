@@ -4,6 +4,7 @@
 #include "Asset/AssetModuleTypes.h"
 #include "Common/CommonModuleTypes.h"
 #include "Math/MathTypes.h"
+#include "ObjectPool/ObjectPoolModuleTypes.h"
 #include "Parameter/ParameterValueTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "Scene/SceneModuleTypes.h"
@@ -19,6 +20,24 @@ class AVoxelAuxiliary;
 class UVoxel;
 class AActor;
 class UTexture2D;
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelMeshComponentSpawnParameter : public FObjectSpawnParameter
+{
+	GENERATED_BODY()
+
+public:
+	FVoxelMeshComponentSpawnParameter() = default;
+
+	FVoxelMeshComponentSpawnParameter(UObject* InOuter, UVoxelChunk* InChunk = nullptr)
+		: FObjectSpawnParameter(InOuter)
+		, Chunk(InChunk)
+	{
+	}
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TObjectPtr<UVoxelChunk> Chunk = nullptr;
+};
 
 UENUM(BlueprintType)
 enum class EVoxelRaycastType : uint8

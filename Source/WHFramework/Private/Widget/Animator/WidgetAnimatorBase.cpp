@@ -1,9 +1,10 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Widget/Animator/WidgetAnimatorBase.h"
 
 #include "Blueprint/UserWidget.h"
 #include "Blueprint/WidgetTree.h"
+#include "ObjectPool/ObjectPoolModuleTypes.h"
 
 UWidgetAnimatorBase::UWidgetAnimatorBase()
 {
@@ -16,11 +17,13 @@ UWidgetAnimatorBase::UWidgetAnimatorBase()
 	ParentWidget = nullptr;
 }
 
-void UWidgetAnimatorBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetAnimatorBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 
-	ParentWidget = Cast<UUserWidget>(InOwner);
+	const FWidgetSpawnParameter* Parameter = InParameter.GetPtr<FWidgetSpawnParameter>();
+	ParentWidget = Parameter ? Cast<UUserWidget>(Parameter->OwningObject) : nullptr;
 	
 	if(ParentWidget)
 	{
@@ -35,9 +38,9 @@ void UWidgetAnimatorBase::OnSpawn_Implementation(UObject* InOwner, const TArray<
 	}
 }
 
-void UWidgetAnimatorBase::OnDespawn_Implementation(bool bRecovery)
+void UWidgetAnimatorBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 }
 
 void UWidgetAnimatorBase::Play_Implementation(const FOnWidgetAnimatorCompleted& OnCompleted, bool bInstant)

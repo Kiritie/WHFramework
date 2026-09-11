@@ -9,14 +9,15 @@ UWorldWeather::UWorldWeather()
 	bAutoSave = true;
 }
 
-void UWorldWeather::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWorldWeather::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 }
 
-void UWorldWeather::OnDespawn_Implementation(bool bRecovery)
+void UWorldWeather::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 }
 
 void UWorldWeather::LoadData(FSaveData* InSaveData, EPhase InPhase)

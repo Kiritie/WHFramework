@@ -2,6 +2,8 @@
 
 #include "Setting/Widget/Item/WidgetFloatSettingItemBase.h"
 
+#include "Setting/SettingModuleTypes.h"
+
 #include "Components/EditableTextBox.h"
 #include "Components/Slider.h"
 #include "Components/TextBlock.h"
@@ -17,9 +19,10 @@ UWidgetFloatSettingItemBase::UWidgetFloatSettingItemBase(const FObjectInitialize
 	ScaleFactor = 1.f;
 }
 
-void UWidgetFloatSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetFloatSettingItemBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 
 	Slider_Value->OnValueChanged.AddDynamic(this, &UWidgetFloatSettingItemBase::OnSliderValueChanged);
 	if(TxtBox_Value)
@@ -27,24 +30,13 @@ void UWidgetFloatSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const
 		TxtBox_Value->OnTextCommitted.AddDynamic(this, &UWidgetFloatSettingItemBase::OnTextBoxValueCommitted);
 	}
 
-	if(InParams.IsValidIndex(1))
+	if(const FWidgetFloatSettingItemSpawnParameter* Parameter =
+		InParameter.GetPtr<FWidgetFloatSettingItemSpawnParameter>())
 	{
-		MinValue = InParams[1].Get<float>();
-	}
-
-	if(InParams.IsValidIndex(2))
-	{
-		MaxValue = InParams[2].Get<float>();
-	}
-
-	if(InParams.IsValidIndex(3))
-	{
-		DecimalNum = InParams[3].Get<int32>();
-	}
-
-	if(InParams.IsValidIndex(4))
-	{
-		ScaleFactor = InParams[4].Get<float>();
+		MinValue = Parameter->MinValue;
+		MaxValue = Parameter->MaxValue;
+		DecimalNum = Parameter->DecimalNum;
+		ScaleFactor = Parameter->ScaleFactor;
 	}
 
 	if(Txt_MinValue)
@@ -57,9 +49,9 @@ void UWidgetFloatSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const
 	}
 }
 
-void UWidgetFloatSettingItemBase::OnDespawn_Implementation(bool bRecovery)
+void UWidgetFloatSettingItemBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 
 	MinValue = 0.f;
 	MaxValue = 1.f;

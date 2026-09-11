@@ -1,31 +1,18 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 
-bool UObjectPoolModuleStatics::HasObject(TSubclassOf<UObject> InType)
+UObject* UObjectPoolModuleStatics::SpawnObject(UClass* InClass, const FParameter& InParameter)
 {
-	return UObjectPoolModule::Get().HasObject(InType);
+	return UObjectPoolModule::Get().SpawnObject(InClass, InParameter);
 }
 
-UObject* UObjectPoolModuleStatics::SpawnObject(TSubclassOf<UObject> InType, UObject* InOwner, const TArray<FParameter>& InParams)
+void UObjectPoolModuleStatics::DespawnObject(UObject* InObject, EObjectDespawnMode InMode)
 {
-	return UObjectPoolModule::Get().SpawnObject(InType, InOwner, InParams);
+	UObjectPoolModule::Get().DespawnObject(InObject, InMode);
 }
 
-void UObjectPoolModuleStatics::DespawnObject(UObject* InObject, bool bRecovery)
+void UObjectPoolModuleStatics::ClearObject(TSubclassOf<UObject> InClass)
 {
-	UObjectPoolModule::Get().DespawnObject(InObject, bRecovery);
-}
-
-void UObjectPoolModuleStatics::DespawnObjects(TArray<UObject*> InObjects, bool bRecovery)
-{
-	UObjectPoolModule::Get().DespawnObjects(InObjects, bRecovery);
-}
-
-void UObjectPoolModuleStatics::ClearObject(TSubclassOf<UObject> InType)
-{
-	UObjectPoolModule::Get().ClearObject(InType);
+	UObjectPoolModule::Get().ClearObject(InClass);
 }
 
 void UObjectPoolModuleStatics::ClearAllObject()

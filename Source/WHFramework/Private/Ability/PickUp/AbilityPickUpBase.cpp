@@ -42,16 +42,17 @@ AAbilityPickUpBase::AAbilityPickUpBase()
 	Item = FAbilityItem::Empty;
 }
 
-void AAbilityPickUpBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void AAbilityPickUpBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 }
 
-void AAbilityPickUpBase::OnDespawn_Implementation(bool bRecovery)
+void AAbilityPickUpBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	Interaction->SetInteractable(false);
 
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 
 	Item = FAbilityItem::Empty;
 

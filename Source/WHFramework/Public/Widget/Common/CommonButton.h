@@ -187,11 +187,12 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
 public:
-	virtual int32 GetLimit_Implementation() const override { return -1; }
 
-	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
+	virtual void OnSpawn_Implementation(
+		const FParameter& InParameter) override;
 		
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
+	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode)
+		override;
 
 public:
 	virtual void NativePreConstruct() override;
@@ -249,8 +250,6 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual TArray<FParameter> GetWidgetParams() const { return WidgetParams; }
-
-	virtual TArray<FParameter> GetSpawnParams_Implementation() const override { return WidgetParams; }
 
 	UFUNCTION(BlueprintCallable)
 	void SetIsEnabledN(bool bEnable);

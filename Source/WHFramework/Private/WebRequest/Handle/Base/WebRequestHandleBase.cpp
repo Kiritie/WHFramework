@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "WebRequest/Handle/Base/WebRequestHandleBase.h"
@@ -8,7 +8,7 @@ UWebRequestHandleBase::UWebRequestHandleBase()
 	bSucceeded = false;
 }
 
-void UWebRequestHandleBase::OnDespawn_Implementation(bool bRecovery)
+void UWebRequestHandleBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	bSucceeded = false;
 }

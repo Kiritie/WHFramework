@@ -7,12 +7,13 @@ UCommonTabList::UCommonTabList(const FObjectInitializer& ObjectInitializer) : Su
 	
 }
 
-void UCommonTabList::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UCommonTabList::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
 	
 }
 
-void UCommonTabList::OnDespawn_Implementation(bool bRecovery)
+void UCommonTabList::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	RemoveFromParent();
 }

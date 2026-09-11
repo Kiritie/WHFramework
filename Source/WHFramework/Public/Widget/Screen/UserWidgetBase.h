@@ -27,11 +27,12 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
 public:
-	virtual int32 GetLimit_Implementation() const override { return -1; }
 
-	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
+	virtual void OnSpawn_Implementation(
+		const FParameter& InParameter) override;
 		
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
+	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode)
+		override;
 
 protected:
 	UPROPERTY(EditDefaultsOnly)
@@ -341,8 +342,6 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual TArray<FParameter> GetWidgetParams() const override { return WidgetParams; }
-	
-	virtual TArray<FParameter> GetSpawnParams_Implementation() const override { return WidgetParams; }
 
 	UFUNCTION(BlueprintPure)
 	virtual EInputMode GetWidgetInputMode() const override { return WidgetInputMode; }

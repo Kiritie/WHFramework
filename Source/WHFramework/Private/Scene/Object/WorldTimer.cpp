@@ -10,14 +10,15 @@ UWorldTimer::UWorldTimer()
 	bAutoSave = true;
 }
 
-void UWorldTimer::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWorldTimer::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 }
 
-void UWorldTimer::OnDespawn_Implementation(bool bRecovery)
+void UWorldTimer::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 }
 
 void UWorldTimer::LoadData(FSaveData* InSaveData, EPhase InPhase)

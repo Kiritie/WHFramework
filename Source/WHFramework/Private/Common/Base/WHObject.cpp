@@ -14,12 +14,13 @@ UWHObject::UWHObject(const FObjectInitializer& ObjectInitializer)
 {
 }
 
-void UWHObject::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWHObject::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
 	
 }
 
-void UWHObject::OnDespawn_Implementation(bool bRecovery)
+void UWHObject::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	
 }

@@ -19,7 +19,8 @@ public:
 	AVoxelContainerAuxiliary();
 
 public:
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
+	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode)
+		override;
 
 protected:
 	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;

@@ -1,23 +1,21 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "ObjectPool/ObjectPoolModule.h"
 
-#include "ObjectPool/ObjectPool.h"
-#include "ObjectPool/Actor/ActorPool.h"
-#include "ObjectPool/Widget/WidgetPool.h"
+#include "Blueprint/UserWidget.h"
+#include "GameFramework/Actor.h"
+#include "ObjectPool/ObjectPoolBucket.h"
+#include "ObjectPool/ObjectPoolInterface.h"
+#include "ObjectPool/ObjectPoolProvider.h"
+#include "ObjectPool/Provider/ActorPoolProvider.h"
+#include "ObjectPool/Provider/ObjectPoolProvider.h"
+#include "ObjectPool/Provider/WidgetPoolProvider.h"
 
 IMPLEMENTATION_MODULE(UObjectPoolModule)
 
-// Sets default values
 UObjectPoolModule::UObjectPoolModule()
 {
 	ModuleName = FName("ObjectPoolModule");
 	ModuleDisplayName = FText::FromString(TEXT("Object Pool Module"));
-
 	bModuleRequired = true;
-
-	ObjectPools = TMap<TSubclassOf<UObject>, UObjectPool*>();
 }
 
 UObjectPoolModule::~UObjectPoolModule()
@@ -34,7 +32,6 @@ void UObjectPoolModule::OnGenerate()
 void UObjectPoolModule::OnDestroy()
 {
 	Super::OnDestroy();
-
 	TERMINATION_MODULE(UObjectPoolModule)
 }
 #endif
@@ -42,6 +39,9 @@ void UObjectPoolModule::OnDestroy()
 void UObjectPoolModule::OnInitialize()
 {
 	Super::OnInitialize();
+	ObjectProvider = MakeUnique<FObjectPoolProvider>(*this);
+	ActorProvider = MakeUnique<FActorPoolProvider>(*this);
+	WidgetProvider = MakeUnique<FWidgetPoolProvider>(*this);
 }
 
 void UObjectPoolModule::OnPreparatory(EPhase InPhase)
@@ -67,128 +67,261 @@ void UObjectPoolModule::OnUnPause()
 void UObjectPoolModule::OnTermination(EPhase InPhase)
 {
 	Super::OnTermination(InPhase);
-
 	if(PHASEC(InPhase, EPhase::Final))
 	{
 		ClearAllObject();
+		WidgetProvider.Reset();
+		ActorProvider.Reset();
+		ObjectProvider.Reset();
 	}
 }
 
 FString UObjectPoolModule::GetModuleDebugMessage()
 {
 	FString DebugMessage;
-	for(auto Iter : ObjectPools)
+	for(const UObjectPoolBucket* Bucket : GenericBuckets)
 	{
-		if(Iter.Value->GetCount() > 0)
+		if(Bucket && Bucket->Num() > 0)
 		{
-			DebugMessage.Appendf(TEXT("%s: %d\n"), *Iter.Key->GetName(), Iter.Value->GetCount());
+			DebugMessage.Appendf(TEXT("Generic: %d\n"), Bucket->Num());
 		}
 	}
 	DebugMessage.RemoveFromEnd(TEXT("\n"));
-	if(!DebugMessage.IsEmpty())
+	return DebugMessage.IsEmpty() ? Super::GetModuleDebugMessage() : DebugMessage;
+}
+
+UObject* UObjectPoolModule::SpawnObject(UClass* InClass, const FParameter& InParameter)
+{
+	IObjectPoolProvider* Provider = ResolveProvider(InClass);
+	UObject* Object = Provider ? Provider->Spawn(InClass, InParameter) : nullptr;
+	if(!Object)
 	{
-		return DebugMessage;
+		return nullptr;
 	}
-	return Super::GetModuleDebugMessage();
-}
 
-bool UObjectPoolModule::HasPool(TSubclassOf<UObject> InType) const
-{
-	return ObjectPools.Contains(InType);
-}
-
-UObjectPool* UObjectPoolModule::GetPool(TSubclassOf<UObject> InType) const
-{
-	if(HasPool(InType))
+	InactiveObjects.Remove(Object);
+	if(Object->Implements<UObjectPoolInterface>())
 	{
-		return ObjectPools[InType];
+		IObjectPoolInterface::Execute_OnSpawn(Object, InParameter);
 	}
-	return nullptr;
+	return Object;
 }
 
-UObjectPool* UObjectPoolModule::CreatePool(TSubclassOf<UObject> InType)
+void UObjectPoolModule::DespawnObject(UObject* InObject, EObjectDespawnMode InMode)
 {
-	if(!InType || HasPool(InType)) return nullptr;
-	
-	UObjectPool* ObjectPool;
-	if(InType->IsChildOf<AActor>())
+	if(!::IsValid(InObject) || ModuleState == EModuleState::Terminated)
 	{
-		ObjectPool = NewObject<UActorPool>(this);
+		return;
 	}
-	else if(InType->IsChildOf<UUserWidget>())
+	if(InMode == EObjectDespawnMode::Destroy)
 	{
-		ObjectPool = NewObject<UWidgetPool>(this);
+		DestroyObject(InObject);
+		return;
 	}
-	else
+	if(!ensureMsgf(!IsInactive(InObject), TEXT("Object %s was despawned more than once."), *GetNameSafe(InObject)))
 	{
-		ObjectPool = NewObject<UObjectPool>(this);
+		return;
 	}
-	ObjectPool->Initialize(IObjectPoolInterface::Execute_GetLimit(InType.GetDefaultObject()), InType);
-	ObjectPools.Add(InType, ObjectPool);
-	return ObjectPool;
-}
 
-void UObjectPoolModule::DestroyPool(TSubclassOf<UObject> InType)
-{
-	if(!InType || !HasPool(InType)) return;
-
-	ObjectPools[InType]->ConditionalBeginDestroy();
-	ObjectPools.Remove(InType);
-}
-
-bool UObjectPoolModule::HasObject(TSubclassOf<UObject> InType)
-{
-	if(!InType || !InType->ImplementsInterface(UObjectPoolInterface::StaticClass())) return false;
-
-	if(ObjectPools.Contains(InType))
+	IObjectPoolProvider* Provider = ResolveProvider(InObject->GetClass());
+	if(Provider)
 	{
-		return ObjectPools[InType]->GetCount() > 0;
+		Provider->PrepareDespawn(InObject);
 	}
-	return false;
-}
 
-UObject* UObjectPoolModule::SpawnObject(TSubclassOf<UObject> InType, UObject* InOwner, const TArray<FParameter>& InParams)
-{
-	if(!InType || !InType->ImplementsInterface(UObjectPoolInterface::StaticClass())) return nullptr;
-
-	UObjectPool* ObjectPool = HasPool(InType) ? GetPool(InType) : CreatePool(InType);
-	return ObjectPool->Spawn(InOwner, InParams);
-}
-
-void UObjectPoolModule::DespawnObject(UObject* InObject, bool bRecovery)
-{
-	if(!InObject || ModuleState == EModuleState::Terminated) return;
-
-	UClass* InType = InObject->GetClass();
-	if(!InType->ImplementsInterface(UObjectPoolInterface::StaticClass())) return;
-
-	UObjectPool* ObjectPool = HasPool(InType) ? GetPool(InType) : CreatePool(InType);
-	ObjectPool->Despawn(InObject, bRecovery);
-}
-
-void UObjectPoolModule::DespawnObjects(TArray<UObject*> InObjects, bool bRecovery)
-{
-	for(auto Iter : InObjects)
+	const bool bRecovery = Provider && Provider->Despawn(InObject);
+	const EObjectDespawnMode FinalMode = bRecovery
+		? EObjectDespawnMode::Recovery
+		: EObjectDespawnMode::Destroy;
+	if(InObject->Implements<UObjectPoolInterface>())
 	{
-		DespawnObject(Iter, bRecovery);
+		IObjectPoolInterface::Execute_OnDespawn(InObject, FinalMode);
+	}
+
+	if(bRecovery)
+	{
+		InactiveObjects.Add(InObject);
 	}
 }
 
-void UObjectPoolModule::ClearObject(TSubclassOf<UObject> InType)
+void UObjectPoolModule::DespawnObjects(const TArray<UObject*>& InObjects)
 {
-	if(!InType || !InType->ImplementsInterface(UObjectPoolInterface::StaticClass())) return;
-
-	if(HasPool(InType))
+	for(UObject* Object : InObjects)
 	{
-		GetPool(InType)->Clear();
+		DespawnObject(Object);
+	}
+}
+
+void UObjectPoolModule::ClearObject(TSubclassOf<UObject> InClass)
+{
+	TArray<UObject*> ObjectsToDestroy;
+	for(const TWeakObjectPtr<UObject>& Object : InactiveObjects)
+	{
+		if(Object.IsValid() && Object->GetClass() == InClass)
+		{
+			ObjectsToDestroy.Add(Object.Get());
+		}
+	}
+	for(UObject* Object : ObjectsToDestroy)
+	{
+		DestroyObject(Object);
 	}
 }
 
 void UObjectPoolModule::ClearAllObject()
 {
-	for (auto Iter : ObjectPools)
+	TArray<UObject*> ObjectsToDestroy;
+	for(const TWeakObjectPtr<UObject>& Object : InactiveObjects)
 	{
-		Iter.Value->Clear();
+		if(Object.IsValid())
+		{
+			ObjectsToDestroy.Add(Object.Get());
+		}
 	}
-	ObjectPools.Empty();
+	for(UObject* Object : ObjectsToDestroy)
+	{
+		if(IObjectPoolProvider* Provider = ResolveProvider(Object->GetClass()))
+		{
+			Provider->Destroy(Object);
+		}
+	}
+
+	if(WidgetProvider)
+	{
+		WidgetProvider->ClearAll();
+	}
+	if(ActorProvider)
+	{
+		ActorProvider->ClearAll();
+	}
+	if(ObjectProvider)
+	{
+		ObjectProvider->ClearAll();
+	}
+
+	for(UObjectPoolWidgetBucket* Bucket : WidgetBuckets)
+	{
+		if(Bucket)
+		{
+			Bucket->Clear();
+		}
+	}
+	for(UObjectPoolBucket* Bucket : GenericBuckets)
+	{
+		if(Bucket)
+		{
+			Bucket->Clear();
+		}
+	}
+
+	InactiveObjects.Reset();
+	WidgetBuckets.Reset();
+	GenericBuckets.Reset();
+}
+
+FObjectPoolPolicy UObjectPoolModule::GetPoolPolicy(TSubclassOf<UObject> InClass) const
+{
+	for(UClass* Class = InClass.Get(); Class; Class = Class->GetSuperClass())
+	{
+		if(const FObjectPoolPolicy* Policy = PoolPolicies.Find(Class))
+		{
+			return *Policy;
+		}
+	}
+	return FObjectPoolPolicyRegistry::Resolve(InClass);
+}
+
+void UObjectPoolModule::SetPoolPolicy(TSubclassOf<UObject> InClass, const FObjectPoolPolicy& InPolicy)
+{
+	if(InClass)
+	{
+		PoolPolicies.Add(InClass, InPolicy);
+	}
+}
+
+void UObjectPoolModule::DestroyObject(UObject* InObject)
+{
+	if(!::IsValid(InObject))
+	{
+		return;
+	}
+
+	const bool bWasInactive = InactiveObjects.Remove(InObject) > 0;
+	if(!bWasInactive && InObject->Implements<UObjectPoolInterface>())
+	{
+		IObjectPoolInterface::Execute_OnDespawn(InObject, EObjectDespawnMode::Destroy);
+	}
+
+	if(IObjectPoolProvider* Provider = ResolveProvider(InObject->GetClass()))
+	{
+		Provider->Destroy(InObject);
+	}
+}
+
+UObjectPoolBucket* UObjectPoolModule::FindOrAddGenericBucket(UClass* InClass, UObject* InScope, int32 InMaxIdle)
+{
+	for(UObjectPoolBucket* Bucket : GenericBuckets)
+	{
+		if(Bucket && Bucket->Matches(InClass, InScope))
+		{
+			return Bucket;
+		}
+	}
+
+	UObjectPoolBucket* Bucket = NewObject<UObjectPoolBucket>(this);
+	Bucket->Initialize(InClass, InScope, InMaxIdle);
+	GenericBuckets.Add(Bucket);
+	return Bucket;
+}
+
+UObjectPoolWidgetBucket* UObjectPoolModule::FindOrAddWidgetBucket(
+	UObject* InScope,
+	UWorld* InWorld,
+	APlayerController* InPlayerController)
+{
+	for(UObjectPoolWidgetBucket* Bucket : WidgetBuckets)
+	{
+		if(Bucket && Bucket->Matches(InScope))
+		{
+			return Bucket;
+		}
+	}
+
+	UObjectPoolWidgetBucket* Bucket = NewObject<UObjectPoolWidgetBucket>(this);
+	Bucket->Initialize(InScope, InWorld, InPlayerController);
+	WidgetBuckets.Add(Bucket);
+	return Bucket;
+}
+
+void UObjectPoolModule::RemoveFromGenericBucket(UObject* InObject)
+{
+	for(UObjectPoolBucket* Bucket : GenericBuckets)
+	{
+		if(Bucket && Bucket->Remove(InObject))
+		{
+			return;
+		}
+	}
+}
+
+IObjectPoolProvider* UObjectPoolModule::ResolveProvider(UClass* InClass) const
+{
+	if(!InClass)
+	{
+		return nullptr;
+	}
+	if(InClass->IsChildOf<UUserWidget>())
+	{
+		return WidgetProvider.Get();
+	}
+	if(InClass->IsChildOf<AActor>())
+	{
+		return ActorProvider.Get();
+	}
+	return ObjectProvider.Get();
+}
+
+bool UObjectPoolModule::IsInactive(UObject* InObject) const
+{
+	return InactiveObjects.Contains(InObject);
 }

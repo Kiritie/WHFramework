@@ -1,12 +1,13 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Ability/Effects/EffectBase.h"
 
-void UEffectBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UEffectBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
 }
 
-void UEffectBase::OnDespawn_Implementation(bool bRecovery)
+void UEffectBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	Modifiers.Empty();
 }

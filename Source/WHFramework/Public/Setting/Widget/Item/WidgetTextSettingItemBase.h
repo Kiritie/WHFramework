@@ -17,9 +17,11 @@ public:
 	UWidgetTextSettingItemBase(const FObjectInitializer& ObjectInitializer);
 
 public:
-	virtual void OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams) override;
+	virtual void OnSpawn_Implementation(
+		const FParameter& InParameter) override;
 
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
+	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode)
+		override;
 
 public:
 	virtual void OnRefresh() override;

@@ -21,12 +21,13 @@ UAbilityInventorySlotBase::UAbilityInventorySlotBase()
 	SlotIndex = 0;
 }
 
-void UAbilityInventorySlotBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UAbilityInventorySlotBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
 	
 }
 
-void UAbilityInventorySlotBase::OnDespawn_Implementation(bool bRecovery)
+void UAbilityInventorySlotBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	SetItem(FAbilityItem::Empty);
 	Inventory = nullptr;

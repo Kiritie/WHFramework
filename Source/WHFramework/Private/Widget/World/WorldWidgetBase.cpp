@@ -42,12 +42,13 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 	BindWidgetMap = TMap<UWidget*, FWorldWidgetMapping>();
 }
 
-void UWorldWidgetBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWorldWidgetBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
 	
 }
 
-void UWorldWidgetBase::OnDespawn_Implementation(bool bRecovery)
+void UWorldWidgetBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 }
 
@@ -128,7 +129,7 @@ void UWorldWidgetBase::OnCreate(UObject* InOwner, FWorldWidgetMapping InMapping,
 
 	for(auto Iter : GetPoolWidgets())
 	{
-		IObjectPoolInterface::Execute_OnSpawn(Iter, this, IObjectPoolInterface::Execute_GetSpawnParams(Iter));
+		IObjectPoolInterface::Execute_OnSpawn(Iter, FParameter(FWidgetSpawnParameter(this)));
 	}
 	
 	TArray<UWidget*> Widgets;
@@ -195,7 +196,9 @@ void UWorldWidgetBase::OnDestroy(bool bRecovery)
 	if(K2_OnDestroyed.IsBound()) K2_OnDestroyed.Broadcast(bRecovery);
 	if(OnDestroyed.IsBound()) OnDestroyed.Broadcast(bRecovery);
 
-	UObjectPoolModuleStatics::DespawnObject(this, bRecovery);
+	UObjectPoolModuleStatics::DespawnObject(
+		this,
+		bRecovery ? EObjectDespawnMode::Recovery : EObjectDespawnMode::Destroy);
 
 	OwnerObject = nullptr;
 	WidgetParams.Empty();
@@ -243,7 +246,8 @@ ISubWidgetInterface* UWorldWidgetBase::CreateSubWidget(TSubclassOf<UUserWidget> 
 
 ISubWidgetInterface* UWorldWidgetBase::CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams)
 {
-	if(ISubWidgetInterface* SubWidget = UObjectPoolModuleStatics::SpawnObject<ISubWidgetInterface>(this, nullptr, InClass))
+	if(ISubWidgetInterface* SubWidget = Cast<ISubWidgetInterface>(
+		UObjectPoolModuleStatics::SpawnObject(InClass.Get(), FParameter(FWidgetSpawnParameter(this)))))
 	{
 		SubWidget->OnCreate(this, InParams);
 		return SubWidget;

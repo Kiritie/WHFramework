@@ -1,68 +1,61 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
-
-#include "ObjectPoolModule.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "ObjectPool/ObjectPoolModule.h"
 #include "ObjectPoolModuleStatics.generated.h"
 
-/**
- * 
- */
 UCLASS()
 class WHFRAMEWORK_API UObjectPoolModuleStatics : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
 
 public:
-	template<class T>
-	static bool HasObject(TSubclassOf<UObject> InType = T::StaticClass())
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"), Category = "ObjectPoolModule")
+	static UObject* SpawnObject(UClass* InClass, const FParameter& InParameter);
+
+	template<class TObject>
+	static TObject* SpawnObject(TSubclassOf<TObject> InClass = TObject::StaticClass())
 	{
-		return HasObject(InType);
+		return UObjectPoolModule::Get().SpawnObject<TObject>(InClass);
 	}
 
-	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModuleStatics")
-	static bool HasObject(TSubclassOf<UObject> InType);
-	
-	template<class T>
-	static T* SpawnObject(UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UObject> InType = T::StaticClass())
+	template<class TObject, class TSpawnParameter>
+		requires std::is_base_of_v<FSpawnParameter, std::decay_t<TSpawnParameter>>
+	static TObject* SpawnObject(
+		const TSpawnParameter& InParameter,
+		TSubclassOf<TObject> InClass = TObject::StaticClass())
 	{
-		return UObjectPoolModule::Get().SpawnObject<T>(InOwner, InParams, InType);
+		return UObjectPoolModule::Get().SpawnObject<TObject>(InParameter, InClass);
 	}
-	
-	template<class T>
-	static T* SpawnObject(UObject* InOwner, const TArray<FParameter>& InParams, TSubclassOf<UObject> InType = T::StaticClass())
-	{
-		return UObjectPoolModule::Get().SpawnObject<T>(InOwner, InParams, InType);
-	}
-	
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InType", AutoCreateRefTerm = "InParams"), Category = "ObjectPoolModuleStatics")
-	static UObject* SpawnObject(TSubclassOf<UObject> InType, UObject* InOwner, const TArray<FParameter>& InParams);
 
-	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModuleStatics")
-	static void DespawnObject(UObject* InObject, bool bRecovery = true);
-	
-	template<class T>
-	static void DespawnObjects(TArray<T*> InObjects, bool bRecovery = true)
+	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModule")
+	static void DespawnObject(
+		UObject* InObject,
+		EObjectDespawnMode InMode = EObjectDespawnMode::Recovery);
+
+	template<class TObject>
+	static void DespawnObjects(const TArray<TObject*>& InObjects,
+		EObjectDespawnMode InMode = EObjectDespawnMode::Recovery)
 	{
-		for(auto Iter : InObjects)
+		for(TObject* Object : InObjects)
 		{
-			DespawnObject(Iter, bRecovery);
+			DespawnObject(Object);
 		}
 	}
-	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModuleStatics")
-	static void DespawnObjects(TArray<UObject*> InObjects, bool bRecovery = true);
 
-	template<class T>
-	static void ClearObject(TSubclassOf<UObject> InType = T::StaticClass())
+	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModule")
+	static void DespawnObjects(const TArray<UObject*>& InObjects,
+		EObjectDespawnMode InMode = EObjectDespawnMode::Recovery)
 	{
-		UObjectPoolModule::Get().ClearObject<T>(InType);
+		for(UObject* Object : InObjects)
+		{
+			DespawnObject(Object);
+		}
 	}
-	
-	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModuleStatics")
-	static void ClearObject(TSubclassOf<UObject> InType);
-	
-	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModuleStatics")
+
+	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModule")
+	static void ClearObject(TSubclassOf<UObject> InClass);
+
+	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModule")
 	static void ClearAllObject();
 };

@@ -13,11 +13,12 @@ APhysicsVolumeBase::APhysicsVolumeBase()
 	bInitialized = false;
 }
 
-void APhysicsVolumeBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void APhysicsVolumeBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
 }
 
-void APhysicsVolumeBase::OnDespawn_Implementation(bool bRecovery)
+void APhysicsVolumeBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	VolumeName = NAME_None;
 }

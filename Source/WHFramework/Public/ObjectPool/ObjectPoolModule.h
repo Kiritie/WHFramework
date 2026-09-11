@@ -1,35 +1,34 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
-
-#include "ObjectPool.h"
-#include "ObjectPoolInterface.h"
 #include "Main/Base/ModuleBase.h"
-
+#include "ObjectPool/ObjectPoolModuleTypes.h"
+#include "ObjectPool/Provider/ActorPoolProvider.h"
+#include "ObjectPool/Provider/ObjectPoolProvider.h"
+#include "ObjectPool/Provider/WidgetPoolProvider.h"
+#include "Parameter/ParameterModuleTypes.h"
 #include "ObjectPoolModule.generated.h"
+
+class IObjectPoolProvider;
+class UObjectPoolBucket;
+class UObjectPoolWidgetBucket;
 
 UCLASS()
 class WHFRAMEWORK_API UObjectPoolModule : public UModuleBase
 {
 	GENERATED_BODY()
-		
+
 	GENERATED_MODULE(UObjectPoolModule)
 
 public:
-	// ParamSets default values for this actor's properties
 	UObjectPoolModule();
 
-	~UObjectPoolModule();
+	virtual ~UObjectPoolModule();
 
-	//////////////////////////////////////////////////////////////////////////
-	/// ModuleBase
-public:
-	#if WITH_EDITOR
+#if WITH_EDITOR
 	virtual void OnGenerate() override;
 
 	virtual void OnDestroy() override;
-	#endif
+#endif
 
 	virtual void OnInitialize() override;
 
@@ -43,93 +42,88 @@ public:
 
 	virtual void OnTermination(EPhase InPhase) override;
 
-public:
 	virtual FString GetModuleDebugMessage() override;
 
-	//////////////////////////////////////////////////////////////////////////
-	/// ObjectPool
-protected:
-	UPROPERTY(VisibleAnywhere, Transient)
-	TMap<TSubclassOf<UObject>, UObjectPool*> ObjectPools;
-
-protected:
-	template<class T>
-	bool HasPool(TSubclassOf<UObject> InType = T::StaticClass())
-	{
-		return HasPool(InType);
-	}
-	UFUNCTION(BlueprintPure)
-	bool HasPool(TSubclassOf<UObject> InType) const;
-	
-	template<class T>
-	UObjectPool* GetPool(TSubclassOf<UObject> InType = T::StaticClass())
-	{
-		return GetPool(InType);
-	}
-	UFUNCTION(BlueprintPure)
-	UObjectPool* GetPool(TSubclassOf<UObject> InType) const;
-	
-	template<class T>
-	UObjectPool* CreatePool(TSubclassOf<UObject> InType = T::StaticClass())
-	{
-		return CreatePool(InType);
-	}
-	UFUNCTION(BlueprintCallable)
-	UObjectPool* CreatePool(TSubclassOf<UObject> InType);
-
-	template<class T>
-	void DestroyPool(TSubclassOf<UObject> InType = T::StaticClass())
-	{
-		DestroyPool(InType);
-	}
-	UFUNCTION(BlueprintCallable)
-	void DestroyPool(TSubclassOf<UObject> InType);
-
 public:
-	template<class T>
-	bool HasObject(TSubclassOf<UObject> InType = T::StaticClass())
+	UFUNCTION(BlueprintCallable)
+	UObject* SpawnObject(UClass* InClass, const FParameter& InParameter = FParameter());
+
+	template<class TObject>
+	TObject* SpawnObject(TSubclassOf<TObject> InClass = TObject::StaticClass())
 	{
-		return HasObject(InType);
+		return Cast<TObject>(SpawnObject(InClass.Get(), FParameter()));
+	}
+
+	template<class TObject, class TSpawnParameter>
+		requires std::is_base_of_v<FSpawnParameter, std::decay_t<TSpawnParameter>>
+	TObject* SpawnObject(
+		const TSpawnParameter& InParameter,
+		TSubclassOf<TObject> InClass = TObject::StaticClass())
+	{
+		return Cast<TObject>(SpawnObject(InClass.Get(), FParameter(InParameter)));
 	}
 
 	UFUNCTION(BlueprintCallable)
-	bool HasObject(TSubclassOf<UObject> InType);
+	void DespawnObject(
+		UObject* InObject,
+		EObjectDespawnMode InMode = EObjectDespawnMode::Recovery);
 
-	template<class T>
-	T* SpawnObject(UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UObject> InType = T::StaticClass())
+	template<class TObject>
+	void DespawnObjects(const TArray<TObject*>& InObjects)
 	{
-		return Cast<T>(SpawnObject(InType, InOwner, InParams ? *InParams : TArray<FParameter>()));
-	}
-	template<class T>
-	T* SpawnObject(UObject* InOwner, const TArray<FParameter>& InParams, TSubclassOf<UObject> InType = T::StaticClass())
-	{
-		return Cast<T>(SpawnObject(InType, InOwner, InParams));
-	}
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InType", AutoCreateRefTerm = "InParams"))
-	UObject* SpawnObject(TSubclassOf<UObject> InType, UObject* InOwner, const TArray<FParameter>& InParams);
-
-	UFUNCTION(BlueprintCallable)
-	void DespawnObject(UObject* InObject, bool bRecovery = true);
-
-	template<class T>
-	void DespawnObjects(TArray<T*> InObjects, bool bRecovery = true)
-	{
-		for(auto Iter : InObjects)
+		for(TObject* Object : InObjects)
 		{
-			DespawnObject(Iter, bRecovery);
+			DespawnObject(Object);
 		}
 	}
-	UFUNCTION(BlueprintCallable)
-	void DespawnObjects(TArray<UObject*> InObjects, bool bRecovery = true);
 
-	template<class T>
-	void ClearObject(TSubclassOf<UObject> InType = T::StaticClass())
-	{
-		ClearObject(InType);
-	}
 	UFUNCTION(BlueprintCallable)
-	void ClearObject(TSubclassOf<UObject> InType);
+	void DespawnObjects(const TArray<UObject*>& InObjects);
+
+	UFUNCTION(BlueprintCallable)
+	void ClearObject(TSubclassOf<UObject> InClass);
 
 	UFUNCTION(BlueprintCallable)
 	void ClearAllObject();
+
+	UFUNCTION(BlueprintPure)
+	FObjectPoolPolicy GetPoolPolicy(TSubclassOf<UObject> InClass) const;
+
+	UFUNCTION(BlueprintCallable)
+	void SetPoolPolicy(TSubclassOf<UObject> InClass, const FObjectPoolPolicy& InPolicy);
+
+public:
+	void DestroyObject(UObject* InObject);
+
+	UObjectPoolBucket* FindOrAddGenericBucket(UClass* InClass, UObject* InScope, int32 InMaxIdle);
+
+	UObjectPoolWidgetBucket* FindOrAddWidgetBucket(
+		UObject* InScope,
+		UWorld* InWorld,
+		APlayerController* InPlayerController);
+
+	void RemoveFromGenericBucket(UObject* InObject);
+
+private:
+	IObjectPoolProvider* ResolveProvider(UClass* InClass) const;
+
+	bool IsInactive(UObject* InObject) const;
+
+private:
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UObjectPoolBucket>> GenericBuckets;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UObjectPoolWidgetBucket>> WidgetBuckets;
+
+	UPROPERTY(Transient)
+	TMap<TSubclassOf<UObject>, FObjectPoolPolicy> PoolPolicies;
+
+	TSet<TWeakObjectPtr<UObject>> InactiveObjects;
+
+	TUniquePtr<FObjectPoolProvider> ObjectProvider;
+
+	TUniquePtr<FActorPoolProvider> ActorProvider;
+
+	TUniquePtr<FWidgetPoolProvider> WidgetProvider;
 };

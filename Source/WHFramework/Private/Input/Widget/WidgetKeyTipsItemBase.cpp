@@ -25,16 +25,17 @@ void UWidgetKeyTipsItemBase::NativePreConstruct()
 	SetKeyDisplayName(KeyDisplayName);
 }
 
-void UWidgetKeyTipsItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetKeyTipsItemBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 
 	RefreshData();
 }
 
-void UWidgetKeyTipsItemBase::OnDespawn_Implementation(bool bRecovery)
+void UWidgetKeyTipsItemBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 }
 
 void UWidgetKeyTipsItemBase::RefreshData_Implementation()

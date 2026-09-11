@@ -88,7 +88,7 @@ void UWidgetSettingPageBase::AddSettingItem_Implementation(const FName InName, U
 	if(!InCategory.IsEmpty() && !InCategory.EqualTo(LastCategory))
 	{
 		LastCategory = InCategory;
-		if(UVerticalBoxSlot* VerticalBoxSlot = ContentBox->AddChildToVerticalBox(UObjectPoolModuleStatics::SpawnObject<UWidgetSettingItemCategoryBase>(nullptr, { InCategory }, USettingModule::Get().GetSettingItemCategoryClass())))
+		if(UVerticalBoxSlot* VerticalBoxSlot = ContentBox->AddChildToVerticalBox(UObjectPoolModuleStatics::SpawnObject<UWidgetSettingItemCategoryBase>(FWidgetSettingItemCategorySpawnParameter(InCategory), USettingModule::Get().GetSettingItemCategoryClass())))
 		{
 			VerticalBoxSlot->SetPadding(FMargin(2.5f));
 		}

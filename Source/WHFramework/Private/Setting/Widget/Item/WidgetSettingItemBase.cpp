@@ -2,6 +2,7 @@
 
 
 #include "Setting/Widget/Item/WidgetSettingItemBase.h"
+#include "Setting/SettingModuleTypes.h"
 #include "Widget/WidgetModuleStatics.h"
 
 UWidgetSettingItemBase::UWidgetSettingItemBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
@@ -11,19 +12,21 @@ UWidgetSettingItemBase::UWidgetSettingItemBase(const FObjectInitializer& ObjectI
 	WidgetParams.Add(MoveTemp(TitleParameter));
 }
 
-void UWidgetSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetSettingItemBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);;
+	Super::OnSpawn_Implementation(InParameter);
 
-	if(InParams.IsValidIndex(0))
+	if(const FWidgetSettingItemSpawnParameter* Parameter =
+		InParameter.GetPtr<FWidgetSettingItemSpawnParameter>())
 	{
-		SetTitle(InParams[0].Get<FText>());
+		SetTitle(Parameter->Title);
 	}
 }
 
-void UWidgetSettingItemBase::OnDespawn_Implementation(bool bRecovery)
+void UWidgetSettingItemBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 	
 	SettingName = NAME_None;
 	SetValue(FParameter());

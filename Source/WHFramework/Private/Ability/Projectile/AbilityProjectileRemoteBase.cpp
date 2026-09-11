@@ -29,14 +29,15 @@ AAbilityProjectileRemoteBase::AAbilityProjectileRemoteBase()
 	InitialVelocity = 3000.f;
 }
 
-void AAbilityProjectileRemoteBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void AAbilityProjectileRemoteBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 }
 
-void AAbilityProjectileRemoteBase::OnDespawn_Implementation(bool bRecovery)
+void AAbilityProjectileRemoteBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 
 	ProjectileMovement->Velocity = FVector::ZeroVector;
 }

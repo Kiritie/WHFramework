@@ -17,14 +17,15 @@ AVoxelPrefab::AVoxelPrefab()
 	VoxelMap = TMap<FIndex, FVoxelItem>();
 }
 
-void AVoxelPrefab::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void AVoxelPrefab::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 }
 
-void AVoxelPrefab::OnDespawn_Implementation(bool bRecovery)
+void AVoxelPrefab::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 	
 	DestroyMeshComponents();
 	DestroyAuxiliarys();
@@ -124,7 +125,8 @@ void AVoxelPrefab::SpawnMeshComponents()
 		}
 		else
 		{
-			MeshComponent = UObjectPoolModuleStatics::SpawnObject<UVoxelMeshComponent>(this);
+			MeshComponent = UObjectPoolModuleStatics::SpawnObject<UVoxelMeshComponent>(
+				FVoxelMeshComponentSpawnParameter(this));
 			MeshComponent->Initialize(EVoxelScope::Prefab, Iter);
 		}
 		_MeshComponents.Add(Iter, MeshComponent);
@@ -157,7 +159,7 @@ AVoxelAuxiliary* AVoxelPrefab::SpawnAuxiliary(FVoxelItem& InVoxelItem)
 		const UVoxelData& VoxelData = InVoxelItem.GetData();
 		if(VoxelData.AuxiliaryClass)
 		{
-			if(AVoxelAuxiliary* Auxiliary = UObjectPoolModuleStatics::SpawnObject<AVoxelAuxiliary>(nullptr, nullptr, VoxelData.AuxiliaryClass))
+			if(AVoxelAuxiliary* Auxiliary = UObjectPoolModuleStatics::SpawnObject<AVoxelAuxiliary>(VoxelData.AuxiliaryClass))
 			{
 				Auxiliary->AttachToComponent(RootComponent, FAttachmentTransformRules::SnapToTargetIncludingScale);
 				Auxiliary->Execute_SetActorVisible(Auxiliary, Execute_IsVisible(this));

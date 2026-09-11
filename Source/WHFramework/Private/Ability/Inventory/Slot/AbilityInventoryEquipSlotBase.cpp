@@ -10,14 +10,15 @@ UAbilityInventoryEquipSlotBase::UAbilityInventoryEquipSlotBase()
 {
 }
 
-void UAbilityInventoryEquipSlotBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UAbilityInventoryEquipSlotBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 }
 
-void UAbilityInventoryEquipSlotBase::OnDespawn_Implementation(bool bRecovery)
+void UAbilityInventoryEquipSlotBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 }
 
 void UAbilityInventoryEquipSlotBase::OnInitialize(UAbilityInventoryBase* InInventory, EAbilityItemType InLimitType, ESlotSplitType InSplitType, int32 InSlotIndex)

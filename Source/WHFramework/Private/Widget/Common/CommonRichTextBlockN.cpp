@@ -9,12 +9,13 @@ UCommonRichTextBlockN::UCommonRichTextBlockN(const FObjectInitializer& ObjectIni
 	bUseCommonRichStyle = false;
 }
 
-void UCommonRichTextBlockN::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UCommonRichTextBlockN::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
 	RefreshRichStyle();
 }
 
-void UCommonRichTextBlockN::OnDespawn_Implementation(bool bRecovery)
+void UCommonRichTextBlockN::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	SetText(FText::GetEmpty());
 

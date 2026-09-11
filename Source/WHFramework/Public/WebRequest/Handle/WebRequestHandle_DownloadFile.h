@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -18,7 +18,8 @@ public:
 	UWebRequestHandle_DownloadFile();
 
 public:
-	virtual void OnDespawn_Implementation(bool bRecovery) override;
+	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode)
+		override;
 
 public:
 	virtual void Parse(const FWebRequestResult& InResult, const TArray<FParameter>& InParams) override;

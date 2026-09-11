@@ -61,12 +61,13 @@ UVoxelChunk::UVoxelChunk()
 	bNeedCreateMesh = false;
 }
 
-void UVoxelChunk::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UVoxelChunk::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
 	
 }
 
-void UVoxelChunk::OnDespawn_Implementation(bool bRecovery)
+void UVoxelChunk::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	SaveData();
 	Module->VoxelUpdateChunkIndices.Remove(Index);
@@ -309,7 +310,8 @@ void UVoxelChunk::BuildMesh(EVoxelNature InNature)
 	}
 	else
 	{
-		MeshComponent = UObjectPoolModuleStatics::SpawnObject<UVoxelMeshComponent>(Module->GetVoxelRoot(), { this });
+		MeshComponent = UObjectPoolModuleStatics::SpawnObject<UVoxelMeshComponent>(
+			FVoxelMeshComponentSpawnParameter(Module->GetVoxelRoot(), this));
 		MeshComponent->Initialize(EVoxelScope::Chunk, InNature);
 		MeshComponents.Add(InNature, MeshComponent);
 	}
@@ -1221,7 +1223,7 @@ AVoxelAuxiliary* UVoxelChunk::SpawnAuxiliary(FVoxelItem& InVoxelItem)
 		const auto& VoxelData = InVoxelItem.GetData();
 		if(VoxelData.AuxiliaryClass && VoxelData.IsMainPart())
 		{
-			if(AVoxelAuxiliary* Auxiliary = UObjectPoolModuleStatics::SpawnObject<AVoxelAuxiliary>(nullptr, nullptr, VoxelData.AuxiliaryClass))
+			if(AVoxelAuxiliary* Auxiliary = UObjectPoolModuleStatics::SpawnObject<AVoxelAuxiliary>(VoxelData.AuxiliaryClass))
 			{
 				FVoxelAuxiliarySaveData AuxiliaryData;
 				if(InVoxelItem.AuxiliaryData)
@@ -1282,7 +1284,8 @@ void UVoxelChunk::SpawnMeshComponents(int32 InStage)
 			}
 			else
 			{
-				MeshComponent = UObjectPoolModuleStatics::SpawnObject<UVoxelMeshComponent>(Module->GetVoxelRoot(), { this });
+				MeshComponent = UObjectPoolModuleStatics::SpawnObject<UVoxelMeshComponent>(
+					FVoxelMeshComponentSpawnParameter(Module->GetVoxelRoot(), this));
 				MeshComponent->Initialize(EVoxelScope::Chunk, Iter);
 			}
 			_MeshComponents.Add(Iter, MeshComponent);

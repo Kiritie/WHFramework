@@ -15,9 +15,9 @@ AVoxelContainerAuxiliary::AVoxelContainerAuxiliary()
 	Inventory = CreateDefaultSubobject<UAbilityInventoryBase>(FName("Inventory"));
 }
 
-void AVoxelContainerAuxiliary::OnDespawn_Implementation(bool bRecovery)
+void AVoxelContainerAuxiliary::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 
 	Inventory->UnloadSaveData();
 }

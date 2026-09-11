@@ -7,6 +7,7 @@ template<typename T, typename Enable = void>
 struct TParameterValueAdapter
 {
 	static constexpr bool bSupported = false;
+	static constexpr bool bReferenceable = false;
 };
 
 template<typename T, typename = void>
@@ -25,6 +26,7 @@ struct TParameterValueAdapter<T, std::enable_if_t<TIsParameterStructValue<T>::va
 {
 	using WrapperType = FParameterStructValue;
 	static constexpr bool bSupported = true;
+	static constexpr bool bReferenceable = true;
 
 	template<typename U>
 	static void Set(TInstancedStruct<FParameterValueBase>& Storage, U&& InValue)
@@ -34,8 +36,7 @@ struct TParameterValueAdapter<T, std::enable_if_t<TIsParameterStructValue<T>::va
 
 	static bool Get(const TInstancedStruct<FParameterValueBase>& Storage, T& OutValue)
 	{
-		const WrapperType* Wrapper = Storage.template GetPtr<WrapperType>();
-		const T* Value = Wrapper ? Wrapper->Value.template GetPtr<T>() : nullptr;
+		const T* Value = GetPtr(Storage);
 		if(!Value)
 		{
 			return false;
@@ -43,6 +44,17 @@ struct TParameterValueAdapter<T, std::enable_if_t<TIsParameterStructValue<T>::va
 
 		OutValue = *Value;
 		return true;
+	}
+
+	static const T* GetPtr(const TInstancedStruct<FParameterValueBase>& Storage)
+	{
+		const WrapperType* Wrapper = Storage.template GetPtr<WrapperType>();
+		return Wrapper ? Wrapper->Value.template GetPtr<T>() : nullptr;
+	}
+
+	static bool Is(const TInstancedStruct<FParameterValueBase>& Storage)
+	{
+		return GetPtr(Storage) != nullptr;
 	}
 };
 
@@ -52,6 +64,7 @@ struct TParameterValueAdapter<T, std::enable_if_t<std::is_base_of_v<FParameterVa
 	using WrapperType = T;
 
 	static constexpr bool bSupported = true;
+	static constexpr bool bReferenceable = true;
 
 	template<typename U>
 	static void Set(TInstancedStruct<FParameterValueBase>& Storage, U&& InValue)
@@ -61,7 +74,7 @@ struct TParameterValueAdapter<T, std::enable_if_t<std::is_base_of_v<FParameterVa
 
 	static bool Get(const TInstancedStruct<FParameterValueBase>& Storage, T& OutValue)
 	{
-		const T* Value = Storage.template GetPtr<T>();
+		const T* Value = GetPtr(Storage);
 		if(!Value)
 		{
 			return false;
@@ -69,6 +82,16 @@ struct TParameterValueAdapter<T, std::enable_if_t<std::is_base_of_v<FParameterVa
 
 		OutValue = *Value;
 		return true;
+	}
+
+	static const T* GetPtr(const TInstancedStruct<FParameterValueBase>& Storage)
+	{
+		return Storage.template GetPtr<T>();
+	}
+
+	static bool Is(const TInstancedStruct<FParameterValueBase>& Storage)
+	{
+		return GetPtr(Storage) != nullptr;
 	}
 };
 
@@ -78,20 +101,30 @@ struct TParameterValueAdapter<T, std::enable_if_t<std::is_base_of_v<FParameterVa
 	{ \
 		using WrapperType = ParameterWrapper; \
 		static constexpr bool bSupported = true; \
+		static constexpr bool bReferenceable = true; \
 		template<typename T> \
 		static void Set(TInstancedStruct<FParameterValueBase>& Storage, T&& InValue) \
 		{ \
 			Storage.template InitializeAs<WrapperType>().Value = Forward<T>(InValue); \
 		} \
+		static const NativeType* GetPtr(const TInstancedStruct<FParameterValueBase>& Storage) \
+		{ \
+			const WrapperType* Wrapper = Storage.template GetPtr<WrapperType>(); \
+			return Wrapper ? &Wrapper->Value : nullptr; \
+		} \
 		static bool Get(const TInstancedStruct<FParameterValueBase>& Storage, NativeType& OutValue) \
 		{ \
-			const WrapperType* Value = Storage.template GetPtr<WrapperType>(); \
+			const NativeType* Value = GetPtr(Storage); \
 			if(!Value) \
 			{ \
 				return false; \
 			} \
-			OutValue = Value->Value; \
+			OutValue = *Value; \
 			return true; \
+		} \
+		static bool Is(const TInstancedStruct<FParameterValueBase>& Storage) \
+		{ \
+			return GetPtr(Storage) != nullptr; \
 		} \
 	};
 
@@ -123,6 +156,8 @@ WH_PARAMETER_VALUE_ADAPTER(FSimpleDynamicDelegate, FParameterDelegateValue)
 template<>
 struct TParameterValueAdapter<const TCHAR*> : TParameterValueAdapter<FString>
 {
+	static constexpr bool bReferenceable = false;
+
 	template<typename T>
 	static void Set(TInstancedStruct<FParameterValueBase>& Storage, T&& InValue)
 	{
@@ -133,6 +168,8 @@ struct TParameterValueAdapter<const TCHAR*> : TParameterValueAdapter<FString>
 template<>
 struct TParameterValueAdapter<UClass*> : TParameterValueAdapter<FParameterClassValue>
 {
+	static constexpr bool bReferenceable = false;
+
 	template<typename T>
 	static void Set(TInstancedStruct<FParameterValueBase>& Storage, T&& InValue)
 	{
@@ -155,6 +192,8 @@ struct TParameterValueAdapter<UClass*> : TParameterValueAdapter<FParameterClassV
 template<typename T>
 struct TParameterValueAdapter<TSubclassOf<T>> : TParameterValueAdapter<FParameterClassValue>
 {
+	static constexpr bool bReferenceable = false;
+
 	template<typename U>
 	static void Set(TInstancedStruct<FParameterValueBase>& Storage, U&& InValue)
 	{
@@ -177,6 +216,8 @@ struct TParameterValueAdapter<TSubclassOf<T>> : TParameterValueAdapter<FParamete
 template<typename T>
 struct TParameterValueAdapter<TSoftClassPtr<T>> : TParameterValueAdapter<FParameterSoftClassValue>
 {
+	static constexpr bool bReferenceable = false;
+
 	template<typename U>
 	static void Set(TInstancedStruct<FParameterValueBase>& Storage, U&& InValue)
 	{
@@ -199,6 +240,8 @@ struct TParameterValueAdapter<TSoftClassPtr<T>> : TParameterValueAdapter<FParame
 template<typename T>
 struct TParameterValueAdapter<T*, std::enable_if_t<std::is_base_of_v<UObject, T>>> : TParameterValueAdapter<FParameterObjectValue>
 {
+	static constexpr bool bReferenceable = false;
+
 	template<typename U>
 	static void Set(TInstancedStruct<FParameterValueBase>& Storage, U&& InValue)
 	{
@@ -221,6 +264,8 @@ struct TParameterValueAdapter<T*, std::enable_if_t<std::is_base_of_v<UObject, T>
 template<typename T>
 struct TParameterValueAdapter<TObjectPtr<T>> : TParameterValueAdapter<FParameterObjectValue>
 {
+	static constexpr bool bReferenceable = false;
+
 	template<typename U>
 	static void Set(TInstancedStruct<FParameterValueBase>& Storage, U&& InValue)
 	{
@@ -243,6 +288,8 @@ struct TParameterValueAdapter<TObjectPtr<T>> : TParameterValueAdapter<FParameter
 template<typename T>
 struct TParameterValueAdapter<TScriptInterface<T>> : TParameterValueAdapter<FParameterObjectValue>
 {
+	static constexpr bool bReferenceable = false;
+
 	template<typename U>
 	static void Set(TInstancedStruct<FParameterValueBase>& Storage, U&& InValue)
 	{
@@ -273,6 +320,8 @@ struct TParameterValueAdapter<TScriptInterface<T>> : TParameterValueAdapter<FPar
 template<typename T>
 struct TParameterValueAdapter<TSoftObjectPtr<T>> : TParameterValueAdapter<FParameterSoftObjectValue>
 {
+	static constexpr bool bReferenceable = false;
+
 	template<typename U>
 	static void Set(TInstancedStruct<FParameterValueBase>& Storage, U&& InValue)
 	{
@@ -294,3 +343,8 @@ struct TParameterValueAdapter<TSoftObjectPtr<T>> : TParameterValueAdapter<FParam
 
 template<typename T>
 concept CParameterCompatible = TParameterValueAdapter<std::decay_t<T>>::bSupported;
+
+template<typename T>
+concept CParameterReferenceable =
+	TParameterValueAdapter<std::decay_t<T>>::bSupported &&
+	TParameterValueAdapter<std::decay_t<T>>::bReferenceable;

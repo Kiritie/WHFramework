@@ -205,7 +205,14 @@ bool UParameterModuleStatics::SetValueFromProperty(FParameter& Parameter, const 
 			Parameter.Value.InitializeAsScriptStruct(Typed->Struct, static_cast<const uint8*>(ValuePtr));
 			return true;
 		}
-		return SetKnownStructValue(Parameter, Typed, ValuePtr);
+		if(SetKnownStructValue(Parameter, Typed, ValuePtr))
+		{
+			return true;
+		}
+
+		FParameterStructValue& StructValue = Parameter.Value.InitializeAs<FParameterStructValue>();
+		StructValue.Value.InitializeAs(Typed->Struct, static_cast<const uint8*>(ValuePtr));
+		return true;
 	}
 	return false;
 }
@@ -261,7 +268,19 @@ bool UParameterModuleStatics::GetValueToProperty(const FParameter& Parameter, co
 			Typed->Struct->CopyScriptStruct(ValuePtr, Parameter.Value.GetMemory());
 			return true;
 		}
-		return GetKnownStructValue(Parameter, Typed, ValuePtr);
+		if(GetKnownStructValue(Parameter, Typed, ValuePtr))
+		{
+			return true;
+		}
+
+		const FParameterStructValue* StructValue = Parameter.Value.GetPtr<FParameterStructValue>();
+		if(!StructValue || StructValue->Value.GetScriptStruct() != Typed->Struct)
+		{
+			return false;
+		}
+
+		Typed->Struct->CopyScriptStruct(ValuePtr, StructValue->Value.GetMemory());
+		return true;
 	}
 	return false;
 }

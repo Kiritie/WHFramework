@@ -2,6 +2,8 @@
 
 #include "Setting/Widget/Item/WidgetOptionSettingItemBase.h"
 
+#include "Components/EditableTextBox.h"
+#include "Setting/SettingModuleTypes.h"
 #include "Widget/WidgetModuleStatics.h"
 
 UWidgetOptionSettingItemBase::UWidgetOptionSettingItemBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
@@ -9,25 +11,21 @@ UWidgetOptionSettingItemBase::UWidgetOptionSettingItemBase(const FObjectInitiali
 	bEditable = false;
 }
 
-void UWidgetOptionSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetOptionSettingItemBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 
 	TxtBox_Value->OnTextChanged.AddDynamic(this, &UWidgetOptionSettingItemBase::OnTextBoxValueChanged);
 
 	Btn_Last->OnClicked().AddUObject(this, &UWidgetOptionSettingItemBase::OnLastButtonClicked);
 	Btn_Next->OnClicked().AddUObject(this, &UWidgetOptionSettingItemBase::OnNextButtonClicked);
 
-	if(InParams.IsValidIndex(1))
+	if(const FWidgetOptionSettingItemSpawnParameter* Parameter =
+		InParameter.GetPtr<FWidgetOptionSettingItemSpawnParameter>())
 	{
-		if(const FStringArrayParameterValue* Value = InParams[1].GetStructPtr<FStringArrayParameterValue>())
-		{
-			OptionNames = Value->Value;
-		}
-	}
-	if(InParams.IsValidIndex(2))
-	{
-		bEditable = InParams[2].Get<bool>();
+		OptionNames = Parameter->Options;
+		bEditable = Parameter->bEditable;
 	}
 
 	SetOptionNames(OptionNames);
@@ -35,9 +33,9 @@ void UWidgetOptionSettingItemBase::OnSpawn_Implementation(UObject* InOwner, cons
 	TxtBox_Value->SetVisibility(bEditable ? ESlateVisibility::Visible : ESlateVisibility::HitTestInvisible);
 }
 
-void UWidgetOptionSettingItemBase::OnDespawn_Implementation(bool bRecovery)
+void UWidgetOptionSettingItemBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 
 	TxtBox_Value->OnTextChanged.RemoveDynamic(this, &UWidgetOptionSettingItemBase::OnTextBoxValueChanged);
 	Btn_Last->OnClicked().RemoveAll(this);

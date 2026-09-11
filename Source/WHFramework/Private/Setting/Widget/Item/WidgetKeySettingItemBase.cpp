@@ -10,9 +10,10 @@ UWidgetKeySettingItemBase::UWidgetKeySettingItemBase(const FObjectInitializer& O
 {
 }
 
-void UWidgetKeySettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetKeySettingItemBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 
 	for(int32 i = 0; i < Btn_Values.Num(); i++)
 	{
@@ -20,9 +21,9 @@ void UWidgetKeySettingItemBase::OnSpawn_Implementation(UObject* InOwner, const T
 	}
 }
 
-void UWidgetKeySettingItemBase::OnDespawn_Implementation(bool bRecovery)
+void UWidgetKeySettingItemBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 
 	Keys.Empty();
 

@@ -677,7 +677,7 @@ UVoxelChunk* UVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 	UVoxelChunk* Chunk = GetChunkByIndex(InIndex);
 	if(!Chunk)
 	{
-		Chunk = UObjectPoolModuleStatics::SpawnObject<UVoxelChunk>(nullptr, nullptr, ChunkSpawnClass);
+		Chunk = UObjectPoolModuleStatics::SpawnObject<UVoxelChunk>(ChunkSpawnClass);
 		Chunk->Initialize(this, InIndex, ChunkSpawnBatch + !IsOnTheWorld(InIndex));
 		ChunkMap.Add(InIndex, Chunk);
 	}

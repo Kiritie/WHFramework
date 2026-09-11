@@ -42,12 +42,13 @@ void UCommonTextBlockN::OnBindingChanged(const FName& Property)
 	}
 }
 
-void UCommonTextBlockN::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UCommonTextBlockN::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
 	
 }
 
-void UCommonTextBlockN::OnDespawn_Implementation(bool bRecovery)
+void UCommonTextBlockN::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	SetText(FText::GetEmpty());
 	SetHighlightText(FText::GetEmpty());

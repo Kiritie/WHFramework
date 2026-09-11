@@ -19,7 +19,7 @@ void UWidgetVideoSettingPageBase::OnCreate(UUserWidget* InOwner, const TArray<FP
 {
 	Super::OnCreate(InOwner, InParams);
 
-	SettingItem_WindowMode = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetVideoSettingPageBase", "WindowMode", "窗口模式"), FString("/Script/WHFramework.EWindowModeN") }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_WindowMode = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(FWidgetEnumSettingItemSpawnParameter(NSLOCTEXT("WH.WidgetVideoSettingPageBase", "WindowMode", "窗口模式"), FString("/Script/WHFramework.EWindowModeN")), USettingModule::Get().GetEnumSettingItemClass());
 	SettingItem_WindowMode->SetValue((int32)UVideoModule::Get().GetWindowMode());
 	AddSettingItem(FName("WindowMode"), SettingItem_WindowMode, NSLOCTEXT("WH.WidgetVideoSettingPageBase", "General", "通用"));
 
@@ -33,60 +33,60 @@ void UWidgetVideoSettingPageBase::OnCreate(UUserWidget* InOwner, const TArray<FP
 			TmpArr1.Add(i);
 		}
 	}
-	SettingItem_WindowResolution = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetVideoSettingPageBase", "Resolution", "分辨率"), FString("/Script/WHFramework.EWindowResolution"), FInt32ArrayParameterValue(TmpArr1) }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_WindowResolution = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(FWidgetEnumSettingItemSpawnParameter(NSLOCTEXT("WH.WidgetVideoSettingPageBase", "Resolution", "分辨率"), FString("/Script/WHFramework.EWindowResolution"), TmpArr1), USettingModule::Get().GetEnumSettingItemClass());
 	SettingItem_WindowResolution->SetValue((int32)UVideoModule::Get().GetWindowResolution());
 	AddSettingItem(FName("WindowResolution"), SettingItem_WindowResolution, NSLOCTEXT("WH.WidgetVideoSettingPageBase", "General", "通用"));
 	
-	SettingItem_EnableVSync = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetVideoSettingPageBase", "VerticalSync", "垂直同步") }, USettingModule::Get().GetBoolSettingItemClass());
+	SettingItem_EnableVSync = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(FWidgetSettingItemSpawnParameter(NSLOCTEXT("WH.WidgetVideoSettingPageBase", "VerticalSync", "垂直同步")), USettingModule::Get().GetBoolSettingItemClass());
 	SettingItem_EnableVSync->SetValue(UVideoModule::Get().IsEnableVSync());
 	AddSettingItem(FName("EnableVSync"), SettingItem_EnableVSync, NSLOCTEXT("WH.WidgetVideoSettingPageBase", "General", "通用"));
 	
-	SettingItem_EnableDynamicResolution = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetVideoSettingPageBase", "DynamicResolution", "动态分辨率") }, USettingModule::Get().GetBoolSettingItemClass());
+	SettingItem_EnableDynamicResolution = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(FWidgetSettingItemSpawnParameter(NSLOCTEXT("WH.WidgetVideoSettingPageBase", "DynamicResolution", "动态分辨率")), USettingModule::Get().GetBoolSettingItemClass());
 	SettingItem_EnableDynamicResolution->SetValue(UVideoModule::Get().IsEnableDynamicResolution());
 	AddSettingItem(FName("EnableDynamicResolution"), SettingItem_EnableDynamicResolution, NSLOCTEXT("WH.WidgetVideoSettingPageBase", "General", "通用"));
 
-	SettingItem_GlobalVideoQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetVideoSettingPageBase", "Preset", "预设"), FString("/Script/WHFramework.EVideoQuality") }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_GlobalVideoQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(FWidgetEnumSettingItemSpawnParameter(NSLOCTEXT("WH.WidgetVideoSettingPageBase", "Preset", "预设"), FString("/Script/WHFramework.EVideoQuality")), USettingModule::Get().GetEnumSettingItemClass());
 	SettingItem_GlobalVideoQuality->SetValue((int32)UVideoModule::Get().GetGlobalVideoQuality());
 	AddSettingItem(FName("GlobalVideoQuality"), SettingItem_GlobalVideoQuality, NSLOCTEXT("WH.WidgetVideoSettingPageBase", "GraphicsQuality", "画质"));
 
 	TArray<int32> TmpArr2 = { 5 };
-	SettingItem_ViewDistanceQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetVideoSettingPageBase", "ViewDistance", "渲染距离"), FString("/Script/WHFramework.EVideoQuality"), FInt32ArrayParameterValue(TmpArr2) }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_ViewDistanceQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(FWidgetEnumSettingItemSpawnParameter(NSLOCTEXT("WH.WidgetVideoSettingPageBase", "ViewDistance", "渲染距离"), FString("/Script/WHFramework.EVideoQuality"), TmpArr2), USettingModule::Get().GetEnumSettingItemClass());
 	SettingItem_ViewDistanceQuality->SetValue((int32)UVideoModule::Get().GetViewDistanceQuality());
 	AddSettingItem(FName("ViewDistanceQuality"), SettingItem_ViewDistanceQuality, NSLOCTEXT("WH.WidgetVideoSettingPageBase", "GraphicsQuality", "画质"));
 
-	SettingItem_ShadowQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetVideoSettingPageBase", "Shadows", "阴影"), FString("/Script/WHFramework.EVideoQuality"), FInt32ArrayParameterValue(TmpArr2) }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_ShadowQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(FWidgetEnumSettingItemSpawnParameter(NSLOCTEXT("WH.WidgetVideoSettingPageBase", "Shadows", "阴影"), FString("/Script/WHFramework.EVideoQuality"), TmpArr2), USettingModule::Get().GetEnumSettingItemClass());
 	SettingItem_ShadowQuality->SetValue((int32)UVideoModule::Get().GetShadowQuality());
 	AddSettingItem(FName("ShadowQuality"), SettingItem_ShadowQuality, NSLOCTEXT("WH.WidgetVideoSettingPageBase", "GraphicsQuality", "画质"));
 
-	SettingItem_GlobalIlluminationQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetVideoSettingPageBase", "GlobalIllumination", "光照"), FString("/Script/WHFramework.EVideoQuality"), FInt32ArrayParameterValue(TmpArr2) }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_GlobalIlluminationQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(FWidgetEnumSettingItemSpawnParameter(NSLOCTEXT("WH.WidgetVideoSettingPageBase", "GlobalIllumination", "光照"), FString("/Script/WHFramework.EVideoQuality"), TmpArr2), USettingModule::Get().GetEnumSettingItemClass());
 	SettingItem_GlobalIlluminationQuality->SetValue((int32)UVideoModule::Get().GetGlobalIlluminationQuality());
 	AddSettingItem(FName("GlobalIlluminationQuality"), SettingItem_GlobalIlluminationQuality, NSLOCTEXT("WH.WidgetVideoSettingPageBase", "GraphicsQuality", "画质"));
 
-	SettingItem_ReflectionQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetVideoSettingPageBase", "Reflections", "反射"), FString("/Script/WHFramework.EVideoQuality"), FInt32ArrayParameterValue(TmpArr2) }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_ReflectionQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(FWidgetEnumSettingItemSpawnParameter(NSLOCTEXT("WH.WidgetVideoSettingPageBase", "Reflections", "反射"), FString("/Script/WHFramework.EVideoQuality"), TmpArr2), USettingModule::Get().GetEnumSettingItemClass());
 	SettingItem_ReflectionQuality->SetValue((int32)UVideoModule::Get().GetReflectionQuality());
 	AddSettingItem(FName("ReflectionQuality"), SettingItem_ReflectionQuality, NSLOCTEXT("WH.WidgetVideoSettingPageBase", "GraphicsQuality", "画质"));
 
-	SettingItem_AntiAliasingQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetVideoSettingPageBase", "AntiAliasing", "抗锯齿"), FString("/Script/WHFramework.EVideoQuality"), FInt32ArrayParameterValue(TmpArr2) }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_AntiAliasingQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(FWidgetEnumSettingItemSpawnParameter(NSLOCTEXT("WH.WidgetVideoSettingPageBase", "AntiAliasing", "抗锯齿"), FString("/Script/WHFramework.EVideoQuality"), TmpArr2), USettingModule::Get().GetEnumSettingItemClass());
 	SettingItem_AntiAliasingQuality->SetValue((int32)UVideoModule::Get().GetAntiAliasingQuality());
 	AddSettingItem(FName("AntiAliasingQuality"), SettingItem_AntiAliasingQuality, NSLOCTEXT("WH.WidgetVideoSettingPageBase", "GraphicsQuality", "画质"));
 
-	SettingItem_TextureQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetVideoSettingPageBase", "Textures", "贴图"), FString("/Script/WHFramework.EVideoQuality"), FInt32ArrayParameterValue(TmpArr2) }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_TextureQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(FWidgetEnumSettingItemSpawnParameter(NSLOCTEXT("WH.WidgetVideoSettingPageBase", "Textures", "贴图"), FString("/Script/WHFramework.EVideoQuality"), TmpArr2), USettingModule::Get().GetEnumSettingItemClass());
 	SettingItem_TextureQuality->SetValue((int32)UVideoModule::Get().GetTextureQuality());
 	AddSettingItem(FName("TextureQuality"), SettingItem_TextureQuality, NSLOCTEXT("WH.WidgetVideoSettingPageBase", "GraphicsQuality", "画质"));
 
-	SettingItem_VisualEffectQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetVideoSettingPageBase", "Effects", "视觉效果"), FString("/Script/WHFramework.EVideoQuality"), FInt32ArrayParameterValue(TmpArr2) }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_VisualEffectQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(FWidgetEnumSettingItemSpawnParameter(NSLOCTEXT("WH.WidgetVideoSettingPageBase", "Effects", "视觉效果"), FString("/Script/WHFramework.EVideoQuality"), TmpArr2), USettingModule::Get().GetEnumSettingItemClass());
 	SettingItem_VisualEffectQuality->SetValue((int32)UVideoModule::Get().GetVisualEffectQuality());
 	AddSettingItem(FName("VisualEffectQuality"), SettingItem_VisualEffectQuality, NSLOCTEXT("WH.WidgetVideoSettingPageBase", "GraphicsQuality", "画质"));
 
-	SettingItem_PostProcessingQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetVideoSettingPageBase", "PostProcessing", "后处理"), FString("/Script/WHFramework.EVideoQuality"), FInt32ArrayParameterValue(TmpArr2) }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_PostProcessingQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(FWidgetEnumSettingItemSpawnParameter(NSLOCTEXT("WH.WidgetVideoSettingPageBase", "PostProcessing", "后处理"), FString("/Script/WHFramework.EVideoQuality"), TmpArr2), USettingModule::Get().GetEnumSettingItemClass());
 	SettingItem_PostProcessingQuality->SetValue((int32)UVideoModule::Get().GetPostProcessingQuality());
 	AddSettingItem(FName("PostProcessingQuality"), SettingItem_PostProcessingQuality, NSLOCTEXT("WH.WidgetVideoSettingPageBase", "GraphicsQuality", "画质"));
 
-	SettingItem_FoliageQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetVideoSettingPageBase", "Foliage", "植被"), FString("/Script/WHFramework.EVideoQuality"), FInt32ArrayParameterValue(TmpArr2) }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_FoliageQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(FWidgetEnumSettingItemSpawnParameter(NSLOCTEXT("WH.WidgetVideoSettingPageBase", "Foliage", "植被"), FString("/Script/WHFramework.EVideoQuality"), TmpArr2), USettingModule::Get().GetEnumSettingItemClass());
 	SettingItem_FoliageQuality->SetValue((int32)UVideoModule::Get().GetFoliageQuality());
 	AddSettingItem(FName("FoliageQuality"), SettingItem_FoliageQuality, NSLOCTEXT("WH.WidgetVideoSettingPageBase", "GraphicsQuality", "画质"));
 
-	SettingItem_ShadingQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetVideoSettingPageBase", "AmbientOcclusion", "环境光遮蔽"), FString("/Script/WHFramework.EVideoQuality"), FInt32ArrayParameterValue(TmpArr2) }, USettingModule::Get().GetEnumSettingItemClass());
+	SettingItem_ShadingQuality = UObjectPoolModuleStatics::SpawnObject<UWidgetEnumSettingItemBase>(FWidgetEnumSettingItemSpawnParameter(NSLOCTEXT("WH.WidgetVideoSettingPageBase", "AmbientOcclusion", "环境光遮蔽"), FString("/Script/WHFramework.EVideoQuality"), TmpArr2), USettingModule::Get().GetEnumSettingItemClass());
 	SettingItem_ShadingQuality->SetValue((int32)UVideoModule::Get().GetShadingQuality());
 	AddSettingItem(FName("ShadingQuality"), SettingItem_ShadingQuality, NSLOCTEXT("WH.WidgetVideoSettingPageBase", "GraphicsQuality", "画质"));
 }

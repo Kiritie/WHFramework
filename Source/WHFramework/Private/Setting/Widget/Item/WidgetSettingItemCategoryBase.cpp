@@ -3,25 +3,28 @@
 #include "Setting/Widget/Item/WidgetSettingItemCategoryBase.h"
 
 #include "Components/TextBlock.h"
+#include "Setting/SettingModuleTypes.h"
 #include "Widget/WidgetModuleStatics.h"
 
 UWidgetSettingItemCategoryBase::UWidgetSettingItemCategoryBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 }
 
-void UWidgetSettingItemCategoryBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetSettingItemCategoryBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 	
-	if(InParams.IsValidIndex(0))
+	if(const FWidgetSettingItemCategorySpawnParameter* Parameter =
+		InParameter.GetPtr<FWidgetSettingItemCategorySpawnParameter>())
 	{
-		SetCategory(InParams[0].Get<FText>());
+		SetCategory(Parameter->Category);
 	}
 }
 
-void UWidgetSettingItemCategoryBase::OnDespawn_Implementation(bool bRecovery)
+void UWidgetSettingItemCategoryBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 	
 	SetCategory(FText::GetEmpty());
 }

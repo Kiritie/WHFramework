@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "WebRequest/Handle/WebRequestHandle_GetJson.h"
@@ -11,9 +11,9 @@ UWebRequestHandle_GetJson::UWebRequestHandle_GetJson()
 	Json = nullptr;
 }
 
-void UWebRequestHandle_GetJson::OnDespawn_Implementation(bool bRecovery)
+void UWebRequestHandle_GetJson::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 
 	Json = nullptr;
 }

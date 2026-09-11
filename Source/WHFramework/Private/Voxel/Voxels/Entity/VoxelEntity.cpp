@@ -21,14 +21,15 @@ AVoxelEntity::AVoxelEntity()
 	VoxelScope = EVoxelScope::Entity;
 }
 
-void AVoxelEntity::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void AVoxelEntity::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 }
 
-void AVoxelEntity::OnDespawn_Implementation(bool bRecovery)
+void AVoxelEntity::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 	
 	DestroyAuxiliary();
 	MeshComponent->ClearMesh();
@@ -83,7 +84,7 @@ void AVoxelEntity::SpawnAuxiliary()
 		const UVoxelData& VoxelData = VoxelItem.GetData();
 		if(VoxelData.AuxiliaryClass)
 		{
-			if(AVoxelAuxiliary* Auxiliary = UObjectPoolModuleStatics::SpawnObject<AVoxelAuxiliary>(nullptr, nullptr, VoxelData.AuxiliaryClass))
+			if(AVoxelAuxiliary* Auxiliary = UObjectPoolModuleStatics::SpawnObject<AVoxelAuxiliary>(VoxelData.AuxiliaryClass))
 			{
 				Auxiliary->AttachToComponent(RootComponent, FAttachmentTransformRules::SnapToTargetIncludingScale);
 				Auxiliary->Execute_SetActorVisible(Auxiliary, Execute_IsVisible(this));

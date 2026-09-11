@@ -27,14 +27,14 @@ AVoxelInteractAuxiliary::AVoxelInteractAuxiliary()
 	bInteracting = false;
 }
 
-void AVoxelInteractAuxiliary::OnDespawn_Implementation(bool bRecovery)
+void AVoxelInteractAuxiliary::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	if(bInteracting && InteractingAgent)
 	{
 		SetInteracting(false, Cast<IVoxelAgentInterface>(Cast<AActor>(InteractingAgent)));
 	}
 
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 }
 
 void AVoxelInteractAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)

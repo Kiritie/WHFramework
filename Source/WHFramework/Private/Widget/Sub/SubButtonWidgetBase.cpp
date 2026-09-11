@@ -15,14 +15,15 @@ USubButtonWidgetBase::USubButtonWidgetBase(const FObjectInitializer& ObjectIniti
 	OwnerWidget = nullptr;
 }
 
-void USubButtonWidgetBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void USubButtonWidgetBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 }
 
-void USubButtonWidgetBase::OnDespawn_Implementation(bool bRecovery)
+void USubButtonWidgetBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 }
 
 void USubButtonWidgetBase::OnTick_Implementation(float DeltaSeconds)
@@ -38,7 +39,7 @@ void USubButtonWidgetBase::OnCreate(UUserWidget* InOwner, const TArray<FParamete
 
 	for(auto Iter : GetPoolWidgets())
 	{
-		IObjectPoolInterface::Execute_OnSpawn(Iter, this, IObjectPoolInterface::Execute_GetSpawnParams(Iter));
+		IObjectPoolInterface::Execute_OnSpawn(Iter, FParameter(FWidgetSpawnParameter(this)));
 	}
 
 	K2_OnCreate(InOwner, InParams);
@@ -72,7 +73,9 @@ void USubButtonWidgetBase::OnDestroy(bool bRecovery)
 
 	K2_OnDestroy(bRecovery);
 
-	UObjectPoolModuleStatics::DespawnObject(this, bRecovery);
+	UObjectPoolModuleStatics::DespawnObject(
+		this,
+		bRecovery ? EObjectDespawnMode::Recovery : EObjectDespawnMode::Destroy);
 
 	OwnerWidget = nullptr;
 	WidgetParams.Empty();

@@ -57,24 +57,18 @@ APawnBase::APawnBase(const FObjectInitializer& ObjectInitializer) :
 	GenerateVoxelID = FPrimaryAssetId();
 }
 
-void APawnBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void APawnBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
 	USceneModuleStatics::RemoveSceneActor(this);
 	
-	if(InParams.IsValidIndex(0))
+	if(const FAbilityActorSpawnParameter* Parameter = InParameter.GetPtr<FAbilityActorSpawnParameter>())
 	{
-		if(InParams[0].Is<FTransform>())
+		if(Parameter->bOverrideActorID)
 		{
-			SetActorTransform(InParams[0].Get<FTransform>());
+			ActorID = Parameter->ActorID;
 		}
-		else if(InParams[0].Is<FGuid>())
-		{
-			ActorID = InParams[0].Get<FGuid>();
-		}
-	}
-	if(InParams.IsValidIndex(1))
-	{
-		AssetID = InParams[1].Get<FPrimaryAssetId>();
+		AssetID = Parameter->AssetID;
 	}
 
 	USceneModuleStatics::AddSceneActor(this);
@@ -82,7 +76,7 @@ void APawnBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter
 	Execute_SetActorVisible(this, true);
 }
 
-void APawnBase::OnDespawn_Implementation(bool bRecovery)
+void APawnBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	Execute_SetActorVisible(this, false);
 

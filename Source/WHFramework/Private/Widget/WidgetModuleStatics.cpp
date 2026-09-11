@@ -67,7 +67,9 @@ void UWidgetModuleStatics::RemoveCommonRichTextDecorator(const TSubclassOf<URich
 
 UCommonToolTip* UWidgetModuleStatics::SpawnToolTipForWidget(UWidget* InWidget, TSubclassOf<UCommonToolTip> InToolTipClass)
 {
-	return UObjectPoolModuleStatics::SpawnObject<UCommonToolTip>(InWidget, nullptr, InToolTipClass);
+	return UObjectPoolModuleStatics::SpawnObject<UCommonToolTip>(
+		FWidgetSpawnParameter(InWidget),
+		InToolTipClass);
 }
 
 void UWidgetModuleStatics::DestroyToolTipForWidget(UWidget* InWidget)

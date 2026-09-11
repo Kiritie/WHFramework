@@ -11,9 +11,10 @@ UCommonToolTip::UCommonToolTip(const FObjectInitializer& ObjectInitializer) : Su
 	OwnerWidget = nullptr;
 }
 
-void UCommonToolTip::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UCommonToolTip::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 	
 	if(OwnerWidget)
 	{
@@ -22,7 +23,7 @@ void UCommonToolTip::OnSpawn_Implementation(UObject* InOwner, const TArray<FPara
 	}
 }
 
-void UCommonToolTip::OnDespawn_Implementation(bool bRecovery)
+void UCommonToolTip::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	SetContent(FText::GetEmpty());
 
@@ -31,7 +32,7 @@ void UCommonToolTip::OnDespawn_Implementation(bool bRecovery)
 		OwnerWidget->SetToolTip(nullptr);
 	}
 	
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 }
 
 FText UCommonToolTip::GetContent() const

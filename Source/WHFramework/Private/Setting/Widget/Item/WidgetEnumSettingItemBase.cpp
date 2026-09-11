@@ -4,55 +4,49 @@
 
 #include "Common/CommonModuleStatics.h"
 #include "Components/ComboBoxString.h"
+#include "Setting/SettingModuleTypes.h"
 #include "Widget/WidgetModuleStatics.h"
 
 UWidgetEnumSettingItemBase::UWidgetEnumSettingItemBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 }
 
-void UWidgetEnumSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetEnumSettingItemBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 
 	ComboBox_Value->OnSelectionChanged.AddDynamic(this, &UWidgetEnumSettingItemBase::OnComboBoxSelectionChanged);
 	
-	if(InParams.IsValidIndex(1))
+	TArray<int32> IgnoredIndices;
+	if(const FWidgetEnumSettingItemSpawnParameter* Parameter =
+		InParameter.GetPtr<FWidgetEnumSettingItemSpawnParameter>())
 	{
-		if(InParams[1].Is<FString>())
+		if(!Parameter->EnumNames.IsEmpty())
 		{
-			for(int32 i = 0; i < UCommonModuleStatics::GetEnumItemNum(InParams[1].Get<FString>()); i++)
+			EnumNames = Parameter->EnumNames;
+		}
+		else if(!Parameter->EnumName.IsEmpty())
+		{
+			for(int32 Index = 0; Index < UCommonModuleStatics::GetEnumItemNum(Parameter->EnumName); ++Index)
 			{
-				EnumNames.Add(UCommonModuleStatics::GetEnumDisplayNameByValue(InParams[1].Get<FString>(), i).ToString());
+				EnumNames.Add(UCommonModuleStatics::GetEnumDisplayNameByValue(Parameter->EnumName, Index).ToString());
 			}
 		}
-		else
-		{
-			if(const FStringArrayParameterValue* Value = InParams[1].GetStructPtr<FStringArrayParameterValue>())
-			{
-				EnumNames = Value->Value;
-			}
-		}
+		IgnoredIndices = Parameter->IgnoredIndices;
 	}
-	TArray<int32> IgnoreEnumIndexs;
-	if(InParams.IsValidIndex(2))
+	for(int32 Index = 0; Index < EnumNames.Num(); ++Index)
 	{
-		if(const FInt32ArrayParameterValue* Value = InParams[2].GetStructPtr<FInt32ArrayParameterValue>())
+		if(!IgnoredIndices.Contains(Index))
 		{
-			IgnoreEnumIndexs = Value->Value;
-		}
-	}
-	for(int32 i = 0; i < EnumNames.Num(); i++)
-	{
-		if(!IgnoreEnumIndexs.Contains(i))
-		{
-			ComboBox_Value->AddOption(EnumNames[i]);
+			ComboBox_Value->AddOption(EnumNames[Index]);
 		}
 	}
 }
 
-void UWidgetEnumSettingItemBase::OnDespawn_Implementation(bool bRecovery)
+void UWidgetEnumSettingItemBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 
 	EnumNames.Empty();
 	

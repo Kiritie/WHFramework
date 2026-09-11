@@ -26,22 +26,25 @@ AAbilityProjectileBase::AAbilityProjectileBase()
 	bLaunched = false;
 }
 
-void AAbilityProjectileBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void AAbilityProjectileBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 
-	OwnerActor = Cast<AActor>(InOwner);
+	const FAbilityProjectileSpawnParameter* Parameter =
+		InParameter.GetPtr<FAbilityProjectileSpawnParameter>();
+	OwnerActor = Parameter ? Parameter->Owner.Get() : nullptr;
 
 	if(IAbilityActorInterface* AbilityActor = GetOwnerActor<IAbilityActorInterface>())
 	{
 		AbilityActor->AttachActor(this, FAttachmentTransformRules::SnapToTargetNotIncludingScale, OriginSocketName);
 		SetActorRotation(FinalSocketName.IsNone() ? OwnerActor->GetActorRotation() : UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), AbilityActor->GetMeshComponent()->GetSocketLocation(FinalSocketName)));
 
-		if(InParams.IsValidIndex(0))
+		if(Parameter)
 		{
 			if(UAbilitySystemComponentBase* OwningASC = Cast<UAbilitySystemComponentBase>(AbilityActor->GetAbilitySystemComponent()))
 			{
-				const FGameplayAbilitySpec Spec = OwningASC->FindAbilitySpecForHandle(InParams[0].Get<FGameplayAbilitySpecHandle>());
+				const FGameplayAbilitySpec Spec = OwningASC->FindAbilitySpecForHandle(Parameter->AbilityHandle);
 				if(UAbilityBase* Ability = Cast<UAbilityBase>(Spec.GetPrimaryInstance()))
 				{
 					AbilityLevel = Ability->GetAbilityLevel();
@@ -53,14 +56,14 @@ void AAbilityProjectileBase::OnSpawn_Implementation(UObject* InOwner, const TArr
 	}
 }
 
-void AAbilityProjectileBase::OnDespawn_Implementation(bool bRecovery)
+void AAbilityProjectileBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	if(IAbilityActorInterface* AbilityActor = GetOwnerActor<IAbilityActorInterface>())
 	{
 		AbilityActor->DetachActor(this, FDetachmentTransformRules::KeepWorldTransform);
 	}
 
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 
 	SetHitAble(false);
 	ClearHitTargets();

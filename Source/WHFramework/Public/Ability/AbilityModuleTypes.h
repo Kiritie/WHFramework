@@ -6,6 +6,7 @@
 #include "GameplayTagContainer.h"
 #include "Asset/AssetModuleTypes.h"
 #include "Common/CommonModuleTypes.h"
+#include "ObjectPool/ObjectPoolModuleTypes.h"
 #include "ReferencePool/ReferencePoolInterface.h"
 #include "Scene/SceneModuleTypes.h"
 
@@ -24,6 +25,52 @@ class UWidgetAbilityInventorySlotBase;
 class UAbilityInventorySlotBase;
 
 extern WHFRAMEWORK_API FPrimaryAssetId PAID_EXP;
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FAbilityActorSpawnParameter : public FWHActorSpawnParameter
+{
+	GENERATED_BODY()
+
+public:
+	FAbilityActorSpawnParameter() = default;
+
+	FAbilityActorSpawnParameter(
+		UObject* InWorldContext,
+		const FTransform& InTransform,
+		const FGuid& InActorID,
+		const FPrimaryAssetId& InAssetID)
+	{
+		WorldContext = InWorldContext;
+		Transform = InTransform;
+		bOverrideActorID = true;
+		ActorID = InActorID;
+		AssetID = InAssetID;
+	}
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FPrimaryAssetId AssetID;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FAbilityProjectileSpawnParameter : public FWHActorSpawnParameter
+{
+	GENERATED_BODY()
+
+public:
+	FAbilityProjectileSpawnParameter() = default;
+
+	FAbilityProjectileSpawnParameter(
+		AActor* InOwner,
+		const FGameplayAbilitySpecHandle& InAbilityHandle)
+		: AbilityHandle(InAbilityHandle)
+	{
+		WorldContext = InOwner;
+		Owner = InOwner;
+	}
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FGameplayAbilitySpecHandle AbilityHandle;
+};
 
 DECLARE_PROPERTY_ROB_GETTER(FGameplayEffectModifierMagnitude, AttributeBasedMagnitude, FAttributeBasedFloat)
 
@@ -581,6 +628,42 @@ public:
 		}
 		return A;
 	}
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FAbilityItemSpawnParameter : public FWHActorSpawnParameter
+{
+	GENERATED_BODY()
+
+public:
+	FAbilityItemSpawnParameter() = default;
+
+	FAbilityItemSpawnParameter(AActor* InOwner, const FAbilityItem& InItem)
+		: Item(InItem)
+	{
+		WorldContext = InOwner;
+		Owner = InOwner;
+	}
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FAbilityItem Item;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FAbilityWidgetSpawnParameter : public FWidgetSpawnParameter
+{
+	GENERATED_BODY()
+
+public:
+	FAbilityWidgetSpawnParameter() = default;
+
+	explicit FAbilityWidgetSpawnParameter(const FAbilityItem& InItem)
+		: Item(InItem)
+	{
+	}
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FAbilityItem Item;
 };
 
 USTRUCT(BlueprintType)

@@ -12,20 +12,21 @@ UWidgetAbilityDragItemBase::UWidgetAbilityDragItemBase(const FObjectInitializer&
 	UUserWidget::SetVisibility(ESlateVisibility::HitTestInvisible);
 }
 
-void UWidgetAbilityDragItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetAbilityDragItemBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 	
-	if(InParams.IsValidIndex(0))
+	if(const FAbilityWidgetSpawnParameter* SpawnParameter = InParameter.GetPtr<FAbilityWidgetSpawnParameter>())
 	{
-		Item = InParams[0].Get<FAbilityItem>();
+		Item = SpawnParameter->Item;
 		Item.Payload = this;
 	}
 }
 
-void UWidgetAbilityDragItemBase::OnDespawn_Implementation(bool bRecovery)
+void UWidgetAbilityDragItemBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 	
 	Item = FAbilityItem();
 }

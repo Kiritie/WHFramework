@@ -14,14 +14,15 @@ AVoxelAuxiliary::AVoxelAuxiliary()
 	VoxelScope = EVoxelScope::None;
 }
 
-void AVoxelAuxiliary::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void AVoxelAuxiliary::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 }
 
-void AVoxelAuxiliary::OnDespawn_Implementation(bool bRecovery)
+void AVoxelAuxiliary::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 
 	VoxelItem = FVoxelItem::Empty;
 	VoxelScope = EVoxelScope::None;

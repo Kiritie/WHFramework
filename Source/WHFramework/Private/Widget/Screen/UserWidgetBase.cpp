@@ -57,12 +57,13 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	ChildWidgets = TArray<IScreenWidgetInterface*>();
 }
 
-void UUserWidgetBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UUserWidgetBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
 	
 }
 
-void UUserWidgetBase::OnDespawn_Implementation(bool bRecovery)
+void UUserWidgetBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	
 }
@@ -95,17 +96,21 @@ void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPar
 
 	if(WidgetOpenAnimator)
 	{
-		WidgetOpenAnimator->Execute_OnSpawn(WidgetOpenAnimator, this, {});
+		IObjectPoolInterface::Execute_OnSpawn(
+			WidgetOpenAnimator,
+			FParameter(FWidgetSpawnParameter(this)));
 	}
 
 	if(WidgetCloseAnimator)
 	{
-		WidgetCloseAnimator->Execute_OnSpawn(WidgetCloseAnimator, this, {});
+		IObjectPoolInterface::Execute_OnSpawn(
+			WidgetCloseAnimator,
+			FParameter(FWidgetSpawnParameter(this)));
 	}
 
 	for(auto Iter : GetPoolWidgets())
 	{
-		IObjectPoolInterface::Execute_OnSpawn(Iter, this, IObjectPoolInterface::Execute_GetSpawnParams(Iter));
+		IObjectPoolInterface::Execute_OnSpawn(Iter, FParameter(FWidgetSpawnParameter(this)));
 	}
 
 	K2_OnCreate(InOwner, InParams);
@@ -363,7 +368,9 @@ void UUserWidgetBase::OnDestroy(bool bRecovery)
 	if(K2_OnDestroyed.IsBound()) K2_OnDestroyed.Broadcast(bRecovery);
 	if(OnDestroyed.IsBound()) OnDestroyed.Broadcast(bRecovery);
 
-	UObjectPoolModuleStatics::DespawnObject(this, bRecovery);
+	UObjectPoolModuleStatics::DespawnObject(
+		this,
+		bRecovery ? EObjectDespawnMode::Recovery : EObjectDespawnMode::Destroy);
 
 	OwnerObject = nullptr;
 	WidgetParams.Empty();
@@ -515,7 +522,8 @@ ISubWidgetInterface* UUserWidgetBase::CreateSubWidget(TSubclassOf<UUserWidget> I
 
 ISubWidgetInterface* UUserWidgetBase::CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams)
 {
-	if(ISubWidgetInterface* SubWidget = UObjectPoolModuleStatics::SpawnObject<ISubWidgetInterface>(this, nullptr, InClass))
+	if(ISubWidgetInterface* SubWidget = Cast<ISubWidgetInterface>(
+		UObjectPoolModuleStatics::SpawnObject(InClass.Get(), FParameter(FWidgetSpawnParameter(this)))))
 	{
 		SubWidget->OnCreate(this, InParams);
 		return SubWidget;

@@ -8,16 +8,17 @@ UWidgetBoolSettingItemBase::UWidgetBoolSettingItemBase(const FObjectInitializer&
 {
 }
 
-void UWidgetBoolSettingItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetBoolSettingItemBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 
 	Btn_Value->OnIsSelectedChanged().AddUObject(this, &UWidgetBoolSettingItemBase::OnCheckBoxStateChanged);
 }
 
-void UWidgetBoolSettingItemBase::OnDespawn_Implementation(bool bRecovery)
+void UWidgetBoolSettingItemBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 	
 	Btn_Value->OnIsSelectedChanged().RemoveAll(this);
 }

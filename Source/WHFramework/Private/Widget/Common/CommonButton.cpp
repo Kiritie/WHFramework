@@ -434,12 +434,13 @@ UCommonButton::UCommonButton(const FObjectInitializer& ObjectInitializer) : Supe
 	}
 }
 
-void UCommonButton::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UCommonButton::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
 	
 }
 
-void UCommonButton::OnDespawn_Implementation(bool bRecovery)
+void UCommonButton::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	SetTitle(FText::GetEmpty());
 

@@ -29,15 +29,15 @@ void UWidgetParameterSettingPageBase::OnCreate(UUserWidget* InOwner, const TArra
 			if (Iter.Parameter.Is<int32>() || Iter.Parameter.Is<float>() || Iter.Parameter.Is<FString>() ||
 				Iter.Parameter.Is<FName>() || Iter.Parameter.Is<FText>())
 			{
-				SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetTextSettingItemBase>(nullptr, { Iter.Parameter.GetDescription() }, USettingModule::Get().GetTextSettingItemClass());
+				SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetTextSettingItemBase>(FWidgetSettingItemSpawnParameter(Iter.Parameter.GetDescription()), USettingModule::Get().GetTextSettingItemClass());
 			}
 			else if (Iter.Parameter.Is<bool>())
 			{
-				SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(nullptr, { Iter.Parameter.GetDescription() }, USettingModule::Get().GetBoolSettingItemClass());
+				SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetBoolSettingItemBase>(FWidgetSettingItemSpawnParameter(Iter.Parameter.GetDescription()), USettingModule::Get().GetBoolSettingItemClass());
 			}
 			else if (Iter.Parameter.Is<FKey>())
 			{
-				SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetKeySettingItemBase>(nullptr, { Iter.Parameter.GetDescription(), 1, true }, USettingModule::Get().GetKeySettingItemClass());
+				SettingItem = UObjectPoolModuleStatics::SpawnObject<UWidgetKeySettingItemBase>(FWidgetKeySettingItemSpawnParameter(Iter.Parameter.GetDescription(), 1, true), USettingModule::Get().GetKeySettingItemClass());
 			}
 			AddSettingItem(Iter.Name, SettingItem, Iter.Category);
 		}

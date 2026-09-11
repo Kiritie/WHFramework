@@ -11,19 +11,22 @@ UCommonButtonGroup::UCommonButtonGroup()
 	bBroadcastOnDeselected = true;
 }
 
-void UCommonButtonGroup::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UCommonButtonGroup::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
 	
 }
 
-void UCommonButtonGroup::OnDespawn_Implementation(bool bRecovery)
+void UCommonButtonGroup::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	bSelectionRequired = false;
 	bBroadcastOnDeselected = true;
 
 	for(auto Iter : Buttons)
 	{
-		UObjectPoolModuleStatics::DespawnObject(Iter.Get(), true);
+		UObjectPoolModuleStatics::DespawnObject(
+			Iter.Get(),
+			EObjectDespawnMode::Recovery);
 	}
 	RemoveAll();
 }

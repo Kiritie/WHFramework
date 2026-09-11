@@ -92,7 +92,9 @@ void UWidgetSettingPanelBase::OnResetButtonClicked()
 
 UCommonButton* UWidgetSettingPanelBase::SpawnPageItem_Implementation(UWidgetSettingPageBase* InPage)
 {
-	if(UCommonButton* PageItem = UObjectPoolModuleStatics::SpawnObject<UCommonButton>(InPage, nullptr, PageItemClass))
+	if(UCommonButton* PageItem = UObjectPoolModuleStatics::SpawnObject<UCommonButton>(
+		FWidgetSpawnParameter(InPage),
+		PageItemClass))
 	{
 		PageItem->SetIsSelectable(true);
 		PageItem->SetTitle(InPage->GetTitle());

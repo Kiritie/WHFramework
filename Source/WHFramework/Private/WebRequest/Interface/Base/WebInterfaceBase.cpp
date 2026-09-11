@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "WebRequest/Interface/Base/WebInterfaceBase.h"
@@ -14,7 +14,7 @@ UWebInterfaceBase::UWebInterfaceBase()
 	HandleMap = TMap<FString, UWebRequestHandleBase*>();
 }
 
-void UWebInterfaceBase::OnDespawn_Implementation(bool bRecovery)
+void UWebInterfaceBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	OnWebRequestComplete.Clear();
 	for(auto& Iter : HandleMap)
@@ -34,7 +34,7 @@ void UWebInterfaceBase::RequestComplete(FWebRequestResult InResult, const TArray
 	UWebRequestHandleBase* WebRequestHandle;
 	if(!HandleMap.Contains(InResult.Content))
 	{
-		WebRequestHandle = UObjectPoolModuleStatics::SpawnObject<UWebRequestHandleBase>(nullptr, nullptr, HandleClass);
+		WebRequestHandle = UObjectPoolModuleStatics::SpawnObject<UWebRequestHandleBase>(HandleClass);
 		HandleMap.Add(InResult.Content, WebRequestHandle);
 	}
 	else

@@ -25,14 +25,15 @@ UWidgetAbilityInventorySlotBase::UWidgetAbilityInventorySlotBase(const FObjectIn
 	bWidgetTickAble = true;
 }
 
-void UWidgetAbilityInventorySlotBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetAbilityInventorySlotBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 }
 
-void UWidgetAbilityInventorySlotBase::OnDespawn_Implementation(bool bRecovery)
+void UWidgetAbilityInventorySlotBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 }
 
 void UWidgetAbilityInventorySlotBase::OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams)
@@ -179,7 +180,9 @@ void UWidgetAbilityInventorySlotBase::NativeOnDragDetected(const FGeometry& InGe
 	{
 		OutOperation = UWidgetBlueprintLibrary::CreateDragDropOperation(UDragDropOperation::StaticClass());
 		OutOperation->Payload = this;
-		OutOperation->DefaultDragVisual = UObjectPoolModuleStatics::SpawnObject<UWidgetAbilityDragItemBase>(nullptr, { GetItem() }, UAssetModuleStatics::GetStaticClass(FName("DragItem")));
+		OutOperation->DefaultDragVisual = UObjectPoolModuleStatics::SpawnObject<UWidgetAbilityDragItemBase>(
+			FAbilityWidgetSpawnParameter(GetItem()),
+			UAssetModuleStatics::GetStaticClass(FName("DragItem")));
 	}
 }
 

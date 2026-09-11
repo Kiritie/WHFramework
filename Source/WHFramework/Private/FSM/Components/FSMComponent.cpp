@@ -64,7 +64,7 @@ void UFSMComponent::OnInitialize()
 			const FName StateName = Iter->GetDefaultObject<UFiniteStateBase>()->GetStateName();
 			if(!StateMap.Contains(StateName))
 			{
-				if(UFiniteStateBase* FiniteState = UObjectPoolModuleStatics::SpawnObject<UFiniteStateBase>(nullptr, nullptr, Iter))
+				if(UFiniteStateBase* FiniteState = UObjectPoolModuleStatics::SpawnObject<UFiniteStateBase>(Iter))
 				{
 					FiniteState->OnInitialize(this, StateMap.Num());
 					StateMap.Add(StateName, FiniteState);

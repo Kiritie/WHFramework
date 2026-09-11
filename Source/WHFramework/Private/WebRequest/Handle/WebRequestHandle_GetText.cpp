@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "WebRequest/Handle/WebRequestHandle_GetText.h"
@@ -10,9 +10,9 @@ UWebRequestHandle_GetText::UWebRequestHandle_GetText()
 	Text = TEXT("");
 }
 
-void UWebRequestHandle_GetText::OnDespawn_Implementation(bool bRecovery)
+void UWebRequestHandle_GetText::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 
 	Text = TEXT("");
 }

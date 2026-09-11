@@ -42,21 +42,22 @@ AAbilityActorBase::AAbilityActorBase(const FObjectInitializer& ObjectInitializer
 	BirthTransform = FTransform::Identity;
 }
 
-void AAbilityActorBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void AAbilityActorBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	if(InParams.IsValidIndex(1))
+	if(const FAbilityActorSpawnParameter* Parameter = InParameter.GetPtr<FAbilityActorSpawnParameter>())
 	{
-		AssetID = InParams[1].Get<FPrimaryAssetId>();
+		AssetID = Parameter->AssetID;
 	}
 
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 
 	InitializeAbilities();
 }
 
-void AAbilityActorBase::OnDespawn_Implementation(bool bRecovery)
+void AAbilityActorBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 
 	AssetID = FPrimaryAssetId();
 	Name = NAME_None;

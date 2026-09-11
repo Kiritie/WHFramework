@@ -29,19 +29,16 @@ void AWHActor::InitializeDefaults()
 	Container = nullptr;
 }
 
-void AWHActor::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void AWHActor::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
 	USceneModuleStatics::RemoveSceneActor(this);
 	
-	if(InParams.IsValidIndex(0))
+	if(const FWHActorSpawnParameter* Parameter = InParameter.GetPtr<FWHActorSpawnParameter>())
 	{
-		if(InParams[0].Is<FTransform>())
+		if(Parameter->bOverrideActorID)
 		{
-			SetActorTransform(InParams[0].Get<FTransform>());
-		}
-		else if(InParams[0].Is<FGuid>())
-		{
-			ActorID = InParams[0].Get<FGuid>();
+			ActorID = Parameter->ActorID;
 		}
 	}
 
@@ -50,7 +47,7 @@ void AWHActor::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>
 	USceneModuleStatics::AddSceneActor(this);
 }
 
-void AWHActor::OnDespawn_Implementation(bool bRecovery)
+void AWHActor::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	Execute_SetActorVisible(this, false);
 

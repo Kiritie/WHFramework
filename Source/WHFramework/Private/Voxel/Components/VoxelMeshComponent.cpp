@@ -30,25 +30,25 @@ UVoxelMeshComponent::UVoxelMeshComponent(const FObjectInitializer& ObjectInitial
 	OnComponentEndOverlap.AddDynamic(this, &UVoxelMeshComponent::OnEndOverlap);
 }
 
-void UVoxelMeshComponent::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UVoxelMeshComponent::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	if(AActor* InActor = Cast<AActor>(InOwner))
+	const FVoxelMeshComponentSpawnParameter* Parameter =
+		InParameter.GetPtr<FVoxelMeshComponentSpawnParameter>();
+	if(AActor* Actor = Parameter ? Cast<AActor>(Parameter->Outer) : nullptr)
 	{
-		Register(InActor);
-		AttachToComponent(InActor->GetRootComponent(), FAttachmentTransformRules::SnapToTargetIncludingScale);
+		Register(Actor);
+		AttachToComponent(Actor->GetRootComponent(), FAttachmentTransformRules::SnapToTargetIncludingScale);
 	}
-	if (InParams.IsValidIndex(0))
+	Chunk = Parameter ? Parameter->Chunk.Get() : nullptr;
+	if(Chunk)
 	{
-		Chunk = InParams[0].Get<UVoxelChunk*>();
-		if (Chunk)
-		{
-			SetRelativeLocation(FVector(Chunk->GetIndex().X * UVoxelModule::Get().GetWorldData().GetChunkRealSize().X,
-				Chunk->GetIndex().Y * UVoxelModule::Get().GetWorldData().GetChunkRealSize().Y, 0.f));
-		}
+		SetRelativeLocation(FVector(Chunk->GetIndex().X * UVoxelModule::Get().GetWorldData().GetChunkRealSize().X,
+			Chunk->GetIndex().Y * UVoxelModule::Get().GetWorldData().GetChunkRealSize().Y, 0.f));
 	}
 }
 
-void UVoxelMeshComponent::OnDespawn_Implementation(bool bRecovery)
+void UVoxelMeshComponent::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	ClearMesh();
 	UnRegister();

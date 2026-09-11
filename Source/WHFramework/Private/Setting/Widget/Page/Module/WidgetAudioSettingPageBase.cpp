@@ -18,19 +18,19 @@ void UWidgetAudioSettingPageBase::OnCreate(UUserWidget* InOwner, const TArray<FP
 {
 	Super::OnCreate(InOwner, InParams);
 
-	SettingItem_GlobalSoundVolume = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetAudioSettingPageBase", "Global", "全局"), 0.f, 1.f, 0, 100.f }, USettingModule::Get().GetFloatSettingItemClass());
+	SettingItem_GlobalSoundVolume = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(FWidgetFloatSettingItemSpawnParameter(NSLOCTEXT("WH.WidgetAudioSettingPageBase", "Global", "全局"), 0.f, 1.f, 0, 100.f), USettingModule::Get().GetFloatSettingItemClass());
 	SettingItem_GlobalSoundVolume->SetValue(UAudioModuleStatics::GetGlobalSoundVolume());
 	AddSettingItem(FName("GlobalSoundVolume"), SettingItem_GlobalSoundVolume, NSLOCTEXT("WH.WidgetAudioSettingPageBase", "Volume", "音量大小"));
 
-	SettingItem_BackgroundSoundVolume = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetAudioSettingPageBase", "Music", "背景"), 0.f, 1.f, 0, 100.f }, USettingModule::Get().GetFloatSettingItemClass());
+	SettingItem_BackgroundSoundVolume = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(FWidgetFloatSettingItemSpawnParameter(NSLOCTEXT("WH.WidgetAudioSettingPageBase", "Music", "背景"), 0.f, 1.f, 0, 100.f), USettingModule::Get().GetFloatSettingItemClass());
 	SettingItem_BackgroundSoundVolume->SetValue(UAudioModuleStatics::GetBackgroundSoundVolume());
 	AddSettingItem(FName("BackgroundSoundVolume"), SettingItem_BackgroundSoundVolume, NSLOCTEXT("WH.WidgetAudioSettingPageBase", "Volume", "音量大小"));
 
-	SettingItem_EnvironmentSoundVolume = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetAudioSettingPageBase", "Ambient", "环境"), 0.f, 1.f, 0, 100.f }, USettingModule::Get().GetFloatSettingItemClass());
+	SettingItem_EnvironmentSoundVolume = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(FWidgetFloatSettingItemSpawnParameter(NSLOCTEXT("WH.WidgetAudioSettingPageBase", "Ambient", "环境"), 0.f, 1.f, 0, 100.f), USettingModule::Get().GetFloatSettingItemClass());
 	SettingItem_EnvironmentSoundVolume->SetValue(UAudioModuleStatics::GetEnvironmentSoundVolume());
 	AddSettingItem(FName("EnvironmentSoundVolume"), SettingItem_EnvironmentSoundVolume, NSLOCTEXT("WH.WidgetAudioSettingPageBase", "Volume", "音量大小"));
 
-	SettingItem_EffectSoundVolume = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(nullptr, { NSLOCTEXT("WH.WidgetAudioSettingPageBase", "SoundEffects", "音效"), 0.f, 1.f, 0, 100.f }, USettingModule::Get().GetFloatSettingItemClass());
+	SettingItem_EffectSoundVolume = UObjectPoolModuleStatics::SpawnObject<UWidgetFloatSettingItemBase>(FWidgetFloatSettingItemSpawnParameter(NSLOCTEXT("WH.WidgetAudioSettingPageBase", "SoundEffects", "音效"), 0.f, 1.f, 0, 100.f), USettingModule::Get().GetFloatSettingItemClass());
 	SettingItem_EffectSoundVolume->SetValue(UAudioModuleStatics::GetEffectSoundVolume());
 	AddSettingItem(FName("EffectSoundVolume"), SettingItem_EffectSoundVolume, NSLOCTEXT("WH.WidgetAudioSettingPageBase", "Volume", "音量大小"));
 }

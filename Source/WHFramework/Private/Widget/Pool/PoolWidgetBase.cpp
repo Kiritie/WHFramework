@@ -4,6 +4,7 @@
 
 #include "Common/CommonModuleTypes.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
+#include "ObjectPool/ObjectPoolModuleTypes.h"
 #include "Widget/WidgetModule.h"
 
 UPoolWidgetBase::UPoolWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
@@ -13,17 +14,18 @@ UPoolWidgetBase::UPoolWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	OwnerWidget = nullptr;
 }
 
-void UPoolWidgetBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UPoolWidgetBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
 	if(UWidgetModule::IsValid()) UWidgetModule::Get().RegisterTickableWidget(this);
 
-	OwnerWidget = Cast<UUserWidget>(InOwner);
-	WidgetParams = InParams;
+	const FWidgetSpawnParameter* Parameter = InParameter.GetPtr<FWidgetSpawnParameter>();
+	OwnerWidget = Parameter ? Cast<UUserWidget>(Parameter->OwningObject) : nullptr;
 
 	Refresh();
 }
 
-void UPoolWidgetBase::OnDespawn_Implementation(bool bRecovery)
+void UPoolWidgetBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	if(UWidgetModule::IsValid()) UWidgetModule::Get().UnregisterTickableWidget(this);
 
@@ -50,7 +52,9 @@ void UPoolWidgetBase::Refresh()
 
 void UPoolWidgetBase::Destroy(bool bRecovery)
 {
-	UObjectPoolModuleStatics::DespawnObject(this, bRecovery);
+	UObjectPoolModuleStatics::DespawnObject(
+		this,
+		bRecovery ? EObjectDespawnMode::Recovery : EObjectDespawnMode::Destroy);
 }
 
 UUserWidget* UPoolWidgetBase::GetOwnerWidget(TSubclassOf<UUserWidget> InClass) const

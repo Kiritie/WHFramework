@@ -12,14 +12,15 @@ UWidgetAbilityItemBase::UWidgetAbilityItemBase(const FObjectInitializer& ObjectI
 	Item = FAbilityItem::Empty;
 }
 
-void UWidgetAbilityItemBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetAbilityItemBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 }
 
-void UWidgetAbilityItemBase::OnDespawn_Implementation(bool bRecovery)
+void UWidgetAbilityItemBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 }
 
 void UWidgetAbilityItemBase::OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams)

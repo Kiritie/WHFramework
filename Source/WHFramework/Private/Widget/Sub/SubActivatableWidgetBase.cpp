@@ -15,12 +15,13 @@ USubActivatableWidgetBase::USubActivatableWidgetBase(const FObjectInitializer& O
 	OwnerWidget = nullptr;
 }
 
-void USubActivatableWidgetBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void USubActivatableWidgetBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
 	
 }
 
-void USubActivatableWidgetBase::OnDespawn_Implementation(bool bRecovery)
+void USubActivatableWidgetBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	
 }
@@ -38,7 +39,7 @@ void USubActivatableWidgetBase::OnCreate(UUserWidget* InOwner, const TArray<FPar
 
 	for(auto Iter : GetPoolWidgets())
 	{
-		IObjectPoolInterface::Execute_OnSpawn(Iter, this, IObjectPoolInterface::Execute_GetSpawnParams(Iter));
+		IObjectPoolInterface::Execute_OnSpawn(Iter, FParameter(FWidgetSpawnParameter(this)));
 	}
 
 	K2_OnCreate(InOwner, InParams);
@@ -72,7 +73,9 @@ void USubActivatableWidgetBase::OnDestroy(bool bRecovery)
 
 	K2_OnDestroy(bRecovery);
 
-	UObjectPoolModuleStatics::DespawnObject(this, bRecovery);
+	UObjectPoolModuleStatics::DespawnObject(
+		this,
+		bRecovery ? EObjectDespawnMode::Recovery : EObjectDespawnMode::Destroy);
 
 	OwnerWidget = nullptr;
 	WidgetParams.Empty();

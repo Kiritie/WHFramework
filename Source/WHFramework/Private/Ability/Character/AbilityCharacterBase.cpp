@@ -87,9 +87,10 @@ AAbilityCharacterBase::AAbilityCharacterBase(const FObjectInitializer& ObjectIni
 	ActionAbilities = TMap<FGameplayTag, FVitalityActionAbilityData>();
 }
 
-void AAbilityCharacterBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void AAbilityCharacterBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 
 	InitializeAbilities();
 
@@ -98,9 +99,9 @@ void AAbilityCharacterBase::OnSpawn_Implementation(UObject* InOwner, const TArra
 	SwitchDefaultFiniteState();
 }
 
-void AAbilityCharacterBase::OnDespawn_Implementation(bool bRecovery)
+void AAbilityCharacterBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	Super::OnDespawn_Implementation(bRecovery);
+	Super::OnDespawn_Implementation(InMode);
 
 	SetMotionRate(1.f, 1.f);
 	

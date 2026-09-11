@@ -63,28 +63,37 @@ struct WHFRAMEWORKCORE_API FParameter
 	bool Is() const
 	{
 		using Adapter = TParameterValueAdapter<std::decay_t<T>>;
-		if constexpr(Adapter::bSupported)
-		{
-			return Value.GetScriptStruct() == Adapter::WrapperType::StaticStruct();
-		}
-		else
+		if constexpr(!Adapter::bSupported)
 		{
 			return false;
 		}
+		else if constexpr(requires { Adapter::Is(Value); })
+		{
+			return Adapter::Is(Value);
+		}
+		else
+		{
+			T Result{};
+			return Adapter::Get(Value, Result);
+		}
 	}
 
 	template<typename T>
-	const T* GetStructPtr() const
+		requires CParameterReferenceable<T>
+	const std::decay_t<T>* GetPtr() const
 	{
-		static_assert(std::is_base_of_v<FParameterValueBase, T>);
-		return Value.GetPtr<T>();
+		using ValueType = std::decay_t<T>;
+		using Adapter = TParameterValueAdapter<ValueType>;
+		return Adapter::GetPtr(Value);
 	}
 
 	template<typename T>
-	T* GetMutableStructPtr()
+		requires CParameterReferenceable<T>
+	const std::decay_t<T>& GetRef() const
 	{
-		static_assert(std::is_base_of_v<FParameterValueBase, T>);
-		return Value.GetMutablePtr<T>();
+		const std::decay_t<T>* Result = GetPtr<T>();
+		checkf(Result, TEXT("FParameter value type mismatch."));
+		return *Result;
 	}
 
 	const UScriptStruct* GetValueStruct() const

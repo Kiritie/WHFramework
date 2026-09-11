@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "ObjectPool/ObjectPoolModuleTypes.h"
 #include "Parameter/ParameterModuleTypes.h"
 #include "UObject/Interface.h"
 #include "ObjectPoolInterface.generated.h"	
@@ -23,15 +24,8 @@ class WHFRAMEWORK_API IObjectPoolInterface
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	int32 GetLimit() const;
-
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, meta = (AutoCreateRefTerm = "InParams"))
-	void OnSpawn(UObject* InOwner, const TArray<FParameter>& InParams);
+	void OnSpawn(const FParameter& InParameter);
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void OnDespawn(bool bRecovery);
-
-public:
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	TArray<FParameter> GetSpawnParams() const;
+	void OnDespawn(EObjectDespawnMode InMode);
 };

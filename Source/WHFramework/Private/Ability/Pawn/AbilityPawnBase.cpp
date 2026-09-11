@@ -64,9 +64,10 @@ AAbilityPawnBase::AAbilityPawnBase(const FObjectInitializer& ObjectInitializer) 
 	ActionAbilities = TMap<FGameplayTag, FVitalityActionAbilityData>();
 }
 
-void AAbilityPawnBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FParameter>& InParams)
+void AAbilityPawnBase::OnSpawn_Implementation(
+	const FParameter& InParameter)
 {
-	Super::OnSpawn_Implementation(InOwner, InParams);
+	Super::OnSpawn_Implementation(InParameter);
 
 	InitializeAbilities();
 
@@ -75,7 +76,7 @@ void AAbilityPawnBase::OnSpawn_Implementation(UObject* InOwner, const TArray<FPa
 	SwitchDefaultFiniteState();
 }
 
-void AAbilityPawnBase::OnDespawn_Implementation(bool bRecovery)
+void AAbilityPawnBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	RaceID = NAME_None;
 	Level = 0;

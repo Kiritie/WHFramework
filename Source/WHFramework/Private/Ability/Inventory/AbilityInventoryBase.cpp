@@ -57,25 +57,25 @@ void UAbilityInventoryBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 					}
 					case ESlotSplitType::Shortcut:
 					{
-						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventoryShortcutSlotBase>(nullptr, nullptr, ShortcutSlotClass);
+						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventoryShortcutSlotBase>(ShortcutSlotClass);
 						Slot->OnInitialize(this, EAbilityItemType::None, Iter.Key, i);
 						break;
 					}
 					case ESlotSplitType::Auxiliary:
 					{
-						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventoryAuxiliarySlotBase>(nullptr, nullptr, AuxiliarySlotClass);
+						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventoryAuxiliarySlotBase>(AuxiliarySlotClass);
 						Slot->OnInitialize(this, EAbilityItemType::None, Iter.Key, i);
 						break;
 					}
 					case ESlotSplitType::Equip:
 					{
-						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventoryEquipSlotBase>(nullptr, nullptr, EquipSlotClass);
+						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventoryEquipSlotBase>(EquipSlotClass);
 						Slot->OnInitialize(this, EAbilityItemType::Equip, Iter.Key, i);
 						break;
 					}
 					case ESlotSplitType::Skill:
 					{
-						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventorySkillSlotBase>(nullptr, nullptr, SkillSlotClass);
+						Slot = UObjectPoolModuleStatics::SpawnObject<UAbilityInventorySkillSlotBase>(SkillSlotClass);
 						Slot->OnInitialize(this, EAbilityItemType::Skill, Iter.Key, i);
 						break;
 					}

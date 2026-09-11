@@ -103,9 +103,10 @@ void UK2Node_MakeParameter::GetMenuActions(FBlueprintActionDatabaseRegistrar& Ac
 
 FText UK2Node_MakeParameter::GetMenuCategory() const { return LOCTEXT("MenuCategory", "ParameterModule"); }
 
-bool UK2Node_MakeParameter::CanUseStruct(const UScriptStruct* Struct, bool)
+bool UK2Node_MakeParameter::CanUseStruct(const UScriptStruct* Struct, bool bForInternalUse)
 {
-	return Struct && Struct != FParameterValueBase::StaticStruct() && Struct->IsChildOf(FParameterValueBase::StaticStruct()) &&
+	return Struct && Struct != FParameterValueBase::StaticStruct() &&
+		UEdGraphSchema_K2::IsAllowableBlueprintVariableType(Struct, bForInternalUse) &&
 		!Struct->HasMetaData(TEXT("Abstract")) && !Struct->HasMetaData(TEXT("Deprecated")) &&
 		!Struct->HasMetaData(TEXT("Hidden")) && !Struct->HasMetaData(TEXT("ParameterHidden"));
 }
