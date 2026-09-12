@@ -57,19 +57,16 @@ APawnBase::APawnBase(const FObjectInitializer& ObjectInitializer) :
 	GenerateVoxelID = FPrimaryAssetId();
 }
 
-void APawnBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void APawnBase::OnSpawn_Implementation(const FParameter& InParam)
 {
 	USceneModuleStatics::RemoveSceneActor(this);
-	
-	if(const FAbilityActorSpawnParameter* Parameter = InParameter.GetPtr<FAbilityActorSpawnParameter>())
+
+	const FAbilityActorSpawnParameter& Parameter = InParam.GetRef<FAbilityActorSpawnParameter>();
+	if(Parameter.bOverrideActorID)
 	{
-		if(Parameter->bOverrideActorID)
-		{
-			ActorID = Parameter->ActorID;
-		}
-		AssetID = Parameter->AssetID;
+		ActorID = Parameter.ActorID;
 	}
+	AssetID = Parameter.AssetID;
 
 	USceneModuleStatics::AddSceneActor(this);
 

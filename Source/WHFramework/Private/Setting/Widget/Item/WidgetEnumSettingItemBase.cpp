@@ -11,30 +11,26 @@ UWidgetEnumSettingItemBase::UWidgetEnumSettingItemBase(const FObjectInitializer&
 {
 }
 
-void UWidgetEnumSettingItemBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UWidgetEnumSettingItemBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 
 	ComboBox_Value->OnSelectionChanged.AddDynamic(this, &UWidgetEnumSettingItemBase::OnComboBoxSelectionChanged);
 	
 	TArray<int32> IgnoredIndices;
-	if(const FWidgetEnumSettingItemSpawnParameter* Parameter =
-		InParameter.GetPtr<FWidgetEnumSettingItemSpawnParameter>())
+	const FWidgetEnumSettingItemSpawnParameter& Parameter = InParam.GetRef<FWidgetEnumSettingItemSpawnParameter>();
+	if(!Parameter.EnumNames.IsEmpty())
 	{
-		if(!Parameter->EnumNames.IsEmpty())
-		{
-			EnumNames = Parameter->EnumNames;
-		}
-		else if(!Parameter->EnumName.IsEmpty())
-		{
-			for(int32 Index = 0; Index < UCommonModuleStatics::GetEnumItemNum(Parameter->EnumName); ++Index)
-			{
-				EnumNames.Add(UCommonModuleStatics::GetEnumDisplayNameByValue(Parameter->EnumName, Index).ToString());
-			}
-		}
-		IgnoredIndices = Parameter->IgnoredIndices;
+		EnumNames = Parameter.EnumNames;
 	}
+	else if(!Parameter.EnumName.IsEmpty())
+	{
+		for(int32 Index = 0; Index < UCommonModuleStatics::GetEnumItemNum(Parameter.EnumName); ++Index)
+		{
+			EnumNames.Add(UCommonModuleStatics::GetEnumDisplayNameByValue(Parameter.EnumName, Index).ToString());
+		}
+	}
+	IgnoredIndices = Parameter.IgnoredIndices;
 	for(int32 Index = 0; Index < EnumNames.Num(); ++Index)
 	{
 		if(!IgnoredIndices.Contains(Index))

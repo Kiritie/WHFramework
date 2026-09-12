@@ -9,10 +9,9 @@ UWorldWeather::UWorldWeather()
 	bAutoSave = true;
 }
 
-void UWorldWeather::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UWorldWeather::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 }
 
 void UWorldWeather::OnDespawn_Implementation(EObjectDespawnMode InMode)

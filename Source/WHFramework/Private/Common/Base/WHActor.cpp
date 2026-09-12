@@ -29,17 +29,14 @@ void AWHActor::InitializeDefaults()
 	Container = nullptr;
 }
 
-void AWHActor::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void AWHActor::OnSpawn_Implementation(const FParameter& InParam)
 {
 	USceneModuleStatics::RemoveSceneActor(this);
-	
-	if(const FWHActorSpawnParameter* Parameter = InParameter.GetPtr<FWHActorSpawnParameter>())
+
+	const FWHActorSpawnParameter& Parameter = InParam.GetRef<FWHActorSpawnParameter>();
+	if(Parameter.bOverrideActorID)
 	{
-		if(Parameter->bOverrideActorID)
-		{
-			ActorID = Parameter->ActorID;
-		}
+		ActorID = Parameter.ActorID;
 	}
 
 	Execute_SetActorVisible(this, true);

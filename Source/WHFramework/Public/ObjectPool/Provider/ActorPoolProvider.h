@@ -14,7 +14,7 @@ class FActorPoolProvider : public IObjectPoolProvider
 public:
 	explicit FActorPoolProvider(UObjectPoolModule& InModule);
 
-	virtual UObject* Spawn(UClass* InClass, const FParameter& InParameter) override;
+	virtual UObject* Spawn(UClass* InClass, const FParameter& InParam) override;
 
 	virtual void PrepareDespawn(UObject* InObject) override;
 

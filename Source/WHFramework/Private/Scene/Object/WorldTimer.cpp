@@ -10,10 +10,9 @@ UWorldTimer::UWorldTimer()
 	bAutoSave = true;
 }
 
-void UWorldTimer::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UWorldTimer::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 }
 
 void UWorldTimer::OnDespawn_Implementation(EObjectDespawnMode InMode)

@@ -42,8 +42,7 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 	BindWidgetMap = TMap<UWidget*, FWorldWidgetMapping>();
 }
 
-void UWorldWidgetBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UWorldWidgetBase::OnSpawn_Implementation(const FParameter& InParam)
 {
 	
 }

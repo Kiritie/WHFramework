@@ -10,10 +10,9 @@ UWidgetTextSettingItemBase::UWidgetTextSettingItemBase(const FObjectInitializer&
 	ParameterValueType = nullptr;
 }
 
-void UWidgetTextSettingItemBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UWidgetTextSettingItemBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 
 	TxtBox_Value->OnTextChanged.AddDynamic(this, &UWidgetTextSettingItemBase::OnTextBoxValueChanged);
 }

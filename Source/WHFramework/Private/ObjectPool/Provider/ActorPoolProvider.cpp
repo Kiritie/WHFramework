@@ -12,9 +12,9 @@ FActorPoolProvider::FActorPoolProvider(UObjectPoolModule& InModule)
 {
 }
 
-UObject* FActorPoolProvider::Spawn(UClass* InClass, const FParameter& InParameter)
+UObject* FActorPoolProvider::Spawn(UClass* InClass, const FParameter& InParam)
 {
-	const FActorSpawnParameter* Parameter = InParameter.GetPtr<FActorSpawnParameter>();
+	const FActorSpawnParameter* Parameter = InParam.GetPtr<FActorSpawnParameter>();
 	UObject* WorldContext = Parameter ? Parameter->WorldContext.Get() : nullptr;
 	if(!WorldContext && Parameter)
 	{

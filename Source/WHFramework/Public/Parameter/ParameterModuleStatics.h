@@ -15,7 +15,7 @@ public:
 	static bool HasGlobalParameter(FName InName, bool bEnsured = true);
 
 	UFUNCTION(BlueprintCallable, Category = "ParameterModule")
-	static void SetGlobalParameter(FName InName, FParameter InParameter);
+	static void SetGlobalParameter(FName InName, FParameter InParam);
 
 	UFUNCTION(BlueprintPure, Category = "ParameterModule")
 	static FParameter GetGlobalParameter(FName InName, bool bEnsured = true);

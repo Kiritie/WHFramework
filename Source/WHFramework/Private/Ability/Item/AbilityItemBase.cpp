@@ -18,16 +18,13 @@ AAbilityItemBase::AAbilityItemBase()
 	OwnerActor = nullptr;
 }
 
-void AAbilityItemBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void AAbilityItemBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 
-	if(const FAbilityItemSpawnParameter* Parameter = InParameter.GetPtr<FAbilityItemSpawnParameter>())
-	{
-		OwnerActor = Parameter->Owner;
-		Item = Parameter->Item;
-	}
+	const FAbilityItemSpawnParameter& Parameter = InParam.GetRef<FAbilityItemSpawnParameter>();
+	OwnerActor = Parameter.Owner;
+	Item = Parameter.Item;
 }
 
 void AAbilityItemBase::OnDespawn_Implementation(EObjectDespawnMode InMode)

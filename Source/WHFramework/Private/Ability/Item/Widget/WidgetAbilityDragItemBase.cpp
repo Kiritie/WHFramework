@@ -12,16 +12,13 @@ UWidgetAbilityDragItemBase::UWidgetAbilityDragItemBase(const FObjectInitializer&
 	UUserWidget::SetVisibility(ESlateVisibility::HitTestInvisible);
 }
 
-void UWidgetAbilityDragItemBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UWidgetAbilityDragItemBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
-	
-	if(const FAbilityWidgetSpawnParameter* SpawnParameter = InParameter.GetPtr<FAbilityWidgetSpawnParameter>())
-	{
-		Item = SpawnParameter->Item;
-		Item.Payload = this;
-	}
+	Super::OnSpawn_Implementation(InParam);
+
+	const FAbilityWidgetSpawnParameter& SpawnParameter = InParam.GetRef<FAbilityWidgetSpawnParameter>();
+	Item = SpawnParameter.Item;
+	Item.Payload = this;
 }
 
 void UWidgetAbilityDragItemBase::OnDespawn_Implementation(EObjectDespawnMode InMode)

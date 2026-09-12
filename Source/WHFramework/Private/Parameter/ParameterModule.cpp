@@ -113,10 +113,10 @@ bool UParameterModule::HasParameter(FName InName, bool bEnsured) const
 	return ParameterSets.HasParameter(InName, bEnsured);
 }
 
-void UParameterModule::SetParameter(FName InName, FParameter InParameter)
+void UParameterModule::SetParameter(FName InName, FParameter InParam)
 {
-	ParameterSets.SetParameter(InName, InParameter);
-	UEventModuleStatics::BroadcastEvent<FEventGlobalParameterChanged>(this, { InName, InParameter });
+	ParameterSets.SetParameter(InName, InParam);
+	UEventModuleStatics::BroadcastEvent<FEventGlobalParameterChanged>(this, { InName, InParam });
 }
 
 FParameter UParameterModule::GetParameter(FName InName, bool bEnsured) const

@@ -10,10 +10,9 @@ UWidgetKeySettingItemBase::UWidgetKeySettingItemBase(const FObjectInitializer& O
 {
 }
 
-void UWidgetKeySettingItemBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UWidgetKeySettingItemBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 
 	for(int32 i = 0; i < Btn_Values.Num(); i++)
 	{

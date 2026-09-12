@@ -41,7 +41,7 @@ public:
 		Listener.Handle = FDelegateHandle(FDelegateHandle::GenerateNewHandle);
 		Listener.Delegate.BindLambda([Callback = MoveTemp(InCallback)](UObject* InSender, FConstStructView InData)
 		{
-			Callback(InSender, *InData.GetPtr<TEvent>());
+			Callback(InSender, InData.Get<TEvent>());
 		});
 		EventMappings.FindOrAdd(TEvent::StaticStruct()).Listeners.Add(MoveTemp(Listener));
 		return EventMappings[TEvent::StaticStruct()].Listeners.Last().Handle;

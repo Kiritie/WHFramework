@@ -1,8 +1,8 @@
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 
-UObject* UObjectPoolModuleStatics::SpawnObject(UClass* InClass, const FParameter& InParameter)
+UObject* UObjectPoolModuleStatics::SpawnObject(UClass* InClass, const FParameter& InParam)
 {
-	return UObjectPoolModule::Get().SpawnObject(InClass, InParameter);
+	return UObjectPoolModule::Get().SpawnObject(InClass, InParam);
 }
 
 void UObjectPoolModuleStatics::DespawnObject(UObject* InObject, EObjectDespawnMode InMode)

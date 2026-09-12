@@ -9,8 +9,7 @@ UCommonRichTextBlockN::UCommonRichTextBlockN(const FObjectInitializer& ObjectIni
 	bUseCommonRichStyle = false;
 }
 
-void UCommonRichTextBlockN::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UCommonRichTextBlockN::OnSpawn_Implementation(const FParameter& InParam)
 {
 	RefreshRichStyle();
 }

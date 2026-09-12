@@ -18,7 +18,7 @@
 namespace
 {
 	const FName SpawnClassPinName = TEXT("InClass");
-	const FName SpawnParameterPinName = TEXT("InParameter");
+	const FName SpawnParameterPinName = TEXT("InParam");
 }
 
 void UK2Node_SpawnObject::AllocateDefaultPins()

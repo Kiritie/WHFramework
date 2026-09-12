@@ -21,8 +21,7 @@ UAbilityInventorySlotBase::UAbilityInventorySlotBase()
 	SlotIndex = 0;
 }
 
-void UAbilityInventorySlotBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UAbilityInventorySlotBase::OnSpawn_Implementation(const FParameter& InParam)
 {
 	
 }

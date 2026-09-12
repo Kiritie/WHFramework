@@ -14,12 +14,11 @@ UPoolWidgetBase::UPoolWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	OwnerWidget = nullptr;
 }
 
-void UPoolWidgetBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UPoolWidgetBase::OnSpawn_Implementation(const FParameter& InParam)
 {
 	if(UWidgetModule::IsValid()) UWidgetModule::Get().RegisterTickableWidget(this);
 
-	const FWidgetSpawnParameter* Parameter = InParameter.GetPtr<FWidgetSpawnParameter>();
+	const FWidgetSpawnParameter* Parameter = InParam.GetPtr<FWidgetSpawnParameter>();
 	OwnerWidget = Parameter ? Cast<UUserWidget>(Parameter->OwningObject) : nullptr;
 
 	Refresh();

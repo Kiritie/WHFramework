@@ -9,7 +9,7 @@ class FWidgetPoolProvider : public IObjectPoolProvider
 public:
 	explicit FWidgetPoolProvider(UObjectPoolModule& InModule);
 
-	virtual UObject* Spawn(UClass* InClass, const FParameter& InParameter) override;
+	virtual UObject* Spawn(UClass* InClass, const FParameter& InParam) override;
 
 	virtual bool Despawn(UObject* InObject) override;
 

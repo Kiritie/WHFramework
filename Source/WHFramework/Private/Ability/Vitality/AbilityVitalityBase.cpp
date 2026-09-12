@@ -45,10 +45,9 @@ AAbilityVitalityBase::AAbilityVitalityBase(const FObjectInitializer& ObjectIniti
 	ActionAbilities = TMap<FGameplayTag, FVitalityActionAbilityData>();
 }
 
-void AAbilityVitalityBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void AAbilityVitalityBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 
 	SwitchDefaultFiniteState();
 }

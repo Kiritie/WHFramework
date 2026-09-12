@@ -25,10 +25,9 @@ UWidgetAbilityInventorySlotBase::UWidgetAbilityInventorySlotBase(const FObjectIn
 	bWidgetTickAble = true;
 }
 
-void UWidgetAbilityInventorySlotBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UWidgetAbilityInventorySlotBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 }
 
 void UWidgetAbilityInventorySlotBase::OnDespawn_Implementation(EObjectDespawnMode InMode)

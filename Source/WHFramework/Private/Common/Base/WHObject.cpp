@@ -14,8 +14,7 @@ UWHObject::UWHObject(const FObjectInitializer& ObjectInitializer)
 {
 }
 
-void UWHObject::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UWHObject::OnSpawn_Implementation(const FParameter& InParam)
 {
 	
 }

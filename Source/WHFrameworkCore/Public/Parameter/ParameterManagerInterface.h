@@ -24,7 +24,7 @@ class WHFRAMEWORKCORE_API IParameterManagerInterface
 public:
 	virtual bool HasParameter(FName InName, bool bEnsured = true) const = 0;
 
-	virtual void SetParameter(FName InName, FParameter InParameter) = 0;
+	virtual void SetParameter(FName InName, FParameter InParam) = 0;
 
 	virtual FParameter GetParameter(FName InName, bool bEnsured = true) const = 0;
 

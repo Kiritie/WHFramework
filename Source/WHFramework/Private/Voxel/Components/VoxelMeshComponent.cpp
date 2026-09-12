@@ -30,17 +30,15 @@ UVoxelMeshComponent::UVoxelMeshComponent(const FObjectInitializer& ObjectInitial
 	OnComponentEndOverlap.AddDynamic(this, &UVoxelMeshComponent::OnEndOverlap);
 }
 
-void UVoxelMeshComponent::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UVoxelMeshComponent::OnSpawn_Implementation(const FParameter& InParam)
 {
-	const FVoxelMeshComponentSpawnParameter* Parameter =
-		InParameter.GetPtr<FVoxelMeshComponentSpawnParameter>();
-	if(AActor* Actor = Parameter ? Cast<AActor>(Parameter->Outer) : nullptr)
+	const FVoxelMeshComponentSpawnParameter& Parameter = InParam.GetRef<FVoxelMeshComponentSpawnParameter>();
+	if(AActor* Actor = Cast<AActor>(Parameter.Outer))
 	{
 		Register(Actor);
 		AttachToComponent(Actor->GetRootComponent(), FAttachmentTransformRules::SnapToTargetIncludingScale);
 	}
-	Chunk = Parameter ? Parameter->Chunk.Get() : nullptr;
+	Chunk = Parameter.Chunk.Get();
 	if(Chunk)
 	{
 		SetRelativeLocation(FVector(Chunk->GetIndex().X * UVoxelModule::Get().GetWorldData().GetChunkRealSize().X,

@@ -24,7 +24,7 @@ class WHFRAMEWORK_API IObjectPoolInterface
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void OnSpawn(const FParameter& InParameter);
+	void OnSpawn(const FParameter& InParam);
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void OnDespawn(EObjectDespawnMode InMode);

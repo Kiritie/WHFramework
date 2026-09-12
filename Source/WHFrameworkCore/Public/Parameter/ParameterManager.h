@@ -25,7 +25,7 @@ public:
 public:
 	virtual bool HasParameter(FName InName, bool bEnsured = true) const override { return false; }
 
-	virtual void SetParameter(FName InName, FParameter InParameter) override { }
+	virtual void SetParameter(FName InName, FParameter InParam) override { }
 
 	virtual FParameter GetParameter(FName InName, bool bEnsured = true) const override { return FParameter(); }
 

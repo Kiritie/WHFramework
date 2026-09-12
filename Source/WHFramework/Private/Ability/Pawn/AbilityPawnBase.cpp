@@ -64,10 +64,9 @@ AAbilityPawnBase::AAbilityPawnBase(const FObjectInitializer& ObjectInitializer) 
 	ActionAbilities = TMap<FGameplayTag, FVitalityActionAbilityData>();
 }
 
-void AAbilityPawnBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void AAbilityPawnBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 
 	InitializeAbilities();
 

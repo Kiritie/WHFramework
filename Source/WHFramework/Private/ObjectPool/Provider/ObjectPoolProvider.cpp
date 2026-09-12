@@ -9,9 +9,9 @@ FObjectPoolProvider::FObjectPoolProvider(UObjectPoolModule& InModule)
 {
 }
 
-UObject* FObjectPoolProvider::Spawn(UClass* InClass, const FParameter& InParameter)
+UObject* FObjectPoolProvider::Spawn(UClass* InClass, const FParameter& InParam)
 {
-	const FObjectSpawnParameter* Parameter = InParameter.GetPtr<FObjectSpawnParameter>();
+	const FObjectSpawnParameter* Parameter = InParam.GetPtr<FObjectSpawnParameter>();
 	UObject* Outer = Parameter && Parameter->Outer ? Parameter->Outer.Get() : &Module;
 	const FObjectPoolPolicy Policy = Module.GetPoolPolicy(InClass);
 	UObject* Object = nullptr;

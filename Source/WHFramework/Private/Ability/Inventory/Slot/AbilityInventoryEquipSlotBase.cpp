@@ -10,10 +10,9 @@ UAbilityInventoryEquipSlotBase::UAbilityInventoryEquipSlotBase()
 {
 }
 
-void UAbilityInventoryEquipSlotBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UAbilityInventoryEquipSlotBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 }
 
 void UAbilityInventoryEquipSlotBase::OnDespawn_Implementation(EObjectDespawnMode InMode)

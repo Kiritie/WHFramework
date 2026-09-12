@@ -24,8 +24,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Object
 public:
-	virtual void OnSpawn_Implementation(
-		const FParameter& InParameter) override;
+	virtual void OnSpawn_Implementation(const FParameter& InParam) override;
 		
 	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode)
 		override;

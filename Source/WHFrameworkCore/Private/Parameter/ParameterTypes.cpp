@@ -29,7 +29,7 @@ bool FParameterSets::HasParameter(FName InName, bool bEnsured) const
 	return false;
 }
 
-void FParameterSets::SetParameter(FName InName, const FParameter& InParameter)
+void FParameterSets::SetParameter(FName InName, const FParameter& InParam)
 {
 	if(FParameterSet* Set = Sets.FindByPredicate([InName](const FParameterSet& Candidate)
 	{
@@ -37,12 +37,12 @@ void FParameterSets::SetParameter(FName InName, const FParameter& InParameter)
 	}))
 	{
 		const FText Description = Set->Parameter.GetDescription();
-		Set->Parameter = InParameter;
+		Set->Parameter = InParam;
 		Set->Parameter.SetDescription(Description);
 		return;
 	}
 
-	Sets.Add(FParameterSet(InName, InParameter));
+	Sets.Add(FParameterSet(InName, InParam));
 }
 
 FParameter FParameterSets::GetParameter(FName InName, bool bEnsured) const

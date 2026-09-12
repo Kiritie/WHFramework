@@ -21,10 +21,9 @@ AVoxelEntity::AVoxelEntity()
 	VoxelScope = EVoxelScope::Entity;
 }
 
-void AVoxelEntity::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void AVoxelEntity::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 }
 
 void AVoxelEntity::OnDespawn_Implementation(EObjectDespawnMode InMode)

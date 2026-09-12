@@ -14,10 +14,9 @@ AVoxelAuxiliary::AVoxelAuxiliary()
 	VoxelScope = EVoxelScope::None;
 }
 
-void AVoxelAuxiliary::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void AVoxelAuxiliary::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 }
 
 void AVoxelAuxiliary::OnDespawn_Implementation(EObjectDespawnMode InMode)

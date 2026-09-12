@@ -87,10 +87,9 @@ AAbilityCharacterBase::AAbilityCharacterBase(const FObjectInitializer& ObjectIni
 	ActionAbilities = TMap<FGameplayTag, FVitalityActionAbilityData>();
 }
 
-void AAbilityCharacterBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void AAbilityCharacterBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 
 	InitializeAbilities();
 

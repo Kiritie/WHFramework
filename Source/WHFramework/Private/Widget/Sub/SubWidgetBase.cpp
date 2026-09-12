@@ -15,8 +15,7 @@ USubWidgetBase::USubWidgetBase(const FObjectInitializer& ObjectInitializer) : Su
 	OwnerWidget = nullptr;
 }
 
-void USubWidgetBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void USubWidgetBase::OnSpawn_Implementation(const FParameter& InParam)
 {
 	
 }

@@ -42,8 +42,7 @@ void UCommonTextBlockN::OnBindingChanged(const FName& Property)
 	}
 }
 
-void UCommonTextBlockN::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UCommonTextBlockN::OnSpawn_Implementation(const FParameter& InParam)
 {
 	
 }

@@ -155,8 +155,8 @@ struct WHFRAMEWORKCORE_API FParameterSet
 {
 	GENERATED_BODY()
 	FParameterSet();
-	FParameterSet(FName InName, const FParameter& InParameter, const FText& InCategory = FText::GetEmpty(), bool bInRegistered = false)
-		: Name(InName), bRegistered(bInRegistered), Category(InCategory), Parameter(InParameter)
+	FParameterSet(FName InName, const FParameter& InParam, const FText& InCategory = FText::GetEmpty(), bool bInRegistered = false)
+		: Name(InName), bRegistered(bInRegistered), Category(InCategory), Parameter(InParam)
 	{
 	}
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -180,7 +180,7 @@ struct WHFRAMEWORKCORE_API FParameterSets
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (TitleProperty = "Name"))
 	TArray<FParameterSet> Sets;
 	bool HasParameter(FName InName, bool bEnsured = true) const;
-	void SetParameter(FName InName, const FParameter& InParameter);
+	void SetParameter(FName InName, const FParameter& InParam);
 	FParameter GetParameter(FName InName, bool bEnsured = true) const;
 	TArray<FParameter> GetParameters(FName InName, bool bEnsured = true) const;
 	void RemoveParameter(FName InName);

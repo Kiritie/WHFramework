@@ -11,7 +11,7 @@ class WHFRAMEWORK_API UObjectPoolModuleStatics : public UBlueprintFunctionLibrar
 
 public:
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"), Category = "ObjectPoolModule")
-	static UObject* SpawnObject(UClass* InClass, const FParameter& InParameter);
+	static UObject* SpawnObject(UClass* InClass, const FParameter& InParam);
 
 	template<class TObject>
 	static TObject* SpawnObject(TSubclassOf<TObject> InClass = TObject::StaticClass())
@@ -22,10 +22,10 @@ public:
 	template<class TObject, class TSpawnParameter>
 		requires std::is_base_of_v<FSpawnParameter, std::decay_t<TSpawnParameter>>
 	static TObject* SpawnObject(
-		const TSpawnParameter& InParameter,
+		const TSpawnParameter& InParam,
 		TSubclassOf<TObject> InClass = TObject::StaticClass())
 	{
-		return UObjectPoolModule::Get().SpawnObject<TObject>(InParameter, InClass);
+		return UObjectPoolModule::Get().SpawnObject<TObject>(InParam, InClass);
 	}
 
 	UFUNCTION(BlueprintCallable, Category = "ObjectPoolModule")

@@ -8,10 +8,9 @@ UWidgetBoolSettingItemBase::UWidgetBoolSettingItemBase(const FObjectInitializer&
 {
 }
 
-void UWidgetBoolSettingItemBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UWidgetBoolSettingItemBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 
 	Btn_Value->OnIsSelectedChanged().AddUObject(this, &UWidgetBoolSettingItemBase::OnCheckBoxStateChanged);
 }

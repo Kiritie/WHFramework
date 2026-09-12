@@ -12,16 +12,12 @@ UWidgetSettingItemBase::UWidgetSettingItemBase(const FObjectInitializer& ObjectI
 	WidgetParams.Add(MoveTemp(TitleParameter));
 }
 
-void UWidgetSettingItemBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UWidgetSettingItemBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 
-	if(const FWidgetSettingItemSpawnParameter* Parameter =
-		InParameter.GetPtr<FWidgetSettingItemSpawnParameter>())
-	{
-		SetTitle(Parameter->Title);
-	}
+	const FWidgetSettingItemSpawnParameter& Parameter = InParam.GetRef<FWidgetSettingItemSpawnParameter>();
+	SetTitle(Parameter.Title);
 }
 
 void UWidgetSettingItemBase::OnDespawn_Implementation(EObjectDespawnMode InMode)

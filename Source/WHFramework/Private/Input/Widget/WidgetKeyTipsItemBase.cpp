@@ -25,10 +25,9 @@ void UWidgetKeyTipsItemBase::NativePreConstruct()
 	SetKeyDisplayName(KeyDisplayName);
 }
 
-void UWidgetKeyTipsItemBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UWidgetKeyTipsItemBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 
 	RefreshData();
 }

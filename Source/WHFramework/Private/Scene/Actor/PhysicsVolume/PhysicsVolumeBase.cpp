@@ -13,8 +13,7 @@ APhysicsVolumeBase::APhysicsVolumeBase()
 	bInitialized = false;
 }
 
-void APhysicsVolumeBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void APhysicsVolumeBase::OnSpawn_Implementation(const FParameter& InParam)
 {
 }
 

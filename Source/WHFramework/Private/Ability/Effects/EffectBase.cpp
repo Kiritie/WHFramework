@@ -2,8 +2,7 @@
 
 #include "Ability/Effects/EffectBase.h"
 
-void UEffectBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UEffectBase::OnSpawn_Implementation(const FParameter& InParam)
 {
 }
 

@@ -42,15 +42,12 @@ AAbilityActorBase::AAbilityActorBase(const FObjectInitializer& ObjectInitializer
 	BirthTransform = FTransform::Identity;
 }
 
-void AAbilityActorBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void AAbilityActorBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	if(const FAbilityActorSpawnParameter* Parameter = InParameter.GetPtr<FAbilityActorSpawnParameter>())
-	{
-		AssetID = Parameter->AssetID;
-	}
+	const FAbilityActorSpawnParameter& Parameter = InParam.GetRef<FAbilityActorSpawnParameter>();
+	AssetID = Parameter.AssetID;
 
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 
 	InitializeAbilities();
 }

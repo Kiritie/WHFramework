@@ -19,10 +19,9 @@ UWidgetFloatSettingItemBase::UWidgetFloatSettingItemBase(const FObjectInitialize
 	ScaleFactor = 1.f;
 }
 
-void UWidgetFloatSettingItemBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UWidgetFloatSettingItemBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 
 	Slider_Value->OnValueChanged.AddDynamic(this, &UWidgetFloatSettingItemBase::OnSliderValueChanged);
 	if(TxtBox_Value)
@@ -30,14 +29,11 @@ void UWidgetFloatSettingItemBase::OnSpawn_Implementation(
 		TxtBox_Value->OnTextCommitted.AddDynamic(this, &UWidgetFloatSettingItemBase::OnTextBoxValueCommitted);
 	}
 
-	if(const FWidgetFloatSettingItemSpawnParameter* Parameter =
-		InParameter.GetPtr<FWidgetFloatSettingItemSpawnParameter>())
-	{
-		MinValue = Parameter->MinValue;
-		MaxValue = Parameter->MaxValue;
-		DecimalNum = Parameter->DecimalNum;
-		ScaleFactor = Parameter->ScaleFactor;
-	}
+	const FWidgetFloatSettingItemSpawnParameter& Parameter = InParam.GetRef<FWidgetFloatSettingItemSpawnParameter>();
+	MinValue = Parameter.MinValue;
+	MaxValue = Parameter.MaxValue;
+	DecimalNum = Parameter.DecimalNum;
+	ScaleFactor = Parameter.ScaleFactor;
 
 	if(Txt_MinValue)
 	{

@@ -11,22 +11,18 @@ UWidgetOptionSettingItemBase::UWidgetOptionSettingItemBase(const FObjectInitiali
 	bEditable = false;
 }
 
-void UWidgetOptionSettingItemBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UWidgetOptionSettingItemBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 
 	TxtBox_Value->OnTextChanged.AddDynamic(this, &UWidgetOptionSettingItemBase::OnTextBoxValueChanged);
 
 	Btn_Last->OnClicked().AddUObject(this, &UWidgetOptionSettingItemBase::OnLastButtonClicked);
 	Btn_Next->OnClicked().AddUObject(this, &UWidgetOptionSettingItemBase::OnNextButtonClicked);
 
-	if(const FWidgetOptionSettingItemSpawnParameter* Parameter =
-		InParameter.GetPtr<FWidgetOptionSettingItemSpawnParameter>())
-	{
-		OptionNames = Parameter->Options;
-		bEditable = Parameter->bEditable;
-	}
+	const FWidgetOptionSettingItemSpawnParameter& Parameter = InParam.GetRef<FWidgetOptionSettingItemSpawnParameter>();
+	OptionNames = Parameter.Options;
+	bEditable = Parameter.bEditable;
 
 	SetOptionNames(OptionNames);
 

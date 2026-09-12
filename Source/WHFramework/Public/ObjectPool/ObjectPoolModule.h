@@ -46,7 +46,7 @@ public:
 
 public:
 	UFUNCTION(BlueprintCallable)
-	UObject* SpawnObject(UClass* InClass, const FParameter& InParameter = FParameter());
+	UObject* SpawnObject(UClass* InClass, const FParameter& InParam = FParameter());
 
 	template<class TObject>
 	TObject* SpawnObject(TSubclassOf<TObject> InClass = TObject::StaticClass())
@@ -57,10 +57,10 @@ public:
 	template<class TObject, class TSpawnParameter>
 		requires std::is_base_of_v<FSpawnParameter, std::decay_t<TSpawnParameter>>
 	TObject* SpawnObject(
-		const TSpawnParameter& InParameter,
+		const TSpawnParameter& InParam,
 		TSubclassOf<TObject> InClass = TObject::StaticClass())
 	{
-		return Cast<TObject>(SpawnObject(InClass.Get(), FParameter(InParameter)));
+		return Cast<TObject>(SpawnObject(InClass.Get(), FParameter(InParam)));
 	}
 
 	UFUNCTION(BlueprintCallable)

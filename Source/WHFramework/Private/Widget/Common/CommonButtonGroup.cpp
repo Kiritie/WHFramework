@@ -11,8 +11,7 @@ UCommonButtonGroup::UCommonButtonGroup()
 	bBroadcastOnDeselected = true;
 }
 
-void UCommonButtonGroup::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UCommonButtonGroup::OnSpawn_Implementation(const FParameter& InParam)
 {
 	
 }

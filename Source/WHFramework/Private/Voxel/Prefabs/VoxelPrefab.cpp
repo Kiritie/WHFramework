@@ -17,10 +17,9 @@ AVoxelPrefab::AVoxelPrefab()
 	VoxelMap = TMap<FIndex, FVoxelItem>();
 }
 
-void AVoxelPrefab::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void AVoxelPrefab::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 }
 
 void AVoxelPrefab::OnDespawn_Implementation(EObjectDespawnMode InMode)

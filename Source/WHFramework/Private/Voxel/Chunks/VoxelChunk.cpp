@@ -61,8 +61,7 @@ UVoxelChunk::UVoxelChunk()
 	bNeedCreateMesh = false;
 }
 
-void UVoxelChunk::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UVoxelChunk::OnSpawn_Implementation(const FParameter& InParam)
 {
 	
 }

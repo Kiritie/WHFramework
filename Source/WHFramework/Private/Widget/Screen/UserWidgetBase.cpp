@@ -57,8 +57,7 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	ChildWidgets = TArray<IScreenWidgetInterface*>();
 }
 
-void UUserWidgetBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UUserWidgetBase::OnSpawn_Implementation(const FParameter& InParam)
 {
 	
 }

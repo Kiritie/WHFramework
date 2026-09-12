@@ -10,7 +10,7 @@ class IObjectPoolProvider
 public:
 	virtual ~IObjectPoolProvider() = default;
 
-	virtual UObject* Spawn(UClass* InClass, const FParameter& InParameter) = 0;
+	virtual UObject* Spawn(UClass* InClass, const FParameter& InParam) = 0;
 
 	virtual void PrepareDespawn(UObject* InObject) { }
 

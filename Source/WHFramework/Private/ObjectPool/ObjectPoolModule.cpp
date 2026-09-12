@@ -90,10 +90,10 @@ FString UObjectPoolModule::GetModuleDebugMessage()
 	return DebugMessage.IsEmpty() ? Super::GetModuleDebugMessage() : DebugMessage;
 }
 
-UObject* UObjectPoolModule::SpawnObject(UClass* InClass, const FParameter& InParameter)
+UObject* UObjectPoolModule::SpawnObject(UClass* InClass, const FParameter& InParam)
 {
 	IObjectPoolProvider* Provider = ResolveProvider(InClass);
-	UObject* Object = Provider ? Provider->Spawn(InClass, InParameter) : nullptr;
+	UObject* Object = Provider ? Provider->Spawn(InClass, InParam) : nullptr;
 	if(!Object)
 	{
 		return nullptr;
@@ -102,7 +102,7 @@ UObject* UObjectPoolModule::SpawnObject(UClass* InClass, const FParameter& InPar
 	InactiveObjects.Remove(Object);
 	if(Object->Implements<UObjectPoolInterface>())
 	{
-		IObjectPoolInterface::Execute_OnSpawn(Object, InParameter);
+		IObjectPoolInterface::Execute_OnSpawn(Object, InParam);
 	}
 	return Object;
 }

@@ -12,10 +12,9 @@ UWidgetAbilityItemBase::UWidgetAbilityItemBase(const FObjectInitializer& ObjectI
 	Item = FAbilityItem::Empty;
 }
 
-void UWidgetAbilityItemBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UWidgetAbilityItemBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 }
 
 void UWidgetAbilityItemBase::OnDespawn_Implementation(EObjectDespawnMode InMode)

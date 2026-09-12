@@ -22,8 +22,7 @@ UFiniteStateBase::UFiniteStateBase()
 	bHasBlueprintOnPreLeave = UCommonModuleStatics::IsImplementedInBlueprint(OnPreLeaveFunction);
 }
 
-void UFiniteStateBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UFiniteStateBase::OnSpawn_Implementation(const FParameter& InParam)
 {
 	
 }

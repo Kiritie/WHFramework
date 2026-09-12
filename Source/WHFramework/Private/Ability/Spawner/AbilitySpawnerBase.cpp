@@ -54,17 +54,14 @@ AAbilitySpawnerBase::AAbilitySpawnerBase()
 	bAutoSpawn = false;
 }
 
-void AAbilitySpawnerBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void AAbilitySpawnerBase::OnSpawn_Implementation(const FParameter& InParam)
 {
 	USceneModuleStatics::RemoveSceneActor(this);
-	
-	if(const FWHActorSpawnParameter* Parameter = InParameter.GetPtr<FWHActorSpawnParameter>())
+
+	const FWHActorSpawnParameter& Parameter = InParam.GetRef<FWHActorSpawnParameter>();
+	if(Parameter.bOverrideActorID)
 	{
-		if(Parameter->bOverrideActorID)
-		{
-			ActorID = Parameter->ActorID;
-		}
+		ActorID = Parameter.ActorID;
 	}
 	
 	USceneModuleStatics::AddSceneActor(this);

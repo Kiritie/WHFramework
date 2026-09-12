@@ -10,16 +10,12 @@ UWidgetSettingItemCategoryBase::UWidgetSettingItemCategoryBase(const FObjectInit
 {
 }
 
-void UWidgetSettingItemCategoryBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UWidgetSettingItemCategoryBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
-	
-	if(const FWidgetSettingItemCategorySpawnParameter* Parameter =
-		InParameter.GetPtr<FWidgetSettingItemCategorySpawnParameter>())
-	{
-		SetCategory(Parameter->Category);
-	}
+	Super::OnSpawn_Implementation(InParam);
+
+	const FWidgetSettingItemCategorySpawnParameter& Parameter = InParam.GetRef<FWidgetSettingItemCategorySpawnParameter>();
+	SetCategory(Parameter.Category);
 }
 
 void UWidgetSettingItemCategoryBase::OnDespawn_Implementation(EObjectDespawnMode InMode)

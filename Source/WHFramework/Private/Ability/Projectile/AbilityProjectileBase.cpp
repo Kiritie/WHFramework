@@ -26,31 +26,26 @@ AAbilityProjectileBase::AAbilityProjectileBase()
 	bLaunched = false;
 }
 
-void AAbilityProjectileBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void AAbilityProjectileBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 
-	const FAbilityProjectileSpawnParameter* Parameter =
-		InParameter.GetPtr<FAbilityProjectileSpawnParameter>();
-	OwnerActor = Parameter ? Parameter->Owner.Get() : nullptr;
+	const FAbilityProjectileSpawnParameter& Parameter = InParam.GetRef<FAbilityProjectileSpawnParameter>();
+	OwnerActor = Parameter.Owner.Get();
 
 	if(IAbilityActorInterface* AbilityActor = GetOwnerActor<IAbilityActorInterface>())
 	{
 		AbilityActor->AttachActor(this, FAttachmentTransformRules::SnapToTargetNotIncludingScale, OriginSocketName);
 		SetActorRotation(FinalSocketName.IsNone() ? OwnerActor->GetActorRotation() : UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), AbilityActor->GetMeshComponent()->GetSocketLocation(FinalSocketName)));
 
-		if(Parameter)
+		if(UAbilitySystemComponentBase* OwningASC = Cast<UAbilitySystemComponentBase>(AbilityActor->GetAbilitySystemComponent()))
 		{
-			if(UAbilitySystemComponentBase* OwningASC = Cast<UAbilitySystemComponentBase>(AbilityActor->GetAbilitySystemComponent()))
+			const FGameplayAbilitySpec Spec = OwningASC->FindAbilitySpecForHandle(Parameter.AbilityHandle);
+			if(UAbilityBase* Ability = Cast<UAbilityBase>(Spec.GetPrimaryInstance()))
 			{
-				const FGameplayAbilitySpec Spec = OwningASC->FindAbilitySpecForHandle(Parameter->AbilityHandle);
-				if(UAbilityBase* Ability = Cast<UAbilityBase>(Spec.GetPrimaryInstance()))
-				{
-					AbilityLevel = Ability->GetAbilityLevel();
-					AbilityActorInfo = Ability->GetActorInfo();
-					EffectContainerMap = Ability->EffectContainerMap;
-				}
+				AbilityLevel = Ability->GetAbilityLevel();
+				AbilityActorInfo = Ability->GetActorInfo();
+				EffectContainerMap = Ability->EffectContainerMap;
 			}
 		}
 	}

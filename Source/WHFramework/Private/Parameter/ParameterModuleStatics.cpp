@@ -62,9 +62,9 @@ bool UParameterModuleStatics::HasGlobalParameter(FName InName, bool bEnsured)
 	return UParameterModule::Get().HasParameter(InName, bEnsured);
 }
 
-void UParameterModuleStatics::SetGlobalParameter(FName InName, FParameter InParameter)
+void UParameterModuleStatics::SetGlobalParameter(FName InName, FParameter InParam)
 {
-	UParameterModule::Get().SetParameter(InName, InParameter);
+	UParameterModule::Get().SetParameter(InName, InParam);
 }
 
 FParameter UParameterModuleStatics::GetGlobalParameter(FName InName, bool bEnsured)

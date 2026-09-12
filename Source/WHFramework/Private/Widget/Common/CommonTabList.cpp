@@ -7,8 +7,7 @@ UCommonTabList::UCommonTabList(const FObjectInitializer& ObjectInitializer) : Su
 	
 }
 
-void UCommonTabList::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UCommonTabList::OnSpawn_Implementation(const FParameter& InParam)
 {
 	
 }

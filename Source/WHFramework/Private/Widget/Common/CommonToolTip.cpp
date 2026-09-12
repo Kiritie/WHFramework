@@ -11,10 +11,9 @@ UCommonToolTip::UCommonToolTip(const FObjectInitializer& ObjectInitializer) : Su
 	OwnerWidget = nullptr;
 }
 
-void UCommonToolTip::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UCommonToolTip::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 	
 	if(OwnerWidget)
 	{

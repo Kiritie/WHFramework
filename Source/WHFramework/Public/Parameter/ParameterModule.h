@@ -65,7 +65,7 @@ public:
 	virtual bool HasParameter(FName InName, bool bEnsured = true) const override;
 
 	UFUNCTION(BlueprintCallable)
-	virtual void SetParameter(FName InName, FParameter InParameter) override;
+	virtual void SetParameter(FName InName, FParameter InParam) override;
 
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	virtual FParameter GetParameter(FName InName, bool bEnsured = true) const override;

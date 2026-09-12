@@ -434,8 +434,7 @@ UCommonButton::UCommonButton(const FObjectInitializer& ObjectInitializer) : Supe
 	}
 }
 
-void UCommonButton::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void UCommonButton::OnSpawn_Implementation(const FParameter& InParam)
 {
 	
 }

@@ -13,8 +13,8 @@ struct WHFRAMEWORK_API FEventGlobalParameterChanged : public FEventBase
 public:
 	FEventGlobalParameterChanged() = default;
 
-	FEventGlobalParameterChanged(FName InParameterName, FParameter InParameter)
-		: ParameterName(MoveTemp(InParameterName)), Parameter(MoveTemp(InParameter))
+	FEventGlobalParameterChanged(FName InParamName, FParameter InParam)
+		: ParameterName(MoveTemp(InParamName)), Parameter(MoveTemp(InParam))
 	{
 	}
 

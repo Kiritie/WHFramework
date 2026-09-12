@@ -15,10 +15,9 @@ USubButtonWidgetBase::USubButtonWidgetBase(const FObjectInitializer& ObjectIniti
 	OwnerWidget = nullptr;
 }
 
-void USubButtonWidgetBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void USubButtonWidgetBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 }
 
 void USubButtonWidgetBase::OnDespawn_Implementation(EObjectDespawnMode InMode)

@@ -29,10 +29,9 @@ AAbilityProjectileRemoteBase::AAbilityProjectileRemoteBase()
 	InitialVelocity = 3000.f;
 }
 
-void AAbilityProjectileRemoteBase::OnSpawn_Implementation(
-	const FParameter& InParameter)
+void AAbilityProjectileRemoteBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	Super::OnSpawn_Implementation(InParameter);
+	Super::OnSpawn_Implementation(InParam);
 }
 
 void AAbilityProjectileRemoteBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
