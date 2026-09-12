@@ -4,7 +4,6 @@
 
 UWidgetAbilitySpawnerInfo::UWidgetAbilitySpawnerInfo(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	WidgetName = FName("SpawnerInfo");
 
 	WidgetSpace = EWidgetSpace::World;
 	WidgetAlignment = FVector2D(0.5f);

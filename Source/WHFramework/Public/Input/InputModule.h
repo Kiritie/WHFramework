@@ -8,11 +8,14 @@
 
 #include "InputModule.generated.h"
 
-class UInputManagerBase;
+class UInputBindingBase;
 class UInputComponentBase;
 class UInputMappingContext;
 class UInputActionBase;
 class UEnhancedInputComponent;
+enum class ECommonInputType : uint8;
+
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnInputTypeChanged, int32, ECommonInputType);
 
 UCLASS()
 class WHFRAMEWORK_API UInputModule : public UModuleBase, public IInputManagerInterface
@@ -63,6 +66,12 @@ protected:
 protected:
 	FInputModuleSaveData LocalSaveData;
 
+	void BuildInputCaches();
+
+	void BuildPlayerRuntimes();
+
+	void HandleInputMethodChanged(ECommonInputType InInputType, int32 InPlayerIndex);
+
 public:
 	virtual FString GetModuleDebugMessage() override;
 
@@ -73,10 +82,7 @@ protected:
 	EInputMode NativeInputMode;
 
 	UPROPERTY(EditAnywhere, Instanced, Category = "InputSteups|Manager")
-	TArray<UInputManagerBase*> InputManagers;
-
-	UPROPERTY(VisibleAnywhere, Category = "InputSteups|Manager")
-	TArray<FPlayerInputManagerInfo> InputManagerInfos;
+	TArray<UInputBindingBase*> InputBindings;
 
 public:
 	UFUNCTION(BlueprintPure)
@@ -89,77 +95,43 @@ public:
 	virtual void SetNativeInputMode(EInputMode InInputMode) override;
 
 	template<class T>
-	T* GetInputManager(int32 InPlayerIndex = 0) const
+	T* GetInputBinding(int32 InPlayerIndex = 0) const
 	{
-		return Cast<T>(GetInputManager(T::StaticClass(), InPlayerIndex));
+		return Cast<T>(GetInputBinding(T::StaticClass(), InPlayerIndex));
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	UInputManagerBase* GetInputManager(TSubclassOf<UInputManagerBase> InClass, int32 InPlayerIndex = 0) const;
+	UInputBindingBase* GetInputBinding(TSubclassOf<UInputBindingBase> InClass, int32 InPlayerIndex = 0) const;
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	UInputManagerBase* GetInputManagerByName(const FName InName, int32 InPlayerIndex = 0, TSubclassOf<UInputManagerBase> InClass = nullptr) const;
-
-	//////////////////////////////////////////////////////////////////////////
-	// InputShortcuts
-public:
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InTag"))
-	void AddKeyShortcut(const FGameplayTag& InTag, const FInputKeyShortcut& InKeyShortcut = FInputKeyShortcut());
-
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InTag"))
-	void RemoveKeyShortcut(const FGameplayTag& InTag);
+	UInputBindingBase* GetInputBindingByName(const FName InName, int32 InPlayerIndex = 0, TSubclassOf<UInputBindingBase> InClass = nullptr) const;
 
 protected:
-	UPROPERTY(EditAnywhere, Category = "InputSteups|Key")
-	TMap<FGameplayTag, FInputKeyShortcut> KeyShortcuts;
+	UPROPERTY(EditAnywhere, Category = "Input|Context")
+	TArray<FInputContextConfig> ContextConfigs;
+
+	UPROPERTY(Transient)
+	TMap<FGameplayTag, TObjectPtr<const UInputActionBase>> InputActionMap;
+
+	UPROPERTY(Transient)
+	TMap<FGameplayTag, TObjectPtr<UInputMappingContext>> InputContextMap;
+
+	TMultiMap<FGameplayTag, FInputMappableEntry> PlayerMappableByActionTag;
+
+	UPROPERTY(Transient)
+	TArray<FInputPlayerRuntime> PlayerRuntimes;
 
 public:
-	UFUNCTION(BlueprintPure)
-	TMap<FGameplayTag, FInputKeyShortcut>& GetKeyShortcuts() { return KeyShortcuts; }
+	const TArray<FInputContextConfig>& GetContextConfigs() const { return ContextConfigs; }
 
-	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"))
-	FInputKeyShortcut GetKeyShortcut(const FGameplayTag& InTag) const;
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InContextTag"))
+	bool ActivateInputContext(FGameplayTag InContextTag, int32 InPlayerIndex = 0);
 
-	//////////////////////////////////////////////////////////////////////////
-	// InputMappings
-public:
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InTag"))
-	void AddKeyMapping(const FGameplayTag& InTag, const FInputKeyMapping& InKeyMapping);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InContextTag"))
+	bool DeactivateInputContext(FGameplayTag InContextTag, int32 InPlayerIndex = 0);
 
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InTag"))
-	void RemoveKeyMapping(const FGameplayTag& InTag);
-
-	UFUNCTION(BlueprintCallable)
-	void AddTouchMapping(const FInputTouchMapping& InTouchMapping);
-	
-	UFUNCTION(BlueprintCallable)
-	void AddPlayerKeyMapping(const FName InName, const FKey InKey, int32 InSlot = 0, int32 InPlayerIndex = 0);
-
-protected:
-	UFUNCTION(BlueprintCallable)
-	void ApplyKeyMappings();
-
-	UFUNCTION(BlueprintCallable)
-	void ApplyTouchMappings();
-
-protected:
-	UPROPERTY(EditAnywhere, Category = "InputSteups|Context")
-	TArray<FInputContextMapping> ContextMappings;
-
-	UPROPERTY(VisibleAnywhere, Category = "InputSteups|Key")
-	TMap<FGameplayTag, FInputKeyMapping> KeyMappings;
-
-	UPROPERTY(VisibleAnywhere, Category = "InputSteups|Touch")
-	TArray<FInputTouchMapping> TouchMappings;
-
-public:
-	TArray<FInputContextMapping>& GetContextMappings() { return ContextMappings; }
-
-	UFUNCTION(BlueprintPure)
-	TMap<FGameplayTag, FInputKeyMapping>& GetKeyMappings() { return KeyMappings; }
-
-	UFUNCTION(BlueprintPure)
-	TArray<FInputTouchMapping>& GetTouchMappings() { return TouchMappings; }
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InContextTag"))
+	bool IsInputContextActive(FGameplayTag InContextTag, int32 InPlayerIndex = 0) const;
 
 	UFUNCTION(BlueprintPure)
 	TArray<FEnhancedActionKeyMapping> GetAllActionKeyMappings(int32 InPlayerIndex = 0);
@@ -170,56 +142,37 @@ public:
 	UFUNCTION(BlueprintPure)
 	TArray<FPlayerKeyMapping> GetAllPlayerKeyMappings(int32 InPlayerIndex = 0);
 
-	UFUNCTION(BlueprintPure)
-	TArray<FPlayerKeyMapping> GetPlayerKeyMappingsByName(const FName InName, int32 InPlayerIndex = 0);
-
-	UFUNCTION(BlueprintPure)
-	FPlayerKeyMappingInfo GetPlayerKeyMappingInfoByName(const FName InName, int32 InPlayerIndex = 0) const;
-
-	UFUNCTION(BlueprintPure)
-	bool IsPlayerMappedKeyByName(const FName InName, const FKey& InKey, int32 InPlayerIndex = 0) const;
-
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"))
 	bool IsPlayerMappedKeyByTag(const FGameplayTag& InTag, const FKey& InKey, int32 InPlayerIndex = 0) const;
 
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"))
 	const UInputActionBase* GetInputActionByTag(const FGameplayTag& InTag, bool bEnsured = true) const;
 
-	//////////////////////////////////////////////////////////////////////////
-	/// TouchInputs
-protected:
-	UPROPERTY(EditAnywhere, Category = "InputSteups|Touch")
-	float TouchInputRate;
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"))
+	bool IsInputActionActive(const FGameplayTag& InTag, int32 InPlayerIndex = 0) const;
 
-protected:
-	UFUNCTION(BlueprintNativeEvent)
-	void TouchPressed(ETouchIndex::Type InTouchIndex, FVector InLocation);
+	bool MapPlayerKeyByTag(FGameplayTag InActionTag, FKey InNewKey, EPlayerMappableKeySlot InSlot, int32 InPlayerIndex = 0, FGameplayTagContainer* OutFailureReason = nullptr);
 
-	UFUNCTION(BlueprintNativeEvent)
-	void TouchPressedImpl();
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InActionTag"))
+	bool ResetPlayerKeyByTag(FGameplayTag InActionTag, int32 InPlayerIndex = 0);
 
-	UFUNCTION(BlueprintNativeEvent)
-	void TouchReleased(ETouchIndex::Type InTouchIndex, FVector InLocation);
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InActionTag"))
+	TArray<FPlayerKeyMapping> GetPlayerKeyMappingsByTag(FGameplayTag InActionTag, int32 InPlayerIndex = 0) const;
 
-	UFUNCTION(BlueprintNativeEvent)
-	void TouchReleasedImpl(ETouchIndex::Type InTouchIndex);
-
-	UFUNCTION(BlueprintNativeEvent)
-	void TouchMoved(ETouchIndex::Type InTouchIndex, FVector InLocation);
-
-	//////////////////////////////////////////////////////////////////////////
-	/// InputStates
-protected:
-	UPROPERTY(VisibleAnywhere, Category = "InputStates|Touch")
-	int32 TouchPressedCount;
-
-	FVector2D TouchLocationPrevious;
-	float TouchPinchValuePrevious;
-	FTimerHandle TouchReleaseTimerHandle1;
-	FTimerHandle TouchReleaseTimerHandle2;
-	FTimerHandle TouchReleaseTimerHandle3;
-
-public:
 	UFUNCTION(BlueprintPure)
-	int32 GetTouchPressedCount() const { return TouchPressedCount; }
+	TArray<FGameplayTag> GetAllMappableActions() const;
+
+	UFUNCTION(BlueprintPure)
+	ECommonInputType GetCurrentInputType(int32 InPlayerIndex = 0) const;
+
+	UFUNCTION(BlueprintPure)
+	bool IsUsingGamepad(int32 InPlayerIndex = 0) const;
+
+	UFUNCTION(BlueprintPure)
+	bool IsUsingMouseAndKeyboard(int32 InPlayerIndex = 0) const;
+
+	UFUNCTION(BlueprintPure)
+	bool IsUsingTouch(int32 InPlayerIndex = 0) const;
+
+	FOnInputTypeChanged OnInputTypeChanged;
 };

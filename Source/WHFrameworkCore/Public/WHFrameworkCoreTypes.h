@@ -7,6 +7,13 @@
 
 #include "WHFrameworkCoreTypes.generated.h"
 
+UENUM(BlueprintType)
+enum class EObjectDespawnMode : uint8
+{
+	Recovery,
+	Destroy
+};
+
 // 不加编译会报错
 USTRUCT()
 struct FMyStruct

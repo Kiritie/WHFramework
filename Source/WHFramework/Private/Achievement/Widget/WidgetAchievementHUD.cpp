@@ -12,13 +12,11 @@
 
 UWidgetAchievementHUD::UWidgetAchievementHUD(const FObjectInitializer &ObjectInitializer) : UUserWidgetBase(ObjectInitializer)
 {
-	WidgetName = FName("AchievementHUD");
 	WidgetType = EWidgetType::Permanent;
 	WidgetInputMode = EInputMode::None;
 
 	WidgetZOrder = 5;
 
-	WidgetCreateType = EWidgetCreateType::AutoCreateAndOpen;
 	WidgetRefreshType = EWidgetRefreshType::Tick;
 }
 

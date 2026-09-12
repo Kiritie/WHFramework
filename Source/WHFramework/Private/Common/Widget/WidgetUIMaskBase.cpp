@@ -4,7 +4,6 @@
 
 UWidgetUIMaskBase::UWidgetUIMaskBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	WidgetName = FName("UIMask");
 	WidgetType = EWidgetType::Permanent;
 	WidgetInputMode = EInputMode::UIOnly;
 

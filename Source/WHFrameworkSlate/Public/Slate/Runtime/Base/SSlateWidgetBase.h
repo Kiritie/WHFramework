@@ -170,11 +170,11 @@ public:
 		return WidgetType;
 	}
 
-	virtual FName GetWidgetName() const override { return _WidgetName; }
+	FName GetWidgetName() const { return _WidgetName; }
 
-	virtual FName GetParentName() const override { return _ParentName; }
+	FName GetParentName() const { return _ParentName; }
 
-	virtual FName GetParentSlot() const override { return ParentSlot; }
+	FName GetParentSlot() const { return ParentSlot; }
 
 	virtual int32 GetWidgetZOrder() const override { return WidgetZOrder; }
 
@@ -207,7 +207,7 @@ public:
 		return GetWidgetState(bInheritParent) == EScreenWidgetState::Closed || (bCheckClosing && GetWidgetState(bInheritParent) == EScreenWidgetState::Closing);
 	}
 
-	virtual EWidgetCreateType GetWidgetCreateType() const override { return WidgetCreateType; }
+	EWidgetCreateType GetWidgetCreateType() const { return WidgetCreateType; }
 
 	virtual EWidgetOpenType GetWidgetOpenType() const override { return WidgetOpenType; }
 
@@ -221,17 +221,17 @@ public:
 
 	virtual UObject* GetOwnerObject() const override { return OwnerObject; }
 
-	virtual IScreenWidgetInterface* GetLastTemporary() const override { return LastTemporary; }
+	IScreenWidgetInterface* GetLastTemporary() const { return LastTemporary; }
 
-	virtual void SetLastTemporary(IScreenWidgetInterface* InLastTemporary) override { LastTemporary = InLastTemporary; }
+	void SetLastTemporary(IScreenWidgetInterface* InLastTemporary) { LastTemporary = InLastTemporary; }
 
 	virtual IScreenWidgetInterface* GetParentWidgetN() const override { return ParentWidget; }
 
 	virtual void SetParentWidgetN(IScreenWidgetInterface* InParentWidget) override { ParentWidget = InParentWidget; }
 		
-	virtual IScreenWidgetInterface* GetTemporaryChild() const override { return TemporaryChild; }
+	IScreenWidgetInterface* GetTemporaryChild() const { return TemporaryChild; }
 
-	virtual void SetTemporaryChild(IScreenWidgetInterface* InTemporaryChild) override { TemporaryChild = InTemporaryChild; }
+	void SetTemporaryChild(IScreenWidgetInterface* InTemporaryChild) { TemporaryChild = InTemporaryChild; }
 	
 	TArray<UWidget*> GetPoolWidgets() const;
 

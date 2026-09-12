@@ -654,7 +654,7 @@ bool UCameraModule::IsControllingMove(int32 InPlayerIndex)
 {
 	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
 	{
-		return UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraPanMove).IsPressing(CameraManager->GetOwningPlayerController()) || UInputModuleStatics::GetTouchPressedCount() == 3;
+		return CameraManager->IsControllingMove();
 	}
 	return false;
 }
@@ -663,7 +663,7 @@ bool UCameraModule::IsControllingRotate(int32 InPlayerIndex)
 {
 	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
 	{
-		return UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraZoom).IsPressing(CameraManager->GetOwningPlayerController()) || UInputModuleStatics::GetTouchPressedCount() == 2;
+		return CameraManager->IsControllingRotate();
 	}
 	return false;
 }
@@ -672,7 +672,7 @@ bool UCameraModule::IsControllingZoom(int32 InPlayerIndex)
 {
 	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
 	{
-		return UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraZoom).IsPressing(CameraManager->GetOwningPlayerController()) || UInputModuleStatics::GetTouchPressedCount() == 2;
+		return CameraManager->IsControllingZoom();
 	}
 	return false;
 }

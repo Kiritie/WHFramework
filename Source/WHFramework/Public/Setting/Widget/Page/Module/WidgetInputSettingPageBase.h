@@ -35,9 +35,6 @@ public:
 
 protected:
 	UFUNCTION(BlueprintNativeEvent)
-	void AddShortcutSettingItem(const FName InName, UWidgetSettingItemBase* InSettingItem, const FText& InCategory = FText::GetEmpty());
-	
-	UFUNCTION(BlueprintNativeEvent)
 	void AddMappingSettingItem(const FName InName, UWidgetSettingItemBase* InSettingItem, const FText& InCategory = FText::GetEmpty());
 	
 	virtual void ClearSettingItems_Implementation() override;
@@ -45,10 +42,8 @@ protected:
 protected:
 	virtual FSaveData* GetDefaultSaveData() const override;
 
-protected:
-	UPROPERTY()
-	TMap<FName, UWidgetSettingItemBase*> ShortcutSettingItems;
 
+	protected:
 	UPROPERTY()
 	TMap<FName, UWidgetSettingItemBase*> MappingSettingItems;
 };

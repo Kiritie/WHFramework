@@ -20,7 +20,7 @@
 UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	bWidgetTickAble = false;
-	WidgetName = NAME_None;
+	WidgetTag = FGameplayTag();
 	WidgetSpace = EWidgetSpace::Screen;
 	WidgetZOrder = 0;
 	WidgetAnchors = FAnchors(0.f, 0.f, 0.f, 0.f);

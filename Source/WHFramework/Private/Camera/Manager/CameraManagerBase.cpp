@@ -922,17 +922,19 @@ void ACameraManagerBase::ResetCameraView(ECameraResetMode InCameraResetMode, boo
 
 bool ACameraManagerBase::IsControllingMove()
 {
-	return UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraPanMove).IsPressing(PCOwner) || UInputModuleStatics::GetTouchPressedCount() == 3;
+	return UInputModuleStatics::IsInputActionActive(GameplayTags::Input_PanHCamera)
+		|| UInputModuleStatics::IsInputActionActive(GameplayTags::Input_PanVCamera);
 }
 
 bool ACameraManagerBase::IsControllingRotate()
 {
-	return UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraRotate).IsPressing(PCOwner) || UInputModuleStatics::GetTouchPressedCount() == 1;
+	return UInputModuleStatics::IsInputActionActive(GameplayTags::Input_TurnCamera)
+		|| UInputModuleStatics::IsInputActionActive(GameplayTags::Input_LookUpCamera);
 }
 
 bool ACameraManagerBase::IsControllingZoom()
 {
-	return UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_CameraZoom).IsPressing(PCOwner) || UInputModuleStatics::GetTouchPressedCount() == 2;
+	return UInputModuleStatics::IsInputActionActive(GameplayTags::Input_CameraZoomModifier);
 }
 
 bool ACameraManagerBase::IsTrackingTarget() const

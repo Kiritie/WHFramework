@@ -4,8 +4,7 @@
 #include "Input/InputModule.h"
 
 #include "CommonInputBaseTypes.h"
-#include "Camera/CameraModule.h"
-#include "Camera/CameraModuleStatics.h"
+#include "CommonInputSubsystem.h"
 #include "Main/Base/ModuleBase.h"
 #include "Event/Events/Input/Event_InputModeChanged.h"
 #include "Gameplay/WHPlayerController.h"
@@ -13,16 +12,16 @@
 #include "Main/MainModuleStatics.h"
 #include "InputMappingContext.h"
 #include "EnhancedInputSubsystems.h"
-#include "Blueprint/WidgetBlueprintLibrary.h"
+#include "EnhancedPlayerInput.h"
+#include "Engine/GameInstance.h"
 #include "Input/InputManager.h"
 #include "Input/Base/InputActionBase.h"
 #include "SaveGame/Module/InputSaveGame.h"
 #include "Input/InputModuleStatics.h"
 #include "Input/Base/InputUserSettingsBase.h"
 #include "Input/Components/InputComponentBase.h"
-#include "Input/Manager/DefaultInputManagerBase.h"
-#include "Input/Manager/InputManagerBase.h"
-#include "Input/Widget/WidgetKeyTipsItemBase.h"
+#include "Input/Manager/DefaultInputBinding.h"
+#include "Input/Manager/InputBindingBase.h"
 
 IMPLEMENTATION_MODULE(UInputModule)
 
@@ -36,54 +35,6 @@ UInputModule::UInputModule()
 
 	ModuleSaveGame = UInputSaveGame::StaticClass();
 	
-	AddKeyShortcut(GameplayTags::Input_InteractSelect, FInputKeyShortcut(FText::FromString("Interact Select"), FText::FromString("Interaction")));
-	
-	AddKeyShortcut(GameplayTags::Input_CameraPanMove, FInputKeyShortcut(FText::FromString("Camera Pan Move"), FText::FromString("Camera Control")));
-	AddKeyShortcut(GameplayTags::Input_CameraRotate, FInputKeyShortcut(FText::FromString("Camera Rotate"), FText::FromString("Camera Control")));
-	AddKeyShortcut(GameplayTags::Input_CameraZoom, FInputKeyShortcut(FText::FromString("Camera Zoom"), FText::FromString("Camera Control")));
-	AddKeyShortcut(GameplayTags::Input_CameraSprint, FInputKeyShortcut(FText::FromString("Camera Sprint"), FText::FromString("Camera Control")));
-
-	static ConstructorHelpers::FObjectFinder<UInputMappingContext> CameraMovementMapping(TEXT("/Script/EnhancedInput.InputMappingContext'/WHFramework/Input/DataAssets/IMC_CameraMovement.IMC_CameraMovement'"));
-	if(CameraMovementMapping.Succeeded())
-	{
-		FInputContextMapping ContextMapping;
-		ContextMapping.InputMapping = CameraMovementMapping.Object;
-		ContextMappings.Add(ContextMapping);
-	}
-
-	static ConstructorHelpers::FObjectFinder<UInputMappingContext> CharacterMovementMapping(TEXT("/Script/EnhancedInput.InputMappingContext'/WHFramework/Input/DataAssets/IMC_CharacterMovement.IMC_CharacterMovement'"));
-	if(CharacterMovementMapping.Succeeded())
-	{
-		FInputContextMapping ContextMapping;
-		ContextMapping.InputMapping = CharacterMovementMapping.Object;
-		ContextMappings.Add(ContextMapping);
-	}
-
-	static ConstructorHelpers::FObjectFinder<UInputMappingContext> CharacterActionMapping(TEXT("/Script/EnhancedInput.InputMappingContext'/WHFramework/Input/DataAssets/IMC_CharacterAction.IMC_CharacterAction'"));
-	if(CharacterActionMapping.Succeeded())
-	{
-		FInputContextMapping ContextMapping;
-		ContextMapping.InputMapping = CharacterActionMapping.Object;
-		ContextMappings.Add(ContextMapping);
-	}
-
-	static ConstructorHelpers::FObjectFinder<UInputMappingContext> SystemActionMapping(TEXT("/Script/EnhancedInput.InputMappingContext'/WHFramework/Input/DataAssets/IMC_SystemAction.IMC_SystemAction'"));
-	if(SystemActionMapping.Succeeded())
-	{
-		FInputContextMapping ContextMapping;
-		ContextMapping.InputMapping = SystemActionMapping.Object;
-		ContextMappings.Add(ContextMapping);
-	}
-
-	AddTouchMapping(FInputTouchMapping(IE_Pressed, FInputTouchHandlerSignature::CreateUObject(this, &UInputModule::TouchPressed)));
-	AddTouchMapping(FInputTouchMapping(IE_Released, FInputTouchHandlerSignature::CreateUObject(this, &UInputModule::TouchReleased)));
-	AddTouchMapping(FInputTouchMapping(IE_Repeat, FInputTouchHandlerSignature::CreateUObject(this, &UInputModule::TouchMoved)));
-
-	TouchInputRate = 1.f;
-	TouchPressedCount = 0;
-	TouchLocationPrevious = FVector2D(-1.f, -1.f);
-	TouchPinchValuePrevious = -1.f;
-
 	NativeInputMode = EInputMode::GameOnly;
 }
 
@@ -97,10 +48,12 @@ void UInputModule::OnGenerate()
 {
 	Super::OnGenerate();
 
-	if(InputManagers.IsEmpty())
+	if(InputBindings.IsEmpty())
 	{
-		InputManagers.Add(NewObject<UDefaultInputManagerBase>(this));
+		InputBindings.Add(NewObject<UDefaultInputBinding>(this));
 	}
+
+	BuildInputCaches();
 }
 
 void UInputModule::OnDestroy()
@@ -115,16 +68,15 @@ void UInputModule::OnInitialize()
 {
 	Super::OnInitialize();
 
+	BuildInputCaches();
+
 	FInputManager::Get().AddInputManager(this);
 	
 	FInputManager::Get().SetNativeInputMode(NativeInputMode);
 
-	for(auto Iter : InputManagers)
+	for(UInputBindingBase* InputBinding : InputBindings)
 	{
-		Iter->OnInitialize();
-		FPlayerInputManagerInfo InputManagerInfo;
-		InputManagerInfo.InputManagerRefs.Add(Iter->GetInputManagerName(), Iter);
-		InputManagerInfos.Add(InputManagerInfo);
+		InputBinding->OnInitialize(0);
 	}
 }
 
@@ -134,30 +86,24 @@ void UInputModule::OnPreparatory(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		ApplyKeyMappings();
-		ApplyTouchMappings();
+		BuildPlayerRuntimes();
 
-		UEnhancedInputLocalPlayerSubsystem* Subsystem = UInputModuleStatics::GetInputSubsystem();
-		UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>();
 		UInputComponentBase* Component = UInputModuleStatics::GetInputComponent<UInputComponentBase>();
 
-		for (const auto& Iter : ContextMappings)
+		for(const FInputContextConfig& Config : ContextConfigs)
 		{
-			if (Iter.bRegisterWithSettings)
+			if(Config.bAutoActivate)
 			{
-				Settings->RegisterInputMappingContext(Iter.InputMapping);
-				FModifyContextOptions Options = {};
-				Options.bIgnoreAllPressedKeysUntilRelease = false;
-				Subsystem->AddMappingContext(Iter.InputMapping, Iter.Priority, Options);
+				for(int32 PlayerIndex = 0; PlayerIndex < PlayerRuntimes.Num(); ++PlayerIndex)
+				{
+					ActivateInputContext(Config.ContextTag, PlayerIndex);
+				}
 			}
 		}
 
-		for(auto& Iter1 : InputManagerInfos)
+		for(UInputBindingBase* InputBinding : InputBindings)
 		{
-			for(auto& Iter2 : Iter1.InputManagerRefs)
-			{
-				Iter2.Value->OnBindAction(Component);
-			}
+			InputBinding->OnBindInput(Component);
 		}
 
 		UInputModuleStatics::UpdateGlobalInputMode();
@@ -168,15 +114,10 @@ void UInputModule::OnReset()
 {
 	Super::OnReset();
 
-	for(auto& Iter1 : InputManagerInfos)
+	for(UInputBindingBase* InputBinding : InputBindings)
 	{
-		for(auto& Iter2 : Iter1.InputManagerRefs)
-		{
-			Iter2.Value->OnReset();
-		}
+		InputBinding->OnReset();
 	}
-
-	TouchPressedCount = 0;
 }
 
 void UInputModule::OnRefresh(float DeltaSeconds, bool bInEditor)
@@ -185,12 +126,9 @@ void UInputModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 
 	if(bInEditor) return;
 
-	for(auto& Iter1 : InputManagerInfos)
+	for(UInputBindingBase* InputBinding : InputBindings)
 	{
-		for(auto& Iter2 : Iter1.InputManagerRefs)
-		{
-			Iter2.Value->OnRefresh(DeltaSeconds);
-		}
+		InputBinding->OnRefresh(DeltaSeconds);
 	}
 }
 
@@ -216,14 +154,125 @@ void UInputModule::OnTermination(EPhase InPhase)
 	{
 		FInputManager::Get().RemoveInputManager(this);
 
-		for(auto& Iter1 : InputManagerInfos)
+		for(UInputBindingBase* InputBinding : InputBindings)
 		{
-			for(auto& Iter2 : Iter1.InputManagerRefs)
+			InputBinding->OnTermination();
+		}
+
+		for(FInputPlayerRuntime& Runtime : PlayerRuntimes)
+		{
+			if(Runtime.CommonInputSubsystem)
 			{
-				Iter2.Value->OnTermination();
+				Runtime.CommonInputSubsystem->OnInputMethodChangedNative.RemoveAll(this);
 			}
 		}
+		PlayerRuntimes.Reset();
 	}
+}
+
+void UInputModule::BuildInputCaches()
+{
+	InputActionMap.Reset();
+	InputContextMap.Reset();
+	PlayerMappableByActionTag.Reset();
+
+	auto AddMappings = [this](UInputMappingContext* MappingContext)
+	{
+		if(!MappingContext)
+		{
+			return;
+		}
+
+		for(const FEnhancedActionKeyMapping& Mapping : MappingContext->GetMappings())
+		{
+			const UInputActionBase* Action = Cast<UInputActionBase>(Mapping.Action);
+			if(!Action || !Action->ActionTag.IsValid())
+			{
+				continue;
+			}
+
+			const TObjectPtr<const UInputActionBase>* Existing = InputActionMap.Find(Action->ActionTag);
+			ensureMsgf(!Existing || Existing->Get() == Action, TEXT("Input ActionTag collision: %s"), *Action->ActionTag.ToString());
+			InputActionMap.Add(Action->ActionTag, Action);
+
+			const FName MappingName = Mapping.GetMappingName();
+			if(!MappingName.IsNone())
+			{
+				TArray<FInputMappableEntry> Entries;
+				PlayerMappableByActionTag.MultiFind(Action->ActionTag, Entries);
+				if(!Entries.ContainsByPredicate([MappingName](const FInputMappableEntry& Entry)
+				{
+					return Entry.MappingName == MappingName;
+				}))
+				{
+					FInputMappableEntry Entry;
+					Entry.ActionTag = Action->ActionTag;
+					Entry.MappingName = MappingName;
+					PlayerMappableByActionTag.Add(Action->ActionTag, Entry);
+				}
+			}
+		}
+	};
+
+	for(const FInputContextConfig& Config : ContextConfigs)
+	{
+		if(!Config.ContextTag.IsValid() || !Config.MappingContext)
+		{
+			continue;
+		}
+
+		ensureMsgf(!InputContextMap.Contains(Config.ContextTag), TEXT("Input ContextTag collision: %s"), *Config.ContextTag.ToString());
+		InputContextMap.Add(Config.ContextTag, Config.MappingContext);
+		AddMappings(Config.MappingContext);
+	}
+
+}
+
+void UInputModule::BuildPlayerRuntimes()
+{
+	for(FInputPlayerRuntime& Runtime : PlayerRuntimes)
+	{
+		if(Runtime.CommonInputSubsystem)
+		{
+			Runtime.CommonInputSubsystem->OnInputMethodChangedNative.RemoveAll(this);
+		}
+	}
+	PlayerRuntimes.Reset();
+
+	if(!GetWorld() || !GetWorld()->GetGameInstance())
+	{
+		return;
+	}
+
+	const TArray<ULocalPlayer*>& LocalPlayers = GetWorld()->GetGameInstance()->GetLocalPlayers();
+	for(int32 PlayerIndex = 0; PlayerIndex < LocalPlayers.Num(); ++PlayerIndex)
+	{
+		ULocalPlayer* LocalPlayer = LocalPlayers[PlayerIndex];
+		FInputPlayerRuntime& Runtime = PlayerRuntimes.AddDefaulted_GetRef();
+		Runtime.LocalPlayer = LocalPlayer;
+		Runtime.EnhancedInputSubsystem = LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
+		Runtime.CommonInputSubsystem = LocalPlayer->GetSubsystem<UCommonInputSubsystem>();
+
+		if(Runtime.EnhancedInputSubsystem)
+		{
+			Runtime.UserSettings = Runtime.EnhancedInputSubsystem->GetUserSettings();
+		}
+
+		if(APlayerController* PlayerController = LocalPlayer->GetPlayerController(GetWorld()))
+		{
+			Runtime.InputComponent = Cast<UInputComponentBase>(PlayerController->InputComponent);
+		}
+
+		if(Runtime.CommonInputSubsystem)
+		{
+			Runtime.CommonInputSubsystem->OnInputMethodChangedNative.AddUObject(this, &ThisClass::HandleInputMethodChanged, PlayerIndex);
+		}
+	}
+}
+
+void UInputModule::HandleInputMethodChanged(ECommonInputType InInputType, int32 InPlayerIndex)
+{
+	OnInputTypeChanged.Broadcast(InPlayerIndex, InInputType);
 }
 
 void UInputModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -231,19 +280,9 @@ void UInputModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	auto& SaveData = InSaveData->CastRef<FInputModuleSaveData>();
 	if(SaveData.IsSaved())
 	{
-		KeyShortcuts = SaveData.KeyShortcuts;
-
 		UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>();
 
 		UCommonModuleStatics::LoadObjectDataFromMemory(Settings, SaveData.GetDatas());
-
-		for(auto& Iter : SaveData.KeyMappings)
-		{
-			if(KeyMappings.Contains(Iter.Key))
-			{
-				KeyMappings[Iter.Key].Key = Iter.Value;
-			}
-		}
 
 		RefreshData();
 	}
@@ -257,16 +296,6 @@ void UInputModule::UnloadData(EPhase InPhase)
 void UInputModule::RefreshData()
 {
 	LocalSaveData = GetSaveDataRef<FInputModuleSaveData>(true);
-
-	TArray<UUserWidget*> KeyTipsItems;
-	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(this, KeyTipsItems, UWidgetKeyTipsItemBase::StaticClass(), false);
-	for(auto Iter : KeyTipsItems)
-	{
-		if(UWidgetKeyTipsItemBase* KeyTipsItem = Cast<UWidgetKeyTipsItemBase>(Iter))
-		{
-			KeyTipsItem->RefreshData();
-		}
-	}
 }
 
 FSaveData* UInputModule::ToData()
@@ -274,19 +303,9 @@ FSaveData* UInputModule::ToData()
 	FInputModuleSaveData& SaveData = GetMutableSaveData<FInputModuleSaveData>();
 	SaveData = FInputModuleSaveData();
 
-	SaveData.KeyShortcuts = KeyShortcuts;
-
 	UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>();
 
 	UCommonModuleStatics::SaveObjectDataToMemory(Settings, SaveData.GetDatas());
-
-	for(auto& Iter : KeyMappings)
-	{
-		if(SaveData.KeyMappings.Contains(Iter.Key))
-		{
-			SaveData.KeyMappings[Iter.Key] = Iter.Value.Key;
-		}
-	}
 
 	return &SaveData;
 }
@@ -311,121 +330,33 @@ void UInputModule::SetNativeInputMode(EInputMode InInputMode)
 	FInputManager::Get().SetNativeInputMode(InInputMode);
 }
 
-UInputManagerBase* UInputModule::GetInputManager(TSubclassOf<UInputManagerBase> InClass, int32 InPlayerIndex) const
+UInputBindingBase* UInputModule::GetInputBinding(TSubclassOf<UInputBindingBase> InClass, int32 InPlayerIndex) const
 {
-	const FName InputManagerName = InClass->GetDefaultObject<UInputManagerBase>()->GetInputManagerName();
-	return GetInputManagerByName(InputManagerName, InPlayerIndex, InClass);
+	const FName InputBindingName = InClass->GetDefaultObject<UInputBindingBase>()->GetInputBindingName();
+	return GetInputBindingByName(InputBindingName, InPlayerIndex, InClass);
 }
 
-UInputManagerBase* UInputModule::GetInputManagerByName(const FName InName, int32 InPlayerIndex, TSubclassOf<UInputManagerBase> InClass) const
+UInputBindingBase* UInputModule::GetInputBindingByName(const FName InName, int32 InPlayerIndex, TSubclassOf<UInputBindingBase> InClass) const
 {
-	if(InputManagerInfos.IsValidIndex(InPlayerIndex))
+	for(UInputBindingBase* InputBinding : InputBindings)
 	{
-		if(InputManagerInfos[InPlayerIndex].InputManagerRefs.Contains(InName))
+		if(InputBinding && InputBinding->GetInputBindingName() == InName)
 		{
-			return GetDeterminesOutputObject(InputManagerInfos[InPlayerIndex].InputManagerRefs[InName], InClass);
+			return GetDeterminesOutputObject(InputBinding, InClass);
 		}
 	}
 	return nullptr;
 }
 
-void UInputModule::AddKeyShortcut(const FGameplayTag& InTag, const FInputKeyShortcut& InKeyShortcut)
-{
-	if(!KeyShortcuts.Contains(InTag))
-	{
-		KeyShortcuts.Add(InTag, InKeyShortcut);
-	}
-}
-
-void UInputModule::RemoveKeyShortcut(const FGameplayTag& InTag)
-{
-	if(KeyShortcuts.Contains(InTag))
-	{
-		KeyShortcuts.Remove(InTag);
-	}
-}
-
-FInputKeyShortcut UInputModule::GetKeyShortcut(const FGameplayTag& InTag) const
-{
-	if(KeyShortcuts.Contains(InTag))
-	{
-		return KeyShortcuts[InTag];
-	}
-	return FInputKeyShortcut();
-}
-
-void UInputModule::AddKeyMapping(const FGameplayTag& InTag, const FInputKeyMapping& InKeyMapping)
-{
-	if(!KeyMappings.Contains(InTag))
-	{
-		KeyMappings.Add(InTag, InKeyMapping);
-	}
-}
-
-void UInputModule::RemoveKeyMapping(const FGameplayTag& InTag)
-{
-	if(KeyMappings.Contains(InTag))
-	{
-		KeyMappings.Remove(InTag);
-	}
-}
-
-void UInputModule::AddTouchMapping(const FInputTouchMapping& InTouchMapping)
-{
-	TouchMappings.Add(InTouchMapping);
-}
-
-void UInputModule::AddPlayerKeyMapping(const FName InName, const FKey InKey, int32 InSlot, int32 InPlayerIndex)
-{
-	UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>(InPlayerIndex);
-	if (Settings && !InKey.IsGamepadKey())
-	{
-		FMapPlayerKeyArgs Args = {};
-		Args.MappingName = InName;
-		Args.Slot = (EPlayerMappableKeySlot)InSlot;
-		Args.NewKey = InKey;
-	
-		FGameplayTagContainer FailureReason;
-		Settings->MapPlayerKey(Args, FailureReason);
-
-		RefreshData();
-	}
-}
-
-void UInputModule::ApplyKeyMappings()
-{
-	UCommonModuleStatics::GetPlayerController()->InputComponent->KeyBindings.Empty();
-	for(auto& Iter : KeyMappings)
-	{
-		FInputKeyBinding KB(FInputChord(Iter.Value.Key, false, false, false, false), Iter.Value.Event);
-		KB.KeyDelegate.BindDelegate(Iter.Value.Delegate.IsBound() ? Iter.Value.Delegate.GetUObject() : Iter.Value.Delegate.GetUObject(), Iter.Value.Delegate.GetFunctionName());
-		UCommonModuleStatics::GetPlayerController()->InputComponent->KeyBindings.Emplace(MoveTemp(KB));
-	}
-}
-
-void UInputModule::ApplyTouchMappings()
-{
-	// UCommonModuleStatics::GetPlayerController()->InputComponent->TouchBindings.Empty();
-	// for(auto& Iter : TouchMappings)
-	// {
-	// 	FInputTouchBinding TB(Iter.Event);
-	// 	TB.TouchDelegate.BindDelegate(Iter.Delegate.IsBound() ? Iter.Delegate.GetUObject() : Iter.DynamicDelegate.GetUObject(), Iter.Delegate.IsBound() ? Iter.Delegate.TryGetBoundFunctionName() : Iter.DynamicDelegate.GetFunctionName());
-	// 	UCommonModuleStatics::GetPlayerController()->InputComponent->TouchBindings.Emplace(MoveTemp(TB));
-	// }
-
-	UCommonModuleStatics::GetPlayerController()->InputComponent->BindTouch(EInputEvent::IE_Pressed, this, &UInputModule::TouchPressed);
-	UCommonModuleStatics::GetPlayerController()->InputComponent->BindTouch(EInputEvent::IE_Released, this, &UInputModule::TouchReleased);
-	UCommonModuleStatics::GetPlayerController()->InputComponent->BindTouch(EInputEvent::IE_Repeat, this, &UInputModule::TouchMoved);
-}
-
 TArray<FEnhancedActionKeyMapping> UInputModule::GetAllActionKeyMappings(int32 InPlayerIndex)
 {
 	TArray<FEnhancedActionKeyMapping> Mappings;
-	for (const auto& Iter1 : ContextMappings)
+	for(const FInputContextConfig& Config : ContextConfigs)
 	{
-		for(auto& Iter2 : Iter1.InputMapping->GetMappings())
+		if(!Config.MappingContext) continue;
+		for(const FEnhancedActionKeyMapping& Mapping : Config.MappingContext->GetMappings())
 		{
-			Mappings.Add(Iter2);
+			Mappings.Add(Mapping);
 		}
 	}
 	return Mappings;
@@ -434,11 +365,12 @@ TArray<FEnhancedActionKeyMapping> UInputModule::GetAllActionKeyMappings(int32 In
 TArray<FName> UInputModule::GetAllActionKeyMappingNames(int32 InPlayerIndex)
 {
 	TArray<FName> MappingNames;
-	for (const auto& Iter1 : ContextMappings)
+	for(const FInputContextConfig& Config : ContextConfigs)
 	{
-		for(auto& Iter2 : Iter1.InputMapping->GetMappings())
+		if(!Config.MappingContext) continue;
+		for(const FEnhancedActionKeyMapping& Mapping : Config.MappingContext->GetMappings())
 		{
-			MappingNames.Add(Iter2.GetMappingName());
+			MappingNames.Add(Mapping.GetMappingName());
 		}
 	}
 	return MappingNames;
@@ -474,83 +406,11 @@ TArray<FPlayerKeyMapping> UInputModule::GetAllPlayerKeyMappings(int32 InPlayerIn
 	return Mappings;
 }
 
-TArray<FPlayerKeyMapping> UInputModule::GetPlayerKeyMappingsByName(const FName InName, int32 InPlayerIndex)
+bool UInputModule::IsPlayerMappedKeyByTag(const FGameplayTag& InTag, const FKey& InKey, int32 InPlayerIndex) const
 {
-	for(auto& Iter : KeyShortcuts)
+	for(const FPlayerKeyMapping& Mapping : GetPlayerKeyMappingsByTag(InTag, InPlayerIndex))
 	{
-		FString TagName = Iter.Key.ToString();
-		TagName = TagName.Mid(TagName.Find(".", ESearchCase::IgnoreCase, ESearchDir::FromEnd) + 1, TagName.Len());
-		if(TagName == InName)
-		{
-			TArray<FPlayerKeyMapping> _KeyMappings;
-			for(auto& Iter2 : Iter.Value.Keys)
-			{
-				FPlayerKeyMapping KeyMapping;
-				KeyMapping.SetCurrentKey(Iter2);
-				_KeyMappings.Add(KeyMapping);
-			}
-			return _KeyMappings;
-		}
-	}
-	TArray<FPlayerKeyMapping> Mappings;
-	if(const UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>(InPlayerIndex))
-	{
-		for (auto& Iter1 : Settings->GetAllAvailableKeyProfiles())
-		{
-			if(Iter1.Value->GetPlayerMappingRows().Contains(InName))
-			{
-				for (const FPlayerKeyMapping& Iter2 : Iter1.Value->GetPlayerMappingRows()[InName].Mappings)
-				{
-					Mappings.Add(Iter2);
-				}
-			}
-		}
-	}
-	if(Mappings.Num() > 1)
-	{
-		Mappings.Sort([](const FPlayerKeyMapping& A, const FPlayerKeyMapping& B){
-			return A.GetSlot() < B.GetSlot();
-		});
-	}
-	return Mappings;
-}
-
-FPlayerKeyMappingInfo UInputModule::GetPlayerKeyMappingInfoByName(const FName InName, int32 InPlayerIndex) const
-{
-	FPlayerKeyMappingInfo KeyMappingInfo;
-
-	FString KeyName;
-	FString KeyCode;
-
-	auto PlayerKeyMappings = UInputModuleStatics::GetPlayerKeyMappingsByName(InName);
-	if(PlayerKeyMappings.Num() > 0)
-	{
-		for(auto& Iter2 : PlayerKeyMappings)
-		{
-			FSlateBrush ImageBrush;
-			const UCommonInputPlatformSettings* Settings = UPlatformSettingsManager::Get().GetSettingsForPlatform<UCommonInputPlatformSettings>();
-			if(Settings->TryGetInputBrush(ImageBrush, Iter2.GetCurrentKey(), ECommonInputType::MouseAndKeyboard, FName("XSX")))
-			{
-				ImageBrush.ImageSize = FVector2D(25.f);
-				KeyMappingInfo.KeyBrushs.Add(ImageBrush);
-			}
-			KeyCode.Append(FString::Printf(TEXT("%s/"), *Iter2.GetCurrentKey().GetDisplayName(false).ToString()));
-			KeyName = Iter2.GetDisplayName().ToString();
-		}
-		KeyCode.RemoveFromEnd(TEXT("/"));
-	}
-
-	KeyMappingInfo.KeyName = FText::FromString(KeyName);
-	KeyMappingInfo.KeyCode = FText::FromString(KeyCode);
-
-	return KeyMappingInfo;
-}
-
-bool UInputModule::IsPlayerMappedKeyByName(const FName InName, const FKey& InKey, int32 InPlayerIndex) const
-{
-	for(auto& Iter : UInputModuleStatics::GetPlayerKeyMappingsByName(InName))
-	{
-		if(InKey == Iter.GetCurrentKey())
+		if(InKey == Mapping.GetCurrentKey())
 		{
 			return true;
 		}
@@ -558,188 +418,202 @@ bool UInputModule::IsPlayerMappedKeyByName(const FName InName, const FKey& InKey
 	return false;
 }
 
-bool UInputModule::IsPlayerMappedKeyByTag(const FGameplayTag& InTag, const FKey& InKey, int32 InPlayerIndex) const
-{
-	return IsPlayerMappedKeyByName(UInputModuleStatics::GetPlayerKeyMappingName(InTag), InKey, InPlayerIndex);
-}
-
 const UInputActionBase* UInputModule::GetInputActionByTag(const FGameplayTag& InTag, bool bEnsured) const
 {
-	for(const auto& Iter1 : ContextMappings)
+	if(const TObjectPtr<const UInputActionBase>* Action = InputActionMap.Find(InTag))
 	{
-		if(UInputMappingContext* IMC = Iter1.InputMapping)
-		{
-			for(const auto& Iter2 : IMC->GetMappings())
-			{
-				if(const auto InputAction = Cast<UInputActionBase>(Iter2.Action))
-				{
-					if(InputAction->ActionTag == InTag)
-					{
-						return InputAction;
-					}
-				}
-			}
-		}
+		return Action->Get();
 	}
 	ensureEditorMsgf(!bEnsured, FString::Printf(TEXT("Can't find InputAction for InputTag [%s] on InputConfig [%s]."), *InTag.ToString(), *GetNameSafe(this)), EDC_Input, EDV_Error);
 
 	return nullptr;
 }
 
-void UInputModule::TouchPressed_Implementation(ETouchIndex::Type InTouchIndex, FVector InLocation)
+bool UInputModule::IsInputActionActive(const FGameplayTag& InTag, int32 InPlayerIndex) const
 {
-	switch (InTouchIndex)
+	const UInputActionBase* Action = GetInputActionByTag(InTag, false);
+	const APlayerController* PlayerController = UCommonModuleStatics::GetPlayerController(InPlayerIndex);
+	const UEnhancedPlayerInput* PlayerInput = PlayerController
+		? Cast<UEnhancedPlayerInput>(PlayerController->PlayerInput)
+		: nullptr;
+	const FInputActionInstance* ActionInstance = PlayerInput && Action
+		? PlayerInput->FindActionInstanceData(Action)
+		: nullptr;
+	return ActionInstance && ActionInstance->GetValue().IsNonZero();
+}
+
+bool UInputModule::ActivateInputContext(FGameplayTag InContextTag, int32 InPlayerIndex)
+{
+	if(!PlayerRuntimes.IsValidIndex(InPlayerIndex))
 	{
-		case ETouchIndex::Touch1:
+		return false;
+	}
+
+	const TObjectPtr<UInputMappingContext>* MappingContext = InputContextMap.Find(InContextTag);
+	UEnhancedInputLocalPlayerSubsystem* Subsystem = PlayerRuntimes[InPlayerIndex].EnhancedInputSubsystem;
+	if(!MappingContext || !MappingContext->Get() || !Subsystem)
+	{
+		return false;
+	}
+
+	const FInputContextConfig* Config = ContextConfigs.FindByPredicate([InContextTag](const FInputContextConfig& Item)
+	{
+		return Item.ContextTag == InContextTag;
+	});
+	if(!Config)
+	{
+		return false;
+	}
+
+	if(Config->bRegisterWithSettings && PlayerRuntimes[InPlayerIndex].UserSettings)
+	{
+		PlayerRuntimes[InPlayerIndex].UserSettings->RegisterInputMappingContext(Config->MappingContext);
+	}
+
+	FModifyContextOptions Options;
+	Options.bIgnoreAllPressedKeysUntilRelease = true;
+	Subsystem->AddMappingContext(Config->MappingContext, Config->Priority, Options);
+	return true;
+}
+
+bool UInputModule::DeactivateInputContext(FGameplayTag InContextTag, int32 InPlayerIndex)
+{
+	if(!PlayerRuntimes.IsValidIndex(InPlayerIndex))
+	{
+		return false;
+	}
+
+	const TObjectPtr<UInputMappingContext>* MappingContext = InputContextMap.Find(InContextTag);
+	UEnhancedInputLocalPlayerSubsystem* Subsystem = PlayerRuntimes[InPlayerIndex].EnhancedInputSubsystem;
+	if(!MappingContext || !MappingContext->Get() || !Subsystem)
+	{
+		return false;
+	}
+
+	Subsystem->RemoveMappingContext(MappingContext->Get());
+	return true;
+}
+
+bool UInputModule::IsInputContextActive(FGameplayTag InContextTag, int32 InPlayerIndex) const
+{
+	if(!PlayerRuntimes.IsValidIndex(InPlayerIndex))
+	{
+		return false;
+	}
+
+	const TObjectPtr<UInputMappingContext>* MappingContext = InputContextMap.Find(InContextTag);
+	const UEnhancedInputLocalPlayerSubsystem* Subsystem = PlayerRuntimes[InPlayerIndex].EnhancedInputSubsystem;
+	return MappingContext && MappingContext->Get() && Subsystem && Subsystem->HasMappingContext(MappingContext->Get());
+}
+
+bool UInputModule::MapPlayerKeyByTag(FGameplayTag InActionTag, FKey InNewKey, EPlayerMappableKeySlot InSlot, int32 InPlayerIndex, FGameplayTagContainer* OutFailureReason)
+{
+	if(!PlayerRuntimes.IsValidIndex(InPlayerIndex) || !PlayerRuntimes[InPlayerIndex].UserSettings)
+	{
+		return false;
+	}
+
+	TArray<FInputMappableEntry> Entries;
+	PlayerMappableByActionTag.MultiFind(InActionTag, Entries);
+	if(Entries.IsEmpty())
+	{
+		return false;
+	}
+
+	FMapPlayerKeyArgs Args;
+	Args.MappingName = Entries[0].MappingName;
+	Args.Slot = InSlot;
+	Args.NewKey = InNewKey;
+
+	FGameplayTagContainer FailureReasons;
+	PlayerRuntimes[InPlayerIndex].UserSettings->MapPlayerKey(Args, FailureReasons);
+	if(OutFailureReason)
+	{
+		*OutFailureReason = FailureReasons;
+	}
+	return FailureReasons.IsEmpty();
+}
+
+bool UInputModule::ResetPlayerKeyByTag(FGameplayTag InActionTag, int32 InPlayerIndex)
+{
+	if(!PlayerRuntimes.IsValidIndex(InPlayerIndex) || !PlayerRuntimes[InPlayerIndex].UserSettings)
+	{
+		return false;
+	}
+
+	TArray<FInputMappableEntry> Entries;
+	PlayerMappableByActionTag.MultiFind(InActionTag, Entries);
+	bool bReset = false;
+	for(const FInputMappableEntry& Entry : Entries)
+	{
+		FMapPlayerKeyArgs Args;
+		Args.MappingName = Entry.MappingName;
+		FGameplayTagContainer FailureReasons;
+		PlayerRuntimes[InPlayerIndex].UserSettings->ResetAllPlayerKeysInRow(Args, FailureReasons);
+		bReset |= FailureReasons.IsEmpty();
+	}
+	return bReset;
+}
+
+TArray<FPlayerKeyMapping> UInputModule::GetPlayerKeyMappingsByTag(FGameplayTag InActionTag, int32 InPlayerIndex) const
+{
+	TArray<FPlayerKeyMapping> Mappings;
+	if(!PlayerRuntimes.IsValidIndex(InPlayerIndex) || !PlayerRuntimes[InPlayerIndex].UserSettings)
+	{
+		return Mappings;
+	}
+
+	TArray<FInputMappableEntry> Entries;
+	PlayerMappableByActionTag.MultiFind(InActionTag, Entries);
+	for(const FInputMappableEntry& Entry : Entries)
+	{
+		for(const auto& Profile : PlayerRuntimes[InPlayerIndex].UserSettings->GetAllAvailableKeyProfiles())
 		{
-			if(TouchReleaseTimerHandle1.IsValid())
+			if(const FKeyMappingRow* Row = Profile.Value->GetPlayerMappingRows().Find(Entry.MappingName))
 			{
-				TouchReleasedImpl(InTouchIndex);
+				for(const FPlayerKeyMapping& Mapping : Row->Mappings)
+				{
+					Mappings.Add(Mapping);
+				}
 			}
-			TouchPressedImpl();
-			break;
 		}
-		case ETouchIndex::Touch2:
-		{
-			if(TouchReleaseTimerHandle2.IsValid())
-			{
-				TouchReleasedImpl(InTouchIndex);
-			}
-			TouchPressedImpl();
-			break;
-		}
-		case ETouchIndex::Touch3:
-		{
-			if(TouchReleaseTimerHandle3.IsValid())
-			{
-				TouchReleasedImpl(InTouchIndex);
-			}
-			TouchPressedImpl();
-			break;
-		}
-		default: break;
 	}
+	Mappings.Sort([](const FPlayerKeyMapping& A, const FPlayerKeyMapping& B)
+	{
+		return A.GetSlot() < B.GetSlot();
+	});
+	return Mappings;
 }
 
-void UInputModule::TouchPressedImpl_Implementation()
+TArray<FGameplayTag> UInputModule::GetAllMappableActions() const
 {
-	TouchPressedCount++;
-
-	TouchLocationPrevious = FVector2D(-1.f, -1.f);
-	TouchPinchValuePrevious = -1.f;
+	TArray<FGameplayTag> ActionTags;
+	PlayerMappableByActionTag.GetKeys(ActionTags);
+	ActionTags.Sort([](const FGameplayTag& A, const FGameplayTag& B)
+	{
+		return A.ToString() < B.ToString();
+	});
+	return ActionTags;
 }
 
-void UInputModule::TouchReleased_Implementation(ETouchIndex::Type InTouchIndex, FVector InLocation)
+ECommonInputType UInputModule::GetCurrentInputType(int32 InPlayerIndex) const
 {
-	switch (InTouchIndex)
-	{
-		case ETouchIndex::Touch1:
-		{
-			FTimerDelegate TimerDelegate;
-			TimerDelegate.BindUObject(this, &UInputModule::TouchReleasedImpl, InTouchIndex);
-			GetWorld()->GetTimerManager().SetTimer(TouchReleaseTimerHandle1, TimerDelegate, 0.15f, false);
-			break;
-		}
-		case ETouchIndex::Touch2:
-		{
-			FTimerDelegate TimerDelegate;
-			TimerDelegate.BindUObject(this, &UInputModule::TouchReleasedImpl, InTouchIndex);
-			GetWorld()->GetTimerManager().SetTimer(TouchReleaseTimerHandle2, TimerDelegate, 0.15f, false);
-			break;
-		}
-		case ETouchIndex::Touch3:
-		{
-			FTimerDelegate TimerDelegate;
-			TimerDelegate.BindUObject(this, &UInputModule::TouchReleasedImpl, InTouchIndex);
-			GetWorld()->GetTimerManager().SetTimer(TouchReleaseTimerHandle3, TimerDelegate, 0.15f, false);
-			break;
-		}
-		default: break;
-	}
+	return PlayerRuntimes.IsValidIndex(InPlayerIndex) && PlayerRuntimes[InPlayerIndex].CommonInputSubsystem
+		? PlayerRuntimes[InPlayerIndex].CommonInputSubsystem->GetCurrentInputType()
+		: ECommonInputType::MouseAndKeyboard;
 }
 
-void UInputModule::TouchReleasedImpl_Implementation(ETouchIndex::Type InTouchIndex)
+bool UInputModule::IsUsingGamepad(int32 InPlayerIndex) const
 {
-	TouchPressedCount--;
-	if(TouchPressedCount < 0)
-	{
-		TouchPressedCount = 0;
-	}
-	
-	TouchLocationPrevious = FVector2D(-1.f, -1.f);
-	TouchPinchValuePrevious = -1.f;
-
-	switch (InTouchIndex)
-	{
-		case ETouchIndex::Touch1:
-		{
-			GetWorld()->GetTimerManager().ClearTimer(TouchReleaseTimerHandle1);
-			break;
-		}
-		case ETouchIndex::Touch2:
-		{
-			GetWorld()->GetTimerManager().ClearTimer(TouchReleaseTimerHandle2);
-			break;
-		}
-		case ETouchIndex::Touch3:
-		{
-			GetWorld()->GetTimerManager().ClearTimer(TouchReleaseTimerHandle3);
-			break;
-		}
-		default: break;
-	}
+	return GetCurrentInputType(InPlayerIndex) == ECommonInputType::Gamepad;
 }
 
-void UInputModule::TouchMoved_Implementation(ETouchIndex::Type InTouchIndex, FVector InLocation)
+bool UInputModule::IsUsingMouseAndKeyboard(int32 InPlayerIndex) const
 {
-	if(TouchPressedCount <= 0) return;
-	
-	if(TouchPressedCount == 1)
-	{
-		float TouchLocationX = 0.f;
-		float TouchLocationY = 0.f;
-		bool bIsCurrentPressed = false;
-		UCommonModuleStatics::GetPlayerController()->GetInputTouchState(InTouchIndex, TouchLocationX, TouchLocationY, bIsCurrentPressed);
-		
-		if(TouchLocationPrevious != FVector2D(-1.f, -1.f))
-		{
-			UCameraModule::Get().AddCameraRotationInput((TouchLocationX - TouchLocationPrevious.X) * TouchInputRate, (TouchLocationY - TouchLocationPrevious.Y) * TouchInputRate * (UCameraModule::Get().IsReverseCameraPitch() ? 1.f : -1.f));
-		}
-		TouchLocationPrevious = FVector2D(TouchLocationX, TouchLocationY);
-	}
-	else if(TouchPressedCount == 2)
-	{
-		float TouchLocationX1 = 0.f;
-		float TouchLocationY1 = 0.f;
-		bool bIsCurrentPressed1 = false;
-		UCommonModuleStatics::GetPlayerController()->GetInputTouchState(ETouchIndex::Touch1, TouchLocationX1, TouchLocationY1, bIsCurrentPressed1);
-		
-		float TouchLocationX2;
-		float TouchLocationY2;
-		bool bIsCurrentPressed2;
-		UCommonModuleStatics::GetPlayerController()->GetInputTouchState(ETouchIndex::Touch2, TouchLocationX2, TouchLocationY2, bIsCurrentPressed2);
-		
-		const float TouchCurrentPinchValue = FVector2D::Distance(FVector2D(TouchLocationX1, TouchLocationY1), FVector2D(TouchLocationX2, TouchLocationY2));
-		if(TouchPinchValuePrevious != -1.f)
-		{
-			UCameraModuleStatics::AddCameraDistanceInput((TouchCurrentPinchValue - TouchPinchValuePrevious) * TouchInputRate * -0.2f);
-		}
-		TouchPinchValuePrevious = TouchCurrentPinchValue;
-	}
-	else if(TouchPressedCount == 3)
-	{
-		float TouchLocationX = 0.f;
-		float TouchLocationY = 0.f;
-		bool bIsCurrentPressed = false;
-		UCommonModuleStatics::GetPlayerController()->GetInputTouchState(ETouchIndex::Touch1, TouchLocationX, TouchLocationY, bIsCurrentPressed);
-		
-		if(TouchLocationPrevious != FVector2D(-1.f, -1.f))
-		{
-			const FRotator Rotation = UCommonModuleStatics::GetPlayerController()->GetControlRotation();
-			const FVector DirectionH = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * (TouchLocationX - TouchLocationPrevious.X);
-			const FVector DirectionV = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Z) * -(TouchLocationY - TouchLocationPrevious.Y);
-			UCameraModule::Get().AddCameraMovementInput(DirectionH + DirectionV, TouchInputRate * (UCameraModule::Get().IsReverseCameraPanMove() ? -1.f : 1.f));
-		}
-		TouchLocationPrevious = FVector2D(TouchLocationX, TouchLocationY);
-	}
+	return GetCurrentInputType(InPlayerIndex) == ECommonInputType::MouseAndKeyboard;
+}
+
+bool UInputModule::IsUsingTouch(int32 InPlayerIndex) const
+{
+	return GetCurrentInputType(InPlayerIndex) == ECommonInputType::Touch;
 }

@@ -173,29 +173,6 @@ void AWHPlayerController::RefreshInteraction_Implementation()
 			IInteractionAgentInterface::Execute_OnHovering(HoveringInteraction.GetObject());
 		}
 		
-		if(UInputModuleStatics::GetKeyShortcut(GameplayTags::Input_InteractSelect).IsPressed(this))
-		{
-			if(HoveringInteraction.GetObject())
-			{
-				if(!SelectedInteraction.GetObject())
-				{
-					SelectedInteraction = HoveringInteraction;
-					IInteractionAgentInterface::Execute_OnSelected(SelectedInteraction.GetObject());
-				}
-				else if(SelectedInteraction != HoveringInteraction)
-				{
-					IInteractionAgentInterface::Execute_OnDeselected(SelectedInteraction.GetObject());
-					SelectedInteraction = HoveringInteraction;
-					IInteractionAgentInterface::Execute_OnSelected(SelectedInteraction.GetObject());
-				}
-			}
-			else if(SelectedInteraction.GetObject())
-			{
-				IInteractionAgentInterface::Execute_OnDeselected(SelectedInteraction.GetObject());
-				SelectedInteraction = nullptr;
-			}
-		}
-
 		if(UCommonModuleStatics::HasMouseCapture() && HoveringInteraction.GetObject())
 		{
 			IInteractionAgentInterface::Execute_OnEndHover(HoveringInteraction.GetObject());

@@ -62,13 +62,7 @@ public:
 	virtual void RemoveAllChildWidget() = 0;
 
 public:
-	virtual FName GetParentName() const = 0;
-
-	virtual FName GetParentSlot() const = 0;
-
 	virtual EWidgetType GetWidgetType(bool bInheritParent = true) const = 0;
-
-	virtual EWidgetCreateType GetWidgetCreateType() const = 0;
 
 	virtual EWidgetOpenType GetWidgetOpenType() const = 0;
 
@@ -80,17 +74,9 @@ public:
 	
 	virtual bool IsWidgetClosed(bool bCheckClosing = true, bool bInheritParent = false) const = 0;
 
-	virtual IScreenWidgetInterface* GetLastTemporary() const = 0;
-
-	virtual void SetLastTemporary(IScreenWidgetInterface* InLastTemporary) = 0;
-
 	virtual IScreenWidgetInterface* GetParentWidgetN() const = 0;
 
 	virtual void SetParentWidgetN(IScreenWidgetInterface* InParentWidget) = 0;
-
-	virtual IScreenWidgetInterface* GetTemporaryChild() const = 0;
-	
-	virtual void SetTemporaryChild(IScreenWidgetInterface* InTemporaryChild) = 0;
 
 	virtual int32 GetChildWidgetNum() const = 0;
 

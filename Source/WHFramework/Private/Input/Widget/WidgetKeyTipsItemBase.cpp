@@ -2,12 +2,9 @@
 
 #include "Input/Widget/WidgetKeyTipsItemBase.h"
 
-#include "CommonInputBaseTypes.h"
 #include "Components/Border.h"
 #include "Components/HorizontalBox.h"
-#include "Components/HorizontalBoxSlot.h"
-#include "Components/Image.h"
-#include "Input/InputModuleStatics.h"
+#include "Input/Widget/WidgetInputAction.h"
 #include "Widget/Common/CommonTextBlockN.h"
 
 UWidgetKeyTipsItemBase::UWidgetKeyTipsItemBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
@@ -23,6 +20,7 @@ void UWidgetKeyTipsItemBase::NativePreConstruct()
 	Super::NativePreConstruct();
 
 	SetKeyDisplayName(KeyDisplayName);
+	RefreshData();
 }
 
 void UWidgetKeyTipsItemBase::OnSpawn_Implementation(const FParameter& InParam)
@@ -39,62 +37,36 @@ void UWidgetKeyTipsItemBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 
 void UWidgetKeyTipsItemBase::RefreshData_Implementation()
 {
-	FString KeyCode;
-
-	const UImage* Img_KeyIcon = Cast<UImage>(Box_KeyIcon->GetChildAt(0));
-
-	while(Box_KeyIcon->GetChildrenCount() > 1)
+	if(!Box_KeyIcon)
 	{
-		Box_KeyIcon->RemoveChildAt(1);
-	}
-	
-	TArray<FString> KeyMappingNames;
-	KeyMappingName.ParseIntoArray(KeyMappingNames, TEXT(","));
-
-	#define EXPRESSION1(Key, Code) \
-	FSlateBrush ImageBrush; \
-	const UCommonInputPlatformSettings* Settings = UPlatformSettingsManager::Get().GetSettingsForPlatform<UCommonInputPlatformSettings>(); \
-	if(Settings->TryGetInputBrush(ImageBrush, Key, ECommonInputType::MouseAndKeyboard, FName("XSX")) && ImageBrush.GetResourceObject()) \
-	{ \
-		ImageBrush.ImageSize = Img_KeyIcon->GetBrush().ImageSize; \
-		UImage* Image = NewObject<UImage>(GetWorld()); \
-		Image->SetBrush(ImageBrush); \
-		if(const auto ImageSlot = Box_KeyIcon->AddChildToHorizontalBox(Image)) \
-		{ \
-			ImageSlot->SetPadding(Cast<UHorizontalBoxSlot>(Img_KeyIcon->Slot)->GetPadding()); \
-			ImageSlot->SetSize(FSlateChildSize(ESlateSizeRule::Automatic)); \
-		} \
-	} \
-	else if(!Code.StartsWith(TEXT("None"))) \
-	{ \
-		KeyCode.Append(Code); \
+		return;
 	}
 
-	ITER_ARRAY(KeyMappingNames, Iter1,
-		auto KeyMappings = UInputModuleStatics::GetPlayerKeyMappingsByName(*Iter1);
-		if(KeyMappings.Num() > 0)
-		{
-			ITER_ARRAY_WITHINDEX(KeyMappings, i, Iter2,
-				EXPRESSION1(Iter2.GetCurrentKey(), FString::Printf(TEXT("%s%s"), *Iter2.GetCurrentKey().GetDisplayName(false).ToString(), i == KeyMappings.Num() - 1 ? TEXT(".") : TEXT("/")))
-			)
-		}
-		else
-		{
-			EXPRESSION1(FKey(*Iter1), FString::Printf(TEXT("%s."), *FKey(*Iter1).GetDisplayName(false).ToString()))
-		}
-	)
-	KeyCode.RemoveFromEnd(TEXT("."));
-	KeyCode.RemoveFromEnd(TEXT("/"));
-
-	if(Box_KeyIcon->GetChildrenCount() > 1)
+	Box_KeyIcon->ClearChildren();
+	for(const FGameplayTag& ActionTag : ActionTags)
 	{
-		Cast<UHorizontalBoxSlot>(Box_KeyIcon->GetChildAt(Box_KeyIcon->GetChildrenCount() - 1)->Slot)->SetPadding(FMargin(0.f));
+		if(!ActionTag.IsValid())
+		{
+			continue;
+		}
+
+		UWidgetInputAction* ActionWidget = NewObject<UWidgetInputAction>(this);
+		ActionWidget->SetActionTag(ActionTag);
+		Box_KeyIcon->AddChildToHorizontalBox(ActionWidget);
 	}
 
-	Txt_KeyCode->SetText(FText::FromString(KeyCode));
-
-	Box_KeyIcon->SetVisibility(Box_KeyIcon->GetChildrenCount() > 1 ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
-	Border_KeyCode->SetVisibility(!KeyCode.IsEmpty() ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+	Box_KeyIcon->SetVisibility(Box_KeyIcon->GetChildrenCount() > 0
+		? ESlateVisibility::SelfHitTestInvisible
+		: ESlateVisibility::Collapsed);
+	if(Border_KeyCode)
+	{
+		Border_KeyCode->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	if(Txt_KeyCode)
+	{
+		Txt_KeyCode->SetText(FText::GetEmpty());
+		Txt_KeyCode->SetVisibility(ESlateVisibility::Collapsed);
+	}
 }
 
 FText UWidgetKeyTipsItemBase::GetKeyDisplayName() const
@@ -113,14 +85,8 @@ void UWidgetKeyTipsItemBase::SetKeyDisplayName(const FText InKeyDisplayName)
 	}
 }
 
-FString UWidgetKeyTipsItemBase::GetKeyMappingName() const
+void UWidgetKeyTipsItemBase::SetActionTags(const TArray<FGameplayTag>& InActionTags)
 {
-	return KeyMappingName;
-}
-
-void UWidgetKeyTipsItemBase::SetKeyMappingName(const FString& InKeyMappingName)
-{
-	KeyMappingName = InKeyMappingName;
-
+	ActionTags = InActionTags;
 	RefreshData();
 }

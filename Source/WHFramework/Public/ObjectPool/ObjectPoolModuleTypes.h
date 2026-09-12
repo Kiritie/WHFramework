@@ -2,15 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "Engine/EngineTypes.h"
+#include "WHFrameworkCoreTypes.h"
 #include "ObjectPoolModuleTypes.generated.h"
-
-UENUM(BlueprintType)
-enum class EObjectDespawnMode : uint8
-{
-	Recovery,
-
-	Destroy
-};
 
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FSpawnParameter

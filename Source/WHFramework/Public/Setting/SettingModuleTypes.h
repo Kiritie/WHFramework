@@ -12,6 +12,191 @@
 #include "SettingModuleTypes.generated.h"
 
 USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSettingId
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FName Name;
+
+	bool IsValid() const
+	{
+		return !Name.IsNone();
+	}
+
+	bool operator==(const FSettingId& Other) const
+	{
+		return Name == Other.Name;
+	}
+};
+
+FORCEINLINE uint32 GetTypeHash(const FSettingId& Value)
+{
+	return GetTypeHash(Value.Name);
+}
+
+UENUM(BlueprintType)
+enum class ESettingRendererType : uint8
+{
+	Auto,
+	Bool,
+	Number,
+	Enum,
+	Text,
+	Option,
+	Key,
+	Custom
+};
+
+UENUM(BlueprintType)
+enum class ESettingApplyPolicy : uint8
+{
+	Deferred,
+	Preview,
+	Immediate
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSettingNumberDisplay
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	double Min = 0.0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	double Max = 1.0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	double Step = 0.01;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	double Scale = 1.0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 DecimalPlaces = 2;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FText Suffix;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSettingDefinition
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	FSettingId SettingId;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	FString SourcePath;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FName Page;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FName Category;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Order = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FText DisplayName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FText Description;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	ESettingRendererType Renderer = ESettingRendererType::Auto;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	ESettingApplyPolicy ApplyPolicy = ESettingApplyPolicy::Deferred;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bVisible = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bRequiresConfirmation = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FGameplayTag SemanticTag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FSettingNumberDisplay NumberDisplay;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSettingDefinitionOverride
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FSettingId SettingId;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bOverrideDisplayName = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "bOverrideDisplayName"))
+	FText DisplayName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bOverridePage = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "bOverridePage"))
+	FName Page;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bOverrideCategory = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "bOverrideCategory"))
+	FName Category;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bOverrideOrder = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "bOverrideOrder"))
+	int32 Order = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bOverrideRenderer = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "bOverrideRenderer"))
+	ESettingRendererType Renderer = ESettingRendererType::Auto;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bOverrideApplyPolicy = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "bOverrideApplyPolicy"))
+	ESettingApplyPolicy ApplyPolicy = ESettingApplyPolicy::Deferred;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bOverrideVisible = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "bOverrideVisible"))
+	bool bVisible = true;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSettingPageDefinition
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FName Page;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FText DisplayName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Order = 0;
+};
+
+USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FWidgetSettingItemSpawnParameter : public FWidgetSpawnParameter
 {
 	GENERATED_BODY()
@@ -215,6 +400,25 @@ public:
 		InputData.MakeSaved();
 		ParameterData.MakeSaved();
 	}
+};
+
+USTRUCT()
+struct WHFRAMEWORK_API FSettingEditSession
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(Transient)
+	FSettingModuleSaveData AppliedData;
+
+	UPROPERTY(Transient)
+	FSettingModuleSaveData PendingData;
+
+	UPROPERTY(Transient)
+	FSettingModuleSaveData DefaultData;
+
+	UPROPERTY(Transient)
+	bool bActive = false;
 };
 
 USTRUCT()

@@ -7,7 +7,6 @@
 UWidgetSceneWorldMarker::UWidgetSceneWorldMarker(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-	WidgetName = TEXT("SceneWorldMarker");
 	WidgetSpace = EWidgetSpace::Screen;
 	WidgetZOrder = 2;
 	bWidgetAutoSize = true;

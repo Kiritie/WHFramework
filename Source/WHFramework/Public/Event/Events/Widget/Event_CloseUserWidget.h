@@ -12,16 +12,13 @@ struct WHFRAMEWORK_API FEventCloseUserWidget : public FEventBase
 public:
 	FEventCloseUserWidget() = default;
 
-	FEventCloseUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass, FName InWidgetName, bool InbInstant)
-		: WidgetClass(MoveTemp(InWidgetClass)), WidgetName(MoveTemp(InWidgetName)), bInstant(MoveTemp(InbInstant))
+	FEventCloseUserWidget(FGameplayTag InWidgetTag, bool bInInstant)
+		: WidgetTag(InWidgetTag), bInstant(bInInstant)
 	{
 	}
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSubclassOf<class UUserWidgetBase> WidgetClass = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "WidgetClass == nullptr"))
-	FName WidgetName = NAME_None;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (Categories = "Widget"))
+	FGameplayTag WidgetTag;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bInstant = false;

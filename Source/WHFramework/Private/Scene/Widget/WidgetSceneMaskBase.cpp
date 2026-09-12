@@ -4,7 +4,6 @@
 
 UWidgetSceneMaskBase::UWidgetSceneMaskBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	WidgetName = FName("SceneMask");
 	WidgetType = EWidgetType::Permanent;
 	WidgetZOrder = -1;
 	WidgetInputMode = EInputMode::UIOnly;

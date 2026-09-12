@@ -11,7 +11,6 @@
 
 UWidgetLoadingLevelPanel::UWidgetLoadingLevelPanel(const FObjectInitializer& ObjectInitializer) :Super(ObjectInitializer)
 {
-	WidgetName = FName("LoadingLevelPanel");
 	WidgetType = EWidgetType::Temporary;
 	WidgetRefreshType = EWidgetRefreshType::Tick;
 	WidgetInputMode = EInputMode::None;

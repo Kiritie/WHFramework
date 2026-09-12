@@ -4,6 +4,7 @@
 #include "Widget/Screen/UserWidgetBase.h"
 
 #include "Blueprint/WidgetTree.h"
+#include "CommonInputBaseTypes.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/ContentWidget.h"
@@ -19,21 +20,18 @@
 #include "Slate/Runtime/Interfaces/SubWidgetInterface.h"
 #include "Widget/Animator/WidgetAnimatorBase.h"
 #include "Widget/WidgetModule.h"
+#include "Widget/Screen/WidgetMountSlot.h"
 
 UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	bWidgetTickAble = false;
 
 	WidgetType = EWidgetType::Permanent;
-	WidgetName = NAME_None;
-	ParentName = NAME_None;
-	ParentSlot = NAME_None;
 	WidgetZOrder = 0;
 	WidgetAnchors = FAnchors(0.f, 0.f, 1.f, 1.f);
 	bWidgetAutoSize = false;
 	WidgetOffsets = FMargin(0.f);
 	WidgetAlignment = FVector2D(0.f);
-	WidgetCreateType = EWidgetCreateType::None;
 	WidgetOpenType = EWidgetOpenType::SelfHitTestInvisible;
 	WidgetOpenFinishType = EWidgetOpenFinishType::Instant;
 	WidgetOpenFinishTime = 0.f;
@@ -47,12 +45,13 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	WidgetState = EScreenWidgetState::None;
 	WidgetParams = TArray<FParameter>();
 	WidgetInputMode = EInputMode::None;
+	InputConfig = EWidgetInputConfig::None;
 	bWidgetAutoFocus = false;
 
 	OwnerObject = nullptr;
-	LastTemporary = nullptr;
+	bInitialized = false;
+	WidgetTag = FGameplayTag();
 	ParentWidget = nullptr;
-	TemporaryChild = nullptr;
 	SubWidgets = TArray<ISubWidgetInterface*>();
 	ChildWidgets = TArray<IScreenWidgetInterface*>();
 }
@@ -69,27 +68,32 @@ void UUserWidgetBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 
 void UUserWidgetBase::OnTick_Implementation(float DeltaSeconds)
 {
-	
+
+}
+
+TOptional<FUIInputConfig> UUserWidgetBase::GetDesiredInputConfig() const
+{
+	switch(InputConfig)
+	{
+		case EWidgetInputConfig::Game:
+			return FUIInputConfig(ECommonInputMode::Game, EMouseCaptureMode::CapturePermanently, true);
+		case EWidgetInputConfig::GameAndMenu:
+			return FUIInputConfig(ECommonInputMode::All, EMouseCaptureMode::NoCapture, false);
+		case EWidgetInputConfig::Menu:
+			return FUIInputConfig(ECommonInputMode::Menu, EMouseCaptureMode::NoCapture, false);
+		default:
+			return TOptional<FUIInputConfig>();
+	}
 }
 
 void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
 {
 	if(UWidgetModule::IsValid()) UWidgetModule::Get().RegisterTickableWidget(this);
+	RebuildWidgetMountSlotCache();
 
-	if(ParentWidget)
-	{
-		ParentWidget->RemoveChildWidget(this);
-	}
-	if(ParentName != NAME_None)
-	{
-		ParentWidget = UWidgetModuleStatics::GetUserWidgetByName<UUserWidgetBase>(ParentName);
-	}
-	else if(UUserWidgetBase* InParent = Cast<UUserWidgetBase>(InOwner); InParent != this)
+	if(UUserWidgetBase* InParent = Cast<UUserWidgetBase>(InOwner); InParent != this)
 	{
 		ParentWidget = InParent;
-	}
-	if(ParentWidget)
-	{
 		ParentWidget->AddChildWidget(this);
 	}
 
@@ -116,18 +120,6 @@ void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPar
 
 	UEventModuleStatics::BroadcastEvent<FEventUserWidgetCreated>(this, { this });
 
-	for(const auto& Iter : UWidgetModuleStatics::GetUserWidgetChildrenByName(WidgetName))
-	{
-		if(UWidgetModuleStatics::HasUserWidgetClassByName(Iter))
-		{
-			const UUserWidgetBase* DefaultObject = UWidgetModuleStatics::GetUserWidgetClassByName(Iter)->GetDefaultObject<UUserWidgetBase>();
-			if(DefaultObject->ParentName == WidgetName && (DefaultObject->WidgetCreateType == EWidgetCreateType::AutoCreate || DefaultObject->WidgetCreateType == EWidgetCreateType::AutoCreateAndOpen))
-			{
-				UWidgetModuleStatics::CreateUserWidgetByName<UUserWidgetBase>(Iter, InOwner);
-			}
-		}
-	}
-	
 	TArray<UWidget*> Widgets;
 	WidgetTree->GetAllWidgets(Widgets);
 	for(auto Iter : Widgets)
@@ -156,13 +148,21 @@ void UUserWidgetBase::OnReset(bool bForce)
 
 void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 {
-	if(WidgetState == EScreenWidgetState::Opening || WidgetState == EScreenWidgetState::Opened) return K2_OnOpen(InParams, bInstant);
-	
+	CurrentOpenParameters = InParams;
 	WidgetParams = InParams;
+	AbortCloseTransition();
+
+	if(WidgetState == EScreenWidgetState::Opening || WidgetState == EScreenWidgetState::Opened)
+	{
+		K2_OnOpen(CurrentOpenParameters, bInstant);
+		return;
+	}
+
 	WidgetState = EScreenWidgetState::Opening;
 	OnStateChanged(WidgetState);
 
-	K2_OnOpen(InParams, bInstant);
+	K2_OnOpen(CurrentOpenParameters, bInstant);
+	ActivateWidget();
 
 	switch(WidgetOpenType)
 	{
@@ -197,12 +197,13 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 			{
 				FTimerDelegate TimerDelegate;
 				TimerDelegate.BindUObject(this, &UUserWidgetBase::FinishOpen, false);
-				GetWorld()->GetTimerManager().SetTimer(WidgetFinishOpenTimerHandle, TimerDelegate, WidgetRefreshTime, false);
+				GetWorld()->GetTimerManager().SetTimer(WidgetFinishOpenTimerHandle, TimerDelegate, WidgetOpenFinishTime, false);
 			}
 			else
 			{
 				FinishOpen(true);
 			}
+			break;
 		}
 		case EWidgetOpenFinishType::Animator:
 		{
@@ -266,30 +267,59 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 		default: break;
 	}
 
-	if(bWidgetAutoFocus)
+}
+
+void UUserWidgetBase::RebuildWidgetMountSlotCache()
+{
+	WidgetMountSlotMap.Reset();
+	if(!WidgetTree)
 	{
-		SetFocus();
+		return;
 	}
 
-	UInputModuleStatics::UpdateGlobalInputMode();
-
-	if(K2_OnOpened.IsBound()) K2_OnOpened.Broadcast(InParams, bInstant);
-	if(OnOpened.IsBound()) OnOpened.Broadcast(InParams, bInstant);
-
-	UEventModuleStatics::BroadcastEvent<FEventUserWidgetOpened>(this, { this });
-
-	for(const auto Iter : ChildWidgets)
+	TArray<UWidget*> Widgets;
+	WidgetTree->GetAllWidgets(Widgets);
+	for(UWidget* Widget : Widgets)
 	{
-		if(Iter->GetParentName() == WidgetName && Iter->GetWidgetCreateType() == EWidgetCreateType::AutoCreateAndOpen)
+		UWidgetMountSlot* MountSlot = Cast<UWidgetMountSlot>(Widget);
+		if(!MountSlot || !MountSlot->GetSlotTag().IsValid())
 		{
-			Iter->Open(nullptr, bInstant);
+			continue;
 		}
+
+		ensureMsgf(
+			!WidgetMountSlotMap.Contains(MountSlot->GetSlotTag()),
+			TEXT("Duplicate WidgetMountSlot tag %s in %s"),
+			*MountSlot->GetSlotTag().ToString(),
+			*GetClass()->GetName());
+		WidgetMountSlotMap.Add(MountSlot->GetSlotTag(), MountSlot);
 	}
+}
+
+UWidgetMountSlot* UUserWidgetBase::GetWidgetMountSlot(const FGameplayTag& InSlotTag) const
+{
+	if(const TObjectPtr<UWidgetMountSlot>* MountSlot = WidgetMountSlotMap.Find(InSlotTag))
+	{
+		return MountSlot->Get();
+	}
+	return nullptr;
+}
+
+bool UUserWidgetBase::IsWidgetActiveInHierarchy() const
+{
+	if(!IsActivated() || WidgetState != EScreenWidgetState::Opened || GetVisibility() == ESlateVisibility::Collapsed || GetVisibility() == ESlateVisibility::Hidden)
+	{
+		return false;
+	}
+	const UUserWidgetBase* ParentUserWidget = GetParentWidgetN<UUserWidgetBase>();
+	return !ParentUserWidget || ParentUserWidget->IsWidgetActiveInHierarchy();
 }
 
 void UUserWidgetBase::OnClose(bool bInstant)
 {
 	if(WidgetState == EScreenWidgetState::Closing || WidgetState == EScreenWidgetState::Closed) return;
+
+	AbortOpenTransition();
 	
 	WidgetState = EScreenWidgetState::Closing;
 	OnStateChanged(WidgetState);
@@ -315,6 +345,7 @@ void UUserWidgetBase::OnClose(bool bInstant)
 			{
 				FinishClose(true);
 			}
+			break;
 		}
 		case EWidgetCloseFinishType::Animator:
 		{
@@ -331,11 +362,6 @@ void UUserWidgetBase::OnClose(bool bInstant)
 		}
 		default: break;
 	}
-
-	if(K2_OnClosed.IsBound()) K2_OnClosed.Broadcast(bInstant);
-	if(OnClosed.IsBound()) OnClosed.Broadcast(bInstant);
-
-	UEventModuleStatics::BroadcastEvent<FEventUserWidgetClosed>(this, { this });
 }
 
 void UUserWidgetBase::OnRefresh()
@@ -360,9 +386,10 @@ void UUserWidgetBase::OnDestroy(bool bRecovery)
 
 	UInputModuleStatics::UpdateGlobalInputMode();
 
-	GetWorld()->GetTimerManager().ClearTimer(WidgetFinishOpenTimerHandle);
-	GetWorld()->GetTimerManager().ClearTimer(WidgetFinishCloseTimerHandle);
+	AbortOpenTransition();
+	AbortCloseTransition();
 	GetWorld()->GetTimerManager().ClearTimer(WidgetRefreshTimerHandle);
+	DeactivateWidget();
 
 	if(K2_OnDestroyed.IsBound()) K2_OnDestroyed.Broadcast(bRecovery);
 	if(OnDestroyed.IsBound()) OnDestroyed.Broadcast(bRecovery);
@@ -372,7 +399,9 @@ void UUserWidgetBase::OnDestroy(bool bRecovery)
 		bRecovery ? EObjectDespawnMode::Recovery : EObjectDespawnMode::Destroy);
 
 	OwnerObject = nullptr;
+	bInitialized = false;
 	WidgetParams.Empty();
+	CurrentOpenParameters.Empty();
 }
 
 void UUserWidgetBase::OnStateChanged(EScreenWidgetState InWidgetState)
@@ -391,14 +420,10 @@ void UUserWidgetBase::Init(UObject* InOwner, const TArray<FParameter>* InParams,
 
 void UUserWidgetBase::Init(UObject* InOwner, const TArray<FParameter>& InParams, bool bForce)
 {
-	if(!InOwner || OwnerObject != InOwner || bForce)
+	if(!bInitialized || OwnerObject != InOwner || bForce)
 	{
 		OnInitialize(InOwner, InParams);
-		
-		for(auto& Iter : ChildWidgets)
-		{
-			Iter->Init(InOwner, InParams, bForce);
-		}
+		bInitialized = true;
 	}
 }
 
@@ -413,17 +438,21 @@ void UUserWidgetBase::Reset(bool bForce)
 
 void UUserWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant, bool bForce)
 {
-	UWidgetModuleStatics::OpenUserWidgetByName(WidgetName, InParams, bInstant, bForce);
+	const FParameter Parameter = InParams && !InParams->IsEmpty()
+		? (*InParams)[0]
+		: FParameter();
+	UWidgetModuleStatics::OpenUserWidgetByTag(WidgetTag, Parameter, bInstant, bForce);
 }
 
 void UUserWidgetBase::Open(const TArray<FParameter>& InParams, bool bInstant, bool bForce)
 {
-	UWidgetModuleStatics::OpenUserWidgetByName(WidgetName, InParams, bInstant, bForce);
+	const FParameter Parameter = InParams.IsEmpty() ? FParameter() : InParams[0];
+	UWidgetModuleStatics::OpenUserWidgetByTag(WidgetTag, Parameter, bInstant, bForce);
 }
 
 void UUserWidgetBase::Close(bool bInstant)
 {
-	UWidgetModuleStatics::CloseUserWidgetByName(WidgetName, bInstant);
+	UWidgetModuleStatics::CloseUserWidgetByTag(WidgetTag, bInstant);
 }
 
 void UUserWidgetBase::Toggle(bool bInstant)
@@ -449,7 +478,7 @@ void UUserWidgetBase::Refresh()
 
 void UUserWidgetBase::Destroy(bool bRecovery)
 {
-	UWidgetModuleStatics::DestroyUserWidgetByName(WidgetName, bRecovery);
+	UWidgetModuleStatics::DestroyUserWidgetByTag(WidgetTag, bRecovery);
 }
 
 bool UUserWidgetBase::CanOpen_Implementation() const
@@ -459,15 +488,28 @@ bool UUserWidgetBase::CanOpen_Implementation() const
 
 void UUserWidgetBase::FinishOpen(bool bInstant)
 {
-	if(WidgetState == EScreenWidgetState::Opened) return;
+	if(WidgetState != EScreenWidgetState::Opening) return;
 
 	WidgetState = EScreenWidgetState::Opened;
 	OnStateChanged(WidgetState);
+
+	if(bWidgetAutoFocus)
+	{
+		SetFocus();
+	}
+
+	UInputModuleStatics::UpdateGlobalInputMode();
+
+	if(K2_OnOpened.IsBound()) K2_OnOpened.Broadcast(CurrentOpenParameters, bInstant);
+	if(OnOpened.IsBound()) OnOpened.Broadcast(CurrentOpenParameters, bInstant);
+
+	UEventModuleStatics::BroadcastEvent<FEventUserWidgetOpened>(this, { this });
+
 }
 
 void UUserWidgetBase::FinishClose(bool bInstant)
 {
-	if(WidgetState == EScreenWidgetState::Closed) return;
+	if(WidgetState != EScreenWidgetState::Closing) return;
 
 	WidgetState = EScreenWidgetState::Closed;
 	OnStateChanged(WidgetState);
@@ -492,21 +534,37 @@ void UUserWidgetBase::FinishClose(bool bInstant)
 		default: break;
 	}
 	
-	if(GetWidgetType(false) == EWidgetType::Temporary)
-	{
-		if(GetLastTemporary())
-		{
-			GetLastTemporary()->Open();
-			SetLastTemporary(nullptr);
-		}
-	}
-
 	if(WidgetRefreshType == EWidgetRefreshType::Timer)
 	{
 		GetWorld()->GetTimerManager().ClearTimer(WidgetRefreshTimerHandle);
 	}
 
+	DeactivateWidget();
+
 	UInputModuleStatics::UpdateGlobalInputMode();
+
+	if(K2_OnClosed.IsBound()) K2_OnClosed.Broadcast(bInstant);
+	if(OnClosed.IsBound()) OnClosed.Broadcast(bInstant);
+
+	UEventModuleStatics::BroadcastEvent<FEventUserWidgetClosed>(this, { this });
+}
+
+void UUserWidgetBase::AbortOpenTransition()
+{
+	GetWorld()->GetTimerManager().ClearTimer(WidgetFinishOpenTimerHandle);
+	if(WidgetOpenAnimator)
+	{
+		WidgetOpenAnimator->Abort();
+	}
+}
+
+void UUserWidgetBase::AbortCloseTransition()
+{
+	GetWorld()->GetTimerManager().ClearTimer(WidgetFinishCloseTimerHandle);
+	if(WidgetCloseAnimator)
+	{
+		WidgetCloseAnimator->Abort();
+	}
 }
 
 UUserWidget* UUserWidgetBase::K2_CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams)
@@ -635,9 +693,5 @@ UPanelWidget* UUserWidgetBase::GetRootPanelWidget() const
 
 UPanelWidget* UUserWidgetBase::GetParentPanelWidget() const
 {
-	if(const auto ParentUserWidget = GetParentWidgetN<UUserWidgetBase>())
-	{
-		return ParentSlot.IsNone() ? ParentUserWidget->GetRootPanelWidget() : Cast<UPanelWidget>(ParentUserWidget->WidgetTree->FindWidget(ParentSlot));
-	}
-	return nullptr;
+	return GetParent();
 }

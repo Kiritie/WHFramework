@@ -3,20 +3,18 @@
 #pragma once
 
 #include "Common/Base/WHObject.h"
-#include "Input/InputManagerInterface.h"
-
-#include "InputManagerBase.generated.h"
+#include "InputBindingBase.generated.h"
 
 class UInputComponentBase;
 
 UCLASS(EditInlineNew)
-class WHFRAMEWORK_API UInputManagerBase : public UWHObject, public IInputManagerInterface
+class WHFRAMEWORK_API UInputBindingBase : public UWHObject
 {
 	GENERATED_BODY()
 	
 public:	
 	// ParamSets default values for this object's properties
-	UInputManagerBase();
+	UInputBindingBase();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Defaults
@@ -27,7 +25,7 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitialize")
 	void K2_OnInitialize();
 	UFUNCTION()
-	virtual void OnInitialize();
+	virtual void OnInitialize(int32 InPlayerIndex);
 	/**
 	* 当重置
 	*/
@@ -45,10 +43,12 @@ public:
 	/**
 	* 当绑定
 	*/
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnBindAction")
-	void K2_OnBindAction(UInputComponentBase* InInputComponent);
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnBindInput")
+	void K2_OnBindInput(UInputComponentBase* InInputComponent);
 	UFUNCTION()
-	virtual void OnBindAction(UInputComponentBase* InInputComponent);
+	virtual void OnBindInput(UInputComponentBase* InInputComponent);
+	UFUNCTION()
+	virtual void OnUnbindInput();
 	/**
 	* 当销毁
 	*/
@@ -59,21 +59,21 @@ public:
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FName InputManagerName;
+	FName InputBindingName;
 
 	UPROPERTY(BlueprintReadOnly)
 	int32 LocalPlayerIndex;
  
 public:
 	UFUNCTION(BlueprintPure)
-	FName GetInputManagerName() const { return InputManagerName; }
+	FName GetInputBindingName() const { return InputBindingName; }
 
 	UFUNCTION(BlueprintPure)
 	int32 GetLocalPlayerIndex() const { return LocalPlayerIndex; }
 
-	UFUNCTION(BlueprintNativeEvent)
-	int32 GetNativeInputPriority() const override;
+protected:
+	UPROPERTY(Transient)
+	TObjectPtr<UInputComponentBase> BoundInputComponent;
 
-	UFUNCTION(BlueprintNativeEvent)
-	EInputMode GetNativeInputMode() const override;
+	TArray<uint32> BindingHandles;
 };

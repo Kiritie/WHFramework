@@ -177,7 +177,9 @@ void SSlateWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 
 	for(const auto Iter : ChildWidgets)
 	{
-		if(Iter->GetParentName() == GetWidgetName() && Iter->GetWidgetCreateType() == EWidgetCreateType::AutoCreateAndOpen)
+		const SSlateWidgetBase* ChildWidget = static_cast<const SSlateWidgetBase*>(Iter);
+		if(ChildWidget->GetParentName() == GetWidgetName()
+			&& ChildWidget->GetWidgetCreateType() == EWidgetCreateType::AutoCreateAndOpen)
 		{
 			Iter->Open(nullptr, bInstant);
 		}

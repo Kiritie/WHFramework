@@ -213,13 +213,11 @@ namespace GameplayTags
 	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Option_Task);
 	
 	////////////////////////////////////////////////////
-	// Input_Shortcut
-	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_InteractSelect);
-
-	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_CameraPanMove);
-	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_CameraRotate);
-	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_CameraZoom);
-	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_CameraSprint);
+	// Input_Context
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Context_Camera);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Context_CharacterMovement);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Context_CharacterAction);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Context_System);
 
 	////////////////////////////////////////////////////
 	// Input_Camera
@@ -228,6 +226,7 @@ namespace GameplayTags
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_PanHCamera);
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_PanVCamera);
 	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_ZoomCamera);
+	WHFRAMEWORK_API	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_CameraZoomModifier);
 	
 	////////////////////////////////////////////////////
 	// Input_Player

@@ -62,13 +62,11 @@ namespace GameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Interaction_Option_Task, "Interaction.Option.Task", "Task interaction option");
 
 	////////////////////////////////////////////////////
-	// Input_Shortcut
-	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_InteractSelect, "Input.Shortcut.InteractSelect", "Camera Pan Move");
-	
-	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_CameraPanMove, "Input.Shortcut.CameraPanMove", "Camera Pan Move");
-	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_CameraRotate, "Input.Shortcut.CameraRotate", "Camera Rotate");
-	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_CameraZoom, "Input.Shortcut.CameraZoom", "Camera Zoom");
-	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_CameraSprint, "Input.Shortcut.CameraSprint", "Camera Sprint");
+	// Input_Context
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_Context_Camera, "Input.Context.Camera", "Camera input context");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_Context_CharacterMovement, "Input.Context.CharacterMovement", "Character movement input context");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_Context_CharacterAction, "Input.Context.CharacterAction", "Character action input context");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_Context_System, "Input.Context.System", "System input context");
 
 	////////////////////////////////////////////////////
 	// Input_Camera
@@ -77,6 +75,7 @@ namespace GameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_PanHCamera, "Input.Camera.PanH", "Pan H Camera");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_PanVCamera, "Input.Camera.PanV", "Pan V Camera");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_ZoomCamera, "Input.Camera.Zoom", "Zoom Camera");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_CameraZoomModifier, "Input.Camera.ZoomModifier", "Camera zoom modifier");
 
 	////////////////////////////////////////////////////
 	// Input_Player

@@ -48,11 +48,11 @@ protected:
 	UCommonTextBlockN* Txt_DisplayName;
 
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "KeyMapping")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	FText KeyDisplayName;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "KeyMapping")
-	FString KeyMappingName;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input", meta = (Categories = "Input"))
+	TArray<FGameplayTag> ActionTags;
 
 public:
 	UFUNCTION(BlueprintPure)
@@ -61,9 +61,9 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void SetKeyDisplayName(const FText InKeyDisplayName);
 
-	UFUNCTION(BlueprintPure)
-	FString GetKeyMappingName() const;
+	UFUNCTION(BlueprintPure, Category = "Input")
+	const TArray<FGameplayTag>& GetActionTags() const { return ActionTags; }
 
-	UFUNCTION(BlueprintCallable)
-	void SetKeyMappingName(const FString& InKeyMappingName);
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	void SetActionTags(const TArray<FGameplayTag>& InActionTags);
 };

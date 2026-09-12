@@ -6,15 +6,6 @@
 #include "Event_OpenUserWidget.generated.h"
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FWidgetParameterArray
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<FParameter> Value;
-};
-
-USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FEventOpenUserWidget : public FEventBase
 {
 	GENERATED_BODY()
@@ -22,19 +13,19 @@ struct WHFRAMEWORK_API FEventOpenUserWidget : public FEventBase
 public:
 	FEventOpenUserWidget() = default;
 
-	FEventOpenUserWidget(TSubclassOf<class UUserWidgetBase> InWidgetClass, FName InWidgetName, FWidgetParameterArray InWidgetParams, bool InbInstant, bool InbForce)
-		: WidgetClass(MoveTemp(InWidgetClass)), WidgetName(MoveTemp(InWidgetName)), WidgetParams(MoveTemp(InWidgetParams)), bInstant(MoveTemp(InbInstant)), bForce(MoveTemp(InbForce))
+	FEventOpenUserWidget(FGameplayTag InWidgetTag, const FParameter& InWidgetParam, bool bInInstant, bool bInForce, TSubclassOf<class UUserWidgetBase> InWidgetClassOverride = nullptr)
+		: WidgetTag(InWidgetTag), WidgetClassOverride(InWidgetClassOverride), WidgetParam(InWidgetParam), bInstant(bInInstant), bForce(bInForce)
 	{
 	}
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSubclassOf<class UUserWidgetBase> WidgetClass = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "WidgetClass == nullptr"))
-	FName WidgetName = NAME_None;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (Categories = "Widget"))
+	FGameplayTag WidgetTag;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FWidgetParameterArray WidgetParams = {};
+	TSubclassOf<class UUserWidgetBase> WidgetClassOverride = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FParameter WidgetParam;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bInstant = false;

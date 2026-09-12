@@ -4,7 +4,6 @@
 
 UWidgetAbilityPickUpSprite::UWidgetAbilityPickUpSprite(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	WidgetName = FName("PickUpSprite");
 
 	WidgetSpace = EWidgetSpace::World;
 	WidgetAlignment = FVector2D(0.5f);

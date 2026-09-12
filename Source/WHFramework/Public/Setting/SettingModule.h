@@ -5,6 +5,7 @@
 
 #include "Main/Base/ModuleBase.h"
 #include "SaveGame/Base/SaveDataAgentInterface.h"
+#include "Setting/SettingModuleTypes.h"
 
 #include "SettingModule.generated.h"
 
@@ -15,6 +16,16 @@ class UWidgetTextSettingItemBase;
 class UWidgetEnumSettingItemBase;
 class UWidgetBoolSettingItemBase;
 class UWidgetFloatSettingItemBase;
+class USettingRegistry;
+class USettingProviderBase;
+class USettingEntry;
+class FProperty;
+
+struct FResolvedSettingProperty
+{
+	void* ContainerPtr = nullptr;
+	FProperty* Property = nullptr;
+};
 
 UCLASS()
 class WHFRAMEWORK_API USettingModule : public UModuleBase
@@ -58,6 +69,51 @@ protected:
 	virtual FSaveData* ToData() override;
 
 protected:
+	void BuildSettingDefinitions();
+
+	void BuildSettingEntries();
+
+	void CollectPropertyDefinitions(const UStruct* InStruct, const FString& InPrefix, TArray<FSettingDefinition>& OutDefinitions) const;
+
+	bool IsSupportedSettingProperty(const FProperty* InProperty) const;
+
+	ESettingRendererType InferRenderer(const FProperty* InProperty) const;
+
+	bool ResolvePropertyPath(UStruct* InRootStruct, void* InRootData, const FString& InPath, FResolvedSettingProperty& OutResolved) const;
+
+	FParameter ReadPropertyValue(const FResolvedSettingProperty& InResolved) const;
+
+	bool WritePropertyValue(const FResolvedSettingProperty& InResolved, const FParameter& InValue) const;
+
+	FSettingModuleSaveData GetCurrentCombinedSettings() const;
+
+	void ApplyCombinedSettings(FSettingModuleSaveData& InData);
+
+	const FSettingDefinition* FindSettingDefinition(FSettingId InSettingId) const;
+
+	FParameter ReadSessionValue(FSettingModuleSaveData& InData, FSettingId InSettingId) const;
+
+	bool WriteSessionValue(FSettingModuleSaveData& InData, FSettingId InSettingId, const FParameter& InValue) const;
+
+	UPROPERTY(EditAnywhere, Category = "Setting")
+	TObjectPtr<USettingRegistry> Registry;
+
+	UPROPERTY(EditAnywhere, Instanced, Category = "Setting")
+	TArray<TObjectPtr<USettingProviderBase>> Providers;
+
+	UPROPERTY(VisibleAnywhere, Transient, Category = "Setting")
+	TArray<FSettingDefinition> FinalDefinitions;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<USettingEntry>> SettingEntries;
+
+	UPROPERTY(Transient)
+	FSettingEditSession EditSession;
+
+	TMap<FSettingId, TObjectPtr<USettingEntry>> SettingEntryMap;
+
+	//////////////////////////////////////////////////////////////////////////
+	/// Legacy renderer classes
 	UPROPERTY(EditAnywhere, Category = "WdigetClass")
 	TSubclassOf<UWidgetSettingItemCategoryBase> SettingItemCategoryClass;
 
@@ -80,6 +136,54 @@ protected:
 	TSubclassOf<UWidgetOptionSettingItemBase> OptionSettingItemClass;
 
 public:
+	UFUNCTION(CallInEditor, BlueprintCallable, Category = "Setting")
+	void RefreshSettingDefinitions();
+
+	UFUNCTION(BlueprintCallable)
+	void BeginEdit();
+
+	UFUNCTION(BlueprintCallable)
+	bool ApplyEditSession();
+
+	UFUNCTION(BlueprintCallable)
+	void CancelEditSession();
+
+	UFUNCTION(BlueprintCallable)
+	void ResetAllToDefault();
+
+	UFUNCTION(BlueprintPure)
+	bool IsEditSessionActive() const { return EditSession.bActive; }
+
+	UFUNCTION(BlueprintPure)
+	bool CanApply() const;
+
+	UFUNCTION(BlueprintPure)
+	bool CanReset() const;
+
+	UFUNCTION(BlueprintPure)
+	bool IsSettingDirty(FSettingId InSettingId) const;
+
+	UFUNCTION(BlueprintPure)
+	bool CanResetSetting(FSettingId InSettingId) const;
+
+	UFUNCTION(BlueprintPure)
+	FParameter GetAppliedValue(FSettingId InSettingId) const;
+
+	UFUNCTION(BlueprintPure)
+	FParameter GetPendingValue(FSettingId InSettingId) const;
+
+	UFUNCTION(BlueprintPure)
+	FParameter GetDefaultValue(FSettingId InSettingId) const;
+
+	UFUNCTION(BlueprintCallable)
+	bool SetPendingValue(FSettingId InSettingId, const FParameter& InValue);
+
+	UFUNCTION(BlueprintPure)
+	const TArray<FSettingDefinition>& GetSettingDefinitions() const { return FinalDefinitions; }
+
+	UFUNCTION(BlueprintPure)
+	TArray<USettingEntry*> GetSettingEntries() const;
+
 	UFUNCTION(BlueprintPure)
 	TSubclassOf<UWidgetSettingItemCategoryBase> GetSettingItemCategoryClass() const { return SettingItemCategoryClass; }
 

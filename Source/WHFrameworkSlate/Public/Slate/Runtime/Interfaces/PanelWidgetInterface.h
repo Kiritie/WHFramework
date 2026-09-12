@@ -45,8 +45,6 @@ public:
 	virtual void DestroyAllSubWidget(bool bRecovery = false) = 0;
 
 public:
-	virtual FName GetWidgetName() const = 0;
-
 	virtual int32 GetWidgetZOrder() const = 0;
 
 	virtual FAnchors GetWidgetAnchors() const = 0;

@@ -4,7 +4,6 @@
 
 UWidgetTransitionMaskBase::UWidgetTransitionMaskBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	WidgetName = FName("TransitionMask");
 
 	WidgetType = EWidgetType::Permanent;
 

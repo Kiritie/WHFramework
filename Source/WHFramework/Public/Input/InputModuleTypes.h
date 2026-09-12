@@ -9,8 +9,13 @@
 
 #include "InputModuleTypes.generated.h"
 
-class UInputManagerBase;
 class UPlayerMappableKeyProfileBase;
+class UCommonInputSubsystem;
+class UEnhancedInputLocalPlayerSubsystem;
+class UEnhancedInputUserSettings;
+class UInputActionBase;
+class UInputComponentBase;
+class ULocalPlayer;
 
 UENUM(BlueprintType)
 enum class EInputInteractAction : uint8
@@ -29,197 +34,60 @@ enum class EInputInteractEvent : uint8
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FInputKeyShortcut
+struct WHFRAMEWORK_API FInputContextConfig
 {
 	GENERATED_BODY()
 
-public:
-	FInputKeyShortcut()
-	{
-		Keys = TArray<FKey>();
-		Auxs = TArray<FKey>();
-	}
+	UPROPERTY(EditAnywhere, Category = "Input", meta = (Categories = "Input.Context"))
+	FGameplayTag ContextTag;
 
-	FInputKeyShortcut(const TArray<FKey>& InKey)
-		: Keys(InKey)
-	{
-	}
+	UPROPERTY(EditAnywhere, Category = "Input")
+	TObjectPtr<UInputMappingContext> MappingContext = nullptr;
 
-	FInputKeyShortcut(const FText& InDisplayName, const FText& InCategory)
-		: DisplayName(InDisplayName),
-		  Category(InCategory)
-	{
-	}
+	UPROPERTY(EditAnywhere, Category = "Input")
+	int32 Priority = 0;
 
-	FInputKeyShortcut(const FText& InDisplayName, const FText& InCategory, const TArray<FKey>& InKey)
-		: DisplayName(InDisplayName),
-		  Category(InCategory),
-		  Keys(InKey),
-		  Auxs({})
-	{
-	}
+	UPROPERTY(EditAnywhere, Category = "Input")
+	bool bAutoActivate = true;
 
-	FInputKeyShortcut(const FText& InDisplayName, const FText& InCategory, const TArray<FKey>& InKey, const TArray<FKey>& InAuxs)
-		: DisplayName(InDisplayName),
-		  Category(InCategory),
-		  Keys(InKey),
-		  Auxs(InAuxs)
-	{
-	}
-
-public:
-	bool IsValid() const
-	{
-		for(auto& Iter : Keys)
-		{
-			if(Iter.IsValid())
-			{
-				return true;
-			}
-		}
-		return false;
-	}
-		
-	bool IsPressed(APlayerController* InPlayerController, bool bAllowInvalid = false) const;
-		
-	bool IsReleased(APlayerController* InPlayerController, bool bAllowInvalid = false) const;
-
-	bool IsPressing(APlayerController* InPlayerController, bool bAllowInvalid = false) const;
-
-public:
-	UPROPERTY(EditAnywhere)
-	FText DisplayName;
-
-	UPROPERTY(EditAnywhere)
-	FText Category;
-
-	UPROPERTY(EditAnywhere)
-	TArray<FKey> Keys;
-
-	UPROPERTY(EditAnywhere)
-	TArray<FKey> Auxs;
+	UPROPERTY(EditAnywhere, Category = "Input")
+	bool bRegisterWithSettings = true;
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FInputContextMapping
+struct WHFRAMEWORK_API FInputMappableEntry
 {
 	GENERATED_BODY()
 
-public:
-	FInputContextMapping()
-	{
-		InputMapping = nullptr;
-		Priority = 0;
-		bRegisterWithSettings = true;
-	}
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	FGameplayTag ActionTag;
 
-public:
-	UPROPERTY(EditAnywhere, Category="Input")
-	UInputMappingContext* InputMapping;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	FName MappingName;
 
-	// Higher priority input mappings will be prioritized over mappings with a lower priority.
-	UPROPERTY(EditAnywhere, Category="Input")
-	int32 Priority;
-	
-	/** If true, then this mapping context will be registered with the settings when this game feature action is registered. */
-	UPROPERTY(EditAnywhere, Category="Input")
-	bool bRegisterWithSettings;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	EPlayerMappableKeySlot Slot = EPlayerMappableKeySlot::First;
 };
 
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FInputKeyMapping
+USTRUCT()
+struct WHFRAMEWORK_API FInputPlayerRuntime
 {
 	GENERATED_BODY()
 
-public:
-	FInputKeyMapping()
-	{
-		Key = FKey();
-		Event = EInputEvent::IE_MAX;
-	}
-
-	FInputKeyMapping(const FKey& InKey, EInputEvent InEvent, const FInputActionHandlerDynamicSignature& InDelegate)
-		: Key(InKey),
-		  Event(InEvent),
-		  Delegate(InDelegate)
-	{
-	}
-	
-public:
-	UPROPERTY(BlueprintReadWrite)
-	FKey Key;
-
-	UPROPERTY(BlueprintReadWrite)
-	TEnumAsByte<EInputEvent> Event;
-
-	UPROPERTY(BlueprintReadWrite)
-	FInputActionHandlerDynamicSignature Delegate;
-};
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FInputTouchMapping
-{
-	GENERATED_BODY()
-
-public:
-	FInputTouchMapping()
-	{
-		Event = EInputEvent::IE_MAX;
-	}
-
-	FInputTouchMapping(EInputEvent InEvent, const FInputTouchHandlerSignature& InDelegate)
-		: Event(InEvent),
-		  Delegate(InDelegate)
-	{
-	}
-
-public:
-	UPROPERTY(BlueprintReadWrite)
-	TEnumAsByte<EInputEvent> Event;
-
-	FInputTouchHandlerSignature Delegate;
-
-	UPROPERTY(BlueprintReadWrite)
-	FInputTouchHandlerDynamicSignature DynamicDelegate;
-};
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FPlayerKeyMappingInfo
-{
-	GENERATED_BODY()
-
-public:
-	FPlayerKeyMappingInfo()
-	{
-		KeyName = FText::GetEmpty();
-		KeyCode = FText::GetEmpty();
-		KeyBrushs = TArray<FSlateBrush>();
-	}
-
-public:
-	UPROPERTY(BlueprintReadOnly)
-	FText KeyName;
-
-	UPROPERTY(BlueprintReadOnly)
-	FText KeyCode;
-
-	UPROPERTY(BlueprintReadOnly)
-	TArray<FSlateBrush> KeyBrushs;
-};
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FPlayerInputManagerInfo
-{
-	GENERATED_BODY()
-
-public:
-	FPlayerInputManagerInfo()
-	{
-	}
-
-public:
 	UPROPERTY(Transient)
-	TMap<FName, UInputManagerBase*> InputManagerRefs;
+	TObjectPtr<ULocalPlayer> LocalPlayer = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UEnhancedInputLocalPlayerSubsystem> EnhancedInputSubsystem = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UEnhancedInputUserSettings> UserSettings = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UCommonInputSubsystem> CommonInputSubsystem = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputComponentBase> InputComponent = nullptr;
 };
 
 USTRUCT(BlueprintType)
@@ -228,18 +96,8 @@ struct WHFRAMEWORK_API FInputModuleSaveData : public FSaveData
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FInputModuleSaveData()
-	{
-		KeyShortcuts = TMap<FGameplayTag, FInputKeyShortcut>();
-		KeyMappings = TMap<FGameplayTag, FKey>();
-	}
+	FORCEINLINE FInputModuleSaveData() = default;
 
-public:
-	UPROPERTY()
-	TMap<FGameplayTag, FInputKeyShortcut> KeyShortcuts;
-
-	UPROPERTY()
-	TMap<FGameplayTag, FKey> KeyMappings;
 
 public:
 	virtual bool IsValid() const override

@@ -83,7 +83,6 @@ private:
 UWidgetPressAnyKeyPanelBase::UWidgetPressAnyKeyPanelBase(const FObjectInitializer& Initializer)
 	: Super(Initializer)
 {
-	WidgetName = FName("PressAnyKeyPanel");
 
 	WidgetType = EWidgetType::Permanent;
 	WidgetInputMode = EInputMode::UIOnly;

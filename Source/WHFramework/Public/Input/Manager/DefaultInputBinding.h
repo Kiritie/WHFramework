@@ -3,29 +3,29 @@
 #pragma once
 
 #include "InputActionValue.h"
-#include "InputManagerBase.h"
+#include "InputBindingBase.h"
 
-#include "DefaultInputManagerBase.generated.h"
+#include "DefaultInputBinding.generated.h"
 
 UCLASS()
-class WHFRAMEWORK_API UDefaultInputManagerBase : public UInputManagerBase
+class WHFRAMEWORK_API UDefaultInputBinding : public UInputBindingBase
 {
 	GENERATED_BODY()
 	
 public:	
 	// ParamSets default values for this object's properties
-	UDefaultInputManagerBase();
+	UDefaultInputBinding();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Defaults
 public:
-	virtual void OnInitialize() override;
+	virtual void OnInitialize(int32 InPlayerIndex) override;
 
 	virtual void OnReset() override;
 
 	virtual void OnRefresh(float DeltaSeconds) override;
 	
-	virtual void OnBindAction(UInputComponentBase* InInputComponent) override;
+	virtual void OnBindInput(UInputComponentBase* InInputComponent) override;
 
 	virtual void OnTermination() override;
 

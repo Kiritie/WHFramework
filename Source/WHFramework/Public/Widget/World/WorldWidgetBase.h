@@ -139,8 +139,8 @@ public:
 	bool IsWidgetVisible(bool bRefresh = false);
 
 protected:
-	UPROPERTY(EditDefaultsOnly)
-	FName WidgetName;
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "Widget")
+	FGameplayTag WidgetTag;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	EWidgetSpace WidgetSpace;
@@ -210,7 +210,7 @@ private:
 	
 public:
 	UFUNCTION(BlueprintPure)
-	virtual FName GetWidgetName() const override { return WidgetName; }
+	FGameplayTag GetWidgetTag() const { return WidgetTag; }
 	
 	UFUNCTION(BlueprintPure)
 	virtual int32 GetWidgetZOrder() const override { return WidgetZOrder; }

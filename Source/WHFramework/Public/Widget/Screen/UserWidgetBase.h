@@ -2,20 +2,22 @@
 
 #pragma once
 
-#include "CommonUserWidget.h"
+#include "CommonActivatableWidget.h"
 #include "Common/CommonModuleTypes.h"
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "Slate/Runtime/Interfaces/ScreenWidgetInterface.h"
+#include "Widget/WidgetModuleTypes.h"
 
 #include "UserWidgetBase.generated.h"
 
 class USubWidgetBase;
 class UWidgetAnimatorBase;
+class UWidgetMountSlot;
 /**
  * 
  */
 UCLASS(BlueprintType, meta = (DisableNativeTick))
-class WHFRAMEWORK_API UUserWidgetBase : public UCommonUserWidget, public IScreenWidgetInterface, public IObjectPoolInterface
+class WHFRAMEWORK_API UUserWidgetBase : public UCommonActivatableWidget, public IScreenWidgetInterface, public IObjectPoolInterface
 {
 	friend class UWidgetModule;
 	
@@ -41,6 +43,8 @@ public:
 	virtual bool IsTickAble_Implementation() const override { return bWidgetTickAble; }
 
 	virtual void OnTick_Implementation(float DeltaSeconds) override;
+
+	virtual TOptional<FUIInputConfig> GetDesiredInputConfig() const override;
 
 public:
 	UFUNCTION(BlueprintImplementableEvent, meta = (AutoCreateRefTerm = "InParams"), DisplayName = "OnCreate")
@@ -155,35 +159,29 @@ public:
 	virtual void RemoveAllChildWidget() override;
 
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "Widget")
+	FGameplayTag WidgetTag;
+
+	UPROPERTY(Transient)
+	TMap<FGameplayTag, TObjectPtr<UWidgetMountSlot>> WidgetMountSlotMap;
+
+	UPROPERTY(Transient, BlueprintReadOnly)
 	EWidgetType WidgetType;
-
-	UPROPERTY(EditDefaultsOnly)
-	FName WidgetName;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	FName ParentName;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = EDC_ParentName))
-	FName ParentSlot;
 		
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	UPROPERTY(Transient, BlueprintReadOnly)
 	int32 WidgetZOrder;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = EDC_ParentName))
+	UPROPERTY(Transient, BlueprintReadOnly)
 	FAnchors WidgetAnchors;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = EDC_ParentName))
+	UPROPERTY(Transient, BlueprintReadOnly)
 	bool bWidgetAutoSize;
 	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = EDC_WidgetAutoSize))
+	UPROPERTY(Transient, BlueprintReadOnly)
 	FMargin WidgetOffsets;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = EDC_ParentName))
+	UPROPERTY(Transient, BlueprintReadOnly)
 	FVector2D WidgetAlignment;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	EWidgetCreateType WidgetCreateType;
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	EWidgetOpenType WidgetOpenType;
@@ -221,6 +219,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	EInputMode WidgetInputMode;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	EWidgetInputConfig InputConfig;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	bool bWidgetAutoFocus;
 
@@ -230,11 +231,13 @@ protected:
 	UPROPERTY(Transient)
 	UObject* OwnerObject;
 
-	IScreenWidgetInterface* LastTemporary;
-	
+	UPROPERTY(Transient)
+	bool bInitialized;
+
+	UPROPERTY(Transient)
+	TArray<FParameter> CurrentOpenParameters;
+
 	IScreenWidgetInterface* ParentWidget;
-		
-	IScreenWidgetInterface* TemporaryChild;
 
 	TArray<ISubWidgetInterface*> SubWidgets;
 
@@ -260,26 +263,32 @@ public:
 	FOnWidgetClosed OnDestroyed;
 
 private:
+	void AbortOpenTransition();
+
+	void AbortCloseTransition();
+
 	FTimerHandle WidgetFinishOpenTimerHandle;
 	FTimerHandle WidgetFinishCloseTimerHandle;
 	FTimerHandle WidgetRefreshTimerHandle;
 
 public:
 	UFUNCTION(BlueprintPure)
+	FGameplayTag GetWidgetTag() const { return WidgetTag; }
+
+	UFUNCTION(BlueprintPure)
+	UWidgetMountSlot* GetWidgetMountSlot(const FGameplayTag& InSlotTag) const;
+
+	UFUNCTION(BlueprintPure)
+	bool IsWidgetActiveInHierarchy() const;
+
+	void RebuildWidgetMountSlotCache();
+
+	UFUNCTION(BlueprintPure)
 	virtual EWidgetType GetWidgetType(bool bInheritParent = true) const override
 	{
 		if(bInheritParent && ParentWidget) return ParentWidget->GetWidgetType();
 		return WidgetType;
 	}
-
-	UFUNCTION(BlueprintPure)
-	virtual FName GetWidgetName() const override { return WidgetName; }
-
-	UFUNCTION(BlueprintPure)
-	virtual FName GetParentName() const override { return ParentName; }
-
-	UFUNCTION(BlueprintPure)
-	virtual FName GetParentSlot() const override { return ParentSlot; }
 
 	UFUNCTION(BlueprintPure)
 	virtual int32 GetWidgetZOrder() const override { return WidgetZOrder; }
@@ -298,9 +307,6 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual FVector2D GetWidgetAlignment() const override { return WidgetAlignment; }
-
-	UFUNCTION(BlueprintPure)
-	virtual EWidgetCreateType GetWidgetCreateType() const override { return WidgetCreateType; }
 
 	UFUNCTION(BlueprintPure)
 	virtual EWidgetOpenType GetWidgetOpenType() const override { return WidgetOpenType; }
@@ -355,10 +361,6 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	virtual UObject* GetOwnerObject(TSubclassOf<UObject> InClass) const { return GetDeterminesOutputObject(OwnerObject, InClass); }
 
-	virtual IScreenWidgetInterface* GetLastTemporary() const override { return LastTemporary; }
-
-	virtual void SetLastTemporary(IScreenWidgetInterface* InLastTemporary) override { LastTemporary = InLastTemporary; }
-
 	template<class T>
 	T* GetParentWidgetN() const
 	{
@@ -367,15 +369,6 @@ public:
 	virtual IScreenWidgetInterface* GetParentWidgetN() const override { return ParentWidget; }
 
 	virtual void SetParentWidgetN(IScreenWidgetInterface* InParentWidget) override { ParentWidget = InParentWidget; }
-	
-	template<class T>
-	T* GetTemporaryChild() const
-	{
-		return Cast<T>(GetTemporaryChild());
-	}
-	virtual IScreenWidgetInterface* GetTemporaryChild() const override { return TemporaryChild; }
-
-	virtual void SetTemporaryChild(IScreenWidgetInterface* InTemporaryChild) override { TemporaryChild = InTemporaryChild; }
 	
 	UFUNCTION(BlueprintPure)
 	TArray<UWidget*> GetPoolWidgets() const;
@@ -484,10 +477,4 @@ public:
 	UFUNCTION(BlueprintPure)
 	UPanelWidget* GetParentPanelWidget() const;
 
-private:
-	UFUNCTION()
-	bool EDC_ParentName() const { return ParentName != NAME_None; };
-	
-	UFUNCTION()
-	bool EDC_WidgetAutoSize() const { return ParentName != NAME_None && !bWidgetAutoSize; };
 };

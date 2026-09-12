@@ -10,7 +10,6 @@
 
 UWidgetSettingPanelBase::UWidgetSettingPanelBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	WidgetName = FName("SettingPanel");
 
 	WidgetType = EWidgetType::Temporary;
 	WidgetInputMode = EInputMode::UIOnly;

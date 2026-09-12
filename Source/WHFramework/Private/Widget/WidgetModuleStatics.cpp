@@ -77,9 +77,34 @@ void UWidgetModuleStatics::DestroyToolTipForWidget(UWidget* InWidget)
 	UObjectPoolModuleStatics::DespawnObject(InWidget->GetToolTip());
 }
 
-UUserWidgetBase* UWidgetModuleStatics::GetTemporaryUserWidget()
+UUserWidgetBase* UWidgetModuleStatics::GetUserWidgetByTag(FGameplayTag InWidgetTag, TSubclassOf<UUserWidgetBase> InExpectedClass)
 {
-	return UWidgetModule::Get().GetTemporaryUserWidget();
+	return UWidgetModule::Get().GetUserWidgetByTag(InWidgetTag, InExpectedClass);
+}
+
+UUserWidgetBase* UWidgetModuleStatics::CreateUserWidgetByTag(FGameplayTag InWidgetTag, UObject* InOwner, const FParameter& InInitParameter, TSubclassOf<UUserWidgetBase> InClassOverride)
+{
+	return UWidgetModule::Get().CreateUserWidgetByTag(InWidgetTag, InOwner, &InInitParameter, InClassOverride);
+}
+
+bool UWidgetModuleStatics::OpenUserWidgetByTag(FGameplayTag InWidgetTag, const FParameter& InOpenParameter, bool bInstant, bool bForce)
+{
+	return UWidgetModule::Get().OpenUserWidgetByTag(InWidgetTag, InOpenParameter, bInstant, bForce);
+}
+
+bool UWidgetModuleStatics::CloseUserWidgetByTag(FGameplayTag InWidgetTag, bool bInstant)
+{
+	return UWidgetModule::Get().CloseUserWidgetByTag(InWidgetTag, bInstant);
+}
+
+bool UWidgetModuleStatics::ToggleUserWidgetByTag(FGameplayTag InWidgetTag, bool bInstant)
+{
+	return UWidgetModule::Get().ToggleUserWidgetByTag(InWidgetTag, bInstant);
+}
+
+bool UWidgetModuleStatics::DestroyUserWidgetByTag(FGameplayTag InWidgetTag, bool bRecovery)
+{
+	return UWidgetModule::Get().DestroyUserWidgetByTag(InWidgetTag, bRecovery);
 }
 
 bool UWidgetModuleStatics::HasUserWidgetClass(TSubclassOf<UUserWidgetBase> InClass)
@@ -87,9 +112,9 @@ bool UWidgetModuleStatics::HasUserWidgetClass(TSubclassOf<UUserWidgetBase> InCla
 	return UWidgetModule::Get().HasUserWidgetClass(InClass);
 }
 
-void UWidgetModuleStatics::AddUserWidgetClassMapping(FName InName, TSubclassOf<UUserWidgetBase> InClass)
+TSubclassOf<UUserWidgetBase> UWidgetModuleStatics::GetUserWidgetClass(TSubclassOf<UUserWidgetBase> InClass)
 {
-	return UWidgetModule::Get().AddUserWidgetClassMapping(InName, InClass);
+	return UWidgetModule::Get().GetUserWidgetClass(InClass);
 }
 
 bool UWidgetModuleStatics::HasUserWidget(TSubclassOf<UUserWidgetBase> InClass)
@@ -102,29 +127,16 @@ UUserWidgetBase* UWidgetModuleStatics::GetUserWidget(TSubclassOf<UUserWidgetBase
 	return GetDeterminesOutputObject(UWidgetModule::Get().GetUserWidget(InClass), InClass);
 }
 
-UUserWidgetBase* UWidgetModuleStatics::GetUserWidgetByName(FName InName, TSubclassOf<UUserWidgetBase> InClass)
-{
-	return GetDeterminesOutputObject(UWidgetModule::Get().GetUserWidgetByName(InName, InClass), InClass);
-}
-
 UUserWidgetBase* UWidgetModuleStatics::CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner, const TArray<FParameter>& InParams, bool bForce)
 {
-	return GetDeterminesOutputObject(UWidgetModule::Get().CreateUserWidget(InClass, InOwner, InParams, bForce), InClass);
-}
-
-UUserWidgetBase* UWidgetModuleStatics::CreateUserWidgetByName(FName InName, UObject* InOwner, const TArray<FParameter>& InParams, bool bForce)
-{
-	return UWidgetModule::Get().CreateUserWidgetByName(InName, InOwner, InParams, bForce);
+	return GetDeterminesOutputObject(
+		UWidgetModule::Get().CreateUserWidget(InClass, InOwner, InParams, bForce),
+		InClass);
 }
 
 bool UWidgetModuleStatics::OpenUserWidget(TSubclassOf<UUserWidgetBase> InClass, const TArray<FParameter>& InParams, bool bInstant, bool bForce)
 {
 	return UWidgetModule::Get().OpenUserWidget(InClass, InParams, bInstant, bForce);
-}
-
-bool UWidgetModuleStatics::OpenUserWidgetByName(FName InName, const TArray<FParameter>& InParams, bool bInstant, bool bForce)
-{
-	return UWidgetModule::Get().OpenUserWidgetByName(InName, InParams, bInstant, bForce);
 }
 
 bool UWidgetModuleStatics::CloseUserWidget(TSubclassOf<UUserWidgetBase> InClass, bool bInstant)
@@ -157,6 +169,43 @@ UWorldWidgetContainer* UWidgetModuleStatics::GetWorldWidgetContainer()
 	return UWidgetModule::Get().GetWorldWidgetContainer();
 }
 
+TArray<UWorldWidgetBase*> UWidgetModuleStatics::GetWorldWidgetsByTag(FGameplayTag InWidgetTag)
+{
+	return UWidgetModule::Get().GetWorldWidgetsByTag(InWidgetTag);
+}
+
+UWorldWidgetBase* UWidgetModuleStatics::GetWorldWidgetByTag(FGameplayTag InWidgetTag, int32 InIndex, TSubclassOf<UWorldWidgetBase> InExpectedClass)
+{
+	return GetDeterminesOutputObject(
+		UWidgetModule::Get().GetWorldWidgetByTag(InWidgetTag, InIndex, InExpectedClass),
+		InExpectedClass);
+}
+
+UWorldWidgetBase* UWidgetModuleStatics::CreateWorldWidgetByTag(FGameplayTag InWidgetTag, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams, TSubclassOf<UWorldWidgetBase> InClassOverride)
+{
+	return UWidgetModule::Get().CreateWorldWidgetByTag(
+		InWidgetTag,
+		InOwner,
+		InMapping,
+		InParams,
+		InClassOverride);
+}
+
+bool UWidgetModuleStatics::DestroyWorldWidgetByTag(FGameplayTag InWidgetTag, UWorldWidgetBase* InWidget, bool bRecovery)
+{
+	return UWidgetModule::Get().DestroyWorldWidgetByTag(InWidgetTag, InWidget, bRecovery);
+}
+
+bool UWidgetModuleStatics::GetWorldWidgetVisibleByTag(FGameplayTag InWidgetTag)
+{
+	return UWidgetModule::Get().GetWorldWidgetVisibleByTag(InWidgetTag);
+}
+
+void UWidgetModuleStatics::SetWorldWidgetVisibleByTag(FGameplayTag InWidgetTag, bool bVisible)
+{
+	UWidgetModule::Get().SetWorldWidgetVisibleByTag(InWidgetTag, bVisible);
+}
+
 bool UWidgetModuleStatics::GetWorldWidgetVisible(TSubclassOf<UWorldWidgetBase> InClass)
 {
 	return UWidgetModule::Get().GetWorldWidgetVisible(InClass);
@@ -174,12 +223,9 @@ bool UWidgetModuleStatics::HasWorldWidget(TSubclassOf<UWorldWidgetBase> InClass,
 
 UWorldWidgetBase* UWidgetModuleStatics::GetWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex)
 {
-	return UWidgetModule::Get().GetWorldWidget(InClass, InIndex);
-}
-
-UWorldWidgetBase* UWidgetModuleStatics::GetWorldWidgetByName(FName InName, TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex)
-{
-	return UWidgetModule::Get().GetWorldWidgetByName(InName, InClass, InIndex);
+	return GetDeterminesOutputObject(
+		UWidgetModule::Get().GetWorldWidget(InClass, InIndex),
+		InClass);
 }
 
 TArray<UWorldWidgetBase*> UWidgetModuleStatics::GetWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass)
@@ -187,19 +233,11 @@ TArray<UWorldWidgetBase*> UWidgetModuleStatics::GetWorldWidgets(TSubclassOf<UWor
 	return UWidgetModule::Get().GetWorldWidgets(InClass);
 }
 
-TArray<UWorldWidgetBase*> UWidgetModuleStatics::GetWorldWidgetsByName(FName InName)
-{
-	return UWidgetModule::Get().GetWorldWidgetsByName(InName);
-}
-
 UWorldWidgetBase* UWidgetModuleStatics::CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams)
 {
-	return UWidgetModule::Get().CreateWorldWidget(InClass, InOwner, InMapping, InParams);
-}
-
-UWorldWidgetBase* UWidgetModuleStatics::CreateWorldWidgetByName(FName InName, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams)
-{
-	return UWidgetModule::Get().CreateWorldWidgetByName(InName, InOwner, InMapping, InParams);
+	return GetDeterminesOutputObject(
+		UWidgetModule::Get().CreateWorldWidget(InClass, InOwner, InMapping, InParams),
+		InClass);
 }
 
 bool UWidgetModuleStatics::DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex, bool bRecovery)
