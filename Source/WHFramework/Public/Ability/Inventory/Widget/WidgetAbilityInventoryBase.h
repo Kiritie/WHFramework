@@ -21,7 +21,7 @@ public:
 	UWidgetAbilityInventoryBase(const FObjectInitializer& ObjectInitializer);
 
 public:
-	virtual void OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams) override;
+	virtual void OnInitialize(const FParameter& InParams) override;
 	
 	virtual void OnRefresh() override;
 

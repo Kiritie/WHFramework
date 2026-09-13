@@ -80,12 +80,15 @@ void ACharacterBase::OnSpawn_Implementation(const FParameter& InParam)
 {
 	USceneModuleStatics::RemoveSceneActor(this);
 
-	const FAbilityActorSpawnParameter& Parameter = InParam.GetRef<FAbilityActorSpawnParameter>();
-	if(Parameter.bOverrideActorID)
+	const FAbilityActorSpawnParameter* Param = InParam.GetPtr<FAbilityActorSpawnParameter>();
+	if(Param && Param->bOverrideActorID)
 	{
-		ActorID = Parameter.ActorID;
+		ActorID = Param->ActorID;
 	}
-	AssetID = Parameter.AssetID;
+	if(Param)
+	{
+		AssetID = Param->AssetID;
+	}
 
 	USceneModuleStatics::AddSceneActor(this);
 

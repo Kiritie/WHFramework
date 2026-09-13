@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "Input/InputManagerInterface.h"
 #include "Main/Base/ModuleBase.h"
 #include "Input/InputModuleTypes.h"
 
@@ -14,11 +13,12 @@ class UInputMappingContext;
 class UInputActionBase;
 class UEnhancedInputComponent;
 enum class ECommonInputType : uint8;
+struct FUIInputConfig;
 
 DECLARE_MULTICAST_DELEGATE_TwoParams(FOnInputTypeChanged, int32, ECommonInputType);
 
 UCLASS()
-class WHFRAMEWORK_API UInputModule : public UModuleBase, public IInputManagerInterface
+class WHFRAMEWORK_API UInputModule : public UModuleBase
 {
 	GENERATED_BODY()
 			
@@ -72,27 +72,30 @@ protected:
 
 	void HandleInputMethodChanged(ECommonInputType InInputType, int32 InPlayerIndex);
 
+	void HandleCommonUIInputConfigChanged(FUIInputConfig InInputConfig, int32 InPlayerIndex);
+
+	void HandleGlobalInputModeChanged(EInputMode InPreviousInputMode, EInputMode InInputMode);
+
+	void RefreshCommonUIInputMode(int32 InPlayerIndex);
+
 public:
 	virtual FString GetModuleDebugMessage() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// InputManager
 protected:
-	UPROPERTY(EditAnywhere, Category = "InputSteups|Mode")
+	UPROPERTY(EditAnywhere, Category = "Input|Mode")
 	EInputMode NativeInputMode;
 
-	UPROPERTY(EditAnywhere, Instanced, Category = "InputSteups|Manager")
-	TArray<UInputBindingBase*> InputBindings;
+	UPROPERTY(EditAnywhere, Instanced, Category = "Input|Binding")
+	TArray<TObjectPtr<UInputBindingBase>> InputBindings;
 
 public:
 	UFUNCTION(BlueprintPure)
-	virtual int32 GetNativeInputPriority() const override { return 0; }
-
-	UFUNCTION(BlueprintPure)
-	virtual EInputMode GetNativeInputMode() const override { return NativeInputMode; }
+	EInputMode GetNativeInputMode() const { return NativeInputMode; }
 
 	UFUNCTION(BlueprintCallable)
-	virtual void SetNativeInputMode(EInputMode InInputMode) override;
+	void SetNativeInputMode(EInputMode InInputMode);
 
 	template<class T>
 	T* GetInputBinding(int32 InPlayerIndex = 0) const
@@ -153,14 +156,28 @@ public:
 
 	bool MapPlayerKeyByTag(FGameplayTag InActionTag, FKey InNewKey, EPlayerMappableKeySlot InSlot, int32 InPlayerIndex = 0, FGameplayTagContainer* OutFailureReason = nullptr);
 
+	bool MapPlayerKeyByMappingName(FName InMappingName, FKey InNewKey, EPlayerMappableKeySlot InSlot, int32 InPlayerIndex = 0, FGameplayTagContainer* OutFailureReason = nullptr);
+
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InActionTag"))
 	bool ResetPlayerKeyByTag(FGameplayTag InActionTag, int32 InPlayerIndex = 0);
+
+	UFUNCTION(BlueprintCallable)
+	bool ResetPlayerKeyByMappingName(FName InMappingName, int32 InPlayerIndex = 0);
 
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InActionTag"))
 	TArray<FPlayerKeyMapping> GetPlayerKeyMappingsByTag(FGameplayTag InActionTag, int32 InPlayerIndex = 0) const;
 
 	UFUNCTION(BlueprintPure)
+	TArray<FPlayerKeyMapping> GetPlayerKeyMappingsByMappingName(FName InMappingName, int32 InPlayerIndex = 0) const;
+
+	UFUNCTION(BlueprintPure)
 	TArray<FGameplayTag> GetAllMappableActions() const;
+
+	UFUNCTION(BlueprintPure)
+	TArray<FInputMappableEntry> GetAllMappableEntries() const;
+
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InActionTag"))
+	TArray<FInputMappableEntry> GetMappableEntriesByActionTag(FGameplayTag InActionTag) const;
 
 	UFUNCTION(BlueprintPure)
 	ECommonInputType GetCurrentInputType(int32 InPlayerIndex = 0) const;

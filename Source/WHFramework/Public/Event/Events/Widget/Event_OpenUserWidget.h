@@ -18,7 +18,7 @@ public:
 	{
 	}
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (Categories = "Widget"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (Categories = "Widget.Screen"))
 	FGameplayTag WidgetTag;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

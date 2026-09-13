@@ -22,9 +22,11 @@ void AAbilityItemBase::OnSpawn_Implementation(const FParameter& InParam)
 {
 	Super::OnSpawn_Implementation(InParam);
 
-	const FAbilityItemSpawnParameter& Parameter = InParam.GetRef<FAbilityItemSpawnParameter>();
-	OwnerActor = Parameter.Owner;
-	Item = Parameter.Item;
+	if(const FAbilityItemSpawnParameter* Param = InParam.GetPtr<FAbilityItemSpawnParameter>())
+	{
+		OwnerActor = Param->Owner;
+		Item = Param->Item;
+	}
 }
 
 void AAbilityItemBase::OnDespawn_Implementation(EObjectDespawnMode InMode)

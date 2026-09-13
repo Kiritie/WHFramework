@@ -69,11 +69,11 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InExpectedClass", AutoCreateRefTerm = "InWidgetTag"), Category = "WidgetModuleStatics")
 	static UUserWidgetBase* GetUserWidgetByTag(FGameplayTag InWidgetTag, TSubclassOf<UUserWidgetBase> InExpectedClass = nullptr);
 
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClassOverride", AutoCreateRefTerm = "InWidgetTag,InInitParameter"), Category = "WidgetModuleStatics")
-	static UUserWidgetBase* CreateUserWidgetByTag(FGameplayTag InWidgetTag, UObject* InOwner, const FParameter& InInitParameter, TSubclassOf<UUserWidgetBase> InClassOverride = nullptr);
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InWidgetTag,InParam"), Category = "WidgetModuleStatics")
+	static UUserWidgetBase* CreateUserWidgetByTag(FGameplayTag InWidgetTag, const FParameter& InParam = FParameter(), TSubclassOf<UUserWidgetBase> InClass = nullptr);
 
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InWidgetTag,InOpenParameter"), Category = "WidgetModuleStatics")
-	static bool OpenUserWidgetByTag(FGameplayTag InWidgetTag, const FParameter& InOpenParameter, bool bInstant = false, bool bForce = false);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InWidgetTag,InParam"), Category = "WidgetModuleStatics")
+	static bool OpenUserWidgetByTag(FGameplayTag InWidgetTag, const FParameter& InParam = FParameter(), bool bInstant = false, bool bForce = false);
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InWidgetTag"), Category = "WidgetModuleStatics")
 	static bool CloseUserWidgetByTag(FGameplayTag InWidgetTag, bool bInstant = false);
@@ -82,7 +82,7 @@ public:
 	static bool ToggleUserWidgetByTag(FGameplayTag InWidgetTag, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InWidgetTag"), Category = "WidgetModuleStatics")
-	static bool DestroyUserWidgetByTag(FGameplayTag InWidgetTag, bool bRecovery = false);
+	static bool DestroyUserWidgetByTag(FGameplayTag InWidgetTag, EObjectDespawnMode InMode = EObjectDespawnMode::Destroy);
 
 	template<class T>
 	static bool HasUserWidgetClass(TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
@@ -121,34 +121,22 @@ public:
 	static UUserWidgetBase* GetUserWidget(TSubclassOf<UUserWidgetBase> InClass);
 
 	template<class T>
-	static T* CreateUserWidget(UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr, bool bForce = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	static T* CreateUserWidget(const FParameter& InParam = FParameter(), TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
 	{
-		return UWidgetModule::Get().CreateUserWidget<T>(InOwner, InParams, bForce, InClass);
+		return UWidgetModule::Get().CreateUserWidget<T>(InParam, InClass);
 	}
+
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParam"), Category = "WidgetModuleStatics")
+	static UUserWidgetBase* CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, const FParameter& InParam = FParameter());
 
 	template<class T>
-	static T* CreateUserWidget(UObject* InOwner, const TArray<FParameter>& InParams, bool bForce = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	static bool OpenUserWidget(const FParameter& InParam = FParameter(), bool bInstant = false, bool bForce = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
 	{
-		return CreateUserWidget<T>(InOwner, &InParams, bForce, InClass);
+		return UWidgetModule::Get().OpenUserWidget<T>(InParam, bInstant, bForce, InClass);
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"), Category = "WidgetModuleStatics")
-	static UUserWidgetBase* CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner, const TArray<FParameter>& InParams, bool bForce = false);
-
-	template<class T>
-	static bool OpenUserWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, bool bForce = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
-	{
-		return UWidgetModule::Get().OpenUserWidget<T>(InParams, bInstant, bForce, InClass);
-	}
-
-	template<class T>
-	static bool OpenUserWidget(const TArray<FParameter>& InParams, bool bInstant = false, bool bForce = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
-	{
-		return OpenUserWidget<T>(&InParams, bInstant, bForce, InClass);
-	}
-
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"), Category = "WidgetModuleStatics")
-	static bool OpenUserWidget(TSubclassOf<UUserWidgetBase> InClass, const TArray<FParameter>& InParams, bool bInstant = false, bool bForce = false);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParam"), Category = "WidgetModuleStatics")
+	static bool OpenUserWidget(TSubclassOf<UUserWidgetBase> InClass, const FParameter& InParam = FParameter(), bool bInstant = false, bool bForce = false);
 
 	template<class T>
 	static bool CloseUserWidget(bool bInstant = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
@@ -169,13 +157,13 @@ public:
 	static bool ToggleUserWidget(TSubclassOf<UUserWidgetBase> InClass, bool bInstant = false);
 
 	template<class T>
-	static bool DestroyUserWidget(bool bRecovery = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	static bool DestroyUserWidget(EObjectDespawnMode InMode = EObjectDespawnMode::Destroy, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
 	{
-		return UWidgetModule::Get().DestroyUserWidget<T>(bRecovery, InClass);
+		return UWidgetModule::Get().DestroyUserWidget<T>(InMode, InClass);
 	}
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
-	static bool DestroyUserWidget(TSubclassOf<UUserWidgetBase> InClass, bool bRecovery = false);
+	static bool DestroyUserWidget(TSubclassOf<UUserWidgetBase> InClass, EObjectDespawnMode InMode = EObjectDespawnMode::Destroy);
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
 	static void CloseAllUserWidget(bool bInstant = false);
@@ -189,21 +177,15 @@ public:
 	}
 
 	template<class T>
-	static TSharedPtr<T> CreateSlateWidget(UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr)
+	static TSharedPtr<T> CreateSlateWidget(const FParameter& InParam = FParameter())
 	{
-		return FSlateWidgetManager::Get().CreateSlateWidget<T>(InOwner, InParams);
+		return FSlateWidgetManager::Get().CreateSlateWidget<T>(InParam);
 	}
 
 	template<class T>
-	static bool OpenSlateWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, FName InName = T::WidgetName)
+	static bool OpenSlateWidget(const FParameter& InParam = FParameter(), bool bInstant = false, FName InName = T::WidgetName)
 	{
-		return FSlateWidgetManager::Get().OpenSlateWidget<T>(InParams, bInstant, InName);
-	}
-	
-	template<class T>
-	static bool OpenSlateWidget(const TArray<FParameter>& InParams, bool bInstant = false, FName InName = T::WidgetName)
-	{
-		return FSlateWidgetManager::Get().OpenSlateWidget<T>(&InParams, bInstant, InName);
+		return FSlateWidgetManager::Get().OpenSlateWidget<T>(InParam, bInstant, InName);
 	}
 
 	template<class T>
@@ -219,9 +201,9 @@ public:
 	}
 
 	template<class T>
-	static bool DestroySlateWidget(bool bRecovery = false, FName InName = T::WidgetName)
+	static bool DestroySlateWidget(EObjectDespawnMode InMode = EObjectDespawnMode::Destroy, FName InName = T::WidgetName)
 	{
-		return FSlateWidgetManager::Get().DestroySlateWidget<T>(bRecovery, InName);
+		return FSlateWidgetManager::Get().DestroySlateWidget<T>(InMode, InName);
 	}
 
 	static void CloseAllSlateWidget(bool bInstant = false);
@@ -231,14 +213,11 @@ public:
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InWidgetTag"), Category = "WidgetModuleStatics")
 	static TArray<UWorldWidgetBase*> GetWorldWidgetsByTag(FGameplayTag InWidgetTag);
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InExpectedClass", AutoCreateRefTerm = "InWidgetTag"), Category = "WidgetModuleStatics")
-	static UWorldWidgetBase* GetWorldWidgetByTag(FGameplayTag InWidgetTag, int32 InIndex, TSubclassOf<UWorldWidgetBase> InExpectedClass = nullptr);
-
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InWidgetTag,InParams"), Category = "WidgetModuleStatics")
-	static UWorldWidgetBase* CreateWorldWidgetByTag(FGameplayTag InWidgetTag, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams, TSubclassOf<UWorldWidgetBase> InClassOverride = nullptr);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InWidgetTag,InParam"), Category = "WidgetModuleStatics")
+	static UWorldWidgetBase* CreateWorldWidgetByTag(FGameplayTag InWidgetTag, FWorldWidgetMapping InMapping, const FParameter& InParam = FParameter(), TSubclassOf<UWorldWidgetBase> InClass = nullptr);
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InWidgetTag"), Category = "WidgetModuleStatics")
-	static bool DestroyWorldWidgetByTag(FGameplayTag InWidgetTag, UWorldWidgetBase* InWidget, bool bRecovery = false);
+	static bool DestroyWorldWidgetByTag(FGameplayTag InWidgetTag, UWorldWidgetBase* InWidget, EObjectDespawnMode InMode = EObjectDespawnMode::Destroy);
 
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InWidgetTag"), Category = "WidgetModuleStatics")
 	static bool GetWorldWidgetVisibleByTag(FGameplayTag InWidgetTag);
@@ -256,24 +235,6 @@ public:
 	static void SetWorldWidgetVisible(bool bVisible, TSubclassOf<UWorldWidgetBase> InClass = nullptr);
 
 	template<class T>
-	static bool HasWorldWidget(int32 InIndex, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
-	{
-		return UWidgetModule::Get().HasWorldWidget<T>(InIndex, InClass);
-	}
-
-	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
-	static bool HasWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex);
-
-	template<class T>
-	static T* GetWorldWidget(int32 InIndex, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
-	{
-		return UWidgetModule::Get().GetWorldWidget<T>(InIndex, InClass);
-	}
-
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "WidgetModuleStatics")
-	static UWorldWidgetBase* GetWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex);
-
-	template<class T>
 	static TArray<T*> GetWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
 		return UWidgetModule::Get().GetWorldWidgets<T>(InClass);
@@ -283,40 +244,25 @@ public:
 	static TArray<UWorldWidgetBase*> GetWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass);
 
 	template<class T>
-	static T* CreateWorldWidget(UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	static T* CreateWorldWidget(FWorldWidgetMapping InMapping, const FParameter& InParam = FParameter(), TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
-		return UWidgetModule::Get().CreateWorldWidget<T>(InOwner, InMapping, InParams, InClass);
+		return UWidgetModule::Get().CreateWorldWidget<T>(InMapping, InParam, InClass);
+	}
+
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParam"), Category = "WidgetModuleStatics")
+	static UWorldWidgetBase* CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, FWorldWidgetMapping InMapping, const FParameter& InParam = FParameter());
+
+	static bool DestroyWorldWidget(UWorldWidgetBase* InWidget, EObjectDespawnMode InMode = EObjectDespawnMode::Destroy)
+	{
+		return UWidgetModule::Get().DestroyWorldWidget(InWidget, InMode);
 	}
 
 	template<class T>
-	static T* CreateWorldWidget(UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	static void DestroyWorldWidgets(EObjectDespawnMode InMode = EObjectDespawnMode::Destroy, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
-		return CreateWorldWidget<T>(InOwner, InMapping, &InParams, InClass);
-	}
-
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"), Category = "WidgetModuleStatics")
-	static UWorldWidgetBase* CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams);
-
-	static bool DestroyWorldWidget(UWorldWidgetBase* InWidget, bool bRecovery = false)
-	{
-		return UWidgetModule::Get().DestroyWorldWidget(InWidget, bRecovery);
-	}
-
-	template<class T>
-	static bool DestroyWorldWidget(int32 InIndex, bool bRecovery = false, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
-	{
-		return UWidgetModule::Get().DestroyWorldWidget<T>(InIndex, bRecovery, InClass);
+		UWidgetModule::Get().DestroyWorldWidgets<T>(InMode, InClass);
 	}
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
-	static bool DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex, bool bRecovery = false);
-
-	template<class T>
-	static void DestroyWorldWidgets(bool bRecovery = false, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
-	{
-		UWidgetModule::Get().DestroyWorldWidgets<T>(bRecovery, InClass);
-	}
-
-	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
-	static void DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass, bool bRecovery = false);
+	static void DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass, EObjectDespawnMode InMode = EObjectDespawnMode::Destroy);
 };

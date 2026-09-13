@@ -23,24 +23,20 @@ class WHFRAMEWORKSLATE_API IScreenWidgetInterface : public IPanelWidgetInterface
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
-	virtual void OnCreate(UObject* InOwner, const TArray<FParameter>& InParams) = 0;
+	virtual void OnCreate(const FParameter& InParam) = 0;
 
-	virtual void OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams) = 0;
+	virtual void OnInitialize(const FParameter& InParam) = 0;
 
-	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant = false) = 0;
+	virtual void OnOpen(const FParameter& InParam, bool bInstant = false) = 0;
 	
 	virtual void OnClose(bool bInstant = false) = 0;
 
 	virtual void OnStateChanged(EScreenWidgetState InWidgetChange) = 0;
 
 public:
-	virtual void Init(UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr, bool bForce = false) = 0;
-	
-	virtual void Init(UObject* InOwner, const TArray<FParameter>& InParams, bool bForce = false) = 0;
+	virtual void Init(const FParameter& InParam = FParameter(), bool bForce = false) = 0;
 
-	virtual void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, bool bForce = false) = 0;
-	
-	virtual void Open(const TArray<FParameter>& InParams, bool bInstant = false, bool bForce = false) = 0;
+	virtual void Open(const FParameter& InParam = FParameter(), bool bInstant = false, bool bForce = false) = 0;
 
 	virtual void Close(bool bInstant = false) = 0;
 

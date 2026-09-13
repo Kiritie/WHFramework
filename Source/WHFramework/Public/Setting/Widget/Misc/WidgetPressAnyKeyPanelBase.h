@@ -18,9 +18,9 @@ public:
 	UWidgetPressAnyKeyPanelBase(const FObjectInitializer& Initializer);
 	
 public:
-	virtual void OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams) override;
+	virtual void OnInitialize(const FParameter& InParams) override;
 
-	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant) override;
+	virtual void OnOpen(const FParameter& InParams, bool bInstant) override;
 
 	virtual void OnClose(bool bInstant) override;
 

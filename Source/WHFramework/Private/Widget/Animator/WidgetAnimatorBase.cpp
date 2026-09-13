@@ -22,7 +22,7 @@ void UWidgetAnimatorBase::OnSpawn_Implementation(const FParameter& InParam)
 	Super::OnSpawn_Implementation(InParam);
 
 	const FWidgetSpawnParameter* Parameter = InParam.GetPtr<FWidgetSpawnParameter>();
-	ParentWidget = Parameter ? Cast<UUserWidget>(Parameter->OwningObject) : nullptr;
+	ParentWidget = Parameter ? Cast<UUserWidget>(Parameter->OwnerObject) : nullptr;
 	
 	if(ParentWidget)
 	{

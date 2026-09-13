@@ -11,9 +11,7 @@
 
 UWidgetLoadingLevelPanel::UWidgetLoadingLevelPanel(const FObjectInitializer& ObjectInitializer) :Super(ObjectInitializer)
 {
-	WidgetType = EWidgetType::Temporary;
 	WidgetRefreshType = EWidgetRefreshType::Tick;
-	WidgetInputMode = EInputMode::None;
 	
 	LevelPath = NAME_None;
 	bUnloading = false;
@@ -21,20 +19,17 @@ UWidgetLoadingLevelPanel::UWidgetLoadingLevelPanel(const FObjectInitializer& Obj
 	CurrentProgress = 0.f;
 }
 
-void UWidgetLoadingLevelPanel::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
+void UWidgetLoadingLevelPanel::OnOpen(const FParameter& InParams, bool bInstant)
 {
 	Super::OnOpen(InParams, bInstant);
 	
 	LoadProgress = 0.f;
 	CurrentProgress = 0.f;
 
-	if(InParams.IsValidIndex(0))
+	if(const FLoadingLevelWidgetOpenParameter* OpenParameter = InParams.GetPtr<FLoadingLevelWidgetOpenParameter>())
 	{
-		LevelPath = InParams[0].Get<FName>();
-	}
-	if(InParams.IsValidIndex(1))
-	{
-		bUnloading = InParams[1].Get<bool>();
+		LevelPath = OpenParameter->LevelPath;
+		bUnloading = OpenParameter->bUnloading;
 	}
 }
 

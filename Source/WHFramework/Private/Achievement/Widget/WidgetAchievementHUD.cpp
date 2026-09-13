@@ -12,25 +12,20 @@
 
 UWidgetAchievementHUD::UWidgetAchievementHUD(const FObjectInitializer &ObjectInitializer) : UUserWidgetBase(ObjectInitializer)
 {
-	WidgetType = EWidgetType::Permanent;
-	WidgetInputMode = EInputMode::None;
-
-	WidgetZOrder = 5;
-
 	WidgetRefreshType = EWidgetRefreshType::Tick;
 }
 
-void UWidgetAchievementHUD::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetAchievementHUD::OnCreate(const FParameter& InParams)
 {
-	Super::OnCreate(InOwner, InParams);
+	Super::OnCreate(InParams);
 }
 
-void UWidgetAchievementHUD::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetAchievementHUD::OnInitialize(const FParameter& InParams)
 {
-	Super::OnInitialize(InOwner, InParams);
+	Super::OnInitialize(InParams);
 }
 
-void UWidgetAchievementHUD::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
+void UWidgetAchievementHUD::OnOpen(const FParameter& InParams, bool bInstant)
 {
 	Super::OnOpen(InParams, bInstant);
 
@@ -92,9 +87,9 @@ void UWidgetAchievementHUD::OnRefresh()
 	}
 }
 
-void UWidgetAchievementHUD::OnDestroy(bool bRecovery)
+void UWidgetAchievementHUD::OnDestroy(EObjectDespawnMode InMode)
 {
-	Super::OnDestroy(bRecovery);
+	Super::OnDestroy(InMode);
 }
 
 void UWidgetAchievementHUD::ScheduleAchievementDisplay(FAchievementData Achievement, FAchievementStates State)

@@ -24,23 +24,21 @@ class WHFRAMEWORKSLATE_API ISubWidgetInterface : public IBaseWidgetInterface
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
-	virtual void OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams) = 0;
+	virtual void OnCreate(const FParameter& InParam) = 0;
 
 	virtual void OnReset(bool bForce = false) = 0;
 
-	virtual void OnInitialize(const TArray<FParameter>& InParams) = 0;
+	virtual void OnInitialize(const FParameter& InParam) = 0;
 
-	virtual void OnDestroy(bool bRecovery) = 0;
+	virtual void OnDestroy(EObjectDespawnMode InMode) = 0;
 
 public:
-	virtual void Init(const TArray<FParameter>* InParams = nullptr) = 0;
-	
-	virtual void Init(const TArray<FParameter>& InParams) = 0;
+	virtual void Init(const FParameter& InParam = FParameter()) = 0;
 
 	virtual void Reset(bool bForce = false) = 0;
 
 public:
 	virtual UUserWidget* GetOwnerWidget(TSubclassOf<UUserWidget> InClass = nullptr) const = 0;
 
-	virtual TArray<FParameter> GetWidgetParams() const = 0;
+	virtual FParameter GetWidgetParams() const = 0;
 };

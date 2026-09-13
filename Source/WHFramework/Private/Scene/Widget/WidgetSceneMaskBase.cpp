@@ -4,30 +4,27 @@
 
 UWidgetSceneMaskBase::UWidgetSceneMaskBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	WidgetType = EWidgetType::Permanent;
-	WidgetZOrder = -1;
-	WidgetInputMode = EInputMode::UIOnly;
-	
 	SetIsFocusable(true);
 }
 
-void UWidgetSceneMaskBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetSceneMaskBase::OnCreate(const FParameter& InParam)
 {
-	Super::OnCreate(InOwner, InParams);
+	Super::OnCreate(InParam);
 }
 
-void UWidgetSceneMaskBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetSceneMaskBase::OnInitialize(const FParameter& InParam)
 {
-	Super::OnInitialize(InOwner, InParams);
+	Super::OnInitialize(InParam);
 }
 
-void UWidgetSceneMaskBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
+void UWidgetSceneMaskBase::OnOpen(const FParameter& InParam, bool bInstant)
 {
-	Super::OnOpen(InParams, bInstant);
+	Super::OnOpen(InParam, bInstant);
 
-	if(InParams.IsValidIndex(0))
+	OnMaskClosed.Clear();
+	if(const FWidgetDelegateOpenParameter* Param = InParam.GetPtr<FWidgetDelegateOpenParameter>())
 	{
-		OnMaskClosed = InParams[0].Get<FSimpleDynamicDelegate>();
+		OnMaskClosed = Param->Delegate;
 	}
 }
 

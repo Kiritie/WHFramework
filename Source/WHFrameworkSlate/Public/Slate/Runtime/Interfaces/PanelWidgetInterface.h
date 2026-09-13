@@ -30,19 +30,17 @@ class WHFRAMEWORKSLATE_API IPanelWidgetInterface : public IBaseWidgetInterface
 public:
 	virtual void OnReset(bool bForce = false) = 0;
 
-	virtual void OnDestroy(bool bRecovery) = 0;
+	virtual void OnDestroy(EObjectDespawnMode InMode) = 0;
 
 public:
 	virtual void Reset(bool bForce = false) = 0;
 
 public:
-	virtual ISubWidgetInterface* CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>* InParams = nullptr) = 0;
+	virtual ISubWidgetInterface* CreateSubWidget(TSubclassOf<UUserWidget> InClass, const FParameter& InParam = FParameter()) = 0;
 
-	virtual ISubWidgetInterface* CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams) = 0;
+	virtual bool DestroySubWidget(ISubWidgetInterface* InWidget, EObjectDespawnMode InMode = EObjectDespawnMode::Destroy) = 0;
 
-	virtual bool DestroySubWidget(ISubWidgetInterface* InWidget, bool bRecovery = false) = 0;
-
-	virtual void DestroyAllSubWidget(bool bRecovery = false) = 0;
+	virtual void DestroyAllSubWidget(EObjectDespawnMode InMode = EObjectDespawnMode::Destroy) = 0;
 
 public:
 	virtual int32 GetWidgetZOrder() const = 0;
@@ -59,8 +57,6 @@ public:
 
 	virtual EWidgetRefreshType GetWidgetRefreshType() const = 0;
 
-	virtual EInputMode GetWidgetInputMode() const = 0;
-
 	virtual int32 GetSubWidgetNum() const = 0;
 
 	virtual TArray<ISubWidgetInterface*> GetSubWidgets() = 0;
@@ -69,7 +65,7 @@ public:
 
 	virtual int32 FindSubWidget(ISubWidgetInterface* InWidget) const = 0;
 
-	virtual TArray<FParameter> GetWidgetParams() const = 0;
+	virtual FParameter GetWidgetParams() const = 0;
 
 	virtual UObject* GetOwnerObject() const = 0;
 };

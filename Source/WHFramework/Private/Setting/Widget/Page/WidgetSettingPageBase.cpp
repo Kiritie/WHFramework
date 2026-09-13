@@ -1,36 +1,66 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #include "Setting/Widget/Page/WidgetSettingPageBase.h"
 
-#include "Asset/AssetModuleStatics.h"
 #include "Blueprint/WidgetTree.h"
-#include "Components/ScrollBox.h"
-#include "Components/VerticalBox.h"
-#include "Components/VerticalBoxSlot.h"
+#include "CommonListView.h"
+#include "Components/PanelWidget.h"
+#include "Setting/SettingEntry.h"
 #include "Setting/SettingModule.h"
-#include "Setting/Widget/Item/WidgetSettingItemBase.h"
-#include "Setting/Widget/Item/WidgetSettingItemCategoryBase.h"
-#include "Widget/WidgetModuleStatics.h"
+#include "Setting/Widget/Entry/WidgetSettingEntryBase.h"
+#include "Widget/Theme/WidgetTheme.h"
+#include "Widget/WidgetModule.h"
 
 UWidgetSettingPageBase::UWidgetSettingPageBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 }
 
-void UWidgetSettingPageBase::OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams)
+void UWidgetSettingPageBase::OnCreate(const FParameter& InParam)
 {
-	Super::OnCreate(InOwner, InParams);
+	Super::OnCreate(InParam);
 
-	if(!ContentBox)
+	if(!SettingList && WidgetTree)
 	{
-		ContentBox = NewObject<UVerticalBox>(this);
+		SettingList = WidgetTree->ConstructWidget<UCommonListView>(
+			UCommonListView::StaticClass(),
+			TEXT("SettingList"));
+		if(!WidgetTree->RootWidget)
+		{
+			WidgetTree->RootWidget = SettingList;
+		}
+		else if(UPanelWidget* RootPanel = Cast<UPanelWidget>(WidgetTree->RootWidget))
+		{
+			RootPanel->AddChild(SettingList);
+		}
 	}
 
-	WidgetTree->RootWidget = ContentBox;
+	if(SettingList)
+	{
+		SettingList->OnGetEntryClassForItem().BindUObject(this, &ThisClass::ResolveEntryClass);
+		USettingModule::Get().OnSettingValueChanged.AddDynamic(this, &ThisClass::OnSettingValueChanged);
+		RefreshEntries();
+	}
 }
 
 void UWidgetSettingPageBase::OnReset(bool bForce)
 {
 	Super::OnReset(bForce);
+	if(PageName.IsNone())
+	{
+		return;
+	}
+	for(USettingEntry* Entry : USettingModule::Get().GetSettingEntriesByPage(PageName))
+	{
+		if(Entry)
+		{
+			Entry->SetPendingValue(Entry->GetDefaultValue());
+		}
+	}
+	RefreshEntries();
+}
+
+void UWidgetSettingPageBase::OnDestroy(EObjectDespawnMode InMode)
+{
+	USettingModule::Get().OnSettingValueChanged.RemoveDynamic(this, &ThisClass::OnSettingValueChanged);
+	Super::OnDestroy(InMode);
 }
 
 void UWidgetSettingPageBase::NativeOnActivated()
@@ -45,26 +75,39 @@ void UWidgetSettingPageBase::NativeOnDeactivated()
 
 void UWidgetSettingPageBase::OnApply()
 {
+	if(!PageName.IsNone())
+	{
+		USettingModule::Get().ApplyEditSession();
+	}
 	K2_OnApply();
 }
 
-void UWidgetSettingPageBase::OnValueChange(UWidgetSettingItemBase* InSettingItem, const FParameter& InValue)
+void UWidgetSettingPageBase::OnSettingValueChanged(FSettingId InSettingId)
 {
-	K2_OnValueChange(InSettingItem, InValue);
-}
-
-void UWidgetSettingPageBase::OnValuesChange(UWidgetSettingItemBase* InSettingItem, const TArray<FParameter>& InValues)
-{
-	K2_OnValuesChange(InSettingItem, InValues);
+	if(SettingList)
+	{
+		SettingList->RequestRefresh();
+	}
 }
 
 bool UWidgetSettingPageBase::CanApply_Implementation() const
 {
-	return false;
+	return !PageName.IsNone() && USettingModule::Get().CanApply();
 }
 
 bool UWidgetSettingPageBase::CanReset_Implementation() const
 {
+	if(PageName.IsNone())
+	{
+		return false;
+	}
+	for(USettingEntry* Entry : USettingModule::Get().GetSettingEntriesByPage(PageName))
+	{
+		if(Entry && Entry->CanReset())
+		{
+			return true;
+		}
+	}
 	return false;
 }
 
@@ -73,45 +116,40 @@ void UWidgetSettingPageBase::Apply()
 	OnApply();
 }
 
-FSaveData* UWidgetSettingPageBase::GetDefaultSaveData() const
+void UWidgetSettingPageBase::SetPage(FName InPage)
 {
-	return nullptr;
+	PageName = InPage;
+	RefreshEntries();
 }
 
-void UWidgetSettingPageBase::AddSettingItem_Implementation(const FName InName, UWidgetSettingItemBase* InSettingItem, const FText& InCategory)
+void UWidgetSettingPageBase::SetPageDefinition(const FSettingPageDefinition& InDefinition)
 {
-	if(!InSettingItem) return;
-	
-	InSettingItem->SetNameS(InName);
-	InSettingItem->OnValueChanged.AddDynamic(this, &UWidgetSettingPageBase::OnValueChange);
-	InSettingItem->OnValuesChanged.AddDynamic(this, &UWidgetSettingPageBase::OnValuesChange);
-	if(!InCategory.IsEmpty() && !InCategory.EqualTo(LastCategory))
-	{
-		LastCategory = InCategory;
-		if(UVerticalBoxSlot* VerticalBoxSlot = ContentBox->AddChildToVerticalBox(UObjectPoolModuleStatics::SpawnObject<UWidgetSettingItemCategoryBase>(FWidgetSettingItemCategorySpawnParameter(InCategory), USettingModule::Get().GetSettingItemCategoryClass())))
-		{
-			VerticalBoxSlot->SetPadding(FMargin(2.5f));
-		}
-	}
-	if(UVerticalBoxSlot* VerticalBoxSlot = ContentBox->AddChildToVerticalBox(InSettingItem))
-	{
-		VerticalBoxSlot->SetPadding(FMargin(2.5f));
-	}
-	SettingItems.Add(InName, InSettingItem);
+	PageName = InDefinition.Page;
+	Title = InDefinition.DisplayName.IsEmpty() ? FText::FromName(InDefinition.Page) : InDefinition.DisplayName;
+	RefreshEntries();
 }
 
-void UWidgetSettingPageBase::ClearSettingItems_Implementation()
+void UWidgetSettingPageBase::RefreshEntries()
 {
-	UObjectPoolModuleStatics::DespawnObjects(ContentBox->GetAllChildren());
-	ContentBox->ClearChildren();
-	SettingItems.Empty();
+	if(!SettingList || PageName.IsNone())
+	{
+		return;
+	}
+
+	TArray<UObject*> ListItems;
+	for(USettingEntry* Entry : USettingModule::Get().GetSettingEntriesByPage(PageName))
+	{
+		ListItems.Add(Entry);
+	}
+	SettingList->SetListItems(ListItems);
 }
 
-UWidgetSettingItemBase* UWidgetSettingPageBase::GetSettingItemByName(const FName InName)
+TSubclassOf<UUserWidget> UWidgetSettingPageBase::ResolveEntryClass(UObject* InItem) const
 {
-	if(SettingItems.Contains(InName))
-	{
-		return SettingItems[InName];
-	}
-	return nullptr;
+	const USettingEntry* Entry = Cast<USettingEntry>(InItem);
+	const UWidgetTheme* Theme = UWidgetModule::Get().GetDefaultWidgetTheme();
+	const TSubclassOf<UWidgetSettingEntryBase> EntryClass = Entry && Theme
+		? Theme->FindSettingRendererClass(Entry->GetDefinition().Renderer)
+		: nullptr;
+	return EntryClass.Get();
 }

@@ -9,6 +9,7 @@
 #include "ObjectPool/ObjectPoolModuleTypes.h"
 #include "ReferencePool/ReferencePoolInterface.h"
 #include "Scene/SceneModuleTypes.h"
+#include "Widget/WidgetModuleTypes.h"
 
 #include "AbilityModuleTypes.generated.h"
 
@@ -650,7 +651,24 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FAbilityWidgetSpawnParameter : public FWidgetSpawnParameter
+struct WHFRAMEWORK_API FAbilityInventorySlotWidgetParameter : public FSubWidgetSpawnParameter
+{
+	GENERATED_BODY()
+
+public:
+	FAbilityInventorySlotWidgetParameter() = default;
+
+	explicit FAbilityInventorySlotWidgetParameter(UAbilityInventorySlotBase* InOwnerSlot)
+		: OwnerSlot(InOwnerSlot)
+	{
+	}
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TObjectPtr<UAbilityInventorySlotBase> OwnerSlot = nullptr;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FAbilityWidgetSpawnParameter : public FSubWidgetSpawnParameter
 {
 	GENERATED_BODY()
 

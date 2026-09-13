@@ -46,11 +46,11 @@ protected:
 	virtual FReply OnTouchEnded(const FGeometry& MyGeometry, const FPointerEvent& GestureEvent) override;
 
 public:
-	virtual void OnCreate(UObject* InOwner, const TArray<FParameter>& InParams) override;
+	virtual void OnCreate(const FParameter& InParam) override;
 	
-	virtual void OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams) override;
+	virtual void OnInitialize(const FParameter& InParam) override;
 
-	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant = false) override;
+	virtual void OnOpen(const FParameter& InParam, bool bInstant = false) override;
 	
 	virtual void OnClose(bool bInstant = false) override;
 
@@ -58,18 +58,14 @@ public:
 	
 	virtual void OnRefresh() override;
 
-	virtual void OnDestroy(bool bRecovery) override;
+	virtual void OnDestroy(EObjectDespawnMode InMode) override;
 
 	virtual void OnStateChanged(EScreenWidgetState InWidgetChange) override;
 
 public:
-	virtual void Init(UObject* InOwner, const TArray<FParameter>* InParams = nullptr, bool bForce = false) override;
-
-	virtual void Init(UObject* InOwner, const TArray<FParameter>& InParams, bool bForce = false) override;
+	virtual void Init(const FParameter& InParam = FParameter(), bool bForce = false) override;
 	
-	virtual void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, bool bForce = false) override;
-	
-	virtual void Open(const TArray<FParameter>& InParams, bool bInstant = false, bool bForce = false) override;
+	virtual void Open(const FParameter& InParam = FParameter(), bool bInstant = false, bool bForce = false) override;
 
 	virtual void Close(bool bInstant = false) override;
 
@@ -79,7 +75,7 @@ public:
 
 	virtual void Refresh() override;
 
-	virtual void Destroy(bool bRecovery = false) override;
+	virtual void Destroy(EObjectDespawnMode InMode = EObjectDespawnMode::Destroy) override;
 
 public:
 	virtual bool CanOpen() const override;
@@ -91,24 +87,16 @@ protected:
 
 public:
 	template<class T>
-	T* CreateSubWidget(const TArray<FParameter>* InParams = nullptr, TSubclassOf<UUserWidget> InClass = T::StaticClass())
+	T* CreateSubWidget(const FParameter& InParam = FParameter(), TSubclassOf<UUserWidget> InClass = T::StaticClass())
 	{
-		return Cast<T>(CreateSubWidget(InClass, InParams ? *InParams : TArray<FParameter>()));
+		return Cast<T>(CreateSubWidget(InClass, InParam));
 	}
 
-	template<class T>
-	T* CreateSubWidget(const TArray<FParameter>& InParams, TSubclassOf<UUserWidget> InClass = T::StaticClass())
-	{
-		return Cast<T>(CreateSubWidget(InClass, InParams));
-	}
+	virtual ISubWidgetInterface* CreateSubWidget(TSubclassOf<UUserWidget> InClass, const FParameter& InParam = FParameter()) override;
 
-	virtual ISubWidgetInterface* CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>* InParams = nullptr) override;
+	virtual bool DestroySubWidget(ISubWidgetInterface* InWidget, EObjectDespawnMode InMode) override;
 
-	virtual ISubWidgetInterface* CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams) override;
-
-	virtual bool DestroySubWidget(ISubWidgetInterface* InWidget, bool bRecovery) override;
-
-	virtual void DestroyAllSubWidget(bool bRecovery) override;
+	virtual void DestroyAllSubWidget(EObjectDespawnMode InMode) override;
 
 	virtual void AddChildWidget(IScreenWidgetInterface* InWidget) override;
 
@@ -143,7 +131,7 @@ protected:
 	
 	EWidgetRefreshType WidgetRefreshType;
 
-	TArray<FParameter> WidgetParams;
+	FParameter WidgetParams;
 
 	EInputMode WidgetInputMode;
 
@@ -151,8 +139,8 @@ protected:
 
 	bool bConsumePointerInput;
 
-	UObject* OwnerObject;
-	
+	bool bInitialized;
+
 	IScreenWidgetInterface* LastTemporary;
 	
 	IScreenWidgetInterface* ParentWidget;
@@ -215,11 +203,11 @@ public:
 	
 	virtual EWidgetRefreshType GetWidgetRefreshType() const override { return WidgetRefreshType; }
 
-	virtual EInputMode GetWidgetInputMode() const override { return WidgetInputMode; }
+	EInputMode GetWidgetInputMode() const { return WidgetInputMode; }
 
-	virtual TArray<FParameter> GetWidgetParams() const override { return WidgetParams; }
+	virtual FParameter GetWidgetParams() const override { return WidgetParams; }
 
-	virtual UObject* GetOwnerObject() const override { return OwnerObject; }
+	virtual UObject* GetOwnerObject() const override { return nullptr; }
 
 	IScreenWidgetInterface* GetLastTemporary() const { return LastTemporary; }
 

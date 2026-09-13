@@ -52,6 +52,12 @@ struct TParameterValueAdapter<T, std::enable_if_t<TIsParameterStructValue<T>::va
 		return Wrapper ? Wrapper->Value.template GetPtr<T>() : nullptr;
 	}
 
+	static T* GetMutablePtr(TInstancedStruct<FParameterValueBase>& Storage)
+	{
+		WrapperType* Wrapper = Storage.template GetMutablePtr<WrapperType>();
+		return Wrapper ? Wrapper->Value.template GetMutablePtr<T>() : nullptr;
+	}
+
 	static bool Is(const TInstancedStruct<FParameterValueBase>& Storage)
 	{
 		return GetPtr(Storage) != nullptr;
@@ -87,6 +93,11 @@ struct TParameterValueAdapter<T, std::enable_if_t<std::is_base_of_v<FParameterVa
 	static const T* GetPtr(const TInstancedStruct<FParameterValueBase>& Storage)
 	{
 		return Storage.template GetPtr<T>();
+	}
+
+	static T* GetMutablePtr(TInstancedStruct<FParameterValueBase>& Storage)
+	{
+		return Storage.template GetMutablePtr<T>();
 	}
 
 	static bool Is(const TInstancedStruct<FParameterValueBase>& Storage)
@@ -144,6 +155,7 @@ WH_PARAMETER_VALUE_ADAPTER(FTransform, FParameterTransformValue)
 WH_PARAMETER_VALUE_ADAPTER(FColor, FParameterColorValue)
 WH_PARAMETER_VALUE_ADAPTER(FLinearColor, FParameterLinearColorValue)
 WH_PARAMETER_VALUE_ADAPTER(FKey, FParameterKeyValue)
+WH_PARAMETER_VALUE_ADAPTER(FIntPoint, FParameterIntPointValue)
 WH_PARAMETER_VALUE_ADAPTER(FGameplayTag, FParameterTagValue)
 WH_PARAMETER_VALUE_ADAPTER(FGameplayTagContainer, FParameterTagsValue)
 WH_PARAMETER_VALUE_ADAPTER(FSlateBrush, FParameterBrushValue)

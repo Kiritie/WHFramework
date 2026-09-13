@@ -5,6 +5,23 @@
 
 #include "WidgetTransitionMaskBase.generated.h"
 
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FTransitionMaskWidgetOpenParameter : public FWidgetOpenParameter
+{
+	GENERATED_BODY()
+
+public:
+	FTransitionMaskWidgetOpenParameter() = default;
+
+	explicit FTransitionMaskWidgetOpenParameter(float InDuration)
+		: Duration(InDuration)
+	{
+	}
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float Duration = 0.f;
+};
+
 /**
  * 
  */
@@ -17,11 +34,11 @@ public:
 	UWidgetTransitionMaskBase(const FObjectInitializer& ObjectInitializer);
 	
 public:
-	virtual void OnCreate(UObject* InOwner, const TArray<FParameter>& InParams) override;
+	virtual void OnCreate(const FParameter& InParams) override;
 	
-	virtual void OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams) override;
+	virtual void OnInitialize(const FParameter& InParams) override;
 
-	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant) override;
+	virtual void OnOpen(const FParameter& InParams, bool bInstant) override;
 
 	virtual void OnClose(bool bInstant) override;
 };

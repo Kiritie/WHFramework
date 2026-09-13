@@ -27,7 +27,7 @@ public:
 
 	virtual void OnInitialize() = 0;
 
-	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant) = 0;
+	virtual void OnOpen(const FParameter& InParam, bool bInstant) = 0;
 
 	virtual void OnClose(bool bInstant) = 0;
 
@@ -42,9 +42,7 @@ public:
 	virtual void OnDestroy() = 0;
 	
 public:
-	virtual void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false) = 0;
-	
-	virtual void Open(const TArray<FParameter>& InParams, bool bInstant = false) = 0;
+	virtual void Open(const FParameter& InParam = FParameter(), bool bInstant = false) = 0;
 
 	virtual void Close(bool bInstant = false) = 0;
 

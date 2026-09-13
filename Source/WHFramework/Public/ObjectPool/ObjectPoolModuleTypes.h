@@ -71,13 +71,13 @@ struct WHFRAMEWORK_API FWidgetSpawnParameter : public FSpawnParameter
 public:
 	FWidgetSpawnParameter() = default;
 
-	explicit FWidgetSpawnParameter(UObject* InOwningObject)
-		: OwningObject(InOwningObject)
+	explicit FWidgetSpawnParameter(UObject* InOwnerObject)
+		: OwnerObject(InOwnerObject)
 	{
 	}
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TObjectPtr<UObject> OwningObject = nullptr;
+	TObjectPtr<UObject> OwnerObject = nullptr;
 };
 
 USTRUCT(BlueprintType)

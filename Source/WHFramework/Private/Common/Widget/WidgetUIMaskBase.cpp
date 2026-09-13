@@ -4,29 +4,27 @@
 
 UWidgetUIMaskBase::UWidgetUIMaskBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	WidgetType = EWidgetType::Permanent;
-	WidgetInputMode = EInputMode::UIOnly;
-
 	SetIsFocusable(true);
 }
 
-void UWidgetUIMaskBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetUIMaskBase::OnCreate(const FParameter& InParam)
 {
-	Super::OnCreate(InOwner, InParams);
+	Super::OnCreate(InParam);
 }
 
-void UWidgetUIMaskBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetUIMaskBase::OnInitialize(const FParameter& InParam)
 {
-	Super::OnInitialize(InOwner, InParams);
+	Super::OnInitialize(InParam);
 }
 
-void UWidgetUIMaskBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
+void UWidgetUIMaskBase::OnOpen(const FParameter& InParam, bool bInstant)
 {
-	Super::OnOpen(InParams, bInstant);
+	Super::OnOpen(InParam, bInstant);
 
-	if(InParams.IsValidIndex(0))
+	OnPressAnyKey.Clear();
+	if(const FWidgetDelegateOpenParameter* Param = InParam.GetPtr<FWidgetDelegateOpenParameter>())
 	{
-		OnPressAnyKey = InParams[0].Get<FSimpleDynamicDelegate>();
+		OnPressAnyKey = Param->Delegate;
 	}
 }
 

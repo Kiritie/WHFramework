@@ -31,5 +31,5 @@ public:
 public:
 	virtual void Refresh() = 0;
 
-	virtual void Destroy(bool bRecovery = false) = 0;
+	virtual void Destroy(EObjectDespawnMode InMode = EObjectDespawnMode::Destroy) = 0;
 };

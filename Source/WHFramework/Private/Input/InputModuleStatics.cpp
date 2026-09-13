@@ -98,14 +98,29 @@ bool UInputModuleStatics::MapPlayerKeyByTag(FGameplayTag InActionTag, FKey InNew
 	return UInputModule::Get().MapPlayerKeyByTag(InActionTag, InNewKey, InSlot, InPlayerIndex, &OutFailureReason);
 }
 
+bool UInputModuleStatics::MapPlayerKeyByMappingName(FName InMappingName, FKey InNewKey, EPlayerMappableKeySlot InSlot, FGameplayTagContainer& OutFailureReason, int32 InPlayerIndex)
+{
+	return UInputModule::Get().MapPlayerKeyByMappingName(InMappingName, InNewKey, InSlot, InPlayerIndex, &OutFailureReason);
+}
+
 bool UInputModuleStatics::ResetPlayerKeyByTag(FGameplayTag InActionTag, int32 InPlayerIndex)
 {
 	return UInputModule::Get().ResetPlayerKeyByTag(InActionTag, InPlayerIndex);
 }
 
+bool UInputModuleStatics::ResetPlayerKeyByMappingName(FName InMappingName, int32 InPlayerIndex)
+{
+	return UInputModule::Get().ResetPlayerKeyByMappingName(InMappingName, InPlayerIndex);
+}
+
 TArray<FPlayerKeyMapping> UInputModuleStatics::GetPlayerKeyMappingsByTag(FGameplayTag InActionTag, int32 InPlayerIndex)
 {
 	return UInputModule::Get().GetPlayerKeyMappingsByTag(InActionTag, InPlayerIndex);
+}
+
+TArray<FPlayerKeyMapping> UInputModuleStatics::GetPlayerKeyMappingsByMappingName(FName InMappingName, int32 InPlayerIndex)
+{
+	return UInputModule::Get().GetPlayerKeyMappingsByMappingName(InMappingName, InPlayerIndex);
 }
 
 FText UInputModuleStatics::GetPlayerKeyCodeByTag(FGameplayTag InActionTag, int32 InPlayerIndex)
@@ -125,6 +140,16 @@ FText UInputModuleStatics::GetPlayerKeyCodeByTag(FGameplayTag InActionTag, int32
 TArray<FGameplayTag> UInputModuleStatics::GetAllMappableActions()
 {
 	return UInputModule::Get().GetAllMappableActions();
+}
+
+TArray<FInputMappableEntry> UInputModuleStatics::GetAllMappableEntries()
+{
+	return UInputModule::Get().GetAllMappableEntries();
+}
+
+TArray<FInputMappableEntry> UInputModuleStatics::GetMappableEntriesByActionTag(FGameplayTag InActionTag)
+{
+	return UInputModule::Get().GetMappableEntriesByActionTag(InActionTag);
 }
 
 ECommonInputType UInputModuleStatics::GetCurrentInputType(int32 InPlayerIndex)

@@ -23,11 +23,11 @@ UWidgetSceneMarkerPanel::UWidgetSceneMarkerPanel(const FObjectInitializer& Objec
 	MarkerItemClass = UWidgetSceneMarkerItem::StaticClass();
 }
 
-void UWidgetSceneMarkerPanel::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetSceneMarkerPanel::OnInitialize(const FParameter& InParams)
 {
 	ResolveMarkerCanvas();
 	ResolveMapBackground();
-	Super::OnInitialize(InOwner, InParams);
+	Super::OnInitialize(InParams);
 	if(USceneModule::IsValid()) USceneModule::Get().OnSceneMarkersChanged.AddUniqueDynamic(this, &UWidgetSceneMarkerPanel::RefreshMarkerMembership);
 	RefreshMarkerMembership();
 	OnRefresh();
@@ -59,11 +59,11 @@ void UWidgetSceneMarkerPanel::OnRefresh()
 	UpdateMarkerStates();
 }
 
-void UWidgetSceneMarkerPanel::OnDestroy(bool bRecovery)
+void UWidgetSceneMarkerPanel::OnDestroy(EObjectDespawnMode InMode)
 {
 	if(USceneModule::IsValid()) USceneModule::Get().OnSceneMarkersChanged.RemoveDynamic(this, &UWidgetSceneMarkerPanel::RefreshMarkerMembership);
 	DestroyMarkerItems();
-	Super::OnDestroy(bRecovery);
+	Super::OnDestroy(InMode);
 }
 
 FVector UWidgetSceneMarkerPanel::GetMarkerViewLocation() const
@@ -159,7 +159,7 @@ void UWidgetSceneMarkerPanel::RebuildMarkerItems()
 	for(const FGuid& MarkerID : RemovedIDs)
 	{
 		if(DesiredIDs.Contains(MarkerID)) continue;
-		if(UWidgetSceneMarkerItem* Item = MarkerItems.FindRef(MarkerID)) DestroySubWidget(Item, true);
+		if(UWidgetSceneMarkerItem* Item = MarkerItems.FindRef(MarkerID)) DestroySubWidget(Item, EObjectDespawnMode::Recovery);
 		MarkerItems.Remove(MarkerID);
 	}
 }
@@ -291,7 +291,7 @@ void UWidgetSceneMarkerPanel::DestroyMarkerItems()
 {
 	for(const auto& Pair : MarkerItems)
 	{
-		if(Pair.Value) DestroySubWidget(Pair.Value, true);
+		if(Pair.Value) DestroySubWidget(Pair.Value, EObjectDespawnMode::Recovery);
 	}
 	MarkerItems.Reset();
 }

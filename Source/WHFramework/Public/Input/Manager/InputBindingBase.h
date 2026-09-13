@@ -7,7 +7,7 @@
 
 class UInputComponentBase;
 
-UCLASS(EditInlineNew)
+UCLASS(Abstract, BlueprintType, EditInlineNew)
 class WHFRAMEWORK_API UInputBindingBase : public UWHObject
 {
 	GENERATED_BODY()
@@ -58,10 +58,10 @@ public:
 	virtual void OnTermination();
 
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	FName InputBindingName;
 
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(Transient, BlueprintReadOnly)
 	int32 LocalPlayerIndex;
  
 public:
@@ -70,6 +70,8 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	int32 GetLocalPlayerIndex() const { return LocalPlayerIndex; }
+
+	void AddBindingHandle(uint32 InHandle);
 
 protected:
 	UPROPERTY(Transient)

@@ -13,6 +13,7 @@
 #include "WidgetModule.generated.h"
 
 class UWorldWidgetContainer;
+class UWidgetTheme;
 struct FEventSetWorldWidgetVisible;
 struct FEventCloseUserWidget;
 struct FEventOpenUserWidget;
@@ -20,6 +21,8 @@ struct FEventOpenUserWidget;
 UCLASS()
 class WHFRAMEWORK_API UWidgetModule : public UModuleBase
 {
+	friend class UWorldWidgetComponent;
+
 	GENERATED_BODY()
 			
 	GENERATED_MODULE(UWidgetModule)
@@ -141,6 +144,19 @@ public:
 	void RemoveCommonRichTextDecorator(const TSubclassOf<URichTextBlockDecorator>& InCommonRichTextDecorator) { CommonRichTextDecorators.Remove(InCommonRichTextDecorator); }
 
 	////////////////////////////////////////////////////
+	// WidgetTheme
+protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "CommonWidget|Theme")
+	TObjectPtr<UWidgetTheme> DefaultWidgetTheme;
+
+public:
+	UFUNCTION(BlueprintPure)
+	UWidgetTheme* GetDefaultWidgetTheme() const { return DefaultWidgetTheme; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetDefaultWidgetTheme(UWidgetTheme* InTheme) { DefaultWidgetTheme = InTheme; }
+
+	////////////////////////////////////////////////////
 	// ScreenWidget
 protected:
 	UPROPERTY(EditAnywhere, Category = "ScreenWidget")
@@ -160,10 +176,20 @@ private:
 	UPROPERTY(Transient)
 	TMap<FWidgetMountContext, TObjectPtr<UUserWidgetBase>> ActiveTemporaryWidgets;
 
+	TSet<FGameplayTag> PendingWidgetOpenTags;
+
 private:
 	void BuildRuntimeCaches();
 
-	const FScreenWidgetConfig* GetUserWidgetConfig(FGameplayTag InWidgetTag) const;
+#if WITH_EDITOR
+	bool ValidateScreenWidgetConfigs(TArray<FText>& OutErrors, TArray<FText>& OutWarnings) const;
+
+	bool ValidateWorldWidgetConfigs(TArray<FText>& OutErrors, TArray<FText>& OutWarnings) const;
+
+	bool ValidateWidgetTheme(TArray<FText>& OutErrors, TArray<FText>& OutWarnings) const;
+
+	void ValidateNativeWidgetUsage(TArray<FText>& OutWarnings) const;
+#endif
 
 	FGameplayTag ResolveWidgetTagForClass(
 		TSubclassOf<UUserWidgetBase> InClass,
@@ -171,42 +197,33 @@ private:
 
 	bool EnsureParentCreated(
 		const FScreenWidgetConfig& InConfig,
-		UObject* InOwner);
-
-	void ApplyWidgetConfig(
-		UUserWidgetBase* InWidget,
-		const FScreenWidgetConfig& InConfig) const;
+		const FParameter& InParam);
 
 	bool AttachWidgetToConfiguredParent(
 		UUserWidgetBase* InWidget,
 		const FScreenWidgetConfig& InConfig);
 
 public:
+	const FScreenWidgetConfig* GetUserWidgetConfig(FGameplayTag InWidgetTag) const;
+
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InExpectedClass", AutoCreateRefTerm = "InWidgetTag"))
 	UUserWidgetBase* GetUserWidgetByTag(
 		FGameplayTag InWidgetTag,
 		TSubclassOf<UUserWidgetBase> InExpectedClass = nullptr) const;
 
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InWidgetTag,InParam"))
 	UUserWidgetBase* CreateUserWidgetByTag(
 		FGameplayTag InWidgetTag,
-		UObject* InOwner = nullptr,
-		const FParameter* InInitParameter = nullptr,
-		TSubclassOf<UUserWidgetBase> InClassOverride = nullptr);
+		const FParameter& InParam = FParameter(),
+		TSubclassOf<UUserWidgetBase> InClass = nullptr);
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Create User Widget By Tag", DeterminesOutputType = "InClassOverride", AutoCreateRefTerm = "InWidgetTag,InInitParameter"))
-	UUserWidgetBase* K2_CreateUserWidgetByTag(
-		FGameplayTag InWidgetTag,
-		UObject* InOwner,
-		const FParameter& InInitParameter,
-		TSubclassOf<UUserWidgetBase> InClassOverride = nullptr);
-
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InWidgetTag,InOpenParameter"))
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InWidgetTag,InParam"))
 	bool OpenUserWidgetByTag(
 		FGameplayTag InWidgetTag,
-		const FParameter& InOpenParameter,
+		const FParameter& InParam = FParameter(),
 		bool bInstant = false,
 		bool bForce = false,
-		TSubclassOf<UUserWidgetBase> InClassOverride = nullptr);
+		TSubclassOf<UUserWidgetBase> InClass = nullptr);
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InWidgetTag"))
 	bool CloseUserWidgetByTag(
@@ -221,17 +238,17 @@ public:
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InWidgetTag"))
 	bool DestroyUserWidgetByTag(
 		FGameplayTag InWidgetTag,
-		bool bRecovery = false);
+		EObjectDespawnMode InMode = EObjectDespawnMode::Destroy);
 
 	UFUNCTION(BlueprintCallable)
 	bool CloseActiveTemporaryWidget(
 		const FWidgetMountContext& InContext,
 		bool bInstant = false);
 
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParentWidgetTag,InParentSlotTag"))
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParentWidgetTag,InSlotTag"))
 	bool CloseTemporaryWidgetInSlot(
 		FGameplayTag InParentWidgetTag,
-		FGameplayTag InParentSlotTag,
+		FGameplayTag InSlotTag,
 		bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParentWidgetTag"))
@@ -278,32 +295,34 @@ public:
 	UUserWidgetBase* GetUserWidget(TSubclassOf<UUserWidgetBase> InClass) const;
 
 	template<class T>
-	T* CreateUserWidget(UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr, bool bForce = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	T* CreateUserWidget(const FParameter& InParam = FParameter(), TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
 	{
 		if(!InClass)
 		{
 			return nullptr;
 		}
-		const FParameter* Parameter = InParams && !InParams->IsEmpty() ? &(*InParams)[0] : nullptr;
-		return Cast<T>(CreateUserWidgetByTag(ResolveWidgetTagForClass(InClass), InOwner, Parameter));
+		return Cast<T>(CreateUserWidgetByTag(ResolveWidgetTagForClass(InClass), InParam));
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"))
-	UUserWidgetBase* CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, UObject* InOwner, const TArray<FParameter>& InParams, bool bForce = false);
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParam"))
+	UUserWidgetBase* CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, const FParameter& InParam = FParameter());
 
 	template<class T>
-	bool OpenUserWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, bool bForce = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	bool OpenUserWidget(const FParameter& InParam = FParameter(), bool bInstant = false, bool bForce = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
 	{
 		if(!InClass)
 		{
 			return false;
 		}
-		const FParameter Parameter = InParams && !InParams->IsEmpty() ? (*InParams)[0] : FParameter();
-		return OpenUserWidgetByTag(ResolveWidgetTagForClass(InClass), Parameter, bInstant, bForce);
+		return OpenUserWidgetByTag(
+			ResolveWidgetTagForClass(InClass),
+			InParam,
+			bInstant,
+			bForce);
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
-	bool OpenUserWidget(TSubclassOf<UUserWidgetBase> InClass, const TArray<FParameter>& InParams, bool bInstant = false, bool bForce = false);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParam"))
+	bool OpenUserWidget(TSubclassOf<UUserWidgetBase> InClass, const FParameter& InParam = FParameter(), bool bInstant = false, bool bForce = false);
 
 	template<class T>
 	bool CloseUserWidget(bool bInstant = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
@@ -324,19 +343,19 @@ public:
 	bool ToggleUserWidget(TSubclassOf<UUserWidgetBase> InClass, bool bInstant = false);
 
 	template<class T>
-	bool DestroyUserWidget(bool bRecovery = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	bool DestroyUserWidget(EObjectDespawnMode InMode = EObjectDespawnMode::Destroy, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
 	{
-		return InClass && DestroyUserWidgetByTag(ResolveWidgetTagForClass(InClass), bRecovery);
+		return InClass && DestroyUserWidgetByTag(ResolveWidgetTagForClass(InClass), InMode);
 	}
 
 	UFUNCTION(BlueprintCallable)
-	bool DestroyUserWidget(TSubclassOf<UUserWidgetBase> InClass, bool bRecovery = false);
+	bool DestroyUserWidget(TSubclassOf<UUserWidgetBase> InClass, EObjectDespawnMode InMode = EObjectDespawnMode::Destroy);
 
 	UFUNCTION(BlueprintCallable)
 	void CloseAllUserWidget(bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
-	void ClearAllUserWidget(bool bRecovery = false);
+	void ClearAllUserWidget(EObjectDespawnMode InMode = EObjectDespawnMode::Destroy);
 
 	////////////////////////////////////////////////////
 	// WorldWidget
@@ -366,8 +385,6 @@ private:
 	UWorldWidgetContainer* WorldWidgetContainer;
 
 private:
-	const FWorldWidgetConfig* GetWorldWidgetConfig(FGameplayTag InWidgetTag) const;
-
 	FGameplayTag ResolveWorldWidgetTagForClass(TSubclassOf<UWorldWidgetBase> InClass, bool bEnsured = true) const;
 
 protected:
@@ -375,17 +392,16 @@ protected:
 	void OnSetWorldWidgetVisible(UObject* InSender, const FEventSetWorldWidgetVisible& InEvent);
 
 public:
+	const FWorldWidgetConfig* GetWorldWidgetConfig(FGameplayTag InWidgetTag) const;
+
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InWidgetTag"))
 	TArray<UWorldWidgetBase*> GetWorldWidgetsByTag(FGameplayTag InWidgetTag) const;
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InExpectedClass", AutoCreateRefTerm = "InWidgetTag"))
-	UWorldWidgetBase* GetWorldWidgetByTag(FGameplayTag InWidgetTag, int32 InIndex, TSubclassOf<UWorldWidgetBase> InExpectedClass = nullptr) const;
-
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InWidgetTag,InParams"))
-	UWorldWidgetBase* CreateWorldWidgetByTag(FGameplayTag InWidgetTag, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams, TSubclassOf<UWorldWidgetBase> InClassOverride = nullptr);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InWidgetTag,InParam"))
+	UWorldWidgetBase* CreateWorldWidgetByTag(FGameplayTag InWidgetTag, FWorldWidgetMapping InMapping, const FParameter& InParam = FParameter(), TSubclassOf<UWorldWidgetBase> InClass = nullptr);
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InWidgetTag"))
-	bool DestroyWorldWidgetByTag(FGameplayTag InWidgetTag, UWorldWidgetBase* InWidget, bool bRecovery = false);
+	bool DestroyWorldWidgetByTag(FGameplayTag InWidgetTag, UWorldWidgetBase* InWidget, EObjectDespawnMode InMode = EObjectDespawnMode::Destroy);
 
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InWidgetTag"))
 	bool GetWorldWidgetVisibleByTag(FGameplayTag InWidgetTag) const;
@@ -406,24 +422,6 @@ public:
 	void SetWorldWidgetVisible(bool bVisible, TSubclassOf<UWorldWidgetBase> InClass = nullptr);
 
 	template<class T>
-	bool HasWorldWidget(int32 InIndex, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass()) const
-	{
-		return GetWorldWidgetByTag(ResolveWorldWidgetTagForClass(InClass, false), InIndex, InClass) != nullptr;
-	}
-
-	UFUNCTION(BlueprintPure)
-	bool HasWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex) const;
-
-	template<class T>
-	T* GetWorldWidget(int32 InIndex, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass()) const
-	{
-		return Cast<T>(GetWorldWidgetByTag(ResolveWorldWidgetTagForClass(InClass), InIndex, InClass));
-	}
-
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	UWorldWidgetBase* GetWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex) const;
-
-	template<class T>
 	TArray<T*> GetWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass()) const
 	{
 		TArray<T*> Result;
@@ -438,43 +436,33 @@ public:
 	TArray<UWorldWidgetBase*> GetWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass) const;
 
 	template<class T>
-	T* CreateWorldWidget(UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>* InParams = nullptr, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	T* CreateWorldWidget(FWorldWidgetMapping InMapping, const FParameter& InParam = FParameter(), TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
 		if(!InClass)
 		{
 			return nullptr;
 		}
-		return Cast<T>(CreateWorldWidgetByTag(ResolveWorldWidgetTagForClass(InClass), InOwner, InMapping, InParams ? *InParams : TArray<FParameter>(), InClass));
+		return Cast<T>(CreateWorldWidgetByTag(ResolveWorldWidgetTagForClass(InClass), InMapping, InParam, InClass));
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"))
-	UWorldWidgetBase* CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams);
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParam"))
+	UWorldWidgetBase* CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, FWorldWidgetMapping InMapping, const FParameter& InParam = FParameter());
 
-	bool DestroyWorldWidget(UWorldWidgetBase* InWidget, bool bRecovery = false);
-
-	template<class T>
-	bool DestroyWorldWidget(int32 InIndex, bool bRecovery = false, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
-	{
-		const FGameplayTag WidgetTag = ResolveWorldWidgetTagForClass(InClass);
-		return DestroyWorldWidgetByTag(WidgetTag, GetWorldWidgetByTag(WidgetTag, InIndex, InClass), bRecovery);
-	}
-
-	UFUNCTION(BlueprintCallable)
-	bool DestroyWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, int32 InIndex, bool bRecovery = false);
+	bool DestroyWorldWidget(UWorldWidgetBase* InWidget, EObjectDespawnMode InMode = EObjectDespawnMode::Destroy);
 
 	template<class T>
-	void DestroyWorldWidgets(bool bRecovery = false, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	void DestroyWorldWidgets(EObjectDespawnMode InMode = EObjectDespawnMode::Destroy, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
 		const FGameplayTag WidgetTag = ResolveWorldWidgetTagForClass(InClass);
 		for(UWorldWidgetBase* Widget : GetWorldWidgetsByTag(WidgetTag))
 		{
-			DestroyWorldWidgetByTag(WidgetTag, Widget, bRecovery);
+			DestroyWorldWidgetByTag(WidgetTag, Widget, InMode);
 		}
 	}
 
 	UFUNCTION(BlueprintCallable)
-	void DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass, bool bRecovery = false);
+	void DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass, EObjectDespawnMode InMode = EObjectDespawnMode::Destroy);
 
 	UFUNCTION(BlueprintCallable)
-	void ClearAllWorldWidget(bool bRecovery = false);
+	void ClearAllWorldWidget(EObjectDespawnMode InMode = EObjectDespawnMode::Destroy);
 };

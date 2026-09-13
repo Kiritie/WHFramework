@@ -5,6 +5,7 @@
 #include "ObjectPool/ObjectPoolInterface.h"
 
 #include "CommonTextBlock.h"
+#include "GameplayTagContainer.h"
 
 #include "CommonTextBlockN.generated.h"
 
@@ -29,6 +30,15 @@ public:
 		
 	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode)
 		override;
+
+protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Text"))
+	FGameplayTag StyleTag;
+
+private:
+	void ApplyStyleTag();
+
+	bool bApplyingStyleTag = false;
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Getter, Setter, BlueprintGetter = "GetHighlightText", BlueprintSetter = "SetHighlightText", Category = "Content", meta = (MultiLine = "true"))
@@ -58,4 +68,10 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category = "Widget")
 	virtual void SetHighlightColor(const FSlateColor InColor);
+
+	UFUNCTION(BlueprintCallable, Category = "Style")
+	void SetStyleTag(FGameplayTag InStyleTag);
+
+	UFUNCTION(BlueprintPure, Category = "Style")
+	FGameplayTag GetStyleTag() const { return StyleTag; }
 };

@@ -352,7 +352,7 @@ void UTargetingComponent::TargetLockOff()
 	bTargetLocked = false;
 	if (TargetLockedOnWidget)
 	{
-		TargetLockedOnWidget->Destroy(true);
+		TargetLockedOnWidget->Destroy(EObjectDespawnMode::Recovery);
 		TargetLockedOnWidget = nullptr;
 	}
 
@@ -393,7 +393,13 @@ void UTargetingComponent::CreateAndAttachTargetLockedOnWidgetComponent(AActor* T
 	UMeshComponent* MeshComponent = TargetActor->FindComponentByClass<UMeshComponent>();
 	USceneComponent* ParentComponent = MeshComponent && LockedOnWidgetParentSocket != NAME_None ? MeshComponent : TargetActor->GetRootComponent();
 
-	TargetLockedOnWidget = UWidgetModuleStatics::CreateWorldWidget(LockedOnWidgetClass, TargetActor, FWorldWidgetMapping(ParentComponent, LockedOnWidgetParentSocket, LockedOnWidgetRelativeLocation), {});
+	TargetLockedOnWidget = UWidgetModuleStatics::CreateWorldWidget(
+		LockedOnWidgetClass,
+		FWorldWidgetMapping(
+			ParentComponent,
+			LockedOnWidgetParentSocket,
+			LockedOnWidgetRelativeLocation),
+		FWidgetSpawnParameter(TargetActor));
 }
 
 TArray<AActor*> UTargetingComponent::GetAllActorsOfClass(const TSubclassOf<AActor> ActorClass) const

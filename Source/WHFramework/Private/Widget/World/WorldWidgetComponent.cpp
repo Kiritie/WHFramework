@@ -5,9 +5,40 @@
 
 #include "Camera/CameraModuleStatics.h"
 #include "Common/CommonModuleStatics.h"
+#include "ObjectPool/ObjectPoolInterface.h"
 #include "Scene/SceneManager.h"
+#include "Widget/WidgetModule.h"
 #include "Widget/WidgetModuleStatics.h"
 #include "Widget/World/WorldWidgetActor.h"
+
+namespace
+{
+	FParameter MakeWidgetParam(const UWorldWidgetComponent* InComponent, const FParameter& InParam)
+	{
+		UObject* OwnerObject = InComponent ? InComponent->GetOwner() : nullptr;
+		if(!InParam.HasValue())
+		{
+			return FParameter(FWidgetSpawnParameter(OwnerObject));
+		}
+
+		FParameter Param = InParam;
+		FWidgetSpawnParameter* SpawnParam = Param.GetMutablePtr<FWidgetSpawnParameter>();
+		if(!SpawnParam)
+		{
+			ensureEditorMsgf(
+				false,
+				FString::Printf(
+					TEXT("World widget parameter %s must derive from FWidgetSpawnParameter."),
+					*GetNameSafe(Param.GetValueStruct())),
+				EDC_Widget,
+				EDV_Error);
+			return FParameter(FWidgetSpawnParameter(OwnerObject));
+		}
+
+		SpawnParam->OwnerObject = OwnerObject;
+		return Param;
+	}
+}
 
 UWorldWidgetComponent::UWorldWidgetComponent()
 {
@@ -22,7 +53,9 @@ UWorldWidgetComponent::UWorldWidgetComponent()
 	bAutoCreate = true;
 	bOrientCamera = false;
 	bBindToSelf = true;
-	WidgetParams = TArray<FParameter>();
+	WorldWidgetTag = FGameplayTag();
+	WorldWidgetClassOverride = nullptr;
+	WidgetParam = FParameter();
 	WidgetScale = FVector::OneVector;
 	WidgetPoints = TMap<FName, USceneComponent*>();
 	WorldWidget = nullptr;
@@ -31,6 +64,7 @@ UWorldWidgetComponent::UWorldWidgetComponent()
 void UWorldWidgetComponent::BeginPlay()
 {
 	Super::BeginPlay();
+	RefreshParams();
 	
 	WidgetPoints.Add(GetFName(), this);
 	
@@ -46,18 +80,18 @@ void UWorldWidgetComponent::BeginPlay()
 
 	if(bAutoCreate)
 	{
-		CreateWorldWidget(WidgetParams);
+		CreateWorldWidget(WidgetParam);
 	}
 }
 
 void UWorldWidgetComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	Super::EndPlay(EndPlayReason);
-
 	if(UCommonModuleStatics::IsPlaying() && EndPlayReason == EEndPlayReason::Type::Destroyed)
 	{
 		DestroyWorldWidget();
 	}
+
+	Super::EndPlay(EndPlayReason);
 }
 
 void UWorldWidgetComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -97,6 +131,13 @@ void UWorldWidgetComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 
 void UWorldWidgetComponent::SetWidget(UUserWidget* InWidget)
 {
+	UWorldWidgetBase* PreviousWorldWidget = WorldWidget;
+	if(PreviousWorldWidget && PreviousWorldWidget != InWidget)
+	{
+		WorldWidget = nullptr;
+		PreviousWorldWidget->OnDestroy(EObjectDespawnMode::Destroy);
+	}
+
 	Super::SetWidget(InWidget);
 
 	if(InWidget)
@@ -106,28 +147,32 @@ void UWorldWidgetComponent::SetWidget(UUserWidget* InWidget)
 			WorldWidget = Cast<UWorldWidgetBase>(InWidget);
 			if(WorldWidget)
 			{
-				WorldWidget->OnCreate(GetOwner(), this, WidgetParams);
+				const FParameter Param = MakeWidgetParam(this, WidgetParam);
+				if(const FWorldWidgetConfig* Config = ResolveWorldWidgetConfig())
+				{
+					WorldWidget->WidgetTag = Config->ResolveWidgetTag();
+				}
+				IObjectPoolInterface::Execute_OnSpawn(WorldWidget, Param);
+				WorldWidget->OnCreate(this, Param);
 			}
 		}
-	}
-	else if(WorldWidget)
-	{
-		WorldWidget->OnDestroy(false);
-		WorldWidget = nullptr;
 	}
 }
 
 void UWorldWidgetComponent::RefreshParams()
 {
-	if(!WorldWidgetClass) return;
-
-	if(const UWorldWidgetBase* DefaultObject = Cast<UWorldWidgetBase>(WorldWidgetClass->GetDefaultObject()))
+	const FWorldWidgetConfig* Config = ResolveWorldWidgetConfig();
+	if(!Config)
 	{
-		Space = DefaultObject->GetWidgetSpace();
-		DrawSize = FIntPoint(DefaultObject->GetWidgetDrawSize().X, DefaultObject->GetWidgetDrawSize().Y);
-		Pivot = DefaultObject->GetWidgetAlignment();
-		WidgetParams = DefaultObject->GetWidgetParams();
+		return;
 	}
+
+	Space = Config->Space == EWorldWidgetSpace::World
+		? EWidgetSpace::World
+		: EWidgetSpace::Screen;
+	bDrawAtDesiredSize = Config->bAutoSize;
+	DrawSize = FIntPoint(Config->DrawSize.X, Config->DrawSize.Y);
+	Pivot = Config->Alignment;
 }
 
 #if WITH_EDITOR
@@ -169,7 +214,8 @@ void UWorldWidgetComponent::PostEditChangeProperty(FPropertyChangedEvent& Proper
 		static FName RefreshEditorOnlyName = GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, bRefreshEditorOnly);
 		static FName SpaceName = GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, Space);
 		static FName AutoCreateName = GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, bAutoCreate);
-		static FName WorldWidgetClassName = GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, WorldWidgetClass);
+		static FName WorldWidgetTagName = GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, WorldWidgetTag);
+		static FName WorldWidgetClassOverrideName = GET_MEMBER_NAME_STRING_CHECKED(UWorldWidgetComponent, WorldWidgetClassOverride);
 
 		const FName PropertyName = Property->GetFName();
 
@@ -182,16 +228,16 @@ void UWorldWidgetComponent::PostEditChangeProperty(FPropertyChangedEvent& Proper
 			}
 		}
 
-		if(PropertyName == WorldWidgetClassName)
+		if(PropertyName == WorldWidgetTagName || PropertyName == WorldWidgetClassOverrideName)
 		{
 			RefreshParams();
 		}
 
-		if(PropertyName == SpaceName || PropertyName == AutoCreateName || PropertyName == WorldWidgetClassName)
+		if(PropertyName == SpaceName || PropertyName == AutoCreateName || PropertyName == WorldWidgetTagName || PropertyName == WorldWidgetClassOverrideName)
 		{
 			if(Space == EWidgetSpace::World && bAutoCreate)
 			{
-				WidgetClass = WorldWidgetClass;
+				WidgetClass = ResolveWorldWidgetClass();
 			}
 			else
 			{
@@ -205,17 +251,31 @@ void UWorldWidgetComponent::PostEditChangeProperty(FPropertyChangedEvent& Proper
 }
 #endif
 
-void UWorldWidgetComponent::CreateWorldWidget(const TArray<FParameter>& InParams, bool bInEditor)
+void UWorldWidgetComponent::CreateWorldWidget(const FParameter& InParam, bool bInEditor)
 {
-	DestroyWorldWidget(false, bInEditor);
+	DestroyWorldWidget(EObjectDespawnMode::Destroy, bInEditor);
+	RefreshParams();
+	const FWorldWidgetConfig* Config = ResolveWorldWidgetConfig();
+	const TSubclassOf<UWorldWidgetBase> ResolvedClass = ResolveWorldWidgetClass();
+	const FParameter Param = MakeWidgetParam(
+		this,
+		InParam.HasValue() ? InParam : WidgetParam);
 	
-	if(WorldWidgetClass)
+	if(Config && ResolvedClass)
 	{
 		switch(Space)
 		{
 			case EWidgetSpace::World:
 			{
-				SetWorldWidget(CreateWidget(GetWorld(), WidgetClass));
+				UWorldWidgetBase* NewWorldWidget = CreateWidget<UWorldWidgetBase>(GetWorld(), ResolvedClass);
+				Super::SetWidget(NewWorldWidget);
+				WorldWidget = NewWorldWidget;
+				if(WorldWidget)
+				{
+					WorldWidget->WidgetTag = Config->ResolveWidgetTag();
+					IObjectPoolInterface::Execute_OnSpawn(WorldWidget, Param);
+					WorldWidget->OnCreate(this, Param);
+				}
 				break;
 			}
 			case EWidgetSpace::Screen:
@@ -223,14 +283,19 @@ void UWorldWidgetComponent::CreateWorldWidget(const TArray<FParameter>& InParams
 				UWorldWidgetBase* _WorldWidget;
 				if(bInEditor)
 				{
-					_WorldWidget = CreateWidget<UWorldWidgetBase>(GetWorld(), WorldWidgetClass);
-					_WorldWidget->WidgetIndex = 0;
+					_WorldWidget = CreateWidget<UWorldWidgetBase>(GetWorld(), ResolvedClass);
 					_WorldWidget->bWidgetInEditor = true;
-					_WorldWidget->OnCreate(GetOwner(), this, InParams);
+					_WorldWidget->WidgetTag = Config->ResolveWidgetTag();
+					IObjectPoolInterface::Execute_OnSpawn(_WorldWidget, Param);
+					_WorldWidget->OnCreate(this, Param);
 				}
 				else
 				{
-					_WorldWidget = UWidgetModuleStatics::CreateWorldWidget<UWorldWidgetBase>(GetOwner(), this, InParams.IsEmpty() ? WidgetParams : InParams, WorldWidgetClass);
+					_WorldWidget = UWidgetModuleStatics::CreateWorldWidgetByTag(
+						Config->ResolveWidgetTag(),
+						this,
+						Param,
+						ResolvedClass);
 				}
 				SetWorldWidget(_WorldWidget);
 				break;
@@ -239,33 +304,30 @@ void UWorldWidgetComponent::CreateWorldWidget(const TArray<FParameter>& InParams
 	}
 }
 
-void UWorldWidgetComponent::CreateWorldWidget(const TArray<FParameter>* InParams, bool bInEditor)
+void UWorldWidgetComponent::DestroyWorldWidget(EObjectDespawnMode InMode, bool bInEditor)
 {
-	CreateWorldWidget(InParams ? *InParams : TArray<FParameter>(), bInEditor);
-}
-
-void UWorldWidgetComponent::DestroyWorldWidget(bool bRecovery, bool bInEditor)
-{
-	if(WorldWidget)
+	if(UWorldWidgetBase* WidgetToDestroy = WorldWidget)
 	{
+		WorldWidget = nullptr;
 		switch(Space)
 		{
 			case EWidgetSpace::World:
 			{
+				Super::SetWidget(nullptr);
 				SetWidgetClass(nullptr);
+				WidgetToDestroy->OnDestroy(InMode);
 				break;
 			}
 			case EWidgetSpace::Screen:
 			{
 				if(bInEditor)
 				{
-					WorldWidget->OnDestroy(bRecovery);
+					WidgetToDestroy->OnDestroy(InMode);
 				}
 				else
 				{
-					UWidgetModuleStatics::DestroyWorldWidget(WorldWidget, bRecovery);
+					UWidgetModuleStatics::DestroyWorldWidget(WidgetToDestroy, InMode);
 				}
-				SetWorldWidget(nullptr);
 				break;
 			}
 		}
@@ -289,11 +351,15 @@ void UWorldWidgetComponent::SetWorldWidget(UUserWidget* InWidget)
 	}
 }
 
-void UWorldWidgetComponent::SetWorldWidgetClass(TSubclassOf<UUserWidget> InClass, bool bRefresh)
+void UWorldWidgetComponent::SetWorldWidgetClass(TSubclassOf<UWorldWidgetBase> InClass, bool bRefresh)
 {
-	if(WorldWidgetClass == InClass) return;
+	if(WorldWidgetClassOverride == InClass) return;
 
-	WorldWidgetClass = InClass;
+	WorldWidgetClassOverride = InClass;
+	if(UWidgetModule::IsValid())
+	{
+		WorldWidgetTag = UWidgetModule::Get().ResolveWorldWidgetTagForClass(InClass, false);
+	}
 
 	RefreshParams();
 	
@@ -301,7 +367,7 @@ void UWorldWidgetComponent::SetWorldWidgetClass(TSubclassOf<UUserWidget> InClass
 	{
 		case EWidgetSpace::World:
 		{
-			WidgetClass = InClass;
+			WidgetClass = ResolveWorldWidgetClass();
 			if(bRefresh)
 			{
 				if(FSlateApplication::IsInitialized())
@@ -325,9 +391,9 @@ void UWorldWidgetComponent::SetWorldWidgetClass(TSubclassOf<UUserWidget> InClass
 		{
 			if(bRefresh)
 			{
-				if(WorldWidgetClass)
+				if(ResolveWorldWidgetClass())
 				{
-					CreateWorldWidget(WidgetParams);
+					CreateWorldWidget(WidgetParam);
 				}
 				else
 				{
@@ -336,6 +402,21 @@ void UWorldWidgetComponent::SetWorldWidgetClass(TSubclassOf<UUserWidget> InClass
 			}
 			break;
 		}
+	}
+}
+
+void UWorldWidgetComponent::SetWorldWidgetTag(FGameplayTag InTag, bool bRefresh)
+{
+	if(WorldWidgetTag == InTag)
+	{
+		return;
+	}
+
+	WorldWidgetTag = InTag;
+	RefreshParams();
+	if(bRefresh)
+	{
+		CreateWorldWidget(WidgetParam);
 	}
 }
 
@@ -356,5 +437,32 @@ USceneComponent* UWorldWidgetComponent::GetWidgetPoint(FName InPointName) const
 bool UWorldWidgetComponent::EDC_AutoCreate() const
 {
 	return !GetOwner() || !GetOwner()->IsA<AWorldWidgetActor>();
+}
+
+const FWorldWidgetConfig* UWorldWidgetComponent::ResolveWorldWidgetConfig() const
+{
+	if(!UWidgetModule::IsValid())
+	{
+		return nullptr;
+	}
+
+	FGameplayTag WidgetTag = WorldWidgetTag;
+	if(!WidgetTag.IsValid() && WorldWidgetClassOverride)
+	{
+		WidgetTag = UWidgetModule::Get().ResolveWorldWidgetTagForClass(WorldWidgetClassOverride, false);
+	}
+	return WidgetTag.IsValid()
+		? UWidgetModule::Get().GetWorldWidgetConfig(WidgetTag)
+		: nullptr;
+}
+
+TSubclassOf<UWorldWidgetBase> UWorldWidgetComponent::ResolveWorldWidgetClass() const
+{
+	if(WorldWidgetClassOverride)
+	{
+		return WorldWidgetClassOverride;
+	}
+	const FWorldWidgetConfig* Config = ResolveWorldWidgetConfig();
+	return Config ? Config->WidgetClass : nullptr;
 }
 

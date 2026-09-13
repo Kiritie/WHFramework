@@ -2,6 +2,7 @@
 
 #include "GameplayTagContainer.h"
 #include "InputCoreTypes.h"
+#include "Math/IntPoint.h"
 #include "Styling/SlateBrush.h"
 #include "StructUtils/InstancedStruct.h"
 #include "UObject/PrimaryAssetId.h"
@@ -179,6 +180,14 @@ struct WHFRAMEWORKCORE_API FParameterKeyValue : public FParameterValueBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FKey Value;
+};
+USTRUCT(BlueprintType, meta = (DisplayName = "Integer Point", ParameterInlineValue))
+struct WHFRAMEWORKCORE_API FParameterIntPointValue : public FParameterValueBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FIntPoint Value = FIntPoint::ZeroValue;
 };
 USTRUCT(BlueprintType, meta = (DisplayName = "Gameplay Tag", ParameterInlineValue))
 struct WHFRAMEWORKCORE_API FParameterTagValue : public FParameterValueBase

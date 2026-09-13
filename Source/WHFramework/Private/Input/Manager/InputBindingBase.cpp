@@ -39,9 +39,10 @@ void UInputBindingBase::OnUnbindInput()
 {
 	if(BoundInputComponent)
 	{
-		BoundInputComponent->ClearBindingsForObject(this);
 		BoundInputComponent->RemoveBinds(BindingHandles);
+		BoundInputComponent->ClearBindingsForObject(this);
 	}
+	BindingHandles.Reset();
 	BoundInputComponent = nullptr;
 }
 
@@ -50,4 +51,12 @@ void UInputBindingBase::OnTermination()
 	OnUnbindInput();
 	K2_OnTermination();
 	LocalPlayerIndex = INDEX_NONE;
+}
+
+void UInputBindingBase::AddBindingHandle(uint32 InHandle)
+{
+	if(InHandle != 0)
+	{
+		BindingHandles.AddUnique(InHandle);
+	}
 }

@@ -6,6 +6,7 @@
 #include "Common/CommonModuleTypes.h"
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "Slate/Runtime/Interfaces/ScreenWidgetInterface.h"
+#include "Slate/Runtime/Interfaces/SubWidgetInterface.h"
 #include "Widget/WidgetModuleTypes.h"
 
 #include "UserWidgetBase.generated.h"
@@ -13,6 +14,7 @@
 class USubWidgetBase;
 class UWidgetAnimatorBase;
 class UWidgetMountSlot;
+struct FUIActionBindingHandle;
 /**
  * 
  */
@@ -46,26 +48,36 @@ public:
 
 	virtual TOptional<FUIInputConfig> GetDesiredInputConfig() const override;
 
-public:
-	UFUNCTION(BlueprintImplementableEvent, meta = (AutoCreateRefTerm = "InParams"), DisplayName = "OnCreate")
-	void K2_OnCreate(UObject* InOwner, const TArray<FParameter>& InParams);
-	UFUNCTION()
-	virtual void OnCreate(UObject* InOwner, const TArray<FParameter>& InParams) override;
+	FUIActionBindingHandle RegisterUIActionByTag(
+		FGameplayTag InActionTag,
+		bool bInDisplayInActionBar = true);
 
-	UFUNCTION(BlueprintImplementableEvent, meta = (AutoCreateRefTerm = "InParams"), DisplayName = "OnInitialize")
-	void K2_OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams);
+	UFUNCTION(BlueprintNativeEvent, Category = "Input")
+	void OnUIActionTriggered(FGameplayTag InActionTag);
+
+private:
+	void HandleUIActionTriggered(FGameplayTag InActionTag);
+
+public:
+	UFUNCTION(BlueprintImplementableEvent, meta = (AutoCreateRefTerm = "InParam"), DisplayName = "OnCreate")
+	void K2_OnCreate(const FParameter& InParam);
 	UFUNCTION()
-	virtual void OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams) override;
+	virtual void OnCreate(const FParameter& InParam) override;
+
+	UFUNCTION(BlueprintImplementableEvent, meta = (AutoCreateRefTerm = "InParam"), DisplayName = "OnInitialize")
+	void K2_OnInitialize(const FParameter& InParam);
+	UFUNCTION()
+	virtual void OnInitialize(const FParameter& InParam) override;
 	
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnReset")
 	void K2_OnReset(bool bForce = false);
 	UFUNCTION()
 	virtual void OnReset(bool bForce = false) override;
 
-	UFUNCTION(BlueprintImplementableEvent, meta = (AutoCreateRefTerm = "InParams"), DisplayName = "OnOpen")
-	void K2_OnOpen(const TArray<FParameter>& InParams, bool bInstant = false);
+	UFUNCTION(BlueprintImplementableEvent, meta = (AutoCreateRefTerm = "InParam"), DisplayName = "OnOpen")
+	void K2_OnOpen(const FParameter& InParam, bool bInstant = false);
 	UFUNCTION()
-	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant = false) override;
+	virtual void OnOpen(const FParameter& InParam, bool bInstant = false) override;
 
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnClose")
 	void K2_OnClose(bool bInstant = false);
@@ -78,9 +90,9 @@ public:
 	virtual void OnRefresh() override;
 	
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnDestroy")
-	void K2_OnDestroy(bool bRecovery);
+	void K2_OnDestroy(EObjectDespawnMode InMode);
 	UFUNCTION()
-	virtual void OnDestroy(bool bRecovery) override;
+	virtual void OnDestroy(EObjectDespawnMode InMode) override;
 
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnStateChanged")
 	void K2_OnStateChanged(EScreenWidgetState InWidgetState);
@@ -88,18 +100,14 @@ public:
 	virtual void OnStateChanged(EScreenWidgetState InWidgetState) override;
 
 public:
-	virtual void Init(UObject* InOwner, const TArray<FParameter>* InParams = nullptr, bool bForce = false) override;
-	
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
-	virtual void Init(UObject* InOwner, const TArray<FParameter>& InParams, bool bForce = false) override;
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParam"))
+	virtual void Init(const FParameter& InParam = FParameter(), bool bForce = false) override;
 
 	UFUNCTION(BlueprintCallable)
 	virtual void Reset(bool bForce = false) override;
 
-	virtual void Open(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, bool bForce = false) override;
-	
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
-	virtual void Open(const TArray<FParameter>& InParams, bool bInstant = false, bool bForce = false) override;
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParam"))
+	virtual void Open(const FParameter& InParam = FParameter(), bool bInstant = false, bool bForce = false) override;
 
 	UFUNCTION(BlueprintCallable)
 	virtual void Close(bool bInstant = false) override;
@@ -111,7 +119,7 @@ public:
 	virtual void Refresh() override;
 
 	UFUNCTION(BlueprintCallable)
-	virtual void Destroy(bool bRecovery = false) override;
+	virtual void Destroy(EObjectDespawnMode InMode = EObjectDespawnMode::Destroy) override;
 	
 public:
 	UFUNCTION(BlueprintNativeEvent)
@@ -126,31 +134,23 @@ protected:
 
 public:
 	template<class T>
-	T* CreateSubWidget(const TArray<FParameter>* InParams = nullptr, TSubclassOf<UUserWidget> InClass = T::StaticClass())
+	T* CreateSubWidget(const FParameter& InParam = FParameter(), TSubclassOf<UUserWidget> InClass = T::StaticClass())
 	{
-		return Cast<T>(CreateSubWidget(InClass, InParams ? *InParams : TArray<FParameter>()));
+		return Cast<T>(CreateSubWidget(InClass, InParam));
 	}
 
-	template<class T>
-	T* CreateSubWidget(const TArray<FParameter>& InParams, TSubclassOf<UUserWidget> InClass = T::StaticClass())
-	{
-		return Cast<T>(CreateSubWidget(InClass, InParams));
-	}
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParam"), DisplayName = "CreateSubWidget")
+	UUserWidget* K2_CreateSubWidget(TSubclassOf<UUserWidget> InClass, const FParameter& InParam = FParameter());
 
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"), DisplayName = "CreateSubWidget")
-	UUserWidget* K2_CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams);
-
-	virtual ISubWidgetInterface* CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>* InParams = nullptr) override;
-
-	virtual ISubWidgetInterface* CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams) override;
+	virtual ISubWidgetInterface* CreateSubWidget(TSubclassOf<UUserWidget> InClass, const FParameter& InParam = FParameter()) override;
 
 	UFUNCTION(BlueprintCallable, DisplayName = "DestroySubWidget")
-	bool K2_DestroySubWidget(UUserWidget* InWidget, bool bRecovery = false);
+	bool K2_DestroySubWidget(UUserWidget* InWidget, EObjectDespawnMode InMode = EObjectDespawnMode::Destroy);
 
-	virtual bool DestroySubWidget(ISubWidgetInterface* InWidget, bool bRecovery) override;
+	virtual bool DestroySubWidget(ISubWidgetInterface* InWidget, EObjectDespawnMode InMode) override;
 
 	UFUNCTION(BlueprintCallable)
-	virtual void DestroyAllSubWidget(bool bRecovery) override;
+	virtual void DestroyAllSubWidget(EObjectDespawnMode InMode) override;
 
 	virtual void AddChildWidget(IScreenWidgetInterface* InWidget) override;
 
@@ -159,29 +159,14 @@ public:
 	virtual void RemoveAllChildWidget() override;
 
 protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Widget", meta = (Categories = "Widget.Screen"))
+	FGameplayTag DefaultWidgetTag;
+
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "Widget")
 	FGameplayTag WidgetTag;
 
 	UPROPERTY(Transient)
 	TMap<FGameplayTag, TObjectPtr<UWidgetMountSlot>> WidgetMountSlotMap;
-
-	UPROPERTY(Transient, BlueprintReadOnly)
-	EWidgetType WidgetType;
-		
-	UPROPERTY(Transient, BlueprintReadOnly)
-	int32 WidgetZOrder;
-
-	UPROPERTY(Transient, BlueprintReadOnly)
-	FAnchors WidgetAnchors;
-
-	UPROPERTY(Transient, BlueprintReadOnly)
-	bool bWidgetAutoSize;
-	
-	UPROPERTY(Transient, BlueprintReadOnly)
-	FMargin WidgetOffsets;
-
-	UPROPERTY(Transient, BlueprintReadOnly)
-	FVector2D WidgetAlignment;
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	EWidgetOpenType WidgetOpenType;
@@ -213,11 +198,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "WidgetRefreshType == EWidgetRefreshType::Timer"))
 	float WidgetRefreshTime;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	TArray<FParameter> WidgetParams;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	EInputMode WidgetInputMode;
+	UPROPERTY(Transient)
+	FParameter InitializeParameter;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
 	EWidgetInputConfig InputConfig;
@@ -235,11 +217,12 @@ protected:
 	bool bInitialized;
 
 	UPROPERTY(Transient)
-	TArray<FParameter> CurrentOpenParameters;
+	FParameter CurrentOpenParameter;
 
 	IScreenWidgetInterface* ParentWidget;
 
-	TArray<ISubWidgetInterface*> SubWidgets;
+	UPROPERTY(Transient)
+	TArray<FSubWidgetRuntimeEntry> SubWidgetEntries;
 
 	TArray<IScreenWidgetInterface*> ChildWidgets;
 
@@ -260,7 +243,7 @@ public:
 
 	FOnWidgetClosed OnClosed;
 	
-	FOnWidgetClosed OnDestroyed;
+	FOnWidgetDestroyed OnDestroyed;
 
 private:
 	void AbortOpenTransition();
@@ -273,6 +256,9 @@ private:
 
 public:
 	UFUNCTION(BlueprintPure)
+	FGameplayTag GetDefaultWidgetTag() const { return DefaultWidgetTag; }
+
+	UFUNCTION(BlueprintPure)
 	FGameplayTag GetWidgetTag() const { return WidgetTag; }
 
 	UFUNCTION(BlueprintPure)
@@ -283,30 +269,28 @@ public:
 
 	void RebuildWidgetMountSlotCache();
 
-	UFUNCTION(BlueprintPure)
-	virtual EWidgetType GetWidgetType(bool bInheritParent = true) const override
-	{
-		if(bInheritParent && ParentWidget) return ParentWidget->GetWidgetType();
-		return WidgetType;
-	}
+	const FScreenWidgetConfig* GetWidgetConfig() const;
 
 	UFUNCTION(BlueprintPure)
-	virtual int32 GetWidgetZOrder() const override { return WidgetZOrder; }
+	virtual EWidgetType GetWidgetType(bool bInheritParent = true) const override;
 
 	UFUNCTION(BlueprintPure)
-	virtual FAnchors GetWidgetAnchors() const override { return WidgetAnchors; }
+	virtual int32 GetWidgetZOrder() const override;
 
 	UFUNCTION(BlueprintPure)
-	virtual bool IsWidgetAutoSize() const override { return bWidgetAutoSize; }
+	virtual FAnchors GetWidgetAnchors() const override;
 
 	UFUNCTION(BlueprintPure)
-	virtual FVector2D GetWidgetDrawSize() const override { return FVector2D(WidgetOffsets.Right, WidgetOffsets.Bottom); }
+	virtual bool IsWidgetAutoSize() const override;
 
 	UFUNCTION(BlueprintPure)
-	virtual FMargin GetWidgetOffsets() const override { return WidgetOffsets; }
+	virtual FVector2D GetWidgetDrawSize() const override;
 
 	UFUNCTION(BlueprintPure)
-	virtual FVector2D GetWidgetAlignment() const override { return WidgetAlignment; }
+	virtual FMargin GetWidgetOffsets() const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual FVector2D GetWidgetAlignment() const override;
 
 	UFUNCTION(BlueprintPure)
 	virtual EWidgetOpenType GetWidgetOpenType() const override { return WidgetOpenType; }
@@ -346,10 +330,10 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure)
-	virtual TArray<FParameter> GetWidgetParams() const override { return WidgetParams; }
-
-	UFUNCTION(BlueprintPure)
-	virtual EInputMode GetWidgetInputMode() const override { return WidgetInputMode; }
+	virtual FParameter GetWidgetParams() const override
+	{
+		return CurrentOpenParameter.HasValue() ? CurrentOpenParameter : InitializeParameter;
+	}
 	
 	template<class T>
 	T* GetOwnerObject() const
@@ -374,7 +358,7 @@ public:
 	TArray<UWidget*> GetPoolWidgets() const;
 
 	UFUNCTION(BlueprintPure)
-	virtual int32 GetSubWidgetNum() const override { return SubWidgets.Num(); }
+	virtual int32 GetSubWidgetNum() const override { return SubWidgetEntries.Num(); }
 
 	template<class T>
 	TArray<T*> GetSubWidgets()
@@ -387,7 +371,7 @@ public:
 		return ReturnValues;
 	}
 	
-	virtual TArray<ISubWidgetInterface*> GetSubWidgets() override { return SubWidgets; }
+	virtual TArray<ISubWidgetInterface*> GetSubWidgets() override;
 	
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), DisplayName = "GetSubWidgets")
 	virtual TArray<UUserWidget*> K2_GetSubWidgets(TSubclassOf<UUserWidget> InClass);
@@ -406,16 +390,23 @@ public:
 
 	virtual ISubWidgetInterface* GetSubWidget(int32 InIndex) const override
 	{
-		if(SubWidgets.IsValidIndex(InIndex))
+		if(SubWidgetEntries.IsValidIndex(InIndex))
 		{
-			return SubWidgets[InIndex];
+			return Cast<ISubWidgetInterface>(SubWidgetEntries[InIndex].Widget);
 		}
 		return nullptr;
 	}
 
 	virtual int32 FindSubWidget(ISubWidgetInterface* InWidget) const override
 	{
-		return SubWidgets.Find(InWidget);
+		for(int32 Index = 0; Index < SubWidgetEntries.Num(); ++Index)
+		{
+			if(Cast<ISubWidgetInterface>(SubWidgetEntries[Index].Widget) == InWidget)
+			{
+				return Index;
+			}
+		}
+		return INDEX_NONE;
 	}
 
 	UFUNCTION(BlueprintPure)

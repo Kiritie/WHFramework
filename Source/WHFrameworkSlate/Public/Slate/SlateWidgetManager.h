@@ -55,19 +55,13 @@ public:
 	}
 
 	template<class T>
-	TSharedPtr<T> CreateSlateWidget(UObject* InOwner = nullptr, const TArray<FParameter>* InParams = nullptr)
-	{
-		return CreateSlateWidget<T>(InOwner, InParams ? *InParams : TArray<FParameter>());
-	}
-
-	template<class T>
-	TSharedPtr<T> CreateSlateWidget(UObject* InOwner, const TArray<FParameter>& InParams)
+	TSharedPtr<T> CreateSlateWidget(const FParameter& InParam = FParameter())
 	{
 		if(TSharedPtr<T> SlateWidget = SNew(T))
 		{
 			SlateWidget->_WidgetName = T::WidgetName;
-			SlateWidget->OnCreate(InOwner, InParams);
-			SlateWidget->Init(InOwner, InParams);
+			SlateWidget->OnCreate(InParam);
+			SlateWidget->Init(InParam);
 			const FName WidgetName = SlateWidget->GetWidgetName();
 			if(!AllSlateWidgets.Contains(WidgetName))
 			{
@@ -79,15 +73,9 @@ public:
 	}
 
 	template<class T>
-	bool OpenSlateWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, FName InName = T::WidgetName)
+	bool OpenSlateWidget(const FParameter& InParam = FParameter(), bool bInstant = false, FName InName = T::WidgetName)
 	{
-		return OpenSlateWidget<T>(InParams ? *InParams : TArray<FParameter>(), bInstant, InName);
-	}
-	
-	template<class T>
-	bool OpenSlateWidget(const TArray<FParameter>& InParams, bool bInstant = false, FName InName = T::WidgetName)
-	{
-		if(TSharedPtr<T> SlateWidget = HasSlateWidget<T>(InName) ? GetSlateWidget<T>(InName) : CreateSlateWidget<T>(nullptr, InParams))
+		if(TSharedPtr<T> SlateWidget = HasSlateWidget<T>(InName) ? GetSlateWidget<T>(InName) : CreateSlateWidget<T>(InParam))
 		{
 			if(!SlateWidget->GetParentWidgetN() && SlateWidget->GetWidgetType() == EWidgetType::Temporary)
 			{
@@ -98,7 +86,7 @@ public:
 				//SlateWidget->SetLastTemporary(TemporarySlateWidget);
 				TemporarySlateWidget = SlateWidget;
 			}
-			SlateWidget->OnOpen(InParams, bInstant);
+			SlateWidget->OnOpen(InParam, bInstant);
 			return true;
 		}
 		return false;
@@ -122,7 +110,7 @@ public:
 	template<class T>
 	bool ToggleSlateWidget(bool bInstant = false, FName InName = T::WidgetName)
 	{
-		if(TSharedPtr<T> SlateWidget = HasSlateWidget<T>(InName) ? GetSlateWidget<T>(InName) : CreateSlateWidget<T>(nullptr))
+		if(TSharedPtr<T> SlateWidget = HasSlateWidget<T>(InName) ? GetSlateWidget<T>(InName) : CreateSlateWidget<T>())
 		{
 			SlateWidget->Toggle(bInstant);
 			return true;
@@ -131,7 +119,7 @@ public:
 	}
 
 	template<class T>
-	bool DestroySlateWidget(bool bRecovery = false, FName InName = T::WidgetName)
+	bool DestroySlateWidget(EObjectDespawnMode InMode = EObjectDespawnMode::Destroy, FName InName = T::WidgetName)
 	{
 		if(AllSlateWidgets.Contains(InName))
 		{
@@ -142,7 +130,7 @@ public:
 				{
 					TemporarySlateWidget = nullptr;
 				}
-				SlateWidget->OnDestroy(bRecovery);
+				SlateWidget->OnDestroy(InMode);
 				SlateWidget = nullptr;
 			}
 			return true;
@@ -152,7 +140,7 @@ public:
 
 	void CloseAllSlateWidget(bool bInstant = false);
 	
-	void ClearAllSlateWidget(bool bRecovery = false);
+	void ClearAllSlateWidget(EObjectDespawnMode InMode = EObjectDespawnMode::Destroy);
 
 	////////////////////////////////////////////////////
 	// EditorWidget
@@ -192,25 +180,19 @@ public:
 		}
 		if(bAutoOpen)
 		{
-			InWidget->Open(nullptr, true);
+			InWidget->Open(FParameter(), true);
 		}
 		return InWidget;
 	}
 		
 	template<class T>
-	bool OpenEditorWidget(const TArray<FParameter>* InParams = nullptr, bool bInstant = false, FName InName = T::WidgetName)
-	{
-		return OpenEditorWidget<T>(InParams ? *InParams : TArray<FParameter>(), bInstant, InName);
-	}
-
-	template<class T>
-	bool OpenEditorWidget(const TArray<FParameter>& InParams, bool bInstant = false, FName InName = T::WidgetName)
+	bool OpenEditorWidget(const FParameter& InParam = FParameter(), bool bInstant = false, FName InName = T::WidgetName)
 	{
 		if(TSharedPtr<T> EditorWidget = GetEditorWidget<T>(InName))
 		{
 			if(EditorWidget->GetWidgetState() != EEditorWidgetState::Opened)
 			{
-				EditorWidget->OnOpen(InParams, bInstant);
+				EditorWidget->OnOpen(InParam, bInstant);
 			}
 			return true;
 		}

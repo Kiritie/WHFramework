@@ -21,9 +21,9 @@ void SDebugPanelWidget::Construct(const FArguments& InArgs)
 	SSlateWidgetBase::Construct(SSlateWidgetBase::FArguments());
 }
 
-void SDebugPanelWidget::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
+void SDebugPanelWidget::OnCreate(const FParameter& InParams)
 {
-	SSlateWidgetBase::OnCreate(InOwner, InParams);
+	SSlateWidgetBase::OnCreate(InParams);
 
 	const TSharedPtr<SWrapBox> MessageBox = SNew(SWrapBox)
 		.Orientation(Orient_Vertical)
@@ -92,7 +92,7 @@ void SDebugPanelWidget::OnCreate(UObject* InOwner, const TArray<FParameter>& InP
 	];
 }
 
-void SDebugPanelWidget::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
+void SDebugPanelWidget::OnOpen(const FParameter& InParams, bool bInstant)
 {
 	SSlateWidgetBase::OnOpen(InParams, bInstant);
 }

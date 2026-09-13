@@ -11,7 +11,7 @@ UPoolWidgetBase::UPoolWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 {
 	bWidgetTickAble = false;
 
-	OwnerWidget = nullptr;
+	WidgetParam = FParameter();
 }
 
 void UPoolWidgetBase::OnSpawn_Implementation(const FParameter& InParam)
@@ -19,7 +19,8 @@ void UPoolWidgetBase::OnSpawn_Implementation(const FParameter& InParam)
 	if(UWidgetModule::IsValid()) UWidgetModule::Get().RegisterTickableWidget(this);
 
 	const FWidgetSpawnParameter* Parameter = InParam.GetPtr<FWidgetSpawnParameter>();
-	OwnerWidget = Parameter ? Cast<UUserWidget>(Parameter->OwningObject) : nullptr;
+	OwnerWidget = Parameter ? Cast<UUserWidget>(Parameter->OwnerObject) : nullptr;
+	WidgetParam = InParam;
 
 	Refresh();
 }
@@ -29,9 +30,7 @@ void UPoolWidgetBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 	if(UWidgetModule::IsValid()) UWidgetModule::Get().UnregisterTickableWidget(this);
 
 	OwnerWidget = nullptr;
-	WidgetParams.Empty();
-
-	RemoveFromParent();
+	WidgetParam.Reset();
 }
 
 void UPoolWidgetBase::OnTick_Implementation(float DeltaSeconds)
@@ -49,11 +48,9 @@ void UPoolWidgetBase::Refresh()
 	OnRefresh();
 }
 
-void UPoolWidgetBase::Destroy(bool bRecovery)
+void UPoolWidgetBase::Destroy(EObjectDespawnMode InMode)
 {
-	UObjectPoolModuleStatics::DespawnObject(
-		this,
-		bRecovery ? EObjectDespawnMode::Recovery : EObjectDespawnMode::Destroy);
+	UObjectPoolModuleStatics::DespawnObject(this, InMode);
 }
 
 UUserWidget* UPoolWidgetBase::GetOwnerWidget(TSubclassOf<UUserWidget> InClass) const

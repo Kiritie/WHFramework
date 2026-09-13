@@ -32,13 +32,17 @@ UVoxelMeshComponent::UVoxelMeshComponent(const FObjectInitializer& ObjectInitial
 
 void UVoxelMeshComponent::OnSpawn_Implementation(const FParameter& InParam)
 {
-	const FVoxelMeshComponentSpawnParameter& Parameter = InParam.GetRef<FVoxelMeshComponentSpawnParameter>();
-	if(AActor* Actor = Cast<AActor>(Parameter.Outer))
+	const FVoxelMeshComponentSpawnParameter* Param = InParam.GetPtr<FVoxelMeshComponentSpawnParameter>();
+	if(!Param)
+	{
+		return;
+	}
+	if(AActor* Actor = Cast<AActor>(Param->Outer))
 	{
 		Register(Actor);
 		AttachToComponent(Actor->GetRootComponent(), FAttachmentTransformRules::SnapToTargetIncludingScale);
 	}
-	Chunk = Parameter.Chunk.Get();
+	Chunk = Param->Chunk.Get();
 	if(Chunk)
 	{
 		SetRelativeLocation(FVector(Chunk->GetIndex().X * UVoxelModule::Get().GetWorldData().GetChunkRealSize().X,

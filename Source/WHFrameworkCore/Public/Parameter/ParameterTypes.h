@@ -96,6 +96,22 @@ struct WHFRAMEWORKCORE_API FParameter
 		return *Result;
 	}
 
+	template<typename T>
+		requires CParameterReferenceable<T>
+	std::decay_t<T>* GetMutablePtr()
+	{
+		using ValueType = std::decay_t<T>;
+		using Adapter = TParameterValueAdapter<ValueType>;
+		if constexpr(requires { Adapter::GetMutablePtr(Value); })
+		{
+			return Adapter::GetMutablePtr(Value);
+		}
+		else
+		{
+			return nullptr;
+		}
+	}
+
 	const UScriptStruct* GetValueStruct() const
 	{
 		return Value.GetScriptStruct();

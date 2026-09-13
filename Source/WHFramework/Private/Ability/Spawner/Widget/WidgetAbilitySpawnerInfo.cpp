@@ -4,10 +4,6 @@
 
 UWidgetAbilitySpawnerInfo::UWidgetAbilitySpawnerInfo(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-
-	WidgetSpace = EWidgetSpace::World;
-	WidgetAlignment = FVector2D(0.5f);
-	bWidgetAutoSize = true;
 }
 
 void UWidgetAbilitySpawnerInfo::InitAbilityItem_Implementation(const FAbilityItem& InAbilityItem)

@@ -15,6 +15,6 @@ public:
 
 public:
 	// A localized descriptor of this input action
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tag")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input", meta = (Categories = "Input"))
 	FGameplayTag ActionTag;
 };

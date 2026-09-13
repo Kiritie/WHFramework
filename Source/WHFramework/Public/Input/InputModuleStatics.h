@@ -86,17 +86,32 @@ public:
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InActionTag,OutFailureReason"), Category = "InputModuleStatics")
 	static bool MapPlayerKeyByTag(FGameplayTag InActionTag, FKey InNewKey, EPlayerMappableKeySlot InSlot, FGameplayTagContainer& OutFailureReason, int32 InPlayerIndex = 0);
 
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "OutFailureReason"), Category = "InputModuleStatics")
+	static bool MapPlayerKeyByMappingName(FName InMappingName, FKey InNewKey, EPlayerMappableKeySlot InSlot, FGameplayTagContainer& OutFailureReason, int32 InPlayerIndex = 0);
+
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InActionTag"), Category = "InputModuleStatics")
 	static bool ResetPlayerKeyByTag(FGameplayTag InActionTag, int32 InPlayerIndex = 0);
 
+	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")
+	static bool ResetPlayerKeyByMappingName(FName InMappingName, int32 InPlayerIndex = 0);
+
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InActionTag"), Category = "InputModuleStatics")
 	static TArray<FPlayerKeyMapping> GetPlayerKeyMappingsByTag(FGameplayTag InActionTag, int32 InPlayerIndex = 0);
+
+	UFUNCTION(BlueprintPure, Category = "InputModuleStatics")
+	static TArray<FPlayerKeyMapping> GetPlayerKeyMappingsByMappingName(FName InMappingName, int32 InPlayerIndex = 0);
 
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InActionTag"), Category = "InputModuleStatics")
 	static FText GetPlayerKeyCodeByTag(FGameplayTag InActionTag, int32 InPlayerIndex = 0);
 
 	UFUNCTION(BlueprintPure, Category = "InputModuleStatics")
 	static TArray<FGameplayTag> GetAllMappableActions();
+
+	UFUNCTION(BlueprintPure, Category = "InputModuleStatics")
+	static TArray<FInputMappableEntry> GetAllMappableEntries();
+
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InActionTag"), Category = "InputModuleStatics")
+	static TArray<FInputMappableEntry> GetMappableEntriesByActionTag(FGameplayTag InActionTag);
 
 	UFUNCTION(BlueprintPure, Category = "InputModuleStatics")
 	static ECommonInputType GetCurrentInputType(int32 InPlayerIndex = 0);

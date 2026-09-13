@@ -10,14 +10,60 @@
 #include "Setting/SettingModuleNetworkComponent.h"
 #include "Setting/SettingModuleTypes.h"
 #include "Setting/SettingEntry.h"
-#include "Setting/InputSettingProvider.h"
-#include "Setting/SettingProviderBase.h"
+#include "Setting/Provider/InputSettingProvider.h"
+#include "Setting/Provider/LanguageSettingProvider.h"
+#include "Setting/Provider/ResolutionSettingProvider.h"
+#include "Setting/Provider/SettingProviderBase.h"
 #include "Setting/SettingRegistry.h"
 #include "Video/VideoModule.h"
 #include "Widget/WidgetModule.h"
 #include "UObject/UnrealType.h"
 
 IMPLEMENTATION_MODULE(USettingModule)
+
+namespace
+{
+	template<typename TProvider>
+	void EnsureSettingProvider(
+		UObject* InOuter,
+		TArray<TObjectPtr<USettingProviderBase>>& InProviders)
+	{
+		if(InProviders.ContainsByPredicate([](const TObjectPtr<USettingProviderBase>& Provider)
+		{
+			return Provider && Provider->IsA<TProvider>();
+		}))
+		{
+			return;
+		}
+
+		InProviders.Add(NewObject<TProvider>(InOuter, NAME_None, RF_Transactional));
+	}
+
+	bool TryGetNumericValue(const FParameter& InValue, double& OutValue)
+	{
+		if(const int32* Value = InValue.GetPtr<int32>())
+		{
+			OutValue = *Value;
+			return true;
+		}
+		if(const int64* Value = InValue.GetPtr<int64>())
+		{
+			OutValue = static_cast<double>(*Value);
+			return true;
+		}
+		if(const float* Value = InValue.GetPtr<float>())
+		{
+			OutValue = *Value;
+			return true;
+		}
+		if(const double* Value = InValue.GetPtr<double>())
+		{
+			OutValue = *Value;
+			return true;
+		}
+		return false;
+	}
+}
 
 // Sets default values
 USettingModule::USettingModule()
@@ -30,6 +76,8 @@ USettingModule::USettingModule()
 	ModuleNetworkComponent = USettingModuleNetworkComponent::StaticClass();
 
 	Providers.Add(CreateDefaultSubobject<UInputSettingProvider>(TEXT("InputSettingProvider")));
+	Providers.Add(CreateDefaultSubobject<UResolutionSettingProvider>(TEXT("ResolutionSettingProvider")));
+	Providers.Add(CreateDefaultSubobject<ULanguageSettingProvider>(TEXT("LanguageSettingProvider")));
 }
 
 USettingModule::~USettingModule()
@@ -41,7 +89,7 @@ USettingModule::~USettingModule()
 void USettingModule::OnGenerate()
 {
 	Super::OnGenerate();
-	BuildSettingDefinitions();
+	BuildSettingDefinitions(true);
 }
 
 void USettingModule::OnDestroy()
@@ -64,6 +112,11 @@ void USettingModule::OnPreparatory(EPhase InPhase)
 void USettingModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
 	Super::OnRefresh(DeltaSeconds, bInEditor);
+
+	if(ConfirmationTransaction.bActive && FPlatformTime::Seconds() >= ConfirmationTransaction.ExpiresAt)
+	{
+		RejectPendingSettings();
+	}
 }
 
 void USettingModule::OnPause()
@@ -82,8 +135,17 @@ void USettingModule::OnTermination(EPhase InPhase)
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
 		EditSession = FSettingEditSession();
+		ConfirmationTransaction = FSettingConfirmationTransaction();
 		SettingEntries.Reset();
 		SettingEntryMap.Reset();
+		ValidationResults.Reset();
+		for(USettingProviderBase* Provider : Providers)
+		{
+			if(Provider)
+			{
+				Provider->EndEdit();
+			}
+		}
 	}
 }
 
@@ -124,12 +186,33 @@ void USettingModule::CollectPropertyDefinitions(const UStruct* InStruct, const F
 		FSettingDefinition& Definition = OutDefinitions.AddDefaulted_GetRef();
 		Definition.SettingId.Name = FName(*SettingPath);
 		Definition.SourcePath = PropertyPath;
-		Definition.Page = FName(*Root);
-		Definition.Category = Property->HasMetaData(TEXT("SettingCategory")) ? FName(*Property->GetMetaData(TEXT("SettingCategory"))) : FName(TEXT("General"));
+		Definition.Page = Property->HasMetaData(TEXT("SettingPage"))
+			? FName(*Property->GetMetaData(TEXT("SettingPage")))
+			: FName(*Root);
+		if(Property->HasMetaData(TEXT("SettingCategory")))
+		{
+			Definition.Category = FName(*Property->GetMetaData(TEXT("SettingCategory")));
+		}
+		else if(Property->HasMetaData(TEXT("Category")))
+		{
+			Definition.Category = FName(*Property->GetMetaData(TEXT("Category")));
+		}
+		else
+		{
+			Definition.Category = FName(TEXT("General"));
+		}
 		Definition.Order = Property->HasMetaData(TEXT("SettingOrder")) ? FCString::Atoi(*Property->GetMetaData(TEXT("SettingOrder"))) : OutDefinitions.Num() - 1;
 		Definition.DisplayName = Property->GetDisplayNameText();
 		Definition.Description = Property->GetToolTipText();
 		Definition.Renderer = InferRenderer(Property);
+		const FString Renderer = Property->GetMetaData(TEXT("SettingRenderer"));
+		if(Renderer.Equals(TEXT("Bool"), ESearchCase::IgnoreCase)) Definition.Renderer = ESettingRendererType::Bool;
+		else if(Renderer.Equals(TEXT("Number"), ESearchCase::IgnoreCase)) Definition.Renderer = ESettingRendererType::Number;
+		else if(Renderer.Equals(TEXT("Enum"), ESearchCase::IgnoreCase)) Definition.Renderer = ESettingRendererType::Enum;
+		else if(Renderer.Equals(TEXT("Text"), ESearchCase::IgnoreCase)) Definition.Renderer = ESettingRendererType::Text;
+		else if(Renderer.Equals(TEXT("Option"), ESearchCase::IgnoreCase)) Definition.Renderer = ESettingRendererType::Option;
+		else if(Renderer.Equals(TEXT("Key"), ESearchCase::IgnoreCase)) Definition.Renderer = ESettingRendererType::Key;
+		else if(Renderer.Equals(TEXT("Custom"), ESearchCase::IgnoreCase)) Definition.Renderer = ESettingRendererType::Custom;
 
 		const FString ApplyPolicy = Property->GetMetaData(TEXT("SettingApply"));
 		Definition.ApplyPolicy = ApplyPolicy.Equals(TEXT("Preview"), ESearchCase::IgnoreCase)
@@ -137,14 +220,65 @@ void USettingModule::CollectPropertyDefinitions(const UStruct* InStruct, const F
 			: ApplyPolicy.Equals(TEXT("Immediate"), ESearchCase::IgnoreCase)
 				? ESettingApplyPolicy::Immediate
 				: ESettingApplyPolicy::Deferred;
+		Definition.bVisible = !Property->HasMetaData(TEXT("SettingVisible")) || !Property->GetMetaData(TEXT("SettingVisible")).Equals(TEXT("false"), ESearchCase::IgnoreCase);
+		Definition.bEnabled = !Property->HasMetaData(TEXT("SettingEnabled")) || !Property->GetMetaData(TEXT("SettingEnabled")).Equals(TEXT("false"), ESearchCase::IgnoreCase);
+		Definition.bRequiresConfirmation = Property->HasMetaData(TEXT("SettingRequiresConfirmation"));
 
-		if(Property->HasMetaData(TEXT("ClampMin")))
+		const FString MinMetadata = Property->HasMetaData(TEXT("UIMin")) ? TEXT("UIMin") : TEXT("ClampMin");
+		const FString MaxMetadata = Property->HasMetaData(TEXT("UIMax")) ? TEXT("UIMax") : TEXT("ClampMax");
+		if(Property->HasMetaData(*MinMetadata))
 		{
-			Definition.NumberDisplay.Min = FCString::Atod(*Property->GetMetaData(TEXT("ClampMin")));
+			Definition.NumberDisplay.bHasMin = true;
+			Definition.NumberDisplay.Min = FCString::Atod(*Property->GetMetaData(*MinMetadata));
 		}
-		if(Property->HasMetaData(TEXT("ClampMax")))
+		if(Property->HasMetaData(*MaxMetadata))
 		{
-			Definition.NumberDisplay.Max = FCString::Atod(*Property->GetMetaData(TEXT("ClampMax")));
+			Definition.NumberDisplay.bHasMax = true;
+			Definition.NumberDisplay.Max = FCString::Atod(*Property->GetMetaData(*MaxMetadata));
+		}
+		if(Property->HasMetaData(TEXT("Delta")))
+		{
+			Definition.NumberDisplay.Step = FCString::Atod(*Property->GetMetaData(TEXT("Delta")));
+		}
+		if(Property->HasMetaData(TEXT("SettingScale")))
+		{
+			Definition.NumberDisplay.Scale = FCString::Atod(*Property->GetMetaData(TEXT("SettingScale")));
+		}
+		if(Property->HasMetaData(TEXT("SettingDecimalPlaces")))
+		{
+			Definition.NumberDisplay.DecimalPlaces = FCString::Atoi(*Property->GetMetaData(TEXT("SettingDecimalPlaces")));
+		}
+		if(Property->HasMetaData(TEXT("Units")))
+		{
+			Definition.NumberDisplay.Suffix = FText::FromString(Property->GetMetaData(TEXT("Units")));
+		}
+
+		if(const FEnumProperty* EnumProperty = CastField<FEnumProperty>(Property))
+		{
+			Definition.Enum = EnumProperty->GetEnum();
+		}
+		else if(const FByteProperty* ByteProperty = CastField<FByteProperty>(Property))
+		{
+			Definition.Enum = ByteProperty->Enum;
+		}
+		if(Definition.Enum)
+		{
+			for(int32 Index = 0; Index < Definition.Enum->NumEnums(); ++Index)
+			{
+				if(Definition.Enum->HasMetaData(TEXT("Hidden"), Index))
+				{
+					continue;
+				}
+				const int64 EnumValue = Definition.Enum->GetValueByIndex(Index);
+				if(EnumValue == INDEX_NONE || Definition.Enum->GetNameStringByIndex(Index).EndsWith(TEXT("_MAX")))
+				{
+					continue;
+				}
+
+				FSettingOption& Option = Definition.Options.AddDefaulted_GetRef();
+				Option.Value = FParameter(EnumValue);
+				Option.DisplayName = Definition.Enum->GetDisplayNameTextByIndex(Index);
+			}
 		}
 	}
 }
@@ -161,7 +295,7 @@ bool USettingModule::IsSupportedSettingProperty(const FProperty* InProperty) con
 	}
 	if(const FStructProperty* StructProperty = CastField<FStructProperty>(InProperty))
 	{
-		return StructProperty->Struct == TBaseStructure<FKey>::Get();
+		return StructProperty->Struct == TBaseStructure<FKey>::Get() || StructProperty->Struct == TBaseStructure<FIntPoint>::Get();
 	}
 	return false;
 }
@@ -187,10 +321,26 @@ ESettingRendererType USettingModule::InferRenderer(const FProperty* InProperty) 
 	return ESettingRendererType::Text;
 }
 
-void USettingModule::BuildSettingDefinitions()
+void USettingModule::EnsureBuiltinProviders()
 {
+	EnsureSettingProvider<UInputSettingProvider>(this, Providers);
+	EnsureSettingProvider<UResolutionSettingProvider>(this, Providers);
+	EnsureSettingProvider<ULanguageSettingProvider>(this, Providers);
+}
+
+void USettingModule::BuildSettingDefinitions(bool bUpdateSnapshot)
+{
+	EnsureBuiltinProviders();
+
 	FinalDefinitions.Reset();
-	CollectPropertyDefinitions(FSettingModuleSaveData::StaticStruct(), FString(), FinalDefinitions);
+	if(!bUpdateSnapshot && Registry && !Registry->FinalDefinitions.IsEmpty())
+	{
+		FinalDefinitions = Registry->FinalDefinitions;
+	}
+	else
+	{
+		CollectPropertyDefinitions(FSettingModuleSaveData::StaticStruct(), FString(), FinalDefinitions);
+	}
 	for(const USettingProviderBase* Provider : Providers)
 	{
 		if(Provider)
@@ -212,12 +362,18 @@ void USettingModule::BuildSettingDefinitions()
 				continue;
 			}
 			if(Override->bOverrideDisplayName) Definition.DisplayName = Override->DisplayName;
+			if(Override->bOverrideDescription) Definition.Description = Override->Description;
 			if(Override->bOverridePage) Definition.Page = Override->Page;
 			if(Override->bOverrideCategory) Definition.Category = Override->Category;
 			if(Override->bOverrideOrder) Definition.Order = Override->Order;
 			if(Override->bOverrideRenderer) Definition.Renderer = Override->Renderer;
 			if(Override->bOverrideApplyPolicy) Definition.ApplyPolicy = Override->ApplyPolicy;
 			if(Override->bOverrideVisible) Definition.bVisible = Override->bVisible;
+			if(Override->bOverrideEnabled) Definition.bEnabled = Override->bEnabled;
+			if(Override->bOverrideRequiresConfirmation) Definition.bRequiresConfirmation = Override->bRequiresConfirmation;
+			if(Override->bOverrideNumberDisplay) Definition.NumberDisplay = Override->NumberDisplay;
+			if(Override->bOverrideVisibleConditions) Definition.VisibleConditions = Override->VisibleConditions;
+			if(Override->bOverrideEnableConditions) Definition.EnableConditions = Override->EnableConditions;
 		}
 	}
 
@@ -227,6 +383,32 @@ void USettingModule::BuildSettingDefinitions()
 		ensureEditorMsgf(Definition.SettingId.IsValid() && !UniqueIds.Contains(Definition.SettingId), FString::Printf(TEXT("Duplicate or invalid setting id: %s"), *Definition.SettingId.Name.ToString()), EDC_Default, EDV_Error);
 		UniqueIds.Add(Definition.SettingId);
 	}
+	FSettingModuleSaveData ValidationData;
+	for(const FSettingDefinition& Definition : FinalDefinitions)
+	{
+		ensureEditorMsgf(!Definition.Page.IsNone(), FString::Printf(TEXT("Setting %s has no page."), *Definition.SettingId.Name.ToString()), EDC_Default, EDV_Error);
+		if(!FindSettingProvider(Definition))
+		{
+			FResolvedSettingProperty Resolved;
+			ensureEditorMsgf(ResolvePropertyPath(FSettingModuleSaveData::StaticStruct(), &ValidationData, Definition.SourcePath, Resolved), FString::Printf(TEXT("Setting %s has invalid source path %s."), *Definition.SettingId.Name.ToString(), *Definition.SourcePath), EDC_Default, EDV_Error);
+		}
+
+		for(int32 OptionIndex = 0; OptionIndex < Definition.Options.Num(); ++OptionIndex)
+		{
+			ensureEditorMsgf(!Definition.Options.ContainsByPredicate([&Definition, OptionIndex](const FSettingOption& Option)
+			{
+				return &Option != &Definition.Options[OptionIndex] && Option.Value == Definition.Options[OptionIndex].Value;
+			}), FString::Printf(TEXT("Setting %s has duplicate option values."), *Definition.SettingId.Name.ToString()), EDC_Default, EDV_Error);
+		}
+		for(const FSettingCondition& Condition : Definition.VisibleConditions)
+		{
+			ensureEditorMsgf(UniqueIds.Contains(Condition.OtherSetting), FString::Printf(TEXT("Setting %s references missing visible condition %s."), *Definition.SettingId.Name.ToString(), *Condition.OtherSetting.Name.ToString()), EDC_Default, EDV_Error);
+		}
+		for(const FSettingCondition& Condition : Definition.EnableConditions)
+		{
+			ensureEditorMsgf(UniqueIds.Contains(Condition.OtherSetting), FString::Printf(TEXT("Setting %s references missing enable condition %s."), *Definition.SettingId.Name.ToString(), *Condition.OtherSetting.Name.ToString()), EDC_Default, EDV_Error);
+		}
+	}
 
 	FinalDefinitions.Sort([](const FSettingDefinition& A, const FSettingDefinition& B)
 	{
@@ -234,6 +416,21 @@ void USettingModule::BuildSettingDefinitions()
 		if(A.Category != B.Category) return A.Category.LexicalLess(B.Category);
 		return A.Order < B.Order;
 	});
+
+#if WITH_EDITOR
+	if(bUpdateSnapshot && Registry)
+	{
+		Registry->Modify();
+		Registry->FinalDefinitions = FinalDefinitions;
+		++Registry->GeneratedSnapshotVersion;
+		Registry->MarkPackageDirty();
+	}
+#endif
+
+	if(EditSession.bActive)
+	{
+		BuildSettingEntries();
+	}
 }
 
 bool USettingModule::ResolvePropertyPath(UStruct* InRootStruct, void* InRootData, const FString& InPath, FResolvedSettingProperty& OutResolved) const
@@ -283,6 +480,7 @@ FParameter USettingModule::ReadPropertyValue(const FResolvedSettingProperty& InR
 	if(const FEnumProperty* Typed = CastField<FEnumProperty>(Property)) return FParameter(Typed->GetUnderlyingProperty()->GetSignedIntPropertyValue(ValuePtr));
 	if(const FByteProperty* Typed = CastField<FByteProperty>(Property)) return FParameter(static_cast<int64>(Typed->GetPropertyValue(ValuePtr)));
 	if(const FStructProperty* Typed = CastField<FStructProperty>(Property); Typed && Typed->Struct == TBaseStructure<FKey>::Get()) return FParameter(*static_cast<FKey*>(ValuePtr));
+	if(const FStructProperty* Typed = CastField<FStructProperty>(Property); Typed && Typed->Struct == TBaseStructure<FIntPoint>::Get()) return FParameter(*static_cast<FIntPoint*>(ValuePtr));
 	return FParameter();
 }
 
@@ -302,6 +500,7 @@ bool USettingModule::WritePropertyValue(const FResolvedSettingProperty& InResolv
 	if(FEnumProperty* Typed = CastField<FEnumProperty>(Property); Typed && InValue.Is<int64>()) { Typed->GetUnderlyingProperty()->SetIntPropertyValue(ValuePtr, InValue.Get<int64>()); return true; }
 	if(FByteProperty* Typed = CastField<FByteProperty>(Property); Typed && InValue.Is<int64>()) { Typed->SetPropertyValue(ValuePtr, static_cast<uint8>(InValue.Get<int64>())); return true; }
 	if(const FStructProperty* Typed = CastField<FStructProperty>(Property); Typed && Typed->Struct == TBaseStructure<FKey>::Get() && InValue.Is<FKey>()) { *static_cast<FKey*>(ValuePtr) = InValue.Get<FKey>(); return true; }
+	if(const FStructProperty* Typed = CastField<FStructProperty>(Property); Typed && Typed->Struct == TBaseStructure<FIntPoint>::Get() && InValue.Is<FIntPoint>()) { *static_cast<FIntPoint*>(ValuePtr) = InValue.Get<FIntPoint>(); return true; }
 	return false;
 }
 
@@ -311,6 +510,97 @@ const FSettingDefinition* USettingModule::FindSettingDefinition(FSettingId InSet
 	{
 		return Definition.SettingId == InSettingId;
 	});
+}
+
+USettingProviderBase* USettingModule::FindSettingProvider(const FSettingDefinition& InDefinition) const
+{
+	for(USettingProviderBase* Provider : Providers)
+	{
+		if(Provider && Provider->CanHandle(InDefinition))
+		{
+			return Provider;
+		}
+	}
+	return nullptr;
+}
+
+FSettingValidationResult USettingModule::ValidateSettingValue(const FSettingDefinition& InDefinition, const FParameter& InValue) const
+{
+	if(!InValue.HasValue())
+	{
+		return FSettingValidationResult::Invalid(NSLOCTEXT("WH.SettingModule", "MissingValue", "设置值不能为空。"));
+	}
+
+	const FParameter CurrentValue = GetPendingValue(InDefinition.SettingId);
+	if(CurrentValue.HasValue() && CurrentValue.GetValueStruct() != InValue.GetValueStruct())
+	{
+		return FSettingValidationResult::Invalid(NSLOCTEXT("WH.SettingModule", "InvalidType", "设置值类型不匹配。"));
+	}
+
+	if(!InDefinition.Options.IsEmpty() && !InDefinition.Options.ContainsByPredicate([&InValue](const FSettingOption& Option)
+	{
+		return Option.Value == InValue;
+	}))
+	{
+		return FSettingValidationResult::Invalid(NSLOCTEXT("WH.SettingModule", "InvalidOption", "该值不在可选项中。"));
+	}
+
+	double NumericValue = 0.0;
+	if(TryGetNumericValue(InValue, NumericValue))
+	{
+		if(InDefinition.NumberDisplay.bHasMin && NumericValue < InDefinition.NumberDisplay.Min)
+		{
+			return FSettingValidationResult::Invalid(FText::Format(
+				NSLOCTEXT("WH.SettingModule", "BelowMinimum", "设置值不能小于 {0}。"),
+				FText::AsNumber(InDefinition.NumberDisplay.Min)));
+		}
+		if(InDefinition.NumberDisplay.bHasMax && NumericValue > InDefinition.NumberDisplay.Max)
+		{
+			return FSettingValidationResult::Invalid(FText::Format(
+				NSLOCTEXT("WH.SettingModule", "AboveMaximum", "设置值不能大于 {0}。"),
+				FText::AsNumber(InDefinition.NumberDisplay.Max)));
+		}
+	}
+
+	if(const USettingProviderBase* Provider = FindSettingProvider(InDefinition))
+	{
+		return Provider->Validate(InDefinition, InValue);
+	}
+	return FSettingValidationResult::Valid();
+}
+
+bool USettingModule::EvaluateConditions(const TArray<FSettingCondition>& InConditions) const
+{
+	for(const FSettingCondition& Condition : InConditions)
+	{
+		const FParameter OtherValue = GetPendingValue(Condition.OtherSetting);
+		bool bPassed = false;
+		switch(Condition.Op)
+		{
+			case ESettingConditionOp::Equals:
+				bPassed = OtherValue == Condition.Value;
+				break;
+			case ESettingConditionOp::NotEquals:
+				bPassed = OtherValue != Condition.Value;
+				break;
+			case ESettingConditionOp::Greater:
+			case ESettingConditionOp::Less:
+			{
+				double Left = 0.0;
+				double Right = 0.0;
+				if(TryGetNumericValue(OtherValue, Left) && TryGetNumericValue(Condition.Value, Right))
+				{
+					bPassed = Condition.Op == ESettingConditionOp::Greater ? Left > Right : Left < Right;
+				}
+				break;
+			}
+		}
+		if(!bPassed)
+		{
+			return false;
+		}
+	}
+	return true;
 }
 
 FParameter USettingModule::ReadSessionValue(FSettingModuleSaveData& InData, FSettingId InSettingId) const
@@ -339,6 +629,15 @@ FSettingModuleSaveData USettingModule::GetCurrentCombinedSettings() const
 	return Data;
 }
 
+FSettingModuleSaveData USettingModule::GetDefaultCombinedSettings() const
+{
+	if(const USettingSaveGame* SaveGame = Cast<USettingSaveGame>(GetModuleSaveGame()))
+	{
+		return const_cast<USettingSaveGame*>(SaveGame)->GetDefaultDataRef<FSettingModuleSaveData>();
+	}
+	return FSettingModuleSaveData();
+}
+
 void USettingModule::ApplyCombinedSettings(FSettingModuleSaveData& InData)
 {
 	UWidgetModule::Get().LoadSaveData(&InData.WidgetData, EPhase::All);
@@ -347,6 +646,14 @@ void USettingModule::ApplyCombinedSettings(FSettingModuleSaveData& InData)
 	UCameraModule::Get().LoadSaveData(&InData.CameraData, EPhase::All);
 	UInputModule::Get().LoadSaveData(&InData.InputData, EPhase::All);
 	UParameterModule::Get().LoadSaveData(&InData.ParameterData, EPhase::All);
+}
+
+void USettingModule::SaveSettings()
+{
+	if(USettingSaveGame* SaveGame = Cast<USettingSaveGame>(GetModuleSaveGame()))
+	{
+		SaveGame->Save(true);
+	}
 }
 
 void USettingModule::BuildSettingEntries()
@@ -364,47 +671,237 @@ void USettingModule::BuildSettingEntries()
 
 void USettingModule::RefreshSettingDefinitions()
 {
-	BuildSettingDefinitions();
+	BuildSettingDefinitions(true);
 }
+
+#if WITH_EDITOR
+void USettingModule::GenerateRegistrySnapshot(USettingRegistry* InRegistry)
+{
+	if(!InRegistry)
+	{
+		return;
+	}
+
+	USettingRegistry* PreviousRegistry = Registry;
+	Registry = InRegistry;
+	BuildSettingDefinitions(true);
+	Registry = PreviousRegistry;
+	if(PreviousRegistry != InRegistry)
+	{
+		BuildSettingDefinitions();
+	}
+}
+#endif
 
 void USettingModule::BeginEdit()
 {
+	if(EditSession.bActive)
+	{
+		return;
+	}
+
 	EditSession.AppliedData = GetCurrentCombinedSettings();
 	EditSession.PendingData = EditSession.AppliedData;
-	EditSession.DefaultData = FSettingModuleSaveData();
+	EditSession.DefaultData = GetDefaultCombinedSettings();
 	EditSession.bActive = true;
+	ConfirmationTransaction = FSettingConfirmationTransaction();
+	ValidationResults.Reset();
+	for(USettingProviderBase* Provider : Providers)
+	{
+		if(Provider)
+		{
+			Provider->BeginEdit(FinalDefinitions);
+		}
+	}
 	BuildSettingEntries();
+}
+
+void USettingModule::EndEdit()
+{
+	if(!EditSession.bActive)
+	{
+		return;
+	}
+	if(ConfirmationTransaction.bActive)
+	{
+		RejectPendingSettings();
+	}
+	for(USettingProviderBase* Provider : Providers)
+	{
+		if(Provider)
+		{
+			Provider->EndEdit();
+		}
+	}
+	EditSession = FSettingEditSession();
+	SettingEntries.Reset();
+	SettingEntryMap.Reset();
+	ValidationResults.Reset();
 }
 
 bool USettingModule::ApplyEditSession()
 {
-	if(!EditSession.bActive) return false;
-	ApplyCombinedSettings(EditSession.PendingData);
-	for(USettingProviderBase* Provider : Providers)
+	if(!EditSession.bActive || ConfirmationTransaction.bActive)
 	{
-		if(!Provider) continue;
-		for(const FSettingDefinition& Definition : FinalDefinitions)
+		return false;
+	}
+
+	TArray<const FSettingDefinition*> DirtyDefinitions;
+	bool bRequiresConfirmation = false;
+	for(const FSettingDefinition& Definition : FinalDefinitions)
+	{
+		if(!IsSettingDirty(Definition.SettingId))
 		{
-			if(Provider->CanHandle(Definition)) Provider->Apply(Definition, GetPendingValue(Definition.SettingId));
+			continue;
+		}
+		const FSettingValidationResult Validation = ValidateSettingValue(Definition, GetPendingValue(Definition.SettingId));
+		ValidationResults.Add(Definition.SettingId, Validation);
+		if(!Validation.bValid)
+		{
+			return false;
+		}
+		DirtyDefinitions.Add(&Definition);
+		bRequiresConfirmation |= Definition.bRequiresConfirmation;
+	}
+	if(DirtyDefinitions.IsEmpty())
+	{
+		return false;
+	}
+
+	ApplyCombinedSettings(EditSession.PendingData);
+	for(const FSettingDefinition* Definition : DirtyDefinitions)
+	{
+		if(USettingProviderBase* Provider = FindSettingProvider(*Definition))
+		{
+			if(!Provider->Apply(*Definition, GetPendingValue(Definition->SettingId)))
+			{
+				ApplyCombinedSettings(EditSession.AppliedData);
+				for(const FSettingDefinition* AppliedDefinition : DirtyDefinitions)
+				{
+					if(USettingProviderBase* AppliedProvider = FindSettingProvider(*AppliedDefinition))
+					{
+						AppliedProvider->Rollback(*AppliedDefinition);
+					}
+				}
+				return false;
+			}
 		}
 	}
+
+	if(bRequiresConfirmation)
+	{
+		ConfirmationTransaction.PreviousData = EditSession.AppliedData;
+		ConfirmationTransaction.SettingIds.Reset();
+		for(const FSettingDefinition* Definition : DirtyDefinitions)
+		{
+			if(Definition->bRequiresConfirmation)
+			{
+				ConfirmationTransaction.SettingIds.Add(Definition->SettingId);
+			}
+		}
+		ConfirmationTransaction.ExpiresAt = FPlatformTime::Seconds() + ConfirmationTimeout;
+		ConfirmationTransaction.bActive = true;
+		return true;
+	}
+
 	EditSession.AppliedData = EditSession.PendingData;
+	for(USettingProviderBase* Provider : Providers)
+	{
+		if(Provider)
+		{
+			Provider->Commit();
+		}
+	}
+	SaveSettings();
+	ValidationResults.Reset();
 	return true;
 }
 
 void USettingModule::CancelEditSession()
 {
-	if(!EditSession.bActive) return;
+	if(!EditSession.bActive)
+	{
+		return;
+	}
+	if(ConfirmationTransaction.bActive)
+	{
+		RejectPendingSettings();
+		return;
+	}
+
 	ApplyCombinedSettings(EditSession.AppliedData);
 	for(USettingProviderBase* Provider : Providers)
 	{
-		if(!Provider) continue;
+		if(!Provider)
+		{
+			continue;
+		}
 		for(const FSettingDefinition& Definition : FinalDefinitions)
 		{
-			if(Provider->CanHandle(Definition)) Provider->Rollback(Definition);
+			if(Provider->CanHandle(Definition))
+			{
+				Provider->Rollback(Definition);
+			}
 		}
 	}
 	EditSession.PendingData = EditSession.AppliedData;
+	ValidationResults.Reset();
+	for(const FSettingDefinition& Definition : FinalDefinitions)
+	{
+		OnSettingValueChanged.Broadcast(Definition.SettingId);
+	}
+}
+
+bool USettingModule::ConfirmPendingSettings()
+{
+	if(!EditSession.bActive || !ConfirmationTransaction.bActive)
+	{
+		return false;
+	}
+
+	EditSession.AppliedData = EditSession.PendingData;
+	for(USettingProviderBase* Provider : Providers)
+	{
+		if(Provider)
+		{
+			Provider->Commit();
+		}
+	}
+	ConfirmationTransaction = FSettingConfirmationTransaction();
+	ValidationResults.Reset();
+	SaveSettings();
+	return true;
+}
+
+void USettingModule::RejectPendingSettings()
+{
+	if(!EditSession.bActive || !ConfirmationTransaction.bActive)
+	{
+		return;
+	}
+
+	ApplyCombinedSettings(ConfirmationTransaction.PreviousData);
+	for(USettingProviderBase* Provider : Providers)
+	{
+		if(!Provider)
+		{
+			continue;
+		}
+		for(const FSettingDefinition& Definition : FinalDefinitions)
+		{
+			if(Provider->CanHandle(Definition))
+			{
+				Provider->Rollback(Definition);
+			}
+		}
+	}
+	EditSession.PendingData = EditSession.AppliedData;
+	ConfirmationTransaction = FSettingConfirmationTransaction();
+	ValidationResults.Reset();
+	for(const FSettingDefinition& Definition : FinalDefinitions)
+	{
+		OnSettingValueChanged.Broadcast(Definition.SettingId);
+	}
 }
 
 void USettingModule::ResetAllToDefault()
@@ -418,7 +915,7 @@ void USettingModule::ResetAllToDefault()
 
 bool USettingModule::CanApply() const
 {
-	if(!EditSession.bActive) return false;
+	if(!EditSession.bActive || ConfirmationTransaction.bActive) return false;
 	for(const FSettingDefinition& Definition : FinalDefinitions)
 	{
 		if(IsSettingDirty(Definition.SettingId)) return true;
@@ -445,7 +942,34 @@ bool USettingModule::IsSettingDirty(FSettingId InSettingId) const
 bool USettingModule::CanResetSetting(FSettingId InSettingId) const
 {
 	if(!EditSession.bActive) return false;
-	return const_cast<USettingModule*>(this)->ReadSessionValue(const_cast<FSettingModuleSaveData&>(EditSession.PendingData), InSettingId) != const_cast<USettingModule*>(this)->ReadSessionValue(const_cast<FSettingModuleSaveData&>(EditSession.DefaultData), InSettingId);
+	return GetPendingValue(InSettingId) != GetDefaultValue(InSettingId);
+}
+
+bool USettingModule::IsSettingEnabled(FSettingId InSettingId) const
+{
+	if(const FSettingDefinition* Definition = FindSettingDefinition(InSettingId))
+	{
+		return Definition->bEnabled && EvaluateConditions(Definition->EnableConditions);
+	}
+	return false;
+}
+
+bool USettingModule::IsSettingVisible(FSettingId InSettingId) const
+{
+	if(const FSettingDefinition* Definition = FindSettingDefinition(InSettingId))
+	{
+		return Definition->bVisible && EvaluateConditions(Definition->VisibleConditions);
+	}
+	return false;
+}
+
+FSettingValidationResult USettingModule::GetValidationResult(FSettingId InSettingId) const
+{
+	if(const FSettingValidationResult* Result = ValidationResults.Find(InSettingId))
+	{
+		return *Result;
+	}
+	return FSettingValidationResult::Valid();
 }
 
 FParameter USettingModule::GetAppliedValue(FSettingId InSettingId) const
@@ -453,9 +977,9 @@ FParameter USettingModule::GetAppliedValue(FSettingId InSettingId) const
 	if(!EditSession.bActive) return FParameter();
 	if(const FSettingDefinition* Definition = FindSettingDefinition(InSettingId))
 	{
-		for(const USettingProviderBase* Provider : Providers)
+		if(const USettingProviderBase* Provider = FindSettingProvider(*Definition))
 		{
-			if(Provider && Provider->CanHandle(*Definition)) return Provider->GetAppliedValue(*Definition);
+			return Provider->GetAppliedValue(*Definition);
 		}
 	}
 	return const_cast<USettingModule*>(this)->ReadSessionValue(const_cast<FSettingModuleSaveData&>(EditSession.AppliedData), InSettingId);
@@ -466,9 +990,9 @@ FParameter USettingModule::GetPendingValue(FSettingId InSettingId) const
 	if(!EditSession.bActive) return FParameter();
 	if(const FSettingDefinition* Definition = FindSettingDefinition(InSettingId))
 	{
-		for(const USettingProviderBase* Provider : Providers)
+		if(const USettingProviderBase* Provider = FindSettingProvider(*Definition))
 		{
-			if(Provider && Provider->CanHandle(*Definition)) return Provider->GetPendingValue(*Definition);
+			return Provider->GetPendingValue(*Definition);
 		}
 	}
 	return const_cast<USettingModule*>(this)->ReadSessionValue(const_cast<FSettingModuleSaveData&>(EditSession.PendingData), InSettingId);
@@ -476,35 +1000,72 @@ FParameter USettingModule::GetPendingValue(FSettingId InSettingId) const
 
 FParameter USettingModule::GetDefaultValue(FSettingId InSettingId) const
 {
-	return EditSession.bActive ? const_cast<USettingModule*>(this)->ReadSessionValue(const_cast<FSettingModuleSaveData&>(EditSession.DefaultData), InSettingId) : FParameter();
+	if(!EditSession.bActive)
+	{
+		return FParameter();
+	}
+	if(const FSettingDefinition* Definition = FindSettingDefinition(InSettingId))
+	{
+		if(const USettingProviderBase* Provider = FindSettingProvider(*Definition))
+		{
+			return Provider->GetDefaultValue(*Definition);
+		}
+	}
+	return const_cast<USettingModule*>(this)->ReadSessionValue(const_cast<FSettingModuleSaveData&>(EditSession.DefaultData), InSettingId);
 }
 
 bool USettingModule::SetPendingValue(FSettingId InSettingId, const FParameter& InValue)
 {
-	if(!EditSession.bActive) return false;
+	if(!EditSession.bActive || ConfirmationTransaction.bActive) return false;
 	const FSettingDefinition* Definition = FindSettingDefinition(InSettingId);
-	if(!Definition) return false;
+	if(!Definition || !IsSettingEnabled(InSettingId)) return false;
 
-	for(USettingProviderBase* Provider : Providers)
+	const FSettingValidationResult Validation = ValidateSettingValue(*Definition, InValue);
+	ValidationResults.Add(InSettingId, Validation);
+	if(!Validation.bValid)
 	{
-		if(Provider && Provider->CanHandle(*Definition))
+		return false;
+	}
+
+	if(USettingProviderBase* Provider = FindSettingProvider(*Definition))
+	{
+		const FParameter PreviousValue = Provider->GetPendingValue(*Definition);
+		if(!Provider->SetPendingValue(*Definition, InValue))
 		{
-			if(!Provider->SetPendingValue(*Definition, InValue)) return false;
-			if(Definition->ApplyPolicy == ESettingApplyPolicy::Preview) Provider->Preview(*Definition, InValue);
-			if(Definition->ApplyPolicy == ESettingApplyPolicy::Immediate) Provider->Apply(*Definition, InValue);
-			return true;
+			return false;
 		}
+		if(Definition->ApplyPolicy == ESettingApplyPolicy::Preview && !Provider->Preview(*Definition, InValue))
+		{
+			Provider->SetPendingValue(*Definition, PreviousValue);
+			return false;
+		}
+		if(Definition->ApplyPolicy == ESettingApplyPolicy::Immediate)
+		{
+			if(!Provider->Apply(*Definition, InValue))
+			{
+				Provider->SetPendingValue(*Definition, PreviousValue);
+				return false;
+			}
+			Provider->Commit();
+			SaveSettings();
+		}
+		OnSettingValueChanged.Broadcast(InSettingId);
+		return true;
 	}
 
 	if(!WriteSessionValue(EditSession.PendingData, InSettingId, InValue)) return false;
 	if(Definition->ApplyPolicy != ESettingApplyPolicy::Deferred)
 	{
-		ApplyCombinedSettings(EditSession.PendingData);
+		FSettingModuleSaveData RuntimeData = GetCurrentCombinedSettings();
+		WriteSessionValue(RuntimeData, InSettingId, InValue);
+		ApplyCombinedSettings(RuntimeData);
 		if(Definition->ApplyPolicy == ESettingApplyPolicy::Immediate)
 		{
 			WriteSessionValue(EditSession.AppliedData, InSettingId, InValue);
+			SaveSettings();
 		}
 	}
+	OnSettingValueChanged.Broadcast(InSettingId);
 	return true;
 }
 
@@ -516,6 +1077,44 @@ TArray<USettingEntry*> USettingModule::GetSettingEntries() const
 	{
 		Result.Add(Entry);
 	}
+	return Result;
+}
+
+TArray<USettingEntry*> USettingModule::GetSettingEntriesByPage(FName InPage) const
+{
+	TArray<USettingEntry*> Result;
+	for(USettingEntry* Entry : SettingEntries)
+	{
+		if(Entry && Entry->GetDefinition().Page == InPage)
+		{
+			Result.Add(Entry);
+		}
+	}
+	return Result;
+}
+
+TArray<FSettingPageDefinition> USettingModule::GetSettingPages() const
+{
+	TArray<FSettingPageDefinition> Result = Registry ? Registry->Pages : TArray<FSettingPageDefinition>();
+	for(const FSettingDefinition& Definition : FinalDefinitions)
+	{
+		if(Definition.Page.IsNone() || Result.ContainsByPredicate([&Definition](const FSettingPageDefinition& Page)
+		{
+			return Page.Page == Definition.Page;
+		}))
+		{
+			continue;
+		}
+
+		FSettingPageDefinition& Page = Result.AddDefaulted_GetRef();
+		Page.Page = Definition.Page;
+		Page.DisplayName = FText::FromName(Definition.Page);
+		Page.Order = Result.Num() - 1;
+	}
+	Result.Sort([](const FSettingPageDefinition& A, const FSettingPageDefinition& B)
+	{
+		return A.Order == B.Order ? A.Page.LexicalLess(B.Page) : A.Order < B.Order;
+	});
 	return Result;
 }
 

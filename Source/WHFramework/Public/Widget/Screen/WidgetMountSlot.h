@@ -11,7 +11,7 @@ class WHFRAMEWORK_API UWidgetMountSlot : public UNamedSlot
 	GENERATED_BODY()
 
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "WidgetMountSlot", meta = (Categories = "WidgetSlot"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "WidgetMountSlot", meta = (Categories = "Widget.Slot"))
 	FGameplayTag SlotTag;
 
 public:

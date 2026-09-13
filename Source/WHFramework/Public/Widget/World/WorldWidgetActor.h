@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -45,10 +45,10 @@ public:
 	void CreateWorldWidget(bool bInEditor = false);
 
 	UFUNCTION(BlueprintCallable)
-	void DestroyWorldWidget(bool bRecovery = false, bool bInEditor = false);
+	void DestroyWorldWidget(EObjectDespawnMode InMode = EObjectDespawnMode::Destroy, bool bInEditor = false);
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintPure)
-	TArray<FParameter> GetWidgetParams() const;
+	FParameter GetWidgetParams() const;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")

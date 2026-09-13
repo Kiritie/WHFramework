@@ -41,6 +41,9 @@ public:
 	UFUNCTION(BlueprintPure)
 	bool IsVisible() const;
 
+	UFUNCTION(BlueprintPure)
+	FSettingValidationResult GetValidationResult() const;
+
 private:
 	UPROPERTY(Transient)
 	TObjectPtr<USettingModule> OwnerModule;

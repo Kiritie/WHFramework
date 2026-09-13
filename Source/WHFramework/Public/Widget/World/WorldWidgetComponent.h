@@ -8,6 +8,7 @@
 #include "WorldWidgetComponent.generated.h"
 
 class UWorldWidgetBase;
+struct FWorldWidgetConfig;
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), hidecategories=(Physics, Collision, HLOD, PathTracing, Natigation, VirtualTexture, Tags, Cooking, MaterialParameters, TextureStreaming, Mobile, RayTracing, AssetUserData))
 class WHFRAMEWORK_API UWorldWidgetComponent : public UWidgetComponent
@@ -36,19 +37,20 @@ public:
 #endif
 
 public:
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
-	void CreateWorldWidget(const TArray<FParameter>& InParams, bool bInEditor = false);
-
-	void CreateWorldWidget(const TArray<FParameter>* InParams = nullptr, bool bInEditor = false);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParam"))
+	void CreateWorldWidget(const FParameter& InParam = FParameter(), bool bInEditor = false);
 
 	UFUNCTION(BlueprintCallable)
-	void DestroyWorldWidget(bool bRecovery = false, bool bInEditor = false);
+	void DestroyWorldWidget(EObjectDespawnMode InMode = EObjectDespawnMode::Destroy, bool bInEditor = false);
 
 	UFUNCTION(BlueprintCallable)
 	void SetWorldWidget(UUserWidget* InWidget);
 
 	UFUNCTION(BlueprintCallable)
-	void SetWorldWidgetClass(TSubclassOf<UUserWidget> InClass, bool bRefresh = false);
+	void SetWorldWidgetClass(TSubclassOf<UWorldWidgetBase> InClass, bool bRefresh = false);
+
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InTag"))
+	void SetWorldWidgetTag(FGameplayTag InTag, bool bRefresh = false);
 
 protected:
 #if WITH_EDITORONLY_DATA
@@ -56,8 +58,11 @@ protected:
 	bool bRefreshEditorOnly;
 #endif
 
+	UPROPERTY(EditAnywhere, Category = "UserInterface", meta = (Categories = "Widget.World"))
+	FGameplayTag WorldWidgetTag;
+
 	UPROPERTY(EditAnywhere, Category = "UserInterface")
-	TSubclassOf<UWorldWidgetBase> WorldWidgetClass;
+	TSubclassOf<UWorldWidgetBase> WorldWidgetClassOverride;
 	
 	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "EDC_AutoCreate"), Category = "UserInterface")
 	bool bAutoCreate;
@@ -69,7 +74,7 @@ protected:
 	bool bBindToSelf;
 
 	UPROPERTY(EditAnywhere, Category = "UserInterface")
-	TArray<FParameter> WidgetParams;
+	FParameter WidgetParam;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UserInterface")
 	FVector WidgetScale;
@@ -108,4 +113,9 @@ public:
 protected:
 	UFUNCTION()
 	bool EDC_AutoCreate() const;
+
+private:
+	const FWorldWidgetConfig* ResolveWorldWidgetConfig() const;
+
+	TSubclassOf<UWorldWidgetBase> ResolveWorldWidgetClass() const;
 };

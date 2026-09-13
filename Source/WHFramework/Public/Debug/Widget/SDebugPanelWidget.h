@@ -24,9 +24,9 @@ public:
 	static const FName ParentName;
 
 public:
-	virtual void OnCreate(UObject* InOwner, const TArray<FParameter>& InParams) override;
+	virtual void OnCreate(const FParameter& InParams) override;
 
-	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant) override;
+	virtual void OnOpen(const FParameter& InParams, bool bInstant) override;
 
 	virtual void OnClose(bool bInstant) override;
 };

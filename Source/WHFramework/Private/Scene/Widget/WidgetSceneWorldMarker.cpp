@@ -7,12 +7,7 @@
 UWidgetSceneWorldMarker::UWidgetSceneWorldMarker(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-	WidgetSpace = EWidgetSpace::Screen;
-	WidgetZOrder = 2;
-	bWidgetAutoSize = true;
-	WidgetAlignment = FVector2D(0.f, 0.5f);
 	WidgetRefreshType = EWidgetRefreshType::Procedure;
-	WidgetVisibility = EWorldWidgetVisibility::ScreenOnly;
 }
 
 void UWidgetSceneWorldMarker::RefreshLocation_Implementation(UWidget* InWidget, FWorldWidgetMapping InMapping)

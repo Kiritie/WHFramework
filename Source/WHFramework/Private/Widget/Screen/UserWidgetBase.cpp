@@ -3,12 +3,16 @@
 
 #include "Widget/Screen/UserWidgetBase.h"
 
+#include "Input/Base/InputActionBase.h"
+#include "Input/InputModule.h"
 #include "Blueprint/WidgetTree.h"
 #include "CommonInputBaseTypes.h"
+#include "Input/CommonUIInputTypes.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/ContentWidget.h"
 #include "Components/PanelWidget.h"
+#include "Components/WidgetSwitcher.h"
 #include "Event/EventModuleStatics.h"
 #include "Event/Events/Widget/Event_UserWidgetClosed.h"
 #include "Event/Events/Widget/Event_UserWidgetCreated.h"
@@ -16,22 +20,47 @@
 #include "Event/Events/Widget/Event_UserWidgetStateChanged.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Widget/WidgetModuleStatics.h"
-#include "Input/InputModuleStatics.h"
 #include "Slate/Runtime/Interfaces/SubWidgetInterface.h"
 #include "Widget/Animator/WidgetAnimatorBase.h"
 #include "Widget/WidgetModule.h"
 #include "Widget/Screen/WidgetMountSlot.h"
 
+namespace
+{
+	FParameter MakeScreenSubWidgetParam(
+		UUserWidget* InOwnerWidget,
+		const FParameter& InParam,
+		bool bInDynamic)
+	{
+		if(!InParam.HasValue())
+		{
+			return FParameter(FSubWidgetSpawnParameter(InOwnerWidget, bInDynamic));
+		}
+
+		FParameter Param = InParam;
+		if(FSubWidgetSpawnParameter* SpawnParam = Param.GetMutablePtr<FSubWidgetSpawnParameter>())
+		{
+			SpawnParam->OwnerObject = InOwnerWidget;
+			SpawnParam->bDynamic = bInDynamic;
+		}
+		else
+		{
+			ensureEditorMsgf(
+				false,
+				FString::Printf(
+					TEXT("Sub widget parameter %s must derive from FSubWidgetSpawnParameter."),
+					*GetNameSafe(Param.GetValueStruct())),
+				EDC_Widget,
+				EDV_Error);
+		}
+		return Param;
+	}
+}
+
 UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	bWidgetTickAble = false;
 
-	WidgetType = EWidgetType::Permanent;
-	WidgetZOrder = 0;
-	WidgetAnchors = FAnchors(0.f, 0.f, 1.f, 1.f);
-	bWidgetAutoSize = false;
-	WidgetOffsets = FMargin(0.f);
-	WidgetAlignment = FVector2D(0.f);
 	WidgetOpenType = EWidgetOpenType::SelfHitTestInvisible;
 	WidgetOpenFinishType = EWidgetOpenFinishType::Instant;
 	WidgetOpenFinishTime = 0.f;
@@ -43,27 +72,105 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	WidgetRefreshType = EWidgetRefreshType::Procedure;
 	WidgetRefreshTime = 0.f;
 	WidgetState = EScreenWidgetState::None;
-	WidgetParams = TArray<FParameter>();
-	WidgetInputMode = EInputMode::None;
 	InputConfig = EWidgetInputConfig::None;
 	bWidgetAutoFocus = false;
 
-	OwnerObject = nullptr;
 	bInitialized = false;
 	WidgetTag = FGameplayTag();
 	ParentWidget = nullptr;
-	SubWidgets = TArray<ISubWidgetInterface*>();
+	SubWidgetEntries = TArray<FSubWidgetRuntimeEntry>();
 	ChildWidgets = TArray<IScreenWidgetInterface*>();
+}
+
+const FScreenWidgetConfig* UUserWidgetBase::GetWidgetConfig() const
+{
+	return UWidgetModule::IsValid()
+		? UWidgetModule::Get().GetUserWidgetConfig(WidgetTag)
+		: nullptr;
+}
+
+EWidgetType UUserWidgetBase::GetWidgetType(bool bInheritParent) const
+{
+	if(bInheritParent && ParentWidget)
+	{
+		return ParentWidget->GetWidgetType();
+	}
+	const FScreenWidgetConfig* Config = GetWidgetConfig();
+	return Config ? Config->WidgetType : EWidgetType::Permanent;
+}
+
+int32 UUserWidgetBase::GetWidgetZOrder() const
+{
+	const FScreenWidgetConfig* Config = GetWidgetConfig();
+	return Config ? Config->ZOrder : 0;
+}
+
+FAnchors UUserWidgetBase::GetWidgetAnchors() const
+{
+	const FScreenWidgetConfig* Config = GetWidgetConfig();
+	return Config ? Config->Anchors : FAnchors(0.f, 0.f, 1.f, 1.f);
+}
+
+bool UUserWidgetBase::IsWidgetAutoSize() const
+{
+	const FScreenWidgetConfig* Config = GetWidgetConfig();
+	return Config ? Config->bAutoSize : false;
+}
+
+FVector2D UUserWidgetBase::GetWidgetDrawSize() const
+{
+	const FMargin Offsets = GetWidgetOffsets();
+	return FVector2D(Offsets.Right, Offsets.Bottom);
+}
+
+FMargin UUserWidgetBase::GetWidgetOffsets() const
+{
+	const FScreenWidgetConfig* Config = GetWidgetConfig();
+	return Config ? Config->Offsets : FMargin(0.f);
+}
+
+FVector2D UUserWidgetBase::GetWidgetAlignment() const
+{
+	const FScreenWidgetConfig* Config = GetWidgetConfig();
+	return Config ? Config->Alignment : FVector2D::ZeroVector;
+}
+
+FUIActionBindingHandle UUserWidgetBase::RegisterUIActionByTag(
+	FGameplayTag InActionTag,
+	bool bInDisplayInActionBar)
+{
+	const UInputActionBase* InputAction = InActionTag.IsValid()
+		? UInputModule::Get().GetInputActionByTag(InActionTag, false)
+		: nullptr;
+	return InputAction
+		? RegisterUIActionBinding(FBindUIActionArgs(
+			InputAction,
+			bInDisplayInActionBar,
+			FSimpleDelegate::CreateUObject(
+				this,
+				&ThisClass::HandleUIActionTriggered,
+				InActionTag)))
+		: FUIActionBindingHandle();
+}
+
+void UUserWidgetBase::OnUIActionTriggered_Implementation(FGameplayTag InActionTag)
+{
+}
+
+void UUserWidgetBase::HandleUIActionTriggered(FGameplayTag InActionTag)
+{
+	OnUIActionTriggered(InActionTag);
 }
 
 void UUserWidgetBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	
+	const FWidgetSpawnParameter* Param = InParam.GetPtr<FWidgetSpawnParameter>();
+	OwnerObject = Param ? Param->OwnerObject.Get() : nullptr;
 }
 
 void UUserWidgetBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	
+	OwnerObject = nullptr;
 }
 
 void UUserWidgetBase::OnTick_Implementation(float DeltaSeconds)
@@ -86,16 +193,10 @@ TOptional<FUIInputConfig> UUserWidgetBase::GetDesiredInputConfig() const
 	}
 }
 
-void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
+void UUserWidgetBase::OnCreate(const FParameter& InParam)
 {
 	if(UWidgetModule::IsValid()) UWidgetModule::Get().RegisterTickableWidget(this);
 	RebuildWidgetMountSlotCache();
-
-	if(UUserWidgetBase* InParent = Cast<UUserWidgetBase>(InOwner); InParent != this)
-	{
-		ParentWidget = InParent;
-		ParentWidget->AddChildWidget(this);
-	}
 
 	if(WidgetOpenAnimator)
 	{
@@ -111,12 +212,13 @@ void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPar
 			FParameter(FWidgetSpawnParameter(this)));
 	}
 
+	const FParameter ChildParam = FParameter(FSubWidgetSpawnParameter(this, false));
 	for(auto Iter : GetPoolWidgets())
 	{
-		IObjectPoolInterface::Execute_OnSpawn(Iter, FParameter(FWidgetSpawnParameter(this)));
+		IObjectPoolInterface::Execute_OnSpawn(Iter, ChildParam);
 	}
 
-	K2_OnCreate(InOwner, InParams);
+	K2_OnCreate(InParam);
 
 	UEventModuleStatics::BroadcastEvent<FEventUserWidgetCreated>(this, { this });
 
@@ -126,19 +228,18 @@ void UUserWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPar
 	{
 		if(ISubWidgetInterface* SubWidget = Cast<ISubWidgetInterface>(Iter))
 		{
-			SubWidgets.Add(SubWidget);
-			SubWidget->OnCreate(this, SubWidget->GetWidgetParams());
+			FSubWidgetRuntimeEntry& Entry = SubWidgetEntries.AddDefaulted_GetRef();
+			Entry.Widget = Cast<UUserWidget>(Iter);
+			Entry.bDynamic = false;
+			SubWidget->OnCreate(ChildParam);
 		}
 	}
 }
 
-void UUserWidgetBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
+void UUserWidgetBase::OnInitialize(const FParameter& InParam)
 {
-	OwnerObject = InOwner;
-
-	WidgetParams = InParams;
-
-	K2_OnInitialize(InOwner, InParams);
+	InitializeParameter = InParam;
+	K2_OnInitialize(InitializeParameter);
 }
 
 void UUserWidgetBase::OnReset(bool bForce)
@@ -146,23 +247,26 @@ void UUserWidgetBase::OnReset(bool bForce)
 	K2_OnReset(bForce);
 }
 
-void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
+void UUserWidgetBase::OnOpen(const FParameter& InParam, bool bInstant)
 {
-	CurrentOpenParameters = InParams;
-	WidgetParams = InParams;
+	if(const FWidgetOpenParameter* Param = InParam.GetPtr<FWidgetOpenParameter>();
+		Param && Param->OwnerObject)
+	{
+		OwnerObject = Param->OwnerObject;
+	}
+	CurrentOpenParameter = InParam;
 	AbortCloseTransition();
 
 	if(WidgetState == EScreenWidgetState::Opening || WidgetState == EScreenWidgetState::Opened)
 	{
-		K2_OnOpen(CurrentOpenParameters, bInstant);
+		K2_OnOpen(CurrentOpenParameter, bInstant);
 		return;
 	}
 
 	WidgetState = EScreenWidgetState::Opening;
 	OnStateChanged(WidgetState);
 
-	K2_OnOpen(CurrentOpenParameters, bInstant);
-	ActivateWidget();
+	K2_OnOpen(CurrentOpenParameter, bInstant);
 
 	switch(WidgetOpenType)
 	{
@@ -183,6 +287,42 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 		}
 		default: break;
 	}
+
+	if(!GetParentWidgetN<UUserWidgetBase>())
+	{
+		if(GetParent())
+		{
+			RemoveFromParent();
+		}
+		AddToViewport(GetWidgetZOrder());
+	}
+	else if(UPanelWidget* ParentPanelWidget = GetParentPanelWidget())
+	{
+		if(GetParent() != ParentPanelWidget)
+		{
+			if(UContentWidget* ContentWidget = Cast<UContentWidget>(ParentPanelWidget))
+			{
+				ContentWidget->SetContent(this);
+			}
+			else if(UCanvasPanel* CanvasPanel = Cast<UCanvasPanel>(ParentPanelWidget))
+			{
+				UCanvasPanelSlot* CanvasPanelSlot = CanvasPanel->AddChildToCanvas(this);
+				if(const FScreenWidgetConfig* Config = GetWidgetConfig())
+				{
+					CanvasPanelSlot->SetZOrder(Config->ZOrder);
+					CanvasPanelSlot->SetAnchors(Config->Anchors);
+					CanvasPanelSlot->SetOffsets(Config->Offsets);
+					CanvasPanelSlot->SetAlignment(Config->Alignment);
+				}
+			}
+			else
+			{
+				ParentPanelWidget->AddChild(this);
+			}
+		}
+	}
+
+	ActivateWidget();
 
 	switch(WidgetOpenFinishType)
 	{
@@ -217,39 +357,9 @@ void UUserWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 			{
 				FinishOpen(true);
 			}
+			break;
 		}
 		default: break;
-	}
-
-	if(!GetParentWidgetN<UUserWidgetBase>())
-	{
-		if(GetParent())
-		{
-			RemoveFromParent();
-		}
-		AddToViewport(WidgetZOrder);
-	}
-	else if(UPanelWidget* ParentPanelWidget = GetParentPanelWidget())
-	{
-		if(GetParent() != ParentPanelWidget)
-		{
-			if(UContentWidget* ContentWidget = Cast<UContentWidget>(ParentPanelWidget))
-			{
-				ContentWidget->SetContent(this);
-			}
-			else if(UCanvasPanel* CanvasPanel = Cast<UCanvasPanel>(ParentPanelWidget))
-			{
-				UCanvasPanelSlot* CanvasPanelSlot = CanvasPanel->AddChildToCanvas(this);
-				CanvasPanelSlot->SetZOrder(WidgetZOrder);
-				CanvasPanelSlot->SetAnchors(WidgetAnchors);
-				CanvasPanelSlot->SetOffsets(WidgetOffsets);
-				CanvasPanelSlot->SetAlignment(WidgetAlignment);
-			}
-			else
-			{
-				ParentPanelWidget->AddChild(this);
-			}
-		}
 	}
 
 	switch(WidgetRefreshType)
@@ -307,10 +417,28 @@ UWidgetMountSlot* UUserWidgetBase::GetWidgetMountSlot(const FGameplayTag& InSlot
 
 bool UUserWidgetBase::IsWidgetActiveInHierarchy() const
 {
-	if(!IsActivated() || WidgetState != EScreenWidgetState::Opened || GetVisibility() == ESlateVisibility::Collapsed || GetVisibility() == ESlateVisibility::Hidden)
+	if(!IsActivated()
+		|| (WidgetState != EScreenWidgetState::Opening && WidgetState != EScreenWidgetState::Opened)
+		|| GetVisibility() == ESlateVisibility::Collapsed
+		|| GetVisibility() == ESlateVisibility::Hidden)
 	{
 		return false;
 	}
+
+	const UWidget* Child = this;
+	for(const UPanelWidget* Parent = GetParent(); Parent; Parent = Parent->GetParent())
+	{
+		if(Parent->GetVisibility() == ESlateVisibility::Collapsed || Parent->GetVisibility() == ESlateVisibility::Hidden)
+		{
+			return false;
+		}
+		if(const UWidgetSwitcher* Switcher = Cast<UWidgetSwitcher>(Parent); Switcher && Switcher->GetActiveWidget() != Child)
+		{
+			return false;
+		}
+		Child = Parent;
+	}
+
 	const UUserWidgetBase* ParentUserWidget = GetParentWidgetN<UUserWidgetBase>();
 	return !ParentUserWidget || ParentUserWidget->IsWidgetActiveInHierarchy();
 }
@@ -359,6 +487,7 @@ void UUserWidgetBase::OnClose(bool bInstant)
 			{
 				FinishClose(true);
 			}
+			break;
 		}
 		default: break;
 	}
@@ -369,11 +498,31 @@ void UUserWidgetBase::OnRefresh()
 	K2_OnRefresh();
 }
 
-void UUserWidgetBase::OnDestroy(bool bRecovery)
+void UUserWidgetBase::OnDestroy(EObjectDespawnMode InMode)
 {
 	if(UWidgetModule::IsValid()) UWidgetModule::Get().UnregisterTickableWidget(this);
 
-	K2_OnDestroy(bRecovery);
+	AbortOpenTransition();
+	AbortCloseTransition();
+	GetWorld()->GetTimerManager().ClearTimer(WidgetRefreshTimerHandle);
+	DeactivateWidget();
+	DestroyAllSubWidget(InMode);
+
+	for(UWidget* PoolWidget : GetPoolWidgets())
+	{
+		if(!PoolWidget->Implements<USubWidgetInterface>())
+		{
+			IObjectPoolInterface::Execute_OnDespawn(PoolWidget, InMode);
+		}
+	}
+	if(WidgetOpenAnimator)
+	{
+		IObjectPoolInterface::Execute_OnDespawn(WidgetOpenAnimator, InMode);
+	}
+	if(WidgetCloseAnimator)
+	{
+		IObjectPoolInterface::Execute_OnDespawn(WidgetCloseAnimator, InMode);
+	}
 
 	if(IsInViewport())
 	{
@@ -384,24 +533,19 @@ void UUserWidgetBase::OnDestroy(bool bRecovery)
 		ParentWidget->RemoveChildWidget(this);
 	}
 
-	UInputModuleStatics::UpdateGlobalInputMode();
+	K2_OnDestroy(InMode);
+	if(K2_OnDestroyed.IsBound()) K2_OnDestroyed.Broadcast(InMode);
+	if(OnDestroyed.IsBound()) OnDestroyed.Broadcast(InMode);
 
-	AbortOpenTransition();
-	AbortCloseTransition();
-	GetWorld()->GetTimerManager().ClearTimer(WidgetRefreshTimerHandle);
-	DeactivateWidget();
-
-	if(K2_OnDestroyed.IsBound()) K2_OnDestroyed.Broadcast(bRecovery);
-	if(OnDestroyed.IsBound()) OnDestroyed.Broadcast(bRecovery);
-
-	UObjectPoolModuleStatics::DespawnObject(
-		this,
-		bRecovery ? EObjectDespawnMode::Recovery : EObjectDespawnMode::Destroy);
-
-	OwnerObject = nullptr;
 	bInitialized = false;
-	WidgetParams.Empty();
-	CurrentOpenParameters.Empty();
+	WidgetState = EScreenWidgetState::None;
+	WidgetTag = FGameplayTag();
+	ParentWidget = nullptr;
+	ChildWidgets.Reset();
+	WidgetMountSlotMap.Reset();
+	InitializeParameter.Reset();
+	CurrentOpenParameter.Reset();
+	UObjectPoolModuleStatics::DespawnObject(this, InMode);
 }
 
 void UUserWidgetBase::OnStateChanged(EScreenWidgetState InWidgetState)
@@ -413,41 +557,31 @@ void UUserWidgetBase::OnStateChanged(EScreenWidgetState InWidgetState)
 	UEventModuleStatics::BroadcastEvent<FEventUserWidgetStateChanged>(this, { this, InWidgetState });
 }
 
-void UUserWidgetBase::Init(UObject* InOwner, const TArray<FParameter>* InParams, bool bForce)
+void UUserWidgetBase::Init(const FParameter& InParam, bool bForce)
 {
-	Init(InOwner, InParams ? *InParams : TArray<FParameter>(), bForce);
-}
-
-void UUserWidgetBase::Init(UObject* InOwner, const TArray<FParameter>& InParams, bool bForce)
-{
-	if(!bInitialized || OwnerObject != InOwner || bForce)
+	if(!bInitialized || bForce)
 	{
-		OnInitialize(InOwner, InParams);
+		OnInitialize(InParam);
 		bInitialized = true;
+
+		for(IScreenWidgetInterface* ChildWidget : ChildWidgets)
+		{
+			if(ChildWidget)
+			{
+				ChildWidget->Init(InParam, bForce);
+			}
+		}
 	}
 }
 
 void UUserWidgetBase::Reset(bool bForce)
 {
-	if(bForce)
-	{
-		OwnerObject = nullptr;
-	}
 	OnReset(bForce);
 }
 
-void UUserWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant, bool bForce)
+void UUserWidgetBase::Open(const FParameter& InParam, bool bInstant, bool bForce)
 {
-	const FParameter Parameter = InParams && !InParams->IsEmpty()
-		? (*InParams)[0]
-		: FParameter();
-	UWidgetModuleStatics::OpenUserWidgetByTag(WidgetTag, Parameter, bInstant, bForce);
-}
-
-void UUserWidgetBase::Open(const TArray<FParameter>& InParams, bool bInstant, bool bForce)
-{
-	const FParameter Parameter = InParams.IsEmpty() ? FParameter() : InParams[0];
-	UWidgetModuleStatics::OpenUserWidgetByTag(WidgetTag, Parameter, bInstant, bForce);
+	UWidgetModuleStatics::OpenUserWidgetByTag(WidgetTag, InParam, bInstant, bForce);
 }
 
 void UUserWidgetBase::Close(bool bInstant)
@@ -461,7 +595,7 @@ void UUserWidgetBase::Toggle(bool bInstant)
 	
 	if(WidgetState != EScreenWidgetState::Opened)
 	{
-		Open(nullptr, bInstant);
+		Open(FWidgetOpenParameter(), bInstant);
 	}
 	else
 	{
@@ -471,14 +605,14 @@ void UUserWidgetBase::Toggle(bool bInstant)
 
 void UUserWidgetBase::Refresh()
 {
-	if(WidgetRefreshType == EWidgetRefreshType::None) return;
+	if(WidgetRefreshType == EWidgetRefreshType::None || !IsWidgetActiveInHierarchy()) return;
 
 	OnRefresh();
 }
 
-void UUserWidgetBase::Destroy(bool bRecovery)
+void UUserWidgetBase::Destroy(EObjectDespawnMode InMode)
 {
-	UWidgetModuleStatics::DestroyUserWidgetByTag(WidgetTag, bRecovery);
+	UWidgetModuleStatics::DestroyUserWidgetByTag(WidgetTag, InMode);
 }
 
 bool UUserWidgetBase::CanOpen_Implementation() const
@@ -493,15 +627,13 @@ void UUserWidgetBase::FinishOpen(bool bInstant)
 	WidgetState = EScreenWidgetState::Opened;
 	OnStateChanged(WidgetState);
 
-	if(bWidgetAutoFocus)
+	if(bWidgetAutoFocus && IsWidgetActiveInHierarchy())
 	{
 		SetFocus();
 	}
 
-	UInputModuleStatics::UpdateGlobalInputMode();
-
-	if(K2_OnOpened.IsBound()) K2_OnOpened.Broadcast(CurrentOpenParameters, bInstant);
-	if(OnOpened.IsBound()) OnOpened.Broadcast(CurrentOpenParameters, bInstant);
+	if(K2_OnOpened.IsBound()) K2_OnOpened.Broadcast(CurrentOpenParameter, bInstant);
+	if(OnOpened.IsBound()) OnOpened.Broadcast(CurrentOpenParameter, bInstant);
 
 	UEventModuleStatics::BroadcastEvent<FEventUserWidgetOpened>(this, { this });
 
@@ -541,8 +673,6 @@ void UUserWidgetBase::FinishClose(bool bInstant)
 
 	DeactivateWidget();
 
-	UInputModuleStatics::UpdateGlobalInputMode();
-
 	if(K2_OnClosed.IsBound()) K2_OnClosed.Broadcast(bInstant);
 	if(OnClosed.IsBound()) OnClosed.Broadcast(bInstant);
 
@@ -567,47 +697,66 @@ void UUserWidgetBase::AbortCloseTransition()
 	}
 }
 
-UUserWidget* UUserWidgetBase::K2_CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams)
+UUserWidget* UUserWidgetBase::K2_CreateSubWidget(TSubclassOf<UUserWidget> InClass, const FParameter& InParam)
 {
-	return Cast<UUserWidget>(CreateSubWidget(InClass, InParams));
+	return Cast<UUserWidget>(CreateSubWidget(InClass, InParam));
 }
 
-ISubWidgetInterface* UUserWidgetBase::CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>* InParams)
+ISubWidgetInterface* UUserWidgetBase::CreateSubWidget(TSubclassOf<UUserWidget> InClass, const FParameter& InParam)
 {
-	return CreateSubWidget(InClass, InParams ? *InParams : TArray<FParameter>());
-}
-
-ISubWidgetInterface* UUserWidgetBase::CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams)
-{
+	const FParameter Param = MakeScreenSubWidgetParam(this, InParam, true);
 	if(ISubWidgetInterface* SubWidget = Cast<ISubWidgetInterface>(
-		UObjectPoolModuleStatics::SpawnObject(InClass.Get(), FParameter(FWidgetSpawnParameter(this)))))
+		UObjectPoolModuleStatics::SpawnObject(InClass.Get(), Param)))
 	{
-		SubWidget->OnCreate(this, InParams);
+		FSubWidgetRuntimeEntry& Entry = SubWidgetEntries.AddDefaulted_GetRef();
+		Entry.Widget = Cast<UUserWidget>(SubWidget);
+		Entry.bDynamic = true;
+		SubWidget->OnCreate(Param);
 		return SubWidget;
 	}
 	return nullptr;
 }
 
-bool UUserWidgetBase::K2_DestroySubWidget(UUserWidget* InWidget, bool bRecovery)
+bool UUserWidgetBase::K2_DestroySubWidget(UUserWidget* InWidget, EObjectDespawnMode InMode)
 {
-	return DestroySubWidget(Cast<ISubWidgetInterface>(InWidget), bRecovery);
+	return DestroySubWidget(Cast<ISubWidgetInterface>(InWidget), InMode);
 }
 
-bool UUserWidgetBase::DestroySubWidget(ISubWidgetInterface* InWidget, bool bRecovery)
+bool UUserWidgetBase::DestroySubWidget(ISubWidgetInterface* InWidget, EObjectDespawnMode InMode)
 {
 	if(!InWidget) return false;
 
-	InWidget->OnDestroy(bRecovery);
+	const int32 EntryIndex = FindSubWidget(InWidget);
+	if(EntryIndex != INDEX_NONE)
+	{
+		const FSubWidgetRuntimeEntry Entry = SubWidgetEntries[EntryIndex];
+		SubWidgetEntries.RemoveAt(EntryIndex);
+		InWidget->OnDestroy(InMode);
+		if(!Entry.bDynamic && Entry.Widget)
+		{
+			IObjectPoolInterface::Execute_OnDespawn(Entry.Widget, InMode);
+		}
+		return true;
+	}
+	InWidget->OnDestroy(InMode);
 	return true;
 }
 
-void UUserWidgetBase::DestroyAllSubWidget(bool bRecovery)
+void UUserWidgetBase::DestroyAllSubWidget(EObjectDespawnMode InMode)
 {
-	for(auto Iter : SubWidgets)
+	const TArray<FSubWidgetRuntimeEntry> Entries = MoveTemp(SubWidgetEntries);
+	SubWidgetEntries.Reset();
+	for(const FSubWidgetRuntimeEntry& Entry : Entries)
 	{
-		Iter->Destroy();
+		if(ISubWidgetInterface* SubWidget = Cast<ISubWidgetInterface>(Entry.Widget))
+		{
+			SubWidget->OnDestroy(InMode);
+			if(!Entry.bDynamic)
+			{
+				IObjectPoolInterface::Execute_OnDespawn(Entry.Widget, InMode);
+			}
+		}
 	}
-	SubWidgets.Empty();
 }
 
 void UUserWidgetBase::AddChildWidget(IScreenWidgetInterface* InWidget)
@@ -649,11 +798,25 @@ TArray<UWidget*> UUserWidgetBase::GetPoolWidgets() const
 TArray<UUserWidget*> UUserWidgetBase::K2_GetSubWidgets(TSubclassOf<UUserWidget> InClass)
 {
 	TArray<UUserWidget*> ReturnValues;
-	for(auto Iter : SubWidgets)
+	for(const FSubWidgetRuntimeEntry& Entry : SubWidgetEntries)
 	{
-		ReturnValues.Add(GetDeterminesOutputObject(Cast<UUserWidget>(Iter), InClass));
+		ReturnValues.Add(GetDeterminesOutputObject(Entry.Widget.Get(), InClass));
 	}
 	return ReturnValues;
+}
+
+TArray<ISubWidgetInterface*> UUserWidgetBase::GetSubWidgets()
+{
+	TArray<ISubWidgetInterface*> Result;
+	Result.Reserve(SubWidgetEntries.Num());
+	for(const FSubWidgetRuntimeEntry& Entry : SubWidgetEntries)
+	{
+		if(ISubWidgetInterface* SubWidget = Cast<ISubWidgetInterface>(Entry.Widget))
+		{
+			Result.Add(SubWidget);
+		}
+	}
+	return Result;
 }
 
 UUserWidget* UUserWidgetBase::GetSubWidget(int32 InIndex, TSubclassOf<UUserWidget> InClass) const

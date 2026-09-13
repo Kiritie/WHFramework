@@ -8,9 +8,9 @@ UWidgetAbilityInventoryBase::UWidgetAbilityInventoryBase(const FObjectInitialize
 
 }
 
-void UWidgetAbilityInventoryBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetAbilityInventoryBase::OnInitialize(const FParameter& InParams)
 {
-	Super::OnInitialize(InOwner, InParams);
+	Super::OnInitialize(InParams);
 }
 
 void UWidgetAbilityInventoryBase::OnRefresh()

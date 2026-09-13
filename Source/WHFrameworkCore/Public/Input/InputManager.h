@@ -6,6 +6,11 @@
 #include "Main/MainTypes.h"
 #include "Main/Base/ManagerBase.h"
 
+DECLARE_MULTICAST_DELEGATE_TwoParams(
+	FOnGlobalInputModeChanged,
+	EInputMode,
+	EInputMode);
+
 class WHFRAMEWORKCORE_API FInputManager : public FManagerBase, public IInputManagerInterface
 {
 	GENERATED_MANAGER(FInputManager)
@@ -39,10 +44,16 @@ public:
 
 	virtual void UpdateInputMode();
 
+	virtual void SetExternalInputMode(TOptional<EInputMode> InInputMode);
+
 protected:
 	EInputMode NativeInputMode;
 	
 	EInputMode GlobalInputMode;
+
+	TOptional<EInputMode> ExternalInputMode;
+
+	bool bInputModeExternallyManaged;
 	
 	TArray<IInputManagerInterface*> InputManagers;
 
@@ -54,4 +65,6 @@ public:
 	virtual void SetNativeInputMode(EInputMode InInputMode) override;
 
 	virtual EInputMode GetGlobalInputMode() const { return GlobalInputMode; }
+
+	FOnGlobalInputModeChanged OnInputModeChanged;
 };

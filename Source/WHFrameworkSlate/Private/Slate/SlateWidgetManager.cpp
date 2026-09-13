@@ -5,6 +5,30 @@
 #include "Input/InputManager.h"
 #include "Main/MainManager.h"
 
+namespace
+{
+	int32 GetSlateInputModeRank(EInputMode InInputMode)
+	{
+		switch(InInputMode)
+		{
+			case EInputMode::None:
+				return 0;
+			case EInputMode::GameOnly:
+				return 10;
+			case EInputMode::GameOnly_NotHideCursor:
+				return 11;
+			case EInputMode::GameAndUI:
+				return 20;
+			case EInputMode::GameAndUI_NotHideCursor:
+				return 21;
+			case EInputMode::UIOnly:
+				return 30;
+			default:
+				return 0;
+		}
+	}
+}
+
 FUniqueType FSlateWidgetManager::Type = FUniqueType(&FManagerBase::Type);
 
 IMPLEMENTATION_MANAGER(FSlateWidgetManager)
@@ -54,6 +78,8 @@ void FSlateWidgetManager::OnRefresh(float DeltaSeconds)
 void FSlateWidgetManager::OnTermination()
 {
 	FManagerBase::OnTermination();
+
+	FInputManager::Get().RemoveInputManager(this);
 }
 
 void FSlateWidgetManager::CloseAllSlateWidget(bool bInstant)
@@ -68,13 +94,13 @@ void FSlateWidgetManager::CloseAllSlateWidget(bool bInstant)
 	}
 }
 
-void FSlateWidgetManager::ClearAllSlateWidget(bool bRecovery)
+void FSlateWidgetManager::ClearAllSlateWidget(EObjectDespawnMode InMode)
 {
 	for (auto Iter : AllSlateWidgets)
 	{
 		if(Iter.Value)
 		{
-			Iter.Value->OnDestroy(bRecovery);
+			Iter.Value->OnDestroy(InMode);
 		}
 	}
 	AllSlateWidgets.Empty();
@@ -108,7 +134,10 @@ EInputMode FSlateWidgetManager::GetNativeInputMode() const
 	EInputMode InputMode = EInputMode::None;
 	for (const auto& Iter : AllSlateWidgets)
 	{
-		if (Iter.Value && (Iter.Value->GetWidgetState(true) == EScreenWidgetState::Opening || Iter.Value->GetWidgetState(true) == EScreenWidgetState::Opened) && (int32)Iter.Value->GetWidgetInputMode() > (int32)InputMode)
+		if(Iter.Value
+			&& (Iter.Value->GetWidgetState(true) == EScreenWidgetState::Opening
+				|| Iter.Value->GetWidgetState(true) == EScreenWidgetState::Opened)
+			&& GetSlateInputModeRank(Iter.Value->GetWidgetInputMode()) > GetSlateInputModeRank(InputMode))
 		{
 			InputMode = Iter.Value->GetWidgetInputMode();
 		}

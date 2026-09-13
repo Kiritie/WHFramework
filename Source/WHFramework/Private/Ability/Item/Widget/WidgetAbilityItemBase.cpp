@@ -22,19 +22,19 @@ void UWidgetAbilityItemBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 	Super::OnDespawn_Implementation(InMode);
 }
 
-void UWidgetAbilityItemBase::OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams)
+void UWidgetAbilityItemBase::OnCreate(const FParameter& InParam)
 {
-	Super::OnCreate(InOwner, InParams);
+	Super::OnCreate(InParam);
 }
 
-void UWidgetAbilityItemBase::OnInitialize(const TArray<FParameter>& InParams)
+void UWidgetAbilityItemBase::OnInitialize(const FParameter& InParam)
 {
-	if(InParams.IsValidIndex(0))
+	if(const FAbilityWidgetSpawnParameter* Param = InParam.GetPtr<FAbilityWidgetSpawnParameter>())
 	{
-		Item = InParams[0].Get<FAbilityItem>();
+		Item = Param->Item;
 		Item.Payload = this;
 	}
-	Super::OnInitialize(InParams);
+	Super::OnInitialize(InParam);
 }
 
 void UWidgetAbilityItemBase::OnRefresh()
@@ -42,9 +42,9 @@ void UWidgetAbilityItemBase::OnRefresh()
 	Super::OnRefresh();
 }
 
-void UWidgetAbilityItemBase::OnDestroy(bool bRecovery)
+void UWidgetAbilityItemBase::OnDestroy(EObjectDespawnMode InMode)
 {
-	Super::OnDestroy(bRecovery);
+	Super::OnDestroy(InMode);
 	
 	Item = FAbilityItem::Empty;
 }

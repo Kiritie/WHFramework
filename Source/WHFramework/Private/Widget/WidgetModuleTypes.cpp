@@ -8,12 +8,45 @@
 
 FGameplayTag FScreenWidgetConfig::ResolveWidgetTag() const
 {
-	return WidgetTagOverride;
+	if(WidgetTagOverride.IsValid())
+	{
+		return WidgetTagOverride;
+	}
+
+	if(const UUserWidgetBase* DefaultWidget = WidgetClass ? WidgetClass->GetDefaultObject<UUserWidgetBase>() : nullptr)
+	{
+		return DefaultWidget->GetDefaultWidgetTag();
+	}
+
+	return FGameplayTag();
+}
+
+FGameplayTag FScreenWidgetConfig::ResolveParentWidgetTag() const
+{
+	const FGameplayTag WidgetTag = ResolveWidgetTag();
+	const FGameplayTag ScreenRootTag = FGameplayTag::RequestGameplayTag(TEXT("Widget.Screen"), false);
+	if(!WidgetTag.IsValid() || !ScreenRootTag.IsValid() || !WidgetTag.MatchesTag(ScreenRootTag))
+	{
+		return FGameplayTag();
+	}
+
+	const FGameplayTag ParentWidgetTag = WidgetTag.RequestDirectParent();
+	return ParentWidgetTag != ScreenRootTag ? ParentWidgetTag : FGameplayTag();
 }
 
 FGameplayTag FWorldWidgetConfig::ResolveWidgetTag() const
 {
-	return WidgetTagOverride;
+	if(WidgetTagOverride.IsValid())
+	{
+		return WidgetTagOverride;
+	}
+	if(const UWorldWidgetBase* DefaultObject = WidgetClass
+		? WidgetClass->GetDefaultObject<UWorldWidgetBase>()
+		: nullptr)
+	{
+		return DefaultObject->GetDefaultWidgetTag();
+	}
+	return FGameplayTag();
 }
 
 FVector FWorldWidgetMapping::GetLocation() const

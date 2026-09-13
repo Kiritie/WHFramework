@@ -58,10 +58,10 @@ void AAbilitySpawnerBase::OnSpawn_Implementation(const FParameter& InParam)
 {
 	USceneModuleStatics::RemoveSceneActor(this);
 
-	const FWHActorSpawnParameter& Parameter = InParam.GetRef<FWHActorSpawnParameter>();
-	if(Parameter.bOverrideActorID)
+	const FWHActorSpawnParameter* Param = InParam.GetPtr<FWHActorSpawnParameter>();
+	if(Param && Param->bOverrideActorID)
 	{
-		ActorID = Parameter.ActorID;
+		ActorID = Param->ActorID;
 	}
 	
 	USceneModuleStatics::AddSceneActor(this);

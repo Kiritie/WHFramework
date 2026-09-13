@@ -4,7 +4,6 @@
 #include "Slate/Runtime/Base/SSlateWidgetBase.h"
 #include "SlateOptMacros.h"
 #include "Engine/World.h"
-#include "Input/InputManager.h"
 #include "Slate/SlateWidgetManager.h"
 #include "Slate/Runtime/Interfaces/SubWidgetInterface.h"
 
@@ -29,7 +28,7 @@ SSlateWidgetBase::SSlateWidgetBase()
 	WidgetRefreshType = EWidgetRefreshType::None;
 	WidgetState = EScreenWidgetState::None;
 	WidgetInputMode = EInputMode::None;
-	OwnerObject = nullptr;
+	bInitialized = false;
 	LastTemporary = nullptr;
 	ParentWidget = nullptr;
 	TemporaryChild = nullptr;
@@ -91,14 +90,15 @@ FReply SSlateWidgetBase::OnTouchEnded(const FGeometry& MyGeometry, const FPointe
 	return bConsumePointerInput ? FReply::Handled() : SCompoundWidget::OnTouchEnded(MyGeometry, GestureEvent);
 }
 
-void SSlateWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
+void SSlateWidgetBase::OnCreate(const FParameter& InParam)
 {
-	WidgetParams = InParams;
+	WidgetParams = InParam;
 
 	if(ParentWidget)
 	{
 		ParentWidget->RemoveChildWidget(this);
 	}
+
 	if(ParentName != NAME_None)
 	{
 		// ParentWidget = FSlateWidgetManager::Get().GetSlateWidget<SSlateWidgetBase>(ParentName);
@@ -115,22 +115,22 @@ void SSlateWidgetBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InPa
 	// 		const SSlateWidgetBase* DefaultObject = FSlateWidgetManager::Get().GetUserWidgetClassByName(Iter)->GetDefaultObject<SSlateWidgetBase>();
 	// 		if(DefaultObject->ParentName == WidgetName && (DefaultObject->WidgetCreateType == EWidgetCreateType::AutoCreate || DefaultObject->WidgetCreateType == EWidgetCreateType::AutoCreateAndOpen))
 	// 		{
-	// 			FSlateWidgetManager::Get().CreateUserWidgetByName<SSlateWidgetBase>(Iter, InOwner);
+	// 			FSlateWidgetManager::Get().CreateUserWidgetByName<SSlateWidgetBase>(Iter, OwnerObject);
 	// 		}
 	// 	}
 	// }
 }
 
-void SSlateWidgetBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
+void SSlateWidgetBase::OnInitialize(const FParameter& InParam)
 {
-	OwnerObject = InOwner;
+	WidgetParams = InParam;
 }
 
-void SSlateWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
+void SSlateWidgetBase::OnOpen(const FParameter& InParam, bool bInstant)
 {
 	if(WidgetState == EScreenWidgetState::Opening || WidgetState == EScreenWidgetState::Opened) return;
 	
-	WidgetParams = InParams;
+	WidgetParams = InParam;
 	WidgetState = EScreenWidgetState::Opening;
 	OnStateChanged(WidgetState);
 
@@ -170,10 +170,8 @@ void SSlateWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 		FinishOpen(bInstant);
 	}
 
-	FInputManager::Get().UpdateInputMode();
-
-	// if(K2_OnOpened.IsBound()) K2_OnOpened.Broadcast(InParams, bInstant);
-	// if(OnOpened.IsBound()) OnOpened.Broadcast(InParams, bInstant);
+	// if(K2_OnOpened.IsBound()) K2_OnOpened.Broadcast(InParam, bInstant);
+	// if(OnOpened.IsBound()) OnOpened.Broadcast(InParam, bInstant);
 
 	for(const auto Iter : ChildWidgets)
 	{
@@ -181,7 +179,7 @@ void SSlateWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
 		if(ChildWidget->GetParentName() == GetWidgetName()
 			&& ChildWidget->GetWidgetCreateType() == EWidgetCreateType::AutoCreateAndOpen)
 		{
-			Iter->Open(nullptr, bInstant);
+			Iter->Open(FParameter(), bInstant);
 		}
 	}
 }
@@ -204,7 +202,7 @@ void SSlateWidgetBase::OnRefresh()
 {
 }
 
-void SSlateWidgetBase::OnDestroy(bool bRecovery)
+void SSlateWidgetBase::OnDestroy(EObjectDespawnMode InMode)
 {
 	if(GWorld->GetGameViewport())
 	{
@@ -216,36 +214,26 @@ void SSlateWidgetBase::OnDestroy(bool bRecovery)
 		ParentWidget->RemoveChildWidget(this);
 	}
 
-	FInputManager::Get().UpdateInputMode();
+	bInitialized = false;
+	WidgetParams.Reset();
 }
 
 void SSlateWidgetBase::OnStateChanged(EScreenWidgetState InWidgetChange)
 {
 }
 
-void SSlateWidgetBase::Init(UObject* InOwner, const TArray<FParameter>* InParams, bool bForce)
+void SSlateWidgetBase::Init(const FParameter& InParam, bool bForce)
 {
-	Init(InOwner, InParams ? *InParams : TArray<FParameter>(), bForce);
-}
-
-void SSlateWidgetBase::Init(UObject* InOwner, const TArray<FParameter>& InParams, bool bForce)
-{
-	if(bForce || !InOwner || OwnerObject != InOwner)
+	if(!bInitialized || bForce)
 	{
-		OwnerObject = InOwner;
-
-		OnInitialize(InOwner, InParams);
+		OnInitialize(InParam);
+		bInitialized = true;
 	}
 }
 
-void SSlateWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant, bool bForce)
+void SSlateWidgetBase::Open(const FParameter& InParam, bool bInstant, bool bForce)
 {
-	FSlateWidgetManager::Get().OpenSlateWidget<SSlateWidgetBase>(InParams, bInstant, GetWidgetName());
-}
-
-void SSlateWidgetBase::Open(const TArray<FParameter>& InParams, bool bInstant, bool bForce)
-{
-	FSlateWidgetManager::Get().OpenSlateWidget<SSlateWidgetBase>(InParams, bInstant, GetWidgetName());
+	FSlateWidgetManager::Get().OpenSlateWidget<SSlateWidgetBase>(InParam, bInstant, GetWidgetName());
 }
 
 void SSlateWidgetBase::Close(bool bInstant)
@@ -259,7 +247,7 @@ void SSlateWidgetBase::Toggle(bool bInstant)
 	
 	if(WidgetState != EScreenWidgetState::Opened)
 	{
-		Open(nullptr, bInstant);
+		Open(FParameter(), bInstant);
 	}
 	else
 	{
@@ -280,9 +268,9 @@ void SSlateWidgetBase::Refresh()
 	}
 }
 
-void SSlateWidgetBase::Destroy(bool bRecovery)
+void SSlateWidgetBase::Destroy(EObjectDespawnMode InMode)
 {
-	FSlateWidgetManager::Get().DestroySlateWidget<SSlateWidgetBase>(bRecovery, GetWidgetName());
+	FSlateWidgetManager::Get().DestroySlateWidget<SSlateWidgetBase>(InMode, GetWidgetName());
 }
 
 bool SSlateWidgetBase::CanOpen() const
@@ -312,40 +300,34 @@ void SSlateWidgetBase::FinishClose(bool bInstant)
 		{
 			if(!bInstant && GetLastTemporary())
 			{
-				GetLastTemporary()->Open();
+				GetLastTemporary()->Open(FParameter());
 			}
 			GWorld->GetGameViewport()->RemoveViewportWidgetContent(SharedThis(this));
 		}
 		default: break;
 	}
 
-	FInputManager::Get().UpdateInputMode();
 }
 
-ISubWidgetInterface* SSlateWidgetBase::CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>* InParams)
-{
-	return CreateSubWidget(InClass, InParams ? *InParams : TArray<FParameter>());
-}
-
-ISubWidgetInterface* SSlateWidgetBase::CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams)
+ISubWidgetInterface* SSlateWidgetBase::CreateSubWidget(TSubclassOf<UUserWidget> InClass, const FParameter& InParam)
 {
 	return nullptr;
 }
 
-bool SSlateWidgetBase::DestroySubWidget(ISubWidgetInterface* InWidget, bool bRecovery)
+bool SSlateWidgetBase::DestroySubWidget(ISubWidgetInterface* InWidget, EObjectDespawnMode InMode)
 {
 	if(!InWidget) return false;
 
-	InWidget->OnDestroy(bRecovery);
+	InWidget->OnDestroy(InMode);
 
 	return true;
 }
 
-void SSlateWidgetBase::DestroyAllSubWidget(bool bRecovery)
+void SSlateWidgetBase::DestroyAllSubWidget(EObjectDespawnMode InMode)
 {
 	for(auto Iter : SubWidgets)
 	{
-		Iter->Destroy();
+		Iter->Destroy(InMode);
 	}
 	SubWidgets.Empty();
 }

@@ -16,8 +16,10 @@ void UWidgetAbilityDragItemBase::OnSpawn_Implementation(const FParameter& InPara
 {
 	Super::OnSpawn_Implementation(InParam);
 
-	const FAbilityWidgetSpawnParameter& SpawnParameter = InParam.GetRef<FAbilityWidgetSpawnParameter>();
-	Item = SpawnParameter.Item;
+	if(const FAbilityWidgetSpawnParameter* Param = InParam.GetPtr<FAbilityWidgetSpawnParameter>())
+	{
+		Item = Param->Item;
+	}
 	Item.Payload = this;
 }
 

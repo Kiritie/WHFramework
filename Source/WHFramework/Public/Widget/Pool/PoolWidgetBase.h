@@ -44,14 +44,14 @@ public:
 	virtual void Refresh() override;
 
 	UFUNCTION(BlueprintCallable)
-	virtual void Destroy(bool bRecovery = false) override;
+	virtual void Destroy(EObjectDespawnMode InMode = EObjectDespawnMode::Destroy) override;
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	UPROPERTY(VisibleAnywhere, Transient, BlueprintReadOnly)
 	UUserWidget* OwnerWidget;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn))
-	TArray<FParameter> WidgetParams;
+	UPROPERTY(Transient, BlueprintReadWrite)
+	FParameter WidgetParam;
 
 public:
 	template<class T>
@@ -64,5 +64,5 @@ public:
 	UUserWidget* GetOwnerWidget(TSubclassOf<UUserWidget> InClass = nullptr) const;
 
 	UFUNCTION(BlueprintPure)
-	virtual TArray<FParameter> GetWidgetParams() const { return WidgetParams; }
+	virtual FParameter GetWidgetParams() const { return WidgetParam; }
 };

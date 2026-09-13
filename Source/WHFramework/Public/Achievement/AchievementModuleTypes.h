@@ -21,9 +21,9 @@ public:
 
 	//Icons
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ShortTooltip = "Icon to display when locked", ToolTip = "Icon to display when locked. Overlay this if LockOverlay is true"), Category = "Achievement Data")
-	UTexture2D* LockedIcon;
+	UTexture2D* LockedIcon = nullptr;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ToolTip = "Icon to display when achieved"), Category = "Achievement Data")
-	UTexture2D* AchievedIcon;
+	UTexture2D* AchievedIcon = nullptr;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ToolTip = "If true, LockedIcon will be rendered on top of the achieved icon"), Category = "Achievement Data")
 	bool LockOverlay = false;
 	

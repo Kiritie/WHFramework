@@ -11,9 +11,11 @@
 
 class UPlayerMappableKeyProfileBase;
 class UCommonInputSubsystem;
+class UCommonUIActionRouterBase;
 class UEnhancedInputLocalPlayerSubsystem;
 class UEnhancedInputUserSettings;
 class UInputActionBase;
+class UInputBindingBase;
 class UInputComponentBase;
 class ULocalPlayer;
 
@@ -66,7 +68,16 @@ struct WHFRAMEWORK_API FInputMappableEntry
 	FName MappingName;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	EPlayerMappableKeySlot Slot = EPlayerMappableKeySlot::First;
+	EPlayerMappableKeySlot Slot = EPlayerMappableKeySlot::Unspecified;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	FKey DefaultKey;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	FText DisplayName;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	FText DisplayCategory;
 };
 
 USTRUCT()
@@ -87,7 +98,13 @@ struct WHFRAMEWORK_API FInputPlayerRuntime
 	TObjectPtr<UCommonInputSubsystem> CommonInputSubsystem = nullptr;
 
 	UPROPERTY(Transient)
+	TObjectPtr<UCommonUIActionRouterBase> CommonUIActionRouter = nullptr;
+
+	UPROPERTY(Transient)
 	TObjectPtr<UInputComponentBase> InputComponent = nullptr;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UInputBindingBase>> InputBindings;
 };
 
 USTRUCT(BlueprintType)

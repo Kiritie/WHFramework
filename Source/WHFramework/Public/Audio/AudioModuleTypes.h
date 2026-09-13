@@ -103,10 +103,10 @@ struct FSoundParams : public FSaveData
 	}
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.0", ClampMax = "1.0", SettingApply = "Preview", SettingScale = "100.0", SettingDecimalPlaces = "0", Units = "%"), Category = "Volume")
 	float Volume;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.5", ClampMax = "2.0", SettingApply = "Preview"), Category = "Pitch")
 	float Pitch;
 };
 

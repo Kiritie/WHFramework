@@ -17,11 +17,11 @@ public:
 	UWidgetUIMaskBase(const FObjectInitializer& ObjectInitializer);
 	
 public:
-	virtual void OnCreate(UObject* InOwner, const TArray<FParameter>& InParams) override;
+	virtual void OnCreate(const FParameter& InParam) override;
 	
-	virtual void OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams) override;
+	virtual void OnInitialize(const FParameter& InParam) override;
 
-	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant) override;
+	virtual void OnOpen(const FParameter& InParam, bool bInstant) override;
 
 	virtual void OnClose(bool bInstant) override;
 

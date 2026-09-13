@@ -3,10 +3,16 @@
 
 #include "Input/InputModule.h"
 
+#include "Algo/Unique.h"
 #include "CommonInputBaseTypes.h"
 #include "CommonInputSubsystem.h"
+#include "CommonActivatableWidget.h"
+#include "Input/CommonUIActionRouterBase.h"
+#include "Input/UIActionBindingHandle.h"
 #include "Main/Base/ModuleBase.h"
+#include "Event/EventModuleStatics.h"
 #include "Event/Events/Input/Event_InputModeChanged.h"
+#include "Event/Events/Input/Event_InputTypeChanged.h"
 #include "Gameplay/WHPlayerController.h"
 #include "Common/CommonModuleStatics.h"
 #include "Main/MainModuleStatics.h"
@@ -70,14 +76,8 @@ void UInputModule::OnInitialize()
 
 	BuildInputCaches();
 
-	FInputManager::Get().AddInputManager(this);
-	
+	FInputManager::Get().OnInputModeChanged.AddUObject(this, &ThisClass::HandleGlobalInputModeChanged);
 	FInputManager::Get().SetNativeInputMode(NativeInputMode);
-
-	for(UInputBindingBase* InputBinding : InputBindings)
-	{
-		InputBinding->OnInitialize(0);
-	}
 }
 
 void UInputModule::OnPreparatory(EPhase InPhase)
@@ -87,8 +87,6 @@ void UInputModule::OnPreparatory(EPhase InPhase)
 	if(PHASEC(InPhase, EPhase::Final))
 	{
 		BuildPlayerRuntimes();
-
-		UInputComponentBase* Component = UInputModuleStatics::GetInputComponent<UInputComponentBase>();
 
 		for(const FInputContextConfig& Config : ContextConfigs)
 		{
@@ -101,11 +99,6 @@ void UInputModule::OnPreparatory(EPhase InPhase)
 			}
 		}
 
-		for(UInputBindingBase* InputBinding : InputBindings)
-		{
-			InputBinding->OnBindInput(Component);
-		}
-
 		UInputModuleStatics::UpdateGlobalInputMode();
 	}
 }
@@ -114,9 +107,15 @@ void UInputModule::OnReset()
 {
 	Super::OnReset();
 
-	for(UInputBindingBase* InputBinding : InputBindings)
+	for(FInputPlayerRuntime& Runtime : PlayerRuntimes)
 	{
-		InputBinding->OnReset();
+		for(UInputBindingBase* InputBinding : Runtime.InputBindings)
+		{
+			if(InputBinding)
+			{
+				InputBinding->OnReset();
+			}
+		}
 	}
 }
 
@@ -126,9 +125,15 @@ void UInputModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 
 	if(bInEditor) return;
 
-	for(UInputBindingBase* InputBinding : InputBindings)
+	for(FInputPlayerRuntime& Runtime : PlayerRuntimes)
 	{
-		InputBinding->OnRefresh(DeltaSeconds);
+		for(UInputBindingBase* InputBinding : Runtime.InputBindings)
+		{
+			if(InputBinding)
+			{
+				InputBinding->OnRefresh(DeltaSeconds);
+			}
+		}
 	}
 }
 
@@ -136,14 +141,30 @@ void UInputModule::OnPause()
 {
 	Super::OnPause();
 
-	UCommonModuleStatics::GetPlayerController()->DisableInput(nullptr);
+	for(const FInputPlayerRuntime& Runtime : PlayerRuntimes)
+	{
+		if(APlayerController* PlayerController = Runtime.LocalPlayer
+			? Runtime.LocalPlayer->GetPlayerController(GetWorld())
+			: nullptr)
+		{
+			PlayerController->DisableInput(nullptr);
+		}
+	}
 }
 
 void UInputModule::OnUnPause()
 {
 	Super::OnUnPause();
 
-	UCommonModuleStatics::GetPlayerController()->EnableInput(nullptr);
+	for(const FInputPlayerRuntime& Runtime : PlayerRuntimes)
+	{
+		if(APlayerController* PlayerController = Runtime.LocalPlayer
+			? Runtime.LocalPlayer->GetPlayerController(GetWorld())
+			: nullptr)
+		{
+			PlayerController->EnableInput(nullptr);
+		}
+	}
 }
 
 void UInputModule::OnTermination(EPhase InPhase)
@@ -152,18 +173,27 @@ void UInputModule::OnTermination(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		FInputManager::Get().RemoveInputManager(this);
-
-		for(UInputBindingBase* InputBinding : InputBindings)
-		{
-			InputBinding->OnTermination();
-		}
+		FInputManager::Get().OnInputModeChanged.RemoveAll(this);
+		FInputManager::Get().SetExternalInputMode(TOptional<EInputMode>());
 
 		for(FInputPlayerRuntime& Runtime : PlayerRuntimes)
 		{
+			for(UInputBindingBase* InputBinding : Runtime.InputBindings)
+			{
+				if(InputBinding)
+				{
+					InputBinding->OnTermination();
+				}
+			}
+			Runtime.InputBindings.Reset();
+
 			if(Runtime.CommonInputSubsystem)
 			{
 				Runtime.CommonInputSubsystem->OnInputMethodChangedNative.RemoveAll(this);
+			}
+			if(Runtime.CommonUIActionRouter)
+			{
+				Runtime.CommonUIActionRouter->OnActiveInputConfigChanged().RemoveAll(this);
 			}
 		}
 		PlayerRuntimes.Reset();
@@ -176,7 +206,11 @@ void UInputModule::BuildInputCaches()
 	InputContextMap.Reset();
 	PlayerMappableByActionTag.Reset();
 
-	auto AddMappings = [this](UInputMappingContext* MappingContext)
+	TMap<FName, int32> NextSlotByMappingName;
+	TMap<FString, FGameplayTag> ActionTagByMappingSlot;
+	auto AddMappings = [this, &NextSlotByMappingName, &ActionTagByMappingSlot](
+		UInputMappingContext* MappingContext,
+		bool bRegisterWithSettings)
 	{
 		if(!MappingContext)
 		{
@@ -186,44 +220,97 @@ void UInputModule::BuildInputCaches()
 		for(const FEnhancedActionKeyMapping& Mapping : MappingContext->GetMappings())
 		{
 			const UInputActionBase* Action = Cast<UInputActionBase>(Mapping.Action);
-			if(!Action || !Action->ActionTag.IsValid())
+			if(!ensureMsgf(
+				Action,
+				TEXT("Input mapping context %s contains an action that is not UInputActionBase."),
+				*GetNameSafe(MappingContext)))
+			{
+				continue;
+			}
+			if(!ensureMsgf(
+				Action->ActionTag.IsValid(),
+				TEXT("Input action %s has no valid ActionTag."),
+				*GetNameSafe(Action)))
 			{
 				continue;
 			}
 
 			const TObjectPtr<const UInputActionBase>* Existing = InputActionMap.Find(Action->ActionTag);
-			ensureMsgf(!Existing || Existing->Get() == Action, TEXT("Input ActionTag collision: %s"), *Action->ActionTag.ToString());
-			InputActionMap.Add(Action->ActionTag, Action);
-
-			const FName MappingName = Mapping.GetMappingName();
-			if(!MappingName.IsNone())
+			if(!ensureMsgf(!Existing || Existing->Get() == Action, TEXT("Input ActionTag collision: %s"), *Action->ActionTag.ToString()))
 			{
-				TArray<FInputMappableEntry> Entries;
-				PlayerMappableByActionTag.MultiFind(Action->ActionTag, Entries);
-				if(!Entries.ContainsByPredicate([MappingName](const FInputMappableEntry& Entry)
+				continue;
+			}
+			if(!Existing)
+			{
+				InputActionMap.Add(Action->ActionTag, Action);
+			}
+
+			if(!bRegisterWithSettings || !Mapping.IsPlayerMappable())
+			{
+				continue;
+			}
+			const FName MappingName = Mapping.GetMappingName();
+			if(!ensureMsgf(!MappingName.IsNone(), TEXT("Player mappable action %s has no MappingName."), *Action->ActionTag.ToString()))
+			{
+				continue;
+			}
+
+			const int32 SlotIndex = NextSlotByMappingName.FindOrAdd(MappingName)++;
+			if(!ensureMsgf(
+				SlotIndex <= static_cast<int32>(EPlayerMappableKeySlot::Seventh),
+				TEXT("Player mappable row %s exceeds the supported slot count."),
+				*MappingName.ToString()))
+			{
+				continue;
+			}
+
+			const EPlayerMappableKeySlot Slot = static_cast<EPlayerMappableKeySlot>(SlotIndex);
+			const FString MappingSlotKey = FString::Printf(TEXT("%s.%d"), *MappingName.ToString(), SlotIndex);
+			if(const FGameplayTag* ExistingActionTag = ActionTagByMappingSlot.Find(MappingSlotKey))
+			{
+				if(!ensureMsgf(
+					*ExistingActionTag == Action->ActionTag,
+					TEXT("Player mappable MappingName/Slot collision: %s"),
+					*MappingSlotKey))
 				{
-					return Entry.MappingName == MappingName;
-				}))
-				{
-					FInputMappableEntry Entry;
-					Entry.ActionTag = Action->ActionTag;
-					Entry.MappingName = MappingName;
-					PlayerMappableByActionTag.Add(Action->ActionTag, Entry);
+					continue;
 				}
 			}
+			ActionTagByMappingSlot.Add(MappingSlotKey, Action->ActionTag);
+
+			FInputMappableEntry Entry;
+			Entry.ActionTag = Action->ActionTag;
+			Entry.MappingName = MappingName;
+			Entry.Slot = Slot;
+			Entry.DefaultKey = Mapping.Key;
+			Entry.DisplayName = Mapping.GetDisplayName();
+			Entry.DisplayCategory = Mapping.GetDisplayCategory();
+			PlayerMappableByActionTag.Add(Action->ActionTag, Entry);
 		}
 	};
 
 	for(const FInputContextConfig& Config : ContextConfigs)
 	{
-		if(!Config.ContextTag.IsValid() || !Config.MappingContext)
+		if(!ensureMsgf(
+			Config.ContextTag.IsValid(),
+			TEXT("Input context config has no valid ContextTag.")))
+		{
+			continue;
+		}
+		if(!ensureMsgf(
+			Config.MappingContext,
+			TEXT("Input context %s has no mapping context."),
+			*Config.ContextTag.ToString()))
 		{
 			continue;
 		}
 
-		ensureMsgf(!InputContextMap.Contains(Config.ContextTag), TEXT("Input ContextTag collision: %s"), *Config.ContextTag.ToString());
+		if(!ensureMsgf(!InputContextMap.Contains(Config.ContextTag), TEXT("Input ContextTag collision: %s"), *Config.ContextTag.ToString()))
+		{
+			continue;
+		}
 		InputContextMap.Add(Config.ContextTag, Config.MappingContext);
-		AddMappings(Config.MappingContext);
+		AddMappings(Config.MappingContext, Config.bRegisterWithSettings);
 	}
 
 }
@@ -232,9 +319,20 @@ void UInputModule::BuildPlayerRuntimes()
 {
 	for(FInputPlayerRuntime& Runtime : PlayerRuntimes)
 	{
+		for(UInputBindingBase* InputBinding : Runtime.InputBindings)
+		{
+			if(InputBinding)
+			{
+				InputBinding->OnTermination();
+			}
+		}
 		if(Runtime.CommonInputSubsystem)
 		{
 			Runtime.CommonInputSubsystem->OnInputMethodChangedNative.RemoveAll(this);
+		}
+		if(Runtime.CommonUIActionRouter)
+		{
+			Runtime.CommonUIActionRouter->OnActiveInputConfigChanged().RemoveAll(this);
 		}
 	}
 	PlayerRuntimes.Reset();
@@ -252,10 +350,21 @@ void UInputModule::BuildPlayerRuntimes()
 		Runtime.LocalPlayer = LocalPlayer;
 		Runtime.EnhancedInputSubsystem = LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
 		Runtime.CommonInputSubsystem = LocalPlayer->GetSubsystem<UCommonInputSubsystem>();
+		Runtime.CommonUIActionRouter = LocalPlayer->GetSubsystem<UCommonUIActionRouterBase>();
 
 		if(Runtime.EnhancedInputSubsystem)
 		{
 			Runtime.UserSettings = Runtime.EnhancedInputSubsystem->GetUserSettings();
+			if(Runtime.UserSettings)
+			{
+				for(const FInputContextConfig& Config : ContextConfigs)
+				{
+					if(Config.bRegisterWithSettings && Config.MappingContext)
+					{
+						Runtime.UserSettings->RegisterInputMappingContext(Config.MappingContext);
+					}
+				}
+			}
 		}
 
 		if(APlayerController* PlayerController = LocalPlayer->GetPlayerController(GetWorld()))
@@ -267,12 +376,87 @@ void UInputModule::BuildPlayerRuntimes()
 		{
 			Runtime.CommonInputSubsystem->OnInputMethodChangedNative.AddUObject(this, &ThisClass::HandleInputMethodChanged, PlayerIndex);
 		}
+		if(Runtime.CommonUIActionRouter)
+		{
+			Runtime.CommonUIActionRouter->OnActiveInputConfigChanged().AddUObject(
+				this,
+				&ThisClass::HandleCommonUIInputConfigChanged,
+				PlayerIndex);
+		}
+
+		for(UInputBindingBase* InputBindingTemplate : InputBindings)
+		{
+			if(!InputBindingTemplate)
+			{
+				continue;
+			}
+
+			UInputBindingBase* InputBinding = DuplicateObject<UInputBindingBase>(
+				InputBindingTemplate,
+				this);
+			Runtime.InputBindings.Add(InputBinding);
+			InputBinding->OnInitialize(PlayerIndex);
+			if(Runtime.InputComponent)
+			{
+				InputBinding->OnBindInput(Runtime.InputComponent);
+			}
+		}
 	}
+
+	RefreshCommonUIInputMode(0);
 }
 
 void UInputModule::HandleInputMethodChanged(ECommonInputType InInputType, int32 InPlayerIndex)
 {
 	OnInputTypeChanged.Broadcast(InPlayerIndex, InInputType);
+	UEventModuleStatics::BroadcastEvent<FEventInputTypeChanged>(this, { InPlayerIndex, InInputType });
+}
+
+void UInputModule::HandleCommonUIInputConfigChanged(FUIInputConfig InInputConfig, int32 InPlayerIndex)
+{
+	(void)InInputConfig;
+	RefreshCommonUIInputMode(InPlayerIndex);
+}
+
+void UInputModule::HandleGlobalInputModeChanged(EInputMode InPreviousInputMode, EInputMode InInputMode)
+{
+	UEventModuleStatics::BroadcastEvent<FEventInputModeChanged>(this, { InInputMode, InPreviousInputMode });
+}
+
+void UInputModule::RefreshCommonUIInputMode(int32 InPlayerIndex)
+{
+	if(InPlayerIndex != 0 || !PlayerRuntimes.IsValidIndex(InPlayerIndex))
+	{
+		return;
+	}
+
+	TOptional<EInputMode> InputMode;
+	const UCommonUIActionRouterBase* ActionRouter = PlayerRuntimes[InPlayerIndex].CommonUIActionRouter;
+	const UCommonActivatableWidget* ActiveWidget = ActionRouter
+		? ActionRouter->GetLeafmostActivatableWidget()
+		: nullptr;
+	const TOptional<FUIInputConfig> InputConfig = ActiveWidget
+		? ActiveWidget->GetDesiredInputConfig()
+		: TOptional<FUIInputConfig>();
+	if(InputConfig.IsSet())
+	{
+		switch(InputConfig->GetInputMode())
+		{
+			case ECommonInputMode::Game:
+				InputMode = EInputMode::GameOnly;
+				break;
+			case ECommonInputMode::All:
+				InputMode = EInputMode::GameAndUI;
+				break;
+			case ECommonInputMode::Menu:
+				InputMode = EInputMode::UIOnly;
+				break;
+			default:
+				break;
+		}
+	}
+
+	FInputManager::Get().SetExternalInputMode(InputMode);
 }
 
 void UInputModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -332,13 +516,23 @@ void UInputModule::SetNativeInputMode(EInputMode InInputMode)
 
 UInputBindingBase* UInputModule::GetInputBinding(TSubclassOf<UInputBindingBase> InClass, int32 InPlayerIndex) const
 {
+	if(!InClass)
+	{
+		return nullptr;
+	}
+
 	const FName InputBindingName = InClass->GetDefaultObject<UInputBindingBase>()->GetInputBindingName();
 	return GetInputBindingByName(InputBindingName, InPlayerIndex, InClass);
 }
 
 UInputBindingBase* UInputModule::GetInputBindingByName(const FName InName, int32 InPlayerIndex, TSubclassOf<UInputBindingBase> InClass) const
 {
-	for(UInputBindingBase* InputBinding : InputBindings)
+	if(!PlayerRuntimes.IsValidIndex(InPlayerIndex))
+	{
+		return nullptr;
+	}
+
+	for(UInputBindingBase* InputBinding : PlayerRuntimes[InPlayerIndex].InputBindings)
 	{
 		if(InputBinding && InputBinding->GetInputBindingName() == InName)
 		{
@@ -370,7 +564,11 @@ TArray<FName> UInputModule::GetAllActionKeyMappingNames(int32 InPlayerIndex)
 		if(!Config.MappingContext) continue;
 		for(const FEnhancedActionKeyMapping& Mapping : Config.MappingContext->GetMappings())
 		{
-			MappingNames.Add(Mapping.GetMappingName());
+			const FName MappingName = Mapping.GetMappingName();
+			if(!MappingName.IsNone())
+			{
+				MappingNames.AddUnique(MappingName);
+			}
 		}
 	}
 	return MappingNames;
@@ -379,7 +577,10 @@ TArray<FName> UInputModule::GetAllActionKeyMappingNames(int32 InPlayerIndex)
 TArray<FPlayerKeyMapping> UInputModule::GetAllPlayerKeyMappings(int32 InPlayerIndex)
 {
 	TArray<FPlayerKeyMapping> Mappings;
-	if(const UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>(InPlayerIndex))
+	const UEnhancedInputUserSettings* Settings = PlayerRuntimes.IsValidIndex(InPlayerIndex)
+		? PlayerRuntimes[InPlayerIndex].UserSettings.Get()
+		: nullptr;
+	if(Settings)
 	{
 		for (auto& Iter1 : Settings->GetAllAvailableKeyProfiles())
 		{
@@ -465,11 +666,6 @@ bool UInputModule::ActivateInputContext(FGameplayTag InContextTag, int32 InPlaye
 		return false;
 	}
 
-	if(Config->bRegisterWithSettings && PlayerRuntimes[InPlayerIndex].UserSettings)
-	{
-		PlayerRuntimes[InPlayerIndex].UserSettings->RegisterInputMappingContext(Config->MappingContext);
-	}
-
 	FModifyContextOptions Options;
 	Options.bIgnoreAllPressedKeysUntilRelease = true;
 	Subsystem->AddMappingContext(Config->MappingContext, Config->Priority, Options);
@@ -515,13 +711,26 @@ bool UInputModule::MapPlayerKeyByTag(FGameplayTag InActionTag, FKey InNewKey, EP
 
 	TArray<FInputMappableEntry> Entries;
 	PlayerMappableByActionTag.MultiFind(InActionTag, Entries);
-	if(Entries.IsEmpty())
+	const FInputMappableEntry* Entry = Entries.FindByPredicate([InSlot](const FInputMappableEntry& Item)
+	{
+		return Item.Slot == InSlot;
+	});
+	if(!Entry)
+	{
+		return false;
+	}
+	return MapPlayerKeyByMappingName(Entry->MappingName, InNewKey, InSlot, InPlayerIndex, OutFailureReason);
+}
+
+bool UInputModule::MapPlayerKeyByMappingName(FName InMappingName, FKey InNewKey, EPlayerMappableKeySlot InSlot, int32 InPlayerIndex, FGameplayTagContainer* OutFailureReason)
+{
+	if(InMappingName.IsNone() || !PlayerRuntimes.IsValidIndex(InPlayerIndex) || !PlayerRuntimes[InPlayerIndex].UserSettings)
 	{
 		return false;
 	}
 
 	FMapPlayerKeyArgs Args;
-	Args.MappingName = Entries[0].MappingName;
+	Args.MappingName = InMappingName;
 	Args.Slot = InSlot;
 	Args.NewKey = InNewKey;
 
@@ -544,15 +753,32 @@ bool UInputModule::ResetPlayerKeyByTag(FGameplayTag InActionTag, int32 InPlayerI
 	TArray<FInputMappableEntry> Entries;
 	PlayerMappableByActionTag.MultiFind(InActionTag, Entries);
 	bool bReset = false;
+	TSet<FName> ResetMappingNames;
 	for(const FInputMappableEntry& Entry : Entries)
 	{
-		FMapPlayerKeyArgs Args;
-		Args.MappingName = Entry.MappingName;
-		FGameplayTagContainer FailureReasons;
-		PlayerRuntimes[InPlayerIndex].UserSettings->ResetAllPlayerKeysInRow(Args, FailureReasons);
-		bReset |= FailureReasons.IsEmpty();
+		if(ResetMappingNames.Contains(Entry.MappingName))
+		{
+			continue;
+		}
+		ResetMappingNames.Add(Entry.MappingName);
+
+		bReset |= ResetPlayerKeyByMappingName(Entry.MappingName, InPlayerIndex);
 	}
 	return bReset;
+}
+
+bool UInputModule::ResetPlayerKeyByMappingName(FName InMappingName, int32 InPlayerIndex)
+{
+	if(InMappingName.IsNone() || !PlayerRuntimes.IsValidIndex(InPlayerIndex) || !PlayerRuntimes[InPlayerIndex].UserSettings)
+	{
+		return false;
+	}
+
+	FMapPlayerKeyArgs Args;
+	Args.MappingName = InMappingName;
+	FGameplayTagContainer FailureReasons;
+	PlayerRuntimes[InPlayerIndex].UserSettings->ResetAllPlayerKeysInRow(Args, FailureReasons);
+	return FailureReasons.IsEmpty();
 }
 
 TArray<FPlayerKeyMapping> UInputModule::GetPlayerKeyMappingsByTag(FGameplayTag InActionTag, int32 InPlayerIndex) const
@@ -565,16 +791,45 @@ TArray<FPlayerKeyMapping> UInputModule::GetPlayerKeyMappingsByTag(FGameplayTag I
 
 	TArray<FInputMappableEntry> Entries;
 	PlayerMappableByActionTag.MultiFind(InActionTag, Entries);
+	TSet<FName> MappingNames;
 	for(const FInputMappableEntry& Entry : Entries)
 	{
-		for(const auto& Profile : PlayerRuntimes[InPlayerIndex].UserSettings->GetAllAvailableKeyProfiles())
+		MappingNames.Add(Entry.MappingName);
+	}
+
+	for(const FName MappingName : MappingNames)
+	{
+		for(const FPlayerKeyMapping& Mapping : GetPlayerKeyMappingsByMappingName(MappingName, InPlayerIndex))
 		{
-			if(const FKeyMappingRow* Row = Profile.Value->GetPlayerMappingRows().Find(Entry.MappingName))
+			const UInputActionBase* Action = Cast<UInputActionBase>(Mapping.GetAssociatedInputAction());
+			if(Action && Action->ActionTag == InActionTag)
 			{
-				for(const FPlayerKeyMapping& Mapping : Row->Mappings)
-				{
-					Mappings.Add(Mapping);
-				}
+				Mappings.AddUnique(Mapping);
+			}
+		}
+	}
+	Mappings.Sort([](const FPlayerKeyMapping& A, const FPlayerKeyMapping& B)
+	{
+		return A.GetSlot() < B.GetSlot();
+	});
+	return Mappings;
+}
+
+TArray<FPlayerKeyMapping> UInputModule::GetPlayerKeyMappingsByMappingName(FName InMappingName, int32 InPlayerIndex) const
+{
+	TArray<FPlayerKeyMapping> Mappings;
+	if(InMappingName.IsNone() || !PlayerRuntimes.IsValidIndex(InPlayerIndex) || !PlayerRuntimes[InPlayerIndex].UserSettings)
+	{
+		return Mappings;
+	}
+
+	for(const auto& Profile : PlayerRuntimes[InPlayerIndex].UserSettings->GetAllAvailableKeyProfiles())
+	{
+		if(const FKeyMappingRow* Row = Profile.Value->GetPlayerMappingRows().Find(InMappingName))
+		{
+			for(const FPlayerKeyMapping& Mapping : Row->Mappings)
+			{
+				Mappings.Add(Mapping);
 			}
 		}
 	}
@@ -593,7 +848,45 @@ TArray<FGameplayTag> UInputModule::GetAllMappableActions() const
 	{
 		return A.ToString() < B.ToString();
 	});
+	ActionTags.SetNum(Algo::Unique(ActionTags));
 	return ActionTags;
+}
+
+TArray<FInputMappableEntry> UInputModule::GetAllMappableEntries() const
+{
+	TArray<FInputMappableEntry> Entries;
+	for(const TPair<FGameplayTag, FInputMappableEntry>& Pair : PlayerMappableByActionTag)
+	{
+		Entries.Add(Pair.Value);
+	}
+	Entries.Sort([](const FInputMappableEntry& A, const FInputMappableEntry& B)
+	{
+		if(A.ActionTag != B.ActionTag)
+		{
+			return A.ActionTag.ToString() < B.ActionTag.ToString();
+		}
+		if(A.MappingName != B.MappingName)
+		{
+			return A.MappingName.LexicalLess(B.MappingName);
+		}
+		return A.Slot < B.Slot;
+	});
+	return Entries;
+}
+
+TArray<FInputMappableEntry> UInputModule::GetMappableEntriesByActionTag(FGameplayTag InActionTag) const
+{
+	TArray<FInputMappableEntry> Entries;
+	PlayerMappableByActionTag.MultiFind(InActionTag, Entries);
+	Entries.Sort([](const FInputMappableEntry& A, const FInputMappableEntry& B)
+	{
+		if(A.MappingName != B.MappingName)
+		{
+			return A.MappingName.LexicalLess(B.MappingName);
+		}
+		return A.Slot < B.Slot;
+	});
+	return Entries;
 }
 
 ECommonInputType UInputModule::GetCurrentInputType(int32 InPlayerIndex) const

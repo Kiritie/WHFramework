@@ -15,9 +15,9 @@ UWidgetAbilityInventorySlotBase::UWidgetAbilityInventorySlotBase(const FObjectIn
 {
 	ClickMethod = EButtonClickMethod::MouseDown;
 
-	MatchStyle = nullptr;
-	MismatchStyle = nullptr;
-	DefaultStyle = nullptr;
+	MatchStyleTag = FGameplayTag();
+	MismatchStyleTag = FGameplayTag();
+	DefaultStyleTag = FGameplayTag();
 	
 	OwnerSlot = nullptr;
 	CooldownTimerHandle = FTimerHandle();
@@ -35,18 +35,18 @@ void UWidgetAbilityInventorySlotBase::OnDespawn_Implementation(EObjectDespawnMod
 	Super::OnDespawn_Implementation(InMode);
 }
 
-void UWidgetAbilityInventorySlotBase::OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams)
+void UWidgetAbilityInventorySlotBase::OnCreate(const FParameter& InParam)
 {
-	Super::OnCreate(InOwner, InParams);
+	Super::OnCreate(InParam);
 
-	DefaultStyle = Style;
+	DefaultStyleTag = GetStyleTag();
 }
 
-void UWidgetAbilityInventorySlotBase::OnInitialize(const TArray<FParameter>& InParams)
+void UWidgetAbilityInventorySlotBase::OnInitialize(const FParameter& InParam)
 {
-	if(InParams.IsValidIndex(0))
+	if(const FAbilityInventorySlotWidgetParameter* Param = InParam.GetPtr<FAbilityInventorySlotWidgetParameter>())
 	{
-		const auto InOwnerSlot = InParams[0].Get<UAbilityInventorySlotBase*>();
+		UAbilityInventorySlotBase* InOwnerSlot = Param->OwnerSlot;
 		if(InOwnerSlot == OwnerSlot) return;
 	
 		if(OwnerSlot)
@@ -65,7 +65,7 @@ void UWidgetAbilityInventorySlotBase::OnInitialize(const TArray<FParameter>& InP
 			OwnerSlot->OnSlotDeactived.AddDynamic(this, &UWidgetAbilityInventorySlotBase::OnDeactivated);
 		}
 	}
-	Super::OnInitialize(InParams);
+	Super::OnInitialize(InParam);
 }
 
 void UWidgetAbilityInventorySlotBase::OnRefresh()
@@ -91,11 +91,11 @@ void UWidgetAbilityInventorySlotBase::OnRefresh()
 	}
 }
 
-void UWidgetAbilityInventorySlotBase::OnDestroy(bool bRecovery)
+void UWidgetAbilityInventorySlotBase::OnDestroy(EObjectDespawnMode InMode)
 {
-	Super::OnDestroy(bRecovery);
+	Super::OnDestroy(InMode);
 
-	SetStyle(DefaultStyle);
+	SetStyleTag(DefaultStyleTag);
 
 	OwnerSlot = nullptr;
 	StopCooldown();
@@ -108,7 +108,7 @@ bool UWidgetAbilityInventorySlotBase::NativeOnDrop(const FGeometry& InGeometry, 
 	const auto PayloadSlot = Cast<UWidgetAbilityInventorySlotBase>(InOperation->Payload);
 	if (PayloadSlot && PayloadSlot != this && !PayloadSlot->IsEmpty())
 	{
-		SetStyle(DefaultStyle);
+		SetStyleTag(DefaultStyleTag);
 
 		FAbilityItem& _Item = PayloadSlot->GetItem();
 		if(OwnerSlot->MatchItemLimit(_Item, true))
@@ -135,28 +135,28 @@ void UWidgetAbilityInventorySlotBase::NativeOnDragEnter(const FGeometry& InGeome
 	const auto PayloadSlot = Cast<UWidgetAbilityInventorySlotBase>(InOperation->Payload);
 	if (PayloadSlot && !PayloadSlot->IsEmpty())
 	{
-		TSubclassOf<UCommonButtonStyle> _Style;
+		FGameplayTag TargetStyleTag;
 		FAbilityItem& _Item = PayloadSlot->GetItem();
 		if(OwnerSlot->MatchItemLimit(_Item, true))
 		{
 			if (OwnerSlot->ContainsItem(_Item))
 			{
-				_Style = MatchStyle;
+				TargetStyleTag = MatchStyleTag;
 			}
 			else if(OwnerSlot->IsEmpty() || PayloadSlot->OwnerSlot->MatchItemLimit(OwnerSlot->GetItem(), true))
 			{
-				_Style = MatchStyle;
+				TargetStyleTag = MatchStyleTag;
 			}
 			else
 			{
-				_Style = MismatchStyle;
+				TargetStyleTag = MismatchStyleTag;
 			}
 		}
 		else
 		{
-			_Style = MismatchStyle;
+			TargetStyleTag = MismatchStyleTag;
 		}
-		SetStyle(_Style);
+		SetStyleTag(TargetStyleTag);
 	}
 }
 
@@ -167,7 +167,7 @@ void UWidgetAbilityInventorySlotBase::NativeOnDragLeave(const FDragDropEvent& In
 	const auto PayloadSlot = Cast<UWidgetAbilityInventorySlotBase>(InOperation->Payload);
 	if (PayloadSlot && !PayloadSlot->IsEmpty())
 	{
-		SetStyle(DefaultStyle);
+		SetStyleTag(DefaultStyleTag);
 	}
 }
 

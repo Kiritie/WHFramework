@@ -9,13 +9,6 @@
 
 #include "SettingModule.generated.h"
 
-class UWidgetOptionSettingItemBase;
-class UWidgetSettingItemCategoryBase;
-class UWidgetKeySettingItemBase;
-class UWidgetTextSettingItemBase;
-class UWidgetEnumSettingItemBase;
-class UWidgetBoolSettingItemBase;
-class UWidgetFloatSettingItemBase;
 class USettingRegistry;
 class USettingProviderBase;
 class USettingEntry;
@@ -69,7 +62,9 @@ protected:
 	virtual FSaveData* ToData() override;
 
 protected:
-	void BuildSettingDefinitions();
+	void EnsureBuiltinProviders();
+
+	void BuildSettingDefinitions(bool bUpdateSnapshot = false);
 
 	void BuildSettingEntries();
 
@@ -87,9 +82,19 @@ protected:
 
 	FSettingModuleSaveData GetCurrentCombinedSettings() const;
 
+	FSettingModuleSaveData GetDefaultCombinedSettings() const;
+
 	void ApplyCombinedSettings(FSettingModuleSaveData& InData);
 
+	void SaveSettings();
+
 	const FSettingDefinition* FindSettingDefinition(FSettingId InSettingId) const;
+
+	USettingProviderBase* FindSettingProvider(const FSettingDefinition& InDefinition) const;
+
+	FSettingValidationResult ValidateSettingValue(const FSettingDefinition& InDefinition, const FParameter& InValue) const;
+
+	bool EvaluateConditions(const TArray<FSettingCondition>& InConditions) const;
 
 	FParameter ReadSessionValue(FSettingModuleSaveData& InData, FSettingId InSettingId) const;
 
@@ -110,43 +115,47 @@ protected:
 	UPROPERTY(Transient)
 	FSettingEditSession EditSession;
 
+	UPROPERTY(Transient)
+	FSettingConfirmationTransaction ConfirmationTransaction;
+
+	UPROPERTY(EditAnywhere, Category = "Setting", meta = (ClampMin = "1.0"))
+	float ConfirmationTimeout = 15.f;
+
 	TMap<FSettingId, TObjectPtr<USettingEntry>> SettingEntryMap;
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Legacy renderer classes
-	UPROPERTY(EditAnywhere, Category = "WdigetClass")
-	TSubclassOf<UWidgetSettingItemCategoryBase> SettingItemCategoryClass;
-
-	UPROPERTY(EditAnywhere, Category = "WdigetClass")
-	TSubclassOf<UWidgetFloatSettingItemBase> FloatSettingItemClass;
-
-	UPROPERTY(EditAnywhere, Category = "WdigetClass")
-	TSubclassOf<UWidgetBoolSettingItemBase> BoolSettingItemClass;
-
-	UPROPERTY(EditAnywhere, Category = "WdigetClass")
-	TSubclassOf<UWidgetEnumSettingItemBase> EnumSettingItemClass;
-
-	UPROPERTY(EditAnywhere, Category = "WdigetClass")
-	TSubclassOf<UWidgetTextSettingItemBase> TextSettingItemClass;
-
-	UPROPERTY(EditAnywhere, Category = "WdigetClass")
-	TSubclassOf<UWidgetKeySettingItemBase> KeySettingItemClass;
-
-	UPROPERTY(EditAnywhere, Category = "WdigetClass")
-	TSubclassOf<UWidgetOptionSettingItemBase> OptionSettingItemClass;
+	TMap<FSettingId, FSettingValidationResult> ValidationResults;
 
 public:
+	UPROPERTY(BlueprintAssignable)
+	FOnSettingValueChanged OnSettingValueChanged;
+
 	UFUNCTION(CallInEditor, BlueprintCallable, Category = "Setting")
 	void RefreshSettingDefinitions();
 
+#if WITH_EDITOR
+	void GenerateRegistrySnapshot(USettingRegistry* InRegistry);
+#endif
+
 	UFUNCTION(BlueprintCallable)
 	void BeginEdit();
+
+	UFUNCTION(BlueprintCallable)
+	void EndEdit();
 
 	UFUNCTION(BlueprintCallable)
 	bool ApplyEditSession();
 
 	UFUNCTION(BlueprintCallable)
 	void CancelEditSession();
+
+	UFUNCTION(BlueprintCallable)
+	bool ConfirmPendingSettings();
+
+	UFUNCTION(BlueprintCallable)
+	void RejectPendingSettings();
+
+	UFUNCTION(BlueprintPure)
+	bool HasPendingConfirmation() const { return ConfirmationTransaction.bActive; }
 
 	UFUNCTION(BlueprintCallable)
 	void ResetAllToDefault();
@@ -167,6 +176,15 @@ public:
 	bool CanResetSetting(FSettingId InSettingId) const;
 
 	UFUNCTION(BlueprintPure)
+	bool IsSettingEnabled(FSettingId InSettingId) const;
+
+	UFUNCTION(BlueprintPure)
+	bool IsSettingVisible(FSettingId InSettingId) const;
+
+	UFUNCTION(BlueprintPure)
+	FSettingValidationResult GetValidationResult(FSettingId InSettingId) const;
+
+	UFUNCTION(BlueprintPure)
 	FParameter GetAppliedValue(FSettingId InSettingId) const;
 
 	UFUNCTION(BlueprintPure)
@@ -185,25 +203,19 @@ public:
 	TArray<USettingEntry*> GetSettingEntries() const;
 
 	UFUNCTION(BlueprintPure)
-	TSubclassOf<UWidgetSettingItemCategoryBase> GetSettingItemCategoryClass() const { return SettingItemCategoryClass; }
+	TArray<USettingEntry*> GetSettingEntriesByPage(FName InPage) const;
 
 	UFUNCTION(BlueprintPure)
-	TSubclassOf<UWidgetFloatSettingItemBase> GetFloatSettingItemClass() const { return FloatSettingItemClass; }
+	TArray<FSettingPageDefinition> GetSettingPages() const;
 
 	UFUNCTION(BlueprintPure)
-	TSubclassOf<UWidgetBoolSettingItemBase> GetBoolSettingItemClass() const { return BoolSettingItemClass; }
+	float GetConfirmationTimeout() const { return ConfirmationTimeout; }
 
 	UFUNCTION(BlueprintPure)
-	TSubclassOf<UWidgetEnumSettingItemBase> GetEnumSettingItemClass() const { return EnumSettingItemClass; }
+	USettingRegistry* GetRegistry() const { return Registry; }
 
-	UFUNCTION(BlueprintPure)
-	TSubclassOf<UWidgetTextSettingItemBase> GetTextSettingItemClass() const { return TextSettingItemClass; }
-
-	UFUNCTION(BlueprintPure)
-	TSubclassOf<UWidgetKeySettingItemBase> GetKeySettingItemClass() const { return KeySettingItemClass; }
-
-	UFUNCTION(BlueprintPure)
-	TSubclassOf<UWidgetOptionSettingItemBase> GetOptionSettingItemClass() const { return OptionSettingItemClass; }
+	UFUNCTION(BlueprintCallable)
+	void SetRegistry(USettingRegistry* InRegistry) { Registry = InRegistry; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Network

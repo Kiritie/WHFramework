@@ -7,22 +7,26 @@
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Widget/Screen/UserWidgetBase.h"
 #include "Widget/WidgetModule.h"
+#include "Widget/WidgetModuleTypes.h"
 
 USubWidgetBase::USubWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	bWidgetTickAble = false;
+	bDynamicSubWidget = false;
 
-	OwnerWidget = nullptr;
 }
 
 void USubWidgetBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	
+	const FSubWidgetSpawnParameter* Param = InParam.GetPtr<FSubWidgetSpawnParameter>();
+	OwnerWidget = Param ? Cast<IPanelWidgetInterface>(Param->OwnerObject) : nullptr;
+	bDynamicSubWidget = Param ? Param->bDynamic : false;
 }
 
 void USubWidgetBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	
+	OwnerWidget = nullptr;
+	bDynamicSubWidget = false;
 }
 
 void USubWidgetBase::OnTick_Implementation(float DeltaSeconds)
@@ -30,26 +34,24 @@ void USubWidgetBase::OnTick_Implementation(float DeltaSeconds)
 	
 }
 
-void USubWidgetBase::OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams)
+void USubWidgetBase::OnCreate(const FParameter& InParam)
 {
 	if(UWidgetModule::IsValid()) UWidgetModule::Get().RegisterTickableWidget(this);
-
-	OwnerWidget = Cast<IPanelWidgetInterface>(InOwner);
 
 	for(auto Iter : GetPoolWidgets())
 	{
 		IObjectPoolInterface::Execute_OnSpawn(Iter, FParameter(FWidgetSpawnParameter(this)));
 	}
 
-	K2_OnCreate(InOwner, InParams);
+	K2_OnCreate(InParam);
 
-	OnInitialize(InParams);
+	OnInitialize(InParam);
 }
 
-void USubWidgetBase::OnInitialize(const TArray<FParameter>& InParams)
+void USubWidgetBase::OnInitialize(const FParameter& InParam)
 {
-	WidgetParams = InParams;
-	K2_OnInitialize(InParams);
+	WidgetParams = InParam;
+	K2_OnInitialize(InParam);
 
 	OnRefresh();
 }
@@ -64,30 +66,28 @@ void USubWidgetBase::OnRefresh()
 	K2_OnRefresh();
 }
 
-void USubWidgetBase::OnDestroy(bool bRecovery)
+void USubWidgetBase::OnDestroy(EObjectDespawnMode InMode)
 {
 	if(UWidgetModule::IsValid()) UWidgetModule::Get().UnregisterTickableWidget(this);
+	for(UWidget* PoolWidget : GetPoolWidgets())
+	{
+		IObjectPoolInterface::Execute_OnDespawn(PoolWidget, InMode);
+	}
 
-	RemoveFromParent();
+	K2_OnDestroy(InMode);
+	WidgetParams.Reset();
 
-	K2_OnDestroy(bRecovery);
+	if(bDynamicSubWidget)
+	{
+		RemoveFromParent();
+		UObjectPoolModuleStatics::DespawnObject(this, InMode);
+	}
 
-	UObjectPoolModuleStatics::DespawnObject(
-		this,
-		bRecovery ? EObjectDespawnMode::Recovery : EObjectDespawnMode::Destroy);
-
-	OwnerWidget = nullptr;
-	WidgetParams.Empty();
 }
 
-void USubWidgetBase::Init(const TArray<FParameter>* InParams)
+void USubWidgetBase::Init(const FParameter& InParam)
 {
-	Init(InParams ? *InParams : TArray<FParameter>());
-}
-
-void USubWidgetBase::Init(const TArray<FParameter>& InParams)
-{
-	OnInitialize(InParams);
+	OnInitialize(InParam);
 }
 
 void USubWidgetBase::Reset(bool bForce)
@@ -100,11 +100,11 @@ void USubWidgetBase::Refresh()
 	OnRefresh();
 }
 
-void USubWidgetBase::Destroy(bool bRecovery)
+void USubWidgetBase::Destroy(EObjectDespawnMode InMode)
 {
 	if(OwnerWidget)
 	{
-		OwnerWidget->DestroySubWidget(this, bRecovery);
+		OwnerWidget->DestroySubWidget(this, InMode);
 	}
 }
 

@@ -866,7 +866,9 @@ void USceneModule::RefreshWorldMarkerWidgets()
 			if(!::IsValid(Widget))
 			{
 				Widget = UWidgetModule::Get().CreateWorldWidget<UWidgetSceneWorldMarker>(
-					this, FWorldWidgetMapping(Pair.Value.Location + Pair.Value.Offset), nullptr, UWidgetSceneWorldMarker::StaticClass());
+					FWorldWidgetMapping(Pair.Value.Location + Pair.Value.Offset),
+					FWidgetSpawnParameter(this),
+					UWidgetSceneWorldMarker::StaticClass());
 			}
 			if(Widget)
 			{
@@ -879,7 +881,7 @@ void USceneModule::RefreshWorldMarkerWidgets()
 			if(DesiredIDs.Contains(Iter.Key())) continue;
 			if(::IsValid(Iter.Value()))
 			{
-				UWidgetModule::Get().DestroyWorldWidget(Iter.Value(), true);
+				UWidgetModule::Get().DestroyWorldWidget(Iter.Value(), EObjectDespawnMode::Recovery);
 			}
 			Iter.RemoveCurrent();
 		}
@@ -914,7 +916,7 @@ void USceneModule::ClearWorldMarkerWidgets()
 	{
 		for(const auto& Pair : WorldMarkerWidgets)
 		{
-			if(::IsValid(Pair.Value)) UWidgetModule::Get().DestroyWorldWidget(Pair.Value, true);
+			if(::IsValid(Pair.Value)) UWidgetModule::Get().DestroyWorldWidget(Pair.Value, EObjectDespawnMode::Recovery);
 		}
 	}
 	WorldMarkerWidgets.Reset();
@@ -1361,7 +1363,9 @@ void USceneModule::SpawnWorldText(const FString& InText, const FLinearColor& InT
 	{
 		InMapping.Location = InMapping.Location + FMath::RandPointInBox(FBox(-InOffsetRange * 0.5f, InOffsetRange * 0.5f));
 	}
-	UWidgetModuleStatics::CreateWorldWidget<UWidgetWorldText>(nullptr, InMapping, { InText, InTextColor, (int32)InTextStyle });
+	UWidgetModuleStatics::CreateWorldWidget<UWidgetWorldText>(
+		InMapping,
+		FWorldTextWidgetParameter(InText, InTextColor, static_cast<int32>(InTextStyle)));
 }
 
 FLinearColor USceneModule::GetOutlineColor() const
@@ -1482,7 +1486,8 @@ void USceneModule::AsyncLoadLevelInternal(FAsyncLoadLevelTask& InTask)
 
 	if(InTask.bCreateLoadingWidget)
 	{
-		UWidgetModuleStatics::OpenUserWidget<UWidgetLoadingLevelPanel>({ InTask.LevelPath, false });
+		UWidgetModuleStatics::OpenUserWidget<UWidgetLoadingLevelPanel>(
+			FLoadingLevelWidgetOpenParameter(InTask.LevelPath, false));
 	}
 	
 	LoadPackageAsync(LoadPackagePath, FLoadPackageAsyncDelegate::CreateLambda([this, InTask](const FName PackageName, UPackage* LoadedPackage, EAsyncLoadingResult::Type Result){
@@ -1510,7 +1515,8 @@ void USceneModule::AsyncUnloadLevelInternal(FAsyncLoadLevelTask& InTask)
 
 	if(InTask.bCreateLoadingWidget)
 	{
-		UWidgetModuleStatics::OpenUserWidget<UWidgetLoadingLevelPanel>({ InTask.LevelPath, true });
+		UWidgetModuleStatics::OpenUserWidget<UWidgetLoadingLevelPanel>(
+			FLoadingLevelWidgetOpenParameter(InTask.LevelPath, true));
 	}
 
 	FLatentActionInfo LatentActionInfo;

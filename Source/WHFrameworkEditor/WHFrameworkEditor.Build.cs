@@ -44,10 +44,12 @@ public class WHFrameworkEditor : ModuleRules
 				"BlueprintGraph",
 				"LevelEditor",
 				"GraphEditor",
+				"GameplayTags",
 				"WorkspaceMenuStructure",
 				"KismetWidgets",
 				"EditorWidgets",
 				"UMG",
+				"CommonUI",
 				"Json",
 				"JsonUtilities",
 				"AnimGraph"

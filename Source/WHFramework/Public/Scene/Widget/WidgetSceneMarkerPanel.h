@@ -17,9 +17,9 @@ class WHFRAMEWORK_API UWidgetSceneMarkerPanel : public UUserWidgetBase
 public:
 	UWidgetSceneMarkerPanel(const FObjectInitializer& ObjectInitializer);
 
-	virtual void OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams) override;
+	virtual void OnInitialize(const FParameter& InParams) override;
 	virtual void OnRefresh() override;
-	virtual void OnDestroy(bool bRecovery) override;
+	virtual void OnDestroy(EObjectDespawnMode InMode) override;
 
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnMarkersUpdated")
 	void K2_OnMarkersUpdated(const TArray<FSceneMarkerView>& InMarkers);

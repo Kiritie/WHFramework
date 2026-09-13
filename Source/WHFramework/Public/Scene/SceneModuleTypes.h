@@ -441,7 +441,7 @@ public:
 	}
 
 public:
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite, meta = (IgnoreForMemberInitializationTest))
 	FGuid ActorID;
 
 	UPROPERTY()

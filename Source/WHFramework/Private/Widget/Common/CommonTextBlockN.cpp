@@ -2,17 +2,19 @@
 
 #include "Widget/Common/CommonTextBlockN.h"
 
+#include "Widget/Theme/WidgetTheme.h"
+#include "Widget/WidgetModule.h"
+
 UCommonTextBlockN::UCommonTextBlockN(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	static ConstructorHelpers::FClassFinder<UCommonTextStyle> StyleClassFinder(TEXT("/Script/Engine.Blueprint'/WHFramework/Widget/Blueprints/Common/_Style/Text/CTS_Default.CTS_Default_C'"));
-	if(StyleClassFinder.Succeeded())
-	{
-		SetStyle(StyleClassFinder.Class);
-	}
 }
 
 void UCommonTextBlockN::SynchronizeProperties()
 {
+	if(!bApplyingStyleTag)
+	{
+		ApplyStyleTag();
+	}
 	Super::SynchronizeProperties();
 
 	if ( MyTextBlock.IsValid() )
@@ -51,13 +53,11 @@ void UCommonTextBlockN::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	SetText(FText::GetEmpty());
 	SetHighlightText(FText::GetEmpty());
-
-	RemoveFromParent();
 }
 
 FText UCommonTextBlockN::GetHighlightText() const
 {
-	if (ColorAndOpacityDelegate.IsBound() && !IsDesignTime())
+	if (HighlightTextDelegate.IsBound() && !IsDesignTime())
 	{
 		return HighlightTextDelegate.Execute();
 	}
@@ -90,5 +90,26 @@ void UCommonTextBlockN::SetHighlightColor(const FSlateColor InColor)
 	if (MyTextBlock.IsValid())
 	{
 		MyTextBlock->SetHighlightColor(InColor.GetSpecifiedColor());
+	}
+}
+
+void UCommonTextBlockN::SetStyleTag(FGameplayTag InStyleTag)
+{
+	StyleTag = InStyleTag;
+	ApplyStyleTag();
+}
+
+void UCommonTextBlockN::ApplyStyleTag()
+{
+	const bool bInEditor = IsDesignTime();
+	const UWidgetModule* WidgetModule = UWidgetModule::IsValid(bInEditor)
+		? UWidgetModule::GetPtr(bInEditor)
+		: nullptr;
+	const UWidgetTheme* Theme = WidgetModule ? WidgetModule->GetDefaultWidgetTheme() : nullptr;
+	const FWidgetTextStyleData* StyleData = Theme ? Theme->FindTextStyle(StyleTag) : nullptr;
+	if(StyleData && StyleData->Style)
+	{
+		TGuardValue<bool> ApplyingStyleTagGuard(bApplyingStyleTag, true);
+		SetStyle(StyleData->Style);
 	}
 }

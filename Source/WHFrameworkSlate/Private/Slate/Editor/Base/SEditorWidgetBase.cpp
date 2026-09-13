@@ -65,7 +65,7 @@ void SEditorWidgetBase::OnInitialize()
 	}));
 }
 
-void SEditorWidgetBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
+void SEditorWidgetBase::OnOpen(const FParameter& InParam, bool bInstant)
 {
 	WidgetState = EEditorWidgetState::Opening;
 	SetVisibility(EVisibility::SelfHitTestInvisible);
@@ -211,14 +211,9 @@ FReply SEditorWidgetBase::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent
 	return SCompoundWidget::OnKeyDown(MyGeometry, InKeyEvent);
 }
 
-void SEditorWidgetBase::Open(const TArray<FParameter>* InParams, bool bInstant)
+void SEditorWidgetBase::Open(const FParameter& InParam, bool bInstant)
 {
-	FSlateWidgetManager::Get().OpenEditorWidget<SEditorWidgetBase>(InParams, bInstant, GetWidgetName());
-}
-
-void SEditorWidgetBase::Open(const TArray<FParameter>& InParams, bool bInstant)
-{
-	FSlateWidgetManager::Get().OpenEditorWidget<SEditorWidgetBase>(InParams, bInstant, GetWidgetName());
+	FSlateWidgetManager::Get().OpenEditorWidget<SEditorWidgetBase>(InParam, bInstant, GetWidgetName());
 }
 
 void SEditorWidgetBase::Close(bool bInstant)
@@ -234,7 +229,7 @@ void SEditorWidgetBase::Toggle(bool bInstant)
 	}
 	else
 	{
-		Open(nullptr, bInstant);
+		Open(FParameter(), bInstant);
 	}
 }
 

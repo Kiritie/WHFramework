@@ -8,7 +8,6 @@
 UCommonToolTip::UCommonToolTip(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	Txt_Content = nullptr;
-	OwnerWidget = nullptr;
 }
 
 void UCommonToolTip::OnSpawn_Implementation(const FParameter& InParam)

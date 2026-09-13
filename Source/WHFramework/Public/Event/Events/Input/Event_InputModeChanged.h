@@ -14,11 +14,17 @@ struct WHFRAMEWORK_API FEventInputModeChanged : public FEventBase
 public:
 	FEventInputModeChanged() = default;
 
-	FEventInputModeChanged(EInputMode InInputMode)
-		: InputMode(MoveTemp(InInputMode))
+	FEventInputModeChanged(
+		EInputMode InInputMode,
+		EInputMode InPreviousInputMode = EInputMode::None)
+		: InputMode(InInputMode),
+		PreviousInputMode(InPreviousInputMode)
 	{
 	}
 
 	UPROPERTY(BlueprintReadWrite)
 	EInputMode InputMode = EInputMode::None;
+
+	UPROPERTY(BlueprintReadWrite)
+	EInputMode PreviousInputMode = EInputMode::None;
 };

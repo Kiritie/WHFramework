@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Widget/World/WorldWidgetActor.h"
 
@@ -44,7 +44,7 @@ void AWorldWidgetActor::OnTermination_Implementation()
 {
 	Super::OnTermination_Implementation();
 
-	DestroyWorldWidget(true);
+	DestroyWorldWidget(EObjectDespawnMode::Recovery);
 }
 
 void AWorldWidgetActor::PostInitProperties()
@@ -75,7 +75,7 @@ void AWorldWidgetActor::OnConstruction(const FTransform& Transform)
 		}
 		else
 		{
-			DestroyWorldWidget(false, true);
+			DestroyWorldWidget(EObjectDespawnMode::Destroy, true);
 		}
 	}
 }
@@ -86,7 +86,7 @@ void AWorldWidgetActor::Destroyed()
 
 	if(!GIsPlaying && UCommonModuleStatics::GetWorldContext(true) && bShowInEditor)
 	{
-		DestroyWorldWidget(false, true);
+		DestroyWorldWidget(EObjectDespawnMode::Destroy, true);
 	}
 }
 
@@ -105,13 +105,13 @@ void AWorldWidgetActor::CreateWorldWidget(bool bInEditor)
 	WorldWidget->CreateWorldWidget(GetWidgetParams(), bInEditor);
 }
 
-void AWorldWidgetActor::DestroyWorldWidget(bool bRecovery, bool bInEditor)
+void AWorldWidgetActor::DestroyWorldWidget(EObjectDespawnMode InMode, bool bInEditor)
 {
-	WorldWidget->DestroyWorldWidget(bRecovery, bInEditor);
+	WorldWidget->DestroyWorldWidget(InMode, bInEditor);
 }
 
-TArray<FParameter> AWorldWidgetActor::GetWidgetParams_Implementation() const
+FParameter AWorldWidgetActor::GetWidgetParams_Implementation() const
 {
-	return TArray<FParameter>();
+	return FParameter();
 }
 

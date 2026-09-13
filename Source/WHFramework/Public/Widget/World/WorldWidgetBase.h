@@ -10,6 +10,7 @@
 #include "Parameter/ParameterModuleTypes.h"
 #include "Widget/WidgetModuleTypes.h"
 #include "Slate/Runtime/Interfaces/PanelWidgetInterface.h"
+#include "Slate/Runtime/Interfaces/SubWidgetInterface.h"
 
 #include "WorldWidgetBase.generated.h"
 
@@ -48,14 +49,14 @@ public:
 
 public:
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnCreate")
-	void K2_OnCreate(UObject* InOwner, const TArray<FParameter>& InParams);
+	void K2_OnCreate(const FParameter& InParam);
 	UFUNCTION()
-	virtual void OnCreate(UObject* InOwner, FWorldWidgetMapping InMapping, const TArray<FParameter>& InParams);
+	virtual void OnCreate(FWorldWidgetMapping InMapping, const FParameter& InParam);
 	
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitialize")
-	void K2_OnInitialize(const TArray<FParameter>& InParams);
+	void K2_OnInitialize(const FParameter& InParam);
 	UFUNCTION()
-	virtual void OnInitialize(const TArray<FParameter>& InParams);
+	virtual void OnInitialize(const FParameter& InParam);
 
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnReset")
 	void K2_OnReset(bool bForce = false);
@@ -68,15 +69,13 @@ public:
 	virtual void OnRefresh() override;
 	
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnDestroy")
-	void K2_OnDestroy(bool bRecovery);
+	void K2_OnDestroy(EObjectDespawnMode InMode);
 	UFUNCTION()
-	virtual void OnDestroy(bool bRecovery) override;
+	virtual void OnDestroy(EObjectDespawnMode InMode) override;
 
 public:
-	virtual void Init(const TArray<FParameter>* InParams);
-	
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
-	virtual void Init(const TArray<FParameter>& InParams);
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParam"))
+	virtual void Init(const FParameter& InParam = FParameter(), bool bForce = false);
 	
 	UFUNCTION(BlueprintCallable)
 	virtual void Reset(bool bForce = false) override;
@@ -85,35 +84,27 @@ public:
 	virtual void Refresh() override;
 
 	UFUNCTION(BlueprintCallable)
-	virtual void Destroy(bool bRecovery = false) override;
+	virtual void Destroy(EObjectDespawnMode InMode = EObjectDespawnMode::Destroy) override;
 
 public:
 	template<class T>
-	T* CreateSubWidget(const TArray<FParameter>* InParams = nullptr, TSubclassOf<UUserWidget> InClass = T::StaticClass())
+	T* CreateSubWidget(const FParameter& InParam = FParameter(), TSubclassOf<UUserWidget> InClass = T::StaticClass())
 	{
-		return Cast<T>(CreateSubWidget(InClass, InParams ? *InParams : TArray<FParameter>()));
+		return Cast<T>(CreateSubWidget(InClass, InParam));
 	}
 
-	template<class T>
-	T* CreateSubWidget(const TArray<FParameter>& InParams, TSubclassOf<UUserWidget> InClass = T::StaticClass())
-	{
-		return Cast<T>(CreateSubWidget(InClass, InParams));
-	}
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParam"), DisplayName = "CreateSubWidget")
+	UUserWidget* K2_CreateSubWidget(TSubclassOf<UUserWidget> InClass, const FParameter& InParam = FParameter());
 
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParams"), DisplayName = "CreateSubWidget")
-	UUserWidget* K2_CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams);
+	virtual ISubWidgetInterface* CreateSubWidget(TSubclassOf<UUserWidget> InClass, const FParameter& InParam = FParameter()) override;
 
-	virtual ISubWidgetInterface* CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>* InParams = nullptr) override;
+	UFUNCTION(BlueprintCallable, DisplayName = "DestroySubWidget")
+	bool K2_DestroySubWidget(UUserWidget* InWidget, EObjectDespawnMode InMode = EObjectDespawnMode::Destroy);
 
-	virtual ISubWidgetInterface* CreateSubWidget(TSubclassOf<UUserWidget> InClass, const TArray<FParameter>& InParams) override;
-
-	UFUNCTION(BlueprintCallable, DisplayName = "DestroyDestroyWidget")
-	bool K2_DestroySubWidget(UUserWidget* InWidget, bool bRecovery = false);
-
-	virtual bool DestroySubWidget(ISubWidgetInterface* InWidget, bool bRecovery) override;
+	virtual bool DestroySubWidget(ISubWidgetInterface* InWidget, EObjectDespawnMode InMode) override;
 
 	UFUNCTION(BlueprintCallable)
-	virtual void DestroyAllSubWidget(bool bRecovery) override;
+	virtual void DestroyAllSubWidget(EObjectDespawnMode InMode) override;
 
 protected:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
@@ -139,29 +130,11 @@ public:
 	bool IsWidgetVisible(bool bRefresh = false);
 
 protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Widget", meta = (Categories = "Widget.World"))
+	FGameplayTag DefaultWidgetTag;
+
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "Widget")
 	FGameplayTag WidgetTag;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	EWidgetSpace WidgetSpace;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "WidgetSpace == EWidgetSpace::Screen"))
-	int32 WidgetZOrder;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "WidgetSpace == EWidgetSpace::Screen"))
-	FAnchors WidgetAnchors;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	bool bWidgetAutoSize;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "WidgetSpace == EWidgetSpace::World && bWidgetAutoSize == false"))
-	FVector2D WidgetDrawSize;
-	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "WidgetSpace == EWidgetSpace::Screen && bWidgetAutoSize == false"))
-	FMargin WidgetOffsets;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	FVector2D WidgetAlignment;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	EWidgetRefreshType WidgetRefreshType;
@@ -169,34 +142,26 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "WidgetRefreshType == EWidgetRefreshType::Timer"))
 	float WidgetRefreshTime;
 	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	EWorldWidgetVisibility WidgetVisibility;
-	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "WidgetVisibility == EWorldWidgetVisibility::DistanceOnly || WidgetVisibility == EWorldWidgetVisibility::RenderAndDistance || WidgetVisibility == EWorldWidgetVisibility::ScreenAndDistance"))
-	float WidgetShowDistance;
+	UPROPERTY(Transient)
+	FParameter InitializeParameter;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	TArray<FParameter> WidgetParams;
+	UPROPERTY(Transient)
+	bool bInitialized;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	EInputMode WidgetInputMode;
-
-	UPROPERTY()
+	UPROPERTY(Transient)
 	UObject* OwnerObject;
-	
-	UPROPERTY()
-	int32 WidgetIndex;
-		
-	UPROPERTY()
+
+	UPROPERTY(Transient)
 	bool bWidgetInEditor;
 
-	UPROPERTY()
+	UPROPERTY(Transient)
 	UWorldWidgetComponent* WidgetComponent;
 
-	UPROPERTY()
+	UPROPERTY(Transient)
 	TMap<UWidget*, FWorldWidgetMapping> BindWidgetMap;
 
-	TArray<ISubWidgetInterface*> SubWidgets;
+	UPROPERTY(Transient)
+	TArray<FSubWidgetRuntimeEntry> SubWidgetEntries;
 
 public:
 	UPROPERTY(BlueprintAssignable, meta = (DisplayName = "OnDestroyed"))
@@ -210,34 +175,42 @@ private:
 	
 public:
 	UFUNCTION(BlueprintPure)
+	FGameplayTag GetDefaultWidgetTag() const { return DefaultWidgetTag; }
+
+	UFUNCTION(BlueprintPure)
 	FGameplayTag GetWidgetTag() const { return WidgetTag; }
-	
-	UFUNCTION(BlueprintPure)
-	virtual int32 GetWidgetZOrder() const override { return WidgetZOrder; }
+
+	const FWorldWidgetConfig* GetWidgetConfig() const;
 
 	UFUNCTION(BlueprintPure)
-	virtual FAnchors GetWidgetAnchors() const override { return WidgetAnchors; }
+	virtual int32 GetWidgetZOrder() const override;
 
 	UFUNCTION(BlueprintPure)
-	virtual bool IsWidgetAutoSize() const override { return bWidgetAutoSize; }
+	virtual FAnchors GetWidgetAnchors() const override;
 
 	UFUNCTION(BlueprintPure)
-	virtual FVector2D GetWidgetDrawSize() const override { return WidgetDrawSize; }
+	virtual bool IsWidgetAutoSize() const override;
 
 	UFUNCTION(BlueprintPure)
-	virtual FMargin GetWidgetOffsets() const override { return WidgetOffsets; }
+	virtual FVector2D GetWidgetDrawSize() const override;
 
 	UFUNCTION(BlueprintPure)
-	virtual FVector2D GetWidgetAlignment() const override { return WidgetAlignment; }
+	virtual FMargin GetWidgetOffsets() const override;
+
+	UFUNCTION(BlueprintPure)
+	virtual FVector2D GetWidgetAlignment() const override;
+
+	UFUNCTION(BlueprintPure)
+	EWorldWidgetVisibility GetWidgetVisibility() const;
+
+	UFUNCTION(BlueprintPure)
+	float GetWidgetShowDistance() const;
 
 	UFUNCTION(BlueprintPure)
 	virtual EWidgetRefreshType GetWidgetRefreshType() const override { return WidgetRefreshType; }
-	
-	UFUNCTION(BlueprintPure)
-	virtual TArray<FParameter> GetWidgetParams() const override { return WidgetParams; }
 
 	UFUNCTION(BlueprintPure)
-	virtual EInputMode GetWidgetInputMode() const override { return WidgetInputMode; }
+	virtual FParameter GetWidgetParams() const override { return InitializeParameter; }
 
 	template<class T>
 	T* GetOwnerObject() const
@@ -251,13 +224,13 @@ public:
 	virtual UObject* GetOwnerObject(TSubclassOf<UObject> InClass) const { return GetDeterminesOutputObject(OwnerObject, InClass); }
 
 	UFUNCTION(BlueprintPure)
-	virtual int32 GetWidgetIndex() const { return WidgetIndex; }
-
-	UFUNCTION(BlueprintPure)
 	virtual bool IsWidgetInEditor() const { return bWidgetInEditor; }
 
 	UFUNCTION(BlueprintPure)
 	UWorldWidgetComponent* GetWidgetComponent() const { return WidgetComponent; }
+
+	UFUNCTION(BlueprintPure)
+	EWorldWidgetSpace GetWorldWidgetSpace() const;
 
 	UFUNCTION(BlueprintPure)
 	EWidgetSpace GetWidgetSpace() const;
@@ -269,7 +242,7 @@ public:
 	TArray<UWidget*> GetPoolWidgets() const;
 
 	UFUNCTION(BlueprintPure)
-	virtual int32 GetSubWidgetNum() const override { return SubWidgets.Num(); }
+	virtual int32 GetSubWidgetNum() const override { return SubWidgetEntries.Num(); }
 
 	template<class T>
 	TArray<T*> GetSubWidgets()
@@ -281,7 +254,7 @@ public:
 		}
 		return ReturnValues;
 	}
-	virtual TArray<ISubWidgetInterface*> GetSubWidgets() override { return SubWidgets; }
+	virtual TArray<ISubWidgetInterface*> GetSubWidgets() override;
 	
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), DisplayName = "GetSubWidgets")
 	virtual TArray<UUserWidget*> K2_GetSubWidgets(TSubclassOf<UUserWidget> InClass);
@@ -300,15 +273,22 @@ public:
 
 	virtual ISubWidgetInterface* GetSubWidget(int32 InIndex) const override
 	{
-		if(SubWidgets.IsValidIndex(InIndex))
+		if(SubWidgetEntries.IsValidIndex(InIndex))
 		{
-			return SubWidgets[InIndex];
+			return Cast<ISubWidgetInterface>(SubWidgetEntries[InIndex].Widget);
 		}
 		return nullptr;
 	}
 
 	virtual int32 FindSubWidget(ISubWidgetInterface* InWidget) const override
 	{
-		return SubWidgets.Find(InWidget);
+		for(int32 Index = 0; Index < SubWidgetEntries.Num(); ++Index)
+		{
+			if(Cast<ISubWidgetInterface>(SubWidgetEntries[Index].Widget) == InWidget)
+			{
+				return Index;
+			}
+		}
+		return INDEX_NONE;
 	}
 };

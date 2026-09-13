@@ -3,6 +3,8 @@
 #include "Setting/Widget/WidgetSettingPanelBase.h"
 
 #include "CommonActivatableWidgetSwitcher.h"
+#include "Components/PanelWidget.h"
+#include "Setting/SettingModule.h"
 #include "Setting/Widget/Page/WidgetSettingPageBase.h"
 #include "Widget/WidgetModuleStatics.h"
 #include "Widget/Common/CommonButton.h"
@@ -11,25 +13,18 @@
 UWidgetSettingPanelBase::UWidgetSettingPanelBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 
-	WidgetType = EWidgetType::Temporary;
-	WidgetInputMode = EInputMode::UIOnly;
-
-	WidgetZOrder = 10;
-
 	bWidgetAutoFocus = true;
 
 	SetIsFocusable(true);
 	
 	PageItemGroup = nullptr;
 	PageItemClass = nullptr;
-
-	Btn_Apply = nullptr;
-	Btn_Reset = nullptr;
+	SettingPageClass = UWidgetSettingPageBase::StaticClass();
 }
 
-void UWidgetSettingPanelBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetSettingPanelBase::OnCreate(const FParameter& InParam)
 {
-	Super::OnCreate(InOwner, InParams);
+	Super::OnCreate(InParam);
 
 	if(Btn_Apply)
 	{
@@ -45,26 +40,41 @@ void UWidgetSettingPanelBase::OnCreate(UObject* InOwner, const TArray<FParameter
 	PageItemGroup->SetBroadcastOnDeselected(false);
 	PageItemGroup->OnSelectedButtonBaseChanged.AddDynamic(this, &UWidgetSettingPanelBase::OnPageItemSelected);
 
+	GenerateSettingPages();
 	for(const auto Iter : GetSubWidgets<UWidgetSettingPageBase>())
 	{
-		SpawnPageItem(Iter);
+		if(Iter)
+		{
+			SpawnPageItem(Iter);
+		}
 	}
 }
 
-void UWidgetSettingPanelBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetSettingPanelBase::OnInitialize(const FParameter& InParam)
 {
-	Super::OnInitialize(InOwner, InParams);
+	Super::OnInitialize(InParam);
 }
 
-void UWidgetSettingPanelBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
+void UWidgetSettingPanelBase::OnOpen(const FParameter& InParam, bool bInstant)
 {
-	Super::OnOpen(InParams, bInstant);
+	Super::OnOpen(InParam, bInstant);
+
+	USettingModule::Get().BeginEdit();
+	for(UWidgetSettingPageBase* Page : GetSubWidgets<UWidgetSettingPageBase>())
+	{
+		if(Page)
+		{
+			Page->RefreshEntries();
+		}
+	}
 	
 	SetCurrentPage(0);
 }
 
 void UWidgetSettingPanelBase::OnClose(bool bInstant)
 {
+	USettingModule::Get().CancelEditSession();
+	USettingModule::Get().EndEdit();
 	Super::OnClose(bInstant);
 }
 
@@ -75,17 +85,31 @@ void UWidgetSettingPanelBase::OnPageItemSelected_Implementation(UCommonButtonBas
 
 void UWidgetSettingPanelBase::OnApplyButtonClicked()
 {
-	if(UWidgetSettingPageBase* SettingPage = GetCurrentPage())
+	if(USettingModule::Get().ApplyEditSession())
 	{
-		SettingPage->Apply();
+		if(USettingModule::Get().HasPendingConfirmation())
+		{
+			K2_OnConfirmationRequested(USettingModule::Get().GetConfirmationTimeout());
+		}
+		for(UWidgetSettingPageBase* Page : GetSubWidgets<UWidgetSettingPageBase>())
+		{
+			if(Page)
+			{
+				Page->RefreshEntries();
+			}
+		}
 	}
 }
 
 void UWidgetSettingPanelBase::OnResetButtonClicked()
 {
-	if(UWidgetSettingPageBase* SettingPage = GetCurrentPage())
+	USettingModule::Get().ResetAllToDefault();
+	for(UWidgetSettingPageBase* Page : GetSubWidgets<UWidgetSettingPageBase>())
 	{
-		SettingPage->Reset();
+		if(Page)
+		{
+			Page->RefreshEntries();
+		}
 	}
 }
 
@@ -97,14 +121,31 @@ UCommonButton* UWidgetSettingPanelBase::SpawnPageItem_Implementation(UWidgetSett
 	{
 		PageItem->SetIsSelectable(true);
 		PageItem->SetTitle(InPage->GetTitle());
-		if(InPage->GetPageItemStyle())
-		{
-			PageItem->SetStyle(InPage->GetPageItemStyle());
-		}
+		PageItem->SetStyleTag(FGameplayTag::RequestGameplayTag(FName(TEXT("Style.Button.Setting.PageTab")), false));
 		PageItemGroup->AddWidget(PageItem);
+		if(PageItemContainer)
+		{
+			PageItemContainer->AddChild(PageItem);
+		}
 		return PageItem;
 	}
 	return nullptr;
+}
+
+void UWidgetSettingPanelBase::GenerateSettingPages()
+{
+	if(!SettingPageClass || !Switcher_Page)
+	{
+		return;
+	}
+	for(const FSettingPageDefinition& PageDefinition : USettingModule::Get().GetSettingPages())
+	{
+		if(UWidgetSettingPageBase* Page = CreateSubWidget<UWidgetSettingPageBase>(FParameter(), SettingPageClass))
+		{
+			Page->SetPageDefinition(PageDefinition);
+			Switcher_Page->AddChild(Page);
+		}
+	}
 }
 
 int32 UWidgetSettingPanelBase::GetCurrentPageIndex() const
@@ -120,4 +161,32 @@ UWidgetSettingPageBase* UWidgetSettingPanelBase::GetCurrentPage() const
 void UWidgetSettingPanelBase::SetCurrentPage(int32 InPageIndex)
 {
 	PageItemGroup->SelectButtonAtIndex(InPageIndex);
+}
+
+bool UWidgetSettingPanelBase::ConfirmPendingSettings()
+{
+	const bool bResult = USettingModule::Get().ConfirmPendingSettings();
+	if(bResult)
+	{
+		for(UWidgetSettingPageBase* Page : GetSubWidgets<UWidgetSettingPageBase>())
+		{
+			if(Page)
+			{
+				Page->RefreshEntries();
+			}
+		}
+	}
+	return bResult;
+}
+
+void UWidgetSettingPanelBase::RejectPendingSettings()
+{
+	USettingModule::Get().RejectPendingSettings();
+	for(UWidgetSettingPageBase* Page : GetSubWidgets<UWidgetSettingPageBase>())
+	{
+		if(Page)
+		{
+			Page->RefreshEntries();
+		}
+	}
 }

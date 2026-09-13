@@ -30,8 +30,12 @@ void AAbilityProjectileBase::OnSpawn_Implementation(const FParameter& InParam)
 {
 	Super::OnSpawn_Implementation(InParam);
 
-	const FAbilityProjectileSpawnParameter& Parameter = InParam.GetRef<FAbilityProjectileSpawnParameter>();
-	OwnerActor = Parameter.Owner.Get();
+	const FAbilityProjectileSpawnParameter* Param = InParam.GetPtr<FAbilityProjectileSpawnParameter>();
+	if(!Param)
+	{
+		return;
+	}
+	OwnerActor = Param->Owner.Get();
 
 	if(IAbilityActorInterface* AbilityActor = GetOwnerActor<IAbilityActorInterface>())
 	{
@@ -40,7 +44,7 @@ void AAbilityProjectileBase::OnSpawn_Implementation(const FParameter& InParam)
 
 		if(UAbilitySystemComponentBase* OwningASC = Cast<UAbilitySystemComponentBase>(AbilityActor->GetAbilitySystemComponent()))
 		{
-			const FGameplayAbilitySpec Spec = OwningASC->FindAbilitySpecForHandle(Parameter.AbilityHandle);
+			const FGameplayAbilitySpec Spec = OwningASC->FindAbilitySpecForHandle(Param->AbilityHandle);
 			if(UAbilityBase* Ability = Cast<UAbilityBase>(Spec.GetPrimaryInstance()))
 			{
 				AbilityLevel = Ability->GetAbilityLevel();

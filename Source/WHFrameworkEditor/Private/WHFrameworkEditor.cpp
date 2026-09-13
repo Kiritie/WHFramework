@@ -26,9 +26,12 @@
 #include "Preferences/UnrealEdOptions.h"
 #include "Procedure/ProcedureEditor.h"
 #include "Scene/SceneEditor.h"
+#include "Setting/Customization/SettingRegistryCustomization.h"
+#include "Setting/SettingRegistry.h"
 #include "Step/StepEditor.h"
 #include "Task/TaskEditor.h"
 #include "Dialogue/DialogueEditor.h"
+#include "Widget/WidgetEditor.h"
 
 #define LOCTEXT_NAMESPACE "FWHFrameworkEditorModule"
 
@@ -96,6 +99,11 @@ void FWHFrameworkEditorModule::StartupEditorModules()
 	STARTUP_MODULE(FStepEditorModule);
 	STARTUP_MODULE(FTaskEditorModule);
 	STARTUP_MODULE(FDialogueEditorModule);
+	STARTUP_MODULE(FWidgetEditorModule);
+
+	PropertyEditorModule.RegisterCustomClassLayout(
+		USettingRegistry::StaticClass()->GetFName(),
+		FOnGetDetailCustomizationInstance::CreateStatic(&FSettingRegistryCustomization::MakeInstance));
 
 	PropertyEditorModule.NotifyCustomizationModuleChanged();
 }
@@ -124,6 +132,9 @@ void FWHFrameworkEditorModule::ShutdownEditorModules()
 	SHUTDOWN_MODULE(FStepEditorModule);
 	SHUTDOWN_MODULE(FTaskEditorModule);
 	SHUTDOWN_MODULE(FDialogueEditorModule);
+	SHUTDOWN_MODULE(FWidgetEditorModule);
+
+	PropertyEditorModule.UnregisterCustomClassLayout(USettingRegistry::StaticClass()->GetFName());
 
 	if(FModuleManager::Get().IsModuleLoaded(TEXT("AssetTools")))
 	{

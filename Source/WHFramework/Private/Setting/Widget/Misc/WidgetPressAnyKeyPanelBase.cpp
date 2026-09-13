@@ -64,12 +64,12 @@ public:
 private:
 	void HandleKey(const FKey& Key)
 	{
-		// Cancel this process if it's Escape, Touch, or a gamepad key.
+		// Escape and touch cancel the capture. Gamepad keys are valid remap targets.
 		if (Key == EKeys::LeftCommand || Key == EKeys::RightCommand)
 		{
 			// Ignore
 		}
-		else if (Key == EKeys::Escape || Key.IsTouch() || Key.IsGamepadKey())
+		else if (Key == EKeys::Escape || Key.IsTouch())
 		{
 			OnKeySelectionCanceled.Broadcast();
 		}
@@ -84,16 +84,14 @@ UWidgetPressAnyKeyPanelBase::UWidgetPressAnyKeyPanelBase(const FObjectInitialize
 	: Super(Initializer)
 {
 
-	WidgetType = EWidgetType::Permanent;
-	WidgetInputMode = EInputMode::UIOnly;
 }
 
-void UWidgetPressAnyKeyPanelBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetPressAnyKeyPanelBase::OnInitialize(const FParameter& InParams)
 {
-	Super::OnInitialize(InOwner, InParams);
+	Super::OnInitialize(InParams);
 }
 
-void UWidgetPressAnyKeyPanelBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
+void UWidgetPressAnyKeyPanelBase::OnOpen(const FParameter& InParams, bool bInstant)
 {
 	Super::OnOpen(InParams, bInstant);
 

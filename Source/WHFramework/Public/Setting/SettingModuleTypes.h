@@ -11,12 +11,21 @@
 
 #include "SettingModuleTypes.generated.h"
 
+class UEnum;
+
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FSettingId
 {
 	GENERATED_BODY()
 
 public:
+	FSettingId() = default;
+
+	explicit FSettingId(FName InName)
+		: Name(InName)
+	{
+	}
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FName Name;
 
@@ -57,6 +66,72 @@ enum class ESettingApplyPolicy : uint8
 	Immediate
 };
 
+UENUM(BlueprintType)
+enum class ESettingConditionOp : uint8
+{
+	Equals,
+	NotEquals,
+	Greater,
+	Less
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSettingOption
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FParameter Value;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FText DisplayName;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSettingCondition
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FSettingId OtherSetting;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	ESettingConditionOp Op = ESettingConditionOp::Equals;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FParameter Value;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSettingValidationResult
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bValid = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FText Error;
+
+	static FSettingValidationResult Valid()
+	{
+		return FSettingValidationResult();
+	}
+
+	static FSettingValidationResult Invalid(const FText& InError)
+	{
+		FSettingValidationResult Result;
+		Result.bValid = false;
+		Result.Error = InError;
+		return Result;
+	}
+};
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSettingValueChanged, FSettingId, InSettingId);
+
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FSettingNumberDisplay
 {
@@ -64,7 +139,13 @@ struct WHFRAMEWORK_API FSettingNumberDisplay
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bHasMin = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	double Min = 0.0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bHasMax = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	double Max = 1.0;
@@ -94,6 +175,9 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	FString SourcePath;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	FName Provider;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FName Page;
 
@@ -119,6 +203,9 @@ public:
 	bool bVisible = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bEnabled = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bRequiresConfirmation = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -126,6 +213,18 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FSettingNumberDisplay NumberDisplay;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	TObjectPtr<UEnum> Enum;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FSettingOption> Options;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FSettingCondition> VisibleConditions;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FSettingCondition> EnableConditions;
 };
 
 USTRUCT(BlueprintType)
@@ -142,6 +241,12 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "bOverrideDisplayName"))
 	FText DisplayName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bOverrideDescription = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "bOverrideDescription"))
+	FText Description;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bOverridePage = false;
@@ -178,6 +283,36 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "bOverrideVisible"))
 	bool bVisible = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bOverrideEnabled = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "bOverrideEnabled"))
+	bool bEnabled = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bOverrideRequiresConfirmation = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "bOverrideRequiresConfirmation"))
+	bool bRequiresConfirmation = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bOverrideNumberDisplay = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "bOverrideNumberDisplay"))
+	FSettingNumberDisplay NumberDisplay;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bOverrideVisibleConditions = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "bOverrideVisibleConditions"))
+	TArray<FSettingCondition> VisibleConditions;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bOverrideEnableConditions = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "bOverrideEnableConditions"))
+	TArray<FSettingCondition> EnableConditions;
 };
 
 USTRUCT(BlueprintType)
@@ -197,160 +332,20 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FWidgetSettingItemSpawnParameter : public FWidgetSpawnParameter
+struct WHFRAMEWORK_API FWidgetPressAnyKeyOpenParameter : public FWidgetOpenParameter
 {
 	GENERATED_BODY()
 
 public:
-	FWidgetSettingItemSpawnParameter() = default;
+	FWidgetPressAnyKeyOpenParameter() = default;
 
-	explicit FWidgetSettingItemSpawnParameter(const FText& InTitle)
-		: Title(InTitle)
+	explicit FWidgetPressAnyKeyOpenParameter(int32 InKeyIndex)
+		: KeyIndex(InKeyIndex)
 	{
 	}
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FText Title;
-};
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FWidgetFloatSettingItemSpawnParameter : public FWidgetSettingItemSpawnParameter
-{
-	GENERATED_BODY()
-
-public:
-	FWidgetFloatSettingItemSpawnParameter() = default;
-
-	FWidgetFloatSettingItemSpawnParameter(
-		const FText& InTitle,
-		float InMinValue,
-		float InMaxValue,
-		int32 InDecimalNum,
-		float InScaleFactor = 1.f)
-		: FWidgetSettingItemSpawnParameter(InTitle)
-		, MinValue(InMinValue)
-		, MaxValue(InMaxValue)
-		, DecimalNum(InDecimalNum)
-		, ScaleFactor(InScaleFactor)
-	{
-	}
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float MinValue = 0.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float MaxValue = 1.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 DecimalNum = 2;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float ScaleFactor = 1.f;
-};
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FWidgetEnumSettingItemSpawnParameter : public FWidgetSettingItemSpawnParameter
-{
-	GENERATED_BODY()
-
-public:
-	FWidgetEnumSettingItemSpawnParameter() = default;
-
-	FWidgetEnumSettingItemSpawnParameter(
-		const FText& InTitle,
-		const FString& InEnumName,
-		const TArray<int32>& InIgnoredIndices = {})
-		: FWidgetSettingItemSpawnParameter(InTitle)
-		, EnumName(InEnumName)
-		, IgnoredIndices(InIgnoredIndices)
-	{
-	}
-
-	FWidgetEnumSettingItemSpawnParameter(
-		const FText& InTitle,
-		const TArray<FString>& InEnumNames,
-		const TArray<int32>& InIgnoredIndices = {})
-		: FWidgetSettingItemSpawnParameter(InTitle)
-		, EnumNames(InEnumNames)
-		, IgnoredIndices(InIgnoredIndices)
-	{
-	}
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FString EnumName;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<FString> EnumNames;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<int32> IgnoredIndices;
-};
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FWidgetOptionSettingItemSpawnParameter : public FWidgetSettingItemSpawnParameter
-{
-	GENERATED_BODY()
-
-public:
-	FWidgetOptionSettingItemSpawnParameter() = default;
-
-	FWidgetOptionSettingItemSpawnParameter(
-		const FText& InTitle,
-		const TArray<FString>& InOptions,
-		bool bInEditable)
-		: FWidgetSettingItemSpawnParameter(InTitle)
-		, Options(InOptions)
-		, bEditable(bInEditable)
-	{
-	}
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<FString> Options;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool bEditable = false;
-};
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FWidgetKeySettingItemSpawnParameter : public FWidgetSettingItemSpawnParameter
-{
-	GENERATED_BODY()
-
-public:
-	FWidgetKeySettingItemSpawnParameter() = default;
-
-	FWidgetKeySettingItemSpawnParameter(
-		const FText& InTitle,
-		int32 InKeyNum,
-		bool bInEditable)
-		: FWidgetSettingItemSpawnParameter(InTitle)
-		, KeyNum(InKeyNum)
-		, bEditable(bInEditable)
-	{
-	}
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 KeyNum = 0;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool bEditable = false;
-};
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FWidgetSettingItemCategorySpawnParameter : public FWidgetSpawnParameter
-{
-	GENERATED_BODY()
-
-public:
-	FWidgetSettingItemCategorySpawnParameter() = default;
-
-	explicit FWidgetSettingItemCategorySpawnParameter(const FText& InCategory)
-		: Category(InCategory)
-	{
-	}
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FText Category;
+	int32 KeyIndex = INDEX_NONE;
 };
 
 USTRUCT(BlueprintType)
@@ -416,6 +411,25 @@ public:
 
 	UPROPERTY(Transient)
 	FSettingModuleSaveData DefaultData;
+
+	UPROPERTY(Transient)
+	bool bActive = false;
+};
+
+USTRUCT()
+struct WHFRAMEWORK_API FSettingConfirmationTransaction
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(Transient)
+	FSettingModuleSaveData PreviousData;
+
+	UPROPERTY(Transient)
+	TArray<FSettingId> SettingIds;
+
+	UPROPERTY(Transient)
+	double ExpiresAt = 0.0;
 
 	UPROPERTY(Transient)
 	bool bActive = false;

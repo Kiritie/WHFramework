@@ -38,14 +38,14 @@ public:
 
 public:
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnCreate")
-	void K2_OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams);
+	void K2_OnCreate(const FParameter& InParam);
 	UFUNCTION()
-	virtual void OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams) override;
+	virtual void OnCreate(const FParameter& InParam) override;
 
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitialize")
-	void K2_OnInitialize(const TArray<FParameter>& InParams);
+	void K2_OnInitialize(const FParameter& InParam);
 	UFUNCTION()
-	virtual void OnInitialize(const TArray<FParameter>& InParams) override;
+	virtual void OnInitialize(const FParameter& InParam) override;
 
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnReset")
 	void K2_OnReset(bool bForce = false);
@@ -58,15 +58,13 @@ public:
 	virtual void OnRefresh() override;
 
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnDestroy")
-	void K2_OnDestroy(bool bRecovery);
+	void K2_OnDestroy(EObjectDespawnMode InMode);
 	UFUNCTION()
-	virtual void OnDestroy(bool bRecovery) override;
+	virtual void OnDestroy(EObjectDespawnMode InMode) override;
 
 public:
-	virtual void Init(const TArray<FParameter>* InParams) override;
-	
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParams"))
-	virtual void Init(const TArray<FParameter>& InParams) override;
+	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParam"))
+	virtual void Init(const FParameter& InParam = FParameter()) override;
 	
 	UFUNCTION(BlueprintCallable)
 	virtual void Reset(bool bForce = false) override;
@@ -75,10 +73,13 @@ public:
 	virtual void Refresh() override;
 
 	UFUNCTION(BlueprintCallable)
-	virtual void Destroy(bool bRecovery = false) override;
+	virtual void Destroy(EObjectDespawnMode InMode = EObjectDespawnMode::Destroy) override;
 
 protected:
 	IPanelWidgetInterface* OwnerWidget;
+
+	UPROPERTY(Transient)
+	bool bDynamicSubWidget;
 
 public:
 	template<class T>
@@ -90,7 +91,7 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	virtual UUserWidget* GetOwnerWidget(TSubclassOf<UUserWidget> InClass = nullptr) const override;
 
-	virtual TArray<FParameter> GetWidgetParams() const override { return Super::GetWidgetParams(); }
+	virtual FParameter GetWidgetParams() const override { return Super::GetWidgetParams(); }
 
 	UFUNCTION(BlueprintPure)
 	TArray<UWidget*> GetPoolWidgets() const;

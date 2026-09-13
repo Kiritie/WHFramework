@@ -27,13 +27,13 @@ public:
 		override;
 
 public:
-	virtual void OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams) override;
+	virtual void OnCreate(const FParameter& InParam) override;
 
-	virtual void OnInitialize(const TArray<FParameter>& InParams) override;
+	virtual void OnInitialize(const FParameter& InParam) override;
 
 	virtual void OnRefresh() override;
 
-	virtual void OnDestroy(bool bRecovery) override;
+	virtual void OnDestroy(EObjectDespawnMode InMode) override;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)

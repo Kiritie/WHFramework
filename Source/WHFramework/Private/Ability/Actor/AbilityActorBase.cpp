@@ -44,8 +44,10 @@ AAbilityActorBase::AAbilityActorBase(const FObjectInitializer& ObjectInitializer
 
 void AAbilityActorBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	const FAbilityActorSpawnParameter& Parameter = InParam.GetRef<FAbilityActorSpawnParameter>();
-	AssetID = Parameter.AssetID;
+	if(const FAbilityActorSpawnParameter* Param = InParam.GetPtr<FAbilityActorSpawnParameter>())
+	{
+		AssetID = Param->AssetID;
+	}
 
 	Super::OnSpawn_Implementation(InParam);
 

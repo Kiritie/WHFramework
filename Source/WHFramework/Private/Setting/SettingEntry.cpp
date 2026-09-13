@@ -40,10 +40,15 @@ bool USettingEntry::CanReset() const
 
 bool USettingEntry::IsEnabled() const
 {
-	return OwnerModule != nullptr;
+	return OwnerModule && OwnerModule->IsSettingEnabled(Definition.SettingId);
 }
 
 bool USettingEntry::IsVisible() const
 {
-	return Definition.bVisible;
+	return OwnerModule && OwnerModule->IsSettingVisible(Definition.SettingId);
+}
+
+FSettingValidationResult USettingEntry::GetValidationResult() const
+{
+	return OwnerModule ? OwnerModule->GetValidationResult(Definition.SettingId) : FSettingValidationResult::Valid();
 }

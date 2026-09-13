@@ -113,11 +113,19 @@ TArray<UModuleBase*> UMainModuleStatics::GetAllModule(bool bInEditor)
 
 bool UMainModuleStatics::IsExistModuleByClass(TSubclassOf<UModuleBase> InClass, bool bInEditor)
 {
+	if(!GEngine)
+	{
+		return false;
+	}
 	return AMainModule::IsExistModuleByClass(bInEditor, InClass);
 }
 
 bool UMainModuleStatics::IsExistModuleByName(const FName InName, bool bInEditor)
 {
+	if(!GEngine)
+	{
+		return false;
+	}
 	return AMainModule::IsExistModuleByName(InName, bInEditor);
 }
 

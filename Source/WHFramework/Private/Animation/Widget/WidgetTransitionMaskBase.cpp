@@ -5,22 +5,19 @@
 UWidgetTransitionMaskBase::UWidgetTransitionMaskBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 
-	WidgetType = EWidgetType::Permanent;
-
-	WidgetZOrder = 100;
 }
 
-void UWidgetTransitionMaskBase::OnCreate(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetTransitionMaskBase::OnCreate(const FParameter& InParams)
 {
-	Super::OnCreate(InOwner, InParams);
+	Super::OnCreate(InParams);
 }
 
-void UWidgetTransitionMaskBase::OnInitialize(UObject* InOwner, const TArray<FParameter>& InParams)
+void UWidgetTransitionMaskBase::OnInitialize(const FParameter& InParams)
 {
-	Super::OnInitialize(InOwner, InParams);
+	Super::OnInitialize(InParams);
 }
 
-void UWidgetTransitionMaskBase::OnOpen(const TArray<FParameter>& InParams, bool bInstant)
+void UWidgetTransitionMaskBase::OnOpen(const FParameter& InParams, bool bInstant)
 {
 	Super::OnOpen(InParams, bInstant);
 }

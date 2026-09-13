@@ -110,7 +110,8 @@ void UAnimationModule::ExecuteWithTransition(float Duration, TFunction<void()> O
 	LatentInfo.ExecutionFunction = GET_FUNCTION_NAME_THISCLASS(OnExecuteWithTransitionFinish);
 	LatentActionManager.AddNewAction(LatentInfo.CallbackTarget, LatentInfo.UUID, new FTransitionAction(Duration / 2.f, LatentInfo));
 
-	UWidgetModuleStatics::OpenUserWidget<UWidgetTransitionMaskBase>({ Duration });
+	UWidgetModuleStatics::OpenUserWidget<UWidgetTransitionMaskBase>(
+		FTransitionMaskWidgetOpenParameter(Duration));
 }
 
 void UAnimationModule::OnExecuteWithDelayFinish()

@@ -17,8 +17,6 @@ void UCommonRichTextBlockN::OnSpawn_Implementation(const FParameter& InParam)
 void UCommonRichTextBlockN::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	SetText(FText::GetEmpty());
-
-	RemoveFromParent();
 }
 
 void UCommonRichTextBlockN::SetText(const FText& InText)

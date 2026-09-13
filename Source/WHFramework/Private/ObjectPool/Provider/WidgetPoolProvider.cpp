@@ -15,7 +15,7 @@ FWidgetPoolProvider::FWidgetPoolProvider(UObjectPoolModule& InModule)
 UObject* FWidgetPoolProvider::Spawn(UClass* InClass, const FParameter& InParam)
 {
 	const FWidgetSpawnParameter* Parameter = InParam.GetPtr<FWidgetSpawnParameter>();
-	UObject* OwningObject = Parameter ? Parameter->OwningObject.Get() : nullptr;
+	UObject* OwningObject = Parameter ? Parameter->OwnerObject.Get() : nullptr;
 	UWorld* World = GEngine && OwningObject
 		? GEngine->GetWorldFromContextObject(OwningObject, EGetWorldErrorMode::ReturnNull)
 		: Module.GetWorld();

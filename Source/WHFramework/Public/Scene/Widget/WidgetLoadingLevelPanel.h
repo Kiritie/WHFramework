@@ -5,6 +5,27 @@
 #include "Widget/Screen/UserWidgetBase.h"
 #include "WidgetLoadingLevelPanel.generated.h"
 
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FLoadingLevelWidgetOpenParameter : public FWidgetOpenParameter
+{
+	GENERATED_BODY()
+
+	FLoadingLevelWidgetOpenParameter()
+	{
+	}
+
+	FLoadingLevelWidgetOpenParameter(FName InLevelPath, bool bInUnloading)
+		: LevelPath(InLevelPath), bUnloading(bInUnloading)
+	{
+	}
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FName LevelPath;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bUnloading = false;
+};
+
 /**
  * 
  */
@@ -17,7 +38,7 @@ public:
 	UWidgetLoadingLevelPanel(const FObjectInitializer& ObjectInitializer);
 
 public:
-	virtual void OnOpen(const TArray<FParameter>& InParams, bool bInstant) override;
+	virtual void OnOpen(const FParameter& InParams, bool bInstant) override;
 
 	virtual void OnClose(bool bInstant) override;
 

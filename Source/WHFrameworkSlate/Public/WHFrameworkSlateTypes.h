@@ -182,14 +182,14 @@ enum class EEditorWidgetState : uint8
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWidgetStateChanged, EScreenWidgetState, InWidgetState);
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FK2_OnWidgetOpened, const TArray<FParameter>&, InParams, bool, bInstant);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FK2_OnWidgetOpened, const FParameter&, InParameter, bool, bInstant);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FK2_OnWidgetClosed, bool, bInstant);
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FK2_OnWidgetDestroyed, bool, bRecovery);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FK2_OnWidgetDestroyed, EObjectDespawnMode, InMode);
 
-DECLARE_MULTICAST_DELEGATE_TwoParams(FOnWidgetOpened, const TArray<FParameter>&, bool);
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnWidgetOpened, const FParameter&, bool);
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnWidgetClosed, bool);
 
-DECLARE_MULTICAST_DELEGATE_OneParam(FOnWidgetDestroyed, bool);
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnWidgetDestroyed, EObjectDespawnMode);

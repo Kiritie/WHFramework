@@ -33,7 +33,7 @@ UVideoModule::UVideoModule()
 	MediaPlayers = TArray<AMediaPlayerBase*>();
 
 	WindowMode = EWindowModeN::Fullscreen;
-	WindowResolution = EWindowResolution::WR_ScreenSize;
+	WindowResolution = FIntPoint::ZeroValue;
 	bEnableVSync = false;
 	bEnableDynamicResolution = false;
 	
@@ -357,59 +357,11 @@ void UVideoModule::SetWindowMode(EWindowModeN InMode, bool bApply)
 	if(bApply) GetGameUserSettings()->ApplySettings(false);
 }
 
-void UVideoModule::SetWindowResolution(EWindowResolution InResolution, bool bApply)
+void UVideoModule::SetWindowResolution(FIntPoint InResolution, bool bApply)
 {
 	WindowResolution = InResolution;
 	if(GetWorld() && GetWorld()->IsPlayInEditor()) return;
-	switch (InResolution)
-	{
-		case EWindowResolution::WR_ScreenSize:
-		{
-			GetGameUserSettings()->SetScreenResolution(GetDesktopResolution());
-			break;
-		}
-		case EWindowResolution::WR_3840_2160:
-		{
-			GetGameUserSettings()->SetScreenResolution(FIntPoint(3840, 2160));
-			break;
-		}
-		case EWindowResolution::WR_2560_1440:
-		{
-			GetGameUserSettings()->SetScreenResolution(FIntPoint(2560, 1440));
-			break;
-		}
-		case EWindowResolution::WR_1920_1080:
-		{
-			GetGameUserSettings()->SetScreenResolution(FIntPoint(1920, 1080));
-			break;
-		}
-		case EWindowResolution::WR_1600_900:
-		{
-			GetGameUserSettings()->SetScreenResolution(FIntPoint(1600, 900));
-			break;
-		}
-		case EWindowResolution::WR_1366_768:
-		{
-			GetGameUserSettings()->SetScreenResolution(FIntPoint(1366, 768));
-			break;
-		}
-		case EWindowResolution::WR_1280_720:
-		{
-			GetGameUserSettings()->SetScreenResolution(FIntPoint(1280, 720));
-			break;
-		}
-		case EWindowResolution::WR_1024_576:
-		{
-			GetGameUserSettings()->SetScreenResolution(FIntPoint(1024, 576));
-			break;
-		}
-		case EWindowResolution::WR_960_540:
-		{
-			GetGameUserSettings()->SetScreenResolution(FIntPoint(960, 540));
-			break;
-		}
-		default: break;
-	}
+	GetGameUserSettings()->SetScreenResolution(InResolution == FIntPoint::ZeroValue ? GetDesktopResolution() : InResolution);
 	if(bApply) GetGameUserSettings()->ApplySettings(false);
 }
 

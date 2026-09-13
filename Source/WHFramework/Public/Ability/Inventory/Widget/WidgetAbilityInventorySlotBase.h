@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Ability/AbilityModuleTypes.h"
+#include "GameplayTagContainer.h"
 #include "Widget/Sub/SubButtonWidgetBase.h"
 #include "WidgetAbilityInventorySlotBase.generated.h"
 
@@ -30,13 +31,13 @@ public:
 		override;
 
 public:
-	virtual void OnCreate(UUserWidget* InOwner, const TArray<FParameter>& InParams) override;
+	virtual void OnCreate(const FParameter& InParam) override;
 
-	virtual void OnInitialize(const TArray<FParameter>& InParams) override;
+	virtual void OnInitialize(const FParameter& InParam) override;
 
 	virtual void OnRefresh() override;
 
-	virtual void OnDestroy(bool bRecovery) override;
+	virtual void OnDestroy(EObjectDespawnMode InMode) override;
 
 public:
 	virtual bool NativeOnDrop( const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation ) override;
@@ -86,16 +87,16 @@ public:
 	void DiscardItem(int InCount = -1);
 	
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ExposeOnSpawn = true), Category = "Style")
-	TSubclassOf<UCommonButtonStyle> MatchStyle;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ExposeOnSpawn = true, Categories = "Style.Button"), Category = "Style")
+	FGameplayTag MatchStyleTag;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ExposeOnSpawn = true), Category = "Style")
-	TSubclassOf<UCommonButtonStyle> MismatchStyle;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ExposeOnSpawn = true, Categories = "Style.Button"), Category = "Style")
+	FGameplayTag MismatchStyleTag;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	UAbilityInventorySlotBase* OwnerSlot;
 
-	TSubclassOf<UCommonButtonStyle> DefaultStyle;
+	FGameplayTag DefaultStyleTag;
 
 	FTimerHandle CooldownTimerHandle;
 

@@ -114,7 +114,7 @@ protected:
 	EWindowModeN WindowMode;
 
 	UPROPERTY(EditAnywhere, Category = "VideoSetting")
-	EWindowResolution WindowResolution;
+	FIntPoint WindowResolution;
 
 	UPROPERTY(EditAnywhere, Category = "VideoSetting")
 	bool bEnableVSync;
@@ -163,10 +163,10 @@ public:
 	void SetWindowMode(EWindowModeN InMode, bool bApply = false);
 
 	UFUNCTION(BlueprintPure)
-	EWindowResolution GetWindowResolution() const { return WindowResolution; }
+	FIntPoint GetWindowResolution() const { return WindowResolution; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetWindowResolution(EWindowResolution InResolution, bool bApply = false);
+	void SetWindowResolution(FIntPoint InResolution, bool bApply = false);
 
 	UFUNCTION(BlueprintPure)
 	FIntPoint GetDesktopResolution() const;

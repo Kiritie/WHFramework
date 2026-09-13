@@ -60,7 +60,7 @@ public:
 	FORCEINLINE FVideoModuleSaveData()
 	{
 		WindowMode = EWindowModeN::Fullscreen;
-		WindowResolution = EWindowResolution::WR_ScreenSize;
+		WindowResolution = FIntPoint::ZeroValue;
 		bEnableVSync = false;
 		bEnableDynamicResolution = false;
 		GlobalVideoQuality = EVideoQuality::Epic;
@@ -77,48 +77,48 @@ public:
 	}
 
 public:
-	UPROPERTY()
+	UPROPERTY(meta = (SettingCategory = "Display", SettingOrder = "0", SettingRequiresConfirmation))
 	EWindowModeN WindowMode;
 
-	UPROPERTY()
-	EWindowResolution WindowResolution;
+	UPROPERTY(meta = (SettingLeaf, SettingRenderer = "Option", SettingApply = "Deferred", SettingCategory = "Display", SettingOrder = "10", SettingRequiresConfirmation))
+	FIntPoint WindowResolution;
 
-	UPROPERTY()
+	UPROPERTY(meta = (SettingCategory = "Display", SettingOrder = "20"))
 	bool bEnableVSync;
 
-	UPROPERTY()
+	UPROPERTY(meta = (SettingCategory = "Display", SettingOrder = "30"))
 	bool bEnableDynamicResolution;
 
-	UPROPERTY()
+	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "40"))
 	EVideoQuality GlobalVideoQuality;
 
-	UPROPERTY()
+	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "50"))
 	EVideoQuality ViewDistanceQuality;
 
-	UPROPERTY()
+	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "60"))
 	EVideoQuality ShadowQuality;
 
-	UPROPERTY()
+	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "70"))
 	EVideoQuality GlobalIlluminationQuality;
 
-	UPROPERTY()
+	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "80"))
 	EVideoQuality ReflectionQuality;
 
-	UPROPERTY()
+	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "90"))
 	EVideoQuality AntiAliasingQuality;
 
-	UPROPERTY()
+	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "100"))
 	EVideoQuality TextureQuality;
 
-	UPROPERTY()
+	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "110"))
 	EVideoQuality VisualEffectQuality;
 
-	UPROPERTY()
+	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "120"))
 	EVideoQuality PostProcessingQuality;
 
-	UPROPERTY()
+	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "130"))
 	EVideoQuality FoliageQuality;
 
-	UPROPERTY()
+	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "140"))
 	EVideoQuality ShadingQuality;
 };
