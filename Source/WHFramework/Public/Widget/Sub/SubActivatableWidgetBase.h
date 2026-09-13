@@ -82,6 +82,9 @@ public:
 	virtual void Destroy(EObjectDespawnMode InMode = EObjectDespawnMode::Destroy) override;
 
 protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	EWidgetInputConfig InputConfig;
+
 	UPROPERTY(Transient)
 	FParameter WidgetParams;
 
@@ -105,4 +108,6 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	TArray<UWidget*> GetPoolWidgets() const;
+
+	virtual TOptional<FUIInputConfig> GetDesiredInputConfig() const override;
 };

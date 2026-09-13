@@ -4,12 +4,11 @@
 #include "WHFrameworkSlateTypes.h"
 #include "Editor/Base/IEditorWidgetBase.h"
 #include "Runtime/Base/SSlateWidgetBase.h"
-#include "Input/InputManagerInterface.h"
 #include "Main/MainTypes.h"
 #include "Main/Base/ManagerBase.h"
 #include "Parameter/ParameterTypes.h"
 
-class WHFRAMEWORKSLATE_API FSlateWidgetManager : public FManagerBase, public IInputManagerInterface
+class WHFRAMEWORKSLATE_API FSlateWidgetManager : public FManagerBase
 {
 	GENERATED_MANAGER(FSlateWidgetManager)
 
@@ -87,6 +86,7 @@ public:
 				TemporarySlateWidget = SlateWidget;
 			}
 			SlateWidget->OnOpen(InParam, bInstant);
+			RefreshInputModeRequest();
 			return true;
 		}
 		return false;
@@ -102,6 +102,7 @@ public:
 				TemporarySlateWidget = nullptr;
 			}
 			SlateWidget->OnClose(bInstant);
+			RefreshInputModeRequest();
 			return true;
 		}
 		return false;
@@ -113,6 +114,7 @@ public:
 		if(TSharedPtr<T> SlateWidget = HasSlateWidget<T>(InName) ? GetSlateWidget<T>(InName) : CreateSlateWidget<T>())
 		{
 			SlateWidget->Toggle(bInstant);
+			RefreshInputModeRequest();
 			return true;
 		}
 		return false;
@@ -133,6 +135,7 @@ public:
 				SlateWidget->OnDestroy(InMode);
 				SlateWidget = nullptr;
 			}
+			RefreshInputModeRequest();
 			return true;
 		}
 		return false;
@@ -251,9 +254,9 @@ public:
 	void ClearAllEditorWidget();
 
 	//////////////////////////////////////////////////////////////////////////
-	// InputManager
-public:
-	virtual int32 GetNativeInputPriority() const override { return 1; }
-	
-	virtual EInputMode GetNativeInputMode() const override;
+	// InputMode
+protected:
+	void RefreshInputModeRequest();
+
+	EInputMode GetDesiredInputMode() const;
 };

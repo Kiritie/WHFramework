@@ -43,6 +43,12 @@ void UCommonButton::OnDespawn_Implementation(EObjectDespawnMode InMode)
 	WidgetParams.Reset();
 }
 
+void UCommonButton::SynchronizeProperties()
+{
+	ApplyStyleTag();
+	Super::SynchronizeProperties();
+}
+
 void UCommonButton::NativePreConstruct()
 {
 	Super::NativePreConstruct();
@@ -50,6 +56,13 @@ void UCommonButton::NativePreConstruct()
 	ApplyStyleTag();
 	ApplyTriggeringActionTag();
 	SetTitle(Title);
+}
+
+void UCommonButton::NativeConstruct()
+{
+	Super::NativeConstruct();
+
+	ApplyStyleTag();
 }
 
 void UCommonButton::NativeOnDragEnter(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
@@ -82,10 +95,7 @@ void UCommonButton::NativeOnCurrentTextStyleChanged()
 {
 	Super::NativeOnCurrentTextStyleChanged();
 
-	if(Txt_Title)
-	{
-		Txt_Title->SetStyle(GetCurrentTextStyleClass());
-	}
+	ApplyTitleStyle();
 }
 
 void UCommonButton::NativeOnClicked()
@@ -161,6 +171,16 @@ void UCommonButton::ApplyStyleTag()
 	if(StyleData && StyleData->Style)
 	{
 		SetStyle(StyleData->Style);
+	}
+	ApplyTitleStyle();
+}
+
+void UCommonButton::ApplyTitleStyle()
+{
+	if(Txt_Title)
+	{
+		Txt_Title->SetStyleTag(FGameplayTag());
+		Txt_Title->SetStyle(GetCurrentTextStyleClass());
 	}
 }
 

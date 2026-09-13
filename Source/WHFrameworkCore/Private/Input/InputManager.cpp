@@ -3,6 +3,7 @@
 
 #include "Input/InputManager.h"
 
+#include "Engine/Engine.h"
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainManager.h"
 
@@ -37,13 +38,12 @@ IMPLEMENTATION_MANAGER(FInputManager)
 // Sets default values
 FInputManager::FInputManager() : FManagerBase(Type)
 {
-	NativeInputMode = EInputMode::GameOnly;
+	DefaultInputMode = EInputMode::GameOnly;
 	
 	GlobalInputMode = EInputMode::None;
-	ExternalInputMode.Reset();
-	bInputModeExternallyManaged = false;
-
-	InputManagers = TArray<IInputManagerInterface*>();
+	CommonUIInputMode.Reset();
+	bCommonUIControlled = false;
+	InputModeRequests.Reset();
 }
 
 FInputManager::~FInputManager()
@@ -54,7 +54,6 @@ void FInputManager::OnInitialize()
 {
 	FManagerBase::OnInitialize();
 
-	AddInputManager(this);
 }
 
 void FInputManager::OnPreparatory()
@@ -68,7 +67,10 @@ void FInputManager::OnReset()
 {
 	FManagerBase::OnReset();
 	
-	GlobalInputMode = EInputMode::GameOnly;
+	GlobalInputMode = EInputMode::None;
+	CommonUIInputMode.Reset();
+	InputModeRequests.Reset();
+	UpdateInputMode();
 }
 
 void FInputManager::OnRefresh(float DeltaSeconds)
@@ -80,71 +82,54 @@ void FInputManager::OnTermination()
 {
 	FManagerBase::OnTermination();
 
-	RemoveInputManager(this);
-}
-
-void FInputManager::AddInputManager(IInputManagerInterface* InInputManager)
-{
-	if(!InputManagers.Contains(InInputManager))
-	{
-		InputManagers.Add(InInputManager);
-	}
-}
-
-void FInputManager::RemoveInputManager(IInputManagerInterface* InInputManager)
-{
-	if(InputManagers.Contains(InInputManager))
-	{
-		InputManagers.Remove(InInputManager);
-	}
 }
 
 void FInputManager::UpdateInputMode()
 {
-	APlayerController* PlayerController = UGameplayStatics::GetPlayerController(GWorldContext, 0);
-
-	if(!PlayerController) return;
-	
-	EInputMode InputMode = ExternalInputMode.Get(EInputMode::None);
-	if(!ExternalInputMode.IsSet())
+	UWorld* World = nullptr;
+	if(GEngine)
 	{
-		int32 InputPriority = MIN_int32;
-		int32 InputModeRank = MIN_int32;
-		for(IInputManagerInterface* InputManager : InputManagers)
+		for(const FWorldContext& WorldContext : GEngine->GetWorldContexts())
 		{
-			if(!InputManager)
+			if(WorldContext.WorldType == EWorldType::PIE || WorldContext.WorldType == EWorldType::Game)
 			{
-				continue;
-			}
-
-			const EInputMode CandidateInputMode = InputManager->GetNativeInputMode();
-			if(CandidateInputMode == EInputMode::None && InputManager != this)
-			{
-				continue;
-			}
-
-			const int32 CandidatePriority = InputManager->GetNativeInputPriority();
-			const int32 CandidateModeRank = GetInputModeRank(CandidateInputMode);
-			if(CandidatePriority > InputPriority
-				|| (CandidatePriority == InputPriority && CandidateModeRank > InputModeRank))
-			{
-				InputPriority = CandidatePriority;
-				InputModeRank = CandidateModeRank;
-				InputMode = CandidateInputMode;
+				World = WorldContext.World();
+				if(World) break;
 			}
 		}
 	}
+	APlayerController* PlayerController = World ? UGameplayStatics::GetPlayerController(World, 0) : nullptr;
 
-	const bool bWasExternallyManaged = bInputModeExternallyManaged;
-	const bool bIsExternallyManaged = ExternalInputMode.IsSet();
-	if(GlobalInputMode != InputMode || bWasExternallyManaged != bIsExternallyManaged)
+	if(!PlayerController) return;
+	
+	EInputMode InputMode = CommonUIInputMode.Get(DefaultInputMode);
+	int32 InputPriority = MIN_int32;
+	int32 InputModeRank = MIN_int32;
+	for(const TPair<const void*, FInputModeRequest>& Pair : InputModeRequests)
+	{
+		const FInputModeRequest& Request = Pair.Value;
+		const int32 CandidateModeRank = GetInputModeRank(Request.InputMode);
+		if(Request.Priority > InputPriority
+			|| (Request.Priority == InputPriority && CandidateModeRank > InputModeRank))
+		{
+			InputPriority = Request.Priority;
+			InputModeRank = CandidateModeRank;
+			InputMode = Request.InputMode;
+		}
+	}
+
+	const bool bWasCommonUIControlled = bCommonUIControlled;
+	const bool bIsCommonUIControlled = CommonUIInputMode.IsSet() && InputModeRequests.IsEmpty();
+	// if(GlobalInputMode != InputMode || bWasCommonUIControlled != bIsCommonUIControlled)
 	{
 		const EInputMode PreviousInputMode = GlobalInputMode;
 		GlobalInputMode = InputMode;
-		bInputModeExternallyManaged = bIsExternallyManaged;
+		bCommonUIControlled = bIsCommonUIControlled;
 
-		if(!ExternalInputMode.IsSet())
+		if(!bIsCommonUIControlled)
 		{
+			PlayerController->ResetIgnoreMoveInput();
+			PlayerController->ResetIgnoreLookInput();
 			switch(InputMode)
 			{
 				case EInputMode::None:
@@ -183,14 +168,28 @@ void FInputManager::UpdateInputMode()
 	}
 }
 
-void FInputManager::SetExternalInputMode(TOptional<EInputMode> InInputMode)
+void FInputManager::RequestInputMode(const void* InOwner, EInputMode InInputMode, int32 InPriority)
 {
-	ExternalInputMode = InInputMode;
+	if(!InOwner) return;
+	InputModeRequests.FindOrAdd(InOwner) = { InInputMode, InPriority };
 	UpdateInputMode();
 }
 
-void FInputManager::SetNativeInputMode(EInputMode InInputMode)
+void FInputManager::ReleaseInputMode(const void* InOwner)
 {
-	NativeInputMode = InInputMode;
+	if(!InOwner) return;
+	InputModeRequests.Remove(InOwner);
+	UpdateInputMode();
+}
+
+void FInputManager::SetCommonUIInputMode(TOptional<EInputMode> InInputMode)
+{
+	CommonUIInputMode = InInputMode;
+	UpdateInputMode();
+}
+
+void FInputManager::SetDefaultInputMode(EInputMode InInputMode)
+{
+	DefaultInputMode = InInputMode;
 	UpdateInputMode();
 }

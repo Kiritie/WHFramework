@@ -2,9 +2,13 @@
 
 #include "Input/Widget/WidgetKeyTipsItemBase.h"
 
+#include "CommonInputBaseTypes.h"
+#include "CommonInputSubsystem.h"
 #include "Components/Border.h"
 #include "Components/HorizontalBox.h"
-#include "Input/Widget/WidgetInputAction.h"
+#include "Components/HorizontalBoxSlot.h"
+#include "Components/Image.h"
+#include "Input/InputModuleStatics.h"
 #include "Widget/Common/CommonTextBlockN.h"
 
 UWidgetKeyTipsItemBase::UWidgetKeyTipsItemBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
@@ -37,12 +41,29 @@ void UWidgetKeyTipsItemBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 
 void UWidgetKeyTipsItemBase::RefreshData_Implementation()
 {
-	if(!Box_KeyIcon)
+	UImage* ImageTemplate = Box_KeyIcon && Box_KeyIcon->GetChildrenCount() > 0
+		? Cast<UImage>(Box_KeyIcon->GetChildAt(0))
+		: nullptr;
+	if(!ImageTemplate)
 	{
 		return;
 	}
 
-	Box_KeyIcon->ClearChildren();
+	while(Box_KeyIcon->GetChildrenCount() > 1)
+	{
+		Box_KeyIcon->RemoveChildAt(1);
+	}
+
+	FString KeyCode;
+	const UCommonInputPlatformSettings* Settings = UPlatformSettingsManager::Get().GetSettingsForPlatform<UCommonInputPlatformSettings>();
+	ECommonInputType InputType;
+	FName GamepadName;
+	FCommonInputBase::GetCurrentPlatformDefaults(InputType, GamepadName);
+	if(const UCommonInputSubsystem* InputSubsystem = UCommonInputSubsystem::Get(GetOwningLocalPlayer()))
+	{
+		InputType = InputSubsystem->GetCurrentInputType();
+		GamepadName = InputSubsystem->GetCurrentGamepadName();
+	}
 	for(const FGameplayTag& ActionTag : ActionTags)
 	{
 		if(!ActionTag.IsValid())
@@ -50,22 +71,55 @@ void UWidgetKeyTipsItemBase::RefreshData_Implementation()
 			continue;
 		}
 
-		UWidgetInputAction* ActionWidget = NewObject<UWidgetInputAction>(this);
-		ActionWidget->SetActionTag(ActionTag);
-		Box_KeyIcon->AddChildToHorizontalBox(ActionWidget);
+		for(const FKey& Key : UInputModuleStatics::GetKeysByActionTag(ActionTag))
+		{
+			FSlateBrush ImageBrush;
+			if(Settings->TryGetInputBrush(
+				ImageBrush,
+				Key,
+				InputType,
+				GamepadName)
+				&& ImageBrush.GetResourceObject())
+			{
+				ImageBrush.ImageSize = ImageTemplate->GetBrush().ImageSize;
+				UImage* Image = NewObject<UImage>(this);
+				Image->SetBrush(ImageBrush);
+				if(UHorizontalBoxSlot* ImageSlot = Box_KeyIcon->AddChildToHorizontalBox(Image))
+				{
+					ImageSlot->SetPadding(CastChecked<UHorizontalBoxSlot>(ImageTemplate->Slot)->GetPadding());
+					ImageSlot->SetSize(FSlateChildSize(ESlateSizeRule::Automatic));
+				}
+			}
+			else
+			{
+				if(!KeyCode.IsEmpty())
+				{
+					KeyCode += TEXT("/");
+				}
+				KeyCode += Key.GetDisplayName(false).ToString();
+			}
+		}
 	}
 
-	Box_KeyIcon->SetVisibility(Box_KeyIcon->GetChildrenCount() > 0
+	if(Box_KeyIcon->GetChildrenCount() > 1)
+	{
+		CastChecked<UHorizontalBoxSlot>(Box_KeyIcon->GetChildAt(Box_KeyIcon->GetChildrenCount() - 1)->Slot)->SetPadding(FMargin(0.f));
+	}
+	Box_KeyIcon->SetVisibility(Box_KeyIcon->GetChildrenCount() > 1
 		? ESlateVisibility::SelfHitTestInvisible
 		: ESlateVisibility::Collapsed);
 	if(Border_KeyCode)
 	{
-		Border_KeyCode->SetVisibility(ESlateVisibility::Collapsed);
+		Border_KeyCode->SetVisibility(KeyCode.IsEmpty()
+			? ESlateVisibility::Collapsed
+			: ESlateVisibility::SelfHitTestInvisible);
 	}
 	if(Txt_KeyCode)
 	{
-		Txt_KeyCode->SetText(FText::GetEmpty());
-		Txt_KeyCode->SetVisibility(ESlateVisibility::Collapsed);
+		Txt_KeyCode->SetText(FText::FromString(KeyCode));
+		Txt_KeyCode->SetVisibility(KeyCode.IsEmpty()
+			? ESlateVisibility::Collapsed
+			: ESlateVisibility::SelfHitTestInvisible);
 	}
 }
 

@@ -41,7 +41,7 @@ UInputModule::UInputModule()
 
 	ModuleSaveGame = UInputSaveGame::StaticClass();
 	
-	NativeInputMode = EInputMode::GameOnly;
+	DefaultInputMode = EInputMode::GameOnly;
 }
 
 UInputModule::~UInputModule()
@@ -77,7 +77,7 @@ void UInputModule::OnInitialize()
 	BuildInputCaches();
 
 	FInputManager::Get().OnInputModeChanged.AddUObject(this, &ThisClass::HandleGlobalInputModeChanged);
-	FInputManager::Get().SetNativeInputMode(NativeInputMode);
+	FInputManager::Get().SetDefaultInputMode(DefaultInputMode);
 }
 
 void UInputModule::OnPreparatory(EPhase InPhase)
@@ -174,7 +174,7 @@ void UInputModule::OnTermination(EPhase InPhase)
 	if(PHASEC(InPhase, EPhase::Final))
 	{
 		FInputManager::Get().OnInputModeChanged.RemoveAll(this);
-		FInputManager::Get().SetExternalInputMode(TOptional<EInputMode>());
+		FInputManager::Get().SetCommonUIInputMode(TOptional<EInputMode>());
 
 		for(FInputPlayerRuntime& Runtime : PlayerRuntimes)
 		{
@@ -456,7 +456,7 @@ void UInputModule::RefreshCommonUIInputMode(int32 InPlayerIndex)
 		}
 	}
 
-	FInputManager::Get().SetExternalInputMode(InputMode);
+	FInputManager::Get().SetCommonUIInputMode(InputMode);
 }
 
 void UInputModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
@@ -508,10 +508,10 @@ FString UInputModule::GetModuleDebugMessage()
 	return FString::Printf(TEXT("GlobalInputMode: %s"), *UCommonModuleStatics::GetEnumAuthoredNameByValue(TEXT("/Script/WHFrameworkCore.EInputMode"), (int32)UInputModuleStatics::GetGlobalInputMode()));
 }
 
-void UInputModule::SetNativeInputMode(EInputMode InInputMode)
+void UInputModule::SetDefaultInputMode(EInputMode InInputMode)
 {
-	NativeInputMode = InInputMode;
-	FInputManager::Get().SetNativeInputMode(InInputMode);
+	DefaultInputMode = InInputMode;
+	FInputManager::Get().SetDefaultInputMode(InInputMode);
 }
 
 UInputBindingBase* UInputModule::GetInputBinding(TSubclassOf<UInputBindingBase> InClass, int32 InPlayerIndex) const
@@ -813,6 +813,35 @@ TArray<FPlayerKeyMapping> UInputModule::GetPlayerKeyMappingsByTag(FGameplayTag I
 		return A.GetSlot() < B.GetSlot();
 	});
 	return Mappings;
+}
+
+TArray<FKey> UInputModule::GetKeysByActionTag(FGameplayTag InActionTag, int32 InPlayerIndex) const
+{
+	TArray<FKey> Keys;
+	const TArray<FPlayerKeyMapping> PlayerMappings = GetPlayerKeyMappingsByTag(InActionTag, InPlayerIndex);
+	for(const FPlayerKeyMapping& Mapping : PlayerMappings)
+	{
+		Keys.AddUnique(Mapping.GetCurrentKey());
+	}
+
+	for(const FInputContextConfig& Config : ContextConfigs)
+	{
+		if(!Config.MappingContext)
+		{
+			continue;
+		}
+		for(const FEnhancedActionKeyMapping& Mapping : Config.MappingContext->GetMappings())
+		{
+			const UInputActionBase* Action = Cast<UInputActionBase>(Mapping.Action);
+			if(Action
+				&& Action->ActionTag == InActionTag
+				&& (!Mapping.IsPlayerMappable() || PlayerMappings.IsEmpty()))
+			{
+				Keys.AddUnique(Mapping.Key);
+			}
+		}
+	}
+	return Keys;
 }
 
 TArray<FPlayerKeyMapping> UInputModule::GetPlayerKeyMappingsByMappingName(FName InMappingName, int32 InPlayerIndex) const

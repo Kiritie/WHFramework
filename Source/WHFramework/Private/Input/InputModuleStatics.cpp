@@ -48,14 +48,14 @@ UInputBindingBase* UInputModuleStatics::GetInputBindingByName(const FName InName
 	return UInputModule::Get().GetInputBindingByName(InName, InPlayerIndex, InClass);
 }
 
-EInputMode UInputModuleStatics::GetNativeInputMode()
+EInputMode UInputModuleStatics::GetDefaultInputMode()
 {
-	return UInputModule::Get().GetNativeInputMode();
+	return UInputModule::Get().GetDefaultInputMode();
 }
 
-void UInputModuleStatics::SetNativeInputMode(EInputMode InInputMode)
+void UInputModuleStatics::SetDefaultInputMode(EInputMode InInputMode)
 {
-	UInputModule::Get().SetNativeInputMode(InInputMode);
+	UInputModule::Get().SetDefaultInputMode(InInputMode);
 }
 
 TArray<FPlayerKeyMapping> UInputModuleStatics::GetAllPlayerKeyMappings(int32 InPlayerIndex)
@@ -116,6 +116,11 @@ bool UInputModuleStatics::ResetPlayerKeyByMappingName(FName InMappingName, int32
 TArray<FPlayerKeyMapping> UInputModuleStatics::GetPlayerKeyMappingsByTag(FGameplayTag InActionTag, int32 InPlayerIndex)
 {
 	return UInputModule::Get().GetPlayerKeyMappingsByTag(InActionTag, InPlayerIndex);
+}
+
+TArray<FKey> UInputModuleStatics::GetKeysByActionTag(FGameplayTag InActionTag, int32 InPlayerIndex)
+{
+	return UInputModule::Get().GetKeysByActionTag(InActionTag, InPlayerIndex);
 }
 
 TArray<FPlayerKeyMapping> UInputModuleStatics::GetPlayerKeyMappingsByMappingName(FName InMappingName, int32 InPlayerIndex)

@@ -98,6 +98,9 @@ public:
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InActionTag"), Category = "InputModuleStatics")
 	static TArray<FPlayerKeyMapping> GetPlayerKeyMappingsByTag(FGameplayTag InActionTag, int32 InPlayerIndex = 0);
 
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InActionTag"), Category = "InputModuleStatics")
+	static TArray<FKey> GetKeysByActionTag(FGameplayTag InActionTag, int32 InPlayerIndex = 0);
+
 	UFUNCTION(BlueprintPure, Category = "InputModuleStatics")
 	static TArray<FPlayerKeyMapping> GetPlayerKeyMappingsByMappingName(FName InMappingName, int32 InPlayerIndex = 0);
 
@@ -129,10 +132,10 @@ public:
 	// InputMode
 public:
 	UFUNCTION(BlueprintPure, Category = "InputModuleStatics")
-	static EInputMode GetNativeInputMode();
+	static EInputMode GetDefaultInputMode();
 
 	UFUNCTION(BlueprintCallable, Category = "InputModuleStatics")
-	static void SetNativeInputMode(EInputMode InInputMode);
+	static void SetDefaultInputMode(EInputMode InInputMode);
 
 	UFUNCTION(BlueprintPure, Category = "InputModuleStatics")
 	static EInputMode GetGlobalInputMode();

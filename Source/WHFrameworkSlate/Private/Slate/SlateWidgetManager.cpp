@@ -51,7 +51,6 @@ void FSlateWidgetManager::OnInitialize()
 {
 	FManagerBase::OnInitialize();
 
-	FInputManager::Get().AddInputManager(this);
 }
 
 void FSlateWidgetManager::OnReset()
@@ -79,7 +78,6 @@ void FSlateWidgetManager::OnTermination()
 {
 	FManagerBase::OnTermination();
 
-	FInputManager::Get().RemoveInputManager(this);
 }
 
 void FSlateWidgetManager::CloseAllSlateWidget(bool bInstant)
@@ -92,6 +90,7 @@ void FSlateWidgetManager::CloseAllSlateWidget(bool bInstant)
 			Iter.Value->Close(bInstant);
 		}
 	}
+	RefreshInputModeRequest();
 }
 
 void FSlateWidgetManager::ClearAllSlateWidget(EObjectDespawnMode InMode)
@@ -104,6 +103,7 @@ void FSlateWidgetManager::ClearAllSlateWidget(EObjectDespawnMode InMode)
 		}
 	}
 	AllSlateWidgets.Empty();
+	RefreshInputModeRequest();
 }
 
 void FSlateWidgetManager::CloseAllEditorWidget(bool bInstant)
@@ -129,7 +129,20 @@ void FSlateWidgetManager::ClearAllEditorWidget()
 	AllEditorWidgets.Empty();
 }
 
-EInputMode FSlateWidgetManager::GetNativeInputMode() const
+void FSlateWidgetManager::RefreshInputModeRequest()
+{
+	const EInputMode InputMode = GetDesiredInputMode();
+	if(InputMode == EInputMode::None)
+	{
+		FInputManager::Get().ReleaseInputMode(this);
+	}
+	else
+	{
+		FInputManager::Get().RequestInputMode(this, InputMode, 10);
+	}
+}
+
+EInputMode FSlateWidgetManager::GetDesiredInputMode() const
 {
 	EInputMode InputMode = EInputMode::None;
 	for (const auto& Iter : AllSlateWidgets)

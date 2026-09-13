@@ -848,6 +848,7 @@ UUserWidgetBase* UWidgetModule::CreateUserWidgetByTag(FGameplayTag InWidgetTag, 
 		Widget->OnDestroy(EObjectDespawnMode::Destroy);
 		return nullptr;
 	}
+	Widget->SetVisibility(ESlateVisibility::Collapsed);
 
 	TArray<FGameplayTag> ChildTags;
 	UserWidgetChildrenMap.MultiFind(InWidgetTag, ChildTags);

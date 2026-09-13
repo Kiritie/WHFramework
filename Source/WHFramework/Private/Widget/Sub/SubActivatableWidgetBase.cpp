@@ -137,3 +137,18 @@ TArray<UWidget*> USubActivatableWidgetBase::GetPoolWidgets() const
 	}
 	return PoolWidgets;
 }
+
+TOptional<FUIInputConfig> USubActivatableWidgetBase::GetDesiredInputConfig() const
+{
+	switch(InputConfig)
+	{
+		case EWidgetInputConfig::Game:
+			return FUIInputConfig(ECommonInputMode::Game, EMouseCaptureMode::CapturePermanently, true);
+		case EWidgetInputConfig::GameAndMenu:
+			return FUIInputConfig(ECommonInputMode::All, EMouseCaptureMode::NoCapture, false);
+		case EWidgetInputConfig::Menu:
+			return FUIInputConfig(ECommonInputMode::Menu, EMouseCaptureMode::NoCapture, false);
+		default:
+			return TOptional<FUIInputConfig>();
+	}
+}

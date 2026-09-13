@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "InputManagerInterface.h"
+#include "InputTypes.h"
 #include "Main/MainTypes.h"
 #include "Main/Base/ManagerBase.h"
 
@@ -11,7 +11,7 @@ DECLARE_MULTICAST_DELEGATE_TwoParams(
 	EInputMode,
 	EInputMode);
 
-class WHFRAMEWORKCORE_API FInputManager : public FManagerBase, public IInputManagerInterface
+class WHFRAMEWORKCORE_API FInputManager : public FManagerBase
 {
 	GENERATED_MANAGER(FInputManager)
 
@@ -38,31 +38,35 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// InputManager
 public:
-	virtual void AddInputManager(IInputManagerInterface* InInputManager);
-
-	virtual void RemoveInputManager(IInputManagerInterface* InInputManager);
-
 	virtual void UpdateInputMode();
 
-	virtual void SetExternalInputMode(TOptional<EInputMode> InInputMode);
+	virtual void RequestInputMode(const void* InOwner, EInputMode InInputMode, int32 InPriority = 0);
+
+	virtual void ReleaseInputMode(const void* InOwner);
+
+	virtual void SetCommonUIInputMode(TOptional<EInputMode> InInputMode);
 
 protected:
-	EInputMode NativeInputMode;
+	struct FInputModeRequest
+	{
+		EInputMode InputMode = EInputMode::None;
+		int32 Priority = 0;
+	};
+
+	EInputMode DefaultInputMode;
 	
 	EInputMode GlobalInputMode;
 
-	TOptional<EInputMode> ExternalInputMode;
+	TOptional<EInputMode> CommonUIInputMode;
 
-	bool bInputModeExternallyManaged;
-	
-	TArray<IInputManagerInterface*> InputManagers;
+	bool bCommonUIControlled;
+
+	TMap<const void*, FInputModeRequest> InputModeRequests;
 
 public:
-	virtual int32 GetNativeInputPriority() const override { return 0; }
+	virtual EInputMode GetDefaultInputMode() const { return DefaultInputMode; }
 
-	virtual EInputMode GetNativeInputMode() const override { return NativeInputMode; }
-
-	virtual void SetNativeInputMode(EInputMode InInputMode) override;
+	virtual void SetDefaultInputMode(EInputMode InInputMode);
 
 	virtual EInputMode GetGlobalInputMode() const { return GlobalInputMode; }
 

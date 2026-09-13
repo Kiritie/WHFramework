@@ -2,6 +2,7 @@
 
 #include "Blueprint/WidgetTree.h"
 #include "CommonListView.h"
+#include "Components/Overlay.h"
 #include "Components/PanelWidget.h"
 #include "Setting/SettingEntry.h"
 #include "Setting/SettingModule.h"
@@ -11,6 +12,7 @@
 
 UWidgetSettingPageBase::UWidgetSettingPageBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
+	InputConfig = EWidgetInputConfig::Menu;
 }
 
 void UWidgetSettingPageBase::OnCreate(const FParameter& InParam)
@@ -29,6 +31,16 @@ void UWidgetSettingPageBase::OnCreate(const FParameter& InParam)
 		else if(UPanelWidget* RootPanel = Cast<UPanelWidget>(WidgetTree->RootWidget))
 		{
 			RootPanel->AddChild(SettingList);
+		}
+		else
+		{
+			UWidget* PreviousRoot = WidgetTree->RootWidget;
+			UOverlay* RootOverlay = WidgetTree->ConstructWidget<UOverlay>(
+				UOverlay::StaticClass(),
+				TEXT("SettingRoot"));
+			WidgetTree->RootWidget = RootOverlay;
+			RootOverlay->AddChildToOverlay(PreviousRoot);
+			RootOverlay->AddChildToOverlay(SettingList);
 		}
 	}
 

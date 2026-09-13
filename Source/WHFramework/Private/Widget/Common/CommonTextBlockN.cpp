@@ -11,7 +11,7 @@ UCommonTextBlockN::UCommonTextBlockN(const FObjectInitializer& ObjectInitializer
 
 void UCommonTextBlockN::SynchronizeProperties()
 {
-	if(!bApplyingStyleTag)
+	if(StyleTag.IsValid() && !bApplyingStyleTag)
 	{
 		ApplyStyleTag();
 	}
@@ -101,6 +101,11 @@ void UCommonTextBlockN::SetStyleTag(FGameplayTag InStyleTag)
 
 void UCommonTextBlockN::ApplyStyleTag()
 {
+	if(!StyleTag.IsValid())
+	{
+		return;
+	}
+
 	const bool bInEditor = IsDesignTime();
 	const UWidgetModule* WidgetModule = UWidgetModule::IsValid(bInEditor)
 		? UWidgetModule::GetPtr(bInEditor)

@@ -82,20 +82,20 @@ public:
 	virtual FString GetModuleDebugMessage() override;
 
 	//////////////////////////////////////////////////////////////////////////
-	/// InputManager
+	/// InputModule
 protected:
-	UPROPERTY(EditAnywhere, Category = "Input|Mode")
-	EInputMode NativeInputMode;
+	UPROPERTY(EditAnywhere, Category = "Mode")
+	EInputMode DefaultInputMode;
 
-	UPROPERTY(EditAnywhere, Instanced, Category = "Input|Binding")
+	UPROPERTY(EditAnywhere, Instanced, Category = "Binding")
 	TArray<TObjectPtr<UInputBindingBase>> InputBindings;
 
 public:
 	UFUNCTION(BlueprintPure)
-	EInputMode GetNativeInputMode() const { return NativeInputMode; }
+	EInputMode GetDefaultInputMode() const { return DefaultInputMode; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetNativeInputMode(EInputMode InInputMode);
+	void SetDefaultInputMode(EInputMode InInputMode);
 
 	template<class T>
 	T* GetInputBinding(int32 InPlayerIndex = 0) const
@@ -110,7 +110,7 @@ public:
 	UInputBindingBase* GetInputBindingByName(const FName InName, int32 InPlayerIndex = 0, TSubclassOf<UInputBindingBase> InClass = nullptr) const;
 
 protected:
-	UPROPERTY(EditAnywhere, Category = "Input|Context")
+	UPROPERTY(EditAnywhere, Category = "Context")
 	TArray<FInputContextConfig> ContextConfigs;
 
 	UPROPERTY(Transient)
@@ -166,6 +166,9 @@ public:
 
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InActionTag"))
 	TArray<FPlayerKeyMapping> GetPlayerKeyMappingsByTag(FGameplayTag InActionTag, int32 InPlayerIndex = 0) const;
+
+	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InActionTag"))
+	TArray<FKey> GetKeysByActionTag(FGameplayTag InActionTag, int32 InPlayerIndex = 0) const;
 
 	UFUNCTION(BlueprintPure)
 	TArray<FPlayerKeyMapping> GetPlayerKeyMappingsByMappingName(FName InMappingName, int32 InPlayerIndex = 0) const;

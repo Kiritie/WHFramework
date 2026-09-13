@@ -31,7 +31,11 @@ public:
 		override;
 
 public:
+	virtual void SynchronizeProperties() override;
+
 	virtual void NativePreConstruct() override;
+
+	virtual void NativeConstruct() override;
 
 	virtual void NativeOnDragEnter(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 
@@ -69,6 +73,8 @@ protected:
 
 private:
 	void ApplyStyleTag();
+
+	void ApplyTitleStyle();
 
 	void ApplyTriggeringActionTag();
 

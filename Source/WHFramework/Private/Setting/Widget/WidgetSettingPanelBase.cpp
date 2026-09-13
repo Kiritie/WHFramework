@@ -39,15 +39,6 @@ void UWidgetSettingPanelBase::OnCreate(const FParameter& InParam)
 	PageItemGroup->SetSelectionRequiredN(true);
 	PageItemGroup->SetBroadcastOnDeselected(false);
 	PageItemGroup->OnSelectedButtonBaseChanged.AddDynamic(this, &UWidgetSettingPanelBase::OnPageItemSelected);
-
-	GenerateSettingPages();
-	for(const auto Iter : GetSubWidgets<UWidgetSettingPageBase>())
-	{
-		if(Iter)
-		{
-			SpawnPageItem(Iter);
-		}
-	}
 }
 
 void UWidgetSettingPanelBase::OnInitialize(const FParameter& InParam)
@@ -57,9 +48,24 @@ void UWidgetSettingPanelBase::OnInitialize(const FParameter& InParam)
 
 void UWidgetSettingPanelBase::OnOpen(const FParameter& InParam, bool bInstant)
 {
+	USettingModule::Get().BeginEdit();
+	if(GetSubWidgets<UWidgetSettingPageBase>().IsEmpty())
+	{
+		GenerateSettingPages();
+	}
+	if(PageItemGroup && PageItemGroup->GetButtons().IsEmpty())
+	{
+		for(UWidgetSettingPageBase* Page : GetSubWidgets<UWidgetSettingPageBase>())
+		{
+			if(Page)
+			{
+				SpawnPageItem(Page);
+			}
+		}
+	}
+
 	Super::OnOpen(InParam, bInstant);
 
-	USettingModule::Get().BeginEdit();
 	for(UWidgetSettingPageBase* Page : GetSubWidgets<UWidgetSettingPageBase>())
 	{
 		if(Page)
@@ -68,7 +74,10 @@ void UWidgetSettingPanelBase::OnOpen(const FParameter& InParam, bool bInstant)
 		}
 	}
 	
-	SetCurrentPage(0);
+	if(PageItemGroup && !PageItemGroup->GetButtons().IsEmpty())
+	{
+		SetCurrentPage(0);
+	}
 }
 
 void UWidgetSettingPanelBase::OnClose(bool bInstant)
