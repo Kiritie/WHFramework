@@ -7,7 +7,7 @@ class ACameraManagerBase;
 class UCameraComponent;
 class UCameraSpringArmComponent;
 
-UCLASS()
+UCLASS(NotPlaceable)
 class WHFRAMEWORK_API ACameraRigBase : public AWHActor
 {
 	GENERATED_BODY()

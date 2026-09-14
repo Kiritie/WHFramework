@@ -14,7 +14,6 @@ UCameraModule::UCameraModule()
 	bModuleRequired = true;
 
 	DefaultRigClass = ACameraRigBase::StaticClass();
-	DefaultRig = nullptr;
 	DefaultModeClass = UFreeCameraMode::StaticClass();
 }
 
@@ -27,45 +26,6 @@ UCameraModule::~UCameraModule()
 void UCameraModule::OnGenerate()
 {
 	Super::OnGenerate();
-
-	TArray<AActor*> ChildActors;
-	GetModuleOwner()->GetAttachedActors(ChildActors);
-
-	for(AActor* ChildActor : ChildActors)
-	{
-		if(ACameraRigBase* CameraRig = Cast<ACameraRigBase>(ChildActor))
-		{
-			if(!DefaultRig && DefaultRigClass && CameraRig->IsA(DefaultRigClass))
-			{
-				DefaultRig = CameraRig;
-			}
-			else
-			{
-				CameraRig->Destroy();
-			}
-		}
-	}
-
-	if(DefaultRig && (!DefaultRigClass || !DefaultRig->IsA(DefaultRigClass)))
-	{
-		DefaultRig->Destroy();
-		DefaultRig = nullptr;
-	}
-
-	if(!DefaultRig && DefaultRigClass)
-	{
-		FActorSpawnParameters ActorSpawnParameters;
-		ActorSpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-		DefaultRig = GetWorld()->SpawnActor<ACameraRigBase>(DefaultRigClass, ActorSpawnParameters);
-		if(DefaultRig)
-		{
-			DefaultRig->SetActorLabel(DefaultRigClass->GetName());
-			DefaultRig->AttachToActor(GetModuleOwner(), FAttachmentTransformRules::KeepWorldTransform);
-		}
-	}
-
-	Modify();
 }
 
 void UCameraModule::OnDestroy()
@@ -73,12 +33,6 @@ void UCameraModule::OnDestroy()
 	Super::OnDestroy();
 
 	TERMINATION_MODULE(UCameraModule)
-
-	if(DefaultRig)
-	{
-		DefaultRig->Destroy();
-		DefaultRig = nullptr;
-	}
 }
 #endif
 

@@ -60,9 +60,6 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Rig")
 	TSubclassOf<ACameraRigBase> DefaultRigClass;
 
-	UPROPERTY(VisibleAnywhere, Category = "Rig")
-	TObjectPtr<ACameraRigBase> DefaultRig;
-
 	UPROPERTY(EditAnywhere, Category = "Mode")
 	TSubclassOf<UCameraModeBase> DefaultModeClass;
 
@@ -93,8 +90,6 @@ public:
 	const TArray<TWeakObjectPtr<ACameraShotAnchor>>& GetShotAnchors() const { return ShotAnchors; }
 
 	TSubclassOf<ACameraRigBase> GetDefaultRigClass() const { return DefaultRigClass; }
-
-	ACameraRigBase* GetDefaultRig() const { return DefaultRig; }
 
 	TSubclassOf<UCameraModeBase> GetDefaultModeClass() const { return DefaultModeClass; }
 

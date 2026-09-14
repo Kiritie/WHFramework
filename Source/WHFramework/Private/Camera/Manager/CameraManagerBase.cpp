@@ -7,8 +7,6 @@
 #include "Camera/Feature/CameraFeatureBase.h"
 #include "Camera/Interface/CameraTrackableInterface.h"
 #include "Camera/Mode/CameraModeBase.h"
-#include "Engine/GameInstance.h"
-#include "Engine/LocalPlayer.h"
 #include "Math/MathHelper.h"
 
 ACameraManagerBase::ACameraManagerBase(const FObjectInitializer& ObjectInitializer)
@@ -28,6 +26,11 @@ void ACameraManagerBase::InitializeFor(APlayerController* PC)
 	PC->IsSplitscreenPlayer(&LocalPlayerIndex);
 
 	SpawnRuntimeRig();
+	if(!RuntimeRig)
+	{
+		return;
+	}
+
 	UCameraModule::Get().RegisterCameraManager(this);
 
 	const FCameraConfig& CameraConfig = UCameraModule::Get().GetCameraConfig();
@@ -38,20 +41,15 @@ void ACameraManagerBase::InitializeFor(APlayerController* PC)
 	DesiredState.bEnableCollision = CameraConfig.bEnableCollision;
 	CurrentArmLength = DesiredState.ArmLength;
 
-	if(RuntimeRig)
-	{
-		PC->SetViewTarget(RuntimeRig);
-	}
+	PC->SetViewTarget(RuntimeRig);
 
 	ActivateDefaultMode();
 }
 
 void ACameraManagerBase::Destroyed()
 {
-	ACameraRigBase* DefaultRig = nullptr;
 	if(UCameraModule::IsValid())
 	{
-		DefaultRig = UCameraModule::Get().GetDefaultRig();
 		UCameraModule::Get().UnRegisterCameraManager(this);
 	}
 
@@ -64,9 +62,10 @@ void ACameraManagerBase::Destroyed()
 		}
 	}
 
-	if(RuntimeRig && RuntimeRig != DefaultRig)
+	if(RuntimeRig)
 	{
 		RuntimeRig->Destroy();
+		RuntimeRig = nullptr;
 	}
 
 	Super::Destroyed();
@@ -76,13 +75,6 @@ void ACameraManagerBase::SpawnRuntimeRig()
 {
 	if(RuntimeRig || !GetWorld())
 	{
-		return;
-	}
-
-	if(LocalPlayerIndex == 0 && IsValid(UCameraModule::Get().GetDefaultRig()))
-	{
-		RuntimeRig = UCameraModule::Get().GetDefaultRig();
-		RuntimeRig->SetOwningCameraManager(this);
 		return;
 	}
 
