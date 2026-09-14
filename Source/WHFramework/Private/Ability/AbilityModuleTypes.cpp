@@ -8,6 +8,7 @@
 #include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
 #include "Ability/Vitality/AbilityVitalityInterface.h"
 #include "Common/CommonModuleStatics.h"
+#include "ReferencePool/ReferencePoolModuleStatics.h"
 
 FPrimaryAssetId PAID_EXP = FPrimaryAssetId(TEXT("Misc:DA_Exp"));
 
@@ -39,11 +40,6 @@ void UTargetType_UseEventData::GetTargets_Implementation(AActor* OwningActor, AA
 	}
 }
 
-void UDamageHandle::OnReset_Implementation()
-{
-	
-}
-
 void UDamageHandle::HandleDamage(AActor* SourceActor, AActor* TargetActor, float DamageValue, const FGameplayAttribute& DamageAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
 {
 	IAbilityVitalityInterface* TargetVitality = Cast<IAbilityVitalityInterface>(TargetActor);
@@ -57,11 +53,6 @@ void UDamageHandle::HandleDamage(AActor* SourceActor, AActor* TargetActor, float
 	}
 }
 
-void URecoveryHandle::OnReset_Implementation()
-{
-	
-}
-
 void URecoveryHandle::HandleRecovery(AActor* SourceActor, AActor* TargetActor, float RecoveryValue, const FGameplayAttribute& RecoveryAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
 {
 	IAbilityVitalityInterface* TargetVitality = Cast<IAbilityVitalityInterface>(TargetActor);
@@ -73,11 +64,6 @@ void URecoveryHandle::HandleRecovery(AActor* SourceActor, AActor* TargetActor, f
 			TargetVitality->HandleRecovery(RecoveryAttribute, RecoveryValue, HitResult, SourceTags, SourceActor);
 		}
 	}
-}
-
-void UInterruptHandle::OnReset_Implementation()
-{
-	
 }
 
 void UInterruptHandle::HandleInterrupt(AActor* SourceActor, AActor* TargetActor, float InterruptDuration, const FGameplayAttribute& InterruptAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
@@ -228,7 +214,7 @@ void FInventorySaveData::CopyItems(const FInventorySaveData& InSaveData)
 
 void FInventorySaveData::AddItem(FAbilityItem InItem, bool bUnique)
 {
-	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(true, InventoryClass);
+	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(InventoryClass);
 
 	Inventory.LoadSaveData(this);
 	if(!bUnique || !Inventory.QueryItemByRange(EItemQueryType::Get, InItem).IsValid())
@@ -237,36 +223,40 @@ void FInventorySaveData::AddItem(FAbilityItem InItem, bool bUnique)
 	}
 
 	CopyItems(Inventory.GetSaveDataRef<FInventorySaveData>(true));
+	UReferencePoolModuleStatics::ResetReference<UAbilityInventoryBase>(InventoryClass);
 }
 
 void FInventorySaveData::RemoveItem(FAbilityItem InItem)
 {
-	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(true, InventoryClass);
+	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(InventoryClass);
 
 	Inventory.LoadSaveData(this);
 	Inventory.RemoveItemByRange(InItem, 0, -1, false);
 
 	CopyItems(Inventory.GetSaveDataRef<FInventorySaveData>(true));
+	UReferencePoolModuleStatics::ResetReference<UAbilityInventoryBase>(InventoryClass);
 }
 
 void FInventorySaveData::ClearItem(FAbilityItem InItem)
 {
-	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(true, InventoryClass);
+	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(InventoryClass);
 
 	Inventory.LoadSaveData(this);
 	Inventory.ClearItem(InItem);
 
 	CopyItems(Inventory.GetSaveDataRef<FInventorySaveData>(true));
+	UReferencePoolModuleStatics::ResetReference<UAbilityInventoryBase>(InventoryClass);
 }
 
 void FInventorySaveData::ClearItems()
 {
-	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(true, InventoryClass);
+	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(InventoryClass);
 
 	Inventory.LoadSaveData(this);
 	Inventory.ClearItems();
 
 	CopyItems(Inventory.GetSaveDataRef<FInventorySaveData>(true));
+	UReferencePoolModuleStatics::ResetReference<UAbilityInventoryBase>(InventoryClass);
 }
 
 UAbilityItemDataBase& FRaceItem::GetData() const

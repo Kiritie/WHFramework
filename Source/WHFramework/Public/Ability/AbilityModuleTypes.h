@@ -7,7 +7,6 @@
 #include "Asset/AssetModuleTypes.h"
 #include "Common/CommonModuleTypes.h"
 #include "ObjectPool/ObjectPoolModuleTypes.h"
-#include "ReferencePool/ReferencePoolInterface.h"
 #include "Scene/SceneModuleTypes.h"
 #include "Widget/WidgetModuleTypes.h"
 
@@ -287,14 +286,12 @@ public:
  * 伤害处理类
  */
 UCLASS(Blueprintable)
-class WHFRAMEWORK_API UDamageHandle : public UWHObject, public IReferencePoolInterface
+class WHFRAMEWORK_API UDamageHandle : public UWHObject
 {
 	GENERATED_BODY()
 
 public:
 	UDamageHandle() {}
-
-	virtual void OnReset_Implementation() override;
 
 	virtual void HandleDamage(AActor* SourceActor, AActor* TargetActor, float DamageValue, const FGameplayAttribute& DamageAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
 };
@@ -303,14 +300,12 @@ public:
  * 伤害处理类
  */
 UCLASS(Blueprintable)
-class WHFRAMEWORK_API URecoveryHandle : public UWHObject, public IReferencePoolInterface
+class WHFRAMEWORK_API URecoveryHandle : public UWHObject
 {
 	GENERATED_BODY()
 
 public:
 	URecoveryHandle() {}
-
-	virtual void OnReset_Implementation() override;
 
 	virtual void HandleRecovery(AActor* SourceActor, AActor* TargetActor, float RecoveryValue, const FGameplayAttribute& RecoveryAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
 };
@@ -319,14 +314,12 @@ public:
  * 伤害处理类
  */
 UCLASS(Blueprintable)
-class WHFRAMEWORK_API UInterruptHandle : public UWHObject, public IReferencePoolInterface
+class WHFRAMEWORK_API UInterruptHandle : public UWHObject
 {
 	GENERATED_BODY()
 
 public:
 	UInterruptHandle() {}
-
-	virtual void OnReset_Implementation() override;
 
 	virtual void HandleInterrupt(AActor* SourceActor, AActor* TargetActor, float InterruptDuration, const FGameplayAttribute& InterruptAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags);
 };

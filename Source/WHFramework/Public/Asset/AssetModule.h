@@ -177,10 +177,7 @@ public:
 		{
 			return *Asset;
 		}
-		else
-		{
-			return UReferencePoolModuleStatics::GetReference<T>();
-		}
+		return UReferencePoolModuleStatics::GetDefaultReference<T>();
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InTag"))

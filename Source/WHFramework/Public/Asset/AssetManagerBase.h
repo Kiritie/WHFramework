@@ -42,10 +42,7 @@ public:
 		{
 			return *Asset;
 		}
-		else
-		{
-			return UReferencePoolModuleStatics::GetReference<T>();
-		}
+		return UReferencePoolModuleStatics::GetDefaultReference<T>();
 	}
 
 	virtual TSharedPtr<FStreamableHandle> LoadPrimaryAssets(const TArray<FPrimaryAssetId>& AssetsToLoad, const TArray<FName>& LoadBundles, FStreamableDelegate DelegateToCall, TAsyncLoadPriority Priority, UE::FSourceLocation Location = UE::FSourceLocation::Current()) override;

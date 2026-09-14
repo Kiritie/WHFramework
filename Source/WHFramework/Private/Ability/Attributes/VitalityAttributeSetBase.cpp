@@ -68,32 +68,32 @@ void UVitalityAttributeSetBase::PostGameplayEffectExecute(const struct FGameplay
 
 	if(Data.EvaluatedData.Attribute == GetHealthRecoveryAttribute())
 	{
-		UReferencePoolModuleStatics::GetReference<URecoveryHandle>(true, RecoveryHandleClass).HandleRecovery(SourceActor, TargetActor, GetHealthRecovery(), GetHealthRecoveryAttribute(), HitResult, SourceTags);
+		UReferencePoolModuleStatics::GetDefaultReference<URecoveryHandle>(RecoveryHandleClass).HandleRecovery(SourceActor, TargetActor, GetHealthRecovery(), GetHealthRecoveryAttribute(), HitResult, SourceTags);
 		SetHealthRecovery(0.f);
 	}
 	else if(Data.EvaluatedData.Attribute == GetPhysicsDamageAttribute())
 	{
-		UReferencePoolModuleStatics::GetReference<UDamageHandle>(true, DamageHandleClass).HandleDamage(SourceActor, TargetActor, GetPhysicsDamage(), GetPhysicsDamageAttribute(), HitResult, SourceTags);
+		UReferencePoolModuleStatics::GetDefaultReference<UDamageHandle>(DamageHandleClass).HandleDamage(SourceActor, TargetActor, GetPhysicsDamage(), GetPhysicsDamageAttribute(), HitResult, SourceTags);
 		SetPhysicsDamage(0.f);
 	}
 	else if(Data.EvaluatedData.Attribute == GetMagicDamageAttribute())
 	{
-		UReferencePoolModuleStatics::GetReference<UDamageHandle>(true, DamageHandleClass).HandleDamage(SourceActor, TargetActor, GetMagicDamage(), GetMagicDamageAttribute(), HitResult, SourceTags);
+		UReferencePoolModuleStatics::GetDefaultReference<UDamageHandle>(DamageHandleClass).HandleDamage(SourceActor, TargetActor, GetMagicDamage(), GetMagicDamageAttribute(), HitResult, SourceTags);
 		SetMagicDamage(0.f);
 	}
 	else if(Data.EvaluatedData.Attribute == GetFallDamageAttribute())
 	{
-		UReferencePoolModuleStatics::GetReference<UDamageHandle>(true, DamageHandleClass).HandleDamage(SourceActor, TargetActor, GetFallDamage(), GetFallDamageAttribute(), HitResult, SourceTags);
+		UReferencePoolModuleStatics::GetDefaultReference<UDamageHandle>(DamageHandleClass).HandleDamage(SourceActor, TargetActor, GetFallDamage(), GetFallDamageAttribute(), HitResult, SourceTags);
 		SetFallDamage(0.f);
 	}
 	else if(Data.EvaluatedData.Attribute == GetRealDamageAttribute())
 	{
-		UReferencePoolModuleStatics::GetReference<UDamageHandle>(true, DamageHandleClass).HandleDamage(SourceActor, TargetActor, GetRealDamage(), GetRealDamageAttribute(), HitResult, SourceTags);
+		UReferencePoolModuleStatics::GetDefaultReference<UDamageHandle>(DamageHandleClass).HandleDamage(SourceActor, TargetActor, GetRealDamage(), GetRealDamageAttribute(), HitResult, SourceTags);
 		SetRealDamage(0.f);
 	}
 	else if (Data.EvaluatedData.Attribute == GetInterruptAttribute())
 	{
-		UReferencePoolModuleStatics::GetReference<UInterruptHandle>(true, InterruptHandleClass).HandleInterrupt(SourceActor, TargetActor, GetInterrupt(), GetInterruptAttribute(), HitResult, SourceTags);
+		UReferencePoolModuleStatics::GetDefaultReference<UInterruptHandle>(InterruptHandleClass).HandleInterrupt(SourceActor, TargetActor, GetInterrupt(), GetInterruptAttribute(), HitResult, SourceTags);
 		SetInterrupt(0.f);
 	}
 }

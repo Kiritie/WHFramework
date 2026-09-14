@@ -2,6 +2,7 @@
 
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/PickUp/AbilityPickUpVoxel.h"
+#include "ReferencePool/ReferencePoolModuleStatics.h"
 #include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Voxels/Voxel.h"
 
@@ -81,7 +82,7 @@ UVoxelData& UVoxelData::GetPartData(FIndex InIndex)
 	if(MainData) return MainData->GetPartData(InIndex);
 	if(InIndex == FIndex::ZeroIndex) return *this;
 	if(_PartDatas.Contains(InIndex)) return *_PartDatas[InIndex];
-	return UReferencePoolModuleStatics::GetReference<UVoxelData>();
+	return UReferencePoolModuleStatics::GetDefaultReference<UVoxelData>();
 }
 
 TArray<UVoxelData*> UVoxelData::GetPartDatas()

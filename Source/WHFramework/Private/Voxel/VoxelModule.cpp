@@ -307,7 +307,7 @@ void UVoxelModule::OnInitialize()
 	
 	for(const auto& Iter : VoxelClasses)
 	{
-		UReferencePoolModuleStatics::CreateReference(nullptr, Iter);
+		UReferencePoolModuleStatics::GetReference<UVoxel>(Iter);
 	}
 		
 	for(auto& Iter : ChunkQueues)
