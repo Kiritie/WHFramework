@@ -48,17 +48,12 @@ UCameraModule::UCameraModule()
 
 	bCameraMoveAble = true;
 	bCameraMoveControlAble = true;
-	bReverseCameraPanMove = false;
-	bEnableCameraPanZMove = true;
 	CameraMoveRange = FBox(EForceInit::ForceInitToZero);
 
 #if WITH_EDITORONLY_DATA
 	bDrawCameraRange = false;
 #endif
 
-	CameraMoveRate = 600.f;
-	bSmoothCameraMove = true;
-	CameraMoveSpeed = 5.f;
 	CameraMoveAltitude = 0.f;
 
 	bCameraOffsetAble = true;
@@ -68,11 +63,6 @@ UCameraModule::UCameraModule()
 
 	bCameraRotateAble = true;
 	bCameraRotateControlAble = true;
-	bReverseCameraPitch = false;
-	CameraTurnRate = 30.f;
-	CameraLookUpRate = 30.f;
-	bSmoothCameraRotate = true;
-	CameraRotateSpeed = 7.f;
 	MinCameraPitch = -90.f;
 	MaxCameraPitch = 90.f;
 	InitCameraPitch = -1.f;
@@ -81,9 +71,6 @@ UCameraModule::UCameraModule()
 	bCameraZoomControlAble = true;
 	bCameraZoomMoveAble = false;
 	bNormalizeCameraZoom = false;
-	CameraZoomRate = 300.f;
-	bSmoothCameraZoom = true;
-	CameraZoomSpeed = 5.f;
 	MinCameraDistance = 0.f;
 	MaxCameraDistance = -1.f;
 	InitCameraDistance = -1.f;
@@ -225,23 +212,10 @@ void UCameraModule::OnTermination(EPhase InPhase)
 
 void UCameraModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 {
-	auto& SaveData = InSaveData->CastRef<FCameraModuleSaveData>();
+	if(!InSaveData) return;
 
-	bEnableCameraPanZMove = SaveData.bEnableCameraPanZMove;
-	bReverseCameraPanMove = SaveData.bReverseCameraPanMove;
-	CameraMoveRate = SaveData.CameraMoveRate;
-	bSmoothCameraMove = SaveData.bSmoothCameraMove;
-	CameraMoveSpeed = SaveData.CameraMoveSpeed;
-
-	bReverseCameraPitch = SaveData.bReverseCameraPitch;
-	CameraTurnRate = SaveData.CameraTurnRate;
-	CameraLookUpRate = SaveData.CameraLookUpRate;
-	bSmoothCameraRotate = SaveData.bSmoothCameraRotate;
-	CameraRotateSpeed = SaveData.CameraRotateSpeed;
-
-	CameraZoomRate = SaveData.CameraZoomRate;
-	bSmoothCameraZoom = SaveData.bSmoothCameraZoom;
-	CameraZoomSpeed = SaveData.CameraZoomSpeed;
+	const FCameraModuleSaveData& SaveData = InSaveData->CastRef<FCameraModuleSaveData>();
+	ApplySettings(SaveData.ToSettings());
 }
 
 void UCameraModule::UnloadData(EPhase InPhase)
@@ -252,22 +226,7 @@ FSaveData* UCameraModule::ToData()
 {
 	FCameraModuleSaveData& SaveData = GetMutableSaveData<FCameraModuleSaveData>();
 	SaveData = FCameraModuleSaveData();
-
-	SaveData.bEnableCameraPanZMove = bEnableCameraPanZMove;
-	SaveData.bReverseCameraPanMove = bReverseCameraPanMove;
-	SaveData.CameraMoveRate = CameraMoveRate;
-	SaveData.bSmoothCameraMove = bSmoothCameraMove;
-	SaveData.CameraMoveSpeed = CameraMoveSpeed;
-
-	SaveData.bReverseCameraPitch = bReverseCameraPitch;
-	SaveData.CameraTurnRate = CameraTurnRate;
-	SaveData.CameraLookUpRate = CameraLookUpRate;
-	SaveData.bSmoothCameraRotate = bSmoothCameraRotate;
-	SaveData.CameraRotateSpeed = CameraRotateSpeed;
-
-	SaveData.CameraZoomRate = CameraZoomRate;
-	SaveData.bSmoothCameraZoom = bSmoothCameraZoom;
-	SaveData.CameraZoomSpeed = CameraZoomSpeed;
+	SaveData.FromSettings(CameraSettings);
 	
 	return &SaveData;
 }
@@ -291,15 +250,6 @@ ACameraManagerBase* UCameraModule::GetCameraManager(int32 InPlayerIndex) const
 	if(CameraManagers.IsValidIndex(InPlayerIndex))
 	{
 		return CameraManagers[InPlayerIndex];
-	}
-	return nullptr;
-}
-
-ACameraActorBase* UCameraModule::GetCurrentCamera(int32 InPlayerIndex, TSubclassOf<ACameraActorBase> InClass) const
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		return GetDeterminesOutputObject(CameraManager->GetCurrentCamera(), InClass);
 	}
 	return nullptr;
 }
@@ -348,9 +298,14 @@ void UCameraModule::SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool bSet
 
 void UCameraModule::RegisterCameraManager(ACameraManagerBase* InCameraManager)
 {
-	if(CameraManagers.Contains(InCameraManager)) return;
+	if(!InCameraManager || InCameraManager->LocalPlayerIndex == INDEX_NONE || CameraManagers.Contains(InCameraManager)) return;
 
-	InCameraManager->LocalPlayerIndex = CameraManagers.Add(InCameraManager);
+	if(CameraManagers.Num() <= InCameraManager->LocalPlayerIndex)
+	{
+		CameraManagers.SetNum(InCameraManager->LocalPlayerIndex + 1);
+	}
+	CameraManagers[InCameraManager->LocalPlayerIndex] = InCameraManager;
+	InCameraManager->ApplySettings(CameraSettings);
 
 	InCameraManager->InitCameraPitch = InitCameraPitch;
 	InCameraManager->InitCameraDistance = InitCameraDistance;
@@ -359,6 +314,7 @@ void UCameraModule::RegisterCameraManager(ACameraManagerBase* InCameraManager)
 	
 	if(InCameraManager->LocalPlayerIndex == 0)
 	{
+		InCameraManager->bOwnsRuntimeCameras = false;
 		InCameraManager->Cameras = Cameras;
 		if(DefaultCamera)
 		{
@@ -367,6 +323,7 @@ void UCameraModule::RegisterCameraManager(ACameraManagerBase* InCameraManager)
 	}
 	else
 	{
+		InCameraManager->bOwnsRuntimeCameras = true;
 		for(auto Iter : Cameras)
 		{
 			ACameraActorBase* CameraActor = DuplicateObject(Iter, nullptr);
@@ -411,360 +368,49 @@ void UCameraModule::UnRegisterCameraManager(ACameraManagerBase* InCameraManager)
 {
 	if(!CameraManagers.Contains(InCameraManager)) return;
 
-	for(auto Iter : InCameraManager->Cameras)
+	if(InCameraManager->bOwnsRuntimeCameras)
 	{
-		Iter->Destroy();
+		for(auto Iter : InCameraManager->Cameras)
+		{
+			Iter->Destroy();
+		}
 	}
 	
-	CameraManagers.Remove(InCameraManager);
+	CameraManagers[InCameraManager->LocalPlayerIndex] = nullptr;
 }
 
-void UCameraModule::StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackMode, ECameraViewMode InViewMode, ECameraViewSpace InViewSpace, FVector InLocation, FVector InOffset, float InYaw, float InPitch, float InDistance, bool bAllowControl, EEaseType InViewEaseType, float InViewDuration, bool bInstant, int32 InPlayerIndex)
+void UCameraModule::ApplySettings(const FCameraSettings& InSettings)
 {
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->StartTrackTarget(InTargetActor, InTrackMode, InViewMode, InViewSpace, InLocation, InOffset, InYaw, InPitch, InDistance, bAllowControl, InViewEaseType, InViewDuration, bInstant);
-	}
-}
+	CameraSettings = InSettings;
 
-void UCameraModule::EndTrackTarget(AActor* InTargetActor, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
+	for(ACameraManagerBase* CameraManager : CameraManagers)
 	{
-		CameraManager->EndTrackTarget(InTargetActor);
-	}
-}
-
-void UCameraModule::SetCameraLocation(FVector InLocation, bool bInstant, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->SetCameraLocation(InLocation, bInstant);
-	}
-}
-
-void UCameraModule::DoCameraLocation(FVector InLocation, float InDuration, EEaseType InEaseType, bool bForce, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->DoCameraLocation(InLocation, InDuration, InEaseType, bForce);
-	}
-}
-
-void UCameraModule::StopDoCameraLocation(int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->StopDoCameraLocation();
-	}
-}
-
-void UCameraModule::SetCameraOffset(FVector InOffset, bool bInstant, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->SetCameraOffset(InOffset, bInstant);
-	}
-}
-
-void UCameraModule::DoCameraOffset(FVector InOffset, float InDuration, EEaseType InEaseType, bool bForce, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->DoCameraOffset(InOffset, InDuration, InEaseType, bForce);
-	}
-}
-
-void UCameraModule::StopDoCameraOffset(int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->StopDoCameraOffset();
-	}
-}
-
-void UCameraModule::SetCameraRotation(float InYaw, float InPitch, bool bInstant, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->SetCameraRotation(InYaw, InPitch, bInstant);
-	}
-}
-
-void UCameraModule::DoCameraRotation(float InYaw, float InPitch, float InDuration, EEaseType InEaseType, bool bForce, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->DoCameraRotation(InYaw, InPitch, InDuration, InEaseType, bForce);
-	}
-}
-
-void UCameraModule::StopDoCameraRotation(int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->StopDoCameraRotation();
-	}
-}
-
-void UCameraModule::SetCameraDistance(float InDistance, bool bInstant, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->SetCameraDistance(InDistance, bInstant);
-	}
-}
-
-void UCameraModule::DoCameraDistance(float InDistance, float InDuration, EEaseType InEaseType, bool bForce, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->DoCameraDistance(InDistance, InDuration, InEaseType, bForce);
-	}
-}
-
-void UCameraModule::StopDoCameraDistance(int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->StopDoCameraDistance();
-	}
-}
-
-void UCameraModule::SetCameraRotationAndDistance(float InYaw, float InPitch, float InDistance, bool bInstant, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->SetCameraRotationAndDistance(InYaw, InPitch, InDistance, bInstant);
-	}
-}
-
-void UCameraModule::DoCameraRotationAndDistance(float InYaw, float InPitch, float InDistance, float InDuration, EEaseType InEaseType, bool bForce, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->DoCameraRotationAndDistance(InYaw, InPitch, InDistance, InDuration, InEaseType, bForce);
-	}
-}
-
-void UCameraModule::SetCameraTransform(FVector InLocation, float InYaw, float InPitch, float InDistance, bool bInstant, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->SetCameraTransform(InLocation, InYaw, InPitch, InDistance, bInstant);
-	}
-}
-
-void UCameraModule::DoCameraTransform(FVector InLocation, float InYaw, float InPitch, float InDistance, float InDuration, EEaseType InEaseType, bool bForce, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->DoCameraTransform(InLocation, InYaw, InPitch, InDistance, InDuration, InEaseType, bForce);
-	}
-}
-
-void UCameraModule::StopDoCameraTransform(int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->StopDoCameraTransform();
-	}
-}
-
-void UCameraModule::SetCameraFov(float InFov, bool bInstant, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->SetCameraFov(InFov, bInstant);
-	}
-}
-
-void UCameraModule::DoCameraFov(float InFov, float InDuration, EEaseType InEaseType, bool bForce, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->DoCameraFov(InFov, InDuration, InEaseType, bForce);
-	}
-}
-
-void UCameraModule::StopDoCameraFov(int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->StopDoCameraFov();
-	}
-}
-
-void UCameraModule::AddCameraMovementInput(FVector InDirection, float InValue, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->AddCameraMovementInput(InDirection, InValue);
-	}
-}
-
-void UCameraModule::AddCameraRotationInput(float InYaw, float InPitch, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->AddCameraRotationInput(InYaw, InPitch);
-	}
-}
-
-void UCameraModule::AddCameraDistanceInput(float InValue, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->AddCameraDistanceInput(InValue);
-	}
-}
-
-void UCameraModule::SetCameraView(const FCameraViewData& InCameraViewData, bool bCacheData, bool bInstant, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->SetCameraView(InCameraViewData, bCacheData, bInstant);
-	}
-}
-
-void UCameraModule::ResetCameraView(ECameraResetMode InCameraResetMode, bool bInstant, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->ResetCameraView(InCameraResetMode, bInstant);
+		if(CameraManager)
+		{
+			CameraManager->ApplySettings(CameraSettings);
+		}
 	}
 }
 
 void UCameraModule::OnSetCameraView(UObject* InSender, const FEventSetCameraView& InEvent)
 {
-	SetCameraView(InEvent.CameraViewData, InEvent.bCacheData);
+	if(ACameraManagerBase* CameraManager = GetCameraManager())
+	{
+		CameraManager->ApplyViewData(InEvent.CameraViewData, InEvent.bCacheData);
+	}
 }
 
 void UCameraModule::OnResetCameraView(UObject* InSender, const FEventResetCameraView& InEvent)
 {
-	ResetCameraView(InEvent.CameraResetMode);
+	if(ACameraManagerBase* CameraManager = GetCameraManager())
+	{
+		CameraManager->ResetView(InEvent.CameraResetMode);
+	}
 }
 
 void UCameraModule::OnSwitchCameraPoint(UObject* InSender, const FEventSwitchCameraPoint& InEvent)
 {
 	SwitchCameraPoint(InEvent.CameraPoint.LoadSynchronous());
-}
-
-bool UCameraModule::IsControllingMove(int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		return CameraManager->IsControllingMove();
-	}
-	return false;
-}
-
-bool UCameraModule::IsControllingRotate(int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		return CameraManager->IsControllingRotate();
-	}
-	return false;
-}
-
-bool UCameraModule::IsControllingZoom(int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		return CameraManager->IsControllingZoom();
-	}
-	return false;
-}
-
-FVector UCameraModule::GetRealCameraLocation(int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		return CameraManager->GetRealCameraLocation();
-	}
-	return FVector::ZeroVector;
-}
-
-FVector UCameraModule::GetCurrentCameraLocation(bool bRefresh, int32 InPlayerIndex) const
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		return CameraManager->GetCurrentCameraLocation(bRefresh);
-	}
-	return FVector::ZeroVector;
-}
-
-FVector UCameraModule::GetRealCameraOffset(int32 InPlayerIndex) const
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		return CameraManager->GetRealCameraOffset();
-	}
-	return FVector::ZeroVector;
-}
-
-FVector UCameraModule::GetCurrentCameraOffset(bool bRefresh, int32 InPlayerIndex) const
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		return CameraManager->GetCurrentCameraOffset(bRefresh);
-	}
-	return FVector::ZeroVector;
-}
-
-FRotator UCameraModule::GetRealCameraRotation(int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		return CameraManager->GetRealCameraRotation();
-	}
-	return FRotator::ZeroRotator;
-}
-
-FRotator UCameraModule::GetCurrentCameraRotation(bool bRefresh, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		return CameraManager->GetCurrentCameraRotation(bRefresh);
-	}
-	return FRotator::ZeroRotator;
-}
-
-float UCameraModule::GetRealCameraDistance(int32 InPlayerIndex) const
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		return CameraManager->GetRealCameraDistance();
-	}
-	return 0.f;
-}
-
-float UCameraModule::GetCurrentCameraDistance(bool bRefresh, int32 InPlayerIndex) const
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		return CameraManager->GetCurrentCameraDistance(bRefresh);
-	}
-	return 0.f;
-}
-
-float UCameraModule::GetRealCameraFov(int32 InPlayerIndex) const
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		return CameraManager->GetRealCameraFov();
-	}
-	return 0.f;
-}
-
-float UCameraModule::GetCurrentCameraFov(bool bRefresh, int32 InPlayerIndex) const
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		return CameraManager->GetCurrentCameraFov(bRefresh);
-	}
-	return 0.f;
 }
 
 void UCameraModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

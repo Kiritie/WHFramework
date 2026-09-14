@@ -552,7 +552,7 @@ UVoxel& UVoxelModuleStatics::GetVoxel(const FPrimaryAssetId& InVoxelID)
 	const UVoxelData& VoxelData = UAssetModuleStatics::LoadPrimaryAssetRef<UVoxelData>(InVoxelID);
 	if(VoxelData.IsValid())
 	{
-		const TSubclassOf<UVoxel> VoxelClass = VoxelData.VoxelClass.Get() ? VoxelData.VoxelClass : UVoxel::StaticClass();
+		const TSubclassOf<UVoxel> VoxelClass = VoxelData.VoxelClass.Get() ? VoxelData.VoxelClass : TSubclassOf<UVoxel>(UVoxel::StaticClass());
 		UVoxel& Voxel = UReferencePoolModuleStatics::GetReference<UVoxel>(VoxelClass);
 		UReferencePoolModuleStatics::ResetReference<UVoxel>(VoxelClass);
 		Voxel.SetItem(InVoxelID);

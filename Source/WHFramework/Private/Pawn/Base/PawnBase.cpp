@@ -252,39 +252,9 @@ void APawnBase::JumpN_Implementation()
 	
 }
 
-FVector APawnBase::GetCameraOffset_Implementation() const
+FCameraTrackProfile APawnBase::GetCameraTrackProfile_Implementation() const
 {
-	return FVector::ZeroVector;
-}
-
-float APawnBase::GetCameraDistance_Implementation() const
-{
-	return -1.f;
-}
-
-float APawnBase::GetCameraMinPitch_Implementation() const
-{
-	return -1.f;
-}
-
-float APawnBase::GetCameraMaxPitch_Implementation() const
-{
-	return -1.f;
-}
-
-ECameraTrackMode APawnBase::GetCameraTrackMode_Implementation() const
-{
-	return ECameraTrackMode::LocationAndRotationOnceAndDistanceOnce;
-}
-
-ECameraSmoothMode APawnBase::GetCameraSmoothMode_Implementation() const
-{
-	return ECameraSmoothMode::All;
-}
-
-ECameraControlMode APawnBase::GetCameraControlMode_Implementation() const
-{
-	return ECameraControlMode::All;
+	return CameraTrackProfile;
 }
 
 void APawnBase::SetActorVisible_Implementation(bool bInVisible)

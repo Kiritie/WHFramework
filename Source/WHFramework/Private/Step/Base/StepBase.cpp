@@ -3,7 +3,8 @@
 
 #include "Step/Base/StepBase.h"
 
-#include "Camera/CameraModuleStatics.h"
+#include "Camera/CameraModule.h"
+#include "Camera/Manager/CameraManagerBase.h"
 #include "Event/EventModuleStatics.h"
 #include "Event/Events/Step/Event_StepCompleted.h"
 #include "Event/Events/Step/Event_StepEntered.h"
@@ -315,7 +316,10 @@ void UStepBase::OnComplete(EStepExecuteResult InStepExecuteResult)
 
 	if(bTrackTarget && OperationTarget)
 	{
-		UCameraModuleStatics::EndTrackTarget();
+		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
+		{
+			CameraManager->ClearTarget();
+		}
 	}
 	
 	K2_OnComplete(InStepExecuteResult);
@@ -342,7 +346,10 @@ void UStepBase::OnLeave()
 
 	if(bTrackTarget)
 	{
-		UCameraModuleStatics::EndTrackTarget(OperationTarget.LoadSynchronous());
+		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
+		{
+			CameraManager->ClearTarget(OperationTarget.LoadSynchronous());
+		}
 	}
 
 	GetWorld()->GetTimerManager().ClearTimer(AutoLeaveTimerHandle);
@@ -407,7 +414,10 @@ void UStepBase::ResetCameraView()
 	
 	if(CameraViewParams.IsValid())
 	{
-		UCameraModuleStatics::SetCameraView(FCameraViewData(OperationTarget.LoadSynchronous(), bTrackTarget, TrackTargetMode, CameraViewParams));
+		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
+		{
+			CameraManager->ApplyViewData(FCameraViewData(OperationTarget.LoadSynchronous(), bTrackTarget, TrackTargetMode, CameraViewParams));
+		}
 	}
 }
 

@@ -4,6 +4,7 @@
 #include "Input/Manager/DefaultInputBinding.h"
 
 #include "Camera/CameraModule.h"
+#include "Camera/Manager/CameraManagerBase.h"
 #include "Common/CommonModuleStatics.h"
 #include "Gameplay/WHPlayerInterface.h"
 #include "Input/InputModuleStatics.h"
@@ -75,64 +76,91 @@ void UDefaultInputBinding::SystemOperation_Implementation()
 
 void UDefaultInputBinding::OnTurnCamera_Implementation(const FInputActionValue& InValue)
 {
-	if(InValue.Get<float>() == 0.f || UCameraModule::Get().IsControllingMove()) return;
+	const float Value = InValue.Get<float>();
+	if(FMath::IsNearlyZero(Value)) return;
 
-	UCameraModule::Get().AddCameraRotationInput(InValue.Get<float>() / UCommonModuleStatics::GetTimeScale(), 0.f);
+	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(LocalPlayerIndex))
+	{
+		CameraManager->AddLookInput(FVector2D(Value / UCommonModuleStatics::GetTimeScale(), 0.f));
+	}
 }
 
 void UDefaultInputBinding::OnLookUpCamera_Implementation(const FInputActionValue& InValue)
 {
-	if(InValue.Get<float>() == 0.f || UCameraModule::Get().IsControllingMove()) return;
+	const float Value = InValue.Get<float>();
+	if(FMath::IsNearlyZero(Value)) return;
 
-	UCameraModule::Get().AddCameraRotationInput(0.f, (UCameraModule::Get().IsReverseCameraPitch() ? -InValue.Get<float>() : InValue.Get<float>()) / UCommonModuleStatics::GetTimeScale());
+	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(LocalPlayerIndex))
+	{
+		CameraManager->AddLookInput(FVector2D(0.f, Value / UCommonModuleStatics::GetTimeScale()));
+	}
 }
 
 void UDefaultInputBinding::OnPanHCamera_Implementation(const FInputActionValue& InValue)
 {
-	if(InValue.Get<float>() == 0.f) return;
+	const float Value = InValue.Get<float>();
+	if(FMath::IsNearlyZero(Value)) return;
 
-	const FRotator Rotation = FRotator(0.f, UCommonModuleStatics::GetPlayerController(LocalPlayerIndex)->GetControlRotation().Yaw, 0.f);
-	const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y) * (UCameraModule::Get().IsReverseCameraPanMove() ? -0.7f : 0.7f);
-	UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>() / UCommonModuleStatics::GetTimeScale());
+	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(LocalPlayerIndex))
+	{
+		CameraManager->AddPanInput(FVector2D(Value / UCommonModuleStatics::GetTimeScale(), 0.f));
+	}
 }
 
 void UDefaultInputBinding::OnPanVCamera_Implementation(const FInputActionValue& InValue)
 {
-	if(InValue.Get<float>() == 0.f) return;
+	const float Value = InValue.Get<float>();
+	if(FMath::IsNearlyZero(Value)) return;
 
-	const FRotator Rotation = FRotator(UCameraModule::Get().IsEnableCameraPanZMove() ? UCommonModuleStatics::GetPlayerController(LocalPlayerIndex)->GetControlRotation().Pitch : 0.f, UCommonModuleStatics::GetPlayerController(LocalPlayerIndex)->GetControlRotation().Yaw, 0.f);
-	const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(UCameraModule::Get().IsEnableCameraPanZMove() ? EAxis::Z : EAxis::X) * (UCameraModule::Get().IsReverseCameraPanMove() ? -0.7f : 0.7f);
-	UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>() / UCommonModuleStatics::GetTimeScale());
+	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(LocalPlayerIndex))
+	{
+		CameraManager->AddPanInput(FVector2D(0.f, Value / UCommonModuleStatics::GetTimeScale()));
+	}
 }
 
 void UDefaultInputBinding::OnZoomCamera_Implementation(const FInputActionValue& InValue)
 {
-	if(InValue.Get<float>() == 0.f) return;
+	const float Value = InValue.Get<float>();
+	if(FMath::IsNearlyZero(Value)) return;
 
-	UCameraModule::Get().AddCameraDistanceInput(-InValue.Get<float>() / UCommonModuleStatics::GetTimeScale());
+	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(LocalPlayerIndex))
+	{
+		CameraManager->AddZoomInput(-Value / UCommonModuleStatics::GetTimeScale());
+	}
 }
 
 void UDefaultInputBinding::OnMoveForwardCamera_Implementation(const FInputActionValue& InValue)
 {
-	if(InValue.Get<float>() == 0.f) return;
+	const float Value = InValue.Get<float>();
+	if(FMath::IsNearlyZero(Value)) return;
 
-	const FVector Direction = UCameraModule::Get().GetCurrentCameraRotation().Vector();
-	UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>() / UCommonModuleStatics::GetTimeScale());
+	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(LocalPlayerIndex))
+	{
+		CameraManager->AddMoveInput(CameraManager->GetRuntimeState().Rotation.Vector() * Value / UCommonModuleStatics::GetTimeScale());
+	}
 }
 
 void UDefaultInputBinding::OnMoveRightCamera_Implementation(const FInputActionValue& InValue)
 {
-	if(InValue.Get<float>() == 0.f) return;
+	const float Value = InValue.Get<float>();
+	if(FMath::IsNearlyZero(Value)) return;
 
-	const FVector Direction = FRotationMatrix(UCameraModule::Get().GetCurrentCameraRotation()).GetUnitAxis(EAxis::Y);
-	UCameraModule::Get().AddCameraMovementInput(Direction, InValue.Get<float>() / UCommonModuleStatics::GetTimeScale());
+	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(LocalPlayerIndex))
+	{
+		const FVector Direction = FRotationMatrix(CameraManager->GetRuntimeState().Rotation).GetUnitAxis(EAxis::Y);
+		CameraManager->AddMoveInput(Direction * Value / UCommonModuleStatics::GetTimeScale());
+	}
 }
 
 void UDefaultInputBinding::OnMoveUpCamera_Implementation(const FInputActionValue& InValue)
 {
-	if(InValue.Get<float>() == 0.f) return;
+	const float Value = InValue.Get<float>();
+	if(FMath::IsNearlyZero(Value)) return;
 
-	UCameraModule::Get().AddCameraMovementInput(FVector::UpVector, InValue.Get<float>() / UCommonModuleStatics::GetTimeScale());
+	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(LocalPlayerIndex))
+	{
+		CameraManager->AddMoveInput(FVector::UpVector * Value / UCommonModuleStatics::GetTimeScale());
+	}
 }
 
 void UDefaultInputBinding::OnTurnPlayer_Implementation(const FInputActionValue& InValue)

@@ -24,23 +24,5 @@ class WHFRAMEWORK_API ICameraTrackableInterface
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	FVector GetCameraOffset() const;
-	
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	float GetCameraDistance() const;
-	
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	float GetCameraMinPitch() const;
-	
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	float GetCameraMaxPitch() const;
-
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	ECameraTrackMode GetCameraTrackMode() const;
-
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	ECameraSmoothMode GetCameraSmoothMode() const;
-	
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	ECameraControlMode GetCameraControlMode() const;
+	FCameraTrackProfile GetCameraTrackProfile() const;
 };

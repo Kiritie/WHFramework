@@ -3,8 +3,9 @@
 
 #include "Pawn/PawnModule.h"
 
-#include "Camera/CameraModuleStatics.h"
+#include "Camera/CameraModule.h"
 #include "Camera/Actor/CameraActorBase.h"
+#include "Camera/Manager/CameraManagerBase.h"
 #include "Pawn/PawnModuleNetworkComponent.h"
 #include "Pawn/Base/PawnBase.h"
 #include "Gameplay/WHPlayerController.h"
@@ -142,19 +143,35 @@ void UPawnModule::SwitchPawn(APawnBase* InPawn, bool bResetCamera, bool bInstant
 		CurrentPawn = InPawn;
 		PlayerController->Possess(CurrentPawn);
 		CurrentPawn->OnSwitch();
-		UCameraModuleStatics::EndTrackTarget();
-		UCameraModuleStatics::StartTrackTarget(CurrentPawn, ICameraTrackableInterface::Execute_GetCameraTrackMode(CurrentPawn), bInstant ? ECameraViewMode::Instant : ECameraViewMode::Smooth, ECameraViewSpace::Local, FVector::ZeroVector, ICameraTrackableInterface::Execute_GetCameraOffset(CurrentPawn) * CurrentPawn->GetActorScale3D(), bResetCamera ? 0.f : -1.f, bResetCamera ? 0.f : -1.f, ICameraTrackableInterface::Execute_GetCameraDistance(CurrentPawn));
+		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
+		{
+			FCameraTrackProfile Profile = ICameraTrackableInterface::Execute_GetCameraTrackProfile(CurrentPawn);
+			Profile.Offset *= CurrentPawn->GetActorScale3D();
+
+			FCameraTargetRequest Request;
+			Request.Target = CurrentPawn;
+			Request.Profile = Profile;
+			Request.ViewMode = bInstant ? ECameraViewMode::Instant : ECameraViewMode::Smooth;
+			Request.ViewSpace = ECameraViewSpace::Local;
+			Request.bResetRotation = bResetCamera;
+			Request.bInstant = bInstant;
+			CameraManager->BindTarget(Request);
+		}
 	}
 	else if(CurrentPawn)
 	{
+		APawnBase* PreviousPawn = CurrentPawn;
 		CurrentPawn->OnUnSwitch();
 		PlayerController->UnPossess();
 		if(CurrentPawn->GetDefaultController())
 		{
 			CurrentPawn->GetDefaultController()->Possess(CurrentPawn);
 		}
+		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
+		{
+			CameraManager->ClearTarget(PreviousPawn);
+		}
 		CurrentPawn = nullptr;
-		UCameraModuleStatics::EndTrackTarget();
 	}
 }
 

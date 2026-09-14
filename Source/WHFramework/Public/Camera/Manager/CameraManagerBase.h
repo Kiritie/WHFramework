@@ -13,8 +13,8 @@ class ACameraActorBase;
 /**
  *
  */
-UCLASS(notplaceable, MinimalAPI)
-class ACameraManagerBase : public APlayerCameraManager
+UCLASS(notplaceable)
+class WHFRAMEWORK_API ACameraManagerBase : public APlayerCameraManager
 {
 	GENERATED_BODY()
 
@@ -51,10 +51,55 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	int32 LocalPlayerIndex;
 
+	UPROPERTY(Transient)
+	FCameraSettings RuntimeSettings;
+
+	UPROPERTY(Transient)
+	bool bOwnsRuntimeCameras;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
+	FCameraRuntimeState RuntimeState;
+
+	UPROPERTY(Transient)
+	FCameraTrackProfile TrackProfile;
+
+	TWeakObjectPtr<AActor> TrackTarget;
+
 private:
 	TMap<FName, ACameraActorBase*> CameraMap;
 
+	void RefreshTransitionState();
+
 public:
+	void ApplySettings(const FCameraSettings& InSettings) { RuntimeSettings = InSettings; }
+
+	UFUNCTION(BlueprintPure)
+	const FCameraRuntimeState& GetRuntimeState() const { return RuntimeState; }
+
+	UFUNCTION(BlueprintCallable)
+	void BindTarget(const FCameraTargetRequest& InRequest);
+
+	UFUNCTION(BlueprintCallable)
+	void ClearTarget(AActor* InExpectedTarget = nullptr);
+
+	UFUNCTION(BlueprintCallable)
+	void ApplyView(const FCameraViewRequest& InRequest);
+
+	UFUNCTION(BlueprintCallable)
+	void StopViewTransition(int32 InProperties);
+
+	UFUNCTION(BlueprintCallable)
+	void AddLookInput(const FVector2D& InValue);
+
+	UFUNCTION(BlueprintCallable)
+	void AddPanInput(const FVector2D& InValue);
+
+	UFUNCTION(BlueprintCallable)
+	void AddMoveInput(const FVector& InValue);
+
+	UFUNCTION(BlueprintCallable)
+	void AddZoomInput(float InValue);
+
 	template<class T>
 	T* GetCurrentCamera()
 	{
@@ -195,92 +240,61 @@ protected:
 	
 	virtual void DoTrackTargetDistance(bool bInstant = false);
 
-public:
-	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "bAllowControl,InViewEaseType,InViewDuration,bInstant"))
-	virtual void StartTrackTarget(AActor* InTargetActor, ECameraTrackMode InTrackMode = ECameraTrackMode::LocationAndRotationAndDistanceOnce, ECameraViewMode InViewMode = ECameraViewMode::Smooth, ECameraViewSpace InViewSpace = ECameraViewSpace::Local, FVector InLocation = FVector(-1.f), FVector InOffset = FVector(-1.f), float InYaw = -1.f, float InPitch = -1.f, float InDistance = -1.f, bool bAllowControl = true, EEaseType InViewEaseType = EEaseType::Linear, float InViewDuration = 1.f, bool bInstant = false);
+protected:
+	virtual void ApplyLocationInternal(FVector InLocation, bool bInstant);
 
-	UFUNCTION(BlueprintCallable)
-	virtual void EndTrackTarget(AActor* InTargetActor = nullptr);
+	virtual void TransitionLocationInternal(FVector InLocation, float InDuration, EEaseType InEaseType, bool bForce = true);
 
-	UFUNCTION(BlueprintCallable)
-	virtual void SetCameraLocation(FVector InLocation, bool bInstant = false);
+	virtual void StopTransitionLocationInternal();
 
-	UFUNCTION(BlueprintCallable)
-	virtual void DoCameraLocation(FVector InLocation, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear, bool bForce = true);
+	virtual void ApplyOffsetInternal(FVector InOffset, bool bInstant = false);
 
-	UFUNCTION(BlueprintCallable)
-	virtual void StopDoCameraLocation();
+	virtual void TransitionOffsetInternal(FVector InOffset, float InDuration, EEaseType InEaseType, bool bForce = true);
 
-	UFUNCTION(BlueprintCallable)
-	virtual void SetCameraOffset(FVector InOffset = FVector(-1.f), bool bInstant = false);
+	virtual void StopTransitionOffsetInternal();
 
-	UFUNCTION(BlueprintCallable)
-	virtual void DoCameraOffset(FVector InOffset = FVector(-1.f), float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear, bool bForce = true);
+	virtual void ApplyRotationInternal(float InYaw, float InPitch, bool bInstant);
 
-	UFUNCTION(BlueprintCallable)
-	virtual void StopDoCameraOffset();
+	virtual void TransitionRotationInternal(float InYaw, float InPitch, float InDuration, EEaseType InEaseType, bool bForce = true);
 
-	UFUNCTION(BlueprintCallable)
-	virtual void SetCameraRotation(float InYaw = -1.f, float InPitch = -1.f, bool bInstant = false);
+	virtual void StopTransitionRotationInternal();
 
-	UFUNCTION(BlueprintCallable)
-	virtual void DoCameraRotation(float InYaw = -1.f, float InPitch = -1.f, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear, bool bForce = true);
+	virtual void ApplyDistanceInternal(float InDistance, bool bInstant);
 
-	UFUNCTION(BlueprintCallable)
-	virtual void StopDoCameraRotation();
+	virtual void TransitionDistanceInternal(float InDistance, float InDuration, EEaseType InEaseType, bool bForce = true);
 
-	UFUNCTION(BlueprintCallable)
-	virtual void SetCameraDistance(float InDistance = -1.f, bool bInstant = false);
+	virtual void StopTransitionDistanceInternal();
 
-	UFUNCTION(BlueprintCallable)
-	virtual void DoCameraDistance(float InDistance = -1.f, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear, bool bForce = true);
+	virtual void ApplyRotationAndDistanceInternal(float InYaw, float InPitch, float InDistance, bool bInstant);
 
-	UFUNCTION(BlueprintCallable)
-	virtual void StopDoCameraDistance();
+	virtual void TransitionRotationAndDistanceInternal(float InYaw, float InPitch, float InDistance, float InDuration, EEaseType InEaseType, bool bForce = true);
 
-	UFUNCTION(BlueprintCallable)
-	virtual void SetCameraRotationAndDistance(float InYaw = -1.f, float InPitch = -1.f, float InDistance = -1.f, bool bInstant = false);
+	virtual void ApplyTransformInternal(FVector InLocation, float InYaw, float InPitch, float InDistance, bool bInstant);
 
-	UFUNCTION(BlueprintCallable)
-	virtual void DoCameraRotationAndDistance(float InYaw = -1.f, float InPitch = -1.f, float InDistance = -1.f, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear, bool bForce = true);
+	virtual void TransitionTransformInternal(FVector InLocation, float InYaw, float InPitch, float InDistance, float InDuration, EEaseType InEaseType, bool bForce = true);
 
-	UFUNCTION(BlueprintCallable)
-	virtual void SetCameraTransform(FVector InLocation, float InYaw = -1.f, float InPitch = -1.f, float InDistance = -1.f, bool bInstant = false);
+	virtual void StopTransitionTransformInternal();
 
-	UFUNCTION(BlueprintCallable)
-	virtual void DoCameraTransform(FVector InLocation, float InYaw = -1.f, float InPitch = -1.f, float InDistance = -1.f, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear, bool bForce = true);
+	virtual void ApplyFovInternal(float InFov, bool bInstant);
 
-	UFUNCTION(BlueprintCallable)
-	virtual void StopDoCameraTransform();
+	virtual void TransitionFovInternal(float InFov, float InDuration, EEaseType InEaseType, bool bForce = true);
 
-	UFUNCTION(BlueprintCallable)
-	virtual void SetCameraFov(float InFov = -1.f, bool bInstant = false);
+	virtual void StopTransitionFovInternal();
 
-	UFUNCTION(BlueprintCallable)
-	virtual void DoCameraFov(float InFov = -1.f, float InDuration = 1.f, EEaseType InEaseType = EEaseType::Linear, bool bForce = true);
+	virtual void ApplyMoveInputInternal(FVector InDirection, float InValue);
 
-	UFUNCTION(BlueprintCallable)
-	virtual void StopDoCameraFov();
+	virtual void ApplyLookInputInternal(float InYaw, float InPitch);
 
-	UFUNCTION(BlueprintCallable)
-	virtual void AddCameraMovementInput(FVector InDirection, float InValue);
-
-	UFUNCTION(BlueprintCallable)
-	virtual void AddCameraRotationInput(float InYaw, float InPitch);
-
-	UFUNCTION(BlueprintCallable)
-	virtual void AddCameraDistanceInput(float InValue);
+	virtual void ApplyZoomInputInternal(float InValue);
 
 public:
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InCameraViewData"))
-	virtual void SetCameraView(const FCameraViewData& InCameraViewData, bool bCacheData = true, bool bInstant = false);
+	virtual void ApplyViewData(const FCameraViewData& InCameraViewData, bool bCacheData = true, bool bInstant = false);
 	
 	UFUNCTION(BlueprintCallable)
-	virtual void ResetCameraView(ECameraResetMode InCameraResetMode = ECameraResetMode::DefaultPoint, bool bInstant = false);
+	virtual void ResetView(ECameraResetMode InCameraResetMode = ECameraResetMode::DefaultPoint, bool bInstant = false);
 
 protected:
-	UFUNCTION(BlueprintCallable)
-	virtual void SetCameraViewParams(const FCameraViewParams& InCameraViewParams, bool bInstant = false);
+	virtual void ApplyViewParamsInternal(const FCameraViewParams& InCameraViewParams, bool bInstant);
 
 public:
 	UFUNCTION(BlueprintPure)
@@ -360,7 +374,7 @@ public:
 	float GetTargetCameraFov() const { return TargetCameraFov; }
 
 	UFUNCTION(BlueprintPure)
-	AActor* GetTrackingTarget() const { return TrackCameraViewData.CameraViewParams.CameraViewTarget; }
+	AActor* GetTrackingTarget() const { return RuntimeState.Target; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Network

@@ -5,6 +5,8 @@
 #include "WHFrameworkCoreStatics.h"
 #include "Animation/AnimationModuleStatics.h"
 #include "Camera/CameraModuleStatics.h"
+#include "Camera/CameraModule.h"
+#include "Camera/Manager/CameraManagerBase.h"
 #include "Camera/Point/CameraPointBase.h"
 #include "Common/CommonModuleStatics.h"
 #include "Kismet/GameplayStatics.h"
@@ -118,10 +120,21 @@ void ACCTVCameraActor::OnRefresh_Implementation(float DeltaSeconds)
 						}
 						default: break;
 					}
-					UCameraModuleStatics::SetCameraView(CurrentCameraShotData.CameraViewData, false, true);
+					if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
+					{
+						CameraManager->ApplyViewData(CurrentCameraShotData.CameraViewData, false, true);
+					}
 					if(CurrentCameraShotData.CameraViewData.bTrackTarget)
 					{
-						UCameraModuleStatics::SetCameraRotationAndDistance(CurrentCameraShotData.CameraViewData.CameraViewParams.CameraViewYaw, CurrentCameraShotData.CameraViewData.CameraViewParams.CameraViewPitch, CurrentCameraShotData.CameraViewData.CameraViewParams.CameraViewDistance, true);
+						if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
+						{
+							FCameraViewRequest Request;
+							Request.Properties = static_cast<int32>(ECameraViewProperty::Rotation) | static_cast<int32>(ECameraViewProperty::Distance);
+							Request.Rotation = FRotator(CurrentCameraShotData.CameraViewData.CameraViewParams.CameraViewPitch, CurrentCameraShotData.CameraViewData.CameraViewParams.CameraViewYaw, 0.f);
+							Request.Distance = CurrentCameraShotData.CameraViewData.CameraViewParams.CameraViewDistance;
+							Request.Transition.Mode = ECameraViewMode::Instant;
+							CameraManager->ApplyView(Request);
+						}
 					}
 				});
 			}
@@ -137,22 +150,22 @@ void ACCTVCameraActor::OnRefresh_Implementation(float DeltaSeconds)
 			{
 				if(CurrentCameraShotData.CameraZoomSpeed < 0.f ? UCameraModuleStatics::GetCameraDistance() > CurrentCameraShotData.CameraMinDistance : UCameraModuleStatics::GetCameraDistance() < CurrentCameraShotData.CameraMaxDistance)
 				{
-					UCameraModuleStatics::AddCameraDistanceInput(CurrentCameraShotData.CameraZoomSpeed);
+					if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager()) CameraManager->AddZoomInput(CurrentCameraShotData.CameraZoomSpeed);
 				}
 				break;
 			}
 			case ECCTVCameraShotMode::Rotate:
 			{
-				UCameraModuleStatics::AddCameraRotationInput(CurrentCameraShotData.CameraRotateSpeed, 0.f);
+				if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager()) CameraManager->AddLookInput(FVector2D(CurrentCameraShotData.CameraRotateSpeed, 0.f));
 				break;
 			}
 			case ECCTVCameraShotMode::ZoomAndRotate:
 			{
 				if(CurrentCameraShotData.CameraZoomSpeed < 0.f ? UCameraModuleStatics::GetCameraDistance() > CurrentCameraShotData.CameraMinDistance : UCameraModuleStatics::GetCameraDistance() < CurrentCameraShotData.CameraMaxDistance)
 				{
-					UCameraModuleStatics::AddCameraDistanceInput(CurrentCameraShotData.CameraZoomSpeed);
+					if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager()) CameraManager->AddZoomInput(CurrentCameraShotData.CameraZoomSpeed);
 				}
-				UCameraModuleStatics::AddCameraRotationInput(CurrentCameraShotData.CameraRotateSpeed, 0.f);
+				if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager()) CameraManager->AddLookInput(FVector2D(CurrentCameraShotData.CameraRotateSpeed, 0.f));
 				break;
 			}
 			default: break;
@@ -172,5 +185,8 @@ void ACCTVCameraActor::OnUnSwitch_Implementation()
 {
 	Super::OnUnSwitch_Implementation();
 
-	UCameraModuleStatics::EndTrackTarget();
+	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
+	{
+		CameraManager->ClearTarget();
+	}
 }

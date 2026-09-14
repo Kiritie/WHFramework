@@ -135,20 +135,12 @@ protected:
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Camera
+protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
+	FCameraTrackProfile CameraTrackProfile;
+
 public:
-	virtual FVector GetCameraOffset_Implementation() const override;
-
-	virtual float GetCameraDistance_Implementation() const override;
-
-	virtual float GetCameraMinPitch_Implementation() const override;
-
-	virtual float GetCameraMaxPitch_Implementation() const override;
-
-	virtual ECameraTrackMode GetCameraTrackMode_Implementation() const override;
-
-	virtual ECameraSmoothMode GetCameraSmoothMode_Implementation() const override;
-
-	virtual ECameraControlMode GetCameraControlMode_Implementation() const override;
+	virtual FCameraTrackProfile GetCameraTrackProfile_Implementation() const override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Actor

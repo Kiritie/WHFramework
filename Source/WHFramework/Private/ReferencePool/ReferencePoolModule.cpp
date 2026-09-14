@@ -89,7 +89,7 @@ bool UReferencePoolModule::HasReference(UClass* InType) const
 	const TSubclassOf<UObject> Type = InType;
 	if(const TObjectPtr<UObject>* Reference = References.Find(Type))
 	{
-		return IsValid(Reference->Get());
+		return ::IsValid(Reference->Get());
 	}
 	return false;
 }
@@ -101,7 +101,7 @@ UObject* UReferencePoolModule::GetReference(UClass* InType)
 	const TSubclassOf<UObject> Type = InType;
 	if(TObjectPtr<UObject>* Reference = References.Find(Type))
 	{
-		if(IsValid(Reference->Get()))
+		if(::IsValid(Reference->Get()))
 		{
 			return Reference->Get();
 		}
@@ -129,7 +129,7 @@ bool UReferencePoolModule::ResetReference(UClass* InType)
 	}
 
 	UObject* Object = Reference->Get();
-	if(!IsValid(Object))
+	if(!::IsValid(Object))
 	{
 		References.Remove(Type);
 		return false;
@@ -161,7 +161,7 @@ FString UReferencePoolModule::GetModuleDebugMessage()
 	for(const auto& Iter : References)
 	{
 		UObject* Object = Iter.Value.Get();
-		if(!IsValid(Object))
+		if(!::IsValid(Object))
 		{
 			continue;
 		}

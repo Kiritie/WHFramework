@@ -5,6 +5,7 @@
 #include "CommonActivatableWidget.h"
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "Slate/Runtime/Interfaces/SubWidgetInterface.h"
+#include "Widget/WidgetModuleTypes.h"
 
 #include "SubActivatableWidgetBase.generated.h"
 

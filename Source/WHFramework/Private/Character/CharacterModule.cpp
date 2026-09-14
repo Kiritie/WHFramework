@@ -3,8 +3,9 @@
 
 #include "Character/CharacterModule.h"
 
-#include "Camera/CameraModuleStatics.h"
+#include "Camera/CameraModule.h"
 #include "Camera/Actor/CameraActorBase.h"
+#include "Camera/Manager/CameraManagerBase.h"
 #include "Character/CharacterModuleNetworkComponent.h"
 #include "Character/Base/CharacterBase.h"
 #include "Gameplay/WHPlayerController.h"
@@ -169,19 +170,35 @@ void UCharacterModule::SwitchCharacter(ACharacterBase* InCharacter, bool bResetC
 		CurrentCharacter = InCharacter;
 		PlayerController->Possess(CurrentCharacter);
 		CurrentCharacter->OnSwitch();
-		UCameraModuleStatics::EndTrackTarget();
-		UCameraModuleStatics::StartTrackTarget(CurrentCharacter, ICameraTrackableInterface::Execute_GetCameraTrackMode(CurrentCharacter), bInstant ? ECameraViewMode::Instant : ECameraViewMode::Smooth, ECameraViewSpace::Local, FVector::ZeroVector, ICameraTrackableInterface::Execute_GetCameraOffset(CurrentCharacter) * CurrentCharacter->GetActorScale3D(), bResetCamera ? 0.f : -1.f, bResetCamera ? 0.f : -1.f, ICameraTrackableInterface::Execute_GetCameraDistance(CurrentCharacter));
+		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
+		{
+			FCameraTrackProfile Profile = ICameraTrackableInterface::Execute_GetCameraTrackProfile(CurrentCharacter);
+			Profile.Offset *= CurrentCharacter->GetActorScale3D();
+
+			FCameraTargetRequest Request;
+			Request.Target = CurrentCharacter;
+			Request.Profile = Profile;
+			Request.ViewMode = bInstant ? ECameraViewMode::Instant : ECameraViewMode::Smooth;
+			Request.ViewSpace = ECameraViewSpace::Local;
+			Request.bResetRotation = bResetCamera;
+			Request.bInstant = bInstant;
+			CameraManager->BindTarget(Request);
+		}
 	}
 	else if(CurrentCharacter)
 	{
+		ACharacterBase* PreviousCharacter = CurrentCharacter;
 		CurrentCharacter->OnUnSwitch();
 		PlayerController->UnPossess();
 		if(CurrentCharacter->GetDefaultController())
 		{
 			CurrentCharacter->GetDefaultController()->Possess(CurrentCharacter);
 		}
+		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
+		{
+			CameraManager->ClearTarget(PreviousCharacter);
+		}
 		CurrentCharacter = nullptr;
-		UCameraModuleStatics::EndTrackTarget();
 	}
 }
 

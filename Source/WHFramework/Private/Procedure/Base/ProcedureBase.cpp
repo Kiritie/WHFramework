@@ -4,7 +4,7 @@
 #include "Procedure/Base/ProcedureBase.h"
 
 #include "Camera/CameraModule.h"
-#include "Camera/CameraModuleStatics.h"
+#include "Camera/Manager/CameraManagerBase.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Event/EventModuleStatics.h"
 #include "Event/Events/Procedure/Event_ProcedureEntered.h"
@@ -117,7 +117,10 @@ void UProcedureBase::OnLeave(UProcedureBase* InNextProcedure)
 
 	if(bTrackTarget)
 	{
-		UCameraModuleStatics::EndTrackTarget(OperationTarget.LoadSynchronous());
+		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
+		{
+			CameraManager->ClearTarget(OperationTarget.LoadSynchronous());
+		}
 	}
 
 	WHDebug(FString::Printf(TEXT("离开流程: %s"), *ProcedureDisplayName.ToString()), EDM_All, EDC_Procedure, EDV_Log, FColor::Orange, 5.f);
@@ -188,7 +191,10 @@ void UProcedureBase::ResetCameraView()
 {
 	if(IsCurrent() && CameraViewParams.IsValid())
 	{
-		UCameraModuleStatics::SetCameraView(FCameraViewData(OperationTarget.LoadSynchronous(), bTrackTarget, TrackTargetMode, CameraViewParams));
+		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
+		{
+			CameraManager->ApplyViewData(FCameraViewData(OperationTarget.LoadSynchronous(), bTrackTarget, TrackTargetMode, CameraViewParams));
+		}
 	}
 }
 

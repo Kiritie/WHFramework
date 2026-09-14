@@ -8,6 +8,53 @@
 #include "CameraModuleTypes.generated.h"
 
 class ACameraActorBase;
+class ACameraPointBase;
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FCameraSettings
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bEnablePanZMove = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bReversePanMove = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MoveRate = 300.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bSmoothMove = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MoveSpeed = 5.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bReversePitch = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float TurnRate = 90.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float LookUpRate = 90.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bSmoothRotate = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float RotateSpeed = 5.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float ZoomRate = 150.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bSmoothZoom = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float ZoomSpeed = 5.f;
+};
 
 UENUM(BlueprintType)
 enum class ECameraCollisionMode : uint8
@@ -77,6 +124,159 @@ enum class ECameraResetMode : uint8
 	DefaultPoint,
 	CurrentPoint,
 	CachedData
+};
+
+UENUM(BlueprintType, meta = (Bitflags))
+enum class ECameraViewProperty : uint8
+{
+	None = 0,
+	Location = 1 << 0,
+	Offset = 1 << 1,
+	Rotation = 1 << 2,
+	Distance = 1 << 3,
+	FOV = 1 << 4
+};
+
+ENUM_CLASS_FLAGS(ECameraViewProperty)
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FCameraTrackProfile
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector Offset = FVector::ZeroVector;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float Distance = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MinPitch = -90.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MaxPitch = 90.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	ECameraTrackMode TrackMode = ECameraTrackMode::LocationAndRotationAndDistanceOnce;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	ECameraSmoothMode SmoothMode = ECameraSmoothMode::All;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	ECameraControlMode ControlMode = ECameraControlMode::All;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FCameraTargetRequest
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TObjectPtr<AActor> Target = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FCameraTrackProfile Profile;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	ECameraViewMode ViewMode = ECameraViewMode::Smooth;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	ECameraViewSpace ViewSpace = ECameraViewSpace::Local;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bResetRotation = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bInstant = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bAllowControl = true;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FCameraTransitionParams
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	ECameraViewMode Mode = ECameraViewMode::Smooth;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float Duration = 1.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EEaseType EaseType = EEaseType::Linear;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bForce = true;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FCameraViewRequest
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (Bitmask, BitmaskEnum = "/Script/WHFramework.ECameraViewProperty"))
+	int32 Properties = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector Location = FVector::ZeroVector;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector Offset = FVector::ZeroVector;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FRotator Rotation = FRotator::ZeroRotator;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float Distance = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float FOV = 90.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FCameraTransitionParams Transition;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FCameraRuntimeState
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(BlueprintReadOnly)
+	TObjectPtr<ACameraActorBase> Camera = nullptr;
+
+	UPROPERTY(BlueprintReadOnly)
+	TObjectPtr<AActor> Target = nullptr;
+
+	UPROPERTY(BlueprintReadOnly)
+	TObjectPtr<ACameraPointBase> CameraPoint = nullptr;
+
+	UPROPERTY(BlueprintReadOnly)
+	FVector Location = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadOnly)
+	FVector Offset = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadOnly)
+	FRotator Rotation = FRotator::ZeroRotator;
+
+	UPROPERTY(BlueprintReadOnly)
+	float Distance = 0.f;
+
+	UPROPERTY(BlueprintReadOnly)
+	float FOV = 90.f;
+
+	UPROPERTY(BlueprintReadOnly)
+	bool bTracking = false;
+
+	UPROPERTY(BlueprintReadOnly)
+	bool bTransitioning = false;
 };
 
 USTRUCT(BlueprintType)
@@ -274,46 +474,84 @@ public:
 	}
 
 public:
+	FCameraSettings ToSettings() const
+	{
+		FCameraSettings Result;
+
+		Result.bEnablePanZMove = bEnableCameraPanZMove;
+		Result.bReversePanMove = bReverseCameraPanMove;
+		Result.MoveRate = CameraMoveRate;
+		Result.bSmoothMove = bSmoothCameraMove;
+		Result.MoveSpeed = CameraMoveSpeed;
+		Result.bReversePitch = bReverseCameraPitch;
+		Result.TurnRate = CameraTurnRate;
+		Result.LookUpRate = CameraLookUpRate;
+		Result.bSmoothRotate = bSmoothCameraRotate;
+		Result.RotateSpeed = CameraRotateSpeed;
+		Result.ZoomRate = CameraZoomRate;
+		Result.bSmoothZoom = bSmoothCameraZoom;
+		Result.ZoomSpeed = CameraZoomSpeed;
+
+		return Result;
+	}
+
+	void FromSettings(const FCameraSettings& InSettings)
+	{
+		bEnableCameraPanZMove = InSettings.bEnablePanZMove;
+		bReverseCameraPanMove = InSettings.bReversePanMove;
+		CameraMoveRate = InSettings.MoveRate;
+		bSmoothCameraMove = InSettings.bSmoothMove;
+		CameraMoveSpeed = InSettings.MoveSpeed;
+		bReverseCameraPitch = InSettings.bReversePitch;
+		CameraTurnRate = InSettings.TurnRate;
+		CameraLookUpRate = InSettings.LookUpRate;
+		bSmoothCameraRotate = InSettings.bSmoothRotate;
+		CameraRotateSpeed = InSettings.RotateSpeed;
+		CameraZoomRate = InSettings.ZoomRate;
+		bSmoothCameraZoom = InSettings.bSmoothZoom;
+		CameraZoomSpeed = InSettings.ZoomSpeed;
+	}
+
 	// Move
-	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraControl|Move", meta = (SettingPage = "Camera", SettingCategory = "Move", SettingOrder = "0"))
 	bool bEnableCameraPanZMove;
 	
-	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraControl|Move", meta = (SettingPage = "Camera", SettingCategory = "Move", SettingOrder = "1"))
 	bool bReverseCameraPanMove;
 	
-	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraControl|Move", meta = (SettingPage = "Camera", SettingCategory = "Move", SettingOrder = "2", UIMin = "0.0", UIMax = "1000.0", Delta = "1.0", SettingDecimalPlaces = "0"))
 	float CameraMoveRate;
 
-	UPROPERTY(EditAnywhere, Category = "CameraControl|Move")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraControl|Move", meta = (SettingPage = "Camera", SettingCategory = "Move", SettingOrder = "3"))
 	bool bSmoothCameraMove;
 
-	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bSmoothCameraMove == true"), Category = "CameraControl|Move")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraControl|Move", meta = (EditConditionHides, EditCondition = "bSmoothCameraMove == true", SettingPage = "Camera", SettingCategory = "Move", SettingOrder = "4", UIMin = "0.0", UIMax = "20.0", Delta = "0.1", SettingDecimalPlaces = "1"))
 	float CameraMoveSpeed;
 
 	// Rotate
-	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraControl|Rotate", meta = (SettingPage = "Camera", SettingCategory = "Rotate", SettingOrder = "0"))
 	bool bReverseCameraPitch;
 
-	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraControl|Rotate", meta = (SettingPage = "Camera", SettingCategory = "Rotate", SettingOrder = "1", UIMin = "0.0", UIMax = "300.0", Delta = "1.0", SettingDecimalPlaces = "0"))
 	float CameraTurnRate;
 
-	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraControl|Rotate", meta = (SettingPage = "Camera", SettingCategory = "Rotate", SettingOrder = "2", UIMin = "0.0", UIMax = "300.0", Delta = "1.0", SettingDecimalPlaces = "0"))
 	float CameraLookUpRate;
 
-	UPROPERTY(EditAnywhere, Category = "CameraControl|Rotate")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraControl|Rotate", meta = (SettingPage = "Camera", SettingCategory = "Rotate", SettingOrder = "3"))
 	bool bSmoothCameraRotate;
 
-	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bSmoothCameraRotate == true"), Category = "CameraControl|Rotate")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraControl|Rotate", meta = (EditConditionHides, EditCondition = "bSmoothCameraRotate == true", SettingPage = "Camera", SettingCategory = "Rotate", SettingOrder = "4", UIMin = "0.0", UIMax = "20.0", Delta = "0.1", SettingDecimalPlaces = "1"))
 	float CameraRotateSpeed;
 
 	// Zoom
-	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraControl|Zoom", meta = (SettingPage = "Camera", SettingCategory = "Zoom", SettingOrder = "0", UIMin = "0.0", UIMax = "1000.0", Delta = "1.0", SettingDecimalPlaces = "0"))
 	float CameraZoomRate;
 
-	UPROPERTY(EditAnywhere, Category = "CameraControl|Zoom")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraControl|Zoom", meta = (SettingPage = "Camera", SettingCategory = "Zoom", SettingOrder = "1"))
 	bool bSmoothCameraZoom;
 
-	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "bSmoothCameraZoom == true"), Category = "CameraControl|Zoom")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraControl|Zoom", meta = (EditConditionHides, EditCondition = "bSmoothCameraZoom == true", SettingPage = "Camera", SettingCategory = "Zoom", SettingOrder = "2", UIMin = "0.0", UIMax = "20.0", Delta = "0.1", SettingDecimalPlaces = "1"))
 	float CameraZoomSpeed;
 
 public:

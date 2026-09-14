@@ -275,39 +275,9 @@ void ACharacterBase::JumpN_Implementation()
 	Jump();
 }
 
-FVector ACharacterBase::GetCameraOffset_Implementation() const
+FCameraTrackProfile ACharacterBase::GetCameraTrackProfile_Implementation() const
 {
-	return FVector::ZeroVector;
-}
-
-float ACharacterBase::GetCameraDistance_Implementation() const
-{
-	return -1.f;
-}
-
-float ACharacterBase::GetCameraMinPitch_Implementation() const
-{
-	return -1.f;
-}
-
-float ACharacterBase::GetCameraMaxPitch_Implementation() const
-{
-	return -1.f;
-}
-
-ECameraTrackMode ACharacterBase::GetCameraTrackMode_Implementation() const
-{
-	return ECameraTrackMode::LocationAndRotationOnceAndDistanceOnce;
-}
-
-ECameraSmoothMode ACharacterBase::GetCameraSmoothMode_Implementation() const
-{
-	return ECameraSmoothMode::All;
-}
-
-ECameraControlMode ACharacterBase::GetCameraControlMode_Implementation() const
-{
-	return ECameraControlMode::All;
+	return CameraTrackProfile;
 }
 
 void ACharacterBase::SetActorVisible_Implementation(bool bInVisible)
