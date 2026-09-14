@@ -15,7 +15,7 @@
 
 UWidgetSettingPageBase::UWidgetSettingPageBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	InputConfig = EWidgetInputConfig::Menu;
+	WidgetInputMode = EWidgetInputMode::UIOnly;
 	bWidgetActivatable = true;
 }
 

@@ -12,7 +12,7 @@
 USubActivatableWidgetBase::USubActivatableWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	bWidgetTickAble = false;
-	InputConfig = EWidgetInputConfig::None;
+	WidgetInputMode = EWidgetInputMode::None;
 	bWidgetActivatable = false;
 	bDynamicSubWidget = false;
 
@@ -156,14 +156,14 @@ TArray<UWidget*> USubActivatableWidgetBase::GetPoolWidgets() const
 
 TOptional<FUIInputConfig> USubActivatableWidgetBase::GetDesiredInputConfig() const
 {
-	switch(InputConfig)
+	switch(WidgetInputMode)
 	{
-		case EWidgetInputConfig::Game:
+		case EWidgetInputMode::GameOnly:
 			return FUIInputConfig(ECommonInputMode::Game, EMouseCaptureMode::CapturePermanently, true);
-		case EWidgetInputConfig::GameAndMenu:
-			return FUIInputConfig(ECommonInputMode::All, EMouseCaptureMode::NoCapture, false);
-		case EWidgetInputConfig::Menu:
+		case EWidgetInputMode::UIOnly:
 			return FUIInputConfig(ECommonInputMode::Menu, EMouseCaptureMode::NoCapture, false);
+		case EWidgetInputMode::GameAndUI:
+			return FUIInputConfig(ECommonInputMode::All, EMouseCaptureMode::NoCapture, false);
 		default:
 			return TOptional<FUIInputConfig>();
 	}

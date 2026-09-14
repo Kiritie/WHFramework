@@ -88,7 +88,7 @@ public:
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
-	EWidgetInputConfig InputConfig;
+	EWidgetInputMode WidgetInputMode;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
 	bool bWidgetActivatable;

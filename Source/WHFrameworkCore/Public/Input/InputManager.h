@@ -44,8 +44,6 @@ public:
 
 	virtual void ReleaseInputMode(const void* InOwner);
 
-	virtual void SetCommonUIInputMode(TOptional<EInputMode> InInputMode);
-
 protected:
 	struct FInputModeRequest
 	{
@@ -62,11 +60,14 @@ protected:
 	TMap<const void*, FInputModeRequest> InputModeRequests;
 
 public:
+	FOnGlobalInputModeChanged OnInputModeChanged;
+	
+public:
 	virtual EInputMode GetDefaultInputMode() const { return DefaultInputMode; }
 
 	virtual void SetDefaultInputMode(EInputMode InInputMode);
 
 	virtual EInputMode GetGlobalInputMode() const { return GlobalInputMode; }
 
-	FOnGlobalInputModeChanged OnInputModeChanged;
+	virtual void SetCommonUIInputMode(TOptional<EInputMode> InInputMode);
 };

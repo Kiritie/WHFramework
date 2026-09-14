@@ -21,6 +21,7 @@
 #include "Widget/Animator/WidgetAnimatorBase.h"
 #include "Widget/WidgetModule.h"
 #include "Widget/Screen/WidgetMountSlot.h"
+#include "Widget/Sub/SubActivatableWidgetBase.h"
 
 namespace
 {
@@ -67,7 +68,7 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	WidgetRefreshType = EWidgetRefreshType::Procedure;
 	WidgetRefreshTime = 0.f;
 	WidgetState = EScreenWidgetState::None;
-	InputConfig = EWidgetInputConfig::None;
+	WidgetInputMode = EWidgetInputMode::None;
 	bWidgetActivatable = false;
 	bWidgetAutoFocus = false;
 
@@ -176,14 +177,14 @@ void UUserWidgetBase::OnTick_Implementation(float DeltaSeconds)
 
 TOptional<FUIInputConfig> UUserWidgetBase::GetDesiredInputConfig() const
 {
-	switch(InputConfig)
+	switch(WidgetInputMode)
 	{
-		case EWidgetInputConfig::Game:
+		case EWidgetInputMode::GameOnly:
 			return FUIInputConfig(ECommonInputMode::Game, EMouseCaptureMode::CapturePermanently, true);
-		case EWidgetInputConfig::GameAndMenu:
-			return FUIInputConfig(ECommonInputMode::All, EMouseCaptureMode::NoCapture, false);
-		case EWidgetInputConfig::Menu:
+		case EWidgetInputMode::UIOnly:
 			return FUIInputConfig(ECommonInputMode::Menu, EMouseCaptureMode::NoCapture, false);
+		case EWidgetInputMode::GameAndUI:
+			return FUIInputConfig(ECommonInputMode::All, EMouseCaptureMode::NoCapture, false);
 		default:
 			return TOptional<FUIInputConfig>();
 	}
@@ -615,6 +616,16 @@ void UUserWidgetBase::FinishClose(bool bInstant)
 	}
 
 	DeactivateWidget();
+		
+	TArray<UWidget*> Widgets;
+	WidgetTree->GetAllWidgets(Widgets);
+	for(auto Iter : Widgets)
+	{
+		if(USubActivatableWidgetBase* SubWidget = Cast<USubActivatableWidgetBase>(Iter))
+		{
+			SubWidget->DeactivateWidget();
+		}
+	}
 
 	if(K2_OnClosed.IsBound()) K2_OnClosed.Broadcast(bInstant);
 	if(OnClosed.IsBound()) OnClosed.Broadcast(bInstant);

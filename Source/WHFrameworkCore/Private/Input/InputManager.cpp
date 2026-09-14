@@ -176,14 +176,14 @@ void FInputManager::ReleaseInputMode(const void* InOwner)
 	UpdateInputMode();
 }
 
-void FInputManager::SetCommonUIInputMode(TOptional<EInputMode> InInputMode)
-{
-	CommonUIInputMode = InInputMode;
-	UpdateInputMode();
-}
-
 void FInputManager::SetDefaultInputMode(EInputMode InInputMode)
 {
 	DefaultInputMode = InInputMode;
+	UpdateInputMode();
+}
+
+void FInputManager::SetCommonUIInputMode(TOptional<EInputMode> InInputMode)
+{
+	CommonUIInputMode = InInputMode;
 	UpdateInputMode();
 }

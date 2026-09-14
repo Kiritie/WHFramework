@@ -129,12 +129,12 @@ FORCEINLINE uint32 GetTypeHash(const FWidgetMountContext& Value)
 }
 
 UENUM(BlueprintType)
-enum class EWidgetInputConfig : uint8
+enum class EWidgetInputMode : uint8
 {
 	None,
-	Game,
-	GameAndMenu,
-	Menu
+	GameOnly,
+	UIOnly,
+	GameAndUI
 };
 
 UENUM(BlueprintType)
