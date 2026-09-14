@@ -59,8 +59,6 @@ protected:
 
 	TOptional<EInputMode> CommonUIInputMode;
 
-	bool bCommonUIControlled;
-
 	TMap<const void*, FInputModeRequest> InputModeRequests;
 
 public:

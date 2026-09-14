@@ -13,6 +13,7 @@
 UWidgetAchievementHUD::UWidgetAchievementHUD(const FObjectInitializer &ObjectInitializer) : UUserWidgetBase(ObjectInitializer)
 {
 	WidgetRefreshType = EWidgetRefreshType::Tick;
+	
 }
 
 void UWidgetAchievementHUD::OnCreate(const FParameter& InParams)

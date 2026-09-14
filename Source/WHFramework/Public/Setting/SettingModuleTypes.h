@@ -133,6 +133,27 @@ public:
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSettingValueChanged, FSettingId, InSettingId);
 
 USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSettingEditState
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(BlueprintReadOnly)
+	bool bActive = false;
+
+	UPROPERTY(BlueprintReadOnly)
+	bool bDirty = false;
+
+	UPROPERTY(BlueprintReadOnly)
+	bool bCanApply = false;
+
+	UPROPERTY(BlueprintReadOnly)
+	bool bCanReset = false;
+};
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSettingEditStateChanged, const FSettingEditState&, InState);
+
+USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FSettingNumberDisplay
 {
 	GENERATED_BODY()
@@ -183,6 +204,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FName Category;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 CategoryOrder = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Order = 0;
@@ -261,6 +285,12 @@ public:
 	FName Category;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bOverrideCategoryOrder = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "bOverrideCategoryOrder"))
+	int32 CategoryOrder = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bOverrideOrder = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "bOverrideOrder"))
@@ -329,6 +359,19 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Order = 0;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSettingConfig
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FSettingPageDefinition> Pages;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FSettingDefinitionOverride> Overrides;
 };
 
 USTRUCT(BlueprintType)

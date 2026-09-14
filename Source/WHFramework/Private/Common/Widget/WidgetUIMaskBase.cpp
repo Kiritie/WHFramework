@@ -5,7 +5,6 @@
 UWidgetUIMaskBase::UWidgetUIMaskBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	SetIsFocusable(true);
-	bWidgetActivatable = false;
 }
 
 void UWidgetUIMaskBase::OnCreate(const FParameter& InParam)

@@ -31,6 +31,8 @@ public:
 
 	virtual void OnClose(bool bInstant) override;
 
+	virtual void OnDestroy(EObjectDespawnMode InMode) override;
+
 protected:
 	UFUNCTION(BlueprintNativeEvent)
 	void OnPageItemSelected(UCommonButtonBase* AssociatedButton, int32 ButtonIndex);
@@ -40,6 +42,11 @@ protected:
 
 	UFUNCTION()
 	void OnResetButtonClicked();
+
+	UFUNCTION()
+	void OnSettingEditStateChanged(const FSettingEditState& InState);
+
+	void RefreshActionButtonState();
 
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnConfirmationRequested")
 	void K2_OnConfirmationRequested(float InTimeout);

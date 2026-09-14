@@ -45,7 +45,6 @@ public:
 	virtual bool IsTickAble_Implementation() const override { return bWidgetTickAble; }
 
 	virtual void OnTick_Implementation(float DeltaSeconds) override;
-
 	virtual TOptional<FUIInputConfig> GetDesiredInputConfig() const override;
 
 	FUIActionBindingHandle RegisterUIActionByTag(
@@ -98,6 +97,15 @@ public:
 	void K2_OnStateChanged(EScreenWidgetState InWidgetState);
 	UFUNCTION()
 	virtual void OnStateChanged(EScreenWidgetState InWidgetState) override;
+
+public:
+	virtual void NativeOnActivated() override;
+
+	virtual void NativeOnDeactivated() override;
+	
+	virtual void InternalProcessActivation() override;
+	
+	virtual void InternalProcessDeactivation() override;
 
 public:
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParam"))

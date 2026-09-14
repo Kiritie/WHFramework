@@ -4,6 +4,7 @@
 
 #include "Widget/Customization/WidgetModuleCustomization.h"
 #include "Widget/Customization/WidgetStyleCustomization.h"
+#include "Widget/Customization/WidgetThemeCustomization.h"
 
 IMPLEMENTATION_EDITOR_MODULE(FWidgetEditorModule)
 
@@ -34,6 +35,9 @@ void FWidgetEditorModule::RegisterCustomization(FPropertyEditorModule& PropertyE
 	PropertyEditor.RegisterCustomClassLayout(
 		FName("CommonImageN"),
 		FOnGetDetailCustomizationInstance::CreateStatic(&FWidgetStyleCustomization::MakeImageInstance));
+	PropertyEditor.RegisterCustomClassLayout(
+		FName("WidgetTheme"),
+		FOnGetDetailCustomizationInstance::CreateStatic(&FWidgetThemeCustomization::MakeInstance));
 }
 
 void FWidgetEditorModule::UnRegisterCustomization(FPropertyEditorModule& PropertyEditor)
@@ -42,4 +46,5 @@ void FWidgetEditorModule::UnRegisterCustomization(FPropertyEditorModule& Propert
 	PropertyEditor.UnregisterCustomClassLayout(FName("CommonButton"));
 	PropertyEditor.UnregisterCustomClassLayout(FName("CommonTextBlockN"));
 	PropertyEditor.UnregisterCustomClassLayout(FName("CommonImageN"));
+	PropertyEditor.UnregisterCustomClassLayout(FName("WidgetTheme"));
 }

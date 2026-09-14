@@ -40,7 +40,10 @@ void UInputSettingProvider::CollectDefinitions(TArray<FSettingDefinition>& OutDe
 		Definition->SourcePath = Entry.MappingName.ToString();
 		Definition->Provider = InputProviderName;
 		Definition->Page = FName(TEXT("Input"));
-		Definition->Category = Entry.DisplayCategory.IsEmpty() ? FName(TEXT("Bindings")) : FName(*Entry.DisplayCategory.ToString());
+		const FString SourceCategory = Entry.DisplayCategory.ToString();
+		const bool bSystemOperation = SourceCategory.Contains(TEXT("System")) || SourceCategory.Contains(TEXT("系统"));
+		Definition->Category = bSystemOperation ? FName(TEXT("System Operation")) : FName(TEXT("Character Control"));
+		Definition->CategoryOrder = bSystemOperation ? 10 : 0;
 		Definition->Order = static_cast<int32>(Entry.Slot);
 		Definition->DisplayName = Entry.DisplayName.IsEmpty() ? FText::FromName(Entry.MappingName) : Entry.DisplayName;
 		Definition->Renderer = ESettingRendererType::Key;

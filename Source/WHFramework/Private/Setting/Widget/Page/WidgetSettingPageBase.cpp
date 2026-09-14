@@ -4,15 +4,19 @@
 #include "CommonListView.h"
 #include "Components/Overlay.h"
 #include "Components/PanelWidget.h"
+#include "Components/TextBlock.h"
 #include "Setting/SettingEntry.h"
+#include "Setting/SettingCategoryEntry.h"
 #include "Setting/SettingModule.h"
 #include "Setting/Widget/Entry/WidgetSettingEntryBase.h"
+#include "Setting/Widget/Entry/WidgetSettingCategoryEntry.h"
 #include "Widget/Theme/WidgetTheme.h"
 #include "Widget/WidgetModule.h"
 
 UWidgetSettingPageBase::UWidgetSettingPageBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	InputConfig = EWidgetInputConfig::Menu;
+	bWidgetActivatable = true;
 }
 
 void UWidgetSettingPageBase::OnCreate(const FParameter& InParam)
@@ -41,6 +45,24 @@ void UWidgetSettingPageBase::OnCreate(const FParameter& InParam)
 			WidgetTree->RootWidget = RootOverlay;
 			RootOverlay->AddChildToOverlay(PreviousRoot);
 			RootOverlay->AddChildToOverlay(SettingList);
+		}
+	}
+	if(!EmptyState && WidgetTree)
+	{
+		UTextBlock* EmptyText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("EmptyState"));
+		EmptyText->SetText(NSLOCTEXT("WH.Setting", "EmptyParameterPage", "No configurable parameters."));
+		EmptyState = EmptyText;
+		if(UPanelWidget* RootPanel = Cast<UPanelWidget>(WidgetTree->RootWidget))
+		{
+			RootPanel->AddChild(EmptyState);
+		}
+		else if(WidgetTree->RootWidget)
+		{
+			UWidget* PreviousRoot = WidgetTree->RootWidget;
+			UOverlay* RootOverlay = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("SettingEmptyRoot"));
+			WidgetTree->RootWidget = RootOverlay;
+			RootOverlay->AddChildToOverlay(PreviousRoot);
+			RootOverlay->AddChildToOverlay(EmptyState);
 		}
 	}
 
@@ -87,18 +109,23 @@ void UWidgetSettingPageBase::NativeOnDeactivated()
 
 void UWidgetSettingPageBase::OnApply()
 {
-	if(!PageName.IsNone())
-	{
-		USettingModule::Get().ApplyEditSession();
-	}
 	K2_OnApply();
 }
 
 void UWidgetSettingPageBase::OnSettingValueChanged(FSettingId InSettingId)
 {
-	if(SettingList)
+	if(!SettingList)
 	{
-		SettingList->RequestRefresh();
+		return;
+	}
+	for(UUserWidget* EntryWidget : SettingList->GetDisplayedEntryWidgets())
+	{
+		UWidgetSettingEntryBase* SettingEntryWidget = Cast<UWidgetSettingEntryBase>(EntryWidget);
+		if(SettingEntryWidget && SettingEntryWidget->GetSettingEntry()
+			&& SettingEntryWidget->GetSettingEntry()->GetDefinition().SettingId != InSettingId)
+		{
+			SettingEntryWidget->RefreshFromModel();
+		}
 	}
 }
 
@@ -148,18 +175,68 @@ void UWidgetSettingPageBase::RefreshEntries()
 		return;
 	}
 
-	TArray<UObject*> ListItems;
-	for(USettingEntry* Entry : USettingModule::Get().GetSettingEntriesByPage(PageName))
+	CategoryEntries.Reset();
+	TArray<USettingEntry*> Entries = USettingModule::Get().GetSettingEntriesByPage(PageName);
+	Entries.Sort([](const USettingEntry& A, const USettingEntry& B)
 	{
+		const FSettingDefinition& DefinitionA = A.GetDefinition();
+		const FSettingDefinition& DefinitionB = B.GetDefinition();
+		if(DefinitionA.CategoryOrder != DefinitionB.CategoryOrder)
+		{
+			return DefinitionA.CategoryOrder < DefinitionB.CategoryOrder;
+		}
+		if(DefinitionA.Category != DefinitionB.Category)
+		{
+			return DefinitionA.Category.LexicalLess(DefinitionB.Category);
+		}
+		return DefinitionA.Order < DefinitionB.Order;
+	});
+
+	TArray<UObject*> ListItems;
+	FName LastCategory = NAME_None;
+	for(USettingEntry* Entry : Entries)
+	{
+		if(!Entry)
+		{
+			continue;
+		}
+
+		const FSettingDefinition& Definition = Entry->GetDefinition();
+		if(Definition.Category != LastCategory)
+		{
+			LastCategory = Definition.Category;
+			if(!LastCategory.IsNone())
+			{
+				USettingCategoryEntry* CategoryEntry = NewObject<USettingCategoryEntry>(this);
+				CategoryEntry->Initialize(LastCategory, FText::FromName(LastCategory), Definition.CategoryOrder);
+				CategoryEntries.Add(CategoryEntry);
+				ListItems.Add(CategoryEntry);
+			}
+		}
 		ListItems.Add(Entry);
 	}
+	const bool bEmpty = ListItems.IsEmpty();
+	if(EmptyState)
+	{
+		EmptyState->SetVisibility(bEmpty ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	}
+	SettingList->SetVisibility(bEmpty ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
 	SettingList->SetListItems(ListItems);
 }
 
 TSubclassOf<UUserWidget> UWidgetSettingPageBase::ResolveEntryClass(UObject* InItem) const
 {
-	const USettingEntry* Entry = Cast<USettingEntry>(InItem);
 	const UWidgetTheme* Theme = UWidgetModule::Get().GetDefaultWidgetTheme();
+	if(!Theme)
+	{
+		return nullptr;
+	}
+	if(InItem && InItem->IsA<USettingCategoryEntry>())
+	{
+		return Theme->GetSettingCategoryEntryClass();
+	}
+
+	const USettingEntry* Entry = Cast<USettingEntry>(InItem);
 	const TSubclassOf<UWidgetSettingEntryBase> EntryClass = Entry && Theme
 		? Theme->FindSettingRendererClass(Entry->GetDefinition().Renderer)
 		: nullptr;

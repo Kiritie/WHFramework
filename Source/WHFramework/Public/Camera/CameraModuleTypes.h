@@ -450,35 +450,35 @@ USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FCameraModuleSaveData : public FSaveData
 {
 	GENERATED_BODY()
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (SettingCategory = "Camera Rotate", SettingCategoryOrder = "10"))
 	float HorizontalLookSensitivity = 1.f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (SettingCategory = "Camera Rotate", SettingCategoryOrder = "10"))
 	float VerticalLookSensitivity = 1.f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (SettingCategory = "Camera Rotate", SettingCategoryOrder = "10"))
 	bool bInvertHorizontalLook = false;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (SettingCategory = "Camera Rotate", SettingCategoryOrder = "10"))
 	bool bInvertVerticalLook = false;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (SettingCategory = "Camera Move", SettingCategoryOrder = "0"))
 	float HorizontalPanSensitivity = 1.f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (SettingCategory = "Camera Move", SettingCategoryOrder = "0"))
 	float VerticalPanSensitivity = 1.f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (SettingCategory = "Camera Move", SettingCategoryOrder = "0"))
 	bool bInvertHorizontalPan = false;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (SettingCategory = "Camera Move", SettingCategoryOrder = "0"))
 	bool bInvertVerticalPan = false;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera Move", meta = (SettingCategory = "Camera Move", SettingCategoryOrder = "0"))
 	float ZoomSensitivity = 1.f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera Move", meta = (SettingCategory = "Camera Move", SettingCategoryOrder = "0"))
 	bool bSmoothMovement = true;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera Move", meta = (SettingCategory = "Camera Move", SettingCategoryOrder = "0"))
 	float MovementSmoothing = 0.5f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera Rotate", meta = (SettingCategory = "Camera Rotate", SettingCategoryOrder = "10"))
 	bool bSmoothRotation = true;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera Rotate", meta = (SettingCategory = "Camera Rotate", SettingCategoryOrder = "10"))
 	float RotationSmoothing = 0.5f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera Move", meta = (SettingCategory = "Camera Move", SettingCategoryOrder = "0"))
 	bool bSmoothZoom = true;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera Move", meta = (SettingCategory = "Camera Move", SettingCategoryOrder = "0"))
 	float ZoomSmoothing = 0.5f;
 
 	FCameraUserSettings ToUserSettings() const;

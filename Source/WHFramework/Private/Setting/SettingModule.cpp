@@ -13,8 +13,9 @@
 #include "Setting/Provider/InputSettingProvider.h"
 #include "Setting/Provider/LanguageSettingProvider.h"
 #include "Setting/Provider/ResolutionSettingProvider.h"
+#include "Setting/Provider/AudioSettingProvider.h"
+#include "Setting/Provider/ParameterSettingProvider.h"
 #include "Setting/Provider/SettingProviderBase.h"
-#include "Setting/SettingRegistry.h"
 #include "Video/VideoModule.h"
 #include "Widget/WidgetModule.h"
 #include "UObject/UnrealType.h"
@@ -63,6 +64,35 @@ namespace
 		}
 		return false;
 	}
+
+	int32 GetDefaultSettingPageOrder(FName InPage)
+	{
+		if(InPage == FName(TEXT("Audio")))
+		{
+			return 0;
+		}
+		if(InPage == FName(TEXT("Video")))
+		{
+			return 10;
+		}
+		if(InPage == FName(TEXT("Camera")))
+		{
+			return 20;
+		}
+		if(InPage == FName(TEXT("Input")))
+		{
+			return 30;
+		}
+		if(InPage == FName(TEXT("Parameter")))
+		{
+			return 40;
+		}
+		if(InPage == FName(TEXT("Game")))
+		{
+			return 50;
+		}
+		return 100;
+	}
 }
 
 // Sets default values
@@ -78,6 +108,7 @@ USettingModule::USettingModule()
 	Providers.Add(CreateDefaultSubobject<UInputSettingProvider>(TEXT("InputSettingProvider")));
 	Providers.Add(CreateDefaultSubobject<UResolutionSettingProvider>(TEXT("ResolutionSettingProvider")));
 	Providers.Add(CreateDefaultSubobject<ULanguageSettingProvider>(TEXT("LanguageSettingProvider")));
+	Providers.Add(CreateDefaultSubobject<UAudioSettingProvider>(TEXT("AudioSettingProvider")));
 }
 
 USettingModule::~USettingModule()
@@ -89,7 +120,7 @@ USettingModule::~USettingModule()
 void USettingModule::OnGenerate()
 {
 	Super::OnGenerate();
-	BuildSettingDefinitions(true);
+	BuildSettingDefinitions();
 }
 
 void USettingModule::OnDestroy()
@@ -158,6 +189,11 @@ void USettingModule::CollectPropertyDefinitions(const UStruct* InStruct, const F
 		{
 			continue;
 		}
+		if(InPrefix.IsEmpty() && (Property->GetFName() == GET_MEMBER_NAME_CHECKED(FSettingModuleSaveData, AudioData)
+			|| Property->GetFName() == GET_MEMBER_NAME_CHECKED(FSettingModuleSaveData, ParameterData)))
+		{
+			continue;
+		}
 
 		const FString PropertyPath = InPrefix.IsEmpty() ? Property->GetName() : InPrefix + TEXT(".") + Property->GetName();
 		if(const FStructProperty* StructProperty = CastField<FStructProperty>(Property))
@@ -202,7 +238,17 @@ void USettingModule::CollectPropertyDefinitions(const UStruct* InStruct, const F
 			Definition.Category = FName(TEXT("General"));
 		}
 		Definition.Order = Property->HasMetaData(TEXT("SettingOrder")) ? FCString::Atoi(*Property->GetMetaData(TEXT("SettingOrder"))) : OutDefinitions.Num() - 1;
-		Definition.DisplayName = Property->GetDisplayNameText();
+		Definition.CategoryOrder = Property->HasMetaData(TEXT("SettingCategoryOrder")) ? FCString::Atoi(*Property->GetMetaData(TEXT("SettingCategoryOrder"))) : 0;
+		if(Property->HasMetaData(TEXT("DisplayName")))
+		{
+			Definition.DisplayName = Property->GetDisplayNameText();
+		}
+		else
+		{
+			FString DisplayPath = SettingPath;
+			DisplayPath.ReplaceInline(TEXT("."), TEXT(" "));
+			Definition.DisplayName = FText::FromString(FName::NameToDisplayString(DisplayPath, false));
+		}
 		Definition.Description = Property->GetToolTipText();
 		Definition.Renderer = InferRenderer(Property);
 		const FString Renderer = Property->GetMetaData(TEXT("SettingRenderer"));
@@ -323,24 +369,19 @@ ESettingRendererType USettingModule::InferRenderer(const FProperty* InProperty) 
 
 void USettingModule::EnsureBuiltinProviders()
 {
+	EnsureSettingProvider<UAudioSettingProvider>(this, Providers);
+	EnsureSettingProvider<UParameterSettingProvider>(this, Providers);
 	EnsureSettingProvider<UInputSettingProvider>(this, Providers);
 	EnsureSettingProvider<UResolutionSettingProvider>(this, Providers);
 	EnsureSettingProvider<ULanguageSettingProvider>(this, Providers);
 }
 
-void USettingModule::BuildSettingDefinitions(bool bUpdateSnapshot)
+void USettingModule::BuildSettingDefinitions()
 {
 	EnsureBuiltinProviders();
 
 	FinalDefinitions.Reset();
-	if(!bUpdateSnapshot && Registry && !Registry->FinalDefinitions.IsEmpty())
-	{
-		FinalDefinitions = Registry->FinalDefinitions;
-	}
-	else
-	{
-		CollectPropertyDefinitions(FSettingModuleSaveData::StaticStruct(), FString(), FinalDefinitions);
-	}
+	CollectPropertyDefinitions(FSettingModuleSaveData::StaticStruct(), FString(), FinalDefinitions);
 	for(const USettingProviderBase* Provider : Providers)
 	{
 		if(Provider)
@@ -349,32 +390,46 @@ void USettingModule::BuildSettingDefinitions(bool bUpdateSnapshot)
 		}
 	}
 
-	if(Registry)
+	TMap<FSettingId, int32> DefinitionIndexMap;
+	TArray<FSettingDefinition> DeduplicatedDefinitions;
+	for(FSettingDefinition& Definition : FinalDefinitions)
 	{
-		for(FSettingDefinition& Definition : FinalDefinitions)
+		if(int32* ExistingIndex = DefinitionIndexMap.Find(Definition.SettingId))
 		{
-			const FSettingDefinitionOverride* Override = Registry->Overrides.FindByPredicate([&Definition](const FSettingDefinitionOverride& Item)
-			{
-				return Item.SettingId == Definition.SettingId;
-			});
-			if(!Override)
-			{
-				continue;
-			}
-			if(Override->bOverrideDisplayName) Definition.DisplayName = Override->DisplayName;
-			if(Override->bOverrideDescription) Definition.Description = Override->Description;
-			if(Override->bOverridePage) Definition.Page = Override->Page;
-			if(Override->bOverrideCategory) Definition.Category = Override->Category;
-			if(Override->bOverrideOrder) Definition.Order = Override->Order;
-			if(Override->bOverrideRenderer) Definition.Renderer = Override->Renderer;
-			if(Override->bOverrideApplyPolicy) Definition.ApplyPolicy = Override->ApplyPolicy;
-			if(Override->bOverrideVisible) Definition.bVisible = Override->bVisible;
-			if(Override->bOverrideEnabled) Definition.bEnabled = Override->bEnabled;
-			if(Override->bOverrideRequiresConfirmation) Definition.bRequiresConfirmation = Override->bRequiresConfirmation;
-			if(Override->bOverrideNumberDisplay) Definition.NumberDisplay = Override->NumberDisplay;
-			if(Override->bOverrideVisibleConditions) Definition.VisibleConditions = Override->VisibleConditions;
-			if(Override->bOverrideEnableConditions) Definition.EnableConditions = Override->EnableConditions;
+			DeduplicatedDefinitions[*ExistingIndex] = MoveTemp(Definition);
 		}
+		else
+		{
+			const int32 Index = DeduplicatedDefinitions.Add(MoveTemp(Definition));
+			DefinitionIndexMap.Add(DeduplicatedDefinitions[Index].SettingId, Index);
+		}
+	}
+	FinalDefinitions = MoveTemp(DeduplicatedDefinitions);
+
+	for(FSettingDefinition& Definition : FinalDefinitions)
+	{
+		const FSettingDefinitionOverride* Override = SettingConfig.Overrides.FindByPredicate([&Definition](const FSettingDefinitionOverride& Item)
+		{
+			return Item.SettingId == Definition.SettingId;
+		});
+		if(!Override)
+		{
+			continue;
+		}
+		if(Override->bOverrideDisplayName) Definition.DisplayName = Override->DisplayName;
+		if(Override->bOverrideDescription) Definition.Description = Override->Description;
+		if(Override->bOverridePage) Definition.Page = Override->Page;
+		if(Override->bOverrideCategory) Definition.Category = Override->Category;
+		if(Override->bOverrideCategoryOrder) Definition.CategoryOrder = Override->CategoryOrder;
+		if(Override->bOverrideOrder) Definition.Order = Override->Order;
+		if(Override->bOverrideRenderer) Definition.Renderer = Override->Renderer;
+		if(Override->bOverrideApplyPolicy) Definition.ApplyPolicy = Override->ApplyPolicy;
+		if(Override->bOverrideVisible) Definition.bVisible = Override->bVisible;
+		if(Override->bOverrideEnabled) Definition.bEnabled = Override->bEnabled;
+		if(Override->bOverrideRequiresConfirmation) Definition.bRequiresConfirmation = Override->bRequiresConfirmation;
+		if(Override->bOverrideNumberDisplay) Definition.NumberDisplay = Override->NumberDisplay;
+		if(Override->bOverrideVisibleConditions) Definition.VisibleConditions = Override->VisibleConditions;
+		if(Override->bOverrideEnableConditions) Definition.EnableConditions = Override->EnableConditions;
 	}
 
 	TSet<FSettingId> UniqueIds;
@@ -413,19 +468,10 @@ void USettingModule::BuildSettingDefinitions(bool bUpdateSnapshot)
 	FinalDefinitions.Sort([](const FSettingDefinition& A, const FSettingDefinition& B)
 	{
 		if(A.Page != B.Page) return A.Page.LexicalLess(B.Page);
+		if(A.CategoryOrder != B.CategoryOrder) return A.CategoryOrder < B.CategoryOrder;
 		if(A.Category != B.Category) return A.Category.LexicalLess(B.Category);
 		return A.Order < B.Order;
 	});
-
-#if WITH_EDITOR
-	if(bUpdateSnapshot && Registry)
-	{
-		Registry->Modify();
-		Registry->FinalDefinitions = FinalDefinitions;
-		++Registry->GeneratedSnapshotVersion;
-		Registry->MarkPackageDirty();
-	}
-#endif
 
 	if(EditSession.bActive)
 	{
@@ -671,27 +717,8 @@ void USettingModule::BuildSettingEntries()
 
 void USettingModule::RefreshSettingDefinitions()
 {
-	BuildSettingDefinitions(true);
+	BuildSettingDefinitions();
 }
-
-#if WITH_EDITOR
-void USettingModule::GenerateRegistrySnapshot(USettingRegistry* InRegistry)
-{
-	if(!InRegistry)
-	{
-		return;
-	}
-
-	USettingRegistry* PreviousRegistry = Registry;
-	Registry = InRegistry;
-	BuildSettingDefinitions(true);
-	Registry = PreviousRegistry;
-	if(PreviousRegistry != InRegistry)
-	{
-		BuildSettingDefinitions();
-	}
-}
-#endif
 
 void USettingModule::BeginEdit()
 {
@@ -699,6 +726,7 @@ void USettingModule::BeginEdit()
 	{
 		return;
 	}
+	BuildSettingDefinitions();
 
 	EditSession.AppliedData = GetCurrentCombinedSettings();
 	EditSession.PendingData = EditSession.AppliedData;
@@ -714,6 +742,7 @@ void USettingModule::BeginEdit()
 		}
 	}
 	BuildSettingEntries();
+	BroadcastEditStateChanged();
 }
 
 void USettingModule::EndEdit()
@@ -737,6 +766,7 @@ void USettingModule::EndEdit()
 	SettingEntries.Reset();
 	SettingEntryMap.Reset();
 	ValidationResults.Reset();
+	BroadcastEditStateChanged();
 }
 
 bool USettingModule::ApplyEditSession()
@@ -758,6 +788,7 @@ bool USettingModule::ApplyEditSession()
 		ValidationResults.Add(Definition.SettingId, Validation);
 		if(!Validation.bValid)
 		{
+			BroadcastEditStateChanged();
 			return false;
 		}
 		DirtyDefinitions.Add(&Definition);
@@ -801,6 +832,7 @@ bool USettingModule::ApplyEditSession()
 		}
 		ConfirmationTransaction.ExpiresAt = FPlatformTime::Seconds() + ConfirmationTimeout;
 		ConfirmationTransaction.bActive = true;
+		BroadcastEditStateChanged();
 		return true;
 	}
 
@@ -814,6 +846,7 @@ bool USettingModule::ApplyEditSession()
 	}
 	SaveSettings();
 	ValidationResults.Reset();
+	BroadcastEditStateChanged();
 	return true;
 }
 
@@ -829,7 +862,6 @@ void USettingModule::CancelEditSession()
 		return;
 	}
 
-	ApplyCombinedSettings(EditSession.AppliedData);
 	for(USettingProviderBase* Provider : Providers)
 	{
 		if(!Provider)
@@ -850,6 +882,7 @@ void USettingModule::CancelEditSession()
 	{
 		OnSettingValueChanged.Broadcast(Definition.SettingId);
 	}
+	BroadcastEditStateChanged();
 }
 
 bool USettingModule::ConfirmPendingSettings()
@@ -870,6 +903,7 @@ bool USettingModule::ConfirmPendingSettings()
 	ConfirmationTransaction = FSettingConfirmationTransaction();
 	ValidationResults.Reset();
 	SaveSettings();
+	BroadcastEditStateChanged();
 	return true;
 }
 
@@ -902,15 +936,20 @@ void USettingModule::RejectPendingSettings()
 	{
 		OnSettingValueChanged.Broadcast(Definition.SettingId);
 	}
+	BroadcastEditStateChanged();
 }
 
 void USettingModule::ResetAllToDefault()
 {
-	if(!EditSession.bActive) return;
+	if(!EditSession.bActive)
+	{
+		return;
+	}
 	for(const FSettingDefinition& Definition : FinalDefinitions)
 	{
 		SetPendingValue(Definition.SettingId, GetDefaultValue(Definition.SettingId));
 	}
+	BroadcastEditStateChanged();
 }
 
 bool USettingModule::CanApply() const
@@ -1016,57 +1055,78 @@ FParameter USettingModule::GetDefaultValue(FSettingId InSettingId) const
 
 bool USettingModule::SetPendingValue(FSettingId InSettingId, const FParameter& InValue)
 {
-	if(!EditSession.bActive || ConfirmationTransaction.bActive) return false;
+	if(!EditSession.bActive || ConfirmationTransaction.bActive)
+	{
+		return false;
+	}
 	const FSettingDefinition* Definition = FindSettingDefinition(InSettingId);
-	if(!Definition || !IsSettingEnabled(InSettingId)) return false;
+	if(!Definition || !IsSettingEnabled(InSettingId))
+	{
+		return false;
+	}
 
 	const FSettingValidationResult Validation = ValidateSettingValue(*Definition, InValue);
 	ValidationResults.Add(InSettingId, Validation);
 	if(!Validation.bValid)
 	{
+		BroadcastEditStateChanged();
 		return false;
 	}
 
 	if(USettingProviderBase* Provider = FindSettingProvider(*Definition))
 	{
-		const FParameter PreviousValue = Provider->GetPendingValue(*Definition);
 		if(!Provider->SetPendingValue(*Definition, InValue))
 		{
 			return false;
 		}
-		if(Definition->ApplyPolicy == ESettingApplyPolicy::Preview && !Provider->Preview(*Definition, InValue))
-		{
-			Provider->SetPendingValue(*Definition, PreviousValue);
-			return false;
-		}
-		if(Definition->ApplyPolicy == ESettingApplyPolicy::Immediate)
-		{
-			if(!Provider->Apply(*Definition, InValue))
-			{
-				Provider->SetPendingValue(*Definition, PreviousValue);
-				return false;
-			}
-			Provider->Commit();
-			SaveSettings();
-		}
 		OnSettingValueChanged.Broadcast(InSettingId);
+		BroadcastEditStateChanged();
 		return true;
 	}
 
-	if(!WriteSessionValue(EditSession.PendingData, InSettingId, InValue)) return false;
-	if(Definition->ApplyPolicy != ESettingApplyPolicy::Deferred)
+	if(!WriteSessionValue(EditSession.PendingData, InSettingId, InValue))
 	{
-		FSettingModuleSaveData RuntimeData = GetCurrentCombinedSettings();
-		WriteSessionValue(RuntimeData, InSettingId, InValue);
-		ApplyCombinedSettings(RuntimeData);
-		if(Definition->ApplyPolicy == ESettingApplyPolicy::Immediate)
-		{
-			WriteSessionValue(EditSession.AppliedData, InSettingId, InValue);
-			SaveSettings();
-		}
+		return false;
 	}
 	OnSettingValueChanged.Broadcast(InSettingId);
+	BroadcastEditStateChanged();
 	return true;
+}
+
+FSettingEditState USettingModule::GetEditState() const
+{
+	FSettingEditState State;
+	State.bActive = EditSession.bActive;
+	State.bCanApply = CanApply();
+	State.bCanReset = CanReset();
+	State.bDirty = State.bCanApply;
+	return State;
+}
+
+void USettingModule::BroadcastEditStateChanged()
+{
+	OnSettingEditStateChanged.Broadcast(GetEditState());
+}
+
+void USettingModule::RegisterProvider(USettingProviderBase* InProvider)
+{
+	if(!InProvider)
+	{
+		return;
+	}
+	Providers.AddUnique(InProvider);
+	if(!FinalDefinitions.IsEmpty())
+	{
+		BuildSettingDefinitions();
+	}
+}
+
+void USettingModule::UnregisterProvider(USettingProviderBase* InProvider)
+{
+	if(Providers.Remove(InProvider) > 0 && !FinalDefinitions.IsEmpty())
+	{
+		BuildSettingDefinitions();
+	}
 }
 
 TArray<USettingEntry*> USettingModule::GetSettingEntries() const
@@ -1095,7 +1155,17 @@ TArray<USettingEntry*> USettingModule::GetSettingEntriesByPage(FName InPage) con
 
 TArray<FSettingPageDefinition> USettingModule::GetSettingPages() const
 {
-	TArray<FSettingPageDefinition> Result = Registry ? Registry->Pages : TArray<FSettingPageDefinition>();
+	TArray<FSettingPageDefinition> Result = SettingConfig.Pages;
+	if(!Result.ContainsByPredicate([](const FSettingPageDefinition& Page)
+	{
+		return Page.Page == FName(TEXT("Parameter"));
+	}))
+	{
+		FSettingPageDefinition& ParameterPage = Result.AddDefaulted_GetRef();
+		ParameterPage.Page = FName(TEXT("Parameter"));
+		ParameterPage.DisplayName = FText::FromName(ParameterPage.Page);
+		ParameterPage.Order = GetDefaultSettingPageOrder(ParameterPage.Page);
+	}
 	for(const FSettingDefinition& Definition : FinalDefinitions)
 	{
 		if(Definition.Page.IsNone() || Result.ContainsByPredicate([&Definition](const FSettingPageDefinition& Page)
@@ -1109,7 +1179,7 @@ TArray<FSettingPageDefinition> USettingModule::GetSettingPages() const
 		FSettingPageDefinition& Page = Result.AddDefaulted_GetRef();
 		Page.Page = Definition.Page;
 		Page.DisplayName = FText::FromName(Definition.Page);
-		Page.Order = Result.Num() - 1;
+		Page.Order = GetDefaultSettingPageOrder(Definition.Page);
 	}
 	Result.Sort([](const FSettingPageDefinition& A, const FSettingPageDefinition& B)
 	{

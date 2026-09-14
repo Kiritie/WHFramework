@@ -44,9 +44,13 @@ void UWidgetNumberSettingEntryBase::ApplyValueToControl_Implementation(const FPa
 		Slider_Value->OnValueChanged.RemoveDynamic(this, &ThisClass::OnSliderValueChanged);
 		Slider_Value->OnValueChanged.AddDynamic(this, &ThisClass::OnSliderValueChanged);
 		Slider_Value->SetVisibility(bHasRange ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+		Slider_Value->SetIsEnabled(SettingEntry->IsEnabled());
 		if(bHasRange)
 		{
-			Slider_Value->SetValue(static_cast<float>((Value - Display.Min) / (Display.Max - Display.Min)));
+			Slider_Value->SetMinValue(static_cast<float>(Display.Min));
+			Slider_Value->SetMaxValue(static_cast<float>(Display.Max));
+			Slider_Value->SetStepSize(static_cast<float>(Display.Step));
+			Slider_Value->SetValue(static_cast<float>(Value));
 		}
 	}
 	if(Txt_MinValue)
@@ -79,7 +83,18 @@ void UWidgetNumberSettingEntryBase::OnSliderValueChanged(float InValue)
 	const FSettingNumberDisplay& Display = SettingEntry->GetDefinition().NumberDisplay;
 	if(Display.bHasMin && Display.bHasMax && Display.Max > Display.Min)
 	{
-		CommitUserValue(MakeTypedValue(FMath::Lerp(Display.Min, Display.Max, static_cast<double>(InValue))));
+		if(CommitUserValue(MakeTypedValue(InValue)))
+		{
+			const double DisplayValue = static_cast<double>(InValue) * Display.Scale;
+			if(Txt_Value)
+			{
+				Txt_Value->SetText(FormatValue(DisplayValue));
+			}
+			if(TxtBox_Value)
+			{
+				TxtBox_Value->SetText(FormatValue(DisplayValue));
+			}
+		}
 	}
 }
 

@@ -1,8 +1,10 @@
 #include "Widget/Theme/WidgetTheme.h"
+#include "Setting/Widget/Entry/WidgetSettingCategoryEntry.h"
 #include "Setting/Widget/Entry/WidgetSettingEntryBase.h"
 
 UWidgetTheme::UWidgetTheme()
 {
+	SettingCategoryEntryClass = UWidgetSettingCategoryEntry::StaticClass();
 }
 
 const FWidgetButtonStyleData* UWidgetTheme::FindButtonStyle(FGameplayTag InStyleTag) const
@@ -42,3 +44,39 @@ TSubclassOf<UWidgetSettingEntryBase> UWidgetTheme::FindSettingRendererClass(ESet
 			return nullptr;
 	}
 }
+
+#if WITH_EDITOR
+bool UWidgetTheme::AreStylesSorted() const
+{
+	const auto IsSorted = [](const auto& InStyles)
+	{
+		FString PreviousTag;
+		for(const auto& Style : InStyles)
+		{
+			const FString Tag = Style.Key.ToString();
+			if(!PreviousTag.IsEmpty() && Tag < PreviousTag)
+			{
+				return false;
+			}
+			PreviousTag = Tag;
+		}
+		return true;
+	};
+
+	return IsSorted(ButtonStyles)
+		&& IsSorted(TextStyles)
+		&& IsSorted(BrushStyles);
+}
+
+void UWidgetTheme::SortStyles()
+{
+	const auto CompareTags = [](const FGameplayTag& Left, const FGameplayTag& Right)
+	{
+		return Left.ToString() < Right.ToString();
+	};
+
+	ButtonStyles.KeySort(CompareTags);
+	TextStyles.KeySort(CompareTags);
+	BrushStyles.KeySort(CompareTags);
+}
+#endif

@@ -12,6 +12,8 @@
 USubActivatableWidgetBase::USubActivatableWidgetBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	bWidgetTickAble = false;
+	InputConfig = EWidgetInputConfig::None;
+	bWidgetActivatable = false;
 	bDynamicSubWidget = false;
 
 }
@@ -93,6 +95,20 @@ void USubActivatableWidgetBase::NativeOnActivated()
 void USubActivatableWidgetBase::NativeOnDeactivated()
 {
 	Super::NativeOnDeactivated();
+}
+
+void USubActivatableWidgetBase::InternalProcessActivation()
+{
+	if (!bWidgetActivatable) return;
+	
+	Super::InternalProcessActivation();
+}
+
+void USubActivatableWidgetBase::InternalProcessDeactivation()
+{
+	if (!bWidgetActivatable) return;
+	
+	Super::InternalProcessDeactivation();
 }
 
 void USubActivatableWidgetBase::Init(const FParameter& InParam)

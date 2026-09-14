@@ -60,6 +60,5 @@ bool UWidgetSettingEntryBase::CommitUserValue(const FParameter& InValue)
 	}
 
 	const bool bResult = SettingEntry->SetPendingValue(InValue);
-	RefreshFromModel();
 	return bResult;
 }

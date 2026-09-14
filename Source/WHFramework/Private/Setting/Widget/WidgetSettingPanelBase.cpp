@@ -19,7 +19,7 @@ UWidgetSettingPanelBase::UWidgetSettingPanelBase(const FObjectInitializer& Objec
 	
 	PageItemGroup = nullptr;
 	PageItemClass = nullptr;
-	SettingPageClass = UWidgetSettingPageBase::StaticClass();
+	SettingPageClass = nullptr;
 }
 
 void UWidgetSettingPanelBase::OnCreate(const FParameter& InParam)
@@ -34,11 +34,13 @@ void UWidgetSettingPanelBase::OnCreate(const FParameter& InParam)
 	{
 		Btn_Reset->OnClicked().AddUObject(this, &UWidgetSettingPanelBase::OnResetButtonClicked);
 	}
+	USettingModule::Get().OnSettingEditStateChanged.AddDynamic(this, &ThisClass::OnSettingEditStateChanged);
 
 	PageItemGroup = UObjectPoolModuleStatics::SpawnObject<UCommonButtonGroup>();
 	PageItemGroup->SetSelectionRequiredN(true);
 	PageItemGroup->SetBroadcastOnDeselected(false);
 	PageItemGroup->OnSelectedButtonBaseChanged.AddDynamic(this, &UWidgetSettingPanelBase::OnPageItemSelected);
+	RefreshActionButtonState();
 }
 
 void UWidgetSettingPanelBase::OnInitialize(const FParameter& InParam)
@@ -49,6 +51,7 @@ void UWidgetSettingPanelBase::OnInitialize(const FParameter& InParam)
 void UWidgetSettingPanelBase::OnOpen(const FParameter& InParam, bool bInstant)
 {
 	USettingModule::Get().BeginEdit();
+	RefreshActionButtonState();
 	if(GetSubWidgets<UWidgetSettingPageBase>().IsEmpty())
 	{
 		GenerateSettingPages();
@@ -85,6 +88,12 @@ void UWidgetSettingPanelBase::OnClose(bool bInstant)
 	USettingModule::Get().CancelEditSession();
 	USettingModule::Get().EndEdit();
 	Super::OnClose(bInstant);
+}
+
+void UWidgetSettingPanelBase::OnDestroy(EObjectDespawnMode InMode)
+{
+	USettingModule::Get().OnSettingEditStateChanged.RemoveDynamic(this, &ThisClass::OnSettingEditStateChanged);
+	Super::OnDestroy(InMode);
 }
 
 void UWidgetSettingPanelBase::OnPageItemSelected_Implementation(UCommonButtonBase* AssociatedButton, int32 ButtonIndex)
@@ -155,6 +164,23 @@ void UWidgetSettingPanelBase::GenerateSettingPages()
 			Switcher_Page->AddChild(Page);
 		}
 	}
+}
+
+void UWidgetSettingPanelBase::OnSettingEditStateChanged(const FSettingEditState& InState)
+{
+	if(Btn_Apply)
+	{
+		Btn_Apply->SetIsEnabled(InState.bCanApply);
+	}
+	if(Btn_Reset)
+	{
+		Btn_Reset->SetIsEnabled(InState.bCanReset);
+	}
+}
+
+void UWidgetSettingPanelBase::RefreshActionButtonState()
+{
+	OnSettingEditStateChanged(USettingModule::Get().GetEditState());
 }
 
 int32 UWidgetSettingPanelBase::GetCurrentPageIndex() const

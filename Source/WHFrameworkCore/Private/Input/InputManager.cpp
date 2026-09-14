@@ -42,7 +42,6 @@ FInputManager::FInputManager() : FManagerBase(Type)
 	
 	GlobalInputMode = EInputMode::None;
 	CommonUIInputMode.Reset();
-	bCommonUIControlled = false;
 	InputModeRequests.Reset();
 }
 
@@ -118,53 +117,48 @@ void FInputManager::UpdateInputMode()
 		}
 	}
 
-	const bool bWasCommonUIControlled = bCommonUIControlled;
 	const bool bIsCommonUIControlled = CommonUIInputMode.IsSet() && InputModeRequests.IsEmpty();
-	// if(GlobalInputMode != InputMode || bWasCommonUIControlled != bIsCommonUIControlled)
+	if(!bIsCommonUIControlled)
 	{
-		const EInputMode PreviousInputMode = GlobalInputMode;
-		GlobalInputMode = InputMode;
-		bCommonUIControlled = bIsCommonUIControlled;
-
-		if(!bIsCommonUIControlled)
+		PlayerController->ResetIgnoreMoveInput();
+		PlayerController->ResetIgnoreLookInput();
+		switch(InputMode)
 		{
-			PlayerController->ResetIgnoreMoveInput();
-			PlayerController->ResetIgnoreLookInput();
-			switch(InputMode)
-			{
-				case EInputMode::None:
-					PlayerController->SetInputMode(FInputModeNone());
-					PlayerController->bShowMouseCursor = false;
-					break;
-				case EInputMode::GameOnly:
-					PlayerController->SetInputMode(FInputModeGameOnly());
-					PlayerController->bShowMouseCursor = false;
-					break;
-				case EInputMode::GameOnly_NotHideCursor:
-					PlayerController->SetInputMode(FInputModeGameOnly_NotHideCursor());
-					PlayerController->bShowMouseCursor = true;
-					break;
-				case EInputMode::GameAndUI:
-					PlayerController->SetInputMode(FInputModeGameAndUI());
-					PlayerController->bShowMouseCursor = true;
-					break;
-				case EInputMode::GameAndUI_NotHideCursor:
-					PlayerController->SetInputMode(FInputModeGameAndUI_NotHideCursor());
-					PlayerController->bShowMouseCursor = true;
-					break;
-				case EInputMode::UIOnly:
-					PlayerController->SetInputMode(FInputModeUIOnly());
-					PlayerController->bShowMouseCursor = true;
-					break;
-				default:
-					break;
-			}
+			case EInputMode::None:
+				PlayerController->SetInputMode(FInputModeNone());
+				PlayerController->bShowMouseCursor = false;
+				break;
+			case EInputMode::GameOnly:
+				PlayerController->SetInputMode(FInputModeGameOnly());
+				PlayerController->bShowMouseCursor = false;
+				break;
+			case EInputMode::GameOnly_NotHideCursor:
+				PlayerController->SetInputMode(FInputModeGameOnly_NotHideCursor());
+				PlayerController->bShowMouseCursor = true;
+				break;
+			case EInputMode::GameAndUI:
+				PlayerController->SetInputMode(FInputModeGameAndUI());
+				PlayerController->bShowMouseCursor = true;
+				break;
+			case EInputMode::GameAndUI_NotHideCursor:
+				PlayerController->SetInputMode(FInputModeGameAndUI_NotHideCursor());
+				PlayerController->bShowMouseCursor = true;
+				break;
+			case EInputMode::UIOnly:
+				PlayerController->SetInputMode(FInputModeUIOnly());
+				PlayerController->bShowMouseCursor = true;
+				break;
+			default:
+				break;
 		}
+	}
+	
+	const EInputMode PreviousInputMode = GlobalInputMode;
+	GlobalInputMode = InputMode;
 
-		if(PreviousInputMode != GlobalInputMode)
-		{
-			OnInputModeChanged.Broadcast(PreviousInputMode, GlobalInputMode);
-		}
+	if(PreviousInputMode != GlobalInputMode)
+	{
+		OnInputModeChanged.Broadcast(PreviousInputMode, GlobalInputMode);
 	}
 }
 

@@ -176,8 +176,6 @@ private:
 	UPROPERTY(Transient)
 	TMap<FWidgetMountContext, TObjectPtr<UUserWidgetBase>> ActiveTemporaryWidgets;
 
-	TSet<FGameplayTag> PendingWidgetOpenTags;
-
 private:
 	void BuildRuntimeCaches();
 
@@ -194,10 +192,6 @@ private:
 	FGameplayTag ResolveWidgetTagForClass(
 		TSubclassOf<UUserWidgetBase> InClass,
 		bool bEnsured = true) const;
-
-	bool EnsureParentCreated(
-		const FScreenWidgetConfig& InConfig,
-		const FParameter& InParam);
 
 	bool MountUserWidget(
 		UUserWidgetBase* InWidget,

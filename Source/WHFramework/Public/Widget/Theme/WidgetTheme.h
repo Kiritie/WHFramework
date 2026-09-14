@@ -9,6 +9,7 @@
 #include "WidgetTheme.generated.h"
 
 class UWidgetSettingEntryBase;
+class UWidgetSettingCategoryEntry;
 
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FSettingRendererClasses
@@ -89,6 +90,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Setting")
 	FSettingRendererClasses SettingRendererClasses;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Setting")
+	TSubclassOf<UWidgetSettingCategoryEntry> SettingCategoryEntryClass;
+
 public:
 	const TMap<FGameplayTag, FWidgetButtonStyleData>& GetButtonStyles() const { return ButtonStyles; }
 
@@ -97,6 +101,8 @@ public:
 	const TMap<FGameplayTag, FWidgetBrushStyleData>& GetBrushStyles() const { return BrushStyles; }
 
 	const FSettingRendererClasses& GetSettingRendererClasses() const { return SettingRendererClasses; }
+
+	TSubclassOf<UWidgetSettingCategoryEntry> GetSettingCategoryEntryClass() const { return SettingCategoryEntryClass; }
 
 	const FWidgetButtonStyleData* FindButtonStyle(FGameplayTag InStyleTag) const;
 
@@ -107,6 +113,10 @@ public:
 	TSubclassOf<UWidgetSettingEntryBase> FindSettingRendererClass(ESettingRendererType InRenderer) const;
 
 #if WITH_EDITOR
+	bool AreStylesSorted() const;
+
+	void SortStyles();
+
 	void SetButtonStyles(const TMap<FGameplayTag, FWidgetButtonStyleData>& InStyles) { ButtonStyles = InStyles; }
 
 	void SetTextStyles(const TMap<FGameplayTag, FWidgetTextStyleData>& InStyles) { TextStyles = InStyles; }

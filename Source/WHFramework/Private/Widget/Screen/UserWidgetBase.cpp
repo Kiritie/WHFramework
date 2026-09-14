@@ -68,7 +68,7 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	WidgetRefreshTime = 0.f;
 	WidgetState = EScreenWidgetState::None;
 	InputConfig = EWidgetInputConfig::None;
-	bWidgetActivatable = true;
+	bWidgetActivatable = false;
 	bWidgetAutoFocus = false;
 
 	bInitialized = false;
@@ -264,11 +264,9 @@ void UUserWidgetBase::OnOpen(const FParameter& InParam, bool bInstant)
 
 	K2_OnOpen(CurrentOpenParameter, bInstant);
 
-	SetVisibility(ESlateVisibility::Visible);
-	if(bWidgetActivatable)
-	{
-		ActivateWidget();
-	}
+	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	
+	ActivateWidget();
 
 	switch(WidgetOpenFinishType)
 	{
@@ -451,10 +449,9 @@ void UUserWidgetBase::OnDestroy(EObjectDespawnMode InMode)
 	AbortOpenTransition();
 	AbortCloseTransition();
 	GetWorld()->GetTimerManager().ClearTimer(WidgetRefreshTimerHandle);
-	if(bWidgetActivatable)
-	{
-		DeactivateWidget();
-	}
+	
+	DeactivateWidget();
+	
 	DestroyAllSubWidget(InMode);
 
 	for(UWidget* PoolWidget : GetPoolWidgets())
@@ -495,6 +492,30 @@ void UUserWidgetBase::OnStateChanged(EScreenWidgetState InWidgetState)
 	OnWidgetStateChanged.Broadcast(InWidgetState);
 
 	UEventModuleStatics::BroadcastEvent<FEventUserWidgetStateChanged>(this, { this, InWidgetState });
+}
+
+void UUserWidgetBase::NativeOnActivated()
+{
+	Super::NativeOnActivated();
+}
+
+void UUserWidgetBase::NativeOnDeactivated()
+{
+	Super::NativeOnDeactivated();
+}
+
+void UUserWidgetBase::InternalProcessActivation()
+{
+	if (!bWidgetActivatable) return;
+	
+	Super::InternalProcessActivation();
+}
+
+void UUserWidgetBase::InternalProcessDeactivation()
+{
+	if (!bWidgetActivatable) return;
+	
+	Super::InternalProcessDeactivation();
 }
 
 void UUserWidgetBase::Init(const FParameter& InParam, bool bForce)
@@ -593,10 +614,7 @@ void UUserWidgetBase::FinishClose(bool bInstant)
 		GetWorld()->GetTimerManager().ClearTimer(WidgetRefreshTimerHandle);
 	}
 
-	if(bWidgetActivatable)
-	{
-		DeactivateWidget();
-	}
+	DeactivateWidget();
 
 	if(K2_OnClosed.IsBound()) K2_OnClosed.Broadcast(bInstant);
 	if(OnClosed.IsBound()) OnClosed.Broadcast(bInstant);

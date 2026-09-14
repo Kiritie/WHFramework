@@ -9,7 +9,6 @@
 
 #include "SettingModule.generated.h"
 
-class USettingRegistry;
 class USettingProviderBase;
 class USettingEntry;
 class FProperty;
@@ -64,7 +63,7 @@ protected:
 protected:
 	void EnsureBuiltinProviders();
 
-	void BuildSettingDefinitions(bool bUpdateSnapshot = false);
+	void BuildSettingDefinitions();
 
 	void BuildSettingEntries();
 
@@ -100,9 +99,11 @@ protected:
 
 	bool WriteSessionValue(FSettingModuleSaveData& InData, FSettingId InSettingId, const FParameter& InValue) const;
 
+	void BroadcastEditStateChanged();
+
 protected:
-	UPROPERTY(EditAnywhere, Category = "Registry")
-	TObjectPtr<USettingRegistry> Registry;
+	UPROPERTY(EditAnywhere, Category = "Setting")
+	FSettingConfig SettingConfig;
 
 	UPROPERTY(EditAnywhere, Instanced, Category = "Provider")
 	TArray<TObjectPtr<USettingProviderBase>> Providers;
@@ -130,12 +131,20 @@ public:
 	UPROPERTY(BlueprintAssignable)
 	FOnSettingValueChanged OnSettingValueChanged;
 
+	UPROPERTY(BlueprintAssignable)
+	FOnSettingEditStateChanged OnSettingEditStateChanged;
+
+	UFUNCTION(BlueprintPure)
+	FSettingEditState GetEditState() const;
+
+	UFUNCTION(BlueprintCallable)
+	void RegisterProvider(USettingProviderBase* InProvider);
+
+	UFUNCTION(BlueprintCallable)
+	void UnregisterProvider(USettingProviderBase* InProvider);
+
 	UFUNCTION(CallInEditor, BlueprintCallable, Category = "Setting")
 	void RefreshSettingDefinitions();
-
-#if WITH_EDITOR
-	void GenerateRegistrySnapshot(USettingRegistry* InRegistry);
-#endif
 
 	UFUNCTION(BlueprintCallable)
 	void BeginEdit();
@@ -211,12 +220,6 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	float GetConfirmationTimeout() const { return ConfirmationTimeout; }
-
-	UFUNCTION(BlueprintPure)
-	USettingRegistry* GetRegistry() const { return Registry; }
-
-	UFUNCTION(BlueprintCallable)
-	void SetRegistry(USettingRegistry* InRegistry) { Registry = InRegistry; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Network

@@ -6,7 +6,9 @@
 
 class UCommonListView;
 class USettingEntry;
+class USettingCategoryEntry;
 class UWidgetSettingEntryBase;
+class UWidget;
 struct FSettingPageDefinition;
 
 UCLASS()
@@ -69,6 +71,12 @@ protected:
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = true), Category = "Components")
 	TObjectPtr<UCommonListView> SettingList;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UWidget> EmptyState;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<USettingCategoryEntry>> CategoryEntries;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Setting")
 	FText Title;

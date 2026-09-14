@@ -68,6 +68,10 @@ public:
 	virtual void NativeOnActivated() override;
 
 	virtual void NativeOnDeactivated() override;
+	
+	virtual void InternalProcessActivation() override;
+	
+	virtual void InternalProcessDeactivation() override;
 
 public:
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParam"))
@@ -85,6 +89,9 @@ public:
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
 	EWidgetInputConfig InputConfig;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	bool bWidgetActivatable;
 
 	UPROPERTY(Transient)
 	FParameter WidgetParams;

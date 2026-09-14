@@ -1,10 +1,10 @@
+// Copyright Epic Games, Inc. All Rights Reserved.
+
 #pragma once
 
 #include "Common/Customization/ClassCustomizationBase.h"
 
-class IDetailLayoutBuilder;
-
-class FSettingRegistryCustomization : public FClassCustomizationBase
+class FWidgetThemeCustomization : public FClassCustomizationBase
 {
 public:
 	static TSharedRef<IDetailCustomization> MakeInstance();
@@ -12,7 +12,7 @@ public:
 	virtual void CustomizeDetails(IDetailLayoutBuilder& DetailLayoutBuilder) override;
 
 private:
-	FReply OnGenerateSnapshot();
+	FReply OnSortStyles();
 
-	IDetailLayoutBuilder* DetailBuilder = nullptr;
+	IDetailLayoutBuilder* DetailBuilder;
 };

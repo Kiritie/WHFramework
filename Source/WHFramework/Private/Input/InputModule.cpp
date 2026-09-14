@@ -414,8 +414,13 @@ void UInputModule::HandleInputMethodChanged(ECommonInputType InInputType, int32 
 
 void UInputModule::HandleCommonUIInputConfigChanged(FUIInputConfig InInputConfig, int32 InPlayerIndex)
 {
-	(void)InInputConfig;
-	RefreshCommonUIInputMode(InPlayerIndex);
+	if(InPlayerIndex != 0 || !PlayerRuntimes.IsValidIndex(InPlayerIndex))
+	{
+		return;
+	}
+
+	const UCommonUIActionRouterBase* ActionRouter = PlayerRuntimes[InPlayerIndex].CommonUIActionRouter;
+	ApplyCommonUIInputConfig(ActionRouter && ActionRouter->GetLeafmostActivatableWidget() ? &InInputConfig : nullptr);
 }
 
 void UInputModule::HandleGlobalInputModeChanged(EInputMode InPreviousInputMode, EInputMode InInputMode)
@@ -423,24 +428,12 @@ void UInputModule::HandleGlobalInputModeChanged(EInputMode InPreviousInputMode, 
 	UEventModuleStatics::BroadcastEvent<FEventInputModeChanged>(this, { InInputMode, InPreviousInputMode });
 }
 
-void UInputModule::RefreshCommonUIInputMode(int32 InPlayerIndex)
+void UInputModule::ApplyCommonUIInputConfig(const FUIInputConfig* InInputConfig)
 {
-	if(InPlayerIndex != 0 || !PlayerRuntimes.IsValidIndex(InPlayerIndex))
-	{
-		return;
-	}
-
 	TOptional<EInputMode> InputMode;
-	const UCommonUIActionRouterBase* ActionRouter = PlayerRuntimes[InPlayerIndex].CommonUIActionRouter;
-	const UCommonActivatableWidget* ActiveWidget = ActionRouter
-		? ActionRouter->GetLeafmostActivatableWidget()
-		: nullptr;
-	const TOptional<FUIInputConfig> InputConfig = ActiveWidget
-		? ActiveWidget->GetDesiredInputConfig()
-		: TOptional<FUIInputConfig>();
-	if(InputConfig.IsSet())
+	if(InInputConfig)
 	{
-		switch(InputConfig->GetInputMode())
+		switch(InInputConfig->GetInputMode())
 		{
 			case ECommonInputMode::Game:
 				InputMode = EInputMode::GameOnly;
@@ -457,6 +450,23 @@ void UInputModule::RefreshCommonUIInputMode(int32 InPlayerIndex)
 	}
 
 	FInputManager::Get().SetCommonUIInputMode(InputMode);
+}
+
+void UInputModule::RefreshCommonUIInputMode(int32 InPlayerIndex)
+{
+	if(InPlayerIndex != 0 || !PlayerRuntimes.IsValidIndex(InPlayerIndex))
+	{
+		return;
+	}
+
+	const UCommonUIActionRouterBase* ActionRouter = PlayerRuntimes[InPlayerIndex].CommonUIActionRouter;
+	const UCommonActivatableWidget* ActiveWidget = ActionRouter
+		? ActionRouter->GetLeafmostActivatableWidget()
+		: nullptr;
+	const TOptional<FUIInputConfig> InputConfig = ActiveWidget
+		? ActiveWidget->GetDesiredInputConfig()
+		: TOptional<FUIInputConfig>();
+	ApplyCommonUIInputConfig(InputConfig.IsSet() ? &InputConfig.GetValue() : nullptr);
 }
 
 void UInputModule::LoadData(FSaveData* InSaveData, EPhase InPhase)

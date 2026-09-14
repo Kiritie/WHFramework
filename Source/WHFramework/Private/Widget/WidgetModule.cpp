@@ -92,10 +92,6 @@ namespace
 		return FParameter(FWidgetSpawnParameter(GetWidgetOwnerObject(InParam)));
 	}
 
-	FParameter MakeWidgetOpenOwnerParam(const FParameter& InParam)
-	{
-		return FParameter(FWidgetOpenParameter(GetWidgetOwnerObject(InParam)));
-	}
 }
 
 // Sets default values
@@ -774,13 +770,6 @@ UUserWidgetBase* UWidgetModule::GetUserWidgetByTag(FGameplayTag InWidgetTag, TSu
 	return !InExpectedClass || (Widget && Widget->IsA(InExpectedClass)) ? Widget : nullptr;
 }
 
-bool UWidgetModule::EnsureParentCreated(const FScreenWidgetConfig& InConfig, const FParameter& InParam)
-{
-	const FGameplayTag ParentWidgetTag = InConfig.ResolveParentWidgetTag();
-	return !ParentWidgetTag.IsValid()
-		|| CreateUserWidgetByTag(ParentWidgetTag, InParam) != nullptr;
-}
-
 bool UWidgetModule::MountUserWidget(UUserWidgetBase* InWidget, const FScreenWidgetConfig& InConfig)
 {
 	if(!InWidget)
@@ -878,7 +867,12 @@ UUserWidgetBase* UWidgetModule::CreateUserWidgetByTag(FGameplayTag InWidgetTag, 
 	const FParameter SpawnParam = MakeWidgetSpawnParam(InParam);
 	const FParameter OwnerParam = MakeWidgetSpawnOwnerParam(SpawnParam);
 	const FScreenWidgetConfig* Config = GetUserWidgetConfig(InWidgetTag);
-	if(!Config || !EnsureParentCreated(*Config, OwnerParam))
+	if(!Config)
+	{
+		return nullptr;
+	}
+	const FGameplayTag ParentWidgetTag = Config->ResolveParentWidgetTag();
+	if(ParentWidgetTag.IsValid() && !GetUserWidgetByTag(ParentWidgetTag))
 	{
 		return nullptr;
 	}
@@ -926,7 +920,21 @@ bool UWidgetModule::OpenUserWidgetByTag(FGameplayTag InWidgetTag, const FParamet
 {
 	const FParameter OpenParam = MakeWidgetOpenParam(InParam);
 	const FParameter SpawnOwnerParam = MakeWidgetSpawnOwnerParam(OpenParam);
-	const FParameter OpenOwnerParam = MakeWidgetOpenOwnerParam(OpenParam);
+	const FScreenWidgetConfig* Config = GetUserWidgetConfig(InWidgetTag);
+	if(!Config)
+	{
+		return false;
+	}
+	const FGameplayTag ParentWidgetTag = Config->ResolveParentWidgetTag();
+	if(ParentWidgetTag.IsValid())
+	{
+		const UUserWidgetBase* ParentWidget = GetUserWidgetByTag(ParentWidgetTag);
+		if(!ParentWidget || !ParentWidget->IsWidgetOpened())
+		{
+			return false;
+		}
+	}
+
 	UUserWidgetBase* Widget = GetUserWidgetByTag(InWidgetTag);
 	if(!Widget)
 	{
@@ -940,19 +948,7 @@ bool UWidgetModule::OpenUserWidgetByTag(FGameplayTag InWidgetTag, const FParamet
 		return false;
 	}
 
-	const FScreenWidgetConfig* Config = GetUserWidgetConfig(InWidgetTag);
-	const FGameplayTag ParentWidgetTag = Config ? Config->ResolveParentWidgetTag() : FGameplayTag();
-	if(ParentWidgetTag.IsValid())
-	{
-		PendingWidgetOpenTags.Add(InWidgetTag);
-		OpenUserWidgetByTag(
-			ParentWidgetTag,
-			OpenOwnerParam,
-			bInstant,
-			false);
-		PendingWidgetOpenTags.Remove(InWidgetTag);
-	}
-	if(Config && Config->WidgetType == EWidgetType::Temporary)
+	if(Config->WidgetType == EWidgetType::Temporary)
 	{
 		FWidgetMountContext Context;
 		Context.ParentWidgetTag = ParentWidgetTag;
@@ -978,8 +974,7 @@ bool UWidgetModule::OpenUserWidgetByTag(FGameplayTag InWidgetTag, const FParamet
 		{
 			const FScreenWidgetConfig* ChildConfig = GetUserWidgetConfig(ChildTag);
 			if(ChildConfig
-				&& ChildConfig->CreateType == EWidgetCreateType::AutoCreateAndOpen
-				&& !PendingWidgetOpenTags.Contains(ChildTag))
+				&& ChildConfig->CreateType == EWidgetCreateType::AutoCreateAndOpen)
 			{
 				OpenUserWidgetByTag(ChildTag, FWidgetOpenParameter(), bInstant);
 			}
