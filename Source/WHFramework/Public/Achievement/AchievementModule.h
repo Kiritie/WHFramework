@@ -122,10 +122,10 @@ public:
 	EAchievementAnimation ExitAnimation = EAchievementAnimation::SLIDE;
 	/**成就通知离开屏幕所需的秒数*/
 	UPROPERTY(EditAnywhere, Category = "Achievement Animation")
-	float ExitAnimationLength = 0.5;
+	float ExitAnimationLength = 0.5f;
 	/**成就通知进入屏幕所需的秒数*/
 	UPROPERTY(EditAnywhere, Category = "Achievement Animation")
-	float EntranceAnimationLength = 0.2;
+	float EntranceAnimationLength = 0.2f;
 
 	/**使用这个成就界面来显示进度并解锁玩家屏幕上的更新*/
 	UPROPERTY(EditAnywhere, Category = "UI Achievement Indicator")

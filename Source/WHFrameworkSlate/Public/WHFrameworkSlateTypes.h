@@ -68,22 +68,6 @@ enum class EWidgetCreateType : uint8
 };
 
 /**
-* Widget打开类型
-*/
-UENUM(BlueprintType)
-enum class EWidgetOpenType : uint8
-{
-	/// 无
-	None,
-	/// 显示
-	Visible,
-	/// 显示并禁用点击
-	HitTestInvisible,
-	/// 显示并禁用自身点击
-	SelfHitTestInvisible
-};
-
-/**
 * Widget打开完成类型
 */
 UENUM(BlueprintType)
@@ -97,22 +81,6 @@ enum class EWidgetOpenFinishType : uint8
 	Animator,
 	/// 程序调用
 	Procedure
-};
-
-/**
-* Widget关闭类型
-*/
-UENUM(BlueprintType)
-enum class EWidgetCloseType : uint8
-{
-	/// 无
-	None,
-	/// 隐藏
-	Hidden,
-	/// 塌陷
-	Collapsed,
-	/// 移除
-	Remove
 };
 
 /**

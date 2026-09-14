@@ -60,10 +60,6 @@ public:
 public:
 	virtual EWidgetType GetWidgetType(bool bInheritParent = true) const = 0;
 
-	virtual EWidgetOpenType GetWidgetOpenType() const = 0;
-
-	virtual EWidgetCloseType GetWidgetCloseType() const = 0;
-
 	virtual EScreenWidgetState GetWidgetState(bool bInheritParent = false) const = 0;
 	
 	virtual bool IsWidgetOpened(bool bCheckOpening = true, bool bInheritParent = false) const = 0;

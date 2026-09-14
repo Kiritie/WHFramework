@@ -8,9 +8,6 @@
 #include "Blueprint/WidgetTree.h"
 #include "CommonInputBaseTypes.h"
 #include "Input/CommonUIInputTypes.h"
-#include "Components/CanvasPanel.h"
-#include "Components/CanvasPanelSlot.h"
-#include "Components/ContentWidget.h"
 #include "Components/PanelWidget.h"
 #include "Components/WidgetSwitcher.h"
 #include "Event/EventModuleStatics.h"
@@ -61,11 +58,9 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 {
 	bWidgetTickAble = false;
 
-	WidgetOpenType = EWidgetOpenType::SelfHitTestInvisible;
 	WidgetOpenFinishType = EWidgetOpenFinishType::Instant;
 	WidgetOpenFinishTime = 0.f;
 	WidgetOpenAnimator = nullptr;
-	WidgetCloseType = EWidgetCloseType::Hidden;
 	WidgetCloseFinishType = EWidgetCloseFinishType::Instant;
 	WidgetCloseFinishTime = 0.f;
 	WidgetCloseAnimator = nullptr;
@@ -73,6 +68,7 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 	WidgetRefreshTime = 0.f;
 	WidgetState = EScreenWidgetState::None;
 	InputConfig = EWidgetInputConfig::None;
+	bWidgetActivatable = true;
 	bWidgetAutoFocus = false;
 
 	bInitialized = false;
@@ -268,61 +264,11 @@ void UUserWidgetBase::OnOpen(const FParameter& InParam, bool bInstant)
 
 	K2_OnOpen(CurrentOpenParameter, bInstant);
 
-	switch(WidgetOpenType)
+	SetVisibility(ESlateVisibility::Visible);
+	if(bWidgetActivatable)
 	{
-		case EWidgetOpenType::Visible:
-		{
-			SetVisibility(ESlateVisibility::Visible);
-			break;
-		}
-		case EWidgetOpenType::HitTestInvisible:
-		{
-			SetVisibility(ESlateVisibility::HitTestInvisible);
-			break;
-		}
-		case EWidgetOpenType::SelfHitTestInvisible:
-		{
-			SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-			break;
-		}
-		default: break;
+		ActivateWidget();
 	}
-
-	if(!GetParentWidgetN<UUserWidgetBase>())
-	{
-		if(GetParent())
-		{
-			RemoveFromParent();
-		}
-		AddToViewport(GetWidgetZOrder());
-	}
-	else if(UPanelWidget* ParentPanelWidget = GetParentPanelWidget())
-	{
-		if(GetParent() != ParentPanelWidget)
-		{
-			if(UContentWidget* ContentWidget = Cast<UContentWidget>(ParentPanelWidget))
-			{
-				ContentWidget->SetContent(this);
-			}
-			else if(UCanvasPanel* CanvasPanel = Cast<UCanvasPanel>(ParentPanelWidget))
-			{
-				UCanvasPanelSlot* CanvasPanelSlot = CanvasPanel->AddChildToCanvas(this);
-				if(const FScreenWidgetConfig* Config = GetWidgetConfig())
-				{
-					CanvasPanelSlot->SetZOrder(Config->ZOrder);
-					CanvasPanelSlot->SetAnchors(Config->Anchors);
-					CanvasPanelSlot->SetOffsets(Config->Offsets);
-					CanvasPanelSlot->SetAlignment(Config->Alignment);
-				}
-			}
-			else
-			{
-				ParentPanelWidget->AddChild(this);
-			}
-		}
-	}
-
-	ActivateWidget();
 
 	switch(WidgetOpenFinishType)
 	{
@@ -505,7 +451,10 @@ void UUserWidgetBase::OnDestroy(EObjectDespawnMode InMode)
 	AbortOpenTransition();
 	AbortCloseTransition();
 	GetWorld()->GetTimerManager().ClearTimer(WidgetRefreshTimerHandle);
-	DeactivateWidget();
+	if(bWidgetActivatable)
+	{
+		DeactivateWidget();
+	}
 	DestroyAllSubWidget(InMode);
 
 	for(UWidget* PoolWidget : GetPoolWidgets())
@@ -522,15 +471,6 @@ void UUserWidgetBase::OnDestroy(EObjectDespawnMode InMode)
 	if(WidgetCloseAnimator)
 	{
 		IObjectPoolInterface::Execute_OnDespawn(WidgetCloseAnimator, InMode);
-	}
-
-	if(IsInViewport())
-	{
-		RemoveFromParent();
-	}
-	if(ParentWidget)
-	{
-		ParentWidget->RemoveChildWidget(this);
 	}
 
 	K2_OnDestroy(InMode);
@@ -646,32 +586,17 @@ void UUserWidgetBase::FinishClose(bool bInstant)
 	WidgetState = EScreenWidgetState::Closed;
 	OnStateChanged(WidgetState);
 
-	switch(WidgetCloseType)
-	{
-		case EWidgetCloseType::Hidden:
-		{
-			SetVisibility(ESlateVisibility::Hidden);
-			break;
-		}
-		case EWidgetCloseType::Collapsed:
-		{
-			SetVisibility(ESlateVisibility::Collapsed);
-			break;
-		}
-		case EWidgetCloseType::Remove:
-		{
-			RemoveFromParent();
-			break;
-		}
-		default: break;
-	}
+	SetVisibility(ESlateVisibility::Hidden);
 	
 	if(WidgetRefreshType == EWidgetRefreshType::Timer)
 	{
 		GetWorld()->GetTimerManager().ClearTimer(WidgetRefreshTimerHandle);
 	}
 
-	DeactivateWidget();
+	if(bWidgetActivatable)
+	{
+		DeactivateWidget();
+	}
 
 	if(K2_OnClosed.IsBound()) K2_OnClosed.Broadcast(bInstant);
 	if(OnClosed.IsBound()) OnClosed.Broadcast(bInstant);
@@ -847,14 +772,4 @@ UWidgetAnimatorBase* UUserWidgetBase::GetWidgetOpenAnimator(TSubclassOf<UWidgetA
 UWidgetAnimatorBase* UUserWidgetBase::GetWidgetCloseAnimator(TSubclassOf<UWidgetAnimatorBase> InClass) const
 {
 	return GetDeterminesOutputObject(WidgetCloseAnimator, InClass);
-}
-
-UPanelWidget* UUserWidgetBase::GetRootPanelWidget() const
-{
-	return Cast<UPanelWidget>(GetRootWidget());
-}
-
-UPanelWidget* UUserWidgetBase::GetParentPanelWidget() const
-{
-	return GetParent();
 }

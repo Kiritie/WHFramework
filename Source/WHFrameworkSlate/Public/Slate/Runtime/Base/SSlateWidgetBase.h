@@ -125,10 +125,6 @@ protected:
 								
 	EWidgetCreateType WidgetCreateType;
 				
-	EWidgetOpenType WidgetOpenType;
-
-	EWidgetCloseType WidgetCloseType;
-	
 	EWidgetRefreshType WidgetRefreshType;
 
 	FParameter WidgetParams;
@@ -197,10 +193,6 @@ public:
 
 	EWidgetCreateType GetWidgetCreateType() const { return WidgetCreateType; }
 
-	virtual EWidgetOpenType GetWidgetOpenType() const override { return WidgetOpenType; }
-
-	virtual EWidgetCloseType GetWidgetCloseType() const override { return WidgetCloseType; }
-	
 	virtual EWidgetRefreshType GetWidgetRefreshType() const override { return WidgetRefreshType; }
 
 	EInputMode GetWidgetInputMode() const { return WidgetInputMode; }

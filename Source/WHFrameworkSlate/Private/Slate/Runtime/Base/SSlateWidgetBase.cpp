@@ -23,8 +23,6 @@ SSlateWidgetBase::SSlateWidgetBase()
 	WidgetOffsets = FMargin(0.f);
 	WidgetAlignment = FVector2D(0.f);
 	WidgetCreateType = EWidgetCreateType::None;
-	WidgetOpenType = EWidgetOpenType::SelfHitTestInvisible;
-	WidgetCloseType = EWidgetCloseType::Hidden;
 	WidgetRefreshType = EWidgetRefreshType::None;
 	WidgetState = EScreenWidgetState::None;
 	WidgetInputMode = EInputMode::None;
@@ -139,25 +137,7 @@ void SSlateWidgetBase::OnOpen(const FParameter& InParam, bool bInstant)
 		GWorld->GetGameViewport()->AddViewportWidgetContent(SharedThis(this), WidgetZOrder);
 	}
 
-	switch(WidgetOpenType)
-	{
-		case EWidgetOpenType::Visible:
-		{
-			SetVisibility(EVisibility::Visible);
-			break;
-		}
-		case EWidgetOpenType::HitTestInvisible:
-		{
-			SetVisibility(EVisibility::HitTestInvisible);
-			break;
-		}
-		case EWidgetOpenType::SelfHitTestInvisible:
-		{
-			SetVisibility(EVisibility::SelfHitTestInvisible);
-			break;
-		}
-		default: break;
-	}
+	SetVisibility(EVisibility::Visible);
 		
 	Refresh();
 

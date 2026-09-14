@@ -199,9 +199,12 @@ private:
 		const FScreenWidgetConfig& InConfig,
 		const FParameter& InParam);
 
-	bool AttachWidgetToConfiguredParent(
+	bool MountUserWidget(
 		UUserWidgetBase* InWidget,
 		const FScreenWidgetConfig& InConfig);
+
+	void UnMountUserWidget(
+		UUserWidgetBase* InWidget);
 
 public:
 	const FScreenWidgetConfig* GetUserWidgetConfig(FGameplayTag InWidgetTag) const;

@@ -169,9 +169,6 @@ protected:
 	TMap<FGameplayTag, TObjectPtr<UWidgetMountSlot>> WidgetMountSlotMap;
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	EWidgetOpenType WidgetOpenType;
-	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	EWidgetOpenFinishType WidgetOpenFinishType;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (EditConditionHides, EditCondition = "WidgetOpenFinishType == EWidgetOpenFinishType::Delay"))
@@ -180,9 +177,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Instanced, meta = (EditConditionHides, EditCondition = "WidgetOpenFinishType == EWidgetOpenFinishType::Animator"))
 	UWidgetAnimatorBase* WidgetOpenAnimator;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
-	EWidgetCloseType WidgetCloseType;
-	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	EWidgetCloseFinishType WidgetCloseFinishType;
 
@@ -203,6 +197,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
 	EWidgetInputConfig InputConfig;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	bool bWidgetActivatable;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	bool bWidgetAutoFocus;
@@ -292,14 +289,8 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual FVector2D GetWidgetAlignment() const override;
 
-	UFUNCTION(BlueprintPure)
-	virtual EWidgetOpenType GetWidgetOpenType() const override { return WidgetOpenType; }
-
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	virtual UWidgetAnimatorBase* GetWidgetOpenAnimator(TSubclassOf<UWidgetAnimatorBase> InClass = nullptr) const;
-
-	UFUNCTION(BlueprintPure)
-	virtual EWidgetCloseType GetWidgetCloseType() const override { return WidgetCloseType; }
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	virtual UWidgetAnimatorBase* GetWidgetCloseAnimator(TSubclassOf<UWidgetAnimatorBase> InClass = nullptr) const;
@@ -461,11 +452,5 @@ public:
 	}
 
 	FOnWidgetStateChanged& GetOnWidgetStateChanged() { return OnWidgetStateChanged; }
-
-	UFUNCTION(BlueprintPure)
-	UPanelWidget* GetRootPanelWidget() const;
-
-	UFUNCTION(BlueprintPure)
-	UPanelWidget* GetParentPanelWidget() const;
 
 };

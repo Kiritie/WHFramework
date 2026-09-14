@@ -8,7 +8,11 @@
 #include "Blueprint/WidgetTree.h"
 #include "Common/CommonModuleStatics.h"
 #include "Components/Button.h"
+#include "Components/CanvasPanel.h"
+#include "Components/CanvasPanelSlot.h"
+#include "Components/ContentWidget.h"
 #include "Components/Image.h"
+#include "Components/PanelWidget.h"
 #include "Components/TextBlock.h"
 #include "Components/WidgetSwitcher.h"
 #include "Event/EventModuleStatics.h"
@@ -222,11 +226,6 @@ bool UWidgetModule::ValidateScreenWidgetConfigs(TArray<FText>& OutErrors, TArray
 			continue;
 		}
 
-		if(!Config.SlotTag.IsValid())
-		{
-			continue;
-		}
-
 		const int32* ParentIndex = ConfigIndexByTag.Find(ParentWidgetTag);
 		if(!ParentIndex)
 		{
@@ -235,6 +234,21 @@ bool UWidgetModule::ValidateScreenWidgetConfigs(TArray<FText>& OutErrors, TArray
 		const FScreenWidgetConfig& ParentConfig = UserWidgetConfigs[*ParentIndex];
 		const UWidgetBlueprintGeneratedClass* ParentGeneratedClass = Cast<UWidgetBlueprintGeneratedClass>(ParentConfig.WidgetClass.Get());
 		const UWidgetTree* WidgetTree = ParentGeneratedClass ? ParentGeneratedClass->GetWidgetTreeArchetype() : nullptr;
+		if(!Config.SlotTag.IsValid())
+		{
+			const UPanelWidget* RootPanel = WidgetTree
+				? Cast<UPanelWidget>(WidgetTree->RootWidget)
+				: nullptr;
+			if(!RootPanel)
+			{
+				OutErrors.Add(FText::Format(
+					NSLOCTEXT("WH.WidgetModule", "InvalidParentRootPanel", "Parent widget {0} root widget is not a PanelWidget, but child {1} has no mount slot."),
+					FText::FromString(ParentWidgetTag.ToString()),
+					FText::FromString(WidgetTag.ToString())));
+			}
+			continue;
+		}
+
 		TArray<UWidget*> Widgets;
 		if(WidgetTree)
 		{
@@ -767,50 +781,91 @@ bool UWidgetModule::EnsureParentCreated(const FScreenWidgetConfig& InConfig, con
 		|| CreateUserWidgetByTag(ParentWidgetTag, InParam) != nullptr;
 }
 
-bool UWidgetModule::AttachWidgetToConfiguredParent(UUserWidgetBase* InWidget, const FScreenWidgetConfig& InConfig)
+bool UWidgetModule::MountUserWidget(UUserWidgetBase* InWidget, const FScreenWidgetConfig& InConfig)
 {
+	if(!InWidget)
+	{
+		return false;
+	}
+
+	const FGameplayTag WidgetTag = InConfig.ResolveWidgetTag();
 	const FGameplayTag ParentWidgetTag = InConfig.ResolveParentWidgetTag();
 	if(!ParentWidgetTag.IsValid())
 	{
+		InWidget->AddToViewport(InConfig.ZOrder);
 		return true;
 	}
 
 	UUserWidgetBase* ParentWidget = GetUserWidgetByTag(ParentWidgetTag);
 	if(!ParentWidget)
 	{
-		ensureEditorMsgf(false, FString::Printf(TEXT("Failed to attach %s to parent %s slot %s."), *InConfig.ResolveWidgetTag().ToString(), *ParentWidgetTag.ToString(), *InConfig.SlotTag.ToString()), EDC_Widget, EDV_Error);
+		ensureEditorMsgf(false, FString::Printf(TEXT("Failed to mount widget %s: parent %s does not exist."), *WidgetTag.ToString(), *ParentWidgetTag.ToString()), EDC_Widget, EDV_Error);
+		return false;
+	}
+
+	UPanelWidget* MountPanel = nullptr;
+	if(InConfig.SlotTag.IsValid())
+	{
+		MountPanel = ParentWidget->GetWidgetMountSlot(InConfig.SlotTag);
+		if(!MountPanel)
+		{
+			ensureEditorMsgf(false, FString::Printf(TEXT("Failed to mount widget %s: slot %s was not found in parent %s."), *WidgetTag.ToString(), *InConfig.SlotTag.ToString(), *ParentWidgetTag.ToString()), EDC_Widget, EDV_Error);
+			return false;
+		}
+	}
+	else
+	{
+		MountPanel = Cast<UPanelWidget>(ParentWidget->GetRootWidget());
+		if(!MountPanel)
+		{
+			ensureEditorMsgf(false, FString::Printf(TEXT("Failed to mount widget %s: parent %s root widget is not a PanelWidget."), *WidgetTag.ToString(), *ParentWidgetTag.ToString()), EDC_Widget, EDV_Error);
+			return false;
+		}
+	}
+
+	if(UContentWidget* ContentWidget = Cast<UContentWidget>(MountPanel))
+	{
+		if(ContentWidget->GetContent() && ContentWidget->GetContent() != InWidget)
+		{
+			ensureEditorMsgf(false, FString::Printf(TEXT("Failed to mount widget %s: mount target in parent %s already contains %s."), *WidgetTag.ToString(), *ParentWidgetTag.ToString(), *GetNameSafe(ContentWidget->GetContent())), EDC_Widget, EDV_Error);
+			return false;
+		}
+		ContentWidget->SetContent(InWidget);
+	}
+	else if(UCanvasPanel* CanvasPanel = Cast<UCanvasPanel>(MountPanel))
+	{
+		UCanvasPanelSlot* CanvasSlot = CanvasPanel->AddChildToCanvas(InWidget);
+		if(!CanvasSlot)
+		{
+			return false;
+		}
+		CanvasSlot->SetZOrder(InConfig.ZOrder);
+		CanvasSlot->SetAnchors(InConfig.Anchors);
+		CanvasSlot->SetOffsets(InConfig.Offsets);
+		CanvasSlot->SetAlignment(InConfig.Alignment);
+	}
+	else if(!MountPanel->AddChild(InWidget))
+	{
+		ensureEditorMsgf(false, FString::Printf(TEXT("Failed to add widget %s to parent %s panel %s."), *WidgetTag.ToString(), *ParentWidgetTag.ToString(), *GetNameSafe(MountPanel)), EDC_Widget, EDV_Error);
 		return false;
 	}
 
 	InWidget->ParentWidget = ParentWidget;
 	ParentWidget->AddChildWidget(InWidget);
-	if(!InConfig.SlotTag.IsValid())
-	{
-		return true;
-	}
-
-	UWidgetMountSlot* MountSlot = ParentWidget->GetWidgetMountSlot(InConfig.SlotTag);
-	if(!MountSlot)
-	{
-		ensureEditorMsgf(false, FString::Printf(TEXT("Failed to find widget mount slot %s in parent %s."), *InConfig.SlotTag.ToString(), *ParentWidgetTag.ToString()), EDC_Widget, EDV_Error);
-		return false;
-	}
-
-	if(MountSlot->GetContent() && MountSlot->GetContent() != InWidget)
-	{
-		ensureEditorMsgf(false, FString::Printf(
-			TEXT("Widget mount slot %s already contains %s while attaching %s (%s)."),
-			*InConfig.SlotTag.ToString(),
-			*GetNameSafe(MountSlot->GetContent()),
-			*GetNameSafe(InWidget),
-			*InConfig.ResolveWidgetTag().ToString()), EDC_Widget, EDV_Error);
-		ParentWidget->RemoveChildWidget(InWidget);
-		InWidget->ParentWidget = nullptr;
-		return false;
-	}
-
-	MountSlot->SetContent(InWidget);
 	return true;
+}
+
+void UWidgetModule::UnMountUserWidget(UUserWidgetBase* InWidget)
+{
+	if(InWidget->IsInViewport() || InWidget->GetParent())
+	{
+		InWidget->RemoveFromParent();
+	}
+	if(InWidget->ParentWidget)
+	{
+		InWidget->ParentWidget->RemoveChildWidget(InWidget);
+		InWidget->ParentWidget = nullptr;
+	}
 }
 
 UUserWidgetBase* UWidgetModule::CreateUserWidgetByTag(FGameplayTag InWidgetTag, const FParameter& InParam, TSubclassOf<UUserWidgetBase> InClass)
@@ -842,14 +897,13 @@ UUserWidgetBase* UWidgetModule::CreateUserWidgetByTag(FGameplayTag InWidgetTag, 
 
 	Widget->OnCreate(SpawnParam);
 	Widget->Init(SpawnParam, false);
-	if(!AttachWidgetToConfiguredParent(Widget, *Config))
+	Widget->SetVisibility(ESlateVisibility::Hidden);
+	if(!MountUserWidget(Widget, *Config))
 	{
 		UserWidgetByTag.Remove(InWidgetTag);
 		Widget->OnDestroy(EObjectDespawnMode::Destroy);
 		return nullptr;
 	}
-	Widget->SetVisibility(ESlateVisibility::Collapsed);
-
 	TArray<FGameplayTag> ChildTags;
 	UserWidgetChildrenMap.MultiFind(InWidgetTag, ChildTags);
 	for(const FGameplayTag& ChildTag : ChildTags)
@@ -1025,6 +1079,9 @@ bool UWidgetModule::DestroyUserWidgetByTag(FGameplayTag InWidgetTag, EObjectDesp
 		}
 
 		Widget->OnDestroy(InMode);
+
+		UnMountUserWidget(Widget);
+
 		return true;
 	}
 	return false;
