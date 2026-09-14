@@ -3,8 +3,6 @@
 #include "Camera/CameraEditor.h"
 
 #include "Editor.h"
-#include "Camera/Customization/CameraModuleCustomization.h"
-#include "Camera/Customization/CameraPointCustomization.h"
 
 #define LOCTEXT_NAMESPACE "FCameraEditor"
 
@@ -57,14 +55,10 @@ void FCameraEditorModule::RegisterAssetTypeAction(IAssetTools& AssetTools, EAsse
 
 void FCameraEditorModule::RegisterCustomization(FPropertyEditorModule& PropertyEditor)
 {
-	PropertyEditor.RegisterCustomClassLayout(FName("CameraModule"), FOnGetDetailCustomizationInstance::CreateStatic(&FCameraModuleCustomization::MakeInstance));
-	PropertyEditor.RegisterCustomClassLayout(FName("CameraPointBase"), FOnGetDetailCustomizationInstance::CreateStatic(&FCameraPointCustomization::MakeInstance));
 }
 
 void FCameraEditorModule::UnRegisterCustomization(FPropertyEditorModule& PropertyEditor)
 {
-	PropertyEditor.UnregisterCustomClassLayout(FName("CameraModule"));
-	PropertyEditor.UnregisterCustomClassLayout(FName("CameraPointBase"));
 }
 
 #undef LOCTEXT_NAMESPACE

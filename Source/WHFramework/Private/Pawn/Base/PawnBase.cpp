@@ -252,9 +252,9 @@ void APawnBase::JumpN_Implementation()
 	
 }
 
-FCameraTrackProfile APawnBase::GetCameraTrackProfile_Implementation() const
+FCameraTargetParams APawnBase::GetCameraTargetParams_Implementation() const
 {
-	return CameraTrackProfile;
+	return CameraTargetParams;
 }
 
 void APawnBase::SetActorVisible_Implementation(bool bInVisible)

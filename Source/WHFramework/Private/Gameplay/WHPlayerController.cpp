@@ -85,7 +85,7 @@ void AWHPlayerController::OnPossess(APawn* InPawn)
 
 	SetPlayerPawn(InPawn);
 
-	SetControlRotation(UCameraModuleStatics::GetCameraRotation());
+	SetControlRotation(UCameraModuleStatics::GetViewRotation());
 }
 
 void AWHPlayerController::OnUnPossess()
@@ -217,7 +217,8 @@ bool AWHPlayerController::RaycastSingleFromScreenPosition(FVector2D InScreenPosi
 	if(DeprojectScreenPositionToWorld(InScreenPosition.X, InScreenPosition.Y, SightPos, RayDirection))
 	{
 		const FVector RayStart = PlayerCameraManager->GetCameraLocation();
-		const FVector RayEnd = RayStart + RayDirection * (InRayDistance + UCameraModuleStatics::GetCameraDistance(true));
+		const ACameraManagerBase* CameraManager = UCameraModuleStatics::GetCameraManager();
+		const FVector RayEnd = RayStart + RayDirection * (InRayDistance + (CameraManager ? CameraManager->GetCurrentRigDistance() : 0.f));
 		TArray<AActor*> IgnoreActors = InIgnoreActors;
 		IgnoreActors.AddUnique(GetPawn());
 		IgnoreActors.AddUnique(GetPlayerPawn());

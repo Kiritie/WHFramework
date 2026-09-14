@@ -457,7 +457,7 @@ bool UWorldWidgetBase::IsWidgetVisible_Implementation(bool bRefresh)
 			const auto OwnerActor = Cast<AActor>(OwnerObject);
 			
 			const FVector Location = GetWidgetMapping(this, Mapping) ? Mapping.GetLocation() : (OwnerActor ? OwnerActor->GetActorLocation() : FVector(-1.f));
-			const FVector CameraLocation = UCameraModuleStatics::GetCameraLocation(true);
+			const FVector CameraLocation = UCameraModuleStatics::GetViewLocation();
 			const float Distance = FVector::Distance(Location, CameraLocation);
 			const FWorldWidgetConfig* Config = GetWidgetConfig();
 			const EWorldWidgetVisibility ConfigVisibility = Config ? Config->Visibility : EWorldWidgetVisibility::AlwaysShow;

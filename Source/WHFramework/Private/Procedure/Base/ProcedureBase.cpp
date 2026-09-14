@@ -4,6 +4,7 @@
 #include "Procedure/Base/ProcedureBase.h"
 
 #include "Camera/CameraModule.h"
+#include "Camera/Anchor/CameraShotAnchor.h"
 #include "Camera/Manager/CameraManagerBase.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Event/EventModuleStatics.h"
@@ -26,9 +27,8 @@ UProcedureBase::UProcedureBase()
 	ProcedureGuideIntervalTime = 0.f;
 
 	OperationTarget = nullptr;
-	bTrackTarget = false;
-	TrackTargetMode = ECameraTrackMode::LocationOnly;
-	CameraViewParams = FCameraViewParams();
+	bApplyCameraAction = false;
+	bRestoreDefaultCameraOnLeave = false;
 }
 
 #if WITH_EDITOR
@@ -61,7 +61,6 @@ void UProcedureBase::OnInitialize()
 {
 	K2_OnInitialize();
 
-	CameraViewParams.CameraViewTarget = OperationTarget.LoadSynchronous();
 }
 
 void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
@@ -73,7 +72,7 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 
 	K2_OnEnter(InLastProcedure);
 
-	ResetCameraView();
+	ApplyCameraAction();
 
 	switch(ProcedureGuideType)
 	{
@@ -95,7 +94,7 @@ void UProcedureBase::OnRefresh()
 
 void UProcedureBase::OnGuide()
 {
-	ResetCameraView();
+	ApplyCameraAction();
 
 	switch(ProcedureGuideType)
 	{
@@ -112,14 +111,22 @@ void UProcedureBase::OnGuide()
 
 void UProcedureBase::OnLeave(UProcedureBase* InNextProcedure)
 {
-	ProcedureState = EProcedureState::Leaved;
-	OnStateChanged(ProcedureState);
-
-	if(bTrackTarget)
+	if(CameraOverrideHandle.IsValid())
 	{
 		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
 		{
-			CameraManager->ClearTarget(OperationTarget.LoadSynchronous());
+			CameraManager->PopCameraConfigOverride(CameraOverrideHandle);
+		}
+		CameraOverrideHandle.Reset();
+	}
+	ProcedureState = EProcedureState::Leaved;
+	OnStateChanged(ProcedureState);
+
+	if(bRestoreDefaultCameraOnLeave)
+	{
+		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
+		{
+			CameraManager->SetDefaultMode(CameraTransition);
 		}
 	}
 
@@ -171,30 +178,32 @@ UProcedureAsset* UProcedureBase::GetProcedureAsset() const
 	return Cast<UProcedureAsset>(GetOuter());
 }
 
-#if WITH_EDITOR
-void UProcedureBase::GetCameraView()
+void UProcedureBase::ApplyCameraAction()
 {
-	CameraViewParams.GetCameraParams(OperationTarget.LoadSynchronous());
-
-	Modify();
-}
-
-void UProcedureBase::SetCameraView(const FCameraParams& InCameraParams)
-{
-	CameraViewParams.SetCameraParams(InCameraParams, OperationTarget.LoadSynchronous());
-
-	Modify();
-}
-#endif
-
-void UProcedureBase::ResetCameraView()
-{
-	if(IsCurrent() && CameraViewParams.IsValid())
+	if(!IsCurrent() || !bApplyCameraAction)
 	{
-		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
-		{
-			CameraManager->ApplyViewData(FCameraViewData(OperationTarget.LoadSynchronous(), bTrackTarget, TrackTargetMode, CameraViewParams));
-		}
+		return;
+	}
+
+	ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager();
+	if(!CameraManager)
+	{
+		return;
+	}
+	if(CameraOverrideHandle.IsValid())
+	{
+		CameraManager->PopCameraConfigOverride(CameraOverrideHandle);
+		CameraOverrideHandle.Reset();
+	}
+	CameraOverrideHandle = CameraManager->PushCameraConfigOverride(CameraOverride, 10);
+
+	if(CameraModeClass)
+	{
+		FCameraModeContext Context;
+		Context.Target = OperationTarget.LoadSynchronous();
+		Context.Anchor = CameraAnchor.LoadSynchronous();
+		Context.Transition = CameraTransition;
+		CameraManager->SetMode(CameraModeClass, Context);
 	}
 }
 
@@ -206,11 +215,9 @@ AActor* UProcedureBase::GetOperationTarget(TSubclassOf<AActor> InClass) const
 void UProcedureBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCameraView)
 {
 	OperationTarget = InOperationTarget;
-	CameraViewParams.CameraViewTarget = InOperationTarget;
-
 	if(bResetCameraView)
 	{
-		ResetCameraView();
+		ApplyCameraAction();
 	}
 }
 

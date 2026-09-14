@@ -10,7 +10,8 @@
 #include "ProcedureBase.generated.h"
 
 class UProcedureAsset;
-class ACameraActorBase;
+class ACameraShotAnchor;
+class UCameraModeBase;
 
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FProcedureListItemStates
@@ -186,34 +187,24 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Operation Target")
 	TSoftObjectPtr<AActor> OperationTarget;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Operation Target")
-	bool bTrackTarget;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "bTrackTarget == true"), Category = "Operation Target")
-	ECameraTrackMode TrackTargetMode;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
+	bool bApplyCameraAction;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "bApplyCameraAction"), Category = "Camera")
+	TSubclassOf<UCameraModeBase> CameraModeClass;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "bApplyCameraAction"), Category = "Camera")
+	FCameraConfigOverride CameraOverride;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "bApplyCameraAction"), Category = "Camera")
+	TSoftObjectPtr<ACameraShotAnchor> CameraAnchor;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "bApplyCameraAction"), Category = "Camera")
+	FCameraTransitionParams CameraTransition;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
+	bool bRestoreDefaultCameraOnLeave;
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Camera View
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Operation Target|Camera View")
-	FCameraViewParams CameraViewParams;
+	FCameraConfigOverrideHandle CameraOverrideHandle;
 
 public:
-#if WITH_EDITOR
-	/**
-	* 获取摄像机视角
-	*/
-	void GetCameraView();
-	/**
-	* 设置摄像机视角
-	*/
-	void SetCameraView(const FCameraParams& InCameraParams);
-#endif
-	/**
-	* 还原摄像机视角
-	*/
 	UFUNCTION(BlueprintCallable)
-	void ResetCameraView();
+	void ApplyCameraAction();
 	/**
 	* 获取操作目标
 	*/

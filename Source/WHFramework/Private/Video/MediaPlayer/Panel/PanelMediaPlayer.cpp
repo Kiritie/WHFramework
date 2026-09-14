@@ -54,7 +54,7 @@ void APanelMediaPlayer::OnRefresh_Implementation(float DeltaSeconds)
 
 	if(bOrientCamera)
 	{
-		const FRotator Rotator = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), UCameraModuleStatics::GetCameraLocation(true));
+		const FRotator Rotator = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), UCameraModuleStatics::GetViewLocation());
 		SetActorRotation(FRotator(0.f, Rotator.Yaw, 0.f));
 	}
 }

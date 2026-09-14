@@ -11,7 +11,6 @@
 #include "TaskBase.generated.h"
 
 class UTaskAsset;
-class ACameraActorBase;
 
 /**
  * 任务基类

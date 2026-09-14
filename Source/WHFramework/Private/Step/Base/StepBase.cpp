@@ -4,6 +4,7 @@
 #include "Step/Base/StepBase.h"
 
 #include "Camera/CameraModule.h"
+#include "Camera/Anchor/CameraShotAnchor.h"
 #include "Camera/Manager/CameraManagerBase.h"
 #include "Event/EventModuleStatics.h"
 #include "Event/Events/Step/Event_StepCompleted.h"
@@ -26,9 +27,8 @@ UStepBase::UStepBase()
 	StepState = EStepState::None;
 
 	OperationTarget = nullptr;
-	bTrackTarget = false;
-	TrackTargetMode = ECameraTrackMode::LocationOnly;
-	CameraViewParams = FCameraViewParams();
+	bApplyCameraAction = false;
+	bRestoreDefaultCameraOnLeave = false;
 
 	StepExecuteCondition = EStepExecuteResult::None;
 	StepExecuteResult = EStepExecuteResult::None;
@@ -135,7 +135,7 @@ void UStepBase::OnEnter(UStepBase* InLastStep)
 
 	K2_OnEnter(InLastStep);
 
-	ResetCameraView();
+	ApplyCameraAction();
 
 	switch(StepGuideType)
 	{
@@ -249,7 +249,7 @@ void UStepBase::OnRefresh()
 
 void UStepBase::OnGuide()
 {
-	ResetCameraView();
+	ApplyCameraAction();
 
 	switch(StepGuideType)
 	{
@@ -314,14 +314,6 @@ void UStepBase::OnComplete(EStepExecuteResult InStepExecuteResult)
 
 	GetWorld()->GetTimerManager().ClearTimer(StartGuideTimerHandle);
 
-	if(bTrackTarget && OperationTarget)
-	{
-		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
-		{
-			CameraManager->ClearTarget();
-		}
-	}
-	
 	K2_OnComplete(InStepExecuteResult);
 
 	UEventModuleStatics::BroadcastEvent<FEventStepCompleted>(this, {this});
@@ -341,14 +333,22 @@ void UStepBase::OnComplete(EStepExecuteResult InStepExecuteResult)
 
 void UStepBase::OnLeave()
 {
-	StepState = EStepState::Leaved;
-	OnStateChanged(StepState);
-
-	if(bTrackTarget)
+	if(CameraOverrideHandle.IsValid())
 	{
 		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
 		{
-			CameraManager->ClearTarget(OperationTarget.LoadSynchronous());
+			CameraManager->PopCameraConfigOverride(CameraOverrideHandle);
+		}
+		CameraOverrideHandle.Reset();
+	}
+	StepState = EStepState::Leaved;
+	OnStateChanged(StepState);
+
+	if(bRestoreDefaultCameraOnLeave)
+	{
+		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
+		{
+			CameraManager->SetDefaultMode(CameraTransition);
 		}
 	}
 
@@ -392,32 +392,32 @@ bool UStepBase::IsSkipAble_Implementation() const
 	return true;
 }
 
-#if WITH_EDITOR
-void UStepBase::GetCameraView()
+void UStepBase::ApplyCameraAction()
 {
-	CameraViewParams.GetCameraParams(OperationTarget.LoadSynchronous());
-
-	Modify();
-}
-
-void UStepBase::SetCameraView(FCameraParams InCameraParams)
-{
-	CameraViewParams.SetCameraParams(InCameraParams, OperationTarget.LoadSynchronous());
-
-	Modify();
-}
-#endif
-
-void UStepBase::ResetCameraView()
-{
-	if(StepState != EStepState::Entered) return;
-	
-	if(CameraViewParams.IsValid())
+	if(StepState != EStepState::Entered || !bApplyCameraAction)
 	{
-		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
-		{
-			CameraManager->ApplyViewData(FCameraViewData(OperationTarget.LoadSynchronous(), bTrackTarget, TrackTargetMode, CameraViewParams));
-		}
+		return;
+	}
+
+	ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager();
+	if(!CameraManager)
+	{
+		return;
+	}
+	if(CameraOverrideHandle.IsValid())
+	{
+		CameraManager->PopCameraConfigOverride(CameraOverrideHandle);
+		CameraOverrideHandle.Reset();
+	}
+	CameraOverrideHandle = CameraManager->PushCameraConfigOverride(CameraOverride, 20);
+
+	if(CameraModeClass)
+	{
+		FCameraModeContext Context;
+		Context.Target = OperationTarget.LoadSynchronous();
+		Context.Anchor = CameraAnchor.LoadSynchronous();
+		Context.Transition = CameraTransition;
+		CameraManager->SetMode(CameraModeClass, Context);
 	}
 }
 
@@ -429,11 +429,9 @@ AActor* UStepBase::GetOperationTarget(TSubclassOf<AActor> InClass) const
 void UStepBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCameraView)
 {
 	OperationTarget = InOperationTarget;
-	CameraViewParams.CameraViewTarget = InOperationTarget;
-
 	if(bResetCameraView)
 	{
-		ResetCameraView();
+		ApplyCameraAction();
 	}
 }
 
@@ -685,7 +683,6 @@ void UStepBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, OperationTarget))
 		{
-			CameraViewParams.CameraViewTarget = OperationTarget.LoadSynchronous();
 		}
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, SubSteps) ||

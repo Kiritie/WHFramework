@@ -623,7 +623,7 @@ FSettingModuleSaveData USettingModule::GetCurrentCombinedSettings() const
 	Data.WidgetData = UWidgetModule::Get().GetSaveDataRef<FWidgetModuleSaveData>(true);
 	Data.AudioData = UAudioModule::Get().GetSaveDataRef<FAudioModuleSaveData>(true);
 	Data.VideoData = UVideoModule::Get().GetSaveDataRef<FVideoModuleSaveData>(true);
-	Data.CameraData = UCameraModule::Get().GetSaveDataRef<FCameraModuleSaveData>(true);
+	Data.CameraData.FromUserSettings(UCameraModule::Get().GetUserSettings());
 	Data.InputData = UInputModule::Get().GetSaveDataRef<FInputModuleSaveData>(false);
 	Data.ParameterData = UParameterModule::Get().GetSaveDataRef<FParameterModuleSaveData>(true);
 	return Data;
@@ -1142,7 +1142,7 @@ FSaveData* USettingModule::ToData()
 	SaveData.WidgetData = UWidgetModule::Get().GetSaveDataRef<FWidgetModuleSaveData>(true);
 	SaveData.AudioData = UAudioModule::Get().GetSaveDataRef<FAudioModuleSaveData>(true);
 	SaveData.VideoData = UVideoModule::Get().GetSaveDataRef<FVideoModuleSaveData>(true);
-	SaveData.CameraData = UCameraModule::Get().GetSaveDataRef<FCameraModuleSaveData>(true);
+	SaveData.CameraData.FromUserSettings(UCameraModule::Get().GetUserSettings());
 	SaveData.InputData = UInputModule::Get().GetSaveDataRef<FInputModuleSaveData>(false);
 	SaveData.ParameterData = UParameterModule::Get().GetSaveDataRef<FParameterModuleSaveData>(true);
 	

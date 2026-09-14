@@ -4,8 +4,8 @@
 #include "Pawn/PawnModule.h"
 
 #include "Camera/CameraModule.h"
-#include "Camera/Actor/CameraActorBase.h"
 #include "Camera/Manager/CameraManagerBase.h"
+#include "Camera/Mode/FollowCameraMode.h"
 #include "Pawn/PawnModuleNetworkComponent.h"
 #include "Pawn/Base/PawnBase.h"
 #include "Gameplay/WHPlayerController.h"
@@ -145,17 +145,10 @@ void UPawnModule::SwitchPawn(APawnBase* InPawn, bool bResetCamera, bool bInstant
 		CurrentPawn->OnSwitch();
 		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
 		{
-			FCameraTrackProfile Profile = ICameraTrackableInterface::Execute_GetCameraTrackProfile(CurrentPawn);
-			Profile.Offset *= CurrentPawn->GetActorScale3D();
-
-			FCameraTargetRequest Request;
-			Request.Target = CurrentPawn;
-			Request.Profile = Profile;
-			Request.ViewMode = bInstant ? ECameraViewMode::Instant : ECameraViewMode::Smooth;
-			Request.ViewSpace = ECameraViewSpace::Local;
-			Request.bResetRotation = bResetCamera;
-			Request.bInstant = bInstant;
-			CameraManager->BindTarget(Request);
+			FCameraModeContext Context;
+			Context.Target = CurrentPawn;
+			Context.Transition = bInstant ? FCameraTransitionParams::Instant() : FCameraTransitionParams::Smooth();
+			CameraManager->SetMode(UFollowCameraMode::StaticClass(), Context);
 		}
 	}
 	else if(CurrentPawn)
@@ -169,7 +162,7 @@ void UPawnModule::SwitchPawn(APawnBase* InPawn, bool bResetCamera, bool bInstant
 		}
 		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
 		{
-			CameraManager->ClearTarget(PreviousPawn);
+			CameraManager->ClearModeTarget();
 		}
 		CurrentPawn = nullptr;
 	}

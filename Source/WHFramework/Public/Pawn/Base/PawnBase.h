@@ -15,6 +15,7 @@
 
 #include "PawnBase.generated.h"
 
+
 class UBoxComponent;
 class UAIPerceptionStimuliSourceComponent;
 /**
@@ -137,10 +138,10 @@ protected:
 	/// Camera
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
-	FCameraTrackProfile CameraTrackProfile;
+	FCameraTargetParams CameraTargetParams;
 
 public:
-	virtual FCameraTrackProfile GetCameraTrackProfile_Implementation() const override;
+	virtual FCameraTargetParams GetCameraTargetParams_Implementation() const override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Actor

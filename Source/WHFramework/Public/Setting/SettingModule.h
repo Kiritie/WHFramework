@@ -100,13 +100,14 @@ protected:
 
 	bool WriteSessionValue(FSettingModuleSaveData& InData, FSettingId InSettingId, const FParameter& InValue) const;
 
-	UPROPERTY(EditAnywhere, Category = "Setting")
+protected:
+	UPROPERTY(EditAnywhere, Category = "Registry")
 	TObjectPtr<USettingRegistry> Registry;
 
-	UPROPERTY(EditAnywhere, Instanced, Category = "Setting")
+	UPROPERTY(EditAnywhere, Instanced, Category = "Provider")
 	TArray<TObjectPtr<USettingProviderBase>> Providers;
 
-	UPROPERTY(VisibleAnywhere, Transient, Category = "Setting")
+	UPROPERTY(VisibleAnywhere, Transient, Category = "Definition")
 	TArray<FSettingDefinition> FinalDefinitions;
 
 	UPROPERTY(Transient)
@@ -118,7 +119,7 @@ protected:
 	UPROPERTY(Transient)
 	FSettingConfirmationTransaction ConfirmationTransaction;
 
-	UPROPERTY(EditAnywhere, Category = "Setting", meta = (ClampMin = "1.0"))
+	UPROPERTY(EditAnywhere, Category = "Other", meta = (ClampMin = "1.0"))
 	float ConfirmationTimeout = 15.f;
 
 	TMap<FSettingId, TObjectPtr<USettingEntry>> SettingEntryMap;

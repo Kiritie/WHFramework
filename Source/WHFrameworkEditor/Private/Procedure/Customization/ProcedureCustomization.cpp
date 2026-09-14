@@ -36,56 +36,9 @@ void FProcedureCustomization::CustomizeDetails(IDetailLayoutBuilder& DetailLayou
 	IDetailCategoryBuilder& OperationTargetCategory = DetailLayoutBuilder.EditCategory(FName("Operation Target"));
 	
 	OperationTargetCategory.AddProperty(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UProcedureBase, OperationTarget)));
-	OperationTargetCategory.AddProperty(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UProcedureBase, bTrackTarget)));
-	OperationTargetCategory.AddProperty(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UProcedureBase, TrackTargetMode)));
-
-	IDetailGroup& CameraViewGroup = OperationTargetCategory.AddGroup(FName("Camera View"), FText::FromString(TEXT("Camera View")), false, false);
-	CameraViewGroup.AddPropertyRow(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UProcedureBase, CameraViewParams)));
-
-	CameraViewGroup.AddWidgetRow()
-		.WholeRowContent()
-		[
-			SNew(SWrapBox)
-			.UseAllottedSize(true)
-			+SWrapBox::Slot()
-			[
-				SNew(SButton)
-				.Text(FText::FromString(TEXT("Get Camera View")))
-				.OnClicked_Raw(this, &FProcedureCustomization::OnClickGetCameraViewButton)
-			]
-			+SWrapBox::Slot()
-			[
-				SNew(SButton)
-				.Text(FText::FromString(TEXT("Paste Camera View")))
-				.OnClicked_Raw(this, &FProcedureCustomization::OnClickPasteCameraViewButton)
-			]
-		];
-}
-
-FReply FProcedureCustomization::OnClickGetCameraViewButton()
-{
-	for(const TWeakObjectPtr<UObject>& SelectedObject : SelectedObjectsList)
-	{
-		if(UProcedureBase* Procedure = Cast<UProcedureBase>(SelectedObject.Get()))
-		{
-			Procedure->GetCameraView();
-		}
-	}
-
-	return FReply::Handled();
-}
-
-FReply FProcedureCustomization::OnClickPasteCameraViewButton()
-{
-	for(const TWeakObjectPtr<UObject>& SelectedObject : SelectedObjectsList)
-	{
-		if(UProcedureBase* Procedure = Cast<UProcedureBase>(SelectedObject.Get()))
-		{
-			FString CameraParams;
-			FPlatformApplicationMisc::ClipboardPaste(CameraParams);
-			Procedure->SetCameraView(FCameraParams(CameraParams));
-		}
-	}
-
-	return FReply::Handled();
+	OperationTargetCategory.AddProperty(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UProcedureBase, bApplyCameraAction)));
+	OperationTargetCategory.AddProperty(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UProcedureBase, CameraModeClass)));
+	OperationTargetCategory.AddProperty(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UProcedureBase, CameraOverride)));
+	OperationTargetCategory.AddProperty(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UProcedureBase, CameraAnchor)));
+	OperationTargetCategory.AddProperty(DetailLayoutBuilder.GetProperty(GET_MEMBER_NAME_CHECKED(UProcedureBase, CameraTransition)));
 }

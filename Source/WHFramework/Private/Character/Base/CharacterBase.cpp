@@ -275,9 +275,9 @@ void ACharacterBase::JumpN_Implementation()
 	Jump();
 }
 
-FCameraTrackProfile ACharacterBase::GetCameraTrackProfile_Implementation() const
+FCameraTargetParams ACharacterBase::GetCameraTargetParams_Implementation() const
 {
-	return CameraTrackProfile;
+	return CameraTargetParams;
 }
 
 void ACharacterBase::SetActorVisible_Implementation(bool bInVisible)

@@ -1,129 +1,75 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Camera/CameraModuleStatics.h"
-
 #include "Camera/CameraModule.h"
-#include "Camera/Actor/CameraActorBase.h"
 #include "Camera/Manager/CameraManagerBase.h"
 
-ACameraManagerBase* UCameraModuleStatics::GetCameraManager(int32 InPlayerIndex)
+ACameraManagerBase* UCameraModuleStatics::GetCameraManager(int32 Index)
 {
-	return UCameraModule::Get().GetCameraManager(InPlayerIndex);
+	return UCameraModule::Get().GetCameraManager(Index);
 }
 
-ACameraActorBase* UCameraModuleStatics::GetCurrentCamera(int32 InPlayerIndex, TSubclassOf<ACameraActorBase> InClass)
+FCameraViewSnapshot UCameraModuleStatics::GetViewSnapshot(int32 Index)
 {
-	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(InPlayerIndex))
+	const ACameraManagerBase* Manager = GetCameraManager(Index);
+	return Manager ? Manager->GetFinalView() : FCameraViewSnapshot();
+}
+
+FTransform UCameraModuleStatics::GetViewTransform(int32 Index)
+{
+	return GetViewSnapshot(Index).Transform;
+}
+
+FVector UCameraModuleStatics::GetViewLocation(int32 Index)
+{
+	return GetViewTransform(Index).GetLocation();
+}
+
+FRotator UCameraModuleStatics::GetViewRotation(int32 Index)
+{
+	return GetViewTransform(Index).Rotator();
+}
+
+float UCameraModuleStatics::GetViewFOV(int32 Index)
+{
+	return GetViewSnapshot(Index).FOV;
+}
+
+void UCameraModuleStatics::SetCameraMode(TSubclassOf<UCameraModeBase> Class, const FCameraModeContext& Context, int32 Index)
+{
+	if(ACameraManagerBase* Manager = GetCameraManager(Index))
 	{
-		return CameraManager->GetCurrentCamera(InClass);
-	}
-	return nullptr;
-}
-
-ACameraPointBase* UCameraModuleStatics::GetDefaultCameraPoint()
-{
-	return UCameraModule::Get().GetDefaultCameraPoint();
-}
-
-FVector UCameraModuleStatics::GetCameraLocation(bool bReally, bool bRefresh, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(InPlayerIndex))
-	{
-		return bReally ? CameraManager->GetRealCameraLocation() : CameraManager->GetCurrentCameraLocation(bRefresh);
-	}
-	return FVector::ZeroVector;
-}
-
-FRotator UCameraModuleStatics::GetCameraRotation(bool bReally, bool bRefresh, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(InPlayerIndex))
-	{
-		return bReally ? CameraManager->GetRealCameraRotation() : CameraManager->GetCurrentCameraRotation(bRefresh);
-	}
-	return FRotator::ZeroRotator;
-}
-
-float UCameraModuleStatics::GetCameraDistance(bool bReally, bool bRefresh, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(InPlayerIndex))
-	{
-		return bReally ? CameraManager->GetRealCameraDistance() : CameraManager->GetCurrentCameraDistance(bRefresh);
-	}
-	return 0.f;
-}
-
-FVector UCameraModuleStatics::GetCameraOffset(bool bReally, bool bRefresh, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(InPlayerIndex))
-	{
-		return bReally ? CameraManager->GetRealCameraOffset() : CameraManager->GetCurrentCameraOffset(bRefresh);
-	}
-	return FVector::ZeroVector;
-}
-
-float UCameraModuleStatics::GetCameraFov(bool bReally, bool bRefresh, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(InPlayerIndex))
-	{
-		return bReally ? CameraManager->GetRealCameraFov() : CameraManager->GetCurrentCameraFov(bRefresh);
-	}
-	return 0.f;
-}
-
-ACameraActorBase* UCameraModuleStatics::GetCameraByClass(TSubclassOf<ACameraActorBase> InClass, int32 InPlayerIndex)
-{
-	return UCameraModule::Get().GetCameraByClass(InClass, InPlayerIndex);
-}
-
-ACameraActorBase* UCameraModuleStatics::GetCameraByName(const FName InName, int32 InPlayerIndex)
-{
-	return UCameraModule::Get().GetCameraByName(InName, InPlayerIndex);
-}
-
-void UCameraModuleStatics::SwitchCameraByClass(TSubclassOf<ACameraActorBase> InClass, bool bReset, bool bInstant, int32 InPlayerIndex)
-{
-	UCameraModule::Get().SwitchCameraByClass(InClass, bReset, bInstant, InPlayerIndex);
-}
-
-void UCameraModuleStatics::SwitchCameraByName(const FName InName, bool bReset, bool bInstant, int32 InPlayerIndex)
-{
-	UCameraModule::Get().SwitchCameraByName(InName, bReset, bInstant, InPlayerIndex);
-}
-
-void UCameraModuleStatics::SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool bSetAsDefault, bool bInstant, int32 InPlayerIndex)
-{
-	UCameraModule::Get().SwitchCameraPoint(InCameraPoint, bSetAsDefault, bInstant, InPlayerIndex);
-}
-
-void UCameraModuleStatics::BindTarget(const FCameraTargetRequest& InRequest, int32 InPlayerIndex)
-{
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
-	{
-		CameraManager->BindTarget(InRequest);
+		Manager->SetMode(Class, Context);
 	}
 }
 
-void UCameraModuleStatics::ClearTarget(AActor* InExpectedTarget, int32 InPlayerIndex)
+FCameraFeatureHandle UCameraModuleStatics::PushFeature(TSubclassOf<UCameraFeatureBase> Class, const FCameraFeatureContext& Context, int32 Index)
 {
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
+	if(ACameraManagerBase* Manager = GetCameraManager(Index))
 	{
-		CameraManager->ClearTarget(InExpectedTarget);
+		return Manager->PushFeature(Class, Context);
+	}
+	return {};
+}
+
+void UCameraModuleStatics::PopFeature(FCameraFeatureHandle Handle, int32 Index)
+{
+	if(ACameraManagerBase* Manager = GetCameraManager(Index))
+	{
+		Manager->PopFeature(Handle);
 	}
 }
 
-void UCameraModuleStatics::ApplyView(const FCameraViewRequest& InRequest, int32 InPlayerIndex)
+void UCameraModuleStatics::StartDirector(TSubclassOf<UCameraDirectorBase> Class, int32 Index)
 {
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
+	if(ACameraManagerBase* Manager = GetCameraManager(Index))
 	{
-		CameraManager->ApplyView(InRequest);
+		Manager->StartDirector(Class);
 	}
 }
 
-void UCameraModuleStatics::ResetView(ECameraResetMode InMode, bool bInstant, int32 InPlayerIndex)
+void UCameraModuleStatics::StopDirector(int32 Index)
 {
-	if(ACameraManagerBase* CameraManager = GetCameraManager(InPlayerIndex))
+	if(ACameraManagerBase* Manager = GetCameraManager(Index))
 	{
-		CameraManager->ResetView(InMode, bInstant);
+		Manager->StopDirector();
 	}
 }

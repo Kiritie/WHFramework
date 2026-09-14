@@ -101,9 +101,9 @@ void UWorldWidgetComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 	if(bOrientCamera)
 	{
 #if WITH_EDITOR
-		SetWorldRotation(GIsPlaying ? UCameraModuleStatics::GetCameraRotation(true) : FSceneManager::Get().GetActiveViewportViewRotation());
+		SetWorldRotation(GIsPlaying ? UCameraModuleStatics::GetViewRotation() : FSceneManager::Get().GetActiveViewportViewRotation());
 #else
-		SetWorldRotation(UCameraModuleStatics::GetCameraRotation(true));
+		SetWorldRotation(UCameraModuleStatics::GetViewRotation());
 #endif
 		SetRelativeScale3D(FVector(-WidgetScale.X, -WidgetScale.Y, WidgetScale.Z));
 	}

@@ -22,6 +22,7 @@ class UWorldWeather;
 class UWorldTimer;
 class UWidgetSceneWorldMarker;
 class UWidgetSceneMapBase;
+class ACameraStreamingBridge;
 /** 场景模块 */
 UCLASS()
 class WHFRAMEWORK_API USceneModule : public UModuleBase, public ISceneContainerInterface, public IDebuggerInterface
@@ -65,6 +66,9 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 protected:
+	UPROPERTY(Transient)
+	TObjectPtr<ACameraStreamingBridge> CameraStreamingBridge;
+
 	virtual void OnDrawDebug(UCanvas* InCanvas, APlayerController* InPC) override;
 
 #if WITH_EDITOR

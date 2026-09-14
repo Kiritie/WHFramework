@@ -15,7 +15,4 @@ public:
 
 	virtual void CustomizeDetails( IDetailLayoutBuilder& DetailLayout ) override;
 
-protected:
-	FReply OnClickGetCameraViewButton();
-	FReply OnClickPasteCameraViewButton();
 };

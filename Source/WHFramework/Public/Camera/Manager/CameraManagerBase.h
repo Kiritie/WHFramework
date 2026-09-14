@@ -1,19 +1,15 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
-
 #pragma once
 
 #include "Camera/CameraModuleTypes.h"
 #include "Camera/PlayerCameraManager.h"
-#include "Math/MathTypes.h"
-
 #include "CameraManagerBase.generated.h"
 
-class ACameraPointBase;
-class ACameraActorBase;
-/**
- *
- */
-UCLASS(notplaceable)
+class ACameraRigBase;
+class UCameraDirectorBase;
+class UCameraFeatureBase;
+class UCameraModeBase;
+
+UCLASS(NotPlaceable)
 class WHFRAMEWORK_API ACameraManagerBase : public APlayerCameraManager
 {
 	GENERATED_BODY()
@@ -23,7 +19,6 @@ class WHFRAMEWORK_API ACameraManagerBase : public APlayerCameraManager
 public:
 	ACameraManagerBase(const FObjectInitializer& ObjectInitializer);
 
-public:
 	virtual void InitializeFor(APlayerController* PC) override;
 
 	virtual void Destroyed() override;
@@ -32,352 +27,129 @@ public:
 
 	virtual void UpdateCamera(float DeltaTime) override;
 
-protected:
-	virtual void UpdateViewTarget(FTViewTarget& OutVT, float DeltaTime) override;
-
-protected:
-	UPROPERTY(VisibleAnywhere, Category = "Camera")
-	TArray<ACameraActorBase*> Cameras;
-
-	UPROPERTY(VisibleAnywhere, Category = "Camera")
-	ACameraActorBase* CurrentCamera;
-		
-	UPROPERTY(EditAnywhere, Category = "Camera")
-	ACameraPointBase* DefaultCameraPoint;
-
-	UPROPERTY(VisibleAnywhere, Category = "Camera")
-	ACameraPointBase* CurrentCameraPoint;
-
-	UPROPERTY(VisibleAnywhere, Category = "Camera")
-	int32 LocalPlayerIndex;
-
-	UPROPERTY(Transient)
-	FCameraSettings RuntimeSettings;
-
-	UPROPERTY(Transient)
-	bool bOwnsRuntimeCameras;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
-	FCameraRuntimeState RuntimeState;
-
-	UPROPERTY(Transient)
-	FCameraTrackProfile TrackProfile;
-
-	TWeakObjectPtr<AActor> TrackTarget;
-
-private:
-	TMap<FName, ACameraActorBase*> CameraMap;
-
-	void RefreshTransitionState();
-
+	//////////////////////////////////////////////////////////////////////////
+	/// Camera Mode
 public:
-	void ApplySettings(const FCameraSettings& InSettings) { RuntimeSettings = InSettings; }
+	UFUNCTION(BlueprintCallable, Category = "CameraModule")
+	void SetMode(TSubclassOf<UCameraModeBase> ModeClass, const FCameraModeContext& Context);
 
-	UFUNCTION(BlueprintPure)
-	const FCameraRuntimeState& GetRuntimeState() const { return RuntimeState; }
+	UFUNCTION(BlueprintCallable, Category = "CameraModule")
+	void SetDefaultMode(const FCameraTransitionParams& Transition);
 
-	UFUNCTION(BlueprintCallable)
-	void BindTarget(const FCameraTargetRequest& InRequest);
+	UFUNCTION(BlueprintCallable, Category = "CameraModule")
+	void ClearModeTarget();
 
-	UFUNCTION(BlueprintCallable)
-	void ClearTarget(AActor* InExpectedTarget = nullptr);
+	UFUNCTION(BlueprintCallable, Category = "CameraModule")
+	void AddInputIntent(const FCameraInputIntent& Intent);
 
-	UFUNCTION(BlueprintCallable)
-	void ApplyView(const FCameraViewRequest& InRequest);
+	UFUNCTION(BlueprintCallable, Category = "CameraModule")
+	FCameraConfigOverrideHandle PushCameraConfigOverride(const FCameraConfigOverride& InOverride, int32 InPriority = 0);
 
-	UFUNCTION(BlueprintCallable)
-	void StopViewTransition(int32 InProperties);
+	UFUNCTION(BlueprintCallable, Category = "CameraModule")
+	void PopCameraConfigOverride(FCameraConfigOverrideHandle InHandle);
 
-	UFUNCTION(BlueprintCallable)
-	void AddLookInput(const FVector2D& InValue);
+	UFUNCTION(BlueprintCallable, Category = "CameraModule")
+	void ClearCameraConfigOverrides();
 
-	UFUNCTION(BlueprintCallable)
-	void AddPanInput(const FVector2D& InValue);
+	const FCameraResolvedConfig& GetResolvedCameraConfig();
 
-	UFUNCTION(BlueprintCallable)
-	void AddMoveInput(const FVector& InValue);
+	//////////////////////////////////////////////////////////////////////////
+	/// Camera Feature
+public:
+	UFUNCTION(BlueprintCallable, Category = "CameraModule")
+	FCameraFeatureHandle PushFeature(TSubclassOf<UCameraFeatureBase> FeatureClass, const FCameraFeatureContext& Context);
 
-	UFUNCTION(BlueprintCallable)
-	void AddZoomInput(float InValue);
+	UFUNCTION(BlueprintCallable, Category = "CameraModule")
+	void PopFeature(FCameraFeatureHandle Handle);
 
-	template<class T>
-	T* GetCurrentCamera()
-	{
-		return Cast<T>(CurrentCamera);
-	}
-	
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	ACameraActorBase* GetCurrentCamera(TSubclassOf<ACameraActorBase> InClass = nullptr) const;
-	
-	UFUNCTION(BlueprintPure)
-	ACameraPointBase* GetDefaultCameraPoint() const { return DefaultCameraPoint; }
-	
-	UFUNCTION(BlueprintCallable)
-	void SetDefaultCameraPoint(ACameraPointBase* InCameraPoint) { DefaultCameraPoint = InCameraPoint; }
+	//////////////////////////////////////////////////////////////////////////
+	/// Camera Director
+public:
+	UFUNCTION(BlueprintCallable, Category = "CameraModule")
+	void StartDirector(TSubclassOf<UCameraDirectorBase> DirectorClass);
 
-	template<class T>
-	T* GetCameraByClass(TSubclassOf<ACameraActorBase> InClass = T::StaticClass())
-	{
-		return Cast<T>(GetCameraByClass(InClass));
-	}
+	UFUNCTION(BlueprintCallable, Category = "CameraModule")
+	void StopDirector();
 
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"))
-	ACameraActorBase* GetCameraByClass(TSubclassOf<ACameraActorBase> InClass);
+	//////////////////////////////////////////////////////////////////////////
+	/// Camera State
+public:
+	void ApplyUserSettings(const FCameraUserSettings& InSettings) { UserSettings = InSettings; }
 
-	template<class T>
-	T* GetCameraByName(const FName InName)
-	{
-		return Cast<T>(GetCameraByName(InName));
-	}
+	void SetInitialView(const FRotator& Rotation, float Distance);
 
-	UFUNCTION(BlueprintPure)
-	ACameraActorBase* GetCameraByName(const FName InName) const;
+	void SetDesiredPivot(const FVector& Location, const FRotator& Rotation);
 
-	UFUNCTION(BlueprintPure)
+	UFUNCTION(BlueprintPure, Category = "CameraModule")
+	const FCameraViewSnapshot& GetFinalView() const { return FinalView; }
+
+	UFUNCTION(BlueprintPure, Category = "CameraModule")
+	float GetCurrentRigDistance() const { return DesiredState.ArmLength; }
+
+	UFUNCTION(BlueprintPure, Category = "CameraModule")
 	int32 GetLocalPlayerIndex() const { return LocalPlayerIndex; }
-	
-	UFUNCTION(BlueprintCallable)
-	void SwitchCamera(ACameraActorBase* InCamera, bool bReset = true, bool bInstant = false);
 
-	template<class T>
-	void SwitchCameraByClass(bool bReset = true, bool bInstant = false, TSubclassOf<ACameraActorBase> InClass = T::StaticClass())
-	{
-		SwitchCameraByClass(InClass, bReset, bInstant);
-	}
-
-	UFUNCTION(BlueprintCallable)
-	void SwitchCameraByClass(TSubclassOf<ACameraActorBase> InClass, bool bReset = true, bool bInstant = false);
-
-	UFUNCTION(BlueprintCallable)
-	void SwitchCameraByName(const FName InName, bool bReset = true, bool bInstant = false);
-
-	UFUNCTION(BlueprintCallable)
-	void SwitchCameraPoint(ACameraPointBase* InCameraPoint, bool bSetAsDefault = false, bool bInstant = false);
+	ACameraRigBase* GetRuntimeRig() const { return RuntimeRig; }
 
 	//////////////////////////////////////////////////////////////////////////
-	/// Camera Stats
 protected:
-	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Location")
-	FVector CurrentCameraLocation;
-	
-	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Location")
-	FVector TargetCameraLocation;
+	UPROPERTY(Transient)
+	TObjectPtr<ACameraRigBase> RuntimeRig;
 
-	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Rotation")
-	FRotator CurrentCameraRotation;
-	
-	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Rotation")
-	FRotator TargetCameraRotation;
+	UPROPERTY(Transient)
+	TObjectPtr<UCameraModeBase> ActiveMode;
 
-	UPROPERTY(EditAnywhere, Category = "CameraStats|Rotate")
-	float InitCameraPitch;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UCameraFeatureBase>> ActiveFeatures;
 
-	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Distance")
-	float CurrentCameraDistance;
-	
-	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Distance")
-	float TargetCameraDistance;
+	UPROPERTY(Transient)
+	TObjectPtr<UCameraDirectorBase> ActiveDirector;
 
-	UPROPERTY(EditAnywhere, Category = "CameraStats|Zoom")
-	float InitCameraDistance;
+	UPROPERTY(Transient)
+	FCameraRigState DesiredState;
 
-	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Offset")
-	FVector CurrentCameraOffset;
-	
-	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Offset")
-	FVector TargetCameraOffset;
+	UPROPERTY(Transient)
+	FCameraViewSnapshot FinalView;
 
-	UPROPERTY(EditAnywhere, Category = "CameraStats|Offset")
-	FVector InitCameraOffset;
+	UPROPERTY(Transient)
+	FCameraUserSettings UserSettings;
 
-	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Fov")
-	float CurrentCameraFov;
-	
-	UPROPERTY(VisibleAnywhere, Category = "CameraStats|Fov")
-	float TargetCameraFov;
-	
-	UPROPERTY(EditAnywhere, Category = "CameraStats|Fov")
-	float InitCameraFov;
+	UPROPERTY(Transient)
+	TArray<FCameraConfigOverrideEntry> CameraConfigOverrides;
+
+	UPROPERTY(Transient)
+	int32 LocalPlayerIndex = INDEX_NONE;
 
 private:
-	float CameraDoLocationTime;
-	float CameraDoLocationDuration;
-	FVector CameraDoLocationLocation;
-	EEaseType CameraDoLocationEaseType;
-	
-	float CameraDoOffsetTime;
-	float CameraDoOffsetDuration;
-	FVector CameraDoOffsetOffset;
-	EEaseType CameraDoOffsetEaseType;
-	
-	float CameraDoRotationTime;
-	float CameraDoRotationDuration;
-	FRotator CameraDoRotationRotation;
-	EEaseType CameraDoRotationEaseType;
-	
-	float CameraDoDistanceTime;
-	float CameraDoDistanceDuration;
-	float CameraDoDistanceDistance;
-	EEaseType CameraDoDistanceEaseType;
-		
-	float CameraDoFovTime;
-	float CameraDoFovDuration;
-	float CameraDoFovFov;
-	EEaseType CameraDoFovEaseType;
+	FCameraRigState TransitionSource;
 
-	FCameraViewData CachedCameraViewData;
-	FCameraViewData TrackCameraViewData;
-	bool bTrackAllowControl;
-	ECameraSmoothMode TrackSmoothMode;
-	ECameraControlMode TrackControlMode;
+	FCameraTransitionParams ActiveTransition;
 
-protected:
-	virtual void DoTrackTarget(bool bInstant = false);
-	
-	virtual void DoTrackTargetLocation(bool bInstant = false);
-	
-	virtual void DoTrackTargetRotation(bool bInstant = false);
-	
-	virtual void DoTrackTargetDistance(bool bInstant = false);
+	float TransitionElapsed = 0.f;
 
-protected:
-	virtual void ApplyLocationInternal(FVector InLocation, bool bInstant);
+	bool bTransitionActive = false;
 
-	virtual void TransitionLocationInternal(FVector InLocation, float InDuration, EEaseType InEaseType, bool bForce = true);
+	uint64 CameraOverrideSequence = 0;
 
-	virtual void StopTransitionLocationInternal();
+	FCameraResolvedConfig CachedResolvedCameraConfig;
 
-	virtual void ApplyOffsetInternal(FVector InOffset, bool bInstant = false);
+	bool bResolvedCameraConfigDirty = true;
 
-	virtual void TransitionOffsetInternal(FVector InOffset, float InDuration, EEaseType InEaseType, bool bForce = true);
+	float CurrentArmLength = 0.f;
 
-	virtual void StopTransitionOffsetInternal();
+	void SpawnRuntimeRig();
 
-	virtual void ApplyRotationInternal(float InYaw, float InPitch, bool bInstant);
+	void ActivateDefaultMode();
 
-	virtual void TransitionRotationInternal(float InYaw, float InPitch, float InDuration, EEaseType InEaseType, bool bForce = true);
+	void ApplyRig(float DeltaTime);
 
-	virtual void StopTransitionRotationInternal();
+	void RefreshFinalView();
 
-	virtual void ApplyDistanceInternal(float InDistance, bool bInstant);
+	FCameraInputIntent ResolveInput(const FCameraInputIntent& InRawInput) const;
 
-	virtual void TransitionDistanceInternal(float InDistance, float InDuration, EEaseType InEaseType, bool bForce = true);
+	FCameraResolvedConfig ResolveCameraConfig(const FCameraTargetParams* InTargetParams) const;
 
-	virtual void StopTransitionDistanceInternal();
+	const FCameraTargetParams* GetActiveTargetParams() const;
 
-	virtual void ApplyRotationAndDistanceInternal(float InYaw, float InPitch, float InDistance, bool bInstant);
-
-	virtual void TransitionRotationAndDistanceInternal(float InYaw, float InPitch, float InDistance, float InDuration, EEaseType InEaseType, bool bForce = true);
-
-	virtual void ApplyTransformInternal(FVector InLocation, float InYaw, float InPitch, float InDistance, bool bInstant);
-
-	virtual void TransitionTransformInternal(FVector InLocation, float InYaw, float InPitch, float InDistance, float InDuration, EEaseType InEaseType, bool bForce = true);
-
-	virtual void StopTransitionTransformInternal();
-
-	virtual void ApplyFovInternal(float InFov, bool bInstant);
-
-	virtual void TransitionFovInternal(float InFov, float InDuration, EEaseType InEaseType, bool bForce = true);
-
-	virtual void StopTransitionFovInternal();
-
-	virtual void ApplyMoveInputInternal(FVector InDirection, float InValue);
-
-	virtual void ApplyLookInputInternal(float InYaw, float InPitch);
-
-	virtual void ApplyZoomInputInternal(float InValue);
-
-public:
-	virtual void ApplyViewData(const FCameraViewData& InCameraViewData, bool bCacheData = true, bool bInstant = false);
-	
-	UFUNCTION(BlueprintCallable)
-	virtual void ResetView(ECameraResetMode InCameraResetMode = ECameraResetMode::DefaultPoint, bool bInstant = false);
-
-protected:
-	virtual void ApplyViewParamsInternal(const FCameraViewParams& InCameraViewParams, bool bInstant);
-
-public:
-	UFUNCTION(BlueprintPure)
-	bool IsControllingMove();
-
-	UFUNCTION(BlueprintPure)
-	bool IsControllingRotate();
-
-	UFUNCTION(BlueprintPure)
-	bool IsControllingZoom();
-
-	UFUNCTION(BlueprintPure)
-	bool IsTrackingTarget() const;
-
-public:
-	UFUNCTION(BlueprintPure)
-	float GetMinCameraPitch() const;
-
-	UFUNCTION(BlueprintPure)
-	float GetMaxCameraPitch() const;
-
-	UFUNCTION(BlueprintPure)
-	float GetInitCameraPitch() const { return InitCameraPitch; }
-
-	UFUNCTION(BlueprintCallable)
-	void SetInitCameraPitch(float InInitCameraPitch) { InitCameraPitch = InInitCameraPitch; }
-
-	UFUNCTION(BlueprintPure)
-	float GetInitCameraDistance() const { return InitCameraDistance; }
-
-	UFUNCTION(BlueprintCallable)
-	void SetInitCameraDistance(float InInitCameraDistance) { InitCameraDistance = InInitCameraDistance; }
-	
-	UFUNCTION(BlueprintPure)
-	FVector GetRealCameraLocation();
-	
-	UFUNCTION(BlueprintPure)
-	FVector GetCurrentCameraLocation(bool bRefresh = false) const;
-
-	UFUNCTION(BlueprintPure)
-	FVector GetTargetCameraLocation() const { return TargetCameraLocation; }
-
-	UFUNCTION(BlueprintPure)
-	FVector GetRealCameraOffset() const;
-
-	UFUNCTION(BlueprintPure)
-	FVector GetCurrentCameraOffset(bool bRefresh = false) const;
-
-	UFUNCTION(BlueprintPure)
-	FVector GetTargetCameraOffset() const { return TargetCameraOffset; }
-
-	UFUNCTION(BlueprintPure)
-	FRotator GetRealCameraRotation();
-
-	UFUNCTION(BlueprintPure)
-	FRotator GetCurrentCameraRotation(bool bRefresh = false);
-
-	UFUNCTION(BlueprintPure)
-	FRotator GetTargetCameraRotation() const { return TargetCameraRotation; }
-
-	UFUNCTION(BlueprintPure)
-	float GetRealCameraDistance() const;
-
-	UFUNCTION(BlueprintPure)
-	float GetCurrentCameraDistance(bool bRefresh = false) const;
-
-	UFUNCTION(BlueprintPure)
-	float GetTargetCameraDistance() const { return TargetCameraDistance; }
-
-	UFUNCTION(BlueprintPure)
-	float GetRealCameraFov() const;
-
-	UFUNCTION(BlueprintPure)
-	float GetCurrentCameraFov(bool bRefresh = false) const;
-
-	UFUNCTION(BlueprintPure)
-	float GetTargetCameraFov() const { return TargetCameraFov; }
-
-	UFUNCTION(BlueprintPure)
-	AActor* GetTrackingTarget() const { return RuntimeState.Target; }
-
-	//////////////////////////////////////////////////////////////////////////
-	/// Network
-public:
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	static float ResolveSmoothSpeed(float InSmoothingAmount, float InMinSmoothSpeed, float InMaxSmoothSpeed);
 };

@@ -81,7 +81,9 @@ void UDefaultInputBinding::OnTurnCamera_Implementation(const FInputActionValue& 
 
 	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(LocalPlayerIndex))
 	{
-		CameraManager->AddLookInput(FVector2D(Value / UCommonModuleStatics::GetTimeScale(), 0.f));
+		FCameraInputIntent Intent;
+		Intent.Look.X = Value / UCommonModuleStatics::GetTimeScale();
+		CameraManager->AddInputIntent(Intent);
 	}
 }
 
@@ -92,7 +94,9 @@ void UDefaultInputBinding::OnLookUpCamera_Implementation(const FInputActionValue
 
 	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(LocalPlayerIndex))
 	{
-		CameraManager->AddLookInput(FVector2D(0.f, Value / UCommonModuleStatics::GetTimeScale()));
+		FCameraInputIntent Intent;
+		Intent.Look.Y = Value / UCommonModuleStatics::GetTimeScale();
+		CameraManager->AddInputIntent(Intent);
 	}
 }
 
@@ -103,7 +107,9 @@ void UDefaultInputBinding::OnPanHCamera_Implementation(const FInputActionValue& 
 
 	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(LocalPlayerIndex))
 	{
-		CameraManager->AddPanInput(FVector2D(Value / UCommonModuleStatics::GetTimeScale(), 0.f));
+		FCameraInputIntent Intent;
+		Intent.Pan.X = Value / UCommonModuleStatics::GetTimeScale();
+		CameraManager->AddInputIntent(Intent);
 	}
 }
 
@@ -114,7 +120,9 @@ void UDefaultInputBinding::OnPanVCamera_Implementation(const FInputActionValue& 
 
 	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(LocalPlayerIndex))
 	{
-		CameraManager->AddPanInput(FVector2D(0.f, Value / UCommonModuleStatics::GetTimeScale()));
+		FCameraInputIntent Intent;
+		Intent.Pan.Y = Value / UCommonModuleStatics::GetTimeScale();
+		CameraManager->AddInputIntent(Intent);
 	}
 }
 
@@ -125,7 +133,9 @@ void UDefaultInputBinding::OnZoomCamera_Implementation(const FInputActionValue& 
 
 	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(LocalPlayerIndex))
 	{
-		CameraManager->AddZoomInput(-Value / UCommonModuleStatics::GetTimeScale());
+		FCameraInputIntent Intent;
+		Intent.Zoom = -Value / UCommonModuleStatics::GetTimeScale();
+		CameraManager->AddInputIntent(Intent);
 	}
 }
 
@@ -136,7 +146,9 @@ void UDefaultInputBinding::OnMoveForwardCamera_Implementation(const FInputAction
 
 	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(LocalPlayerIndex))
 	{
-		CameraManager->AddMoveInput(CameraManager->GetRuntimeState().Rotation.Vector() * Value / UCommonModuleStatics::GetTimeScale());
+		FCameraInputIntent Intent;
+		Intent.Move.X = Value / UCommonModuleStatics::GetTimeScale();
+		CameraManager->AddInputIntent(Intent);
 	}
 }
 
@@ -147,8 +159,9 @@ void UDefaultInputBinding::OnMoveRightCamera_Implementation(const FInputActionVa
 
 	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(LocalPlayerIndex))
 	{
-		const FVector Direction = FRotationMatrix(CameraManager->GetRuntimeState().Rotation).GetUnitAxis(EAxis::Y);
-		CameraManager->AddMoveInput(Direction * Value / UCommonModuleStatics::GetTimeScale());
+		FCameraInputIntent Intent;
+		Intent.Move.Y = Value / UCommonModuleStatics::GetTimeScale();
+		CameraManager->AddInputIntent(Intent);
 	}
 }
 
@@ -159,7 +172,9 @@ void UDefaultInputBinding::OnMoveUpCamera_Implementation(const FInputActionValue
 
 	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(LocalPlayerIndex))
 	{
-		CameraManager->AddMoveInput(FVector::UpVector * Value / UCommonModuleStatics::GetTimeScale());
+		FCameraInputIntent Intent;
+		Intent.Move.Z = Value / UCommonModuleStatics::GetTimeScale();
+		CameraManager->AddInputIntent(Intent);
 	}
 }
 

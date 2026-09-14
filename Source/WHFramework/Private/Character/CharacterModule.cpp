@@ -4,8 +4,8 @@
 #include "Character/CharacterModule.h"
 
 #include "Camera/CameraModule.h"
-#include "Camera/Actor/CameraActorBase.h"
 #include "Camera/Manager/CameraManagerBase.h"
+#include "Camera/Mode/FollowCameraMode.h"
 #include "Character/CharacterModuleNetworkComponent.h"
 #include "Character/Base/CharacterBase.h"
 #include "Gameplay/WHPlayerController.h"
@@ -172,17 +172,10 @@ void UCharacterModule::SwitchCharacter(ACharacterBase* InCharacter, bool bResetC
 		CurrentCharacter->OnSwitch();
 		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
 		{
-			FCameraTrackProfile Profile = ICameraTrackableInterface::Execute_GetCameraTrackProfile(CurrentCharacter);
-			Profile.Offset *= CurrentCharacter->GetActorScale3D();
-
-			FCameraTargetRequest Request;
-			Request.Target = CurrentCharacter;
-			Request.Profile = Profile;
-			Request.ViewMode = bInstant ? ECameraViewMode::Instant : ECameraViewMode::Smooth;
-			Request.ViewSpace = ECameraViewSpace::Local;
-			Request.bResetRotation = bResetCamera;
-			Request.bInstant = bInstant;
-			CameraManager->BindTarget(Request);
+			FCameraModeContext Context;
+			Context.Target = CurrentCharacter;
+			Context.Transition = bInstant ? FCameraTransitionParams::Instant() : FCameraTransitionParams::Smooth();
+			CameraManager->SetMode(UFollowCameraMode::StaticClass(), Context);
 		}
 	}
 	else if(CurrentCharacter)
@@ -196,7 +189,7 @@ void UCharacterModule::SwitchCharacter(ACharacterBase* InCharacter, bool bResetC
 		}
 		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
 		{
-			CameraManager->ClearTarget(PreviousCharacter);
+			CameraManager->ClearModeTarget();
 		}
 		CurrentCharacter = nullptr;
 	}

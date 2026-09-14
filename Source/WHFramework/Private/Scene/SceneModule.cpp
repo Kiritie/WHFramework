@@ -1,8 +1,8 @@
 
 #include "Scene/SceneModule.h"
+#include "Scene/Camera/CameraStreamingBridge.h"
 
 #include "Camera/CameraModuleStatics.h"
-#include "Camera/Actor/CameraActorBase.h"
 #include "Common/CommonModuleStatics.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Debug/DebugModuleTypes.h"
@@ -175,6 +175,10 @@ void USceneModule::OnInitialize()
 	Super::OnInitialize();
 
 	IDebuggerInterface::Register();
+	if(GetWorld() && GetWorld()->GetNetMode() != NM_DedicatedServer)
+	{
+		CameraStreamingBridge = GetWorld()->SpawnActor<ACameraStreamingBridge>();
+	}
 
 	UEventModuleStatics::SubscribeEvent<FEventAsyncLoadLevels>(this, &ThisClass::OnAsyncLoadLevels);
 	UEventModuleStatics::SubscribeEvent<FEventAsyncUnloadLevels>(this, &ThisClass::OnAsyncUnloadLevels);
@@ -298,7 +302,7 @@ void USceneModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 		AddSceneArea(PendingSceneArea);
 	}
 
-	Altitude = UCameraModuleStatics::GetCameraLocation(true).Z - SeaLevel;
+	Altitude = UCameraModuleStatics::GetViewLocation().Z - SeaLevel;
 	RefreshWorldMarkerWidgets();
 
 	if(MiniMapCapture && MiniMapSource == EWorldMiniMapSource::SceneCapture)
@@ -323,10 +327,8 @@ void USceneModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 			}
 			case EWorldMiniMapMode::CameraPoint:
 			{
-				if(const ACameraActorBase* CameraActor = UCameraModuleStatics::GetCurrentCamera())
-				{
-					MiniMapCapture->SetActorLocationAndRotation(CameraActor->GetActorLocation(), bMiniMapRotatable ? FRotator(0.f, CameraActor->GetActorRotation().Yaw, 0.f) : FRotator::ZeroRotator);
-				}
+				const FTransform ViewTransform = UCameraModuleStatics::GetViewTransform();
+				MiniMapCapture->SetActorLocationAndRotation(ViewTransform.GetLocation(), bMiniMapRotatable ? FRotator(0.f, ViewTransform.Rotator().Yaw, 0.f) : FRotator::ZeroRotator);
 				break;
 			}
 			default: break;
@@ -403,6 +405,11 @@ void USceneModule::OnTermination(EPhase InPhase)
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
 		IDebuggerInterface::UnRegister();
+		if(CameraStreamingBridge)
+		{
+			CameraStreamingBridge->Destroy();
+			CameraStreamingBridge = nullptr;
+		}
 
 		FSceneArea Area;
 		while(PendingSceneAreas.Dequeue(Area)) { }
@@ -554,7 +561,7 @@ void USceneModule::PostEditChangeProperty(FPropertyChangedEvent& PropertyChanged
 
 float USceneModule::GetAltitude(bool bUnsigned, bool bRefresh) const
 {
-	const float ReturnValue = bRefresh ? UCameraModuleStatics::GetCameraLocation(true).Z - SeaLevel : Altitude;
+	const float ReturnValue = bRefresh ? UCameraModuleStatics::GetViewLocation().Z - SeaLevel : Altitude;
 	return bUnsigned ? FMath::Max(ReturnValue, 0.f) : ReturnValue;
 }
 
@@ -603,11 +610,9 @@ FSceneMapView USceneModule::GetMapView(ESceneMarkerChannel InChannel) const
 		}
 		case EWorldMiniMapMode::CameraPoint:
 		{
-			if(const ACameraActorBase* CameraActor = UCameraModuleStatics::GetCurrentCamera())
-			{
-				Location = CameraActor->GetActorLocation();
-				Yaw = CameraActor->GetActorRotation().Yaw;
-			}
+			const FTransform ViewTransform = UCameraModuleStatics::GetViewTransform();
+			Location = ViewTransform.GetLocation();
+			Yaw = ViewTransform.Rotator().Yaw;
 			break;
 		}
 		default: break;
@@ -888,7 +893,7 @@ void USceneModule::RefreshWorldMarkerWidgets()
 		bWorldMarkerWidgetsDirty = false;
 	}
 
-	const FVector ViewLocation = UCameraModuleStatics::GetCameraLocation(true);
+	const FVector ViewLocation = UCameraModuleStatics::GetViewLocation();
 	float ViewYaw = 0.f;
 	if(const APlayerController* PlayerController = UCommonModuleStatics::GetPlayerController())
 	{

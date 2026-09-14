@@ -76,7 +76,7 @@ FVector UWidgetSceneMarkerPanel::GetMarkerViewLocation() const
 	{
 		if(const AActor* ViewTarget = PlayerController->GetViewTarget()) return ViewTarget->GetActorLocation();
 	}
-	return UCameraModuleStatics::GetCameraLocation(true);
+	return UCameraModuleStatics::GetViewLocation();
 }
 
 float UWidgetSceneMarkerPanel::GetMarkerViewYaw() const
