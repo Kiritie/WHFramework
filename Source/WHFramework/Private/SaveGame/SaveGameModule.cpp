@@ -21,6 +21,8 @@ USaveGameModule::USaveGameModule()
 	SaveScope = ESaveScope::None;
 	UserIndex = 0;
 	bSaveOperationRunning = false;
+	bHasPendingSaveSlot = false;
+	PendingSaveSlotParams = FCreateSaveSlotParams();
 }
 
 USaveGameModule::~USaveGameModule() = default;
@@ -45,7 +47,7 @@ void USaveGameModule::OnPreparatory(EPhase InPhase)
 	{
 		const FPendingSaveLoadContext Context = PendingLoadContext;
 		PendingLoadContext = FPendingSaveLoadContext();
-		RestoreSlotGeneration(Context);
+		RestoreSlotGeneration(Context, Context.LoadPhase);
 	}
 }
 
@@ -124,6 +126,47 @@ FSaveOperationResult USaveGameModule::SaveSlot(FGuid SaveId)
 FSaveOperationResult USaveGameModule::SaveActiveSlot()
 {
 	return ActiveSaveId.IsValid() ? SaveSlot(ActiveSaveId) : FSaveOperationResult::Failed(ESaveResultCode::NotFound, FText::FromString(TEXT("No active save.")));
+}
+
+void USaveGameModule::BeginPendingSaveSlot(const FCreateSaveSlotParams& Params)
+{
+	PendingSaveSlotParams = Params;
+	PendingSaveSlotParams.bCaptureCurrentWorld = true;
+	bHasPendingSaveSlot = true;
+}
+
+void USaveGameModule::CancelPendingSaveSlot()
+{
+	bHasPendingSaveSlot = false;
+	PendingSaveSlotParams = FCreateSaveSlotParams();
+}
+
+FSaveOperationResult USaveGameModule::SaveCurrentSlot()
+{
+	if(bHasPendingSaveSlot)
+	{
+		FSaveSlotSummary Summary;
+		const FSaveOperationResult Result = CreateSaveSlot(PendingSaveSlotParams, Summary);
+		if(Result)
+		{
+			CancelPendingSaveSlot();
+		}
+		return Result;
+	}
+	if(ActiveSaveId.IsValid())
+	{
+		return SaveActiveSlot();
+	}
+	return FSaveOperationResult::Success();
+}
+
+void USaveGameModule::ClearActiveSave()
+{
+	ActiveSaveId.Invalidate();
+	if(UVoxelModule* Voxel = AMainModule::GetModuleByClass<UVoxelModule>(false))
+	{
+		Voxel->ClearActiveSaveSource();
+	}
 }
 
 FSaveOperationResult USaveGameModule::SaveSlotInternal(FGuid SaveId)
@@ -205,7 +248,7 @@ FSaveOperationResult USaveGameModule::CaptureModulesToGeneration(const FGuid& Sa
 	return FSaveOperationResult::Success();
 }
 
-FSaveOperationResult USaveGameModule::LoadSlot(FGuid SaveId)
+FSaveOperationResult USaveGameModule::LoadSlot(FGuid SaveId, EPhase InPhase)
 {
 	if(!SaveId.IsValid())
 	{
@@ -227,6 +270,7 @@ FSaveOperationResult USaveGameModule::LoadSlot(FGuid SaveId)
 		PendingLoadContext.SaveId = SaveId;
 		PendingLoadContext.Generation = Manifest.CurrentGeneration;
 		PendingLoadContext.TargetMap = Manifest.CurrentMap;
+		PendingLoadContext.LoadPhase = InPhase;
 		if(UWHGameInstance* GameInstance = GetWorld() ? Cast<UWHGameInstance>(GetWorld()->GetGameInstance()) : nullptr)
 		{
 			GameInstance->SetPendingSaveLoad(PendingLoadContext);
@@ -238,20 +282,22 @@ FSaveOperationResult USaveGameModule::LoadSlot(FGuid SaveId)
 	Context.SaveId = SaveId;
 	Context.Generation = Manifest.CurrentGeneration;
 	Context.TargetMap = Manifest.CurrentMap.IsNone() ? CurrentMap : Manifest.CurrentMap;
-	return RestoreSlotGeneration(Context);
+	Context.LoadPhase = InPhase;
+	return RestoreSlotGeneration(Context, InPhase);
 }
 
-FSaveOperationResult USaveGameModule::RestoreSlotGeneration(const FPendingSaveLoadContext& Context)
+FSaveOperationResult USaveGameModule::RestoreSlotGeneration(const FPendingSaveLoadContext& Context, EPhase InPhase)
 {
-	FSaveOperationResult Result = LoadModulesFromGeneration(Context.SaveId, Context.Generation);
+	FSaveOperationResult Result = LoadModulesFromGeneration(Context.SaveId, Context.Generation, InPhase);
 	if(Result)
 	{
 		ActiveSaveId = Context.SaveId;
+		CancelPendingSaveSlot();
 	}
 	return Result;
 }
 
-FSaveOperationResult USaveGameModule::LoadModulesFromGeneration(const FGuid& SaveId, int32 Generation)
+FSaveOperationResult USaveGameModule::LoadModulesFromGeneration(const FGuid& SaveId, int32 Generation, EPhase InPhase)
 {
 	struct FLoadedModuleSaveData
 	{
@@ -279,25 +325,38 @@ FSaveOperationResult USaveGameModule::LoadModulesFromGeneration(const FGuid& Sav
 		}
 		Loaded.Add(MoveTemp(Item));
 	}
-	if(UVoxelModule* Voxel = AMainModule::GetModuleByClass<UVoxelModule>(false))
+	if(PHASEC(InPhase, EPhase::Primary))
 	{
-		Voxel->SetActiveSaveSource(SaveId, Generation, Storage.Get());
+		if(UVoxelModule* Voxel = AMainModule::GetModuleByClass<UVoxelModule>(false))
+		{
+			Voxel->SetActiveSaveSource(SaveId, Generation, Storage.Get());
+		}
+		for(FLoadedModuleSaveData& Item : Loaded)
+		{
+			Item.Module->OnBeforeLoadData();
+		}
+		for(FLoadedModuleSaveData& Item : Loaded)
+		{
+			Item.Module->LoadSaveData(Item.Data, EPhase::Primary);
+		}
 	}
-	for(FLoadedModuleSaveData& Item : Loaded)
+	if(PHASEC(InPhase, EPhase::Lesser))
 	{
-		Item.Module->OnBeforeLoadData();
+		for(FLoadedModuleSaveData& Item : Loaded)
+		{
+			Item.Module->LoadSaveData(Item.Data, EPhase::Lesser);
+		}
 	}
-	for(FLoadedModuleSaveData& Item : Loaded)
+	if(PHASEC(InPhase, EPhase::Final))
 	{
-		Item.Module->LoadSaveData(Item.Data, EPhase::Primary);
-	}
-	for(FLoadedModuleSaveData& Item : Loaded)
-	{
-		Item.Module->LoadSaveData(Item.Data, EPhase::Final);
-	}
-	for(FLoadedModuleSaveData& Item : Loaded)
-	{
-		Item.Module->OnAfterLoadData(true);
+		for(FLoadedModuleSaveData& Item : Loaded)
+		{
+			Item.Module->LoadSaveData(Item.Data, EPhase::Final);
+		}
+		for(FLoadedModuleSaveData& Item : Loaded)
+		{
+			Item.Module->OnAfterLoadData(true);
+		}
 	}
 	return FSaveOperationResult::Success();
 }
@@ -439,9 +498,6 @@ TArray<UModuleBase*> USaveGameModule::GetSaveModules(ESaveScope Scope) const
 
 void USaveGameModule::OnGameExited(UObject* InSender, const FEventGameExited& InEvent)
 {
-	if(HasActiveSave())
-	{
-		SaveActiveSlot();
-	}
+	SaveCurrentSlot();
 	SaveProfile();
 }

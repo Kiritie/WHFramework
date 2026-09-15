@@ -589,6 +589,11 @@ void UVoxelModule::SetActiveSaveSource(const FGuid& SaveId, int32 Generation, FS
 	RegionStore->SetSource(SaveId, Generation, Storage);
 }
 
+void UVoxelModule::ClearActiveSaveSource()
+{
+	RegionStore->Reset();
+}
+
 bool UVoxelModule::WritePendingRegionsToGeneration(const FGuid& SaveId, int32 Generation, FSaveGameStorage& Storage)
 {
 	return RegionStore->WritePendingRegions(Storage.GetTempGenerationDir(SaveId, Generation));

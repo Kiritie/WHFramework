@@ -1,6 +1,8 @@
 
 #pragma once
 
+#include "Common/CommonModuleTypes.h"
+
 #include "SaveGameModuleTypes.generated.h"
 
 USTRUCT(BlueprintType)
@@ -250,6 +252,9 @@ struct WHFRAMEWORK_API FPendingSaveLoadContext
 
 	UPROPERTY()
 	FName TargetMap;
+
+	UPROPERTY()
+	EPhase LoadPhase = EPhase::All;
 
 	bool IsValid() const
 	{

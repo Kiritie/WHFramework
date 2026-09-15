@@ -22,14 +22,39 @@ FSaveOperationResult USaveGameModuleStatics::SaveActiveSlot()
 	return USaveGameModule::Get().SaveActiveSlot();
 }
 
+void USaveGameModuleStatics::BeginPendingSaveSlot(const FCreateSaveSlotParams& Params)
+{
+	USaveGameModule::Get().BeginPendingSaveSlot(Params);
+}
+
+void USaveGameModuleStatics::CancelPendingSaveSlot()
+{
+	USaveGameModule::Get().CancelPendingSaveSlot();
+}
+
+bool USaveGameModuleStatics::HasPendingSaveSlot()
+{
+	return USaveGameModule::Get().HasPendingSaveSlot();
+}
+
+FSaveOperationResult USaveGameModuleStatics::SaveCurrentSlot()
+{
+	return USaveGameModule::Get().SaveCurrentSlot();
+}
+
+void USaveGameModuleStatics::ClearActiveSave()
+{
+	USaveGameModule::Get().ClearActiveSave();
+}
+
 FSaveOperationResult USaveGameModuleStatics::SaveSlot(FGuid SaveId)
 {
 	return USaveGameModule::Get().SaveSlot(SaveId);
 }
 
-FSaveOperationResult USaveGameModuleStatics::LoadSaveSlot(FGuid SaveId)
+FSaveOperationResult USaveGameModuleStatics::LoadSaveSlot(FGuid SaveId, EPhase InPhase)
 {
-	return USaveGameModule::Get().LoadSlot(SaveId);
+	return USaveGameModule::Get().LoadSlot(SaveId, InPhase);
 }
 
 FSaveOperationResult USaveGameModuleStatics::DeleteSaveSlot(FGuid SaveId)

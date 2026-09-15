@@ -24,10 +24,25 @@ public:
 	static FSaveOperationResult SaveActiveSlot();
 
 	UFUNCTION(BlueprintCallable, Category = "SaveGameModule")
+	static void BeginPendingSaveSlot(const FCreateSaveSlotParams& Params);
+
+	UFUNCTION(BlueprintCallable, Category = "SaveGameModule")
+	static void CancelPendingSaveSlot();
+
+	UFUNCTION(BlueprintPure, Category = "SaveGameModule")
+	static bool HasPendingSaveSlot();
+
+	UFUNCTION(BlueprintCallable, Category = "SaveGameModule")
+	static FSaveOperationResult SaveCurrentSlot();
+
+	UFUNCTION(BlueprintCallable, Category = "SaveGameModule")
+	static void ClearActiveSave();
+
+	UFUNCTION(BlueprintCallable, Category = "SaveGameModule")
 	static FSaveOperationResult SaveSlot(FGuid SaveId);
 
 	UFUNCTION(BlueprintCallable, Category = "SaveGameModule")
-	static FSaveOperationResult LoadSaveSlot(FGuid SaveId);
+	static FSaveOperationResult LoadSaveSlot(FGuid SaveId, EPhase InPhase = EPhase::All);
 
 	UFUNCTION(BlueprintCallable, Category = "SaveGameModule")
 	static FSaveOperationResult DeleteSaveSlot(FGuid SaveId);

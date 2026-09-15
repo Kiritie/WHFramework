@@ -449,6 +449,15 @@ void USceneModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 			WorldWeather->LoadSaveData(FParameter(SaveData.WeatherData));
 		}
 
+		if(WorldTimer)
+		{
+			WorldTimer->OnRefresh(0.f);
+		}
+		if(WorldWeather)
+		{
+			WorldWeather->OnRefresh(0.f);
+		}
+
 		if(bSaveActorDatas)
 		{
 			for(const FSceneActorSaveRecord& Record : SaveData.ActorSaveRecords)

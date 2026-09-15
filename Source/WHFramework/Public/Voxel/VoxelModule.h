@@ -169,6 +169,7 @@ public:
 	virtual void OnBeforeSaveData() override;
 	virtual void OnAfterSaveData(bool bSuccess) override;
 	void SetActiveSaveSource(const FGuid& SaveId, int32 Generation, FSaveGameStorage* Storage);
+	void ClearActiveSaveSource();
 	bool WritePendingRegionsToGeneration(const FGuid& SaveId, int32 Generation, FSaveGameStorage& Storage);
 
 public:

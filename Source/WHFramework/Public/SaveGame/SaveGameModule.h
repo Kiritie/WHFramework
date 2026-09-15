@@ -39,7 +39,22 @@ public:
 	FSaveOperationResult SaveActiveSlot();
 
 	UFUNCTION(BlueprintCallable, Category = "SaveGame|World")
-	FSaveOperationResult LoadSlot(FGuid SaveId);
+	void BeginPendingSaveSlot(const FCreateSaveSlotParams& Params);
+
+	UFUNCTION(BlueprintCallable, Category = "SaveGame|World")
+	void CancelPendingSaveSlot();
+
+	UFUNCTION(BlueprintPure, Category = "SaveGame|World")
+	bool HasPendingSaveSlot() const { return bHasPendingSaveSlot; }
+
+	UFUNCTION(BlueprintCallable, Category = "SaveGame|World")
+	FSaveOperationResult SaveCurrentSlot();
+
+	UFUNCTION(BlueprintCallable, Category = "SaveGame|World")
+	void ClearActiveSave();
+
+	UFUNCTION(BlueprintCallable, Category = "SaveGame|World")
+	FSaveOperationResult LoadSlot(FGuid SaveId, EPhase InPhase = EPhase::All);
 
 	UFUNCTION(BlueprintCallable, Category = "SaveGame|World")
 	FSaveOperationResult DeleteSaveSlot(FGuid SaveId);
@@ -77,8 +92,8 @@ public:
 private:
 	FSaveOperationResult SaveSlotInternal(FGuid SaveId);
 	FSaveOperationResult CaptureModulesToGeneration(const FGuid& SaveId, int32 Generation, TArray<UModuleBase*>& OutCaptured);
-	FSaveOperationResult LoadModulesFromGeneration(const FGuid& SaveId, int32 Generation);
-	FSaveOperationResult RestoreSlotGeneration(const FPendingSaveLoadContext& Context);
+	FSaveOperationResult LoadModulesFromGeneration(const FGuid& SaveId, int32 Generation, EPhase InPhase);
+	FSaveOperationResult RestoreSlotGeneration(const FPendingSaveLoadContext& Context, EPhase InPhase);
 	TArray<UModuleBase*> GetSaveModules(ESaveScope Scope) const;
 	void OnGameExited(UObject* InSender, const struct FEventGameExited& InEvent);
 
@@ -91,6 +106,12 @@ private:
 
 	UPROPERTY(Transient)
 	bool bSaveOperationRunning;
+
+	UPROPERTY(Transient)
+	bool bHasPendingSaveSlot;
+
+	UPROPERTY(Transient)
+	FCreateSaveSlotParams PendingSaveSlotParams;
 
 	UPROPERTY(Transient)
 	FPendingSaveLoadContext PendingLoadContext;
