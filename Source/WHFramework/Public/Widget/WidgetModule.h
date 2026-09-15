@@ -54,11 +54,11 @@ public:
 	virtual void OnTermination(EPhase InPhase) override;
 
 protected:
-	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+	virtual void LoadData(const FParameter& InSaveData, EPhase InPhase) override;
 
 	virtual void UnloadData(EPhase InPhase) override;
 
-	virtual FSaveData* ToData() override;
+	virtual FParameter ToData() override;
 
 public:
 	virtual FString GetModuleDebugMessage() override;
@@ -176,6 +176,9 @@ private:
 	UPROPERTY(Transient)
 	TMap<FWidgetMountContext, TObjectPtr<UUserWidgetBase>> ActiveTemporaryWidgets;
 
+	UPROPERTY(Transient)
+	TMap<FWidgetMountContext, FTemporaryWidgetHistory> TemporaryWidgetHistories;
+
 private:
 	void BuildRuntimeCaches();
 
@@ -198,6 +201,11 @@ private:
 		const FScreenWidgetConfig& InConfig);
 
 	void UnMountUserWidget(
+		UUserWidgetBase* InWidget);
+
+	void HandleTemporaryWidgetClosed(
+		bool bInstant,
+		FWidgetMountContext InContext,
 		UUserWidgetBase* InWidget);
 
 public:

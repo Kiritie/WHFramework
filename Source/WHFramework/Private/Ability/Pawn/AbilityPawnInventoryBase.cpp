@@ -7,12 +7,12 @@ UAbilityPawnInventoryBase::UAbilityPawnInventoryBase()
 	
 }
 
-void UAbilityPawnInventoryBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UAbilityPawnInventoryBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
 	Super::LoadData(InSaveData, InPhase);
 }
 
-FSaveData* UAbilityPawnInventoryBase::ToData()
+FParameter UAbilityPawnInventoryBase::ToData()
 {
 	return Super::ToData();
 }

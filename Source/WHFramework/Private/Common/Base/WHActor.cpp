@@ -3,6 +3,7 @@
 #include "Common/Base/WHActor.h"
 
 #include "Math/MathTypes.h"
+#include "Scene/SceneModule.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Scene/Container/SceneContainerInterface.h"
 
@@ -83,9 +84,9 @@ void AWHActor::OnTermination_Implementation()
 	USceneModuleStatics::RemoveSceneActor(this);
 }
 
-void AWHActor::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void AWHActor::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	auto& SaveData = InSaveData->CastRef<FSceneActorSaveData>();
+	auto& SaveData = InSaveData.GetRef<FSceneActorSaveData>();
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
@@ -94,15 +95,14 @@ void AWHActor::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-FSaveData* AWHActor::ToData()
+FParameter AWHActor::ToData()
 {
-	FSceneActorSaveData& SaveData = GetMutableSaveData<FSceneActorSaveData>();
-	SaveData = FSceneActorSaveData();
+	FSceneActorSaveData SaveData;
 
 	SaveData.ActorID = ActorID;
 	SaveData.SpawnTransform = GetActorTransform();
 
-	return &SaveData;
+	return FParameter(MoveTemp(SaveData));
 }
 
 void AWHActor::SetActorVisible_Implementation(bool bInVisible)
@@ -133,6 +133,11 @@ void AWHActor::BeginPlay()
 
 void AWHActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if(EndPlayReason == EEndPlayReason::Destroyed)
+	{
+		USceneModule::Get().MarkSceneActorDestroyed(this);
+	}
+
 	Super::EndPlay(EndPlayReason);
 	
 	if(Execute_IsUseDefaultLifecycle(this))

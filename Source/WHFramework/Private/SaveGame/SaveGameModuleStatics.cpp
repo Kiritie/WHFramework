@@ -1,9 +1,6 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "SaveGame/SaveGameModuleStatics.h"
+
 #include "SaveGame/SaveGameModule.h"
-#include "SaveGame/Base/SaveDataAgentInterface.h"
 
 int32 USaveGameModuleStatics::GetUserIndex()
 {
@@ -15,82 +12,67 @@ void USaveGameModuleStatics::SetUserIndex(int32 InUserIndex)
 	USaveGameModule::Get().SetUserIndex(InUserIndex);
 }
 
-FString USaveGameModuleStatics::GetSaveSlotName(FName InSaveName, int32 InIndex)
+FSaveOperationResult USaveGameModuleStatics::CreateSaveSlot(const FCreateSaveSlotParams& Params, FSaveSlotSummary& OutSummary)
 {
-	return USaveGameModule::Get().GetSlotName(InSaveName, InIndex);
+	return USaveGameModule::Get().CreateSaveSlot(Params, OutSummary);
 }
 
-bool USaveGameModuleStatics::HasSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex)
+FSaveOperationResult USaveGameModuleStatics::SaveActiveSlot()
 {
-	return USaveGameModule::Get().HasSaveGame(InClass, InIndex);
+	return USaveGameModule::Get().SaveActiveSlot();
 }
 
-FSaveGameInfo USaveGameModuleStatics::GetSaveGameInfo(TSubclassOf<USaveGameBase> InClass)
+FSaveOperationResult USaveGameModuleStatics::SaveSlot(FGuid SaveId)
 {
-	return USaveGameModule::Get().GetSaveGameInfo(InClass);
+	return USaveGameModule::Get().SaveSlot(SaveId);
 }
 
-USaveGameBase* USaveGameModuleStatics::GetSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex)
+FSaveOperationResult USaveGameModuleStatics::LoadSaveSlot(FGuid SaveId)
 {
-	return USaveGameModule::Get().GetSaveGame(InClass, InIndex);
+	return USaveGameModule::Get().LoadSlot(SaveId);
 }
 
-TArray<USaveGameBase*> USaveGameModuleStatics::GetSaveGames(TSubclassOf<USaveGameBase> InClass)
+FSaveOperationResult USaveGameModuleStatics::DeleteSaveSlot(FGuid SaveId)
 {
-	return USaveGameModule::Get().GetSaveGames(InClass);
+	return USaveGameModule::Get().DeleteSaveSlot(SaveId);
 }
 
-USaveGameBase* USaveGameModuleStatics::CreateSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
+FSaveOperationResult USaveGameModuleStatics::RenameSaveSlot(FGuid SaveId, const FString& NewName)
 {
-	return USaveGameModule::Get().CreateSaveGame(InClass, InIndex, InPhase);
+	return USaveGameModule::Get().RenameSaveSlot(SaveId, NewName);
 }
 
-USaveGameBase* USaveGameModuleStatics::GetOrCreateSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
+FSaveOperationResult USaveGameModuleStatics::DuplicateSaveSlot(FGuid SourceSaveId, const FString& NewName, FSaveSlotSummary& OutSummary)
 {
-	return USaveGameModule::Get().GetOrCreateSaveGame(InClass, InIndex);
+	return USaveGameModule::Get().DuplicateSaveSlot(SourceSaveId, NewName, OutSummary);
 }
 
-USaveGameBase* USaveGameModuleStatics::LoadOrCreateSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
+FSaveSlotSummary USaveGameModuleStatics::GetSaveSlotSummary(FGuid SaveId)
 {
-	return USaveGameModule::Get().LoadOrCreateSaveGame(InClass, InIndex, InPhase);
+	return USaveGameModule::Get().GetSaveSlotSummary(SaveId);
 }
 
-bool USaveGameModuleStatics::SaveSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, bool bRefresh)
+TArray<FSaveSlotSummary> USaveGameModuleStatics::GetSaveSlotSummaries()
 {
-	return USaveGameModule::Get().SaveSaveGame(InClass, InIndex, bRefresh);
+	return USaveGameModule::Get().GetSaveSlotSummaries();
 }
 
-bool USaveGameModuleStatics::SaveSaveGames(TSubclassOf<USaveGameBase> InClass, bool bRefresh)
+bool USaveGameModuleStatics::HasActiveSave()
 {
-	return USaveGameModule::Get().SaveSaveGames(InClass, bRefresh);
+	return USaveGameModule::Get().HasActiveSave();
 }
 
-bool USaveGameModuleStatics::SaveAllSaveGame(bool bRefresh)
+FGuid USaveGameModuleStatics::GetActiveSaveId()
 {
-	return USaveGameModule::Get().SaveAllSaveGame(bRefresh);
+	return USaveGameModule::Get().GetActiveSaveId();
 }
 
-USaveGameBase* USaveGameModuleStatics::LoadSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
+FSaveOperationResult USaveGameModuleStatics::SaveProfile(FName ProfileName)
 {
-	return USaveGameModule::Get().LoadSaveGame(InClass, InIndex, InPhase);
+	return USaveGameModule::Get().SaveProfile(ProfileName);
 }
 
-bool USaveGameModuleStatics::UnloadSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex, EPhase InPhase)
+FSaveOperationResult USaveGameModuleStatics::LoadProfile(FName ProfileName)
 {
-	return USaveGameModule::Get().UnloadSaveGame(InClass, InIndex, InPhase);
-}
-
-bool USaveGameModuleStatics::ResetSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex)
-{
-	return USaveGameModule::Get().ResetSaveGame(InClass, InIndex);
-}
-
-bool USaveGameModuleStatics::RefreshSaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex)
-{
-	return USaveGameModule::Get().RefreshSaveGame(InClass, InIndex);
-}
-
-bool USaveGameModuleStatics::DestroySaveGame(TSubclassOf<USaveGameBase> InClass, int32 InIndex)
-{
-	return USaveGameModule::Get().DestroySaveGame(InClass, InIndex);
+	return USaveGameModule::Get().LoadProfile(ProfileName);
 }

@@ -5,8 +5,7 @@
 
 #include "Main/MainModule.h"
 #include "Net/UnrealNetwork.h"
-#include "SaveGame/SaveGameModuleStatics.h"
-#include "SaveGame/Module/ModuleSaveGame.h"
+#include "SaveGame/SaveDataSerializer.h"
 
 // Sets default values
 UModuleBase::UModuleBase()
@@ -18,9 +17,8 @@ UModuleBase::UModuleBase()
 	ModuleIndex = 0;
 	bModuleRequired = false;
 	bModuleAutoRun = true;
-	bModuleAutoSave = false;
-	ModuleSavePhase = EPhase::Final;
-	ModuleSaveGame = nullptr;
+	SaveScope = ESaveScope::None;
+	SaveDataVersion = 1;
 	ModuleNetworkComponent = nullptr;
 	ModuleDependencies = TArray<FName>();
 }
@@ -45,11 +43,6 @@ void UModuleBase::OnInitialize()
 void UModuleBase::OnPreparatory(EPhase InPhase)
 {
 	K2_OnPreparatory(InPhase);
-
-	if(InPhase == ModuleSavePhase)
-	{
-		Load();
-	}
 }
 
 void UModuleBase::OnReset()
@@ -75,11 +68,6 @@ void UModuleBase::OnRefresh(float DeltaSeconds, bool bInEditor)
 void UModuleBase::OnTermination(EPhase InPhase)
 {
 	K2_OnTermination(InPhase);
-
-	if(InPhase == ModuleSavePhase)
-	{
-		Save();
-	}
 }
 
 void UModuleBase::OnStateChanged(EModuleState InModuleState)
@@ -88,7 +76,7 @@ void UModuleBase::OnStateChanged(EModuleState InModuleState)
 	OnModuleStateChanged.Broadcast(InModuleState);
 }
 
-void UModuleBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UModuleBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
 }
 
@@ -97,25 +85,28 @@ void UModuleBase::UnloadData(EPhase InPhase)
 	ISaveDataAgentInterface::UnloadData(InPhase);
 }
 
-FSaveData* UModuleBase::ToData()
+FParameter UModuleBase::ToData()
 {
-	return nullptr;
+	return FParameter();
+}
+
+bool UModuleBase::BuildSaveFile(TArray<uint8>& OutBytes)
+{
+	if(!IsSaveEnabled())
+	{
+		return false;
+	}
+
+	FParameter Data = GetSaveData(true);
+	return Data.HasValue() && FSaveDataSerializer::BuildModuleFile(ModuleName, GetSaveDataVersion(), Data, OutBytes);
 }
 
 void UModuleBase::Load_Implementation()
 {
-	if(bModuleAutoSave)
-	{
-		USaveGameModuleStatics::LoadOrCreateSaveGame(ModuleSaveGame, 0);
-	}
 }
 
 void UModuleBase::Save_Implementation()
 {
-	if(bModuleAutoSave)
-	{
-		USaveGameModuleStatics::SaveSaveGame(ModuleSaveGame, 0, true);
-	}
 }
 
 void UModuleBase::Run_Implementation()
@@ -196,11 +187,6 @@ bool UModuleBase::IsModuleInEditor() const
 AMainModule* UModuleBase::GetModuleOwner() const
 {
 	return Cast<AMainModule>(GetOuter());
-}
-
-USaveGameBase* UModuleBase::GetModuleSaveGame() const
-{
-	return USaveGameModuleStatics::GetSaveGame(ModuleSaveGame);
 }
 
 UModuleNetworkComponentBase* UModuleBase::GetModuleNetworkComponent() const

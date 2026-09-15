@@ -7,6 +7,24 @@ FParameter::FParameter()
 {
 }
 
+const UScriptStruct* FParameter::GetStructType() const
+{
+	const FParameterStructValue* Wrapper = Value.GetPtr<FParameterStructValue>();
+	return Wrapper && Wrapper->Value.IsValid() ? Wrapper->Value.GetScriptStruct() : nullptr;
+}
+
+const uint8* FParameter::GetStructMemory() const
+{
+	const FParameterStructValue* Wrapper = Value.GetPtr<FParameterStructValue>();
+	return Wrapper && Wrapper->Value.IsValid() ? Wrapper->Value.GetMemory() : nullptr;
+}
+
+uint8* FParameter::GetMutableStructMemory()
+{
+	FParameterStructValue* Wrapper = Value.GetMutablePtr<FParameterStructValue>();
+	return Wrapper && Wrapper->Value.IsValid() ? Wrapper->Value.GetMutableMemory() : nullptr;
+}
+
 FParameterSet::FParameterSet()
 {
 }

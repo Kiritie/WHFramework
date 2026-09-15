@@ -22,7 +22,7 @@ AVoxelTorchAuxiliary::AVoxelTorchAuxiliary()
 	ParticleSystem->SetupAttachment(PointLight);
 }
 
-void AVoxelTorchAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void AVoxelTorchAuxiliary::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
 	Super::LoadData(InSaveData, InPhase);
 

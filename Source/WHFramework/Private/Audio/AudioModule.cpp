@@ -13,7 +13,6 @@
 #include "Main/MainModule.h"
 #include "Net/UnrealNetwork.h"
 #include "SaveGame/SaveGameModuleStatics.h"
-#include "SaveGame/Module/AudioSaveGame.h"
 #include "Sound/SoundBase.h"
 #include "Sound/SoundClass.h"
 #include "Sound/SoundMix.h"
@@ -26,7 +25,6 @@ UAudioModule::UAudioModule()
 	ModuleName = FName("AudioModule");
 	ModuleDisplayName = FText::FromString(TEXT("Audio Module"));
 
-	ModuleSaveGame = UAudioSaveGame::StaticClass();
 	
 	ModuleNetworkComponent = UAudioModuleNetworkComponent::StaticClass();
 
@@ -139,9 +137,9 @@ void UAudioModule::OnTermination(EPhase InPhase)
 	Super::OnTermination(InPhase);
 }
 
-void UAudioModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UAudioModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	auto& SaveData = InSaveData->CastRef<FAudioModuleSaveData>();
+	auto& SaveData = InSaveData.GetRef<FAudioModuleSaveData>();
 	if(SaveData.IsSaved())
 	{
 		GlobalSoundParams = SaveData.GlobalSoundParams;
@@ -160,17 +158,16 @@ void UAudioModule::UnloadData(EPhase InPhase)
 {
 }
 
-FSaveData* UAudioModule::ToData()
+FParameter UAudioModule::ToData()
 {
-	FAudioModuleSaveData& SaveData = GetMutableSaveData<FAudioModuleSaveData>();
-	SaveData = FAudioModuleSaveData();
+	FAudioModuleSaveData SaveData;
 
 	SaveData.GlobalSoundParams = GlobalSoundParams;
 	SaveData.BackgroundSoundParams = BackgroundSoundParams;
 	SaveData.EnvironmentSoundParams = EnvironmentSoundParams;
 	SaveData.EffectSoundParams = EffectSoundParams;
 	
-	return &SaveData;
+	return FParameter(MoveTemp(SaveData));
 }
 
 FString UAudioModule::GetModuleDebugMessage()

@@ -13,7 +13,7 @@ AVoxelEntityCapture::AVoxelEntityCapture()
 	VoxelScope = EVoxelScope::Capture;
 }
 
-void AVoxelEntityCapture::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void AVoxelEntityCapture::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
 	Super::LoadData(InSaveData, InPhase);
 

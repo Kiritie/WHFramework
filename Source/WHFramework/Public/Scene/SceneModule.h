@@ -57,9 +57,9 @@ public:
 	virtual void OnTermination(EPhase InPhase) override;
 	
 protected:
-	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+	virtual void LoadData(const FParameter& InSaveData, EPhase InPhase) override;
 
-	virtual FSaveData* ToData() override;
+	virtual FParameter ToData() override;
 
 public:
 	virtual FString GetModuleDebugMessage() override;
@@ -77,7 +77,7 @@ protected:
 
 	//////////////////////////////////////////////////////////////////////////
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "bModuleAutoSave == true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	bool bSaveActorDatas;
 
 	//////////////////////////////////////////////////////////////////////////
@@ -292,9 +292,6 @@ private:
 	void NotifySceneMarkersChanged();
 	void RefreshWorldMarkerWidgets();
 	void ClearWorldMarkerWidgets();
-	UPROPERTY(Transient)
-	FSceneModuleSaveData CachedSaveData;
-
 	//////////////////////////////////////////////////////////////////////////
 protected:
 	UPROPERTY(EditAnywhere, Instanced, Category = "WorldTimer")
@@ -377,6 +374,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "SceneActor")
 	TMap<FGuid, AActor*> SceneActorMap;
 
+	UPROPERTY(Transient)
+	TSet<FGuid> DestroyedSceneActorIds;
+
 public:
 	UFUNCTION(BlueprintPure)
 	virtual bool HasSceneActor(const FString& InID, bool bEnsured = true) const override;
@@ -395,6 +395,8 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual bool RemoveSceneActor(AActor* InActor) override;
+
+	void MarkSceneActorDestroyed(AActor* InActor);
 
 	//////////////////////////////////////////////////////////////////////////
 protected:

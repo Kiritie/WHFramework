@@ -54,11 +54,11 @@ public:
 	virtual void OnTermination(EPhase InPhase) override;
 
 protected:
-	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+	virtual void LoadData(const FParameter& InSaveData, EPhase InPhase) override;
 
 	virtual void UnloadData(EPhase InPhase) override;
 
-	virtual FSaveData* ToData() override;
+	virtual FParameter ToData() override;
 
 protected:
 	void EnsureBuiltinProviders();

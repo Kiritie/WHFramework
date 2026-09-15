@@ -96,9 +96,9 @@ void UVoxelChunk::OnDespawn_Implementation(EObjectDespawnMode InMode)
 	bNeedCreateMesh = false;
 }
 
-void UVoxelChunk::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UVoxelChunk::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	auto& SaveData = InSaveData->CastRef<FVoxelChunkSaveData>();
+	auto& SaveData = InSaveData.GetRef<FVoxelChunkSaveData>();
 
 	TArray<FString> VoxelDatas;
 	SaveData.VoxelDatas.ParseIntoArray(VoxelDatas, TEXT("|"));
@@ -119,17 +119,18 @@ void UVoxelChunk::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	for(auto& Iter : SaveData.AuxiliaryDatas)
 	{
 		FVoxelItem& VoxelItem = GetVoxel(Iter.VoxelItem.Index);
-		VoxelItem.AuxiliaryData = &Iter;
+		VoxelItem.AuxiliaryData = FParameter(Iter);
 	}
+	bChanged = SaveData.bChanged;
 	bBuilded = true;
 	RebuildVoxelMap();
+	LoadSceneActors(InSaveData);
 	BuildStage.Store(Module->ChunkQueues[EVoxelWorldState::MapBuilding].Queues.Num());
 }
 
-FSaveData* UVoxelChunk::ToData()
+FParameter UVoxelChunk::ToData()
 {
-	FVoxelChunkSaveData& SaveData = GetMutableSaveData<FVoxelChunkSaveData>();
-	SaveData = FVoxelChunkSaveData();
+	FVoxelChunkSaveData SaveData;
 
 	SaveData.Index = Index;
 	SaveData.bChanged = bChanged;
@@ -152,11 +153,6 @@ FSaveData* UVoxelChunk::ToData()
 		}
 		SaveData.TopographyDatas.RemoveFromEnd(TEXT("|"));
 	}
-	else if(const FVoxelChunkSaveData* ChunkData = Module->GetWorldData().GetChunkData(Index))
-	{
-		SaveData.VoxelDatas = ChunkData->VoxelDatas;
-		SaveData.TopographyDatas = ChunkData->TopographyDatas;
-	}
 
 	SaveData.AuxiliaryDatas.Reset();
 	SaveData.PickUpDatas.Reset();
@@ -164,22 +160,22 @@ FSaveData* UVoxelChunk::ToData()
 	{
 		if(AVoxelAuxiliary* Auxiliary = Cast<AVoxelAuxiliary>(Iter.Value))
 		{
-			SaveData.AuxiliaryDatas.Add(Auxiliary->GetSaveDataRef<FVoxelAuxiliarySaveData>(true));
+			SaveData.AuxiliaryDatas.Add(Auxiliary->GetSaveData(true).GetRef<FVoxelAuxiliarySaveData>());
 		}
 		else if(AAbilityPickUpBase* PickUp = Cast<AAbilityPickUpBase>(Iter.Value))
 		{
-			SaveData.PickUpDatas.Add(PickUp->GetSaveDataRef<FPickUpSaveData>(true));
+			SaveData.PickUpDatas.Add(PickUp->GetSaveData(true).GetRef<FPickUpSaveData>());
 		}
 	}
 
-	return &SaveData;
+	return FParameter(MoveTemp(SaveData));
 }
 
 void UVoxelChunk::SaveData()
 {
 	if(bGenerated)
 	{
-		Module->GetWorldData().SetChunkData(Index, GetSaveData<FVoxelChunkSaveData>(true));
+		Module->SaveChunk(Index);
 	}
 }
 
@@ -1175,9 +1171,9 @@ void UVoxelChunk::GenerateSceneActors()
 {
 	auto& WorldData = Module->GetWorldData();
 	
-	if(WorldData.IsExistChunkData(Index))
+	if(bChanged)
 	{
-		LoadSceneActors(WorldData.GetChunkData(Index));
+		return;
 	}
 	else
 	{
@@ -1188,13 +1184,13 @@ void UVoxelChunk::GenerateSceneActors()
 	}
 }
 
-void UVoxelChunk::LoadSceneActors(FSaveData* InSaveData)
+void UVoxelChunk::LoadSceneActors(const FParameter& InSaveData)
 {
-	auto& SaveData = InSaveData->CastRef<FVoxelChunkSaveData>();
+	auto& SaveData = InSaveData.GetRef<FVoxelChunkSaveData>();
 
 	for(auto& Iter : SaveData.PickUpDatas)
 	{
-		UAbilityModuleStatics::SpawnAbilityPickUp(&Iter, this);
+		UAbilityModuleStatics::SpawnAbilityPickUp(FParameter(Iter), this);
 	}
 }
 
@@ -1225,13 +1221,13 @@ AVoxelAuxiliary* UVoxelChunk::SpawnAuxiliary(FVoxelItem& InVoxelItem)
 			if(AVoxelAuxiliary* Auxiliary = UObjectPoolModuleStatics::SpawnObject<AVoxelAuxiliary>(VoxelData.AuxiliaryClass))
 			{
 				FVoxelAuxiliarySaveData AuxiliaryData;
-				if(InVoxelItem.AuxiliaryData)
+				if(InVoxelItem.AuxiliaryData.HasValue())
 				{
-					AuxiliaryData = InVoxelItem.AuxiliaryData->CastRef<FVoxelAuxiliarySaveData>();
+					AuxiliaryData = InVoxelItem.AuxiliaryData.GetRef<FVoxelAuxiliarySaveData>();
 				}
 				AuxiliaryData.VoxelScope = EVoxelScope::Chunk;
 				AuxiliaryData.VoxelItem = InVoxelItem;
-				Auxiliary->LoadSaveData(&AuxiliaryData);
+				Auxiliary->LoadSaveData(FParameter(AuxiliaryData));
 				InVoxelItem.Auxiliary = Auxiliary;
 				AddSceneActor(Auxiliary);
 				return Auxiliary;

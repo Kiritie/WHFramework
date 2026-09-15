@@ -159,12 +159,11 @@ public:
 protected:
 	virtual void Serialize(FArchive& Ar) override;
 
-	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+	virtual void LoadData(const FParameter& InSaveData, EPhase InPhase) override;
 
-	virtual FSaveData* ToData() override;
+	virtual FParameter ToData() override;
 
 	virtual bool HasArchive() const override { return true; }
-	FSaveData CachedSaveData;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Name/Description

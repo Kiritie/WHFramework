@@ -36,9 +36,9 @@ void AVoxelPrefab::OnInitialize_Implementation()
 	Super::OnInitialize_Implementation();
 }
 
-void AVoxelPrefab::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void AVoxelPrefab::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	auto& SaveData = InSaveData->CastRef<FVoxelPrefabSaveData>();
+	auto& SaveData = InSaveData.GetRef<FVoxelPrefabSaveData>();
 
 	DestroyAuxiliarys();
 	
@@ -64,10 +64,9 @@ void AVoxelPrefab::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	CreateMesh();
 }
 
-FSaveData* AVoxelPrefab::ToData()
+FParameter AVoxelPrefab::ToData()
 {
-	FVoxelPrefabSaveData& SaveData = GetMutableSaveData<FVoxelPrefabSaveData>();
-	SaveData = FVoxelPrefabSaveData();
+	FVoxelPrefabSaveData SaveData;
 
 	ITER_MAP(VoxelMap, Iter,
 		if(Iter.Value.IsValid())
@@ -76,7 +75,7 @@ FSaveData* AVoxelPrefab::ToData()
 		}
 	)
 	SaveData.VoxelDatas.RemoveFromEnd(TEXT("|"));
-	return &SaveData;
+	return FParameter(MoveTemp(SaveData));
 }
 
 void AVoxelPrefab::CreateMesh()
@@ -163,7 +162,7 @@ AVoxelAuxiliary* AVoxelPrefab::SpawnAuxiliary(FVoxelItem& InVoxelItem)
 				Auxiliary->AttachToComponent(RootComponent, FAttachmentTransformRules::SnapToTargetIncludingScale);
 				Auxiliary->Execute_SetActorVisible(Auxiliary, Execute_IsVisible(this));
 				auto SaveData = FVoxelAuxiliarySaveData(InVoxelItem, EVoxelScope::Prefab);
-				Auxiliary->LoadSaveData(&SaveData);
+				Auxiliary->LoadSaveData(FParameter(SaveData));
 				InVoxelItem.Auxiliary = Auxiliary;
 				return Auxiliary;
 			}

@@ -76,7 +76,7 @@ public:
 public:
 	virtual AAbilityPickUpBase* SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer = nullptr);
 
-	virtual AAbilityPickUpBase* SpawnAbilityPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+	virtual AAbilityPickUpBase* SpawnAbilityPickUp(const FParameter& InSaveData, ISceneContainerInterface* InContainer = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Projectile
@@ -86,5 +86,5 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Actor
 public:
-	virtual AActor* SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+	virtual AActor* SpawnAbilityActor(const FParameter& InSaveData, ISceneContainerInterface* InContainer = nullptr);
 };

@@ -19,9 +19,9 @@ void UWorldWeather::OnDespawn_Implementation(EObjectDespawnMode InMode)
 	Super::OnDespawn_Implementation(InMode);
 }
 
-void UWorldWeather::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UWorldWeather::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	const auto& SaveData = InSaveData->CastRef<FWorldWeatherSaveData>();
+	const auto& SaveData = InSaveData.GetRef<FWorldWeatherSaveData>();
 
 	SetWeatherSeed(SaveData.WeatherSeed);
 	if(!SaveData.WeatherParams.IsEmpty())
@@ -34,13 +34,12 @@ void UWorldWeather::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-FSaveData* UWorldWeather::ToData()
+FParameter UWorldWeather::ToData()
 {
-	FWorldWeatherSaveData& SaveData = GetMutableSaveData<FWorldWeatherSaveData>();
-	SaveData = FWorldWeatherSaveData();
+	FWorldWeatherSaveData SaveData;
 
 	SaveData.WeatherSeed = GetWeatherSeed();
 	SaveData.WeatherParams = GetWeatherParams();
 
-	return &SaveData;
+	return FParameter(MoveTemp(SaveData));
 }

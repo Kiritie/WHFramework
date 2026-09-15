@@ -128,6 +128,16 @@ FORCEINLINE uint32 GetTypeHash(const FWidgetMountContext& Value)
 	return HashCombine(GetTypeHash(Value.ParentWidgetTag), GetTypeHash(Value.SlotTag));
 }
 
+USTRUCT()
+struct WHFRAMEWORK_API FTemporaryWidgetHistory
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UUserWidgetBase>> Widgets;
+};
+
 UENUM(BlueprintType)
 enum class EWidgetInputMode : uint8
 {

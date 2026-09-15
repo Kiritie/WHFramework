@@ -46,9 +46,9 @@ public:
 	void OnUnPause();
 
 protected:
-	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+	virtual void LoadData(const FParameter& InSaveData, EPhase InPhase) override;
 
-	virtual FSaveData* ToData() override;
+	virtual FParameter ToData() override;
 
 public:
 	UFUNCTION(BlueprintImplementableEvent, BlueprintPure)

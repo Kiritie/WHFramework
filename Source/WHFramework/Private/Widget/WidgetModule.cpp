@@ -19,7 +19,6 @@
 #include "Event/Events/Widget/Event_CloseUserWidget.h"
 #include "Event/Events/Widget/Event_OpenUserWidget.h"
 #include "Event/Events/Widget/Event_SetWorldWidgetVisible.h"
-#include "SaveGame/Module/WidgetSaveGame.h"
 #include "Widget/World/WorldWidgetContainer.h"
 #include "Widget/Common/CommonButton.h"
 #include "Widget/Common/CommonImageN.h"
@@ -100,7 +99,6 @@ UWidgetModule::UWidgetModule()
 	ModuleName = FName("WidgetModule");
 	ModuleDisplayName = FText::FromString(TEXT("Widget Module"));
 
-	ModuleSaveGame = UWidgetSaveGame::StaticClass();
 
 	bModuleRequired = true;
 
@@ -650,9 +648,9 @@ void UWidgetModule::OnTermination(EPhase InPhase)
 	}
 }
 
-void UWidgetModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UWidgetModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	auto& SaveData = InSaveData->CastRef<FWidgetModuleSaveData>();
+	auto& SaveData = InSaveData.GetRef<FWidgetModuleSaveData>();
 
 	SetLanguageType(SaveData.LanguageType);
 	SetGlobalScale(SaveData.GlobalScale);
@@ -662,15 +660,14 @@ void UWidgetModule::UnloadData(EPhase InPhase)
 {
 }
 
-FSaveData* UWidgetModule::ToData()
+FParameter UWidgetModule::ToData()
 {
-	FWidgetModuleSaveData& SaveData = GetMutableSaveData<FWidgetModuleSaveData>();
-	SaveData = FWidgetModuleSaveData();
+	FWidgetModuleSaveData SaveData;
 
 	SaveData.LanguageType = LanguageType;
 	SaveData.GlobalScale = GlobalScale;
 	
-	return &SaveData;
+	return FParameter(MoveTemp(SaveData));
 }
 
 FString UWidgetModule::GetModuleDebugMessage()
@@ -955,7 +952,11 @@ bool UWidgetModule::OpenUserWidgetByTag(FGameplayTag InWidgetTag, const FParamet
 		Context.SlotTag = Config->SlotTag;
 		if(UUserWidgetBase* ActiveWidget = ActiveTemporaryWidgets.FindRef(Context); ActiveWidget && ActiveWidget != Widget)
 		{
-			ActiveWidget->Close(true);
+			FTemporaryWidgetHistory& History = TemporaryWidgetHistories.FindOrAdd(Context);
+			History.Widgets.Remove(Widget);
+			History.Widgets.Add(ActiveWidget);
+			ActiveWidget->OnClosed.RemoveAll(this);
+			ActiveWidget->OnClose(true);
 		}
 		ActiveTemporaryWidgets.Add(Context, Widget);
 	}
@@ -995,6 +996,8 @@ bool UWidgetModule::CloseUserWidgetByTag(FGameplayTag InWidgetTag, bool bInstant
 			if(ActiveTemporaryWidgets.FindRef(Context) == Widget)
 			{
 				ActiveTemporaryWidgets.Remove(Context);
+				Widget->OnClosed.RemoveAll(this);
+				Widget->OnClosed.AddUObject(this, &ThisClass::HandleTemporaryWidgetClosed, Context, Widget);
 			}
 		}
 		Widget->OnClose(bInstant);
@@ -1021,11 +1024,35 @@ bool UWidgetModule::CloseActiveTemporaryWidget(const FWidgetMountContext& InCont
 {
 	if(UUserWidgetBase* Widget = ActiveTemporaryWidgets.FindRef(InContext))
 	{
-		ActiveTemporaryWidgets.Remove(InContext);
-		Widget->OnClose(bInstant);
-		return true;
+		return CloseUserWidgetByTag(Widget->GetWidgetTag(), bInstant);
 	}
 	return false;
+}
+
+void UWidgetModule::HandleTemporaryWidgetClosed(bool bInstant, FWidgetMountContext InContext, UUserWidgetBase* InWidget)
+{
+	InWidget->OnClosed.RemoveAll(this);
+	if(ActiveTemporaryWidgets.Contains(InContext))
+	{
+		return;
+	}
+
+	FTemporaryWidgetHistory* History = TemporaryWidgetHistories.Find(InContext);
+	while(History && !History->Widgets.IsEmpty())
+	{
+		UUserWidgetBase* PreviousWidget = History->Widgets.Pop();
+		if(PreviousWidget && OpenUserWidgetByTag(
+			PreviousWidget->GetWidgetTag(),
+			PreviousWidget->CurrentOpenParameter,
+			bInstant))
+		{
+			break;
+		}
+	}
+	if(History && History->Widgets.IsEmpty())
+	{
+		TemporaryWidgetHistories.Remove(InContext);
+	}
 }
 
 bool UWidgetModule::CloseTemporaryWidgetInSlot(FGameplayTag InParentWidgetTag, FGameplayTag InSlotTag, bool bInstant)
@@ -1044,6 +1071,7 @@ void UWidgetModule::CloseTemporaryWidgetsForParent(FGameplayTag InParentWidgetTa
 	{
 		if(Context.ParentWidgetTag == InParentWidgetTag)
 		{
+			TemporaryWidgetHistories.Remove(Context);
 			CloseActiveTemporaryWidget(Context, bInstant);
 		}
 	}
@@ -1070,6 +1098,24 @@ bool UWidgetModule::DestroyUserWidgetByTag(FGameplayTag InWidgetTag, EObjectDesp
 				|| ActiveTemporaryWidgets.FindRef(Context) == Widget)
 			{
 				ActiveTemporaryWidgets.Remove(Context);
+				TemporaryWidgetHistories.Remove(Context);
+			}
+		}
+		TArray<FWidgetMountContext> HistoryContexts;
+		TemporaryWidgetHistories.GetKeys(HistoryContexts);
+		for(const FWidgetMountContext& Context : HistoryContexts)
+		{
+			if(Context.ParentWidgetTag == InWidgetTag)
+			{
+				TemporaryWidgetHistories.Remove(Context);
+			}
+			else if(FTemporaryWidgetHistory* History = TemporaryWidgetHistories.Find(Context))
+			{
+				History->Widgets.Remove(Widget);
+				if(History->Widgets.IsEmpty())
+				{
+					TemporaryWidgetHistories.Remove(Context);
+				}
 			}
 		}
 
@@ -1153,6 +1199,7 @@ bool UWidgetModule::DestroyUserWidget(TSubclassOf<UUserWidgetBase> InClass, EObj
 
 void UWidgetModule::CloseAllUserWidget(bool bInstant)
 {
+	TemporaryWidgetHistories.Empty();
 	for(const auto& Iter : UserWidgetByTag)
 	{
 		if(Iter.Value)
@@ -1173,6 +1220,7 @@ void UWidgetModule::ClearAllUserWidget(EObjectDespawnMode InMode)
 	}
 	UserWidgetByTag.Reset();
 	ActiveTemporaryWidgets.Empty();
+	TemporaryWidgetHistories.Empty();
 }
 
 const FWorldWidgetConfig* UWidgetModule::GetWorldWidgetConfig(FGameplayTag InWidgetTag) const

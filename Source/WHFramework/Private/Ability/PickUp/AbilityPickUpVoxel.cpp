@@ -18,7 +18,7 @@ AAbilityPickUpVoxel::AAbilityPickUpVoxel()
 	MeshComponent->Initialize(EVoxelScope::PickUp);
 }
 
-void AAbilityPickUpVoxel::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void AAbilityPickUpVoxel::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
 	Super::LoadData(InSaveData, InPhase);
 

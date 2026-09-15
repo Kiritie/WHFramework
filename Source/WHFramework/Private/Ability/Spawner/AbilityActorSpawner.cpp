@@ -73,9 +73,9 @@ AActor* AAbilityActorSpawner::SpawnImpl_Implementation(const FAbilityItem& InAbi
 	SaveData.Name = *ActorData.Name.ToString();
 	SaveData.Level = InAbilityItem.Level;
 	SaveData.SpawnTransform = GetActorTransform();
-	SaveData.InventoryData = ActorData.InventoryData;
+	SaveData.InventoryData = FParameter(ActorData.InventoryData);
 
-	return UAbilityModuleStatics::SpawnAbilityActor(&SaveData);
+	return UAbilityModuleStatics::SpawnAbilityActor(FParameter(MoveTemp(SaveData)));
 }
 
 void AAbilityActorSpawner::DestroyImpl_Implementation(AActor* InAbilityActor)

@@ -65,7 +65,7 @@ AActor* AAbilityCharacterSpawner::SpawnImpl_Implementation(const FAbilityItem& I
 	SaveData.SpawnTransform = GetActorTransform();
 	SaveData.InitData();
 
-	return UAbilityModuleStatics::SpawnAbilityActor(&SaveData);
+	return UAbilityModuleStatics::SpawnAbilityActor(FParameter(MoveTemp(SaveData)));
 }
 
 void AAbilityCharacterSpawner::DestroyImpl_Implementation(AActor* InAbilityActor)

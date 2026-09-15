@@ -43,9 +43,9 @@ void AVoxelEntity::OnInitialize_Implementation()
 	MeshComponent->Initialize(VoxelScope);
 }
 
-void AVoxelEntity::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void AVoxelEntity::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	const auto& SaveData = InSaveData->CastRef<FVoxelItem>();
+	const auto& SaveData = InSaveData.GetRef<FVoxelItem>();
 
 	DestroyAuxiliary();
 
@@ -71,9 +71,9 @@ void AVoxelEntity::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	MeshComponent->CreateVoxel(VoxelItem);
 }
 
-FSaveData* AVoxelEntity::ToData()
+FParameter AVoxelEntity::ToData()
 {
-	return nullptr;
+	return FParameter();
 }
 
 void AVoxelEntity::SpawnAuxiliary()
@@ -88,7 +88,7 @@ void AVoxelEntity::SpawnAuxiliary()
 				Auxiliary->AttachToComponent(RootComponent, FAttachmentTransformRules::SnapToTargetIncludingScale);
 				Auxiliary->Execute_SetActorVisible(Auxiliary, Execute_IsVisible(this));
 				auto SaveData = FVoxelAuxiliarySaveData(VoxelItem, VoxelScope);
-				Auxiliary->LoadSaveData(&SaveData);
+				Auxiliary->LoadSaveData(FParameter(SaveData));
 				VoxelItem.Auxiliary = Auxiliary;
 			}
 		}

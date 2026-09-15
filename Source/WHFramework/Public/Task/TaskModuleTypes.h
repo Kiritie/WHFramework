@@ -222,7 +222,7 @@ struct WHFRAMEWORK_API FTaskRuntimeSaveData
 	GENERATED_BODY()
 
 	UPROPERTY()
-	FSaveData Archive;
+	FParameter Data;
 
 	UPROPERTY()
 	float ExecuteRemaining = -1.f;
@@ -278,12 +278,4 @@ struct WHFRAMEWORK_API FTaskModuleSaveData : public FSaveData
 	UPROPERTY()
 	TMap<FString, FTaskRuntimeSaveData> TaskRecords;
 
-	virtual void MakeSaved() override
-	{
-		Super::MakeSaved();
-		for (auto& Iter : TaskRecords)
-		{
-			Iter.Value.Archive.MakeSaved();
-		}
-	}
 };

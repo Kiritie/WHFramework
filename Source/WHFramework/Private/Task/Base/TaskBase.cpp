@@ -435,14 +435,13 @@ void UTaskBase::Serialize(FArchive& Ar)
 	}
 }
 
-void UTaskBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UTaskBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
 }
 
-FSaveData* UTaskBase::ToData()
+FParameter UTaskBase::ToData()
 {
-	CachedSaveData = FSaveData();
-	return &CachedSaveData;
+	return FParameter(FSaveData());
 }
 
 void UTaskBase::ClearTaskTimers()
@@ -489,7 +488,7 @@ void UTaskBase::SetTaskTimersPaused(bool bPaused)
 FTaskRuntimeSaveData UTaskBase::CaptureRuntimeData()
 {
 	FTaskRuntimeSaveData Data;
-	Data.Archive = GetSaveDataRef<FSaveData>(true);
+	Data.Data = GetSaveData(true);
 	Data.Target = Target;
 	for (const FTaskObjective& Objective : Objectives)
 	{

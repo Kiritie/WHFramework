@@ -20,9 +20,9 @@ void UWorldTimer::OnDespawn_Implementation(EObjectDespawnMode InMode)
 	Super::OnDespawn_Implementation(InMode);
 }
 
-void UWorldTimer::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UWorldTimer::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	const auto& SaveData = InSaveData->CastRef<FWorldTimerSaveData>();
+	const auto& SaveData = InSaveData.GetRef<FWorldTimerSaveData>();
 
 	SetDayLength(SaveData.DayLength);
 	SetNightLength(SaveData.NightLength);
@@ -36,16 +36,15 @@ void UWorldTimer::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-FSaveData* UWorldTimer::ToData()
+FParameter UWorldTimer::ToData()
 {
-	FWorldTimerSaveData& SaveData = GetMutableSaveData<FWorldTimerSaveData>();
-	SaveData = FWorldTimerSaveData();
+	FWorldTimerSaveData SaveData;
 
 	SaveData.DayLength = GetDayLength();
 	SaveData.NightLength = GetNightLength();
 	SaveData.DateTime = GetDateTime();
 
-	return &SaveData;
+	return FParameter(MoveTemp(SaveData));
 }
 
 void UWorldTimer::ResetTimerParams_Implementation() const

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Common/CommonModuleTypes.h"
+#include "Parameter/ParameterTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 
 #include "SaveDataAgentInterface.generated.h"
@@ -16,45 +17,27 @@ class WHFRAMEWORK_API ISaveDataAgentInterface
 	GENERATED_BODY()
 
 public:
-	void LoadSaveData(FSaveData* InSaveData, EPhase InPhase = EPhase::All);
+	void LoadSaveData(const FParameter& InSaveData, EPhase InPhase = EPhase::All);
 
-	FSaveData* GetSaveData(bool bRefresh = false);
-
-	template<class T>
-	T* GetSaveData(bool bRefresh = false)
-	{
-		return static_cast<T*>(GetSaveData(bRefresh));
-	}
-
-	template<class T>
-	T& GetSaveDataRef(bool bRefresh = false)
-	{
-		return *GetSaveData<T>(bRefresh);
-	}
+	FParameter GetSaveData(bool bRefresh = false);
 
 	void UnloadSaveData(EPhase InPhase = EPhase::All);
 
 protected:
-	template<class T>
-	T& GetMutableSaveData() const
-	{
-		TSharedPtr<FSaveData>& SaveData = SaveDataCache.FindOrAdd(T::StaticStruct());
-		if(!SaveData.IsValid()) SaveData = MakeShared<T>();
-		return *static_cast<T*>(SaveData.Get());
-	}
+	virtual void LoadData(const FParameter& InSaveData, EPhase InPhase) = 0;
 
-	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) = 0;
-
-	virtual FSaveData* ToData() = 0;
+	virtual FParameter ToData() = 0;
 
 	virtual void UnloadData(EPhase InPhase) { }
 
 	virtual void ResetData() { }
 
-	virtual FSaveData* GetData() { return nullptr; }
+	virtual FParameter GetData() { return FParameter(); }
 
 	virtual bool HasArchive() const { return false; }
 
 private:
-	mutable TMap<const UScriptStruct*, TSharedPtr<FSaveData>> SaveDataCache;
+	static const FSaveData* ResolveSaveData(const FParameter& InParameter);
+
+	static FSaveData* ResolveSaveData(FParameter& InParameter);
 };

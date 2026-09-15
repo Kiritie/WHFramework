@@ -5,7 +5,6 @@
 #include "Achievement/Widget/WidgetAchievement.h"
 #include "Achievement/Widget/WidgetAchievementHUD.h"
 #include "SaveGame/SaveGameModuleStatics.h"
-#include "SaveGame/Module/AchievementSaveGame.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Widget/WidgetModuleStatics.h"
 
@@ -16,7 +15,7 @@ UAchievementModule::UAchievementModule()
 {
 	ModuleName = FName("AchievementModule");
 	ModuleDisplayName = FText::FromString(TEXT("Achievement Module"));
-	ModuleSaveGame = UAchievementSaveGame::StaticClass();
+	SaveScope = ESaveScope::World;
 
 	ModuleDependencies = { FName("AudioModule"), FName("WidgetModule") };
 	
@@ -87,9 +86,9 @@ void UAchievementModule::OnTermination(EPhase InPhase)
 	Super::OnTermination(InPhase);
 }
 
-void UAchievementModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UAchievementModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	auto& SaveData = InSaveData->CastRef<FAchievementModuleSaveData>();
+	auto& SaveData = InSaveData.GetRef<FAchievementModuleSaveData>();
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
@@ -109,14 +108,13 @@ void UAchievementModule::UnloadData(EPhase InPhase)
 	}
 }
 
-FSaveData* UAchievementModule::ToData()
+FParameter UAchievementModule::ToData()
 {
-	FAchievementModuleSaveData& SaveData = GetMutableSaveData<FAchievementModuleSaveData>();
-	SaveData = FAchievementModuleSaveData();
+	FAchievementModuleSaveData SaveData;
 	
 	SaveData.States = States;
 	SaveData.TotalUnlocked = TotalUnlocked;
-	return &SaveData;
+	return FParameter(MoveTemp(SaveData));
 }
 
 FString UAchievementModule::GetModuleDebugMessage()

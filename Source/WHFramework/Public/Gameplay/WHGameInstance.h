@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Engine/GameInstance.h"
+#include "SaveGame/SaveGameModuleTypes.h"
 #include "WHGameInstance.generated.h"
 
 /**
@@ -20,4 +21,17 @@ public:
 	virtual void Init() override;
 
 	virtual void Shutdown() override;
+
+	void SetPendingSaveLoad(const FPendingSaveLoadContext& InContext) { PendingSaveLoad = InContext; }
+
+	FPendingSaveLoadContext ConsumePendingSaveLoad()
+	{
+		const FPendingSaveLoadContext Result = PendingSaveLoad;
+		PendingSaveLoad = FPendingSaveLoadContext();
+		return Result;
+	}
+
+private:
+	UPROPERTY(Transient)
+	FPendingSaveLoadContext PendingSaveLoad;
 };

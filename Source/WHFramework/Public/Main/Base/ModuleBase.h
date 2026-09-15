@@ -9,7 +9,6 @@
 #include "ModuleBase.generated.h"
 
 class AMainModule;
-class UModuleSaveGame;
 class UModuleNetworkComponentBase;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FModuleStateChanged, EModuleState, InModuleState);
@@ -112,11 +111,30 @@ public:
 	virtual void OnStateChanged(EModuleState InModuleState);
 
 protected:
-	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+	virtual void LoadData(const FParameter& InSaveData, EPhase InPhase) override;
 
 	virtual void UnloadData(EPhase InPhase) override;
 
-	virtual FSaveData* ToData() override;
+	virtual FParameter ToData() override;
+
+public:
+	ESaveScope GetSaveScope() const { return SaveScope; }
+
+	int32 GetSaveDataVersion() const { return SaveDataVersion; }
+
+	virtual bool IsSaveEnabled() const { return SaveScope != ESaveScope::None; }
+
+	virtual void OnBeforeSaveData() { }
+
+	virtual void OnAfterSaveData(bool bSuccess) { }
+
+	virtual void OnBeforeLoadData() { }
+
+	virtual void OnAfterLoadData(bool bSuccess) { }
+
+	virtual bool MigrateSaveData(int32 FromVersion, FParameter& InOutData) { return FromVersion == GetSaveDataVersion(); }
+
+	bool BuildSaveFile(TArray<uint8>& OutBytes);
 
 public:
 	/**
@@ -177,15 +195,11 @@ protected:
 	/// 是否自动运行
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	bool bModuleAutoRun;
-	/// 是否自动保存
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	bool bModuleAutoSave;
-	/// 自动保存时机
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "bModuleAutoSave == true"))
-	EPhase ModuleSavePhase;
-	/// 模块存档
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditConditionHides, EditCondition = "bModuleAutoSave == true"))
-	TSubclassOf<UModuleSaveGame> ModuleSaveGame;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "SaveGame")
+	ESaveScope SaveScope;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "SaveGame")
+	int32 SaveDataVersion;
 	/// 模块网络组件
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSubclassOf<UModuleNetworkComponentBase> ModuleNetworkComponent;
@@ -227,10 +241,6 @@ public:
 	*/
 	bool IsModuleAutoRun() const { return bModuleAutoRun; }
 	/**
-	* 是否自动保存
-	*/
-	bool IsModuleAutoSave() const { return bModuleAutoSave; }
-	/**
 	* 是否在编辑器下
 	*/
 	UFUNCTION(BlueprintPure)
@@ -240,16 +250,6 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	AMainModule* GetModuleOwner() const;
-	/**
-	* 获取模块存档
-	*/
-	template<class T>
-	static T* GetModuleSaveGame()
-	{
-		return Cast<T>(GetModuleSaveGame());
-	}
-	UFUNCTION(BlueprintPure)
-	USaveGameBase* GetModuleSaveGame() const;
 	/**
 	* 获取模块网络组件
 	*/

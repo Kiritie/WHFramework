@@ -117,6 +117,12 @@ struct WHFRAMEWORKCORE_API FParameter
 		return Value.GetScriptStruct();
 	}
 
+	const UScriptStruct* GetStructType() const;
+
+	const uint8* GetStructMemory() const;
+
+	uint8* GetMutableStructMemory();
+
 	bool HasValue() const
 	{
 		return Value.IsValid();

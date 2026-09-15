@@ -164,9 +164,9 @@ void AAbilityPawnBase::Serialize(FArchive& Ar)
 	}
 }
 
-void AAbilityPawnBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void AAbilityPawnBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	auto& SaveData = InSaveData->CastRef<FPawnSaveData>();
+	auto& SaveData = InSaveData.GetRef<FPawnSaveData>();
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
@@ -200,14 +200,13 @@ void AAbilityPawnBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		SetLevelA(SaveData.Level);
 		SetRaceID(SaveData.RaceID);
 
-		Inventory->LoadSaveData(&SaveData.InventoryData, InPhase);
+		Inventory->LoadSaveData(SaveData.InventoryData, InPhase);
 	}
 }
 
-FSaveData* AAbilityPawnBase::ToData()
+FParameter AAbilityPawnBase::ToData()
 {
-	FPawnSaveData& SaveData = GetMutableSaveData<FPawnSaveData>();
-	SaveData = FPawnSaveData();
+	FPawnSaveData SaveData;
 
 	SaveData.ActorID = ActorID;
 	SaveData.AssetID = AssetID;
@@ -215,14 +214,14 @@ FSaveData* AAbilityPawnBase::ToData()
 	SaveData.RaceID = RaceID;
 	SaveData.Level = Level;
 
-	SaveData.InventoryData = Inventory->GetSaveDataRef<FInventorySaveData>(true);
+	SaveData.InventoryData = Inventory->GetSaveData(true);
 
 	SaveData.SpawnTransform = GetActorTransform();
 	SaveData.BirthTransform = BirthTransform;
 
 	SaveData.ActionAbilities = ActionAbilities;
 
-	return &SaveData;
+	return FParameter(MoveTemp(SaveData));
 }
 
 void AAbilityPawnBase::ResetData()

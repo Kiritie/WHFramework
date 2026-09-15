@@ -29,7 +29,7 @@ public:
 
 	virtual bool RemoveSceneActor(AActor* InActor) = 0;
 
-	virtual void LoadSceneActors(FSaveData* InSaveData) {}
+	virtual void LoadSceneActors(const FParameter& InSaveData) {}
 
 	virtual void SpawnSceneActors() {}
 

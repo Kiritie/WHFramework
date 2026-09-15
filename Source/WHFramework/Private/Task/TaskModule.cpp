@@ -9,7 +9,6 @@
 #include "Event/EventModuleStatics.h"
 #include "Event/Events/Task/Event_CurrentTaskChanged.h"
 #include "SaveGame/SaveGameModuleStatics.h"
-#include "SaveGame/Module/TaskSaveGame.h"
 #include "Scene/Actor/SceneActorInterface.h"
 #include "Scene/SceneModule.h"
 #include "Task/TaskModuleNetworkComponent.h"
@@ -23,8 +22,8 @@ UTaskModule::UTaskModule()
 {
 	ModuleName = FName("TaskModule");
 	ModuleDisplayName = FText::FromString(TEXT("Task Module"));
+	SaveScope = ESaveScope::World;
 
-	ModuleSaveGame = UTaskSaveGame::StaticClass();
 
 	ModuleNetworkComponent = UTaskModuleNetworkComponent::StaticClass();
 
@@ -130,10 +129,9 @@ void UTaskModule::ClearRuntimeAssets()
 	if(bHadCurrentTask) UEventModuleStatics::BroadcastEvent<FEventCurrentTaskChanged>(this, { nullptr });
 }
 
-void UTaskModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UTaskModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	if (!InSaveData) return;
-	auto& Data = InSaveData->CastRef<FTaskModuleSaveData>();
+	const FTaskModuleSaveData& Data = InSaveData.GetRef<FTaskModuleSaveData>();
 	if (!Data.IsSaved()) return;
 	if (PHASEC(InPhase, EPhase::Primary))
 	{
@@ -161,7 +159,7 @@ void UTaskModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 				UTaskBase* Task = Pair.Value;
 				if (const FTaskRuntimeSaveData* Record = Data.TaskRecords.Find(GetSaveKey(Asset, Pair.Key)))
 				{
-					Task->LoadSaveData(const_cast<FSaveData*>(&Record->Archive));
+					Task->LoadSaveData(Record->Data, EPhase::Primary);
 					PendingResume.Add(Task, *Record);
 				}
 
@@ -177,6 +175,7 @@ void UTaskModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		for (const auto& Pair : Resume)
 			if (Pair.Key && Assets.Contains(Pair.Key->GetTaskAsset()))
 			{
+				Pair.Key->LoadSaveData(Pair.Value.Data, EPhase::Final);
 				Pair.Key->ResumeRuntimeData(Pair.Value);
 				Pair.Key->SetTaskTimersPaused(ModuleState == EModuleState::Paused);
 			}
@@ -195,9 +194,9 @@ void UTaskModule::UnloadData(EPhase InPhase)
 	}
 }
 
-FSaveData* UTaskModule::ToData()
+FParameter UTaskModule::ToData()
 {
-	CachedSaveData = FTaskModuleSaveData();
+	FTaskModuleSaveData SaveData;
 	for (UTaskAsset* Asset : Assets)
 	{
 		if (!Asset || !Asset->SourceObject) continue;
@@ -206,15 +205,15 @@ FSaveData* UTaskModule::ToData()
 		AssetData.InstanceID = Asset->InstanceID;
 		AssetData.AgentID = Asset->AgentID;
 		AssetData.AgentLocation = Asset->AgentLocation;
-		CachedSaveData.Assets.Add(AssetData);
+		SaveData.Assets.Add(AssetData);
 		for (const auto& Pair : Asset->TaskMap)
-			if (Pair.Value) CachedSaveData.TaskRecords.Add(GetSaveKey(Asset, Pair.Key), Pair.Value->CaptureRuntimeData());
+			if (Pair.Value) SaveData.TaskRecords.Add(GetSaveKey(Asset, Pair.Key), Pair.Value->CaptureRuntimeData());
 	}
 	if (CurrentTask && CurrentTask->GetTaskAsset())
 	{
-		CachedSaveData.CurrentTask = CurrentTask->GetTaskAsset()->MakeTaskReference(CurrentTask->TaskGUID);
+		SaveData.CurrentTask = CurrentTask->GetTaskAsset()->MakeTaskReference(CurrentTask->TaskGUID);
 	}
-	return &CachedSaveData;
+	return FParameter(MoveTemp(SaveData));
 }
 
 FString UTaskModule::GetModuleDebugMessage()

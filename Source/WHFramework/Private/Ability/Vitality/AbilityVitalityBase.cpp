@@ -87,11 +87,11 @@ void AAbilityVitalityBase::OnTermination_Implementation()
 	Super::OnTermination_Implementation();
 }
 
-void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void AAbilityVitalityBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
 	Super::LoadData(InSaveData, InPhase);
 
-	auto& SaveData = InSaveData->CastRef<FVitalitySaveData>();
+	auto& SaveData = InSaveData.GetRef<FVitalitySaveData>();
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
@@ -120,14 +120,14 @@ void AAbilityVitalityBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-FSaveData* AAbilityVitalityBase::ToData()
+FParameter AAbilityVitalityBase::ToData()
 {
-	FVitalitySaveData& SaveData = GetMutableSaveData<FVitalitySaveData>();
-	SaveData = Super::ToData()->CastRef<FActorSaveData>();
+	FVitalitySaveData SaveData;
+	SaveData = Super::ToData().GetRef<FActorSaveData>();
 
 	SaveData.RaceID = RaceID;
 
-	return &SaveData;
+	return FParameter(MoveTemp(SaveData));
 }
 
 void AAbilityVitalityBase::ResetData()

@@ -12,7 +12,7 @@ AVoxelEntityPreview::AVoxelEntityPreview()
 	VoxelScope = EVoxelScope::Preview;
 }
 
-void AVoxelEntityPreview::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void AVoxelEntityPreview::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
 	Super::LoadData(InSaveData, InPhase);
 }

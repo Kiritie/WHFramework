@@ -56,7 +56,7 @@ bool IVoxelAgentInterface::OnGenerateVoxel(EInputInteractEvent InInteractEvent, 
 			if(!GeneratePreviewVoxel)
 			{
 				GeneratePreviewVoxel = UObjectPoolModuleStatics::SpawnObject<AVoxelEntityPreview>();
-				GeneratePreviewVoxel->LoadSaveData(&GenerateVoxelItem);
+				GeneratePreviewVoxel->LoadSaveData(FParameter(GenerateVoxelItem));
 			}
 			if(GeneratePreviewVoxel)
 			{
@@ -66,7 +66,7 @@ bool IVoxelAgentInterface::OnGenerateVoxel(EInputInteractEvent InInteractEvent, 
 					if(GenerateVoxelItem.Angle != Angle)
 					{
 						GenerateVoxelItem.Angle = Angle;
-						GeneratePreviewVoxel->LoadSaveData(&GenerateVoxelItem);
+						GeneratePreviewVoxel->LoadSaveData(FParameter(GenerateVoxelItem));
 					}
 				}
 				GeneratePreviewVoxel->SetActorLocation(GenerateVoxelItem.GetLocation());

@@ -22,30 +22,32 @@ void AVoxelContainerAuxiliary::OnDespawn_Implementation(EObjectDespawnMode InMod
 	Inventory->UnloadSaveData();
 }
 
-void AVoxelContainerAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void AVoxelContainerAuxiliary::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
 	Super::LoadData(InSaveData, InPhase);
 	
-	auto& SaveData = InSaveData->CastRef<FVoxelAuxiliarySaveData>();
+	const FVoxelAuxiliarySaveData& SaveData = InSaveData.GetRef<FVoxelAuxiliarySaveData>();
+	FParameter InventoryData = SaveData.InventoryData;
 
-	if(!SaveData.InventoryData.IsSaved())
+	if(!InventoryData.HasValue() || !InventoryData.GetRef<FInventorySaveData>().IsSaved())
 	{
-		SaveData.InventoryData = VoxelItem.GetData<UVoxelContainerData>().InventoryData;
+		InventoryData = FParameter(VoxelItem.GetData<UVoxelContainerData>().InventoryData);
 	}
 
 	if(PHASEC(InPhase, EPhase::All))
 	{
-		Inventory->LoadSaveData(&SaveData.InventoryData, InPhase);
+		Inventory->LoadSaveData(InventoryData, InPhase);
 	}
 }
 
-FSaveData* AVoxelContainerAuxiliary::ToData()
+FParameter AVoxelContainerAuxiliary::ToData()
 {
-	auto& SaveData = Super::ToData()->CastRef<FVoxelAuxiliarySaveData>();
+	FParameter Result = Super::ToData();
+	FVoxelAuxiliarySaveData& SaveData = *Result.GetMutablePtr<FVoxelAuxiliarySaveData>();
 
-	SaveData.InventoryData = Inventory->GetSaveDataRef<FInventorySaveData>(true);
+	SaveData.InventoryData = Inventory->GetSaveData(true);
 
-	return &SaveData;
+	return Result;
 }
 
 void AVoxelContainerAuxiliary::OnAdditionItem(const FAbilityItem& InItem)

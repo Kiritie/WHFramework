@@ -9,12 +9,12 @@ UAbilityCharacterInventoryBase::UAbilityCharacterInventoryBase()
 	
 }
 
-void UAbilityCharacterInventoryBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UAbilityCharacterInventoryBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
 	Super::LoadData(InSaveData, InPhase);
 }
 
-FSaveData* UAbilityCharacterInventoryBase::ToData()
+FParameter UAbilityCharacterInventoryBase::ToData()
 {
 	return Super::ToData();
 }

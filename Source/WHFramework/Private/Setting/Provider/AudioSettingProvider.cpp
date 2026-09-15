@@ -49,7 +49,7 @@ bool UAudioSettingProvider::CanHandle(const FSettingDefinition& InDefinition) co
 void UAudioSettingProvider::BeginEdit(const TArray<FSettingDefinition>& InDefinitions)
 {
 	Super::BeginEdit(InDefinitions);
-	AppliedData = UAudioModule::Get().GetSaveDataRef<FAudioModuleSaveData>(true);
+	AppliedData = UAudioModule::Get().GetSaveData(true).GetRef<FAudioModuleSaveData>();
 	PendingData = AppliedData;
 	DefaultData = FAudioModuleSaveData();
 }

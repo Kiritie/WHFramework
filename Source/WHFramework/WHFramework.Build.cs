@@ -18,6 +18,7 @@ public class WHFramework : ModuleRules
 				"Engine",
 				"HTTP",
 				"Json",
+				"JsonUtilities",
 				"AIModule",
 				"CommonUI",
 				"CommonInput",

@@ -36,9 +36,9 @@ void UAbilityInventoryBase::OnReset_Implementation()
 	OnSlotSelected.Clear();
 }
 
-void UAbilityInventoryBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UAbilityInventoryBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	auto& SaveData = InSaveData->CastRef<FInventorySaveData>();
+	auto& SaveData = InSaveData.GetRef<FInventorySaveData>();
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
@@ -92,7 +92,7 @@ void UAbilityInventoryBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		{
 			for (int32 i = 0; i < Iter.Value.Items.Num(); i++)
 			{
-				FAbilityItem& Item = Iter.Value.Items[i];
+				FAbilityItem Item = Iter.Value.Items[i];
 				UAbilityInventorySlotBase* Slot = SplitSlots.FindOrAdd(Iter.Key).Slots[i];
 				Slot->SetItem(Item);
 				if(SaveData.SelectedIndexs.Contains(Iter.Key) ? SaveData.SelectedIndexs[Iter.Key] == i : i == 0)
@@ -104,10 +104,9 @@ void UAbilityInventoryBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-FSaveData* UAbilityInventoryBase::ToData()
+FParameter UAbilityInventoryBase::ToData()
 {
-	FInventorySaveData& SaveData = GetMutableSaveData<FInventorySaveData>();
-	SaveData = FInventorySaveData();
+	FInventorySaveData SaveData;
 
 	SaveData.InventoryClass = GetClass();
 	for(auto& Iter : SplitSlots)
@@ -115,7 +114,7 @@ FSaveData* UAbilityInventoryBase::ToData()
 		SaveData.SplitItems.Add(Iter.Key, Iter.Value.GetItems());
 	}
 	SaveData.SelectedIndexs = SelectedIndexs;
-	return &SaveData;
+	return FParameter(MoveTemp(SaveData));
 }
 
 void UAbilityInventoryBase::UnloadData(EPhase InPhase)

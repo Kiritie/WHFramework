@@ -145,17 +145,16 @@ AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(FAbilityItem InItem, FVec
 {
 	if(!InItem.IsValid()) return nullptr;
 
-	FPickUpSaveData& SaveData = GetMutableSaveData<FPickUpSaveData>();
-	SaveData = FPickUpSaveData();
+	FPickUpSaveData SaveData;
 	SaveData.Item = InItem;
 	SaveData.Location = InLocation;
 
-	return SpawnAbilityPickUp(&SaveData, InContainer);
+	return SpawnAbilityPickUp(FParameter(MoveTemp(SaveData)), InContainer);
 }
 
-AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(const FParameter& InSaveData, ISceneContainerInterface* InContainer)
 {
-	const auto& SaveData = InSaveData->CastRef<FPickUpSaveData>();
+	const auto& SaveData = InSaveData.GetRef<FPickUpSaveData>();
 
 	const auto& ItemData = SaveData.Item.GetData<UAbilityItemDataBase>();
 	
@@ -178,9 +177,9 @@ AAbilityProjectileBase* UAbilityModule::SpawnAbilityProjectile(const TSubclassOf
 		InClass);
 }
 
-AActor* UAbilityModule::SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+AActor* UAbilityModule::SpawnAbilityActor(const FParameter& InSaveData, ISceneContainerInterface* InContainer)
 {
-	auto& SaveData = InSaveData->CastRef<FActorSaveData>();
+	auto& SaveData = InSaveData.GetRef<FActorSaveData>();
 	if(AActor* Actor = UObjectPoolModuleStatics::SpawnObject<AActor>(
 		FAbilityActorSpawnParameter(this, SaveData.SpawnTransform, SaveData.ActorID, SaveData.AssetID),
 		SaveData.GetData<UAbilityActorDataBase>().Class))

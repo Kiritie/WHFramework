@@ -7,12 +7,12 @@ UAbilityVitalityInventoryBase::UAbilityVitalityInventoryBase()
 	
 }
 
-void UAbilityVitalityInventoryBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UAbilityVitalityInventoryBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
 	Super::LoadData(InSaveData, InPhase);
 }
 
-FSaveData* UAbilityVitalityInventoryBase::ToData()
+FParameter UAbilityVitalityInventoryBase::ToData()
 {
 	return Super::ToData();
 }

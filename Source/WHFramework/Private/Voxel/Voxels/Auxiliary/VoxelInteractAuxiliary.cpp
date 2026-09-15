@@ -37,11 +37,11 @@ void AVoxelInteractAuxiliary::OnDespawn_Implementation(EObjectDespawnMode InMode
 	Super::OnDespawn_Implementation(InMode);
 }
 
-void AVoxelInteractAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void AVoxelInteractAuxiliary::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
 	Super::LoadData(InSaveData, InPhase);
 
-	const auto& SaveData = InSaveData->CastRef<FVoxelAuxiliarySaveData>();
+	const auto& SaveData = InSaveData.GetRef<FVoxelAuxiliarySaveData>();
 
 	if(PHASEC(InPhase, EPhase::All))
 	{

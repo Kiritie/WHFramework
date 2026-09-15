@@ -216,13 +216,13 @@ void FInventorySaveData::AddItem(FAbilityItem InItem, bool bUnique)
 {
 	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(InventoryClass);
 
-	Inventory.LoadSaveData(this);
+	Inventory.LoadSaveData(FParameter(*this));
 	if(!bUnique || !Inventory.QueryItemByRange(EItemQueryType::Get, InItem).IsValid())
 	{
 		Inventory.AddItemByRange(InItem, 0, -1, false);
 	}
 
-	CopyItems(Inventory.GetSaveDataRef<FInventorySaveData>(true));
+	CopyItems(Inventory.GetSaveData(true).GetRef<FInventorySaveData>());
 	UReferencePoolModuleStatics::ResetReference<UAbilityInventoryBase>(InventoryClass);
 }
 
@@ -230,10 +230,10 @@ void FInventorySaveData::RemoveItem(FAbilityItem InItem)
 {
 	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(InventoryClass);
 
-	Inventory.LoadSaveData(this);
+	Inventory.LoadSaveData(FParameter(*this));
 	Inventory.RemoveItemByRange(InItem, 0, -1, false);
 
-	CopyItems(Inventory.GetSaveDataRef<FInventorySaveData>(true));
+	CopyItems(Inventory.GetSaveData(true).GetRef<FInventorySaveData>());
 	UReferencePoolModuleStatics::ResetReference<UAbilityInventoryBase>(InventoryClass);
 }
 
@@ -241,10 +241,10 @@ void FInventorySaveData::ClearItem(FAbilityItem InItem)
 {
 	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(InventoryClass);
 
-	Inventory.LoadSaveData(this);
+	Inventory.LoadSaveData(FParameter(*this));
 	Inventory.ClearItem(InItem);
 
-	CopyItems(Inventory.GetSaveDataRef<FInventorySaveData>(true));
+	CopyItems(Inventory.GetSaveData(true).GetRef<FInventorySaveData>());
 	UReferencePoolModuleStatics::ResetReference<UAbilityInventoryBase>(InventoryClass);
 }
 
@@ -252,10 +252,10 @@ void FInventorySaveData::ClearItems()
 {
 	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(InventoryClass);
 
-	Inventory.LoadSaveData(this);
+	Inventory.LoadSaveData(FParameter(*this));
 	Inventory.ClearItems();
 
-	CopyItems(Inventory.GetSaveDataRef<FInventorySaveData>(true));
+	CopyItems(Inventory.GetSaveData(true).GetRef<FInventorySaveData>());
 	UReferencePoolModuleStatics::ResetReference<UAbilityInventoryBase>(InventoryClass);
 }
 
@@ -266,8 +266,9 @@ UAbilityItemDataBase& FRaceItem::GetData() const
 
 void FActorSaveData::InitData(FRandomStream InRandomStream)
 {
-	InventoryData = GetData().InventoryData;
-	InventoryData.FillItems(Level, InRandomStream);
+	FInventorySaveData Data = GetData().InventoryData;
+	Data.FillItems(Level, InRandomStream);
+	InventoryData = FParameter(MoveTemp(Data));
 }
 
 UAbilityActorDataBase& FActorSaveData::GetData() const

@@ -3,6 +3,7 @@
 #include "Scene/Camera/CameraStreamingBridge.h"
 
 #include "Camera/CameraModuleStatics.h"
+#include "Asset/Primary/PrimaryEntityInterface.h"
 #include "Common/CommonModuleStatics.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Debug/DebugModuleTypes.h"
@@ -27,7 +28,6 @@
 #include "Math/MathHelper.h"
 #include "Runtime/LevelSequence/Public/LevelSequenceActor.h"
 #include "Runtime/LevelSequence/Public/LevelSequencePlayer.h"
-#include "SaveGame/Module/SceneSaveGame.h"
 #include "Scene/Object/WorldTimer.h"
 #include "Scene/Object/WorldWeather.h"
 #include "Scene/Actor/SceneActorInterface.h"
@@ -46,10 +46,10 @@ USceneModule::USceneModule()
 {
 	ModuleName = FName("SceneModule");
 	ModuleDisplayName = FText::FromString(TEXT("Scene Module"));
+	SaveScope = ESaveScope::World;
 
 	bModuleRequired = true;
 
-	ModuleSaveGame = USceneSaveGame::StaticClass();
 
 	bSaveActorDatas = false;
 
@@ -418,9 +418,9 @@ void USceneModule::OnTermination(EPhase InPhase)
 	}
 }
 
-void USceneModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void USceneModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	auto& SaveData = InSaveData->CastRef<FSceneModuleSaveData>();
+	auto& SaveData = InSaveData.GetRef<FSceneModuleSaveData>();
 
 	if(PHASEC(InPhase, EPhase::All))
 	{
@@ -441,67 +441,115 @@ void USceneModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		
 		if(WorldTimer && WorldTimer->IsAutoSave())
 		{
-			WorldTimer->LoadSaveData(&SaveData.TimerData);
+			WorldTimer->LoadSaveData(FParameter(SaveData.TimerData));
 		}
 		
 		if(WorldWeather && WorldWeather->IsAutoSave())
 		{
-			WorldWeather->LoadSaveData(&SaveData.WeatherData);
+			WorldWeather->LoadSaveData(FParameter(SaveData.WeatherData));
 		}
 
 		if(bSaveActorDatas)
 		{
-			for(auto& Iter : SaveData.ActorSaveDatas)
+			for(const FSceneActorSaveRecord& Record : SaveData.ActorSaveRecords)
 			{
-				if(auto Agent = GetSceneActor<ISaveDataAgentInterface>(Iter.ActorID.ToString(), false))
+				AActor* Actor = GetSceneActor(Record.ActorId.ToString(), nullptr, false);
+				if(PHASEC(InPhase, EPhase::Primary))
 				{
-					Agent->LoadSaveData(&Iter);
+					if(Record.bDestroyed)
+					{
+						if(Actor)
+						{
+							Actor->Destroy();
+						}
+						DestroyedSceneActorIds.Add(Record.ActorId);
+						continue;
+					}
+					if(!Actor && Record.bRuntimeSpawned && !Record.ActorClass.IsNull())
+					{
+						if(UClass* ActorClass = Record.ActorClass.TryLoadClass<AActor>())
+						{
+							Actor = GetWorld()->SpawnActorDeferred<AActor>(ActorClass, Record.Transform);
+							if(Actor && Actor->Implements<USceneActorInterface>())
+							{
+								ISceneActorInterface::Execute_SetActorID(Actor, Record.ActorId.ToString());
+								UGameplayStatics::FinishSpawningActor(Actor, Record.Transform);
+								AddSceneActor(Actor);
+							}
+						}
+					}
+				}
+				if(Actor)
+				{
+					Actor->SetActorTransform(Record.Transform);
+					if(ISaveDataAgentInterface* Agent = Cast<ISaveDataAgentInterface>(Actor))
+					{
+						Agent->LoadSaveData(Record.Data, InPhase);
+					}
 				}
 			}
 		}
 	}
 }
 
-FSaveData* USceneModule::ToData()
+FParameter USceneModule::ToData()
 {
-	CachedSaveData = FSceneModuleSaveData();
-	FSceneModuleSaveData* SaveData = &CachedSaveData;
+	FSceneModuleSaveData SaveData;
 
-	SaveData->MiniMapRange = MiniMapRange;
-	SaveData->WorldMapCenter = WorldMapCenter;
-	SaveData->WorldMapRange = WorldMapRange;
-	SaveData->TrackedMarkerID = TrackedMarkerID;
-	SaveData->SceneAreas = SceneAreas;
+	SaveData.MiniMapRange = MiniMapRange;
+	SaveData.WorldMapCenter = WorldMapCenter;
+	SaveData.WorldMapRange = WorldMapRange;
+	SaveData.TrackedMarkerID = TrackedMarkerID;
+	SaveData.SceneAreas = SceneAreas;
 	for(const auto& Iter : Markers)
 	{
-		if(Iter.Value.bPersistent) SaveData->Markers.Add(Iter.Value);
+		if(Iter.Value.bPersistent) SaveData.Markers.Add(Iter.Value);
 	}
 	
 	if(WorldTimer && WorldTimer->IsAutoSave())
 	{
-		SaveData->TimerData = WorldTimer->GetSaveDataRef<FWorldTimerSaveData>(true);
+		SaveData.TimerData = WorldTimer->GetSaveData(true).GetRef<FWorldTimerSaveData>();
 	}
 	
 	if(WorldWeather && WorldWeather->IsAutoSave())
 	{
-		SaveData->WeatherData = WorldWeather->GetSaveDataRef<FWorldWeatherSaveData>(true);
+		SaveData.WeatherData = WorldWeather->GetSaveData(true).GetRef<FWorldWeatherSaveData>();
 	}
 
 	if(bSaveActorDatas)
 	{
-		for(auto& Iter : SceneActorMap)
+		for(const TPair<FGuid, AActor*>& Iter : SceneActorMap)
 		{
-			if(auto Agent = Cast<ISaveDataAgentInterface>(Iter.Value))
+			AActor* Actor = Iter.Value;
+			if(!::IsValid(Actor))
 			{
-				if(auto Data = Agent->GetSaveData<FSceneActorSaveData>(true))
-				{
-					SaveData->ActorSaveDatas.Add(*Data);
-				}
+				continue;
 			}
+			if(ISaveDataAgentInterface* Agent = Cast<ISaveDataAgentInterface>(Actor))
+			{
+				FSceneActorSaveRecord Record;
+				Record.ActorId = Iter.Key;
+				Record.ActorClass = FSoftClassPath(Actor->GetClass());
+				Record.Transform = Actor->GetActorTransform();
+				Record.bRuntimeSpawned = !Actor->HasAnyFlags(RF_WasLoaded);
+				Record.Data = Agent->GetSaveData(true);
+				if(Actor->Implements<UPrimaryEntityInterface>())
+				{
+					Record.AssetId = IPrimaryEntityInterface::Execute_GetAssetID(Actor);
+				}
+				SaveData.ActorSaveRecords.Add(MoveTemp(Record));
+			}
+		}
+		for(const FGuid& ActorId : DestroyedSceneActorIds)
+		{
+			FSceneActorSaveRecord Record;
+			Record.ActorId = ActorId;
+			Record.bDestroyed = true;
+			SaveData.ActorSaveRecords.Add(MoveTemp(Record));
 		}
 	}
 
-	return SaveData;
+	return FParameter(MoveTemp(SaveData));
 }
 
 FString USceneModule::GetModuleDebugMessage()
@@ -1222,6 +1270,14 @@ bool USceneModule::RemoveSceneActor(AActor* InActor)
 		return true;
 	}
 	return false;
+}
+
+void USceneModule::MarkSceneActorDestroyed(AActor* InActor)
+{
+	if(InActor && InActor->Implements<USceneActorInterface>() && InActor->HasAnyFlags(RF_WasLoaded))
+	{
+		DestroyedSceneActorIds.Add(ISceneActorInterface::Execute_GetActorID(InActor));
+	}
 }
 
 bool USceneModule::HasTargetPointByName(const FName InName, bool bEnsured) const

@@ -6,7 +6,20 @@
 
 #include "CharacterModuleTypes.generated.h"
 
-class ACharacterBase;
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FCharacterSaveRecord
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FGuid CharacterId;
+
+	UPROPERTY()
+	FPrimaryAssetId CharacterAssetId;
+
+	UPROPERTY()
+	FParameter Data;
+};
 
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FCharacterModuleSaveData : public FSaveData
@@ -14,12 +27,12 @@ struct WHFRAMEWORK_API FCharacterModuleSaveData : public FSaveData
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FCharacterModuleSaveData()
-	{
-		CurrentCharacter = nullptr;
-	}
-
-public:
 	UPROPERTY(BlueprintReadWrite)
-	ACharacterBase* CurrentCharacter;
+	FGuid CurrentCharacterId;
+
+	UPROPERTY()
+	TArray<FCharacterSaveRecord> Characters;
+
+	UPROPERTY()
+	FParameter PlayerControllerData;
 };

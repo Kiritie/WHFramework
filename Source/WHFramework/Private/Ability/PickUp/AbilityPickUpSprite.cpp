@@ -28,7 +28,7 @@ AAbilityPickUpSprite::AAbilityPickUpSprite()
 	}
 }
 
-void AAbilityPickUpSprite::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void AAbilityPickUpSprite::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
 	Super::LoadData(InSaveData, InPhase);
 

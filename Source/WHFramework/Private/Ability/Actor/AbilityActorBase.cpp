@@ -109,11 +109,11 @@ void AAbilityActorBase::Serialize(FArchive& Ar)
 	}
 }
 
-void AAbilityActorBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void AAbilityActorBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
 	Super::LoadData(InSaveData, InPhase);
 
-	auto& SaveData = InSaveData->CastRef<FActorSaveData>();
+	auto& SaveData = InSaveData.GetRef<FActorSaveData>();
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
@@ -132,25 +132,25 @@ void AAbilityActorBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 		SetNameA(SaveData.Name);
 		SetLevelA(SaveData.Level);
 
-		Inventory->LoadSaveData(&SaveData.InventoryData, InPhase);
+		Inventory->LoadSaveData(SaveData.InventoryData, InPhase);
 	}
 }
 
-FSaveData* AAbilityActorBase::ToData()
+FParameter AAbilityActorBase::ToData()
 {
-	FActorSaveData& SaveData = GetMutableSaveData<FActorSaveData>();
-	SaveData = Super::ToData()->CastRef<FSceneActorSaveData>();
+	FActorSaveData SaveData;
+	SaveData = Super::ToData().GetRef<FSceneActorSaveData>();
 
 	SaveData.AssetID = AssetID;
 	SaveData.Name = Name;
 	SaveData.Level = Level;
 
-	SaveData.InventoryData = Inventory->GetSaveDataRef<FInventorySaveData>(true);
+	SaveData.InventoryData = Inventory->GetSaveData(true);
 
 	SaveData.SpawnTransform = GetActorTransform();
 	SaveData.BirthTransform = BirthTransform;
 
-	return &SaveData;
+	return FParameter(MoveTemp(SaveData));
 }
 
 void AAbilityActorBase::ResetData()

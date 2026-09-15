@@ -79,7 +79,7 @@ public:
 	// PickUp
 	static AAbilityPickUpBase* SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer = nullptr);
 
-	static AAbilityPickUpBase* SpawnAbilityPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+	static AAbilityPickUpBase* SpawnAbilityPickUp(const FParameter& InSaveData, ISceneContainerInterface* InContainer = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Projectile
@@ -87,5 +87,5 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Actor
-	static AActor* SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer = nullptr);
+	static AActor* SpawnAbilityActor(const FParameter& InSaveData, ISceneContainerInterface* InContainer = nullptr);
 };

@@ -3,7 +3,6 @@
 #include "Dialogue/Base/DialogueConditionBase.h"
 #include "Dialogue/Base/DialogueEventBase.h"
 
-#include "SaveGame/Module/DialogueSaveGame.h"
 #include "GameFramework/PlayerController.h"
 #include "Engine/GameInstance.h"
 #include "Common/Interaction/InteractionComponent.h"
@@ -16,10 +15,9 @@ UDialogueModule::UDialogueModule()
 {
 	ModuleName = FName("DialogueModule");
 	ModuleDisplayName = NSLOCTEXT("WHFramework", "DialogueModule", "Dialogue Module");
-	ModuleSaveGame = UDialogueSaveGame::StaticClass();
+	SaveScope = ESaveScope::World;
 	ModuleDependencies.Add(FName("TaskModule"));
 	bModuleRequired = false;
-	bModuleAutoSave = true;
 }
 
 UDialogueModule::~UDialogueModule()
@@ -191,12 +189,12 @@ void UDialogueModule::OnTermination(EPhase InPhase)
 	if (PHASEC(InPhase, EPhase::Final)) EndDialogue();
 }
 
-void UDialogueModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UDialogueModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	if (InSaveData && InSaveData->IsSaved() && PHASEC(InPhase, EPhase::Primary))
+	if (InSaveData.GetRef<FDialogueModuleSaveData>().IsSaved() && PHASEC(InPhase, EPhase::Primary))
 	{
 		EndDialogue();
-		SavedDialogue = InSaveData->CastRef<FDialogueModuleSaveData>();
+		SavedDialogue = InSaveData.GetRef<FDialogueModuleSaveData>();
 	}
 }
 
@@ -209,12 +207,12 @@ void UDialogueModule::UnloadData(EPhase InPhase)
 	}
 }
 
-FSaveData* UDialogueModule::ToData()
+FParameter UDialogueModule::ToData()
 {
 	if (CurrentDialogue)
 	{
 		SavedDialogue.DialogueAsset = SourceDialogue;
 		SavedDialogue.NodeID = CurrentNodeID;
 	}
-	return &SavedDialogue;
+	return FParameter(MoveTemp(SavedDialogue));
 }

@@ -33,7 +33,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Math/MathTypes.h"
 #include "SaveGame/SaveGameModuleStatics.h"
-#include "SaveGame/Module/VoxelSaveGame.h"
+#include "SaveGame/SaveGameStorage.h"
 #include "Scene/SceneModule.h"
 #include "Voxel/Capture/VoxelCapture.h"
 #include "Voxel/Components/VoxelMeshComponent.h"
@@ -50,6 +50,7 @@
 #include "Voxel/Generators/VoxelSurfaceGenerator.h"
 #include "Voxel/Generators/VoxelTerrainGenerator.h"
 #include "Voxel/Root/VoxelRoot.h"
+#include "Voxel/Save/VoxelRegionStore.h"
 #include "Voxel/Voxels/VoxelContainer.h"
 
 IMPLEMENTATION_MODULE(UVoxelModule)
@@ -58,7 +59,7 @@ UVoxelModule::UVoxelModule()
 {
 	ModuleName = FName("VoxelModule");
 	ModuleDisplayName = FText::FromString(TEXT("Voxel Module"));
-	ModuleSaveGame = UVoxelSaveGame::StaticClass();
+	SaveScope = ESaveScope::World;
 
 	ModuleDependencies = { FName("AbilityModule"), FName("AudioModule"), FName("SceneModule") };
 
@@ -174,6 +175,8 @@ UVoxelModule::UVoxelModule()
 
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> IconSourceMatFinder(TEXT("/Script/Engine.Material'/WHFramework/Voxel/Materials/M_VoxelIcon.M_VoxelIcon'"));
 	WorldBasicData.IconMat = IconSourceMatFinder.Object;
+	WorldData = MakeUnique<FVoxelModuleSaveData>(WorldBasicData);
+	RegionStore = MakeUnique<FVoxelRegionStore>();
 }
 
 UVoxelModule::~UVoxelModule()
@@ -370,13 +373,10 @@ void UVoxelModule::OnTermination(EPhase InPhase)
 
 void UVoxelModule::Load_Implementation()
 {
-	if(bModuleAutoSave)
+	if(!WorldData)
 	{
-		USaveGameModuleStatics::LoadOrCreateSaveGame(ModuleSaveGame, 0, bAutoGenerate ? EPhase::All : EPhase::Primary);
-	}
-	else if(!WorldData)
-	{
-		LoadSaveData(NewWorldData(), bAutoGenerate ? EPhase::All : EPhase::Primary);
+		WorldData = NewWorldData();
+		LoadSaveData(ToData(), bAutoGenerate ? EPhase::All : EPhase::Primary);
 	}
 }
 
@@ -451,19 +451,19 @@ FBox UVoxelModule::GetWorldBounds(float InRadius, float InHalfHeight) const
 
 FVoxelWorldSaveData& UVoxelModule::GetWorldData() const
 {
-	return WorldData ? *WorldData : GetMutableSaveData<FVoxelWorldSaveData>();
+	return *WorldData;
 }
 
-FVoxelWorldSaveData* UVoxelModule::NewWorldData(FSaveData* InBasicData) const
+TUniquePtr<FVoxelWorldSaveData> UVoxelModule::NewWorldData(const FParameter& InBasicData) const
 {
-	FVoxelModuleSaveData& SaveData = GetMutableSaveData<FVoxelModuleSaveData>();
-	SaveData = !InBasicData ? FVoxelModuleSaveData(WorldBasicData) : InBasicData->CastRef<FVoxelModuleSaveData>();
-	return &SaveData;
+	return MakeUnique<FVoxelModuleSaveData>(InBasicData.HasValue() ? InBasicData.GetRef<FVoxelModuleSaveData>() : FVoxelModuleSaveData(WorldBasicData));
 }
 
-void UVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UVoxelModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	auto& SaveData = InSaveData->CastRef<FVoxelWorldSaveData>();
+	const UScriptStruct* StructType = InSaveData.GetStructType();
+	check(StructType && StructType->IsChildOf(FVoxelWorldSaveData::StaticStruct()) && InSaveData.GetStructMemory());
+	const FVoxelWorldSaveData& SaveData = *reinterpret_cast<const FVoxelWorldSaveData*>(InSaveData.GetStructMemory());
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
@@ -503,7 +503,7 @@ void UVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 			if(VoxelEntity)
 			{
 				FVoxelItem VoxelItem = Item->GetPrimaryAssetId();
-				VoxelEntity->LoadSaveData(&VoxelItem);
+				VoxelEntity->LoadSaveData(FParameter(VoxelItem));
 				VoxelEntity->SetActorLocation(FVector((ItemIndex / 8 - 3.5f) * WorldBasicData.BlockSize * 0.5f, (ItemIndex % 8 - 3.5f) * WorldBasicData.BlockSize * 0.5f, -800.f));
 				VoxelEntity->SetActorRotation(FRotator(-70.f, 0.f, -180.f));
 				VoxelEntity->GetMeshComponent()->SetRelativeRotation(FRotator(0.f, 45.f, 0.f));
@@ -522,29 +522,76 @@ void UVoxelModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 	if(PHASEC(InPhase, EPhase::All))
 	{
-		if(SaveData.SceneData.WeatherData.WeatherSeed == 0)
+		FSceneModuleSaveData SceneData = SaveData.SceneData;
+		if(SceneData.WeatherData.WeatherSeed == 0)
 		{
-			SaveData.SceneData.WeatherData.WeatherSeed = WorldData->WorldSeed;
+			SceneData.WeatherData.WeatherSeed = WorldData->WorldSeed;
 		}
-		USceneModule::Get().LoadSaveData(&SaveData.SceneData, InPhase);
+		USceneModule::Get().LoadSaveData(FParameter(MoveTemp(SceneData)), InPhase);
 		USceneModule::Get().SetSeaLevel(SaveData.SeaLevel * SaveData.BlockSize);
 	}
 }
 
-FSaveData* UVoxelModule::ToData()
+FParameter UVoxelModule::ToData()
 {
-	FVoxelWorldSaveData* SaveData = NewWorldData(WorldData);
-	
-	ITER_MAP(ChunkMap, Iter,
-		if(Iter.Value->IsGenerated())
-		{
-			SaveData->SetChunkData(Iter.Key, Iter.Value->GetSaveData<FVoxelChunkSaveData>(true));
-		}
-	)
+	FVoxelModuleSaveData SaveData(WorldBasicData);
+	if(WorldData)
+	{
+		static_cast<FVoxelWorldSaveData&>(SaveData) = *WorldData;
+	}
+	SaveData.SceneData = USceneModule::Get().GetSaveData(true).GetRef<FSceneModuleSaveData>();
+	return FParameter(MoveTemp(SaveData));
+}
 
-	SaveData->SceneData = USceneModule::Get().GetSaveDataRef<FSceneModuleSaveData>(true);
-	
-	return SaveData;
+FParameter UVoxelModule::GetData()
+{
+	return ToData();
+}
+
+void UVoxelModule::OnBeforeSaveData()
+{
+	for(const TPair<FIndex, UVoxelChunk*>& Pair : ChunkMap)
+	{
+		if(Pair.Value && Pair.Value->IsChanged())
+		{
+			DirtyChunkIndices.Add(Pair.Key);
+		}
+	}
+	for(const FIndex& Index : DirtyChunkIndices)
+	{
+		if(UVoxelChunk* Chunk = GetChunkByIndex(Index))
+		{
+			RegionStore->StageChunk(Index, Chunk->GetSaveData(true));
+		}
+	}
+}
+
+void UVoxelModule::OnAfterSaveData(bool bSuccess)
+{
+	if(!bSuccess)
+	{
+		RegionStore->AbortPending();
+		return;
+	}
+	RegionStore->CommitPending();
+	for(const FIndex& Index : DirtyChunkIndices)
+	{
+		if(UVoxelChunk* Chunk = GetChunkByIndex(Index))
+		{
+			Chunk->SetChanged(false);
+		}
+	}
+	DirtyChunkIndices.Reset();
+}
+
+void UVoxelModule::SetActiveSaveSource(const FGuid& SaveId, int32 Generation, FSaveGameStorage* Storage)
+{
+	RegionStore->SetSource(SaveId, Generation, Storage);
+}
+
+bool UVoxelModule::WritePendingRegionsToGeneration(const FGuid& SaveId, int32 Generation, FSaveGameStorage& Storage)
+{
+	return RegionStore->WritePendingRegions(Storage.GetTempGenerationDir(SaveId, Generation));
 }
 
 void UVoxelModule::UnloadData(EPhase InPhase)
@@ -685,8 +732,7 @@ UVoxelChunk* UVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 	{
 		if(!Chunk->IsBuilded())
 		{
-			const FVoxelChunkSaveData* ChunkData = WorldData->GetChunkData(InIndex);
-			if(ChunkData && ChunkData->bChanged)
+			if(RegionStore && RegionStore->HasChunk(InIndex))
 			{
 				AddToChunkQueue(EVoxelWorldState::MapLoading, InIndex);
 			}
@@ -716,9 +762,13 @@ UVoxelChunk* UVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
 
 void UVoxelModule::LoadChunkMap(FIndex InIndex)
 {
-	if(UVoxelChunk* Chunk = GetChunkByIndex(InIndex))
+	FParameter Data;
+	if(RegionStore && RegionStore->LoadChunk(InIndex, Data))
 	{
-		Chunk->LoadSaveData(WorldData->GetChunkData(InIndex));
+		if(UVoxelChunk* Chunk = GetChunkByIndex(InIndex))
+		{
+			Chunk->LoadSaveData(Data, EPhase::All);
+		}
 	}
 }
 
@@ -758,7 +808,8 @@ void UVoxelModule::SaveChunk(FIndex InIndex)
 {
 	if(UVoxelChunk* Chunk = GetChunkByIndex(InIndex))
 	{
-		Chunk->SaveData();
+		RegionStore->StageChunk(InIndex, Chunk->GetSaveData(true));
+		DirtyChunkIndices.Add(InIndex);
 	}
 }
 
@@ -766,6 +817,11 @@ void UVoxelModule::UnloadChunk(FIndex InIndex)
 {
 	if(UVoxelChunk* Chunk = GetChunkByIndex(InIndex))
 	{
+		if(Chunk->IsChanged())
+		{
+			RegionStore->StageChunk(InIndex, Chunk->GetSaveData(true));
+			DirtyChunkIndices.Add(InIndex);
+		}
 		if(!Chunk->IsGenerated())
 		{
 			TArray<UVoxelChunk*> NeighborChunks;

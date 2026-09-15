@@ -3,8 +3,6 @@
 
 #include "SaveGameModuleTypes.generated.h"
 
-class USaveGameBase;
-
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FSaveData
 {
@@ -35,6 +33,8 @@ public:
 
 	virtual TArray<uint8>& GetDatas() { return Datas; }
 
+	virtual const TArray<uint8>& GetDatas() const { return Datas; }
+
 	virtual void SetDatas(const TArray<uint8>& InDatas) { Datas = InDatas; }
 
 public:
@@ -51,81 +51,208 @@ public:
 	}
 };
 
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FSaveGameInfo
+UENUM(BlueprintType)
+enum class ESaveScope : uint8
 {
-	GENERATED_BODY()
+	None,
+	Profile,
+	World
+};
 
-public:
-	FORCEINLINE FSaveGameInfo()
-	{
-		ActiveIndex = -1;
-		SaveGameClass = nullptr;
-		SaveGames = TArray<USaveGameBase*>();
-	}
-
-	FORCEINLINE FSaveGameInfo(UClass* InClass, int32 InActiveIndex = -1)
-	{
-		ActiveIndex = InActiveIndex;
-		SaveGameClass = InClass;
-	}
-
-	UPROPERTY(BlueprintReadOnly)
-	int32 ActiveIndex;
-
-	UPROPERTY(BlueprintReadOnly)
-	UClass* SaveGameClass;
-
-	UPROPERTY(BlueprintReadOnly, Transient)
-	TArray<USaveGameBase*> SaveGames;
+UENUM(BlueprintType)
+enum class ESaveResultCode : uint8
+{
+	None,
+	Success,
+	InvalidArgument,
+	NotFound,
+	AlreadyExists,
+	Busy,
+	CaptureFailed,
+	SerializeFailed,
+	ReadFailed,
+	WriteFailed,
+	CommitFailed,
+	CorruptData,
+	VersionMismatch,
+	ModuleMissing,
+	LoadFailed,
+	Unsupported,
+	Unknown
 };
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FSaveGameData : public FSaveData
+struct WHFRAMEWORK_API FSaveOperationResult
 {
 	GENERATED_BODY()
 
-public:
-	FORCEINLINE FSaveGameData()
+	UPROPERTY(BlueprintReadOnly)
+	bool bSuccess = false;
+
+	UPROPERTY(BlueprintReadOnly)
+	ESaveResultCode Code = ESaveResultCode::Unknown;
+
+	UPROPERTY(BlueprintReadOnly)
+	FText Message;
+
+	static FSaveOperationResult Success();
+
+	static FSaveOperationResult Failed(ESaveResultCode InCode, const FText& InMessage);
+
+	FORCEINLINE operator bool() const
 	{
-		ActiveIndex = -1;
-		SaveGameClass = nullptr;
-		SaveIndexs = TArray<int32>();
+		return bSuccess;
 	}
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSaveSlotHandle
+{
+	GENERATED_BODY()
 
 	UPROPERTY(BlueprintReadOnly)
-	int32 ActiveIndex;
+	FGuid SaveId;
+
+	bool IsValid() const
+	{
+		return SaveId.IsValid();
+	}
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FCreateSaveSlotParams
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FString DisplayName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FString Description;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FName InitialMap;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bCaptureCurrentWorld = false;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSaveSlotSummary
+{
+	GENERATED_BODY()
 
 	UPROPERTY(BlueprintReadOnly)
-	UClass* SaveGameClass;
+	FGuid SaveId;
+
+	UPROPERTY(BlueprintReadOnly)
+	FString DisplayName;
+
+	UPROPERTY(BlueprintReadOnly)
+	FString Description;
+
+	UPROPERTY(BlueprintReadOnly)
+	FDateTime CreatedAt;
+
+	UPROPERTY(BlueprintReadOnly)
+	FDateTime UpdatedAt;
+
+	UPROPERTY(BlueprintReadOnly)
+	FName CurrentMap;
+
+	UPROPERTY(BlueprintReadOnly)
+	double PlayTimeSeconds = 0.0;
+
+	UPROPERTY(BlueprintReadOnly)
+	FString PreviewPath;
+
+	UPROPERTY(BlueprintReadOnly)
+	bool bValid = false;
+};
+
+USTRUCT()
+struct WHFRAMEWORK_API FSaveManifest
+{
+	GENERATED_BODY()
 
 	UPROPERTY()
-	TArray<int32> SaveIndexs;
+	FGuid SaveId;
+
+	UPROPERTY()
+	FString DisplayName;
+
+	UPROPERTY()
+	FString Description;
+
+	UPROPERTY()
+	FDateTime CreatedAt;
+
+	UPROPERTY()
+	FDateTime UpdatedAt;
+
+	UPROPERTY()
+	FName CurrentMap;
+
+	UPROPERTY()
+	double PlayTimeSeconds = 0.0;
+
+	UPROPERTY()
+	FString PreviewFile = TEXT("preview.png");
+
+	UPROPERTY()
+	int32 StorageVersion = 1;
+
+	UPROPERTY()
+	int32 GameVersion = 1;
+
+	UPROPERTY()
+	int32 CurrentGeneration = 0;
+
+	UPROPERTY()
+	TMap<FName, int32> ModuleVersions;
+
+	FSaveSlotSummary ToSummary(const FString& WorldDir) const;
 };
 
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FGeneralSaveData : public FSaveData
+struct FModuleSaveFileHeader
+{
+	static constexpr uint32 MagicValue = 0x44574D53;
+
+	uint32 Magic = MagicValue;
+	int32 StorageVersion = 1;
+	FName ModuleName;
+	int32 ModuleVersion = 1;
+	int64 PayloadSize = 0;
+	uint32 PayloadCrc = 0;
+
+	friend FArchive& operator<<(FArchive& Ar, FModuleSaveFileHeader& Value)
+	{
+		Ar << Value.Magic;
+		Ar << Value.StorageVersion;
+		Ar << Value.ModuleName;
+		Ar << Value.ModuleVersion;
+		Ar << Value.PayloadSize;
+		Ar << Value.PayloadCrc;
+		return Ar;
+	}
+};
+
+USTRUCT()
+struct WHFRAMEWORK_API FPendingSaveLoadContext
 {
 	GENERATED_BODY()
 
-public:
-	FORCEINLINE FGeneralSaveData()
+	UPROPERTY()
+	FGuid SaveId;
+
+	UPROPERTY()
+	int32 Generation = 0;
+
+	UPROPERTY()
+	FName TargetMap;
+
+	bool IsValid() const
 	{
-		SaveGameDatas = TArray<FSaveGameData>();
-	}
-
-public:
-	UPROPERTY(BlueprintReadOnly)
-	TArray<FSaveGameData> SaveGameDatas;
-
-public:
-	virtual void MakeSaved() override
-	{
-		Super::MakeSaved();
-
-		for(auto& Iter : SaveGameDatas)
-		{
-			Iter.MakeSaved();
-		}
+		return SaveId.IsValid() && Generation > 0 && !TargetMap.IsNone();
 	}
 };

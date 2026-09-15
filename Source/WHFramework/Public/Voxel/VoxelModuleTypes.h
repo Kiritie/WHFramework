@@ -578,7 +578,7 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 	AVoxelAuxiliary* Auxiliary;
 
-	FSaveData* AuxiliaryData;
+	FParameter AuxiliaryData;
 
 public:
 	static FVoxelItem Empty;
@@ -593,7 +593,7 @@ public:
 		Data = TEXT("");
 		Chunk = nullptr;
 		Auxiliary = nullptr;
-		AuxiliaryData = nullptr;
+		AuxiliaryData.Reset();
 	}
 		
 	FVoxelItem(const FAbilityItem& InAbilityItem)
@@ -605,7 +605,7 @@ public:
 		Data = TEXT("");
 		Chunk = nullptr;
 		Auxiliary = nullptr;
-		AuxiliaryData = nullptr;
+		AuxiliaryData.Reset();
 	}
 
 	FVoxelItem(const FPrimaryAssetId& InID, FIndex InIndex = FIndex::ZeroIndex, UVoxelChunk* InOwner = nullptr, const FString& InData = TEXT(""));
@@ -807,7 +807,7 @@ public:
 	{
 		VoxelItem = FVoxelItem();
 		VoxelScope = EVoxelScope::None;
-		InventoryData = FInventorySaveData();
+		InventoryData = FParameter(FInventorySaveData());
 	}
 
 	FORCEINLINE FVoxelAuxiliarySaveData(const FVoxelItem& InVoxelItem, EVoxelScope InVoxelScope = EVoxelScope::None) : FVoxelAuxiliarySaveData()
@@ -824,7 +824,7 @@ public:
 	EVoxelScope VoxelScope;
 
 	UPROPERTY(BlueprintReadWrite)
-	FInventorySaveData InventoryData;
+	FParameter InventoryData;
 
 public:
 	virtual void MakeSaved() override
@@ -832,7 +832,10 @@ public:
 		Super::MakeSaved();
 
 		VoxelItem.MakeSaved();
-		InventoryData.MakeSaved();
+		if(FInventorySaveData* Data = InventoryData.GetMutablePtr<FInventorySaveData>())
+		{
+			Data->MakeSaved();
+		}
 	}
 };
 
@@ -1046,26 +1049,6 @@ public:
 	FRandomStream RandomStream;
 	
 public:
-	virtual bool IsExistChunkData(FIndex InChunkIndex) const { return false; }
-
-	template<class T>
-	T* GetChunkData(FIndex InChunkIndex)
-	{
-		return static_cast<T*>(GetChunkData(InChunkIndex));
-	}
-
-	virtual FVoxelChunkSaveData* GetChunkData(FIndex InChunkIndex) { return nullptr; }
-
-	virtual void SetChunkData(FIndex InChunkIndex, FVoxelChunkSaveData* InChunkData) { }
-	
-	virtual bool IsChunkDataChanged(FIndex InChunkIndex)
-	{
-		if(const auto ChunkData = GetChunkData(InChunkIndex))
-		{
-			return ChunkData->bChanged;
-		}
-		return false;
-	}
 };
 
 USTRUCT(BlueprintType)
@@ -1074,43 +1057,10 @@ struct WHFRAMEWORK_API FVoxelModuleSaveData : public FVoxelWorldSaveData
 	GENERATED_BODY()
 
 public:
-	FORCEINLINE FVoxelModuleSaveData()
-	{
-		ChunkDatas = TMap<FVector, FVoxelChunkSaveData>();
-	}
+	FORCEINLINE FVoxelModuleSaveData() = default;
 	
 	FORCEINLINE FVoxelModuleSaveData(const FVoxelWorldBasicSaveData& InBasicSaveData) : FVoxelWorldSaveData(InBasicSaveData)
 	{
-		ChunkDatas = TMap<FVector, FVoxelChunkSaveData>();
-	}
-
-public:
-	UPROPERTY(BlueprintReadOnly)
-	TMap<FVector, FVoxelChunkSaveData> ChunkDatas;
-
-public:
-	virtual void MakeSaved() override
-	{
-		Super::MakeSaved();
-		for(auto& Iter : ChunkDatas)
-		{
-			Iter.Value.MakeSaved();
-		}
-	}
-	
-	virtual bool IsExistChunkData(FIndex InChunkIndex) const override
-	{
-		return ChunkDatas.Contains(InChunkIndex.ToVector());
-	}
-
-	virtual FVoxelChunkSaveData* GetChunkData(FIndex InChunkIndex) override
-	{
-		return ChunkDatas.Find(InChunkIndex.ToVector());
-	}
-
-	virtual void SetChunkData(FIndex InChunkIndex, FVoxelChunkSaveData* InChunkData) override
-	{
-		ChunkDatas.Emplace(InChunkIndex.ToVector(), InChunkData->CastRef<FVoxelChunkSaveData>());
 	}
 };
 

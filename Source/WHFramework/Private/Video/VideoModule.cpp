@@ -14,7 +14,6 @@
 #include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
 #include "SaveGame/SaveGameModuleStatics.h"
-#include "SaveGame/Module/VideoSaveGame.h"
 #include "Video/VideoModuleNetworkComponent.h"
 #include "Video/MediaPlayer/MediaPlayerBase.h"
 
@@ -26,7 +25,6 @@ UVideoModule::UVideoModule()
 	ModuleName = FName("VideoModule");
 	ModuleDisplayName = FText::FromString(TEXT("Video Module"));
 
-	ModuleSaveGame = UVideoSaveGame::StaticClass();
 
 	ModuleNetworkComponent = UVideoModuleNetworkComponent::StaticClass();
 
@@ -130,9 +128,9 @@ void UVideoModule::OnTermination(EPhase InPhase)
 	Super::OnTermination(InPhase);
 }
 
-void UVideoModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UVideoModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	const auto& SaveData = InSaveData->CastRef<FVideoModuleSaveData>();
+	const auto& SaveData = InSaveData.GetRef<FVideoModuleSaveData>();
 
 	if(SaveData.IsSaved())
 	{
@@ -161,10 +159,9 @@ void UVideoModule::UnloadData(EPhase InPhase)
 	Super::UnloadData(InPhase);
 }
 
-FSaveData* UVideoModule::ToData()
+FParameter UVideoModule::ToData()
 {
-	FVideoModuleSaveData& SaveData = GetMutableSaveData<FVideoModuleSaveData>();
-	SaveData = FVideoModuleSaveData();
+	FVideoModuleSaveData SaveData;
 	
 	SaveData.WindowMode = GetWindowMode();
 	SaveData.WindowResolution = GetWindowResolution();
@@ -182,17 +179,14 @@ FSaveData* UVideoModule::ToData()
 	SaveData.FoliageQuality = GetFoliageQuality();
 	SaveData.ShadingQuality = GetShadingQuality();
 
-	return &SaveData;
+	return FParameter(MoveTemp(SaveData));
 }
 
 void UVideoModule::Load_Implementation()
 {
 	Super::Load_Implementation();
 
-	if(!bModuleAutoSave)
-	{
-		SetGlobalVideoQuality(GlobalVideoQuality, true);
-	}
+	SetGlobalVideoQuality(GlobalVideoQuality, true);
 }
 
 FString UVideoModule::GetModuleDebugMessage()

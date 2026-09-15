@@ -22,7 +22,6 @@
 #include "Engine/GameInstance.h"
 #include "Input/InputManager.h"
 #include "Input/Base/InputActionBase.h"
-#include "SaveGame/Module/InputSaveGame.h"
 #include "Input/InputModuleStatics.h"
 #include "Input/Base/InputUserSettingsBase.h"
 #include "Input/Components/InputComponentBase.h"
@@ -39,7 +38,6 @@ UInputModule::UInputModule()
 
 	bModuleRequired = true;
 
-	ModuleSaveGame = UInputSaveGame::StaticClass();
 	
 	DefaultInputMode = EInputMode::GameOnly;
 }
@@ -469,9 +467,9 @@ void UInputModule::RefreshCommonUIInputMode(int32 InPlayerIndex)
 	ApplyCommonUIInputConfig(InputConfig.IsSet() ? &InputConfig.GetValue() : nullptr);
 }
 
-void UInputModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UInputModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	auto& SaveData = InSaveData->CastRef<FInputModuleSaveData>();
+	auto& SaveData = InSaveData.GetRef<FInputModuleSaveData>();
 	if(SaveData.IsSaved())
 	{
 		UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>();
@@ -489,28 +487,27 @@ void UInputModule::UnloadData(EPhase InPhase)
 
 void UInputModule::RefreshData()
 {
-	LocalSaveData = GetSaveDataRef<FInputModuleSaveData>(true);
+	LocalSaveData = GetSaveData(true).GetRef<FInputModuleSaveData>();
 }
 
-FSaveData* UInputModule::ToData()
+FParameter UInputModule::ToData()
 {
-	FInputModuleSaveData& SaveData = GetMutableSaveData<FInputModuleSaveData>();
-	SaveData = FInputModuleSaveData();
+	FInputModuleSaveData SaveData;
 
 	UInputUserSettingsBase* Settings = UInputModuleStatics::GetInputUserSettings<UInputUserSettingsBase>();
 
 	UCommonModuleStatics::SaveObjectDataToMemory(Settings, SaveData.GetDatas());
 
-	return &SaveData;
+	return FParameter(MoveTemp(SaveData));
 }
 
-FSaveData* UInputModule::GetData()
+FParameter UInputModule::GetData()
 {
 	if(!LocalSaveData.IsValid())
 	{
-		LocalSaveData = ToData()->CastRef<FInputModuleSaveData>();
+		LocalSaveData = ToData().GetRef<FInputModuleSaveData>();
 	}
-	return &LocalSaveData;
+	return FParameter(LocalSaveData);
 }
 
 FString UInputModule::GetModuleDebugMessage()

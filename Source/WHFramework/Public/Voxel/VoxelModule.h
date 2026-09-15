@@ -2,6 +2,7 @@
 
 #include "Containers/Queue.h"
 #include "VoxelModuleTypes.h"
+#include "Voxel/Save/VoxelRegionStore.h"
 #include "Chunks/VoxelChunk.h"
 #include "Common/CommonModuleTypes.h"
 #include "Main/Base/ModuleBase.h"
@@ -18,6 +19,7 @@ class UWorldTimer;
 class UWorldWeather;
 class AVoxelEntityCapture;
 class UDataTable;
+class FSaveGameStorage;
 
 /**
  * 体素模块
@@ -138,7 +140,7 @@ protected:
 	virtual void OnWorldAgentMoved();
 
 protected:
-	FVoxelWorldSaveData* WorldData;
+	TUniquePtr<FVoxelWorldSaveData> WorldData;
 	
 public:
 	template<class T>
@@ -148,20 +150,26 @@ public:
 	}
 	FVoxelWorldSaveData& GetWorldData() const;
 
-	virtual FVoxelWorldSaveData* NewWorldData(FSaveData* InBasicData = nullptr) const;
+	virtual TUniquePtr<FVoxelWorldSaveData> NewWorldData(const FParameter& InBasicData = FParameter()) const;
 
 	virtual float GetWorldGeneratePercent() const;
 	
 	virtual FBox GetWorldBounds(float InRadius = 0.f, float InHalfHeight = 0.f) const;
 
 protected:
-	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+	virtual void LoadData(const FParameter& InSaveData, EPhase InPhase) override;
 
-	virtual FSaveData* GetData() override { return WorldData; }
+	virtual FParameter GetData() override;
 
-	virtual FSaveData* ToData() override;
+	virtual FParameter ToData() override;
 
 	virtual void UnloadData(EPhase InPhase) override;
+
+public:
+	virtual void OnBeforeSaveData() override;
+	virtual void OnAfterSaveData(bool bSuccess) override;
+	void SetActiveSaveSource(const FGuid& SaveId, int32 Generation, FSaveGameStorage* Storage);
+	bool WritePendingRegionsToGeneration(const FGuid& SaveId, int32 Generation, FSaveGameStorage& Storage);
 
 public:
 	virtual void LoadPrefabData(const FVoxelPrefabSaveData& InPrefabData);
@@ -323,6 +331,10 @@ protected:
 
 	UPROPERTY(Transient)
 	TMap<FIndex, UVoxelChunk*> ChunkMap;
+
+	TUniquePtr<FVoxelRegionStore> RegionStore;
+
+	TSet<FIndex> DirtyChunkIndices;
 
 	TSet<FIndex> VoxelUpdateChunkIndices;
 

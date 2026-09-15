@@ -1,24 +1,61 @@
-#pragma once
-
 #include "SaveGame/Base/SaveDataAgentInterface.h"
 
 #include "Common/CommonModuleStatics.h"
 
-void ISaveDataAgentInterface::LoadSaveData(FSaveData* InSaveData, EPhase InPhase)
+const FSaveData* ISaveDataAgentInterface::ResolveSaveData(const FParameter& InParameter)
 {
-	if (PHASEC(InPhase, EPhase::Final) && HasArchive())
-	{
-		UCommonModuleStatics::LoadObjectDataFromMemory(Cast<UObject>(this), InSaveData->GetDatas());
-	}
-	LoadData(InSaveData, InPhase);
+	const UScriptStruct* Struct = InParameter.GetStructType();
+	const uint8* Memory = InParameter.GetStructMemory();
+	return Struct && Memory && Struct->IsChildOf(FSaveData::StaticStruct()) ? reinterpret_cast<const FSaveData*>(Memory) : nullptr;
 }
 
-FSaveData* ISaveDataAgentInterface::GetSaveData(bool bRefresh)
+FSaveData* ISaveDataAgentInterface::ResolveSaveData(FParameter& InParameter)
+
 {
-	FSaveData* SaveData = !bRefresh ? GetData() : ToData();
-	if (HasArchive())
+	const UScriptStruct* Struct = InParameter.GetStructType();
+	uint8* Memory = InParameter.GetMutableStructMemory();
+	return Struct && Memory && Struct->IsChildOf(FSaveData::StaticStruct()) ? reinterpret_cast<FSaveData*>(Memory) : nullptr;
+}
+
+void ISaveDataAgentInterface::LoadSaveData(const FParameter& InSaveData, EPhase InPhase)
+{
+	if(!InSaveData.HasValue())
 	{
-		UCommonModuleStatics::SaveObjectDataToMemory(Cast<UObject>(this), SaveData->GetDatas());
+		return;
+	}
+
+	FParameter SaveData = InSaveData;
+	if(FSaveData* Data = ResolveSaveData(SaveData))
+	{
+		Data->MakeSaved();
+	}
+	if(PHASEC(InPhase, EPhase::Final) && HasArchive())
+	{
+		if(const FSaveData* Data = ResolveSaveData(SaveData))
+		{
+			UCommonModuleStatics::LoadObjectDataFromMemory(Cast<UObject>(this), Data->GetDatas());
+		}
+	}
+	LoadData(SaveData, InPhase);
+}
+
+FParameter ISaveDataAgentInterface::GetSaveData(bool bRefresh)
+{
+	FParameter SaveData = bRefresh ? ToData() : GetData();
+	if(!SaveData.HasValue())
+	{
+		SaveData = ToData();
+	}
+	if(!SaveData.HasValue())
+	{
+		return FParameter();
+	}
+	if(HasArchive())
+	{
+		if(FSaveData* Data = ResolveSaveData(SaveData))
+		{
+			UCommonModuleStatics::SaveObjectDataToMemory(Cast<UObject>(this), Data->GetDatas());
+		}
 	}
 	return SaveData;
 }

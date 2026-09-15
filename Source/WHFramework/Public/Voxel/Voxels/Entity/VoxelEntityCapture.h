@@ -19,7 +19,7 @@ public:
 	AVoxelEntityCapture();
 
 protected:
-	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+	virtual void LoadData(const FParameter& InSaveData, EPhase InPhase) override;
 
 public:
 	virtual void SpawnAuxiliary() override;

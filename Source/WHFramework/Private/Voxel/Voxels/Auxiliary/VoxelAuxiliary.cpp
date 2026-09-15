@@ -27,9 +27,9 @@ void AVoxelAuxiliary::OnDespawn_Implementation(EObjectDespawnMode InMode)
 	VoxelScope = EVoxelScope::None;
 }
 
-void AVoxelAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void AVoxelAuxiliary::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	const auto& SaveData = InSaveData->CastRef<FVoxelAuxiliarySaveData>();
+	const auto& SaveData = InSaveData.GetRef<FVoxelAuxiliarySaveData>();
 
 	if(PHASEC(InPhase, EPhase::All))
 	{
@@ -60,15 +60,14 @@ void AVoxelAuxiliary::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-FSaveData* AVoxelAuxiliary::ToData()
+FParameter AVoxelAuxiliary::ToData()
 {
-	FVoxelAuxiliarySaveData& SaveData = GetMutableSaveData<FVoxelAuxiliarySaveData>();
-	SaveData = FVoxelAuxiliarySaveData();
+	FVoxelAuxiliarySaveData SaveData;
 
 	SaveData.VoxelItem = VoxelItem;
 	SaveData.VoxelScope = VoxelScope;
 
-	return &SaveData;
+	return FParameter(MoveTemp(SaveData));
 }
 
 FVoxelItem& AVoxelAuxiliary::GetVoxelItem(bool bRefresh)

@@ -449,6 +449,34 @@ public:
 };
 
 USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSceneActorSaveRecord
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY()
+	FGuid ActorId;
+
+	UPROPERTY()
+	FPrimaryAssetId AssetId;
+
+	UPROPERTY()
+	FSoftClassPath ActorClass;
+
+	UPROPERTY()
+	FTransform Transform = FTransform::Identity;
+
+	UPROPERTY()
+	bool bRuntimeSpawned = false;
+
+	UPROPERTY()
+	bool bDestroyed = false;
+
+	UPROPERTY()
+	FParameter Data;
+};
+
+USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FSceneModuleSaveData : public FSaveData
 {
 	GENERATED_BODY()
@@ -462,7 +490,7 @@ public:
 		SceneAreas = TArray<FSceneArea>();
 		TimerData = FWorldTimerSaveData();
 		WeatherData = FWorldWeatherSaveData();
-		ActorSaveDatas = TArray<FSceneActorSaveData>();
+		ActorSaveRecords = TArray<FSceneActorSaveRecord>();
 	}
 
 public:
@@ -491,7 +519,7 @@ public:
 	FWorldWeatherSaveData WeatherData;
 		
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<FSceneActorSaveData> ActorSaveDatas;
+	TArray<FSceneActorSaveRecord> ActorSaveRecords;
 
 public:
 	virtual void MakeSaved() override
@@ -501,9 +529,13 @@ public:
 		TimerData.MakeSaved();
 		WeatherData.MakeSaved();
 
-		for(auto& Iter : ActorSaveDatas)
+		for(FSceneActorSaveRecord& Iter : ActorSaveRecords)
 		{
-			Iter.MakeSaved();
+			const UScriptStruct* StructType = Iter.Data.GetStructType();
+			if(StructType && StructType->IsChildOf(FSaveData::StaticStruct()))
+			{
+				reinterpret_cast<FSaveData*>(Iter.Data.GetMutableStructMemory())->MakeSaved();
+			}
 		}
 	}
 };

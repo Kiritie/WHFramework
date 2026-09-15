@@ -1267,7 +1267,7 @@ public:
 		AssetID = FPrimaryAssetId();
 		Name = NAME_None;
 		Level = 1;
-		InventoryData = FInventorySaveData();
+		InventoryData = FParameter(FInventorySaveData());
 		BirthTransform = FTransform::Identity;
 	}
 
@@ -1276,7 +1276,7 @@ public:
 		AssetID = FPrimaryAssetId();
 		Name = NAME_None;
 		Level = 1;
-		InventoryData = FInventorySaveData();
+		InventoryData = FParameter(FInventorySaveData());
 		BirthTransform = FTransform::Identity;
 	}
 
@@ -1291,7 +1291,7 @@ public:
 	int32 Level;
 	
 	UPROPERTY(BlueprintReadWrite)
-	FInventorySaveData InventoryData;
+	FParameter InventoryData;
 
 	UPROPERTY()
 	FTransform BirthTransform;
@@ -1306,7 +1306,10 @@ public:
 	{
 		Super::MakeSaved();
 
-		InventoryData.MakeSaved();
+		if(FInventorySaveData* Data = InventoryData.GetMutablePtr<FInventorySaveData>())
+		{
+			Data->MakeSaved();
+		}
 	}
 
 	virtual void InitData(FRandomStream InRandomStream = FRandomStream());

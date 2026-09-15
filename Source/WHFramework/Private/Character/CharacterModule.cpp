@@ -11,7 +11,6 @@
 #include "Gameplay/WHPlayerController.h"
 #include "Common/CommonModuleStatics.h"
 #include "Net/UnrealNetwork.h"
-#include "SaveGame/Module/CharacterSaveGame.h"
 #include "Scene/SceneModuleStatics.h"
 
 IMPLEMENTATION_MODULE(UCharacterModule)
@@ -21,8 +20,8 @@ UCharacterModule::UCharacterModule()
 {
 	ModuleName = FName("CharacterModule");
 	ModuleDisplayName = FText::FromString(TEXT("Character Module"));
+	SaveScope = ESaveScope::World;
 
-	ModuleSaveGame = UCharacterSaveGame::StaticClass();
 	
 	ModuleNetworkComponent = UCharacterModuleNetworkComponent::StaticClass();
 
@@ -99,27 +98,68 @@ void UCharacterModule::OnTermination(EPhase InPhase)
 	Super::OnTermination(InPhase);
 }
 
-void UCharacterModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UCharacterModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	auto& SaveData = InSaveData->CastRef<FCharacterModuleSaveData>();
-
-	if(SaveData.IsSaved())
+	auto& SaveData = InSaveData.GetRef<FCharacterModuleSaveData>();
+	if(ISaveDataAgentInterface* Controller = Cast<ISaveDataAgentInterface>(UCommonModuleStatics::GetPlayerController<AWHPlayerController>()))
 	{
-		if(SaveData.CurrentCharacter)
+		Controller->LoadSaveData(SaveData.PlayerControllerData, InPhase);
+	}
+
+	if(PHASEC(InPhase, EPhase::Primary))
+	{
+		for(const FCharacterSaveRecord& Record : SaveData.Characters)
 		{
-			SwitchCharacter(SaveData.CurrentCharacter, DefaultResetCamera, DefaultInstantSwitch);
+			if(ACharacterBase* const* Character = Characters.FindByPredicate([&Record](const ACharacterBase* Candidate)
+			{
+				return Candidate && Candidate->GetActorID_Implementation() == Record.CharacterId;
+			}))
+			{
+				(*Character)->LoadSaveData(Record.Data, EPhase::Primary);
+			}
+		}
+	}
+	if(PHASEC(InPhase, EPhase::Final))
+	{
+		for(const FCharacterSaveRecord& Record : SaveData.Characters)
+		{
+			if(ACharacterBase* const* Character = Characters.FindByPredicate([&Record](const ACharacterBase* Candidate)
+			{
+				return Candidate && Candidate->GetActorID_Implementation() == Record.CharacterId;
+			}))
+			{
+				(*Character)->LoadSaveData(Record.Data, EPhase::Final);
+				if(Record.CharacterId == SaveData.CurrentCharacterId)
+				{
+					SwitchCharacter(*Character, DefaultResetCamera, DefaultInstantSwitch);
+				}
+			}
 		}
 	}
 }
 
-FSaveData* UCharacterModule::ToData()
+FParameter UCharacterModule::ToData()
 {
-	FCharacterModuleSaveData& SaveData = GetMutableSaveData<FCharacterModuleSaveData>();
-	SaveData = FCharacterModuleSaveData();
+	FCharacterModuleSaveData SaveData;
 
-	SaveData.CurrentCharacter = CurrentCharacter;
+	SaveData.CurrentCharacterId = CurrentCharacter ? CurrentCharacter->GetActorID_Implementation() : FGuid();
+	for(ACharacterBase* Character : Characters)
+	{
+		if(Character)
+		{
+			FCharacterSaveRecord Record;
+			Record.CharacterId = Character->GetActorID_Implementation();
+			Record.CharacterAssetId = Character->GetAssetID_Implementation();
+			Record.Data = Character->GetSaveData(true);
+			SaveData.Characters.Add(MoveTemp(Record));
+		}
+	}
+	if(ISaveDataAgentInterface* Controller = Cast<ISaveDataAgentInterface>(UCommonModuleStatics::GetPlayerController<AWHPlayerController>()))
+	{
+		SaveData.PlayerControllerData = Controller->GetSaveData(true);
+	}
 
-	return &SaveData;
+	return FParameter(MoveTemp(SaveData));
 }
 
 FString UCharacterModule::GetModuleDebugMessage()

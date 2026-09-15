@@ -24,7 +24,7 @@ AActor* AAbilityVitalitySpawner::SpawnImpl_Implementation(const FAbilityItem& In
 	SaveData.SpawnTransform = GetActorTransform();
 	SaveData.InitData();
 
-	return UAbilityModuleStatics::SpawnAbilityActor(&SaveData);
+	return UAbilityModuleStatics::SpawnAbilityActor(FParameter(MoveTemp(SaveData)));
 }
 
 void AAbilityVitalitySpawner::DestroyImpl_Implementation(AActor* InAbilityActor)

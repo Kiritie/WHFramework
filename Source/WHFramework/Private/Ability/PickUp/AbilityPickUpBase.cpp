@@ -65,9 +65,9 @@ void AAbilityPickUpBase::OnInitialize_Implementation()
 	FallingMovement->SetTraceChannel(USceneModuleStatics::GetTraceMapping(FName("PickUp")).GetTraceChannel());
 }
 
-void AAbilityPickUpBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void AAbilityPickUpBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	const auto& SaveData = InSaveData->CastRef<FPickUpSaveData>();
+	const auto& SaveData = InSaveData.GetRef<FPickUpSaveData>();
 
 	Item = SaveData.Item;
 	Item.Payload = this;
@@ -75,15 +75,14 @@ void AAbilityPickUpBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	SetActorLocationAndRotation(SaveData.Location, FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f));
 }
 
-FSaveData* AAbilityPickUpBase::ToData()
+FParameter AAbilityPickUpBase::ToData()
 {
-	FPickUpSaveData& SaveData = GetMutableSaveData<FPickUpSaveData>();
-	SaveData = FPickUpSaveData();
+	FPickUpSaveData SaveData;
 
 	SaveData.Item = Item;
 	SaveData.Location = GetActorLocation();
 
-	return &SaveData;
+	return FParameter(MoveTemp(SaveData));
 }
 
 void AAbilityPickUpBase::OnPickUp(IAbilityPickerInterface* InPicker)

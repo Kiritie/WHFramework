@@ -38,9 +38,9 @@ public:
 		override;
 
 protected:
-	virtual void LoadData(FSaveData* InSaveData, EPhase InPhase) override;
+	virtual void LoadData(const FParameter& InSaveData, EPhase InPhase) override;
 
-	virtual FSaveData* ToData() override;
+	virtual FParameter ToData() override;
 
 	virtual void SaveData();
 
@@ -172,7 +172,7 @@ public:
 
 	virtual void GenerateSceneActors();
 
-	virtual void LoadSceneActors(FSaveData* InSaveData) override;
+	virtual void LoadSceneActors(const FParameter& InSaveData) override;
 
 	virtual void SpawnSceneActors() override;
 

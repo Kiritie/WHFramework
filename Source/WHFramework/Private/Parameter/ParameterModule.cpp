@@ -8,7 +8,6 @@
 #include "Event/Events/Parameter/Event_GlobalParameterChanged.h"
 #include "Net/UnrealNetwork.h"
 #include "SaveGame/SaveGameModuleStatics.h"
-#include "SaveGame/Module/ParameterSaveGame.h"
 		
 IMPLEMENTATION_MODULE(UParameterModule)
 
@@ -17,7 +16,6 @@ UParameterModule::UParameterModule()
 {
 	ModuleName = FName("ParameterModule");
 	ModuleDisplayName = FText::FromString(TEXT("Parameter Module"));
-	ModuleSaveGame = UParameterSaveGame::StaticClass();
 
 	bModuleRequired = true;
 }
@@ -71,9 +69,9 @@ void UParameterModule::OnTermination(EPhase InPhase)
 	Super::OnTermination(InPhase);
 }
 
-void UParameterModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UParameterModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	auto& SaveData = InSaveData->CastRef<FParameterModuleSaveData>();
+	auto& SaveData = InSaveData.GetRef<FParameterModuleSaveData>();
 
 	for(auto& Iter : SaveData.ParameterSets.Sets)
 	{
@@ -81,25 +79,21 @@ void UParameterModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-FSaveData* UParameterModule::ToData()
+FParameter UParameterModule::ToData()
 {
-	FParameterModuleSaveData& SaveData = GetMutableSaveData<FParameterModuleSaveData>();
-	SaveData = FParameterModuleSaveData();
+	FParameterModuleSaveData SaveData;
 	
 	SaveData.ParameterSets = ParameterSets;
-	return &SaveData;
+	return FParameter(MoveTemp(SaveData));
 }
 
 void UParameterModule::Load_Implementation()
 {
 	Super::Load_Implementation();
 
-	if(!bModuleAutoSave)
+	for(auto& Iter : ParameterSets.Sets)
 	{
-		for(auto& Iter : ParameterSets.Sets)
-		{
-			UEventModuleStatics::BroadcastEvent<FEventGlobalParameterChanged>(this, { Iter.Name, Iter.Parameter });
-		}
+		UEventModuleStatics::BroadcastEvent<FEventGlobalParameterChanged>(this, { Iter.Name, Iter.Parameter });
 	}
 }
 

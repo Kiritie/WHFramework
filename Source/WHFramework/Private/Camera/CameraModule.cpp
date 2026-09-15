@@ -73,11 +73,11 @@ void UCameraModule::OnTermination(EPhase InPhase)
 	}
 }
 
-void UCameraModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void UCameraModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	if(InSaveData)
+	if(InSaveData.HasValue())
 	{
-		ApplyUserSettings(InSaveData->CastRef<FCameraModuleSaveData>().ToUserSettings());
+		ApplyUserSettings(InSaveData.GetRef<FCameraModuleSaveData>().ToUserSettings());
 	}
 }
 

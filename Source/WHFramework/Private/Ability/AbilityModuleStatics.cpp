@@ -115,7 +115,7 @@ AAbilityPickUpBase* UAbilityModuleStatics::SpawnAbilityPickUp(FAbilityItem InIte
 	return UAbilityModule::Get().SpawnAbilityPickUp(InItem, InLocation, InContainer);
 }
 
-AAbilityPickUpBase* UAbilityModuleStatics::SpawnAbilityPickUp(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+AAbilityPickUpBase* UAbilityModuleStatics::SpawnAbilityPickUp(const FParameter& InSaveData, ISceneContainerInterface* InContainer)
 {
 	return UAbilityModule::Get().SpawnAbilityPickUp(InSaveData, InContainer);
 }
@@ -125,7 +125,7 @@ AAbilityProjectileBase* UAbilityModuleStatics::SpawnAbilityProjectile(const TSub
 	return UAbilityModule::Get().SpawnAbilityProjectile(InClass, InOwnerActor, InAbilityHandle);
 }
 
-AActor* UAbilityModuleStatics::SpawnAbilityActor(FSaveData* InSaveData, ISceneContainerInterface* InContainer)
+AActor* UAbilityModuleStatics::SpawnAbilityActor(const FParameter& InSaveData, ISceneContainerInterface* InContainer)
 {
 	return UAbilityModule::Get().SpawnAbilityActor(InSaveData, InContainer);
 }

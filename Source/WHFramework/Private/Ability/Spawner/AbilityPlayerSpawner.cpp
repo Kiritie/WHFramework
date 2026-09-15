@@ -65,9 +65,9 @@ AActor* AAbilityPlayerSpawner::SpawnImpl_Implementation(const FAbilityItem& InAb
 	SaveData.RaceID = CharacterData.RaceID;
 	SaveData.Level = InAbilityItem.Level;
 	SaveData.SpawnTransform = GetActorTransform();
-	SaveData.InventoryData = CharacterData.InventoryData;
+	SaveData.InventoryData = FParameter(CharacterData.InventoryData);
 	
-	AActor* PlayerActor = UAbilityModuleStatics::SpawnAbilityActor(&SaveData);
+	AActor* PlayerActor = UAbilityModuleStatics::SpawnAbilityActor(FParameter(MoveTemp(SaveData)));
 	if(AAbilityPawnBase* PlayerPawn = Cast<AAbilityPawnBase>(PlayerActor))
 	{
 		UPawnModuleStatics::SwitchPawn(PlayerPawn);

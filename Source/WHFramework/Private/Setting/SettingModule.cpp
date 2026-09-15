@@ -6,7 +6,6 @@
 #include "Camera/CameraModule.h"
 #include "Input/InputModule.h"
 #include "Parameter/ParameterModule.h"
-#include "SaveGame/Module/SettingSaveGame.h"
 #include "Setting/SettingModuleNetworkComponent.h"
 #include "Setting/SettingModuleTypes.h"
 #include "Setting/SettingEntry.h"
@@ -100,8 +99,8 @@ USettingModule::USettingModule()
 {
 	ModuleName = FName("SettingModule");
 	ModuleDisplayName = FText::FromString(TEXT("Setting Module"));
+	SaveScope = ESaveScope::Profile;
 
-	ModuleSaveGame = USettingSaveGame::StaticClass();
 	
 	ModuleNetworkComponent = USettingModuleNetworkComponent::StaticClass();
 
@@ -666,40 +665,33 @@ bool USettingModule::WriteSessionValue(FSettingModuleSaveData& InData, FSettingI
 FSettingModuleSaveData USettingModule::GetCurrentCombinedSettings() const
 {
 	FSettingModuleSaveData Data;
-	Data.WidgetData = UWidgetModule::Get().GetSaveDataRef<FWidgetModuleSaveData>(true);
-	Data.AudioData = UAudioModule::Get().GetSaveDataRef<FAudioModuleSaveData>(true);
-	Data.VideoData = UVideoModule::Get().GetSaveDataRef<FVideoModuleSaveData>(true);
+	Data.WidgetData = UWidgetModule::Get().GetSaveData(true).GetRef<FWidgetModuleSaveData>();
+	Data.AudioData = UAudioModule::Get().GetSaveData(true).GetRef<FAudioModuleSaveData>();
+	Data.VideoData = UVideoModule::Get().GetSaveData(true).GetRef<FVideoModuleSaveData>();
 	Data.CameraData.FromUserSettings(UCameraModule::Get().GetUserSettings());
-	Data.InputData = UInputModule::Get().GetSaveDataRef<FInputModuleSaveData>(false);
-	Data.ParameterData = UParameterModule::Get().GetSaveDataRef<FParameterModuleSaveData>(true);
+	Data.InputData = UInputModule::Get().GetSaveData(false).GetRef<FInputModuleSaveData>();
+	Data.ParameterData = UParameterModule::Get().GetSaveData(true).GetRef<FParameterModuleSaveData>();
 	return Data;
 }
 
 FSettingModuleSaveData USettingModule::GetDefaultCombinedSettings() const
 {
-	if(const USettingSaveGame* SaveGame = Cast<USettingSaveGame>(GetModuleSaveGame()))
-	{
-		return const_cast<USettingSaveGame*>(SaveGame)->GetDefaultDataRef<FSettingModuleSaveData>();
-	}
 	return FSettingModuleSaveData();
 }
 
 void USettingModule::ApplyCombinedSettings(FSettingModuleSaveData& InData)
 {
-	UWidgetModule::Get().LoadSaveData(&InData.WidgetData, EPhase::All);
-	UAudioModule::Get().LoadSaveData(&InData.AudioData, EPhase::All);
-	UVideoModule::Get().LoadSaveData(&InData.VideoData, EPhase::All);
-	UCameraModule::Get().LoadSaveData(&InData.CameraData, EPhase::All);
-	UInputModule::Get().LoadSaveData(&InData.InputData, EPhase::All);
-	UParameterModule::Get().LoadSaveData(&InData.ParameterData, EPhase::All);
+	UWidgetModule::Get().LoadSaveData(FParameter(InData.WidgetData), EPhase::All);
+	UAudioModule::Get().LoadSaveData(FParameter(InData.AudioData), EPhase::All);
+	UVideoModule::Get().LoadSaveData(FParameter(InData.VideoData), EPhase::All);
+	UCameraModule::Get().LoadSaveData(FParameter(InData.CameraData), EPhase::All);
+	UInputModule::Get().LoadSaveData(FParameter(InData.InputData), EPhase::All);
+	UParameterModule::Get().LoadSaveData(FParameter(InData.ParameterData), EPhase::All);
 }
 
 void USettingModule::SaveSettings()
 {
-	if(USettingSaveGame* SaveGame = Cast<USettingSaveGame>(GetModuleSaveGame()))
-	{
-		SaveGame->Save(true);
-	}
+	USaveGameModuleStatics::SaveProfile();
 }
 
 void USettingModule::BuildSettingEntries()
@@ -1188,35 +1180,34 @@ TArray<FSettingPageDefinition> USettingModule::GetSettingPages() const
 	return Result;
 }
 
-void USettingModule::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void USettingModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	auto& SaveData = InSaveData->CastRef<FSettingModuleSaveData>();
+	auto& SaveData = InSaveData.GetRef<FSettingModuleSaveData>();
 
-	UWidgetModule::Get().LoadSaveData(&SaveData.WidgetData, InPhase);
-	UAudioModule::Get().LoadSaveData(&SaveData.AudioData, InPhase);
-	UVideoModule::Get().LoadSaveData(&SaveData.VideoData, InPhase);
-	UCameraModule::Get().LoadSaveData(&SaveData.CameraData, InPhase);
-	UInputModule::Get().LoadSaveData(&SaveData.InputData, InPhase);
-	UParameterModule::Get().LoadSaveData(&SaveData.ParameterData, InPhase);
+	UWidgetModule::Get().LoadSaveData(FParameter(SaveData.WidgetData), InPhase);
+	UAudioModule::Get().LoadSaveData(FParameter(SaveData.AudioData), InPhase);
+	UVideoModule::Get().LoadSaveData(FParameter(SaveData.VideoData), InPhase);
+	UCameraModule::Get().LoadSaveData(FParameter(SaveData.CameraData), InPhase);
+	UInputModule::Get().LoadSaveData(FParameter(SaveData.InputData), InPhase);
+	UParameterModule::Get().LoadSaveData(FParameter(SaveData.ParameterData), InPhase);
 }
 
 void USettingModule::UnloadData(EPhase InPhase)
 {
 }
 
-FSaveData* USettingModule::ToData()
+FParameter USettingModule::ToData()
 {
-	FSettingModuleSaveData& SaveData = GetMutableSaveData<FSettingModuleSaveData>();
-	SaveData = FSettingModuleSaveData();
+	FSettingModuleSaveData SaveData;
 
-	SaveData.WidgetData = UWidgetModule::Get().GetSaveDataRef<FWidgetModuleSaveData>(true);
-	SaveData.AudioData = UAudioModule::Get().GetSaveDataRef<FAudioModuleSaveData>(true);
-	SaveData.VideoData = UVideoModule::Get().GetSaveDataRef<FVideoModuleSaveData>(true);
+	SaveData.WidgetData = UWidgetModule::Get().GetSaveData(true).GetRef<FWidgetModuleSaveData>();
+	SaveData.AudioData = UAudioModule::Get().GetSaveData(true).GetRef<FAudioModuleSaveData>();
+	SaveData.VideoData = UVideoModule::Get().GetSaveData(true).GetRef<FVideoModuleSaveData>();
 	SaveData.CameraData.FromUserSettings(UCameraModule::Get().GetUserSettings());
-	SaveData.InputData = UInputModule::Get().GetSaveDataRef<FInputModuleSaveData>(false);
-	SaveData.ParameterData = UParameterModule::Get().GetSaveDataRef<FParameterModuleSaveData>(true);
+	SaveData.InputData = UInputModule::Get().GetSaveData(false).GetRef<FInputModuleSaveData>();
+	SaveData.ParameterData = UParameterModule::Get().GetSaveData(true).GetRef<FParameterModuleSaveData>();
 	
-	return &SaveData;
+	return FParameter(MoveTemp(SaveData));
 }
 
 void USettingModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

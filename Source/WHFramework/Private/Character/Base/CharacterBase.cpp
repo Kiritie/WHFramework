@@ -149,9 +149,9 @@ void ACharacterBase::OnTermination_Implementation()
 	USceneModuleStatics::RemoveSceneActor(this);
 }
 
-void ACharacterBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
+void ACharacterBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	auto& SaveData = InSaveData->CastRef<FSceneActorSaveData>();
+	auto& SaveData = InSaveData.GetRef<FSceneActorSaveData>();
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
@@ -160,15 +160,14 @@ void ACharacterBase::LoadData(FSaveData* InSaveData, EPhase InPhase)
 	}
 }
 
-FSaveData* ACharacterBase::ToData()
+FParameter ACharacterBase::ToData()
 {
-	FSceneActorSaveData& SaveData = GetMutableSaveData<FSceneActorSaveData>();
-	SaveData = FSceneActorSaveData();
+	FSceneActorSaveData SaveData;
 
 	SaveData.ActorID = ActorID;
 	SaveData.SpawnTransform = GetActorTransform();
 
-	return &SaveData;
+	return FParameter(MoveTemp(SaveData));
 }
 
 void ACharacterBase::BeginPlay()
