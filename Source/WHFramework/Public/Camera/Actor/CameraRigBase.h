@@ -1,9 +1,9 @@
 #pragma once
 
+#include "Camera/Manager/CameraManagerBase.h"
 #include "Common/Base/WHActor.h"
 #include "CameraRigBase.generated.h"
 
-class ACameraManagerBase;
 class UCameraComponent;
 class UCameraSpringArmComponent;
 
@@ -24,8 +24,20 @@ protected:
 	TWeakObjectPtr<ACameraManagerBase> OwningCameraManager;
 
 public:
-	UCameraComponent* GetCameraComponent() const { return Camera; }
-	UCameraSpringArmComponent* GetCameraBoom() const { return CameraBoom; }
-	void SetOwningCameraManager(ACameraManagerBase* InManager) { OwningCameraManager = InManager; }
-	ACameraManagerBase* GetOwningCameraManager() const { return OwningCameraManager.Get(); }
+	UCameraComponent* GetCameraComponent() const
+	{
+		return Camera;
+	}
+	UCameraSpringArmComponent* GetCameraBoom() const
+	{
+		return CameraBoom;
+	}
+	void SetOwningCameraManager(ACameraManagerBase* InManager)
+	{
+		OwningCameraManager = InManager;
+	}
+	ACameraManagerBase* GetOwningCameraManager() const
+	{
+		return OwningCameraManager.Get();
+	}
 };

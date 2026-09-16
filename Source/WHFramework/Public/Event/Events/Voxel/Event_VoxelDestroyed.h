@@ -2,6 +2,7 @@
 
 #include "Parameter/ParameterModuleTypes.h"
 #include "Voxel/VoxelModuleTypes.h"
+#include "Voxel/Agent/VoxelAgentInterface.h"
 #include "Event/EventModuleTypes.h"
 
 #include "Event_VoxelDestroyed.generated.h"
@@ -15,7 +16,8 @@ public:
 	FEventVoxelDestroyed() = default;
 
 	FEventVoxelDestroyed(FVoxelItem InVoxelItem, TScriptInterface<IVoxelAgentInterface> InVoxelAgent)
-		: VoxelItem(MoveTemp(InVoxelItem)), VoxelAgent(MoveTemp(InVoxelAgent))
+	    : VoxelItem(MoveTemp(InVoxelItem))
+	    , VoxelAgent(MoveTemp(InVoxelAgent))
 	{
 	}
 

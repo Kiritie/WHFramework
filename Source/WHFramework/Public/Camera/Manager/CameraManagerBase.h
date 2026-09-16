@@ -1,4 +1,5 @@
 #pragma once
+#include "Camera/Mode/CameraModeBase.h"
 
 #include "Camera/CameraModuleTypes.h"
 #include "Camera/PlayerCameraManager.h"
@@ -74,22 +75,37 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Camera State
 public:
-	void ApplyUserSettings(const FCameraUserSettings& InSettings) { UserSettings = InSettings; }
+	void ApplyUserSettings(const FCameraUserSettings& InSettings)
+	{
+		UserSettings = InSettings;
+	}
 
 	void SetInitialView(const FRotator& Rotation, float Distance);
 
 	void SetDesiredPivot(const FVector& Location, const FRotator& Rotation);
 
 	UFUNCTION(BlueprintPure, Category = "CameraModule")
-	const FCameraViewSnapshot& GetFinalView() const { return FinalView; }
+	const FCameraViewSnapshot& GetFinalView() const
+	{
+		return FinalView;
+	}
 
 	UFUNCTION(BlueprintPure, Category = "CameraModule")
-	float GetCurrentRigDistance() const { return DesiredState.ArmLength; }
+	float GetCurrentRigDistance() const
+	{
+		return DesiredState.ArmLength;
+	}
 
 	UFUNCTION(BlueprintPure, Category = "CameraModule")
-	int32 GetLocalPlayerIndex() const { return LocalPlayerIndex; }
+	int32 GetLocalPlayerIndex() const
+	{
+		return LocalPlayerIndex;
+	}
 
-	ACameraRigBase* GetRuntimeRig() const { return RuntimeRig; }
+	ACameraRigBase* GetRuntimeRig() const
+	{
+		return RuntimeRig;
+	}
 
 	//////////////////////////////////////////////////////////////////////////
 protected:

@@ -18,9 +18,15 @@ public:
 
 public:
 #if WITH_EDITOR
-	virtual bool IsUserManaged() const override { return false; }
+	virtual bool IsUserManaged() const override
+	{
+		return false;
+	}
 
-	virtual bool CanChangeIsSpatiallyLoadedFlag() const override { return false; }
+	virtual bool CanChangeIsSpatiallyLoadedFlag() const override
+	{
+		return false;
+	}
 #endif
 
 	//////////////////////////////////////////////////////////////////////////
@@ -31,5 +37,8 @@ protected:
 
 public:
 	UFUNCTION(BlueprintPure)
-	USceneCaptureComponent2D* GetCapture() const { return Capture; }
+	USceneCaptureComponent2D* GetCapture() const
+	{
+		return Capture;
+	}
 };

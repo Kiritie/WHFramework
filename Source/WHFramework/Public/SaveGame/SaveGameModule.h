@@ -3,9 +3,11 @@
 #include "Main/Base/ModuleBase.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "SaveGame/SaveGameStorage.h"
+#include "SaveGame/SaveGameAsyncExecutor.h"
 
 #include "SaveGameModule.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FWorldSaveFinished, FGuid, SaveId, const FSaveOperationResult&, Result);
 
 UCLASS()
 class WHFRAMEWORK_API USaveGameModule : public UModuleBase
@@ -20,8 +22,13 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 public:
+#if WITH_EDITOR
+	virtual void OnDestroy() override;
+#endif
+
 	virtual void OnInitialize() override;
 	virtual void OnPreparatory(EPhase InPhase) override;
+	virtual void OnRefresh(float DeltaSeconds, bool bInEditor) override;
 	virtual void OnTermination(EPhase InPhase) override;
 
 protected:
@@ -39,13 +46,27 @@ public:
 	FSaveOperationResult SaveActiveSlot();
 
 	UFUNCTION(BlueprintCallable, Category = "SaveGame|World")
+	FSaveOperationResult SaveSlotAsync(FGuid SaveId);
+
+	UFUNCTION(BlueprintCallable, Category = "SaveGame|World")
+	FSaveOperationResult SaveActiveSlotAsync();
+
+	FSaveOperationResult FinishPendingSave();
+
+	UPROPERTY(BlueprintAssignable)
+	FWorldSaveFinished OnWorldSaveFinished;
+
+	UFUNCTION(BlueprintCallable, Category = "SaveGame|World")
 	void BeginPendingSaveSlot(const FCreateSaveSlotParams& Params);
 
 	UFUNCTION(BlueprintCallable, Category = "SaveGame|World")
 	void CancelPendingSaveSlot();
 
 	UFUNCTION(BlueprintPure, Category = "SaveGame|World")
-	bool HasPendingSaveSlot() const { return bHasPendingSaveSlot; }
+	bool HasPendingSaveSlot() const
+	{
+		return bHasPendingSaveSlot;
+	}
 
 	UFUNCTION(BlueprintCallable, Category = "SaveGame|World")
 	FSaveOperationResult SaveCurrentSlot();
@@ -66,10 +87,16 @@ public:
 	FSaveOperationResult DuplicateSaveSlot(FGuid SourceSaveId, const FString& NewName, FSaveSlotSummary& OutSummary);
 
 	UFUNCTION(BlueprintPure, Category = "SaveGame|World")
-	bool HasActiveSave() const { return ActiveSaveId.IsValid(); }
+	bool HasActiveSave() const
+	{
+		return ActiveSaveId.IsValid();
+	}
 
 	UFUNCTION(BlueprintPure, Category = "SaveGame|World")
-	FGuid GetActiveSaveId() const { return ActiveSaveId; }
+	FGuid GetActiveSaveId() const
+	{
+		return ActiveSaveId;
+	}
 
 	UFUNCTION(BlueprintPure, Category = "SaveGame|World")
 	FSaveSlotSummary GetSaveSlotSummary(FGuid SaveId) const;
@@ -84,14 +111,16 @@ public:
 	FSaveOperationResult LoadProfile(FName ProfileName = TEXT("Default"));
 
 	UFUNCTION(BlueprintPure)
-	int32 GetUserIndex() const { return UserIndex; }
+	int32 GetUserIndex() const
+	{
+		return UserIndex;
+	}
 
 	UFUNCTION(BlueprintCallable)
 	void SetUserIndex(int32 InUserIndex);
 
 private:
-	FSaveOperationResult SaveSlotInternal(FGuid SaveId);
-	FSaveOperationResult CaptureModulesToGeneration(const FGuid& SaveId, int32 Generation, TArray<UModuleBase*>& OutCaptured);
+	void CompleteAsyncSave(const FSaveOperationResult& Result);
 	FSaveOperationResult LoadModulesFromGeneration(const FGuid& SaveId, int32 Generation, EPhase InPhase);
 	FSaveOperationResult RestoreSlotGeneration(const FPendingSaveLoadContext& Context, EPhase InPhase);
 	TArray<UModuleBase*> GetSaveModules(ESaveScope Scope) const;
@@ -117,4 +146,8 @@ private:
 	FPendingSaveLoadContext PendingLoadContext;
 
 	TUniquePtr<FSaveGameStorage> Storage;
+	TUniquePtr<FSaveGameAsyncExecutor> AsyncSave;
+	TArray<TWeakObjectPtr<UModuleBase>> AsyncCaptured;
+	FGuid AsyncSaveId;
+	FString AsyncCommittedDirectory;
 };

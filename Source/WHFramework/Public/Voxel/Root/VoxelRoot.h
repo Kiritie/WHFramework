@@ -18,8 +18,14 @@ public:
 
 public:
 #if WITH_EDITOR
-	virtual bool IsUserManaged() const override { return false; }
+	virtual bool IsUserManaged() const override
+	{
+		return false;
+	}
 
-	virtual bool CanChangeIsSpatiallyLoadedFlag() const override { return false; }
+	virtual bool CanChangeIsSpatiallyLoadedFlag() const override
+	{
+		return false;
+	}
 #endif
 };

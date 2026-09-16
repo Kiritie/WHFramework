@@ -36,16 +36,16 @@
 //////////////////////////////////////////////////////////////////////////
 // AAbilityCharacterBase
 AAbilityCharacterBase::AAbilityCharacterBase(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer)
+    : Super(ObjectInitializer)
 {
 	AutoPossessAI = EAutoPossessAI::Disabled;
-	
+
 	AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
 	AbilitySystem->SetIsReplicated(true);
 	AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 
 	AttributeSet = CreateDefaultSubobject<UCharacterAttributeSetBase>(FName("AttributeSet"));
-	
+
 	Inventory = CreateDefaultSubobject<UAbilityCharacterInventoryBase>(FName("Inventory"));
 
 	Interaction = CreateDefaultSubobject<UInteractionComponent>(FName("Interaction"));
@@ -56,10 +56,10 @@ AAbilityCharacterBase::AAbilityCharacterBase(const FObjectInitializer& ObjectIni
 
 	FSM = CreateDefaultSubobject<UFSMComponent>(FName("FSM"));
 	FSM->GroupName = FName("Character");
-	
+
 	FSM->DefaultState = UAbilityCharacterState_Spawn::StaticClass();
 	FSM->FinalState = UAbilityCharacterState_Death::StaticClass();
-	
+
 	FSM->States.Add(UAbilityCharacterState_Climb::StaticClass());
 	FSM->States.Add(UAbilityCharacterState_Crouch::StaticClass());
 	FSM->States.Add(UAbilityCharacterState_Death::StaticClass());
@@ -103,13 +103,13 @@ void AAbilityCharacterBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 	Super::OnDespawn_Implementation(InMode);
 
 	SetMotionRate(1.f, 1.f);
-	
+
 	AssetID = FPrimaryAssetId();
 	RaceID = NAME_None;
 	Level = 0;
 
 	BirthTransform = FTransform::Identity;
-	
+
 	Inventory->UnloadSaveData();
 }
 
@@ -132,18 +132,18 @@ void AAbilityCharacterBase::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);
 
-	if(IsActive())
+	if (IsActive())
 	{
 		ModifyHealth(ATTRIBUTE_DELTAVALUE_CLAMP(this, Health, GetHealthRegenSpeed() * DeltaSeconds));
 
-		if(GetMoveVelocity(true).Size() > 0.2f)
+		if (GetMoveVelocity(true).Size() > 0.2f)
 		{
-			if(!IsMoving())
+			if (!IsMoving())
 			{
 				AbilitySystem->AddLooseGameplayTag(GameplayTags::State_Pawn_Moving);
 			}
 		}
-		else if(IsMoving())
+		else if (IsMoving())
 		{
 			AbilitySystem->RemoveLooseGameplayTag(GameplayTags::State_Pawn_Moving);
 		}
@@ -164,19 +164,23 @@ void AAbilityCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInp
 
 void AAbilityCharacterBase::BindASCInput()
 {
-	if(!bASCInputBound && IsValid(AbilitySystem) && IsValid(InputComponent))
+	if (!bASCInputBound && IsValid(AbilitySystem) && IsValid(InputComponent))
 	{
-		AbilitySystem->BindAbilityActivationToInputComponent(InputComponent, FGameplayAbilityInputBinds(FString("ConfirmTarget"),
-			FString("CancelTarget"), FTopLevelAssetPath("/Script/WHFramework", FName("EAbilityInputID")), static_cast<int32>(EAbilityInputID::Confirm), static_cast<int32>(EAbilityInputID::Cancel)));
+		AbilitySystem->BindAbilityActivationToInputComponent(InputComponent,
+		                                                     FGameplayAbilityInputBinds(FString("ConfirmTarget"),
+		                                                                                FString("CancelTarget"),
+		                                                                                FTopLevelAssetPath("/Script/WHFramework", FName("EAbilityInputID")),
+		                                                                                static_cast<int32>(EAbilityInputID::Confirm),
+		                                                                                static_cast<int32>(EAbilityInputID::Cancel)));
 		bASCInputBound = true;
 	}
 }
 
 void AAbilityCharacterBase::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
 {
-	if(IsFloating())
+	if (IsFloating())
 	{
-		if(WorldDirection.Z > -0.5f)
+		if (WorldDirection.Z > -0.5f)
 		{
 			WorldDirection.Z = 0.f;
 		}
@@ -188,15 +192,16 @@ void AAbilityCharacterBase::Serialize(FArchive& Ar)
 {
 	Super::Serialize(Ar);
 
-	if(!AttributeSet || HasAnyFlags(EObjectFlags::RF_ClassDefaultObject)) return;
+	if (!AttributeSet || HasAnyFlags(EObjectFlags::RF_ClassDefaultObject))
+		return;
 
-	if(Ar.ArIsSaveGame)
+	if (Ar.ArIsSaveGame)
 	{
-		if(Ar.IsLoading())
+		if (Ar.IsLoading())
 		{
 			Ar << Level;
 		}
-		else if(Ar.IsSaving())
+		else if (Ar.IsSaving())
 		{
 			Ar << Level;
 		}
@@ -208,16 +213,16 @@ void AAbilityCharacterBase::LoadData(const FParameter& InSaveData, EPhase InPhas
 {
 	auto& SaveData = InSaveData.GetRef<FCharacterSaveData>();
 
-	if(PHASEC(InPhase, EPhase::Primary))
+	if (PHASEC(InPhase, EPhase::Primary))
 	{
 		SetActorTransform(SaveData.SpawnTransform);
-		if(!SaveData.IsSaved())
+		if (!SaveData.IsSaved())
 		{
 			BirthTransform = SaveData.SpawnTransform;
 
 			const UAbilityCharacterDataBase& CharacterData = GetCharacterData<UAbilityCharacterDataBase>();
-			
-			for(auto Iter : CharacterData.ActionAbilities)
+
+			for (auto Iter : CharacterData.ActionAbilities)
 			{
 				Iter.AbilityHandle = AbilitySystem->K2_GiveAbility(Iter.AbilityClass, Iter.Level);
 				ActionAbilities.Add(Iter.AbilityClass->GetDefaultObject<UAbilityBase>()->AbilityTags.GetByIndex(0), Iter);
@@ -226,20 +231,20 @@ void AAbilityCharacterBase::LoadData(const FParameter& InSaveData, EPhase InPhas
 		else
 		{
 			BirthTransform = SaveData.BirthTransform;
-			
+
 			ActionAbilities = SaveData.ActionAbilities;
-			for(auto& Iter : ActionAbilities)
+			for (auto& Iter : ActionAbilities)
 			{
 				Iter.Value.AbilityHandle = AbilitySystem->K2_GiveAbility(Iter.Value.AbilityClass, Iter.Value.Level);
 			}
 		}
 	}
-	if(PHASEC(InPhase, EPhase::All))
+	if (PHASEC(InPhase, EPhase::All))
 	{
 		SetNameA(SaveData.Name);
 		SetLevelA(SaveData.Level);
 		SetRaceID(SaveData.RaceID);
-	
+
 		Inventory->LoadSaveData(SaveData.InventoryData, InPhase);
 	}
 }
@@ -271,15 +276,17 @@ void AAbilityCharacterBase::ResetData()
 
 void AAbilityCharacterBase::OnFiniteStateRefresh(UFiniteStateBase* InCurrentState)
 {
-	if(!IsActive()) return;
-	if(InCurrentState && !IsWalking() && !IsJumping() && !IsFalling() && !IsSwimming() && !IsFloating() && !IsFlying()) return;
+	if (!IsActive())
+		return;
+	if (InCurrentState && !IsWalking() && !IsJumping() && !IsFalling() && !IsSwimming() && !IsFloating() && !IsFlying())
+		return;
 
 	switch (GetCharacterMovement()->MovementMode)
 	{
 		case MOVE_Walking:
 		case MOVE_NavWalking:
 		{
-			if(!IsJumping() && !IsWalking())
+			if (!IsJumping() && !IsWalking())
 			{
 				SwitchFiniteStateByClass<UAbilityCharacterState_Walk>();
 			}
@@ -287,16 +294,17 @@ void AAbilityCharacterBase::OnFiniteStateRefresh(UFiniteStateBase* InCurrentStat
 		}
 		case MOVE_Falling:
 		{
-			if(!IsFalling()) SwitchFiniteStateByClass<UAbilityCharacterState_Fall>();
+			if (!IsFalling())
+				SwitchFiniteStateByClass<UAbilityCharacterState_Fall>();
 			break;
 		}
 		case MOVE_Swimming:
 		{
-			if(!InCurrentState)
+			if (!InCurrentState)
 			{
 				SwitchFiniteStateByClass<UAbilityCharacterState_Fall>();
 			}
-			else if(!IsSwimming() && !IsFloating())
+			else if (!IsSwimming() && !IsFloating())
 			{
 				Swim();
 			}
@@ -304,17 +312,18 @@ void AAbilityCharacterBase::OnFiniteStateRefresh(UFiniteStateBase* InCurrentStat
 		}
 		case MOVE_Flying:
 		{
-			if(!InCurrentState)
+			if (!InCurrentState)
 			{
 				SwitchFiniteStateByClass<UAbilityCharacterState_Fall>();
 			}
-			else if(!IsFlying())
+			else if (!IsFlying())
 			{
 				Fly();
 			}
 			break;
 		}
-		default: break;
+		default:
+			break;
 	}
 }
 
@@ -322,12 +331,13 @@ void AAbilityCharacterBase::OnMovementModeChanged(EMovementMode PrevMovementMode
 {
 	Super::OnMovementModeChanged(PrevMovementMode, PreviousCustomMode);
 
-	if(!IsActive()) return;
+	if (!IsActive())
+		return;
 
 	UCharacterMovementComponent* Movement = GetCharacterMovement();
-	APhysicsVolume* PhysicsVolume = Movement->MovementMode == MOVE_Swimming ?
-		USceneModuleStatics::GetPhysicsVolumeByName(FName("Water")) : USceneModuleStatics::GetDefaultPhysicsVolume();
-	if(Movement->UpdatedComponent && PhysicsVolume && Movement->GetPhysicsVolume() != PhysicsVolume)
+	APhysicsVolume* PhysicsVolume =
+	    Movement->MovementMode == MOVE_Swimming ? USceneModuleStatics::GetPhysicsVolumeByName(FName("Water")) : USceneModuleStatics::GetDefaultPhysicsVolume();
+	if (Movement->UpdatedComponent && PhysicsVolume && Movement->GetPhysicsVolume() != PhysicsVolume)
 	{
 		Movement->UpdatedComponent->SetPhysicsVolume(PhysicsVolume, true);
 	}
@@ -337,12 +347,12 @@ void AAbilityCharacterBase::OnMovementModeChanged(EMovementMode PrevMovementMode
 
 void AAbilityCharacterBase::Death(IAbilityVitalityInterface* InKiller)
 {
-	SwitchFinalFiniteState({ Cast<UObject>(InKiller) });
+	SwitchFinalFiniteState({Cast<UObject>(InKiller)});
 }
 
 void AAbilityCharacterBase::Kill(IAbilityVitalityInterface* InTarget)
 {
-	if(InTarget != this)
+	if (InTarget != this)
 	{
 		ModifyExp(InTarget->GetLevelA() * 10.f);
 	}
@@ -351,7 +361,7 @@ void AAbilityCharacterBase::Kill(IAbilityVitalityInterface* InTarget)
 
 void AAbilityCharacterBase::Revive(IAbilityVitalityInterface* InRescuer)
 {
-	SwitchDefaultFiniteState({ Cast<UObject>(InRescuer) });
+	SwitchDefaultFiniteState({Cast<UObject>(InRescuer)});
 }
 
 void AAbilityCharacterBase::Static()
@@ -361,7 +371,7 @@ void AAbilityCharacterBase::Static()
 
 void AAbilityCharacterBase::UnStatic()
 {
-	if(IsCurrentFiniteStateClass<UAbilityCharacterState_Static>())
+	if (IsCurrentFiniteStateClass<UAbilityCharacterState_Static>())
 	{
 		SwitchFiniteState(nullptr);
 	}
@@ -369,12 +379,12 @@ void AAbilityCharacterBase::UnStatic()
 
 void AAbilityCharacterBase::Interrupt(float InDuration /*= -1*/)
 {
-	SwitchFiniteStateByClass<UAbilityCharacterState_Interrupt>({ InDuration });
+	SwitchFiniteStateByClass<UAbilityCharacterState_Interrupt>({InDuration});
 }
 
 void AAbilityCharacterBase::UnInterrupt()
 {
-	if(IsCurrentFiniteStateClass<UAbilityCharacterState_Interrupt>())
+	if (IsCurrentFiniteStateClass<UAbilityCharacterState_Interrupt>())
 	{
 		SwitchFiniteState(nullptr);
 	}
@@ -382,7 +392,7 @@ void AAbilityCharacterBase::UnInterrupt()
 
 void AAbilityCharacterBase::FreeToAnim()
 {
-	if(!IsFreeToAnim())
+	if (!IsFreeToAnim())
 	{
 		AbilitySystem->AddLooseGameplayTag(GameplayTags::State_Character_FreeToAnim);
 	}
@@ -390,7 +400,7 @@ void AAbilityCharacterBase::FreeToAnim()
 
 void AAbilityCharacterBase::LimitToAnim()
 {
-	if(IsFreeToAnim())
+	if (IsFreeToAnim())
 	{
 		AbilitySystem->RemoveLooseGameplayTag(GameplayTags::State_Character_FreeToAnim);
 	}
@@ -398,7 +408,7 @@ void AAbilityCharacterBase::LimitToAnim()
 
 void AAbilityCharacterBase::Jump()
 {
-	if(!IsCurrentFiniteStateClass<UAbilityCharacterState_Jump>())
+	if (!IsCurrentFiniteStateClass<UAbilityCharacterState_Jump>())
 	{
 		SwitchFiniteStateByClass<UAbilityCharacterState_Jump>();
 	}
@@ -410,7 +420,7 @@ void AAbilityCharacterBase::Jump()
 
 void AAbilityCharacterBase::UnJump()
 {
-	if(IsCurrentFiniteStateClass<UAbilityCharacterState_Jump>())
+	if (IsCurrentFiniteStateClass<UAbilityCharacterState_Jump>())
 	{
 		SwitchFiniteState(nullptr);
 	}
@@ -422,9 +432,9 @@ void AAbilityCharacterBase::UnJump()
 
 void AAbilityCharacterBase::Crouch(bool bClientSimulation)
 {
-	if(!IsCurrentFiniteStateClass<UAbilityCharacterState_Crouch>())
+	if (!IsCurrentFiniteStateClass<UAbilityCharacterState_Crouch>())
 	{
-		SwitchFiniteStateByClass<UAbilityCharacterState_Crouch>({ bClientSimulation });
+		SwitchFiniteStateByClass<UAbilityCharacterState_Crouch>({bClientSimulation});
 	}
 	else
 	{
@@ -434,7 +444,7 @@ void AAbilityCharacterBase::Crouch(bool bClientSimulation)
 
 void AAbilityCharacterBase::UnCrouch(bool bClientSimulation)
 {
-	if(IsCurrentFiniteStateClass<UAbilityCharacterState_Crouch>())
+	if (IsCurrentFiniteStateClass<UAbilityCharacterState_Crouch>())
 	{
 		SwitchFiniteState(nullptr);
 	}
@@ -451,7 +461,7 @@ void AAbilityCharacterBase::Swim()
 
 void AAbilityCharacterBase::UnSwim()
 {
-	if(IsCurrentFiniteStateClass<UAbilityCharacterState_Swim>())
+	if (IsCurrentFiniteStateClass<UAbilityCharacterState_Swim>())
 	{
 		SwitchFiniteState(nullptr);
 	}
@@ -459,12 +469,12 @@ void AAbilityCharacterBase::UnSwim()
 
 void AAbilityCharacterBase::Float(float InWaterPosZ)
 {
-	SwitchFiniteStateByClass<UAbilityCharacterState_Float>({ InWaterPosZ });
+	SwitchFiniteStateByClass<UAbilityCharacterState_Float>({InWaterPosZ});
 }
 
 void AAbilityCharacterBase::UnFloat()
 {
-	if(IsCurrentFiniteStateClass<UAbilityCharacterState_Float>())
+	if (IsCurrentFiniteStateClass<UAbilityCharacterState_Float>())
 	{
 		SwitchFiniteState(nullptr);
 	}
@@ -477,7 +487,7 @@ void AAbilityCharacterBase::Climb()
 
 void AAbilityCharacterBase::UnClimb()
 {
-	if(IsCurrentFiniteStateClass<UAbilityCharacterState_Climb>())
+	if (IsCurrentFiniteStateClass<UAbilityCharacterState_Climb>())
 	{
 		SwitchFiniteState(nullptr);
 	}
@@ -490,7 +500,7 @@ void AAbilityCharacterBase::Fly()
 
 void AAbilityCharacterBase::UnFly()
 {
-	if(IsCurrentFiniteStateClass<UAbilityCharacterState_Fly>())
+	if (IsCurrentFiniteStateClass<UAbilityCharacterState_Fly>())
 	{
 		SwitchFiniteState(nullptr);
 	}
@@ -498,10 +508,12 @@ void AAbilityCharacterBase::UnFly()
 
 bool AAbilityCharacterBase::DoAction(const FGameplayTag& InActionTag)
 {
-	if(!AssetID.IsValid()) return true;
-	
-	if(!HasActionAbility(InActionTag)) return false;
-	
+	if (!AssetID.IsValid())
+		return true;
+
+	if (!HasActionAbility(InActionTag))
+		return false;
+
 	const FVitalityActionAbilityData AbilityData = GetActionAbility(InActionTag);
 	const bool bSuccess = AbilitySystem->TryActivateAbility(AbilityData.AbilityHandle);
 	const FGameplayAbilitySpec Spec = AbilitySystem->FindAbilitySpecForHandle(AbilityData.AbilityHandle);
@@ -510,13 +522,15 @@ bool AAbilityCharacterBase::DoAction(const FGameplayTag& InActionTag)
 
 bool AAbilityCharacterBase::StopAction(const FGameplayTag& InActionTag)
 {
-	if(!AssetID.IsValid()) return true;
-	
-	if(!HasActionAbility(InActionTag)) return false;
-	
+	if (!AssetID.IsValid())
+		return true;
+
+	if (!HasActionAbility(InActionTag))
+		return false;
+
 	const FVitalityActionAbilityData AbilityData = GetActionAbility(InActionTag);
 	const FGameplayAbilitySpec Spec = AbilitySystem->FindAbilitySpecForHandle(AbilityData.AbilityHandle);
-	if(UVitalityActionAbilityBase* Ability = Cast<UVitalityActionAbilityBase>(Spec.GetPrimaryInstance()))
+	if (UVitalityActionAbilityBase* Ability = Cast<UVitalityActionAbilityBase>(Spec.GetPrimaryInstance()))
 	{
 		Ability->SetStopped(true);
 	}
@@ -526,42 +540,42 @@ bool AAbilityCharacterBase::StopAction(const FGameplayTag& InActionTag)
 
 void AAbilityCharacterBase::EndAction(const FGameplayTag& InActionTag, bool bWasCancelled)
 {
-	if(InActionTag.MatchesTag(GameplayTags::Ability_Vitality_Action_Death))
+	if (InActionTag.MatchesTag(GameplayTags::Ability_Vitality_Action_Death))
 	{
-		if(IsCurrentFiniteStateClass<UAbilityCharacterState_Death>())
+		if (IsCurrentFiniteStateClass<UAbilityCharacterState_Death>())
 		{
 			FSM->GetCurrentState<UAbilityCharacterState_Death>()->DeathEnd();
 		}
 	}
-	else if(InActionTag.MatchesTag(GameplayTags::Ability_Vitality_Action_Static))
+	else if (InActionTag.MatchesTag(GameplayTags::Ability_Vitality_Action_Static))
 	{
 		UnStatic();
 	}
-	else if(InActionTag.MatchesTag(GameplayTags::Ability_Vitality_Action_Interrupt))
+	else if (InActionTag.MatchesTag(GameplayTags::Ability_Vitality_Action_Interrupt))
 	{
 		UnInterrupt();
 	}
-	else if(InActionTag.MatchesTag(GameplayTags::Ability_Character_Action_Jump))
+	else if (InActionTag.MatchesTag(GameplayTags::Ability_Character_Action_Jump))
 	{
 		UnJump();
 	}
-	else if(InActionTag.MatchesTag(GameplayTags::Ability_Character_Action_Crouch))
+	else if (InActionTag.MatchesTag(GameplayTags::Ability_Character_Action_Crouch))
 	{
 		UnCrouch(false);
 	}
-	else if(InActionTag.MatchesTag(GameplayTags::Ability_Character_Action_Swim))
+	else if (InActionTag.MatchesTag(GameplayTags::Ability_Character_Action_Swim))
 	{
 		UnSwim();
 	}
-	else if(InActionTag.MatchesTag(GameplayTags::Ability_Character_Action_Float))
+	else if (InActionTag.MatchesTag(GameplayTags::Ability_Character_Action_Float))
 	{
 		UnFloat();
 	}
-	else if(InActionTag.MatchesTag(GameplayTags::Ability_Character_Action_Climb))
+	else if (InActionTag.MatchesTag(GameplayTags::Ability_Character_Action_Climb))
 	{
 		UnClimb();
 	}
-	else if(InActionTag.MatchesTag(GameplayTags::Ability_Character_Action_Fly))
+	else if (InActionTag.MatchesTag(GameplayTags::Ability_Character_Action_Fly))
 	{
 		UnFly();
 	}
@@ -569,7 +583,7 @@ void AAbilityCharacterBase::EndAction(const FGameplayTag& InActionTag, bool bWas
 
 void AAbilityCharacterBase::OnPickUp(AAbilityPickUpBase* InPickUp)
 {
-	if(InPickUp)
+	if (InPickUp)
 	{
 		Inventory->AddItemByRange(InPickUp->GetItem(), -1);
 	}
@@ -585,7 +599,7 @@ void AAbilityCharacterBase::OnLeaveInteract(IInteractionAgentInterface* InIntera
 
 void AAbilityCharacterBase::OnAdditionItem(const FAbilityItem& InItem)
 {
-	if(InItem.ID == PAID_EXP)
+	if (InItem.ID == PAID_EXP)
 	{
 		ModifyExp(InItem.Count);
 	}
@@ -593,109 +607,61 @@ void AAbilityCharacterBase::OnAdditionItem(const FAbilityItem& InItem)
 
 void AAbilityCharacterBase::OnRemoveItem(const FAbilityItem& InItem)
 {
-	
 }
 
 void AAbilityCharacterBase::OnPreChangeItem(const FAbilityItem& InOldItem)
 {
-	
 }
 
 void AAbilityCharacterBase::OnChangeItem(const FAbilityItem& InNewItem)
 {
-	
 }
 
 void AAbilityCharacterBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
 {
-
 }
 
 void AAbilityCharacterBase::OnDeactiveItem(const FAbilityItem& InItem, bool bPassive)
 {
-
 }
 
 void AAbilityCharacterBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPlace)
 {
 	FVector Pos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
-	if(!bInPlace) Pos += GetActorForwardVector() * (GetRadius() + 35.f);
+	if (!bInPlace)
+		Pos += GetActorForwardVector() * (GetRadius() + 35.f);
 	UAbilityModuleStatics::SpawnAbilityPickUp(InItem, Pos, Container.GetInterface());
 }
 
 void AAbilityCharacterBase::OnSelectItem(const FAbilityItem& InItem)
 {
-	if(InItem.GetPayload<UAbilityInventorySlotBase>()->GetSplitType() == ESlotSplitType::Shortcut)
-	{
-		if(InItem.IsValid() && InItem.GetType() == EAbilityItemType::Voxel)
-		{
-			SetGenerateVoxelID(InItem.ID);
-		}
-		else
-		{
-			SetGenerateVoxelID(FPrimaryAssetId());
-		}
-	}
 }
 
 void AAbilityCharacterBase::OnAuxiliaryItem(const FAbilityItem& InItem)
 {
-
-}
-
-bool AAbilityCharacterBase::OnGenerateVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
-{
-	switch(InInteractEvent)
-	{
-		case EInputInteractEvent::Started:
-		{
-			return IVoxelAgentInterface::OnGenerateVoxel(InInteractEvent, InHitResult);
-		}
-		case EInputInteractEvent::Triggered:
-		{
-			return IVoxelAgentInterface::OnGenerateVoxel(InInteractEvent, InHitResult);
-		}
-		case EInputInteractEvent::Completed:
-		{
-			FItemQueryData ItemQueryData = Inventory->QueryItemByRange(EItemQueryType::Remove, GenerateVoxelItem.ID, -1);
-			if(!ItemQueryData.IsValid()) bCanGenerateVoxel = false;
-			if(IVoxelAgentInterface::OnGenerateVoxel(InInteractEvent, InHitResult))
-			{
-				Inventory->RemoveItemByQueryData(ItemQueryData);
-				return true;
-			}
-			break;
-		}
-	}
-	return false;
-}
-
-bool AAbilityCharacterBase::OnDestroyVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult)
-{
-	return IVoxelAgentInterface::OnDestroyVoxel(InInteractEvent, InHitResult);
 }
 
 void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
 {
-	if(InAttributeChangeData.Attribute == GetExpAttribute())
+	if (InAttributeChangeData.Attribute == GetExpAttribute())
 	{
-		if(InAttributeChangeData.NewValue >= GetMaxExp())
+		if (InAttributeChangeData.NewValue >= GetMaxExp())
 		{
 			const float Exp = InAttributeChangeData.NewValue - GetMaxExp();
 			SetLevelA(GetLevelA() + 1);
 			SetExp(Exp);
 		}
 	}
-	else if(InAttributeChangeData.Attribute == GetMoveSpeedAttribute())
+	else if (InAttributeChangeData.Attribute == GetMoveSpeedAttribute())
 	{
 		GetCharacterMovement()->MaxWalkSpeed = InAttributeChangeData.NewValue * MovementRate;
 	}
-	else if(InAttributeChangeData.Attribute == GetRotationSpeedAttribute())
+	else if (InAttributeChangeData.Attribute == GetRotationSpeedAttribute())
 	{
 		GetCharacterMovement()->RotationRate = FRotator(0, InAttributeChangeData.NewValue * RotationRate, 0);
 		Looking->LookingRotationSpeed = InAttributeChangeData.NewValue * RotationRate;
 	}
-	else if(InAttributeChangeData.Attribute == GetJumpForceAttribute())
+	else if (InAttributeChangeData.Attribute == GetJumpForceAttribute())
 	{
 		GetCharacterMovement()->JumpZVelocity = InAttributeChangeData.NewValue;
 	}
@@ -703,21 +669,25 @@ void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAt
 
 void AAbilityCharacterBase::OnActorAttached(AActor* InActor)
 {
-	
 }
 
 void AAbilityCharacterBase::OnActorDetached(AActor* InActor)
 {
-	
 }
 
-void AAbilityCharacterBase::HandleDamage(const FGameplayAttribute& DamageAttribute, float DamageValue, float DefendValue, bool bHasCrited, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+void AAbilityCharacterBase::HandleDamage(const FGameplayAttribute& DamageAttribute,
+                                         float DamageValue,
+                                         float DefendValue,
+                                         bool bHasCrited,
+                                         const FHitResult& HitResult,
+                                         const FGameplayTagContainer& SourceTags,
+                                         AActor* SourceActor)
 {
 	ModifyHealth(-DamageValue);
 
-	if(GetHealth() <= 0.f)
+	if (GetHealth() <= 0.f)
 	{
-		if(IAbilityVitalityInterface* SourceVitality = Cast<IAbilityVitalityInterface>(SourceActor))
+		if (IAbilityVitalityInterface* SourceVitality = Cast<IAbilityVitalityInterface>(SourceActor))
 		{
 			SourceVitality->Kill(this);
 		}
@@ -727,32 +697,40 @@ void AAbilityCharacterBase::HandleDamage(const FGameplayAttribute& DamageAttribu
 		}
 	}
 
-	if(DamageValue >= 1.f)
+	if (DamageValue >= 1.f)
 	{
-		USceneModuleStatics::SpawnWorldText(FString::FromInt(DamageValue), UAbilityModuleStatics::GetAttributeColor(DamageAttribute), !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress, GetActorLocation(), FVector(20.f));
+		USceneModuleStatics::SpawnWorldText(FString::FromInt(DamageValue),
+		                                    UAbilityModuleStatics::GetAttributeColor(DamageAttribute),
+		                                    !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress,
+		                                    GetActorLocation(),
+		                                    FVector(20.f));
 	}
-	if(DefendValue >= 1.f)
+	if (DefendValue >= 1.f)
 	{
 		USceneModuleStatics::SpawnWorldText(FString::FromInt(DefendValue), FColor::Cyan, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
 	}
 }
 
-void AAbilityCharacterBase::HandleRecovery(const FGameplayAttribute& RecoveryAttribute, float RecoveryValue, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+void AAbilityCharacterBase::HandleRecovery(
+    const FGameplayAttribute& RecoveryAttribute, float RecoveryValue, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
 {
-	if(RecoveryAttribute == GetHealthRecoveryAttribute())
+	if (RecoveryAttribute == GetHealthRecoveryAttribute())
 	{
 		ModifyHealth(RecoveryValue);
 
-		if(RecoveryValue > 1.f)
+		if (RecoveryValue > 1.f)
 		{
 			USceneModuleStatics::SpawnWorldText(FString::FromInt(RecoveryValue), FColor::Green, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
 		}
 	}
 }
 
-void AAbilityCharacterBase::HandleInterrupt(const FGameplayAttribute& InterruptAttribute, float InterruptDuration, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
+void AAbilityCharacterBase::HandleInterrupt(const FGameplayAttribute& InterruptAttribute,
+                                            float InterruptDuration,
+                                            const FHitResult& HitResult,
+                                            const FGameplayTagContainer& SourceTags,
+                                            AActor* SourceActor)
 {
-	
 }
 
 UAbilitySystemComponent* AAbilityCharacterBase::GetAbilitySystemComponent() const
@@ -900,7 +878,7 @@ bool AAbilityCharacterBase::SetLevelA(int32 InLevel)
 	const auto& CharacterData = GetCharacterData<UAbilityCharacterDataBase>();
 	InLevel = CharacterData.ClampLevel(InLevel);
 
-	if(Level != InLevel)
+	if (Level != InLevel)
 	{
 		Level = InLevel;
 
@@ -925,25 +903,31 @@ FString AAbilityCharacterBase::GetHeadInfo() const
 
 float AAbilityCharacterBase::GetRadius() const
 {
-	if(!GetCapsuleComponent()) return 0.f;
+	if (!GetCapsuleComponent())
+		return 0.f;
 
 	return GetCapsuleComponent()->GetScaledCapsuleRadius();
 }
 
 float AAbilityCharacterBase::GetHalfHeight() const
 {
-	if(!GetCapsuleComponent()) return 0.f;
+	if (!GetCapsuleComponent())
+		return 0.f;
 
 	return GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 }
 
 float AAbilityCharacterBase::GetDistance(AActor* InTargetActor, bool bIgnoreRadius /*= true*/, bool bIgnoreZAxis /*= true*/) const
 {
-	if(!InTargetActor) return -1;
+	if (!InTargetActor)
+		return -1;
 
 	IAbilityActorInterface* TargetAbilityActor = Cast<IAbilityActorInterface>(InTargetActor);
 
-	return FVector::Distance(FVector(GetActorLocation().X, GetActorLocation().Y, bIgnoreZAxis ? 0 : GetActorLocation().Z), FVector(InTargetActor->GetActorLocation().X, InTargetActor->GetActorLocation().Y, bIgnoreZAxis ? 0 : InTargetActor->GetActorLocation().Z)) - (bIgnoreRadius ? 0 : TargetAbilityActor->GetRadius());
+	return FVector::Distance(
+	           FVector(GetActorLocation().X, GetActorLocation().Y, bIgnoreZAxis ? 0 : GetActorLocation().Z),
+	           FVector(InTargetActor->GetActorLocation().X, InTargetActor->GetActorLocation().Y, bIgnoreZAxis ? 0 : InTargetActor->GetActorLocation().Z)) -
+	       (bIgnoreRadius ? 0 : TargetAbilityActor->GetRadius());
 }
 
 void AAbilityCharacterBase::GetMotionRate(float& OutMovementRate, float& OutRotationRate)
@@ -970,7 +954,7 @@ bool AAbilityCharacterBase::HasActionAbility(const FGameplayTag& InActionTag) co
 
 FVitalityActionAbilityData AAbilityCharacterBase::GetActionAbility(const FGameplayTag& InActionTag)
 {
-	if(HasActionAbility(InActionTag))
+	if (HasActionAbility(InActionTag))
 	{
 		return ActionAbilities[InActionTag];
 	}
@@ -986,7 +970,7 @@ void AAbilityCharacterBase::OnRep_PlayerState()
 {
 	Super::OnRep_PlayerState();
 
-	if(GetPlayerState())
+	if (GetPlayerState())
 	{
 		BindASCInput();
 	}

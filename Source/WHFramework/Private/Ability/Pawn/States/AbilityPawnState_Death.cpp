@@ -5,6 +5,7 @@
 #include "AbilitySystemComponent.h"
 #include "Ability/Pawn/AbilityPawnBase.h"
 #include "Ability/Pawn/AbilityPawnInventoryBase.h"
+#include "Ability/Pawn/States/AbilityPawnState_Spawn.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "AI/Base/AIControllerBase.h"
@@ -33,12 +34,12 @@ void UAbilityPawnState_Death::OnEnter(UFiniteStateBase* InLastState, const TArra
 {
 	Super::OnEnter(InLastState, InParams);
 
-	if(InParams.IsValidIndex(0))
+	if (InParams.IsValidIndex(0))
 	{
 		Killer = Cast<IAbilityVitalityInterface>(InParams[0].Get<UObject*>());
 	}
-	
-	UEventModuleStatics::BroadcastEvent<FEventVitalityDead>(this, { GetAgent(), Cast<UObject>(Killer) });
+
+	UEventModuleStatics::BroadcastEvent<FEventVitalityDead>(this, {GetAgent(), Cast<UObject>(Killer)});
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
@@ -47,7 +48,7 @@ void UAbilityPawnState_Death::OnEnter(UFiniteStateBase* InLastState, const TArra
 
 	Pawn->GetInteractionComponent()->SetInteractable(false);
 
-	if(Pawn->GetController<AAIControllerBase>())
+	if (Pawn->GetController<AAIControllerBase>())
 	{
 		Pawn->GetController<AAIControllerBase>()->StopBehaviorTree();
 	}
@@ -65,7 +66,8 @@ void UAbilityPawnState_Death::OnRefresh(float DeltaSeconds)
 
 bool UAbilityPawnState_Death::OnPreLeave(UFiniteStateBase* InNextState)
 {
-	if(!Super::OnPreLeave(InNextState)) return false;
+	if (!Super::OnPreLeave(InNextState))
+		return false;
 
 	return InNextState && InNextState->IsA<UAbilityPawnState_Spawn>();
 }
@@ -84,7 +86,7 @@ void UAbilityPawnState_Death::OnLeave(UFiniteStateBase* InNextState)
 
 	Pawn->StopAction(GameplayTags::Ability_Vitality_Action_Death);
 
-	if(Pawn->IsPlayer())
+	if (Pawn->IsPlayer())
 	{
 		Pawn->Execute_SetActorVisible(Pawn, true);
 	}
@@ -102,7 +104,7 @@ void UAbilityPawnState_Death::DeathStart()
 	Pawn->GetMovementComponent()->SetActive(false);
 	Pawn->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	if(!Pawn->DoAction(GameplayTags::Ability_Vitality_Action_Death))
+	if (!Pawn->DoAction(GameplayTags::Ability_Vitality_Action_Death))
 	{
 		DeathEnd();
 	}
@@ -111,13 +113,13 @@ void UAbilityPawnState_Death::DeathStart()
 void UAbilityPawnState_Death::DeathEnd()
 {
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
-	
+
 	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dying);
 	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dead);
 
 	Pawn->Inventory->DiscardItems();
 
-	if(!Pawn->IsPlayer())
+	if (!Pawn->IsPlayer())
 	{
 		UObjectPoolModuleStatics::DespawnObject(Pawn);
 	}

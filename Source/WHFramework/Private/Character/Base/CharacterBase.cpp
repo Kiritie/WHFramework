@@ -1,6 +1,5 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "Character/Base/CharacterBase.h"
 
 #include "AIController.h"
@@ -24,9 +23,10 @@
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Chunks/VoxelChunk.h"
+#include "Voxel/Agent/VoxelAgentComponent.h"
 
-ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer) :
-	Super(ObjectInitializer)
+ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer)
 {
 	PrimaryActorTick.bCanEverTick = true;
 
@@ -61,6 +61,7 @@ ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer) :
 	Looking->OnCanLookAtTarget.BindDynamic(this, &ACharacterBase::CanLookAtTarget);
 	Looking->OnTargetLookAtOn.BindDynamic(this, &ACharacterBase::OnTargetLookAtOn);
 	Looking->OnTargetLookAtOff.BindDynamic(this, &ACharacterBase::OnTargetLookAtOff);
+	VoxelAgentComponent = CreateDefaultSubobject<UVoxelAgentComponent>(TEXT("VoxelAgentComponent"));
 
 	Name = NAME_None;
 	Anim = nullptr;
@@ -72,8 +73,6 @@ ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer) :
 	ActorID = FGuid::NewGuid();
 	bVisible = true;
 	Container = nullptr;
-
-	GenerateVoxelID = FPrimaryAssetId();
 }
 
 void ACharacterBase::OnSpawn_Implementation(const FParameter& InParam)
@@ -81,11 +80,11 @@ void ACharacterBase::OnSpawn_Implementation(const FParameter& InParam)
 	USceneModuleStatics::RemoveSceneActor(this);
 
 	const FAbilityActorSpawnParameter* Param = InParam.GetPtr<FAbilityActorSpawnParameter>();
-	if(Param && Param->bOverrideActorID)
+	if (Param && Param->bOverrideActorID)
 	{
 		ActorID = Param->ActorID;
 	}
-	if(Param)
+	if (Param)
 	{
 		AssetID = Param->AssetID;
 	}
@@ -93,24 +92,36 @@ void ACharacterBase::OnSpawn_Implementation(const FParameter& InParam)
 	USceneModuleStatics::AddSceneActor(this);
 
 	Execute_SetActorVisible(this, true);
+	if (VoxelAgentComponent)
+	{
+		VoxelAgentComponent->SetAgentEnabled(true);
+	}
 }
 
 void ACharacterBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
+	if (VoxelAgentComponent)
+	{
+		VoxelAgentComponent->SetAgentEnabled(false);
+	}
+
 	Execute_SetActorVisible(this, false);
 
 	SetActorLocationAndRotation(UNDER_Vector, FRotator::ZeroRotator);
 
 	USceneModuleStatics::RemoveSceneActor(this);
-	if(Container)
+	if (Container)
 	{
 		Container->RemoveSceneActor(this);
 	}
 
 	Container = nullptr;
 	DefaultController = nullptr;
+}
 
-	SetGenerateVoxelID(FPrimaryAssetId());
+UVoxelAgentComponent* ACharacterBase::GetVoxelAgentComponent() const
+{
+	return VoxelAgentComponent;
 }
 
 void ACharacterBase::OnInitialize_Implementation()
@@ -126,22 +137,10 @@ void ACharacterBase::OnInitialize_Implementation()
 
 void ACharacterBase::OnPreparatory_Implementation()
 {
-	
 }
 
 void ACharacterBase::OnRefresh_Implementation(float DeltaSeconds)
 {
-	if(AMainModule::IsExistModuleByClass<UVoxelModule>())
-	{
-		if(UVoxelChunk* Chunk = UVoxelModuleStatics::GetChunkByLocation(GetActorLocation()))
-		{
-			Chunk->AddSceneActor(this);
-		}
-		else if(Container)
-		{
-			Container->RemoveSceneActor(this);
-		}
-	}
 }
 
 void ACharacterBase::OnTermination_Implementation()
@@ -153,7 +152,7 @@ void ACharacterBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData.GetRef<FSceneActorSaveData>();
 
-	if(PHASEC(InPhase, EPhase::Primary))
+	if (PHASEC(InPhase, EPhase::Primary))
 	{
 		ActorID = SaveData.ActorID;
 		SetActorTransform(SaveData.SpawnTransform);
@@ -173,10 +172,10 @@ FParameter ACharacterBase::ToData()
 void ACharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
-	
-	if(Execute_IsUseDefaultLifecycle(this))
+
+	if (Execute_IsUseDefaultLifecycle(this))
 	{
-		if(!Execute_IsInitialized(this))
+		if (!Execute_IsInitialized(this))
 		{
 			Execute_OnInitialize(this);
 		}
@@ -188,7 +187,7 @@ void ACharacterBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
-	if(Execute_IsUseDefaultLifecycle(this))
+	if (Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnTermination(this);
 	}
@@ -198,7 +197,7 @@ void ACharacterBase::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	if(Execute_IsUseDefaultLifecycle(this))
+	if (Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnRefresh(this, DeltaSeconds);
 	}
@@ -213,12 +212,10 @@ void ACharacterBase::SpawnDefaultController()
 
 void ACharacterBase::OnSwitch_Implementation()
 {
-	
 }
 
 void ACharacterBase::OnUnSwitch_Implementation()
 {
-	
 }
 
 void ACharacterBase::Switch_Implementation()
@@ -228,7 +225,7 @@ void ACharacterBase::Switch_Implementation()
 
 void ACharacterBase::UnSwitch_Implementation()
 {
-	if(IsCurrent())
+	if (IsCurrent())
 	{
 		UCharacterModuleStatics::SwitchCharacter(nullptr);
 	}
@@ -261,7 +258,8 @@ void ACharacterBase::MoveRight_Implementation(float InValue)
 
 void ACharacterBase::MoveUp_Implementation(float InValue)
 {
-	if(GetCharacterMovement()->IsMovingOnGround()) return;
+	if (GetCharacterMovement()->IsMovingOnGround())
+		return;
 
 	const FRotator Rotation = GetControlRotation();
 	const FRotator YawRotation(0, Rotation.Yaw, 0);
@@ -285,9 +283,9 @@ void ACharacterBase::SetActorVisible_Implementation(bool bInVisible)
 	GetRootComponent()->SetVisibility(bInVisible, true);
 	TArray<AActor*> AttachedActors;
 	GetAttachedActors(AttachedActors);
-	for(auto Iter : AttachedActors)
+	for (auto Iter : AttachedActors)
 	{
-		if(Iter && Iter->Implements<USceneActorInterface>())
+		if (Iter && Iter->Implements<USceneActorInterface>())
 		{
 			ISceneActorInterface::Execute_SetActorVisible(Iter, bInVisible);
 		}
@@ -317,19 +315,20 @@ void ACharacterBase::StopSound(bool bMulticast)
 
 void ACharacterBase::PlayMontage(UAnimMontage* InMontage, bool bMulticast)
 {
-	if(bMulticast)
+	if (bMulticast)
 	{
-		if(HasAuthority())
+		if (HasAuthority())
 		{
 			MultiPlayMontage(InMontage);
 		}
-		else if(UCharacterModuleNetworkComponent* CharacterModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UCharacterModuleNetworkComponent>())
+		else if (UCharacterModuleNetworkComponent* CharacterModuleNetworkComponent =
+		             AMainModule::GetModuleNetworkComponentByClass<UCharacterModuleNetworkComponent>())
 		{
 			CharacterModuleNetworkComponent->ServerPlayMontageMulticast(this, InMontage);
 		}
 		return;
 	}
-	if(Anim)
+	if (Anim)
 	{
 		Anim->Montage_Play(InMontage);
 	}
@@ -343,7 +342,7 @@ void ACharacterBase::MultiPlayMontage_Implementation(UAnimMontage* InMontage)
 void ACharacterBase::PlayMontageByName(const FName InMontageName, bool bMulticast)
 {
 	auto& CharacterData = GetCharacterData<UCharacterDataBase>();
-	if(CharacterData.AnimMontages.Contains(InMontageName))
+	if (CharacterData.AnimMontages.Contains(InMontageName))
 	{
 		PlayMontage(CharacterData.AnimMontages[InMontageName], bMulticast);
 	}
@@ -351,19 +350,20 @@ void ACharacterBase::PlayMontageByName(const FName InMontageName, bool bMulticas
 
 void ACharacterBase::StopMontage(UAnimMontage* InMontage, bool bMulticast)
 {
-	if(bMulticast)
+	if (bMulticast)
 	{
-		if(HasAuthority())
+		if (HasAuthority())
 		{
 			MultiStopMontage(InMontage);
 		}
-		else if(UCharacterModuleNetworkComponent* CharacterModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UCharacterModuleNetworkComponent>())
+		else if (UCharacterModuleNetworkComponent* CharacterModuleNetworkComponent =
+		             AMainModule::GetModuleNetworkComponentByClass<UCharacterModuleNetworkComponent>())
 		{
 			CharacterModuleNetworkComponent->ServerStopMontageMulticast(this, InMontage);
 		}
 		return;
 	}
-	if(Anim)
+	if (Anim)
 	{
 		Anim->Montage_Stop(.2f, InMontage);
 	}
@@ -377,7 +377,7 @@ void ACharacterBase::MultiStopMontage_Implementation(UAnimMontage* InMontage)
 void ACharacterBase::StopMontageByName(const FName InMontageName, bool bMulticast)
 {
 	auto& CharacterData = GetCharacterData<UCharacterDataBase>();
-	if(CharacterData.AnimMontages.Contains(InMontageName))
+	if (CharacterData.AnimMontages.Contains(InMontageName))
 	{
 		StopMontage(CharacterData.AnimMontages[InMontageName], bMulticast);
 	}
@@ -385,13 +385,14 @@ void ACharacterBase::StopMontageByName(const FName InMontageName, bool bMulticas
 
 void ACharacterBase::TransformTowards(FTransform InTransform, float InDuration, bool bMulticast)
 {
-	if(bMulticast)
+	if (bMulticast)
 	{
-		if(HasAuthority())
+		if (HasAuthority())
 		{
 			MultiTransformTowards(InTransform);
 		}
-		else if(UCharacterModuleNetworkComponent* CharacterModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UCharacterModuleNetworkComponent>())
+		else if (UCharacterModuleNetworkComponent* CharacterModuleNetworkComponent =
+		             AMainModule::GetModuleNetworkComponentByClass<UCharacterModuleNetworkComponent>())
 		{
 			CharacterModuleNetworkComponent->ServerTransformTowardsToMulticast(this, InTransform);
 		}
@@ -407,13 +408,14 @@ void ACharacterBase::MultiTransformTowards_Implementation(FTransform InTransform
 
 void ACharacterBase::RotationTowards(FRotator InRotation, float InDuration, bool bMulticast)
 {
-	if(bMulticast)
+	if (bMulticast)
 	{
-		if(HasAuthority())
+		if (HasAuthority())
 		{
 			MultiRotationTowards(InRotation, InDuration);
 		}
-		else if(UCharacterModuleNetworkComponent* CharacterModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UCharacterModuleNetworkComponent>())
+		else if (UCharacterModuleNetworkComponent* CharacterModuleNetworkComponent =
+		             AMainModule::GetModuleNetworkComponentByClass<UCharacterModuleNetworkComponent>())
 		{
 			CharacterModuleNetworkComponent->ServerRotationTowardsMulticast(this, InRotation, InDuration);
 		}
@@ -429,19 +431,20 @@ void ACharacterBase::MultiRotationTowards_Implementation(FRotator InRotation, fl
 
 void ACharacterBase::AIMoveTo(FVector InLocation, float InStopDistance, bool bMulticast)
 {
-	if(bMulticast)
+	if (bMulticast)
 	{
-		if(HasAuthority())
+		if (HasAuthority())
 		{
 			MultiAIMoveTo(InLocation, InStopDistance);
 		}
-		else if(UCharacterModuleNetworkComponent* CharacterModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UCharacterModuleNetworkComponent>())
+		else if (UCharacterModuleNetworkComponent* CharacterModuleNetworkComponent =
+		             AMainModule::GetModuleNetworkComponentByClass<UCharacterModuleNetworkComponent>())
 		{
 			CharacterModuleNetworkComponent->ServerAIMoveToMulticast(this, InLocation, InStopDistance);
 		}
 		return;
 	}
-	if(AAIController* AIController = GetController<AAIController>())
+	if (AAIController* AIController = GetController<AAIController>())
 	{
 		AIController->MoveToLocation(InLocation, InStopDistance);
 	}
@@ -454,19 +457,20 @@ void ACharacterBase::MultiAIMoveTo_Implementation(FVector InLocation, float InSt
 
 void ACharacterBase::StopAIMove(bool bMulticast)
 {
-	if(bMulticast)
+	if (bMulticast)
 	{
-		if(HasAuthority())
+		if (HasAuthority())
 		{
 			MultiStopAIMove();
 		}
-		else if(UCharacterModuleNetworkComponent* CharacterModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UCharacterModuleNetworkComponent>())
+		else if (UCharacterModuleNetworkComponent* CharacterModuleNetworkComponent =
+		             AMainModule::GetModuleNetworkComponentByClass<UCharacterModuleNetworkComponent>())
 		{
 			CharacterModuleNetworkComponent->ServerStopAIMoveMulticast(this);
 		}
 		return;
 	}
-	if(AAIController* AIController = GetController<AAIController>())
+	if (AAIController* AIController = GetController<AAIController>())
 	{
 		AIController->StopMovement();
 	}
@@ -515,7 +519,8 @@ AAIControllerBase* ACharacterBase::GetAIController() const
 FVector ACharacterBase::GetMoveVelocity(bool bIgnoreZ) const
 {
 	FVector Velocity = GetMovementComponent()->Velocity;
-	if(bIgnoreZ) Velocity.Z = 0;
+	if (bIgnoreZ)
+		Velocity.Z = 0;
 	return Velocity;
 }
 

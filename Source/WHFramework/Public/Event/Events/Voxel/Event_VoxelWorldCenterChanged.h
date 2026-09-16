@@ -15,11 +15,11 @@ struct WHFRAMEWORK_API FEventVoxelWorldCenterChanged : public FEventBase
 public:
 	FEventVoxelWorldCenterChanged() = default;
 
-	FEventVoxelWorldCenterChanged(FIndex InWorldCenter)
-		: WorldCenter(MoveTemp(InWorldCenter))
+	explicit FEventVoxelWorldCenterChanged(FIntVector InWorldCenter)
+	    : WorldCenter(MoveTemp(InWorldCenter))
 	{
 	}
 
 	UPROPERTY(BlueprintReadWrite)
-	FIndex WorldCenter = FIndex::ZeroIndex;
+	FIntVector WorldCenter = FIntVector::ZeroValue;
 };

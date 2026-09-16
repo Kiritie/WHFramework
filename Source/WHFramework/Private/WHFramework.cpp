@@ -22,14 +22,12 @@
 void FWHFrameworkModule::StartupModule()
 {
 	TArray<FCoreRedirect> Redirects;
-	const TPair<const TCHAR*, const TCHAR*> Classes[] = {
-		{TEXT("Dialogue"), TEXT("DialogueAsset")},
-		{TEXT("DialogueEvents"), TEXT("DialogueEventBase")},
-		{TEXT("DialogueConditions"), TEXT("DialogueConditionBase")},
-		{TEXT("OrCondition"), TEXT("DialogueCondition_Or")},
-		{TEXT("AndCondition"), TEXT("DialogueCondition_And")},
-		{TEXT("DialogueUserWidget"), TEXT("WidgetDialogueBase")}
-	};
+	const TPair<const TCHAR*, const TCHAR*> Classes[] = {{TEXT("Dialogue"), TEXT("DialogueAsset")},
+	                                                     {TEXT("DialogueEvents"), TEXT("DialogueEventBase")},
+	                                                     {TEXT("DialogueConditions"), TEXT("DialogueConditionBase")},
+	                                                     {TEXT("OrCondition"), TEXT("DialogueCondition_Or")},
+	                                                     {TEXT("AndCondition"), TEXT("DialogueCondition_And")},
+	                                                     {TEXT("DialogueUserWidget"), TEXT("WidgetDialogueBase")}};
 	for (const auto& Class : Classes)
 	{
 		const FString Destination = FString(TEXT("/Script/WHFramework.")) + Class.Value;
@@ -37,7 +35,8 @@ void FWHFrameworkModule::StartupModule()
 		Redirects.Emplace(ECoreRedirectFlags::Type_Class, FString(TEXT("/Script/WHFramework.")) + Class.Key, Destination);
 	}
 	Redirects.Emplace(ECoreRedirectFlags::Type_Struct, TEXT("/Script/DialoguePlugin.DialogueNode"), TEXT("/Script/WHFramework.DialogueNode"));
-	Redirects.Emplace(ECoreRedirectFlags::Type_Package, TEXT("/DialoguePlugin/DialogueSoundConcurrency"), TEXT("/WHFramework/Dialogue/DialogueSoundConcurrency"));
+	Redirects.Emplace(
+	    ECoreRedirectFlags::Type_Package, TEXT("/DialoguePlugin/DialogueSoundConcurrency"), TEXT("/WHFramework/Dialogue/DialogueSoundConcurrency"));
 	Redirects.Emplace(ECoreRedirectFlags::Type_Package, TEXT("/DialoguePlugin/UI/DemoDialogueWidget"), TEXT("/WHFramework/Dialogue/UI/DemoDialogueWidget"));
 	Redirects.Emplace(ECoreRedirectFlags::Type_Package, TEXT("/DialoguePlugin/UI/DemoReplyWidget"), TEXT("/WHFramework/Dialogue/UI/DemoReplyWidget"));
 	FCoreRedirects::AddRedirectList(Redirects, TEXT("WHFrameworkDialogueMigration"));
@@ -51,7 +50,6 @@ void FWHFrameworkModule::StartupModule()
 	FObjectPoolSpawnParameterRegistry::Register(APawnBase::StaticClass(), FAbilityActorSpawnParameter::StaticStruct());
 	FObjectPoolSpawnParameterRegistry::Register(UWidgetAbilityDragItemBase::StaticClass(), FAbilityWidgetSpawnParameter::StaticStruct());
 	FObjectPoolSpawnParameterRegistry::Register(UCommonOptionSelector::StaticClass(), FCommonOptionSelectorSpawnParameter::StaticStruct());
-	FObjectPoolSpawnParameterRegistry::Register(UVoxelMeshComponent::StaticClass(), FVoxelMeshComponentSpawnParameter::StaticStruct());
 }
 
 void FWHFrameworkModule::ShutdownModule()
@@ -60,5 +58,5 @@ void FWHFrameworkModule::ShutdownModule()
 }
 
 #undef LOCTEXT_NAMESPACE
-	
+
 IMPLEMENT_MODULE(FWHFrameworkModule, WHFramework)

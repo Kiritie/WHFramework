@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "Parameter/ParameterTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "UObject/Interface.h"
 #include "SceneContainerInterface.generated.h"
@@ -14,7 +15,7 @@ class USceneContainerInterface : public UInterface
 };
 
 /**
- * 
+ *
  */
 class WHFRAMEWORK_API ISceneContainerInterface
 {
@@ -29,9 +30,15 @@ public:
 
 	virtual bool RemoveSceneActor(AActor* InActor) = 0;
 
-	virtual void LoadSceneActors(const FParameter& InSaveData) {}
+	virtual void LoadSceneActors(const FParameter& InSaveData)
+	{
+	}
 
-	virtual void SpawnSceneActors() {}
+	virtual void SpawnSceneActors()
+	{
+	}
 
-	virtual void DestroySceneActors() {}
+	virtual void DestroySceneActors()
+	{
+	}
 };

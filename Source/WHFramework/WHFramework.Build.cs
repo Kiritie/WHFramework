@@ -26,6 +26,8 @@ public class WHFramework : ModuleRules
 				"GameplayTags",
 				"GameplayTasks",
 				"GameplayAbilities",
+				"ProceduralMeshComponent",
+				"PhysicsCore",
 				"StructUtils",
 				"WHFrameworkCore",
 				"WHFrameworkSlate"
@@ -36,6 +38,7 @@ public class WHFramework : ModuleRules
 			new string[]
 			{
 				"RHI",
+				"RenderCore",
 				"UMG",
 				"Slate",
 				"Paper2D",
@@ -49,7 +52,6 @@ public class WHFramework : ModuleRules
 				"ApplicationCore",
 				"ImageWrapper",
 				"ImageWriteQueue",
-				"ProceduralMeshComponent",
 				"DeveloperSettings",
 				"LevelSequence",
 				"MovieScene",

@@ -14,6 +14,7 @@
 #include "Input/Components/InputComponentBase.h"
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainModule.h"
+#include "Voxel/Network/VoxelModuleNetworkComponent.h"
 
 AWHPlayerController::AWHPlayerController()
 {
@@ -21,6 +22,7 @@ AWHPlayerController::AWHPlayerController()
 
 	WidgetInteractionComp = CreateDefaultSubobject<UWidgetInteractionComponent>(FName("WidgetInteractionComp"));
 	WidgetInteractionComp->SetupAttachment(RootComponent);
+	VoxelNetworkComponent = CreateDefaultSubobject<UVoxelModuleNetworkComponent>(TEXT("VoxelNetworkComponent"));
 
 	InteractionRaycastMode = EInteractionRaycastMode::None;
 	InteractionDistance = 100000.f;
@@ -35,13 +37,23 @@ void AWHPlayerController::OnInitialize_Implementation()
 
 void AWHPlayerController::OnPreparatory_Implementation()
 {
-	for(const auto Iter : AMainModule::GetAllModule())
+	for (const auto Module : AMainModule::GetAllModule())
 	{
-		if(Iter->ModuleNetworkComponent)
+		if (!Module || !Module->ModuleNetworkComponent)
 		{
-			UModuleNetworkComponentBase* NetworkComponent = NewObject<UModuleNetworkComponentBase>(this, Iter->ModuleNetworkComponent, *FString::Printf(TEXT("%sNetworkComp"), *Iter->ModuleName.ToString()));
-			NetworkComponent->RegisterComponent();
+			continue;
 		}
+		if (Module->ModuleNetworkComponent->IsChildOf(UVoxelModuleNetworkComponent::StaticClass()))
+		{
+			continue;
+		}
+		if (GetComponentByClass(Module->ModuleNetworkComponent))
+		{
+			continue;
+		}
+		UModuleNetworkComponentBase* Component = NewObject<UModuleNetworkComponentBase>(
+		    this, Module->ModuleNetworkComponent, *FString::Printf(TEXT("%sNetworkComp"), *Module->ModuleName.ToString()));
+		Component->RegisterComponent();
 	}
 }
 
@@ -52,16 +64,15 @@ void AWHPlayerController::OnRefresh_Implementation(float DeltaSeconds)
 
 void AWHPlayerController::OnTermination_Implementation()
 {
-	
 }
 
 void AWHPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if(Execute_IsUseDefaultLifecycle(this))
+	if (Execute_IsUseDefaultLifecycle(this))
 	{
-		if(!Execute_IsInitialized(this))
+		if (!Execute_IsInitialized(this))
 		{
 			Execute_OnInitialize(this);
 		}
@@ -73,7 +84,7 @@ void AWHPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
-	if(Execute_IsUseDefaultLifecycle(this))
+	if (Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnTermination(this);
 	}
@@ -97,24 +108,27 @@ void AWHPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 
-	ensureEditorMsgf(InputComponent->IsA<UInputComponentBase>(), FString::Printf(TEXT("Invalid InputComponent in DefaultInput.ini, must be InputComponentBase!")), EDC_Input, EDV_Error);
+	ensureEditorMsgf(InputComponent->IsA<UInputComponentBase>(),
+	                 FString::Printf(TEXT("Invalid InputComponent in DefaultInput.ini, must be InputComponentBase!")),
+	                 EDC_Input,
+	                 EDV_Error);
 }
 
 void AWHPlayerController::InitPlayerState()
 {
 	Super::InitPlayerState();
 
-	if(AWHPlayerState* WHPlayerState = Cast<AWHPlayerState>(PlayerState))
+	if (AWHPlayerState* WHPlayerState = Cast<AWHPlayerState>(PlayerState))
 	{
 		WHPlayerState->Execute_OnInitialize(WHPlayerState);
 	}
 }
 
-void AWHPlayerController::Tick(float DeltaSeconds) 
+void AWHPlayerController::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	if(Execute_IsUseDefaultLifecycle(this))
+	if (Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnRefresh(this, DeltaSeconds);
 	}
@@ -122,8 +136,9 @@ void AWHPlayerController::Tick(float DeltaSeconds)
 
 void AWHPlayerController::RefreshInteraction_Implementation()
 {
-	if(UCommonModuleStatics::GetLocalPlayerNum() > 1) return;
-	
+	if (UCommonModuleStatics::GetLocalPlayerNum() > 1)
+		return;
+
 	FHitResult HitResult;
 
 	switch (InteractionRaycastMode)
@@ -138,17 +153,18 @@ void AWHPlayerController::RefreshInteraction_Implementation()
 			RaycastSingleFromMousePosition(InteractionDistance, ECC_Visibility, {}, HitResult);
 			break;
 		}
-		default: break;
+		default:
+			break;
 	}
-	
-	if(HitResult.bBlockingHit)
+
+	if (HitResult.bBlockingHit)
 	{
 		AActor* HitActor = HitResult.GetActor();
-		if(HoveringInteraction.GetObject())
+		if (HoveringInteraction.GetObject())
 		{
-			if(HitActor->Implements<UInteractionAgentInterface>())
+			if (HitActor->Implements<UInteractionAgentInterface>())
 			{
-				if(HitActor == HoveringInteraction.GetObject())
+				if (HitActor == HoveringInteraction.GetObject())
 				{
 					IInteractionAgentInterface::Execute_OnHovering(HoveringInteraction.GetObject());
 				}
@@ -166,20 +182,20 @@ void AWHPlayerController::RefreshInteraction_Implementation()
 				HoveringInteraction = nullptr;
 			}
 		}
-		else if(HitActor->Implements<UInteractionAgentInterface>())
+		else if (HitActor->Implements<UInteractionAgentInterface>())
 		{
 			HoveringInteraction = HitActor;
 			IInteractionAgentInterface::Execute_OnBeginHover(HoveringInteraction.GetObject());
 			IInteractionAgentInterface::Execute_OnHovering(HoveringInteraction.GetObject());
 		}
-		
-		if(UCommonModuleStatics::HasMouseCapture() && HoveringInteraction.GetObject())
+
+		if (UCommonModuleStatics::HasMouseCapture() && HoveringInteraction.GetObject())
 		{
 			IInteractionAgentInterface::Execute_OnEndHover(HoveringInteraction.GetObject());
 			HoveringInteraction = nullptr;
 		}
 	}
-	else if(HoveringInteraction.GetObject())
+	else if (HoveringInteraction.GetObject())
 	{
 		IInteractionAgentInterface::Execute_OnEndHover(HoveringInteraction.GetObject());
 		HoveringInteraction = nullptr;
@@ -188,33 +204,35 @@ void AWHPlayerController::RefreshInteraction_Implementation()
 
 void AWHPlayerController::SetSelectedInteraction(TScriptInterface<IInteractionAgentInterface> InInteractionAgent)
 {
-	if(InInteractionAgent.GetObject())
+	if (InInteractionAgent.GetObject())
 	{
-		if(!SelectedInteraction.GetObject())
+		if (!SelectedInteraction.GetObject())
 		{
 			SelectedInteraction = InInteractionAgent;
 			IInteractionAgentInterface::Execute_OnSelected(SelectedInteraction.GetObject());
 		}
-		else if(SelectedInteraction != InInteractionAgent)
+		else if (SelectedInteraction != InInteractionAgent)
 		{
 			IInteractionAgentInterface::Execute_OnDeselected(SelectedInteraction.GetObject());
 			SelectedInteraction = InInteractionAgent;
 			IInteractionAgentInterface::Execute_OnSelected(SelectedInteraction.GetObject());
 		}
 	}
-	else if(SelectedInteraction.GetObject())
+	else if (SelectedInteraction.GetObject())
 	{
 		IInteractionAgentInterface::Execute_OnDeselected(SelectedInteraction.GetObject());
 		SelectedInteraction = nullptr;
 	}
 }
 
-bool AWHPlayerController::RaycastSingleFromScreenPosition(FVector2D InScreenPosition, float InRayDistance, ECollisionChannel InGameTraceChannel, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
+bool AWHPlayerController::RaycastSingleFromScreenPosition(
+    FVector2D InScreenPosition, float InRayDistance, ECollisionChannel InGameTraceChannel, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
 {
-	if(UInputModuleStatics::GetGlobalInputMode() == EInputMode::None || UInputModuleStatics::GetGlobalInputMode() == EInputMode::UIOnly) return false;
+	if (UInputModuleStatics::GetGlobalInputMode() == EInputMode::None || UInputModuleStatics::GetGlobalInputMode() == EInputMode::UIOnly)
+		return false;
 
 	FVector SightPos, RayDirection;
-	if(DeprojectScreenPositionToWorld(InScreenPosition.X, InScreenPosition.Y, SightPos, RayDirection))
+	if (DeprojectScreenPositionToWorld(InScreenPosition.X, InScreenPosition.Y, SightPos, RayDirection))
 	{
 		const FVector RayStart = PlayerCameraManager->GetCameraLocation();
 		const ACameraManagerBase* CameraManager = UCameraModuleStatics::GetCameraManager();
@@ -222,44 +240,55 @@ bool AWHPlayerController::RaycastSingleFromScreenPosition(FVector2D InScreenPosi
 		TArray<AActor*> IgnoreActors = InIgnoreActors;
 		IgnoreActors.AddUnique(GetPawn());
 		IgnoreActors.AddUnique(GetPlayerPawn());
-		return UKismetSystemLibrary::LineTraceSingle(this, RayStart, RayEnd, UEngineTypes::ConvertToTraceType(InGameTraceChannel), false, IgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
+		return UKismetSystemLibrary::LineTraceSingle(
+		    this, RayStart, RayEnd, UEngineTypes::ConvertToTraceType(InGameTraceChannel), false, IgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
 	}
 	return false;
 }
 
-bool AWHPlayerController::RaycastSingleFromViewportPosition(FVector2D InViewportPosition, float InRayDistance, ECollisionChannel InGameTraceChannel, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
+bool AWHPlayerController::RaycastSingleFromViewportPosition(
+    FVector2D InViewportPosition, float InRayDistance, ECollisionChannel InGameTraceChannel, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
 {
 	int32 ViewportSizeX, ViewportSizeY;
 	GetViewportSize(ViewportSizeX, ViewportSizeY);
-	return RaycastSingleFromScreenPosition(FVector2D(ViewportSizeX * InViewportPosition.X, ViewportSizeY * InViewportPosition.Y), InRayDistance, InGameTraceChannel, InIgnoreActors, OutHitResult);
+	return RaycastSingleFromScreenPosition(
+	    FVector2D(ViewportSizeX * InViewportPosition.X, ViewportSizeY * InViewportPosition.Y), InRayDistance, InGameTraceChannel, InIgnoreActors, OutHitResult);
 }
 
-bool AWHPlayerController::RaycastSingleFromMousePosition(float InRayDistance, ECollisionChannel InGameTraceChannel, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
+bool AWHPlayerController::RaycastSingleFromMousePosition(float InRayDistance,
+                                                         ECollisionChannel InGameTraceChannel,
+                                                         const TArray<AActor*>& InIgnoreActors,
+                                                         FHitResult& OutHitResult)
 {
-	if(!bShowMouseCursor) return false;
+	if (!bShowMouseCursor)
+		return false;
 
 	float MousePosX, MousePosY;
 	GetMousePosition(MousePosX, MousePosY);
 	return RaycastSingleFromScreenPosition(FVector2D(MousePosX, MousePosY), InRayDistance, InGameTraceChannel, InIgnoreActors, OutHitResult);
 }
 
-bool AWHPlayerController::RaycastSingleFromAimPosition(float InRayDistance, ECollisionChannel InGameTraceChannel, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
+bool AWHPlayerController::RaycastSingleFromAimPosition(float InRayDistance,
+                                                       ECollisionChannel InGameTraceChannel,
+                                                       const TArray<AActor*>& InIgnoreActors,
+                                                       FHitResult& OutHitResult)
 {
 	return RaycastSingleFromViewportPosition(GetAnimPosition(), InRayDistance, InGameTraceChannel, InIgnoreActors, OutHitResult);
 }
 
 void AWHPlayerController::SetPlayerPawn(APawn* InPlayerPawn)
 {
-	if(InPlayerPawn && !InPlayerPawn->Implements<UWHPlayerInterface>()) return;
+	if (InPlayerPawn && !InPlayerPawn->Implements<UWHPlayerInterface>())
+		return;
 
-	if(PlayerPawn != InPlayerPawn)
+	if (PlayerPawn != InPlayerPawn)
 	{
-		if(PlayerPawn)
+		if (PlayerPawn)
 		{
 			PlayerPawn->OnDestroyed.RemoveAll(this);
 		}
 		PlayerPawn = InPlayerPawn;
-		if(PlayerPawn)
+		if (PlayerPawn)
 		{
 			PlayerPawn->OnDestroyed.AddDynamic(this, &AWHPlayerController::OnPlayerDestroyed);
 		}

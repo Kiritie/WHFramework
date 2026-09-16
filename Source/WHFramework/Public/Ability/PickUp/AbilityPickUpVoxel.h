@@ -1,32 +1,45 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
-#include "AbilityPickUpBase.h"
-
+#include "UObject/PrimaryAssetId.h"
+#include "Ability/PickUp/AbilityPickUpBase.h"
 #include "AbilityPickUpVoxel.generated.h"
-
 class UVoxelMeshComponent;
-/**
- * 可拾取体素
- */
+class UVoxelChunk;
 UCLASS()
 class WHFRAMEWORK_API AAbilityPickUpVoxel : public AAbilityPickUpBase
 {
 	GENERATED_BODY()
-
 public:
 	AAbilityPickUpVoxel();
-
-public:
-	virtual void LoadData(const FParameter& InSaveData, EPhase InPhase) override;
-
-protected:
-	virtual void OnPickUp(IAbilityPickerInterface* InPicker) override;
-
-protected:
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	UVoxelMeshComponent* MeshComponent;
-
-public:
+	static AAbilityPickUpVoxel* CreateReserved(UWorld* World, const FAbilityItem& Item, const FVector& Location, UVoxelChunk* Column);
+	void ActivateReserved();
+	virtual void SetContainer_Implementation(const TScriptInterface<ISceneContainerInterface>& Container) override;
+	virtual void Tick(float DeltaSeconds) override;
+	virtual void LoadData(const FParameter& Data, EPhase Phase) override;
+	virtual FParameter ToData() override;
 	virtual UMeshComponent* GetMeshComponent() const override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out) const override;
+
+protected:
+	virtual void OnPickUp(IAbilityPickerInterface* Picker) override;
+	virtual void OnBeginOverlap(
+	    UPrimitiveComponent* Component, AActor* Actor, UPrimitiveComponent* OtherComponent, int32 BodyIndex, bool bSweep, const FHitResult& Hit) override;
+	virtual void OnEnterInteract(IInteractionAgentInterface* Agent) override;
+	UFUNCTION()
+	void OnRepState();
+	UPROPERTY(ReplicatedUsing = OnRepState)
+	FPrimaryAssetId RepID;
+	UPROPERTY(ReplicatedUsing = OnRepState)
+	int32 RepCount = 0;
+	UPROPERTY(ReplicatedUsing = OnRepState)
+	int32 RepLevel = 0;
+	UPROPERTY(ReplicatedUsing = OnRepState)
+	bool bActivated = false;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UVoxelMeshComponent>> DisplayMeshes;
+	UPROPERTY(Transient)
+	TObjectPtr<UVoxelChunk> OwningColumn;
+
+private:
+	bool BuildVisual();
+	bool bVisualDirty = true;
 };

@@ -1,4 +1,5 @@
 #pragma once
+#include "Camera/Mode/CameraModeBase.h"
 
 #include "CameraModuleTypes.h"
 #include "Debug/DebuggerInterface.h"
@@ -87,16 +88,31 @@ public:
 
 	void UnregisterShotAnchor(ACameraShotAnchor* InAnchor);
 
-	const TArray<TWeakObjectPtr<ACameraShotAnchor>>& GetShotAnchors() const { return ShotAnchors; }
+	const TArray<TWeakObjectPtr<ACameraShotAnchor>>& GetShotAnchors() const
+	{
+		return ShotAnchors;
+	}
 
-	TSubclassOf<ACameraRigBase> GetDefaultRigClass() const { return DefaultRigClass; }
+	TSubclassOf<ACameraRigBase> GetDefaultRigClass() const
+	{
+		return DefaultRigClass;
+	}
 
-	TSubclassOf<UCameraModeBase> GetDefaultModeClass() const { return DefaultModeClass; }
+	TSubclassOf<UCameraModeBase> GetDefaultModeClass() const
+	{
+		return DefaultModeClass;
+	}
 
 	UFUNCTION(BlueprintPure, Category = "CameraModule")
-	const FCameraConfig& GetCameraConfig() const { return CameraConfig; }
+	const FCameraConfig& GetCameraConfig() const
+	{
+		return CameraConfig;
+	}
 
-	const FCameraUserSettings& GetUserSettings() const { return UserSettings; }
+	const FCameraUserSettings& GetUserSettings() const
+	{
+		return UserSettings;
+	}
 
 	void ApplyUserSettings(const FCameraUserSettings& InSettings);
 };

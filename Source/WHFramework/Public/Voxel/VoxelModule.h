@@ -1,392 +1,288 @@
 #pragma once
-
-#include "Containers/Queue.h"
-#include "VoxelModuleTypes.h"
-#include "Voxel/Save/VoxelRegionStore.h"
-#include "Chunks/VoxelChunk.h"
-#include "Common/CommonModuleTypes.h"
+#include "CoreMinimal.h"
 #include "Main/Base/ModuleBase.h"
+#include "Voxel/Interaction/VoxelRaycast.h"
+#include "Voxel/Network/VoxelNetworkTypes.h"
+#include "Voxel/Runtime/VoxelStreaming.h"
+#include "Voxel/Runtime/VoxelWorldRuntime.h"
+#include "Voxel/Save/VoxelWorldSaveAdapter.h"
+#include "Voxel/Tasks/VoxelTaskScheduler.h"
+#include "Voxel/VoxelModuleTypes.h"
 
 #include "VoxelModule.generated.h"
 
-class AVoxelRoot;
-class UVoxelGenerator;
-class AVoxelCapture;
+class UVoxelModuleNetworkComponent;
 class UVoxelChunk;
-class UVoxelData;
-class ACharacterBase;
-class UWorldTimer;
-class UWorldWeather;
-class AVoxelEntityCapture;
-class UDataTable;
-class FSaveGameStorage;
+class UVoxelMaterialSet;
+class APlayerController;
+class UAbilityInventoryBase;
+class UVoxelAgentComponent;
+DECLARE_MULTICAST_DELEGATE_OneParam(FVoxelBlocksCommitted, const FVoxelEditBatch&);
+DECLARE_MULTICAST_DELEGATE_TwoParams(FVoxelRemoteBatchCompleted, const FVoxelSnapshotBatch&, bool);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FVoxelWorldInitialized);
 
-/**
- * 体素模块
- */
+struct WHFRAMEWORK_API FVoxelModuleSaveCapture
+{
+	FVoxelWorldSaveCapture Voxels;
+	TMap<FString, TArray<uint8>> SceneFiles;
+};
 UCLASS()
 class WHFRAMEWORK_API UVoxelModule : public UModuleBase
 {
 	GENERATED_BODY()
 
-	friend class UVoxelChunk;
-	
 	GENERATED_MODULE(UVoxelModule)
 
-public:	
+public:
 	UVoxelModule();
 
-	~UVoxelModule();
+	virtual ~UVoxelModule();
 
 	//////////////////////////////////////////////////////////////////////////
 public:
 #if WITH_EDITOR
-	virtual void OnGenerate() override;
-
 	virtual void OnDestroy() override;
 #endif
 
 	virtual void OnInitialize() override;
 
-	virtual void OnPreparatory(EPhase InPhase) override;
+	virtual void OnPreparatory(EPhase Phase) override;
 
 	virtual void OnRefresh(float DeltaSeconds, bool bInEditor) override;
 
-	virtual void OnPause() override;
-
-	virtual void OnUnPause() override;
-
-	virtual void OnTermination(EPhase InPhase) override;
-
-public:
-	virtual void Load_Implementation() override;
-
-	virtual void Save_Implementation() override;
-
-public:
-	virtual FString GetModuleDebugMessage() override;
+	virtual void OnTermination(EPhase Phase) override;
 
 	//////////////////////////////////////////////////////////////////////////
-protected:
-	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Root")
-	AVoxelRoot* VoxelRoot;
-
 public:
-	UFUNCTION(BlueprintPure)
-	AVoxelRoot* GetVoxelRoot() const { return VoxelRoot; }
-	
-	//////////////////////////////////////////////////////////////////////////
-protected:
-	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Capture")
-	AVoxelCapture* VoxelCapture;
+	virtual UWorld* GetWorld() const override;
 
-	UPROPERTY(Transient)
-	TArray<AVoxelEntityCapture*> CaptureVoxels;
+	virtual bool IsSaveEnabled() const override;
 
-public:
-	UFUNCTION(BlueprintPure)
-	AVoxelCapture* GetVoxelCapture() const { return VoxelCapture; }
+	virtual void OnBeforeSaveData() override;
+
+	virtual void OnAfterSaveData(bool bSuccess) override;
 
 	//////////////////////////////////////////////////////////////////////////
-protected:
-	UPROPERTY(EditAnywhere, Category = "World")
-	bool bAutoGenerate;
-
-	UPROPERTY(EditAnywhere, Category = "World")
-	EVoxelWorldMode WorldMode;
-
-	UPROPERTY(VisibleAnywhere, Category = "World")
-	EVoxelWorldState WorldState;
-
-	UPROPERTY(EditAnywhere, Category = "World")
-	FVoxelWorldBasicSaveData WorldBasicData;
-	
-	UPROPERTY(VisibleAnywhere, Category = "World")
-	FIndex WorldCenterIndex;
-	
-	UPROPERTY(VisibleAnywhere, Category = "World")
-	FIndex WorldAgentIndex;
-
 public:
-	UFUNCTION(BlueprintPure)
-	EVoxelWorldMode GetWorldMode() const { return WorldMode; }
+	bool BeginProjectMutation()
+	{
+		if (bMutating || !IsAuthority() || !IsReady())
+			return false;
+		bMutating = true;
+		return true;
+	}
+	void EndProjectMutation()
+	{
+		bMutating = false;
+	}
+	void PublishProjectEdit(const FVoxelEditBatch& Batch)
+	{
+		OnBlocksCommitted.Broadcast(Batch);
+	}
 
-	UFUNCTION(BlueprintCallable)
+	bool CreateWorld(const FVoxelGenerationSettings& Settings, int32 BlockSizeCentimeters, FString& Error);
+
+	bool StartWorld(const FVoxelWorldManifest& Manifest, bool bFromServer, FString& Error);
+
+	bool StopWorld(bool bDiscardDirty, FString& Error);
+
+	bool ValidateWorldData(const FParameter& Data, FString& Error) const;
+
+	bool IsAuthority() const;
+
+	bool IsReady() const
+	{
+		return bool(Runtime) && WorldState == EVoxelWorldState::Running;
+	}
+
+	float GetWarmupProgress() const;
+
+	double BlockSize() const
+	{
+		return Manifest.BlockSizeCentimeters;
+	}
+	const FVoxelWorldManifest& GetManifest() const
+	{
+		return Manifest;
+	}
+	FGuid GetSessionId() const
+	{
+		return SessionId;
+	}
+	FVoxelWorldRuntime* GetRuntime()
+	{
+		return Runtime.Get();
+	}
+	const FVoxelWorldRuntime* GetRuntime() const
+	{
+		return Runtime.Get();
+	}
+	TSharedPtr<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> GetRegistry() const
+	{
+		return Registry.GetSnapshot();
+	}
+	TSharedPtr<const FVoxelShapeRegistry, ESPMode::ThreadSafe> GetShapes() const
+	{
+		return Shapes;
+	}
+	UVoxelMaterialSet* GetMaterialSet() const
+	{
+		return MaterialSet;
+	}
+	TSharedPtr<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> GetGenerator() const
+	{
+		return Generator;
+	}
+
+	UVoxelChunk* GetColumn(FIntPoint Key, bool bCreate = false);
+
+	AActor* FindSceneActor(const FGuid& ID) const;
+	FGuid RegisterSource(UObject* Owner, const FVoxelStreamingSource& Source);
+	bool UpdateSource(const FGuid& ID, const FVoxelStreamingSource& Source);
+	void UnregisterSource(const FGuid& ID);
+	bool QueueRemoteEncoded(const TArray<uint8>& Payload, FString& Error);
+	bool QueueNetworkEncode(const FVoxelSnapshotBatch& Batch, UVoxelModuleNetworkComponent* Recipient);
+	bool QueueRemoteBatch(const FVoxelSnapshotBatch& Batch, FString& Error);
+	bool CopyOverlay(const FVoxelSectionKey& Key, FVoxelSectionOverlay& Out) const;
+	FVoxelTraceResult Trace(const FVector& Start, const FVector& Direction, double Distance = 600) const;
+	bool VerifyView(APlayerController* PC, AActor* AuthorizedObserver, const FVoxelEditIntent& Intent, FVoxelTraceResult& Out, FString& Error) const;
+	FVoxelEditReply ExecuteIntent(APlayerController* PC, AActor* Source, const FVoxelEditIntent& Intent, bool bTrustedStandaloneCreative = false);
+	bool ApplyPrefab(const FVoxelPrefabSaveData& Prefab, const FIntVector& Origin, FString& Error);
+	bool ExportPrefab(const FIntVector& Min, const FIntVector& Max, FVoxelPrefabSaveData& Out, FString& Error) const;
+	virtual TUniquePtr<FVoxelWorldSaveData> NewWorldData(const FParameter& Basic = FParameter()) const;
+	const FVoxelWorldSaveData& GetWorldData() const
+	{
+		return *WorldData;
+	}
+	const FVoxelWorldBasicSaveData& GetWorldBasicData() const
+	{
+		return WorldBasicData;
+	}
+	EVoxelWorldState GetWorldState() const
+	{
+		return WorldState;
+	}
+	EVoxelWorldMode GetWorldMode() const
+	{
+		return WorldMode;
+	}
+
 	void SetWorldMode(EVoxelWorldMode InWorldMode);
 
-	UFUNCTION(BlueprintPure)
-	EVoxelWorldState GetWorldState() const { return WorldState; }
+	void SetActiveSaveSource(const FGuid& SaveId, int32 Generation, FSaveGameStorage* Storage);
 
-	UFUNCTION(BlueprintPure)
-	FVoxelWorldBasicSaveData& GetWorldBasicData() { return WorldBasicData; }
-
-	UFUNCTION(BlueprintPure)
-	FIndex GetWorldCenterIndex() const { return WorldCenterIndex; }
-
-	UFUNCTION(BlueprintPure)
-	FIndex GetWorldAgentIndex() const { return WorldAgentIndex; }
-
-protected:
-	UFUNCTION(BlueprintCallable)
-	void SetWorldState(EVoxelWorldState InWorldState);
-
-protected:
-	virtual void OnWorldModeChanged();
-
-	virtual void OnWorldStateChanged();
-
-	virtual void OnWorldCenterChanged();
-
-	virtual void OnWorldAgentMoved();
-
-protected:
-	TUniquePtr<FVoxelWorldSaveData> WorldData;
-	
-public:
-	template<class T>
-	T& GetWorldData() const
+	bool CopySaveCapture(FVoxelModuleSaveCapture& Out, FString& Error) const;
+	void SetPendingCommitDirectory(const FString& Directory)
 	{
-		return static_cast<T&>(GetWorldData());
+		PendingCommitDirectory = Directory;
 	}
-	FVoxelWorldSaveData& GetWorldData() const;
+	static bool WriteSaveCapture(const FVoxelModuleSaveCapture& Capture, const FString& TempGeneration, FString& Error);
 
-	virtual TUniquePtr<FVoxelWorldSaveData> NewWorldData(const FParameter& InBasicData = FParameter()) const;
+	//////////////////////////////////////////////////////////////////////////
+public:
+	FVoxelBlocksCommitted OnBlocksCommitted;
 
-	virtual float GetWorldGeneratePercent() const;
-	
-	virtual FBox GetWorldBounds(float InRadius = 0.f, float InHalfHeight = 0.f) const;
+	FVoxelRemoteBatchCompleted OnRemoteBatchCompleted;
 
+	UPROPERTY(BlueprintAssignable)
+	FVoxelWorldInitialized OnWorldInitialized;
+
+	//////////////////////////////////////////////////////////////////////////
 protected:
-	virtual void LoadData(const FParameter& InSaveData, EPhase InPhase) override;
+	virtual void LoadData(const FParameter& Data, EPhase Phase) override;
 
 	virtual FParameter GetData() override;
 
 	virtual FParameter ToData() override;
 
-	virtual void UnloadData(EPhase InPhase) override;
+	virtual void UnloadData(EPhase Phase) override;
 
-public:
-	virtual void OnBeforeSaveData() override;
-	virtual void OnAfterSaveData(bool bSuccess) override;
-	void SetActiveSaveSource(const FGuid& SaveId, int32 Generation, FSaveGameStorage* Storage);
-	void ClearActiveSaveSource();
-	bool WritePendingRegionsToGeneration(const FGuid& SaveId, int32 Generation, FSaveGameStorage& Storage);
-
-public:
-	virtual void LoadPrefabData(const FVoxelPrefabSaveData& InPrefabData);
-
-	virtual FVoxelPrefabSaveData GetPrefabData();
-
+	//////////////////////////////////////////////////////////////////////////
 protected:
-	virtual void GenerateWorld();
-	
-public:
-	virtual UVoxelChunk* SpawnChunk(FIndex InIndex, bool bAddToQueue = true);
+	UPROPERTY(EditAnywhere)
+	FVoxelWorldBasicSaveData WorldBasicData;
 
-	virtual void LoadChunkMap(FIndex InIndex);
+	UPROPERTY(EditAnywhere)
+	bool bAutoGenerate = false;
 
-	virtual void BuildChunkMap(FIndex InIndex, int32 InStage);
-
-	virtual void SpawnChunkMesh(FIndex InIndex, int32 InStage);
-
-	virtual void BuildChunkMesh(FIndex InIndex);
-
-	virtual void GenerateChunk(FIndex InIndex);
-
-	virtual void SaveChunk(FIndex InIndex);
-
-	virtual void UnloadChunk(FIndex InIndex);
-	
-public:
-	virtual void GenerateChunkQueues(bool bFromAgent = true, bool bForce = false);
-
-	virtual void ResetChunkQueues();
-
-protected:
-	virtual bool UpdateChunkQueue(EVoxelWorldState InState, TFunction<void(FIndex)> InFunc);
-	
-	virtual bool UpdateChunkQueue(EVoxelWorldState InState, TFunction<void(FIndex, int32)> InFunc);
-
-	virtual void UpdateChunkQueueThreads();
-
-	virtual bool DispatchChunkQueue(FVoxelChunkQueue& InQueue, const TFunction<void(FIndex, int32)>& InFunc, int32 InStage, const TArray<UVoxelGenerator*>& InGenerators);
-
-	virtual void CancelChunkQueueBatch();
-
-	virtual void SortChunkQueue(EVoxelWorldState InState, FVoxelChunkQueue& InQueue);
-
-	virtual void ShutdownChunkQueueThreads();
-
-	virtual void AddToChunkQueue(EVoxelWorldState InState, FIndex InIndex);
-	
-	virtual void RemoveFromChunkQueue(EVoxelWorldState InState, FIndex InIndex);
-
-public:
-	virtual bool IsOnTheWorld(FIndex InIndex, bool bIgnoreZ = true) const;
-
-	virtual UVoxelChunk* GetChunkByIndex(FIndex InIndex) const;
-
-	void ForEachChunk(TFunctionRef<void(const UVoxelChunk&)> InVisitor) const;
-
-	virtual UVoxelChunk* GetChunkByLocation(FVector InLocation) const;
-
-	virtual UVoxelChunk* GetChunkByVoxelIndex(FIndex InIndex) const;
-		
-	virtual bool HasVoxelByIndex(FIndex InIndex, bool bSafe = false);
-
-	virtual bool HasVoxelByLocation(FVector InLocation, bool bSafe = false);
-
-	virtual FVoxelItem& GetVoxelByIndex(FIndex InIndex, bool bMainPart = false);
-
-	virtual FVoxelItem& GetVoxelByLocation(FVector InLocation, bool bMainPart = false);
-	
-	virtual void SetVoxelByIndex(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bSafe = false);
-	
-	virtual void SetVoxelByLocation(FVector InLocation, const FVoxelItem& InVoxelItem, bool bSafe = false);
-
-public:
-	virtual void AddToVoxelUpdateQueue(FIndex InIndex);
-
-	virtual void AddToVoxelLiquidUpdateQueue(FIndex InIndex);
-
-protected:
-	virtual void UpdateVoxelQueue();
-
-	virtual void ApplyVoxelUpdates(const TMap<FIndex, FVoxelItem>& InVoxelMap, TSet<FIndex>& OutChangedChunkIndices);
-
-public:
-	virtual const FVoxelTopography& GetTopographyByIndex(FIndex InIndex);
-
-	virtual const FVoxelTopography& GetTopographyByLocation(FVector InLocation);
-
-	virtual void SetTopographyByIndex(FIndex InIndex, const FVoxelTopography& InTopography);
-
-	virtual void SetTopographyByLocation(FVector InLocation, const FVoxelTopography& InTopography);
-
-	FVoxelTopography SampleBaseTopographyByIndex(FIndex InIndex) const;
-
-	FVoxelTopography SampleTopographyByIndex(FIndex InIndex) const;
-
-	UFUNCTION(BlueprintPure)
-	EVoxelRegionType GetWorldRegionByIndex(FIndex InIndex) const;
-
-public:
-	virtual float GetVoxelNoise1D(float InValue, bool bAbs = false, bool bUnsigned = false) const;
-
-	virtual float GetVoxelNoise2D(FVector2D InLocation, bool bAbs = false, bool bUnsigned = false) const;
-
-	virtual float GetVoxelNoise3D(FVector InLocation, bool bAbs = false, bool bUnsigned = false) const;
-
-public:
-	virtual FIndex LocationToChunkIndex(FVector InLocation) const;
-
-	virtual FVector ChunkIndexToLocation(FIndex InIndex) const;
-
-	virtual FIndex ChunkIndexToVoxelIndex(FIndex InIndex) const;
-
-	virtual FIndex LocationToVoxelIndex(FVector InLocation) const;
-
-	virtual FVector VoxelIndexToLocation(FIndex InIndex) const;
-
-	virtual FIndex VoxelIndexToChunkIndex(FIndex InIndex) const;
-
-	virtual uint64 VoxelIndexToNumber(FIndex InIndex, bool bWorldSpace = false) const;
-
-	virtual FIndex NumberToVoxelIndex(uint64 InNumber, bool bWorldSpace = false) const;
-
-public:
-	virtual bool VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult);
-
-	virtual bool VoxelRaycastSinge(EVoxelRaycastType InRaycastType, float InDistance, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult);
-
-	virtual bool VoxelItemTraceSingle(const FVoxelItem& InVoxelItem, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult);
-
-	virtual bool VoxelAgentTraceSingle(FIndex InChunkIndex, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock = false, int32 InMaxCount = 1, bool bFromCenter = false, bool bForce = false);
-
-	virtual bool VoxelAgentTraceSingle(FVector InLocation, FVector2D InRange, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock = false, int32 InMaxCount = 1, bool bFromCenter = false, bool bForce = false);
-
-	virtual bool VoxelAgentTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bCheckVoxel = false);
-
-protected:
-	UPROPERTY(EditAnywhere, Category = "Chunk")
+	UPROPERTY(EditAnywhere)
+	EVoxelWorldMode WorldMode = EVoxelWorldMode::Default;
+	UPROPERTY(Transient)
+	EVoxelWorldState WorldState = EVoxelWorldState::None;
+	UPROPERTY(EditAnywhere)
 	TSubclassOf<UVoxelChunk> ChunkSpawnClass;
-
-	UPROPERTY(EditAnywhere, Category = "Chunk")
-	float ChunkSpawnDistance;
-
-	UPROPERTY(EditAnywhere, Category = "Chunk")
-	TMap<EVoxelWorldState, FVoxelChunkQueues> ChunkQueues;
-
-	TArray<FVoxelChunkQueueThread*> ChunkQueueThreads;
-
-	TSharedPtr<FVoxelChunkQueueBatch, ESPMode::ThreadSafe> ActiveChunkQueueBatch;
-
-	FVoxelChunkQueue* ActiveChunkQueue;
-
-	TArray<FVoxelChunkQueueThread*> ActiveChunkQueueThreads;
-
-	TArray<UVoxelGenerator*> ActiveChunkQueueGenerators;
-
-	UPROPERTY(VisibleAnywhere, Category = "Chunk")
-	int32 ChunkSpawnBatch;
-
+	UPROPERTY(EditAnywhere)
+	TSoftObjectPtr<UVoxelMaterialSet> MaterialSetAsset;
 	UPROPERTY(Transient)
-	TMap<FIndex, UVoxelChunk*> ChunkMap;
-
-	TUniquePtr<FVoxelRegionStore> RegionStore;
-
-	TSet<FIndex> DirtyChunkIndices;
-
-	TSet<FIndex> VoxelUpdateChunkIndices;
-
-	TQueue<FIndex, EQueueMode::Mpsc> VoxelUpdateQueue;
-
-	TSet<FIndex> VoxelLiquidUpdateIndices;
-
-	TQueue<FIndex, EQueueMode::Mpsc> VoxelLiquidUpdateQueue;
-
-	float VoxelUpdateTime;
-
-	bool bVoxelUpdateRunning;
-
-public:
-	virtual int32 GetChunkNum(bool bNeedGenerated = false) const;
-
-	virtual bool IsChunkGenerated(FIndex InIndex) const;
-	
-	virtual FVoxelChunkQueues GetChunkQueues(EVoxelWorldState InWorldState) const;
-
-protected:
-	UPROPERTY(EditAnywhere, Category = "Voxel")
-	TArray<TSubclassOf<UVoxel>> VoxelClasses;
-
+	TObjectPtr<UVoxelMaterialSet> MaterialSet;
 	UPROPERTY(Transient)
-	TMap<TSubclassOf<UVoxelGenerator>, UVoxelGenerator*> VoxelGeneratorMap;
+	TMap<FIntPoint, TObjectPtr<UVoxelChunk>> Columns;
+	TUniquePtr<FVoxelWorldSaveData> WorldData;
 
-	UPROPERTY(Transient)
-	TMap<EVoxelType, FPrimaryAssetId> VoxelAssetIDMap;
-
-public:
-	template<class T>
-	T* GetVoxelGenerator() const
+	//////////////////////////////////////////////////////////////////////////
+private:
+	struct FSource
 	{
-		return Cast<T>(GetVoxelGenerator(T::StaticClass()));
-	}
-	virtual UVoxelGenerator* GetVoxelGenerator(const TSubclassOf<UVoxelGenerator>& InClass) const;
+		TWeakObjectPtr<UObject> Owner;
+		FVoxelStreamingSource Value;
+	};
+	struct FBreak
+	{
+		FIntVector Target;
+		FVoxelBlockState Expected;
+		double Began = 0;
+		double LastPulse = 0;
+	};
 
-	UFUNCTION(BlueprintPure)
-	FPrimaryAssetId VoxelTypeToAssetID(EVoxelType InVoxelType) const;
+	//////////////////////////////////////////////////////////////////////////
+private:
+	void RefreshStreaming(double Now);
 
-protected:
-	UPROPERTY(EditAnywhere, Category = "Area")
-	FName VoxelAreaNamespace;
+	void QueueSection(const FVoxelSectionKey& Key, const FVoxelSectionDemand& Demand);
+	void ApplyTask(FVoxelTaskResult&& Result);
+	void PumpRemote();
+	bool CaptureColumnForUnload(UVoxelChunk& Column, FString& Error);
+	void QueueSceneLoad(UVoxelChunk& Column, const FVoxelSection& Section);
+	bool IsActorRayClear(const FVector& Start, const FVector& End, AActor* Ignore) const;
+	bool PlacementOverlapsActors(const FVoxelInteractionPlan& Plan) const;
+	UAbilityInventoryBase* ResolveInventory(APlayerController* PC, AActor* Source) const;
+	FVoxelEditReply TransferContainer(APlayerController* PC, AActor* Source, const FVoxelEditIntent& Intent, const FVoxelTraceResult& Hit);
+	FVoxelRegistry Registry;
+	TSharedPtr<const FVoxelShapeRegistry, ESPMode::ThreadSafe> Shapes;
+	TSharedPtr<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> Generator;
+	TUniquePtr<FVoxelWorldRuntime> Runtime;
+	TUniquePtr<FVoxelTaskScheduler> Scheduler;
+	FVoxelRegionStore RegionStore;
+	FVoxelWorldSaveAdapter SaveAdapter;
 
-	FSceneArea ResolveVoxelArea(const FSceneArea& InArea, const FVector2D& InPoint) const;
+	FVoxelWorldManifest Manifest;
+	FGuid SessionId;
+	uint64 Epoch = 0;
+	TMap<FGuid, FSource> Sources;
+	TMap<FVoxelSectionKey, FVoxelSectionDemand> Desired;
+	TArray<FVoxelSectionKey> OrderedDesired;
+	int32 DispatchCursor = 0;
+	TOptional<FVoxelSnapshotBatch> RemoteInFlight;
+	TMap<FVoxelSectionKey, double> RetryAfter;
+	TMap<FVoxelSectionKey, int32> RetryCount;
+	TArray<FVoxelSnapshotBatch> RemotePending;
+	TArray<TArray<uint8>> EncodedRemotePending;
+	bool bDecodeRunning = false;
+	uint64 NextNetworkJob = 1;
+	int32 SceneTickCursor = 0;
+	TArray<FIntPoint> SceneColumnOrder;
+	TMap<uint64, TWeakObjectPtr<UVoxelModuleNetworkComponent>> NetworkRecipients;
+	TMap<uint64, FGuid> NetworkBatchIds;
 
-public:
-	FText GetVoxelAreaName(FIndex InIndex) const;
+	void PumpDecode();
 
-	FText GetVoxelAreaName(FIndex InIndex, EVoxelAreaType InAreaType) const;
+	TMap<FString, TArray<uint8>> UnloadedSceneFiles;
 
-	FText GetVoxelAreaName(FIndex InIndex, EVoxelAreaType InAreaType, const FText& InAreaName) const;
+	TMap<FString, TArray<uint8>> CapturedSceneFiles;
+	TMap<TWeakObjectPtr<AActor>, FBreak> Breaking;
+	FString LastSaveError;
+	FString PendingCommitDirectory;
+	double LastStreaming = -1;
+	bool bMutating = false;
+	bool bRemoteRunning = false;
 };

@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
+#include "Camera/Mode/CameraModeBase.h"
 
 #include "Step/StepModuleTypes.h"
 #include "Debug/DebugModuleTypes.h"
@@ -59,8 +60,8 @@ public:
 
 public:
 	/**
-	* 步骤状态改变
-	*/
+	 * 步骤状态改变
+	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnStateChanged")
 	void K2_OnStateChanged(EStepState InStepState);
 	UFUNCTION()
@@ -95,8 +96,8 @@ public:
 	UFUNCTION()
 	virtual void OnRefresh();
 	/**
-	* 步骤指引
-	*/
+	 * 步骤指引
+	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnGuide")
 	void K2_OnGuide();
 	UFUNCTION()
@@ -125,28 +126,28 @@ public:
 
 public:
 	/**
-	* 还原步骤
-	*/
+	 * 还原步骤
+	 */
 	UFUNCTION(BlueprintCallable)
 	void Restore();
 	/**
-	* 进入步骤
-	*/
+	 * 进入步骤
+	 */
 	UFUNCTION(BlueprintCallable)
 	void Enter();
 	/**
-	* 进入步骤
-	*/
+	 * 进入步骤
+	 */
 	UFUNCTION(BlueprintCallable)
 	void Refresh();
 	/**
-	* 指引步骤
-	*/
+	 * 指引步骤
+	 */
 	UFUNCTION(BlueprintCallable)
 	void Guide();
 	/**
-	* 执行步骤
-	*/
+	 * 执行步骤
+	 */
 	UFUNCTION(BlueprintCallable)
 	void Execute();
 	/**
@@ -155,8 +156,8 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void Complete(EStepExecuteResult InStepExecuteResult = EStepExecuteResult::Succeed);
 	/**
-	* 离开步骤
-	*/
+	 * 离开步骤
+	 */
 	UFUNCTION(BlueprintCallable)
 	void Leave();
 
@@ -194,33 +195,39 @@ public:
 
 public:
 	/**
-	* 获取步骤状态
-	*/
+	 * 获取步骤状态
+	 */
 	UFUNCTION(BlueprintPure)
-	EStepState GetStepState() const { return StepState; }
+	EStepState GetStepState() const
+	{
+		return StepState;
+	}
 	/**
-	* 获取步骤资产
-	*/
+	 * 获取步骤资产
+	 */
 	UFUNCTION(BlueprintPure)
 	UStepAsset* GetStepAsset() const;
 	/**
-	* 是否是根步骤
-	*/
+	 * 是否是根步骤
+	 */
 	UFUNCTION(BlueprintPure)
-	bool IsRootStep() const { return StepHierarchy == 0; }
+	bool IsRootStep() const
+	{
+		return StepHierarchy == 0;
+	}
 	/**
-	* 是否已进入
-	*/
+	 * 是否已进入
+	 */
 	UFUNCTION(BlueprintPure)
 	bool IsEntered() const;
 	/**
-	* 是否已完成
-	*/
+	 * 是否已完成
+	 */
 	UFUNCTION(BlueprintPure)
 	bool IsCompleted(bool bCheckSubs = false) const;
 	/**
-	* 能否跳过
-	*/
+	 * 能否跳过
+	 */
 	UFUNCTION(BlueprintNativeEvent, BlueprintPure)
 	bool IsSkipAble() const;
 
@@ -229,7 +236,7 @@ public:
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Operation Target")
 	TSoftObjectPtr<AActor> OperationTarget;
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
 	bool bApplyCameraAction;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "bApplyCameraAction"), Category = "Camera")
@@ -249,18 +256,17 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void ApplyCameraAction();
 	/**
-	* 获取操作目标
-	*/
-	template<class T>
-	T* GetOperationTarget() const
+	 * 获取操作目标
+	 */
+	template <class T> T* GetOperationTarget() const
 	{
 		return Cast<T>(GetOperationTarget(T::StaticClass()));
 	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	AActor* GetOperationTarget(TSubclassOf<AActor> InClass) const;
 	/**
-	* 设置操作目标
-	*/
+	 * 设置操作目标
+	 */
 	UFUNCTION(BlueprintCallable)
 	void SetOperationTarget(AActor* InOperationTarget, bool bResetCameraView = false);
 
@@ -291,23 +297,23 @@ public:
 	/// 自动离开步骤时间
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Execute/Guide")
 	float AutoLeaveStepTime;
-	/// 步骤指引类型 
+	/// 步骤指引类型
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
 	EStepGuideType StepGuideType;
-	/// 步骤指引间隔时间 
+	/// 步骤指引间隔时间
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
 	float StepGuideIntervalTime;
 
 protected:
 	FTimerHandle StartGuideTimerHandle;
-	
+
 public:
 	/**
-	* 检测步骤执行条件
-	*/
+	 * 检测步骤执行条件
+	 */
 	UFUNCTION(BlueprintPure)
 	bool CheckStepCondition(UStepBase* InStep) const;
-	
+
 	UFUNCTION(BlueprintPure)
 	EStepExecuteType GetStepExecuteType() const;
 
@@ -323,7 +329,7 @@ public:
 	/// 根步骤
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ParentStep")
 	UStepBase* RootStep;
-	/// 父步骤 
+	/// 父步骤
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ParentStep")
 	UStepBase* ParentStep;
 
@@ -343,11 +349,12 @@ public:
 	/// 子步骤
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SubStep")
 	TArray<UStepBase*> SubSteps;
+
 public:
 	/**
-	* 是否有子步骤
-	* @param bIgnoreMerge 是否忽略合并（ture => !bMergeSubStep）
-	*/
+	 * 是否有子步骤
+	 * @param bIgnoreMerge 是否忽略合并（ture => !bMergeSubStep）
+	 */
 	UFUNCTION(BlueprintPure)
 	bool HasSubStep(bool bIgnoreMerge = true) const;
 	/**
@@ -361,13 +368,13 @@ public:
 	UFUNCTION(BlueprintPure)
 	bool IsSubOf(UStepBase* InStep) const;
 	/**
-	* 是否已完成所有子步骤
-	*/
+	 * 是否已完成所有子步骤
+	 */
 	UFUNCTION(BlueprintPure)
 	bool IsAllSubCompleted() const;
 	/**
-	* 是否已成功执行有子步骤
-	*/
+	 * 是否已成功执行有子步骤
+	 */
 	UFUNCTION(BlueprintPure)
 	bool IsAllSubExecuteSucceed() const;
 
@@ -382,18 +389,18 @@ protected:
 
 public:
 	/**
-	* 是否有步骤任务
-	*/
+	 * 是否有步骤任务
+	 */
 	UFUNCTION(BlueprintPure)
 	bool HasStepTask() const;
 	/**
-	* 是否已完成所有步骤任务
-	*/
+	 * 是否已完成所有步骤任务
+	 */
 	UFUNCTION(BlueprintPure)
 	bool IsAllTaskCompleted() const;
 	/**
-	* 添加步骤任务
-	*/
+	 * 添加步骤任务
+	 */
 	struct FStepTaskItem& AddStepTask(const FName InTaskName, float InDurationTime = 0.f, float InDelayTime = 1.f);
 
 protected:
@@ -410,12 +417,12 @@ public:
 #endif
 #if WITH_EDITOR
 	/**
-	* 构建步骤列表项
-	*/
+	 * 构建步骤列表项
+	 */
 	virtual bool GenerateListItem(TSharedPtr<struct FStepListItem> OutStepListItem, const FString& InFilterText = TEXT(""));
 	/**
-	* 更新步骤列表项
-	*/
+	 * 更新步骤列表项
+	 */
 	virtual void UpdateListItem(TSharedPtr<struct FStepListItem> OutStepListItem);
 
 	virtual bool CanEditChange(const FProperty* InProperty) const override;
@@ -425,7 +432,7 @@ public:
 
 /**
  * 步骤列表项
- */ 
+ */
 #if WITH_EDITOR
 struct FStepListItem : public TSharedFromThis<FStepListItem>
 {
@@ -433,7 +440,7 @@ public:
 	FStepListItem()
 	{
 		Step = nullptr;
-		ParentListItem = nullptr; 
+		ParentListItem = nullptr;
 		SubListItems = TArray<TSharedPtr<FStepListItem>>();
 	}
 
@@ -458,16 +465,16 @@ public:
 	{
 		return Step->ParentStep;
 	}
-	
-	TArray<UStepBase*>& GetSubSteps()const
+
+	TArray<UStepBase*>& GetSubSteps() const
 	{
 		return Step->SubSteps;
 	}
-	
+
 	void GetSubStepNum(int32& OutNum) const
 	{
 		OutNum += SubListItems.Num();
-		for(auto Iter : SubListItems)
+		for (auto Iter : SubListItems)
 		{
 			Iter->GetSubStepNum(OutNum);
 		}
@@ -477,7 +484,7 @@ public:
 	{
 		return ParentListItem->GetSubSteps();
 	}
-	
+
 	TArray<TSharedPtr<FStepListItem>>& GetParentSubListItems() const
 	{
 		return ParentListItem->SubListItems;
@@ -486,8 +493,8 @@ public:
 #endif
 
 /**
-* 步骤任务项
-*/
+ * 步骤任务项
+ */
 struct FStepTaskItem
 {
 public:
@@ -514,7 +521,7 @@ public:
 	EStepTaskState TaskState;
 	/// 任务名称
 	FName TaskName;
-	
+
 	/// 持续时间
 	float DurationTime;
 	/// 延迟时间
@@ -531,8 +538,7 @@ public:
 	FOnExecuteStepTaskDelegate OnExecuteDelegate;
 
 public:
-	template <typename... VarTypes>
-	FStepTaskItem& AddOnExecuteTaskFunc(class UStepBase* InStep, const FName InFuncName, VarTypes... Vars)
+	template <typename... VarTypes> FStepTaskItem& AddOnExecuteTaskFunc(class UStepBase* InStep, const FName InFuncName, VarTypes... Vars)
 	{
 		if (InStep)
 		{
@@ -558,7 +564,8 @@ public:
 
 	void TryExecute(float DeltaSeconds)
 	{
-		if(!Refresh(DeltaSeconds)) return;
+		if (!Refresh(DeltaSeconds))
+			return;
 
 		TaskState = EStepTaskState::Executing;
 		RemainTime = DurationTime;
@@ -570,14 +577,14 @@ public:
 
 	void TryComplete(float DeltaSeconds)
 	{
-		if(!OnCheckDelegate.IsBound())
+		if (!OnCheckDelegate.IsBound())
 		{
-			if(Refresh(DeltaSeconds))
+			if (Refresh(DeltaSeconds))
 			{
 				TaskState = EStepTaskState::Completed;
 			}
 		}
-		else if(OnCheckDelegate.Execute())
+		else if (OnCheckDelegate.Execute())
 		{
 			TaskState = EStepTaskState::Completed;
 		}

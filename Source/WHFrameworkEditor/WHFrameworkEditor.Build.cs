@@ -52,6 +52,9 @@ public class WHFrameworkEditor : ModuleRules
 				"CommonUI",
 				"Json",
 				"JsonUtilities",
+				"ImageCore",
+				"MaterialEditor",
+				"RenderCore",
 				"AnimGraph"
 			});
 	}

@@ -1,4 +1,5 @@
 #pragma once
+#include "Camera/Mode/CameraModeBase.h"
 #include "Camera/CameraModuleTypes.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "CameraModuleStatics.generated.h"

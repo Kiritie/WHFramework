@@ -28,7 +28,12 @@ class UAbilityPawnDataBase;
  * Ability Pawn基类
  */
 UCLASS()
-class WHFRAMEWORK_API AAbilityPawnBase : public APawnBase, public IAbilityPawnInterface, public IFSMAgentInterface, public IInteractionAgentInterface, public IAbilityInventoryAgentInterface, public ITargetingAgentInterface
+class WHFRAMEWORK_API AAbilityPawnBase : public APawnBase,
+                                         public IAbilityPawnInterface,
+                                         public IFSMAgentInterface,
+                                         public IInteractionAgentInterface,
+                                         public IAbilityInventoryAgentInterface,
+                                         public ITargetingAgentInterface
 {
 	GENERATED_BODY()
 
@@ -41,11 +46,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
 public:
-
 	virtual void OnSpawn_Implementation(const FParameter& InParam) override;
-		
-	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode)
-		override;
+
+	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// WHActor
@@ -66,14 +69,17 @@ protected:
 	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue = 1.0f, bool bForce = false) override;
 
 protected:
-	virtual bool HasArchive() const override { return true; }
+	virtual bool HasArchive() const override
+	{
+		return true;
+	}
 
 	virtual void Serialize(FArchive& Ar) override;
 
 	virtual void LoadData(const FParameter& InSaveData, EPhase InPhase) override;
 
 	virtual FParameter ToData() override;
-	
+
 	virtual void ResetData() override;
 
 	virtual void OnFiniteStateRefresh(UFiniteStateBase* InCurrentState) override;
@@ -96,7 +102,7 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void UnInterrupt() override;
-	
+
 	UFUNCTION(BlueprintCallable)
 	virtual bool DoAction(const FGameplayTag& InActionTag) override;
 
@@ -120,7 +126,7 @@ public:
 	virtual void OnChangeItem(const FAbilityItem& InNewItem) override;
 
 	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
-		
+
 	virtual void OnDeactiveItem(const FAbilityItem& InItem, bool bPassive) override;
 
 	virtual void OnDiscardItem(const FAbilityItem& InItem, bool bInPlace) override;
@@ -130,10 +136,6 @@ public:
 	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
 
 protected:
-	virtual bool OnGenerateVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult) override;
-
-	virtual bool OnDestroyVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult) override;
-
 protected:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
 
@@ -142,22 +144,36 @@ protected:
 	virtual void OnActorDetached(AActor* InActor) override;
 
 public:
-	virtual void HandleDamage(const FGameplayAttribute& DamageAttribute, float DamageValue, float DefendValue, bool bHasCrited, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+	virtual void HandleDamage(const FGameplayAttribute& DamageAttribute,
+	                          float DamageValue,
+	                          float DefendValue,
+	                          bool bHasCrited,
+	                          const FHitResult& HitResult,
+	                          const FGameplayTagContainer& SourceTags,
+	                          AActor* SourceActor) override;
 
-	virtual void HandleRecovery(const FGameplayAttribute& RecoveryAttribute, float RecoveryValue, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+	virtual void HandleRecovery(const FGameplayAttribute& RecoveryAttribute,
+	                            float RecoveryValue,
+	                            const FHitResult& HitResult,
+	                            const FGameplayTagContainer& SourceTags,
+	                            AActor* SourceActor) override;
 
-	virtual void HandleInterrupt(const FGameplayAttribute& InterruptAttribute, float InterruptDuration, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+	virtual void HandleInterrupt(const FGameplayAttribute& InterruptAttribute,
+	                             float InterruptDuration,
+	                             const FHitResult& HitResult,
+	                             const FGameplayTagContainer& SourceTags,
+	                             AActor* SourceActor) override;
 
 protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UAbilitySystemComponentBase* AbilitySystem;
-	
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UVitalityAttributeSetBase* AttributeSet;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UInteractionComponent* Interaction;
-	
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UAbilityPawnInventoryBase* Inventory;
 
@@ -167,7 +183,7 @@ protected:
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "PawnStats")
 	FName RaceID;
-	
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "PawnStats")
 	int32 Level;
 
@@ -184,28 +200,27 @@ protected:
 
 public:
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Exp)
-	
+
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxExp)
 
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Health)
 
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxHealth)
-	
+
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, HealthRecovery)
-		
+
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, HealthRegenSpeed)
 
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, PhysicsDamage)
-	
+
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
-	
+
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, FallDamage)
 
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Interrupt)
 
 public:
-	template<class T>
-	T* GetAttributeSet() const
+	template <class T> T* GetAttributeSet() const
 	{
 		return Cast<T>(GetAttributeSet());
 	}
@@ -216,32 +231,42 @@ public:
 
 	virtual UMeshComponent* GetMeshComponent() const override;
 
-	template<class T>
-	T* GetAbilitySystemComponent() const
+	template <class T> T* GetAbilitySystemComponent() const
 	{
 		return Cast<T>(GetAbilitySystemComponent());
 	}
 
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
-	virtual IInteractionAgentInterface* GetInteractingAgent() const override { return IInteractionAgentInterface::GetInteractingAgent(); }
+	virtual IInteractionAgentInterface* GetInteractingAgent() const override
+	{
+		return IInteractionAgentInterface::GetInteractingAgent();
+	}
 
-	template<class T>
-	T* GetInteractingAgent() const
+	template <class T> T* GetInteractingAgent() const
 	{
 		return Cast<T>(GetInteractingAgent());
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	virtual AActor* GetInteractingAgent(TSubclassOf<AActor> InClass) const { return GetDeterminesOutputObject(Cast<AActor>(GetInteractingAgent()), InClass); }
+	virtual AActor* GetInteractingAgent(TSubclassOf<AActor> InClass) const
+	{
+		return GetDeterminesOutputObject(Cast<AActor>(GetInteractingAgent()), InClass);
+	}
 
-	virtual EInteractAgentType GetInteractAgentType() const override { return EInteractAgentType::Initiative; }
+	virtual EInteractAgentType GetInteractAgentType() const override
+	{
+		return EInteractAgentType::Initiative;
+	}
 
 	virtual UInteractionComponent* GetInteractionComponent() const override;
-	
+
 	virtual UAbilityInventoryBase* GetInventory() const override;
 
-	virtual UFSMComponent* GetFSMComponent() const override { return FSM; }
+	virtual UFSMComponent* GetFSMComponent() const override
+	{
+		return FSM;
+	}
 
 public:
 	UFUNCTION(BlueprintPure)
@@ -251,7 +276,7 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual bool IsActive() const override;
-	
+
 	UFUNCTION(BlueprintPure)
 	virtual bool IsDead(bool bCheckDying = true) const override;
 
@@ -266,49 +291,67 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	virtual bool IsMoving() const override;
-	
+
 	virtual bool IsTargetAble_Implementation(APawn* InPlayerPawn) const override;
 
 public:
 	UFUNCTION(BlueprintPure)
-	virtual FName GetNameA() const override { return Name; }
+	virtual FName GetNameA() const override
+	{
+		return Name;
+	}
 
 	UFUNCTION(BlueprintCallable)
-	virtual void SetNameA(FName InName) override { Name = InName; }
-	
+	virtual void SetNameA(FName InName) override
+	{
+		Name = InName;
+	}
+
 	UFUNCTION(BlueprintPure)
-	virtual FName GetRaceID() const override { return RaceID; }
+	virtual FName GetRaceID() const override
+	{
+		return RaceID;
+	}
 
 	UFUNCTION(BlueprintCallable)
-	virtual void SetRaceID(FName InRaceID) override { RaceID = InRaceID; }
+	virtual void SetRaceID(FName InRaceID) override
+	{
+		RaceID = InRaceID;
+	}
 
 	UFUNCTION(BlueprintPure)
-	virtual int32 GetLevelA() const override { return Level; }
+	virtual int32 GetLevelA() const override
+	{
+		return Level;
+	}
 
 	UFUNCTION(BlueprintCallable)
 	virtual bool SetLevelA(int32 InLevel) override;
 
 	UFUNCTION(BlueprintPure)
 	virtual FString GetHeadInfo() const override;
-	
+
 	UFUNCTION(BlueprintPure)
 	virtual float GetRadius() const override;
 
 	UFUNCTION(BlueprintPure)
 	virtual float GetHalfHeight() const override;
-	
+
 	UFUNCTION(BlueprintPure)
 	virtual float GetDistance(AActor* InTargetActor, bool bIgnoreRadius = true, bool bIgnoreZAxis = true) const override;
 
 	UFUNCTION(BlueprintPure)
-	virtual FTransform GetBirthTransform() const override { return BirthTransform; }
+	virtual FTransform GetBirthTransform() const override
+	{
+		return BirthTransform;
+	}
 
 	UFUNCTION(BlueprintPure)
 	virtual void GetMotionRate(float& OutMovementRate, float& OutRotationRate) override;
-	
+
 	UFUNCTION(BlueprintCallable)
 	virtual void SetMotionRate(float InMovementRate, float InRotationRate) override;
-	
+
 	UFUNCTION(BlueprintPure)
 	virtual bool HasActionAbility(const FGameplayTag& InActionTag) const override;
 
@@ -316,7 +359,10 @@ public:
 	virtual FVitalityActionAbilityData GetActionAbility(const FGameplayTag& InActionTag) override;
 
 	UFUNCTION(BlueprintPure)
-	virtual TMap<FGameplayTag, FVitalityActionAbilityData>& GetActionAbilities() override { return ActionAbilities; }
+	virtual TMap<FGameplayTag, FVitalityActionAbilityData>& GetActionAbilities() override
+	{
+		return ActionAbilities;
+	}
 
 public:
 	virtual void OnRep_Controller() override;

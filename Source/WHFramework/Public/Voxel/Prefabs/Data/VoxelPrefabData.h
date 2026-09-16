@@ -1,36 +1,32 @@
 #pragma once
 #include "Asset/Primary/PrimaryAssetBase.h"
-
+#include "Voxel/VoxelModuleTypes.h"
 #include "VoxelPrefabData.generated.h"
 
-/** 体素预制体数据 */
+struct FVoxelRegistrySnapshot;
+
+namespace VoxelPrefab
+{
+constexpr int32 MaxCellCount = 65536;
+constexpr int32 MaxSectionCount = 32;
+}
+
+/** Finite, explicitly positioned block definitions. Never a second live world.
+ */
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UVoxelPrefabData : public UPrimaryAssetBase
 {
 	GENERATED_BODY()
-
 public:
 	UVoxelPrefabData();
 
-public:
-	virtual void OnInitialize_Implementation() override;
-
-	virtual void OnReset_Implementation() override;
-
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Voxel|Prefab")
 	FText DisplayName;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (MultiLine = "true"))
-	FString VoxelDatas;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Voxel|Prefab")
+	FVoxelPrefabSaveData Data;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector VoxelSize;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FVector CenterOffset;
-
-public:
-	UFUNCTION(BlueprintPure)
 	FBox GetVoxelBounds() const;
+	bool Validate(const FVoxelRegistrySnapshot& Registry, FString& Error) const;
+	static bool ValidateCells(const FVoxelPrefabSaveData& Value, const FVoxelRegistrySnapshot& Registry, FString& Error);
 };

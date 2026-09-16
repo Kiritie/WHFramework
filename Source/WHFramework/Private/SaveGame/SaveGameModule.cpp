@@ -1,6 +1,7 @@
 #include "SaveGame/SaveGameModule.h"
 
 #include "Event/EventModuleStatics.h"
+#include "Event/Events/Common/Game/Event_GameExited.h"
 #include "Gameplay/WHGameInstance.h"
 #include "HAL/FileManager.h"
 #include "Kismet/GameplayStatics.h"
@@ -8,8 +9,10 @@
 #include "Misc/Paths.h"
 #include "SaveGame/SaveDataSerializer.h"
 #include "SaveGame/SaveGameStorage.h"
+#include "SaveGame/SaveGameAsyncExecutor.h"
 #include "Setting/SettingModule.h"
 #include "Voxel/VoxelModule.h"
+#include "EngineUtils.h"
 
 IMPLEMENTATION_MODULE(USaveGameModule)
 
@@ -25,7 +28,19 @@ USaveGameModule::USaveGameModule()
 	PendingSaveSlotParams = FCreateSaveSlotParams();
 }
 
-USaveGameModule::~USaveGameModule() = default;
+USaveGameModule::~USaveGameModule()
+{
+	TERMINATION_MODULE(USaveGameModule)
+}
+
+#if WITH_EDITOR
+void USaveGameModule::OnDestroy()
+{
+	Super::OnDestroy();
+
+	TERMINATION_MODULE(USaveGameModule)
+}
+#endif
 
 void USaveGameModule::OnInitialize()
 {
@@ -33,7 +48,7 @@ void USaveGameModule::OnInitialize()
 	Storage = MakeUnique<FSaveGameStorage>(UserIndex);
 	Storage->EnsureRoot();
 	Storage->CleanupAllTempGenerations();
-	if(UWHGameInstance* GameInstance = GetWorld() ? Cast<UWHGameInstance>(GetWorld()->GetGameInstance()) : nullptr)
+	if (UWHGameInstance* GameInstance = GetWorld() ? Cast<UWHGameInstance>(GetWorld()->GetGameInstance()) : nullptr)
 	{
 		PendingLoadContext = GameInstance->ConsumePendingSaveLoad();
 	}
@@ -43,7 +58,7 @@ void USaveGameModule::OnInitialize()
 void USaveGameModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
-	if(PHASEC(InPhase, EPhase::Final) && PendingLoadContext.IsValid())
+	if (PHASEC(InPhase, EPhase::Final) && PendingLoadContext.IsValid())
 	{
 		const FPendingSaveLoadContext Context = PendingLoadContext;
 		PendingLoadContext = FPendingSaveLoadContext();
@@ -53,10 +68,26 @@ void USaveGameModule::OnPreparatory(EPhase InPhase)
 
 void USaveGameModule::OnTermination(EPhase InPhase)
 {
+	FinishPendingSave();
 	Super::OnTermination(InPhase);
-	if(PHASEC(InPhase, EPhase::Final))
+	if (PHASEC(InPhase, EPhase::Final))
 	{
+		AsyncSave.Reset();
 		Storage.Reset();
+	}
+}
+
+void USaveGameModule::OnRefresh(float DeltaSeconds, bool bInEditor)
+{
+	Super::OnRefresh(DeltaSeconds, bInEditor);
+	if (bInEditor || !AsyncSave)
+	{
+		return;
+	}
+	FSaveOperationResult Result = FSaveOperationResult::Success();
+	if (AsyncSave->Poll(Result))
+	{
+		CompleteAsyncSave(Result);
 	}
 }
 
@@ -71,6 +102,10 @@ FParameter USaveGameModule::ToData()
 
 void USaveGameModule::SetUserIndex(int32 InUserIndex)
 {
+	if (bSaveOperationRunning)
+	{
+		return;
+	}
 	UserIndex = InUserIndex;
 	Storage = MakeUnique<FSaveGameStorage>(UserIndex);
 	Storage->EnsureRoot();
@@ -78,11 +113,10 @@ void USaveGameModule::SetUserIndex(int32 InUserIndex)
 
 FSaveOperationResult USaveGameModule::CreateSaveSlot(const FCreateSaveSlotParams& Params, FSaveSlotSummary& OutSummary)
 {
-	if(!Storage || bSaveOperationRunning)
+	if (!Storage || bSaveOperationRunning || !GetWorld() || GetWorld()->GetNetMode() == NM_Client)
 	{
-		return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("Save system is busy.")));
+		return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("Cannot create world slot now")));
 	}
-	TGuardValue<bool> Guard(bSaveOperationRunning, true);
 	FSaveManifest Manifest;
 	Manifest.SaveId = FGuid::NewGuid();
 	Manifest.DisplayName = Params.DisplayName;
@@ -90,20 +124,26 @@ FSaveOperationResult USaveGameModule::CreateSaveSlot(const FCreateSaveSlotParams
 	Manifest.CreatedAt = FDateTime::UtcNow();
 	Manifest.UpdatedAt = Manifest.CreatedAt;
 	Manifest.CurrentMap = Params.InitialMap;
-	if(!Storage->CreateWorldDirectory(Manifest.SaveId) || !Storage->WriteManifestAtomic(Manifest.SaveId, Manifest))
 	{
-		Storage->DeleteWorldDirectory(Manifest.SaveId);
-		return FSaveOperationResult::Failed(ESaveResultCode::WriteFailed, FText::FromString(TEXT("Create save slot failed.")));
+		TGuardValue<bool> Guard(bSaveOperationRunning, true);
+		if (!Storage->CreateWorldDirectory(Manifest.SaveId) || !Storage->WriteManifestAtomic(Manifest.SaveId, Manifest))
+		{
+			Storage->DeleteWorldDirectory(Manifest.SaveId);
+			return FSaveOperationResult::Failed(ESaveResultCode::WriteFailed, FText::FromString(TEXT("Create save slot failed")));
+		}
+		ActiveSaveId = Manifest.SaveId;
 	}
-	ActiveSaveId = Manifest.SaveId;
-	if(Params.bCaptureCurrentWorld)
+	if (Params.bCaptureCurrentWorld)
 	{
-		const FSaveOperationResult Result = SaveSlotInternal(Manifest.SaveId);
-		if(!Result)
+		const FSaveOperationResult Result = SaveSlot(Manifest.SaveId);
+		if (!Result)
 		{
 			return Result;
 		}
-		Storage->ReadManifest(Manifest.SaveId, Manifest);
+		if (!Storage->ReadManifest(Manifest.SaveId, Manifest))
+		{
+			return FSaveOperationResult::Failed(ESaveResultCode::ReadFailed, FText::FromString(TEXT("Committed manifest could not be reread")));
+		}
 	}
 	OutSummary = Manifest.ToSummary(Storage->GetWorldDir(Manifest.SaveId));
 	return FSaveOperationResult::Success();
@@ -111,21 +151,117 @@ FSaveOperationResult USaveGameModule::CreateSaveSlot(const FCreateSaveSlotParams
 
 FSaveOperationResult USaveGameModule::SaveSlot(FGuid SaveId)
 {
-	if(!SaveId.IsValid())
-	{
-		return FSaveOperationResult::Failed(ESaveResultCode::InvalidArgument, FText::FromString(TEXT("Invalid save id.")));
-	}
-	if(!Storage || bSaveOperationRunning)
-	{
-		return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("Save system is busy.")));
-	}
-	TGuardValue<bool> Guard(bSaveOperationRunning, true);
-	return SaveSlotInternal(SaveId);
+	const FSaveOperationResult Started = SaveSlotAsync(SaveId);
+	return Started ? FinishPendingSave() : Started;
 }
 
 FSaveOperationResult USaveGameModule::SaveActiveSlot()
 {
-	return ActiveSaveId.IsValid() ? SaveSlot(ActiveSaveId) : FSaveOperationResult::Failed(ESaveResultCode::NotFound, FText::FromString(TEXT("No active save.")));
+	return ActiveSaveId.IsValid() ? SaveSlot(ActiveSaveId) : FSaveOperationResult::Failed(ESaveResultCode::NotFound, FText::FromString(TEXT("No active save")));
+}
+
+FSaveOperationResult USaveGameModule::SaveSlotAsync(FGuid SaveId)
+{
+	check(IsInGameThread());
+	if (!Storage || bSaveOperationRunning || !SaveId.IsValid() || !GetWorld() || GetWorld()->GetNetMode() == NM_Client)
+	{
+		return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("World save is unavailable or busy")));
+	}
+	FSaveGenerationPlan Plan;
+	Plan.SaveId = SaveId;
+	Plan.UserIndex = UserIndex;
+	if (!Storage->ReadManifest(SaveId, Plan.Manifest) || Plan.Manifest.CurrentGeneration == MAX_int32)
+	{
+		return FSaveOperationResult::Failed(ESaveResultCode::NotFound, FText::FromString(TEXT("Save slot not found")));
+	}
+	Plan.CurrentMap = FName(*UGameplayStatics::GetCurrentLevelName(GetWorld(), true));
+	bSaveOperationRunning = true;
+	AsyncSaveId = SaveId;
+	AsyncCommittedDirectory = Storage->GetGenerationDir(SaveId, Plan.Manifest.CurrentGeneration + 1);
+	AsyncCaptured.Reset();
+	const TArray<UModuleBase*> Modules = GetSaveModules(ESaveScope::World);
+	for (UModuleBase* Module : Modules)
+	{
+		AsyncCaptured.Add(Module);
+		Module->OnBeforeSaveData();
+	}
+	for (UModuleBase* Module : Modules)
+	{
+		FSaveModuleBytes Item;
+		Item.ModuleName = Module->GetModuleName();
+		Item.Version = Module->GetSaveDataVersion();
+		if (!Module->BuildSaveFile(Item.Bytes))
+		{
+			const FSaveOperationResult Result = FSaveOperationResult::Failed(ESaveResultCode::CaptureFailed, FText::FromName(Item.ModuleName));
+			CompleteAsyncSave(Result);
+			return Result;
+		}
+		Plan.Modules.Add(MoveTemp(Item));
+		if (UVoxelModule* Voxel = Cast<UVoxelModule>(Module))
+		{
+			FVoxelModuleSaveCapture Capture;
+			FString Error;
+			if (!Voxel->CopySaveCapture(Capture, Error))
+			{
+				const FSaveOperationResult Result = FSaveOperationResult::Failed(ESaveResultCode::CaptureFailed, FText::FromString(Error));
+				CompleteAsyncSave(Result);
+				return Result;
+			}
+			Voxel->SetPendingCommitDirectory(AsyncCommittedDirectory);
+			Plan.Voxel = MoveTemp(Capture);
+		}
+	}
+	if (!AsyncSave)
+	{
+		AsyncSave = MakeUnique<FSaveGameAsyncExecutor>();
+	}
+	if (!AsyncSave->Start(MoveTemp(Plan)))
+	{
+		const FSaveOperationResult Result = FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("Save worker is busy")));
+		CompleteAsyncSave(Result);
+		return Result;
+	}
+	return FSaveOperationResult::Success();
+}
+
+FSaveOperationResult USaveGameModule::SaveActiveSlotAsync()
+{
+	return ActiveSaveId.IsValid() ? SaveSlotAsync(ActiveSaveId)
+	                              : FSaveOperationResult::Failed(ESaveResultCode::NotFound, FText::FromString(TEXT("No active save")));
+}
+
+void USaveGameModule::CompleteAsyncSave(const FSaveOperationResult& Result)
+{
+	check(IsInGameThread());
+	const FGuid CompletedId = AsyncSaveId;
+	TArray<TWeakObjectPtr<UModuleBase>> Captured = MoveTemp(AsyncCaptured);
+	AsyncCaptured.Reset();
+	AsyncSaveId.Invalidate();
+	AsyncCommittedDirectory.Reset();
+	for (TWeakObjectPtr<UModuleBase>& Weak : Captured)
+	{
+		if (UModuleBase* Module = Weak.Get())
+		{
+			Module->OnAfterSaveData(bool(Result));
+		}
+	}
+	if (Result)
+	{
+		ActiveSaveId = CompletedId;
+	}
+	bSaveOperationRunning = false;
+	OnWorldSaveFinished.Broadcast(CompletedId, Result);
+}
+
+FSaveOperationResult USaveGameModule::FinishPendingSave()
+{
+	if (!AsyncSave || !AsyncSave->IsRunning())
+	{
+		return FSaveOperationResult::Success();
+	}
+	const FSaveOperationResult Result = AsyncSave->Finish();
+	CompleteAsyncSave(Result);
+	return Result;
 }
 
 void USaveGameModule::BeginPendingSaveSlot(const FCreateSaveSlotParams& Params)
@@ -143,17 +279,17 @@ void USaveGameModule::CancelPendingSaveSlot()
 
 FSaveOperationResult USaveGameModule::SaveCurrentSlot()
 {
-	if(bHasPendingSaveSlot)
+	if (bHasPendingSaveSlot)
 	{
 		FSaveSlotSummary Summary;
 		const FSaveOperationResult Result = CreateSaveSlot(PendingSaveSlotParams, Summary);
-		if(Result)
+		if (Result)
 		{
 			CancelPendingSaveSlot();
 		}
 		return Result;
 	}
-	if(ActiveSaveId.IsValid())
+	if (ActiveSaveId.IsValid())
 	{
 		return SaveActiveSlot();
 	}
@@ -163,115 +299,41 @@ FSaveOperationResult USaveGameModule::SaveCurrentSlot()
 void USaveGameModule::ClearActiveSave()
 {
 	ActiveSaveId.Invalidate();
-	if(UVoxelModule* Voxel = AMainModule::GetModuleByClass<UVoxelModule>(false))
+	if (UVoxelModule* Voxel = UVoxelModule::GetPtr())
 	{
-		Voxel->ClearActiveSaveSource();
+		Voxel->SetActiveSaveSource(FGuid(), 0, nullptr);
 	}
-}
-
-FSaveOperationResult USaveGameModule::SaveSlotInternal(FGuid SaveId)
-{
-	FSaveManifest Manifest;
-	if(!Storage->ReadManifest(SaveId, Manifest))
-	{
-		return FSaveOperationResult::Failed(ESaveResultCode::NotFound, FText::FromString(TEXT("Save slot not found.")));
-	}
-	Storage->CleanupUncommittedGenerations(SaveId, Manifest.CurrentGeneration);
-	const int32 NewGeneration = Manifest.CurrentGeneration + 1;
-	if(!Storage->PrepareTempGeneration(SaveId, Manifest.CurrentGeneration, NewGeneration))
-	{
-		return FSaveOperationResult::Failed(ESaveResultCode::WriteFailed, FText::FromString(TEXT("Prepare generation failed.")));
-	}
-	TArray<UModuleBase*> Modules = GetSaveModules(ESaveScope::World);
-	for(UModuleBase* Module : Modules)
-	{
-		Module->OnBeforeSaveData();
-	}
-	TArray<UModuleBase*> Captured;
-	FSaveOperationResult Result = CaptureModulesToGeneration(SaveId, NewGeneration, Captured);
-	if(!Result || !Storage->CommitGeneration(SaveId, NewGeneration))
-	{
-		for(UModuleBase* Module : Modules)
-		{
-			Module->OnAfterSaveData(false);
-		}
-		return Result ? FSaveOperationResult::Failed(ESaveResultCode::CommitFailed, FText::FromString(TEXT("Generation commit failed."))) : Result;
-	}
-	Manifest.CurrentGeneration = NewGeneration;
-	Manifest.UpdatedAt = FDateTime::UtcNow();
-	if(UWorld* World = GetWorld())
-	{
-		Manifest.CurrentMap = FName(*UGameplayStatics::GetCurrentLevelName(World, true));
-	}
-	for(UModuleBase* Module : Modules)
-	{
-		Manifest.ModuleVersions.Add(Module->GetModuleName(), Module->GetSaveDataVersion());
-	}
-	if(!Storage->WriteManifestAtomic(SaveId, Manifest))
-	{
-		for(UModuleBase* Module : Modules)
-		{
-			Module->OnAfterSaveData(false);
-		}
-		return FSaveOperationResult::Failed(ESaveResultCode::CommitFailed, FText::FromString(TEXT("Manifest update failed.")));
-	}
-	for(UModuleBase* Module : Modules)
-	{
-		Module->OnAfterSaveData(true);
-	}
-	ActiveSaveId = SaveId;
-	return FSaveOperationResult::Success();
-}
-
-FSaveOperationResult USaveGameModule::CaptureModulesToGeneration(const FGuid& SaveId, int32 Generation, TArray<UModuleBase*>& OutCaptured)
-{
-	for(UModuleBase* Module : GetSaveModules(ESaveScope::World))
-	{
-		TArray<uint8> Bytes;
-		if(!Module->BuildSaveFile(Bytes))
-		{
-			return FSaveOperationResult::Failed(ESaveResultCode::CaptureFailed, FText::FromName(Module->GetModuleName()));
-		}
-		if(!Storage->WriteBinary(Storage->GetTempModuleFilePath(SaveId, Generation, Module->GetModuleName()), Bytes))
-		{
-			return FSaveOperationResult::Failed(ESaveResultCode::WriteFailed, FText::FromName(Module->GetModuleName()));
-		}
-		OutCaptured.Add(Module);
-	}
-	if(UVoxelModule* Voxel = AMainModule::GetModuleByClass<UVoxelModule>(false))
-	{
-		if(Voxel->IsSaveEnabled() && !Voxel->WritePendingRegionsToGeneration(SaveId, Generation, *Storage))
-		{
-			return FSaveOperationResult::Failed(ESaveResultCode::WriteFailed, FText::FromString(TEXT("Voxel region write failed.")));
-		}
-	}
-	return FSaveOperationResult::Success();
 }
 
 FSaveOperationResult USaveGameModule::LoadSlot(FGuid SaveId, EPhase InPhase)
 {
-	if(!SaveId.IsValid())
+	if (GetWorld() && GetWorld()->GetNetMode() == NM_Client)
+	{
+		return FSaveOperationResult::Failed(ESaveResultCode::InvalidArgument,
+		                                    FText::FromString(TEXT("A guest cannot load a local world into the server session")));
+	}
+	if (!SaveId.IsValid())
 	{
 		return FSaveOperationResult::Failed(ESaveResultCode::InvalidArgument, FText::FromString(TEXT("Invalid save id.")));
 	}
-	if(!Storage || bSaveOperationRunning)
+	if (!Storage || bSaveOperationRunning)
 	{
 		return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("Save system is busy.")));
 	}
 	TGuardValue<bool> Guard(bSaveOperationRunning, true);
 	FSaveManifest Manifest;
-	if(!Storage->ReadManifest(SaveId, Manifest) || Manifest.CurrentGeneration <= 0)
+	if (!Storage->ReadManifest(SaveId, Manifest) || Manifest.CurrentGeneration <= 0)
 	{
 		return FSaveOperationResult::Failed(ESaveResultCode::NotFound, FText::FromString(TEXT("Committed save slot not found.")));
 	}
 	const FName CurrentMap(*UGameplayStatics::GetCurrentLevelName(GetWorld(), true));
-	if(!Manifest.CurrentMap.IsNone() && Manifest.CurrentMap != CurrentMap)
+	if (!Manifest.CurrentMap.IsNone() && Manifest.CurrentMap != CurrentMap)
 	{
 		PendingLoadContext.SaveId = SaveId;
 		PendingLoadContext.Generation = Manifest.CurrentGeneration;
 		PendingLoadContext.TargetMap = Manifest.CurrentMap;
 		PendingLoadContext.LoadPhase = InPhase;
-		if(UWHGameInstance* GameInstance = GetWorld() ? Cast<UWHGameInstance>(GetWorld()->GetGameInstance()) : nullptr)
+		if (UWHGameInstance* GameInstance = GetWorld() ? Cast<UWHGameInstance>(GetWorld()->GetGameInstance()) : nullptr)
 		{
 			GameInstance->SetPendingSaveLoad(PendingLoadContext);
 		}
@@ -289,7 +351,7 @@ FSaveOperationResult USaveGameModule::LoadSlot(FGuid SaveId, EPhase InPhase)
 FSaveOperationResult USaveGameModule::RestoreSlotGeneration(const FPendingSaveLoadContext& Context, EPhase InPhase)
 {
 	FSaveOperationResult Result = LoadModulesFromGeneration(Context.SaveId, Context.Generation, InPhase);
-	if(Result)
+	if (Result)
 	{
 		ActiveSaveId = Context.SaveId;
 		CancelPendingSaveSlot();
@@ -306,54 +368,65 @@ FSaveOperationResult USaveGameModule::LoadModulesFromGeneration(const FGuid& Sav
 		FParameter Data;
 	};
 	TArray<FLoadedModuleSaveData> Loaded;
-	for(UModuleBase* Module : GetSaveModules(ESaveScope::World))
+	for (UModuleBase* Module : GetSaveModules(ESaveScope::World))
 	{
 		TArray<uint8> Bytes;
 		FLoadedModuleSaveData Item;
 		Item.Module = Module;
-		if(!Storage->ReadBinary(Storage->GetModuleFilePath(SaveId, Generation, Module->GetModuleName()), Bytes))
+		if (!Storage->ReadBinary(Storage->GetModuleFilePath(SaveId, Generation, Module->GetModuleName()), Bytes))
 		{
 			return FSaveOperationResult::Failed(ESaveResultCode::ReadFailed, FText::FromName(Module->GetModuleName()));
 		}
-		if(!FSaveDataSerializer::ReadModuleFile(Bytes, Item.Header, Item.Data) || Item.Header.ModuleName != Module->GetModuleName())
+		if (!FSaveDataSerializer::ReadModuleFile(Bytes, Item.Header, Item.Data) || Item.Header.ModuleName != Module->GetModuleName())
 		{
 			return FSaveOperationResult::Failed(ESaveResultCode::CorruptData, FText::FromName(Module->GetModuleName()));
 		}
-		if(Item.Header.ModuleVersion != Module->GetSaveDataVersion() && !Module->MigrateSaveData(Item.Header.ModuleVersion, Item.Data))
+		if (Item.Header.ModuleVersion != Module->GetSaveDataVersion() && !Module->MigrateSaveData(Item.Header.ModuleVersion, Item.Data))
 		{
 			return FSaveOperationResult::Failed(ESaveResultCode::VersionMismatch, FText::FromName(Module->GetModuleName()));
 		}
 		Loaded.Add(MoveTemp(Item));
 	}
-	if(PHASEC(InPhase, EPhase::Primary))
+	for (const FLoadedModuleSaveData& Item : Loaded)
 	{
-		if(UVoxelModule* Voxel = AMainModule::GetModuleByClass<UVoxelModule>(false))
+		if (const UVoxelModule* Voxel = Cast<UVoxelModule>(Item.Module))
+		{
+			FString Error;
+			if (!Voxel->ValidateWorldData(Item.Data, Error))
+			{
+				return FSaveOperationResult::Failed(ESaveResultCode::VersionMismatch, FText::FromString(Error));
+			}
+		}
+	}
+	if (PHASEC(InPhase, EPhase::Primary))
+	{
+		if (UVoxelModule* Voxel = UVoxelModule::GetPtr())
 		{
 			Voxel->SetActiveSaveSource(SaveId, Generation, Storage.Get());
 		}
-		for(FLoadedModuleSaveData& Item : Loaded)
+		for (FLoadedModuleSaveData& Item : Loaded)
 		{
 			Item.Module->OnBeforeLoadData();
 		}
-		for(FLoadedModuleSaveData& Item : Loaded)
+		for (FLoadedModuleSaveData& Item : Loaded)
 		{
 			Item.Module->LoadSaveData(Item.Data, EPhase::Primary);
 		}
 	}
-	if(PHASEC(InPhase, EPhase::Lesser))
+	if (PHASEC(InPhase, EPhase::Lesser))
 	{
-		for(FLoadedModuleSaveData& Item : Loaded)
+		for (FLoadedModuleSaveData& Item : Loaded)
 		{
 			Item.Module->LoadSaveData(Item.Data, EPhase::Lesser);
 		}
 	}
-	if(PHASEC(InPhase, EPhase::Final))
+	if (PHASEC(InPhase, EPhase::Final))
 	{
-		for(FLoadedModuleSaveData& Item : Loaded)
+		for (FLoadedModuleSaveData& Item : Loaded)
 		{
 			Item.Module->LoadSaveData(Item.Data, EPhase::Final);
 		}
-		for(FLoadedModuleSaveData& Item : Loaded)
+		for (FLoadedModuleSaveData& Item : Loaded)
 		{
 			Item.Module->OnAfterLoadData(true);
 		}
@@ -363,45 +436,62 @@ FSaveOperationResult USaveGameModule::LoadModulesFromGeneration(const FGuid& Sav
 
 FSaveOperationResult USaveGameModule::DeleteSaveSlot(FGuid SaveId)
 {
-	if(!Storage || !SaveId.IsValid())
+	if (bSaveOperationRunning)
+	{
+		return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("Save transaction is in progress")));
+	}
+	if (!Storage || !SaveId.IsValid())
 	{
 		return FSaveOperationResult::Failed(ESaveResultCode::InvalidArgument, FText::FromString(TEXT("Invalid save id.")));
 	}
-	if(SaveId == ActiveSaveId)
+	if (SaveId == ActiveSaveId)
 	{
 		ActiveSaveId.Invalidate();
 	}
-	return Storage->DeleteWorldDirectory(SaveId) ? FSaveOperationResult::Success() : FSaveOperationResult::Failed(ESaveResultCode::WriteFailed, FText::FromString(TEXT("Delete save slot failed.")));
+	return Storage->DeleteWorldDirectory(SaveId)
+	           ? FSaveOperationResult::Success()
+	           : FSaveOperationResult::Failed(ESaveResultCode::WriteFailed, FText::FromString(TEXT("Delete save slot failed.")));
 }
 
 FSaveOperationResult USaveGameModule::RenameSaveSlot(FGuid SaveId, const FString& NewName)
 {
+	if (bSaveOperationRunning)
+	{
+		return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("Save transaction is in progress")));
+	}
 	FSaveManifest Manifest;
-	if(!Storage || NewName.IsEmpty() || !Storage->ReadManifest(SaveId, Manifest))
+	if (!Storage || NewName.IsEmpty() || !Storage->ReadManifest(SaveId, Manifest))
 	{
 		return FSaveOperationResult::Failed(ESaveResultCode::InvalidArgument, FText::FromString(TEXT("Invalid save slot or name.")));
 	}
 	Manifest.DisplayName = NewName;
 	Manifest.UpdatedAt = FDateTime::UtcNow();
-	return Storage->WriteManifestAtomic(SaveId, Manifest) ? FSaveOperationResult::Success() : FSaveOperationResult::Failed(ESaveResultCode::WriteFailed, FText::FromString(TEXT("Rename save slot failed.")));
+	return Storage->WriteManifestAtomic(SaveId, Manifest)
+	           ? FSaveOperationResult::Success()
+	           : FSaveOperationResult::Failed(ESaveResultCode::WriteFailed, FText::FromString(TEXT("Rename save slot failed.")));
 }
 
 FSaveOperationResult USaveGameModule::DuplicateSaveSlot(FGuid SourceSaveId, const FString& NewName, FSaveSlotSummary& OutSummary)
 {
+	if (bSaveOperationRunning)
+	{
+		return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("Save transaction is in progress")));
+	}
 	FSaveManifest Manifest;
-	if(!Storage || NewName.IsEmpty() || !Storage->ReadManifest(SourceSaveId, Manifest) || Manifest.CurrentGeneration <= 0)
+	if (!Storage || NewName.IsEmpty() || !Storage->ReadManifest(SourceSaveId, Manifest) || Manifest.CurrentGeneration <= 0)
 	{
 		return FSaveOperationResult::Failed(ESaveResultCode::InvalidArgument, FText::FromString(TEXT("Invalid source save slot.")));
 	}
 	const FGuid TargetSaveId = FGuid::NewGuid();
-	if(!Storage->CreateWorldDirectory(TargetSaveId) || !Storage->CopyCurrentGeneration(SourceSaveId, TargetSaveId, Manifest.CurrentGeneration, Manifest.CurrentGeneration))
+	if (!Storage->CreateWorldDirectory(TargetSaveId) ||
+	    !Storage->CopyCurrentGeneration(SourceSaveId, TargetSaveId, Manifest.CurrentGeneration, Manifest.CurrentGeneration))
 	{
 		Storage->DeleteWorldDirectory(TargetSaveId);
 		return FSaveOperationResult::Failed(ESaveResultCode::WriteFailed, FText::FromString(TEXT("Duplicate generation failed.")));
 	}
 	const FString SourcePreview = FPaths::Combine(Storage->GetWorldDir(SourceSaveId), Manifest.PreviewFile);
 	const FString TargetPreview = FPaths::Combine(Storage->GetWorldDir(TargetSaveId), Manifest.PreviewFile);
-	if(IFileManager::Get().FileExists(*SourcePreview))
+	if (IFileManager::Get().FileExists(*SourcePreview))
 	{
 		IFileManager::Get().Copy(*TargetPreview, *SourcePreview, true, true);
 	}
@@ -409,7 +499,7 @@ FSaveOperationResult USaveGameModule::DuplicateSaveSlot(FGuid SourceSaveId, cons
 	Manifest.DisplayName = NewName;
 	Manifest.CreatedAt = FDateTime::UtcNow();
 	Manifest.UpdatedAt = Manifest.CreatedAt;
-	if(!Storage->WriteManifestAtomic(TargetSaveId, Manifest))
+	if (!Storage->WriteManifestAtomic(TargetSaveId, Manifest))
 	{
 		Storage->DeleteWorldDirectory(TargetSaveId);
 		return FSaveOperationResult::Failed(ESaveResultCode::WriteFailed, FText::FromString(TEXT("Duplicate manifest failed.")));
@@ -428,27 +518,35 @@ TArray<FSaveSlotSummary> USaveGameModule::GetSaveSlotSummaries() const
 {
 	TArray<FSaveSlotSummary> Result;
 	TArray<FSaveManifest> Manifests;
-	if(Storage && Storage->EnumerateManifests(Manifests))
+	if (Storage && Storage->EnumerateManifests(Manifests))
 	{
-		for(const FSaveManifest& Manifest : Manifests)
+		for (const FSaveManifest& Manifest : Manifests)
 		{
 			Result.Add(Manifest.ToSummary(Storage->GetWorldDir(Manifest.SaveId)));
 		}
-		Result.Sort([](const FSaveSlotSummary& A, const FSaveSlotSummary& B) { return A.UpdatedAt > B.UpdatedAt; });
+		Result.Sort(
+		    [](const FSaveSlotSummary& A, const FSaveSlotSummary& B)
+		    {
+			    return A.UpdatedAt > B.UpdatedAt;
+		    });
 	}
 	return Result;
 }
 
 FSaveOperationResult USaveGameModule::SaveProfile(FName ProfileName)
 {
+	if (bSaveOperationRunning)
+	{
+		return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("Save transaction is in progress")));
+	}
 	USettingModule* Setting = AMainModule::GetModuleByClass<USettingModule>();
-	if(!Setting)
+	if (!Setting)
 	{
 		return FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, FText::FromString(TEXT("SettingModule missing.")));
 	}
 	Setting->OnBeforeSaveData();
 	TArray<uint8> Bytes;
-	if(!Setting->BuildSaveFile(Bytes) || !Storage->WriteBinaryAtomic(Storage->GetProfileModuleFilePath(ProfileName, Setting->GetModuleName()), Bytes))
+	if (!Setting->BuildSaveFile(Bytes) || !Storage->WriteBinaryAtomic(Storage->GetProfileModuleFilePath(ProfileName, Setting->GetModuleName()), Bytes))
 	{
 		Setting->OnAfterSaveData(false);
 		return FSaveOperationResult::Failed(ESaveResultCode::WriteFailed, FText::FromString(TEXT("Profile save failed.")));
@@ -459,19 +557,24 @@ FSaveOperationResult USaveGameModule::SaveProfile(FName ProfileName)
 
 FSaveOperationResult USaveGameModule::LoadProfile(FName ProfileName)
 {
+	if (bSaveOperationRunning)
+	{
+		return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("Save transaction is in progress")));
+	}
 	USettingModule* Setting = AMainModule::GetModuleByClass<USettingModule>();
 	TArray<uint8> Bytes;
 	FModuleSaveFileHeader Header;
 	FParameter Data;
-	if(!Setting || !Storage->ReadBinary(Storage->GetProfileModuleFilePath(ProfileName, Setting->GetModuleName()), Bytes))
+	if (!Setting || !Storage->ReadBinary(Storage->GetProfileModuleFilePath(ProfileName, Setting->GetModuleName()), Bytes))
 	{
-		return FSaveOperationResult::Failed(Setting ? ESaveResultCode::NotFound : ESaveResultCode::ModuleMissing, FText::FromString(TEXT("Profile not found.")));
+		return FSaveOperationResult::Failed(Setting ? ESaveResultCode::NotFound : ESaveResultCode::ModuleMissing,
+		                                    FText::FromString(TEXT("Profile not found.")));
 	}
-	if(!FSaveDataSerializer::ReadModuleFile(Bytes, Header, Data) || Header.ModuleName != Setting->GetModuleName())
+	if (!FSaveDataSerializer::ReadModuleFile(Bytes, Header, Data) || Header.ModuleName != Setting->GetModuleName())
 	{
 		return FSaveOperationResult::Failed(ESaveResultCode::CorruptData, FText::FromString(TEXT("Profile data is corrupt.")));
 	}
-	if(Header.ModuleVersion != Setting->GetSaveDataVersion() && !Setting->MigrateSaveData(Header.ModuleVersion, Data))
+	if (Header.ModuleVersion != Setting->GetSaveDataVersion() && !Setting->MigrateSaveData(Header.ModuleVersion, Data))
 	{
 		return FSaveOperationResult::Failed(ESaveResultCode::VersionMismatch, FText::FromString(TEXT("Profile version mismatch.")));
 	}
@@ -485,14 +588,21 @@ FSaveOperationResult USaveGameModule::LoadProfile(FName ProfileName)
 TArray<UModuleBase*> USaveGameModule::GetSaveModules(ESaveScope Scope) const
 {
 	TArray<UModuleBase*> Result;
-	for(UModuleBase* Module : AMainModule::GetAllModule())
+	for (TActorIterator<AMainModule> MainModule(GetWorld()); MainModule; ++MainModule)
 	{
-		if(Module && Module != this && Module->IsSaveEnabled() && Module->GetSaveScope() == Scope)
+		for (UModuleBase* Module : MainModule->GetModules())
 		{
-			Result.Add(Module);
+			if (Module && Module->GetSaveScope() == Scope && Module->IsSaveEnabled())
+			{
+				Result.Add(Module);
+			}
 		}
 	}
-	Result.Sort([](const UModuleBase& A, const UModuleBase& B) { return A.GetModuleIndex() < B.GetModuleIndex(); });
+	Result.Sort(
+	    [](const UModuleBase& A, const UModuleBase& B)
+	    {
+		    return A.GetModuleIndex() < B.GetModuleIndex();
+	    });
 	return Result;
 }
 

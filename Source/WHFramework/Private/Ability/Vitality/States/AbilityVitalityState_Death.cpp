@@ -4,6 +4,7 @@
 
 #include "AbilitySystemComponent.h"
 #include "Ability/Vitality/AbilityVitalityBase.h"
+#include "Ability/Vitality/States/AbilityVitalityState_Spawn.h"
 #include "Ability/Vitality/AbilityVitalityInventoryBase.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Common/Interaction/InteractionComponent.h"
@@ -31,12 +32,12 @@ void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastState, const T
 {
 	Super::OnEnter(InLastState, InParams);
 
-	if(InParams.IsValidIndex(0))
+	if (InParams.IsValidIndex(0))
 	{
 		Killer = Cast<IAbilityVitalityInterface>(InParams[0].Get<UObject*>());
 	}
-	
-	UEventModuleStatics::BroadcastEvent<FEventVitalityDead>(this, { GetAgent(), Cast<UObject>(Killer) });
+
+	UEventModuleStatics::BroadcastEvent<FEventVitalityDead>(this, {GetAgent(), Cast<UObject>(Killer)});
 
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
@@ -58,7 +59,8 @@ void UAbilityVitalityState_Death::OnRefresh(float DeltaSeconds)
 
 bool UAbilityVitalityState_Death::OnPreLeave(UFiniteStateBase* InNextState)
 {
-	if(!Super::OnPreLeave(InNextState)) return false;
+	if (!Super::OnPreLeave(InNextState))
+		return false;
 
 	return InNextState && InNextState->IsA<UAbilityVitalityState_Spawn>();
 }
@@ -89,7 +91,7 @@ void UAbilityVitalityState_Death::DeathStart()
 
 	Vitality->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	if(!Vitality->DoAction(GameplayTags::Ability_Vitality_Action_Death))
+	if (!Vitality->DoAction(GameplayTags::Ability_Vitality_Action_Death))
 	{
 		DeathEnd();
 	}
@@ -98,7 +100,7 @@ void UAbilityVitalityState_Death::DeathStart()
 void UAbilityVitalityState_Death::DeathEnd()
 {
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
-	
+
 	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dying);
 	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dead);
 

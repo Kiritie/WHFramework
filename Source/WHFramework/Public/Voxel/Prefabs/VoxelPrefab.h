@@ -1,80 +1,34 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
-
 #include "Common/Base/WHActor.h"
 #include "Voxel/VoxelModuleTypes.h"
-
 #include "VoxelPrefab.generated.h"
 
-class AVoxelAuxiliary;
-class UVoxelData;
+class UVoxelPrefabData;
 class UVoxelMeshComponent;
 
-/**
- * 
- */
+/** Display-only prefab host. World edits must use UVoxelModule::ApplyPrefab. */
 UCLASS()
 class WHFRAMEWORK_API AVoxelPrefab : public AWHActor
 {
 	GENERATED_BODY()
-
 public:
-	// Sets default values for this actor's properties
 	AVoxelPrefab();
-
-	//////////////////////////////////////////////////////////////////////////
-	/// ObjectPool
-public:
-
-	virtual void OnSpawn_Implementation(const FParameter& InParam) override;
-		
-	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode)
-		override;
-
-public:
-	virtual void OnInitialize_Implementation() override;
+	bool SetPreviewAsset(UVoxelPrefabData* Asset, double BlockSize, FString& Error);
+	bool SetPreviewData(const FVoxelPrefabSaveData& Data, double BlockSize, FString& Error);
+	void ClearPreview();
+	virtual void OnDespawn_Implementation(EObjectDespawnMode Mode) override;
 
 protected:
-	virtual void LoadData(const FParameter& InSaveData, EPhase InPhase) override;
-
+	virtual void LoadData(const FParameter& Value, EPhase Phase) override;
 	virtual FParameter ToData() override;
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 
-public:
-	virtual void CreateMesh();
-
-	virtual void BuildMesh();
-
-protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TMap<EVoxelNature, UVoxelMeshComponent*> MeshComponents;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	TMap<FIndex, FVoxelItem> VoxelMap;
-
-public:
-	void SpawnMeshComponents();
-
-	void DestroyMeshComponents();
-
-	AVoxelAuxiliary* SpawnAuxiliary(FVoxelItem& InVoxelItem);
-
-	void DestroyAuxiliary(FVoxelItem& InVoxelItem);
-
-	void DestroyAuxiliarys();
-
-public:
-	bool HasVoxel(FIndex InIndex);
-
-	bool HasVoxel(int32 InX, int32 InY, int32 InZ);
-
-	FVoxelItem& GetVoxel(FIndex InIndex);
-
-	FVoxelItem& GetVoxel(int32 InX, int32 InY, int32 InZ);
-
-	void SetVoxel(FIndex InIndex, const FVoxelItem& InVoxelItem);
-
-	void SetVoxel(int32 InX, int32 InY, int32 InZ, const FVoxelItem& InVoxelItem);
-
-	UVoxelMeshComponent* GetMeshComponent(EVoxelNature InVoxelNature);
+	UPROPERTY(Transient)
+	TObjectPtr<UVoxelPrefabData> PreviewAsset;
+	UPROPERTY(Transient)
+	FVoxelPrefabSaveData PreviewData;
+	UPROPERTY(Transient)
+	double PreviewBlockSize = 100.0;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UVoxelMeshComponent>> PreviewMeshes;
 };

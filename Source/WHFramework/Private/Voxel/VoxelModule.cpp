@@ -1,1675 +1,1543 @@
 #include "Voxel/VoxelModule.h"
-#include "Voxel/VoxelModuleStatics.h"
-
-#include "Ability/AbilityModuleStatics.h"
+#include "Voxel/Prefabs/Data/VoxelPrefabData.h"
+#include "Voxel/Network/VoxelModuleNetworkComponent.h"
+#include "Voxel/Network/VoxelNetworkCodec.h"
+#include "Voxel/Chunks/VoxelChunk.h"
+#include "Voxel/Rendering/VoxelMaterialSet.h"
+#include "Voxel/Voxels/Data/VoxelData.h"
+#include "Voxel/Voxels/VoxelItemBridge.h"
+#include "Voxel/Interaction/VoxelEditTransaction.h"
+#include "Voxel/Interaction/VoxelInventoryTransaction.h"
+#include "Voxel/Save/VoxelDeltaCodec.h"
+#include "Voxel/Save/VoxelSceneColumnCodec.h"
+#include "Voxel/Generation/VoxelManifestCodec.h"
+#include "Voxel/Agent/VoxelAgentComponent.h"
+#include "Voxel/Components/VoxelCollisionComponent.h"
+#include "Voxel/Save/VoxelBlockEntityCodec.h"
 #include "Asset/AssetModuleStatics.h"
-#include "Components/SceneCaptureComponent2D.h"
-#include "Engine/TextureRenderTarget2D.h"
-#include "HAL/PlatformMisc.h"
+#include "Ability/AbilityModuleStatics.h"
+#include "Ability/Inventory/AbilityInventoryBase.h"
+#include "Ability/Inventory/AbilityInventoryAgentInterface.h"
+#include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
+#include "Ability/Item/AbilityItemDataBase.h"
+#include "Ability/PickUp/AbilityPickUpVoxel.h"
 #include "Event/EventModuleStatics.h"
 #include "Event/Events/Voxel/Event_VoxelWorldModeChanged.h"
-#include "Event/Events/Voxel/Event_VoxelWorldStateChanged.h"
-#include "Engine/Texture2D.h"
-#include "Main/MainModuleStatics.h"
-#include "Math/MathHelper.h"
-#include "ObjectPool/ObjectPoolModuleStatics.h"
-#include "ReferencePool/ReferencePoolModuleStatics.h"
-#include "Scene/SceneModuleStatics.h"
-#include "Voxel/Agent/VoxelAgentInterface.h"
-#include "Voxel/Chunks/VoxelChunk.h"
-#include "Voxel/Voxels/Data/VoxelData.h"
-#include "Voxel/Voxels/Voxel.h"
-#include "Voxel/Voxels/VoxelDoor.h"
-#include "Voxel/Voxels/VoxelPlant.h"
-#include "Voxel/Voxels/VoxelTorch.h"
-#include "Voxel/Voxels/VoxelWater.h"
-#include "Voxel/Voxels/Entity/VoxelEntityCapture.h"
-#include "Common/CommonModuleStatics.h"
-#include "Common/CommonModuleTypes.h"
-#include "Event/Events/Voxel/Event_VoxelWorldAgentMoved.h"
-#include "Event/Events/Voxel/Event_VoxelWorldCenterChanged.h"
-#include "Kismet/KismetMaterialLibrary.h"
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/Pawn.h"
 #include "Main/MainModule.h"
-#include "Materials/MaterialInstanceDynamic.h"
-#include "Math/MathTypes.h"
-#include "SaveGame/SaveGameModuleStatics.h"
-#include "SaveGame/SaveGameStorage.h"
 #include "Scene/SceneModule.h"
-#include "Voxel/Capture/VoxelCapture.h"
-#include "Voxel/Components/VoxelMeshComponent.h"
-#include "Voxel/Generators/VoxelBuildingGenerator.h"
-#include "Voxel/Generators/VoxelTownGenerator.h"
-#include "Voxel/Generators/VoxelCaveGenerator.h"
-#include "Voxel/Generators/VoxelGenerator.h"
-#include "Voxel/Generators/VoxelFoliageGenerator.h"
-#include "Voxel/Generators/VoxelLakeGenerator.h"
-#include "Voxel/Generators/VoxelLiquidGenerator.h"
-#include "Voxel/Generators/VoxelOreGenerator.h"
-#include "Voxel/Generators/VoxelRegionGenerator.h"
-#include "Voxel/Generators/VoxelRiverGenerator.h"
-#include "Voxel/Generators/VoxelSurfaceGenerator.h"
-#include "Voxel/Generators/VoxelTerrainGenerator.h"
-#include "Voxel/Root/VoxelRoot.h"
-#include "Voxel/Save/VoxelRegionStore.h"
-#include "Voxel/Voxels/VoxelContainer.h"
-
+#include "SaveGame/SaveGameStorage.h"
+#include "SaveGame/SaveGameModule.h"
+#include "Engine/World.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "HAL/FileManager.h"
 IMPLEMENTATION_MODULE(UVoxelModule)
-
+UWorld* UVoxelModule::GetWorld() const
+{
+	if (HasAnyFlags(RF_ClassDefaultObject))
+		return nullptr;
+	auto* M = GetTypedOuter<AMainModule>();
+	return M ? M->GetWorld() : nullptr;
+}
 UVoxelModule::UVoxelModule()
 {
-	ModuleName = FName("VoxelModule");
+	ModuleName = TEXT("VoxelModule");
 	ModuleDisplayName = FText::FromString(TEXT("Voxel Module"));
 	SaveScope = ESaveScope::World;
-
-	ModuleDependencies = { FName("AbilityModule"), FName("AudioModule"), FName("SceneModule") };
-
-	VoxelCapture = nullptr;
-	
-	bAutoGenerate = false;
-	WorldMode = EVoxelWorldMode::None;
-	WorldState = EVoxelWorldState::None;
-	WorldBasicData = FVoxelWorldBasicSaveData();
-	WorldCenterIndex = EMPTY_Index;
-	WorldAgentIndex = EMPTY_Index;
-
-	WorldData = nullptr;
-	VoxelAreaNamespace = NAME_None;
-
+	SaveDataVersion = 2;
+	ModuleDependencies = {FName(TEXT("AbilityModule")), FName(TEXT("SceneModule"))};
 	ChunkSpawnClass = UVoxelChunk::StaticClass();
-	
-	ChunkSpawnDistance = 0.35f;
-	ChunkQueues = {
-		{ EVoxelWorldState::Spawning, FVoxelChunkQueues({
-			FVoxelChunkQueue(false, 1000)
-		}) },
-		{ EVoxelWorldState::MapLoading, FVoxelChunkQueues({
-			FVoxelChunkQueue(true, 512)
-		}) },
-		{ EVoxelWorldState::MapBuilding, FVoxelChunkQueues({
-			FVoxelChunkQueue(true, 256, {
-				CreateDefaultSubobject<UVoxelSurfaceGenerator>(FName("SurfaceGenerator")),
-				CreateDefaultSubobject<UVoxelRiverGenerator>(FName("RiverGenerator")),
-				CreateDefaultSubobject<UVoxelLakeGenerator>(FName("LakeGenerator")),
-				CreateDefaultSubobject<UVoxelRegionGenerator>(FName("RegionGenerator")),
-				CreateDefaultSubobject<UVoxelCaveGenerator>(FName("CaveGenerator")),
-				CreateDefaultSubobject<UVoxelOreGenerator>(FName("OreGenerator")),
-				CreateDefaultSubobject<UVoxelTerrainGenerator>(FName("TerrainGenerator")),
-				CreateDefaultSubobject<UVoxelFoliageGenerator>(FName("FoliageGenerator")),
-				CreateDefaultSubobject<UVoxelTownGenerator>(FName("TownGenerator")),
-				CreateDefaultSubobject<UVoxelBuildingGenerator>(FName("BuildingGenerator"))
-			}),
-			FVoxelChunkQueue(true, 256, {
-				CreateDefaultSubobject<UVoxelLiquidGenerator>(FName("LiquidGenerator"))
-			})
-		}) },
-		{ EVoxelWorldState::MeshSpawning, FVoxelChunkQueues({
-			FVoxelChunkQueue(true, 512),
-			FVoxelChunkQueue(false, 30)
-		}) },
-		{ EVoxelWorldState::MeshBuilding, FVoxelChunkQueues({
-			FVoxelChunkQueue(false, 4)
-		}) },
-		{ EVoxelWorldState::Generating, FVoxelChunkQueues({
-			FVoxelChunkQueue(false, 1)
-		}) },
-		{ EVoxelWorldState::Unloading, FVoxelChunkQueues({
-			FVoxelChunkQueue(false, 10)
-		}) }
-	};
-
-	ChunkQueueThreads = TArray<FVoxelChunkQueueThread*>();
-	ActiveChunkQueueBatch.Reset();
-	ActiveChunkQueue = nullptr;
-	ActiveChunkQueueThreads = TArray<FVoxelChunkQueueThread*>();
-	ActiveChunkQueueGenerators = TArray<UVoxelGenerator*>();
-
-	ChunkSpawnBatch = 0;
-	ChunkMap = TMap<FIndex, UVoxelChunk*>();
-	VoxelUpdateChunkIndices = TSet<FIndex>();
-	VoxelLiquidUpdateIndices = TSet<FIndex>();
-	VoxelUpdateTime = 0.f;
-	bVoxelUpdateRunning = false;
-
-	VoxelClasses = TArray<TSubclassOf<UVoxel>>();
-	VoxelClasses.Add(UVoxel::StaticClass());
-	VoxelClasses.Add(UVoxelEmpty::StaticClass());
-	VoxelClasses.Add(UVoxelUnknown::StaticClass());
-	VoxelClasses.Add(UVoxelInteract::StaticClass());
-	VoxelClasses.Add(UVoxelSwitch::StaticClass());
-	VoxelClasses.Add(UVoxelContainer::StaticClass());
-	VoxelClasses.Add(UVoxelDoor::StaticClass());
-	VoxelClasses.Add(UVoxelPlant::StaticClass());
-	VoxelClasses.Add(UVoxelTorch::StaticClass());
-	VoxelClasses.Add(UVoxelWater::StaticClass());
-	
-	VoxelGeneratorMap = TMap<TSubclassOf<UVoxelGenerator>, UVoxelGenerator*>();
-	VoxelAssetIDMap = TMap<EVoxelType, FPrimaryAssetId>();
-
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> TransMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_Trans.M_Voxel_Trans'"));
-
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SolidUnlitMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_Solid_Unlit.M_Voxel_Solid_Unlit'"));
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SemiUnlitMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_Semi_Unlit.M_Voxel_Semi_Unlit'"));
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> TransUnlitMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_Trans_Unlit.M_Voxel_Trans_Unlit'"));
-
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SolidMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_Solid.M_Voxel_Solid'"));
-	WorldBasicData.RenderDatas.Add(EVoxelNature::Solid, FVoxelRenderData(SolidMatFinder.Object, SolidUnlitMatFinder.Object, TransMatFinder.Object));
-	
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SemiSolidMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_SemiSolid.M_Voxel_SemiSolid'"));
-	WorldBasicData.RenderDatas.Add(EVoxelNature::SemiSolid, FVoxelRenderData(SemiSolidMatFinder.Object, SemiUnlitMatFinder.Object, TransMatFinder.Object));
-	WorldBasicData.RenderDatas.Add(EVoxelNature::SmallSemiSolid, FVoxelRenderData(SemiSolidMatFinder.Object, SemiUnlitMatFinder.Object, TransMatFinder.Object));
-
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> TransSolidMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_TransSolid.M_Voxel_TransSolid'"));
-	WorldBasicData.RenderDatas.Add(EVoxelNature::TransSolid, FVoxelRenderData(TransSolidMatFinder.Object, TransUnlitMatFinder.Object, TransMatFinder.Object));
-
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> LiquidMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_Liquid.M_Voxel_Liquid'"));
-	WorldBasicData.RenderDatas.Add(EVoxelNature::Liquid, FVoxelRenderData(LiquidMatFinder.Object, TransUnlitMatFinder.Object, TransMatFinder.Object));
-
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SemiLiquidMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_SemiLiquid.M_Voxel_SemiLiquid'"));
-	WorldBasicData.RenderDatas.Add(EVoxelNature::SemiLiquid, FVoxelRenderData(SemiLiquidMatFinder.Object, TransUnlitMatFinder.Object, TransMatFinder.Object));
-
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> FoliageMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_Foliage.M_Voxel_Foliage'"));
-	WorldBasicData.RenderDatas.Add(EVoxelNature::Foliage, FVoxelRenderData(FoliageMatFinder.Object, SemiUnlitMatFinder.Object, TransMatFinder.Object));
-	
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SemiFoliageMatFinder(TEXT("Material'/WHFramework/Voxel/Materials/M_Voxel_SemiFoliage.M_Voxel_SemiFoliage'"));
-	WorldBasicData.RenderDatas.Add(EVoxelNature::SemiFoliage, FVoxelRenderData(SemiFoliageMatFinder.Object, TransUnlitMatFinder.Object, TransMatFinder.Object));
-
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> IconSourceMatFinder(TEXT("/Script/Engine.Material'/WHFramework/Voxel/Materials/M_VoxelIcon.M_VoxelIcon'"));
-	WorldBasicData.IconMat = IconSourceMatFinder.Object;
+	// RPC bridge is a stable default subobject on AWHPlayerController, not independently created on both peers.
+	ModuleNetworkComponent = nullptr;
 	WorldData = MakeUnique<FVoxelModuleSaveData>(WorldBasicData);
-	RegionStore = MakeUnique<FVoxelRegionStore>();
 }
-
 UVoxelModule::~UVoxelModule()
 {
+	if (Scheduler)
+		Scheduler->StopAndJoin();
 	TERMINATION_MODULE(UVoxelModule)
 }
 
 #if WITH_EDITOR
-void UVoxelModule::OnGenerate()
-{
-	if(!VoxelRoot)
-	{
-		TArray<AActor*> ChildActors;
-		GetModuleOwner()->GetAttachedActors(ChildActors);
-		if(ChildActors.Num() > 0)
-		{
-			VoxelRoot = Cast<AVoxelRoot>(ChildActors[0]);
-		}
-	}
-	if(!VoxelRoot)
-	{
-		FActorSpawnParameters ActorSpawnParameters;
-		ActorSpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		VoxelRoot = GetWorld()->SpawnActor<AVoxelRoot>(ActorSpawnParameters);
-		if(VoxelRoot)
-		{
-			VoxelRoot->SetActorLabel(TEXT("VoxelRoot"));
-			VoxelRoot->AttachToActor(GetModuleOwner(), FAttachmentTransformRules::KeepWorldTransform);
-		}
-	}
-	if(VoxelRoot)
-	{
-		VoxelRoot->SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
-	}
-
-	if(!VoxelCapture)
-	{
-		TArray<AActor*> ChildActors;
-		GetModuleOwner()->GetAttachedActors(ChildActors);
-		if(ChildActors.Num() > 0)
-		{
-			VoxelCapture = Cast<AVoxelCapture>(ChildActors[0]);
-		}
-	}
-	if(!VoxelCapture)
-	{
-		FActorSpawnParameters ActorSpawnParameters;
-		ActorSpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		VoxelCapture = GetWorld()->SpawnActor<AVoxelCapture>(ActorSpawnParameters);
-		if(VoxelCapture)
-		{
-			VoxelCapture->SetActorLabel(TEXT("VoxelCapture"));
-			VoxelCapture->AttachToActor(GetModuleOwner(), FAttachmentTransformRules::KeepWorldTransform);
-		}
-	}
-	if(VoxelCapture)
-	{
-		VoxelCapture->SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
-	}
-
-	Modify();
-}
-
 void UVoxelModule::OnDestroy()
 {
 	Super::OnDestroy();
 
-	ShutdownChunkQueueThreads();
 	TERMINATION_MODULE(UVoxelModule)
-
-	if(VoxelRoot)
-	{
-		VoxelRoot->Destroy();
-	}
-
-	if(VoxelCapture)
-	{
-		VoxelCapture->Destroy();
-	}
 }
 #endif
 
-void UVoxelModule::OnInitialize()
+bool UVoxelModule::IsAuthority() const
 {
-	Super::OnInitialize();
-
-
-	
-	USceneModule::Get().RegisterSceneAreaResolver(ESceneAreaType::Chunk, FSceneAreaResolver::CreateUObject(this, &UVoxelModule::ResolveVoxelArea));
-
-	UAssetModuleStatics::AddStaticObject(FName("EVoxelType"), FStaticObject(UEnum::StaticClass(), TEXT("/Script/WHFramework.EVoxelType")));
-
-	USceneModuleStatics::AddTraceMapping(FName("Chunk"), (ECollisionChannel)EGameTraceChannel::Chunk);
-	USceneModuleStatics::AddTraceMapping(FName("Voxel"), (ECollisionChannel)EGameTraceChannel::Voxel);
-
-	for(const auto Iter1 : UAssetModuleStatics::LoadPrimaryAssets<UVoxelData>(FName("Voxel")))
-	{
-		for(auto& Iter2 : Iter1->MeshDatas)
-		{
-			for(auto& Iter3 : Iter2.MeshUVDatas)
-			{
-				if(Iter3.Texture && WorldBasicData.RenderDatas.Contains(Iter1->Nature))
-				{
-					Iter3.UVOffset = FVector2D(0.f, WorldBasicData.RenderDatas[Iter1->Nature].Textures.AddUnique(Iter3.Texture));
-				}
-			}
-		}
-	}
-	
-	for(auto& Iter : WorldBasicData.RenderDatas)
-	{
-		Iter.Value.TextureSize = FVector2D(Iter.Value.PixelSize, Iter.Value.Textures.Num() * Iter.Value.PixelSize);
-
-		if(UTexture2D* Texture = UCommonModuleStatics::CompositeTextures(Iter.Value.Textures, Iter.Value.TextureSize))
-		{
-			Iter.Value.CombineTexture = Texture;
-				
-			UMaterialInstanceDynamic* MatInst = UKismetMaterialLibrary::CreateDynamicMaterialInstance(this, Iter.Value.Material);
-			MatInst->SetTextureParameterValue(FName("Texture"), Texture);
-			Iter.Value.MaterialInst = MatInst;
-			
-			MatInst = UKismetMaterialLibrary::CreateDynamicMaterialInstance(this, Iter.Value.UnlitMaterial);
-			MatInst->SetTextureParameterValue(FName("Texture"), Texture);
-			Iter.Value.UnlitMaterialInst = MatInst;
-			
-			MatInst = UKismetMaterialLibrary::CreateDynamicMaterialInstance(this, Iter.Value.TransMaterial);
-			MatInst->SetTextureParameterValue(FName("Texture"), Texture);
-			Iter.Value.TransMaterialInst = MatInst;
-		}
-	}
-	
-	for(const auto& Iter : VoxelClasses)
-	{
-		UReferencePoolModuleStatics::GetReference<UVoxel>(Iter);
-	}
-		
-	for(auto& Iter : ChunkQueues)
-	{
-		ITER_ARRAY_WITHINDEX(Iter.Value.Queues, i, Queue,
-			for(UVoxelGenerator* Generator : Queue.Generators)
-			{
-				Generator->Initialize(this, i + 1);
-				VoxelGeneratorMap.Add(Generator->GetClass(), Generator);
-			}
-		)
-	}
+	return GetWorld() && GetWorld()->GetNetMode() != NM_Client;
 }
-
-void UVoxelModule::OnPreparatory(EPhase InPhase)
+bool UVoxelModule::IsSaveEnabled() const
 {
-	Super::OnPreparatory(InPhase);
-}
-
-void UVoxelModule::OnRefresh(float DeltaSeconds, bool bInEditor)
-{
-	Super::OnRefresh(DeltaSeconds, bInEditor);
-
-	if(bInEditor) return;
-
-	if(WorldMode != EVoxelWorldMode::None)
-	{
-		GenerateChunkQueues();
-		GenerateWorld();
-		FIndex VoxelUpdateIndex;
-		while(VoxelUpdateQueue.Dequeue(VoxelUpdateIndex)) AddToVoxelUpdateQueue(VoxelUpdateIndex);
-		VoxelUpdateTime += DeltaSeconds;
-		if(VoxelUpdateTime >= 0.2f && !bVoxelUpdateRunning)
-		{
-			VoxelUpdateTime = 0.f;
-			UpdateVoxelQueue();
-		}
-	}
-}
-
-void UVoxelModule::OnPause()
-{
-	Super::OnPause();
-}
-
-void UVoxelModule::OnUnPause()
-{
-	Super::OnUnPause();
-}
-
-void UVoxelModule::OnTermination(EPhase InPhase)
-{
-	Super::OnTermination(InPhase);
-
-	if(PHASEC(InPhase, EPhase::Primary))
-	{
-		ShutdownChunkQueueThreads();
-	}
-}
-
-void UVoxelModule::Load_Implementation()
-{
-	if(!WorldData)
-	{
-		WorldData = NewWorldData();
-		LoadSaveData(ToData(), bAutoGenerate ? EPhase::All : EPhase::Primary);
-	}
-}
-
-void UVoxelModule::Save_Implementation()
-{
-	Super::Save_Implementation();
-}
-
-FString UVoxelModule::GetModuleDebugMessage()
-{
-	const FString StateName = UCommonModuleStatics::GetEnumAuthoredNameByValue(TEXT("/Script/WHFramework.EVoxelWorldState"), static_cast<int32>(WorldState));
-	return FString::Printf(TEXT("WorldState: %s"), *StateName);
+	return Super::IsSaveEnabled() && IsAuthority() && WorldMode == EVoxelWorldMode::Default;
 }
 
 void UVoxelModule::SetWorldMode(EVoxelWorldMode InWorldMode)
 {
-	if(WorldMode != InWorldMode)
+	if (WorldMode == InWorldMode)
 	{
-		WorldMode = InWorldMode;
-		OnWorldModeChanged();
+		return;
+	}
+	WorldMode = InWorldMode;
+	UEventModuleStatics::BroadcastEvent<FEventVoxelWorldModeChanged>(this, {WorldMode});
+}
+void UVoxelModule::OnInitialize()
+{
+	Super::OnInitialize();
+	FString Error;
+	bool Rendering = GetWorld() && GetWorld()->GetNetMode() != NM_DedicatedServer;
+	auto Assets = UAssetModuleStatics::LoadPrimaryAssets<UVoxelData>(FName(TEXT("Voxel")));
+	if (!Registry.Build(Assets, Rendering, Error))
+	{
+		WorldState = EVoxelWorldState::Failed;
+		UE_LOG(LogTemp, Error, TEXT("Voxel registry: %s"), *Error);
+		return;
+	}
+	auto S = MakeShared<FVoxelShapeRegistry, ESPMode::ThreadSafe>();
+	S->BuildDefaults();
+	Shapes = S;
+	if (Rendering)
+	{
+		MaterialSet = MaterialSetAsset.LoadSynchronous();
+		if (!MaterialSet || !MaterialSet->Validate(Error))
+		{
+			WorldState = EVoxelWorldState::Failed;
+			UE_LOG(LogTemp, Error, TEXT("Voxel material set: %s"), *Error);
+		}
 	}
 }
-
-void UVoxelModule::SetWorldState(EVoxelWorldState InWorldState)
+void UVoxelModule::OnPreparatory(EPhase P)
 {
-	if(WorldState != InWorldState)
+	Super::OnPreparatory(P);
+	if (bAutoGenerate && IsAuthority() && !Runtime && WorldState != EVoxelWorldState::Failed)
 	{
-		WorldState = InWorldState;
-		OnWorldStateChanged();
+		FString E;
+		CreateWorld(WorldBasicData.Generation, WorldBasicData.BlockSizeCentimeters, E);
 	}
 }
-
-void UVoxelModule::OnWorldModeChanged()
+bool UVoxelModule::CreateWorld(const FVoxelGenerationSettings& S, int32 Size, FString& E)
 {
-	UEventModuleStatics::BroadcastEvent<FEventVoxelWorldModeChanged>(this, { WorldMode });
-}
-
-void UVoxelModule::OnWorldStateChanged()
-{
-	UEventModuleStatics::BroadcastEvent<FEventVoxelWorldStateChanged>(this, { WorldState });
-}
-
-void UVoxelModule::OnWorldCenterChanged()
-{
-	UEventModuleStatics::BroadcastEvent<FEventVoxelWorldCenterChanged>(this, { WorldCenterIndex });
-}
-
-void UVoxelModule::OnWorldAgentMoved()
-{
-	UEventModuleStatics::BroadcastEvent<FEventVoxelWorldAgentMoved>(this, { WorldAgentIndex });
-}
-
-float UVoxelModule::GetWorldGeneratePercent() const
-{
-	const int32 BasicNum = (WorldData->GetWorldSize().X * ChunkSpawnDistance) * (WorldData->GetWorldSize().Y * ChunkSpawnDistance);
-	int32 GeneratedNum = 0;
-	ITER_MAP(ChunkMap, Iter,
-		if(Iter.Value->IsGenerated())
-		{
-			GeneratedNum++;
-		}
-	)
-	return (float)GeneratedNum / BasicNum;
-}
-
-FBox UVoxelModule::GetWorldBounds(float InRadius, float InHalfHeight) const
-{
-	const FVector2D WorldRadius = WorldData->GetWorldRealSize() * 0.5f;
-	const FVector WorldCenter = FVector(ChunkIndexToLocation(WorldCenterIndex).X + ((int32)WorldData->GetWorldSize().X % 2 == 1 ? WorldData->GetChunkRealSize().X * 0.5f : 0.f), ChunkIndexToLocation(WorldCenterIndex).Y + ((int32)WorldData->GetWorldSize().Y % 2 == 1 ? WorldData->GetChunkRealSize().Y * 0.5f : 0.f), WorldData->SkyHeight);
-	return FBox(WorldCenter - FVector(WorldRadius.X - InRadius, WorldRadius.Y - InRadius, WorldData->GetWorldRealHeight() - InHalfHeight), WorldCenter + FVector(WorldRadius.X - InRadius, WorldRadius.Y - InRadius, WorldData->GetWorldRealHeight() - InHalfHeight));
-}
-
-FVoxelWorldSaveData& UVoxelModule::GetWorldData() const
-{
-	return *WorldData;
-}
-
-TUniquePtr<FVoxelWorldSaveData> UVoxelModule::NewWorldData(const FParameter& InBasicData) const
-{
-	return MakeUnique<FVoxelModuleSaveData>(InBasicData.HasValue() ? InBasicData.GetRef<FVoxelModuleSaveData>() : FVoxelModuleSaveData(WorldBasicData));
-}
-
-void UVoxelModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
-{
-	const UScriptStruct* StructType = InSaveData.GetStructType();
-	check(StructType && StructType->IsChildOf(FVoxelWorldSaveData::StaticStruct()) && InSaveData.GetStructMemory());
-	const FVoxelWorldSaveData& SaveData = *reinterpret_cast<const FVoxelWorldSaveData*>(InSaveData.GetStructMemory());
-
-	if(PHASEC(InPhase, EPhase::Primary))
+	if (!IsAuthority() || !Registry.GetSnapshot())
 	{
-		WorldData = NewWorldData(InSaveData);
-
-		WorldData->RenderDatas = WorldBasicData.RenderDatas;
-		
-		if(WorldData->WorldSeed == 0)
+		E = TEXT("Only authority with a built registry can create a world");
+		return false;
+	}
+	if (Runtime)
+	{
+		E = TEXT("Close the current world before creating another");
+		return false;
+	}
+	FVoxelWorldManifest M;
+	M.WorldId = FGuid::NewGuid();
+	M.Settings = S;
+	M.BlockSizeCentimeters = Size;
+	M.RegistryHash = Registry.GetSnapshot()->Hash;
+	FVoxelGenerationRuntimeConfig C;
+	if (!Registry.GetSnapshot()->BuildGenerationConfig(S, C, E))
+		return false;
+	FVoxelGenerationPipeline G(C);
+	M.RecipeHash = FVoxelManifestCodec::RecipeFingerprint(M);
+	M.BaseSampleHash = G.BuildHandshakeSignature();
+	TArray<uint8> B;
+	if (!FVoxelManifestCodec::Encode(M, B))
+	{
+		E = TEXT("Invalid creation settings");
+		return false;
+	}
+	RegionStore.Reset();
+	return StartWorld(M, false, E);
+}
+bool UVoxelModule::StartWorld(const FVoxelWorldManifest& M, bool FromServer, FString& E)
+{
+	if (!Registry.GetSnapshot() || !Shapes || !GetWorld())
+	{
+		E = TEXT("Voxel assets are not initialized");
+		return false;
+	}
+	if ((GetWorld()->GetNetMode() == NM_Client) != FromServer)
+	{
+		E = TEXT("World authority mode mismatch");
+		return false;
+	}
+	if (Runtime)
+	{
+		E = TEXT("A world is already active");
+		return false;
+	}
+	if (!M.WorldId.IsValid() || M.RecipeHash != FVoxelManifestCodec::RecipeFingerprint(M) || M.RegistryHash != Registry.GetSnapshot()->Hash)
+	{
+		E = TEXT("World manifest or registry mismatch");
+		return false;
+	}
+	FVoxelGenerationRuntimeConfig C;
+	if (!Registry.GetSnapshot()->BuildGenerationConfig(M.Settings, C, E))
+		return false;
+	auto G = MakeShared<FVoxelGenerationPipeline, ESPMode::ThreadSafe>(C);
+	if (G->BuildHandshakeSignature() != M.BaseSampleHash)
+	{
+		E = TEXT("Base generation signature mismatch");
+		return false;
+	}
+	if (Epoch == MAX_uint64)
+	{
+		E = TEXT("World epoch exhausted");
+		return false;
+	}
+	Manifest = M;
+	Generator = G;
+	Runtime = MakeUnique<FVoxelWorldRuntime>(++Epoch, IsAuthority(), Registry.GetSnapshot().ToSharedRef(), G);
+	Scheduler = MakeUnique<FVoxelTaskScheduler>();
+	SessionId = IsAuthority() ? FGuid::NewGuid() : FGuid();
+	Desired.Reset();
+	RetryAfter.Reset();
+	RetryCount.Reset();
+	RemotePending.Reset();
+	Breaking.Reset();
+	LastStreaming = -1;
+	bRemoteRunning = false;
+	if (FromServer)
+		RegionStore.Reset();
+	WorldState = EVoxelWorldState::Running;
+	if (!WorldData)
+		WorldData = NewWorldData();
+	WorldData->Generation = M.Settings;
+	WorldData->BlockSizeCentimeters = M.BlockSizeCentimeters;
+	FVoxelManifestCodec::Encode(M, WorldData->ManifestBytes);
+	OnWorldInitialized.Broadcast();
+	E.Reset();
+	return true;
+}
+bool UVoxelModule::StopWorld(bool Discard, FString& E)
+{
+	if (SaveAdapter.IsBusy())
+	{
+		E = TEXT("Finish the SaveGame transaction before closing the voxel world");
+		return false;
+	}
+	if (Runtime && !Discard)
+	{
+		for (const auto& K : Runtime->ResidentKeys())
+			if (Runtime->Find(K)->IsSaveDirty())
+			{
+				E = TEXT("World contains uncommitted voxel edits");
+				return false;
+			}
+		if (!UnloadedSceneFiles.IsEmpty())
 		{
-			WorldData->WorldSeed = FMath::Rand();
+			E = TEXT("World contains uncommitted scene actors");
+			return false;
 		}
-		WorldData->RandomStream = FRandomStream(WorldData->WorldSeed);
-
-		VoxelCapture->GetCapture()->SetActive(true);
-		VoxelCapture->GetCapture()->OrthoWidth = WorldData->BlockSize * 4.f;
-		
-		int32 ItemIndex = 0;
-		ITER_ARRAY(UAssetModuleStatics::LoadPrimaryAssets<UVoxelData>(FName("Voxel")), Item,
-			if(!VoxelAssetIDMap.Contains(Item->VoxelType))
-			{
-				VoxelAssetIDMap.Add(Item->VoxelType, Item->GetPrimaryAssetId());
-			}
-		
-			if(Item->IsUnknown() || !Item->IsMainPart()) continue;
-			
-			AVoxelEntityCapture* VoxelEntity;
-			if(CaptureVoxels.IsValidIndex(ItemIndex))
-			{
-				VoxelEntity = CaptureVoxels[ItemIndex];
-			}
-			else
-			{
-				VoxelEntity = UObjectPoolModuleStatics::SpawnObject<AVoxelEntityCapture>();
-				VoxelCapture->GetCapture()->ShowOnlyActors.Add(VoxelEntity);
-				CaptureVoxels.EmplaceAt(ItemIndex, VoxelEntity);
-			}
-			if(VoxelEntity)
-			{
-				FVoxelItem VoxelItem = Item->GetPrimaryAssetId();
-				VoxelEntity->LoadSaveData(FParameter(VoxelItem));
-				VoxelEntity->SetActorLocation(FVector((ItemIndex / 8 - 3.5f) * WorldBasicData.BlockSize * 0.5f, (ItemIndex % 8 - 3.5f) * WorldBasicData.BlockSize * 0.5f, -800.f));
-				VoxelEntity->SetActorRotation(FRotator(-70.f, 0.f, -180.f));
-				VoxelEntity->GetMeshComponent()->SetRelativeRotation(FRotator(0.f, 45.f, 0.f));
-				VoxelEntity->GetMeshComponent()->SetRelativeScale3D(FVector(0.3f));
-
-				if(UMaterialInstanceDynamic* IconMat = Cast<UMaterialInstanceDynamic>(Item->Icon))
+	}
+	WorldState = EVoxelWorldState::Closing;
+	if (Scheduler)
+		Scheduler->StopAndJoin();
+	Scheduler.Reset();
+	for (auto& P : Columns)
+		if (P.Value)
+			P.Value->Shutdown();
+	Columns.Reset();
+	Runtime.Reset();
+	Generator.Reset();
+	RemotePending.Reset();
+	EncodedRemotePending.Reset();
+	NetworkRecipients.Reset();
+	NetworkBatchIds.Reset();
+	RemoteInFlight.Reset();
+	bDecodeRunning = bRemoteRunning = false;
+	Desired.Reset();
+	Breaking.Reset();
+	RetryAfter.Reset();
+	RetryCount.Reset();
+	UnloadedSceneFiles.Reset();
+	CapturedSceneFiles.Reset();
+	SessionId.Invalidate();
+	WorldState = EVoxelWorldState::None;
+	E.Reset();
+	return true;
+}
+void UVoxelModule::OnTermination(EPhase P)
+{
+	// Ordinary quit UI first completes SaveActiveSlotAsync. Engine teardown is not an implicit successful save.
+	if (SaveAdapter.IsBusy())
+		if (USaveGameModule* SaveGameModule = USaveGameModule::GetPtr())
+			SaveGameModule->FinishPendingSave();
+	FString E;
+	if (!StopWorld(true, E))
+		UE_LOG(LogTemp, Error, TEXT("Voxel close failed: %s"), *E);
+	Super::OnTermination(P);
+}
+void UVoxelModule::OnRefresh(float Dt, bool InEditor)
+{
+	Super::OnRefresh(Dt, InEditor);
+	if (InEditor || !IsReady())
+		return;
+	Scheduler->Tick(
+	    [this](FVoxelTaskResult&& R)
+	    {
+		    ApplyTask(MoveTemp(R));
+	    });
+	double Now = FPlatformTime::Seconds();
+	if (LastStreaming < 0 || Now - LastStreaming >= .2)
+	{
+		RefreshStreaming(Now);
+		LastStreaming = Now;
+	}
+	// Dispatch backlog every frame, not only when the source changes.
+	for (int32 I = 0; I < FMath::Min(32, OrderedDesired.Num()); ++I)
+		if (const auto* D = Desired.Find(OrderedDesired[I]))
+			QueueSection(OrderedDesired[I], *D);
+	for (int32 I = 0; I < 96 && !OrderedDesired.IsEmpty(); ++I)
+	{
+		DispatchCursor %= OrderedDesired.Num();
+		auto K = OrderedDesired[DispatchCursor++];
+		if (const auto* D = Desired.Find(K))
+			QueueSection(K, *D);
+	}
+	PumpRemote();
+	const double SceneEnd = FPlatformTime::Seconds() + .0005;
+	for (int32 I = 0; I < 4 && !SceneColumnOrder.IsEmpty() && FPlatformTime::Seconds() < SceneEnd; ++I)
+	{
+		SceneTickCursor %= SceneColumnOrder.Num();
+		const FIntPoint C = SceneColumnOrder[SceneTickCursor++];
+		auto* Column = GetColumn(C);
+		if (!Column || !Column->bSceneReady || Column->bSceneFailed)
+			continue;
+		bool Sim = false;
+		for (int32 Z = VoxelCoord::FloorDiv(Manifest.Settings.MinZ, 16); Z <= VoxelCoord::FloorDiv(Manifest.Settings.MaxZ - 1, 16); ++Z)
+			if (const auto* D = Desired.Find({C.X, C.Y, Z}))
+				if (D->bSimulation)
 				{
-					IconMat->SetTextureParameterValue(FName("Texture"), VoxelCapture->GetCapture()->TextureTarget);
-					IconMat->SetScalarParameterValue(FName("Index"), ItemIndex);
-					IconMat->SetScalarParameterValue(FName("SizeX"), 8.f);
-					IconMat->SetScalarParameterValue(FName("SizeY"), 8.f);
+					Sim = true;
+					break;
 				}
-			}
-			ItemIndex++;
-		)
+		if (Sim)
+			Column->TickSceneActors(Dt);
 	}
-	if(PHASEC(InPhase, EPhase::All))
+	for (auto It = Breaking.CreateIterator(); It; ++It)
+		if (!It.Key().IsValid() || Now - It.Value().LastPulse > .35)
+			It.RemoveCurrent();
+}
+FGuid UVoxelModule::RegisterSource(UObject* Owner, const FVoxelStreamingSource& S)
+{
+	if (!Owner || Owner->GetWorld() != GetWorld())
+		return FGuid();
+	FVoxelStreamingSource V = S;
+	V.Id = FGuid::NewGuid();
+	if (!FVoxelStreaming::Validate(V))
+		return FGuid();
+	FSource N;
+	N.Owner = Owner;
+	N.Value = V;
+	Sources.Add(V.Id, N);
+	LastStreaming = -1;
+	return V.Id;
+}
+bool UVoxelModule::UpdateSource(const FGuid& ID, const FVoxelStreamingSource& S)
+{
+	auto* N = Sources.Find(ID);
+	if (!N)
+		return false;
+	auto V = S;
+	V.Id = ID;
+	if (!FVoxelStreaming::Validate(V))
+		return false;
+	if (VoxelCoord::Section(V.Center) != VoxelCoord::Section(N->Value.Center))
+		LastStreaming = -1;
+	N->Value = V;
+	return true;
+}
+void UVoxelModule::UnregisterSource(const FGuid& ID)
+{
+	Sources.Remove(ID);
+	LastStreaming = -1;
+}
+UVoxelChunk* UVoxelModule::GetColumn(FIntPoint K, bool Create)
+{
+	if (const TObjectPtr<UVoxelChunk> Column = Columns.FindRef(K))
 	{
-		FSceneModuleSaveData SceneData = SaveData.SceneData;
-		if(SceneData.WeatherData.WeatherSeed == 0)
+		return Column.Get();
+	}
+	if (!Create || !Runtime)
+		return nullptr;
+	auto* C = NewObject<UVoxelChunk>(this, ChunkSpawnClass);
+	if (!C->Initialize(this, K))
+		return nullptr;
+	Columns.Add(K, C);
+	return C;
+}
+AActor* UVoxelModule::FindSceneActor(const FGuid& ID) const
+{
+	for (const auto& P : Columns)
+		if (P.Value)
+			if (AActor* A = P.Value->GetSceneActors().FindRef(ID))
+				if (::IsValid(A))
+					return A;
+	return nullptr;
+}
+void UVoxelModule::RefreshStreaming(double Now)
+{
+	TArray<FVoxelStreamingSource> A;
+	for (auto It = Sources.CreateIterator(); It; ++It)
+	{
+		if (!It.Value().Owner.IsValid())
 		{
-			SceneData.WeatherData.WeatherSeed = WorldData->WorldSeed;
+			It.RemoveCurrent();
+			continue;
 		}
-		USceneModule::Get().LoadSaveData(FParameter(MoveTemp(SceneData)), InPhase);
-		USceneModule::Get().SetSeaLevel(SaveData.SeaLevel * SaveData.BlockSize);
+		A.Add(It.Value().Value);
+	}
+	Columns.GetKeys(SceneColumnOrder);
+	Desired = FVoxelStreaming::Compute(A, Manifest.Settings);
+	auto Keys = FVoxelStreaming::ByPriority(Desired);
+	OrderedDesired = Keys;
+	int32 Created = 0;
+	for (const auto& K : Keys)
+	{
+		auto* S = Runtime->Find(K);
+		if (!S && Created < 32 && Runtime->NumSections() < 8192)
+		{
+			S = Runtime->Allocate(K, Now);
+			if (S)
+				++Created;
+		}
+		if (!S)
+			continue;
+		const auto& D = Desired.FindChecked(K);
+		S->LastWanted = Now;
+		if (S->bWantsMesh && !D.bMesh)
+			if (auto* C = GetColumn({K.X, K.Y}))
+				C->ClearMesh(K.Z);
+		if (S->bWantsCollision && !D.bCollision)
+		{
+			S->bHasCollision = false;
+			if (auto* C = GetColumn({K.X, K.Y}))
+				C->ClearCollision(K.Z);
+		}
+		if (!S->bWantsMesh && D.bMesh)
+			S->bMeshDirty = true;
+		if (!S->bWantsCollision && D.bCollision)
+			S->bCollisionDirty = true;
+		S->bWantsMesh = D.bMesh;
+		S->bWantsCollision = D.bCollision;
+		S->bWantsSimulation = D.bSimulation;
+	}
+	auto Resident = Runtime->ResidentKeys();
+	int32 Removed = 0;
+	for (const auto& K : Resident)
+	{
+		if (Removed >= 16)
+			break;
+		auto* S = Runtime->Find(K);
+		if (!S || Desired.Contains(K) || S->PinCount || S->IsSaveDirty() || Now - S->LastWanted < 2)
+			continue;
+		bool Last = true;
+		for (const auto& Other : Resident)
+			if (Other != K && Other.X == K.X && Other.Y == K.Y && Runtime->Find(Other))
+			{
+				Last = false;
+				break;
+			}
+		UVoxelChunk* C = GetColumn({K.X, K.Y});
+		FString E;
+		if (Last && C && IsAuthority() && C->bSceneReady && !CaptureColumnForUnload(*C, E))
+			continue;
+		Scheduler->CancelSection(K);
+		if (!Runtime->Remove(K))
+			continue;
+		++Removed;
+		RetryCount.Remove(K);
+		RetryAfter.Remove(K);
+		if (C)
+		{
+			C->ClearMesh(K.Z);
+			C->ClearCollision(K.Z);
+			if (Last)
+			{
+				C->Shutdown();
+				Columns.Remove({K.X, K.Y});
+			}
+		}
 	}
 }
-
+void UVoxelModule::QueueSection(const FVoxelSectionKey& K, const FVoxelSectionDemand& D)
+{
+	auto* S = Runtime->Find(K);
+	if (!S || RetryCount.FindRef(K) >= 3)
+		return;
+	double Now = FPlatformTime::Seconds();
+	if (RetryAfter.FindRef(K) > Now)
+		return;
+	if (S->Status == EVoxelSectionStatus::Failed)
+	{
+		if (RetryCount.FindRef(K) >= 3)
+			return;
+		S->Status = EVoxelSectionStatus::Allocated;
+	}
+	if (S->Status == EVoxelSectionStatus::Allocated)
+	{
+		if (!IsAuthority() || Scheduler->Has(S->Stamp, EVoxelTaskKind::Generate))
+			return;
+		FVoxelTaskRequest Q;
+		Q.Stamp = S->Stamp;
+		Q.Kind = EVoxelTaskKind::Generate;
+		Q.Priority = D.Priority;
+		Q.ReservedBytes = 2 * 1024 * 1024;
+		auto Stamp = S->Stamp;
+		auto G = Generator;
+		auto R = Registry.GetSnapshot();
+		auto M = Manifest;
+		auto Read = RegionStore.CaptureRead(K);
+		Q.Execute = [Stamp, G, R, M, Read](const std::atomic_bool& Cancel)
+		{
+			FVoxelTaskResult O;
+			O.Stamp = Stamp;
+			O.Kind = EVoxelTaskKind::Generate;
+			O.Overlay.Key = Stamp.Key;
+			if (!G->GenerateSection(Stamp.Key, O.Base, &Cancel))
+			{
+				O.bCanceled = Cancel.load();
+				return O;
+			}
+			TArray<uint8> B;
+			auto Status = FVoxelRegionStore::Read(Read, B, O.Error);
+			if (Status == EVoxelRegionRead::Failed)
+				return O;
+			if (Status == EVoxelRegionRead::Loaded && !FVoxelDeltaCodec::Decode(B, M, *R, O.Overlay))
+			{
+				O.Error = TEXT("Corrupt section delta");
+				return O;
+			}
+			O.bSuccess = !Cancel.load();
+			O.bCanceled = Cancel.load();
+			return O;
+		};
+		Scheduler->Enqueue(MoveTemp(Q));
+		return;
+	}
+	if (S->Status != EVoxelSectionStatus::DataReady)
+		return;
+	if (D.bMesh && S->bMeshDirty && GetWorld()->GetNetMode() != NM_DedicatedServer && !Scheduler->Has(S->Stamp, EVoxelTaskKind::Mesh))
+	{
+		FVoxelSectionSnapshot Snap;
+		if (Runtime->CaptureSnapshot(K, Snap))
+		{
+			FVoxelTaskRequest Q;
+			Q.Stamp = S->Stamp;
+			Q.Kind = EVoxelTaskKind::Mesh;
+			Q.Priority = D.Priority;
+			Q.InputBytes = Snap.Bytes();
+			Q.ReservedBytes = 48 * 1024 * 1024;
+			auto R = Registry.GetSnapshot();
+			auto H = Shapes;
+			Q.Execute = [Snap = MoveTemp(Snap), R, H](const std::atomic_bool& C)
+			{
+				FVoxelTaskResult O;
+				O.Stamp = Snap.Stamp;
+				O.Kind = EVoxelTaskKind::Mesh;
+				O.bSuccess = FVoxelSectionMesher::Build(Snap, *R, *H, O.Mesh, &C);
+				O.bCanceled = C.load();
+				return O;
+			};
+			Scheduler->Enqueue(MoveTemp(Q));
+		}
+	}
+	if (D.bCollision && S->bCollisionDirty && !Scheduler->Has(S->Stamp, EVoxelTaskKind::Collision))
+	{
+		FVoxelSectionSnapshot Snap;
+		if (Runtime->CaptureSnapshot(K, Snap))
+		{
+			FVoxelTaskRequest Q;
+			Q.Stamp = S->Stamp;
+			Q.Kind = EVoxelTaskKind::Collision;
+			Q.Priority = D.Priority - 200000;
+			Q.InputBytes = Snap.Bytes();
+			Q.ReservedBytes = 2 * 1024 * 1024;
+			auto R = Registry.GetSnapshot();
+			auto H = Shapes;
+			Q.Execute = [Snap = MoveTemp(Snap), R, H](const std::atomic_bool& C)
+			{
+				FVoxelTaskResult O;
+				O.Stamp = Snap.Stamp;
+				O.Kind = EVoxelTaskKind::Collision;
+				O.bSuccess = FVoxelCollisionBuilder::Build(Snap, *R, *H, O.Collision, &C);
+				O.bCanceled = C.load();
+				return O;
+			};
+			Scheduler->Enqueue(MoveTemp(Q));
+		}
+	}
+	if (IsAuthority() && D.bSimulation)
+	{
+		if (auto* C = GetColumn({K.X, K.Y}, true))
+			if (!C->bSceneReady && !C->bSceneLoading && !C->bSceneFailed)
+				QueueSceneLoad(*C, *S);
+	}
+}
+void UVoxelModule::ApplyTask(FVoxelTaskResult&& R)
+{
+	if (!Runtime)
+		return;
+	if (R.Kind == EVoxelTaskKind::EncodeNetwork)
+	{
+		uint64 ID = R.Stamp.GenerationToken;
+		auto Recipient = NetworkRecipients.FindRef(ID);
+		FGuid Batch = NetworkBatchIds.FindRef(ID);
+		NetworkRecipients.Remove(ID);
+		NetworkBatchIds.Remove(ID);
+		if (R.Stamp.WorldEpoch == Epoch && Recipient.IsValid())
+			Recipient->CompleteSnapshotSend(Batch, MoveTemp(R.Bytes), R.bSuccess && !R.bCanceled);
+		return;
+	}
+	if (R.Kind == EVoxelTaskKind::DecodeNetwork)
+	{
+		bDecodeRunning = false;
+		if (R.Stamp.WorldEpoch != Epoch)
+			return;
+		if (!R.bSuccess || R.bCanceled)
+		{
+			UE_LOG(LogTemp, Error, TEXT("Invalid remote snapshot payload"));
+			if (!R.bCanceled)
+			{
+				WorldState = EVoxelWorldState::Failed;
+				LastSaveError = TEXT("Invalid remote snapshot; reconnect required");
+			}
+			return;
+		}
+		FVoxelSnapshotBatch B;
+		B.Id = R.BatchId;
+		B.Sections = MoveTemp(R.RemoteOverlays);
+		FString E;
+		if (!QueueRemoteBatch(B, E))
+			OnRemoteBatchCompleted.Broadcast(B, false);
+		return;
+	}
+	if (R.Kind == EVoxelTaskKind::RebuildOverlay)
+	{
+		bRemoteRunning = false;
+		FVoxelSnapshotBatch B;
+		B.Id = R.BatchId;
+		B.Sections = R.RemoteOverlays;
+		if (RemoteInFlight.IsSet() && !B.Id.IsValid())
+			B = RemoteInFlight.GetValue();
+		RemoteInFlight.Reset();
+		bool OK = R.bSuccess && !R.bCanceled;
+		for (const auto& T : R.RemoteStamps)
+			if (!Runtime->IsCurrent(T, false))
+				OK = false;
+		if (OK)
+			OK = Runtime->ApplyRemoteSnapshots(R.RemoteOverlays, MoveTemp(R.RemoteBases));
+		OnRemoteBatchCompleted.Broadcast(B, OK);
+		return;
+	}
+	if (R.Kind == EVoxelTaskKind::LoadScene)
+	{
+		auto* C = GetColumn({R.Stamp.Key.X, R.Stamp.Key.Y});
+		if (!C)
+			return;
+		C->bSceneLoading = false;
+		if (R.bCanceled || !Runtime->IsCurrent(R.Stamp, false))
+			return;
+		if (!R.bSuccess)
+		{
+			C->bSceneFailed = true;
+			UE_LOG(LogTemp, Error, TEXT("Voxel scene load: %s"), *R.Error);
+			return;
+		}
+		FString E;
+		if (R.Bytes.IsEmpty())
+		{
+			C->bSceneReady = true;
+		}
+		else if (!C->RestoreActors(R.Bytes, E))
+		{
+			C->bSceneFailed = true;
+			UE_LOG(LogTemp, Error, TEXT("Voxel scene restore: %s"), *E);
+		}
+		return;
+	}
+	if (!Runtime->IsCurrent(R.Stamp, R.Kind != EVoxelTaskKind::Generate))
+		return;
+	if (!R.bSuccess)
+	{
+		if (!R.bCanceled)
+		{
+			int32& N = RetryCount.FindOrAdd(R.Stamp.Key);
+			++N;
+			RetryAfter.Add(R.Stamp.Key, FPlatformTime::Seconds() + N);
+			if (R.Kind == EVoxelTaskKind::Generate)
+				Runtime->Find(R.Stamp.Key)->Status = EVoxelSectionStatus::Failed;
+			UE_LOG(LogTemp, Error, TEXT("Voxel job %d failed at %d,%d,%d: %s"), int32(R.Kind), R.Stamp.Key.X, R.Stamp.Key.Y, R.Stamp.Key.Z, *R.Error);
+		}
+		return;
+	}
+	if (R.Kind == EVoxelTaskKind::Generate)
+	{
+		if (!Runtime->PublishLoaded(R.Stamp, MoveTemp(R.Base), R.Overlay, true))
+		{
+			Runtime->Find(R.Stamp.Key)->Status = EVoxelSectionStatus::Failed;
+			RetryCount.Add(R.Stamp.Key, 3);
+			return;
+		}
+		if (auto* C = GetColumn({R.Stamp.Key.X, R.Stamp.Key.Y}, true))
+			C->OnSectionActivated(R.Stamp.Key);
+	}
+	else if (auto* C = GetColumn({R.Stamp.Key.X, R.Stamp.Key.Y}, true))
+	{
+		bool Attempted = false;
+		bool Applied = false;
+		if (R.Kind == EVoxelTaskKind::Mesh && Runtime->Find(R.Stamp.Key)->bWantsMesh)
+		{
+			Attempted = true;
+			Applied = MaterialSet && C->ApplyMesh(R.Mesh, *MaterialSet, BlockSize());
+			if (Applied)
+				Runtime->MarkMeshApplied(R.Stamp);
+		}
+		if (R.Kind == EVoxelTaskKind::Collision && Runtime->Find(R.Stamp.Key)->bWantsCollision)
+		{
+			Attempted = true;
+			Applied = C->ApplyCollision(R.Collision, BlockSize());
+			if (Applied)
+				Runtime->MarkCollisionApplied(R.Stamp);
+		}
+		if (Attempted && !Applied)
+		{
+			int32& N = RetryCount.FindOrAdd(R.Stamp.Key);
+			++N;
+			RetryAfter.Add(R.Stamp.Key, FPlatformTime::Seconds() + N);
+			UE_LOG(LogTemp, Error, TEXT("Voxel component apply failed; section %d,%d,%d attempt %d"), R.Stamp.Key.X, R.Stamp.Key.Y, R.Stamp.Key.Z, N);
+		}
+	}
+}
+bool UVoxelModule::QueueRemoteBatch(const FVoxelSnapshotBatch& B, FString& E)
+{
+	if (!IsReady() || IsAuthority() || RemotePending.Num() >= 4 || B.Sections.IsEmpty() || B.Sections.Num() > 32)
+		return false;
+	for (const auto& O : B.Sections)
+		if (!VoxelCoord::IsValidSection(O.Key, Manifest.Settings.MinZ, Manifest.Settings.MaxZ))
+			return false;
+	RemotePending.Add(B);
+	E.Reset();
+	return true;
+}
+void UVoxelModule::PumpRemote()
+{
+	PumpDecode();
+	if (IsAuthority() || bRemoteRunning || RemotePending.IsEmpty())
+		return;
+	FVoxelSnapshotBatch B = MoveTemp(RemotePending[0]);
+	RemotePending.RemoveAt(0);
+	TArray<FVoxelTaskStamp> Stamps;
+	bool AnyNew = false;
+	for (const auto& O : B.Sections)
+	{
+		auto* S = Runtime->Find(O.Key);
+		if (!S && Runtime->NumSections() < 8192)
+			S = Runtime->Allocate(O.Key, FPlatformTime::Seconds());
+		if (!S || S->Stamp.Revision > O.Revision)
+		{
+			OnRemoteBatchCompleted.Broadcast(B, false);
+			return;
+		}
+		if (S->Status != EVoxelSectionStatus::DataReady || S->Stamp.Revision < O.Revision)
+			AnyNew = true;
+		Stamps.Add(S->Stamp);
+	}
+	if (!AnyNew)
+	{
+		OnRemoteBatchCompleted.Broadcast(B, true);
+		return;
+	}
+	FVoxelTaskRequest Q;
+	Q.Kind = EVoxelTaskKind::RebuildOverlay;
+	Q.Stamp = Stamps[0];
+	Q.Priority = -300000;
+	Q.ReservedBytes = 16 * 1024 * 1024;
+	Q.InputBytes = 0;
+	for (const auto& O : B.Sections)
+	{
+		Q.InputBytes += O.Blocks.Num() * 16;
+		for (const auto& P : O.Entities)
+			Q.InputBytes += P.Value.Payload.Num() + 64;
+	}
+	auto G = Generator;
+	Q.Execute = [B, Stamps, G](const std::atomic_bool& C)
+	{
+		FVoxelTaskResult O;
+		O.Kind = EVoxelTaskKind::RebuildOverlay;
+		O.Stamp = Stamps[0];
+		O.BatchId = B.Id;
+		O.RemoteStamps = Stamps;
+		O.RemoteOverlays = B.Sections;
+		for (const auto& S : B.Sections)
+		{
+			FVoxelSectionStorage Base;
+			if (!G->GenerateSection(S.Key, Base, &C))
+			{
+				O.bCanceled = C.load();
+				return O;
+			}
+			O.RemoteBases.Add(MoveTemp(Base));
+		}
+		O.bSuccess = true;
+		return O;
+	};
+	if (Scheduler->Enqueue(MoveTemp(Q)))
+	{
+		bRemoteRunning = true;
+		RemoteInFlight = B;
+	}
+	else
+		RemotePending.Insert(MoveTemp(B), 0);
+}
+bool UVoxelModule::CopyOverlay(const FVoxelSectionKey& K, FVoxelSectionOverlay& O) const
+{
+	const auto* S = Runtime ? Runtime->Find(K) : nullptr;
+	if (!S || S->Status != EVoxelSectionStatus::DataReady)
+		return false;
+	O = S->Overlay;
+	return true;
+}
+FVoxelTraceResult UVoxelModule::Trace(const FVector& S, const FVector& D, double Range) const
+{
+	if (!IsReady())
+		return {};
+	return FVoxelRaycast::Trace(*Runtime, *Registry.GetSnapshot(), *Shapes, S, D, Range, BlockSize());
+}
+bool UVoxelModule::IsActorRayClear(const FVector& S, const FVector& E, AActor* Ignore) const
+{
+	FCollisionQueryParams P(SCENE_QUERY_STAT(VoxelActorLOS), false);
+	if (Ignore)
+		P.AddIgnoredActor(Ignore);
+	for (int32 I = 0; I < 64; ++I)
+	{
+		FHitResult H;
+		if (!GetWorld()->LineTraceSingleByChannel(H, S, E, ECC_Visibility, P))
+			return true;
+		if (H.GetComponent() && H.GetComponent()->IsA<UVoxelCollisionComponent>())
+		{
+			P.AddIgnoredActor(H.GetActor());
+			continue;
+		}
+		return false;
+	}
+	return false;
+}
+bool UVoxelModule::VerifyView(APlayerController* PC, AActor* Observer, const FVoxelEditIntent& I, FVoxelTraceResult& O, FString& E) const
+{
+	if (!IsReady() || !IsAuthority() || !Observer || Observer->GetWorld() != GetWorld() || I.Origin.ContainsNaN() || I.Direction.ContainsNaN() ||
+	    I.Direction.IsNearlyZero())
+		return false;
+	FVector Eye;
+	FRotator Rotation;
+	Observer->GetActorEyesViewPoint(Eye, Rotation);
+	if (PC && PC->GetPawn() == Observer)
+		Rotation = PC->GetControlRotation();
+	if (GetWorld()->GetNetMode() != NM_Standalone)
+	{
+		if (!PC || !PC->HasAuthority() || FVector::DistSquared(I.Origin, Eye) > 500.0 * 500.0 ||
+		    FVector::DotProduct(Rotation.Vector(), I.Direction.GetSafeNormal()) < .984807753)
+		{
+			E = TEXT("View is outside the authorized observer");
+			return false;
+		}
+		double Offset = FVector::Distance(Eye, I.Origin);
+		if (Offset > 1)
+		{
+			auto C = Trace(Eye, I.Origin - Eye, Offset);
+			if (C.Status == EVoxelTraceStatus::NeedsData || C.Status == EVoxelTraceStatus::Hit && C.Distance < Offset - 1 ||
+			    !IsActorRayClear(Eye, I.Origin, Observer))
+			{
+				E = TEXT("Camera cannot see through an obstacle");
+				return false;
+			}
+		}
+	}
+	O = Trace(I.Origin, I.Direction, 600);
+	if (O.Status != EVoxelTraceStatus::Hit || O.Index != I.ExpectedTarget || FVector::Distance(O.Point, Eye) > 600 ||
+	    !IsActorRayClear(I.Origin, O.Point - I.Direction.GetSafeNormal() * .1, Observer))
+	{
+		E = O.Status == EVoxelTraceStatus::NeedsData ? TEXT("Target data is not ready") : TEXT("Target is not visible or is too far");
+		return false;
+	}
+	return true;
+}
+bool UVoxelModule::PlacementOverlapsActors(const FVoxelInteractionPlan& P) const
+{
+	FCollisionObjectQueryParams Objects;
+	Objects.AddObjectTypesToQuery(ECC_Pawn);
+	Objects.AddObjectTypesToQuery(ECC_WorldDynamic);
+	for (const auto& E : P.Cells)
+	{
+		if (E.Value.IsAir())
+			continue;
+		const auto* D = Registry.GetSnapshot()->Find(E.Value.TypeId);
+		if (!D || !D->bSolid)
+			continue;
+		for (const FBox& B : Shapes->Get(D->Shape, E.Value.State).CollisionBoxes)
+		{
+			FVector Center = (FVector(E.Position) + B.GetCenter()) * BlockSize(), Half = B.GetExtent() * BlockSize() - FVector(.1);
+			if (Half.GetMin() <= 0)
+				continue;
+			if (GetWorld()->OverlapAnyTestByObjectType(Center, FQuat::Identity, Objects, FCollisionShape::MakeBox(Half)))
+				return true;
+		}
+	}
+	return false;
+}
+UAbilityInventoryBase* UVoxelModule::ResolveInventory(APlayerController* PC, AActor* Source) const
+{
+	AActor* A = PC && PC->GetPawn() ? PC->GetPawn() : Source;
+	auto* I = Cast<IAbilityInventoryAgentInterface>(A);
+	return I ? I->GetInventory() : nullptr;
+}
+FVoxelEditReply UVoxelModule::ExecuteIntent(APlayerController* PC, AActor* Source, const FVoxelEditIntent& I, bool Creative)
+{
+	FVoxelEditReply Reply;
+	Reply.RequestId = I.RequestId;
+	Reply.Code = EVoxelEditCode::Rejected;
+	if (!I.RequestId || !Source || bMutating || !IsReady() || !IsAuthority())
+	{
+		Reply.Code = EVoxelEditCode::Busy;
+		return Reply;
+	}
+	if (I.Action == EVoxelEditAction::BreakCancel)
+	{
+		Breaking.Remove(Source);
+		Reply.Code = EVoxelEditCode::Accepted;
+		return Reply;
+	}
+	FVoxelTraceResult H;
+	if (!VerifyView(PC, Source, I, H, Reply.Reason))
+	{
+		Reply.Code = H.Status == EVoxelTraceStatus::NeedsData ? EVoxelEditCode::NeedsData : EVoxelEditCode::Rejected;
+		Breaking.Remove(Source);
+		return Reply;
+	}
+	double Now = FPlatformTime::Seconds();
+	if (I.Action == EVoxelEditAction::BreakBegin)
+	{
+		FBreak B;
+		B.Target = H.Index;
+		B.Expected = H.State;
+		B.Began = B.LastPulse = Now;
+		Breaking.Add(Source, B);
+		Reply.Code = EVoxelEditCode::Pending;
+		return Reply;
+	}
+	if (I.Action == EVoxelEditAction::BreakPulse)
+	{
+		auto* B = Breaking.Find(Source);
+		if (!B || B->Target != H.Index || B->Expected != H.State || Now - B->LastPulse > .35)
+		{
+			Breaking.Remove(Source);
+			Reply.Code = EVoxelEditCode::Stale;
+			return Reply;
+		}
+		B->LastPulse = Now;
+		int32 Milliseconds = Registry.GetSnapshot()->Find(H.State.TypeId)->BreakMilliseconds;
+		if ((Now - B->Began) * 1000 < Milliseconds)
+		{
+			Reply.Code = EVoxelEditCode::Pending;
+			return Reply;
+		}
+	}
+	if (I.Action == EVoxelEditAction::ContainerTake || I.Action == EVoxelEditAction::ContainerPut)
+		return TransferContainer(PC, Source, I, H);
+	UAbilityInventoryBase* Inventory = ResolveInventory(PC, Source);
+	UAbilityInventorySlotBase* Slot = nullptr;
+	uint16 PlaceType = 0;
+	const auto* Agent = Source->FindComponentByClass<UVoxelAgentComponent>();
+	Creative = Creative && GetWorld()->GetNetMode() == NM_Standalone && Agent && Agent->bCreativeInStandalone;
+	FAbilityItem Before, After;
+	if (I.Action == EVoxelEditAction::Place)
+	{
+		const auto* Def = Registry.GetSnapshot()->Find(I.ExpectedItemID);
+		if (!Def)
+		{
+			Reply.Reason = TEXT("Unknown inventory block");
+			return Reply;
+		}
+		PlaceType = Def->TypeId;
+		if (!Creative)
+		{
+			Slot = Inventory ? Inventory->GetSlotBySplitTypeAndIndex(ESlotSplitType::Shortcut, I.InventorySlot) : nullptr;
+			if (!Slot || Slot != Inventory->GetSelectedSlot(ESlotSplitType::Shortcut) || !Slot->IsEnabled() || Slot->GetItem().ID != I.ExpectedItemID ||
+			    Slot->GetItem().Count <= 0 || Slot->GetItem().Level != 0)
+			{
+				Reply.Reason = TEXT("Server inventory slot does not contain this block");
+				return Reply;
+			}
+			Before = Slot->GetItem();
+			After = Before;
+			--After.Count;
+			if (After.Count == 0)
+				After = FAbilityItem::Empty;
+		}
+	}
+	FVoxelInteractionPlan Plan;
+	if (!FVoxelEditTransaction::Build(*Runtime, *Registry.GetSnapshot(), *Shapes, H, I.Action, PlaceType, I.Direction, BlockSize(), Plan, Reply.Reason))
+		return Reply;
+	if ((I.Action == EVoxelEditAction::Place || I.Action == EVoxelEditAction::Use) && PlacementOverlapsActors(Plan))
+	{
+		Reply.Reason = TEXT("Result would overlap an actor");
+		return Reply;
+	}
+	FVoxelPreparedEdit Prepared;
+	if (!Runtime->PrepareEdit(Plan.Cells, Plan.Entities, Prepared, Reply.Reason))
+		return Reply;
+	TGuardValue<bool> Guard(bMutating, true);
+	AAbilityPickUpVoxel* Drop = nullptr;
+	if (Plan.DropID.IsValid() && Plan.DropCount > 0)
+	{
+		auto* C = GetColumn({VoxelCoord::Section(H.Index).X, VoxelCoord::Section(H.Index).Y}, true);
+		Drop = AAbilityPickUpVoxel::CreateReserved(GetWorld(), FAbilityItem(Plan.DropID, Plan.DropCount), H.Point, C);
+		if (!Drop)
+		{
+			Reply.Reason = TEXT("Cannot allocate a drop; block was not changed");
+			return Reply;
+		}
+	}
+	if (Slot && !FVoxelInventoryTransaction::SetSilent(*Slot, Before, After))
+	{
+		if (Drop)
+			Drop->Destroy();
+		Reply.Code = EVoxelEditCode::Stale;
+		return Reply;
+	}
+	FVoxelEditBatch Batch;
+	if (!Runtime->CommitEdit(MoveTemp(Prepared), Batch))
+	{
+		if (Slot)
+			FVoxelInventoryTransaction::RestoreSilent(*Slot, Before);
+		if (Drop)
+			Drop->Destroy();
+		Reply.Code = EVoxelEditCode::Stale;
+		return Reply;
+	}
+	if (Drop)
+		Drop->ActivateReserved();
+	if (Slot)
+		FVoxelInventoryTransaction::Notify(*Slot, Before);
+	Breaking.Remove(Source);
+	OnBlocksCommitted.Broadcast(Batch);
+	Reply.Code = EVoxelEditCode::Accepted;
+	return Reply;
+}
+FVoxelEditReply UVoxelModule::TransferContainer(APlayerController* PC, AActor* Source, const FVoxelEditIntent& I, const FVoxelTraceResult& H)
+{
+	FVoxelEditReply Reply;
+	Reply.RequestId = I.RequestId;
+	auto* S = Runtime->Find(VoxelCoord::Section(H.Index));
+	if (!S || S->Stamp.Revision != I.ExpectedRevision || I.ContainerSlot < 0 || I.ContainerSlot >= 27)
+	{
+		Reply.Code = EVoxelEditCode::Stale;
+		return Reply;
+	}
+	auto* Entity = S->Overlay.Entities.Find(VoxelCoord::Linear(VoxelCoord::Local(H.Index)));
+	TArray<FVoxelItemStack> Items;
+	auto* Inv = ResolveInventory(PC, Source);
+	auto* Slot = Inv ? Inv->GetSlotBySplitTypeAndIndex(ESlotSplitType::Shortcut, I.InventorySlot) : nullptr;
+	if (!Slot || !Slot->IsEnabled() || !Entity || !FVoxelBlockEntityCodec::DecodeContainer(*Entity, Items))
+		return Reply;
+	FAbilityItem Before = Slot->GetItem(), After = Before;
+	auto& Cell = Items[I.ContainerSlot];
+	int32 N = I.Count;
+	if (N <= 0)
+		return Reply;
+	if (I.Action == EVoxelEditAction::ContainerTake)
+	{
+		if (Cell.Count < N)
+			return Reply;
+		FAbilityItem Take(Cell.ID, N, Cell.Level);
+		if (!Slot->MatchItem(Take, true) || Slot->GetRemainVolume(Take) < N)
+			return Reply;
+		After = Before.Count > 0 ? FAbilityItem(Before.ID, Before.Count + N, Before.Level) : Take;
+		Cell.Count -= N;
+		if (Cell.Count == 0)
+			Cell = {};
+	}
+	else
+	{
+		if (Before.Count < N || !Before.ID.IsValid() || Before.ID != I.ExpectedItemID || Cell.Count > 0 && (Cell.ID != Before.ID || Cell.Level != Before.Level))
+			return Reply;
+		auto* Data = UAssetModuleStatics::LoadPrimaryAsset<UAbilityItemDataBase>(Before.ID, false);
+		if (!Data || N > Data->MaxCount - Cell.Count)
+			return Reply;
+		Cell.ID = Before.ID;
+		Cell.Level = Before.Level;
+		Cell.Count += N;
+		After.Count -= N;
+		if (After.Count == 0)
+			After = FAbilityItem::Empty;
+	}
+	FVoxelEntityEdit E;
+	E.Position = H.Index;
+	if (!FVoxelBlockEntityCodec::EncodeContainer(Items, E.Value))
+		return Reply;
+	FVoxelPreparedEdit P;
+	TArray<FVoxelEntityEdit> Writes{E};
+	if (!Runtime->PrepareEdit({}, Writes, P, Reply.Reason))
+		return Reply;
+	TGuardValue<bool> Guard(bMutating, true);
+	if (!FVoxelInventoryTransaction::SetSilent(*Slot, Before, After))
+	{
+		Reply.Code = EVoxelEditCode::Stale;
+		return Reply;
+	}
+	FVoxelEditBatch Batch;
+	if (!Runtime->CommitEdit(MoveTemp(P), Batch))
+	{
+		FVoxelInventoryTransaction::RestoreSilent(*Slot, Before);
+		Reply.Code = EVoxelEditCode::Stale;
+		return Reply;
+	}
+	FVoxelInventoryTransaction::Notify(*Slot, Before);
+	OnBlocksCommitted.Broadcast(Batch);
+	Reply.Code = EVoxelEditCode::Accepted;
+	return Reply;
+}
+bool UVoxelModule::ApplyPrefab(const FVoxelPrefabSaveData& P, const FIntVector& Origin, FString& E)
+{
+	if (!IsAuthority() || !IsReady() || bMutating || P.Cells.IsEmpty() || P.Cells.Num() > VoxelPrefab::MaxCellCount)
+	{
+		E = TEXT("Invalid prefab operation");
+		return false;
+	}
+	if (!UVoxelPrefabData::ValidateCells(P, *Registry.GetSnapshot(), E))
+		return false;
+	TArray<FVoxelCellEdit> Cells;
+	TSet<FIntVector> Seen;
+	for (const auto& C : P.Cells)
+	{
+		int64 X = int64(Origin.X) + C.Offset.X, Y = int64(Origin.Y) + C.Offset.Y, Z = int64(Origin.Z) + C.Offset.Z;
+		if (FMath::Abs(X) >= VoxelBlock::MaxAbsCoordinate || FMath::Abs(Y) >= VoxelBlock::MaxAbsCoordinate || FMath::Abs(Z) >= VoxelBlock::MaxAbsCoordinate)
+			return false;
+		FVoxelCellEdit W;
+		W.Position = FIntVector(int32(X), int32(Y), int32(Z));
+		if (Seen.Contains(W.Position) || !Runtime->TryGetBlock(W.Position, W.Expected) || !FVoxelItemBridge::ToBlock(*Registry.GetSnapshot(), C.Item, W.Value))
+			return false;
+		Seen.Add(W.Position);
+		Cells.Add(W);
+	}
+	if (!FVoxelEditTransaction::ValidateBatch(*Runtime, *Registry.GetSnapshot(), *Shapes, Cells, E))
+		return false;
+	FVoxelInteractionPlan Plan;
+	Plan.Cells = Cells;
+	if (PlacementOverlapsActors(Plan))
+	{
+		E = TEXT("Prefab overlaps live actors");
+		return false;
+	}
+	if (Cells.IsEmpty())
+	{
+		E = TEXT("Prefab makes no change");
+		return false;
+	}
+	FVoxelPreparedEdit Prepared;
+	if (!Runtime->PrepareEdit(Cells, {}, Prepared, E))
+		return false;
+	TGuardValue<bool> Guard(bMutating, true);
+	FVoxelEditBatch Batch;
+	if (!Runtime->CommitEdit(MoveTemp(Prepared), Batch))
+		return false;
+	OnBlocksCommitted.Broadcast(Batch);
+	return true;
+}
+bool UVoxelModule::ExportPrefab(const FIntVector& Min, const FIntVector& Max, FVoxelPrefabSaveData& O, FString& E) const
+{
+	if (!IsReady() || !VoxelCoord::IsValid(Min) || !VoxelCoord::IsValid(Max))
+		return false;
+	int64 SX = int64(Max.X) - Min.X, SY = int64(Max.Y) - Min.Y, SZ = int64(Max.Z) - Min.Z;
+	if (SX <= 0 || SY <= 0 || SZ <= 0 || SX > VoxelPrefab::MaxCellCount || SY > VoxelPrefab::MaxCellCount ||
+	    SZ > VoxelPrefab::MaxCellCount || SX * SY * SZ > VoxelPrefab::MaxCellCount)
+	{
+		E = FString::Printf(TEXT("Prefab bounds exceed %d cells"), VoxelPrefab::MaxCellCount);
+		return false;
+	}
+	FVoxelPrefabSaveData P;
+	for (int32 Z = Min.Z; Z < Max.Z; ++Z)
+		for (int32 Y = Min.Y; Y < Max.Y; ++Y)
+			for (int32 X = Min.X; X < Max.X; ++X)
+			{
+				FIntVector Position(X, Y, Z);
+				FVoxelBlockState B;
+				if (!Runtime->TryGetBlock(Position, B))
+				{
+					E = TEXT("Prefab selection is not fully loaded");
+					return false;
+				}
+				if (B.IsAir())
+					continue;
+				const auto* Def = Registry.GetSnapshot()->Find(B.TypeId);
+				if (Def && Def->EntityKind)
+				{
+					const auto* S = Runtime->Find(VoxelCoord::Section(Position));
+					const auto* Entity = S->Overlay.Entities.Find(VoxelCoord::Linear(VoxelCoord::Local(Position)));
+					FVoxelBlockEntityState Default;
+					if (!Entity || !FVoxelBlockEntityCodec::MakeDefault(Def->EntityKind, Default, Def->EntityVariant) || !(*Entity == Default))
+					{
+						E = TEXT("Prefab export supports definitions, not live entity contents; reset entity state explicitly first");
+						return false;
+					}
+				}
+				FVoxelPrefabCell C;
+				C.Offset = Position - Min;
+				if (!FVoxelItemBridge::ToItem(*Registry.GetSnapshot(), B, 1, C.Item))
+					return false;
+				P.Cells.Add(C);
+			}
+	if (!UVoxelPrefabData::ValidateCells(P, *Registry.GetSnapshot(), E))
+	{
+		return false;
+	}
+	O = MoveTemp(P);
+	return true;
+}
+bool UVoxelModule::CaptureColumnForUnload(UVoxelChunk& C, FString& E)
+{
+	TArray<uint8> B;
+	if (!C.CaptureActors(B, E))
+		return false;
+	uint64 Bytes = B.Num();
+	FString Path = FVoxelSceneColumnCodec::RelativePath(C.GetColumn());
+	for (const auto& P : UnloadedSceneFiles)
+		if (P.Key != Path)
+			Bytes += P.Value.Num();
+	if (Bytes > 32 * 1024 * 1024)
+	{
+		E = TEXT("Save scene changes before unloading more columns");
+		return false;
+	}
+	UnloadedSceneFiles.Add(Path, MoveTemp(B));
+	return true;
+}
+void UVoxelModule::QueueSceneLoad(UVoxelChunk& C, const FVoxelSection& S)
+{
+	FString Relative = FVoxelSceneColumnCodec::RelativePath(C.GetColumn());
+	if (auto* Bytes = UnloadedSceneFiles.Find(Relative))
+	{
+		FString E;
+		C.bSceneLoading = true;
+		if (!C.RestoreActors(*Bytes, E))
+		{
+			C.bSceneLoading = false;
+			C.bSceneFailed = true;
+		}
+		return;
+	}
+	FVoxelTaskRequest Q;
+	Q.Stamp = S.Stamp;
+	Q.Kind = EVoxelTaskKind::LoadScene;
+	Q.Priority = -200000;
+	Q.ReservedBytes = 8 * 1024 * 1024;
+	FString Root = RegionStore.GetSourceDirectory(), Path = FPaths::Combine(Root, Relative);
+	auto Stamp = S.Stamp;
+	Q.Execute = [Root, Path, Stamp](const std::atomic_bool& Cancel)
+	{
+		FVoxelTaskResult O;
+		O.Stamp = Stamp;
+		O.Kind = EVoxelTaskKind::LoadScene;
+		int64 Size = Root.IsEmpty() ? -1 : IFileManager::Get().FileSize(*Path);
+		if (Size < 0)
+		{
+			O.bSuccess = true;
+			return O;
+		}
+		if (Size > 8 * 1024 * 1024)
+		{
+			O.Error = TEXT("Scene file exceeds limit");
+			return O;
+		}
+		O.bSuccess = FFileHelper::LoadFileToArray(O.Bytes, *Path) && !Cancel.load();
+		O.bCanceled = Cancel.load();
+		return O;
+	};
+	if (Scheduler->Enqueue(MoveTemp(Q)))
+		C.bSceneLoading = true;
+}
+TUniquePtr<FVoxelWorldSaveData> UVoxelModule::NewWorldData(const FParameter& P) const
+{
+	auto O = MakeUnique<FVoxelModuleSaveData>(WorldBasicData);
+	if (P.HasValue() && P.GetStructType() && P.GetStructType()->IsChildOf(FVoxelWorldSaveData::StaticStruct()))
+		static_cast<FVoxelWorldSaveData&>(*O) = *reinterpret_cast<const FVoxelWorldSaveData*>(P.GetStructMemory());
+	return O;
+}
+bool UVoxelModule::ValidateWorldData(const FParameter& P, FString& E) const
+{
+	if (!P.HasValue() || !P.GetStructType() || !P.GetStructType()->IsChildOf(FVoxelWorldSaveData::StaticStruct()) || !P.GetStructMemory())
+		return false;
+	const auto& D = *reinterpret_cast<const FVoxelWorldSaveData*>(P.GetStructMemory());
+	FVoxelWorldManifest M;
+	if (!FVoxelManifestCodec::Decode(D.ManifestBytes, M) || !Registry.GetSnapshot() || M.RegistryHash != Registry.GetSnapshot()->Hash)
+	{
+		E = TEXT("Save recipe or registry is incompatible");
+		return false;
+	}
+	FVoxelGenerationRuntimeConfig C;
+	if (!Registry.GetSnapshot()->BuildGenerationConfig(M.Settings, C, E))
+		return false;
+	FVoxelGenerationPipeline G(C);
+	if (G.BuildHandshakeSignature() != M.BaseSampleHash)
+	{
+		E = TEXT("Save base terrain fingerprint differs");
+		return false;
+	}
+	return true;
+}
+void UVoxelModule::LoadData(const FParameter& P, EPhase Phase)
+{
+	if (!IsAuthority())
+		return;
+	if (PHASEC(Phase, EPhase::Primary))
+	{
+		FString E;
+		if (!ValidateWorldData(P, E))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Voxel load skipped: %s; creating a world from the current defaults"), *E);
+			if (!Runtime && !CreateWorld(WorldBasicData.Generation, WorldBasicData.BlockSizeCentimeters, E))
+			{
+				WorldState = EVoxelWorldState::Failed;
+				UE_LOG(LogTemp, Error, TEXT("Voxel fallback creation failed: %s"), *E);
+			}
+			return;
+		}
+		FVoxelWorldManifest M;
+		const auto& D = *reinterpret_cast<const FVoxelWorldSaveData*>(P.GetStructMemory());
+		FVoxelManifestCodec::Decode(D.ManifestBytes, M);
+		if (!StopWorld(true, E))
+			return;
+		WorldData = NewWorldData(P);
+		if (!StartWorld(M, false, E))
+		{
+			WorldState = EVoxelWorldState::Failed;
+			UE_LOG(LogTemp, Error, TEXT("Voxel start: %s"), *E);
+		}
+	}
+	if (PHASEC(Phase, EPhase::Final) && IsReady())
+	{
+		USceneModule& SceneModule = USceneModule::Get();
+		SceneModule.LoadSaveData(FParameter(WorldData->SceneData), Phase);
+		SceneModule.SetSeaLevel(Manifest.Settings.SeaLevel * BlockSize());
+	}
+}
 FParameter UVoxelModule::ToData()
 {
-	FVoxelModuleSaveData SaveData(WorldBasicData);
-	if(WorldData)
-	{
-		static_cast<FVoxelWorldSaveData&>(SaveData) = *WorldData;
-	}
-	SaveData.SceneData = USceneModule::Get().GetSaveData(true).GetRef<FSceneModuleSaveData>();
-	return FParameter(MoveTemp(SaveData));
+	if (!IsReady() || !LastSaveError.IsEmpty())
+		return FParameter();
+	FVoxelModuleSaveData D(WorldBasicData);
+	static_cast<FVoxelWorldSaveData&>(D) = *WorldData;
+	FVoxelManifestCodec::Encode(Manifest, D.ManifestBytes);
+	D.Generation = Manifest.Settings;
+	D.BlockSizeCentimeters = Manifest.BlockSizeCentimeters;
+	const auto SceneSave = USceneModule::Get().GetSaveData(true);
+	const auto* SD = SceneSave.GetPtr<FSceneModuleSaveData>();
+	if (!SD)
+		return FParameter();
+	D.SceneData = *SD;
+	return FParameter(MoveTemp(D));
 }
-
 FParameter UVoxelModule::GetData()
 {
 	return ToData();
 }
-
+void UVoxelModule::UnloadData(EPhase P)
+{
+	if (PHASEC(P, EPhase::Primary))
+	{
+		FString E;
+		if (!StopWorld(true, E))
+			UE_LOG(LogTemp, Error, TEXT("Voxel unload: %s"), *E);
+	}
+}
+void UVoxelModule::SetActiveSaveSource(const FGuid& ID, int32 G, FSaveGameStorage* S)
+{
+	RegionStore.SetSource(ID, G, S);
+}
 void UVoxelModule::OnBeforeSaveData()
 {
-	for(const TPair<FIndex, UVoxelChunk*>& Pair : ChunkMap)
+	LastSaveError.Reset();
+	CapturedSceneFiles.Reset();
+	if (!IsSaveEnabled())
+		return;
+	if (!Runtime)
 	{
-		if(Pair.Value && Pair.Value->IsChanged())
-		{
-			DirtyChunkIndices.Add(Pair.Key);
-		}
-	}
-	for(const FIndex& Index : DirtyChunkIndices)
-	{
-		if(UVoxelChunk* Chunk = GetChunkByIndex(Index))
-		{
-			RegionStore->StageChunk(Index, Chunk->GetSaveData(true));
-		}
-	}
-}
-
-void UVoxelModule::OnAfterSaveData(bool bSuccess)
-{
-	if(!bSuccess)
-	{
-		RegionStore->AbortPending();
+		LastSaveError = TEXT("Create or load the world before capturing it");
 		return;
 	}
-	RegionStore->CommitPending();
-	for(const FIndex& Index : DirtyChunkIndices)
+	if (bMutating || !SaveAdapter.Capture(*Runtime, Manifest, Registry.GetSnapshot(), RegionStore, LastSaveError))
 	{
-		if(UVoxelChunk* Chunk = GetChunkByIndex(Index))
+		if (LastSaveError.IsEmpty())
+			LastSaveError = TEXT("Voxel save capture is busy");
+		return;
+	}
+	CapturedSceneFiles = UnloadedSceneFiles;
+	for (const auto& P : Columns)
+		if (P.Value && P.Value->bSceneReady)
 		{
-			Chunk->SetChanged(false);
+			TArray<uint8> B;
+			if (!P.Value->CaptureActors(B, LastSaveError))
+				break;
+			CapturedSceneFiles.Add(FVoxelSceneColumnCodec::RelativePath(P.Key), MoveTemp(B));
 		}
-	}
-	DirtyChunkIndices.Reset();
 }
-
-void UVoxelModule::SetActiveSaveSource(const FGuid& SaveId, int32 Generation, FSaveGameStorage* Storage)
+bool UVoxelModule::CopySaveCapture(FVoxelModuleSaveCapture& O, FString& E) const
 {
-	RegionStore->SetSource(SaveId, Generation, Storage);
-}
-
-void UVoxelModule::ClearActiveSaveSource()
-{
-	RegionStore->Reset();
-}
-
-bool UVoxelModule::WritePendingRegionsToGeneration(const FGuid& SaveId, int32 Generation, FSaveGameStorage& Storage)
-{
-	return RegionStore->WritePendingRegions(Storage.GetTempGenerationDir(SaveId, Generation));
-}
-
-void UVoxelModule::UnloadData(EPhase InPhase)
-{
-	if(PHASEC(InPhase, EPhase::Primary))
+	if (!LastSaveError.IsEmpty() || !SaveAdapter.GetCapture())
 	{
-		SetWorldState(EVoxelWorldState::None);
-
-		ResetChunkQueues();
-
-		ITER_MAP(ChunkMap, Iter,
-			UObjectPoolModuleStatics::DespawnObject(Iter.Value);
-		)
-		ChunkMap.Empty();
-
-		ChunkSpawnBatch = 0;
-		WorldCenterIndex = EMPTY_Index;
-		WorldAgentIndex = EMPTY_Index;
-
-		WorldData = NewWorldData();
-
-		VoxelCapture->GetCapture()->SetActive(false);
-		
-		VoxelAssetIDMap.Empty();
-	}
-}
-
-void UVoxelModule::LoadPrefabData(const FVoxelPrefabSaveData& InPrefabData)
-{
-	if(WorldMode != EVoxelWorldMode::Prefab || GetWorldGeneratePercent() < 1.f) return;
-	
-	TArray<UVoxelChunk*> GenerateChunks;
-	ITER_MAP(ChunkMap, Iter,
-		if(Iter.Value->IsGenerated() && Iter.Value->IsChanged())
-		{
-			Iter.Value->ClearMap();
-			GenerateChunks.Add(Iter.Value);
-		}
-	)
-	if(!InPrefabData.VoxelDatas.IsEmpty())
-	{
-		TArray<FString> VoxelDatas;
-		InPrefabData.VoxelDatas.ParseIntoArray(VoxelDatas, TEXT("|"));
-		for(auto& Iter : VoxelDatas)
-		{
-			FVoxelItem VoxelItem(Iter, true);
-			if(VoxelItem.IsValid())
-			{
-				if(UVoxelChunk* Chunk = GetChunkByVoxelIndex(VoxelItem.Index))
-				{
-					SetVoxelByIndex(VoxelItem.Index, VoxelItem);
-					GenerateChunks.AddUnique(Chunk);
-				}
-			}
-		}
-	}
-	for(auto Iter : GenerateChunks)
-	{
-		if(Iter)
-		{
-			Iter->Generate(EPhase::Lesser);
-			Iter->SetChanged(true);
-		}
-	}
-}
-
-FVoxelPrefabSaveData UVoxelModule::GetPrefabData()
-{
-	if(WorldMode != EVoxelWorldMode::Prefab || GetWorldGeneratePercent() < 1.f) return FVoxelPrefabSaveData();
-	
-	FVoxelPrefabSaveData PrefabData;
-	ITER_MAP(ChunkMap, Iter,
-		if(Iter.Value->IsGenerated() && Iter.Value->IsChanged())
-		{
-			for(auto& VoxelIter : Iter.Value->VoxelMap)
-			{
-				FVoxelItem& Item = VoxelIter.Value;
-				if(Item.IsValid())
-				{
-					PrefabData.VoxelDatas.Appendf(TEXT("%s|"), *Item.ToSaveData(true, true));
-				}
-			}
-		}
-	)
-	PrefabData.VoxelDatas.RemoveFromEnd(TEXT("|"));
-	return PrefabData;
-}
-
-void UVoxelModule::GenerateWorld()
-{
-	UpdateChunkQueueThreads();
-	if(ActiveChunkQueueBatch) return;
-
-	if(UpdateChunkQueue(EVoxelWorldState::Unloading, [this](FIndex Index){ UnloadChunk(Index); }))
-	{
-		SetWorldState(EVoxelWorldState::Unloading);
-	}
-	else if(UpdateChunkQueue(EVoxelWorldState::Spawning, [this](FIndex Index){ SpawnChunk(Index); }))
-	{
-		SetWorldState(EVoxelWorldState::Spawning);
-	}
-	else if(UpdateChunkQueue(EVoxelWorldState::MapLoading, [this](FIndex Index){ LoadChunkMap(Index); }))
-	{
-		SetWorldState(EVoxelWorldState::MapLoading);
-	}
-	else if(UpdateChunkQueue(EVoxelWorldState::MapBuilding, [this](FIndex Index, int32 Stage){ BuildChunkMap(Index, Stage); }))
-	{
-		SetWorldState(EVoxelWorldState::MapBuilding);
-	}
-	else if(UpdateChunkQueue(EVoxelWorldState::MeshSpawning, [this](FIndex Index, int32 Stage){ SpawnChunkMesh(Index, Stage); }))
-	{
-		SetWorldState(EVoxelWorldState::MeshSpawning);
-	}
-	else if(UpdateChunkQueue(EVoxelWorldState::MeshBuilding, [this](FIndex Index){ BuildChunkMesh(Index); }))
-	{
-		SetWorldState(EVoxelWorldState::MeshBuilding);
-	}
-	else if(UpdateChunkQueue(EVoxelWorldState::Generating, [this](FIndex Index){ GenerateChunk(Index); }))
-	{
-		SetWorldState(EVoxelWorldState::Generating);
-	}
-	else
-	{
-		SetWorldState(EVoxelWorldState::None);
-	}
-}
-
-UVoxelChunk* UVoxelModule::SpawnChunk(FIndex InIndex, bool bAddToQueue)
-{
-	UVoxelChunk* Chunk = GetChunkByIndex(InIndex);
-	if(!Chunk)
-	{
-		Chunk = UObjectPoolModuleStatics::SpawnObject<UVoxelChunk>(ChunkSpawnClass);
-		Chunk->Initialize(this, InIndex, ChunkSpawnBatch + !IsOnTheWorld(InIndex));
-		ChunkMap.Add(InIndex, Chunk);
-	}
-	if(bAddToQueue)
-	{
-		if(!Chunk->IsBuilded())
-		{
-			if(RegionStore && RegionStore->HasChunk(InIndex))
-			{
-				AddToChunkQueue(EVoxelWorldState::MapLoading, InIndex);
-			}
-			else
-			{
-				AddToChunkQueue(EVoxelWorldState::MapBuilding, InIndex);
-			}
-		}
-		if(!Chunk->IsGenerated())
-		{
-			TArray<UVoxelChunk*> GenerateChunks;
-			Chunk->GetNeighbors().GenerateValueArray(GenerateChunks);
-			GenerateChunks.Add(Chunk);
-			for(auto Iter : GenerateChunks)
-			{
-				if(Iter && (Iter == Chunk || Iter->GetBatch() != Chunk->GetBatch()))
-				{
-					AddToChunkQueue(EVoxelWorldState::MeshSpawning, Iter->GetIndex());
-					AddToChunkQueue(EVoxelWorldState::MeshBuilding, Iter->GetIndex());
-					AddToChunkQueue(EVoxelWorldState::Generating, Iter->GetIndex());
-				}
-			}
-		}
-	}
-	return Chunk;
-}
-
-void UVoxelModule::LoadChunkMap(FIndex InIndex)
-{
-	FParameter Data;
-	if(RegionStore && RegionStore->LoadChunk(InIndex, Data))
-	{
-		if(UVoxelChunk* Chunk = GetChunkByIndex(InIndex))
-		{
-			Chunk->LoadSaveData(Data, EPhase::All);
-		}
-	}
-}
-
-void UVoxelModule::BuildChunkMap(FIndex InIndex, int32 InStage)
-{
-	if(UVoxelChunk* Chunk = GetChunkByIndex(InIndex))
-	{
-		Chunk->BuildMap(InStage);
-	}
-}
-
-void UVoxelModule::SpawnChunkMesh(FIndex InIndex, int32 InStage)
-{
-	if(UVoxelChunk* Chunk = GetChunkByIndex(InIndex))
-	{
-		Chunk->SpawnMeshComponents(InStage);
-	}
-}
-
-void UVoxelModule::BuildChunkMesh(FIndex InIndex)
-{
-	if(UVoxelChunk* Chunk = GetChunkByIndex(InIndex))
-	{
-		Chunk->BuildMesh();
-	}
-}
-
-void UVoxelModule::GenerateChunk(FIndex InIndex)
-{
-	if(UVoxelChunk* Chunk = GetChunkByIndex(InIndex))
-	{
-		Chunk->Generate(EPhase::Primary);
-	}
-}
-
-void UVoxelModule::SaveChunk(FIndex InIndex)
-{
-	if(UVoxelChunk* Chunk = GetChunkByIndex(InIndex))
-	{
-		RegionStore->StageChunk(InIndex, Chunk->GetSaveData(true));
-		DirtyChunkIndices.Add(InIndex);
-	}
-}
-
-void UVoxelModule::UnloadChunk(FIndex InIndex)
-{
-	if(UVoxelChunk* Chunk = GetChunkByIndex(InIndex))
-	{
-		if(Chunk->IsChanged())
-		{
-			RegionStore->StageChunk(InIndex, Chunk->GetSaveData(true));
-			DirtyChunkIndices.Add(InIndex);
-		}
-		if(!Chunk->IsGenerated())
-		{
-			TArray<UVoxelChunk*> NeighborChunks;
-			Chunk->GetNeighbors().GenerateValueArray(NeighborChunks);
-			NeighborChunks.Add(Chunk);
-			for(auto Iter : NeighborChunks)
-			{
-				if(Iter && (Iter == Chunk || Iter->GetBatch() != Chunk->GetBatch()))
-				{
-					RemoveFromChunkQueue(EVoxelWorldState::MeshSpawning, Iter->GetIndex());
-					RemoveFromChunkQueue(EVoxelWorldState::MeshBuilding, Iter->GetIndex());
-					RemoveFromChunkQueue(EVoxelWorldState::Generating, Iter->GetIndex());
-				}
-			}
-		}
-		UObjectPoolModuleStatics::DespawnObject(Chunk);
-		ChunkMap.Remove(InIndex);
-	}
-}
-
-void UVoxelModule::GenerateChunkQueues(bool bFromAgent, bool bForce)
-{
-	if(bForce) ResetChunkQueues();
-	FIndex GenerateIndex = FIndex::ZeroIndex;
-	FVector2D GenerateOffset = FVector2D::ZeroVector;
-	AActor* VoxelAgentActor = UCommonModuleStatics::GetPlayerPawn();
-	if(!VoxelAgentActor)
-	{
-		if(APlayerController* PlayerController = UCommonModuleStatics::GetPlayerController()) VoxelAgentActor = PlayerController->GetViewTarget();
-	}
-	const auto VoxelAgent = Cast<IVoxelAgentInterface>(VoxelAgentActor);
-	if(bFromAgent && VoxelAgent)
-	{
-		const FVector2D AgentLocation = FVector2D(WorldData->WorldRange.X != 0.f ? VoxelAgent->GetVoxelAgentLocation().X : 0.f, WorldData->WorldRange.Y != 0.f ? VoxelAgent->GetVoxelAgentLocation().Y : 0.f);
-		GenerateIndex = LocationToChunkIndex(FVector(AgentLocation.X, AgentLocation.Y, 0.f));
-		GenerateOffset = (AgentLocation / WorldData->GetChunkRealSize() - WorldCenterIndex.ToVector2D()).GetAbs();
-		if(WorldAgentIndex != GenerateIndex)
-		{
-			WorldAgentIndex = GenerateIndex;
-			OnWorldAgentMoved();
-		}
-	}
-	if(bForce || WorldCenterIndex == EMPTY_Index || (WorldData->WorldRange.X != 0.f && GenerateOffset.X > WorldData->GetWorldSize().X * ChunkSpawnDistance * 0.5f) || (WorldData->WorldRange.Y != 0.f && GenerateOffset.Y > WorldData->GetWorldSize().Y * ChunkSpawnDistance * 0.5f))
-	{
-		TSet<FIndex> UnloadIndices;
-		for(const auto& Iter : ChunkMap) UnloadIndices.Add(Iter.Key);
-		const FVector2D SpawnRange = WorldData->GetWorldSize() * 0.5f;
-		for(int32 x = GenerateIndex.X - SpawnRange.X; x < GenerateIndex.X + SpawnRange.X; x++)
-		{
-			for(int32 y = GenerateIndex.Y - SpawnRange.Y; y < GenerateIndex.Y + SpawnRange.Y; y++)
-			{
-				const FIndex Index = FIndex(x, y, 0);
-				if(FMathHelper::IsPointInEllipse2D(Index.ToVector2D() + FVector2D(0.5f), GenerateIndex.ToVector2D(), FVector2D(FMath::CeilToInt(SpawnRange.X), FMath::CeilToInt(SpawnRange.Y))))
-				{
-					UnloadIndices.Remove(Index);
-					AddToChunkQueue(EVoxelWorldState::Spawning, Index);
-				}
-			}
-		}
-		ITER_ARRAY(UnloadIndices, Item,
-			AddToChunkQueue(EVoxelWorldState::Unloading, Item);
-		)
-		WorldCenterIndex = GenerateIndex;
-		ITER_ARRAY(ChunkQueues[EVoxelWorldState::Generating].Queues, Queue, Queue.bSortRequired = true; )
-		ITER_ARRAY(ChunkQueues[EVoxelWorldState::Unloading].Queues, Queue, Queue.bSortRequired = true; )
-		ChunkSpawnBatch++;
-		
-		OnWorldCenterChanged();
-	}
-}
-
-void UVoxelModule::ResetChunkQueues()
-{
-	CancelChunkQueueBatch();
-
-	for(auto& Iter : ChunkQueues)
-	{
-		ITER_ARRAY(Iter.Value.Queues, Queue,
-			Queue.Reset();
-		)
-		Iter.Value.Stage = 0;
-	}
-}
-
-void UVoxelModule::UpdateChunkQueueThreads()
-{
-	if(!ActiveChunkQueueBatch) return;
-
-	for(const FVoxelChunkQueueThread* Thread : ActiveChunkQueueThreads)
-	{
-		if(Thread && !Thread->IsIdle()) return;
-	}
-
-	const bool bCancelled = ActiveChunkQueueBatch->IsCancelled();
-	for(UVoxelGenerator* Generator : ActiveChunkQueueGenerators)
-	{
-		if(Generator) Generator->CompleteBatch(bCancelled);
-	}
-	if(ActiveChunkQueue && !bCancelled)
-	{
-		TSet<FIndex> CompletedIndices;
-		CompletedIndices.Reserve(ActiveChunkQueueBatch->GetQueue().Num());
-		for(const FIndex& Index : ActiveChunkQueueBatch->GetQueue()) CompletedIndices.Add(Index);
-		ActiveChunkQueue->RemoveBatch(CompletedIndices);
-	}
-	ActiveChunkQueueBatch.Reset();
-	ActiveChunkQueue = nullptr;
-	ActiveChunkQueueThreads.Empty();
-	ActiveChunkQueueGenerators.Empty();
-}
-
-bool UVoxelModule::DispatchChunkQueue(FVoxelChunkQueue& InQueue, const TFunction<void(FIndex, int32)>& InFunc, int32 InStage, const TArray<UVoxelGenerator*>& InGenerators)
-{
-	if(ActiveChunkQueueBatch || InQueue.Queue.Num() == 0) return false;
-
-	const int32 BatchCount = FMath::Min(FMath::Max(1, InQueue.Speed), InQueue.Queue.Num());
-	const int32 WorkerCount = FMath::Min(FMath::Max(1, FPlatformMisc::NumberOfWorkerThreadsToSpawn()), BatchCount);
-	while(ChunkQueueThreads.Num() < WorkerCount)
-	{
-		FVoxelChunkQueueThread* Thread = new FVoxelChunkQueueThread();
-		if(!Thread->IsValid())
-		{
-			delete Thread;
-			break;
-		}
-		ChunkQueueThreads.Add(Thread);
-	}
-	if(ChunkQueueThreads.Num() == 0) return false;
-
-	TArray<FIndex> Queue;
-	Queue.Append(InQueue.Queue.GetData(), BatchCount);
-	TArray<UVoxelGenerator*> Generators;
-	for(UVoxelGenerator* Generator : InGenerators)
-	{
-		if(Generator)
-		{
-			Generator->PrepareBatch(Queue);
-			Generators.Add(Generator);
-		}
-	}
-	const TSharedRef<FVoxelChunkQueueBatch, ESPMode::ThreadSafe> Batch = MakeShared<FVoxelChunkQueueBatch, ESPMode::ThreadSafe>(MoveTemp(Queue));
-	const int32 DispatchCount = FMath::Min(WorkerCount, ChunkQueueThreads.Num());
-	ActiveChunkQueueThreads.Empty(DispatchCount);
-	for(int32 i = 0; i < DispatchCount; i++)
-	{
-		if(ChunkQueueThreads[i]->Dispatch(Batch, InFunc, InStage)) ActiveChunkQueueThreads.Add(ChunkQueueThreads[i]);
-	}
-	if(ActiveChunkQueueThreads.Num() == 0)
-	{
-		for(UVoxelGenerator* Generator : Generators) Generator->CompleteBatch(true);
+		E = LastSaveError.IsEmpty() ? TEXT("Voxel save was not captured") : LastSaveError;
 		return false;
 	}
+	O.Voxels = *SaveAdapter.GetCapture();
+	O.SceneFiles = CapturedSceneFiles;
+	return true;
+}
+bool UVoxelModule::WriteSaveCapture(const FVoxelModuleSaveCapture& C, const FString& Dir, FString& E)
+{
+	if (!FVoxelWorldSaveAdapter::WriteCapture(C.Voxels, Dir, E))
+		return false;
+	for (const auto& P : C.SceneFiles)
+	{
+		if (!P.Key.StartsWith(TEXT("voxel/actors/c_")) || P.Key.Contains(TEXT("..")) || P.Value.Num() > 8 * 1024 * 1024)
+			return false;
+		FString Path = FPaths::Combine(Dir, P.Key);
+		IFileManager::Get().MakeDirectory(*FPaths::GetPath(Path), true);
+		if (!FFileHelper::SaveArrayToFile(P.Value, *Path))
+		{
+			E = TEXT("Scene actor file write failed");
+			return false;
+		}
+	}
+	return true;
+}
+void UVoxelModule::OnAfterSaveData(bool Success)
+{
+	if (Runtime && SaveAdapter.IsBusy())
+		SaveAdapter.Complete(*Runtime, RegionStore, Success, PendingCommitDirectory);
+	if (Success)
+		for (const auto& P : CapturedSceneFiles)
+			if (const auto* B = UnloadedSceneFiles.Find(P.Key))
+				if (*B == P.Value)
+					UnloadedSceneFiles.Remove(P.Key);
+	CapturedSceneFiles.Reset();
+	LastSaveError.Reset();
+	PendingCommitDirectory.Reset();
+}
 
-	ActiveChunkQueueBatch = Batch;
-	ActiveChunkQueue = &InQueue;
-	ActiveChunkQueueGenerators = MoveTemp(Generators);
+bool UVoxelModule::QueueRemoteEncoded(const TArray<uint8>& P, FString& E)
+{
+	if (!IsReady() || IsAuthority() || P.IsEmpty() || P.Num() > 2 * 1024 * 1024)
+		return false;
+	uint64 Bytes = P.Num();
+	for (const auto& B : EncodedRemotePending)
+		Bytes += B.Num();
+	if (EncodedRemotePending.Num() + RemotePending.Num() + int32(bDecodeRunning) + int32(bRemoteRunning) >= 8 || Bytes > 8 * 1024 * 1024)
+	{
+		E = TEXT("Remote decode backlog exceeds the bounded budget");
+		return false;
+	}
+	EncodedRemotePending.Add(P);
+	return true;
+}
+void UVoxelModule::PumpDecode()
+{
+	if (IsAuthority() || bDecodeRunning || EncodedRemotePending.IsEmpty() || RemotePending.Num() >= 4)
+		return;
+	if (NextNetworkJob >= uint64(MAX_int32))
+		return;
+	uint64 ID = NextNetworkJob++;
+	FVoxelTaskRequest Q;
+	Q.Kind = EVoxelTaskKind::DecodeNetwork;
+	Q.Stamp.WorldEpoch = Epoch;
+	Q.Stamp.GenerationToken = ID;
+	Q.Stamp.Key = {int32(ID), MAX_int32, MAX_int32};
+	Q.Priority = -300000;
+	Q.ReservedBytes = 32 * 1024 * 1024;
+	Q.InputBytes = EncodedRemotePending[0].Num();
+	auto Payload = EncodedRemotePending[0];
+	auto RegistrySnapshot = Registry.GetSnapshot();
+	auto WorldManifest = Manifest;
+	Q.Execute = [Payload = MoveTemp(Payload), RegistrySnapshot, WorldManifest](const std::atomic_bool& Cancel)
+	{
+		FVoxelTaskResult O;
+		FVoxelSnapshotBatch B;
+		if (Cancel.load())
+			return O;
+		if (!FVoxelNetworkCodec::DecodeSnapshots(Payload, WorldManifest, *RegistrySnapshot, B))
+			return O;
+		O.BatchId = B.Id;
+		O.RemoteOverlays = MoveTemp(B.Sections);
+		O.bSuccess = true;
+		return O;
+	};
+	if (Scheduler->Enqueue(MoveTemp(Q)))
+	{
+		EncodedRemotePending.RemoveAt(0);
+		bDecodeRunning = true;
+	}
+}
+bool UVoxelModule::QueueNetworkEncode(const FVoxelSnapshotBatch& B, UVoxelModuleNetworkComponent* Recipient)
+{
+	if (!IsReady() || !IsAuthority() || !Recipient || NextNetworkJob >= uint64(MAX_int32))
+		return false;
+	uint64 ID = NextNetworkJob++;
+	FVoxelTaskRequest Q;
+	Q.Kind = EVoxelTaskKind::EncodeNetwork;
+	Q.Stamp.WorldEpoch = Epoch;
+	Q.Stamp.GenerationToken = ID;
+	Q.Stamp.Key = {int32(ID), MAX_int32, MAX_int32};
+	Q.Priority = -200000;
+	Q.ReservedBytes = 4 * 1024 * 1024;
+	for (const auto& S : B.Sections)
+	{
+		Q.InputBytes += S.Blocks.Num() * 16;
+		for (const auto& E : S.Entities)
+			Q.InputBytes += E.Value.Payload.Num() + 64;
+	}
+	auto Snapshot = Registry.GetSnapshot();
+	auto World = Manifest;
+	auto Session = SessionId;
+	Q.Execute = [B, Snapshot, World, Session](const std::atomic_bool& Cancel)
+	{
+		FVoxelTaskResult O;
+		O.BatchId = B.Id;
+		if (Cancel.load())
+			return O;
+		TArray<uint8> Payload;
+		if (!FVoxelNetworkCodec::EncodeSnapshots(B, World, *Snapshot, Payload))
+			return O;
+		O.bSuccess = FVoxelNetworkCodec::Encode(EVoxelMessage::Snapshots, Session, Payload, O.Bytes);
+		return O;
+	};
+	if (!Scheduler->Enqueue(MoveTemp(Q)))
+		return false;
+	NetworkRecipients.Add(ID, Recipient);
+	NetworkBatchIds.Add(ID, B.Id);
 	return true;
 }
 
-void UVoxelModule::CancelChunkQueueBatch()
+float UVoxelModule::GetWarmupProgress() const
 {
-	if(ActiveChunkQueueBatch) ActiveChunkQueueBatch->Cancel();
-	for(FVoxelChunkQueueThread* Thread : ActiveChunkQueueThreads)
-	{
-		if(Thread) Thread->WaitForIdle();
-	}
-	for(UVoxelGenerator* Generator : ActiveChunkQueueGenerators)
-	{
-		if(Generator) Generator->CompleteBatch(true);
-	}
-	ActiveChunkQueueBatch.Reset();
-	ActiveChunkQueue = nullptr;
-	ActiveChunkQueueThreads.Empty();
-	ActiveChunkQueueGenerators.Empty();
-}
-
-void UVoxelModule::SortChunkQueue(EVoxelWorldState InState, FVoxelChunkQueue& InQueue)
-{
-	if(!InQueue.bSortRequired) return;
-	if(InState == EVoxelWorldState::Generating)
-	{
-		InQueue.Queue.Sort([this](const FIndex& A, const FIndex& B)
+	if (!Runtime)
+		return 0;
+	int32 Wanted = 0;
+	int32 Ready = 0;
+	for (const auto& D : Desired)
+		if (D.Value.bCollision)
 		{
-			const float DistanceA = WorldCenterIndex.DistanceTo(A, false, true);
-			const float DistanceB = WorldCenterIndex.DistanceTo(B, false, true);
-			if(!FMath::IsNearlyEqual(DistanceA, DistanceB)) return DistanceA < DistanceB;
-			if(A.X != B.X) return A.X < B.X;
-			if(A.Y != B.Y) return A.Y < B.Y;
-			return A.Z < B.Z;
-		});
-	}
-	else if(InState == EVoxelWorldState::Unloading)
-	{
-		InQueue.Queue.Sort([this](const FIndex& A, const FIndex& B)
-		{
-			const float DistanceA = WorldCenterIndex.DistanceTo(A, false, true);
-			const float DistanceB = WorldCenterIndex.DistanceTo(B, false, true);
-			if(!FMath::IsNearlyEqual(DistanceA, DistanceB)) return DistanceA > DistanceB;
-			if(A.X != B.X) return A.X < B.X;
-			if(A.Y != B.Y) return A.Y < B.Y;
-			return A.Z < B.Z;
-		});
-	}
-	InQueue.bSortRequired = false;
-}
-
-void UVoxelModule::ShutdownChunkQueueThreads()
-{
-	CancelChunkQueueBatch();
-	for(FVoxelChunkQueueThread* Thread : ChunkQueueThreads) delete Thread;
-	ChunkQueueThreads.Empty();
-}
-
-bool UVoxelModule::UpdateChunkQueue(EVoxelWorldState InState, TFunction<void(FIndex)> InFunc)
-{
-	return UpdateChunkQueue(InState, [InFunc](FIndex Index, int32 Stage) { InFunc(Index); });
-}
-
-bool UVoxelModule::UpdateChunkQueue(EVoxelWorldState InState, TFunction<void(FIndex, int32)> InFunc)
-{
-	FVoxelChunkQueues& QueueGroup = ChunkQueues[InState];
-	ITER_ARRAY_WITHINDEX(QueueGroup.Queues, i, Item,
-		QueueGroup.Stage = i + 1;
-		SortChunkQueue(InState, Item);
-		if(Item.Queue.Num() > 0)
-		{
-			if(Item.bAsync && ActiveChunkQueueBatch) return true;
-
-			const TFunction<void(FIndex, int32)> Func([this, InState, InFunc, Generators = Item.Generators](FIndex Index, int32 Stage)
-			{
-				if(InState == EVoxelWorldState::Spawning) InFunc(Index, Stage);
-				if(UVoxelChunk* Chunk = GetChunkByIndex(Index))
-				{
-					for(UVoxelGenerator* Generator : Generators)
-					{
-						if(Generator) Generator->Generate(Chunk);
-					}
-				}
-				if(InState != EVoxelWorldState::Spawning) InFunc(Index, Stage);
-			});
-
-			if(Item.bAsync && DispatchChunkQueue(Item, Func, i + 1, Item.Generators)) return true;
-
-			const int32 Num = FMath::Min(FMath::Max(1, Item.Speed), Item.Queue.Num());
-			TArray<FIndex> BatchIndices;
-			BatchIndices.Append(Item.Queue.GetData(), Num);
-			for(UVoxelGenerator* Generator : Item.Generators) if(Generator) Generator->PrepareBatch(BatchIndices);
-			DON_WITHINDEX(Num, j, Func(Item.Queue[j], i + 1); )
-			for(UVoxelGenerator* Generator : Item.Generators) if(Generator) Generator->CompleteBatch(false);
-			Item.RemoveFront(Num);
-			if(Item.bAsync || Item.Queue.Num() > 0)
-			{
-				return true;
-			}
+			++Wanted;
+			const auto* S = Runtime->Find(D.Key);
+			if (S && S->Status == EVoxelSectionStatus::DataReady && S->bHasCollision && !S->bCollisionDirty)
+				++Ready;
 		}
-	)
-	return false;
-}
-
-void UVoxelModule::AddToChunkQueue(EVoxelWorldState InState, FIndex InIndex)
-{
-	ITER_ARRAY(ChunkQueues[InState].Queues, Item,
-		if((InState == EVoxelWorldState::Spawning ? !ChunkMap.Contains(InIndex) : ChunkMap.Contains(InIndex)))
-		{
-			Item.Add(InIndex);
-		}
-	)
-}
-
-void UVoxelModule::RemoveFromChunkQueue(EVoxelWorldState InState, FIndex InIndex)
-{
-	ITER_ARRAY(ChunkQueues[InState].Queues, Item,
-		Item.Remove(InIndex);
-	)
-}
-
-bool UVoxelModule::IsOnTheWorld(FIndex InIndex, bool bIgnoreZ) const
-{
-	const FVector2D SpawnRange = WorldData->GetWorldSize() * 0.5f;
-	return InIndex.X >= WorldCenterIndex.X - SpawnRange.X && InIndex.X < WorldCenterIndex.X + SpawnRange.X &&
-		InIndex.Y >= WorldCenterIndex.Y - SpawnRange.Y && InIndex.Y < WorldCenterIndex.Y + SpawnRange.Y &&
-		(!bIgnoreZ || InIndex.Z >= 0 && InIndex.Z < WorldData->SkyHeight);
-}
-
-UVoxelChunk* UVoxelModule::GetChunkByIndex(FIndex InIndex) const
-{
-	if(ChunkMap.Contains(InIndex))
+	if (Wanted == 0)
 	{
-		return ChunkMap[InIndex];
+		return IsReady() ? 1.f : 0.f;
 	}
-	return nullptr;
-}
-
-void UVoxelModule::ForEachChunk(TFunctionRef<void(const UVoxelChunk&)> InVisitor) const
-{
-	for(const auto& Iter : ChunkMap)
-	{
-		if(Iter.Value) InVisitor(*Iter.Value);
-	}
-}
-
-UVoxelChunk* UVoxelModule::GetChunkByLocation(FVector InLocation) const
-{
-	return GetChunkByIndex(LocationToChunkIndex(InLocation));
-}
-
-UVoxelChunk* UVoxelModule::GetChunkByVoxelIndex(FIndex InIndex) const
-{
-	return GetChunkByIndex(VoxelIndexToChunkIndex(InIndex));
-}
-
-bool UVoxelModule::HasVoxelByIndex(FIndex InIndex, bool bSafe)
-{
-	if(UVoxelChunk* Chunk = GetChunkByVoxelIndex(InIndex))
-	{
-		return Chunk->HasVoxel(Chunk->WorldIndexToLocal(InIndex), bSafe);
-	}
-	return false;
-}
-
-bool UVoxelModule::HasVoxelByLocation(FVector InLocation, bool bSafe)
-{
-	return HasVoxelByIndex(LocationToVoxelIndex(InLocation), bSafe);
-}
-
-FVoxelItem& UVoxelModule::GetVoxelByIndex(FIndex InIndex, bool bMainPart)
-{
-	if(UVoxelChunk* Chunk = GetChunkByVoxelIndex(InIndex))
-	{
-		return Chunk->GetVoxel(Chunk->WorldIndexToLocal(InIndex), bMainPart);
-	}
-	return FVoxelItem::Empty;
-}
-
-FVoxelItem& UVoxelModule::GetVoxelByLocation(FVector InLocation, bool bMainPart)
-{
-	return GetVoxelByIndex(LocationToVoxelIndex(InLocation), bMainPart);
-}
-
-void UVoxelModule::SetVoxelByIndex(FIndex InIndex, const FVoxelItem& InVoxelItem, bool bSafe)
-{
-	if(UVoxelChunk* Chunk = GetChunkByVoxelIndex(InIndex))
-	{
-		Chunk->SetVoxel(Chunk->WorldIndexToLocal(InIndex), InVoxelItem, bSafe || Chunk->IsBuilded());
-	}
-}
-
-void UVoxelModule::SetVoxelByLocation(FVector InLocation, const FVoxelItem& InVoxelItem, bool bSafe)
-{
-	SetVoxelByIndex(LocationToVoxelIndex(InLocation), InVoxelItem, bSafe);
-}
-
-void UVoxelModule::AddToVoxelUpdateQueue(FIndex InIndex)
-{
-	if(!IsInGameThread())
-	{
-		VoxelUpdateQueue.Enqueue(InIndex);
-		return;
-	}
-	if(UVoxelChunk* Chunk = GetChunkByVoxelIndex(InIndex))
-	{
-		Chunk->VoxelUpdateIndices.Add(Chunk->WorldIndexToLocal(InIndex));
-		VoxelUpdateChunkIndices.Add(Chunk->GetIndex());
-	}
-}
-
-void UVoxelModule::AddToVoxelLiquidUpdateQueue(FIndex InIndex)
-{
-	if(!VoxelLiquidUpdateIndices.Contains(InIndex))
-	{
-		VoxelLiquidUpdateIndices.Add(InIndex);
-		VoxelLiquidUpdateQueue.Enqueue(InIndex);
-	}
-}
-
-void UVoxelModule::UpdateVoxelQueue()
-{
-	TArray<FIndex> ChunkIndices = VoxelUpdateChunkIndices.Array();
-	TSet<FIndex> LiquidUpdateIndexSet;
-	FIndex LiquidUpdateIndex;
-	const int32 LiquidUpdateCount = VoxelLiquidUpdateIndices.Num();
-	while(LiquidUpdateIndexSet.Num() < LiquidUpdateCount && VoxelLiquidUpdateQueue.Dequeue(LiquidUpdateIndex))
-	{
-		VoxelLiquidUpdateIndices.Remove(LiquidUpdateIndex);
-		LiquidUpdateIndexSet.Add(LiquidUpdateIndex);
-	}
-	TArray<FIndex> LiquidUpdateIndices = LiquidUpdateIndexSet.Array();
-	TSet<FIndex> ChangedChunkIndices;
-	int32 RemainingUpdates = 256;
-	for(const FIndex& ChunkIndex : ChunkIndices)
-	{
-		UVoxelChunk* Chunk = GetChunkByIndex(ChunkIndex);
-		if(!Chunk)
-		{
-			VoxelUpdateChunkIndices.Remove(ChunkIndex);
-			continue;
-		}
-		if(!Chunk->IsGenerated()) continue;
-
-		RemainingUpdates -= Chunk->UpdateVoxels(FMath::Min(RemainingUpdates, 32), ChangedChunkIndices);
-		if(Chunk->VoxelUpdateIndices.IsEmpty()) VoxelUpdateChunkIndices.Remove(ChunkIndex);
-		if(RemainingUpdates <= 0) break;
-	}
-
-	for(const FIndex& ChunkIndex : ChangedChunkIndices)
-	{
-		if(UVoxelChunk* Chunk = GetChunkByIndex(ChunkIndex); Chunk && Chunk->IsGenerated()) Chunk->Generate(EPhase::Lesser);
-	}
-	if(LiquidUpdateIndices.IsEmpty()) return;
-
-	TSet<FIndex> LiquidEvaluationIndexSet = LiquidUpdateIndexSet;
-	for(const FIndex& Index : LiquidUpdateIndices)
-	{
-		ITER_DIRECTION(Direction, LiquidEvaluationIndexSet.Add(Index + FMathHelper::DirectionToIndex(Direction)); )
-		for(const EDirectionN Iter : { EDirectionN::Forward, EDirectionN::Right, EDirectionN::Backward, EDirectionN::Left })
-		{
-			LiquidEvaluationIndexSet.Add(Index + FMathHelper::DirectionToIndex(Iter) + FIndex(0, 0, -1));
-		}
-	}
-	TMap<FIndex, FVoxelLiquidSnapshot> LiquidSnapshots;
-	for(const FIndex& Index : LiquidEvaluationIndexSet)
-	{
-		TSet<FIndex> SnapshotIndices;
-		SnapshotIndices.Add(Index);
-		ITER_DIRECTION(Direction, SnapshotIndices.Add(Index + FMathHelper::DirectionToIndex(Direction)); )
-		SnapshotIndices.Add(Index + FIndex(0, 0, -2));
-		for(const EDirectionN Iter : { EDirectionN::Forward, EDirectionN::Right, EDirectionN::Backward, EDirectionN::Left })
-		{
-			const FIndex NeighborIndex = Index + FMathHelper::DirectionToIndex(Iter);
-			SnapshotIndices.Add(NeighborIndex + FIndex(0, 0, 1));
-			SnapshotIndices.Add(NeighborIndex + FIndex(0, 0, -1));
-			SnapshotIndices.Add(NeighborIndex + FIndex(0, 0, -2));
-		}
-		for(const FIndex& SnapshotIndex : SnapshotIndices)
-		{
-			if(LiquidSnapshots.Contains(SnapshotIndex)) continue;
-			FVoxelLiquidSnapshot Snapshot;
-			if(const UVoxelChunk* Chunk = GetChunkByVoxelIndex(SnapshotIndex); Chunk && Chunk->IsGenerated())
-			{
-				Snapshot.bGenerated = true;
-				const FVoxelItem& Item = GetVoxelByIndex(SnapshotIndex);
-				Snapshot.VoxelType = Item.IsUnknown() ? EVoxelType::Unknown : Item.IsValid() ? Item.GetVoxelType() : EVoxelType::Empty;
-				Snapshot.Data = Item.Data;
-				Snapshot.bCanFlowThrough = Item.IsValid() && (Item.GetData().Nature == EVoxelNature::Foliage || Item.GetData().Nature == EVoxelNature::SemiFoliage);
-			}
-			LiquidSnapshots.Add(SnapshotIndex, MoveTemp(Snapshot));
-		}
-	}
-
-	bVoxelUpdateRunning = true;
-	TWeakObjectPtr<UVoxelModule> Module(this);
-	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [Module, LiquidEvaluationIndices = LiquidEvaluationIndexSet.Array(), LiquidSnapshots = MoveTemp(LiquidSnapshots)]() mutable
-	{
-		TMap<FIndex, FVoxelLiquidUpdate> LiquidUpdates;
-		for(const FIndex& Index : LiquidEvaluationIndices)
-		{
-			FVoxelLiquidUpdate Update;
-			if(UVoxelModuleStatics::CalculateVoxelLiquidUpdate(Index, LiquidSnapshots, Update)) LiquidUpdates.Add(Index, MoveTemp(Update));
-		}
-		AsyncTask(ENamedThreads::GameThread, [Module, LiquidSnapshots = MoveTemp(LiquidSnapshots), LiquidUpdates = MoveTemp(LiquidUpdates)]() mutable
-		{
-			if(!Module.IsValid()) return;
-			Module->bVoxelUpdateRunning = false;
-			if(Module->WorldMode == EVoxelWorldMode::None) return;
-			TMap<FIndex, FVoxelItem> VoxelUpdates;
-			TSet<FIndex> VegetationChangedChunkIndices;
-			for(const auto& Iter : LiquidUpdates)
-			{
-				const FVoxelLiquidSnapshot* Snapshot = LiquidSnapshots.Find(Iter.Key);
-				if(!Snapshot || !Snapshot->bGenerated) continue;
-				const FVoxelItem& CurrentItem = Module->GetVoxelByIndex(Iter.Key);
-				const EVoxelType CurrentType = CurrentItem.IsUnknown() ? EVoxelType::Unknown : CurrentItem.IsValid() ? CurrentItem.GetVoxelType() : EVoxelType::Empty;
-				if(CurrentType != Snapshot->VoxelType || CurrentItem.Data != Snapshot->Data)
-				{
-					Module->AddToVoxelLiquidUpdateQueue(Iter.Key);
-					continue;
-				}
-				if(Iter.Value.bRemove)
-				{
-					VoxelUpdates.Add(Iter.Key, FVoxelItem::Empty);
-				}
-				else
-				{
-					if(Snapshot->bCanFlowThrough)
-					{
-						if(UVoxelModuleStatics::GetVoxelWorldMode() != EVoxelWorldMode::Prefab)
-						{
-							const UVoxelData& VoxelData = CurrentItem.GetData();
-							UAbilityModuleStatics::SpawnAbilityPickUp(FAbilityItem(VoxelData.GatherData ? VoxelData.GatherData->GetPrimaryAssetId() : VoxelData.GetPrimaryAssetId(), 1),
-								CurrentItem.GetLocation() + VoxelData.GetRange(CurrentItem.Angle) * Module->GetWorldData().BlockSize * 0.5f, CurrentItem.Chunk);
-						}
-						VegetationChangedChunkIndices.Add(CurrentItem.Chunk->GetIndex());
-					}
-					FVoxelItem Item = CurrentItem;
-					if(CurrentType != EVoxelType::Water) Item = FVoxelItem(EVoxelType::Water);
-					Item.Data = Iter.Value.Data;
-					VoxelUpdates.Add(Iter.Key, Item);
-				}
-			}
-			TSet<FIndex> ChangedChunkIndices;
-			Module->ApplyVoxelUpdates(VoxelUpdates, ChangedChunkIndices);
-			for(const auto& Iter : VoxelUpdates) Module->AddToVoxelLiquidUpdateQueue(Iter.Key);
-			for(const FIndex& ChunkIndex : ChangedChunkIndices)
-			{
-				if(UVoxelChunk* Chunk = Module->GetChunkByIndex(ChunkIndex))
-				{
-					Chunk->BuildMesh(EVoxelNature::Liquid);
-					Chunk->CreateMesh(EVoxelNature::Liquid);
-				}
-			}
-			for(const FIndex& ChunkIndex : VegetationChangedChunkIndices)
-			{
-				if(UVoxelChunk* Chunk = Module->GetChunkByIndex(ChunkIndex))
-				{
-					Chunk->BuildMesh(EVoxelNature::Foliage);
-					Chunk->CreateMesh(EVoxelNature::Foliage);
-					Chunk->BuildMesh(EVoxelNature::SemiFoliage);
-					Chunk->CreateMesh(EVoxelNature::SemiFoliage);
-				}
-			}
-		});
-	});
-}
-
-void UVoxelModule::ApplyVoxelUpdates(const TMap<FIndex, FVoxelItem>& InVoxelMap, TSet<FIndex>& OutChangedChunkIndices)
-{
-	for(const auto& Iter : InVoxelMap)
-	{
-		if(UVoxelChunk* Chunk = GetChunkByVoxelIndex(Iter.Key); Chunk && Chunk->IsGenerated())
-		{
-			const FIndex LocalIndex = Chunk->WorldIndexToLocal(Iter.Key);
-			const FVoxelItem& CurrentItem = Chunk->GetVoxel(LocalIndex);
-			if(CurrentItem.ID == Iter.Value.ID && CurrentItem.Data == Iter.Value.Data) continue;
-			Chunk->SetVoxel(LocalIndex, Iter.Value, true);
-			Chunk->SetChanged(true);
-			for(int32 X = -1; X <= 1; ++X)
-			{
-				for(int32 Y = -1; Y <= 1; ++Y)
-				{
-					if(UVoxelChunk* ChangedChunk = GetChunkByVoxelIndex(Iter.Key + FIndex(X, Y, 0)); ChangedChunk && ChangedChunk->IsGenerated())
-					{
-						OutChangedChunkIndices.Add(ChangedChunk->GetIndex());
-					}
-				}
-			}
-		}
-	}
-}
-
-const FVoxelTopography& UVoxelModule::GetTopographyByIndex(FIndex InIndex)
-{
-	if(UVoxelChunk* Chunk = GetChunkByVoxelIndex(FIndex(InIndex.X, InIndex.Y, 0)))
-	{
-		return Chunk->GetTopography(Chunk->WorldIndexToLocal(FIndex(InIndex.X, InIndex.Y, 0)));
-	}
-	static FVoxelTopography Temp;
-	return Temp;
-}
-
-const FVoxelTopography& UVoxelModule::GetTopographyByLocation(FVector InLocation)
-{
-	return GetTopographyByIndex(LocationToVoxelIndex(InLocation));
-}
-
-void UVoxelModule::SetTopographyByIndex(FIndex InIndex, const FVoxelTopography& InTopography)
-{
-	if(UVoxelChunk* Chunk = GetChunkByVoxelIndex(FIndex(InIndex.X, InIndex.Y, 0)))
-	{
-		if(!Chunk->IsBuilded())
-		{
-			Chunk->SetTopography(Chunk->WorldIndexToLocal(FIndex(InIndex.X, InIndex.Y, 0)), InTopography);
-		}
-	}
-}
-
-void UVoxelModule::SetTopographyByLocation(FVector InLocation, const FVoxelTopography& InTopography)
-{
-	SetTopographyByIndex(LocationToVoxelIndex(InLocation), InTopography);
-}
-
-FVoxelTopography UVoxelModule::SampleBaseTopographyByIndex(FIndex InIndex) const
-{
-	if(const UVoxelSurfaceGenerator* Generator = GetVoxelGenerator<UVoxelSurfaceGenerator>()) return Generator->SampleTopography(InIndex);
-	return FVoxelTopography();
-}
-
-FVoxelTopography UVoxelModule::SampleTopographyByIndex(FIndex InIndex) const
-{
-	FVoxelTopography Topography = SampleBaseTopographyByIndex(InIndex);
-	if(const UVoxelRiverGenerator* Generator = GetVoxelGenerator<UVoxelRiverGenerator>())
-	{
-		Generator->ApplyToTopography(InIndex, Topography);
-	}
-	if(const UVoxelLakeGenerator* Generator = GetVoxelGenerator<UVoxelLakeGenerator>())
-	{
-		Generator->ApplyToTopography(InIndex, Topography);
-	}
-	return Topography;
-}
-
-EVoxelRegionType UVoxelModule::GetWorldRegionByIndex(FIndex InIndex) const
-{
-	return SampleTopographyByIndex(InIndex).RegionType;
-}
-
-float UVoxelModule::GetVoxelNoise1D(float InValue, bool bAbs, bool bUnsigned) const
-{
-	return FMathHelper::GetNoise1D(InValue, WorldData->WorldSeed, bAbs, bUnsigned);
-}
-
-float UVoxelModule::GetVoxelNoise2D(FVector2D InLocation, bool bAbs, bool bUnsigned) const
-{
-	return FMathHelper::GetNoise2D(InLocation, WorldData->WorldSeed, bAbs, bUnsigned);
-}
-
-float UVoxelModule::GetVoxelNoise3D(FVector InLocation, bool bAbs, bool bUnsigned) const
-{
-	return FMathHelper::GetNoise3D(InLocation, WorldData->WorldSeed, bAbs, bUnsigned);
-}
-
-FIndex UVoxelModule::LocationToChunkIndex(FVector InLocation) const
-{
-	return FIndex(FMath::FloorToInt(InLocation.X / WorldData->GetChunkRealSize().X), FMath::FloorToInt(InLocation.Y / WorldData->GetChunkRealSize().Y), 0);
-}
-
-FVector UVoxelModule::ChunkIndexToLocation(FIndex InIndex) const
-{
-	return InIndex.ToVector() * FVector(WorldData->GetChunkRealSize().X, WorldData->GetChunkRealSize().Y, 0.f);
-}
-
-FIndex UVoxelModule::ChunkIndexToVoxelIndex(FIndex InIndex) const
-{
-	return InIndex * WorldData->ChunkSize;
-}
-
-FIndex UVoxelModule::LocationToVoxelIndex(FVector InLocation) const
-{
-	InLocation /= WorldData->BlockSize;
-	return FIndex(FMath::FloorToInt(InLocation.X), FMath::FloorToInt(InLocation.Y), FMath::FloorToInt(InLocation.Z));
-}
-
-FVector UVoxelModule::VoxelIndexToLocation(FIndex InIndex) const
-{
-	return InIndex.ToVector() * WorldData->BlockSize;
-}
-
-FIndex UVoxelModule::VoxelIndexToChunkIndex(FIndex InIndex) const
-{
-	const FVector2D Index = InIndex.ToVector2D() / WorldData->ChunkSize;
-	return FIndex(FMath::FloorToInt(Index.X), FMath::FloorToInt(Index.Y), 0);
-}
-
-uint64 UVoxelModule::VoxelIndexToNumber(FIndex InIndex, bool bWorldSpace) const
-{
-	if(!bWorldSpace)
-	{
-		const int32 SizeX = (int32)WorldData->ChunkSize.X;
-		return InIndex.X + InIndex.Y * SizeX + InIndex.Z * SizeX * (int32)WorldData->ChunkSize.Y;
-	}
-	return FMathHelper::CompressIndex(InIndex);
-}
-
-FIndex UVoxelModule::NumberToVoxelIndex(uint64 InNumber, bool bWorldSpace) const
-{
-	if(!bWorldSpace)
-	{
-		const int32 Num1 = (int32)WorldData->ChunkSize.X;
-		const int32 Num2 = Num1 * (int32)WorldData->ChunkSize.Y;
-		const int32 Num3 = InNumber % Num2;
-		return FIndex(Num3 % Num1, Num3 / Num1, InNumber / Num2);
-	}
-	return FMathHelper::UnCompressIndex(InNumber);
-}
-
-bool UVoxelModule::VoxelRaycastSinge(FVector InRayStart, FVector InRayEnd, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
-{
-	FHitResult HitResult;
-	if(UKismetSystemLibrary::LineTraceSingle(GetWorldContext(), InRayStart, InRayEnd, USceneModuleStatics::GetTraceMapping(FName("Voxel")).GetTraceType(), false, InIgnoreActors, EDrawDebugTrace::None, HitResult, true))
-	{
-		OutHitResult = FVoxelHitResult(HitResult);
-		return OutHitResult.IsValid();
-	}
-	return false;
-}
-
-bool UVoxelModule::VoxelRaycastSinge(EVoxelRaycastType InRaycastType, float InDistance, const TArray<AActor*>& InIgnoreActors, FVoxelHitResult& OutHitResult)
-{
-	if(AWHPlayerController* PlayerController = UCommonModuleStatics::GetPlayerController())
-	{
-		FHitResult HitResult;
-		switch (InRaycastType)
-		{
-			case EVoxelRaycastType::FromAimPoint:
-			{
-				PlayerController->RaycastSingleFromViewportPosition(FVector2D(0.5f), InDistance, USceneModuleStatics::GetTraceMapping(FName("Voxel")).GetTraceChannel(), InIgnoreActors, HitResult);
-				break;
-			}
-			case EVoxelRaycastType::FromMousePosition:
-			{
-				PlayerController->RaycastSingleFromMousePosition(InDistance, USceneModuleStatics::GetTraceMapping(FName("Voxel")).GetTraceChannel(), InIgnoreActors, HitResult);
-				break;
-			}
-		}
-		OutHitResult = FVoxelHitResult(HitResult);
-		return OutHitResult.IsValid();
-	}
-	return false;
-}
-
-bool UVoxelModule::VoxelItemTraceSingle(const FVoxelItem& InVoxelItem, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
-{
-	const FVector Size = InVoxelItem.GetRange(true, true) * WorldData->BlockSize * 0.5f;
-	const FVector Location = InVoxelItem.GetLocation();
-	return UKismetSystemLibrary::BoxTraceSingle(GetWorldContext(), Location + Size, Location + Size, Size * 0.95f, FRotator::ZeroRotator, USceneModuleStatics::GetTraceMapping(FName("Voxel")).GetTraceType(), false, InIgnoreActors, EDrawDebugTrace::None, OutHitResult, true);
-}
-
-bool UVoxelModule::VoxelAgentTraceSingle(FIndex InChunkIndex, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock, int32 InMaxCount, bool bFromCenter, bool bForce)
-{
-	const FVector2D ChunkRadius = WorldData->GetChunkRealSize() * 0.5f;
-	const FVector ChunkLocation = ChunkIndexToLocation(InChunkIndex);
-	return VoxelAgentTraceSingle(ChunkLocation + FVector(ChunkRadius.X, ChunkRadius.Y, 0.f), FVector2D(ChunkRadius.X, ChunkRadius.Y), InRadius, InHalfHeight, InIgnoreActors, OutHitResult, bSnapToBlock, InMaxCount, bFromCenter, bForce);
-}
-
-bool UVoxelModule::VoxelAgentTraceSingle(FVector InLocation, FVector2D InRange, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bSnapToBlock, int32 InMaxCount, bool bFromCenter, bool bForce)
-{
-	const FBox WorldBounds = GetWorldBounds(InRadius, InHalfHeight);
-	InLocation.X = FMath::Clamp(InLocation.X, WorldBounds.Min.X, WorldBounds.Max.X);
-	InLocation.Y = FMath::Clamp(InLocation.Y, WorldBounds.Min.Y, WorldBounds.Max.Y);
-	DON_WITHINDEX(InMaxCount, i,
-		FVector RayStart = FVector((bFromCenter && i == 0) ? 0.f : WorldData->RandomStream.FRandRange(-InRange.X * 0.5f, InRange.X * 0.5f),
-			(bFromCenter && i == 0) ? 0.f : WorldData->RandomStream.FRandRange(-InRange.Y * 0.5f, InRange.Y * 0.5f), WorldData->GetWorldRealHeight());
-		RayStart.X = FMath::Clamp(InLocation.X + (bSnapToBlock ? (FMath::Floor(RayStart.X / WorldData->BlockSize) + 0.5f) * WorldData->BlockSize : RayStart.X), WorldBounds.Min.X, WorldBounds.Max.X);
-		RayStart.Y = FMath::Clamp(InLocation.Y + (bSnapToBlock ? (FMath::Floor(RayStart.Y / WorldData->BlockSize) + 0.5f) * WorldData->BlockSize : RayStart.Y), WorldBounds.Min.Y, WorldBounds.Max.Y);
-		const FVector RayEnd = FVector(RayStart.X, RayStart.Y, 0.f);
-		FHitResult HitResult;
-		if(VoxelAgentTraceSingle(RayStart, RayEnd, InRadius, InHalfHeight, InIgnoreActors, HitResult, !bForce || i < InMaxCount - 1))
-		{
-			OutHitResult = HitResult;
-			return true;
-		}
-	)
-	return false;
-}
-
-bool UVoxelModule::VoxelAgentTraceSingle(FVector InRayStart, FVector InRayEnd, float InRadius, float InHalfHeight, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult, bool bCheckVoxel)
-{
-	FHitResult HitResult1;
-	if(UKismetSystemLibrary::CapsuleTraceSingle(GetWorldContext(), InRayStart, InRayEnd, InRadius * 0.95f, InHalfHeight, USceneModuleStatics::GetTraceMapping(FName("Chunk")).GetTraceType(), false, InIgnoreActors, EDrawDebugTrace::None, HitResult1, true))
-	{
-		FHitResult HitResult2;
-		if(!UKismetSystemLibrary::CapsuleTraceSingle(GetWorldContext(), HitResult1.Location, HitResult1.Location, InRadius * 0.95f, InHalfHeight * 0.95f, USceneModuleStatics::GetTraceMapping(FName("Voxel")).GetTraceType(), false, InIgnoreActors, EDrawDebugTrace::None, HitResult2, true))
-		{
-			if(!bCheckVoxel || !GetVoxelByLocation(HitResult1.Location).IsValid())
-			{
-				OutHitResult = HitResult1;
-				return true;
-			}
-		}
-	}
-	return false;
-}
-
-int32 UVoxelModule::GetChunkNum(bool bNeedGenerated /*= false*/) const
-{
-	if(bNeedGenerated)
-	{
-		int32 ReturnValue = 0;
-		ITER_MAP(ChunkMap, Iter,
-			if(Iter.Value->IsGenerated())
-			{
-				ReturnValue++;
-			}
-		)
-		return ReturnValue;
-	}
-	return ChunkMap.Num();
-}
-
-bool UVoxelModule::IsChunkGenerated(FIndex InIndex) const
-{
-	if(UVoxelChunk* Chunk = GetChunkByIndex(InIndex))
-	{
-		return Chunk->IsGenerated();
-	}
-	return false;
-}
-
-FVoxelChunkQueues UVoxelModule::GetChunkQueues(EVoxelWorldState InWorldState) const
-{
-	return ChunkQueues.FindRef(InWorldState);
-}
-
-UVoxelGenerator* UVoxelModule::GetVoxelGenerator(const TSubclassOf<UVoxelGenerator>& InClass) const
-{
-	return VoxelGeneratorMap.FindRef(InClass);
-}
-
-FPrimaryAssetId UVoxelModule::VoxelTypeToAssetID(EVoxelType InVoxelType) const
-{
-	if(VoxelAssetIDMap.Contains(InVoxelType))
-	{
-		return VoxelAssetIDMap[InVoxelType];
-	}
-	return FPrimaryAssetId(FName("Voxel"), *FString::Printf(TEXT("DA_%s"), *UCommonModuleStatics::GetEnumAuthoredNameByValue(TEXT("/Script/WHFramework.EVoxelType"), (int32)InVoxelType)));
-}
-
-FSceneArea UVoxelModule::ResolveVoxelArea(const FSceneArea& InArea, const FVector2D& InPoint) const
-{
-	const float BlockSize = FMath::Max(GetWorldData().BlockSize, UE_SMALL_NUMBER);
-	const FIndex Index(FMath::FloorToInt(InPoint.X / BlockSize), FMath::FloorToInt(InPoint.Y / BlockSize), 0);
-	const FText RegionDisplayName = UCommonModuleStatics::GetEnumDisplayNameByValue(TEXT("/Script/WHFramework.EVoxelRegionType"), static_cast<int32>(SampleTopographyByIndex(Index).RegionType));
-	FSceneArea Area = InArea;
-	Area.AreaDisplayName = InArea.AreaDisplayName.IsEmpty()
-		? GetVoxelAreaName(Index, EVoxelAreaType::Continent, RegionDisplayName)
-		: FText::Format(FText::FromString(TEXT("{0}{1}")), InArea.AreaDisplayName, RegionDisplayName);
-	return Area;
-}
-
-FText UVoxelModule::GetVoxelAreaName(FIndex InIndex) const
-{
-	if(IsInGameThread())
-	{
-		const FSceneArea Area = USceneModule::Get().GetSceneAreaByPoint(InIndex.ToVector2D() * GetWorldData().BlockSize);
-		if(!Area.AreaName.IsNone() && !Area.AreaDisplayName.IsEmpty()) return Area.AreaDisplayName;
-	}
-	const FText RegionDisplayName = UCommonModuleStatics::GetEnumDisplayNameByValue(TEXT("/Script/WHFramework.EVoxelRegionType"), static_cast<int32>(SampleTopographyByIndex(InIndex).RegionType));
-	return GetVoxelAreaName(InIndex, EVoxelAreaType::Continent, RegionDisplayName);
-}
-
-FText UVoxelModule::GetVoxelAreaName(FIndex InIndex, EVoxelAreaType InAreaType) const
-{
-	const int32 WorldSeed = WorldData ? WorldData->WorldSeed : 0;
-	const uint32 Hash = HashCombine(HashCombine(GetTypeHash(WorldSeed), GetTypeHash(InIndex.X)), HashCombine(GetTypeHash(InIndex.Y), GetTypeHash(static_cast<uint8>(InAreaType))));
-	const FString Prefix = StaticEnum<EVoxelAreaType>()->GetNameStringByValue(static_cast<int64>(InAreaType)) + TEXT(".");
-	const FName Key = UAssetModuleStatics::GetRandomTextKey(VoxelAreaNamespace, Prefix, Hash);
-	return Key.IsNone() ? FText::GetEmpty() : UAssetModuleStatics::GetLocalizedText(VoxelAreaNamespace, Key.ToString());
-}
-
-FText UVoxelModule::GetVoxelAreaName(FIndex InIndex, EVoxelAreaType InAreaType, const FText& InAreaName) const
-{
-	const FText Prefix = GetVoxelAreaName(InIndex, InAreaType);
-	if(Prefix.IsEmpty()) return InAreaName;
-	if(InAreaName.IsEmpty()) return Prefix;
-
-	return FText::Format(FText::FromString(TEXT("{0}{1}")), Prefix, InAreaName);
+	return float(Ready) / Wanted;
 }

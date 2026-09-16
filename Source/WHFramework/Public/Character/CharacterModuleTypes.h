@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "Parameter/ParameterTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 
 #include "CharacterModuleTypes.generated.h"

@@ -1,17 +1,17 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "Character/Base/CharacterPartBase.h"
 
 #include "Character/Base/CharacterBase.h"
 #include "Voxel/VoxelModule.h"
-#include "Voxel/Chunks/VoxelChunk.h"
-#include "Voxel/Voxels/Voxel.h"
+#include "Voxel/VoxelModuleStatics.h"
+#include "Voxel/Chunks/VoxelSectionKey.h"
 
-UCharacterPartBase::UCharacterPartBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
+UCharacterPartBase::UCharacterPartBase(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer)
 {
 	PrimaryComponentTick.bCanEverTick = true;
-	
+
 	UPrimitiveComponent::SetCollisionProfileName(TEXT("CharacterPart"));
 	InitBoxExtent(FVector(15, 15, 15));
 
@@ -26,64 +26,26 @@ void UCharacterPartBase::BeginPlay()
 void UCharacterPartBase::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-	
+
 	UpdateVoxelOverlap();
 }
 
 void UCharacterPartBase::UpdateVoxelOverlap()
 {
-	if(!GetOwnerCharacter()) return;
-	
-	if(UVoxelChunk* Chunk = Cast<UVoxelChunk>(ISceneActorInterface::Execute_GetContainer(GetOwnerCharacter()).GetObject()))
+	ACharacterBase* OwnerCharacter = GetOwnerCharacter();
+	UVoxelModule* VoxelModule = UVoxelModule::GetPtr();
+	if (!OwnerCharacter || !VoxelModule || !VoxelModule->IsReady())
 	{
-		FVoxelItem StayingVoxel = Chunk->GetVoxelComplex(Chunk->LocationToIndex(GetComponentLocation()), true);
-		if(StayingVoxel.GetVoxelType() == EVoxelType::Water && FVoxelLiquidState(StayingVoxel.Data).GetLevel() != 0)
-		{
-			StayingVoxel = FVoxelItem::Empty;
-		}
-		const FVoxelHitResult VoxelHitResult = FVoxelHitResult(StayingVoxel, GetComponentLocation(), GetOwnerCharacter()->GetMoveDirection());
-		if(StayingVoxel != OverlappingVoxel)
-		{
-			if(StayingVoxel.IsValid())
-			{
-				if(OverlappingVoxel.IsValid())
-				{
-					OnExitVoxel(OverlappingVoxel.GetVoxel(), VoxelHitResult);
-				}
-				OverlappingVoxel = StayingVoxel;
-				OnEnterVoxel(StayingVoxel.GetVoxel(), VoxelHitResult);
-			}
-			else if(OverlappingVoxel.IsValid())
-			{
-				OnExitVoxel(OverlappingVoxel.GetVoxel(), VoxelHitResult);
-				OverlappingVoxel = FVoxelItem::Empty;
-			}
-		}
-		else if(OverlappingVoxel.IsValid())
-		{
-			OnStayVoxel(OverlappingVoxel.GetVoxel(), VoxelHitResult);
-		}
+		OverlappingVoxel = FVoxelItem();
+		return;
 	}
-}
 
-void UCharacterPartBase::OnHitVoxel(UVoxel& InVoxel, const FVoxelHitResult& InHitResult)
-{
-	InVoxel.OnAgentHit(GetOwnerCharacter(), InHitResult);
-}
-
-void UCharacterPartBase::OnEnterVoxel(UVoxel& InVoxel, const FVoxelHitResult& InHitResult)
-{
-	InVoxel.OnAgentEnter(GetOwnerCharacter(), InHitResult);
-}
-
-void UCharacterPartBase::OnStayVoxel(UVoxel& InVoxel, const FVoxelHitResult& InHitResult)
-{
-	InVoxel.OnAgentStay(GetOwnerCharacter(), InHitResult);
-}
-
-void UCharacterPartBase::OnExitVoxel(UVoxel& InVoxel, const FVoxelHitResult& InHitResult)
-{
-	InVoxel.OnAgentExit(GetOwnerCharacter(), InHitResult);
+	FIntVector BlockIndex;
+	if (!VoxelCoord::FromWorld(GetComponentLocation(), VoxelModule->BlockSize(), BlockIndex) ||
+	    !UVoxelModuleStatics::GetVoxelBlock(this, BlockIndex, OverlappingVoxel))
+	{
+		OverlappingVoxel = FVoxelItem();
+	}
 }
 
 ACharacterBase* UCharacterPartBase::GetOwnerCharacter(TSubclassOf<ACharacterBase> InClass) const

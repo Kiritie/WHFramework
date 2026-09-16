@@ -19,6 +19,7 @@ class UAbilitySystemComponentBase;
 class UBoxComponent;
 class UAttributeSetBase;
 class UAbilityVitalityInventoryBase;
+class UVoxelAgentComponent;
 
 /**
  * Ability Vitality基类
@@ -37,11 +38,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
 public:
-
 	virtual void OnSpawn_Implementation(const FParameter& InParam) override;
-		
-	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode)
-		override;
+
+	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// WHActor
@@ -58,7 +57,7 @@ protected:
 	virtual void LoadData(const FParameter& InSaveData, EPhase InPhase) override;
 
 	virtual FParameter ToData() override;
-	
+
 	virtual void ResetData() override;
 
 	virtual void OnFiniteStateRefresh(UFiniteStateBase* InCurrentState) override;
@@ -71,7 +70,7 @@ public:
 	virtual void Kill(IAbilityVitalityInterface* InTarget) override;
 
 	virtual void Revive(IAbilityVitalityInterface* InRescuer) override;
-	
+
 	UFUNCTION(BlueprintCallable)
 	virtual void Static() override;
 
@@ -83,7 +82,7 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void UnInterrupt() override;
-	
+
 	UFUNCTION(BlueprintCallable)
 	virtual bool DoAction(const FGameplayTag& InActionTag) override;
 
@@ -105,7 +104,7 @@ public:
 	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
 
 	virtual void OnRemoveItem(const FAbilityItem& InItem) override;
-		
+
 	virtual void OnDeactiveItem(const FAbilityItem& InItem, bool bPassive) override;
 
 	virtual void OnDiscardItem(const FAbilityItem& InItem, bool bInPlace) override;
@@ -115,10 +114,6 @@ public:
 	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
 
 protected:
-	virtual bool OnGenerateVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult) override;
-
-	virtual bool OnDestroyVoxel(EInputInteractEvent InInteractEvent, const FVoxelHitResult& InHitResult) override;
-
 protected:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
 
@@ -127,11 +122,25 @@ protected:
 	virtual void OnActorDetached(AActor* InActor) override;
 
 public:
-	virtual void HandleDamage(const FGameplayAttribute& DamageAttribute, float DamageValue, float DefendValue, bool bHasCrited, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+	virtual void HandleDamage(const FGameplayAttribute& DamageAttribute,
+	                          float DamageValue,
+	                          float DefendValue,
+	                          bool bHasCrited,
+	                          const FHitResult& HitResult,
+	                          const FGameplayTagContainer& SourceTags,
+	                          AActor* SourceActor) override;
 
-	virtual void HandleRecovery(const FGameplayAttribute& RecoveryAttribute, float RecoveryValue, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+	virtual void HandleRecovery(const FGameplayAttribute& RecoveryAttribute,
+	                            float RecoveryValue,
+	                            const FHitResult& HitResult,
+	                            const FGameplayTagContainer& SourceTags,
+	                            AActor* SourceActor) override;
 
-	virtual void HandleInterrupt(const FGameplayAttribute& InterruptAttribute, float InterruptDuration, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) override;
+	virtual void HandleInterrupt(const FGameplayAttribute& InterruptAttribute,
+	                             float InterruptDuration,
+	                             const FHitResult& HitResult,
+	                             const FGameplayTagContainer& SourceTags,
+	                             AActor* SourceActor) override;
 
 protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
@@ -141,36 +150,36 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
 	FName RaceID;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
-	FPrimaryAssetId GenerateVoxelID;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Voxel")
+	TObjectPtr<UVoxelAgentComponent> VoxelAgentComponent;
 
 	TMap<FGameplayTag, FVitalityActionAbilityData> ActionAbilities;
 
 public:
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Exp)
-	
+
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxExp)
 
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Health)
 
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxHealth)
-	
+
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, HealthRecovery)
-		
+
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, HealthRegenSpeed)
 
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, PhysicsDamage)
-	
+
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
-	
+
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, FallDamage)
-	
+
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Interrupt)
 
 public:
 	UFUNCTION(BlueprintPure)
 	virtual bool IsActive() const override;
-	
+
 	UFUNCTION(BlueprintPure)
 	virtual bool IsDead(bool bCheckDying = true) const override;
 
@@ -184,31 +193,61 @@ public:
 	virtual bool IsInterrupting() const override;
 
 public:
-	virtual FName GetNameA() const override { return Super::GetNameA(); }
-	
-	virtual void SetNameA(FName InName) override { Super::SetNameA(InName); }
-	
-	virtual int32 GetLevelA() const override { return Super::GetLevelA(); }
-	
-	virtual bool SetLevelA(int32 InLevel) override { return Super::SetLevelA(InLevel); }
-	
-	virtual float GetRadius() const override { return Super::GetRadius(); }
+	virtual FName GetNameA() const override
+	{
+		return Super::GetNameA();
+	}
 
-	virtual float GetHalfHeight() const override { return Super::GetRadius(); }
-		
-	virtual float GetDistance(AActor* InTargetActor, bool bIgnoreRadius = true, bool bIgnoreZAxis = true) const override { return Super::GetDistance(InTargetActor, bIgnoreRadius, bIgnoreZAxis); }
+	virtual void SetNameA(FName InName) override
+	{
+		Super::SetNameA(InName);
+	}
 
-	virtual FTransform GetBirthTransform() const override { return Super::GetBirthTransform(); }
+	virtual int32 GetLevelA() const override
+	{
+		return Super::GetLevelA();
+	}
+
+	virtual bool SetLevelA(int32 InLevel) override
+	{
+		return Super::SetLevelA(InLevel);
+	}
+
+	virtual float GetRadius() const override
+	{
+		return Super::GetRadius();
+	}
+
+	virtual float GetHalfHeight() const override
+	{
+		return Super::GetRadius();
+	}
+
+	virtual float GetDistance(AActor* InTargetActor, bool bIgnoreRadius = true, bool bIgnoreZAxis = true) const override
+	{
+		return Super::GetDistance(InTargetActor, bIgnoreRadius, bIgnoreZAxis);
+	}
+
+	virtual FTransform GetBirthTransform() const override
+	{
+		return Super::GetBirthTransform();
+	}
 
 	UFUNCTION(BlueprintPure)
-	virtual FName GetRaceID() const override { return RaceID; }
+	virtual FName GetRaceID() const override
+	{
+		return RaceID;
+	}
 
 	UFUNCTION(BlueprintCallable)
-	virtual void SetRaceID(FName InRaceID) override { RaceID = InRaceID; }
+	virtual void SetRaceID(FName InRaceID) override
+	{
+		RaceID = InRaceID;
+	}
 
 	UFUNCTION(BlueprintPure)
 	virtual FString GetHeadInfo() const override;
-	
+
 	UFUNCTION(BlueprintPure)
 	virtual bool HasActionAbility(const FGameplayTag& InActionTag) const override;
 
@@ -216,41 +255,52 @@ public:
 	virtual FVitalityActionAbilityData GetActionAbility(const FGameplayTag& InActionTag) override;
 
 	UFUNCTION(BlueprintPure)
-	virtual TMap<FGameplayTag, FVitalityActionAbilityData>& GetActionAbilities() override { return ActionAbilities; }
+	virtual TMap<FGameplayTag, FVitalityActionAbilityData>& GetActionAbilities() override
+	{
+		return ActionAbilities;
+	}
 
-	template<class T>
-	T& GetVitalityData() const
+	template <class T> T& GetVitalityData() const
 	{
 		return static_cast<T&>(GetVitalityData());
 	}
-	
+
 	UAbilityVitalityDataBase& GetVitalityData() const;
 
-	virtual UFSMComponent* GetFSMComponent() const override { return FSM; }
+	virtual UFSMComponent* GetFSMComponent() const override
+	{
+		return FSM;
+	}
 
-	virtual FVector GetVoxelAgentLocation() const override { return GetActorLocation(); }
+	virtual UVoxelAgentComponent* GetVoxelAgentComponent() const override;
 
-	virtual FPrimaryAssetId GetGenerateVoxelID() const override { return GenerateVoxelID; }
-
-	virtual void SetGenerateVoxelID(const FPrimaryAssetId& InGenerateVoxelID) override { GenerateVoxelID = InGenerateVoxelID; }
-
-	template<class T>
-	T* GetAttributeSet() const
+	template <class T> T* GetAttributeSet() const
 	{
 		return Cast<T>(GetAttributeSet());
 	}
 
-	virtual UAttributeSetBase* GetAttributeSet() const override { return Super::GetAttributeSet(); }
+	virtual UAttributeSetBase* GetAttributeSet() const override
+	{
+		return Super::GetAttributeSet();
+	}
 
-	virtual UShapeComponent* GetCollisionComponent() const override { return Super::GetCollisionComponent(); }
+	virtual UShapeComponent* GetCollisionComponent() const override
+	{
+		return Super::GetCollisionComponent();
+	}
 
-	virtual UMeshComponent* GetMeshComponent() const override { return Super::GetMeshComponent(); }
+	virtual UMeshComponent* GetMeshComponent() const override
+	{
+		return Super::GetMeshComponent();
+	}
 
-	template<class T>
-	T* GetAbilitySystemComponent() const
+	template <class T> T* GetAbilitySystemComponent() const
 	{
 		return Cast<T>(GetAbilitySystemComponent());
 	}
 
-	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override { return Super::GetAbilitySystemComponent(); }
+	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override
+	{
+		return Super::GetAbilitySystemComponent();
+	}
 };

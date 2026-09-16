@@ -15,11 +15,11 @@ struct WHFRAMEWORK_API FEventVoxelWorldAgentMoved : public FEventBase
 public:
 	FEventVoxelWorldAgentMoved() = default;
 
-	FEventVoxelWorldAgentMoved(FIndex InAgentIndex)
-		: AgentIndex(MoveTemp(InAgentIndex))
+	explicit FEventVoxelWorldAgentMoved(FIntVector InAgentIndex)
+	    : AgentIndex(MoveTemp(InAgentIndex))
 	{
 	}
 
 	UPROPERTY(BlueprintReadWrite)
-	FIndex AgentIndex = FIndex::ZeroIndex;
+	FIntVector AgentIndex = FIntVector::ZeroValue;
 };

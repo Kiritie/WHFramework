@@ -1,6 +1,5 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "Pawn/Base/PawnBase.h"
 
 #include "AIController.h"
@@ -20,9 +19,10 @@
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/Chunks/VoxelChunk.h"
+#include "Voxel/Agent/VoxelAgentComponent.h"
 
-APawnBase::APawnBase(const FObjectInitializer& ObjectInitializer) :
-	Super(ObjectInitializer)
+APawnBase::APawnBase(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer)
 {
 	PrimaryActorTick.bCanEverTick = true;
 
@@ -43,6 +43,7 @@ APawnBase::APawnBase(const FObjectInitializer& ObjectInitializer) :
 	StimuliSource = CreateDefaultSubobject<UAIPerceptionStimuliSourceComponent>(FName("StimuliSource"));
 	StimuliSource->RegisterForSense(UAISense_Sight::StaticClass());
 	StimuliSource->RegisterForSense(UAISense_Damage::StaticClass());
+	VoxelAgentComponent = CreateDefaultSubobject<UVoxelAgentComponent>(TEXT("VoxelAgentComponent"));
 
 	Name = NAME_None;
 	DefaultController = nullptr;
@@ -53,8 +54,6 @@ APawnBase::APawnBase(const FObjectInitializer& ObjectInitializer) :
 	ActorID = FGuid::NewGuid();
 	bVisible = true;
 	Container = nullptr;
-
-	GenerateVoxelID = FPrimaryAssetId();
 }
 
 void APawnBase::OnSpawn_Implementation(const FParameter& InParam)
@@ -62,11 +61,11 @@ void APawnBase::OnSpawn_Implementation(const FParameter& InParam)
 	USceneModuleStatics::RemoveSceneActor(this);
 
 	const FAbilityActorSpawnParameter* Param = InParam.GetPtr<FAbilityActorSpawnParameter>();
-	if(Param && Param->bOverrideActorID)
+	if (Param && Param->bOverrideActorID)
 	{
 		ActorID = Param->ActorID;
 	}
-	if(Param)
+	if (Param)
 	{
 		AssetID = Param->AssetID;
 	}
@@ -74,30 +73,42 @@ void APawnBase::OnSpawn_Implementation(const FParameter& InParam)
 	USceneModuleStatics::AddSceneActor(this);
 
 	Execute_SetActorVisible(this, true);
+	if (VoxelAgentComponent)
+	{
+		VoxelAgentComponent->SetAgentEnabled(true);
+	}
 }
 
 void APawnBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
+	if (VoxelAgentComponent)
+	{
+		VoxelAgentComponent->SetAgentEnabled(false);
+	}
+
 	Execute_SetActorVisible(this, false);
 
 	SetActorLocationAndRotation(UNDER_Vector, FRotator::ZeroRotator);
 
 	USceneModuleStatics::RemoveSceneActor(this);
-	if(Container)
+	if (Container)
 	{
 		Container->RemoveSceneActor(this);
 	}
 
 	Container = nullptr;
 	DefaultController = nullptr;
+}
 
-	SetGenerateVoxelID(FPrimaryAssetId());
+UVoxelAgentComponent* APawnBase::GetVoxelAgentComponent() const
+{
+	return VoxelAgentComponent;
 }
 
 void APawnBase::OnInitialize_Implementation()
 {
 	bInitialized = true;
-	
+
 	Execute_SetActorVisible(this, bVisible);
 
 	USceneModuleStatics::AddSceneActor(this);
@@ -105,22 +116,10 @@ void APawnBase::OnInitialize_Implementation()
 
 void APawnBase::OnPreparatory_Implementation()
 {
-	
 }
 
 void APawnBase::OnRefresh_Implementation(float DeltaSeconds)
 {
-	if(AMainModule::IsExistModuleByClass<UVoxelModule>())
-	{
-		if(UVoxelChunk* Chunk = UVoxelModuleStatics::GetChunkByLocation(GetActorLocation()))
-		{
-			Chunk->AddSceneActor(this);
-		}
-		else if(Container)
-		{
-			Container->RemoveSceneActor(this);
-		}
-	}
 }
 
 void APawnBase::OnTermination_Implementation()
@@ -132,7 +131,7 @@ void APawnBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData.GetRef<FSceneActorSaveData>();
 
-	if(PHASEC(InPhase, EPhase::Primary))
+	if (PHASEC(InPhase, EPhase::Primary))
 	{
 		ActorID = SaveData.ActorID;
 		SetActorTransform(SaveData.SpawnTransform);
@@ -152,10 +151,10 @@ FParameter APawnBase::ToData()
 void APawnBase::BeginPlay()
 {
 	Super::BeginPlay();
-	
-	if(Execute_IsUseDefaultLifecycle(this))
+
+	if (Execute_IsUseDefaultLifecycle(this))
 	{
-		if(!Execute_IsInitialized(this))
+		if (!Execute_IsInitialized(this))
 		{
 			Execute_OnInitialize(this);
 		}
@@ -167,7 +166,7 @@ void APawnBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
-	if(Execute_IsUseDefaultLifecycle(this))
+	if (Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnTermination(this);
 	}
@@ -177,7 +176,7 @@ void APawnBase::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	if(Execute_IsUseDefaultLifecycle(this))
+	if (Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnRefresh(this, DeltaSeconds);
 	}
@@ -192,12 +191,10 @@ void APawnBase::SpawnDefaultController()
 
 void APawnBase::OnSwitch_Implementation()
 {
-	
 }
 
 void APawnBase::OnUnSwitch_Implementation()
 {
-	
 }
 
 void APawnBase::Switch_Implementation()
@@ -207,7 +204,7 @@ void APawnBase::Switch_Implementation()
 
 void APawnBase::UnSwitch_Implementation()
 {
-	if(IsCurrent())
+	if (IsCurrent())
 	{
 		UPawnModuleStatics::SwitchPawn(nullptr);
 	}
@@ -248,7 +245,6 @@ void APawnBase::MoveUp_Implementation(float InValue)
 
 void APawnBase::JumpN_Implementation()
 {
-	
 }
 
 FCameraTargetParams APawnBase::GetCameraTargetParams_Implementation() const
@@ -262,9 +258,9 @@ void APawnBase::SetActorVisible_Implementation(bool bInVisible)
 	GetRootComponent()->SetVisibility(bInVisible, true);
 	TArray<AActor*> AttachedActors;
 	GetAttachedActors(AttachedActors);
-	for(auto Iter : AttachedActors)
+	for (auto Iter : AttachedActors)
 	{
-		if(Iter && Iter->Implements<USceneActorInterface>())
+		if (Iter && Iter->Implements<USceneActorInterface>())
 		{
 			ISceneActorInterface::Execute_SetActorVisible(Iter, bInVisible);
 		}
@@ -283,13 +279,13 @@ void APawnBase::SetUseControllerRotation(bool bValue)
 
 void APawnBase::TransformTowards(FTransform InTransform, float InDuration, bool bMulticast)
 {
-	if(bMulticast)
+	if (bMulticast)
 	{
-		if(HasAuthority())
+		if (HasAuthority())
 		{
 			MultiTransformTowards(InTransform);
 		}
-		else if(UPawnModuleNetworkComponent* PawnModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UPawnModuleNetworkComponent>())
+		else if (UPawnModuleNetworkComponent* PawnModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UPawnModuleNetworkComponent>())
 		{
 			PawnModuleNetworkComponent->ServerTransformTowardsToMulticast(this, InTransform);
 		}
@@ -305,13 +301,13 @@ void APawnBase::MultiTransformTowards_Implementation(FTransform InTransform, flo
 
 void APawnBase::RotationTowards(FRotator InRotation, float InDuration, bool bMulticast)
 {
-	if(bMulticast)
+	if (bMulticast)
 	{
-		if(HasAuthority())
+		if (HasAuthority())
 		{
 			MultiRotationTowards(InRotation, InDuration);
 		}
-		else if(UPawnModuleNetworkComponent* PawnModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UPawnModuleNetworkComponent>())
+		else if (UPawnModuleNetworkComponent* PawnModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UPawnModuleNetworkComponent>())
 		{
 			PawnModuleNetworkComponent->ServerRotationTowardsMulticast(this, InRotation, InDuration);
 		}
@@ -327,19 +323,19 @@ void APawnBase::MultiRotationTowards_Implementation(FRotator InRotation, float I
 
 void APawnBase::AIMoveTo(FVector InLocation, float InStopDistance, bool bMulticast)
 {
-	if(bMulticast)
+	if (bMulticast)
 	{
-		if(HasAuthority())
+		if (HasAuthority())
 		{
 			MultiAIMoveTo(InLocation, InStopDistance);
 		}
-		else if(UPawnModuleNetworkComponent* PawnModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UPawnModuleNetworkComponent>())
+		else if (UPawnModuleNetworkComponent* PawnModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UPawnModuleNetworkComponent>())
 		{
 			PawnModuleNetworkComponent->ServerAIMoveToMulticast(this, InLocation, InStopDistance);
 		}
 		return;
 	}
-	if(AAIController* AIController = GetController<AAIController>())
+	if (AAIController* AIController = GetController<AAIController>())
 	{
 		AIController->MoveToLocation(InLocation, InStopDistance);
 	}
@@ -352,19 +348,19 @@ void APawnBase::MultiAIMoveTo_Implementation(FVector InLocation, float InStopDis
 
 void APawnBase::StopAIMove(bool bMulticast)
 {
-	if(bMulticast)
+	if (bMulticast)
 	{
-		if(HasAuthority())
+		if (HasAuthority())
 		{
 			MultiStopAIMove();
 		}
-		else if(UPawnModuleNetworkComponent* PawnModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UPawnModuleNetworkComponent>())
+		else if (UPawnModuleNetworkComponent* PawnModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UPawnModuleNetworkComponent>())
 		{
 			PawnModuleNetworkComponent->ServerStopAIMoveMulticast(this);
 		}
 		return;
 	}
-	if(AAIController* AIController = GetController<AAIController>())
+	if (AAIController* AIController = GetController<AAIController>())
 	{
 		AIController->StopMovement();
 	}
@@ -393,7 +389,8 @@ AAIControllerBase* APawnBase::GetAIController() const
 FVector APawnBase::GetMoveVelocity(bool bIgnoreZ) const
 {
 	FVector Velocity = GetMovementComponent()->Velocity;
-	if(bIgnoreZ) Velocity.Z = 0;
+	if (bIgnoreZ)
+		Velocity.Z = 0;
 	return Velocity;
 }
 

@@ -15,28 +15,35 @@
 
 #include "PawnBase.generated.h"
 
-
 class UBoxComponent;
 class UAIPerceptionStimuliSourceComponent;
+class UVoxelAgentComponent;
+class UPrimaryAssetBase;
 /**
- * 
+ *
  */
-UCLASS(meta=(ShortTooltip="A Pawn is an actor that can be 'possessed' and receive input from a controller."))
-class WHFRAMEWORK_API APawnBase : public APawn, public IPawnInterface, public IWHPlayerInterface, public IAIAgentInterface, public IVoxelAgentInterface, public IObjectPoolInterface, public ISaveDataAgentInterface, public IPrimaryEntityInterface, public IWHActorInterface
+UCLASS(meta = (ShortTooltip = "A Pawn is an actor that can be 'possessed' and receive input from a controller."))
+class WHFRAMEWORK_API APawnBase : public APawn,
+                                  public IPawnInterface,
+                                  public IWHPlayerInterface,
+                                  public IAIAgentInterface,
+                                  public IVoxelAgentInterface,
+                                  public IObjectPoolInterface,
+                                  public ISaveDataAgentInterface,
+                                  public IPrimaryEntityInterface,
+                                  public IWHActorInterface
 {
 	GENERATED_BODY()
-	
+
 public:
 	APawnBase(const FObjectInitializer& ObjectInitializer);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
 public:
-
 	virtual void OnSpawn_Implementation(const FParameter& InParam) override;
-		
-	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode)
-		override;
+
+	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// WHActor
@@ -52,11 +59,17 @@ public:
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "WHActor")
 	bool bInitialized;
-	
+
 protected:
-	virtual bool IsInitialized_Implementation() const override { return bInitialized; }
-	
-	virtual bool IsUseDefaultLifecycle_Implementation() const override { return true; }
+	virtual bool IsInitialized_Implementation() const override
+	{
+		return bInitialized;
+	}
+
+	virtual bool IsUseDefaultLifecycle_Implementation() const override
+	{
+		return true;
+	}
 
 	//////////////////////////////////////////////////////////////////////////
 	/// SaveData
@@ -99,18 +112,29 @@ public:
 protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UBoxComponent* BoxComponent;
+
 public:
-	virtual UBoxComponent* GetBoxComponent() const { return BoxComponent; }
+	virtual UBoxComponent* GetBoxComponent() const
+	{
+		return BoxComponent;
+	}
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Name
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PawnStats")
 	FName Name;
-public:
-	virtual FName GetNameP() const override { return Name; }
 
-	virtual void SetNameP(FName InName) override { Name = InName; }
+public:
+	virtual FName GetNameP() const override
+	{
+		return Name;
+	}
+
+	virtual void SetNameP(FName InName) override
+	{
+		Name = InName;
+	}
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Player
@@ -130,9 +154,15 @@ protected:
 	virtual void JumpN_Implementation() override;
 
 protected:
-	virtual bool IsBlockAllInput_Implementation() const override { return bBlockAllInput; }
+	virtual bool IsBlockAllInput_Implementation() const override
+	{
+		return bBlockAllInput;
+	}
 
-	virtual void SetBlockAllInput_Implementation(bool bInValue) override { bBlockAllInput = bInValue; }
+	virtual void SetBlockAllInput_Implementation(bool bInValue) override
+	{
+		bBlockAllInput = bInValue;
+	}
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Camera
@@ -154,17 +184,32 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SceneActor")
 	TScriptInterface<ISceneContainerInterface> Container;
-	
+
 public:
-	virtual FGuid GetActorID_Implementation() const override { return ActorID; }
+	virtual FGuid GetActorID_Implementation() const override
+	{
+		return ActorID;
+	}
 
-	virtual void SetActorID_Implementation(const FString& InID) override { ActorID = FGuid(InID); }
+	virtual void SetActorID_Implementation(const FString& InID) override
+	{
+		ActorID = FGuid(InID);
+	}
 
-	virtual TScriptInterface<ISceneContainerInterface> GetContainer_Implementation() const override { return Container; }
+	virtual TScriptInterface<ISceneContainerInterface> GetContainer_Implementation() const override
+	{
+		return Container;
+	}
 
-	virtual void SetContainer_Implementation(const TScriptInterface<ISceneContainerInterface>& InContainer) override { Container = InContainer; }
+	virtual void SetContainer_Implementation(const TScriptInterface<ISceneContainerInterface>& InContainer) override
+	{
+		Container = InContainer;
+	}
 
-	virtual bool IsVisible_Implementation() const override { return bVisible; }
+	virtual bool IsVisible_Implementation() const override
+	{
+		return bVisible;
+	}
 
 	virtual void SetActorVisible_Implementation(bool bInVisible) override;
 
@@ -173,15 +218,17 @@ public:
 protected:
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Components")
 	AController* DefaultController;
-	
+
 public:
-	template<class T>
-	T* GetDefaultController() const
+	template <class T> T* GetDefaultController() const
 	{
 		return Cast<T>(DefaultController);
 	}
-	
-	virtual AController* GetDefaultController() const override { return DefaultController; }
+
+	virtual AController* GetDefaultController() const override
+	{
+		return DefaultController;
+	}
 
 	virtual bool IsUseControllerRotation() const override;
 
@@ -190,15 +237,11 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Voxel
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "PawnStats")
-	FPrimaryAssetId GenerateVoxelID;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Voxel")
+	TObjectPtr<UVoxelAgentComponent> VoxelAgentComponent;
 
 public:
-	virtual FVector GetVoxelAgentLocation() const override { return GetActorLocation(); }
-
-	virtual FPrimaryAssetId GetGenerateVoxelID() const override { return GenerateVoxelID; }
-
-	virtual void SetGenerateVoxelID(const FPrimaryAssetId& InGenerateVoxelID) override { GenerateVoxelID = InGenerateVoxelID; }
+	virtual UVoxelAgentComponent* GetVoxelAgentComponent() const override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Transform
@@ -232,21 +275,26 @@ protected:
 	FPrimaryAssetId AssetID;
 
 public:
-	virtual FPrimaryAssetId GetAssetID_Implementation() const override { return AssetID; }
-	
-	virtual void SetAssetID_Implementation(const FPrimaryAssetId& InID) override { AssetID = InID; }
-	
-	template<class T>
-	T& GetPawnData() const
+	virtual FPrimaryAssetId GetAssetID_Implementation() const override
+	{
+		return AssetID;
+	}
+
+	virtual void SetAssetID_Implementation(const FPrimaryAssetId& InID) override
+	{
+		AssetID = InID;
+	}
+
+	template <class T> T& GetPawnData() const
 	{
 		return static_cast<T&>(GetPawnData());
 	}
-	
+
 	UPrimaryAssetBase& GetPawnData() const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// AI
-protected: 
+protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UAIPerceptionStimuliSourceComponent* StimuliSource;
 
@@ -255,8 +303,11 @@ public:
 	virtual UBehaviorTree* GetBehaviorTreeAsset() const override;
 
 	virtual AAIControllerBase* GetAIController() const override;
-	
-	UAIPerceptionStimuliSourceComponent* GetStimuliSource() const { return StimuliSource; }
+
+	UAIPerceptionStimuliSourceComponent* GetStimuliSource() const
+	{
+		return StimuliSource;
+	}
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats
