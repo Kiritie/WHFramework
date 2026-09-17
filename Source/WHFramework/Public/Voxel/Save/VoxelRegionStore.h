@@ -1,4 +1,5 @@
 #pragma once
+#include <atomic>
 #include "CoreMinimal.h"
 #include "Voxel/Chunks/VoxelSectionKey.h"
 class FSaveGameStorage;
@@ -42,6 +43,15 @@ public:
 	}
 	FVoxelRegionReadView CaptureRead(const FVoxelSectionKey& Key) const;
 	static EVoxelRegionRead Read(const FVoxelRegionReadView& View, TArray<uint8>& Out, FString& Error);
+	static bool ReadRange(
+		const FString& Directory,
+		const FVoxelSectionKey& MinInclusive,
+		const FVoxelSectionKey& MaxExclusive,
+		const TSet<FVoxelSectionKey>& SupersededResident,
+		TMap<FVoxelSectionKey, TArray<uint8>>& Out,
+		bool& bOverBudget,
+		FString& Error,
+		const std::atomic_bool* Cancel = nullptr);
 	static bool StageSection(FVoxelRegionWritePlan& Plan, const FVoxelSectionKey& Key, TArray<uint8>&& Bytes);
 	static void StageDelete(FVoxelRegionWritePlan& Plan, const FVoxelSectionKey& Key);
 	static bool WritePendingRegions(const FVoxelRegionWritePlan& Plan, const FString& TempGenerationDirectory, FString& Error);

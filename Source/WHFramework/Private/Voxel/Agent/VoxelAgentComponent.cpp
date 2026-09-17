@@ -207,16 +207,37 @@ void UVoxelAgentComponent::RefreshSource()
 		return;
 	S.Id = SourceId.IsValid() ? SourceId : FGuid::NewGuid();
 	S.Direction = D;
-	S.RenderRadius = FMath::Clamp(RenderRadius, 1, 8);
+	S.RenderRadius = 0;
 	S.CollisionRadius = 2;
-	S.SimulationRadius = 2;
-	S.PreloadRadius = S.RenderRadius;
-	S.VerticalRadius = FMath::Clamp(VerticalRadius, 1, 3);
+	S.SimulationRadius = 0;
+	S.PreloadRadius = 2;
+	S.VerticalRadius = 2;
+	S.bCollision = true;
+	S.bSimulation = false;
 	S.bRender = GetWorld()->GetNetMode() != NM_DedicatedServer;
 	if (!SourceId.IsValid())
 		SourceId = M->RegisterSource(this, S);
 	else if (!M->UpdateSource(SourceId, S))
 		SourceId.Invalidate();
+}
+void UVoxelAgentComponent::RefreshStepHeight()
+{
+	auto* C = Cast<ACharacter>(GetOwner());
+	auto* M = Module.Get();
+	if (!C || !C->GetCharacterMovement())
+		return;
+	auto* Move = C->GetCharacterMovement();
+	if (bUseSmallVoxelStepHeight && M && M->IsReady())
+	{
+		if (PreviousStepHeight < 0.f)
+			PreviousStepHeight = Move->MaxStepHeight;
+		Move->MaxStepHeight = FMath::Clamp(float(M->BlockSize()) + 5.f, 20.f, 40.f);
+	}
+	else if (PreviousStepHeight >= 0.f)
+	{
+		Move->MaxStepHeight = PreviousStepHeight;
+		PreviousStepHeight = -1.f;
+	}
 }
 void UVoxelAgentComponent::GateCharacter()
 {
@@ -263,6 +284,7 @@ void UVoxelAgentComponent::TickComponent(float D, ELevelTick T, FActorComponentT
 {
 	Super::TickComponent(D, T, F);
 	RefreshSource();
+	RefreshStepHeight();
 	GateCharacter();
 	double Now = FPlatformTime::Seconds();
 	if (bHeld && Now - LastPulse >= .1)
@@ -292,6 +314,10 @@ void UVoxelAgentComponent::EndPlay(const EEndPlayReason::Type R)
 		Module->UnregisterSource(SourceId);
 	if (Network.IsValid())
 		Network->OnIntentReply.Remove(ReplyHandle);
+	if (auto* C = Cast<ACharacter>(GetOwner()))
+		if (C->GetCharacterMovement() && PreviousStepHeight >= 0.f)
+			C->GetCharacterMovement()->MaxStepHeight = PreviousStepHeight;
+	PreviousStepHeight = -1.f;
 	Super::EndPlay(R);
 }
 

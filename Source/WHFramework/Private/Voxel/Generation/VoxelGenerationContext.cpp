@@ -1,29 +1,39 @@
 #include "Voxel/Generation/VoxelGenerationContext.h"
-bool FVoxelGenerationSettings::Validate(FString& E) const
+VoxelGen::Settings FVoxelGenerationSettings::ToKernel(int32 CellCm) const
 {
-	if (MinZ >= MaxZ || MinZ < -32768 || MaxZ > 32768 || int64(MaxZ) - MinZ > 4096)
-	{
-		E = TEXT("Invalid height range");
-		return false;
-	}
-	if (SeaLevel < MinZ || SeaLevel >= MaxZ || BaseHeight < MinZ || BaseHeight >= MaxZ)
-	{
-		E = TEXT("Invalid sea/base height");
-		return false;
-	}
-	const int32 P[] = {ContinentalPeriod, ErosionPeriod, MountainPeriod, ClimatePeriod, DetailPeriod};
-	for (int32 V : P)
-		if (V < 2 || V > 1048576)
-		{
-			E = TEXT("Noise period out of range");
-			return false;
-		}
-	if (ContinentalAmplitude < 0 || ContinentalAmplitude > 512 || MountainAmplitude < 0 || MountainAmplitude > 512 || DetailAmplitude < 0 ||
-	    DetailAmplitude > 64)
-	{
-		E = TEXT("Noise amplitude out of range");
-		return false;
-	}
-	E.Reset();
-	return true;
+    VoxelGen::Settings S;S.cellCm=CellCm;
+    S.seed=Seed;
+    S.minZ=MinZ;
+    S.maxZ=MaxZ;
+    S.sea=SeaLevel;
+    S.base=BaseHeight;
+    S.continentPeriod=ContinentalPeriod;
+    S.erosionPeriod=ErosionPeriod;
+    S.mountainPeriod=MountainPeriod;
+    S.climatePeriod=ClimatePeriod;
+    S.detailPeriod=DetailPeriod;
+    S.continentAmplitude=ContinentalAmplitude;
+    S.mountainAmplitude=MountainAmplitude;
+    S.detailAmplitude=DetailAmplitude;
+    S.riverPeriod=RiverPeriod;
+    S.riverWidthQ15=RiverWidthQ15;
+    S.riverDepth=RiverDepth;
+    S.lakeSpacing=LakeSpacing;
+    S.lakeRadius=LakeRadius;
+    S.lakeDepth=LakeDepth;
+    S.cavePeriod=CavePeriod;
+    S.chamberPeriod=ChamberPeriod;
+    S.caveWidthQ15=CaveWidthQ15;
+    S.chamberThresholdQ15=ChamberThresholdQ15;
+    S.aquiferSpacing=AquiferSpacing;
+    S.aquiferRadius=AquiferRadius;
+    S.lavaCeiling=LavaCeiling;
+    S.structureSpacing=StructureSpacing;
+    S.structureChancePermille=StructureChancePermille;
+    S.maxSiteCutFill=MaxSiteCutFill;
+    return S;
+}
+bool FVoxelGenerationSettings::Validate(FString& Error) const
+{
+    std::string E;const bool OK=ToKernel(25).Validate(E);Error=UTF8_TO_TCHAR(E.c_str());return OK;
 }

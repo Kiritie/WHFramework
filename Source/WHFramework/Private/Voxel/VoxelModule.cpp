@@ -11,6 +11,10 @@
 #include "Voxel/Save/VoxelDeltaCodec.h"
 #include "Voxel/Save/VoxelSceneColumnCodec.h"
 #include "Voxel/Generation/VoxelManifestCodec.h"
+#include "Voxel/Generation/Assets/VoxelWorldGenerationProfile.h"
+#include "Voxel/Generation/VoxelGenerationBinding.h"
+#include "Voxel/Rendering/VoxelWorldView.h"
+#include "Voxel/Rendering/VoxelDetailView.h"
 #include "Voxel/Agent/VoxelAgentComponent.h"
 #include "Voxel/Components/VoxelCollisionComponent.h"
 #include "Voxel/Save/VoxelBlockEntityCodec.h"
@@ -57,6 +61,8 @@ UVoxelModule::~UVoxelModule()
 {
 	if (Scheduler)
 		Scheduler->StopAndJoin();
+	DetailView.Reset();
+	WorldView.Reset();
 	TERMINATION_MODULE(UVoxelModule)
 }
 
@@ -75,7 +81,7 @@ bool UVoxelModule::IsAuthority() const
 }
 bool UVoxelModule::IsSaveEnabled() const
 {
-	return Super::IsSaveEnabled() && IsAuthority() && WorldMode == EVoxelWorldMode::Default;
+	return Super::IsSaveEnabled() && !bWorldLoadRejected && IsAuthority() && WorldMode == EVoxelWorldMode::Default;
 }
 
 void UVoxelModule::SetWorldMode(EVoxelWorldMode InWorldMode)
@@ -111,6 +117,19 @@ void UVoxelModule::OnInitialize()
 			UE_LOG(LogTemp, Error, TEXT("Voxel material set: %s"), *Error);
 		}
 	}
+	if (WorldState != EVoxelWorldState::Failed)
+	{
+		WorldGenerationProfile = WorldGenerationProfileAsset.LoadSynchronous();
+		FVoxelGenerationRuntimeConfig Probe;
+		if (!WorldGenerationProfile || !FVoxelGenerationBinding::Build(
+				*WorldGenerationProfile, *Registry.GetSnapshot(),
+				WorldGenerationProfile->Defaults,
+				WorldGenerationProfile->TargetCellCentimeters, Probe, Error))
+		{
+			WorldState = EVoxelWorldState::Failed;
+			UE_LOG(LogTemp, Error, TEXT("Voxel phase2 profile: %s"), *Error);
+		}
+	}
 }
 void UVoxelModule::OnPreparatory(EPhase P)
 {
@@ -118,36 +137,52 @@ void UVoxelModule::OnPreparatory(EPhase P)
 	if (bAutoGenerate && IsAuthority() && !Runtime && WorldState != EVoxelWorldState::Failed)
 	{
 		FString E;
-		CreateWorld(WorldBasicData.Generation, WorldBasicData.BlockSizeCentimeters, E);
+		CreateWorldFromProfile(WorldBasicData.Generation.Seed, E);
 	}
+}
+bool UVoxelModule::CreateWorldFromProfile(int32 Seed, FString& E)
+{
+	if (!WorldGenerationProfile)
+	{
+		E = TEXT("No baked world generation profile");
+		return false;
+	}
+	FVoxelGenerationSettings Settings = WorldGenerationProfile->Defaults;
+	Settings.Seed = Seed;
+	return CreateWorld(Settings, WorldGenerationProfile->TargetCellCentimeters, E);
 }
 bool UVoxelModule::CreateWorld(const FVoxelGenerationSettings& S, int32 Size, FString& E)
 {
-	if (!IsAuthority() || !Registry.GetSnapshot())
+	if (!IsAuthority() || !Registry.GetSnapshot() || !WorldGenerationProfile)
 	{
-		E = TEXT("Only authority with a built registry can create a world");
+		E = TEXT("Authority and initialized generation assets required");
 		return false;
 	}
 	if (Runtime)
 	{
-		E = TEXT("Close the current world before creating another");
+		E = TEXT("Close the current world explicitly before creating another");
 		return false;
 	}
+	FVoxelGenerationRuntimeConfig C;
+	if (!FVoxelGenerationBinding::Build(*WorldGenerationProfile, *Registry.GetSnapshot(), S, Size, C, E))
+		return false;
 	FVoxelWorldManifest M;
 	M.WorldId = FGuid::NewGuid();
 	M.Settings = S;
 	M.BlockSizeCentimeters = Size;
 	M.RegistryHash = Registry.GetSnapshot()->Hash;
-	FVoxelGenerationRuntimeConfig C;
-	if (!Registry.GetSnapshot()->BuildGenerationConfig(S, C, E))
-		return false;
-	FVoxelGenerationPipeline G(C);
+	M.CatalogHash = C.CatalogHash;
 	M.RecipeHash = FVoxelManifestCodec::RecipeFingerprint(M);
-	M.BaseSampleHash = G.BuildHandshakeSignature();
+	FVoxelGenerationPipeline G(C);
+	if (!G.BuildHandshakeSignature(M.BaseSampleHash))
+	{
+		E = TEXT("Generation signature evaluation failed");
+		return false;
+	}
 	TArray<uint8> B;
 	if (!FVoxelManifestCodec::Encode(M, B))
 	{
-		E = TEXT("Invalid creation settings");
+		E = TEXT("Invalid new-world manifest");
 		return false;
 	}
 	RegionStore.Reset();
@@ -155,31 +190,29 @@ bool UVoxelModule::CreateWorld(const FVoxelGenerationSettings& S, int32 Size, FS
 }
 bool UVoxelModule::StartWorld(const FVoxelWorldManifest& M, bool FromServer, FString& E)
 {
-	if (!Registry.GetSnapshot() || !Shapes || !GetWorld())
+	if (!Registry.GetSnapshot() || !Shapes || !GetWorld() || !WorldGenerationProfile)
 	{
-		E = TEXT("Voxel assets are not initialized");
+		E = TEXT("Voxel phase2 assets are not initialized");
 		return false;
 	}
-	if ((GetWorld()->GetNetMode() == NM_Client) != FromServer)
+	if ((GetWorld()->GetNetMode() == NM_Client) != FromServer || Runtime)
 	{
-		E = TEXT("World authority mode mismatch");
+		E = TEXT("World mode mismatch or another world is already active");
 		return false;
 	}
-	if (Runtime)
+	if (!M.WorldId.IsValid() || M.RecipeHash != FVoxelManifestCodec::RecipeFingerprint(M) ||
+		M.RegistryHash != Registry.GetSnapshot()->Hash || M.CatalogHash != WorldGenerationProfile->CatalogHash)
 	{
-		E = TEXT("A world is already active");
-		return false;
-	}
-	if (!M.WorldId.IsValid() || M.RecipeHash != FVoxelManifestCodec::RecipeFingerprint(M) || M.RegistryHash != Registry.GetSnapshot()->Hash)
-	{
-		E = TEXT("World manifest or registry mismatch");
+		E = TEXT("World/registry/generation-content fingerprint mismatch");
 		return false;
 	}
 	FVoxelGenerationRuntimeConfig C;
-	if (!Registry.GetSnapshot()->BuildGenerationConfig(M.Settings, C, E))
+	if (!FVoxelGenerationBinding::Build(*WorldGenerationProfile, *Registry.GetSnapshot(),
+		M.Settings, M.BlockSizeCentimeters, C, E))
 		return false;
 	auto G = MakeShared<FVoxelGenerationPipeline, ESPMode::ThreadSafe>(C);
-	if (G->BuildHandshakeSignature() != M.BaseSampleHash)
+	uint64 Signature = 0;
+	if (!G->BuildHandshakeSignature(Signature) || Signature != M.BaseSampleHash)
 	{
 		E = TEXT("Base generation signature mismatch");
 		return false;
@@ -195,20 +228,42 @@ bool UVoxelModule::StartWorld(const FVoxelWorldManifest& M, bool FromServer, FSt
 	Scheduler = MakeUnique<FVoxelTaskScheduler>();
 	SessionId = IsAuthority() ? FGuid::NewGuid() : FGuid();
 	Desired.Reset();
+	OrderedDesired.Reset();
 	RetryAfter.Reset();
 	RetryCount.Reset();
 	RemotePending.Reset();
 	Breaking.Reset();
+	RemoteFineDemand.Reset();
 	LastStreaming = -1;
 	bRemoteRunning = false;
 	if (FromServer)
 		RegionStore.Reset();
+	bWorldLoadRejected = false;
 	WorldState = EVoxelWorldState::Running;
 	if (!WorldData)
 		WorldData = NewWorldData();
 	WorldData->Generation = M.Settings;
 	WorldData->BlockSizeCentimeters = M.BlockSizeCentimeters;
-	FVoxelManifestCodec::Encode(M, WorldData->ManifestBytes);
+	if (!FVoxelManifestCodec::Encode(M, WorldData->ManifestBytes))
+	{
+		E = TEXT("World manifest could not be stored");
+		WorldState = EVoxelWorldState::Failed;
+		return false;
+	}
+	WorldView = MakeUnique<FVoxelWorldView>(*this, *Scheduler, RegionStore, Epoch,
+		GetWorld()->GetNetMode() != NM_DedicatedServer);
+	DetailView = MakeUnique<FVoxelDetailView>(*this, *Scheduler, Epoch);
+	if (!DetailView->Initialize(E))
+	{
+		Scheduler->StopAndJoin();
+		DetailView.Reset();
+		WorldView.Reset();
+		Runtime.Reset();
+		Generator.Reset();
+		Scheduler.Reset();
+		WorldState = EVoxelWorldState::Failed;
+		return false;
+	}
 	OnWorldInitialized.Broadcast();
 	E.Reset();
 	return true;
@@ -237,6 +292,9 @@ bool UVoxelModule::StopWorld(bool Discard, FString& E)
 	WorldState = EVoxelWorldState::Closing;
 	if (Scheduler)
 		Scheduler->StopAndJoin();
+	DetailView.Reset();
+	WorldView.Reset();
+	RemoteFineDemand.Reset();
 	Scheduler.Reset();
 	for (auto& P : Columns)
 		if (P.Value)
@@ -277,11 +335,16 @@ void UVoxelModule::OnRefresh(float Dt, bool InEditor)
 	Super::OnRefresh(Dt, InEditor);
 	if (InEditor || !IsReady())
 		return;
+	SectionAllocationsThisFrame = 0;
 	Scheduler->Tick(
 	    [this](FVoxelTaskResult&& R)
 	    {
-		    ApplyTask(MoveTemp(R));
-	    });
+			ApplyTask(MoveTemp(R));
+		});
+	if (WorldView)
+		WorldView->Tick(CollectLocalViewObservers());
+	if (DetailView)
+		DetailView->Tick(CollectDetailObservers());
 	double Now = FPlatformTime::Seconds();
 	if (LastStreaming < 0 || Now - LastStreaming >= .2)
 	{
@@ -357,6 +420,61 @@ void UVoxelModule::UnregisterSource(const FGuid& ID)
 	Sources.Remove(ID);
 	LastStreaming = -1;
 }
+TArray<FVector> UVoxelModule::CollectLocalViewObservers() const
+{
+	TArray<FVector> Result;
+	TSet<FIntVector> Seen;
+	for (const auto& Pair : Sources)
+	{
+		const auto& S = Pair.Value;
+		if (!S.Owner.IsValid() || !S.Value.bRender || Seen.Contains(S.Value.Center))
+			continue;
+		Seen.Add(S.Value.Center);
+		Result.Add(FVector(S.Value.Center) * BlockSize());
+	}
+	return Result;
+}
+TArray<FVector> UVoxelModule::CollectDetailObservers() const
+{
+	TArray<FVector> Result;
+	TSet<FIntVector> Seen;
+	for (const auto& Pair : Sources)
+	{
+		const auto& S = Pair.Value;
+		if (!S.Owner.IsValid() || !(S.Value.bRender || S.Value.bCollision) || Seen.Contains(S.Value.Center))
+			continue;
+		Seen.Add(S.Value.Center);
+		Result.Add(FVector(S.Value.Center) * BlockSize());
+	}
+	return Result;
+}
+void UVoxelModule::SetRemoteFineDemand(UObject* Owner, const TSet<FVoxelSectionKey>& Keys)
+{
+	if (!IsAuthority() || !Owner || Owner->GetWorld() != GetWorld() || Keys.Num() > 8192)
+		return;
+	RemoteFineDemand.Add(Owner, Keys);
+	LastStreaming = -1;
+}
+void UVoxelModule::ClearRemoteFineDemand(UObject* Owner)
+{
+	if (RemoteFineDemand.Remove(Owner))
+		LastStreaming = -1;
+}
+void UVoxelModule::GetFineViewKeys(TArray<FVoxelSectionKey>& Out) const
+{
+	TArray<FVoxelStreamingSource> Local;
+	for (const auto& P : Sources)
+		if (P.Value.Owner.IsValid() && P.Value.Value.bRender)
+			Local.Add(P.Value.Value);
+	auto Needed = FVoxelStreaming::Compute(Local, Manifest.Settings);
+	if (WorldView)
+		WorldView->AppendFineDemand(Needed);
+	Out.Reset();
+	for (const auto& P : Needed)
+		if (VoxelCoord::IsValidSection(P.Key, Manifest.Settings.MinZ, Manifest.Settings.MaxZ))
+			Out.Add(P.Key);
+	Out.Sort([](const auto& A, const auto& B) { return A < B; });
+}
 UVoxelChunk* UVoxelModule::GetColumn(FIntPoint K, bool Create)
 {
 	if (const TObjectPtr<UVoxelChunk> Column = Columns.FindRef(K))
@@ -394,18 +512,34 @@ void UVoxelModule::RefreshStreaming(double Now)
 	}
 	Columns.GetKeys(SceneColumnOrder);
 	Desired = FVoxelStreaming::Compute(A, Manifest.Settings);
+	if (WorldView)
+	{
+		for (auto& P : Desired)
+			P.Value.bMesh = false;
+		WorldView->AppendFineDemand(Desired);
+	}
+	for (auto It = RemoteFineDemand.CreateIterator(); It; ++It)
+	{
+		if (!It.Key().IsValid())
+		{
+			It.RemoveCurrent();
+			continue;
+		}
+		for (const auto& K : It.Value())
+		{
+			auto& Demand = Desired.FindOrAdd(K);
+			Demand.bMesh = false;
+			Demand.Priority = FMath::Min(Demand.Priority, -500.0);
+		}
+	}
+	for (auto It = Desired.CreateIterator(); It; ++It)
+		if (!VoxelCoord::IsValidSection(It.Key(), Manifest.Settings.MinZ, Manifest.Settings.MaxZ))
+			It.RemoveCurrent();
 	auto Keys = FVoxelStreaming::ByPriority(Desired);
 	OrderedDesired = Keys;
-	int32 Created = 0;
 	for (const auto& K : Keys)
 	{
 		auto* S = Runtime->Find(K);
-		if (!S && Created < 32 && Runtime->NumSections() < 8192)
-		{
-			S = Runtime->Allocate(K, Now);
-			if (S)
-				++Created;
-		}
 		if (!S)
 			continue;
 		const auto& D = Desired.FindChecked(K);
@@ -467,10 +601,22 @@ void UVoxelModule::RefreshStreaming(double Now)
 }
 void UVoxelModule::QueueSection(const FVoxelSectionKey& K, const FVoxelSectionDemand& D)
 {
+	const double Now = FPlatformTime::Seconds();
 	auto* S = Runtime->Find(K);
+	if (!S && SectionAllocationsThisFrame < 16 && Runtime->NumSections() < MaxResidentSections)
+	{
+		S = Runtime->Allocate(K, Now);
+		if (S)
+		{
+			++SectionAllocationsThisFrame;
+			S->LastWanted = Now;
+			S->bWantsMesh = D.bMesh;
+			S->bWantsCollision = D.bCollision;
+			S->bWantsSimulation = D.bSimulation;
+		}
+	}
 	if (!S || RetryCount.FindRef(K) >= 3)
 		return;
-	double Now = FPlatformTime::Seconds();
 	if (RetryAfter.FindRef(K) > Now)
 		return;
 	if (S->Status == EVoxelSectionStatus::Failed)
@@ -582,6 +728,10 @@ void UVoxelModule::QueueSection(const FVoxelSectionKey& K, const FVoxelSectionDe
 void UVoxelModule::ApplyTask(FVoxelTaskResult&& R)
 {
 	if (!Runtime)
+		return;
+	if (WorldView && WorldView->OnTask(MoveTemp(R)))
+		return;
+	if (DetailView && DetailView->OnTask(MoveTemp(R)))
 		return;
 	if (R.Kind == EVoxelTaskKind::EncodeNetwork)
 	{
@@ -737,7 +887,7 @@ void UVoxelModule::PumpRemote()
 	for (const auto& O : B.Sections)
 	{
 		auto* S = Runtime->Find(O.Key);
-		if (!S && Runtime->NumSections() < 8192)
+		if (!S && Runtime->NumSections() < MaxResidentSections)
 			S = Runtime->Allocate(O.Key, FPlatformTime::Seconds());
 		if (!S || S->Stamp.Revision > O.Revision)
 		{
@@ -1271,21 +1421,28 @@ TUniquePtr<FVoxelWorldSaveData> UVoxelModule::NewWorldData(const FParameter& P) 
 bool UVoxelModule::ValidateWorldData(const FParameter& P, FString& E) const
 {
 	if (!P.HasValue() || !P.GetStructType() || !P.GetStructType()->IsChildOf(FVoxelWorldSaveData::StaticStruct()) || !P.GetStructMemory())
+	{
+		E = TEXT("Expected typed voxel world save data");
 		return false;
+	}
 	const auto& D = *reinterpret_cast<const FVoxelWorldSaveData*>(P.GetStructMemory());
 	FVoxelWorldManifest M;
-	if (!FVoxelManifestCodec::Decode(D.ManifestBytes, M) || !Registry.GetSnapshot() || M.RegistryHash != Registry.GetSnapshot()->Hash)
+	if (!FVoxelManifestCodec::Decode(D.ManifestBytes, M) || !Registry.GetSnapshot() ||
+		!WorldGenerationProfile || M.RegistryHash != Registry.GetSnapshot()->Hash ||
+		M.CatalogHash != WorldGenerationProfile->CatalogHash)
 	{
-		E = TEXT("Save recipe or registry is incompatible");
+		E = TEXT("Save generator/catalog/registry mismatch; original save is left unchanged");
 		return false;
 	}
 	FVoxelGenerationRuntimeConfig C;
-	if (!Registry.GetSnapshot()->BuildGenerationConfig(M.Settings, C, E))
+	if (!FVoxelGenerationBinding::Build(*WorldGenerationProfile, *Registry.GetSnapshot(),
+		M.Settings, M.BlockSizeCentimeters, C, E))
 		return false;
 	FVoxelGenerationPipeline G(C);
-	if (G.BuildHandshakeSignature() != M.BaseSampleHash)
+	uint64 H = 0;
+	if (!G.BuildHandshakeSignature(H) || H != M.BaseSampleHash)
 	{
-		E = TEXT("Save base terrain fingerprint differs");
+		E = TEXT("Saved base generation signature differs");
 		return false;
 	}
 	return true;
@@ -1297,26 +1454,48 @@ void UVoxelModule::LoadData(const FParameter& P, EPhase Phase)
 	if (PHASEC(Phase, EPhase::Primary))
 	{
 		FString E;
-		if (!ValidateWorldData(P, E))
+		const bool Typed = P.HasValue() && P.GetStructType() && P.GetStructMemory() &&
+			P.GetStructType()->IsChildOf(FVoxelWorldSaveData::StaticStruct());
+		const auto* D = Typed ? reinterpret_cast<const FVoxelWorldSaveData*>(P.GetStructMemory()) : nullptr;
+		const bool NewRequest = D && D->ManifestBytes.IsEmpty() && RegionStore.GetSourceDirectory().IsEmpty();
+		if (NewRequest)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Voxel load skipped: %s; creating a world from the current defaults"), *E);
-			if (!Runtime && !CreateWorld(WorldBasicData.Generation, WorldBasicData.BlockSizeCentimeters, E))
+			if (Runtime)
+			{
+				E = TEXT("Close the current preview/world before creating a new world");
+				UE_LOG(LogTemp, Error, TEXT("%s"), *E);
+				return;
+			}
+			WorldData = NewWorldData(P);
+			if (!CreateWorldFromProfile(D->Generation.Seed, E))
 			{
 				WorldState = EVoxelWorldState::Failed;
-				UE_LOG(LogTemp, Error, TEXT("Voxel fallback creation failed: %s"), *E);
+				bWorldLoadRejected = true;
+				UE_LOG(LogTemp, Error, TEXT("Voxel new world: %s"), *E);
+				return;
 			}
-			return;
 		}
-		FVoxelWorldManifest M;
-		const auto& D = *reinterpret_cast<const FVoxelWorldSaveData*>(P.GetStructMemory());
-		FVoxelManifestCodec::Decode(D.ManifestBytes, M);
-		if (!StopWorld(true, E))
-			return;
-		WorldData = NewWorldData(P);
-		if (!StartWorld(M, false, E))
+		else
 		{
-			WorldState = EVoxelWorldState::Failed;
-			UE_LOG(LogTemp, Error, TEXT("Voxel start: %s"), *E);
+			if (!ValidateWorldData(P, E))
+			{
+				bWorldLoadRejected = true;
+				WorldState = EVoxelWorldState::Failed;
+				LastSaveError = E;
+				UE_LOG(LogTemp, Error, TEXT("Voxel load rejected, no fallback/save rewrite: %s"), *E);
+				return;
+			}
+			FVoxelWorldManifest M;
+			if (!FVoxelManifestCodec::Decode(D->ManifestBytes, M) || !StopWorld(true, E))
+				return;
+			WorldData = NewWorldData(P);
+			if (!StartWorld(M, false, E))
+			{
+				bWorldLoadRejected = true;
+				WorldState = EVoxelWorldState::Failed;
+				UE_LOG(LogTemp, Error, TEXT("Voxel start: %s"), *E);
+				return;
+			}
 		}
 	}
 	if (PHASEC(Phase, EPhase::Final) && IsReady())
@@ -1365,15 +1544,21 @@ void UVoxelModule::OnBeforeSaveData()
 	CapturedSceneFiles.Reset();
 	if (!IsSaveEnabled())
 		return;
+	if (WorldView)
+		WorldView->OnSaveBoundary(true);
 	if (!Runtime)
 	{
 		LastSaveError = TEXT("Create or load the world before capturing it");
+		if (WorldView)
+			WorldView->OnSaveBoundary(false);
 		return;
 	}
 	if (bMutating || !SaveAdapter.Capture(*Runtime, Manifest, Registry.GetSnapshot(), RegionStore, LastSaveError))
 	{
 		if (LastSaveError.IsEmpty())
 			LastSaveError = TEXT("Voxel save capture is busy");
+		if (WorldView)
+			WorldView->OnSaveBoundary(false);
 		return;
 	}
 	CapturedSceneFiles = UnloadedSceneFiles;
@@ -1427,6 +1612,8 @@ void UVoxelModule::OnAfterSaveData(bool Success)
 	CapturedSceneFiles.Reset();
 	LastSaveError.Reset();
 	PendingCommitDirectory.Reset();
+	if (WorldView)
+		WorldView->OnSaveBoundary(false);
 }
 
 bool UVoxelModule::QueueRemoteEncoded(const TArray<uint8>& P, FString& E)

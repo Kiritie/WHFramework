@@ -173,12 +173,12 @@ bool FVoxelTextureArrayBuilder::Build(const TArray<UVoxelData*>& Assets, UVoxelM
 			Array->PostEditChange();
 			UTexture* TexturesToFinish[] = {Array};
 			FTextureCompilingManager::Get().FinishCompilation(TexturesToFinish);
-			if (Array->GetArraySize() != Count)
+			if (Array->Source.GetNumSlices() != Count)
 			{
 				Error = FString::Printf(
 					TEXT("Texture array %s contains %d slices after compilation; expected %d"),
 					*Array->GetPathName(),
-					Array->GetArraySize(),
+					Array->Source.GetNumSlices(),
 					Count);
 				return false;
 			}

@@ -46,6 +46,7 @@ void UVoxelModuleNetworkComponent::BindModule()
 }
 void UVoxelModuleNetworkComponent::EndPlay(const EEndPlayReason::Type R)
 {
+	ResetPhase2();
 	if (auto* M = Module.Get())
 	{
 		M->OnBlocksCommitted.Remove(CommitHandle);
@@ -58,6 +59,7 @@ void UVoxelModuleNetworkComponent::EndPlay(const EEndPlayReason::Type R)
 }
 void UVoxelModuleNetworkComponent::ResetProtocol()
 {
+	ResetPhase2();
 	bReady = bWelcomed = false;
 	Session.Invalidate();
 	Acknowledged.Reset();
@@ -74,6 +76,7 @@ void UVoxelModuleNetworkComponent::ResetProtocol()
 }
 void UVoxelModuleNetworkComponent::Fail(const FString& E)
 {
+	ResetPhase2();
 	Transfer.Reset();
 	if (auto* PC = Controller())
 		if (PC->HasAuthority())
@@ -131,6 +134,7 @@ void UVoxelModuleNetworkComponent::TickComponent(float D, ELevelTick T, FActorCo
 	              });
 	if (bRejected)
 		return;
+	PumpPhase2();
 	if (Server)
 	{
 		if (M->IsReady() && bWelcomed && Session != M->GetSessionId())
@@ -141,11 +145,11 @@ void UVoxelModuleNetworkComponent::TickComponent(float D, ELevelTick T, FActorCo
 		if (Nonce.IsValid() && !bWelcomed && M->IsReady())
 		{
 			Session = M->GetSessionId();
-			FVoxelByteWriter W(1024);
+			FVoxelByteWriter W(FVoxelManifestCodec::MaxBytes + 64);
 			W.Guid(Nonce);
 			TArray<uint8> B;
 			FVoxelManifestCodec::Encode(M->GetManifest(), B);
-			W.Blob(B, 512);
+			W.Blob(B, FVoxelManifestCodec::MaxBytes);
 			TArray<uint8> P;
 			W.Finish(P);
 			if (Send(EVoxelMessage::Welcome, P))
@@ -241,12 +245,7 @@ void UVoxelModuleNetworkComponent::TickComponent(float D, ELevelTick T, FActorCo
 		}
 		if (bReady && Now - LastInterest > .5)
 		{
-			FVoxelByteWriter W(16);
-			W.I32(FMath::Clamp(RequestedRadius, 1, 8));
-			W.I32(FMath::Clamp(RequestedVerticalRadius, 1, 3));
-			TArray<uint8> B;
-			W.Finish(B);
-			Send(EVoxelMessage::Interest, B);
+			SendFineInterest();
 			TArray<FVoxelSectionKey> Missing;
 			if (auto* R = M->GetRuntime())
 				for (const auto& K : R->ResidentKeys())
@@ -343,7 +342,7 @@ void UVoxelModuleNetworkComponent::Handle(const FVoxelWireMessage& W, bool Serve
 	if (!Server && W.Kind == EVoxelMessage::Welcome)
 	{
 		FGuid Echo = R.Guid();
-		auto B = R.Blob(512);
+		auto B = R.Blob(FVoxelManifestCodec::MaxBytes);
 		FVoxelWorldManifest Manifest;
 		if (!R.End() || Echo != Nonce || !W.Session.IsValid() || !FVoxelManifestCodec::Decode(B, Manifest))
 		{
@@ -407,19 +406,8 @@ void UVoxelModuleNetworkComponent::Handle(const FVoxelWireMessage& W, bool Serve
 		Fail(TEXT("Message before Ready"));
 		return;
 	}
-	if (Server && W.Kind == EVoxelMessage::Interest)
-	{
-		int32 Radius = R.I32(), Vertical = R.I32();
-		if (!R.End() || Radius < 1 || Radius > 8 || Vertical < 1 || Vertical > 3)
-		{
-			Fail(TEXT("Invalid interest radius"));
-			return;
-		}
-		RequestedRadius = Radius;
-		RequestedVerticalRadius = Vertical;
-		RefreshInterest();
+	if (HandlePhase2(W, Server))
 		return;
-	}
 	if (Server && W.Kind == EVoxelMessage::Resync)
 	{
 		uint8 N = R.U8();
@@ -577,26 +565,46 @@ void UVoxelModuleNetworkComponent::RefreshInterest()
 	S.Id = SourceId.IsValid() ? SourceId : FGuid::NewGuid();
 	S.Center = Center;
 	S.Direction = Observer->GetActorForwardVector();
-	S.RenderRadius = RequestedRadius;
-	S.CollisionRadius = FMath::Min(4, RequestedRadius);
-	S.SimulationRadius = FMath::Min(3, RequestedRadius);
-	S.PreloadRadius = RequestedRadius;
-	S.VerticalRadius = RequestedVerticalRadius;
+	S.RenderRadius = 0;
+	S.CollisionRadius = 2;
+	S.SimulationRadius = 0;
+	S.PreloadRadius = 2;
+	S.VerticalRadius = 2;
 	S.bRender = false;
+	S.bCollision = true;
+	S.bSimulation = false;
 	if (SourceId.IsValid())
 		M->UpdateSource(SourceId, S);
 	else
 		SourceId = M->RegisterSource(this, S);
-	auto D = FVoxelStreaming::Compute({S}, M->GetManifest().Settings);
 	TSet<FVoxelSectionKey> Next;
-	for (const auto& P : D)
+	const auto Basic = FVoxelStreaming::Compute({S}, M->GetManifest().Settings);
+	for (const auto& P : Basic)
 		Next.Add(P.Key);
+	const double Size = M->BlockSize();
+	const FVector Location = Observer->GetActorLocation();
+	for (auto It = Phase2.Fine.CreateIterator(); It; ++It)
+	{
+		const auto K = *It;
+		const FVector Min(double(K.X) * 16 * Size, double(K.Y) * 16 * Size, double(K.Z) * 16 * Size);
+		const FVector Max = Min + FVector(16 * Size);
+		const double DX = FMath::Max(FMath::Max(Min.X - Location.X, Location.X - Max.X), 0.0);
+		const double DY = FMath::Max(FMath::Max(Min.Y - Location.Y, Location.Y - Max.Y), 0.0);
+		const double DZ = FMath::Max(FMath::Max(Min.Z - Location.Z, Location.Z - Max.Z), 0.0);
+		if (DX * DX + DY * DY > 4800.0 * 4800.0 || DZ > 4800)
+		{
+			It.RemoveCurrent();
+			continue;
+		}
+		Next.Add(K);
+	}
 	for (const auto& K : Interest)
 		if (!Next.Contains(K))
 		{
 			Acknowledged.Remove(K);
 			LastSent.Remove(K);
 		}
+	M->SetRemoteFineDemand(this, Phase2.Fine);
 	Interest = MoveTemp(Next);
 }
 bool UVoxelModuleNetworkComponent::QueueSnapshots(const TArray<FVoxelSectionKey>& Keys, bool Atomic)
@@ -682,6 +690,7 @@ void UVoxelModuleNetworkComponent::CompleteSnapshotSend(FGuid ID, TArray<uint8>&
 }
 void UVoxelModuleNetworkComponent::OnCommit(const FVoxelEditBatch& B)
 {
+	NotifyProxyEdit(B);
 	if (!Controller() || !Controller()->HasAuthority() || Controller()->IsLocalController() || !bReady)
 		return;
 	TArray<FVoxelSectionKey> Keys;

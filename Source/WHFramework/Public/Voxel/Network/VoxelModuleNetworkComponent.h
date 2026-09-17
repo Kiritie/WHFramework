@@ -3,6 +3,7 @@
 #include "Main/Base/ModuleNetworkComponentBase.h"
 #include "Voxel/Network/VoxelNetworkTransfer.h"
 #include "Voxel/Network/VoxelNetworkTypes.h"
+#include "Voxel/Network/VoxelPhase2Network.h"
 #include "VoxelModuleNetworkComponent.generated.h"
 class UVoxelModule;
 class APawn;
@@ -24,6 +25,8 @@ public:
 		return NextOutboundId == MAX_uint64 ? 0 : NextOutboundId++;
 	}
 	bool SubmitIntent(const FVoxelEditIntent& Intent);
+	bool RequestProxy(const FVoxelProxyRequest& Request);
+	bool DeliverProxy(const FVoxelProxyReply& Reply);
 	bool IsSessionReady() const
 	{
 		return bReady && !bRejected;
@@ -35,11 +38,6 @@ public:
 	UPROPERTY(BlueprintAssignable)
 	FVoxelProtocolFailure OnProtocolFailure;
 	FVoxelIntentReplyReceived OnIntentReply;
-	UPROPERTY(EditAnywhere)
-	int32 RequestedRadius = 8;
-	UPROPERTY(EditAnywhere)
-	int32 RequestedVerticalRadius = 3;
-
 protected:
 	UFUNCTION(Server, Reliable)
 	void ServerReceive(const FVoxelRPCPacket& Packet);
@@ -63,6 +61,11 @@ private:
 	void OnRemoteCompleted(const FVoxelSnapshotBatch& Batch, bool bSuccess);
 	void SendInventory();
 	bool ApplyInventory(const TArray<uint8>& Payload);
+	void ResetPhase2();
+	void PumpPhase2();
+	void SendFineInterest();
+	bool HandlePhase2(const FVoxelWireMessage& Message, bool bServer);
+	void NotifyProxyEdit(const FVoxelEditBatch& Batch);
 	APlayerController* Controller() const;
 	TWeakObjectPtr<UVoxelModule> Module;
 	TWeakObjectPtr<AActor> AuthorizedObserver;
@@ -75,6 +78,7 @@ private:
 	FGuid SourceId;
 	FDelegateHandle CommitHandle, RemoteHandle;
 	FVoxelNetworkTransfer Transfer;
+	FVoxelPhase2NetworkState Phase2;
 	TSet<FVoxelSectionKey> Interest;
 	TMap<FVoxelSectionKey, uint64> Acknowledged;
 	TMap<FVoxelSectionKey, double> LastSent;

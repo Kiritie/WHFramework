@@ -30,7 +30,10 @@ enum class EVoxelMessage : uint8
 	Reply,
 	Resync,
 	Closed,
-	Inventory
+	Inventory,
+	ProxyRequest = 12,
+	ProxyReply = 13,
+	ProxyInvalidate = 14
 };
 struct WHFRAMEWORK_API FVoxelWireMessage
 {

@@ -15,6 +15,7 @@ struct WHFRAMEWORK_API FVoxelSection
 	FVoxelTaskStamp Stamp;
 	EVoxelSectionStatus Status = EVoxelSectionStatus::Allocated;
 	FVoxelSectionStorage Blocks;
+	TSharedPtr<const FVoxelSectionStorage, ESPMode::ThreadSafe> BaseBlocks;
 	FVoxelSectionOverlay Overlay;
 	uint64 CommittedRevision = 0;
 	uint32 PinCount = 0;

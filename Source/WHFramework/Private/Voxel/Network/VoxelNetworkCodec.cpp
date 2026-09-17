@@ -16,7 +16,7 @@ bool FVoxelNetworkCodec::Decode(TConstArrayView<uint8> B, FVoxelWireMessage& O)
 	if (R.U32() != 0x32544e56)
 		return false;
 	uint8 K = R.U8();
-	if (K < 1 || K > 11)
+	if (K < 1 || K > 14)
 		return false;
 	FVoxelWireMessage T;
 	T.Kind = EVoxelMessage(K);

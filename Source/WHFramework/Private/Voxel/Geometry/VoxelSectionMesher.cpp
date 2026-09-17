@@ -98,7 +98,7 @@ bool Visible(const FVoxelSectionSnapshot& S,
 	const auto* Shape = H.Find(BD->Shape, B.State);
 	return !Shape || !Covered(*Shape, Face ^ 1, Quad);
 }
-void AppendQuad(FVoxelMeshBuffers& O, const FVector* P, const FVector2D* UV, const FVoxelRuntimeFaceRef& T, EVoxelRenderGroup G, const FVector& Cell)
+void AppendQuad(FVoxelMeshBuffers& O, const FVector* P, const FVector2D* UV, const FVoxelRuntimeFaceRef& T, EVoxelRenderGroup G, const FVector& Cell, bool bPlantWind = false)
 {
 	int32 N = O.Vertices.Num();
 	FVector Normal = FVector::CrossProduct(P[1] - P[0], P[2] - P[0]).GetSafeNormal();
@@ -110,7 +110,8 @@ void AppendQuad(FVoxelMeshBuffers& O, const FVector* P, const FVector2D* UV, con
 		O.UV0.Add(UV[I]);
 		O.UV1.Add(FVector2D(T.Layer, T.Frames));
 		O.UV2.Add(FVector2D(T.FPS, 0));
-		const float Wind = G == EVoxelRenderGroup::Foliage ? float(FMath::Clamp(P[I].Z, 0.0, 1.0)) : 0.f;
+		const float Wind = bPlantWind && G == EVoxelRenderGroup::Foliage
+			? float(FMath::Clamp(P[I].Z, 0.0, 1.0)) : 0.f;
 		O.Colors.Add(FLinearColor(Wind, 0, 1, 1));
 		O.Tangents.Add(FProcMeshTangent(Tangent, false));
 	}
@@ -118,7 +119,8 @@ void AppendQuad(FVoxelMeshBuffers& O, const FVector* P, const FVector2D* UV, con
 }
 }
 bool FVoxelSectionMesher::Build(
-    const FVoxelSectionSnapshot& S, const FVoxelRegistrySnapshot& R, const FVoxelShapeRegistry& H, FVoxelSectionMeshResult& O, const std::atomic_bool* Cancel)
+    const FVoxelSectionSnapshot& S, const FVoxelRegistrySnapshot& R, const FVoxelShapeRegistry& H, FVoxelSectionMeshResult& O, const std::atomic_bool* Cancel,
+	uint8 SkipBoundaryMask)
 {
 	if (S.Blocks.Num() != 4096)
 		return false;
@@ -148,6 +150,8 @@ bool FVoxelSectionMesher::Build(
 	for (uint8 F = 0; F < 6; ++F)
 		for (int32 Slice = 0; Slice < 16; ++Slice)
 		{
+			if ((SkipBoundaryMask & (1u << F)) && Slice == ((F & 1) ? 0 : 15))
+				continue;
 			if (Cancel && Cancel->load(std::memory_order_relaxed))
 				return false;
 			FFaceKey Mask[256];
@@ -239,10 +243,14 @@ bool FVoxelSectionMesher::Build(
 		FIntVector P = VoxelCoord::Unlinear(I);
 		for (const auto& Q : Shape->Quads)
 		{
+			if (Q.bBoundary && (SkipBoundaryMask & (1u << Q.Face)) &&
+				P[Q.Face / 2] == ((Q.Face & 1) ? 0 : 15))
+				continue;
 			if (Q.bBoundary && !Visible(S, R, H, P, B, Q.Face, &Q))
 				continue;
 			const auto& Tex = D->Face(B.State, Q.MaterialFace);
-			AppendQuad(Batch(D->RenderGroup, Tex.Bank), Q.Vertices, Q.UV, Tex, D->RenderGroup, FVector(P));
+			AppendQuad(Batch(D->RenderGroup, Tex.Bank), Q.Vertices, Q.UV, Tex,
+				D->RenderGroup, FVector(P), D->Shape == EVoxelShapeKind::CrossPlant);
 			TotalVertices += 4;
 			if (OverBudget())
 				return false;

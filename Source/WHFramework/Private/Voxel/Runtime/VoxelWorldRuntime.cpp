@@ -139,6 +139,7 @@ bool FVoxelWorldRuntime::PublishLoaded(const FVoxelTaskStamp& T, FVoxelSectionSt
 	auto* S = Find(T.Key);
 	if (!S || S->Status != EVoxelSectionStatus::Allocated || !IsCurrent(T, false) || O.Key != T.Key)
 		return false;
+	auto Natural = MakeShared<FVoxelSectionStorage, ESPMode::ThreadSafe>(Base);
 	for (const auto& P : O.Blocks)
 	{
 		if (P.Key >= 4096 || !Registry->IsValid(P.Value))
@@ -147,6 +148,7 @@ bool FVoxelWorldRuntime::PublishLoaded(const FVoxelTaskStamp& T, FVoxelSectionSt
 	}
 	if (!ValidateOverlay(O, Base))
 		return false;
+	S->BaseBlocks = Natural;
 	S->Blocks = MoveTemp(Base);
 	S->Overlay = O;
 	S->Stamp.Revision = O.Revision;
@@ -210,7 +212,7 @@ bool FVoxelWorldRuntime::PrepareEdit(const TArray<FVoxelCellEdit>& C, const TArr
 		if (int32* I = Map.Find(K))
 			return &T.Sections[*I];
 		const auto* S = Find(K);
-		if (!S || S->Status != EVoxelSectionStatus::DataReady || S->Stamp.Revision == MAX_uint64 || Map.Num() >= 32)
+		if (!S || S->Status != EVoxelSectionStatus::DataReady || !S->BaseBlocks || S->Stamp.Revision == MAX_uint64 || Map.Num() >= 32)
 			return nullptr;
 		FVoxelPreparedSection N;
 		N.Before = S->Stamp;
@@ -248,7 +250,13 @@ bool FVoxelWorldRuntime::PrepareEdit(const TArray<FVoxelCellEdit>& C, const TArr
 			continue;
 		N->Blocks.Set(I, W.Value);
 		N->Patch.Blocks.Add({I, W.Value});
-		if (W.Value == Generator->SampleBaseBlock(W.Position))
+		const FVoxelSection* SourceSection = Find(VoxelCoord::Section(W.Position));
+		if (!SourceSection || !SourceSection->BaseBlocks)
+		{
+			Error = TEXT("Natural section baseline is unavailable");
+			return false;
+		}
+		if (W.Value == SourceSection->BaseBlocks->Get(I))
 			N->Overlay.Blocks.Remove(I);
 		else
 			N->Overlay.Blocks.Add(I, W.Value);
@@ -382,12 +390,15 @@ bool FVoxelWorldRuntime::ApplyRemoteSnapshots(const TArray<FVoxelSectionOverlay>
 	if (bAuthority || O.Num() != Bases.Num() || O.Num() > 32)
 		return false;
 	TSet<FVoxelSectionKey> Seen;
+	TArray<TSharedPtr<const FVoxelSectionStorage, ESPMode::ThreadSafe>> Natural;
+	Natural.Reserve(Bases.Num());
 	for (int32 I = 0; I < O.Num(); ++I)
 	{
 		auto* S = Find(O[I].Key);
 		if (!S || Seen.Contains(O[I].Key) || O[I].Revision < S->Stamp.Revision)
 			return false;
 		Seen.Add(O[I].Key);
+		Natural.Add(MakeShared<FVoxelSectionStorage, ESPMode::ThreadSafe>(Bases[I]));
 		for (const auto& P : O[I].Blocks)
 		{
 			if (P.Key >= 4096 || !Registry->IsValid(P.Value))
@@ -400,6 +411,7 @@ bool FVoxelWorldRuntime::ApplyRemoteSnapshots(const TArray<FVoxelSectionOverlay>
 	for (int32 I = 0; I < O.Num(); ++I)
 	{
 		auto* S = Find(O[I].Key);
+		S->BaseBlocks = Natural[I];
 		S->Blocks = MoveTemp(Bases[I]);
 		S->Overlay = O[I];
 		S->Stamp.Revision = O[I].Revision;

@@ -31,8 +31,7 @@ class WHFRAMEWORK_API FVoxelSectionMesher
 {
 public:
 	static bool Build(const FVoxelSectionSnapshot& Snapshot,
-	                  const FVoxelRegistrySnapshot& Registry,
-	                  const FVoxelShapeRegistry& Shapes,
-	                  FVoxelSectionMeshResult& Out,
-	                  const std::atomic_bool* Cancel = nullptr);
+		const FVoxelRegistrySnapshot& Registry, const FVoxelShapeRegistry& Shapes,
+		FVoxelSectionMeshResult& Out, const std::atomic_bool* Cancel = nullptr,
+		uint8 SkipBoundaryMask = 0);
 };

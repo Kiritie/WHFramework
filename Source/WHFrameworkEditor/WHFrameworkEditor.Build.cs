@@ -54,6 +54,9 @@ public class WHFrameworkEditor : ModuleRules
 				"JsonUtilities",
 				"ImageCore",
 				"MaterialEditor",
+				"MeshDescription",
+				"StaticMeshDescription",
+				"MeshUtilities",
 				"RenderCore",
 				"AnimGraph"
 			});

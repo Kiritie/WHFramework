@@ -235,6 +235,26 @@ bool FVoxelEditTransaction::Build(const FVoxelWorldRuntime& W,
 	TArray<FIntVector> Changed;
 	Map.GetKeys(Changed);
 	for (const FIntVector& Center : Changed)
+	{
+		const FIntVector Above = Center + FIntVector(0, 0, 1);
+		FVoxelBlockState Plant;
+		if (!Read(Above, Plant))
+		{
+			Error = TEXT("Load the adjacent section before removing its plant support");
+			return false;
+		}
+		const auto* Definition = R.Find(Plant.TypeId);
+		if (!Definition || Plant.IsAir() || Definition->Shape != EVoxelShapeKind::CrossPlant ||
+			Definition->DropCount != 0 || Definition->EntityKind != 0 || Supports(Center, 4))
+			continue;
+		if (P.Cells.Num() >= 8192 || !Write(Above, {}))
+		{
+			Error = TEXT("Plant support cleanup exceeds the bounded edit plan");
+			return false;
+		}
+	}
+	Map.GetKeys(Changed);
+	for (const FIntVector& Center : Changed)
 		for (uint8 F = 0; F < 6; ++F)
 		{
 			FIntVector Q = Center + VoxelCoord::Direction(F);

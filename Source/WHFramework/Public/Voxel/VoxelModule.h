@@ -5,6 +5,8 @@
 #include "Voxel/Network/VoxelNetworkTypes.h"
 #include "Voxel/Runtime/VoxelStreaming.h"
 #include "Voxel/Runtime/VoxelWorldRuntime.h"
+#include "Voxel/Rendering/VoxelDetailView.h"
+#include "Voxel/Rendering/VoxelWorldView.h"
 #include "Voxel/Save/VoxelWorldSaveAdapter.h"
 #include "Voxel/Tasks/VoxelTaskScheduler.h"
 #include "Voxel/VoxelModuleTypes.h"
@@ -17,6 +19,7 @@ class UVoxelMaterialSet;
 class APlayerController;
 class UAbilityInventoryBase;
 class UVoxelAgentComponent;
+class UVoxelWorldGenerationProfile;
 DECLARE_MULTICAST_DELEGATE_OneParam(FVoxelBlocksCommitted, const FVoxelEditBatch&);
 DECLARE_MULTICAST_DELEGATE_TwoParams(FVoxelRemoteBatchCompleted, const FVoxelSnapshotBatch&, bool);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FVoxelWorldInitialized);
@@ -81,6 +84,7 @@ public:
 	}
 
 	bool CreateWorld(const FVoxelGenerationSettings& Settings, int32 BlockSizeCentimeters, FString& Error);
+	bool CreateWorldFromProfile(int32 Seed, FString& Error);
 
 	bool StartWorld(const FVoxelWorldManifest& Manifest, bool bFromServer, FString& Error);
 
@@ -133,6 +137,21 @@ public:
 	{
 		return Generator;
 	}
+	FVoxelWorldView* GetWorldView() const
+	{
+		return WorldView.Get();
+	}
+	void ForceVoxelStreamingRefresh()
+	{
+		LastStreaming = -1;
+	}
+	bool IsProjectSceneSimulationEnabled() const
+	{
+		return bEnableProjectSceneSimulation;
+	}
+	void SetRemoteFineDemand(UObject* Owner, const TSet<FVoxelSectionKey>& Keys);
+	void ClearRemoteFineDemand(UObject* Owner);
+	void GetFineViewKeys(TArray<FVoxelSectionKey>& Out) const;
 
 	UVoxelChunk* GetColumn(FIntPoint Key, bool bCreate = false);
 
@@ -215,6 +234,12 @@ protected:
 	TSoftObjectPtr<UVoxelMaterialSet> MaterialSetAsset;
 	UPROPERTY(Transient)
 	TObjectPtr<UVoxelMaterialSet> MaterialSet;
+	UPROPERTY(EditAnywhere, Category = "Voxel|Generation")
+	TSoftObjectPtr<UVoxelWorldGenerationProfile> WorldGenerationProfileAsset;
+	UPROPERTY(Transient)
+	TObjectPtr<UVoxelWorldGenerationProfile> WorldGenerationProfile;
+	UPROPERTY(EditAnywhere, Category = "Voxel|Project")
+	bool bEnableProjectSceneSimulation = false;
 	UPROPERTY(Transient)
 	TMap<FIntPoint, TObjectPtr<UVoxelChunk>> Columns;
 	TUniquePtr<FVoxelWorldSaveData> WorldData;
@@ -252,6 +277,8 @@ private:
 	TSharedPtr<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> Generator;
 	TUniquePtr<FVoxelWorldRuntime> Runtime;
 	TUniquePtr<FVoxelTaskScheduler> Scheduler;
+	TUniquePtr<FVoxelWorldView> WorldView;
+	TUniquePtr<FVoxelDetailView> DetailView;
 	FVoxelRegionStore RegionStore;
 	FVoxelWorldSaveAdapter SaveAdapter;
 
@@ -280,6 +307,12 @@ private:
 
 	TMap<FString, TArray<uint8>> CapturedSceneFiles;
 	TMap<TWeakObjectPtr<AActor>, FBreak> Breaking;
+	static constexpr int32 MaxResidentSections = 16384;
+	TMap<TWeakObjectPtr<UObject>, TSet<FVoxelSectionKey>> RemoteFineDemand;
+	bool bWorldLoadRejected = false;
+	int32 SectionAllocationsThisFrame = 0;
+	TArray<FVector> CollectLocalViewObservers() const;
+	TArray<FVector> CollectDetailObservers() const;
 	FString LastSaveError;
 	FString PendingCommitDirectory;
 	double LastStreaming = -1;

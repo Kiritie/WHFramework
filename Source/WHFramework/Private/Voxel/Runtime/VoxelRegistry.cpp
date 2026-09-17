@@ -23,37 +23,6 @@ bool FVoxelRegistrySnapshot::IsValid(FVoxelBlockState S) const
 	const auto* D = Find(S.TypeId);
 	return D && FVoxelShapeRegistry::IsValidState(D->Shape, S.State);
 }
-bool FVoxelRegistrySnapshot::BuildGenerationConfig(const FVoxelGenerationSettings& S, FVoxelGenerationRuntimeConfig& O, FString& E) const
-{
-	if (!S.Validate(E))
-		return false;
-	FVoxelGenerationRuntimeConfig C;
-	C.Settings = S;
-	const TCHAR* NamesToResolve[] = {TEXT("dreamworld:stone"),
-	                                 TEXT("dreamworld:dirt"),
-	                                 TEXT("dreamworld:grass"),
-	                                 TEXT("dreamworld:sand"),
-	                                 TEXT("dreamworld:snow"),
-	                                 TEXT("dreamworld:water")};
-	uint16* Targets[] = {&C.Stone, &C.Dirt, &C.Grass, &C.Sand, &C.Snow, &C.Water};
-	for (int32 I = 0; I < 6; ++I)
-	{
-		const auto* D = Find(FName(NamesToResolve[I]));
-		if (!D || D->TypeId == 0)
-		{
-			E = FString::Printf(TEXT("Missing required block %s"), NamesToResolve[I]);
-			return false;
-		}
-		if ((I == 5 && D->Shape != EVoxelShapeKind::Fluid) || (I < 5 && D->Shape != EVoxelShapeKind::FullCube))
-		{
-			E = TEXT("Required terrain block has wrong shape");
-			return false;
-		}
-		*Targets[I] = D->TypeId;
-	}
-	O = C;
-	return true;
-}
 bool FVoxelRegistry::Build(const TArray<UVoxelData*>& In, bool Render, FString& E)
 {
 	check(IsInGameThread());

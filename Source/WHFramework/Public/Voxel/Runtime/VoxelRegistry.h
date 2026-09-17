@@ -14,7 +14,6 @@ struct WHFRAMEWORK_API FVoxelRegistrySnapshot
 	const FVoxelRuntimeDefinition* Find(FName Name) const;
 	const FVoxelRuntimeDefinition* Find(const FPrimaryAssetId& Asset) const;
 	bool IsValid(FVoxelBlockState S) const;
-	bool BuildGenerationConfig(const FVoxelGenerationSettings& Settings, FVoxelGenerationRuntimeConfig& Out, FString& Error) const;
 };
 class WHFRAMEWORK_API FVoxelRegistry
 {

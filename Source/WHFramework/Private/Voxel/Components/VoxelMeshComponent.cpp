@@ -8,6 +8,13 @@ UVoxelMeshComponent::UVoxelMeshComponent(const FObjectInitializer& ObjectInitial
 	SetCanEverAffectNavigation(false);
 	bUseAsyncCooking = false;
 }
+FBoxSphereBounds UVoxelMeshComponent::CalcBounds(const FTransform& LocalToWorld) const
+{
+	FBoxSphereBounds CalculatedBounds = Super::CalcBounds(LocalToWorld);
+	CalculatedBounds.BoxExtent += FVector(4.0);
+	CalculatedBounds.SphereRadius = CalculatedBounds.BoxExtent.Size();
+	return CalculatedBounds;
+}
 bool UVoxelMeshComponent::Apply(const FVoxelMeshBuffers& B, double S, UMaterialInterface* M)
 {
 	check(IsInGameThread());

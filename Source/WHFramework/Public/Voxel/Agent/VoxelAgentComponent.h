@@ -74,11 +74,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bGateCharacterUntilCollision = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "1", ClampMax = "8"))
-	int32 RenderRadius = 8;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "1", ClampMax = "3"))
-	int32 VerticalRadius = 3;
+	UPROPERTY(EditAnywhere, Category = "Voxel|Movement")
+	bool bUseSmallVoxelStepHeight = false;
 
 	//////////////////////////////////////////////////////////////////////////
 private:
@@ -89,6 +86,8 @@ private:
 	bool Send(FVoxelEditIntent Intent);
 
 	void RefreshSource();
+
+	void RefreshStepHeight();
 
 	void GateCharacter();
 
@@ -104,6 +103,7 @@ private:
 	bool bGated = false;
 	uint8 PreviousMoveMode = 0;
 	uint8 PreviousCustomMode = 0;
+	float PreviousStepHeight = -1.f;
 	FIntVector BreakTarget = FIntVector::ZeroValue;
 	double LastPulse = -10;
 	uint64 NextLocalID = 1;

@@ -148,6 +148,97 @@ EVoxelRegionRead FVoxelRegionStore::Read(const FVoxelRegionReadView& V, TArray<u
 	}
 	return EVoxelRegionRead::Loaded;
 }
+bool FVoxelRegionStore::ReadRange(
+	const FString& Directory,
+	const FVoxelSectionKey& Min,
+	const FVoxelSectionKey& Max,
+	const TSet<FVoxelSectionKey>& SupersededResident,
+	TMap<FVoxelSectionKey, TArray<uint8>>& Out,
+	bool& bOverBudget,
+	FString& Error,
+	const std::atomic_bool* Cancel)
+{
+	bOverBudget = false;
+	Error.Reset();
+	const int64 DX = int64(Max.X) - Min.X;
+	const int64 DY = int64(Max.Y) - Min.Y;
+	const int64 DZ = int64(Max.Z) - Min.Z;
+	if (DX <= 0 || DY <= 0 || DZ <= 0 || DX > 16 || DY > 16 || DZ > 16)
+	{
+		Error = TEXT("Proxy range must fit at most 16x16x16 sections");
+		return false;
+	}
+	TMap<FVoxelSectionKey, TArray<uint8>> Result;
+	if (Directory.IsEmpty())
+	{
+		Out = MoveTemp(Result);
+		return true;
+	}
+	if (!IFileManager::Get().DirectoryExists(*Directory))
+	{
+		Error = TEXT("Captured save generation no longer exists");
+		return false;
+	}
+	const FVoxelSectionKey First = Region(Min);
+	const FVoxelSectionKey Last = Region({Max.X - 1, Max.Y - 1, Max.Z - 1});
+	uint64 Bytes = 0;
+	constexpr uint64 MaxBytes = 32ull * 1024 * 1024;
+	for (int32 Z = First.Z; Z <= Last.Z; ++Z)
+		for (int32 Y = First.Y; Y <= Last.Y; ++Y)
+			for (int32 X = First.X; X <= Last.X; ++X)
+			{
+				if (Cancel && Cancel->load(std::memory_order_relaxed))
+				{
+					Error = TEXT("Canceled proxy read");
+					return false;
+				}
+				const FVoxelSectionKey RK{X, Y, Z};
+				const FString Filename = Path(Directory, RK);
+				FRegionIndex Index;
+				const EVoxelRegionRead Status = ReadIndex(Filename, Index, Error);
+				if (Status == EVoxelRegionRead::Failed)
+					return false;
+				if (Status == EVoxelRegionRead::Missing)
+					continue;
+				TUniquePtr<FArchive> File(IFileManager::Get().CreateFileReader(*Filename));
+				if (!File)
+				{
+					Error = TEXT("Cannot open indexed proxy region");
+					return false;
+				}
+				for (const FEntry& Entry : Index.Entries)
+				{
+					const FVoxelSectionKey Key{
+						X * 8 + Entry.Local % 8,
+						Y * 8 + (Entry.Local / 8) % 8,
+						Z * 8 + Entry.Local / 64};
+					if (Key.X < Min.X || Key.X >= Max.X || Key.Y < Min.Y || Key.Y >= Max.Y ||
+						Key.Z < Min.Z || Key.Z >= Max.Z || SupersededResident.Contains(Key))
+						continue;
+					Bytes += Entry.Size;
+					if (Bytes > MaxBytes)
+					{
+						bOverBudget = true;
+						Out.Reset();
+						return true;
+					}
+					TArray<uint8> Data;
+					if (!ReadEntry(*File, Entry, Data))
+					{
+						Error = TEXT("Proxy region payload CRC/read failure");
+						return false;
+					}
+					Result.Add(Key, MoveTemp(Data));
+				}
+			}
+	if (!IFileManager::Get().DirectoryExists(*Directory))
+	{
+		Error = TEXT("Save generation changed while reading");
+		return false;
+	}
+	Out = MoveTemp(Result);
+	return true;
+}
 bool FVoxelRegionStore::StageSection(FVoxelRegionWritePlan& P, const FVoxelSectionKey& K, TArray<uint8>&& B)
 {
 	if (B.IsEmpty() || B.Num() > int32(MaxRecord))

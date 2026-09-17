@@ -134,12 +134,6 @@ int32 UVoxelValidateCommandlet::Main(const FString& Params)
 	const bool bRegistryOK = Registry.Build(Assets, true, Error);
 	if (!bRegistryOK)
 		Issue(TEXT("Registry"), TEXT("Build"), Error);
-	else
-	{
-		FVoxelGenerationRuntimeConfig Config;
-		if (!Registry.GetSnapshot()->BuildGenerationConfig(FVoxelGenerationSettings(), Config, Error))
-			Issue(TEXT("Registry"), TEXT("RequiredTerrain"), Error);
-	}
 	TArray<FAssetData> Prefabs;
 	AR.GetAssetsByClass(UVoxelPrefabData::StaticClass()->GetClassPathName(), Prefabs, true);
 	Prefabs.Sort(
