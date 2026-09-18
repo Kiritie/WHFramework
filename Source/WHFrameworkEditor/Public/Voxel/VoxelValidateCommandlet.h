@@ -4,8 +4,8 @@
 UCLASS()
 class WHFRAMEWORKEDITOR_API UVoxelValidateCommandlet : public UCommandlet
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 public:
-	UVoxelValidateCommandlet();
-	virtual int32 Main(const FString& Params) override;
+    UVoxelValidateCommandlet();
+    virtual int32 Main(const FString& Params) override;
 };

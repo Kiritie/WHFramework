@@ -5,20 +5,7 @@
 #include "Voxel/Generation/Kernel/VoxelGenCatalog.h"
 #include "VoxelGenerationContext.generated.h"
 UENUM(BlueprintType)
-enum class EVoxelBiomeId : uint8
-{
-	None,
-	Plains,
-	Forest,
-	Desert,
-	Snow,
-	Mountain,
-	Ocean,
-	Savanna,
-	Rainforest,
-	Wetland,
-	Badlands
-};
+enum class EVoxelBiomeId : uint8 { None, Plains, Forest, Desert, Snow, Mountain, Ocean, Savanna, Rainforest, Wetland, Badlands };
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelGenerationSettings
 {
@@ -101,6 +88,7 @@ struct WHFRAMEWORK_API FVoxelColumnSample
     int32 SurfaceZ=0;
     EVoxelBiomeId Biome=EVoxelBiomeId::Plains;
     int32 TemperatureQ15=0,MoistureQ15=0;
+    int32 SlopePermille=0;
     int32 WaterZ=MIN_int32;
     bool bRiver=false,bLake=false,bCoast=false;
 };

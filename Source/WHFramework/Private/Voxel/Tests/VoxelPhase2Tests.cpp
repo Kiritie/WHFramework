@@ -72,8 +72,8 @@ bool FVoxelPhase2BaseTest::RunTest(const FString&)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelPhase2SeamTest,"WHFramework.Voxel.Phase2.LodBoundary",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
 bool FVoxelPhase2SeamTest::RunTest(const FString&)
 {
-    auto Fine=std::make_shared<VoxelView::Grid>();Fine->key={{1,0,0},0};Fine->cells.fill(VoxelGen::Pack(1));
-    auto Coarse=std::make_shared<VoxelView::Grid>();Coarse->key={{1,0,0},1};Coarse->cells.fill(VoxelGen::Pack(1));
+    auto Fine=std::make_shared<VoxelView::Grid>();Fine->key={{1,0,10},0};Fine->cells.fill(VoxelGen::Pack(1));
+    auto Coarse=std::make_shared<VoxelView::Grid>();Coarse->key={{1,0,5},1};Coarse->cells.fill(VoxelGen::Pack(1));
     FVoxelLodMeshInput I;I.Current=Fine;I.Neighbors={Coarse};I.CoverageSerial=1;
     FVoxelShapeRegistry H;H.BuildDefaults();auto R=Registry();FVoxelGenerationPipeline G(Config());
     FVoxelLodBuiltMesh M;FString Error;

@@ -1,5 +1,2 @@
 #include "Voxel/Generation/Assets/VoxelStructureData.h"
-UVoxelStructureData::UVoxelStructureData()
-{
-	Type = TEXT("VoxelStructure");
-}
+UVoxelStructureData::UVoxelStructureData(){Type=TEXT("VoxelStructure");}

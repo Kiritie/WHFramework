@@ -23,7 +23,7 @@ using Cell = uint32_t;
 constexpr int32_t SectionSide = 16;
 constexpr int32_t SectionVolume = 4096;
 constexpr int32_t CoordinateLimit = 1 << 24;
-constexpr uint32_t AlgorithmVersion = 3;
+constexpr uint32_t AlgorithmVersion = 4;
 constexpr uint32_t CatalogFormat = 1;
 struct I3
 {
@@ -74,6 +74,7 @@ struct WHFRAMEWORK_API Settings
 struct Column
 {
     int32_t height=0, densityHeight=0, temperature=0, moisture=0, water=std::numeric_limits<int32_t>::min();
+    int32_t slopePermille=0;
     Biome biome=Biome::Plains;
     bool river=false, lake=false, coast=false, explicitBed=false;
 };

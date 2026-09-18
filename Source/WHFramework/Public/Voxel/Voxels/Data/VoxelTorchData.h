@@ -2,9 +2,9 @@
 #include "Voxel/Voxels/Data/VoxelData.h"
 #include "VoxelTorchData.generated.h"
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UVoxelTorchData : public UVoxelData
+class WHFRAMEWORK_API UVoxelTorchData:public UVoxelData
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 public:
-	UVoxelTorchData();
+    UVoxelTorchData();
 };

@@ -26,10 +26,7 @@ FVoxelTaskScheduler::FVoxelTaskScheduler()
 {
     MaxRunning = FMath::Clamp(FPlatformMisc::NumberOfWorkerThreadsToSpawn() / 2, 1, 8);
 }
-FVoxelTaskScheduler::~FVoxelTaskScheduler()
-{
-	StopAndJoin();
-}
+FVoxelTaskScheduler::~FVoxelTaskScheduler() { StopAndJoin(); }
 bool FVoxelTaskScheduler::Has(const FVoxelTaskStamp& S, EVoxelTaskKind K) const
 {
     for (const auto& P : Pending) if (P.Kind == K && P.Stamp == S) return true;

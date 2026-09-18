@@ -1,5 +1,2 @@
 #include "Voxel/Voxels/Data/VoxelSwitchData.h"
-UVoxelSwitchData::UVoxelSwitchData()
-{
-	EntityKind = 2;
-}
+UVoxelSwitchData::UVoxelSwitchData(){EntityKind=2;}

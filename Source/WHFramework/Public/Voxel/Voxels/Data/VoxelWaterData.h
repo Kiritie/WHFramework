@@ -2,9 +2,9 @@
 #include "Voxel/Voxels/Data/VoxelData.h"
 #include "VoxelWaterData.generated.h"
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UVoxelWaterData : public UVoxelData
+class WHFRAMEWORK_API UVoxelWaterData:public UVoxelData
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 public:
-	UVoxelWaterData();
+    UVoxelWaterData();
 };

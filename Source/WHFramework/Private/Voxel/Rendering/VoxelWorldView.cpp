@@ -12,6 +12,38 @@ bool Touches(VoxelGen::Box A,VoxelGen::Box B)
     for(int Axis=0;Axis<3;++Axis){int U=(Axis+1)%3,V=(Axis+2)%3;if((A.max[Axis]==B.min[Axis]||A.min[Axis]==B.max[Axis])&&A.min[U]<B.max[U]&&A.max[U]>B.min[U]&&A.min[V]<B.max[V]&&A.max[V]>B.min[V])return true;}return false;
 }
 FVoxelSectionKey Section(VoxelView::Key K){return {K.coordinate.x,K.coordinate.y,K.coordinate.z};}
+int64 DistanceSquaredToBox(const VoxelGen::Box& B,VoxelGen::I3 P)
+{
+    const int64 X=P.x<B.min.x?int64(B.min.x)-P.x:P.x>=B.max.x?int64(P.x)-B.max.x+1:0;
+    const int64 Y=P.y<B.min.y?int64(B.min.y)-P.y:P.y>=B.max.y?int64(P.y)-B.max.y+1:0;
+    const int64 Z=P.z<B.min.z?int64(B.min.z)-P.z:P.z>=B.max.z?int64(P.z)-B.max.z+1:0;
+    return X*X+Y*Y+Z*Z;
+}
+bool HasVisibleSurfaceEvidence(const FVoxelGenerationPipeline& G,VoxelView::Key K,const std::vector<VoxelGen::I3>& Observers)
+{
+    const auto B=K.Bounds();
+    // A player inside/next to an underground tile is explicit evidence: keep cave exploration responsive.
+    const int64 Near=int64(K.Side())*K.Side();
+    for(const auto& P:Observers)if(DistanceSquaredToBox(B,P)<=Near)return true;
+    int32 Above=24;
+    const auto& Config=G.GetConfig();
+    if(Config.Catalog)
+    {
+        for(const auto& T:Config.Catalog->trees)Above=FMath::Max(Above,T.maxHeight+2*T.crownRadius+8);
+        for(const auto& T:Config.Catalog->structures)Above=FMath::Max(Above,(T.bounds.max.z-T.groundZ)+8);
+    }
+    Above=FMath::Clamp(Above,24,1024);
+    const int32 Xs[3]={B.min.x,(B.min.x+B.max.x)/2,B.max.x-1};
+    const int32 Ys[3]={B.min.y,(B.min.y+B.max.y)/2,B.max.y-1};
+    for(int32 Y:Ys)for(int32 X:Xs)
+    {
+        const auto C=G.SampleColumn(X,Y);
+        const int32 Top=FMath::Max(C.SurfaceZ,C.WaterZ==MIN_int32?C.SurfaceZ:C.WaterZ);
+        // Keep the surface-bearing tile plus authored vegetation/structure headroom. Deep sealed volume is omitted.
+        if(B.max.z>Top-8&&B.min.z<=Top+Above)return true;
+    }
+    return false;
+}
 }
 FVoxelWorldView::FVoxelWorldView(UVoxelModule& M,FVoxelTaskScheduler& S,FVoxelRegionStore& R,uint64 E,bool Render):Module(M),Scheduler(S),Store(R),Epoch(E),bRendering(Render)
 {
@@ -131,12 +163,14 @@ bool FVoxelWorldView::UpdateDesired(const TArray<FVector>& Observers)
     std::vector<VoxelGen::I3> Points;for(const auto& P:Observers){FIntVector V;if(VoxelCoord::FromWorld(P,Module.BlockSize(),V))Points.push_back({V.X,V.Y,V.Z});}
     if(Points.empty()){if(!DesiredLeaves.empty()){AbortStage();DesiredLeaves.clear();Coverage.SetDesired({});}return true;}
     if(Points.size()>4){UE_LOG(LogTemp,Error,TEXT("At most four local view sources are supported by this quality profile"));return false;}
-    auto World=Module.GetGenerator()->GetConfig().Settings.ToKernel(int32(Module.BlockSize()));auto View=Policy;auto Force=Forced;
+    auto Generator=Module.GetGenerator();auto World=Generator->GetConfig().Settings.ToKernel(int32(Module.BlockSize()));auto View=Policy;auto Force=Forced;
     FJob J;J.Kind=EJob::Plan;J.PeerSerial=++PlanSerial;
-    if(!Enqueue(J,[World,View,Force=std::move(Force),Points=std::move(Points)](const std::atomic_bool& C)
+    if(!Enqueue(J,[Generator,World,View,Force=std::move(Force),Points=std::move(Points)](const std::atomic_bool& C)
     {
         FVoxelTaskResult R;if(C.load())return R;auto Out=std::make_shared<std::vector<VoxelView::Key>>();std::string E;
-        R.bSuccess=VoxelView::SelectMany(View,World,Points,Force,*Out,E);R.ViewPlan=Out;R.Error=UTF8_TO_TCHAR(E.c_str());return R;
+        if(!VoxelView::SelectMany(View,World,Points,Force,*Out,E)){R.Error=UTF8_TO_TCHAR(E.c_str());return R;}
+        Out->erase(std::remove_if(Out->begin(),Out->end(),[&](const VoxelView::Key& K){return !HasVisibleSurfaceEvidence(*Generator,K,Points);}),Out->end());
+        R.bSuccess=true;R.ViewPlan=Out;R.Error.Reset();return R;
     },8ull*1024*1024))return false;
     bPlanRunning=true;return true;
 }

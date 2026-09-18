@@ -4,8 +4,8 @@
 UCLASS()
 class WHFRAMEWORKEDITOR_API UVoxelPrefabImportCommandlet : public UCommandlet
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 public:
-	UVoxelPrefabImportCommandlet();
-	virtual int32 Main(const FString& Params) override;
+    UVoxelPrefabImportCommandlet();
+    virtual int32 Main(const FString& Params) override;
 };

@@ -1,5 +1,2 @@
 #include "Voxel/Generation/Assets/VoxelWorldGenerationProfile.h"
-UVoxelWorldGenerationProfile::UVoxelWorldGenerationProfile()
-{
-	Type = TEXT("VoxelGenerationProfile");
-}
+UVoxelWorldGenerationProfile::UVoxelWorldGenerationProfile(){Type=TEXT("VoxelGenerationProfile");}

@@ -1,9 +1,6 @@
 #include "Voxel/Rendering/VoxelDetailData.h"
 #include "Voxel/Serialization/VoxelBinaryCodec.h"
-UVoxelDetailData::UVoxelDetailData()
-{
-	Type = TEXT("VoxelDetail");
-}
+UVoxelDetailData::UVoxelDetailData(){Type=TEXT("VoxelDetail");}
 bool UVoxelDetailData::Validate(FString& E) const
 {
     if(StableKey.IsNone()||Mesh.IsNull()||BakeVersion!=1||!GeometryHash){E=TEXT("Detail requires a stable key and baked mesh fingerprint");return false;}

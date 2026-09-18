@@ -30,7 +30,7 @@ bool Select(const Settings& v,const VoxelGen::Settings& w,I3 p,std::vector<Key>&
         const Key k=stack.back();stack.pop_back();const Box b=k.Bounds();
         if(b.max.z<=w.minZ||b.min.z>=w.maxZ)continue;
         // Level transitions use 2:1 refinement. Keep a full tile-width band for balancing.
-        const int64_t threshold=int64_t(near)*(int64_t{1}<<std::max(0,int(k.level)-1));
+        const int64_t threshold=int64_t(near)*(int64_t(1)<<std::max(0,int(k.level)-1));
         if(k.level&&Distance2(b,p)<=threshold*threshold)
         {
             auto children=k.Children();stack.insert(stack.end(),children.begin(),children.end());
@@ -103,14 +103,17 @@ bool IsBalanced(const std::vector<Key>& leaves)
     return true;
 }
 static bool Plant(const VoxelGen::Catalog& c,Cell value){for(const auto& p:c.plants)if(VoxelGen::Symbol(value)==p.block)return true;return false;}
-static Cell Majority(const std::map<Cell,uint32_t>& counts,const VoxelGen::Catalog& c)
+static Cell Representative(const std::map<Cell,uint32_t>& counts,const VoxelGen::Catalog& c,Cell surface)
 {
+    if(VoxelGen::Symbol(surface)&&!Plant(c,surface))return surface;
     Cell best=0;uint32_t n=0;int bestKind=0;
     for(const auto& v:counts)
     {
         const uint16_t symbol=VoxelGen::Symbol(v.first);if(!symbol||Plant(c,v.first))continue;
         const int kind=(symbol==c.palette.water||symbol==c.palette.lava)?1:2;
-        if(kind>bestKind||(kind==bestKind&&v.second>n)){best=v.first;n=v.second;bestKind=kind;}
+        // Density chooses geometry; material kind is only a deterministic tie-breaker.
+        // The old kind-first rule let one stone sample erase a mostly-water proxy cell.
+        if(v.second>n||(v.second==n&&kind>bestKind)){best=v.first;n=v.second;bestKind=kind;}
     }
     return best;
 }
@@ -133,23 +136,26 @@ bool BuildProxy(const VoxelGen::Settings& s,std::shared_ptr<const VoxelGen::Cata
         if(VoxelGen::Canceled(cancel)){error="Canceled";return false;}
         const int index=x+16*y+256*z;const I3 p=b.min+I3{x*step,y*step,z*step};
         if(p.z>=s.maxZ||p.z+step<=s.minZ)continue;
-        std::map<Cell,uint32_t> counts;
+        std::map<Cell,uint32_t> counts;Cell surface=0;int32_t surfaceZ=INT32_MIN;
         if(touched.count(index))
         {
-            // Edited buckets are recomputed from final fine cells. Removing the last leaf/wall cannot resurrect a natural proxy.
+            // Edited buckets are recomputed from final fine cells. Preserve the highest final non-air material as the visible surface.
             for(int dz=0;dz<step;++dz)for(int dy=0;dy<step;++dy)for(int dx=0;dx<step;++dx)
             {
                 if((++work&1023)==0&&VoxelGen::Canceled(cancel)){error="Canceled";return false;}
-                ++counts[sample(p+I3{dx,dy,dz})];
+                const Cell value=sample(p+I3{dx,dy,dz});++counts[value];
+                if(VoxelGen::Symbol(value)&&!Plant(*catalog,value)&&p.z+dz>=surfaceZ){surfaceZ=p.z+dz;surface=value;}
             }
         }
         else
         {
-            // Defined visual approximation: 27 stratified samples, no authority/collision use.
+            // Density is stratified, but visible material comes from the column's actual upper surface.
             const int positions[]={0,step/2,step-1};
             for(int dz:positions)for(int dy:positions)for(int dx:positions)++counts[sample(p+I3{dx,dy,dz})];
+            const int32_t cx=p.x+step/2,cy=p.y+step/2,top=query.UpperBound(cx,cy);
+            if(top>=p.z&&top<p.z+step)surface=sample({cx,cy,top});
         }
-        grid.cells[index]=Majority(counts,*catalog);
+        grid.cells[index]=Representative(counts,*catalog,surface);
     }
     // Thin structure protection: rasterize any template solid whose source volume intersects a proxy cell.
     // This applies ONLY to untouched buckets. Edited buckets use exact final reduction above.

@@ -10,13 +10,7 @@
 #include "Misc/Paths.h"
 #include "HAL/FileManager.h"
 #include "Modules/ModuleManager.h"
-UVoxelWorldBakeCommandlet::UVoxelWorldBakeCommandlet()
-{
-	IsClient = false;
-	IsServer = false;
-	IsEditor = true;
-	LogToConsole = true;
-}
+UVoxelWorldBakeCommandlet::UVoxelWorldBakeCommandlet(){IsClient=false;IsServer=false;IsEditor=true;LogToConsole=true;}
 int32 UVoxelWorldBakeCommandlet::Main(const FString& Params)
 {
     FString Path,Root=TEXT("/Game/VoxelGenerated/Phase2/Details"),ReportPath=FPaths::ProjectSavedDir()/TEXT("VoxelPhase2AssetReport.txt");

@@ -11,6 +11,7 @@ public:
     Cell Geology(I3 p,const Column& column) const;
     bool SolidDensity(I3 p,int32_t height) const;
     bool Carved(I3 p,const Column& column) const;
+    bool SurfaceRouteCarved(I3 p) const;
 private:
     Biome ResolveBiome(const Column& column) const;
     const Settings& s;

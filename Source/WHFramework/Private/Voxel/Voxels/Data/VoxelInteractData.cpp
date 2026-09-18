@@ -1,5 +1,2 @@
 #include "Voxel/Voxels/Data/VoxelInteractData.h"
-UVoxelInteractData::UVoxelInteractData()
-{
-	EntityKind = 2;
-}
+UVoxelInteractData::UVoxelInteractData(){EntityKind=2;}

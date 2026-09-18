@@ -2,10 +2,10 @@
 #include "Commandlets/Commandlet.h"
 #include "VoxelLegacyExportCommandlet.generated.h"
 UCLASS()
-class WHFRAMEWORKEDITOR_API UVoxelLegacyExportCommandlet : public UCommandlet
+class WHFRAMEWORKEDITOR_API UVoxelLegacyExportCommandlet:public UCommandlet
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 public:
-	UVoxelLegacyExportCommandlet();
-	virtual int32 Main(const FString& Params) override;
+    UVoxelLegacyExportCommandlet();
+    virtual int32 Main(const FString& Params)override;
 };

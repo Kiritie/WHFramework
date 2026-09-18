@@ -1,6 +1,2 @@
 #include "Voxel/Voxels/Data/VoxelDoorData.h"
-UVoxelDoorData::UVoxelDoorData()
-{
-	Shape = EVoxelShapeKind::Door;
-	EntityKind = 0;
-}
+UVoxelDoorData::UVoxelDoorData(){Shape=EVoxelShapeKind::Door;EntityKind=0;}

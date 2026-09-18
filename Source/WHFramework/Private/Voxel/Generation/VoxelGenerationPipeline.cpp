@@ -44,7 +44,7 @@ FVoxelColumnSample FVoxelGenerationPipeline::SampleColumn(int32 X,int32 Y) const
 {
     FVoxelColumnSample O;if(!Config.Catalog)return O;
     const auto S=Config.Settings.ToKernel(Config.BlockSizeCentimeters);VoxelGen::Terrain T(S,Config.Catalog->palette);const auto C=T.SampleColumn(X,Y);
-    O.SurfaceZ=C.height;O.HeightQ16=int64(C.height)*65536;O.Biome=static_cast<EVoxelBiomeId>(C.biome);O.TemperatureQ15=C.temperature;O.MoistureQ15=C.moisture;O.WaterZ=C.water;O.bRiver=C.river;O.bLake=C.lake;O.bCoast=C.coast;return O;
+    O.SurfaceZ=C.height;O.HeightQ16=int64(C.height)*65536;O.Biome=static_cast<EVoxelBiomeId>(C.biome);O.TemperatureQ15=C.temperature;O.MoistureQ15=C.moisture;O.SlopePermille=C.slopePermille;O.WaterZ=C.water;O.bRiver=C.river;O.bLake=C.lake;O.bCoast=C.coast;return O;
 }
 bool FVoxelGenerationPipeline::BuildHandshakeSignature(uint64& O) const
 {

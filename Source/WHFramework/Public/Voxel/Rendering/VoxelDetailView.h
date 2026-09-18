@@ -1,5 +1,6 @@
 #pragma once
 #include "CoreMinimal.h"
+#include "Engine/StaticMesh.h"
 #include "UObject/StrongObjectPtr.h"
 #include "Voxel/Generation/Kernel/VoxelGenStructures.h"
 #include "Voxel/Rendering/VoxelDetailData.h"
@@ -7,7 +8,6 @@
 class UVoxelModule;
 class FVoxelTaskScheduler;
 class AActor;
-class UStaticMesh;
 struct FVoxelTaskResult;
 struct WHFRAMEWORK_API FVoxelDetailPlan
 {

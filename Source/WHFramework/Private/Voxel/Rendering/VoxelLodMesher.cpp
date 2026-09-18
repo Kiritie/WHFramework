@@ -10,7 +10,11 @@ const VoxelView::Grid* At(const FVoxelLodMeshInput& I,const FVector& P)
 }
 FVoxelBlockState Sample(const VoxelView::Grid* Grid,const FVector& P,const FVoxelGenerationPipeline& G)
 {
-    if(!Grid)return {};FVoxelBlockState Out;G.ToRuntime(Grid->Sample({int32(FMath::FloorToInt(P.X)),int32(FMath::FloorToInt(P.Y)),int32(FMath::FloorToInt(P.Z))}),Out);return Out;
+    const FIntVector Cell(FMath::FloorToInt(P.X),FMath::FloorToInt(P.Y),FMath::FloorToInt(P.Z));
+    FVoxelBlockState Out;
+    if(Grid){G.ToRuntime(Grid->Sample({Cell.X,Cell.Y,Cell.Z}),Out);return Out;}
+    // Missing displayed-neighbor data is not evidence of air. Natural generation is authoritative for untouched boundaries.
+    G.SampleBaseBlock(Cell,Out);return Out;
 }
 bool Covered(const VoxelView::Grid* Grid,FVoxelBlockState S,const FVector& P,uint8 Face,
              const FVoxelRegistrySnapshot& R,const FVoxelShapeRegistry& H)
@@ -95,7 +99,8 @@ bool FVoxelLodMesher::Build(const FVoxelLodMeshInput& I,const FVoxelGenerationPi
                 auto AState=Sample(I.Current.get(),Inside,G);if(AState.IsAir()||!Covered(I.Current.get(),AState,Inside,F,R,H))continue;
                 const auto* AD=R.Find(AState.TypeId);const auto* N=At(I,Outside);auto BState=Sample(N,Outside,G);const auto* BD=R.Find(BState.TypeId);
                 const bool Same=AState.TypeId==BState.TypeId&&(AD->RenderGroup==EVoxelRenderGroup::Water||AD->RenderGroup==EVoxelRenderGroup::Translucent);
-                const bool Hidden=BD&&!BState.IsAir()&&(BD->bOccludes||Same)&&Covered(N,BState,Outside,F^1,R,H);
+                const bool BoundaryCovered=N?Covered(N,BState,Outside,F^1,R,H):(BD&&(BD->Shape==EVoxelShapeKind::FullCube||BD->Shape==EVoxelShapeKind::Fluid));
+                const bool Hidden=BD&&!BState.IsAir()&&(BD->bOccludes||Same)&&BoundaryCovered;
                 if(!Hidden)Mask[X+Size*Y]=AState.Pack();
             }
         }

@@ -2,9 +2,9 @@
 #include "Voxel/Voxels/Data/VoxelData.h"
 #include "VoxelInteractData.generated.h"
 UCLASS(BlueprintType)
-class WHFRAMEWORK_API UVoxelInteractData : public UVoxelData
+class WHFRAMEWORK_API UVoxelInteractData:public UVoxelData
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 public:
-	UVoxelInteractData();
+    UVoxelInteractData();
 };
