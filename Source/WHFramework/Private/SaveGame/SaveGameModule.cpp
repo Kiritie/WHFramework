@@ -459,7 +459,10 @@ FSaveOperationResult USaveGameModule::DeleteSaveSlot(FGuid SaveId)
 	}
 	if (SaveId == ActiveSaveId)
 	{
-		ActiveSaveId.Invalidate();
+		// Do not leave voxel streaming pointed at a generation directory that is
+		// about to be deleted. The currently resident world can remain as an
+		// unsaved preview, but future region reads must be detached first.
+		ClearActiveSave();
 	}
 	return Storage->DeleteWorldDirectory(SaveId)
 	           ? FSaveOperationResult::Success()
