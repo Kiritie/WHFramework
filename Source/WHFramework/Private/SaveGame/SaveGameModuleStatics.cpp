@@ -42,6 +42,11 @@ FSaveOperationResult USaveGameModuleStatics::SaveCurrentSlot()
 	return USaveGameModule::Get().SaveCurrentSlot();
 }
 
+void USaveGameModuleStatics::DetachActiveSave()
+{
+	USaveGameModule::Get().DetachActiveSave();
+}
+
 void USaveGameModuleStatics::ClearActiveSave()
 {
 	USaveGameModule::Get().ClearActiveSave();

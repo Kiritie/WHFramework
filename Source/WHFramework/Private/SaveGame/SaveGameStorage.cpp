@@ -72,6 +72,11 @@ FString FSaveGameStorage::GetTempModuleFilePath(const FGuid& SaveId, int32 Gener
 	return FPaths::Combine(GetTempGenerationDir(SaveId, Generation), TEXT("modules"), ModuleName.ToString() + TEXT(".bin"));
 }
 
+FString FSaveGameStorage::GetLastActiveSavePath() const
+{
+	return FPaths::Combine(GetRootDir(), TEXT("last_active.txt"));
+}
+
 bool FSaveGameStorage::EnsureRoot()
 {
 	return IFileManager::Get().MakeDirectory(*GetProfilesDir(), true) && IFileManager::Get().MakeDirectory(*GetWorldsDir(), true);
@@ -114,6 +119,42 @@ bool FSaveGameStorage::EnumerateManifests(TArray<FSaveManifest>& OutManifests) c
 		}
 	}
 	return true;
+}
+
+bool FSaveGameStorage::ReadLastActiveSave(FGuid& OutSaveId) const
+{
+	OutSaveId.Invalidate();
+	FString Text;
+	if(!FFileHelper::LoadFileToString(Text, *GetLastActiveSavePath()))
+	{
+		return false;
+	}
+	Text.TrimStartAndEndInline();
+	FGuid SaveId;
+	FSaveManifest Manifest;
+	if(!FGuid::Parse(Text, SaveId) || !ReadManifest(SaveId, Manifest) || Manifest.CurrentGeneration <= 0 ||
+	   !IsGenerationComplete(SaveId, Manifest.CurrentGeneration, Manifest))
+	{
+		return false;
+	}
+	OutSaveId = SaveId;
+	return true;
+}
+
+bool FSaveGameStorage::WriteLastActiveSave(const FGuid& SaveId)
+{
+	FSaveManifest Manifest;
+	if(!SaveId.IsValid() || !ReadManifest(SaveId, Manifest) || Manifest.CurrentGeneration <= 0 ||
+	   !IsGenerationComplete(SaveId, Manifest.CurrentGeneration, Manifest))
+	{
+		return false;
+	}
+	return WriteTextAtomic(GetLastActiveSavePath(), SaveId.ToString(EGuidFormats::DigitsWithHyphens));
+}
+
+void FSaveGameStorage::ClearLastActiveSave()
+{
+	IFileManager::Get().Delete(*GetLastActiveSavePath(), false, true);
 }
 
 bool FSaveGameStorage::WriteBinary(const FString& Path, const TArray<uint8>& Bytes)

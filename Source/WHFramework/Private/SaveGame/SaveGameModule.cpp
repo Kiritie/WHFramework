@@ -11,10 +11,37 @@
 #include "SaveGame/SaveGameStorage.h"
 #include "SaveGame/SaveGameAsyncExecutor.h"
 #include "Setting/SettingModule.h"
+#include "Scene/SceneModule.h"
+#include "Scene/Object/WorldTimer.h"
+#include "Scene/Object/WorldWeather.h"
 #include "Voxel/VoxelModule.h"
 #include "EngineUtils.h"
 
 IMPLEMENTATION_MODULE(USaveGameModule)
+
+namespace
+{
+void RestoreSceneEnvironment(UModuleBase* Module, const FParameter& Data, EPhase Phase)
+{
+	USceneModule* Scene = Cast<USceneModule>(Module);
+	const FSceneModuleSaveData* SceneData = Data.GetPtr<FSceneModuleSaveData>();
+	if(!Scene || !SceneData) return;
+
+	// Keep timer/weather restoration explicit at the save transaction boundary.
+	// This also repairs projects that temporarily shipped SceneModule with these
+	// two agent-load calls commented out. Reapplying the same values is safe.
+	if(UWorldTimer* Timer = Scene->GetWorldTimer())
+	{
+		if(Timer->IsAutoSave()) Timer->LoadSaveData(FParameter(SceneData->TimerData), Phase);
+		Timer->OnRefresh(0.f);
+	}
+	if(UWorldWeather* Weather = Scene->GetWorldWeather())
+	{
+		if(Weather->IsAutoSave()) Weather->LoadSaveData(FParameter(SceneData->WeatherData), Phase);
+		Weather->OnRefresh(0.f);
+	}
+}
+}
 
 USaveGameModule::USaveGameModule()
 {
@@ -37,10 +64,36 @@ USaveGameModule::~USaveGameModule()
 void USaveGameModule::OnDestroy()
 {
 	Super::OnDestroy();
-
 	TERMINATION_MODULE(USaveGameModule)
 }
 #endif
+
+void USaveGameModule::RestoreLastActiveSave()
+{
+	ActiveSaveId.Invalidate();
+	if(!Storage)
+	{
+		return;
+	}
+
+	if(Storage->ReadLastActiveSave(ActiveSaveId))
+	{
+		return;
+	}
+
+	// Migrate installs created before last_active.txt existed. Only complete,
+	// committed saves are exposed by GetSaveSlotSummaries().
+	Storage->ClearLastActiveSave();
+	const TArray<FSaveSlotSummary> Saves = GetSaveSlotSummaries();
+	if(!Saves.IsEmpty())
+	{
+		ActiveSaveId = Saves[0].SaveId;
+		if(!Storage->WriteLastActiveSave(ActiveSaveId))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Could not persist the recovered last active save."));
+		}
+	}
+}
 
 void USaveGameModule::OnInitialize()
 {
@@ -48,6 +101,7 @@ void USaveGameModule::OnInitialize()
 	Storage = MakeUnique<FSaveGameStorage>(UserIndex);
 	Storage->EnsureRoot();
 	Storage->CleanupAllTempGenerations();
+	RestoreLastActiveSave();
 	if (UWHGameInstance* GameInstance = GetWorld() ? Cast<UWHGameInstance>(GetWorld()->GetGameInstance()) : nullptr)
 	{
 		PendingLoadContext = GameInstance->ConsumePendingSaveLoad();
@@ -106,9 +160,12 @@ void USaveGameModule::SetUserIndex(int32 InUserIndex)
 	{
 		return;
 	}
+	DetachActiveSave();
 	UserIndex = InUserIndex;
 	Storage = MakeUnique<FSaveGameStorage>(UserIndex);
 	Storage->EnsureRoot();
+	Storage->CleanupAllTempGenerations();
+	RestoreLastActiveSave();
 }
 
 FSaveOperationResult USaveGameModule::CreateSaveSlot(const FCreateSaveSlotParams& Params, FSaveSlotSummary& OutSummary)
@@ -117,6 +174,10 @@ FSaveOperationResult USaveGameModule::CreateSaveSlot(const FCreateSaveSlotParams
 	{
 		return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("Cannot create world slot now")));
 	}
+
+	const FGuid PreviousActiveSaveId = ActiveSaveId;
+	FGuid PreviousPersistedSaveId;
+	Storage->ReadLastActiveSave(PreviousPersistedSaveId);
 	FSaveManifest Manifest;
 	Manifest.SaveId = FGuid::NewGuid();
 	Manifest.DisplayName = Params.DisplayName;
@@ -124,6 +185,7 @@ FSaveOperationResult USaveGameModule::CreateSaveSlot(const FCreateSaveSlotParams
 	Manifest.CreatedAt = FDateTime::UtcNow();
 	Manifest.UpdatedAt = Manifest.CreatedAt;
 	Manifest.CurrentMap = Params.InitialMap;
+
 	{
 		TGuardValue<bool> Guard(bSaveOperationRunning, true);
 		if (!Storage->CreateWorldDirectory(Manifest.SaveId) || !Storage->WriteManifestAtomic(Manifest.SaveId, Manifest))
@@ -131,20 +193,33 @@ FSaveOperationResult USaveGameModule::CreateSaveSlot(const FCreateSaveSlotParams
 			Storage->DeleteWorldDirectory(Manifest.SaveId);
 			return FSaveOperationResult::Failed(ESaveResultCode::WriteFailed, FText::FromString(TEXT("Create save slot failed")));
 		}
-		ActiveSaveId = Manifest.SaveId;
 	}
+
 	if (Params.bCaptureCurrentWorld)
 	{
 		const FSaveOperationResult Result = SaveSlot(Manifest.SaveId);
 		if (!Result)
 		{
+			Storage->DeleteWorldDirectory(Manifest.SaveId);
+			ActiveSaveId = PreviousActiveSaveId;
+			if(PreviousPersistedSaveId.IsValid()) Storage->WriteLastActiveSave(PreviousPersistedSaveId);
+			else Storage->ClearLastActiveSave();
 			return Result;
 		}
 		if (!Storage->ReadManifest(Manifest.SaveId, Manifest))
 		{
+			Storage->DeleteWorldDirectory(Manifest.SaveId);
+			ActiveSaveId = PreviousActiveSaveId;
+			if(PreviousPersistedSaveId.IsValid()) Storage->WriteLastActiveSave(PreviousPersistedSaveId);
+			else Storage->ClearLastActiveSave();
 			return FSaveOperationResult::Failed(ESaveResultCode::ReadFailed, FText::FromString(TEXT("Committed manifest could not be reread")));
 		}
 	}
+	else
+	{
+		ActiveSaveId = Manifest.SaveId;
+	}
+
 	OutSummary = Manifest.ToSummary(Storage->GetWorldDir(Manifest.SaveId));
 	return FSaveOperationResult::Success();
 }
@@ -248,6 +323,10 @@ void USaveGameModule::CompleteAsyncSave(const FSaveOperationResult& Result)
 	if (Result)
 	{
 		ActiveSaveId = CompletedId;
+		if(Storage && !Storage->WriteLastActiveSave(CompletedId))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Save committed, but last_active.txt could not be updated."));
+		}
 	}
 	bSaveOperationRunning = false;
 	OnWorldSaveFinished.Broadcast(CompletedId, Result);
@@ -296,12 +375,21 @@ FSaveOperationResult USaveGameModule::SaveCurrentSlot()
 	return FSaveOperationResult::Success();
 }
 
-void USaveGameModule::ClearActiveSave()
+void USaveGameModule::DetachActiveSave()
 {
 	ActiveSaveId.Invalidate();
 	if (UVoxelModule* Voxel = UVoxelModule::GetPtr())
 	{
 		Voxel->SetActiveSaveSource(FGuid(), 0, nullptr);
+	}
+}
+
+void USaveGameModule::ClearActiveSave()
+{
+	DetachActiveSave();
+	if(Storage)
+	{
+		Storage->ClearLastActiveSave();
 	}
 }
 
@@ -322,7 +410,8 @@ FSaveOperationResult USaveGameModule::LoadSlot(FGuid SaveId, EPhase InPhase)
 	}
 	TGuardValue<bool> Guard(bSaveOperationRunning, true);
 	FSaveManifest Manifest;
-	if (!Storage->ReadManifest(SaveId, Manifest) || Manifest.CurrentGeneration <= 0)
+	if (!Storage->ReadManifest(SaveId, Manifest) || Manifest.CurrentGeneration <= 0 ||
+	    !Storage->IsGenerationComplete(SaveId, Manifest.CurrentGeneration, Manifest))
 	{
 		return FSaveOperationResult::Failed(ESaveResultCode::NotFound, FText::FromString(TEXT("Committed save slot not found.")));
 	}
@@ -354,6 +443,10 @@ FSaveOperationResult USaveGameModule::RestoreSlotGeneration(const FPendingSaveLo
 	if (Result)
 	{
 		ActiveSaveId = Context.SaveId;
+		if(Storage && !Storage->WriteLastActiveSave(Context.SaveId))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Loaded save, but last_active.txt could not be updated."));
+		}
 		CancelPendingSaveSlot();
 	}
 	return Result;
@@ -411,6 +504,7 @@ FSaveOperationResult USaveGameModule::LoadModulesFromGeneration(const FGuid& Sav
 		for (FLoadedModuleSaveData& Item : Loaded)
 		{
 			Item.Module->LoadSaveData(Item.Data, EPhase::Primary);
+			RestoreSceneEnvironment(Item.Module, Item.Data, EPhase::Primary);
 		}
 	}
 	if (PHASEC(InPhase, EPhase::Lesser))
@@ -418,6 +512,7 @@ FSaveOperationResult USaveGameModule::LoadModulesFromGeneration(const FGuid& Sav
 		for (FLoadedModuleSaveData& Item : Loaded)
 		{
 			Item.Module->LoadSaveData(Item.Data, EPhase::Lesser);
+			RestoreSceneEnvironment(Item.Module, Item.Data, EPhase::Lesser);
 		}
 	}
 	if (PHASEC(InPhase, EPhase::Final))
@@ -425,6 +520,7 @@ FSaveOperationResult USaveGameModule::LoadModulesFromGeneration(const FGuid& Sav
 		for (FLoadedModuleSaveData& Item : Loaded)
 		{
 			Item.Module->LoadSaveData(Item.Data, EPhase::Final);
+			RestoreSceneEnvironment(Item.Module, Item.Data, EPhase::Final);
 		}
 		for (FLoadedModuleSaveData& Item : Loaded)
 		{
@@ -444,13 +540,35 @@ FSaveOperationResult USaveGameModule::DeleteSaveSlot(FGuid SaveId)
 	{
 		return FSaveOperationResult::Failed(ESaveResultCode::InvalidArgument, FText::FromString(TEXT("Invalid save id.")));
 	}
-	if (SaveId == ActiveSaveId)
+
+	FSaveManifest ExistingManifest;
+	Storage->ReadManifest(SaveId, ExistingManifest);
+	const bool bWasActive = SaveId == ActiveSaveId;
+	FGuid PersistedSaveId;
+	const bool bWasPersistedLast = Storage->ReadLastActiveSave(PersistedSaveId) && PersistedSaveId == SaveId;
+	if(bWasActive)
 	{
-		ActiveSaveId.Invalidate();
+		DetachActiveSave();
 	}
-	return Storage->DeleteWorldDirectory(SaveId)
-	           ? FSaveOperationResult::Success()
-	           : FSaveOperationResult::Failed(ESaveResultCode::WriteFailed, FText::FromString(TEXT("Delete save slot failed.")));
+
+	if(!Storage->DeleteWorldDirectory(SaveId))
+	{
+		if(bWasActive)
+		{
+			ActiveSaveId = SaveId;
+			if(UVoxelModule* Voxel = UVoxelModule::GetPtr())
+			{
+				Voxel->SetActiveSaveSource(SaveId, ExistingManifest.CurrentGeneration, Storage.Get());
+			}
+		}
+		return FSaveOperationResult::Failed(ESaveResultCode::WriteFailed, FText::FromString(TEXT("Delete save slot failed.")));
+	}
+
+	if(bWasPersistedLast)
+	{
+		Storage->ClearLastActiveSave();
+	}
+	return FSaveOperationResult::Success();
 }
 
 FSaveOperationResult USaveGameModule::RenameSaveSlot(FGuid SaveId, const FString& NewName)
@@ -478,7 +596,8 @@ FSaveOperationResult USaveGameModule::DuplicateSaveSlot(FGuid SourceSaveId, cons
 		return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("Save transaction is in progress")));
 	}
 	FSaveManifest Manifest;
-	if (!Storage || NewName.IsEmpty() || !Storage->ReadManifest(SourceSaveId, Manifest) || Manifest.CurrentGeneration <= 0)
+	if (!Storage || NewName.IsEmpty() || !Storage->ReadManifest(SourceSaveId, Manifest) || Manifest.CurrentGeneration <= 0 ||
+	    !Storage->IsGenerationComplete(SourceSaveId, Manifest.CurrentGeneration, Manifest))
 	{
 		return FSaveOperationResult::Failed(ESaveResultCode::InvalidArgument, FText::FromString(TEXT("Invalid source save slot.")));
 	}
@@ -511,7 +630,12 @@ FSaveOperationResult USaveGameModule::DuplicateSaveSlot(FGuid SourceSaveId, cons
 FSaveSlotSummary USaveGameModule::GetSaveSlotSummary(FGuid SaveId) const
 {
 	FSaveManifest Manifest;
-	return Storage && Storage->ReadManifest(SaveId, Manifest) ? Manifest.ToSummary(Storage->GetWorldDir(SaveId)) : FSaveSlotSummary();
+	if (!Storage || !Storage->ReadManifest(SaveId, Manifest) || Manifest.CurrentGeneration <= 0 ||
+	    !Storage->IsGenerationComplete(SaveId, Manifest.CurrentGeneration, Manifest))
+	{
+		return FSaveSlotSummary();
+	}
+	return Manifest.ToSummary(Storage->GetWorldDir(SaveId));
 }
 
 TArray<FSaveSlotSummary> USaveGameModule::GetSaveSlotSummaries() const
@@ -522,7 +646,10 @@ TArray<FSaveSlotSummary> USaveGameModule::GetSaveSlotSummaries() const
 	{
 		for (const FSaveManifest& Manifest : Manifests)
 		{
-			Result.Add(Manifest.ToSummary(Storage->GetWorldDir(Manifest.SaveId)));
+			if (Manifest.CurrentGeneration > 0 && Storage->IsGenerationComplete(Manifest.SaveId, Manifest.CurrentGeneration, Manifest))
+			{
+				Result.Add(Manifest.ToSummary(Storage->GetWorldDir(Manifest.SaveId)));
+			}
 		}
 		Result.Sort(
 		    [](const FSaveSlotSummary& A, const FSaveSlotSummary& B)
@@ -608,6 +735,10 @@ TArray<UModuleBase*> USaveGameModule::GetSaveModules(ESaveScope Scope) const
 
 void USaveGameModule::OnGameExited(UObject* InSender, const FEventGameExited& InEvent)
 {
-	SaveCurrentSlot();
+	const FSaveOperationResult SaveResult = SaveCurrentSlot();
+	if(!SaveResult)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Saving before exit failed: %s"), *SaveResult.Message.ToString());
+	}
 	SaveProfile();
 }

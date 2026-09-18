@@ -21,6 +21,7 @@ public:
 	FString GetTempGenerationDir(const FGuid& SaveId, int32 Generation) const;
 	FString GetModuleFilePath(const FGuid& SaveId, int32 Generation, FName ModuleName) const;
 	FString GetTempModuleFilePath(const FGuid& SaveId, int32 Generation, FName ModuleName) const;
+	FString GetLastActiveSavePath() const;
 
 	bool EnsureRoot();
 	bool CreateWorldDirectory(const FGuid& SaveId);
@@ -28,6 +29,9 @@ public:
 	bool ReadManifest(const FGuid& SaveId, FSaveManifest& OutManifest) const;
 	bool WriteManifestAtomic(const FGuid& SaveId, const FSaveManifest& Manifest);
 	bool EnumerateManifests(TArray<FSaveManifest>& OutManifests) const;
+	bool ReadLastActiveSave(FGuid& OutSaveId) const;
+	bool WriteLastActiveSave(const FGuid& SaveId);
+	void ClearLastActiveSave();
 	bool WriteBinary(const FString& Path, const TArray<uint8>& Bytes);
 	bool WriteBinaryAtomic(const FString& Path, const TArray<uint8>& Bytes);
 	bool ReadBinary(const FString& Path, TArray<uint8>& OutBytes) const;

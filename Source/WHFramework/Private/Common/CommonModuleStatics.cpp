@@ -16,6 +16,7 @@
 #include "Common/CommonModuleTypes.h"
 #include "Event/Events/Common/Game/Event_GamePaused.h"
 #include "Event/Events/Common/Game/Event_GameUnPaused.h"
+#include "Event/Events/Common/Game/Event_GameExited.h"
 #include "Gameplay/WHLocalPlayer.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetStringLibrary.h"
@@ -110,6 +111,9 @@ void UCommonModuleStatics::UnPauseGame(EPauseMode PauseMode)
 
 void UCommonModuleStatics::QuitGame(TEnumAsByte<EQuitPreference::Type> QuitPreference, bool bIgnorePlatformRestrictions)
 {
+	// Explicit user exits are save boundaries. SaveCurrentSlot() is synchronous,
+	// so the event handler finishes the generation commit before QuitGame returns.
+	UEventModuleStatics::BroadcastEvent<FEventGameExited>(nullptr, { false });
 	UKismetSystemLibrary::QuitGame(GetWorldContext(), GetPlayerController<AWHPlayerController>(), QuitPreference, bIgnorePlatformRestrictions);
 }
 
@@ -118,7 +122,6 @@ bool UCommonModuleStatics::IsInScreenViewport(const FVector& InWorldLocation)
 	const UWHLocalPlayer* LP = GetLocalPlayer();
 	if (LP && LP->ViewportClient)
 	{
-		// get the projection data
 		FSceneViewProjectionData ProjectionData;
 		if (LP->GetProjectionData(LP->ViewportClient->Viewport, ProjectionData))
 		{

@@ -71,6 +71,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "SaveGame|World")
 	FSaveOperationResult SaveCurrentSlot();
 
+	/** Detach the live preview/runtime from a slot without forgetting which committed slot was last used. */
+	UFUNCTION(BlueprintCallable, Category = "SaveGame|World")
+	void DetachActiveSave();
+
+	/** Forget the active slot both in memory and across the next process start. */
 	UFUNCTION(BlueprintCallable, Category = "SaveGame|World")
 	void ClearActiveSave();
 
@@ -121,6 +126,7 @@ public:
 
 private:
 	void CompleteAsyncSave(const FSaveOperationResult& Result);
+	void RestoreLastActiveSave();
 	FSaveOperationResult LoadModulesFromGeneration(const FGuid& SaveId, int32 Generation, EPhase InPhase);
 	FSaveOperationResult RestoreSlotGeneration(const FPendingSaveLoadContext& Context, EPhase InPhase);
 	TArray<UModuleBase*> GetSaveModules(ESaveScope Scope) const;

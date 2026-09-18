@@ -12,6 +12,31 @@ FBox RotateBox(const FBox& B,uint8 Y)
     FBox O(ForceInit);for(int32 I=0;I<8;++I)
     O+=RotatePoint(FVector(I&1?B.Max.X:B.Min.X,I&2?B.Max.Y:B.Min.Y,I&4?B.Max.Z:B.Min.Z),Y);return O;
 }
+FVector2D MakeFaceUV(
+	uint8 Face,
+	const FVector& Position)
+{
+	if(Face < 2)
+	{
+		return FVector2D(
+			Position.Y,
+			1.0 - Position.Z
+		);
+	}
+
+	if(Face < 4)
+	{
+		return FVector2D(
+			Position.X,
+			1.0 - Position.Z
+		);
+	}
+
+	return FVector2D(
+		Position.X,
+		Position.Y
+	);
+}
 bool Inside(const TArray<FBox>& B,const FVector& P)
 {for(const FBox& X:B)if(X.IsInsideOrOn(P))return true;return false;}
 FVoxelShapeQuad Quad(uint8 Face,double Plane,double U0,double U1,double V0,double V1)
@@ -20,7 +45,22 @@ FVoxelShapeQuad Quad(uint8 Face,double Plane,double U0,double U1,double V0,doubl
     Q.Face=Face;Q.MaterialFace=Face;
     Q.bBoundary=FMath::IsNearlyEqual(Plane,Face%2==0?1.0:0.0,1e-8);
     const double Us[4]={U0,U1,U1,U0},Vs[4]={V0,V0,V1,V1};
-    for(int32 I=0;I<4;++I){Q.Vertices[I]=FVector::ZeroVector;Q.Vertices[I][A]=Plane;Q.Vertices[I][U]=Us[I];Q.Vertices[I][V]=Vs[I];Q.UV[I]=FVector2D(Us[I],Vs[I]);}
+    for(int32 I=0;I<4;++I)
+    {
+    	Q.Vertices[I]=FVector::ZeroVector;Q.Vertices[I][A]=Plane;Q.Vertices[I][U]=Us[I];Q.Vertices[I][V]=Vs[I];
+    	Q.UV[I] = MakeFaceUV(
+			Face,
+			Q.Vertices[I]
+		);
+    	if(Face < 4)
+    	{
+    		Q.UV[I] = FVector2D(Us[I], 1.0 - Vs[I]);
+    	}
+    	else
+    	{
+    		Q.UV[I] = FVector2D(Us[I], Vs[I]);
+    	}
+    }
     if(Face&1){Swap(Q.Vertices[1],Q.Vertices[3]);Swap(Q.UV[1],Q.UV[3]);}
     return Q;
 }

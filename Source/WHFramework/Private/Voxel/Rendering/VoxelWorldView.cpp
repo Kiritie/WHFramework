@@ -49,7 +49,7 @@ FVoxelWorldView::FVoxelWorldView(UVoxelModule& M,FVoxelTaskScheduler& S,FVoxelRe
 {
     // Initial fixed quality profile: 32 m exact, 256 m far, +/-128 m visual height.
     // 512 m is a separate measured quality preset, not an unmeasured performance promise.
-    Policy.nearRadiusCm=3200;Policy.farRadiusCm=25600;Policy.verticalRadiusCm=12800;
+    Policy.nearRadiusCm=3200;Policy.farRadiusCm=51200;Policy.verticalRadiusCm=19200;
     if(bRendering&&M.GetWorld()&&M.GetMaterialSet())Presenter=MakeUnique<FVoxelPagePresenter>(*M.GetWorld(),*M.GetMaterialSet(),int32(M.BlockSize()));
     CommitHandle=M.OnBlocksCommitted.AddRaw(this,&FVoxelWorldView::Invalidate);
     RemoteHandle=M.OnRemoteBatchCompleted.AddLambda([this](const FVoxelSnapshotBatch& B,bool OK){if(OK){FVoxelEditBatch E;for(const auto& X:B.Sections){FVoxelSectionPatch P;P.Key=X.Key;E.Sections.Add(P);}Invalidate(E);}});

@@ -1,31 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
-
-#include "Common/Base/WHActor.h"
-#include "VoxelRoot.generated.h"
-
-/**
- * 体素模块
- */
-UCLASS()
-class WHFRAMEWORK_API AVoxelRoot : public AWHActor
-{
-	GENERATED_BODY()
-
-public:
-	AVoxelRoot();
-
-public:
-#if WITH_EDITOR
-	virtual bool IsUserManaged() const override
-	{
-		return false;
-	}
-
-	virtual bool CanChangeIsSpatiallyLoadedFlag() const override
-	{
-		return false;
-	}
-#endif
-};
+// AVoxelRoot was removed from the runtime. This compatibility stub intentionally
+// contains no reflected type so copying this patch over an older checkout also
+// removes the obsolete class without requiring a separate delete operation.

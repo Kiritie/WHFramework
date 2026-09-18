@@ -36,6 +36,9 @@ public:
 	static FSaveOperationResult SaveCurrentSlot();
 
 	UFUNCTION(BlueprintCallable, Category = "SaveGameModule")
+	static void DetachActiveSave();
+
+	UFUNCTION(BlueprintCallable, Category = "SaveGameModule")
 	static void ClearActiveSave();
 
 	UFUNCTION(BlueprintCallable, Category = "SaveGameModule")

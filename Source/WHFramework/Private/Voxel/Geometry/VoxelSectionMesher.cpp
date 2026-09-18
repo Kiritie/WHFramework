@@ -19,6 +19,32 @@ struct FFaceKey
     bool Visible=false;uint32 Packed=0;FVoxelRuntimeFaceRef Texture;EVoxelRenderGroup Group=EVoxelRenderGroup::Opaque;
     bool operator==(const FFaceKey&B)const{return Visible==B.Visible&&Packed==B.Packed&&Texture==B.Texture&&Group==B.Group;}
 };
+FVector2D MakeFaceUV(
+uint8 Face,
+const FVector& Position,
+double VerticalExtent)
+{
+	if(Face < 2)
+	{
+		return FVector2D(
+			Position.Y,
+			VerticalExtent - Position.Z
+		);
+	}
+
+	if(Face < 4)
+	{
+		return FVector2D(
+			Position.X,
+			VerticalExtent - Position.Z
+		);
+	}
+
+	return FVector2D(
+		Position.X,
+		Position.Y
+	);
+}
 bool Covered(const FVoxelResolvedShape&S,uint8 F,const FVoxelShapeQuad*Q)
 {
     if(!Q)return (S.OcclusionMask&(1u<<F))!=0;
@@ -45,8 +71,7 @@ void AppendQuad(FVoxelMeshBuffers&O,const FVector*P,const FVector2D*UV,const FVo
         const float Wind=bPlantWind&&G==EVoxelRenderGroup::Foliage?float(FMath::Clamp(P[I].Z,0.0,1.0)):0.f;
         O.Colors.Add(FLinearColor(Wind,0,1,1));O.Tangents.Add(FProcMeshTangent(Tangent,false));
     }
-    O.Triangles.Append({N,N+1,N+2,N,N+2,N+3});
-}
+	O.Triangles.Append({N, N + 2, N + 1, N, N + 3, N + 2});}
 }
 bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegistrySnapshot&R,const FVoxelShapeRegistry&H,
     FVoxelSectionMeshResult&O,const std::atomic_bool*Cancel,uint8 SkipBoundaryMask)
@@ -76,9 +101,14 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
             const auto K=Mask[X+16*Y];if(!K.Visible){++X;continue;}int32 W=1,Ht=1;
             while(X+W<16&&Mask[X+W+16*Y]==K)++W;
             bool Stop=false;while(Y+Ht<16&&!Stop){for(int32 DX=0;DX<W;++DX)if(!(Mask[X+DX+16*(Y+Ht)]==K)){Stop=true;break;}if(!Stop)++Ht;}
-            FVector P[4];FVector2D UV[4]={{0,0},{double(W),0},{double(W),double(Ht)},{0,double(Ht)}};
+        	FVector P[4];
+        	FVector2D UV[4];
             const int32 XX[4]={X,X+W,X+W,X},YY[4]={Y,Y,Y+Ht,Y+Ht};
-            for(int32 I=0;I<4;++I){P[I]=FVector::ZeroVector;P[I][A]=Slice+(F%2==0?1:0);P[I][U]=XX[I];P[I][V]=YY[I];}
+            for(int32 I=0;I<4;++I)
+            {
+	            P[I]=FVector::ZeroVector;P[I][A]=Slice+(F%2==0?1:0);P[I][U]=XX[I];P[I][V]=YY[I];
+            	UV[I] = MakeFaceUV(F, P[I], 16.0);
+            }
             if(F&1){Swap(P[1],P[3]);Swap(UV[1],UV[3]);}
             AppendQuad(Batch(K.Group,K.Texture.Bank),P,UV,K.Texture,K.Group,FVector::ZeroVector);
             TotalVertices+=4;if(OverBudget())return false;

@@ -42,6 +42,7 @@ FParameter UWorldTimer::ToData()
 
 	SaveData.DayLength = GetDayLength();
 	SaveData.NightLength = GetNightLength();
+	SaveData.TimeOfDay = GetCurrentTime();
 	SaveData.DateTime = GetDateTime();
 
 	return FParameter(MoveTemp(SaveData));

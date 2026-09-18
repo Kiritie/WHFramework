@@ -571,11 +571,30 @@ void UVoxelModule::LoadData(const FParameter&P,EPhase Phase)
     if(PHASEC(Phase,EPhase::Primary))
     {
         FString E;const bool Typed=P.HasValue()&&P.GetStructType()&&P.GetStructMemory()&&P.GetStructType()->IsChildOf(FVoxelWorldSaveData::StaticStruct());const auto*D=Typed?reinterpret_cast<const FVoxelWorldSaveData*>(P.GetStructMemory()):nullptr;
-        const bool NewRequest=D&&D->ManifestBytes.IsEmpty()&&RegionStore.GetSourceDirectory().IsEmpty();
-        if(NewRequest){if(Runtime){E=TEXT("Close the current preview/world before creating a new world");UE_LOG(LogTemp,Error,TEXT("%s"),*E);return;}WorldData=NewWorldData(P);if(!CreateWorldFromProfile(D->Generation.Seed,E)){WorldState=EVoxelWorldState::Failed;bWorldLoadRejected=true;UE_LOG(LogTemp,Error,TEXT("Voxel new world: %s"),*E);return;}}
+        const bool NewRequest=D&&D->ManifestBytes.IsEmpty();
+        if(NewRequest)
+        {
+            // Empty manifest bytes explicitly mean "generate a fresh world".
+            // Archive creation edits the seed/settings while a menu preview is
+            // already running, so replace that preview here.
+            if(Runtime&&!StopWorld(true,E))
+            {
+                WorldState=EVoxelWorldState::Failed;bWorldLoadRejected=true;
+                UE_LOG(LogTemp,Error,TEXT("Voxel preview replacement failed: %s"),*E);return;
+            }
+            RegionStore.Reset();
+            WorldData=NewWorldData(P);
+            if(!CreateWorldFromProfile(D->Generation.Seed,E))
+            {
+                WorldState=EVoxelWorldState::Failed;bWorldLoadRejected=true;
+                UE_LOG(LogTemp,Error,TEXT("Voxel new world: %s"),*E);return;
+            }
+        }
         else{if(!ValidateWorldData(P,E)){bWorldLoadRejected=true;WorldState=EVoxelWorldState::Failed;LastSaveError=E;UE_LOG(LogTemp,Error,TEXT("Voxel load rejected, no fallback/save rewrite: %s"),*E);return;}FVoxelWorldManifest M;if(!FVoxelManifestCodec::Decode(D->ManifestBytes,M)||!StopWorld(true,E))return;WorldData=NewWorldData(P);if(!StartWorld(M,false,E)){bWorldLoadRejected=true;WorldState=EVoxelWorldState::Failed;UE_LOG(LogTemp,Error,TEXT("Voxel start: %s"),*E);return;}}
     }
-    if(PHASEC(Phase,EPhase::Final)&&IsReady()){if(auto*Scene=VoxelScene(GetWorld())){Scene->LoadSaveData(FParameter(WorldData->SceneData),Phase);Scene->SetSeaLevel(Manifest.Settings.SeaLevel*BlockSize());}}
+    // Scene data has its own save module. Do not load it a second time from the
+    // voxel module; only synchronize the voxel-derived sea level here.
+    if(PHASEC(Phase,EPhase::Final)&&IsReady()){if(auto*Scene=VoxelScene(GetWorld()))Scene->SetSeaLevel(Manifest.Settings.SeaLevel*BlockSize());}
 }
 FParameter UVoxelModule::ToData()
 {
@@ -681,7 +700,15 @@ float UVoxelModule::GetWarmupProgress()const
     // No collision demand means there is nothing left to warm up. Returning
     // zero here creates a deadlock because the procedure waits for 1.0 before
     // it can enter the next state, while no additional collision work exists.
-    if(Wanted==0)return 1.f;
+    if(Wanted==0)
+    {
+        // A source can be registered by the menu/procedure before this module has
+        // had its next streaming refresh. Do not report 100% for that one-frame
+        // window or the loading procedure can enter the menu before any terrain
+        // demand has been built. Render-only sources still complete after the
+        // first RefreshStreaming pass because LastStreaming becomes non-negative.
+        return !Sources.IsEmpty()&&LastStreaming<0?0.f:1.f;
+    }
 
     return FMath::Clamp(float(Ready)/float(Wanted),0.f,1.f);
 }
