@@ -571,11 +571,28 @@ void UVoxelModule::LoadData(const FParameter&P,EPhase Phase)
     if(PHASEC(Phase,EPhase::Primary))
     {
         FString E;const bool Typed=P.HasValue()&&P.GetStructType()&&P.GetStructMemory()&&P.GetStructType()->IsChildOf(FVoxelWorldSaveData::StaticStruct());const auto*D=Typed?reinterpret_cast<const FVoxelWorldSaveData*>(P.GetStructMemory()):nullptr;
-        const bool NewRequest=D&&D->ManifestBytes.IsEmpty()&&RegionStore.GetSourceDirectory().IsEmpty();
-        if(NewRequest){if(Runtime){E=TEXT("Close the current preview/world before creating a new world");UE_LOG(LogTemp,Error,TEXT("%s"),*E);return;}WorldData=NewWorldData(P);if(!CreateWorldFromProfile(D->Generation.Seed,E)){WorldState=EVoxelWorldState::Failed;bWorldLoadRejected=true;UE_LOG(LogTemp,Error,TEXT("Voxel new world: %s"),*E);return;}}
+        const bool NewRequest=D&&D->ManifestBytes.IsEmpty();
+        if(NewRequest)
+        {
+            // Empty manifest bytes explicitly mean "generate a fresh world".
+            // Archive creation edits the seed/settings while a menu preview is
+            // already running, so replace that preview atomically here.
+            if(Runtime&&!StopWorld(true,E))
+            {
+                WorldState=EVoxelWorldState::Failed;bWorldLoadRejected=true;
+                UE_LOG(LogTemp,Error,TEXT("Voxel preview replacement failed: %s"),*E);return;
+            }
+            RegionStore.Reset();
+            WorldData=NewWorldData(P);
+            if(!CreateWorldFromProfile(D->Generation.Seed,E))
+            {
+                WorldState=EVoxelWorldState::Failed;bWorldLoadRejected=true;
+                UE_LOG(LogTemp,Error,TEXT("Voxel new world: %s"),*E);return;
+            }
+        }
         else{if(!ValidateWorldData(P,E)){bWorldLoadRejected=true;WorldState=EVoxelWorldState::Failed;LastSaveError=E;UE_LOG(LogTemp,Error,TEXT("Voxel load rejected, no fallback/save rewrite: %s"),*E);return;}FVoxelWorldManifest M;if(!FVoxelManifestCodec::Decode(D->ManifestBytes,M)||!StopWorld(true,E))return;WorldData=NewWorldData(P);if(!StartWorld(M,false,E)){bWorldLoadRejected=true;WorldState=EVoxelWorldState::Failed;UE_LOG(LogTemp,Error,TEXT("Voxel start: %s"),*E);return;}}
     }
-    if(PHASEC(Phase,EPhase::Final)&&IsReady()){if(auto*Scene=VoxelScene(GetWorld())){Scene->LoadSaveData(FParameter(WorldData->SceneData),Phase);Scene->SetSeaLevel(Manifest.Settings.SeaLevel*BlockSize());}}
+    if(PHASEC(Phase,EPhase::Final)&&IsReady()){if(auto*Scene=VoxelScene(GetWorld()))Scene->SetSeaLevel(Manifest.Settings.SeaLevel*BlockSize());}
 }
 FParameter UVoxelModule::ToData()
 {

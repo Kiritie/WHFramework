@@ -117,6 +117,8 @@ FSaveOperationResult USaveGameModule::CreateSaveSlot(const FCreateSaveSlotParams
 	{
 		return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("Cannot create world slot now")));
 	}
+
+	const FGuid PreviousActiveSaveId = ActiveSaveId;
 	FSaveManifest Manifest;
 	Manifest.SaveId = FGuid::NewGuid();
 	Manifest.DisplayName = Params.DisplayName;
@@ -124,6 +126,7 @@ FSaveOperationResult USaveGameModule::CreateSaveSlot(const FCreateSaveSlotParams
 	Manifest.CreatedAt = FDateTime::UtcNow();
 	Manifest.UpdatedAt = Manifest.CreatedAt;
 	Manifest.CurrentMap = Params.InitialMap;
+
 	{
 		TGuardValue<bool> Guard(bSaveOperationRunning, true);
 		if (!Storage->CreateWorldDirectory(Manifest.SaveId) || !Storage->WriteManifestAtomic(Manifest.SaveId, Manifest))
@@ -131,24 +134,34 @@ FSaveOperationResult USaveGameModule::CreateSaveSlot(const FCreateSaveSlotParams
 			Storage->DeleteWorldDirectory(Manifest.SaveId);
 			return FSaveOperationResult::Failed(ESaveResultCode::WriteFailed, FText::FromString(TEXT("Create save slot failed")));
 		}
-		ActiveSaveId = Manifest.SaveId;
 	}
+
 	if (Params.bCaptureCurrentWorld)
 	{
 		const FSaveOperationResult Result = SaveSlot(Manifest.SaveId);
 		if (!Result)
 		{
+			// A failed first capture must not become the active save and must not
+			// leave an empty slot visible in the archive chooser.
+			Storage->DeleteWorldDirectory(Manifest.SaveId);
+			ActiveSaveId = PreviousActiveSaveId;
 			return Result;
 		}
 		if (!Storage->ReadManifest(Manifest.SaveId, Manifest))
 		{
+			Storage->DeleteWorldDirectory(Manifest.SaveId);
+			ActiveSaveId = PreviousActiveSaveId;
 			return FSaveOperationResult::Failed(ESaveResultCode::ReadFailed, FText::FromString(TEXT("Committed manifest could not be reread")));
 		}
 	}
+	else
+	{
+		ActiveSaveId = Manifest.SaveId;
+	}
+
 	OutSummary = Manifest.ToSummary(Storage->GetWorldDir(Manifest.SaveId));
 	return FSaveOperationResult::Success();
 }
-
 FSaveOperationResult USaveGameModule::SaveSlot(FGuid SaveId)
 {
 	const FSaveOperationResult Started = SaveSlotAsync(SaveId);
@@ -511,7 +524,12 @@ FSaveOperationResult USaveGameModule::DuplicateSaveSlot(FGuid SourceSaveId, cons
 FSaveSlotSummary USaveGameModule::GetSaveSlotSummary(FGuid SaveId) const
 {
 	FSaveManifest Manifest;
-	return Storage && Storage->ReadManifest(SaveId, Manifest) ? Manifest.ToSummary(Storage->GetWorldDir(SaveId)) : FSaveSlotSummary();
+	if (!Storage || !Storage->ReadManifest(SaveId, Manifest) || Manifest.CurrentGeneration <= 0 ||
+	    !Storage->IsGenerationComplete(SaveId, Manifest.CurrentGeneration, Manifest))
+	{
+		return FSaveSlotSummary();
+	}
+	return Manifest.ToSummary(Storage->GetWorldDir(SaveId));
 }
 
 TArray<FSaveSlotSummary> USaveGameModule::GetSaveSlotSummaries() const
@@ -522,7 +540,10 @@ TArray<FSaveSlotSummary> USaveGameModule::GetSaveSlotSummaries() const
 	{
 		for (const FSaveManifest& Manifest : Manifests)
 		{
-			Result.Add(Manifest.ToSummary(Storage->GetWorldDir(Manifest.SaveId)));
+			if (Manifest.CurrentGeneration > 0 && Storage->IsGenerationComplete(Manifest.SaveId, Manifest.CurrentGeneration, Manifest))
+			{
+				Result.Add(Manifest.ToSummary(Storage->GetWorldDir(Manifest.SaveId)));
+			}
 		}
 		Result.Sort(
 		    [](const FSaveSlotSummary& A, const FSaveSlotSummary& B)

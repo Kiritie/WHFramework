@@ -441,12 +441,12 @@ void USceneModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 		
 		if(WorldTimer && WorldTimer->IsAutoSave())
 		{
-			// WorldTimer->LoadSaveData(FParameter(SaveData.TimerData));
+			WorldTimer->LoadSaveData(FParameter(SaveData.TimerData), InPhase);
 		}
 		
 		if(WorldWeather && WorldWeather->IsAutoSave())
 		{
-			// WorldWeather->LoadSaveData(FParameter(SaveData.WeatherData));
+			WorldWeather->LoadSaveData(FParameter(SaveData.WeatherData), InPhase);
 		}
 
 		if(WorldTimer)

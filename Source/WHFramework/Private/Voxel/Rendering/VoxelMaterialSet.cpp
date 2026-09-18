@@ -12,7 +12,18 @@ bool UVoxelMaterialSet::Validate(FString&E)const
         uint32 K=(uint32(B.Group)<<16)|uint32(B.Bank);if(Seen.Contains(K)){E=TEXT("Duplicate material bank");return false;}Seen.Add(K);
         int32 ArraySize=B.Textures->GetArraySize();
 #if WITH_EDITORONLY_DATA
-        if(ArraySize==0&&B.Textures->Source.IsValid())ArraySize=B.Textures->Source.GetNumSlices();
+        if(B.Textures->Source.IsValid())
+        {
+            const int32 SourceSlices=B.Textures->Source.GetNumSlices();
+            if(SourceSlices==B.SliceCount)
+            {
+                // In PIE the texture compiler may still expose stale platform
+                // data (commonly SizeZ == 1) while the serialized source array
+                // already contains every baked slice. The source is the
+                // authoritative editor-time validation input.
+                ArraySize=SourceSlices;
+            }
+        }
 #endif
         if(ArraySize!=B.SliceCount)
         {
