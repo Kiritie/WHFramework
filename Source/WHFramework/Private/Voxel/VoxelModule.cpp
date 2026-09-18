@@ -133,7 +133,7 @@ bool UVoxelModule::StartWorld(const FVoxelWorldManifest&M,bool FromServer,FStrin
     if(Epoch==MAX_uint64){E=TEXT("World epoch exhausted");return false;}
     Manifest=M;Generator=G;Runtime=MakeUnique<FVoxelWorldRuntime>(++Epoch,IsAuthority(),Registry.GetSnapshot().ToSharedRef(),G);
     Scheduler=MakeUnique<FVoxelTaskScheduler>();SessionId=IsAuthority()?FGuid::NewGuid():FGuid();Desired.Reset();OrderedDesired.Reset();RetryAfter.Reset();RetryCount.Reset();RemotePending.Reset();Breaking.Reset();RemoteFineDemand.Reset();LastStreaming=-1;bRemoteRunning=false;
-    if(FromServer)RegionStore.Reset();bWorldLoadRejected=false;WorldState=EVoxelWorldState::Running;
+    if(FromServer)RegionStore.Reset();bWorldLoadRejected=false;LastSaveError.Reset();WorldState=EVoxelWorldState::Running;
     if(!WorldData)WorldData=NewWorldData();WorldData->Generation=M.Settings;WorldData->BlockSizeCentimeters=M.BlockSizeCentimeters;
     if(!FVoxelManifestCodec::Encode(M,WorldData->ManifestBytes)){E=TEXT("World manifest could not be stored");WorldState=EVoxelWorldState::Failed;return false;}
     WorldView=MakeUnique<FVoxelWorldView>(*this,*Scheduler,RegionStore,Epoch,GetWorld()->GetNetMode()!=NM_DedicatedServer);
@@ -267,6 +267,23 @@ void UVoxelModule::QueueSection(const FVoxelSectionKey&K,const FVoxelSectionDema
 void UVoxelModule::ApplyTask(FVoxelTaskResult&&R)
 {
     if(!Runtime)return;
+
+    // Warmup progress remains a single float. Permanent generation/collision
+    // failures are represented by the existing world Failed state instead of
+    // leaving the progress value permanently below 1.0 with no exit path.
+    auto FailWarmupIfExhausted=[this](const FVoxelTaskStamp& Stamp,EVoxelTaskKind Kind,int32 Attempts,const FString& Reason)
+    {
+        if(Attempts<3||(Kind!=EVoxelTaskKind::Generate&&Kind!=EVoxelTaskKind::Collision))return;
+        const FVoxelSectionDemand* Demand=Desired.Find(Stamp.Key);
+        if(!Demand||!Demand->bCollision)return;
+
+        LastSaveError=FString::Printf(
+            TEXT("Voxel warmup failed at %d,%d,%d after %d attempts: %s"),
+            Stamp.Key.X,Stamp.Key.Y,Stamp.Key.Z,Attempts,*Reason);
+        WorldState=EVoxelWorldState::Failed;
+        UE_LOG(LogTemp,Error,TEXT("%s"),*LastSaveError);
+    };
+
     if(WorldView&&WorldView->OnTask(MoveTemp(R)))return;
     if(DetailView&&DetailView->OnTask(MoveTemp(R)))return;
     if(R.Kind==EVoxelTaskKind::EncodeNetwork)
@@ -300,14 +317,26 @@ void UVoxelModule::ApplyTask(FVoxelTaskResult&&R)
     if(!Runtime->IsCurrent(R.Stamp,R.Kind!=EVoxelTaskKind::Generate))return;
     if(!R.bSuccess)
     {
-        if(!R.bCanceled){int32&N=RetryCount.FindOrAdd(R.Stamp.Key);++N;RetryAfter.Add(R.Stamp.Key,FPlatformTime::Seconds()+N);
+        if(!R.bCanceled)
+        {
+            int32&N=RetryCount.FindOrAdd(R.Stamp.Key);++N;RetryAfter.Add(R.Stamp.Key,FPlatformTime::Seconds()+N);
             if(R.Kind==EVoxelTaskKind::Generate)Runtime->Find(R.Stamp.Key)->Status=EVoxelSectionStatus::Failed;
-            UE_LOG(LogTemp,Error,TEXT("Voxel job %d failed at %d,%d,%d: %s"),int32(R.Kind),R.Stamp.Key.X,R.Stamp.Key.Y,R.Stamp.Key.Z,*R.Error);}
+            UE_LOG(LogTemp,Error,TEXT("Voxel job %d failed at %d,%d,%d: %s"),int32(R.Kind),R.Stamp.Key.X,R.Stamp.Key.Y,R.Stamp.Key.Z,*R.Error);
+            FailWarmupIfExhausted(R.Stamp,R.Kind,N,R.Error);
+        }
         return;
     }
     if(R.Kind==EVoxelTaskKind::Generate)
-    {if(!Runtime->PublishLoaded(R.Stamp,MoveTemp(R.Base),R.Overlay,true)){Runtime->Find(R.Stamp.Key)->Status=EVoxelSectionStatus::Failed;RetryCount.Add(R.Stamp.Key,3);return;}
-        if(auto*C=GetColumn({R.Stamp.Key.X,R.Stamp.Key.Y},true))C->OnSectionActivated(R.Stamp.Key);}
+    {
+        if(!Runtime->PublishLoaded(R.Stamp,MoveTemp(R.Base),R.Overlay,true))
+        {
+            Runtime->Find(R.Stamp.Key)->Status=EVoxelSectionStatus::Failed;
+            RetryCount.Add(R.Stamp.Key,3);
+            FailWarmupIfExhausted(R.Stamp,R.Kind,3,TEXT("Generated section could not be published"));
+            return;
+        }
+        if(auto*C=GetColumn({R.Stamp.Key.X,R.Stamp.Key.Y},true))C->OnSectionActivated(R.Stamp.Key);
+    }
     else if(auto*C=GetColumn({R.Stamp.Key.X,R.Stamp.Key.Y},true))
     {
         bool Attempted=false,Applied=false;
@@ -315,8 +344,12 @@ void UVoxelModule::ApplyTask(FVoxelTaskResult&&R)
         {Attempted=true;Applied=MaterialSet&&C->ApplyMesh(R.Mesh,*MaterialSet,BlockSize());if(Applied)Runtime->MarkMeshApplied(R.Stamp);}
         if(R.Kind==EVoxelTaskKind::Collision&&Runtime->Find(R.Stamp.Key)->bWantsCollision)
         {Attempted=true;Applied=C->ApplyCollision(R.Collision,BlockSize());if(Applied)Runtime->MarkCollisionApplied(R.Stamp);}
-        if(Attempted&&!Applied){int32& N=RetryCount.FindOrAdd(R.Stamp.Key);++N;RetryAfter.Add(R.Stamp.Key,FPlatformTime::Seconds()+N);
-            UE_LOG(LogTemp,Error,TEXT("Voxel component apply failed; section %d,%d,%d attempt %d"),R.Stamp.Key.X,R.Stamp.Key.Y,R.Stamp.Key.Z,N);}
+        if(Attempted&&!Applied)
+        {
+            int32&N=RetryCount.FindOrAdd(R.Stamp.Key);++N;RetryAfter.Add(R.Stamp.Key,FPlatformTime::Seconds()+N);
+            UE_LOG(LogTemp,Error,TEXT("Voxel component apply failed; section %d,%d,%d attempt %d"),R.Stamp.Key.X,R.Stamp.Key.Y,R.Stamp.Key.Z,N);
+            FailWarmupIfExhausted(R.Stamp,R.Kind,N,TEXT("Voxel component apply failed"));
+        }
     }
 }
 bool UVoxelModule::QueueRemoteBatch(const FVoxelSnapshotBatch&B,FString&E)
@@ -629,7 +662,26 @@ bool UVoxelModule::QueueNetworkEncode(const FVoxelSnapshotBatch& B,UVoxelModuleN
 
 float UVoxelModule::GetWarmupProgress()const
 {
-    if(!Runtime)return 0;int32 Wanted=0,Ready=0;
-    for(const auto& D:Desired)if(D.Value.bCollision){++Wanted;const auto* S=Runtime->Find(D.Key);if(S&&S->Status==EVoxelSectionStatus::DataReady&&S->bHasCollision&&!S->bCollisionDirty)++Ready;}
-    return Wanted?float(Ready)/Wanted:0.f;
+    if(!IsReady()||!Runtime)return 0.f;
+
+    int32 Wanted=0;
+    int32 Ready=0;
+    for(const auto& D:Desired)
+    {
+        if(!D.Value.bCollision)continue;
+        ++Wanted;
+
+        const auto* S=Runtime->Find(D.Key);
+        if(S&&S->Status==EVoxelSectionStatus::DataReady&&S->bHasCollision&&!S->bCollisionDirty)
+        {
+            ++Ready;
+        }
+    }
+
+    // No collision demand means there is nothing left to warm up. Returning
+    // zero here creates a deadlock because the procedure waits for 1.0 before
+    // it can enter the next state, while no additional collision work exists.
+    if(Wanted==0)return 1.f;
+
+    return FMath::Clamp(float(Ready)/float(Wanted),0.f,1.f);
 }
