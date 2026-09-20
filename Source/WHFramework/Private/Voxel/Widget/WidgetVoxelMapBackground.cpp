@@ -2,29 +2,21 @@
 
 #include "Rendering/DrawElements.h"
 #include "Styling/CoreStyle.h"
+#include "Voxel/Generation/VoxelGenerationBinding.h"
 #include "Voxel/VoxelModule.h"
-#include "Voxel/Chunks/VoxelSectionKey.h"
 
 namespace
 {
-FLinearColor GetBiomeColor(EVoxelBiomeId InBiome)
+FLinearColor GetBiomeColor(const FVoxelGenerationRuntimeConfig& InConfig, uint16 InBiomeIndex)
 {
-	switch (InBiome)
+	if (!InConfig.Recipe.IsValid() || !InConfig.Recipe->Biomes.IsValidIndex(InBiomeIndex))
 	{
-		case EVoxelBiomeId::Forest:
-			return FLinearColor(0.08f, 0.32f, 0.08f);
-		case EVoxelBiomeId::Desert:
-			return FLinearColor(0.72f, 0.60f, 0.28f);
-		case EVoxelBiomeId::Snow:
-			return FLinearColor(0.82f, 0.88f, 0.92f);
-		case EVoxelBiomeId::Mountain:
-			return FLinearColor(0.34f, 0.34f, 0.36f);
-		case EVoxelBiomeId::Ocean:
-			return FLinearColor(0.05f, 0.22f, 0.56f);
-		case EVoxelBiomeId::Plains:
-		default:
-			return FLinearColor(0.22f, 0.52f, 0.16f);
+		return FLinearColor(0.22f, 0.52f, 0.16f);
 	}
+
+	const uint32 Hash = GetTypeHash(InConfig.Recipe->Biomes[InBiomeIndex].StableId);
+	const uint8 Hue = static_cast<uint8>(Hash & 0xffu);
+	return FLinearColor::MakeFromHSV8(Hue, 150, 180);
 }
 }
 
@@ -65,24 +57,37 @@ int32 UWidgetVoxelMapBackground::NativePaint(const FPaintArgs& Args,
 	{
 		return BaseLayer + 1;
 	}
+	const TSharedPtr<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> GenerationConfig = VoxelModule.GetGenerationConfig();
+	if (!GenerationConfig)
+	{
+		return BaseLayer + 1;
+	}
 
 	const double BlockSize = VoxelModule.BlockSize();
 	const float PixelsPerWorldUnit = PanelSize.X / MapView.Range;
 	const int32 Stride = GetLODStride(static_cast<float>(BlockSize) * PixelsPerWorldUnit);
 	const int32 HalfCellsX = FMath::CeilToInt(MapView.Range / BlockSize * 0.5);
 	const int32 HalfCellsY = FMath::CeilToInt(MapView.Range * PanelSize.Y / PanelSize.X / BlockSize * 0.5);
-	FIntVector CenterIndex;
-	if (!VoxelCoord::FromWorld(FVector(MapView.Center, 0.0), BlockSize, CenterIndex))
+	if (!FMath::IsFinite(BlockSize) || BlockSize <= 0.0)
 	{
 		return BaseLayer + 1;
 	}
+	const FIntVector CenterIndex(
+		FMath::FloorToInt(MapView.Center.X / BlockSize),
+		FMath::FloorToInt(MapView.Center.Y / BlockSize),
+		0);
 
 	for (int32 Y = CenterIndex.Y - HalfCellsY; Y <= CenterIndex.Y + HalfCellsY; Y += Stride)
 	{
 		for (int32 X = CenterIndex.X - HalfCellsX; X <= CenterIndex.X + HalfCellsX; X += Stride)
 		{
-			const FVoxelColumnSample Column = Generator->SampleColumn(X, Y);
-			FLinearColor CellColor = GetBiomeColor(Column.Biome) * MapTintColor;
+			FVoxelColumnSample Column;
+			FString Error;
+			if (!Generator->SampleColumn(X, Y, Column, Error))
+			{
+				continue;
+			}
+			FLinearColor CellColor = GetBiomeColor(*GenerationConfig, Column.BiomeIndex) * MapTintColor;
 			FVoxelBlockState State;
 			for (int32 Z = VoxelModule.GetManifest().Settings.MaxZ - 1; Z >= VoxelModule.GetManifest().Settings.MinZ; --Z)
 			{

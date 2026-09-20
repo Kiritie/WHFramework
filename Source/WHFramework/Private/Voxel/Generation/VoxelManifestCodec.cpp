@@ -1,90 +1,159 @@
 #include "Voxel/Generation/VoxelManifestCodec.h"
+
 #include "Voxel/Serialization/VoxelBinaryCodec.h"
+
 namespace
 {
-void Recipe(FVoxelByteWriter& W,const FVoxelWorldManifest& M)
-{
-    W.U32(FVoxelWorldManifest::GeneratorVersion);W.I32(M.BlockSizeCentimeters);W.U64(M.CatalogHash);
-    W.I32(M.Settings.Seed);
-    W.I32(M.Settings.MinZ);
-    W.I32(M.Settings.MaxZ);
-    W.I32(M.Settings.SeaLevel);
-    W.I32(M.Settings.BaseHeight);
-    W.I32(M.Settings.ContinentalPeriod);
-    W.I32(M.Settings.ErosionPeriod);
-    W.I32(M.Settings.MountainPeriod);
-    W.I32(M.Settings.ClimatePeriod);
-    W.I32(M.Settings.DetailPeriod);
-    W.I32(M.Settings.ContinentalAmplitude);
-    W.I32(M.Settings.MountainAmplitude);
-    W.I32(M.Settings.DetailAmplitude);
-    W.I32(M.Settings.RiverPeriod);
-    W.I32(M.Settings.RiverWidthQ15);
-    W.I32(M.Settings.RiverDepth);
-    W.I32(M.Settings.LakeSpacing);
-    W.I32(M.Settings.LakeRadius);
-    W.I32(M.Settings.LakeDepth);
-    W.I32(M.Settings.CavePeriod);
-    W.I32(M.Settings.ChamberPeriod);
-    W.I32(M.Settings.CaveWidthQ15);
-    W.I32(M.Settings.ChamberThresholdQ15);
-    W.I32(M.Settings.AquiferSpacing);
-    W.I32(M.Settings.AquiferRadius);
-    W.I32(M.Settings.LavaCeiling);
-    W.I32(M.Settings.StructureSpacing);
-    W.I32(M.Settings.StructureChancePermille);
-    W.I32(M.Settings.MaxSiteCutFill);
+	constexpr uint32 ManifestMagic = 0x344D5856;
 
-}
-bool ReadRecipe(FVoxelByteReader& R,FVoxelWorldManifest& M)
-{
-    if(R.U32()!=FVoxelWorldManifest::GeneratorVersion)return false;
-    M.BlockSizeCentimeters=R.I32();M.CatalogHash=R.U64();
-    M.Settings.Seed=R.I32();
-    M.Settings.MinZ=R.I32();
-    M.Settings.MaxZ=R.I32();
-    M.Settings.SeaLevel=R.I32();
-    M.Settings.BaseHeight=R.I32();
-    M.Settings.ContinentalPeriod=R.I32();
-    M.Settings.ErosionPeriod=R.I32();
-    M.Settings.MountainPeriod=R.I32();
-    M.Settings.ClimatePeriod=R.I32();
-    M.Settings.DetailPeriod=R.I32();
-    M.Settings.ContinentalAmplitude=R.I32();
-    M.Settings.MountainAmplitude=R.I32();
-    M.Settings.DetailAmplitude=R.I32();
-    M.Settings.RiverPeriod=R.I32();
-    M.Settings.RiverWidthQ15=R.I32();
-    M.Settings.RiverDepth=R.I32();
-    M.Settings.LakeSpacing=R.I32();
-    M.Settings.LakeRadius=R.I32();
-    M.Settings.LakeDepth=R.I32();
-    M.Settings.CavePeriod=R.I32();
-    M.Settings.ChamberPeriod=R.I32();
-    M.Settings.CaveWidthQ15=R.I32();
-    M.Settings.ChamberThresholdQ15=R.I32();
-    M.Settings.AquiferSpacing=R.I32();
-    M.Settings.AquiferRadius=R.I32();
-    M.Settings.LavaCeiling=R.I32();
-    M.Settings.StructureSpacing=R.I32();
-    M.Settings.StructureChancePermille=R.I32();
-    M.Settings.MaxSiteCutFill=R.I32();
+	void WriteManifestSettings(FVoxelByteWriter& InWriter, const FVoxelGenerationSettings& InSettings)
+	{
+		InWriter.I32(InSettings.Seed);
+		InWriter.I32(InSettings.MinZ);
+		InWriter.I32(InSettings.MaxZ);
+		InWriter.I32(InSettings.SeaLevel);
+		InWriter.I32(InSettings.BaseHeight);
+		InWriter.I32(InSettings.ContinentalPeriod);
+		InWriter.I32(InSettings.ErosionPeriod);
+		InWriter.I32(InSettings.MountainPeriod);
+		InWriter.I32(InSettings.ClimatePeriod);
+		InWriter.I32(InSettings.DetailPeriod);
+		InWriter.I32(InSettings.ContinentalAmplitude);
+		InWriter.I32(InSettings.MountainAmplitude);
+		InWriter.I32(InSettings.DetailAmplitude);
+		InWriter.I32(InSettings.HydrologyCellSize);
+		InWriter.I32(InSettings.HydrologyRegionSide);
+		InWriter.I32(InSettings.RiverSourceAccumulation);
+		InWriter.I32(InSettings.RiverBaseHalfWidth);
+		InWriter.I32(InSettings.RiverBaseDepth);
+		InWriter.I32(InSettings.HydrologyHaloCells);
+		InWriter.I32(InSettings.HydrologySinkSpacing);
+		InWriter.I32(InSettings.RiverSourceSpacing);
+		InWriter.I32(InSettings.RiverTraceBudget);
+		InWriter.I32(InSettings.LakeMaxCells);
+		InWriter.I32(InSettings.CaveSpacing);
+		InWriter.I32(InSettings.CaveMinDepth);
+		InWriter.I32(InSettings.CaveMaxDepth);
+		InWriter.I32(InSettings.CaveMainRadius);
+		InWriter.I32(InSettings.CaveBranchRadius);
+		InWriter.I32(InSettings.AquiferSpacing);
+		InWriter.I32(InSettings.AquiferRadius);
+		InWriter.I32(InSettings.LavaCeiling);
+	}
 
-    std::string E;return R.IsValid()&&M.CatalogHash&&M.Settings.ToKernel(M.BlockSizeCentimeters).Validate(E);
+	void ReadSettings(FVoxelByteReader& InReader, FVoxelGenerationSettings& OutSettings)
+	{
+		OutSettings.Seed = InReader.I32();
+		OutSettings.MinZ = InReader.I32();
+		OutSettings.MaxZ = InReader.I32();
+		OutSettings.SeaLevel = InReader.I32();
+		OutSettings.BaseHeight = InReader.I32();
+		OutSettings.ContinentalPeriod = InReader.I32();
+		OutSettings.ErosionPeriod = InReader.I32();
+		OutSettings.MountainPeriod = InReader.I32();
+		OutSettings.ClimatePeriod = InReader.I32();
+		OutSettings.DetailPeriod = InReader.I32();
+		OutSettings.ContinentalAmplitude = InReader.I32();
+		OutSettings.MountainAmplitude = InReader.I32();
+		OutSettings.DetailAmplitude = InReader.I32();
+		OutSettings.HydrologyCellSize = InReader.I32();
+		OutSettings.HydrologyRegionSide = InReader.I32();
+		OutSettings.RiverSourceAccumulation = InReader.I32();
+		OutSettings.RiverBaseHalfWidth = InReader.I32();
+		OutSettings.RiverBaseDepth = InReader.I32();
+		OutSettings.HydrologyHaloCells = InReader.I32();
+		OutSettings.HydrologySinkSpacing = InReader.I32();
+		OutSettings.RiverSourceSpacing = InReader.I32();
+		OutSettings.RiverTraceBudget = InReader.I32();
+		OutSettings.LakeMaxCells = InReader.I32();
+		OutSettings.CaveSpacing = InReader.I32();
+		OutSettings.CaveMinDepth = InReader.I32();
+		OutSettings.CaveMaxDepth = InReader.I32();
+		OutSettings.CaveMainRadius = InReader.I32();
+		OutSettings.CaveBranchRadius = InReader.I32();
+		OutSettings.AquiferSpacing = InReader.I32();
+		OutSettings.AquiferRadius = InReader.I32();
+		OutSettings.LavaCeiling = InReader.I32();
+	}
+
+	void WriteGenerationIdentity(FVoxelByteWriter& InWriter, const FVoxelWorldManifest& InManifest)
+	{
+		InWriter.U32(InManifest.GeneratorVersion);
+		InWriter.I32(InManifest.BlockSizeCentimeters);
+		WriteManifestSettings(InWriter, InManifest.Settings);
+	}
 }
-}
-uint64 FVoxelManifestCodec::RecipeFingerprint(const FVoxelWorldManifest& M)
+
+uint64 FVoxelManifestCodec::RecipeFingerprint(const FVoxelWorldManifest& InManifest)
 {
-    FVoxelByteWriter W(MaxBytes);Recipe(W,M);TArray<uint8> B;if(!W.Finish(B))return 0;return VoxelBinary::Hash(B);
+	FVoxelByteWriter Writer(MaxBytes);
+	WriteGenerationIdentity(Writer, InManifest);
+	TArray<uint8> Bytes;
+	return Writer.Finish(Bytes) ? VoxelBinary::Hash(Bytes) : 0;
 }
-bool FVoxelManifestCodec::Encode(const FVoxelWorldManifest& M,TArray<uint8>& O)
+
+bool FVoxelManifestCodec::Encode(
+	const FVoxelWorldManifest& InManifest,
+	TArray<uint8>& OutBytes)
 {
-    std::string E;if(!M.WorldId.IsValid()||!M.CatalogHash||!M.Settings.ToKernel(M.BlockSizeCentimeters).Validate(E))return false;
-    FVoxelByteWriter W(MaxBytes);W.U32(0x334d5856);W.Guid(M.WorldId);Recipe(W,M);W.U64(M.RegistryHash);W.U64(RecipeFingerprint(M));W.U64(M.BaseSampleHash);return W.Finish(O);
+	FString Error;
+	if (!InManifest.WorldId.IsValid() ||
+		InManifest.GeneratorVersion == 0 ||
+		InManifest.BlockSizeCentimeters <= 0 ||
+		InManifest.RegistryHash == 0 ||
+		InManifest.RecipeHash == 0 ||
+		InManifest.BaseSampleHash == 0 ||
+		!InManifest.Settings.Validate(Error))
+	{
+		return false;
+	}
+
+	FVoxelByteWriter Writer(MaxBytes);
+	Writer.U32(ManifestMagic);
+	Writer.U32(FVoxelWorldManifest::ProtocolVersion);
+	Writer.Guid(InManifest.WorldId);
+	WriteGenerationIdentity(Writer, InManifest);
+	Writer.U64(InManifest.RegistryHash);
+	Writer.U64(InManifest.RecipeHash);
+	Writer.U64(InManifest.BaseSampleHash);
+	return Writer.Finish(OutBytes);
 }
-bool FVoxelManifestCodec::Decode(TConstArrayView<uint8> B,FVoxelWorldManifest& O)
+
+bool FVoxelManifestCodec::Decode(
+	TConstArrayView<uint8> InBytes,
+	FVoxelWorldManifest& OutManifest)
 {
-    if(B.Num()>MaxBytes)return false;FVoxelByteReader R(B);if(R.U32()!=0x334d5856)return false;
-    FVoxelWorldManifest M;M.WorldId=R.Guid();if(!M.WorldId.IsValid()||!ReadRecipe(R,M))return false;
-    M.RegistryHash=R.U64();M.RecipeHash=R.U64();M.BaseSampleHash=R.U64();if(!R.End()||M.RecipeHash!=RecipeFingerprint(M))return false;O=M;return true;
+	if (InBytes.Num() > MaxBytes)
+	{
+		return false;
+	}
+	FVoxelByteReader Reader(InBytes);
+	if (Reader.U32() != ManifestMagic || Reader.U32() != FVoxelWorldManifest::ProtocolVersion)
+	{
+		return false;
+	}
+
+	FVoxelWorldManifest Manifest;
+	Manifest.WorldId = Reader.Guid();
+	Manifest.GeneratorVersion = Reader.U32();
+	Manifest.BlockSizeCentimeters = Reader.I32();
+	ReadSettings(Reader, Manifest.Settings);
+	Manifest.RegistryHash = Reader.U64();
+	Manifest.RecipeHash = Reader.U64();
+	Manifest.BaseSampleHash = Reader.U64();
+	FString Error;
+	if (!Reader.End() ||
+		!Manifest.WorldId.IsValid() ||
+		Manifest.GeneratorVersion == 0 ||
+		Manifest.BlockSizeCentimeters <= 0 ||
+		Manifest.RegistryHash == 0 ||
+		Manifest.RecipeHash == 0 ||
+		Manifest.BaseSampleHash == 0 ||
+		!Manifest.Settings.Validate(Error))
+	{
+		return false;
+	}
+
+	OutManifest = MoveTemp(Manifest);
+	return true;
 }

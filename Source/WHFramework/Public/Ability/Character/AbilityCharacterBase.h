@@ -17,7 +17,7 @@ class UFSMComponent;
 class UInteractionComponent;
 class UCharacterAttributeSetBase;
 class UBoxComponent;
-class UVoxelChunk;
+class UVoxelSceneRegion;
 class UVoxel;
 class AController;
 class UAbilityBase;

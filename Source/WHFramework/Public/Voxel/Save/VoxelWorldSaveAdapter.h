@@ -2,6 +2,7 @@
 #include "CoreMinimal.h"
 #include "Voxel/Runtime/VoxelWorldRuntime.h"
 #include "Voxel/Save/VoxelRegionStore.h"
+#include "Voxel/Generation/VoxelWorldManifest.h"
 struct WHFRAMEWORK_API FVoxelWorldSaveCapture
 {
     FGuid TransactionId;
@@ -9,7 +10,7 @@ struct WHFRAMEWORK_API FVoxelWorldSaveCapture
     FVoxelWorldManifest Manifest;
     FString SourceDirectory;
     TSharedPtr<const FVoxelRegistrySnapshot,ESPMode::ThreadSafe> Registry;
-    TArray<FVoxelSectionOverlay> Sections;
+    TArray<FVoxelPersistentSection> Sections;
 };
 class WHFRAMEWORK_API FVoxelWorldSaveAdapter
 {

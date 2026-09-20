@@ -1,47 +1,224 @@
 #include "Voxel/Network/VoxelNetworkTransfer.h"
-#include "Voxel/Serialization/VoxelBinaryCodec.h"
+
 #include "Misc/Crc.h"
-bool FVoxelNetworkTransfer::Enqueue(TArray<uint8>&&M)
+#include "Voxel/Network/VoxelNetworkCodec.h"
+#include "Voxel/Serialization/VoxelBinaryCodec.h"
+
+namespace
 {
-    if(M.IsEmpty()||M.Num()>2*1024*1024||Pending.Num()>=64||PendingBytes+M.Num()>8*1024*1024||NextID==MAX_uint64)return false;
-    FSend S;S.ID=NextID++;S.CRC=FCrc::MemCrc32(M.GetData(),M.Num());S.Bytes=MoveTemp(M);PendingBytes+=S.Bytes.Num();Pending.Add(MoveTemp(S));return true;
+	constexpr int32 FragmentBytes = 4096;
+	constexpr int32 MaxPacketBytes = 4608;
+	constexpr uint32 FragmentMagic = 0x34475246;
 }
-void FVoxelNetworkTransfer::Tick(double Now,TFunctionRef<void(const TArray<uint8>&)>Send)
+
+FVoxelNetworkTransfer::FVoxelNetworkTransfer(const FVoxelNetworkSettings& InSettings)
+	: Settings(InSettings)
+	, Tokens(InSettings.BurstBytes)
 {
-    if(LastTick==0)LastTick=Now;Tokens=FMath::Min(32768.0,Tokens+FMath::Clamp(Now-LastTick,0.0,1.0)*131072);LastTick=Now;
-    for(int32 Count=0;Count<4&&!Pending.IsEmpty();++Count)
-    {
-        auto&S=Pending[0];int32 N=FMath::Min(4096,S.Bytes.Num()-S.Offset);if(Tokens<N+32)break;
-        FVoxelByteWriter W(4608);W.U32(0x32475246);W.U64(S.ID);W.U16(uint16(S.Offset/4096));
-        W.U16(uint16((S.Bytes.Num()+4095)/4096));W.U32(uint32(S.Bytes.Num()));W.U32(S.CRC);
-        W.Blob(MakeArrayView(S.Bytes).Slice(S.Offset,N),4096);TArray<uint8>B;if(!W.Finish(B))break;
-        Send(B);Tokens-=B.Num();S.Offset+=N;
-        if(S.Offset==S.Bytes.Num()){PendingBytes-=S.Bytes.Num();Pending.RemoveAt(0,1,EAllowShrinking::No);}
-    }
-    for(auto It=Receiving.CreateIterator();It;++It)if(Now-It.Value().Since>15){ReceivingBytes-=It.Value().Total;It.RemoveCurrent();}
 }
-bool FVoxelNetworkTransfer::Receive(TConstArrayView<uint8>P,double Now,TArray<uint8>&Completed)
+
+bool FVoxelNetworkTransfer::Enqueue(
+	const EVoxelTransferPriority InPriority,
+	TArray<uint8>&& InMessage)
 {
-    Completed.Reset();if(P.Num()>4608)return false;FVoxelByteReader R(P);if(R.U32()!=0x32475246)return false;
-    uint64 ID=R.U64();uint16 Index=R.U16(),Num=R.U16();uint32 Total=R.U32(),CRC=R.U32();auto Data=R.Blob(4096);
-    if(!R.End()||!ID||!Total||Total>2*1024*1024||Num!=(Total+4095)/4096||Index>=Num||
-        Data.Num()!=FMath::Min<uint32>(4096,Total-uint32(Index)*4096))return false;
-    auto*S=Receiving.Find(ID);
-    if(!S)
-    {
-        if(Receiving.Num()>=4||ReceivingBytes+Total>8*1024*1024)return false;
-        FReceive N;N.Total=int32(Total);N.CRC=CRC;N.Bytes.SetNumUninitialized(N.Total);N.Got.Init(false,Num);N.Since=Now;
-        ReceivingBytes+=N.Total;S=&Receiving.Add(ID,MoveTemp(N));
-    }
-    if(S->Total!=int32(Total)||S->CRC!=CRC||S->Got.Num()!=Num)return false;
-    int32 Offset=int32(Index)*4096;
-    if(S->Got[Index])return FMemory::Memcmp(S->Bytes.GetData()+Offset,Data.GetData(),Data.Num())==0;
-    FMemory::Memcpy(S->Bytes.GetData()+Offset,Data.GetData(),Data.Num());S->Got[Index]=true;++S->Count;
-    if(S->Count==Num)
-    {
-        bool OK=FCrc::MemCrc32(S->Bytes.GetData(),S->Bytes.Num())==S->CRC;ReceivingBytes-=S->Total;
-        if(OK)Completed=MoveTemp(S->Bytes);Receiving.Remove(ID);return OK;
-    }
-    return true;
+	if (InPriority == EVoxelTransferPriority::None ||
+		InMessage.IsEmpty() ||
+		InMessage.Num() > FVoxelNetworkCodec::MaxWireBytes ||
+		Pending.Num() >= 256 ||
+		PendingBytes + InMessage.Num() > static_cast<uint64>(Settings.MaxQueuedBytes) ||
+		NextId == MAX_uint64 ||
+		NextSerial == MAX_uint64)
+	{
+		return false;
+	}
+
+	FSend Send;
+	Send.Id = NextId++;
+	Send.Serial = NextSerial++;
+	Send.Priority = InPriority;
+	Send.Crc = FCrc::MemCrc32(InMessage.GetData(), InMessage.Num());
+	Send.Bytes = MoveTemp(InMessage);
+	PendingBytes += Send.Bytes.Num();
+	Pending.Add(MoveTemp(Send));
+	return true;
 }
-void FVoxelNetworkTransfer::Reset(){Pending.Reset();Receiving.Reset();PendingBytes=0;ReceivingBytes=0;LastTick=0;Tokens=32768;}
+
+void FVoxelNetworkTransfer::Tick(
+	const double InNow,
+	TFunctionRef<void(const TArray<uint8>&)> InSend)
+{
+	if (LastTick == 0.0)
+	{
+		LastTick = InNow;
+	}
+	Tokens = FMath::Min(
+		static_cast<double>(Settings.BurstBytes),
+		Tokens + FMath::Clamp(InNow - LastTick, 0.0, 1.0) * Settings.BytesPerSecond);
+	LastTick = InNow;
+
+	for (int32 Count = 0; Count < 4 && !Pending.IsEmpty(); ++Count)
+	{
+		const int32 SendIndex = FindNextSend();
+		if (SendIndex == INDEX_NONE)
+		{
+			break;
+		}
+		FSend& Send = Pending[SendIndex];
+		const int32 PayloadBytes = FMath::Min(FragmentBytes, Send.Bytes.Num() - Send.Offset);
+		if (Tokens < PayloadBytes + 32)
+		{
+			break;
+		}
+
+		FVoxelByteWriter Writer(MaxPacketBytes);
+		Writer.U32(FragmentMagic);
+		Writer.U64(Send.Id);
+		Writer.U16(static_cast<uint16>(Send.Offset / FragmentBytes));
+		Writer.U16(static_cast<uint16>((Send.Bytes.Num() + FragmentBytes - 1) / FragmentBytes));
+		Writer.U32(static_cast<uint32>(Send.Bytes.Num()));
+		Writer.U32(Send.Crc);
+		Writer.Blob(MakeArrayView(Send.Bytes).Slice(Send.Offset, PayloadBytes), FragmentBytes);
+		TArray<uint8> Packet;
+		if (!Writer.Finish(Packet))
+		{
+			break;
+		}
+		InSend(Packet);
+		Tokens -= Packet.Num();
+		Send.Offset += PayloadBytes;
+		if (Send.Offset == Send.Bytes.Num())
+		{
+			PendingBytes -= Send.Bytes.Num();
+			Pending.RemoveAt(SendIndex, 1, EAllowShrinking::No);
+		}
+	}
+
+	for (auto Iterator = Receiving.CreateIterator(); Iterator; ++Iterator)
+	{
+		if (InNow - Iterator.Value().Since > 15.0)
+		{
+			ReceivingBytes -= Iterator.Value().Total;
+			Iterator.RemoveCurrent();
+		}
+	}
+}
+
+bool FVoxelNetworkTransfer::Receive(
+	TConstArrayView<uint8> InPacket,
+	const double InNow,
+	TArray<uint8>& OutCompleted)
+{
+	OutCompleted.Reset();
+	if (InPacket.Num() > MaxPacketBytes)
+	{
+		return false;
+	}
+
+	FVoxelByteReader Reader(InPacket);
+	if (Reader.U32() != FragmentMagic)
+	{
+		return false;
+	}
+	const uint64 Id = Reader.U64();
+	const uint16 Index = Reader.U16();
+	const uint16 FragmentCount = Reader.U16();
+	const uint32 Total = Reader.U32();
+	const uint32 Crc = Reader.U32();
+	const TArray<uint8> Data = Reader.Blob(FragmentBytes);
+	if (!Reader.End() ||
+		Id == 0 ||
+		Total == 0 ||
+		Total > static_cast<uint32>(FVoxelNetworkCodec::MaxWireBytes) ||
+		FragmentCount != (Total + FragmentBytes - 1) / FragmentBytes ||
+		Index >= FragmentCount ||
+		Data.Num() != FMath::Min<uint32>(FragmentBytes, Total - static_cast<uint32>(Index) * FragmentBytes))
+	{
+		return false;
+	}
+
+	FReceive* ReceiveState = Receiving.Find(Id);
+	if (!ReceiveState)
+	{
+		if (Receiving.Num() >= 4 ||
+			ReceivingBytes + static_cast<int32>(Total) > Settings.MaxQueuedBytes)
+		{
+			return false;
+		}
+		FReceive NewState;
+		NewState.Total = static_cast<int32>(Total);
+		NewState.Crc = Crc;
+		NewState.Bytes.SetNumUninitialized(NewState.Total);
+		NewState.Received.Init(false, FragmentCount);
+		NewState.Since = InNow;
+		ReceivingBytes += NewState.Total;
+		ReceiveState = &Receiving.Add(Id, MoveTemp(NewState));
+	}
+	if (ReceiveState->Total != static_cast<int32>(Total) ||
+		ReceiveState->Crc != Crc ||
+		ReceiveState->Received.Num() != FragmentCount)
+	{
+		return false;
+	}
+
+	const int32 Offset = static_cast<int32>(Index) * FragmentBytes;
+	if (ReceiveState->Received[Index])
+	{
+		return FMemory::Memcmp(
+			ReceiveState->Bytes.GetData() + Offset,
+			Data.GetData(),
+			Data.Num()) == 0;
+	}
+	FMemory::Memcpy(ReceiveState->Bytes.GetData() + Offset, Data.GetData(), Data.Num());
+	ReceiveState->Received[Index] = true;
+	++ReceiveState->Count;
+	if (ReceiveState->Count == FragmentCount)
+	{
+		const bool bValid = FCrc::MemCrc32(
+			ReceiveState->Bytes.GetData(),
+			ReceiveState->Bytes.Num()) == ReceiveState->Crc;
+		ReceivingBytes -= ReceiveState->Total;
+		if (bValid)
+		{
+			OutCompleted = MoveTemp(ReceiveState->Bytes);
+		}
+		Receiving.Remove(Id);
+		return bValid;
+	}
+	return true;
+}
+
+void FVoxelNetworkTransfer::Reset()
+{
+	Pending.Reset();
+	Receiving.Reset();
+	PendingBytes = 0;
+	ReceivingBytes = 0;
+	LastTick = 0.0;
+	Tokens = Settings.BurstBytes;
+}
+
+void FVoxelNetworkTransfer::SetSettings(const FVoxelNetworkSettings& InSettings)
+{
+	Settings = InSettings;
+	Tokens = FMath::Min(Tokens, static_cast<double>(Settings.BurstBytes));
+}
+
+uint64 FVoxelNetworkTransfer::QueuedBytes() const
+{
+	return PendingBytes;
+}
+
+int32 FVoxelNetworkTransfer::FindNextSend() const
+{
+	int32 Best = INDEX_NONE;
+	for (int32 Index = 0; Index < Pending.Num(); ++Index)
+	{
+		if (Best == INDEX_NONE ||
+			static_cast<uint8>(Pending[Index].Priority) < static_cast<uint8>(Pending[Best].Priority) ||
+			(Pending[Index].Priority == Pending[Best].Priority && Pending[Index].Serial < Pending[Best].Serial))
+		{
+			Best = Index;
+		}
+	}
+	return Best;
+}

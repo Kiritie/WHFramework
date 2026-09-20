@@ -1,33 +1,141 @@
 #include "Voxel/Generation/VoxelGenerationBinding.h"
-#include "Voxel/Generation/Assets/VoxelWorldGenerationProfile.h"
-#include "Voxel/Generation/Kernel/VoxelGenMath.h"
-#include "Voxel/Runtime/VoxelRegistry.h"
-bool FVoxelGenerationBinding::Build(const UVoxelWorldGenerationProfile& P,const FVoxelRegistrySnapshot& R,const FVoxelGenerationSettings& S,int32 Size,FVoxelGenerationRuntimeConfig& O,FString& E)
+
+#include "Voxel/Authoring/VoxelWorldGenerationProfile.h"
+#include "Voxel/Generation/VoxelGenerationRecipeCodec.h"
+
+bool FVoxelGenerationRuntimeConfig::IsValid() const
 {
-    if(P.CatalogBakeVersion!=1||P.BakedCellCentimeters!=Size||P.CatalogBytes.IsEmpty()||P.CatalogBytes.Num()>64*1024*1024){E=TEXT("Generation profile is unbaked or has a different voxel size");return false;}
-    std::vector<uint8_t> B(P.CatalogBytes.GetData(),P.CatalogBytes.GetData()+P.CatalogBytes.Num());
-    if(VoxelGen::HashBytes(B)!=P.CatalogHash){E=TEXT("Generation catalog fingerprint is invalid");return false;}
-    auto C=std::make_shared<VoxelGen::Catalog>();std::string Error;
-    if(!VoxelGen::DecodeCatalog(B,*C,Error)||!C->Validate(S.ToKernel(Size),Error)){E=UTF8_TO_TCHAR(Error.c_str());return false;}
-    FVoxelGenerationRuntimeConfig T;T.Settings=S;T.BlockSizeCentimeters=Size;T.CatalogHash=P.CatalogHash;
-    T.SymbolToRuntime.resize(C->blocks.size());T.RuntimeToSymbol.assign(R.Definitions.Num(),MAX_uint16);
-    for(uint32 I=0;I<C->blocks.size();++I)
-    {
-        const FName Name(UTF8_TO_TCHAR(C->blocks[I].c_str()));const auto* D=R.Find(Name);
-        if(!D){E=FString::Printf(TEXT("Catalog block missing from Registry: %s"),*Name.ToString());return false;}
-        T.SymbolToRuntime[I]=D->TypeId;T.RuntimeToSymbol[D->TypeId]=uint16(I);
-    }
-    auto Definition=[&](uint16 Symbol)->const FVoxelRuntimeDefinition*{return Symbol<T.SymbolToRuntime.size()?R.Find(T.SymbolToRuntime[Symbol]):nullptr;};
-    auto Cube=[&](uint16 Symbol)->bool{const auto* D=Definition(Symbol);return D&&D->EntityKind==0&&D->Shape==EVoxelShapeKind::FullCube;};
-    const auto& A=C->palette;
-    const uint16 Cubes[]={A.stone,A.dirt,A.grass,A.sand,A.snow,A.bedrock,A.road};
-    for(uint16 K:Cubes)if(!Cube(K)){E=TEXT("Terrain role must be a plain FullCube with no BlockEntity");return false;}
-    for(uint16 K:{A.water,A.lava}){const auto* D=Definition(K);if(!D||D->Shape!=EVoxelShapeKind::Fluid||D->bSolid||D->EntityKind){E=TEXT("Fluid role has an invalid shape/physics/entity definition");return false;}}
-    if(Definition(A.water)->RenderGroup!=EVoxelRenderGroup::Water||Definition(A.lava)->RenderGroup!=EVoxelRenderGroup::Emissive){E=TEXT("Water/Lava require Water/Emissive render groups");return false;}
-    for(const auto& V:C->trees)if(!Cube(V.trunk)||!Cube(V.leaves)){E=TEXT("Tree trunk and crown must use plain shared cube definitions");return false;}
-    for(const auto& V:C->plants){const auto* D=Definition(V.block);if(!D||D->Shape!=EVoxelShapeKind::CrossPlant||D->bSolid||D->EntityKind||D->DropCount!=0){E=TEXT("Phase2 ground vegetation requires non-solid/entity-free CrossPlant with DropCount=0");return false;}}
-    for(const auto& V:C->ores)if(!Cube(V.block)){E=TEXT("Ore must be a plain cube");return false;}
-    for(const auto& V:C->structures)for(const auto& Run:V.writes)if(VoxelGen::Symbol(Run.value)&&!Cube(VoxelGen::Symbol(Run.value))){E=TEXT("Baked structure contains a non-static cube or gameplay marker");return false;}
-    T.Stone=T.SymbolToRuntime[A.stone];T.Dirt=T.SymbolToRuntime[A.dirt];T.Grass=T.SymbolToRuntime[A.grass];T.Sand=T.SymbolToRuntime[A.sand];T.Snow=T.SymbolToRuntime[A.snow];T.Water=T.SymbolToRuntime[A.water];T.Lava=T.SymbolToRuntime[A.lava];
-    T.Catalog=C;O=MoveTemp(T);E.Reset();return true;
+	return Recipe.IsValid() && !SymbolToRuntime.IsEmpty() && !RuntimeToSymbol.IsEmpty();
+}
+
+bool FVoxelGenerationRuntimeConfig::ToRuntime(uint32 InPackedSymbol, FVoxelBlockState& OutState) const
+{
+	const uint16 Symbol = static_cast<uint16>(InPackedSymbol & 0xffffu);
+	if (!SymbolToRuntime.IsValidIndex(Symbol))
+	{
+		return false;
+	}
+	OutState.TypeId = SymbolToRuntime[Symbol];
+	OutState.State = static_cast<uint16>(InPackedSymbol >> 16);
+	return true;
+}
+
+bool FVoxelGenerationRuntimeConfig::ToSymbol(FVoxelBlockState InState, uint32& OutPackedSymbol) const
+{
+	if (!RuntimeToSymbol.IsValidIndex(InState.TypeId))
+	{
+		return false;
+	}
+	const uint16 Symbol = RuntimeToSymbol[InState.TypeId];
+	if (Symbol == MAX_uint16)
+	{
+		return false;
+	}
+	OutPackedSymbol = static_cast<uint32>(Symbol) | (static_cast<uint32>(InState.State) << 16);
+	return true;
+}
+
+bool FVoxelGenerationBinding::Build(const UVoxelWorldGenerationProfile& InProfile, const FVoxelRegistrySnapshot& InRegistry,
+	const FVoxelGenerationSettings& InSettings, int32 InCellCentimeters,
+	FVoxelGenerationRuntimeConfig& OutConfig, FString& OutError)
+{
+	if (InProfile.RecipeBytes.IsEmpty())
+	{
+		OutError = TEXT("Voxel generation profile has no baked recipe");
+		return false;
+	}
+	if (InCellCentimeters <= 0 || !InSettings.Validate(OutError))
+	{
+		if (OutError.IsEmpty()) OutError = TEXT("Voxel runtime cell size must be positive");
+		return false;
+	}
+
+	FVoxelGenerationRecipe RuntimeRecipe;
+	if (!FVoxelGenerationRecipeCodec::Decode(InProfile.RecipeBytes, RuntimeRecipe, OutError))
+	{
+		return false;
+	}
+	if (RuntimeRecipe.RecipeHash != InProfile.RecipeHash)
+	{
+		OutError = TEXT("Voxel generation profile RecipeHash does not match RecipeBytes");
+		return false;
+	}
+	if (RuntimeRecipe.CellCentimeters != InProfile.BakedCellCentimeters || RuntimeRecipe.CellCentimeters != InCellCentimeters)
+	{
+		OutError = TEXT("Voxel generation profile bake cell size does not match runtime cell size");
+		return false;
+	}
+	RuntimeRecipe.Settings = InSettings;
+	if (!FVoxelGenerationRecipeCodec::RefreshHash(RuntimeRecipe, OutError) || !RuntimeRecipe.BuildLookups(OutError))
+	{
+		return false;
+	}
+
+	FVoxelGenerationRuntimeConfig Result;
+	Result.RegistryHash = InRegistry.Hash;
+	Result.SymbolToRuntime.SetNum(RuntimeRecipe.BlockNames.Num());
+	Result.RuntimeToSymbol.Init(MAX_uint16, InRegistry.Definitions.Num());
+	Result.SymbolToRuntime[0] = VoxelBlock::Air;
+	if (Result.RuntimeToSymbol.IsValidIndex(VoxelBlock::Air))
+	{
+		Result.RuntimeToSymbol[VoxelBlock::Air] = 0;
+	}
+
+	for (int32 SymbolIndex = 1; SymbolIndex < RuntimeRecipe.BlockNames.Num(); ++SymbolIndex)
+	{
+		const FName BlockName = RuntimeRecipe.BlockNames[SymbolIndex];
+		const FVoxelRuntimeDefinition* Definition = InRegistry.Find(BlockName);
+		if (!Definition)
+		{
+			OutError = FString::Printf(TEXT("Voxel recipe references an unregistered block: %s"), *BlockName.ToString());
+			return false;
+		}
+		if (!Result.RuntimeToSymbol.IsValidIndex(Definition->TypeId))
+		{
+			OutError = TEXT("Voxel runtime block id exceeds generation binding table");
+			return false;
+		}
+		Result.SymbolToRuntime[SymbolIndex] = Definition->TypeId;
+		Result.RuntimeToSymbol[Definition->TypeId] = static_cast<uint16>(SymbolIndex);
+	}
+
+	auto Resolve = [&Result, &OutError](uint16 Symbol, bool bRequired, FVoxelBlockState& OutState)
+	{
+		if (Symbol == MAX_uint16)
+		{
+			if (bRequired)
+			{
+				OutError = TEXT("Voxel recipe is missing a required palette symbol");
+				return false;
+			}
+			OutState = {};
+			return true;
+		}
+		if (!Result.SymbolToRuntime.IsValidIndex(Symbol))
+		{
+			OutError = TEXT("Voxel recipe palette symbol exceeds runtime binding table");
+			return false;
+		}
+		OutState = FVoxelBlockState(Result.SymbolToRuntime[Symbol], 0);
+		return true;
+	};
+
+	Result.Air = {};
+	if (!Resolve(RuntimeRecipe.Palette.Stone, true, Result.Stone) ||
+		!Resolve(RuntimeRecipe.Palette.Dirt, true, Result.Dirt) ||
+		!Resolve(RuntimeRecipe.Palette.Grass, true, Result.Grass) ||
+		!Resolve(RuntimeRecipe.Palette.Sand, true, Result.Sand) ||
+		!Resolve(RuntimeRecipe.Palette.Snow, true, Result.Snow) ||
+		!Resolve(RuntimeRecipe.Palette.Water, true, Result.Water) ||
+		!Resolve(RuntimeRecipe.Palette.Lava, true, Result.Lava) ||
+		!Resolve(RuntimeRecipe.Palette.Bedrock, true, Result.Bedrock) ||
+		!Resolve(RuntimeRecipe.Palette.Road, false, Result.Road))
+	{
+		return false;
+	}
+
+	Result.Recipe = MakeShared<const FVoxelGenerationRecipe, ESPMode::ThreadSafe>(MoveTemp(RuntimeRecipe));
+	OutConfig = MoveTemp(Result);
+	OutError.Reset();
+	return true;
 }

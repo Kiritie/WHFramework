@@ -15,6 +15,7 @@ bool FSaveDataSerializer::SerializeParameter(const FParameter& InData, TArray<ui
 	OutBytes.Reset();
 	FMemoryWriter Writer(OutBytes, true);
 	FSaveDataArchive Archive(Writer);
+	Archive.ArIsSaveGame = false;
 	FParameter::StaticStruct()->SerializeItem(Archive, const_cast<FParameter*>(&InData), nullptr);
 	return !Archive.IsError();
 }
@@ -28,6 +29,7 @@ bool FSaveDataSerializer::DeserializeParameter(const TArray<uint8>& InBytes, FPa
 
 	FMemoryReader Reader(InBytes, true);
 	FSaveDataArchive Archive(Reader);
+	Archive.ArIsSaveGame = false;
 	OutData.Reset();
 	FParameter::StaticStruct()->SerializeItem(Archive, &OutData, nullptr);
 	if(Archive.IsError() || !OutData.HasValue())
@@ -83,7 +85,9 @@ bool FSaveDataSerializer::ReadModuleFile(const TArray<uint8>& InFileBytes, FModu
 
 	FMemoryReader Reader(InFileBytes, true);
 	Reader << OutHeader;
-	if(Reader.IsError() || OutHeader.Magic != FModuleSaveFileHeader::MagicValue || OutHeader.StorageVersion != 1)
+	if(Reader.IsError() ||
+		OutHeader.Magic != FModuleSaveFileHeader::MagicValue ||
+		OutHeader.StorageVersion != FModuleSaveFileHeader::CurrentStorageVersion)
 	{
 		return false;
 	}

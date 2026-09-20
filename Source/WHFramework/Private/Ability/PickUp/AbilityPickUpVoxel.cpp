@@ -5,7 +5,7 @@
 #include "Asset/AssetModuleStatics.h"
 #include "Voxel/Voxels/Data/VoxelData.h"
 #include "Voxel/VoxelModule.h"
-#include "Voxel/Chunks/VoxelChunk.h"
+#include "Voxel/Scene/VoxelSceneRegion.h"
 #include "Voxel/Components/VoxelMeshComponent.h"
 #include "Voxel/Rendering/VoxelMaterialSet.h"
 #include "Voxel/Network/VoxelModuleNetworkComponent.h"
@@ -27,7 +27,7 @@ AAbilityPickUpVoxel::AAbilityPickUpVoxel()
 	if (BoxComponent)
 		BoxComponent->SetGenerateOverlapEvents(false);
 }
-AAbilityPickUpVoxel* AAbilityPickUpVoxel::CreateReserved(UWorld* W, const FAbilityItem& I, const FVector& P, UVoxelChunk* C)
+AAbilityPickUpVoxel* AAbilityPickUpVoxel::CreateReserved(UWorld* W, const FAbilityItem& I, const FVector& P, UVoxelSceneRegion* C)
 {
 	if (!W || W->GetNetMode() == NM_Client || !C || !I.ID.IsValid() || I.Count <= 0)
 		return nullptr;
@@ -42,7 +42,7 @@ AAbilityPickUpVoxel* AAbilityPickUpVoxel::CreateReserved(UWorld* W, const FAbili
 	A->RepLevel = I.Level;
 	A->Item = I;
 	A->Item.Payload = A;
-	A->OwningColumn = C;
+	A->OwningRegion = C;
 	A->bActivated = false;
 	ISceneActorInterface::Execute_SetActorID(A, FGuid::NewGuid().ToString());
 	TScriptInterface<ISceneContainerInterface> Container;
@@ -177,8 +177,8 @@ void AAbilityPickUpVoxel::OnPickUp(IAbilityPickerInterface* Picker)
 	if (RepCount == 0)
 	{
 		bActivated = false;
-		if (OwningColumn)
-			OwningColumn->RemoveSceneActor(this);
+		if (OwningRegion)
+			OwningRegion->RemoveSceneActor(this);
 		SetActorEnableCollision(false);
 		Destroy();
 	}
@@ -206,10 +206,10 @@ void AAbilityPickUpVoxel::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 
 void AAbilityPickUpVoxel::SetContainer_Implementation(const TScriptInterface<ISceneContainerInterface>& C)
 {
-	if (OwningColumn)
-		OwningColumn->RemoveSceneActor(this);
+	if (OwningRegion)
+		OwningRegion->RemoveSceneActor(this);
 	Super::SetContainer_Implementation(C);
-	OwningColumn = Cast<UVoxelChunk>(C.GetObject());
-	if (OwningColumn)
-		OwningColumn->AddSceneActor(this);
+	OwningRegion = Cast<UVoxelSceneRegion>(C.GetObject());
+	if (OwningRegion)
+		OwningRegion->AddSceneActor(this);
 }

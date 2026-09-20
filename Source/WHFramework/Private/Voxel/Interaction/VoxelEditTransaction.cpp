@@ -3,7 +3,7 @@
 bool FVoxelEditTransaction::Build(const FVoxelWorldRuntime&W,const FVoxelRegistrySnapshot&R,const FVoxelShapeRegistry&Shapes,
     const FVoxelTraceResult&H,EVoxelEditAction Action,uint16 PlaceType,const FVector&View,double Size,FVoxelInteractionPlan&O,FString&Error)
 {
-    if(!W.Authority()||H.Status!=EVoxelTraceStatus::Hit||H.bStartedInside||!R.IsValid(H.State)||Size<=0)
+    if(!W.IsServer()||H.Status!=EVoxelTraceStatus::Hit||H.bStartedInside||!R.IsValid(H.State)||Size<=0)
     {Error=TEXT("Invalid interaction target");return false;}
     FVoxelInteractionPlan P;TMap<FIntVector,int32>Map;
     auto Read=[&](const FIntVector&Pos,FVoxelBlockState&State)->bool
@@ -38,7 +38,7 @@ bool FVoxelEditTransaction::Build(const FVoxelWorldRuntime&W,const FVoxelRegistr
         // 不丢弃有内容的容器：先取空，再破坏。没有隐式销毁 Inventory 的路径。
         if(HitDef->EntityKind==1)
         {
-            const auto*S=W.Find(VoxelCoord::Section(Target));const auto*B=S->Overlay.Entities.Find(VoxelCoord::Linear(VoxelCoord::Local(Target)));
+            const FVoxelSectionKey Key=VoxelCoord::Section(Target);const auto*S=W.FindSection(FIntVector(Key.X,Key.Y,Key.Z));const auto*B=S->Entities.Find(VoxelCoord::Linear(VoxelCoord::Local(Target)));
             TArray<FVoxelItemStack>Slots;if(!B||!FVoxelBlockEntityCodec::DecodeContainer(*B,Slots))return false;
             for(const auto&I:Slots)if(I.Count>0){Error=TEXT("Empty the container before breaking it");return false;}
         }
@@ -56,7 +56,7 @@ bool FVoxelEditTransaction::Build(const FVoxelWorldRuntime&W,const FVoxelRegistr
         {auto S=H.State;S.State^=16;if(!Write(Target,S))return false;}
         else if(HitDef->EntityKind==2)
         {
-            const auto*S=W.Find(VoxelCoord::Section(Target));const auto*B=S->Overlay.Entities.Find(VoxelCoord::Linear(VoxelCoord::Local(Target)));
+            const FVoxelSectionKey Key=VoxelCoord::Section(Target);const auto*S=W.FindSection(FIntVector(Key.X,Key.Y,Key.Z));const auto*B=S->Entities.Find(VoxelCoord::Linear(VoxelCoord::Local(Target)));
             FVoxelEntityEdit E;E.Position=Target;if(!B||!FVoxelBlockEntityCodec::IncrementCounter(*B,E.Value))return false;P.Entities.Add(E);
         }
         else{Error=TEXT("This block has no Use action; container operations use explicit slot intents");return false;}
@@ -151,7 +151,7 @@ bool FVoxelEditTransaction::ValidateBatch(const FVoxelWorldRuntime&W,const FVoxe
     {auto&E=Candidate[I];FVoxelBlockState Actual;if(Map.Contains(E.Position)||!R.IsValid(E.Value)||!W.TryGetBlock(E.Position,Actual)||Actual!=E.Expected)
         {Error=TEXT("Duplicate, stale or invalid batch cell");return false;}Map.Add(E.Position,I);
         if(Actual!=E.Value)
-        {const auto*S=W.Find(VoxelCoord::Section(E.Position));const auto*BE=S->Overlay.Entities.Find(VoxelCoord::Linear(VoxelCoord::Local(E.Position)));
+        {const FVoxelSectionKey Key=VoxelCoord::Section(E.Position);const auto*S=W.FindSection(FIntVector(Key.X,Key.Y,Key.Z));const auto*BE=S->Entities.Find(VoxelCoord::Linear(VoxelCoord::Local(E.Position)));
             if(BE&&BE->Kind==1){TArray<FVoxelItemStack>Items;if(!FVoxelBlockEntityCodec::DecodeContainer(*BE,Items))return false;
                 for(const auto&Item:Items)if(Item.Count>0){Error=TEXT("Batch would destroy nonempty container");return false;}}}}
     auto Read=[&](const FIntVector&P,FVoxelBlockState&B){if(const int32*I=Map.Find(P)){B=Candidate[*I].Value;return true;}return W.TryGetBlock(P,B);};

@@ -1,7 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "Containers/ArrayView.h"
-#include "Voxel/Generation/VoxelGenerationContext.h"
+#include "Voxel/Generation/VoxelWorldManifest.h"
 class WHFRAMEWORK_API FVoxelManifestCodec
 {
 public:

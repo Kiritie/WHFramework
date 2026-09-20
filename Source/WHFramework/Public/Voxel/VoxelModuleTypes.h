@@ -3,9 +3,10 @@
 #include "Voxel/VoxelAuthoringTypes.h"
 #include "CoreMinimal.h"
 #include "SaveGame/SaveGameModuleTypes.h"
-#include "Scene/SceneModuleTypes.h"
-#include "Voxel/Generation/VoxelGenerationContext.h"
+#include "Voxel/Generation/VoxelGenerationTypes.h"
 #include "VoxelModuleTypes.generated.h"
+
+class UVoxelWorldGenerationProfile;
 UENUM(BlueprintType)
 enum class EVoxelWorldMode:uint8{None,Default,Preview,Prefab};
 UENUM(BlueprintType)
@@ -51,9 +52,12 @@ USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelWorldBasicSaveData:public FSaveData
 {
     GENERATED_BODY()
-    UPROPERTY(EditAnywhere,BlueprintReadWrite) FVoxelGenerationSettings Generation;
-    UPROPERTY(EditAnywhere,BlueprintReadWrite,meta=(ClampMin="1",ClampMax="10000")) int32 BlockSizeCentimeters=100;
-    UPROPERTY(EditAnywhere,BlueprintReadWrite) FSceneModuleSaveData SceneData;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSoftObjectPtr<UVoxelWorldGenerationProfile> GenerationProfile;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Seed = 1;
 };
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelWorldSaveData:public FVoxelWorldBasicSaveData

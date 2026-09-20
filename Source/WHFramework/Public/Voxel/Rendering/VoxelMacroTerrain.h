@@ -1,0 +1,43 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Voxel/Generation/VoxelGenerationPipeline.h"
+#include "Voxel/Rendering/VoxelViewTypes.h"
+
+struct WHFRAMEWORK_API FVoxelMacroStructureProxy
+{
+	FIntPoint Coordinate = FIntPoint::ZeroValue;
+	int32 GroundZ = 0;
+	uint16 StructureIndex = 0;
+	uint16 Radius = 0;
+};
+
+struct WHFRAMEWORK_API FVoxelMacroTileData
+{
+	FVoxelMacroTileKey Key;
+	uint64 Revision = 0;
+	int32 Side = 0;
+	int32 Step = 0;
+	TArray<int32> Height;
+	TArray<int32> WaterHeight;
+	TArray<uint16> SurfaceClass;
+	TArray<uint8> ForestCoverage;
+	TArray<uint8> SnowCoverage;
+	TArray<FVoxelMacroStructureProxy> LargeStructures;
+};
+
+class WHFRAMEWORK_API FVoxelMacroTerrainBuilder
+{
+public:
+	explicit FVoxelMacroTerrainBuilder(
+		TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator);
+
+	bool Build(
+		const FVoxelMacroTileKey& InKey,
+		FVoxelMacroTileData& OutData,
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr) const;
+
+private:
+	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> Generator;
+};

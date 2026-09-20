@@ -11,7 +11,7 @@
 class UBoxComponent;
 class UFollowingMovementComponent;
 class IAbilityPickerInterface;
-class UVoxelChunk;
+class UVoxelSceneRegion;
 class UMeshComponent;
 class URotatingMovementComponent;
 class UFallingMovementComponent;

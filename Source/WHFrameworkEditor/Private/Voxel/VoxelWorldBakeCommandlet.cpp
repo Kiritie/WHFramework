@@ -1,7 +1,9 @@
 #include "Voxel/VoxelWorldBakeCommandlet.h"
 #include "Voxel/VoxelGenerationCompiler.h"
 #include "Voxel/VoxelDetailBaker.h"
-#include "Voxel/Generation/Assets/VoxelWorldGenerationProfile.h"
+#include "Voxel/VoxelEditorAssetIO.h"
+#include "Voxel/Authoring/VoxelWorldGenerationProfile.h"
+#include "Voxel/Generation/VoxelGenerationRecipe.h"
 #include "Voxel/Runtime/VoxelRegistry.h"
 #include "Voxel/Voxels/Data/VoxelData.h"
 #include "AssetRegistry/AssetRegistryModule.h"
@@ -13,7 +15,7 @@
 UVoxelWorldBakeCommandlet::UVoxelWorldBakeCommandlet(){IsClient=false;IsServer=false;IsEditor=true;LogToConsole=true;}
 int32 UVoxelWorldBakeCommandlet::Main(const FString& Params)
 {
-    FString Path,Root=TEXT("/Game/VoxelGenerated/Phase2/Details"),ReportPath=FPaths::ProjectSavedDir()/TEXT("VoxelPhase2AssetReport.txt");
+    FString Path,Root=TEXT("/Game/VoxelGenerated/Details"),ReportPath=FPaths::ProjectSavedDir()/TEXT("VoxelAssetReport.txt");
     if(!FParse::Value(*Params,TEXT("Profile="),Path)){UE_LOG(LogTemp,Error,TEXT("Required: -Profile=/Game/...Asset.Asset"));return 1;}
     FParse::Value(*Params,TEXT("GeneratedRoot="),Root);FParse::Value(*Params,TEXT("Report="),ReportPath);
     const bool ValidateOnly=FParse::Param(*Params,TEXT("ValidateOnly"));
@@ -29,7 +31,10 @@ int32 UVoxelWorldBakeCommandlet::Main(const FString& Params)
     for(const FAssetData& A:Found)if(auto* D=Cast<UVoxelData>(A.GetAsset()))Blocks.Add(D);
     FVoxelRegistry Registry;
     if(!Registry.Build(Blocks,false,E)){UE_LOG(LogTemp,Error,TEXT("Registry: %s"),*E);return 4;}
-    const bool OK=FVoxelGenerationCompiler::Compile(*P,*Registry.GetSnapshot(),Report,E,!ValidateOnly);
+    bool OK=ValidateOnly
+        ? [&](){FVoxelGenerationRecipe Recipe;return FVoxelGenerationCompiler::BuildRecipe(*P,*Registry.GetSnapshot(),Recipe,E);}()
+        : FVoxelGenerationCompiler::Compile(*P,*Registry.GetSnapshot(),E);
+    if(OK&&!ValidateOnly)OK=FVoxelEditorAssetIO::Save(P,E);
     Report.Add(OK?TEXT("PASS asset validation/compilation"):TEXT("FAIL ")+E);
     IFileManager::Get().MakeDirectory(*FPaths::GetPath(ReportPath),true);
     if(!FFileHelper::SaveStringArrayToFile(Report,*ReportPath)){UE_LOG(LogTemp,Error,TEXT("Cannot write asset report"));return 5;}

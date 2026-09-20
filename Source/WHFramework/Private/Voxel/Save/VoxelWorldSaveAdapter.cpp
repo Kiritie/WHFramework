@@ -1,41 +1,120 @@
 #include "Voxel/Save/VoxelWorldSaveAdapter.h"
+
 #include "Voxel/Save/VoxelDeltaCodec.h"
-bool FVoxelWorldSaveAdapter::Capture(FVoxelWorldRuntime&R,const FVoxelWorldManifest&M,
-    TSharedPtr<const FVoxelRegistrySnapshot,ESPMode::ThreadSafe>Registry,const FVoxelRegionStore&Store,FString&E)
+
+bool FVoxelWorldSaveAdapter::Capture(
+	FVoxelWorldRuntime& InRuntime,
+	const FVoxelWorldManifest& InManifest,
+	TSharedPtr<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry,
+	const FVoxelRegionStore& InStore,
+	FString& OutError)
 {
-    check(IsInGameThread());if(Active.IsSet()||!R.Authority()||!Registry){E=TEXT("Save capture busy or not authority");return false;}
-    FVoxelWorldSaveCapture C;C.TransactionId=FGuid::NewGuid();C.WorldEpoch=R.Epoch();C.Manifest=M;C.Registry=Registry;C.SourceDirectory=Store.GetSourceDirectory();
-    auto Keys=R.ResidentKeys();Keys.Sort();
-    for(const auto&K:Keys)
-    {
-        auto*S=R.Find(K);if(S&&S->Status==EVoxelSectionStatus::DataReady&&S->IsSaveDirty())
-        {if(S->PinCount==MAX_uint32){E=TEXT("Section pin overflow");return false;}C.Sections.Add(S->Overlay);}
-    }
-    for(const auto&O:C.Sections)++R.Find(O.Key)->PinCount;
-    Active=MoveTemp(C);E.Reset();return true;
+	check(IsInGameThread());
+	if (Active.IsSet() || !InRuntime.IsServer() || !InRegistry)
+	{
+		OutError = TEXT("Voxel save capture is busy or not authoritative");
+		return false;
+	}
+	FVoxelWorldSaveCapture Capture;
+	Capture.TransactionId = FGuid::NewGuid();
+	Capture.WorldEpoch = InRuntime.Epoch();
+	Capture.Manifest = InManifest;
+	Capture.Registry = InRegistry;
+	Capture.SourceDirectory = InStore.GetSourceDirectory();
+	TArray<FIntVector> Sections = InRuntime.ResidentSections();
+	Sections.Sort([](const FIntVector& InA, const FIntVector& InB)
+	{
+		if (InA.X != InB.X) return InA.X < InB.X;
+		if (InA.Y != InB.Y) return InA.Y < InB.Y;
+		return InA.Z < InB.Z;
+	});
+	for (const FIntVector& Key : Sections)
+	{
+		FVoxelSection* Section = InRuntime.FindSection(Key);
+		if (!Section ||
+			Section->Status != EVoxelSectionStatus::DataReady ||
+			Section->PersistedRevision == Section->CommittedRevision)
+		{
+			continue;
+		}
+		if (Section->PinCount.Load() == MAX_int32)
+		{
+			OutError = TEXT("Voxel section save pin overflow");
+			return false;
+		}
+		FVoxelPersistentSection Persistent;
+		Persistent.Section = Key;
+		Persistent.Revision = Section->CommittedRevision;
+		Persistent.Blocks = Section->Overlay;
+		Persistent.Entities = Section->Entities;
+		Capture.Sections.Add(MoveTemp(Persistent));
+		++Section->PinCount;
+	}
+	Active = MoveTemp(Capture);
+	OutError.Reset();
+	return true;
 }
-bool FVoxelWorldSaveAdapter::WriteCapture(const FVoxelWorldSaveCapture&C,const FString&Temp,FString&E)
+
+bool FVoxelWorldSaveAdapter::WriteCapture(
+	const FVoxelWorldSaveCapture& InCapture,
+	const FString& InTemporaryGenerationDirectory,
+	FString& OutError)
 {
-    if(!C.Registry||!C.TransactionId.IsValid()){E=TEXT("Invalid save capture");return false;}
-    FVoxelRegionWritePlan P;P.TransactionId=C.TransactionId;P.SourceDirectory=C.SourceDirectory;
-    for(const auto&O:C.Sections)
-    {
-        TArray<uint8>B;if(!FVoxelDeltaCodec::Encode(C.Manifest,*C.Registry,O,B)||!FVoxelRegionStore::StageSection(P,O.Key,MoveTemp(B)))
-        {E=TEXT("Cannot encode section delta");return false;}
-    }
-    return FVoxelRegionStore::WritePendingRegions(P,Temp,E);
+	if (!InCapture.Registry || !InCapture.TransactionId.IsValid())
+	{
+		OutError = TEXT("Invalid voxel save capture");
+		return false;
+	}
+	FVoxelRegionWritePlan Plan;
+	Plan.TransactionId = InCapture.TransactionId;
+	Plan.SourceDirectory = InCapture.SourceDirectory;
+	for (const FVoxelPersistentSection& Section : InCapture.Sections)
+	{
+		if (Section.IsEmpty())
+		{
+			FVoxelRegionStore::StageDelete(Plan, Section.Section);
+			continue;
+		}
+		TArray<uint8> Bytes;
+		if (!FVoxelDeltaCodec::Encode(InCapture.Manifest, *InCapture.Registry, Section, Bytes) ||
+			!FVoxelRegionStore::StageSection(Plan, Section.Section, MoveTemp(Bytes)))
+		{
+			OutError = TEXT("Cannot encode voxel section delta");
+			return false;
+		}
+	}
+	return FVoxelRegionStore::WritePendingRegions(Plan, InTemporaryGenerationDirectory, OutError);
 }
-void FVoxelWorldSaveAdapter::Complete(FVoxelWorldRuntime&R,FVoxelRegionStore&S,bool Success,const FString&Committed)
+
+void FVoxelWorldSaveAdapter::Complete(
+	FVoxelWorldRuntime& InRuntime,
+	FVoxelRegionStore& InStore,
+	const bool bInSuccess,
+	const FString& InCommittedDirectory)
 {
-    check(IsInGameThread());if(!Active.IsSet())return;
-    if(Active->WorldEpoch==R.Epoch())
-    {
-        for(const auto&O:Active->Sections)
-        {
-            if(Success)R.MarkCommitted(O.Key,O.Revision);
-            if(auto*Section=R.Find(O.Key)){check(Section->PinCount>0);--Section->PinCount;}
-        }
-        if(Success)S.AdvanceSource(Committed);
-    }
-    Active.Reset();
+	check(IsInGameThread());
+	if (!Active.IsSet())
+	{
+		return;
+	}
+	if (Active->WorldEpoch == InRuntime.Epoch())
+	{
+		for (const FVoxelPersistentSection& Persistent : Active->Sections)
+		{
+			if (bInSuccess)
+			{
+				InRuntime.MarkCommitted(Persistent.Section, Persistent.Revision);
+			}
+			if (FVoxelSection* Section = InRuntime.FindSection(Persistent.Section))
+			{
+				check(Section->PinCount.Load() > 0);
+				--Section->PinCount;
+			}
+		}
+		if (bInSuccess)
+		{
+			InStore.AdvanceSource(InCommittedDirectory);
+		}
+	}
+	Active.Reset();
 }

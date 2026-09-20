@@ -1,7 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "Asset/Primary/PrimaryAssetBase.h"
-#include "Voxel/Generation/Assets/VoxelStructureData.h"
+#include "Voxel/Authoring/VoxelStructureData.h"
 #include "VoxelDetailData.generated.h"
 class UStaticMesh;
 class UMaterialInterface;

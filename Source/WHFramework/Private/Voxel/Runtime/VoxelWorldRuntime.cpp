@@ -1,154 +1,752 @@
 #include "Voxel/Runtime/VoxelWorldRuntime.h"
-#include "Voxel/Save/VoxelBlockEntityCodec.h"
-#include "Voxel/Save/VoxelDeltaCodec.h"
-FVoxelWorldRuntime::FVoxelWorldRuntime(uint64 E,bool A,TSharedRef<const FVoxelRegistrySnapshot,ESPMode::ThreadSafe>R,
-    TSharedRef<const FVoxelGenerationPipeline,ESPMode::ThreadSafe>G):WorldEpoch(E),bAuthority(A),Registry(R),Generator(G){}
-FVoxelSection* FVoxelWorldRuntime::Find(const FVoxelSectionKey&K){auto*P=Sections.Find(K);return P?P->Get():nullptr;}
-const FVoxelSection* FVoxelWorldRuntime::Find(const FVoxelSectionKey&K)const{const auto*P=Sections.Find(K);return P?P->Get():nullptr;}
-FVoxelSection* FVoxelWorldRuntime::Allocate(const FVoxelSectionKey&K,double Now)
+
+#include "Voxel/Generation/VoxelGenerationMath.h"
+
+namespace VoxelWorldRuntimePrivate
 {
-    check(IsInGameThread());if(auto*S=Find(K))return S;const auto&C=Generator->GetConfig().Settings;
-    if(!VoxelCoord::IsValidSection(K,C.MinZ,C.MaxZ)||NextToken==MAX_uint64)return nullptr;
-    auto S=MakeUnique<FVoxelSection>();S->Stamp.WorldEpoch=WorldEpoch;S->Stamp.Key=K;S->Stamp.GenerationToken=NextToken++;
-    S->Stamp.GeometryVersion=1;S->Overlay.Key=K;S->LastWanted=Now;auto*P=S.Get();Sections.Add(K,MoveTemp(S));return P;
+	constexpr int32 RuntimeSectionSide = 16;
+	constexpr int32 SectionVolume = RuntimeSectionSide * RuntimeSectionSide * RuntimeSectionSide;
+
+	FIntVector ToSection(const FIntVector& InPosition)
+	{
+		return FIntVector(
+			VoxelGeneration::FloorDivide(InPosition.X, RuntimeSectionSide),
+			VoxelGeneration::FloorDivide(InPosition.Y, RuntimeSectionSide),
+			VoxelGeneration::FloorDivide(InPosition.Z, RuntimeSectionSide));
+	}
+
+	int32 PositiveMod(const int32 InValue)
+	{
+		const int32 Result = InValue % RuntimeSectionSide;
+		return Result < 0 ? Result + RuntimeSectionSide : Result;
+	}
+
+	int32 ToCellIndex(const FIntVector& InPosition)
+	{
+		const int32 X = PositiveMod(InPosition.X);
+		const int32 Y = PositiveMod(InPosition.Y);
+		const int32 Z = PositiveMod(InPosition.Z);
+		return X + Y * RuntimeSectionSide + Z * RuntimeSectionSide * RuntimeSectionSide;
+	}
 }
-TArray<FVoxelSectionKey> FVoxelWorldRuntime::ResidentKeys()const{TArray<FVoxelSectionKey>K;Sections.GetKeys(K);return K;}
-bool FVoxelWorldRuntime::TryGetBlock(const FIntVector&P,FVoxelBlockState&O)const
+
+using namespace VoxelWorldRuntimePrivate;
+
+FVoxelWorldRuntime::FVoxelWorldRuntime(
+	const uint64 InWorldEpoch,
+	const bool bInAuthority,
+	TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry,
+	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator)
+	: WorldEpoch(InWorldEpoch)
+	, bAuthority(bInAuthority)
+	, Registry(InRegistry)
+	, Generator(InGenerator)
 {
-    if(!VoxelCoord::IsValid(P))return false;const auto&C=Generator->GetConfig().Settings;
-    if(P.Z<C.MinZ||P.Z>=C.MaxZ){O={};return true;}
-    const auto*S=Find(VoxelCoord::Section(P));if(!S||S->Status!=EVoxelSectionStatus::DataReady)return false;
-    O=S->Blocks.Get(VoxelCoord::Linear(VoxelCoord::Local(P)));return true;
 }
-bool FVoxelWorldRuntime::IsCurrent(const FVoxelTaskStamp&T,bool Geometry)const
+
+FVoxelSection* FVoxelWorldRuntime::FindSection(const FIntVector& InSection)
 {
-    const auto*S=Find(T.Key);return S&&S->Status!=EVoxelSectionStatus::Unloading&&S->Stamp.WorldEpoch==T.WorldEpoch&&
-    S->Stamp.GenerationToken==T.GenerationToken&&S->Stamp.Revision==T.Revision&&(!Geometry||S->Stamp.GeometryVersion==T.GeometryVersion);
+	const TUniquePtr<FVoxelSection>* Found = Sections.Find(InSection);
+	return Found ? Found->Get() : nullptr;
 }
-void FVoxelWorldRuntime::Invalidate(const FVoxelSectionKey&K,bool Neighbors)
+
+const FVoxelSection* FVoxelWorldRuntime::FindSection(const FIntVector& InSection) const
 {
-    auto Mark=[&](const FVoxelSectionKey&P){if(auto*S=Find(P)){check(S->Stamp.GeometryVersion<MAX_uint64);++S->Stamp.GeometryVersion;S->bMeshDirty=S->bCollisionDirty=true;}};
-    Mark(K);if(Neighbors)for(uint8 F=0;F<6;++F)Mark(VoxelCoord::Neighbor(K,F));
+	const TUniquePtr<FVoxelSection>* Found = Sections.Find(InSection);
+	return Found ? Found->Get() : nullptr;
 }
-void FVoxelWorldRuntime::InvalidateEdit(const FVoxelSectionPatch&P)
+
+FVoxelSection* FVoxelWorldRuntime::FindOrAllocate(const FIntVector& InSection, const uint64 InFrame)
 {
-    Invalidate(P.Key,false);TSet<uint8>Faces;
-    for(const auto&W:P.Blocks){FIntVector L=VoxelCoord::Unlinear(W.Index);for(uint8 A=0;A<3;++A){if(L[A]==0)Faces.Add(A*2+1);if(L[A]==15)Faces.Add(A*2);}}
-    for(uint8 F:Faces)Invalidate(VoxelCoord::Neighbor(P.Key,F),false);
+	check(IsInGameThread());
+
+	if (FVoxelSection* Existing = FindSection(InSection))
+	{
+		Existing->LastWantedFrame = InFrame;
+		return Existing;
+	}
+
+	if (NextToken == MAX_uint64)
+	{
+		return nullptr;
+	}
+
+	TUniquePtr<FVoxelSection> NewSection = MakeUnique<FVoxelSection>();
+	NewSection->Stamp.Epoch = WorldEpoch;
+	NewSection->Stamp.Token = NextToken++;
+	NewSection->Status = EVoxelSectionStatus::Allocated;
+	NewSection->LastWantedFrame = InFrame;
+	FVoxelSection* Result = NewSection.Get();
+	Sections.Add(InSection, MoveTemp(NewSection));
+	return Result;
 }
-bool FVoxelWorldRuntime::ValidateOverlay(const FVoxelSectionOverlay&O,const FVoxelSectionStorage&E)const
+
+TArray<FIntVector> FVoxelWorldRuntime::ResidentSections() const
 {
-    if(O.Blocks.Num()>4096||O.Entities.Num()>256||!FVoxelDeltaCodec::MaxEncodedBytes(*Registry,O))return false;uint64 Bytes=0;
-    for(const auto&B:O.Blocks)if(B.Key>=4096||!Registry->IsValid(B.Value))return false;
-    for(const auto&B:O.Entities)
-    {
-        if(B.Key>=4096||!FVoxelBlockEntityCodec::Validate(B.Value))return false;
-        const auto*D=Registry->Find(E.Get(B.Key).TypeId);if(!D||D->EntityKind==0||D->EntityKind!=B.Value.Kind)return false;
-        if(D->EntityKind==100&&(B.Value.Payload.IsEmpty()||B.Value.Payload[0]!=D->EntityVariant))return false;
-        Bytes+=B.Value.Payload.Num();if(Bytes>256*1024)return false;
-    }
-    for(uint16 I=0;I<4096;++I){const auto*D=Registry->Find(E.Get(I).TypeId);if(!D)return false;
-        if(D->EntityKind&&!O.Entities.Contains(I))return false;}
-    return true;
+	TArray<FIntVector> Result;
+	Sections.GetKeys(Result);
+	Result.Sort([](const FIntVector& InA, const FIntVector& InB)
+	{
+		if (InA.X != InB.X)
+		{
+			return InA.X < InB.X;
+		}
+		if (InA.Y != InB.Y)
+		{
+			return InA.Y < InB.Y;
+		}
+		return InA.Z < InB.Z;
+	});
+	return Result;
 }
-bool FVoxelWorldRuntime::PublishLoaded(const FVoxelTaskStamp&T,FVoxelSectionStorage&&Base,const FVoxelSectionOverlay&O,bool Committed)
+
+bool FVoxelWorldRuntime::TryGetBlock(const FIntVector& InPosition, FVoxelBlockState& OutState) const
 {
-    check(IsInGameThread());auto*S=Find(T.Key);if(!S||S->Status!=EVoxelSectionStatus::Allocated||!IsCurrent(T,false)||O.Key!=T.Key)return false;
-    auto Natural=MakeShared<FVoxelSectionStorage,ESPMode::ThreadSafe>(Base);for(const auto&P:O.Blocks){if(P.Key>=4096||!Registry->IsValid(P.Value))return false;Base.Set(P.Key,P.Value);}if(!ValidateOverlay(O,Base))return false;
-    S->BaseBlocks=Natural;S->Blocks=MoveTemp(Base);S->Overlay=O;S->Stamp.Revision=O.Revision;S->CommittedRevision=Committed?O.Revision:0;S->Status=EVoxelSectionStatus::DataReady;Invalidate(T.Key,true);return true;
+	const FVoxelSection* Section = FindSection(ToSection(InPosition));
+	if (!Section || Section->Status != EVoxelSectionStatus::DataReady)
+	{
+		return false;
+	}
+
+	const int32 CellIndex = ToCellIndex(InPosition);
+	if (!Section->Blocks.IsValidIndex(CellIndex))
+	{
+		return false;
+	}
+
+	OutState = Section->Blocks[CellIndex];
+	return true;
 }
-bool FVoxelWorldRuntime::CaptureSnapshot(const FVoxelSectionKey&K,FVoxelSectionSnapshot&O)const
+
+bool FVoxelWorldRuntime::PublishBase(
+	const FIntVector& InSection,
+	const FVoxelSectionStamp& InStamp,
+	TArray<FVoxelBlockState>&& InBaseBlocks,
+	FString& OutError)
 {
-    const auto*S=Find(K);if(!S||S->Status!=EVoxelSectionStatus::DataReady)return false;
-    FVoxelSectionSnapshot T;T.Stamp=S->Stamp;S->Blocks.CopyToDense(T.Blocks);FIntVector Origin=VoxelCoord::Origin(K);
-    for(uint8 F=0;F<6;++F)
-    {
-        int32 A=F/2,U=(A+1)%3,V=(A+2)%3;T.Halo[F].SetNumUninitialized(256);bool Known=true;
-        for(int32 Y=0;Y<16;++Y)for(int32 X=0;X<16;++X)
-        {
-            FIntVector P=Origin;P[A]+=F%2==0?16:-1;P[U]+=X;P[V]+=Y;FVoxelBlockState B;
-            if(!TryGetBlock(P,B)){Known=false;B={};}T.Halo[F][X+16*Y]=B.Pack();
-        }
-        T.Known[F]=Known;
-    }
-    O=MoveTemp(T);return true;
+	check(IsInGameThread());
+	FVoxelSection* Section = FindSection(InSection);
+	if (!Section ||
+		Section->Status != EVoxelSectionStatus::Allocated ||
+		Section->Stamp != InStamp)
+	{
+		OutError = TEXT("Voxel natural base publish stamp is stale");
+		return false;
+	}
+
+	if (InBaseBlocks.Num() != SectionVolume)
+	{
+		OutError = TEXT("Voxel natural base must contain exactly 4096 cells");
+		return false;
+	}
+
+	for (const FVoxelBlockState& State : InBaseBlocks)
+	{
+		if (!ValidateState(State))
+		{
+			OutError = TEXT("Voxel natural base contains an invalid block state");
+			return false;
+		}
+	}
+
+	Section->BaseBlocks = MakeShared<const TArray<FVoxelBlockState>, ESPMode::ThreadSafe>(MoveTemp(InBaseBlocks));
+	Section->Status = EVoxelSectionStatus::BaseReady;
+	OutError.Reset();
+	return true;
 }
-bool FVoxelWorldRuntime::PrepareEdit(const TArray<FVoxelCellEdit>&C,const TArray<FVoxelEntityEdit>&E,FVoxelPreparedEdit&O,FString&Error)const
+
+bool FVoxelWorldRuntime::PublishFinal(
+	const FIntVector& InSection,
+	const uint64 InRevision,
+	const TMap<int32, FVoxelBlockState>& InOverlay,
+	const TMap<int32, FVoxelBlockEntityState>& InEntities,
+	FString& OutError)
 {
-    check(IsInGameThread());if(!bAuthority||C.Num()+E.Num()>8192||C.IsEmpty()&&E.IsEmpty()){Error=TEXT("Invalid edit batch");return false;}
-    FVoxelPreparedEdit T;T.TransactionId=FGuid::NewGuid();TMap<FVoxelSectionKey,int32>Map;TSet<FIntVector>SeenCells,SeenEntities;
-    auto Target=[&](const FIntVector&P)->FVoxelPreparedSection*
-    {
-        const auto&Cfg=Generator->GetConfig().Settings;
-        if(!VoxelCoord::IsValid(P)||P.Z<Cfg.MinZ||P.Z>=Cfg.MaxZ)return nullptr;
-        const auto K=VoxelCoord::Section(P);if(int32*I=Map.Find(K))return &T.Sections[*I];
-        const auto*S=Find(K);if(!S||S->Status!=EVoxelSectionStatus::DataReady||!S->BaseBlocks||S->Stamp.Revision==MAX_uint64||Map.Num()>=32)return nullptr;
-        FVoxelPreparedSection N;N.Before=S->Stamp;N.Blocks=S->Blocks;N.Overlay=S->Overlay;N.Patch.Key=K;
-        N.Patch.FromRevision=S->Stamp.Revision;N.Patch.ToRevision=S->Stamp.Revision+1;
-        int32 I=T.Sections.Add(MoveTemp(N));Map.Add(K,I);return &T.Sections[I];
-    };
-    for(const auto&W:C)
-    {
-        if(SeenCells.Contains(W.Position)||!Registry->IsValid(W.Value)){Error=TEXT("Duplicate or invalid block write");return false;}SeenCells.Add(W.Position);
-        auto*N=Target(W.Position);if(!N){Error=TEXT("Section not ready or edit out of range");return false;}
-        uint16 I=VoxelCoord::Linear(VoxelCoord::Local(W.Position));auto Old=N->Blocks.Get(I);
-        if(Old!=W.Expected){Error=TEXT("Stale block value");return false;}if(Old==W.Value)continue;
-        N->Blocks.Set(I,W.Value);N->Patch.Blocks.Add({I,W.Value});
-        const FVoxelSection*SourceSection=Find(VoxelCoord::Section(W.Position));if(!SourceSection||!SourceSection->BaseBlocks){Error=TEXT("Natural section baseline is unavailable");return false;}
-        if(W.Value==SourceSection->BaseBlocks->Get(I))N->Overlay.Blocks.Remove(I);else N->Overlay.Blocks.Add(I,W.Value);
-        if(Old.TypeId!=W.Value.TypeId)
-        {
-            if(N->Overlay.Entities.Remove(I)){FVoxelEntityWrite D;D.Index=I;D.bRemove=true;N->Patch.Entities.Add(D);}
-            const auto*Def=Registry->Find(W.Value.TypeId);if(Def->EntityKind)
-            {
-                FVoxelBlockEntityState B;if(!FVoxelBlockEntityCodec::MakeDefault(Def->EntityKind,B,Def->EntityVariant)){Error=TEXT("Unsupported BlockEntity kind");return false;}
-                N->Patch.Entities.RemoveAll([I](const FVoxelEntityWrite& X){return X.Index==I;});
-                N->Overlay.Entities.Add(I,B);FVoxelEntityWrite U;U.Index=I;U.Value=B;N->Patch.Entities.Add(MoveTemp(U));
-            }
-        }
-    }
-    for(const auto&W:E)
-    {
-        if(SeenEntities.Contains(W.Position)){Error=TEXT("Duplicate entity write");return false;}SeenEntities.Add(W.Position);
-        auto*N=Target(W.Position);if(!N){Error=TEXT("Entity section not ready");return false;}uint16 I=VoxelCoord::Linear(VoxelCoord::Local(W.Position));
-        const auto*D=Registry->Find(N->Blocks.Get(I).TypeId);
-        if(W.bRemove){if(D->EntityKind!=0){Error=TEXT("Cannot remove required entity without removing block");return false;}N->Overlay.Entities.Remove(I);}
-        else{if(D->EntityKind!=W.Value.Kind||!FVoxelBlockEntityCodec::Validate(W.Value)){Error=TEXT("Invalid entity payload");return false;}N->Overlay.Entities.Add(I,W.Value);}
-        N->Patch.Entities.RemoveAll([I](const FVoxelEntityWrite&X){return X.Index==I;});
-        FVoxelEntityWrite V;V.Index=I;V.bRemove=W.bRemove;V.Value=W.Value;N->Patch.Entities.Add(MoveTemp(V));
-    }
-    T.Sections.RemoveAll([](const FVoxelPreparedSection&S){return S.Patch.Blocks.IsEmpty()&&S.Patch.Entities.IsEmpty();});
-    uint64 WireBytes=17;
-    for(auto&N:T.Sections)
-    {
-        N.Overlay.Revision=N.Patch.ToRevision;
-        if(!ValidateOverlay(N.Overlay,N.Blocks)){Error=TEXT("Invalid or oversized resulting section");return false;}
-        WireBytes+=4+FVoxelDeltaCodec::MaxEncodedBytes(*Registry,N.Overlay);
-        if(WireBytes>FVoxelDeltaCodec::MaxAtomicBatchWireBytes){Error=TEXT("Atomic edit exceeds the full-snapshot byte budget");return false;}
-    }
-    O=MoveTemp(T);Error.Reset();return true;
+	check(IsInGameThread());
+	FVoxelSection* Section = FindSection(InSection);
+	if (!Section || Section->Status != EVoxelSectionStatus::BaseReady || !Section->BaseBlocks)
+	{
+		OutError = TEXT("Voxel final publish target is not BaseReady");
+		return false;
+	}
+
+	TArray<FVoxelBlockState> Candidate = *Section->BaseBlocks;
+	for (const TPair<int32, FVoxelBlockState>& Pair : InOverlay)
+	{
+		if (!Candidate.IsValidIndex(Pair.Key) || !ValidateState(Pair.Value))
+		{
+			OutError = TEXT("Voxel final overlay contains an invalid cell");
+			return false;
+		}
+		Candidate[Pair.Key] = Pair.Value;
+	}
+
+	if (!ValidateSection(Candidate, InOverlay, OutError))
+	{
+		return false;
+	}
+
+	Section->Blocks = MoveTemp(Candidate);
+	Section->Overlay = InOverlay;
+	Section->Entities = InEntities;
+	Section->CommittedRevision = InRevision;
+	Section->PersistedRevision = InRevision;
+	Section->Status = EVoxelSectionStatus::DataReady;
+	Section->bCollisionDirty = true;
+	Section->bFineMeshDirty = true;
+	ChangeIndex.SetModified(InSection, !Section->Overlay.IsEmpty());
+	ChangeHierarchy.InvalidateSection(InSection);
+	OutError.Reset();
+	return true;
 }
-bool FVoxelWorldRuntime::CommitEdit(FVoxelPreparedEdit&&T,FVoxelEditBatch&O)
+
+bool FVoxelWorldRuntime::CaptureSnapshot(
+	const FIntVector& InSection,
+	FVoxelSectionSnapshot& OutSnapshot) const
 {
-    check(IsInGameThread());if(!bAuthority)return false;
-    for(const auto&N:T.Sections)if(!IsCurrent(N.Before,false))return false;
-    FVoxelEditBatch B;B.TransactionId=T.TransactionId;
-    for(auto&N:T.Sections){auto*S=Find(N.Before.Key);S->Blocks=MoveTemp(N.Blocks);S->Overlay=MoveTemp(N.Overlay);S->Stamp.Revision=N.Patch.ToRevision;B.Sections.Add(MoveTemp(N.Patch));}
-    for(const auto&P:B.Sections)InvalidateEdit(P);O=MoveTemp(B);return true;
+	const FVoxelSection* Section = FindSection(InSection);
+	if (!Section || Section->Status != EVoxelSectionStatus::DataReady)
+	{
+		return false;
+	}
+
+	FVoxelSectionSnapshot Snapshot;
+	Snapshot.Section = InSection;
+	Snapshot.Stamp = Section->Stamp;
+	Snapshot.Revision = Section->CommittedRevision;
+	Snapshot.Blocks.SetNumUninitialized(Section->Blocks.Num());
+	for (int32 Index = 0; Index < Section->Blocks.Num(); ++Index)
+	{
+		Snapshot.Blocks[Index] = Section->Blocks[Index].Pack();
+	}
+
+	const FIntVector Origin = InSection * RuntimeSectionSide;
+	for (uint8 Face = 0; Face < 6; ++Face)
+	{
+		const int32 Axis = Face / 2;
+		const int32 UAxis = (Axis + 1) % 3;
+		const int32 VAxis = (Axis + 2) % 3;
+		Snapshot.Halo[Face].SetNumUninitialized(RuntimeSectionSide * RuntimeSectionSide);
+		bool bKnown = true;
+		for (int32 V = 0; V < RuntimeSectionSide; ++V)
+		{
+			for (int32 U = 0; U < RuntimeSectionSide; ++U)
+			{
+				FIntVector Position = Origin;
+				Position[Axis] += Face % 2 == 0 ? RuntimeSectionSide : -1;
+				Position[UAxis] += U;
+				Position[VAxis] += V;
+				FVoxelBlockState State;
+				if (!TryGetBlock(Position, State))
+				{
+					bKnown = false;
+					State = FVoxelBlockState();
+				}
+				Snapshot.Halo[Face][U + RuntimeSectionSide * V] = State.Pack();
+			}
+		}
+		Snapshot.Known[Face] = bKnown;
+	}
+
+	OutSnapshot = MoveTemp(Snapshot);
+	return true;
 }
-bool FVoxelWorldRuntime::ApplyRemoteSnapshots(const TArray<FVoxelSectionOverlay>&O,TArray<FVoxelSectionStorage>&&Bases)
+
+bool FVoxelWorldRuntime::PrepareEdit(
+	const TArray<FVoxelCellEdit>& InCells,
+	const TArray<FVoxelEntityEdit>& InEntities,
+	FVoxelPreparedEdit& OutPrepared,
+	FString& OutError) const
 {
-    check(IsInGameThread());if(bAuthority||O.Num()!=Bases.Num()||O.Num()>32)return false;TSet<FVoxelSectionKey>Seen;TArray<TSharedPtr<const FVoxelSectionStorage,ESPMode::ThreadSafe>>Natural;Natural.Reserve(Bases.Num());
-    for(int32 I=0;I<O.Num();++I){auto*S=Find(O[I].Key);if(!S||Seen.Contains(O[I].Key)||O[I].Revision<S->Stamp.Revision)return false;Seen.Add(O[I].Key);Natural.Add(MakeShared<FVoxelSectionStorage,ESPMode::ThreadSafe>(Bases[I]));for(const auto&P:O[I].Blocks){if(P.Key>=4096||!Registry->IsValid(P.Value))return false;Bases[I].Set(P.Key,P.Value);}if(!ValidateOverlay(O[I],Bases[I]))return false;}
-    for(int32 I=0;I<O.Num();++I){auto*S=Find(O[I].Key);S->BaseBlocks=Natural[I];S->Blocks=MoveTemp(Bases[I]);S->Overlay=O[I];S->Stamp.Revision=O[I].Revision;S->Status=EVoxelSectionStatus::DataReady;}
-    for(const auto&P:O)Invalidate(P.Key,true);return true;
+	check(IsInGameThread());
+	if (!bAuthority || (InCells.IsEmpty() && InEntities.IsEmpty()))
+	{
+		OutError = TEXT("Voxel edit batch is empty or the runtime is not authoritative");
+		return false;
+	}
+
+	FVoxelPreparedEdit Prepared;
+	Prepared.TransactionId = FGuid::NewGuid();
+	TMap<FIntVector, int32> SectionToPrepared;
+	TSet<FIntVector> SeenPositions;
+
+	for (const FVoxelCellEdit& Edit : InCells)
+	{
+		if (SeenPositions.Contains(Edit.Position) || !ValidateState(Edit.Value))
+		{
+			OutError = TEXT("Voxel edit contains a duplicate position or invalid block state");
+			return false;
+		}
+		SeenPositions.Add(Edit.Position);
+
+		const FIntVector SectionKey = ToSection(Edit.Position);
+		int32* PreparedIndex = SectionToPrepared.Find(SectionKey);
+		if (!PreparedIndex)
+		{
+			const FVoxelSection* Section = FindSection(SectionKey);
+			if (!Section || Section->Status != EVoxelSectionStatus::DataReady || !Section->BaseBlocks)
+			{
+				OutError = TEXT("Voxel edit target is not DataReady");
+				return false;
+			}
+
+			FVoxelPreparedSection NewPrepared;
+			NewPrepared.Before = Section->Stamp;
+			NewPrepared.Blocks = Section->Blocks;
+			NewPrepared.Overlay = Section->Overlay;
+			NewPrepared.Entities = Section->Entities;
+			NewPrepared.Patch.Section = SectionKey;
+			NewPrepared.Patch.FromRevision = Section->CommittedRevision;
+			NewPrepared.Patch.ToRevision = Section->CommittedRevision + 1;
+			const int32 NewIndex = Prepared.Sections.Add(MoveTemp(NewPrepared));
+			SectionToPrepared.Add(SectionKey, NewIndex);
+			PreparedIndex = SectionToPrepared.Find(SectionKey);
+		}
+
+		FVoxelPreparedSection& Target = Prepared.Sections[*PreparedIndex];
+		const int32 CellIndex = ToCellIndex(Edit.Position);
+		if (Target.Blocks[CellIndex] != Edit.Expected)
+		{
+			OutError = TEXT("Voxel edit expected state is stale");
+			return false;
+		}
+		if (Target.Blocks[CellIndex] == Edit.Value)
+		{
+			continue;
+		}
+
+		const FVoxelSection* Source = FindSection(SectionKey);
+		const FVoxelBlockState& Natural = (*Source->BaseBlocks)[CellIndex];
+		Target.Blocks[CellIndex] = Edit.Value;
+		if (Edit.Value == Natural)
+		{
+			Target.Overlay.Remove(CellIndex);
+		}
+		else
+		{
+			Target.Overlay.Add(CellIndex, Edit.Value);
+		}
+
+		FVoxelSectionCellEdit PatchEdit;
+		PatchEdit.CellIndex = CellIndex;
+		PatchEdit.bNatural = Edit.Value == Natural;
+		PatchEdit.State = Edit.Value;
+		Target.Patch.Edits.Add(PatchEdit);
+	}
+
+	for (const FVoxelEntityEdit& Edit : InEntities)
+	{
+		const FIntVector SectionKey = ToSection(Edit.Position);
+		int32* PreparedIndex = SectionToPrepared.Find(SectionKey);
+		if (!PreparedIndex)
+		{
+			const FVoxelSection* Section = FindSection(SectionKey);
+			if (!Section || Section->Status != EVoxelSectionStatus::DataReady || !Section->BaseBlocks)
+			{
+				OutError = TEXT("Voxel entity edit target is not DataReady");
+				return false;
+			}
+			FVoxelPreparedSection NewPrepared;
+			NewPrepared.Before = Section->Stamp;
+			NewPrepared.Blocks = Section->Blocks;
+			NewPrepared.Overlay = Section->Overlay;
+			NewPrepared.Entities = Section->Entities;
+			NewPrepared.Patch.Section = SectionKey;
+			NewPrepared.Patch.FromRevision = Section->CommittedRevision;
+			NewPrepared.Patch.ToRevision = Section->CommittedRevision + 1;
+			const int32 NewIndex = Prepared.Sections.Add(MoveTemp(NewPrepared));
+			SectionToPrepared.Add(SectionKey, NewIndex);
+			PreparedIndex = SectionToPrepared.Find(SectionKey);
+		}
+
+		FVoxelPreparedSection& Target = Prepared.Sections[*PreparedIndex];
+		const int32 CellIndex = ToCellIndex(Edit.Position);
+		if (Target.Patch.Entities.ContainsByPredicate([CellIndex](const FVoxelEntityWrite& InWrite)
+		{
+			return InWrite.CellIndex == CellIndex;
+		}))
+		{
+			OutError = TEXT("Voxel entity edit contains a duplicate position");
+			return false;
+		}
+		FVoxelEntityWrite Write;
+		Write.CellIndex = CellIndex;
+		Write.bRemove = Edit.bRemove;
+		Write.Value = Edit.Value;
+		if (Write.bRemove)
+		{
+			Target.Entities.Remove(CellIndex);
+		}
+		else
+		{
+			Target.Entities.Add(CellIndex, Write.Value);
+		}
+		Target.Patch.Entities.Add(MoveTemp(Write));
+	}
+
+	Prepared.Sections.RemoveAll([](const FVoxelPreparedSection& InSection)
+	{
+		return InSection.Patch.Edits.IsEmpty() && InSection.Patch.Entities.IsEmpty();
+	});
+
+	for (const FVoxelPreparedSection& Section : Prepared.Sections)
+	{
+		if (!ValidateSection(Section.Blocks, Section.Overlay, OutError))
+		{
+			return false;
+		}
+	}
+
+	OutPrepared = MoveTemp(Prepared);
+	OutError.Reset();
+	return true;
 }
-bool FVoxelWorldRuntime::Remove(const FVoxelSectionKey&K,bool Discard)
+
+bool FVoxelWorldRuntime::CommitPreparedEdit(
+	FVoxelPreparedEdit&& InPrepared,
+	FVoxelEditBatch& OutBatch,
+	FString& OutError)
 {
-    check(IsInGameThread());auto*S=Find(K);if(!S)return true;if(S->PinCount||(!Discard&&bAuthority&&S->IsSaveDirty()))return false;
-    S->Status=EVoxelSectionStatus::Unloading;Sections.Remove(K);for(uint8 F=0;F<6;++F)Invalidate(VoxelCoord::Neighbor(K,F),false);return true;
+	check(IsInGameThread());
+	if (!bAuthority)
+	{
+		OutError = TEXT("Only the authoritative voxel runtime may commit local edits");
+		return false;
+	}
+
+	for (const FVoxelPreparedSection& PreparedSection : InPrepared.Sections)
+	{
+		if (!IsCurrentStamp(PreparedSection.Patch.Section, PreparedSection.Before))
+		{
+			OutError = TEXT("Voxel prepared edit stamp is stale");
+			return false;
+		}
+		const FVoxelSection* Section = FindSection(PreparedSection.Patch.Section);
+		if (!Section || Section->CommittedRevision != PreparedSection.Patch.FromRevision)
+		{
+			OutError = TEXT("Voxel prepared edit revision is stale");
+			return false;
+		}
+	}
+
+	FVoxelEditBatch Batch;
+	Batch.TransactionId = InPrepared.TransactionId;
+	for (FVoxelPreparedSection& PreparedSection : InPrepared.Sections)
+	{
+		FVoxelSection* Section = FindSection(PreparedSection.Patch.Section);
+		PublishPatchCandidate(
+			*Section,
+			PreparedSection.Patch,
+			MoveTemp(PreparedSection.Blocks),
+			MoveTemp(PreparedSection.Overlay),
+			MoveTemp(PreparedSection.Entities));
+		Batch.Sections.Add(MoveTemp(PreparedSection.Patch));
+	}
+
+	OutBatch = MoveTemp(Batch);
+	OutError.Reset();
+	return true;
 }
-void FVoxelWorldRuntime::MarkCommitted(const FVoxelSectionKey&K,uint64 R)
-{if(auto*S=Find(K))if(R<=S->Stamp.Revision)S->CommittedRevision=FMath::Max(S->CommittedRevision,R);}
-void FVoxelWorldRuntime::MarkMeshApplied(const FVoxelTaskStamp&T){if(IsCurrent(T))Find(T.Key)->bMeshDirty=false;}
-void FVoxelWorldRuntime::MarkCollisionApplied(const FVoxelTaskStamp&T){if(IsCurrent(T)){Find(T.Key)->bCollisionDirty=false;Find(T.Key)->bHasCollision=true;}}
+
+bool FVoxelWorldRuntime::ApplyPatch(const FVoxelSectionPatch& InPatch, FString& OutError)
+{
+	check(IsInGameThread());
+	FVoxelSection* Section = FindSection(InPatch.Section);
+	if (!Section)
+	{
+		OutError = TEXT("Voxel patch target does not exist");
+		return false;
+	}
+
+	TArray<FVoxelBlockState> CandidateBlocks;
+	TMap<int32, FVoxelBlockState> CandidateOverlay;
+	TMap<int32, FVoxelBlockEntityState> CandidateEntities;
+	if (!BuildPatchCandidate(*Section, InPatch, CandidateBlocks, CandidateOverlay, CandidateEntities, OutError))
+	{
+		return false;
+	}
+
+	PublishPatchCandidate(
+		*Section,
+		InPatch,
+		MoveTemp(CandidateBlocks),
+		MoveTemp(CandidateOverlay),
+		MoveTemp(CandidateEntities));
+	OutError.Reset();
+	return true;
+}
+
+bool FVoxelWorldRuntime::ApplyRemotePatchBatch(
+	const FVoxelEditBatch& InBatch,
+	FString& OutError)
+{
+	check(IsInGameThread());
+	if (bAuthority)
+	{
+		OutError = TEXT("Authoritative voxel runtime cannot apply a remote patch batch");
+		return false;
+	}
+
+	struct FCandidate
+	{
+		FVoxelSection* Section = nullptr;
+		const FVoxelSectionPatch* Patch = nullptr;
+		TArray<FVoxelBlockState> Blocks;
+		TMap<int32, FVoxelBlockState> Overlay;
+		TMap<int32, FVoxelBlockEntityState> Entities;
+	};
+
+	TArray<FCandidate> Candidates;
+	Candidates.Reserve(InBatch.Sections.Num());
+	TSet<FIntVector> SeenSections;
+	for (const FVoxelSectionPatch& Patch : InBatch.Sections)
+	{
+		if (SeenSections.Contains(Patch.Section))
+		{
+			OutError = TEXT("Voxel remote patch batch contains a duplicate section");
+			return false;
+		}
+		SeenSections.Add(Patch.Section);
+
+		FCandidate& Candidate = Candidates.AddDefaulted_GetRef();
+		Candidate.Section = FindSection(Patch.Section);
+		Candidate.Patch = &Patch;
+		if (!Candidate.Section ||
+			!BuildPatchCandidate(
+				*Candidate.Section,
+				Patch,
+				Candidate.Blocks,
+				Candidate.Overlay,
+				Candidate.Entities,
+				OutError))
+		{
+			return false;
+		}
+	}
+
+	for (FCandidate& Candidate : Candidates)
+	{
+		PublishPatchCandidate(
+			*Candidate.Section,
+			*Candidate.Patch,
+			MoveTemp(Candidate.Blocks),
+			MoveTemp(Candidate.Overlay),
+			MoveTemp(Candidate.Entities));
+	}
+
+	OutError.Reset();
+	return true;
+}
+
+bool FVoxelWorldRuntime::RemoveSection(
+	const FIntVector& InSection,
+	const bool bDiscardModified)
+{
+	check(IsInGameThread());
+	FVoxelSection* Section = FindSection(InSection);
+	if (!Section)
+	{
+		return true;
+	}
+
+	if (Section->PinCount.Load() > 0 ||
+		(!bDiscardModified && bAuthority && Section->PersistedRevision != Section->CommittedRevision))
+	{
+		return false;
+	}
+
+	Section->Status = EVoxelSectionStatus::Unloading;
+	Sections.Remove(InSection);
+	ChangeHierarchy.ReleaseSection(InSection);
+	return true;
+}
+
+void FVoxelWorldRuntime::MarkCommitted(
+	const FIntVector& InSection,
+	const uint64 InRevision)
+{
+	if (FVoxelSection* Section = FindSection(InSection))
+	{
+		if (InRevision != Section->CommittedRevision)
+		{
+			return;
+		}
+		Section->PersistedRevision = InRevision;
+	}
+}
+
+bool FVoxelWorldRuntime::IsCurrentStamp(
+	const FIntVector& InSection,
+	const FVoxelSectionStamp& InStamp) const
+{
+	const FVoxelSection* Section = FindSection(InSection);
+	return Section &&
+		Section->Status != EVoxelSectionStatus::Unloading &&
+		Section->Stamp == InStamp;
+}
+
+int32 FVoxelWorldRuntime::NumSections() const
+{
+	return Sections.Num();
+}
+
+uint64 FVoxelWorldRuntime::Epoch() const
+{
+	return WorldEpoch;
+}
+
+bool FVoxelWorldRuntime::IsServer() const
+{
+	return bAuthority;
+}
+
+FVoxelChangeHierarchy& FVoxelWorldRuntime::GetChangeHierarchy()
+{
+	return ChangeHierarchy;
+}
+
+const FVoxelChangeHierarchy& FVoxelWorldRuntime::GetChangeHierarchy() const
+{
+	return ChangeHierarchy;
+}
+
+FVoxelChangeIndex& FVoxelWorldRuntime::GetChangeIndex()
+{
+	return ChangeIndex;
+}
+
+const FVoxelChangeIndex& FVoxelWorldRuntime::GetChangeIndex() const
+{
+	return ChangeIndex;
+}
+
+bool FVoxelWorldRuntime::ValidateState(const FVoxelBlockState& InState) const
+{
+	return Registry->IsValid(InState);
+}
+
+bool FVoxelWorldRuntime::ValidateSection(
+	const TArray<FVoxelBlockState>& InBlocks,
+	const TMap<int32, FVoxelBlockState>& InOverlay,
+	FString& OutError) const
+{
+	if (InBlocks.Num() != SectionVolume || InOverlay.Num() > SectionVolume)
+	{
+		OutError = TEXT("Voxel section cell count or overlay size is invalid");
+		return false;
+	}
+
+	for (const FVoxelBlockState& State : InBlocks)
+	{
+		if (!ValidateState(State))
+		{
+			OutError = TEXT("Voxel section contains an invalid block state");
+			return false;
+		}
+	}
+
+	for (const TPair<int32, FVoxelBlockState>& Pair : InOverlay)
+	{
+		if (!InBlocks.IsValidIndex(Pair.Key) || InBlocks[Pair.Key] != Pair.Value)
+		{
+			OutError = TEXT("Voxel overlay does not match final section data");
+			return false;
+		}
+	}
+
+	return true;
+}
+
+bool FVoxelWorldRuntime::BuildPatchCandidate(
+	const FVoxelSection& InSection,
+	const FVoxelSectionPatch& InPatch,
+	TArray<FVoxelBlockState>& OutBlocks,
+	TMap<int32, FVoxelBlockState>& OutOverlay,
+	TMap<int32, FVoxelBlockEntityState>& OutEntities,
+	FString& OutError) const
+{
+	if (InSection.Status != EVoxelSectionStatus::DataReady)
+	{
+		OutError = TEXT("Voxel patch target is not DataReady");
+		return false;
+	}
+	if (InSection.CommittedRevision != InPatch.FromRevision ||
+		InPatch.ToRevision != InPatch.FromRevision + 1)
+	{
+		OutError = TEXT("Voxel patch revision mismatch");
+		return false;
+	}
+	if (!InSection.BaseBlocks || InSection.BaseBlocks->Num() != InSection.Blocks.Num())
+	{
+		OutError = TEXT("Voxel patch target has no valid natural base");
+		return false;
+	}
+
+	OutBlocks = InSection.Blocks;
+	OutOverlay = InSection.Overlay;
+	OutEntities = InSection.Entities;
+	TSet<int32> SeenCells;
+	for (const FVoxelSectionCellEdit& Edit : InPatch.Edits)
+	{
+		if (!OutBlocks.IsValidIndex(Edit.CellIndex) || SeenCells.Contains(Edit.CellIndex))
+		{
+			OutError = TEXT("Voxel patch cell index is invalid or duplicated");
+			return false;
+		}
+		SeenCells.Add(Edit.CellIndex);
+
+		const FVoxelBlockState& Natural = (*InSection.BaseBlocks)[Edit.CellIndex];
+		const FVoxelBlockState FinalState = Edit.bNatural ? Natural : Edit.State;
+		if (!ValidateState(FinalState))
+		{
+			OutError = TEXT("Voxel patch contains an invalid block state");
+			return false;
+		}
+		OutBlocks[Edit.CellIndex] = FinalState;
+		if (FinalState == Natural)
+		{
+			OutOverlay.Remove(Edit.CellIndex);
+		}
+		else
+		{
+			OutOverlay.Add(Edit.CellIndex, FinalState);
+		}
+	}
+	TSet<int32> SeenEntities;
+	for (const FVoxelEntityWrite& Write : InPatch.Entities)
+	{
+		if (!OutBlocks.IsValidIndex(Write.CellIndex) || SeenEntities.Contains(Write.CellIndex))
+		{
+			OutError = TEXT("Voxel patch entity index is invalid or duplicated");
+			return false;
+		}
+		SeenEntities.Add(Write.CellIndex);
+		if (Write.bRemove)
+		{
+			OutEntities.Remove(Write.CellIndex);
+		}
+		else
+		{
+			OutEntities.Add(Write.CellIndex, Write.Value);
+		}
+	}
+
+	return ValidateSection(OutBlocks, OutOverlay, OutError);
+}
+
+void FVoxelWorldRuntime::PublishPatchCandidate(
+	FVoxelSection& InSection,
+	const FVoxelSectionPatch& InPatch,
+	TArray<FVoxelBlockState>&& InBlocks,
+	TMap<int32, FVoxelBlockState>&& InOverlay,
+	TMap<int32, FVoxelBlockEntityState>&& InEntities)
+{
+	InSection.Blocks = MoveTemp(InBlocks);
+	InSection.Overlay = MoveTemp(InOverlay);
+	InSection.Entities = MoveTemp(InEntities);
+	InSection.CommittedRevision = InPatch.ToRevision;
+	InSection.bCollisionDirty = true;
+	InSection.bFineMeshDirty = true;
+	ChangeIndex.SetModified(InPatch.Section, !InSection.Overlay.IsEmpty() || !InSection.Entities.IsEmpty());
+	ChangeHierarchy.InvalidateSection(InPatch.Section);
+}

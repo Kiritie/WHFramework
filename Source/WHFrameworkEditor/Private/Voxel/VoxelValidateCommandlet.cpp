@@ -3,7 +3,7 @@
 #include "Voxel/Prefabs/Data/VoxelPrefabData.h"
 #include "Voxel/Rendering/VoxelMaterialSet.h"
 #include "Voxel/Runtime/VoxelRegistry.h"
-#include "Voxel/Generation/Assets/VoxelWorldGenerationProfile.h"
+#include "Voxel/Authoring/VoxelWorldGenerationProfile.h"
 #include "Voxel/Generation/VoxelGenerationBinding.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Engine/Texture2D.h"

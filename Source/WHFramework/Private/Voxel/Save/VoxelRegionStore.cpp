@@ -1,125 +1,466 @@
 #include "Voxel/Save/VoxelRegionStore.h"
-#include "SaveGame/SaveGameStorage.h"
-#include "Voxel/Serialization/VoxelBinaryCodec.h"
+
 #include "HAL/FileManager.h"
-#include "Misc/Paths.h"
 #include "Misc/Crc.h"
+#include "Misc/Paths.h"
+#include "SaveGame/SaveGameStorage.h"
+#include "String/LexFromString.h"
+#include "Voxel/Generation/VoxelGenerationMath.h"
+#include "Voxel/Serialization/VoxelBinaryCodec.h"
+
 namespace
 {
-constexpr uint32 RegionMagic=0x32525856;
-constexpr uint32 MaxRecord=1024*1024+65536+16;
-struct FEntry{uint16 Local=0;uint64 Offset=0;uint32 Size=0,Crc=0;};
-struct FRegionIndex{TArray<FEntry>Entries;};
-FVoxelSectionKey Region(const FVoxelSectionKey&K){return {VoxelCoord::FloorDiv(K.X,8),VoxelCoord::FloorDiv(K.Y,8),VoxelCoord::FloorDiv(K.Z,8)};}
-uint16 LocalKey(const FVoxelSectionKey&K){auto R=Region(K);return uint16(K.X-R.X*8+(K.Y-R.Y*8)*8+(K.Z-R.Z*8)*64);}
-FString Path(const FString&Dir,const FVoxelSectionKey&R){return FPaths::Combine(Dir,TEXT("voxel"),TEXT("regions"),FString::Printf(TEXT("r_%d_%d_%d.bin"),R.X,R.Y,R.Z));}
-bool ReadBytes(FArchive&Ar,int64 Offset,int32 Size,TArray<uint8>&Out)
-{
-    if(Offset<0||Size<0||Offset>Ar.TotalSize()||int64(Size)>Ar.TotalSize()-Offset)return false;
-    TArray<uint8>B;B.SetNumUninitialized(Size);Ar.Seek(Offset);if(Size)Ar.Serialize(B.GetData(),Size);
-    if(Ar.IsError())return false;Out=MoveTemp(B);return true;
+	constexpr uint32 RegionMagic = 0x33525856;
+	constexpr int32 HeaderBytes = 84;
+	constexpr int32 IndexEntryBytes = 18;
+	constexpr uint32 MaxRecordBytes = 1024 * 1024 + 65536 + 16;
+
+	struct FEntry
+	{
+		uint16 Local = 0;
+		uint64 Offset = 0;
+		uint32 Size = 0;
+		uint32 Crc = 0;
+	};
+
+	struct FRegionIndex
+	{
+		FVoxelRegionFileHeader Header;
+		TArray<FEntry> Entries;
+	};
+
+	FIntVector RegionOf(const FIntVector& InSection)
+	{
+		return FIntVector(
+			VoxelGeneration::FloorDivide(InSection.X, 8),
+			VoxelGeneration::FloorDivide(InSection.Y, 8),
+			VoxelGeneration::FloorDivide(InSection.Z, 8));
+	}
+
+	int32 RegionPositiveMod(const int32 InValue)
+	{
+		const int32 Value = InValue % 8;
+		return Value < 0 ? Value + 8 : Value;
+	}
+
+	uint16 LocalOf(const FIntVector& InSection)
+	{
+		return static_cast<uint16>(
+			RegionPositiveMod(InSection.X) +
+			RegionPositiveMod(InSection.Y) * 8 +
+			RegionPositiveMod(InSection.Z) * 64);
+	}
+
+	FString RegionPath(const FString& InDirectory, const FIntVector& InRegion)
+	{
+		return FPaths::Combine(
+			InDirectory,
+			TEXT("voxel"),
+			TEXT("regions"),
+			FString::Printf(TEXT("r_%d_%d_%d.bin"), InRegion.X, InRegion.Y, InRegion.Z));
+	}
+
+	bool ReadBytes(FArchive& InArchive, const int64 InOffset, const int32 InSize, TArray<uint8>& OutBytes)
+	{
+		if (InOffset < 0 || InSize < 0 || InOffset > InArchive.TotalSize() || InSize > InArchive.TotalSize() - InOffset)
+		{
+			return false;
+		}
+		OutBytes.SetNumUninitialized(InSize);
+		InArchive.Seek(InOffset);
+		if (InSize > 0)
+		{
+			InArchive.Serialize(OutBytes.GetData(), InSize);
+		}
+		return !InArchive.IsError();
+	}
+
+	EVoxelRegionRead ReadIndex(const FString& InPath, FRegionIndex& OutIndex, FString& OutError)
+	{
+		if (!IFileManager::Get().FileExists(*InPath))
+		{
+			return EVoxelRegionRead::Missing;
+		}
+		TUniquePtr<FArchive> File(IFileManager::Get().CreateFileReader(*InPath));
+		if (!File)
+		{
+			OutError = TEXT("Cannot open voxel region file");
+			return EVoxelRegionRead::Failed;
+		}
+		TArray<uint8> HeaderData;
+		if (!ReadBytes(*File, 0, HeaderBytes, HeaderData))
+		{
+			OutError = TEXT("Truncated voxel region header");
+			return EVoxelRegionRead::Failed;
+		}
+		FVoxelByteReader Reader(HeaderData);
+		FRegionIndex Index;
+		Index.Header.Magic = Reader.U32();
+		Index.Header.Version = Reader.U32();
+		Index.Header.EntryCount = Reader.U32();
+		Index.Header.RegionRevision = Reader.U64();
+		for (uint64& Word : Index.Header.ModifiedMask)
+		{
+			Word = Reader.U64();
+		}
+		if (!Reader.End() ||
+			Index.Header.Magic != RegionMagic ||
+			Index.Header.Version != VoxelRegionFileVersion ||
+			Index.Header.EntryCount > 512)
+		{
+			OutError = TEXT("Voxel region V3 header is invalid");
+			return EVoxelRegionRead::Failed;
+		}
+		TArray<uint8> IndexData;
+		if (!ReadBytes(*File, HeaderBytes, Index.Header.EntryCount * IndexEntryBytes, IndexData))
+		{
+			OutError = TEXT("Truncated voxel region index");
+			return EVoxelRegionRead::Failed;
+		}
+		FVoxelByteReader IndexReader(IndexData);
+		uint64 ExpectedOffset = HeaderBytes + static_cast<uint64>(Index.Header.EntryCount) * IndexEntryBytes;
+		int32 PreviousLocal = INDEX_NONE;
+		uint64 ExpectedMask[8] = {};
+		for (uint32 EntryIndex = 0; EntryIndex < Index.Header.EntryCount; ++EntryIndex)
+		{
+			FEntry Entry;
+			Entry.Local = IndexReader.U16();
+			Entry.Offset = IndexReader.U64();
+			Entry.Size = IndexReader.U32();
+			Entry.Crc = IndexReader.U32();
+			if (Entry.Local >= 512 ||
+				Entry.Local <= PreviousLocal ||
+				Entry.Offset != ExpectedOffset ||
+				Entry.Size == 0 ||
+				Entry.Size > MaxRecordBytes ||
+				Entry.Offset + Entry.Size > static_cast<uint64>(File->TotalSize()))
+			{
+				OutError = TEXT("Voxel region index bounds are invalid");
+				return EVoxelRegionRead::Failed;
+			}
+			ExpectedMask[Entry.Local / 64] |= 1ull << (Entry.Local % 64);
+			PreviousLocal = Entry.Local;
+			ExpectedOffset += Entry.Size;
+			Index.Entries.Add(Entry);
+		}
+		if (!IndexReader.End() || ExpectedOffset != static_cast<uint64>(File->TotalSize()))
+		{
+			OutError = TEXT("Voxel region payload bounds are invalid");
+			return EVoxelRegionRead::Failed;
+		}
+		for (int32 Word = 0; Word < 8; ++Word)
+		{
+			if (ExpectedMask[Word] != Index.Header.ModifiedMask[Word])
+			{
+				OutError = TEXT("Voxel region modified mask does not match its index");
+				return EVoxelRegionRead::Failed;
+			}
+		}
+		OutIndex = MoveTemp(Index);
+		return EVoxelRegionRead::Loaded;
+	}
+
+	bool ReadEntry(FArchive& InArchive, const FEntry& InEntry, TArray<uint8>& OutBytes)
+	{
+		return ReadBytes(InArchive, InEntry.Offset, InEntry.Size, OutBytes) &&
+			FCrc::MemCrc32(OutBytes.GetData(), OutBytes.Num()) == InEntry.Crc;
+	}
 }
-EVoxelRegionRead ReadIndex(const FString&P,FRegionIndex&Out,FString&E)
+
+void FVoxelRegionStore::SetSource(
+	const FGuid& InSaveId,
+	const int32 InGeneration,
+	FSaveGameStorage* InStorage)
 {
-    if(!IFileManager::Get().FileExists(*P))return EVoxelRegionRead::Missing;
-    TUniquePtr<FArchive>F(IFileManager::Get().CreateFileReader(*P));if(!F){E=TEXT("Cannot open region file");return EVoxelRegionRead::Failed;}
-    TArray<uint8>Head;if(!ReadBytes(*F,0,8,Head)){E=TEXT("Truncated region header");return EVoxelRegionRead::Failed;}
-    FVoxelByteReader H(Head);uint32 M=H.U32();uint16 V=H.U16(),N=H.U16();
-    if(M!=RegionMagic||V!=2||N>512){E=TEXT("Region schema mismatch");return EVoxelRegionRead::Failed;}
-    TArray<uint8>Table;if(!ReadBytes(*F,8,int32(N)*18,Table)){E=TEXT("Truncated region index");return EVoxelRegionRead::Failed;}
-    FVoxelByteReader Q(Table);FRegionIndex T;uint64 Expected=8+uint64(N)*18;int32 Prev=-1;
-    for(uint16 I=0;I<N;++I)
-    {
-        FEntry A;A.Local=Q.U16();A.Offset=Q.U64();A.Size=Q.U32();A.Crc=Q.U32();
-        if(A.Local>=512||A.Local<=Prev||A.Offset!=Expected||A.Size==0||A.Size>MaxRecord||A.Offset>uint64(F->TotalSize())||A.Size>uint64(F->TotalSize())-A.Offset)
-        {E=TEXT("Invalid region index bounds");return EVoxelRegionRead::Failed;}
-        Prev=A.Local;Expected+=A.Size;T.Entries.Add(A);
-    }
-    if(!Q.End()||Expected!=uint64(F->TotalSize())){E=TEXT("Region trailing or missing bytes");return EVoxelRegionRead::Failed;}
-    Out=MoveTemp(T);return EVoxelRegionRead::Loaded;
+	check(IsInGameThread());
+	SourceDirectory = InStorage && InSaveId.IsValid() && InGeneration > 0 ?
+		InStorage->GetGenerationDir(InSaveId, InGeneration) : FString();
 }
-bool ReadEntry(FArchive&F,const FEntry&E,TArray<uint8>&Out)
+
+void FVoxelRegionStore::Reset()
 {
-    TArray<uint8>B;if(!ReadBytes(F,int64(E.Offset),int32(E.Size),B)||FCrc::MemCrc32(B.GetData(),B.Num())!=E.Crc)return false;Out=MoveTemp(B);return true;
+	SourceDirectory.Reset();
 }
-}
-void FVoxelRegionStore::SetSource(const FGuid&Id,int32 G,FSaveGameStorage*S)
-{check(IsInGameThread());SourceDirectory=S&&Id.IsValid()&&G>0?S->GetGenerationDir(Id,G):FString();}
-FVoxelRegionReadView FVoxelRegionStore::CaptureRead(const FVoxelSectionKey&K)const
-{return {SourceDirectory,K};}
-EVoxelRegionRead FVoxelRegionStore::Read(const FVoxelRegionReadView&V,TArray<uint8>&O,FString&E)
+
+const FString& FVoxelRegionStore::GetSourceDirectory() const
 {
-    if(V.SourceDirectory.IsEmpty())return EVoxelRegionRead::Missing;
-    FString P=Path(V.SourceDirectory,Region(V.Key));FRegionIndex I;auto R=ReadIndex(P,I,E);if(R!=EVoxelRegionRead::Loaded)return R;
-    const uint16 L=LocalKey(V.Key);const FEntry*Found=I.Entries.FindByPredicate([L](const FEntry&A){return A.Local==L;});
-    if(!Found)return EVoxelRegionRead::Missing;TUniquePtr<FArchive>F(IFileManager::Get().CreateFileReader(*P));
-    if(!F||!ReadEntry(*F,*Found,O)){E=TEXT("Region record read/checksum failed");return EVoxelRegionRead::Failed;}return EVoxelRegionRead::Loaded;
+	return SourceDirectory;
 }
-bool FVoxelRegionStore::ReadRange(const FString&Directory,const FVoxelSectionKey&Min,const FVoxelSectionKey&Max,const TSet<FVoxelSectionKey>&SupersededResident,TMap<FVoxelSectionKey,TArray<uint8>>&Out,bool&bOverBudget,FString&Error,const std::atomic_bool*Cancel)
+
+void FVoxelRegionStore::AdvanceSource(const FString& InCommittedDirectory)
 {
-    bOverBudget=false;Error.Reset();const int64 DX=int64(Max.X)-Min.X,DY=int64(Max.Y)-Min.Y,DZ=int64(Max.Z)-Min.Z;
-    if(DX<=0||DY<=0||DZ<=0||DX>16||DY>16||DZ>16){Error=TEXT("Proxy range must fit at most 16x16x16 sections");return false;}
-    TMap<FVoxelSectionKey,TArray<uint8>> Result;if(Directory.IsEmpty()){Out=MoveTemp(Result);return true;}
-    if(!IFileManager::Get().DirectoryExists(*Directory)){Error=TEXT("Captured save generation no longer exists");return false;}
-    const FVoxelSectionKey First=Region(Min),Last=Region({Max.X-1,Max.Y-1,Max.Z-1});uint64 Bytes=0;constexpr uint64 MaxBytes=32ull*1024*1024;
-    for(int32 Z=First.Z;Z<=Last.Z;++Z)for(int32 Y=First.Y;Y<=Last.Y;++Y)for(int32 X=First.X;X<=Last.X;++X)
-    {
-        if(Cancel&&Cancel->load(std::memory_order_relaxed)){Error=TEXT("Canceled proxy read");return false;}
-        const FVoxelSectionKey RK{X,Y,Z};const FString Filename=Path(Directory,RK);FRegionIndex Index;const auto Status=ReadIndex(Filename,Index,Error);if(Status==EVoxelRegionRead::Failed)return false;if(Status==EVoxelRegionRead::Missing)continue;
-        TUniquePtr<FArchive>File(IFileManager::Get().CreateFileReader(*Filename));if(!File){Error=TEXT("Cannot open indexed proxy region");return false;}
-        for(const FEntry&Entry:Index.Entries){const FVoxelSectionKey Key{X*8+Entry.Local%8,Y*8+(Entry.Local/8)%8,Z*8+Entry.Local/64};if(Key.X<Min.X||Key.X>=Max.X||Key.Y<Min.Y||Key.Y>=Max.Y||Key.Z<Min.Z||Key.Z>=Max.Z||SupersededResident.Contains(Key))continue;Bytes+=Entry.Size;if(Bytes>MaxBytes){bOverBudget=true;Out.Reset();return true;}TArray<uint8>Data;if(!ReadEntry(*File,Entry,Data)){Error=TEXT("Proxy region payload CRC/read failure");return false;}Result.Add(Key,MoveTemp(Data));}
-    }
-    if(!IFileManager::Get().DirectoryExists(*Directory)){Error=TEXT("Save generation changed while reading");return false;}Out=MoveTemp(Result);return true;
+	SourceDirectory = InCommittedDirectory;
 }
-bool FVoxelRegionStore::StageSection(FVoxelRegionWritePlan&P,const FVoxelSectionKey&K,TArray<uint8>&&B)
+
+FVoxelRegionReadView FVoxelRegionStore::CaptureRead(const FIntVector& InSection) const
 {
-    if(B.IsEmpty()||B.Num()>int32(MaxRecord))return false;FVoxelRegionOperation O;
-    O.Bytes=MakeShared<TArray<uint8>,ESPMode::ThreadSafe>(MoveTemp(B));P.Operations.Add(K,MoveTemp(O));return true;
+	return { SourceDirectory, InSection };
 }
-void FVoxelRegionStore::StageDelete(FVoxelRegionWritePlan&P,const FVoxelSectionKey&K)
-{FVoxelRegionOperation O;O.bDelete=true;P.Operations.Add(K,MoveTemp(O));}
-bool FVoxelRegionStore::WritePendingRegions(const FVoxelRegionWritePlan&P,const FString&Temp,FString&E)
+
+EVoxelRegionRead FVoxelRegionStore::ReadSection(
+	const FIntVector& InSection,
+	TArray<uint8>& OutBytes,
+	FString& OutError) const
 {
-    if(!P.TransactionId.IsValid()||Temp.IsEmpty()||(!P.SourceDirectory.IsEmpty()&&FPaths::IsSamePath(P.SourceDirectory,Temp)))
-    {E=TEXT("Invalid region write target");return false;}
-    TMap<FVoxelSectionKey,TArray<FVoxelSectionKey>>Groups;
-    for(const auto&X:P.Operations)Groups.FindOrAdd(Region(X.Key)).Add(X.Key);
-    for(const auto&G:Groups)
-    {
-        FString Source=Path(P.SourceDirectory,G.Key),Dest=Path(Temp,G.Key);FRegionIndex Old;
-        if(!P.SourceDirectory.IsEmpty()&&ReadIndex(Source,Old,E)==EVoxelRegionRead::Failed)return false;
-        struct FOutput{FEntry Entry;TSharedPtr<const TArray<uint8>,ESPMode::ThreadSafe>Replacement;};
-        TMap<uint16,FOutput>Output;
-        for(const auto&A:Old.Entries){FOutput O;O.Entry=A;Output.Add(A.Local,MoveTemp(O));}
-        for(const auto&K:G.Value)
-        {
-            const auto&Op=P.Operations.FindChecked(K);uint16 L=LocalKey(K);
-            if(Op.bDelete){Output.Remove(L);continue;}
-            if(!Op.Bytes||Op.Bytes->IsEmpty()||Op.Bytes->Num()>int32(MaxRecord)){E=TEXT("Invalid staged region bytes");return false;}
-            FOutput O;O.Entry.Local=L;O.Entry.Size=uint32(Op.Bytes->Num());O.Entry.Crc=FCrc::MemCrc32(Op.Bytes->GetData(),Op.Bytes->Num());O.Replacement=Op.Bytes;Output.Add(L,MoveTemp(O));
-        }
-        if(Output.IsEmpty())
-        {
-            if(IFileManager::Get().FileExists(*Dest)&&!IFileManager::Get().Delete(*Dest,false,true)){E=TEXT("Cannot remove empty target region");return false;}continue;
-        }
-        if(!IFileManager::Get().MakeDirectory(*FPaths::GetPath(Dest),true)){E=TEXT("Cannot create region directory");return false;}
-        TArray<uint16>Keys;Output.GetKeys(Keys);Keys.Sort();FVoxelByteWriter W(8+512*18);W.U32(RegionMagic);W.U16(2);W.U16(uint16(Keys.Num()));
-        uint64 Offset=8+uint64(Keys.Num())*18;
-        for(uint16 K:Keys){const auto&O=Output.FindChecked(K);W.U16(K);W.U64(Offset);W.U32(O.Entry.Size);W.U32(O.Entry.Crc);Offset+=O.Entry.Size;}
-        TArray<uint8>Header;if(!W.Finish(Header))return false;TUniquePtr<FArchive>Writer(IFileManager::Get().CreateFileWriter(*Dest));
-        if(!Writer){E=TEXT("Cannot write region");return false;}Writer->Serialize(Header.GetData(),Header.Num());
-        TUniquePtr<FArchive>Reader;
-        for(uint16 K:Keys)
-        {
-            const auto&O=Output.FindChecked(K);TArray<uint8>Copied;const TArray<uint8>*Bytes=O.Replacement.Get();
-            if(!Bytes)
-            {
-                if(!Reader)Reader.Reset(IFileManager::Get().CreateFileReader(*Source));
-                if(!Reader||!ReadEntry(*Reader,O.Entry,Copied)){E=TEXT("Cannot copy verified source record");return false;}Bytes=&Copied;
-            }
-            Writer->Serialize(const_cast<uint8*>(Bytes->GetData()),Bytes->Num());if(Writer->IsError()){E=TEXT("Region write failed");return false;}
-        }
-        if(!Writer->Close()){E=TEXT("Region close failed");return false;}
-    }
-    return true;
+	return Read(CaptureRead(InSection), OutBytes, OutError);
+}
+
+bool FVoxelRegionStore::ReadChangeHeader(
+	const FIntVector& InRegion,
+	uint64& OutRevision,
+	TArray<uint64>& OutModifiedMask,
+	FString& OutError) const
+{
+	FRegionIndex Index;
+	const EVoxelRegionRead Status = ReadIndex(RegionPath(SourceDirectory, InRegion), Index, OutError);
+	if (Status == EVoxelRegionRead::Failed)
+	{
+		return false;
+	}
+	OutModifiedMask.SetNumZeroed(8);
+	OutRevision = 0;
+	if (Status == EVoxelRegionRead::Loaded)
+	{
+		OutRevision = Index.Header.RegionRevision;
+		for (int32 Word = 0; Word < 8; ++Word)
+		{
+			OutModifiedMask[Word] = Index.Header.ModifiedMask[Word];
+		}
+	}
+	return true;
+}
+
+bool FVoxelRegionStore::ScanChangeHeaders(
+	TFunctionRef<void(const FIntVector&, uint64, const TArray<uint64>&)> InVisit,
+	FString& OutError) const
+{
+	if (SourceDirectory.IsEmpty())
+	{
+		return true;
+	}
+	TArray<FString> Files;
+	IFileManager::Get().FindFiles(
+		Files,
+		*FPaths::Combine(SourceDirectory, TEXT("voxel"), TEXT("regions"), TEXT("r_*_*_*.bin")),
+		true,
+		false);
+	Files.Sort();
+	for (const FString& File : Files)
+	{
+		FString Name = FPaths::GetBaseFilename(File);
+		TArray<FString> Parts;
+		Name.ParseIntoArray(Parts, TEXT("_"), true);
+		FIntVector Region;
+		if (Parts.Num() != 4 ||
+			Parts[0] != TEXT("r") ||
+			!LexTryParseString(Region.X, *Parts[1]) ||
+			!LexTryParseString(Region.Y, *Parts[2]) ||
+			!LexTryParseString(Region.Z, *Parts[3]))
+		{
+			OutError = TEXT("Invalid voxel region filename");
+			return false;
+		}
+		uint64 Revision = 0;
+		TArray<uint64> Mask;
+		if (!ReadChangeHeader(Region, Revision, Mask, OutError))
+		{
+			return false;
+		}
+		InVisit(Region, Revision, Mask);
+	}
+	return true;
+}
+
+EVoxelRegionRead FVoxelRegionStore::Read(
+	const FVoxelRegionReadView& InView,
+	TArray<uint8>& OutBytes,
+	FString& OutError)
+{
+	if (InView.SourceDirectory.IsEmpty())
+	{
+		return EVoxelRegionRead::Missing;
+	}
+	const FString Path = RegionPath(InView.SourceDirectory, RegionOf(InView.Section));
+	FRegionIndex Index;
+	const EVoxelRegionRead Status = ReadIndex(Path, Index, OutError);
+	if (Status != EVoxelRegionRead::Loaded)
+	{
+		return Status;
+	}
+	const uint16 Local = LocalOf(InView.Section);
+	const FEntry* Entry = Index.Entries.FindByPredicate([Local](const FEntry& InEntry)
+	{
+		return InEntry.Local == Local;
+	});
+	if (!Entry)
+	{
+		return EVoxelRegionRead::Missing;
+	}
+	TUniquePtr<FArchive> File(IFileManager::Get().CreateFileReader(*Path));
+	if (!File || !ReadEntry(*File, *Entry, OutBytes))
+	{
+		OutError = TEXT("Voxel region record read or checksum failed");
+		return EVoxelRegionRead::Failed;
+	}
+	return EVoxelRegionRead::Loaded;
+}
+
+bool FVoxelRegionStore::StageSection(
+	FVoxelRegionWritePlan& InPlan,
+	const FIntVector& InSection,
+	TArray<uint8>&& InBytes)
+{
+	if (InBytes.IsEmpty() || InBytes.Num() > static_cast<int32>(MaxRecordBytes))
+	{
+		return false;
+	}
+	FVoxelRegionOperation Operation;
+	Operation.Bytes = MakeShared<TArray<uint8>, ESPMode::ThreadSafe>(MoveTemp(InBytes));
+	InPlan.Operations.Add(InSection, MoveTemp(Operation));
+	return true;
+}
+
+void FVoxelRegionStore::StageDelete(FVoxelRegionWritePlan& InPlan, const FIntVector& InSection)
+{
+	FVoxelRegionOperation Operation;
+	Operation.bDelete = true;
+	InPlan.Operations.Add(InSection, MoveTemp(Operation));
+}
+
+bool FVoxelRegionStore::WritePendingRegions(
+	const FVoxelRegionWritePlan& InPlan,
+	const FString& InTemporaryGenerationDirectory,
+	FString& OutError)
+{
+	if (!InPlan.TransactionId.IsValid() || InTemporaryGenerationDirectory.IsEmpty())
+	{
+		OutError = TEXT("Invalid voxel region write target");
+		return false;
+	}
+	TMap<FIntVector, TArray<FIntVector>> Groups;
+	for (const TPair<FIntVector, FVoxelRegionOperation>& Pair : InPlan.Operations)
+	{
+		Groups.FindOrAdd(RegionOf(Pair.Key)).Add(Pair.Key);
+	}
+	for (const TPair<FIntVector, TArray<FIntVector>>& Group : Groups)
+	{
+		const FString SourcePath = RegionPath(InPlan.SourceDirectory, Group.Key);
+		const FString DestinationPath = RegionPath(InTemporaryGenerationDirectory, Group.Key);
+		FRegionIndex Old;
+		const EVoxelRegionRead OldStatus = InPlan.SourceDirectory.IsEmpty() ?
+			EVoxelRegionRead::Missing : ReadIndex(SourcePath, Old, OutError);
+		if (OldStatus == EVoxelRegionRead::Failed)
+		{
+			return false;
+		}
+		struct FOutput
+		{
+			FEntry Entry;
+			TSharedPtr<const TArray<uint8>, ESPMode::ThreadSafe> Replacement;
+		};
+		TMap<uint16, FOutput> Output;
+		for (const FEntry& Entry : Old.Entries)
+		{
+			FOutput Existing;
+			Existing.Entry = Entry;
+			Output.Add(Entry.Local, MoveTemp(Existing));
+		}
+		for (const FIntVector& Section : Group.Value)
+		{
+			const FVoxelRegionOperation& Operation = InPlan.Operations.FindChecked(Section);
+			const uint16 Local = LocalOf(Section);
+			if (Operation.bDelete)
+			{
+				Output.Remove(Local);
+				continue;
+			}
+			FOutput Replacement;
+			Replacement.Entry.Local = Local;
+			Replacement.Entry.Size = Operation.Bytes->Num();
+			Replacement.Entry.Crc = FCrc::MemCrc32(Operation.Bytes->GetData(), Operation.Bytes->Num());
+			Replacement.Replacement = Operation.Bytes;
+			Output.Add(Local, MoveTemp(Replacement));
+		}
+		if (Output.IsEmpty())
+		{
+			if (IFileManager::Get().FileExists(*DestinationPath) &&
+				!IFileManager::Get().Delete(*DestinationPath, false, true))
+			{
+				OutError = TEXT("Cannot remove empty voxel region");
+				return false;
+			}
+			continue;
+		}
+		if (!IFileManager::Get().MakeDirectory(*FPaths::GetPath(DestinationPath), true))
+		{
+			OutError = TEXT("Cannot create voxel region directory");
+			return false;
+		}
+		TArray<uint16> Locals;
+		Output.GetKeys(Locals);
+		Locals.Sort();
+		FVoxelByteWriter Header(HeaderBytes + 512 * IndexEntryBytes);
+		Header.U32(RegionMagic);
+		Header.U32(VoxelRegionFileVersion);
+		Header.U32(Locals.Num());
+		Header.U64(Old.Header.RegionRevision + 1);
+		uint64 Mask[8] = {};
+		for (const uint16 Local : Locals)
+		{
+			Mask[Local / 64] |= 1ull << (Local % 64);
+		}
+		for (const uint64 Word : Mask)
+		{
+			Header.U64(Word);
+		}
+		uint64 Offset = HeaderBytes + static_cast<uint64>(Locals.Num()) * IndexEntryBytes;
+		for (const uint16 Local : Locals)
+		{
+			const FOutput& Item = Output.FindChecked(Local);
+			Header.U16(Local);
+			Header.U64(Offset);
+			Header.U32(Item.Entry.Size);
+			Header.U32(Item.Entry.Crc);
+			Offset += Item.Entry.Size;
+		}
+		TArray<uint8> HeaderBytesData;
+		if (!Header.Finish(HeaderBytesData))
+		{
+			return false;
+		}
+		TUniquePtr<FArchive> Writer(IFileManager::Get().CreateFileWriter(*DestinationPath));
+		if (!Writer)
+		{
+			OutError = TEXT("Cannot write voxel region");
+			return false;
+		}
+		Writer->Serialize(HeaderBytesData.GetData(), HeaderBytesData.Num());
+		TUniquePtr<FArchive> Source;
+		for (const uint16 Local : Locals)
+		{
+			const FOutput& Item = Output.FindChecked(Local);
+			TArray<uint8> Copied;
+			const TArray<uint8>* Bytes = Item.Replacement.Get();
+			if (!Bytes)
+			{
+				if (!Source)
+				{
+					Source.Reset(IFileManager::Get().CreateFileReader(*SourcePath));
+				}
+				if (!Source || !ReadEntry(*Source, Item.Entry, Copied))
+				{
+					OutError = TEXT("Cannot copy verified voxel region record");
+					return false;
+				}
+				Bytes = &Copied;
+			}
+			Writer->Serialize(const_cast<uint8*>(Bytes->GetData()), Bytes->Num());
+		}
+		if (Writer->IsError() || !Writer->Close())
+		{
+			OutError = TEXT("Voxel region write failed");
+			return false;
+		}
+	}
+	return true;
 }

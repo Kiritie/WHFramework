@@ -1,44 +1,67 @@
 #pragma once
+
 #include "CoreMinimal.h"
 #include "Engine/StaticMesh.h"
 #include "UObject/StrongObjectPtr.h"
-#include "Voxel/Generation/Kernel/VoxelGenStructures.h"
+#include "Voxel/Generation/VoxelStructure.h"
 #include "Voxel/Rendering/VoxelDetailData.h"
-#include <set>
-class UVoxelModule;
-class FVoxelTaskScheduler;
+
 class AActor;
+class FVoxelTaskScheduler;
+class UVoxelModule;
 struct FVoxelTaskResult;
+
 struct WHFRAMEWORK_API FVoxelDetailPlan
 {
-    uint64 Serial=0;
-    std::vector<VoxelGen::DetailPlacement> Placements;
-    uint64 Bytes() const { return Placements.size()*sizeof(VoxelGen::DetailPlacement); }
+	uint64 Token = 0;
+	TArray<FVoxelStructureDetailPlacement> Placements;
+
+	uint64 GetAllocatedBytes() const;
 };
-// Presentation and simple near collision only. No NPC, gameplay object spawning or per-instance save protocol.
+
+/**
+ * Near vegetation/detail presentation. It deliberately owns presentation only;
+ * placement truth remains in the frozen structure/feature plans.
+ */
 class WHFRAMEWORK_API FVoxelDetailView
 {
 public:
-    FVoxelDetailView(UVoxelModule& Module,FVoxelTaskScheduler& Scheduler,uint64 Epoch);
-    ~FVoxelDetailView();
-    bool Initialize(FString& Error);
-    void Tick(const TArray<FVector>& Observers);
-    bool OnTask(FVoxelTaskResult&& Result);
-    void Reset();
+	FVoxelDetailView(
+		UVoxelModule& InModule,
+		FVoxelTaskScheduler& InScheduler,
+		uint64 InWorldEpoch);
+	~FVoxelDetailView();
+
+	bool Initialize(FString& OutError);
+	void Tick(TConstArrayView<FVector> InObservers);
+	bool OnTask(FVoxelTaskResult&& InResult);
+	void Reset();
+
 private:
-    bool BuildBatch(uint32 Asset,FString& Error);
-    void AbortStage();
-    UVoxelModule& Module;
-    FVoxelTaskScheduler& Scheduler;
-    uint64 Epoch=0,NextSerial=1,WaitingSerial=0;
-    bool bRunning=false,bDirty=true,bStopped=false;
-    double LastRequest=-100;
-    std::set<VoxelGen::I3> LastCenters;
-    TArray<TStrongObjectPtr<UVoxelDetailData>> Assets;
-    TArray<TStrongObjectPtr<UStaticMesh>> Meshes;
-    TArray<FVector> CollisionObservers;
-    TSharedPtr<const FVoxelDetailPlan,ESPMode::ThreadSafe> Pending;
-    TArray<TWeakObjectPtr<AActor>> Active,Staged;
-    int32 AssetCursor=0;
-    FDelegateHandle CommitHandle,RemoteHandle;
+	bool BuildAssetBatch(int32 InAssetIndex, FString& OutError);
+	void DestroyActors(TArray<TWeakObjectPtr<AActor>>& InActors);
+	void AbortStaging();
+	void MarkDirty(const struct FVoxelEditBatch& InBatch);
+
+
+private:
+	UVoxelModule& Module;
+	FVoxelTaskScheduler& Scheduler;
+	uint64 WorldEpoch = 0;
+	uint64 NextToken = 1;
+	uint64 WaitingToken = 0;
+	double LastRequestTime = -100.0;
+	TArray<FIntVector> LastObserverSections;
+	TArray<FVector> Observers;
+	TArray<TStrongObjectPtr<UVoxelDetailData>> Assets;
+	TArray<TStrongObjectPtr<UStaticMesh>> Meshes;
+	TMap<FName, int32> AssetIndices;
+	TSharedPtr<const FVoxelDetailPlan, ESPMode::ThreadSafe> PendingPlan;
+	TArray<TWeakObjectPtr<AActor>> ActiveActors;
+	TArray<TWeakObjectPtr<AActor>> StagedActors;
+	FDelegateHandle CommitHandle;
+	int32 StagedAssetIndex = 0;
+	bool bRunning = false;
+	bool bDirty = true;
+	bool bStopped = false;
 };

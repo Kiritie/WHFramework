@@ -4,7 +4,7 @@ namespace
 {
 bool RayBox(const FVector&S,const FVector&D,const FBox&B,double&T,FVector&N,bool&Inside)
 {
-    double Near=-std::numeric_limits<double>::infinity(),Far=std::numeric_limits<double>::infinity();FVector NN(0,0,0),FN(0,0,0);
+    double Near=-TNumericLimits<double>::Max(),Far=TNumericLimits<double>::Max();FVector NN(0,0,0),FN(0,0,0);
     for(int32 A=0;A<3;++A)
     {
         if(FMath::Abs(D[A])<1e-12){if(S[A]<B.Min[A]||S[A]>B.Max[A])return false;continue;}
@@ -27,7 +27,7 @@ FVoxelTraceResult FVoxelRaycast::Trace(const FVoxelWorldRuntime&W,const FVoxelRe
     FVoxelTraceResult O;FIntVector Cell;
     if(!VoxelCoord::FromWorld(Start,BlockSize,Cell)||!FMath::IsFinite(MaxDistance)||MaxDistance<=0||MaxDistance>100000||Direction.ContainsNaN()||Direction.IsNearlyZero())
     {O.Status=EVoxelTraceStatus::Invalid;return O;}
-    FVector D=Direction.GetSafeNormal(),S=Start/BlockSize;const double Limit=MaxDistance/BlockSize,Inf=std::numeric_limits<double>::infinity();
+    FVector D=Direction.GetSafeNormal(),S=Start/BlockSize;const double Limit=MaxDistance/BlockSize,Inf=TNumericLimits<double>::Max();
     FIntVector Step(0,0,0);FVector Next(Inf,Inf,Inf),Delta(Inf,Inf,Inf);
     for(int32 A=0;A<3;++A)if(FMath::Abs(D[A])>=1e-12){Step[A]=D[A]>0?1:-1;Delta[A]=FMath::Abs(1/D[A]);Next[A]=(Cell[A]+(Step[A]>0?1:0)-S[A])/D[A];}
     double Enter=0;const int32 MaxSteps=FMath::CeilToInt(Limit*1.733)+8;

@@ -74,10 +74,15 @@ void AppendQuad(FVoxelMeshBuffers&O,const FVector*P,const FVector2D*UV,const FVo
 	O.Triangles.Append({N, N + 2, N + 1, N, N + 3, N + 2});}
 }
 bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegistrySnapshot&R,const FVoxelShapeRegistry&H,
-    FVoxelSectionMeshResult&O,const std::atomic_bool*Cancel,uint8 SkipBoundaryMask)
+    FVoxelSectionMeshResult&O,const TAtomic<bool>*Cancel,uint8 SkipBoundaryMask)
 {
     if(S.Blocks.Num()!=4096)return false;for(uint32 P:S.Blocks)if(!R.IsValid(FVoxelBlockState::Unpack(P)))return false;
-    FVoxelSectionMeshResult T;T.Stamp=S.Stamp;TMap<uint32,int32>Groups;int32 TotalVertices=0;
+    FVoxelSectionMeshResult T;
+    T.Stamp.WorldEpoch = S.Stamp.Epoch;
+    T.Stamp.Token = S.Stamp.Token;
+    T.Stamp.Revision = S.Revision;
+    T.Stamp.Section = S.Section;
+    TMap<uint32,int32>Groups;int32 TotalVertices=0;
     auto Batch=[&](EVoxelRenderGroup G,uint16 Bank)->FVoxelMeshBuffers&
     {
         uint32 K=(uint32(G)<<16)|Bank;if(const int32*I=Groups.Find(K))return T.Batches[*I].Mesh;
@@ -87,7 +92,7 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
     for(uint8 F=0;F<6;++F)for(int32 Slice=0;Slice<16;++Slice)
     {
         if((SkipBoundaryMask&(1u<<F))&&Slice==((F&1)?0:15))continue;
-        if(Cancel&&Cancel->load(std::memory_order_relaxed))return false;
+        if(Cancel&&Cancel->Load())return false;
         FFaceKey Mask[256];int32 A=F/2,U=(A+1)%3,V=(A+2)%3;
         for(int32 Y=0;Y<16;++Y)for(int32 X=0;X<16;++X)
         {
@@ -117,7 +122,7 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
     }
     for(uint16 I=0;I<4096;++I)
     {
-        if((I&63)==0&&Cancel&&Cancel->load(std::memory_order_relaxed))return false;
+        if((I&63)==0&&Cancel&&Cancel->Load())return false;
         auto B=FVoxelBlockState::Unpack(S.Blocks[I]);if(B.IsAir())continue;const auto*D=R.Find(B.TypeId);
         if(D->Shape==EVoxelShapeKind::FullCube)continue;const auto*Shape=H.Find(D->Shape,B.State);if(!Shape)return false;
         FIntVector P=VoxelCoord::Unlinear(I);for(const auto&Q:Shape->Quads)

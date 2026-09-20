@@ -37,7 +37,7 @@ bool FVoxelRegistry::Build(const TArray<UVoxelData*>&In,bool Render,FString&E)
         W.U8(uint8(D.Shape));W.U8(uint8(D.RenderGroup));W.U8(D.bSolid);W.U8(D.bOccludes);W.U8(D.bReplaceable);W.U8(D.bBreakable);
         W.I32(D.BreakMilliseconds);W.I32(D.DropCount);W.U16(D.EntityKind);W.U8(D.EntityVariant);
     }
-    for(const auto&D:R->Definitions)if(D.DropCount>0&&!R->Assets.Contains(D.DropAssetID)){E=TEXT("Phase1 voxel drops require a registered voxel asset");return false;}
+    for(const auto&D:R->Definitions)if(D.DropCount>0&&!R->Assets.Contains(D.DropAssetID)){E=TEXT("Voxel drops require a registered voxel asset");return false;}
     TArray<uint8>B;if(!W.Finish(B)){E=TEXT("Registry canonical size exceeded");return false;}R->Hash=VoxelBinary::Hash(B);
     Published=R;E.Reset();return true;
 }

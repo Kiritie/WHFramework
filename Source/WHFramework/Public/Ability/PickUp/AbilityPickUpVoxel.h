@@ -3,14 +3,14 @@
 #include "Ability/PickUp/AbilityPickUpBase.h"
 #include "AbilityPickUpVoxel.generated.h"
 class UVoxelMeshComponent;
-class UVoxelChunk;
+class UVoxelSceneRegion;
 UCLASS()
 class WHFRAMEWORK_API AAbilityPickUpVoxel : public AAbilityPickUpBase
 {
 	GENERATED_BODY()
 public:
 	AAbilityPickUpVoxel();
-	static AAbilityPickUpVoxel* CreateReserved(UWorld* World, const FAbilityItem& Item, const FVector& Location, UVoxelChunk* Column);
+	static AAbilityPickUpVoxel* CreateReserved(UWorld* World, const FAbilityItem& Item, const FVector& Location, UVoxelSceneRegion* Region);
 	void ActivateReserved();
 	virtual void SetContainer_Implementation(const TScriptInterface<ISceneContainerInterface>& Container) override;
 	virtual void Tick(float DeltaSeconds) override;
@@ -37,7 +37,7 @@ protected:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UVoxelMeshComponent>> DisplayMeshes;
 	UPROPERTY(Transient)
-	TObjectPtr<UVoxelChunk> OwningColumn;
+	TObjectPtr<UVoxelSceneRegion> OwningRegion;
 
 private:
 	bool BuildVisual();

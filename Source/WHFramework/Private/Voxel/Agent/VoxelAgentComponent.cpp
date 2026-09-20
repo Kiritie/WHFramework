@@ -1,11 +1,13 @@
 #include "Voxel/Agent/VoxelAgentComponent.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Voxels/VoxelItemBridge.h"
+#include "Voxel/Chunks/VoxelSectionKey.h"
 #include "Voxel/Network/VoxelModuleNetworkComponent.h"
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
 #include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
 #include "GameFramework/PlayerController.h"
+#include "Camera/PlayerCameraManager.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -41,7 +43,7 @@ bool UVoxelAgentComponent::MakeIntent(EVoxelEditAction A,FVoxelEditIntent&O)cons
 {
     auto*M=Module.Get();if(!M||!M->IsReady()||!View(O.Origin,O.Direction))return false;
     auto H=M->Trace(O.Origin,O.Direction);if(H.Status!=EVoxelTraceStatus::Hit)return false;
-    O.Action=A;O.ExpectedTarget=H.Index;const auto*S=M->GetRuntime()->Find(VoxelCoord::Section(H.Index));if(!S)return false;O.ExpectedRevision=S->Stamp.Revision;
+    O.Action=A;O.ExpectedTarget=H.Index;const FVoxelSectionKey OldKey=VoxelCoord::Section(H.Index);const auto*S=M->GetRuntime()->FindSection({OldKey.X,OldKey.Y,OldKey.Z});if(!S)return false;O.ExpectedRevision=S->CommittedRevision;
     AActor*InventoryOwner=BoundController.IsValid()&&BoundController->GetPawn()?BoundController->GetPawn():GetOwner();
     if(auto*Agent=Cast<IAbilityInventoryAgentInterface>(InventoryOwner))if(auto*I=Agent->GetInventory())
         if(auto*Slot=I->GetSelectedSlot(ESlotSplitType::Shortcut)){O.InventorySlot=Slot->GetSlotIndex();O.ExpectedItemID=Slot->GetItem().ID;}
@@ -81,8 +83,9 @@ void UVoxelAgentComponent::RefreshSource()
     if(GetWorld()->GetNetMode()!=NM_Standalone)Active=Active&&BoundController.IsValid()&&BoundController->IsLocalController();
     if(!Active){if(SourceId.IsValid())M->UnregisterSource(SourceId);SourceId.Invalidate();return;}
     FVoxelStreamingSource S;FVector O,D;if(!View(O,D)||!VoxelCoord::FromWorld(GetOwner()->GetActorLocation(),M->BlockSize(),S.Center))return;
-    S.Id=SourceId.IsValid()?SourceId:FGuid::NewGuid();S.Direction=D;S.RenderRadius=0;
-    S.CollisionRadius=2;S.SimulationRadius=0;S.PreloadRadius=2;S.VerticalRadius=2;
+    S.Id=SourceId.IsValid()?SourceId:FGuid::NewGuid();S.Direction=D;S.ExactRadius=32;
+    if(BoundController.IsValid()){S.VerticalFovDegrees=BoundController->PlayerCameraManager?BoundController->PlayerCameraManager->GetFOVAngle():90.f;int32 Width=0,Height=0;BoundController->GetViewportSize(Width,Height);S.ViewportHeightPixels=FMath::Max(1,Height);}
+    S.CollisionRadius=32;S.SimulationRadius=0;S.VerticalExactRadius=8;
     S.bCollision=true;S.bSimulation=false;S.bRender=GetWorld()->GetNetMode()!=NM_DedicatedServer;
     if(!SourceId.IsValid())SourceId=M->RegisterSource(this,S);else if(!M->UpdateSource(SourceId,S))SourceId.Invalidate();
 }
@@ -112,7 +115,7 @@ void UVoxelAgentComponent::GateCharacter()
         auto A=VoxelCoord::Section(Min),B=VoxelCoord::Section(Max);
         if(B.X-A.X>8||B.Y-A.Y>8||B.Z-A.Z>8)Ready=false;
         for(int32 Z=A.Z;Ready&&Z<=B.Z;++Z)for(int32 Y=A.Y;Ready&&Y<=B.Y;++Y)for(int32 X=A.X;Ready&&X<=B.X;++X)
-        {const auto*S=M->GetRuntime()->Find({X,Y,Z});Ready=S&&S->Status==EVoxelSectionStatus::DataReady&&S->bHasCollision&&!S->bCollisionDirty;}
+        {Ready=M->IsCollisionReady({X,Y,Z});}
     }
     auto*Movement=C->GetCharacterMovement();
     if(!Ready&&!bGated){PreviousMoveMode=uint8(Movement->MovementMode);PreviousCustomMode=Movement->CustomMovementMode;bGated=true;Movement->StopMovementImmediately();Movement->DisableMovement();}

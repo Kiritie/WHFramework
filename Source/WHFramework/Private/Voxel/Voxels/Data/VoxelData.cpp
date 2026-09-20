@@ -21,9 +21,9 @@ bool UVoxelData::ValidateDefinition(bool Render,FString&E)const
        BreakMilliseconds<0||BreakMilliseconds>600000||DropCount<0||DropCount>64||EntityKind<0||EntityKind>65535)
     {E=TEXT("Invalid voxel definition range");return false;}
     if((Shape==EVoxelShapeKind::CrossPlant||Shape==EVoxelShapeKind::Fluid||Shape==EVoxelShapeKind::Torch||Shape==EVoxelShapeKind::Ladder)&&bSolid)
-    {E=TEXT("This Phase1 shape must use bSolid=false");return false;}
+    {E=TEXT("This non-cube shape must use bSolid=false");return false;}
     if((EntityKind==100&&(EntityVariant<1||EntityVariant>2))||(EntityKind!=100&&EntityVariant!=0)){E=TEXT("Invalid entity variant");return false;}
-    if(EntityKind!=0&&EntityKind!=1&&EntityKind!=2&&EntityKind!=100&&EntityKind!=101){E=TEXT("Unsupported Phase1 entity kind");return false;}
+    if(EntityKind!=0&&EntityKind!=1&&EntityKind!=2&&EntityKind!=100&&EntityKind!=101){E=TEXT("Unsupported voxel entity kind");return false;}
     if(Render)
     {
         if(BakeVersion!=2||BakedFaces.Num()!=6||(Shape==EVoxelShapeKind::Door&&BakedUpperFaces.Num()!=6))

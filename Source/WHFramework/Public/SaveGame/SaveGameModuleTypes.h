@@ -219,9 +219,10 @@ struct WHFRAMEWORK_API FSaveManifest
 struct FModuleSaveFileHeader
 {
 	static constexpr uint32 MagicValue = 0x44574D53;
+	static constexpr int32 CurrentStorageVersion = 2;
 
 	uint32 Magic = MagicValue;
-	int32 StorageVersion = 1;
+	int32 StorageVersion = CurrentStorageVersion;
 	FName ModuleName;
 	int32 ModuleVersion = 1;
 	int64 PayloadSize = 0;

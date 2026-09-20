@@ -22,7 +22,7 @@
 #include "Tasks/AITask_MoveTo.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/VoxelModuleStatics.h"
-#include "Voxel/Chunks/VoxelChunk.h"
+#include "Voxel/Scene/VoxelSceneRegion.h"
 #include "Voxel/Agent/VoxelAgentComponent.h"
 
 ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer)

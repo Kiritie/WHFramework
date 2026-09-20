@@ -1,16 +1,29 @@
 #pragma once
+
 #include "CoreMinimal.h"
-#include <atomic>
 #include "Voxel/Chunks/VoxelSectionSnapshot.h"
+#include "Voxel/Task/VoxelTaskScheduler.h"
 #include "Voxel/Runtime/VoxelRegistry.h"
 #include "Voxel/Geometry/VoxelShapeRegistry.h"
+
 struct WHFRAMEWORK_API FVoxelSectionCollisionResult
 {
-    FVoxelTaskStamp Stamp;TArray<FBox> Boxes;
+	FVoxelTaskStamp Stamp;
+	TArray<FBox> Boxes;
+
+	uint64 Bytes() const
+	{
+		return uint64(Boxes.Num()) * sizeof(FBox);
+	}
 };
+
 class WHFRAMEWORK_API FVoxelCollisionBuilder
 {
 public:
-    static bool Build(const FVoxelSectionSnapshot& Snapshot,const FVoxelRegistrySnapshot& Registry,
-        const FVoxelShapeRegistry& Shapes,FVoxelSectionCollisionResult& Out,const std::atomic_bool* Cancel=nullptr);
+	static bool Build(
+		const FVoxelSectionSnapshot& InSnapshot,
+		const FVoxelRegistrySnapshot& InRegistry,
+		const FVoxelShapeRegistry& InShapes,
+		FVoxelSectionCollisionResult& OutResult,
+		const TAtomic<bool>* InCancel = nullptr);
 };

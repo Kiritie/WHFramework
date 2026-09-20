@@ -1,10 +1,10 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "ProceduralMeshComponent.h"
-#include <atomic>
 #include "Voxel/Chunks/VoxelSectionSnapshot.h"
 #include "Voxel/Runtime/VoxelRegistry.h"
 #include "Voxel/Geometry/VoxelShapeRegistry.h"
+#include "Voxel/Task/VoxelTaskScheduler.h"
 struct WHFRAMEWORK_API FVoxelMeshBuffers
 {
     TArray<FVector> Vertices,Normals;
@@ -29,5 +29,5 @@ class WHFRAMEWORK_API FVoxelSectionMesher
 {
 public:
     static bool Build(const FVoxelSectionSnapshot& Snapshot,const FVoxelRegistrySnapshot& Registry,
-        const FVoxelShapeRegistry& Shapes,FVoxelSectionMeshResult& Out,const std::atomic_bool* Cancel=nullptr,uint8 SkipBoundaryMask=0);
+        const FVoxelShapeRegistry& Shapes,FVoxelSectionMeshResult& Out,const TAtomic<bool>* Cancel=nullptr,uint8 SkipBoundaryMask=0);
 };

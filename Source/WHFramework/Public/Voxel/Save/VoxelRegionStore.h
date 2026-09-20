@@ -1,35 +1,81 @@
 #pragma once
+
 #include "CoreMinimal.h"
-#include "Voxel/Chunks/VoxelSectionKey.h"
-#include <atomic>
+
 class FSaveGameStorage;
-enum class EVoxelRegionRead:uint8{Missing,Loaded,Failed};
+
+static constexpr uint32 VoxelRegionFileVersion = 3;
+
+struct WHFRAMEWORK_API FVoxelRegionFileHeader
+{
+	uint32 Magic = 0;
+	uint32 Version = VoxelRegionFileVersion;
+	uint32 EntryCount = 0;
+	uint64 RegionRevision = 0;
+	uint64 ModifiedMask[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+};
+
+enum class EVoxelRegionRead : uint8
+{
+	Missing,
+	Loaded,
+	Failed
+};
+
 struct WHFRAMEWORK_API FVoxelRegionReadView
 {
-    FString SourceDirectory;FVoxelSectionKey Key;
+	FString SourceDirectory;
+	FIntVector Section = FIntVector::ZeroValue;
 };
+
 struct WHFRAMEWORK_API FVoxelRegionOperation
 {
-    bool bDelete=false;TSharedPtr<const TArray<uint8>,ESPMode::ThreadSafe> Bytes;
+	bool bDelete = false;
+	TSharedPtr<const TArray<uint8>, ESPMode::ThreadSafe> Bytes;
 };
+
 struct WHFRAMEWORK_API FVoxelRegionWritePlan
 {
-    FGuid TransactionId;FString SourceDirectory;
-    TMap<FVoxelSectionKey,FVoxelRegionOperation> Operations;
+	FGuid TransactionId;
+	FString SourceDirectory;
+	TMap<FIntVector, FVoxelRegionOperation> Operations;
 };
+
 class WHFRAMEWORK_API FVoxelRegionStore
 {
 public:
-    void SetSource(const FGuid& SaveId,int32 Generation,FSaveGameStorage* Storage);
-    void Reset(){SourceDirectory.Reset();}
-    const FString& GetSourceDirectory()const{return SourceDirectory;}
-    void AdvanceSource(const FString& CommittedDirectory){SourceDirectory=CommittedDirectory;}
-    FVoxelRegionReadView CaptureRead(const FVoxelSectionKey& Key)const;
-    static EVoxelRegionRead Read(const FVoxelRegionReadView& View,TArray<uint8>& Out,FString& Error);
-    static bool ReadRange(const FString& Directory,const FVoxelSectionKey& MinInclusive,const FVoxelSectionKey& MaxExclusive,const TSet<FVoxelSectionKey>& SupersededResident,TMap<FVoxelSectionKey,TArray<uint8>>& Out,bool& bOverBudget,FString& Error,const std::atomic_bool* Cancel=nullptr);
-    static bool StageSection(FVoxelRegionWritePlan& Plan,const FVoxelSectionKey& Key,TArray<uint8>&& Bytes);
-    static void StageDelete(FVoxelRegionWritePlan& Plan,const FVoxelSectionKey& Key);
-    static bool WritePendingRegions(const FVoxelRegionWritePlan& Plan,const FString& TempGenerationDirectory,FString& Error);
+	void SetSource(const FGuid& InSaveId, int32 InGeneration, FSaveGameStorage* InStorage);
+	void Reset();
+	const FString& GetSourceDirectory() const;
+	void AdvanceSource(const FString& InCommittedDirectory);
+	FVoxelRegionReadView CaptureRead(const FIntVector& InSection) const;
+	EVoxelRegionRead ReadSection(
+		const FIntVector& InSection,
+		TArray<uint8>& OutBytes,
+		FString& OutError) const;
+	bool ReadChangeHeader(
+		const FIntVector& InRegion,
+		uint64& OutRevision,
+		TArray<uint64>& OutModifiedMask,
+		FString& OutError) const;
+	bool ScanChangeHeaders(
+		TFunctionRef<void(const FIntVector&, uint64, const TArray<uint64>&)> InVisit,
+		FString& OutError) const;
+
+	static EVoxelRegionRead Read(
+		const FVoxelRegionReadView& InView,
+		TArray<uint8>& OutBytes,
+		FString& OutError);
+	static bool StageSection(
+		FVoxelRegionWritePlan& InPlan,
+		const FIntVector& InSection,
+		TArray<uint8>&& InBytes);
+	static void StageDelete(FVoxelRegionWritePlan& InPlan, const FIntVector& InSection);
+	static bool WritePendingRegions(
+		const FVoxelRegionWritePlan& InPlan,
+		const FString& InTemporaryGenerationDirectory,
+		FString& OutError);
+
 private:
-    FString SourceDirectory;
+	FString SourceDirectory;
 };

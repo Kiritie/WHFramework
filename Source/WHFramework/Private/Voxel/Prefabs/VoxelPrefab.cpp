@@ -89,7 +89,7 @@ bool AVoxelPrefab::SetPreviewData(const FVoxelPrefabSaveData& Value, double Size
     for (const FVoxelSectionKey& Key : Keys)
     {
         FVoxelSectionSnapshot Snapshot;
-        Snapshot.Stamp.Key = Key;
+        Snapshot.Section = FIntVector(Key.X, Key.Y, Key.Z);
         Snapshot.Blocks.SetNumUninitialized(VoxelBlock::Volume);
         const FIntVector Origin = VoxelCoord::Origin(Key);
         for (int32 I = 0; I < VoxelBlock::Volume; ++I)
@@ -165,7 +165,7 @@ bool AVoxelPrefab::SetPreviewData(const FVoxelPrefabSaveData& Value, double Size
             AddInstanceComponent(Mesh);
             Mesh->SetupAttachment(GetRootComponent());
             Mesh->SetVisibility(false, true);
-            Mesh->SetRelativeLocation(FVector(VoxelCoord::Origin(Result.Stamp.Key)) * Size);
+            Mesh->SetRelativeLocation(FVector(Result.Stamp.Section * 16) * Size);
             if (!Mesh->Apply(Batch.Mesh, Size, Bank->Material))
             {
                 Error = TEXT("Prefab mesh submission failed");
