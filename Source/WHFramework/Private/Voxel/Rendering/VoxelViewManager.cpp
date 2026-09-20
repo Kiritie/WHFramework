@@ -972,15 +972,42 @@ bool FVoxelViewManager::HasPrimaryRepresentation() const
 		!MacroActors.IsEmpty();
 }
 
-void FVoxelViewManager::EnumerateModifiedSections(
+FVoxelPrimaryFineReadiness FVoxelViewManager::GetPrimaryFineReadiness(
+	const TMap<FIntVector, FVoxelExactDemand>& InExact) const
+{
+	FVoxelPrimaryFineReadiness Result;
+	for (const TPair<FIntVector, FVoxelExactDemand>& Pair : InExact)
+	{
+		const FVoxelExactDemand& Demand = Pair.Value;
+		if (!Demand.bWarmupData || !Demand.bFineRender)
+		{
+			continue;
+		}
+
+		++Result.Required;
+		if (FineReady.Contains(Pair.Key))
+		{
+			++Result.Ready;
+		}
+		if (FineActors.Contains(Pair.Key))
+		{
+			++Result.Renderable;
+		}
+	}
+	return Result;
+}
+
+bool FVoxelViewManager::EnumerateModifiedSections(
 	const FVoxelGenerationBounds& InBounds,
-	TArray<FIntVector>& OutSections) const
+	TArray<FIntVector>& OutSections,
+	const TAtomic<bool>* InCancel) const
 {
 	OutSections.Reset();
 	if (const FVoxelWorldRuntime* Runtime = Module.GetRuntime())
 	{
-		Runtime->GetChangeIndex().Enumerate(InBounds, OutSections);
+		return Runtime->GetChangeIndex().Enumerate(InBounds, OutSections, InCancel);
 	}
+	return true;
 }
 
 bool FVoxelViewManager::ReadOverlay(
@@ -1074,8 +1101,12 @@ void FVoxelViewManager::RequestFine(
 	Request.Kind =
 		EVoxelTaskKind::BuildFineMesh;
 
+	const FVoxelExactDemand* Demand =
+		Module.GetCurrentInterest().Exact.Find(InSection);
 	Request.WorkClass =
-		EVoxelWorkClass::Visible;
+		Demand && Demand->bWarmupData
+			? EVoxelWorkClass::Critical
+			: EVoxelWorkClass::Visible;
 
 	Request.Stamp =
 		Stamp;
@@ -1443,7 +1474,7 @@ void FVoxelViewManager::RequestSurface(
 		EVoxelTaskKind::BuildSurface;
 
 	Request.WorkClass =
-		EVoxelWorkClass::Boundary;
+		EVoxelWorkClass::Exploration;
 
 	Request.Stamp.WorldEpoch =
 		WorldEpoch;
@@ -1492,6 +1523,7 @@ void FVoxelViewManager::RequestSurface(
 			const TAtomic<bool>& InCancel)
 		{
 			FVoxelTaskResult Result;
+			const double TotalStart = FPlatformTime::Seconds();
 
 			Result.Surface =
 				MakeShared<
@@ -1499,16 +1531,20 @@ void FVoxelViewManager::RequestSurface(
 
 			const FVoxelSurfaceProxyBuilder Builder(
 				Generator.ToSharedRef(),
+				Config.ToSharedRef(),
 				Settings,
 				*this);
+			FVoxelSurfaceBuildTiming Timing;
 
 			Result.bSuccess =
 				Builder.Build(
 					InKey,
 					*Result.Surface,
 					Result.Error,
-					&InCancel);
+					&InCancel,
+					&Timing);
 
+			const double TerrainMeshStart = FPlatformTime::Seconds();
 			if (Result.bSuccess)
 			{
 				Result.SurfaceMesh =
@@ -1531,12 +1567,15 @@ void FVoxelViewManager::RequestSurface(
 							-0.02,
 							8);
 			}
+			const double TerrainMeshMilliseconds =
+				(FPlatformTime::Seconds() - TerrainMeshStart) * 1000.0;
 
 			if (!Result.bSuccess)
 			{
 				return Result;
 			}
 
+			const double WaterBuildStart = FPlatformTime::Seconds();
 			Result.Water = MakeShared<FVoxelWaterSurfaceTileData>();
 			FVoxelWaterViewBuilder WaterBuilder;
 			Result.bSuccess = WaterBuilder.Build(*Result.Surface, *Result.Water, Result.Error);
@@ -1544,7 +1583,10 @@ void FVoxelViewManager::RequestSurface(
 			{
 				return Result;
 			}
+			const double WaterBuildMilliseconds =
+				(FPlatformTime::Seconds() - WaterBuildStart) * 1000.0;
 
+			const double WaterMeshStart = FPlatformTime::Seconds();
 			FVoxelSectionMeshResult WaterMesh;
 			Result.bSuccess = FVoxelHeightfieldMesher::BuildWater(
 				*Result.Water,
@@ -1556,6 +1598,29 @@ void FVoxelViewManager::RequestSurface(
 			{
 				AppendNonEmptyBatches(*Result.SurfaceMesh, MoveTemp(WaterMesh));
 			}
+			const double WaterMeshMilliseconds =
+				(FPlatformTime::Seconds() - WaterMeshStart) * 1000.0;
+			const double TotalMilliseconds =
+				(FPlatformTime::Seconds() - TotalStart) * 1000.0;
+
+#if !UE_BUILD_SHIPPING
+			if (TotalMilliseconds >= 50.0)
+			{
+				UE_LOG(
+					LogTemp,
+					Display,
+					TEXT("Voxel Surface phase key=(%d,%d,L%d) columnsMs=%.2f overlayMs=%.2f terrainMeshMs=%.2f waterBuildMs=%.2f waterMeshMs=%.2f totalMs=%.2f"),
+					InKey.Coordinate.X,
+					InKey.Coordinate.Y,
+					InKey.Level,
+					Timing.ColumnsMilliseconds,
+					Timing.OverlayMilliseconds,
+					TerrainMeshMilliseconds,
+					WaterBuildMilliseconds,
+					WaterMeshMilliseconds,
+					TotalMilliseconds);
+			}
+#endif
 
 			return Result;
 		};
@@ -1802,7 +1867,7 @@ bool FVoxelViewManager::PublishVoxelProxy(const FVoxelTaskResult& InResult)
 	VoxelProxyData.Add(Key, InResult.VoxelProxy);
 	VoxelProxyReady.Add(Key);
 	VoxelProxyRevisions.Add(Key, InResult.Stamp.Revision);
-	if (!InResult.VoxelProxy->bHasVisibleSurfaceEvidence || !HasRenderableMesh(*InResult.VoxelProxyMesh))
+	if (!HasRenderableMesh(*InResult.VoxelProxyMesh))
 	{
 		if (AActor* Existing = VoxelProxyActors.FindRef(Key))
 		{

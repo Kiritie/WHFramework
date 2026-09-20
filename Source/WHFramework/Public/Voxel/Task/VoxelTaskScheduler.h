@@ -176,6 +176,8 @@ struct WHFRAMEWORK_API FVoxelTaskBudget
 	uint64 MaxInputBytes = 32ull * 1024ull * 1024ull;
 	int32 MaxCompletedResultsPerFrame = 8;
 	int32 MaxHeavyCompletedResultsPerFrame = 1;
+	int32 MaxConcurrentSurfaceTasks = 1;
+	int32 MaxConcurrentMacroTasks = 1;
 };
 
 struct WHFRAMEWORK_API FVoxelTaskKindDiagnostics
@@ -203,6 +205,8 @@ struct WHFRAMEWORK_API FVoxelTaskDiagnostics
 	uint64 QueuedInputBytes = 0;
 
 	TMap<EVoxelTaskKind, FVoxelTaskKindDiagnostics> ByKind;
+	TMap<EVoxelTaskKind, int32> PendingByKind;
+	TMap<EVoxelTaskKind, int32> RunningByKind;
 };
 
 class WHFRAMEWORK_API FVoxelTaskScheduler
@@ -269,6 +273,8 @@ private:
 
 	static bool IsHeavyApplyKind(EVoxelTaskKind InKind);
 	static bool UsesSectionKey(EVoxelTaskKind InKind);
+	int32 RunningCount(EVoxelTaskKind InKind) const;
+	bool CanStartKind(EVoxelTaskKind InKind) const;
 
 	void Pump();
 	void QueueCanceled(FVoxelTaskRequest&& InRequest);

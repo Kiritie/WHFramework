@@ -645,9 +645,10 @@ void UVoxelAgentComponent::RefreshSource()
 	Source.bSimulation =
 		SimulationRadiusCells > 0;
 
-	Source.bRender =
-		GetWorld()->GetNetMode() !=
-		NM_DedicatedServer;
+	Source.RenderMode =
+		GetWorld()->GetNetMode() == NM_DedicatedServer
+			? EVoxelStreamingRenderMode::None
+			: EVoxelStreamingRenderMode::Full;
 
 	if (!SourceId.IsValid())
 	{

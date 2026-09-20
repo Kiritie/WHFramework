@@ -50,14 +50,21 @@ struct WHFRAMEWORK_API FVoxelOverlaySnapshot
 	TMap<int32, FVoxelBlockState> Blocks;
 };
 
+struct WHFRAMEWORK_API FVoxelSurfaceBuildTiming
+{
+	double ColumnsMilliseconds = 0.0;
+	double OverlayMilliseconds = 0.0;
+};
+
 class WHFRAMEWORK_API IVoxelOverlaySource
 {
 public:
 	virtual ~IVoxelOverlaySource() = default;
 
-	virtual void EnumerateModifiedSections(
+	virtual bool EnumerateModifiedSections(
 		const FVoxelGenerationBounds& InBounds,
-		TArray<FIntVector>& OutSections) const = 0;
+		TArray<FIntVector>& OutSections,
+		const TAtomic<bool>* InCancel = nullptr) const = 0;
 
 	virtual bool ReadOverlay(
 		const FIntVector& InSection,
@@ -69,6 +76,7 @@ class WHFRAMEWORK_API FVoxelSurfaceProxyBuilder
 public:
 	FVoxelSurfaceProxyBuilder(
 		TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator,
+		TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
 		const FVoxelGenerationSettings& InSettings,
 		const IVoxelOverlaySource& InOverlaySource);
 
@@ -76,7 +84,8 @@ public:
 		const FVoxelSurfaceTileKey& InKey,
 		FVoxelSurfaceTileData& OutData,
 		FString& OutError,
-		const TAtomic<bool>* InCancel = nullptr) const;
+		const TAtomic<bool>* InCancel = nullptr,
+		FVoxelSurfaceBuildTiming* OutTiming = nullptr) const;
 
 private:
 	bool ApplyModifiedSurface(
@@ -87,6 +96,7 @@ private:
 
 private:
 	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> Generator;
+	TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config;
 	FVoxelGenerationSettings Settings;
 	const IVoxelOverlaySource& OverlaySource;
 };

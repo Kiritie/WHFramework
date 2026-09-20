@@ -103,7 +103,7 @@ namespace
 			InA.CollisionRadius != InB.CollisionRadius ||
 			InA.SimulationRadius != InB.SimulationRadius ||
 			InA.VerticalExactRadius != InB.VerticalExactRadius ||
-			InA.bRender != InB.bRender ||
+			InA.RenderMode != InB.RenderMode ||
 			InA.bCollision != InB.bCollision ||
 			InA.bSimulation != InB.bSimulation)
 		{
@@ -512,6 +512,14 @@ bool UVoxelModule::StartWorld(
 		ViewSettings.MaximumVoxelProxyLevel = ViewProfile->MaximumVoxelProxyLevel;
 		ViewSettings.MaximumSurfaceLevel = ViewProfile->MaximumSurfaceLevel;
 		ViewSettings.MaximumMacroLevel = ViewProfile->MaximumMacroLevel;
+		ViewSettings.MaximumSurfaceTilesPerSource = FMath::Clamp(
+			ViewProfile->MaximumSurfaceTilesPerSource,
+			32,
+			2048);
+		ViewSettings.MaximumMacroTilesPerSource = FMath::Clamp(
+			ViewProfile->MaximumMacroTilesPerSource,
+			32,
+			2048);
 	}
 	const uint64 ExpectedGenerationSignature =
 		BuildGenerationSignature(
@@ -1240,15 +1248,22 @@ void UVoxelModule::UpdateReadiness()
 			}
 		}
 	}
-	Snapshot.RequiredPrimaryRepresentations = ViewManager ? 1 : 0;
-	Snapshot.ReadyPrimaryRepresentations = ViewManager && ViewManager->HasPrimaryRepresentation() ? 1 : 0;
+	FVoxelPrimaryFineReadiness PrimaryFine;
+	if (ViewManager)
+	{
+		PrimaryFine = ViewManager->GetPrimaryFineReadiness(CurrentInterest.Exact);
+	}
+	Snapshot.RequiredPrimaryFineSections = PrimaryFine.Required;
+	Snapshot.ReadyPrimaryFineSections = PrimaryFine.Ready;
+	Snapshot.RenderablePrimaryFineSections = PrimaryFine.Renderable;
+	Snapshot.RequiredPrimaryRepresentations = PrimaryFine.Required;
+	Snapshot.ReadyPrimaryRepresentations = PrimaryFine.Ready;
 	Snapshot.PendingCriticalDependencies = Scheduler ? Scheduler->CriticalCount() : 0;
 	const bool bSpawnDataReady = Snapshot.bSpawnPlanReady &&
 		Snapshot.ReadySpawnSections >= Snapshot.RequiredSpawnSections;
 	const bool bSpawnCollisionReady = bSpawnDataReady &&
 		Snapshot.ReadyCollisionSections >= Snapshot.RequiredCollisionSections;
-	const bool bPrimaryViewReady = bSpawnCollisionReady &&
-		Snapshot.ReadyPrimaryRepresentations >= Snapshot.RequiredPrimaryRepresentations;
+	const bool bPrimaryViewReady = bSpawnCollisionReady && PrimaryFine.IsComplete();
 	if (WorldState == EVoxelWorldState::Failed)
 	{
 		Snapshot.bFailed = true;

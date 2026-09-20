@@ -42,4 +42,10 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Voxel|View", meta = (ClampMin = "1", ClampMax = "8"))
 	uint8 MaximumMacroLevel = 4;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Voxel|View|Budget", meta = (ClampMin = "32", ClampMax = "2048"))
+	int32 MaximumSurfaceTilesPerSource = 256;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Voxel|View|Budget", meta = (ClampMin = "32", ClampMax = "2048"))
+	int32 MaximumMacroTilesPerSource = 128;
 };

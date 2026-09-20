@@ -794,7 +794,7 @@ void UVoxelModuleNetworkComponent::RefreshInterest(const double InNow)
 		FMath::FloorToInt(Position.Y),
 		FMath::FloorToInt(Position.Z));
 	Source.Direction = Observer->GetActorForwardVector();
-	Source.bRender = false;
+	Source.RenderMode = EVoxelStreamingRenderMode::None;
 	Source.ExactRadius = 16;
 	Source.CollisionRadius = 8;
 	Source.SimulationRadius = 6;

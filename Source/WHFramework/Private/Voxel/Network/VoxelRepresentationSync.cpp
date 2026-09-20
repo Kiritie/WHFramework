@@ -87,15 +87,17 @@ namespace
 		{
 		}
 
-		virtual void EnumerateModifiedSections(
+		virtual bool EnumerateModifiedSections(
 			const FVoxelGenerationBounds& InBounds,
-			TArray<FIntVector>& OutSections) const override
+			TArray<FIntVector>& OutSections,
+			const TAtomic<bool>* InCancel = nullptr) const override
 		{
 			OutSections.Reset();
 			if (const FVoxelWorldRuntime* Runtime = Module.GetRuntime())
 			{
-				Runtime->GetChangeIndex().Enumerate(InBounds, OutSections);
+				return Runtime->GetChangeIndex().Enumerate(InBounds, OutSections, InCancel);
 			}
+			return true;
 		}
 
 		virtual bool ReadOverlay(
@@ -148,13 +150,19 @@ namespace
 		{
 		}
 
-		virtual void EnumerateModifiedSections(
+		virtual bool EnumerateModifiedSections(
 			const FVoxelGenerationBounds& InBounds,
-			TArray<FIntVector>& OutSections) const override
+			TArray<FIntVector>& OutSections,
+			const TAtomic<bool>* InCancel = nullptr) const override
 		{
 			OutSections.Reset();
 			for (const TPair<FIntVector, FVoxelOverlaySnapshot>& Pair : Overlays)
 			{
+				if (InCancel && InCancel->Load())
+				{
+					OutSections.Reset();
+					return false;
+				}
 				const FVoxelGenerationBounds SectionBounds {
 					Pair.Key * ExactSectionSide,
 					(Pair.Key + FIntVector(1)) * ExactSectionSide };
@@ -163,6 +171,7 @@ namespace
 					OutSections.Add(Pair.Key);
 				}
 			}
+			return true;
 		}
 
 		virtual bool ReadOverlay(
@@ -542,6 +551,7 @@ bool FVoxelRepresentationSync::BuildServerData(
 		FVoxelSurfaceTileData Data;
 		const FVoxelSurfaceProxyBuilder Builder(
 			InInput.Generator.ToSharedRef(),
+			InInput.Config.ToSharedRef(),
 			InInput.Settings,
 			OverlaySource);
 		if (!Builder.Build(Key, Data, OutError, InCancel)) return false;

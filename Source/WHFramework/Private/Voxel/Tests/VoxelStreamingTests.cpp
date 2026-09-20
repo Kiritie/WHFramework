@@ -22,7 +22,7 @@ bool FVoxelStreamingDemandTest::RunTest(const FString& InParameters)
 	Source.ExactRadius = 0;
 	Source.CollisionRadius = 24;
 	Source.bCollision = true;
-	Source.bRender = false;
+	Source.RenderMode = EVoxelStreamingRenderMode::None;
 
 	const FVoxelInterestManager Manager;
 	const FVoxelInterestSet Interest = Manager.Compute(
@@ -39,6 +39,51 @@ bool FVoxelStreamingDemandTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("Non-render source creates no voxel proxies"), Interest.VoxelProxy.IsEmpty());
 	TestTrue(TEXT("Non-render source creates no surface tiles"), Interest.Surface.IsEmpty());
 	TestTrue(TEXT("Non-render source creates no macro tiles"), Interest.Macro.IsEmpty());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelStreamingRenderScopeTest,
+	"WHFramework.Voxel.Streaming.RenderScope",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelStreamingRenderScopeTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelWorldManifest Manifest;
+	Manifest.Settings.MinZ = -128;
+	Manifest.Settings.MaxZ = 128;
+	FVoxelViewSettings Settings;
+	FVoxelStreamingSource Source;
+	Source.Center = FIntVector::ZeroValue;
+	Source.ExactRadius = 32;
+	Source.CollisionRadius = 32;
+	Source.VerticalExactRadius = 16;
+	Source.RenderMode = EVoxelStreamingRenderMode::FineOnly;
+
+	const FVoxelInterestManager Manager;
+	const FVoxelInterestSet FineOnly = Manager.Compute(
+		MakeArrayView(&Source, 1),
+		Manifest,
+		Settings);
+	bool bHasFine = false;
+	for (const TPair<FIntVector, FVoxelExactDemand>& Pair : FineOnly.Exact)
+	{
+		bHasFine |= Pair.Value.bFineRender;
+	}
+	TestTrue(TEXT("FineOnly creates fine demand"), bHasFine);
+	TestTrue(TEXT("FineOnly creates no voxel proxies"), FineOnly.VoxelProxy.IsEmpty());
+	TestTrue(TEXT("FineOnly creates no surface tiles"), FineOnly.Surface.IsEmpty());
+	TestTrue(TEXT("FineOnly creates no macro tiles"), FineOnly.Macro.IsEmpty());
+
+	Source.RenderMode = EVoxelStreamingRenderMode::Full;
+	const FVoxelInterestSet Full = Manager.Compute(
+		MakeArrayView(&Source, 1),
+		Manifest,
+		Settings);
+	TestFalse(TEXT("Full creates voxel proxies"), Full.VoxelProxy.IsEmpty());
+	TestFalse(TEXT("Full creates surface tiles"), Full.Surface.IsEmpty());
+	TestFalse(TEXT("Full creates macro tiles"), Full.Macro.IsEmpty());
 	return true;
 }
 

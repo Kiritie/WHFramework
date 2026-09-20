@@ -39,4 +39,6 @@ struct WHFRAMEWORK_API FVoxelViewSettings
 	uint8 MaximumVoxelProxyLevel = 4;
 	uint8 MaximumSurfaceLevel = 4;
 	uint8 MaximumMacroLevel = 4;
+	int32 MaximumSurfaceTilesPerSource = 256;
+	int32 MaximumMacroTilesPerSource = 128;
 };

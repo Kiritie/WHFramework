@@ -7,7 +7,10 @@ void FVoxelChangeIndex::SetModified(const FIntVector& InSection, bool bInModifie
 	FWriteScopeLock Scope(Lock);
 	const FIntVector Region = ToRegion(InSection);
 	TArray<uint64>& Mask = RegionMasks.FindOrAdd(Region);
-	Mask.SetNumZeroed(8);
+	if (Mask.Num() != 8)
+	{
+		Mask.Init(0, 8);
+	}
 	const int32 Bit = ToRegionBit(InSection);
 	const uint64 Flag = 1ull << (Bit & 63);
 	if (bInModified) Mask[Bit >> 6] |= Flag;
@@ -53,35 +56,71 @@ void FVoxelChangeIndex::Reset()
 	RegionMasks.Reset();
 }
 
-void FVoxelChangeIndex::Enumerate(
+bool FVoxelChangeIndex::Enumerate(
 	const FVoxelGenerationBounds& InBounds,
-	TArray<FIntVector>& OutSections) const
+	TArray<FIntVector>& OutSections,
+	const TAtomic<bool>* InCancel) const
 {
+	OutSections.Reset();
+	if (InBounds.Max.X <= InBounds.Min.X ||
+		InBounds.Max.Y <= InBounds.Min.Y ||
+		InBounds.Max.Z <= InBounds.Min.Z)
+	{
+		return true;
+	}
+
 	FReadScopeLock Guard(Lock);
 	const FIntVector MinSection(
-		FMath::FloorToInt(static_cast<double>(InBounds.Min.X) / 16.0),
-		FMath::FloorToInt(static_cast<double>(InBounds.Min.Y) / 16.0),
-		FMath::FloorToInt(static_cast<double>(InBounds.Min.Z) / 16.0));
+		VoxelGeneration::FloorDivide(InBounds.Min.X, 16),
+		VoxelGeneration::FloorDivide(InBounds.Min.Y, 16),
+		VoxelGeneration::FloorDivide(InBounds.Min.Z, 16));
 	const FIntVector MaxSection(
-		FMath::FloorToInt(static_cast<double>(InBounds.Max.X - 1) / 16.0),
-		FMath::FloorToInt(static_cast<double>(InBounds.Max.Y - 1) / 16.0),
-		FMath::FloorToInt(static_cast<double>(InBounds.Max.Z - 1) / 16.0));
-	for (int32 Z = MinSection.Z; Z <= MaxSection.Z; ++Z)
+		VoxelGeneration::FloorDivide(InBounds.Max.X - 1, 16),
+		VoxelGeneration::FloorDivide(InBounds.Max.Y - 1, 16),
+		VoxelGeneration::FloorDivide(InBounds.Max.Z - 1, 16));
+
+	for (const TPair<FIntVector, TArray<uint64>>& Pair : RegionMasks)
 	{
-		for (int32 Y = MinSection.Y; Y <= MaxSection.Y; ++Y)
+		if (InCancel && InCancel->Load())
 		{
-			for (int32 X = MinSection.X; X <= MaxSection.X; ++X)
+			OutSections.Reset();
+			return false;
+		}
+
+		const TArray<uint64>& Mask = Pair.Value;
+		for (int32 WordIndex = 0; WordIndex < Mask.Num(); ++WordIndex)
+		{
+			uint64 Word = Mask[WordIndex];
+			while (Word != 0)
 			{
-				const FIntVector Section(X, Y, Z);
-				const TArray<uint64>* Mask = RegionMasks.Find(ToRegion(Section));
-				const int32 Bit = ToRegionBit(Section);
-				if (Mask && Mask->IsValidIndex(Bit / 64) && (((*Mask)[Bit / 64] >> (Bit % 64)) & 1ull) != 0)
+				const int32 LowestBit = FMath::CountTrailingZeros64(Word);
+				const FIntVector Section = RegionBitToSection(
+					Pair.Key,
+					WordIndex * 64 + LowestBit);
+				if (Section.X >= MinSection.X && Section.X <= MaxSection.X &&
+					Section.Y >= MinSection.Y && Section.Y <= MaxSection.Y &&
+					Section.Z >= MinSection.Z && Section.Z <= MaxSection.Z)
 				{
 					OutSections.Add(Section);
 				}
+				Word &= Word - 1;
 			}
 		}
 	}
+
+	OutSections.Sort([](const FIntVector& InA, const FIntVector& InB)
+	{
+		if (InA.Z != InB.Z) return InA.Z < InB.Z;
+		if (InA.Y != InB.Y) return InA.Y < InB.Y;
+		return InA.X < InB.X;
+	});
+	return true;
+}
+
+bool FVoxelChangeIndex::HasAnyModified() const
+{
+	FReadScopeLock Scope(Lock);
+	return !RegionMasks.IsEmpty();
 }
 
 int32 FVoxelChangeIndex::PositiveMod(int32 InValue, int32 InDivisor)
@@ -105,4 +144,14 @@ int32 FVoxelChangeIndex::ToRegionBit(const FIntVector& InSection)
 	const int32 Y = PositiveMod(InSection.Y, 8);
 	const int32 Z = PositiveMod(InSection.Z, 8);
 	return X + Y * 8 + Z * 64;
+}
+
+FIntVector FVoxelChangeIndex::RegionBitToSection(
+	const FIntVector& InRegion,
+	const int32 InBit)
+{
+	return InRegion * 8 + FIntVector(
+		InBit & 7,
+		(InBit >> 3) & 7,
+		(InBit >> 6) & 7);
 }

@@ -47,9 +47,11 @@ namespace
 
 FVoxelSurfaceProxyBuilder::FVoxelSurfaceProxyBuilder(
 	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator,
+	TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
 	const FVoxelGenerationSettings& InSettings,
 	const IVoxelOverlaySource& InOverlaySource)
 	: Generator(InGenerator)
+	, Config(InConfig)
 	, Settings(InSettings)
 	, OverlaySource(InOverlaySource)
 {
@@ -59,7 +61,8 @@ bool FVoxelSurfaceProxyBuilder::Build(
 	const FVoxelSurfaceTileKey& InKey,
 	FVoxelSurfaceTileData& OutData,
 	FString& OutError,
-	const TAtomic<bool>* InCancel) const
+	const TAtomic<bool>* InCancel,
+	FVoxelSurfaceBuildTiming* OutTiming) const
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_SurfaceBuild);
 
@@ -93,6 +96,7 @@ bool FVoxelSurfaceProxyBuilder::Build(
 		TileSide;
 
 	TArray<FVoxelColumnSample> Columns;
+	const double ColumnsStart = FPlatformTime::Seconds();
 
 	if (!Generator->SampleColumns(
 		TileOrigin,
@@ -105,6 +109,8 @@ bool FVoxelSurfaceProxyBuilder::Build(
 	{
 		return false;
 	}
+	const double ColumnsMilliseconds =
+		(FPlatformTime::Seconds() - ColumnsStart) * 1000.0;
 
 	if (Columns.Num() !=
 		Count)
@@ -160,6 +166,7 @@ bool FVoxelSurfaceProxyBuilder::Build(
 			Flags;
 	}
 
+	const double OverlayStart = FPlatformTime::Seconds();
 	if (!ApplyModifiedSurface(
 		InKey,
 		Data,
@@ -167,6 +174,13 @@ bool FVoxelSurfaceProxyBuilder::Build(
 		InCancel))
 	{
 		return false;
+	}
+	const double OverlayMilliseconds =
+		(FPlatformTime::Seconds() - OverlayStart) * 1000.0;
+	if (OutTiming)
+	{
+		OutTiming->ColumnsMilliseconds = ColumnsMilliseconds;
+		OutTiming->OverlayMilliseconds = OverlayMilliseconds;
 	}
 
 	OutData =
@@ -193,7 +207,7 @@ bool FVoxelSurfaceProxyBuilder::ApplyModifiedSurface(
 		FIntVector(
 			TileMin.X,
 			TileMin.Y,
-			MIN_int32),
+			Settings.MinZ),
 		FIntVector(
 			TileMin.X +
 				TileSide +
@@ -201,15 +215,25 @@ bool FVoxelSurfaceProxyBuilder::ApplyModifiedSurface(
 			TileMin.Y +
 				TileSide +
 				1,
-			MAX_int32)
+			Settings.MaxZ)
 	};
 
 	TArray<FIntVector> ModifiedSections;
 
-	OverlaySource.
+	if (!OverlaySource.
 		EnumerateModifiedSections(
 			Bounds,
-			ModifiedSections);
+			ModifiedSections,
+			InCancel))
+	{
+		OutError = TEXT("Canceled");
+		return false;
+	}
+
+	if (ModifiedSections.IsEmpty())
+	{
+		return true;
+	}
 
 	ModifiedSections.Sort(
 		[](
@@ -398,9 +422,15 @@ bool FVoxelSurfaceProxyBuilder::ApplyModifiedSurface(
 						Index] =
 							Z;
 
-					InOutData.SurfaceMaterial[
-						Index] =
-							State.TypeId;
+					uint32 PackedSymbol = 0;
+					if (!Config->ToSymbol(State, PackedSymbol))
+					{
+						OutError = TEXT("Modified voxel surface material is not present in the generation recipe");
+						return false;
+					}
+
+					InOutData.SurfaceMaterial[Index] =
+						static_cast<uint16>(PackedSymbol & 0xffffu);
 
 					break;
 				}

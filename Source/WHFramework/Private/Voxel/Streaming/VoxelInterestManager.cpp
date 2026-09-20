@@ -8,8 +8,6 @@
 namespace
 {
 	constexpr int32 InterestSectionSide = 16;
-	constexpr int32 MaxAdaptiveTilesPerSource = 1536;
-
 	int32 CeilDividePositive(
 		const int32 InValue,
 		const int32 InDivisor)
@@ -66,6 +64,7 @@ namespace
 		const int32 InBaseTileSide,
 		const int32 InBaseSampleStepCells,
 		const uint8 InMaximumLevel,
+		const int32 InMaximumTiles,
 		const FVoxelStreamingSource& InSource,
 		const FVoxelViewSettings& InSettings,
 		TSet<KeyType>& OutKeys)
@@ -138,7 +137,7 @@ namespace
 			const bool bCanSubdivide =
 				Node.Level > DesiredLevel &&
 				Node.Level > 0 &&
-				Added + Stack.Num() + 4 < MaxAdaptiveTilesPerSource;
+				Added + Stack.Num() + 4 < InMaximumTiles;
 
 			if (bCanSubdivide)
 			{
@@ -208,8 +207,11 @@ void FVoxelInterestManager::AddExactSource(
 				InSource.SimulationRadius)
 			: 0;
 
+	const bool bWantsFine =
+		InSource.RenderMode != EVoxelStreamingRenderMode::None;
+
 	const int32 FineRadius =
-		InSource.bRender
+		bWantsFine
 			? FMath::Min(
 				FMath::Max(
 					0,
@@ -321,7 +323,7 @@ void FVoxelInterestManager::AddExactSource(
 						SimulationRadius);
 
 				const bool bFineRender =
-					InSource.bRender &&
+					bWantsFine &&
 					IsInsideRadius(
 						Delta,
 						FineRadius);
@@ -400,7 +402,7 @@ void FVoxelInterestManager::AddViewSource(
 	const FVoxelViewSettings& InViewSettings,
 	FVoxelInterestSet& InOutInterest) const
 {
-	if (!InSource.bRender)
+	if (InSource.RenderMode != EVoxelStreamingRenderMode::Full)
 	{
 		return;
 	}
@@ -556,6 +558,7 @@ void FVoxelInterestManager::AddViewSource(
 			InViewSettings.SurfaceTileSide,
 			1,
 			InViewSettings.MaximumSurfaceLevel,
+			InViewSettings.MaximumSurfaceTilesPerSource,
 			InSource,
 			InViewSettings,
 			InOutInterest.Surface);
@@ -575,6 +578,7 @@ void FVoxelInterestManager::AddViewSource(
 			InViewSettings.MacroTileSide,
 			FVoxelMacroTileData::BaseStep,
 			InViewSettings.MaximumMacroLevel,
+			InViewSettings.MaximumMacroTilesPerSource,
 			InSource,
 			InViewSettings,
 			InOutInterest.Macro);

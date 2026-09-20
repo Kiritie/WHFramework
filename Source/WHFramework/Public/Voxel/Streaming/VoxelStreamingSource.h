@@ -2,6 +2,13 @@
 
 #include "CoreMinimal.h"
 
+enum class EVoxelStreamingRenderMode : uint8
+{
+	None = 0,
+	FineOnly,
+	Full
+};
+
 struct WHFRAMEWORK_API FVoxelStreamingSource
 {
 	FGuid Id;
@@ -14,7 +21,7 @@ struct WHFRAMEWORK_API FVoxelStreamingSource
 	int32 SimulationRadius = 6;
 	int32 VerticalExactRadius = 8;
 	int32 MovementCriticalCollisionRadius = 0;
-	bool bRender = true;
+	EVoxelStreamingRenderMode RenderMode = EVoxelStreamingRenderMode::Full;
 	bool bCollision = true;
 	bool bSimulation = true;
 };

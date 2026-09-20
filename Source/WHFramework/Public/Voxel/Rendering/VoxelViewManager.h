@@ -20,6 +20,18 @@ struct FVoxelTaskResult;
 struct FVoxelVoxelProxyData;
 struct FVoxelWaterSurfaceTileData;
 
+struct WHFRAMEWORK_API FVoxelPrimaryFineReadiness
+{
+	int32 Required = 0;
+	int32 Ready = 0;
+	int32 Renderable = 0;
+
+	bool IsComplete() const
+	{
+		return Required > 0 && Ready >= Required && Renderable > 0;
+	}
+};
+
 class WHFRAMEWORK_API FVoxelViewManager :
 	public IVoxelOverlaySource
 {
@@ -46,10 +58,13 @@ public:
 
 	void Reset();
 	bool HasPrimaryRepresentation() const;
+	FVoxelPrimaryFineReadiness GetPrimaryFineReadiness(
+		const TMap<FIntVector, FVoxelExactDemand>& InExact) const;
 
-	virtual void EnumerateModifiedSections(
+	virtual bool EnumerateModifiedSections(
 		const FVoxelGenerationBounds& InBounds,
-		TArray<FIntVector>& OutSections) const override;
+		TArray<FIntVector>& OutSections,
+		const TAtomic<bool>* InCancel = nullptr) const override;
 
 	virtual bool ReadOverlay(
 		const FIntVector& InSection,

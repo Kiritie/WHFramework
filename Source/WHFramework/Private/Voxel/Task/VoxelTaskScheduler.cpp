@@ -481,6 +481,11 @@ void FVoxelTaskScheduler::SetBudget(
 			InBudget.MaxHeavyCompletedResultsPerFrame,
 			1,
 			Budget.MaxCompletedResultsPerFrame);
+
+	Budget.MaxConcurrentSurfaceTasks =
+		FMath::Max(1, InBudget.MaxConcurrentSurfaceTasks);
+	Budget.MaxConcurrentMacroTasks =
+		FMath::Max(1, InBudget.MaxConcurrentMacroTasks);
 }
 
 FVoxelTaskDiagnostics
@@ -505,6 +510,17 @@ FVoxelTaskScheduler::GetDiagnostics() const
 
 	Result.QueuedInputBytes =
 		QueuedInputBytes;
+
+	Result.PendingByKind.Reset();
+	for (const FVoxelTaskRequest& Request : Pending)
+	{
+		++Result.PendingByKind.FindOrAdd(Request.Kind);
+	}
+	Result.RunningByKind.Reset();
+	for (const FRunning& Task : Running)
+	{
+		++Result.RunningByKind.FindOrAdd(Task.Kind);
+	}
 
 	return Result;
 }
@@ -580,6 +596,29 @@ bool FVoxelTaskScheduler::UsesSectionKey(
 	}
 }
 
+int32 FVoxelTaskScheduler::RunningCount(const EVoxelTaskKind InKind) const
+{
+	int32 Count = 0;
+	for (const FRunning& Task : Running)
+	{
+		Count += Task.Kind == InKind ? 1 : 0;
+	}
+	return Count;
+}
+
+bool FVoxelTaskScheduler::CanStartKind(const EVoxelTaskKind InKind) const
+{
+	switch (InKind)
+	{
+	case EVoxelTaskKind::BuildSurface:
+		return RunningCount(InKind) < Budget.MaxConcurrentSurfaceTasks;
+	case EVoxelTaskKind::BuildMacro:
+		return RunningCount(InKind) < Budget.MaxConcurrentMacroTasks;
+	default:
+		return true;
+	}
+}
+
 void FVoxelTaskScheduler::Pump()
 {
 	while (!bStopped &&
@@ -596,6 +635,11 @@ void FVoxelTaskScheduler::Pump()
 		{
 			const FVoxelTaskRequest& Request =
 				Pending[Index];
+
+			if (!CanStartKind(Request.Kind))
+			{
+				continue;
+			}
 
 			if (Request.ReservedBytes >
 				Budget.MaxReservedBytes -

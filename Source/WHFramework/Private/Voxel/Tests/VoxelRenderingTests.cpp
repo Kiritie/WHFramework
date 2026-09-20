@@ -11,12 +11,18 @@ namespace
 	class FVoxelTestOverlaySource final : public IVoxelOverlaySource
 	{
 	public:
-		virtual void EnumerateModifiedSections(
+		virtual bool EnumerateModifiedSections(
 			const FVoxelGenerationBounds& InBounds,
-			TArray<FIntVector>& OutSections) const override
+			TArray<FIntVector>& OutSections,
+			const TAtomic<bool>* InCancel = nullptr) const override
 		{
 			for (const TPair<FIntVector, FVoxelOverlaySnapshot>& Pair : Overlays)
 			{
+				if (InCancel && InCancel->Load())
+				{
+					OutSections.Reset();
+					return false;
+				}
 				const FVoxelGenerationBounds SectionBounds{
 					Pair.Key * VoxelBlock::Size,
 					(Pair.Key + FIntVector(1)) * VoxelBlock::Size
@@ -26,6 +32,7 @@ namespace
 					OutSections.Add(Pair.Key);
 				}
 			}
+			return true;
 		}
 
 		virtual bool ReadOverlay(
@@ -105,8 +112,10 @@ bool FVoxelSurfaceProxyOverlayTest::RunTest(const FString& InParameters)
 	const TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config =
 		VoxelTest::MakeGenerationConfig();
 	const TSharedRef<FVoxelGenerationPipeline, ESPMode::ThreadSafe> Generator = VoxelTest::MakeGenerator();
+	FVoxelGenerationSettings SurfaceSettings = Config->Recipe->Settings;
+	SurfaceSettings.MaxZ = 512;
 	FVoxelTestOverlaySource Overlay;
-	FVoxelSurfaceProxyBuilder Builder(Generator, Config->Recipe->Settings, Overlay);
+	FVoxelSurfaceProxyBuilder Builder(Generator, Config, SurfaceSettings, Overlay);
 	const FVoxelSurfaceTileKey Key{ FIntPoint::ZeroValue, 0 };
 	FVoxelSurfaceTileData Natural;
 	FString Error;
@@ -127,6 +136,21 @@ bool FVoxelSurfaceProxyOverlayTest::RunTest(const FString& InParameters)
 			NaturalGround,
 			SurfaceEdit.GroundZ[0]),
 		SurfaceEdit.GroundZ[0] < NaturalGround);
+
+	FVoxelGenerationRuntimeConfig RemappedConfig = *Config;
+	RemappedConfig.RuntimeToSymbol[1] = 3;
+	const TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Remapped =
+		MakeShared<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe>(MoveTemp(RemappedConfig));
+	FVoxelTestOverlaySource MaterialOverlay;
+	MaterialOverlay.Set(FIntVector(0, 0, NaturalGround + 1), FVoxelBlockState(1, 0));
+	FVoxelSurfaceProxyBuilder RemappedBuilder(
+		Generator,
+		Remapped,
+		SurfaceSettings,
+		MaterialOverlay);
+	FVoxelSurfaceTileData MaterialEdit;
+	TestTrue(TEXT("Remapped material overlay builds"), RemappedBuilder.Build(Key, MaterialEdit, Error));
+	TestEqual(TEXT("Overlay material remains in recipe symbol domain"), MaterialEdit.SurfaceMaterial[0], uint16(3));
 	return true;
 }
 
