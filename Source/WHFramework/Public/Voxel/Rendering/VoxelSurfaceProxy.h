@@ -4,8 +4,8 @@
 #include "Voxel/Generation/VoxelGenerationPipeline.h"
 #include "Voxel/Generation/VoxelGenerationTypes.h"
 #include "Voxel/Rendering/VoxelViewTypes.h"
-#include "Voxel/Runtime/VoxelChangeIndex.h"
 #include "Voxel/Runtime/VoxelBlockState.h"
+#include "Voxel/Runtime/VoxelChangeIndex.h"
 
 enum EVoxelSurfaceFlags : uint8
 {
@@ -17,8 +17,11 @@ enum EVoxelSurfaceFlags : uint8
 
 struct WHFRAMEWORK_API FVoxelSurfaceTileData
 {
+	static constexpr int32 CellSide = 32;
+	static constexpr int32 VertexSide = CellSide + 1;
+
 	FVoxelSurfaceTileKey Key;
-	int32 Side = 0;
+	int32 Side = VertexSide;
 	int32 Step = 0;
 	uint64 Revision = 0;
 	TArray<int32> GroundZ;
@@ -26,6 +29,18 @@ struct WHFRAMEWORK_API FVoxelSurfaceTileData
 	TArray<uint16> SurfaceMaterial;
 	TArray<uint16> Biome;
 	TArray<uint8> Flags;
+
+	int32 GetTileSide() const
+	{
+		return CellSide *
+			Step;
+	}
+
+	int32 GetVertexCount() const
+	{
+		return Side *
+			Side;
+	}
 };
 
 struct WHFRAMEWORK_API FVoxelOverlaySnapshot
@@ -39,9 +54,11 @@ class WHFRAMEWORK_API IVoxelOverlaySource
 {
 public:
 	virtual ~IVoxelOverlaySource() = default;
+
 	virtual void EnumerateModifiedSections(
 		const FVoxelGenerationBounds& InBounds,
 		TArray<FIntVector>& OutSections) const = 0;
+
 	virtual bool ReadOverlay(
 		const FIntVector& InSection,
 		FVoxelOverlaySnapshot& OutOverlay) const = 0;

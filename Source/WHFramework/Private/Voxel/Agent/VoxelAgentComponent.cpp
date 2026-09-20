@@ -77,17 +77,90 @@ void UVoxelAgentComponent::OnReply(const FVoxelEditReply&R)
 {if(R.RequestId==LastRequest&&R.Code!=EVoxelEditCode::Pending)bBreakActive=false;}
 void UVoxelAgentComponent::RefreshSource()
 {
-    auto*M=Module.Get();if(!M)return;
-    if(auto*P=Cast<APawn>(GetOwner())){auto*PC=Cast<APlayerController>(P->GetController());if(BoundController.Get()!=PC)BindController(PC);}
-    auto*Pawn=Cast<APawn>(GetOwner());bool Active=bEnableStreaming&&(!Pawn||Pawn->IsPlayerControlled()||bEnableNonPlayerSource);
-    if(GetWorld()->GetNetMode()!=NM_Standalone)Active=Active&&BoundController.IsValid()&&BoundController->IsLocalController();
-    if(!Active){if(SourceId.IsValid())M->UnregisterSource(SourceId);SourceId.Invalidate();return;}
-    FVoxelStreamingSource S;FVector O,D;if(!View(O,D)||!VoxelCoord::FromWorld(GetOwner()->GetActorLocation(),M->BlockSize(),S.Center))return;
-    S.Id=SourceId.IsValid()?SourceId:FGuid::NewGuid();S.Direction=D;S.ExactRadius=32;
-    if(BoundController.IsValid()){S.VerticalFovDegrees=BoundController->PlayerCameraManager?BoundController->PlayerCameraManager->GetFOVAngle():90.f;int32 Width=0,Height=0;BoundController->GetViewportSize(Width,Height);S.ViewportHeightPixels=FMath::Max(1,Height);}
-    S.CollisionRadius=32;S.SimulationRadius=0;S.VerticalExactRadius=8;
-    S.bCollision=true;S.bSimulation=false;S.bRender=GetWorld()->GetNetMode()!=NM_DedicatedServer;
-    if(!SourceId.IsValid())SourceId=M->RegisterSource(this,S);else if(!M->UpdateSource(SourceId,S))SourceId.Invalidate();
+	UVoxelModule* VoxelModule = Module.Get();
+	if (!VoxelModule)
+	{
+		return;
+	}
+
+	if (APawn* Pawn = Cast<APawn>(GetOwner()))
+	{
+		APlayerController* PlayerController =
+			Cast<APlayerController>(Pawn->GetController());
+		if (BoundController.Get() != PlayerController)
+		{
+			BindController(PlayerController);
+		}
+	}
+
+	APawn* Pawn = Cast<APawn>(GetOwner());
+	bool bActive =
+		bEnableStreaming &&
+		(!Pawn || Pawn->IsPlayerControlled() || bEnableNonPlayerSource);
+
+	if (GetWorld()->GetNetMode() != NM_Standalone)
+	{
+		bActive =
+			bActive &&
+			BoundController.IsValid() &&
+			BoundController->IsLocalController();
+	}
+
+	if (!bActive)
+	{
+		if (SourceId.IsValid())
+		{
+			VoxelModule->UnregisterSource(SourceId);
+		}
+		SourceId.Invalidate();
+		return;
+	}
+
+	FVoxelStreamingSource Source;
+	FVector ViewOrigin;
+	FVector ViewDirection;
+
+	if (!View(ViewOrigin, ViewDirection) ||
+		!VoxelCoord::FromWorld(
+			GetOwner()->GetActorLocation(),
+			VoxelModule->BlockSize(),
+			Source.Center))
+	{
+		return;
+	}
+
+	Source.Id = SourceId.IsValid() ? SourceId : FGuid::NewGuid();
+	Source.Direction = ViewDirection;
+	Source.ExactRadius = FMath::Max(0, ExactRadiusCells);
+	Source.CollisionRadius = FMath::Max(0, CollisionRadiusCells);
+	Source.SimulationRadius = FMath::Max(0, SimulationRadiusCells);
+	Source.VerticalExactRadius = FMath::Max(0, VerticalExactRadiusCells);
+
+	if (BoundController.IsValid())
+	{
+		Source.VerticalFovDegrees =
+			BoundController->PlayerCameraManager
+				? BoundController->PlayerCameraManager->GetFOVAngle()
+				: 90.0f;
+
+		int32 ViewportWidth = 0;
+		int32 ViewportHeight = 0;
+		BoundController->GetViewportSize(ViewportWidth, ViewportHeight);
+		Source.ViewportHeightPixels = FMath::Max(1, ViewportHeight);
+	}
+
+	Source.bCollision = true;
+	Source.bSimulation = SimulationRadiusCells > 0;
+	Source.bRender = GetWorld()->GetNetMode() != NM_DedicatedServer;
+
+	if (!SourceId.IsValid())
+	{
+		SourceId = VoxelModule->RegisterSource(this, Source);
+	}
+	else if (!VoxelModule->UpdateSource(SourceId, Source))
+	{
+		SourceId.Invalidate();
+	}
 }
 void UVoxelAgentComponent::RefreshStepHeight()
 {

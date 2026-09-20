@@ -79,6 +79,7 @@ bool FVoxelWaterViewTest::RunTest(const FString& InParameters)
 	Surface.Side = 2;
 	Surface.Step = 4;
 	Surface.Revision = 9;
+	Surface.GroundZ = { 4, 8, 7, 0 };
 	Surface.WaterZ = { 7, 8, 9, MIN_int32 };
 	Surface.Flags = { VoxelSurface_River, VoxelSurface_Lake, VoxelSurface_Ocean, 0 };
 	FVoxelWaterSurfaceTileData Water;
@@ -120,7 +121,12 @@ bool FVoxelSurfaceProxyOverlayTest::RunTest(const FString& InParameters)
 	Overlay.Set(FIntVector(0, 0, NaturalGround), FVoxelBlockState());
 	FVoxelSurfaceTileData SurfaceEdit;
 	TestTrue(TEXT("Surface overlay builds"), Builder.Build(Key, SurfaceEdit, Error));
-	TestTrue(TEXT("Surface removal lowers the visible ground"), SurfaceEdit.GroundZ[0] < NaturalGround);
+	TestTrue(
+		FString::Printf(
+			TEXT("Surface removal lowers the visible ground (natural=%d, edited=%d)"),
+			NaturalGround,
+			SurfaceEdit.GroundZ[0]),
+		SurfaceEdit.GroundZ[0] < NaturalGround);
 	return true;
 }
 

@@ -17,17 +17,46 @@ namespace
 		const FVoxelRepresentationWireKey& InKey,
 		const FVoxelGenerationSettings& InSettings)
 	{
-		if (InType == EVoxelRepresentationWireType::VoxelProxy)
+		if (InType ==
+			EVoxelRepresentationWireType::
+				VoxelProxy)
 		{
-			return FVoxelViewKey { InKey.Coordinate, InKey.Level }.GetBounds();
+			return FVoxelViewKey {
+				InKey.Coordinate,
+				InKey.Level
+			}.
+			GetBounds();
 		}
-		const int32 Side = InType == EVoxelRepresentationWireType::SurfaceProxy ?
-			32 * (1 << InKey.Level) : 32 * (64 << InKey.Level);
+
+		const int32 Side =
+			InType ==
+				EVoxelRepresentationWireType::
+					SurfaceProxy
+				? FVoxelSurfaceTileData::
+					CellSide *
+					(1 << InKey.Level)
+				: FVoxelMacroTileData::
+					CellSide *
+					(
+						FVoxelMacroTileData::
+							BaseStep <<
+						InKey.Level
+					);
+
 		const FIntVector Min(
-			InKey.Coordinate.X * Side,
-			InKey.Coordinate.Y * Side,
+			InKey.Coordinate.X *
+				Side,
+			InKey.Coordinate.Y *
+				Side,
 			InSettings.MinZ);
-		return { Min, FIntVector(Min.X + Side, Min.Y + Side, InSettings.MaxZ) };
+
+		return {
+			Min,
+			FIntVector(
+				Min.X + Side,
+				Min.Y + Side,
+				InSettings.MaxZ)
+		};
 	}
 
 	uint64 ResolveBuildRevision(

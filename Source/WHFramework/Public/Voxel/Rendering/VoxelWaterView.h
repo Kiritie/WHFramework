@@ -17,6 +17,7 @@ struct WHFRAMEWORK_API FVoxelWaterSurfaceTileData
 	uint64 Revision = 0;
 	int32 Side = 0;
 	int32 Step = 0;
+	TArray<int32> GroundZ;
 	TArray<int32> WaterZ;
 	TArray<uint8> WaterKind;
 };

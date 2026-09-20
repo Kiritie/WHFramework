@@ -4,17 +4,17 @@
 #include "Voxel/Generation/Biome/VoxelBiomeGenerator.h"
 #include "Voxel/Generation/Caves/VoxelCaveGenerator.h"
 #include "Voxel/Generation/Climate/VoxelClimateGenerator.h"
-#include "Voxel/Generation/Hydrology/VoxelHydrology.h"
+#include "Voxel/Generation/Hydrology/VoxelLakeGenerator.h"
+#include "Voxel/Generation/Hydrology/VoxelRiverGenerator.h"
 #include "Voxel/Generation/Surface/VoxelSurfaceGenerator.h"
 #include "Voxel/Generation/Terrain/VoxelTerrainGenerator.h"
 #include "Voxel/Generation/VoxelFeature.h"
-#include "Voxel/Generation/VoxelStructure.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "Voxel/Generation/VoxelStructure.h"
 
 namespace
 {
-	constexpr int32 VoxelGenerationPlanTileSide =
-		256;
+	constexpr int32 VoxelGenerationPlanTileSide = 256;
 
 	FVoxelGenerationBounds MakeTileBounds(
 		const FVoxelGenerationTileKey& InKey)
@@ -30,63 +30,11 @@ namespace
 					VoxelGenerationPlanTileSide)
 		};
 	}
-
-	void MergeHydrology(
-		const FVoxelHydrologyInfluence& InCandidate,
-		FVoxelHydrologyInfluence& InOutResult)
-	{
-		if (InCandidate.bOcean ||
-			InCandidate.bLake)
-		{
-			if ((!InOutResult.bOcean &&
-				 !InOutResult.bLake) ||
-				InCandidate.SurfaceWaterZ >
-					InOutResult.SurfaceWaterZ)
-			{
-				InOutResult =
-					InCandidate;
-			}
-
-			return;
-		}
-
-		if (!InOutResult.bOcean &&
-			!InOutResult.bLake)
-		{
-			if (InCandidate.GroundOverrideZ !=
-					MIN_int32 &&
-				(InOutResult.GroundOverrideZ ==
-						MIN_int32 ||
-				 InCandidate.GroundOverrideZ <
-						InOutResult.GroundOverrideZ))
-			{
-				InOutResult.GroundOverrideZ =
-					InCandidate.GroundOverrideZ;
-			}
-
-			if (InCandidate.SurfaceWaterZ >
-				InOutResult.SurfaceWaterZ)
-			{
-				InOutResult.SurfaceWaterZ =
-					InCandidate.SurfaceWaterZ;
-			}
-
-			InOutResult.bRiver |=
-				InCandidate.bRiver;
-		}
-
-		InOutResult.bCoast |=
-			InCandidate.bCoast;
-	}
 }
 
 bool FVoxelGenerationQuery::Create(
-	TSharedRef<
-		const FVoxelGenerationRuntimeConfig,
-		ESPMode::ThreadSafe> InConfig,
-	TSharedRef<
-		FVoxelGenerationPlanCache,
-		ESPMode::ThreadSafe> InCache,
+	TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
+	TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> InCache,
 	FVoxelGenerationQuery& OutQuery,
 	FString& OutError)
 {
@@ -101,11 +49,8 @@ bool FVoxelGenerationQuery::Create(
 
 	FVoxelGenerationQuery Query;
 
-	Query.Config =
-		InConfig;
-
-	Query.Cache =
-		InCache;
+	Query.Config = InConfig;
+	Query.Cache = InCache;
 
 	Query.Climate =
 		MakeShared<
@@ -130,13 +75,24 @@ bool FVoxelGenerationQuery::Create(
 				InConfig->Recipe.
 					ToSharedRef());
 
-	Query.Hydrology =
+	Query.River =
 		MakeShared<
-			FVoxelHydrologyGenerator,
+			FVoxelRiverGenerator,
 			ESPMode::ThreadSafe>(
 				InConfig->Recipe.
 					ToSharedRef(),
 				Query.Terrain.
+					ToSharedRef());
+
+	Query.Lake =
+		MakeShared<
+			FVoxelLakeGenerator,
+			ESPMode::ThreadSafe>(
+				InConfig->Recipe.
+					ToSharedRef(),
+				Query.Terrain.
+					ToSharedRef(),
+				Query.River.
 					ToSharedRef());
 
 	Query.Cave =
@@ -144,10 +100,6 @@ bool FVoxelGenerationQuery::Create(
 			FVoxelCaveGenerator,
 			ESPMode::ThreadSafe>(
 				InConfig->Recipe.
-					ToSharedRef(),
-				Query.Terrain.
-					ToSharedRef(),
-				Query.Hydrology.
 					ToSharedRef());
 
 	Query.Aquifer =
@@ -184,7 +136,15 @@ bool FVoxelGenerationQuery::PrepareColumns(
 		return false;
 	}
 
-	PreparedHydrology.Reset();
+	if (InCancel &&
+		InCancel->Load())
+	{
+		OutError =
+			TEXT("Canceled");
+
+		return false;
+	}
+
 	PreparedCaves.Reset();
 	PreparedFeatures.Reset();
 	PreparedStructures.Reset();
@@ -193,18 +153,8 @@ bool FVoxelGenerationQuery::PrepareColumns(
 	PreparedBounds =
 		InBounds;
 
-	bColumnsPrepared = false;
-	bSymbolsPrepared = false;
-
-	if (!PrepareHydrology(
-		InBounds,
-		OutError,
-		InCancel))
-	{
-		return false;
-	}
-
 	bColumnsPrepared = true;
+	bSymbolsPrepared = false;
 
 	OutError.Reset();
 	return true;
@@ -215,25 +165,13 @@ bool FVoxelGenerationQuery::Prepare(
 	FString& OutError,
 	const TAtomic<bool>* InCancel)
 {
-	if (!InBounds.IsValid())
+	if (!PrepareColumns(
+		InBounds,
+		OutError,
+		InCancel))
 	{
-		OutError =
-			TEXT("Voxel generation query bounds are invalid");
-
 		return false;
 	}
-
-	PreparedHydrology.Reset();
-	PreparedCaves.Reset();
-	PreparedFeatures.Reset();
-	PreparedStructures.Reset();
-	PreparedColumnCache.Reset();
-
-	PreparedBounds =
-		InBounds;
-
-	bColumnsPrepared = false;
-	bSymbolsPrepared = false;
 
 	const FVoxelGenerationSettings& Settings =
 		Config->Recipe->Settings;
@@ -243,25 +181,9 @@ bool FVoxelGenerationQuery::Prepare(
 			Settings.CaveSpacing,
 			VoxelGenerationPlanTileSide);
 
-	const FVoxelGenerationBounds
-		PlanningBounds =
-			InBounds.Expand(
-				PlanningMargin);
-
-	/*
-	 * Structure / Feature Planner 会在 Planning Tile
-	 * 上采 Column，因此 Hydrology 必须覆盖 PlanningBounds，
-	 * 不能只覆盖最终 16³ Section。
-	 */
-	if (!PrepareHydrology(
-		PlanningBounds,
-		OutError,
-		InCancel))
-	{
-		return false;
-	}
-
-	bColumnsPrepared = true;
+	const FVoxelGenerationBounds PlanningBounds =
+		InBounds.Expand(
+			PlanningMargin);
 
 	auto ColumnSampler =
 		[this](
@@ -352,9 +274,9 @@ bool FVoxelGenerationQuery::Prepare(
 					0)
 			};
 
-			const FVoxelGenerationBounds
-				TileBounds =
-					MakeTileBounds(Key);
+			const FVoxelGenerationBounds TileBounds =
+				MakeTileBounds(
+					Key);
 
 			FVoxelCavePlanPtr CavePlan;
 
@@ -363,6 +285,7 @@ bool FVoxelGenerationQuery::Prepare(
 				[
 					this,
 					TileBounds,
+					&ColumnSampler,
 					InCancel
 				](
 					FVoxelCavePlan& OutPlan,
@@ -370,6 +293,7 @@ bool FVoxelGenerationQuery::Prepare(
 				{
 					return Cave->BuildPlan(
 						TileBounds,
+						ColumnSampler,
 						OutPlan,
 						BuildError,
 						InCancel);
@@ -383,8 +307,7 @@ bool FVoxelGenerationQuery::Prepare(
 			PreparedCaves.Add(
 				CavePlan);
 
-			FVoxelStructurePlanPtr
-				StructurePlan;
+			FVoxelStructurePlanPtr StructurePlan;
 
 			if (!Cache->GetOrBuildStructure(
 				Key,
@@ -397,13 +320,9 @@ bool FVoxelGenerationQuery::Prepare(
 					FVoxelStructurePlan& OutPlan,
 					FString& BuildError)
 				{
-					TArray<
-						FVoxelStructureInstance>
-						Instances;
-
+					TArray<FVoxelStructureInstance> Instances;
 					FVoxelStructurePlanner Planner(
-						Config->Recipe.
-							ToSharedRef());
+						Config->Recipe.ToSharedRef());
 
 					if (!Planner.Plan(
 						TileBounds,
@@ -421,17 +340,14 @@ bool FVoxelGenerationQuery::Prepare(
 					OutPlan.Bounds =
 						TileBounds;
 
-					for (const
-						FVoxelStructureInstance&
-							Instance :
+					for (const FVoxelStructureInstance& Instance :
 						Instances)
 					{
-						const int32
-							DefinitionIndex =
-								Config->Recipe->
-									FindStructure(
-										Instance.
-											DefinitionId);
+						const int32 DefinitionIndex =
+							Config->Recipe->
+								FindStructure(
+									Instance.
+										DefinitionId);
 
 						if (!Config->Recipe->
 							Structures.
@@ -441,17 +357,13 @@ bool FVoxelGenerationQuery::Prepare(
 							continue;
 						}
 
-						const
-							EVoxelGenerationStage
-								Stage =
-									Config->Recipe->
-										Structures[
-											DefinitionIndex].
-										Stage;
+						const EVoxelGenerationStage Stage =
+							Config->Recipe->
+								Structures[
+									DefinitionIndex].
+									Stage;
 
-						for (const
-							FVoxelStructureClearVolume&
-								Clear :
+						for (const FVoxelStructureClearVolume& Clear :
 							Instance.ClearVolumes)
 						{
 							OutPlan.Clears.Add({
@@ -461,9 +373,7 @@ bool FVoxelGenerationQuery::Prepare(
 							});
 						}
 
-						for (const
-							FVoxelStructureCellWrite&
-								Write :
+						for (const FVoxelStructureCellWrite& Write :
 							Instance.Writes)
 						{
 							OutPlan.Writes.Add({
@@ -479,6 +389,7 @@ bool FVoxelGenerationQuery::Prepare(
 					}
 
 					OutPlan.Finalize();
+
 					BuildError.Reset();
 					return true;
 				},
@@ -491,8 +402,7 @@ bool FVoxelGenerationQuery::Prepare(
 			PreparedStructures.Add(
 				StructurePlan);
 
-			FVoxelFeaturePlanPtr
-				FeaturePlan;
+			FVoxelFeaturePlanPtr FeaturePlan;
 
 			if (!Cache->GetOrBuildFeature(
 				Key,
@@ -506,13 +416,9 @@ bool FVoxelGenerationQuery::Prepare(
 					FVoxelFeaturePlan& OutPlan,
 					FString& BuildError)
 				{
-					TArray<
-						FVoxelFeatureInstance>
-						Instances;
-
+					TArray<FVoxelFeatureInstance> Instances;
 					FVoxelFeaturePlanner Planner(
-						Config->Recipe.
-							ToSharedRef());
+						Config->Recipe.ToSharedRef());
 
 					if (!Planner.Plan(
 						TileBounds,
@@ -531,17 +437,14 @@ bool FVoxelGenerationQuery::Prepare(
 					OutPlan.Bounds =
 						TileBounds;
 
-					for (const
-						FVoxelFeatureInstance&
-							Instance :
+					for (const FVoxelFeatureInstance& Instance :
 						Instances)
 					{
-						const int32
-							DefinitionIndex =
-								Config->Recipe->
-									FindFeature(
-										Instance.
-											DefinitionId);
+						const int32 DefinitionIndex =
+							Config->Recipe->
+								FindFeature(
+									Instance.
+										DefinitionId);
 
 						if (!Config->Recipe->
 							Features.
@@ -551,17 +454,13 @@ bool FVoxelGenerationQuery::Prepare(
 							continue;
 						}
 
-						const
-							EVoxelGenerationStage
-								Stage =
-									Config->Recipe->
-										Features[
-											DefinitionIndex].
-										Stage;
+						const EVoxelGenerationStage Stage =
+							Config->Recipe->
+								Features[
+									DefinitionIndex].
+									Stage;
 
-						for (const
-							FVoxelFeatureCellWrite&
-								Write :
+						for (const FVoxelFeatureCellWrite& Write :
 							Instance.Writes)
 						{
 							OutPlan.Writes.Add({
@@ -574,6 +473,7 @@ bool FVoxelGenerationQuery::Prepare(
 					}
 
 					OutPlan.Finalize();
+
 					BuildError.Reset();
 					return true;
 				},
@@ -588,144 +488,9 @@ bool FVoxelGenerationQuery::Prepare(
 		}
 	}
 
-	PreparedHydrology.Sort(
-		[](
-			const FVoxelHydrologyPlanPtr& InA,
-			const FVoxelHydrologyPlanPtr& InB)
-		{
-			return InA->Key <
-				InB->Key;
-		});
-
 	bSymbolsPrepared = true;
 
 	OutError.Reset();
-	return true;
-}
-
-bool FVoxelGenerationQuery::PrepareHydrology(
-	const FVoxelGenerationBounds& InBounds,
-	FString& OutError,
-	const TAtomic<bool>* InCancel)
-{
-	const FVoxelGenerationSettings& Settings =
-		Config->Recipe->Settings;
-
-	const int32 CellSize =
-		FMath::Max(
-			1,
-			Settings.HydrologyCellSize);
-
-	const int32 RegionSide =
-		FMath::Max(
-			1,
-			Settings.HydrologyRegionSide);
-
-	const int32 Halo =
-		FMath::Max(
-			0,
-			Settings.HydrologyHaloCells);
-
-	const int32 MinHydrologyX =
-		VoxelGeneration::FloorDivide(
-			InBounds.Min.X,
-			CellSize);
-
-	const int32 MaxHydrologyX =
-		VoxelGeneration::FloorDivide(
-			InBounds.Max.X - 1,
-			CellSize);
-
-	const int32 MinHydrologyY =
-		VoxelGeneration::FloorDivide(
-			InBounds.Min.Y,
-			CellSize);
-
-	const int32 MaxHydrologyY =
-		VoxelGeneration::FloorDivide(
-			InBounds.Max.Y - 1,
-			CellSize);
-
-	/*
-	 * 一个 Plan 的 Grid = Core ± Halo。
-	 * 因此只有 Core 与目标 Hydrology Cell Range
-	 * 在加减 Halo 后相交的 Region 才需要准备。
-	 *
-	 * 默认值下，普通 Section 从固定 5×5
-	 * 降到通常 2×2。
-	 */
-	const int32 MinRegionX =
-		VoxelGeneration::FloorDivide(
-			MinHydrologyX - Halo,
-			RegionSide);
-
-	const int32 MaxRegionX =
-		VoxelGeneration::FloorDivide(
-			MaxHydrologyX + Halo,
-			RegionSide);
-
-	const int32 MinRegionY =
-		VoxelGeneration::FloorDivide(
-			MinHydrologyY - Halo,
-			RegionSide);
-
-	const int32 MaxRegionY =
-		VoxelGeneration::FloorDivide(
-			MaxHydrologyY + Halo,
-			RegionSide);
-
-	for (int32 RegionY = MinRegionY;
-		RegionY <= MaxRegionY;
-		++RegionY)
-	{
-		for (int32 RegionX = MinRegionX;
-			RegionX <= MaxRegionX;
-			++RegionX)
-		{
-			if (InCancel &&
-				InCancel->Load())
-			{
-				OutError =
-					TEXT("Canceled");
-
-				return false;
-			}
-
-			const FVoxelHydrologyRegionKey Key {
-				FIntPoint(
-					RegionX,
-					RegionY)
-			};
-
-			FVoxelHydrologyPlanPtr Plan;
-
-			if (!Cache->GetOrBuildHydrology(
-				Key,
-				[
-					this,
-					Key,
-					InCancel
-				](
-					FVoxelHydrologyPlan& OutPlan,
-					FString& BuildError)
-				{
-					return Hydrology->BuildPlan(
-						Key,
-						OutPlan,
-						BuildError,
-						InCancel);
-				},
-				Plan,
-				OutError))
-			{
-				return false;
-			}
-
-			PreparedHydrology.Add(
-				Plan);
-		}
-	}
-
 	return true;
 }
 
@@ -744,9 +509,12 @@ bool FVoxelGenerationQuery::SampleBaseColumn(
 			InY);
 
 		if (const FVoxelColumnSample* Cached =
-			PreparedColumnCache.Find(Key))
+			PreparedColumnCache.Find(
+				Key))
 		{
-			OutColumn = *Cached;
+			OutColumn =
+				*Cached;
+
 			return true;
 		}
 
@@ -788,11 +556,10 @@ bool FVoxelGenerationQuery::ComputeBaseColumn(
 			InX,
 			InY);
 
-	const FVoxelMacroTerrainSample
-		TerrainSample =
-			Terrain->SampleMacro(
-				InX,
-				InY);
+	const FVoxelMacroTerrainSample TerrainSample =
+		Terrain->SampleMacro(
+			InX,
+			InY);
 
 	Column.SurfaceZ =
 		TerrainSample.SurfaceZ;
@@ -808,47 +575,63 @@ bool FVoxelGenerationQuery::ComputeBaseColumn(
 			Column.Climate,
 			TerrainSample);
 
-	FVoxelHydrologyInfluence Influence;
+	const int32 SeaLevel =
+		Config->Recipe->
+			Settings.SeaLevel;
 
-	for (const FVoxelHydrologyPlanPtr& Plan :
-		PreparedHydrology)
+	if (Column.SurfaceZ <=
+		SeaLevel)
 	{
-		FVoxelHydrologyInfluence Candidate;
+		Column.SurfaceWaterZ =
+			SeaLevel;
 
-		if (Plan &&
-			Plan->Sample(
-				InX,
-				InY,
-				Column.SurfaceZ,
-				Candidate))
+		Column.bOcean = true;
+	}
+	else
+	{
+		static const FIntPoint CoastNeighbors[] =
 		{
-			MergeHydrology(
-				Candidate,
-				Influence);
+			FIntPoint(-1, 0),
+			FIntPoint(1, 0),
+			FIntPoint(0, -1),
+			FIntPoint(0, 1)
+		};
+
+		for (const FIntPoint& Offset :
+			CoastNeighbors)
+		{
+			if (Terrain->SampleMacro(
+				InX + Offset.X,
+				InY + Offset.Y).
+				SurfaceZ <=
+				SeaLevel)
+			{
+				Column.bCoast = true;
+				break;
+			}
 		}
 	}
 
-	if (Influence.GroundOverrideZ !=
-		MIN_int32)
+	if (!Column.bOcean)
 	{
-		Column.SurfaceZ =
-			Influence.GroundOverrideZ;
+		River->ApplyToColumn(
+			InX,
+			InY,
+			Column);
+
+		Lake->ApplyToColumn(
+			InX,
+			InY,
+			Column);
 	}
 
-	Column.SurfaceWaterZ =
-		Influence.SurfaceWaterZ;
-
-	Column.bRiver =
-		Influence.bRiver;
-
-	Column.bLake =
-		Influence.bLake;
-
-	Column.bOcean =
-		Influence.bOcean;
-
-	Column.bCoast =
-		Influence.bCoast;
+	/*
+	 * River / Lake 修改的是最终 Surface。
+	 * DensityHeight 必须同步，否则 exact voxel 与
+	 * Surface/Macro 会出现 Z 不一致。
+	 */
+	Column.DensityHeight =
+		Column.SurfaceZ;
 
 	Surface->ResolveColumn(
 		Column);
@@ -949,8 +732,7 @@ bool FVoxelGenerationQuery::SampleSymbol(
 		Config->Recipe->
 			Palette.Air;
 
-	static constexpr
-		EVoxelGenerationStage Stages[] =
+	static constexpr EVoxelGenerationStage Stages[] =
 	{
 		EVoxelGenerationStage::TerrainDensity,
 		EVoxelGenerationStage::Aquifer,
@@ -1064,8 +846,6 @@ bool FVoxelGenerationQuery::ApplyStage(
 			PreparedCaves)
 		{
 			if (Plan &&
-				!Plan->ProtectsFloor(
-					InPosition) &&
 				Plan->Carves(
 					InPosition))
 			{

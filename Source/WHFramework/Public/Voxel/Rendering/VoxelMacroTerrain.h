@@ -14,9 +14,13 @@ struct WHFRAMEWORK_API FVoxelMacroStructureProxy
 
 struct WHFRAMEWORK_API FVoxelMacroTileData
 {
+	static constexpr int32 CellSide = 32;
+	static constexpr int32 VertexSide = CellSide + 1;
+	static constexpr int32 BaseStep = 64;
+
 	FVoxelMacroTileKey Key;
 	uint64 Revision = 0;
-	int32 Side = 0;
+	int32 Side = VertexSide;
 	int32 Step = 0;
 	TArray<int32> Height;
 	TArray<int32> WaterHeight;
@@ -24,6 +28,16 @@ struct WHFRAMEWORK_API FVoxelMacroTileData
 	TArray<uint8> ForestCoverage;
 	TArray<uint8> SnowCoverage;
 	TArray<FVoxelMacroStructureProxy> LargeStructures;
+
+	int32 GetTileSide() const
+	{
+		return CellSide * Step;
+	}
+
+	int32 GetVertexCount() const
+	{
+		return Side * Side;
+	}
 };
 
 class WHFRAMEWORK_API FVoxelMacroTerrainBuilder

@@ -1,15 +1,7 @@
 #include "Voxel/Rendering/VoxelMacroTerrain.h"
 
-namespace
-{
-	constexpr int32 MacroGridSide = 32;
-	constexpr int32 MacroBaseStep = 64;
-}
-
 FVoxelMacroTerrainBuilder::FVoxelMacroTerrainBuilder(
-	TSharedRef<
-		const FVoxelGenerationPipeline,
-		ESPMode::ThreadSafe> InGenerator)
+	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator)
 	: Generator(InGenerator)
 {
 }
@@ -26,40 +18,24 @@ bool FVoxelMacroTerrainBuilder::Build(
 		InKey;
 
 	Data.Side =
-		MacroGridSide;
+		FVoxelMacroTileData::VertexSide;
 
 	Data.Step =
-		MacroBaseStep <<
+		FVoxelMacroTileData::BaseStep <<
 		InKey.Level;
 
 	const int32 Count =
-		Data.Side *
-		Data.Side;
+		Data.GetVertexCount();
 
-	Data.Height.
-		SetNumUninitialized(
-			Count);
-
-	Data.WaterHeight.
-		SetNumUninitialized(
-			Count);
-
-	Data.SurfaceClass.
-		SetNumUninitialized(
-			Count);
-
-	Data.ForestCoverage.
-		SetNumUninitialized(
-			Count);
-
-	Data.SnowCoverage.
-		SetNumUninitialized(
-			Count);
+	Data.Height.SetNumUninitialized(Count);
+	Data.WaterHeight.SetNumUninitialized(Count);
+	Data.SurfaceClass.SetNumUninitialized(Count);
+	Data.ForestCoverage.SetNumUninitialized(Count);
+	Data.SnowCoverage.SetNumUninitialized(Count);
 
 	const FIntPoint TileOrigin =
 		InKey.Coordinate *
-		(Data.Side *
-			Data.Step);
+		Data.GetTileSide();
 
 	TArray<FVoxelColumnSample> Columns;
 
@@ -75,10 +51,11 @@ bool FVoxelMacroTerrainBuilder::Build(
 		return false;
 	}
 
-	if (Columns.Num() != Count)
+	if (Columns.Num() !=
+		Count)
 	{
 		OutError =
-			TEXT("Voxel macro column grid returned an invalid sample count");
+			TEXT("Voxel macro column grid returned an invalid vertex count");
 
 		return false;
 	}

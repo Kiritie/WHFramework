@@ -3,94 +3,80 @@
 #include "CoreMinimal.h"
 #include "Voxel/Generation/VoxelGenerationRecipe.h"
 
-class FVoxelTerrainGenerator;
-class FVoxelHydrologyGenerator;
+using FVoxelCaveColumnSampler =
+	TFunctionRef<
+		bool(
+			const FIntVector&,
+			FVoxelColumnSample&)>;
 
-struct WHFRAMEWORK_API FVoxelCaveAnchor
+struct WHFRAMEWORK_API FVoxelCaveSegment
 {
-    FVoxelStableId Id;
+	FIntVector Start = FIntVector::ZeroValue;
+	FIntVector End = FIntVector::ZeroValue;
+	int32 Radius = 2;
 
-    FIntVector Entrance = FIntVector::ZeroValue;
-    FIntVector Target = FIntVector::ZeroValue;
-
-    int32 Radius = 0;
-};
-
-struct WHFRAMEWORK_API FVoxelCaveRouteSection
-{
-	FIntVector Center = FIntVector::ZeroValue;
-	int32 Radius = 0;
-	int32 FloorZ = 0;
-	int32 CeilingZ = 0;
-};
-
-struct WHFRAMEWORK_API FVoxelCaveRoute
-{
-    FVoxelStableId Id;
-	TArray<FVoxelCaveRouteSection> Sections;
-
-	bool Carves(const FIntVector& InCell) const;
-	bool ProtectsFloor(const FIntVector& InCell) const;
-};
-
-struct WHFRAMEWORK_API FVoxelCaveChamber
-{
-    FVoxelStableId Id;
-
-    FIntVector Center = FIntVector::ZeroValue;
-    FIntVector Radius = FIntVector::ZeroValue;
+	bool IsValid() const
+	{
+		return Radius > 0;
+	}
 };
 
 struct WHFRAMEWORK_API FVoxelCavePlan
 {
-    TArray<FVoxelCaveRoute> Routes;
-    TArray<FVoxelCaveChamber> Chambers;
+	TArray<FVoxelCaveSegment> Segments;
 
-    bool Carves(const FIntVector& InCell) const;
+	void Finalize();
+	bool Carves(const FIntVector& InCell) const;
 	bool ProtectsFloor(const FIntVector& InCell) const;
-    uint64 GetAllocatedBytes() const;
+	uint64 GetAllocatedBytes() const;
+
+private:
+	TMap<FIntVector, TArray<int32>>
+		SegmentIndicesBySection;
 };
 
 class WHFRAMEWORK_API FVoxelCaveGenerator
 {
 public:
-    FVoxelCaveGenerator(
-        TSharedRef<const FVoxelGenerationRecipe, ESPMode::ThreadSafe> InRecipe,
-        TSharedRef<const FVoxelTerrainGenerator, ESPMode::ThreadSafe> InTerrain,
-        TSharedRef<const FVoxelHydrologyGenerator, ESPMode::ThreadSafe> InHydrology);
+	explicit FVoxelCaveGenerator(
+		TSharedRef<const FVoxelGenerationRecipe, ESPMode::ThreadSafe> InRecipe);
 
-public:
-    bool BuildPlan(
-        const FVoxelGenerationBounds& InBounds,
-        FVoxelCavePlan& OutPlan,
+	bool BuildPlan(
+		const FVoxelGenerationBounds& InBounds,
+		FVoxelCaveColumnSampler InColumnSampler,
+		FVoxelCavePlan& OutPlan,
 		FString& OutError,
-        const TAtomic<bool>* InCancel = nullptr) const;
+		const TAtomic<bool>* InCancel = nullptr) const;
 
 private:
-    void GatherAnchors(
-        const FVoxelGenerationBounds& InBounds,
-        TArray<FVoxelCaveAnchor>& OutAnchors) const;
-
-    bool BuildMainRoute(
-        const FVoxelCaveAnchor& InAnchor,
-		FVoxelCaveRoute& OutRoute,
+	bool TryBuildSystem(
+		const FIntPoint& InAnchorGrid,
+		FVoxelCaveColumnSampler InColumnSampler,
+		TArray<FVoxelCaveSegment>& OutSegments,
 		FString& OutError) const;
 
-    void AddBranches(
-        const FVoxelCaveAnchor& InAnchor,
-        const FVoxelCaveRoute& InMainRoute,
-        TArray<FVoxelCaveRoute>& OutRoutes) const;
+	void AddBranch(
+		FRandomStream& InStream,
+		const FIntVector& InStart,
+		double InYaw,
+		double InPitch,
+		FVoxelCaveColumnSampler InColumnSampler,
+		TArray<FVoxelCaveSegment>& OutSegments) const;
 
-	bool ValidateWalkRoute(const FVoxelCaveRoute& InRoute, const FIntVector& InEntrance,
-		const FIntVector& InTarget, FString& OutError) const;
-
-    void AddChambers(
-        const FVoxelCaveAnchor& InAnchor,
-        const FVoxelCaveRoute& InMainRoute,
-        TArray<FVoxelCaveChamber>& OutChambers) const;
+	FIntVector ClampBelowSurface(
+		const FIntVector& InPosition,
+		FVoxelCaveColumnSampler InColumnSampler) const;
 
 private:
-    TSharedRef<const FVoxelGenerationRecipe, ESPMode::ThreadSafe> Recipe;
-    TSharedRef<const FVoxelTerrainGenerator, ESPMode::ThreadSafe> Terrain;
-    TSharedRef<const FVoxelHydrologyGenerator, ESPMode::ThreadSafe> Hydrology;
+	static constexpr int32 SpawnPermille = 650;
+	static constexpr int32 EntrancePermille = 820;
+	static constexpr int32 BranchPermille = 120;
+	static constexpr int32 RoomPermille = 60;
+	static constexpr int32 MinimumSegments = 14;
+	static constexpr int32 MaximumSegments = 28;
+	static constexpr int32 MinimumSegmentLength = 3;
+	static constexpr int32 MaximumSegmentLength = 6;
+	static constexpr int32 MaximumRoomRadius = 4;
+
+	TSharedRef<const FVoxelGenerationRecipe, ESPMode::ThreadSafe> Recipe;
 };

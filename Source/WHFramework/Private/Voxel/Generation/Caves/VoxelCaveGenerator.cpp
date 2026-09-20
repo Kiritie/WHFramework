@@ -1,285 +1,692 @@
 #include "Voxel/Generation/Caves/VoxelCaveGenerator.h"
 
-#include "Voxel/Generation/Hydrology/VoxelHydrology.h"
-#include "Voxel/Generation/Terrain/VoxelTerrainGenerator.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 
-bool FVoxelCaveRoute::Carves(const FIntVector& InCell) const
+namespace
 {
-	for (const FVoxelCaveRouteSection& Section : Sections)
+	uint32 MakeStreamSeed(
+		const uint64 InSeed)
 	{
-		if (InCell.Z < Section.FloorZ || InCell.Z > Section.CeilingZ)
+		return static_cast<uint32>(
+			InSeed ^
+			(InSeed >> 32));
+	}
+}
+
+void FVoxelCavePlan::Finalize()
+{
+	SegmentIndicesBySection.Reset();
+
+	for (int32 SegmentIndex = 0;
+		SegmentIndex < Segments.Num();
+		++SegmentIndex)
+	{
+		const FVoxelCaveSegment& Segment =
+			Segments[SegmentIndex];
+
+		const FIntVector Min(
+			FMath::Min(
+				Segment.Start.X,
+				Segment.End.X) -
+				Segment.Radius,
+			FMath::Min(
+				Segment.Start.Y,
+				Segment.End.Y) -
+				Segment.Radius,
+			FMath::Min(
+				Segment.Start.Z,
+				Segment.End.Z) -
+				Segment.Radius);
+
+		const FIntVector Max(
+			FMath::Max(
+				Segment.Start.X,
+				Segment.End.X) +
+				Segment.Radius,
+			FMath::Max(
+				Segment.Start.Y,
+				Segment.End.Y) +
+				Segment.Radius,
+			FMath::Max(
+				Segment.Start.Z,
+				Segment.End.Z) +
+				Segment.Radius);
+
+		const FIntVector MinSection(
+			VoxelGeneration::FloorDivide(
+				Min.X,
+				16),
+			VoxelGeneration::FloorDivide(
+				Min.Y,
+				16),
+			VoxelGeneration::FloorDivide(
+				Min.Z,
+				16));
+
+		const FIntVector MaxSection(
+			VoxelGeneration::FloorDivide(
+				Max.X,
+				16),
+			VoxelGeneration::FloorDivide(
+				Max.Y,
+				16),
+			VoxelGeneration::FloorDivide(
+				Max.Z,
+				16));
+
+		for (int32 Z = MinSection.Z;
+			Z <= MaxSection.Z;
+			++Z)
+		{
+			for (int32 Y = MinSection.Y;
+				Y <= MaxSection.Y;
+				++Y)
+			{
+				for (int32 X = MinSection.X;
+					X <= MaxSection.X;
+					++X)
+				{
+					SegmentIndicesBySection.
+						FindOrAdd(
+							FIntVector(
+								X,
+								Y,
+								Z)).
+						Add(
+							SegmentIndex);
+				}
+			}
+		}
+	}
+}
+
+bool FVoxelCavePlan::Carves(
+	const FIntVector& InCell) const
+{
+	const FIntVector Section(
+		VoxelGeneration::FloorDivide(
+			InCell.X,
+			16),
+		VoxelGeneration::FloorDivide(
+			InCell.Y,
+			16),
+		VoxelGeneration::FloorDivide(
+			InCell.Z,
+			16));
+
+	const TArray<int32>* SegmentIndices =
+		SegmentIndicesBySection.Find(
+			Section);
+
+	if (!SegmentIndices)
+	{
+		return false;
+	}
+
+	for (const int32 SegmentIndex :
+		*SegmentIndices)
+	{
+		if (!Segments.IsValidIndex(
+			SegmentIndex))
 		{
 			continue;
 		}
-		const int64 DX = static_cast<int64>(InCell.X) - Section.Center.X;
-		const int64 DY = static_cast<int64>(InCell.Y) - Section.Center.Y;
-		if (DX * DX + DY * DY <= static_cast<int64>(Section.Radius) * Section.Radius)
+
+		const FVoxelCaveSegment& Segment =
+			Segments[SegmentIndex];
+
+		if (VoxelGeneration::IsInsideCapsule(
+			InCell,
+			Segment.Start,
+			Segment.End,
+			Segment.Radius))
 		{
 			return true;
 		}
 	}
+
 	return false;
 }
 
-bool FVoxelCaveRoute::ProtectsFloor(const FIntVector& InCell) const
+bool FVoxelCavePlan::ProtectsFloor(
+	const FIntVector& InCell) const
 {
-	for (const FVoxelCaveRouteSection& Section : Sections)
-	{
-		if (InCell.Z != Section.FloorZ - 1)
-		{
-			continue;
-		}
-		const int64 DX = static_cast<int64>(InCell.X) - Section.Center.X;
-		const int64 DY = static_cast<int64>(InCell.Y) - Section.Center.Y;
-		if (DX * DX + DY * DY <= static_cast<int64>(Section.Radius) * Section.Radius)
-		{
-			return true;
-		}
-	}
-	return false;
-}
-
-bool FVoxelCavePlan::Carves(const FIntVector& InCell) const
-{
-	for (const FVoxelCaveRoute& Route : Routes)
-	{
-		if (Route.Carves(InCell))
-		{
-			return true;
-		}
-	}
-	for (const FVoxelCaveChamber& Chamber : Chambers)
-	{
-		if (VoxelGeneration::IsInsideEllipsoid(InCell, Chamber.Center, Chamber.Radius))
-		{
-			return true;
-		}
-	}
-	return false;
-}
-
-bool FVoxelCavePlan::ProtectsFloor(const FIntVector& InCell) const
-{
-	for (const FVoxelCaveRoute& Route : Routes)
-	{
-		if (Route.ProtectsFloor(InCell))
-		{
-			return true;
-		}
-	}
+	(void)InCell;
 	return false;
 }
 
 uint64 FVoxelCavePlan::GetAllocatedBytes() const
 {
-	uint64 Bytes = Routes.GetAllocatedSize() + Chambers.GetAllocatedSize();
-	for (const FVoxelCaveRoute& Route : Routes)
+	uint64 Bytes =
+		Segments.GetAllocatedSize() +
+		SegmentIndicesBySection.
+			GetAllocatedSize();
+
+	for (const TPair<
+		FIntVector,
+		TArray<int32>>& Pair :
+		SegmentIndicesBySection)
 	{
-		Bytes += Route.Sections.GetAllocatedSize();
+		Bytes +=
+			Pair.Value.
+				GetAllocatedSize();
 	}
+
 	return Bytes;
 }
 
 FVoxelCaveGenerator::FVoxelCaveGenerator(
-	TSharedRef<const FVoxelGenerationRecipe, ESPMode::ThreadSafe> InRecipe,
-	TSharedRef<const FVoxelTerrainGenerator, ESPMode::ThreadSafe> InTerrain,
-	TSharedRef<const FVoxelHydrologyGenerator, ESPMode::ThreadSafe> InHydrology)
+	TSharedRef<const FVoxelGenerationRecipe, ESPMode::ThreadSafe> InRecipe)
 	: Recipe(InRecipe)
-	, Terrain(InTerrain)
-	, Hydrology(InHydrology)
 {
 }
 
-bool FVoxelCaveGenerator::BuildPlan(const FVoxelGenerationBounds& InBounds, FVoxelCavePlan& OutPlan,
-	FString& OutError, const TAtomic<bool>* InCancel) const
+bool FVoxelCaveGenerator::BuildPlan(
+	const FVoxelGenerationBounds& InBounds,
+	FVoxelCaveColumnSampler InColumnSampler,
+	FVoxelCavePlan& OutPlan,
+	FString& OutError,
+	const TAtomic<bool>* InCancel) const
 {
-	TArray<FVoxelCaveAnchor> Anchors;
-	GatherAnchors(InBounds, Anchors);
-	FVoxelCavePlan Result;
-	for (const FVoxelCaveAnchor& Anchor : Anchors)
+	if (!InBounds.IsValid())
 	{
-		if (InCancel && InCancel->Load())
-		{
-			OutError = TEXT("Canceled");
-			return false;
-		}
-		FVoxelCaveRoute MainRoute;
-		if (!BuildMainRoute(Anchor, MainRoute, OutError))
-		{
-			return false;
-		}
-		Result.Routes.Add(MainRoute);
-		AddBranches(Anchor, MainRoute, Result.Routes);
-		AddChambers(Anchor, MainRoute, Result.Chambers);
-	}
-	Result.Routes.Sort([](const FVoxelCaveRoute& A, const FVoxelCaveRoute& B) { return A.Id < B.Id; });
-	Result.Chambers.Sort([](const FVoxelCaveChamber& A, const FVoxelCaveChamber& B) { return A.Id < B.Id; });
-	OutPlan = MoveTemp(Result);
-	OutError.Reset();
-	return true;
-}
+		OutError =
+			TEXT("Voxel cave bounds are invalid");
 
-void FVoxelCaveGenerator::GatherAnchors(const FVoxelGenerationBounds& InBounds, TArray<FVoxelCaveAnchor>& OutAnchors) const
-{
-	const int32 Spacing = Recipe->Settings.CaveSpacing;
-	const int32 Margin = Recipe->Settings.CaveMaxDepth + Spacing;
-	const int32 MinGridX = VoxelGeneration::FloorDivide(InBounds.Min.X - Margin, Spacing);
-	const int32 MaxGridX = VoxelGeneration::FloorDivide(InBounds.Max.X + Margin - 1, Spacing);
-	const int32 MinGridY = VoxelGeneration::FloorDivide(InBounds.Min.Y - Margin, Spacing);
-	const int32 MaxGridY = VoxelGeneration::FloorDivide(InBounds.Max.Y + Margin - 1, Spacing);
-	for (int32 GridY = MinGridY; GridY <= MaxGridY; ++GridY)
-	{
-		for (int32 GridX = MinGridX; GridX <= MaxGridX; ++GridX)
-		{
-			const FIntVector Grid(GridX, GridY, 0);
-			const uint64 Seed = VoxelGeneration::MakeSeed(Recipe->Settings.Seed, Grid, 0xCA7E42E1A93411D3ull);
-			if (VoxelGeneration::RandomRange(Seed, 0, 999) >= 420)
-			{
-				continue;
-			}
-			const int32 WorldX = GridX * Spacing + VoxelGeneration::RandomRange(VoxelGeneration::Mix(Seed ^ 0xA019BC27ull), Spacing / 5, Spacing * 4 / 5);
-			const int32 WorldY = GridY * Spacing + VoxelGeneration::RandomRange(VoxelGeneration::Mix(Seed ^ 0x4ECA31D9ull), Spacing / 5, Spacing * 4 / 5);
-			const FVoxelMacroTerrainSample TerrainSample = Terrain->SampleMacro(WorldX, WorldY);
-			if (TerrainSample.SurfaceZ <= Recipe->Settings.SeaLevel + 4)
-			{
-				continue;
-			}
-			const int32 Depth = VoxelGeneration::RandomRange(VoxelGeneration::Mix(Seed ^ 0x71A4F0E5ull),
-				Recipe->Settings.CaveMinDepth, Recipe->Settings.CaveMaxDepth);
-			FVoxelCaveAnchor Anchor;
-			Anchor.Id = VoxelGeneration::MakeStableId(Recipe->Settings.Seed, Grid, 0xCA7E42E1A93411D3ull);
-			Anchor.Entrance = FIntVector(WorldX, WorldY, TerrainSample.SurfaceZ + 1);
-			Anchor.Target = FIntVector(
-				WorldX + VoxelGeneration::RandomRange(VoxelGeneration::Mix(Seed ^ 0x8334B64Full), -Spacing / 2, Spacing / 2),
-				WorldY + VoxelGeneration::RandomRange(VoxelGeneration::Mix(Seed ^ 0x13C65D2Bull), -Spacing / 2, Spacing / 2),
-				FMath::Max(Recipe->Settings.MinZ + 16, TerrainSample.SurfaceZ - Depth));
-			Anchor.Radius = Recipe->Settings.CaveMainRadius;
-			OutAnchors.Add(Anchor);
-		}
-	}
-}
-
-bool FVoxelCaveGenerator::BuildMainRoute(const FVoxelCaveAnchor& InAnchor, FVoxelCaveRoute& OutRoute, FString& OutError) const
-{
-	const FIntVector Delta = InAnchor.Target - InAnchor.Entrance;
-	const int32 Length = FMath::Max3(FMath::Abs(Delta.X), FMath::Abs(Delta.Y), FMath::Abs(Delta.Z));
-	const int32 MaxVerticalStep = FMath::Max(2, InAnchor.Radius);
-	const int32 Steps = FMath::Clamp(FMath::DivideAndRoundUp(Length, MaxVerticalStep), 4, 256);
-	FVoxelCaveRoute Route;
-	Route.Id = InAnchor.Id;
-	Route.Sections.Reserve(Steps + 1);
-	for (int32 Step = 0; Step <= Steps; ++Step)
-	{
-		FIntVector Center(
-			InAnchor.Entrance.X + static_cast<int32>(static_cast<int64>(Delta.X) * Step / Steps),
-			InAnchor.Entrance.Y + static_cast<int32>(static_cast<int64>(Delta.Y) * Step / Steps),
-			InAnchor.Entrance.Z + static_cast<int32>(static_cast<int64>(Delta.Z) * Step / Steps));
-		const uint64 JitterSeed = VoxelGeneration::Mix(InAnchor.Id.High ^ static_cast<uint64>(Step) * 0x9E3779B97F4A7C15ull);
-		if (Step > 0 && Step < Steps)
-		{
-			Center.X += VoxelGeneration::RandomRange(JitterSeed, -8, 8);
-			Center.Y += VoxelGeneration::RandomRange(VoxelGeneration::Mix(JitterSeed), -8, 8);
-		}
-		const int32 Radius = FMath::Max(2, InAnchor.Radius + VoxelGeneration::RandomRange(
-			VoxelGeneration::Mix(JitterSeed ^ 0x93A1D7F2ull), 0, 3));
-		FVoxelCaveRouteSection& Section = Route.Sections.AddDefaulted_GetRef();
-		Section.Center = Center;
-		Section.Radius = Radius;
-		Section.FloorZ = Center.Z - Radius / 2;
-		Section.CeilingZ = Center.Z + FMath::Max(2, Radius);
-	}
-	if (!ValidateWalkRoute(Route, InAnchor.Entrance, InAnchor.Target, OutError))
-	{
 		return false;
 	}
-	OutRoute = MoveTemp(Route);
-	return true;
-}
 
-void FVoxelCaveGenerator::AddBranches(const FVoxelCaveAnchor& InAnchor, const FVoxelCaveRoute& InMainRoute,
-	TArray<FVoxelCaveRoute>& OutRoutes) const
-{
-	if (InMainRoute.Sections.Num() < 5)
-	{
-		return;
-	}
-	const int32 BranchCount = VoxelGeneration::RandomRange(VoxelGeneration::Mix(InAnchor.Id.Low), 0, 3);
-	for (int32 BranchIndex = 0; BranchIndex < BranchCount; ++BranchIndex)
-	{
-		const uint64 Seed = VoxelGeneration::Mix(InAnchor.Id.High ^ static_cast<uint64>(BranchIndex + 1) * 0xD6E8FEB86659FD93ull);
-		const int32 StartIndex = VoxelGeneration::RandomRange(Seed, 2, InMainRoute.Sections.Num() - 3);
-		const FIntVector Start = InMainRoute.Sections[StartIndex].Center;
-		const int32 BranchLength = VoxelGeneration::RandomRange(VoxelGeneration::Mix(Seed), 48, 160);
-		FIntVector End(
-			Start.X + VoxelGeneration::RandomRange(VoxelGeneration::Mix(Seed ^ 0x195CE13Full), -BranchLength, BranchLength),
-			Start.Y + VoxelGeneration::RandomRange(VoxelGeneration::Mix(Seed ^ 0x2C1B3C6Dull), -BranchLength, BranchLength),
-			FMath::Clamp(Start.Z + VoxelGeneration::RandomRange(VoxelGeneration::Mix(Seed ^ 0x71388437ull), -BranchLength / 3, BranchLength / 3),
-				Recipe->Settings.MinZ + 8, Start.Z + 32));
-		FVoxelCaveRoute Branch;
-		Branch.Id = VoxelGeneration::MakeStableId(Recipe->Settings.Seed, Start, InAnchor.Id.Low, BranchIndex + 1);
-		const FIntVector Centers[] = {Start, (Start + End) / 2, End};
-		for (int32 Index = 0; Index < UE_ARRAY_COUNT(Centers); ++Index)
-		{
-			FVoxelCaveRouteSection& Section = Branch.Sections.AddDefaulted_GetRef();
-			Section.Center = Centers[Index];
-			Section.Radius = FMath::Max(2, Recipe->Settings.CaveBranchRadius - Index / 2);
-			Section.FloorZ = Section.Center.Z - Section.Radius / 2;
-			Section.CeilingZ = Section.Center.Z + FMath::Max(2, Section.Radius);
-		}
-		OutRoutes.Add(MoveTemp(Branch));
-	}
-}
+	const int32 Spacing =
+		FMath::Max(
+			64,
+			Recipe->Settings.
+				CaveSpacing);
 
-void FVoxelCaveGenerator::AddChambers(const FVoxelCaveAnchor& InAnchor, const FVoxelCaveRoute& InMainRoute,
-	TArray<FVoxelCaveChamber>& OutChambers) const
-{
-	if (InMainRoute.Sections.Num() < 4)
-	{
-		return;
-	}
-	const int32 Count = VoxelGeneration::RandomRange(VoxelGeneration::Mix(InAnchor.Id.High ^ 0x31B56A93ull), 1, 3);
-	for (int32 Index = 0; Index < Count; ++Index)
-	{
-		const uint64 Seed = VoxelGeneration::Mix(InAnchor.Id.Low ^ static_cast<uint64>(Index + 1) * 0x94D049BB133111EBull);
-		const int32 SectionIndex = VoxelGeneration::RandomRange(Seed, 1, InMainRoute.Sections.Num() - 2);
-		FVoxelCaveChamber Chamber;
-		Chamber.Center = InMainRoute.Sections[SectionIndex].Center;
-		Chamber.Id = VoxelGeneration::MakeStableId(Recipe->Settings.Seed, Chamber.Center, InAnchor.Id.High, Index + 1);
-		Chamber.Radius = FIntVector(
-			VoxelGeneration::RandomRange(VoxelGeneration::Mix(Seed), Recipe->Settings.CaveMainRadius, Recipe->Settings.CaveMainRadius * 3),
-			VoxelGeneration::RandomRange(VoxelGeneration::Mix(Seed ^ 0x73A48F19ull), Recipe->Settings.CaveMainRadius, Recipe->Settings.CaveMainRadius * 3),
-			VoxelGeneration::RandomRange(VoxelGeneration::Mix(Seed ^ 0xC124D7A3ull), Recipe->Settings.CaveMainRadius / 2, Recipe->Settings.CaveMainRadius * 2));
-		OutChambers.Add(Chamber);
-	}
-}
+	const int32 Reach =
+		MaximumSegments *
+			MaximumSegmentLength +
+		MaximumRoomRadius +
+		8;
 
-bool FVoxelCaveGenerator::ValidateWalkRoute(const FVoxelCaveRoute& InRoute, const FIntVector& InEntrance,
-	const FIntVector& InTarget, FString& OutError) const
-{
-	if (InRoute.Sections.Num() < 2 || InRoute.Sections[0].Center != InEntrance || InRoute.Sections.Last().Center != InTarget)
+	const int32 MinAnchorX =
+		VoxelGeneration::FloorDivide(
+			InBounds.Min.X -
+				Reach,
+			Spacing);
+
+	const int32 MaxAnchorX =
+		VoxelGeneration::FloorDivide(
+			InBounds.Max.X +
+				Reach -
+				1,
+			Spacing);
+
+	const int32 MinAnchorY =
+		VoxelGeneration::FloorDivide(
+			InBounds.Min.Y -
+				Reach,
+			Spacing);
+
+	const int32 MaxAnchorY =
+		VoxelGeneration::FloorDivide(
+			InBounds.Max.Y +
+				Reach -
+				1,
+			Spacing);
+
+	FVoxelCavePlan Plan;
+
+	for (int32 AnchorY = MinAnchorY;
+		AnchorY <= MaxAnchorY;
+		++AnchorY)
 	{
-		OutError = TEXT("Cave route endpoints are invalid");
-		return false;
-	}
-	for (int32 Index = 0; Index < InRoute.Sections.Num(); ++Index)
-	{
-		const FVoxelCaveRouteSection& Section = InRoute.Sections[Index];
-		if (Section.Radius < 2 || Section.CeilingZ - Section.FloorZ < 2 || Section.FloorZ <= Recipe->Settings.MinZ)
+		for (int32 AnchorX = MinAnchorX;
+			AnchorX <= MaxAnchorX;
+			++AnchorX)
 		{
-			OutError = TEXT("Cave route section lacks required walkable headroom or floor protection");
-			return false;
-		}
-		if (Index > 0)
-		{
-			const FIntVector Delta = Section.Center - InRoute.Sections[Index - 1].Center;
-			if (FMath::Abs(Delta.Z) > FMath::Max(FMath::Abs(Delta.X), FMath::Abs(Delta.Y)) + Section.Radius)
+			if (InCancel &&
+				InCancel->Load())
 			{
-				OutError = TEXT("Cave route contains an unwalkable vertical segment");
+				OutError =
+					TEXT("Canceled");
+
+				return false;
+			}
+
+			FString BuildError;
+
+			const bool bBuilt =
+				TryBuildSystem(
+					FIntPoint(
+						AnchorX,
+						AnchorY),
+					InColumnSampler,
+					Plan.Segments,
+					BuildError);
+
+			if (!bBuilt &&
+				!BuildError.IsEmpty())
+			{
+				OutError =
+					MoveTemp(
+						BuildError);
+
 				return false;
 			}
 		}
 	}
+
+	Plan.Finalize();
+
+	OutPlan =
+		MoveTemp(Plan);
+
 	OutError.Reset();
 	return true;
+}
+
+bool FVoxelCaveGenerator::TryBuildSystem(
+	const FIntPoint& InAnchorGrid,
+	FVoxelCaveColumnSampler InColumnSampler,
+	TArray<FVoxelCaveSegment>& OutSegments,
+	FString& OutError) const
+{
+	const int32 Spacing =
+		FMath::Max(
+			64,
+			Recipe->Settings.
+				CaveSpacing);
+
+	const uint64 Seed =
+		VoxelGeneration::MakeSeed(
+			Recipe->Settings.Seed,
+			FIntVector(
+				InAnchorGrid.X,
+				InAnchorGrid.Y,
+				0),
+			0x4341564553595354ull);
+
+	if (VoxelGeneration::RandomRange(
+		Seed,
+		0,
+		999) >=
+		SpawnPermille)
+	{
+		OutError.Reset();
+		return false;
+	}
+
+	FRandomStream Stream(
+		MakeStreamSeed(
+			Seed));
+
+	const int32 StartX =
+		InAnchorGrid.X *
+			Spacing +
+		Stream.RandRange(
+			0,
+			Spacing - 1);
+
+	const int32 StartY =
+		InAnchorGrid.Y *
+			Spacing +
+		Stream.RandRange(
+			0,
+			Spacing - 1);
+
+	FVoxelColumnSample StartColumn;
+
+	if (!InColumnSampler(
+		FIntVector(
+			StartX,
+			StartY,
+			0),
+		StartColumn))
+	{
+		OutError.Reset();
+		return false;
+	}
+
+	if (StartColumn.SurfaceZ <=
+		Recipe->Settings.SeaLevel +
+			1)
+	{
+		OutError.Reset();
+		return false;
+	}
+
+	const bool bHasEntrance =
+		Stream.RandRange(
+			0,
+			999) <
+		EntrancePermille;
+
+	const int32 MinimumWorldZ =
+		Recipe->Settings.MinZ +
+		3;
+
+	const int32 MinimumSurfaceDepth =
+		FMath::Max(
+			4,
+			FMath::Min(
+				Recipe->Settings.
+					CaveMinDepth,
+				12));
+
+	const int32 UndergroundMaximum =
+		FMath::Max(
+			MinimumWorldZ + 4,
+			StartColumn.SurfaceZ -
+				MinimumSurfaceDepth -
+				4);
+
+	FIntVector Current(
+		StartX,
+		StartY,
+		bHasEntrance
+			? StartColumn.SurfaceZ + 1
+			: Stream.RandRange(
+				MinimumWorldZ + 3,
+				UndergroundMaximum));
+
+	double Yaw =
+		Stream.FRandRange(
+			-PI,
+			PI);
+
+	double Pitch =
+		bHasEntrance
+			? Stream.FRandRange(
+				-0.75f,
+				-0.45f)
+			: Stream.FRandRange(
+				-0.2f,
+				0.2f);
+
+	const int32 SegmentCount =
+		Stream.RandRange(
+			MinimumSegments,
+			MaximumSegments);
+
+	for (int32 SegmentIndex = 0;
+		SegmentIndex < SegmentCount;
+		++SegmentIndex)
+	{
+		const int32 Length =
+			Stream.RandRange(
+				MinimumSegmentLength,
+				MaximumSegmentLength);
+
+		const FVector Direction(
+			FMath::Cos(Yaw) *
+				FMath::Cos(Pitch),
+			FMath::Sin(Yaw) *
+				FMath::Cos(Pitch),
+			FMath::Sin(Pitch));
+
+		FIntVector End(
+			FMath::RoundToInt(
+				Current.X +
+				Direction.X *
+					Length),
+			FMath::RoundToInt(
+				Current.Y +
+				Direction.Y *
+					Length),
+			FMath::RoundToInt(
+				Current.Z +
+				Direction.Z *
+					Length));
+
+		End =
+			ClampBelowSurface(
+				End,
+				InColumnSampler);
+
+		FVoxelCaveSegment Segment;
+
+		Segment.Start =
+			Current;
+
+		Segment.End =
+			End;
+
+		Segment.Radius =
+			FMath::Max(
+				1,
+				Recipe->Settings.
+					CaveMainRadius +
+				Stream.RandRange(
+					-1,
+					0));
+
+		OutSegments.Add(
+			Segment);
+
+		if (SegmentIndex > 2 &&
+			Stream.RandRange(
+				0,
+				999) <
+			RoomPermille)
+		{
+			FVoxelCaveSegment Room;
+
+			Room.Start =
+				End;
+
+			Room.End =
+				End;
+
+			Room.Radius =
+				Stream.RandRange(
+					FMath::Max(
+						Segment.Radius + 1,
+						2),
+					MaximumRoomRadius);
+
+			OutSegments.Add(
+				Room);
+		}
+
+		if (SegmentIndex > 3 &&
+			Stream.RandRange(
+				0,
+				999) <
+			BranchPermille)
+		{
+			AddBranch(
+				Stream,
+				End,
+				Yaw,
+				Pitch,
+				InColumnSampler,
+				OutSegments);
+		}
+
+		Current =
+			End;
+
+		Yaw +=
+			Stream.FRandRange(
+				-0.55f,
+				0.55f);
+
+		Pitch =
+			FMath::Clamp(
+				Pitch +
+					Stream.FRandRange(
+						-0.16f,
+						0.16f),
+				-0.45,
+				0.35);
+
+		if (bHasEntrance &&
+			SegmentIndex < 4)
+		{
+			Pitch =
+				FMath::Min(
+					Pitch,
+					-0.3);
+		}
+
+		if (Current.Z <=
+			MinimumWorldZ + 1)
+		{
+			Pitch =
+				FMath::Abs(
+					Pitch);
+		}
+	}
+
+	OutError.Reset();
+	return true;
+}
+
+void FVoxelCaveGenerator::AddBranch(
+	FRandomStream& InStream,
+	const FIntVector& InStart,
+	const double InYaw,
+	const double InPitch,
+	FVoxelCaveColumnSampler InColumnSampler,
+	TArray<FVoxelCaveSegment>& OutSegments) const
+{
+	FIntVector Current =
+		InStart;
+
+	double Yaw =
+		InYaw +
+		InStream.FRandRange(
+			0.9f,
+			1.8f) *
+		(
+			InStream.FRand() <
+				0.5f
+				? -1.0
+				: 1.0
+		);
+
+	double Pitch =
+		FMath::Clamp(
+			InPitch +
+				InStream.FRandRange(
+					-0.15f,
+					0.15f),
+			-0.35,
+			0.3);
+
+	const int32 Count =
+		InStream.RandRange(
+			3,
+			6);
+
+	for (int32 Index = 0;
+		Index < Count;
+		++Index)
+	{
+		const int32 Length =
+			InStream.RandRange(
+				MinimumSegmentLength,
+				FMath::Max(
+					MinimumSegmentLength,
+					MaximumSegmentLength -
+						1));
+
+		const FVector Direction(
+			FMath::Cos(Yaw) *
+				FMath::Cos(Pitch),
+			FMath::Sin(Yaw) *
+				FMath::Cos(Pitch),
+			FMath::Sin(Pitch));
+
+		FIntVector End(
+			FMath::RoundToInt(
+				Current.X +
+				Direction.X *
+					Length),
+			FMath::RoundToInt(
+				Current.Y +
+					Direction.Y *
+					Length),
+			FMath::RoundToInt(
+				Current.Z +
+					Direction.Z *
+						Length));
+
+		End =
+			ClampBelowSurface(
+				End,
+				InColumnSampler);
+
+		FVoxelCaveSegment Segment;
+
+		Segment.Start =
+			Current;
+
+		Segment.End =
+			End;
+
+		Segment.Radius =
+			FMath::Max(
+				1,
+				Recipe->Settings.
+					CaveBranchRadius);
+
+		OutSegments.Add(
+			Segment);
+
+		Current =
+			End;
+
+		Yaw +=
+			InStream.FRandRange(
+				-0.45f,
+				0.45f);
+
+		Pitch =
+			FMath::Clamp(
+				Pitch +
+					InStream.FRandRange(
+						-0.12f,
+						0.12f),
+				-0.4,
+				0.3);
+	}
+}
+
+FIntVector FVoxelCaveGenerator::ClampBelowSurface(
+	const FIntVector& InPosition,
+	FVoxelCaveColumnSampler InColumnSampler) const
+{
+	FVoxelColumnSample Column;
+
+	if (!InColumnSampler(
+		FIntVector(
+			InPosition.X,
+			InPosition.Y,
+			0),
+		Column))
+	{
+		return InPosition;
+	}
+
+	const int32 MinimumSurfaceDepth =
+		FMath::Max(
+			4,
+			FMath::Min(
+				Recipe->Settings.
+					CaveMinDepth,
+				12));
+
+	FIntVector Result =
+		InPosition;
+
+	Result.Z =
+		FMath::Clamp(
+			Result.Z,
+			Recipe->Settings.MinZ +
+				3,
+			Column.SurfaceZ -
+				MinimumSurfaceDepth);
+
+	return Result;
 }
