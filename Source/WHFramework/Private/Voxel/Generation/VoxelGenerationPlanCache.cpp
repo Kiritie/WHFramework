@@ -361,24 +361,6 @@ int32 FVoxelGenerationPlanCache::NaturalShardIndex(
 			ShardCount);
 }
 
-int32 FVoxelGenerationPlanCache::NaturalShardIndex(
-	const FVoxelNaturalTileKey& InKey) const
-{
-	return
-		static_cast<int32>(
-			GetTypeHash(InKey) %
-			ShardCount);
-}
-
-int32 FVoxelGenerationPlanCache::NaturalShardIndex(
-	const FVoxelLakeAnchorKey& InKey) const
-{
-	return
-		static_cast<int32>(
-			GetTypeHash(InKey) %
-			ShardCount);
-}
-
 int32 FVoxelGenerationPlanCache::PlanShardIndex(
 	const FVoxelHydrologyRegionKey& InKey) const
 {
@@ -395,6 +377,12 @@ int32 FVoxelGenerationPlanCache::PlanShardIndex(
 		static_cast<int32>(
 			GetTypeHash(InKey) %
 			ShardCount);
+}
+
+int32 FVoxelGenerationPlanCache::PlanShardIndex(
+	const FVoxelEcologyTileKey& InKey) const
+{
+	return static_cast<int32>(GetTypeHash(InKey) % ShardCount);
 }
 
 void FVoxelGenerationPlanCache::RecordGateWait(
@@ -430,74 +418,6 @@ bool FVoxelGenerationPlanCache::GetOrBuildBaseColumn(
 			InPosition,
 			InBuild,
 			OutEntry,
-			OutError,
-			InCancel,
-			bAllowGameThreadBuilds,
-			[this](const uint64 InWait)
-			{
-				RecordGateWait(InWait);
-			});
-}
-
-bool FVoxelGenerationPlanCache::GetOrBuildRiverField(
-	const FVoxelNaturalTileKey& InKey,
-	TFunctionRef<bool(
-		FVoxelRiverFieldTile&,
-		FString&)> InBuild,
-	FVoxelRiverFieldTilePtr& OutTile,
-	FString& OutError,
-	const TAtomic<bool>* InCancel)
-{
-	FNaturalShard& Shard =
-		*NaturalShards[
-			NaturalShardIndex(
-				InKey)];
-
-	return GetOrBuildValue<
-		FVoxelNaturalTileKey,
-		FVoxelRiverFieldTile,
-		FBuildGate>(
-			Shard.Lock,
-			Shard.RiverFields,
-			Shard.RiverFieldBuilds,
-			Shard.RiverFieldKeys,
-			InKey,
-			InBuild,
-			OutTile,
-			OutError,
-			InCancel,
-			bAllowGameThreadBuilds,
-			[this](const uint64 InWait)
-			{
-				RecordGateWait(InWait);
-			});
-}
-
-bool FVoxelGenerationPlanCache::GetOrBuildLake(
-	const FVoxelLakeAnchorKey& InKey,
-	TFunctionRef<bool(
-		FVoxelLakeAnchorPlan&,
-		FString&)> InBuild,
-	FVoxelLakeAnchorPlanPtr& OutPlan,
-	FString& OutError,
-	const TAtomic<bool>* InCancel)
-{
-	FNaturalShard& Shard =
-		*NaturalShards[
-			NaturalShardIndex(
-				InKey)];
-
-	return GetOrBuildValue<
-		FVoxelLakeAnchorKey,
-		FVoxelLakeAnchorPlan,
-		FBuildGate>(
-			Shard.Lock,
-			Shard.Lakes,
-			Shard.LakeBuilds,
-			Shard.LakeKeys,
-			InKey,
-			InBuild,
-			OutPlan,
 			OutError,
 			InCancel,
 			bAllowGameThreadBuilds,
@@ -722,14 +642,14 @@ bool FVoxelGenerationPlanCache::FindFeature(
 }
 
 bool FVoxelGenerationPlanCache::GetOrBuildEcology(
-	const FVoxelGenerationTileKey& InKey,
+	const FVoxelEcologyTileKey& InKey,
 	TFunctionRef<bool(FVoxelEcologyPlan&, FString&)> InBuild,
 	FVoxelEcologyPlanPtr& OutPlan,
 	FString& OutError,
 	const TAtomic<bool>* InCancel)
 {
 	FPlanShard& Shard = *PlanShards[PlanShardIndex(InKey)];
-	return GetOrBuildValue<FVoxelGenerationTileKey, FVoxelEcologyPlan, FBuildGate>(
+	return GetOrBuildValue<FVoxelEcologyTileKey, FVoxelEcologyPlan, FBuildGate>(
 		Shard.Lock,
 		Shard.Ecology,
 		Shard.EcologyBuilds,
@@ -965,8 +885,6 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 
 	TArray<FVoxelBaseColumnEntryPtr> RetiredBaseColumns;
 	TArray<FVoxelNaturalColumnEntryPtr> RetiredNaturalColumns;
-	TArray<FVoxelRiverFieldTilePtr> RetiredRiverFields;
-	TArray<FVoxelLakeAnchorPlanPtr> RetiredLakes;
 
 	{
 		FNaturalShard& Shard =
@@ -1006,37 +924,6 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 					Snapshot);
 			});
 
-		TrimMapBudgeted(
-			Shard.RiverFields,
-			Shard.RiverFieldKeys,
-			Shard.RiverFieldCursor,
-			Budget,
-			RetiredRiverFields,
-			[this, &Snapshot](
-				const FVoxelNaturalTileKey& InKey)
-			{
-				return IsRetained(
-					InKey.Coordinate *
-						FVoxelRiverFieldTile::Side,
-					Snapshot.NaturalRadiusCells,
-					Snapshot);
-			});
-
-		TrimMapBudgeted(
-			Shard.Lakes,
-			Shard.LakeKeys,
-			Shard.LakeCursor,
-			Budget,
-			RetiredLakes,
-			[this, &Snapshot](
-				const FVoxelLakeAnchorKey& InKey)
-			{
-				return IsRetained(
-					InKey.Coordinate *
-						LakeAnchorSide,
-					Snapshot.NaturalRadiusCells,
-					Snapshot);
-			});
 	}
 
 	if (Budget <= 0)
@@ -1085,11 +972,11 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			Shard.EcologyCursor,
 			Budget,
 			RetiredEcology,
-			[this, &Snapshot](const FVoxelGenerationTileKey& InKey)
+			[this, &Snapshot](const FVoxelEcologyTileKey& InKey)
 			{
-				const FIntVector Origin = InKey.Coordinate * GenerationPlanTileSide;
+				const FIntPoint Center = InKey.Coordinate * 64 + FIntPoint(32, 32);
 				return IsRetained(
-					FIntPoint(Origin.X, Origin.Y),
+					Center,
 					Snapshot.PlanRadiusCells,
 					Snapshot);
 			});
@@ -1168,23 +1055,15 @@ void FVoxelGenerationPlanCache::Reset()
 				Shard.Lock);
 
 			Shard.BaseColumns.Reset();
-			Shard.RiverFields.Reset();
-			Shard.Lakes.Reset();
 			Shard.NaturalColumns.Reset();
 
 			Shard.BaseColumnBuilds.Reset();
-			Shard.RiverFieldBuilds.Reset();
-			Shard.LakeBuilds.Reset();
 			Shard.NaturalColumnBuilds.Reset();
 
 			Shard.BaseColumnKeys.Reset();
-			Shard.RiverFieldKeys.Reset();
-			Shard.LakeKeys.Reset();
 			Shard.NaturalColumnKeys.Reset();
 
 			Shard.BaseColumnCursor = 0;
-			Shard.RiverFieldCursor = 0;
-			Shard.LakeCursor = 0;
 			Shard.NaturalColumnCursor = 0;
 		}
 
@@ -1246,11 +1125,6 @@ FVoxelGenerationPlanCache::GetStats() const
 			Stats.NaturalColumns +=
 				Shard.NaturalColumns.Num();
 
-			Stats.RiverFields +=
-				Shard.RiverFields.Num();
-
-			Stats.Lakes +=
-				Shard.Lakes.Num();
 		}
 
 		{
@@ -1306,38 +1180,12 @@ uint64 FVoxelGenerationPlanCache::GetAllocatedBytes() const
 
 			Bytes +=
 				Shard.BaseColumns.GetAllocatedSize() +
-				Shard.RiverFields.GetAllocatedSize() +
-				Shard.Lakes.GetAllocatedSize() +
 				Shard.NaturalColumns.GetAllocatedSize() +
 				Shard.BaseColumnKeys.GetAllocatedSize() +
-				Shard.RiverFieldKeys.GetAllocatedSize() +
-				Shard.LakeKeys.GetAllocatedSize() +
 				Shard.NaturalColumnKeys.GetAllocatedSize();
 
 			for (const TPair<FIntPoint, FVoxelBaseColumnEntryPtr>& Pair :
 				Shard.BaseColumns)
-			{
-				if (Pair.Value)
-				{
-					Bytes +=
-						Pair.Value->
-							GetAllocatedBytes();
-				}
-			}
-
-			for (const TPair<FVoxelNaturalTileKey, FVoxelRiverFieldTilePtr>& Pair :
-				Shard.RiverFields)
-			{
-				if (Pair.Value)
-				{
-					Bytes +=
-						Pair.Value->
-							GetAllocatedBytes();
-				}
-			}
-
-			for (const TPair<FVoxelLakeAnchorKey, FVoxelLakeAnchorPlanPtr>& Pair :
-				Shard.Lakes)
 			{
 				if (Pair.Value)
 				{
@@ -1411,7 +1259,7 @@ uint64 FVoxelGenerationPlanCache::GetAllocatedBytes() const
 				}
 			}
 
-			for (const TPair<FVoxelGenerationTileKey, FVoxelEcologyPlanPtr>& Pair :
+			for (const TPair<FVoxelEcologyTileKey, FVoxelEcologyPlanPtr>& Pair :
 				Shard.Ecology)
 			{
 				if (Pair.Value)

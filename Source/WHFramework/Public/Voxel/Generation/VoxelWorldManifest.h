@@ -5,7 +5,7 @@
 
 struct WHFRAMEWORK_API FVoxelWorldManifest
 {
-	static constexpr uint32 ProtocolVersion = 5;
+	static constexpr uint32 ProtocolVersion = 4;
 
 	FGuid WorldId;
 	uint32 GeneratorVersion =

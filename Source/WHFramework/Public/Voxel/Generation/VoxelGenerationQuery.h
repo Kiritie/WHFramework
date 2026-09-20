@@ -9,14 +9,17 @@ class FVoxelBiomeGenerator;
 class FVoxelCaveGenerator;
 class FVoxelClimateGenerator;
 class FVoxelEcologyGenerator;
-class FVoxelLakeGenerator;
-class FVoxelRiverGenerator;
+class FVoxelHydrologyGenerator;
+using FVoxelHydrologyPlanner = FVoxelHydrologyGenerator;
 class FVoxelSurfaceGenerator;
 class FVoxelTerrainGenerator;
 
 class WHFRAMEWORK_API FVoxelGenerationQuery
 {
 public:
+	static constexpr int32 GenerationPlanTileSide = 256;
+	static constexpr int32 EcologyTileSide = 64;
+
 	static bool Create(
 		TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
 		TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> InCache,
@@ -38,6 +41,20 @@ public:
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr);
 
+	bool SampleEnvironmentColumn(
+		int32 InX,
+		int32 InY,
+		FVoxelColumnSample& OutColumn,
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr) const;
+
+	bool ResolveSurfaceCandidate(
+		int32 InX,
+		int32 InY,
+		FVoxelSurfaceCandidate& OutCandidate,
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr) const;
+
 	bool SampleColumn(
 		int32 InX,
 		int32 InY,
@@ -53,10 +70,12 @@ public:
 		GetPreparedStructurePlans() const;
 
 private:
-	bool SampleBaseColumn(
+	bool GetBaseColumn(
 		int32 InX,
 		int32 InY,
-		FVoxelColumnSample& OutColumn) const;
+		FVoxelColumnSample& OutColumn,
+		FString& OutError,
+		const TAtomic<bool>* InCancel) const;
 
 	bool ComputeBaseColumn(
 		int32 InX,
@@ -67,7 +86,19 @@ private:
 		int32 InX,
 		int32 InY,
 		FVoxelColumnSample& OutColumn,
-		FString& OutError) const;
+		FString& OutError,
+		const TAtomic<bool>* InCancel) const;
+
+	bool ApplyHydrology(
+		int32 InX,
+		int32 InY,
+		FVoxelColumnSample& InOutColumn,
+		FString& OutError,
+		const TAtomic<bool>* InCancel) const;
+
+	FVoxelHydrologyRegionKey HydrologyRegionForVoxel(
+		int32 InX,
+		int32 InY) const;
 
 	bool IsInsidePreparedXY(
 		int32 InX,
@@ -86,8 +117,7 @@ private:
 	TSharedPtr<const FVoxelClimateGenerator, ESPMode::ThreadSafe> Climate;
 	TSharedPtr<const FVoxelTerrainGenerator, ESPMode::ThreadSafe> Terrain;
 	TSharedPtr<const FVoxelBiomeGenerator, ESPMode::ThreadSafe> Biome;
-	TSharedPtr<const FVoxelRiverGenerator, ESPMode::ThreadSafe> River;
-	TSharedPtr<const FVoxelLakeGenerator, ESPMode::ThreadSafe> Lake;
+	TSharedPtr<const FVoxelHydrologyPlanner, ESPMode::ThreadSafe> Hydrology;
 	TSharedPtr<const FVoxelCaveGenerator, ESPMode::ThreadSafe> Cave;
 	TSharedPtr<const FVoxelAquiferGenerator, ESPMode::ThreadSafe> Aquifer;
 	TSharedPtr<const FVoxelSurfaceGenerator, ESPMode::ThreadSafe> Surface;

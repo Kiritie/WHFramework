@@ -32,6 +32,24 @@ struct WHFRAMEWORK_API FVoxelPrimaryFineReadiness
 	}
 };
 
+enum class EVoxelViewAdmissionKind : uint8
+{
+	Fine = 0,
+	VoxelProxy,
+	Surface,
+	Macro
+};
+
+struct FVoxelViewAdmission
+{
+	EVoxelViewAdmissionKind Kind = EVoxelViewAdmissionKind::Fine;
+	double DistanceCells = 0.0;
+	FIntVector FineKey = FIntVector::ZeroValue;
+	FVoxelViewKey ProxyKey;
+	FVoxelSurfaceTileKey SurfaceKey;
+	FVoxelMacroTileKey MacroKey;
+};
+
 class WHFRAMEWORK_API FVoxelViewManager :
 	public IVoxelOverlaySource
 {
@@ -60,6 +78,11 @@ public:
 	bool HasPrimaryRepresentation() const;
 	FVoxelPrimaryFineReadiness GetPrimaryFineReadiness(
 		const TMap<FIntVector, FVoxelExactDemand>& InExact) const;
+	static void SortAdmissionsByPriority(TArray<FVoxelViewAdmission>& InOutAdmissions);
+	static double ResolveAdmissionFrontier(
+		TConstArrayView<FVoxelViewAdmission> InAdmissions,
+		TFunctionRef<bool(const FVoxelViewAdmission&)> InIsReady,
+		double InBandWidthCells);
 
 	virtual bool EnumerateModifiedSections(
 		const FVoxelGenerationBounds& InBounds,
@@ -76,6 +99,15 @@ private:
 	void UpdateMacro(TConstArrayView<FVector> InObservers);
 	void UpdateWantedTimestamps(double InNow);
 	void ProcessAdmissions();
+	void RebuildAdmissions(TConstArrayView<FVector> InObservers);
+	double MinimumObserverDistanceCells(const FVector& InWorldCenter) const;
+	double ResolveAdmissionFrontier() const;
+	bool IsAdmissionSatisfied(const FVoxelViewAdmission& InAdmission) const;
+	bool IsAdmissionTerminalFailure(const FVoxelViewAdmission& InAdmission) const;
+	bool TrySubmitAdmission(const FVoxelViewAdmission& InAdmission);
+	void CancelStaleViewTasks();
+	FVector SurfaceWorldCenter(const FVoxelSurfaceTileKey& InKey) const;
+	FVector MacroWorldCenter(const FVoxelMacroTileKey& InKey) const;
 	void SetActorHiddenCached(AActor* InActor, bool bInHidden);
 	void LogRepresentationState(TConstArrayView<FVector> InObservers);
 	void ResolveTransitionVisibility();
@@ -108,10 +140,10 @@ private:
 		FVoxelSectionSnapshot& OutSnapshot,
 		FString& OutError);
 
-	void RequestFine(const FIntVector& InSection, uint64 InRevision);
-	void RequestVoxelProxy(const FVoxelViewKey& InKey);
-	void RequestSurface(const FVoxelSurfaceTileKey& InKey);
-	void RequestMacro(const FVoxelMacroTileKey& InKey);
+	bool RequestFine(const FIntVector& InSection, uint64 InRevision);
+	bool RequestVoxelProxy(const FVoxelViewKey& InKey);
+	bool RequestSurface(const FVoxelSurfaceTileKey& InKey);
+	bool RequestMacro(const FVoxelMacroTileKey& InKey);
 
 	bool PublishFine(const FVoxelTaskResult& InResult);
 	bool PublishVoxelProxy(const FVoxelTaskResult& InResult);
@@ -133,14 +165,10 @@ private:
 	FVoxelTaskScheduler& Scheduler;
 	uint64 WorldEpoch = 0;
 	uint64 AppliedInterestRevision = 0;
-	int32 FineAdmissionIndex = 0;
-	int32 VoxelProxyAdmissionIndex = 0;
-	int32 SurfaceAdmissionIndex = 0;
-	int32 MacroAdmissionIndex = 0;
-	TArray<FIntVector> FineAdmissions;
-	TArray<FVoxelViewKey> VoxelProxyAdmissions;
-	TArray<FVoxelSurfaceTileKey> SurfaceAdmissions;
-	TArray<FVoxelMacroTileKey> MacroAdmissions;
+	TArray<FVoxelViewAdmission> Admissions;
+	TArray<FVector> PriorityObservers;
+	double AdmissionBandWidthCells = 64.0;
+	double LastResolvedFrontier = 0.0;
 	bool bCoverageDirty = true;
 	double NextCoverageCheck = 0.0;
 	double NextRepresentationDebugLog = 0.0;

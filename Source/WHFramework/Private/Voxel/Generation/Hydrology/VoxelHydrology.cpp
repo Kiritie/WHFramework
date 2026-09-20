@@ -110,7 +110,36 @@ namespace
     {
         int32 SpillPlane = 0;
         uint32 Index = 0;
+        FIntPoint WorldCell = FIntPoint::ZeroValue;
     };
+
+    FIntPoint ResolveWorldCell(
+        const FVoxelDrainageInput& InInput,
+        uint32 InIndex)
+    {
+        return InInput.WorldMinCell +
+            FIntPoint(
+                static_cast<int32>(
+                    InIndex %
+                    static_cast<uint32>(
+                        InInput.Width)),
+                static_cast<int32>(
+                    InIndex /
+                    static_cast<uint32>(
+                        InInput.Width)));
+    }
+
+    bool IsWorldCellLess(
+        const FIntPoint& InA,
+        const FIntPoint& InB)
+    {
+        if (InA.Y != InB.Y)
+        {
+            return InA.Y < InB.Y;
+        }
+
+        return InA.X < InB.X;
+    }
 
     bool HydrologyHeapLess(
         const FHydrologyHeapEntry& InA,
@@ -123,8 +152,9 @@ namespace
                 InB.SpillPlane;
         }
 
-        return InA.Index <
-            InB.Index;
+        return IsWorldCellLess(
+            InA.WorldCell,
+            InB.WorldCell);
     }
 
     void HydrologyHeapPush(
@@ -365,7 +395,10 @@ bool VoxelHydrology::BuildDrainage(
             Heap,
             {
                 Result.SpillPlane[Index],
-                Index
+                Index,
+                ResolveWorldCell(
+                    InInput,
+                    Index)
             });
     }
 
@@ -436,7 +469,10 @@ bool VoxelHydrology::BuildDrainage(
                     Heap,
                     {
                         Candidate,
-                        Neighbor
+                        Neighbor,
+                        ResolveWorldCell(
+                            InInput,
+                            Neighbor)
                     });
             }
 
@@ -1417,6 +1453,8 @@ bool FVoxelHydrologyGenerator::BuildPlan(
     }
 
     FVoxelDrainageInput DrainageInput;
+    DrainageInput.WorldMinCell =
+        Plan.Grid.WorldMinCell;
     DrainageInput.Width =
         Plan.Grid.Width;
     DrainageInput.Height =

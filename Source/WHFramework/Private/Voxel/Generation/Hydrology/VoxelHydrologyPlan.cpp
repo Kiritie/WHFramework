@@ -1,4 +1,4 @@
-#include "Voxel/Generation/Hydrology/VoxelHydrology.h"
+#include "Voxel/Generation/Hydrology/VoxelHydrologyPlan.h"
 
 #include "Voxel/Generation/VoxelGenerationMath.h"
 

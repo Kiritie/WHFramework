@@ -17,6 +17,10 @@ struct WHFRAMEWORK_API FVoxelEcologyPlan
 {
 	FVoxelGenerationBounds Bounds;
 	TArray<FVoxelEcologyPlanWrite> Writes;
+	int32 TreeCandidates = 0;
+	int32 TreesAccepted = 0;
+	int32 GrassPatchCandidates = 0;
+	int32 GrassWrites = 0;
 
 	void Finalize();
 	bool Sample(const FIntVector& InPosition, uint32& OutValue) const;
@@ -45,14 +49,14 @@ private:
 		const FVoxelGenerationBounds& InBounds,
 		TFunctionRef<bool(const FIntVector&, FVoxelColumnSample&)> InSampleColumn,
 		TFunctionRef<bool(const FIntVector&, uint32&)> InSampleBaseSymbol,
-		TArray<FVoxelEcologyPlanWrite>& InOutWrites,
+		FVoxelEcologyPlan& InOutPlan,
 		const TAtomic<bool>* InCancel) const;
 
 	void BuildGrass(
 		const FVoxelGenerationBounds& InBounds,
 		TFunctionRef<bool(const FIntVector&, FVoxelColumnSample&)> InSampleColumn,
 		TFunctionRef<bool(const FIntVector&, uint32&)> InSampleBaseSymbol,
-		TArray<FVoxelEcologyPlanWrite>& InOutWrites,
+		FVoxelEcologyPlan& InOutPlan,
 		const TAtomic<bool>* InCancel) const;
 
 	bool IsTreeColumnAllowed(const FVoxelColumnSample& InColumn) const;

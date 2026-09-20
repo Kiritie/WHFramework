@@ -39,16 +39,6 @@ using FVoxelBaseColumnEntryPtr =
 		const FVoxelBaseColumnEntry,
 		ESPMode::ThreadSafe>;
 
-using FVoxelRiverFieldTilePtr =
-	TSharedPtr<
-		const FVoxelRiverFieldTile,
-		ESPMode::ThreadSafe>;
-
-using FVoxelLakeAnchorPlanPtr =
-	TSharedPtr<
-		const FVoxelLakeAnchorPlan,
-		ESPMode::ThreadSafe>;
-
 using FVoxelNaturalColumnEntryPtr =
 	TSharedPtr<
 		const FVoxelNaturalColumnEntry,
@@ -70,9 +60,6 @@ struct WHFRAMEWORK_API FVoxelGenerationCacheStats
 {
 	int32 BaseColumns = 0;
 	int32 NaturalColumns = 0;
-	int32 RiverFields = 0;
-	int32 Lakes = 0;
-
 	int32 Hydrology = 0;
 	int32 Caves = 0;
 	int32 Ecology = 0;
@@ -102,24 +89,6 @@ public:
 			FVoxelBaseColumnEntry&,
 			FString&)> InBuild,
 		FVoxelBaseColumnEntryPtr& OutEntry,
-		FString& OutError,
-		const TAtomic<bool>* InCancel = nullptr);
-
-	bool GetOrBuildRiverField(
-		const FVoxelNaturalTileKey& InKey,
-		TFunctionRef<bool(
-			FVoxelRiverFieldTile&,
-			FString&)> InBuild,
-		FVoxelRiverFieldTilePtr& OutTile,
-		FString& OutError,
-		const TAtomic<bool>* InCancel = nullptr);
-
-	bool GetOrBuildLake(
-		const FVoxelLakeAnchorKey& InKey,
-		TFunctionRef<bool(
-			FVoxelLakeAnchorPlan&,
-			FString&)> InBuild,
-		FVoxelLakeAnchorPlanPtr& OutPlan,
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr);
 
@@ -184,7 +153,7 @@ public:
 		const TAtomic<bool>* InCancel = nullptr);
 
 	bool GetOrBuildEcology(
-		const FVoxelGenerationTileKey& InKey,
+		const FVoxelEcologyTileKey& InKey,
 		TFunctionRef<bool(FVoxelEcologyPlan&, FString&)> InBuild,
 		FVoxelEcologyPlanPtr& OutPlan,
 		FString& OutError,
@@ -230,23 +199,15 @@ private:
 		mutable FRWLock Lock;
 
 		TMap<FIntPoint, FVoxelBaseColumnEntryPtr> BaseColumns;
-		TMap<FVoxelNaturalTileKey, FVoxelRiverFieldTilePtr> RiverFields;
-		TMap<FVoxelLakeAnchorKey, FVoxelLakeAnchorPlanPtr> Lakes;
 		TMap<FIntPoint, FVoxelNaturalColumnEntryPtr> NaturalColumns;
 
 		TMap<FIntPoint, TSharedPtr<FBuildGate, ESPMode::ThreadSafe>> BaseColumnBuilds;
-		TMap<FVoxelNaturalTileKey, TSharedPtr<FBuildGate, ESPMode::ThreadSafe>> RiverFieldBuilds;
-		TMap<FVoxelLakeAnchorKey, TSharedPtr<FBuildGate, ESPMode::ThreadSafe>> LakeBuilds;
 		TMap<FIntPoint, TSharedPtr<FBuildGate, ESPMode::ThreadSafe>> NaturalColumnBuilds;
 
 		TArray<FIntPoint> BaseColumnKeys;
-		TArray<FVoxelNaturalTileKey> RiverFieldKeys;
-		TArray<FVoxelLakeAnchorKey> LakeKeys;
 		TArray<FIntPoint> NaturalColumnKeys;
 
 		int32 BaseColumnCursor = 0;
-		int32 RiverFieldCursor = 0;
-		int32 LakeCursor = 0;
 		int32 NaturalColumnCursor = 0;
 	};
 
@@ -256,19 +217,19 @@ private:
 
 		TMap<FVoxelHydrologyRegionKey, FVoxelHydrologyPlanPtr> Hydrology;
 		TMap<FVoxelGenerationTileKey, FVoxelCavePlanPtr> Caves;
-		TMap<FVoxelGenerationTileKey, FVoxelEcologyPlanPtr> Ecology;
+		TMap<FVoxelEcologyTileKey, FVoxelEcologyPlanPtr> Ecology;
 		TMap<FVoxelGenerationTileKey, FVoxelFeaturePlanPtr> Features;
 		TMap<FVoxelGenerationTileKey, FVoxelStructurePlanPtr> Structures;
 
 		TMap<FVoxelHydrologyRegionKey, TSharedPtr<FBuildGate, ESPMode::ThreadSafe>> HydrologyBuilds;
 		TMap<FVoxelGenerationTileKey, TSharedPtr<FBuildGate, ESPMode::ThreadSafe>> CaveBuilds;
-		TMap<FVoxelGenerationTileKey, TSharedPtr<FBuildGate, ESPMode::ThreadSafe>> EcologyBuilds;
+		TMap<FVoxelEcologyTileKey, TSharedPtr<FBuildGate, ESPMode::ThreadSafe>> EcologyBuilds;
 		TMap<FVoxelGenerationTileKey, TSharedPtr<FBuildGate, ESPMode::ThreadSafe>> FeatureBuilds;
 		TMap<FVoxelGenerationTileKey, TSharedPtr<FBuildGate, ESPMode::ThreadSafe>> StructureBuilds;
 
 		TArray<FVoxelHydrologyRegionKey> HydrologyKeys;
 		TArray<FVoxelGenerationTileKey> CaveKeys;
-		TArray<FVoxelGenerationTileKey> EcologyKeys;
+		TArray<FVoxelEcologyTileKey> EcologyKeys;
 		TArray<FVoxelGenerationTileKey> FeatureKeys;
 		TArray<FVoxelGenerationTileKey> StructureKeys;
 
@@ -280,11 +241,10 @@ private:
 	};
 
 	int32 NaturalShardIndex(const FIntPoint& InKey) const;
-	int32 NaturalShardIndex(const FVoxelNaturalTileKey& InKey) const;
-	int32 NaturalShardIndex(const FVoxelLakeAnchorKey& InKey) const;
 
 	int32 PlanShardIndex(const FVoxelHydrologyRegionKey& InKey) const;
 	int32 PlanShardIndex(const FVoxelGenerationTileKey& InKey) const;
+	int32 PlanShardIndex(const FVoxelEcologyTileKey& InKey) const;
 
 	bool IsRetained(
 		const FIntPoint& InPosition,

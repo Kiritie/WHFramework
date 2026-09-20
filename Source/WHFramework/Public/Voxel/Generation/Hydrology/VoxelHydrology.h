@@ -12,6 +12,8 @@ class FVoxelTerrainGenerator;
 
 struct WHFRAMEWORK_API FVoxelDrainageInput
 {
+    FIntPoint WorldMinCell = FIntPoint::ZeroValue;
+
     int32 Width = 0;
     int32 Height = 0;
 

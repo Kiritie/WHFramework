@@ -225,6 +225,8 @@ public:
 		double InMaxApplyMilliseconds = 2.0);
 
 	void CancelSection(const FIntVector& InSection);
+	void CancelMatching(
+		TFunctionRef<bool(EVoxelTaskKind, const FVoxelTaskStamp&)> InPredicate);
 	void StopAndJoin();
 
 	bool Has(
@@ -239,6 +241,9 @@ public:
 	void SetBudget(const FVoxelTaskBudget& InBudget);
 
 	FVoxelTaskDiagnostics GetDiagnostics() const;
+	static bool IsHigherPriority(
+		const FVoxelTaskRequest& InA,
+		const FVoxelTaskRequest& InB);
 
 private:
 	struct FSlot
@@ -266,10 +271,6 @@ private:
 		FVoxelTaskResult Result;
 		TFunction<void(FVoxelTaskResult&&)> Apply;
 	};
-
-	static bool IsHigherPriority(
-		const FVoxelTaskRequest& InA,
-		const FVoxelTaskRequest& InB);
 
 	static bool IsHeavyApplyKind(EVoxelTaskKind InKind);
 	static bool UsesSectionKey(EVoxelTaskKind InKind);

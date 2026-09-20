@@ -339,11 +339,9 @@ void UVoxelModule::OnRefresh(
 		{
 			const FVoxelGenerationCacheStats CacheStats = GenerationCache->GetStats();
 			UE_LOG(LogTemp, Display,
-				TEXT("Voxel cache: base=%d natural=%d river=%d lake=%d hydro=%d cave=%d ecology=%d feature=%d structure=%d memory=%.2fMiB waits=%llu waitMs=%.2f"),
+				TEXT("Voxel cache: base=%d natural=%d hydro=%d cave=%d ecology=%d feature=%d structure=%d memory=%.2fMiB waits=%llu waitMs=%.2f"),
 				CacheStats.BaseColumns,
 				CacheStats.NaturalColumns,
-				CacheStats.RiverFields,
-				CacheStats.Lakes,
 				CacheStats.Hydrology,
 				CacheStats.Caves,
 				CacheStats.Ecology,
@@ -352,6 +350,25 @@ void UVoxelModule::OnRefresh(
 				static_cast<double>(CacheStats.AllocatedBytes) / (1024.0 * 1024.0),
 				CacheStats.GateWaitCount,
 				static_cast<double>(CacheStats.GateWaitMicroseconds) / 1000.0);
+		}
+
+		for (const TPair<FGuid, FSource>& Pair : Sources)
+		{
+			const UObject* Owner = Pair.Value.Owner.Get();
+			const FVoxelStreamingSource& Source = Pair.Value.Value;
+
+			UE_LOG(
+				LogTemp,
+				Display,
+				TEXT("Voxel source id=%s owner=%s center=(%d,%d,%d) render=%d exact=%d collision=%d"),
+				*Pair.Key.ToString(EGuidFormats::DigitsWithHyphens),
+				Owner ? *Owner->GetName() : TEXT("<invalid>"),
+				Source.Center.X,
+				Source.Center.Y,
+				Source.Center.Z,
+				static_cast<int32>(Source.RenderMode),
+				Source.ExactRadius,
+				Source.CollisionRadius);
 		}
 	}
 #endif
@@ -492,6 +509,29 @@ bool UVoxelModule::StartWorld(
 		}
 		return false;
 	}
+
+	if ((Config.Recipe->Settings.Ecology.Tree.bEnabled &&
+			(Config.Recipe->Ecology.TreeTrunk == MAX_uint16 ||
+			 Config.Recipe->Ecology.TreeLeaves == MAX_uint16)) ||
+		(Config.Recipe->Settings.Ecology.Grass.bEnabled &&
+		 Config.Recipe->Ecology.GrassPlant == MAX_uint16))
+	{
+		OutError = TEXT("Enabled voxel ecology symbols are not bound");
+		WorldState = EVoxelWorldState::Failed;
+		return false;
+	}
+
+#if !UE_BUILD_SHIPPING
+	UE_LOG(
+		LogTemp,
+		Display,
+		TEXT("Voxel ecology runtime: treeEnabled=%d trunk=%u leaves=%u grassEnabled=%d grass=%u"),
+		Config.Recipe->Settings.Ecology.Tree.bEnabled ? 1 : 0,
+		Config.Recipe->Ecology.TreeTrunk,
+		Config.Recipe->Ecology.TreeLeaves,
+		Config.Recipe->Settings.Ecology.Grass.bEnabled ? 1 : 0,
+		Config.Recipe->Ecology.GrassPlant);
+#endif
 
 	GenerationConfig = MakeShared<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe>(MoveTemp(Config));
 	ViewSettings = {};

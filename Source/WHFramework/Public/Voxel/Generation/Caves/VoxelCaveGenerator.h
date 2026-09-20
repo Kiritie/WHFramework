@@ -51,7 +51,8 @@ public:
 	static int32 GetMaximumReach(const FVoxelGenerationSettings& InSettings)
 	{
 		return MaximumSegments * MaximumSegmentLength + MaximumRoomRadius +
-			FMath::Max(InSettings.CaveMainRadius, InSettings.CaveBranchRadius) + 8;
+			FMath::Max(InSettings.CaveMainRadius, InSettings.CaveBranchRadius) +
+			InSettings.CaveEntranceLength + 8;
 	}
 
 private:
@@ -72,15 +73,26 @@ private:
 		TArray<FVoxelCaveSegment>& OutSegments,
 		const TAtomic<bool>* InCancel) const;
 
+	bool BuildEntranceCorridor(
+		FRandomStream& InStream,
+		const FIntPoint& InStartXY,
+		const FVoxelColumnSample& InStartColumn,
+		FVoxelCaveColumnSampler InColumnSampler,
+		TArray<FVoxelCaveSegment>& InOutSegments,
+		FIntVector& OutEnd,
+		double& OutYaw,
+		FString& OutError,
+		const TAtomic<bool>* InCancel) const;
+
 	FIntVector ClampBelowSurface(
 		const FIntVector& InPosition,
 		FVoxelCaveColumnSampler InColumnSampler) const;
 
+	bool IsDeepEnoughForInterior(
+		const FIntVector& InPosition,
+		FVoxelCaveColumnSampler InColumnSampler) const;
+
 private:
-	static constexpr int32 SpawnPermille = 650;
-	static constexpr int32 EntrancePermille = 820;
-	static constexpr int32 BranchPermille = 120;
-	static constexpr int32 RoomPermille = 60;
 	static constexpr int32 MinimumSegments = 14;
 	static constexpr int32 MaximumSegments = 28;
 	static constexpr int32 MinimumSegmentLength = 3;

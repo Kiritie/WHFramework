@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "Voxel/Rendering/VoxelHeightfieldMesher.h"
 #include "Voxel/Rendering/VoxelSurfaceProxy.h"
 #include "Voxel/Rendering/VoxelWaterView.h"
 #include "Voxel/Tests/VoxelTestUtilities.h"
@@ -151,6 +152,136 @@ bool FVoxelSurfaceProxyOverlayTest::RunTest(const FString& InParameters)
 	FVoxelSurfaceTileData MaterialEdit;
 	TestTrue(TEXT("Remapped material overlay builds"), RemappedBuilder.Build(Key, MaterialEdit, Error));
 	TestEqual(TEXT("Overlay material remains in recipe symbol domain"), MaterialEdit.SurfaceMaterial[0], uint16(3));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelBlockyFlatTest,
+	"WHFramework.Voxel.Rendering.Blocky.Flat",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelBlockyFlatTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config =
+		VoxelTest::MakeGenerationConfig();
+	const TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> Registry =
+		VoxelTest::MakeRegistry();
+	const TArray<int32> Heights = { 10, 10, 10, 10, 10, 10, 10, 10, 10 };
+	const TArray<uint16> Materials = { 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+	FVoxelSectionMeshResult Mesh;
+	FString Error;
+	TestTrue(TEXT("Flat blocky terrain builds"), FVoxelHeightfieldMesher::BuildBlockyTerrain(
+		3, 1, Heights, Materials, *Config, *Registry, Mesh, Error));
+	int32 Vertices = 0;
+	for (const FVoxelRenderBatch& Batch : Mesh.Batches)
+	{
+		Vertices += Batch.Mesh.Vertices.Num();
+		for (const FVector& Normal : Batch.Mesh.Normals)
+		{
+			TestTrue(TEXT("Flat top normal points upward"), Normal.Z > 0.99);
+		}
+	}
+	TestEqual(TEXT("Flat terrain has tops and no internal sides"), Vertices, 16);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelBlockyStepTest,
+	"WHFramework.Voxel.Rendering.Blocky.Step",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelBlockyStepTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config =
+		VoxelTest::MakeGenerationConfig();
+	const TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> Registry =
+		VoxelTest::MakeRegistry();
+	const TArray<int32> Heights = { 10, 4, 4, 10, 4, 4, 10, 4, 4 };
+	const TArray<uint16> Materials = { 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+	FVoxelSectionMeshResult Mesh;
+	FString Error;
+	TestTrue(TEXT("Stepped blocky terrain builds"), FVoxelHeightfieldMesher::BuildBlockyTerrain(
+		3, 1, Heights, Materials, *Config, *Registry, Mesh, Error));
+	int32 VerticalQuads = 0;
+	for (const FVoxelRenderBatch& Batch : Mesh.Batches)
+	{
+		for (int32 Vertex = 0; Vertex + 3 < Batch.Mesh.Vertices.Num(); Vertex += 4)
+		{
+			const TConstArrayView<FVector> Quad(&Batch.Mesh.Vertices[Vertex], 4);
+			const double MinZ = FMath::Min(FMath::Min(Quad[0].Z, Quad[1].Z), FMath::Min(Quad[2].Z, Quad[3].Z));
+			const double MaxZ = FMath::Max(FMath::Max(Quad[0].Z, Quad[1].Z), FMath::Max(Quad[2].Z, Quad[3].Z));
+			if (FMath::IsNearlyEqual(MaxZ - MinZ, 6.0))
+			{
+				++VerticalQuads;
+			}
+		}
+	}
+	TestEqual(TEXT("Each stepped cell boundary produces one side quad"), VerticalQuads, 2);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelBlockyNoSlopeTest,
+	"WHFramework.Voxel.Rendering.Blocky.NoSlope",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelBlockyNoSlopeTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config =
+		VoxelTest::MakeGenerationConfig();
+	const TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> Registry =
+		VoxelTest::MakeRegistry();
+	const TArray<int32> Heights = { 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+	const TArray<uint16> Materials = { 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+	FVoxelSectionMeshResult Mesh;
+	FString Error;
+	TestTrue(TEXT("Irregular blocky terrain builds"), FVoxelHeightfieldMesher::BuildBlockyTerrain(
+		3, 1, Heights, Materials, *Config, *Registry, Mesh, Error));
+	for (const FVoxelRenderBatch& Batch : Mesh.Batches)
+	{
+		for (int32 Vertex = 0; Vertex + 3 < Batch.Mesh.Vertices.Num(); Vertex += 4)
+		{
+			const FVector& A = Batch.Mesh.Vertices[Vertex];
+			const FVector& B = Batch.Mesh.Vertices[Vertex + 1];
+			const FVector& C = Batch.Mesh.Vertices[Vertex + 2];
+			const FVector& D = Batch.Mesh.Vertices[Vertex + 3];
+			const bool bHorizontal = FMath::IsNearlyEqual(A.Z, B.Z) &&
+				FMath::IsNearlyEqual(B.Z, C.Z) && FMath::IsNearlyEqual(C.Z, D.Z);
+			const bool bVertical = FMath::IsNearlyEqual(A.X, B.X) &&
+				FMath::IsNearlyEqual(B.X, C.X) && FMath::IsNearlyEqual(C.X, D.X) ||
+				FMath::IsNearlyEqual(A.Y, B.Y) && FMath::IsNearlyEqual(B.Y, C.Y) &&
+				FMath::IsNearlyEqual(C.Y, D.Y);
+			TestTrue(TEXT("Every blocky quad is horizontal or vertical"), bHorizontal || bVertical);
+		}
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelWaterContinuousTest,
+	"WHFramework.Voxel.Rendering.Water.Continuous",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelWaterContinuousTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelWaterSurfaceTileData Water;
+	Water.Side = 2;
+	Water.Step = 1;
+	Water.WaterZ = { 2, 3, 4, 5 };
+	Water.GroundZ = { 0, 0, 0, 0 };
+	Water.WaterKind.Init(static_cast<uint8>(EVoxelWaterKind::River), 4);
+	FVoxelRegistrySnapshot Registry = *VoxelTest::MakeRegistry();
+	Registry.Definitions[6].RenderGroup = EVoxelRenderGroup::Water;
+	FVoxelSectionMeshResult Mesh;
+	FString Error;
+	TestTrue(TEXT("Continuous water builds"), FVoxelHeightfieldMesher::BuildWater(
+		Water, Registry, Mesh, Error));
+	TestTrue(TEXT("Continuous water retains differing corner heights"),
+		!Mesh.Batches.IsEmpty() && Mesh.Batches[0].Mesh.Vertices[0].Z != Mesh.Batches[0].Mesh.Vertices[1].Z);
 	return true;
 }
 

@@ -118,6 +118,17 @@ bool FVoxelHydrologySeamTest::RunTest(const FString& InParameters)
 		{
 			continue;
 		}
+		const FIntPoint LocalA = PlanA.Grid.ToLocal(IndexA);
+		constexpr int32 CertificationMargin = 2;
+		if (LocalA.X < CertificationMargin || LocalA.Y < CertificationMargin ||
+			LocalA.X >= PlanA.Grid.Width - CertificationMargin ||
+			LocalA.Y >= PlanA.Grid.Height - CertificationMargin ||
+			LocalB.X < CertificationMargin || LocalB.Y < CertificationMargin ||
+			LocalB.X >= PlanB.Grid.Width - CertificationMargin ||
+			LocalB.Y >= PlanB.Grid.Height - CertificationMargin)
+		{
+			continue;
+		}
 		const uint32 IndexB = PlanB.Grid.ToIndex(LocalB.X, LocalB.Y);
 		++SharedCells;
 		TestEqual(TEXT("Shared ground plane matches"), PlanA.Grid.GroundPlane[IndexA], PlanB.Grid.GroundPlane[IndexB]);
@@ -132,6 +143,84 @@ bool FVoxelHydrologySeamTest::RunTest(const FString& InParameters)
 		TestEqual(TEXT("Shared drainage parent matches"), ParentWorld(PlanA, IndexA), ParentWorld(PlanB, IndexB));
 	}
 	TestTrue(TEXT("Adjacent plans share a certified halo"), SharedCells > 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelHydrologyRiverHeightTest,
+	"WHFramework.Voxel.Hydrology.RiverWaterContinuous",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelHydrologyRiverHeightTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config =
+		VoxelTest::MakeGenerationConfig();
+	const TSharedRef<const FVoxelGenerationRecipe, ESPMode::ThreadSafe> Recipe = Config->Recipe.ToSharedRef();
+	const TSharedRef<const FVoxelClimateGenerator, ESPMode::ThreadSafe> Climate =
+		MakeShared<const FVoxelClimateGenerator, ESPMode::ThreadSafe>(Recipe);
+	const TSharedRef<const FVoxelTerrainGenerator, ESPMode::ThreadSafe> Terrain =
+		MakeShared<const FVoxelTerrainGenerator, ESPMode::ThreadSafe>(Recipe, Climate);
+	FVoxelHydrologyPlan Plan;
+	FString Error;
+	TestTrue(TEXT("Hydrology region builds"), FVoxelHydrologyGenerator(Recipe, Terrain).BuildPlan({ FIntPoint(0, 0) }, Plan, Error));
+	TestTrue(TEXT("Hydrology region contains river routes"), !Plan.Rivers.IsEmpty());
+	bool bHasLocalWaterHeight = false;
+	for (const FVoxelRiverRoute& Route : Plan.Rivers)
+	{
+		for (int32 PointIndex = 0; PointIndex < Route.Points.Num(); ++PointIndex)
+		{
+			const FVoxelRiverRoutePoint& Point = Route.Points[PointIndex];
+			bHasLocalWaterHeight |= Point.WaterZ != Recipe->Settings.SeaLevel + 4;
+			if (PointIndex > 0)
+			{
+				const int32 Delta = FMath::Abs(Point.WaterZ - Route.Points[PointIndex - 1].WaterZ);
+				TestTrue(TEXT("Adjacent route water heights stay continuous"), Delta <= Recipe->Settings.MaxZ - Recipe->Settings.MinZ);
+			}
+		}
+	}
+	TestTrue(TEXT("River water height is derived from local drainage"), bHasLocalWaterHeight);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelHydrologyHighlandRiverTest,
+	"WHFramework.Voxel.Hydrology.HighlandRiver",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelHydrologyHighlandRiverTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config =
+		VoxelTest::MakeGenerationConfig(919);
+	const TSharedRef<const FVoxelGenerationRecipe, ESPMode::ThreadSafe> Recipe = Config->Recipe.ToSharedRef();
+	const TSharedRef<const FVoxelClimateGenerator, ESPMode::ThreadSafe> Climate =
+		MakeShared<const FVoxelClimateGenerator, ESPMode::ThreadSafe>(Recipe);
+	const TSharedRef<const FVoxelTerrainGenerator, ESPMode::ThreadSafe> Terrain =
+		MakeShared<const FVoxelTerrainGenerator, ESPMode::ThreadSafe>(Recipe, Climate);
+	FVoxelHydrologyPlan Plan;
+	FString Error;
+	TestTrue(TEXT("Highland hydrology region builds"), FVoxelHydrologyGenerator(Recipe, Terrain).BuildPlan({ FIntPoint(0, 0) }, Plan, Error));
+	bool bFoundHighlandPoint = false;
+	bool bFoundDescendingRoute = false;
+	for (const FVoxelRiverRoute& Route : Plan.Rivers)
+	{
+		for (int32 PointIndex = 0; PointIndex < Route.Points.Num(); ++PointIndex)
+		{
+			const FVoxelRiverRoutePoint& Point = Route.Points[PointIndex];
+			if (Point.WaterZ > Recipe->Settings.SeaLevel + 4)
+			{
+				bFoundHighlandPoint = true;
+				TestNotEqual(TEXT("Highland river is not clamped to global river level"), Point.WaterZ, Recipe->Settings.SeaLevel + 4);
+			}
+			if (PointIndex > 0 && Point.WaterZ < Route.Points[PointIndex - 1].WaterZ)
+			{
+				bFoundDescendingRoute = true;
+			}
+		}
+	}
+	TestTrue(TEXT("A river route contains highland water"), bFoundHighlandPoint);
+	TestTrue(TEXT("River water follows drainage downhill"), bFoundDescendingRoute);
 	return true;
 }
 

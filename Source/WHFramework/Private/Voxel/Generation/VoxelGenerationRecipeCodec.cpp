@@ -4,7 +4,7 @@
 namespace
 {
 	constexpr uint32 VoxelRecipeMagic = 0x31524356;
-	constexpr uint32 VoxelRecipeSchemaVersion = 2;
+	constexpr uint32 VoxelRecipeSchemaVersion = 3;
 	constexpr int32 MaxRecipeBytes = 32 * 1024 * 1024;
 	constexpr int32 MaxRecipeArrayCount = 1 << 20;
 
@@ -154,6 +154,13 @@ namespace
 		Writer.I32(Value.CaveMaxDepth);
 		Writer.I32(Value.CaveMainRadius);
 		Writer.I32(Value.CaveBranchRadius);
+		Writer.I32(Value.CaveSystemChancePermille);
+		Writer.I32(Value.CaveEntranceChancePermille);
+		Writer.I32(Value.CaveEntranceLength);
+		Writer.I32(Value.CaveEntranceDropPerStep);
+		Writer.I32(Value.CaveEntranceTransitionDepth);
+		Writer.I32(Value.CaveRoomChancePermille);
+		Writer.I32(Value.CaveBranchChancePermille);
 		Writer.I32(Value.AquiferSpacing);
 		Writer.I32(Value.AquiferRadius);
 		Writer.I32(Value.LavaCeiling);
@@ -192,6 +199,13 @@ namespace
 		Result.CaveMaxDepth = Reader.I32();
 		Result.CaveMainRadius = Reader.I32();
 		Result.CaveBranchRadius = Reader.I32();
+		Result.CaveSystemChancePermille = Reader.I32();
+		Result.CaveEntranceChancePermille = Reader.I32();
+		Result.CaveEntranceLength = Reader.I32();
+		Result.CaveEntranceDropPerStep = Reader.I32();
+		Result.CaveEntranceTransitionDepth = Reader.I32();
+		Result.CaveRoomChancePermille = Reader.I32();
+		Result.CaveBranchChancePermille = Reader.I32();
 		Result.AquiferSpacing = Reader.I32();
 		Result.AquiferRadius = Reader.I32();
 		Result.LavaCeiling = Reader.I32();

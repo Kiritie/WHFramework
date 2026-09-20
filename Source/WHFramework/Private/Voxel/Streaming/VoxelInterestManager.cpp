@@ -379,18 +379,8 @@ void FVoxelInterestManager::AddExactSource(
 								Distance)
 						: 1.0;
 
-				const double Priority =
-					1.0 /
-						(1.0 + Distance) +
-					FMath::Max(
-						0.0,
-						Forward) *
-						0.25;
-
-				Demand.Priority =
-					FMath::Max(
-						Demand.Priority,
-						Priority);
+				Demand.DistanceCells = FMath::Min(Demand.DistanceCells, Distance);
+				Demand.ForwardScore = FMath::Max(Demand.ForwardScore, Forward);
 			}
 		}
 	}

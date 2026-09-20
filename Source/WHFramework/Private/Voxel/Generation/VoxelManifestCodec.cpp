@@ -36,6 +36,13 @@ namespace
 		InWriter.I32(InSettings.CaveMaxDepth);
 		InWriter.I32(InSettings.CaveMainRadius);
 		InWriter.I32(InSettings.CaveBranchRadius);
+		InWriter.I32(InSettings.CaveSystemChancePermille);
+		InWriter.I32(InSettings.CaveEntranceChancePermille);
+		InWriter.I32(InSettings.CaveEntranceLength);
+		InWriter.I32(InSettings.CaveEntranceDropPerStep);
+		InWriter.I32(InSettings.CaveEntranceTransitionDepth);
+		InWriter.I32(InSettings.CaveRoomChancePermille);
+		InWriter.I32(InSettings.CaveBranchChancePermille);
 		InWriter.I32(InSettings.AquiferSpacing);
 		InWriter.I32(InSettings.AquiferRadius);
 		InWriter.I32(InSettings.LavaCeiling);
@@ -96,6 +103,13 @@ namespace
 		OutSettings.CaveMaxDepth = InReader.I32();
 		OutSettings.CaveMainRadius = InReader.I32();
 		OutSettings.CaveBranchRadius = InReader.I32();
+		OutSettings.CaveSystemChancePermille = InReader.I32();
+		OutSettings.CaveEntranceChancePermille = InReader.I32();
+		OutSettings.CaveEntranceLength = InReader.I32();
+		OutSettings.CaveEntranceDropPerStep = InReader.I32();
+		OutSettings.CaveEntranceTransitionDepth = InReader.I32();
+		OutSettings.CaveRoomChancePermille = InReader.I32();
+		OutSettings.CaveBranchChancePermille = InReader.I32();
 		OutSettings.AquiferSpacing = InReader.I32();
 		OutSettings.AquiferRadius = InReader.I32();
 		OutSettings.LavaCeiling = InReader.I32();

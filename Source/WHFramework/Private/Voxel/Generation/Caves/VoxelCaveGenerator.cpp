@@ -309,7 +309,7 @@ bool FVoxelCaveGenerator::TryBuildSystem(
 		Seed,
 		0,
 		999) >=
-		SpawnPermille)
+		Recipe->Settings.CaveSystemChancePermille)
 	{
 		OutError.Reset();
 		return false;
@@ -363,11 +363,16 @@ bool FVoxelCaveGenerator::TryBuildSystem(
 		return false;
 	}
 
-	const bool bHasEntrance =
+	const bool bWantsEntrance =
+		!StartColumn.bOcean &&
+		!StartColumn.bLake &&
+		!StartColumn.bRiver &&
+		!StartColumn.bCoast &&
+		StartColumn.SlopePermille <= 450 &&
 		Stream.RandRange(
 			0,
 			999) <
-		EntrancePermille;
+		Recipe->Settings.CaveEntranceChancePermille;
 
 	const int32 MinimumWorldZ =
 		Recipe->Settings.MinZ +
@@ -388,19 +393,36 @@ bool FVoxelCaveGenerator::TryBuildSystem(
 				MinimumSurfaceDepth -
 				4);
 
-	FIntVector Current(
-		StartX,
-		StartY,
-		bHasEntrance
-			? StartColumn.SurfaceZ + 1
-			: Stream.RandRange(
-				MinimumWorldZ + 3,
-				UndergroundMaximum));
-
-	double Yaw =
-		Stream.FRandRange(
-			-PI,
-			PI);
+	FIntVector Current = FIntVector::ZeroValue;
+	double Yaw = 0.0;
+	bool bHasEntrance = false;
+	if (bWantsEntrance)
+	{
+		FString EntranceError;
+		bHasEntrance = BuildEntranceCorridor(
+			Stream,
+			FIntPoint(StartX, StartY),
+			StartColumn,
+			InColumnSampler,
+			OutSegments,
+			Current,
+			Yaw,
+			EntranceError,
+			InCancel);
+		if (!bHasEntrance && EntranceError == TEXT("Canceled"))
+		{
+			OutError = MoveTemp(EntranceError);
+			return false;
+		}
+	}
+	if (!bHasEntrance)
+	{
+		Current = FIntVector(
+			StartX,
+			StartY,
+			Stream.RandRange(MinimumWorldZ + 3, UndergroundMaximum));
+		Yaw = Stream.FRandRange(-PI, PI);
+	}
 
 	double Pitch =
 		bHasEntrance
@@ -476,11 +498,13 @@ bool FVoxelCaveGenerator::TryBuildSystem(
 		OutSegments.Add(
 			Segment);
 
-		if (SegmentIndex > 2 &&
+		const bool bInterior = IsDeepEnoughForInterior(End, InColumnSampler);
+
+		if (bInterior &&
 			Stream.RandRange(
 				0,
 				999) <
-			RoomPermille)
+			Recipe->Settings.CaveRoomChancePermille)
 		{
 			FVoxelCaveSegment Room;
 
@@ -501,11 +525,11 @@ bool FVoxelCaveGenerator::TryBuildSystem(
 				Room);
 		}
 
-		if (SegmentIndex > 3 &&
+		if (bInterior &&
 			Stream.RandRange(
 				0,
 				999) <
-			BranchPermille)
+			Recipe->Settings.CaveBranchChancePermille)
 		{
 			if (!AddBranch(
 				Stream,
@@ -537,15 +561,6 @@ bool FVoxelCaveGenerator::TryBuildSystem(
 						0.16f),
 				-0.45,
 				0.35);
-
-		if (bHasEntrance &&
-			SegmentIndex < 4)
-		{
-			Pitch =
-				FMath::Min(
-					Pitch,
-					-0.3);
-		}
 
 		if (Current.Z <=
 			MinimumWorldZ + 1)
@@ -678,6 +693,79 @@ bool FVoxelCaveGenerator::AddBranch(
 	return true;
 }
 
+bool FVoxelCaveGenerator::BuildEntranceCorridor(
+	FRandomStream& InStream,
+	const FIntPoint& InStartXY,
+	const FVoxelColumnSample& InStartColumn,
+	FVoxelCaveColumnSampler InColumnSampler,
+	TArray<FVoxelCaveSegment>& InOutSegments,
+	FIntVector& OutEnd,
+	double& OutYaw,
+	FString& OutError,
+	const TAtomic<bool>* InCancel) const
+{
+	const FVoxelGenerationSettings& Settings = Recipe->Settings;
+	const int32 TotalLength = FMath::Max(4, Settings.CaveEntranceLength);
+	const int32 DropPerStep = FMath::Clamp(Settings.CaveEntranceDropPerStep, 1, 4);
+	const int32 Radius = FMath::Max(2, Settings.CaveMainRadius);
+	constexpr int32 HorizontalStep = 4;
+	OutYaw = InStream.FRandRange(-PI, PI);
+	FIntVector Current(InStartXY.X, InStartXY.Y, InStartColumn.SurfaceZ + 1);
+	TArray<FVoxelCaveSegment> LocalSegments;
+
+	for (int32 Travelled = 0; Travelled < TotalLength;)
+	{
+		if (InCancel && InCancel->Load())
+		{
+			OutError = TEXT("Canceled");
+			return false;
+		}
+		const int32 Step = FMath::Min(HorizontalStep, TotalLength - Travelled);
+		const int32 NextX = FMath::RoundToInt(Current.X + FMath::Cos(OutYaw) * Step);
+		const int32 NextY = FMath::RoundToInt(Current.Y + FMath::Sin(OutYaw) * Step);
+		FVoxelColumnSample Column;
+		if (!InColumnSampler(FIntVector(NextX, NextY, 0), Column) ||
+			Column.bOcean || Column.bLake || Column.bRiver)
+		{
+			OutError.Reset();
+			return false;
+		}
+		const int32 DesiredZ = Current.Z - DropPerStep;
+		const int32 NextZ = FMath::Min(DesiredZ, Column.SurfaceZ + 1);
+		if (Current.Z - NextZ > DropPerStep + 1)
+		{
+			OutError.Reset();
+			return false;
+		}
+		const FIntVector Next(NextX, NextY, NextZ);
+		LocalSegments.Add({ Current, Next, Radius });
+		Current = Next;
+		Travelled += Step;
+	}
+
+	FVoxelColumnSample EndColumn;
+	if (!InColumnSampler(FIntVector(Current.X, Current.Y, 0), EndColumn) ||
+		EndColumn.SurfaceZ - Current.Z < Radius)
+	{
+		OutError.Reset();
+		return false;
+	}
+	InOutSegments.Append(MoveTemp(LocalSegments));
+	OutEnd = Current;
+	OutError.Reset();
+	return true;
+}
+
+bool FVoxelCaveGenerator::IsDeepEnoughForInterior(
+	const FIntVector& InPosition,
+	FVoxelCaveColumnSampler InColumnSampler) const
+{
+	FVoxelColumnSample Column;
+	return InColumnSampler(FIntVector(InPosition.X, InPosition.Y, 0), Column) &&
+		Column.SurfaceZ - InPosition.Z >=
+		FMath::Max(4, Recipe->Settings.CaveEntranceTransitionDepth);
+}
+
 FIntVector FVoxelCaveGenerator::ClampBelowSurface(
 	const FIntVector& InPosition,
 	FVoxelCaveColumnSampler InColumnSampler) const
@@ -697,10 +785,7 @@ FIntVector FVoxelCaveGenerator::ClampBelowSurface(
 	const int32 MinimumSurfaceDepth =
 		FMath::Max(
 			4,
-			FMath::Min(
-				Recipe->Settings.
-					CaveMinDepth,
-				12));
+			Recipe->Settings.CaveMinDepth);
 
 	FIntVector Result =
 		InPosition;

@@ -69,56 +69,14 @@ void FVoxelViewManager::Tick(
 
 	if (AppliedInterestRevision != InInterestRevision)
 	{
+		PriorityObservers = TArray<FVector>(InObservers);
 		UpdateFineAndVoxelProxy(InObservers);
 		UpdateSurface(InObservers);
 		UpdateMacro(InObservers);
+		CancelStaleViewTasks();
 		UpdateWantedTimestamps(Now);
-		FineAdmissions = FineWanted.Array();
-		VoxelProxyAdmissions = VoxelProxyWanted.Array();
-		SurfaceAdmissions = SurfaceWanted.Array();
-		MacroAdmissions = MacroWanted.Array();
-		if (!InObservers.IsEmpty())
-		{
-			const FVector Observer = InObservers[0];
-			const double BlockSize = Module.BlockSize();
-			FineAdmissions.Sort([Observer, BlockSize](const FIntVector& InA, const FIntVector& InB)
-			{
-				const FVector CenterA = FVector(InA * ViewSectionSide + FIntVector(ViewSectionSide / 2)) * BlockSize;
-				const FVector CenterB = FVector(InB * ViewSectionSide + FIntVector(ViewSectionSide / 2)) * BlockSize;
-				return FVector::DistSquared(CenterA, Observer) < FVector::DistSquared(CenterB, Observer);
-			});
-			VoxelProxyAdmissions.Sort([Observer, BlockSize](const FVoxelViewKey& InA, const FVoxelViewKey& InB)
-			{
-				const FVoxelGenerationBounds BoundsA = InA.GetBounds();
-				const FVoxelGenerationBounds BoundsB = InB.GetBounds();
-				const FVector CenterA = FVector(BoundsA.Min + BoundsA.Max) * (0.5 * BlockSize);
-				const FVector CenterB = FVector(BoundsB.Min + BoundsB.Max) * (0.5 * BlockSize);
-				return FVector::DistSquared(CenterA, Observer) < FVector::DistSquared(CenterB, Observer);
-			});
-			SurfaceAdmissions.Sort([this, Observer, BlockSize](const FVoxelSurfaceTileKey& InA, const FVoxelSurfaceTileKey& InB)
-			{
-				const FVoxelCoverageRect BoundsA = SurfaceCoverageRect(InA);
-				const FVoxelCoverageRect BoundsB = SurfaceCoverageRect(InB);
-				const FVector2D CenterA = FVector2D(BoundsA.Min + BoundsA.Max) * (0.5 * BlockSize);
-				const FVector2D CenterB = FVector2D(BoundsB.Min + BoundsB.Max) * (0.5 * BlockSize);
-				const FVector2D ObserverXY(Observer.X, Observer.Y);
-				return FVector2D::DistSquared(CenterA, ObserverXY) < FVector2D::DistSquared(CenterB, ObserverXY);
-			});
-			MacroAdmissions.Sort([this, Observer, BlockSize](const FVoxelMacroTileKey& InA, const FVoxelMacroTileKey& InB)
-			{
-				const FVoxelCoverageRect BoundsA = MacroCoverageRect(InA);
-				const FVoxelCoverageRect BoundsB = MacroCoverageRect(InB);
-				const FVector2D CenterA = FVector2D(BoundsA.Min + BoundsA.Max) * (0.5 * BlockSize);
-				const FVector2D CenterB = FVector2D(BoundsB.Min + BoundsB.Max) * (0.5 * BlockSize);
-				const FVector2D ObserverXY(Observer.X, Observer.Y);
-				return FVector2D::DistSquared(CenterA, ObserverXY) < FVector2D::DistSquared(CenterB, ObserverXY);
-			});
-		}
+		RebuildAdmissions(InObservers);
 		AppliedInterestRevision = InInterestRevision;
-		FineAdmissionIndex = 0;
-		VoxelProxyAdmissionIndex = 0;
-		SurfaceAdmissionIndex = 0;
-		MacroAdmissionIndex = 0;
 		bCoverageDirty = true;
 	}
 
@@ -159,54 +117,166 @@ void FVoxelViewManager::Tick(
 void FVoxelViewManager::ProcessAdmissions()
 {
 	constexpr int32 MaxAdmissionsPerTick = 24;
-	int32 Attempts = 0;
-	auto AdvanceIndex = [](int32& InOutIndex, const int32 InNum)
+	const double Frontier = ResolveAdmissionFrontier();
+	LastResolvedFrontier = Frontier;
+	int32 Submitted = 0;
+	for (const FVoxelViewAdmission& Admission : Admissions)
 	{
-		const int32 Result = InOutIndex;
-		InOutIndex = InNum > 0 ? (InOutIndex + 1) % InNum : 0;
-		return Result;
-	};
-
-	while (Attempts < MaxAdmissionsPerTick &&
-		(!FineAdmissions.IsEmpty() || !VoxelProxyAdmissions.IsEmpty() || !SurfaceAdmissions.IsEmpty() || !MacroAdmissions.IsEmpty()))
-	{
-		const int32 Lane = Attempts % 4;
-		if (Lane == 0 && !FineAdmissions.IsEmpty())
-		{
-			const FIntVector Key = FineAdmissions[AdvanceIndex(FineAdmissionIndex, FineAdmissions.Num())];
-			if (const FVoxelSection* Section = Module.GetRuntime()->FindSection(Key);
-				Section && Section->Status == EVoxelSectionStatus::DataReady)
-			{
-				const uint64* PublishedRevision = FineRevisions.Find(Key);
-				if (!PublishedRevision || *PublishedRevision != Section->CommittedRevision)
-				{
-					RequestFine(Key, Section->CommittedRevision);
-				}
-			}
-		}
-		else if (Lane == 1 && !VoxelProxyAdmissions.IsEmpty())
-		{
-			const FVoxelViewKey Key = VoxelProxyAdmissions[AdvanceIndex(VoxelProxyAdmissionIndex, VoxelProxyAdmissions.Num())];
-			const uint64 Revision = Module.GetRuntime()->GetChangeHierarchy().GetVoxelProxyRevision(Key.Coordinate);
-			const uint64* PublishedRevision = VoxelProxyRevisions.Find(Key);
-			if (!PublishedRevision || *PublishedRevision != Revision) RequestVoxelProxy(Key);
-		}
-		else if (Lane == 2 && !SurfaceAdmissions.IsEmpty())
-		{
-			const FVoxelSurfaceTileKey Key = SurfaceAdmissions[AdvanceIndex(SurfaceAdmissionIndex, SurfaceAdmissions.Num())];
-			const uint64 Revision = Module.GetRuntime()->GetChangeHierarchy().GetSurfaceRevision(Key.Coordinate);
-			const uint64* PublishedRevision = SurfaceRevisions.Find(Key);
-			if (!PublishedRevision || *PublishedRevision != Revision) RequestSurface(Key);
-		}
-		else if (Lane == 3 && !MacroAdmissions.IsEmpty())
-		{
-			const FVoxelMacroTileKey Key = MacroAdmissions[AdvanceIndex(MacroAdmissionIndex, MacroAdmissions.Num())];
-			const uint64 Revision = Module.GetRuntime()->GetChangeHierarchy().GetMacroRevision(Key.Coordinate);
-			const uint64* PublishedRevision = MacroRevisions.Find(Key);
-			if (!PublishedRevision || *PublishedRevision != Revision) RequestMacro(Key);
-		}
-		++Attempts;
+		if (Submitted >= MaxAdmissionsPerTick || Admission.DistanceCells > Frontier) break;
+		if (IsAdmissionSatisfied(Admission) || IsAdmissionTerminalFailure(Admission)) continue;
+		Submitted += TrySubmitAdmission(Admission) ? 1 : 0;
 	}
+}
+
+double FVoxelViewManager::MinimumObserverDistanceCells(const FVector& InWorldCenter) const
+{
+	double BestSquared = TNumericLimits<double>::Max();
+	for (const FVector& Observer : PriorityObservers)
+	{
+		BestSquared = FMath::Min(BestSquared, FVector::DistSquared(InWorldCenter, Observer));
+	}
+	return PriorityObservers.IsEmpty() ? 0.0 : FMath::Sqrt(BestSquared) / FMath::Max(1.0, Module.BlockSize());
+}
+
+FVector FVoxelViewManager::SurfaceWorldCenter(const FVoxelSurfaceTileKey& InKey) const
+{
+	const FVoxelCoverageRect Bounds = SurfaceCoverageRect(InKey);
+	return FVector(FVector2D(Bounds.Min + Bounds.Max) * (0.5 * Module.BlockSize()),
+		PriorityObservers.IsEmpty() ? 0.0 : PriorityObservers[0].Z);
+}
+
+FVector FVoxelViewManager::MacroWorldCenter(const FVoxelMacroTileKey& InKey) const
+{
+	const FVoxelCoverageRect Bounds = MacroCoverageRect(InKey);
+	return FVector(FVector2D(Bounds.Min + Bounds.Max) * (0.5 * Module.BlockSize()),
+		PriorityObservers.IsEmpty() ? 0.0 : PriorityObservers[0].Z);
+}
+
+void FVoxelViewManager::RebuildAdmissions(TConstArrayView<FVector> InObservers)
+{
+	(void)InObservers;
+	Admissions.Reset();
+	for (const FIntVector& Key : FineWanted)
+	{
+		FVoxelViewAdmission& A = Admissions.AddDefaulted_GetRef();
+		A.Kind = EVoxelViewAdmissionKind::Fine;
+		A.FineKey = Key;
+		A.DistanceCells = MinimumObserverDistanceCells(
+			FVector(Key * ViewSectionSide + FIntVector(ViewSectionSide / 2)) * Module.BlockSize());
+	}
+	for (const FVoxelViewKey& Key : VoxelProxyWanted)
+	{
+		FVoxelViewAdmission& A = Admissions.AddDefaulted_GetRef();
+		A.Kind = EVoxelViewAdmissionKind::VoxelProxy;
+		A.ProxyKey = Key;
+		const FVoxelGenerationBounds Bounds = Key.GetBounds();
+		A.DistanceCells = MinimumObserverDistanceCells(FVector(Bounds.Min + Bounds.Max) * 0.5 * Module.BlockSize());
+	}
+	for (const FVoxelSurfaceTileKey& Key : SurfaceWanted)
+	{
+		FVoxelViewAdmission& A = Admissions.AddDefaulted_GetRef();
+		A.Kind = EVoxelViewAdmissionKind::Surface;
+		A.SurfaceKey = Key;
+		A.DistanceCells = MinimumObserverDistanceCells(SurfaceWorldCenter(Key));
+	}
+	for (const FVoxelMacroTileKey& Key : MacroWanted)
+	{
+		FVoxelViewAdmission& A = Admissions.AddDefaulted_GetRef();
+		A.Kind = EVoxelViewAdmissionKind::Macro;
+		A.MacroKey = Key;
+		A.DistanceCells = MinimumObserverDistanceCells(MacroWorldCenter(Key));
+	}
+	SortAdmissionsByPriority(Admissions);
+}
+
+void FVoxelViewManager::SortAdmissionsByPriority(TArray<FVoxelViewAdmission>& InOutAdmissions)
+
+{
+	InOutAdmissions.Sort([](const FVoxelViewAdmission& A, const FVoxelViewAdmission& B)
+	{
+		return A.DistanceCells != B.DistanceCells ? A.DistanceCells < B.DistanceCells :
+			static_cast<uint8>(A.Kind) < static_cast<uint8>(B.Kind);
+	});
+}
+
+double FVoxelViewManager::ResolveAdmissionFrontier(
+	const TConstArrayView<FVoxelViewAdmission> InAdmissions,
+	const TFunctionRef<bool(const FVoxelViewAdmission&)> InIsReady,
+	const double InBandWidthCells)
+{
+	for (const FVoxelViewAdmission& Admission : InAdmissions)
+	{
+		if (!InIsReady(Admission))
+		{
+			return Admission.DistanceCells + InBandWidthCells;
+		}
+	}
+	return TNumericLimits<double>::Max();
+}
+
+bool FVoxelViewManager::IsAdmissionSatisfied(const FVoxelViewAdmission& A) const
+{
+	switch (A.Kind)
+	{
+	case EVoxelViewAdmissionKind::Fine: return FineReady.Contains(A.FineKey);
+	case EVoxelViewAdmissionKind::VoxelProxy: return VoxelProxyReady.Contains(A.ProxyKey);
+	case EVoxelViewAdmissionKind::Surface: return SurfaceReady.Contains(A.SurfaceKey);
+	case EVoxelViewAdmissionKind::Macro: return MacroReady.Contains(A.MacroKey);
+	default: return true;
+	}
+}
+
+bool FVoxelViewManager::IsAdmissionTerminalFailure(const FVoxelViewAdmission& A) const
+{
+	if (A.Kind != EVoxelViewAdmissionKind::Fine) return false;
+	const FVoxelSection* Section = Module.GetRuntime()->FindSection(A.FineKey);
+	return Section && Section->Status == EVoxelSectionStatus::Failed;
+}
+
+double FVoxelViewManager::ResolveAdmissionFrontier() const
+{
+	return ResolveAdmissionFrontier(
+		Admissions,
+		[this](const FVoxelViewAdmission& Admission)
+		{
+			return IsAdmissionSatisfied(Admission) || IsAdmissionTerminalFailure(Admission);
+		},
+		AdmissionBandWidthCells);
+}
+
+bool FVoxelViewManager::TrySubmitAdmission(const FVoxelViewAdmission& A)
+{
+	switch (A.Kind)
+	{
+	case EVoxelViewAdmissionKind::Fine:
+		if (const FVoxelSection* Section = Module.GetRuntime()->FindSection(A.FineKey);
+			Section && Section->Status == EVoxelSectionStatus::DataReady)
+		{
+			const uint64* Revision = FineRevisions.Find(A.FineKey);
+			return (!Revision || *Revision != Section->CommittedRevision) && RequestFine(A.FineKey, Section->CommittedRevision);
+		}
+		return false;
+	case EVoxelViewAdmissionKind::VoxelProxy: return RequestVoxelProxy(A.ProxyKey);
+	case EVoxelViewAdmissionKind::Surface: return RequestSurface(A.SurfaceKey);
+	case EVoxelViewAdmissionKind::Macro: return RequestMacro(A.MacroKey);
+	default: return false;
+	}
+}
+
+void FVoxelViewManager::CancelStaleViewTasks()
+{
+	Scheduler.CancelMatching([this](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
+	{
+		switch (Kind)
+		{
+		case EVoxelTaskKind::BuildFineMesh: return !FineWanted.Contains(Stamp.Section);
+		case EVoxelTaskKind::BuildVoxelProxy: return !VoxelProxyWanted.Contains(Stamp.ViewKey);
+		case EVoxelTaskKind::BuildSurface:
+		case EVoxelTaskKind::BuildWater: return !SurfaceWanted.Contains(Stamp.SurfaceKey);
+		case EVoxelTaskKind::BuildMacro: return !MacroWanted.Contains(Stamp.MacroKey);
+		default: return false;
+		}
+	});
 }
 
 void FVoxelViewManager::SetActorHiddenCached(AActor* InActor, const bool bInHidden)
@@ -259,6 +329,21 @@ void FVoxelViewManager::LogRepresentationState(const TConstArrayView<FVector> In
 		MacroReady.Num(),
 		MacroActors.Num(),
 		CountVisible(MacroActors));
+
+	const FVoxelTaskDiagnostics SchedulerStats = Scheduler.GetDiagnostics();
+
+	UE_LOG(
+		LogTemp,
+		Display,
+		TEXT("Voxel frontier=%.1f admissions=%d pending=%d running=%d surfaceP=%d surfaceR=%d macroP=%d macroR=%d"),
+		LastResolvedFrontier,
+		Admissions.Num(),
+		SchedulerStats.Pending,
+		SchedulerStats.Running,
+		SchedulerStats.PendingByKind.FindRef(EVoxelTaskKind::BuildSurface),
+		SchedulerStats.RunningByKind.FindRef(EVoxelTaskKind::BuildSurface),
+		SchedulerStats.PendingByKind.FindRef(EVoxelTaskKind::BuildMacro),
+		SchedulerStats.RunningByKind.FindRef(EVoxelTaskKind::BuildMacro));
 
 	if (CVarVoxelDebugRepresentation.GetValueOnGameThread() < 2 || InObservers.IsEmpty())
 	{
@@ -738,7 +823,7 @@ bool FVoxelViewManager::ApplyRemoteRepresentation(
 			FVoxelTaskResult Result;
 			Result.Surface = MakeShared<FVoxelSurfaceTileData>(MoveTemp(Data));
 			Result.SurfaceMesh = MakeShared<FVoxelSectionMeshResult>();
-			Result.bSuccess = Config && FVoxelHeightfieldMesher::BuildTerrain(
+			Result.bSuccess = Config && FVoxelHeightfieldMesher::BuildBlockyTerrain(
 				Result.Surface->Side,
 				Result.Surface->Step,
 				Result.Surface->GroundZ,
@@ -786,7 +871,7 @@ bool FVoxelViewManager::ApplyRemoteRepresentation(
 			FVoxelTaskResult Result;
 			Result.Macro = MakeShared<FVoxelMacroTileData>(MoveTemp(Data));
 			Result.MacroMesh = MakeShared<FVoxelSectionMeshResult>();
-			Result.bSuccess = Config && FVoxelHeightfieldMesher::BuildTerrain(
+			Result.bSuccess = Config && FVoxelHeightfieldMesher::BuildBlockyTerrain(
 				Result.Macro->Side,
 				Result.Macro->Step,
 				Result.Macro->Height,
@@ -949,16 +1034,11 @@ void FVoxelViewManager::Reset()
 	VoxelProxyLastWanted.Reset();
 	SurfaceLastWanted.Reset();
 	MacroLastWanted.Reset();
-	FineAdmissions.Reset();
-	VoxelProxyAdmissions.Reset();
-	SurfaceAdmissions.Reset();
-	MacroAdmissions.Reset();
+	Admissions.Reset();
+	PriorityObservers.Reset();
 	ActorHiddenStates.Reset();
 	AppliedInterestRevision = 0;
-	FineAdmissionIndex = 0;
-	VoxelProxyAdmissionIndex = 0;
-	SurfaceAdmissionIndex = 0;
-	MacroAdmissionIndex = 0;
+	LastResolvedFrontier = 0.0;
 	bCoverageDirty = true;
 	NextCoverageCheck = 0.0;
 	NextRepresentationDebugLog = 0.0;
@@ -1053,7 +1133,7 @@ void FVoxelViewManager::UpdateMacro(const TConstArrayView<FVector> InObservers)
 	MacroWanted = Module.GetCurrentInterest().Macro;
 }
 
-void FVoxelViewManager::RequestFine(
+bool FVoxelViewManager::RequestFine(
 	const FIntVector& InSection,
 	const uint64 InRevision)
 {
@@ -1066,7 +1146,7 @@ void FVoxelViewManager::RequestFine(
 		Section->Status !=
 			EVoxelSectionStatus::DataReady)
 	{
-		return;
+		return false;
 	}
 
 	FVoxelTaskStamp Stamp;
@@ -1083,7 +1163,7 @@ void FVoxelViewManager::RequestFine(
 		Stamp,
 		EVoxelTaskKind::BuildFineMesh))
 	{
-		return;
+		return false;
 	}
 
 	FVoxelSectionSnapshot Snapshot;
@@ -1093,7 +1173,7 @@ void FVoxelViewManager::RequestFine(
 			InSection,
 			Snapshot))
 	{
-		return;
+		return false;
 	}
 
 	FVoxelTaskRequest Request;
@@ -1110,6 +1190,9 @@ void FVoxelViewManager::RequestFine(
 
 	Request.Stamp =
 		Stamp;
+	Request.DistanceScore = MinimumObserverDistanceCells(
+		FVector(InSection * ViewSectionSide + FIntVector(ViewSectionSide / 2)) * Module.BlockSize());
+	Request.ForwardScore = 0.0;
 
 	Request.InputBytes =
 		Snapshot.Bytes();
@@ -1157,8 +1240,7 @@ void FVoxelViewManager::RequestFine(
 			return Result;
 		};
 
-	Scheduler.Enqueue(
-		MoveTemp(Request));
+	return Scheduler.Enqueue(MoveTemp(Request));
 }
 
 bool FVoxelViewManager::BuildVoxelProxySnapshot(
@@ -1200,7 +1282,7 @@ bool FVoxelViewManager::BuildVoxelProxySnapshot(
 	return true;
 }
 
-void FVoxelViewManager::RequestVoxelProxy(
+bool FVoxelViewManager::RequestVoxelProxy(
 	const FVoxelViewKey& InKey)
 {
 	if (!Module.IsAuthority())
@@ -1221,8 +1303,7 @@ void FVoxelViewManager::RequestVoxelProxy(
 					Find(
 						InKey);
 
-			Module.
-				RequestRemoteRepresentation(
+			return Module.RequestRemoteRepresentation(
 					EVoxelRepresentationWireType::
 						VoxelProxy,
 					{
@@ -1233,7 +1314,6 @@ void FVoxelViewManager::RequestVoxelProxy(
 						? *Revision
 						: 0);
 
-			return;
 		}
 	}
 
@@ -1252,7 +1332,7 @@ void FVoxelViewManager::RequestVoxelProxy(
 	if (!Config ||
 		!Cache)
 	{
-		return;
+		return false;
 	}
 
 	FVoxelTaskRequest Request;
@@ -1290,12 +1370,16 @@ void FVoxelViewManager::RequestVoxelProxy(
 		48ull *
 		1024ull *
 		1024ull;
+	const FVoxelGenerationBounds ProxyBounds = InKey.GetBounds();
+	Request.DistanceScore = MinimumObserverDistanceCells(
+		FVector(ProxyBounds.Min + ProxyBounds.Max) * 0.5 * Module.BlockSize());
+	Request.ForwardScore = 0.0;
 
 	if (Scheduler.Has(
 			Request.Stamp,
 			Request.Kind))
 	{
-		return;
+		return false;
 	}
 
 	const TSharedPtr<
@@ -1382,12 +1466,10 @@ void FVoxelViewManager::RequestVoxelProxy(
 			return Result;
 		};
 
-	Scheduler.Enqueue(
-		MoveTemp(
-			Request));
+	return Scheduler.Enqueue(MoveTemp(Request));
 }
 
-void FVoxelViewManager::RequestSurface(
+bool FVoxelViewManager::RequestSurface(
 	const FVoxelSurfaceTileKey& InKey)
 {
 	if (!Module.IsAuthority())
@@ -1428,7 +1510,7 @@ void FVoxelViewManager::RequestSurface(
 				SurfaceRevisions.Find(
 					InKey);
 
-			Module.RequestRemoteRepresentation(
+			return Module.RequestRemoteRepresentation(
 				EVoxelRepresentationWireType::
 					SurfaceProxy,
 				{
@@ -1442,7 +1524,6 @@ void FVoxelViewManager::RequestSurface(
 					? *Revision
 					: 0);
 
-			return;
 		}
 	}
 
@@ -1465,7 +1546,7 @@ void FVoxelViewManager::RequestSurface(
 		!Config ||
 		!Registry)
 	{
-		return;
+		return false;
 	}
 
 	FVoxelTaskRequest Request;
@@ -1499,12 +1580,14 @@ void FVoxelViewManager::RequestSurface(
 		40ull *
 		1024ull *
 		1024ull;
+	Request.DistanceScore = MinimumObserverDistanceCells(SurfaceWorldCenter(InKey));
+	Request.ForwardScore = 0.0;
 
 	if (Scheduler.Has(
 		Request.Stamp,
 		Request.Kind))
 	{
-		return;
+		return false;
 	}
 
 	const FVoxelGenerationSettings Settings =
@@ -1553,7 +1636,7 @@ void FVoxelViewManager::RequestSurface(
 
 				Result.bSuccess =
 					FVoxelHeightfieldMesher::
-						BuildTerrain(
+						BuildBlockyTerrain(
 							Result.Surface->Side,
 							Result.Surface->Step,
 							Result.Surface->GroundZ,
@@ -1625,11 +1708,10 @@ void FVoxelViewManager::RequestSurface(
 			return Result;
 		};
 
-	Scheduler.Enqueue(
-		MoveTemp(Request));
+	return Scheduler.Enqueue(MoveTemp(Request));
 }
 
-void FVoxelViewManager::RequestMacro(
+bool FVoxelViewManager::RequestMacro(
 	const FVoxelMacroTileKey& InKey)
 {
 	if (!Module.IsAuthority())
@@ -1674,7 +1756,7 @@ void FVoxelViewManager::RequestMacro(
 				MacroRevisions.Find(
 					InKey);
 
-			Module.RequestRemoteRepresentation(
+			return Module.RequestRemoteRepresentation(
 				EVoxelRepresentationWireType::
 					MacroTerrain,
 				{
@@ -1688,7 +1770,6 @@ void FVoxelViewManager::RequestMacro(
 					? *Revision
 					: 0);
 
-			return;
 		}
 	}
 
@@ -1711,7 +1792,7 @@ void FVoxelViewManager::RequestMacro(
 		!Config ||
 		!Registry)
 	{
-		return;
+		return false;
 	}
 
 	FVoxelTaskRequest Request;
@@ -1745,12 +1826,14 @@ void FVoxelViewManager::RequestMacro(
 		32ull *
 		1024ull *
 		1024ull;
+	Request.DistanceScore = MinimumObserverDistanceCells(MacroWorldCenter(InKey));
+	Request.ForwardScore = 0.0;
 
 	if (Scheduler.Has(
 		Request.Stamp,
 		Request.Kind))
 	{
-		return;
+		return false;
 	}
 
 	Request.Execute =
@@ -1786,7 +1869,7 @@ void FVoxelViewManager::RequestMacro(
 
 				Result.bSuccess =
 					FVoxelHeightfieldMesher::
-						BuildTerrain(
+						BuildBlockyTerrain(
 							Result.Macro->Side,
 							Result.Macro->Step,
 							Result.Macro->Height,
@@ -1805,8 +1888,7 @@ void FVoxelViewManager::RequestMacro(
 			return Result;
 		};
 
-	Scheduler.Enqueue(
-		MoveTemp(Request));
+	return Scheduler.Enqueue(MoveTemp(Request));
 }
 
 bool FVoxelViewManager::HasRenderableMesh(const FVoxelSectionMeshResult& InMesh)

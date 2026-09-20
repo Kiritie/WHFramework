@@ -10,6 +10,20 @@ struct FVoxelWaterSurfaceTileData;
 class WHFRAMEWORK_API FVoxelHeightfieldMesher
 {
 public:
+	static bool BuildBlockyTerrain(
+		int32 InVertexSide,
+		int32 InStep,
+		TConstArrayView<int32> InHeights,
+		TConstArrayView<uint16> InMaterials,
+		const FVoxelGenerationRuntimeConfig& InConfig,
+		const FVoxelRegistrySnapshot& InRegistry,
+		FVoxelSectionMeshResult& OutMesh,
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr,
+		TConstArrayView<uint8> InCoverage = {},
+		double InZBiasCells = 0.0,
+		int32 InSkirtDepthCells = 0);
+
 	static bool BuildTerrain(
 		int32 InVertexSide,
 		int32 InStep,

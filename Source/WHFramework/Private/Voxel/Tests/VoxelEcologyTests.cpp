@@ -142,4 +142,103 @@ bool FVoxelEcologyOverrideTest::RunTest(const FString& InParameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelEcologySmallTileTest,
+	"WHFramework.Voxel.Ecology.SmallTile",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelEcologySmallTileTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelGenerationRecipe Recipe = MakeEcologyRecipe();
+	Recipe.Settings.Ecology.Tree.ChancePermille = 1000;
+	Recipe.Settings.Ecology.Tree.DensityPermille = 1000;
+	const TSharedRef<const FVoxelGenerationRecipe, ESPMode::ThreadSafe> Shared =
+		MakeShared<const FVoxelGenerationRecipe, ESPMode::ThreadSafe>(Recipe);
+	FVoxelEcologyGenerator Generator(Shared);
+	FVoxelEcologyPlan Plan;
+	FString Error;
+	auto SampleColumn = [](const FIntVector&, FVoxelColumnSample& OutColumn)
+	{
+		OutColumn.SurfaceZ = 0;
+		OutColumn.Climate.MoistureQ15 = 12000;
+		return true;
+	};
+	auto SampleBase = [](const FIntVector& InPosition, uint32& OutValue)
+	{
+		OutValue = InPosition.Z <= 0 ? 1 : 0;
+		return true;
+	};
+	TestTrue(TEXT("64-cell ecology tile builds"), Generator.BuildPlan(
+		{ FIntVector(0, 0, -64), FIntVector(64, 64, 128) }, SampleColumn, SampleBase, Plan, Error));
+	TestTrue(TEXT("Small tile evaluates tree candidates"), Plan.TreeCandidates > 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelEcologyTreeWritesTest,
+	"WHFramework.Voxel.Ecology.TreeWrites",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelEcologyTreeWritesTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelEcologyPlan Plan;
+	FString Error;
+	TestTrue(TEXT("Tree write plan builds"), BuildEcologyPlan(MakeEcologyRecipe(), Plan, Error));
+	TestTrue(TEXT("Accepted trees produce writes"), Plan.TreesAccepted > 0 && Plan.Writes.Num() > 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelEcologyGrassWritesTest,
+	"WHFramework.Voxel.Ecology.GrassWrites",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelEcologyGrassWritesTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelEcologyPlan Plan;
+	FString Error;
+	TestTrue(TEXT("Grass write plan builds"), BuildEcologyPlan(MakeEcologyRecipe(), Plan, Error));
+	TestTrue(TEXT("Grass diagnostics count writes"), Plan.GrassPatchCandidates > 0 && Plan.GrassWrites > 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelEcologyHydrologyAwareTest,
+	"WHFramework.Voxel.Ecology.HydrologyAware",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelEcologyHydrologyAwareTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelGenerationRecipe Recipe = MakeEcologyRecipe();
+	Recipe.Settings.Ecology.Tree.bAllowNearWater = false;
+	Recipe.Settings.Ecology.Tree.ChancePermille = 1000;
+	Recipe.Settings.Ecology.Tree.DensityPermille = 1000;
+	Recipe.Settings.Ecology.Grass.bEnabled = false;
+	const TSharedRef<const FVoxelGenerationRecipe, ESPMode::ThreadSafe> Shared =
+		MakeShared<const FVoxelGenerationRecipe, ESPMode::ThreadSafe>(Recipe);
+	FVoxelEcologyGenerator Generator(Shared);
+	FVoxelEcologyPlan Plan;
+	FString Error;
+	auto RiverColumn = [](const FIntVector&, FVoxelColumnSample& OutColumn)
+	{
+		OutColumn.SurfaceZ = 0;
+		OutColumn.bRiver = true;
+		OutColumn.Climate.MoistureQ15 = 12000;
+		return true;
+	};
+	auto SampleBase = [](const FIntVector& InPosition, uint32& OutValue)
+	{
+		OutValue = InPosition.Z <= 0 ? 1 : 0;
+		return true;
+	};
+	TestTrue(TEXT("River ecology plan builds"), Generator.BuildPlan(
+		{ FIntVector(0, 0, -64), FIntVector(64, 64, 128) }, RiverColumn, SampleBase, Plan, Error));
+	TestEqual(TEXT("Trees are rejected near river hydrology"), Plan.TreesAccepted, 0);
+	return true;
+}
+
 #endif

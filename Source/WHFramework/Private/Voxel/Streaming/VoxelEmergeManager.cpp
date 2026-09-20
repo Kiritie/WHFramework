@@ -207,15 +207,15 @@ void FVoxelEmergeManager::RebuildDemand(
 			const FIntVector& InA,
 			const FIntVector& InB)
 		{
-			const double PriorityA =
-				CurrentDemand.FindChecked(InA).Priority;
-
-			const double PriorityB =
-				CurrentDemand.FindChecked(InB).Priority;
-
-			if (PriorityA != PriorityB)
+			const FVoxelExactDemand& A = CurrentDemand.FindChecked(InA);
+			const FVoxelExactDemand& B = CurrentDemand.FindChecked(InB);
+			if (A.DistanceCells != B.DistanceCells)
 			{
-				return PriorityA > PriorityB;
+				return A.DistanceCells < B.DistanceCells;
+			}
+			if (A.ForwardScore != B.ForwardScore)
+			{
+				return A.ForwardScore > B.ForwardScore;
 			}
 
 			if (InA.X != InB.X)
@@ -320,13 +320,8 @@ void FVoxelEmergeManager::RequestBase(
 	Request.Stamp =
 		TaskStamp;
 
-	Request.DistanceScore =
-		InDemand.Priority > 0.0
-			? 1.0 / InDemand.Priority
-			: MAX_dbl;
-
-	Request.ForwardScore =
-		InDemand.Priority;
+	Request.DistanceScore = InDemand.DistanceCells;
+	Request.ForwardScore = InDemand.ForwardScore;
 
 	Request.ReservedBytes =
 		2ull * 1024ull * 1024ull;
@@ -422,10 +417,8 @@ void FVoxelEmergeManager::ResolveOverlay(
 		Request.WorkClass = EVoxelWorkClass::ExactData;
 	}
 
-	Request.DistanceScore = InDemand.Priority > 0.0
-		? 1.0 / InDemand.Priority
-		: MAX_dbl;
-	Request.ForwardScore = InDemand.Priority;
+	Request.DistanceScore = InDemand.DistanceCells;
+	Request.ForwardScore = InDemand.ForwardScore;
 
 	Request.Stamp.WorldEpoch =
 		InSection.Stamp.Epoch;

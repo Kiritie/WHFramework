@@ -13,7 +13,8 @@ struct WHFRAMEWORK_API FVoxelExactDemand
 	bool bWarmupData = false;
 	bool bWarmupCollision = false;
 	bool bMovementCriticalCollision = false;
-	double Priority = 0.0;
+	double DistanceCells = MAX_dbl;
+	double ForwardScore = 0.0;
 };
 
 struct WHFRAMEWORK_API FVoxelInterestSet

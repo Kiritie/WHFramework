@@ -124,6 +124,12 @@ bool FVoxelGenerationSettings::Validate(FString& OutError) const
 	if (CaveMinDepth <= 0 || CaveMaxDepth < CaveMinDepth) { OutError = TEXT("Voxel cave depth settings are invalid"); return false; }
 	if (CaveMainRadius < 2 || CaveBranchRadius < 2) { OutError = TEXT("Voxel cave radii must be at least two cells"); return false; }
 	if (CaveMainRadius > CaveSpacing / 2 || CaveBranchRadius > CaveSpacing / 2) { OutError = TEXT("Voxel cave radius is too large relative to cave spacing"); return false; }
+	if (CaveSystemChancePermille < 0 || CaveSystemChancePermille > 1000) { OutError = TEXT("Voxel cave system chance must be in [0,1000]"); return false; }
+	if (CaveEntranceChancePermille < 0 || CaveEntranceChancePermille > 1000) { OutError = TEXT("Voxel cave entrance chance must be in [0,1000]"); return false; }
+	if (CaveEntranceLength < 4 || CaveEntranceLength > 64) { OutError = TEXT("Voxel cave entrance length is outside the supported range"); return false; }
+	if (CaveEntranceDropPerStep < 1 || CaveEntranceDropPerStep > 4) { OutError = TEXT("Voxel cave entrance drop per step is outside the supported range"); return false; }
+	if (CaveEntranceTransitionDepth < 4 || CaveEntranceTransitionDepth > CaveMaxDepth) { OutError = TEXT("Voxel cave entrance transition depth is invalid"); return false; }
+	if (CaveRoomChancePermille < 0 || CaveRoomChancePermille > 1000 || CaveBranchChancePermille < 0 || CaveBranchChancePermille > 1000) { OutError = TEXT("Voxel cave room/branch chance must be in [0,1000]"); return false; }
 	if (AquiferSpacing <= 0) { OutError = TEXT("Voxel aquifer spacing must be positive"); return false; }
 	if (AquiferRadius <= 0 || AquiferRadius >= AquiferSpacing) { OutError = TEXT("Voxel aquifer radius must be smaller than aquifer spacing"); return false; }
 	if (LavaCeiling < MinZ || LavaCeiling >= MaxZ) { OutError = TEXT("Voxel lava ceiling is outside world height"); return false; }

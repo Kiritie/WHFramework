@@ -196,10 +196,8 @@ void FVoxelCollisionPresenter::RequestCollision(
 			? EVoxelWorkClass::Critical
 			: EVoxelWorkClass::Interactive;
 
-	Request.DistanceScore = InDemand.Priority > 0.0
-		? 1.0 / InDemand.Priority
-		: MAX_dbl;
-	Request.ForwardScore = InDemand.Priority;
+	Request.DistanceScore = InDemand.DistanceCells;
+	Request.ForwardScore = InDemand.ForwardScore;
 
 	Request.Stamp =
 		Stamp;

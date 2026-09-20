@@ -4,6 +4,8 @@
 #include "EngineGlobals.h"
 #include "Voxel/Streaming/VoxelInterestManager.h"
 #include "Voxel/Streaming/VoxelResidencyManager.h"
+#include "Voxel/Rendering/VoxelViewManager.h"
+#include "Voxel/Task/VoxelTaskScheduler.h"
 #include "Voxel/Tests/VoxelTestUtilities.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -123,6 +125,128 @@ bool FVoxelResidencyPinTest::RunTest(const FString& InParameters)
 	GFrameCounter = PreviousFrameCounter;
 	TestNull(TEXT("Unpinned undemanded section evicts"), Runtime.FindSection(SectionKey));
 	TestEqual(TEXT("Eviction callback runs once"), Evictions, 1);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelStreamingViewNearestFirstTest,
+	"WHFramework.Voxel.Streaming.View.NearestFirst",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelStreamingViewNearestFirstTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	TArray<FVoxelViewAdmission> Admissions;
+	Admissions.Add({ EVoxelViewAdmissionKind::Macro, 512.0 });
+	Admissions.Add({ EVoxelViewAdmissionKind::Surface, 32.0 });
+	Admissions.Add({ EVoxelViewAdmissionKind::VoxelProxy, 128.0 });
+	FVoxelViewManager::SortAdmissionsByPriority(Admissions);
+	TestEqual(TEXT("Nearest admission is first"), Admissions[0].DistanceCells, 32.0);
+	TestEqual(TEXT("Middle admission is second"), Admissions[1].DistanceCells, 128.0);
+	TestEqual(TEXT("Farthest admission is last"), Admissions[2].DistanceCells, 512.0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelStreamingViewFrontierBlocksFarTileTest,
+	"WHFramework.Voxel.Streaming.View.FrontierBlocksFarTile",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelStreamingViewFrontierBlocksFarTileTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const TArray<FVoxelViewAdmission> Admissions = {
+		{ EVoxelViewAdmissionKind::Fine, 64.0 },
+		{ EVoxelViewAdmissionKind::Surface, 256.0 }
+	};
+	const double Frontier = FVoxelViewManager::ResolveAdmissionFrontier(
+		Admissions,
+		[](const FVoxelViewAdmission&) { return false; },
+		64.0);
+	TestEqual(TEXT("Nearest unfinished ring defines the frontier"), Frontier, 128.0);
+	TestTrue(TEXT("Far tile is outside the frontier"), Admissions[1].DistanceCells > Frontier);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelStreamingViewFrontierAdvancesTest,
+	"WHFramework.Voxel.Streaming.View.FrontierAdvances",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelStreamingViewFrontierAdvancesTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const TArray<FVoxelViewAdmission> Admissions = {
+		{ EVoxelViewAdmissionKind::Fine, 32.0 },
+		{ EVoxelViewAdmissionKind::VoxelProxy, 96.0 },
+		{ EVoxelViewAdmissionKind::Surface, 192.0 }
+	};
+	const double Initial = FVoxelViewManager::ResolveAdmissionFrontier(
+		Admissions,
+		[](const FVoxelViewAdmission&) { return false; },
+		64.0);
+	const double Advanced = FVoxelViewManager::ResolveAdmissionFrontier(
+		Admissions,
+		[](const FVoxelViewAdmission& Admission) { return Admission.DistanceCells < 192.0; },
+		64.0);
+	TestEqual(TEXT("Initial frontier covers only the nearest band"), Initial, 96.0);
+	TestEqual(TEXT("Ready near rings advance the frontier"), Advanced, 256.0);
+	TestTrue(TEXT("Far ring becomes admissible"), Admissions[2].DistanceCells <= Advanced);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelStreamingViewDistanceScoreTest,
+	"WHFramework.Voxel.Streaming.View.DistanceScore",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelStreamingViewDistanceScoreTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelWorldManifest Manifest;
+	Manifest.Settings.MinZ = -128;
+	Manifest.Settings.MaxZ = 128;
+	FVoxelStreamingSource Source;
+	Source.Center = FIntVector::ZeroValue;
+	Source.ExactRadius = 64;
+	Source.CollisionRadius = 64;
+	Source.RenderMode = EVoxelStreamingRenderMode::FineOnly;
+	const FVoxelInterestSet Interest = FVoxelInterestManager().Compute(
+		MakeArrayView(&Source, 1), Manifest, FVoxelViewSettings());
+	const FVoxelExactDemand* Center = Interest.Exact.Find(FIntVector::ZeroValue);
+	TestNotNull(TEXT("Center demand exists"), Center);
+	double MinimumDistance = TNumericLimits<double>::Max();
+	double MaximumDistance = 0.0;
+	for (const TPair<FIntVector, FVoxelExactDemand>& Pair : Interest.Exact)
+	{
+		TestTrue(TEXT("Demand distance is finite"), FMath::IsFinite(Pair.Value.DistanceCells));
+		MinimumDistance = FMath::Min(MinimumDistance, Pair.Value.DistanceCells);
+		MaximumDistance = FMath::Max(MaximumDistance, Pair.Value.DistanceCells);
+	}
+	if (Center)
+	{
+		TestEqual(TEXT("Observer section has the minimum center distance"), Center->DistanceCells, MinimumDistance);
+	}
+	TestTrue(TEXT("Off-center demand carries a larger real distance score"), MaximumDistance > MinimumDistance);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelStreamingSchedulerVisualDistanceFirstTest,
+	"WHFramework.Voxel.Streaming.Scheduler.VisualDistanceFirst",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelStreamingSchedulerVisualDistanceFirstTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelTaskRequest Near;
+	Near.WorkClass = EVoxelWorkClass::Background;
+	Near.DistanceScore = 32.0;
+	FVoxelTaskRequest Far;
+	Far.WorkClass = EVoxelWorkClass::Visible;
+	Far.DistanceScore = 512.0;
+	TestTrue(TEXT("Near visual work outranks far visual work"), FVoxelTaskScheduler::IsHigherPriority(Near, Far));
+	TestFalse(TEXT("Far visual work does not outrank near visual work"), FVoxelTaskScheduler::IsHigherPriority(Far, Near));
 	return true;
 }
 

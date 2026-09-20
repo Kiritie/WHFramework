@@ -90,7 +90,7 @@ void FVoxelEcologyGenerator::BuildTrees(
 	const FVoxelGenerationBounds& InBounds,
 	TFunctionRef<bool(const FIntVector&, FVoxelColumnSample&)> InSampleColumn,
 	TFunctionRef<bool(const FIntVector&, uint32&)> InSampleBaseSymbol,
-	TArray<FVoxelEcologyPlanWrite>& InOutWrites,
+	FVoxelEcologyPlan& InOutPlan,
 	const TAtomic<bool>* InCancel) const
 {
 	const FVoxelTreeGenerationSettings& Settings = Recipe->Settings.Ecology.Tree;
@@ -110,6 +110,7 @@ void FVoxelEcologyGenerator::BuildTrees(
 	{
 		for (int32 GridX = MinGridX; GridX <= MaxGridX; ++GridX)
 		{
+			++InOutPlan.TreeCandidates;
 			if (InCancel && InCancel->Load())
 			{
 				return;
@@ -152,11 +153,12 @@ void FVoxelEcologyGenerator::BuildTrees(
 
 			const FVoxelStableId OwnerId = VoxelGeneration::MakeStableId(
 				Recipe->Settings.Seed, Anchor, TreeSalt);
+			++InOutPlan.TreesAccepted;
 			const int32 Height = VoxelGeneration::RandomRange(
 				VoxelGeneration::Mix(CandidateSeed ^ TreeHeightSalt), Settings.MinHeight, Settings.MaxHeight);
 			for (int32 Z = 0; Z < Height; ++Z)
 			{
-				InOutWrites.Add({Anchor + FIntVector(0, 0, Z), Recipe->Ecology.TreeTrunk, TrunkPriority, OwnerId});
+				InOutPlan.Writes.Add({Anchor + FIntVector(0, 0, Z), Recipe->Ecology.TreeTrunk, TrunkPriority, OwnerId});
 			}
 
 			const FIntVector CrownCenter = Anchor + FIntVector(0, 0, Height - 1);
@@ -175,7 +177,7 @@ void FVoxelEcologyGenerator::BuildTrees(
 						{
 							continue;
 						}
-						InOutWrites.Add({Position, Recipe->Ecology.TreeLeaves, LeafPriority, OwnerId});
+						InOutPlan.Writes.Add({Position, Recipe->Ecology.TreeLeaves, LeafPriority, OwnerId});
 					}
 				}
 			}
@@ -187,7 +189,7 @@ void FVoxelEcologyGenerator::BuildGrass(
 	const FVoxelGenerationBounds& InBounds,
 	TFunctionRef<bool(const FIntVector&, FVoxelColumnSample&)> InSampleColumn,
 	TFunctionRef<bool(const FIntVector&, uint32&)> InSampleBaseSymbol,
-	TArray<FVoxelEcologyPlanWrite>& InOutWrites,
+	FVoxelEcologyPlan& InOutPlan,
 	const TAtomic<bool>* InCancel) const
 {
 	const FVoxelGrassGenerationSettings& Settings = Recipe->Settings.Ecology.Grass;
@@ -218,6 +220,7 @@ void FVoxelEcologyGenerator::BuildGrass(
 			const int32 OffsetY = VoxelGeneration::RandomRange(
 				VoxelGeneration::Mix(CandidateSeed ^ 0x5A738CB14268F9E1ull), 0, Spacing - 1);
 			const FIntVector PatchCenter(GridX * Spacing + OffsetX, GridY * Spacing + OffsetY, 0);
+			++InOutPlan.GrassPatchCandidates;
 			if (PatchCenter.X < InBounds.Min.X || PatchCenter.X >= InBounds.Max.X ||
 				PatchCenter.Y < InBounds.Min.Y || PatchCenter.Y >= InBounds.Max.Y ||
 				VoxelGeneration::RandomRange(VoxelGeneration::Mix(CandidateSeed), 0, 999) >= Chance)
@@ -257,7 +260,8 @@ void FVoxelEcologyGenerator::BuildGrass(
 					{
 						continue;
 					}
-					InOutWrites.Add({SurfacePosition, Recipe->Ecology.GrassPlant, GrassPriority, OwnerId});
+					InOutPlan.Writes.Add({SurfacePosition, Recipe->Ecology.GrassPlant, GrassPriority, OwnerId});
+					++InOutPlan.GrassWrites;
 				}
 			}
 		}
@@ -281,19 +285,36 @@ bool FVoxelEcologyGenerator::BuildPlan(
 
 	FVoxelEcologyPlan Plan;
 	Plan.Bounds = InBounds;
-	BuildTrees(InBounds, InSampleColumn, InSampleBaseSymbol, Plan.Writes, InCancel);
+	BuildTrees(InBounds, InSampleColumn, InSampleBaseSymbol, Plan, InCancel);
 	if (InCancel && InCancel->Load())
 	{
 		OutError = TEXT("Canceled");
 		return false;
 	}
-	BuildGrass(InBounds, InSampleColumn, InSampleBaseSymbol, Plan.Writes, InCancel);
+	BuildGrass(InBounds, InSampleColumn, InSampleBaseSymbol, Plan, InCancel);
 	if (InCancel && InCancel->Load())
 	{
 		OutError = TEXT("Canceled");
 		return false;
 	}
 	Plan.Finalize();
+
+#if !UE_BUILD_SHIPPING
+	UE_LOG(
+		LogTemp,
+		VeryVerbose,
+		TEXT("Voxel ecology bounds=(%d,%d)-(%d,%d) tree=%d/%d grassPatches=%d grassWrites=%d totalWrites=%d"),
+		InBounds.Min.X,
+		InBounds.Min.Y,
+		InBounds.Max.X,
+		InBounds.Max.Y,
+		Plan.TreesAccepted,
+		Plan.TreeCandidates,
+		Plan.GrassPatchCandidates,
+		Plan.GrassWrites,
+		Plan.Writes.Num());
+#endif
+
 	OutPlan = MoveTemp(Plan);
 	OutError.Reset();
 	return true;

@@ -12,7 +12,7 @@ struct FVoxelStructurePieceTemplate;
 class WHFRAMEWORKEDITOR_API FVoxelGenerationCompiler
 {
 public:
-	static constexpr int32 CurrentBakeVersion = 4;
+	static constexpr int32 CurrentBakeVersion = 5;
 
 public:
 	static bool Compile(UVoxelWorldGenerationProfile& InOutProfile, const FVoxelRegistrySnapshot& InRegistry, FString& OutError);

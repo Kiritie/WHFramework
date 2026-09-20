@@ -11,6 +11,23 @@
 #include "Voxel/Rendering/VoxelWaterView.h"
 #include "Voxel/Save/VoxelDeltaTypes.h"
 
+namespace
+{
+	bool IsVisualWorkClass(const EVoxelWorkClass InClass)
+	{
+		switch (InClass)
+		{
+		case EVoxelWorkClass::Visible:
+		case EVoxelWorkClass::Boundary:
+		case EVoxelWorkClass::Exploration:
+		case EVoxelWorkClass::Background:
+			return true;
+		default:
+			return false;
+		}
+	}
+}
+
 bool FVoxelTaskStamp::operator==(const FVoxelTaskStamp& InOther) const
 {
 	return WorldEpoch == InOther.WorldEpoch &&
@@ -377,6 +394,31 @@ void FVoxelTaskScheduler::CancelSection(
 	}
 }
 
+void FVoxelTaskScheduler::CancelMatching(
+	TFunctionRef<bool(EVoxelTaskKind, const FVoxelTaskStamp&)> InPredicate)
+{
+	check(IsInGameThread());
+	for (int32 Index = Pending.Num() - 1; Index >= 0; --Index)
+	{
+		if (!InPredicate(Pending[Index].Kind, Pending[Index].Stamp))
+		{
+			continue;
+		}
+		QueuedInputBytes -= Pending[Index].InputBytes;
+		FVoxelTaskRequest Request = MoveTemp(Pending[Index]);
+		Pending.RemoveAtSwap(Index, 1, EAllowShrinking::No);
+		RemoveActive(Request.Stamp, Request.Kind, Request.WorkClass);
+		QueueCanceled(MoveTemp(Request));
+	}
+	for (FRunning& Task : Running)
+	{
+		if (InPredicate(Task.Kind, Task.Stamp))
+		{
+			Task.Slot->Cancel.Store(true);
+		}
+	}
+}
+
 void FVoxelTaskScheduler::StopAndJoin()
 {
 	if (bStopped &&
@@ -529,8 +571,13 @@ bool FVoxelTaskScheduler::IsHigherPriority(
 	const FVoxelTaskRequest& InA,
 	const FVoxelTaskRequest& InB)
 {
-	if (InA.WorkClass !=
-		InB.WorkClass)
+	const bool bAVisual = IsVisualWorkClass(InA.WorkClass);
+	const bool bBVisual = IsVisualWorkClass(InB.WorkClass);
+	if (bAVisual != bBVisual)
+	{
+		return !bAVisual;
+	}
+	if (!bAVisual && InA.WorkClass != InB.WorkClass)
 	{
 		return
 			static_cast<uint8>(
@@ -538,13 +585,16 @@ bool FVoxelTaskScheduler::IsHigherPriority(
 			static_cast<uint8>(
 				InB.WorkClass);
 	}
-
 	if (InA.DistanceScore !=
 		InB.DistanceScore)
 	{
 		return
 			InA.DistanceScore <
 			InB.DistanceScore;
+	}
+	if (bAVisual && InA.WorkClass != InB.WorkClass)
+	{
+		return static_cast<uint8>(InA.WorkClass) < static_cast<uint8>(InB.WorkClass);
 	}
 
 	if (InA.ForwardScore !=

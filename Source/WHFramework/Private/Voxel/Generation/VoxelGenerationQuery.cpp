@@ -6,8 +6,7 @@
 #include "Voxel/Generation/Caves/VoxelCaveGenerator.h"
 #include "Voxel/Generation/Climate/VoxelClimateGenerator.h"
 #include "Voxel/Generation/Ecology/VoxelEcology.h"
-#include "Voxel/Generation/Hydrology/VoxelLakeGenerator.h"
-#include "Voxel/Generation/Hydrology/VoxelRiverGenerator.h"
+#include "Voxel/Generation/Hydrology/VoxelHydrologyPlanner.h"
 #include "Voxel/Generation/Surface/VoxelSurfaceGenerator.h"
 #include "Voxel/Generation/Terrain/VoxelTerrainGenerator.h"
 #include "Voxel/Generation/VoxelFeature.h"
@@ -77,24 +76,13 @@ bool FVoxelGenerationQuery::Create(
 				InConfig->Recipe.
 					ToSharedRef());
 
-	Query.River =
+	Query.Hydrology =
 		MakeShared<
-			FVoxelRiverGenerator,
+			FVoxelHydrologyPlanner,
 			ESPMode::ThreadSafe>(
 				InConfig->Recipe.
 					ToSharedRef(),
 				Query.Terrain.
-					ToSharedRef());
-
-	Query.Lake =
-		MakeShared<
-			FVoxelLakeGenerator,
-			ESPMode::ThreadSafe>(
-				InConfig->Recipe.
-					ToSharedRef(),
-				Query.Terrain.
-					ToSharedRef(),
-				Query.River.
 					ToSharedRef());
 
 	Query.Cave =
@@ -194,27 +182,33 @@ bool FVoxelGenerationQuery::Prepare(
 			PlanningMargin);
 
 	auto ColumnSampler =
-		[this](
+		[this, InCancel](
 			const FIntVector& InPosition,
 			FVoxelColumnSample& OutColumn)
 		{
-			return SampleBaseColumn(
+			FString Error;
+			return SampleEnvironmentColumn(
 				InPosition.X,
 				InPosition.Y,
-				OutColumn);
+				OutColumn,
+				Error,
+				InCancel);
 		};
 
 	auto SymbolSampler =
-		[this](
+		[this, InCancel](
 			const FIntVector& InPosition,
 			uint32& OutSymbol)
 		{
 			FVoxelColumnSample Column;
 
-			if (!SampleBaseColumn(
+			FString Error;
+			if (!SampleEnvironmentColumn(
 				InPosition.X,
 				InPosition.Y,
-				Column))
+				Column,
+				Error,
+				InCancel))
 			{
 				return false;
 			}
@@ -315,29 +309,6 @@ bool FVoxelGenerationQuery::Prepare(
 
 			PreparedCaves.Add(
 				CavePlan);
-
-			FVoxelEcologyPlanPtr EcologyPlan;
-			if (!Cache->GetOrBuildEcology(
-				Key,
-				[this, TileBounds, &ColumnSampler, &SymbolSampler, InCancel](
-					FVoxelEcologyPlan& OutPlan,
-					FString& BuildError)
-				{
-					return Ecology->BuildPlan(
-						TileBounds,
-						ColumnSampler,
-						SymbolSampler,
-						OutPlan,
-						BuildError,
-						InCancel);
-				},
-				EcologyPlan,
-				OutError,
-				InCancel))
-			{
-				return false;
-			}
-			PreparedEcology.Add(EcologyPlan);
 
 			FVoxelStructurePlanPtr StructurePlan;
 
@@ -522,6 +493,40 @@ bool FVoxelGenerationQuery::Prepare(
 		}
 	}
 
+	const int32 EcologyMargin = FMath::Max(
+		Config->Recipe->Settings.Ecology.Tree.CrownRadius,
+		Config->Recipe->Settings.Ecology.Grass.PatchRadius) + 2;
+	const int32 EcologyMinX = VoxelGeneration::FloorDivide(InBounds.Min.X - EcologyMargin, EcologyTileSide);
+	const int32 EcologyMaxX = VoxelGeneration::FloorDivide(InBounds.Max.X - 1 + EcologyMargin, EcologyTileSide);
+	const int32 EcologyMinY = VoxelGeneration::FloorDivide(InBounds.Min.Y - EcologyMargin, EcologyTileSide);
+	const int32 EcologyMaxY = VoxelGeneration::FloorDivide(InBounds.Max.Y - 1 + EcologyMargin, EcologyTileSide);
+	for (int32 TileY = EcologyMinY; TileY <= EcologyMaxY; ++TileY)
+	{
+		for (int32 TileX = EcologyMinX; TileX <= EcologyMaxX; ++TileX)
+		{
+			const FVoxelEcologyTileKey Key { FIntPoint(TileX, TileY) };
+			const FIntPoint MinXY = Key.Coordinate * EcologyTileSide;
+			const FVoxelGenerationBounds Bounds {
+				FIntVector(MinXY.X, MinXY.Y, Config->Recipe->Settings.MinZ),
+				FIntVector(MinXY.X + EcologyTileSide, MinXY.Y + EcologyTileSide, Config->Recipe->Settings.MaxZ)
+			};
+			FVoxelEcologyPlanPtr Plan;
+			if (!Cache->GetOrBuildEcology(
+				Key,
+				[this, Bounds, &ColumnSampler, &SymbolSampler, InCancel](FVoxelEcologyPlan& OutPlan, FString& BuildError)
+				{
+					return Ecology->BuildPlan(Bounds, ColumnSampler, SymbolSampler, OutPlan, BuildError, InCancel);
+				},
+				Plan,
+				OutError,
+				InCancel))
+			{
+				return false;
+			}
+			PreparedEcology.Add(Plan);
+		}
+	}
+
 	bSymbolsPrepared = true;
 
 	OutError.Reset();
@@ -538,11 +543,17 @@ bool FVoxelGenerationQuery::PrepareStructuresOnly(
 		return false;
 	}
 
-	auto ColumnSampler = [this](
+	auto ColumnSampler = [this, InCancel](
 		const FIntVector& InPosition,
 		FVoxelColumnSample& OutColumn)
 	{
-		return SampleBaseColumn(InPosition.X, InPosition.Y, OutColumn);
+		FString Error;
+		return SampleEnvironmentColumn(
+			InPosition.X,
+			InPosition.Y,
+			OutColumn,
+			Error,
+			InCancel);
 	};
 
 	const FVoxelGenerationBounds PlanningBounds = InBounds.Expand(VoxelGenerationPlanTileSide);
@@ -615,36 +626,42 @@ bool FVoxelGenerationQuery::PrepareStructuresOnly(
 	return true;
 }
 
-bool FVoxelGenerationQuery::SampleBaseColumn(
+bool FVoxelGenerationQuery::GetBaseColumn(
 	const int32 InX,
 	const int32 InY,
-	FVoxelColumnSample& OutColumn) const
+	FVoxelColumnSample& OutColumn,
+	FString& OutError,
+	const TAtomic<bool>* InCancel) const
 {
-	if (Cancel && Cancel->Load())
+	if (InCancel && InCancel->Load())
 	{
+		OutError = TEXT("Canceled");
 		return false;
 	}
 
-	const FIntPoint Position(InX, InY);
-	FVoxelNaturalColumnEntryPtr Entry;
-	FString Error;
-	const bool bBuilt = Cache->GetOrBuildNaturalColumn(
-		Position,
-		[this, InX, InY](FVoxelNaturalColumnEntry& OutEntry, FString& BuildError)
+	FVoxelBaseColumnEntryPtr Entry;
+	if (!Cache->GetOrBuildBaseColumn(
+		FIntPoint(InX, InY),
+		[this, InX, InY](FVoxelBaseColumnEntry& OutEntry, FString& BuildError)
 		{
 			OutEntry.Position = FIntPoint(InX, InY);
-			return ComputeNaturalColumn(InX, InY, OutEntry.Column, BuildError);
+			if (!ComputeBaseColumn(InX, InY, OutEntry.Column))
+			{
+				BuildError = TEXT("Voxel base column generation failed");
+				return false;
+			}
+			BuildError.Reset();
+			return true;
 		},
 		Entry,
-		Error,
-		Cancel);
-
-	if (!bBuilt || !Entry)
+		OutError,
+		InCancel) || !Entry)
 	{
 		return false;
 	}
 
 	OutColumn = Entry->Column;
+	OutError.Reset();
 	return true;
 }
 
@@ -726,124 +743,132 @@ bool FVoxelGenerationQuery::ComputeNaturalColumn(
 	const int32 InX,
 	const int32 InY,
 	FVoxelColumnSample& OutColumn,
-	FString& OutError) const
+	FString& OutError,
+	const TAtomic<bool>* InCancel) const
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_NaturalColumn);
 
-	if (Cancel && Cancel->Load())
-	{
-		OutError = TEXT("Canceled");
-		return false;
-	}
-
-	FVoxelBaseColumnEntryPtr BaseEntry;
-	if (!Cache->GetOrBuildBaseColumn(
-		FIntPoint(InX, InY),
-		[this, InX, InY](FVoxelBaseColumnEntry& OutEntry, FString& BuildError)
-		{
-			OutEntry.Position = FIntPoint(InX, InY);
-			if (!ComputeBaseColumn(InX, InY, OutEntry.Column))
-			{
-				BuildError = TEXT("Voxel base column generation failed");
-				return false;
-			}
-			BuildError.Reset();
-			return true;
-		},
-		BaseEntry,
-		OutError,
-		Cancel) || !BaseEntry)
+	FVoxelColumnSample Column;
+	if (!GetBaseColumn(InX, InY, Column, OutError, InCancel))
 	{
 		return false;
 	}
 
-	FVoxelColumnSample Column = BaseEntry->Column;
-	if (!Column.bOcean)
+	if (!ApplyHydrology(InX, InY, Column, OutError, InCancel))
 	{
-		const FVoxelNaturalTileKey RiverKey = VoxelNaturalTileKeyFromCell(InX, InY);
-		FVoxelRiverFieldTilePtr RiverTile;
-		auto BaseColumnLookup = [this](
-			const int32 X,
-			const int32 Y,
-			FVoxelColumnSample& OutBase,
-			FString& Error)
-		{
-			FVoxelBaseColumnEntryPtr Entry;
-			if (!Cache->GetOrBuildBaseColumn(
-				FIntPoint(X, Y),
-				[this, X, Y](FVoxelBaseColumnEntry& OutEntry, FString& BuildError)
-				{
-					OutEntry.Position = FIntPoint(X, Y);
-					if (!ComputeBaseColumn(X, Y, OutEntry.Column))
-					{
-						BuildError = TEXT("Voxel base column generation failed");
-						return false;
-					}
-					BuildError.Reset();
-					return true;
-			},
-			Entry,
-			Error,
-			Cancel) || !Entry)
-			{
-				return false;
-			}
-			OutBase = Entry->Column;
-			return true;
-		};
-
-		if (!Cache->GetOrBuildRiverField(
-			RiverKey,
-			[this, RiverKey, &BaseColumnLookup](FVoxelRiverFieldTile& OutTile, FString& BuildError)
-			{
-				return River->BuildFieldTile(RiverKey, BaseColumnLookup, OutTile, BuildError, Cancel);
-			},
-			RiverTile,
-			OutError,
-			Cancel) || !RiverTile)
-		{
-			return false;
-		}
-
-		FVoxelRiverFieldSample RiverSample;
-		if (!RiverTile->Sample(InX, InY, RiverSample))
-		{
-			OutError = TEXT("Voxel river field tile did not contain the requested column");
-			return false;
-		}
-		River->ApplyToColumn(InX, InY, RiverSample, Column);
-
-		const int32 AnchorX = VoxelGeneration::FloorDivide(InX, FVoxelLakeGenerator::AnchorSide);
-		const int32 AnchorY = VoxelGeneration::FloorDivide(InY, FVoxelLakeGenerator::AnchorSide);
-		for (int32 OffsetY = -1; OffsetY <= 1; ++OffsetY)
-		{
-			for (int32 OffsetX = -1; OffsetX <= 1; ++OffsetX)
-			{
-				const FVoxelLakeAnchorKey LakeKey { FIntPoint(AnchorX + OffsetX, AnchorY + OffsetY) };
-				FVoxelLakeAnchorPlanPtr LakePlan;
-				if (!Cache->GetOrBuildLake(
-					LakeKey,
-					[this, LakeKey](FVoxelLakeAnchorPlan& OutPlan, FString& BuildError)
-					{
-						return Lake->BuildPlan(LakeKey, OutPlan, BuildError, Cancel);
-					},
-					LakePlan,
-					OutError,
-					Cancel))
-				{
-					return false;
-				}
-				if (LakePlan)
-				{
-					Lake->ApplyFeature(*LakePlan, InX, InY, Column);
-				}
-			}
-		}
+		return false;
 	}
 
 	Column.DensityHeight = Column.SurfaceZ;
 	Surface->ResolveColumn(Column);
 	OutColumn = Column;
+	OutError.Reset();
+	return true;
+}
+
+FVoxelHydrologyRegionKey FVoxelGenerationQuery::HydrologyRegionForVoxel(
+	const int32 InX,
+	const int32 InY) const
+{
+	const FVoxelGenerationSettings& Settings = Config->Recipe->Settings;
+	const int32 CellSize = FMath::Max(1, Settings.HydrologyCellSize);
+	const int32 RegionSide = FMath::Max(1, Settings.HydrologyRegionSide);
+	return { FIntPoint(
+		VoxelGeneration::FloorDivide(VoxelGeneration::FloorDivide(InX, CellSize), RegionSide),
+		VoxelGeneration::FloorDivide(VoxelGeneration::FloorDivide(InY, CellSize), RegionSide)) };
+}
+
+bool FVoxelGenerationQuery::ApplyHydrology(
+	const int32 InX,
+	const int32 InY,
+	FVoxelColumnSample& InOutColumn,
+	FString& OutError,
+	const TAtomic<bool>* InCancel) const
+{
+	const FVoxelHydrologyRegionKey Key = HydrologyRegionForVoxel(InX, InY);
+	FVoxelHydrologyPlanPtr Plan;
+	if (!Cache->GetOrBuildHydrology(
+		Key,
+		[this, Key, InCancel](FVoxelHydrologyPlan& OutPlan, FString& BuildError)
+		{
+			return Hydrology->BuildPlan(Key, OutPlan, BuildError, InCancel);
+		},
+		Plan,
+		OutError,
+		InCancel) || !Plan)
+	{
+		return false;
+	}
+
+	FVoxelHydrologyInfluence Influence;
+	if (!Plan->Sample(InX, InY, InOutColumn.SurfaceZ, Influence))
+	{
+		OutError.Reset();
+		return true;
+	}
+
+	if (Influence.GroundOverrideZ != MIN_int32)
+	{
+		InOutColumn.SurfaceZ = Influence.GroundOverrideZ;
+	}
+	InOutColumn.SurfaceWaterZ = Influence.SurfaceWaterZ;
+	InOutColumn.bRiver = Influence.bRiver;
+	InOutColumn.bLake = Influence.bLake;
+	InOutColumn.bOcean = Influence.bOcean;
+	InOutColumn.bCoast = Influence.bCoast;
+	OutError.Reset();
+	return true;
+}
+
+bool FVoxelGenerationQuery::SampleEnvironmentColumn(
+	const int32 InX,
+	const int32 InY,
+	FVoxelColumnSample& OutColumn,
+	FString& OutError,
+	const TAtomic<bool>* InCancel) const
+{
+	FVoxelNaturalColumnEntryPtr Entry;
+	if (!Cache->GetOrBuildNaturalColumn(
+		FIntPoint(InX, InY),
+		[this, InX, InY, InCancel](FVoxelNaturalColumnEntry& OutEntry, FString& BuildError)
+		{
+			OutEntry.Position = FIntPoint(InX, InY);
+			return ComputeNaturalColumn(InX, InY, OutEntry.Column, BuildError, InCancel);
+		},
+		Entry,
+		OutError,
+		InCancel) || !Entry)
+	{
+		return false;
+	}
+	OutColumn = Entry->Column;
+	OutError.Reset();
+	return true;
+}
+
+bool FVoxelGenerationQuery::ResolveSurfaceCandidate(
+	const int32 InX,
+	const int32 InY,
+	FVoxelSurfaceCandidate& OutCandidate,
+	FString& OutError,
+	const TAtomic<bool>* InCancel) const
+{
+	FVoxelColumnSample Column;
+	if (!SampleEnvironmentColumn(InX, InY, Column, OutError, InCancel))
+	{
+		return false;
+	}
+	OutCandidate.XY = FIntPoint(InX, InY);
+	OutCandidate.GroundZ = Column.SurfaceZ;
+	OutCandidate.WaterZ = Column.SurfaceWaterZ;
+	OutCandidate.SlopePermille = Column.SlopePermille;
+	OutCandidate.BiomeIndex = Column.BiomeIndex;
+	OutCandidate.bRiver = Column.bRiver;
+	OutCandidate.bLake = Column.bLake;
+	OutCandidate.bOcean = Column.bOcean;
+	OutCandidate.bCoast = Column.bCoast;
+	OutCandidate.bValid = Column.SurfaceZ >= Config->Recipe->Settings.MinZ &&
+		Column.SurfaceZ < Config->Recipe->Settings.MaxZ - 2;
 	OutError.Reset();
 	return true;
 }
@@ -879,14 +904,13 @@ bool FVoxelGenerationQuery::SampleColumn(
 		return false;
 	}
 
-	if (!SampleBaseColumn(
+	if (!SampleEnvironmentColumn(
 		InX,
 		InY,
-		OutColumn))
+		OutColumn,
+		OutError,
+		Cancel))
 	{
-		OutError =
-			TEXT("Voxel generation column sampling failed");
-
 		return false;
 	}
 
@@ -923,14 +947,13 @@ bool FVoxelGenerationQuery::SampleSymbol(
 
 	FVoxelColumnSample Column;
 
-	if (!SampleBaseColumn(
+	if (!SampleEnvironmentColumn(
 		InPosition.X,
 		InPosition.Y,
-		Column))
+		Column,
+		OutError,
+		Cancel))
 	{
-		OutError =
-			TEXT("Voxel generation base column sampling failed");
-
 		return false;
 	}
 
@@ -1082,12 +1105,20 @@ bool FVoxelGenerationQuery::ApplyStage(
 		{
 			break;
 		}
+		for (const FVoxelCavePlanPtr& Plan : PreparedCaves)
+		{
+			if (Plan && Plan->Carves(InPosition))
+			{
+				return true;
+			}
+		}
 		for (const FVoxelEcologyPlanPtr& Plan : PreparedEcology)
 		{
 			uint32 PlannedValue = 0;
 			if (Plan && Plan->Sample(InPosition, PlannedValue))
 			{
 				InOutValue = PlannedValue;
+				break;
 			}
 		}
 		break;

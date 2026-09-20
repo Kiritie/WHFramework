@@ -245,6 +245,27 @@ struct WHFRAMEWORK_API FVoxelGenerationSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Cave", meta = (ClampMin = "2"))
 	int32 CaveBranchRadius = 5;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Cave", meta = (ClampMin = "0", ClampMax = "1000"))
+	int32 CaveSystemChancePermille = 500;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Cave", meta = (ClampMin = "0", ClampMax = "1000"))
+	int32 CaveEntranceChancePermille = 80;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Cave", meta = (ClampMin = "4", ClampMax = "64"))
+	int32 CaveEntranceLength = 16;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Cave", meta = (ClampMin = "1", ClampMax = "4"))
+	int32 CaveEntranceDropPerStep = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Cave", meta = (ClampMin = "4", ClampMax = "64"))
+	int32 CaveEntranceTransitionDepth = 12;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Cave", meta = (ClampMin = "0", ClampMax = "1000"))
+	int32 CaveRoomChancePermille = 60;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Cave", meta = (ClampMin = "0", ClampMax = "1000"))
+	int32 CaveBranchChancePermille = 120;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Aquifer", meta = (ClampMin = "1"))
 	int32 AquiferSpacing = 128;
 
@@ -319,6 +340,20 @@ struct WHFRAMEWORK_API FVoxelColumnSample
 	bool bCoast = false;
 };
 
+struct WHFRAMEWORK_API FVoxelSurfaceCandidate
+{
+	FIntPoint XY = FIntPoint::ZeroValue;
+	int32 GroundZ = 0;
+	int32 WaterZ = MIN_int32;
+	int32 SlopePermille = 0;
+	uint16 BiomeIndex = MAX_uint16;
+	bool bRiver = false;
+	bool bLake = false;
+	bool bOcean = false;
+	bool bCoast = false;
+	bool bValid = false;
+};
+
 struct WHFRAMEWORK_API FVoxelAquiferSample
 {
 	EVoxelFluidKind Fluid = EVoxelFluidKind::None;
@@ -340,6 +375,30 @@ struct WHFRAMEWORK_API FVoxelGenerationTileKey
 };
 
 FORCEINLINE uint32 GetTypeHash(const FVoxelGenerationTileKey& InKey)
+{
+	return ::GetTypeHash(InKey.Coordinate);
+}
+
+struct WHFRAMEWORK_API FVoxelEcologyTileKey
+{
+	FIntPoint Coordinate = FIntPoint::ZeroValue;
+
+	bool operator==(const FVoxelEcologyTileKey& InOther) const
+	{
+		return Coordinate == InOther.Coordinate;
+	}
+
+	bool operator<(const FVoxelEcologyTileKey& InOther) const
+	{
+		if (Coordinate.Y != InOther.Coordinate.Y)
+		{
+			return Coordinate.Y < InOther.Coordinate.Y;
+		}
+		return Coordinate.X < InOther.Coordinate.X;
+	}
+};
+
+FORCEINLINE uint32 GetTypeHash(const FVoxelEcologyTileKey& InKey)
 {
 	return ::GetTypeHash(InKey.Coordinate);
 }
