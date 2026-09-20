@@ -8,6 +8,7 @@ class FVoxelAquiferGenerator;
 class FVoxelBiomeGenerator;
 class FVoxelCaveGenerator;
 class FVoxelClimateGenerator;
+class FVoxelEcologyGenerator;
 class FVoxelLakeGenerator;
 class FVoxelRiverGenerator;
 class FVoxelSurfaceGenerator;
@@ -91,6 +92,8 @@ private:
 	TSharedPtr<const FVoxelAquiferGenerator, ESPMode::ThreadSafe> Aquifer;
 	TSharedPtr<const FVoxelSurfaceGenerator, ESPMode::ThreadSafe> Surface;
 	TArray<FVoxelCavePlanPtr> PreparedCaves;
+	TSharedPtr<const FVoxelEcologyGenerator, ESPMode::ThreadSafe> Ecology;
+	TArray<FVoxelEcologyPlanPtr> PreparedEcology;
 	TArray<FVoxelFeaturePlanPtr> PreparedFeatures;
 	TArray<FVoxelStructurePlanPtr> PreparedStructures;
 	FVoxelGenerationBounds PreparedBounds;

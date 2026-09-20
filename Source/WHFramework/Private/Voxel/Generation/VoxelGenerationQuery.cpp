@@ -5,6 +5,7 @@
 #include "Voxel/Generation/Biome/VoxelBiomeGenerator.h"
 #include "Voxel/Generation/Caves/VoxelCaveGenerator.h"
 #include "Voxel/Generation/Climate/VoxelClimateGenerator.h"
+#include "Voxel/Generation/Ecology/VoxelEcology.h"
 #include "Voxel/Generation/Hydrology/VoxelLakeGenerator.h"
 #include "Voxel/Generation/Hydrology/VoxelRiverGenerator.h"
 #include "Voxel/Generation/Surface/VoxelSurfaceGenerator.h"
@@ -117,6 +118,10 @@ bool FVoxelGenerationQuery::Create(
 				InConfig->Recipe.
 					ToSharedRef());
 
+	Query.Ecology =
+		MakeShared<FVoxelEcologyGenerator, ESPMode::ThreadSafe>(
+			InConfig->Recipe.ToSharedRef());
+
 	OutQuery =
 		MoveTemp(Query);
 
@@ -147,6 +152,7 @@ bool FVoxelGenerationQuery::PrepareColumns(
 	}
 
 	PreparedCaves.Reset();
+	PreparedEcology.Reset();
 	PreparedFeatures.Reset();
 	PreparedStructures.Reset();
 	PreparedBounds =
@@ -301,13 +307,37 @@ bool FVoxelGenerationQuery::Prepare(
 						InCancel);
 				},
 				CavePlan,
-				OutError))
+				OutError,
+				InCancel))
 			{
 				return false;
 			}
 
 			PreparedCaves.Add(
 				CavePlan);
+
+			FVoxelEcologyPlanPtr EcologyPlan;
+			if (!Cache->GetOrBuildEcology(
+				Key,
+				[this, TileBounds, &ColumnSampler, &SymbolSampler, InCancel](
+					FVoxelEcologyPlan& OutPlan,
+					FString& BuildError)
+				{
+					return Ecology->BuildPlan(
+						TileBounds,
+						ColumnSampler,
+						SymbolSampler,
+						OutPlan,
+						BuildError,
+						InCancel);
+				},
+				EcologyPlan,
+				OutError,
+				InCancel))
+			{
+				return false;
+			}
+			PreparedEcology.Add(EcologyPlan);
 
 			FVoxelStructurePlanPtr StructurePlan;
 
@@ -396,7 +426,8 @@ bool FVoxelGenerationQuery::Prepare(
 					return true;
 				},
 				StructurePlan,
-				OutError))
+				OutError,
+				InCancel))
 			{
 				return false;
 			}
@@ -480,7 +511,8 @@ bool FVoxelGenerationQuery::Prepare(
 					return true;
 				},
 				FeaturePlan,
-				OutError))
+				OutError,
+				InCancel))
 			{
 				return false;
 			}
@@ -570,7 +602,8 @@ bool FVoxelGenerationQuery::PrepareStructuresOnly(
 					return true;
 				},
 				StructurePlan,
-				OutError))
+				OutError,
+				InCancel))
 			{
 				return false;
 			}
@@ -603,7 +636,8 @@ bool FVoxelGenerationQuery::SampleBaseColumn(
 			return ComputeNaturalColumn(InX, InY, OutEntry.Column, BuildError);
 		},
 		Entry,
-		Error);
+		Error,
+		Cancel);
 
 	if (!bBuilt || !Entry)
 	{
@@ -717,7 +751,8 @@ bool FVoxelGenerationQuery::ComputeNaturalColumn(
 			return true;
 		},
 		BaseEntry,
-		OutError) || !BaseEntry)
+		OutError,
+		Cancel) || !BaseEntry)
 	{
 		return false;
 	}
@@ -746,9 +781,10 @@ bool FVoxelGenerationQuery::ComputeNaturalColumn(
 					}
 					BuildError.Reset();
 					return true;
-				},
-				Entry,
-				Error) || !Entry)
+			},
+			Entry,
+			Error,
+			Cancel) || !Entry)
 			{
 				return false;
 			}
@@ -763,7 +799,8 @@ bool FVoxelGenerationQuery::ComputeNaturalColumn(
 				return River->BuildFieldTile(RiverKey, BaseColumnLookup, OutTile, BuildError, Cancel);
 			},
 			RiverTile,
-			OutError) || !RiverTile)
+			OutError,
+			Cancel) || !RiverTile)
 		{
 			return false;
 		}
@@ -791,7 +828,8 @@ bool FVoxelGenerationQuery::ComputeNaturalColumn(
 						return Lake->BuildPlan(LakeKey, OutPlan, BuildError, Cancel);
 					},
 					LakePlan,
-					OutError))
+					OutError,
+					Cancel))
 				{
 					return false;
 				}
@@ -907,6 +945,7 @@ bool FVoxelGenerationQuery::SampleSymbol(
 		EVoxelGenerationStage::Surface,
 		EVoxelGenerationStage::Carving,
 		EVoxelGenerationStage::HydrologyRaster,
+		EVoxelGenerationStage::BaseEcology,
 		EVoxelGenerationStage::UndergroundStructures,
 		EVoxelGenerationStage::SurfaceStructures,
 		EVoxelGenerationStage::UndergroundOres,
@@ -1038,6 +1077,21 @@ bool FVoxelGenerationQuery::ApplyStage(
 		}
 		break;
 
+	case EVoxelGenerationStage::BaseEcology:
+		if (static_cast<uint16>(InOutValue & 0xffffu) != Palette.Air)
+		{
+			break;
+		}
+		for (const FVoxelEcologyPlanPtr& Plan : PreparedEcology)
+		{
+			uint32 PlannedValue = 0;
+			if (Plan && Plan->Sample(InPosition, PlannedValue))
+			{
+				InOutValue = PlannedValue;
+			}
+		}
+		break;
+
 	case EVoxelGenerationStage::UndergroundStructures:
 	case EVoxelGenerationStage::SurfaceStructures:
 		for (const FVoxelStructurePlanPtr& Plan :
@@ -1075,15 +1129,23 @@ bool FVoxelGenerationQuery::ApplyStage(
 		{
 			uint32 PlannedValue = 0;
 
-			if (Plan &&
-				Plan->Sample(
+			if (!Plan ||
+				!Plan->Sample(
 					InPosition,
 					InStage,
 					PlannedValue))
 			{
-				InOutValue =
-					PlannedValue;
+				continue;
 			}
+
+			if ((InStage == EVoxelGenerationStage::Vegetation ||
+				 InStage == EVoxelGenerationStage::SurfaceDecoration) &&
+				static_cast<uint16>(InOutValue & 0xffffu) != Palette.Air)
+			{
+				continue;
+			}
+
+			InOutValue = PlannedValue;
 		}
 		break;
 	}

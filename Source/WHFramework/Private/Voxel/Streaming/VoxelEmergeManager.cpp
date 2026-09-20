@@ -304,7 +304,7 @@ void FVoxelEmergeManager::RequestBase(
 	Request.Kind =
 		EVoxelTaskKind::GenerateExactBase;
 
-	if (InDemand.bWarmupCollision)
+	if (InDemand.bMovementCriticalCollision || InDemand.bWarmupCollision)
 	{
 		Request.WorkClass = EVoxelWorkClass::Critical;
 	}
@@ -409,7 +409,7 @@ void FVoxelEmergeManager::ResolveOverlay(
 	Request.Kind =
 		EVoxelTaskKind::DecodeOverlay;
 
-	if (InDemand.bWarmupCollision)
+	if (InDemand.bMovementCriticalCollision || InDemand.bWarmupCollision)
 	{
 		Request.WorkClass = EVoxelWorkClass::Critical;
 	}

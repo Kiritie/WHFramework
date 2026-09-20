@@ -39,6 +39,31 @@ namespace
 		InWriter.I32(InSettings.AquiferSpacing);
 		InWriter.I32(InSettings.AquiferRadius);
 		InWriter.I32(InSettings.LavaCeiling);
+		InWriter.U8(InSettings.Ecology.Tree.bEnabled ? 1 : 0);
+		InWriter.I32(InSettings.Ecology.Tree.MinHeight);
+		InWriter.I32(InSettings.Ecology.Tree.MaxHeight);
+		InWriter.I32(InSettings.Ecology.Tree.Spacing);
+		InWriter.I32(InSettings.Ecology.Tree.DensityPermille);
+		InWriter.I32(InSettings.Ecology.Tree.ChancePermille);
+		InWriter.I32(InSettings.Ecology.Tree.CrownRadius);
+		InWriter.I32(InSettings.Ecology.Tree.MaxSlopePermille);
+		InWriter.I32(InSettings.Ecology.Tree.Temperature.Min);
+		InWriter.I32(InSettings.Ecology.Tree.Temperature.Max);
+		InWriter.I32(InSettings.Ecology.Tree.Moisture.Min);
+		InWriter.I32(InSettings.Ecology.Tree.Moisture.Max);
+		InWriter.U8(InSettings.Ecology.Tree.bAllowNearWater ? 1 : 0);
+		InWriter.U8(InSettings.Ecology.Grass.bEnabled ? 1 : 0);
+		InWriter.I32(InSettings.Ecology.Grass.Spacing);
+		InWriter.I32(InSettings.Ecology.Grass.DensityPermille);
+		InWriter.I32(InSettings.Ecology.Grass.ChancePermille);
+		InWriter.I32(InSettings.Ecology.Grass.PatchRadius);
+		InWriter.I32(InSettings.Ecology.Grass.PatchFillPermille);
+		InWriter.I32(InSettings.Ecology.Grass.MaxSlopePermille);
+		InWriter.I32(InSettings.Ecology.Grass.Temperature.Min);
+		InWriter.I32(InSettings.Ecology.Grass.Temperature.Max);
+		InWriter.I32(InSettings.Ecology.Grass.Moisture.Min);
+		InWriter.I32(InSettings.Ecology.Grass.Moisture.Max);
+		InWriter.U8(InSettings.Ecology.Grass.bAllowNearWater ? 1 : 0);
 	}
 
 	void ReadSettings(FVoxelByteReader& InReader, FVoxelGenerationSettings& OutSettings)
@@ -74,6 +99,31 @@ namespace
 		OutSettings.AquiferSpacing = InReader.I32();
 		OutSettings.AquiferRadius = InReader.I32();
 		OutSettings.LavaCeiling = InReader.I32();
+		OutSettings.Ecology.Tree.bEnabled = InReader.U8() != 0;
+		OutSettings.Ecology.Tree.MinHeight = InReader.I32();
+		OutSettings.Ecology.Tree.MaxHeight = InReader.I32();
+		OutSettings.Ecology.Tree.Spacing = InReader.I32();
+		OutSettings.Ecology.Tree.DensityPermille = InReader.I32();
+		OutSettings.Ecology.Tree.ChancePermille = InReader.I32();
+		OutSettings.Ecology.Tree.CrownRadius = InReader.I32();
+		OutSettings.Ecology.Tree.MaxSlopePermille = InReader.I32();
+		OutSettings.Ecology.Tree.Temperature.Min = InReader.I32();
+		OutSettings.Ecology.Tree.Temperature.Max = InReader.I32();
+		OutSettings.Ecology.Tree.Moisture.Min = InReader.I32();
+		OutSettings.Ecology.Tree.Moisture.Max = InReader.I32();
+		OutSettings.Ecology.Tree.bAllowNearWater = InReader.U8() != 0;
+		OutSettings.Ecology.Grass.bEnabled = InReader.U8() != 0;
+		OutSettings.Ecology.Grass.Spacing = InReader.I32();
+		OutSettings.Ecology.Grass.DensityPermille = InReader.I32();
+		OutSettings.Ecology.Grass.ChancePermille = InReader.I32();
+		OutSettings.Ecology.Grass.PatchRadius = InReader.I32();
+		OutSettings.Ecology.Grass.PatchFillPermille = InReader.I32();
+		OutSettings.Ecology.Grass.MaxSlopePermille = InReader.I32();
+		OutSettings.Ecology.Grass.Temperature.Min = InReader.I32();
+		OutSettings.Ecology.Grass.Temperature.Max = InReader.I32();
+		OutSettings.Ecology.Grass.Moisture.Min = InReader.I32();
+		OutSettings.Ecology.Grass.Moisture.Max = InReader.I32();
+		OutSettings.Ecology.Grass.bAllowNearWater = InReader.U8() != 0;
 	}
 
 	void WriteGenerationIdentity(FVoxelByteWriter& InWriter, const FVoxelWorldManifest& InManifest)

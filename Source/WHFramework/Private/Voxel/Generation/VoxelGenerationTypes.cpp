@@ -16,6 +16,91 @@ bool FVoxelGenerationRange::Validate(FString& OutError) const
 	return true;
 }
 
+bool FVoxelTreeGenerationSettings::Validate(FString& OutError) const
+{
+	if (MinHeight <= 0 || MaxHeight < MinHeight)
+	{
+		OutError = TEXT("Voxel tree height range is invalid");
+		return false;
+	}
+	if (Spacing < 4)
+	{
+		OutError = TEXT("Voxel tree spacing must be at least four cells");
+		return false;
+	}
+	if (DensityPermille < 0 || DensityPermille > 2000)
+	{
+		OutError = TEXT("Voxel tree density must be in [0, 2000] permille");
+		return false;
+	}
+	if (ChancePermille < 0 || ChancePermille > 1000)
+	{
+		OutError = TEXT("Voxel tree chance must be in [0, 1000] permille");
+		return false;
+	}
+	if (CrownRadius <= 0 || CrownRadius > Spacing / 2)
+	{
+		OutError = TEXT("Voxel tree crown radius is invalid relative to spacing");
+		return false;
+	}
+	if (MaxSlopePermille < 0)
+	{
+		OutError = TEXT("Voxel tree maximum slope cannot be negative");
+		return false;
+	}
+	if (!Temperature.Validate(OutError) || !Moisture.Validate(OutError))
+	{
+		return false;
+	}
+	OutError.Reset();
+	return true;
+}
+
+bool FVoxelGrassGenerationSettings::Validate(FString& OutError) const
+{
+	if (Spacing < 2)
+	{
+		OutError = TEXT("Voxel grass spacing must be at least two cells");
+		return false;
+	}
+	if (DensityPermille < 0 || DensityPermille > 2000)
+	{
+		OutError = TEXT("Voxel grass density must be in [0, 2000] permille");
+		return false;
+	}
+	if (ChancePermille < 0 || ChancePermille > 1000)
+	{
+		OutError = TEXT("Voxel grass chance must be in [0, 1000] permille");
+		return false;
+	}
+	if (PatchRadius < 0 || PatchRadius > Spacing)
+	{
+		OutError = TEXT("Voxel grass patch radius is invalid");
+		return false;
+	}
+	if (PatchFillPermille < 0 || PatchFillPermille > 1000)
+	{
+		OutError = TEXT("Voxel grass patch fill must be in [0, 1000] permille");
+		return false;
+	}
+	if (MaxSlopePermille < 0)
+	{
+		OutError = TEXT("Voxel grass maximum slope cannot be negative");
+		return false;
+	}
+	if (!Temperature.Validate(OutError) || !Moisture.Validate(OutError))
+	{
+		return false;
+	}
+	OutError.Reset();
+	return true;
+}
+
+bool FVoxelEcologyGenerationSettings::Validate(FString& OutError) const
+{
+	return Tree.Validate(OutError) && Grass.Validate(OutError);
+}
+
 bool FVoxelGenerationSettings::Validate(FString& OutError) const
 {
 	if (MinZ >= MaxZ) { OutError = TEXT("Voxel generation MinZ must be lower than MaxZ"); return false; }
@@ -42,6 +127,7 @@ bool FVoxelGenerationSettings::Validate(FString& OutError) const
 	if (AquiferSpacing <= 0) { OutError = TEXT("Voxel aquifer spacing must be positive"); return false; }
 	if (AquiferRadius <= 0 || AquiferRadius >= AquiferSpacing) { OutError = TEXT("Voxel aquifer radius must be smaller than aquifer spacing"); return false; }
 	if (LavaCeiling < MinZ || LavaCeiling >= MaxZ) { OutError = TEXT("Voxel lava ceiling is outside world height"); return false; }
+	if (!Ecology.Validate(OutError)) { return false; }
 	OutError.Reset();
 	return true;
 }

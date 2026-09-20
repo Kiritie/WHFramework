@@ -6,6 +6,7 @@
 #include "Voxel/Runtime/VoxelBlockState.h"
 
 struct FVoxelGenerationRuntimeConfig;
+struct FVoxelRegistrySnapshot;
 
 struct WHFRAMEWORK_API FVoxelFeatureCellWrite
 {
@@ -31,6 +32,17 @@ struct WHFRAMEWORK_API FVoxelFeatureInstance
 	TArray<FVoxelFeatureCellWrite> Writes;
 
 	uint64 GetAllocatedBytes() const;
+};
+
+struct WHFRAMEWORK_API FVoxelFeatureBakeContext
+{
+	const FVoxelRegistrySnapshot* Registry = nullptr;
+	const TMap<FName, uint16>* BlockSymbols = nullptr;
+
+	bool ResolveBlockSymbol(
+		const FPrimaryAssetId& InAssetId,
+		uint16& OutSymbol,
+		FString& OutError) const;
 };
 
 struct WHFRAMEWORK_API FVoxelFeatureQueryContext
@@ -70,12 +82,18 @@ public:
 
 	virtual uint32 GetVersion() const = 0;
 
+	virtual bool GatherReferencedBlocks(
+		const FParameter& InConfiguration,
+		TArray<FPrimaryAssetId>& OutBlockAssets,
+		FString& OutError) const = 0;
+
 	/**
 	 * Editor/Cook 时将 FParameter 转成稳定 bytes。
 	 *
 	 * Runtime 不解析 UObject / UStruct 资产。
 	 */
 	virtual bool BakeConfiguration(
+		const FVoxelFeatureBakeContext& InContext,
 		const FParameter& InConfiguration,
 		TArray<uint8>& OutBytes,
 		FString& OutError) const = 0;

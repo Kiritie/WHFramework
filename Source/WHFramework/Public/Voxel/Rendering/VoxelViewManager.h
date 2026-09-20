@@ -10,6 +10,7 @@ class UVoxelMeshComponent;
 class UVoxelModule;
 
 struct FVoxelMacroTileData;
+struct FVoxelCoverageRect;
 struct FVoxelRepresentationInvalidate;
 struct FVoxelRepresentationReply;
 struct FVoxelSectionMeshResult;
@@ -62,11 +63,21 @@ private:
 	void ResolveTransitionVisibility();
 	void CleanupRetiredRepresentations(double InNow);
 
-	bool HasReplacementForFine(const FIntVector& InSection) const;
-	bool HasFineReplacementForProxy(const FVoxelViewKey& InKey) const;
+	FVoxelCoverageRect FineCoverage(const FIntVector& InKey) const;
+	FVoxelCoverageRect VoxelProxyCoverage(const FVoxelViewKey& InKey) const;
+	FVoxelCoverageRect SurfaceCoverage(const FVoxelSurfaceTileKey& InKey) const;
+	FVoxelCoverageRect MacroCoverage(const FVoxelMacroTileKey& InKey) const;
+	void GatherReadyFineCoverage(TArray<FVoxelCoverageRect>& OutCoverage) const;
+	void GatherReadyVoxelProxyCoverage(TArray<FVoxelCoverageRect>& OutCoverage) const;
+	void GatherReadySurfaceCoverage(TArray<FVoxelCoverageRect>& OutCoverage) const;
+	void GatherReadyMacroCoverage(TArray<FVoxelCoverageRect>& OutCoverage) const;
+	bool HasHigherReplacementForProxy(const FVoxelViewKey& InKey) const;
+	bool HasReplacementForProxy(const FVoxelViewKey& InKey) const;
+	bool HasHigherReplacementForSurface(const FVoxelSurfaceTileKey& InKey) const;
 	bool HasReplacementForSurface(const FVoxelSurfaceTileKey& InKey) const;
+	bool HasHigherReplacementForMacro(const FVoxelMacroTileKey& InKey) const;
 	bool HasReplacementForMacro(const FVoxelMacroTileKey& InKey) const;
-	bool IsFineCoveredByRetainedProxy(const FIntVector& InSection) const;
+	bool HasReplacementForFine(const FIntVector& InSection) const;
 
 	void RequestFine(const FIntVector& InSection, uint64 InRevision);
 	void RequestVoxelProxy(const FVoxelViewKey& InKey);
@@ -87,6 +98,7 @@ private:
 
 private:
 	static constexpr double RetireDelaySeconds = 0.20;
+	static constexpr double MaximumRetainSeconds = 1.00;
 
 	UVoxelModule& Module;
 	FVoxelTaskScheduler& Scheduler;

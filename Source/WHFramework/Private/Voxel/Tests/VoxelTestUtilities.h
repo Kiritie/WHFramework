@@ -31,6 +31,8 @@ namespace VoxelTest
 		Recipe.Settings.AquiferSpacing = 32;
 		Recipe.Settings.AquiferRadius = 8;
 		Recipe.Settings.LavaCeiling = -48;
+		Recipe.Settings.Ecology.Tree.bEnabled = false;
+		Recipe.Settings.Ecology.Grass.bEnabled = false;
 		Recipe.BlockNames =
 		{
 			NAME_None,

@@ -51,12 +51,12 @@ bool FVoxelSceneColumnCodecTest::RunTest(const FString& InParameters)
 		FVoxelSceneColumnCodec::RelativePath(Column),
 		FString(TEXT("voxel/actors/c_-12_34.bin")));
 
-	FVoxelWorldBasicSaveData ActorData;
+	FVoxelModuleSaveData ActorData;
 	ActorData.Seed = 19;
 	FVoxelSavedSceneActor SourceActor;
 	SourceActor.Id = FGuid::NewGuid();
 	SourceActor.Data = FParameter(ActorData);
-	FVoxelWorldBasicSaveData SourceProjectData;
+	FVoxelModuleSaveData SourceProjectData;
 	SourceProjectData.Seed = 23;
 	TArray<FVoxelSavedSceneActor> SourceActors{ SourceActor };
 	FParameter DirectSource(ActorData);
@@ -111,14 +111,14 @@ bool FVoxelSceneColumnCodecTest::RunTest(const FString& InParameters)
 	if (Actors.Num() == 1)
 	{
 		TestEqual(TEXT("Actor id roundtrips"), Actors[0].Id, SourceActor.Id);
-		const FVoxelWorldBasicSaveData* DecodedActor = Actors[0].Data.GetPtr<FVoxelWorldBasicSaveData>();
+		const FVoxelModuleSaveData* DecodedActor = Actors[0].Data.GetPtr<FVoxelModuleSaveData>();
 		TestNotNull(TEXT("Actor payload type roundtrips"), DecodedActor);
 		if (DecodedActor)
 		{
 			TestEqual(TEXT("Actor payload roundtrips"), DecodedActor->Seed, 19);
 		}
 	}
-	const FVoxelWorldBasicSaveData* DecodedProject = ProjectData.GetPtr<FVoxelWorldBasicSaveData>();
+	const FVoxelModuleSaveData* DecodedProject = ProjectData.GetPtr<FVoxelModuleSaveData>();
 	TestNotNull(TEXT("Project payload type roundtrips"), DecodedProject);
 	if (DecodedProject)
 	{

@@ -8,8 +8,6 @@
 
 class UVoxelWorldGenerationProfile;
 UENUM(BlueprintType)
-enum class EVoxelWorldMode:uint8{None,Default,Preview,Prefab};
-UENUM(BlueprintType)
 enum class EVoxelWorldState:uint8{None,Initializing,Running,Closing,Failed};
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelItem:public FSaveData
@@ -49,28 +47,23 @@ struct WHFRAMEWORK_API FVoxelPrefabSaveData:public FSaveData
     UPROPERTY(EditAnywhere,BlueprintReadWrite) TArray<FVoxelPrefabCell> Cells;
 };
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelWorldBasicSaveData:public FSaveData
+struct WHFRAMEWORK_API FVoxelWorldSaveData :
+	public FSaveData
 {
-    GENERATED_BODY()
+	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSoftObjectPtr<UVoxelWorldGenerationProfile> GenerationProfile;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Seed = 1;
+
+	UPROPERTY()
+	TArray<uint8> ManifestBytes;
 };
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelWorldSaveData:public FVoxelWorldBasicSaveData
+struct WHFRAMEWORK_API FVoxelModuleSaveData :
+	public FVoxelWorldSaveData
 {
-    GENERATED_BODY()
-    UPROPERTY() TArray<uint8> ManifestBytes;
-    FVoxelWorldSaveData()=default;
-    explicit FVoxelWorldSaveData(const FVoxelWorldBasicSaveData& B):FVoxelWorldBasicSaveData(B){}
-};
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelModuleSaveData:public FVoxelWorldSaveData
-{
-    GENERATED_BODY()
-    FVoxelModuleSaveData()=default;
-    explicit FVoxelModuleSaveData(const FVoxelWorldBasicSaveData& B):FVoxelWorldSaveData(B){}
+	GENERATED_BODY()
 };

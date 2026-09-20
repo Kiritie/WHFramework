@@ -4,7 +4,7 @@
 namespace
 {
 	constexpr uint32 VoxelRecipeMagic = 0x31524356;
-	constexpr uint32 VoxelRecipeSchemaVersion = 1;
+	constexpr uint32 VoxelRecipeSchemaVersion = 2;
 	constexpr int32 MaxRecipeBytes = 32 * 1024 * 1024;
 	constexpr int32 MaxRecipeArrayCount = 1 << 20;
 
@@ -45,6 +45,68 @@ namespace
 		FVoxelGenerationRange Result;
 		Result.Min = Reader.I32();
 		Result.Max = Reader.I32();
+		return Result;
+	}
+
+	void WriteTreeSettings(FVoxelByteWriter& Writer, const FVoxelTreeGenerationSettings& Value)
+	{
+		Writer.U8(Value.bEnabled ? 1 : 0);
+		Writer.I32(Value.MinHeight);
+		Writer.I32(Value.MaxHeight);
+		Writer.I32(Value.Spacing);
+		Writer.I32(Value.DensityPermille);
+		Writer.I32(Value.ChancePermille);
+		Writer.I32(Value.CrownRadius);
+		Writer.I32(Value.MaxSlopePermille);
+		WriteRange(Writer, Value.Temperature);
+		WriteRange(Writer, Value.Moisture);
+		Writer.U8(Value.bAllowNearWater ? 1 : 0);
+	}
+
+	FVoxelTreeGenerationSettings ReadTreeSettings(FVoxelByteReader& Reader)
+	{
+		FVoxelTreeGenerationSettings Result;
+		Result.bEnabled = Reader.U8() != 0;
+		Result.MinHeight = Reader.I32();
+		Result.MaxHeight = Reader.I32();
+		Result.Spacing = Reader.I32();
+		Result.DensityPermille = Reader.I32();
+		Result.ChancePermille = Reader.I32();
+		Result.CrownRadius = Reader.I32();
+		Result.MaxSlopePermille = Reader.I32();
+		Result.Temperature = ReadRange(Reader);
+		Result.Moisture = ReadRange(Reader);
+		Result.bAllowNearWater = Reader.U8() != 0;
+		return Result;
+	}
+
+	void WriteGrassSettings(FVoxelByteWriter& Writer, const FVoxelGrassGenerationSettings& Value)
+	{
+		Writer.U8(Value.bEnabled ? 1 : 0);
+		Writer.I32(Value.Spacing);
+		Writer.I32(Value.DensityPermille);
+		Writer.I32(Value.ChancePermille);
+		Writer.I32(Value.PatchRadius);
+		Writer.I32(Value.PatchFillPermille);
+		Writer.I32(Value.MaxSlopePermille);
+		WriteRange(Writer, Value.Temperature);
+		WriteRange(Writer, Value.Moisture);
+		Writer.U8(Value.bAllowNearWater ? 1 : 0);
+	}
+
+	FVoxelGrassGenerationSettings ReadGrassSettings(FVoxelByteReader& Reader)
+	{
+		FVoxelGrassGenerationSettings Result;
+		Result.bEnabled = Reader.U8() != 0;
+		Result.Spacing = Reader.I32();
+		Result.DensityPermille = Reader.I32();
+		Result.ChancePermille = Reader.I32();
+		Result.PatchRadius = Reader.I32();
+		Result.PatchFillPermille = Reader.I32();
+		Result.MaxSlopePermille = Reader.I32();
+		Result.Temperature = ReadRange(Reader);
+		Result.Moisture = ReadRange(Reader);
+		Result.bAllowNearWater = Reader.U8() != 0;
 		return Result;
 	}
 
@@ -95,6 +157,8 @@ namespace
 		Writer.I32(Value.AquiferSpacing);
 		Writer.I32(Value.AquiferRadius);
 		Writer.I32(Value.LavaCeiling);
+		WriteTreeSettings(Writer, Value.Ecology.Tree);
+		WriteGrassSettings(Writer, Value.Ecology.Grass);
 	}
 
 	FVoxelGenerationSettings ReadSettings(FVoxelByteReader& Reader)
@@ -131,6 +195,8 @@ namespace
 		Result.AquiferSpacing = Reader.I32();
 		Result.AquiferRadius = Reader.I32();
 		Result.LavaCeiling = Reader.I32();
+		Result.Ecology.Tree = ReadTreeSettings(Reader);
+		Result.Ecology.Grass = ReadGrassSettings(Reader);
 		return Result;
 	}
 
@@ -226,6 +292,9 @@ bool FVoxelGenerationRecipeCodec::Encode(const FVoxelGenerationRecipe& Recipe, T
 	Writer.U16(Recipe.Palette.Lava);
 	Writer.U16(Recipe.Palette.Bedrock);
 	Writer.U16(Recipe.Palette.Road);
+	Writer.U16(Recipe.Ecology.TreeTrunk);
+	Writer.U16(Recipe.Ecology.TreeLeaves);
+	Writer.U16(Recipe.Ecology.GrassPlant);
 
 	Writer.U32(Recipe.SurfaceRules.Num());
 	for (const FVoxelSurfaceRuntimeRuleSet& RuleSet : Recipe.SurfaceRules)
@@ -367,6 +436,9 @@ bool FVoxelGenerationRecipeCodec::Decode(TConstArrayView<uint8> Bytes, FVoxelGen
 	Result.Palette.Lava = Reader.U16();
 	Result.Palette.Bedrock = Reader.U16();
 	Result.Palette.Road = Reader.U16();
+	Result.Ecology.TreeTrunk = Reader.U16();
+	Result.Ecology.TreeLeaves = Reader.U16();
+	Result.Ecology.GrassPlant = Reader.U16();
 
 	if (!ReadCount(Reader, Count)) return false;
 	for (int32 SetIndex = 0; SetIndex < Count; ++SetIndex)

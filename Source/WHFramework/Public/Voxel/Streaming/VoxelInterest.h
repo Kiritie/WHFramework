@@ -12,6 +12,7 @@ struct WHFRAMEWORK_API FVoxelExactDemand
 	bool bFineRender = false;
 	bool bWarmupData = false;
 	bool bWarmupCollision = false;
+	bool bMovementCriticalCollision = false;
 	double Priority = 0.0;
 };
 

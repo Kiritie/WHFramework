@@ -4,6 +4,7 @@
 #include "Voxel/VoxelEditorAssetIO.h"
 #include "Voxel/Authoring/VoxelWorldGenerationProfile.h"
 #include "Voxel/Generation/VoxelGenerationRecipe.h"
+#include "Voxel/Generation/VoxelBuiltinFeatures.h"
 #include "Voxel/Runtime/VoxelRegistry.h"
 #include "Voxel/Voxels/Data/VoxelData.h"
 #include "AssetRegistry/AssetRegistryModule.h"
@@ -22,6 +23,7 @@ int32 UVoxelWorldBakeCommandlet::Main(const FString& Params)
     auto* P=LoadObject<UVoxelWorldGenerationProfile>(nullptr,*Path);
     if(!P){UE_LOG(LogTemp,Error,TEXT("Cannot load generation profile: %s"),*Path);return 2;}
     FString E;TArray<FString> Report;
+    if(!VoxelBuiltinFeatures::Register(E)){UE_LOG(LogTemp,Error,TEXT("Builtin feature registration: %s"),*E);return 3;}
     if(!ValidateOnly)for(const auto& D:P->Details)
     {auto* A=D.LoadSynchronous();if(!A||!FVoxelDetailBaker::Bake(*A,Root,E)){UE_LOG(LogTemp,Error,TEXT("Detail bake: %s"),*E);return 3;}}
     auto& AR=FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get();AR.SearchAllAssets(true);

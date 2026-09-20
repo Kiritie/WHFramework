@@ -1,5 +1,6 @@
 #include "Voxel/VoxelModule.h"
 
+#include "Async/Async.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
@@ -9,8 +10,6 @@
 #include "Ability/PickUp/AbilityPickUpVoxel.h"
 #include "Asset/AssetModuleStatics.h"
 #include "EngineUtils.h"
-#include "Event/EventModuleStatics.h"
-#include "Event/Events/Voxel/Event_VoxelWorldModeChanged.h"
 #include "GameFramework/PlayerController.h"
 #include "Main/MainModule.h"
 #include "Misc/FileHelper.h"
@@ -20,6 +19,7 @@
 #include "Voxel/Authoring/VoxelViewProfile.h"
 #include "Voxel/Collision/VoxelCollisionPresenter.h"
 #include "Voxel/Generation/VoxelGenerationBinding.h"
+#include "Voxel/Generation/VoxelBuiltinFeatures.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelGenerationPipeline.h"
 #include "Voxel/Generation/VoxelGenerationPlanCache.h"
@@ -126,14 +126,32 @@ IMPLEMENTATION_MODULE(UVoxelModule)
 
 UVoxelModule::UVoxelModule()
 {
-	ModuleName = TEXT("VoxelModule");
-	ModuleDisplayName = FText::FromString(TEXT("Voxel Module"));
-	SaveScope = ESaveScope::World;
-	SaveDataVersion = 4;
+	ModuleName =
+		TEXT("VoxelModule");
+
+	ModuleDisplayName =
+		FText::FromString(
+			TEXT(
+				"Voxel Module"));
+
+	SaveScope =
+		ESaveScope::World;
+
+	/**
+	 * Save struct 已扁平化。
+	 * 不做旧开发存档兼容。
+	 */
+	SaveDataVersion =
+		5;
+
 	ModuleDependencies = {
 		FName(TEXT("AbilityModule")),
-		FName(TEXT("SceneModule")) };
-	WorldData = MakeUnique<FVoxelModuleSaveData>(WorldBasicData);
+		FName(TEXT("SceneModule"))
+	};
+
+	WorldData =
+		MakeUnique<
+			FVoxelModuleSaveData>();
 }
 
 UVoxelModule::~UVoxelModule()
@@ -184,6 +202,12 @@ void UVoxelModule::OnInitialize()
 {
 	Super::OnInitialize();
 	FString Error;
+	if (!VoxelBuiltinFeatures::Register(Error))
+	{
+		WorldState = EVoxelWorldState::Failed;
+		UE_LOG(LogTemp, Error, TEXT("Voxel builtin feature registration: %s"), *Error);
+		return;
+	}
 	const bool bRendering = GetWorld() && GetWorld()->GetNetMode() != NM_DedicatedServer;
 	const TArray<UVoxelData*> Assets = UAssetModuleStatics::LoadPrimaryAssets<UVoxelData>(FName(TEXT("Voxel")));
 	if (!Registry.Build(Assets, bRendering, Error))
@@ -219,7 +243,10 @@ void UVoxelModule::OnPreparatory(const EPhase InPhase)
 	if (bAutoGenerate && IsAuthority() && !Runtime && WorldState != EVoxelWorldState::Failed)
 	{
 		FString Error;
-		CreateWorldFromProfile(WorldBasicData.Seed, Error);
+		if (!CreateWorldFromProfile(DefaultWorldSeed, Error))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Voxel auto world creation: %s"), *Error);
+		}
 	}
 }
 
@@ -244,6 +271,11 @@ void UVoxelModule::OnRefresh(
 			ApplyTask(
 				MoveTemp(InResult));
 		});
+
+	if (GenerationCache)
+	{
+		GenerationCache->TickMaintenance(256);
+	}
 
 	const double Now =
 		FPlatformTime::Seconds();
@@ -298,6 +330,31 @@ void UVoxelModule::OnRefresh(
 	}
 
 	UpdateReadiness();
+
+#if !UE_BUILD_SHIPPING
+	if (Now - LastDiagnosticsLog >= 10.0)
+	{
+		LastDiagnosticsLog = Now;
+		if (GenerationCache)
+		{
+			const FVoxelGenerationCacheStats CacheStats = GenerationCache->GetStats();
+			UE_LOG(LogTemp, Display,
+				TEXT("Voxel cache: base=%d natural=%d river=%d lake=%d hydro=%d cave=%d ecology=%d feature=%d structure=%d memory=%.2fMiB waits=%llu waitMs=%.2f"),
+				CacheStats.BaseColumns,
+				CacheStats.NaturalColumns,
+				CacheStats.RiverFields,
+				CacheStats.Lakes,
+				CacheStats.Hydrology,
+				CacheStats.Caves,
+				CacheStats.Ecology,
+				CacheStats.Features,
+				CacheStats.Structures,
+				static_cast<double>(CacheStats.AllocatedBytes) / (1024.0 * 1024.0),
+				CacheStats.GateWaitCount,
+				static_cast<double>(CacheStats.GateWaitMicroseconds) / 1000.0);
+		}
+	}
+#endif
 }
 
 void UVoxelModule::OnTermination(const EPhase InPhase)
@@ -469,7 +526,7 @@ bool UVoxelModule::StartWorld(
 		return false;
 	}
 
-	GenerationCache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
+	GenerationCache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>(false);
 	Generator = MakeShared<const FVoxelGenerationPipeline, ESPMode::ThreadSafe>(
 		GenerationConfig.ToSharedRef(),
 		GenerationCache.ToSharedRef());
@@ -560,7 +617,7 @@ bool UVoxelModule::StartWorld(
 	CurrentInterest = {};
 	InterestRevision = 0;
 	LastInterestRefresh = -1.0;
-	LastNaturalCacheTrim = -1.0;
+	LastDiagnosticsLog = -1.0;
 	bInterestDirty = true;
 	ReadyStage = EVoxelWorldReadyStage::AssetsValidated;
 	ReadinessSnapshot = {};
@@ -570,6 +627,10 @@ bool UVoxelModule::StartWorld(
 	{
 		WorldData = NewWorldData();
 	}
+	WorldData->GenerationProfile =
+		WorldGenerationProfileAsset;
+	WorldData->Seed =
+		Manifest.Settings.Seed;
 	FVoxelManifestCodec::Encode(Manifest, WorldData->ManifestBytes);
 	OnWorldInitialized.Broadcast();
 	OutError.Reset();
@@ -632,14 +693,30 @@ bool UVoxelModule::StopWorld(const bool bDiscardDirty, FString& OutError)
 	InterestManager.Reset();
 	Runtime.Reset();
 	Generator.Reset();
-	GenerationCache.Reset();
+
+	/**
+	 * Generation caches can contain hundreds of thousands of immutable entries.
+	 * Their destruction is independent after all scheduler work has joined, so
+	 * release the memory off the game thread instead of blocking PIE teardown.
+	 */
+	TSharedPtr<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> RetiredGenerationCache =
+		MoveTemp(GenerationCache);
+	if (RetiredGenerationCache)
+	{
+		AsyncTask(
+			ENamedThreads::AnyBackgroundThreadNormalTask,
+			[RetiredGenerationCache = MoveTemp(RetiredGenerationCache)]() mutable
+			{
+				RetiredGenerationCache.Reset();
+			});
+	}
 	GenerationConfig.Reset();
 	Scheduler.Reset();
 	Sources.Reset();
 	CurrentInterest = {};
 	InterestRevision = 0;
 	LastInterestRefresh = -1.0;
-	LastNaturalCacheTrim = -1.0;
+	LastDiagnosticsLog = -1.0;
 	bInterestDirty = true;
 	Breaking.Reset();
 	SessionId.Invalidate();
@@ -782,6 +859,36 @@ const FVoxelRegionStore& UVoxelModule::GetRegionStore() const
 const FVoxelInterestSet& UVoxelModule::GetCurrentInterest() const
 {
 	return CurrentInterest;
+}
+
+bool UVoxelModule::EnqueueProjectBackgroundTask(FVoxelTaskRequest&& InRequest)
+{
+	check(IsInGameThread());
+	if (!Scheduler || InRequest.Kind != EVoxelTaskKind::ProjectBackground)
+	{
+		return false;
+	}
+	return Scheduler->Enqueue(MoveTemp(InRequest));
+}
+
+void UVoxelModule::SetPersistenceEnabled(const bool bInEnabled)
+{
+	bPersistenceEnabledForCurrentWorld = bInEnabled;
+}
+
+bool UVoxelModule::IsPersistenceEnabled() const
+{
+	return bPersistenceEnabledForCurrentWorld;
+}
+
+TSoftObjectPtr<UVoxelWorldGenerationProfile> UVoxelModule::GetWorldGenerationProfileAsset() const
+{
+	return WorldGenerationProfileAsset;
+}
+
+int32 UVoxelModule::GetDefaultWorldSeed() const
+{
+	return DefaultWorldSeed;
 }
 
 FGuid UVoxelModule::RegisterSource(UObject* InOwner, const FVoxelStreamingSource& InSource)
@@ -1036,22 +1143,20 @@ void UVoxelModule::RefreshInterest(
 
 	bInterestDirty = false;
 
-	if (GenerationCache &&
-		!ActiveSources.IsEmpty() &&
-		(LastNaturalCacheTrim < 0.0 ||
-			InNow - LastNaturalCacheTrim >= 5.0))
+	if (GenerationCache && !ActiveSources.IsEmpty())
 	{
-		TArray<FIntPoint> Centers;
-		Centers.Reserve(ActiveSources.Num());
+		FVoxelGenerationCacheRetention Retention;
+		Retention.Centers.Reserve(ActiveSources.Num());
 		for (const FVoxelStreamingSource& Source : ActiveSources)
 		{
-			Centers.Add(FIntPoint(Source.Center.X, Source.Center.Y));
+			Retention.Centers.Add(FIntPoint(Source.Center.X, Source.Center.Y));
 		}
-
-		GenerationCache->TrimNaturalCaches(
-			Centers,
-			ViewSettings.MacroRadius + ViewSettings.MacroTileSide * 2);
-		LastNaturalCacheTrim = InNow;
+		Retention.NaturalRadiusCells = FMath::Max(ViewSettings.SurfaceRadius, ViewSettings.VoxelProxyRadius) + 512;
+		Retention.PlanRadiusCells = Retention.NaturalRadiusCells + 512;
+		Retention.HydrologyRadiusCells = Retention.PlanRadiusCells + Manifest.Settings.HydrologyRegionSide;
+		Retention.HydrologyRegionSide = FMath::Max(8, Manifest.Settings.HydrologyRegionSide);
+		Retention.Revision = InterestRevision;
+		GenerationCache->UpdateRetention(Retention);
 	}
 }
 
@@ -1801,10 +1906,11 @@ bool UVoxelModule::ExportPrefab(
 
 bool UVoxelModule::IsSaveEnabled() const
 {
-	return Super::IsSaveEnabled() &&
+	return
+		Super::IsSaveEnabled() &&
 		!bWorldLoadRejected &&
 		IsAuthority() &&
-		WorldMode == EVoxelWorldMode::Default;
+		bPersistenceEnabledForCurrentWorld;
 }
 
 const FVoxelWorldSaveData& UVoxelModule::GetWorldData() const
@@ -1813,42 +1919,79 @@ const FVoxelWorldSaveData& UVoxelModule::GetWorldData() const
 	return *WorldData;
 }
 
-const FVoxelWorldBasicSaveData& UVoxelModule::GetWorldBasicData() const
-{
-	return WorldBasicData;
-}
-
 EVoxelWorldState UVoxelModule::GetWorldState() const
 {
 	return WorldState;
 }
 
-EVoxelWorldMode UVoxelModule::GetWorldMode() const
+bool UVoxelModule::ApplyGenerationProfileFromSave(
+	const FVoxelWorldSaveData& InData,
+	FString& OutError)
 {
-	return WorldMode;
+	TSoftObjectPtr<
+		UVoxelWorldGenerationProfile>
+		ProfileAsset =
+			InData.
+				GenerationProfile;
+
+	if (ProfileAsset.IsNull())
+	{
+		ProfileAsset =
+			WorldGenerationProfileAsset;
+	}
+
+	UVoxelWorldGenerationProfile* Profile =
+		ProfileAsset.
+			LoadSynchronous();
+
+	if (!Profile)
+	{
+		OutError =
+			FString::Printf(
+				TEXT(
+					"Voxel world generation profile could not be loaded: %s"),
+				*ProfileAsset.
+					ToSoftObjectPath().
+					ToString());
+
+		return false;
+	}
+
+	WorldGenerationProfileAsset =
+		ProfileAsset;
+
+	WorldGenerationProfile =
+		Profile;
+
+	OutError.Reset();
+	return true;
 }
 
-void UVoxelModule::SetWorldMode(const EVoxelWorldMode InWorldMode)
+TUniquePtr<FVoxelWorldSaveData>
+UVoxelModule::NewWorldData(
+	const FParameter& InBasic) const
 {
-	if (WorldMode == InWorldMode)
-	{
-		return;
-	}
-	WorldMode = InWorldMode;
-	UEventModuleStatics::BroadcastEvent<FEventVoxelWorldModeChanged>(this, { WorldMode });
-}
+	TUniquePtr<FVoxelModuleSaveData> Result =
+		MakeUnique<
+			FVoxelModuleSaveData>();
 
-TUniquePtr<FVoxelWorldSaveData> UVoxelModule::NewWorldData(const FParameter& InBasic) const
-{
-	TUniquePtr<FVoxelModuleSaveData> Result = MakeUnique<FVoxelModuleSaveData>(WorldBasicData);
-	if (InBasic.HasValue() &&
-		InBasic.GetStructType() &&
-		InBasic.GetStructType()->IsChildOf(FVoxelWorldSaveData::StaticStruct()) &&
-		InBasic.GetStructMemory())
+	Result->GenerationProfile =
+		WorldGenerationProfileAsset;
+
+	Result->Seed =
+		DefaultWorldSeed;
+
+	if (const FVoxelWorldSaveData* Source =
+		InBasic.
+			GetPtr<
+				FVoxelWorldSaveData>())
 	{
-		static_cast<FVoxelWorldSaveData&>(*Result) =
-			*reinterpret_cast<const FVoxelWorldSaveData*>(InBasic.GetStructMemory());
+		static_cast<
+			FVoxelWorldSaveData&>(
+				*Result) =
+					*Source;
 	}
+
 	return Result;
 }
 
@@ -1859,17 +2002,15 @@ bool UVoxelModule::ValidateWorldData(const FParameter& InData, FString& OutError
 		OutError = SceneSourceError;
 		return false;
 	}
-	if (!InData.HasValue() ||
-		!InData.GetStructType() ||
-		!InData.GetStructType()->IsChildOf(FVoxelWorldSaveData::StaticStruct()) ||
-		!InData.GetStructMemory())
+	const FVoxelWorldSaveData* Data =
+		InData.GetPtr<FVoxelWorldSaveData>();
+	if (!Data)
 	{
 		OutError = TEXT("Expected typed voxel world save data");
 		return false;
 	}
-	const FVoxelWorldSaveData& Data = *reinterpret_cast<const FVoxelWorldSaveData*>(InData.GetStructMemory());
 	FVoxelWorldManifest SavedManifest;
-	if (!FVoxelManifestCodec::Decode(Data.ManifestBytes, SavedManifest) ||
+	if (!FVoxelManifestCodec::Decode(Data->ManifestBytes, SavedManifest) ||
 		!Registry.GetSnapshot() ||
 		!WorldGenerationProfile ||
 		SavedManifest.RegistryHash != Registry.GetSnapshot()->Hash)
@@ -1902,73 +2043,229 @@ bool UVoxelModule::ValidateWorldData(const FParameter& InData, FString& OutError
 	return true;
 }
 
-void UVoxelModule::LoadData(const FParameter& InData, const EPhase InPhase)
+void UVoxelModule::LoadData(
+	const FParameter& InData,
+	const EPhase InPhase)
 {
-	if (!IsAuthority() || !PHASEC(InPhase, EPhase::Primary))
+	if (!IsAuthority())
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("Voxel world load ignored on a non-authoritative world (phase=%d, netMode=%d)."),
+			static_cast<int32>(InPhase),
+			GetWorld()
+				? static_cast<int32>(GetWorld()->GetNetMode())
+				: -1);
+
+		return;
+	}
+
+	if (!PHASEC(
+		InPhase,
+		EPhase::Primary))
 	{
 		return;
 	}
+
 	FString Error;
-	const FVoxelWorldSaveData* Data = InData.GetPtr<FVoxelWorldSaveData>();
+
+	const FVoxelWorldSaveData* Data =
+		InData.
+			GetPtr<
+				FVoxelWorldSaveData>();
+
 	if (!Data)
 	{
-		bWorldLoadRejected = true;
-		WorldState = EVoxelWorldState::Failed;
+		bWorldLoadRejected =
+			true;
+
+		WorldState =
+			EVoxelWorldState::
+				Failed;
+
+		LastSaveError =
+			TEXT(
+				"Voxel module expected FVoxelWorldSaveData");
+
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("Voxel world load rejected: %s (parameter struct=%s)."),
+			*LastSaveError,
+			InData.GetStructType()
+				? *InData.GetStructType()->GetPathName()
+				: TEXT("None"));
+
 		return;
 	}
-	if (Runtime && !StopWorld(true, Error))
+
+	if (Runtime &&
+		!StopWorld(
+			true,
+			Error))
 	{
-		bWorldLoadRejected = true;
-		WorldState = EVoxelWorldState::Failed;
+		bWorldLoadRejected =
+			true;
+
+		WorldState =
+			EVoxelWorldState::
+				Failed;
+
+		LastSaveError =
+			Error;
+
 		return;
 	}
-	WorldData = NewWorldData(InData);
+
+	if (!ApplyGenerationProfileFromSave(
+			*Data,
+			Error))
+	{
+		bWorldLoadRejected =
+			true;
+
+		WorldState =
+			EVoxelWorldState::
+				Failed;
+
+		LastSaveError =
+			Error;
+
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT(
+				"Voxel profile load rejected: %s"),
+			*Error);
+
+		return;
+	}
+
+	WorldData =
+		NewWorldData(
+			InData);
+
 	if (Data->ManifestBytes.IsEmpty())
 	{
 		RegionStore.Reset();
 		UnloadedSceneFiles.Reset();
 		SceneSourceError.Reset();
-		if (!CreateWorldFromProfile(Data->Seed, Error))
+
+		if (!CreateWorldFromProfile(
+				Data->Seed,
+				Error))
 		{
-			bWorldLoadRejected = true;
-			WorldState = EVoxelWorldState::Failed;
-			UE_LOG(LogTemp, Error, TEXT("Voxel new world: %s"), *Error);
+			bWorldLoadRejected =
+				true;
+
+			WorldState =
+				EVoxelWorldState::
+					Failed;
+
+			LastSaveError =
+				Error;
+
+			UE_LOG(
+				LogTemp,
+				Error,
+				TEXT(
+					"Voxel new world: %s"),
+				*Error);
 		}
+
 		return;
 	}
-	if (!ValidateWorldData(InData, Error))
+
+	if (!ValidateWorldData(
+			InData,
+			Error))
 	{
-		bWorldLoadRejected = true;
-		WorldState = EVoxelWorldState::Failed;
-		LastSaveError = Error;
-		UE_LOG(LogTemp, Error, TEXT("Voxel load rejected: %s"), *Error);
+		bWorldLoadRejected =
+			true;
+
+		WorldState =
+			EVoxelWorldState::
+				Failed;
+
+		LastSaveError =
+			Error;
+
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT(
+				"Voxel load rejected: %s"),
+			*Error);
+
 		return;
 	}
+
 	FVoxelWorldManifest SavedManifest;
-	if (!FVoxelManifestCodec::Decode(Data->ManifestBytes, SavedManifest) ||
-		!StartWorld(SavedManifest, false, Error))
+
+	if (!FVoxelManifestCodec::Decode(
+			Data->ManifestBytes,
+			SavedManifest) ||
+		!StartWorld(
+			SavedManifest,
+			false,
+			Error))
 	{
-		bWorldLoadRejected = true;
-		WorldState = EVoxelWorldState::Failed;
-		UE_LOG(LogTemp, Error, TEXT("Voxel start: %s"), *Error);
+		bWorldLoadRejected =
+			true;
+
+		WorldState =
+			EVoxelWorldState::
+				Failed;
+
+		LastSaveError =
+			Error.IsEmpty()
+				? TEXT(
+					"Voxel saved manifest could not start")
+				: Error;
+
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT(
+				"Voxel start: %s"),
+			*LastSaveError);
 	}
 }
 
 FParameter UVoxelModule::ToData()
 {
-	if (!IsReady() || !LastSaveError.IsEmpty() || !WorldData)
+	if (!IsReady() ||
+		!LastSaveError.IsEmpty() ||
+		!WorldData)
 	{
 		return FParameter();
 	}
-	FVoxelModuleSaveData Data(WorldBasicData);
-	static_cast<FVoxelWorldSaveData&>(Data) = *WorldData;
-	Data.GenerationProfile = WorldGenerationProfileAsset;
-	Data.Seed = Manifest.Settings.Seed;
-	if (!FVoxelManifestCodec::Encode(Manifest, Data.ManifestBytes))
+
+	FVoxelModuleSaveData Data;
+
+	static_cast<
+		FVoxelWorldSaveData&>(
+			Data) =
+				*WorldData;
+
+	Data.GenerationProfile =
+		WorldGenerationProfileAsset;
+
+	Data.Seed =
+		Manifest.
+			Settings.Seed;
+
+	if (!FVoxelManifestCodec::Encode(
+			Manifest,
+			Data.ManifestBytes))
 	{
 		return FParameter();
 	}
-	return FParameter(MoveTemp(Data));
+
+	return FParameter(
+		MoveTemp(
+			Data));
 }
 
 FParameter UVoxelModule::GetData()
@@ -1994,6 +2291,12 @@ void UVoxelModule::SetActiveSaveSource(
 	FSaveGameStorage* InStorage)
 {
 	RegionStore.SetSource(InSaveId, InGeneration, InStorage);
+	if (InStorage &&
+		InSaveId.IsValid() &&
+		InGeneration > 0)
+	{
+		bPersistenceEnabledForCurrentWorld = true;
+	}
 	UnloadedSceneFiles.Reset();
 	SceneSourceError.Reset();
 	const FString& SourceDirectory = RegionStore.GetSourceDirectory();

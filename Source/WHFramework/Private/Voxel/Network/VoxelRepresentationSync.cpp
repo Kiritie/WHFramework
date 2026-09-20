@@ -8,7 +8,7 @@
 namespace
 {
 	constexpr uint32 RepresentationMagic = 0x34505256;
-	constexpr uint16 RepresentationVersion = 1;
+	constexpr uint16 RepresentationVersion = 2;
 	constexpr int32 MaxCells = 4096;
 	constexpr int32 ExactSectionSide = 16;
 
@@ -279,60 +279,261 @@ bool FVoxelRepresentationSync::BuildServerData(
 {
 	const FVoxelRepresentationRequest& InRequest = InInput.Request;
 	const FSnapshotOverlaySource OverlaySource(InInput.Overlays);
-	if (InRequest.Type == EVoxelRepresentationWireType::VoxelProxy)
+	if (InRequest.Type ==
+	EVoxelRepresentationWireType::
+		VoxelProxy)
+{
+	const FVoxelViewKey Key {
+		InRequest.Key.Coordinate,
+		InRequest.Key.Level
+	};
+
+	FVoxelVoxelProxyData Data;
+
+	const FVoxelVoxelProxyBuilder Builder(
+		InInput.Config.ToSharedRef(),
+		InInput.Cache.ToSharedRef());
+
+	if (!Builder.BuildNatural(
+			Key,
+			Data,
+			OutError,
+			InCancel))
 	{
-		const FVoxelViewKey Key { InRequest.Key.Coordinate, InRequest.Key.Level };
-		FVoxelVoxelProxyData Data;
-		const FVoxelVoxelProxyBuilder Builder(InInput.Config.ToSharedRef(), InInput.Cache.ToSharedRef());
-		if (!Builder.BuildNatural(Key, Data, OutError, InCancel))
+		return false;
+	}
+
+	const FVoxelGenerationBounds Bounds =
+		Key.GetBounds();
+
+	const int32 Step =
+		Key.GetStep();
+
+	auto ApplyOverlayAtWorld =
+		[
+			&InInput
+		](
+			const FIntVector& InWorld,
+			FVoxelBlockState& InOutState)
 		{
+			const FIntVector Section(
+				VoxelGeneration::FloorDivide(
+					InWorld.X,
+					ExactSectionSide),
+				VoxelGeneration::FloorDivide(
+					InWorld.Y,
+					ExactSectionSide),
+				VoxelGeneration::FloorDivide(
+					InWorld.Z,
+					ExactSectionSide));
+
+			const FVoxelOverlaySnapshot* Overlay =
+				InInput.
+					Overlays.
+					Find(
+						Section);
+
+			if (!Overlay)
+			{
+				return;
+			}
+
+			const FIntVector Local =
+				InWorld -
+				Section *
+					ExactSectionSide;
+
+			if (Local.X < 0 ||
+				Local.X >=
+					ExactSectionSide ||
+				Local.Y < 0 ||
+				Local.Y >=
+					ExactSectionSide ||
+				Local.Z < 0 ||
+				Local.Z >=
+					ExactSectionSide)
+			{
+				return;
+			}
+
+			const int32 CellIndex =
+				Local.X +
+				Local.Y *
+					ExactSectionSide +
+				Local.Z *
+					ExactSectionSide *
+					ExactSectionSide;
+
+			if (const FVoxelBlockState* Modified =
+				Overlay->
+					Blocks.
+					Find(
+						CellIndex))
+			{
+				InOutState =
+					*Modified;
+			}
+		};
+
+	for (int32 Z = 0;
+		Z < Data.GridSide;
+		++Z)
+	{
+		if (InCancel &&
+			InCancel->Load())
+		{
+			OutError =
+				TEXT("Canceled");
+
 			return false;
 		}
-		TArray<FIntVector> ModifiedSections;
-		OverlaySource.EnumerateModifiedSections(Key.GetBounds(), ModifiedSections);
-		const FVoxelGenerationBounds Bounds = Key.GetBounds();
-		const int32 Step = Key.GetStep();
-		for (int32 Z = 0; Z < Data.GridSide; ++Z)
+
+		for (int32 Y = 0;
+			Y < Data.GridSide;
+			++Y)
 		{
-			if (InCancel && InCancel->Load())
+			for (int32 X = 0;
+				X < Data.GridSide;
+				++X)
 			{
-				OutError = TEXT("Canceled");
-				return false;
-			}
-			for (int32 Y = 0; Y < Data.GridSide; ++Y)
-			{
-				for (int32 X = 0; X < Data.GridSide; ++X)
-				{
-					const FIntVector World = Bounds.Min + FIntVector(
-						X * Step + Step / 2,
-						Y * Step + Step / 2,
-						Z * Step + Step / 2);
-					const FIntVector Section(
-						VoxelGeneration::FloorDivide(World.X, ExactSectionSide),
-						VoxelGeneration::FloorDivide(World.Y, ExactSectionSide),
-						VoxelGeneration::FloorDivide(World.Z, ExactSectionSide));
-					const FVoxelOverlaySnapshot* Overlay = InInput.Overlays.Find(Section);
-					if (!Overlay) continue;
-					const FIntVector Local = World - Section * ExactSectionSide;
-					const int32 CellIndex = Local.X + Local.Y * ExactSectionSide + Local.Z * ExactSectionSide * ExactSectionSide;
-					if (const FVoxelBlockState* State = Overlay->Blocks.Find(CellIndex))
-					{
-						Data.Cells[X + Y * Data.GridSide + Z * Data.GridSide * Data.GridSide] = *State;
-					}
-				}
+				const FIntVector World =
+					Bounds.Min +
+					FIntVector(
+						X * Step +
+							Step / 2,
+						Y * Step +
+							Step / 2,
+						Z * Step +
+							Step / 2);
+
+				FVoxelBlockState& State =
+					Data.Cells[
+						X +
+						Y *
+							Data.GridSide +
+						Z *
+							Data.GridSide *
+							Data.GridSide];
+
+				ApplyOverlayAtWorld(
+					World,
+					State);
 			}
 		}
-		bool bHasAir = false;
-		bool bHasSolid = false;
-		for (const FVoxelBlockState State : Data.Cells)
-		{
-			bHasAir |= State.IsAir();
-			bHasSolid |= !State.IsAir();
-		}
-		Data.bHasVisibleSurfaceEvidence = bHasAir && bHasSolid;
-		Data.Revision = InInput.Revision;
-		return EncodeVoxelProxy(Data, OutBytes, OutError);
 	}
+
+	for (int32 Face = 0;
+		Face < 6;
+		++Face)
+	{
+		if (!Data.Known[
+				Face] ||
+			Data.Halo[
+				Face].Num() !=
+				256)
+		{
+			continue;
+		}
+
+		const int32 Axis =
+			Face /
+			2;
+
+		const bool bNegative =
+			(Face &
+				1) !=
+			0;
+
+		const int32 U =
+			(Axis + 1) %
+			3;
+
+		const int32 V =
+			(Axis + 2) %
+			3;
+
+		for (int32 LocalV = 0;
+			LocalV < 16;
+			++LocalV)
+		{
+			for (int32 LocalU = 0;
+				LocalU < 16;
+				++LocalU)
+			{
+				FIntVector Local(
+					0,
+					0,
+					0);
+
+				Local[Axis] =
+					bNegative
+						? -1
+						: 16;
+
+				Local[U] =
+					LocalU;
+
+				Local[V] =
+					LocalV;
+
+				const FIntVector World =
+					Bounds.Min +
+					FIntVector(
+						Local.X *
+							Step +
+							Step / 2,
+						Local.Y *
+							Step +
+							Step / 2,
+						Local.Z *
+							Step +
+							Step / 2);
+
+				ApplyOverlayAtWorld(
+					World,
+					Data.Halo[
+						Face][
+							LocalU +
+							LocalV *
+								16]);
+			}
+		}
+	}
+
+	bool bHasAir =
+		false;
+
+	bool bHasSolid =
+		false;
+
+	for (const FVoxelBlockState State :
+		Data.Cells)
+	{
+		bHasAir |=
+			State.IsAir();
+
+		bHasSolid |=
+			!State.IsAir() &&
+			State !=
+				InInput.Config->
+					Water &&
+			State !=
+				InInput.Config->
+					Lava;
+	}
+
+	Data.bHasVisibleSurfaceEvidence =
+		bHasAir &&
+		bHasSolid;
+
+	Data.Revision =
+		InInput.Revision;
+
+	return EncodeVoxelProxy(
+		Data,
+		OutBytes,
+		OutError);
+}
 	if (InRequest.Type == EVoxelRepresentationWireType::SurfaceProxy)
 	{
 		const FVoxelSurfaceTileKey Key {
@@ -367,21 +568,104 @@ bool FVoxelRepresentationSync::EncodeVoxelProxy(
 	TArray<uint8>& OutBytes,
 	FString& OutError)
 {
-	if (InData.GridSide != 16 || InData.Cells.Num() != 4096)
+	if (InData.GridSide !=
+			16 ||
+		InData.Cells.Num() !=
+			4096)
 	{
-		OutError = TEXT("Voxel proxy representation is invalid");
+		OutError =
+			TEXT(
+				"Voxel proxy representation is invalid");
+
 		return false;
 	}
-	FVoxelByteWriter Writer(FVoxelNetworkCodec::MaxRepresentationBytes);
-	Writer.U32(RepresentationMagic);
-	Writer.U16(RepresentationVersion);
-	Writer.U8(1);
-	WriteViewKey(Writer, InData.Key);
-	Writer.U64(InData.Revision);
-	Writer.U16(InData.GridSide);
-	Writer.U32(InData.Cells.Num());
-	for (const FVoxelBlockState State : InData.Cells) Writer.U32(State.Pack());
-	return FinishCompressed(Writer, OutBytes, OutError);
+
+	for (int32 Face = 0;
+		Face < 6;
+		++Face)
+	{
+		if (InData.Known[
+				Face] &&
+			InData.Halo[
+				Face].Num() !=
+				256)
+		{
+			OutError =
+				TEXT(
+					"Voxel proxy representation halo is invalid");
+
+			return false;
+		}
+	}
+
+	FVoxelByteWriter Writer(
+		FVoxelNetworkCodec::
+			MaxRepresentationBytes);
+
+	Writer.U32(
+		RepresentationMagic);
+
+	Writer.U16(
+		RepresentationVersion);
+
+	Writer.U8(
+		1);
+
+	WriteViewKey(
+		Writer,
+		InData.Key);
+
+	Writer.U64(
+		InData.Revision);
+
+	Writer.U16(
+		InData.GridSide);
+
+	Writer.U8(
+		InData.
+			bHasVisibleSurfaceEvidence
+				? 1
+				: 0);
+
+	Writer.U32(
+		InData.Cells.Num());
+
+	for (const FVoxelBlockState State :
+		InData.Cells)
+	{
+		Writer.U32(
+			State.Pack());
+	}
+
+	for (int32 Face = 0;
+		Face < 6;
+		++Face)
+	{
+		Writer.U8(
+			InData.Known[
+				Face]
+				? 1
+				: 0);
+
+		if (!InData.Known[
+				Face])
+		{
+			continue;
+		}
+
+		for (const FVoxelBlockState State :
+			InData.Halo[
+				Face])
+		{
+			Writer.U32(
+				State.Pack());
+		}
+	}
+
+	return FinishCompressed(
+		Writer,
+		OutBytes,
+		OutError);
 }
 
 bool FVoxelRepresentationSync::DecodeVoxelProxy(
@@ -390,35 +674,136 @@ bool FVoxelRepresentationSync::DecodeVoxelProxy(
 	FString& OutError)
 {
 	TArray<uint8> Raw;
-	if (!OpenCompressed(InBytes, Raw, OutError)) return false;
-	FVoxelByteReader Reader(Raw);
-	if (Reader.U32() != RepresentationMagic || Reader.U16() != RepresentationVersion || Reader.U8() != 1)
+
+	if (!OpenCompressed(
+			InBytes,
+			Raw,
+			OutError))
 	{
-		OutError = TEXT("Voxel proxy representation header is invalid");
 		return false;
 	}
+
+	FVoxelByteReader Reader(
+		Raw);
+
+	if (Reader.U32() !=
+			RepresentationMagic ||
+		Reader.U16() !=
+			RepresentationVersion ||
+		Reader.U8() !=
+			1)
+	{
+		OutError =
+			TEXT(
+				"Voxel proxy representation header is invalid");
+
+		return false;
+	}
+
 	FVoxelVoxelProxyData Data;
-	Data.Key = ReadViewKey(Reader);
-	Data.Revision = Reader.U64();
-	Data.GridSide = Reader.U16();
-	const uint32 Count = Reader.U32();
-	if (Data.GridSide != 16 || Count != 4096) Reader.Reject();
-	Data.Cells.Reserve(Count);
-	for (uint32 Index = 0; Index < Count && Reader.IsValid(); ++Index) Data.Cells.Add(FVoxelBlockState::Unpack(Reader.U32()));
+
+	Data.Key =
+		ReadViewKey(
+			Reader);
+
+	Data.Revision =
+		Reader.U64();
+
+	Data.GridSide =
+		Reader.U16();
+
+	const uint8 VisibleSurface =
+		Reader.U8();
+
+	if (VisibleSurface > 1)
+	{
+		Reader.Reject();
+	}
+
+	Data.bHasVisibleSurfaceEvidence =
+		VisibleSurface !=
+			0;
+
+	const uint32 Count =
+		Reader.U32();
+
+	if (Data.GridSide != 16 ||
+		Count != 4096)
+	{
+		Reader.Reject();
+	}
+
+	Data.Cells.Reserve(
+		Count);
+
+	for (uint32 Index = 0;
+		Index < Count &&
+			Reader.IsValid();
+		++Index)
+	{
+		Data.Cells.Add(
+			FVoxelBlockState::
+				Unpack(
+					Reader.U32()));
+	}
+
+	for (int32 Face = 0;
+		Face < 6 &&
+			Reader.IsValid();
+		++Face)
+	{
+		const uint8 Known =
+			Reader.U8();
+
+		if (Known > 1)
+		{
+			Reader.Reject();
+			break;
+		}
+
+		Data.Known[
+			Face] =
+				Known !=
+				0;
+
+		if (!Data.Known[
+				Face])
+		{
+			continue;
+		}
+
+		Data.Halo[
+			Face].
+			Reserve(
+				256);
+
+		for (int32 Index = 0;
+			Index < 256 &&
+				Reader.IsValid();
+			++Index)
+		{
+			Data.Halo[
+				Face].
+				Add(
+					FVoxelBlockState::
+						Unpack(
+							Reader.U32()));
+		}
+	}
+
 	if (!Reader.End())
 	{
-		OutError = TEXT("Voxel proxy representation payload is invalid");
+		OutError =
+			TEXT(
+				"Voxel proxy representation payload is invalid");
+
 		return false;
 	}
-	bool bHasAir = false;
-	bool bHasSolid = false;
-	for (const FVoxelBlockState State : Data.Cells)
-	{
-		bHasAir |= State.IsAir();
-		bHasSolid |= !State.IsAir();
-	}
-	Data.bHasVisibleSurfaceEvidence = bHasAir && bHasSolid;
-	OutData = MoveTemp(Data);
+
+	OutData =
+		MoveTemp(
+			Data);
+
 	OutError.Reset();
 	return true;
 }

@@ -23,11 +23,24 @@ namespace
 			return 1;
 		}
 
+		virtual bool GatherReferencedBlocks(
+			const FParameter& InConfiguration,
+			TArray<FPrimaryAssetId>& OutBlockAssets,
+			FString& OutError) const override
+		{
+			(void)InConfiguration;
+			OutBlockAssets.Reset();
+			OutError.Reset();
+			return true;
+		}
+
 		virtual bool BakeConfiguration(
+			const FVoxelFeatureBakeContext& InContext,
 			const FParameter& InConfiguration,
 			TArray<uint8>& OutBytes,
 			FString& OutError) const override
 		{
+			(void)InContext;
 			(void)InConfiguration;
 			OutBytes.Reset();
 			OutError.Reset();

@@ -2,6 +2,300 @@
 
 #include "HAL/Event.h"
 #include "HAL/PlatformProcess.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
+
+namespace
+{
+	constexpr int32 GenerationPlanTileSide = 256;
+	constexpr int32 LakeAnchorSide = 64;
+
+	template<typename KeyType, typename ValueType>
+	using TConstCachePtr =
+		TSharedPtr<
+			const ValueType,
+			ESPMode::ThreadSafe>;
+
+	template<typename KeyType, typename ValueType, typename BuildGateType>
+	bool GetOrBuildValue(
+		FRWLock& InLock,
+		TMap<KeyType, TConstCachePtr<KeyType, ValueType>>& InValues,
+		TMap<KeyType, TSharedPtr<BuildGateType, ESPMode::ThreadSafe>>& InBuilds,
+		TArray<KeyType>& InKeys,
+		const KeyType& InKey,
+		TFunctionRef<bool(ValueType&, FString&)> InBuild,
+		TConstCachePtr<KeyType, ValueType>& OutValue,
+		FString& OutError,
+		const TAtomic<bool>* InCancel,
+		const bool bInAllowGameThreadBuilds,
+		TFunctionRef<void(uint64)> InRecordWait)
+	{
+		{
+			FReadScopeLock Scope(InLock);
+
+			if (const TConstCachePtr<KeyType, ValueType>* Found =
+				InValues.Find(InKey))
+			{
+				OutValue = *Found;
+				OutError.Reset();
+				return OutValue.IsValid();
+			}
+		}
+
+		TSharedPtr<BuildGateType, ESPMode::ThreadSafe> Gate;
+		bool bOwner = false;
+
+		{
+			FWriteScopeLock Scope(InLock);
+
+			if (const TConstCachePtr<KeyType, ValueType>* Found =
+				InValues.Find(InKey))
+			{
+				OutValue = *Found;
+				OutError.Reset();
+				return OutValue.IsValid();
+			}
+
+			if (TSharedPtr<BuildGateType, ESPMode::ThreadSafe>* Existing =
+				InBuilds.Find(InKey))
+			{
+				Gate = *Existing;
+			}
+			else
+			{
+				Gate =
+					MakeShared<
+						BuildGateType,
+						ESPMode::ThreadSafe>();
+
+				InBuilds.Add(
+					InKey,
+					Gate);
+
+				bOwner = true;
+			}
+		}
+
+		if (!bOwner)
+		{
+			if (!bInAllowGameThreadBuilds)
+			{
+				ensureAlwaysMsgf(
+					!IsInGameThread(),
+					TEXT(
+						"Runtime GameThread attempted to wait for voxel generation cache key"));
+			}
+
+			const double WaitStart =
+				FPlatformTime::Seconds();
+
+			while (!Gate->Event->Wait(2))
+			{
+				if (InCancel &&
+					InCancel->Load())
+				{
+					OutError =
+						TEXT("Canceled");
+
+					return false;
+				}
+			}
+
+			const uint64 WaitMicroseconds =
+				static_cast<uint64>(
+					FMath::Max(
+						0.0,
+						(FPlatformTime::Seconds() -
+							WaitStart) *
+							1000000.0));
+
+			InRecordWait(
+				WaitMicroseconds);
+
+			if (!Gate->bSuccess)
+			{
+				OutError =
+					Gate->Error;
+
+				return false;
+			}
+
+			FReadScopeLock Scope(
+				InLock);
+
+			if (const TConstCachePtr<KeyType, ValueType>* Found =
+				InValues.Find(InKey))
+			{
+				OutValue =
+					*Found;
+
+				OutError.Reset();
+				return OutValue.IsValid();
+			}
+
+			OutError =
+				TEXT(
+					"Voxel generation cache build completed without publishing a value");
+
+			return false;
+		}
+
+		if (!bInAllowGameThreadBuilds)
+		{
+			ensureAlwaysMsgf(
+				!IsInGameThread(),
+				TEXT(
+					"Runtime GameThread is building a voxel generation cache miss synchronously"));
+		}
+
+		ValueType LocalValue;
+		FString BuildError;
+
+		const bool bSuccess =
+			(!InCancel || !InCancel->Load()) &&
+			InBuild(
+				LocalValue,
+				BuildError);
+
+		TConstCachePtr<KeyType, ValueType> BuiltValue;
+
+		if (bSuccess)
+		{
+			BuiltValue =
+				MakeShared<
+					const ValueType,
+					ESPMode::ThreadSafe>(
+						MoveTemp(
+							LocalValue));
+		}
+
+		{
+			FWriteScopeLock Scope(
+				InLock);
+
+			if (BuiltValue)
+			{
+				const bool bWasAbsent =
+					!InValues.Contains(
+						InKey);
+
+				InValues.Add(
+					InKey,
+					BuiltValue);
+
+				if (bWasAbsent)
+				{
+					InKeys.Add(
+						InKey);
+				}
+			}
+
+			Gate->bSuccess =
+				BuiltValue.IsValid();
+
+			Gate->Error =
+				Gate->bSuccess
+					? FString()
+					: BuildError;
+
+			InBuilds.Remove(
+				InKey);
+		}
+
+		/**
+		 * Trigger 在锁外。
+		 */
+		Gate->Event->Trigger();
+
+		if (!Gate->bSuccess)
+		{
+			OutError =
+				Gate->Error;
+
+			return false;
+		}
+
+		OutValue =
+			MoveTemp(
+				BuiltValue);
+
+		OutError.Reset();
+		return true;
+	}
+
+	template<typename KeyType, typename ValueType, typename KeepPredicate>
+	void TrimMapBudgeted(
+		TMap<KeyType, TSharedPtr<const ValueType, ESPMode::ThreadSafe>>& InValues,
+		TArray<KeyType>& InKeys,
+		int32& InOutCursor,
+		int32& InOutBudget,
+		TArray<TSharedPtr<const ValueType, ESPMode::ThreadSafe>>& OutRetired,
+		KeepPredicate&& InKeep)
+	{
+		while (InOutBudget > 0 &&
+			!InKeys.IsEmpty())
+		{
+			InOutCursor =
+				FMath::Clamp(
+					InOutCursor,
+					0,
+					InKeys.Num() - 1);
+
+			const KeyType Key =
+				InKeys[
+					InOutCursor];
+
+			--InOutBudget;
+
+			if (!InValues.Contains(Key))
+			{
+				InKeys.RemoveAtSwap(
+					InOutCursor,
+					1,
+					EAllowShrinking::No);
+
+				if (InKeys.IsEmpty())
+				{
+					InOutCursor = 0;
+				}
+
+				continue;
+			}
+
+			if (!InKeep(Key))
+			{
+				if (TSharedPtr<const ValueType, ESPMode::ThreadSafe>* Retired =
+					InValues.Find(Key))
+				{
+					/**
+					 * 把最后一个 shared ref Move 到锁外释放。
+					 * 避免大型 plan/array 在 shard lock 内析构。
+					 */
+					OutRetired.Add(
+						MoveTemp(*Retired));
+				}
+
+				InValues.Remove(
+					Key);
+
+				InKeys.RemoveAtSwap(
+					InOutCursor,
+					1,
+					EAllowShrinking::No);
+
+				if (InKeys.IsEmpty())
+				{
+					InOutCursor = 0;
+				}
+
+				continue;
+			}
+
+			InOutCursor =
+				(InOutCursor + 1) %
+				InKeys.Num();
+		}
+	}
+}
 
 struct FVoxelGenerationPlanCache::FBuildGate
 {
@@ -9,7 +303,8 @@ struct FVoxelGenerationPlanCache::FBuildGate
 	{
 		Event =
 			FPlatformProcess::
-				GetSynchEventFromPool(true);
+				GetSynchEventFromPool(
+					true);
 	}
 
 	~FBuildGate()
@@ -17,7 +312,8 @@ struct FVoxelGenerationPlanCache::FBuildGate
 		if (Event)
 		{
 			FPlatformProcess::
-				ReturnSynchEventToPool(Event);
+				ReturnSynchEventToPool(
+					Event);
 
 			Event = nullptr;
 		}
@@ -28,145 +324,236 @@ struct FVoxelGenerationPlanCache::FBuildGate
 	FString Error;
 };
 
-template<typename KeyType, typename ValueType>
-bool FVoxelGenerationPlanCache::GetOrBuildNatural(
-	const KeyType& InKey,
-	TMap<KeyType, TSharedPtr<const ValueType, ESPMode::ThreadSafe>>& InValues,
-	TMap<KeyType, TSharedPtr<FBuildGate, ESPMode::ThreadSafe>>& InBuilds,
-	TFunctionRef<bool(ValueType&, FString&)> InBuild,
-	TSharedPtr<const ValueType, ESPMode::ThreadSafe>& OutValue,
-	FString& OutError)
+FVoxelGenerationPlanCache::FVoxelGenerationPlanCache(
+	const bool bInAllowGameThreadBuilds)
+	: bAllowGameThreadBuilds(
+		bInAllowGameThreadBuilds)
 {
+	NaturalShards.SetNum(
+		ShardCount);
+
+	PlanShards.SetNum(
+		ShardCount);
+
+	for (int32 Index = 0;
+		Index < ShardCount;
+		++Index)
 	{
-		FReadScopeLock Scope(NaturalLock);
-		if (const TSharedPtr<const ValueType, ESPMode::ThreadSafe>* Found = InValues.Find(InKey))
-		{
-			OutValue = *Found;
-			OutError.Reset();
-			return OutValue.IsValid();
-		}
+		NaturalShards[Index] =
+			MakeUnique<FNaturalShard>();
+
+		PlanShards[Index] =
+			MakeUnique<FPlanShard>();
 	}
+}
 
-	TSharedPtr<FBuildGate, ESPMode::ThreadSafe> Gate;
-	bool bOwner = false;
-	{
-		FWriteScopeLock Scope(NaturalLock);
-		if (const TSharedPtr<const ValueType, ESPMode::ThreadSafe>* Found = InValues.Find(InKey))
-		{
-			OutValue = *Found;
-			OutError.Reset();
-			return OutValue.IsValid();
-		}
+FVoxelGenerationPlanCache::~FVoxelGenerationPlanCache()
+{
+	Reset();
+}
 
-		if (TSharedPtr<FBuildGate, ESPMode::ThreadSafe>* Existing = InBuilds.Find(InKey))
-		{
-			Gate = *Existing;
-		}
-		else
-		{
-			Gate = MakeShared<FBuildGate, ESPMode::ThreadSafe>();
-			InBuilds.Add(InKey, Gate);
-			bOwner = true;
-		}
-	}
+int32 FVoxelGenerationPlanCache::NaturalShardIndex(
+	const FIntPoint& InKey) const
+{
+	return
+		static_cast<int32>(
+			GetTypeHash(InKey) %
+			ShardCount);
+}
 
-	if (!bOwner)
-	{
-		Gate->Event->Wait();
-		if (!Gate->bSuccess)
-		{
-			OutError = Gate->Error;
-			return false;
-		}
+int32 FVoxelGenerationPlanCache::NaturalShardIndex(
+	const FVoxelNaturalTileKey& InKey) const
+{
+	return
+		static_cast<int32>(
+			GetTypeHash(InKey) %
+			ShardCount);
+}
 
-		FReadScopeLock Scope(NaturalLock);
-		if (const TSharedPtr<const ValueType, ESPMode::ThreadSafe>* Found = InValues.Find(InKey))
-		{
-			OutValue = *Found;
-			OutError.Reset();
-			return OutValue.IsValid();
-		}
+int32 FVoxelGenerationPlanCache::NaturalShardIndex(
+	const FVoxelLakeAnchorKey& InKey) const
+{
+	return
+		static_cast<int32>(
+			GetTypeHash(InKey) %
+			ShardCount);
+}
 
-		OutError = TEXT("Natural generation build completed without publishing a value");
-		return false;
-	}
+int32 FVoxelGenerationPlanCache::PlanShardIndex(
+	const FVoxelHydrologyRegionKey& InKey) const
+{
+	return
+		static_cast<int32>(
+			GetTypeHash(InKey) %
+			ShardCount);
+}
 
-	ValueType LocalValue;
-	FString BuildError;
-	const bool bSuccess = InBuild(LocalValue, BuildError);
-	TSharedPtr<const ValueType, ESPMode::ThreadSafe> BuiltValue;
-	if (bSuccess)
-	{
-		BuiltValue = MakeShared<const ValueType, ESPMode::ThreadSafe>(MoveTemp(LocalValue));
-	}
+int32 FVoxelGenerationPlanCache::PlanShardIndex(
+	const FVoxelGenerationTileKey& InKey) const
+{
+	return
+		static_cast<int32>(
+			GetTypeHash(InKey) %
+			ShardCount);
+}
 
-	{
-		FWriteScopeLock Scope(NaturalLock);
-		if (BuiltValue)
-		{
-			InValues.Add(InKey, BuiltValue);
-		}
-		Gate->bSuccess = BuiltValue.IsValid();
-		Gate->Error = Gate->bSuccess ? FString() : BuildError;
-		InBuilds.Remove(InKey);
-	}
-	Gate->Event->Trigger();
-
-	if (!Gate->bSuccess)
-	{
-		OutError = Gate->Error;
-		return false;
-	}
-
-	OutValue = MoveTemp(BuiltValue);
-	OutError.Reset();
-	return true;
+void FVoxelGenerationPlanCache::RecordGateWait(
+	const uint64 InMicroseconds)
+{
+	++GateWaitCount;
+	GateWaitMicroseconds.AddExchange(
+		InMicroseconds);
 }
 
 bool FVoxelGenerationPlanCache::GetOrBuildBaseColumn(
 	const FIntPoint& InPosition,
-	TFunctionRef<bool(FVoxelBaseColumnEntry&, FString&)> InBuild,
+	TFunctionRef<bool(
+		FVoxelBaseColumnEntry&,
+		FString&)> InBuild,
 	FVoxelBaseColumnEntryPtr& OutEntry,
-	FString& OutError)
+	FString& OutError,
+	const TAtomic<bool>* InCancel)
 {
-	return GetOrBuildNatural(InPosition, BaseColumns, BaseColumnBuilds, InBuild, OutEntry, OutError);
+	FNaturalShard& Shard =
+		*NaturalShards[
+			NaturalShardIndex(
+				InPosition)];
+
+	return GetOrBuildValue<
+		FIntPoint,
+		FVoxelBaseColumnEntry,
+		FBuildGate>(
+			Shard.Lock,
+			Shard.BaseColumns,
+			Shard.BaseColumnBuilds,
+			Shard.BaseColumnKeys,
+			InPosition,
+			InBuild,
+			OutEntry,
+			OutError,
+			InCancel,
+			bAllowGameThreadBuilds,
+			[this](const uint64 InWait)
+			{
+				RecordGateWait(InWait);
+			});
 }
 
 bool FVoxelGenerationPlanCache::GetOrBuildRiverField(
 	const FVoxelNaturalTileKey& InKey,
-	TFunctionRef<bool(FVoxelRiverFieldTile&, FString&)> InBuild,
+	TFunctionRef<bool(
+		FVoxelRiverFieldTile&,
+		FString&)> InBuild,
 	FVoxelRiverFieldTilePtr& OutTile,
-	FString& OutError)
+	FString& OutError,
+	const TAtomic<bool>* InCancel)
 {
-	return GetOrBuildNatural(InKey, RiverFields, RiverFieldBuilds, InBuild, OutTile, OutError);
+	FNaturalShard& Shard =
+		*NaturalShards[
+			NaturalShardIndex(
+				InKey)];
+
+	return GetOrBuildValue<
+		FVoxelNaturalTileKey,
+		FVoxelRiverFieldTile,
+		FBuildGate>(
+			Shard.Lock,
+			Shard.RiverFields,
+			Shard.RiverFieldBuilds,
+			Shard.RiverFieldKeys,
+			InKey,
+			InBuild,
+			OutTile,
+			OutError,
+			InCancel,
+			bAllowGameThreadBuilds,
+			[this](const uint64 InWait)
+			{
+				RecordGateWait(InWait);
+			});
 }
 
 bool FVoxelGenerationPlanCache::GetOrBuildLake(
 	const FVoxelLakeAnchorKey& InKey,
-	TFunctionRef<bool(FVoxelLakeAnchorPlan&, FString&)> InBuild,
+	TFunctionRef<bool(
+		FVoxelLakeAnchorPlan&,
+		FString&)> InBuild,
 	FVoxelLakeAnchorPlanPtr& OutPlan,
-	FString& OutError)
+	FString& OutError,
+	const TAtomic<bool>* InCancel)
 {
-	return GetOrBuildNatural(InKey, Lakes, LakeBuilds, InBuild, OutPlan, OutError);
+	FNaturalShard& Shard =
+		*NaturalShards[
+			NaturalShardIndex(
+				InKey)];
+
+	return GetOrBuildValue<
+		FVoxelLakeAnchorKey,
+		FVoxelLakeAnchorPlan,
+		FBuildGate>(
+			Shard.Lock,
+			Shard.Lakes,
+			Shard.LakeBuilds,
+			Shard.LakeKeys,
+			InKey,
+			InBuild,
+			OutPlan,
+			OutError,
+			InCancel,
+			bAllowGameThreadBuilds,
+			[this](const uint64 InWait)
+			{
+				RecordGateWait(InWait);
+			});
 }
 
 bool FVoxelGenerationPlanCache::GetOrBuildNaturalColumn(
 	const FIntPoint& InPosition,
-	TFunctionRef<bool(FVoxelNaturalColumnEntry&, FString&)> InBuild,
+	TFunctionRef<bool(
+		FVoxelNaturalColumnEntry&,
+		FString&)> InBuild,
 	FVoxelNaturalColumnEntryPtr& OutEntry,
-	FString& OutError)
+	FString& OutError,
+	const TAtomic<bool>* InCancel)
 {
-	return GetOrBuildNatural(InPosition, NaturalColumns, NaturalColumnBuilds, InBuild, OutEntry, OutError);
+	FNaturalShard& Shard =
+		*NaturalShards[
+			NaturalShardIndex(
+				InPosition)];
+
+	return GetOrBuildValue<
+		FIntPoint,
+		FVoxelNaturalColumnEntry,
+		FBuildGate>(
+			Shard.Lock,
+			Shard.NaturalColumns,
+			Shard.NaturalColumnBuilds,
+			Shard.NaturalColumnKeys,
+			InPosition,
+			InBuild,
+			OutEntry,
+			OutError,
+			InCancel,
+			bAllowGameThreadBuilds,
+			[this](const uint64 InWait)
+			{
+				RecordGateWait(InWait);
+			});
 }
 
 bool FVoxelGenerationPlanCache::FindHydrology(
 	const FVoxelHydrologyRegionKey& InKey,
 	FVoxelHydrologyPlanPtr& OutPlan) const
 {
-	FReadScopeLock Scope(Lock);
+	const FPlanShard& Shard =
+		*PlanShards[
+			PlanShardIndex(InKey)];
+
+	FReadScopeLock Scope(
+		Shard.Lock);
 
 	if (const FVoxelHydrologyPlanPtr* Found =
-		Hydrology.Find(InKey))
+		Shard.Hydrology.Find(InKey))
 	{
 		OutPlan = *Found;
 		return OutPlan.IsValid();
@@ -179,11 +566,26 @@ void FVoxelGenerationPlanCache::StoreHydrology(
 	const FVoxelHydrologyRegionKey& InKey,
 	FVoxelHydrologyPlanPtr InPlan)
 {
-	FWriteScopeLock Scope(Lock);
+	FPlanShard& Shard =
+		*PlanShards[
+			PlanShardIndex(InKey)];
 
-	Hydrology.Add(
+	FWriteScopeLock Scope(
+		Shard.Lock);
+
+	const bool bNew =
+		!Shard.Hydrology.Contains(
+			InKey);
+
+	Shard.Hydrology.Add(
 		InKey,
 		MoveTemp(InPlan));
+
+	if (bNew)
+	{
+		Shard.HydrologyKeys.Add(
+			InKey);
+	}
 }
 
 bool FVoxelGenerationPlanCache::GetOrBuildHydrology(
@@ -192,144 +594,46 @@ bool FVoxelGenerationPlanCache::GetOrBuildHydrology(
 		FVoxelHydrologyPlan&,
 		FString&)> InBuild,
 	FVoxelHydrologyPlanPtr& OutPlan,
-	FString& OutError)
+	FString& OutError,
+	const TAtomic<bool>* InCancel)
 {
-	{
-		FReadScopeLock Scope(Lock);
+	FPlanShard& Shard =
+		*PlanShards[
+			PlanShardIndex(InKey)];
 
-		if (const FVoxelHydrologyPlanPtr* Found =
-			Hydrology.Find(InKey))
-		{
-			OutPlan = *Found;
-			OutError.Reset();
-			return OutPlan.IsValid();
-		}
-	}
-
-	TSharedPtr<
-		FBuildGate,
-		ESPMode::ThreadSafe> Gate;
-
-	bool bOwner = false;
-
-	{
-		FWriteScopeLock Scope(Lock);
-
-		if (const FVoxelHydrologyPlanPtr* Found =
-			Hydrology.Find(InKey))
-		{
-			OutPlan = *Found;
-			OutError.Reset();
-			return OutPlan.IsValid();
-		}
-
-		if (TSharedPtr<
-			FBuildGate,
-			ESPMode::ThreadSafe>* Existing =
-				HydrologyBuilds.Find(InKey))
-		{
-			Gate = *Existing;
-		}
-		else
-		{
-			Gate =
-				MakeShared<
-					FBuildGate,
-					ESPMode::ThreadSafe>();
-
-			HydrologyBuilds.Add(
-				InKey,
-				Gate);
-
-			bOwner = true;
-		}
-	}
-
-	if (!bOwner)
-	{
-		Gate->Event->Wait();
-
-		if (!Gate->bSuccess)
-		{
-			OutError = Gate->Error;
-			return false;
-		}
-
-		if (!FindHydrology(
+	return GetOrBuildValue<
+		FVoxelHydrologyRegionKey,
+		FVoxelHydrologyPlan,
+		FBuildGate>(
+			Shard.Lock,
+			Shard.Hydrology,
+			Shard.HydrologyBuilds,
+			Shard.HydrologyKeys,
 			InKey,
-			OutPlan))
-		{
-			OutError =
-				TEXT("Hydrology plan build completed without publishing a plan");
-
-			return false;
-		}
-
-		OutError.Reset();
-		return true;
-	}
-
-	FVoxelHydrologyPlan LocalPlan;
-	FString BuildError;
-
-	const bool bSuccess =
-		InBuild(
-			LocalPlan,
-			BuildError);
-
-	FVoxelHydrologyPlanPtr BuiltPlan;
-
-	if (bSuccess)
-	{
-		BuiltPlan =
-			MakeShared<
-				const FVoxelHydrologyPlan,
-				ESPMode::ThreadSafe>(
-					MoveTemp(LocalPlan));
-	}
-
-	{
-		FWriteScopeLock Scope(Lock);
-
-		if (BuiltPlan)
-		{
-			Hydrology.Add(
-				InKey,
-				BuiltPlan);
-		}
-
-		Gate->bSuccess =
-			BuiltPlan.IsValid();
-
-		Gate->Error =
-			Gate->bSuccess
-				? FString()
-				: BuildError;
-
-		HydrologyBuilds.Remove(InKey);
-	}
-
-	Gate->Event->Trigger();
-
-	if (!Gate->bSuccess)
-	{
-		OutError = Gate->Error;
-		return false;
-	}
-
-	OutPlan = MoveTemp(BuiltPlan);
-	OutError.Reset();
-	return true;
+			InBuild,
+			OutPlan,
+			OutError,
+			InCancel,
+			bAllowGameThreadBuilds,
+			[this](const uint64 InWait)
+			{
+				RecordGateWait(InWait);
+			});
 }
 
 bool FVoxelGenerationPlanCache::FindCave(
 	const FVoxelGenerationTileKey& InKey,
 	FVoxelCavePlanPtr& OutPlan) const
 {
-	FReadScopeLock Scope(Lock);
+	const FPlanShard& Shard =
+		*PlanShards[
+			PlanShardIndex(InKey)];
+
+	FReadScopeLock Scope(
+		Shard.Lock);
 
 	if (const FVoxelCavePlanPtr* Found =
-		Caves.Find(InKey))
+		Shard.Caves.Find(InKey))
 	{
 		OutPlan = *Found;
 		return OutPlan.IsValid();
@@ -342,11 +646,25 @@ void FVoxelGenerationPlanCache::StoreCave(
 	const FVoxelGenerationTileKey& InKey,
 	FVoxelCavePlanPtr InPlan)
 {
-	FWriteScopeLock Scope(Lock);
+	FPlanShard& Shard =
+		*PlanShards[
+			PlanShardIndex(InKey)];
 
-	Caves.Add(
+	FWriteScopeLock Scope(
+		Shard.Lock);
+
+	const bool bNew =
+		!Shard.Caves.Contains(InKey);
+
+	Shard.Caves.Add(
 		InKey,
 		MoveTemp(InPlan));
+
+	if (bNew)
+	{
+		Shard.CaveKeys.Add(
+			InKey);
+	}
 }
 
 bool FVoxelGenerationPlanCache::GetOrBuildCave(
@@ -355,144 +673,46 @@ bool FVoxelGenerationPlanCache::GetOrBuildCave(
 		FVoxelCavePlan&,
 		FString&)> InBuild,
 	FVoxelCavePlanPtr& OutPlan,
-	FString& OutError)
+	FString& OutError,
+	const TAtomic<bool>* InCancel)
 {
-	{
-		FReadScopeLock Scope(Lock);
+	FPlanShard& Shard =
+		*PlanShards[
+			PlanShardIndex(InKey)];
 
-		if (const FVoxelCavePlanPtr* Found =
-			Caves.Find(InKey))
-		{
-			OutPlan = *Found;
-			OutError.Reset();
-			return OutPlan.IsValid();
-		}
-	}
-
-	TSharedPtr<
-		FBuildGate,
-		ESPMode::ThreadSafe> Gate;
-
-	bool bOwner = false;
-
-	{
-		FWriteScopeLock Scope(Lock);
-
-		if (const FVoxelCavePlanPtr* Found =
-			Caves.Find(InKey))
-		{
-			OutPlan = *Found;
-			OutError.Reset();
-			return OutPlan.IsValid();
-		}
-
-		if (TSharedPtr<
-			FBuildGate,
-			ESPMode::ThreadSafe>* Existing =
-				CaveBuilds.Find(InKey))
-		{
-			Gate = *Existing;
-		}
-		else
-		{
-			Gate =
-				MakeShared<
-					FBuildGate,
-					ESPMode::ThreadSafe>();
-
-			CaveBuilds.Add(
-				InKey,
-				Gate);
-
-			bOwner = true;
-		}
-	}
-
-	if (!bOwner)
-	{
-		Gate->Event->Wait();
-
-		if (!Gate->bSuccess)
-		{
-			OutError = Gate->Error;
-			return false;
-		}
-
-		if (!FindCave(
+	return GetOrBuildValue<
+		FVoxelGenerationTileKey,
+		FVoxelCavePlan,
+		FBuildGate>(
+			Shard.Lock,
+			Shard.Caves,
+			Shard.CaveBuilds,
+			Shard.CaveKeys,
 			InKey,
-			OutPlan))
-		{
-			OutError =
-				TEXT("Cave plan build completed without publishing a plan");
-
-			return false;
-		}
-
-		OutError.Reset();
-		return true;
-	}
-
-	FVoxelCavePlan LocalPlan;
-	FString BuildError;
-
-	const bool bSuccess =
-		InBuild(
-			LocalPlan,
-			BuildError);
-
-	FVoxelCavePlanPtr BuiltPlan;
-
-	if (bSuccess)
-	{
-		BuiltPlan =
-			MakeShared<
-				const FVoxelCavePlan,
-				ESPMode::ThreadSafe>(
-					MoveTemp(LocalPlan));
-	}
-
-	{
-		FWriteScopeLock Scope(Lock);
-
-		if (BuiltPlan)
-		{
-			Caves.Add(
-				InKey,
-				BuiltPlan);
-		}
-
-		Gate->bSuccess =
-			BuiltPlan.IsValid();
-
-		Gate->Error =
-			Gate->bSuccess
-				? FString()
-				: BuildError;
-
-		CaveBuilds.Remove(InKey);
-	}
-
-	Gate->Event->Trigger();
-
-	if (!Gate->bSuccess)
-	{
-		OutError = Gate->Error;
-		return false;
-	}
-
-	OutPlan = MoveTemp(BuiltPlan);
-	OutError.Reset();
-	return true;
+			InBuild,
+			OutPlan,
+			OutError,
+			InCancel,
+			bAllowGameThreadBuilds,
+			[this](const uint64 InWait)
+			{
+				RecordGateWait(InWait);
+			});
 }
 
 bool FVoxelGenerationPlanCache::FindFeature(
 	const FVoxelGenerationTileKey& InKey,
 	FVoxelFeaturePlanPtr& OutPlan) const
 {
-	FReadScopeLock Scope(Lock);
+	const FPlanShard& Shard =
+		*PlanShards[
+			PlanShardIndex(InKey)];
+
+	FReadScopeLock Scope(
+		Shard.Lock);
 
 	if (const FVoxelFeaturePlanPtr* Found =
-		Features.Find(InKey))
+		Shard.Features.Find(InKey))
 	{
 		OutPlan = *Found;
 		return OutPlan.IsValid();
@@ -501,15 +721,55 @@ bool FVoxelGenerationPlanCache::FindFeature(
 	return false;
 }
 
+bool FVoxelGenerationPlanCache::GetOrBuildEcology(
+	const FVoxelGenerationTileKey& InKey,
+	TFunctionRef<bool(FVoxelEcologyPlan&, FString&)> InBuild,
+	FVoxelEcologyPlanPtr& OutPlan,
+	FString& OutError,
+	const TAtomic<bool>* InCancel)
+{
+	FPlanShard& Shard = *PlanShards[PlanShardIndex(InKey)];
+	return GetOrBuildValue<FVoxelGenerationTileKey, FVoxelEcologyPlan, FBuildGate>(
+		Shard.Lock,
+		Shard.Ecology,
+		Shard.EcologyBuilds,
+		Shard.EcologyKeys,
+		InKey,
+		InBuild,
+		OutPlan,
+		OutError,
+		InCancel,
+		bAllowGameThreadBuilds,
+		[this](const uint64 InWait)
+		{
+			RecordGateWait(InWait);
+		});
+}
+
 void FVoxelGenerationPlanCache::StoreFeature(
 	const FVoxelGenerationTileKey& InKey,
 	FVoxelFeaturePlanPtr InPlan)
 {
-	FWriteScopeLock Scope(Lock);
+	FPlanShard& Shard =
+		*PlanShards[
+			PlanShardIndex(InKey)];
 
-	Features.Add(
+	FWriteScopeLock Scope(
+		Shard.Lock);
+
+	const bool bNew =
+		!Shard.Features.Contains(
+			InKey);
+
+	Shard.Features.Add(
 		InKey,
 		MoveTemp(InPlan));
+
+	if (bNew)
+	{
+		Shard.FeatureKeys.Add(
+			InKey);
+	}
 }
 
 bool FVoxelGenerationPlanCache::GetOrBuildFeature(
@@ -518,144 +778,46 @@ bool FVoxelGenerationPlanCache::GetOrBuildFeature(
 		FVoxelFeaturePlan&,
 		FString&)> InBuild,
 	FVoxelFeaturePlanPtr& OutPlan,
-	FString& OutError)
+	FString& OutError,
+	const TAtomic<bool>* InCancel)
 {
-	{
-		FReadScopeLock Scope(Lock);
+	FPlanShard& Shard =
+		*PlanShards[
+			PlanShardIndex(InKey)];
 
-		if (const FVoxelFeaturePlanPtr* Found =
-			Features.Find(InKey))
-		{
-			OutPlan = *Found;
-			OutError.Reset();
-			return OutPlan.IsValid();
-		}
-	}
-
-	TSharedPtr<
-		FBuildGate,
-		ESPMode::ThreadSafe> Gate;
-
-	bool bOwner = false;
-
-	{
-		FWriteScopeLock Scope(Lock);
-
-		if (const FVoxelFeaturePlanPtr* Found =
-			Features.Find(InKey))
-		{
-			OutPlan = *Found;
-			OutError.Reset();
-			return OutPlan.IsValid();
-		}
-
-		if (TSharedPtr<
-			FBuildGate,
-			ESPMode::ThreadSafe>* Existing =
-				FeatureBuilds.Find(InKey))
-		{
-			Gate = *Existing;
-		}
-		else
-		{
-			Gate =
-				MakeShared<
-					FBuildGate,
-					ESPMode::ThreadSafe>();
-
-			FeatureBuilds.Add(
-				InKey,
-				Gate);
-
-			bOwner = true;
-		}
-	}
-
-	if (!bOwner)
-	{
-		Gate->Event->Wait();
-
-		if (!Gate->bSuccess)
-		{
-			OutError = Gate->Error;
-			return false;
-		}
-
-		if (!FindFeature(
+	return GetOrBuildValue<
+		FVoxelGenerationTileKey,
+		FVoxelFeaturePlan,
+		FBuildGate>(
+			Shard.Lock,
+			Shard.Features,
+			Shard.FeatureBuilds,
+			Shard.FeatureKeys,
 			InKey,
-			OutPlan))
-		{
-			OutError =
-				TEXT("Feature plan build completed without publishing a plan");
-
-			return false;
-		}
-
-		OutError.Reset();
-		return true;
-	}
-
-	FVoxelFeaturePlan LocalPlan;
-	FString BuildError;
-
-	const bool bSuccess =
-		InBuild(
-			LocalPlan,
-			BuildError);
-
-	FVoxelFeaturePlanPtr BuiltPlan;
-
-	if (bSuccess)
-	{
-		BuiltPlan =
-			MakeShared<
-				const FVoxelFeaturePlan,
-				ESPMode::ThreadSafe>(
-					MoveTemp(LocalPlan));
-	}
-
-	{
-		FWriteScopeLock Scope(Lock);
-
-		if (BuiltPlan)
-		{
-			Features.Add(
-				InKey,
-				BuiltPlan);
-		}
-
-		Gate->bSuccess =
-			BuiltPlan.IsValid();
-
-		Gate->Error =
-			Gate->bSuccess
-				? FString()
-				: BuildError;
-
-		FeatureBuilds.Remove(InKey);
-	}
-
-	Gate->Event->Trigger();
-
-	if (!Gate->bSuccess)
-	{
-		OutError = Gate->Error;
-		return false;
-	}
-
-	OutPlan = MoveTemp(BuiltPlan);
-	OutError.Reset();
-	return true;
+			InBuild,
+			OutPlan,
+			OutError,
+			InCancel,
+			bAllowGameThreadBuilds,
+			[this](const uint64 InWait)
+			{
+				RecordGateWait(InWait);
+			});
 }
 
 bool FVoxelGenerationPlanCache::FindStructure(
 	const FVoxelGenerationTileKey& InKey,
 	FVoxelStructurePlanPtr& OutPlan) const
 {
-	FReadScopeLock Scope(Lock);
+	const FPlanShard& Shard =
+		*PlanShards[
+			PlanShardIndex(InKey)];
+
+	FReadScopeLock Scope(
+		Shard.Lock);
 
 	if (const FVoxelStructurePlanPtr* Found =
-		Structures.Find(InKey))
+		Shard.Structures.Find(InKey))
 	{
 		OutPlan = *Found;
 		return OutPlan.IsValid();
@@ -668,11 +830,26 @@ void FVoxelGenerationPlanCache::StoreStructure(
 	const FVoxelGenerationTileKey& InKey,
 	FVoxelStructurePlanPtr InPlan)
 {
-	FWriteScopeLock Scope(Lock);
+	FPlanShard& Shard =
+		*PlanShards[
+			PlanShardIndex(InKey)];
 
-	Structures.Add(
+	FWriteScopeLock Scope(
+		Shard.Lock);
+
+	const bool bNew =
+		!Shard.Structures.Contains(
+			InKey);
+
+	Shard.Structures.Add(
 		InKey,
 		MoveTemp(InPlan));
+
+	if (bNew)
+	{
+		Shard.StructureKeys.Add(
+			InKey);
+	}
 }
 
 bool FVoxelGenerationPlanCache::GetOrBuildStructure(
@@ -681,283 +858,578 @@ bool FVoxelGenerationPlanCache::GetOrBuildStructure(
 		FVoxelStructurePlan&,
 		FString&)> InBuild,
 	FVoxelStructurePlanPtr& OutPlan,
-	FString& OutError)
+	FString& OutError,
+	const TAtomic<bool>* InCancel)
 {
-	{
-		FReadScopeLock Scope(Lock);
+	FPlanShard& Shard =
+		*PlanShards[
+			PlanShardIndex(InKey)];
 
-		if (const FVoxelStructurePlanPtr* Found =
-			Structures.Find(InKey))
-		{
-			OutPlan = *Found;
-			OutError.Reset();
-			return OutPlan.IsValid();
-		}
-	}
-
-	TSharedPtr<
-		FBuildGate,
-		ESPMode::ThreadSafe> Gate;
-
-	bool bOwner = false;
-
-	{
-		FWriteScopeLock Scope(Lock);
-
-		if (const FVoxelStructurePlanPtr* Found =
-			Structures.Find(InKey))
-		{
-			OutPlan = *Found;
-			OutError.Reset();
-			return OutPlan.IsValid();
-		}
-
-		if (TSharedPtr<
-			FBuildGate,
-			ESPMode::ThreadSafe>* Existing =
-				StructureBuilds.Find(InKey))
-		{
-			Gate = *Existing;
-		}
-		else
-		{
-			Gate =
-				MakeShared<
-					FBuildGate,
-					ESPMode::ThreadSafe>();
-
-			StructureBuilds.Add(
-				InKey,
-				Gate);
-
-			bOwner = true;
-		}
-	}
-
-	if (!bOwner)
-	{
-		Gate->Event->Wait();
-
-		if (!Gate->bSuccess)
-		{
-			OutError = Gate->Error;
-			return false;
-		}
-
-		if (!FindStructure(
+	return GetOrBuildValue<
+		FVoxelGenerationTileKey,
+		FVoxelStructurePlan,
+		FBuildGate>(
+			Shard.Lock,
+			Shard.Structures,
+			Shard.StructureBuilds,
+			Shard.StructureKeys,
 			InKey,
-			OutPlan))
-		{
-			OutError =
-				TEXT("Structure plan build completed without publishing a plan");
+			InBuild,
+			OutPlan,
+			OutError,
+			InCancel,
+			bAllowGameThreadBuilds,
+			[this](const uint64 InWait)
+			{
+				RecordGateWait(InWait);
+			});
+}
 
-			return false;
-		}
+void FVoxelGenerationPlanCache::UpdateRetention(
+	const FVoxelGenerationCacheRetention& InRetention)
+{
+	FWriteScopeLock Scope(
+		RetentionLock);
 
-		OutError.Reset();
+	Retention =
+		InRetention;
+}
+
+bool FVoxelGenerationPlanCache::IsRetained(
+	const FIntPoint& InPosition,
+	const int32 InRadius,
+	const FVoxelGenerationCacheRetention& InRetention) const
+{
+	if (InRetention.Centers.IsEmpty())
+	{
 		return true;
 	}
 
-	FVoxelStructurePlan LocalPlan;
-	FString BuildError;
-
-	const bool bSuccess =
-		InBuild(
-			LocalPlan,
-			BuildError);
-
-	FVoxelStructurePlanPtr BuiltPlan;
-
-	if (bSuccess)
+	for (const FIntPoint& Center :
+		InRetention.Centers)
 	{
-		BuiltPlan =
-			MakeShared<
-				const FVoxelStructurePlan,
-				ESPMode::ThreadSafe>(
-					MoveTemp(LocalPlan));
-	}
-
-	{
-		FWriteScopeLock Scope(Lock);
-
-		if (BuiltPlan)
+		if (FMath::Abs(
+				InPosition.X -
+					Center.X) <=
+				InRadius &&
+			FMath::Abs(
+				InPosition.Y -
+					Center.Y) <=
+				InRadius)
 		{
-			Structures.Add(
-				InKey,
-				BuiltPlan);
+			return true;
 		}
-
-		Gate->bSuccess =
-			BuiltPlan.IsValid();
-
-		Gate->Error =
-			Gate->bSuccess
-				? FString()
-				: BuildError;
-
-		StructureBuilds.Remove(InKey);
 	}
 
-	Gate->Event->Trigger();
-
-	if (!Gate->bSuccess)
-	{
-		OutError = Gate->Error;
-		return false;
-	}
-
-	OutPlan = MoveTemp(BuiltPlan);
-	OutError.Reset();
-	return true;
+	return false;
 }
 
-void FVoxelGenerationPlanCache::Reset()
+void FVoxelGenerationPlanCache::TickMaintenance(
+	const int32 InMaxEntries)
 {
-	{
-		FWriteScopeLock Scope(NaturalLock);
-		BaseColumns.Reset();
-		RiverFields.Reset();
-		Lakes.Reset();
-		NaturalColumns.Reset();
-		BaseColumnBuilds.Reset();
-		RiverFieldBuilds.Reset();
-		LakeBuilds.Reset();
-		NaturalColumnBuilds.Reset();
-	}
+	TRACE_CPUPROFILER_EVENT_SCOPE(
+		Voxel_GenerationCacheMaintenance);
 
-	FWriteScopeLock Scope(Lock);
+	int32 Budget =
+		FMath::Max(
+			0,
+			InMaxEntries);
 
-	Hydrology.Reset();
-	Caves.Reset();
-	Features.Reset();
-	Structures.Reset();
-}
-
-void FVoxelGenerationPlanCache::TrimNaturalCaches(
-	TConstArrayView<FIntPoint> InCenters,
-	const int32 InKeepRadiusCells)
-{
-	if (InCenters.IsEmpty() || InKeepRadiusCells < 0)
+	if (Budget <= 0)
 	{
 		return;
 	}
 
-	auto IsRetained = [InCenters, InKeepRadiusCells](const FIntPoint& InPosition)
-	{
-		for (const FIntPoint& Center : InCenters)
-		{
-			if (FMath::Abs(InPosition.X - Center.X) <= InKeepRadiusCells &&
-				FMath::Abs(InPosition.Y - Center.Y) <= InKeepRadiusCells)
-			{
-				return true;
-			}
-		}
-		return false;
-	};
+	FVoxelGenerationCacheRetention Snapshot;
 
-	FWriteScopeLock Scope(NaturalLock);
-	for (auto It = BaseColumns.CreateIterator(); It; ++It)
 	{
-		if (!IsRetained(It.Key())) It.RemoveCurrent();
+		FReadScopeLock Scope(
+			RetentionLock);
+
+		Snapshot =
+			Retention;
 	}
-	for (auto It = NaturalColumns.CreateIterator(); It; ++It)
+
+	if (Snapshot.Centers.IsEmpty())
 	{
-		if (!IsRetained(It.Key())) It.RemoveCurrent();
+		return;
 	}
-	for (auto It = RiverFields.CreateIterator(); It; ++It)
+
+	const int32 ShardIndex =
+		MaintenanceShardCursor %
+		ShardCount;
+
+	MaintenanceShardCursor =
+		(MaintenanceShardCursor + 1) %
+		ShardCount;
+
+	TArray<FVoxelBaseColumnEntryPtr> RetiredBaseColumns;
+	TArray<FVoxelNaturalColumnEntryPtr> RetiredNaturalColumns;
+	TArray<FVoxelRiverFieldTilePtr> RetiredRiverFields;
+	TArray<FVoxelLakeAnchorPlanPtr> RetiredLakes;
+
 	{
-		if (!IsRetained(It.Key().Coordinate * FVoxelRiverFieldTile::Side)) It.RemoveCurrent();
+		FNaturalShard& Shard =
+			*NaturalShards[
+				ShardIndex];
+
+		FWriteScopeLock Scope(
+			Shard.Lock);
+
+		TrimMapBudgeted(
+			Shard.BaseColumns,
+			Shard.BaseColumnKeys,
+			Shard.BaseColumnCursor,
+			Budget,
+			RetiredBaseColumns,
+			[this, &Snapshot](
+				const FIntPoint& InKey)
+			{
+				return IsRetained(
+					InKey,
+					Snapshot.NaturalRadiusCells,
+					Snapshot);
+			});
+
+		TrimMapBudgeted(
+			Shard.NaturalColumns,
+			Shard.NaturalColumnKeys,
+			Shard.NaturalColumnCursor,
+			Budget,
+			RetiredNaturalColumns,
+			[this, &Snapshot](
+				const FIntPoint& InKey)
+			{
+				return IsRetained(
+					InKey,
+					Snapshot.NaturalRadiusCells,
+					Snapshot);
+			});
+
+		TrimMapBudgeted(
+			Shard.RiverFields,
+			Shard.RiverFieldKeys,
+			Shard.RiverFieldCursor,
+			Budget,
+			RetiredRiverFields,
+			[this, &Snapshot](
+				const FVoxelNaturalTileKey& InKey)
+			{
+				return IsRetained(
+					InKey.Coordinate *
+						FVoxelRiverFieldTile::Side,
+					Snapshot.NaturalRadiusCells,
+					Snapshot);
+			});
+
+		TrimMapBudgeted(
+			Shard.Lakes,
+			Shard.LakeKeys,
+			Shard.LakeCursor,
+			Budget,
+			RetiredLakes,
+			[this, &Snapshot](
+				const FVoxelLakeAnchorKey& InKey)
+			{
+				return IsRetained(
+					InKey.Coordinate *
+						LakeAnchorSide,
+					Snapshot.NaturalRadiusCells,
+					Snapshot);
+			});
 	}
-	for (auto It = Lakes.CreateIterator(); It; ++It)
+
+	if (Budget <= 0)
 	{
-		if (!IsRetained(It.Key().Coordinate * 64)) It.RemoveCurrent();
+		return;
 	}
+
+	TArray<FVoxelHydrologyPlanPtr> RetiredHydrology;
+	TArray<FVoxelCavePlanPtr> RetiredCaves;
+	TArray<FVoxelEcologyPlanPtr> RetiredEcology;
+	TArray<FVoxelFeaturePlanPtr> RetiredFeatures;
+	TArray<FVoxelStructurePlanPtr> RetiredStructures;
+
+	{
+		FPlanShard& Shard =
+			*PlanShards[
+				ShardIndex];
+
+		FWriteScopeLock Scope(
+			Shard.Lock);
+
+		TrimMapBudgeted(
+			Shard.Caves,
+			Shard.CaveKeys,
+			Shard.CaveCursor,
+			Budget,
+			RetiredCaves,
+			[this, &Snapshot](
+				const FVoxelGenerationTileKey& InKey)
+			{
+				const FIntVector Origin =
+					InKey.Coordinate *
+					GenerationPlanTileSide;
+
+				return IsRetained(
+					FIntPoint(
+						Origin.X,
+						Origin.Y),
+					Snapshot.PlanRadiusCells,
+					Snapshot);
+			});
+
+		TrimMapBudgeted(
+			Shard.Ecology,
+			Shard.EcologyKeys,
+			Shard.EcologyCursor,
+			Budget,
+			RetiredEcology,
+			[this, &Snapshot](const FVoxelGenerationTileKey& InKey)
+			{
+				const FIntVector Origin = InKey.Coordinate * GenerationPlanTileSide;
+				return IsRetained(
+					FIntPoint(Origin.X, Origin.Y),
+					Snapshot.PlanRadiusCells,
+					Snapshot);
+			});
+
+		TrimMapBudgeted(
+			Shard.Features,
+			Shard.FeatureKeys,
+			Shard.FeatureCursor,
+			Budget,
+			RetiredFeatures,
+			[this, &Snapshot](
+				const FVoxelGenerationTileKey& InKey)
+			{
+				const FIntVector Origin =
+					InKey.Coordinate *
+					GenerationPlanTileSide;
+
+				return IsRetained(
+					FIntPoint(
+						Origin.X,
+						Origin.Y),
+					Snapshot.PlanRadiusCells,
+					Snapshot);
+			});
+
+		TrimMapBudgeted(
+			Shard.Structures,
+			Shard.StructureKeys,
+			Shard.StructureCursor,
+			Budget,
+			RetiredStructures,
+			[this, &Snapshot](
+				const FVoxelGenerationTileKey& InKey)
+			{
+				const FIntVector Origin =
+					InKey.Coordinate *
+					GenerationPlanTileSide;
+
+				return IsRetained(
+					FIntPoint(
+						Origin.X,
+						Origin.Y),
+					Snapshot.PlanRadiusCells,
+					Snapshot);
+			});
+
+		TrimMapBudgeted(
+			Shard.Hydrology,
+			Shard.HydrologyKeys,
+			Shard.HydrologyCursor,
+			Budget,
+			RetiredHydrology,
+			[this, &Snapshot](
+				const FVoxelHydrologyRegionKey& InKey)
+			{
+				return IsRetained(
+					InKey.Coordinate *
+						Snapshot.HydrologyRegionSide,
+					Snapshot.HydrologyRadiusCells,
+					Snapshot);
+			});
+	}
+}
+
+void FVoxelGenerationPlanCache::Reset()
+{
+	for (int32 Index = 0;
+		Index < ShardCount;
+		++Index)
+	{
+		{
+			FNaturalShard& Shard =
+				*NaturalShards[Index];
+
+			FWriteScopeLock Scope(
+				Shard.Lock);
+
+			Shard.BaseColumns.Reset();
+			Shard.RiverFields.Reset();
+			Shard.Lakes.Reset();
+			Shard.NaturalColumns.Reset();
+
+			Shard.BaseColumnBuilds.Reset();
+			Shard.RiverFieldBuilds.Reset();
+			Shard.LakeBuilds.Reset();
+			Shard.NaturalColumnBuilds.Reset();
+
+			Shard.BaseColumnKeys.Reset();
+			Shard.RiverFieldKeys.Reset();
+			Shard.LakeKeys.Reset();
+			Shard.NaturalColumnKeys.Reset();
+
+			Shard.BaseColumnCursor = 0;
+			Shard.RiverFieldCursor = 0;
+			Shard.LakeCursor = 0;
+			Shard.NaturalColumnCursor = 0;
+		}
+
+		{
+			FPlanShard& Shard =
+				*PlanShards[Index];
+
+			FWriteScopeLock Scope(
+				Shard.Lock);
+
+			Shard.Hydrology.Reset();
+			Shard.Caves.Reset();
+			Shard.Ecology.Reset();
+			Shard.Features.Reset();
+			Shard.Structures.Reset();
+
+			Shard.HydrologyBuilds.Reset();
+			Shard.CaveBuilds.Reset();
+			Shard.EcologyBuilds.Reset();
+			Shard.FeatureBuilds.Reset();
+			Shard.StructureBuilds.Reset();
+
+			Shard.HydrologyKeys.Reset();
+			Shard.CaveKeys.Reset();
+			Shard.EcologyKeys.Reset();
+			Shard.FeatureKeys.Reset();
+			Shard.StructureKeys.Reset();
+
+			Shard.HydrologyCursor = 0;
+			Shard.CaveCursor = 0;
+			Shard.EcologyCursor = 0;
+			Shard.FeatureCursor = 0;
+			Shard.StructureCursor = 0;
+		}
+	}
+
+	MaintenanceShardCursor = 0;
+}
+
+FVoxelGenerationCacheStats
+FVoxelGenerationPlanCache::GetStats() const
+{
+	FVoxelGenerationCacheStats Stats;
+
+	for (int32 Index = 0;
+		Index < ShardCount;
+		++Index)
+	{
+		{
+			const FNaturalShard& Shard =
+				*NaturalShards[Index];
+
+			FReadScopeLock Scope(
+				Shard.Lock);
+
+			Stats.BaseColumns +=
+				Shard.BaseColumns.Num();
+
+			Stats.NaturalColumns +=
+				Shard.NaturalColumns.Num();
+
+			Stats.RiverFields +=
+				Shard.RiverFields.Num();
+
+			Stats.Lakes +=
+				Shard.Lakes.Num();
+		}
+
+		{
+			const FPlanShard& Shard =
+				*PlanShards[Index];
+
+			FReadScopeLock Scope(
+				Shard.Lock);
+
+			Stats.Hydrology +=
+				Shard.Hydrology.Num();
+
+			Stats.Caves +=
+				Shard.Caves.Num();
+
+			Stats.Ecology +=
+				Shard.Ecology.Num();
+
+			Stats.Features +=
+				Shard.Features.Num();
+
+			Stats.Structures +=
+				Shard.Structures.Num();
+		}
+	}
+
+	Stats.GateWaitCount =
+		GateWaitCount.Load();
+
+	Stats.GateWaitMicroseconds =
+		GateWaitMicroseconds.Load();
+
+	Stats.AllocatedBytes =
+		GetAllocatedBytes();
+
+	return Stats;
 }
 
 uint64 FVoxelGenerationPlanCache::GetAllocatedBytes() const
 {
 	uint64 Bytes = 0;
 
+	for (int32 Index = 0;
+		Index < ShardCount;
+		++Index)
 	{
-		FReadScopeLock NaturalScope(NaturalLock);
-		Bytes += BaseColumns.GetAllocatedSize() +
-			RiverFields.GetAllocatedSize() +
-			Lakes.GetAllocatedSize() +
-			NaturalColumns.GetAllocatedSize();
-		for (const TPair<FIntPoint, FVoxelBaseColumnEntryPtr>& Pair : BaseColumns)
 		{
-			if (Pair.Value) Bytes += Pair.Value->GetAllocatedBytes();
-		}
-		for (const TPair<FVoxelNaturalTileKey, FVoxelRiverFieldTilePtr>& Pair : RiverFields)
-		{
-			if (Pair.Value) Bytes += Pair.Value->GetAllocatedBytes();
-		}
-		for (const TPair<FVoxelLakeAnchorKey, FVoxelLakeAnchorPlanPtr>& Pair : Lakes)
-		{
-			if (Pair.Value) Bytes += Pair.Value->GetAllocatedBytes();
-		}
-		for (const TPair<FIntPoint, FVoxelNaturalColumnEntryPtr>& Pair : NaturalColumns)
-		{
-			if (Pair.Value) Bytes += Pair.Value->GetAllocatedBytes();
-		}
-	}
+			const FNaturalShard& Shard =
+				*NaturalShards[Index];
 
-	FReadScopeLock Scope(Lock);
-	Bytes +=
-		Hydrology.GetAllocatedSize() +
-		Caves.GetAllocatedSize() +
-		Features.GetAllocatedSize() +
-		Structures.GetAllocatedSize();
+			FReadScopeLock Scope(
+				Shard.Lock);
 
-	for (const TPair<
-		FVoxelHydrologyRegionKey,
-		FVoxelHydrologyPlanPtr>& Pair :
-		Hydrology)
-	{
-		if (Pair.Value)
-		{
 			Bytes +=
-				Pair.Value->
-					GetAllocatedBytes();
-		}
-	}
+				Shard.BaseColumns.GetAllocatedSize() +
+				Shard.RiverFields.GetAllocatedSize() +
+				Shard.Lakes.GetAllocatedSize() +
+				Shard.NaturalColumns.GetAllocatedSize() +
+				Shard.BaseColumnKeys.GetAllocatedSize() +
+				Shard.RiverFieldKeys.GetAllocatedSize() +
+				Shard.LakeKeys.GetAllocatedSize() +
+				Shard.NaturalColumnKeys.GetAllocatedSize();
 
-	for (const TPair<
-		FVoxelGenerationTileKey,
-		FVoxelCavePlanPtr>& Pair :
-		Caves)
-	{
-		if (Pair.Value)
-		{
-			Bytes +=
-				Pair.Value->
-					GetAllocatedBytes();
-		}
-	}
+			for (const TPair<FIntPoint, FVoxelBaseColumnEntryPtr>& Pair :
+				Shard.BaseColumns)
+			{
+				if (Pair.Value)
+				{
+					Bytes +=
+						Pair.Value->
+							GetAllocatedBytes();
+				}
+			}
 
-	for (const TPair<
-		FVoxelGenerationTileKey,
-		FVoxelFeaturePlanPtr>& Pair :
-		Features)
-	{
-		if (Pair.Value)
-		{
-			Bytes +=
-				Pair.Value->
-					GetAllocatedBytes();
-		}
-	}
+			for (const TPair<FVoxelNaturalTileKey, FVoxelRiverFieldTilePtr>& Pair :
+				Shard.RiverFields)
+			{
+				if (Pair.Value)
+				{
+					Bytes +=
+						Pair.Value->
+							GetAllocatedBytes();
+				}
+			}
 
-	for (const TPair<
-		FVoxelGenerationTileKey,
-		FVoxelStructurePlanPtr>& Pair :
-		Structures)
-	{
-		if (Pair.Value)
+			for (const TPair<FVoxelLakeAnchorKey, FVoxelLakeAnchorPlanPtr>& Pair :
+				Shard.Lakes)
+			{
+				if (Pair.Value)
+				{
+					Bytes +=
+						Pair.Value->
+							GetAllocatedBytes();
+				}
+			}
+
+			for (const TPair<FIntPoint, FVoxelNaturalColumnEntryPtr>& Pair :
+				Shard.NaturalColumns)
+			{
+				if (Pair.Value)
+				{
+					Bytes +=
+						Pair.Value->
+							GetAllocatedBytes();
+				}
+			}
+		}
+
 		{
+			const FPlanShard& Shard =
+				*PlanShards[Index];
+
+			FReadScopeLock Scope(
+				Shard.Lock);
+
 			Bytes +=
-				Pair.Value->
-					GetAllocatedBytes();
+				Shard.Hydrology.GetAllocatedSize() +
+				Shard.Caves.GetAllocatedSize() +
+				Shard.Ecology.GetAllocatedSize() +
+				Shard.Features.GetAllocatedSize() +
+				Shard.Structures.GetAllocatedSize() +
+				Shard.HydrologyKeys.GetAllocatedSize() +
+				Shard.CaveKeys.GetAllocatedSize() +
+				Shard.EcologyKeys.GetAllocatedSize() +
+				Shard.FeatureKeys.GetAllocatedSize() +
+				Shard.StructureKeys.GetAllocatedSize();
+
+			for (const TPair<FVoxelHydrologyRegionKey, FVoxelHydrologyPlanPtr>& Pair :
+				Shard.Hydrology)
+			{
+				if (Pair.Value)
+				{
+					Bytes +=
+						Pair.Value->
+							GetAllocatedBytes();
+				}
+			}
+
+			for (const TPair<FVoxelGenerationTileKey, FVoxelCavePlanPtr>& Pair :
+				Shard.Caves)
+			{
+				if (Pair.Value)
+				{
+					Bytes +=
+						Pair.Value->
+							GetAllocatedBytes();
+				}
+			}
+
+			for (const TPair<FVoxelGenerationTileKey, FVoxelFeaturePlanPtr>& Pair :
+				Shard.Features)
+			{
+				if (Pair.Value)
+				{
+					Bytes +=
+						Pair.Value->
+							GetAllocatedBytes();
+				}
+			}
+
+			for (const TPair<FVoxelGenerationTileKey, FVoxelEcologyPlanPtr>& Pair :
+				Shard.Ecology)
+			{
+				if (Pair.Value)
+				{
+					Bytes += Pair.Value->GetAllocatedBytes();
+				}
+			}
+
+			for (const TPair<FVoxelGenerationTileKey, FVoxelStructurePlanPtr>& Pair :
+				Shard.Structures)
+			{
+				if (Pair.Value)
+				{
+					Bytes +=
+						Pair.Value->
+							GetAllocatedBytes();
+				}
+			}
 		}
 	}
 

@@ -1,4 +1,5 @@
 #include "Voxel/Components/VoxelMeshComponent.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 
 UVoxelMeshComponent::UVoxelMeshComponent(
 	const FObjectInitializer& InObjectInitializer)
@@ -35,7 +36,9 @@ bool UVoxelMeshComponent::Apply(
 	const double InBlockSize,
 	UMaterialInterface* InMaterial)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_MeshApplyGT);
 	check(IsInGameThread());
+	const double StartTime = FPlatformTime::Seconds();
 
 	if (!InMaterial ||
 		!FMath::IsFinite(
@@ -76,6 +79,21 @@ bool UVoxelMeshComponent::Apply(
 	SetMaterial(
 		0,
 		InMaterial);
+
+#if !UE_BUILD_SHIPPING
+	const double Milliseconds =
+		(FPlatformTime::Seconds() - StartTime) * 1000.0;
+	if (Milliseconds >= 5.0)
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("Voxel mesh GT apply %.2fms; vertices=%d triangles=%d"),
+			Milliseconds,
+			InMesh.Vertices.Num(),
+			InMesh.Triangles.Num() / 3);
+	}
+#endif
 
 	return true;
 }

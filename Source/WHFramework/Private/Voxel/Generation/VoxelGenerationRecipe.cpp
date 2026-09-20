@@ -142,6 +142,30 @@ bool FVoxelGenerationPalette::Validate(int32 InBlockCount, FString& OutError) co
 	return true;
 }
 
+bool FVoxelEcologyRuntimePalette::Validate(
+	const int32 InBlockCount,
+	const FVoxelEcologyGenerationSettings& InSettings,
+	FString& OutError) const
+{
+	const auto IsValid = [InBlockCount](const uint16 InSymbol)
+	{
+		return InSymbol != MAX_uint16 && static_cast<int32>(InSymbol) < InBlockCount;
+	};
+
+	if (InSettings.Tree.bEnabled && (!IsValid(TreeTrunk) || !IsValid(TreeLeaves)))
+	{
+		OutError = TEXT("Voxel recipe contains invalid default tree ecology symbols");
+		return false;
+	}
+	if (InSettings.Grass.bEnabled && !IsValid(GrassPlant))
+	{
+		OutError = TEXT("Voxel recipe contains invalid default grass ecology symbol");
+		return false;
+	}
+	OutError.Reset();
+	return true;
+}
+
 bool FVoxelSurfaceRuntimeRule::Validate(int32 InBlockCount, FString& OutError) const
 {
 	if (!Height.Validate(OutError) || !Slope.Validate(OutError) || !Temperature.Validate(OutError) || !Moisture.Validate(OutError))
@@ -377,6 +401,7 @@ bool FVoxelGenerationRecipe::Validate(FString& OutError) const
 		UniqueBlocks.Add(Name);
 	}
 	if (!Palette.Validate(BlockNames.Num(), OutError)) return false;
+	if (!Ecology.Validate(BlockNames.Num(), Settings.Ecology, OutError)) return false;
 	if (!VoxelGenerationValidateUniqueNames(Biomes, TEXT("Voxel biomes"), OutError) ||
 		!VoxelGenerationValidateUniqueNames(Features, TEXT("Voxel features"), OutError) ||
 		!VoxelGenerationValidateUniqueNames(Structures, TEXT("Voxel structures"), OutError) ||

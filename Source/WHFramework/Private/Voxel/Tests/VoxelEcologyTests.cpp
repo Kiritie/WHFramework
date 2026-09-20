@@ -1,0 +1,145 @@
+#if WITH_DEV_AUTOMATION_TESTS
+
+#include "Misc/AutomationTest.h"
+
+#include "Voxel/Generation/Ecology/VoxelEcology.h"
+#include "Voxel/Generation/VoxelGenerationRecipe.h"
+
+namespace
+{
+	FVoxelGenerationRecipe MakeEcologyRecipe()
+	{
+		FVoxelGenerationRecipe Recipe;
+		Recipe.Settings.Seed = 12345;
+		Recipe.Settings.Ecology = FVoxelEcologyGenerationSettings();
+		Recipe.Palette.Air = 0;
+		Recipe.Palette.Stone = 1;
+		Recipe.Ecology.TreeTrunk = 2;
+		Recipe.Ecology.TreeLeaves = 3;
+		Recipe.Ecology.GrassPlant = 4;
+		return Recipe;
+	}
+
+	bool BuildEcologyPlan(const FVoxelGenerationRecipe& Recipe, FVoxelEcologyPlan& OutPlan, FString& OutError)
+	{
+		const TSharedRef<const FVoxelGenerationRecipe, ESPMode::ThreadSafe> Shared =
+			MakeShared<const FVoxelGenerationRecipe, ESPMode::ThreadSafe>(Recipe);
+		FVoxelEcologyGenerator Generator(Shared);
+		auto SampleColumn = [](const FIntVector& InPosition, FVoxelColumnSample& OutColumn)
+		{
+			(void)InPosition;
+			OutColumn.SurfaceZ = 0;
+			OutColumn.DensityHeight = 0;
+			OutColumn.SlopePermille = 0;
+			OutColumn.Climate.TemperatureQ15 = 0;
+			OutColumn.Climate.MoistureQ15 = 12000;
+			return true;
+		};
+		auto SampleBase = [](const FIntVector& InPosition, uint32& OutValue)
+		{
+			OutValue = InPosition.Z <= 0 ? 1 : 0;
+			return true;
+		};
+		return Generator.BuildPlan(
+			{FIntVector(-256, -256, -64), FIntVector(256, 256, 128)},
+			SampleColumn,
+			SampleBase,
+			OutPlan,
+			OutError);
+	}
+
+	int32 CountSymbol(const FVoxelEcologyPlan& Plan, const uint16 Symbol)
+	{
+		int32 Count = 0;
+		for (const FVoxelEcologyPlanWrite& Write : Plan.Writes)
+		{
+			if (static_cast<uint16>(Write.Value & 0xffffu) == Symbol)
+			{
+				++Count;
+			}
+		}
+		return Count;
+	}
+
+	bool AreWritesEqual(const TArray<FVoxelEcologyPlanWrite>& A, const TArray<FVoxelEcologyPlanWrite>& B)
+	{
+		if (A.Num() != B.Num())
+		{
+			return false;
+		}
+		for (int32 Index = 0; Index < A.Num(); ++Index)
+		{
+			if (A[Index].Position != B[Index].Position || A[Index].Value != B[Index].Value ||
+				A[Index].Priority != B[Index].Priority || A[Index].OwnerId != B[Index].OwnerId)
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelDefaultEcologyTest,
+	"WHFramework.Voxel.Generation.DefaultEcology",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelDefaultEcologyTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const FVoxelGenerationRecipe Recipe = MakeEcologyRecipe();
+	FVoxelEcologyPlan Plan;
+	FString Error;
+	TestTrue(TEXT("Default ecology plan builds without profile features"), BuildEcologyPlan(Recipe, Plan, Error));
+	TestTrue(TEXT("Default ecology contains tree writes"),
+		CountSymbol(Plan, Recipe.Ecology.TreeTrunk) + CountSymbol(Plan, Recipe.Ecology.TreeLeaves) > 0);
+	TestTrue(TEXT("Default ecology contains grass writes"), CountSymbol(Plan, Recipe.Ecology.GrassPlant) > 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelEcologyOverrideTest,
+	"WHFramework.Voxel.Generation.EcologyOverride",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelEcologyOverrideTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FString Error;
+
+	FVoxelGenerationRecipe Recipe = MakeEcologyRecipe();
+	FVoxelEcologyPlan First;
+	FVoxelEcologyPlan Second;
+	TestTrue(TEXT("First deterministic ecology plan builds"), BuildEcologyPlan(Recipe, First, Error));
+	TestTrue(TEXT("Second deterministic ecology plan builds"), BuildEcologyPlan(Recipe, Second, Error));
+	TestTrue(TEXT("Same seed and settings produce identical writes"), AreWritesEqual(First.Writes, Second.Writes));
+
+	Recipe.Settings.Ecology.Tree.bEnabled = false;
+	FVoxelEcologyPlan NoTrees;
+	TestTrue(TEXT("Tree-disabled ecology plan builds"), BuildEcologyPlan(Recipe, NoTrees, Error));
+	TestEqual(TEXT("Tree disable removes trunks"), CountSymbol(NoTrees, Recipe.Ecology.TreeTrunk), 0);
+	TestEqual(TEXT("Tree disable removes leaves"), CountSymbol(NoTrees, Recipe.Ecology.TreeLeaves), 0);
+	TestTrue(TEXT("Tree disable keeps grass"), CountSymbol(NoTrees, Recipe.Ecology.GrassPlant) > 0);
+
+	Recipe = MakeEcologyRecipe();
+	Recipe.Settings.Ecology.Grass.bEnabled = false;
+	FVoxelEcologyPlan NoGrass;
+	TestTrue(TEXT("Grass-disabled ecology plan builds"), BuildEcologyPlan(Recipe, NoGrass, Error));
+	TestEqual(TEXT("Grass disable removes grass"), CountSymbol(NoGrass, Recipe.Ecology.GrassPlant), 0);
+	TestTrue(TEXT("Grass disable keeps trees"), CountSymbol(NoGrass, Recipe.Ecology.TreeTrunk) > 0);
+
+	Recipe = MakeEcologyRecipe();
+	Recipe.Settings.Ecology.Tree.DensityPermille = 0;
+	FVoxelEcologyPlan ZeroTreeDensity;
+	TestTrue(TEXT("Zero-tree-density ecology plan builds"), BuildEcologyPlan(Recipe, ZeroTreeDensity, Error));
+	TestEqual(TEXT("Zero tree density removes trunks"), CountSymbol(ZeroTreeDensity, Recipe.Ecology.TreeTrunk), 0);
+
+	Recipe = MakeEcologyRecipe();
+	Recipe.Settings.Ecology.Grass.DensityPermille = 0;
+	FVoxelEcologyPlan ZeroGrassDensity;
+	TestTrue(TEXT("Zero-grass-density ecology plan builds"), BuildEcologyPlan(Recipe, ZeroGrassDensity, Error));
+	TestEqual(TEXT("Zero grass density removes grass"), CountSymbol(ZeroGrassDensity, Recipe.Ecology.GrassPlant), 0);
+	return true;
+}
+
+#endif

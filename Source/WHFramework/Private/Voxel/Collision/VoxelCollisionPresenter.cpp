@@ -192,7 +192,7 @@ void FVoxelCollisionPresenter::RequestCollision(
 		EVoxelTaskKind::BuildCollision;
 
 	Request.WorkClass =
-		InDemand.bWarmupCollision
+		(InDemand.bMovementCriticalCollision || InDemand.bWarmupCollision)
 			? EVoxelWorkClass::Critical
 			: EVoxelWorkClass::Interactive;
 

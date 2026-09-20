@@ -10,7 +10,7 @@ uint16 FVoxelBiomeGenerator::Resolve(
     const FVoxelMacroTerrainSample& InTerrain) const
 {
     int32 BestPriority = MIN_int32;
-    uint16 BestIndex = 0;
+    uint16 BestIndex = MAX_uint16;
 
     for (int32 Index = 0; Index < Recipe->Biomes.Num(); ++Index)
     {

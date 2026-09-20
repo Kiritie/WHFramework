@@ -12,7 +12,7 @@ struct FVoxelStructurePieceTemplate;
 class WHFRAMEWORKEDITOR_API FVoxelGenerationCompiler
 {
 public:
-	static constexpr int32 CurrentBakeVersion = 2;
+	static constexpr int32 CurrentBakeVersion = 4;
 
 public:
 	static bool Compile(UVoxelWorldGenerationProfile& InOutProfile, const FVoxelRegistrySnapshot& InRegistry, FString& OutError);
@@ -24,9 +24,18 @@ private:
 		TArray<FName>& OutBlockNames, FString& OutError);
 	static bool CompilePalette(const UVoxelWorldGenerationProfile& InProfile, const FVoxelRegistrySnapshot& InRegistry,
 		const TMap<FName, uint16>& InBlockSymbols, FVoxelGenerationRecipe& InOutRecipe, FString& OutError);
+	static bool GatherBuiltinEcologyBlockNames(const UVoxelWorldGenerationProfile& InProfile,
+		const FVoxelRegistrySnapshot& InRegistry, TSet<FName>& InOutNames, FString& OutError);
+	static bool CompileBuiltinEcology(const UVoxelWorldGenerationProfile& InProfile,
+		const FVoxelRegistrySnapshot& InRegistry, const TMap<FName, uint16>& InBlockSymbols,
+		FVoxelGenerationRecipe& InOutRecipe, FString& OutError);
 	static bool CompileSurfaceRules(const UVoxelWorldGenerationProfile& InProfile, const FVoxelRegistrySnapshot& InRegistry,
 		const TMap<FName, uint16>& InBlockSymbols, FVoxelGenerationRecipe& InOutRecipe, FString& OutError);
-	static bool CompileFeatures(const UVoxelWorldGenerationProfile& InProfile, FVoxelGenerationRecipe& InOutRecipe, FString& OutError);
+	static bool CompileFeatures(const UVoxelWorldGenerationProfile& InProfile, const FVoxelRegistrySnapshot& InRegistry,
+		const TMap<FName, uint16>& InBlockSymbols, FVoxelGenerationRecipe& InOutRecipe, FString& OutError);
+	static bool GatherFeatureBlockNames(const UVoxelWorldGenerationProfile& InProfile, const FVoxelRegistrySnapshot& InRegistry,
+		TSet<FName>& InOutNames, FString& OutError);
+	static bool ValidateBiomeFeatureCoverage(const UVoxelWorldGenerationProfile& InProfile, FString& OutError);
 	static bool CompileStructures(const UVoxelWorldGenerationProfile& InProfile, const FVoxelRegistrySnapshot& InRegistry,
 		const TMap<FName, uint16>& InBlockSymbols, FVoxelGenerationRecipe& InOutRecipe, FString& OutError);
 	static bool CompileBiomes(const UVoxelWorldGenerationProfile& InProfile, FVoxelGenerationRecipe& InOutRecipe, FString& OutError);

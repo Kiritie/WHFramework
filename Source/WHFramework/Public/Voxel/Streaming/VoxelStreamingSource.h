@@ -13,6 +13,7 @@ struct WHFRAMEWORK_API FVoxelStreamingSource
 	int32 CollisionRadius = 8;
 	int32 SimulationRadius = 6;
 	int32 VerticalExactRadius = 8;
+	int32 MovementCriticalCollisionRadius = 0;
 	bool bRender = true;
 	bool bCollision = true;
 	bool bSimulation = true;

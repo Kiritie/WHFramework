@@ -22,6 +22,18 @@
 
 namespace
 {
+	const FSoftObjectPath DefaultTreeTrunkPath(
+		TEXT("/WHFramework/Voxel/DataAssets/Voxel/DA_Oak.DA_Oak"));
+	const FSoftObjectPath DefaultTreeLeavesPath(
+		TEXT("/WHFramework/Voxel/DataAssets/Voxel/DA_Oak_Leaves.DA_Oak_Leaves"));
+	const FSoftObjectPath DefaultGrassPlantPath(
+		TEXT("/WHFramework/Voxel/DataAssets/Voxel/DA_Tall_Grass.DA_Tall_Grass"));
+
+	UVoxelData* LoadBuiltinEcologyVoxel(const FSoftObjectPath& InPath)
+	{
+		return Cast<UVoxelData>(InPath.TryLoad());
+	}
+
 	template<typename TObjectType>
 	bool LoadSoftObjectRequired(
 		const TSoftObjectPtr<TObjectType>& InSoftObject,
@@ -266,6 +278,11 @@ bool FVoxelGenerationCompiler::BuildRecipe(
 		return false;
 	}
 
+	if (!ValidateBiomeFeatureCoverage(InProfile, OutError))
+	{
+		return false;
+	}
+
 	TArray<FName> BlockNames;
 
 	if (!GatherBlockNames(
@@ -316,6 +333,12 @@ bool FVoxelGenerationCompiler::BuildRecipe(
 			BlockSymbols,
 			Recipe,
 			OutError) ||
+		!CompileBuiltinEcology(
+			InProfile,
+			InRegistry,
+			BlockSymbols,
+			Recipe,
+			OutError) ||
 		!CompileSurfaceRules(
 			InProfile,
 			InRegistry,
@@ -324,6 +347,8 @@ bool FVoxelGenerationCompiler::BuildRecipe(
 			OutError) ||
 		!CompileFeatures(
 			InProfile,
+			InRegistry,
+			BlockSymbols,
 			Recipe,
 			OutError) ||
 		!CompileStructures(
@@ -414,6 +439,15 @@ bool FVoxelGenerationCompiler::GatherBlockNames(
 		{
 			return false;
 		}
+	}
+
+	if (!GatherBuiltinEcologyBlockNames(
+		InProfile,
+		InRegistry,
+		Names,
+		OutError))
+	{
+		return false;
 	}
 
 	for (const TSoftObjectPtr<UVoxelSurfaceRuleSet>& SoftRuleSet :
@@ -513,6 +547,11 @@ bool FVoxelGenerationCompiler::GatherBlockNames(
 		}
 	}
 
+	if (!GatherFeatureBlockNames(InProfile, InRegistry, Names, OutError))
+	{
+		return false;
+	}
+
 	TArray<FName> SortedNames =
 		Names.Array();
 
@@ -528,6 +567,90 @@ bool FVoxelGenerationCompiler::GatherBlockNames(
 	 */
 	OutBlockNames.Add(NAME_None);
 	OutBlockNames.Append(SortedNames);
+
+	OutError.Reset();
+	return true;
+}
+
+bool FVoxelGenerationCompiler::GatherBuiltinEcologyBlockNames(
+	const UVoxelWorldGenerationProfile& InProfile,
+	const FVoxelRegistrySnapshot& InRegistry,
+	TSet<FName>& InOutNames,
+	FString& OutError)
+{
+	const FVoxelEcologyGenerationSettings& Ecology = InProfile.Defaults.Ecology;
+	if (Ecology.Tree.bEnabled)
+	{
+		UVoxelData* Trunk = LoadBuiltinEcologyVoxel(DefaultTreeTrunkPath);
+		UVoxelData* Leaves = LoadBuiltinEcologyVoxel(DefaultTreeLeavesPath);
+		if (!Trunk || !Leaves)
+		{
+			OutError = TEXT("WHFramework default tree ecology assets are missing");
+			return false;
+		}
+		if (!AddReferencedVoxel(Trunk, InRegistry, InOutNames, OutError) ||
+			!AddReferencedVoxel(Leaves, InRegistry, InOutNames, OutError))
+		{
+			return false;
+		}
+	}
+	if (Ecology.Grass.bEnabled)
+	{
+		UVoxelData* GrassPlant = LoadBuiltinEcologyVoxel(DefaultGrassPlantPath);
+		if (!GrassPlant)
+		{
+			OutError = TEXT("WHFramework default grass ecology asset is missing");
+			return false;
+		}
+		if (!AddReferencedVoxel(GrassPlant, InRegistry, InOutNames, OutError))
+		{
+			return false;
+		}
+	}
+	OutError.Reset();
+	return true;
+}
+
+bool FVoxelGenerationCompiler::GatherFeatureBlockNames(
+	const UVoxelWorldGenerationProfile& InProfile,
+	const FVoxelRegistrySnapshot& InRegistry,
+	TSet<FName>& InOutNames,
+	FString& OutError)
+{
+	for (const TSoftObjectPtr<UVoxelFeatureData>& SoftFeature : InProfile.Features)
+	{
+		UVoxelFeatureData* Feature = SoftFeature.LoadSynchronous();
+		if (!Feature)
+		{
+			OutError = FString::Printf(TEXT("Voxel generation compiler failed to load feature: %s"), *SoftFeature.ToSoftObjectPath().ToString());
+			return false;
+		}
+
+		TSharedPtr<const IVoxelFeatureAlgorithm, ESPMode::ThreadSafe> Algorithm =
+			FVoxelFeatureAlgorithmRegistry::Get().Find(Feature->AlgorithmId);
+		if (!Algorithm)
+		{
+			OutError = FString::Printf(TEXT("Voxel feature algorithm is not registered: %s"), *Feature->AlgorithmId.ToString());
+			return false;
+		}
+
+		TArray<FPrimaryAssetId> ReferencedBlocks;
+		if (!Algorithm->GatherReferencedBlocks(Feature->Configuration, ReferencedBlocks, OutError))
+		{
+			OutError = FString::Printf(TEXT("Failed to gather feature %s block dependencies: %s"), *Feature->StableId.ToString(), *OutError);
+			return false;
+		}
+
+		for (const FPrimaryAssetId& AssetId : ReferencedBlocks)
+		{
+			FName BlockName;
+			if (!ResolveBlockName(AssetId, InRegistry, BlockName, OutError))
+			{
+				return false;
+			}
+			InOutNames.Add(BlockName);
+		}
+	}
 
 	OutError.Reset();
 	return true;
@@ -593,6 +716,47 @@ bool FVoxelGenerationCompiler::CompilePalette(
 		}
 	}
 
+	OutError.Reset();
+	return true;
+}
+
+bool FVoxelGenerationCompiler::CompileBuiltinEcology(
+	const UVoxelWorldGenerationProfile& InProfile,
+	const FVoxelRegistrySnapshot& InRegistry,
+	const TMap<FName, uint16>& InBlockSymbols,
+	FVoxelGenerationRecipe& InOutRecipe,
+	FString& OutError)
+{
+	InOutRecipe.Ecology = FVoxelEcologyRuntimePalette();
+	const FVoxelEcologyGenerationSettings& Ecology = InProfile.Defaults.Ecology;
+	if (Ecology.Tree.bEnabled)
+	{
+		UVoxelData* Trunk = LoadBuiltinEcologyVoxel(DefaultTreeTrunkPath);
+		UVoxelData* Leaves = LoadBuiltinEcologyVoxel(DefaultTreeLeavesPath);
+		if (!Trunk || !Leaves)
+		{
+			OutError = TEXT("WHFramework default tree ecology assets are missing");
+			return false;
+		}
+		if (!ResolveBlockSymbol(Trunk, InRegistry, InBlockSymbols, InOutRecipe.Ecology.TreeTrunk, OutError) ||
+			!ResolveBlockSymbol(Leaves, InRegistry, InBlockSymbols, InOutRecipe.Ecology.TreeLeaves, OutError))
+		{
+			return false;
+		}
+	}
+	if (Ecology.Grass.bEnabled)
+	{
+		UVoxelData* GrassPlant = LoadBuiltinEcologyVoxel(DefaultGrassPlantPath);
+		if (!GrassPlant)
+		{
+			OutError = TEXT("WHFramework default grass ecology asset is missing");
+			return false;
+		}
+		if (!ResolveBlockSymbol(GrassPlant, InRegistry, InBlockSymbols, InOutRecipe.Ecology.GrassPlant, OutError))
+		{
+			return false;
+		}
+	}
 	OutError.Reset();
 	return true;
 }
@@ -701,6 +865,8 @@ bool FVoxelGenerationCompiler::CompileSurfaceRules(
 
 bool FVoxelGenerationCompiler::CompileFeatures(
 	const UVoxelWorldGenerationProfile& InProfile,
+	const FVoxelRegistrySnapshot& InRegistry,
+	const TMap<FName, uint16>& InBlockSymbols,
 	FVoxelGenerationRecipe& InOutRecipe,
 	FString& OutError)
 {
@@ -712,6 +878,8 @@ bool FVoxelGenerationCompiler::CompileFeatures(
 	InOutRecipe.Features.Reset();
 	InOutRecipe.Features.Reserve(
 		Features.Num());
+
+	const FVoxelFeatureBakeContext BakeContext { &InRegistry, &InBlockSymbols };
 
 	for (UVoxelFeatureData* Feature :
 		Features)
@@ -768,6 +936,7 @@ bool FVoxelGenerationCompiler::CompileFeatures(
 			Feature->Placement;
 
 		if (!Algorithm->BakeConfiguration(
+			BakeContext,
 			Feature->Configuration,
 			RuntimeFeature.ConfigBytes,
 			OutError))
@@ -782,6 +951,134 @@ bool FVoxelGenerationCompiler::CompileFeatures(
 
 		InOutRecipe.Features.Add(
 			MoveTemp(RuntimeFeature));
+	}
+
+	OutError.Reset();
+	return true;
+}
+
+bool FVoxelGenerationCompiler::ValidateBiomeFeatureCoverage(
+	const UVoxelWorldGenerationProfile& InProfile,
+	FString& OutError)
+{
+	if (InProfile.Biomes.IsEmpty())
+	{
+		OutError =
+			TEXT(
+				"Voxel generation profile must contain at least one biome");
+
+		return false;
+	}
+
+	TSet<FName> ReferencedFeatures;
+
+	bool bHasFallbackBiome =
+		false;
+
+	for (const TSoftObjectPtr<UVoxelBiomeData>& SoftBiome :
+		InProfile.Biomes)
+	{
+		UVoxelBiomeData* Biome =
+			SoftBiome.
+				LoadSynchronous();
+
+		if (!Biome)
+		{
+			OutError =
+				TEXT(
+					"Voxel generation profile contains an unloaded biome");
+
+			return false;
+		}
+
+		const bool bFullTemperature =
+			Biome->Temperature.Min ==
+				MIN_int32 &&
+			Biome->Temperature.Max ==
+				MAX_int32;
+
+		const bool bFullMoisture =
+			Biome->Moisture.Min ==
+				MIN_int32 &&
+			Biome->Moisture.Max ==
+				MAX_int32;
+
+		const bool bFullContinentalness =
+			Biome->Continentalness.Min ==
+				MIN_int32 &&
+			Biome->Continentalness.Max ==
+				MAX_int32;
+
+		const bool bFullErosion =
+			Biome->Erosion.Min ==
+				MIN_int32 &&
+			Biome->Erosion.Max ==
+				MAX_int32;
+
+		const bool bFullHeight =
+			Biome->Height.Min ==
+				MIN_int32 &&
+			Biome->Height.Max ==
+				MAX_int32;
+
+		const bool bFullSlope =
+			Biome->Slope.Min ==
+				MIN_int32 &&
+			Biome->Slope.Max ==
+				MAX_int32;
+
+		bHasFallbackBiome |=
+			bFullTemperature &&
+			bFullMoisture &&
+			bFullContinentalness &&
+			bFullErosion &&
+			bFullHeight &&
+			bFullSlope;
+
+		for (const TSoftObjectPtr<UVoxelFeatureData>& SoftFeature :
+			Biome->Features)
+		{
+			if (UVoxelFeatureData* Feature =
+				SoftFeature.
+					LoadSynchronous())
+			{
+				ReferencedFeatures.Add(
+					Feature->
+						StableId);
+			}
+		}
+	}
+
+	if (!bHasFallbackBiome)
+	{
+		OutError =
+			TEXT(
+				"Voxel generation profile has no full-range fallback biome");
+
+		return false;
+	}
+
+	for (const TSoftObjectPtr<UVoxelFeatureData>& SoftFeature :
+		InProfile.Features)
+	{
+		UVoxelFeatureData* Feature =
+			SoftFeature.
+				LoadSynchronous();
+
+		if (Feature &&
+			!ReferencedFeatures.Contains(
+				Feature->StableId))
+		{
+			OutError =
+				FString::Printf(
+					TEXT(
+						"Voxel feature %s is not referenced by any biome"),
+					*Feature->
+						StableId.
+						ToString());
+
+			return false;
+		}
 	}
 
 	OutError.Reset();

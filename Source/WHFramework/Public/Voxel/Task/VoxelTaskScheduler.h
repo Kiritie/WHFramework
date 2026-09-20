@@ -40,7 +40,11 @@ enum class EVoxelTaskKind : uint8
 	BuildDetails,
 	DecodeOverlay,
 	EncodeRegion,
-	NetworkRepresentation
+	NetworkRepresentation,
+
+	// 项目层允许复用 Voxel Scheduler 的纯后台任务。
+	// 不参与 Voxel 内部 ApplyTask switch。
+	ProjectBackground
 };
 
 struct WHFRAMEWORK_API FVoxelTaskStamp
@@ -86,6 +90,20 @@ FORCEINLINE uint32 GetTypeHash(const FVoxelTaskKey& InKey)
 		::GetTypeHash(InKey.Stamp));
 }
 
+/**
+ * 项目层异步任务的通用纯 C++ Payload。
+ * Payload 不能持有只能在 GameThread 访问的 UObject。
+ */
+struct WHFRAMEWORK_API FVoxelTaskCustomPayload
+{
+	virtual ~FVoxelTaskCustomPayload() = default;
+
+	virtual uint64 GetAllocatedBytes() const
+	{
+		return sizeof(FVoxelTaskCustomPayload);
+	}
+};
+
 struct WHFRAMEWORK_API FVoxelTaskResult
 {
 	FVoxelTaskResult() = default;
@@ -96,23 +114,34 @@ struct WHFRAMEWORK_API FVoxelTaskResult
 
 	EVoxelTaskKind Kind = EVoxelTaskKind::None;
 	FVoxelTaskStamp Stamp;
+
 	bool bSuccess = false;
 	bool bCanceled = false;
 	FString Error;
+
+	// diagnostics
+	double QueueMilliseconds = 0.0;
+	double ExecuteMilliseconds = 0.0;
+	double ApplyMilliseconds = 0.0;
+
 	TArray<FVoxelBlockState> BaseBlocks;
 	TArray<uint8> Payload;
+
 	TSharedPtr<FVoxelSectionCollisionResult> Collision;
 	TSharedPtr<FVoxelSectionMeshResult> FineMesh;
 	TSharedPtr<FVoxelSectionMeshResult> VoxelProxyMesh;
 	TSharedPtr<FVoxelSectionMeshResult> SurfaceMesh;
 	TSharedPtr<FVoxelSectionMeshResult> WaterMesh;
 	TSharedPtr<FVoxelSectionMeshResult> MacroMesh;
+
 	TSharedPtr<FVoxelVoxelProxyData> VoxelProxy;
 	TSharedPtr<FVoxelSurfaceTileData> Surface;
 	TSharedPtr<FVoxelWaterSurfaceTileData> Water;
 	TSharedPtr<FVoxelMacroTileData> Macro;
 	TSharedPtr<FVoxelDetailPlan, ESPMode::ThreadSafe> Details;
 	TSharedPtr<FVoxelPersistentSection> PersistentSection;
+
+	TSharedPtr<const FVoxelTaskCustomPayload, ESPMode::ThreadSafe> CustomPayload;
 
 	uint64 ResultBytes() const;
 };
@@ -122,12 +151,20 @@ struct WHFRAMEWORK_API FVoxelTaskRequest
 	FVoxelTaskStamp Stamp;
 	EVoxelTaskKind Kind = EVoxelTaskKind::None;
 	EVoxelWorkClass WorkClass = EVoxelWorkClass::None;
+
 	double DistanceScore = 0.0;
 	double ForwardScore = 0.0;
 	double QueuedAt = 0.0;
+
 	uint64 ReservedBytes = 0;
 	uint64 InputBytes = 0;
+
 	TFunction<FVoxelTaskResult(const TAtomic<bool>&)> Execute;
+
+	/**
+	 * 非空时由任务自己消费结果。
+	 * 为空时回到 UVoxelModule::ApplyTask。
+	 */
 	TFunction<void(FVoxelTaskResult&&)> Apply;
 };
 
@@ -141,6 +178,33 @@ struct WHFRAMEWORK_API FVoxelTaskBudget
 	int32 MaxHeavyCompletedResultsPerFrame = 1;
 };
 
+struct WHFRAMEWORK_API FVoxelTaskKindDiagnostics
+{
+	uint64 Completed = 0;
+	uint64 Failed = 0;
+	uint64 Canceled = 0;
+
+	double TotalQueueMilliseconds = 0.0;
+	double TotalExecuteMilliseconds = 0.0;
+	double TotalApplyMilliseconds = 0.0;
+
+	double MaximumQueueMilliseconds = 0.0;
+	double MaximumExecuteMilliseconds = 0.0;
+	double MaximumApplyMilliseconds = 0.0;
+};
+
+struct WHFRAMEWORK_API FVoxelTaskDiagnostics
+{
+	int32 Pending = 0;
+	int32 Running = 0;
+	int32 Critical = 0;
+
+	uint64 ReservedBytes = 0;
+	uint64 QueuedInputBytes = 0;
+
+	TMap<EVoxelTaskKind, FVoxelTaskKindDiagnostics> ByKind;
+};
+
 class WHFRAMEWORK_API FVoxelTaskScheduler
 {
 public:
@@ -151,16 +215,26 @@ public:
 	FVoxelTaskScheduler& operator=(const FVoxelTaskScheduler&) = delete;
 
 	bool Enqueue(FVoxelTaskRequest&& InRequest);
+
 	void Tick(
 		TFunctionRef<void(FVoxelTaskResult&&)> InApply,
 		double InMaxApplyMilliseconds = 2.0);
+
 	void CancelSection(const FIntVector& InSection);
 	void StopAndJoin();
-	bool Has(const FVoxelTaskStamp& InStamp, EVoxelTaskKind InKind) const;
+
+	bool Has(
+		const FVoxelTaskStamp& InStamp,
+		EVoxelTaskKind InKind) const;
+
 	bool HasSectionTask(const FIntVector& InSection) const;
+
 	int32 ActiveCount() const;
 	int32 CriticalCount() const;
+
 	void SetBudget(const FVoxelTaskBudget& InBudget);
+
+	FVoxelTaskDiagnostics GetDiagnostics() const;
 
 private:
 	struct FSlot
@@ -174,7 +248,10 @@ private:
 		FVoxelTaskStamp Stamp;
 		EVoxelTaskKind Kind = EVoxelTaskKind::None;
 		EVoxelWorkClass WorkClass = EVoxelWorkClass::None;
+
+		double QueuedAt = 0.0;
 		uint64 ReservedBytes = 0;
+
 		TSharedPtr<FSlot, ESPMode::ThreadSafe> Slot;
 		UE::Tasks::FTask Task;
 		TFunction<void(FVoxelTaskResult&&)> Apply;
@@ -189,27 +266,36 @@ private:
 	static bool IsHigherPriority(
 		const FVoxelTaskRequest& InA,
 		const FVoxelTaskRequest& InB);
+
 	static bool IsHeavyApplyKind(EVoxelTaskKind InKind);
 	static bool UsesSectionKey(EVoxelTaskKind InKind);
 
 	void Pump();
 	void QueueCanceled(FVoxelTaskRequest&& InRequest);
+
 	void AddActive(
 		const FVoxelTaskStamp& InStamp,
 		EVoxelTaskKind InKind,
 		EVoxelWorkClass InWorkClass);
+
 	void RemoveActive(
 		const FVoxelTaskStamp& InStamp,
 		EVoxelTaskKind InKind,
 		EVoxelWorkClass InWorkClass);
 
+	void RecordCompletedResult(const FVoxelTaskResult& InResult);
+
 private:
 	TArray<FVoxelTaskRequest> Pending;
 	TArray<FRunning> Running;
 	TArray<FCompleted> Canceled;
+
 	TSet<FVoxelTaskKey> ActiveKeys;
 	TMap<FIntVector, int32> SectionTaskCounts;
+
 	FVoxelTaskBudget Budget;
+	FVoxelTaskDiagnostics Diagnostics;
+
 	bool bStopped = false;
 	uint64 ReservedBytes = 0;
 	uint64 QueuedInputBytes = 0;

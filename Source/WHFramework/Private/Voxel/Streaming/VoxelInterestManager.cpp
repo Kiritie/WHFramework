@@ -2,6 +2,8 @@
 
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "Voxel/Rendering/VoxelMacroTerrain.h"
+#include "Voxel/Rendering/VoxelViewLod.h"
 
 namespace
 {
@@ -56,61 +58,13 @@ namespace
 			RadiusSquared;
 	}
 
-	uint8 ResolveScreenErrorLevel(
-		const int32 InDistanceCells,
-		const FVoxelStreamingSource& InSource,
-		const FVoxelViewSettings& InSettings,
-		const uint8 InMaximumLevel)
-	{
-		const double Distance =
-			FMath::Max(1, InDistanceCells);
-
-		const double HalfFov =
-			FMath::DegreesToRadians(
-				FMath::Clamp(
-					InSource.VerticalFovDegrees,
-					1.0f,
-					179.0f) *
-				0.5f);
-
-		const double ProjectionScale =
-			FMath::Max(
-				1,
-				InSource.ViewportHeightPixels) /
-			(2.0 * FMath::Tan(HalfFov));
-
-		const double Target =
-			FMath::Max(
-				0.1f,
-				InSettings.TargetScreenErrorPixels);
-
-		uint8 Level = 0;
-
-		while (Level < InMaximumLevel)
-		{
-			const double NextLevelError =
-				static_cast<double>(
-					1 << (Level + 1)) *
-				ProjectionScale /
-				Distance;
-
-			if (NextLevelError > Target)
-			{
-				break;
-			}
-
-			++Level;
-		}
-
-		return Level;
-	}
-
 	template<typename KeyType>
 	void AddAdaptiveTwoDimensionalTiles(
 		const FIntVector& InCenter,
 		const int32 InOuterRadius,
 		const int32 InInnerRadius,
 		const int32 InBaseTileSide,
+		const int32 InBaseSampleStepCells,
 		const uint8 InMaximumLevel,
 		const FVoxelStreamingSource& InSource,
 		const FVoxelViewSettings& InSettings,
@@ -175,8 +129,9 @@ namespace
 			const int32 NearDistance = FMath::Max(
 				1,
 				FMath::FloorToInt(FMath::Max(0.0, Distance - HalfDiagonal)));
-			const uint8 DesiredLevel = ResolveScreenErrorLevel(
+			const uint8 DesiredLevel = VoxelViewLod::ResolveScreenErrorLevel(
 				NearDistance,
+				InBaseSampleStepCells,
 				InSource,
 				InSettings,
 				InMaximumLevel);
@@ -272,6 +227,13 @@ void FVoxelInterestManager::AddExactSource(
 			? FMath::Min(
 				FMath::Max(0, InViewSettings.WarmupCollisionRadius),
 				CollisionRadius)
+			: 0;
+
+	const int32 MovementCriticalCollisionRadius =
+		InSource.bCollision
+			? FMath::Min(
+				CollisionRadius,
+				FMath::Max(0, InSource.MovementCriticalCollisionRadius))
 			: 0;
 
 	const int32 DataRadius =
@@ -371,12 +333,18 @@ void FVoxelInterestManager::AddExactSource(
 					InSource.bCollision &&
 					IsInsideRadius(Delta, WarmupCollisionRadius);
 
+				const bool bMovementCriticalCollision =
+					InSource.bCollision &&
+					MovementCriticalCollisionRadius > 0 &&
+					IsInsideRadius(Delta, MovementCriticalCollisionRadius);
+
 				if (!bExact &&
 					!bCollision &&
 					!bSimulation &&
 					!bFineRender &&
 					!bWarmupData &&
-					!bWarmupCollision)
+					!bWarmupCollision &&
+					!bMovementCriticalCollision)
 				{
 					continue;
 				}
@@ -392,6 +360,7 @@ void FVoxelInterestManager::AddExactSource(
 				Demand.bFineRender |= bFineRender;
 				Demand.bWarmupData |= bWarmupData;
 				Demand.bWarmupCollision |= bWarmupCollision;
+				Demand.bMovementCriticalCollision |= bMovementCriticalCollision;
 
 				const FVector DeltaVector(
 					Delta);
@@ -455,10 +424,11 @@ void FVoxelInterestManager::AddViewSource(
 		const uint8 ProxyLevel =
 			FMath::Max<uint8>(
 				1,
-				ResolveScreenErrorLevel(
+				VoxelViewLod::ResolveScreenErrorLevel(
 					FMath::Max(
 						FineRadius,
 						ProxyRange / 2),
+					1,
 					InSource,
 					InViewSettings,
 					InViewSettings.
@@ -584,6 +554,7 @@ void FVoxelInterestManager::AddViewSource(
 			SurfaceRange,
 			ProxyRange,
 			InViewSettings.SurfaceTileSide,
+			1,
 			InViewSettings.MaximumSurfaceLevel,
 			InSource,
 			InViewSettings,
@@ -602,6 +573,7 @@ void FVoxelInterestManager::AddViewSource(
 			MacroRange,
 			SurfaceRange,
 			InViewSettings.MacroTileSide,
+			FVoxelMacroTileData::BaseStep,
 			InViewSettings.MaximumMacroLevel,
 			InSource,
 			InViewSettings,

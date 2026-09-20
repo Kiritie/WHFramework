@@ -106,6 +106,11 @@ public:
 	TSharedPtr<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> GetGenerationCache() const;
 	const FVoxelRegionStore& GetRegionStore() const;
 	const FVoxelInterestSet& GetCurrentInterest() const;
+	bool EnqueueProjectBackgroundTask(FVoxelTaskRequest&& InRequest);
+	void SetPersistenceEnabled(bool bInEnabled);
+	bool IsPersistenceEnabled() const;
+	TSoftObjectPtr<UVoxelWorldGenerationProfile> GetWorldGenerationProfileAsset() const;
+	int32 GetDefaultWorldSeed() const;
 
 	FGuid RegisterSource(UObject* InOwner, const FVoxelStreamingSource& InSource);
 	bool UpdateSource(const FGuid& InId, const FVoxelStreamingSource& InSource);
@@ -147,10 +152,7 @@ public:
 
 	virtual TUniquePtr<FVoxelWorldSaveData> NewWorldData(const FParameter& InBasic = FParameter()) const;
 	const FVoxelWorldSaveData& GetWorldData() const;
-	const FVoxelWorldBasicSaveData& GetWorldBasicData() const;
 	EVoxelWorldState GetWorldState() const;
-	EVoxelWorldMode GetWorldMode() const;
-	void SetWorldMode(EVoxelWorldMode InWorldMode);
 	virtual void OnBeforeSaveData() override;
 	virtual void OnAfterSaveData(bool bInSuccess) override;
 	void SetActiveSaveSource(const FGuid& InSaveId, int32 InGeneration, FSaveGameStorage* InStorage);
@@ -173,13 +175,7 @@ protected:
 	virtual void UnloadData(EPhase InPhase) override;
 
 	UPROPERTY(EditAnywhere)
-	FVoxelWorldBasicSaveData WorldBasicData;
-
-	UPROPERTY(EditAnywhere)
 	bool bAutoGenerate = false;
-
-	UPROPERTY(EditAnywhere)
-	EVoxelWorldMode WorldMode = EVoxelWorldMode::Default;
 
 	UPROPERTY(Transient)
 	EVoxelWorldState WorldState = EVoxelWorldState::None;
@@ -192,6 +188,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "Voxel|Generation")
 	TSoftObjectPtr<UVoxelWorldGenerationProfile> WorldGenerationProfileAsset;
+
+	UPROPERTY(EditAnywhere, Category = "Voxel|Generation")
+	int32 DefaultWorldSeed = 1;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UVoxelWorldGenerationProfile> WorldGenerationProfile;
@@ -229,6 +228,9 @@ private:
 	TArray<FVector> CollectDetailObservers() const;
 	bool IsActorRayClear(const FVector& InStart, const FVector& InEnd, AActor* InIgnore) const;
 	bool PlacementOverlapsActors(const FVoxelInteractionPlan& InPlan) const;
+	bool ApplyGenerationProfileFromSave(
+		const FVoxelWorldSaveData& InData,
+		FString& OutError);
 	UAbilityInventoryBase* ResolveInventory(APlayerController* InController, AActor* InSource) const;
 	FVoxelEditReply TransferContainer(
 		APlayerController* InController,
@@ -268,8 +270,9 @@ private:
 	FString PendingCommitDirectory;
 	uint64 InterestRevision = 0;
 	double LastInterestRefresh = -1.0;
-	double LastNaturalCacheTrim = -1.0;
+	double LastDiagnosticsLog = -1.0;
 	bool bInterestDirty = true;
 	bool bMutating = false;
 	bool bWorldLoadRejected = false;
+	bool bPersistenceEnabledForCurrentWorld = false;
 };

@@ -2,6 +2,37 @@
 
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "Voxel/Runtime/VoxelRegistry.h"
+
+bool FVoxelFeatureBakeContext::ResolveBlockSymbol(
+	const FPrimaryAssetId& InAssetId,
+	uint16& OutSymbol,
+	FString& OutError) const
+{
+	if (!Registry || !BlockSymbols || !InAssetId.IsValid())
+	{
+		OutError = TEXT("Voxel feature bake context is invalid");
+		return false;
+	}
+
+	const FVoxelRuntimeDefinition* Definition = Registry->Find(InAssetId);
+	if (!Definition || Definition->BlockName.IsNone())
+	{
+		OutError = FString::Printf(TEXT("Voxel feature references an unknown block asset: %s"), *InAssetId.ToString());
+		return false;
+	}
+
+	const uint16* Symbol = BlockSymbols->Find(Definition->BlockName);
+	if (!Symbol)
+	{
+		OutError = FString::Printf(TEXT("Voxel feature block was not gathered into recipe symbols: %s"), *Definition->BlockName.ToString());
+		return false;
+	}
+
+	OutSymbol = *Symbol;
+	OutError.Reset();
+	return true;
+}
 
 uint64 FVoxelFeatureInstance::GetAllocatedBytes() const
 {
@@ -213,6 +244,20 @@ bool FVoxelFeaturePlanner::Plan(
 				Definition.Placement.bRequireSurface
 					? Column.SurfaceZ + 1
 					: Anchor.Z);
+
+			if (Definition.Placement.bRequireSolidFloor)
+			{
+				uint32 FloorValue = 0;
+				if (!InSampleBaseSymbol(SurfaceAnchor - FIntVector(0, 0, 1), FloorValue))
+				{
+					continue;
+				}
+				const uint16 FloorSymbol = static_cast<uint16>(FloorValue & 0xffffu);
+				if (FloorSymbol == Recipe->Palette.Air)
+				{
+					continue;
+				}
+			}
 
 			const uint64 CandidateSeed =
 				VoxelGeneration::MakeSeed(

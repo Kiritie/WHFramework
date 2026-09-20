@@ -113,6 +113,18 @@ struct WHFRAMEWORK_API FVoxelGenerationPalette
 	bool Validate(int32 InBlockCount, FString& OutError) const;
 };
 
+struct WHFRAMEWORK_API FVoxelEcologyRuntimePalette
+{
+	uint16 TreeTrunk = MAX_uint16;
+	uint16 TreeLeaves = MAX_uint16;
+	uint16 GrassPlant = MAX_uint16;
+
+	bool Validate(
+		int32 InBlockCount,
+		const FVoxelEcologyGenerationSettings& InSettings,
+		FString& OutError) const;
+};
+
 struct WHFRAMEWORK_API FVoxelSurfaceRuntimeRule
 {
 	FVoxelGenerationRange Height;
@@ -216,7 +228,7 @@ struct WHFRAMEWORK_API FVoxelStructureRuntimeDefinition
 
 struct WHFRAMEWORK_API FVoxelGenerationRecipe
 {
-	static constexpr uint32 CurrentAlgorithmVersion = 2;
+	static constexpr uint32 CurrentAlgorithmVersion = 3;
 
 	uint32 AlgorithmVersion = CurrentAlgorithmVersion;
 	uint64 RecipeHash = 0;
@@ -224,6 +236,7 @@ struct WHFRAMEWORK_API FVoxelGenerationRecipe
 	FVoxelGenerationSettings Settings;
 	TArray<FName> BlockNames;
 	FVoxelGenerationPalette Palette;
+	FVoxelEcologyRuntimePalette Ecology;
 	TArray<FVoxelBiomeRuntimeDefinition> Biomes;
 	TArray<FVoxelFeatureRuntimeDefinition> Features;
 	TArray<FVoxelStructureRuntimeDefinition> Structures;

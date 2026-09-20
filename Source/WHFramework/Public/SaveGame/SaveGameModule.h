@@ -129,7 +129,9 @@ private:
 	void RestoreLastActiveSave();
 	FSaveOperationResult LoadModulesFromGeneration(const FGuid& SaveId, int32 Generation, EPhase InPhase);
 	FSaveOperationResult RestoreSlotGeneration(const FPendingSaveLoadContext& Context, EPhase InPhase);
-	TArray<UModuleBase*> GetSaveModules(ESaveScope Scope) const;
+	TArray<UModuleBase*> GetSaveModules(
+		ESaveScope Scope,
+		bool bRequireSaveEnabled = true) const;
 	void OnGameExited(UObject* InSender, const struct FEventGameExited& InEvent);
 
 private:

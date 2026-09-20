@@ -461,7 +461,9 @@ FSaveOperationResult USaveGameModule::LoadModulesFromGeneration(const FGuid& Sav
 		FParameter Data;
 	};
 	TArray<FLoadedModuleSaveData> Loaded;
-	for (UModuleBase* Module : GetSaveModules(ESaveScope::World))
+	for (UModuleBase* Module : GetSaveModules(
+		ESaveScope::World,
+		false))
 	{
 		TArray<uint8> Bytes;
 		FLoadedModuleSaveData Item;
@@ -712,14 +714,18 @@ FSaveOperationResult USaveGameModule::LoadProfile(FName ProfileName)
 	return FSaveOperationResult::Success();
 }
 
-TArray<UModuleBase*> USaveGameModule::GetSaveModules(ESaveScope Scope) const
+TArray<UModuleBase*> USaveGameModule::GetSaveModules(
+	const ESaveScope Scope,
+	const bool bRequireSaveEnabled) const
 {
 	TArray<UModuleBase*> Result;
 	for (TActorIterator<AMainModule> MainModule(GetWorld()); MainModule; ++MainModule)
 	{
 		for (UModuleBase* Module : MainModule->GetModules())
 		{
-			if (Module && Module->GetSaveScope() == Scope && Module->IsSaveEnabled())
+			if (Module &&
+				Module->GetSaveScope() == Scope &&
+				(!bRequireSaveEnabled || Module->IsSaveEnabled()))
 			{
 				Result.Add(Module);
 			}
