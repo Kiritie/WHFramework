@@ -54,7 +54,7 @@ namespace
 			VoxelGeneration::FloorDivide(InPosition.Z, 16));
 	}
 
-	int32 ToCellIndex(const FIntVector& InPosition)
+	int32 VoxelModuleToCellIndex(const FIntVector& InPosition)
 	{
 		auto PositiveMod = [](const int32 InValue)
 		{
@@ -66,28 +66,31 @@ namespace
 			PositiveMod(InPosition.Z) * 256;
 	}
 
-	uint64 BuildBaseSampleHash(const FVoxelGenerationPipeline& InGenerator, FString& OutError)
+	uint64 BuildGenerationSignature(
+		const FVoxelWorldManifest& InManifest)
 	{
-		static const FIntVector Samples[] = {
-			FIntVector(0, 0, 0),
-			FIntVector(7, -11, 3),
-			FIntVector(-19, 5, -7) };
-		TArray<uint8> Bytes;
-		Bytes.Reserve(UE_ARRAY_COUNT(Samples) * 4096 * sizeof(uint32));
-		for (const FIntVector& Sample : Samples)
+		const uint64 Fingerprint =
+			FVoxelManifestCodec::RecipeFingerprint(
+				InManifest);
+
+		if (Fingerprint == 0 ||
+			InManifest.RegistryHash == 0 ||
+			InManifest.RecipeHash == 0)
 		{
-			TArray<FVoxelBlockState> Blocks;
-			if (!InGenerator.GenerateSection(Sample, Blocks, OutError))
-			{
-				return 0;
-			}
-			for (const FVoxelBlockState& State : Blocks)
-			{
-				const uint32 Packed = State.Pack();
-				Bytes.Append(reinterpret_cast<const uint8*>(&Packed), sizeof(Packed));
-			}
+			return 0;
 		}
-		return VoxelBinary::Hash(Bytes);
+
+		const uint64 Signature =
+			VoxelBinary::Mix64(
+				Fingerprint ^
+				VoxelBinary::Mix64(
+					InManifest.RegistryHash) ^
+				VoxelBinary::Mix64(
+					InManifest.RecipeHash));
+
+		return Signature == 0
+			? 1
+			: Signature;
 	}
 }
 
@@ -192,45 +195,76 @@ void UVoxelModule::OnPreparatory(const EPhase InPhase)
 	}
 }
 
-void UVoxelModule::OnRefresh(const float InDeltaSeconds, const bool bInEditor)
+void UVoxelModule::OnRefresh(
+	const float InDeltaSeconds,
+	const bool bInEditor)
 {
-	Super::OnRefresh(InDeltaSeconds, bInEditor);
-	if (bInEditor || !IsReady())
+	Super::OnRefresh(
+		InDeltaSeconds,
+		bInEditor);
+
+	if (bInEditor ||
+		!IsReady())
 	{
 		return;
 	}
 
-	Scheduler->Tick([this](FVoxelTaskResult&& InResult)
-	{
-		ApplyTask(MoveTemp(InResult));
-	});
+	Scheduler->Tick(
+		[this](
+			FVoxelTaskResult&& InResult)
+		{
+			ApplyTask(
+				MoveTemp(InResult));
+		});
 
-	const double Now = FPlatformTime::Seconds();
-	if (LastInterestRefresh < 0.0 || Now - LastInterestRefresh >= 0.1)
+	const double Now =
+		FPlatformTime::Seconds();
+
+	if (LastInterestRefresh < 0.0 ||
+		Now - LastInterestRefresh >= 0.1)
 	{
 		RefreshInterest(Now);
 	}
-	EmergeManager->Tick(CurrentInterest.Exact, Now);
-	ResidencyManager->Tick(CurrentInterest.Exact, Now);
+
+	EmergeManager->Tick(
+		CurrentInterest.Exact,
+		InterestRevision,
+		Now);
+
+	ResidencyManager->Tick(
+		CurrentInterest.Exact,
+		Now);
+
 	if (ViewManager)
 	{
-		ViewManager->Tick(CollectLocalViewObservers());
+		ViewManager->Tick(
+			CollectLocalViewObservers());
 	}
+
 	if (CollisionPresenter)
 	{
-		CollisionPresenter->Tick(CurrentInterest.Exact);
+		CollisionPresenter->Tick(
+			CurrentInterest.Exact);
 	}
+
 	if (DetailView)
 	{
-		DetailView->Tick(CollectDetailObservers());
+		DetailView->Tick(
+			CollectDetailObservers());
 	}
-	for (const TPair<FIntVector, TObjectPtr<UVoxelSceneRegion>>& Pair : SceneRegions)
+
+	for (const TPair<
+		FIntVector,
+		TObjectPtr<UVoxelSceneRegion>>& Pair :
+		SceneRegions)
 	{
 		if (Pair.Value)
 		{
-			Pair.Value->TickSceneActors(InDeltaSeconds);
+			Pair.Value->TickSceneActors(
+				InDeltaSeconds);
 		}
 	}
+
 	UpdateReadiness();
 }
 
@@ -258,12 +292,19 @@ bool UVoxelModule::CreateWorld(
 	const int32 InBlockSizeCentimeters,
 	FString& OutError)
 {
-	if (!IsAuthority() || !Registry.GetSnapshot() || !WorldGenerationProfile || Runtime)
+	if (!IsAuthority() ||
+		!Registry.GetSnapshot() ||
+		!WorldGenerationProfile ||
+		Runtime)
 	{
-		OutError = TEXT("Creating a voxel world requires an idle authoritative initialized module");
+		OutError =
+			TEXT("Creating a voxel world requires an idle authoritative initialized module");
+
 		return false;
 	}
+
 	FVoxelGenerationRuntimeConfig Config;
+
 	if (!FVoxelGenerationBinding::Build(
 		*WorldGenerationProfile,
 		*Registry.GetSnapshot(),
@@ -274,22 +315,49 @@ bool UVoxelModule::CreateWorld(
 	{
 		return false;
 	}
-	const TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
-	const TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> SharedConfig = MakeShared<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe>(MoveTemp(Config));
-	const FVoxelGenerationPipeline Pipeline(SharedConfig, Cache);
-	FVoxelWorldManifest NewManifest;
-	NewManifest.WorldId = FGuid::NewGuid();
-	NewManifest.Settings = InSettings;
-	NewManifest.BlockSizeCentimeters = InBlockSizeCentimeters;
-	NewManifest.RegistryHash = Registry.GetSnapshot()->Hash;
-	NewManifest.RecipeHash = SharedConfig->Recipe->RecipeHash;
-	NewManifest.BaseSampleHash = BuildBaseSampleHash(Pipeline, OutError);
-	if (NewManifest.BaseSampleHash == 0)
+
+	if (!Config.Recipe)
 	{
+		OutError =
+			TEXT("Voxel generation binding has no frozen recipe");
+
 		return false;
 	}
+
+	FVoxelWorldManifest NewManifest;
+	NewManifest.WorldId =
+		FGuid::NewGuid();
+
+	NewManifest.Settings =
+		InSettings;
+
+	NewManifest.BlockSizeCentimeters =
+		InBlockSizeCentimeters;
+
+	NewManifest.RegistryHash =
+		Registry.GetSnapshot()->Hash;
+
+	NewManifest.RecipeHash =
+		Config.Recipe->RecipeHash;
+
+	NewManifest.BaseSampleHash =
+		BuildGenerationSignature(
+			NewManifest);
+
+	if (NewManifest.BaseSampleHash == 0)
+	{
+		OutError =
+			TEXT("Voxel generation signature could not be built");
+
+		return false;
+	}
+
 	RegionStore.Reset();
-	return StartWorld(NewManifest, false, OutError);
+
+	return StartWorld(
+		NewManifest,
+		false,
+		OutError);
 }
 
 bool UVoxelModule::StartWorld(
@@ -354,23 +422,23 @@ bool UVoxelModule::StartWorld(
 		ViewSettings.MaximumSurfaceLevel = ViewProfile->MaximumSurfaceLevel;
 		ViewSettings.MaximumMacroLevel = ViewProfile->MaximumMacroLevel;
 	}
+	const uint64 ExpectedGenerationSignature =
+		BuildGenerationSignature(
+			Manifest);
+	if (ExpectedGenerationSignature == 0 ||
+		Manifest.BaseSampleHash != ExpectedGenerationSignature ||
+		Epoch == MAX_uint64)
+	{
+		GenerationConfig.Reset();
+		WorldState = EVoxelWorldState::Failed;
+		OutError = TEXT("Voxel generation signature mismatch");
+		return false;
+	}
+
 	GenerationCache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
 	Generator = MakeShared<const FVoxelGenerationPipeline, ESPMode::ThreadSafe>(
 		GenerationConfig.ToSharedRef(),
 		GenerationCache.ToSharedRef());
-	const uint64 SampleHash = BuildBaseSampleHash(*Generator, OutError);
-	if (SampleHash == 0 || SampleHash != Manifest.BaseSampleHash || Epoch == MAX_uint64)
-	{
-		Generator.Reset();
-		GenerationCache.Reset();
-		GenerationConfig.Reset();
-		WorldState = EVoxelWorldState::Failed;
-		if (OutError.IsEmpty())
-		{
-			OutError = TEXT("Voxel base generation signature mismatch");
-		}
-		return false;
-	}
 
 	++Epoch;
 	Runtime = MakeUnique<FVoxelWorldRuntime>(
@@ -456,6 +524,7 @@ bool UVoxelModule::StartWorld(
 	SessionId = IsAuthority() ? FGuid::NewGuid() : FGuid();
 	Sources.Reset();
 	CurrentInterest = {};
+	InterestRevision = 0;
 	LastInterestRefresh = -1.0;
 	ReadyStage = EVoxelWorldReadyStage::AssetsValidated;
 	ReadinessSnapshot = {};
@@ -532,6 +601,7 @@ bool UVoxelModule::StopWorld(const bool bDiscardDirty, FString& OutError)
 	Scheduler.Reset();
 	Sources.Reset();
 	CurrentInterest = {};
+	InterestRevision = 0;
 	Breaking.Reset();
 	SessionId.Invalidate();
 	ReadyStage = EVoxelWorldReadyStage::None;
@@ -686,16 +756,25 @@ FGuid UVoxelModule::RegisterSource(UObject* InOwner, const FVoxelStreamingSource
 	return Id;
 }
 
-bool UVoxelModule::UpdateSource(const FGuid& InId, const FVoxelStreamingSource& InSource)
+bool UVoxelModule::UpdateSource(
+	const FGuid& InId,
+	const FVoxelStreamingSource& InSource)
 {
-	FSource* Source = Sources.Find(InId);
-	if (!Source || !Source->Owner.IsValid())
+	FSource* Source =
+		Sources.Find(InId);
+
+	if (!Source ||
+		!Source->Owner.IsValid())
 	{
 		return false;
 	}
-	Source->Value = InSource;
-	Source->Value.Id = InId;
-	LastInterestRefresh = -1.0;
+
+	Source->Value =
+		InSource;
+
+	Source->Value.Id =
+		InId;
+
 	return true;
 }
 
@@ -857,20 +936,49 @@ UVoxelSceneRegion* UVoxelModule::GetSceneRegion(const FIntVector& InSection, con
 	return NewRegion;
 }
 
-void UVoxelModule::RefreshInterest(const double InNow)
+void UVoxelModule::RefreshInterest(
+	const double InNow)
 {
-	TArray<FVoxelStreamingSource> ActiveSources;
-	for (auto Iterator = Sources.CreateIterator(); Iterator; ++Iterator)
+	TArray<FVoxelStreamingSource>
+		ActiveSources;
+
+	ActiveSources.Reserve(
+		Sources.Num());
+
+	for (auto Iterator =
+		Sources.CreateIterator();
+		Iterator;
+		++Iterator)
 	{
-		if (!Iterator.Value().Owner.IsValid())
+		if (!Iterator.Value().
+			Owner.IsValid())
 		{
 			Iterator.RemoveCurrent();
 			continue;
 		}
-		ActiveSources.Add(Iterator.Value().Value);
+
+		ActiveSources.Add(
+			Iterator.Value().Value);
 	}
-	CurrentInterest = InterestManager->Compute(ActiveSources, Manifest, ViewSettings);
-	LastInterestRefresh = InNow;
+
+	CurrentInterest =
+		InterestManager->Compute(
+			ActiveSources,
+			Manifest,
+			ViewSettings);
+
+	if (InterestRevision ==
+		MAX_uint64)
+	{
+		InterestRevision = 1;
+	}
+	else
+	{
+		++InterestRevision;
+	}
+
+	LastInterestRefresh =
+		InNow;
 }
 
 void UVoxelModule::ApplyTask(FVoxelTaskResult&& InResult)
@@ -1392,7 +1500,7 @@ FVoxelEditReply UVoxelModule::TransferContainer(
 		Reply.Code = EVoxelEditCode::Stale;
 		return Reply;
 	}
-	FVoxelBlockEntityState* Entity = Section->Entities.Find(ToCellIndex(InHit.Index));
+	FVoxelBlockEntityState* Entity = Section->Entities.Find(VoxelModuleToCellIndex(InHit.Index));
 	TArray<FVoxelItemStack> Items;
 	UAbilityInventoryBase* Inventory = ResolveInventory(InController, InSource);
 	UAbilityInventorySlotBase* Slot = Inventory ? Inventory->GetSlotBySplitTypeAndIndex(
@@ -1591,7 +1699,7 @@ bool UVoxelModule::ExportPrefab(
 				if (Definition && Definition->EntityKind)
 				{
 					const FVoxelSection* Section = Runtime->FindSection(VoxelModuleToSection(Position));
-					const FVoxelBlockEntityState* Entity = Section ? Section->Entities.Find(ToCellIndex(Position)) : nullptr;
+					const FVoxelBlockEntityState* Entity = Section ? Section->Entities.Find(VoxelModuleToCellIndex(Position)) : nullptr;
 					FVoxelBlockEntityState Default;
 					if (!Entity ||
 						!FVoxelBlockEntityCodec::MakeDefault(Definition->EntityKind, Default, Definition->EntityVariant) ||
@@ -1707,13 +1815,10 @@ bool UVoxelModule::ValidateWorldData(const FParameter& InData, FString& OutError
 	{
 		return false;
 	}
-	const TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> SharedConfig =
-		MakeShared<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe>(MoveTemp(Config));
-	const TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> Cache =
-		MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
-	const FVoxelGenerationPipeline Pipeline(SharedConfig, Cache);
-	const uint64 SampleHash = BuildBaseSampleHash(Pipeline, OutError);
-	if (SampleHash == 0 || SampleHash != SavedManifest.BaseSampleHash)
+	const uint64 ExpectedGenerationSignature =
+		BuildGenerationSignature(SavedManifest);
+	if (ExpectedGenerationSignature == 0 ||
+		ExpectedGenerationSignature != SavedManifest.BaseSampleHash)
 	{
 		OutError = TEXT("Saved voxel base generation signature differs");
 		return false;

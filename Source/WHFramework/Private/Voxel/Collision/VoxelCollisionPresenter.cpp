@@ -129,40 +129,102 @@ void FVoxelCollisionPresenter::RequestCollision(
 	const FIntVector& InSection,
 	const uint64 InRevision)
 {
+	const FVoxelSection* Section =
+		Module.GetRuntime()->
+			FindSection(
+				InSection);
+
+	if (!Section ||
+		Section->Status !=
+			EVoxelSectionStatus::DataReady)
+	{
+		return;
+	}
+
+	FVoxelTaskStamp Stamp;
+	Stamp.WorldEpoch =
+		WorldEpoch;
+	Stamp.Token =
+		Section->Stamp.Token;
+	Stamp.Revision =
+		InRevision;
+	Stamp.Section =
+		InSection;
+
+	if (Scheduler.Has(
+		Stamp,
+		EVoxelTaskKind::BuildCollision))
+	{
+		return;
+	}
+
 	FVoxelSectionSnapshot Snapshot;
-	if (!Module.GetRuntime()->CaptureSnapshot(InSection, Snapshot))
+
+	if (!Module.GetRuntime()->
+		CaptureSnapshot(
+			InSection,
+			Snapshot))
 	{
 		return;
 	}
 
 	FVoxelTaskRequest Request;
-	Request.Kind = EVoxelTaskKind::BuildCollision;
-	Request.WorkClass = EVoxelWorkClass::Critical;
-	Request.Stamp.WorldEpoch = WorldEpoch;
-	Request.Stamp.Token = Snapshot.Stamp.Token;
-	Request.Stamp.Revision = InRevision;
-	Request.Stamp.Section = InSection;
-	Request.ReservedBytes = 4ull * 1024ull * 1024ull;
-	Request.InputBytes = Snapshot.Bytes();
-	if (Scheduler.Has(Request.Stamp, Request.Kind))
-	{
-		return;
-	}
-	const TSharedPtr<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> Registry = Module.GetRegistry();
-	const TSharedPtr<const FVoxelShapeRegistry, ESPMode::ThreadSafe> Shapes = Module.GetShapes();
-	Request.Execute = [Snapshot = MoveTemp(Snapshot), Registry, Shapes](const TAtomic<bool>& InCancel)
-	{
-		FVoxelTaskResult Result;
-		Result.Collision = MakeShared<FVoxelSectionCollisionResult>();
-		Result.bSuccess = Registry &&
-			Shapes &&
-			FVoxelCollisionBuilder::Build(
-				Snapshot,
-				*Registry,
-				*Shapes,
-				*Result.Collision,
-				&InCancel);
-		return Result;
-	};
-	Scheduler.Enqueue(MoveTemp(Request));
+
+	Request.Kind =
+		EVoxelTaskKind::BuildCollision;
+
+	Request.WorkClass =
+		EVoxelWorkClass::Critical;
+
+	Request.Stamp =
+		Stamp;
+
+	Request.ReservedBytes =
+		4ull *
+		1024ull *
+		1024ull;
+
+	Request.InputBytes =
+		Snapshot.Bytes();
+
+	const TSharedPtr<
+		const FVoxelRegistrySnapshot,
+		ESPMode::ThreadSafe> Registry =
+			Module.GetRegistry();
+
+	const TSharedPtr<
+		const FVoxelShapeRegistry,
+		ESPMode::ThreadSafe> Shapes =
+			Module.GetShapes();
+
+	Request.Execute =
+		[
+			Snapshot =
+				MoveTemp(Snapshot),
+			Registry,
+			Shapes
+		](
+			const TAtomic<bool>& InCancel)
+		{
+			FVoxelTaskResult Result;
+
+			Result.Collision =
+				MakeShared<
+					FVoxelSectionCollisionResult>();
+
+			Result.bSuccess =
+				Registry &&
+				Shapes &&
+				FVoxelCollisionBuilder::Build(
+					Snapshot,
+					*Registry,
+					*Shapes,
+					*Result.Collision,
+					&InCancel);
+
+			return Result;
+		};
+
+	Scheduler.Enqueue(
+		MoveTemp(Request));
 }

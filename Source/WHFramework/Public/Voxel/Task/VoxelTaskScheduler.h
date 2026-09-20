@@ -54,6 +54,36 @@ struct WHFRAMEWORK_API FVoxelTaskStamp
 	bool operator==(const FVoxelTaskStamp& InOther) const;
 };
 
+FORCEINLINE uint32 GetTypeHash(const FVoxelTaskStamp& InStamp)
+{
+	uint32 Hash = ::GetTypeHash(InStamp.WorldEpoch);
+	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.Token));
+	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.Revision));
+	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.Section));
+	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.ViewKey));
+	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.SurfaceKey));
+	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.MacroKey));
+	return Hash;
+}
+
+struct WHFRAMEWORK_API FVoxelTaskKey
+{
+	EVoxelTaskKind Kind = EVoxelTaskKind::None;
+	FVoxelTaskStamp Stamp;
+
+	bool operator==(const FVoxelTaskKey& InOther) const
+	{
+		return Kind == InOther.Kind && Stamp == InOther.Stamp;
+	}
+};
+
+FORCEINLINE uint32 GetTypeHash(const FVoxelTaskKey& InKey)
+{
+	return HashCombineFast(
+		::GetTypeHash(static_cast<uint8>(InKey.Kind)),
+		::GetTypeHash(InKey.Stamp));
+}
+
 struct WHFRAMEWORK_API FVoxelTaskResult
 {
 	FVoxelTaskResult() = default;
@@ -102,9 +132,11 @@ struct WHFRAMEWORK_API FVoxelTaskRequest
 struct WHFRAMEWORK_API FVoxelTaskBudget
 {
 	int32 MaxConcurrentTasks = 2;
+	int32 MaxPendingTasks = 256;
 	uint64 MaxReservedBytes = 128ull * 1024ull * 1024ull;
 	uint64 MaxInputBytes = 32ull * 1024ull * 1024ull;
 	int32 MaxCompletedResultsPerFrame = 8;
+	int32 MaxHeavyCompletedResultsPerFrame = 1;
 };
 
 class WHFRAMEWORK_API FVoxelTaskScheduler
@@ -155,15 +187,29 @@ private:
 	static bool IsHigherPriority(
 		const FVoxelTaskRequest& InA,
 		const FVoxelTaskRequest& InB);
+	static bool IsHeavyApplyKind(EVoxelTaskKind InKind);
+	static bool UsesSectionKey(EVoxelTaskKind InKind);
+
 	void Pump();
 	void QueueCanceled(FVoxelTaskRequest&& InRequest);
+	void AddActive(
+		const FVoxelTaskStamp& InStamp,
+		EVoxelTaskKind InKind,
+		EVoxelWorkClass InWorkClass);
+	void RemoveActive(
+		const FVoxelTaskStamp& InStamp,
+		EVoxelTaskKind InKind,
+		EVoxelWorkClass InWorkClass);
 
 private:
 	TArray<FVoxelTaskRequest> Pending;
 	TArray<FRunning> Running;
 	TArray<FCompleted> Canceled;
+	TSet<FVoxelTaskKey> ActiveKeys;
+	TMap<FIntVector, int32> SectionTaskCounts;
 	FVoxelTaskBudget Budget;
 	bool bStopped = false;
 	uint64 ReservedBytes = 0;
 	uint64 QueuedInputBytes = 0;
+	int32 CriticalTaskCount = 0;
 };

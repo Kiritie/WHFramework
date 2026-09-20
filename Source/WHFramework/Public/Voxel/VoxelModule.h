@@ -265,6 +265,7 @@ private:
 	FString SceneSourceError;
 	FString LastSaveError;
 	FString PendingCommitDirectory;
+	uint64 InterestRevision = 0;
 	double LastInterestRefresh = -1.0;
 	bool bMutating = false;
 	bool bWorldLoadRejected = false;

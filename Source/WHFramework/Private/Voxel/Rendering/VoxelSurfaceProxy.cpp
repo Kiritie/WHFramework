@@ -45,51 +45,127 @@ bool FVoxelSurfaceProxyBuilder::Build(
 	const TAtomic<bool>* InCancel) const
 {
 	FVoxelSurfaceTileData Data;
-	Data.Key = InKey;
-	Data.Side = SurfaceGridSide;
-	Data.Step = 1 << InKey.Level;
-	const int32 Count = Data.Side * Data.Side;
-	Data.GroundZ.SetNumUninitialized(Count);
-	Data.WaterZ.SetNumUninitialized(Count);
-	Data.SurfaceMaterial.SetNumUninitialized(Count);
-	Data.Biome.SetNumUninitialized(Count);
-	Data.Flags.Init(0, Count);
 
-	for (int32 Y = 0; Y < Data.Side; ++Y)
-	{
-		for (int32 X = 0; X < Data.Side; ++X)
-		{
-			if (InCancel && InCancel->Load())
-			{
-				OutError = TEXT("Canceled");
-				return false;
-			}
-			const FIntPoint WorldXY = ResolveWorldXY(InKey, X, Y, Data.Step);
-			FVoxelColumnSample Column;
-			if (!Generator->SampleColumn(WorldXY.X, WorldXY.Y, Column, OutError, InCancel))
-			{
-				return false;
-			}
+	Data.Key =
+		InKey;
 
-			const int32 Index = X + Y * Data.Side;
-			Data.GroundZ[Index] = Column.SurfaceZ;
-			Data.WaterZ[Index] = Column.SurfaceWaterZ;
-			Data.Biome[Index] = Column.BiomeIndex;
-			Data.SurfaceMaterial[Index] = Column.SurfaceMaterial;
-			uint8 Flags = 0;
-			Flags |= Column.bRiver ? VoxelSurface_River : 0;
-			Flags |= Column.bLake ? VoxelSurface_Lake : 0;
-			Flags |= Column.bOcean ? VoxelSurface_Ocean : 0;
-			Flags |= Column.bCoast ? VoxelSurface_Coast : 0;
-			Data.Flags[Index] = Flags;
-		}
-	}
+	Data.Side =
+		SurfaceGridSide;
 
-	if (!ApplyModifiedSurface(InKey, Data, OutError, InCancel))
+	Data.Step =
+		1 << InKey.Level;
+
+	const int32 Count =
+		Data.Side *
+		Data.Side;
+
+	Data.GroundZ.
+		SetNumUninitialized(
+			Count);
+
+	Data.WaterZ.
+		SetNumUninitialized(
+			Count);
+
+	Data.SurfaceMaterial.
+		SetNumUninitialized(
+			Count);
+
+	Data.Biome.
+		SetNumUninitialized(
+			Count);
+
+	Data.Flags.Init(
+		0,
+		Count);
+
+	const int32 TileSide =
+		Data.Side *
+		Data.Step;
+
+	const FIntPoint TileOrigin =
+		InKey.Coordinate *
+		TileSide;
+
+	TArray<FVoxelColumnSample> Columns;
+
+	if (!Generator->SampleColumns(
+		TileOrigin,
+		Data.Side,
+		Data.Side,
+		Data.Step,
+		Columns,
+		OutError,
+		InCancel))
 	{
 		return false;
 	}
-	OutData = MoveTemp(Data);
+
+	if (Columns.Num() != Count)
+	{
+		OutError =
+			TEXT("Voxel surface column grid returned an invalid sample count");
+
+		return false;
+	}
+
+	for (int32 Index = 0;
+		Index < Count;
+		++Index)
+	{
+		const FVoxelColumnSample& Column =
+			Columns[Index];
+
+		Data.GroundZ[Index] =
+			Column.SurfaceZ;
+
+		Data.WaterZ[Index] =
+			Column.SurfaceWaterZ;
+
+		Data.Biome[Index] =
+			Column.BiomeIndex;
+
+		Data.SurfaceMaterial[Index] =
+			Column.SurfaceMaterial;
+
+		uint8 Flags = 0;
+
+		Flags |=
+			Column.bRiver
+				? VoxelSurface_River
+				: 0;
+
+		Flags |=
+			Column.bLake
+				? VoxelSurface_Lake
+				: 0;
+
+		Flags |=
+			Column.bOcean
+				? VoxelSurface_Ocean
+				: 0;
+
+		Flags |=
+			Column.bCoast
+				? VoxelSurface_Coast
+				: 0;
+
+		Data.Flags[Index] =
+			Flags;
+	}
+
+	if (!ApplyModifiedSurface(
+		InKey,
+		Data,
+		OutError,
+		InCancel))
+	{
+		return false;
+	}
+
+	OutData =
+		MoveTemp(Data);
+
 	OutError.Reset();
 	return true;
 }

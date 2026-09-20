@@ -26,29 +26,52 @@ public:
 		const FVoxelWorldManifest& InManifest,
 		TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry);
 
-	void Tick(const TMap<FIntVector, FVoxelExactDemand>& InDemand, double InNow);
+	void Tick(
+		const TMap<FIntVector, FVoxelExactDemand>& InDemand,
+		uint64 InInterestRevision,
+		double InNow);
+
 	bool OnTask(FVoxelTaskResult&& InResult);
-	void SetRemoteChangeState(const FIntVector& InSection, EVoxelSectionChangeState InState);
+
+	void SetRemoteChangeState(
+		const FIntVector& InSection,
+		EVoxelSectionChangeState InState);
+
 	void Reset();
 
 private:
-	void RequestSection(const FIntVector& InKey, const FVoxelExactDemand& InDemand);
+	void RebuildDemand(
+		const TMap<FIntVector, FVoxelExactDemand>& InDemand,
+		uint64 InInterestRevision);
+
+	void RequestSection(
+		const FIntVector& InKey,
+		const FVoxelExactDemand& InDemand);
+
 	void RequestBase(
 		FVoxelSection& InSection,
 		const FIntVector& InKey,
 		const FVoxelExactDemand& InDemand);
+
 	void ResolveOverlay(
 		FVoxelSection& InSection,
 		const FIntVector& InKey,
 		const FVoxelExactDemand& InDemand);
 
 private:
+	static constexpr int32 MaxSectionAdmissionsPerTick = 64;
+
 	FVoxelWorldRuntime& Runtime;
 	FVoxelTaskScheduler& Scheduler;
 	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> Generator;
 	const FVoxelRegionStore& RegionStore;
 	FVoxelWorldManifest Manifest;
 	TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> Registry;
+
 	TMap<FIntVector, FVoxelExactDemand> CurrentDemand;
 	TMap<FIntVector, EVoxelSectionChangeState> RemoteChangeStates;
+	TArray<FIntVector> OrderedKeys;
+
+	uint64 CurrentInterestRevision = 0;
+	int32 NextAdmissionIndex = 0;
 };

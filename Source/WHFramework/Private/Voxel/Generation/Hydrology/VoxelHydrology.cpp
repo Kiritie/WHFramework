@@ -1515,6 +1515,8 @@ bool FVoxelHydrologyGenerator::BuildPlan(
             return InA.Id < InB.Id;
         });
 
+	Plan.Finalize();
+
     OutPlan =
         MoveTemp(Plan);
 
@@ -2118,112 +2120,4 @@ bool FVoxelHydrologyGenerator::BuildLakes(
 
     OutError.Reset();
     return true;
-}
-
-bool FVoxelHydrologyPlan::Sample(int32 InWorldX, int32 InWorldY, int32 InOriginalGround,
-    FVoxelHydrologyInfluence& OutInfluence) const
-{
-    if (Grid.CellSize <= 0 || Grid.Width <= 0 || Grid.Height <= 0)
-    {
-        return false;
-    }
-
-    const FIntPoint WorldHydrologyCell(
-        VoxelGeneration::FloorDivide(InWorldX, Grid.CellSize),
-        VoxelGeneration::FloorDivide(InWorldY, Grid.CellSize));
-    const FIntPoint LocalCell = WorldHydrologyCell - Grid.WorldMinCell;
-    if (LocalCell.X < 0 || LocalCell.Y < 0 || LocalCell.X >= Grid.Width || LocalCell.Y >= Grid.Height)
-    {
-        return false;
-    }
-
-    FVoxelHydrologyInfluence Result;
-    const uint32 GridIndex = Grid.ToIndex(LocalCell.X, LocalCell.Y);
-    if (const int32* OceanPlane = Grid.OceanOutlets.Find(GridIndex))
-    {
-        Result.SurfaceWaterZ = *OceanPlane;
-        Result.GroundOverrideZ = FMath::Min(InOriginalGround, *OceanPlane - 1);
-        Result.bOcean = true;
-    }
-    else
-    {
-        static const FIntPoint Neighbors[] =
-        {
-            FIntPoint(-1, 0), FIntPoint(1, 0), FIntPoint(0, -1), FIntPoint(0, 1)
-        };
-        for (const FIntPoint Offset : Neighbors)
-        {
-            const FIntPoint Neighbor = LocalCell + Offset;
-            if (Neighbor.X >= 0 && Neighbor.Y >= 0 && Neighbor.X < Grid.Width && Neighbor.Y < Grid.Height &&
-                Grid.OceanOutlets.Contains(Grid.ToIndex(Neighbor.X, Neighbor.Y)))
-            {
-                Result.bCoast = true;
-                break;
-            }
-        }
-    }
-
-    const FIntPoint SampleCellOrigin(WorldHydrologyCell.X * Grid.CellSize, WorldHydrologyCell.Y * Grid.CellSize);
-    for (const FVoxelLakePlan& Lake : Lakes)
-    {
-        if (Lake.Cells.Contains(SampleCellOrigin))
-        {
-            Result.SurfaceWaterZ = FMath::Max(Result.SurfaceWaterZ, Lake.WaterZ);
-            Result.GroundOverrideZ = FMath::Min(InOriginalGround, Lake.WaterZ - 1);
-            Result.bLake = true;
-            Result.bOcean = false;
-            break;
-        }
-    }
-
-    int32 BestDistance = MAX_int32;
-    FVoxelRiverSection BestSection;
-    bool bHasRiver = false;
-    const FIntPoint Sample(InWorldX, InWorldY);
-    for (const FVoxelRiverRoute& River : Rivers)
-    {
-        for (int32 PointIndex = 1; PointIndex < River.Points.Num(); ++PointIndex)
-        {
-            const FVoxelRiverRoutePoint& A = River.Points[PointIndex - 1];
-            const FVoxelRiverRoutePoint& B = River.Points[PointIndex];
-            const int64 ABX = static_cast<int64>(B.Position.X) - A.Position.X;
-            const int64 ABY = static_cast<int64>(B.Position.Y) - A.Position.Y;
-            const int64 APX = static_cast<int64>(Sample.X) - A.Position.X;
-            const int64 APY = static_cast<int64>(Sample.Y) - A.Position.Y;
-            const int64 LengthSq = ABX * ABX + ABY * ABY;
-            const int32 AlphaQ16 = LengthSq > 0
-                ? static_cast<int32>(FMath::Clamp<int64>((APX * ABX + APY * ABY) * 65536 / LengthSq, 0, 65536))
-                : 0;
-            const int64 ClosestXQ16 = static_cast<int64>(A.Position.X) * 65536 + ABX * AlphaQ16;
-            const int64 ClosestYQ16 = static_cast<int64>(A.Position.Y) * 65536 + ABY * AlphaQ16;
-            const int64 DX = FMath::Abs(static_cast<int64>(Sample.X) * 65536 - ClosestXQ16);
-            const int64 DY = FMath::Abs(static_cast<int64>(Sample.Y) * 65536 - ClosestYQ16);
-            const int32 Distance = static_cast<int32>((FMath::Max(DX, DY) + FMath::Min(DX, DY) * 3 / 8) / 65536);
-            const int32 WaterZ = A.WaterZ + static_cast<int32>((static_cast<int64>(B.WaterZ - A.WaterZ) * AlphaQ16) / 65536);
-            FVoxelRiverShape Shape;
-            Shape.HalfWidth = A.HalfWidth + static_cast<int32>((static_cast<int64>(B.HalfWidth - A.HalfWidth) * AlphaQ16) / 65536);
-            Shape.Depth = A.Depth + static_cast<int32>((static_cast<int64>(B.Depth - A.Depth) * AlphaQ16) / 65536);
-            Shape.BankWidth = FMath::Max(1, Shape.HalfWidth);
-            Shape.ShoreWidth = FMath::Max(Shape.BankWidth + 1, Shape.HalfWidth * 3);
-            Shape.MaxCutFill = FMath::Max(64, Shape.Depth * 4);
-            FVoxelRiverSection Section;
-            FString Error;
-            if (Distance < BestDistance && VoxelHydrology::EvaluateRiverSection(InOriginalGround, WaterZ, Distance, Shape, Section, Error))
-            {
-                BestDistance = Distance;
-                BestSection = Section;
-                bHasRiver = true;
-            }
-        }
-    }
-
-    if (bHasRiver && !Result.bOcean && !Result.bLake)
-    {
-        Result.GroundOverrideZ = BestSection.GroundPlane;
-        Result.SurfaceWaterZ = BestSection.bWet ? BestSection.WaterPlane : MIN_int32;
-        Result.bRiver = BestSection.bWet;
-    }
-
-    OutInfluence = Result;
-    return Result.bOcean || Result.bLake || Result.bRiver || Result.bCoast || Result.GroundOverrideZ != MIN_int32;
 }

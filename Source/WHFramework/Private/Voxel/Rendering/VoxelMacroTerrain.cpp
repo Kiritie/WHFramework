@@ -7,7 +7,9 @@ namespace
 }
 
 FVoxelMacroTerrainBuilder::FVoxelMacroTerrainBuilder(
-	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator)
+	TSharedRef<
+		const FVoxelGenerationPipeline,
+		ESPMode::ThreadSafe> InGenerator)
 	: Generator(InGenerator)
 {
 }
@@ -19,47 +21,120 @@ bool FVoxelMacroTerrainBuilder::Build(
 	const TAtomic<bool>* InCancel) const
 {
 	FVoxelMacroTileData Data;
-	Data.Key = InKey;
-	Data.Side = MacroGridSide;
-	Data.Step = MacroBaseStep << InKey.Level;
-	const int32 Count = Data.Side * Data.Side;
-	Data.Height.SetNumUninitialized(Count);
-	Data.WaterHeight.SetNumUninitialized(Count);
-	Data.SurfaceClass.SetNumUninitialized(Count);
-	Data.ForestCoverage.SetNumUninitialized(Count);
-	Data.SnowCoverage.SetNumUninitialized(Count);
-	const FIntPoint TileOrigin = InKey.Coordinate * (Data.Side * Data.Step);
 
-	for (int32 Y = 0; Y < Data.Side; ++Y)
+	Data.Key =
+		InKey;
+
+	Data.Side =
+		MacroGridSide;
+
+	Data.Step =
+		MacroBaseStep <<
+		InKey.Level;
+
+	const int32 Count =
+		Data.Side *
+		Data.Side;
+
+	Data.Height.
+		SetNumUninitialized(
+			Count);
+
+	Data.WaterHeight.
+		SetNumUninitialized(
+			Count);
+
+	Data.SurfaceClass.
+		SetNumUninitialized(
+			Count);
+
+	Data.ForestCoverage.
+		SetNumUninitialized(
+			Count);
+
+	Data.SnowCoverage.
+		SetNumUninitialized(
+			Count);
+
+	const FIntPoint TileOrigin =
+		InKey.Coordinate *
+		(Data.Side *
+			Data.Step);
+
+	TArray<FVoxelColumnSample> Columns;
+
+	if (!Generator->SampleColumns(
+		TileOrigin,
+		Data.Side,
+		Data.Side,
+		Data.Step,
+		Columns,
+		OutError,
+		InCancel))
 	{
-		for (int32 X = 0; X < Data.Side; ++X)
-		{
-			if (InCancel && InCancel->Load())
-			{
-				OutError = TEXT("Canceled");
-				return false;
-			}
-			const FIntPoint World = TileOrigin + FIntPoint(
-				X * Data.Step + Data.Step / 2,
-				Y * Data.Step + Data.Step / 2);
-			FVoxelColumnSample Column;
-			if (!Generator->SampleColumn(World.X, World.Y, Column, OutError, InCancel))
-			{
-				return false;
-			}
-
-			const int32 Index = X + Y * Data.Side;
-			Data.Height[Index] = Column.SurfaceZ;
-			Data.WaterHeight[Index] = Column.SurfaceWaterZ;
-			Data.SurfaceClass[Index] = Column.SurfaceMaterial;
-			const int32 Moisture = FMath::Clamp(Column.Climate.MoistureQ15, 0, 32767);
-			const int32 Temperature = FMath::Clamp(Column.Climate.TemperatureQ15, -32768, 32767);
-			Data.ForestCoverage[Index] = static_cast<uint8>(FMath::Clamp(Moisture * 255 / 32767, 0, 255));
-			Data.SnowCoverage[Index] = static_cast<uint8>(FMath::Clamp((-Temperature) * 255 / 32768, 0, 255));
-		}
+		return false;
 	}
 
-	OutData = MoveTemp(Data);
+	if (Columns.Num() != Count)
+	{
+		OutError =
+			TEXT("Voxel macro column grid returned an invalid sample count");
+
+		return false;
+	}
+
+	for (int32 Index = 0;
+		Index < Count;
+		++Index)
+	{
+		const FVoxelColumnSample& Column =
+			Columns[Index];
+
+		Data.Height[Index] =
+			Column.SurfaceZ;
+
+		Data.WaterHeight[Index] =
+			Column.SurfaceWaterZ;
+
+		Data.SurfaceClass[Index] =
+			Column.SurfaceMaterial;
+
+		const int32 Moisture =
+			FMath::Clamp(
+				Column.Climate.
+					MoistureQ15,
+				0,
+				32767);
+
+		const int32 Temperature =
+			FMath::Clamp(
+				Column.Climate.
+					TemperatureQ15,
+				-32768,
+				32767);
+
+		Data.ForestCoverage[Index] =
+			static_cast<uint8>(
+				FMath::Clamp(
+					Moisture *
+						255 /
+						32767,
+					0,
+					255));
+
+		Data.SnowCoverage[Index] =
+			static_cast<uint8>(
+				FMath::Clamp(
+					(-Temperature) *
+						255 /
+						32768,
+					0,
+					255));
+	}
+
+	OutData =
+		MoveTemp(Data);
+
 	OutError.Reset();
 	return true;
 }

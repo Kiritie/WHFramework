@@ -195,6 +195,12 @@ struct WHFRAMEWORK_API FVoxelLakePlan
     FVoxelBasinCertificate Certificate;
 };
 
+struct WHFRAMEWORK_API FVoxelRiverSegmentRef
+{
+	int32 RiverIndex = INDEX_NONE;
+	int32 PointIndex = INDEX_NONE;
+};
+
 struct WHFRAMEWORK_API FVoxelHydrologyInfluence
 {
     int32 SurfaceWaterZ = MIN_int32;
@@ -210,8 +216,11 @@ struct WHFRAMEWORK_API FVoxelHydrologyPlan
 {
     FVoxelHydrologyRegionKey Key;
 
-    FIntPoint CoreMin = FIntPoint::ZeroValue;
-    FIntPoint CoreMax = FIntPoint::ZeroValue;
+	FIntPoint CoreMin =
+		FIntPoint::ZeroValue;
+
+	FIntPoint CoreMax =
+		FIntPoint::ZeroValue;
 
     FVoxelHydrologyGrid Grid;
     FVoxelDrainageResult Drainage;
@@ -219,11 +228,26 @@ struct WHFRAMEWORK_API FVoxelHydrologyPlan
     TArray<FVoxelRiverRoute> Rivers;
     TArray<FVoxelLakePlan> Lakes;
 
+	void Finalize();
+
     bool Sample(
         int32 InWorldX,
         int32 InWorldY,
         int32 InOriginalGround,
         FVoxelHydrologyInfluence& OutInfluence) const;
+
+	uint64 GetAllocatedBytes() const;
+
+private:
+	TMap<
+		FIntPoint,
+		int32>
+		LakeWaterByCellOrigin;
+
+	TMap<
+		FIntPoint,
+		TArray<FVoxelRiverSegmentRef>>
+		RiverSegmentsByHydrologyCell;
 };
 
 class WHFRAMEWORK_API FVoxelHydrologyGenerator

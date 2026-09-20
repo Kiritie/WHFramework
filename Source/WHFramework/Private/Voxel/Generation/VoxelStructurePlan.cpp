@@ -1,63 +1,81 @@
-bool FVoxelStructurePlan::IsCleared(
-    const FIntVector& InPosition,
-    EVoxelGenerationStage InStage) const
-{
-    for (const FVoxelStructurePlanClear& Clear :
-        Clears)
-    {
-        if (Clear.Stage ==
-                InStage &&
-            Clear.Bounds.Contains(
-                InPosition))
-        {
-            return true;
-        }
-    }
+#include "Voxel/Generation/VoxelStructurePlan.h"
 
-    return false;
+void FVoxelStructurePlan::Finalize()
+{
+	ResolvedWrites.Reset();
+
+	ResolvedWrites.Reserve(
+		Writes.Num());
+
+	for (const FVoxelStructurePlanWrite& Write :
+		Writes)
+	{
+		const FVoxelStructurePlanKey Key {
+			Write.Position,
+			Write.Stage
+		};
+
+		FVoxelStructurePlanWrite* Existing =
+			ResolvedWrites.Find(Key);
+
+		if (!Existing ||
+			Existing->OwnerId <
+				Write.OwnerId)
+		{
+			ResolvedWrites.Add(
+				Key,
+				Write);
+		}
+	}
+}
+
+bool FVoxelStructurePlan::IsCleared(
+	const FIntVector& InPosition,
+	const EVoxelGenerationStage InStage) const
+{
+	for (const FVoxelStructurePlanClear& Clear :
+		Clears)
+	{
+		if (Clear.Stage ==
+				InStage &&
+			Clear.Bounds.Contains(
+				InPosition))
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 bool FVoxelStructurePlan::Sample(
-    const FIntVector& InPosition,
-    EVoxelGenerationStage InStage,
-    uint32& OutValue) const
+	const FIntVector& InPosition,
+	const EVoxelGenerationStage InStage,
+	uint32& OutValue) const
 {
-    bool bFound = false;
-    FVoxelStableId WinningOwner;
+	const FVoxelStructurePlanWrite* Write =
+		ResolvedWrites.Find({
+			InPosition,
+			InStage
+		});
 
-    for (const FVoxelStructurePlanWrite& Write :
-        Writes)
-    {
-        if (Write.Position !=
-                InPosition ||
-            Write.Stage !=
-                InStage)
-        {
-            continue;
-        }
+	if (!Write)
+	{
+		return false;
+	}
 
-        if (!bFound ||
-            WinningOwner <
-                Write.OwnerId)
-        {
-            WinningOwner =
-                Write.OwnerId;
+	OutValue =
+		Write->Value;
 
-            OutValue =
-                Write.Value;
-
-            bFound = true;
-        }
-    }
-
-    return bFound;
+	return true;
 }
 
 uint64 FVoxelStructurePlan::GetAllocatedBytes() const
 {
-    return sizeof(FVoxelStructurePlan) +
-        Clears.GetAllocatedSize() +
-        Writes.GetAllocatedSize() +
-        Details.GetAllocatedSize();
+	return
+		sizeof(FVoxelStructurePlan) +
+		Clears.GetAllocatedSize() +
+		Writes.GetAllocatedSize() +
+		Details.GetAllocatedSize() +
+		ResolvedWrites.GetAllocatedSize();
 }
-#include "Voxel/Generation/VoxelStructurePlan.h"

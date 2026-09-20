@@ -1,50 +1,61 @@
 #include "Voxel/Generation/VoxelFeaturePlan.h"
 
-bool FVoxelFeaturePlan::Sample(
-    const FIntVector& InPosition,
-    EVoxelGenerationStage InStage,
-    uint32& OutValue) const
+void FVoxelFeaturePlan::Finalize()
 {
-    bool bFound = false;
-    FVoxelStableId WinningOwner;
+	ResolvedWrites.Reset();
 
-    for (const FVoxelFeaturePlanWrite& Write :
-        Writes)
-    {
-        if (Write.Position !=
-                InPosition ||
-            Write.Stage !=
-                InStage)
-        {
-            continue;
-        }
+	ResolvedWrites.Reserve(
+		Writes.Num());
 
-        /**
-         * 冲突规则已经固定：
-         * Stable InstanceId 小的先执行；
-         * 后执行者覆盖前执行者。
-         *
-         * 因此同 Stage 下更大的 OwnerId 最终获胜。
-         */
-        if (!bFound ||
-            WinningOwner <
-                Write.OwnerId)
-        {
-            WinningOwner =
-                Write.OwnerId;
+	for (const FVoxelFeaturePlanWrite& Write :
+		Writes)
+	{
+		const FVoxelFeaturePlanKey Key {
+			Write.Position,
+			Write.Stage
+		};
 
-            OutValue =
-                Write.Value;
+		FVoxelFeaturePlanWrite* Existing =
+			ResolvedWrites.Find(Key);
 
-            bFound = true;
-        }
-    }
+		if (!Existing ||
+			Existing->OwnerId <
+				Write.OwnerId)
+		{
+			ResolvedWrites.Add(
+				Key,
+				Write);
+		}
+	}
+}
 
-    return bFound;
+bool FVoxelFeaturePlan::Sample(
+	const FIntVector& InPosition,
+	const EVoxelGenerationStage InStage,
+	uint32& OutValue) const
+{
+	const FVoxelFeaturePlanWrite* Write =
+		ResolvedWrites.Find({
+			InPosition,
+			InStage
+		});
+
+	if (!Write)
+	{
+		return false;
+	}
+
+	OutValue =
+		Write->Value;
+
+	return true;
 }
 
 uint64 FVoxelFeaturePlan::GetAllocatedBytes() const
 {
-    return static_cast<uint64>(
-        Writes.GetAllocatedSize());
+	return
+		static_cast<uint64>(
+			Writes.GetAllocatedSize()) +
+		static_cast<uint64>(
+			ResolvedWrites.GetAllocatedSize());
 }

@@ -14,7 +14,7 @@
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FVoxelManifestCodecTest,
-	"WHFramework.Voxel.Save.ManifestV4",
+	"WHFramework.Voxel.Save.ManifestV5",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FVoxelManifestCodecTest::RunTest(const FString& InParameters)

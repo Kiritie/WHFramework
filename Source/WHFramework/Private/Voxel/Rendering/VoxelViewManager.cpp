@@ -642,41 +642,108 @@ void FVoxelViewManager::UpdateMacro(const TConstArrayView<FVector> InObservers)
 	}
 }
 
-void FVoxelViewManager::RequestFine(const FIntVector& InSection, const uint64 InRevision)
+void FVoxelViewManager::RequestFine(
+	const FIntVector& InSection,
+	const uint64 InRevision)
 {
+	const FVoxelSection* Section =
+		Module.GetRuntime()->
+			FindSection(
+				InSection);
+
+	if (!Section ||
+		Section->Status !=
+			EVoxelSectionStatus::DataReady)
+	{
+		return;
+	}
+
+	FVoxelTaskStamp Stamp;
+	Stamp.WorldEpoch =
+		WorldEpoch;
+	Stamp.Token =
+		Section->Stamp.Token;
+	Stamp.Revision =
+		InRevision;
+	Stamp.Section =
+		InSection;
+
+	if (Scheduler.Has(
+		Stamp,
+		EVoxelTaskKind::BuildFineMesh))
+	{
+		return;
+	}
+
 	FVoxelSectionSnapshot Snapshot;
-	if (!Module.GetRuntime()->CaptureSnapshot(InSection, Snapshot))
+
+	if (!Module.GetRuntime()->
+		CaptureSnapshot(
+			InSection,
+			Snapshot))
 	{
 		return;
 	}
+
 	FVoxelTaskRequest Request;
-	Request.Kind = EVoxelTaskKind::BuildFineMesh;
-	Request.WorkClass = EVoxelWorkClass::Visible;
-	Request.Stamp.WorldEpoch = WorldEpoch;
-	Request.Stamp.Token = Snapshot.Stamp.Token;
-	Request.Stamp.Revision = InRevision;
-	Request.Stamp.Section = InSection;
-	Request.InputBytes = Snapshot.Bytes();
-	Request.ReservedBytes = 48ull * 1024ull * 1024ull;
-	if (Scheduler.Has(Request.Stamp, Request.Kind))
-	{
-		return;
-	}
-	const TSharedPtr<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> Registry = Module.GetRegistry();
-	const TSharedPtr<const FVoxelShapeRegistry, ESPMode::ThreadSafe> Shapes = Module.GetShapes();
-	Request.Execute = [Snapshot = MoveTemp(Snapshot), Registry, Shapes](const TAtomic<bool>& InCancel)
-	{
-		FVoxelTaskResult Result;
-		Result.FineMesh = MakeShared<FVoxelSectionMeshResult>();
-		Result.bSuccess = Registry && Shapes && FVoxelSectionMesher::Build(
-			Snapshot,
-			*Registry,
-			*Shapes,
-			*Result.FineMesh,
-			&InCancel);
-		return Result;
-	};
-	Scheduler.Enqueue(MoveTemp(Request));
+
+	Request.Kind =
+		EVoxelTaskKind::BuildFineMesh;
+
+	Request.WorkClass =
+		EVoxelWorkClass::Visible;
+
+	Request.Stamp =
+		Stamp;
+
+	Request.InputBytes =
+		Snapshot.Bytes();
+
+	Request.ReservedBytes =
+		48ull *
+		1024ull *
+		1024ull;
+
+	const TSharedPtr<
+		const FVoxelRegistrySnapshot,
+		ESPMode::ThreadSafe> Registry =
+			Module.GetRegistry();
+
+	const TSharedPtr<
+		const FVoxelShapeRegistry,
+		ESPMode::ThreadSafe> Shapes =
+			Module.GetShapes();
+
+	Request.Execute =
+		[
+			Snapshot =
+				MoveTemp(Snapshot),
+			Registry,
+			Shapes
+		](
+			const TAtomic<bool>& InCancel)
+		{
+			FVoxelTaskResult Result;
+
+			Result.FineMesh =
+				MakeShared<
+					FVoxelSectionMeshResult>();
+
+			Result.bSuccess =
+				Registry &&
+				Shapes &&
+				FVoxelSectionMesher::Build(
+					Snapshot,
+					*Registry,
+					*Shapes,
+					*Result.FineMesh,
+					&InCancel);
+
+			return Result;
+		};
+
+	Scheduler.Enqueue(
+		MoveTemp(Request));
 }
 
 void FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey)
@@ -1025,42 +1092,166 @@ bool FVoxelViewManager::PublishMeshActor(
 	const double InBlockSize,
 	const FVoxelSectionMeshResult& InMesh)
 {
-	if (InOutActor)
-	{
-		InOutActor->Destroy();
-		InOutActor = nullptr;
-	}
-	FActorSpawnParameters Parameters;
-	Parameters.ObjectFlags |= RF_Transient;
-	Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	AActor* Host = Module.GetWorld()->SpawnActor<AActor>(AActor::StaticClass(), FTransform::Identity, Parameters);
-	if (!Host || !Module.GetMaterialSet())
+	if (!Module.GetWorld() ||
+		!Module.GetMaterialSet() ||
+		!FMath::IsFinite(
+			InBlockSize) ||
+		InBlockSize <= 0.0)
 	{
 		return false;
 	}
-	Host->SetReplicates(false);
-	Host->SetActorEnableCollision(false);
-	USceneComponent* Root = NewObject<USceneComponent>(Host);
-	Host->SetRootComponent(Root);
-	Root->RegisterComponent();
-	Host->SetActorLocation(InLocation);
-	for (const FVoxelRenderBatch& Batch : InMesh.Batches)
+
+	TArray<UMaterialInterface*> Materials;
+	Materials.Reserve(
+		InMesh.Batches.Num());
+
+	for (const FVoxelRenderBatch& Batch :
+		InMesh.Batches)
 	{
-		const FVoxelMaterialBank* Bank = Module.GetMaterialSet()->FindBank(Batch.Group, Batch.Bank);
-		if (!Bank || !Bank->Material)
+		const FVoxelMaterialBank* Bank =
+			Module.GetMaterialSet()->
+				FindBank(
+					Batch.Group,
+					Batch.Bank);
+
+		if (!Bank ||
+			!Bank->Material)
+		{
+			return false;
+		}
+
+		Materials.Add(
+			Bank->Material);
+	}
+
+	AActor* Host =
+		InOutActor;
+
+	const bool bNewHost =
+		Host == nullptr;
+
+	if (!Host)
+	{
+		FActorSpawnParameters Parameters;
+		Parameters.ObjectFlags |=
+			RF_Transient;
+
+		Parameters.
+			SpawnCollisionHandlingOverride =
+				ESpawnActorCollisionHandlingMethod::
+					AlwaysSpawn;
+
+		Host =
+			Module.GetWorld()->
+				SpawnActor<AActor>(
+					AActor::StaticClass(),
+					FTransform::Identity,
+					Parameters);
+
+		if (!Host)
+		{
+			return false;
+		}
+
+		Host->SetReplicates(false);
+		Host->SetActorEnableCollision(false);
+
+		USceneComponent* Root =
+			NewObject<USceneComponent>(
+				Host);
+
+		if (!Root)
 		{
 			Host->Destroy();
 			return false;
 		}
-		UVoxelMeshComponent* Component = NewObject<UVoxelMeshComponent>(Host);
-		Component->SetupAttachment(Root);
-		Component->RegisterComponent();
-		if (!Component->Apply(Batch.Mesh, InBlockSize, Bank->Material))
+
+		Host->SetRootComponent(
+			Root);
+
+		Root->RegisterComponent();
+	}
+
+	Host->SetActorLocation(
+		InLocation);
+
+	TInlineComponentArray<
+		UVoxelMeshComponent*>
+		Components;
+
+	Host->GetComponents(
+		Components);
+
+	for (int32 BatchIndex = 0;
+		BatchIndex <
+			InMesh.Batches.Num();
+		++BatchIndex)
+	{
+		UVoxelMeshComponent* Component =
+			Components.IsValidIndex(
+				BatchIndex)
+				? Components[
+					BatchIndex]
+				: nullptr;
+
+		if (!Component)
+		{
+			Component =
+				NewObject<
+					UVoxelMeshComponent>(
+						Host);
+
+			if (!Component)
+			{
+				if (bNewHost)
+				{
+					Host->Destroy();
+				}
+
+				return false;
+			}
+
+			Component->SetupAttachment(
+				Host->GetRootComponent());
+
+			Component->
+				RegisterComponent();
+
+			Components.Add(
+				Component);
+		}
+
+		if (!Component->Apply(
+			InMesh.Batches[
+				BatchIndex].
+				Mesh,
+			InBlockSize,
+			Materials[
+				BatchIndex]))
 		{
 			Host->Destroy();
+			InOutActor = nullptr;
 			return false;
 		}
 	}
-	InOutActor = Host;
+
+	for (int32 ComponentIndex =
+			Components.Num() - 1;
+		ComponentIndex >=
+			InMesh.Batches.Num();
+		--ComponentIndex)
+	{
+		if (Components[
+			ComponentIndex])
+		{
+			Components[
+				ComponentIndex]->
+					DestroyComponent();
+		}
+	}
+
+	InOutActor =
+		Host;
+
 	return true;
 }

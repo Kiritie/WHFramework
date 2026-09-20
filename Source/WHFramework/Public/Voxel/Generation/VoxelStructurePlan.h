@@ -7,43 +7,78 @@
 
 struct WHFRAMEWORK_API FVoxelStructurePlanWrite
 {
-    FIntVector Position =
-        FIntVector::ZeroValue;
+	FIntVector Position =
+		FIntVector::ZeroValue;
 
-    uint32 Value = 0;
+	uint32 Value = 0;
 
-    EVoxelGenerationStage Stage =
-        EVoxelGenerationStage::None;
+	EVoxelGenerationStage Stage =
+		EVoxelGenerationStage::None;
 
-    FVoxelStableId OwnerId;
+	FVoxelStableId OwnerId;
 };
 
 struct WHFRAMEWORK_API FVoxelStructurePlanClear
 {
-    FVoxelGenerationBounds Bounds;
+	FVoxelGenerationBounds Bounds;
 
-    EVoxelGenerationStage Stage =
-        EVoxelGenerationStage::None;
+	EVoxelGenerationStage Stage =
+		EVoxelGenerationStage::None;
 
-    FVoxelStableId OwnerId;
+	FVoxelStableId OwnerId;
 };
+
+struct WHFRAMEWORK_API FVoxelStructurePlanKey
+{
+	FIntVector Position =
+		FIntVector::ZeroValue;
+
+	EVoxelGenerationStage Stage =
+		EVoxelGenerationStage::None;
+
+	bool operator==(
+		const FVoxelStructurePlanKey& InOther) const
+	{
+		return
+			Position == InOther.Position &&
+			Stage == InOther.Stage;
+	}
+};
+
+FORCEINLINE uint32 GetTypeHash(
+	const FVoxelStructurePlanKey& InKey)
+{
+	return HashCombineFast(
+		::GetTypeHash(InKey.Position),
+		::GetTypeHash(
+			static_cast<uint8>(
+				InKey.Stage)));
+}
 
 struct WHFRAMEWORK_API FVoxelStructurePlan
 {
-    FVoxelGenerationBounds Bounds;
+	FVoxelGenerationBounds Bounds;
 
 	TArray<FVoxelStructurePlanClear> Clears;
 	TArray<FVoxelStructurePlanWrite> Writes;
 	TArray<FVoxelStructureDetailPlacement> Details;
 
-    bool IsCleared(
-        const FIntVector& InPosition,
-        EVoxelGenerationStage InStage) const;
+	void Finalize();
 
-    bool Sample(
-        const FIntVector& InPosition,
-        EVoxelGenerationStage InStage,
-        uint32& OutValue) const;
+	bool IsCleared(
+		const FIntVector& InPosition,
+		EVoxelGenerationStage InStage) const;
 
-    uint64 GetAllocatedBytes() const;
+	bool Sample(
+		const FIntVector& InPosition,
+		EVoxelGenerationStage InStage,
+		uint32& OutValue) const;
+
+	uint64 GetAllocatedBytes() const;
+
+private:
+	TMap<
+		FVoxelStructurePlanKey,
+		FVoxelStructurePlanWrite>
+		ResolvedWrites;
 };

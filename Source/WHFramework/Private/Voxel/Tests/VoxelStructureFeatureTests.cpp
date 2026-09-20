@@ -80,6 +80,7 @@ bool FVoxelStructureFeatureConflictTest::RunTest(const FString& InParameters)
 	FVoxelStructurePlan Structure;
 	Structure.Writes.Add({ Position, 11, EVoxelGenerationStage::SurfaceStructures, Low });
 	Structure.Writes.Add({ Position, 22, EVoxelGenerationStage::SurfaceStructures, High });
+	Structure.Finalize();
 	uint32 Value = 0;
 	TestTrue(TEXT("Structure write resolves"), Structure.Sample(Position, EVoxelGenerationStage::SurfaceStructures, Value));
 	TestEqual(TEXT("Later stable owner overrides"), Value, uint32(22));
@@ -93,6 +94,7 @@ bool FVoxelStructureFeatureConflictTest::RunTest(const FString& InParameters)
 	FVoxelFeaturePlan Feature;
 	Feature.Writes.Add({ Position, 31, EVoxelGenerationStage::Vegetation, Low });
 	Feature.Writes.Add({ Position, 32, EVoxelGenerationStage::Vegetation, High });
+	Feature.Finalize();
 	TestTrue(TEXT("Feature write resolves"), Feature.Sample(Position, EVoxelGenerationStage::Vegetation, Value));
 	TestEqual(TEXT("Feature stable owner order"), Value, uint32(32));
 	return true;
