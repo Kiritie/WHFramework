@@ -28,6 +28,137 @@ struct FVoxelGenerationPlanCache::FBuildGate
 	FString Error;
 };
 
+template<typename KeyType, typename ValueType>
+bool FVoxelGenerationPlanCache::GetOrBuildNatural(
+	const KeyType& InKey,
+	TMap<KeyType, TSharedPtr<const ValueType, ESPMode::ThreadSafe>>& InValues,
+	TMap<KeyType, TSharedPtr<FBuildGate, ESPMode::ThreadSafe>>& InBuilds,
+	TFunctionRef<bool(ValueType&, FString&)> InBuild,
+	TSharedPtr<const ValueType, ESPMode::ThreadSafe>& OutValue,
+	FString& OutError)
+{
+	{
+		FReadScopeLock Scope(NaturalLock);
+		if (const TSharedPtr<const ValueType, ESPMode::ThreadSafe>* Found = InValues.Find(InKey))
+		{
+			OutValue = *Found;
+			OutError.Reset();
+			return OutValue.IsValid();
+		}
+	}
+
+	TSharedPtr<FBuildGate, ESPMode::ThreadSafe> Gate;
+	bool bOwner = false;
+	{
+		FWriteScopeLock Scope(NaturalLock);
+		if (const TSharedPtr<const ValueType, ESPMode::ThreadSafe>* Found = InValues.Find(InKey))
+		{
+			OutValue = *Found;
+			OutError.Reset();
+			return OutValue.IsValid();
+		}
+
+		if (TSharedPtr<FBuildGate, ESPMode::ThreadSafe>* Existing = InBuilds.Find(InKey))
+		{
+			Gate = *Existing;
+		}
+		else
+		{
+			Gate = MakeShared<FBuildGate, ESPMode::ThreadSafe>();
+			InBuilds.Add(InKey, Gate);
+			bOwner = true;
+		}
+	}
+
+	if (!bOwner)
+	{
+		Gate->Event->Wait();
+		if (!Gate->bSuccess)
+		{
+			OutError = Gate->Error;
+			return false;
+		}
+
+		FReadScopeLock Scope(NaturalLock);
+		if (const TSharedPtr<const ValueType, ESPMode::ThreadSafe>* Found = InValues.Find(InKey))
+		{
+			OutValue = *Found;
+			OutError.Reset();
+			return OutValue.IsValid();
+		}
+
+		OutError = TEXT("Natural generation build completed without publishing a value");
+		return false;
+	}
+
+	ValueType LocalValue;
+	FString BuildError;
+	const bool bSuccess = InBuild(LocalValue, BuildError);
+	TSharedPtr<const ValueType, ESPMode::ThreadSafe> BuiltValue;
+	if (bSuccess)
+	{
+		BuiltValue = MakeShared<const ValueType, ESPMode::ThreadSafe>(MoveTemp(LocalValue));
+	}
+
+	{
+		FWriteScopeLock Scope(NaturalLock);
+		if (BuiltValue)
+		{
+			InValues.Add(InKey, BuiltValue);
+		}
+		Gate->bSuccess = BuiltValue.IsValid();
+		Gate->Error = Gate->bSuccess ? FString() : BuildError;
+		InBuilds.Remove(InKey);
+	}
+	Gate->Event->Trigger();
+
+	if (!Gate->bSuccess)
+	{
+		OutError = Gate->Error;
+		return false;
+	}
+
+	OutValue = MoveTemp(BuiltValue);
+	OutError.Reset();
+	return true;
+}
+
+bool FVoxelGenerationPlanCache::GetOrBuildBaseColumn(
+	const FIntPoint& InPosition,
+	TFunctionRef<bool(FVoxelBaseColumnEntry&, FString&)> InBuild,
+	FVoxelBaseColumnEntryPtr& OutEntry,
+	FString& OutError)
+{
+	return GetOrBuildNatural(InPosition, BaseColumns, BaseColumnBuilds, InBuild, OutEntry, OutError);
+}
+
+bool FVoxelGenerationPlanCache::GetOrBuildRiverField(
+	const FVoxelNaturalTileKey& InKey,
+	TFunctionRef<bool(FVoxelRiverFieldTile&, FString&)> InBuild,
+	FVoxelRiverFieldTilePtr& OutTile,
+	FString& OutError)
+{
+	return GetOrBuildNatural(InKey, RiverFields, RiverFieldBuilds, InBuild, OutTile, OutError);
+}
+
+bool FVoxelGenerationPlanCache::GetOrBuildLake(
+	const FVoxelLakeAnchorKey& InKey,
+	TFunctionRef<bool(FVoxelLakeAnchorPlan&, FString&)> InBuild,
+	FVoxelLakeAnchorPlanPtr& OutPlan,
+	FString& OutError)
+{
+	return GetOrBuildNatural(InKey, Lakes, LakeBuilds, InBuild, OutPlan, OutError);
+}
+
+bool FVoxelGenerationPlanCache::GetOrBuildNaturalColumn(
+	const FIntPoint& InPosition,
+	TFunctionRef<bool(FVoxelNaturalColumnEntry&, FString&)> InBuild,
+	FVoxelNaturalColumnEntryPtr& OutEntry,
+	FString& OutError)
+{
+	return GetOrBuildNatural(InPosition, NaturalColumns, NaturalColumnBuilds, InBuild, OutEntry, OutError);
+}
+
 bool FVoxelGenerationPlanCache::FindHydrology(
 	const FVoxelHydrologyRegionKey& InKey,
 	FVoxelHydrologyPlanPtr& OutPlan) const
@@ -682,6 +813,18 @@ bool FVoxelGenerationPlanCache::GetOrBuildStructure(
 
 void FVoxelGenerationPlanCache::Reset()
 {
+	{
+		FWriteScopeLock Scope(NaturalLock);
+		BaseColumns.Reset();
+		RiverFields.Reset();
+		Lakes.Reset();
+		NaturalColumns.Reset();
+		BaseColumnBuilds.Reset();
+		RiverFieldBuilds.Reset();
+		LakeBuilds.Reset();
+		NaturalColumnBuilds.Reset();
+	}
+
 	FWriteScopeLock Scope(Lock);
 
 	Hydrology.Reset();
@@ -690,11 +833,77 @@ void FVoxelGenerationPlanCache::Reset()
 	Structures.Reset();
 }
 
+void FVoxelGenerationPlanCache::TrimNaturalCaches(
+	TConstArrayView<FIntPoint> InCenters,
+	const int32 InKeepRadiusCells)
+{
+	if (InCenters.IsEmpty() || InKeepRadiusCells < 0)
+	{
+		return;
+	}
+
+	auto IsRetained = [InCenters, InKeepRadiusCells](const FIntPoint& InPosition)
+	{
+		for (const FIntPoint& Center : InCenters)
+		{
+			if (FMath::Abs(InPosition.X - Center.X) <= InKeepRadiusCells &&
+				FMath::Abs(InPosition.Y - Center.Y) <= InKeepRadiusCells)
+			{
+				return true;
+			}
+		}
+		return false;
+	};
+
+	FWriteScopeLock Scope(NaturalLock);
+	for (auto It = BaseColumns.CreateIterator(); It; ++It)
+	{
+		if (!IsRetained(It.Key())) It.RemoveCurrent();
+	}
+	for (auto It = NaturalColumns.CreateIterator(); It; ++It)
+	{
+		if (!IsRetained(It.Key())) It.RemoveCurrent();
+	}
+	for (auto It = RiverFields.CreateIterator(); It; ++It)
+	{
+		if (!IsRetained(It.Key().Coordinate * FVoxelRiverFieldTile::Side)) It.RemoveCurrent();
+	}
+	for (auto It = Lakes.CreateIterator(); It; ++It)
+	{
+		if (!IsRetained(It.Key().Coordinate * 64)) It.RemoveCurrent();
+	}
+}
+
 uint64 FVoxelGenerationPlanCache::GetAllocatedBytes() const
 {
-	FReadScopeLock Scope(Lock);
+	uint64 Bytes = 0;
 
-	uint64 Bytes =
+	{
+		FReadScopeLock NaturalScope(NaturalLock);
+		Bytes += BaseColumns.GetAllocatedSize() +
+			RiverFields.GetAllocatedSize() +
+			Lakes.GetAllocatedSize() +
+			NaturalColumns.GetAllocatedSize();
+		for (const TPair<FIntPoint, FVoxelBaseColumnEntryPtr>& Pair : BaseColumns)
+		{
+			if (Pair.Value) Bytes += Pair.Value->GetAllocatedBytes();
+		}
+		for (const TPair<FVoxelNaturalTileKey, FVoxelRiverFieldTilePtr>& Pair : RiverFields)
+		{
+			if (Pair.Value) Bytes += Pair.Value->GetAllocatedBytes();
+		}
+		for (const TPair<FVoxelLakeAnchorKey, FVoxelLakeAnchorPlanPtr>& Pair : Lakes)
+		{
+			if (Pair.Value) Bytes += Pair.Value->GetAllocatedBytes();
+		}
+		for (const TPair<FIntPoint, FVoxelNaturalColumnEntryPtr>& Pair : NaturalColumns)
+		{
+			if (Pair.Value) Bytes += Pair.Value->GetAllocatedBytes();
+		}
+	}
+
+	FReadScopeLock Scope(Lock);
+	Bytes +=
 		Hydrology.GetAllocatedSize() +
 		Caves.GetAllocatedSize() +
 		Features.GetAllocatedSize() +

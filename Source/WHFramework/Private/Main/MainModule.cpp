@@ -94,11 +94,15 @@ void AMainModule::OnRefresh_Implementation(float DeltaSeconds)
 
 void AMainModule::OnTermination_Implementation()
 {
+	const double TerminationStartTime = FPlatformTime::Seconds();
+	UE_LOG(LogTemp, Display, TEXT("Main module termination started."));
+
 	Super::OnTermination_Implementation();
 		
 	ITER_PHASE(Phase,
 		for(auto Iter : Modules)
 		{
+			const double ModuleStartTime = FPlatformTime::Seconds();
 			if(Phase != EPhase::Final)
 			{
 				Iter->OnTermination(Phase);
@@ -107,12 +111,26 @@ void AMainModule::OnTermination_Implementation()
 			{
 				Iter->Termination();
 			}
+			const double ModuleDuration = FPlatformTime::Seconds() - ModuleStartTime;
+			if(ModuleDuration >= 0.1)
+			{
+				UE_LOG(LogTemp,
+				       Warning,
+				       TEXT("Slow module termination: %s phase=%d duration=%.3fs"),
+				       *Iter->GetModuleName().ToString(),
+				       static_cast<int32>(Phase),
+				       ModuleDuration);
+			}
 		}
 	)
 	
-	UEventModuleStatics::BroadcastEvent<FEventGameExited>(this);
+	UEventModuleStatics::BroadcastEvent<FEventGameExited>(this, { true });
 
 	ModuleMap.Empty();
+	UE_LOG(LogTemp,
+	       Display,
+	       TEXT("Main module termination finished in %.3fs."),
+	       FPlatformTime::Seconds() - TerminationStartTime);
 }
 
 void AMainModule::EndPlay(const EEndPlayReason::Type EndPlayReason)

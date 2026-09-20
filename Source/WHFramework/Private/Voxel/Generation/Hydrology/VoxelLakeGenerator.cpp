@@ -1,5 +1,6 @@
 #include "Voxel/Generation/Hydrology/VoxelLakeGenerator.h"
 
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Generation/Hydrology/VoxelRiverGenerator.h"
 #include "Voxel/Generation/Terrain/VoxelTerrainGenerator.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
@@ -114,6 +115,53 @@ bool FVoxelLakeGenerator::ApplyToColumn(
 	}
 
 	return bAffected;
+}
+
+bool FVoxelLakeGenerator::BuildPlan(
+	const FVoxelLakeAnchorKey& InKey,
+	FVoxelLakeAnchorPlan& OutPlan,
+	FString& OutError,
+	const TAtomic<bool>* InCancel) const
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_LakePlan);
+
+	if (InCancel && InCancel->Load())
+	{
+		OutError = TEXT("Canceled");
+		return false;
+	}
+
+	FVoxelLakeAnchorPlan Plan;
+	Plan.Key = InKey;
+	Plan.bHasFeature = TryGetFeature(InKey.Coordinate, Plan.Feature);
+	OutPlan = MoveTemp(Plan);
+	OutError.Reset();
+	return true;
+}
+
+bool FVoxelLakeGenerator::ApplyFeature(
+	const FVoxelLakeAnchorPlan& InPlan,
+	const int32 InX,
+	const int32 InY,
+	FVoxelColumnSample& InOutColumn) const
+{
+	if (InOutColumn.bOcean || !InPlan.bHasFeature || !InPlan.Feature.IsValid())
+	{
+		return false;
+	}
+
+	int32 BedZ = 0;
+	int32 WaterZ = 0;
+	if (!EvaluateFeature(InPlan.Feature, InX, InY, InOutColumn.SurfaceZ, BedZ, WaterZ))
+	{
+		return false;
+	}
+
+	InOutColumn.SurfaceZ = FMath::Min(InOutColumn.SurfaceZ, BedZ);
+	InOutColumn.SurfaceWaterZ = FMath::Max(InOutColumn.SurfaceWaterZ, WaterZ);
+	InOutColumn.bLake = true;
+	InOutColumn.bRiver = false;
+	return true;
 }
 
 bool FVoxelLakeGenerator::TryGetFeature(

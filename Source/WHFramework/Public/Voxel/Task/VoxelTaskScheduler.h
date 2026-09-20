@@ -18,6 +18,8 @@ enum class EVoxelWorkClass : uint8
 {
 	None = 0,
 	Critical,
+	Warmup,
+	ExactData,
 	Interactive,
 	Visible,
 	Boundary,

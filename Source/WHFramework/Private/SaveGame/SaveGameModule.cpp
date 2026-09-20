@@ -735,6 +735,11 @@ TArray<UModuleBase*> USaveGameModule::GetSaveModules(ESaveScope Scope) const
 
 void USaveGameModule::OnGameExited(UObject* InSender, const FEventGameExited& InEvent)
 {
+	if(InEvent.bIsSimulating)
+	{
+		return;
+	}
+
 	const FSaveOperationResult SaveResult = SaveCurrentSlot();
 	if(!SaveResult)
 	{

@@ -13,6 +13,12 @@ public:
 	UVoxelViewProfile();
 
 public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Voxel|View|Warmup", meta = (ClampMin = "0"))
+	int32 WarmupDataRadiusCentimeters = 600;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Voxel|View|Warmup", meta = (ClampMin = "0"))
+	int32 WarmupCollisionRadiusCentimeters = 600;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Voxel|View", meta = (ClampMin = "0"))
 	int32 FineRadiusCentimeters = 8000;
 

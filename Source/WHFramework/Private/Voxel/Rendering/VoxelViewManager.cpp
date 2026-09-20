@@ -3,8 +3,10 @@
 #include "Components/SceneComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Components/VoxelMeshComponent.h"
 #include "Voxel/Geometry/VoxelSectionMesher.h"
+#include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Network/VoxelNetworkTypes.h"
 #include "Voxel/Network/VoxelRepresentationSync.h"
 #include "Voxel/Rendering/VoxelHeightfieldMesher.h"
@@ -19,6 +21,19 @@
 namespace
 {
 	constexpr int32 ViewSectionSide = 16;
+
+	void AppendNonEmptyBatches(
+		FVoxelSectionMeshResult& InOutTarget,
+		FVoxelSectionMeshResult&& InSource)
+	{
+		for (FVoxelRenderBatch& Batch : InSource.Batches)
+		{
+			if (!Batch.Mesh.Vertices.IsEmpty() && !Batch.Mesh.Triangles.IsEmpty())
+			{
+				InOutTarget.Batches.Add(MoveTemp(Batch));
+			}
+		}
+	}
 }
 
 FVoxelViewManager::FVoxelViewManager(
@@ -37,27 +52,121 @@ FVoxelViewManager::~FVoxelViewManager()
 }
 
 void FVoxelViewManager::Tick(
+	const uint64 InInterestRevision,
 	const TConstArrayView<FVector> InObservers)
 {
-	UpdateFineAndVoxelProxy(
-		InObservers);
-
-	UpdateSurface(
-		InObservers);
-
-	UpdateMacro(
-		InObservers);
-
 	const double Now =
 		FPlatformTime::Seconds();
 
-	UpdateWantedTimestamps(
-		Now);
+	if (AppliedInterestRevision != InInterestRevision)
+	{
+		UpdateFineAndVoxelProxy(InObservers);
+		UpdateSurface(InObservers);
+		UpdateMacro(InObservers);
+		UpdateWantedTimestamps(Now);
+		FineAdmissions = FineWanted.Array();
+		VoxelProxyAdmissions = VoxelProxyWanted.Array();
+		SurfaceAdmissions = SurfaceWanted.Array();
+		MacroAdmissions = MacroWanted.Array();
+		AppliedInterestRevision = InInterestRevision;
+		FineAdmissionIndex = 0;
+		VoxelProxyAdmissionIndex = 0;
+		SurfaceAdmissionIndex = 0;
+		MacroAdmissionIndex = 0;
+		bCoverageDirty = true;
+	}
 
-	ResolveTransitionVisibility();
+	ProcessAdmissions();
 
-	CleanupRetiredRepresentations(
-		Now);
+	if (bCoverageDirty && Now >= NextCoverageCheck)
+	{
+		ResolveTransitionVisibility();
+		CleanupRetiredRepresentations(Now);
+		NextCoverageCheck = Now + RetireDelaySeconds;
+		bCoverageDirty = false;
+		for (const TPair<FIntVector, TObjectPtr<AActor>>& Pair : FineActors)
+		{
+			bCoverageDirty |= !FineWanted.Contains(Pair.Key);
+		}
+		for (const TPair<FVoxelViewKey, TObjectPtr<AActor>>& Pair : VoxelProxyActors)
+		{
+			bCoverageDirty |= !VoxelProxyWanted.Contains(Pair.Key);
+		}
+		for (const TPair<FVoxelSurfaceTileKey, TObjectPtr<AActor>>& Pair : SurfaceActors)
+		{
+			bCoverageDirty |= !SurfaceWanted.Contains(Pair.Key);
+		}
+		for (const TPair<FVoxelMacroTileKey, TObjectPtr<AActor>>& Pair : MacroActors)
+		{
+			bCoverageDirty |= !MacroWanted.Contains(Pair.Key);
+		}
+	}
+}
+
+void FVoxelViewManager::ProcessAdmissions()
+{
+	constexpr int32 MaxAdmissionsPerTick = 24;
+	int32 Attempts = 0;
+	auto AdvanceIndex = [](int32& InOutIndex, const int32 InNum)
+	{
+		const int32 Result = InOutIndex;
+		InOutIndex = InNum > 0 ? (InOutIndex + 1) % InNum : 0;
+		return Result;
+	};
+
+	while (Attempts < MaxAdmissionsPerTick &&
+		(!FineAdmissions.IsEmpty() || !VoxelProxyAdmissions.IsEmpty() || !SurfaceAdmissions.IsEmpty() || !MacroAdmissions.IsEmpty()))
+	{
+		const int32 Lane = Attempts % 4;
+		if (Lane == 0 && !FineAdmissions.IsEmpty())
+		{
+			const FIntVector Key = FineAdmissions[AdvanceIndex(FineAdmissionIndex, FineAdmissions.Num())];
+			if (const FVoxelSection* Section = Module.GetRuntime()->FindSection(Key);
+				Section && Section->Status == EVoxelSectionStatus::DataReady)
+			{
+				const uint64* PublishedRevision = FineRevisions.Find(Key);
+				if (!PublishedRevision || *PublishedRevision != Section->CommittedRevision)
+				{
+					RequestFine(Key, Section->CommittedRevision);
+				}
+			}
+		}
+		else if (Lane == 1 && !VoxelProxyAdmissions.IsEmpty())
+		{
+			const FVoxelViewKey Key = VoxelProxyAdmissions[AdvanceIndex(VoxelProxyAdmissionIndex, VoxelProxyAdmissions.Num())];
+			const uint64 Revision = Module.GetRuntime()->GetChangeHierarchy().GetVoxelProxyRevision(Key.Coordinate);
+			const uint64* PublishedRevision = VoxelProxyRevisions.Find(Key);
+			if (!PublishedRevision || *PublishedRevision != Revision) RequestVoxelProxy(Key);
+		}
+		else if (Lane == 2 && !SurfaceAdmissions.IsEmpty())
+		{
+			const FVoxelSurfaceTileKey Key = SurfaceAdmissions[AdvanceIndex(SurfaceAdmissionIndex, SurfaceAdmissions.Num())];
+			const uint64 Revision = Module.GetRuntime()->GetChangeHierarchy().GetSurfaceRevision(Key.Coordinate);
+			const uint64* PublishedRevision = SurfaceRevisions.Find(Key);
+			if (!PublishedRevision || *PublishedRevision != Revision) RequestSurface(Key);
+		}
+		else if (Lane == 3 && !MacroAdmissions.IsEmpty())
+		{
+			const FVoxelMacroTileKey Key = MacroAdmissions[AdvanceIndex(MacroAdmissionIndex, MacroAdmissions.Num())];
+			const uint64 Revision = Module.GetRuntime()->GetChangeHierarchy().GetMacroRevision(Key.Coordinate);
+			const uint64* PublishedRevision = MacroRevisions.Find(Key);
+			if (!PublishedRevision || *PublishedRevision != Revision) RequestMacro(Key);
+		}
+		++Attempts;
+	}
+}
+
+void FVoxelViewManager::SetActorHiddenCached(AActor* InActor, const bool bInHidden)
+{
+	if (!InActor) return;
+	const TWeakObjectPtr<AActor> Key(InActor);
+	if (const bool* Previous = ActorHiddenStates.Find(Key);
+		Previous && *Previous == bInHidden)
+	{
+		return;
+	}
+	InActor->SetActorHiddenInGame(bInHidden);
+	ActorHiddenStates.Add(Key, bInHidden);
 }
 
 void FVoxelViewManager::UpdateWantedTimestamps(
@@ -98,6 +207,8 @@ void FVoxelViewManager::UpdateWantedTimestamps(
 
 void FVoxelViewManager::ResolveTransitionVisibility()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewCoverage);
+
 	for (const TPair<
 		FIntVector,
 		TObjectPtr<AActor>>& Pair :
@@ -112,9 +223,7 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 			IsFineCoveredByRetainedProxy(
 				Pair.Key);
 
-		Pair.Value->
-			SetActorHiddenInGame(
-				bHidden);
+		SetActorHiddenCached(Pair.Value, bHidden);
 	}
 
 	for (const TPair<
@@ -124,9 +233,7 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 	{
 		if (Pair.Value)
 		{
-			Pair.Value->
-				SetActorHiddenInGame(
-					false);
+			SetActorHiddenCached(Pair.Value, false);
 		}
 	}
 
@@ -137,9 +244,7 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 	{
 		if (Pair.Value)
 		{
-			Pair.Value->
-				SetActorHiddenInGame(
-					false);
+			SetActorHiddenCached(Pair.Value, false);
 		}
 	}
 
@@ -150,9 +255,7 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 	{
 		if (Pair.Value)
 		{
-			Pair.Value->
-				SetActorHiddenInGame(
-					false);
+			SetActorHiddenCached(Pair.Value, false);
 		}
 	}
 
@@ -163,9 +266,7 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 	{
 		if (Pair.Value)
 		{
-			Pair.Value->
-				SetActorHiddenInGame(
-					false);
+			SetActorHiddenCached(Pair.Value, false);
 		}
 	}
 }
@@ -745,9 +846,11 @@ bool FVoxelViewManager::OnTask(FVoxelTaskResult&& InResult)
 	{
 	case EVoxelTaskKind::BuildFineMesh:
 		PublishFine(InResult);
+		bCoverageDirty = true;
 		return true;
 	case EVoxelTaskKind::BuildVoxelProxy:
 		PublishVoxelProxy(InResult);
+		bCoverageDirty = true;
 		return true;
 	case EVoxelTaskKind::BuildSurface:
 		if (InResult.Surface && SurfaceWanted.Contains(InResult.Stamp.SurfaceKey))
@@ -755,50 +858,20 @@ bool FVoxelViewManager::OnTask(FVoxelTaskResult&& InResult)
 			PublishSurface(InResult);
 			const FVoxelSurfaceTileKey Key = InResult.Stamp.SurfaceKey;
 			SurfaceData.Add(Key, InResult.Surface);
-			FVoxelTaskRequest Request;
-			Request.Kind = EVoxelTaskKind::BuildWater;
-			Request.WorkClass = EVoxelWorkClass::Visible;
-			Request.Stamp = InResult.Stamp;
-			Request.ReservedBytes = 24ull * 1024ull * 1024ull;
-			const TSharedPtr<const FVoxelSurfaceTileData> Surface = InResult.Surface;
-			const TSharedPtr<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> Registry = Module.GetRegistry();
-			Request.Execute = [Surface, Registry](const TAtomic<bool>& InCancel)
-			{
-				FVoxelTaskResult Result;
-				if (InCancel.Load())
-				{
-					return Result;
-				}
-				Result.Water = MakeShared<FVoxelWaterSurfaceTileData>();
-				FVoxelWaterViewBuilder Builder;
-				Result.bSuccess = Builder.Build(*Surface, *Result.Water, Result.Error);
-				if (Result.bSuccess && Registry)
-				{
-					Result.WaterMesh = MakeShared<FVoxelSectionMeshResult>();
-					Result.bSuccess = FVoxelHeightfieldMesher::BuildWater(
-						*Result.Water,
-						*Registry,
-						*Result.WaterMesh,
-						Result.Error,
-						&InCancel);
-				}
-				return Result;
-			};
-			Scheduler.Enqueue(MoveTemp(Request));
+			bCoverageDirty = true;
+			if (InResult.Water) WaterData.Add(Key, InResult.Water);
+			else WaterData.Remove(Key);
 		}
 		return true;
 	case EVoxelTaskKind::BuildWater:
-		if (InResult.Water && SurfaceWanted.Contains(InResult.Stamp.SurfaceKey))
-		{
-			PublishWater(InResult);
-			WaterData.Add(InResult.Stamp.SurfaceKey, MoveTemp(InResult.Water));
-		}
+		// 升级过程中已排队的旧 Water 任务只做丢弃。
 		return true;
 	case EVoxelTaskKind::BuildMacro:
 		if (InResult.Macro && MacroWanted.Contains(InResult.Stamp.MacroKey))
 		{
 			PublishMacro(InResult);
 			MacroData.Add(InResult.Stamp.MacroKey, MoveTemp(InResult.Macro));
+			bCoverageDirty = true;
 		}
 		return true;
 	default:
@@ -851,6 +924,7 @@ bool FVoxelViewManager::ApplyRemoteRepresentation(
 		if (!FVoxelRepresentationSync::DecodeVoxelProxy(InReply.Data, Data, OutError)) return false;
 		Request.Kind = EVoxelTaskKind::BuildVoxelProxy;
 		Request.Stamp.ViewKey = Data.Key;
+		Request.Stamp.Token = HashCombineFast(GetTypeHash(Data.Key), GetTypeHash(InReply.Revision));
 		Module.GetRuntime()->GetChangeHierarchy().SetVoxelProxyRevision(Data.Key.Coordinate, InReply.Revision);
 		const TSharedPtr<const FVoxelShapeRegistry, ESPMode::ThreadSafe> Shapes = Module.GetShapes();
 		Request.Execute = [Data = MoveTemp(Data), Registry, Shapes](const TAtomic<bool>& InCancel) mutable
@@ -873,6 +947,7 @@ bool FVoxelViewManager::ApplyRemoteRepresentation(
 		if (!FVoxelRepresentationSync::DecodeSurface(InReply.Data, Data, OutError)) return false;
 		Request.Kind = EVoxelTaskKind::BuildSurface;
 		Request.Stamp.SurfaceKey = Data.Key;
+		Request.Stamp.Token = HashCombineFast(GetTypeHash(Data.Key), GetTypeHash(InReply.Revision));
 		Module.GetRuntime()->GetChangeHierarchy().SetSurfaceRevision(Data.Key.Coordinate, InReply.Revision);
 		const TSharedPtr<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config = Module.GetGenerationConfig();
 		Request.Execute = [Data = MoveTemp(Data), Registry, Config](const TAtomic<bool>& InCancel) mutable
@@ -893,6 +968,24 @@ bool FVoxelViewManager::ApplyRemoteRepresentation(
 				{},
 				-0.02,
 				8);
+			if (!Result.bSuccess)
+			{
+				return Result;
+			}
+			Result.Water = MakeShared<FVoxelWaterSurfaceTileData>();
+			FVoxelWaterViewBuilder WaterBuilder;
+			Result.bSuccess = WaterBuilder.Build(*Result.Surface, *Result.Water, Result.Error);
+			if (!Result.bSuccess)
+			{
+				return Result;
+			}
+			FVoxelSectionMeshResult WaterMesh;
+			Result.bSuccess = FVoxelHeightfieldMesher::BuildWater(
+				*Result.Water, *Registry, WaterMesh, Result.Error, &InCancel);
+			if (Result.bSuccess)
+			{
+				AppendNonEmptyBatches(*Result.SurfaceMesh, MoveTemp(WaterMesh));
+			}
 			return Result;
 		};
 	}
@@ -902,6 +995,7 @@ bool FVoxelViewManager::ApplyRemoteRepresentation(
 		if (!FVoxelRepresentationSync::DecodeMacro(InReply.Data, Data, OutError)) return false;
 		Request.Kind = EVoxelTaskKind::BuildMacro;
 		Request.Stamp.MacroKey = Data.Key;
+		Request.Stamp.Token = HashCombineFast(GetTypeHash(Data.Key), GetTypeHash(InReply.Revision));
 		Module.GetRuntime()->GetChangeHierarchy().SetMacroRevision(Data.Key.Coordinate, InReply.Revision);
 		const TSharedPtr<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config = Module.GetGenerationConfig();
 		Request.Execute = [Data = MoveTemp(Data), Registry, Config](const TAtomic<bool>& InCancel) mutable
@@ -942,77 +1036,73 @@ bool FVoxelViewManager::ApplyRemoteRepresentation(
 void FVoxelViewManager::InvalidateRemoteRepresentations(
 	const FVoxelRepresentationInvalidate& InInvalidate)
 {
+	AppliedInterestRevision = 0;
+	bCoverageDirty = true;
 	for (const FVoxelRepresentationWireKey& WireKey : InInvalidate.Keys)
 	{
 		const FVoxelViewKey VoxelKey { WireKey.Coordinate, WireKey.Level };
-		if (AActor* Actor = VoxelProxyActors.FindRef(VoxelKey)) Actor->Destroy();
-		VoxelProxyActors.Remove(VoxelKey); VoxelProxyData.Remove(VoxelKey); VoxelProxyRevisions.Remove(VoxelKey);
+		VoxelProxyData.Remove(VoxelKey);
+		VoxelProxyRevisions.Remove(VoxelKey);
 		Module.GetRuntime()->GetChangeHierarchy().SetVoxelProxyRevision(WireKey.Coordinate, InInvalidate.Revision);
 
 		const FIntPoint Coordinate(WireKey.Coordinate.X, WireKey.Coordinate.Y);
 		const FVoxelSurfaceTileKey SurfaceKey { Coordinate, WireKey.Level };
-		if (AActor* Actor = SurfaceActors.FindRef(SurfaceKey)) Actor->Destroy();
-		if (AActor* Actor = WaterActors.FindRef(SurfaceKey)) Actor->Destroy();
-		SurfaceActors.Remove(SurfaceKey); WaterActors.Remove(SurfaceKey);
-		SurfaceData.Remove(SurfaceKey); WaterData.Remove(SurfaceKey); SurfaceRevisions.Remove(SurfaceKey);
+		SurfaceData.Remove(SurfaceKey);
+		WaterData.Remove(SurfaceKey);
+		SurfaceRevisions.Remove(SurfaceKey);
 		Module.GetRuntime()->GetChangeHierarchy().SetSurfaceRevision(Coordinate, InInvalidate.Revision);
 
 		const FVoxelMacroTileKey MacroKey { Coordinate, WireKey.Level };
-		if (AActor* Actor = MacroActors.FindRef(MacroKey)) Actor->Destroy();
-		MacroActors.Remove(MacroKey); MacroData.Remove(MacroKey); MacroRevisions.Remove(MacroKey);
+		MacroData.Remove(MacroKey);
+		MacroRevisions.Remove(MacroKey);
 		Module.GetRuntime()->GetChangeHierarchy().SetMacroRevision(Coordinate, InInvalidate.Revision);
 	}
 }
 
 void FVoxelViewManager::InvalidateSection(const FIntVector& InKey)
 {
+	AppliedInterestRevision = 0;
+	bCoverageDirty = true;
 	FineRevisions.Remove(InKey);
 	Scheduler.CancelSection(InKey);
-	const FVoxelGenerationBounds Bounds { InKey * ViewSectionSide, (InKey + FIntVector(1)) * ViewSectionSide };
-	for (auto Iterator = VoxelProxyData.CreateIterator(); Iterator; ++Iterator)
+	const FIntVector CellCenter = InKey * ViewSectionSide + FIntVector(ViewSectionSide / 2);
+	for (uint8 Level = 1; Level <= 8; ++Level)
 	{
-		if (Iterator.Key().GetBounds().Intersects(Bounds))
-		{
-			if (AActor* Actor = VoxelProxyActors.FindRef(Iterator.Key()))
-			{
-				Actor->Destroy();
-			}
-			VoxelProxyActors.Remove(Iterator.Key());
-			VoxelProxyRevisions.Remove(Iterator.Key());
-			Iterator.RemoveCurrent();
-		}
+		const int32 Side = ViewSectionSide << Level;
+		const FVoxelViewKey Key {
+			FIntVector(
+				VoxelGeneration::FloorDivide(CellCenter.X, Side),
+				VoxelGeneration::FloorDivide(CellCenter.Y, Side),
+				VoxelGeneration::FloorDivide(CellCenter.Z, Side)),
+			Level
+		};
+		VoxelProxyRevisions.Remove(Key);
+		VoxelProxyData.Remove(Key);
 	}
-	for (auto Iterator = SurfaceData.CreateIterator(); Iterator; ++Iterator)
+
+	for (uint8 Level = 0; Level <= 8; ++Level)
 	{
-		const int32 Side = FVoxelSurfaceTileData::CellSide * (8 << Iterator.Key().Level);
-		const FVoxelGenerationBounds TileBounds {
-			FIntVector(Iterator.Key().Coordinate.X * Side, Iterator.Key().Coordinate.Y * Side, MIN_int32),
-			FIntVector((Iterator.Key().Coordinate.X + 1) * Side, (Iterator.Key().Coordinate.Y + 1) * Side, MAX_int32) };
-		if (Bounds.Intersects(TileBounds))
-		{
-			if (AActor* Actor = SurfaceActors.FindRef(Iterator.Key())) Actor->Destroy();
-			if (AActor* Actor = WaterActors.FindRef(Iterator.Key())) Actor->Destroy();
-			SurfaceActors.Remove(Iterator.Key());
-			WaterActors.Remove(Iterator.Key());
-			SurfaceRevisions.Remove(Iterator.Key());
-			WaterData.Remove(Iterator.Key());
-			Iterator.RemoveCurrent();
-		}
-	}
-	for (auto Iterator = MacroData.CreateIterator(); Iterator; ++Iterator)
-	{
-		const int32 Side = FVoxelMacroTileData::CellSide *
-			(FVoxelMacroTileData::BaseStep << Iterator.Key().Level);
-		const FVoxelGenerationBounds TileBounds {
-			FIntVector(Iterator.Key().Coordinate.X * Side, Iterator.Key().Coordinate.Y * Side, MIN_int32),
-			FIntVector((Iterator.Key().Coordinate.X + 1) * Side, (Iterator.Key().Coordinate.Y + 1) * Side, MAX_int32) };
-		if (Bounds.Intersects(TileBounds))
-		{
-			if (AActor* Actor = MacroActors.FindRef(Iterator.Key())) Actor->Destroy();
-			MacroActors.Remove(Iterator.Key());
-			MacroRevisions.Remove(Iterator.Key());
-			Iterator.RemoveCurrent();
-		}
+		const int32 SurfaceSide = FVoxelSurfaceTileData::CellSide * (1 << Level);
+		const FVoxelSurfaceTileKey SurfaceKey {
+			FIntPoint(
+				VoxelGeneration::FloorDivide(CellCenter.X, SurfaceSide),
+				VoxelGeneration::FloorDivide(CellCenter.Y, SurfaceSide)),
+			Level
+		};
+		SurfaceRevisions.Remove(SurfaceKey);
+		SurfaceData.Remove(SurfaceKey);
+		WaterData.Remove(SurfaceKey);
+
+		const int32 MacroSide = FVoxelMacroTileData::CellSide *
+			(FVoxelMacroTileData::BaseStep << Level);
+		const FVoxelMacroTileKey MacroKey {
+			FIntPoint(
+				VoxelGeneration::FloorDivide(CellCenter.X, MacroSide),
+				VoxelGeneration::FloorDivide(CellCenter.Y, MacroSide)),
+			Level
+		};
+		MacroRevisions.Remove(MacroKey);
+		MacroData.Remove(MacroKey);
 	}
 }
 
@@ -1065,6 +1155,18 @@ void FVoxelViewManager::Reset()
 	VoxelProxyLastWanted.Reset();
 	SurfaceLastWanted.Reset();
 	MacroLastWanted.Reset();
+	FineAdmissions.Reset();
+	VoxelProxyAdmissions.Reset();
+	SurfaceAdmissions.Reset();
+	MacroAdmissions.Reset();
+	ActorHiddenStates.Reset();
+	AppliedInterestRevision = 0;
+	FineAdmissionIndex = 0;
+	VoxelProxyAdmissionIndex = 0;
+	SurfaceAdmissionIndex = 0;
+	MacroAdmissionIndex = 0;
+	bCoverageDirty = true;
+	NextCoverageCheck = 0.0;
 }
 
 bool FVoxelViewManager::HasPrimaryRepresentation() const
@@ -1112,54 +1214,21 @@ void FVoxelViewManager::UpdateFineAndVoxelProxy(const TConstArrayView<FVector> I
 			continue;
 		}
 		FineWanted.Add(Pair.Key);
-		const FVoxelSection* Section = Module.GetRuntime()->FindSection(Pair.Key);
-		if (Section && Section->Status == EVoxelSectionStatus::DataReady)
-		{
-			const uint64* Revision = FineRevisions.Find(Pair.Key);
-			if (!Revision || *Revision != Section->CommittedRevision)
-			{
-				RequestFine(Pair.Key, Section->CommittedRevision);
-			}
-		}
 	}
 	for (const FVoxelViewKey& Key : Module.GetCurrentInterest().VoxelProxy)
 	{
 		VoxelProxyWanted.Add(Key);
-		const uint64 Revision = Module.GetRuntime()->GetChangeHierarchy().GetVoxelProxyRevision(Key.Coordinate);
-		const uint64* PublishedRevision = VoxelProxyRevisions.Find(Key);
-		if (!PublishedRevision || *PublishedRevision != Revision)
-		{
-			RequestVoxelProxy(Key);
-		}
 	}
 }
 
 void FVoxelViewManager::UpdateSurface(const TConstArrayView<FVector> InObservers)
 {
 	SurfaceWanted = Module.GetCurrentInterest().Surface;
-	for (const FVoxelSurfaceTileKey& Key : SurfaceWanted)
-	{
-		const uint64 Revision = Module.GetRuntime()->GetChangeHierarchy().GetSurfaceRevision(Key.Coordinate);
-		const uint64* PublishedRevision = SurfaceRevisions.Find(Key);
-		if (!PublishedRevision || *PublishedRevision != Revision)
-		{
-			RequestSurface(Key);
-		}
-	}
 }
 
 void FVoxelViewManager::UpdateMacro(const TConstArrayView<FVector> InObservers)
 {
 	MacroWanted = Module.GetCurrentInterest().Macro;
-	for (const FVoxelMacroTileKey& Key : MacroWanted)
-	{
-		const uint64 Revision = Module.GetRuntime()->GetChangeHierarchy().GetMacroRevision(Key.Coordinate);
-		const uint64* PublishedRevision = MacroRevisions.Find(Key);
-		if (!PublishedRevision || *PublishedRevision != Revision)
-		{
-			RequestMacro(Key);
-		}
-	}
 }
 
 void FVoxelViewManager::RequestFine(
@@ -1446,7 +1515,7 @@ void FVoxelViewManager::RequestSurface(
 					Revision));
 
 	Request.ReservedBytes =
-		32ull *
+		40ull *
 		1024ull *
 		1024ull;
 
@@ -1511,6 +1580,31 @@ void FVoxelViewManager::RequestSurface(
 							{},
 							-0.02,
 							8);
+			}
+
+			if (!Result.bSuccess)
+			{
+				return Result;
+			}
+
+			Result.Water = MakeShared<FVoxelWaterSurfaceTileData>();
+			FVoxelWaterViewBuilder WaterBuilder;
+			Result.bSuccess = WaterBuilder.Build(*Result.Surface, *Result.Water, Result.Error);
+			if (!Result.bSuccess)
+			{
+				return Result;
+			}
+
+			FVoxelSectionMeshResult WaterMesh;
+			Result.bSuccess = FVoxelHeightfieldMesher::BuildWater(
+				*Result.Water,
+				*Registry,
+				WaterMesh,
+				Result.Error,
+				&InCancel);
+			if (Result.bSuccess)
+			{
+				AppendNonEmptyBatches(*Result.SurfaceMesh, MoveTemp(WaterMesh));
 			}
 
 			return Result;

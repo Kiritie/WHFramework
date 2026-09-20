@@ -10,6 +10,8 @@ struct WHFRAMEWORK_API FVoxelExactDemand
 	bool bCollision = false;
 	bool bSimulation = false;
 	bool bFineRender = false;
+	bool bWarmupData = false;
+	bool bWarmupCollision = false;
 	double Priority = 0.0;
 };
 
@@ -23,6 +25,8 @@ struct WHFRAMEWORK_API FVoxelInterestSet
 
 struct WHFRAMEWORK_API FVoxelViewSettings
 {
+	int32 WarmupDataRadius = 24;
+	int32 WarmupCollisionRadius = 24;
 	int32 FineRadius = 320;
 	int32 VoxelProxyRadius = 3200;
 	int32 SurfaceRadius = 32000;

@@ -32,6 +32,11 @@ public:
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr);
 
+	bool PrepareStructuresOnly(
+		const FVoxelGenerationBounds& InBounds,
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr);
+
 	bool SampleColumn(
 		int32 InX,
 		int32 InY,
@@ -56,6 +61,12 @@ private:
 		int32 InX,
 		int32 InY,
 		FVoxelColumnSample& OutColumn) const;
+
+	bool ComputeNaturalColumn(
+		int32 InX,
+		int32 InY,
+		FVoxelColumnSample& OutColumn,
+		FString& OutError) const;
 
 	bool IsInsidePreparedXY(
 		int32 InX,
@@ -82,8 +93,8 @@ private:
 	TArray<FVoxelCavePlanPtr> PreparedCaves;
 	TArray<FVoxelFeaturePlanPtr> PreparedFeatures;
 	TArray<FVoxelStructurePlanPtr> PreparedStructures;
-	mutable TMap<FIntPoint, FVoxelColumnSample> PreparedColumnCache;
 	FVoxelGenerationBounds PreparedBounds;
+	const TAtomic<bool>* Cancel = nullptr;
 	bool bColumnsPrepared = false;
 	bool bSymbolsPrepared = false;
 };

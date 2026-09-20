@@ -1,5 +1,6 @@
 #include "Voxel/VoxelModule.h"
 
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
@@ -91,6 +92,33 @@ namespace
 		return Signature == 0
 			? 1
 			: Signature;
+	}
+
+	bool StreamingSourceAffectsInterest(
+		const FVoxelStreamingSource& InA,
+		const FVoxelStreamingSource& InB)
+	{
+		if (InA.Center != InB.Center ||
+			InA.ExactRadius != InB.ExactRadius ||
+			InA.CollisionRadius != InB.CollisionRadius ||
+			InA.SimulationRadius != InB.SimulationRadius ||
+			InA.VerticalExactRadius != InB.VerticalExactRadius ||
+			InA.bRender != InB.bRender ||
+			InA.bCollision != InB.bCollision ||
+			InA.bSimulation != InB.bSimulation)
+		{
+			return true;
+		}
+
+		if (FMath::Abs(InA.VerticalFovDegrees - InB.VerticalFovDegrees) > 0.5f ||
+			FMath::Abs(InA.ViewportHeightPixels - InB.ViewportHeightPixels) >= 32)
+		{
+			return true;
+		}
+
+		return FVector::DotProduct(
+			InA.Direction.GetSafeNormal(),
+			InB.Direction.GetSafeNormal()) < 0.996194698;
 	}
 }
 
@@ -220,8 +248,9 @@ void UVoxelModule::OnRefresh(
 	const double Now =
 		FPlatformTime::Seconds();
 
-	if (LastInterestRefresh < 0.0 ||
-		Now - LastInterestRefresh >= 0.1)
+	if (bInterestDirty &&
+		(LastInterestRefresh < 0.0 ||
+			Now - LastInterestRefresh >= 0.1))
 	{
 		RefreshInterest(Now);
 	}
@@ -233,18 +262,21 @@ void UVoxelModule::OnRefresh(
 
 	ResidencyManager->Tick(
 		CurrentInterest.Exact,
+		InterestRevision,
 		Now);
-
-	if (ViewManager)
-	{
-		ViewManager->Tick(
-			CollectLocalViewObservers());
-	}
 
 	if (CollisionPresenter)
 	{
 		CollisionPresenter->Tick(
-			CurrentInterest.Exact);
+			CurrentInterest.Exact,
+			InterestRevision);
+	}
+
+	if (ViewManager)
+	{
+		ViewManager->Tick(
+			InterestRevision,
+			CollectLocalViewObservers());
 	}
 
 	if (DetailView)
@@ -413,6 +445,8 @@ bool UVoxelModule::StartWorld(
 		{
 			return FMath::Max(0, FMath::DivideAndRoundUp(InCentimeters, CellCentimeters));
 		};
+		ViewSettings.WarmupDataRadius = ToCells(ViewProfile->WarmupDataRadiusCentimeters);
+		ViewSettings.WarmupCollisionRadius = ToCells(ViewProfile->WarmupCollisionRadiusCentimeters);
 		ViewSettings.FineRadius = ToCells(ViewProfile->FineRadiusCentimeters);
 		ViewSettings.VoxelProxyRadius = ToCells(ViewProfile->VoxelProxyRadiusCentimeters);
 		ViewSettings.SurfaceRadius = ToCells(ViewProfile->SurfaceRadiusCentimeters);
@@ -526,6 +560,8 @@ bool UVoxelModule::StartWorld(
 	CurrentInterest = {};
 	InterestRevision = 0;
 	LastInterestRefresh = -1.0;
+	LastNaturalCacheTrim = -1.0;
+	bInterestDirty = true;
 	ReadyStage = EVoxelWorldReadyStage::AssetsValidated;
 	ReadinessSnapshot = {};
 	bWorldLoadRejected = false;
@@ -602,6 +638,9 @@ bool UVoxelModule::StopWorld(const bool bDiscardDirty, FString& OutError)
 	Sources.Reset();
 	CurrentInterest = {};
 	InterestRevision = 0;
+	LastInterestRefresh = -1.0;
+	LastNaturalCacheTrim = -1.0;
+	bInterestDirty = true;
 	Breaking.Reset();
 	SessionId.Invalidate();
 	ReadyStage = EVoxelWorldReadyStage::None;
@@ -685,6 +724,11 @@ uint64 UVoxelModule::GetWorldEpoch() const
 	return Epoch;
 }
 
+uint64 UVoxelModule::GetInterestRevision() const
+{
+	return InterestRevision;
+}
+
 FVoxelWorldRuntime* UVoxelModule::GetRuntime()
 {
 	return Runtime.Get();
@@ -752,6 +796,7 @@ FGuid UVoxelModule::RegisterSource(UObject* InOwner, const FVoxelStreamingSource
 	Source.Value = InSource;
 	Source.Value.Id = Id;
 	Sources.Add(Id, MoveTemp(Source));
+	bInterestDirty = true;
 	LastInterestRefresh = -1.0;
 	return Id;
 }
@@ -769,23 +814,31 @@ bool UVoxelModule::UpdateSource(
 		return false;
 	}
 
-	Source->Value =
-		InSource;
+	FVoxelStreamingSource Updated = InSource;
+	Updated.Id = InId;
 
-	Source->Value.Id =
-		InId;
+	if (StreamingSourceAffectsInterest(Source->Value, Updated))
+	{
+		bInterestDirty = true;
+	}
+
+	Source->Value = MoveTemp(Updated);
 
 	return true;
 }
 
 void UVoxelModule::UnregisterSource(const FGuid& InId)
 {
-	Sources.Remove(InId);
-	LastInterestRefresh = -1.0;
+	if (Sources.Remove(InId) > 0)
+	{
+		bInterestDirty = true;
+		LastInterestRefresh = -1.0;
+	}
 }
 
 void UVoxelModule::ForceVoxelStreamingRefresh()
 {
+	bInterestDirty = true;
 	LastInterestRefresh = -1.0;
 }
 
@@ -954,6 +1007,7 @@ void UVoxelModule::RefreshInterest(
 			Owner.IsValid())
 		{
 			Iterator.RemoveCurrent();
+			bInterestDirty = true;
 			continue;
 		}
 
@@ -979,6 +1033,26 @@ void UVoxelModule::RefreshInterest(
 
 	LastInterestRefresh =
 		InNow;
+
+	bInterestDirty = false;
+
+	if (GenerationCache &&
+		!ActiveSources.IsEmpty() &&
+		(LastNaturalCacheTrim < 0.0 ||
+			InNow - LastNaturalCacheTrim >= 5.0))
+	{
+		TArray<FIntPoint> Centers;
+		Centers.Reserve(ActiveSources.Num());
+		for (const FVoxelStreamingSource& Source : ActiveSources)
+		{
+			Centers.Add(FIntPoint(Source.Center.X, Source.Center.Y));
+		}
+
+		GenerationCache->TrimNaturalCaches(
+			Centers,
+			ViewSettings.MacroRadius + ViewSettings.MacroTileSide * 2);
+		LastNaturalCacheTrim = InNow;
+	}
 }
 
 void UVoxelModule::ApplyTask(FVoxelTaskResult&& InResult)
@@ -1031,6 +1105,8 @@ void UVoxelModule::ApplyTask(FVoxelTaskResult&& InResult)
 
 void UVoxelModule::UpdateReadiness()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_Readiness);
+
 	const EVoxelWorldReadyStage PreviousReadyStage = ReadyStage;
 	FVoxelWorldReadinessSnapshot Snapshot;
 	Snapshot.WorldEpoch = static_cast<int64>(Epoch);
@@ -1039,8 +1115,7 @@ void UVoxelModule::UpdateReadiness()
 	Snapshot.bSpawnPlanReady = false;
 	for (const TPair<FIntVector, FVoxelExactDemand>& Pair : CurrentInterest.Exact)
 	{
-		const bool bSpawnDemand = Pair.Value.bExact || Pair.Value.bCollision || Pair.Value.bSimulation;
-		if (!bSpawnDemand)
+		if (!Pair.Value.bWarmupData)
 		{
 			continue;
 		}
@@ -1051,7 +1126,7 @@ void UVoxelModule::UpdateReadiness()
 		{
 			++Snapshot.ReadySpawnSections;
 		}
-		if (Pair.Value.bCollision)
+		if (Pair.Value.bWarmupCollision)
 		{
 			++Snapshot.RequiredCollisionSections;
 			if (CollisionPresenter && CollisionPresenter->IsReady(Pair.Key))
@@ -1111,7 +1186,7 @@ void UVoxelModule::UpdateReadiness()
 		UE_LOG(
 			LogTemp,
 			Display,
-			TEXT("Voxel readiness stage %d -> %d; spawn=%d/%d collision=%d/%d primary=%d/%d critical=%d"),
+			TEXT("Voxel readiness stage %d -> %d; warmup=%d/%d collision=%d/%d primary=%d/%d critical=%d"),
 			static_cast<int32>(PreviousReadyStage),
 			static_cast<int32>(ReadyStage),
 			Snapshot.ReadySpawnSections,

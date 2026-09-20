@@ -304,12 +304,18 @@ void FVoxelEmergeManager::RequestBase(
 	Request.Kind =
 		EVoxelTaskKind::GenerateExactBase;
 
-	Request.WorkClass =
-		InDemand.bCollision
-			? EVoxelWorkClass::Critical
-			: InDemand.bFineRender
-				? EVoxelWorkClass::Visible
-				: EVoxelWorkClass::Interactive;
+	if (InDemand.bWarmupCollision)
+	{
+		Request.WorkClass = EVoxelWorkClass::Critical;
+	}
+	else if (InDemand.bWarmupData)
+	{
+		Request.WorkClass = EVoxelWorkClass::Warmup;
+	}
+	else
+	{
+		Request.WorkClass = EVoxelWorkClass::ExactData;
+	}
 
 	Request.Stamp =
 		TaskStamp;
@@ -403,10 +409,23 @@ void FVoxelEmergeManager::ResolveOverlay(
 	Request.Kind =
 		EVoxelTaskKind::DecodeOverlay;
 
-	Request.WorkClass =
-		InDemand.bCollision
-			? EVoxelWorkClass::Critical
-			: EVoxelWorkClass::Interactive;
+	if (InDemand.bWarmupCollision)
+	{
+		Request.WorkClass = EVoxelWorkClass::Critical;
+	}
+	else if (InDemand.bWarmupData)
+	{
+		Request.WorkClass = EVoxelWorkClass::Warmup;
+	}
+	else
+	{
+		Request.WorkClass = EVoxelWorkClass::ExactData;
+	}
+
+	Request.DistanceScore = InDemand.Priority > 0.0
+		? 1.0 / InDemand.Priority
+		: MAX_dbl;
+	Request.ForwardScore = InDemand.Priority;
 
 	Request.Stamp.WorldEpoch =
 		InSection.Stamp.Epoch;

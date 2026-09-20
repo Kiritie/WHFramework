@@ -94,6 +94,7 @@ public:
 	const FVoxelWorldManifest& GetManifest() const;
 	FGuid GetSessionId() const;
 	uint64 GetWorldEpoch() const;
+	uint64 GetInterestRevision() const;
 	FVoxelWorldRuntime* GetRuntime();
 	const FVoxelWorldRuntime* GetRuntime() const;
 	TSharedPtr<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> GetRegistry() const;
@@ -267,6 +268,8 @@ private:
 	FString PendingCommitDirectory;
 	uint64 InterestRevision = 0;
 	double LastInterestRefresh = -1.0;
+	double LastNaturalCacheTrim = -1.0;
+	bool bInterestDirty = true;
 	bool bMutating = false;
 	bool bWorldLoadRejected = false;
 };

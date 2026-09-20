@@ -1,5 +1,6 @@
 #include "Voxel/Rendering/VoxelMacroTerrain.h"
 
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 FVoxelMacroTerrainBuilder::FVoxelMacroTerrainBuilder(
 	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator)
 	: Generator(InGenerator)
@@ -12,6 +13,8 @@ bool FVoxelMacroTerrainBuilder::Build(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_MacroBuild);
+
 	FVoxelMacroTileData Data;
 
 	Data.Key =

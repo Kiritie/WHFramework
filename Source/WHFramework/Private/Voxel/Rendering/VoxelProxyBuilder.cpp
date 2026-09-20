@@ -1,17 +1,7 @@
 #include "Voxel/Rendering/VoxelProxyBuilder.h"
 
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Generation/VoxelGenerationQuery.h"
-
-namespace
-{
-	uint16 RecipeSymbol(
-		const uint32 InValue)
-	{
-		return static_cast<uint16>(
-			InValue &
-			0xffffu);
-	}
-}
 
 FVoxelVoxelProxyBuilder::FVoxelVoxelProxyBuilder(
 	TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
@@ -27,236 +17,100 @@ bool FVoxelVoxelProxyBuilder::BuildNatural(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ProxyBuild);
+
 	if (InKey.Level == 0)
 	{
-		OutError =
-			TEXT("VoxelProxy Level 0 must use Fine Exact data");
-
+		OutError = TEXT("VoxelProxy Level 0 must use Fine Exact data");
 		return false;
 	}
 
 	constexpr int32 GridSide = 16;
-
+	const int32 Step = InKey.GetStep();
+	const FVoxelGenerationBounds Bounds = InKey.GetBounds();
 	FVoxelGenerationQuery Query;
+	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError))
+	{
+		return false;
+	}
 
-	if (!FVoxelGenerationQuery::Create(
-			Config,
-			Cache,
-			Query,
-			OutError) ||
-		!Query.Prepare(
-			InKey.GetBounds(),
-			OutError,
-			InCancel))
+	const FVoxelGenerationBounds ColumnBounds {
+		FIntVector(Bounds.Min.X, Bounds.Min.Y, Config->Recipe->Settings.MinZ),
+		FIntVector(Bounds.Max.X, Bounds.Max.Y, Config->Recipe->Settings.MaxZ)
+	};
+	if (!Query.PrepareColumns(ColumnBounds, OutError, InCancel))
 	{
 		return false;
 	}
 
 	FVoxelVoxelProxyData Data;
+	Data.Key = InKey;
+	Data.GridSide = GridSide;
+	Data.Cells.SetNumUninitialized(GridSide * GridSide * GridSide);
 
-	Data.Key =
-		InKey;
-
-	Data.GridSide =
-		GridSide;
-
-	Data.Cells.SetNumUninitialized(
-		GridSide *
-		GridSide *
-		GridSide);
-
-	const int32 Step =
-		InKey.GetStep();
-
-	const FVoxelGenerationBounds Bounds =
-		InKey.GetBounds();
-
-	const FVoxelGenerationPalette& Palette =
-		Config->Recipe->
-			Palette;
-
-	bool bHasProxyAir = false;
-	bool bHasProxyNonAir = false;
-
-	int32 OutputIndex = 0;
-
-	for (int32 Z = 0;
-		Z < GridSide;
-		++Z)
+	TArray<FVoxelColumnSample> Columns;
+	Columns.SetNumUninitialized(GridSide * GridSide);
+	for (int32 Y = 0; Y < GridSide; ++Y)
 	{
-		if (InCancel &&
-			InCancel->Load())
+		if (InCancel && InCancel->Load())
 		{
-			OutError =
-				TEXT("Canceled");
-
+			OutError = TEXT("Canceled");
 			return false;
 		}
 
-		for (int32 Y = 0;
-			Y < GridSide;
-			++Y)
+		for (int32 X = 0; X < GridSide; ++X)
 		{
-			for (int32 X = 0;
-				X < GridSide;
-				++X)
+			const int32 WorldX = Bounds.Min.X + X * Step + Step / 2;
+			const int32 WorldY = Bounds.Min.Y + Y * Step + Step / 2;
+			if (!Query.SampleColumn(WorldX, WorldY, Columns[X + Y * GridSide], OutError))
 			{
-				TArray<uint32, TInlineAllocator<8>>
-					Samples;
-
-				const int32 Low =
-					FMath::Max(
-						0,
-						Step /
-							4);
-
-				const int32 High =
-					FMath::Clamp(
-						Step -
-							Low -
-							1,
-						0,
-						Step - 1);
-
-				const int32 Offsets[] =
-				{
-					Low,
-					High
-				};
-
-				for (const int32 LocalZ :
-					Offsets)
-				{
-					for (const int32 LocalY :
-						Offsets)
-					{
-						for (const int32 LocalX :
-							Offsets)
-						{
-							uint32 Value = 0;
-
-							const FIntVector Position =
-								Bounds.Min +
-								FIntVector(
-									X * Step +
-										LocalX,
-									Y * Step +
-										LocalY,
-									Z * Step +
-										LocalZ);
-
-							if (!Query.SampleSymbol(
-								Position,
-								Value,
-								OutError))
-							{
-								return false;
-							}
-
-							Samples.Add(
-								Value);
-						}
-					}
-				}
-
-				int32 AirCount = 0;
-				int32 WaterCount = 0;
-				int32 LavaCount = 0;
-				int32 SolidCount = 0;
-
-				uint32 FirstSolid = 0;
-
-				for (const uint32 Sample :
-					Samples)
-				{
-					const uint16 Symbol =
-						RecipeSymbol(
-							Sample);
-
-					if (Symbol ==
-						Palette.Air)
-					{
-						++AirCount;
-					}
-					else if (
-						Symbol ==
-						Palette.Water)
-					{
-						++WaterCount;
-					}
-					else if (
-						Symbol ==
-						Palette.Lava)
-					{
-						++LavaCount;
-					}
-					else
-					{
-						if (SolidCount == 0)
-						{
-							FirstSolid =
-								Sample;
-						}
-
-						++SolidCount;
-					}
-				}
-
-				uint32 Selected =
-					Palette.Air;
-
-				const int32 SampleCount =
-					Samples.Num();
-
-				if (SolidCount * 2 >=
-					SampleCount)
-				{
-					Selected =
-						FirstSolid;
-				}
-				else if (WaterCount ==
-					SampleCount)
-				{
-					Selected =
-						Palette.Water;
-				}
-				else if (LavaCount ==
-					SampleCount)
-				{
-					Selected =
-						Palette.Lava;
-				}
-
-				FVoxelBlockState& OutputState =
-					Data.Cells[
-						OutputIndex++];
-
-				if (!Config->ToRuntime(
-					Selected,
-					OutputState))
-				{
-					OutError =
-						TEXT("VoxelProxy generation returned an invalid recipe symbol");
-
-					return false;
-				}
-
-				bHasProxyAir |=
-					OutputState.IsAir();
-
-				bHasProxyNonAir |=
-					!OutputState.IsAir();
+				return false;
 			}
 		}
 	}
 
-	Data.bHasVisibleSurfaceEvidence =
-		bHasProxyAir &&
-		bHasProxyNonAir;
+	bool bHasAir = false;
+	bool bHasSolid = false;
+	for (int32 Z = 0; Z < GridSide; ++Z)
+	{
+		for (int32 Y = 0; Y < GridSide; ++Y)
+		{
+			for (int32 X = 0; X < GridSide; ++X)
+			{
+				const FVoxelColumnSample& Column = Columns[X + Y * GridSide];
+				const int32 CellMinZ = Bounds.Min.Z + Z * Step;
+				const int32 CellMaxZ = CellMinZ + Step - 1;
+				FVoxelBlockState State = Config->Air;
+				if (CellMinZ <= Column.SurfaceZ)
+				{
+					if (CellMaxZ >= Column.SurfaceZ)
+					{
+						if (!Config->ToRuntime(Column.SurfaceMaterial, State))
+						{
+							OutError = TEXT("VoxelProxy surface symbol is invalid");
+							return false;
+						}
+					}
+					else
+					{
+						State = Config->Stone;
+					}
+				}
+				else if (Column.SurfaceWaterZ != MIN_int32 && CellMinZ <= Column.SurfaceWaterZ)
+				{
+					State = Config->Water;
+				}
 
-	OutData =
-		MoveTemp(Data);
+				const int32 Index = X + Y * GridSide + Z * GridSide * GridSide;
+				Data.Cells[Index] = State;
+				bHasAir |= State.IsAir();
+				bHasSolid |= !State.IsAir() && State != Config->Water && State != Config->Lava;
+			}
+		}
+	}
 
+	Data.bHasVisibleSurfaceEvidence = bHasAir && bHasSolid;
+	OutData = MoveTemp(Data);
 	OutError.Reset();
 	return true;
 }

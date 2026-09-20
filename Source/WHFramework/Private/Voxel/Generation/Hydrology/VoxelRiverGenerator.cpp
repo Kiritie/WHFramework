@@ -1,5 +1,6 @@
 #include "Voxel/Generation/Hydrology/VoxelRiverGenerator.h"
 
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Generation/Terrain/VoxelTerrainGenerator.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 
@@ -34,6 +35,46 @@ FVoxelRiverGenerator::FVoxelRiverGenerator(
 	: Recipe(InRecipe)
 	, Terrain(InTerrain)
 {
+}
+
+bool FVoxelRiverGenerator::BuildFieldTile(
+	const FVoxelNaturalTileKey& InKey,
+	FVoxelBaseColumnLookup InBaseColumn,
+	FVoxelRiverFieldTile& OutTile,
+	FString& OutError,
+	const TAtomic<bool>* InCancel) const
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_RiverFieldTile);
+
+	(void)InBaseColumn;
+	FVoxelRiverFieldTile Tile;
+	Tile.Key = InKey;
+	Tile.Samples.SetNumUninitialized(FVoxelRiverFieldTile::Side * FVoxelRiverFieldTile::Side);
+	const FIntPoint Origin = Tile.GetOrigin();
+	for (int32 Y = 0; Y < FVoxelRiverFieldTile::Side; ++Y)
+	{
+		if (InCancel && InCancel->Load())
+		{
+			OutError = TEXT("Canceled");
+			return false;
+		}
+
+		for (int32 X = 0; X < FVoxelRiverFieldTile::Side; ++X)
+		{
+			const int32 WorldX = Origin.X + X;
+			const int32 WorldY = Origin.Y + Y;
+			FVoxelRiverFieldSample& Sample = Tile.Samples[X + Y * FVoxelRiverFieldTile::Side];
+			Sample.Distance = SampleRiverDistance(WorldX, WorldY);
+			Sample.NormalizedDistanceQ16 = SampleNormalizedDistanceQ16(WorldX, WorldY);
+			const FVector2D Direction = SampleRiverDirection(WorldX, WorldY);
+			Sample.DirectionXQ15 = static_cast<int16>(FMath::Clamp(FMath::RoundToInt(Direction.X * 32767.0), -32767, 32767));
+			Sample.DirectionYQ15 = static_cast<int16>(FMath::Clamp(FMath::RoundToInt(Direction.Y * 32767.0), -32767, 32767));
+		}
+	}
+
+	OutTile = MoveTemp(Tile);
+	OutError.Reset();
+	return true;
 }
 
 bool FVoxelRiverGenerator::ApplyToColumn(
@@ -78,6 +119,28 @@ bool FVoxelRiverGenerator::ApplyToColumn(
 		InY,
 		Distance,
 		InOutColumn);
+}
+
+bool FVoxelRiverGenerator::ApplyToColumn(
+	const int32 InX,
+	const int32 InY,
+	const FVoxelRiverFieldSample& InRiver,
+	FVoxelColumnSample& InOutColumn) const
+{
+	const FVoxelGenerationSettings& Settings = Recipe->Settings;
+	const int32 WaterHeight = SampleWaterHeight();
+	if (InOutColumn.bOcean ||
+		InOutColumn.SurfaceZ <= Settings.SeaLevel ||
+		(InOutColumn.Climate.ContinentalnessQ15 < 2621 && InOutColumn.SurfaceZ < WaterHeight))
+	{
+		return false;
+	}
+
+	const int32 RiverHalfWidth = FMath::Max(1, Settings.RiverBaseHalfWidth);
+	const int32 OuterWidth = RiverHalfWidth + FMath::Max(1, RiverHalfWidth);
+	return InRiver.Distance < OuterWidth
+		? ApplyRiverProfile(InX, InY, InRiver.Distance, InOutColumn)
+		: ApplyRiverShore(InX, InY, InRiver.Distance, InOutColumn);
 }
 
 int32 FVoxelRiverGenerator::SampleRiverDistance(

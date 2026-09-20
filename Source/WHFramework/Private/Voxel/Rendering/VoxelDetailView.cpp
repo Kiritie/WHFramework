@@ -256,7 +256,7 @@ void FVoxelDetailView::Tick(const TConstArrayView<FVector> InObservers)
 					Center.X + DetailRadiusCells + 1,
 					Center.Y + DetailRadiusCells + 1,
 					Config->Recipe->Settings.MaxZ) };
-			if (!Query.Prepare(Bounds, Result.Error, &InCancel))
+			if (!Query.PrepareStructuresOnly(Bounds, Result.Error, &InCancel))
 			{
 				return Result;
 			}

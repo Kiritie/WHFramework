@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "EngineGlobals.h"
 #include "Voxel/Streaming/VoxelInterestManager.h"
 #include "Voxel/Streaming/VoxelResidencyManager.h"
 #include "Voxel/Tests/VoxelTestUtilities.h"
@@ -31,6 +32,8 @@ bool FVoxelStreamingDemandTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("Collision demand creates exact data"), Interest.Exact.Contains(FIntVector::ZeroValue));
 	const FVoxelExactDemand& Demand = Interest.Exact.FindChecked(FIntVector::ZeroValue);
 	TestTrue(TEXT("Collision demand is marked collision"), Demand.bCollision);
+	TestFalse(TEXT("Collision-only demand is not in data warmup"), Demand.bWarmupData);
+	TestTrue(TEXT("Collision demand is in warmup collision"), Demand.bWarmupCollision);
 	TestFalse(TEXT("Collision-only demand is not marked exact"), Demand.bExact);
 	TestFalse(TEXT("Collision demand does not imply fine render"), Demand.bFineRender);
 	TestTrue(TEXT("Non-render source creates no voxel proxies"), Interest.VoxelProxy.IsEmpty());
@@ -64,12 +67,15 @@ bool FVoxelResidencyPinTest::RunTest(const FString& InParameters)
 		++Evictions;
 	});
 	Manager.SetEvictGraceFrames(0);
-	Manager.Tick({}, 0.0);
+	Manager.Tick({}, 1, 0.0);
 	TestNotNull(TEXT("Pinned section is retained"), Runtime.FindSection(SectionKey));
 	TestEqual(TEXT("Pinned section does not run eviction callback"), Evictions, 0);
 
 	Section->PinCount.Store(0);
-	Manager.Tick({}, 0.0);
+	const uint64 PreviousFrameCounter = GFrameCounter;
+	GFrameCounter += 15;
+	Manager.Tick({}, 1, 0.0);
+	GFrameCounter = PreviousFrameCounter;
 	TestNull(TEXT("Unpinned undemanded section evicts"), Runtime.FindSection(SectionKey));
 	TestEqual(TEXT("Eviction callback runs once"), Evictions, 1);
 	return true;

@@ -1,10 +1,12 @@
 #include "Voxel/Streaming/VoxelInterestManager.h"
 
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 
 namespace
 {
 	constexpr int32 InterestSectionSide = 16;
+	constexpr int32 MaxAdaptiveTilesPerSource = 1536;
 
 	int32 CeilDividePositive(
 		const int32 InValue,
@@ -104,91 +106,98 @@ namespace
 	}
 
 	template<typename KeyType>
-	void AddTwoDimensionalTiles(
+	void AddAdaptiveTwoDimensionalTiles(
 		const FIntVector& InCenter,
 		const int32 InOuterRadius,
 		const int32 InInnerRadius,
-		const int32 InTileSide,
-		const uint8 InLevel,
+		const int32 InBaseTileSide,
+		const uint8 InMaximumLevel,
+		const FVoxelStreamingSource& InSource,
+		const FVoxelViewSettings& InSettings,
 		TSet<KeyType>& OutKeys)
 	{
 		if (InOuterRadius <= 0 ||
-			InTileSide <= 0)
+			InBaseTileSide <= 0)
 		{
 			return;
 		}
 
-		const int32 CenterX =
-			VoxelGeneration::FloorDivide(
-				InCenter.X,
-				InTileSide);
+		struct FNode
+		{
+			FIntPoint Coordinate;
+			uint8 Level = 0;
+		};
 
-		const int32 CenterY =
-			VoxelGeneration::FloorDivide(
-				InCenter.Y,
-				InTileSide);
-
-		const int32 TileRadius =
+		const int32 RootSide =
+			InBaseTileSide << InMaximumLevel;
+		const int32 RootX =
+			VoxelGeneration::FloorDivide(InCenter.X, RootSide);
+		const int32 RootY =
+			VoxelGeneration::FloorDivide(InCenter.Y, RootSide);
+		const int32 RootRadius =
 			CeilDividePositive(
 				InOuterRadius,
-				InTileSide) +
+				RootSide) +
 			1;
 
-		const double HalfDiagonal =
-			static_cast<double>(InTileSide) *
-			0.7071067811865476;
+		TArray<FNode> Stack;
 
-		const double InnerRadius =
-			FMath::Clamp(
-				static_cast<double>(InInnerRadius),
-				0.0,
-				static_cast<double>(InOuterRadius));
-
-		for (int32 Y = -TileRadius;
-			Y <= TileRadius;
+		for (int32 Y = -RootRadius;
+			Y <= RootRadius;
 			++Y)
 		{
-			for (int32 X = -TileRadius;
-				X <= TileRadius;
+			for (int32 X = -RootRadius;
+				X <= RootRadius;
 				++X)
 			{
-				const FIntPoint Coordinate(
-					CenterX + X,
-					CenterY + Y);
-
-				const FVector2D TileCenter(
-					Coordinate.X * InTileSide +
-						InTileSide * 0.5,
-					Coordinate.Y * InTileSide +
-						InTileSide * 0.5);
-
-				const FVector2D Delta =
-					TileCenter -
-					FVector2D(
-						InCenter.X,
-						InCenter.Y);
-
-				const double Distance =
-					Delta.Size();
-
-				if (Distance - HalfDiagonal >
-					InOuterRadius)
-				{
-					continue;
-				}
-
-				if (InnerRadius > 0.0 &&
-					Distance + HalfDiagonal <=
-						InnerRadius)
-				{
-					continue;
-				}
-
-				OutKeys.Add({
-					Coordinate,
-					InLevel
-				});
+				Stack.Add({ FIntPoint(RootX + X, RootY + Y), InMaximumLevel });
 			}
+		}
+
+		int32 Added = 0;
+		while (!Stack.IsEmpty())
+		{
+			const FNode Node = Stack.Pop(EAllowShrinking::No);
+			const int32 Side = InBaseTileSide << Node.Level;
+			const FVector2D TileCenter(
+				Node.Coordinate.X * Side + Side * 0.5,
+				Node.Coordinate.Y * Side + Side * 0.5);
+			const double Distance =
+				(TileCenter - FVector2D(InCenter.X, InCenter.Y)).Size();
+			const double HalfDiagonal = static_cast<double>(Side) * 0.7071067811865476;
+
+			if (Distance - HalfDiagonal > InOuterRadius ||
+				(InInnerRadius > 0 && Distance + HalfDiagonal <= InInnerRadius))
+			{
+				continue;
+			}
+
+			const int32 NearDistance = FMath::Max(
+				1,
+				FMath::FloorToInt(FMath::Max(0.0, Distance - HalfDiagonal)));
+			const uint8 DesiredLevel = ResolveScreenErrorLevel(
+				NearDistance,
+				InSource,
+				InSettings,
+				InMaximumLevel);
+			const bool bCanSubdivide =
+				Node.Level > DesiredLevel &&
+				Node.Level > 0 &&
+				Added + Stack.Num() + 4 < MaxAdaptiveTilesPerSource;
+
+			if (bCanSubdivide)
+			{
+				const uint8 ChildLevel = Node.Level - 1;
+				const FIntPoint ChildBase = Node.Coordinate * 2;
+				Stack.Add({ ChildBase + FIntPoint(0, 0), ChildLevel });
+				Stack.Add({ ChildBase + FIntPoint(1, 0), ChildLevel });
+				Stack.Add({ ChildBase + FIntPoint(0, 1), ChildLevel });
+				Stack.Add({ ChildBase + FIntPoint(1, 1), ChildLevel });
+				continue;
+			}
+
+			OutKeys.Add({ Node.Coordinate, Node.Level });
+			++Added;
 		}
 	}
 }
@@ -198,6 +207,8 @@ FVoxelInterestSet FVoxelInterestManager::Compute(
 	const FVoxelWorldManifest& InManifest,
 	const FVoxelViewSettings& InViewSettings) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewInterestPlan);
+
 	FVoxelInterestSet Result;
 
 	for (const FVoxelStreamingSource& Source :
@@ -249,6 +260,18 @@ void FVoxelInterestManager::AddExactSource(
 					0,
 					InViewSettings.FineRadius),
 				ExactRadius)
+			: 0;
+
+	const int32 WarmupDataRadius =
+		FMath::Min(
+			FMath::Max(0, InViewSettings.WarmupDataRadius),
+			ExactRadius);
+
+	const int32 WarmupCollisionRadius =
+		InSource.bCollision
+			? FMath::Min(
+				FMath::Max(0, InViewSettings.WarmupCollisionRadius),
+				CollisionRadius)
 			: 0;
 
 	const int32 DataRadius =
@@ -341,10 +364,19 @@ void FVoxelInterestManager::AddExactSource(
 						Delta,
 						FineRadius);
 
+				const bool bWarmupData =
+					IsInsideRadius(Delta, WarmupDataRadius);
+
+				const bool bWarmupCollision =
+					InSource.bCollision &&
+					IsInsideRadius(Delta, WarmupCollisionRadius);
+
 				if (!bExact &&
 					!bCollision &&
 					!bSimulation &&
-					!bFineRender)
+					!bFineRender &&
+					!bWarmupData &&
+					!bWarmupCollision)
 				{
 					continue;
 				}
@@ -358,6 +390,8 @@ void FVoxelInterestManager::AddExactSource(
 				Demand.bCollision |= bCollision;
 				Demand.bSimulation |= bSimulation;
 				Demand.bFineRender |= bFineRender;
+				Demand.bWarmupData |= bWarmupData;
+				Demand.bWarmupCollision |= bWarmupCollision;
 
 				const FVector DeltaVector(
 					Delta);
@@ -545,29 +579,14 @@ void FVoxelInterestManager::AddViewSource(
 
 	if (SurfaceRange > ProxyRange)
 	{
-		const uint8 SurfaceLevel =
-			ResolveScreenErrorLevel(
-				FMath::Max(
-					ProxyRange,
-					SurfaceRange / 2),
-				InSource,
-				InViewSettings,
-				InViewSettings.
-					MaximumSurfaceLevel);
-
-		const int32 SurfaceSide =
-			FMath::Max(
-				1,
-				InViewSettings.
-					SurfaceTileSide <<
-				SurfaceLevel);
-
-		AddTwoDimensionalTiles(
+		AddAdaptiveTwoDimensionalTiles(
 			InSource.Center,
 			SurfaceRange,
 			ProxyRange,
-			SurfaceSide,
-			SurfaceLevel,
+			InViewSettings.SurfaceTileSide,
+			InViewSettings.MaximumSurfaceLevel,
+			InSource,
+			InViewSettings,
 			InOutInterest.Surface);
 	}
 
@@ -578,29 +597,14 @@ void FVoxelInterestManager::AddViewSource(
 
 	if (MacroRange > SurfaceRange)
 	{
-		const uint8 MacroLevel =
-			ResolveScreenErrorLevel(
-				FMath::Max(
-					SurfaceRange,
-					MacroRange / 2),
-				InSource,
-				InViewSettings,
-				InViewSettings.
-					MaximumMacroLevel);
-
-		const int32 MacroSide =
-			FMath::Max(
-				1,
-				InViewSettings.
-					MacroTileSide <<
-				MacroLevel);
-
-		AddTwoDimensionalTiles(
+		AddAdaptiveTwoDimensionalTiles(
 			InSource.Center,
 			MacroRange,
 			SurfaceRange,
-			MacroSide,
-			MacroLevel,
+			InViewSettings.MacroTileSide,
+			InViewSettings.MaximumMacroLevel,
+			InSource,
+			InViewSettings,
 			InOutInterest.Macro);
 	}
 }

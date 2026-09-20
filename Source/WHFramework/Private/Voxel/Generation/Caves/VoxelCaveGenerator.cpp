@@ -1,5 +1,6 @@
 #include "Voxel/Generation/Caves/VoxelCaveGenerator.h"
 
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 
 namespace
@@ -188,10 +189,11 @@ bool FVoxelCaveGenerator::BuildPlan(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_CavePlan);
+
 	if (!InBounds.IsValid())
 	{
-		OutError =
-			TEXT("Voxel cave bounds are invalid");
+		OutError = TEXT("Voxel cave owner tile bounds are invalid");
 
 		return false;
 	}
@@ -202,36 +204,24 @@ bool FVoxelCaveGenerator::BuildPlan(
 			Recipe->Settings.
 				CaveSpacing);
 
-	const int32 Reach =
-		MaximumSegments *
-			MaximumSegmentLength +
-		MaximumRoomRadius +
-		8;
-
 	const int32 MinAnchorX =
 		VoxelGeneration::FloorDivide(
-			InBounds.Min.X -
-				Reach,
-			Spacing);
+			InBounds.Min.X,
+			Spacing) - 1;
 
 	const int32 MaxAnchorX =
 		VoxelGeneration::FloorDivide(
-			InBounds.Max.X +
-				Reach -
-				1,
+			InBounds.Max.X - 1,
 			Spacing);
 
 	const int32 MinAnchorY =
 		VoxelGeneration::FloorDivide(
-			InBounds.Min.Y -
-				Reach,
-			Spacing);
+			InBounds.Min.Y,
+			Spacing) - 1;
 
 	const int32 MaxAnchorY =
 		VoxelGeneration::FloorDivide(
-			InBounds.Max.Y +
-				Reach -
-				1,
+			InBounds.Max.Y - 1,
 			Spacing);
 
 	FVoxelCavePlan Plan;
@@ -260,9 +250,11 @@ bool FVoxelCaveGenerator::BuildPlan(
 					FIntPoint(
 						AnchorX,
 						AnchorY),
+					InBounds,
 					InColumnSampler,
 					Plan.Segments,
-					BuildError);
+					BuildError,
+					InCancel);
 
 			if (!bBuilt &&
 				!BuildError.IsEmpty())
@@ -287,10 +279,17 @@ bool FVoxelCaveGenerator::BuildPlan(
 
 bool FVoxelCaveGenerator::TryBuildSystem(
 	const FIntPoint& InAnchorGrid,
+	const FVoxelGenerationBounds& InOwnerBounds,
 	FVoxelCaveColumnSampler InColumnSampler,
 	TArray<FVoxelCaveSegment>& OutSegments,
-	FString& OutError) const
+	FString& OutError,
+	const TAtomic<bool>* InCancel) const
 {
+	if (InCancel && InCancel->Load())
+	{
+		OutError = TEXT("Canceled");
+		return false;
+	}
 	const int32 Spacing =
 		FMath::Max(
 			64,
@@ -333,6 +332,15 @@ bool FVoxelCaveGenerator::TryBuildSystem(
 		Stream.RandRange(
 			0,
 			Spacing - 1);
+
+	if (StartX < InOwnerBounds.Min.X ||
+		StartY < InOwnerBounds.Min.Y ||
+		StartX >= InOwnerBounds.Max.X ||
+		StartY >= InOwnerBounds.Max.Y)
+	{
+		OutError.Reset();
+		return false;
+	}
 
 	FVoxelColumnSample StartColumn;
 
@@ -412,6 +420,11 @@ bool FVoxelCaveGenerator::TryBuildSystem(
 		SegmentIndex < SegmentCount;
 		++SegmentIndex)
 	{
+		if (InCancel && InCancel->Load())
+		{
+			OutError = TEXT("Canceled");
+			return false;
+		}
 		const int32 Length =
 			Stream.RandRange(
 				MinimumSegmentLength,
@@ -494,13 +507,18 @@ bool FVoxelCaveGenerator::TryBuildSystem(
 				999) <
 			BranchPermille)
 		{
-			AddBranch(
+			if (!AddBranch(
 				Stream,
 				End,
 				Yaw,
 				Pitch,
 				InColumnSampler,
-				OutSegments);
+				OutSegments,
+				InCancel))
+			{
+				OutError = TEXT("Canceled");
+				return false;
+			}
 		}
 
 		Current =
@@ -542,13 +560,14 @@ bool FVoxelCaveGenerator::TryBuildSystem(
 	return true;
 }
 
-void FVoxelCaveGenerator::AddBranch(
+bool FVoxelCaveGenerator::AddBranch(
 	FRandomStream& InStream,
 	const FIntVector& InStart,
 	const double InYaw,
 	const double InPitch,
 	FVoxelCaveColumnSampler InColumnSampler,
-	TArray<FVoxelCaveSegment>& OutSegments) const
+	TArray<FVoxelCaveSegment>& OutSegments,
+	const TAtomic<bool>* InCancel) const
 {
 	FIntVector Current =
 		InStart;
@@ -583,6 +602,10 @@ void FVoxelCaveGenerator::AddBranch(
 		Index < Count;
 		++Index)
 	{
+		if (InCancel && InCancel->Load())
+		{
+			return false;
+		}
 		const int32 Length =
 			InStream.RandRange(
 				MinimumSegmentLength,
@@ -651,6 +674,8 @@ void FVoxelCaveGenerator::AddBranch(
 				-0.4,
 				0.3);
 	}
+
+	return true;
 }
 
 FIntVector FVoxelCaveGenerator::ClampBelowSurface(

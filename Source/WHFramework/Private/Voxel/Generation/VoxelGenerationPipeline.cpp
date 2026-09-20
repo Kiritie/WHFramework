@@ -1,5 +1,6 @@
 #include "Voxel/Generation/VoxelGenerationPipeline.h"
 
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Generation/VoxelGenerationQuery.h"
 
 FVoxelGenerationPipeline::FVoxelGenerationPipeline(
@@ -20,6 +21,8 @@ bool FVoxelGenerationPipeline::GenerateSection(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_GenerateSection);
+
 	constexpr int32 SectionSide = 16;
 	constexpr int32 SectionCellCount =
 		SectionSide *

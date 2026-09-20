@@ -13,7 +13,10 @@ public:
 		FVoxelTaskScheduler& InScheduler,
 		TFunction<void(const FIntVector&)> InBeforeEvict);
 
-	void Tick(const TMap<FIntVector, FVoxelExactDemand>& InDemand, double InNow);
+	void Tick(
+		const TMap<FIntVector, FVoxelExactDemand>& InDemand,
+		uint64 InInterestRevision,
+		double InNow);
 	void SetEvictGraceFrames(uint64 InFrames);
 
 private:
@@ -23,9 +26,13 @@ private:
 		uint64 InFrame) const;
 
 private:
+	static constexpr uint64 EvictionCheckIntervalFrames = 15;
+
 	FVoxelWorldRuntime& Runtime;
 	FVoxelTaskScheduler& Scheduler;
 	TFunction<void(const FIntVector&)> BeforeEvict;
 	TSet<FIntVector> Demanded;
+	uint64 CurrentInterestRevision = 0;
+	uint64 LastEvictionCheckFrame = 0;
 	uint64 EvictGraceFrames = 180;
 };

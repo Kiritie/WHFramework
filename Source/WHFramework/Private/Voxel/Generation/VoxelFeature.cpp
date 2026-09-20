@@ -1,4 +1,6 @@
 #include "Voxel/Generation/VoxelFeature.h"
+
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 
 uint64 FVoxelFeatureInstance::GetAllocatedBytes() const
@@ -103,6 +105,8 @@ bool FVoxelFeaturePlanner::Plan(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_FeaturePlan);
+
 	if (!InBounds.IsValid())
 	{
 		OutError = TEXT("Voxel feature planner received invalid bounds");

@@ -28,7 +28,9 @@ public:
 
 	~FVoxelViewManager();
 
-	void Tick(TConstArrayView<FVector> InObservers);
+	void Tick(
+		uint64 InInterestRevision,
+		TConstArrayView<FVector> InObservers);
 	bool OnTask(FVoxelTaskResult&& InResult);
 	void InvalidateSection(const FIntVector& InKey);
 
@@ -55,6 +57,8 @@ private:
 	void UpdateSurface(TConstArrayView<FVector> InObservers);
 	void UpdateMacro(TConstArrayView<FVector> InObservers);
 	void UpdateWantedTimestamps(double InNow);
+	void ProcessAdmissions();
+	void SetActorHiddenCached(AActor* InActor, bool bInHidden);
 	void ResolveTransitionVisibility();
 	void CleanupRetiredRepresentations(double InNow);
 
@@ -87,6 +91,18 @@ private:
 	UVoxelModule& Module;
 	FVoxelTaskScheduler& Scheduler;
 	uint64 WorldEpoch = 0;
+	uint64 AppliedInterestRevision = 0;
+	int32 FineAdmissionIndex = 0;
+	int32 VoxelProxyAdmissionIndex = 0;
+	int32 SurfaceAdmissionIndex = 0;
+	int32 MacroAdmissionIndex = 0;
+	TArray<FIntVector> FineAdmissions;
+	TArray<FVoxelViewKey> VoxelProxyAdmissions;
+	TArray<FVoxelSurfaceTileKey> SurfaceAdmissions;
+	TArray<FVoxelMacroTileKey> MacroAdmissions;
+	bool bCoverageDirty = true;
+	double NextCoverageCheck = 0.0;
+	TMap<TWeakObjectPtr<AActor>, bool> ActorHiddenStates;
 
 	TSet<FIntVector> FineWanted;
 	TSet<FVoxelViewKey> VoxelProxyWanted;

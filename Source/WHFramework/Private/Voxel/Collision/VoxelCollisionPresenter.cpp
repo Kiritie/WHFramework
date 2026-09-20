@@ -18,16 +18,17 @@ FVoxelCollisionPresenter::FVoxelCollisionPresenter(
 {
 }
 
-void FVoxelCollisionPresenter::Tick(const TMap<FIntVector, FVoxelExactDemand>& InDemand)
+void FVoxelCollisionPresenter::Tick(
+	const TMap<FIntVector, FVoxelExactDemand>& InDemand,
+	const uint64 InInterestRevision)
 {
-	TSet<FIntVector> Wanted;
-	for (const TPair<FIntVector, FVoxelExactDemand>& Pair : InDemand)
+	if (CurrentInterestRevision != InInterestRevision)
 	{
-		if (!Pair.Value.bCollision)
-		{
-			continue;
-		}
-		Wanted.Add(Pair.Key);
+		RebuildWanted(InDemand, InInterestRevision);
+	}
+
+	for (const TPair<FIntVector, FVoxelExactDemand>& Pair : Wanted)
+	{
 		const FVoxelSection* Section = Module.GetRuntime()->FindSection(Pair.Key);
 		if (!Section || Section->Status != EVoxelSectionStatus::DataReady)
 		{
@@ -36,10 +37,23 @@ void FVoxelCollisionPresenter::Tick(const TMap<FIntVector, FVoxelExactDemand>& I
 		const uint64* Published = PublishedRevisions.Find(Pair.Key);
 		if (!Published || *Published != Section->CommittedRevision)
 		{
-			RequestCollision(Pair.Key, Section->CommittedRevision);
+			RequestCollision(Pair.Key, Section->CommittedRevision, Pair.Value);
 		}
 	}
+}
 
+void FVoxelCollisionPresenter::RebuildWanted(
+	const TMap<FIntVector, FVoxelExactDemand>& InDemand,
+	const uint64 InInterestRevision)
+{
+	Wanted.Reset();
+	for (const TPair<FIntVector, FVoxelExactDemand>& Pair : InDemand)
+	{
+		if (Pair.Value.bCollision)
+		{
+			Wanted.Add(Pair.Key, Pair.Value);
+		}
+	}
 	for (auto Iterator = SectionComponents.CreateIterator(); Iterator; ++Iterator)
 	{
 		if (!Wanted.Contains(Iterator.Key()))
@@ -52,6 +66,7 @@ void FVoxelCollisionPresenter::Tick(const TMap<FIntVector, FVoxelExactDemand>& I
 			Iterator.RemoveCurrent();
 		}
 	}
+	CurrentInterestRevision = InInterestRevision;
 }
 
 bool FVoxelCollisionPresenter::OnTask(FVoxelTaskResult&& InResult)
@@ -123,11 +138,14 @@ void FVoxelCollisionPresenter::Reset()
 	}
 	SectionComponents.Reset();
 	PublishedRevisions.Reset();
+	Wanted.Reset();
+	CurrentInterestRevision = 0;
 }
 
 void FVoxelCollisionPresenter::RequestCollision(
 	const FIntVector& InSection,
-	const uint64 InRevision)
+	const uint64 InRevision,
+	const FVoxelExactDemand& InDemand)
 {
 	const FVoxelSection* Section =
 		Module.GetRuntime()->
@@ -174,7 +192,14 @@ void FVoxelCollisionPresenter::RequestCollision(
 		EVoxelTaskKind::BuildCollision;
 
 	Request.WorkClass =
-		EVoxelWorkClass::Critical;
+		InDemand.bWarmupCollision
+			? EVoxelWorkClass::Critical
+			: EVoxelWorkClass::Interactive;
+
+	Request.DistanceScore = InDemand.Priority > 0.0
+		? 1.0 / InDemand.Priority
+		: MAX_dbl;
+	Request.ForwardScore = InDemand.Priority;
 
 	Request.Stamp =
 		Stamp;

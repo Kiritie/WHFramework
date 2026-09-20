@@ -14,16 +14,27 @@ FVoxelResidencyManager::FVoxelResidencyManager(
 
 void FVoxelResidencyManager::Tick(
 	const TMap<FIntVector, FVoxelExactDemand>& InDemand,
+	const uint64 InInterestRevision,
 	const double InNow)
 {
 	(void)InNow;
-	Demanded.Reset();
-	for (const TPair<FIntVector, FVoxelExactDemand>& Pair : InDemand)
+	if (CurrentInterestRevision != InInterestRevision)
 	{
-		Demanded.Add(Pair.Key);
+		Demanded.Reset();
+		for (const TPair<FIntVector, FVoxelExactDemand>& Pair : InDemand)
+		{
+			Demanded.Add(Pair.Key);
+		}
+		CurrentInterestRevision = InInterestRevision;
 	}
 
 	const uint64 Frame = GFrameCounter;
+	if (Frame < LastEvictionCheckFrame ||
+		Frame - LastEvictionCheckFrame < EvictionCheckIntervalFrames)
+	{
+		return;
+	}
+	LastEvictionCheckFrame = Frame;
 	const TArray<FIntVector> Resident = Runtime.ResidentSections();
 	for (const FIntVector& Key : Resident)
 	{

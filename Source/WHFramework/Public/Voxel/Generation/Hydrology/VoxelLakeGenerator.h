@@ -2,28 +2,10 @@
 
 #include "CoreMinimal.h"
 #include "Voxel/Generation/VoxelGenerationRecipe.h"
+#include "Voxel/Generation/VoxelNaturalGenerationCache.h"
 
 class FVoxelRiverGenerator;
 class FVoxelTerrainGenerator;
-
-struct WHFRAMEWORK_API FVoxelLakeFeature
-{
-	FIntPoint Center = FIntPoint::ZeroValue;
-	int32 WaterZ = MIN_int32;
-	int32 MajorRadius = 0;
-	int32 MinorRadius = 0;
-	int32 Depth = 0;
-	double Rotation = 0.0;
-
-	bool IsValid() const
-	{
-		return
-			WaterZ != MIN_int32 &&
-			MajorRadius > 0 &&
-			MinorRadius > 0 &&
-			Depth > 0;
-	}
-};
 
 class WHFRAMEWORK_API FVoxelLakeGenerator
 {
@@ -37,6 +19,20 @@ public:
 		int32 InX,
 		int32 InY,
 		FVoxelColumnSample& InOutColumn) const;
+
+	bool BuildPlan(
+		const FVoxelLakeAnchorKey& InKey,
+		FVoxelLakeAnchorPlan& OutPlan,
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr) const;
+
+	bool ApplyFeature(
+		const FVoxelLakeAnchorPlan& InPlan,
+		int32 InX,
+		int32 InY,
+		FVoxelColumnSample& InOutColumn) const;
+
+	static constexpr int32 AnchorSide = 64;
 
 private:
 	bool TryGetFeature(
@@ -64,7 +60,6 @@ private:
 		const FVoxelLakeFeature& InFeature) const;
 
 private:
-	static constexpr int32 AnchorSide = 64;
 	static constexpr int32 SpawnPermille = 350;
 	static constexpr int32 MinimumRadius = 4;
 	static constexpr int32 MaximumRadius = 30;

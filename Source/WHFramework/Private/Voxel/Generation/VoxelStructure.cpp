@@ -1,4 +1,6 @@
 #include "Voxel/Generation/VoxelStructure.h"
+
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 
 namespace
@@ -223,6 +225,8 @@ bool FVoxelStructurePlanner::Plan(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_StructurePlan);
+
 	if (!InBounds.IsValid())
 	{
 		OutError = TEXT("Voxel structure planner received invalid bounds");
@@ -419,22 +423,22 @@ void FVoxelStructurePlanner::GatherCandidates(
 
 	const int32 MinGridX =
 		VoxelGeneration::FloorDivide(
-			InBounds.Min.X - Spacing,
-			Spacing);
+			InBounds.Min.X,
+			Spacing) - 1;
 
 	const int32 MaxGridX =
 		VoxelGeneration::FloorDivide(
-			InBounds.Max.X + Spacing - 1,
+			InBounds.Max.X - 1,
 			Spacing);
 
 	const int32 MinGridY =
 		VoxelGeneration::FloorDivide(
-			InBounds.Min.Y - Spacing,
-			Spacing);
+			InBounds.Min.Y,
+			Spacing) - 1;
 
 	const int32 MaxGridY =
 		VoxelGeneration::FloorDivide(
-			InBounds.Max.Y + Spacing - 1,
+			InBounds.Max.Y - 1,
 			Spacing);
 
 	for (int32 GridY = MinGridY;
@@ -480,11 +484,20 @@ void FVoxelStructurePlanner::GatherCandidates(
 					MinOffset,
 					MaxOffset);
 
-			OutCandidates.Add(
-				FIntVector(
-					GridX * Spacing + OffsetX,
-					GridY * Spacing + OffsetY,
-					0));
+			const FIntVector Candidate(
+				GridX * Spacing + OffsetX,
+				GridY * Spacing + OffsetY,
+				0);
+
+			if (Candidate.X < InBounds.Min.X ||
+				Candidate.Y < InBounds.Min.Y ||
+				Candidate.X >= InBounds.Max.X ||
+				Candidate.Y >= InBounds.Max.Y)
+			{
+				continue;
+			}
+
+			OutCandidates.Add(Candidate);
 		}
 	}
 }

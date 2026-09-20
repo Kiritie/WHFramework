@@ -48,20 +48,29 @@ public:
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr) const;
 
+	static int32 GetMaximumReach(const FVoxelGenerationSettings& InSettings)
+	{
+		return MaximumSegments * MaximumSegmentLength + MaximumRoomRadius +
+			FMath::Max(InSettings.CaveMainRadius, InSettings.CaveBranchRadius) + 8;
+	}
+
 private:
 	bool TryBuildSystem(
 		const FIntPoint& InAnchorGrid,
+		const FVoxelGenerationBounds& InOwnerBounds,
 		FVoxelCaveColumnSampler InColumnSampler,
 		TArray<FVoxelCaveSegment>& OutSegments,
-		FString& OutError) const;
+		FString& OutError,
+		const TAtomic<bool>* InCancel) const;
 
-	void AddBranch(
+	bool AddBranch(
 		FRandomStream& InStream,
 		const FIntVector& InStart,
 		double InYaw,
 		double InPitch,
 		FVoxelCaveColumnSampler InColumnSampler,
-		TArray<FVoxelCaveSegment>& OutSegments) const;
+		TArray<FVoxelCaveSegment>& OutSegments,
+		const TAtomic<bool>* InCancel) const;
 
 	FIntVector ClampBelowSurface(
 		const FIntVector& InPosition,

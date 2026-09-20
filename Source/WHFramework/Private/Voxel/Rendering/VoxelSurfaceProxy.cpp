@@ -1,5 +1,6 @@
 #include "Voxel/Rendering/VoxelSurfaceProxy.h"
 
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 
 namespace
@@ -60,6 +61,8 @@ bool FVoxelSurfaceProxyBuilder::Build(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_SurfaceBuild);
+
 	FVoxelSurfaceTileData Data;
 
 	Data.Key =
