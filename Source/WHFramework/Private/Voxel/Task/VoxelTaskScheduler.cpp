@@ -394,6 +394,12 @@ void FVoxelTaskScheduler::StopAndJoin()
 
 	for (FRunning& Task : Running)
 	{
+		UE_LOG(
+			LogTemp,
+			Display,
+			TEXT("Waiting for voxel task shutdown: kind=%d executeMs=%.2f"),
+			static_cast<int32>(Task.Kind),
+			Task.Slot->Result.ExecuteMilliseconds);
 		Task.Task.Wait();
 	}
 

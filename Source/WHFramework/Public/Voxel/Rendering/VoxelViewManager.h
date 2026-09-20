@@ -10,10 +10,12 @@ class UVoxelMeshComponent;
 class UVoxelModule;
 
 struct FVoxelMacroTileData;
+struct FVoxelCoverageBox;
 struct FVoxelCoverageRect;
 struct FVoxelRepresentationInvalidate;
 struct FVoxelRepresentationReply;
 struct FVoxelSectionMeshResult;
+struct FVoxelSectionSnapshot;
 struct FVoxelTaskResult;
 struct FVoxelVoxelProxyData;
 struct FVoxelWaterSurfaceTileData;
@@ -60,35 +62,47 @@ private:
 	void UpdateWantedTimestamps(double InNow);
 	void ProcessAdmissions();
 	void SetActorHiddenCached(AActor* InActor, bool bInHidden);
+	void LogRepresentationState(TConstArrayView<FVector> InObservers);
 	void ResolveTransitionVisibility();
 	void CleanupRetiredRepresentations(double InNow);
 
-	FVoxelCoverageRect FineCoverage(const FIntVector& InKey) const;
-	FVoxelCoverageRect VoxelProxyCoverage(const FVoxelViewKey& InKey) const;
-	FVoxelCoverageRect SurfaceCoverage(const FVoxelSurfaceTileKey& InKey) const;
-	FVoxelCoverageRect MacroCoverage(const FVoxelMacroTileKey& InKey) const;
-	void GatherReadyFineCoverage(TArray<FVoxelCoverageRect>& OutCoverage) const;
-	void GatherReadyVoxelProxyCoverage(TArray<FVoxelCoverageRect>& OutCoverage) const;
-	void GatherReadySurfaceCoverage(TArray<FVoxelCoverageRect>& OutCoverage) const;
-	void GatherReadyMacroCoverage(TArray<FVoxelCoverageRect>& OutCoverage) const;
-	bool HasHigherReplacementForProxy(const FVoxelViewKey& InKey) const;
-	bool HasReplacementForProxy(const FVoxelViewKey& InKey) const;
-	bool HasHigherReplacementForSurface(const FVoxelSurfaceTileKey& InKey) const;
-	bool HasReplacementForSurface(const FVoxelSurfaceTileKey& InKey) const;
-	bool HasHigherReplacementForMacro(const FVoxelMacroTileKey& InKey) const;
-	bool HasReplacementForMacro(const FVoxelMacroTileKey& InKey) const;
-	bool HasReplacementForFine(const FIntVector& InSection) const;
+	FVoxelCoverageBox FineCoverageBox(const FIntVector& InKey) const;
+	FVoxelCoverageBox VoxelProxyCoverageBox(const FVoxelViewKey& InKey) const;
+	FVoxelCoverageRect FineCoverageRect(const FIntVector& InKey) const;
+	FVoxelCoverageRect VoxelProxyCoverageRect(const FVoxelViewKey& InKey) const;
+	FVoxelCoverageRect SurfaceCoverageRect(const FVoxelSurfaceTileKey& InKey) const;
+	FVoxelCoverageRect MacroCoverageRect(const FVoxelMacroTileKey& InKey) const;
+	void GatherReadyWantedFineBoxes(TArray<FVoxelCoverageBox>& OutCoverage) const;
+	void GatherReadyWantedProxyBoxes(TArray<FVoxelCoverageBox>& OutCoverage) const;
+	void GatherReadyWantedSurfaceRects(TArray<FVoxelCoverageRect>& OutCoverage) const;
+	void GatherReadyWantedMacroRects(TArray<FVoxelCoverageRect>& OutCoverage) const;
+	void GatherReadyWantedProxySurfaceRects(TArray<FVoxelCoverageRect>& OutCoverage) const;
+	void GatherCurrentRenderDomainRects(TArray<FVoxelCoverageRect>& OutCoverage) const;
+	bool IsFineReplacementReady(const FIntVector& InKey) const;
+	bool IsProxyReplacementReady(const FVoxelViewKey& InKey) const;
+	bool IsSurfaceReplacementReady(const FVoxelSurfaceTileKey& InKey) const;
+	bool IsMacroReplacementReady(const FVoxelMacroTileKey& InKey) const;
+	bool IsFineInsideRenderDomain(const FIntVector& InKey) const;
+	bool IsProxyInsideRenderDomain(const FVoxelViewKey& InKey) const;
+	bool IsSurfaceInsideRenderDomain(const FVoxelSurfaceTileKey& InKey) const;
+	bool IsMacroInsideRenderDomain(const FVoxelMacroTileKey& InKey) const;
+	static bool HasRenderableMesh(const FVoxelSectionMeshResult& InMesh);
+	static bool BuildVoxelProxySnapshot(
+		const FVoxelVoxelProxyData& InData,
+		uint64 InRecipeHash,
+		FVoxelSectionSnapshot& OutSnapshot,
+		FString& OutError);
 
 	void RequestFine(const FIntVector& InSection, uint64 InRevision);
 	void RequestVoxelProxy(const FVoxelViewKey& InKey);
 	void RequestSurface(const FVoxelSurfaceTileKey& InKey);
 	void RequestMacro(const FVoxelMacroTileKey& InKey);
 
-	void PublishFine(const FVoxelTaskResult& InResult);
-	void PublishVoxelProxy(const FVoxelTaskResult& InResult);
-	void PublishSurface(const FVoxelTaskResult& InResult);
+	bool PublishFine(const FVoxelTaskResult& InResult);
+	bool PublishVoxelProxy(const FVoxelTaskResult& InResult);
+	bool PublishSurface(const FVoxelTaskResult& InResult);
 	void PublishWater(const FVoxelTaskResult& InResult);
-	void PublishMacro(const FVoxelTaskResult& InResult);
+	bool PublishMacro(const FVoxelTaskResult& InResult);
 
 	bool PublishMeshActor(
 		AActor*& InOutActor,
@@ -98,7 +112,7 @@ private:
 
 private:
 	static constexpr double RetireDelaySeconds = 0.20;
-	static constexpr double MaximumRetainSeconds = 1.00;
+	static constexpr double OutsideDomainRetireDelaySeconds = 0.50;
 
 	UVoxelModule& Module;
 	FVoxelTaskScheduler& Scheduler;
@@ -114,12 +128,17 @@ private:
 	TArray<FVoxelMacroTileKey> MacroAdmissions;
 	bool bCoverageDirty = true;
 	double NextCoverageCheck = 0.0;
+	double NextRepresentationDebugLog = 0.0;
 	TMap<TWeakObjectPtr<AActor>, bool> ActorHiddenStates;
 
 	TSet<FIntVector> FineWanted;
 	TSet<FVoxelViewKey> VoxelProxyWanted;
 	TSet<FVoxelSurfaceTileKey> SurfaceWanted;
 	TSet<FVoxelMacroTileKey> MacroWanted;
+	TSet<FIntVector> FineReady;
+	TSet<FVoxelViewKey> VoxelProxyReady;
+	TSet<FVoxelSurfaceTileKey> SurfaceReady;
+	TSet<FVoxelMacroTileKey> MacroReady;
 
 	TMap<FIntVector, TObjectPtr<AActor>> FineActors;
 	TMap<FIntVector, uint64> FineRevisions;
