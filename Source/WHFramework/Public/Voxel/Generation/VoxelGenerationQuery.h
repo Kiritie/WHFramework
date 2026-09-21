@@ -24,7 +24,8 @@ public:
 		TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
 		TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> InCache,
 		FVoxelGenerationQuery& OutQuery,
-		FString& OutError);
+		FString& OutError,
+		bool bInUseColumnCache = true);
 
 	bool PrepareColumns(
 		const FVoxelGenerationBounds& InBounds,
@@ -128,6 +129,7 @@ private:
 	TArray<FVoxelStructurePlanPtr> PreparedStructures;
 	FVoxelGenerationBounds PreparedBounds;
 	const TAtomic<bool>* Cancel = nullptr;
+	bool bUseColumnCache = true;
 	bool bColumnsPrepared = false;
 	bool bSymbolsPrepared = false;
 };

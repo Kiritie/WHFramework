@@ -166,7 +166,8 @@ bool FVoxelGenerationPipeline::SampleColumns(
 	const int32 InStep,
 	TArray<FVoxelColumnSample>& OutColumns,
 	FString& OutError,
-	const TAtomic<bool>* InCancel) const
+	const TAtomic<bool>* InCancel,
+	const bool bInUseColumnCache) const
 {
 	if (InWidth <= 0 ||
 		InHeight <= 0 ||
@@ -237,7 +238,8 @@ bool FVoxelGenerationPipeline::SampleColumns(
 			Config,
 			Cache,
 			Query,
-			OutError) ||
+			OutError,
+			bInUseColumnCache) ||
 		!Query.PrepareColumns(
 			Bounds,
 			OutError,

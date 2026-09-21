@@ -1191,4 +1191,9 @@ void UVoxelAgentComponent::SetAgentEnabled(
 
 	SetComponentTickEnabled(
 		bInEnabled);
+
+	if (bInEnabled)
+	{
+		RefreshSource();
+	}
 }

@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "Voxel/Generation/VoxelGenerationQuery.h"
 #include "Voxel/Tests/VoxelTestUtilities.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -55,6 +56,66 @@ bool FVoxelGenerationMathDeterminismTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("Negative coordinate first query"), GeneratorA->SampleBlock(FIntVector(-17, 31, -9), SampleA, SampleError));
 	TestTrue(TEXT("Negative coordinate second query"), GeneratorB->SampleBlock(FIntVector(-17, 31, -9), SampleB, SampleError));
 	TestEqual(TEXT("Query bounds do not change natural cell"), SampleA.Pack(), SampleB.Pack());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelSurfaceCandidateSupportTest,
+	"WHFramework.Voxel.Generation.SurfaceCandidateSupport",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelSurfaceCandidateSupportTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelGenerationRuntimeConfig RuntimeConfig = *VoxelTest::MakeGenerationConfig();
+	FVoxelGenerationRecipe Recipe = *RuntimeConfig.Recipe;
+	Recipe.Settings.ContinentalAmplitude = 0;
+	Recipe.Settings.MountainAmplitude = 0;
+	Recipe.Settings.DetailAmplitude = 0;
+	Recipe.Settings.SeaLevel = -64;
+	Recipe.Settings.RiverSourceAccumulation = MAX_int32;
+	RuntimeConfig.Recipe = MakeShared<const FVoxelGenerationRecipe, ESPMode::ThreadSafe>(MoveTemp(Recipe));
+	const TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config =
+		MakeShared<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe>(MoveTemp(RuntimeConfig));
+	const TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
+	FVoxelGenerationQuery Query;
+	FString Error;
+	if (!TestTrue(TEXT("Create surface query"), FVoxelGenerationQuery::Create(Config, Cache, Query, Error)))
+	{
+		return false;
+	}
+
+	const FVoxelGenerationPipeline Generator(Config, Cache);
+	int32 Checked = 0;
+	for (const FIntPoint XY : { FIntPoint(0, 0), FIntPoint(16, 16), FIntPoint(-16, -16) })
+	{
+		FVoxelSurfaceCandidate Candidate;
+		if (!TestTrue(TEXT("Resolve candidate"), Query.ResolveSurfaceCandidate(XY.X, XY.Y, Candidate, Error)))
+		{
+			return false;
+		}
+		if (!Candidate.bValid || Candidate.bRiver || Candidate.bLake || Candidate.bOcean)
+		{
+			continue;
+		}
+		FVoxelBlockState Support;
+		FVoxelBlockState Above;
+		FVoxelColumnSample Column;
+		if (!TestTrue(TEXT("Sample ground column"), Query.SampleEnvironmentColumn(XY.X, XY.Y, Column, Error)))
+		{
+			return false;
+		}
+		TestEqual(TEXT("Candidate and coarse terrain share the highest solid cell"), Candidate.GroundZ, Column.SurfaceZ);
+		if (!TestTrue(TEXT("Sample support"), Generator.SampleBlock(FIntVector(XY.X, XY.Y, Candidate.GroundZ), Support, Error)) ||
+			!TestTrue(TEXT("Sample space above support"), Generator.SampleBlock(FIntVector(XY.X, XY.Y, Candidate.GroundZ + 1), Above, Error)))
+		{
+			return false;
+		}
+		TestFalse(TEXT("Spawn support is terrain rather than air"), Support.IsAir());
+		TestTrue(TEXT("Space directly above natural terrain is air"), Above.IsAir());
+		++Checked;
+	}
+	TestTrue(TEXT("Checked at least one dry surface"), Checked > 0);
 	return true;
 }
 

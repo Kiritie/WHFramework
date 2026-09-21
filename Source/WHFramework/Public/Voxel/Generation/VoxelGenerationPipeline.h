@@ -35,7 +35,8 @@ public:
 		int32 InStep,
 		TArray<FVoxelColumnSample>& OutColumns,
 		FString& OutError,
-		const TAtomic<bool>* InCancel = nullptr) const;
+		const TAtomic<bool>* InCancel = nullptr,
+		bool bInUseColumnCache = true) const;
 
 	bool SampleBlock(
 		const FIntVector& InPosition,

@@ -25,7 +25,7 @@ int32 FVoxelTerrainGenerator::SampleDensityQ16(
     const FIntVector& InCell,
     const FVoxelMacroTerrainSample& InMacro) const
 {
-    return (InMacro.DensityHeight - InCell.Z) * 65536;
+    return (InMacro.DensityHeight - InCell.Z + 1) * 65536;
 }
 
 int32 FVoxelTerrainGenerator::SampleRawHeight(

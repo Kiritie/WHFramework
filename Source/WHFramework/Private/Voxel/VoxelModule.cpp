@@ -1201,8 +1201,15 @@ void UVoxelModule::RefreshInterest(
 		}
 		Retention.NaturalRadiusCells = FMath::Max(ViewSettings.SurfaceRadius, ViewSettings.VoxelProxyRadius) + 512;
 		Retention.PlanRadiusCells = Retention.NaturalRadiusCells + 512;
-		Retention.HydrologyRadiusCells = Retention.PlanRadiusCells + Manifest.Settings.HydrologyRegionSide;
 		Retention.HydrologyRegionSide = FMath::Max(8, Manifest.Settings.HydrologyRegionSide);
+		Retention.HydrologyCellSize = FMath::Max(1, Manifest.Settings.HydrologyCellSize);
+		const int64 HydrologyRegionCellSide =
+			static_cast<int64>(Retention.HydrologyRegionSide) *
+			Retention.HydrologyCellSize;
+		Retention.HydrologyRadiusCells = static_cast<int32>(FMath::Clamp<int64>(
+			static_cast<int64>(Retention.PlanRadiusCells) + HydrologyRegionCellSide,
+			1,
+			MAX_int32));
 		Retention.Revision = InterestRevision;
 		GenerationCache->UpdateRetention(Retention);
 	}
@@ -1221,6 +1228,10 @@ void UVoxelModule::ApplyTask(FVoxelTaskResult&& InResult)
 			if (const FVoxelSection* Data = Runtime->FindSection(Section);
 				Data && Data->Status == EVoxelSectionStatus::DataReady)
 			{
+				if (ViewManager)
+				{
+					ViewManager->InvalidateNeighbors(Section);
+				}
 				if (UVoxelSceneRegion* Region = GetSceneRegion(Section, true))
 				{
 					Region->OnSectionActivated(Section);

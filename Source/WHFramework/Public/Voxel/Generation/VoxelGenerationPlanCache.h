@@ -52,6 +52,7 @@ struct WHFRAMEWORK_API FVoxelGenerationCacheRetention
 	int32 PlanRadiusCells = 2048;
 	int32 HydrologyRadiusCells = 4096;
 	int32 HydrologyRegionSide = 256;
+	int32 HydrologyCellSize = 1;
 
 	uint64 Revision = 0;
 };

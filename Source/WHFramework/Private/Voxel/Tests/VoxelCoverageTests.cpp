@@ -29,6 +29,17 @@ bool FVoxelCoverageTest::RunTest(const FString& InParameters)
 	};
 	TestTrue(TEXT("Negative coordinates cover correctly"),
 		VoxelCoverage::IsFullyCovered2D(NegativeTarget, NegativeCoverage));
+	const FVoxelCoverageRect DenseTarget { FIntPoint(-64, -64), FIntPoint(64, 64) };
+	TArray<FVoxelCoverageRect> DenseCoverage;
+	for (int32 X = -64; X < 64; ++X)
+	{
+		DenseCoverage.Add({ FIntPoint(X, -64), FIntPoint(X + 1, 64) });
+	}
+	TestTrue(TEXT("Dense coverage does not retain an obsolete parent at the old edge limit"),
+		VoxelCoverage::IsFullyCovered2D(DenseTarget, DenseCoverage));
+	DenseCoverage.RemoveAt(64);
+	TestFalse(TEXT("A one-cell gap in dense coverage keeps the parent"),
+		VoxelCoverage::IsFullyCovered2D(DenseTarget, DenseCoverage));
 
 	const FVoxelCoverageBox Parent3D { FIntVector(-16), FIntVector(16) };
 	TArray<FVoxelCoverageBox> Children3D;

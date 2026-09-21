@@ -124,13 +124,9 @@ void FVoxelHeightfieldMesher::AppendQuad(
 		InD
 	};
 
-	const FVector2D UVs[] =
-	{
-		FVector2D(0.0, 0.0),
-		FVector2D(1.0, 0.0),
-		FVector2D(1.0, 1.0),
-		FVector2D(0.0, 1.0)
-	};
+	// 所有层级按体素尺寸平铺纹理，不能将整张纹理拉伸到一个粗采样面上。
+	const bool bTop = FMath::Abs(Normal.Z) >= FMath::Max(FMath::Abs(Normal.X), FMath::Abs(Normal.Y));
+	const bool bAlongX = FMath::Abs(Normal.X) > FMath::Abs(Normal.Y);
 
 	for (int32 Index = 0;
 		Index < 4;
@@ -142,8 +138,10 @@ void FVoxelHeightfieldMesher::AppendQuad(
 		InOutMesh.Normals.Add(
 			Normal);
 
-		InOutMesh.UV0.Add(
-			UVs[Index]);
+		const FVector& Position = Vertices[Index];
+		InOutMesh.UV0.Add(bTop
+			? FVector2D(Position.X, Position.Y)
+			: FVector2D(bAlongX ? Position.Y : Position.X, -Position.Z));
 
 		InOutMesh.UV1.Add(
 			FVector2D(

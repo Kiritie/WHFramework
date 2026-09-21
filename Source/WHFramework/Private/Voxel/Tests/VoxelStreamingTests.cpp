@@ -90,6 +90,46 @@ bool FVoxelStreamingRenderScopeTest::RunTest(const FString& InParameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelStreamingLodSymmetryTest,
+	"WHFramework.Voxel.Streaming.LodSymmetry",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelStreamingLodSymmetryTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelWorldManifest Manifest;
+	Manifest.Settings.MinZ = -128;
+	Manifest.Settings.MaxZ = 128;
+	FVoxelViewSettings Settings;
+	Settings.FineRadius = 64;
+	Settings.VoxelProxyRadius = 256;
+	Settings.SurfaceRadius = 1024;
+	Settings.MacroRadius = 16000;
+	Settings.MaximumSurfaceTilesPerSource = 256;
+	Settings.MaximumMacroTilesPerSource = 128;
+	FVoxelStreamingSource Source;
+	Source.ExactRadius = 64;
+	Source.Center = FIntVector::ZeroValue;
+	const FVoxelInterestManager Manager;
+	const FVoxelInterestSet Interest = Manager.Compute(MakeArrayView(&Source, 1), Manifest, Settings);
+	TestTrue(TEXT("Surface obeys tile budget"), Interest.Surface.Num() <= Settings.MaximumSurfaceTilesPerSource);
+	TestTrue(TEXT("Macro obeys tile budget"), Interest.Macro.Num() <= Settings.MaximumMacroTilesPerSource);
+	TestFalse(TEXT("Surface coverage remains available"), Interest.Surface.IsEmpty());
+	TestFalse(TEXT("Macro coverage remains available"), Interest.Macro.IsEmpty());
+	for (const FVoxelSurfaceTileKey& Key : Interest.Surface)
+	{
+		TestTrue(TEXT("Surface reflects across player X"), Interest.Surface.Contains({ FIntPoint(-Key.Coordinate.X - 1, Key.Coordinate.Y), Key.Level }));
+		TestTrue(TEXT("Surface reflects across player Y"), Interest.Surface.Contains({ FIntPoint(Key.Coordinate.X, -Key.Coordinate.Y - 1), Key.Level }));
+	}
+	for (const FVoxelMacroTileKey& Key : Interest.Macro)
+	{
+		TestTrue(TEXT("Macro reflects across player X"), Interest.Macro.Contains({ FIntPoint(-Key.Coordinate.X - 1, Key.Coordinate.Y), Key.Level }));
+		TestTrue(TEXT("Macro reflects across player Y"), Interest.Macro.Contains({ FIntPoint(Key.Coordinate.X, -Key.Coordinate.Y - 1), Key.Level }));
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FVoxelResidencyPinTest,
 	"WHFramework.Voxel.Streaming.ResidencyPin",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -247,6 +287,27 @@ bool FVoxelStreamingSchedulerVisualDistanceFirstTest::RunTest(const FString& InP
 	Far.DistanceScore = 512.0;
 	TestTrue(TEXT("Near visual work outranks far visual work"), FVoxelTaskScheduler::IsHigherPriority(Near, Far));
 	TestFalse(TEXT("Far visual work does not outrank near visual work"), FVoxelTaskScheduler::IsHigherPriority(Far, Near));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelStreamingSchedulerSectionDistanceFirstTest,
+	"WHFramework.Voxel.Streaming.Scheduler.SectionDistanceFirst",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelStreamingSchedulerSectionDistanceFirstTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelTaskRequest Near;
+	Near.Kind = EVoxelTaskKind::GenerateExactBase;
+	Near.WorkClass = EVoxelWorkClass::ExactData;
+	Near.DistanceScore = 32.0;
+	FVoxelTaskRequest Far;
+	Far.Kind = EVoxelTaskKind::BuildCollision;
+	Far.WorkClass = EVoxelWorkClass::Critical;
+	Far.DistanceScore = 512.0;
+	TestTrue(TEXT("Near streaming section outranks far critical section"), FVoxelTaskScheduler::IsHigherPriority(Near, Far));
+	TestFalse(TEXT("Far critical section does not outrank near streaming section"), FVoxelTaskScheduler::IsHigherPriority(Far, Near));
 	return true;
 }
 

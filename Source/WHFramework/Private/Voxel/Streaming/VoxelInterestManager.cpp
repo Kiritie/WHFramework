@@ -79,6 +79,7 @@ namespace
 		{
 			FIntPoint Coordinate;
 			uint8 Level = 0;
+			double Error = 0.0;
 		};
 
 		const int32 RootSide =
@@ -93,7 +94,28 @@ namespace
 				RootSide) +
 			1;
 
-		TArray<FNode> Stack;
+		TArray<FNode> Leaves;
+		auto AddNode = [&](const FIntPoint& Coordinate, const uint8 Level, TArray<FNode>& Nodes)
+		{
+			const int32 Side = InBaseTileSide << Level;
+			const FVector2D Delta(
+				Coordinate.X * Side + Side * 0.5 - InCenter.X,
+				Coordinate.Y * Side + Side * 0.5 - InCenter.Y);
+			const FVector2D NearDelta(
+				FMath::Max(0.0, FMath::Abs(Delta.X) - Side * 0.5),
+				FMath::Max(0.0, FMath::Abs(Delta.Y) - Side * 0.5));
+			const FVector2D FarDelta(FMath::Abs(Delta.X) + Side * 0.5, FMath::Abs(Delta.Y) + Side * 0.5);
+			if (NearDelta.SizeSquared() > FMath::Square(static_cast<double>(InOuterRadius)) ||
+				(InInnerRadius > 0 && FarDelta.SizeSquared() <= FMath::Square(static_cast<double>(InInnerRadius))))
+			{
+				return;
+			}
+			const double Distance = FMath::Max(1.0, NearDelta.Size());
+			const uint8 DesiredLevel = VoxelViewLod::ResolveScreenErrorLevel(
+				FMath::FloorToInt(Distance), InBaseSampleStepCells, InSource, InSettings, InMaximumLevel);
+			const double Error = Level > DesiredLevel ? static_cast<double>(InBaseSampleStepCells << Level) / Distance : 0.0;
+			Nodes.Add({ Coordinate, Level, Error });
+		};
 
 		for (int32 Y = -RootRadius;
 			Y <= RootRadius;
@@ -103,55 +125,52 @@ namespace
 				X <= RootRadius;
 				++X)
 			{
-				Stack.Add({ FIntPoint(RootX + X, RootY + Y), InMaximumLevel });
+				AddNode(FIntPoint(RootX + X, RootY + Y), InMaximumLevel, Leaves);
 			}
 		}
 
-		int32 Added = 0;
-		while (!Stack.IsEmpty())
+		while (!Leaves.IsEmpty())
 		{
-			const FNode Node = Stack.Pop(EAllowShrinking::No);
-			const int32 Side = InBaseTileSide << Node.Level;
-			const FVector2D TileCenter(
-				Node.Coordinate.X * Side + Side * 0.5,
-				Node.Coordinate.Y * Side + Side * 0.5);
-			const double Distance =
-				(TileCenter - FVector2D(InCenter.X, InCenter.Y)).Size();
-			const double HalfDiagonal = static_cast<double>(Side) * 0.7071067811865476;
-
-			if (Distance - HalfDiagonal > InOuterRadius ||
-				(InInnerRadius > 0 && Distance + HalfDiagonal <= InInnerRadius))
+			double MaximumError = 0.0;
+			for (const FNode& Node : Leaves)
 			{
-				continue;
+				MaximumError = FMath::Max(MaximumError, Node.Error);
 			}
-
-			const int32 NearDistance = FMath::Max(
-				1,
-				FMath::FloorToInt(FMath::Max(0.0, Distance - HalfDiagonal)));
-			const uint8 DesiredLevel = VoxelViewLod::ResolveScreenErrorLevel(
-				NearDistance,
-				InBaseSampleStepCells,
-				InSource,
-				InSettings,
-				InMaximumLevel);
-			const bool bCanSubdivide =
-				Node.Level > DesiredLevel &&
-				Node.Level > 0 &&
-				Added + Stack.Num() + 4 < InMaximumTiles;
-
-			if (bCanSubdivide)
+			if (MaximumError <= 0.0)
 			{
-				const uint8 ChildLevel = Node.Level - 1;
+				break;
+			}
+			TArray<FNode> Children;
+			int32 ParentCount = 0;
+			for (const FNode& Node : Leaves)
+			{
+				if (!FMath::IsNearlyEqual(Node.Error, MaximumError, UE_DOUBLE_SMALL_NUMBER))
+				{
+					continue;
+				}
+				++ParentCount;
 				const FIntPoint ChildBase = Node.Coordinate * 2;
-				Stack.Add({ ChildBase + FIntPoint(0, 0), ChildLevel });
-				Stack.Add({ ChildBase + FIntPoint(1, 0), ChildLevel });
-				Stack.Add({ ChildBase + FIntPoint(0, 1), ChildLevel });
-				Stack.Add({ ChildBase + FIntPoint(1, 1), ChildLevel });
-				continue;
+				for (int32 Y = 0; Y < 2; ++Y)
+				{
+					for (int32 X = 0; X < 2; ++X)
+					{
+						AddNode(ChildBase + FIntPoint(X, Y), Node.Level - 1, Children);
+					}
+				}
 			}
-
+			if (Leaves.Num() - ParentCount + Children.Num() > InMaximumTiles)
+			{
+				break;
+			}
+			Leaves.RemoveAll([MaximumError](const FNode& Node)
+			{
+				return FMath::IsNearlyEqual(Node.Error, MaximumError, UE_DOUBLE_SMALL_NUMBER);
+			});
+			Leaves.Append(MoveTemp(Children));
+		}
+		for (const FNode& Node : Leaves)
+		{
 			OutKeys.Add({ Node.Coordinate, Node.Level });
-			++Added;
 		}
 	}
 }

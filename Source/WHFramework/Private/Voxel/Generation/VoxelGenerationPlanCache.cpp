@@ -850,15 +850,39 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 	TRACE_CPUPROFILER_EVENT_SCOPE(
 		Voxel_GenerationCacheMaintenance);
 
-	int32 Budget =
+	int32 RemainingBudget =
 		FMath::Max(
 			0,
 			InMaxEntries);
 
-	if (Budget <= 0)
+	if (RemainingBudget <= 0)
 	{
 		return;
 	}
+
+	int32 RemainingGroups = 7;
+	auto TakeGroupBudget =
+		[&RemainingBudget, &RemainingGroups]()
+		{
+			const int32 GroupBudget =
+				RemainingGroups > 0
+					? FMath::DivideAndRoundUp(
+						RemainingBudget,
+						RemainingGroups)
+					: 0;
+
+			RemainingBudget -= GroupBudget;
+			--RemainingGroups;
+			return GroupBudget;
+		};
+
+	int32 HydrologyBudget = TakeGroupBudget();
+	int32 BaseColumnBudget = TakeGroupBudget();
+	int32 NaturalColumnBudget = TakeGroupBudget();
+	int32 CaveBudget = TakeGroupBudget();
+	int32 EcologyBudget = TakeGroupBudget();
+	int32 FeatureBudget = TakeGroupBudget();
+	int32 StructureBudget = TakeGroupBudget();
 
 	FVoxelGenerationCacheRetention Snapshot;
 
@@ -898,7 +922,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			Shard.BaseColumns,
 			Shard.BaseColumnKeys,
 			Shard.BaseColumnCursor,
-			Budget,
+			BaseColumnBudget,
 			RetiredBaseColumns,
 			[this, &Snapshot](
 				const FIntPoint& InKey)
@@ -913,7 +937,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			Shard.NaturalColumns,
 			Shard.NaturalColumnKeys,
 			Shard.NaturalColumnCursor,
-			Budget,
+			NaturalColumnBudget,
 			RetiredNaturalColumns,
 			[this, &Snapshot](
 				const FIntPoint& InKey)
@@ -924,11 +948,6 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 					Snapshot);
 			});
 
-	}
-
-	if (Budget <= 0)
-	{
-		return;
 	}
 
 	TArray<FVoxelHydrologyPlanPtr> RetiredHydrology;
@@ -946,10 +965,36 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			Shard.Lock);
 
 		TrimMapBudgeted(
+			Shard.Hydrology,
+			Shard.HydrologyKeys,
+			Shard.HydrologyCursor,
+			HydrologyBudget,
+			RetiredHydrology,
+			[this, &Snapshot](
+				const FVoxelHydrologyRegionKey& InKey)
+			{
+				const int32 RegionCellSide =
+					static_cast<int32>(FMath::Clamp<int64>(
+						static_cast<int64>(FMath::Max(1, Snapshot.HydrologyRegionSide)) *
+							FMath::Max(1, Snapshot.HydrologyCellSize),
+						1,
+						MAX_int32));
+
+				const FIntPoint RegionCenter =
+					InKey.Coordinate * RegionCellSide +
+					FIntPoint(RegionCellSide / 2);
+
+				return IsRetained(
+					RegionCenter,
+					Snapshot.HydrologyRadiusCells,
+					Snapshot);
+			});
+
+		TrimMapBudgeted(
 			Shard.Caves,
 			Shard.CaveKeys,
 			Shard.CaveCursor,
-			Budget,
+			CaveBudget,
 			RetiredCaves,
 			[this, &Snapshot](
 				const FVoxelGenerationTileKey& InKey)
@@ -970,7 +1015,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			Shard.Ecology,
 			Shard.EcologyKeys,
 			Shard.EcologyCursor,
-			Budget,
+			EcologyBudget,
 			RetiredEcology,
 			[this, &Snapshot](const FVoxelEcologyTileKey& InKey)
 			{
@@ -985,7 +1030,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			Shard.Features,
 			Shard.FeatureKeys,
 			Shard.FeatureCursor,
-			Budget,
+			FeatureBudget,
 			RetiredFeatures,
 			[this, &Snapshot](
 				const FVoxelGenerationTileKey& InKey)
@@ -1006,7 +1051,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			Shard.Structures,
 			Shard.StructureKeys,
 			Shard.StructureCursor,
-			Budget,
+			StructureBudget,
 			RetiredStructures,
 			[this, &Snapshot](
 				const FVoxelGenerationTileKey& InKey)
@@ -1023,21 +1068,6 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 					Snapshot);
 			});
 
-		TrimMapBudgeted(
-			Shard.Hydrology,
-			Shard.HydrologyKeys,
-			Shard.HydrologyCursor,
-			Budget,
-			RetiredHydrology,
-			[this, &Snapshot](
-				const FVoxelHydrologyRegionKey& InKey)
-			{
-				return IsRetained(
-					InKey.Coordinate *
-						Snapshot.HydrologyRegionSide,
-					Snapshot.HydrologyRadiusCells,
-					Snapshot);
-			});
 	}
 }
 

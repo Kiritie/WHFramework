@@ -21,7 +21,6 @@ bool VoxelCoverage::IsFullyCovered2D(const FVoxelCoverageRect& InTarget, const T
 	if (!InTarget.IsValid()) return false;
 	TArray<FVoxelCoverageRect> Clipped;
 	TArray<int32> XEdges { InTarget.Min.X, InTarget.Max.X };
-	TArray<int32> YEdges { InTarget.Min.Y, InTarget.Max.Y };
 	for (const FVoxelCoverageRect& Coverage : InCoverage)
 	{
 		if (!Coverage.IsValid() || !Coverage.Intersects(InTarget)) continue;
@@ -32,18 +31,40 @@ bool VoxelCoverage::IsFullyCovered2D(const FVoxelCoverageRect& InTarget, const T
 		if (!Rect.IsValid()) continue;
 		Clipped.Add(Rect);
 		XEdges.Append({ Rect.Min.X, Rect.Max.X });
-		YEdges.Append({ Rect.Min.Y, Rect.Max.Y });
 	}
 	if (Clipped.IsEmpty()) return false;
-	SortUnique(XEdges); SortUnique(YEdges);
-	if (XEdges.Num() > MaximumCoverageEdgesPerAxis || YEdges.Num() > MaximumCoverageEdgesPerAxis) return false;
+	SortUnique(XEdges);
+	TArray<FIntPoint> Intervals;
 	for (int32 X = 0; X + 1 < XEdges.Num(); ++X)
 	{
-		for (int32 Y = 0; Y + 1 < YEdges.Num(); ++Y)
+		Intervals.Reset();
+		for (const FVoxelCoverageRect& Rect : Clipped)
 		{
-			if (XEdges[X] >= XEdges[X + 1] || YEdges[Y] >= YEdges[Y + 1]) continue;
-			const FIntPoint Probe(XEdges[X], YEdges[Y]);
-			if (!Clipped.ContainsByPredicate([&Probe](const FVoxelCoverageRect& Rect) { return Rect.ContainsCell(Probe); })) return false;
+			if (Rect.Min.X <= XEdges[X] && Rect.Max.X >= XEdges[X + 1])
+			{
+				Intervals.Add(FIntPoint(Rect.Min.Y, Rect.Max.Y));
+			}
+		}
+		Intervals.Sort([](const FIntPoint& A, const FIntPoint& B)
+		{
+			return A.X < B.X;
+		});
+		int32 CoveredY = InTarget.Min.Y;
+		for (const FIntPoint& Interval : Intervals)
+		{
+			if (Interval.X > CoveredY)
+			{
+				return false;
+			}
+			CoveredY = FMath::Max(CoveredY, Interval.Y);
+			if (CoveredY >= InTarget.Max.Y)
+			{
+				break;
+			}
+		}
+		if (CoveredY < InTarget.Max.Y)
+		{
+			return false;
 		}
 	}
 	return true;

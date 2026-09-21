@@ -26,6 +26,30 @@ namespace
 			return false;
 		}
 	}
+
+	bool IsCoarseTerrainKind(const EVoxelTaskKind InKind)
+	{
+		return
+			InKind == EVoxelTaskKind::BuildSurface ||
+			InKind == EVoxelTaskKind::BuildMacro;
+	}
+
+	bool UsesStreamingDistancePriority(const EVoxelTaskKind InKind)
+	{
+		switch (InKind)
+		{
+		case EVoxelTaskKind::GenerateExactBase:
+		case EVoxelTaskKind::BuildCollision:
+		case EVoxelTaskKind::BuildFineMesh:
+		case EVoxelTaskKind::BuildVoxelProxy:
+		case EVoxelTaskKind::BuildSurface:
+		case EVoxelTaskKind::BuildMacro:
+		case EVoxelTaskKind::DecodeOverlay:
+			return true;
+		default:
+			return false;
+		}
+	}
 }
 
 bool FVoxelTaskStamp::operator==(const FVoxelTaskStamp& InOther) const
@@ -122,11 +146,6 @@ uint64 FVoxelTaskResult::ResultBytes() const
 
 FVoxelTaskScheduler::FVoxelTaskScheduler()
 {
-	Budget.MaxConcurrentTasks =
-		FMath::Clamp(
-			FPlatformMisc::NumberOfWorkerThreadsToSpawn() / 3,
-			1,
-			6);
 }
 
 FVoxelTaskScheduler::~FVoxelTaskScheduler()
@@ -154,6 +173,25 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 	if (Has(InRequest.Stamp, InRequest.Kind))
 	{
 		return true;
+	}
+
+	if (IsCoarseTerrainKind(InRequest.Kind))
+	{
+		int32 PendingCoarseTerrainTasks = 0;
+
+		for (const FVoxelTaskRequest& PendingRequest : Pending)
+		{
+			PendingCoarseTerrainTasks +=
+				IsCoarseTerrainKind(PendingRequest.Kind)
+					? 1
+					: 0;
+		}
+
+		if (PendingCoarseTerrainTasks >=
+			Budget.MaxPendingCoarseTerrainTasks)
+		{
+			return false;
+		}
 	}
 
 	if (Pending.Num() >= Budget.MaxPendingTasks ||
@@ -215,6 +253,11 @@ void FVoxelTaskScheduler::Tick(
 			continue;
 		}
 
+		if (Running[Index].Slot->Cancel.Load())
+		{
+			Running[Index].Slot->Result.bCanceled = true;
+			Running[Index].Slot->Result.bSuccess = false;
+		}
 		const bool bHeavy =
 			!Running[Index].Slot->Result.bCanceled &&
 			IsHeavyApplyKind(
@@ -528,6 +571,18 @@ void FVoxelTaskScheduler::SetBudget(
 		FMath::Max(1, InBudget.MaxConcurrentSurfaceTasks);
 	Budget.MaxConcurrentMacroTasks =
 		FMath::Max(1, InBudget.MaxConcurrentMacroTasks);
+
+	Budget.MaxConcurrentCoarseTerrainTasks =
+		FMath::Clamp(
+			InBudget.MaxConcurrentCoarseTerrainTasks,
+			1,
+			Budget.MaxConcurrentTasks);
+
+	Budget.MaxPendingCoarseTerrainTasks =
+		FMath::Clamp(
+			InBudget.MaxPendingCoarseTerrainTasks,
+			1,
+			Budget.MaxPendingTasks);
 }
 
 FVoxelTaskDiagnostics
@@ -571,6 +626,20 @@ bool FVoxelTaskScheduler::IsHigherPriority(
 	const FVoxelTaskRequest& InA,
 	const FVoxelTaskRequest& InB)
 {
+	const bool bAUsesStreamingDistance =
+		UsesStreamingDistancePriority(InA.Kind);
+	const bool bBUsesStreamingDistance =
+		UsesStreamingDistancePriority(InB.Kind);
+
+	if (bAUsesStreamingDistance &&
+		bBUsesStreamingDistance &&
+		InA.DistanceScore != InB.DistanceScore)
+	{
+		return
+			InA.DistanceScore <
+			InB.DistanceScore;
+	}
+
 	const bool bAVisual = IsVisualWorkClass(InA.WorkClass);
 	const bool bBVisual = IsVisualWorkClass(InB.WorkClass);
 	if (bAVisual != bBVisual)
@@ -585,7 +654,9 @@ bool FVoxelTaskScheduler::IsHigherPriority(
 			static_cast<uint8>(
 				InB.WorkClass);
 	}
-	if (InA.DistanceScore !=
+	if ((!bAUsesStreamingDistance ||
+		!bBUsesStreamingDistance) &&
+		InA.DistanceScore !=
 		InB.DistanceScore)
 	{
 		return
@@ -658,6 +729,14 @@ int32 FVoxelTaskScheduler::RunningCount(const EVoxelTaskKind InKind) const
 
 bool FVoxelTaskScheduler::CanStartKind(const EVoxelTaskKind InKind) const
 {
+	if (IsCoarseTerrainKind(InKind) &&
+		RunningCount(EVoxelTaskKind::BuildSurface) +
+			RunningCount(EVoxelTaskKind::BuildMacro) >=
+			Budget.MaxConcurrentCoarseTerrainTasks)
+	{
+		return false;
+	}
+
 	switch (InKind)
 	{
 	case EVoxelTaskKind::BuildSurface:

@@ -105,7 +105,8 @@ bool FVoxelSurfaceProxyBuilder::Build(
 		Data.Step,
 		Columns,
 		OutError,
-		InCancel))
+		InCancel,
+		false))
 	{
 		return false;
 	}

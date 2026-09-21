@@ -37,7 +37,8 @@ bool FVoxelGenerationQuery::Create(
 	TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
 	TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> InCache,
 	FVoxelGenerationQuery& OutQuery,
-	FString& OutError)
+	FString& OutError,
+	const bool bInUseColumnCache)
 {
 	if (!InConfig->IsValid() ||
 		!InConfig->Recipe)
@@ -52,6 +53,7 @@ bool FVoxelGenerationQuery::Create(
 
 	Query.Config = InConfig;
 	Query.Cache = InCache;
+	Query.bUseColumnCache = bInUseColumnCache;
 
 	Query.Climate =
 		MakeShared<
@@ -639,6 +641,21 @@ bool FVoxelGenerationQuery::GetBaseColumn(
 		return false;
 	}
 
+	if (!bUseColumnCache)
+	{
+		if (!ComputeBaseColumn(
+			InX,
+			InY,
+			OutColumn))
+		{
+			OutError = TEXT("Voxel base column generation failed");
+			return false;
+		}
+
+		OutError.Reset();
+		return true;
+	}
+
 	FVoxelBaseColumnEntryPtr Entry;
 	if (!Cache->GetOrBuildBaseColumn(
 		FIntPoint(InX, InY),
@@ -827,6 +844,16 @@ bool FVoxelGenerationQuery::SampleEnvironmentColumn(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	if (!bUseColumnCache)
+	{
+		return ComputeNaturalColumn(
+			InX,
+			InY,
+			OutColumn,
+			OutError,
+			InCancel);
+	}
+
 	FVoxelNaturalColumnEntryPtr Entry;
 	if (!Cache->GetOrBuildNaturalColumn(
 		FIntPoint(InX, InY),
@@ -867,8 +894,8 @@ bool FVoxelGenerationQuery::ResolveSurfaceCandidate(
 	OutCandidate.bLake = Column.bLake;
 	OutCandidate.bOcean = Column.bOcean;
 	OutCandidate.bCoast = Column.bCoast;
-	OutCandidate.bValid = Column.SurfaceZ >= Config->Recipe->Settings.MinZ &&
-		Column.SurfaceZ < Config->Recipe->Settings.MaxZ - 2;
+	OutCandidate.bValid = OutCandidate.GroundZ >= Config->Recipe->Settings.MinZ &&
+		OutCandidate.GroundZ < Config->Recipe->Settings.MaxZ - 2;
 	OutError.Reset();
 	return true;
 }

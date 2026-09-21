@@ -60,6 +60,11 @@ bool FVoxelGenerationBinding::Build(const UVoxelWorldGenerationProfile& InProfil
 		OutError = TEXT("Voxel generation profile RecipeHash does not match RecipeBytes");
 		return false;
 	}
+	if (RuntimeRecipe.AlgorithmVersion != FVoxelGenerationRecipe::CurrentAlgorithmVersion)
+	{
+		OutError = TEXT("Voxel generation profile requires rebaking for the current terrain algorithm");
+		return false;
+	}
 	if (RuntimeRecipe.CellCentimeters != InProfile.BakedCellCentimeters || RuntimeRecipe.CellCentimeters != InCellCentimeters)
 	{
 		OutError = TEXT("Voxel generation profile bake cell size does not match runtime cell size");

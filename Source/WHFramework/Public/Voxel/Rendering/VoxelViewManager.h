@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Voxel/Rendering/VoxelCoverage.h"
 #include "Voxel/Rendering/VoxelSurfaceProxy.h"
 #include "Voxel/Streaming/VoxelInterest.h"
 
@@ -66,6 +67,7 @@ public:
 		TConstArrayView<FVector> InObservers);
 	bool OnTask(FVoxelTaskResult&& InResult);
 	void InvalidateSection(const FIntVector& InKey);
+	void InvalidateNeighbors(const FIntVector& InKey);
 
 	bool ApplyRemoteRepresentation(
 		const FVoxelRepresentationReply& InReply,
@@ -123,7 +125,8 @@ private:
 	void GatherReadyWantedProxyBoxes(TArray<FVoxelCoverageBox>& OutCoverage) const;
 	void GatherReadyWantedSurfaceRects(TArray<FVoxelCoverageRect>& OutCoverage) const;
 	void GatherReadyWantedMacroRects(TArray<FVoxelCoverageRect>& OutCoverage) const;
-	void GatherReadyWantedProxySurfaceRects(TArray<FVoxelCoverageRect>& OutCoverage) const;
+	void GatherReadyWantedProxySurfaceRects(const FVoxelCoverageRect& InTarget, TArray<FVoxelCoverageRect>& OutCoverage) const;
+	void UpdateProxySurfaceCoverage(const FVoxelVoxelProxyData& InData);
 	void GatherCurrentRenderDomainRects(TArray<FVoxelCoverageRect>& OutCoverage) const;
 	bool IsFineReplacementReady(const FIntVector& InKey) const;
 	bool IsProxyReplacementReady(const FVoxelViewKey& InKey) const;
@@ -167,10 +170,12 @@ private:
 	uint64 AppliedInterestRevision = 0;
 	TArray<FVoxelViewAdmission> Admissions;
 	TArray<FVector> PriorityObservers;
+	int32 AdmissionScanIndex = 0;
 	double AdmissionBandWidthCells = 64.0;
 	double LastResolvedFrontier = 0.0;
 	bool bCoverageDirty = true;
 	double NextCoverageCheck = 0.0;
+	double LastCoverageMilliseconds = 0.0;
 	double NextRepresentationDebugLog = 0.0;
 	TMap<TWeakObjectPtr<AActor>, bool> ActorHiddenStates;
 
@@ -197,6 +202,7 @@ private:
 	TMap<FVoxelMacroTileKey, uint64> MacroRevisions;
 
 	TMap<FVoxelViewKey, TSharedPtr<const FVoxelVoxelProxyData>> VoxelProxyData;
+	TMap<FVoxelViewKey, TArray<FVoxelCoverageRect>> ProxySurfaceCoverage;
 	TMap<FVoxelSurfaceTileKey, TSharedPtr<const FVoxelSurfaceTileData>> SurfaceData;
 	TMap<FVoxelSurfaceTileKey, TSharedPtr<const FVoxelWaterSurfaceTileData>> WaterData;
 	TMap<FVoxelMacroTileKey, TSharedPtr<const FVoxelMacroTileData>> MacroData;

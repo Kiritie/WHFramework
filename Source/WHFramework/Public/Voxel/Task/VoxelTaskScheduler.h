@@ -178,6 +178,8 @@ struct WHFRAMEWORK_API FVoxelTaskBudget
 	int32 MaxHeavyCompletedResultsPerFrame = 1;
 	int32 MaxConcurrentSurfaceTasks = 1;
 	int32 MaxConcurrentMacroTasks = 1;
+	int32 MaxConcurrentCoarseTerrainTasks = 1;
+	int32 MaxPendingCoarseTerrainTasks = 24;
 };
 
 struct WHFRAMEWORK_API FVoxelTaskKindDiagnostics
