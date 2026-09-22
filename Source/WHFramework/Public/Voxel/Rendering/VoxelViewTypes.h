@@ -47,3 +47,27 @@ FORCEINLINE uint32 GetTypeHash(const FVoxelMacroTileKey& InKey)
 {
 	return HashCombineFast(::GetTypeHash(InKey.Coordinate), ::GetTypeHash(InKey.Level));
 }
+
+enum class EVoxelViewAdmissionKind : uint8
+{
+	Fine = 0,
+	VoxelProxy,
+	Surface,
+	Macro
+};
+
+struct FVoxelViewAdmission
+{
+	EVoxelViewAdmissionKind Kind = EVoxelViewAdmissionKind::Fine;
+	double DistanceCells = 0.0;
+	FIntVector FineKey = FIntVector::ZeroValue;
+	FVoxelViewKey ProxyKey;
+	FVoxelSurfaceTileKey SurfaceKey;
+	FVoxelMacroTileKey MacroKey;
+
+	bool operator<(const FVoxelViewAdmission& Other) const
+	{
+		return DistanceCells != Other.DistanceCells ? DistanceCells < Other.DistanceCells :
+			static_cast<uint8>(Kind) < static_cast<uint8>(Other.Kind);
+	}
+};

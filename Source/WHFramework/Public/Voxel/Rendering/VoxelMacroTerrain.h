@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Voxel/Generation/VoxelGenerationPipeline.h"
 #include "Voxel/Rendering/VoxelViewTypes.h"
+#include "Voxel/Rendering/VoxelSurfaceProxy.h"
 
 struct WHFRAMEWORK_API FVoxelMacroStructureProxy
 {
@@ -43,8 +44,10 @@ struct WHFRAMEWORK_API FVoxelMacroTileData
 class WHFRAMEWORK_API FVoxelMacroTerrainBuilder
 {
 public:
-	explicit FVoxelMacroTerrainBuilder(
-		TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator);
+	FVoxelMacroTerrainBuilder(TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator,
+		TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
+		const FVoxelGenerationSettings& InSettings, const IVoxelOverlaySource& InOverlays,
+		TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry);
 
 	bool Build(
 		const FVoxelMacroTileKey& InKey,
@@ -53,5 +56,5 @@ public:
 		const TAtomic<bool>* InCancel = nullptr) const;
 
 private:
-	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> Generator;
+	FVoxelSurfaceProxyBuilder SurfaceBuilder;
 };

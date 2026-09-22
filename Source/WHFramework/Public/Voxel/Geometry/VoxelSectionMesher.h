@@ -29,5 +29,5 @@ class WHFRAMEWORK_API FVoxelSectionMesher
 {
 public:
     static bool Build(const FVoxelSectionSnapshot& Snapshot,const FVoxelRegistrySnapshot& Registry,
-        const FVoxelShapeRegistry& Shapes,FVoxelSectionMeshResult& Out,const TAtomic<bool>* Cancel=nullptr,uint8 SkipBoundaryMask=0);
+        const FVoxelShapeRegistry& Shapes,FVoxelSectionMeshResult& Out,const TAtomic<bool>* Cancel=nullptr, double InTextureRepeatsPerCell=1.0);
 };

@@ -119,4 +119,32 @@ bool FVoxelSurfaceCandidateSupportTest::RunTest(const FString& InParameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelColumnSymbolsTest, "WHFramework.Voxel.Generation.ColumnSymbolsMatchPointQueries", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelColumnSymbolsTest::RunTest(const FString& InParameters)
+{
+	const auto Config = VoxelTest::MakeGenerationConfig();
+	const auto Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
+	FVoxelGenerationQuery Query;
+	FString Error;
+	if (!TestTrue(TEXT("Query initializes"), FVoxelGenerationQuery::Create(Config, Cache, Query, Error))) return false;
+	for (const FIntPoint Column : { FIntPoint(-17, 31), FIntPoint(0, 0), FIntPoint(127, -64) })
+	{
+		FVoxelColumnSample Surface;
+		if (!TestTrue(TEXT("Column prepares"), Query.PrepareColumns({ FIntVector(Column.X, Column.Y, -128), FIntVector(Column.X + 1, Column.Y + 1, 512) }, Error))) return false;
+		if (!TestTrue(TEXT("Surface resolves"), Query.SampleColumn(Column.X, Column.Y, Surface, Error))) return false;
+		const int32 MinZ = Surface.SurfaceZ - 24;
+		if (!TestTrue(TEXT("Full generation stages prepare"), Query.Prepare({ FIntVector(Column.X, Column.Y, MinZ), FIntVector(Column.X + 1, Column.Y + 1, MinZ + 48) }, Error))) return false;
+		TArray<uint32> Symbols;
+		if (!TestTrue(TEXT("Column symbols resolve"), Query.SampleColumnSymbols(Column, MinZ, 48, Symbols, Error))) return false;
+		for (int32 Index = 0; Index < Symbols.Num(); ++Index)
+		{
+			uint32 Point = 0;
+			TestTrue(TEXT("Point query resolves"), Query.SampleSymbol(FIntVector(Column.X, Column.Y, MinZ + Index), Point, Error));
+			TestEqual(TEXT("Column batching preserves full generation semantics"), Symbols[Index], Point);
+		}
+	}
+	return true;
+}
+
 #endif

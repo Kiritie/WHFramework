@@ -15,7 +15,8 @@ struct WHFRAMEWORK_API FVoxelRepresentationBuildInput
 	TSharedPtr<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config;
 	TSharedPtr<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> Cache;
 	TSharedPtr<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> Generator;
-	TMap<FIntVector, FVoxelOverlaySnapshot> Overlays;
+	TSharedPtr<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> Registry;
+	FVoxelOverlaySnapshotSet Overlays;
 	uint64 Revision = 0;
 };
 

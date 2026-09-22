@@ -178,7 +178,8 @@ namespace
 FVoxelInterestSet FVoxelInterestManager::Compute(
 	TConstArrayView<FVoxelStreamingSource> InSources,
 	const FVoxelWorldManifest& InManifest,
-	const FVoxelViewSettings& InViewSettings) const
+	const FVoxelViewSettings& InViewSettings,
+	const FVoxelInterestSet* InPrevious) const
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewInterestPlan);
 
@@ -191,7 +192,8 @@ FVoxelInterestSet FVoxelInterestManager::Compute(
 			Source,
 			InManifest,
 			InViewSettings,
-			Result);
+			Result,
+			InPrevious);
 
 		AddViewSource(
 			Source,
@@ -200,6 +202,144 @@ FVoxelInterestSet FVoxelInterestManager::Compute(
 			Result);
 	}
 
+	if (!Result.VoxelProxy.IsEmpty())
+	{
+		TSet<FIntVector> FineSections;
+		for (const TPair<FIntVector, FVoxelExactDemand>& Pair : Result.Exact)
+		{
+			if (Pair.Value.bFineRender)
+			{
+				FineSections.Add(Pair.Key);
+			}
+		}
+		Result.TerrainPlan.Build(InSources, FineSections, Result.VoxelProxy, InViewSettings, InViewSettings.MaximumTerrainLeaves);
+		Result.VoxelProxy.Reset();
+		for (const FVoxelViewKey& Key : Result.TerrainPlan.Leaves)
+		{
+			if (Key.Level > 0)
+			{
+				Result.VoxelProxy.Add(Key);
+				continue;
+			}
+			FVoxelExactDemand& Demand = Result.Exact.FindOrAdd(Key.Coordinate);
+			Demand.bData = true;
+			Demand.bFineRender = true;
+			const FVector Center = FVector(Key.Coordinate * InterestSectionSide) + FVector(InterestSectionSide * 0.5);
+			for (const FVoxelStreamingSource& Source : InSources)
+			{
+				if (Source.RenderMode != EVoxelStreamingRenderMode::None)
+				{
+					Demand.DistanceCells = FMath::Min(Demand.DistanceCells, FVector::Distance(Center, FVector(Source.Center)));
+				}
+			}
+		}
+	}
+	// 精细边界需要真实相邻数据；只增加数据依赖，不扩张碰撞、模拟或可见几何。
+	TArray<FIntVector> FineKeys;
+	for (const auto& Pair : Result.Exact)
+	{
+		if (Pair.Value.bFineRender)
+		{
+			FineKeys.Add(Pair.Key);
+		}
+	}
+	const auto FineSnapshot = MakeShared<TSet<FIntVector>, ESPMode::ThreadSafe>();
+	FineSnapshot->Append(FineKeys);
+	Result.FineSections = FineSnapshot;
+	for (const FIntVector& Key : FineKeys)
+	{
+		const double Distance = Result.Exact.FindChecked(Key).DistanceCells;
+		for (int32 Axis = 0; Axis < 3; ++Axis)
+		{
+			for (const int32 Sign : { -1, 1 })
+			{
+				FIntVector Neighbor = Key;
+				Neighbor[Axis] += Sign;
+				if (Neighbor.Z * InterestSectionSide >= InManifest.Settings.MaxZ ||
+					(Neighbor.Z + 1) * InterestSectionSide <= InManifest.Settings.MinZ)
+				{
+					continue;
+				}
+				FVoxelExactDemand& Demand = Result.Exact.FindOrAdd(Neighbor);
+				Demand.bData = true;
+				Demand.DistanceCells = FMath::Min(Demand.DistanceCells, Distance + InterestSectionSide);
+			}
+		}
+	}
+
+	// 排序随不可变范围快照在后台完成，主线程只消费索引，不重新分配、排序数万个节点。
+	auto Distance = [&InSources](const FBox& Bounds, const bool bColumn)
+	{
+		double Best = MAX_dbl;
+		for (const FVoxelStreamingSource& Source : InSources)
+		{
+			if (Source.RenderMode == EVoxelStreamingRenderMode::None) continue;
+			FVector Position(Source.Center);
+			if (bColumn) Position.Z = 0.0;
+			Best = FMath::Min(Best, FMath::Sqrt(Bounds.ComputeSquaredDistanceToPoint(Position)));
+		}
+		return Best;
+	};
+	for (const auto& Pair : Result.Exact)
+	{
+		if (!Pair.Value.bFineRender) continue;
+		FVoxelViewAdmission& A = Result.Admissions.AddDefaulted_GetRef();
+		A.Kind = EVoxelViewAdmissionKind::Fine;
+		A.FineKey = Pair.Key;
+		const FVector Center(Pair.Key * InterestSectionSide + FIntVector(InterestSectionSide / 2));
+		A.DistanceCells = Distance(FBox(Center, Center), false);
+	}
+	for (const FVoxelViewKey& Key : Result.VoxelProxy)
+	{
+		FVoxelViewAdmission& A = Result.Admissions.AddDefaulted_GetRef();
+		A.Kind = EVoxelViewAdmissionKind::VoxelProxy;
+		A.ProxyKey = Key;
+		const FVoxelGenerationBounds Bounds = Key.GetBounds();
+		A.DistanceCells = Distance(FBox(FVector(Bounds.Min), FVector(Bounds.Max)), false);
+	}
+	for (const FVoxelSurfaceTileKey& Key : Result.Surface)
+	{
+		FVoxelViewAdmission& A = Result.Admissions.AddDefaulted_GetRef();
+		A.Kind = EVoxelViewAdmissionKind::Surface;
+		A.SurfaceKey = Key;
+		const int32 Side = InViewSettings.SurfaceTileSide << Key.Level;
+		const FVector Center((Key.Coordinate.X + 0.5) * Side, (Key.Coordinate.Y + 0.5) * Side, 0.0);
+		A.DistanceCells = Distance(FBox(Center, Center), true);
+	}
+	for (const FVoxelMacroTileKey& Key : Result.Macro)
+	{
+		FVoxelViewAdmission& A = Result.Admissions.AddDefaulted_GetRef();
+		A.Kind = EVoxelViewAdmissionKind::Macro;
+		A.MacroKey = Key;
+		const int32 Side = InViewSettings.MacroTileSide << Key.Level;
+		const FVector Center((Key.Coordinate.X + 0.5) * Side, (Key.Coordinate.Y + 0.5) * Side, 0.0);
+		A.DistanceCells = Distance(FBox(Center, Center), true);
+	}
+	Result.Admissions.Sort();
+	for (int32 Index = 0; Index < Result.Admissions.Num(); ++Index)
+	{
+		Result.AdmissionLanes[static_cast<uint8>(Result.Admissions[Index].Kind)].Add(Index);
+	}
+
+	for (const auto& Pair : Result.Exact)
+	{
+		if (Pair.Value.bWarmupData) Result.Warmup.Add(Pair.Key, Pair.Value);
+	}
+	Result.Exact.GetKeys(Result.ExactOrder);
+	Result.ExactOrder.Sort([&Result](const FIntVector& Left, const FIntVector& Right)
+	{
+		const FVoxelExactDemand& A = Result.Exact.FindChecked(Left);
+		const FVoxelExactDemand& B = Result.Exact.FindChecked(Right);
+		const bool bGameplayA = A.bExact || A.bCollision || A.bSimulation || A.bWarmupData;
+		const bool bGameplayB = B.bExact || B.bCollision || B.bSimulation || B.bWarmupData;
+		if (bGameplayA != bGameplayB) return bGameplayA;
+		if (A.DistanceCells != B.DistanceCells) return A.DistanceCells < B.DistanceCells;
+		if (A.ForwardScore != B.ForwardScore) return A.ForwardScore > B.ForwardScore;
+		if (Left.X != Right.X) return Left.X < Right.X;
+		if (Left.Y != Right.Y) return Left.Y < Right.Y;
+		return Left.Z < Right.Z;
+	});
+
 	return Result;
 }
 
@@ -207,7 +347,8 @@ void FVoxelInterestManager::AddExactSource(
 	const FVoxelStreamingSource& InSource,
 	const FVoxelWorldManifest& InManifest,
 	const FVoxelViewSettings& InViewSettings,
-	FVoxelInterestSet& InOutInterest) const
+	FVoxelInterestSet& InOutInterest,
+	const FVoxelInterestSet* InPrevious) const
 {
 	const int32 ExactRadius =
 		FMath::Max(0, InSource.ExactRadius);
@@ -229,14 +370,8 @@ void FVoxelInterestManager::AddExactSource(
 	const bool bWantsFine =
 		InSource.RenderMode != EVoxelStreamingRenderMode::None;
 
-	const int32 FineRadius =
-		bWantsFine
-			? FMath::Min(
-				FMath::Max(
-					0,
-					InViewSettings.FineRadius),
-				ExactRadius)
-			: 0;
+	const int32 FineRadius = bWantsFine ? FMath::Max(0, InViewSettings.FineRadius) +
+		FMath::Max(0, InViewSettings.FinePreload) : 0;
 
 	const int32 WarmupDataRadius =
 		FMath::Min(
@@ -257,24 +392,21 @@ void FVoxelInterestManager::AddExactSource(
 				FMath::Max(0, InSource.MovementCriticalCollisionRadius))
 			: 0;
 
-	const int32 DataRadius =
+	const int32 FineRetainRadius = bWantsFine && FineRadius > 0 ? FineRadius + InterestSectionSide : 0;
+	const int32 DataRadius = FMath::Max(FineRetainRadius,
 		FMath::Max(
 			FMath::Max(
 				ExactRadius,
 				CollisionRadius),
-			SimulationRadius);
+			SimulationRadius));
 
 	const int32 HorizontalSections =
 		CeilDividePositive(
 			DataRadius,
 			InterestSectionSide);
 
-	const int32 VerticalSections =
-		CeilDividePositive(
-			FMath::Max(
-				0,
-				InSource.VerticalExactRadius),
-			InterestSectionSide);
+	const int32 VerticalSections = CeilDividePositive(
+		FMath::Max(FineRetainRadius, FMath::Max(0, InSource.VerticalExactRadius)), InterestSectionSide);
 
 	const FIntVector CenterSection =
 		InterestToSection(
@@ -341,11 +473,14 @@ void FVoxelInterestManager::AddExactSource(
 						Delta,
 						SimulationRadius);
 
+				const FVoxelExactDemand* Previous = InPrevious ? InPrevious->Exact.Find(Key) : nullptr;
+				const bool bRetainFine = InPrevious && InPrevious->FineSections
+					? InPrevious->FineSections->Contains(Key) : Previous && Previous->bFineRender;
 				const bool bFineRender =
 					bWantsFine &&
 					IsInsideRadius(
 						Delta,
-						FineRadius);
+						bRetainFine ? FineRetainRadius : FineRadius);
 
 				const bool bWarmupData =
 					IsInsideRadius(Delta, WarmupDataRadius);
@@ -416,14 +551,7 @@ void FVoxelInterestManager::AddViewSource(
 		return;
 	}
 
-	const int32 FineRadius =
-		FMath::Min(
-			FMath::Max(
-				0,
-				InViewSettings.FineRadius),
-			FMath::Max(
-				0,
-				InSource.ExactRadius));
+	const int32 FineRadius = FMath::Max(0, InViewSettings.FineRadius) + FMath::Max(0, InViewSettings.FinePreload);
 
 	const int32 ProxyRange =
 		FMath::Max(
@@ -432,18 +560,7 @@ void FVoxelInterestManager::AddViewSource(
 
 	if (ProxyRange > FineRadius)
 	{
-		const uint8 ProxyLevel =
-			FMath::Max<uint8>(
-				1,
-				VoxelViewLod::ResolveScreenErrorLevel(
-					FMath::Max(
-						FineRadius,
-						ProxyRange / 2),
-					1,
-					InSource,
-					InViewSettings,
-					InViewSettings.
-						MaximumVoxelProxyLevel));
+		const uint8 ProxyLevel = FMath::Max<uint8>(1, InViewSettings.MaximumVoxelProxyLevel);
 
 		const int32 ProxySide =
 			FMath::Max(

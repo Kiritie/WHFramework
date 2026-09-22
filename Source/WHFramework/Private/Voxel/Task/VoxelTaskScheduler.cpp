@@ -27,6 +27,18 @@ namespace
 		}
 	}
 
+	int32 TerrainLane(const EVoxelTaskKind Kind)
+	{
+		switch (Kind)
+		{
+		case EVoxelTaskKind::BuildFineMesh: return 0;
+		case EVoxelTaskKind::BuildVoxelProxy: return 1;
+		case EVoxelTaskKind::BuildSurface: return 2;
+		case EVoxelTaskKind::BuildMacro: return 3;
+		default: return INDEX_NONE;
+		}
+	}
+
 	bool IsCoarseTerrainKind(const EVoxelTaskKind InKind)
 	{
 		return
@@ -34,22 +46,6 @@ namespace
 			InKind == EVoxelTaskKind::BuildMacro;
 	}
 
-	bool UsesStreamingDistancePriority(const EVoxelTaskKind InKind)
-	{
-		switch (InKind)
-		{
-		case EVoxelTaskKind::GenerateExactBase:
-		case EVoxelTaskKind::BuildCollision:
-		case EVoxelTaskKind::BuildFineMesh:
-		case EVoxelTaskKind::BuildVoxelProxy:
-		case EVoxelTaskKind::BuildSurface:
-		case EVoxelTaskKind::BuildMacro:
-		case EVoxelTaskKind::DecodeOverlay:
-			return true;
-		default:
-			return false;
-		}
-	}
 }
 
 bool FVoxelTaskStamp::operator==(const FVoxelTaskStamp& InOther) const
@@ -194,15 +190,57 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 		}
 	}
 
-	if (Pending.Num() >= Budget.MaxPendingTasks ||
-		InRequest.InputBytes >
-			Budget.MaxInputBytes - QueuedInputBytes)
+	InRequest.QueuedAt = FPlatformTime::Seconds();
+	const bool bVisual = IsVisualWorkClass(InRequest.WorkClass);
+	const int32 Lane = TerrainLane(InRequest.Kind);
+	const int32 ReservedPerLane = Budget.MaxPendingTasks >= 16 ? 2 : 0;
+	int32 Counts[4] = {};
+	for (const FVoxelTaskRequest& Request : Pending)
 	{
-		return false;
+		const int32 Index = TerrainLane(Request.Kind);
+		if (Index != INDEX_NONE) ++Counts[Index];
 	}
-
-	InRequest.QueuedAt =
-		FPlatformTime::Seconds();
+	int32 PendingLimit = Budget.MaxPendingTasks;
+	if (bVisual)
+	{
+		for (int32 Index = 0; Index < 4; ++Index)
+		{
+			if (Index != Lane) PendingLimit -= FMath::Max(0, ReservedPerLane - Counts[Index]);
+		}
+	}
+	const bool bReservedAdmission = Lane != INDEX_NONE && Counts[Lane] < ReservedPerLane;
+	// 先完整验证替换集合，再取消旧请求，内存不足不能导致部分取消后仍然拒绝新请求。
+	TArray<int32, TInlineAllocator<8>> DisplacedIndices;
+	uint64 RemainingInput = QueuedInputBytes;
+	while (Pending.Num() - DisplacedIndices.Num() >= PendingLimit ||
+		InRequest.InputBytes > Budget.MaxInputBytes - RemainingInput)
+	{
+		int32 Worst = INDEX_NONE;
+		for (int32 Index = 0; Index < Pending.Num(); ++Index)
+		{
+			if (DisplacedIndices.Contains(Index)) continue;
+			const FVoxelTaskRequest& Existing = Pending[Index];
+			const int32 ExistingLane = TerrainLane(Existing.Kind);
+			if (bVisual && ExistingLane != INDEX_NONE && ExistingLane != Lane && Counts[ExistingLane] <= ReservedPerLane) continue;
+			const bool bMayReplace = IsHigherPriority(InRequest, Existing) ||
+				(bReservedAdmission && IsVisualWorkClass(Existing.WorkClass) && ExistingLane != Lane);
+			if (bMayReplace && (Worst == INDEX_NONE || IsHigherPriority(Pending[Worst], Existing))) Worst = Index;
+		}
+		if (Worst == INDEX_NONE) return false;
+		DisplacedIndices.Add(Worst);
+		RemainingInput -= Pending[Worst].InputBytes;
+		const int32 ExistingLane = TerrainLane(Pending[Worst].Kind);
+		if (ExistingLane != INDEX_NONE) --Counts[ExistingLane];
+	}
+	DisplacedIndices.Sort([](const int32 A, const int32 B) { return A > B; });
+	for (const int32 Index : DisplacedIndices)
+	{
+		FVoxelTaskRequest Displaced = MoveTemp(Pending[Index]);
+		Pending.RemoveAtSwap(Index, 1, EAllowShrinking::No);
+		QueuedInputBytes -= Displaced.InputBytes;
+		RemoveActive(Displaced.Stamp, Displaced.Kind, Displaced.WorkClass);
+		QueueCanceled(MoveTemp(Displaced));
+	}
 
 	QueuedInputBytes +=
 		InRequest.InputBytes;
@@ -258,10 +296,7 @@ void FVoxelTaskScheduler::Tick(
 			Running[Index].Slot->Result.bCanceled = true;
 			Running[Index].Slot->Result.bSuccess = false;
 		}
-		const bool bHeavy =
-			!Running[Index].Slot->Result.bCanceled &&
-			IsHeavyApplyKind(
-				Running[Index].Kind);
+		const bool bHeavy = Running[Index].Slot->Result.HasHeavyApply();
 
 		if (bHeavy &&
 			HeavyApplied >=
@@ -626,20 +661,6 @@ bool FVoxelTaskScheduler::IsHigherPriority(
 	const FVoxelTaskRequest& InA,
 	const FVoxelTaskRequest& InB)
 {
-	const bool bAUsesStreamingDistance =
-		UsesStreamingDistancePriority(InA.Kind);
-	const bool bBUsesStreamingDistance =
-		UsesStreamingDistancePriority(InB.Kind);
-
-	if (bAUsesStreamingDistance &&
-		bBUsesStreamingDistance &&
-		InA.DistanceScore != InB.DistanceScore)
-	{
-		return
-			InA.DistanceScore <
-			InB.DistanceScore;
-	}
-
 	const bool bAVisual = IsVisualWorkClass(InA.WorkClass);
 	const bool bBVisual = IsVisualWorkClass(InB.WorkClass);
 	if (bAVisual != bBVisual)
@@ -654,10 +675,7 @@ bool FVoxelTaskScheduler::IsHigherPriority(
 			static_cast<uint8>(
 				InB.WorkClass);
 	}
-	if ((!bAUsesStreamingDistance ||
-		!bBUsesStreamingDistance) &&
-		InA.DistanceScore !=
-		InB.DistanceScore)
+	if (InA.DistanceScore != InB.DistanceScore)
 	{
 		return
 			InA.DistanceScore <
@@ -681,10 +699,18 @@ bool FVoxelTaskScheduler::IsHigherPriority(
 		InB.QueuedAt;
 }
 
-bool FVoxelTaskScheduler::IsHeavyApplyKind(
-	const EVoxelTaskKind InKind)
+bool FVoxelTaskResult::HasHeavyApply() const
 {
-	switch (InKind)
+	if (bCanceled || !bSuccess) return false;
+	if (Kind == EVoxelTaskKind::BuildFineMesh)
+	{
+		// 空网格只更新就绪/版本状态，不占据实体网格每帧一次的重发布配额。
+		return FineMesh && FineMesh->Batches.ContainsByPredicate([](const FVoxelRenderBatch& Batch)
+		{
+			return !Batch.Mesh.Triangles.IsEmpty();
+		});
+	}
+	switch (Kind)
 	{
 	case EVoxelTaskKind::BuildCollision:
 	case EVoxelTaskKind::BuildFineMesh:
@@ -791,6 +817,24 @@ void FVoxelTaskScheduler::Pump()
 			INDEX_NONE)
 		{
 			break;
+		}
+
+		// 超过等待期限的可视任务按入队时间获得机会；碰撞、出生及交互优先级不降级。
+		if (IsVisualWorkClass(Pending[BestIndex].WorkClass))
+		{
+			const double Deadline = FPlatformTime::Seconds() - 1.0;
+			int32 Oldest = INDEX_NONE;
+			for (int32 Index = 0; Index < Pending.Num(); ++Index)
+			{
+				const FVoxelTaskRequest& Candidate = Pending[Index];
+				if (IsVisualWorkClass(Candidate.WorkClass) && Candidate.QueuedAt <= Deadline &&
+					CanStartKind(Candidate.Kind) && Candidate.ReservedBytes <= Budget.MaxReservedBytes - ReservedBytes &&
+					(Oldest == INDEX_NONE || Candidate.QueuedAt < Pending[Oldest].QueuedAt))
+				{
+					Oldest = Index;
+				}
+			}
+			if (Oldest != INDEX_NONE) BestIndex = Oldest;
 		}
 
 		FVoxelTaskRequest Request =

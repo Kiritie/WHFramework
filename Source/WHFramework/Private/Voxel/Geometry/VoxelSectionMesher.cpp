@@ -57,7 +57,15 @@ bool Covered(const FVoxelResolvedShape&S,uint8 F,const FVoxelShapeQuad*Q)
 bool Visible(const FVoxelSectionSnapshot&S,const FVoxelRegistrySnapshot&R,const FVoxelShapeRegistry&H,
     FIntVector P,FVoxelBlockState A,uint8 Face,const FVoxelShapeQuad*Quad)
 {
-    FVoxelBlockState B;if(!S.TrySample(P+VoxelCoord::Direction(Face),B)||B.IsAir())return true;
+    FVoxelBlockState B;
+    if (!S.TrySample(P + VoxelCoord::Direction(Face), B))
+    {
+        return false;
+    }
+    if (B.IsAir())
+    {
+        return true;
+    }
     const auto*BD=R.Find(B.TypeId);const auto*AD=R.Find(A.TypeId);if(!BD||!AD)return true;
     const bool SameTransparent=A.TypeId==B.TypeId&&(AD->RenderGroup==EVoxelRenderGroup::Water||AD->RenderGroup==EVoxelRenderGroup::Translucent);
     if(!BD->bOccludes&&!SameTransparent)return true;const auto*Shape=H.Find(BD->Shape,B.State);return !Shape||!Covered(*Shape,Face^1,Quad);
@@ -74,7 +82,7 @@ void AppendQuad(FVoxelMeshBuffers&O,const FVector*P,const FVector2D*UV,const FVo
 	O.Triangles.Append({N, N + 2, N + 1, N, N + 3, N + 2});}
 }
 bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegistrySnapshot&R,const FVoxelShapeRegistry&H,
-    FVoxelSectionMeshResult&O,const TAtomic<bool>*Cancel,uint8 SkipBoundaryMask)
+    FVoxelSectionMeshResult&O,const TAtomic<bool>*Cancel, const double InTextureRepeatsPerCell)
 {
     if(S.Blocks.Num()!=4096)return false;for(uint32 P:S.Blocks)if(!R.IsValid(FVoxelBlockState::Unpack(P)))return false;
     FVoxelSectionMeshResult T;
@@ -91,7 +99,6 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
     auto OverBudget=[&](){return TotalVertices>262144;};
     for(uint8 F=0;F<6;++F)for(int32 Slice=0;Slice<16;++Slice)
     {
-        if((SkipBoundaryMask&(1u<<F))&&Slice==((F&1)?0:15))continue;
         if(Cancel&&Cancel->Load())return false;
         FFaceKey Mask[256];int32 A=F/2,U=(A+1)%3,V=(A+2)%3;
         for(int32 Y=0;Y<16;++Y)for(int32 X=0;X<16;++X)
@@ -114,6 +121,10 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
 	            P[I]=FVector::ZeroVector;P[I][A]=Slice+(F%2==0?1:0);P[I][U]=XX[I];P[I][V]=YY[I];
             	UV[I] = MakeFaceUV(F, P[I], 16.0);
             }
+            for (FVector2D& Coordinate : UV)
+            {
+                Coordinate *= InTextureRepeatsPerCell;
+            }
             if(F&1){Swap(P[1],P[3]);Swap(UV[1],UV[3]);}
             AppendQuad(Batch(K.Group,K.Texture.Bank),P,UV,K.Texture,K.Group,FVector::ZeroVector);
             TotalVertices+=4;if(OverBudget())return false;
@@ -127,7 +138,6 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
         if(D->Shape==EVoxelShapeKind::FullCube)continue;const auto*Shape=H.Find(D->Shape,B.State);if(!Shape)return false;
         FIntVector P=VoxelCoord::Unlinear(I);for(const auto&Q:Shape->Quads)
         {
-            if(Q.bBoundary&&(SkipBoundaryMask&(1u<<Q.Face))&&P[Q.Face/2]==((Q.Face&1)?0:15))continue;
             if(Q.bBoundary&&!Visible(S,R,H,P,B,Q.Face,&Q))continue;
             const auto&Tex=D->Face(B.State,Q.MaterialFace);AppendQuad(Batch(D->RenderGroup,Tex.Bank),Q.Vertices,Q.UV,Tex,D->RenderGroup,FVector(P),D->Shape==EVoxelShapeKind::CrossPlant);
             TotalVertices+=4;if(OverBudget())return false;

@@ -75,3 +75,9 @@ uint8 VoxelViewLod::ResolveScreenErrorLevel(
 
 	return Level;
 }
+
+// 纹理尺度只由采样等级决定，不能随贪心合并面的宽高变化。
+double VoxelViewLod::TexturePeriodCells(const int32 InStep, const double InMaximumStretchCells)
+{
+	return FMath::Clamp(static_cast<double>(InStep), 1.0, FMath::Max(1.0, InMaximumStretchCells));
+}

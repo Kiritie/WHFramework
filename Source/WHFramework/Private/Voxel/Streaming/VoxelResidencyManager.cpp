@@ -70,7 +70,7 @@ bool FVoxelResidencyManager::CanEvict(
 	{
 		return false;
 	}
-	if (Runtime.IsServer() && Runtime.GetChangeIndex().IsModified(InKey))
+	if (Runtime.IsServer() && InSection.PersistedRevision != InSection.CommittedRevision)
 	{
 		return false;
 	}

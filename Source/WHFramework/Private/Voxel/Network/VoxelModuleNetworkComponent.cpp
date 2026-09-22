@@ -60,11 +60,11 @@ namespace
 		switch (InType)
 		{
 		case EVoxelRepresentationWireType::VoxelProxy:
-			return InRuntime.GetChangeHierarchy().GetVoxelProxyRevision(InKey.Coordinate);
+			return InRuntime.GetChangeHierarchy().GetVoxelProxyRevision({ InKey.Coordinate, InKey.Level });
 		case EVoxelRepresentationWireType::SurfaceProxy:
-			return InRuntime.GetChangeHierarchy().GetSurfaceRevision(FIntPoint(InKey.Coordinate.X, InKey.Coordinate.Y));
+			return InRuntime.GetChangeHierarchy().GetSurfaceRevision({ FIntPoint(InKey.Coordinate.X, InKey.Coordinate.Y), InKey.Level });
 		case EVoxelRepresentationWireType::MacroTerrain:
-			return InRuntime.GetChangeHierarchy().GetMacroRevision(FIntPoint(InKey.Coordinate.X, InKey.Coordinate.Y));
+			return InRuntime.GetChangeHierarchy().GetMacroRevision({ FIntPoint(InKey.Coordinate.X, InKey.Coordinate.Y), InKey.Level });
 		default:
 			return 0;
 		}
@@ -728,11 +728,7 @@ void UVoxelModuleNetworkComponent::Handle(
 				Request.Key.Level };
 		}
 		Task.ReservedBytes = 32ull * 1024ull * 1024ull;
-		for (const TPair<FIntVector, FVoxelOverlaySnapshot>& Pair : BuildInput.Overlays)
-		{
-			Task.InputBytes += sizeof(Pair.Key) + sizeof(Pair.Value) +
-				static_cast<uint64>(Pair.Value.Blocks.Num()) * (sizeof(int32) + sizeof(FVoxelBlockState));
-		}
+		Task.InputBytes = BuildInput.Overlays.GetAllocatedBytes();
 		Task.Execute = [BuildInput = MoveTemp(BuildInput)](const TAtomic<bool>& InCancel)
 		{
 			FVoxelTaskResult Result;
@@ -993,7 +989,7 @@ void UVoxelModuleNetworkComponent::OnCommit(const FVoxelEditBatch& InBatch)
 			{
 				const FVoxelViewKey Key { Subscription.Key.Coordinate, Subscription.Key.Level };
 				bAffected |= Hierarchy.AffectsVoxelProxy(Key, Patch.Section);
-				Revision = FMath::Max(Revision, Hierarchy.GetVoxelProxyRevision(Key.Coordinate));
+				Revision = FMath::Max(Revision, Hierarchy.GetVoxelProxyRevision(Key));
 			}
 			if ((Subscription.Value & 2u) != 0)
 			{
@@ -1001,7 +997,7 @@ void UVoxelModuleNetworkComponent::OnCommit(const FVoxelEditBatch& InBatch)
 					FIntPoint(Subscription.Key.Coordinate.X, Subscription.Key.Coordinate.Y),
 					Subscription.Key.Level };
 				bAffected |= Hierarchy.AffectsSurface(Key, Patch.Section);
-				Revision = FMath::Max(Revision, Hierarchy.GetSurfaceRevision(Key.Coordinate));
+				Revision = FMath::Max(Revision, Hierarchy.GetSurfaceRevision(Key));
 			}
 			if ((Subscription.Value & 4u) != 0)
 			{
@@ -1009,7 +1005,7 @@ void UVoxelModuleNetworkComponent::OnCommit(const FVoxelEditBatch& InBatch)
 					FIntPoint(Subscription.Key.Coordinate.X, Subscription.Key.Coordinate.Y),
 					Subscription.Key.Level };
 				bAffected |= Hierarchy.AffectsMacro(Key, Patch.Section);
-				Revision = FMath::Max(Revision, Hierarchy.GetMacroRevision(Key.Coordinate));
+				Revision = FMath::Max(Revision, Hierarchy.GetMacroRevision(Key));
 			}
 		}
 		if (bAffected)

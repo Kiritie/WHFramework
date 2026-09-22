@@ -59,51 +59,22 @@ bool FVoxelGenerationPipeline::GenerateSection(
 	Blocks.SetNumUninitialized(
 		SectionCellCount);
 
-	int32 LocalIndex = 0;
-
-	for (int32 Z = 0;
-		Z < SectionSide;
-		++Z)
+	// 一列共享同一份自然采样，每格仍执行完整生成阶段，避免反复争用列缓存锁。
+	TArray<uint32> Symbols;
+	for (int32 Y = 0; Y < SectionSide; ++Y)
 	{
-		if (InCancel &&
-			InCancel->Load())
+		for (int32 X = 0; X < SectionSide; ++X)
 		{
-			OutError =
-				TEXT("Canceled");
-
-			return false;
-		}
-
-		for (int32 Y = 0;
-			Y < SectionSide;
-			++Y)
-		{
-			for (int32 X = 0;
-				X < SectionSide;
-				++X)
+			if (!Query.SampleColumnSymbols(FIntPoint(WorldMin.X + X, WorldMin.Y + Y), WorldMin.Z,
+				SectionSide, Symbols, OutError))
 			{
-				uint32 RecipeValue = 0;
-
-				if (!Query.SampleSymbol(
-					WorldMin +
-						FIntVector(
-							X,
-							Y,
-							Z),
-					RecipeValue,
-					OutError))
+				return false;
+			}
+			for (int32 Z = 0; Z < SectionSide; ++Z)
+			{
+				if (!Config->ToRuntime(Symbols[Z], Blocks[X + SectionSide * Y + SectionSide * SectionSide * Z]))
 				{
-					return false;
-				}
-
-				if (!Config->ToRuntime(
-					RecipeValue,
-					Blocks[
-						LocalIndex++]))
-				{
-					OutError =
-						TEXT("Voxel generation returned an invalid recipe symbol");
-
+					OutError = TEXT("Voxel generation returned an invalid recipe symbol");
 					return false;
 				}
 			}

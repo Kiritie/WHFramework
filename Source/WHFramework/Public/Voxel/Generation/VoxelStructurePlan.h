@@ -63,6 +63,12 @@ struct WHFRAMEWORK_API FVoxelStructurePlan
 	TArray<FVoxelStructurePlanWrite> Writes;
 	TArray<FVoxelStructureDetailPlacement> Details;
 
+	// 生成所属瓦片不等于内容范围，跨瓦片树冠、结构和洞穴必须计入实际影响范围。
+	bool AffectsBounds(const FVoxelGenerationBounds& InBounds) const
+	{
+		return InfluenceBounds.IsValid && InfluenceBounds.Intersect(FBox(FVector(InBounds.Min), FVector(InBounds.Max)));
+	}
+
 	void Finalize();
 
 	bool IsCleared(
@@ -77,6 +83,7 @@ struct WHFRAMEWORK_API FVoxelStructurePlan
 	uint64 GetAllocatedBytes() const;
 
 private:
+	FBox InfluenceBounds = FBox(ForceInit);
 	TMap<
 		FVoxelStructurePlanKey,
 		FVoxelStructurePlanWrite>

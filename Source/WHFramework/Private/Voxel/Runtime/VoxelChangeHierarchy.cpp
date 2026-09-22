@@ -1,15 +1,59 @@
 #include "Voxel/Runtime/VoxelChangeHierarchy.h"
 
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "Voxel/Rendering/VoxelMacroTerrain.h"
+#include "Voxel/Rendering/VoxelSurfaceProxy.h"
 
 uint64 FVoxelChangeHierarchy::InvalidateSection(const FIntVector& InSection)
 {
 	FWriteScopeLock Scope(Lock);
 	const uint64 Revision = ++RevisionSerial;
 	SectionRevision.Add(InSection, Revision);
-	VoxelProxyRevision.Add(ToVoxelProxyParent(InSection), Revision);
-	SurfaceRevision.Add(ToSurfaceParent(InSection), Revision);
-	MacroRevision.Add(ToMacroParent(InSection), Revision);
+	const FIntVector CellMin = InSection * 16;
+	const FIntVector CellMax = CellMin + FIntVector(15);
+	for (uint8 Level = 0; Level <= 8; ++Level)
+	{
+		const int32 Step = 1 << Level;
+		const int32 ProxySide = FVoxelViewKey{ FIntVector::ZeroValue, Level }.GetSide();
+		FIntVector ProxyMin;
+		FIntVector ProxyMax;
+		for (int32 Axis = 0; Axis < 3; ++Axis)
+		{
+			ProxyMin[Axis] = VoxelGeneration::FloorDivide(CellMin[Axis] - Step, ProxySide);
+			ProxyMax[Axis] = VoxelGeneration::FloorDivide(CellMax[Axis] + Step, ProxySide);
+		}
+		for (int32 Z = ProxyMin.Z; Z <= ProxyMax.Z; ++Z)
+		{
+			for (int32 Y = ProxyMin.Y; Y <= ProxyMax.Y; ++Y)
+			{
+				for (int32 X = ProxyMin.X; X <= ProxyMax.X; ++X)
+				{
+					VoxelProxyRevision.Add({ FIntVector(X, Y, Z), Level }, Revision);
+				}
+			}
+		}
+		const int32 SurfaceSide = FVoxelSurfaceTileData::CellSide * Step;
+		const int32 MacroStep = FVoxelMacroTileData::BaseStep * Step;
+		const int32 MacroSide = FVoxelMacroTileData::CellSide * MacroStep;
+		for (int32 Y = VoxelGeneration::FloorDivide(CellMin.Y - Step, SurfaceSide);
+			Y <= VoxelGeneration::FloorDivide(CellMax.Y + Step, SurfaceSide); ++Y)
+		{
+			for (int32 X = VoxelGeneration::FloorDivide(CellMin.X - Step, SurfaceSide);
+				X <= VoxelGeneration::FloorDivide(CellMax.X + Step, SurfaceSide); ++X)
+			{
+				SurfaceRevision.Add({ FIntPoint(X, Y), Level }, Revision);
+			}
+		}
+		for (int32 Y = VoxelGeneration::FloorDivide(CellMin.Y - MacroStep, MacroSide);
+			Y <= VoxelGeneration::FloorDivide(CellMax.Y + MacroStep, MacroSide); ++Y)
+		{
+			for (int32 X = VoxelGeneration::FloorDivide(CellMin.X - MacroStep, MacroSide);
+				X <= VoxelGeneration::FloorDivide(CellMax.X + MacroStep, MacroSide); ++X)
+			{
+				MacroRevision.Add({ FIntPoint(X, Y), Level }, Revision);
+			}
+		}
+	}
 	return Revision;
 }
 
@@ -20,21 +64,21 @@ uint64 FVoxelChangeHierarchy::GetSectionRevision(const FIntVector& InSection) co
 	return Found ? *Found : 0;
 }
 
-uint64 FVoxelChangeHierarchy::GetVoxelProxyRevision(const FIntVector& InProxyKey) const
+uint64 FVoxelChangeHierarchy::GetVoxelProxyRevision(const FVoxelViewKey& InProxyKey) const
 {
 	FReadScopeLock Scope(Lock);
 	const uint64* Found = VoxelProxyRevision.Find(InProxyKey);
 	return Found ? *Found : 0;
 }
 
-uint64 FVoxelChangeHierarchy::GetSurfaceRevision(const FIntPoint& InSurfaceTile) const
+uint64 FVoxelChangeHierarchy::GetSurfaceRevision(const FVoxelSurfaceTileKey& InSurfaceTile) const
 {
 	FReadScopeLock Scope(Lock);
 	const uint64* Found = SurfaceRevision.Find(InSurfaceTile);
 	return Found ? *Found : 0;
 }
 
-uint64 FVoxelChangeHierarchy::GetMacroRevision(const FIntPoint& InMacroTile) const
+uint64 FVoxelChangeHierarchy::GetMacroRevision(const FVoxelMacroTileKey& InMacroTile) const
 {
 	FReadScopeLock Scope(Lock);
 	const uint64* Found = MacroRevision.Find(InMacroTile);
@@ -42,7 +86,7 @@ uint64 FVoxelChangeHierarchy::GetMacroRevision(const FIntPoint& InMacroTile) con
 }
 
 void FVoxelChangeHierarchy::SetVoxelProxyRevision(
-	const FIntVector& InProxyKey,
+	const FVoxelViewKey& InProxyKey,
 	const uint64 InRevision)
 {
 	FWriteScopeLock Scope(Lock);
@@ -51,7 +95,7 @@ void FVoxelChangeHierarchy::SetVoxelProxyRevision(
 }
 
 void FVoxelChangeHierarchy::SetSurfaceRevision(
-	const FIntPoint& InSurfaceTile,
+	const FVoxelSurfaceTileKey& InSurfaceTile,
 	const uint64 InRevision)
 {
 	FWriteScopeLock Scope(Lock);
@@ -60,7 +104,7 @@ void FVoxelChangeHierarchy::SetSurfaceRevision(
 }
 
 void FVoxelChangeHierarchy::SetMacroRevision(
-	const FIntPoint& InMacroTile,
+	const FVoxelMacroTileKey& InMacroTile,
 	const uint64 InRevision)
 {
 	FWriteScopeLock Scope(Lock);
@@ -73,7 +117,10 @@ bool FVoxelChangeHierarchy::AffectsVoxelProxy(
 	const FIntVector& InSection) const
 {
 	const FVoxelGenerationBounds SectionBounds { InSection * 16, (InSection + FIntVector(1)) * 16 };
-	return InKey.GetBounds().Intersects(SectionBounds);
+	FVoxelGenerationBounds Bounds = InKey.GetBounds();
+	Bounds.Min -= FIntVector(InKey.GetStep());
+	Bounds.Max += FIntVector(InKey.GetStep());
+	return Bounds.Intersects(SectionBounds);
 }
 
 bool FVoxelChangeHierarchy::AffectsSurface(
@@ -83,8 +130,9 @@ bool FVoxelChangeHierarchy::AffectsSurface(
 	const int32 Side = 32 * (1 << InKey.Level);
 	const FIntPoint Min = InKey.Coordinate * Side;
 	const FIntVector SectionMin = InSection * 16;
-	return SectionMin.X < Min.X + Side && SectionMin.X + 16 > Min.X &&
-		SectionMin.Y < Min.Y + Side && SectionMin.Y + 16 > Min.Y;
+	const int32 Step = 1 << InKey.Level;
+	return SectionMin.X < Min.X + Side + Step && SectionMin.X + 16 > Min.X - Step &&
+		SectionMin.Y < Min.Y + Side + Step && SectionMin.Y + 16 > Min.Y - Step;
 }
 
 bool FVoxelChangeHierarchy::AffectsMacro(
@@ -94,8 +142,9 @@ bool FVoxelChangeHierarchy::AffectsMacro(
 	const int32 Side = 32 * (64 << InKey.Level);
 	const FIntPoint Min = InKey.Coordinate * Side;
 	const FIntVector SectionMin = InSection * 16;
-	return SectionMin.X < Min.X + Side && SectionMin.X + 16 > Min.X &&
-		SectionMin.Y < Min.Y + Side && SectionMin.Y + 16 > Min.Y;
+	const int32 Step = FVoxelMacroTileData::BaseStep << InKey.Level;
+	return SectionMin.X < Min.X + Side + Step && SectionMin.X + 16 > Min.X - Step &&
+		SectionMin.Y < Min.Y + Side + Step && SectionMin.Y + 16 > Min.Y - Step;
 }
 
 void FVoxelChangeHierarchy::ReleaseSection(const FIntVector& InSection)
@@ -112,26 +161,4 @@ void FVoxelChangeHierarchy::Reset()
 	VoxelProxyRevision.Reset();
 	SurfaceRevision.Reset();
 	MacroRevision.Reset();
-}
-
-FIntVector FVoxelChangeHierarchy::ToVoxelProxyParent(const FIntVector& InSection) const
-{
-	return FIntVector(
-		VoxelGeneration::FloorDivide(InSection.X, 2),
-		VoxelGeneration::FloorDivide(InSection.Y, 2),
-		VoxelGeneration::FloorDivide(InSection.Z, 2));
-}
-
-FIntPoint FVoxelChangeHierarchy::ToSurfaceParent(const FIntVector& InSection) const
-{
-	return FIntPoint(
-		VoxelGeneration::FloorDivide(InSection.X, 4),
-		VoxelGeneration::FloorDivide(InSection.Y, 4));
-}
-
-FIntPoint FVoxelChangeHierarchy::ToMacroParent(const FIntVector& InSection) const
-{
-	return FIntPoint(
-		VoxelGeneration::FloorDivide(InSection.X, 32),
-		VoxelGeneration::FloorDivide(InSection.Y, 32));
 }

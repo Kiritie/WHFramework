@@ -121,6 +121,11 @@ bool AAbilityPickUpVoxel::BuildVisual()
 	FVoxelSectionSnapshot S;
 	S.Blocks.Init(0, 4096);
 	S.Blocks[0] = FVoxelBlockState{D->TypeId, 0}.Pack();
+	for (uint8 Face = 0; Face < 6; ++Face)
+	{
+		S.Known[Face] = true;
+		S.Halo[Face].Init(0, 256);
+	}
 	FVoxelSectionMeshResult Result;
 	if (!FVoxelSectionMesher::Build(S, *M->GetRegistry(), *M->GetShapes(), Result))
 		return false;

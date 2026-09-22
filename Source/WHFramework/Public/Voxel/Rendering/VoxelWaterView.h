@@ -8,7 +8,8 @@ enum class EVoxelWaterKind : uint8
 	None = 0,
 	River,
 	Lake,
-	Ocean
+	Ocean,
+	Edited
 };
 
 struct WHFRAMEWORK_API FVoxelWaterSurfaceTileData

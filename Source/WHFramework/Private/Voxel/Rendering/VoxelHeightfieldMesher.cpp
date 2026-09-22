@@ -1,4 +1,5 @@
 #include "Voxel/Rendering/VoxelHeightfieldMesher.h"
+#include "Voxel/Rendering/VoxelViewLod.h"
 
 #include "Voxel/Generation/VoxelGenerationBinding.h"
 #include "Voxel/Rendering/VoxelWaterView.h"
@@ -124,9 +125,15 @@ void FVoxelHeightfieldMesher::AppendQuad(
 		InD
 	};
 
-	// 所有层级按体素尺寸平铺纹理，不能将整张纹理拉伸到一个粗采样面上。
 	const bool bTop = FMath::Abs(Normal.Z) >= FMath::Max(FMath::Abs(Normal.X), FMath::Abs(Normal.Y));
 	const bool bAlongX = FMath::Abs(Normal.X) > FMath::Abs(Normal.Y);
+	FVector2D Coordinates[4];
+	for (int32 Index = 0; Index < 4; ++Index)
+	{
+		const FVector& Position = Vertices[Index];
+		Coordinates[Index] = bTop ? FVector2D(Position.X, Position.Y)
+			: FVector2D(bAlongX ? Position.Y : Position.X, -Position.Z);
+	}
 
 	for (int32 Index = 0;
 		Index < 4;
@@ -138,10 +145,7 @@ void FVoxelHeightfieldMesher::AppendQuad(
 		InOutMesh.Normals.Add(
 			Normal);
 
-		const FVector& Position = Vertices[Index];
-		InOutMesh.UV0.Add(bTop
-			? FVector2D(Position.X, Position.Y)
-			: FVector2D(bAlongX ? Position.Y : Position.X, -Position.Z));
+		InOutMesh.UV0.Add(Coordinates[Index]);
 
 		InOutMesh.UV1.Add(
 			FVector2D(
@@ -214,7 +218,8 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 	const TAtomic<bool>* InCancel,
 	TConstArrayView<uint8> InCoverage,
 	const double InZBiasCells,
-	const int32 InSkirtDepthCells)
+	const int32 InSkirtDepthCells,
+	const double InMaximumTextureStretchCells)
 {
 	if (InVertexSide < 2 ||
 		InStep <= 0 ||
@@ -254,7 +259,7 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 		};
 
 	auto AppendMaterialQuad =
-		[&Mesh, &InConfig, &InRegistry, &InMaterials, &CellIndex, &OutError](
+		[&Mesh, &InConfig, &InRegistry, &InMaterials, &InHeights, &CellIndex, &OutError](
 			const int32 InMaterialX,
 			const int32 InMaterialY,
 			const uint8 InFaceIndex,
@@ -264,6 +269,10 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 			const FVector& InD,
 			const FLinearColor& InColor)
 		{
+			if (InHeights[CellIndex(InMaterialX, InMaterialY)] == MIN_int32)
+			{
+				return true;
+			}
 			const FVoxelRuntimeDefinition* Definition = nullptr;
 			const FVoxelRuntimeFaceRef* Face = nullptr;
 
@@ -314,7 +323,8 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 				return false;
 			}
 
-			if (X + 1 < CellSide)
+			if (X + 1 < InVertexSide && InHeights[CellIndex(X, Y)] != MIN_int32 &&
+				InHeights[CellIndex(X + 1, Y)] != MIN_int32)
 			{
 				const double NeighborTop = TopZ(X + 1, Y);
 
@@ -338,7 +348,8 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 				}
 			}
 
-			if (Y + 1 < CellSide)
+			if (Y + 1 < InVertexSide && InHeights[CellIndex(X, Y)] != MIN_int32 &&
+				InHeights[CellIndex(X, Y + 1)] != MIN_int32)
 			{
 				const double NeighborTop = TopZ(X, Y + 1);
 
@@ -421,6 +432,15 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 		}
 	}
 
+	const double TexturePeriod = VoxelViewLod::TexturePeriodCells(InStep, InMaximumTextureStretchCells);
+	for (FVoxelRenderBatch& OutputBatch : Mesh.Batches)
+	{
+		for (FVector2D& UV : OutputBatch.Mesh.UV0)
+		{
+			UV /= TexturePeriod;
+		}
+	}
+
 	OutMesh = MoveTemp(Mesh);
 	OutError.Reset();
 	return true;
@@ -438,7 +458,8 @@ bool FVoxelHeightfieldMesher::BuildTerrain(
 	const TAtomic<bool>* InCancel,
 	TConstArrayView<uint8> InCoverage,
 	const double InZBiasCells,
-	const int32 InSkirtDepthCells)
+	const int32 InSkirtDepthCells,
+	const double InMaximumTextureStretchCells)
 {
 	if (InVertexSide < 2 ||
 		InStep <= 0 ||
@@ -753,6 +774,15 @@ bool FVoxelHeightfieldMesher::BuildTerrain(
 		}
 	}
 
+	const double TexturePeriod = VoxelViewLod::TexturePeriodCells(InStep, InMaximumTextureStretchCells);
+	for (FVoxelRenderBatch& OutputBatch : Mesh.Batches)
+	{
+		for (FVector2D& UV : OutputBatch.Mesh.UV0)
+		{
+			UV /= TexturePeriod;
+		}
+	}
+
 	OutMesh =
 		MoveTemp(Mesh);
 
@@ -765,7 +795,8 @@ bool FVoxelHeightfieldMesher::BuildWater(
 	const FVoxelRegistrySnapshot& InRegistry,
 	FVoxelSectionMeshResult& OutMesh,
 	FString& OutError,
-	const TAtomic<bool>* InCancel)
+	const TAtomic<bool>* InCancel,
+	const double InMaximumTextureStretchCells)
 {
 	const int32 Count =
 		InWater.Side *
@@ -863,28 +894,7 @@ bool FVoxelHeightfieldMesher::BuildWater(
 					Y,
 					InWater.Side);
 
-			const int32 I10 =
-				VertexIndex(
-					X + 1,
-					Y,
-					InWater.Side);
-
-			const int32 I11 =
-				VertexIndex(
-					X + 1,
-					Y + 1,
-					InWater.Side);
-
-			const int32 I01 =
-				VertexIndex(
-					X,
-					Y + 1,
-					InWater.Side);
-
-			if (!IsWet(I00) ||
-				!IsWet(I10) ||
-				!IsWet(I11) ||
-				!IsWet(I01))
+			if (!IsWet(I00))
 			{
 				continue;
 			}
@@ -915,17 +925,17 @@ bool FVoxelHeightfieldMesher::BuildWater(
 				FVector(
 					X1,
 					Y0,
-					InWater.WaterZ[I10] +
+					InWater.WaterZ[I00] +
 						1.0),
 				FVector(
 					X1,
 					Y1,
-					InWater.WaterZ[I11] +
+					InWater.WaterZ[I00] +
 						1.0),
 				FVector(
 					X0,
 					Y1,
-					InWater.WaterZ[I01] +
+					InWater.WaterZ[I00] +
 						1.0),
 				Face);
 		}
@@ -937,6 +947,15 @@ bool FVoxelHeightfieldMesher::BuildWater(
 			TEXT("Continuous water mesh validation failed");
 
 		return false;
+	}
+
+	const double TexturePeriod = VoxelViewLod::TexturePeriodCells(InWater.Step, InMaximumTextureStretchCells);
+	for (FVoxelRenderBatch& OutputBatch : Mesh.Batches)
+	{
+		for (FVector2D& UV : OutputBatch.Mesh.UV0)
+		{
+			UV /= TexturePeriod;
+		}
 	}
 
 	OutMesh =

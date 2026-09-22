@@ -49,11 +49,13 @@ FVoxelSurfaceProxyBuilder::FVoxelSurfaceProxyBuilder(
 	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator,
 	TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
 	const FVoxelGenerationSettings& InSettings,
-	const IVoxelOverlaySource& InOverlaySource)
+	const IVoxelOverlaySource& InOverlaySource,
+	TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry)
 	: Generator(InGenerator)
 	, Config(InConfig)
 	, Settings(InSettings)
 	, OverlaySource(InOverlaySource)
+	, Registry(InRegistry)
 {
 }
 
@@ -62,7 +64,7 @@ bool FVoxelSurfaceProxyBuilder::Build(
 	FVoxelSurfaceTileData& OutData,
 	FString& OutError,
 	const TAtomic<bool>* InCancel,
-	FVoxelSurfaceBuildTiming* OutTiming) const
+	FVoxelSurfaceBuildTiming* OutTiming, TArray<FVoxelColumnSample>* OutColumns) const
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_SurfaceBuild);
 
@@ -184,6 +186,10 @@ bool FVoxelSurfaceProxyBuilder::Build(
 		OutTiming->OverlayMilliseconds = OverlayMilliseconds;
 	}
 
+	if (OutColumns)
+	{
+		*OutColumns = MoveTemp(Columns);
+	}
 	OutData =
 		MoveTemp(Data);
 
@@ -357,85 +363,74 @@ bool FVoxelSurfaceProxyBuilder::ApplyModifiedSurface(
 				Y *
 					InOutData.Side;
 
-			int32 HighestCandidate =
-				InOutData.GroundZ[
-					Index];
-
-			bool bAffectsSurface =
-				false;
-
-			for (const TPair<
-				int32,
-				FVoxelBlockState>& Edit :
-				*Edits)
+			const int32 NaturalGround = InOutData.GroundZ[Index];
+			int32 HighestCandidate = FMath::Max(NaturalGround, InOutData.WaterZ[Index]);
+			bool bAffectsSurface = false;
+			for (const TPair<int32, FVoxelBlockState>& Edit : *Edits)
 			{
-				bAffectsSurface |=
-					Edit.Key >=
-					InOutData.GroundZ[
-						Index];
-
-				if (!Edit.Value.IsAir())
+				if (Edit.Key < Settings.MinZ || Edit.Key >= Settings.MaxZ)
 				{
-					HighestCandidate =
-						FMath::Max(
-							HighestCandidate,
-							Edit.Key);
+					continue;
 				}
+				bAffectsSurface |= Edit.Key >= NaturalGround;
+				HighestCandidate = FMath::Max(HighestCandidate, Edit.Key);
 			}
-
 			if (!bAffectsSurface)
 			{
 				continue;
 			}
 
-			const int32 ScanFloor =
-				Settings.MinZ;
-
-			for (int32 Z = HighestCandidate;
-				Z >= ScanFloor;
-				--Z)
+			// 地面和水分别解析；非实体装饰不能成为地表，清空整列不能保留旧高度。
+			InOutData.GroundZ[Index] = MIN_int32;
+			InOutData.WaterZ[Index] = MIN_int32;
+			InOutData.SurfaceMaterial[Index] = 0;
+			HighestCandidate = FMath::Min(HighestCandidate, Settings.MaxZ - 1);
+			for (int32 Z = HighestCandidate; Z >= Settings.MinZ; --Z)
 			{
-				FVoxelBlockState State;
-
-				if (const FVoxelBlockState* Modified =
-					Edits->Find(
-						Z))
+				if (InCancel && InCancel->Load())
 				{
-					State =
-						*Modified;
+					OutError = TEXT("Canceled");
+					return false;
 				}
-				else if (!Generator->
-					SampleBlock(
-						FIntVector(
-							WorldXY.X,
-							WorldXY.Y,
-							Z),
-						State,
-						OutError,
-						InCancel))
+				FVoxelBlockState State;
+				if (const FVoxelBlockState* Modified = Edits->Find(Z))
+				{
+					State = *Modified;
+				}
+				else if (!Generator->SampleBlock(FIntVector(WorldXY.X, WorldXY.Y, Z), State, OutError, InCancel))
 				{
 					return false;
 				}
-
-				if (!State.IsAir())
+				if (State.IsAir())
 				{
-					InOutData.GroundZ[
-						Index] =
-							Z;
-
-					uint32 PackedSymbol = 0;
-					if (!Config->ToSymbol(State, PackedSymbol))
-					{
-						OutError = TEXT("Modified voxel surface material is not present in the generation recipe");
-						return false;
-					}
-
-					InOutData.SurfaceMaterial[Index] =
-						static_cast<uint16>(PackedSymbol & 0xffffu);
-
-					break;
+					continue;
 				}
+				const FVoxelRuntimeDefinition* Definition = Registry->Find(State.TypeId);
+				if (!Definition)
+				{
+					OutError = TEXT("Modified voxel surface contains an unknown block type");
+					return false;
+				}
+				if (State.TypeId == Config->Water.TypeId)
+				{
+					InOutData.WaterZ[Index] = FMath::Max(InOutData.WaterZ[Index], Z);
+					continue;
+				}
+				if (!Definition->bSolid)
+				{
+					continue;
+				}
+				uint32 PackedSymbol = 0;
+				if (!Config->ToSymbol(State, PackedSymbol))
+				{
+					OutError = TEXT("Modified voxel surface material is not present in the generation recipe");
+					return false;
+				}
+				InOutData.GroundZ[Index] = Z;
+				InOutData.SurfaceMaterial[Index] = static_cast<uint16>(PackedSymbol & 0xffffu);
+				break;
 			}
+
 		}
 	}
 

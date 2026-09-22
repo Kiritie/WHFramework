@@ -25,12 +25,19 @@ struct WHFRAMEWORK_API FVoxelCavePlan
 {
 	TArray<FVoxelCaveSegment> Segments;
 
+	// 生成所属瓦片不等于内容范围，跨瓦片树冠、结构和洞穴必须计入实际影响范围。
+	bool AffectsBounds(const FVoxelGenerationBounds& InBounds) const
+	{
+		return InfluenceBounds.IsValid && InfluenceBounds.Intersect(FBox(FVector(InBounds.Min), FVector(InBounds.Max)));
+	}
+
 	void Finalize();
 	bool Carves(const FIntVector& InCell) const;
 	bool ProtectsFloor(const FIntVector& InCell) const;
 	uint64 GetAllocatedBytes() const;
 
 private:
+	FBox InfluenceBounds = FBox(ForceInit);
 	TMap<FIntVector, TArray<int32>>
 		SegmentIndicesBySection;
 };

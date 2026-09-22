@@ -17,11 +17,14 @@ namespace
 
 void FVoxelEcologyPlan::Finalize()
 {
+	InfluenceBounds.Init();
 	ResolvedWrites.Reset();
 	ResolvedWrites.Reserve(Writes.Num());
 
 	for (const FVoxelEcologyPlanWrite& Write : Writes)
 	{
+		InfluenceBounds += FVector(Write.Position);
+		InfluenceBounds += FVector(Write.Position) + FVector(1.0);
 		FVoxelEcologyPlanWrite* Existing = ResolvedWrites.Find(Write.Position);
 		if (!Existing || Write.Priority > Existing->Priority ||
 			(Write.Priority == Existing->Priority && Existing->OwnerId < Write.OwnerId))

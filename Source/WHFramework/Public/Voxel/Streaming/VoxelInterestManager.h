@@ -11,14 +11,16 @@ public:
 	FVoxelInterestSet Compute(
 		TConstArrayView<FVoxelStreamingSource> InSources,
 		const FVoxelWorldManifest& InManifest,
-		const FVoxelViewSettings& InViewSettings) const;
+		const FVoxelViewSettings& InViewSettings,
+		const FVoxelInterestSet* InPrevious = nullptr) const;
 
 private:
 	void AddExactSource(
 		const FVoxelStreamingSource& InSource,
 		const FVoxelWorldManifest& InManifest,
 		const FVoxelViewSettings& InViewSettings,
-		FVoxelInterestSet& InOutInterest) const;
+		FVoxelInterestSet& InOutInterest,
+		const FVoxelInterestSet* InPrevious) const;
 	void AddViewSource(
 		const FVoxelStreamingSource& InSource,
 		const FVoxelWorldManifest& InManifest,

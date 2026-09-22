@@ -220,32 +220,30 @@ bool FVoxelWorldRuntime::CaptureSnapshot(
 		Snapshot.Blocks[Index] = Section->Blocks[Index].Pack();
 	}
 
-	const FIntVector Origin = InSection * RuntimeSectionSide;
 	for (uint8 Face = 0; Face < 6; ++Face)
 	{
 		const int32 Axis = Face / 2;
 		const int32 UAxis = (Axis + 1) % 3;
 		const int32 VAxis = (Axis + 2) % 3;
+		FIntVector NeighborKey = InSection;
+		NeighborKey[Axis] += Face % 2 == 0 ? 1 : -1;
+		const FVoxelSection* Neighbor = FindSection(NeighborKey);
+		const bool bKnown = Neighbor && Neighbor->Status == EVoxelSectionStatus::DataReady &&
+			Neighbor->Blocks.Num() == RuntimeSectionSide * RuntimeSectionSide * RuntimeSectionSide;
+		Snapshot.Known[Face] = bKnown;
 		Snapshot.Halo[Face].SetNumUninitialized(RuntimeSectionSide * RuntimeSectionSide);
-		bool bKnown = true;
 		for (int32 V = 0; V < RuntimeSectionSide; ++V)
 		{
 			for (int32 U = 0; U < RuntimeSectionSide; ++U)
 			{
-				FIntVector Position = Origin;
-				Position[Axis] += Face % 2 == 0 ? RuntimeSectionSide : -1;
-				Position[UAxis] += U;
-				Position[VAxis] += V;
-				FVoxelBlockState State;
-				if (!TryGetBlock(Position, State))
-				{
-					bKnown = false;
-					State = FVoxelBlockState();
-				}
-				Snapshot.Halo[Face][U + RuntimeSectionSide * V] = State.Pack();
+				FIntVector Local = FIntVector::ZeroValue;
+				Local[Axis] = Face % 2 == 0 ? 0 : RuntimeSectionSide - 1;
+				Local[UAxis] = U;
+				Local[VAxis] = V;
+				const int32 Index = Local.X + RuntimeSectionSide * (Local.Y + RuntimeSectionSide * Local.Z);
+				Snapshot.Halo[Face][U + RuntimeSectionSide * V] = bKnown ? Neighbor->Blocks[Index].Pack() : FVoxelBlockState().Pack();
 			}
 		}
-		Snapshot.Known[Face] = bKnown;
 	}
 
 	OutSnapshot = MoveTemp(Snapshot);

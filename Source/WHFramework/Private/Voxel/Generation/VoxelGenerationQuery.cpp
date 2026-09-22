@@ -529,6 +529,12 @@ bool FVoxelGenerationQuery::Prepare(
 		}
 	}
 
+	// 在查询准备阶段剔除无关计划，避免对每个方块重复遍历整圈瓦片的空查询。
+	PreparedCaves.RemoveAll([&InBounds](const FVoxelCavePlanPtr& Plan) { return !Plan || !Plan->AffectsBounds(InBounds); });
+	PreparedEcology.RemoveAll([&InBounds](const FVoxelEcologyPlanPtr& Plan) { return !Plan || !Plan->AffectsBounds(InBounds); });
+	PreparedStructures.RemoveAll([&InBounds](const FVoxelStructurePlanPtr& Plan) { return !Plan || !Plan->AffectsBounds(InBounds); });
+	PreparedFeatures.RemoveAll([&InBounds](const FVoxelFeaturePlanPtr& Plan) { return !Plan || !Plan->AffectsBounds(InBounds); });
+
 	bSymbolsPrepared = true;
 
 	OutError.Reset();
@@ -984,6 +990,45 @@ bool FVoxelGenerationQuery::SampleSymbol(
 		return false;
 	}
 
+	return ResolveSymbol(InPosition, Column, OutValue, OutError);
+}
+
+bool FVoxelGenerationQuery::SampleColumnSymbols(const FIntPoint& InColumn, const int32 InMinZ,
+	const int32 InCount, TArray<uint32>& OutValues, FString& OutError) const
+{
+	if (!bSymbolsPrepared || InCount <= 0 ||
+		!PreparedBounds.Contains(FIntVector(InColumn.X, InColumn.Y, InMinZ)) ||
+		static_cast<int64>(InMinZ) + InCount > PreparedBounds.Max.Z)
+	{
+		OutError = TEXT("Voxel symbol column is outside prepared bounds");
+		return false;
+	}
+	FVoxelColumnSample Column;
+	if (!SampleEnvironmentColumn(InColumn.X, InColumn.Y, Column, OutError, Cancel))
+	{
+		return false;
+	}
+	TArray<uint32> Values;
+	Values.SetNumUninitialized(InCount);
+	for (int32 Index = 0; Index < InCount; ++Index)
+	{
+		if (Cancel && Cancel->Load())
+		{
+			OutError = TEXT("Canceled");
+			return false;
+		}
+		if (!ResolveSymbol(FIntVector(InColumn.X, InColumn.Y, InMinZ + Index), Column, Values[Index], OutError))
+		{
+			return false;
+		}
+	}
+	OutValues = MoveTemp(Values);
+	return true;
+}
+
+bool FVoxelGenerationQuery::ResolveSymbol(const FIntVector& InPosition, FVoxelColumnSample Column,
+	uint32& OutValue, FString& OutError) const
+{
 	uint32 Value =
 		Config->Recipe->
 			Palette.Air;

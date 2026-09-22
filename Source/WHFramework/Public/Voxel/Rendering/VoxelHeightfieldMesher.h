@@ -22,7 +22,8 @@ public:
 		const TAtomic<bool>* InCancel = nullptr,
 		TConstArrayView<uint8> InCoverage = {},
 		double InZBiasCells = 0.0,
-		int32 InSkirtDepthCells = 0);
+		int32 InSkirtDepthCells = 0,
+		double InMaximumTextureStretchCells = 4.0);
 
 	static bool BuildTerrain(
 		int32 InVertexSide,
@@ -36,14 +37,16 @@ public:
 		const TAtomic<bool>* InCancel = nullptr,
 		TConstArrayView<uint8> InCoverage = {},
 		double InZBiasCells = 0.0,
-		int32 InSkirtDepthCells = 8);
+		int32 InSkirtDepthCells = 8,
+		double InMaximumTextureStretchCells = 4.0);
 
 	static bool BuildWater(
 		const FVoxelWaterSurfaceTileData& InWater,
 		const FVoxelRegistrySnapshot& InRegistry,
 		FVoxelSectionMeshResult& OutMesh,
 		FString& OutError,
-		const TAtomic<bool>* InCancel = nullptr);
+		const TAtomic<bool>* InCancel = nullptr,
+		double InMaximumTextureStretchCells = 4.0);
 
 private:
 	static FVoxelRenderBatch& FindOrAddBatch(

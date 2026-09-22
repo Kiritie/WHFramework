@@ -30,6 +30,7 @@
 #include "Voxel/Interaction/VoxelInventoryTransaction.h"
 #include "Voxel/Network/VoxelModuleNetworkComponent.h"
 #include "Voxel/Save/VoxelBlockEntityCodec.h"
+#include "Voxel/Save/VoxelDeltaCodec.h"
 #include "Voxel/Save/VoxelSceneColumnCodec.h"
 #include "Voxel/Prefabs/Data/VoxelPrefabData.h"
 #include "Voxel/Rendering/VoxelDetailView.h"
@@ -47,6 +48,16 @@
 
 namespace
 {
+	struct FVoxelInterestTaskPayload : FVoxelTaskCustomPayload
+	{
+		TSharedPtr<FVoxelInterestSet, ESPMode::ThreadSafe> Interest;
+
+		virtual uint64 GetAllocatedBytes() const override
+		{
+			return sizeof(*this) + (Interest ? Interest->GetAllocatedBytes() : 0);
+		}
+	};
+
 	FIntVector VoxelModuleToSection(const FIntVector& InPosition)
 	{
 		return FIntVector(
@@ -264,6 +275,8 @@ void UVoxelModule::OnRefresh(
 		return;
 	}
 
+	const double VoxelTickStart = FPlatformTime::Seconds();
+
 	Scheduler->Tick(
 		[this](
 			FVoxelTaskResult&& InResult)
@@ -271,6 +284,8 @@ void UVoxelModule::OnRefresh(
 			ApplyTask(
 				MoveTemp(InResult));
 		});
+
+	const double AfterScheduler = FPlatformTime::Seconds();
 
 	if (GenerationCache)
 	{
@@ -287,15 +302,24 @@ void UVoxelModule::OnRefresh(
 		RefreshInterest(Now);
 	}
 
+	const double AfterInterest = FPlatformTime::Seconds();
+
 	EmergeManager->Tick(
-		CurrentInterest.Exact,
+		CurrentInterest,
 		InterestRevision,
-		Now);
+		Now,
+		ViewManager ? ViewManager->GetDataAdmissionLimit() : MAX_dbl,
+		ViewSettings.DataBuildsPerFrame,
+		ViewSettings.BuildAdmissionMilliseconds);
+
+	const double AfterEmerge = FPlatformTime::Seconds();
 
 	ResidencyManager->Tick(
 		CurrentInterest.Exact,
 		InterestRevision,
 		Now);
+
+	const double AfterResidency = FPlatformTime::Seconds();
 
 	if (CollisionPresenter)
 	{
@@ -304,12 +328,16 @@ void UVoxelModule::OnRefresh(
 			InterestRevision);
 	}
 
+	const double AfterCollision = FPlatformTime::Seconds();
+
 	if (ViewManager)
 	{
 		ViewManager->Tick(
 			InterestRevision,
 			CollectLocalViewObservers());
 	}
+
+	const double AfterView = FPlatformTime::Seconds();
 
 	if (DetailView)
 	{
@@ -329,12 +357,45 @@ void UVoxelModule::OnRefresh(
 		}
 	}
 
+	const double AfterScenes = FPlatformTime::Seconds();
+
 	UpdateReadiness();
 
 #if !UE_BUILD_SHIPPING
+	static double LastSlowTickLog = 0.0;
+	if (FPlatformTime::Seconds() - VoxelTickStart > 0.008 && Now - LastSlowTickLog > 2.0)
+	{
+		LastSlowTickLog = Now;
+		UE_LOG(LogTemp, Display, TEXT("Voxel slow tick ms: scheduler=%.2f interest=%.2f emerge=%.2f residency=%.2f collision=%.2f view=%.2f scenes=%.2f readiness=%.2f"),
+			(AfterScheduler - VoxelTickStart) * 1000, (AfterInterest - AfterScheduler) * 1000,
+			(AfterEmerge - AfterInterest) * 1000, (AfterResidency - AfterEmerge) * 1000,
+			(AfterCollision - AfterResidency) * 1000, (AfterView - AfterCollision) * 1000,
+			(AfterScenes - AfterView) * 1000, (FPlatformTime::Seconds() - AfterScenes) * 1000);
+	}
+	if (DiagnosticFrameTimes.Num() < 4096)
+	{
+		DiagnosticFrameTimes.Add(InDeltaSeconds * 1000.0);
+		DiagnosticModuleTimes.Add((FPlatformTime::Seconds() - VoxelTickStart) * 1000.0);
+	}
 	if (Now - LastDiagnosticsLog >= 10.0)
 	{
 		LastDiagnosticsLog = Now;
+		if (!DiagnosticFrameTimes.IsEmpty())
+		{
+			DiagnosticFrameTimes.Sort();
+			DiagnosticModuleTimes.Sort();
+			auto Percentile = [](const TArray<double>& Samples, const double Quantile)
+			{
+				return Samples[FMath::Clamp(FMath::CeilToInt(Quantile * Samples.Num()) - 1, 0, Samples.Num() - 1)];
+			};
+			UE_LOG(LogTemp, Display, TEXT("Voxel frame timing samples=%d frameMs p50=%.2f p95=%.2f p99=%.2f max=%.2f voxelGT p95=%.2f max=%.2f"),
+				DiagnosticFrameTimes.Num(), Percentile(DiagnosticFrameTimes, 0.5), Percentile(DiagnosticFrameTimes, 0.95),
+				Percentile(DiagnosticFrameTimes, 0.99), DiagnosticFrameTimes.Last(),
+				Percentile(DiagnosticModuleTimes, 0.95), DiagnosticModuleTimes.Last());
+			DiagnosticFrameTimes.Reset();
+			DiagnosticModuleTimes.Reset();
+		}
+
 		if (GenerationCache)
 		{
 			const FVoxelGenerationCacheStats CacheStats = GenerationCache->GetStats();
@@ -545,6 +606,8 @@ bool UVoxelModule::StartWorld(
 		ViewSettings.WarmupDataRadius = ToCells(ViewProfile->WarmupDataRadiusCentimeters);
 		ViewSettings.WarmupCollisionRadius = ToCells(ViewProfile->WarmupCollisionRadiusCentimeters);
 		ViewSettings.FineRadius = ToCells(ViewProfile->FineRadiusCentimeters);
+		ViewSettings.FinePreload = ToCells(ViewProfile->FinePreloadCentimeters);
+		ViewSettings.MaximumTextureStretchCells = FMath::Clamp(ViewProfile->MaximumTextureStretchCells, 1.0f, 16.0f);
 		ViewSettings.VoxelProxyRadius = ToCells(ViewProfile->VoxelProxyRadiusCentimeters);
 		ViewSettings.SurfaceRadius = ToCells(ViewProfile->SurfaceRadiusCentimeters);
 		ViewSettings.MacroRadius = ToCells(ViewProfile->MacroRadiusCentimeters);
@@ -560,6 +623,14 @@ bool UVoxelModule::StartWorld(
 			ViewProfile->MaximumMacroTilesPerSource,
 			32,
 			2048);
+		ViewSettings.FineBuildsPerFrame = FMath::Clamp(ViewProfile->FineBuildsPerFrame, 1, 256);
+		ViewSettings.VoxelProxyBuildsPerFrame = FMath::Clamp(ViewProfile->VoxelProxyBuildsPerFrame, 1, 256);
+		ViewSettings.SurfaceBuildsPerFrame = FMath::Clamp(ViewProfile->SurfaceBuildsPerFrame, 1, 256);
+		ViewSettings.MacroBuildsPerFrame = FMath::Clamp(ViewProfile->MacroBuildsPerFrame, 1, 256);
+		ViewSettings.DataBuildsPerFrame = FMath::Clamp(ViewProfile->DataBuildsPerFrame, 1, 1024);
+		ViewSettings.CompletedResultsPerFrame = FMath::Clamp(ViewProfile->CompletedResultsPerFrame, 1, 256);
+		ViewSettings.HeavyResultsPerFrame = FMath::Clamp(ViewProfile->HeavyResultsPerFrame, 1, 256);
+		ViewSettings.BuildAdmissionMilliseconds = FMath::Clamp(ViewProfile->BuildAdmissionMilliseconds, 0.1f, 8.0f);
 	}
 	const uint64 ExpectedGenerationSignature =
 		BuildGenerationSignature(
@@ -601,6 +672,17 @@ bool UVoxelModule::StartWorld(
 		return false;
 	}
 	Scheduler = MakeUnique<FVoxelTaskScheduler>();
+	FVoxelTaskBudget TaskBudget;
+	TaskBudget.MaxConcurrentTasks = FMath::Clamp(FPlatformMisc::NumberOfCores() / 2, 1, 4);
+	TaskBudget.MaxCompletedResultsPerFrame = ViewSettings.CompletedResultsPerFrame;
+	TaskBudget.MaxHeavyCompletedResultsPerFrame = FMath::Min(ViewSettings.HeavyResultsPerFrame, ViewSettings.CompletedResultsPerFrame);
+	Scheduler->SetBudget(TaskBudget);
+	UE_LOG(LogTemp, Display, TEXT("Voxel worker budget: cores=%d workers=%d reservedMiB=%llu"),
+		FPlatformMisc::NumberOfCores(), TaskBudget.MaxConcurrentTasks, TaskBudget.MaxReservedBytes / (1024ull * 1024ull));
+	UE_LOG(LogTemp, Display, TEXT("Voxel frame budget: Fine=%d Proxy=%d Surface=%d Macro=%d Data=%d Results=%d Heavy=%d AdmissionMs=%.2f"),
+		ViewSettings.FineBuildsPerFrame, ViewSettings.VoxelProxyBuildsPerFrame,
+		ViewSettings.SurfaceBuildsPerFrame, ViewSettings.MacroBuildsPerFrame, ViewSettings.DataBuildsPerFrame,
+		TaskBudget.MaxCompletedResultsPerFrame, TaskBudget.MaxHeavyCompletedResultsPerFrame, ViewSettings.BuildAdmissionMilliseconds);
 	InterestManager = MakeUnique<FVoxelInterestManager>();
 	EmergeManager = MakeUnique<FVoxelEmergeManager>(
 		*Runtime,
@@ -665,7 +747,10 @@ bool UVoxelModule::StartWorld(
 	CurrentInterest = {};
 	InterestRevision = 0;
 	LastInterestRefresh = -1.0;
+	bInterestBuildPending = false;
 	LastDiagnosticsLog = -1.0;
+	DiagnosticFrameTimes.Reset();
+	DiagnosticModuleTimes.Reset();
 	bInterestDirty = true;
 	ReadyStage = EVoxelWorldReadyStage::AssetsValidated;
 	ReadinessSnapshot = {};
@@ -764,7 +849,10 @@ bool UVoxelModule::StopWorld(const bool bDiscardDirty, FString& OutError)
 	CurrentInterest = {};
 	InterestRevision = 0;
 	LastInterestRefresh = -1.0;
+	bInterestBuildPending = false;
 	LastDiagnosticsLog = -1.0;
+	DiagnosticFrameTimes.Reset();
+	DiagnosticModuleTimes.Reset();
 	bInterestDirty = true;
 	Breaking.Reset();
 	SessionId.Invalidate();
@@ -862,6 +950,48 @@ FVoxelWorldRuntime* UVoxelModule::GetRuntime()
 const FVoxelWorldRuntime* UVoxelModule::GetRuntime() const
 {
 	return Runtime.Get();
+}
+
+bool UVoxelModule::CaptureOverlays(const FVoxelGenerationBounds& InBounds,
+	FVoxelOverlaySnapshotSet& OutSnapshot, FString& OutError) const
+{
+	check(IsInGameThread());
+	if (!Runtime || !GetRegistry())
+	{
+		OutError = TEXT("Voxel runtime is unavailable for overlay capture");
+		return false;
+	}
+	FVoxelOverlaySnapshotSet Snapshot;
+	TArray<FIntVector> Modified;
+	Runtime->GetChangeIndex().Enumerate(InBounds, Modified);
+	for (const FIntVector& Key : Modified)
+	{
+		FVoxelOverlaySnapshot Overlay;
+		Overlay.Section = Key;
+		if (const FVoxelSection* Section = Runtime->FindSection(Key);
+			Section && Section->Status == EVoxelSectionStatus::DataReady)
+		{
+			Overlay.Revision = Section->CommittedRevision;
+			Overlay.Blocks = Section->Overlay;
+		}
+		else
+		{
+			TArray<uint8> Bytes;
+			FVoxelPersistentSection Persistent;
+			if (GetRegionStore().ReadSection(Key, Bytes, OutError) != EVoxelRegionRead::Loaded ||
+				!FVoxelDeltaCodec::Decode(Bytes, GetManifest(), *GetRegistry(), Persistent))
+			{
+				OutError = TEXT("Modified representation overlay could not be read");
+				return false;
+			}
+			Overlay.Revision = Persistent.Revision;
+			Overlay.Blocks = MoveTemp(Persistent.Blocks);
+		}
+		Snapshot.Sections.Add(Key, MoveTemp(Overlay));
+	}
+	OutSnapshot = MoveTemp(Snapshot);
+	OutError.Reset();
+	return true;
 }
 
 TSharedPtr<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> UVoxelModule::GetRegistry() const
@@ -1170,25 +1300,59 @@ void UVoxelModule::RefreshInterest(
 			Iterator.Value().Value);
 	}
 
-	CurrentInterest =
-		InterestManager->Compute(
-			ActiveSources,
-			Manifest,
-			ViewSettings);
-
-	if (InterestRevision ==
-		MAX_uint64)
+	// 一个观察者快照最多有一个规划任务；移动期间合并后续请求，旧分区保留到新结果提交。
+	if (bInterestBuildPending)
 	{
-		InterestRevision = 1;
+		return;
 	}
-	else
+	FVoxelTaskRequest Request;
+	Request.Kind = EVoxelTaskKind::BuildInterest;
+	Request.WorkClass = EVoxelWorkClass::Interactive;
+	Request.Stamp.WorldEpoch = Epoch;
+	Request.Stamp.Token = InterestRevision + 1;
+	Request.ReservedBytes = 32ull * 1024ull * 1024ull;
+	// 滞回只持有后台规划产生的不可变集合，移动时不再在主线程复制数万需求。
+	FVoxelInterestSet Previous;
+	Previous.FineSections = CurrentInterest.FineSections;
+	Request.InputBytes = Previous.GetAllocatedBytes();
+	Request.Execute = [ActiveSources, WorldManifest = Manifest, Settings = ViewSettings,
+		Previous = MoveTemp(Previous)](const TAtomic<bool>& Cancel)
 	{
-		++InterestRevision;
+		FVoxelTaskResult Result;
+		if (Cancel.Load())
+		{
+			return Result;
+		}
+		const auto Payload = MakeShared<FVoxelInterestTaskPayload, ESPMode::ThreadSafe>();
+		Payload->Interest = MakeShared<FVoxelInterestSet, ESPMode::ThreadSafe>(
+			FVoxelInterestManager().Compute(ActiveSources, WorldManifest, Settings, &Previous));
+		Result.bSuccess = !Cancel.Load();
+		Result.CustomPayload = Payload;
+		return Result;
+	};
+	Request.Apply = [this](FVoxelTaskResult&& Result)
+	{
+		if (Result.Stamp.WorldEpoch != Epoch)
+		{
+			return;
+		}
+		bInterestBuildPending = false;
+		if (!Result.bSuccess || Result.bCanceled)
+		{
+			bInterestDirty = true;
+			return;
+		}
+		const auto Payload = StaticCastSharedPtr<const FVoxelInterestTaskPayload>(Result.CustomPayload);
+		CurrentInterest = MoveTemp(*Payload->Interest);
+		InterestRevision = InterestRevision == MAX_uint64 ? 1 : InterestRevision + 1;
+		// 不清除执行期间新产生的移动请求，避免连续行走丢失末次位置。
+	};
+	if (!Scheduler->Enqueue(MoveTemp(Request)))
+	{
+		return;
 	}
-
-	LastInterestRefresh =
-		InNow;
-
+	bInterestBuildPending = true;
+	LastInterestRefresh = InNow;
 	bInterestDirty = false;
 
 	if (GenerationCache && !ActiveSources.IsEmpty())
@@ -1277,7 +1441,7 @@ void UVoxelModule::UpdateReadiness()
 	Snapshot.bAssetsValidated = Registry.GetSnapshot().IsValid() && Shapes.IsValid();
 	Snapshot.bRecipeFrozen = GenerationConfig && GenerationConfig->Recipe;
 	Snapshot.bSpawnPlanReady = false;
-	for (const TPair<FIntVector, FVoxelExactDemand>& Pair : CurrentInterest.Exact)
+	for (const TPair<FIntVector, FVoxelExactDemand>& Pair : CurrentInterest.Warmup)
 	{
 		if (!Pair.Value.bWarmupData)
 		{
@@ -1302,7 +1466,7 @@ void UVoxelModule::UpdateReadiness()
 	FVoxelPrimaryFineReadiness PrimaryFine;
 	if (ViewManager)
 	{
-		PrimaryFine = ViewManager->GetPrimaryFineReadiness(CurrentInterest.Exact);
+		PrimaryFine = ViewManager->GetPrimaryFineReadiness(CurrentInterest.Warmup);
 	}
 	Snapshot.RequiredPrimaryFineSections = PrimaryFine.Required;
 	Snapshot.ReadyPrimaryFineSections = PrimaryFine.Ready;

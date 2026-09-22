@@ -97,6 +97,7 @@ public:
 	uint64 GetInterestRevision() const;
 	FVoxelWorldRuntime* GetRuntime();
 	const FVoxelWorldRuntime* GetRuntime() const;
+	bool CaptureOverlays(const FVoxelGenerationBounds& InBounds, FVoxelOverlaySnapshotSet& OutSnapshot, FString& OutError) const;
 	TSharedPtr<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> GetRegistry() const;
 	TSharedPtr<const FVoxelShapeRegistry, ESPMode::ThreadSafe> GetShapes() const;
 	UVoxelMaterialSet* GetMaterialSet() const;
@@ -106,6 +107,7 @@ public:
 	TSharedPtr<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> GetGenerationCache() const;
 	const FVoxelRegionStore& GetRegionStore() const;
 	const FVoxelInterestSet& GetCurrentInterest() const;
+	const FVoxelViewSettings& GetViewSettings() const { return ViewSettings; }
 	bool EnqueueProjectBackgroundTask(FVoxelTaskRequest&& InRequest);
 	void SetPersistenceEnabled(bool bInEnabled);
 	bool IsPersistenceEnabled() const;
@@ -271,7 +273,10 @@ private:
 	uint64 InterestRevision = 0;
 	double LastInterestRefresh = -1.0;
 	double LastDiagnosticsLog = -1.0;
+	TArray<double> DiagnosticFrameTimes;
+	TArray<double> DiagnosticModuleTimes;
 	bool bInterestDirty = true;
+	bool bInterestBuildPending = false;
 	bool bMutating = false;
 	bool bWorldLoadRejected = false;
 	bool bPersistenceEnabledForCurrentWorld = false;

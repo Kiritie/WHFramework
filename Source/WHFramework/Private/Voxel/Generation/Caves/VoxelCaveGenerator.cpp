@@ -16,6 +16,7 @@ namespace
 
 void FVoxelCavePlan::Finalize()
 {
+	InfluenceBounds.Init();
 	SegmentIndicesBySection.Reset();
 
 	for (int32 SegmentIndex = 0;
@@ -52,6 +53,9 @@ void FVoxelCavePlan::Finalize()
 				Segment.Start.Z,
 				Segment.End.Z) +
 				Segment.Radius);
+
+		InfluenceBounds += FVector(Min);
+		InfluenceBounds += FVector(Max) + FVector(1.0);
 
 		const FIntVector MinSection(
 			VoxelGeneration::FloorDivide(

@@ -2,6 +2,7 @@
 
 void FVoxelFeaturePlan::Finalize()
 {
+	InfluenceBounds.Init();
 	ResolvedWrites.Reset();
 
 	ResolvedWrites.Reserve(
@@ -10,6 +11,8 @@ void FVoxelFeaturePlan::Finalize()
 	for (const FVoxelFeaturePlanWrite& Write :
 		Writes)
 	{
+		InfluenceBounds += FVector(Write.Position);
+		InfluenceBounds += FVector(Write.Position) + FVector(1.0);
 		const FVoxelFeaturePlanKey Key {
 			Write.Position,
 			Write.Stage

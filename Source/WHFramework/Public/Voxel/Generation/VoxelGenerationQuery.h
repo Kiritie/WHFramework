@@ -67,10 +67,16 @@ public:
 		uint32& OutValue,
 		FString& OutError) const;
 
+	bool SampleColumnSymbols(const FIntPoint& InColumn, int32 InMinZ, int32 InCount,
+		TArray<uint32>& OutValues, FString& OutError) const;
+
 	TConstArrayView<FVoxelStructurePlanPtr>
 		GetPreparedStructurePlans() const;
 
 private:
+	bool ResolveSymbol(const FIntVector& InPosition, FVoxelColumnSample InColumn,
+		uint32& OutValue, FString& OutError) const;
+
 	bool GetBaseColumn(
 		int32 InX,
 		int32 InY,

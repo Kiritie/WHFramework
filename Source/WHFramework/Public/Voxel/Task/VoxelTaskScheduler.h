@@ -37,6 +37,7 @@ enum class EVoxelTaskKind : uint8
 	BuildSurface,
 	BuildWater,
 	BuildMacro,
+	BuildViewCoverage,
 	BuildDetails,
 	DecodeOverlay,
 	EncodeRegion,
@@ -44,7 +45,8 @@ enum class EVoxelTaskKind : uint8
 
 	// 项目层允许复用 Voxel Scheduler 的纯后台任务。
 	// 不参与 Voxel 内部 ApplyTask switch。
-	ProjectBackground
+	ProjectBackground,
+	BuildInterest
 };
 
 struct WHFRAMEWORK_API FVoxelTaskStamp
@@ -144,6 +146,7 @@ struct WHFRAMEWORK_API FVoxelTaskResult
 	TSharedPtr<const FVoxelTaskCustomPayload, ESPMode::ThreadSafe> CustomPayload;
 
 	uint64 ResultBytes() const;
+	bool HasHeavyApply() const;
 };
 
 struct WHFRAMEWORK_API FVoxelTaskRequest
@@ -274,7 +277,6 @@ private:
 		TFunction<void(FVoxelTaskResult&&)> Apply;
 	};
 
-	static bool IsHeavyApplyKind(EVoxelTaskKind InKind);
 	static bool UsesSectionKey(EVoxelTaskKind InKind);
 	int32 RunningCount(EVoxelTaskKind InKind) const;
 	bool CanStartKind(EVoxelTaskKind InKind) const;

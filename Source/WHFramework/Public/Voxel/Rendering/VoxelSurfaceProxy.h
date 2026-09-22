@@ -6,6 +6,7 @@
 #include "Voxel/Rendering/VoxelViewTypes.h"
 #include "Voxel/Runtime/VoxelBlockState.h"
 #include "Voxel/Runtime/VoxelChangeIndex.h"
+#include "Voxel/Runtime/VoxelOverlaySnapshot.h"
 
 enum EVoxelSurfaceFlags : uint8
 {
@@ -43,32 +44,10 @@ struct WHFRAMEWORK_API FVoxelSurfaceTileData
 	}
 };
 
-struct WHFRAMEWORK_API FVoxelOverlaySnapshot
-{
-	FIntVector Section = FIntVector::ZeroValue;
-	uint64 Revision = 0;
-	TMap<int32, FVoxelBlockState> Blocks;
-};
-
 struct WHFRAMEWORK_API FVoxelSurfaceBuildTiming
 {
 	double ColumnsMilliseconds = 0.0;
 	double OverlayMilliseconds = 0.0;
-};
-
-class WHFRAMEWORK_API IVoxelOverlaySource
-{
-public:
-	virtual ~IVoxelOverlaySource() = default;
-
-	virtual bool EnumerateModifiedSections(
-		const FVoxelGenerationBounds& InBounds,
-		TArray<FIntVector>& OutSections,
-		const TAtomic<bool>* InCancel = nullptr) const = 0;
-
-	virtual bool ReadOverlay(
-		const FIntVector& InSection,
-		FVoxelOverlaySnapshot& OutOverlay) const = 0;
 };
 
 class WHFRAMEWORK_API FVoxelSurfaceProxyBuilder
@@ -78,14 +57,15 @@ public:
 		TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator,
 		TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
 		const FVoxelGenerationSettings& InSettings,
-		const IVoxelOverlaySource& InOverlaySource);
+		const IVoxelOverlaySource& InOverlaySource,
+	TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry);
 
 	bool Build(
 		const FVoxelSurfaceTileKey& InKey,
 		FVoxelSurfaceTileData& OutData,
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr,
-		FVoxelSurfaceBuildTiming* OutTiming = nullptr) const;
+		FVoxelSurfaceBuildTiming* OutTiming = nullptr, TArray<FVoxelColumnSample>* OutColumns = nullptr) const;
 
 private:
 	bool ApplyModifiedSurface(
@@ -99,4 +79,5 @@ private:
 	TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config;
 	FVoxelGenerationSettings Settings;
 	const IVoxelOverlaySource& OverlaySource;
+	TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> Registry;
 };

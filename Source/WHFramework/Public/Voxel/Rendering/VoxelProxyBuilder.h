@@ -6,6 +6,7 @@
 #include "Voxel/Generation/VoxelGenerationPlanCache.h"
 #include "Voxel/Rendering/VoxelViewTypes.h"
 #include "Voxel/Runtime/VoxelBlockState.h"
+#include "Voxel/Runtime/VoxelOverlaySnapshot.h"
 
 struct WHFRAMEWORK_API FVoxelVoxelProxyData
 {
@@ -60,6 +61,8 @@ public:
 		FVoxelVoxelProxyData& OutData,
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr) const;
+	bool Build(const FVoxelViewKey& InKey, const FVoxelOverlaySnapshotSet& InOverlays,
+		FVoxelVoxelProxyData& OutData, FString& OutError, const TAtomic<bool>* InCancel = nullptr) const;
 
 private:
 	TSharedRef<

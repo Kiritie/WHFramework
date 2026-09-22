@@ -8,6 +8,9 @@
 #include "Camera/PlayerCameraManager.h"
 
 #include "Components/CapsuleComponent.h"
+#include "Engine/GameViewportClient.h"
+#include "Engine/LocalPlayer.h"
+#include "SceneView.h"
 
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -618,26 +621,16 @@ void UVoxelAgentComponent::RefreshSource()
 
 	if (BoundController.IsValid())
 	{
-		Source.VerticalFovDegrees =
-			BoundController->
-				PlayerCameraManager
-					? BoundController->
-						PlayerCameraManager->
-						GetFOVAngle()
-					: 90.0f;
-
-		int32 ViewportWidth = 0;
-		int32 ViewportHeight = 0;
-
-		BoundController->
-			GetViewportSize(
-				ViewportWidth,
-				ViewportHeight);
-
-		Source.ViewportHeightPixels =
-			FMath::Max(
-				1,
-				ViewportHeight);
+		const ULocalPlayer* LocalPlayer = BoundController->GetLocalPlayer();
+		FSceneViewProjectionData Projection;
+		if (LocalPlayer && LocalPlayer->ViewportClient &&
+			LocalPlayer->GetProjectionData(LocalPlayer->ViewportClient->Viewport, Projection) &&
+			Projection.IsPerspectiveProjection() && Projection.IsValidViewRectangle())
+		{
+			const double VerticalScale = FMath::Abs(Projection.ProjectionMatrix.M[1][1]);
+			Source.VerticalFovDegrees = FMath::RadiansToDegrees(2.0 * FMath::Atan(1.0 / VerticalScale));
+			Source.ViewportHeightPixels = Projection.GetConstrainedViewRect().Height();
+		}
 	}
 
 	Source.bCollision = true;

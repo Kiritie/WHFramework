@@ -21,16 +21,19 @@ FVoxelEmergeManager::FVoxelEmergeManager(
 }
 
 void FVoxelEmergeManager::Tick(
-	const TMap<FIntVector, FVoxelExactDemand>& InDemand,
+	const FVoxelInterestSet& InInterest,
 	const uint64 InInterestRevision,
-	const double InNow)
+	const double InNow,
+	const double InDataAdmissionLimit,
+	const int32 InMaxBuildsPerFrame,
+	const double InAdmissionMilliseconds)
 {
 	(void)InNow;
 
 	if (CurrentInterestRevision != InInterestRevision)
 	{
 		RebuildDemand(
-			InDemand,
+			InInterest,
 			InInterestRevision);
 	}
 
@@ -39,14 +42,13 @@ void FVoxelEmergeManager::Tick(
 		return;
 	}
 
-	const int32 AdmissionCount =
-		FMath::Min(
-			MaxSectionAdmissionsPerTick,
-			OrderedKeys.Num());
+	const int32 BuildLimit = FMath::Clamp(InMaxBuildsPerFrame, 1, 1024);
+	const int32 MaximumAttempts = FMath::Min(OrderedKeys.Num(), FMath::Max(64, BuildLimit * 8));
+	const double Deadline = FPlatformTime::Seconds() + FMath::Max(0.1, InAdmissionMilliseconds) / 1000.0;
+	int32 Submitted = 0;
 
-	for (int32 Admission = 0;
-		Admission < AdmissionCount;
-		++Admission)
+	for (int32 Attempt = 0; Attempt < MaximumAttempts && Submitted < BuildLimit &&
+		FPlatformTime::Seconds() < Deadline; ++Attempt)
 	{
 		if (NextAdmissionIndex >= OrderedKeys.Num())
 		{
@@ -61,7 +63,13 @@ void FVoxelEmergeManager::Tick(
 
 		if (Demand)
 		{
-			RequestSection(Key, *Demand);
+			const bool bGameplayData = Demand->bExact || Demand->bCollision || Demand->bSimulation || Demand->bWarmupData;
+			if (!bGameplayData && Demand->DistanceCells > InDataAdmissionLimit)
+			{
+				NextAdmissionIndex = 0;
+				break;
+			}
+			Submitted += RequestSection(Key, *Demand) ? 1 : 0;
 		}
 	}
 }
@@ -195,41 +203,11 @@ void FVoxelEmergeManager::Reset()
 }
 
 void FVoxelEmergeManager::RebuildDemand(
-	const TMap<FIntVector, FVoxelExactDemand>& InDemand,
+	const FVoxelInterestSet& InInterest,
 	const uint64 InInterestRevision)
 {
-	CurrentDemand = InDemand;
-
-	CurrentDemand.GetKeys(OrderedKeys);
-
-	OrderedKeys.Sort(
-		[this](
-			const FIntVector& InA,
-			const FIntVector& InB)
-		{
-			const FVoxelExactDemand& A = CurrentDemand.FindChecked(InA);
-			const FVoxelExactDemand& B = CurrentDemand.FindChecked(InB);
-			if (A.DistanceCells != B.DistanceCells)
-			{
-				return A.DistanceCells < B.DistanceCells;
-			}
-			if (A.ForwardScore != B.ForwardScore)
-			{
-				return A.ForwardScore > B.ForwardScore;
-			}
-
-			if (InA.X != InB.X)
-			{
-				return InA.X < InB.X;
-			}
-
-			if (InA.Y != InB.Y)
-			{
-				return InA.Y < InB.Y;
-			}
-
-			return InA.Z < InB.Z;
-		});
+	CurrentDemand = InInterest.Exact;
+	OrderedKeys = InInterest.ExactOrder;
 
 	CurrentInterestRevision =
 		InInterestRevision;
@@ -237,7 +215,7 @@ void FVoxelEmergeManager::RebuildDemand(
 	NextAdmissionIndex = 0;
 }
 
-void FVoxelEmergeManager::RequestSection(
+bool FVoxelEmergeManager::RequestSection(
 	const FIntVector& InKey,
 	const FVoxelExactDemand& InDemand)
 {
@@ -248,24 +226,22 @@ void FVoxelEmergeManager::RequestSection(
 
 	if (!Section)
 	{
-		return;
+		return false;
 	}
 
 	switch (Section->Status)
 	{
 	case EVoxelSectionStatus::Allocated:
-		RequestBase(
+		return RequestBase(
 			*Section,
 			InKey,
 			InDemand);
-		break;
 
 	case EVoxelSectionStatus::BaseReady:
-		ResolveOverlay(
+		return ResolveOverlay(
 			*Section,
 			InKey,
 			InDemand);
-		break;
 
 	case EVoxelSectionStatus::DataReady:
 		Section->bSimulationWanted =
@@ -278,9 +254,10 @@ void FVoxelEmergeManager::RequestSection(
 	default:
 		break;
 	}
+	return false;
 }
 
-void FVoxelEmergeManager::RequestBase(
+bool FVoxelEmergeManager::RequestBase(
 	FVoxelSection& InSection,
 	const FIntVector& InKey,
 	const FVoxelExactDemand& InDemand)
@@ -297,7 +274,7 @@ void FVoxelEmergeManager::RequestBase(
 		TaskStamp,
 		EVoxelTaskKind::GenerateExactBase))
 	{
-		return;
+		return false;
 	}
 
 	FVoxelTaskRequest Request;
@@ -314,7 +291,8 @@ void FVoxelEmergeManager::RequestBase(
 	}
 	else
 	{
-		Request.WorkClass = EVoxelWorkClass::ExactData;
+		Request.WorkClass = InDemand.bExact || InDemand.bCollision || InDemand.bSimulation
+			? EVoxelWorkClass::ExactData : EVoxelWorkClass::Visible;
 	}
 
 	Request.Stamp =
@@ -350,10 +328,10 @@ void FVoxelEmergeManager::RequestBase(
 			return Result;
 		};
 
-	Scheduler.Enqueue(MoveTemp(Request));
+	return Scheduler.Enqueue(MoveTemp(Request));
 }
 
-void FVoxelEmergeManager::ResolveOverlay(
+bool FVoxelEmergeManager::ResolveOverlay(
 	FVoxelSection& InSection,
 	const FIntVector& InKey,
 	const FVoxelExactDemand& InDemand)
@@ -361,7 +339,7 @@ void FVoxelEmergeManager::ResolveOverlay(
 	if (InSection.Status !=
 		EVoxelSectionStatus::BaseReady)
 	{
-		return;
+		return false;
 	}
 
 	bool bKnownNatural = false;
@@ -385,19 +363,17 @@ void FVoxelEmergeManager::ResolveOverlay(
 	{
 		FString Error;
 
-		Runtime.PublishFinal(
+		return Runtime.PublishFinal(
 			InKey,
 			0,
 			{},
 			{},
 			Error);
-
-		return;
 	}
 
 	if (!Runtime.IsServer())
 	{
-		return;
+		return false;
 	}
 
 	FVoxelTaskRequest Request;
@@ -414,7 +390,8 @@ void FVoxelEmergeManager::ResolveOverlay(
 	}
 	else
 	{
-		Request.WorkClass = EVoxelWorkClass::ExactData;
+		Request.WorkClass = InDemand.bExact || InDemand.bCollision || InDemand.bSimulation
+			? EVoxelWorkClass::ExactData : EVoxelWorkClass::Visible;
 	}
 
 	Request.DistanceScore = InDemand.DistanceCells;
@@ -436,7 +413,7 @@ void FVoxelEmergeManager::ResolveOverlay(
 		Request.Stamp,
 		Request.Kind))
 	{
-		return;
+		return false;
 	}
 
 	const FVoxelRegionReadView Read =
@@ -507,5 +484,5 @@ void FVoxelEmergeManager::ResolveOverlay(
 			return Result;
 		};
 
-	Scheduler.Enqueue(MoveTemp(Request));
+	return Scheduler.Enqueue(MoveTemp(Request));
 }

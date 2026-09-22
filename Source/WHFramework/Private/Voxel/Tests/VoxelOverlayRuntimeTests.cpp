@@ -42,7 +42,18 @@ bool FVoxelChangeHierarchyRevisionTest::RunTest(const FString& InParameters)
 	const uint64 Second = Hierarchy.InvalidateSection(Section);
 	TestTrue(TEXT("Revision never reuses after release"), Second > First);
 	TestEqual(TEXT("Section revision is current"), Hierarchy.GetSectionRevision(Section), Second);
-	TestEqual(TEXT("Voxel proxy parent invalidated"), Hierarchy.GetVoxelProxyRevision(FIntVector(-9, 1, -1)), Second);
+	TestEqual(TEXT("Voxel proxy parent invalidated"), Hierarchy.GetVoxelProxyRevision({ FIntVector(-9, 1, -1), 1 }), Second);
+	const uint64 FarRevision = Hierarchy.InvalidateSection(FIntVector(100, 0, 0));
+	TestEqual(TEXT("Macro revision uses the actual 2048-cell tile"),
+		Hierarchy.GetMacroRevision({ FIntPoint(0, 0), 0 }), FarRevision);
+	TestEqual(TEXT("Unrelated macro tile is unchanged"),
+		Hierarchy.GetMacroRevision({ FIntPoint(3, 0), 0 }), uint64(0));
+	Hierarchy.SetVoxelProxyRevision({ FIntVector(20, 20, 20), 1 }, 100);
+	TestEqual(TEXT("Revision keys distinguish LOD levels"),
+		Hierarchy.GetVoxelProxyRevision({ FIntVector(20, 20, 20), 2 }), uint64(0));
+	const uint64 BoundaryRevision = Hierarchy.InvalidateSection(FIntVector(2, 0, 0));
+	TestEqual(TEXT("Neighbour halo dependency is invalidated"),
+		Hierarchy.GetVoxelProxyRevision({ FIntVector(0, 0, 0), 1 }), BoundaryRevision);
 	return true;
 }
 
@@ -148,6 +159,53 @@ bool FVoxelPatchAtomicityTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("Matching revisions apply atomically"), Runtime.ApplyRemotePatchBatch(Batch, Error));
 	TestEqual(TEXT("First section advances"), Runtime.FindSection(SectionA)->CommittedRevision, uint64(6));
 	TestEqual(TEXT("Second section advances"), Runtime.FindSection(SectionB)->CommittedRevision, uint64(6));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelBulkHaloSnapshotTest,
+	"WHFramework.Voxel.Runtime.BulkHaloSnapshot", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelBulkHaloSnapshotTest::RunTest(const FString& Parameters)
+{
+	for (const FIntVector Center : { FIntVector(-2, -1, -3), FIntVector::ZeroValue, FIntVector(2, 1, 3) })
+	{
+		FVoxelWorldRuntime Runtime(1, true, VoxelTest::MakeRegistry(), VoxelTest::MakeGenerator());
+		FString Error;
+		if (!TestTrue(TEXT("Center publishes"), PublishTestSection(Runtime, Center, 0, Error))) return false;
+		FVoxelSectionSnapshot Snapshot;
+		TestTrue(TEXT("Snapshot without neighbors is valid"), Runtime.CaptureSnapshot(Center, Snapshot));
+		for (uint8 Face = 0; Face < 6; ++Face) TestFalse(TEXT("Absent neighbor stays unknown"), Snapshot.Known[Face]);
+		for (uint8 Face = 0; Face < 6; ++Face)
+		{
+			const int32 Axis = Face / 2;
+			FIntVector Key = Center;
+			Key[Axis] += Face % 2 == 0 ? 1 : -1;
+			FVoxelSection* Section = Runtime.FindOrAllocate(Key, 1);
+			TArray<FVoxelBlockState> Blocks;
+			for (int32 Index = 0; Index < 4096; ++Index) Blocks.Add(FVoxelBlockState(1 + (Index * 7 + Face) % 9, 0));
+			TestTrue(TEXT("Neighbor base publishes"), Runtime.PublishBase(Key, Section->Stamp, MoveTemp(Blocks), Error));
+			TestTrue(TEXT("Neighbor final publishes"), Runtime.PublishFinal(Key, 0, {}, {}, Error));
+		}
+		TestTrue(TEXT("Complete snapshot captures"), Runtime.CaptureSnapshot(Center, Snapshot));
+		for (uint8 Face = 0; Face < 6; ++Face)
+		{
+			TestTrue(TEXT("Loaded neighbor is known"), Snapshot.Known[Face]);
+			const int32 Axis = Face / 2;
+			for (int32 V = 0; V < 16; ++V)
+			{
+				for (int32 U = 0; U < 16; ++U)
+				{
+					FIntVector Position = Center * 16;
+					Position[Axis] += Face % 2 == 0 ? 16 : -1;
+					Position[(Axis + 1) % 3] += U;
+					Position[(Axis + 2) % 3] += V;
+					FVoxelBlockState Expected;
+					TestTrue(TEXT("Reference cell exists"), Runtime.TryGetBlock(Position, Expected));
+					TestEqual(TEXT("Bulk halo matches world sampling in every direction"), Snapshot.Halo[Face][U + 16 * V], Expected.Pack());
+				}
+			}
+		}
+	}
 	return true;
 }
 

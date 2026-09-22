@@ -2,6 +2,12 @@
 
 void FVoxelStructurePlan::Finalize()
 {
+	InfluenceBounds.Init();
+	for (const FVoxelStructurePlanClear& Clear : Clears)
+	{
+		InfluenceBounds += FBox(FVector(Clear.Bounds.Min), FVector(Clear.Bounds.Max));
+	}
+
 	ResolvedWrites.Reset();
 
 	ResolvedWrites.Reserve(
@@ -10,6 +16,8 @@ void FVoxelStructurePlan::Finalize()
 	for (const FVoxelStructurePlanWrite& Write :
 		Writes)
 	{
+		InfluenceBounds += FVector(Write.Position);
+		InfluenceBounds += FVector(Write.Position) + FVector(1.0);
 		const FVoxelStructurePlanKey Key {
 			Write.Position,
 			Write.Stage

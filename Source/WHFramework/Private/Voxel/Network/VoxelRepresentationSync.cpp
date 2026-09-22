@@ -1,7 +1,6 @@
 #include "Voxel/Network/VoxelRepresentationSync.h"
 
 #include "Voxel/Network/VoxelNetworkCodec.h"
-#include "Voxel/Save/VoxelDeltaCodec.h"
 #include "Voxel/Serialization/VoxelBinaryCodec.h"
 #include "Voxel/VoxelModule.h"
 
@@ -10,7 +9,6 @@ namespace
 	constexpr uint32 RepresentationMagic = 0x34505256;
 	constexpr uint16 RepresentationVersion = 2;
 	constexpr int32 MaxCells = 4096;
-	constexpr int32 ExactSectionSide = 16;
 
 	FVoxelGenerationBounds ResolveBuildBounds(
 		const EVoxelRepresentationWireType InType,
@@ -21,11 +19,11 @@ namespace
 			EVoxelRepresentationWireType::
 				VoxelProxy)
 		{
-			return FVoxelViewKey {
-				InKey.Coordinate,
-				InKey.Level
-			}.
-			GetBounds();
+			const FVoxelViewKey Key{ InKey.Coordinate, InKey.Level };
+			FVoxelGenerationBounds Bounds = Key.GetBounds();
+			Bounds.Min -= FIntVector(Key.GetStep());
+			Bounds.Max += FIntVector(Key.GetStep());
+			return Bounds;
 		}
 
 		const int32 Side =
@@ -50,11 +48,13 @@ namespace
 				Side,
 			InSettings.MinZ);
 
+		const int32 Margin = InType == EVoxelRepresentationWireType::SurfaceProxy
+			? 1 << InKey.Level : FVoxelMacroTileData::BaseStep << InKey.Level;
 		return {
-			Min,
+			Min - FIntVector(Margin, Margin, 0),
 			FIntVector(
-				Min.X + Side,
-				Min.Y + Side,
+				Min.X + Side + Margin,
+				Min.Y + Side + Margin,
 				InSettings.MaxZ)
 		};
 	}
@@ -67,128 +67,15 @@ namespace
 		switch (InType)
 		{
 		case EVoxelRepresentationWireType::VoxelProxy:
-			return InRuntime.GetChangeHierarchy().GetVoxelProxyRevision(InKey.Coordinate);
+			return InRuntime.GetChangeHierarchy().GetVoxelProxyRevision({ InKey.Coordinate, InKey.Level });
 		case EVoxelRepresentationWireType::SurfaceProxy:
-			return InRuntime.GetChangeHierarchy().GetSurfaceRevision(
-				FIntPoint(InKey.Coordinate.X, InKey.Coordinate.Y));
+			return InRuntime.GetChangeHierarchy().GetSurfaceRevision({ FIntPoint(InKey.Coordinate.X, InKey.Coordinate.Y), InKey.Level });
 		case EVoxelRepresentationWireType::MacroTerrain:
-			return InRuntime.GetChangeHierarchy().GetMacroRevision(
-				FIntPoint(InKey.Coordinate.X, InKey.Coordinate.Y));
+			return InRuntime.GetChangeHierarchy().GetMacroRevision({ FIntPoint(InKey.Coordinate.X, InKey.Coordinate.Y), InKey.Level });
 		default:
 			return 0;
 		}
 	}
-
-	class FStoredOverlaySource final : public IVoxelOverlaySource
-	{
-	public:
-		explicit FStoredOverlaySource(const UVoxelModule& InModule)
-			: Module(InModule)
-		{
-		}
-
-		virtual bool EnumerateModifiedSections(
-			const FVoxelGenerationBounds& InBounds,
-			TArray<FIntVector>& OutSections,
-			const TAtomic<bool>* InCancel = nullptr) const override
-		{
-			OutSections.Reset();
-			if (const FVoxelWorldRuntime* Runtime = Module.GetRuntime())
-			{
-				return Runtime->GetChangeIndex().Enumerate(InBounds, OutSections, InCancel);
-			}
-			return true;
-		}
-
-		virtual bool ReadOverlay(
-			const FIntVector& InSection,
-			FVoxelOverlaySnapshot& OutOverlay) const override
-		{
-			const FVoxelWorldRuntime* Runtime = Module.GetRuntime();
-			if (Runtime)
-			{
-				if (const FVoxelSection* Section = Runtime->FindSection(InSection);
-					Section && Section->Status == EVoxelSectionStatus::DataReady)
-				{
-					OutOverlay.Section = InSection;
-					OutOverlay.Revision = Section->CommittedRevision;
-					OutOverlay.Blocks = Section->Overlay;
-					return true;
-				}
-			}
-			const TSharedPtr<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> Registry = Module.GetRegistry();
-			if (!Registry)
-			{
-				return false;
-			}
-			TArray<uint8> Bytes;
-			FString Error;
-			if (Module.GetRegionStore().ReadSection(InSection, Bytes, Error) != EVoxelRegionRead::Loaded)
-			{
-				return false;
-			}
-			FVoxelPersistentSection Persistent;
-			if (!FVoxelDeltaCodec::Decode(Bytes, Module.GetManifest(), *Registry, Persistent))
-			{
-				return false;
-			}
-			OutOverlay.Section = InSection;
-			OutOverlay.Revision = Persistent.Revision;
-			OutOverlay.Blocks = MoveTemp(Persistent.Blocks);
-			return true;
-		}
-
-	private:
-		const UVoxelModule& Module;
-	};
-
-	class FSnapshotOverlaySource final : public IVoxelOverlaySource
-	{
-	public:
-		explicit FSnapshotOverlaySource(const TMap<FIntVector, FVoxelOverlaySnapshot>& InOverlays)
-			: Overlays(InOverlays)
-		{
-		}
-
-		virtual bool EnumerateModifiedSections(
-			const FVoxelGenerationBounds& InBounds,
-			TArray<FIntVector>& OutSections,
-			const TAtomic<bool>* InCancel = nullptr) const override
-		{
-			OutSections.Reset();
-			for (const TPair<FIntVector, FVoxelOverlaySnapshot>& Pair : Overlays)
-			{
-				if (InCancel && InCancel->Load())
-				{
-					OutSections.Reset();
-					return false;
-				}
-				const FVoxelGenerationBounds SectionBounds {
-					Pair.Key * ExactSectionSide,
-					(Pair.Key + FIntVector(1)) * ExactSectionSide };
-				if (SectionBounds.Intersects(InBounds))
-				{
-					OutSections.Add(Pair.Key);
-				}
-			}
-			return true;
-		}
-
-		virtual bool ReadOverlay(
-			const FIntVector& InSection,
-			FVoxelOverlaySnapshot& OutOverlay) const override
-		{
-			if (const FVoxelOverlaySnapshot* Overlay = Overlays.Find(InSection))
-			{
-				OutOverlay = *Overlay;
-				return true;
-			}
-			return false;
-		}
-
-	private:
-		const TMap<FIntVector, FVoxelOverlaySnapshot>& Overlays;
-	};
 
 	void WriteViewKey(FVoxelByteWriter& InWriter, const FVoxelViewKey& InKey)
 	{
@@ -251,28 +138,20 @@ bool FVoxelRepresentationSync::PrepareServerBuild(
 	Input.Config = InModule.GetGenerationConfig();
 	Input.Cache = InModule.GetGenerationCache();
 	Input.Generator = InModule.GetGenerator();
-	if (!Input.Config || !Input.Cache || !Input.Generator || !Runtime)
+	Input.Registry = InModule.GetRegistry();
+	if (!Input.Config || !Input.Cache || !Input.Generator || !Input.Registry || !Runtime)
 	{
 		OutError = TEXT("Voxel representation dependencies are unavailable");
 		return false;
 	}
 
-	FStoredOverlaySource OverlaySource(InModule);
 	const FVoxelGenerationBounds Bounds = ResolveBuildBounds(
 		InRequest.Type,
 		InRequest.Key,
 		Input.Settings);
-	TArray<FIntVector> ModifiedSections;
-	OverlaySource.EnumerateModifiedSections(Bounds, ModifiedSections);
-	for (const FIntVector& Section : ModifiedSections)
+	if (!InModule.CaptureOverlays(Bounds, Input.Overlays, OutError))
 	{
-		FVoxelOverlaySnapshot Overlay;
-		if (!OverlaySource.ReadOverlay(Section, Overlay))
-		{
-			OutError = TEXT("Modified representation overlay could not be read");
-			return false;
-		}
-		Input.Overlays.Add(Section, MoveTemp(Overlay));
+		return false;
 	}
 	Input.Revision = ResolveBuildRevision(*Runtime, InRequest.Type, InRequest.Key);
 	OutInput = MoveTemp(Input);
@@ -287,7 +166,12 @@ bool FVoxelRepresentationSync::BuildServerData(
 	const TAtomic<bool>* InCancel)
 {
 	const FVoxelRepresentationRequest& InRequest = InInput.Request;
-	const FSnapshotOverlaySource OverlaySource(InInput.Overlays);
+	const FVoxelOverlaySnapshotSet& OverlaySource = InInput.Overlays;
+	if (InRequest.Type != EVoxelRepresentationWireType::VoxelProxy && !InInput.Registry)
+	{
+		OutError = TEXT("Voxel surface registry snapshot is unavailable");
+		return false;
+	}
 	if (InRequest.Type ==
 	EVoxelRepresentationWireType::
 		VoxelProxy)
@@ -303,237 +187,10 @@ bool FVoxelRepresentationSync::BuildServerData(
 		InInput.Config.ToSharedRef(),
 		InInput.Cache.ToSharedRef());
 
-	if (!Builder.BuildNatural(
-			Key,
-			Data,
-			OutError,
-			InCancel))
+	if (!Builder.Build(Key, InInput.Overlays, Data, OutError, InCancel))
 	{
 		return false;
 	}
-
-	const FVoxelGenerationBounds Bounds =
-		Key.GetBounds();
-
-	const int32 Step =
-		Key.GetStep();
-
-	auto ApplyOverlayAtWorld =
-		[
-			&InInput
-		](
-			const FIntVector& InWorld,
-			FVoxelBlockState& InOutState)
-		{
-			const FIntVector Section(
-				VoxelGeneration::FloorDivide(
-					InWorld.X,
-					ExactSectionSide),
-				VoxelGeneration::FloorDivide(
-					InWorld.Y,
-					ExactSectionSide),
-				VoxelGeneration::FloorDivide(
-					InWorld.Z,
-					ExactSectionSide));
-
-			const FVoxelOverlaySnapshot* Overlay =
-				InInput.
-					Overlays.
-					Find(
-						Section);
-
-			if (!Overlay)
-			{
-				return;
-			}
-
-			const FIntVector Local =
-				InWorld -
-				Section *
-					ExactSectionSide;
-
-			if (Local.X < 0 ||
-				Local.X >=
-					ExactSectionSide ||
-				Local.Y < 0 ||
-				Local.Y >=
-					ExactSectionSide ||
-				Local.Z < 0 ||
-				Local.Z >=
-					ExactSectionSide)
-			{
-				return;
-			}
-
-			const int32 CellIndex =
-				Local.X +
-				Local.Y *
-					ExactSectionSide +
-				Local.Z *
-					ExactSectionSide *
-					ExactSectionSide;
-
-			if (const FVoxelBlockState* Modified =
-				Overlay->
-					Blocks.
-					Find(
-						CellIndex))
-			{
-				InOutState =
-					*Modified;
-			}
-		};
-
-	for (int32 Z = 0;
-		Z < Data.GridSide;
-		++Z)
-	{
-		if (InCancel &&
-			InCancel->Load())
-		{
-			OutError =
-				TEXT("Canceled");
-
-			return false;
-		}
-
-		for (int32 Y = 0;
-			Y < Data.GridSide;
-			++Y)
-		{
-			for (int32 X = 0;
-				X < Data.GridSide;
-				++X)
-			{
-				const FIntVector World =
-					Bounds.Min +
-					FIntVector(
-						X * Step +
-							Step / 2,
-						Y * Step +
-							Step / 2,
-						Z * Step +
-							Step / 2);
-
-				FVoxelBlockState& State =
-					Data.Cells[
-						X +
-						Y *
-							Data.GridSide +
-						Z *
-							Data.GridSide *
-							Data.GridSide];
-
-				ApplyOverlayAtWorld(
-					World,
-					State);
-			}
-		}
-	}
-
-	for (int32 Face = 0;
-		Face < 6;
-		++Face)
-	{
-		if (!Data.Known[
-				Face] ||
-			Data.Halo[
-				Face].Num() !=
-				256)
-		{
-			continue;
-		}
-
-		const int32 Axis =
-			Face /
-			2;
-
-		const bool bNegative =
-			(Face &
-				1) !=
-			0;
-
-		const int32 U =
-			(Axis + 1) %
-			3;
-
-		const int32 V =
-			(Axis + 2) %
-			3;
-
-		for (int32 LocalV = 0;
-			LocalV < 16;
-			++LocalV)
-		{
-			for (int32 LocalU = 0;
-				LocalU < 16;
-				++LocalU)
-			{
-				FIntVector Local(
-					0,
-					0,
-					0);
-
-				Local[Axis] =
-					bNegative
-						? -1
-						: 16;
-
-				Local[U] =
-					LocalU;
-
-				Local[V] =
-					LocalV;
-
-				const FIntVector World =
-					Bounds.Min +
-					FIntVector(
-						Local.X *
-							Step +
-							Step / 2,
-						Local.Y *
-							Step +
-							Step / 2,
-						Local.Z *
-							Step +
-							Step / 2);
-
-				ApplyOverlayAtWorld(
-					World,
-					Data.Halo[
-						Face][
-							LocalU +
-							LocalV *
-								16]);
-			}
-		}
-	}
-
-	bool bHasAir =
-		false;
-
-	bool bHasSolid =
-		false;
-
-	for (const FVoxelBlockState State :
-		Data.Cells)
-	{
-		bHasAir |=
-			State.IsAir();
-
-		bHasSolid |=
-			!State.IsAir() &&
-			State !=
-				InInput.Config->
-					Water &&
-			State !=
-				InInput.Config->
-					Lava;
-	}
-
-	Data.bHasVisibleSurfaceEvidence =
-		bHasAir &&
-		bHasSolid;
 
 	Data.Revision =
 		InInput.Revision;
@@ -553,7 +210,7 @@ bool FVoxelRepresentationSync::BuildServerData(
 			InInput.Generator.ToSharedRef(),
 			InInput.Config.ToSharedRef(),
 			InInput.Settings,
-			OverlaySource);
+			OverlaySource, InInput.Registry.ToSharedRef());
 		if (!Builder.Build(Key, Data, OutError, InCancel)) return false;
 		Data.Revision = InInput.Revision;
 		return EncodeSurface(Data, OutBytes, OutError);
@@ -564,7 +221,7 @@ bool FVoxelRepresentationSync::BuildServerData(
 			FIntPoint(InRequest.Key.Coordinate.X, InRequest.Key.Coordinate.Y),
 			InRequest.Key.Level };
 		FVoxelMacroTileData Data;
-		const FVoxelMacroTerrainBuilder Builder(InInput.Generator.ToSharedRef());
+		const FVoxelMacroTerrainBuilder Builder(InInput.Generator.ToSharedRef(), InInput.Config.ToSharedRef(), InInput.Settings, OverlaySource, InInput.Registry.ToSharedRef());
 		if (!Builder.Build(Key, Data, OutError, InCancel)) return false;
 		Data.Revision = InInput.Revision;
 		return EncodeMacro(Data, OutBytes, OutError);

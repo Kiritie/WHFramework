@@ -16,6 +16,8 @@ IMPLEMENTATION_MAIN_MODULE(AMainModule)
 // ParamSets default values
 AMainModule::AMainModule()
 {
+	// 全局 Tick 同时覆盖编辑器与游戏；禁止 Actor Tick 再次刷新整个模块列表。
+	PrimaryActorTick.bCanEverTick = false;
 #if WITH_EDITORONLY_DATA
 	bIsSpatiallyLoaded = false;
 #endif
@@ -47,6 +49,7 @@ void AMainModule::OnDestroy()
 void AMainModule::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
+	SetActorTickEnabled(false);
 
 	GWorldContext = this;
 

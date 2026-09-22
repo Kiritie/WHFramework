@@ -77,6 +77,7 @@ bool FVoxelCollisionPresenter::OnTask(FVoxelTaskResult&& InResult)
 	}
 	if (!InResult.bSuccess ||
 		InResult.bCanceled ||
+		!Wanted.Contains(InResult.Stamp.Section) ||
 		InResult.Stamp.WorldEpoch != WorldEpoch ||
 		!InResult.Collision)
 	{

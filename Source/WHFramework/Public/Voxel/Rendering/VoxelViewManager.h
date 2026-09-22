@@ -1,12 +1,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Voxel/Geometry/VoxelSectionMesher.h"
 #include "Voxel/Rendering/VoxelCoverage.h"
 #include "Voxel/Rendering/VoxelSurfaceProxy.h"
 #include "Voxel/Streaming/VoxelInterest.h"
 
 class AActor;
 class FVoxelTaskScheduler;
+class FVoxelViewPublisher;
 class UVoxelMeshComponent;
 class UVoxelModule;
 
@@ -26,33 +28,15 @@ struct WHFRAMEWORK_API FVoxelPrimaryFineReadiness
 	int32 Required = 0;
 	int32 Ready = 0;
 	int32 Renderable = 0;
+	int32 Presented = 0;
 
 	bool IsComplete() const
 	{
-		return Required > 0 && Ready >= Required && Renderable > 0;
+		return Required > 0 && Ready >= Required && Presented >= Required;
 	}
 };
 
-enum class EVoxelViewAdmissionKind : uint8
-{
-	Fine = 0,
-	VoxelProxy,
-	Surface,
-	Macro
-};
-
-struct FVoxelViewAdmission
-{
-	EVoxelViewAdmissionKind Kind = EVoxelViewAdmissionKind::Fine;
-	double DistanceCells = 0.0;
-	FIntVector FineKey = FIntVector::ZeroValue;
-	FVoxelViewKey ProxyKey;
-	FVoxelSurfaceTileKey SurfaceKey;
-	FVoxelMacroTileKey MacroKey;
-};
-
-class WHFRAMEWORK_API FVoxelViewManager :
-	public IVoxelOverlaySource
+class WHFRAMEWORK_API FVoxelViewManager
 {
 public:
 	FVoxelViewManager(
@@ -78,6 +62,7 @@ public:
 
 	void Reset();
 	bool HasPrimaryRepresentation() const;
+	double GetDataAdmissionLimit() const;
 	FVoxelPrimaryFineReadiness GetPrimaryFineReadiness(
 		const TMap<FIntVector, FVoxelExactDemand>& InExact) const;
 	static void SortAdmissionsByPriority(TArray<FVoxelViewAdmission>& InOutAdmissions);
@@ -85,15 +70,6 @@ public:
 		TConstArrayView<FVoxelViewAdmission> InAdmissions,
 		TFunctionRef<bool(const FVoxelViewAdmission&)> InIsReady,
 		double InBandWidthCells);
-
-	virtual bool EnumerateModifiedSections(
-		const FVoxelGenerationBounds& InBounds,
-		TArray<FIntVector>& OutSections,
-		const TAtomic<bool>* InCancel = nullptr) const override;
-
-	virtual bool ReadOverlay(
-		const FIntVector& InSection,
-		FVoxelOverlaySnapshot& OutOverlay) const override;
 
 private:
 	void UpdateFineAndVoxelProxy(TConstArrayView<FVector> InObservers);
@@ -103,6 +79,7 @@ private:
 	void ProcessAdmissions();
 	void RebuildAdmissions(TConstArrayView<FVector> InObservers);
 	double MinimumObserverDistanceCells(const FVector& InWorldCenter) const;
+	double MinimumObserverDistanceCells(const FVoxelGenerationBounds& InCellBounds) const;
 	double ResolveAdmissionFrontier() const;
 	bool IsAdmissionSatisfied(const FVoxelViewAdmission& InAdmission) const;
 	bool IsAdmissionTerminalFailure(const FVoxelViewAdmission& InAdmission) const;
@@ -110,7 +87,6 @@ private:
 	void CancelStaleViewTasks();
 	FVector SurfaceWorldCenter(const FVoxelSurfaceTileKey& InKey) const;
 	FVector MacroWorldCenter(const FVoxelMacroTileKey& InKey) const;
-	void SetActorHiddenCached(AActor* InActor, bool bInHidden);
 	void LogRepresentationState(TConstArrayView<FVector> InObservers);
 	void ResolveTransitionVisibility();
 	void CleanupRetiredRepresentations(double InNow);
@@ -154,12 +130,6 @@ private:
 	void PublishWater(const FVoxelTaskResult& InResult);
 	bool PublishMacro(const FVoxelTaskResult& InResult);
 
-	bool PublishMeshActor(
-		AActor*& InOutActor,
-		const FVector& InLocation,
-		double InBlockSize,
-		const FVoxelSectionMeshResult& InMesh);
-
 private:
 	static constexpr double RetireDelaySeconds = 0.20;
 	static constexpr double OutsideDomainRetireDelaySeconds = 0.50;
@@ -168,18 +138,19 @@ private:
 	FVoxelTaskScheduler& Scheduler;
 	uint64 WorldEpoch = 0;
 	uint64 AppliedInterestRevision = 0;
-	TArray<FVoxelViewAdmission> Admissions;
+	TConstArrayView<FVoxelViewAdmission> Admissions;
 	TArray<FVector> PriorityObservers;
-	int32 AdmissionScanIndex = 0;
+	int32 AdmissionScanIndices[4] = {};
 	double AdmissionBandWidthCells = 64.0;
 	double LastResolvedFrontier = 0.0;
 	bool bCoverageDirty = true;
 	double NextCoverageCheck = 0.0;
 	double LastCoverageMilliseconds = 0.0;
 	double NextRepresentationDebugLog = 0.0;
-	TMap<TWeakObjectPtr<AActor>, bool> ActorHiddenStates;
+	TUniquePtr<FVoxelViewPublisher> Publisher;
 
 	TSet<FIntVector> FineWanted;
+	TSet<FVoxelViewKey> VisibleTerrainNodes;
 	TSet<FVoxelViewKey> VoxelProxyWanted;
 	TSet<FVoxelSurfaceTileKey> SurfaceWanted;
 	TSet<FVoxelMacroTileKey> MacroWanted;

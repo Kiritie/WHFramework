@@ -241,4 +241,25 @@ bool FVoxelEcologyHydrologyAwareTest::RunTest(const FString& InParameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelEcologySparseGrassTest,
+	"WHFramework.Voxel.Ecology.SparseGrass", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelEcologySparseGrassTest::RunTest(const FString& Parameters)
+{
+	FVoxelGenerationRecipe Recipe = MakeEcologyRecipe();
+	Recipe.Settings.Ecology.Tree.bEnabled = false;
+	FVoxelEcologyPlan Dense;
+	FVoxelEcologyPlan Sparse;
+	FString Error;
+	if (!BuildEcologyPlan(Recipe, Dense, Error)) return false;
+	Recipe.Settings.Ecology.Grass.DensityPermille = 600;
+	Recipe.Settings.Ecology.Grass.PatchFillPermille = 300;
+	if (!BuildEcologyPlan(Recipe, Sparse, Error)) return false;
+	TestTrue(TEXT("Sparse grass keeps visible patches"), Sparse.GrassWrites > 0);
+	TestTrue(TEXT("Sparse settings remove more than half the grass geometry"), Sparse.GrassWrites * 2 < Dense.GrassWrites);
+	AddInfo(FString::Printf(TEXT("Grass writes: dense=%d sparse=%d retained=%.1f%%"),
+		Dense.GrassWrites, Sparse.GrassWrites, 100.0 * Sparse.GrassWrites / FMath::Max(1, Dense.GrassWrites)));
+	return true;
+}
+
 #endif

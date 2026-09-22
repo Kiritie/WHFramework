@@ -65,7 +65,7 @@ bool FVoxelWaterViewBuilder::Build(
 			InSurface.Flags[Index];
 
 		EVoxelWaterKind Kind =
-			EVoxelWaterKind::None;
+			EVoxelWaterKind::Edited;
 
 		if ((Flags &
 			VoxelSurface_Ocean) != 0)

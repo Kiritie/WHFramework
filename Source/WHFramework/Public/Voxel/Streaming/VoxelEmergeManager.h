@@ -27,9 +27,12 @@ public:
 		TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry);
 
 	void Tick(
-		const TMap<FIntVector, FVoxelExactDemand>& InDemand,
+		const FVoxelInterestSet& InInterest,
 		uint64 InInterestRevision,
-		double InNow);
+		double InNow,
+		double InDataAdmissionLimit,
+		int32 InMaxBuildsPerFrame,
+		double InAdmissionMilliseconds);
 
 	bool OnTask(FVoxelTaskResult&& InResult);
 
@@ -41,26 +44,24 @@ public:
 
 private:
 	void RebuildDemand(
-		const TMap<FIntVector, FVoxelExactDemand>& InDemand,
+		const FVoxelInterestSet& InInterest,
 		uint64 InInterestRevision);
 
-	void RequestSection(
+	bool RequestSection(
 		const FIntVector& InKey,
 		const FVoxelExactDemand& InDemand);
 
-	void RequestBase(
+	bool RequestBase(
 		FVoxelSection& InSection,
 		const FIntVector& InKey,
 		const FVoxelExactDemand& InDemand);
 
-	void ResolveOverlay(
+	bool ResolveOverlay(
 		FVoxelSection& InSection,
 		const FIntVector& InKey,
 		const FVoxelExactDemand& InDemand);
 
 private:
-	static constexpr int32 MaxSectionAdmissionsPerTick = 64;
-
 	FVoxelWorldRuntime& Runtime;
 	FVoxelTaskScheduler& Scheduler;
 	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> Generator;

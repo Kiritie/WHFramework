@@ -31,6 +31,57 @@ FVoxelVoxelProxyBuilder::FVoxelVoxelProxyBuilder(
 {
 }
 
+bool FVoxelVoxelProxyBuilder::Build(const FVoxelViewKey& InKey, const FVoxelOverlaySnapshotSet& InOverlays,
+	FVoxelVoxelProxyData& OutData, FString& OutError, const TAtomic<bool>* InCancel) const
+{
+	FVoxelVoxelProxyData Data;
+	if (!BuildNatural(InKey, Data, OutError, InCancel)) return false;
+	const FIntVector Origin = InKey.GetBounds().Min;
+	const int32 Step = InKey.GetStep();
+	for (int32 Z = 0; Z < 16; ++Z)
+	{
+		if (InCancel && InCancel->Load())
+		{
+			OutError = TEXT("Canceled");
+			return false;
+		}
+		for (int32 Y = 0; Y < 16; ++Y)
+		{
+			for (int32 X = 0; X < 16; ++X)
+			{
+				InOverlays.ApplyAt(Origin + FIntVector(X, Y, Z) * Step + FIntVector(Step / 2),
+					Data.Cells[X + Y * 16 + Z * 256]);
+			}
+		}
+	}
+	for (int32 Face = 0; Face < 6; ++Face)
+	{
+		if (!Data.Known[Face]) continue;
+		const int32 Axis = Face / 2;
+		for (int32 Y = 0; Y < 16; ++Y)
+		{
+			for (int32 X = 0; X < 16; ++X)
+			{
+				FIntVector Local = FIntVector::ZeroValue;
+				Local[Axis] = Face % 2 == 0 ? 16 : -1;
+				Local[(Axis + 1) % 3] = X;
+				Local[(Axis + 2) % 3] = Y;
+				InOverlays.ApplyAt(Origin + Local * Step + FIntVector(Step / 2), Data.Halo[Face][X + Y * 16]);
+			}
+		}
+	}
+	bool bHasAir = false;
+	bool bHasSolid = false;
+	for (const FVoxelBlockState State : Data.Cells)
+	{
+		bHasAir |= State.IsAir();
+		bHasSolid |= !State.IsAir() && State != Config->Water && State != Config->Lava;
+	}
+	Data.bHasVisibleSurfaceEvidence = bHasAir && bHasSolid;
+	OutData = MoveTemp(Data);
+	return true;
+}
+
 bool FVoxelVoxelProxyBuilder::BuildNatural(
 	const FVoxelViewKey& InKey,
 	FVoxelVoxelProxyData& OutData,

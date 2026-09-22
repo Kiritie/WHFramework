@@ -2,8 +2,11 @@
 
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 FVoxelMacroTerrainBuilder::FVoxelMacroTerrainBuilder(
-	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator)
-	: Generator(InGenerator)
+	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator,
+	TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
+	const FVoxelGenerationSettings& InSettings, const IVoxelOverlaySource& InOverlays,
+		TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry)
+	: SurfaceBuilder(InGenerator, InConfig, InSettings, InOverlays, InRegistry)
 {
 }
 
@@ -36,21 +39,11 @@ bool FVoxelMacroTerrainBuilder::Build(
 	Data.ForestCoverage.SetNumUninitialized(Count);
 	Data.SnowCoverage.SetNumUninitialized(Count);
 
-	const FIntPoint TileOrigin =
-		InKey.Coordinate *
-		Data.GetTileSide();
-
 	TArray<FVoxelColumnSample> Columns;
-
-	if (!Generator->SampleColumns(
-		TileOrigin,
-		Data.Side,
-		Data.Side,
-		Data.Step,
-		Columns,
-		OutError,
-		InCancel,
-		false))
+	FVoxelSurfaceTileData Surface;
+	const FVoxelSurfaceTileKey SurfaceKey { InKey.Coordinate,
+		static_cast<uint8>(InKey.Level + FMath::FloorLog2(FVoxelMacroTileData::BaseStep)) };
+	if (!SurfaceBuilder.Build(SurfaceKey, Surface, OutError, InCancel, nullptr, &Columns))
 	{
 		return false;
 	}
@@ -71,14 +64,11 @@ bool FVoxelMacroTerrainBuilder::Build(
 		const FVoxelColumnSample& Column =
 			Columns[Index];
 
-		Data.Height[Index] =
-			Column.SurfaceZ;
+		Data.Height[Index] = Surface.GroundZ[Index];
 
-		Data.WaterHeight[Index] =
-			Column.SurfaceWaterZ;
+		Data.WaterHeight[Index] = Surface.WaterZ[Index];
 
-		Data.SurfaceClass[Index] =
-			Column.SurfaceMaterial;
+		Data.SurfaceClass[Index] = Surface.SurfaceMaterial[Index];
 
 		const int32 Moisture =
 			FMath::Clamp(
