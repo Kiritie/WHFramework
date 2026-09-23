@@ -717,8 +717,8 @@ void UVoxelAgentComponent::ResetInitialCollisionGate()
 	bInitialCollisionGatePending =
 		bGateInitialSpawnUntilCollision;
 
-	bInitialCollisionGateApplied =
-		false;
+	// An epoch change must not discard a movement mode already held by the gate.
+	// Keep it disabled until collision for the new world is ready.
 
 	bHasLastSafeLocation =
 		false;
@@ -726,8 +726,11 @@ void UVoxelAgentComponent::ResetInitialCollisionGate()
 	LastSafeLocation =
 		FVector::ZeroVector;
 
-	InitialPreviousMoveMode = 0;
-	InitialPreviousCustomMode = 0;
+	if (!bInitialCollisionGateApplied)
+	{
+		InitialPreviousMoveMode = 0;
+		InitialPreviousCustomMode = 0;
+	}
 
 	ObservedWorldEpoch =
 		Module.IsValid() &&
@@ -782,7 +785,9 @@ void UVoxelAgentComponent::ApplyInitialCollisionGate(
 	ACharacter& InCharacter,
 	UCharacterMovementComponent& InMovement)
 {
-	if (bInitialCollisionGateApplied)
+	// Another state may already own MOVE_None (for example, spawn placement).
+	// Wait for it to restore movement rather than capturing and later restoring MOVE_None.
+	if (bInitialCollisionGateApplied || InMovement.MovementMode == MOVE_None)
 	{
 		return;
 	}

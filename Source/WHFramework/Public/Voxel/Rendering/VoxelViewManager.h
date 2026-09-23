@@ -65,6 +65,8 @@ public:
 	double GetDataAdmissionLimit() const;
 	FVoxelPrimaryFineReadiness GetPrimaryFineReadiness(
 		const TMap<FIntVector, FVoxelExactDemand>& InExact) const;
+	FVoxelPrimaryFineReadiness GetFineRadiusReadiness(
+		TConstArrayView<FIntVector> InFineKeys) const;
 	static void SortAdmissionsByPriority(TArray<FVoxelViewAdmission>& InOutAdmissions);
 	static double ResolveAdmissionFrontier(
 		TConstArrayView<FVoxelViewAdmission> InAdmissions,
@@ -78,6 +80,8 @@ private:
 	void UpdateWantedTimestamps(double InNow);
 	void ProcessAdmissions();
 	void RebuildAdmissions(TConstArrayView<FVector> InObservers);
+	void TrackReadyTerrainNode(FVoxelViewKey InKey);
+	void RebuildReadyTerrainBranches();
 	double MinimumObserverDistanceCells(const FVector& InWorldCenter) const;
 	double MinimumObserverDistanceCells(const FVoxelGenerationBounds& InCellBounds) const;
 	double ResolveAdmissionFrontier() const;
@@ -113,6 +117,7 @@ private:
 	bool IsSurfaceInsideRenderDomain(const FVoxelSurfaceTileKey& InKey) const;
 	bool IsMacroInsideRenderDomain(const FVoxelMacroTileKey& InKey) const;
 	static bool HasRenderableMesh(const FVoxelSectionMeshResult& InMesh);
+	bool TryResolveFineWithoutMesh(const FIntVector& InSection, uint64 InRevision);
 	static bool BuildVoxelProxySnapshot(
 		const FVoxelVoxelProxyData& InData,
 		uint64 InRecipeHash,
@@ -144,13 +149,16 @@ private:
 	double AdmissionBandWidthCells = 64.0;
 	double LastResolvedFrontier = 0.0;
 	bool bCoverageDirty = true;
-	double NextCoverageCheck = 0.0;
+	double NextRetireCheck = 0.0;
 	double LastCoverageMilliseconds = 0.0;
+	double LastRetireMilliseconds = 0.0;
 	double NextRepresentationDebugLog = 0.0;
 	TUniquePtr<FVoxelViewPublisher> Publisher;
 
 	TSet<FIntVector> FineWanted;
 	TSet<FVoxelViewKey> VisibleTerrainNodes;
+	TSet<FVoxelViewKey> ReadyTerrainBranches;
+	bool bReadyTerrainBranchesDirty = true;
 	TSet<FVoxelViewKey> VoxelProxyWanted;
 	TSet<FVoxelSurfaceTileKey> SurfaceWanted;
 	TSet<FVoxelMacroTileKey> MacroWanted;

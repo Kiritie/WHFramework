@@ -107,9 +107,22 @@ namespace
 
 	bool StreamingSourceAffectsInterest(
 		const FVoxelStreamingSource& InA,
-		const FVoxelStreamingSource& InB)
+		const FVoxelStreamingSource& InB,
+		const FVoxelViewSettings& InViewSettings)
 	{
-		if (InA.Center != InB.Center ||
+		int32 CenterRefreshDistance = FMath::Max(1, FMath::RoundToInt(
+			InViewSettings.FineRadius * InViewSettings.StreamingReplanFineRadiusFraction));
+		if (InB.bCollision)
+		{
+			CenterRefreshDistance = FMath::Min(CenterRefreshDistance,
+				FMath::Max(1, InB.CollisionRadius / 2));
+		}
+		const int64 CenterRefreshDistanceSquared =
+			static_cast<int64>(CenterRefreshDistance) * CenterRefreshDistance;
+		const FIntVector CenterDelta = InA.Center - InB.Center;
+		if (static_cast<int64>(CenterDelta.X) * CenterDelta.X +
+			static_cast<int64>(CenterDelta.Y) * CenterDelta.Y +
+			static_cast<int64>(CenterDelta.Z) * CenterDelta.Z >= CenterRefreshDistanceSquared ||
 			InA.ExactRadius != InB.ExactRadius ||
 			InA.CollisionRadius != InB.CollisionRadius ||
 			InA.SimulationRadius != InB.SimulationRadius ||
@@ -127,9 +140,8 @@ namespace
 			return true;
 		}
 
-		return FVector::DotProduct(
-			InA.Direction.GetSafeNormal(),
-			InB.Direction.GetSafeNormal()) < 0.996194698;
+		// Direction only changes admission priority, not which cells are needed.
+		return false;
 	}
 }
 
@@ -606,6 +618,9 @@ bool UVoxelModule::StartWorld(
 		ViewSettings.WarmupDataRadius = ToCells(ViewProfile->WarmupDataRadiusCentimeters);
 		ViewSettings.WarmupCollisionRadius = ToCells(ViewProfile->WarmupCollisionRadiusCentimeters);
 		ViewSettings.FineRadius = ToCells(ViewProfile->FineRadiusCentimeters);
+		ViewSettings.PlayableFineRadiusFraction = FMath::Clamp(ViewProfile->PlayableFineRadiusFraction, 0.01f, 1.0f);
+		ViewSettings.StreamingReplanFineRadiusFraction = FMath::Clamp(ViewProfile->StreamingReplanFineRadiusFraction, 0.001f, 1.0f);
+		ViewSettings.FineVerticalRadius = ToCells(ViewProfile->FineVerticalRadiusCentimeters);
 		ViewSettings.FinePreload = ToCells(ViewProfile->FinePreloadCentimeters);
 		ViewSettings.MaximumTextureStretchCells = FMath::Clamp(ViewProfile->MaximumTextureStretchCells, 1.0f, 16.0f);
 		ViewSettings.VoxelProxyRadius = ToCells(ViewProfile->VoxelProxyRadiusCentimeters);
@@ -673,9 +688,14 @@ bool UVoxelModule::StartWorld(
 	}
 	Scheduler = MakeUnique<FVoxelTaskScheduler>();
 	FVoxelTaskBudget TaskBudget;
-	TaskBudget.MaxConcurrentTasks = FMath::Clamp(FPlatformMisc::NumberOfCores() / 2, 1, 4);
+	TaskBudget.MaxConcurrentTasks = FMath::Clamp(FPlatformMisc::NumberOfCores() * 2, 1, 16);
+	TaskBudget.MaxReservedBytes = 256ull * 1024ull * 1024ull;
 	TaskBudget.MaxCompletedResultsPerFrame = ViewSettings.CompletedResultsPerFrame;
 	TaskBudget.MaxHeavyCompletedResultsPerFrame = FMath::Min(ViewSettings.HeavyResultsPerFrame, ViewSettings.CompletedResultsPerFrame);
+	TaskBudget.MaxFineApplyPerFrame = ViewSettings.FineBuildsPerFrame;
+	TaskBudget.MaxVoxelLODApplyPerFrame = ViewSettings.VoxelProxyBuildsPerFrame;
+	TaskBudget.MaxSurfaceApplyPerFrame = ViewSettings.SurfaceBuildsPerFrame;
+	TaskBudget.MaxMacroApplyPerFrame = ViewSettings.MacroBuildsPerFrame;
 	Scheduler->SetBudget(TaskBudget);
 	UE_LOG(LogTemp, Display, TEXT("Voxel worker budget: cores=%d workers=%d reservedMiB=%llu"),
 		FPlatformMisc::NumberOfCores(), TaskBudget.MaxConcurrentTasks, TaskBudget.MaxReservedBytes / (1024ull * 1024ull));
@@ -1080,6 +1100,7 @@ FGuid UVoxelModule::RegisterSource(UObject* InOwner, const FVoxelStreamingSource
 	Source.Owner = InOwner;
 	Source.Value = InSource;
 	Source.Value.Id = Id;
+	Source.PlannedValue = Source.Value;
 	Sources.Add(Id, MoveTemp(Source));
 	bInterestDirty = true;
 	LastInterestRefresh = -1.0;
@@ -1102,7 +1123,7 @@ bool UVoxelModule::UpdateSource(
 	FVoxelStreamingSource Updated = InSource;
 	Updated.Id = InId;
 
-	if (StreamingSourceAffectsInterest(Source->Value, Updated))
+	if (StreamingSourceAffectsInterest(Source->PlannedValue, Updated, ViewSettings))
 	{
 		bInterestDirty = true;
 	}
@@ -1354,6 +1375,10 @@ void UVoxelModule::RefreshInterest(
 	bInterestBuildPending = true;
 	LastInterestRefresh = InNow;
 	bInterestDirty = false;
+	for (auto& Pair : Sources)
+	{
+		Pair.Value.PlannedValue = Pair.Value.Value;
+	}
 
 	if (GenerationCache && !ActiveSources.IsEmpty())
 	{
@@ -1464,13 +1489,18 @@ void UVoxelModule::UpdateReadiness()
 		}
 	}
 	FVoxelPrimaryFineReadiness PrimaryFine;
+	FVoxelPrimaryFineReadiness PlayableFine;
 	if (ViewManager)
 	{
 		PrimaryFine = ViewManager->GetPrimaryFineReadiness(CurrentInterest.Warmup);
+		PlayableFine = ViewManager->GetFineRadiusReadiness(CurrentInterest.PlayableFineKeys);
 	}
 	Snapshot.RequiredPrimaryFineSections = PrimaryFine.Required;
 	Snapshot.ReadyPrimaryFineSections = PrimaryFine.Ready;
 	Snapshot.RenderablePrimaryFineSections = PrimaryFine.Renderable;
+	Snapshot.RequiredPlayableFineSections = PlayableFine.Required;
+	Snapshot.ReadyPlayableFineSections = PlayableFine.Ready;
+	Snapshot.PresentedPlayableFineSections = PlayableFine.Presented;
 	Snapshot.RequiredPrimaryRepresentations = PrimaryFine.Required;
 	Snapshot.ReadyPrimaryRepresentations = PrimaryFine.Ready;
 	Snapshot.PendingCriticalDependencies = Scheduler ? Scheduler->CriticalCount() : 0;
@@ -1478,7 +1508,7 @@ void UVoxelModule::UpdateReadiness()
 		Snapshot.ReadySpawnSections >= Snapshot.RequiredSpawnSections;
 	const bool bSpawnCollisionReady = bSpawnDataReady &&
 		Snapshot.ReadyCollisionSections >= Snapshot.RequiredCollisionSections;
-	const bool bPrimaryViewReady = bSpawnCollisionReady && PrimaryFine.IsComplete();
+	const bool bPrimaryViewReady = bSpawnCollisionReady && PrimaryFine.IsComplete() && PlayableFine.IsComplete();
 	if (WorldState == EVoxelWorldState::Failed)
 	{
 		Snapshot.bFailed = true;
@@ -1521,7 +1551,7 @@ void UVoxelModule::UpdateReadiness()
 		UE_LOG(
 			LogTemp,
 			Display,
-			TEXT("Voxel readiness stage %d -> %d; warmup=%d/%d collision=%d/%d primary=%d/%d critical=%d"),
+			TEXT("Voxel readiness stage %d -> %d; warmup=%d/%d collision=%d/%d primary=%d/%d playableFine=%d/%d presented=%d critical=%d"),
 			static_cast<int32>(PreviousReadyStage),
 			static_cast<int32>(ReadyStage),
 			Snapshot.ReadySpawnSections,
@@ -1530,6 +1560,9 @@ void UVoxelModule::UpdateReadiness()
 			Snapshot.RequiredCollisionSections,
 			Snapshot.ReadyPrimaryRepresentations,
 			Snapshot.RequiredPrimaryRepresentations,
+			Snapshot.ReadyPlayableFineSections,
+			Snapshot.RequiredPlayableFineSections,
+			Snapshot.PresentedPlayableFineSections,
 			Snapshot.PendingCriticalDependencies);
 	}
 	ReadinessSnapshot = Snapshot;

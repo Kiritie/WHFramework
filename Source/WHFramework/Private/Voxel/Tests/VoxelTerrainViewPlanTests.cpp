@@ -176,11 +176,23 @@ bool FVoxelTerrainSparseResolveTest::RunTest(const FString& InParameters)
 		if (Step == 6) Ready.Reset(); // 已提交空节点与失效节点仍须保留所有权。
 		TSet<FVoxelViewKey> Reference;
 		TSet<FVoxelViewKey> Pruned;
+		TSet<FVoxelViewKey> Cached;
+		TSet<FVoxelViewKey> ReadyBranches;
+		for (FVoxelViewKey Node : Ready)
+		{
+			while (Node.Level < 24)
+			{
+				ReadyBranches.Add(Node);
+				Node = Node.GetParent();
+			}
+		}
 		int32 ReferenceQueries = 0;
 		int32 PrunedQueries = 0;
 		Plan.ResolveVisible([&](const FVoxelViewKey& Key) { ++ReferenceQueries; return Ready.Contains(Key); }, Reference, &Previous);
 		Plan.ResolveVisible([&](const FVoxelViewKey& Key) { ++PrunedQueries; return Ready.Contains(Key); }, Pruned, &Previous, &Ready);
+		Plan.ResolveVisible([&](const FVoxelViewKey& Key) { return Ready.Contains(Key); }, Cached, &Previous, nullptr, &ReadyBranches);
 		TestTrue(TEXT("Pruning preserves the complete visible ownership set"), Reference.Num() == Pruned.Num() && Reference.Difference(Pruned).IsEmpty());
+		TestTrue(TEXT("Cached branches preserve visible ownership after invalidation"), Reference.Num() == Cached.Num() && Reference.Difference(Cached).IsEmpty());
 		TestTrue(TEXT("Unbuilt branches do not query thousands of missing leaves"), PrunedQueries < ReferenceQueries / 4);
 		Previous = MoveTemp(Pruned);
 	}

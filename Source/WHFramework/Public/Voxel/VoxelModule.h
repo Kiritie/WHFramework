@@ -213,6 +213,7 @@ private:
 	{
 		TWeakObjectPtr<UObject> Owner;
 		FVoxelStreamingSource Value;
+		FVoxelStreamingSource PlannedValue;
 	};
 
 	struct FBreak

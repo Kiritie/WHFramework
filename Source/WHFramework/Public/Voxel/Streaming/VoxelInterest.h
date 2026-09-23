@@ -15,6 +15,7 @@ struct WHFRAMEWORK_API FVoxelExactDemand
 	bool bWarmupCollision = false;
 	bool bMovementCriticalCollision = false;
 	double DistanceCells = MAX_dbl;
+	double HorizontalDistanceCells = MAX_dbl;
 	double ForwardScore = 0.0;
 };
 
@@ -26,6 +27,7 @@ struct WHFRAMEWORK_API FVoxelInterestSet
 	TArray<int32> AdmissionLanes[4];
 	TMap<FIntVector, FVoxelExactDemand> Exact;
 	TArray<FIntVector> ExactOrder;
+	TArray<FIntVector> PlayableFineKeys;
 	TMap<FIntVector, FVoxelExactDemand> Warmup;
 	TSet<FVoxelViewKey> VoxelProxy;
 	TSet<FVoxelSurfaceTileKey> Surface;
@@ -33,7 +35,7 @@ struct WHFRAMEWORK_API FVoxelInterestSet
 
 	uint64 GetAllocatedBytes() const
 	{
-		return (FineSections ? FineSections->GetAllocatedSize() : 0) + Warmup.GetAllocatedSize() + ExactOrder.GetAllocatedSize() + Admissions.GetAllocatedSize() + AdmissionLanes[0].GetAllocatedSize() + AdmissionLanes[1].GetAllocatedSize() +
+		return (FineSections ? FineSections->GetAllocatedSize() : 0) + Warmup.GetAllocatedSize() + ExactOrder.GetAllocatedSize() + PlayableFineKeys.GetAllocatedSize() + Admissions.GetAllocatedSize() + AdmissionLanes[0].GetAllocatedSize() + AdmissionLanes[1].GetAllocatedSize() +
 			AdmissionLanes[2].GetAllocatedSize() + AdmissionLanes[3].GetAllocatedSize() + Exact.GetAllocatedSize() + VoxelProxy.GetAllocatedSize() + Surface.GetAllocatedSize() + Macro.GetAllocatedSize() +
 			TerrainPlan.Roots.GetAllocatedSize() + TerrainPlan.Leaves.GetAllocatedSize() +
 			TerrainPlan.Required.GetAllocatedSize() + TerrainPlan.FineDependencies.GetAllocatedSize();
@@ -45,6 +47,9 @@ struct WHFRAMEWORK_API FVoxelViewSettings
 	int32 WarmupDataRadius = 24;
 	int32 WarmupCollisionRadius = 24;
 	int32 FineRadius = 320;
+	float PlayableFineRadiusFraction = 1.0f / 3.0f;
+	float StreamingReplanFineRadiusFraction = 0.05f;
+	int32 FineVerticalRadius = 64;
 	int32 FinePreload = 32;
 	double MaximumTextureStretchCells = 4.0;
 	int32 VoxelProxyRadius = 3200;

@@ -89,7 +89,25 @@ void FVoxelViewPublisher::SetCoverage(AActor* InActor, TArray<FBox> InWorldCellB
 
 void FVoxelViewPublisher::SetHidden(AActor* InActor, const bool bInHidden)
 {
-	Visibility.Add(TWeakObjectPtr<AActor>(InActor), bInHidden);
+	if (!InActor)
+	{
+		return;
+	}
+
+	const TWeakObjectPtr<AActor> Key(InActor);
+	if (const bool* Pending = Visibility.Find(Key))
+	{
+		if (*Pending == bInHidden)
+		{
+			return;
+		}
+	}
+	else if (InActor->IsHidden() == bInHidden)
+	{
+		return;
+	}
+
+	Visibility.Add(Key, bInHidden);
 }
 
 uint64 FVoxelViewCoverageResult::GetAllocatedBytes() const

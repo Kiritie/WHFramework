@@ -179,6 +179,12 @@ struct WHFRAMEWORK_API FVoxelTaskBudget
 	uint64 MaxInputBytes = 32ull * 1024ull * 1024ull;
 	int32 MaxCompletedResultsPerFrame = 8;
 	int32 MaxHeavyCompletedResultsPerFrame = 1;
+
+	int32 MaxFineApplyPerFrame = 8;
+	int32 MaxVoxelLODApplyPerFrame = 12;
+	int32 MaxSurfaceApplyPerFrame = 16;
+	int32 MaxMacroApplyPerFrame = 24;
+
 	int32 MaxConcurrentSurfaceTasks = 1;
 	int32 MaxConcurrentMacroTasks = 1;
 	int32 MaxConcurrentCoarseTerrainTasks = 1;

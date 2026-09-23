@@ -279,6 +279,28 @@ void FVoxelTaskScheduler::Tick(
 
 	int32 Applied = 0;
 	int32 HeavyApplied = 0;
+	int32 FineApplied = 0;
+	int32 VoxelLODApplied = 0;
+	int32 SurfaceApplied = 0;
+	int32 MacroApplied = 0;
+
+	auto CanApplyTerrainKind =
+		[this, &FineApplied, &VoxelLODApplied, &SurfaceApplied, &MacroApplied](const EVoxelTaskKind Kind) -> bool
+		{
+			switch (Kind)
+			{
+			case EVoxelTaskKind::BuildFineMesh:
+				return FineApplied < Budget.MaxFineApplyPerFrame;
+			case EVoxelTaskKind::BuildVoxelProxy:
+				return VoxelLODApplied < Budget.MaxVoxelLODApplyPerFrame;
+			case EVoxelTaskKind::BuildSurface:
+				return SurfaceApplied < Budget.MaxSurfaceApplyPerFrame;
+			case EVoxelTaskKind::BuildMacro:
+				return MacroApplied < Budget.MaxMacroApplyPerFrame;
+			default:
+				return true;
+			}
+		};
 
 	for (int32 Index = 0;
 		Index < Running.Num() &&
@@ -297,6 +319,12 @@ void FVoxelTaskScheduler::Tick(
 			Running[Index].Slot->Result.bSuccess = false;
 		}
 		const bool bHeavy = Running[Index].Slot->Result.HasHeavyApply();
+
+		if (!CanApplyTerrainKind(Running[Index].Kind))
+		{
+			++Index;
+			continue;
+		}
 
 		if (bHeavy &&
 			HeavyApplied >=
@@ -322,6 +350,24 @@ void FVoxelTaskScheduler::Tick(
 		if (bHeavy)
 		{
 			++HeavyApplied;
+		}
+
+		switch (Completed.Kind)
+		{
+		case EVoxelTaskKind::BuildFineMesh:
+			++FineApplied;
+			break;
+		case EVoxelTaskKind::BuildVoxelProxy:
+			++VoxelLODApplied;
+			break;
+		case EVoxelTaskKind::BuildSurface:
+			++SurfaceApplied;
+			break;
+		case EVoxelTaskKind::BuildMacro:
+			++MacroApplied;
+			break;
+		default:
+			break;
 		}
 
 		FVoxelTaskResult& Result =
@@ -599,6 +645,27 @@ void FVoxelTaskScheduler::SetBudget(
 	Budget.MaxHeavyCompletedResultsPerFrame =
 		FMath::Clamp(
 			InBudget.MaxHeavyCompletedResultsPerFrame,
+			1,
+			Budget.MaxCompletedResultsPerFrame);
+
+	Budget.MaxFineApplyPerFrame =
+		FMath::Clamp(
+			InBudget.MaxFineApplyPerFrame,
+			1,
+			Budget.MaxCompletedResultsPerFrame);
+	Budget.MaxVoxelLODApplyPerFrame =
+		FMath::Clamp(
+			InBudget.MaxVoxelLODApplyPerFrame,
+			1,
+			Budget.MaxCompletedResultsPerFrame);
+	Budget.MaxSurfaceApplyPerFrame =
+		FMath::Clamp(
+			InBudget.MaxSurfaceApplyPerFrame,
+			1,
+			Budget.MaxCompletedResultsPerFrame);
+	Budget.MaxMacroApplyPerFrame =
+		FMath::Clamp(
+			InBudget.MaxMacroApplyPerFrame,
 			1,
 			Budget.MaxCompletedResultsPerFrame);
 

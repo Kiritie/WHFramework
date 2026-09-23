@@ -30,6 +30,7 @@
 #include "Task/TaskEditor.h"
 #include "Dialogue/DialogueEditor.h"
 #include "Widget/WidgetEditor.h"
+#include "Voxel/VoxelModuleCustomization.h"
 
 #define LOCTEXT_NAMESPACE "FWHFrameworkEditorModule"
 
@@ -98,6 +99,9 @@ void FWHFrameworkEditorModule::StartupEditorModules()
 	STARTUP_MODULE(FTaskEditorModule);
 	STARTUP_MODULE(FDialogueEditorModule);
 	STARTUP_MODULE(FWidgetEditorModule);
+	PropertyEditorModule.RegisterCustomClassLayout(
+		TEXT("VoxelModule"),
+		FOnGetDetailCustomizationInstance::CreateStatic(&FVoxelModuleCustomization::MakeInstance));
 
 	PropertyEditorModule.NotifyCustomizationModuleChanged();
 }
@@ -127,6 +131,7 @@ void FWHFrameworkEditorModule::ShutdownEditorModules()
 	SHUTDOWN_MODULE(FTaskEditorModule);
 	SHUTDOWN_MODULE(FDialogueEditorModule);
 	SHUTDOWN_MODULE(FWidgetEditorModule);
+	PropertyEditorModule.UnregisterCustomClassLayout(TEXT("VoxelModule"));
 
 	if(FModuleManager::Get().IsModuleLoaded(TEXT("AssetTools")))
 	{

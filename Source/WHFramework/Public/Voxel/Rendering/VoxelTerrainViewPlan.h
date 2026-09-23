@@ -22,12 +22,13 @@ struct WHFRAMEWORK_API FVoxelTerrainViewPlan
 		const FVoxelViewSettings& InSettings, int32 InMaximumLeaves);
 	void ResolveVisible(TFunctionRef<bool(const FVoxelViewKey&)> InIsReady,
 		TSet<FVoxelViewKey>& OutVisible, const TSet<FVoxelViewKey>* InPrevious = nullptr,
-		const TSet<FVoxelViewKey>* InReadyNodes = nullptr) const;
+		const TSet<FVoxelViewKey>* InReadyNodes = nullptr,
+		const TSet<FVoxelViewKey>* InReadyBranches = nullptr) const;
 	bool Validate(FString& OutError) const;
 
 private:
 	bool ResolveNode(const FVoxelViewKey& InNode,
 		TFunctionRef<bool(const FVoxelViewKey&)> InIsReady,
 		const TSet<FVoxelViewKey>& InPreviousAncestors, const TSet<FVoxelViewKey>* InPrevious,
-		const TSet<FVoxelViewKey>* InAvailableBranches, TArray<FVoxelViewKey>& OutVisible) const;
+		const TSet<FVoxelViewKey>* InReadyBranches, TArray<FVoxelViewKey>& OutVisible) const;
 };

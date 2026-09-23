@@ -55,6 +55,47 @@ namespace
 				InDeltaCells.Z <=
 			RadiusSquared;
 	}
+	bool SectionIntersectsRadius(
+		const FIntVector& InSection,
+		const FIntVector& InCenter,
+		const int32 InRadius)
+	{
+		if (InRadius <= 0)
+		{
+			return false;
+		}
+		const FIntVector Min = InSection * InterestSectionSide;
+		const FIntVector Max = Min + FIntVector(InterestSectionSide);
+		const FIntVector Nearest(
+			FMath::Clamp(InCenter.X, Min.X, Max.X),
+			FMath::Clamp(InCenter.Y, Min.Y, Max.Y),
+			FMath::Clamp(InCenter.Z, Min.Z, Max.Z));
+		return IsInsideRadius(Nearest - InCenter, InRadius);
+	}
+
+	bool IsInsideFineVolume(
+		const FIntVector& InDeltaCells,
+		const int32 InHorizontalRadius,
+		const int32 InVerticalRadius)
+	{
+		if (InHorizontalRadius < 0 ||
+			InVerticalRadius < 0 ||
+			FMath::Abs(InDeltaCells.Z) > InVerticalRadius)
+		{
+			return false;
+		}
+
+		const int64 RadiusSquared =
+			static_cast<int64>(InHorizontalRadius) *
+			InHorizontalRadius;
+
+		return
+			static_cast<int64>(InDeltaCells.X) *
+				InDeltaCells.X +
+			static_cast<int64>(InDeltaCells.Y) *
+				InDeltaCells.Y <=
+			RadiusSquared;
+	}
 
 	template<typename KeyType>
 	void AddAdaptiveTwoDimensionalTiles(
@@ -230,6 +271,8 @@ FVoxelInterestSet FVoxelInterestManager::Compute(
 				if (Source.RenderMode != EVoxelStreamingRenderMode::None)
 				{
 					Demand.DistanceCells = FMath::Min(Demand.DistanceCells, FVector::Distance(Center, FVector(Source.Center)));
+					Demand.HorizontalDistanceCells = FMath::Min(Demand.HorizontalDistanceCells,
+						FVector2D::Distance(FVector2D(Center), FVector2D(Source.Center.X, Source.Center.Y)));
 				}
 			}
 		}
@@ -246,6 +289,16 @@ FVoxelInterestSet FVoxelInterestManager::Compute(
 	const auto FineSnapshot = MakeShared<TSet<FIntVector>, ESPMode::ThreadSafe>();
 	FineSnapshot->Append(FineKeys);
 	Result.FineSections = FineSnapshot;
+	const double PlayableFineRadius = static_cast<double>(InViewSettings.FineRadius) *
+		InViewSettings.PlayableFineRadiusFraction;
+	for (const FIntVector& Key : FineKeys)
+	{
+		if (Result.Exact.FindChecked(Key).HorizontalDistanceCells <= PlayableFineRadius)
+		{
+			Result.PlayableFineKeys.Add(Key);
+		}
+	}
+
 	for (const FIntVector& Key : FineKeys)
 	{
 		const double Distance = Result.Exact.FindChecked(Key).DistanceCells;
@@ -372,6 +425,10 @@ void FVoxelInterestManager::AddExactSource(
 
 	const int32 FineRadius = bWantsFine ? FMath::Max(0, InViewSettings.FineRadius) +
 		FMath::Max(0, InViewSettings.FinePreload) : 0;
+	const int32 FineVerticalRadius =
+		bWantsFine
+			? FMath::Max(0, InViewSettings.FineVerticalRadius)
+			: 0;
 
 	const int32 WarmupDataRadius =
 		FMath::Min(
@@ -393,6 +450,9 @@ void FVoxelInterestManager::AddExactSource(
 			: 0;
 
 	const int32 FineRetainRadius = bWantsFine && FineRadius > 0 ? FineRadius + InterestSectionSide : 0;
+	const int32 FineRetainVerticalRadius = bWantsFine && FineVerticalRadius > 0
+		? FineVerticalRadius + InterestSectionSide
+		: 0;
 	const int32 DataRadius = FMath::Max(FineRetainRadius,
 		FMath::Max(
 			FMath::Max(
@@ -406,7 +466,7 @@ void FVoxelInterestManager::AddExactSource(
 			InterestSectionSide);
 
 	const int32 VerticalSections = CeilDividePositive(
-		FMath::Max(FineRetainRadius, FMath::Max(0, InSource.VerticalExactRadius)), InterestSectionSide);
+		FMath::Max(FineRetainVerticalRadius, FMath::Max(0, InSource.VerticalExactRadius)), InterestSectionSide);
 
 	const FIntVector CenterSection =
 		InterestToSection(
@@ -478,16 +538,17 @@ void FVoxelInterestManager::AddExactSource(
 					? InPrevious->FineSections->Contains(Key) : Previous && Previous->bFineRender;
 				const bool bFineRender =
 					bWantsFine &&
-					IsInsideRadius(
+					IsInsideFineVolume(
 						Delta,
-						bRetainFine ? FineRetainRadius : FineRadius);
+						bRetainFine ? FineRetainRadius : FineRadius,
+						bRetainFine ? FineRetainVerticalRadius : FineVerticalRadius);
 
 				const bool bWarmupData =
-					IsInsideRadius(Delta, WarmupDataRadius);
+					SectionIntersectsRadius(Key, InSource.Center, WarmupDataRadius);
 
 				const bool bWarmupCollision =
 					InSource.bCollision &&
-					IsInsideRadius(Delta, WarmupCollisionRadius);
+					SectionIntersectsRadius(Key, InSource.Center, WarmupCollisionRadius);
 
 				const bool bMovementCriticalCollision =
 					InSource.bCollision &&
@@ -534,6 +595,8 @@ void FVoxelInterestManager::AddExactSource(
 						: 1.0;
 
 				Demand.DistanceCells = FMath::Min(Demand.DistanceCells, Distance);
+				Demand.HorizontalDistanceCells = FMath::Min(Demand.HorizontalDistanceCells,
+					FVector2D(Delta.X, Delta.Y).Size());
 				Demand.ForwardScore = FMath::Max(Demand.ForwardScore, Forward);
 			}
 		}
@@ -552,6 +615,7 @@ void FVoxelInterestManager::AddViewSource(
 	}
 
 	const int32 FineRadius = FMath::Max(0, InViewSettings.FineRadius) + FMath::Max(0, InViewSettings.FinePreload);
+	const int32 FineVerticalRadius = FMath::Max(0, InViewSettings.FineVerticalRadius);
 
 	const int32 ProxyRange =
 		FMath::Max(
@@ -580,9 +644,10 @@ void FVoxelInterestManager::AddViewSource(
 				1,
 				CeilDividePositive(
 					FMath::Max(
-						0,
-						InSource.
-							VerticalExactRadius),
+						FineVerticalRadius,
+						FMath::Max(
+							0,
+							InSource.VerticalExactRadius)),
 					ProxySide));
 
 		const FIntVector ProxyCenter(
@@ -652,12 +717,25 @@ void FVoxelInterestManager::AddViewSource(
 						continue;
 					}
 
-					if (FineRadius > 0 &&
-						Distance +
-							HalfDiagonal <=
-						FineRadius)
+					if (FineRadius > 0 && FineVerticalRadius > 0)
 					{
-						continue;
+						const FVector TileMin = FVector(Coordinate * ProxySide);
+						const FVector TileMax = TileMin + FVector(ProxySide);
+						const double FarX = FMath::Max(
+							FMath::Abs(TileMin.X - InSource.Center.X),
+							FMath::Abs(TileMax.X - InSource.Center.X));
+						const double FarY = FMath::Max(
+							FMath::Abs(TileMin.Y - InSource.Center.Y),
+							FMath::Abs(TileMax.Y - InSource.Center.Y));
+						const bool bInsideFineHorizontal =
+							FarX * FarX + FarY * FarY <= FMath::Square(static_cast<double>(FineRadius));
+						const bool bInsideFineVertical =
+							TileMin.Z >= InSource.Center.Z - FineVerticalRadius &&
+							TileMax.Z <= InSource.Center.Z + FineVerticalRadius;
+						if (bInsideFineHorizontal && bInsideFineVertical)
+						{
+							continue;
+						}
 					}
 
 					InOutInterest.

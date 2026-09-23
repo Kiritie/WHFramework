@@ -43,6 +43,17 @@ bool FVoxelStreamingDemandTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("Non-render source creates no voxel proxies"), Interest.VoxelProxy.IsEmpty());
 	TestTrue(TEXT("Non-render source creates no surface tiles"), Interest.Surface.IsEmpty());
 	TestTrue(TEXT("Non-render source creates no macro tiles"), Interest.Macro.IsEmpty());
+
+	Source.ExactRadius = 64;
+	FVoxelViewSettings SmallWarmupSettings;
+	SmallWarmupSettings.WarmupDataRadius = 12; // 600 cm at a 50 cm cell size.
+	SmallWarmupSettings.WarmupCollisionRadius = 12;
+	const FVoxelInterestSet SmallWarmup = Manager.Compute(
+		MakeArrayView(&Source, 1), Manifest, SmallWarmupSettings);
+	TestTrue(TEXT("Warmup includes the section containing a boundary-aligned source"),
+		SmallWarmup.Warmup.Contains(FIntVector::ZeroValue));
+	TestTrue(TEXT("Warmup collision includes the source section"),
+		SmallWarmup.Exact.FindChecked(FIntVector::ZeroValue).bWarmupCollision);
 	return true;
 }
 
@@ -409,18 +420,23 @@ bool FVoxelFineIndependentRadiusTest::RunTest(const FString& InParameters)
 	FVoxelViewSettings Settings;
 	Settings.FineRadius = 96;
 	Settings.FinePreload = 16;
+	Settings.FineVerticalRadius = 32;
 	FVoxelStreamingSource Source;
 	Source.ExactRadius = 16;
 	Source.CollisionRadius = 16;
 	Source.VerticalExactRadius = 16;
 	Source.RenderMode = EVoxelStreamingRenderMode::FineOnly;
 	const FVoxelInterestSet Interest = FVoxelInterestManager().Compute(MakeArrayView(&Source, 1), Manifest, Settings);
-	for (const FIntVector Key : { FIntVector(5, 0, 0), FIntVector(0, 0, 5), FIntVector(-6, 0, 0) })
+	for (const FIntVector Key : { FIntVector(5, 0, 0), FIntVector(-6, 0, 0), FIntVector(0, 0, 1) })
 	{
 		const FVoxelExactDemand* Demand = Interest.Exact.Find(Key);
-		TestTrue(TEXT("Configured fine radius applies in every axis"), Demand && Demand->bFineRender);
+		TestTrue(TEXT("Configured fine volume includes nearby horizontal and vertical sections"), Demand && Demand->bFineRender);
 		TestFalse(TEXT("Fine range does not enlarge collision or simulation"), Demand && (Demand->bCollision || Demand->bSimulation));
 	}
+	const FVoxelExactDemand* DeepDemand = Interest.Exact.Find(FIntVector(0, 0, 5));
+	TestFalse(TEXT("Fine vertical radius excludes deep invisible sections"), DeepDemand && DeepDemand->bFineRender);
+	TestFalse(TEXT("Deep invisible sections never enter fine admissions"),
+		Interest.FineSections && Interest.FineSections->Contains(FIntVector(0, 0, 5)));
 	for (const auto& Pair : Interest.Exact)
 	{
 		if (!Pair.Value.bFineRender) continue;

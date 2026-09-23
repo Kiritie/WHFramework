@@ -179,10 +179,11 @@ void FVoxelTerrainViewPlan::Build(TConstArrayView<FVoxelStreamingSource> InSourc
 
 bool FVoxelTerrainViewPlan::ResolveNode(const FVoxelViewKey& InNode,
 	TFunctionRef<bool(const FVoxelViewKey&)> InIsReady, const TSet<FVoxelViewKey>& InPreviousAncestors,
-	const TSet<FVoxelViewKey>* InPrevious, const TSet<FVoxelViewKey>* InAvailableBranches,
+	const TSet<FVoxelViewKey>* InPrevious, const TSet<FVoxelViewKey>* InReadyBranches,
 	TArray<FVoxelViewKey>& OutVisible) const
 {
-	if (InAvailableBranches && !InAvailableBranches->Contains(InNode))
+	if (InReadyBranches && !InReadyBranches->Contains(InNode) &&
+		!InPreviousAncestors.Contains(InNode) && (!InPrevious || !InPrevious->Contains(InNode)))
 	{
 		return false;
 	}
@@ -199,7 +200,7 @@ bool FVoxelTerrainViewPlan::ResolveNode(const FVoxelViewKey& InNode,
 		for (int32 Index = 0; Index < 8; ++Index)
 		{
 			const FVoxelViewKey Child { InNode.Coordinate * 2 + FIntVector(Index & 1, (Index >> 1) & 1, (Index >> 2) & 1), static_cast<uint8>(InNode.Level - 1) };
-			bChildrenReady &= ResolveNode(Child, InIsReady, InPreviousAncestors, InPrevious, InAvailableBranches, OutVisible);
+			bChildrenReady &= ResolveNode(Child, InIsReady, InPreviousAncestors, InPrevious, InReadyBranches, OutVisible);
 		}
 		if (bChildrenReady)
 		{
@@ -218,14 +219,20 @@ bool FVoxelTerrainViewPlan::ResolveNode(const FVoxelViewKey& InNode,
 
 void FVoxelTerrainViewPlan::ResolveVisible(TFunctionRef<bool(const FVoxelViewKey&)> InIsReady,
 	TSet<FVoxelViewKey>& OutVisible, const TSet<FVoxelViewKey>* InPrevious,
-	const TSet<FVoxelViewKey>* InReadyNodes) const
+	const TSet<FVoxelViewKey>* InReadyNodes, const TSet<FVoxelViewKey>* InReadyBranches) const
 {
 	TSet<FVoxelViewKey> PreviousAncestors;
 	if (InPrevious)
 	{
+		uint8 RootLevel = 0;
+		for (const FVoxelViewKey& Root : Roots)
+		{
+			RootLevel = FMath::Max(RootLevel, Root.Level);
+		}
 		for (FVoxelViewKey Node : *InPrevious)
 		{
-			while (!Roots.Contains(Node) && Node.Level < 24)
+			// A previous node outside the new root domain cannot be visited by ResolveNode.
+			while (!Roots.Contains(Node) && Node.Level < RootLevel)
 			{
 				Node = Node.GetParent();
 				bool bAlreadyPresent = false;
@@ -234,21 +241,20 @@ void FVoxelTerrainViewPlan::ResolveVisible(TFunctionRef<bool(const FVoxelViewKey
 			}
 		}
 	}
-	TSet<FVoxelViewKey> AvailableBranches;
-	if (InReadyNodes)
+	TSet<FVoxelViewKey> BuiltReadyBranches;
+	if (InReadyNodes && !InReadyBranches)
 	{
-		AvailableBranches = PreviousAncestors;
-		if (InPrevious) AvailableBranches.Append(*InPrevious);
 		for (FVoxelViewKey Node : *InReadyNodes)
 		{
 			while (Node.Level < 24)
 			{
 				bool bAlreadyPresent = false;
-				AvailableBranches.Add(Node, &bAlreadyPresent);
+				BuiltReadyBranches.Add(Node, &bAlreadyPresent);
 				if (bAlreadyPresent || Roots.Contains(Node)) break;
 				Node = Node.GetParent();
 			}
 		}
+		InReadyBranches = &BuiltReadyBranches;
 	}
 	// 上一已提交分区包含合法空节点；没有Actor不等于失去已发布的空间所有权。
 	auto IsAvailable = [&InIsReady, InPrevious](const FVoxelViewKey& Key)
@@ -259,7 +265,7 @@ void FVoxelTerrainViewPlan::ResolveVisible(TFunctionRef<bool(const FVoxelViewKey
 	for (const FVoxelViewKey& Root : Roots)
 	{
 		TArray<FVoxelViewKey> Visible;
-		ResolveNode(Root, IsAvailable, PreviousAncestors, InPrevious, InReadyNodes ? &AvailableBranches : nullptr, Visible);
+		ResolveNode(Root, IsAvailable, PreviousAncestors, InPrevious, InReadyBranches, Visible);
 		for (const FVoxelViewKey& Node : Visible)
 		{
 			OutVisible.Add(Node);

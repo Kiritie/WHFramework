@@ -62,6 +62,15 @@ struct WHFRAMEWORK_API FVoxelWorldReadinessSnapshot
 	int32 RenderablePrimaryFineSections = 0;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	int32 RequiredPlayableFineSections = 0;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	int32 ReadyPlayableFineSections = 0;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	int32 PresentedPlayableFineSections = 0;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	int32 PendingCriticalDependencies = 0;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)

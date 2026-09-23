@@ -22,6 +22,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Voxel|View", meta = (ClampMin = "0"))
 	int32 FineRadiusCentimeters = 8000;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Voxel|View|Warmup", meta = (ClampMin = "0.01", ClampMax = "1.0", ToolTip = "世界达到可游玩状态前，精细网格必须完成的水平半径占Fine Radius的比例。1/3表示先铺满中心三分之一半径。"))
+	float PlayableFineRadiusFraction = 1.0f / 3.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Voxel|View|Warmup", meta = (ClampMin = "0.001", ClampMax = "1.0", ToolTip = "流送源移动达到Fine Radius的这一比例时重新规划。为避免碰撞范围落后，实际阈值最多为碰撞半径的一半。"))
+	float StreamingReplanFineRadiusFraction = 0.05f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Voxel|View", meta = (ClampMin = "0", ToolTip = "Fine精细网格相对观察者的垂直半径。较小值可避免地表下方不可见区块进入Fine构建。"))
+	int32 FineVerticalRadiusCentimeters = 1600;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Voxel|View", meta = (ClampMin = "0"))
 	int32 FinePreloadCentimeters = 800;
 
