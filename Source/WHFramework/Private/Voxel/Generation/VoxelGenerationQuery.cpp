@@ -714,6 +714,9 @@ bool FVoxelGenerationQuery::ComputeBaseColumn(
 	Column.SlopePermille =
 		TerrainSample.SlopePermille;
 
+	Column.Landform =
+		TerrainSample.Landform;
+
 	Column.BiomeIndex =
 		Biome->Resolve(
 			Column.Climate,
@@ -835,6 +838,10 @@ bool FVoxelGenerationQuery::ApplyHydrology(
 		InOutColumn.SurfaceZ = Influence.GroundOverrideZ;
 	}
 	InOutColumn.SurfaceWaterZ = Influence.SurfaceWaterZ;
+	InOutColumn.RiverDistanceCells = Influence.RiverDistanceCells;
+	InOutColumn.BankDistanceCells = Influence.BankDistanceCells;
+	InOutColumn.FloodplainStrengthQ15 = Influence.FloodplainStrengthQ15;
+	InOutColumn.RiverId = Influence.RiverId;
 	InOutColumn.bRiver = Influence.bRiver;
 	InOutColumn.bLake = Influence.bLake;
 	InOutColumn.bOcean = Influence.bOcean;

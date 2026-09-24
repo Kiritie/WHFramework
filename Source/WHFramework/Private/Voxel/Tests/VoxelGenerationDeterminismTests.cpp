@@ -60,6 +60,78 @@ bool FVoxelGenerationMathDeterminismTest::RunTest(const FString& InParameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelLandformEnvironmentTest,
+	"WHFramework.Voxel.Generation.LandformEnvironment",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelLandformEnvironmentTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const TSharedRef<FVoxelGenerationPipeline, ESPMode::ThreadSafe> First = VoxelTest::MakeGenerator(173);
+	const TSharedRef<FVoxelGenerationPipeline, ESPMode::ThreadSafe> Second = VoxelTest::MakeGenerator(173);
+	TArray<FVoxelEnvironmentSample> Grid;
+	FString GridError;
+	if (!TestTrue(TEXT("Natural environment grid resolves"),
+		First->SampleEnvironments(FIntPoint(-33, 29), 3, 2, 16, Grid, GridError)))
+	{
+		AddError(GridError);
+		return false;
+	}
+	TestEqual(TEXT("Natural environment grid count"), Grid.Num(), 6);
+	for (int32 Index = 0; Index < Grid.Num(); ++Index)
+	{
+		const FIntPoint Position(-33 + (Index % 3) * 16,
+			29 + (Index / 3) * 16);
+		FVoxelEnvironmentSample Single;
+		FString Error;
+		if (!TestTrue(TEXT("Natural environment single resolves"),
+			Second->SampleEnvironment(Position.X, Position.Y, Single, Error)))
+		{
+			AddError(Error);
+			return false;
+		}
+		TestEqual(TEXT("Grid preserves natural height"),
+			Grid[Index].Column.SurfaceZ, Single.Column.SurfaceZ);
+		TestEqual(TEXT("Grid preserves natural landform"),
+			Grid[Index].Column.Landform.Dominant, Single.Column.Landform.Dominant);
+		TestEqual(TEXT("Grid preserves natural water"),
+			Grid[Index].Column.SurfaceWaterZ, Single.Column.SurfaceWaterZ);
+		TestEqual(TEXT("Grid preserves river distance"),
+			Grid[Index].Column.RiverDistanceCells, Single.Column.RiverDistanceCells);
+		TestTrue(TEXT("Grid preserves river identity"),
+			Grid[Index].Column.RiverId == Single.Column.RiverId);
+	}
+	TArray<FVoxelEnvironmentSample> InvalidGrid;
+	TestFalse(TEXT("Grid rejects exclusive-bound overflow"),
+		First->SampleEnvironments(FIntPoint(MAX_int32, 0), 1, 1, 1,
+			InvalidGrid, GridError));
+	for (const FIntPoint Point : { FIntPoint(0, 0), FIntPoint(-8193, 2048), FIntPoint(24000, -17000) })
+	{
+		FVoxelEnvironmentSample A;
+		FVoxelEnvironmentSample B;
+		FString Error;
+		if (!TestTrue(TEXT("First environment resolves"), First->SampleEnvironment(Point.X, Point.Y, A, Error)) ||
+			!TestTrue(TEXT("Second environment resolves"), Second->SampleEnvironment(Point.X, Point.Y, B, Error)))
+		{
+			return false;
+		}
+		const FVoxelLandformSample& Shape = A.Column.Landform;
+		const int32 WeightSum = Shape.PlainQ15 + Shape.HillsQ15 + Shape.HighlandQ15 +
+			Shape.MountainQ15 + Shape.PlateauQ15 + Shape.BasinQ15;
+		TestEqual(TEXT("Landform weights sum to Q15"), WeightSum, 32767);
+		TestEqual(TEXT("Natural height is deterministic"), A.Column.SurfaceZ, B.Column.SurfaceZ);
+		TestEqual(TEXT("Landform identity is deterministic"), Shape.Dominant, B.Column.Landform.Dominant);
+		FVoxelColumnSample Column;
+		if (!TestTrue(TEXT("Final column resolves"), First->SampleColumn(Point.X, Point.Y, Column, Error)))
+		{
+			return false;
+		}
+		TestEqual(TEXT("Final query keeps natural landform"), Shape.Dominant, Column.Landform.Dominant);
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FVoxelSurfaceCandidateSupportTest,
 	"WHFramework.Voxel.Generation.SurfaceCandidateSupport",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

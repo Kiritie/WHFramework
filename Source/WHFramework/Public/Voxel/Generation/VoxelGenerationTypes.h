@@ -48,6 +48,56 @@ enum class EVoxelFluidKind : uint8
 	Lava
 };
 
+UENUM(BlueprintType)
+enum class EVoxelLandformKind : uint8
+{
+	None = 0,
+	Plain,
+	RollingHills,
+	Highland,
+	MountainRange,
+	Plateau,
+	Basin
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelLandformGenerationSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "512"))
+	int32 DomainPeriod = 24000;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "512"))
+	int32 ReliefPeriod = 8000;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "512"))
+	int32 HillsPeriod = 5000;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "512"))
+	int32 PlateauPeriod = 12000;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	int32 DomainWarpCells = 512;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	int32 PlainRelief = 32;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	int32 HillRelief = 128;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	int32 HighlandUplift = 256;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	int32 PlateauUplift = 320;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	int32 BasinDepth = 160;
+
+	bool Validate(FString& OutError) const;
+};
+
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelGenerationRange
 {
@@ -200,6 +250,9 @@ struct WHFRAMEWORK_API FVoxelGenerationSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Terrain", meta = (ClampMin = "0"))
 	int32 DetailAmplitude = 12;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Terrain")
+	FVoxelLandformGenerationSettings Landform;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Hydrology", meta = (ClampMin = "1"))
 	int32 HydrologyCellSize = 32;
 
@@ -317,11 +370,24 @@ struct WHFRAMEWORK_API FVoxelClimateSample
 	int32 RidgeQ15 = 0;
 };
 
+struct WHFRAMEWORK_API FVoxelLandformSample
+{
+	EVoxelLandformKind Dominant = EVoxelLandformKind::Plain;
+	int32 PlainQ15 = 0;
+	int32 HillsQ15 = 0;
+	int32 HighlandQ15 = 0;
+	int32 MountainQ15 = 0;
+	int32 PlateauQ15 = 0;
+	int32 BasinQ15 = 0;
+	int32 ReliefQ15 = 0;
+};
+
 struct WHFRAMEWORK_API FVoxelMacroTerrainSample
 {
 	int32 SurfaceZ = 0;
 	int32 DensityHeight = 0;
 	int32 SlopePermille = 0;
+	FVoxelLandformSample Landform;
 };
 
 struct WHFRAMEWORK_API FVoxelColumnSample
@@ -331,13 +397,23 @@ struct WHFRAMEWORK_API FVoxelColumnSample
 	int32 SlopePermille = 0;
 	int32 SurfaceWaterZ = MIN_int32;
 	int32 GroundWaterZ = MIN_int32;
+	int32 RiverDistanceCells = MAX_int32;
+	int32 BankDistanceCells = MAX_int32;
+	int32 FloodplainStrengthQ15 = 0;
+	FVoxelStableId RiverId;
 	uint16 BiomeIndex = MAX_uint16;
 	uint16 SurfaceMaterial = 0;
 	FVoxelClimateSample Climate;
+	FVoxelLandformSample Landform;
 	bool bRiver = false;
 	bool bLake = false;
 	bool bOcean = false;
 	bool bCoast = false;
+};
+
+struct WHFRAMEWORK_API FVoxelEnvironmentSample
+{
+	FVoxelColumnSample Column;
 };
 
 struct WHFRAMEWORK_API FVoxelSurfaceCandidate

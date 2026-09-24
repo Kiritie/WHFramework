@@ -338,10 +338,9 @@ bool FVoxelStructurePlanner::Plan(
 
 			if (!BuildInstance(
 				DefinitionIndex,
-				Definition,
-				Anchor,
-				Column,
-				Instance,
+					Definition,
+					Anchor,
+					Instance,
 				OutError))
 			{
 				return false;
@@ -399,6 +398,33 @@ bool FVoxelStructurePlanner::Plan(
 
 	OutError.Reset();
 	return true;
+}
+
+bool FVoxelStructurePlanner::BuildAt(
+	const FVoxelPlannedStructurePlacement& InPlacement,
+	FVoxelStructureInstance& OutInstance,
+	FString& OutError) const
+{
+	if (!InPlacement.IsValid())
+	{
+		OutError = TEXT("Planned voxel structure placement is invalid");
+		return false;
+	}
+	const int32 DefinitionIndex = Recipe->FindStructure(InPlacement.DefinitionId);
+	if (!Recipe->Structures.IsValidIndex(DefinitionIndex))
+	{
+		OutError = FString::Printf(TEXT("Unknown planned voxel structure definition: %s"),
+			*InPlacement.DefinitionId.ToString());
+		return false;
+	}
+	return BuildInstance(
+		DefinitionIndex,
+		Recipe->Structures[DefinitionIndex],
+		InPlacement.Anchor,
+		OutInstance,
+		OutError,
+		InPlacement.Id,
+		InPlacement.Yaw);
 }
 
 void FVoxelStructurePlanner::GatherCandidates(
@@ -506,9 +532,10 @@ bool FVoxelStructurePlanner::BuildInstance(
 	int32 InDefinitionIndex,
 	const FVoxelStructureRuntimeDefinition& InDefinition,
 	const FIntVector& InCandidate,
-	const FVoxelColumnSample& InColumn,
 	FVoxelStructureInstance& OutInstance,
-	FString& OutError) const
+	FString& OutError,
+	TOptional<FVoxelStableId> InId,
+	TOptional<uint8> InRootYaw) const
 {
 	const uint64 CandidateSeed =
 		VoxelGeneration::MakeSeed(
@@ -528,10 +555,27 @@ bool FVoxelStructurePlanner::BuildInstance(
 		return false;
 	}
 
+	if (InRootYaw.IsSet())
+	{
+		for (FVoxelStructurePiecePlacement& Placement : Pieces)
+		{
+			if (InDefinition.LayoutAlgorithmId.IsNone())
+			{
+				Placement.Yaw = InRootYaw.GetValue();
+			}
+			else
+			{
+				Placement.Origin = RotateCorner(Placement.Origin, InRootYaw.GetValue());
+				Placement.Yaw = (Placement.Yaw + InRootYaw.GetValue()) & 3;
+			}
+		}
+	}
+
 	FVoxelStructureInstance Instance;
 
-	Instance.Id =
-		VoxelGeneration::MakeStableId(
+	Instance.Id = InId.IsSet()
+		? InId.GetValue()
+		: VoxelGeneration::MakeStableId(
 			Recipe->Settings.Seed,
 			InCandidate,
 			InDefinition.StableHash,

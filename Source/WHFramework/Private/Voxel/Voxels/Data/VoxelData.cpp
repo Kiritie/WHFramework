@@ -24,10 +24,24 @@ bool UVoxelData::ValidateDefinition(bool Render,FString&E)const
     {E=TEXT("This non-cube shape must use bSolid=false");return false;}
     if((EntityKind==100&&(EntityVariant<1||EntityVariant>2))||(EntityKind!=100&&EntityVariant!=0)){E=TEXT("Invalid entity variant");return false;}
     if(EntityKind!=0&&EntityKind!=1&&EntityKind!=2&&EntityKind!=100&&EntityKind!=101){E=TEXT("Unsupported voxel entity kind");return false;}
+    for(int32 Half=0;Half<(Shape==EVoxelShapeKind::Door?2:1);++Half)
+    {
+        const FVoxelFaceMaterialSet& Set=Half?UpperFaceMaterials:FaceMaterials;
+        for(uint8 Face=0;Face<6;++Face)
+        {
+            const FVoxelFaceTexture& Material=Set.Get(Face);
+            if(Material.ShadingMode!=EVoxelFaceShadingMode::PaletteColor)continue;
+            const FLinearColor& Color=Material.PaletteColor;
+            if(RenderGroup!=EVoxelRenderGroup::Opaque||Material.FrameCount!=1||Material.FramesPerSecond!=0||
+                !FMath::IsFinite(Color.R)||!FMath::IsFinite(Color.G)||!FMath::IsFinite(Color.B)||
+                Color.R<0.f||Color.R>1.f||Color.G<0.f||Color.G>1.f||Color.B<0.f||Color.B>1.f)
+            {E=TEXT("Palette faces require an opaque static block and finite unit-range color");return false;}
+        }
+    }
     if(Render)
     {
-        if(BakeVersion!=2||BakedFaces.Num()!=6||(Shape==EVoxelShapeKind::Door&&BakedUpperFaces.Num()!=6))
-        {E=TEXT("Missing texture-array bake version 2");return false;}
+        if(BakeVersion!=3||BakedFaces.Num()!=6||(Shape==EVoxelShapeKind::Door&&BakedUpperFaces.Num()!=6))
+        {E=TEXT("Missing texture-array bake version 3");return false;}
         FVoxelRuntimeFaceRef R;for(const auto&F:BakedFaces)if(!F.ToRuntime(R)){E=TEXT("Invalid baked face");return false;}
         for(const auto&F:BakedUpperFaces)if(!F.ToRuntime(R)){E=TEXT("Invalid baked upper face");return false;}
     }

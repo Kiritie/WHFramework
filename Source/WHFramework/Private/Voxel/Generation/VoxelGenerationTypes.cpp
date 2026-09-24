@@ -101,6 +101,20 @@ bool FVoxelEcologyGenerationSettings::Validate(FString& OutError) const
 	return Tree.Validate(OutError) && Grass.Validate(OutError);
 }
 
+bool FVoxelLandformGenerationSettings::Validate(FString& OutError) const
+{
+	if (DomainPeriod < 512 || ReliefPeriod < 512 || HillsPeriod < 512 || PlateauPeriod < 512 ||
+		DomainWarpCells < 0 || DomainWarpCells > DomainPeriod / 8 ||
+		PlainRelief < 0 || HillRelief < 0 || HighlandUplift < 0 ||
+		PlateauUplift < 0 || BasinDepth < 0)
+	{
+		OutError = TEXT("Voxel landform settings are invalid");
+		return false;
+	}
+	OutError.Reset();
+	return true;
+}
+
 bool FVoxelGenerationSettings::Validate(FString& OutError) const
 {
 	if (MinZ >= MaxZ) { OutError = TEXT("Voxel generation MinZ must be lower than MaxZ"); return false; }
@@ -110,6 +124,7 @@ bool FVoxelGenerationSettings::Validate(FString& OutError) const
 	if (BaseHeight < MinZ || BaseHeight >= MaxZ) { OutError = TEXT("Voxel generation BaseHeight is outside world height"); return false; }
 	if (ContinentalPeriod <= 0 || ErosionPeriod <= 0 || MountainPeriod <= 0 || ClimatePeriod <= 0 || DetailPeriod <= 0) { OutError = TEXT("Voxel generation noise periods must be positive"); return false; }
 	if (ContinentalAmplitude < 0 || MountainAmplitude < 0 || DetailAmplitude < 0) { OutError = TEXT("Voxel generation terrain amplitudes cannot be negative"); return false; }
+	if (!Landform.Validate(OutError)) { return false; }
 	if (HydrologyCellSize <= 0) { OutError = TEXT("Voxel hydrology cell size must be positive"); return false; }
 	if (HydrologyRegionSide < 8 || HydrologyRegionSide > 2048) { OutError = TEXT("Voxel hydrology region side is outside the supported range"); return false; }
 	if (RiverSourceAccumulation <= 0) { OutError = TEXT("Voxel river source accumulation must be positive"); return false; }

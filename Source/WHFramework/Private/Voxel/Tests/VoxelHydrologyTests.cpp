@@ -34,6 +34,18 @@ bool FVoxelHydrologyDrainageTest::RunTest(const FString& InParameters)
 		TArray<uint32> Path;
 		TestTrue(TEXT("Drainage route terminates"), VoxelHydrology::TraceDrainage(Input, First, Source, 16, Path, Error));
 		TestEqual(TEXT("Drainage route ends at certified outlet"), Path.Last(), uint32(8));
+		bool bDescended = false;
+		for (int32 Index = 1; Index < Path.Num(); ++Index)
+		{
+			const int32 Upstream = First.SpillPlane[Path[Index - 1]];
+			const int32 Downstream = First.SpillPlane[Path[Index]];
+			TestTrue(TEXT("Downstream water never rises"), Downstream <= Upstream);
+			bDescended |= Downstream < Upstream;
+		}
+		if (Source == 0)
+		{
+			TestTrue(TEXT("Gradient basin route descends"), bDescended);
+		}
 	}
 	return true;
 }
@@ -174,8 +186,8 @@ bool FVoxelHydrologyRiverHeightTest::RunTest(const FString& InParameters)
 			bHasLocalWaterHeight |= Point.WaterZ != Recipe->Settings.SeaLevel + 4;
 			if (PointIndex > 0)
 			{
-				const int32 Delta = FMath::Abs(Point.WaterZ - Route.Points[PointIndex - 1].WaterZ);
-				TestTrue(TEXT("Adjacent route water heights stay continuous"), Delta <= Recipe->Settings.MaxZ - Recipe->Settings.MinZ);
+				TestTrue(TEXT("Route water never rises downstream"),
+					Point.WaterZ <= Route.Points[PointIndex - 1].WaterZ);
 			}
 		}
 	}
@@ -202,7 +214,7 @@ bool FVoxelHydrologyHighlandRiverTest::RunTest(const FString& InParameters)
 	FString Error;
 	TestTrue(TEXT("Highland hydrology region builds"), FVoxelHydrologyGenerator(Recipe, Terrain).BuildPlan({ FIntPoint(0, 0) }, Plan, Error));
 	bool bFoundHighlandPoint = false;
-	bool bFoundDescendingRoute = false;
+	bool bFoundRoute = false;
 	for (const FVoxelRiverRoute& Route : Plan.Rivers)
 	{
 		for (int32 PointIndex = 0; PointIndex < Route.Points.Num(); ++PointIndex)
@@ -213,14 +225,73 @@ bool FVoxelHydrologyHighlandRiverTest::RunTest(const FString& InParameters)
 				bFoundHighlandPoint = true;
 				TestNotEqual(TEXT("Highland river is not clamped to global river level"), Point.WaterZ, Recipe->Settings.SeaLevel + 4);
 			}
-			if (PointIndex > 0 && Point.WaterZ < Route.Points[PointIndex - 1].WaterZ)
+			if (PointIndex > 0)
 			{
-				bFoundDescendingRoute = true;
+				bFoundRoute = true;
+				TestTrue(TEXT("Highland route water never rises downstream"),
+					Point.WaterZ <= Route.Points[PointIndex - 1].WaterZ);
 			}
 		}
 	}
 	TestTrue(TEXT("A river route contains highland water"), bFoundHighlandPoint);
-	TestTrue(TEXT("River water follows drainage downhill"), bFoundDescendingRoute);
+	TestTrue(TEXT("Highland region contains a route segment"), bFoundRoute);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelHydrologyInfluenceContextTest,
+	"WHFramework.Voxel.Hydrology.InfluenceContext",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelHydrologyInfluenceContextTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelHydrologyPlan Plan;
+	Plan.Grid.WorldMinCell = FIntPoint(-2, -2);
+	Plan.Grid.Width = 8;
+	Plan.Grid.Height = 8;
+	Plan.Grid.CellSize = 32;
+	FVoxelRiverRoute Route;
+	Route.Id.High = 1;
+	Route.Id.Low = 2;
+	FVoxelRiverRoutePoint A;
+	A.Position = FIntPoint(0, 0);
+	A.WaterZ = 10;
+	A.HalfWidth = 4;
+	A.Depth = 4;
+	FVoxelRiverRoutePoint B = A;
+	B.Position = FIntPoint(32, 0);
+	Route.Points = { A, B };
+	Plan.Rivers.Add(Route);
+	Plan.Finalize();
+
+	FVoxelHydrologyInfluence Channel;
+	if (!TestTrue(TEXT("Channel influence resolves"),
+		Plan.Sample(16, 0, 12, Channel)))
+	{
+		return false;
+	}
+	TestTrue(TEXT("Channel carries the route identity"), Channel.RiverId == Route.Id);
+	TestEqual(TEXT("Channel centerline distance"), Channel.RiverDistanceCells, 0);
+	TestTrue(TEXT("Channel is wet"), Channel.bRiver);
+	TestEqual(TEXT("Channel floodplain strength"), Channel.FloodplainStrengthQ15, 32767);
+
+	FVoxelHydrologyInfluence Shore;
+	if (!TestTrue(TEXT("Dry shore influence resolves"),
+		Plan.Sample(16, 10, 12, Shore)))
+	{
+		return false;
+	}
+	TestTrue(TEXT("Dry shore keeps river identity"), Shore.RiverId == Route.Id);
+	TestFalse(TEXT("Dry shore is not river water"), Shore.bRiver);
+	TestTrue(TEXT("Dry shore has floodplain influence"),
+		Shore.FloodplainStrengthQ15 > 0 && Shore.FloodplainStrengthQ15 < 32767);
+	TestTrue(TEXT("Dry shore has bank distance"), Shore.BankDistanceCells > 0);
+
+	FVoxelHydrologyInfluence Far;
+	TestFalse(TEXT("Far cell has no local river influence"),
+		Plan.Sample(16, 128, 12, Far));
+	TestEqual(TEXT("Far cell has no river distance"), Far.RiverDistanceCells, MAX_int32);
 	return true;
 }
 

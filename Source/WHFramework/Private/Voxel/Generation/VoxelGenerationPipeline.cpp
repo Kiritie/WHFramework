@@ -3,15 +3,58 @@
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Generation/VoxelGenerationQuery.h"
 
+namespace
+{
+	bool MakeColumnGridBounds(
+		const FVoxelGenerationSettings& InSettings,
+		const FIntPoint& InOrigin,
+		const int32 InWidth,
+		const int32 InHeight,
+		const int32 InStep,
+		FVoxelGenerationBounds& OutBounds,
+		int32& OutCount,
+		FString& OutError)
+	{
+		if (InWidth <= 0 || InHeight <= 0 ||
+			InWidth > 4096 || InHeight > 4096 || InStep <= 0)
+		{
+			OutError = TEXT("Voxel column grid parameters are invalid");
+			return false;
+		}
+
+		const int64 Count = static_cast<int64>(InWidth) * InHeight;
+		const int64 LastX = static_cast<int64>(InOrigin.X) +
+			static_cast<int64>(InWidth - 1) * InStep;
+		const int64 LastY = static_cast<int64>(InOrigin.Y) +
+			static_cast<int64>(InHeight - 1) * InStep;
+		if (Count > MAX_int32 || LastX >= MAX_int32 || LastY >= MAX_int32)
+		{
+			OutError = TEXT("Voxel column grid exceeds coordinate range");
+			return false;
+		}
+
+		OutBounds = {
+			FIntVector(InOrigin.X, InOrigin.Y, InSettings.MinZ),
+			FIntVector(static_cast<int32>(LastX + 1),
+				static_cast<int32>(LastY + 1), InSettings.MaxZ)
+		};
+		OutCount = static_cast<int32>(Count);
+		OutError.Reset();
+		return true;
+	}
+}
+
 FVoxelGenerationPipeline::FVoxelGenerationPipeline(
 	TSharedRef<
 		const FVoxelGenerationRuntimeConfig,
 		ESPMode::ThreadSafe> InConfig,
 	TSharedRef<
 		FVoxelGenerationPlanCache,
-		ESPMode::ThreadSafe> InCache)
+		ESPMode::ThreadSafe> InCache,
+	TSharedPtr<const IVoxelGenerationOverlay, ESPMode::ThreadSafe> InOverlay)
 	: Config(InConfig)
 	, Cache(InCache)
+	, Overlay(MoveTemp(InOverlay))
 {
 }
 
@@ -81,6 +124,12 @@ bool FVoxelGenerationPipeline::GenerateSection(
 		}
 	}
 
+	if (Overlay && !Overlay->ApplySection(InSectionCoordinate, Blocks,
+		OutError, InCancel))
+	{
+		return false;
+	}
+
 	OutBaseBlocks =
 		MoveTemp(Blocks);
 
@@ -95,6 +144,12 @@ bool FVoxelGenerationPipeline::SampleColumn(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	if (InX == MAX_int32 || InY == MAX_int32)
+	{
+		OutError = TEXT("Voxel column exceeds coordinate range");
+		return false;
+	}
+
 	const FVoxelGenerationBounds Bounds {
 		FIntVector(
 			InX,
@@ -130,6 +185,83 @@ bool FVoxelGenerationPipeline::SampleColumn(
 		OutError);
 }
 
+bool FVoxelGenerationPipeline::SampleEnvironment(
+	const int32 InX,
+	const int32 InY,
+	FVoxelEnvironmentSample& OutSample,
+	FString& OutError,
+	const TAtomic<bool>* InCancel) const
+{
+	if (InX == MAX_int32 || InY == MAX_int32)
+	{
+		OutError = TEXT("Voxel environment exceeds coordinate range");
+		return false;
+	}
+
+	FVoxelGenerationQuery Query;
+	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError))
+	{
+		return false;
+	}
+	return Query.SampleEnvironmentColumn(
+		InX, InY, OutSample.Column, OutError, InCancel);
+}
+
+bool FVoxelGenerationPipeline::SampleEnvironments(
+	const FIntPoint& InOrigin,
+	const int32 InWidth,
+	const int32 InHeight,
+	const int32 InStep,
+	TArray<FVoxelEnvironmentSample>& OutSamples,
+	FString& OutError,
+	const TAtomic<bool>* InCancel,
+	const bool bInUseColumnCache) const
+{
+	FVoxelGenerationBounds Bounds;
+	int32 Count = 0;
+	if (!MakeColumnGridBounds(Config->Recipe->Settings, InOrigin,
+		InWidth, InHeight, InStep, Bounds, Count, OutError))
+	{
+		return false;
+	}
+
+	FVoxelGenerationQuery Query;
+	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError,
+			bInUseColumnCache) ||
+		!Query.PrepareColumns(Bounds, OutError, InCancel))
+	{
+		return false;
+	}
+
+	TArray<FVoxelEnvironmentSample> Samples;
+	Samples.SetNumUninitialized(Count);
+	int32 Index = 0;
+	for (int32 Y = 0; Y < InHeight; ++Y)
+	{
+		if (InCancel && InCancel->Load())
+		{
+			OutError = TEXT("Canceled");
+			return false;
+		}
+		for (int32 X = 0; X < InWidth; ++X)
+		{
+			const int32 WorldX = static_cast<int32>(
+				static_cast<int64>(InOrigin.X) + static_cast<int64>(X) * InStep);
+			const int32 WorldY = static_cast<int32>(
+				static_cast<int64>(InOrigin.Y) + static_cast<int64>(Y) * InStep);
+			if (!Query.SampleEnvironmentColumn(WorldX, WorldY,
+				Samples[Index++].Column, OutError, InCancel))
+			{
+				return false;
+			}
+		}
+	}
+
+	OutSamples = MoveTemp(Samples);
+	OutError.Reset();
+	return true;
+}
+
 bool FVoxelGenerationPipeline::SampleColumns(
 	const FIntPoint& InOrigin,
 	const int32 InWidth,
@@ -140,68 +272,13 @@ bool FVoxelGenerationPipeline::SampleColumns(
 	const TAtomic<bool>* InCancel,
 	const bool bInUseColumnCache) const
 {
-	if (InWidth <= 0 ||
-		InHeight <= 0 ||
-		InWidth > 4096 ||
-		InHeight > 4096 ||
-		InStep <= 0)
+	FVoxelGenerationBounds Bounds;
+	int32 Count = 0;
+	if (!MakeColumnGridBounds(Config->Recipe->Settings, InOrigin,
+		InWidth, InHeight, InStep, Bounds, Count, OutError))
 	{
-		OutError =
-			TEXT("Voxel column grid parameters are invalid");
-
 		return false;
 	}
-
-	const int64 Count64 =
-		static_cast<int64>(InWidth) *
-		InHeight;
-
-	if (Count64 <= 0 ||
-		Count64 > MAX_int32)
-	{
-		OutError =
-			TEXT("Voxel column grid size is invalid");
-
-		return false;
-	}
-
-	const int64 LastX =
-		static_cast<int64>(
-			InOrigin.X) +
-		static_cast<int64>(
-			InWidth - 1) *
-		InStep;
-
-	const int64 LastY =
-		static_cast<int64>(
-			InOrigin.Y) +
-		static_cast<int64>(
-			InHeight - 1) *
-		InStep;
-
-	if (LastX < MIN_int32 ||
-		LastX > MAX_int32 ||
-		LastY < MIN_int32 ||
-		LastY > MAX_int32)
-	{
-		OutError =
-			TEXT("Voxel column grid exceeds coordinate range");
-
-		return false;
-	}
-
-	const FVoxelGenerationBounds Bounds {
-		FIntVector(
-			InOrigin.X,
-			InOrigin.Y,
-			Config->Recipe->
-				Settings.MinZ),
-		FIntVector(
-			static_cast<int32>(LastX) + 1,
-			static_cast<int32>(LastY) + 1,
-			Config->Recipe->
-				Settings.MaxZ)
-	};
 
 	FVoxelGenerationQuery Query;
 
@@ -220,8 +297,7 @@ bool FVoxelGenerationPipeline::SampleColumns(
 	}
 
 	TArray<FVoxelColumnSample> Columns;
-	Columns.SetNumUninitialized(
-		static_cast<int32>(Count64));
+	Columns.SetNumUninitialized(Count);
 
 	int32 Index = 0;
 
@@ -243,10 +319,8 @@ bool FVoxelGenerationPipeline::SampleColumns(
 			++X)
 		{
 			if (!Query.SampleColumn(
-				InOrigin.X +
-					X * InStep,
-				InOrigin.Y +
-					Y * InStep,
+				static_cast<int32>(static_cast<int64>(InOrigin.X) + static_cast<int64>(X) * InStep),
+				static_cast<int32>(static_cast<int64>(InOrigin.Y) + static_cast<int64>(Y) * InStep),
 				Columns[Index++],
 				OutError))
 			{

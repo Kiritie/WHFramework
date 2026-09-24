@@ -77,7 +77,7 @@ void AppendQuad(FVoxelMeshBuffers&O,const FVector*P,const FVector2D*UV,const FVo
     {
         O.Vertices.Add(P[I]+Cell);O.Normals.Add(Normal);O.UV0.Add(UV[I]);O.UV1.Add(FVector2D(T.Layer,T.Frames));O.UV2.Add(FVector2D(T.FPS,0));
         const float Wind=bPlantWind&&G==EVoxelRenderGroup::Foliage?float(FMath::Clamp(P[I].Z,0.0,1.0)):0.f;
-        O.Colors.Add(FLinearColor(Wind,0,1,1));O.Tangents.Add(FProcMeshTangent(Tangent,false));
+        O.Colors.Add(G==EVoxelRenderGroup::Opaque?T.Tint:FLinearColor(Wind,0,1,1));O.Tangents.Add(FProcMeshTangent(Tangent,false));
     }
 	O.Triangles.Append({N, N + 2, N + 1, N, N + 3, N + 2});}
 }

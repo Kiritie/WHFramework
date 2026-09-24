@@ -257,6 +257,9 @@ bool FVoxelHydrologyPlan::Sample(
 
 	int32 BestDistance =
 		MAX_int32;
+	int32 BestBankExtent = 0;
+	int32 BestShoreExtent = 0;
+	FVoxelStableId BestRiverId;
 
 	FVoxelRiverSection
 		BestSection;
@@ -441,6 +444,9 @@ bool FVoxelHydrologyPlan::Sample(
 			{
 				BestDistance =
 					Distance;
+				BestBankExtent = Shape.HalfWidth + Shape.BankWidth;
+				BestShoreExtent = BestBankExtent + Shape.ShoreWidth;
+				BestRiverId = River.Id;
 
 				BestSection =
 					Section;
@@ -448,6 +454,16 @@ bool FVoxelHydrologyPlan::Sample(
 				bHasRiver = true;
 			}
 		}
+	}
+	if (bHasRiver)
+	{
+		Result.RiverId = BestRiverId;
+		Result.RiverDistanceCells = BestDistance;
+		Result.BankDistanceCells = FMath::Max(0, BestDistance - BestBankExtent);
+		Result.FloodplainStrengthQ15 = BestDistance <= BestBankExtent ?
+			32767 : static_cast<int32>(
+				static_cast<int64>(FMath::Max(0, BestShoreExtent - BestDistance)) *
+				32767 / FMath::Max(1, BestShoreExtent - BestBankExtent));
 	}
 
 	if (bHasRiver &&

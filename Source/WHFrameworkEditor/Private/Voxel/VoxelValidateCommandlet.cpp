@@ -97,12 +97,14 @@ int32 UVoxelValidateCommandlet::Main(const FString& Params)
             for (uint8 Face = 0; Face < 6; ++Face)
             {
                 const FVoxelFaceTexture& FaceTexture = Source.Get(Face);
-                UTexture2D* Texture = FaceTexture.Texture.LoadSynchronous();
-                if (!Texture || !Texture->Source.IsValid() || FaceTexture.FrameCount < 1 ||
+                UTexture2D* Texture = FaceTexture.ShadingMode == EVoxelFaceShadingMode::Textured ?
+                    FaceTexture.Texture.LoadSynchronous() : nullptr;
+                if (FaceTexture.ShadingMode == EVoxelFaceShadingMode::Textured &&
+                    (!Texture || !Texture->Source.IsValid() || FaceTexture.FrameCount < 1 ||
                     FaceTexture.FrameCount > 256 || FaceTexture.FramesPerSecond < 0 ||
                     FaceTexture.FramesPerSecond > 60 || Texture->Source.GetSizeX() <= 0 ||
                     Texture->Source.GetSizeX() > 4096 ||
-                    int64(Texture->Source.GetSizeY()) != int64(Texture->Source.GetSizeX()) * FaceTexture.FrameCount)
+                    int64(Texture->Source.GetSizeY()) != int64(Texture->Source.GetSizeX()) * FaceTexture.FrameCount))
                 {
                     Issue(Path, TEXT("SourceFrames"), FString::Printf(TEXT("Invalid texture/frame strip at half %d face %d"), Half, Face));
                 }

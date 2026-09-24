@@ -4,7 +4,7 @@
 namespace
 {
 	constexpr uint32 VoxelRecipeMagic = 0x31524356;
-	constexpr uint32 VoxelRecipeSchemaVersion = 3;
+	constexpr uint32 VoxelRecipeSchemaVersion = 4;
 	constexpr int32 MaxRecipeBytes = 32 * 1024 * 1024;
 	constexpr int32 MaxRecipeArrayCount = 1 << 20;
 
@@ -139,6 +139,16 @@ namespace
 		Writer.I32(Value.ContinentalAmplitude);
 		Writer.I32(Value.MountainAmplitude);
 		Writer.I32(Value.DetailAmplitude);
+		Writer.I32(Value.Landform.DomainPeriod);
+		Writer.I32(Value.Landform.ReliefPeriod);
+		Writer.I32(Value.Landform.HillsPeriod);
+		Writer.I32(Value.Landform.PlateauPeriod);
+		Writer.I32(Value.Landform.DomainWarpCells);
+		Writer.I32(Value.Landform.PlainRelief);
+		Writer.I32(Value.Landform.HillRelief);
+		Writer.I32(Value.Landform.HighlandUplift);
+		Writer.I32(Value.Landform.PlateauUplift);
+		Writer.I32(Value.Landform.BasinDepth);
 		Writer.I32(Value.HydrologyCellSize);
 		Writer.I32(Value.HydrologyRegionSide);
 		Writer.I32(Value.RiverSourceAccumulation);
@@ -184,6 +194,16 @@ namespace
 		Result.ContinentalAmplitude = Reader.I32();
 		Result.MountainAmplitude = Reader.I32();
 		Result.DetailAmplitude = Reader.I32();
+		Result.Landform.DomainPeriod = Reader.I32();
+		Result.Landform.ReliefPeriod = Reader.I32();
+		Result.Landform.HillsPeriod = Reader.I32();
+		Result.Landform.PlateauPeriod = Reader.I32();
+		Result.Landform.DomainWarpCells = Reader.I32();
+		Result.Landform.PlainRelief = Reader.I32();
+		Result.Landform.HillRelief = Reader.I32();
+		Result.Landform.HighlandUplift = Reader.I32();
+		Result.Landform.PlateauUplift = Reader.I32();
+		Result.Landform.BasinDepth = Reader.I32();
 		Result.HydrologyCellSize = Reader.I32();
 		Result.HydrologyRegionSide = Reader.I32();
 		Result.RiverSourceAccumulation = Reader.I32();

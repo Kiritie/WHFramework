@@ -18,9 +18,16 @@ namespace
         TArray<uint8> Pixels;FVoxelBakedFaceRef Baked;
     };
     FString KeyOf(EVoxelRenderGroup Group,const FVoxelFaceTexture& F)
-    {return FString::Printf(TEXT("%u|%s|%d|%d"),uint8(Group),*F.Texture.ToSoftObjectPath().ToString(),F.FrameCount,F.FramesPerSecond);}
+    {return F.ShadingMode==EVoxelFaceShadingMode::PaletteColor?
+        FString::Printf(TEXT("%u|palette-white"),uint8(Group)):
+        FString::Printf(TEXT("%u|%s|%d|%d"),uint8(Group),*F.Texture.ToSoftObjectPath().ToString(),F.FrameCount,F.FramesPerSecond);}
     bool ReadFrames(FSource& S,int32 Tile,FString& Error)
     {
+        if(S.Face.ShadingMode==EVoxelFaceShadingMode::PaletteColor)
+        {
+            S.Pixels.Init(255,Tile*Tile*4);
+            return true;
+        }
         UTexture2D* T=S.Face.Texture.LoadSynchronous();
         if(!T||!T->Source.IsValid()||S.Face.FrameCount<1||S.Face.FrameCount>256||S.Face.FramesPerSecond<0||S.Face.FramesPerSecond>60)
         {Error=TEXT("Invalid source texture: ")+S.Key;return false;}
@@ -110,9 +117,9 @@ bool FVoxelTextureArrayBuilder::Build(const TArray<UVoxelData*>& Assets,UVoxelMa
             const auto& Face=(H?A->UpperFaceMaterials:A->FaceMaterials).Get(F);
             (H?A->BakedUpperFaces:A->BakedFaces).Add(Sources[Lookup.FindChecked(KeyOf(A->RenderGroup,Face))].Baked);
         }
-        A->BakeVersion=2;
+        A->BakeVersion=3;
     }
-    Set.Modify();Set.Banks=MoveTemp(Banks);Set.BakeVersion=2;
+    Set.Modify();Set.Banks=MoveTemp(Banks);Set.BakeVersion=3;
     for(UVoxelData* A:Assets)if(!FVoxelEditorAssetIO::Save(A,Error))return false;
     return FVoxelEditorAssetIO::Save(&Set,Error);
 }

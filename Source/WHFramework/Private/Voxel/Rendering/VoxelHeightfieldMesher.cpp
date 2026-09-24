@@ -157,8 +157,7 @@ void FVoxelHeightfieldMesher::AppendQuad(
 				InFace.FPS,
 				0.0));
 
-		InOutMesh.Colors.Add(
-			InColor);
+		InOutMesh.Colors.Add(InFace.Tint * InColor);
 
 		InOutMesh.Tangents.Add(
 			FProcMeshTangent(

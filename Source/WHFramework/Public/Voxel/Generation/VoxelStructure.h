@@ -51,6 +51,19 @@ struct WHFRAMEWORK_API FVoxelStructureInstance
 	uint64 GetAllocatedBytes() const;
 };
 
+struct WHFRAMEWORK_API FVoxelPlannedStructurePlacement
+{
+	FVoxelStableId Id;
+	FName DefinitionId;
+	FIntVector Anchor = FIntVector::ZeroValue;
+	uint8 Yaw = 0;
+
+	bool IsValid() const
+	{
+		return Id.IsValid() && !DefinitionId.IsNone() && Yaw < 4;
+	}
+};
+
 struct WHFRAMEWORK_API FVoxelStructureLayoutContext
 {
 	int32 WorldSeed = 0;
@@ -129,6 +142,11 @@ public:
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr) const;
 
+	bool BuildAt(
+		const FVoxelPlannedStructurePlacement& InPlacement,
+		FVoxelStructureInstance& OutInstance,
+		FString& OutError) const;
+
 private:
 	void GatherCandidates(
 		const FVoxelStructureRuntimeDefinition& InDefinition,
@@ -139,9 +157,10 @@ private:
 		int32 InDefinitionIndex,
 		const FVoxelStructureRuntimeDefinition& InDefinition,
 		const FIntVector& InCandidate,
-		const FVoxelColumnSample& InColumn,
 		FVoxelStructureInstance& OutInstance,
-		FString& OutError) const;
+		FString& OutError,
+		TOptional<FVoxelStableId> InId = {},
+		TOptional<uint8> InRootYaw = {}) const;
 
 	bool BuildPiecePlacements(
 		const FVoxelStructureRuntimeDefinition& InDefinition,

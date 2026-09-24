@@ -28,6 +28,7 @@ class FVoxelDetailView;
 class FVoxelEmergeManager;
 class FVoxelGenerationPipeline;
 class FVoxelGenerationPlanCache;
+class IVoxelGenerationOverlay;
 class FVoxelInterestManager;
 class FVoxelResidencyManager;
 class FVoxelShapeRegistry;
@@ -171,6 +172,15 @@ public:
 	FVoxelWorldInitialized OnWorldInitialized;
 
 protected:
+	/** Project-specific authored content that changes the generated base world. */
+	virtual uint64 GetGenerationIdentitySalt() const;
+
+	virtual bool CreateGenerationOverlay(
+		TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InNaturalGenerator,
+		TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry,
+		TSharedPtr<const IVoxelGenerationOverlay, ESPMode::ThreadSafe>& OutOverlay,
+		FString& OutError) const;
+
 	virtual void LoadData(const FParameter& InData, EPhase InPhase) override;
 	virtual FParameter GetData() override;
 	virtual FParameter ToData() override;

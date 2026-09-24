@@ -22,13 +22,34 @@ int32 UVoxelWorldBakeCommandlet::Main(const FString& Params)
     const bool ValidateOnly=FParse::Param(*Params,TEXT("ValidateOnly"));
     auto* P=LoadObject<UVoxelWorldGenerationProfile>(nullptr,*Path);
     if(!P){UE_LOG(LogTemp,Error,TEXT("Cannot load generation profile: %s"),*Path);return 2;}
+    int32 RiverSourceAccumulation = 0;
+    if (FParse::Value(*Params, TEXT("RiverSourceAccumulation="), RiverSourceAccumulation))
+    {
+        if (RiverSourceAccumulation < 1)
+        {
+            UE_LOG(LogTemp, Error, TEXT("River source accumulation must be positive"));
+            return 2;
+        }
+        P->Defaults.RiverSourceAccumulation = RiverSourceAccumulation;
+    }
+    int32 RiverSourceSpacing = 0;
+    if (FParse::Value(*Params, TEXT("RiverSourceSpacing="), RiverSourceSpacing))
+    {
+        if (RiverSourceSpacing < 1)
+        {
+            UE_LOG(LogTemp, Error, TEXT("River source spacing must be positive"));
+            return 2;
+        }
+        P->Defaults.RiverSourceSpacing = RiverSourceSpacing;
+    }
     FString E;TArray<FString> Report;
     if(!VoxelBuiltinFeatures::Register(E)){UE_LOG(LogTemp,Error,TEXT("Builtin feature registration: %s"),*E);return 3;}
     if(!ValidateOnly)for(const auto& D:P->Details)
     {auto* A=D.LoadSynchronous();if(!A||!FVoxelDetailBaker::Bake(*A,Root,E)){UE_LOG(LogTemp,Error,TEXT("Detail bake: %s"),*E);return 3;}}
     auto& AR=FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get();AR.SearchAllAssets(true);
     FARFilter Filter;Filter.ClassPaths.Add(UVoxelData::StaticClass()->GetClassPathName());Filter.bRecursiveClasses=true;
-    Filter.PackagePaths.Add(TEXT("/WHFramework/Voxel/DataAssets"));Filter.PackagePaths.Add(TEXT("/Game/DataAssets/Voxel"));Filter.bRecursivePaths=true;
+    Filter.PackagePaths.Add(TEXT("/WHFramework/Voxel/DataAssets"));Filter.PackagePaths.Add(TEXT("/Game/DataAssets/Voxel"));
+    Filter.PackagePaths.Add(TEXT("/Game/VoxelStyle/Blocks"));Filter.bRecursivePaths=true;
     TArray<FAssetData> Found;AR.GetAssets(Filter,Found);TArray<UVoxelData*> Blocks;
     for(const FAssetData& A:Found)if(auto* D=Cast<UVoxelData>(A.GetAsset()))Blocks.Add(D);
     FVoxelRegistry Registry;

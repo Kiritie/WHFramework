@@ -207,6 +207,10 @@ struct WHFRAMEWORK_API FVoxelHydrologyInfluence
 {
     int32 SurfaceWaterZ = MIN_int32;
     int32 GroundOverrideZ = MIN_int32;
+	int32 RiverDistanceCells = MAX_int32;
+	int32 BankDistanceCells = MAX_int32;
+	int32 FloodplainStrengthQ15 = 0;
+	FVoxelStableId RiverId;
 
     bool bRiver = false;
     bool bLake = false;

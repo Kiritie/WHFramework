@@ -203,4 +203,56 @@ bool FVoxelStructureFeatureOwnershipTest::RunTest(const FString& InParameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelStructureBuildAtTest,
+	"WHFramework.Voxel.Generation.StructureBuildAt",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelStructureBuildAtTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelGenerationRecipe Recipe = *VoxelTest::MakeGenerationConfig()->Recipe;
+	FVoxelStructureRuntimeDefinition Definition;
+	Definition.StableId = TEXT("test:planned_house");
+	Definition.StableHash = 0x67B3310A9405E119ull;
+	Definition.Stage = EVoxelGenerationStage::SurfaceStructures;
+	FVoxelStructurePieceTemplate Piece;
+	Piece.StableId = TEXT("test:house_piece");
+	Piece.Bounds = { FIntVector::ZeroValue, FIntVector(2, 1, 1) };
+	Piece.Writes.Add({ FIntVector::ZeroValue, 2, 1 });
+	Piece.ClearVolumes.Add(Piece.Bounds);
+	Piece.Details.Add({ TEXT("test:door"), FIntVector(1, 0, 0), 0 });
+	Definition.Pieces.Add(Piece);
+	Recipe.Structures.Add(Definition);
+	FString Error;
+	if (!TestTrue(TEXT("Planned recipe lookups build"), Recipe.BuildLookups(Error)))
+	{
+		return false;
+	}
+	const FVoxelStructurePlanner Planner(
+		MakeShared<const FVoxelGenerationRecipe, ESPMode::ThreadSafe>(MoveTemp(Recipe)));
+	FVoxelPlannedStructurePlacement Placement;
+	Placement.Id = VoxelGeneration::MakeStableId(173, FIntVector(50, -20, 17), 29);
+	Placement.DefinitionId = Definition.StableId;
+	Placement.Anchor = FIntVector(50, -20, 17);
+	Placement.Yaw = 1;
+	FVoxelStructureInstance Instance;
+	if (!TestTrue(TEXT("Exact structure placement builds"), Planner.BuildAt(Placement, Instance, Error)))
+	{
+		return false;
+	}
+	TestTrue(TEXT("World fact identity is retained"), Instance.Id == Placement.Id);
+	TestEqual(TEXT("Anchor is exact"), Instance.Anchor, Placement.Anchor);
+	TestEqual(TEXT("Requested yaw is used"), Instance.Pieces[0].Yaw, uint8(1));
+	TestEqual(TEXT("Both cells rasterize"), Instance.Writes.Num(), 2);
+	TestEqual(TEXT("First cell rotates"), Instance.Writes[0].Position, FIntVector(49, -20, 17));
+	TestEqual(TEXT("Second cell rotates"), Instance.Writes[1].Position, FIntVector(49, -19, 17));
+	TestEqual(TEXT("Clear volume rotates"), Instance.ClearVolumes[0].Bounds.Min, FIntVector(49, -20, 17));
+	TestEqual(TEXT("Detail rotates"), Instance.Details[0].Position, FIntVector(50, -19, 17));
+	TestTrue(TEXT("Detail shares world fact identity"), Instance.Details[0].OwnerId == Placement.Id);
+	Placement.Yaw = 4;
+	TestFalse(TEXT("Invalid yaw is rejected"), Planner.BuildAt(Placement, Instance, Error));
+	return true;
+}
+
 #endif

@@ -31,7 +31,15 @@ bool FVoxelRegistry::Build(const TArray<UVoxelData*>&In,bool Render,FString&E)
         D.Shape=A->Shape;D.RenderGroup=A->RenderGroup;D.bSolid=A->bSolid;D.bOccludes=A->bOccludes;D.bReplaceable=A->bReplaceable;
         D.bBreakable=A->bBreakable;D.BreakMilliseconds=A->BreakMilliseconds;
         if(Render)for(uint8 F=0;F<6;++F){if(!A->BakedFaces[F].ToRuntime(D.Faces[F]))return false;
-            D.UpperFaces[F]=D.Faces[F];if(D.Shape==EVoxelShapeKind::Door&&!A->BakedUpperFaces[F].ToRuntime(D.UpperFaces[F]))return false;}
+            const FVoxelFaceTexture& Source=A->FaceMaterials.Get(F);
+            D.Faces[F].Tint=Source.ShadingMode==EVoxelFaceShadingMode::PaletteColor?Source.PaletteColor:FLinearColor::White;
+            D.UpperFaces[F]=D.Faces[F];
+            if(D.Shape==EVoxelShapeKind::Door)
+            {
+                if(!A->BakedUpperFaces[F].ToRuntime(D.UpperFaces[F]))return false;
+                const FVoxelFaceTexture& Upper=A->UpperFaceMaterials.Get(F);
+                D.UpperFaces[F].Tint=Upper.ShadingMode==EVoxelFaceShadingMode::PaletteColor?Upper.PaletteColor:FLinearColor::White;
+            }}
         R->Definitions.Add(D);R->Names.Add(D.BlockName,D.TypeId);R->Assets.Add(D.AssetID,D.TypeId);
         W.U16(D.TypeId);W.String(D.BlockName.ToString());W.String(D.AssetID.ToString());W.String(D.DropAssetID.ToString());
         W.U8(uint8(D.Shape));W.U8(uint8(D.RenderGroup));W.U8(D.bSolid);W.U8(D.bOccludes);W.U8(D.bReplaceable);W.U8(D.bBreakable);

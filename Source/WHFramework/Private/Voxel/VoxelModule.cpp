@@ -79,7 +79,8 @@ namespace
 	}
 
 	uint64 BuildGenerationSignature(
-		const FVoxelWorldManifest& InManifest)
+		const FVoxelWorldManifest& InManifest,
+		const uint64 InContentSalt)
 	{
 		const uint64 Fingerprint =
 			FVoxelManifestCodec::RecipeFingerprint(
@@ -92,13 +93,17 @@ namespace
 			return 0;
 		}
 
+		const uint64 ContentIdentity = InContentSalt == 0
+			? 0
+			: VoxelBinary::Mix64(InContentSalt);
 		const uint64 Signature =
 			VoxelBinary::Mix64(
 				Fingerprint ^
 				VoxelBinary::Mix64(
 					InManifest.RegistryHash) ^
 				VoxelBinary::Mix64(
-					InManifest.RecipeHash));
+					InManifest.RecipeHash) ^
+				ContentIdentity);
 
 		return Signature == 0
 			? 1
@@ -182,6 +187,24 @@ UVoxelModule::~UVoxelModule()
 	FString Error;
 	StopWorld(true, Error);
 	TERMINATION_MODULE(UVoxelModule)
+}
+
+bool UVoxelModule::CreateGenerationOverlay(
+	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InNaturalGenerator,
+	TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry,
+	TSharedPtr<const IVoxelGenerationOverlay, ESPMode::ThreadSafe>& OutOverlay,
+	FString& OutError) const
+{
+	(void)InNaturalGenerator;
+	(void)InRegistry;
+	OutOverlay.Reset();
+	OutError.Reset();
+	return true;
+}
+
+uint64 UVoxelModule::GetGenerationIdentitySalt() const
+{
+	return 0;
 }
 
 #if WITH_EDITOR
@@ -521,7 +544,8 @@ bool UVoxelModule::CreateWorld(
 
 	NewManifest.BaseSampleHash =
 		BuildGenerationSignature(
-			NewManifest);
+			NewManifest,
+			GetGenerationIdentitySalt());
 
 	if (NewManifest.BaseSampleHash == 0)
 	{
@@ -649,7 +673,8 @@ bool UVoxelModule::StartWorld(
 	}
 	const uint64 ExpectedGenerationSignature =
 		BuildGenerationSignature(
-			Manifest);
+			Manifest,
+			GetGenerationIdentitySalt());
 	if (ExpectedGenerationSignature == 0 ||
 		Manifest.BaseSampleHash != ExpectedGenerationSignature ||
 		Epoch == MAX_uint64)
@@ -661,9 +686,23 @@ bool UVoxelModule::StartWorld(
 	}
 
 	GenerationCache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>(false);
-	Generator = MakeShared<const FVoxelGenerationPipeline, ESPMode::ThreadSafe>(
+	const TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> NaturalGenerator =
+		MakeShared<const FVoxelGenerationPipeline, ESPMode::ThreadSafe>(
 		GenerationConfig.ToSharedRef(),
 		GenerationCache.ToSharedRef());
+	TSharedPtr<const IVoxelGenerationOverlay, ESPMode::ThreadSafe> Overlay;
+	if (!CreateGenerationOverlay(NaturalGenerator, Registry.GetSnapshot().ToSharedRef(),
+		Overlay, OutError))
+	{
+		GenerationCache.Reset();
+		GenerationConfig.Reset();
+		WorldState = EVoxelWorldState::Failed;
+		return false;
+	}
+	Generator = Overlay ?
+		MakeShared<const FVoxelGenerationPipeline, ESPMode::ThreadSafe>(
+			GenerationConfig.ToSharedRef(), GenerationCache.ToSharedRef(), Overlay) :
+		NaturalGenerator;
 
 	++Epoch;
 	Runtime = MakeUnique<FVoxelWorldRuntime>(
@@ -2295,7 +2334,7 @@ bool UVoxelModule::ValidateWorldData(const FParameter& InData, FString& OutError
 		return false;
 	}
 	const uint64 ExpectedGenerationSignature =
-		BuildGenerationSignature(SavedManifest);
+		BuildGenerationSignature(SavedManifest, GetGenerationIdentitySalt());
 	if (ExpectedGenerationSignature == 0 ||
 		ExpectedGenerationSignature != SavedManifest.BaseSampleHash)
 	{

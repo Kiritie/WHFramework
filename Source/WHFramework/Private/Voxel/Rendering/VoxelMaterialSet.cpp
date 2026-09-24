@@ -4,7 +4,7 @@ const FVoxelMaterialBank* UVoxelMaterialSet::FindBank(EVoxelRenderGroup G,uint16
 {for(const auto&V:Banks)if(V.Group==G&&V.Bank==B)return &V;return nullptr;}
 bool UVoxelMaterialSet::Validate(FString&E)const
 {
-    if(BakeVersion!=2){E=TEXT("MaterialSet bake version mismatch");return false;}TSet<uint32>Seen;
+    if(BakeVersion!=3){E=TEXT("MaterialSet bake version mismatch");return false;}TSet<uint32>Seen;
     for(const auto&B:Banks)
     {
         if(uint8(B.Group)>5||B.Bank<0||B.Bank>65535||B.SliceCount<=0||B.SliceCount>65536||!B.Textures||!B.Material)

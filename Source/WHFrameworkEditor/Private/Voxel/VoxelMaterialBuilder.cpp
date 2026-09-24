@@ -46,9 +46,26 @@ UMaterial* FVoxelMaterialBuilder::BuildMaster(const FString& Path,EVoxelRenderGr
     auto* Sample=Node<UMaterialExpressionTextureSampleParameter2DArray>(M,-350,0);
     Sample->ParameterName=TEXT("VoxelArray");Sample->Texture=Array;Sample->SamplerType=SAMPLERTYPE_Color;
     Sample->Coordinates.Connect(0,Coord);
-    bool OK=UMaterialEditingLibrary::ConnectMaterialProperty(Sample,TEXT("RGB"),MP_BaseColor);
-    auto* Rough=Node<UMaterialExpressionConstant>(M,-300,360);Rough->R=Trans?0.12f:0.85f;
+    UMaterialExpression* BaseColor=Sample;
+    if(Group==EVoxelRenderGroup::Opaque)
+    {
+        auto* Stylized=Node<UMaterialExpressionCustom>(M,-100,0);
+        Stylized->OutputType=CMOT_Float3;
+        Stylized->Description=TEXT("World palette tint and restrained per-cell color variation");
+		Stylized->Code=TEXT("float3 cell=floor(P/25.0); float h=frac(sin(dot(cell,float3(17.13,43.71,11.97)))*43758.5453); return saturate(Tex.rgb*Tint.rgb*lerp(0.96,1.04,h));");
+        AddInput(Stylized,TEXT("Tex"),Sample);
+        AddInput(Stylized,TEXT("Tint"),Color);
+        AddInput(Stylized,TEXT("P"),Pos);
+        BaseColor=Stylized;
+    }
+    bool OK=UMaterialEditingLibrary::ConnectMaterialProperty(BaseColor,TEXT(""),MP_BaseColor);
+    auto* Rough=Node<UMaterialExpressionConstant>(M,-300,360);Rough->R=Trans?0.12f:0.9f;
     OK&=UMaterialEditingLibrary::ConnectMaterialProperty(Rough,TEXT(""),MP_Roughness);
+    if(Group==EVoxelRenderGroup::Opaque)
+    {
+        auto* Specular=Node<UMaterialExpressionConstant>(M,-300,470);Specular->R=0.16f;
+        OK&=UMaterialEditingLibrary::ConnectMaterialProperty(Specular,TEXT(""),MP_Specular);
+    }
     if(M->BlendMode==BLEND_Masked)OK&=UMaterialEditingLibrary::ConnectMaterialProperty(Sample,TEXT("A"),MP_OpacityMask);
     if(Group==EVoxelRenderGroup::Emissive)OK&=UMaterialEditingLibrary::ConnectMaterialProperty(Sample,TEXT("RGB"),MP_EmissiveColor);
     if(Trans)
