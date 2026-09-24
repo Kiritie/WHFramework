@@ -4,6 +4,7 @@
 #include "Main/Base/ModuleBase.h"
 #include "Voxel/Interaction/VoxelRaycast.h"
 #include "Voxel/Interaction/VoxelEditTypes.h"
+#include "Voxel/Map/VoxelMapTileCache.h"
 #include "Voxel/Generation/VoxelWorldManifest.h"
 #include "Voxel/Collision/VoxelCollisionPresenter.h"
 #include "Voxel/Rendering/VoxelDetailView.h"
@@ -30,6 +31,7 @@ class FVoxelGenerationPipeline;
 class FVoxelGenerationPlanCache;
 class IVoxelGenerationOverlay;
 class FVoxelInterestManager;
+class FVoxelMapTileCache;
 class FVoxelResidencyManager;
 class FVoxelShapeRegistry;
 class FVoxelTaskScheduler;
@@ -106,6 +108,7 @@ public:
 	TSharedPtr<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> GetGenerator() const;
 	TSharedPtr<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> GetGenerationConfig() const;
 	TSharedPtr<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> GetGenerationCache() const;
+	FVoxelMapTileCache* GetMapTileCache() const;
 	const FVoxelRegionStore& GetRegionStore() const;
 	const FVoxelInterestSet& GetCurrentInterest() const;
 	const FVoxelViewSettings& GetViewSettings() const { return ViewSettings; }
@@ -262,6 +265,7 @@ private:
 	TUniquePtr<FVoxelEmergeManager> EmergeManager;
 	TUniquePtr<FVoxelResidencyManager> ResidencyManager;
 	TUniquePtr<FVoxelTaskScheduler> Scheduler;
+	TUniquePtr<FVoxelMapTileCache> MapTileCache;
 	TUniquePtr<FVoxelViewManager> ViewManager;
 	TUniquePtr<FVoxelCollisionPresenter> CollisionPresenter;
 	TUniquePtr<FVoxelDetailView> DetailView;

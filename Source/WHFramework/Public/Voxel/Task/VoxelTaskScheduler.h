@@ -42,6 +42,7 @@ enum class EVoxelTaskKind : uint8
 	DecodeOverlay,
 	EncodeRegion,
 	NetworkRepresentation,
+	BuildMapTile,
 
 	// 项目层允许复用 Voxel Scheduler 的纯后台任务。
 	// 不参与 Voxel 内部 ApplyTask switch。

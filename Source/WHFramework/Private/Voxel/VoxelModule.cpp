@@ -29,6 +29,7 @@
 #include "Voxel/Interaction/VoxelEditTransaction.h"
 #include "Voxel/Interaction/VoxelInventoryTransaction.h"
 #include "Voxel/Network/VoxelModuleNetworkComponent.h"
+#include "Voxel/Map/VoxelMapTileCache.h"
 #include "Voxel/Save/VoxelBlockEntityCodec.h"
 #include "Voxel/Save/VoxelDeltaCodec.h"
 #include "Voxel/Save/VoxelSceneColumnCodec.h"
@@ -736,6 +737,12 @@ bool UVoxelModule::StartWorld(
 	TaskBudget.MaxSurfaceApplyPerFrame = ViewSettings.SurfaceBuildsPerFrame;
 	TaskBudget.MaxMacroApplyPerFrame = ViewSettings.MacroBuildsPerFrame;
 	Scheduler->SetBudget(TaskBudget);
+	if (GetWorld()->GetNetMode() != NM_DedicatedServer)
+	{
+		MapTileCache = MakeUnique<FVoxelMapTileCache>(
+			*Scheduler, Generator.ToSharedRef(), GenerationConfig.ToSharedRef(),
+			Epoch, BlockSize());
+	}
 	UE_LOG(LogTemp, Display, TEXT("Voxel worker budget: cores=%d workers=%d reservedMiB=%llu"),
 		FPlatformMisc::NumberOfCores(), TaskBudget.MaxConcurrentTasks, TaskBudget.MaxReservedBytes / (1024ull * 1024ull));
 	UE_LOG(LogTemp, Display, TEXT("Voxel frame budget: Fine=%d Proxy=%d Surface=%d Macro=%d Data=%d Results=%d Heavy=%d AdmissionMs=%.2f"),
@@ -860,6 +867,7 @@ bool UVoxelModule::StopWorld(const bool bDiscardDirty, FString& OutError)
 	{
 		Scheduler->StopAndJoin();
 	}
+	MapTileCache.Reset();
 	if (ViewManager)
 	{
 		ViewManager->Reset();
@@ -1086,6 +1094,11 @@ TSharedPtr<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> UVoxelModul
 TSharedPtr<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> UVoxelModule::GetGenerationCache() const
 {
 	return GenerationCache;
+}
+
+FVoxelMapTileCache* UVoxelModule::GetMapTileCache() const
+{
+	return MapTileCache.Get();
 }
 
 const FVoxelRegionStore& UVoxelModule::GetRegionStore() const

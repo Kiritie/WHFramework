@@ -2,7 +2,9 @@
 
 #include "Misc/AutomationTest.h"
 #include "Voxel/Geometry/VoxelSectionMesher.h"
+#include "Voxel/Map/VoxelMapTileCache.h"
 #include "HAL/PlatformProcess.h"
+#include "Engine/Texture2D.h"
 #include "EngineGlobals.h"
 #include "Voxel/Streaming/VoxelInterestManager.h"
 #include "Voxel/Streaming/VoxelResidencyManager.h"
@@ -561,6 +563,80 @@ bool FVoxelEmptyMeshApplyTest::RunTest(const FString& Parameters)
 	Result.bCanceled = false;
 	Result.Kind = EVoxelTaskKind::BuildCollision;
 	TestTrue(TEXT("Collision keeps its heavy apply protection"), Result.HasHeavyApply());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelMapTileCoverageTest,
+	"WHFramework.Voxel.Map.TileCoverage",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelMapTileCoverageTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	TestEqual(TEXT("Near map step"), FVoxelMapTileCache::SelectStep(0.3f), 16);
+	TestEqual(TEXT("Regional map step"), FVoxelMapTileCache::SelectStep(0.02f), 512);
+	FSceneMapView View;
+	View.Center = FVector2D(-25.0, -25.0);
+	View.Range = 500000.f;
+	View.Yaw = 45.f;
+	TArray<FVoxelMapTileKey> Keys;
+	FVoxelMapTileCache::VisibleTiles(View, FVector2D(1000.0, 700.0), 25.0, Keys);
+	TestTrue(TEXT("Rotated view includes negative tile coordinates"),
+		Keys.ContainsByPredicate([](const FVoxelMapTileKey& Key)
+		{
+			return Key.Coordinate.X < 0 && Key.Coordinate.Y < 0;
+		}));
+	TestTrue(TEXT("Map tile count stays bounded"), Keys.Num() > 0 && Keys.Num() <= 1089);
+	for (const FVoxelMapTileKey& Key : Keys)
+	{
+		TestEqual(TEXT("All visible tiles share one LOD"), Key.Step, 128);
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelMapTileBuildTest,
+	"WHFramework.Voxel.Map.BackgroundTileBuild",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelMapTileBuildTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const auto Config = VoxelTest::MakeGenerationConfig();
+	const auto Generator = MakeShared<const FVoxelGenerationPipeline, ESPMode::ThreadSafe>(
+		Config, MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>());
+	FVoxelTaskScheduler Scheduler;
+	FVoxelMapTileCache Cache(Scheduler, Generator, Config, 1, 25.0);
+	const FVoxelMapTileKey Key { FIntPoint(-1, 0), 16 };
+	const FVoxelMapTileKey WorldKey { FIntPoint(0, 0), 512 };
+	TArray<FVoxelMapTileKey> Requested;
+	Requested.Add(Key);
+	Requested.Add(WorldKey);
+	FSceneMapView View;
+	Cache.Request(Requested, View);
+	const double Deadline = FPlatformTime::Seconds() + 90.0;
+	while ((!Cache.FindBrush(Key) || !Cache.FindBrush(WorldKey)) &&
+		FPlatformTime::Seconds() < Deadline)
+	{
+		Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
+		FPlatformProcess::Sleep(0.01f);
+	}
+	const FSlateBrush* Brush = Cache.FindBrush(Key);
+	TestNotNull(TEXT("Natural tile reaches the texture cache"), Brush);
+	TestNotNull(TEXT("20 km world map tile reaches the texture cache"),
+		Cache.FindBrush(WorldKey));
+	if (Brush)
+	{
+		const UTexture2D* Texture = Cast<UTexture2D>(Brush->GetResourceObject());
+		TestNotNull(TEXT("Tile has an actual texture"), Texture);
+		if (Texture)
+		{
+			TestEqual(TEXT("Tile texture width"), Texture->GetSizeX(), FVoxelMapTileCache::TileSide);
+			TestEqual(TEXT("Tile texture height"), Texture->GetSizeY(), FVoxelMapTileCache::TileSide);
+		}
+	}
+	Scheduler.StopAndJoin();
 	return true;
 }
 
