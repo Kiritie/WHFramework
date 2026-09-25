@@ -5,6 +5,7 @@
 
 struct FVoxelGenerationRuntimeConfig;
 struct FVoxelRegistrySnapshot;
+struct FVoxelMacroTileData;
 struct FVoxelWaterSurfaceTileData;
 
 class WHFRAMEWORK_API FVoxelHeightfieldMesher
@@ -23,6 +24,15 @@ public:
 		TConstArrayView<uint8> InCoverage = {},
 		double InZBiasCells = 0.0,
 		int32 InSkirtDepthCells = 0,
+		double InMaximumTextureStretchCells = 4.0);
+
+	static bool BuildMacro(
+		const FVoxelMacroTileData& InMacro,
+		const FVoxelGenerationRuntimeConfig& InConfig,
+		const FVoxelRegistrySnapshot& InRegistry,
+		FVoxelSectionMeshResult& OutMesh,
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr,
 		double InMaximumTextureStretchCells = 4.0);
 
 	static bool BuildTerrain(

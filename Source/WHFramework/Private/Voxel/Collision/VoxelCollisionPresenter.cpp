@@ -49,7 +49,7 @@ void FVoxelCollisionPresenter::RebuildWanted(
 	Wanted.Reset();
 	for (const TPair<FIntVector, FVoxelExactDemand>& Pair : InDemand)
 	{
-		if (Pair.Value.bCollision)
+		if (Pair.Value.bCollision || Pair.Value.bWarmupCollision)
 		{
 			Wanted.Add(Pair.Key, Pair.Value);
 		}

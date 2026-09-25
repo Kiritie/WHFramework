@@ -6,6 +6,7 @@
 struct WHFRAMEWORK_API FVoxelChangeHierarchy
 {
 public:
+	void SetVoxelProxyNaturalInfluence(int32 InHorizontalCells, int32 InUpwardCells);
 	uint64 InvalidateSection(const FIntVector& InSection);
 	uint64 GetSectionRevision(const FIntVector& InSection) const;
 	uint64 GetVoxelProxyRevision(const FVoxelViewKey& InProxyKey) const;
@@ -23,6 +24,8 @@ public:
 private:
 	mutable FRWLock Lock;
 	uint64 RevisionSerial = 0;
+	int32 VoxelProxyHorizontalInfluence = 0;
+	int32 VoxelProxyUpwardInfluence = 0;
 	TMap<FIntVector, uint64> SectionRevision;
 	TMap<FVoxelViewKey, uint64> VoxelProxyRevision;
 	TMap<FVoxelSurfaceTileKey, uint64> SurfaceRevision;

@@ -3,6 +3,8 @@
 #include "Misc/AutomationTest.h"
 #include "Voxel/Rendering/VoxelViewLod.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "Voxel/Generation/VoxelGenerationQuery.h"
+#include "Voxel/Generation/Ecology/VoxelEcology.h"
 #include "Voxel/Rendering/VoxelHeightfieldMesher.h"
 #include "Voxel/Rendering/VoxelMeshClipper.h"
 #include "Voxel/Rendering/VoxelMacroTerrain.h"
@@ -279,6 +281,7 @@ bool FVoxelProxyOverlaySnapshotTest::RunTest(const FString& InParameters)
 	{
 		FVoxelOverlaySnapshot& Overlay = Overlays.Sections.FindOrAdd(Section);
 		Overlay.Section = Section;
+		Overlay.Blocks.Add(272, FVoxelBlockState());
 		Overlay.Blocks.Add(273, FVoxelBlockState());
 	}
 	const FVoxelOverlaySnapshotSet Captured = Overlays;
@@ -290,6 +293,135 @@ bool FVoxelProxyOverlaySnapshotTest::RunTest(const FString& InParameters)
 		Builder.Build({ FIntVector(-1, 0, 0), 1 }, Captured, Data, Error))) return false;
 	TestTrue(TEXT("Negative-coordinate edit comes from captured version"), Data.Cells[0].IsAir());
 	TestTrue(TEXT("Neighbour halo uses the same edit snapshot"), Data.Halo[0][0].IsAir());
+
+	FVoxelOverlaySnapshotSet Placed;
+	FVoxelOverlaySnapshot& AboveGround = Placed.Sections.FindOrAdd(FIntVector(0, 0, 128));
+	AboveGround.Section = FIntVector(0, 0, 128);
+	AboveGround.Blocks.Add(0, FVoxelBlockState(1, 0));
+	FVoxelVoxelProxyData Natural;
+	FVoxelVoxelProxyData Built;
+	const FVoxelViewKey ElevatedKey{ FIntVector(0, 0, 64), 1 };
+	if (!TestTrue(TEXT("Elevated natural proxy builds"),
+		Builder.BuildNatural(ElevatedKey, Natural, Error))) return false;
+	if (!TestTrue(TEXT("Elevated edited proxy builds"),
+		Builder.Build(ElevatedKey, Placed, Built, Error))) return false;
+	TestTrue(TEXT("Elevated natural cell is air"), Natural.Cells[0].IsAir());
+	TestEqual(TEXT("Off-center player block contributes to distant silhouette"),
+		Built.Cells[0].Pack(), FVoxelBlockState(1, 0).Pack());
+	FVoxelOverlaySnapshotSet CoarseBuilding;
+	FVoxelOverlaySnapshot& BuildingSection =
+		CoarseBuilding.Sections.FindOrAdd(FIntVector(0, 0, 8));
+	BuildingSection.Section = FIntVector(0, 0, 8);
+	BuildingSection.Blocks.Add(0, FVoxelBlockState(1, 0));
+	BuildingSection.Blocks.Add(1, FVoxelBlockState(1, 0));
+	FVoxelVoxelProxyData CoarseBuilt;
+	if (!TestTrue(TEXT("Coarse player-built silhouette builds"),
+		Builder.Build({ FIntVector(0, 0, 1), 3 }, CoarseBuilding,
+			CoarseBuilt, Error))) return false;
+	TestEqual(TEXT("Small wall fragment survives distant voxel coarsening"),
+		CoarseBuilt.Cells[0].Pack(), FVoxelBlockState(1, 0).Pack());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelProxyTreeSilhouetteTest,
+	"WHFramework.Voxel.Rendering.ProxyTreeSilhouette",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelProxyTreeSilhouetteTest::RunTest(const FString& InParameters)
+{
+	FVoxelGenerationRuntimeConfig MutableConfig = *VoxelTest::MakeGenerationConfig();
+	FVoxelGenerationRecipe Recipe = *MutableConfig.Recipe;
+	Recipe.Settings.SeaLevel = -64;
+	Recipe.Settings.Ecology.Tree.bEnabled = true;
+	Recipe.Settings.Ecology.Tree.Spacing = 4;
+	Recipe.Settings.Ecology.Tree.ChancePermille = 1000;
+	Recipe.Settings.Ecology.Tree.MinHeight = 8;
+	Recipe.Settings.Ecology.Tree.MaxHeight = 8;
+	Recipe.Settings.Ecology.Tree.CrownRadius = 2;
+	Recipe.Settings.Ecology.Tree.MaxSlopePermille = 10000;
+	Recipe.Settings.Ecology.Tree.Temperature = {-32768, 32767};
+	Recipe.Settings.Ecology.Tree.Moisture = {-32768, 32767};
+	Recipe.Settings.Ecology.Tree.bAllowNearWater = true;
+	Recipe.Ecology.TreeTrunk = 8;
+	Recipe.Ecology.TreeLeaves = 9;
+	MutableConfig.Recipe = MakeShared<const FVoxelGenerationRecipe, ESPMode::ThreadSafe>(MoveTemp(Recipe));
+	const TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config =
+		MakeShared<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe>(MoveTemp(MutableConfig));
+	const auto Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
+	FVoxelGenerationQuery Query;
+	FString Error;
+	if (!TestTrue(TEXT("Tree test query creates"),
+		FVoxelGenerationQuery::Create(Config, Cache, Query, Error))) return false;
+	const FVoxelEcologyGenerator Ecology(Config->Recipe.ToSharedRef());
+	auto SampleColumn = [&Query, &Error](const FIntVector& Position,
+		FVoxelColumnSample& Column)
+	{
+		return Query.SampleEnvironmentColumn(Position.X, Position.Y, Column, Error);
+	};
+	auto SampleBase = [&SampleColumn, &Config](const FIntVector& Position,
+		uint32& Symbol)
+	{
+		FVoxelColumnSample Column;
+		if (!SampleColumn(Position, Column)) return false;
+		Symbol = Position.Z <= Column.SurfaceZ ?
+			Config->Recipe->Palette.Stone : Config->Recipe->Palette.Air;
+		return true;
+	};
+	int32 Candidates = 0;
+	int32 Accepted = 0;
+	FIntVector FirstAnchor = FIntVector::ZeroValue;
+	Ecology.EnumerateTrees({FIntVector(0, 0, -64), FIntVector(32, 32, 128)},
+		SampleColumn, SampleBase,
+		[&FirstAnchor](const FIntVector& Anchor, const int32 Height,
+			const FVoxelStableId)
+		{
+			if (FirstAnchor == FIntVector::ZeroValue) FirstAnchor = Anchor;
+		}, Candidates, Accepted);
+	if (!TestTrue(TEXT("Tree planner accepts candidates"), Accepted > 0)) return false;
+	const FVoxelViewKey Key{
+		FIntVector(VoxelGeneration::FloorDivide(FirstAnchor.X, 32),
+			VoxelGeneration::FloorDivide(FirstAnchor.Y, 32),
+			VoxelGeneration::FloorDivide(FirstAnchor.Z + 7, 32)), 1 };
+	const FVoxelGenerationBounds Bounds = Key.GetBounds();
+	const int32 Crown = Config->Recipe->Settings.Ecology.Tree.CrownRadius;
+	const FVoxelGenerationBounds TreeBounds{
+		FIntVector(Bounds.Min.X - Crown, Bounds.Min.Y - Crown, Config->Recipe->Settings.MinZ),
+		FIntVector(Bounds.Max.X + Crown, Bounds.Max.Y + Crown, Config->Recipe->Settings.MaxZ)
+	};
+	FVoxelOverlaySnapshotSet Removed;
+	Candidates = 0;
+	Accepted = 0;
+	Ecology.EnumerateTrees(TreeBounds, SampleColumn, SampleBase,
+		[&Removed](const FIntVector& Anchor, const int32 Height, const FVoxelStableId)
+		{
+			const FIntVector Section(
+				VoxelGeneration::FloorDivide(Anchor.X, 16),
+				VoxelGeneration::FloorDivide(Anchor.Y, 16),
+				VoxelGeneration::FloorDivide(Anchor.Z, 16));
+			const FIntVector Local = Anchor - Section * 16;
+			FVoxelOverlaySnapshot& Snapshot = Removed.Sections.FindOrAdd(Section);
+			Snapshot.Section = Section;
+			Snapshot.Blocks.Add(Local.X + Local.Y * 16 + Local.Z * 256,
+				FVoxelBlockState());
+		}, Candidates, Accepted);
+	const FVoxelVoxelProxyBuilder Builder(Config, Cache);
+	FVoxelVoxelProxyData Natural;
+	FVoxelVoxelProxyData Destroyed;
+	if (!TestTrue(TEXT("Tree proxy builds"),
+		Builder.Build(Key, {}, Natural, Error)) ||
+		!TestTrue(TEXT("Destroyed tree proxy builds"),
+			Builder.Build(Key, Removed, Destroyed, Error))) return false;
+	int32 NaturalTreeCells = 0;
+	int32 DestroyedTreeCells = 0;
+	for (int32 Index = 0; Index < Natural.Cells.Num(); ++Index)
+	{
+		NaturalTreeCells += Natural.Cells[Index].TypeId == 8 || Natural.Cells[Index].TypeId == 9;
+		DestroyedTreeCells += Destroyed.Cells[Index].TypeId == 8 || Destroyed.Cells[Index].TypeId == 9;
+	}
+	TestTrue(TEXT("Distant proxy shows planned trees"), NaturalTreeCells > 0);
+	TestEqual(TEXT("Removed tree anchors hide distant tree silhouettes"),
+		DestroyedTreeCells, 0);
 	return true;
 }
 
@@ -393,6 +525,50 @@ bool FVoxelMacroOverlayTest::RunTest(const FString& InParameters)
 	TestEqual(TEXT("Edited top reaches distant representation"), Macro.Height[0], 511);
 	TestEqual(TEXT("Edited material reaches distant representation"), Macro.SurfaceClass[0], uint16(1));
 	TestEqual(TEXT("Macro preserves coarse sampling scale"), Macro.Step, FVoxelMacroTileData::BaseStep);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelMacroWaterMeshTest,
+	"WHFramework.Voxel.Rendering.MacroWaterMesh",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelMacroWaterMeshTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const auto Config = VoxelTest::MakeGenerationConfig();
+	FVoxelRegistrySnapshot Registry = *VoxelTest::MakeRegistry();
+	Registry.Definitions[6].RenderGroup = EVoxelRenderGroup::Water;
+	FVoxelMacroTileData Macro;
+	Macro.Side = 2;
+	Macro.Step = 64;
+	Macro.Height = { 10, 10, 10, 10 };
+	Macro.WaterHeight = { 12, MIN_int32, MIN_int32, MIN_int32 };
+	Macro.SurfaceClass = { 1, 1, 1, 1 };
+	Macro.ForestCoverage = { 0, 0, 0, 0 };
+	FVoxelSectionMeshResult Mesh;
+	FString Error;
+	if (!TestTrue(TEXT("Macro terrain and water build"),
+		FVoxelHeightfieldMesher::BuildMacro(Macro, *Config, Registry, Mesh, Error)))
+	{
+		return false;
+	}
+	int32 WaterVertices = 0;
+	bool bGroundHasMaterialTint = false;
+	const FLinearColor GroundTint = Registry.Definitions[1].Face(0, 4).Tint;
+	for (const FVoxelRenderBatch& Batch : Mesh.Batches)
+	{
+		if (Batch.Group == EVoxelRenderGroup::Water)
+		{
+			WaterVertices += Batch.Mesh.Vertices.Num();
+		}
+		else if (!Batch.Mesh.Colors.IsEmpty())
+		{
+			bGroundHasMaterialTint |= Batch.Mesh.Colors[0].Equals(GroundTint);
+		}
+	}
+	TestEqual(TEXT("One wet macro cell produces one visible water quad"), WaterVertices, 4);
+	TestTrue(TEXT("Zero forest coverage does not darken macro ground"), bGroundHasMaterialTint);
 	return true;
 }
 
@@ -624,6 +800,35 @@ bool FVoxelHeightfieldHaloSeamTest::RunTest(const FString& InParameters)
 		}
 	}
 	TestEqual(TEXT("The shared boundary has one owning wall"), Walls, 1);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelHeightfieldDeepSkirtTest, "WHFramework.Voxel.Rendering.Blocky.DeepLodSkirt", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelHeightfieldDeepSkirtTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const auto Config = VoxelTest::MakeGenerationConfig();
+	const auto Registry = VoxelTest::MakeRegistry();
+	const TArray<int32> Heights { 100, 0, 100, 0 };
+	const TArray<uint16> Materials { 1, 1, 1, 1 };
+	FVoxelSectionMeshResult Mesh;
+	FString Error;
+	if (!TestTrue(TEXT("Heightfield with a steep LOD boundary builds"),
+		FVoxelHeightfieldMesher::BuildBlockyTerrain(2, 4, Heights, Materials,
+			*Config, *Registry, Mesh, Error, nullptr, {}, 0.0, 8)))
+	{
+		return false;
+	}
+	bool bSealedBelowAdjacentHeight = false;
+	for (const FVoxelRenderBatch& Batch : Mesh.Batches)
+	{
+		for (const FVector& Vertex : Batch.Mesh.Vertices)
+		{
+			bSealedBelowAdjacentHeight |= Vertex.X == 0.0 && Vertex.Z < 1.0;
+		}
+	}
+	TestTrue(TEXT("Boundary wall reaches below the lower adjacent LOD surface"), bSealedBelowAdjacentHeight);
 	return true;
 }
 

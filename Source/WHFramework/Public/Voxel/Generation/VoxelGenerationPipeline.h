@@ -63,6 +63,14 @@ public:
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr) const;
 
+	bool BuildCoarseOverlay(
+		const FIntVector& InOrigin,
+		int32 InStep,
+		int32 InGridSide,
+		TMap<FIntVector, FVoxelBlockState>& OutCells,
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr) const;
+
 private:
 	TSharedRef<
 		const FVoxelGenerationRuntimeConfig,

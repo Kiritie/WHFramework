@@ -14,4 +14,17 @@ public:
 		TArray<FVoxelBlockState>& InOutBlocks,
 		FString& OutError,
 		const TAtomic<bool>* InCancel) const = 0;
+
+	virtual bool BuildCoarse(
+		const FIntVector&,
+		int32,
+		int32,
+		TMap<FIntVector, FVoxelBlockState>& OutCells,
+		FString& OutError,
+		const TAtomic<bool>*) const
+	{
+		OutCells.Reset();
+		OutError.Reset();
+		return true;
+	}
 };

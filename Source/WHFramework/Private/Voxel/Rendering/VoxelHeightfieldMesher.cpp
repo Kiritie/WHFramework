@@ -2,6 +2,7 @@
 #include "Voxel/Rendering/VoxelViewLod.h"
 
 #include "Voxel/Generation/VoxelGenerationBinding.h"
+#include "Voxel/Rendering/VoxelMacroTerrain.h"
 #include "Voxel/Rendering/VoxelWaterView.h"
 #include "Voxel/Runtime/VoxelRegistry.h"
 
@@ -232,6 +233,13 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 
 	FVoxelSectionMeshResult Mesh;
 	const int32 CellSide = InVertexSide - 1;
+	int32 LowestHeight = MAX_int32;
+	for (const int32 Height : InHeights)
+	{
+		if (Height != MIN_int32) LowestHeight = FMath::Min(LowestHeight, Height);
+	}
+	const double SkirtFloor = LowestHeight == MAX_int32
+		? 0.0 : static_cast<double>(LowestHeight) - FMath::Max(InSkirtDepthCells, InStep * 2);
 
 	auto CellIndex =
 		[InVertexSide](const int32 InX, const int32 InY)
@@ -377,14 +385,15 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 	if (InSkirtDepthCells > 0)
 	{
 		auto BuildEdgeSide =
-			[&AppendMaterialQuad, &CoverageColor, InSkirtDepthCells](
+			[&AppendMaterialQuad, &CoverageColor, InSkirtDepthCells, SkirtFloor](
 				const int32 InX,
 				const int32 InY,
 				const uint8 InFace,
 				const FVector& InTopA,
 				const FVector& InTopB)
 			{
-				const double BottomZ = FMath::Min(InTopA.Z, InTopB.Z) - InSkirtDepthCells;
+				const double BottomZ = FMath::Min(
+					FMath::Min(InTopA.Z, InTopB.Z) - InSkirtDepthCells, SkirtFloor);
 				FVector BottomB = InTopB;
 				FVector BottomA = InTopA;
 				BottomB.Z = BottomZ;
@@ -437,6 +446,70 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 		for (FVector2D& UV : OutputBatch.Mesh.UV0)
 		{
 			UV /= TexturePeriod;
+		}
+	}
+
+	OutMesh = MoveTemp(Mesh);
+	OutError.Reset();
+	return true;
+}
+
+bool FVoxelHeightfieldMesher::BuildMacro(
+	const FVoxelMacroTileData& InMacro,
+	const FVoxelGenerationRuntimeConfig& InConfig,
+	const FVoxelRegistrySnapshot& InRegistry,
+	FVoxelSectionMeshResult& OutMesh,
+	FString& OutError,
+	const TAtomic<bool>* InCancel,
+	const double InMaximumTextureStretchCells)
+{
+	const int32 Count = InMacro.Side * InMacro.Side;
+	if (InMacro.Side < 2 || InMacro.Step <= 0 ||
+		InMacro.WaterHeight.Num() != Count)
+	{
+		OutError = TEXT("Invalid macro water input");
+		return false;
+	}
+
+	FVoxelSectionMeshResult Mesh;
+	if (!BuildBlockyTerrain(
+		InMacro.Side, InMacro.Step, InMacro.Height, InMacro.SurfaceClass,
+		InConfig, InRegistry, Mesh, OutError, InCancel, {}, -0.05, 16,
+		InMaximumTextureStretchCells))
+	{
+		return false;
+	}
+
+	FVoxelWaterSurfaceTileData Water;
+	Water.Side = InMacro.Side;
+	Water.Step = InMacro.Step;
+	Water.GroundZ = InMacro.Height;
+	Water.WaterZ = InMacro.WaterHeight;
+	Water.WaterKind.Init(static_cast<uint8>(EVoxelWaterKind::None), Count);
+	bool bHasWater = false;
+	for (int32 Index = 0; Index < Count; ++Index)
+	{
+		if (Water.WaterZ[Index] != MIN_int32 &&
+			Water.WaterZ[Index] >= Water.GroundZ[Index])
+		{
+			Water.WaterKind[Index] = static_cast<uint8>(EVoxelWaterKind::Edited);
+			bHasWater = true;
+		}
+	}
+	if (bHasWater)
+	{
+		FVoxelSectionMeshResult WaterMesh;
+		if (!BuildWater(Water, InRegistry, WaterMesh, OutError, InCancel,
+			InMaximumTextureStretchCells))
+		{
+			return false;
+		}
+		for (FVoxelRenderBatch& Batch : WaterMesh.Batches)
+		{
+			if (!Batch.Mesh.Vertices.IsEmpty())
+			{
+				Mesh.Batches.Add(MoveTemp(Batch));
+			}
 		}
 	}
 

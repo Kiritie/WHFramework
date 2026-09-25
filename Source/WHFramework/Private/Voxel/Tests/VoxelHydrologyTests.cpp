@@ -3,6 +3,7 @@
 #include "Misc/AutomationTest.h"
 #include "Voxel/Generation/Climate/VoxelClimateGenerator.h"
 #include "Voxel/Generation/Hydrology/VoxelHydrology.h"
+#include "Voxel/Generation/Surface/VoxelSurfaceGenerator.h"
 #include "Voxel/Generation/Terrain/VoxelTerrainGenerator.h"
 #include "Voxel/Tests/VoxelTestUtilities.h"
 
@@ -292,6 +293,76 @@ bool FVoxelHydrologyInfluenceContextTest::RunTest(const FString& InParameters)
 	TestFalse(TEXT("Far cell has no local river influence"),
 		Plan.Sample(16, 128, 12, Far));
 	TestEqual(TEXT("Far cell has no river distance"), Far.RiverDistanceCells, MAX_int32);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelRiverSurfaceKeepsSubsoilTest,
+	"WHFramework.Voxel.Hydrology.RiverSurfaceKeepsSubsoil",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelRiverSurfaceKeepsSubsoilTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelGenerationRecipe Recipe;
+	Recipe.Palette.Grass = 3;
+	Recipe.Palette.Dirt = 2;
+	Recipe.Palette.Stone = 1;
+	FVoxelSurfaceRuntimeRuleSet& Rules = Recipe.SurfaceRules.AddDefaulted_GetRef();
+	FVoxelSurfaceRuntimeRule& Grass = Rules.Rules.AddDefaulted_GetRef();
+	Grass.MinDepth = 0;
+	Grass.MaxDepth = 0;
+	Grass.BlockSymbol = Recipe.Palette.Grass;
+	FVoxelSurfaceRuntimeRule& Stone = Rules.Rules.AddDefaulted_GetRef();
+	Stone.MinDepth = 1;
+	Stone.MaxDepth = 3;
+	Stone.BlockSymbol = Recipe.Palette.Stone;
+	Recipe.Biomes.AddDefaulted_GetRef().SurfaceRuleIndex = 0;
+	const FVoxelSurfaceGenerator Surface(
+		MakeShared<const FVoxelGenerationRecipe, ESPMode::ThreadSafe>(MoveTemp(Recipe)));
+	FVoxelColumnSample Column;
+	Column.BiomeIndex = 0;
+	Column.bRiver = true;
+	Column.RiverDistanceCells = 0;
+	Column.BankDistanceCells = 0;
+	Surface.ResolveColumn(Column);
+	TestEqual(TEXT("Riverbed top keeps the existing subsoil symbol"), Column.SurfaceMaterial, uint16(1));
+	TestEqual(TEXT("Exact riverbed agrees with distant surface"),
+		Surface.ResolveSymbol(FIntVector(16, 0, Column.SurfaceZ), Column, 0), uint32(1));
+	Column.bRiver = false;
+	Column.RiverDistanceCells = 6;
+	Surface.ResolveColumn(Column);
+	TestEqual(TEXT("Dry riverbank keeps the existing subsoil symbol"), Column.SurfaceMaterial, uint16(1));
+	Column.BankDistanceCells = 2;
+	Surface.ResolveColumn(Column);
+	TestEqual(TEXT("Outside the riverbank, the ordinary grass rule still applies"),
+		Column.SurfaceMaterial, uint16(3));
+	Column.BiomeIndex = MAX_uint16;
+	Column.BankDistanceCells = 0;
+	Surface.ResolveColumn(Column);
+	TestEqual(TEXT("A riverbank without a biome rule keeps default dirt subsoil"),
+		Column.SurfaceMaterial, uint16(2));
+	Column = FVoxelColumnSample();
+	Column.BiomeIndex = 0;
+	Column.SurfaceZ = 8;
+	Column.SurfaceWaterZ = 10;
+	Column.bOcean = true;
+	Surface.ResolveColumn(Column);
+	TestEqual(TEXT("Ocean floor keeps the existing subsoil symbol"),
+		Column.SurfaceMaterial, uint16(1));
+	Column.bOcean = false;
+	Column.bLake = true;
+	Surface.ResolveColumn(Column);
+	TestEqual(TEXT("Lake floor keeps the existing subsoil symbol"),
+		Column.SurfaceMaterial, uint16(1));
+	Column.bLake = false;
+	Surface.ResolveColumn(Column);
+	TestEqual(TEXT("Any natural water-covered ground keeps subsoil"),
+		Column.SurfaceMaterial, uint16(1));
+	Column.SurfaceWaterZ = 7;
+	Surface.ResolveColumn(Column);
+	TestEqual(TEXT("Ground above the water keeps its ordinary surface rule"),
+		Column.SurfaceMaterial, uint16(3));
 	return true;
 }
 

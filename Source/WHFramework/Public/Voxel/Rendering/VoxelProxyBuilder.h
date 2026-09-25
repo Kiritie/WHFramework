@@ -8,6 +8,8 @@
 #include "Voxel/Runtime/VoxelBlockState.h"
 #include "Voxel/Runtime/VoxelOverlaySnapshot.h"
 
+class FVoxelGenerationPipeline;
+
 struct WHFRAMEWORK_API FVoxelVoxelProxyData
 {
 	FVoxelViewKey Key;
@@ -54,11 +56,19 @@ public:
 			ESPMode::ThreadSafe> InConfig,
 		TSharedRef<
 			FVoxelGenerationPlanCache,
-			ESPMode::ThreadSafe> InCache);
+			ESPMode::ThreadSafe> InCache,
+		TSharedPtr<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator = nullptr);
 
 	bool BuildNatural(
 		const FVoxelViewKey& InKey,
 		FVoxelVoxelProxyData& OutData,
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr) const;
+
+	bool ApplyTreeSilhouettes(
+		const FVoxelViewKey& InKey,
+		const FVoxelOverlaySnapshotSet& InOverlays,
+		FVoxelVoxelProxyData& InOutData,
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr) const;
 	bool Build(const FVoxelViewKey& InKey, const FVoxelOverlaySnapshotSet& InOverlays,
@@ -70,6 +80,8 @@ private:
 		ESPMode::ThreadSafe> Config;
 
 	TSharedRef<
-		FVoxelGenerationPlanCache,
-		ESPMode::ThreadSafe> Cache;
+			FVoxelGenerationPlanCache,
+			ESPMode::ThreadSafe> Cache;
+
+	TSharedPtr<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> Generator;
 };

@@ -385,3 +385,20 @@ bool FVoxelGenerationPipeline::SampleBlock(
 	OutError.Reset();
 	return true;
 }
+
+bool FVoxelGenerationPipeline::BuildCoarseOverlay(
+	const FIntVector& InOrigin,
+	const int32 InStep,
+	const int32 InGridSide,
+	TMap<FIntVector, FVoxelBlockState>& OutCells,
+	FString& OutError,
+	const TAtomic<bool>* InCancel) const
+{
+	if (Overlay)
+	{
+		return Overlay->BuildCoarse(InOrigin, InStep, InGridSide, OutCells, OutError, InCancel);
+	}
+	OutCells.Reset();
+	OutError.Reset();
+	return true;
+}

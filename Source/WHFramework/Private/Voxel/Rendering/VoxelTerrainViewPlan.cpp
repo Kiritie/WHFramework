@@ -207,8 +207,8 @@ bool FVoxelTerrainViewPlan::ResolveNode(const FVoxelViewKey& InNode,
 			return true;
 		}
 	}
-	// 已呈现父节点需要完整交接；初次加载的空区域直接逐叶发布，不构建粗占位网格。
-	if (InPrevious && InPrevious->Contains(InNode) && InIsReady(InNode))
+	// 初次加载也用已就绪的粗父节点补齐未完成的子节点；完整子族就绪后再整体交接。
+	if (InIsReady(InNode))
 	{
 		OutVisible.SetNum(FirstChild, EAllowShrinking::No);
 		OutVisible.Add(InNode);

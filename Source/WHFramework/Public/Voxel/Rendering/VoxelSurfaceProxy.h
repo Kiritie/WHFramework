@@ -16,6 +16,12 @@ enum EVoxelSurfaceFlags : uint8
 	VoxelSurface_Coast = 1 << 3
 };
 
+struct WHFRAMEWORK_API FVoxelDistantCell
+{
+	FIntVector Coordinate = FIntVector::ZeroValue;
+	FVoxelBlockState State;
+};
+
 struct WHFRAMEWORK_API FVoxelSurfaceTileData
 {
 	static constexpr int32 CellSide = 32;
@@ -30,6 +36,7 @@ struct WHFRAMEWORK_API FVoxelSurfaceTileData
 	TArray<uint16> SurfaceMaterial;
 	TArray<uint16> Biome;
 	TArray<uint8> Flags;
+	TArray<FVoxelDistantCell> DistantCells;
 
 	int32 GetTileSide() const
 	{
@@ -70,6 +77,11 @@ public:
 private:
 	bool ApplyModifiedSurface(
 		const FVoxelSurfaceTileKey& InKey,
+		FVoxelSurfaceTileData& InOutData,
+		FString& OutError,
+		const TAtomic<bool>* InCancel) const;
+
+	bool BuildDistantCells(
 		FVoxelSurfaceTileData& InOutData,
 		FString& OutError,
 		const TAtomic<bool>* InCancel) const;

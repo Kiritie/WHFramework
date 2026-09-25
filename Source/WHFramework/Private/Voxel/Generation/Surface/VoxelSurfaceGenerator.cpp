@@ -18,26 +18,8 @@ void FVoxelSurfaceGenerator::ResolveColumn(FVoxelColumnSample& InOutColumn) cons
                 InOutColumn.SurfaceWaterZ) <= 2;
     }
 
-    const FVoxelSurfaceRuntimeRuleSet* RuleSet =
-        GetRuleSet(InOutColumn.BiomeIndex);
-
-    if (!RuleSet)
-    {
-        InOutColumn.SurfaceMaterial =
-            Recipe->Palette.Grass;
-        return;
-    }
-
-    for (const FVoxelSurfaceRuntimeRule& Rule : RuleSet->Rules)
-    {
-        if (Matches(Rule, InOutColumn, 0))
-        {
-            InOutColumn.SurfaceMaterial = Rule.BlockSymbol;
-            return;
-        }
-    }
-
-    InOutColumn.SurfaceMaterial = Recipe->Palette.Grass;
+    InOutColumn.SurfaceMaterial = static_cast<uint16>(
+        ResolveSymbol(FIntVector::ZeroValue, InOutColumn, 0));
 }
 
 uint32 FVoxelSurfaceGenerator::ResolveSymbol(
@@ -45,6 +27,14 @@ uint32 FVoxelSurfaceGenerator::ResolveSymbol(
     const FVoxelColumnSample& InColumn,
     int32 InDepthFromSurface) const
 {
+    const bool bRiverBedOrBank = !InColumn.bOcean && !InColumn.bLake &&
+        (InColumn.bRiver ||
+            (InColumn.RiverDistanceCells != MAX_int32 && InColumn.BankDistanceCells == 0));
+    const bool bUnderWater = InColumn.SurfaceWaterZ != MIN_int32 &&
+        InColumn.SurfaceWaterZ >= InColumn.SurfaceZ;
+    const bool bKeepSubsoil = bRiverBedOrBank || bUnderWater;
+    const int32 SurfaceDepth = InDepthFromSurface == 0 && bKeepSubsoil
+        ? 1 : InDepthFromSurface;
     const FVoxelSurfaceRuntimeRuleSet* RuleSet =
         GetRuleSet(InColumn.BiomeIndex);
 
@@ -52,7 +42,9 @@ uint32 FVoxelSurfaceGenerator::ResolveSymbol(
     {
         for (const FVoxelSurfaceRuntimeRule& Rule : RuleSet->Rules)
         {
-            if (!Matches(Rule, InColumn, InDepthFromSurface))
+            if (!Matches(Rule, InColumn, SurfaceDepth) ||
+                (InDepthFromSurface == 0 && bKeepSubsoil &&
+                    Rule.BlockSymbol == Recipe->Palette.Grass))
             {
                 continue;
             }
@@ -61,12 +53,12 @@ uint32 FVoxelSurfaceGenerator::ResolveSymbol(
         }
     }
 
-    if (InDepthFromSurface == 0)
+    if (SurfaceDepth == 0)
     {
 		return Recipe->Palette.Grass;
     }
 
-    if (InDepthFromSurface <= 3)
+    if (SurfaceDepth <= 3)
     {
 		return Recipe->Palette.Dirt;
     }

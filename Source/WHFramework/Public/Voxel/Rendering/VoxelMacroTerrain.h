@@ -29,6 +29,7 @@ struct WHFRAMEWORK_API FVoxelMacroTileData
 	TArray<uint8> ForestCoverage;
 	TArray<uint8> SnowCoverage;
 	TArray<FVoxelMacroStructureProxy> LargeStructures;
+	TArray<FVoxelDistantCell> DistantCells;
 
 	int32 GetTileSide() const
 	{

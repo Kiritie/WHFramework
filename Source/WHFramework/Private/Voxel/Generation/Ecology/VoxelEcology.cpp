@@ -96,6 +96,50 @@ void FVoxelEcologyGenerator::BuildTrees(
 	FVoxelEcologyPlan& InOutPlan,
 	const TAtomic<bool>* InCancel) const
 {
+	EnumerateTrees(InBounds, InSampleColumn, InSampleBaseSymbol,
+		[this, &InOutPlan](const FIntVector& Anchor, const int32 Height,
+			const FVoxelStableId OwnerId)
+		{
+			for (int32 Z = 0; Z < Height; ++Z)
+			{
+				InOutPlan.Writes.Add({Anchor + FIntVector(0, 0, Z),
+					Recipe->Ecology.TreeTrunk, TrunkPriority, OwnerId});
+			}
+			const int32 CrownRadius = Recipe->Settings.Ecology.Tree.CrownRadius;
+			const FIntVector CrownCenter = Anchor + FIntVector(0, 0, Height - 1);
+			for (int32 Z = -CrownRadius; Z <= CrownRadius; ++Z)
+			{
+				for (int32 Y = -CrownRadius; Y <= CrownRadius; ++Y)
+				{
+					for (int32 X = -CrownRadius; X <= CrownRadius; ++X)
+					{
+						if (X * X + Y * Y + Z * Z > CrownRadius * CrownRadius)
+						{
+							continue;
+						}
+						const FIntVector Position = CrownCenter + FIntVector(X, Y, Z);
+						if (X == 0 && Y == 0 && Position.Z >= Anchor.Z &&
+							Position.Z < Anchor.Z + Height)
+						{
+							continue;
+						}
+						InOutPlan.Writes.Add({Position, Recipe->Ecology.TreeLeaves,
+							LeafPriority, OwnerId});
+					}
+				}
+			}
+		}, InOutPlan.TreeCandidates, InOutPlan.TreesAccepted, InCancel);
+}
+
+void FVoxelEcologyGenerator::EnumerateTrees(
+	const FVoxelGenerationBounds& InBounds,
+	TFunctionRef<bool(const FIntVector&, FVoxelColumnSample&)> InSampleColumn,
+	TFunctionRef<bool(const FIntVector&, uint32&)> InSampleBaseSymbol,
+	TFunctionRef<void(const FIntVector&, int32, FVoxelStableId)> InVisit,
+	int32& OutCandidates,
+	int32& OutAccepted,
+	const TAtomic<bool>* InCancel) const
+{
 	const FVoxelTreeGenerationSettings& Settings = Recipe->Settings.Ecology.Tree;
 	const int32 Chance = EffectiveChance(Settings.ChancePermille, Settings.DensityPermille);
 	if (!Settings.bEnabled || Chance <= 0)
@@ -113,7 +157,7 @@ void FVoxelEcologyGenerator::BuildTrees(
 	{
 		for (int32 GridX = MinGridX; GridX <= MaxGridX; ++GridX)
 		{
-			++InOutPlan.TreeCandidates;
+			++OutCandidates;
 			if (InCancel && InCancel->Load())
 			{
 				return;
@@ -156,34 +200,10 @@ void FVoxelEcologyGenerator::BuildTrees(
 
 			const FVoxelStableId OwnerId = VoxelGeneration::MakeStableId(
 				Recipe->Settings.Seed, Anchor, TreeSalt);
-			++InOutPlan.TreesAccepted;
+			++OutAccepted;
 			const int32 Height = VoxelGeneration::RandomRange(
 				VoxelGeneration::Mix(CandidateSeed ^ TreeHeightSalt), Settings.MinHeight, Settings.MaxHeight);
-			for (int32 Z = 0; Z < Height; ++Z)
-			{
-				InOutPlan.Writes.Add({Anchor + FIntVector(0, 0, Z), Recipe->Ecology.TreeTrunk, TrunkPriority, OwnerId});
-			}
-
-			const FIntVector CrownCenter = Anchor + FIntVector(0, 0, Height - 1);
-			for (int32 Z = -Settings.CrownRadius; Z <= Settings.CrownRadius; ++Z)
-			{
-				for (int32 Y = -Settings.CrownRadius; Y <= Settings.CrownRadius; ++Y)
-				{
-					for (int32 X = -Settings.CrownRadius; X <= Settings.CrownRadius; ++X)
-					{
-						if (X * X + Y * Y + Z * Z > Settings.CrownRadius * Settings.CrownRadius)
-						{
-							continue;
-						}
-						const FIntVector Position = CrownCenter + FIntVector(X, Y, Z);
-						if (X == 0 && Y == 0 && Position.Z >= Anchor.Z && Position.Z < Anchor.Z + Height)
-						{
-							continue;
-						}
-						InOutPlan.Writes.Add({Position, Recipe->Ecology.TreeLeaves, LeafPriority, OwnerId});
-					}
-				}
-			}
+			InVisit(Anchor, Height, OwnerId);
 		}
 	}
 }

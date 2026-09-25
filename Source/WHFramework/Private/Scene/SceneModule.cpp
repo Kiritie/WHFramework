@@ -71,7 +71,7 @@ USceneModule::USceneModule()
 	WorldMapCenter = FVector2D::ZeroVector;
 	WorldMapRange = 4096.f;
 	WorldMapMinRange = 512.f;
-	WorldMapMaxRange = 262144.f;
+	WorldMapMaxRange = 3000000.f;
 	
 	static ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> MiniMapTexFinder(TEXT("/Script/Engine.TextureRenderTarget2D'/WHFramework/Scene/Textures/Render/RT_MiniMap_Default.RT_MiniMap_Default'"));
 	if(MiniMapTexFinder.Succeeded())
@@ -435,7 +435,7 @@ void USceneModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 			{
 				if(Marker.MarkerID.IsValid()) Markers.Add(Marker.MarkerID, Marker);
 			}
-			TrackedMarkerID = Markers.Contains(SaveData.TrackedMarkerID) ? SaveData.TrackedMarkerID : FGuid();
+			TrackedMarkerID = SaveData.TrackedMarkerID;
 			NotifySceneMarkersChanged();
 		}
 		

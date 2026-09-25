@@ -51,6 +51,15 @@ public:
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr) const;
 
+	void EnumerateTrees(
+		const FVoxelGenerationBounds& InBounds,
+		TFunctionRef<bool(const FIntVector&, FVoxelColumnSample&)> InSampleColumn,
+		TFunctionRef<bool(const FIntVector&, uint32&)> InSampleBaseSymbol,
+		TFunctionRef<void(const FIntVector&, int32, FVoxelStableId)> InVisit,
+		int32& OutCandidates,
+		int32& OutAccepted,
+		const TAtomic<bool>* InCancel = nullptr) const;
+
 private:
 	void BuildTrees(
 		const FVoxelGenerationBounds& InBounds,

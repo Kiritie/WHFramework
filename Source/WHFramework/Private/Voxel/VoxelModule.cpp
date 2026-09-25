@@ -30,6 +30,7 @@
 #include "Voxel/Interaction/VoxelInventoryTransaction.h"
 #include "Voxel/Network/VoxelModuleNetworkComponent.h"
 #include "Voxel/Map/VoxelMapTileCache.h"
+#include "Voxel/Map/VoxelMapSurfaceResolver.h"
 #include "Voxel/Save/VoxelBlockEntityCodec.h"
 #include "Voxel/Save/VoxelDeltaCodec.h"
 #include "Voxel/Save/VoxelSceneColumnCodec.h"
@@ -711,6 +712,13 @@ bool UVoxelModule::StartWorld(
 		IsAuthority(),
 		Registry.GetSnapshot().ToSharedRef(),
 		Generator.ToSharedRef());
+	if (GenerationConfig->Recipe->Settings.Ecology.Tree.bEnabled)
+	{
+		const FVoxelTreeGenerationSettings& Tree =
+			GenerationConfig->Recipe->Settings.Ecology.Tree;
+		Runtime->GetChangeHierarchy().SetVoxelProxyNaturalInfluence(
+			Tree.CrownRadius, Tree.MaxHeight + Tree.CrownRadius);
+	}
 	if (IsAuthority() && !RegionStore.ScanChangeHeaders(
 		[this](const FIntVector& InRegion, const uint64 InRevision, const TArray<uint64>& InMask)
 		{
@@ -1084,6 +1092,20 @@ UVoxelWorldGenerationProfile* UVoxelModule::GetWorldGenerationProfile() const
 TSharedPtr<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> UVoxelModule::GetGenerator() const
 {
 	return Generator;
+}
+
+bool UVoxelModule::ResolveMapSurface(
+	const FVector2D& InMapPosition,
+	FVector& OutLocation,
+	FString& OutError) const
+{
+	if (!IsReady() || !Generator)
+	{
+		OutError = TEXT("Voxel world is not ready for a map surface query");
+		return false;
+	}
+	return FVoxelMapSurfaceResolver::Resolve(
+		*Generator, BlockSize(), InMapPosition, OutLocation, OutError);
 }
 
 TSharedPtr<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> UVoxelModule::GetGenerationConfig() const

@@ -134,7 +134,7 @@ bool FVoxelTerrainFineDependenciesTest::RunTest(const FString& InParameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelTerrainInitialFineTest, "WHFramework.Voxel.Rendering.Plan.InitialFineHasNoCoarsePlaceholder", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelTerrainInitialFineTest, "WHFramework.Voxel.Rendering.Plan.InitialCoarseFallback", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FVoxelTerrainInitialFineTest::RunTest(const FString& InParameters)
 {
@@ -146,14 +146,14 @@ bool FVoxelTerrainInitialFineTest::RunTest(const FString& InParameters)
 	TSet<FVoxelViewKey> Visible;
 	auto IsReady = [&Ready](const FVoxelViewKey& Key) { return Ready.Contains(Key); };
 	Plan.ResolveVisible(IsReady, Visible);
-	TestTrue(TEXT("Unpresented coarse ancestor cannot cover the fine region"), Visible.IsEmpty());
+	TestTrue(TEXT("Ready coarse ancestor fills missing initial children"), Visible.Num() == 1 && Visible.Contains(Root));
 	Ready.Add(Fine);
 	Plan.ResolveVisible(IsReady, Visible);
-	TestTrue(TEXT("Initial fine leaf publishes without unrelated siblings"), Visible.Num() == 1 && Visible.Contains(Fine));
+	TestTrue(TEXT("Incomplete fine siblings retain the coarse ancestor"), Visible.Num() == 1 && Visible.Contains(Root));
 	Ready.Reset();
 	const TSet<FVoxelViewKey> Previous = Visible;
 	Plan.ResolveVisible(IsReady, Visible, &Previous);
-	TestTrue(TEXT("Invalidated initial fine leaf remains owned"), Visible.Num() == 1 && Visible.Contains(Fine));
+	TestTrue(TEXT("Invalidated coarse placeholder remains owned"), Visible.Num() == 1 && Visible.Contains(Root));
 	return true;
 }
 

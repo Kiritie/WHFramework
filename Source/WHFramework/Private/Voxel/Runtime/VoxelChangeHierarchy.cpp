@@ -4,6 +4,15 @@
 #include "Voxel/Rendering/VoxelMacroTerrain.h"
 #include "Voxel/Rendering/VoxelSurfaceProxy.h"
 
+void FVoxelChangeHierarchy::SetVoxelProxyNaturalInfluence(
+	const int32 InHorizontalCells,
+	const int32 InUpwardCells)
+{
+	FWriteScopeLock Scope(Lock);
+	VoxelProxyHorizontalInfluence = FMath::Max(0, InHorizontalCells);
+	VoxelProxyUpwardInfluence = FMath::Max(0, InUpwardCells);
+}
+
 uint64 FVoxelChangeHierarchy::InvalidateSection(const FIntVector& InSection)
 {
 	FWriteScopeLock Scope(Lock);
@@ -19,8 +28,13 @@ uint64 FVoxelChangeHierarchy::InvalidateSection(const FIntVector& InSection)
 		FIntVector ProxyMax;
 		for (int32 Axis = 0; Axis < 3; ++Axis)
 		{
-			ProxyMin[Axis] = VoxelGeneration::FloorDivide(CellMin[Axis] - Step, ProxySide);
-			ProxyMax[Axis] = VoxelGeneration::FloorDivide(CellMax[Axis] + Step, ProxySide);
+			const int32 SideInfluence = Axis == 2 ? 0 : VoxelProxyHorizontalInfluence;
+			const int32 UpperInfluence = Axis == 2 ?
+				VoxelProxyUpwardInfluence : VoxelProxyHorizontalInfluence;
+			ProxyMin[Axis] = VoxelGeneration::FloorDivide(
+				CellMin[Axis] - Step - SideInfluence, ProxySide);
+			ProxyMax[Axis] = VoxelGeneration::FloorDivide(
+				CellMax[Axis] + Step + UpperInfluence, ProxySide);
 		}
 		for (int32 Z = ProxyMin.Z; Z <= ProxyMax.Z; ++Z)
 		{
@@ -116,10 +130,14 @@ bool FVoxelChangeHierarchy::AffectsVoxelProxy(
 	const FVoxelViewKey& InKey,
 	const FIntVector& InSection) const
 {
+	FReadScopeLock Scope(Lock);
 	const FVoxelGenerationBounds SectionBounds { InSection * 16, (InSection + FIntVector(1)) * 16 };
 	FVoxelGenerationBounds Bounds = InKey.GetBounds();
-	Bounds.Min -= FIntVector(InKey.GetStep());
-	Bounds.Max += FIntVector(InKey.GetStep());
+	Bounds.Min -= FIntVector(InKey.GetStep() + VoxelProxyHorizontalInfluence,
+		InKey.GetStep() + VoxelProxyHorizontalInfluence,
+		InKey.GetStep() + VoxelProxyUpwardInfluence);
+	Bounds.Max += FIntVector(InKey.GetStep() + VoxelProxyHorizontalInfluence,
+		InKey.GetStep() + VoxelProxyHorizontalInfluence, InKey.GetStep());
 	return Bounds.Intersects(SectionBounds);
 }
 

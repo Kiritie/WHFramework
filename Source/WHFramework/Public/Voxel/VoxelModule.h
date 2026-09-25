@@ -106,6 +106,10 @@ public:
 	UVoxelMaterialSet* GetMaterialSet() const;
 	UVoxelWorldGenerationProfile* GetWorldGenerationProfile() const;
 	TSharedPtr<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> GetGenerator() const;
+	bool ResolveMapSurface(
+		const FVector2D& InMapPosition,
+		FVector& OutLocation,
+		FString& OutError) const;
 	TSharedPtr<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> GetGenerationConfig() const;
 	TSharedPtr<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> GetGenerationCache() const;
 	FVoxelMapTileCache* GetMapTileCache() const;

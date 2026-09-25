@@ -764,6 +764,22 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 	{
 		return FBox(FVector(Bounds.Min.X, Bounds.Min.Y, -1.e12), FVector(Bounds.Max.X, Bounds.Max.Y, 1.e12));
 	};
+	auto LeaveSeamOverlap = [](TArray<FBox>& Boxes, const int32 Margin)
+	{
+		for (FBox& Bounds : Boxes)
+		{
+			if (Bounds.Max.X - Bounds.Min.X > Margin * 2)
+			{
+				Bounds.Min.X += Margin;
+				Bounds.Max.X -= Margin;
+			}
+			if (Bounds.Max.Y - Bounds.Min.Y > Margin * 2)
+			{
+				Bounds.Min.Y += Margin;
+				Bounds.Max.Y -= Margin;
+			}
+		}
+	};
 	if (bUsesTerrainPlan && bNeedsExclusions)
 	{
 		for (const FVoxelViewKey& Key : TargetTerrainNodes)
@@ -893,6 +909,7 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 		}
 		if (!bHidden)
 		{
+			LeaveSeamOverlap(Exclusions, FMath::Max(1, (1 << Pair.Key.Level) / 4));
 			Publisher->SetCoverage(Pair.Value, Exclusions);
 			if (AActor* Water = WaterActors.FindRef(Pair.Key)) Publisher->SetCoverage(Water, MoveTemp(Exclusions));
 		}
@@ -915,7 +932,11 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 			if (MacroWanted.Contains(Key) && Key != Pair.Key && (!bWanted || Key.Level < Pair.Key.Level))
 				Exclusions.Add(Column(MacroCoverageRect(Key)));
 		}
-		if (!bHidden) Publisher->SetCoverage(Pair.Value, MoveTemp(Exclusions));
+		if (!bHidden)
+		{
+			LeaveSeamOverlap(Exclusions, FMath::Max(1, (FVoxelMacroTileData::BaseStep << Pair.Key.Level) / 4));
+			Publisher->SetCoverage(Pair.Value, MoveTemp(Exclusions));
+		}
 		Publisher->SetHidden(Pair.Value, bHidden);
 	}
 	const double ActorsMilliseconds = (FPlatformTime::Seconds() - ResolveStart) * 1000.0 - PlanMilliseconds - BoxesMilliseconds;
@@ -1219,19 +1240,13 @@ bool FVoxelViewManager::ApplyRemoteRepresentation(
 			FVoxelTaskResult Result;
 			Result.Macro = MakeShared<FVoxelMacroTileData>(MoveTemp(Data));
 			Result.MacroMesh = MakeShared<FVoxelSectionMeshResult>();
-			Result.bSuccess = Config && FVoxelHeightfieldMesher::BuildBlockyTerrain(
-				Result.Macro->Side,
-				Result.Macro->Step,
-				Result.Macro->Height,
-				Result.Macro->SurfaceClass,
+			Result.bSuccess = Config && FVoxelHeightfieldMesher::BuildMacro(
+				*Result.Macro,
 				*Config,
 				*Registry,
 				*Result.MacroMesh,
 				Result.Error,
-				&InCancel,
-				Result.Macro->ForestCoverage,
-				-0.05,
-				16, TextureStretch);
+				&InCancel, TextureStretch);
 			return Result;
 		};
 	}
@@ -1733,6 +1748,16 @@ bool FVoxelViewManager::BuildVoxelProxySnapshot(
 bool FVoxelViewManager::RequestVoxelProxy(
 	const FVoxelViewKey& InKey)
 {
+	const TSharedPtr<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config =
+		Module.GetGenerationConfig();
+	if (!Config || !Config->Recipe) return false;
+	const int32 Step = InKey.GetStep();
+	const FVoxelTreeGenerationSettings& Tree = Config->Recipe->Settings.Ecology.Tree;
+	const int32 Crown = Tree.bEnabled ? Tree.CrownRadius : 0;
+	const int32 TreeHeight = Tree.bEnabled ? Tree.MaxHeight + Crown : 0;
+	FVoxelGenerationBounds OverlayBounds = InKey.GetBounds();
+	OverlayBounds.Min -= FIntVector(Step + Crown, Step + Crown, Step + TreeHeight);
+	OverlayBounds.Max += FIntVector(Step + Crown, Step + Crown, Step);
 	if (!Module.IsAuthority())
 	{
 		TArray<FIntVector> Modified;
@@ -1741,7 +1766,7 @@ bool FVoxelViewManager::RequestVoxelProxy(
 			GetRuntime()->
 			GetChangeIndex().
 			Enumerate(
-				InKey.GetBounds(),
+				OverlayBounds,
 				Modified);
 
 		if (!Modified.IsEmpty())
@@ -1766,16 +1791,12 @@ bool FVoxelViewManager::RequestVoxelProxy(
 	}
 
 	const TSharedPtr<
-		const FVoxelGenerationRuntimeConfig,
-		ESPMode::ThreadSafe> Config =
-			Module.
-				GetGenerationConfig();
-
-	const TSharedPtr<
 		FVoxelGenerationPlanCache,
 		ESPMode::ThreadSafe> Cache =
 			Module.
-				GetGenerationCache();
+			GetGenerationCache();
+	const TSharedPtr<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> Generator =
+		Module.GetGenerator();
 
 	if (!Config ||
 		!Cache)
@@ -1846,9 +1867,6 @@ bool FVoxelViewManager::RequestVoxelProxy(
 			GetManifest().
 			RecipeHash;
 	FVoxelOverlaySnapshotSet Overlays;
-	FVoxelGenerationBounds OverlayBounds = InKey.GetBounds();
-	OverlayBounds.Min -= FIntVector(InKey.GetStep());
-	OverlayBounds.Max += FIntVector(InKey.GetStep());
 	FString OverlayError;
 	if (!Module.CaptureOverlays(OverlayBounds, Overlays, OverlayError)) return false;
 	Request.InputBytes = Overlays.GetAllocatedBytes();
@@ -1857,6 +1875,7 @@ bool FVoxelViewManager::RequestVoxelProxy(
 		[
 			Config,
 			Cache,
+			Generator,
 			Registry,
 			Shapes,
 			RecipeHash,
@@ -1874,7 +1893,8 @@ bool FVoxelViewManager::RequestVoxelProxy(
 
 			const FVoxelVoxelProxyBuilder Builder(
 				Config.ToSharedRef(),
-				Cache.ToSharedRef());
+				Cache.ToSharedRef(),
+				Generator);
 
 			Result.bSuccess =
 				Builder.Build(
@@ -2351,21 +2371,13 @@ bool FVoxelViewManager::RequestMacro(
 						FVoxelSectionMeshResult>();
 
 				Result.bSuccess =
-					FVoxelHeightfieldMesher::
-						BuildBlockyTerrain(
-							Result.Macro->Side,
-							Result.Macro->Step,
-							Result.Macro->Height,
-							Result.Macro->SurfaceClass,
+					FVoxelHeightfieldMesher::BuildMacro(
+							*Result.Macro,
 							*Config,
 							*Registry,
 							*Result.MacroMesh,
 							Result.Error,
-							&InCancel,
-							Result.Macro->
-								ForestCoverage,
-							-0.05,
-							16, TextureStretch);
+							&InCancel, TextureStretch);
 			}
 
 			return Result;

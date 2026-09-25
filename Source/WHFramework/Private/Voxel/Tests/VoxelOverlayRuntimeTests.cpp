@@ -54,6 +54,15 @@ bool FVoxelChangeHierarchyRevisionTest::RunTest(const FString& InParameters)
 	const uint64 BoundaryRevision = Hierarchy.InvalidateSection(FIntVector(2, 0, 0));
 	TestEqual(TEXT("Neighbour halo dependency is invalidated"),
 		Hierarchy.GetVoxelProxyRevision({ FIntVector(0, 0, 0), 1 }), BoundaryRevision);
+	Hierarchy.SetVoxelProxyNaturalInfluence(6, 34);
+	const FIntVector TreeSection(0, 0, 0);
+	const uint64 TreeRevision = Hierarchy.InvalidateSection(TreeSection);
+	TestEqual(TEXT("Tree trunk edits invalidate canopy in the upper proxy"),
+		Hierarchy.GetVoxelProxyRevision({ FIntVector(0, 0, 1), 1 }), TreeRevision);
+	TestTrue(TEXT("Ready canopy proxy is invalidated by a trunk edit"),
+		Hierarchy.AffectsVoxelProxy({ FIntVector(0, 0, 1), 1 }, TreeSection));
+	TestFalse(TEXT("Unrelated higher proxy stays intact"),
+		Hierarchy.AffectsVoxelProxy({ FIntVector(0, 0, 2), 1 }, TreeSection));
 	return true;
 }
 
