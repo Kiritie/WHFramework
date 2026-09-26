@@ -1,4 +1,5 @@
 #include "Voxel/Generation/Surface/VoxelSurfaceGenerator.h"
+#include "Voxel/Generation/VoxelGenerationMath.h"
 
 FVoxelSurfaceGenerator::FVoxelSurfaceGenerator(
     TSharedRef<const FVoxelGenerationRecipe, ESPMode::ThreadSafe> InRecipe)
@@ -6,7 +7,8 @@ FVoxelSurfaceGenerator::FVoxelSurfaceGenerator(
 {
 }
 
-void FVoxelSurfaceGenerator::ResolveColumn(FVoxelColumnSample& InOutColumn) const
+void FVoxelSurfaceGenerator::ResolveColumn(const int32 InX, const int32 InY,
+    FVoxelColumnSample& InOutColumn) const
 {
     if (InOutColumn.SurfaceWaterZ != MIN_int32)
     {
@@ -19,7 +21,7 @@ void FVoxelSurfaceGenerator::ResolveColumn(FVoxelColumnSample& InOutColumn) cons
     }
 
     InOutColumn.SurfaceMaterial = static_cast<uint16>(
-        ResolveSymbol(FIntVector::ZeroValue, InOutColumn, 0));
+        ResolveSymbol(FIntVector(InX, InY, InOutColumn.SurfaceZ), InOutColumn, 0));
 }
 
 uint32 FVoxelSurfaceGenerator::ResolveSymbol(
@@ -27,12 +29,11 @@ uint32 FVoxelSurfaceGenerator::ResolveSymbol(
     const FVoxelColumnSample& InColumn,
     int32 InDepthFromSurface) const
 {
-    const bool bRiverBedOrBank = !InColumn.bOcean && !InColumn.bLake &&
-        (InColumn.bRiver ||
-            (InColumn.RiverDistanceCells != MAX_int32 && InColumn.BankDistanceCells == 0));
     const bool bUnderWater = InColumn.SurfaceWaterZ != MIN_int32 &&
         InColumn.SurfaceWaterZ >= InColumn.SurfaceZ;
-    const bool bKeepSubsoil = bRiverBedOrBank || bUnderWater;
+    const bool bKeepSubsoil = bUnderWater || InColumn.bOcean || InColumn.bLake ||
+        InColumn.RiverZone == EVoxelRiverSurfaceZone::ChannelBed ||
+        InColumn.RiverZone == EVoxelRiverSurfaceZone::WetMargin;
     const int32 SurfaceDepth = InDepthFromSurface == 0 && bKeepSubsoil
         ? 1 : InDepthFromSurface;
     const FVoxelSurfaceRuntimeRuleSet* RuleSet =
@@ -42,7 +43,31 @@ uint32 FVoxelSurfaceGenerator::ResolveSymbol(
     {
         for (const FVoxelSurfaceRuntimeRule& Rule : RuleSet->Rules)
         {
-            if (!Matches(Rule, InColumn, SurfaceDepth) ||
+            if (Rule.RiverZone != EVoxelSurfaceRiverRule::Any &&
+                Matches(Rule, InColumn, InDepthFromSurface))
+            {
+                return Rule.BlockSymbol;
+            }
+        }
+    }
+
+    if (InDepthFromSurface == 0 &&
+        InColumn.RiverZone == EVoxelRiverSurfaceZone::DryBank &&
+        Recipe->Palette.Sand != MAX_uint16 &&
+        VoxelGeneration::RandomRange(VoxelGeneration::MakeSeed(
+            Recipe->Settings.Seed,
+            FIntVector(InCell.X, InCell.Y, InColumn.SurfaceZ),
+            0x5249564552535552ull), 0, 99) < 35)
+    {
+        return Recipe->Palette.Sand;
+    }
+
+    if (RuleSet)
+    {
+        for (const FVoxelSurfaceRuntimeRule& Rule : RuleSet->Rules)
+        {
+            if (Rule.RiverZone != EVoxelSurfaceRiverRule::Any ||
+                !Matches(Rule, InColumn, SurfaceDepth) ||
                 (InDepthFromSurface == 0 && bKeepSubsoil &&
                     Rule.BlockSymbol == Recipe->Palette.Grass))
             {
@@ -55,7 +80,9 @@ uint32 FVoxelSurfaceGenerator::ResolveSymbol(
 
     if (SurfaceDepth == 0)
     {
-		return Recipe->Palette.Grass;
+		return Recipe->Biomes.IsValidIndex(InColumn.BiomeIndex)
+			? Recipe->Biomes[InColumn.BiomeIndex].DefaultSurface
+			: Recipe->Palette.Stone;
     }
 
     if (SurfaceDepth <= 3)
@@ -97,6 +124,13 @@ bool FVoxelSurfaceGenerator::Matches(
     }
 
     if (InRule.bRiverOnly && !InColumn.bRiver)
+    {
+        return false;
+    }
+
+    if (InRule.RiverZone != EVoxelSurfaceRiverRule::Any &&
+        static_cast<uint8>(InRule.RiverZone) !=
+            static_cast<uint8>(InColumn.RiverZone) + 1)
     {
         return false;
     }

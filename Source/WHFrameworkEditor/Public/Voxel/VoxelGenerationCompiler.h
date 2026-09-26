@@ -12,7 +12,7 @@ struct FVoxelStructurePieceTemplate;
 class WHFRAMEWORKEDITOR_API FVoxelGenerationCompiler
 {
 public:
-	static constexpr int32 CurrentBakeVersion = 7;
+	static constexpr int32 CurrentBakeVersion = 9;
 
 public:
 	static bool Compile(UVoxelWorldGenerationProfile& InOutProfile, const FVoxelRegistrySnapshot& InRegistry, FString& OutError);
@@ -38,7 +38,8 @@ private:
 	static bool ValidateBiomeFeatureCoverage(const UVoxelWorldGenerationProfile& InProfile, FString& OutError);
 	static bool CompileStructures(const UVoxelWorldGenerationProfile& InProfile, const FVoxelRegistrySnapshot& InRegistry,
 		const TMap<FName, uint16>& InBlockSymbols, FVoxelGenerationRecipe& InOutRecipe, FString& OutError);
-	static bool CompileBiomes(const UVoxelWorldGenerationProfile& InProfile, FVoxelGenerationRecipe& InOutRecipe, FString& OutError);
+	static bool CompileBiomes(const UVoxelWorldGenerationProfile& InProfile, const FVoxelRegistrySnapshot& InRegistry,
+		const TMap<FName, uint16>& InBlockSymbols, FVoxelGenerationRecipe& InOutRecipe, FString& OutError);
 	static bool CompileStructurePiece(const UVoxelStructureData& InStructure, const FVoxelRegistrySnapshot& InRegistry,
 		const TMap<FName, uint16>& InBlockSymbols, int32 InTargetCellCentimeters,
 		FVoxelStructurePieceTemplate& OutPiece, FString& OutError);

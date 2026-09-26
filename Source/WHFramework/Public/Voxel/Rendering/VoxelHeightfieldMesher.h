@@ -6,6 +6,7 @@
 struct FVoxelGenerationRuntimeConfig;
 struct FVoxelRegistrySnapshot;
 struct FVoxelMacroTileData;
+struct FVoxelDistantCell;
 struct FVoxelWaterSurfaceTileData;
 
 class WHFRAMEWORK_API FVoxelHeightfieldMesher
@@ -23,7 +24,6 @@ public:
 		const TAtomic<bool>* InCancel = nullptr,
 		TConstArrayView<uint8> InCoverage = {},
 		double InZBiasCells = 0.0,
-		int32 InSkirtDepthCells = 0,
 		double InMaximumTextureStretchCells = 4.0);
 
 	static bool BuildMacro(
@@ -35,19 +35,14 @@ public:
 		const TAtomic<bool>* InCancel = nullptr,
 		double InMaximumTextureStretchCells = 4.0);
 
-	static bool BuildTerrain(
-		int32 InVertexSide,
+	static bool AppendDistantCells(
+		TConstArrayView<FVoxelDistantCell> InCells,
+		const FIntPoint& InTileOrigin,
 		int32 InStep,
-		TConstArrayView<int32> InHeights,
-		TConstArrayView<uint16> InMaterials,
-		const FVoxelGenerationRuntimeConfig& InConfig,
 		const FVoxelRegistrySnapshot& InRegistry,
-		FVoxelSectionMeshResult& OutMesh,
+		FVoxelSectionMeshResult& InOutMesh,
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr,
-		TConstArrayView<uint8> InCoverage = {},
-		double InZBiasCells = 0.0,
-		int32 InSkirtDepthCells = 8,
 		double InMaximumTextureStretchCells = 4.0);
 
 	static bool BuildWater(
@@ -73,10 +68,4 @@ private:
 		const FVoxelRuntimeFaceRef& InFace,
 		const FLinearColor& InColor = FLinearColor::White);
 
-	static void AppendSkirtQuad(
-		FVoxelMeshBuffers& InOutMesh,
-		const FVector& InTopA,
-		const FVector& InTopB,
-		double InBottomZ,
-		const FVoxelRuntimeFaceRef& InFace);
 };

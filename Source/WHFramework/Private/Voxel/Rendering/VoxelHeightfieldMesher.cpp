@@ -13,6 +13,7 @@ namespace
 	constexpr uint8 FacePositiveY = 2;
 	constexpr uint8 FaceNegativeY = 3;
 	constexpr uint8 FacePositiveZ = 4;
+	constexpr uint8 FaceNegativeZ = 5;
 	constexpr uint8 TopMaterialFace = 4;
 
 	int32 VertexIndex(
@@ -53,6 +54,26 @@ namespace
 
 		OutFace = &OutDefinition->Face(State.State, InFaceIndex);
 		return true;
+	}
+
+	void AppendWaterPolygon(FVoxelMeshBuffers& InOutMesh,
+		TConstArrayView<FVector> InVertices, const FVoxelRuntimeFaceRef& InFace)
+	{
+		const int32 Base = InOutMesh.Vertices.Num();
+		for (const FVector& Vertex : InVertices)
+		{
+			InOutMesh.Vertices.Add(Vertex);
+			InOutMesh.Normals.Add(FVector::UpVector);
+			InOutMesh.UV0.Add(FVector2D(Vertex.X, Vertex.Y));
+			InOutMesh.UV1.Add(FVector2D(InFace.Layer, InFace.Frames));
+			InOutMesh.UV2.Add(FVector2D(InFace.FPS, 0.0));
+			InOutMesh.Colors.Add(InFace.Tint);
+			InOutMesh.Tangents.Add(FProcMeshTangent(FVector::ForwardVector, false));
+		}
+		for (int32 Index = 1; Index + 1 < InVertices.Num(); ++Index)
+		{
+			InOutMesh.Triangles.Append({Base, Base + Index + 1, Base + Index});
+		}
 	}
 }
 
@@ -176,36 +197,6 @@ void FVoxelHeightfieldMesher::AppendQuad(
 	});
 }
 
-void FVoxelHeightfieldMesher::AppendSkirtQuad(
-	FVoxelMeshBuffers& InOutMesh,
-	const FVector& InTopA,
-	const FVector& InTopB,
-	const double InBottomZ,
-	const FVoxelRuntimeFaceRef& InFace)
-{
-	const FVector BottomB(
-		InTopB.X,
-		InTopB.Y,
-		FMath::Min(
-			InTopB.Z,
-			InBottomZ));
-
-	const FVector BottomA(
-		InTopA.X,
-		InTopA.Y,
-		FMath::Min(
-			InTopA.Z,
-			InBottomZ));
-
-	AppendQuad(
-		InOutMesh,
-		InTopA,
-		InTopB,
-		BottomB,
-		BottomA,
-		InFace);
-}
-
 bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 	const int32 InVertexSide,
 	const int32 InStep,
@@ -218,7 +209,6 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 	const TAtomic<bool>* InCancel,
 	TConstArrayView<uint8> InCoverage,
 	const double InZBiasCells,
-	const int32 InSkirtDepthCells,
 	const double InMaximumTextureStretchCells)
 {
 	if (InVertexSide < 2 ||
@@ -233,14 +223,6 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 
 	FVoxelSectionMeshResult Mesh;
 	const int32 CellSide = InVertexSide - 1;
-	int32 LowestHeight = MAX_int32;
-	for (const int32 Height : InHeights)
-	{
-		if (Height != MIN_int32) LowestHeight = FMath::Min(LowestHeight, Height);
-	}
-	const double SkirtFloor = LowestHeight == MAX_int32
-		? 0.0 : static_cast<double>(LowestHeight) - FMath::Max(InSkirtDepthCells, InStep * 2);
-
 	auto CellIndex =
 		[InVertexSide](const int32 InX, const int32 InY)
 		{
@@ -382,55 +364,6 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 		}
 	}
 
-	if (InSkirtDepthCells > 0)
-	{
-		auto BuildEdgeSide =
-			[&AppendMaterialQuad, &CoverageColor, InSkirtDepthCells, SkirtFloor](
-				const int32 InX,
-				const int32 InY,
-				const uint8 InFace,
-				const FVector& InTopA,
-				const FVector& InTopB)
-			{
-				const double BottomZ = FMath::Min(
-					FMath::Min(InTopA.Z, InTopB.Z) - InSkirtDepthCells, SkirtFloor);
-				FVector BottomB = InTopB;
-				FVector BottomA = InTopA;
-				BottomB.Z = BottomZ;
-				BottomA.Z = BottomZ;
-				return AppendMaterialQuad(
-					InX, InY, InFace, InTopA, InTopB, BottomB, BottomA, CoverageColor(InX, InY));
-			};
-
-		for (int32 Index = 0; Index < CellSide; ++Index)
-		{
-			const double MinYTop = TopZ(Index, 0);
-			const double MaxYTop = TopZ(Index, CellSide - 1);
-			const double MinXTop = TopZ(0, Index);
-			const double MaxXTop = TopZ(CellSide - 1, Index);
-
-			if (!BuildEdgeSide(
-					Index, 0, FaceNegativeY,
-					FVector((Index + 1) * InStep, 0.0, MinYTop),
-					FVector(Index * InStep, 0.0, MinYTop)) ||
-				!BuildEdgeSide(
-					Index, CellSide - 1, FacePositiveY,
-					FVector(Index * InStep, CellSide * InStep, MaxYTop),
-					FVector((Index + 1) * InStep, CellSide * InStep, MaxYTop)) ||
-				!BuildEdgeSide(
-					0, Index, FaceNegativeX,
-					FVector(0.0, Index * InStep, MinXTop),
-					FVector(0.0, (Index + 1) * InStep, MinXTop)) ||
-				!BuildEdgeSide(
-					CellSide - 1, Index, FacePositiveX,
-					FVector(CellSide * InStep, (Index + 1) * InStep, MaxXTop),
-					FVector(CellSide * InStep, Index * InStep, MaxXTop)))
-			{
-				return false;
-			}
-		}
-	}
-
 	for (const FVoxelRenderBatch& Batch : Mesh.Batches)
 	{
 		if (!Batch.Mesh.Validate())
@@ -450,6 +383,66 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 	}
 
 	OutMesh = MoveTemp(Mesh);
+	OutError.Reset();
+	return true;
+}
+
+bool FVoxelHeightfieldMesher::AppendDistantCells(
+	TConstArrayView<FVoxelDistantCell> InCells,
+	const FIntPoint& InTileOrigin,
+	const int32 InStep,
+	const FVoxelRegistrySnapshot& InRegistry,
+	FVoxelSectionMeshResult& InOutMesh,
+	FString& OutError,
+	const TAtomic<bool>* InCancel,
+	const double InMaximumTextureStretchCells)
+{
+	const double TexturePeriod = VoxelViewLod::TexturePeriodCells(InStep, InMaximumTextureStretchCells);
+	for (const FVoxelDistantCell& Cell : InCells)
+	{
+		if (InCancel && InCancel->Load())
+		{
+			OutError = TEXT("Canceled");
+			return false;
+		}
+		if (Cell.State.IsAir() || Cell.Min.X >= Cell.Max.X ||
+			Cell.Min.Y >= Cell.Max.Y || Cell.Min.Z >= Cell.Max.Z)
+		{
+			OutError = TEXT("Distant voxel cell has invalid bounds or state");
+			return false;
+		}
+		const FVoxelRuntimeDefinition* Definition = InRegistry.Find(Cell.State.TypeId);
+		if (!Definition)
+		{
+			OutError = TEXT("Distant voxel cell is missing from registry");
+			return false;
+		}
+		const double X0 = Cell.Min.X - InTileOrigin.X;
+		const double X1 = Cell.Max.X - InTileOrigin.X;
+		const double Y0 = Cell.Min.Y - InTileOrigin.Y;
+		const double Y1 = Cell.Max.Y - InTileOrigin.Y;
+		const double Z0 = Cell.Min.Z;
+		const double Z1 = Cell.Max.Z;
+		auto Face = [&](const uint8 FaceIndex, const FVector& A,
+			const FVector& B, const FVector& C, const FVector& D)
+		{
+			const FVoxelRuntimeFaceRef& Material = Definition->Face(Cell.State.State, FaceIndex);
+			FVoxelRenderBatch& Batch = FindOrAddBatch(InOutMesh,
+				Definition->RenderGroup, Material.Bank);
+			const int32 FirstUV = Batch.Mesh.UV0.Num();
+			AppendQuad(Batch.Mesh, A, B, C, D, Material);
+			for (int32 Index = FirstUV; Index < Batch.Mesh.UV0.Num(); ++Index)
+			{
+				Batch.Mesh.UV0[Index] /= TexturePeriod;
+			}
+		};
+		Face(FacePositiveX, {X1, Y1, Z1}, {X1, Y0, Z1}, {X1, Y0, Z0}, {X1, Y1, Z0});
+		Face(FaceNegativeX, {X0, Y0, Z1}, {X0, Y1, Z1}, {X0, Y1, Z0}, {X0, Y0, Z0});
+		Face(FacePositiveY, {X0, Y1, Z1}, {X1, Y1, Z1}, {X1, Y1, Z0}, {X0, Y1, Z0});
+		Face(FaceNegativeY, {X1, Y0, Z1}, {X0, Y0, Z1}, {X0, Y0, Z0}, {X1, Y0, Z0});
+		Face(FacePositiveZ, {X0, Y0, Z1}, {X1, Y0, Z1}, {X1, Y1, Z1}, {X0, Y1, Z1});
+		Face(FaceNegativeZ, {X0, Y1, Z0}, {X1, Y1, Z0}, {X1, Y0, Z0}, {X0, Y0, Z0});
+	}
 	OutError.Reset();
 	return true;
 }
@@ -474,7 +467,7 @@ bool FVoxelHeightfieldMesher::BuildMacro(
 	FVoxelSectionMeshResult Mesh;
 	if (!BuildBlockyTerrain(
 		InMacro.Side, InMacro.Step, InMacro.Height, InMacro.SurfaceClass,
-		InConfig, InRegistry, Mesh, OutError, InCancel, {}, -0.05, 16,
+		InConfig, InRegistry, Mesh, OutError, InCancel, {}, -0.05,
 		InMaximumTextureStretchCells))
 	{
 		return false;
@@ -512,352 +505,15 @@ bool FVoxelHeightfieldMesher::BuildMacro(
 			}
 		}
 	}
-
-	OutMesh = MoveTemp(Mesh);
-	OutError.Reset();
-	return true;
-}
-
-bool FVoxelHeightfieldMesher::BuildTerrain(
-	const int32 InVertexSide,
-	const int32 InStep,
-	TConstArrayView<int32> InHeights,
-	TConstArrayView<uint16> InMaterials,
-	const FVoxelGenerationRuntimeConfig& InConfig,
-	const FVoxelRegistrySnapshot& InRegistry,
-	FVoxelSectionMeshResult& OutMesh,
-	FString& OutError,
-	const TAtomic<bool>* InCancel,
-	TConstArrayView<uint8> InCoverage,
-	const double InZBiasCells,
-	const int32 InSkirtDepthCells,
-	const double InMaximumTextureStretchCells)
-{
-	if (InVertexSide < 2 ||
-		InStep <= 0 ||
-		InHeights.Num() !=
-			InVertexSide *
-				InVertexSide ||
-		InMaterials.Num() !=
-			InHeights.Num() ||
-		(!InCoverage.IsEmpty() &&
-		 InCoverage.Num() !=
-			InHeights.Num()))
+	if (!AppendDistantCells(InMacro.DistantCells,
+		InMacro.Key.Coordinate * (FVoxelMacroTileData::CellSide * InMacro.Step),
+		InMacro.Step, InRegistry, Mesh, OutError, InCancel,
+		InMaximumTextureStretchCells))
 	{
-		OutError =
-			TEXT("Invalid continuous heightfield input");
-
 		return false;
 	}
 
-	FVoxelSectionMeshResult Mesh;
-
-	const int32 CellSide =
-		InVertexSide - 1;
-
-	for (int32 Y = 0;
-		Y < CellSide;
-		++Y)
-	{
-		if (InCancel &&
-			InCancel->Load())
-		{
-			OutError =
-				TEXT("Canceled");
-
-			return false;
-		}
-
-		for (int32 X = 0;
-			X < CellSide;
-			++X)
-		{
-			const int32 I00 =
-				VertexIndex(
-					X,
-					Y,
-					InVertexSide);
-
-			const int32 I10 =
-				VertexIndex(
-					X + 1,
-					Y,
-					InVertexSide);
-
-			const int32 I11 =
-				VertexIndex(
-					X + 1,
-					Y + 1,
-					InVertexSide);
-
-			const int32 I01 =
-				VertexIndex(
-					X,
-					Y + 1,
-					InVertexSide);
-
-			FVoxelBlockState State;
-
-			if (!InConfig.ToRuntime(
-				InMaterials[I00],
-				State))
-			{
-				OutError =
-					TEXT("Heightfield contains an invalid material symbol");
-
-				return false;
-			}
-
-			const FVoxelRuntimeDefinition* Definition =
-				InRegistry.Find(
-					State.TypeId);
-
-			if (!Definition)
-			{
-				OutError =
-					TEXT("Heightfield material is missing from the runtime registry");
-
-				return false;
-			}
-
-			const FVoxelRuntimeFaceRef& Face =
-				Definition->Face(
-					State.State,
-					TopMaterialFace);
-
-			FVoxelRenderBatch& Batch =
-				FindOrAddBatch(
-					Mesh,
-					Definition->
-						RenderGroup,
-					Face.Bank);
-
-			const double X0 =
-				X *
-				InStep;
-
-			const double X1 =
-				(X + 1) *
-				InStep;
-
-			const double Y0 =
-				Y *
-				InStep;
-
-			const double Y1 =
-				(Y + 1) *
-				InStep;
-
-			const FVector A(
-				X0,
-				Y0,
-				InHeights[I00] +
-					1.0 +
-					InZBiasCells);
-
-			const FVector B(
-				X1,
-				Y0,
-				InHeights[I10] +
-					1.0 +
-					InZBiasCells);
-
-			const FVector C(
-				X1,
-				Y1,
-				InHeights[I11] +
-					1.0 +
-					InZBiasCells);
-
-			const FVector D(
-				X0,
-				Y1,
-				InHeights[I01] +
-					1.0 +
-					InZBiasCells);
-
-			const float Coverage =
-				InCoverage.IsEmpty()
-					? 1.0f
-					: (
-						InCoverage[I00] +
-						InCoverage[I10] +
-						InCoverage[I11] +
-						InCoverage[I01]
-					  ) /
-					  (4.0f * 255.0f);
-
-			AppendQuad(
-				Batch.Mesh,
-				A,
-				B,
-				C,
-				D,
-				Face,
-				FLinearColor(
-					Coverage,
-					Coverage,
-					Coverage,
-					1.0f));
-		}
-	}
-
-	if (InSkirtDepthCells > 0)
-	{
-		auto BuildSkirtSegment =
-			[
-				&InConfig,
-				&InRegistry,
-				&InMaterials,
-				&InHeights,
-				InVertexSide,
-				InStep,
-				InZBiasCells,
-				InSkirtDepthCells,
-				&Mesh,
-				&OutError
-			](
-				const int32 InAX,
-				const int32 InAY,
-				const int32 InBX,
-				const int32 InBY) -> bool
-			{
-				const int32 IA =
-					VertexIndex(
-						InAX,
-						InAY,
-						InVertexSide);
-
-				const int32 IB =
-					VertexIndex(
-						InBX,
-						InBY,
-						InVertexSide);
-
-				FVoxelBlockState State;
-
-				if (!InConfig.ToRuntime(
-					InMaterials[IA],
-					State))
-				{
-					OutError =
-						TEXT("Heightfield skirt material is invalid");
-
-					return false;
-				}
-
-				const FVoxelRuntimeDefinition* Definition =
-					InRegistry.Find(
-						State.TypeId);
-
-				if (!Definition)
-				{
-					OutError =
-						TEXT("Heightfield skirt material is missing");
-
-					return false;
-				}
-
-				const FVoxelRuntimeFaceRef& Face =
-					Definition->Face(
-						State.State,
-						TopMaterialFace);
-
-				FVoxelRenderBatch& Batch =
-					FindOrAddBatch(
-						Mesh,
-						Definition->
-							RenderGroup,
-						Face.Bank);
-
-				const FVector TopA(
-					InAX *
-						InStep,
-					InAY *
-						InStep,
-					InHeights[IA] +
-						1.0 +
-						InZBiasCells);
-
-				const FVector TopB(
-					InBX *
-						InStep,
-					InBY *
-						InStep,
-					InHeights[IB] +
-						1.0 +
-						InZBiasCells);
-
-				const double BottomZ =
-					FMath::Min(
-						TopA.Z,
-						TopB.Z) -
-					InSkirtDepthCells;
-
-				AppendSkirtQuad(
-					Batch.Mesh,
-					TopA,
-					TopB,
-					BottomZ,
-					Face);
-
-				return true;
-			};
-
-		for (int32 Index = 0;
-			Index < CellSide;
-			++Index)
-		{
-			if (!BuildSkirtSegment(
-					Index,
-					0,
-					Index + 1,
-					0) ||
-				!BuildSkirtSegment(
-					Index + 1,
-					CellSide,
-					Index,
-					CellSide) ||
-				!BuildSkirtSegment(
-					0,
-					Index + 1,
-					0,
-					Index) ||
-				!BuildSkirtSegment(
-					CellSide,
-					Index,
-					CellSide,
-					Index + 1))
-			{
-				return false;
-			}
-		}
-	}
-
-	for (const FVoxelRenderBatch& Batch :
-		Mesh.Batches)
-	{
-		if (!Batch.Mesh.Validate())
-		{
-			OutError =
-				TEXT("Continuous heightfield mesh validation failed");
-
-			return false;
-		}
-	}
-
-	const double TexturePeriod = VoxelViewLod::TexturePeriodCells(InStep, InMaximumTextureStretchCells);
-	for (FVoxelRenderBatch& OutputBatch : Mesh.Batches)
-	{
-		for (FVector2D& UV : OutputBatch.Mesh.UV0)
-		{
-			UV /= TexturePeriod;
-		}
-	}
-
-	OutMesh =
-		MoveTemp(Mesh);
-
+	OutMesh = MoveTemp(Mesh);
 	OutError.Reset();
 	return true;
 }
@@ -966,10 +622,14 @@ bool FVoxelHeightfieldMesher::BuildWater(
 					Y,
 					InWater.Side);
 
-			if (!IsWet(I00))
-			{
-				continue;
-			}
+			const int32 I10 = VertexIndex(X + 1, Y, InWater.Side);
+			const int32 I11 = VertexIndex(X + 1, Y + 1, InWater.Side);
+			const int32 I01 = VertexIndex(X, Y + 1, InWater.Side);
+			const bool bWet[4] = {IsWet(I00), IsWet(I10), IsWet(I11), IsWet(I01)};
+			const uint8 WetMask = (bWet[0] ? 1 : 0) |
+				(bWet[1] ? 2 : 0) | (bWet[2] ? 4 : 0) |
+				(bWet[3] ? 8 : 0);
+			if (WetMask == 0) continue;
 
 			const double X0 =
 				X *
@@ -987,29 +647,44 @@ bool FVoxelHeightfieldMesher::BuildWater(
 				(Y + 1) *
 				InWater.Step;
 
-			AppendQuad(
-				Batch.Mesh,
-				FVector(
-					X0,
-					Y0,
-					InWater.WaterZ[I00] +
-						1.0),
-				FVector(
-					X1,
-					Y0,
-					InWater.WaterZ[I00] +
-						1.0),
-				FVector(
-					X1,
-					Y1,
-					InWater.WaterZ[I00] +
-						1.0),
-				FVector(
-					X0,
-					Y1,
-					InWater.WaterZ[I00] +
-						1.0),
-				Face);
+			const FVector Corners[4] = {
+				FVector(X0, Y0, bWet[0] ? InWater.WaterZ[I00] + 1.0 : 0.0),
+				FVector(X1, Y0, bWet[1] ? InWater.WaterZ[I10] + 1.0 : 0.0),
+				FVector(X1, Y1, bWet[2] ? InWater.WaterZ[I11] + 1.0 : 0.0),
+				FVector(X0, Y1, bWet[3] ? InWater.WaterZ[I01] + 1.0 : 0.0)};
+			if (WetMask == 15)
+			{
+				AppendQuad(Batch.Mesh, Corners[0], Corners[1],
+					Corners[2], Corners[3], Face);
+				continue;
+			}
+			auto Boundary = [&Corners](const int32 Wet, const int32 Dry)
+			{
+				const FVector& Water = Corners[Wet];
+				const FVector& Land = Corners[Dry];
+				return FVector((Water.X + Land.X) * 0.5,
+					(Water.Y + Land.Y) * 0.5, Water.Z);
+			};
+			for (int32 Start = 0; Start < 4; ++Start)
+			{
+				if (!bWet[Start] || bWet[(Start + 3) & 3]) continue;
+				TArray<FVector, TInlineAllocator<6>> Polygon;
+				Polygon.Add(Boundary(Start, (Start + 3) & 3));
+				int32 Corner = Start;
+				for (int32 RunIndex = 0; RunIndex < 4 && bWet[Corner]; ++RunIndex)
+				{
+					Polygon.Add(Corners[Corner]);
+					const int32 Next = (Corner + 1) & 3;
+					if (!bWet[Next])
+					{
+						Polygon.Add(Boundary(Corner, Next));
+						break;
+					}
+					Corner = Next;
+				}
+				AppendWaterPolygon(Batch.Mesh,
+					MakeArrayView(Polygon.GetData(), Polygon.Num()), Face);
+			}
 		}
 	}
 

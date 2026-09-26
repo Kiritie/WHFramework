@@ -10,7 +10,11 @@ namespace
 	constexpr uint64 GrassSalt = 0x1987D4A6723FE901ull;
 	constexpr uint64 TreeHeightSalt = 0x04C2A27F81DE930Bull;
 	constexpr uint64 GrassFillSalt = 0x8D923F7415B7CA61ull;
+	constexpr uint64 FlowerSalt = 0x464C4F5745525041ull;
+	constexpr uint64 FlowerFillSalt = 0x464C4F5745524649ull;
+	constexpr uint64 FlowerTypeSalt = 0x464C4F5745525459ull;
 	constexpr uint8 GrassPriority = 1;
+	constexpr uint8 FlowerPriority = 2;
 	constexpr uint8 LeafPriority = 2;
 	constexpr uint8 TrunkPriority = 3;
 }
@@ -65,28 +69,103 @@ int32 FVoxelEcologyGenerator::EffectiveChance(
 	return FMath::Clamp(static_cast<int32>(Scaled / 1000), 0, 1000);
 }
 
-bool FVoxelEcologyGenerator::IsTreeColumnAllowed(const FVoxelColumnSample& InColumn) const
+FVoxelEcologySample FVoxelEcologyGenerator::Sample(const FVoxelColumnSample& InColumn) const
 {
-	const FVoxelTreeGenerationSettings& Settings = Recipe->Settings.Ecology.Tree;
-	if (InColumn.bOcean || InColumn.SlopePermille > Settings.MaxSlopePermille ||
-		!Settings.Temperature.Contains(InColumn.Climate.TemperatureQ15) ||
-		!Settings.Moisture.Contains(InColumn.Climate.MoistureQ15))
+	FVoxelEcologySample Result;
+	Result.BiomeIndex = InColumn.BiomeIndex;
+	if (!Recipe->Biomes.IsValidIndex(InColumn.BiomeIndex))
 	{
-		return false;
+		Result.TreeRejectReason = EVoxelEcologyRejectReason::Biome;
+		Result.FlowerRejectReason = EVoxelEcologyRejectReason::Biome;
+		return Result;
 	}
-	return Settings.bAllowNearWater || (!InColumn.bRiver && !InColumn.bLake && !InColumn.bCoast);
-}
-
-bool FVoxelEcologyGenerator::IsGrassColumnAllowed(const FVoxelColumnSample& InColumn) const
-{
-	const FVoxelGrassGenerationSettings& Settings = Recipe->Settings.Ecology.Grass;
-	if (InColumn.bOcean || InColumn.SlopePermille > Settings.MaxSlopePermille ||
-		!Settings.Temperature.Contains(InColumn.Climate.TemperatureQ15) ||
-		!Settings.Moisture.Contains(InColumn.Climate.MoistureQ15))
+	const FVoxelBiomeEcologyModifier& Modifier = Recipe->Biomes[InColumn.BiomeIndex].Ecology;
+	const FVoxelTreeGenerationSettings& Tree = Recipe->Settings.Ecology.Tree;
+	const FVoxelGrassGenerationSettings& Grass = Recipe->Settings.Ecology.Grass;
+	const FVoxelFlowerGenerationSettings& Flower = Recipe->Settings.Ecology.Flower;
+	const bool bRiverBed = InColumn.RiverZone == EVoxelRiverSurfaceZone::ChannelBed;
+	const bool bWetMargin = InColumn.RiverZone == EVoxelRiverSurfaceZone::WetMargin;
+	const bool bDryBank = InColumn.RiverZone == EVoxelRiverSurfaceZone::DryBank;
+	if (!Modifier.bAllowTrees || Modifier.TreeDensityScalePermille == 0)
 	{
-		return false;
+		Result.TreeRejectReason = EVoxelEcologyRejectReason::Biome;
 	}
-	return Settings.bAllowNearWater || (!InColumn.bRiver && !InColumn.bLake && !InColumn.bCoast);
+	else if (InColumn.bOcean || InColumn.bLake || bRiverBed || bWetMargin || bDryBank ||
+		(!Tree.bAllowNearWater &&
+		(InColumn.bRiver || InColumn.bLake || InColumn.bCoast)))
+	{
+		Result.TreeRejectReason = EVoxelEcologyRejectReason::Water;
+	}
+	else if (InColumn.SlopePermille > Tree.MaxSlopePermille)
+	{
+		Result.TreeRejectReason = EVoxelEcologyRejectReason::Slope;
+	}
+	else if (!Tree.Temperature.Contains(InColumn.Climate.TemperatureQ15))
+	{
+		Result.TreeRejectReason = EVoxelEcologyRejectReason::Temperature;
+	}
+	else if (!Tree.Moisture.Contains(InColumn.Climate.MoistureQ15))
+	{
+		Result.TreeRejectReason = EVoxelEcologyRejectReason::Moisture;
+	}
+	else
+	{
+		Result.bTreeAllowed = Tree.bEnabled;
+		Result.TreeDensity = static_cast<uint16>(FMath::Clamp(
+			static_cast<int64>(EffectiveChance(Tree.ChancePermille, Tree.DensityPermille)) *
+			Modifier.TreeDensityScalePermille / 1000, 0ll, 1000ll));
+	}
+	Result.bGrassAllowed = Grass.bEnabled && Modifier.bAllowGrass &&
+		Modifier.GrassDensityScalePermille > 0 && !InColumn.bOcean &&
+		!InColumn.bLake && !bRiverBed &&
+		InColumn.SurfaceMaterial == Recipe->Palette.Grass &&
+		InColumn.SlopePermille <= Grass.MaxSlopePermille &&
+		Grass.Temperature.Contains(InColumn.Climate.TemperatureQ15) &&
+		Grass.Moisture.Contains(InColumn.Climate.MoistureQ15) &&
+		(Grass.bAllowNearWater || (!InColumn.bRiver && !InColumn.bLake && !InColumn.bCoast));
+	if (Result.bGrassAllowed)
+	{
+		Result.GrassDensity = static_cast<uint16>(FMath::Clamp(
+			static_cast<int64>(EffectiveChance(Grass.ChancePermille, Grass.DensityPermille)) *
+			Modifier.GrassDensityScalePermille *
+			(bWetMargin || bDryBank ? 1 : 2) / 2000, 0ll, 1000ll));
+	}
+	if (!Flower.bEnabled || !Modifier.bAllowFlowers ||
+		Modifier.FlowerDensityScalePermille == 0)
+	{
+		Result.FlowerRejectReason = EVoxelEcologyRejectReason::Biome;
+	}
+	else if (InColumn.bOcean || InColumn.bLake || InColumn.bRiver ||
+		bRiverBed || bWetMargin || bDryBank)
+	{
+		Result.FlowerRejectReason = EVoxelEcologyRejectReason::Water;
+	}
+	else if (InColumn.SlopePermille > Flower.MaxSlopePermille)
+	{
+		Result.FlowerRejectReason = EVoxelEcologyRejectReason::Slope;
+	}
+	else if (!Flower.Temperature.Contains(InColumn.Climate.TemperatureQ15))
+	{
+		Result.FlowerRejectReason = EVoxelEcologyRejectReason::Temperature;
+	}
+	else if (!Flower.Moisture.Contains(InColumn.Climate.MoistureQ15))
+	{
+		Result.FlowerRejectReason = EVoxelEcologyRejectReason::Moisture;
+	}
+	else if (InColumn.SurfaceMaterial != Recipe->Palette.Grass)
+	{
+		Result.FlowerRejectReason = EVoxelEcologyRejectReason::Surface;
+	}
+	else
+	{
+		Result.bFlowerAllowed = true;
+		Result.FlowerDensity = static_cast<uint16>(FMath::Clamp(
+			static_cast<int64>(EffectiveChance(Flower.ChancePermille,
+				Flower.DensityPermille)) * Modifier.FlowerDensityScalePermille *
+			(InColumn.RiverZone == EVoxelRiverSurfaceZone::Floodplain ? 1 : 2) /
+			2000, 0ll, 1000ll));
+	}
+	return Result;
 }
 
 void FVoxelEcologyGenerator::BuildTrees(
@@ -128,7 +207,7 @@ void FVoxelEcologyGenerator::BuildTrees(
 					}
 				}
 			}
-		}, InOutPlan.TreeCandidates, InOutPlan.TreesAccepted, InCancel);
+		}, InOutPlan.TreeCandidates, InOutPlan.TreesAccepted, InCancel, &InOutPlan.TreeRejects);
 }
 
 void FVoxelEcologyGenerator::EnumerateTrees(
@@ -138,7 +217,8 @@ void FVoxelEcologyGenerator::EnumerateTrees(
 	TFunctionRef<void(const FIntVector&, int32, FVoxelStableId)> InVisit,
 	int32& OutCandidates,
 	int32& OutAccepted,
-	const TAtomic<bool>* InCancel) const
+	const TAtomic<bool>* InCancel,
+	FVoxelTreeRejectDiagnostics* OutRejects) const
 {
 	const FVoxelTreeGenerationSettings& Settings = Recipe->Settings.Ecology.Tree;
 	const int32 Chance = EffectiveChance(Settings.ChancePermille, Settings.DensityPermille);
@@ -157,7 +237,6 @@ void FVoxelEcologyGenerator::EnumerateTrees(
 	{
 		for (int32 GridX = MinGridX; GridX <= MaxGridX; ++GridX)
 		{
-			++OutCandidates;
 			if (InCancel && InCancel->Load())
 			{
 				return;
@@ -175,16 +254,36 @@ void FVoxelEcologyGenerator::EnumerateTrees(
 			{
 				continue;
 			}
+			++OutCandidates;
 
 			FVoxelColumnSample Column;
-			if (!InSampleColumn(XY, Column) || !IsTreeColumnAllowed(Column))
+			if (!InSampleColumn(XY, Column))
 			{
+				if (OutRejects) ++OutRejects->Base;
+				continue;
+			}
+			const FVoxelEcologySample Ecology = Sample(Column);
+			if (!Ecology.bTreeAllowed)
+			{
+				if (OutRejects)
+				{
+					switch (Ecology.TreeRejectReason)
+					{
+					case EVoxelEcologyRejectReason::Biome: ++OutRejects->Biome; break;
+					case EVoxelEcologyRejectReason::Slope: ++OutRejects->Slope; break;
+					case EVoxelEcologyRejectReason::Temperature: ++OutRejects->Temperature; break;
+					case EVoxelEcologyRejectReason::Moisture: ++OutRejects->Moisture; break;
+					case EVoxelEcologyRejectReason::Water: ++OutRejects->Water; break;
+					default: ++OutRejects->Base; break;
+					}
+				}
 				continue;
 			}
 
 			const FIntVector Anchor(XY.X, XY.Y, Column.SurfaceZ + 1);
-			if (VoxelGeneration::RandomRange(VoxelGeneration::Mix(CandidateSeed), 0, 999) >= Chance)
+			if (VoxelGeneration::RandomRange(VoxelGeneration::Mix(CandidateSeed), 0, 999) >= Ecology.TreeDensity)
 			{
+				if (OutRejects) ++OutRejects->Chance;
 				continue;
 			}
 
@@ -195,6 +294,7 @@ void FVoxelEcologyGenerator::EnumerateTrees(
 				static_cast<uint16>(AirValue & 0xffffu) != Recipe->Palette.Air ||
 				static_cast<uint16>(FloorValue & 0xffffu) == Recipe->Palette.Air)
 			{
+				if (OutRejects) ++OutRejects->Base;
 				continue;
 			}
 
@@ -245,8 +345,15 @@ void FVoxelEcologyGenerator::BuildGrass(
 			const FIntVector PatchCenter(GridX * Spacing + OffsetX, GridY * Spacing + OffsetY, 0);
 			++InOutPlan.GrassPatchCandidates;
 			if (PatchCenter.X < InBounds.Min.X || PatchCenter.X >= InBounds.Max.X ||
-				PatchCenter.Y < InBounds.Min.Y || PatchCenter.Y >= InBounds.Max.Y ||
-				VoxelGeneration::RandomRange(VoxelGeneration::Mix(CandidateSeed), 0, 999) >= Chance)
+				PatchCenter.Y < InBounds.Min.Y || PatchCenter.Y >= InBounds.Max.Y)
+			{
+				continue;
+			}
+			FVoxelColumnSample CenterColumn;
+			if (!InSampleColumn(PatchCenter, CenterColumn)) continue;
+			const FVoxelEcologySample CenterEcology = Sample(CenterColumn);
+			if (!CenterEcology.bGrassAllowed ||
+				VoxelGeneration::RandomRange(VoxelGeneration::Mix(CandidateSeed), 0, 999) >= CenterEcology.GrassDensity)
 			{
 				continue;
 			}
@@ -263,7 +370,7 @@ void FVoxelEcologyGenerator::BuildGrass(
 					}
 					const FIntVector XY(PatchCenter.X + X, PatchCenter.Y + Y, 0);
 					FVoxelColumnSample Column;
-					if (!InSampleColumn(XY, Column) || !IsGrassColumnAllowed(Column))
+					if (!InSampleColumn(XY, Column) || !Sample(Column).bGrassAllowed)
 					{
 						continue;
 					}
@@ -285,6 +392,139 @@ void FVoxelEcologyGenerator::BuildGrass(
 					}
 					InOutPlan.Writes.Add({SurfacePosition, Recipe->Ecology.GrassPlant, GrassPriority, OwnerId});
 					++InOutPlan.GrassWrites;
+				}
+			}
+		}
+	}
+}
+
+uint16 FVoxelEcologyGenerator::SelectFlowerSymbol(const FIntVector& InPosition,
+	const FVoxelStableId& InOwnerId) const
+{
+	int32 TotalWeight = 0;
+	for (const FVoxelWeightedRuntimeSymbol& Flower : Recipe->Ecology.Flowers)
+	{
+		TotalWeight += Flower.Weight;
+	}
+	if (TotalWeight <= 0) return MAX_uint16;
+	const uint64 Seed = VoxelGeneration::Mix(VoxelGeneration::MakeSeed(
+		Recipe->Settings.Seed, InPosition, FlowerTypeSalt) ^
+		InOwnerId.High ^ InOwnerId.Low);
+	int32 Pick = VoxelGeneration::RandomRange(Seed, 0, TotalWeight - 1);
+	for (const FVoxelWeightedRuntimeSymbol& Flower : Recipe->Ecology.Flowers)
+	{
+		if (Pick < Flower.Weight) return Flower.Symbol;
+		Pick -= Flower.Weight;
+	}
+	return MAX_uint16;
+}
+
+void FVoxelEcologyGenerator::BuildFlowers(
+	const FVoxelGenerationBounds& InBounds,
+	TFunctionRef<bool(const FIntVector&, FVoxelColumnSample&)> InSampleColumn,
+	TFunctionRef<bool(const FIntVector&, uint32&)> InSampleBaseSymbol,
+	FVoxelEcologyPlan& InOutPlan,
+	const TAtomic<bool>* InCancel) const
+{
+	const FVoxelFlowerGenerationSettings& Settings = Recipe->Settings.Ecology.Flower;
+	if (!Settings.bEnabled || Recipe->Ecology.Flowers.IsEmpty()) return;
+	const int32 Spacing = Settings.Spacing;
+	const int32 MinGridX = VoxelGeneration::FloorDivide(InBounds.Min.X, Spacing);
+	const int32 MaxGridX = VoxelGeneration::FloorDivide(InBounds.Max.X - 1, Spacing);
+	const int32 MinGridY = VoxelGeneration::FloorDivide(InBounds.Min.Y, Spacing);
+	const int32 MaxGridY = VoxelGeneration::FloorDivide(InBounds.Max.Y - 1, Spacing);
+	auto RecordReject = [&InOutPlan](const EVoxelEcologyRejectReason Reason)
+	{
+		switch (Reason)
+		{
+		case EVoxelEcologyRejectReason::Biome: ++InOutPlan.FlowerRejects.Biome; break;
+		case EVoxelEcologyRejectReason::Slope: ++InOutPlan.FlowerRejects.Slope; break;
+		case EVoxelEcologyRejectReason::Temperature:
+		case EVoxelEcologyRejectReason::Moisture: ++InOutPlan.FlowerRejects.Climate; break;
+		case EVoxelEcologyRejectReason::Water: ++InOutPlan.FlowerRejects.River; break;
+		default: ++InOutPlan.FlowerRejects.Surface; break;
+		}
+	};
+	for (int32 GridY = MinGridY; GridY <= MaxGridY; ++GridY)
+	{
+		for (int32 GridX = MinGridX; GridX <= MaxGridX; ++GridX)
+		{
+			if (InCancel && InCancel->Load()) return;
+			const FIntVector Grid(GridX, GridY, 0);
+			const uint64 CandidateSeed = VoxelGeneration::MakeSeed(
+				Recipe->Settings.Seed, Grid, FlowerSalt);
+			const int32 OffsetX = VoxelGeneration::RandomRange(
+				VoxelGeneration::Mix(CandidateSeed ^ 0xFA9170D133E38A21ull), 0, Spacing - 1);
+			const int32 OffsetY = VoxelGeneration::RandomRange(
+				VoxelGeneration::Mix(CandidateSeed ^ 0x5A738CB14268F9E1ull), 0, Spacing - 1);
+			const FIntVector Center(GridX * Spacing + OffsetX,
+				GridY * Spacing + OffsetY, 0);
+			if (Center.X < InBounds.Min.X || Center.X >= InBounds.Max.X ||
+				Center.Y < InBounds.Min.Y || Center.Y >= InBounds.Max.Y)
+			{
+				continue;
+			}
+			++InOutPlan.FlowerPatchCandidates;
+			FVoxelColumnSample CenterColumn;
+			if (!InSampleColumn(Center, CenterColumn))
+			{
+				++InOutPlan.FlowerRejects.Surface;
+				continue;
+			}
+			const FVoxelEcologySample CenterEcology = Sample(CenterColumn);
+			if (!CenterEcology.bFlowerAllowed)
+			{
+				RecordReject(CenterEcology.FlowerRejectReason);
+				continue;
+			}
+			if (VoxelGeneration::RandomRange(VoxelGeneration::Mix(CandidateSeed),
+				0, 999) >= CenterEcology.FlowerDensity)
+			{
+				++InOutPlan.FlowerRejects.Chance;
+				continue;
+			}
+			const FVoxelStableId OwnerId = VoxelGeneration::MakeStableId(
+				Recipe->Settings.Seed, Center, FlowerSalt);
+			for (int32 Y = -Settings.PatchRadius; Y <= Settings.PatchRadius; ++Y)
+			{
+				for (int32 X = -Settings.PatchRadius; X <= Settings.PatchRadius; ++X)
+				{
+					if (InCancel && InCancel->Load()) return;
+					const FIntVector XY(Center.X + X, Center.Y + Y, 0);
+					const uint64 PointSeed = VoxelGeneration::MakeSeed(
+						Recipe->Settings.Seed, XY, FlowerFillSalt);
+					if (VoxelGeneration::RandomRange(PointSeed, 0, 999) >=
+						Settings.PatchFillPermille)
+					{
+						++InOutPlan.FlowerRejects.Chance;
+						continue;
+					}
+					FVoxelColumnSample Column;
+					if (!InSampleColumn(XY, Column))
+					{
+						++InOutPlan.FlowerRejects.Surface;
+						continue;
+					}
+					const FVoxelEcologySample Ecology = Sample(Column);
+					if (!Ecology.bFlowerAllowed)
+					{
+						RecordReject(Ecology.FlowerRejectReason);
+						continue;
+					}
+					const FIntVector Position(XY.X, XY.Y, Column.SurfaceZ + 1);
+					uint32 AirValue = MAX_uint32;
+					uint32 FloorValue = MAX_uint32;
+					if (!InSampleBaseSymbol(Position, AirValue) ||
+						!InSampleBaseSymbol(Position - FIntVector(0, 0, 1), FloorValue) ||
+						static_cast<uint16>(AirValue & 0xffffu) != Recipe->Palette.Air ||
+						static_cast<uint16>(FloorValue & 0xffffu) != Recipe->Palette.Grass)
+					{
+						++InOutPlan.FlowerRejects.Surface;
+						continue;
+					}
+					const uint16 Symbol = SelectFlowerSymbol(Position, OwnerId);
+					InOutPlan.Writes.Add({Position, Symbol, FlowerPriority, OwnerId});
+					++InOutPlan.FlowerWrites;
 				}
 			}
 		}
@@ -320,21 +560,42 @@ bool FVoxelEcologyGenerator::BuildPlan(
 		OutError = TEXT("Canceled");
 		return false;
 	}
+	BuildFlowers(InBounds, InSampleColumn, InSampleBaseSymbol, Plan, InCancel);
+	if (InCancel && InCancel->Load())
+	{
+		OutError = TEXT("Canceled");
+		return false;
+	}
 	Plan.Finalize();
 
 #if !UE_BUILD_SHIPPING
 	UE_LOG(
 		LogTemp,
 		VeryVerbose,
-		TEXT("Voxel ecology bounds=(%d,%d)-(%d,%d) tree=%d/%d grassPatches=%d grassWrites=%d totalWrites=%d"),
+		TEXT("Voxel ecology bounds=(%d,%d)-(%d,%d) tree=%d/%d rejectBiome=%d rejectSlope=%d rejectTemperature=%d rejectMoisture=%d rejectWater=%d rejectChance=%d rejectBase=%d grassPatches=%d grassWrites=%d flowerPatches=%d flowerWrites=%d flowerRejectBiome=%d flowerRejectSlope=%d flowerRejectClimate=%d flowerRejectRiver=%d flowerRejectSurface=%d flowerRejectChance=%d totalWrites=%d"),
 		InBounds.Min.X,
 		InBounds.Min.Y,
 		InBounds.Max.X,
 		InBounds.Max.Y,
 		Plan.TreesAccepted,
 		Plan.TreeCandidates,
+		Plan.TreeRejects.Biome,
+		Plan.TreeRejects.Slope,
+		Plan.TreeRejects.Temperature,
+		Plan.TreeRejects.Moisture,
+		Plan.TreeRejects.Water,
+		Plan.TreeRejects.Chance,
+		Plan.TreeRejects.Base,
 		Plan.GrassPatchCandidates,
 		Plan.GrassWrites,
+		Plan.FlowerPatchCandidates,
+		Plan.FlowerWrites,
+		Plan.FlowerRejects.Biome,
+		Plan.FlowerRejects.Slope,
+		Plan.FlowerRejects.Climate,
+		Plan.FlowerRejects.River,
+		Plan.FlowerRejects.Surface,
+		Plan.FlowerRejects.Chance,
 		Plan.Writes.Num());
 #endif
 

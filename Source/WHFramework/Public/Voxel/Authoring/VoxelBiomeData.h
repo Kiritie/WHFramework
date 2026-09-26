@@ -6,6 +6,7 @@
 #include "VoxelBiomeData.generated.h"
 
 class UVoxelSurfaceRuleSet;
+class UVoxelData;
 class UVoxelFeatureData;
 class UVoxelStructureData;
 
@@ -44,6 +45,12 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Voxel|Generation")
 	TSoftObjectPtr<UVoxelSurfaceRuleSet> SurfaceRules;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Voxel|Generation")
+	TSoftObjectPtr<UVoxelData> DefaultSurface;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Voxel|Generation")
+	FVoxelBiomeEcologyModifier Ecology;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Voxel|Generation")
 	TArray<TSoftObjectPtr<UVoxelFeatureData>> Features;

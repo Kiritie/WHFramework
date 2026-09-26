@@ -46,6 +46,12 @@ namespace
 			InKind == EVoxelTaskKind::BuildMacro;
 	}
 
+	bool IsRepresentationDataKind(const EVoxelTaskKind InKind)
+	{
+		return InKind == EVoxelTaskKind::GenerateVoxelProxy ||
+			InKind == EVoxelTaskKind::GenerateSurface || InKind == EVoxelTaskKind::GenerateMacro;
+	}
+
 }
 
 bool FVoxelTaskStamp::operator==(const FVoxelTaskStamp& InOther) const
@@ -74,44 +80,23 @@ uint64 FVoxelTaskResult::ResultBytes() const
 
 	if (VoxelProxy)
 	{
-		Bytes +=
-			static_cast<uint64>(VoxelProxy->Cells.Num()) *
-			sizeof(FVoxelBlockState);
-
-		for (const TArray<FVoxelBlockState>& Halo : VoxelProxy->Halo)
-		{
-			Bytes +=
-				static_cast<uint64>(Halo.Num()) *
-				sizeof(FVoxelBlockState);
-		}
+		Bytes += VoxelProxy->GetAllocatedBytes();
 	}
-
 	if (Surface)
 	{
-		Bytes += static_cast<uint64>(Surface->GroundZ.Num()) * sizeof(int32);
-		Bytes += static_cast<uint64>(Surface->WaterZ.Num()) * sizeof(int32);
-		Bytes += static_cast<uint64>(Surface->SurfaceMaterial.Num()) * sizeof(uint16);
-		Bytes += static_cast<uint64>(Surface->Biome.Num()) * sizeof(uint16);
-		Bytes += Surface->Flags.Num();
+		Bytes += sizeof(FVoxelSurfaceTileData) + Surface->GroundZ.GetAllocatedSize() +
+			Surface->WaterZ.GetAllocatedSize() + Surface->SurfaceMaterial.GetAllocatedSize() +
+			Surface->Biome.GetAllocatedSize() + Surface->Flags.GetAllocatedSize() + Surface->DistantCells.GetAllocatedSize();
 	}
-
 	if (Water)
 	{
-		Bytes += static_cast<uint64>(Water->WaterZ.Num()) * sizeof(int32);
-		Bytes += Water->WaterKind.Num();
+		Bytes += sizeof(FVoxelWaterSurfaceTileData) + Water->WaterZ.GetAllocatedSize() + Water->WaterKind.GetAllocatedSize();
 	}
-
 	if (Macro)
 	{
-		Bytes += static_cast<uint64>(Macro->Height.Num()) * sizeof(int32);
-		Bytes += static_cast<uint64>(Macro->WaterHeight.Num()) * sizeof(int32);
-		Bytes += static_cast<uint64>(Macro->SurfaceClass.Num()) * sizeof(uint16);
-		Bytes += Macro->ForestCoverage.Num();
-		Bytes += Macro->SnowCoverage.Num();
-
-		Bytes +=
-			static_cast<uint64>(Macro->LargeStructures.Num()) *
-			sizeof(FVoxelMacroStructureProxy);
+		Bytes += sizeof(FVoxelMacroTileData) + Macro->Height.GetAllocatedSize() + Macro->WaterHeight.GetAllocatedSize() +
+			Macro->SurfaceClass.GetAllocatedSize() + Macro->ForestCoverage.GetAllocatedSize() + Macro->SnowCoverage.GetAllocatedSize() +
+			Macro->LargeStructures.GetAllocatedSize() + Macro->DistantCells.GetAllocatedSize();
 	}
 
 	Bytes += Details ? Details->GetAllocatedBytes() : 0;
@@ -292,6 +277,7 @@ void FVoxelTaskScheduler::Tick(
 			case EVoxelTaskKind::BuildFineMesh:
 				return FineApplied < Budget.MaxFineApplyPerFrame;
 			case EVoxelTaskKind::BuildVoxelProxy:
+			case EVoxelTaskKind::BuildVolumeTransition:
 				return VoxelLODApplied < Budget.MaxVoxelLODApplyPerFrame;
 			case EVoxelTaskKind::BuildSurface:
 				return SurfaceApplied < Budget.MaxSurfaceApplyPerFrame;
@@ -358,6 +344,7 @@ void FVoxelTaskScheduler::Tick(
 			++FineApplied;
 			break;
 		case EVoxelTaskKind::BuildVoxelProxy:
+		case EVoxelTaskKind::BuildVolumeTransition:
 			++VoxelLODApplied;
 			break;
 		case EVoxelTaskKind::BuildSurface:
@@ -728,6 +715,10 @@ bool FVoxelTaskScheduler::IsHigherPriority(
 	const FVoxelTaskRequest& InA,
 	const FVoxelTaskRequest& InB)
 {
+	if ((InA.WorkClass == EVoxelWorkClass::Prefetch) != (InB.WorkClass == EVoxelWorkClass::Prefetch))
+	{
+		return InB.WorkClass == EVoxelWorkClass::Prefetch;
+	}
 	const bool bAVisual = IsVisualWorkClass(InA.WorkClass);
 	const bool bBVisual = IsVisualWorkClass(InB.WorkClass);
 	if (bAVisual != bBVisual)
@@ -769,10 +760,11 @@ bool FVoxelTaskScheduler::IsHigherPriority(
 bool FVoxelTaskResult::HasHeavyApply() const
 {
 	if (bCanceled || !bSuccess) return false;
-	if (Kind == EVoxelTaskKind::BuildFineMesh)
+	if (Kind == EVoxelTaskKind::BuildFineMesh || Kind == EVoxelTaskKind::BuildVoxelProxy)
 	{
 		// 空网格只更新就绪/版本状态，不占据实体网格每帧一次的重发布配额。
-		return FineMesh && FineMesh->Batches.ContainsByPredicate([](const FVoxelRenderBatch& Batch)
+		const TSharedPtr<FVoxelSectionMeshResult>& Mesh = Kind == EVoxelTaskKind::BuildFineMesh ? FineMesh : VoxelProxyMesh;
+		return Mesh && Mesh->Batches.ContainsByPredicate([](const FVoxelRenderBatch& Batch)
 		{
 			return !Batch.Mesh.Triangles.IsEmpty();
 		});
@@ -782,6 +774,7 @@ bool FVoxelTaskResult::HasHeavyApply() const
 	case EVoxelTaskKind::BuildCollision:
 	case EVoxelTaskKind::BuildFineMesh:
 	case EVoxelTaskKind::BuildVoxelProxy:
+	case EVoxelTaskKind::BuildVolumeTransition:
 	case EVoxelTaskKind::BuildSurface:
 	case EVoxelTaskKind::BuildWater:
 	case EVoxelTaskKind::BuildMacro:
@@ -822,6 +815,12 @@ int32 FVoxelTaskScheduler::RunningCount(const EVoxelTaskKind InKind) const
 
 bool FVoxelTaskScheduler::CanStartKind(const EVoxelTaskKind InKind) const
 {
+	if (IsRepresentationDataKind(InKind))
+	{
+		const int32 DataRunning = RunningCount(EVoxelTaskKind::GenerateVoxelProxy) +
+			RunningCount(EVoxelTaskKind::GenerateSurface) + RunningCount(EVoxelTaskKind::GenerateMacro);
+		if (DataRunning >= FMath::Max(1, Budget.MaxConcurrentTasks / 2)) return false;
+	}
 	if (IsCoarseTerrainKind(InKind) &&
 		RunningCount(EVoxelTaskKind::BuildSurface) +
 			RunningCount(EVoxelTaskKind::BuildMacro) >=

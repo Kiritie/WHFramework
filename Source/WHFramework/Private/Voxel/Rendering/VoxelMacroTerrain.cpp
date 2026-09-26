@@ -1,12 +1,14 @@
 #include "Voxel/Rendering/VoxelMacroTerrain.h"
 
 #include "ProfilingDebugging/CpuProfilerTrace.h"
+#include "Voxel/Generation/Ecology/VoxelEcology.h"
 FVoxelMacroTerrainBuilder::FVoxelMacroTerrainBuilder(
 	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator,
 	TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
 	const FVoxelGenerationSettings& InSettings, const IVoxelOverlaySource& InOverlays,
 		TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry)
-	: SurfaceBuilder(InGenerator, InConfig, InSettings, InOverlays, InRegistry)
+	: Config(InConfig)
+	, SurfaceBuilder(InGenerator, InConfig, InSettings, InOverlays, InRegistry)
 {
 }
 
@@ -56,7 +58,9 @@ bool FVoxelMacroTerrainBuilder::Build(
 
 		return false;
 	}
+	Data.Revision = Surface.Revision;
 
+	const FVoxelEcologyGenerator Ecology(Config->Recipe.ToSharedRef());
 	for (int32 Index = 0;
 		Index < Count;
 		++Index)
@@ -70,12 +74,7 @@ bool FVoxelMacroTerrainBuilder::Build(
 
 		Data.SurfaceClass[Index] = Surface.SurfaceMaterial[Index];
 
-		const int32 Moisture =
-			FMath::Clamp(
-				Column.Climate.
-					MoistureQ15,
-				0,
-				32767);
+		const FVoxelEcologySample EcologySample = Ecology.Sample(Column);
 
 		const int32 Temperature =
 			FMath::Clamp(
@@ -84,14 +83,8 @@ bool FVoxelMacroTerrainBuilder::Build(
 				-32768,
 				32767);
 
-		Data.ForestCoverage[Index] =
-			static_cast<uint8>(
-				FMath::Clamp(
-					Moisture *
-						255 /
-						32767,
-					0,
-					255));
+		Data.ForestCoverage[Index] = static_cast<uint8>(
+			EcologySample.TreeDensity * 255 / 1000);
 
 		Data.SnowCoverage[Index] =
 			static_cast<uint8>(
@@ -102,6 +95,7 @@ bool FVoxelMacroTerrainBuilder::Build(
 					0,
 					255));
 	}
+	Data.DistantCells = MoveTemp(Surface.DistantCells);
 
 	OutData =
 		MoveTemp(Data);

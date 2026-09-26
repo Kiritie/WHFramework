@@ -34,6 +34,9 @@ struct WHFRAMEWORK_API FVoxelSurfaceRuleData
 	TSoftObjectPtr<UVoxelData> Block;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EVoxelSurfaceRiverRule RiverZone = EVoxelSurfaceRiverRule::Any;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bRiverOnly = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

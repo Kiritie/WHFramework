@@ -214,6 +214,57 @@ namespace
 			OutKeys.Add({ Node.Coordinate, Node.Level });
 		}
 	}
+
+	template<typename KeyType>
+	void BalanceAdaptiveTiles(TSet<KeyType>& InOutTiles,
+		const int32 InBaseTileSide, const uint8 InMaximumLevel)
+	{
+		while (true)
+		{
+			TSet<KeyType> ParentsToSplit;
+			for (const KeyType& Tile : InOutTiles)
+			{
+				const int32 Side = InBaseTileSide << Tile.Level;
+				const FIntPoint Min = Tile.Coordinate * Side;
+				const FIntPoint Max = Min + FIntPoint(Side);
+				const FIntPoint Probes[] = {
+					FIntPoint(Min.X - 1, Min.Y), FIntPoint(Min.X - 1, Max.Y - 1),
+					FIntPoint(Max.X, Min.Y), FIntPoint(Max.X, Max.Y - 1),
+					FIntPoint(Min.X, Min.Y - 1), FIntPoint(Max.X - 1, Min.Y - 1),
+					FIntPoint(Min.X, Max.Y), FIntPoint(Max.X - 1, Max.Y)
+				};
+				for (uint8 Level = Tile.Level + 1; Level <= InMaximumLevel; ++Level)
+				{
+					const int32 CandidateSide = InBaseTileSide << Level;
+					const KeyType Ancestor{
+						FIntPoint(VoxelGeneration::FloorDivide(Min.X, CandidateSide),
+							VoxelGeneration::FloorDivide(Min.Y, CandidateSide)), Level};
+					if (InOutTiles.Contains(Ancestor)) ParentsToSplit.Add(Ancestor);
+					if (Level <= Tile.Level + 1) continue;
+					for (const FIntPoint& Probe : Probes)
+					{
+						const KeyType Neighbor{
+							FIntPoint(VoxelGeneration::FloorDivide(Probe.X, CandidateSide),
+								VoxelGeneration::FloorDivide(Probe.Y, CandidateSide)), Level};
+						if (InOutTiles.Contains(Neighbor)) ParentsToSplit.Add(Neighbor);
+					}
+				}
+			}
+			if (ParentsToSplit.IsEmpty()) break;
+			for (const KeyType& Parent : ParentsToSplit)
+			{
+				if (!InOutTiles.Remove(Parent)) continue;
+				const FIntPoint ChildBase = Parent.Coordinate * 2;
+				for (int32 Y = 0; Y < 2; ++Y)
+				{
+					for (int32 X = 0; X < 2; ++X)
+					{
+						InOutTiles.Add({ChildBase + FIntPoint(X, Y), static_cast<uint8>(Parent.Level - 1)});
+					}
+				}
+			}
+		}
+	}
 }
 
 FVoxelInterestSet FVoxelInterestManager::Compute(
@@ -242,6 +293,10 @@ FVoxelInterestSet FVoxelInterestManager::Compute(
 			InViewSettings,
 			Result);
 	}
+	BalanceAdaptiveTiles(Result.Surface, InViewSettings.SurfaceTileSide,
+		InViewSettings.MaximumSurfaceLevel);
+	BalanceAdaptiveTiles(Result.Macro, InViewSettings.MacroTileSide,
+		InViewSettings.MaximumMacroLevel);
 
 	if (!Result.VoxelProxy.IsEmpty())
 	{

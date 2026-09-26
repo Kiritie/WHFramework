@@ -4,23 +4,292 @@
 
 namespace
 {
-	int32 ResolveRiverInfluenceRadius(
-		const FVoxelRiverRoutePoint& InPoint)
+	FVoxelRiverShapePoint ToShapePoint(const FVoxelRiverRoutePoint& InPoint)
 	{
-		const int32 BankWidth =
-			FMath::Max(
-				1,
-				InPoint.HalfWidth);
+		FVoxelRiverShapePoint Result;
+		Result.Position = InPoint.Position;
+		Result.WaterZ = InPoint.WaterZ;
+		Result.BedHalfWidth = InPoint.BedHalfWidth;
+		Result.WaterHalfWidth = InPoint.WaterHalfWidth;
+		Result.BankWidth = InPoint.BankWidth;
+		Result.ShoreWidth = InPoint.ShoreWidth;
+		Result.Depth = InPoint.Depth;
+		Result.Accumulation = InPoint.Accumulation;
+		return Result;
+	}
 
-		const int32 ShoreWidth =
-			FMath::Max(
-				BankWidth + 1,
-				InPoint.HalfWidth * 3);
+	uint64 InterpolateAccumulation(const uint64 A, const uint64 B,
+		const uint32 Numerator, const uint32 Denominator)
+	{
+		const uint64 Delta = A > B ? A - B : B - A;
+		const uint64 Portion = Delta / Denominator * Numerator +
+			(Delta % Denominator * Numerator) / Denominator;
+		return B >= A ? A + Portion : A - Portion;
+	}
 
-		return
-			InPoint.HalfWidth +
-			BankWidth +
-			ShoreWidth;
+	FVoxelRiverShapePoint InterpolateShapePoint(
+		const FVoxelRiverShapePoint& A,
+		const FVoxelRiverShapePoint& B,
+		const int32 Numerator,
+		const int32 Denominator)
+	{
+		auto Blend = [Numerator, Denominator](const int32 First, const int32 Second)
+		{
+			return First + static_cast<int32>(
+				(static_cast<int64>(Second) - First) * Numerator / Denominator);
+		};
+		FVoxelRiverShapePoint Result;
+		Result.Position.X = Blend(A.Position.X, B.Position.X);
+		Result.Position.Y = Blend(A.Position.Y, B.Position.Y);
+		Result.WaterZ = Blend(A.WaterZ, B.WaterZ);
+		Result.BedHalfWidth = Blend(A.BedHalfWidth, B.BedHalfWidth);
+		Result.WaterHalfWidth = Blend(A.WaterHalfWidth, B.WaterHalfWidth);
+		Result.BankWidth = Blend(A.BankWidth, B.BankWidth);
+		Result.ShoreWidth = Blend(A.ShoreWidth, B.ShoreWidth);
+		Result.Depth = Blend(A.Depth, B.Depth);
+		Result.Accumulation = InterpolateAccumulation(A.Accumulation,
+			B.Accumulation, Numerator, Denominator);
+		return Result;
+	}
+
+	void BuildShapeRoute(const TArray<FVoxelRiverRoutePoint>& InRaw,
+		const FIntPoint& InCoreMin, const FIntPoint& InCoreMax,
+		const int32 InPasses, TArray<FVoxelRiverShapePoint>& OutShape)
+	{
+		OutShape.Reset();
+		auto InsideCore = [&InCoreMin, &InCoreMax](const FIntPoint& Position)
+		{
+			return Position.X >= InCoreMin.X && Position.Y >= InCoreMin.Y &&
+				Position.X < InCoreMax.X && Position.Y < InCoreMax.Y;
+		};
+		for (int32 Index = 0; Index < InRaw.Num(); ++Index)
+		{
+			FVoxelRiverShapePoint Point = ToShapePoint(InRaw[Index]);
+			if (Index > 0 && InsideCore(InRaw[Index].Position) !=
+				InsideCore(InRaw[Index - 1].Position))
+			{
+				FVoxelRiverShapePoint Boundary = InterpolateShapePoint(
+					ToShapePoint(InRaw[Index - 1]), Point, 1, 2);
+				Boundary.bAnchor = true;
+				if (Boundary.Position != OutShape.Last().Position &&
+					Boundary.Position != Point.Position)
+				{
+					OutShape.Add(MoveTemp(Boundary));
+				}
+			}
+			Point.bAnchor = Index == 0 || Index + 1 == InRaw.Num();
+			OutShape.Add(MoveTemp(Point));
+		}
+		for (int32 Pass = 0; Pass < InPasses && OutShape.Num() >= 2; ++Pass)
+		{
+			TArray<FVoxelRiverShapePoint> Next;
+			Next.Reserve(OutShape.Num() * 2);
+			Next.Add(OutShape[0]);
+			for (int32 Index = 0; Index + 1 < OutShape.Num(); ++Index)
+			{
+				for (const int32 Fraction : {1, 3})
+				{
+					FVoxelRiverShapePoint Point = InterpolateShapePoint(
+						OutShape[Index], OutShape[Index + 1], Fraction, 4);
+					if (Point.Position != Next.Last().Position) Next.Add(MoveTemp(Point));
+				}
+				if (OutShape[Index + 1].bAnchor && Index + 2 < OutShape.Num())
+				{
+					if (OutShape[Index + 1].Position == Next.Last().Position)
+					{
+						Next.Last().bAnchor = true;
+					}
+					else
+					{
+						Next.Add(OutShape[Index + 1]);
+					}
+				}
+			}
+			if (Next.Last().Position != OutShape.Last().Position)
+			{
+				Next.Add(OutShape.Last());
+			}
+			else
+			{
+				Next.Last().bAnchor = true;
+			}
+			OutShape = MoveTemp(Next);
+		}
+		if (OutShape.Num() < 3) return;
+		const TArray<FVoxelRiverShapePoint> Original = OutShape;
+		auto Smooth = [](const int32 A, const int32 B, const int32 C)
+		{
+			return static_cast<int32>((static_cast<int64>(A) +
+				static_cast<int64>(B) * 2 + C) / 4);
+		};
+		for (int32 Index = 1; Index + 1 < OutShape.Num(); ++Index)
+		{
+			OutShape[Index].BedHalfWidth = Smooth(Original[Index - 1].BedHalfWidth,
+				Original[Index].BedHalfWidth, Original[Index + 1].BedHalfWidth);
+			OutShape[Index].WaterHalfWidth = Smooth(Original[Index - 1].WaterHalfWidth,
+				Original[Index].WaterHalfWidth, Original[Index + 1].WaterHalfWidth);
+			OutShape[Index].Depth = Smooth(Original[Index - 1].Depth,
+				Original[Index].Depth, Original[Index + 1].Depth);
+		}
+	}
+
+	int32 MeanderTangentQ10(const int32 InDegrees)
+	{
+		static constexpr int32 Values[] = {0, 90, 181, 274, 373, 477,
+			591, 717, 859, 1024, 1221, 1462, 1774, 2196, 2813, 3822, 5807};
+		const int32 Degrees = FMath::Clamp(InDegrees, 1, 80);
+		const int32 Bucket = Degrees / 5;
+		if (Bucket >= 16) return Values[16];
+		return Values[Bucket] +
+			(Values[Bucket + 1] - Values[Bucket]) * (Degrees % 5) / 5;
+	}
+
+	bool IsMeanderAngleWithinLimit(const FIntPoint& InPrevious,
+		const FIntPoint& InCurrent, const FIntPoint& InNext,
+		const int32 InTangentQ10)
+	{
+		const FIntPoint A = InCurrent - InPrevious;
+		const FIntPoint B = InNext - InCurrent;
+		const int64 Dot = static_cast<int64>(A.X) * B.X +
+			static_cast<int64>(A.Y) * B.Y;
+		const int64 Cross = FMath::Abs(static_cast<int64>(A.X) * B.Y -
+			static_cast<int64>(A.Y) * B.X);
+		return Dot > 0 && Cross * 1024 <= Dot * InTangentQ10;
+	}
+
+	void BuildMeanderRoute(const TArray<FVoxelRiverShapePoint>& InShape,
+		const int32 InSeed, const int32 InStrength, const int32 InFrequency,
+		const int32 InOctaves, const int32 InMaxAngle,
+		TArray<FVoxelRiverMeanderPoint>& OutPoints)
+	{
+		OutPoints.Reset();
+		OutPoints.Reserve(InShape.Num());
+		if (InShape.Num() < 2) return;
+		TArray<int32> DistanceToAnchor;
+		DistanceToAnchor.SetNum(InShape.Num());
+		int32 Distance = InShape.Num();
+		for (int32 Index = 0; Index < InShape.Num(); ++Index)
+		{
+			Distance = InShape[Index].bAnchor ? 0 : Distance + 1;
+			DistanceToAnchor[Index] = Distance;
+		}
+		Distance = InShape.Num();
+		for (int32 Index = InShape.Num() - 1; Index >= 0; --Index)
+		{
+			Distance = InShape[Index].bAnchor ? 0 : Distance + 1;
+			DistanceToAnchor[Index] = FMath::Min(DistanceToAnchor[Index], Distance);
+		}
+		for (int32 Index = 0; Index < InShape.Num(); ++Index)
+		{
+			const FVoxelRiverShapePoint& Source = InShape[Index];
+			FVoxelRiverMeanderPoint& Result = OutPoints.AddDefaulted_GetRef();
+			Result.Position = Source.Position;
+			Result.bAnchor = Source.bAnchor;
+			Result.WaterZ = Source.WaterZ;
+			Result.BedHalfWidth = Source.BedHalfWidth;
+			Result.WaterHalfWidth = Source.WaterHalfWidth;
+			Result.BankWidth = Source.BankWidth;
+			Result.ShoreWidth = Source.ShoreWidth;
+			Result.Depth = Source.Depth;
+			Result.Accumulation = Source.Accumulation;
+			if (Source.bAnchor || InStrength == 0)
+			{
+				continue;
+			}
+			const FIntPoint Tangent = InShape[Index + 1].Position -
+				InShape[Index - 1].Position;
+			const int64 Length = FMath::Abs(static_cast<int64>(Tangent.X)) +
+				FMath::Abs(static_cast<int64>(Tangent.Y));
+			if (Length == 0) continue;
+			int64 Noise = 0;
+			int64 Weight = 0;
+			for (int32 Octave = 0; Octave < InOctaves; ++Octave)
+			{
+				const int32 Period = FMath::Max(8, InFrequency >> Octave);
+				const int32 OctaveWeight = 1 << (InOctaves - Octave - 1);
+				Noise += static_cast<int64>(VoxelGeneration::Noise2D(InSeed,
+					Source.Position.X, Source.Position.Y, Period,
+					0x52495645524D4541ull + Octave)) * OctaveWeight;
+				Weight += OctaveWeight;
+			}
+			// Keep the first two shape samples on each side of a fixed
+			// connection aligned with its drainage segment. At voxel scale,
+			// moving either sample by one cell can make a 45-degree corner.
+			const int32 Taper = FMath::Clamp(
+				(DistanceToAnchor[Index] - 2) * 256, 0, 1024);
+			const int32 Offset = static_cast<int32>(
+				Noise * InStrength * Taper / FMath::Max<int64>(1,
+					Weight * 32768 * 1024));
+			Result.Position.X += static_cast<int32>(
+				-static_cast<int64>(Tangent.Y) * Offset / Length);
+			Result.Position.Y += static_cast<int32>(
+				static_cast<int64>(Tangent.X) * Offset / Length);
+			Result.MeanderOffset = Offset;
+		}
+		const int32 TangentQ10 = MeanderTangentQ10(InMaxAngle);
+		for (int32 Pass = 0; Pass < 24; ++Pass)
+		{
+			bool bChanged = false;
+			for (int32 Index = 1; Index + 1 < OutPoints.Num(); ++Index)
+			{
+				if (OutPoints[Index].bAnchor) continue;
+				if (IsMeanderAngleWithinLimit(OutPoints[Index - 1].Position,
+					OutPoints[Index].Position, OutPoints[Index + 1].Position,
+					TangentQ10)) continue;
+				const FIntPoint Midpoint(
+					static_cast<int32>((static_cast<int64>(OutPoints[Index - 1].Position.X) +
+						OutPoints[Index + 1].Position.X) / 2),
+					static_cast<int32>((static_cast<int64>(OutPoints[Index - 1].Position.Y) +
+						OutPoints[Index + 1].Position.Y) / 2));
+				if (Midpoint != OutPoints[Index].Position)
+				{
+					OutPoints[Index].Position = Midpoint;
+					bChanged = true;
+				}
+			}
+			if (!bChanged) break;
+		}
+		for (int32 Index = OutPoints.Num() - 2; Index > 0; --Index)
+		{
+			if (OutPoints[Index].bAnchor) continue;
+			if (OutPoints[Index].Position == OutPoints[Index - 1].Position ||
+				OutPoints[Index].Position == OutPoints[Index + 1].Position)
+			{
+				OutPoints.RemoveAt(Index);
+			}
+		}
+		for (int32 Index = 1; Index + 1 < OutPoints.Num();)
+		{
+			if (IsMeanderAngleWithinLimit(OutPoints[Index - 1].Position,
+				OutPoints[Index].Position, OutPoints[Index + 1].Position,
+				TangentQ10))
+			{
+				++Index;
+				continue;
+			}
+			if (OutPoints[Index].bAnchor)
+			{
+				++Index;
+				continue;
+			}
+			OutPoints.RemoveAt(Index);
+			Index = FMath::Max(1, Index - 1);
+		}
+		for (int32 Index = 1; Index + 1 < OutPoints.Num(); ++Index)
+		{
+			const FIntPoint A = OutPoints[Index].Position - OutPoints[Index - 1].Position;
+			const FIntPoint B = OutPoints[Index + 1].Position - OutPoints[Index].Position;
+			const int64 Cross = static_cast<int64>(A.X) * B.Y -
+				static_cast<int64>(A.Y) * B.X;
+			OutPoints[Index].Curvature = Cross > 0 ? 1 : Cross < 0 ? -1 : 0;
+		}
+	}
+
+	int32 ResolveRiverInfluenceRadius(
+		const FVoxelRiverMeanderPoint& InPoint)
+	{
+		return InPoint.WaterHalfWidth + InPoint.BankWidth +
+			InPoint.ShoreWidth;
 	}
 }
 
@@ -28,6 +297,28 @@ void FVoxelHydrologyPlan::Finalize()
 {
 	LakeWaterByCellOrigin.Reset();
 	RiverSegmentsByHydrologyCell.Reset();
+	for (FVoxelRiverRoute& River : Rivers)
+	{
+		BuildShapeRoute(River.Points, CoreMin, CoreMax,
+			RiverShapeSmoothingPasses,
+			River.ShapePoints);
+		BuildMeanderRoute(River.ShapePoints, RiverSeed,
+			RiverMeanderStrength, RiverMeanderFrequency,
+			RiverMeanderOctaves, RiverMaxMeanderAngle,
+			River.MeanderPoints);
+		if (!River.MeanderPoints.IsEmpty())
+		{
+			River.Min = River.MeanderPoints[0].Position;
+			River.Max = River.Min;
+			for (const FVoxelRiverMeanderPoint& Point : River.MeanderPoints)
+			{
+				River.Min.X = FMath::Min(River.Min.X, Point.Position.X);
+				River.Min.Y = FMath::Min(River.Min.Y, Point.Position.Y);
+				River.Max.X = FMath::Max(River.Max.X, Point.Position.X);
+				River.Max.Y = FMath::Max(River.Max.Y, Point.Position.Y);
+			}
+		}
+	}
 
 	for (const FVoxelLakePlan& Lake :
 		Lakes)
@@ -62,15 +353,15 @@ void FVoxelHydrologyPlan::Finalize()
 
 		for (int32 PointIndex = 1;
 			PointIndex <
-				River.Points.Num();
+				River.MeanderPoints.Num();
 			++PointIndex)
 		{
-			const FVoxelRiverRoutePoint& A =
-				River.Points[
+			const FVoxelRiverMeanderPoint& A =
+				River.MeanderPoints[
 					PointIndex - 1];
 
-			const FVoxelRiverRoutePoint& B =
-				River.Points[
+			const FVoxelRiverMeanderPoint& B =
+				River.MeanderPoints[
 					PointIndex];
 
 			const int32 Radius =
@@ -143,6 +434,50 @@ void FVoxelHydrologyPlan::Finalize()
 			}
 		}
 	}
+}
+
+bool FVoxelHydrologyPlan::ValidateRiverRoutes(FString& OutError) const
+{
+	const int32 TangentQ10 = MeanderTangentQ10(RiverMaxMeanderAngle);
+	for (const FVoxelRiverRoute& River : Rivers)
+	{
+		if (River.ShapePoints.Num() < 2 || River.MeanderPoints.Num() < 2)
+		{
+			OutError = TEXT("River has no valid shape route");
+			return false;
+		}
+		for (int32 Index = 0; Index < River.MeanderPoints.Num(); ++Index)
+		{
+			const FVoxelRiverMeanderPoint& Point = River.MeanderPoints[Index];
+			if (Point.BedHalfWidth < 1 || Point.WaterHalfWidth < Point.BedHalfWidth ||
+				Point.BankWidth < 1 || Point.ShoreWidth < 1 || Point.Depth < 1)
+			{
+				OutError = TEXT("River shape contains an invalid width or depth");
+				return false;
+			}
+			if (Index == 0) continue;
+			const FVoxelRiverMeanderPoint& Previous = River.MeanderPoints[Index - 1];
+			if (Point.Position == Previous.Position || Point.WaterZ > Previous.WaterZ + 1)
+			{
+				OutError = TEXT("River shape has a zero segment or uphill discontinuity");
+				return false;
+			}
+			if (Index > 1 && !IsMeanderAngleWithinLimit(
+				River.MeanderPoints[Index - 2].Position, Previous.Position,
+				Point.Position, TangentQ10))
+			{
+				const FIntPoint Before = River.MeanderPoints[Index - 2].Position;
+				OutError = FString::Printf(TEXT("River meander exceeds %d degrees: (%d,%d) -> (%d,%d) -> (%d,%d), anchor=%d"),
+					RiverMaxMeanderAngle, Before.X, Before.Y,
+					Previous.Position.X, Previous.Position.Y,
+					Point.Position.X, Point.Position.Y,
+					Previous.bAnchor ? 1 : 0);
+				return false;
+			}
+		}
+	}
+	OutError.Reset();
+	return true;
 }
 
 bool FVoxelHydrologyPlan::Sample(
@@ -289,20 +624,20 @@ bool FVoxelHydrologyPlan::Sample(
 				Rivers[
 					Ref.RiverIndex];
 
-			if (Ref.PointIndex <= 0 ||
-				!River.Points.IsValidIndex(
-					Ref.PointIndex))
+			if (Ref.ShapePointIndex <= 0 ||
+				!River.MeanderPoints.IsValidIndex(
+					Ref.ShapePointIndex))
 			{
 				continue;
 			}
 
-			const FVoxelRiverRoutePoint& A =
-				River.Points[
-					Ref.PointIndex - 1];
+			const FVoxelRiverMeanderPoint& A =
+				River.MeanderPoints[
+					Ref.ShapePointIndex - 1];
 
-			const FVoxelRiverRoutePoint& B =
-				River.Points[
-					Ref.PointIndex];
+			const FVoxelRiverMeanderPoint& B =
+				River.MeanderPoints[
+					Ref.ShapePointIndex];
 
 			const int64 ABX =
 				static_cast<int64>(
@@ -397,14 +732,17 @@ bool FVoxelHydrologyPlan::Sample(
 
 			FVoxelRiverShape Shape;
 
-			Shape.HalfWidth =
-				A.HalfWidth +
+			Shape.BedHalfWidth =
+				A.BedHalfWidth +
 				static_cast<int32>(
 					static_cast<int64>(
-						B.HalfWidth -
-						A.HalfWidth) *
+						B.BedHalfWidth -
+						A.BedHalfWidth) *
 					AlphaQ16 /
 					65536);
+			Shape.WaterHalfWidth = A.WaterHalfWidth +
+				static_cast<int32>(static_cast<int64>(
+					B.WaterHalfWidth - A.WaterHalfWidth) * AlphaQ16 / 65536);
 
 			Shape.Depth =
 				A.Depth +
@@ -415,15 +753,32 @@ bool FVoxelHydrologyPlan::Sample(
 					AlphaQ16 /
 					65536);
 
-			Shape.BankWidth =
-				FMath::Max(
-					1,
-					Shape.HalfWidth);
-
-			Shape.ShoreWidth =
-				FMath::Max(
-					Shape.BankWidth + 1,
-					Shape.HalfWidth * 3);
+			Shape.BankWidth = A.BankWidth +
+				static_cast<int32>(static_cast<int64>(
+					B.BankWidth - A.BankWidth) * AlphaQ16 / 65536);
+			Shape.ShoreWidth = A.ShoreWidth +
+				static_cast<int32>(static_cast<int64>(
+					B.ShoreWidth - A.ShoreWidth) * AlphaQ16 / 65536);
+			const int32 Curvature = AlphaQ16 < 32768 ? A.Curvature : B.Curvature;
+			const int64 Side = ABX * APY - ABY * APX;
+			if (Curvature != 0 && Side != 0)
+			{
+				if ((Curvature > 0 && Side < 0) ||
+					(Curvature < 0 && Side > 0))
+				{
+					const int32 Shift = FMath::Min(Shape.ShoreWidth - 1,
+						FMath::Max(1, Shape.BankWidth / 5));
+					Shape.BankWidth += Shift;
+					Shape.ShoreWidth -= Shift;
+				}
+				else
+				{
+					const int32 Shift = FMath::Min(Shape.BankWidth - 1,
+						FMath::Max(1, Shape.BankWidth / 10));
+					Shape.BankWidth -= Shift;
+					Shape.ShoreWidth += Shift;
+				}
+			}
 
 			Shape.MaxCutFill =
 				FMath::Max(
@@ -444,7 +799,7 @@ bool FVoxelHydrologyPlan::Sample(
 			{
 				BestDistance =
 					Distance;
-				BestBankExtent = Shape.HalfWidth + Shape.BankWidth;
+				BestBankExtent = Shape.WaterHalfWidth + Shape.BankWidth;
 				BestShoreExtent = BestBankExtent + Shape.ShoreWidth;
 				BestRiverId = River.Id;
 
@@ -480,6 +835,7 @@ bool FVoxelHydrologyPlan::Sample(
 
 		Result.bRiver =
 			BestSection.bWet;
+		Result.RiverZone = BestSection.Zone;
 	}
 
 	OutInfluence =
@@ -516,6 +872,8 @@ uint64 FVoxelHydrologyPlan::GetAllocatedBytes() const
 	{
 		Bytes +=
 			River.Points.GetAllocatedSize();
+		Bytes += River.ShapePoints.GetAllocatedSize();
+		Bytes += River.MeanderPoints.GetAllocatedSize();
 	}
 
 	for (const FVoxelLakePlan& Lake :

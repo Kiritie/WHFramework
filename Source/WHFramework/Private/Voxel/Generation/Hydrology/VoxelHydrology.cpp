@@ -9,6 +9,38 @@ namespace
     constexpr int32 HydrologyMinPlane = -32768;
     constexpr int32 HydrologyMaxPlane = 32768;
 
+    struct FResolvedRiverSize
+    {
+        int32 BedHalfWidth = 1;
+        int32 WaterHalfWidth = 1;
+        int32 BankWidth = 1;
+        int32 ShoreWidth = 1;
+        int32 Depth = 1;
+    };
+
+    FResolvedRiverSize ResolveRiverSize(const uint64 InAccumulation,
+        const FVoxelGenerationSettings& InSettings)
+    {
+        const uint64 Threshold = FMath::Max<uint64>(1,
+            InSettings.RiverSourceAccumulation);
+        const uint64 Relative = FMath::Max<uint64>(1,
+            InAccumulation / Threshold);
+        const int32 GrowthLevel = FMath::Clamp(
+            static_cast<int32>(FMath::FloorLog2(
+                static_cast<uint32>(FMath::Min<uint64>(Relative, MAX_uint32)))),
+            0, InSettings.RiverMaxGrowthLevels);
+        FResolvedRiverSize Result;
+        Result.BedHalfWidth = InSettings.RiverBaseHalfWidth +
+            GrowthLevel * InSettings.RiverWidthGrowthPerLevel;
+        Result.WaterHalfWidth = Result.BedHalfWidth;
+        Result.BankWidth = InSettings.RiverBankWidth;
+        Result.ShoreWidth = FMath::Max(Result.BankWidth + 1,
+            InSettings.RiverShoreWidth);
+        Result.Depth = InSettings.RiverBaseDepth +
+            GrowthLevel * InSettings.RiverDepthGrowthPerLevel;
+        return Result;
+    }
+
     constexpr int32 HydrologyDirectionX[4] =
     {
         1,
@@ -918,127 +950,83 @@ bool VoxelHydrology::EvaluateRiverSection(
     FVoxelRiverSection& OutSection,
     FString& OutError)
 {
-    if (InOriginalGround <
-            HydrologyMinPlane ||
-        InOriginalGround >
-            HydrologyMaxPlane ||
-        InWaterPlane <
-            HydrologyMinPlane ||
-        InWaterPlane >
-            HydrologyMaxPlane - 1 ||
-        InDistanceCells < 0 ||
-        InDistanceCells > 65536 ||
-        InShape.HalfWidth < 1 ||
-        InShape.HalfWidth > 256 ||
-        InShape.BankWidth < 1 ||
-        InShape.BankWidth > 512 ||
-        InShape.ShoreWidth < 1 ||
-        InShape.ShoreWidth > 1024 ||
-        InShape.Depth < 1 ||
-        InShape.Depth > 256 ||
-        InShape.MaxCutFill < 1 ||
-        InShape.MaxCutFill > 512 ||
-        InWaterPlane -
-            InShape.Depth <
-            HydrologyMinPlane)
+    if (InOriginalGround < HydrologyMinPlane ||
+        InOriginalGround > HydrologyMaxPlane ||
+        InWaterPlane < HydrologyMinPlane ||
+        InWaterPlane > HydrologyMaxPlane - 1 ||
+        InDistanceCells < 0 || InDistanceCells > 65536 ||
+        InShape.BedHalfWidth < 1 || InShape.BedHalfWidth > 256 ||
+        InShape.WaterHalfWidth < InShape.BedHalfWidth ||
+        InShape.WaterHalfWidth > 256 ||
+        InShape.BankWidth < 1 || InShape.BankWidth > 512 ||
+        InShape.ShoreWidth < 1 || InShape.ShoreWidth > 1024 ||
+        InShape.Depth < 1 || InShape.Depth > 256 ||
+        InShape.MaxCutFill < 1 || InShape.MaxCutFill > 512 ||
+        InWaterPlane - InShape.Depth < HydrologyMinPlane)
     {
-        OutError =
-            TEXT("Invalid river section");
-
+        OutError = TEXT("Invalid river section");
         return false;
     }
-
     FVoxelRiverSection Section;
-
-    Section.WaterPlane =
-        InWaterPlane;
-
-    Section.BedPlane =
-        InWaterPlane -
-        InShape.Depth;
-
-    if (InDistanceCells <=
-        InShape.HalfWidth)
+    Section.WaterPlane = InWaterPlane;
+    Section.BedPlane = InWaterPlane - InShape.Depth;
+    const int32 WetEnd = InShape.WaterHalfWidth;
+    const int32 BankEnd = WetEnd + InShape.BankWidth;
+    const int32 ShoreEnd = BankEnd + InShape.ShoreWidth;
+    auto Blend = [](const int32 A, const int32 B,
+        const int32 Position, const int32 Start, const int32 End)
     {
-        Section.GroundPlane =
-            Section.BedPlane;
+        const int32 Alpha = static_cast<int32>(
+            static_cast<int64>(Position - Start) * 65536 /
+            FMath::Max(1, End - Start));
+        return A + static_cast<int32>(
+            static_cast<int64>(B - A) * SmoothQ16(Alpha) / 65536);
+    };
+    if (InDistanceCells <= InShape.BedHalfWidth)
+    {
+        Section.GroundPlane = Section.BedPlane;
+        Section.Zone = EVoxelRiverSurfaceZone::ChannelBed;
+        Section.bWet = true;
     }
-    else if (InDistanceCells <=
-        InShape.HalfWidth +
-        InShape.BankWidth)
+    else if (InDistanceCells <= WetEnd)
     {
-        const int32 AlphaQ16 =
-            static_cast<int32>(
-                static_cast<int64>(
-                    InDistanceCells -
-                    InShape.HalfWidth) *
-                65536 /
-                InShape.BankWidth);
-
-        Section.GroundPlane =
-            Section.BedPlane +
-            static_cast<int32>(
-                static_cast<int64>(
-                    InShape.Depth + 1) *
-                SmoothQ16(AlphaQ16) /
-                65536);
+        Section.GroundPlane = Blend(Section.BedPlane, InWaterPlane - 1,
+            InDistanceCells, InShape.BedHalfWidth, WetEnd);
+        Section.Zone = EVoxelRiverSurfaceZone::WetMargin;
+        Section.bWet = true;
     }
-    else if (InDistanceCells <
-        InShape.HalfWidth +
-        InShape.BankWidth +
-        InShape.ShoreWidth)
+    else if (InDistanceCells <= BankEnd)
     {
-        const int32 AlphaQ16 =
-            static_cast<int32>(
-                static_cast<int64>(
-                    InDistanceCells -
-                    InShape.HalfWidth -
-                    InShape.BankWidth) *
-                65536 /
-                InShape.ShoreWidth);
-
-        Section.GroundPlane =
-            InWaterPlane +
-            1 +
-            static_cast<int32>(
-                (static_cast<int64>(
-                    InOriginalGround) -
-                    InWaterPlane -
-                    1) *
-                SmoothQ16(AlphaQ16) /
-                65536);
+        const int32 TargetGround = FMath::Max(InWaterPlane,
+            FMath::Min(InOriginalGround, InWaterPlane + InShape.Depth / 2));
+        Section.GroundPlane = Blend(InWaterPlane, TargetGround,
+            InDistanceCells, WetEnd, BankEnd);
+        Section.Zone = EVoxelRiverSurfaceZone::DryBank;
+    }
+    else if (InDistanceCells <= ShoreEnd)
+    {
+        const int32 StartGround = FMath::Min(InOriginalGround,
+            InWaterPlane + InShape.Depth / 2);
+        Section.GroundPlane = Blend(StartGround, InOriginalGround,
+            InDistanceCells, BankEnd, ShoreEnd);
+        Section.Zone = EVoxelRiverSurfaceZone::Floodplain;
     }
     else
     {
-        Section.GroundPlane =
-            InOriginalGround;
+        Section.GroundPlane = InOriginalGround;
     }
-
-    if (FMath::Abs(
-        static_cast<int64>(
-            Section.GroundPlane) -
-        static_cast<int64>(
-            InOriginalGround)) >
-        InShape.MaxCutFill)
+    const int64 Delta = static_cast<int64>(Section.GroundPlane) - InOriginalGround;
+    if (FMath::Abs(Delta) > InShape.MaxCutFill)
     {
-        OutError =
-            TEXT(
-                "River route exceeds "
-                "cut/fill budget");
-
-        return false;
+        Section.bExceededCutFill = true;
+        if (!Section.bWet)
+        {
+            Section.GroundPlane = InOriginalGround +
+                static_cast<int32>(FMath::Clamp<int64>(Delta,
+                    -InShape.MaxCutFill, InShape.MaxCutFill));
+        }
     }
-
-    Section.bWet =
-        InDistanceCells <=
-            InShape.HalfWidth +
-            InShape.BankWidth &&
-        Section.GroundPlane <
-            InWaterPlane;
-
-    OutSection =
-        Section;
-
+    OutSection = Section;
     OutError.Reset();
     return true;
 }
@@ -1425,6 +1413,12 @@ bool FVoxelHydrologyGenerator::BuildPlan(
     const TAtomic<bool>* InCancel) const
 {
     FVoxelHydrologyPlan Plan;
+    Plan.RiverShapeSmoothingPasses = Recipe->Settings.RiverShapeSmoothingPasses;
+    Plan.RiverSeed = Recipe->Settings.Seed;
+    Plan.RiverMeanderStrength = Recipe->Settings.RiverMeanderStrength;
+    Plan.RiverMeanderFrequency = Recipe->Settings.RiverMeanderFrequency;
+    Plan.RiverMeanderOctaves = Recipe->Settings.RiverMeanderOctaves;
+    Plan.RiverMaxMeanderAngle = Recipe->Settings.RiverMaxMeanderAngle;
     Plan.Key = InKey;
 
     const int32 RegionSide =
@@ -1554,6 +1548,7 @@ bool FVoxelHydrologyGenerator::BuildPlan(
         });
 
 	Plan.Finalize();
+	if (!Plan.ValidateRiverRoutes(OutError)) return false;
 
     OutPlan =
         MoveTemp(Plan);
@@ -1593,6 +1588,7 @@ void FVoxelHydrologyGenerator::SelectRiverSources(
 
     TMap<FIntPoint, FVoxelRiverSource>
         BestPerSourceCell;
+    TArray<FVoxelRiverSource> Continuations;
 
     for (uint32 Index = 0;
         Index <
@@ -1628,6 +1624,11 @@ void FVoxelHydrologyGenerator::SelectRiverSources(
          * 当前点属于已有河道下游，不再生成新 Source。
          */
         bool bHasQualifiedChild = false;
+        bool bHasCoreQualifiedChild = false;
+        bool bHasOutsideQualifiedChild = false;
+		uint32 ContinuationUpstreamIndex = MAX_uint32;
+		uint64 UpstreamAccumulation = 0;
+		FIntPoint UpstreamWorldCell(MAX_int32, MAX_int32);
 
         for (uint8 Face = 0;
             Face < 4;
@@ -1652,11 +1653,29 @@ void FVoxelHydrologyGenerator::SelectRiverSources(
                         SourceThreshold))
             {
                 bHasQualifiedChild = true;
-                break;
+                const FIntPoint Upstream = InGrid.ToWorldHydrologyCell(Neighbor);
+                const bool bUpstreamInCore = Upstream.X >= CoreMin.X &&
+                    Upstream.Y >= CoreMin.Y && Upstream.X < CoreMax.X &&
+                    Upstream.Y < CoreMax.Y;
+                bHasCoreQualifiedChild |= bUpstreamInCore;
+                bHasOutsideQualifiedChild |= !bUpstreamInCore;
+				if (!bUpstreamInCore &&
+					(ContinuationUpstreamIndex == MAX_uint32 ||
+					InDrainage.Accumulation[Neighbor] > UpstreamAccumulation ||
+					(InDrainage.Accumulation[Neighbor] == UpstreamAccumulation &&
+						(Upstream.X < UpstreamWorldCell.X ||
+							(Upstream.X == UpstreamWorldCell.X && Upstream.Y < UpstreamWorldCell.Y)))))
+				{
+					ContinuationUpstreamIndex = Neighbor;
+					UpstreamAccumulation = InDrainage.Accumulation[Neighbor];
+					UpstreamWorldCell = Upstream;
+				}
             }
         }
 
-        if (bHasQualifiedChild)
+        const bool bContinuation = bHasQualifiedChild &&
+            bHasOutsideQualifiedChild && !bHasCoreQualifiedChild;
+        if (bHasQualifiedChild && !bContinuation)
         {
             continue;
         }
@@ -1671,8 +1690,11 @@ void FVoxelHydrologyGenerator::SelectRiverSources(
 
         FVoxelRiverSource Candidate;
         Candidate.GridIndex = Index;
+		Candidate.ContinuationUpstreamIndex = bContinuation
+			? ContinuationUpstreamIndex : MAX_uint32;
         Candidate.Accumulation =
             Accumulation;
+        Candidate.bContinuation = bContinuation;
         Candidate.Id =
             VoxelGeneration::MakeStableId(
                 Recipe->Settings.Seed,
@@ -1680,8 +1702,14 @@ void FVoxelHydrologyGenerator::SelectRiverSources(
                     WorldCell.X,
                     WorldCell.Y,
                     0),
-                0x5249564552535243ull,
+                bContinuation ? 0x5249564552434F4Eull : 0x5249564552535243ull,
                 0);
+
+        if (bContinuation)
+        {
+            Continuations.Add(Candidate);
+            continue;
+        }
 
         FVoxelRiverSource* Existing =
             BestPerSourceCell.Find(
@@ -1703,6 +1731,7 @@ void FVoxelHydrologyGenerator::SelectRiverSources(
 
     BestPerSourceCell.GenerateValueArray(
         OutSources);
+    OutSources.Append(MoveTemp(Continuations));
 
     OutSources.Sort(
         [](const FVoxelRiverSource& InA,
@@ -1734,12 +1763,18 @@ bool FVoxelHydrologyGenerator::TraceRiver(
     {
         return false;
     }
+	if (InSource.bContinuation &&
+		InSource.ContinuationUpstreamIndex != MAX_uint32)
+	{
+		Path.Insert(InSource.ContinuationUpstreamIndex, 0);
+	}
 
     FVoxelRiverRoute Route;
     Route.Id =
         InSource.Id;
     Route.OwnerRegion =
         InOwnerRegion;
+    Route.bContinuation = InSource.bContinuation;
 
     bool bHasBounds = false;
 
@@ -1758,17 +1793,8 @@ bool FVoxelHydrologyGenerator::TraceRiver(
             InDrainage.Accumulation[
                 GridIndex];
 
-        const int32 WidthScale =
-            FMath::Clamp(
-                static_cast<int32>(
-                    FMath::FloorLog2(
-                        static_cast<uint32>(
-                            FMath::Clamp<uint64>(
-                                Accumulation,
-                                1,
-                                MAX_uint32)))),
-                0,
-                8);
+        const FResolvedRiverSize Size = ResolveRiverSize(
+            Accumulation, Recipe->Settings);
 
         FVoxelRiverRoutePoint Point;
         Point.Position =
@@ -1778,13 +1804,11 @@ bool FVoxelHydrologyGenerator::TraceRiver(
             InDrainage.SpillPlane[
                 GridIndex];
 
-        Point.HalfWidth =
-            Recipe->Settings.RiverBaseHalfWidth +
-            WidthScale;
-
-        Point.Depth =
-            Recipe->Settings.RiverBaseDepth +
-            WidthScale / 2;
+        Point.BedHalfWidth = Size.BedHalfWidth;
+        Point.WaterHalfWidth = Size.WaterHalfWidth;
+        Point.BankWidth = Size.BankWidth;
+        Point.ShoreWidth = Size.ShoreWidth;
+        Point.Depth = Size.Depth;
 
         Point.Accumulation =
             Accumulation;

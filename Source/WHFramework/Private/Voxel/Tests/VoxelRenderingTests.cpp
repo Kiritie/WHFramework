@@ -6,6 +6,9 @@
 #include "Voxel/Generation/VoxelGenerationQuery.h"
 #include "Voxel/Generation/Ecology/VoxelEcology.h"
 #include "Voxel/Rendering/VoxelHeightfieldMesher.h"
+#include "Voxel/Rendering/DWHeightfieldTransitionBuilder.h"
+#include "Voxel/Rendering/DWVolumeTransitionPlanner.h"
+#include "Voxel/Geometry/DWVoxelBoundaryTransition.h"
 #include "Voxel/Rendering/VoxelMeshClipper.h"
 #include "Voxel/Rendering/VoxelMacroTerrain.h"
 #include "Voxel/Rendering/VoxelProxyBuilder.h"
@@ -324,6 +327,422 @@ bool FVoxelProxyOverlaySnapshotTest::RunTest(const FString& InParameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelHeightfieldTransitionEdgeTest,
+	"WHFramework.Voxel.Rendering.HeightfieldTransitionEdges",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelHeightfieldTransitionEdgeTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	TArray<int32> CoarseGround = {10, 10, 10, 10, 10, 10, 10, 10, 10};
+	TArray<int32> FineGroundA = {5, 5, 5, 5, 5, 5, 5, 5, 5};
+	TArray<int32> FineGroundB = {7, 7, 7, 7, 7, 7, 7, 7, 7};
+	TArray<int32> Dry;
+	Dry.Init(MIN_int32, 9);
+	TArray<uint16> Materials;
+	Materials.Init(1, 9);
+	FVoxelHeightfieldTileView Coarse;
+	Coarse.Key = {EVoxelHeightfieldRepresentation::Surface, FIntPoint(0, 0), 2};
+	Coarse.Side = 3;
+	Coarse.Step = 4;
+	Coarse.Ground = CoarseGround;
+	Coarse.Water = Dry;
+	Coarse.Material = Materials;
+	FVoxelHeightfieldTileView FineA;
+	FineA.Key = {EVoxelHeightfieldRepresentation::Surface, FIntPoint(2, 0), 1};
+	FineA.Origin = FIntPoint(8, 0);
+	FineA.Side = 3;
+	FineA.Step = 2;
+	FineA.Ground = FineGroundA;
+	FineA.Water = Dry;
+	FineA.Material = Materials;
+	FVoxelHeightfieldTileView FineB = FineA;
+	FineB.Key.Coordinate = FIntPoint(2, 1);
+	FineB.Origin = FIntPoint(8, 4);
+	FineB.Ground = FineGroundB;
+	TArray<FVoxelHeightfieldTileView> Views = {Coarse, FineA, FineB};
+	TArray<FVoxelHeightfieldTransitionEdge> Edges;
+	FString Error;
+	if (!TestTrue(TEXT("Two-to-one heightfield edges build"),
+		FVoxelHeightfieldTransitionBuilder::BuildEdges(Views, Edges, Error))) return false;
+	TestEqual(TEXT("One coarse tile owns both fine boundary intervals"), Edges.Num(), 2);
+	for (const FVoxelHeightfieldTransitionEdge& Edge : Edges)
+	{
+		TestTrue(TEXT("The coarser tile owns each interval"), Edge.Owner == Coarse.Key);
+		TestEqual(TEXT("Boundary direction is +X"),
+			static_cast<uint8>(Edge.Direction),
+			static_cast<uint8>(EVoxelLodEdgeDirection::PositiveX));
+	}
+	TMap<FVoxelHeightfieldNodeKey, FVoxelHeightfieldTileView> ViewMap;
+	for (const FVoxelHeightfieldTileView& View : Views) ViewMap.Add(View.Key, View);
+	FVoxelSectionMeshResult Mesh;
+	const auto Config = VoxelTest::MakeGenerationConfig();
+	const auto Registry = VoxelTest::MakeRegistry();
+	if (!TestTrue(TEXT("Coarse owner transition mesh builds"),
+		FVoxelHeightfieldTransitionBuilder::BuildMesh(Coarse, Edges, ViewMap,
+			*Config, *Registry, -64, 4.0, Mesh, Error))) return false;
+	int32 GroundVertices = 0;
+	for (const FVoxelRenderBatch& Batch : Mesh.Batches)
+	{
+		TestTrue(TEXT("Transition mesh attributes are complete"), Batch.Mesh.Validate());
+		GroundVertices += Batch.Mesh.Vertices.Num();
+	}
+	TestEqual(TEXT("Both fine edges are closed at fine-cell resolution"),
+		GroundVertices, 16);
+	const uint64 Signature = FVoxelHeightfieldTransitionBuilder::BuildSignature(
+		Coarse.Key, Coarse.Revision, Edges);
+	Edges.Swap(0, 1);
+	TestEqual(TEXT("Transition signature is independent of neighbor enumeration order"),
+		FVoxelHeightfieldTransitionBuilder::BuildSignature(
+			Coarse.Key, Coarse.Revision, Edges), Signature);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelHeightfieldTransitionInvariantTest,
+	"WHFramework.Voxel.Rendering.HeightfieldTransitionInvariants",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelHeightfieldTransitionInvariantTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	TArray<int32> HighGround;
+	HighGround.Init(10, 9);
+	TArray<int32> LowGround;
+	LowGround.Init(5, 9);
+	TArray<int32> OwnerWater;
+	OwnerWater.Init(12, 9);
+	TArray<int32> Dry;
+	Dry.Init(MIN_int32, 9);
+	TArray<uint16> Material;
+	Material.Init(1, 9);
+	FVoxelHeightfieldTileView Owner;
+	Owner.Key = {EVoxelHeightfieldRepresentation::Macro, FIntPoint(0, 0), 0};
+	Owner.Side = 3;
+	Owner.Step = 8;
+	Owner.Ground = HighGround;
+	Owner.Water = OwnerWater;
+	Owner.Material = Material;
+	FVoxelHeightfieldTileView Neighbor;
+	Neighbor.Key = {EVoxelHeightfieldRepresentation::Surface, FIntPoint(4, 0), 0};
+	Neighbor.Origin = FIntPoint(16, 0);
+	Neighbor.Side = 3;
+	Neighbor.Step = 2;
+	Neighbor.Ground = LowGround;
+	Neighbor.Water = Dry;
+	Neighbor.Material = Material;
+	TArray<FVoxelHeightfieldTileView> Views = {Owner, Neighbor};
+	TArray<FVoxelHeightfieldTransitionEdge> Edges;
+	FString Error;
+	if (!TestTrue(TEXT("Temporary four-to-one edge is planned"),
+		FVoxelHeightfieldTransitionBuilder::BuildEdges(Views, Edges, Error))) return false;
+	TestEqual(TEXT("Only the touching interval needs a transition"), Edges.Num(), 1);
+	if (Edges.Num() != 1) return false;
+	TestTrue(TEXT("The coarser side owns the temporary transition"), Edges[0].Owner == Owner.Key);
+	TestTrue(TEXT("Temporary ratio above two is recorded"), Edges[0].bUnbalanced);
+	const uint64 Signature = FVoxelHeightfieldTransitionBuilder::BuildSignature(
+		Owner.Key, Owner.Revision, Edges);
+	Edges[0].NeighborRevision++;
+	TestTrue(TEXT("Neighbor edit changes the transition signature"),
+		FVoxelHeightfieldTransitionBuilder::BuildSignature(
+			Owner.Key, Owner.Revision, Edges) != Signature);
+	Edges[0].NeighborRevision--;
+	TMap<FVoxelHeightfieldNodeKey, FVoxelHeightfieldTileView> ViewMap;
+	ViewMap.Add(Owner.Key, Owner);
+	ViewMap.Add(Neighbor.Key, Neighbor);
+	FVoxelSectionMeshResult Mesh;
+	const auto Config = VoxelTest::MakeGenerationConfig();
+	FVoxelRegistrySnapshot Registry = *VoxelTest::MakeRegistry();
+	Registry.Definitions[Config->Water.TypeId].RenderGroup = EVoxelRenderGroup::Water;
+	if (!TestTrue(TEXT("Ground and water transition build from existing heightfields"),
+		FVoxelHeightfieldTransitionBuilder::BuildMesh(Owner, Edges, ViewMap,
+			*Config, Registry, -64, 4.0, Mesh, Error))) return false;
+	int32 GroundVertices = 0;
+	int32 WaterVertices = 0;
+	for (const FVoxelRenderBatch& Batch : Mesh.Batches)
+	{
+		TestTrue(TEXT("Transition mesh is valid"), Batch.Mesh.Validate());
+		for (const FVector& Vertex : Batch.Mesh.Vertices)
+		{
+			TestEqual(TEXT("Boundary vertex lies on the shared plane"), Vertex.X, 16.0);
+		}
+		if (Batch.Group == EVoxelRenderGroup::Water) WaterVertices += Batch.Mesh.Vertices.Num();
+		else GroundVertices += Batch.Mesh.Vertices.Num();
+	}
+	TestEqual(TEXT("Ground closes both fine cells"), GroundVertices, 8);
+	TestEqual(TEXT("Water closes both fine cells"), WaterVertices, 8);
+	TArray<FVoxelHeightfieldTileView> OnlyOwner = {Owner};
+	TArray<FVoxelHeightfieldTileFootprint> PendingNeighbor = {{
+		Neighbor.Key, Neighbor.Origin, Neighbor.CellSide() * Neighbor.Step,
+		Neighbor.Step}};
+	TArray<FVoxelHeightfieldTransitionEdge> PendingEdges;
+	FVoxelHeightfieldTransitionBuilder::AppendPendingEdges(
+		OnlyOwner, PendingNeighbor, PendingEdges);
+	TestEqual(TEXT("Only a wanted but unready neighbor receives a safety edge"),
+		PendingEdges.Num(), 1);
+	if (PendingEdges.Num() == 1)
+	{
+		TestTrue(TEXT("Loading edge is explicitly pending"), PendingEdges[0].bPending);
+		TMap<FVoxelHeightfieldNodeKey, FVoxelHeightfieldTileView> OwnerOnlyMap;
+		OwnerOnlyMap.Add(Owner.Key, Owner);
+		FVoxelSectionMeshResult SafetyMesh;
+		if (!TestTrue(TEXT("Pending edge builds a shallow ground and water wall"),
+			FVoxelHeightfieldTransitionBuilder::BuildMesh(Owner, PendingEdges, OwnerOnlyMap,
+				*Config, Registry, -64, 4.0, SafetyMesh, Error))) return false;
+		for (const FVoxelRenderBatch& Batch : SafetyMesh.Batches)
+		{
+			for (const FVector& Vertex : Batch.Mesh.Vertices)
+			{
+				TestTrue(TEXT("Loading wall is at most two cells deep"), Vertex.Z >= 9.0);
+			}
+		}
+		TestTrue(TEXT("Ready neighbor replaces the pending-edge signature"),
+			FVoxelHeightfieldTransitionBuilder::BuildSignature(
+				Owner.Key, Owner.Revision, PendingEdges) != Signature);
+	}
+	TArray<FBox> FineCoverage = {
+		FBox(FVector(15, 1, -100), FVector(17, 3, 100))};
+	FVoxelHeightfieldTransitionBuilder::ExcludeCoveredIntervals(
+		Views, FineCoverage, TConstArrayView<FBox>(), Edges);
+	TestEqual(TEXT("Coverage removes only its boundary interval"), Edges.Num(), 2);
+	if (Edges.Num() == 2)
+	{
+		TestEqual(TEXT("First visible interval starts at zero"), Edges[0].RangeMin, 0);
+		TestEqual(TEXT("First visible interval ends at coverage"), Edges[0].RangeMax, 1);
+		TestEqual(TEXT("Second visible interval starts after coverage"), Edges[1].RangeMin, 3);
+		TestEqual(TEXT("Second visible interval ends at neighbor edge"), Edges[1].RangeMax, 4);
+		FVoxelSectionMeshResult ClippedMesh;
+		if (!TestTrue(TEXT("Only uncovered edge segments are meshed"),
+			FVoxelHeightfieldTransitionBuilder::BuildMesh(Owner, Edges, ViewMap,
+				*Config, Registry, -64, 4.0, ClippedMesh, Error))) return false;
+		for (const FVoxelRenderBatch& Batch : ClippedMesh.Batches)
+		{
+			for (const FVector& Vertex : Batch.Mesh.Vertices)
+			{
+				TestTrue(TEXT("Transition does not enter the Fine coverage interval"),
+				Vertex.Y <= 1.0 || Vertex.Y >= 3.0);
+			}
+		}
+	}
+	Neighbor.Step = Owner.Step;
+	Neighbor.Key.Coordinate = FIntPoint(2, 0);
+	Views.Reset();
+	Views.Add(Owner);
+	Views.Add(Neighbor);
+	if (!TestTrue(TEXT("Equal-resolution edge scan succeeds"),
+		FVoxelHeightfieldTransitionBuilder::BuildEdges(Views, Edges, Error))) return false;
+	TestTrue(TEXT("Equal-resolution neighbors add zero transition quads"), Edges.IsEmpty());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelVolumeTransitionAdjacencyTest,
+	"WHFramework.Voxel.Rendering.VolumeTransitionAdjacency",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelVolumeTransitionAdjacencyTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const FVoxelViewKey Coarse{FIntVector(0, 0, 0), 1};
+	TSet<FVoxelViewKey> Visible;
+	Visible.Add(Coarse);
+	for (int32 Y = 0; Y < 2; ++Y)
+	{
+		for (int32 Z = 0; Z < 2; ++Z)
+		{
+			Visible.Add({FIntVector(2, Y, Z), 0});
+		}
+	}
+	TArray<FVoxelVolumeTransitionFace> Faces;
+	FVoxelVolumeTransitionPlanner::Build(Visible, 3, Faces);
+	TestEqual(TEXT("One coarse face meets four fine nodes"), Faces.Num(), 4);
+	for (const FVoxelVolumeTransitionFace& Face : Faces)
+	{
+		TestTrue(TEXT("The coarse node owns every face"), Face.Owner == Coarse);
+		TestEqual(TEXT("The owner face points toward +X"),
+			static_cast<uint8>(Face.Direction),
+			static_cast<uint8>(EVoxelVolumeFaceDirection::PositiveX));
+		TestEqual(TEXT("Normal visible transition is two-to-one"), Face.Ratio, 2);
+	}
+	Visible.Reset();
+	Visible.Add({FIntVector(0, 0, 0), 2});
+	Visible.Add({FIntVector(4, 0, 0), 0});
+	FVoxelVolumeTransitionPlanner::Build(Visible, 3, Faces);
+	TestEqual(TEXT("Temporary four-to-one gap is still planned"), Faces.Num(), 1);
+	if (Faces.Num() == 1) TestEqual(TEXT("Temporary ratio is four"), Faces[0].Ratio, 4);
+	Visible.Reset();
+	Visible.Add({FIntVector(-1, 0, 0), 1});
+	Visible.Add({FIntVector(0, 0, 0), 0});
+	FVoxelVolumeTransitionPlanner::Build(Visible, 3, Faces);
+	TestEqual(TEXT("Negative-coordinate neighbors use floor division"), Faces.Num(), 1);
+	Visible.Reset();
+	Visible.Add({FIntVector(0, 0, 0), 1});
+	Visible.Add({FIntVector(1, 0, 0), 1});
+	FVoxelVolumeTransitionPlanner::Build(Visible, 3, Faces);
+	TestTrue(TEXT("Equal-resolution volume neighbors need no transition"), Faces.IsEmpty());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelVolumeTransitionMeshInvariantTest,
+	"WHFramework.Voxel.Rendering.VolumeTransitionMeshInvariants",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelVolumeTransitionMeshInvariantTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelRegistrySnapshot Registry = *VoxelTest::MakeRegistry();
+	Registry.Definitions[1].bSolid = true;
+	Registry.Definitions[1].bOccludes = true;
+	FVoxelShapeRegistry Shapes;
+	Shapes.BuildDefaults();
+	const FVoxelViewKey Owner{FIntVector(0, 0, 0), 1};
+	const FVoxelViewKey Neighbor{FIntVector(2, 0, 0), 0};
+	TSet<FVoxelViewKey> Visible;
+	Visible.Add(Owner);
+	Visible.Add(Neighbor);
+	TArray<FVoxelVolumeTransitionFace> Faces;
+	FVoxelVolumeTransitionPlanner::Build(Visible, 1, Faces);
+	if (!TestEqual(TEXT("Visible coarse/fine boundary has one owner patch"), Faces.Num(), 1))
+	{
+		return false;
+	}
+	FVoxelSection Fine;
+	Fine.Status = EVoxelSectionStatus::DataReady;
+	Fine.Blocks.Init(FVoxelBlockState(0, 0), 4096);
+	Fine.Blocks[0] = FVoxelBlockState(1, 0);
+	Fine.CommittedRevision = 7;
+	FVoxelBoundaryTransitionContext Context;
+	Context.Owner = Owner;
+	FVoxelBoundaryTransitionPatch& Patch = Context.Patches.AddDefaulted_GetRef();
+	Patch.Face = Faces[0];
+	if (!TestTrue(TEXT("Fine boundary is copied from the runtime section"),
+		FVoxelBoundaryFaceSnapshot::CaptureFine(Neighbor, 1, Fine, Patch.Neighbor)))
+	{
+		return false;
+	}
+	if (!TestTrue(TEXT("Captured transition footprint is valid"), Context.Validate()))
+	{
+		return false;
+	}
+	FVoxelSectionSnapshot Coarse;
+	Coarse.Blocks.Init(FVoxelBlockState(0, 0).Pack(), 4096);
+	Coarse.Blocks[15] = FVoxelBlockState(1, 0).Pack();
+	Coarse.Known[0] = true;
+	Coarse.Halo[0].Init(FVoxelBlockState(0, 0).Pack(), 256);
+	auto CountBoundaryTriangles = [](const FVoxelSectionMeshResult& Mesh)
+	{
+		int32 Count = 0;
+		for (const FVoxelRenderBatch& Batch : Mesh.Batches)
+		{
+			for (int32 Index = 0; Index < Batch.Mesh.Triangles.Num(); Index += 3)
+			{
+				const FVector& A = Batch.Mesh.Vertices[Batch.Mesh.Triangles[Index]];
+				const FVector& B = Batch.Mesh.Vertices[Batch.Mesh.Triangles[Index + 1]];
+				const FVector& C = Batch.Mesh.Vertices[Batch.Mesh.Triangles[Index + 2]];
+				if (FMath::IsNearlyEqual(A.X, 16.0) && FMath::IsNearlyEqual(B.X, 16.0) &&
+					FMath::IsNearlyEqual(C.X, 16.0)) ++Count;
+			}
+		}
+		return Count;
+	};
+	FVoxelSectionMeshResult Mesh;
+	if (!TestTrue(TEXT("Coarse boundary with transition builds"),
+		FVoxelSectionMesher::Build(Coarse, Registry, Shapes, Mesh, nullptr, 1.0, &Context)))
+	{
+		return false;
+	}
+	TestEqual(TEXT("One solid fine subface hides only its quadrant; no coarse duplicate"),
+		CountBoundaryTriangles(Mesh), 6);
+	const uint64 PreviousSignature = Context.Signature(3);
+	Fine.Blocks[0] = FVoxelBlockState(0, 0);
+	++Fine.CommittedRevision;
+	TestTrue(TEXT("Boundary snapshot updates after a player edit"),
+		FVoxelBoundaryFaceSnapshot::CaptureFine(Neighbor, 1, Fine, Patch.Neighbor));
+	TestTrue(TEXT("Fine edit invalidates the coarse transition mesh"),
+		Context.Signature(3) != PreviousSignature);
+	if (!TestTrue(TEXT("Edited transition remesh builds"),
+		FVoxelSectionMesher::Build(Coarse, Registry, Shapes, Mesh, nullptr, 1.0, &Context)))
+	{
+		return false;
+	}
+	TestEqual(TEXT("All four fine subfaces become visible after removal"),
+		CountBoundaryTriangles(Mesh), 8);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelProxyTransitionDirectionsTest,
+	"WHFramework.Voxel.Rendering.ProxyTransitionDirections",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelProxyTransitionDirectionsTest::RunTest(const FString& InParameters)
+{
+	FVoxelRegistrySnapshot Registry = *VoxelTest::MakeRegistry();
+	Registry.Definitions[1].bSolid = true;
+	Registry.Definitions[1].bOccludes = true;
+	FVoxelShapeRegistry Shapes;
+	Shapes.BuildDefaults();
+	for (const FIntVector Origin : {FIntVector::ZeroValue, FIntVector(-2, -1, -3)})
+	{
+		for (uint8 Level = 2; Level <= 4; ++Level)
+		{
+			for (uint8 Face = 0; Face < 6; ++Face)
+			{
+				const FString Case = FString::Printf(TEXT("Origin=%s Level=%d Face=%d"),
+					*Origin.ToString(), Level, Face);
+				const int32 Axis = Face / 2;
+				const FVoxelViewKey Owner{Origin, Level};
+				FVoxelViewKey Neighbor{Origin * 2, static_cast<uint8>(Level - 1)};
+				Neighbor.Coordinate[Axis] += (Face & 1) ? -1 : 2;
+				TSet<FVoxelViewKey> Visible{Owner, Neighbor};
+				TArray<FVoxelVolumeTransitionFace> Faces;
+				FVoxelVolumeTransitionPlanner::Build(Visible, Level, Faces);
+				if (!TestEqual(Case + TEXT(" has one shared face"), Faces.Num(), 1)) continue;
+				FVoxelVoxelProxyData NeighborData;
+				NeighborData.Key = Neighbor;
+				NeighborData.Cells.Init(FVoxelBlockState(0, 0), 4096);
+				FIntVector NeighborCell = FIntVector::ZeroValue;
+				NeighborCell[Axis] = (Face & 1) ? 15 : 0;
+				auto Linear = [](const FIntVector& Cell) { return Cell.X + 16 * Cell.Y + 256 * Cell.Z; };
+				NeighborData.Cells[Linear(NeighborCell)] = FVoxelBlockState(1, 0);
+				FVoxelBoundaryTransitionContext Context;
+				Context.Owner = Owner;
+				FVoxelBoundaryTransitionPatch& Patch = Context.Patches.AddDefaulted_GetRef();
+				Patch.Face = Faces[0];
+				if (!TestTrue(Case + TEXT(" captures proxy boundary"),
+					FVoxelBoundaryFaceSnapshot::CaptureProxy(NeighborData, Face ^ 1, Patch.Neighbor))) continue;
+				FVoxelSectionSnapshot Snapshot;
+				Snapshot.Blocks.Init(FVoxelBlockState(0, 0).Pack(), 4096);
+				FIntVector OwnerCell = FIntVector::ZeroValue;
+				OwnerCell[Axis] = (Face & 1) ? 0 : 15;
+				Snapshot.Blocks[Linear(OwnerCell)] = FVoxelBlockState(1, 0).Pack();
+				Snapshot.Known[Face] = true;
+				Snapshot.Halo[Face].Init(FVoxelBlockState(0, 0).Pack(), 256);
+				FVoxelSectionMeshResult Mesh;
+				if (!TestTrue(Case + TEXT(" meshes the shared boundary"),
+					FVoxelSectionMesher::Build(Snapshot, Registry, Shapes, Mesh, nullptr, 1.0, &Context))) continue;
+				int32 BoundaryTriangles = 0;
+				const double Plane = (Face & 1) ? 0.0 : 16.0;
+				for (const FVoxelRenderBatch& Batch : Mesh.Batches)
+				{
+					TestTrue(Case + TEXT(" has valid mesh attributes"), Batch.Mesh.Validate());
+					for (int32 Index = 0; Index < Batch.Mesh.Triangles.Num(); Index += 3)
+					{
+						const FVector& A = Batch.Mesh.Vertices[Batch.Mesh.Triangles[Index]];
+						const FVector& B = Batch.Mesh.Vertices[Batch.Mesh.Triangles[Index + 1]];
+						const FVector& C = Batch.Mesh.Vertices[Batch.Mesh.Triangles[Index + 2]];
+						if (A[Axis] == Plane && B[Axis] == Plane && C[Axis] == Plane) ++BoundaryTriangles;
+					}
+				}
+				TestEqual(Case + TEXT(" exposes three quadrants without a duplicate coarse face"), BoundaryTriangles, 6);
+			}
+		}
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FVoxelProxyTreeSilhouetteTest,
 	"WHFramework.Voxel.Rendering.ProxyTreeSilhouette",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -333,6 +752,7 @@ bool FVoxelProxyTreeSilhouetteTest::RunTest(const FString& InParameters)
 	FVoxelGenerationRuntimeConfig MutableConfig = *VoxelTest::MakeGenerationConfig();
 	FVoxelGenerationRecipe Recipe = *MutableConfig.Recipe;
 	Recipe.Settings.SeaLevel = -64;
+	Recipe.Settings.RiverSourceAccumulation = 1000000;
 	Recipe.Settings.Ecology.Tree.bEnabled = true;
 	Recipe.Settings.Ecology.Tree.Spacing = 4;
 	Recipe.Settings.Ecology.Tree.ChancePermille = 1000;
@@ -453,6 +873,75 @@ bool FVoxelWaterViewTest::RunTest(const FString& InParameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelSurfaceDistantEditsTest,
+	"WHFramework.Voxel.Rendering.SurfaceDistantEdits",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelSurfaceDistantEditsTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const auto Config = VoxelTest::MakeGenerationConfig();
+	const auto Generator = VoxelTest::MakeGenerator();
+	FVoxelGenerationSettings Settings = Config->Recipe->Settings;
+	Settings.MaxZ = 512;
+	FVoxelTestOverlaySource Overlay;
+	const FVoxelSurfaceProxyBuilder Builder(Generator, Config, Settings, Overlay, MakeSurfaceRegistry());
+	const FVoxelSurfaceTileKey Key{FIntPoint::ZeroValue, 4};
+	FString Error;
+	FVoxelSurfaceTileData Natural;
+	if (!TestTrue(TEXT("Coarse surface builds"), Builder.Build(Key, Natural, Error))) return false;
+	const int32 BaseZ = (VoxelGeneration::FloorDivide(Natural.GroundZ[0] + 31, 16) + 1) * 16;
+	Overlay.Set(FIntVector(0, 0, BaseZ), FVoxelBlockState(1, 0));
+	FVoxelSurfaceTileData Tiny;
+	if (!TestTrue(TEXT("Small player edit builds"), Builder.Build(Key, Tiny, Error))) return false;
+	TestEqual(TEXT("Subcell edit does not create a distant block"), Tiny.DistantCells.Num(), Natural.DistantCells.Num());
+	for (int32 Z = 1; Z < 16; ++Z)
+	{
+		Overlay.Set(FIntVector(0, 0, BaseZ + Z), FVoxelBlockState(1, 0));
+	}
+	FVoxelSurfaceTileData Built;
+	if (!TestTrue(TEXT("Visible player construction builds"), Builder.Build(Key, Built, Error))) return false;
+	bool bFound = false;
+	for (const FVoxelDistantCell& Cell : Built.DistantCells)
+	{
+		bFound |= Cell.Min == FIntVector(0, 0, BaseZ) &&
+			Cell.Max == FIntVector(1, 1, BaseZ + 16) && Cell.State == FVoxelBlockState(1, 0);
+	}
+	TestTrue(TEXT("Distant construction keeps its actual dimensions"), bFound);
+	for (int32 X = 8; X < 32; ++X)
+	{
+		Overlay.Set(FIntVector(X, 4, BaseZ + 32), FVoxelBlockState(1, 0));
+	}
+	FVoxelSurfaceTileData CrossBoundary;
+	if (!TestTrue(TEXT("Cross-boundary construction builds"),
+		Builder.Build(Key, CrossBoundary, Error))) return false;
+	bool bShowsShortEdge = false;
+	for (const FVoxelDistantCell& Cell : CrossBoundary.DistantCells)
+	{
+		bShowsShortEdge |= Cell.Min == FIntVector(8, 4, BaseZ + 32) &&
+			Cell.Max == FIntVector(16, 5, BaseZ + 33);
+	}
+	TestTrue(TEXT("A large connected construction retains the segment across a coarse-cell boundary"),
+		bShowsShortEdge);
+	for (int32 Z = 0; Z < 16; ++Z)
+	{
+		Overlay.Set(FIntVector(0, 0, BaseZ + Z), FVoxelBlockState());
+	}
+	FVoxelSurfaceTileData Removed;
+	if (!TestTrue(TEXT("Destroyed construction builds"),
+		Builder.Build(Key, Removed, Error))) return false;
+	bool bRetainsDestroyedColumn = false;
+	for (const FVoxelDistantCell& Cell : Removed.DistantCells)
+	{
+		bRetainsDestroyedColumn |= Cell.Min == FIntVector(0, 0, BaseZ) &&
+			Cell.Max == FIntVector(1, 1, BaseZ + 16);
+	}
+	TestFalse(TEXT("Destroyed player construction is absent from distant representation"),
+		bRetainsDestroyedColumn);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FVoxelSurfaceProxyOverlayTest,
 	"WHFramework.Voxel.Rendering.SurfaceOverlay",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -472,6 +961,13 @@ bool FVoxelSurfaceProxyOverlayTest::RunTest(const FString& InParameters)
 	FString Error;
 	TestTrue(TEXT("Natural surface builds without exact runtime"), Builder.Build(Key, Natural, Error));
 	const int32 NaturalGround = Natural.GroundZ[0];
+	Overlay.Set(FIntVector(-1, 0, NaturalGround + 1), FVoxelBlockState());
+	FVoxelSurfaceTileData BorderEdit;
+	TestTrue(TEXT("Border edit surface builds"), Builder.Build(Key, BorderEdit, Error));
+	TestTrue(TEXT("Adjacent edit revision is captured for distant silhouettes"),
+		BorderEdit.Revision > Natural.Revision);
+	TestEqual(TEXT("Adjacent edit leaves sampled ground unchanged"),
+		BorderEdit.GroundZ[0], NaturalGround);
 
 	Overlay.Set(FIntVector(0, 0, NaturalGround - 20), FVoxelBlockState());
 	FVoxelSurfaceTileData UndergroundEdit;
@@ -567,7 +1063,7 @@ bool FVoxelMacroWaterMeshTest::RunTest(const FString& InParameters)
 			bGroundHasMaterialTint |= Batch.Mesh.Colors[0].Equals(GroundTint);
 		}
 	}
-	TestEqual(TEXT("One wet macro cell produces one visible water quad"), WaterVertices, 4);
+	TestEqual(TEXT("One wet macro corner produces only a clipped water triangle"), WaterVertices, 3);
 	TestTrue(TEXT("Zero forest coverage does not darken macro ground"), bGroundHasMaterialTint);
 	return true;
 }
@@ -702,19 +1198,52 @@ bool FVoxelWaterContinuousTest::RunTest(const FString& InParameters)
 	{
 		return false;
 	}
-	for (const FVector& Vertex : Mesh.Batches[0].Mesh.Vertices)
+	const FVoxelMeshBuffers& Full = Mesh.Batches[0].Mesh;
+	TestEqual(TEXT("Four wet corners retain four water heights"), Full.Vertices.Num(), 4);
+	if (Full.Vertices.Num() == 4)
 	{
-		TestEqual(TEXT("Water cell uses its own horizontal water level"), Vertex.Z, 3.0);
+		TestEqual(TEXT("Southwest water height"), Full.Vertices[0].Z, 3.0);
+		TestEqual(TEXT("Southeast water height"), Full.Vertices[1].Z, 4.0);
+		TestEqual(TEXT("Northeast water height"), Full.Vertices[2].Z, 6.0);
+		TestEqual(TEXT("Northwest water height"), Full.Vertices[3].Z, 5.0);
 	}
+	auto WaterArea = [](const FVoxelSectionMeshResult& InMesh)
+	{
+		double Area = 0.0;
+		for (const FVoxelRenderBatch& Batch : InMesh.Batches)
+		{
+			const FVoxelMeshBuffers& Buffers = Batch.Mesh;
+			for (int32 Index = 0; Index + 2 < Buffers.Triangles.Num(); Index += 3)
+			{
+				const FVector& A = Buffers.Vertices[Buffers.Triangles[Index]];
+				const FVector& B = Buffers.Vertices[Buffers.Triangles[Index + 1]];
+				const FVector& C = Buffers.Vertices[Buffers.Triangles[Index + 2]];
+				Area += FMath::Abs((B.X - A.X) * (C.Y - A.Y) -
+					(B.Y - A.Y) * (C.X - A.X)) * 0.5;
+			}
+		}
+		return Area;
+	};
+	TestEqual(TEXT("Full wet cell covers its full footprint"), WaterArea(Mesh), 1.0);
 	Water.WaterKind[1] = static_cast<uint8>(EVoxelWaterKind::None);
 	Water.WaterZ[1] = MIN_int32;
 	TestTrue(TEXT("Shoreline water builds"), FVoxelHeightfieldMesher::BuildWater(Water, Registry, Mesh, Error));
-	TestTrue(TEXT("Dry neighbouring sample does not erase wet cell"),
-		!Mesh.Batches.IsEmpty() && Mesh.Batches[0].Mesh.Triangles.Num() == 6);
+	TestEqual(TEXT("Three wet corners omit the dry corner"), WaterArea(Mesh), 0.875);
 	Water.WaterKind[0] = static_cast<uint8>(EVoxelWaterKind::None);
 	TestTrue(TEXT("Dry owning cell builds"), FVoxelHeightfieldMesher::BuildWater(Water, Registry, Mesh, Error));
-	TestTrue(TEXT("Wet neighbours do not create water over dry owning cell"),
-		Mesh.Batches.IsEmpty() || Mesh.Batches[0].Mesh.Triangles.IsEmpty());
+	TestEqual(TEXT("Two adjacent wet corners occupy half the cell"), WaterArea(Mesh), 0.5);
+	Water.WaterKind[2] = static_cast<uint8>(EVoxelWaterKind::None);
+	TestTrue(TEXT("Single wet corner builds"), FVoxelHeightfieldMesher::BuildWater(Water, Registry, Mesh, Error));
+	TestEqual(TEXT("Single wet corner occupies an eighth of the cell"), WaterArea(Mesh), 0.125);
+	Water.WaterKind[0] = static_cast<uint8>(EVoxelWaterKind::River);
+	Water.WaterZ[0] = 2;
+	TestTrue(TEXT("Opposite wet corners build separately"),
+		FVoxelHeightfieldMesher::BuildWater(Water, Registry, Mesh, Error));
+	TestEqual(TEXT("Diagonal wet corners do not bridge dry land"), WaterArea(Mesh), 0.25);
+	Water.WaterKind[0] = static_cast<uint8>(EVoxelWaterKind::None);
+	Water.WaterKind[3] = static_cast<uint8>(EVoxelWaterKind::None);
+	TestTrue(TEXT("Dry cell builds"), FVoxelHeightfieldMesher::BuildWater(Water, Registry, Mesh, Error));
+	TestEqual(TEXT("Dry cell has no water footprint"), WaterArea(Mesh), 0.0);
 	return true;
 }
 
@@ -803,9 +1332,9 @@ bool FVoxelHeightfieldHaloSeamTest::RunTest(const FString& InParameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelHeightfieldDeepSkirtTest, "WHFramework.Voxel.Rendering.Blocky.DeepLodSkirt", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelHeightfieldNoUnconditionalSkirtTest, "WHFramework.Voxel.Rendering.Blocky.NoUnconditionalSkirt", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-bool FVoxelHeightfieldDeepSkirtTest::RunTest(const FString& InParameters)
+bool FVoxelHeightfieldNoUnconditionalSkirtTest::RunTest(const FString& InParameters)
 {
 	(void)InParameters;
 	const auto Config = VoxelTest::MakeGenerationConfig();
@@ -816,19 +1345,19 @@ bool FVoxelHeightfieldDeepSkirtTest::RunTest(const FString& InParameters)
 	FString Error;
 	if (!TestTrue(TEXT("Heightfield with a steep LOD boundary builds"),
 		FVoxelHeightfieldMesher::BuildBlockyTerrain(2, 4, Heights, Materials,
-			*Config, *Registry, Mesh, Error, nullptr, {}, 0.0, 8)))
+			*Config, *Registry, Mesh, Error)))
 	{
 		return false;
 	}
-	bool bSealedBelowAdjacentHeight = false;
+	bool bHasDeepPerimeterWall = false;
 	for (const FVoxelRenderBatch& Batch : Mesh.Batches)
 	{
 		for (const FVector& Vertex : Batch.Mesh.Vertices)
 		{
-			bSealedBelowAdjacentHeight |= Vertex.X == 0.0 && Vertex.Z < 1.0;
+			bHasDeepPerimeterWall |= Vertex.X == 0.0 && Vertex.Z < 1.0;
 		}
 	}
-	TestTrue(TEXT("Boundary wall reaches below the lower adjacent LOD surface"), bSealedBelowAdjacentHeight);
+	TestFalse(TEXT("Base terrain adds no unconditional deep perimeter wall"), bHasDeepPerimeterWall);
 	return true;
 }
 

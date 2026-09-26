@@ -36,7 +36,8 @@ bool FVoxelViewPublisher::Stage(AActor*& InOutActor, const FVector& InLocation,
 		FActorSpawnParameters Parameters;
 		Parameters.ObjectFlags |= RF_Transient;
 		Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		InOutActor = Module.GetWorld()->SpawnActor<AActor>(AActor::StaticClass(), FTransform::Identity, Parameters);
+		InOutActor = Module.GetWorld()->SpawnActor<AActor>(AActor::StaticClass(),
+			FTransform(InLocation), Parameters);
 		if (!InOutActor) return false;
 		InOutActor->SetReplicates(false);
 		InOutActor->SetActorEnableCollision(false);

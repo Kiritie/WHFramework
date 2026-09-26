@@ -16,7 +16,7 @@ namespace VoxelTest
 		Recipe.Settings.SeaLevel = 0;
 		Recipe.Settings.BaseHeight = 32;
 		Recipe.Settings.HydrologyCellSize = 8;
-		Recipe.Settings.HydrologyRegionSide = 8;
+		Recipe.Settings.HydrologyRegionSide = 64;
 		Recipe.Settings.HydrologyHaloCells = 8;
 		Recipe.Settings.HydrologySinkSpacing = 8;
 		Recipe.Settings.RiverSourceAccumulation = 8;
@@ -57,6 +57,7 @@ namespace VoxelTest
 		Recipe.Palette.Road = 9;
 		FVoxelBiomeRuntimeDefinition Biome;
 		Biome.StableId = TEXT("test:biome");
+		Biome.DefaultSurface = Recipe.Palette.Grass;
 		Recipe.Biomes.Add(Biome);
 		FString Error;
 		check(Recipe.BuildLookups(Error));

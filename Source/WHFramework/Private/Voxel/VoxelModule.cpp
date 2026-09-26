@@ -716,7 +716,7 @@ bool UVoxelModule::StartWorld(
 	{
 		const FVoxelTreeGenerationSettings& Tree =
 			GenerationConfig->Recipe->Settings.Ecology.Tree;
-		Runtime->GetChangeHierarchy().SetVoxelProxyNaturalInfluence(
+		Runtime->GetChangeHierarchy().SetNaturalInfluence(
 			Tree.CrownRadius, Tree.MaxHeight + Tree.CrownRadius);
 	}
 	if (IsAuthority() && !RegionStore.ScanChangeHeaders(

@@ -5,6 +5,7 @@
 #include "Voxel/Runtime/VoxelRegistry.h"
 #include "Voxel/Geometry/VoxelShapeRegistry.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
+struct FVoxelBoundaryTransitionContext;
 struct WHFRAMEWORK_API FVoxelMeshBuffers
 {
     TArray<FVector> Vertices,Normals;
@@ -29,5 +30,7 @@ class WHFRAMEWORK_API FVoxelSectionMesher
 {
 public:
     static bool Build(const FVoxelSectionSnapshot& Snapshot,const FVoxelRegistrySnapshot& Registry,
-        const FVoxelShapeRegistry& Shapes,FVoxelSectionMeshResult& Out,const TAtomic<bool>* Cancel=nullptr, double InTextureRepeatsPerCell=1.0);
+        const FVoxelShapeRegistry& Shapes,FVoxelSectionMeshResult& Out,const TAtomic<bool>* Cancel=nullptr,
+        double InTextureRepeatsPerCell=1.0,
+        const FVoxelBoundaryTransitionContext* InTransition=nullptr);
 };

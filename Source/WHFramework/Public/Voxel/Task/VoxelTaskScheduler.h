@@ -24,7 +24,8 @@ enum class EVoxelWorkClass : uint8
 	Visible,
 	Boundary,
 	Exploration,
-	Background
+	Background,
+	Prefetch
 };
 
 enum class EVoxelTaskKind : uint8
@@ -37,6 +38,8 @@ enum class EVoxelTaskKind : uint8
 	BuildSurface,
 	BuildWater,
 	BuildMacro,
+	BuildViewTransition,
+	BuildVolumeTransition,
 	BuildViewCoverage,
 	BuildDetails,
 	DecodeOverlay,
@@ -47,7 +50,10 @@ enum class EVoxelTaskKind : uint8
 	// 项目层允许复用 Voxel Scheduler 的纯后台任务。
 	// 不参与 Voxel 内部 ApplyTask switch。
 	ProjectBackground,
-	BuildInterest
+	BuildInterest,
+	GenerateVoxelProxy,
+	GenerateSurface,
+	GenerateMacro
 };
 
 struct WHFRAMEWORK_API FVoxelTaskStamp

@@ -14,9 +14,13 @@ namespace
 		Recipe.Settings.Ecology = FVoxelEcologyGenerationSettings();
 		Recipe.Palette.Air = 0;
 		Recipe.Palette.Stone = 1;
+		Recipe.Palette.Grass = 1;
 		Recipe.Ecology.TreeTrunk = 2;
 		Recipe.Ecology.TreeLeaves = 3;
 		Recipe.Ecology.GrassPlant = 4;
+		FVoxelBiomeRuntimeDefinition& Biome = Recipe.Biomes.AddDefaulted_GetRef();
+		Biome.StableId = TEXT("test:ecology");
+		Biome.DefaultSurface = 1;
 		return Recipe;
 	}
 
@@ -29,8 +33,10 @@ namespace
 		{
 			(void)InPosition;
 			OutColumn.SurfaceZ = 0;
+			OutColumn.BiomeIndex = 0;
 			OutColumn.DensityHeight = 0;
 			OutColumn.SlopePermille = 0;
+			OutColumn.SurfaceMaterial = 1;
 			OutColumn.Climate.TemperatureQ15 = 0;
 			OutColumn.Climate.MoistureQ15 = 12000;
 			return true;
@@ -161,6 +167,8 @@ bool FVoxelEcologySmallTileTest::RunTest(const FString& InParameters)
 	auto SampleColumn = [](const FIntVector&, FVoxelColumnSample& OutColumn)
 	{
 		OutColumn.SurfaceZ = 0;
+		OutColumn.BiomeIndex = 0;
+		OutColumn.SurfaceMaterial = 1;
 		OutColumn.Climate.MoistureQ15 = 12000;
 		return true;
 	};
@@ -187,6 +195,11 @@ bool FVoxelEcologyTreeWritesTest::RunTest(const FString& InParameters)
 	FString Error;
 	TestTrue(TEXT("Tree write plan builds"), BuildEcologyPlan(MakeEcologyRecipe(), Plan, Error));
 	TestTrue(TEXT("Accepted trees produce writes"), Plan.TreesAccepted > 0 && Plan.Writes.Num() > 0);
+	TestEqual(TEXT("Every sampled tree candidate has an outcome"),
+		Plan.TreesAccepted + Plan.TreeRejects.Biome + Plan.TreeRejects.Slope +
+		Plan.TreeRejects.Temperature + Plan.TreeRejects.Moisture +
+		Plan.TreeRejects.Water + Plan.TreeRejects.Chance + Plan.TreeRejects.Base,
+		Plan.TreeCandidates);
 	return true;
 }
 
@@ -226,6 +239,7 @@ bool FVoxelEcologyHydrologyAwareTest::RunTest(const FString& InParameters)
 	auto RiverColumn = [](const FIntVector&, FVoxelColumnSample& OutColumn)
 	{
 		OutColumn.SurfaceZ = 0;
+		OutColumn.BiomeIndex = 0;
 		OutColumn.bRiver = true;
 		OutColumn.Climate.MoistureQ15 = 12000;
 		return true;
@@ -238,6 +252,7 @@ bool FVoxelEcologyHydrologyAwareTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("River ecology plan builds"), Generator.BuildPlan(
 		{ FIntVector(0, 0, -64), FIntVector(64, 64, 128) }, RiverColumn, SampleBase, Plan, Error));
 	TestEqual(TEXT("Trees are rejected near river hydrology"), Plan.TreesAccepted, 0);
+	TestEqual(TEXT("Water rejection identifies the missing trees"), Plan.TreeRejects.Water, Plan.TreeCandidates);
 	return true;
 }
 
@@ -259,6 +274,83 @@ bool FVoxelEcologySparseGrassTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Sparse settings remove more than half the grass geometry"), Sparse.GrassWrites * 2 < Dense.GrassWrites);
 	AddInfo(FString::Printf(TEXT("Grass writes: dense=%d sparse=%d retained=%.1f%%"),
 		Dense.GrassWrites, Sparse.GrassWrites, 100.0 * Sparse.GrassWrites / FMath::Max(1, Dense.GrassWrites)));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelEcologyFlowerPlanTest,
+	"WHFramework.Voxel.Ecology.FlowerPlan",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelEcologyFlowerPlanTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelGenerationRecipe Recipe = MakeEcologyRecipe();
+	Recipe.Settings.Ecology.Tree.bEnabled = false;
+	Recipe.Settings.Ecology.Flower.bEnabled = true;
+	Recipe.Settings.Ecology.Flower.Spacing = 8;
+	Recipe.Settings.Ecology.Flower.DensityPermille = 1000;
+	Recipe.Settings.Ecology.Flower.ChancePermille = 1000;
+	Recipe.Settings.Ecology.Flower.PatchFillPermille = 1000;
+	Recipe.Ecology.Flowers = {{5, 3}, {6, 1}};
+	Recipe.Settings.Ecology.Grass.DensityPermille = 1000;
+	Recipe.Settings.Ecology.Grass.ChancePermille = 1000;
+	Recipe.Settings.Ecology.Grass.PatchFillPermille = 1000;
+	const FVoxelGenerationBounds Bounds{FIntVector(0, 0, -8), FIntVector(64, 64, 32)};
+	auto Build = [&Bounds](const FVoxelGenerationRecipe& InRecipe,
+		const EVoxelRiverSurfaceZone InZone, const uint16 InSurface,
+		FVoxelEcologyPlan& OutPlan)
+	{
+		const auto Shared = MakeShared<const FVoxelGenerationRecipe, ESPMode::ThreadSafe>(InRecipe);
+		FVoxelEcologyGenerator Generator(Shared);
+		auto Column = [InZone, InSurface](const FIntVector&, FVoxelColumnSample& Out)
+		{
+			Out.SurfaceZ = 0;
+			Out.BiomeIndex = 0;
+			Out.SurfaceMaterial = InSurface;
+			Out.RiverZone = InZone;
+			Out.Climate.MoistureQ15 = 12000;
+			return true;
+		};
+		auto Base = [](const FIntVector& Position, uint32& Out)
+		{
+			Out = Position.Z <= 0 ? 1 : 0;
+			return true;
+		};
+		FString Error;
+		return Generator.BuildPlan(Bounds, Column, Base, OutPlan, Error);
+	};
+	FVoxelEcologyPlan First;
+	FVoxelEcologyPlan Second;
+	TestTrue(TEXT("Flower ecology plan builds"),
+		Build(Recipe, EVoxelRiverSurfaceZone::None, 1, First));
+	TestTrue(TEXT("Same seed flower ecology plan builds"),
+		Build(Recipe, EVoxelRiverSurfaceZone::None, 1, Second));
+	TestTrue(TEXT("Flower plan has patches and writes"),
+		First.FlowerPatchCandidates > 0 && First.FlowerWrites > 0);
+	TestTrue(TEXT("Whole ecology output is deterministic"),
+		AreWritesEqual(First.Writes, Second.Writes));
+	for (const FVoxelEcologyPlanWrite& Write : First.Writes)
+	{
+		if (Write.Value != 5 && Write.Value != 6) continue;
+		uint32 Resolved = MAX_uint32;
+		TestTrue(TEXT("Flower replaces grass at its air cell"),
+			First.Sample(Write.Position, Resolved) &&
+			(Resolved == 5 || Resolved == 6));
+	}
+	FVoxelEcologyPlan River;
+	TestTrue(TEXT("Dry bank flower plan builds"),
+		Build(Recipe, EVoxelRiverSurfaceZone::DryBank, 1, River));
+	TestEqual(TEXT("Dry bank contains no ordinary flowers"), River.FlowerWrites, 0);
+	FVoxelEcologyPlan Sand;
+	TestTrue(TEXT("Sand flower plan builds"),
+		Build(Recipe, EVoxelRiverSurfaceZone::None, 2, Sand));
+	TestEqual(TEXT("Sand contains no ordinary flowers"), Sand.FlowerWrites, 0);
+	Recipe.Biomes[0].Ecology.bAllowFlowers = false;
+	FVoxelEcologyPlan DisabledBiome;
+	TestTrue(TEXT("Flower-disabled biome plan builds"),
+		Build(Recipe, EVoxelRiverSurfaceZone::None, 1, DisabledBiome));
+	TestEqual(TEXT("Biome flower modifier prevents writes"),
+		DisabledBiome.FlowerWrites, 0);
 	return true;
 }
 

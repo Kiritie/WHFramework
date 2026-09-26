@@ -10,7 +10,7 @@ public:
         TSharedRef<const FVoxelGenerationRecipe, ESPMode::ThreadSafe> InRecipe);
 
 public:
-    void ResolveColumn(FVoxelColumnSample& InOutColumn) const;
+    void ResolveColumn(int32 InX, int32 InY, FVoxelColumnSample& InOutColumn) const;
 
     uint32 ResolveSymbol(
         const FIntVector& InCell,

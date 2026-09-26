@@ -26,6 +26,16 @@ namespace
 		InWriter.I32(InSettings.RiverSourceAccumulation);
 		InWriter.I32(InSettings.RiverBaseHalfWidth);
 		InWriter.I32(InSettings.RiverBaseDepth);
+		InWriter.I32(InSettings.RiverWidthGrowthPerLevel);
+		InWriter.I32(InSettings.RiverDepthGrowthPerLevel);
+		InWriter.I32(InSettings.RiverMaxGrowthLevels);
+		InWriter.I32(InSettings.RiverBankWidth);
+		InWriter.I32(InSettings.RiverShoreWidth);
+		InWriter.I32(InSettings.RiverShapeSmoothingPasses);
+		InWriter.I32(InSettings.RiverMeanderStrength);
+		InWriter.I32(InSettings.RiverMeanderFrequency);
+		InWriter.I32(InSettings.RiverMeanderOctaves);
+		InWriter.I32(InSettings.RiverMaxMeanderAngle);
 		InWriter.I32(InSettings.HydrologyHaloCells);
 		InWriter.I32(InSettings.HydrologySinkSpacing);
 		InWriter.I32(InSettings.RiverSourceSpacing);
@@ -71,6 +81,17 @@ namespace
 		InWriter.I32(InSettings.Ecology.Grass.Moisture.Min);
 		InWriter.I32(InSettings.Ecology.Grass.Moisture.Max);
 		InWriter.U8(InSettings.Ecology.Grass.bAllowNearWater ? 1 : 0);
+		InWriter.U8(InSettings.Ecology.Flower.bEnabled ? 1 : 0);
+		InWriter.I32(InSettings.Ecology.Flower.Spacing);
+		InWriter.I32(InSettings.Ecology.Flower.DensityPermille);
+		InWriter.I32(InSettings.Ecology.Flower.ChancePermille);
+		InWriter.I32(InSettings.Ecology.Flower.PatchRadius);
+		InWriter.I32(InSettings.Ecology.Flower.PatchFillPermille);
+		InWriter.I32(InSettings.Ecology.Flower.MaxSlopePermille);
+		InWriter.I32(InSettings.Ecology.Flower.Temperature.Min);
+		InWriter.I32(InSettings.Ecology.Flower.Temperature.Max);
+		InWriter.I32(InSettings.Ecology.Flower.Moisture.Min);
+		InWriter.I32(InSettings.Ecology.Flower.Moisture.Max);
 	}
 
 	void ReadSettings(FVoxelByteReader& InReader, FVoxelGenerationSettings& OutSettings)
@@ -93,6 +114,16 @@ namespace
 		OutSettings.RiverSourceAccumulation = InReader.I32();
 		OutSettings.RiverBaseHalfWidth = InReader.I32();
 		OutSettings.RiverBaseDepth = InReader.I32();
+		OutSettings.RiverWidthGrowthPerLevel = InReader.I32();
+		OutSettings.RiverDepthGrowthPerLevel = InReader.I32();
+		OutSettings.RiverMaxGrowthLevels = InReader.I32();
+		OutSettings.RiverBankWidth = InReader.I32();
+		OutSettings.RiverShoreWidth = InReader.I32();
+		OutSettings.RiverShapeSmoothingPasses = InReader.I32();
+		OutSettings.RiverMeanderStrength = InReader.I32();
+		OutSettings.RiverMeanderFrequency = InReader.I32();
+		OutSettings.RiverMeanderOctaves = InReader.I32();
+		OutSettings.RiverMaxMeanderAngle = InReader.I32();
 		OutSettings.HydrologyHaloCells = InReader.I32();
 		OutSettings.HydrologySinkSpacing = InReader.I32();
 		OutSettings.RiverSourceSpacing = InReader.I32();
@@ -138,6 +169,17 @@ namespace
 		OutSettings.Ecology.Grass.Moisture.Min = InReader.I32();
 		OutSettings.Ecology.Grass.Moisture.Max = InReader.I32();
 		OutSettings.Ecology.Grass.bAllowNearWater = InReader.U8() != 0;
+		OutSettings.Ecology.Flower.bEnabled = InReader.U8() != 0;
+		OutSettings.Ecology.Flower.Spacing = InReader.I32();
+		OutSettings.Ecology.Flower.DensityPermille = InReader.I32();
+		OutSettings.Ecology.Flower.ChancePermille = InReader.I32();
+		OutSettings.Ecology.Flower.PatchRadius = InReader.I32();
+		OutSettings.Ecology.Flower.PatchFillPermille = InReader.I32();
+		OutSettings.Ecology.Flower.MaxSlopePermille = InReader.I32();
+		OutSettings.Ecology.Flower.Temperature.Min = InReader.I32();
+		OutSettings.Ecology.Flower.Temperature.Max = InReader.I32();
+		OutSettings.Ecology.Flower.Moisture.Min = InReader.I32();
+		OutSettings.Ecology.Flower.Moisture.Max = InReader.I32();
 	}
 
 	void WriteGenerationIdentity(FVoxelByteWriter& InWriter, const FVoxelWorldManifest& InManifest)

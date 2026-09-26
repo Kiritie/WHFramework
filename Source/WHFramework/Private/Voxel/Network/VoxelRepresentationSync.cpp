@@ -7,8 +7,9 @@
 namespace
 {
 	constexpr uint32 RepresentationMagic = 0x34505256;
-	constexpr uint16 RepresentationVersion = 2;
+	constexpr uint16 RepresentationVersion = 3;
 	constexpr int32 MaxCells = 4096;
+	constexpr uint32 MaxDistantCells = 16384;
 
 	FVoxelGenerationBounds ResolveBuildBounds(
 		const EVoxelRepresentationWireType InType,
@@ -48,8 +49,10 @@ namespace
 				Side,
 			InSettings.MinZ);
 
-		const int32 Margin = InType == EVoxelRepresentationWireType::SurfaceProxy
+		const int32 Step = InType == EVoxelRepresentationWireType::SurfaceProxy
 			? 1 << InKey.Level : FVoxelMacroTileData::BaseStep << InKey.Level;
+		const int32 Margin = FMath::Max(Step, InSettings.Ecology.Tree.bEnabled
+			? InSettings.Ecology.Tree.CrownRadius : 0);
 		return {
 			Min - FIntVector(Margin, Margin, 0),
 			FIntVector(
@@ -100,6 +103,33 @@ namespace
 		InWriter.I32(InCoordinate.X);
 		InWriter.I32(InCoordinate.Y);
 		InWriter.U8(InLevel);
+	}
+
+	void WriteDistantCells(FVoxelByteWriter& InWriter, TConstArrayView<FVoxelDistantCell> InCells)
+	{
+		InWriter.U32(InCells.Num());
+		for (const FVoxelDistantCell& Cell : InCells)
+		{
+			InWriter.I32(Cell.Min.X); InWriter.I32(Cell.Min.Y); InWriter.I32(Cell.Min.Z);
+			InWriter.I32(Cell.Max.X); InWriter.I32(Cell.Max.Y); InWriter.I32(Cell.Max.Z);
+			InWriter.U32(Cell.State.Pack());
+		}
+	}
+
+	void ReadDistantCells(FVoxelByteReader& InReader, TArray<FVoxelDistantCell>& OutCells)
+	{
+		const uint32 Count = InReader.U32();
+		if (Count > MaxDistantCells) InReader.Reject();
+		for (uint32 Index = 0; Index < Count && InReader.IsValid(); ++Index)
+		{
+			FVoxelDistantCell Cell;
+			Cell.Min.X = InReader.I32(); Cell.Min.Y = InReader.I32(); Cell.Min.Z = InReader.I32();
+			Cell.Max.X = InReader.I32(); Cell.Max.Y = InReader.I32(); Cell.Max.Z = InReader.I32();
+			Cell.State = FVoxelBlockState::Unpack(InReader.U32());
+			if (Cell.State.IsAir() || Cell.Min.X >= Cell.Max.X ||
+				Cell.Min.Y >= Cell.Max.Y || Cell.Min.Z >= Cell.Max.Z) InReader.Reject();
+			if (InReader.IsValid()) OutCells.Add(Cell);
+		}
 	}
 
 	bool FinishCompressed(FVoxelByteWriter& InWriter, TArray<uint8>& OutBytes, FString& OutError)
@@ -482,7 +512,8 @@ bool FVoxelRepresentationSync::EncodeSurface(
 {
 	const int32 Count = InData.Side * InData.Side;
 	if (Count <= 0 || Count > MaxCells || InData.GroundZ.Num() != Count || InData.WaterZ.Num() != Count ||
-		InData.SurfaceMaterial.Num() != Count || InData.Biome.Num() != Count || InData.Flags.Num() != Count)
+		InData.SurfaceMaterial.Num() != Count || InData.Biome.Num() != Count || InData.Flags.Num() != Count ||
+		InData.DistantCells.Num() > MaxDistantCells)
 	{
 		OutError = TEXT("Voxel surface representation is invalid");
 		return false;
@@ -496,6 +527,7 @@ bool FVoxelRepresentationSync::EncodeSurface(
 		Writer.I32(InData.GroundZ[Index]); Writer.I32(InData.WaterZ[Index]);
 		Writer.U16(InData.SurfaceMaterial[Index]); Writer.U16(InData.Biome[Index]); Writer.U8(InData.Flags[Index]);
 	}
+	WriteDistantCells(Writer, InData.DistantCells);
 	return FinishCompressed(Writer, OutBytes, OutError);
 }
 
@@ -523,6 +555,7 @@ bool FVoxelRepresentationSync::DecodeSurface(
 		Data.GroundZ.Add(Reader.I32()); Data.WaterZ.Add(Reader.I32());
 		Data.SurfaceMaterial.Add(Reader.U16()); Data.Biome.Add(Reader.U16()); Data.Flags.Add(Reader.U8());
 	}
+	ReadDistantCells(Reader, Data.DistantCells);
 	if (!Reader.End()) { OutError = TEXT("Voxel surface representation payload is invalid"); return false; }
 	OutData = MoveTemp(Data); OutError.Reset(); return true;
 }
@@ -535,7 +568,7 @@ bool FVoxelRepresentationSync::EncodeMacro(
 	const int32 Count = InData.Side * InData.Side;
 	if (Count <= 0 || Count > MaxCells || InData.Height.Num() != Count || InData.WaterHeight.Num() != Count ||
 		InData.SurfaceClass.Num() != Count || InData.ForestCoverage.Num() != Count || InData.SnowCoverage.Num() != Count ||
-		InData.LargeStructures.Num() > 4096)
+		InData.LargeStructures.Num() > 4096 || InData.DistantCells.Num() > MaxDistantCells)
 	{
 		OutError = TEXT("Voxel macro representation is invalid"); return false;
 	}
@@ -554,6 +587,7 @@ bool FVoxelRepresentationSync::EncodeMacro(
 		Writer.I32(Structure.Coordinate.X); Writer.I32(Structure.Coordinate.Y); Writer.I32(Structure.GroundZ);
 		Writer.U16(Structure.StructureIndex); Writer.U16(Structure.Radius);
 	}
+	WriteDistantCells(Writer, InData.DistantCells);
 	return FinishCompressed(Writer, OutBytes, OutError);
 }
 
@@ -589,6 +623,7 @@ bool FVoxelRepresentationSync::DecodeMacro(
 		Structure.Coordinate.X = Reader.I32(); Structure.Coordinate.Y = Reader.I32(); Structure.GroundZ = Reader.I32();
 		Structure.StructureIndex = Reader.U16(); Structure.Radius = Reader.U16(); Data.LargeStructures.Add(Structure);
 	}
+	ReadDistantCells(Reader, Data.DistantCells);
 	if (!Reader.End()) { OutError = TEXT("Voxel macro representation payload is invalid"); return false; }
 	OutData = MoveTemp(Data); OutError.Reset(); return true;
 }

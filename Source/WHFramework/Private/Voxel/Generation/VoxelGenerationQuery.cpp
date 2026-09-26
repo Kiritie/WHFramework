@@ -786,7 +786,7 @@ bool FVoxelGenerationQuery::ComputeNaturalColumn(
 	}
 
 	Column.DensityHeight = Column.SurfaceZ;
-	Surface->ResolveColumn(Column);
+	Surface->ResolveColumn(InX, InY, Column);
 	OutColumn = Column;
 	OutError.Reset();
 	return true;
@@ -842,6 +842,7 @@ bool FVoxelGenerationQuery::ApplyHydrology(
 	InOutColumn.BankDistanceCells = Influence.BankDistanceCells;
 	InOutColumn.FloodplainStrengthQ15 = Influence.FloodplainStrengthQ15;
 	InOutColumn.RiverId = Influence.RiverId;
+	InOutColumn.RiverZone = Influence.RiverZone;
 	InOutColumn.bRiver = Influence.bRiver;
 	InOutColumn.bLake = Influence.bLake;
 	InOutColumn.bOcean = Influence.bOcean;

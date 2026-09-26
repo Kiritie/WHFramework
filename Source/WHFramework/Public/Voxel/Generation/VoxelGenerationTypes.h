@@ -114,6 +114,32 @@ struct WHFRAMEWORK_API FVoxelGenerationRange
 };
 
 USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelBiomeEcologyModifier
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Biome|Ecology")
+	bool bAllowTrees = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Biome|Ecology")
+	bool bAllowGrass = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Biome|Ecology")
+	bool bAllowFlowers = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Biome|Ecology", meta = (ClampMin = "0", ClampMax = "2000"))
+	int32 TreeDensityScalePermille = 1000;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Biome|Ecology", meta = (ClampMin = "0", ClampMax = "2000"))
+	int32 GrassDensityScalePermille = 1000;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Biome|Ecology", meta = (ClampMin = "0", ClampMax = "2000"))
+	int32 FlowerDensityScalePermille = 1000;
+
+	bool Validate(FString& OutError) const;
+};
+
+USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelTreeGenerationSettings
 {
 	GENERATED_BODY()
@@ -193,6 +219,41 @@ struct WHFRAMEWORK_API FVoxelGrassGenerationSettings
 };
 
 USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelFlowerGenerationSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Ecology|Flower")
+	bool bEnabled = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Ecology|Flower", meta = (ClampMin = "2"))
+	int32 Spacing = 12;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Ecology|Flower", meta = (ClampMin = "0", ClampMax = "2000"))
+	int32 DensityPermille = 700;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Ecology|Flower", meta = (ClampMin = "0", ClampMax = "1000"))
+	int32 ChancePermille = 550;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Ecology|Flower", meta = (ClampMin = "0"))
+	int32 PatchRadius = 3;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Ecology|Flower", meta = (ClampMin = "0", ClampMax = "1000"))
+	int32 PatchFillPermille = 350;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Ecology|Flower", meta = (ClampMin = "0"))
+	int32 MaxSlopePermille = 450;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Ecology|Flower")
+	FVoxelGenerationRange Temperature = {-16384, 32767};
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Ecology|Flower")
+	FVoxelGenerationRange Moisture = {-8192, 32767};
+
+	bool Validate(FString& OutError) const;
+};
+
+USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelEcologyGenerationSettings
 {
 	GENERATED_BODY()
@@ -202,6 +263,9 @@ struct WHFRAMEWORK_API FVoxelEcologyGenerationSettings
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Ecology")
 	FVoxelGrassGenerationSettings Grass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Ecology")
+	FVoxelFlowerGenerationSettings Flower;
 
 	bool Validate(FString& OutError) const;
 };
@@ -267,6 +331,36 @@ struct WHFRAMEWORK_API FVoxelGenerationSettings
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Hydrology", meta = (ClampMin = "1"))
 	int32 RiverBaseDepth = 8;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Hydrology", meta = (ClampMin = "0"))
+	int32 RiverWidthGrowthPerLevel = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Hydrology", meta = (ClampMin = "0"))
+	int32 RiverDepthGrowthPerLevel = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Hydrology", meta = (ClampMin = "0", ClampMax = "8"))
+	int32 RiverMaxGrowthLevels = 6;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Hydrology", meta = (ClampMin = "1"))
+	int32 RiverBankWidth = 3;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Hydrology", meta = (ClampMin = "1"))
+	int32 RiverShoreWidth = 8;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Hydrology", meta = (ClampMin = "0", ClampMax = "2"))
+	int32 RiverShapeSmoothingPasses = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Hydrology", meta = (ClampMin = "0"))
+	int32 RiverMeanderStrength = 8;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Hydrology", meta = (ClampMin = "8"))
+	int32 RiverMeanderFrequency = 96;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Hydrology", meta = (ClampMin = "1", ClampMax = "4"))
+	int32 RiverMeanderOctaves = 2;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Hydrology", meta = (ClampMin = "1", ClampMax = "80"))
+	int32 RiverMaxMeanderAngle = 35;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Hydrology", meta = (ClampMin = "8"))
 	int32 HydrologyHaloCells = 64;
@@ -390,6 +484,27 @@ struct WHFRAMEWORK_API FVoxelMacroTerrainSample
 	FVoxelLandformSample Landform;
 };
 
+UENUM(BlueprintType)
+enum class EVoxelRiverSurfaceZone : uint8
+{
+	None = 0,
+	ChannelBed,
+	WetMargin,
+	DryBank,
+	Floodplain
+};
+
+UENUM(BlueprintType)
+enum class EVoxelSurfaceRiverRule : uint8
+{
+	Any = 0,
+	None,
+	ChannelBed,
+	WetMargin,
+	DryBank,
+	Floodplain
+};
+
 struct WHFRAMEWORK_API FVoxelColumnSample
 {
 	int32 SurfaceZ = 0;
@@ -401,6 +516,7 @@ struct WHFRAMEWORK_API FVoxelColumnSample
 	int32 BankDistanceCells = MAX_int32;
 	int32 FloodplainStrengthQ15 = 0;
 	FVoxelStableId RiverId;
+	EVoxelRiverSurfaceZone RiverZone = EVoxelRiverSurfaceZone::None;
 	uint16 BiomeIndex = MAX_uint16;
 	uint16 SurfaceMaterial = 0;
 	FVoxelClimateSample Climate;

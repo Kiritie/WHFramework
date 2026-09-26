@@ -30,7 +30,7 @@ bool FVoxelManifestCodecTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("Manifest encodes"), FVoxelManifestCodec::Encode(Source, Bytes));
 	FVoxelWorldManifest Decoded;
 	TestTrue(TEXT("Manifest decodes"), FVoxelManifestCodec::Decode(Bytes, Decoded));
-	TestEqual(TEXT("Protocol V4 is fixed"), FVoxelWorldManifest::ProtocolVersion, uint32(4));
+	TestEqual(TEXT("Current manifest protocol is V5"), FVoxelWorldManifest::ProtocolVersion, uint32(5));
 	TestEqual(TEXT("Recipe hash preserved"), Decoded.RecipeHash, Source.RecipeHash);
 	TestEqual(TEXT("Base sample hash preserved"), Decoded.BaseSampleHash, Source.BaseSampleHash);
 	TestEqual(TEXT("Manifest fingerprint stable"), FVoxelManifestCodec::RecipeFingerprint(Decoded), FVoxelManifestCodec::RecipeFingerprint(Source));

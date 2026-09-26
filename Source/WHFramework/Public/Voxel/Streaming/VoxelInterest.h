@@ -60,7 +60,7 @@ struct WHFRAMEWORK_API FVoxelViewSettings
 	int32 MacroTileSide = 2048;
 	float TargetScreenErrorPixels = 2.0f;
 	uint8 MaximumVoxelProxyLevel = 4;
-	uint8 MaximumSurfaceLevel = 4;
+	uint8 MaximumSurfaceLevel = 5;
 	uint8 MaximumMacroLevel = 4;
 	int32 MaximumSurfaceTilesPerSource = 256;
 	int32 MaximumMacroTilesPerSource = 128;

@@ -12,6 +12,107 @@
 #include "Voxel/Task/VoxelTaskScheduler.h"
 #include "Voxel/Tests/VoxelTestUtilities.h"
 
+namespace
+{
+	template<typename KeyType>
+	int32 CountTwoToOneViolations(const TSet<KeyType>& InTiles,
+		const int32 InBaseSide, int32& OutOverlaps, int32& OutDifferentLevels)
+	{
+		TArray<KeyType> Tiles;
+		for (const KeyType& Tile : InTiles) Tiles.Add(Tile);
+		int32 Violations = 0;
+		OutOverlaps = 0;
+		OutDifferentLevels = 0;
+		for (int32 A = 0; A < Tiles.Num(); ++A)
+		{
+			const int64 SideA = static_cast<int64>(InBaseSide) << Tiles[A].Level;
+			const int64 MinAX = static_cast<int64>(Tiles[A].Coordinate.X) * SideA;
+			const int64 MinAY = static_cast<int64>(Tiles[A].Coordinate.Y) * SideA;
+			for (int32 B = A + 1; B < Tiles.Num(); ++B)
+			{
+				const int64 SideB = static_cast<int64>(InBaseSide) << Tiles[B].Level;
+				const int64 MinBX = static_cast<int64>(Tiles[B].Coordinate.X) * SideB;
+				const int64 MinBY = static_cast<int64>(Tiles[B].Coordinate.Y) * SideB;
+				const int64 XOverlap = FMath::Min(MinAX + SideA, MinBX + SideB) - FMath::Max(MinAX, MinBX);
+				const int64 YOverlap = FMath::Min(MinAY + SideA, MinBY + SideB) - FMath::Max(MinAY, MinBY);
+				if (XOverlap > 0 && YOverlap > 0) ++OutOverlaps;
+				const bool bShareEdge = (XOverlap == 0 && YOverlap > 0) ||
+					(YOverlap == 0 && XOverlap > 0);
+				if (bShareEdge && Tiles[A].Level != Tiles[B].Level) ++OutDifferentLevels;
+				if (bShareEdge && FMath::Abs(static_cast<int32>(Tiles[A].Level) -
+					static_cast<int32>(Tiles[B].Level)) > 1) ++Violations;
+			}
+		}
+		return Violations;
+	}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelSurfaceTwoToOneBalanceTest,
+	"WHFramework.Voxel.Streaming.SurfaceTwoToOneBalance",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelSurfaceTwoToOneBalanceTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelWorldManifest Manifest;
+	Manifest.Settings.MinZ = -128;
+	Manifest.Settings.MaxZ = 128;
+	FVoxelViewSettings Settings;
+	Settings.FineRadius = 0;
+	Settings.VoxelProxyRadius = 64;
+	Settings.SurfaceRadius = 8192;
+	Settings.MacroRadius = 16384;
+	Settings.MaximumSurfaceTilesPerSource = 512;
+	Settings.TargetScreenErrorPixels = 2.0f;
+	FVoxelStreamingSource Sources[2];
+	Sources[0].Center = FIntVector::ZeroValue;
+	Sources[1].Center = FIntVector(3072, 1024, 0);
+	const FVoxelInterestManager Manager;
+	const FVoxelInterestSet Interest = Manager.Compute(MakeArrayView(Sources), Manifest, Settings);
+	int32 Overlaps = 0;
+	int32 DifferentLevels = 0;
+	const int32 Violations = CountTwoToOneViolations(Interest.Surface,
+		Settings.SurfaceTileSide, Overlaps, DifferentLevels);
+	TestTrue(TEXT("Surface plan contains neighboring LOD levels"), DifferentLevels > 0);
+	TestEqual(TEXT("Surface tiles do not overlap after source merge"), Overlaps, 0);
+	TestEqual(TEXT("Every shared surface edge is at most 2:1"), Violations, 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelMacroTwoToOneBalanceTest,
+	"WHFramework.Voxel.Streaming.MacroTwoToOneBalance",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelMacroTwoToOneBalanceTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelWorldManifest Manifest;
+	Manifest.Settings.MinZ = -128;
+	Manifest.Settings.MaxZ = 128;
+	FVoxelViewSettings Settings;
+	Settings.FineRadius = 0;
+	Settings.VoxelProxyRadius = 64;
+	Settings.SurfaceRadius = 2048;
+	Settings.MacroRadius = 96000;
+	Settings.MaximumMacroTilesPerSource = 512;
+	Settings.TargetScreenErrorPixels = 2.0f;
+	FVoxelStreamingSource Sources[2];
+	Sources[0].Center = FIntVector::ZeroValue;
+	Sources[1].Center = FIntVector(16384, 4096, 0);
+	const FVoxelInterestManager Manager;
+	const FVoxelInterestSet Interest = Manager.Compute(MakeArrayView(Sources), Manifest, Settings);
+	int32 Overlaps = 0;
+	int32 DifferentLevels = 0;
+	const int32 Violations = CountTwoToOneViolations(Interest.Macro,
+		Settings.MacroTileSide, Overlaps, DifferentLevels);
+	TestTrue(TEXT("Macro plan contains neighboring LOD levels"), DifferentLevels > 0);
+	TestEqual(TEXT("Macro tiles do not overlap after source merge"), Overlaps, 0);
+	TestEqual(TEXT("Every shared macro edge is at most 2:1"), Violations, 0);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FVoxelStreamingDemandTest,
 	"WHFramework.Voxel.Streaming.DemandSeparation",
@@ -561,8 +662,62 @@ bool FVoxelEmptyMeshApplyTest::RunTest(const FString& Parameters)
 	Result.bCanceled = true;
 	TestFalse(TEXT("Canceled geometry does not consume publication quota"), Result.HasHeavyApply());
 	Result.bCanceled = false;
+	Result.Kind = EVoxelTaskKind::BuildVoxelProxy;
+	Result.VoxelProxyMesh = MakeShared<FVoxelSectionMeshResult>();
+	TestFalse(TEXT("Empty proxy does not consume heavy publication quota"), Result.HasHeavyApply());
+	Result.VoxelProxyMesh->Batches.AddDefaulted_GetRef().Mesh.Triangles = { 0, 1, 2 };
+	TestTrue(TEXT("Visible proxy keeps heavy publication quota"), Result.HasHeavyApply());
+	Result.Kind = EVoxelTaskKind::GenerateVoxelProxy;
+	TestFalse(TEXT("Prepared data does not publish geometry"), Result.HasHeavyApply());
 	Result.Kind = EVoxelTaskKind::BuildCollision;
 	TestTrue(TEXT("Collision keeps its heavy apply protection"), Result.HasHeavyApply());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelDataPrefetchSchedulerTest,
+	"WHFramework.Voxel.Streaming.Scheduler.DataPrefetch", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelDataPrefetchSchedulerTest::RunTest(const FString& Parameters)
+{
+	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskBudget Budget;
+	Budget.MaxConcurrentTasks = 4;
+	Scheduler.SetBudget(Budget);
+	auto MakeRequest = [](uint64 Token, EVoxelTaskKind Kind, EVoxelWorkClass WorkClass)
+	{
+		FVoxelTaskRequest Request;
+		Request.Kind = Kind;
+		Request.WorkClass = WorkClass;
+		Request.Stamp.Token = Token;
+		Request.ReservedBytes = 1024;
+		Request.Execute = [](const TAtomic<bool>& Cancel)
+		{
+			while (!Cancel.Load()) FPlatformProcess::Sleep(0.001f);
+			return FVoxelTaskResult();
+		};
+		return Request;
+	};
+	FVoxelTaskRequest Prefetch = MakeRequest(1, EVoxelTaskKind::GenerateVoxelProxy, EVoxelWorkClass::Prefetch);
+	FVoxelTaskRequest Fine = MakeRequest(2, EVoxelTaskKind::BuildFineMesh, EVoxelWorkClass::Visible);
+	Fine.DistanceScore = 10000.0;
+	TestTrue(TEXT("Fine has priority over nearer speculative data"), FVoxelTaskScheduler::IsHigherPriority(Fine, Prefetch));
+	TestFalse(TEXT("Speculative data cannot outrank Fine"), FVoxelTaskScheduler::IsHigherPriority(Prefetch, Fine));
+	Scheduler.Enqueue(MoveTemp(Fine));
+	Scheduler.Enqueue(MoveTemp(Prefetch));
+	Scheduler.Enqueue(MakeRequest(3, EVoxelTaskKind::GenerateSurface, EVoxelWorkClass::Prefetch));
+	Scheduler.Enqueue(MakeRequest(4, EVoxelTaskKind::GenerateMacro, EVoxelWorkClass::Prefetch));
+	FVoxelTaskDiagnostics Stats = Scheduler.GetDiagnostics();
+	TestEqual(TEXT("Data starts while Fine is still running"), Stats.RunningByKind.FindRef(EVoxelTaskKind::GenerateVoxelProxy), 1);
+	TestEqual(TEXT("Data tasks leave foreground capacity available"), Stats.Running, 3);
+	TestEqual(TEXT("Excess speculative data remains queued"), Stats.Pending, 1);
+	Scheduler.Enqueue(MakeRequest(5, EVoxelTaskKind::BuildCollision, EVoxelWorkClass::Critical));
+	TestEqual(TEXT("New collision work starts without waiting for prefetch"), Scheduler.GetDiagnostics().RunningByKind.FindRef(EVoxelTaskKind::BuildCollision), 1);
+	Scheduler.CancelMatching([](EVoxelTaskKind Kind, const FVoxelTaskStamp&)
+	{
+		return Kind == EVoxelTaskKind::GenerateMacro;
+	});
+	TestEqual(TEXT("Obsolete queued data is removed"), Scheduler.GetDiagnostics().Pending, 0);
+	Scheduler.StopAndJoin();
 	return true;
 }
 
@@ -591,6 +746,34 @@ bool FVoxelMapTileCoverageTest::RunTest(const FString& InParameters)
 	for (const FVoxelMapTileKey& Key : Keys)
 	{
 		TestEqual(TEXT("All visible tiles share one LOD"), Key.Step, 128);
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelStreamingViewPredecessorCompletionTest,
+	"WHFramework.Voxel.Streaming.View.PredecessorCompletion",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelStreamingViewPredecessorCompletionTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const TArray<FVoxelViewAdmission> Admissions = {
+		{EVoxelViewAdmissionKind::Fine, 64.0},
+		{EVoxelViewAdmissionKind::VoxelProxy, 128.0},
+		{EVoxelViewAdmissionKind::Surface, 256.0},
+		{EVoxelViewAdmissionKind::Macro, 512.0}
+	};
+	for (int32 CompletedKinds = 0; CompletedKinds <= 4; ++CompletedKinds)
+	{
+		const int32 Active = FVoxelViewManager::ResolveActiveAdmissionKind(
+			Admissions,
+			[CompletedKinds](const FVoxelViewAdmission& Admission)
+			{
+				return static_cast<int32>(Admission.Kind) < CompletedKinds;
+			});
+		TestEqual(TEXT("Every distant layer waits for its predecessor"),
+			Active, CompletedKinds);
 	}
 	return true;
 }

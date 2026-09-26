@@ -1,6 +1,7 @@
 #include "Voxel/Generation/VoxelGenerationPipeline.h"
 
 #include "ProfilingDebugging/CpuProfilerTrace.h"
+#include "Voxel/Generation/Ecology/VoxelEcology.h"
 #include "Voxel/Generation/VoxelGenerationQuery.h"
 
 namespace
@@ -183,6 +184,49 @@ bool FVoxelGenerationPipeline::SampleColumn(
 		InY,
 		OutColumn,
 		OutError);
+}
+
+bool FVoxelGenerationPipeline::EnumerateTrees(
+	const FVoxelGenerationBounds& InBounds,
+	TFunctionRef<void(const FIntVector&, int32)> InVisit,
+	FString& OutError,
+	const TAtomic<bool>* InCancel) const
+{
+	FVoxelGenerationQuery Query;
+	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError)) return false;
+	bool bSampleFailed = false;
+	auto SampleColumn = [&](const FIntVector& Position, FVoxelColumnSample& Column)
+	{
+		if (!Query.SampleEnvironmentColumn(Position.X, Position.Y, Column, OutError, InCancel))
+		{
+			bSampleFailed = true;
+			return false;
+		}
+		return true;
+	};
+	auto SampleBase = [&](const FIntVector& Position, uint32& Symbol)
+	{
+		FVoxelColumnSample Column;
+		if (!SampleColumn(Position, Column)) return false;
+		Symbol = Position.Z <= Column.SurfaceZ ? Config->Recipe->Palette.Stone : Config->Recipe->Palette.Air;
+		return true;
+	};
+	const FVoxelEcologyGenerator Ecology(Config->Recipe.ToSharedRef());
+	int32 Candidates = 0;
+	int32 Accepted = 0;
+	Ecology.EnumerateTrees(InBounds, SampleColumn, SampleBase,
+		[&](const FIntVector& Anchor, const int32 Height, const FVoxelStableId)
+		{
+			InVisit(Anchor, Height);
+		}, Candidates, Accepted, InCancel);
+	if (bSampleFailed) return false;
+	if (InCancel && InCancel->Load())
+	{
+		OutError = TEXT("Canceled");
+		return false;
+	}
+	OutError.Reset();
+	return true;
 }
 
 bool FVoxelGenerationPipeline::SampleEnvironment(

@@ -113,11 +113,18 @@ struct WHFRAMEWORK_API FVoxelGenerationPalette
 	bool Validate(int32 InBlockCount, FString& OutError) const;
 };
 
+struct WHFRAMEWORK_API FVoxelWeightedRuntimeSymbol
+{
+	uint16 Symbol = MAX_uint16;
+	uint16 Weight = 0;
+};
+
 struct WHFRAMEWORK_API FVoxelEcologyRuntimePalette
 {
 	uint16 TreeTrunk = MAX_uint16;
 	uint16 TreeLeaves = MAX_uint16;
 	uint16 GrassPlant = MAX_uint16;
+	TArray<FVoxelWeightedRuntimeSymbol> Flowers;
 
 	bool Validate(
 		int32 InBlockCount,
@@ -134,6 +141,7 @@ struct WHFRAMEWORK_API FVoxelSurfaceRuntimeRule
 	int32 MinDepth = 0;
 	int32 MaxDepth = 0;
 	uint16 BlockSymbol = MAX_uint16;
+	EVoxelSurfaceRiverRule RiverZone = EVoxelSurfaceRiverRule::Any;
 	bool bRiverOnly = false;
 	bool bLakeOnly = false;
 	bool bOceanOnly = false;
@@ -162,10 +170,12 @@ struct WHFRAMEWORK_API FVoxelBiomeRuntimeDefinition
 	FVoxelGenerationRange Height;
 	FVoxelGenerationRange Slope;
 	int32 SurfaceRuleIndex = INDEX_NONE;
+	uint16 DefaultSurface = MAX_uint16;
+	FVoxelBiomeEcologyModifier Ecology;
 	TArray<int32> FeatureIndices;
 	TArray<int32> StructureIndices;
 
-	bool Validate(int32 InSurfaceRuleCount, int32 InFeatureCount, int32 InStructureCount, FString& OutError) const;
+	bool Validate(int32 InBlockCount, int32 InSurfaceRuleCount, int32 InFeatureCount, int32 InStructureCount, FString& OutError) const;
 };
 
 struct WHFRAMEWORK_API FVoxelFeatureRuntimeDefinition
@@ -228,7 +238,7 @@ struct WHFRAMEWORK_API FVoxelStructureRuntimeDefinition
 
 struct WHFRAMEWORK_API FVoxelGenerationRecipe
 {
-	static constexpr uint32 CurrentAlgorithmVersion = 7;
+	static constexpr uint32 CurrentAlgorithmVersion = 11;
 
 	uint32 AlgorithmVersion = CurrentAlgorithmVersion;
 	uint64 RecipeHash = 0;

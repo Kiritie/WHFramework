@@ -85,7 +85,8 @@ bool FVoxelHydrologyRiverSectionTest::RunTest(const FString& InParameters)
 	(void)InParameters;
 	FVoxelRiverShape Shape;
 	Shape.Depth = 3;
-	Shape.HalfWidth = 2;
+	Shape.BedHalfWidth = 2;
+	Shape.WaterHalfWidth = 2;
 	Shape.BankWidth = 2;
 	Shape.ShoreWidth = 4;
 	Shape.MaxCutFill = 32;
@@ -95,8 +96,21 @@ bool FVoxelHydrologyRiverSectionTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("Center river section"), VoxelHydrology::EvaluateRiverSection(12, 10, 0, Shape, Center, Error));
 	TestTrue(TEXT("Shore river section"), VoxelHydrology::EvaluateRiverSection(12, 10, 8, Shape, Shore, Error));
 	TestTrue(TEXT("Center is wet"), Center.bWet);
+	TestEqual(TEXT("Channel bed has an explicit zone"),
+		static_cast<uint8>(Center.Zone), static_cast<uint8>(EVoxelRiverSurfaceZone::ChannelBed));
+	FVoxelRiverSection Bank;
+	TestTrue(TEXT("Bank river section"), VoxelHydrology::EvaluateRiverSection(12, 10, 3, Shape, Bank, Error));
+	TestFalse(TEXT("Bank is dry even next to the channel"), Bank.bWet);
+	TestEqual(TEXT("Bank has a dry zone"),
+		static_cast<uint8>(Bank.Zone), static_cast<uint8>(EVoxelRiverSurfaceZone::DryBank));
 	TestEqual(TEXT("Water depth"), Center.WaterPlane - Center.BedPlane, Shape.Depth);
 	TestTrue(TEXT("Ground rises toward natural shore"), Shore.GroundPlane >= Center.GroundPlane);
+	Shape.MaxCutFill = 1;
+	FVoxelRiverSection DeepChannel;
+	TestTrue(TEXT("Cut/fill limit cannot erase a wet channel"),
+		VoxelHydrology::EvaluateRiverSection(25, 10, 0, Shape, DeepChannel, Error));
+	TestTrue(TEXT("Exceeded cut/fill is diagnosed"), DeepChannel.bExceededCutFill);
+	TestTrue(TEXT("Exceeded channel remains wet"), DeepChannel.bWet);
 	return true;
 }
 
@@ -258,7 +272,8 @@ bool FVoxelHydrologyInfluenceContextTest::RunTest(const FString& InParameters)
 	FVoxelRiverRoutePoint A;
 	A.Position = FIntPoint(0, 0);
 	A.WaterZ = 10;
-	A.HalfWidth = 4;
+	A.BedHalfWidth = 4;
+	A.WaterHalfWidth = 4;
 	A.Depth = 4;
 	FVoxelRiverRoutePoint B = A;
 	B.Position = FIntPoint(32, 0);
@@ -297,6 +312,213 @@ bool FVoxelHydrologyInfluenceContextTest::RunTest(const FString& InParameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelHydrologyShapeRouteTest,
+	"WHFramework.Voxel.Hydrology.ShapeRouteRemovesHardCorner",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelHydrologyShapeRouteTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelHydrologyPlan Plan;
+	Plan.Grid.WorldMinCell = FIntPoint(-2, -2);
+	Plan.Grid.Width = 8;
+	Plan.Grid.Height = 8;
+	Plan.Grid.CellSize = 32;
+	Plan.RiverShapeSmoothingPasses = 1;
+	FVoxelRiverRoute Route;
+	for (const FIntPoint Position : {FIntPoint(0, 0), FIntPoint(32, 0),
+		FIntPoint(32, 32)})
+	{
+		FVoxelRiverRoutePoint& Point = Route.Points.AddDefaulted_GetRef();
+		Point.Position = Position;
+		Point.WaterZ = 10;
+		Point.BedHalfWidth = 3;
+		Point.WaterHalfWidth = 3;
+		Point.Depth = 4;
+	}
+	Plan.Rivers.Add(MoveTemp(Route));
+	Plan.Finalize();
+	const TArray<FVoxelRiverShapePoint>& Shape = Plan.Rivers[0].ShapePoints;
+	if (!TestTrue(TEXT("Shape route has intermediate corners"), Shape.Num() > 3))
+	{
+		return false;
+	}
+	TestTrue(TEXT("Headwater anchor is unchanged"), Shape[0].Position == FIntPoint(0, 0));
+	TestTrue(TEXT("Confluence anchor is unchanged"), Shape.Last().Position == FIntPoint(32, 32));
+	for (int32 Index = 1; Index < Shape.Num(); ++Index)
+	{
+		TestFalse(TEXT("Raw axis-aligned right angle is absent"),
+			Shape[Index].Position == FIntPoint(32, 0));
+	}
+	FVoxelHydrologyInfluence Influence;
+	TestTrue(TEXT("Plan samples the smoothed bend"),
+		Plan.Sample(28, 4, 12, Influence));
+	TestTrue(TEXT("Shape bend has river influence"),
+		Influence.RiverZone != EVoxelRiverSurfaceZone::None);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelHydrologyMeanderRouteTest,
+	"WHFramework.Voxel.Hydrology.MeanderRoute",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelHydrologyMeanderRouteTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	auto MakePlan = [](const int32 Seed)
+	{
+		FVoxelHydrologyPlan Plan;
+		Plan.Grid.WorldMinCell = FIntPoint(-16, -16);
+		Plan.Grid.Width = 64;
+		Plan.Grid.Height = 64;
+		Plan.Grid.CellSize = 32;
+		Plan.RiverSeed = Seed;
+		Plan.RiverShapeSmoothingPasses = 1;
+		Plan.RiverMeanderStrength = 24;
+		Plan.RiverMeanderFrequency = 96;
+		Plan.RiverMeanderOctaves = 2;
+		FVoxelRiverRoute& Route = Plan.Rivers.AddDefaulted_GetRef();
+		Route.Id.High = 17;
+		Route.Id.Low = 29;
+		Route.bContinuation = true;
+		for (int32 Index = 0; Index < 9; ++Index)
+		{
+			FVoxelRiverRoutePoint& Point = Route.Points.AddDefaulted_GetRef();
+			Point.Position = FIntPoint(Index * 32, Index % 3 == 1 ? 8 : 0);
+			Point.WaterZ = 20 - Index;
+			Point.BedHalfWidth = 5;
+			Point.WaterHalfWidth = 5;
+			Point.BankWidth = 5;
+			Point.ShoreWidth = 8;
+			Point.Depth = 4;
+		}
+		Plan.Finalize();
+		return Plan;
+	};
+	const FVoxelHydrologyPlan First = MakePlan(71);
+	const FVoxelHydrologyPlan Again = MakePlan(71);
+	const FVoxelHydrologyPlan Different = MakePlan(87);
+	const FVoxelRiverRoute& Route = First.Rivers[0];
+	const TArray<FVoxelRiverMeanderPoint>& Points = Route.MeanderPoints;
+	TestTrue(TEXT("Meander retains continuation identity"), Route.bContinuation);
+	TestTrue(TEXT("Shape route has a stable upstream anchor"),
+		Points[0].Position == Route.Points[0].Position);
+	TestTrue(TEXT("Shape route has a stable downstream anchor"),
+		Points.Last().Position == Route.Points.Last().Position);
+	TestEqual(TEXT("Same seed retains meander point count"),
+		Points.Num(), Again.Rivers[0].MeanderPoints.Num());
+	bool bDifferentInterior = false;
+	for (int32 Index = 0; Index < Points.Num(); ++Index)
+	{
+		TestTrue(TEXT("Same seed has identical final centerline"),
+			Points[Index].Position == Again.Rivers[0].MeanderPoints[Index].Position);
+		if (Different.Rivers[0].MeanderPoints.IsValidIndex(Index) &&
+			Points[Index].Position != Different.Rivers[0].MeanderPoints[Index].Position)
+		{
+			bDifferentInterior = true;
+		}
+		FVoxelHydrologyInfluence Influence;
+		TestTrue(TEXT("Final centerline is sampled by HydrologyPlan"),
+			First.Sample(Points[Index].Position.X, Points[Index].Position.Y,
+				Points[Index].WaterZ + 1, Influence) &&
+			Influence.RiverZone != EVoxelRiverSurfaceZone::None);
+		if (Index > 1)
+		{
+			const FIntPoint A = Points[Index - 1].Position - Points[Index - 2].Position;
+			const FIntPoint B = Points[Index].Position - Points[Index - 1].Position;
+			const int64 Dot = static_cast<int64>(A.X) * B.X +
+				static_cast<int64>(A.Y) * B.Y;
+			const int64 Cross = FMath::Abs(static_cast<int64>(A.X) * B.Y -
+				static_cast<int64>(A.Y) * B.X);
+			TestTrue(TEXT("Final river does not reverse upstream"), Dot > 0);
+			TestTrue(TEXT("Final river turn stays within the configured angle"),
+				Dot > 0 && Cross * 1024 <= Dot * 717);
+		}
+	}
+	TestTrue(TEXT("Different seed changes interior bends"), bDifferentInterior);
+	TestTrue(TEXT("Different seed preserves source anchor"),
+		Different.Rivers[0].MeanderPoints[0].Position == Points[0].Position);
+	TestTrue(TEXT("Different seed preserves confluence anchor"),
+		Different.Rivers[0].MeanderPoints.Last().Position == Points.Last().Position);
+	FString Error;
+	TestTrue(TEXT("Final route satisfies river plan invariants"),
+		First.ValidateRiverRoutes(Error));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelHydrologyContinuationAnchorTest,
+	"WHFramework.Voxel.Hydrology.ContinuationAnchor",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelHydrologyContinuationAnchorTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const TArray<FIntPoint> Path = {
+		FIntPoint(0, 0), FIntPoint(32, 0), FIntPoint(64, 0),
+		FIntPoint(96, 8), FIntPoint(128, 8)};
+	auto Build = [&Path](const int32 FirstIndex, const FIntPoint& CoreMin,
+		const FIntPoint& CoreMax)
+	{
+		FVoxelHydrologyPlan Plan;
+		Plan.Grid.WorldMinCell = FIntPoint(-8, -8);
+		Plan.Grid.Width = 32;
+		Plan.Grid.Height = 32;
+		Plan.Grid.CellSize = 32;
+		Plan.CoreMin = CoreMin;
+		Plan.CoreMax = CoreMax;
+		Plan.RiverSeed = 114;
+		Plan.RiverShapeSmoothingPasses = 2;
+		Plan.RiverMeanderStrength = 20;
+		Plan.RiverMeanderFrequency = 96;
+		Plan.RiverMeanderOctaves = 2;
+		FVoxelRiverRoute& Route = Plan.Rivers.AddDefaulted_GetRef();
+		Route.bContinuation = FirstIndex > 0;
+		for (int32 Index = FirstIndex; Index < Path.Num(); ++Index)
+		{
+			FVoxelRiverRoutePoint& Point = Route.Points.AddDefaulted_GetRef();
+			Point.Position = Path[Index];
+			Point.WaterZ = 20 - Index;
+			Point.BedHalfWidth = 4;
+			Point.WaterHalfWidth = 4;
+			Point.BankWidth = 4;
+			Point.ShoreWidth = 8;
+			Point.Depth = 4;
+		}
+		Plan.Finalize();
+		return Plan;
+	};
+	const FVoxelHydrologyPlan Upstream = Build(0, FIntPoint(0, -64),
+		FIntPoint(64, 64));
+	const FVoxelHydrologyPlan Downstream = Build(1, FIntPoint(64, -64),
+		FIntPoint(128, 64));
+	const FIntPoint Handoff = FIntPoint(48, 0);
+	bool bJoined = false;
+	for (const FVoxelRiverMeanderPoint& Point : Upstream.Rivers[0].MeanderPoints)
+	{
+		bJoined |= Point.bAnchor && Point.Position == Handoff;
+	}
+	TestTrue(TEXT("Upstream meander preserves the region handoff"), bJoined);
+	bool bDownstreamJoined = false;
+	for (const FVoxelRiverMeanderPoint& Point : Downstream.Rivers[0].MeanderPoints)
+	{
+		bDownstreamJoined |= Point.bAnchor && Point.Position == Handoff;
+	}
+	TestTrue(TEXT("Continuation retains the same boundary anchor"),
+		bDownstreamJoined);
+	FVoxelHydrologyInfluence Left;
+	FVoxelHydrologyInfluence Right;
+	TestTrue(TEXT("Both regions sample wet river at the handoff"),
+		Upstream.Sample(Handoff.X, Handoff.Y, 20, Left) && Left.bRiver &&
+		Downstream.Sample(Handoff.X, Handoff.Y, 20, Right) && Right.bRiver);
+	FString Error;
+	TestTrue(TEXT("Upstream turns satisfy the final angle contract"),
+		Upstream.ValidateRiverRoutes(Error));
+	TestTrue(TEXT("Continuation turns satisfy the final angle contract"),
+		Downstream.ValidateRiverRoutes(Error));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FVoxelRiverSurfaceKeepsSubsoilTest,
 	"WHFramework.Voxel.Hydrology.RiverSurfaceKeepsSubsoil",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -308,6 +530,7 @@ bool FVoxelRiverSurfaceKeepsSubsoilTest::RunTest(const FString& InParameters)
 	Recipe.Palette.Grass = 3;
 	Recipe.Palette.Dirt = 2;
 	Recipe.Palette.Stone = 1;
+	Recipe.Palette.Sand = 4;
 	FVoxelSurfaceRuntimeRuleSet& Rules = Recipe.SurfaceRules.AddDefaulted_GetRef();
 	FVoxelSurfaceRuntimeRule& Grass = Rules.Rules.AddDefaulted_GetRef();
 	Grass.MinDepth = 0;
@@ -323,44 +546,59 @@ bool FVoxelRiverSurfaceKeepsSubsoilTest::RunTest(const FString& InParameters)
 	FVoxelColumnSample Column;
 	Column.BiomeIndex = 0;
 	Column.bRiver = true;
+	Column.RiverZone = EVoxelRiverSurfaceZone::ChannelBed;
 	Column.RiverDistanceCells = 0;
 	Column.BankDistanceCells = 0;
-	Surface.ResolveColumn(Column);
+	Surface.ResolveColumn(16, 0, Column);
 	TestEqual(TEXT("Riverbed top keeps the existing subsoil symbol"), Column.SurfaceMaterial, uint16(1));
 	TestEqual(TEXT("Exact riverbed agrees with distant surface"),
 		Surface.ResolveSymbol(FIntVector(16, 0, Column.SurfaceZ), Column, 0), uint32(1));
 	Column.bRiver = false;
+	Column.RiverZone = EVoxelRiverSurfaceZone::DryBank;
 	Column.RiverDistanceCells = 6;
-	Surface.ResolveColumn(Column);
-	TestEqual(TEXT("Dry riverbank keeps the existing subsoil symbol"), Column.SurfaceMaterial, uint16(1));
+	int32 SandCount = 0;
+	int32 GrassCount = 0;
+	for (int32 X = 0; X < 100; ++X)
+	{
+		Surface.ResolveColumn(X, 0, Column);
+		SandCount += Column.SurfaceMaterial == 4 ? 1 : 0;
+		GrassCount += Column.SurfaceMaterial == 3 ? 1 : 0;
+		TestEqual(TEXT("Fine and distant dry-bank material agree"),
+			Surface.ResolveSymbol(FIntVector(X, 0, Column.SurfaceZ), Column, 0),
+			static_cast<uint32>(Column.SurfaceMaterial));
+	}
+	TestTrue(TEXT("Dry bank contains some sand"), SandCount > 0);
+	TestTrue(TEXT("Dry bank retains ordinary ground between sand patches"), GrassCount > 0);
 	Column.BankDistanceCells = 2;
-	Surface.ResolveColumn(Column);
+	Column.RiverZone = EVoxelRiverSurfaceZone::Floodplain;
+	Surface.ResolveColumn(16, 0, Column);
 	TestEqual(TEXT("Outside the riverbank, the ordinary grass rule still applies"),
 		Column.SurfaceMaterial, uint16(3));
 	Column.BiomeIndex = MAX_uint16;
 	Column.BankDistanceCells = 0;
-	Surface.ResolveColumn(Column);
-	TestEqual(TEXT("A riverbank without a biome rule keeps default dirt subsoil"),
+	Column.RiverZone = EVoxelRiverSurfaceZone::ChannelBed;
+	Surface.ResolveColumn(16, 0, Column);
+	TestEqual(TEXT("Riverbed without a biome rule keeps default dirt subsoil"),
 		Column.SurfaceMaterial, uint16(2));
 	Column = FVoxelColumnSample();
 	Column.BiomeIndex = 0;
 	Column.SurfaceZ = 8;
 	Column.SurfaceWaterZ = 10;
 	Column.bOcean = true;
-	Surface.ResolveColumn(Column);
+	Surface.ResolveColumn(16, 0, Column);
 	TestEqual(TEXT("Ocean floor keeps the existing subsoil symbol"),
 		Column.SurfaceMaterial, uint16(1));
 	Column.bOcean = false;
 	Column.bLake = true;
-	Surface.ResolveColumn(Column);
+	Surface.ResolveColumn(16, 0, Column);
 	TestEqual(TEXT("Lake floor keeps the existing subsoil symbol"),
 		Column.SurfaceMaterial, uint16(1));
 	Column.bLake = false;
-	Surface.ResolveColumn(Column);
+	Surface.ResolveColumn(16, 0, Column);
 	TestEqual(TEXT("Any natural water-covered ground keeps subsoil"),
 		Column.SurfaceMaterial, uint16(1));
 	Column.SurfaceWaterZ = 7;
-	Surface.ResolveColumn(Column);
+	Surface.ResolveColumn(16, 0, Column);
 	TestEqual(TEXT("Ground above the water keeps its ordinary surface rule"),
 		Column.SurfaceMaterial, uint16(3));
 	return true;

@@ -27,21 +27,27 @@ AAbilitySpawnerBase::AAbilitySpawnerBase()
 
 #if WITH_EDITORONLY_DATA
 	ArrowComponent = CreateEditorOnlyDefaultSubobject<UArrowComponent>(FName("Arrow"));
-	ArrowComponent->SetupAttachment(GetCapsuleComponent());
-	ArrowComponent->ArrowColor = FColor(150, 200, 255);
-	ArrowComponent->ArrowSize = 1.0f;
-	ArrowComponent->bTreatAsASprite = true;
-	ArrowComponent->bIsScreenSizeScaled = true;
-
-	WidgetComponent = CreateDefaultSubobject<UWorldWidgetComponent>(FName("Widget"));
-	WidgetComponent->SetupAttachment(GetCapsuleComponent());
-	WidgetComponent->SetRelativeLocation(FVector(0.f, 0.f, 50.f));
-	WidgetComponent->SetOrientCamera(true);
-	
-	static ConstructorHelpers::FClassFinder<UWidgetAbilitySpawnerInfo> SpawnerInfoClassFinder(TEXT("/Script/UMGEditor.WidgetBlueprint'/WHFramework/Ability/Blueprints/Widget/WBP_SpawnerInfo_Base.WBP_SpawnerInfo_Base_C'"));
-	if(SpawnerInfoClassFinder.Succeeded())
+	if(ArrowComponent)
 	{
-		WidgetComponent->SetWorldWidgetClass(SpawnerInfoClassFinder.Class);
+		ArrowComponent->SetupAttachment(GetCapsuleComponent());
+		ArrowComponent->ArrowColor = FColor(150, 200, 255);
+		ArrowComponent->ArrowSize = 1.0f;
+		ArrowComponent->bTreatAsASprite = true;
+		ArrowComponent->bIsScreenSizeScaled = true;
+	}
+
+	WidgetComponent = CreateEditorOnlyDefaultSubobject<UWorldWidgetComponent>(FName("Widget"));
+	if(WidgetComponent)
+	{
+		WidgetComponent->SetupAttachment(GetCapsuleComponent());
+		WidgetComponent->SetRelativeLocation(FVector(0.f, 0.f, 50.f));
+		WidgetComponent->SetOrientCamera(true);
+
+		static ConstructorHelpers::FClassFinder<UWidgetAbilitySpawnerInfo> SpawnerInfoClassFinder(TEXT("/Script/UMGEditor.WidgetBlueprint'/WHFramework/Ability/Blueprints/Widget/WBP_SpawnerInfo_Base.WBP_SpawnerInfo_Base_C'"));
+		if(SpawnerInfoClassFinder.Succeeded())
+		{
+			WidgetComponent->SetWorldWidgetClass(SpawnerInfoClassFinder.Class);
+		}
 	}
 #endif
 
@@ -94,7 +100,10 @@ void AAbilitySpawnerBase::OnInitialize_Implementation()
 void AAbilitySpawnerBase::OnPreparatory_Implementation()
 {
 #if WITH_EDITORONLY_DATA
-	WidgetComponent->SetVisibility(false);
+	if(WidgetComponent)
+	{
+		WidgetComponent->SetVisibility(false);
+	}
 #endif
 
 	if(bAutoSpawn)
@@ -120,9 +129,12 @@ void AAbilitySpawnerBase::OnConstruction(const FTransform& Transform)
 	Super::OnConstruction(Transform);
 
 #if WITH_EDITORONLY_DATA
-	if(UWidgetAbilitySpawnerInfo* SpawnerInfo = Cast<UWidgetAbilitySpawnerInfo>(WidgetComponent->GetWorldWidget()))
+	if(WidgetComponent)
 	{
-		SpawnerInfo->InitAbilityItem(AbilityItem);
+		if(UWidgetAbilitySpawnerInfo* SpawnerInfo = Cast<UWidgetAbilitySpawnerInfo>(WidgetComponent->GetWorldWidget()))
+		{
+			SpawnerInfo->InitAbilityItem(AbilityItem);
+		}
 	}
 #endif
 }

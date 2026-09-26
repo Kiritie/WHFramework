@@ -13,6 +13,18 @@ class UVoxelSurfaceRuleSet;
 class UVoxelDetailData;
 class UVoxelViewProfile;
 
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelWeightedPlantReference
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSoftObjectPtr<UVoxelData> Plant;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "1"))
+	int32 Weight = 100;
+};
+
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UVoxelWorldGenerationProfile : public UPrimaryAssetBase
 {
@@ -69,6 +81,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Voxel|Generation")
 	TArray<TSoftObjectPtr<UVoxelDetailData>> Details;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Voxel|Generation|Ecology")
+	TArray<FVoxelWeightedPlantReference> FlowerPalette;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Voxel|View")
 	TSoftObjectPtr<UVoxelViewProfile> View;

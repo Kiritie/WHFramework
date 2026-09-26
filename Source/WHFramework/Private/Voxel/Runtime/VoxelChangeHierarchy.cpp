@@ -4,13 +4,13 @@
 #include "Voxel/Rendering/VoxelMacroTerrain.h"
 #include "Voxel/Rendering/VoxelSurfaceProxy.h"
 
-void FVoxelChangeHierarchy::SetVoxelProxyNaturalInfluence(
+void FVoxelChangeHierarchy::SetNaturalInfluence(
 	const int32 InHorizontalCells,
 	const int32 InUpwardCells)
 {
 	FWriteScopeLock Scope(Lock);
-	VoxelProxyHorizontalInfluence = FMath::Max(0, InHorizontalCells);
-	VoxelProxyUpwardInfluence = FMath::Max(0, InUpwardCells);
+	NaturalHorizontalInfluence = FMath::Max(0, InHorizontalCells);
+	NaturalUpwardInfluence = FMath::Max(0, InUpwardCells);
 }
 
 uint64 FVoxelChangeHierarchy::InvalidateSection(const FIntVector& InSection)
@@ -28,9 +28,9 @@ uint64 FVoxelChangeHierarchy::InvalidateSection(const FIntVector& InSection)
 		FIntVector ProxyMax;
 		for (int32 Axis = 0; Axis < 3; ++Axis)
 		{
-			const int32 SideInfluence = Axis == 2 ? 0 : VoxelProxyHorizontalInfluence;
+			const int32 SideInfluence = Axis == 2 ? 0 : NaturalHorizontalInfluence;
 			const int32 UpperInfluence = Axis == 2 ?
-				VoxelProxyUpwardInfluence : VoxelProxyHorizontalInfluence;
+				NaturalUpwardInfluence : NaturalHorizontalInfluence;
 			ProxyMin[Axis] = VoxelGeneration::FloorDivide(
 				CellMin[Axis] - Step - SideInfluence, ProxySide);
 			ProxyMax[Axis] = VoxelGeneration::FloorDivide(
@@ -49,20 +49,22 @@ uint64 FVoxelChangeHierarchy::InvalidateSection(const FIntVector& InSection)
 		const int32 SurfaceSide = FVoxelSurfaceTileData::CellSide * Step;
 		const int32 MacroStep = FVoxelMacroTileData::BaseStep * Step;
 		const int32 MacroSide = FVoxelMacroTileData::CellSide * MacroStep;
-		for (int32 Y = VoxelGeneration::FloorDivide(CellMin.Y - Step, SurfaceSide);
-			Y <= VoxelGeneration::FloorDivide(CellMax.Y + Step, SurfaceSide); ++Y)
+		const int32 SurfaceMargin = FMath::Max(Step, NaturalHorizontalInfluence);
+		const int32 MacroMargin = FMath::Max(MacroStep, NaturalHorizontalInfluence);
+		for (int32 Y = VoxelGeneration::FloorDivide(CellMin.Y - SurfaceMargin, SurfaceSide);
+			Y <= VoxelGeneration::FloorDivide(CellMax.Y + SurfaceMargin, SurfaceSide); ++Y)
 		{
-			for (int32 X = VoxelGeneration::FloorDivide(CellMin.X - Step, SurfaceSide);
-				X <= VoxelGeneration::FloorDivide(CellMax.X + Step, SurfaceSide); ++X)
+			for (int32 X = VoxelGeneration::FloorDivide(CellMin.X - SurfaceMargin, SurfaceSide);
+				X <= VoxelGeneration::FloorDivide(CellMax.X + SurfaceMargin, SurfaceSide); ++X)
 			{
 				SurfaceRevision.Add({ FIntPoint(X, Y), Level }, Revision);
 			}
 		}
-		for (int32 Y = VoxelGeneration::FloorDivide(CellMin.Y - MacroStep, MacroSide);
-			Y <= VoxelGeneration::FloorDivide(CellMax.Y + MacroStep, MacroSide); ++Y)
+		for (int32 Y = VoxelGeneration::FloorDivide(CellMin.Y - MacroMargin, MacroSide);
+			Y <= VoxelGeneration::FloorDivide(CellMax.Y + MacroMargin, MacroSide); ++Y)
 		{
-			for (int32 X = VoxelGeneration::FloorDivide(CellMin.X - MacroStep, MacroSide);
-				X <= VoxelGeneration::FloorDivide(CellMax.X + MacroStep, MacroSide); ++X)
+			for (int32 X = VoxelGeneration::FloorDivide(CellMin.X - MacroMargin, MacroSide);
+				X <= VoxelGeneration::FloorDivide(CellMax.X + MacroMargin, MacroSide); ++X)
 			{
 				MacroRevision.Add({ FIntPoint(X, Y), Level }, Revision);
 			}
@@ -133,11 +135,11 @@ bool FVoxelChangeHierarchy::AffectsVoxelProxy(
 	FReadScopeLock Scope(Lock);
 	const FVoxelGenerationBounds SectionBounds { InSection * 16, (InSection + FIntVector(1)) * 16 };
 	FVoxelGenerationBounds Bounds = InKey.GetBounds();
-	Bounds.Min -= FIntVector(InKey.GetStep() + VoxelProxyHorizontalInfluence,
-		InKey.GetStep() + VoxelProxyHorizontalInfluence,
-		InKey.GetStep() + VoxelProxyUpwardInfluence);
-	Bounds.Max += FIntVector(InKey.GetStep() + VoxelProxyHorizontalInfluence,
-		InKey.GetStep() + VoxelProxyHorizontalInfluence, InKey.GetStep());
+	Bounds.Min -= FIntVector(InKey.GetStep() + NaturalHorizontalInfluence,
+		InKey.GetStep() + NaturalHorizontalInfluence,
+		InKey.GetStep() + NaturalUpwardInfluence);
+	Bounds.Max += FIntVector(InKey.GetStep() + NaturalHorizontalInfluence,
+		InKey.GetStep() + NaturalHorizontalInfluence, InKey.GetStep());
 	return Bounds.Intersects(SectionBounds);
 }
 
@@ -145,24 +147,27 @@ bool FVoxelChangeHierarchy::AffectsSurface(
 	const FVoxelSurfaceTileKey& InKey,
 	const FIntVector& InSection) const
 {
+	FReadScopeLock Scope(Lock);
 	const int32 Side = 32 * (1 << InKey.Level);
 	const FIntPoint Min = InKey.Coordinate * Side;
 	const FIntVector SectionMin = InSection * 16;
-	const int32 Step = 1 << InKey.Level;
-	return SectionMin.X < Min.X + Side + Step && SectionMin.X + 16 > Min.X - Step &&
-		SectionMin.Y < Min.Y + Side + Step && SectionMin.Y + 16 > Min.Y - Step;
+	const int32 Margin = FMath::Max(1 << InKey.Level, NaturalHorizontalInfluence);
+	return SectionMin.X < Min.X + Side + Margin && SectionMin.X + 16 > Min.X - Margin &&
+		SectionMin.Y < Min.Y + Side + Margin && SectionMin.Y + 16 > Min.Y - Margin;
 }
 
 bool FVoxelChangeHierarchy::AffectsMacro(
 	const FVoxelMacroTileKey& InKey,
 	const FIntVector& InSection) const
 {
+	FReadScopeLock Scope(Lock);
 	const int32 Side = 32 * (64 << InKey.Level);
 	const FIntPoint Min = InKey.Coordinate * Side;
 	const FIntVector SectionMin = InSection * 16;
 	const int32 Step = FVoxelMacroTileData::BaseStep << InKey.Level;
-	return SectionMin.X < Min.X + Side + Step && SectionMin.X + 16 > Min.X - Step &&
-		SectionMin.Y < Min.Y + Side + Step && SectionMin.Y + 16 > Min.Y - Step;
+	const int32 Margin = FMath::Max(Step, NaturalHorizontalInfluence);
+	return SectionMin.X < Min.X + Side + Margin && SectionMin.X + 16 > Min.X - Margin &&
+		SectionMin.Y < Min.Y + Side + Margin && SectionMin.Y + 16 > Min.Y - Margin;
 }
 
 void FVoxelChangeHierarchy::ReleaseSection(const FIntVector& InSection)

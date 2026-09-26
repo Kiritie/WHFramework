@@ -4,7 +4,7 @@
 namespace
 {
 	constexpr uint32 VoxelRecipeMagic = 0x31524356;
-	constexpr uint32 VoxelRecipeSchemaVersion = 4;
+	constexpr uint32 VoxelRecipeSchemaVersion = 8;
 	constexpr int32 MaxRecipeBytes = 32 * 1024 * 1024;
 	constexpr int32 MaxRecipeArrayCount = 1 << 20;
 
@@ -110,6 +110,35 @@ namespace
 		return Result;
 	}
 
+	void WriteFlowerSettings(FVoxelByteWriter& Writer,
+		const FVoxelFlowerGenerationSettings& Value)
+	{
+		Writer.U8(Value.bEnabled ? 1 : 0);
+		Writer.I32(Value.Spacing);
+		Writer.I32(Value.DensityPermille);
+		Writer.I32(Value.ChancePermille);
+		Writer.I32(Value.PatchRadius);
+		Writer.I32(Value.PatchFillPermille);
+		Writer.I32(Value.MaxSlopePermille);
+		WriteRange(Writer, Value.Temperature);
+		WriteRange(Writer, Value.Moisture);
+	}
+
+	FVoxelFlowerGenerationSettings ReadFlowerSettings(FVoxelByteReader& Reader)
+	{
+		FVoxelFlowerGenerationSettings Result;
+		Result.bEnabled = Reader.U8() != 0;
+		Result.Spacing = Reader.I32();
+		Result.DensityPermille = Reader.I32();
+		Result.ChancePermille = Reader.I32();
+		Result.PatchRadius = Reader.I32();
+		Result.PatchFillPermille = Reader.I32();
+		Result.MaxSlopePermille = Reader.I32();
+		Result.Temperature = ReadRange(Reader);
+		Result.Moisture = ReadRange(Reader);
+		return Result;
+	}
+
 	void WriteBounds(FVoxelByteWriter& Writer, const FVoxelGenerationBounds& Value)
 	{
 		WriteVector(Writer, Value.Min);
@@ -154,6 +183,16 @@ namespace
 		Writer.I32(Value.RiverSourceAccumulation);
 		Writer.I32(Value.RiverBaseHalfWidth);
 		Writer.I32(Value.RiverBaseDepth);
+		Writer.I32(Value.RiverWidthGrowthPerLevel);
+		Writer.I32(Value.RiverDepthGrowthPerLevel);
+		Writer.I32(Value.RiverMaxGrowthLevels);
+		Writer.I32(Value.RiverBankWidth);
+		Writer.I32(Value.RiverShoreWidth);
+		Writer.I32(Value.RiverShapeSmoothingPasses);
+		Writer.I32(Value.RiverMeanderStrength);
+		Writer.I32(Value.RiverMeanderFrequency);
+		Writer.I32(Value.RiverMeanderOctaves);
+		Writer.I32(Value.RiverMaxMeanderAngle);
 		Writer.I32(Value.HydrologyHaloCells);
 		Writer.I32(Value.HydrologySinkSpacing);
 		Writer.I32(Value.RiverSourceSpacing);
@@ -176,6 +215,7 @@ namespace
 		Writer.I32(Value.LavaCeiling);
 		WriteTreeSettings(Writer, Value.Ecology.Tree);
 		WriteGrassSettings(Writer, Value.Ecology.Grass);
+		WriteFlowerSettings(Writer, Value.Ecology.Flower);
 	}
 
 	FVoxelGenerationSettings ReadSettings(FVoxelByteReader& Reader)
@@ -209,6 +249,16 @@ namespace
 		Result.RiverSourceAccumulation = Reader.I32();
 		Result.RiverBaseHalfWidth = Reader.I32();
 		Result.RiverBaseDepth = Reader.I32();
+		Result.RiverWidthGrowthPerLevel = Reader.I32();
+		Result.RiverDepthGrowthPerLevel = Reader.I32();
+		Result.RiverMaxGrowthLevels = Reader.I32();
+		Result.RiverBankWidth = Reader.I32();
+		Result.RiverShoreWidth = Reader.I32();
+		Result.RiverShapeSmoothingPasses = Reader.I32();
+		Result.RiverMeanderStrength = Reader.I32();
+		Result.RiverMeanderFrequency = Reader.I32();
+		Result.RiverMeanderOctaves = Reader.I32();
+		Result.RiverMaxMeanderAngle = Reader.I32();
 		Result.HydrologyHaloCells = Reader.I32();
 		Result.HydrologySinkSpacing = Reader.I32();
 		Result.RiverSourceSpacing = Reader.I32();
@@ -231,6 +281,7 @@ namespace
 		Result.LavaCeiling = Reader.I32();
 		Result.Ecology.Tree = ReadTreeSettings(Reader);
 		Result.Ecology.Grass = ReadGrassSettings(Reader);
+		Result.Ecology.Flower = ReadFlowerSettings(Reader);
 		return Result;
 	}
 
@@ -329,6 +380,12 @@ bool FVoxelGenerationRecipeCodec::Encode(const FVoxelGenerationRecipe& Recipe, T
 	Writer.U16(Recipe.Ecology.TreeTrunk);
 	Writer.U16(Recipe.Ecology.TreeLeaves);
 	Writer.U16(Recipe.Ecology.GrassPlant);
+	Writer.U32(Recipe.Ecology.Flowers.Num());
+	for (const FVoxelWeightedRuntimeSymbol& Flower : Recipe.Ecology.Flowers)
+	{
+		Writer.U16(Flower.Symbol);
+		Writer.U16(Flower.Weight);
+	}
 
 	Writer.U32(Recipe.SurfaceRules.Num());
 	for (const FVoxelSurfaceRuntimeRuleSet& RuleSet : Recipe.SurfaceRules)
@@ -344,6 +401,7 @@ bool FVoxelGenerationRecipeCodec::Encode(const FVoxelGenerationRecipe& Recipe, T
 			Writer.I32(Rule.MinDepth);
 			Writer.I32(Rule.MaxDepth);
 			Writer.U16(Rule.BlockSymbol);
+			Writer.U8(static_cast<uint8>(Rule.RiverZone));
 			const uint8 Flags =
 				uint8(Rule.bRiverOnly ? 1 : 0) |
 				uint8(Rule.bLakeOnly ? 2 : 0) |
@@ -422,6 +480,13 @@ bool FVoxelGenerationRecipeCodec::Encode(const FVoxelGenerationRecipe& Recipe, T
 		WriteRange(Writer, Biome.Height);
 		WriteRange(Writer, Biome.Slope);
 		Writer.I32(Biome.SurfaceRuleIndex);
+		Writer.U16(Biome.DefaultSurface);
+		Writer.U8(Biome.Ecology.bAllowTrees ? 1 : 0);
+		Writer.U8(Biome.Ecology.bAllowGrass ? 1 : 0);
+		Writer.U8(Biome.Ecology.bAllowFlowers ? 1 : 0);
+		Writer.I32(Biome.Ecology.TreeDensityScalePermille);
+		Writer.I32(Biome.Ecology.GrassDensityScalePermille);
+		Writer.I32(Biome.Ecology.FlowerDensityScalePermille);
 		Writer.U32(Biome.FeatureIndices.Num());
 		for (const int32 Index : Biome.FeatureIndices) Writer.I32(Index);
 		Writer.U32(Biome.StructureIndices.Num());
@@ -473,6 +538,13 @@ bool FVoxelGenerationRecipeCodec::Decode(TConstArrayView<uint8> Bytes, FVoxelGen
 	Result.Ecology.TreeTrunk = Reader.U16();
 	Result.Ecology.TreeLeaves = Reader.U16();
 	Result.Ecology.GrassPlant = Reader.U16();
+	if (!ReadCount(Reader, Count)) return false;
+	for (int32 Index = 0; Index < Count; ++Index)
+	{
+		FVoxelWeightedRuntimeSymbol& Flower = Result.Ecology.Flowers.AddDefaulted_GetRef();
+		Flower.Symbol = Reader.U16();
+		Flower.Weight = Reader.U16();
+	}
 
 	if (!ReadCount(Reader, Count)) return false;
 	for (int32 SetIndex = 0; SetIndex < Count; ++SetIndex)
@@ -491,6 +563,7 @@ bool FVoxelGenerationRecipeCodec::Decode(TConstArrayView<uint8> Bytes, FVoxelGen
 			Rule.MinDepth = Reader.I32();
 			Rule.MaxDepth = Reader.I32();
 			Rule.BlockSymbol = Reader.U16();
+			Rule.RiverZone = static_cast<EVoxelSurfaceRiverRule>(Reader.U8());
 			const uint8 Flags = Reader.U8();
 			Rule.bRiverOnly = Flags & 1;
 			Rule.bLakeOnly = Flags & 2;
@@ -577,6 +650,13 @@ bool FVoxelGenerationRecipeCodec::Decode(TConstArrayView<uint8> Bytes, FVoxelGen
 		Biome.Height = ReadRange(Reader);
 		Biome.Slope = ReadRange(Reader);
 		Biome.SurfaceRuleIndex = Reader.I32();
+		Biome.DefaultSurface = Reader.U16();
+		Biome.Ecology.bAllowTrees = Reader.U8() != 0;
+		Biome.Ecology.bAllowGrass = Reader.U8() != 0;
+		Biome.Ecology.bAllowFlowers = Reader.U8() != 0;
+		Biome.Ecology.TreeDensityScalePermille = Reader.I32();
+		Biome.Ecology.GrassDensityScalePermille = Reader.I32();
+		Biome.Ecology.FlowerDensityScalePermille = Reader.I32();
 		int32 IndexCount = 0;
 		if (!ReadCount(Reader, IndexCount)) return false;
 		for (int32 Item = 0; Item < IndexCount; ++Item) Biome.FeatureIndices.Add(Reader.I32());

@@ -359,6 +359,8 @@ bool FVoxelGenerationCompiler::BuildRecipe(
 			OutError) ||
 		!CompileBiomes(
 			InProfile,
+			InRegistry,
+			BlockSymbols,
 			Recipe,
 			OutError))
 	{
@@ -439,6 +441,17 @@ bool FVoxelGenerationCompiler::GatherBlockNames(
 		{
 			return false;
 		}
+	}
+	for (const TSoftObjectPtr<UVoxelBiomeData>& SoftBiome : InProfile.Biomes)
+	{
+		UVoxelBiomeData* Biome = SoftBiome.LoadSynchronous();
+		UVoxelData* Surface = Biome ? Biome->DefaultSurface.LoadSynchronous() : nullptr;
+		if (!Surface)
+		{
+			OutError = TEXT("Voxel generation biome is missing DefaultSurface");
+			return false;
+		}
+		if (!AddReferencedVoxel(Surface, InRegistry, Names, OutError)) return false;
 	}
 
 	if (!GatherBuiltinEcologyBlockNames(
@@ -607,6 +620,24 @@ bool FVoxelGenerationCompiler::GatherBuiltinEcologyBlockNames(
 			return false;
 		}
 	}
+	if (Ecology.Flower.bEnabled)
+	{
+		if (InProfile.FlowerPalette.IsEmpty())
+		{
+			OutError = TEXT("Enabled flower ecology has no flower palette");
+			return false;
+		}
+		for (const FVoxelWeightedPlantReference& Entry : InProfile.FlowerPalette)
+		{
+			UVoxelData* Plant = Entry.Plant.LoadSynchronous();
+			if (!Plant || Entry.Weight <= 0 ||
+				!AddReferencedVoxel(Plant, InRegistry, InOutNames, OutError))
+			{
+				if (OutError.IsEmpty()) OutError = TEXT("Flower palette contains an invalid plant or weight");
+				return false;
+			}
+		}
+	}
 	OutError.Reset();
 	return true;
 }
@@ -757,6 +788,32 @@ bool FVoxelGenerationCompiler::CompileBuiltinEcology(
 			return false;
 		}
 	}
+	if (Ecology.Flower.bEnabled)
+	{
+		for (const FVoxelWeightedPlantReference& Entry : InProfile.FlowerPalette)
+		{
+			UVoxelData* Plant = Entry.Plant.LoadSynchronous();
+			if (!Plant || Entry.Weight <= 0)
+			{
+				OutError = TEXT("Flower palette contains an invalid plant or weight");
+				return false;
+			}
+			FVoxelWeightedRuntimeSymbol Flower;
+			if (!ResolveBlockSymbol(Plant, InRegistry, InBlockSymbols,
+				Flower.Symbol, OutError))
+			{
+				return false;
+			}
+			Flower.Weight = static_cast<uint16>(FMath::Min(Entry.Weight, 65535));
+			InOutRecipe.Ecology.Flowers.Add(Flower);
+		}
+		InOutRecipe.Ecology.Flowers.Sort(
+			[](const FVoxelWeightedRuntimeSymbol& A,
+				const FVoxelWeightedRuntimeSymbol& B)
+			{
+				return A.Symbol < B.Symbol;
+			});
+	}
 	OutError.Reset();
 	return true;
 }
@@ -841,6 +898,8 @@ bool FVoxelGenerationCompiler::CompileSurfaceRules(
 
 			RuntimeRule.bRiverOnly =
 				Rule.bRiverOnly;
+
+			RuntimeRule.RiverZone = Rule.RiverZone;
 
 			RuntimeRule.bLakeOnly =
 				Rule.bLakeOnly;
@@ -1185,6 +1244,8 @@ bool FVoxelGenerationCompiler::CompileStructures(
 
 bool FVoxelGenerationCompiler::CompileBiomes(
 	const UVoxelWorldGenerationProfile& InProfile,
+	const FVoxelRegistrySnapshot& InRegistry,
+	const TMap<FName, uint16>& InBlockSymbols,
 	FVoxelGenerationRecipe& InOutRecipe,
 	FString& OutError)
 {
@@ -1276,6 +1337,9 @@ bool FVoxelGenerationCompiler::CompileBiomes(
 
 		RuntimeBiome.Slope =
 			Biome->Slope;
+		RuntimeBiome.Ecology = Biome->Ecology;
+		if (!ResolveBlockSymbol(Biome->DefaultSurface.LoadSynchronous(), InRegistry,
+			InBlockSymbols, RuntimeBiome.DefaultSurface, OutError)) return false;
 
 		RuntimeBiome.SurfaceRuleIndex =
 			INDEX_NONE;

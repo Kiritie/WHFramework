@@ -90,9 +90,10 @@ struct WHFRAMEWORK_API FVoxelBasinCertificate
 
 struct WHFRAMEWORK_API FVoxelRiverShape
 {
-    int32 HalfWidth = 4;
-    int32 BankWidth = 4;
-    int32 ShoreWidth = 12;
+    int32 BedHalfWidth = 2;
+    int32 WaterHalfWidth = 2;
+    int32 BankWidth = 3;
+    int32 ShoreWidth = 8;
     int32 Depth = 8;
     int32 MaxCutFill = 64;
 };
@@ -102,7 +103,9 @@ struct WHFRAMEWORK_API FVoxelRiverSection
     int32 BedPlane = 0;
     int32 WaterPlane = 0;
     int32 GroundPlane = 0;
+    EVoxelRiverSurfaceZone Zone = EVoxelRiverSurfaceZone::None;
     bool bWet = false;
+    bool bExceededCutFill = false;
 };
 
 namespace VoxelHydrology
@@ -162,24 +165,60 @@ struct WHFRAMEWORK_API FVoxelRiverSource
 {
     FVoxelStableId Id;
     uint32 GridIndex = 0;
+	uint32 ContinuationUpstreamIndex = MAX_uint32;
     uint64 Accumulation = 0;
+    bool bContinuation = false;
 };
 
 struct WHFRAMEWORK_API FVoxelRiverRoutePoint
 {
     FIntPoint Position = FIntPoint::ZeroValue;
     int32 WaterZ = 0;
-    int32 HalfWidth = 0;
+    int32 BedHalfWidth = 1;
+    int32 WaterHalfWidth = 1;
+    int32 BankWidth = 3;
+    int32 ShoreWidth = 8;
     int32 Depth = 0;
     uint64 Accumulation = 0;
+};
+
+struct WHFRAMEWORK_API FVoxelRiverShapePoint
+{
+    FIntPoint Position = FIntPoint::ZeroValue;
+	bool bAnchor = false;
+    int32 WaterZ = 0;
+    int32 BedHalfWidth = 1;
+    int32 WaterHalfWidth = 1;
+    int32 BankWidth = 3;
+    int32 ShoreWidth = 8;
+    int32 Depth = 1;
+    uint64 Accumulation = 0;
+};
+
+struct WHFRAMEWORK_API FVoxelRiverMeanderPoint
+{
+    FIntPoint Position = FIntPoint::ZeroValue;
+	bool bAnchor = false;
+    int32 WaterZ = 0;
+    int32 BedHalfWidth = 1;
+    int32 WaterHalfWidth = 1;
+    int32 BankWidth = 3;
+    int32 ShoreWidth = 8;
+    int32 Depth = 1;
+    uint64 Accumulation = 0;
+    int32 MeanderOffset = 0;
+    int32 Curvature = 0;
 };
 
 struct WHFRAMEWORK_API FVoxelRiverRoute
 {
     FVoxelStableId Id;
     FVoxelHydrologyRegionKey OwnerRegion;
+    bool bContinuation = false;
 
     TArray<FVoxelRiverRoutePoint> Points;
+    TArray<FVoxelRiverShapePoint> ShapePoints;
+    TArray<FVoxelRiverMeanderPoint> MeanderPoints;
 
     FIntPoint Min = FIntPoint::ZeroValue;
     FIntPoint Max = FIntPoint::ZeroValue;
@@ -199,8 +238,8 @@ struct WHFRAMEWORK_API FVoxelLakePlan
 
 struct WHFRAMEWORK_API FVoxelRiverSegmentRef
 {
-	int32 RiverIndex = INDEX_NONE;
-	int32 PointIndex = INDEX_NONE;
+    int32 RiverIndex = INDEX_NONE;
+    int32 ShapePointIndex = INDEX_NONE;
 };
 
 struct WHFRAMEWORK_API FVoxelHydrologyInfluence
@@ -211,6 +250,7 @@ struct WHFRAMEWORK_API FVoxelHydrologyInfluence
 	int32 BankDistanceCells = MAX_int32;
 	int32 FloodplainStrengthQ15 = 0;
 	FVoxelStableId RiverId;
+	EVoxelRiverSurfaceZone RiverZone = EVoxelRiverSurfaceZone::None;
 
     bool bRiver = false;
     bool bLake = false;
@@ -221,6 +261,12 @@ struct WHFRAMEWORK_API FVoxelHydrologyInfluence
 struct WHFRAMEWORK_API FVoxelHydrologyPlan
 {
     FVoxelHydrologyRegionKey Key;
+    int32 RiverShapeSmoothingPasses = 1;
+    int32 RiverSeed = 0;
+    int32 RiverMeanderStrength = 8;
+    int32 RiverMeanderFrequency = 96;
+    int32 RiverMeanderOctaves = 2;
+    int32 RiverMaxMeanderAngle = 35;
 
 	FIntPoint CoreMin =
 		FIntPoint::ZeroValue;
@@ -235,6 +281,7 @@ struct WHFRAMEWORK_API FVoxelHydrologyPlan
     TArray<FVoxelLakePlan> Lakes;
 
 	void Finalize();
+	bool ValidateRiverRoutes(FString& OutError) const;
 
     bool Sample(
         int32 InWorldX,

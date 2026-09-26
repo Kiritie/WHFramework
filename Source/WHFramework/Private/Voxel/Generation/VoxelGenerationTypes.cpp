@@ -16,6 +16,19 @@ bool FVoxelGenerationRange::Validate(FString& OutError) const
 	return true;
 }
 
+bool FVoxelBiomeEcologyModifier::Validate(FString& OutError) const
+{
+	if (TreeDensityScalePermille < 0 || TreeDensityScalePermille > 2000 ||
+		GrassDensityScalePermille < 0 || GrassDensityScalePermille > 2000 ||
+		FlowerDensityScalePermille < 0 || FlowerDensityScalePermille > 2000)
+	{
+		OutError = TEXT("Voxel biome ecology density scale must be in [0, 2000] permille");
+		return false;
+	}
+	OutError.Reset();
+	return true;
+}
+
 bool FVoxelTreeGenerationSettings::Validate(FString& OutError) const
 {
 	if (MinHeight <= 0 || MaxHeight < MinHeight)
@@ -96,9 +109,23 @@ bool FVoxelGrassGenerationSettings::Validate(FString& OutError) const
 	return true;
 }
 
+bool FVoxelFlowerGenerationSettings::Validate(FString& OutError) const
+{
+	if (Spacing < 2 || DensityPermille < 0 || DensityPermille > 2000 ||
+		ChancePermille < 0 || ChancePermille > 1000 ||
+		PatchRadius < 0 || PatchRadius > Spacing ||
+		PatchFillPermille < 0 || PatchFillPermille > 1000 ||
+		MaxSlopePermille < 0)
+	{
+		OutError = TEXT("Voxel flower generation settings are invalid");
+		return false;
+	}
+	return Temperature.Validate(OutError) && Moisture.Validate(OutError);
+}
+
 bool FVoxelEcologyGenerationSettings::Validate(FString& OutError) const
 {
-	return Tree.Validate(OutError) && Grass.Validate(OutError);
+	return Tree.Validate(OutError) && Grass.Validate(OutError) && Flower.Validate(OutError);
 }
 
 bool FVoxelLandformGenerationSettings::Validate(FString& OutError) const
@@ -130,6 +157,23 @@ bool FVoxelGenerationSettings::Validate(FString& OutError) const
 	if (RiverSourceAccumulation <= 0) { OutError = TEXT("Voxel river source accumulation must be positive"); return false; }
 	if (RiverBaseHalfWidth <= 0 || RiverBaseHalfWidth > 256) { OutError = TEXT("Voxel river base half width is outside the supported range"); return false; }
 	if (RiverBaseDepth <= 0 || RiverBaseDepth > 256) { OutError = TEXT("Voxel river base depth is outside the supported range"); return false; }
+	if (RiverWidthGrowthPerLevel < 0 || RiverDepthGrowthPerLevel < 0 ||
+		RiverMaxGrowthLevels < 0 || RiverMaxGrowthLevels > 8 ||
+		RiverBankWidth < 1 || RiverBankWidth > 512 ||
+		RiverShoreWidth < 1 || RiverShoreWidth > 1024 ||
+		RiverShapeSmoothingPasses < 0 || RiverShapeSmoothingPasses > 2 ||
+		RiverMeanderStrength < 0 || RiverMeanderStrength > 128 ||
+		RiverMeanderFrequency < 8 || RiverMeanderFrequency > 4096 ||
+		RiverMeanderOctaves < 1 || RiverMeanderOctaves > 4 ||
+		RiverMaxMeanderAngle < 1 || RiverMaxMeanderAngle > 80 ||
+		static_cast<int64>(RiverBaseHalfWidth) +
+			static_cast<int64>(RiverWidthGrowthPerLevel) * RiverMaxGrowthLevels > 256 ||
+		static_cast<int64>(RiverBaseDepth) +
+			static_cast<int64>(RiverDepthGrowthPerLevel) * RiverMaxGrowthLevels > 256)
+	{
+		OutError = TEXT("Voxel river growth or bank settings are invalid");
+		return false;
+	}
 	if (HydrologyHaloCells < 8 || HydrologyHaloCells > HydrologyRegionSide) { OutError = TEXT("Voxel hydrology halo is outside the supported range"); return false; }
 	if (HydrologySinkSpacing < 8 || HydrologySinkSpacing > HydrologyRegionSide) { OutError = TEXT("Voxel hydrology sink spacing is outside the supported range"); return false; }
 	if (RiverSourceSpacing <= 0 || RiverSourceSpacing > HydrologyRegionSide) { OutError = TEXT("Voxel river source spacing is invalid"); return false; }

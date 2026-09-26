@@ -57,5 +57,6 @@ public:
 		const TAtomic<bool>* InCancel = nullptr) const;
 
 private:
+	TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config;
 	FVoxelSurfaceProxyBuilder SurfaceBuilder;
 };

@@ -162,6 +162,24 @@ bool FVoxelEcologyRuntimePalette::Validate(
 		OutError = TEXT("Voxel recipe contains invalid default grass ecology symbol");
 		return false;
 	}
+	if (InSettings.Flower.bEnabled && Flowers.IsEmpty())
+	{
+		OutError = TEXT("Enabled flower ecology requires a flower palette");
+		return false;
+	}
+	if (Flowers.Num() > 256)
+	{
+		OutError = TEXT("Voxel flower palette exceeds 256 species");
+		return false;
+	}
+	for (const FVoxelWeightedRuntimeSymbol& Flower : Flowers)
+	{
+		if (!IsValid(Flower.Symbol) || Flower.Weight == 0)
+		{
+			OutError = TEXT("Voxel recipe contains an invalid weighted flower symbol");
+			return false;
+		}
+	}
 	OutError.Reset();
 	return true;
 }
@@ -180,6 +198,11 @@ bool FVoxelSurfaceRuntimeRule::Validate(int32 InBlockCount, FString& OutError) c
 	if (BlockSymbol == MAX_uint16 || static_cast<int32>(BlockSymbol) >= InBlockCount)
 	{
 		OutError = TEXT("Voxel surface rule references an invalid block symbol");
+		return false;
+	}
+	if (RiverZone > EVoxelSurfaceRiverRule::Floodplain)
+	{
+		OutError = TEXT("Voxel surface rule river zone is invalid");
 		return false;
 	}
 
@@ -206,7 +229,7 @@ bool FVoxelSurfaceRuntimeRuleSet::Validate(int32 InBlockCount, FString& OutError
 	return true;
 }
 
-bool FVoxelBiomeRuntimeDefinition::Validate(int32 InSurfaceRuleCount, int32 InFeatureCount, int32 InStructureCount, FString& OutError) const
+bool FVoxelBiomeRuntimeDefinition::Validate(int32 InBlockCount, int32 InSurfaceRuleCount, int32 InFeatureCount, int32 InStructureCount, FString& OutError) const
 {
 	if (StableId.IsNone())
 	{
@@ -223,6 +246,12 @@ bool FVoxelBiomeRuntimeDefinition::Validate(int32 InSurfaceRuleCount, int32 InFe
 		OutError = TEXT("Voxel biome references an invalid surface rule set");
 		return false;
 	}
+	if (DefaultSurface == 0 || DefaultSurface >= InBlockCount)
+	{
+		OutError = TEXT("Voxel biome has no valid default surface");
+		return false;
+	}
+	if (!Ecology.Validate(OutError)) return false;
 	if (!VoxelGenerationValidateIndices(FeatureIndices, InFeatureCount, TEXT("Biome FeatureIndices"), OutError) ||
 		!VoxelGenerationValidateIndices(StructureIndices, InStructureCount, TEXT("Biome StructureIndices"), OutError))
 	{
@@ -423,7 +452,7 @@ bool FVoxelGenerationRecipe::Validate(FString& OutError) const
 	}
 	for (const FVoxelBiomeRuntimeDefinition& Biome : Biomes)
 	{
-		if (!Biome.Validate(SurfaceRules.Num(), Features.Num(), Structures.Num(), OutError)) return false;
+		if (!Biome.Validate(BlockNames.Num(), SurfaceRules.Num(), Features.Num(), Structures.Num(), OutError)) return false;
 	}
 
 	OutError.Reset();

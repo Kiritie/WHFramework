@@ -18,7 +18,8 @@ enum EVoxelSurfaceFlags : uint8
 
 struct WHFRAMEWORK_API FVoxelDistantCell
 {
-	FIntVector Coordinate = FIntVector::ZeroValue;
+	FIntVector Min = FIntVector::ZeroValue;
+	FIntVector Max = FIntVector::ZeroValue;
 	FVoxelBlockState State;
 };
 
@@ -75,14 +76,23 @@ public:
 		FVoxelSurfaceBuildTiming* OutTiming = nullptr, TArray<FVoxelColumnSample>* OutColumns = nullptr) const;
 
 private:
+	bool CaptureModifiedBlocks(
+		const FVoxelSurfaceTileData& InData,
+		TMap<FIntVector, FVoxelBlockState>& OutBlocks,
+		uint64& OutRevision,
+		FString& OutError,
+		const TAtomic<bool>* InCancel) const;
+
 	bool ApplyModifiedSurface(
 		const FVoxelSurfaceTileKey& InKey,
 		FVoxelSurfaceTileData& InOutData,
+		const TMap<FIntVector, FVoxelBlockState>& InModifiedBlocks,
 		FString& OutError,
 		const TAtomic<bool>* InCancel) const;
 
 	bool BuildDistantCells(
 		FVoxelSurfaceTileData& InOutData,
+		const TMap<FIntVector, FVoxelBlockState>& InModifiedBlocks,
 		FString& OutError,
 		const TAtomic<bool>* InCancel) const;
 

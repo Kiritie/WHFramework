@@ -1,8 +1,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Voxel/Task/VoxelTaskScheduler.h"
 #include "Voxel/Geometry/VoxelSectionMesher.h"
 #include "Voxel/Rendering/VoxelCoverage.h"
+#include "Voxel/Rendering/DWLodTransition.h"
 #include "Voxel/Rendering/VoxelSurfaceProxy.h"
 #include "Voxel/Streaming/VoxelInterest.h"
 
@@ -22,6 +24,7 @@ struct FVoxelSectionSnapshot;
 struct FVoxelTaskResult;
 struct FVoxelVoxelProxyData;
 struct FVoxelWaterSurfaceTileData;
+struct FVoxelBoundaryTransitionContext;
 
 struct WHFRAMEWORK_API FVoxelPrimaryFineReadiness
 {
@@ -68,6 +71,9 @@ public:
 	FVoxelPrimaryFineReadiness GetFineRadiusReadiness(
 		TConstArrayView<FIntVector> InFineKeys) const;
 	static void SortAdmissionsByPriority(TArray<FVoxelViewAdmission>& InOutAdmissions);
+	static int32 ResolveActiveAdmissionKind(
+		TConstArrayView<FVoxelViewAdmission> InAdmissions,
+		TFunctionRef<bool(const FVoxelViewAdmission&)> InIsReady);
 	static double ResolveAdmissionFrontier(
 		TConstArrayView<FVoxelViewAdmission> InAdmissions,
 		TFunctionRef<bool(const FVoxelViewAdmission&)> InIsReady,
@@ -79,12 +85,16 @@ private:
 	void UpdateMacro(TConstArrayView<FVector> InObservers);
 	void UpdateWantedTimestamps(double InNow);
 	void ProcessAdmissions();
+	void ProcessDataAdmissions();
+	bool IsPreparedDataCurrent(const FVoxelTaskKey& InKey) const;
+	void PrunePreparedData();
+	bool EnqueuePreparedData(FVoxelTaskRequest&& InRequest);
+	void RemovePreparedData(const FVoxelTaskKey& InKey);
 	void RebuildAdmissions(TConstArrayView<FVector> InObservers);
 	void TrackReadyTerrainNode(FVoxelViewKey InKey);
 	void RebuildReadyTerrainBranches();
 	double MinimumObserverDistanceCells(const FVector& InWorldCenter) const;
 	double MinimumObserverDistanceCells(const FVoxelGenerationBounds& InCellBounds) const;
-	double ResolveAdmissionFrontier() const;
 	bool IsAdmissionSatisfied(const FVoxelViewAdmission& InAdmission) const;
 	bool IsAdmissionTerminalFailure(const FVoxelViewAdmission& InAdmission) const;
 	bool TrySubmitAdmission(const FVoxelViewAdmission& InAdmission);
@@ -93,6 +103,18 @@ private:
 	FVector MacroWorldCenter(const FVoxelMacroTileKey& InKey) const;
 	void LogRepresentationState(TConstArrayView<FVector> InObservers);
 	void ResolveTransitionVisibility();
+	void RebuildHeightfieldTransitions(
+		const TArray<FBox>& InFineBoxes,
+		const TArray<FBox>& InProxySurfaceBoxes);
+	void ApplyHeightfieldTransition(
+		const FVoxelHeightfieldNodeKey& InOwner,
+		uint64 InSignature,
+		FVoxelTaskResult&& InResult);
+	void PumpHeightfieldTransitions();
+	bool RebuildVolumeTransitions(const TSet<FVoxelViewKey>& InTargetNodes);
+	void PumpVolumeTransitions();
+	void ApplyVolumeTransition(const FVoxelViewKey& InOwner, uint64 InSignature,
+		FVoxelTaskResult&& InResult);
 	void CleanupRetiredRepresentations(double InNow);
 
 	FVoxelCoverageBox FineCoverageBox(const FIntVector& InKey) const;
@@ -125,9 +147,9 @@ private:
 		FString& OutError);
 
 	bool RequestFine(const FIntVector& InSection, uint64 InRevision);
-	bool RequestVoxelProxy(const FVoxelViewKey& InKey);
-	bool RequestSurface(const FVoxelSurfaceTileKey& InKey);
-	bool RequestMacro(const FVoxelMacroTileKey& InKey);
+	bool RequestVoxelProxy(const FVoxelViewKey& InKey, bool bDataOnly = false);
+	bool RequestSurface(const FVoxelSurfaceTileKey& InKey, bool bDataOnly = false);
+	bool RequestMacro(const FVoxelMacroTileKey& InKey, bool bDataOnly = false);
 
 	bool PublishFine(const FVoxelTaskResult& InResult);
 	bool PublishVoxelProxy(const FVoxelTaskResult& InResult);
@@ -146,8 +168,13 @@ private:
 	TConstArrayView<FVoxelViewAdmission> Admissions;
 	TArray<FVector> PriorityObservers;
 	int32 AdmissionScanIndices[4] = {};
+	int32 DataScanIndices[4] = {};
+	TMap<FVoxelTaskKey, TSharedPtr<const FVoxelTaskResult, ESPMode::ThreadSafe>> PreparedData;
+	uint64 PreparedDataBytes = 0;
+	uint64 PendingDataBytes = 0;
 	double AdmissionBandWidthCells = 64.0;
 	double LastResolvedFrontier = 0.0;
+	int32 LastActiveAdmissionKind = 4;
 	bool bCoverageDirty = true;
 	double NextRetireCheck = 0.0;
 	double LastCoverageMilliseconds = 0.0;
@@ -176,6 +203,24 @@ private:
 	TMap<FVoxelSurfaceTileKey, TObjectPtr<AActor>> SurfaceActors;
 	TMap<FVoxelSurfaceTileKey, TObjectPtr<AActor>> WaterActors;
 	TMap<FVoxelMacroTileKey, TObjectPtr<AActor>> MacroActors;
+	TMap<FVoxelHeightfieldNodeKey, TObjectPtr<AActor>> HeightfieldTransitionActors;
+	TMap<FVoxelHeightfieldNodeKey, uint64> HeightfieldTransitionSignatures;
+	TMap<FVoxelHeightfieldNodeKey, uint64> DesiredTransitionSignatures;
+	TMap<FVoxelHeightfieldNodeKey, uint64> PendingTransitionSignatures;
+	TMap<FVoxelHeightfieldNodeKey, uint64> PreparedTransitionSignatures;
+	TMap<FVoxelHeightfieldNodeKey, TSharedPtr<FVoxelSectionMeshResult>> PreparedTransitionMeshes;
+	TMap<FVoxelHeightfieldNodeKey, TArray<FVoxelHeightfieldTransitionEdge>> DesiredTransitionEdges;
+	TArray<FVoxelHeightfieldNodeKey> UnsubmittedTransitionOwners;
+	TArray<FVoxelCoverageRect> PendingHeightfieldHandoffRects;
+	int32 HeightfieldUnbalancedEdgeCount = 0;
+	TMap<FVoxelViewKey, uint64> VolumeTransitionSignatures;
+	TMap<FVoxelViewKey, uint64> DesiredVolumeSignatures;
+	TMap<FVoxelViewKey, uint64> PendingVolumeSignatures;
+	TMap<FVoxelViewKey, uint64> PreparedVolumeSignatures;
+	TMap<FVoxelViewKey, TSharedPtr<FVoxelSectionMeshResult>> PreparedVolumeMeshes;
+	TMap<FVoxelViewKey, TSharedPtr<const FVoxelBoundaryTransitionContext>> DesiredVolumeContexts;
+	TArray<FVoxelViewKey> UnsubmittedVolumeOwners;
+	int32 VolumeUnbalancedFaceCount = 0;
 
 	TMap<FVoxelSurfaceTileKey, uint64> SurfaceRevisions;
 	TMap<FVoxelMacroTileKey, uint64> MacroRevisions;

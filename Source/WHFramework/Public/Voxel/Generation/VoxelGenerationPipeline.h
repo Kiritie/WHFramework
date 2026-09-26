@@ -30,6 +30,12 @@ public:
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr) const;
 
+	bool EnumerateTrees(
+		const FVoxelGenerationBounds& InBounds,
+		TFunctionRef<void(const FIntVector&, int32)> InVisit,
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr) const;
+
 	bool SampleEnvironment(
 		int32 InX,
 		int32 InY,
