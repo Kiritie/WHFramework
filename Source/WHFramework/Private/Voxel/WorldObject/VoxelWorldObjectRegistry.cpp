@@ -80,7 +80,9 @@ bool FVoxelWorldObjectRegistry::Build(const FVoxelRegistrySnapshot& InBlocks, co
 				Part.Offset.GetAbsMax() > 32 || Part.State < 0 || Part.State > MAX_uint16 ||
 				(Part.State & (VoxelState::FacingMask | Definition.ToggleMask)) || Candidate.TypeDefinitions.Contains(Block->TypeId))
 			{
-				OutError = TEXT("Invalid world object part; only the anchor may own an entity");
+				OutError = FString::Printf(TEXT("Invalid world object part %s[%d]: block=%s type=%u entity=%u state=%d toggle=%u"),
+					*Definition.Id.ToString(), Index, *Part.BlockName.ToString(), Block ? Block->TypeId : 0,
+					Block ? Block->EntityKind : 0, Part.State, Definition.ToggleMask);
 				return false;
 			}
 			const uint32 Signature = FVoxelBlockState{Block->TypeId, uint16(Part.State)}.Pack();
