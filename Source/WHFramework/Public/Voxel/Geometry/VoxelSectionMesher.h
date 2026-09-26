@@ -29,6 +29,8 @@ struct WHFRAMEWORK_API FVoxelSectionMeshResult
 class WHFRAMEWORK_API FVoxelSectionMesher
 {
 public:
+	static bool IsKnownEmpty(const FVoxelSectionSnapshot& InSnapshot, const FVoxelRegistrySnapshot& InRegistry,
+		const FVoxelBoundaryTransitionContext* InTransition = nullptr);
     static bool Build(const FVoxelSectionSnapshot& Snapshot,const FVoxelRegistrySnapshot& Registry,
         const FVoxelShapeRegistry& Shapes,FVoxelSectionMeshResult& Out,const TAtomic<bool>* Cancel=nullptr,
         double InTextureRepeatsPerCell=1.0,

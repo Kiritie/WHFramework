@@ -126,6 +126,7 @@ struct WHFRAMEWORK_API FVoxelTaskResult
 
 	bool bSuccess = false;
 	bool bCanceled = false;
+	bool bKnownEmptyMesh = false;
 	FString Error;
 
 	// diagnostics
@@ -161,6 +162,7 @@ struct WHFRAMEWORK_API FVoxelTaskRequest
 	FVoxelTaskStamp Stamp;
 	EVoxelTaskKind Kind = EVoxelTaskKind::None;
 	EVoxelWorkClass WorkClass = EVoxelWorkClass::None;
+	int32 TerrainStage = INDEX_NONE;
 
 	double DistanceScore = 0.0;
 	double ForwardScore = 0.0;
@@ -237,6 +239,8 @@ public:
 	FVoxelTaskScheduler& operator=(const FVoxelTaskScheduler&) = delete;
 
 	bool Enqueue(FVoxelTaskRequest&& InRequest);
+	void UpdatePriorities(TFunctionRef<void(EVoxelTaskKind, const FVoxelTaskStamp&,
+		EVoxelWorkClass&, double&, double&)> InUpdate);
 
 	void Tick(
 		TFunctionRef<void(FVoxelTaskResult&&)> InApply,
@@ -275,8 +279,11 @@ private:
 		FVoxelTaskStamp Stamp;
 		EVoxelTaskKind Kind = EVoxelTaskKind::None;
 		EVoxelWorkClass WorkClass = EVoxelWorkClass::None;
+		int32 TerrainStage = INDEX_NONE;
 
 		double QueuedAt = 0.0;
+		double DistanceScore = 0.0;
+		double ForwardScore = 0.0;
 		uint64 ReservedBytes = 0;
 
 		TSharedPtr<FSlot, ESPMode::ThreadSafe> Slot;

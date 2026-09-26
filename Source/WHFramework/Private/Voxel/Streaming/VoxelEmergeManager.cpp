@@ -202,12 +202,31 @@ void FVoxelEmergeManager::Reset()
 	NextAdmissionIndex = 0;
 }
 
+EVoxelWorkClass FVoxelEmergeManager::ResolveWorkClass(const FVoxelExactDemand& InDemand)
+{
+	if (InDemand.bMovementCriticalCollision || InDemand.bWarmupCollision) return EVoxelWorkClass::Critical;
+	if (InDemand.bWarmupData) return EVoxelWorkClass::Warmup;
+	return InDemand.bExact || InDemand.bCollision || InDemand.bSimulation
+		? EVoxelWorkClass::ExactData : EVoxelWorkClass::Visible;
+}
+
 void FVoxelEmergeManager::RebuildDemand(
 	const FVoxelInterestSet& InInterest,
 	const uint64 InInterestRevision)
 {
 	CurrentDemand = InInterest.Exact;
 	OrderedKeys = InInterest.ExactOrder;
+	Scheduler.UpdatePriorities([this](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp,
+		EVoxelWorkClass& WorkClass, double& Distance, double& Forward)
+	{
+		if (Kind != EVoxelTaskKind::GenerateExactBase && Kind != EVoxelTaskKind::DecodeOverlay) return;
+		if (const FVoxelExactDemand* Demand = CurrentDemand.Find(Stamp.Section))
+		{
+			WorkClass = ResolveWorkClass(*Demand);
+			Distance = Demand->DistanceCells;
+			Forward = Demand->ForwardScore;
+		}
+	});
 
 	CurrentInterestRevision =
 		InInterestRevision;
@@ -281,19 +300,7 @@ bool FVoxelEmergeManager::RequestBase(
 	Request.Kind =
 		EVoxelTaskKind::GenerateExactBase;
 
-	if (InDemand.bMovementCriticalCollision || InDemand.bWarmupCollision)
-	{
-		Request.WorkClass = EVoxelWorkClass::Critical;
-	}
-	else if (InDemand.bWarmupData)
-	{
-		Request.WorkClass = EVoxelWorkClass::Warmup;
-	}
-	else
-	{
-		Request.WorkClass = InDemand.bExact || InDemand.bCollision || InDemand.bSimulation
-			? EVoxelWorkClass::ExactData : EVoxelWorkClass::Visible;
-	}
+	Request.WorkClass = ResolveWorkClass(InDemand);
 
 	Request.Stamp =
 		TaskStamp;
@@ -380,19 +387,7 @@ bool FVoxelEmergeManager::ResolveOverlay(
 	Request.Kind =
 		EVoxelTaskKind::DecodeOverlay;
 
-	if (InDemand.bMovementCriticalCollision || InDemand.bWarmupCollision)
-	{
-		Request.WorkClass = EVoxelWorkClass::Critical;
-	}
-	else if (InDemand.bWarmupData)
-	{
-		Request.WorkClass = EVoxelWorkClass::Warmup;
-	}
-	else
-	{
-		Request.WorkClass = InDemand.bExact || InDemand.bCollision || InDemand.bSimulation
-			? EVoxelWorkClass::ExactData : EVoxelWorkClass::Visible;
-	}
+	Request.WorkClass = ResolveWorkClass(InDemand);
 
 	Request.DistanceScore = InDemand.DistanceCells;
 	Request.ForwardScore = InDemand.ForwardScore;

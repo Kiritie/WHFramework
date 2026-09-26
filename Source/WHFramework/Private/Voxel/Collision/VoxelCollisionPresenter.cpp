@@ -67,6 +67,18 @@ void FVoxelCollisionPresenter::RebuildWanted(
 		}
 	}
 	CurrentInterestRevision = InInterestRevision;
+	Scheduler.UpdatePriorities([this](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp,
+		EVoxelWorkClass& WorkClass, double& Distance, double& Forward)
+	{
+		if (Kind != EVoxelTaskKind::BuildCollision) return;
+		if (const FVoxelExactDemand* Demand = Wanted.Find(Stamp.Section))
+		{
+			WorkClass = Demand->bMovementCriticalCollision || Demand->bWarmupCollision
+				? EVoxelWorkClass::Critical : EVoxelWorkClass::Interactive;
+			Distance = Demand->DistanceCells;
+			Forward = Demand->ForwardScore;
+		}
+	});
 }
 
 bool FVoxelCollisionPresenter::OnTask(FVoxelTaskResult&& InResult)

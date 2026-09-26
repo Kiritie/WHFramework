@@ -65,6 +65,7 @@ public:
 
 	void Reset();
 	bool HasPrimaryRepresentation() const;
+	bool RequiresSectionData(const FIntVector& InKey) const;
 	double GetDataAdmissionLimit() const;
 	FVoxelPrimaryFineReadiness GetPrimaryFineReadiness(
 		const TMap<FIntVector, FVoxelExactDemand>& InExact) const;
@@ -86,11 +87,15 @@ private:
 	void UpdateWantedTimestamps(double InNow);
 	void ProcessAdmissions();
 	void ProcessDataAdmissions();
+	bool IsAdmissionDataReady(const FVoxelViewAdmission& InAdmission) const;
+	bool IsAdmissionMeshReady(const FVoxelViewAdmission& InAdmission) const;
 	bool IsPreparedDataCurrent(const FVoxelTaskKey& InKey) const;
 	void PrunePreparedData();
 	bool EnqueuePreparedData(FVoxelTaskRequest&& InRequest);
 	void RemovePreparedData(const FVoxelTaskKey& InKey);
 	void RebuildAdmissions(TConstArrayView<FVector> InObservers);
+	void UpdateTaskPriorities();
+	EVoxelWorkClass VolumeTransitionWorkClass(const FVoxelViewKey& InOwner) const;
 	void TrackReadyTerrainNode(FVoxelViewKey InKey);
 	void RebuildReadyTerrainBranches();
 	double MinimumObserverDistanceCells(const FVector& InWorldCenter) const;
@@ -172,9 +177,12 @@ private:
 	TMap<FVoxelTaskKey, TSharedPtr<const FVoxelTaskResult, ESPMode::ThreadSafe>> PreparedData;
 	uint64 PreparedDataBytes = 0;
 	uint64 PendingDataBytes = 0;
+	uint64 SkippedProxyMeshes = 0;
+	uint64 SkippedVolumeMeshes = 0;
 	double AdmissionBandWidthCells = 64.0;
 	double LastResolvedFrontier = 0.0;
 	int32 LastActiveAdmissionKind = 4;
+	int32 LastActiveDataKind = 4;
 	bool bCoverageDirty = true;
 	double NextRetireCheck = 0.0;
 	double LastCoverageMilliseconds = 0.0;
@@ -221,6 +229,9 @@ private:
 	TMap<FVoxelViewKey, TSharedPtr<const FVoxelBoundaryTransitionContext>> DesiredVolumeContexts;
 	TArray<FVoxelViewKey> UnsubmittedVolumeOwners;
 	int32 VolumeUnbalancedFaceCount = 0;
+	int32 MissingFineBoundaryCount = 0;
+	int32 MissingProxyBoundaryCount = 0;
+	int32 InvalidVolumeContextCount = 0;
 
 	TMap<FVoxelSurfaceTileKey, uint64> SurfaceRevisions;
 	TMap<FVoxelMacroTileKey, uint64> MacroRevisions;

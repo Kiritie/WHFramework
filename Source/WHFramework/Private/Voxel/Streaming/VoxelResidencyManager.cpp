@@ -5,10 +5,12 @@
 FVoxelResidencyManager::FVoxelResidencyManager(
 	FVoxelWorldRuntime& InRuntime,
 	FVoxelTaskScheduler& InScheduler,
-	TFunction<void(const FIntVector&)> InBeforeEvict)
+	TFunction<void(const FIntVector&)> InBeforeEvict,
+	TFunction<bool(const FIntVector&)> InRetainSection)
 	: Runtime(InRuntime)
 	, Scheduler(InScheduler)
 	, BeforeEvict(MoveTemp(InBeforeEvict))
+	, RetainSection(MoveTemp(InRetainSection))
 {
 }
 
@@ -62,7 +64,8 @@ bool FVoxelResidencyManager::CanEvict(
 	const FVoxelSection& InSection,
 	const uint64 InFrame) const
 {
-	if (Demanded.Contains(InKey) || InSection.PinCount.Load() > 0)
+	if (Demanded.Contains(InKey) || InSection.PinCount.Load() > 0 ||
+		(RetainSection && RetainSection(InKey)))
 	{
 		return false;
 	}

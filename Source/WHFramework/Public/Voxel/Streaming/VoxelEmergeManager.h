@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Voxel/Generation/VoxelGenerationPipeline.h"
+#include "Voxel/Generation/VoxelWorldManifest.h"
 #include "Voxel/Runtime/VoxelWorldRuntime.h"
 #include "Voxel/Streaming/VoxelInterest.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
@@ -43,6 +44,7 @@ public:
 	void Reset();
 
 private:
+	static EVoxelWorkClass ResolveWorkClass(const FVoxelExactDemand& InDemand);
 	void RebuildDemand(
 		const FVoxelInterestSet& InInterest,
 		uint64 InInterestRevision);

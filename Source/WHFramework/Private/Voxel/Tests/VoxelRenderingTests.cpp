@@ -86,6 +86,62 @@ namespace
 	};
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelKnownEmptyMeshTest,
+	"WHFramework.Voxel.Rendering.KnownEmptyMesh", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelKnownEmptyMeshTest::RunTest(const FString& Parameters)
+{
+	FVoxelRegistrySnapshot Registry = *VoxelTest::MakeRegistry();
+	Registry.Definitions[1].Shape = EVoxelShapeKind::FullCube;
+	Registry.Definitions[1].bOccludes = true;
+	FVoxelSectionSnapshot Snapshot;
+	Snapshot.Blocks.Init(0, VoxelBlock::Volume);
+	TestTrue(TEXT("Air is ready without any neighbor data or mesh task"), FVoxelSectionMesher::IsKnownEmpty(Snapshot, Registry));
+	const uint32 Solid = FVoxelBlockState(1, 0).Pack();
+	Snapshot.Blocks.Init(Solid, VoxelBlock::Volume);
+	TestFalse(TEXT("Unknown boundaries cannot prove solid geometry is enclosed"), FVoxelSectionMesher::IsKnownEmpty(Snapshot, Registry));
+	for (int32 Face = 0; Face < 6; ++Face)
+	{
+		Snapshot.Known[Face] = true;
+		Snapshot.Halo[Face].Init(Solid, 256);
+	}
+	TestTrue(TEXT("Fully enclosed solid is ready without meshing"), FVoxelSectionMesher::IsKnownEmpty(Snapshot, Registry));
+	FVoxelBoundaryTransitionContext Transition;
+	Transition.Owner = {FIntVector::ZeroValue, 1};
+	FVoxelBoundaryTransitionPatch& Patch = Transition.Patches.AddDefaulted_GetRef();
+	Patch.Face.Owner = Transition.Owner;
+	Patch.Face.Neighbor = {FIntVector(2, 0, 0), 0};
+	Patch.Face.Direction = EVoxelVolumeFaceDirection::PositiveX;
+	Patch.Face.Min = Patch.Face.Neighbor.GetBounds().Min;
+	Patch.Face.Max = Patch.Face.Neighbor.GetBounds().Max;
+	Patch.Neighbor.Key = Patch.Face.Neighbor;
+	Patch.Neighbor.Face = 1;
+	Patch.Neighbor.States.Init(Solid, 256);
+	TestTrue(TEXT("Empty check uses a valid fine boundary"), Transition.Validate());
+	TestTrue(TEXT("Enclosed fine boundary skips transition meshing"),
+		FVoxelSectionMesher::IsKnownEmpty(Snapshot, Registry, &Transition));
+	Patch.Neighbor.States[17] = 0;
+	TestFalse(TEXT("Fine boundary exposure must not be hidden by solid coarse halo"),
+		FVoxelSectionMesher::IsKnownEmpty(Snapshot, Registry, &Transition));
+	FVoxelShapeRegistry Shapes;
+	FVoxelSectionMeshResult Mesh;
+	TestTrue(TEXT("Fine exposure builds actual transition geometry"),
+		FVoxelSectionMesher::Build(Snapshot, Registry, Shapes, Mesh, nullptr, 1.0, &Transition));
+	TestTrue(TEXT("Fine exposure is not an empty transition"), !Mesh.Batches.IsEmpty());
+	for (int32 Face = 0; Face < 6; ++Face)
+	{
+		Snapshot.Halo[Face][17] = 0;
+		TestFalse(TEXT("An exposed face in every direction requires geometry"), FVoxelSectionMesher::IsKnownEmpty(Snapshot, Registry));
+		Snapshot.Halo[Face][17] = Solid;
+	}
+	Snapshot.Blocks[2048] = 0;
+	TestFalse(TEXT("An internal cavity must not be discarded"), FVoxelSectionMesher::IsKnownEmpty(Snapshot, Registry));
+	Snapshot.Blocks[2048] = Solid;
+	Registry.Definitions[1].bOccludes = false;
+	TestFalse(TEXT("Nonoccluding materials still require meshing"), FVoxelSectionMesher::IsKnownEmpty(Snapshot, Registry));
+	return true;
+}
+
 namespace
 {
 	TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> MakeSurfaceRegistry()

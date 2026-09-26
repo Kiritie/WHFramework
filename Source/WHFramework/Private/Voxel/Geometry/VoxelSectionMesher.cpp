@@ -2,6 +2,51 @@
 #include "Voxel/Geometry/DWVoxelFaceVisibility.h"
 #include "Voxel/Geometry/DWVoxelBoundaryTransition.h"
 #include "Voxel/Chunks/VoxelSectionKey.h"
+
+bool FVoxelSectionMesher::IsKnownEmpty(const FVoxelSectionSnapshot& InSnapshot,
+	const FVoxelRegistrySnapshot& InRegistry, const FVoxelBoundaryTransitionContext* InTransition)
+{
+	if (InSnapshot.Blocks.Num() != VoxelBlock::Volume) return false;
+	if (InTransition && !InTransition->Validate()) return false;
+	auto IsOpaqueCube = [&InRegistry](const uint32 Packed)
+	{
+		const FVoxelBlockState State = FVoxelBlockState::Unpack(Packed);
+		const FVoxelRuntimeDefinition* Definition = InRegistry.Find(State.TypeId);
+		return !State.IsAir() && Definition && Definition->Shape == EVoxelShapeKind::FullCube && Definition->bOccludes;
+	};
+	if (FVoxelBlockState::Unpack(InSnapshot.Blocks[0]).IsAir())
+	{
+		for (const uint32 Packed : InSnapshot.Blocks)
+		{
+			if (!FVoxelBlockState::Unpack(Packed).IsAir()) return false;
+		}
+		return true;
+	}
+	for (const uint32 Packed : InSnapshot.Blocks)
+	{
+		if (!IsOpaqueCube(Packed)) return false;
+	}
+	for (int32 Face = 0; Face < 6; ++Face)
+	{
+		if (!InSnapshot.Known[Face] || InSnapshot.Halo[Face].Num() != VoxelBlock::Size * VoxelBlock::Size) return false;
+		for (const uint32 Packed : InSnapshot.Halo[Face])
+		{
+			if (!IsOpaqueCube(Packed)) return false;
+		}
+	}
+	if (InTransition)
+	{
+		for (const FVoxelBoundaryTransitionPatch& Patch : InTransition->Patches)
+		{
+			for (const uint32 Packed : Patch.Neighbor.States)
+			{
+				if (!IsOpaqueCube(Packed)) return false;
+			}
+		}
+	}
+	return true;
+}
+
 uint64 FVoxelMeshBuffers::Bytes()const
 {return uint64(Vertices.Num())*sizeof(FVector)+uint64(Normals.Num())*sizeof(FVector)+uint64(Triangles.Num())*4+
     uint64(UV0.Num()+UV1.Num()+UV2.Num())*sizeof(FVector2D)+uint64(Colors.Num())*sizeof(FLinearColor)+uint64(Tangents.Num())*sizeof(FProcMeshTangent);}

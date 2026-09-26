@@ -19,7 +19,7 @@ class WHFRAMEWORK_API FVoxelViewPublisher
 public:
 	FVoxelViewPublisher(UVoxelModule& InModule, FVoxelTaskScheduler& InScheduler, uint64 InWorldEpoch);
 	~FVoxelViewPublisher();
-	bool Stage(AActor*& InOutActor, const FVector& InLocation, double InScale, FVoxelSectionMeshResult&& InMesh);
+	bool Stage(AActor*& InOutActor, const FVector& InLocation, double InScale, FVoxelSectionMeshResult&& InMesh, int32 InTerrainStage);
 	void BeginBatch();
 	void SetCoverage(AActor* InActor, TArray<FBox> InWorldCellBoxes);
 	void SetHidden(AActor* InActor, bool bInHidden);
@@ -39,6 +39,7 @@ private:
 	struct FEntry
 	{
 		FMeshPtr Source;
+		int32 TerrainStage = INDEX_NONE;
 		FVector Location = FVector::ZeroVector;
 		double Scale = 1.0;
 		FBox Bounds = FBox(ForceInit);
@@ -52,6 +53,7 @@ private:
 	{
 		TWeakObjectPtr<AActor> Actor;
 		FMeshPtr Source;
+		int32 TerrainStage = INDEX_NONE;
 		FVector Location = FVector::ZeroVector;
 		double Scale = 1.0;
 		TArray<FBox> Exclusions;

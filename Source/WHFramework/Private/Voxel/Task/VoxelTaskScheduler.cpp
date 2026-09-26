@@ -52,6 +52,33 @@ namespace
 			InKind == EVoxelTaskKind::GenerateSurface || InKind == EVoxelTaskKind::GenerateMacro;
 	}
 
+	int32 TerrainPriorityBand(const FVoxelTaskRequest& Request)
+	{
+		if (Request.TerrainStage != INDEX_NONE) return Request.TerrainStage;
+		switch (Request.Kind)
+		{
+		case EVoxelTaskKind::GenerateExactBase:
+		case EVoxelTaskKind::DecodeOverlay:
+		case EVoxelTaskKind::BuildFineMesh:
+			return 0;
+		case EVoxelTaskKind::GenerateVoxelProxy:
+		case EVoxelTaskKind::BuildVoxelProxy:
+			return 1;
+		case EVoxelTaskKind::GenerateSurface:
+		case EVoxelTaskKind::BuildSurface:
+		case EVoxelTaskKind::BuildWater:
+			return 2;
+		case EVoxelTaskKind::GenerateMacro:
+		case EVoxelTaskKind::BuildMacro:
+			return 3;
+		case EVoxelTaskKind::BuildVolumeTransition:
+			return Request.WorkClass == EVoxelWorkClass::Interactive ? 0 : 1;
+		default:
+			return Request.WorkClass >= EVoxelWorkClass::Critical &&
+				Request.WorkClass <= EVoxelWorkClass::Interactive ? -1 : 4;
+		}
+	}
+
 }
 
 bool FVoxelTaskStamp::operator==(const FVoxelTaskStamp& InOther) const
@@ -193,7 +220,6 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 			if (Index != Lane) PendingLimit -= FMath::Max(0, ReservedPerLane - Counts[Index]);
 		}
 	}
-	const bool bReservedAdmission = Lane != INDEX_NONE && Counts[Lane] < ReservedPerLane;
 	// 先完整验证替换集合，再取消旧请求，内存不足不能导致部分取消后仍然拒绝新请求。
 	TArray<int32, TInlineAllocator<8>> DisplacedIndices;
 	uint64 RemainingInput = QueuedInputBytes;
@@ -207,8 +233,7 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 			const FVoxelTaskRequest& Existing = Pending[Index];
 			const int32 ExistingLane = TerrainLane(Existing.Kind);
 			if (bVisual && ExistingLane != INDEX_NONE && ExistingLane != Lane && Counts[ExistingLane] <= ReservedPerLane) continue;
-			const bool bMayReplace = IsHigherPriority(InRequest, Existing) ||
-				(bReservedAdmission && IsVisualWorkClass(Existing.WorkClass) && ExistingLane != Lane);
+			const bool bMayReplace = IsHigherPriority(InRequest, Existing);
 			if (bMayReplace && (Worst == INDEX_NONE || IsHigherPriority(Pending[Worst], Existing))) Worst = Index;
 		}
 		if (Worst == INDEX_NONE) return false;
@@ -242,6 +267,28 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 	return true;
 }
 
+void FVoxelTaskScheduler::UpdatePriorities(TFunctionRef<void(EVoxelTaskKind,
+	const FVoxelTaskStamp&, EVoxelWorkClass&, double&, double&)> InUpdate)
+{
+	check(IsInGameThread());
+	auto Update = [this, &InUpdate](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp,
+		EVoxelWorkClass& WorkClass, double& DistanceScore, double& ForwardScore)
+	{
+		const bool bWasCritical = WorkClass == EVoxelWorkClass::Critical;
+		InUpdate(Kind, Stamp, WorkClass, DistanceScore, ForwardScore);
+		CriticalTaskCount += static_cast<int32>(WorkClass == EVoxelWorkClass::Critical) -
+			static_cast<int32>(bWasCritical);
+	};
+	for (FVoxelTaskRequest& Request : Pending)
+	{
+		Update(Request.Kind, Request.Stamp, Request.WorkClass, Request.DistanceScore, Request.ForwardScore);
+	}
+	for (FRunning& Request : Running)
+	{
+		Update(Request.Kind, Request.Stamp, Request.WorkClass, Request.DistanceScore, Request.ForwardScore);
+	}
+}
+
 void FVoxelTaskScheduler::Tick(
 	TFunctionRef<void(FVoxelTaskResult&&)> InApply,
 	const double InMaxApplyMilliseconds)
@@ -268,6 +315,24 @@ void FVoxelTaskScheduler::Tick(
 	int32 VoxelLODApplied = 0;
 	int32 SurfaceApplied = 0;
 	int32 MacroApplied = 0;
+	Running.StableSort([](const FRunning& A, const FRunning& B)
+	{
+		FVoxelTaskRequest PriorityA;
+		PriorityA.Kind = A.Kind;
+		PriorityA.TerrainStage = A.TerrainStage;
+		PriorityA.WorkClass = A.WorkClass;
+		PriorityA.DistanceScore = A.DistanceScore;
+		PriorityA.ForwardScore = A.ForwardScore;
+		PriorityA.QueuedAt = A.QueuedAt;
+		FVoxelTaskRequest PriorityB;
+		PriorityB.Kind = B.Kind;
+		PriorityB.TerrainStage = B.TerrainStage;
+		PriorityB.WorkClass = B.WorkClass;
+		PriorityB.DistanceScore = B.DistanceScore;
+		PriorityB.ForwardScore = B.ForwardScore;
+		PriorityB.QueuedAt = B.QueuedAt;
+		return IsHigherPriority(PriorityA, PriorityB);
+	});
 
 	auto CanApplyTerrainKind =
 		[this, &FineApplied, &VoxelLODApplied, &SurfaceApplied, &MacroApplied](const EVoxelTaskKind Kind) -> bool
@@ -323,7 +388,7 @@ void FVoxelTaskScheduler::Tick(
 		FRunning Completed =
 			MoveTemp(Running[Index]);
 
-		Running.RemoveAtSwap(Index);
+		Running.RemoveAt(Index, 1, EAllowShrinking::No);
 
 		ReservedBytes -=
 			Completed.ReservedBytes;
@@ -715,6 +780,9 @@ bool FVoxelTaskScheduler::IsHigherPriority(
 	const FVoxelTaskRequest& InA,
 	const FVoxelTaskRequest& InB)
 {
+	const int32 BandA = TerrainPriorityBand(InA);
+	const int32 BandB = TerrainPriorityBand(InB);
+	if (BandA != BandB) return BandA < BandB;
 	if ((InA.WorkClass == EVoxelWorkClass::Prefetch) != (InB.WorkClass == EVoxelWorkClass::Prefetch))
 	{
 		return InB.WorkClass == EVoxelWorkClass::Prefetch;
@@ -885,7 +953,7 @@ void FVoxelTaskScheduler::Pump()
 			break;
 		}
 
-		// 超过等待期限的可视任务按入队时间获得机会；碰撞、出生及交互优先级不降级。
+		// 等待时间只能调整同阶段顺序，不能让下一阶段越过上一阶段。
 		if (IsVisualWorkClass(Pending[BestIndex].WorkClass))
 		{
 			const double Deadline = FPlatformTime::Seconds() - 1.0;
@@ -893,7 +961,8 @@ void FVoxelTaskScheduler::Pump()
 			for (int32 Index = 0; Index < Pending.Num(); ++Index)
 			{
 				const FVoxelTaskRequest& Candidate = Pending[Index];
-				if (IsVisualWorkClass(Candidate.WorkClass) && Candidate.QueuedAt <= Deadline &&
+				if (TerrainPriorityBand(Candidate) == TerrainPriorityBand(Pending[BestIndex]) &&
+					IsVisualWorkClass(Candidate.WorkClass) && Candidate.QueuedAt <= Deadline &&
 					CanStartKind(Candidate.Kind) && Candidate.ReservedBytes <= Budget.MaxReservedBytes - ReservedBytes &&
 					(Oldest == INDEX_NONE || Candidate.QueuedAt < Pending[Oldest].QueuedAt))
 				{
@@ -923,6 +992,9 @@ void FVoxelTaskScheduler::Pump()
 			Request.Kind;
 		RunningTask.WorkClass =
 			Request.WorkClass;
+		RunningTask.TerrainStage = Request.TerrainStage;
+		RunningTask.DistanceScore = Request.DistanceScore;
+		RunningTask.ForwardScore = Request.ForwardScore;
 		RunningTask.QueuedAt =
 			Request.QueuedAt;
 		RunningTask.ReservedBytes =

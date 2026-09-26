@@ -20,7 +20,7 @@ FVoxelViewPublisher::~FVoxelViewPublisher()
 }
 
 bool FVoxelViewPublisher::Stage(AActor*& InOutActor, const FVector& InLocation,
-	const double InScale, FVoxelSectionMeshResult&& InMesh)
+	const double InScale, FVoxelSectionMeshResult&& InMesh, const int32 InTerrainStage)
 {
 	if (!Module.GetWorld() || !Module.GetMaterialSet() || !FMath::IsFinite(InScale) || InScale <= 0.0)
 	{
@@ -46,6 +46,7 @@ bool FVoxelViewPublisher::Stage(AActor*& InOutActor, const FVector& InLocation,
 		Root->RegisterComponent();
 	}
 	FEntry& Entry = Entries.FindOrAdd(TWeakObjectPtr<AActor>(InOutActor));
+	Entry.TerrainStage = InTerrainStage;
 	Entry.Location = InLocation;
 	Entry.Scale = InScale;
 	Entry.Bounds = FBox(ForceInit);
@@ -83,6 +84,7 @@ void FVoxelViewPublisher::SetCoverage(AActor* InActor, TArray<FBox> InWorldCellB
 	FUpdate& Update = Updates.AddDefaulted_GetRef();
 	Update.Actor = InActor;
 	Update.Source = Entry->Source;
+	Update.TerrainStage = Entry->TerrainStage;
 	Update.Location = Entry->Location;
 	Update.Scale = Entry->Scale;
 	Update.Exclusions = MoveTemp(InWorldCellBoxes);
@@ -124,6 +126,10 @@ bool FVoxelViewPublisher::EndBatch(TFunction<void()> InOnCommitted)
 		CommitBatch();
 		return true;
 	}
+	Updates.StableSort([](const FUpdate& A, const FUpdate& B)
+	{
+		return A.TerrainStage < B.TerrainStage;
+	});
 	++BatchSerial;
 	BuildIndex = 0;
 	PrepareIndex = 0;
@@ -147,6 +153,7 @@ void FVoxelViewPublisher::AdmitBuilds()
 		}
 		FVoxelTaskRequest Request;
 		Request.Kind = EVoxelTaskKind::BuildViewCoverage;
+		Request.TerrainStage = Update.TerrainStage;
 		Request.WorkClass = EVoxelWorkClass::Visible;
 		Request.Stamp.WorldEpoch = WorldEpoch;
 		Request.Stamp.Token = HashCombineFast(GetTypeHash(BatchSerial), GetTypeHash(BuildIndex));

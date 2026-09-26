@@ -11,7 +11,8 @@ public:
 	FVoxelResidencyManager(
 		FVoxelWorldRuntime& InRuntime,
 		FVoxelTaskScheduler& InScheduler,
-		TFunction<void(const FIntVector&)> InBeforeEvict);
+		TFunction<void(const FIntVector&)> InBeforeEvict,
+		TFunction<bool(const FIntVector&)> InRetainSection = {});
 
 	void Tick(
 		const TMap<FIntVector, FVoxelExactDemand>& InDemand,
@@ -31,6 +32,7 @@ private:
 	FVoxelWorldRuntime& Runtime;
 	FVoxelTaskScheduler& Scheduler;
 	TFunction<void(const FIntVector&)> BeforeEvict;
+	TFunction<bool(const FIntVector&)> RetainSection;
 	TSet<FIntVector> Demanded;
 	uint64 CurrentInterestRevision = 0;
 	uint64 LastEvictionCheckFrame = 0;

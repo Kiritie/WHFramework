@@ -285,6 +285,35 @@ bool FVoxelResidencyPinTest::RunTest(const FString& InParameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelViewResidencyHandoffTest,
+	"WHFramework.Voxel.Streaming.View.ResidencyHandoff", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelViewResidencyHandoffTest::RunTest(const FString& Parameters)
+{
+	FVoxelWorldRuntime Runtime(4, true, VoxelTest::MakeRegistry(), VoxelTest::MakeGenerator());
+	FVoxelTaskScheduler Scheduler;
+	const FIntVector Key(-3, 2, 1);
+	Runtime.FindOrAllocate(Key, 0);
+	bool bAwaitingReplacement = true;
+	int32 Evictions = 0;
+	FVoxelResidencyManager Manager(Runtime, Scheduler,
+		[&Evictions](const FIntVector&) { ++Evictions; },
+		[&bAwaitingReplacement](const FIntVector&) { return bAwaitingReplacement; });
+	Manager.SetEvictGraceFrames(0);
+	const uint64 PreviousFrame = GFrameCounter;
+	GFrameCounter += 15;
+	Manager.Tick({}, 1, 0.0);
+	TestNotNull(TEXT("Leaving demand does not unload geometry still awaiting replacement"), Runtime.FindSection(Key));
+	TestEqual(TEXT("Retained boundary data does not trigger invalidation"), Evictions, 0);
+	bAwaitingReplacement = false;
+	GFrameCounter += 15;
+	Manager.Tick({}, 1, 0.0);
+	TestNull(TEXT("Completed handoff releases data without another interest change"), Runtime.FindSection(Key));
+	TestEqual(TEXT("Completed handoff evicts exactly once"), Evictions, 1);
+	GFrameCounter = PreviousFrame;
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelPersistedResidencyTest, "WHFramework.Voxel.Streaming.PersistedResidency", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FVoxelPersistedResidencyTest::RunTest(const FString& InParameters)
@@ -414,6 +443,22 @@ bool FVoxelStreamingViewFrontierAdvancesTest::RunTest(const FString& InParameter
 	TestEqual(TEXT("Initial frontier covers only the nearest band"), Initial, 96.0);
 	TestEqual(TEXT("Ready near rings advance the frontier"), Advanced, 256.0);
 	TestTrue(TEXT("Far ring becomes admissible"), Admissions[2].DistanceCells <= Advanced);
+	const TArray<FVoxelViewAdmission> Handoff = {
+		{ EVoxelViewAdmissionKind::Fine, 32.0 },
+		{ EVoxelViewAdmissionKind::Fine, 160.0 },
+		{ EVoxelViewAdmissionKind::VoxelProxy, 192.0 }
+	};
+	const double HandoffFrontier = FVoxelViewManager::ResolveAdmissionFrontier(
+		Handoff,
+		[](const FVoxelViewAdmission& Admission)
+		{
+			return Admission.Kind != EVoxelViewAdmissionKind::Fine || Admission.DistanceCells == 32.0;
+		}, 64.0);
+	TestTrue(TEXT("Built near mesh allows remaining fine siblings before visual handoff"),
+		Handoff[1].DistanceCells <= HandoffFrontier);
+	TestEqual(TEXT("Uncommitted fine meshes still block the proxy stage"),
+		FVoxelViewManager::ResolveActiveAdmissionKind(Handoff,
+			[](const FVoxelViewAdmission&) { return false; }), 0);
 	return true;
 }
 
@@ -671,6 +716,152 @@ bool FVoxelEmptyMeshApplyTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Prepared data does not publish geometry"), Result.HasHeavyApply());
 	Result.Kind = EVoxelTaskKind::BuildCollision;
 	TestTrue(TEXT("Collision keeps its heavy apply protection"), Result.HasHeavyApply());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelMovingPrioritySchedulerTest,
+	"WHFramework.Voxel.Streaming.Scheduler.MovingPriority", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelMovingPrioritySchedulerTest::RunTest(const FString& Parameters)
+{
+	TAtomic<bool> Release(false);
+	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskBudget Budget;
+	Budget.MaxConcurrentTasks = 1;
+	Scheduler.SetBudget(Budget);
+	TArray<uint64> Applied;
+	for (uint64 Token = 1; Token <= 3; ++Token)
+	{
+		FVoxelTaskRequest Request;
+		Request.Kind = EVoxelTaskKind::BuildFineMesh;
+		Request.WorkClass = EVoxelWorkClass::Visible;
+		Request.Stamp.Token = Token;
+		Request.DistanceScore = static_cast<double>(Token);
+		Request.ReservedBytes = 1024;
+		Request.Execute = [&Release](const TAtomic<bool>& Cancel)
+		{
+			while (!Release.Load() && !Cancel.Load()) FPlatformProcess::Sleep(0.001f);
+			FVoxelTaskResult Result;
+			Result.bSuccess = !Cancel.Load();
+			return Result;
+		};
+		TestTrue(TEXT("Movement test task enters scheduler"), Scheduler.Enqueue(MoveTemp(Request)));
+	}
+	Scheduler.UpdatePriorities([](EVoxelTaskKind, const FVoxelTaskStamp& Stamp,
+		EVoxelWorkClass& WorkClass, double& Distance, double& Forward)
+	{
+		WorkClass = Stamp.Token == 3 ? EVoxelWorkClass::Critical : EVoxelWorkClass::Interactive;
+		Distance = Stamp.Token == 3 ? 0.0 : 100.0;
+		Forward = 0.0;
+	});
+	TestEqual(TEXT("Promotion updates critical bookkeeping"), Scheduler.CriticalCount(), 1);
+	TestEqual(TEXT("Reprioritizing retains pending work"), Scheduler.GetDiagnostics().Pending, 2);
+	TestEqual(TEXT("Reprioritizing does not cancel the running task"), Scheduler.GetDiagnostics().Running, 1);
+	Release.Store(true);
+	const double Deadline = FPlatformTime::Seconds() + 5.0;
+	while (Scheduler.ActiveCount() > 0 && FPlatformTime::Seconds() < Deadline)
+	{
+		Scheduler.Tick([&Applied](FVoxelTaskResult&& Result)
+		{
+			if (!Result.bCanceled) Applied.Add(Result.Stamp.Token);
+		}, 8.0);
+		FPlatformProcess::Sleep(0.001f);
+	}
+	Scheduler.StopAndJoin();
+	if (!TestEqual(TEXT("All existing jobs complete exactly once"), Applied.Num(), 3)) return false;
+	TestEqual(TEXT("Already running task is preserved"), Applied[0], 1ull);
+	TestEqual(TEXT("Newly near task overtakes formerly near queued task"), Applied[1], 3ull);
+	TestEqual(TEXT("Formerly near task still completes"), Applied[2], 2ull);
+	TestEqual(TEXT("Critical bookkeeping clears after completion"), Scheduler.CriticalCount(), 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelTerrainStagePriorityTest,
+	"WHFramework.Voxel.Streaming.Scheduler.TerrainStagePriority", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
+{
+	const EVoxelTaskKind Kinds[] = {
+		EVoxelTaskKind::GenerateExactBase, EVoxelTaskKind::BuildFineMesh,
+		EVoxelTaskKind::GenerateVoxelProxy, EVoxelTaskKind::BuildVoxelProxy,
+		EVoxelTaskKind::GenerateSurface, EVoxelTaskKind::BuildSurface,
+		EVoxelTaskKind::GenerateMacro, EVoxelTaskKind::BuildMacro
+	};
+	for (int32 Earlier = 0; Earlier < 8; ++Earlier)
+	{
+		for (int32 Later = 0; Later < 8; ++Later)
+		{
+			if (Earlier / 2 >= Later / 2) continue;
+			FVoxelTaskRequest Predecessor;
+			Predecessor.Kind = Kinds[Earlier];
+			Predecessor.WorkClass = EVoxelWorkClass::Prefetch;
+			Predecessor.DistanceScore = 100000.0;
+			Predecessor.QueuedAt = 100.0;
+			FVoxelTaskRequest Successor;
+			Successor.Kind = Kinds[Later];
+			Successor.WorkClass = EVoxelWorkClass::Visible;
+			Successor.DistanceScore = 0.0;
+			Successor.QueuedAt = 0.0;
+			TestTrue(TEXT("Earlier terrain data and mesh outrank a nearer older later stage"),
+				FVoxelTaskScheduler::IsHigherPriority(Predecessor, Successor));
+			TestFalse(TEXT("Later terrain stage cannot overtake its predecessor"),
+				FVoxelTaskScheduler::IsHigherPriority(Successor, Predecessor));
+		}
+	}
+	for (const int32 WorkerCount : { 1, 16 })
+	{
+		TAtomic<bool> Release(false);
+		TAtomic<int32> Finished(0);
+		FVoxelTaskScheduler Scheduler;
+		FVoxelTaskBudget Budget;
+		Budget.MaxConcurrentTasks = WorkerCount;
+		Budget.MaxConcurrentCoarseTerrainTasks = WorkerCount;
+		Scheduler.SetBudget(Budget);
+		auto Enqueue = [&](const int32 Index)
+		{
+			FVoxelTaskRequest Request;
+			Request.Kind = Index == 8 ? EVoxelTaskKind::BuildCollision : Kinds[Index];
+			Request.WorkClass = Index == 8 ? EVoxelWorkClass::Critical : EVoxelWorkClass::Visible;
+			Request.Stamp.Token = Index;
+			Request.DistanceScore = 1000.0 - Index;
+			Request.ReservedBytes = 1024;
+			Request.Execute = [&Release, &Finished](const TAtomic<bool>& Cancel)
+			{
+				while (!Release.Load() && !Cancel.Load()) FPlatformProcess::Sleep(0.001f);
+				FVoxelTaskResult Result;
+				Result.bSuccess = !Cancel.Load();
+				++Finished;
+				return Result;
+			};
+			TestTrue(TEXT("Stage ordering fixture enters scheduler"), Scheduler.Enqueue(MoveTemp(Request)));
+		};
+		Enqueue(8);
+		for (int32 Index = 7; Index >= 0; --Index) Enqueue(Index);
+		if (WorkerCount == 1) FPlatformProcess::Sleep(1.05f);
+		Release.Store(true);
+		const double Deadline = FPlatformTime::Seconds() + 5.0;
+		if (WorkerCount > 1)
+		{
+			while (Finished.Load() < 9 && FPlatformTime::Seconds() < Deadline) FPlatformProcess::Sleep(0.001f);
+			FPlatformProcess::Sleep(0.01f);
+		}
+		TArray<int32> Stages;
+		while (Scheduler.ActiveCount() > 0 && FPlatformTime::Seconds() < Deadline)
+		{
+			Scheduler.Tick([&Stages](FVoxelTaskResult&& Result)
+			{
+				if (Result.Stamp.Token < 8 && !Result.bCanceled) Stages.Add(static_cast<int32>(Result.Stamp.Token) / 2);
+			}, 8.0);
+			FPlatformProcess::Sleep(0.001f);
+		}
+		Scheduler.StopAndJoin();
+		TestEqual(TEXT("All terrain tasks finish without cancellation"), Stages.Num(), 8);
+		for (int32 Index = 1; Index < Stages.Num(); ++Index)
+		{
+			TestTrue(TEXT("Dispatch and completed-result application preserve stage order, including aged jobs"),
+				Stages[Index - 1] <= Stages[Index]);
+		}
+	}
 	return true;
 }
 

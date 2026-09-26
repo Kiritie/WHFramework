@@ -770,10 +770,6 @@ bool UVoxelModule::StartWorld(
 		*Scheduler,
 		[this](const FIntVector& InSection)
 		{
-			if (ViewManager)
-			{
-				ViewManager->InvalidateSection(InSection);
-			}
 			if (CollisionPresenter)
 			{
 				CollisionPresenter->InvalidateSection(InSection);
@@ -802,6 +798,10 @@ bool UVoxelModule::StartWorld(
 					SceneRegions.Remove(RegionKey);
 				}
 			}
+		},
+		[this](const FIntVector& InSection)
+		{
+			return ViewManager && ViewManager->RequiresSectionData(InSection);
 		});
 	if (GetWorld()->GetNetMode() != NM_DedicatedServer)
 	{
