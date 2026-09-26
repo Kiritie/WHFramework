@@ -84,7 +84,7 @@ bool FVoxelMacroTerrainBuilder::Build(
 				32767);
 
 		Data.ForestCoverage[Index] = static_cast<uint8>(
-			EcologySample.TreeDensity * 255 / 1000);
+			EcologySample.bTreeAllowed ? EcologySample.TreeDensity * 255 / 1000 : 0);
 
 		Data.SnowCoverage[Index] =
 			static_cast<uint8>(

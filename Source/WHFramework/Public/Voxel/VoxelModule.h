@@ -125,6 +125,10 @@ public:
 	FGuid RegisterSource(UObject* InOwner, const FVoxelStreamingSource& InSource);
 	bool UpdateSource(const FGuid& InId, const FVoxelStreamingSource& InSource);
 	void UnregisterSource(const FGuid& InId);
+	bool IsSourceAdmitted(const FGuid& InId) const;
+	void CollectStreamingSourcesForOwner(const AActor* InOwner, TArray<FVoxelStreamingSource>& OutSources) const;
+	FVoxelStreamingReadiness QueryStreamingReadiness(const FGuid& InId) const;
+	FVoxelStreamingReadiness QueryBoundsReadiness(const FVoxelGenerationBounds& InBounds, bool bInRequireCollision) const;
 	void ForceVoxelStreamingRefresh();
 	void SetRemoteChangeState(const FIntVector& InSection, EVoxelSectionChangeState InState);
 	bool ApplyRemoteRepresentation(const FVoxelRepresentationReply& InReply, FString& OutError);
@@ -179,6 +183,23 @@ public:
 	FVoxelWorldInitialized OnWorldInitialized;
 
 protected:
+	virtual void OnWorldStopping();
+	virtual bool BuildInteractionPlan(
+		const FVoxelTraceResult& InHit,
+		EVoxelEditAction InAction,
+		uint16 InPlaceType,
+		const FVector& InViewDirection,
+		AActor* InSource,
+		FVoxelInteractionPlan& OutPlan,
+		FString& OutError);
+	virtual void OnInteractionCommitted(
+		const FVoxelInteractionPlan& InPlan,
+		AActor* InSource);
+
+	virtual bool ValidateInteractionPlan(
+		FVoxelInteractionPlan& InOutPlan,
+		FString& OutError);
+
 	/** Project-specific authored content that changes the generated base world. */
 	virtual uint64 GetGenerationIdentitySalt() const;
 

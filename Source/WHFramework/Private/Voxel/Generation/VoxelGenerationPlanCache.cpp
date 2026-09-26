@@ -817,33 +817,19 @@ void FVoxelGenerationPlanCache::UpdateRetention(
 
 bool FVoxelGenerationPlanCache::IsRetained(
 	const FIntPoint& InPosition,
-	const int32 InRadius,
+	int32 FVoxelGenerationCacheRetentionPoint::* InRadius,
 	const FVoxelGenerationCacheRetention& InRetention) const
 {
-	if (InRetention.Centers.IsEmpty())
+	for (const FVoxelGenerationCacheRetentionPoint& Point : InRetention.Points)
 	{
-		return true;
-	}
-
-	for (const FIntPoint& Center :
-		InRetention.Centers)
-	{
-		if (FMath::Abs(
-				InPosition.X -
-					Center.X) <=
-				InRadius &&
-			FMath::Abs(
-				InPosition.Y -
-					Center.Y) <=
-				InRadius)
+		if (FMath::Abs(static_cast<int64>(InPosition.X) - Point.Center.X) <= Point.*InRadius &&
+			FMath::Abs(static_cast<int64>(InPosition.Y) - Point.Center.Y) <= Point.*InRadius)
 		{
 			return true;
 		}
 	}
-
 	return false;
 }
-
 void FVoxelGenerationPlanCache::TickMaintenance(
 	const int32 InMaxEntries)
 {
@@ -894,7 +880,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			Retention;
 	}
 
-	if (Snapshot.Centers.IsEmpty())
+	if (Snapshot.Revision == 0)
 	{
 		return;
 	}
@@ -929,7 +915,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			{
 				return IsRetained(
 					InKey,
-					Snapshot.NaturalRadiusCells,
+					&FVoxelGenerationCacheRetentionPoint::NaturalRadiusCells,
 					Snapshot);
 			});
 
@@ -944,7 +930,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			{
 				return IsRetained(
 					InKey,
-					Snapshot.NaturalRadiusCells,
+					&FVoxelGenerationCacheRetentionPoint::NaturalRadiusCells,
 					Snapshot);
 			});
 
@@ -986,7 +972,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 
 				return IsRetained(
 					RegionCenter,
-					Snapshot.HydrologyRadiusCells,
+					&FVoxelGenerationCacheRetentionPoint::HydrologyRadiusCells,
 					Snapshot);
 			});
 
@@ -1007,7 +993,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 					FIntPoint(
 						Origin.X,
 						Origin.Y),
-					Snapshot.PlanRadiusCells,
+					&FVoxelGenerationCacheRetentionPoint::PlanRadiusCells,
 					Snapshot);
 			});
 
@@ -1022,7 +1008,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 				const FIntPoint Center = InKey.Coordinate * 64 + FIntPoint(32, 32);
 				return IsRetained(
 					Center,
-					Snapshot.PlanRadiusCells,
+					&FVoxelGenerationCacheRetentionPoint::PlanRadiusCells,
 					Snapshot);
 			});
 
@@ -1043,7 +1029,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 					FIntPoint(
 						Origin.X,
 						Origin.Y),
-					Snapshot.PlanRadiusCells,
+					&FVoxelGenerationCacheRetentionPoint::PlanRadiusCells,
 					Snapshot);
 			});
 
@@ -1064,7 +1050,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 					FIntPoint(
 						Origin.X,
 						Origin.Y),
-					Snapshot.PlanRadiusCells,
+					&FVoxelGenerationCacheRetentionPoint::PlanRadiusCells,
 					Snapshot);
 			});
 

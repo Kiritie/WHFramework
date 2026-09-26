@@ -35,7 +35,7 @@ public:
     UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="Voxel") FPrimaryAssetId DropAssetID;
     UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="Voxel",meta=(ClampMin="0",ClampMax="64")) int32 DropCount=1;
     UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="Voxel",meta=(ClampMin="0",ClampMax="65535")) int32 EntityKind=0;
-    UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="Voxel",meta=(ClampMin="0",ClampMax="2")) int32 EntityVariant=0;
+    UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="Voxel",meta=(ClampMin="0",ClampMax="255")) int32 EntityVariant=0;
     UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="Voxel|Rendering") FVoxelFaceMaterialSet FaceMaterials;
     UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="Voxel|Rendering") FVoxelFaceMaterialSet UpperFaceMaterials;
     UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="Voxel|Sound") TMap<FName,TSoftObjectPtr<USoundBase>> Sounds;

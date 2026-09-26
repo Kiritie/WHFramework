@@ -135,6 +135,11 @@ namespace
 			InA.SimulationRadius != InB.SimulationRadius ||
 			InA.VerticalExactRadius != InB.VerticalExactRadius ||
 			InA.RenderMode != InB.RenderMode ||
+			InA.Purpose != InB.Purpose ||
+			InA.bAffectsGlobalReadiness != InB.bAffectsGlobalReadiness ||
+			InA.bRetainGenerationCache != InB.bRetainGenerationCache ||
+			InA.RetentionRadiusCells != InB.RetentionRadiusCells ||
+			InA.MovementCriticalCollisionRadius != InB.MovementCriticalCollisionRadius ||
 			InA.bCollision != InB.bCollision ||
 			InA.bSimulation != InB.bSimulation)
 		{
@@ -844,6 +849,10 @@ bool UVoxelModule::StartWorld(
 	return true;
 }
 
+void UVoxelModule::OnWorldStopping()
+{
+}
+
 bool UVoxelModule::StopWorld(const bool bDiscardDirty, FString& OutError)
 {
 	if (!Runtime)
@@ -869,6 +878,7 @@ bool UVoxelModule::StopWorld(const bool bDiscardDirty, FString& OutError)
 		}
 	}
 
+	OnWorldStopping();
 	WorldState = EVoxelWorldState::Closing;
 	++Epoch;
 	if (Scheduler)
@@ -1222,6 +1232,86 @@ void UVoxelModule::ForceVoxelStreamingRefresh()
 	LastInterestRefresh = -1.0;
 }
 
+bool UVoxelModule::IsSourceAdmitted(const FGuid& InId) const
+{
+	const FSource* Source = Sources.Find(InId);
+	const FVoxelSourceInterest* Admitted = CurrentInterest.Sources.Find(InId);
+	return Source && Source->Owner.IsValid() && Admitted &&
+		Source->Value.Center == Admitted->Source.Center &&
+		!StreamingSourceAffectsInterest(Admitted->Source, Source->Value, ViewSettings);
+}
+
+void UVoxelModule::CollectStreamingSourcesForOwner(const AActor* InOwner, TArray<FVoxelStreamingSource>& OutSources) const
+{
+	for (const auto& Pair : Sources)
+	{
+		const UObject* Owner = Pair.Value.Owner.Get();
+		if (Owner && InOwner && (Owner == InOwner || Owner->GetTypedOuter<AActor>() == InOwner))
+		{
+			OutSources.Add(Pair.Value.Value);
+		}
+	}
+}
+
+FVoxelStreamingReadiness UVoxelModule::QueryStreamingReadiness(const FGuid& InId) const
+{
+	FVoxelStreamingReadiness Result;
+	Result.bAdmitted = IsReady() && IsSourceAdmitted(InId);
+	if (!Result.bAdmitted)
+	{
+		return Result;
+	}
+	const FVoxelSourceInterest& Interest = CurrentInterest.Sources.FindChecked(InId);
+	Result.RequiredDataSections = Interest.DataSections.Num();
+	Result.RequiredCollisionSections = Interest.CollisionSections.Num();
+	for (const FIntVector& Key : Interest.DataSections)
+	{
+		const FVoxelSection* Section = Runtime->FindSection(Key);
+		Result.ReadyDataSections += Section && Section->Status == EVoxelSectionStatus::DataReady ? 1 : 0;
+	}
+	for (const FIntVector& Key : Interest.CollisionSections)
+	{
+		Result.ReadyCollisionSections += IsCollisionReady(Key) ? 1 : 0;
+	}
+	return Result;
+}
+
+FVoxelStreamingReadiness UVoxelModule::QueryBoundsReadiness(const FVoxelGenerationBounds& InBounds, const bool bInRequireCollision) const
+{
+	FVoxelStreamingReadiness Result;
+	if (!IsReady() || InBounds.Min.X >= InBounds.Max.X || InBounds.Min.Y >= InBounds.Max.Y || InBounds.Min.Z >= InBounds.Max.Z)
+	{
+		return Result;
+	}
+	const FIntVector Min = VoxelModuleToSection(InBounds.Min);
+	const FIntVector Max = VoxelModuleToSection(InBounds.Max - FIntVector(1));
+	const FIntVector Size = Max - Min + FIntVector(1);
+	if (Size.X > 4096 || Size.Y > 4096 || Size.Z > 4096 || static_cast<int64>(Size.X) * Size.Y * Size.Z > 4096)
+	{
+		return Result;
+	}
+	Result.bAdmitted = true;
+	for (int32 Z = Min.Z; Z <= Max.Z; ++Z)
+	{
+		for (int32 Y = Min.Y; Y <= Max.Y; ++Y)
+		{
+			for (int32 X = Min.X; X <= Max.X; ++X)
+			{
+				const FIntVector Key(X, Y, Z);
+				const FVoxelSection* Section = Runtime->FindSection(Key);
+				++Result.RequiredDataSections;
+				Result.ReadyDataSections += Section && Section->Status == EVoxelSectionStatus::DataReady ? 1 : 0;
+				if (bInRequireCollision)
+				{
+					++Result.RequiredCollisionSections;
+					Result.ReadyCollisionSections += IsCollisionReady(Key) ? 1 : 0;
+				}
+			}
+		}
+	}
+	return Result;
+}
+
 void UVoxelModule::SetRemoteChangeState(
 	const FIntVector& InSection,
 	const EVoxelSectionChangeState InState)
@@ -1454,26 +1544,24 @@ void UVoxelModule::RefreshInterest(
 		Pair.Value.PlannedValue = Pair.Value.Value;
 	}
 
-	if (GenerationCache && !ActiveSources.IsEmpty())
+	if (GenerationCache)
 	{
 		FVoxelGenerationCacheRetention Retention;
-		Retention.Centers.Reserve(ActiveSources.Num());
-		for (const FVoxelStreamingSource& Source : ActiveSources)
-		{
-			Retention.Centers.Add(FIntPoint(Source.Center.X, Source.Center.Y));
-		}
-		Retention.NaturalRadiusCells = FMath::Max(ViewSettings.SurfaceRadius, ViewSettings.VoxelProxyRadius) + 512;
-		Retention.PlanRadiusCells = Retention.NaturalRadiusCells + 512;
 		Retention.HydrologyRegionSide = FMath::Max(8, Manifest.Settings.HydrologyRegionSide);
 		Retention.HydrologyCellSize = FMath::Max(1, Manifest.Settings.HydrologyCellSize);
-		const int64 HydrologyRegionCellSide =
-			static_cast<int64>(Retention.HydrologyRegionSide) *
-			Retention.HydrologyCellSize;
-		Retention.HydrologyRadiusCells = static_cast<int32>(FMath::Clamp<int64>(
-			static_cast<int64>(Retention.PlanRadiusCells) + HydrologyRegionCellSide,
-			1,
-			MAX_int32));
-		Retention.Revision = InterestRevision;
+		const int64 HydrologySide = static_cast<int64>(Retention.HydrologyRegionSide) * Retention.HydrologyCellSize;
+		for (const FVoxelStreamingSource& Source : ActiveSources)
+		{
+			if (!Source.bRetainGenerationCache) continue;
+			FVoxelGenerationCacheRetentionPoint& Point = Retention.Points.AddDefaulted_GetRef();
+			Point.Center = FIntPoint(Source.Center.X, Source.Center.Y);
+			Point.NaturalRadiusCells = Source.RetentionRadiusCells > 0 ? Source.RetentionRadiusCells :
+				FMath::Max(ViewSettings.SurfaceRadius, ViewSettings.VoxelProxyRadius) + 512;
+			Point.PlanRadiusCells = Source.RetentionRadiusCells > 0 ? Source.RetentionRadiusCells : Point.NaturalRadiusCells + 512;
+			Point.HydrologyRadiusCells = Source.RetentionRadiusCells > 0 ? Source.RetentionRadiusCells :
+				static_cast<int32>(FMath::Min<int64>(MAX_int32, Point.PlanRadiusCells + HydrologySide));
+		}
+		Retention.Revision = InterestRevision + 1;
 		GenerationCache->UpdateRetention(Retention);
 	}
 }
@@ -1577,7 +1665,9 @@ void UVoxelModule::UpdateReadiness()
 	Snapshot.PresentedPlayableFineSections = PlayableFine.Presented;
 	Snapshot.RequiredPrimaryRepresentations = PrimaryFine.Required;
 	Snapshot.ReadyPrimaryRepresentations = PrimaryFine.Ready;
-	Snapshot.PendingCriticalDependencies = Scheduler ? Scheduler->CriticalCount() : 0;
+	Snapshot.PendingCriticalDependencies =
+		FMath::Max(0, Snapshot.RequiredSpawnSections - Snapshot.ReadySpawnSections) +
+		FMath::Max(0, Snapshot.RequiredCollisionSections - Snapshot.ReadyCollisionSections);
 	const bool bSpawnDataReady = Snapshot.bSpawnPlanReady &&
 		Snapshot.ReadySpawnSections >= Snapshot.RequiredSpawnSections;
 	const bool bSpawnCollisionReady = bSpawnDataReady &&
@@ -1611,10 +1701,6 @@ void UVoxelModule::UpdateReadiness()
 	else if (!bPrimaryViewReady)
 	{
 		ReadyStage = EVoxelWorldReadyStage::SpawnCollisionReady;
-	}
-	else if (Snapshot.PendingCriticalDependencies > 0)
-	{
-		ReadyStage = EVoxelWorldReadyStage::PrimaryViewReady;
 	}
 	else
 	{
@@ -1764,7 +1850,7 @@ bool UVoxelModule::PlacementOverlapsActors(const FVoxelInteractionPlan& InPlan) 
 	Objects.AddObjectTypesToQuery(ECC_WorldDynamic);
 	for (const FVoxelCellEdit& Edit : InPlan.Cells)
 	{
-		if (Edit.Value.IsAir())
+		if (Edit.Value.IsAir() || Edit.Value == Edit.Expected)
 		{
 			continue;
 		}
@@ -1920,17 +2006,14 @@ FVoxelEditReply UVoxelModule::ExecuteIntent(
 	}
 
 	FVoxelInteractionPlan Plan;
-	if (!FVoxelEditTransaction::Build(
-		*Runtime,
-		*Registry.GetSnapshot(),
-		*Shapes,
+	if (!BuildInteractionPlan(
 		Hit,
 		InIntent.Action,
 		PlaceType,
 		InIntent.Direction,
-		BlockSize(),
+		InSource,
 		Plan,
-		Reply.Reason))
+		Reply.Reason) || !ValidateInteractionPlan(Plan, Reply.Reason))
 	{
 		return Reply;
 	}
@@ -1995,8 +2078,23 @@ FVoxelEditReply UVoxelModule::ExecuteIntent(
 	}
 	Breaking.Remove(InSource);
 	PublishProjectEdit(Batch);
+	OnInteractionCommitted(Plan, InSource);
 	Reply.Code = EVoxelEditCode::Accepted;
 	return Reply;
+}
+
+bool UVoxelModule::BuildInteractionPlan(const FVoxelTraceResult& InHit, EVoxelEditAction InAction, uint16 InPlaceType, const FVector& InViewDirection, AActor* InSource, FVoxelInteractionPlan& OutPlan, FString& OutError)
+{
+	return FVoxelEditTransaction::Build(*Runtime, *Registry.GetSnapshot(), *Shapes, InHit, InAction, InPlaceType, InViewDirection, BlockSize(), OutPlan, OutError);
+}
+
+void UVoxelModule::OnInteractionCommitted(const FVoxelInteractionPlan& InPlan, AActor* InSource)
+{
+}
+
+bool UVoxelModule::ValidateInteractionPlan(FVoxelInteractionPlan& InOutPlan, FString& OutError)
+{
+	return FVoxelEditTransaction::ValidateBatch(*Runtime, *Registry.GetSnapshot(), *Shapes, InOutPlan.Cells, OutError);
 }
 
 FVoxelEditReply UVoxelModule::TransferContainer(
@@ -2149,19 +2247,19 @@ bool UVoxelModule::ApplyPrefab(
 		Seen.Add(Edit.Position);
 		Cells.Add(Edit);
 	}
-	if (!FVoxelEditTransaction::ValidateBatch(*Runtime, *Registry.GetSnapshot(), *Shapes, Cells, OutError))
+	FVoxelInteractionPlan Plan;
+	Plan.Cells = Cells;
+	if (!ValidateInteractionPlan(Plan, OutError))
 	{
 		return false;
 	}
-	FVoxelInteractionPlan Plan;
-	Plan.Cells = Cells;
 	if (PlacementOverlapsActors(Plan))
 	{
 		OutError = TEXT("Prefab overlaps live actors");
 		return false;
 	}
 	FVoxelPreparedEdit Prepared;
-	if (!Runtime->PrepareEdit(Cells, {}, Prepared, OutError))
+	if (!Runtime->PrepareEdit(Plan.Cells, Plan.Entities, Prepared, OutError))
 	{
 		return false;
 	}

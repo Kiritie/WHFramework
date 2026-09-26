@@ -3,6 +3,14 @@
 #include "CoreMinimal.h"
 #include "Voxel/Rendering/VoxelViewTypes.h"
 #include "Voxel/Rendering/VoxelTerrainViewPlan.h"
+#include "Voxel/Streaming/VoxelStreamingSource.h"
+
+struct WHFRAMEWORK_API FVoxelSourceInterest
+{
+	FVoxelStreamingSource Source;
+	TSet<FIntVector> DataSections;
+	TSet<FIntVector> CollisionSections;
+};
 
 struct WHFRAMEWORK_API FVoxelExactDemand
 {
@@ -21,6 +29,7 @@ struct WHFRAMEWORK_API FVoxelExactDemand
 
 struct WHFRAMEWORK_API FVoxelInterestSet
 {
+	TMap<FGuid, FVoxelSourceInterest> Sources;
 	FVoxelTerrainViewPlan TerrainPlan;
 	TSharedPtr<const TSet<FIntVector>, ESPMode::ThreadSafe> FineSections;
 	TArray<FVoxelViewAdmission> Admissions;
@@ -35,7 +44,12 @@ struct WHFRAMEWORK_API FVoxelInterestSet
 
 	uint64 GetAllocatedBytes() const
 	{
-		return (FineSections ? FineSections->GetAllocatedSize() : 0) + Warmup.GetAllocatedSize() + ExactOrder.GetAllocatedSize() + PlayableFineKeys.GetAllocatedSize() + Admissions.GetAllocatedSize() + AdmissionLanes[0].GetAllocatedSize() + AdmissionLanes[1].GetAllocatedSize() +
+		uint64 SourceBytes = Sources.GetAllocatedSize();
+		for (const auto& Pair : Sources)
+		{
+			SourceBytes += Pair.Value.DataSections.GetAllocatedSize() + Pair.Value.CollisionSections.GetAllocatedSize();
+		}
+		return SourceBytes + (FineSections ? FineSections->GetAllocatedSize() : 0) + Warmup.GetAllocatedSize() + ExactOrder.GetAllocatedSize() + PlayableFineKeys.GetAllocatedSize() + Admissions.GetAllocatedSize() + AdmissionLanes[0].GetAllocatedSize() + AdmissionLanes[1].GetAllocatedSize() +
 			AdmissionLanes[2].GetAllocatedSize() + AdmissionLanes[3].GetAllocatedSize() + Exact.GetAllocatedSize() + VoxelProxy.GetAllocatedSize() + Surface.GetAllocatedSize() + Macro.GetAllocatedSize() +
 			TerrainPlan.Roots.GetAllocatedSize() + TerrainPlan.Leaves.GetAllocatedSize() +
 			TerrainPlan.Required.GetAllocatedSize() + TerrainPlan.FineDependencies.GetAllocatedSize();

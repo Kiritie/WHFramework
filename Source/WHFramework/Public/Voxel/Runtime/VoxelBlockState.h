@@ -24,9 +24,9 @@ namespace VoxelState
     constexpr uint16 FacingMask=7, HalfMask=8, OpenMask=16, HingeMask=32;
     constexpr uint16 WaterloggedMask=64, VariantMask=0x0780;
     constexpr uint16 ExtraMask=0xf800;
-    uint8 GetFacing(uint16 S);
-    uint16 WithFacing(uint16 S, uint8 Facing);
-    uint16 WithFlag(uint16 S, uint16 Mask, bool bSet);
-    uint8 GetConnections(uint16 S);
-    uint16 WithConnections(uint16 S, uint8 Mask);
+    WHFRAMEWORK_API uint8 GetFacing(uint16 S);
+    WHFRAMEWORK_API uint16 WithFacing(uint16 S, uint8 Facing);
+    WHFRAMEWORK_API uint16 WithFlag(uint16 S, uint16 Mask, bool bSet);
+    WHFRAMEWORK_API uint8 GetConnections(uint16 S);
+    WHFRAMEWORK_API uint16 WithConnections(uint16 S, uint8 Mask);
 }

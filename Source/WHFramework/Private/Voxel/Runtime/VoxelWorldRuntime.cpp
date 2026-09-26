@@ -1,6 +1,7 @@
 #include "Voxel/Runtime/VoxelWorldRuntime.h"
 
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "Voxel/Save/VoxelBlockEntityCodec.h"
 
 namespace VoxelWorldRuntimePrivate
 {
@@ -181,20 +182,35 @@ bool FVoxelWorldRuntime::PublishFinal(
 		Candidate[Pair.Key] = Pair.Value;
 	}
 
-	if (!ValidateSection(Candidate, InOverlay, OutError))
+	TMap<int32, FVoxelBlockEntityState> Entities = InEntities;
+	for (int32 Index = 0; Index < Candidate.Num(); ++Index)
+	{
+		const FVoxelRuntimeDefinition* Definition = Registry->Find(Candidate[Index].TypeId);
+		if (Definition && Definition->EntityKind && !InOverlay.Contains(Index) && !Entities.Contains(Index))
+		{
+			FVoxelBlockEntityState Entity;
+			if (!FVoxelBlockEntityCodec::MakeDefault(Definition->EntityKind, Entity, Definition->EntityVariant))
+			{
+				OutError = TEXT("Generated voxel entity has no registered default codec");
+				return false;
+			}
+			Entities.Add(Index, MoveTemp(Entity));
+		}
+	}
+	if (!ValidateSection(Candidate, InOverlay, Entities, OutError))
 	{
 		return false;
 	}
 
 	Section->Blocks = MoveTemp(Candidate);
 	Section->Overlay = InOverlay;
-	Section->Entities = InEntities;
+	Section->Entities = MoveTemp(Entities);
 	Section->CommittedRevision = InRevision;
 	Section->PersistedRevision = InRevision;
 	Section->Status = EVoxelSectionStatus::DataReady;
 	Section->bCollisionDirty = true;
 	Section->bFineMeshDirty = true;
-	ChangeIndex.SetModified(InSection, !Section->Overlay.IsEmpty());
+	ChangeIndex.SetModified(InSection, !Section->Overlay.IsEmpty() || !InEntities.IsEmpty());
 	ChangeHierarchy.InvalidateSection(InSection);
 	OutError.Reset();
 	return true;
@@ -330,10 +346,41 @@ bool FVoxelWorldRuntime::PrepareEdit(
 		PatchEdit.bNatural = Edit.Value == Natural;
 		PatchEdit.State = Edit.Value;
 		Target.Patch.Edits.Add(PatchEdit);
+		if (Edit.Expected.TypeId != Edit.Value.TypeId)
+		{
+			const FVoxelRuntimeDefinition* Definition = Registry->Find(Edit.Value.TypeId);
+			if (Definition->EntityKind || Target.Entities.Contains(CellIndex))
+			{
+				FVoxelEntityWrite Write;
+				Write.CellIndex = CellIndex;
+				Write.bRemove = Definition->EntityKind == 0;
+				if (Write.bRemove)
+				{
+					Target.Entities.Remove(CellIndex);
+				}
+				else
+				{
+					if (!FVoxelBlockEntityCodec::MakeDefault(Definition->EntityKind, Write.Value, Definition->EntityVariant))
+					{
+						OutError = TEXT("Edited voxel entity has no registered default codec");
+						return false;
+					}
+					Target.Entities.Add(CellIndex, Write.Value);
+				}
+				Target.Patch.Entities.Add(MoveTemp(Write));
+			}
+		}
 	}
 
+	TSet<FIntVector> SeenEntityPositions;
 	for (const FVoxelEntityEdit& Edit : InEntities)
 	{
+		if (SeenEntityPositions.Contains(Edit.Position))
+		{
+			OutError = TEXT("Voxel entity edit contains a duplicate position");
+			return false;
+		}
+		SeenEntityPositions.Add(Edit.Position);
 		const FIntVector SectionKey = ToSection(Edit.Position);
 		int32* PreparedIndex = SectionToPrepared.Find(SectionKey);
 		if (!PreparedIndex)
@@ -359,14 +406,6 @@ bool FVoxelWorldRuntime::PrepareEdit(
 
 		FVoxelPreparedSection& Target = Prepared.Sections[*PreparedIndex];
 		const int32 CellIndex = ToCellIndex(Edit.Position);
-		if (Target.Patch.Entities.ContainsByPredicate([CellIndex](const FVoxelEntityWrite& InWrite)
-		{
-			return InWrite.CellIndex == CellIndex;
-		}))
-		{
-			OutError = TEXT("Voxel entity edit contains a duplicate position");
-			return false;
-		}
 		FVoxelEntityWrite Write;
 		Write.CellIndex = CellIndex;
 		Write.bRemove = Edit.bRemove;
@@ -379,7 +418,17 @@ bool FVoxelWorldRuntime::PrepareEdit(
 		{
 			Target.Entities.Add(CellIndex, Write.Value);
 		}
-		Target.Patch.Entities.Add(MoveTemp(Write));
+		if (FVoxelEntityWrite* Existing = Target.Patch.Entities.FindByPredicate([CellIndex](const FVoxelEntityWrite& InWrite)
+		{
+			return InWrite.CellIndex == CellIndex;
+		}))
+		{
+			*Existing = MoveTemp(Write);
+		}
+		else
+		{
+			Target.Patch.Entities.Add(MoveTemp(Write));
+		}
 	}
 
 	Prepared.Sections.RemoveAll([](const FVoxelPreparedSection& InSection)
@@ -389,7 +438,7 @@ bool FVoxelWorldRuntime::PrepareEdit(
 
 	for (const FVoxelPreparedSection& Section : Prepared.Sections)
 	{
-		if (!ValidateSection(Section.Blocks, Section.Overlay, OutError))
+		if (!ValidateSection(Section.Blocks, Section.Overlay, Section.Entities, OutError))
 		{
 			return false;
 		}
@@ -626,6 +675,7 @@ bool FVoxelWorldRuntime::ValidateState(const FVoxelBlockState& InState) const
 bool FVoxelWorldRuntime::ValidateSection(
 	const TArray<FVoxelBlockState>& InBlocks,
 	const TMap<int32, FVoxelBlockState>& InOverlay,
+	const TMap<int32, FVoxelBlockEntityState>& InEntities,
 	FString& OutError) const
 {
 	if (InBlocks.Num() != SectionVolume || InOverlay.Num() > SectionVolume)
@@ -634,11 +684,27 @@ bool FVoxelWorldRuntime::ValidateSection(
 		return false;
 	}
 
+	int32 RequiredEntities = 0;
 	for (const FVoxelBlockState& State : InBlocks)
 	{
 		if (!ValidateState(State))
 		{
 			OutError = TEXT("Voxel section contains an invalid block state");
+			return false;
+		}
+		RequiredEntities += Registry->Find(State.TypeId)->EntityKind != 0 ? 1 : 0;
+	}
+	if (InEntities.Num() != RequiredEntities)
+	{
+		OutError = TEXT("Voxel section entity count does not match its stateful blocks");
+		return false;
+	}
+	for (const TPair<int32, FVoxelBlockEntityState>& Entity : InEntities)
+	{
+		const FVoxelRuntimeDefinition* Definition = InBlocks.IsValidIndex(Entity.Key) ? Registry->Find(InBlocks[Entity.Key].TypeId) : nullptr;
+		if (!Definition || !Definition->EntityKind || Definition->EntityKind != Entity.Value.Kind || !FVoxelBlockEntityCodec::Validate(Entity.Value))
+		{
+			OutError = TEXT("Voxel entity kind or payload does not match its owning block");
 			return false;
 		}
 	}
@@ -729,7 +795,7 @@ bool FVoxelWorldRuntime::BuildPatchCandidate(
 		}
 	}
 
-	return ValidateSection(OutBlocks, OutOverlay, OutError);
+	return ValidateSection(OutBlocks, OutOverlay, OutEntities, OutError);
 }
 
 void FVoxelWorldRuntime::PublishPatchCandidate(

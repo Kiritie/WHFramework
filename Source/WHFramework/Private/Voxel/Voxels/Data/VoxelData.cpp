@@ -1,5 +1,6 @@
 #include "Voxel/Voxels/Data/VoxelData.h"
 #include "Ability/PickUp/AbilityPickUpVoxel.h"
+#include "Voxel/Save/VoxelBlockEntityCodec.h"
 bool FVoxelBakedFaceRef::ToRuntime(FVoxelRuntimeFaceRef&O)const
 {
     if(Bank<0||Bank>65535||Layer<0||Layer>65535||Frames<1||Frames>256||FPS<0||FPS>60||Layer+Frames>65536)return false;
@@ -18,12 +19,25 @@ bool UVoxelData::ValidateDefinition(bool Render,FString&E)const
     if(BlockName.IsNone()||!N.Contains(TEXT(":"))||N!=N.ToLower()||N==TEXT("core:air")){E=TEXT("Invalid stable block name");return false;}
     for(TCHAR C:N)if(!((C>='a'&&C<='z')||(C>='0'&&C<='9')||C==':'||C=='_'||C=='/'||C=='.'||C=='-')){E=TEXT("Block name must be lowercase ASCII");return false;}
     if(uint8(Shape)>uint8(EVoxelShapeKind::Fluid)||uint8(RenderGroup)>uint8(EVoxelRenderGroup::Emissive)||
-       BreakMilliseconds<0||BreakMilliseconds>600000||DropCount<0||DropCount>64||EntityKind<0||EntityKind>65535)
+       BreakMilliseconds<0||BreakMilliseconds>600000||DropCount<0||DropCount>64||EntityKind<0||EntityKind>65535||EntityVariant<0||EntityVariant>255)
     {E=TEXT("Invalid voxel definition range");return false;}
     if((Shape==EVoxelShapeKind::CrossPlant||Shape==EVoxelShapeKind::Fluid||Shape==EVoxelShapeKind::Torch||Shape==EVoxelShapeKind::Ladder)&&bSolid)
     {E=TEXT("This non-cube shape must use bSolid=false");return false;}
-    if((EntityKind==100&&(EntityVariant<1||EntityVariant>2))||(EntityKind!=100&&EntityVariant!=0)){E=TEXT("Invalid entity variant");return false;}
-    if(EntityKind!=0&&EntityKind!=1&&EntityKind!=2&&EntityKind!=100&&EntityKind!=101){E=TEXT("Unsupported voxel entity kind");return false;}
+    if (EntityKind == 0 && EntityVariant != 0)
+    {
+        E = TEXT("An entity variant requires a registered entity kind");
+        return false;
+    }
+    if (EntityKind != 0)
+    {
+        FVoxelBlockEntityState Entity;
+        if (!FVoxelBlockEntityCodec::MakeDefault(static_cast<uint16>(EntityKind), Entity, EntityVariant) ||
+            !FVoxelBlockEntityCodec::Validate(Entity))
+        {
+            E = TEXT("Voxel entity kind or variant is not supported by its registered codec");
+            return false;
+        }
+    }
     for(int32 Half=0;Half<(Shape==EVoxelShapeKind::Door?2:1);++Half)
     {
         const FVoxelFaceMaterialSet& Set=Half?UpperFaceMaterials:FaceMaterials;

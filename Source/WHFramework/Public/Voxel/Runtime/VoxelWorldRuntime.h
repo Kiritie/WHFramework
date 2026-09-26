@@ -85,6 +85,7 @@ private:
 	bool ValidateSection(
 		const TArray<FVoxelBlockState>& InBlocks,
 		const TMap<int32, FVoxelBlockState>& InOverlay,
+		const TMap<int32, FVoxelBlockEntityState>& InEntities,
 		FString& OutError) const;
 	bool BuildPatchCandidate(
 		const FVoxelSection& InSection,

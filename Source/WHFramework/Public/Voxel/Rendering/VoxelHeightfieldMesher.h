@@ -24,7 +24,8 @@ public:
 		const TAtomic<bool>* InCancel = nullptr,
 		TConstArrayView<uint8> InCoverage = {},
 		double InZBiasCells = 0.0,
-		double InMaximumTextureStretchCells = 4.0);
+		double InMaximumTextureStretchCells = 4.0,
+		TConstArrayView<FLinearColor> InTopTints = {});
 
 	static bool BuildMacro(
 		const FVoxelMacroTileData& InMacro,

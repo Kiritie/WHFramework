@@ -209,13 +209,15 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 	const TAtomic<bool>* InCancel,
 	TConstArrayView<uint8> InCoverage,
 	const double InZBiasCells,
-	const double InMaximumTextureStretchCells)
+	const double InMaximumTextureStretchCells,
+	TConstArrayView<FLinearColor> InTopTints)
 {
 	if (InVertexSide < 2 ||
 		InStep <= 0 ||
 		InHeights.Num() != InVertexSide * InVertexSide ||
 		InMaterials.Num() != InHeights.Num() ||
-		(!InCoverage.IsEmpty() && InCoverage.Num() != InHeights.Num()))
+		(!InCoverage.IsEmpty() && InCoverage.Num() != InHeights.Num()) ||
+		(!InTopTints.IsEmpty() && InTopTints.Num() != InHeights.Num()))
 	{
 		OutError = TEXT("Invalid blocky heightfield input");
 		return false;
@@ -248,7 +250,7 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 		};
 
 	auto AppendMaterialQuad =
-		[&Mesh, &InConfig, &InRegistry, &InMaterials, &InHeights, &CellIndex, &OutError](
+		[&Mesh, &InConfig, &InRegistry, &InMaterials, &InHeights, &InTopTints, &CellIndex, &OutError](
 			const int32 InMaterialX,
 			const int32 InMaterialY,
 			const uint8 InFaceIndex,
@@ -278,7 +280,9 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 			}
 
 			FVoxelRenderBatch& Batch = FindOrAddBatch(Mesh, Definition->RenderGroup, Face->Bank);
-			AppendQuad(Batch.Mesh, InA, InB, InC, InD, *Face, InColor);
+			const FLinearColor Tint = InFaceIndex == FacePositiveZ && !InTopTints.IsEmpty()
+				? InTopTints[CellIndex(InMaterialX, InMaterialY)] : FLinearColor::White;
+			AppendQuad(Batch.Mesh, InA, InB, InC, InD, *Face, InColor * Tint);
 			return true;
 		};
 
@@ -458,17 +462,44 @@ bool FVoxelHeightfieldMesher::BuildMacro(
 {
 	const int32 Count = InMacro.Side * InMacro.Side;
 	if (InMacro.Side < 2 || InMacro.Step <= 0 ||
-		InMacro.WaterHeight.Num() != Count)
+		InMacro.WaterHeight.Num() != Count || InMacro.Height.Num() != Count ||
+		InMacro.SurfaceClass.Num() != Count ||
+		(!InMacro.ForestCoverage.IsEmpty() && InMacro.ForestCoverage.Num() != Count))
 	{
 		OutError = TEXT("Invalid macro water input");
 		return false;
 	}
 
+	TArray<FLinearColor> TopTints;
+	if (InConfig.Recipe->Settings.Ecology.Tree.bEnabled && !InMacro.ForestCoverage.IsEmpty())
+	{
+		FVoxelBlockState Leaves;
+		const FVoxelRuntimeDefinition* LeafDefinition =
+			InConfig.ToRuntime(InConfig.Recipe->Ecology.TreeLeaves, Leaves) && !Leaves.IsAir()
+				? InRegistry.Find(Leaves.TypeId) : nullptr;
+		if (!LeafDefinition)
+		{
+			OutError = TEXT("Macro forest material is missing from registry");
+			return false;
+		}
+		FLinearColor LeafTint = LeafDefinition->Face(Leaves.State, TopMaterialFace).Tint;
+		LeafTint.A = 1.0f;
+		TopTints.Init(FLinearColor::White, Count);
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			if (InMacro.SurfaceClass[Index] == InConfig.Recipe->Palette.Grass &&
+				(InMacro.WaterHeight[Index] == MIN_int32 || InMacro.WaterHeight[Index] < InMacro.Height[Index]))
+			{
+				TopTints[Index] = FMath::Lerp(FLinearColor::White, LeafTint,
+					static_cast<float>(InMacro.ForestCoverage[Index]) / 255.0f);
+			}
+		}
+	}
 	FVoxelSectionMeshResult Mesh;
 	if (!BuildBlockyTerrain(
 		InMacro.Side, InMacro.Step, InMacro.Height, InMacro.SurfaceClass,
 		InConfig, InRegistry, Mesh, OutError, InCancel, {}, -0.05,
-		InMaximumTextureStretchCells))
+		InMaximumTextureStretchCells, TopTints))
 	{
 		return false;
 	}

@@ -10,6 +10,11 @@ struct WHFRAMEWORK_API FVoxelItemStack
 class WHFRAMEWORK_API FVoxelBlockEntityCodec
 {
 public:
+    using FMakeDefault = bool (*)(FVoxelBlockEntityState&, uint8);
+    using FValidate = bool (*)(const FVoxelBlockEntityState&);
+
+    static bool Register(uint16 Kind, FMakeDefault MakeDefault, FValidate Validate);
+    static bool IsRegistered(uint16 Kind);
     static bool MakeDefault(uint16 Kind,FVoxelBlockEntityState& Out,uint8 Variant=0);
     static bool Validate(const FVoxelBlockEntityState& State);
     static bool EncodeContainer(const TArray<FVoxelItemStack>& Slots,FVoxelBlockEntityState& Out);

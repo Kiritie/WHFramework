@@ -344,16 +344,21 @@ FVoxelInterestSet FVoxelInterestManager::Compute(
 	const auto FineSnapshot = MakeShared<TSet<FIntVector>, ESPMode::ThreadSafe>();
 	FineSnapshot->Append(FineKeys);
 	Result.FineSections = FineSnapshot;
-	const double PlayableFineRadius = static_cast<double>(InViewSettings.FineRadius) *
-		InViewSettings.PlayableFineRadiusFraction;
+	const double PlayableRadius = InViewSettings.FineRadius * InViewSettings.PlayableFineRadiusFraction;
 	for (const FIntVector& Key : FineKeys)
 	{
-		if (Result.Exact.FindChecked(Key).HorizontalDistanceCells <= PlayableFineRadius)
+		const FVector2D Center(Key.X * InterestSectionSide + InterestSectionSide * 0.5,
+			Key.Y * InterestSectionSide + InterestSectionSide * 0.5);
+		for (const FVoxelStreamingSource& Source : InSources)
 		{
-			Result.PlayableFineKeys.Add(Key);
+			if (Source.bAffectsGlobalReadiness && Source.RenderMode != EVoxelStreamingRenderMode::None &&
+				FVector2D::DistSquared(Center, FVector2D(Source.Center.X, Source.Center.Y)) <= FMath::Square(PlayableRadius))
+			{
+				Result.PlayableFineKeys.Add(Key);
+				break;
+			}
 		}
 	}
-
 	for (const FIntVector& Key : FineKeys)
 	{
 		const double Distance = Result.Exact.FindChecked(Key).DistanceCells;
@@ -429,11 +434,7 @@ FVoxelInterestSet FVoxelInterestManager::Compute(
 		Result.AdmissionLanes[static_cast<uint8>(Result.Admissions[Index].Kind)].Add(Index);
 	}
 
-	for (const auto& Pair : Result.Exact)
-	{
-		if (Pair.Value.bWarmupData) Result.Warmup.Add(Pair.Key, Pair.Value);
-	}
-	Result.Exact.GetKeys(Result.ExactOrder);
+Result.Exact.GetKeys(Result.ExactOrder);
 	Result.ExactOrder.Sort([&Result](const FIntVector& Left, const FIntVector& Right)
 	{
 		const FVoxelExactDemand& A = Result.Exact.FindChecked(Left);
@@ -458,6 +459,10 @@ void FVoxelInterestManager::AddExactSource(
 	FVoxelInterestSet& InOutInterest,
 	const FVoxelInterestSet* InPrevious) const
 {
+	FVoxelSourceInterest& SourceInterest = InOutInterest.Sources.FindOrAdd(InSource.Id);
+	SourceInterest.Source = InSource;
+	const bool bPrewarm = InSource.Purpose == EVoxelStreamingSourcePurpose::TravelPrewarm ||
+		InSource.Purpose == EVoxelStreamingSourcePurpose::RespawnPrewarm;
 	const int32 ExactRadius =
 		FMath::Max(0, InSource.ExactRadius);
 
@@ -487,13 +492,13 @@ void FVoxelInterestManager::AddExactSource(
 
 	const int32 WarmupDataRadius =
 		FMath::Min(
-			FMath::Max(0, InViewSettings.WarmupDataRadius),
+			bPrewarm ? ExactRadius : FMath::Max(0, InViewSettings.WarmupDataRadius),
 			ExactRadius);
 
 	const int32 WarmupCollisionRadius =
 		InSource.bCollision
 			? FMath::Min(
-				FMath::Max(0, InViewSettings.WarmupCollisionRadius),
+				bPrewarm ? CollisionRadius : FMath::Max(0, InViewSettings.WarmupCollisionRadius),
 				CollisionRadius)
 			: 0;
 
@@ -625,6 +630,21 @@ void FVoxelInterestManager::AddExactSource(
 					InOutInterest.Exact.
 						FindOrAdd(Key);
 
+				if (bExact || bCollision || bSimulation || bWarmupData || bWarmupCollision || bMovementCriticalCollision)
+				{
+					SourceInterest.DataSections.Add(Key);
+				}
+				if (bCollision || bWarmupCollision || bMovementCriticalCollision)
+				{
+					SourceInterest.CollisionSections.Add(Key);
+				}
+				if (InSource.bAffectsGlobalReadiness && bWarmupData)
+				{
+					FVoxelExactDemand& Global = InOutInterest.Warmup.FindOrAdd(Key);
+					Global.bWarmupData = true;
+					Global.bWarmupCollision |= bWarmupCollision;
+					Global.bFineRender |= bFineRender;
+				}
 				Demand.bData = true;
 				Demand.bExact |= bExact;
 				Demand.bCollision |= bCollision;

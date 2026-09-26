@@ -1,5 +1,44 @@
 #include "Voxel/Save/VoxelBlockEntityCodec.h"
 #include "Voxel/Serialization/VoxelBinaryCodec.h"
+#include "Misc/ScopeRWLock.h"
+
+namespace
+{
+    struct FVoxelEntityCodecEntry
+    {
+        FVoxelBlockEntityCodec::FMakeDefault MakeDefault = nullptr;
+        FVoxelBlockEntityCodec::FValidate Validate = nullptr;
+    };
+
+    FRWLock VoxelEntityCodecLock;
+    TMap<uint16, FVoxelEntityCodecEntry> VoxelEntityCodecs;
+
+    FVoxelEntityCodecEntry FindVoxelEntityCodec(uint16 Kind)
+    {
+        FReadScopeLock Lock(VoxelEntityCodecLock);
+        return VoxelEntityCodecs.FindRef(Kind);
+    }
+}
+
+bool FVoxelBlockEntityCodec::Register(uint16 Kind, FMakeDefault Make, FValidate Check)
+{
+    if (Kind <= 2 || !Make || !Check)
+    {
+        return false;
+    }
+    FWriteScopeLock Lock(VoxelEntityCodecLock);
+    if (const FVoxelEntityCodecEntry* Entry = VoxelEntityCodecs.Find(Kind))
+    {
+        return Entry->MakeDefault == Make && Entry->Validate == Check;
+    }
+    VoxelEntityCodecs.Add(Kind, {Make, Check});
+    return true;
+}
+
+bool FVoxelBlockEntityCodec::IsRegistered(uint16 Kind)
+{
+    return Kind == 1 || Kind == 2 || FindVoxelEntityCodec(Kind).Validate != nullptr;
+}
 bool FVoxelBlockEntityCodec::EncodeContainer(const TArray<FVoxelItemStack>&S,FVoxelBlockEntityState&O)
 {
     if(S.Num()!=27)return false;FVoxelByteWriter W(32768);W.U8(27);
@@ -24,27 +63,33 @@ bool FVoxelBlockEntityCodec::DecodeContainer(const FVoxelBlockEntityState&S,TArr
 }
 bool FVoxelBlockEntityCodec::MakeDefault(uint16 K,FVoxelBlockEntityState&O,uint8 Variant)
 {
+    if ((K == 1 || K == 2) && Variant != 0)return false;
     if(K==1){TArray<FVoxelItemStack>S;S.SetNum(27);return EncodeContainer(S,O);}
     FVoxelBlockEntityState T;T.Kind=K;FVoxelByteWriter W(1024);
     if(K==2)W.U64(0);
-    else if(K==100){if(Variant<1||Variant>2)return false;W.U8(Variant);W.U8(0);W.U16(0);} // spawner: kind, consumed, spawned GUID count
-    else if(K==101){W.String(FString(),256);W.U8(1);} // altar: team, enabled
-    else return false;
+    else
+    {
+        const FVoxelEntityCodecEntry Entry = FindVoxelEntityCodec(K);
+        if (!Entry.MakeDefault || !Entry.MakeDefault(T, Variant) || T.Kind != K || !Entry.Validate(T))
+        {
+            return false;
+        }
+        O = MoveTemp(T);
+        return true;
+    }
     if(!W.Finish(T.Payload))return false;O=MoveTemp(T);return true;
 }
 bool FVoxelBlockEntityCodec::Validate(const FVoxelBlockEntityState&S)
 {
-    if(S.Schema!=1||S.Payload.Num()>32768)return false;
+    if(S.Schema==0||S.Payload.Num()>32768)return false;
     if(S.Kind==1){TArray<FVoxelItemStack>T;return DecodeContainer(S,T);}
     FVoxelByteReader R(S.Payload);
-    if(S.Kind==2)R.U64();
-    else if(S.Kind==100)
+    if(S.Kind==2){if(S.Schema!=1)return false;R.U64();}
+    else
     {
-        uint8 K=R.U8(),Consumed=R.U8();uint16 N=R.U16();if(K<1||K>2||Consumed>1||N>256)return false;
-        TSet<FGuid>IDs;for(uint16 I=0;I<N;++I){FGuid G=R.Guid();if(!G.IsValid()||IDs.Contains(G))return false;IDs.Add(G);}
+        const FVoxelEntityCodecEntry Entry = FindVoxelEntityCodec(S.Kind);
+        return Entry.Validate && Entry.Validate(S);
     }
-    else if(S.Kind==101){R.String(256);if(R.U8()>1)return false;}
-    else return false;
     return R.End();
 }
 bool FVoxelBlockEntityCodec::IncrementCounter(const FVoxelBlockEntityState&I,FVoxelBlockEntityState&O)

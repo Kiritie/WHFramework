@@ -44,13 +44,17 @@ using FVoxelNaturalColumnEntryPtr =
 		const FVoxelNaturalColumnEntry,
 		ESPMode::ThreadSafe>;
 
+struct WHFRAMEWORK_API FVoxelGenerationCacheRetentionPoint
+{
+	FIntPoint Center = FIntPoint::ZeroValue;
+	int32 NaturalRadiusCells = 0;
+	int32 PlanRadiusCells = 0;
+	int32 HydrologyRadiusCells = 0;
+};
+
 struct WHFRAMEWORK_API FVoxelGenerationCacheRetention
 {
-	TArray<FIntPoint> Centers;
-
-	int32 NaturalRadiusCells = 1536;
-	int32 PlanRadiusCells = 2048;
-	int32 HydrologyRadiusCells = 4096;
+	TArray<FVoxelGenerationCacheRetentionPoint> Points;
 	int32 HydrologyRegionSide = 256;
 	int32 HydrologyCellSize = 1;
 
@@ -249,7 +253,7 @@ private:
 
 	bool IsRetained(
 		const FIntPoint& InPosition,
-		int32 InRadius,
+		int32 FVoxelGenerationCacheRetentionPoint::* InRadius,
 		const FVoxelGenerationCacheRetention& InRetention) const;
 
 	void RecordGateWait(uint64 InMicroseconds);

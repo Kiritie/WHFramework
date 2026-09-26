@@ -40,6 +40,9 @@ public:
 	void BindController(
 		APlayerController* InController);
 
+	void NotifyTravelTeleported();
+	bool IsTravelObserverReady() const;
+
 	UFUNCTION(BlueprintCallable)
 	bool TraceVoxel(
 		FVoxelHitResult& OutHit) const;

@@ -551,8 +551,7 @@ void UVoxelAgentComponent::RefreshSource()
 		bActive =
 			bActive &&
 			BoundController.IsValid() &&
-			BoundController->
-				IsLocalController();
+			(GetOwner()->HasAuthority() || BoundController->IsLocalController());
 	}
 
 	if (!bActive)
@@ -569,6 +568,8 @@ void UVoxelAgentComponent::RefreshSource()
 	}
 
 	FVoxelStreamingSource Source;
+	Source.Purpose = bInitialCollisionGatePending ? EVoxelStreamingSourcePurpose::InitialSpawn : EVoxelStreamingSourcePurpose::Observer;
+	Source.bAffectsGlobalReadiness = true;
 
 	FVector ViewOrigin;
 	FVector ViewDirection;
@@ -639,7 +640,7 @@ void UVoxelAgentComponent::RefreshSource()
 		SimulationRadiusCells > 0;
 
 	Source.RenderMode =
-		GetWorld()->GetNetMode() == NM_DedicatedServer
+		GetWorld()->GetNetMode() == NM_DedicatedServer || (BoundController.IsValid() && !BoundController->IsLocalController())
 			? EVoxelStreamingRenderMode::None
 			: EVoxelStreamingRenderMode::Full;
 
@@ -710,6 +711,24 @@ void UVoxelAgentComponent::RefreshStepHeight()
 		PreviousStepHeight =
 			-1.0f;
 	}
+}
+
+void UVoxelAgentComponent::NotifyTravelTeleported()
+{
+	bHasLastSafeLocation = false;
+	RefreshSource();
+	if (Module.IsValid())
+	{
+		Module->ForceVoxelStreamingRefresh();
+	}
+	RefreshCollisionMovementGuard();
+}
+
+bool UVoxelAgentComponent::IsTravelObserverReady() const
+{
+	const ACharacter* Character = Cast<ACharacter>(GetOwner());
+	return Character && Module.IsValid() && Module->IsSourceAdmitted(SourceId) &&
+		IsCollisionReadyAt(*Character, Character->GetActorLocation());
 }
 
 void UVoxelAgentComponent::ResetInitialCollisionGate()

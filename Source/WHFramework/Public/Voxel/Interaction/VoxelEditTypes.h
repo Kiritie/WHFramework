@@ -22,6 +22,9 @@ struct WHFRAMEWORK_API FVoxelEditReply
 };
 struct WHFRAMEWORK_API FVoxelInteractionPlan
 {
+    FGuid ObjectId;
+    FIntVector ObjectAnchor = FIntVector::ZeroValue;
+    FName ObjectAction;
     TArray<FVoxelCellEdit> Cells;
     TArray<FVoxelEntityEdit> Entities;
     int32 Cost=0;

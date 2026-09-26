@@ -804,8 +804,11 @@ void UVoxelModuleNetworkComponent::RefreshInterest(const double InNow)
 	}
 
 	const FVoxelInterestManager InterestManager;
+	TArray<FVoxelStreamingSource> AuthorizedSources;
+	AuthorizedSources.Add(Source);
+	VoxelModule->CollectStreamingSourcesForOwner(Controller(), AuthorizedSources);
 	const FVoxelInterestSet ClientInterest = InterestManager.Compute(
-		MakeArrayView(&Source, 1),
+		AuthorizedSources,
 		VoxelModule->GetManifest(),
 		FVoxelViewSettings());
 	TSet<FIntVector> Next;
