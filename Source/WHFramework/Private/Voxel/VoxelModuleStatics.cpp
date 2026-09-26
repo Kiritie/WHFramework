@@ -1,5 +1,6 @@
 #include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/VoxelModule.h"
+#include "Voxel/Prefabs/Data/VoxelPrefabData.h"
 #include "Voxel/Voxels/VoxelItemBridge.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -20,6 +21,18 @@ bool UVoxelModuleStatics::TraceVoxel(const UObject*C,FVector S,FVector D,float R
 }
 bool UVoxelModuleStatics::ImportVoxelPrefab(const UObject*C,const FVoxelPrefabSaveData&P,FIntVector O,FString&E)
 {auto*M=GetVoxelModule(C);if(!M){E=TEXT("No voxel module");return false;}return M->ApplyPrefab(P,O,E);}
+bool UVoxelModuleStatics::ImportVoxelPrefabAsset(const UObject* Context,
+    const UVoxelPrefabData* Prefab, FIntVector Origin, FString& Error)
+{
+    UVoxelModule* Module = GetVoxelModule(Context);
+    if (!Module || !Prefab)
+    {
+        Error = TEXT("Voxel module or prefab asset is missing");
+        return false;
+    }
+    FVoxelPrefabSaveData Cells;
+    return Prefab->DecodeCells(Cells, Error) && Module->ApplyPrefab(Cells, Origin, Error);
+}
 bool UVoxelModuleStatics::ExportVoxelPrefab(const UObject*C,FIntVector A,FIntVector B,FVoxelPrefabSaveData&O,FString&E)
 {auto*M=GetVoxelModule(C);if(!M){E=TEXT("No voxel module");return false;}return M->ExportPrefab(A,B,O,E);}
 bool UVoxelModuleStatics::AreCollisionsReady(UVoxelModule&M,const FBox&B)

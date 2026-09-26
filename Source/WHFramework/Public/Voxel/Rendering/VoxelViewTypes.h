@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelGenerationTypes.h"
+#include "Voxel/Streaming/VoxelStreamingSource.h"
 
 struct WHFRAMEWORK_API FVoxelViewKey
 {
@@ -60,6 +61,7 @@ struct FVoxelViewAdmission
 {
 	EVoxelViewAdmissionKind Kind = EVoxelViewAdmissionKind::Fine;
 	double DistanceCells = 0.0;
+	EVoxelStreamingSourcePriority Priority = EVoxelStreamingSourcePriority::Player;
 	FIntVector FineKey = FIntVector::ZeroValue;
 	FVoxelViewKey ProxyKey;
 	FVoxelSurfaceTileKey SurfaceKey;
@@ -67,6 +69,7 @@ struct FVoxelViewAdmission
 
 	bool operator<(const FVoxelViewAdmission& Other) const
 	{
+		if (Priority != Other.Priority) return Priority < Other.Priority;
 		return DistanceCells != Other.DistanceCells ? DistanceCells < Other.DistanceCells :
 			static_cast<uint8>(Kind) < static_cast<uint8>(Other.Kind);
 	}

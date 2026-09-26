@@ -314,7 +314,8 @@ EVoxelWorkClass FVoxelViewManager::VolumeTransitionWorkClass(const FVoxelViewKey
 void FVoxelViewManager::UpdateTaskPriorities()
 {
 	Scheduler.UpdatePriorities([this](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp,
-		EVoxelWorkClass& WorkClass, double& Distance, double& Forward)
+		EVoxelWorkClass& WorkClass, EVoxelStreamingSourcePriority& Priority,
+		double& Distance, double& Forward)
 	{
 		switch (Kind)
 		{
@@ -323,6 +324,7 @@ void FVoxelViewManager::UpdateTaskPriorities()
 			{
 				WorkClass = Demand->bWarmupData || Demand->bMovementCriticalCollision
 					? EVoxelWorkClass::Critical : EVoxelWorkClass::Interactive;
+				Priority = Demand->Priority;
 				Distance = Demand->DistanceCells;
 				Forward = Demand->ForwardScore;
 			}
@@ -489,6 +491,7 @@ void FVoxelViewManager::SortAdmissionsByPriority(TArray<FVoxelViewAdmission>& In
 {
 	InOutAdmissions.Sort([](const FVoxelViewAdmission& A, const FVoxelViewAdmission& B)
 	{
+		if (A.Priority != B.Priority) return A.Priority < B.Priority;
 		return A.DistanceCells != B.DistanceCells ? A.DistanceCells < B.DistanceCells :
 			static_cast<uint8>(A.Kind) < static_cast<uint8>(B.Kind);
 	});
@@ -2747,6 +2750,7 @@ bool FVoxelViewManager::RequestFine(
 		Stamp;
 	Request.DistanceScore = MinimumObserverDistanceCells(
 		FVector(InSection * ViewSectionSide + FIntVector(ViewSectionSide / 2)) * Module.BlockSize());
+	Request.SourcePriority = Demand ? Demand->Priority : EVoxelStreamingSourcePriority::Player;
 	Request.ForwardScore = 0.0;
 
 	Request.InputBytes =

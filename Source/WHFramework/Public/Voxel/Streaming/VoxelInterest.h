@@ -22,6 +22,7 @@ struct WHFRAMEWORK_API FVoxelExactDemand
 	bool bWarmupData = false;
 	bool bWarmupCollision = false;
 	bool bMovementCriticalCollision = false;
+	EVoxelStreamingSourcePriority Priority = EVoxelStreamingSourcePriority::Preview;
 	double DistanceCells = MAX_dbl;
 	double HorizontalDistanceCells = MAX_dbl;
 	double ForwardScore = 0.0;

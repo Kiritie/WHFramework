@@ -1043,10 +1043,26 @@ void UVoxelModuleNetworkComponent::OnCommit(const FVoxelEditBatch& InBatch)
 	{
 		return;
 	}
-	TArray<uint8> Payload;
-	FString Error;
-	if (FVoxelNetworkCodec::EncodePatchBatch(WireBatch, Payload, Error))
+	// A prefab remains one authoritative transaction. Wire chunks are bounded
+	// independently so large edits can reach clients without a 32-section cap.
+	constexpr int32 SectionsPerMessage = 8;
+	for (int32 First = 0; First < WireBatch.Sections.Num(); First += SectionsPerMessage)
 	{
+		FVoxelNetworkPatchBatch WireChunk;
+		WireChunk.TransactionId = WireBatch.TransactionId;
+		const int32 End = FMath::Min(First + SectionsPerMessage, WireBatch.Sections.Num());
+		for (int32 Index = First; Index < End; ++Index)
+		{
+			WireChunk.Sections.Add(WireBatch.Sections[Index]);
+		}
+		TArray<uint8> Payload;
+		FString Error;
+		if (!FVoxelNetworkCodec::EncodePatchBatch(WireChunk, Payload, Error))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Voxel patch transaction %s cannot be sent: %s"),
+				*WireChunk.TransactionId.ToString(), *Error);
+			return;
+		}
 		Send(EVoxelMessage::SectionPatch, Payload, EVoxelTransferPriority::Critical);
 	}
 }

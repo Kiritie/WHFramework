@@ -4,6 +4,7 @@
 #include "Voxel/Voxels/VoxelItemBridge.h"
 #include "Voxel/Components/VoxelMeshComponent.h"
 #include "Voxel/Chunks/VoxelSectionSnapshot.h"
+#include "Voxel/Chunks/VoxelSectionKey.h"
 #include "Voxel/Geometry/VoxelSectionMesher.h"
 #include "Voxel/Geometry/VoxelShapeRegistry.h"
 #include "Voxel/Rendering/VoxelMaterialSet.h"
@@ -26,7 +27,8 @@ bool AVoxelPrefab::SetPreviewAsset(UVoxelPrefabData* Asset, double Size, FString
         Error = TEXT("Prefab asset is null");
         return false;
     }
-    if (!SetPreviewData(Asset->Data, Size, Error))
+    FVoxelPrefabSaveData Cells;
+    if (!Asset->DecodeCells(Cells, Error) || !SetPreviewData(Cells, Size, Error))
     {
         return false;
     }
@@ -68,6 +70,10 @@ bool AVoxelPrefab::SetPreviewData(const FVoxelPrefabSaveData& Value, double Size
     TSet<FVoxelSectionKey> UniqueKeys;
     for (const FVoxelPrefabCell& Cell : Value.Cells)
     {
+        if (Cell.bClear)
+        {
+            continue;
+        }
         FVoxelBlockState State;
         if (!FVoxelItemBridge::ToBlock(*Registry, Cell.Item, State))
         {

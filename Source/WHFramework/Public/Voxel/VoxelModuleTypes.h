@@ -34,12 +34,13 @@ struct WHFRAMEWORK_API FVoxelHitResult
     bool IsValid()const{return bHit&&VoxelItem.IsValid();}
 };
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FVoxelPrefabCell
-{
-    GENERATED_BODY()
-    UPROPERTY(EditAnywhere,BlueprintReadWrite) FIntVector Offset=FIntVector::ZeroValue;
-    UPROPERTY(EditAnywhere,BlueprintReadWrite) FVoxelItem Item;
-};
+  struct WHFRAMEWORK_API FVoxelPrefabCell
+  {
+      GENERATED_BODY()
+      UPROPERTY(EditAnywhere,BlueprintReadWrite) FIntVector Offset=FIntVector::ZeroValue;
+      UPROPERTY(EditAnywhere,BlueprintReadWrite) FVoxelItem Item;
+      UPROPERTY(EditAnywhere,BlueprintReadWrite) bool bClear=false;
+  };
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelPrefabSaveData:public FSaveData
 {

@@ -268,24 +268,27 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 }
 
 void FVoxelTaskScheduler::UpdatePriorities(TFunctionRef<void(EVoxelTaskKind,
-	const FVoxelTaskStamp&, EVoxelWorkClass&, double&, double&)> InUpdate)
+	const FVoxelTaskStamp&, EVoxelWorkClass&, EVoxelStreamingSourcePriority&, double&, double&)> InUpdate)
 {
 	check(IsInGameThread());
 	auto Update = [this, &InUpdate](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp,
-		EVoxelWorkClass& WorkClass, double& DistanceScore, double& ForwardScore)
+		EVoxelWorkClass& WorkClass, EVoxelStreamingSourcePriority& SourcePriority,
+		double& DistanceScore, double& ForwardScore)
 	{
 		const bool bWasCritical = WorkClass == EVoxelWorkClass::Critical;
-		InUpdate(Kind, Stamp, WorkClass, DistanceScore, ForwardScore);
+		InUpdate(Kind, Stamp, WorkClass, SourcePriority, DistanceScore, ForwardScore);
 		CriticalTaskCount += static_cast<int32>(WorkClass == EVoxelWorkClass::Critical) -
 			static_cast<int32>(bWasCritical);
 	};
 	for (FVoxelTaskRequest& Request : Pending)
 	{
-		Update(Request.Kind, Request.Stamp, Request.WorkClass, Request.DistanceScore, Request.ForwardScore);
+		Update(Request.Kind, Request.Stamp, Request.WorkClass, Request.SourcePriority,
+			Request.DistanceScore, Request.ForwardScore);
 	}
 	for (FRunning& Request : Running)
 	{
-		Update(Request.Kind, Request.Stamp, Request.WorkClass, Request.DistanceScore, Request.ForwardScore);
+		Update(Request.Kind, Request.Stamp, Request.WorkClass, Request.SourcePriority,
+			Request.DistanceScore, Request.ForwardScore);
 	}
 }
 
@@ -321,6 +324,7 @@ void FVoxelTaskScheduler::Tick(
 		PriorityA.Kind = A.Kind;
 		PriorityA.TerrainStage = A.TerrainStage;
 		PriorityA.WorkClass = A.WorkClass;
+		PriorityA.SourcePriority = A.SourcePriority;
 		PriorityA.DistanceScore = A.DistanceScore;
 		PriorityA.ForwardScore = A.ForwardScore;
 		PriorityA.QueuedAt = A.QueuedAt;
@@ -328,6 +332,7 @@ void FVoxelTaskScheduler::Tick(
 		PriorityB.Kind = B.Kind;
 		PriorityB.TerrainStage = B.TerrainStage;
 		PriorityB.WorkClass = B.WorkClass;
+		PriorityB.SourcePriority = B.SourcePriority;
 		PriorityB.DistanceScore = B.DistanceScore;
 		PriorityB.ForwardScore = B.ForwardScore;
 		PriorityB.QueuedAt = B.QueuedAt;
@@ -783,6 +788,7 @@ bool FVoxelTaskScheduler::IsHigherPriority(
 	const int32 BandA = TerrainPriorityBand(InA);
 	const int32 BandB = TerrainPriorityBand(InB);
 	if (BandA != BandB) return BandA < BandB;
+	if (InA.SourcePriority != InB.SourcePriority) return InA.SourcePriority < InB.SourcePriority;
 	if ((InA.WorkClass == EVoxelWorkClass::Prefetch) != (InB.WorkClass == EVoxelWorkClass::Prefetch))
 	{
 		return InB.WorkClass == EVoxelWorkClass::Prefetch;
@@ -992,6 +998,7 @@ void FVoxelTaskScheduler::Pump()
 			Request.Kind;
 		RunningTask.WorkClass =
 			Request.WorkClass;
+		RunningTask.SourcePriority = Request.SourcePriority;
 		RunningTask.TerrainStage = Request.TerrainStage;
 		RunningTask.DistanceScore = Request.DistanceScore;
 		RunningTask.ForwardScore = Request.ForwardScore;

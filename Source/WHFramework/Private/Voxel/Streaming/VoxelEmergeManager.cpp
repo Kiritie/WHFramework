@@ -217,12 +217,14 @@ void FVoxelEmergeManager::RebuildDemand(
 	CurrentDemand = InInterest.Exact;
 	OrderedKeys = InInterest.ExactOrder;
 	Scheduler.UpdatePriorities([this](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp,
-		EVoxelWorkClass& WorkClass, double& Distance, double& Forward)
+		EVoxelWorkClass& WorkClass, EVoxelStreamingSourcePriority& Priority,
+		double& Distance, double& Forward)
 	{
 		if (Kind != EVoxelTaskKind::GenerateExactBase && Kind != EVoxelTaskKind::DecodeOverlay) return;
 		if (const FVoxelExactDemand* Demand = CurrentDemand.Find(Stamp.Section))
 		{
 			WorkClass = ResolveWorkClass(*Demand);
+			Priority = Demand->Priority;
 			Distance = Demand->DistanceCells;
 			Forward = Demand->ForwardScore;
 		}
@@ -301,6 +303,7 @@ bool FVoxelEmergeManager::RequestBase(
 		EVoxelTaskKind::GenerateExactBase;
 
 	Request.WorkClass = ResolveWorkClass(InDemand);
+	Request.SourcePriority = InDemand.Priority;
 
 	Request.Stamp =
 		TaskStamp;
@@ -388,6 +391,7 @@ bool FVoxelEmergeManager::ResolveOverlay(
 		EVoxelTaskKind::DecodeOverlay;
 
 	Request.WorkClass = ResolveWorkClass(InDemand);
+	Request.SourcePriority = InDemand.Priority;
 
 	Request.DistanceScore = InDemand.DistanceCells;
 	Request.ForwardScore = InDemand.ForwardScore;

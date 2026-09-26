@@ -330,6 +330,16 @@ FVoxelInterestSet FVoxelInterestManager::Compute(
 						FVector2D::Distance(FVector2D(Center), FVector2D(Source.Center.X, Source.Center.Y)));
 				}
 			}
+			for (const FVoxelStreamingSource& Source : InSources)
+			{
+				const int32 Radius = Source.FineRadiusCells >= 0 ? Source.FineRadiusCells : InViewSettings.FineRadius;
+				if (Source.RenderMode != EVoxelStreamingRenderMode::None &&
+					FVector2D::DistSquared(FVector2D(Center), FVector2D(Source.Center.X, Source.Center.Y)) <=
+					FMath::Square(static_cast<double>(Radius + InViewSettings.FinePreload)))
+				{
+					Demand.Priority = FMath::Min(Demand.Priority, Source.Priority);
+				}
+			}
 		}
 	}
 	// 精细边界需要真实相邻数据；只增加数据依赖，不扩张碰撞、模拟或可见几何。
@@ -362,6 +372,7 @@ FVoxelInterestSet FVoxelInterestManager::Compute(
 	for (const FIntVector& Key : FineKeys)
 	{
 		const double Distance = Result.Exact.FindChecked(Key).DistanceCells;
+		const EVoxelStreamingSourcePriority Priority = Result.Exact.FindChecked(Key).Priority;
 		for (int32 Axis = 0; Axis < 3; ++Axis)
 		{
 			for (const int32 Sign : { -1, 1 })
@@ -376,6 +387,7 @@ FVoxelInterestSet FVoxelInterestManager::Compute(
 				FVoxelExactDemand& Demand = Result.Exact.FindOrAdd(Neighbor);
 				Demand.bData = true;
 				Demand.DistanceCells = FMath::Min(Demand.DistanceCells, Distance + InterestSectionSide);
+				Demand.Priority = FMath::Min(Demand.Priority, Priority);
 			}
 		}
 	}
@@ -401,6 +413,7 @@ FVoxelInterestSet FVoxelInterestManager::Compute(
 		A.FineKey = Pair.Key;
 		const FVector Center(Pair.Key * InterestSectionSide + FIntVector(InterestSectionSide / 2));
 		A.DistanceCells = Distance(FBox(Center, Center), false);
+		A.Priority = Pair.Value.Priority;
 	}
 	for (const FVoxelViewKey& Key : Result.VoxelProxy)
 	{
@@ -441,6 +454,7 @@ Result.Exact.GetKeys(Result.ExactOrder);
 		const FVoxelExactDemand& B = Result.Exact.FindChecked(Right);
 		const bool bGameplayA = A.bExact || A.bCollision || A.bSimulation || A.bWarmupData;
 		const bool bGameplayB = B.bExact || B.bCollision || B.bSimulation || B.bWarmupData;
+		if (A.Priority != B.Priority) return A.Priority < B.Priority;
 		if (bGameplayA != bGameplayB) return bGameplayA;
 		if (A.DistanceCells != B.DistanceCells) return A.DistanceCells < B.DistanceCells;
 		if (A.ForwardScore != B.ForwardScore) return A.ForwardScore > B.ForwardScore;
@@ -483,7 +497,8 @@ void FVoxelInterestManager::AddExactSource(
 	const bool bWantsFine =
 		InSource.RenderMode != EVoxelStreamingRenderMode::None;
 
-	const int32 FineRadius = bWantsFine ? FMath::Max(0, InViewSettings.FineRadius) +
+		const int32 FineRadius = bWantsFine ? FMath::Max(0,
+			InSource.FineRadiusCells >= 0 ? InSource.FineRadiusCells : InViewSettings.FineRadius) +
 		FMath::Max(0, InViewSettings.FinePreload) : 0;
 	const int32 FineVerticalRadius =
 		bWantsFine
@@ -653,6 +668,7 @@ void FVoxelInterestManager::AddExactSource(
 				Demand.bWarmupData |= bWarmupData;
 				Demand.bWarmupCollision |= bWarmupCollision;
 				Demand.bMovementCriticalCollision |= bMovementCriticalCollision;
+				Demand.Priority = FMath::Min(Demand.Priority, InSource.Priority);
 
 				const FVector DeltaVector(
 					Delta);

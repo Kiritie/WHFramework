@@ -16,7 +16,16 @@ enum class EVoxelStreamingSourcePurpose : uint8
 	InitialSpawn,
 	TravelPrewarm,
 	RespawnPrewarm,
-	SimulationAnchor
+	SimulationAnchor,
+	DebugPOI
+};
+
+enum class EVoxelStreamingSourcePriority : uint8
+{
+	Player = 0,
+	Camera,
+	DebugPOI,
+	Preview
 };
 
 struct WHFRAMEWORK_API FVoxelStreamingReadiness
@@ -42,6 +51,7 @@ struct WHFRAMEWORK_API FVoxelStreamingSource
 {
 	FGuid Id;
 	EVoxelStreamingSourcePurpose Purpose = EVoxelStreamingSourcePurpose::Observer;
+	EVoxelStreamingSourcePriority Priority = EVoxelStreamingSourcePriority::Player;
 	bool bAffectsGlobalReadiness = false;
 	bool bRetainGenerationCache = true;
 	int32 RetentionRadiusCells = 0;
@@ -50,6 +60,7 @@ struct WHFRAMEWORK_API FVoxelStreamingSource
 	float VerticalFovDegrees = 90.0f;
 	int32 ViewportHeightPixels = 1080;
 	int32 ExactRadius = 16;
+	int32 FineRadiusCells = -1;
 	int32 CollisionRadius = 8;
 	int32 SimulationRadius = 6;
 	int32 VerticalExactRadius = 8;

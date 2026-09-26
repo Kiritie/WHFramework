@@ -68,13 +68,15 @@ void FVoxelCollisionPresenter::RebuildWanted(
 	}
 	CurrentInterestRevision = InInterestRevision;
 	Scheduler.UpdatePriorities([this](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp,
-		EVoxelWorkClass& WorkClass, double& Distance, double& Forward)
+		EVoxelWorkClass& WorkClass, EVoxelStreamingSourcePriority& Priority,
+		double& Distance, double& Forward)
 	{
 		if (Kind != EVoxelTaskKind::BuildCollision) return;
 		if (const FVoxelExactDemand* Demand = Wanted.Find(Stamp.Section))
 		{
 			WorkClass = Demand->bMovementCriticalCollision || Demand->bWarmupCollision
 				? EVoxelWorkClass::Critical : EVoxelWorkClass::Interactive;
+			Priority = Demand->Priority;
 			Distance = Demand->DistanceCells;
 			Forward = Demand->ForwardScore;
 		}
@@ -210,6 +212,7 @@ void FVoxelCollisionPresenter::RequestCollision(
 			: EVoxelWorkClass::Interactive;
 
 	Request.DistanceScore = InDemand.DistanceCells;
+	Request.SourcePriority = InDemand.Priority;
 	Request.ForwardScore = InDemand.ForwardScore;
 
 	Request.Stamp =

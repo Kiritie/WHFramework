@@ -748,7 +748,8 @@ bool FVoxelMovingPrioritySchedulerTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Movement test task enters scheduler"), Scheduler.Enqueue(MoveTemp(Request)));
 	}
 	Scheduler.UpdatePriorities([](EVoxelTaskKind, const FVoxelTaskStamp& Stamp,
-		EVoxelWorkClass& WorkClass, double& Distance, double& Forward)
+		EVoxelWorkClass& WorkClass, EVoxelStreamingSourcePriority&,
+		double& Distance, double& Forward)
 	{
 		WorkClass = Stamp.Token == 3 ? EVoxelWorkClass::Critical : EVoxelWorkClass::Interactive;
 		Distance = Stamp.Token == 3 ? 0.0 : 100.0;

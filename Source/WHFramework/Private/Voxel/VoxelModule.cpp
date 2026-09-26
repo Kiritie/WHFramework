@@ -118,7 +118,8 @@ namespace
 		const FVoxelViewSettings& InViewSettings)
 	{
 		int32 CenterRefreshDistance = FMath::Max(1, FMath::RoundToInt(
-			InViewSettings.FineRadius * InViewSettings.StreamingReplanFineRadiusFraction));
+			(InB.FineRadiusCells >= 0 ? InB.FineRadiusCells : InViewSettings.FineRadius) *
+			InViewSettings.StreamingReplanFineRadiusFraction));
 		if (InB.bCollision)
 		{
 			CenterRefreshDistance = FMath::Min(CenterRefreshDistance,
@@ -131,11 +132,13 @@ namespace
 			static_cast<int64>(CenterDelta.Y) * CenterDelta.Y +
 			static_cast<int64>(CenterDelta.Z) * CenterDelta.Z >= CenterRefreshDistanceSquared ||
 			InA.ExactRadius != InB.ExactRadius ||
+			InA.FineRadiusCells != InB.FineRadiusCells ||
 			InA.CollisionRadius != InB.CollisionRadius ||
 			InA.SimulationRadius != InB.SimulationRadius ||
 			InA.VerticalExactRadius != InB.VerticalExactRadius ||
 			InA.RenderMode != InB.RenderMode ||
 			InA.Purpose != InB.Purpose ||
+			InA.Priority != InB.Priority ||
 			InA.bAffectsGlobalReadiness != InB.bAffectsGlobalReadiness ||
 			InA.bRetainGenerationCache != InB.bRetainGenerationCache ||
 			InA.RetentionRadiusCells != InB.RetentionRadiusCells ||
@@ -2212,7 +2215,7 @@ bool UVoxelModule::ApplyPrefab(
 	const FIntVector& InOrigin,
 	FString& OutError)
 {
-	if (!IsAuthority() || !IsReady() || bMutating || InPrefab.Cells.IsEmpty() || InPrefab.Cells.Num() > 4096)
+	if (!IsAuthority() || !IsReady() || bMutating || InPrefab.Cells.IsEmpty())
 	{
 		OutError = TEXT("Invalid prefab operation");
 		return false;
@@ -2239,10 +2242,14 @@ bool UVoxelModule::ApplyPrefab(
 		Edit.Position = FIntVector(static_cast<int32>(X), static_cast<int32>(Y), static_cast<int32>(Z));
 		if (Seen.Contains(Edit.Position) ||
 			!Runtime->TryGetBlock(Edit.Position, Edit.Expected) ||
-			!FVoxelItemBridge::ToBlock(*Registry.GetSnapshot(), Cell.Item, Edit.Value))
+			(!Cell.bClear && !FVoxelItemBridge::ToBlock(*Registry.GetSnapshot(), Cell.Item, Edit.Value)))
 		{
 			OutError = TEXT("Prefab contains duplicate, unloaded, or invalid cells");
 			return false;
+		}
+		if (Cell.bClear)
+		{
+			Edit.Value = {};
 		}
 		Seen.Add(Edit.Position);
 		Cells.Add(Edit);
@@ -2287,11 +2294,15 @@ bool UVoxelModule::ExportPrefab(
 	const int64 SizeX = static_cast<int64>(InMax.X) - InMin.X;
 	const int64 SizeY = static_cast<int64>(InMax.Y) - InMin.Y;
 	const int64 SizeZ = static_cast<int64>(InMax.Z) - InMin.Z;
-	if (SizeX <= 0 || SizeY <= 0 || SizeZ <= 0 || SizeX * SizeY * SizeZ > 4096)
+	if (SizeX <= 0 || SizeY <= 0 || SizeZ <= 0)
 	{
-		OutError = TEXT("Prefab bounds exceed 4096 cells");
+		OutError = TEXT("Prefab bounds are empty");
 		return false;
 	}
+	const FIntVector Center(
+		static_cast<int32>(static_cast<int64>(InMin.X) + SizeX / 2),
+		static_cast<int32>(static_cast<int64>(InMin.Y) + SizeY / 2),
+		static_cast<int32>(static_cast<int64>(InMin.Z) + SizeZ / 2));
 	FVoxelPrefabSaveData Prefab;
 	for (int32 Z = InMin.Z; Z < InMax.Z; ++Z)
 	{
@@ -2325,7 +2336,7 @@ bool UVoxelModule::ExportPrefab(
 					}
 				}
 				FVoxelPrefabCell Cell;
-				Cell.Offset = Position - InMin;
+				Cell.Offset = Position - Center;
 				if (!FVoxelItemBridge::ToItem(*Registry.GetSnapshot(), State, 1, Cell.Item))
 				{
 					return false;

@@ -19,6 +19,16 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Voxel|Prefab")
     FVoxelPrefabSaveData Data;
 
+    /** One complete prefab encoded with a shared voxel-type palette. */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Voxel|Prefab")
+    TArray<FPrimaryAssetId> PackedPalette;
+
+    UPROPERTY()
+    TArray<uint8> PackedCells;
+
+    bool SetPackedData(const FVoxelPrefabSaveData& Value, FString& Error);
+    bool DecodeCells(FVoxelPrefabSaveData& OutData, FString& Error) const;
+
     FBox GetVoxelBounds() const;
     bool Validate(const FVoxelRegistrySnapshot& Registry, FString& Error) const;
     static bool ValidateCells(const FVoxelPrefabSaveData& Value,
