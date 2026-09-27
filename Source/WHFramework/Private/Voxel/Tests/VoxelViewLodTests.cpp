@@ -28,10 +28,6 @@ bool FVoxelViewLodTest::RunTest(
 	Source.ViewportHeightPixels =
 		1080;
 
-	FVoxelViewSettings Settings;
-
-	Settings.TargetScreenErrorPixels =
-		2.0f;
 
 	const int32 Distance =
 		4096;
@@ -42,8 +38,7 @@ bool FVoxelViewLodTest::RunTest(
 				Distance,
 				1,
 				Source,
-				Settings,
-				4);
+				4, 2.0f);
 
 	const uint8 MacroLevel =
 		VoxelViewLod::
@@ -52,8 +47,7 @@ bool FVoxelViewLodTest::RunTest(
 				FVoxelMacroTileData::
 					BaseStep,
 				Source,
-				Settings,
-				4);
+				4, 2.0f);
 
 	TestTrue(
 		TEXT(

@@ -1251,7 +1251,7 @@ FGameplayTag UWidgetModule::ResolveWorldWidgetTagForClass(TSubclassOf<UWorldWidg
 		{
 			for(const FWorldWidgetConfig& Config : WorldWidgetConfigs)
 			{
-				if(Config.WidgetClass == InClass)
+				if(Config.WidgetClass && Config.WidgetClass->IsChildOf(InClass))
 				{
 					Tags.Add(Config.ResolveWidgetTag());
 				}
@@ -1286,7 +1286,7 @@ UWorldWidgetBase* UWidgetModule::CreateWorldWidgetByTag(FGameplayTag InWidgetTag
 	{
 		return nullptr;
 	}
-	const TSubclassOf<UWorldWidgetBase> SpawnClass = InClass
+	const TSubclassOf<UWorldWidgetBase> SpawnClass = InClass && InClass->IsChildOf(Config->WidgetClass)
 		? InClass
 		: Config->WidgetClass;
 	UWorldWidgetBase* Widget = SpawnClass

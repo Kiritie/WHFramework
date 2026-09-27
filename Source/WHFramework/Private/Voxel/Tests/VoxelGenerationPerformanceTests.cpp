@@ -17,9 +17,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FVoxelWarmupDemandDefaultsTest::RunTest(const FString& Parameters)
 {
 	(void)Parameters;
-	const FVoxelViewSettings Settings;
-	TestTrue(TEXT("Warmup data is smaller than default fine radius"), Settings.WarmupDataRadius < Settings.FineRadius);
-	TestTrue(TEXT("Warmup collision is smaller than default fine radius"), Settings.WarmupCollisionRadius < Settings.FineRadius);
+	const FVoxelStreamingSourceView SourceView;
+	TestTrue(TEXT("Warmup data is smaller than default fine radius"), SourceView.WarmupDataRadiusCells < SourceView.FineRadiusCells);
+	TestTrue(TEXT("Warmup collision is smaller than default fine radius"), SourceView.WarmupCollisionRadiusCells < SourceView.FineRadiusCells);
 	return true;
 }
 

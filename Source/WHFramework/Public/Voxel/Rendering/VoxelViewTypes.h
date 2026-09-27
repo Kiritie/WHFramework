@@ -11,6 +11,9 @@ struct WHFRAMEWORK_API FVoxelViewKey
 	uint8 Level = 0;
 
 	int32 GetStep() const;
+	// 覆盖尺度保持不变，内部采样格最多为四个基础体素。
+	int32 GetSampleStep() const { return FMath::Min(GetStep(), 4); }
+	int32 GetGridSide() const { return GetSide() / GetSampleStep(); }
 	int32 GetSide() const;
 	FVoxelGenerationBounds GetBounds() const;
 	FVoxelViewKey GetParent() const;
@@ -61,7 +64,7 @@ struct FVoxelViewAdmission
 {
 	EVoxelViewAdmissionKind Kind = EVoxelViewAdmissionKind::Fine;
 	double DistanceCells = 0.0;
-	EVoxelStreamingSourcePriority Priority = EVoxelStreamingSourcePriority::Player;
+	int32 Priority = 0;
 	FIntVector FineKey = FIntVector::ZeroValue;
 	FVoxelViewKey ProxyKey;
 	FVoxelSurfaceTileKey SurfaceKey;

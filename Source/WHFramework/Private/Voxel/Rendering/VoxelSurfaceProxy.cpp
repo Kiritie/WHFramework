@@ -567,6 +567,41 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 	{
 		AddCell(Cell.Min, Cell.Max, Cell.State);
 	}
+	// 合并同材质、完整共面的长方体，保留实体范围，避免逐体素输出六个内部面。
+	for (int32 Axis = 0; Axis < 3; ++Axis)
+	{
+		if (InCancel && InCancel->Load()) { OutError = TEXT("Canceled"); return false; }
+		const int32 U = (Axis + 1) % 3;
+		const int32 V = (Axis + 2) % 3;
+		InOutData.DistantCells.Sort([Axis, U, V](const FVoxelDistantCell& A, const FVoxelDistantCell& B)
+		{
+			if (A.State.Pack() != B.State.Pack()) return A.State.Pack() < B.State.Pack();
+			for (const int32 Component : { U, V })
+			{
+				if (A.Min[Component] != B.Min[Component]) return A.Min[Component] < B.Min[Component];
+				if (A.Max[Component] != B.Max[Component]) return A.Max[Component] < B.Max[Component];
+			}
+			return A.Min[Axis] != B.Min[Axis] ? A.Min[Axis] < B.Min[Axis] : A.Max[Axis] < B.Max[Axis];
+		});
+		int32 Count = 0;
+		for (int32 Index = 0; Index < InOutData.DistantCells.Num(); ++Index)
+		{
+			const FVoxelDistantCell Cell = InOutData.DistantCells[Index];
+			if (Count > 0)
+			{
+				FVoxelDistantCell& Previous = InOutData.DistantCells[Count - 1];
+				if (Previous.State == Cell.State && Previous.Min[U] == Cell.Min[U] &&
+					Previous.Max[U] == Cell.Max[U] && Previous.Min[V] == Cell.Min[V] &&
+					Previous.Max[V] == Cell.Max[V] && Previous.Max[Axis] >= Cell.Min[Axis])
+				{
+					Previous.Max[Axis] = FMath::Max(Previous.Max[Axis], Cell.Max[Axis]);
+					continue;
+				}
+			}
+			InOutData.DistantCells[Count++] = Cell;
+		}
+		InOutData.DistantCells.SetNum(Count, EAllowShrinking::No);
+	}
 	InOutData.DistantCells.Sort([](const FVoxelDistantCell& A, const FVoxelDistantCell& B)
 	{
 		if (A.Min.X != B.Min.X) return A.Min.X < B.Min.X;
@@ -584,7 +619,8 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 	}
 	if (InOutData.DistantCells.Num() > 16384)
 	{
-		OutError = TEXT("Distant voxel tile exceeds representation capacity");
+		OutError = FString::Printf(TEXT("Distant voxel tile exceeds representation capacity: tile=(%d,%d) level=%d cells=%d"),
+			InOutData.Key.Coordinate.X, InOutData.Key.Coordinate.Y, InOutData.Key.Level, InOutData.DistantCells.Num());
 		return false;
 	}
 	OutError.Reset();

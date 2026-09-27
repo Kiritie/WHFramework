@@ -24,7 +24,7 @@ void FVoxelEmergeManager::Tick(
 	const FVoxelInterestSet& InInterest,
 	const uint64 InInterestRevision,
 	const double InNow,
-	const double InDataAdmissionLimit,
+	const TMap<int32, double>& InDataAdmissionLimits,
 	const int32 InMaxBuildsPerFrame,
 	const double InAdmissionMilliseconds)
 {
@@ -64,10 +64,26 @@ void FVoxelEmergeManager::Tick(
 		if (Demand)
 		{
 			const bool bGameplayData = Demand->bExact || Demand->bCollision || Demand->bSimulation || Demand->bWarmupData;
-			if (!bGameplayData && Demand->DistanceCells > InDataAdmissionLimit)
+			const double* Limit = InDataAdmissionLimits.Find(Demand->Priority);
+			if (!bGameplayData && Limit && Demand->DistanceCells > *Limit)
 			{
-				NextAdmissionIndex = 0;
-				break;
+				// Distances are ordered within each source-priority group. Keep the
+				// single-source frontier, but let a later source use its own near range.
+				while (NextAdmissionIndex < OrderedKeys.Num())
+				{
+					const FVoxelExactDemand* Next = CurrentDemand.Find(OrderedKeys[NextAdmissionIndex]);
+					if (!Next || Next->Priority != Demand->Priority)
+					{
+						break;
+					}
+					++NextAdmissionIndex;
+				}
+				if (NextAdmissionIndex == OrderedKeys.Num())
+				{
+					NextAdmissionIndex = 0;
+					break;
+				}
+				continue;
 			}
 			Submitted += RequestSection(Key, *Demand) ? 1 : 0;
 		}
@@ -111,6 +127,8 @@ bool FVoxelEmergeManager::OnTask(
 
 	if (!InResult.bSuccess)
 	{
+		UE_LOG(LogTemp, Error, TEXT("Voxel section generation failed: section=%s kind=%d error=%s"),
+			*InResult.Stamp.Section.ToString(), static_cast<int32>(InResult.Kind), *InResult.Error);
 		Section->Status =
 			EVoxelSectionStatus::Failed;
 
@@ -217,7 +235,7 @@ void FVoxelEmergeManager::RebuildDemand(
 	CurrentDemand = InInterest.Exact;
 	OrderedKeys = InInterest.ExactOrder;
 	Scheduler.UpdatePriorities([this](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp,
-		EVoxelWorkClass& WorkClass, EVoxelStreamingSourcePriority& Priority,
+		EVoxelWorkClass& WorkClass, int32& Priority,
 		double& Distance, double& Forward)
 	{
 		if (Kind != EVoxelTaskKind::GenerateExactBase && Kind != EVoxelTaskKind::DecodeOverlay) return;

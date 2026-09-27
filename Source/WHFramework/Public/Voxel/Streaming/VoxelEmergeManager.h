@@ -31,7 +31,7 @@ public:
 		const FVoxelInterestSet& InInterest,
 		uint64 InInterestRevision,
 		double InNow,
-		double InDataAdmissionLimit,
+		const TMap<int32, double>& InDataAdmissionLimits,
 		int32 InMaxBuildsPerFrame,
 		double InAdmissionMilliseconds);
 

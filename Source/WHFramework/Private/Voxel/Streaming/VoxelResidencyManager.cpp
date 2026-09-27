@@ -40,6 +40,7 @@ void FVoxelResidencyManager::Tick(
 	const TArray<FIntVector> Resident = Runtime.ResidentSections();
 	for (const FIntVector& Key : Resident)
 	{
+		if (Demanded.Contains(Key)) continue;
 		const FVoxelSection* Section = Runtime.FindSection(Key);
 		if (!Section || !CanEvict(Key, *Section, Frame))
 		{

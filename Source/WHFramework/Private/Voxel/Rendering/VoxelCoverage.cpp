@@ -127,14 +127,14 @@ bool VoxelCoverage::HasProxyTopSurfaceInColumn(
 	const int32 InX,
 	const int32 InY)
 {
-	constexpr int32 Side = 16;
+	const int32 Side = InData.GridSide;
 	if (InData.GridSide != Side || InData.Cells.Num() != Side * Side * Side ||
 		InX < 0 || InX >= Side || InY < 0 || InY >= Side)
 	{
 		return false;
 	}
 
-	auto Sample = [&InData](const int32 X, const int32 Y, const int32 Z, FVoxelBlockState& OutState)
+	auto Sample = [&InData, Side](const int32 X, const int32 Y, const int32 Z, FVoxelBlockState& OutState)
 	{
 		if (Z >= 0 && Z < Side)
 		{

@@ -8,6 +8,8 @@
 #include "Voxel/Rendering/VoxelSurfaceProxy.h"
 #include "Voxel/Streaming/VoxelInterest.h"
 
+struct FVoxelHeightfieldCoveragePlan;
+struct FVoxelVolumeCoveragePlan;
 class AActor;
 class FVoxelTaskScheduler;
 class FVoxelViewPublisher;
@@ -65,16 +67,21 @@ public:
 
 	void Reset();
 	bool HasPrimaryRepresentation() const;
+	bool AreHigherPriorityMeshesComplete(int32 InPriority, uint64 InInterestRevision) const;
 	bool RequiresSectionData(const FIntVector& InKey) const;
-	double GetDataAdmissionLimit() const;
+	TMap<int32, double> GetDataAdmissionLimits() const;
 	FVoxelPrimaryFineReadiness GetPrimaryFineReadiness(
 		const TMap<FIntVector, FVoxelExactDemand>& InExact) const;
 	FVoxelPrimaryFineReadiness GetFineRadiusReadiness(
 		TConstArrayView<FIntVector> InFineKeys) const;
 	static void SortAdmissionsByPriority(TArray<FVoxelViewAdmission>& InOutAdmissions);
-	static int32 ResolveActiveAdmissionKind(
+	static TMap<int32, int32> ResolveAdmissionStages(
 		TConstArrayView<FVoxelViewAdmission> InAdmissions,
 		TFunctionRef<bool(const FVoxelViewAdmission&)> InIsReady);
+	static int32 ResolveActiveAdmissionKind(
+		TConstArrayView<FVoxelViewAdmission> InAdmissions,
+		TFunctionRef<bool(const FVoxelViewAdmission&)> InIsReady,
+		int32* OutPriority = nullptr);
 	static double ResolveAdmissionFrontier(
 		TConstArrayView<FVoxelViewAdmission> InAdmissions,
 		TFunctionRef<bool(const FVoxelViewAdmission&)> InIsReady,
@@ -87,6 +94,7 @@ private:
 	void UpdateWantedTimestamps(double InNow);
 	void ProcessAdmissions();
 	void ProcessDataAdmissions();
+	int32 ResolveDataAdmissionPriority() const;
 	bool IsAdmissionDataReady(const FVoxelViewAdmission& InAdmission) const;
 	bool IsAdmissionMeshReady(const FVoxelViewAdmission& InAdmission) const;
 	bool IsPreparedDataCurrent(const FVoxelTaskKey& InKey) const;
@@ -152,9 +160,9 @@ private:
 		FString& OutError);
 
 	bool RequestFine(const FIntVector& InSection, uint64 InRevision);
-	bool RequestVoxelProxy(const FVoxelViewKey& InKey, bool bDataOnly = false);
-	bool RequestSurface(const FVoxelSurfaceTileKey& InKey, bool bDataOnly = false);
-	bool RequestMacro(const FVoxelMacroTileKey& InKey, bool bDataOnly = false);
+	bool RequestVoxelProxy(const FVoxelViewKey& InKey, int32 InPriority, bool bDataOnly = false);
+	bool RequestSurface(const FVoxelSurfaceTileKey& InKey, int32 InPriority, bool bDataOnly = false);
+	bool RequestMacro(const FVoxelMacroTileKey& InKey, int32 InPriority, bool bDataOnly = false);
 
 	bool PublishFine(const FVoxelTaskResult& InResult);
 	bool PublishVoxelProxy(const FVoxelTaskResult& InResult);
@@ -172,8 +180,10 @@ private:
 	uint64 AppliedInterestRevision = 0;
 	TConstArrayView<FVoxelViewAdmission> Admissions;
 	TArray<FVector> PriorityObservers;
-	int32 AdmissionScanIndices[4] = {};
-	int32 DataScanIndices[4] = {};
+	TMap<int32, int32> AdmissionScanIndices[4];
+	TMap<int32, int32> DataScanIndices[4];
+	TArray<int32> AdmissionPriorities;
+	TMap<int32, int32> ActiveMeshStages;
 	TMap<FVoxelTaskKey, TSharedPtr<const FVoxelTaskResult, ESPMode::ThreadSafe>> PreparedData;
 	uint64 PreparedDataBytes = 0;
 	uint64 PendingDataBytes = 0;
@@ -182,8 +192,15 @@ private:
 	double AdmissionBandWidthCells = 64.0;
 	double LastResolvedFrontier = 0.0;
 	int32 LastActiveAdmissionKind = 4;
+	int32 LastActiveAdmissionPriority = MAX_int32;
 	int32 LastActiveDataKind = 4;
 	bool bCoverageDirty = true;
+	bool bVolumePlanPending = false;
+	bool bHeightfieldPlanPending = false;
+	uint64 HeightfieldPlanSerial = 0;
+	TSharedPtr<const FVoxelHeightfieldCoveragePlan, ESPMode::ThreadSafe> HeightfieldCoveragePlan;
+	uint64 VolumePlanSerial = 0;
+	TSharedPtr<const FVoxelVolumeCoveragePlan, ESPMode::ThreadSafe> VolumeCoveragePlan;
 	double NextRetireCheck = 0.0;
 	double LastCoverageMilliseconds = 0.0;
 	double LastRetireMilliseconds = 0.0;

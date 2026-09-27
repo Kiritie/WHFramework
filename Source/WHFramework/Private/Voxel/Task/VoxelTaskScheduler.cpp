@@ -57,6 +57,7 @@ namespace
 		if (Request.TerrainStage != INDEX_NONE) return Request.TerrainStage;
 		switch (Request.Kind)
 		{
+		case EVoxelTaskKind::BuildViewCoverage:
 		case EVoxelTaskKind::GenerateExactBase:
 		case EVoxelTaskKind::DecodeOverlay:
 		case EVoxelTaskKind::BuildFineMesh:
@@ -165,6 +166,17 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 {
 	check(IsInGameThread());
 
+	if (InRequest.ReservedBytes > Budget.MaxReservedBytes || InRequest.InputBytes > Budget.MaxInputBytes)
+	{
+		const double Now = FPlatformTime::Seconds();
+		if (Now - LastBudgetWarning >= 5.0)
+		{
+			LastBudgetWarning = Now;
+			UE_LOG(LogTemp, Warning, TEXT("Voxel task exceeds budget: kind=%d input=%llu/%llu reserved=%llu/%llu"),
+				static_cast<int32>(InRequest.Kind), InRequest.InputBytes, Budget.MaxInputBytes,
+				InRequest.ReservedBytes, Budget.MaxReservedBytes);
+		}
+	}
 	if (bStopped ||
 		!InRequest.Execute ||
 		InRequest.Kind == EVoxelTaskKind::None ||
@@ -268,11 +280,11 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 }
 
 void FVoxelTaskScheduler::UpdatePriorities(TFunctionRef<void(EVoxelTaskKind,
-	const FVoxelTaskStamp&, EVoxelWorkClass&, EVoxelStreamingSourcePriority&, double&, double&)> InUpdate)
+	const FVoxelTaskStamp&, EVoxelWorkClass&, int32&, double&, double&)> InUpdate)
 {
 	check(IsInGameThread());
 	auto Update = [this, &InUpdate](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp,
-		EVoxelWorkClass& WorkClass, EVoxelStreamingSourcePriority& SourcePriority,
+		EVoxelWorkClass& WorkClass, int32& SourcePriority,
 		double& DistanceScore, double& ForwardScore)
 	{
 		const bool bWasCritical = WorkClass == EVoxelWorkClass::Critical;
@@ -787,6 +799,11 @@ bool FVoxelTaskScheduler::IsHigherPriority(
 {
 	const int32 BandA = TerrainPriorityBand(InA);
 	const int32 BandB = TerrainPriorityBand(InB);
+	if (BandA >= 0 && BandA <= 3 && BandB >= 0 && BandB <= 3 &&
+		InA.SourcePriority != InB.SourcePriority)
+	{
+		return InA.SourcePriority < InB.SourcePriority;
+	}
 	if (BandA != BandB) return BandA < BandB;
 	if (InA.SourcePriority != InB.SourcePriority) return InA.SourcePriority < InB.SourcePriority;
 	if ((InA.WorkClass == EVoxelWorkClass::Prefetch) != (InB.WorkClass == EVoxelWorkClass::Prefetch))
@@ -968,6 +985,7 @@ void FVoxelTaskScheduler::Pump()
 			{
 				const FVoxelTaskRequest& Candidate = Pending[Index];
 				if (TerrainPriorityBand(Candidate) == TerrainPriorityBand(Pending[BestIndex]) &&
+					Candidate.SourcePriority == Pending[BestIndex].SourcePriority &&
 					IsVisualWorkClass(Candidate.WorkClass) && Candidate.QueuedAt <= Deadline &&
 					CanStartKind(Candidate.Kind) && Candidate.ReservedBytes <= Budget.MaxReservedBytes - ReservedBytes &&
 					(Oldest == INDEX_NONE || Candidate.QueuedAt < Pending[Oldest].QueuedAt))
@@ -1093,8 +1111,9 @@ void FVoxelTaskScheduler::Pump()
 							Kind;
 
 						ErrorResult.Error =
-							TEXT(
-								"Voxel task result memory budget exceeded");
+							FString::Printf(TEXT("Voxel task result memory budget exceeded: kind=%d actual=%llu budget=%llu surface=(%d,%d,L%d)"),
+								static_cast<int32>(Kind), Slot->Result.ResultBytes(), ResultBudget,
+								Stamp.SurfaceKey.Coordinate.X, Stamp.SurfaceKey.Coordinate.Y, Stamp.SurfaceKey.Level);
 
 						ErrorResult.QueueMilliseconds =
 							Slot->Result.QueueMilliseconds;

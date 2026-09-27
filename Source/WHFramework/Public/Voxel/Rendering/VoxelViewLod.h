@@ -3,7 +3,6 @@
 #include "CoreMinimal.h"
 
 struct FVoxelStreamingSource;
-struct FVoxelViewSettings;
 
 namespace VoxelViewLod
 {
@@ -13,6 +12,6 @@ namespace VoxelViewLod
 		int32 InDistanceCells,
 		int32 InBaseSampleStepCells,
 		const FVoxelStreamingSource& InSource,
-		const FVoxelViewSettings& InSettings,
-		uint8 InMaximumLevel);
+		uint8 InMaximumLevel,
+		float InTargetScreenErrorPixels);
 }

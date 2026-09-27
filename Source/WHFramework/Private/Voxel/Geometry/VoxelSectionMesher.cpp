@@ -6,7 +6,7 @@
 bool FVoxelSectionMesher::IsKnownEmpty(const FVoxelSectionSnapshot& InSnapshot,
 	const FVoxelRegistrySnapshot& InRegistry, const FVoxelBoundaryTransitionContext* InTransition)
 {
-	if (InSnapshot.Blocks.Num() != VoxelBlock::Volume) return false;
+	if (InSnapshot.Blocks.Num() != InSnapshot.GridSide * InSnapshot.GridSide * InSnapshot.GridSide) return false;
 	if (InTransition && !InTransition->Validate()) return false;
 	auto IsOpaqueCube = [&InRegistry](const uint32 Packed)
 	{
@@ -28,7 +28,7 @@ bool FVoxelSectionMesher::IsKnownEmpty(const FVoxelSectionSnapshot& InSnapshot,
 	}
 	for (int32 Face = 0; Face < 6; ++Face)
 	{
-		if (!InSnapshot.Known[Face] || InSnapshot.Halo[Face].Num() != VoxelBlock::Size * VoxelBlock::Size) return false;
+		if (!InSnapshot.Known[Face] || InSnapshot.Halo[Face].Num() != InSnapshot.GridSide * InSnapshot.GridSide) return false;
 		for (const uint32 Packed : InSnapshot.Halo[Face])
 		{
 			if (!IsOpaqueCube(Packed)) return false;
@@ -117,7 +117,8 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
     FVoxelSectionMeshResult&O,const TAtomic<bool>*Cancel, const double InTextureRepeatsPerCell,
     const FVoxelBoundaryTransitionContext* InTransition)
 {
-    if(S.Blocks.Num()!=4096)return false;for(uint32 P:S.Blocks)if(!R.IsValid(FVoxelBlockState::Unpack(P)))return false;
+    const int32 Side = S.GridSide;
+    if(S.Blocks.Num()!=Side * Side * Side)return false;for(uint32 P:S.Blocks)if(!R.IsValid(FVoxelBlockState::Unpack(P)))return false;
     if(InTransition && !InTransition->Validate())return false;
     FVoxelSectionMeshResult T;
     T.Stamp.WorldEpoch = S.Stamp.Epoch;
@@ -131,30 +132,30 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
         FVoxelRenderBatch B;B.Group=G;B.Bank=Bank;int32 I=T.Batches.Add(MoveTemp(B));Groups.Add(K,I);return T.Batches[I].Mesh;
     };
     auto OverBudget=[&](){return TotalVertices>262144;};
-    for(uint8 F=0;F<6;++F)for(int32 Slice=0;Slice<16;++Slice)
+    for(uint8 F=0;F<6;++F)for(int32 Slice=0;Slice<Side;++Slice)
     {
         if(Cancel&&Cancel->Load())return false;
-        FFaceKey Mask[256];int32 A=F/2,U=(A+1)%3,V=(A+2)%3;
-        for(int32 Y=0;Y<16;++Y)for(int32 X=0;X<16;++X)
+        TArray<FFaceKey> Mask; Mask.SetNum(Side * Side);int32 A=F/2,U=(A+1)%3,V=(A+2)%3;
+        for(int32 Y=0;Y<Side;++Y)for(int32 X=0;X<Side;++X)
         {
-            FIntVector P(0,0,0);P[A]=Slice;P[U]=X;P[V]=Y;FVoxelBlockState B=FVoxelBlockState::Unpack(S.Blocks[VoxelCoord::Linear(P)]);
+            FIntVector P(0,0,0);P[A]=Slice;P[U]=X;P[V]=Y;FVoxelBlockState B=FVoxelBlockState::Unpack(S.Blocks[P.X + Side * (P.Y + Side * P.Z)]);
             if(B.IsAir())continue;const auto*D=R.Find(B.TypeId);if(D->Shape!=EVoxelShapeKind::FullCube||
                 (InTransition && InTransition->CoversCell(F,P))||!Visible(S,R,H,P,B,F,nullptr))continue;
-            FFaceKey&K=Mask[X+16*Y];K.Visible=true;K.Packed=B.Pack();K.Group=D->RenderGroup;
+            FFaceKey&K=Mask[X+Side*Y];K.Visible=true;K.Packed=B.Pack();K.Group=D->RenderGroup;
             uint8 MF=FVoxelShapeRegistry::RotateFace(F,uint8((4-(B.State&3))&3));K.Texture=D->Face(B.State,MF);
         }
-        for(int32 Y=0;Y<16;++Y)for(int32 X=0;X<16;)
+        for(int32 Y=0;Y<Side;++Y)for(int32 X=0;X<Side;)
         {
-            const auto K=Mask[X+16*Y];if(!K.Visible){++X;continue;}int32 W=1,Ht=1;
-            while(X+W<16&&Mask[X+W+16*Y]==K)++W;
-            bool Stop=false;while(Y+Ht<16&&!Stop){for(int32 DX=0;DX<W;++DX)if(!(Mask[X+DX+16*(Y+Ht)]==K)){Stop=true;break;}if(!Stop)++Ht;}
+            const auto K=Mask[X+Side*Y];if(!K.Visible){++X;continue;}int32 W=1,Ht=1;
+            while(X+W<Side&&Mask[X+W+Side*Y]==K)++W;
+            bool Stop=false;while(Y+Ht<Side&&!Stop){for(int32 DX=0;DX<W;++DX)if(!(Mask[X+DX+Side*(Y+Ht)]==K)){Stop=true;break;}if(!Stop)++Ht;}
         	FVector P[4];
         	FVector2D UV[4];
             const int32 XX[4]={X,X+W,X+W,X},YY[4]={Y,Y,Y+Ht,Y+Ht};
             for(int32 I=0;I<4;++I)
             {
 	            P[I]=FVector::ZeroVector;P[I][A]=Slice+(F%2==0?1:0);P[I][U]=XX[I];P[I][V]=YY[I];
-            	UV[I] = MakeFaceUV(F, P[I], 16.0);
+	            UV[I] = MakeFaceUV(F, P[I], double(Side));
             }
             for (FVector2D& Coordinate : UV)
             {
@@ -163,19 +164,19 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
             if(F&1){Swap(P[1],P[3]);Swap(UV[1],UV[3]);}
             AppendQuad(Batch(K.Group,K.Texture.Bank),P,UV,K.Texture,K.Group,FVector::ZeroVector);
             TotalVertices+=4;if(OverBudget())return false;
-            for(int32 DY=0;DY<Ht;++DY)for(int32 DX=0;DX<W;++DX)Mask[X+DX+16*(Y+DY)].Visible=false;X+=W;
+            for(int32 DY=0;DY<Ht;++DY)for(int32 DX=0;DX<W;++DX)Mask[X+DX+Side*(Y+DY)].Visible=false;X+=W;
         }
     }
     if(InTransition)
     {
         const FVoxelGenerationBounds OwnerBounds = InTransition->Owner.GetBounds();
-        const int32 OwnerStep = InTransition->Owner.GetStep();
+        const int32 OwnerStep = InTransition->Owner.GetSampleStep();
         for(const FVoxelBoundaryTransitionPatch& Patch:InTransition->Patches)
         {
             if(Cancel&&Cancel->Load())return false;
             const uint8 Face=static_cast<uint8>(Patch.Face.Direction);
             const int32 Axis=Face/2,UAxis=(Axis+1)%3,VAxis=(Axis+2)%3;
-            const int32 Ratio=Patch.Face.Ratio,FineStep=OwnerStep/Ratio;
+            const int32 FineStep=Patch.Neighbor.Key.GetSampleStep(),Ratio=FMath::Max(1,OwnerStep/FineStep);
             const int32 UFirst=(Patch.Face.Min[UAxis]-OwnerBounds.Min[UAxis])/OwnerStep;
             const int32 ULast=(Patch.Face.Max[UAxis]-OwnerBounds.Min[UAxis])/OwnerStep;
             const int32 VFirst=(Patch.Face.Min[VAxis]-OwnerBounds.Min[VAxis])/OwnerStep;
@@ -183,8 +184,8 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
             for(int32 V=VFirst;V<VLast;++V)for(int32 U=UFirst;U<ULast;++U)
             {
                 FIntVector Cell=FIntVector::ZeroValue;
-                Cell[Axis]=(Face&1)?0:15;Cell[UAxis]=U;Cell[VAxis]=V;
-                const FVoxelBlockState Current=FVoxelBlockState::Unpack(S.Blocks[VoxelCoord::Linear(Cell)]);
+                Cell[Axis]=(Face&1)?0:Side-1;Cell[UAxis]=U;Cell[VAxis]=V;
+                const FVoxelBlockState Current=FVoxelBlockState::Unpack(S.Blocks[Cell.X + Side * (Cell.Y + Side * Cell.Z)]);
                 if(Current.IsAir())continue;
                 const FVoxelRuntimeDefinition* Definition=R.Find(Current.TypeId);
                 if(!Definition||Definition->Shape!=EVoxelShapeKind::FullCube)continue;
@@ -206,9 +207,9 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
                     for(int32 I=0;I<4;++I)
                     {
                         Vertices[I]=FVector::ZeroVector;
-                        Vertices[I][Axis]=(Face&1)?0.0:16.0;
+                        Vertices[I][Axis]=(Face&1)?0.0:double(Side);
                         Vertices[I][UAxis]=Us[I];Vertices[I][VAxis]=Vs[I];
-                        UV[I]=MakeFaceUV(Face,Vertices[I],16.0)*InTextureRepeatsPerCell;
+                        UV[I]=MakeFaceUV(Face,Vertices[I],double(Side))*InTextureRepeatsPerCell;
                     }
                     if(Face&1){Swap(Vertices[1],Vertices[3]);Swap(UV[1],UV[3]);}
                     AppendQuad(Batch(Definition->RenderGroup,Texture.Bank),Vertices,UV,Texture,
@@ -218,12 +219,12 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
             }
         }
     }
-    for(uint16 I=0;I<4096;++I)
+    for(int32 I=0;I<Side * Side * Side;++I)
     {
         if((I&63)==0&&Cancel&&Cancel->Load())return false;
         auto B=FVoxelBlockState::Unpack(S.Blocks[I]);if(B.IsAir())continue;const auto*D=R.Find(B.TypeId);
         if(D->Shape==EVoxelShapeKind::FullCube)continue;const auto*Shape=H.Find(D->Shape,B.State);if(!Shape)return false;
-        FIntVector P=VoxelCoord::Unlinear(I);for(const auto&Q:Shape->Quads)
+        FIntVector P=FIntVector(I % Side, (I / Side) % Side, I / (Side * Side));for(const auto&Q:Shape->Quads)
         {
             if(Q.bBoundary&&!Visible(S,R,H,P,B,Q.Face,&Q))continue;
             const auto&Tex=D->Face(B.State,Q.MaterialFace);AppendQuad(Batch(D->RenderGroup,Tex.Bank),Q.Vertices,Q.UV,Tex,D->RenderGroup,FVector(P),D->Shape==EVoxelShapeKind::CrossPlant);

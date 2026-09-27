@@ -227,6 +227,25 @@ namespace
 			Result.MeanderOffset = Offset;
 		}
 		const int32 TangentQ10 = MeanderTangentQ10(InMaxAngle);
+		auto PreservesAnchorTurns = [&OutPoints, TangentQ10](
+			const int32 Index, const FIntPoint& Position, const bool bRemove)
+		{
+			if (Index > 1 && OutPoints[Index - 1].bAnchor &&
+				!IsMeanderAngleWithinLimit(OutPoints[Index - 2].Position,
+					OutPoints[Index - 1].Position,
+					bRemove ? OutPoints[Index + 1].Position : Position, TangentQ10))
+			{
+				return false;
+			}
+			if (Index + 2 < OutPoints.Num() && OutPoints[Index + 1].bAnchor &&
+				!IsMeanderAngleWithinLimit(
+					bRemove ? OutPoints[Index - 1].Position : Position,
+					OutPoints[Index + 1].Position, OutPoints[Index + 2].Position, TangentQ10))
+			{
+				return false;
+			}
+			return true;
+		};
 		for (int32 Pass = 0; Pass < 24; ++Pass)
 		{
 			bool bChanged = false;
@@ -241,7 +260,10 @@ namespace
 						OutPoints[Index + 1].Position.X) / 2),
 					static_cast<int32>((static_cast<int64>(OutPoints[Index - 1].Position.Y) +
 						OutPoints[Index + 1].Position.Y) / 2));
-				if (Midpoint != OutPoints[Index].Position)
+				if (Midpoint != OutPoints[Index].Position &&
+					Midpoint != OutPoints[Index - 1].Position &&
+					Midpoint != OutPoints[Index + 1].Position &&
+					PreservesAnchorTurns(Index, Midpoint, false))
 				{
 					OutPoints[Index].Position = Midpoint;
 					bChanged = true;
@@ -252,8 +274,9 @@ namespace
 		for (int32 Index = OutPoints.Num() - 2; Index > 0; --Index)
 		{
 			if (OutPoints[Index].bAnchor) continue;
-			if (OutPoints[Index].Position == OutPoints[Index - 1].Position ||
-				OutPoints[Index].Position == OutPoints[Index + 1].Position)
+			if ((OutPoints[Index].Position == OutPoints[Index - 1].Position ||
+				OutPoints[Index].Position == OutPoints[Index + 1].Position) &&
+				PreservesAnchorTurns(Index, OutPoints[Index].Position, true))
 			{
 				OutPoints.RemoveAt(Index);
 			}
@@ -267,7 +290,8 @@ namespace
 				++Index;
 				continue;
 			}
-			if (OutPoints[Index].bAnchor)
+			if (OutPoints[Index].bAnchor ||
+				!PreservesAnchorTurns(Index, OutPoints[Index].Position, true))
 			{
 				++Index;
 				continue;

@@ -19,6 +19,25 @@ void FVoxelTerrainViewPlan::Build(TConstArrayView<FVoxelStreamingSource> InSourc
 	{
 		RootLevel = FMath::Max(RootLevel, Root.Level);
 	}
+	for (const FIntVector& Section : InFineSections)
+	{
+		FVoxelViewKey Node { Section, 0 };
+		Node = Node.GetParent();
+		Roots.Add(Node);
+	}
+	TSet<FVoxelViewKey> NormalizedRoots;
+	for (const FVoxelViewKey& Root : Roots)
+	{
+		FVoxelViewKey Parent = Root;
+		bool bCovered = false;
+		while (Parent.Level < RootLevel)
+		{
+			Parent = Parent.GetParent();
+			if (Roots.Contains(Parent)) { bCovered = true; break; }
+		}
+		if (!bCovered) NormalizedRoots.Add(Root);
+	}
+	Roots = MoveTemp(NormalizedRoots);
 	TSet<FVoxelViewKey> FineAncestors;
 	for (const FIntVector& Section : InFineSections)
 	{
@@ -27,19 +46,9 @@ void FVoxelTerrainViewPlan::Build(TConstArrayView<FVoxelStreamingSource> InSourc
 		{
 			Node = Node.GetParent();
 			FineAncestors.Add(Node);
+			if (Roots.Contains(Node)) break;
 		}
-		Roots.Add(Node);
 	}
-	TSet<FVoxelViewKey> NormalizedRoots;
-	for (FVoxelViewKey Root : Roots)
-	{
-		while (Root.Level < RootLevel)
-		{
-			Root = Root.GetParent();
-		}
-		NormalizedRoots.Add(Root);
-	}
-	Roots = MoveTemp(NormalizedRoots);
 	Leaves = Roots;
 	Required = Roots;
 	auto Split = [this](const FVoxelViewKey& Node)
@@ -88,12 +97,13 @@ void FVoxelTerrainViewPlan::Build(TConstArrayView<FVoxelStreamingSource> InSourc
 		double Error = 0.0;
 		for (const FVoxelStreamingSource& Source : InSources)
 		{
-			if (Source.RenderMode != EVoxelStreamingRenderMode::Full)
+			if (!Source.bRefineView || Source.RenderMode != EVoxelStreamingRenderMode::Full)
 			{
 				continue;
 			}
 			const int32 Distance = FMath::FloorToInt(FMath::Sqrt(Box.ComputeSquaredDistanceToPoint(FVector(Source.Center))));
-			const uint8 Level = FMath::Max<uint8>(1, VoxelViewLod::ResolveScreenErrorLevel(Distance, 1, Source, InSettings, RootLevel));
+			if (Distance > Source.View.VoxelProxyRadiusCells) continue;
+			const uint8 Level = FMath::Max<uint8>(1, VoxelViewLod::ResolveScreenErrorLevel(Distance, 1, Source, RootLevel, Source.View.TargetScreenErrorPixels));
 			if (Level < Node.Level)
 			{
 				Error = FMath::Max(Error, static_cast<double>(Node.GetStep()) / FMath::Max(1, Distance));

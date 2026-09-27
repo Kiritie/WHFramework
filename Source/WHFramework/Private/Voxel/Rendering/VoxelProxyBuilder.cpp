@@ -65,17 +65,18 @@ namespace
 		const FVoxelBlockState InLeaves,
 		FVoxelVoxelProxyData& InOutData)
 	{
-		for (int32 Z = 0; Z < 16; ++Z)
+		const int32 Side = InOutData.GridSide;
+		for (int32 Z = 0; Z < Side; ++Z)
 		{
-			for (int32 Y = 0; Y < 16; ++Y)
+			for (int32 Y = 0; Y < Side; ++Y)
 			{
-				for (int32 X = 0; X < 16; ++X)
+				for (int32 X = 0; X < Side; ++X)
 				{
 					if (const FCoarseOverlayCell* Edits = InEdits.Find(FIntVector(X, Y, Z)))
 					{
 						const FIntVector Local(X, Y, Z);
 						Edits->Apply(InStep, InArchitecture.Contains(Local), InTrunk,
-							InLeaves, InOutData.Cells[X + Y * 16 + Z * 256]);
+							InLeaves, InOutData.Cells[X + Y * Side + Z * (Side * Side)]);
 					}
 				}
 			}
@@ -84,18 +85,18 @@ namespace
 		{
 			if (!InOutData.Known[Face]) continue;
 			const int32 Axis = Face / 2;
-			for (int32 Y = 0; Y < 16; ++Y)
+			for (int32 Y = 0; Y < Side; ++Y)
 			{
-				for (int32 X = 0; X < 16; ++X)
+				for (int32 X = 0; X < Side; ++X)
 				{
 					FIntVector Local = FIntVector::ZeroValue;
-					Local[Axis] = Face % 2 == 0 ? 16 : -1;
+					Local[Axis] = Face % 2 == 0 ? Side : -1;
 					Local[(Axis + 1) % 3] = X;
 					Local[(Axis + 2) % 3] = Y;
 					if (const FCoarseOverlayCell* Edits = InEdits.Find(Local))
 					{
 							Edits->Apply(InStep, InArchitecture.Contains(Local), InTrunk,
-								InLeaves, InOutData.Halo[Face][X + Y * 16]);
+								InLeaves, InOutData.Halo[Face][X + Y * Side]);
 					}
 				}
 			}
@@ -139,30 +140,31 @@ bool FVoxelVoxelProxyBuilder::Build(const FVoxelViewKey& InKey, const FVoxelOver
 	if (!BuildNatural(InKey, Data, OutError, InCancel)) return false;
 	if (!ApplyTreeSilhouettes(InKey, InOverlays, Data, OutError, InCancel)) return false;
 	const FIntVector Origin = InKey.GetBounds().Min;
-	const int32 Step = InKey.GetStep();
+	const int32 Side = Data.GridSide;
+	const int32 Step = InKey.GetSampleStep();
 	TMap<FIntVector, FVoxelBlockState> CoarseNatural;
 	if (Generator && !Generator->BuildCoarseOverlay(
-			Origin, Step, 16, CoarseNatural, OutError, InCancel))
+			Origin, Step, Side, CoarseNatural, OutError, InCancel))
 	{
 		return false;
 	}
 	for (const TPair<FIntVector, FVoxelBlockState>& Entry : CoarseNatural)
 	{
 		const FIntVector& Local = Entry.Key;
-		if (Local.X >= 0 && Local.X < 16 && Local.Y >= 0 && Local.Y < 16 &&
-			Local.Z >= 0 && Local.Z < 16)
+		if (Local.X >= 0 && Local.X < Side && Local.Y >= 0 && Local.Y < Side &&
+			Local.Z >= 0 && Local.Z < Side)
 		{
-			Data.Cells[Local.X + Local.Y * 16 + Local.Z * 256] = Entry.Value;
+			Data.Cells[Local.X + Local.Y * Side + Local.Z * Side * Side] = Entry.Value;
 		}
 		for (int32 Face = 0; Face < 6; ++Face)
 		{
 			const int32 Axis = Face / 2;
 			const int32 U = (Axis + 1) % 3;
 			const int32 V = (Axis + 2) % 3;
-			if (Data.Known[Face] && Local[Axis] == (Face % 2 == 0 ? 16 : -1) &&
-				Local[U] >= 0 && Local[U] < 16 && Local[V] >= 0 && Local[V] < 16)
+			if (Data.Known[Face] && Local[Axis] == (Face % 2 == 0 ? Side : -1) &&
+				Local[U] >= 0 && Local[U] < Side && Local[V] >= 0 && Local[V] < Side)
 			{
-				Data.Halo[Face][Local[U] + Local[V] * 16] = Entry.Value;
+				Data.Halo[Face][Local[U] + Local[V] * Side] = Entry.Value;
 			}
 		}
 	}
@@ -179,8 +181,8 @@ bool FVoxelVoxelProxyBuilder::Build(const FVoxelViewKey& InKey, const FVoxelOver
 				VoxelGeneration::FloorDivide(Position.X - Origin.X, Step),
 				VoxelGeneration::FloorDivide(Position.Y - Origin.Y, Step),
 				VoxelGeneration::FloorDivide(Position.Z - Origin.Z, Step));
-			if (Coarse.X < -1 || Coarse.X > 16 || Coarse.Y < -1 || Coarse.Y > 16 ||
-				Coarse.Z < -1 || Coarse.Z > 16)
+			if (Coarse.X < -1 || Coarse.X > Side || Coarse.Y < -1 || Coarse.Y > Side ||
+				Coarse.Z < -1 || Coarse.Z > Side)
 			{
 				continue;
 			}
@@ -229,19 +231,30 @@ bool FVoxelVoxelProxyBuilder::ApplyTreeSilhouettes(
 		OutError = TEXT("Tree silhouette symbols are invalid");
 		return false;
 	}
+	auto ClearTreeSamples = [Trunk, Leaves](TArray<FVoxelBlockState>& Cells)
+	{
+		for (FVoxelBlockState& Cell : Cells)
+		{
+			if (Cell == Trunk || Cell == Leaves) Cell = FVoxelBlockState();
+		}
+	};
+	ClearTreeSamples(InOutData.Cells);
+	for (TArray<FVoxelBlockState>& Face : InOutData.Halo) ClearTreeSamples(Face);
 	FVoxelGenerationQuery Query;
 	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError))
 	{
 		return false;
 	}
 	const FVoxelGenerationBounds Bounds = InKey.GetBounds();
-	const int32 Step = InKey.GetStep();
+	const int32 Side = InOutData.GridSide;
+	const int32 Step = InKey.GetSampleStep();
 	const FIntVector Origin = Bounds.Min;
+	const int32 CrownPadding = (FMath::Max(1, (Trees.CrownRadius - 1) / Step) + 1) * Step;
 	const FVoxelGenerationBounds TreeBounds {
-		FIntVector(Bounds.Min.X - Trees.CrownRadius,
-			Bounds.Min.Y - Trees.CrownRadius, Config->Recipe->Settings.MinZ),
-		FIntVector(Bounds.Max.X + Trees.CrownRadius,
-			Bounds.Max.Y + Trees.CrownRadius, Config->Recipe->Settings.MaxZ)
+		FIntVector(Bounds.Min.X - CrownPadding,
+			Bounds.Min.Y - CrownPadding, Config->Recipe->Settings.MinZ),
+		FIntVector(Bounds.Max.X + CrownPadding,
+			Bounds.Max.Y + CrownPadding, Config->Recipe->Settings.MaxZ)
 	};
 	bool bSampleFailed = false;
 	auto SampleColumn = [&Query, &OutError, &bSampleFailed, InCancel](
@@ -264,7 +277,7 @@ bool FVoxelVoxelProxyBuilder::ApplyTreeSilhouettes(
 			Config->Recipe->Palette.Stone : Config->Recipe->Palette.Air;
 		return true;
 	};
-	auto Draw = [&InOutData, &Origin, Step, Trunk, Leaves,
+	auto Draw = [&InOutData, &Origin, Step, Side, Trunk, Leaves,
 		Water = Config->Water](
 		const FIntVector& Position, const FVoxelBlockState State,
 		const bool bReplaceTrunk)
@@ -273,10 +286,10 @@ bool FVoxelVoxelProxyBuilder::ApplyTreeSilhouettes(
 			VoxelGeneration::FloorDivide(Position.X - Origin.X, Step),
 			VoxelGeneration::FloorDivide(Position.Y - Origin.Y, Step),
 			VoxelGeneration::FloorDivide(Position.Z - Origin.Z, Step));
-		if (Local.X >= 0 && Local.X < 16 && Local.Y >= 0 && Local.Y < 16 &&
-			Local.Z >= 0 && Local.Z < 16)
+		if (Local.X >= 0 && Local.X < Side && Local.Y >= 0 && Local.Y < Side &&
+			Local.Z >= 0 && Local.Z < Side)
 		{
-			FVoxelBlockState& Cell = InOutData.Cells[Local.X + Local.Y * 16 + Local.Z * 256];
+			FVoxelBlockState& Cell = InOutData.Cells[Local.X + Local.Y * Side + Local.Z * Side * Side];
 			if (Cell.IsAir() || Cell == Water || (State == Trunk && Cell == Leaves) ||
 				(bReplaceTrunk && Cell == Trunk)) Cell = State;
 		}
@@ -285,10 +298,10 @@ bool FVoxelVoxelProxyBuilder::ApplyTreeSilhouettes(
 			const int32 Axis = Face / 2;
 			const int32 U = (Axis + 1) % 3;
 			const int32 V = (Axis + 2) % 3;
-			if (InOutData.Known[Face] && Local[Axis] == (Face % 2 == 0 ? 16 : -1) &&
-				Local[U] >= 0 && Local[U] < 16 && Local[V] >= 0 && Local[V] < 16)
+			if (InOutData.Known[Face] && Local[Axis] == (Face % 2 == 0 ? Side : -1) &&
+				Local[U] >= 0 && Local[U] < Side && Local[V] >= 0 && Local[V] < Side)
 			{
-				FVoxelBlockState& Cell = InOutData.Halo[Face][Local[U] + Local[V] * 16];
+				FVoxelBlockState& Cell = InOutData.Halo[Face][Local[U] + Local[V] * Side];
 				if (Cell.IsAir() || Cell == Water || (State == Trunk && Cell == Leaves) ||
 					(bReplaceTrunk && Cell == Trunk)) Cell = State;
 			}
@@ -313,14 +326,17 @@ bool FVoxelVoxelProxyBuilder::ApplyTreeSilhouettes(
 			{
 				Draw(FIntVector(Anchor.X, Anchor.Y, Origin.Z + Z * Step), Trunk, false);
 			}
-			const int32 Radius = FMath::Max(0, (Trees.CrownRadius - 1) / Step);
-			for (int32 Y = -Radius; Y <= Radius; ++Y)
+			const int32 Radius = FMath::Max(1, (Trees.CrownRadius - 1) / Step);
+			for (int32 Z = -Radius; Z <= Radius; ++Z)
 			{
-				for (int32 X = -Radius; X <= Radius; ++X)
+				for (int32 Y = -Radius; Y <= Radius; ++Y)
 				{
-					if (X * X + Y * Y > Radius * Radius) continue;
-					Draw(FIntVector(Anchor.X + X * Step, Anchor.Y + Y * Step,
-						Origin.Z + CrownZ * Step), Leaves, Radius == 0);
+					for (int32 X = -Radius; X <= Radius; ++X)
+					{
+						if (FMath::Abs(X) == Radius && FMath::Abs(Y) == Radius && FMath::Abs(Z) == Radius) continue;
+						Draw(FIntVector(Anchor.X + X * Step, Anchor.Y + Y * Step,
+							Origin.Z + (CrownZ + Z) * Step), Leaves, true);
+					}
 				}
 			}
 		}, Candidates, Accepted, InCancel);
@@ -352,14 +368,13 @@ bool FVoxelVoxelProxyBuilder::BuildNatural(
 		return false;
 	}
 
-	constexpr int32 GridSide =
-		16;
+	const int32 GridSide = InKey.GetGridSide();
 
-	constexpr int32 ColumnSampleSide =
+	const int32 ColumnSampleSide =
 		GridSide + 2;
 
 	const int32 Step =
-		InKey.GetStep();
+		InKey.GetSampleStep();
 
 	const FVoxelGenerationBounds Bounds =
 		InKey.GetBounds();
@@ -411,7 +426,7 @@ bool FVoxelVoxelProxyBuilder::BuildNatural(
 		ColumnSampleSide);
 
 	auto ColumnIndex =
-		[](
+		[ColumnSampleSide](
 			const int32 InLocalX,
 			const int32 InLocalY)
 		{
@@ -471,6 +486,7 @@ bool FVoxelVoxelProxyBuilder::BuildNatural(
 			this,
 			&Bounds,
 			Step,
+			GridSide,
 			&Columns,
 			&ColumnIndex
 		](

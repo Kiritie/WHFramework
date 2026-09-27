@@ -162,7 +162,7 @@ struct WHFRAMEWORK_API FVoxelTaskRequest
 	FVoxelTaskStamp Stamp;
 	EVoxelTaskKind Kind = EVoxelTaskKind::None;
 	EVoxelWorkClass WorkClass = EVoxelWorkClass::None;
-	EVoxelStreamingSourcePriority SourcePriority = EVoxelStreamingSourcePriority::Player;
+	int32 SourcePriority = 0;
 	int32 TerrainStage = INDEX_NONE;
 
 	double DistanceScore = 0.0;
@@ -241,7 +241,7 @@ public:
 
 	bool Enqueue(FVoxelTaskRequest&& InRequest);
 	void UpdatePriorities(TFunctionRef<void(EVoxelTaskKind, const FVoxelTaskStamp&,
-		EVoxelWorkClass&, EVoxelStreamingSourcePriority&, double&, double&)> InUpdate);
+		EVoxelWorkClass&, int32&, double&, double&)> InUpdate);
 
 	void Tick(
 		TFunctionRef<void(FVoxelTaskResult&&)> InApply,
@@ -280,7 +280,7 @@ private:
 		FVoxelTaskStamp Stamp;
 		EVoxelTaskKind Kind = EVoxelTaskKind::None;
 		EVoxelWorkClass WorkClass = EVoxelWorkClass::None;
-		EVoxelStreamingSourcePriority SourcePriority = EVoxelStreamingSourcePriority::Player;
+		int32 SourcePriority = 0;
 		int32 TerrainStage = INDEX_NONE;
 
 		double QueuedAt = 0.0;
@@ -329,6 +329,7 @@ private:
 	FVoxelTaskBudget Budget;
 	FVoxelTaskDiagnostics Diagnostics;
 
+	double LastBudgetWarning = -10.0;
 	bool bStopped = false;
 	uint64 ReservedBytes = 0;
 	uint64 QueuedInputBytes = 0;

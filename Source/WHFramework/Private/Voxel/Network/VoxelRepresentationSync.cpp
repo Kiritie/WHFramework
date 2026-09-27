@@ -7,7 +7,8 @@
 namespace
 {
 	constexpr uint32 RepresentationMagic = 0x34505256;
-	constexpr uint16 RepresentationVersion = 3;
+	constexpr uint16 RepresentationVersion = 4;
+	constexpr int32 MaxRepresentationRawBytes = 16 * 1024 * 1024;
 	constexpr int32 MaxCells = 4096;
 	constexpr uint32 MaxDistantCells = 16384;
 
@@ -146,7 +147,7 @@ namespace
 
 	bool OpenCompressed(TConstArrayView<uint8> InBytes, TArray<uint8>& OutRaw, FString& OutError)
 	{
-		if (!VoxelBinary::Decompress(InBytes, OutRaw, FVoxelNetworkCodec::MaxRepresentationBytes))
+		if (!VoxelBinary::Decompress(InBytes, OutRaw, MaxRepresentationRawBytes))
 		{
 			OutError = TEXT("Voxel representation compression envelope is invalid");
 			return false;
@@ -265,10 +266,10 @@ bool FVoxelRepresentationSync::EncodeVoxelProxy(
 	TArray<uint8>& OutBytes,
 	FString& OutError)
 {
-	if (InData.GridSide !=
-			16 ||
+	if (InData.Key.Level > 5 || InData.GridSide !=
+			InData.Key.GetGridSide() ||
 		InData.Cells.Num() !=
-			4096)
+			(InData.GridSide * InData.GridSide * InData.GridSide))
 	{
 		OutError =
 			TEXT(
@@ -285,7 +286,7 @@ bool FVoxelRepresentationSync::EncodeVoxelProxy(
 				Face] &&
 			InData.Halo[
 				Face].Num() !=
-				256)
+				(InData.GridSide * InData.GridSide))
 		{
 			OutError =
 				TEXT(
@@ -295,9 +296,7 @@ bool FVoxelRepresentationSync::EncodeVoxelProxy(
 		}
 	}
 
-	FVoxelByteWriter Writer(
-		FVoxelNetworkCodec::
-			MaxRepresentationBytes);
+	FVoxelByteWriter Writer(MaxRepresentationRawBytes);
 
 	Writer.U32(
 		RepresentationMagic);
@@ -424,10 +423,12 @@ bool FVoxelRepresentationSync::DecodeVoxelProxy(
 	const uint32 Count =
 		Reader.U32();
 
-	if (Data.GridSide != 16 ||
-		Count != 4096)
+	if (Data.Key.Level > 5 || Data.GridSide != Data.Key.GetGridSide() || Data.GridSide > 128 ||
+		Count != (Data.GridSide * Data.GridSide * Data.GridSide))
 	{
 		Reader.Reject();
+		OutError = TEXT("Invalid proxy sampling resolution");
+		return false;
 	}
 
 	Data.Cells.Reserve(
@@ -472,10 +473,10 @@ bool FVoxelRepresentationSync::DecodeVoxelProxy(
 		Data.Halo[
 			Face].
 			Reserve(
-				256);
+				(Data.GridSide * Data.GridSide));
 
 		for (int32 Index = 0;
-			Index < 256 &&
+			Index < (Data.GridSide * Data.GridSide) &&
 				Reader.IsValid();
 			++Index)
 		{

@@ -570,6 +570,11 @@ void UVoxelAgentComponent::RefreshSource()
 	FVoxelStreamingSource Source;
 	Source.Purpose = bInitialCollisionGatePending ? EVoxelStreamingSourcePurpose::InitialSpawn : EVoxelStreamingSourcePurpose::Observer;
 	Source.bAffectsGlobalReadiness = true;
+	Source.bInheritWorldView = bInheritWorldView;
+	Source.View = StreamingView;
+	Source.bLocalView = BoundController.IsValid() && BoundController->IsLocalController();
+	Source.bWorldView = bProvideWorldView;
+	Source.Priority = StreamingPriority;
 
 	FVector ViewOrigin;
 	FVector ViewDirection;

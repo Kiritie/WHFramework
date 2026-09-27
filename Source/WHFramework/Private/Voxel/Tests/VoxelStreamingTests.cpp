@@ -59,13 +59,16 @@ bool FVoxelSurfaceTwoToOneBalanceTest::RunTest(const FString& InParameters)
 	Manifest.Settings.MinZ = -128;
 	Manifest.Settings.MaxZ = 128;
 	FVoxelViewSettings Settings;
-	Settings.FineRadius = 0;
-	Settings.VoxelProxyRadius = 64;
-	Settings.SurfaceRadius = 8192;
-	Settings.MacroRadius = 16384;
-	Settings.MaximumSurfaceTilesPerSource = 512;
-	Settings.TargetScreenErrorPixels = 2.0f;
 	FVoxelStreamingSource Sources[2];
+	for (FVoxelStreamingSource& Source : Sources)
+	{
+		Source.View.FineRadiusCells = 0;
+		Source.View.VoxelProxyRadiusCells = 64;
+		Source.View.SurfaceRadiusCells = 8192;
+		Settings.MacroRadiusCells = 16384;
+		Source.View.MaximumSurfaceLevel = 5;
+		Settings.MaximumSurfaceTiles = 512;
+	}
 	Sources[0].Center = FIntVector::ZeroValue;
 	Sources[1].Center = FIntVector(3072, 1024, 0);
 	const FVoxelInterestManager Manager;
@@ -92,13 +95,15 @@ bool FVoxelMacroTwoToOneBalanceTest::RunTest(const FString& InParameters)
 	Manifest.Settings.MinZ = -128;
 	Manifest.Settings.MaxZ = 128;
 	FVoxelViewSettings Settings;
-	Settings.FineRadius = 0;
-	Settings.VoxelProxyRadius = 64;
-	Settings.SurfaceRadius = 2048;
-	Settings.MacroRadius = 96000;
-	Settings.MaximumMacroTilesPerSource = 512;
-	Settings.TargetScreenErrorPixels = 2.0f;
 	FVoxelStreamingSource Sources[2];
+	for (FVoxelStreamingSource& Source : Sources)
+	{
+		Source.View.FineRadiusCells = 0;
+		Source.View.VoxelProxyRadiusCells = 64;
+		Source.View.SurfaceRadiusCells = 2048;
+		Settings.MacroRadiusCells = 96000;
+		Settings.MaximumMacroTiles = 512;
+	}
 	Sources[0].Center = FIntVector::ZeroValue;
 	Sources[1].Center = FIntVector(16384, 4096, 0);
 	const FVoxelInterestManager Manager;
@@ -149,8 +154,9 @@ bool FVoxelStreamingDemandTest::RunTest(const FString& InParameters)
 
 	Source.ExactRadius = 64;
 	FVoxelViewSettings SmallWarmupSettings;
-	SmallWarmupSettings.WarmupDataRadius = 12; // 600 cm at a 50 cm cell size.
-	SmallWarmupSettings.WarmupCollisionRadius = 12;
+	Source.bAffectsGlobalReadiness = true;
+	Source.View.WarmupDataRadiusCells = 12; // 600 cm at a 50 cm cell size.
+	Source.View.WarmupCollisionRadiusCells = 12;
 	const FVoxelInterestSet SmallWarmup = Manager.Compute(
 		MakeArrayView(&Source, 1), Manifest, SmallWarmupSettings);
 	TestTrue(TEXT("Warmup includes the section containing a boundary-aligned source"),
@@ -206,6 +212,81 @@ bool FVoxelStreamingRenderScopeTest::RunTest(const FString& InParameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelIndependentSourceViewTest,
+	"WHFramework.Voxel.Streaming.IndependentSourceView",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelIndependentSourceViewTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelWorldManifest Manifest;
+	Manifest.Settings.MinZ = -128;
+	Manifest.Settings.MaxZ = 128;
+	FVoxelViewSettings Settings;
+	FVoxelStreamingSource Sources[2];
+	Sources[0].Id = FGuid::NewGuid();
+	Sources[0].Priority = 20;
+	Sources[0].View.FineRadiusCells = 32;
+	Sources[0].View.FinePreloadCells = 0;
+	Sources[0].View.VoxelProxyRadiusCells = 128;
+	Sources[0].View.SurfaceRadiusCells = 512;
+	Settings.MacroRadiusCells = 4096;
+
+	Sources[1].Id = FGuid::NewGuid();
+	Sources[1].Purpose = EVoxelStreamingSourcePurpose::DebugPOI;
+	Sources[1].Priority = -25;
+	Sources[1].Center = FIntVector(1024, 0, 0);
+	Sources[1].RenderMode = EVoxelStreamingRenderMode::FineOnly;
+	Sources[1].View.FineRadiusCells = 48;
+	Sources[1].View.FineVerticalRadiusCells = 64;
+	Sources[1].View.FinePreloadCells = 0;
+
+	Sources[1].ExactRadius = -1;
+	Sources[1].CollisionRadius = 0;
+	Sources[1].SimulationRadius = 0;
+	Sources[1].VerticalExactRadius = 0;
+	Sources[1].bCollision = false;
+	Sources[1].bSimulation = false;
+
+	const FVoxelInterestManager Manager;
+	const FVoxelInterestSet DebugOnly = Manager.Compute(MakeArrayView(&Sources[1], 1), Manifest, Settings);
+	const FVoxelExactDemand* DebugDemand = DebugOnly.Exact.Find(FIntVector(64, 0, 0));
+	TestTrue(TEXT("Debug source requests its own fine section"), DebugDemand && DebugDemand->bFineRender);
+	if (DebugDemand)
+	{
+		TestFalse(TEXT("Debug fine does not request exact interaction"), DebugDemand->bExact);
+		TestFalse(TEXT("Debug fine does not request collision"), DebugDemand->bCollision);
+		TestEqual(TEXT("Debug fine uses numeric source priority"), DebugDemand->Priority, -25);
+	}
+	TestTrue(TEXT("Debug source does not request voxel proxies"), DebugOnly.VoxelProxy.IsEmpty());
+	TestTrue(TEXT("Debug source does not request surface"), DebugOnly.Surface.IsEmpty());
+	TestTrue(TEXT("Debug source does not request macro"), DebugOnly.Macro.IsEmpty());
+
+	const FVoxelInterestSet PlayerOnly = Manager.Compute(MakeArrayView(&Sources[0], 1), Manifest, Settings);
+	const FVoxelInterestSet Combined = Manager.Compute(MakeArrayView(Sources), Manifest, Settings);
+	bool bEveryFinePrioritized = true;
+	for (const auto& Pair : Combined.Exact)
+	{
+		if (Pair.Value.bFineRender)
+		{
+			bEveryFinePrioritized &= Pair.Value.Priority != MAX_int32;
+		}
+	}
+	TestTrue(TEXT("Merged fine partition has source priorities"), bEveryFinePrioritized);
+	TestEqual(TEXT("Debug source does not add surface tiles"), Combined.Surface.Num(), PlayerOnly.Surface.Num());
+	TestEqual(TEXT("Debug source does not add macro tiles"), Combined.Macro.Num(), PlayerOnly.Macro.Num());
+	const FVoxelExactDemand* CombinedDemand = Combined.Exact.Find(FIntVector(64, 0, 0));
+	TestTrue(TEXT("Debug fine remains requested with player source"), CombinedDemand && CombinedDemand->bFineRender);
+	if (CombinedDemand)
+	{
+		TestEqual(TEXT("Combined demand keeps debug numeric priority"), CombinedDemand->Priority, -25);
+	}
+	TestTrue(TEXT("Admission order follows numeric priority"),
+		!Combined.Admissions.IsEmpty() && Combined.Admissions[0].Priority == -25);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FVoxelStreamingLodSymmetryTest,
 	"WHFramework.Voxel.Streaming.LodSymmetry",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -217,20 +298,20 @@ bool FVoxelStreamingLodSymmetryTest::RunTest(const FString& InParameters)
 	Manifest.Settings.MinZ = -128;
 	Manifest.Settings.MaxZ = 128;
 	FVoxelViewSettings Settings;
-	Settings.FineRadius = 64;
-	Settings.FinePreload = 0;
-	Settings.VoxelProxyRadius = 256;
-	Settings.SurfaceRadius = 1024;
-	Settings.MacroRadius = 16000;
-	Settings.MaximumSurfaceTilesPerSource = 256;
-	Settings.MaximumMacroTilesPerSource = 128;
 	FVoxelStreamingSource Source;
+	Source.View.FineRadiusCells = 64;
+	Source.View.FinePreloadCells = 0;
+	Source.View.VoxelProxyRadiusCells = 256;
+	Source.View.SurfaceRadiusCells = 1024;
+	Settings.MacroRadiusCells = 16000;
+	Settings.MaximumSurfaceTiles = 256;
+	Settings.MaximumMacroTiles = 128;
 	Source.ExactRadius = 64;
 	Source.Center = FIntVector::ZeroValue;
 	const FVoxelInterestManager Manager;
 	const FVoxelInterestSet Interest = Manager.Compute(MakeArrayView(&Source, 1), Manifest, Settings);
-	TestTrue(TEXT("Surface obeys tile budget"), Interest.Surface.Num() <= Settings.MaximumSurfaceTilesPerSource);
-	TestTrue(TEXT("Macro obeys tile budget"), Interest.Macro.Num() <= Settings.MaximumMacroTilesPerSource);
+	TestTrue(TEXT("Surface obeys tile budget"), Interest.Surface.Num() <= Settings.MaximumSurfaceTiles);
+	TestTrue(TEXT("Macro obeys tile budget"), Interest.Macro.Num() <= Settings.MaximumMacroTiles);
 	TestFalse(TEXT("Surface coverage remains available"), Interest.Surface.IsEmpty());
 	TestFalse(TEXT("Macro coverage remains available"), Interest.Macro.IsEmpty());
 	for (const FVoxelSurfaceTileKey& Key : Interest.Surface)
@@ -359,9 +440,9 @@ bool FVoxelFineLodHysteresisTest::RunTest(const FString& InParameters)
 	Manifest.Settings.MinZ = -128;
 	Manifest.Settings.MaxZ = 128;
 	FVoxelViewSettings Settings;
-	Settings.FineRadius = 64;
-	Settings.FinePreload = 0;
 	FVoxelStreamingSource Source;
+	Source.View.FineRadiusCells = 64;
+	Source.View.FinePreloadCells = 0;
 	Source.ExactRadius = 64;
 	Source.VerticalExactRadius = 16;
 	Source.RenderMode = EVoxelStreamingRenderMode::FineOnly;
@@ -566,10 +647,10 @@ bool FVoxelFineIndependentRadiusTest::RunTest(const FString& InParameters)
 	Manifest.Settings.MinZ = -256;
 	Manifest.Settings.MaxZ = 256;
 	FVoxelViewSettings Settings;
-	Settings.FineRadius = 96;
-	Settings.FinePreload = 16;
-	Settings.FineVerticalRadius = 32;
 	FVoxelStreamingSource Source;
+	Source.View.FineRadiusCells = 96;
+	Source.View.FinePreloadCells = 16;
+	Source.View.FineVerticalRadiusCells = 32;
 	Source.ExactRadius = 16;
 	Source.CollisionRadius = 16;
 	Source.VerticalExactRadius = 16;
@@ -748,7 +829,7 @@ bool FVoxelMovingPrioritySchedulerTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Movement test task enters scheduler"), Scheduler.Enqueue(MoveTemp(Request)));
 	}
 	Scheduler.UpdatePriorities([](EVoxelTaskKind, const FVoxelTaskStamp& Stamp,
-		EVoxelWorkClass& WorkClass, EVoxelStreamingSourcePriority&,
+		EVoxelWorkClass& WorkClass, int32&,
 		double& Distance, double& Forward)
 	{
 		WorkClass = Stamp.Token == 3 ? EVoxelWorkClass::Critical : EVoxelWorkClass::Interactive;
@@ -817,6 +898,10 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 		FVoxelTaskBudget Budget;
 		Budget.MaxConcurrentTasks = WorkerCount;
 		Budget.MaxConcurrentCoarseTerrainTasks = WorkerCount;
+		Budget.MaxConcurrentSurfaceTasks = WorkerCount;
+		Budget.MaxConcurrentMacroTasks = WorkerCount;
+		Budget.MaxCompletedResultsPerFrame = 16;
+		Budget.MaxHeavyCompletedResultsPerFrame = 16;
 		Scheduler.SetBudget(Budget);
 		auto Enqueue = [&](const int32 Index)
 		{
@@ -844,7 +929,8 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 		if (WorkerCount > 1)
 		{
 			while (Finished.Load() < 9 && FPlatformTime::Seconds() < Deadline) FPlatformProcess::Sleep(0.001f);
-			FPlatformProcess::Sleep(0.01f);
+			// Execute increments Finished before the worker marks its task complete.
+			FPlatformProcess::Sleep(0.5f);
 		}
 		TArray<int32> Stages;
 		while (Scheduler.ActiveCount() > 0 && FPlatformTime::Seconds() < Deadline)
@@ -859,7 +945,8 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("All terrain tasks finish without cancellation"), Stages.Num(), 8);
 		for (int32 Index = 1; Index < Stages.Num(); ++Index)
 		{
-			TestTrue(TEXT("Dispatch and completed-result application preserve stage order, including aged jobs"),
+			TestTrue(*FString::Printf(TEXT("Stage application order: workers=%d index=%d previous=%d current=%d"),
+				WorkerCount, Index, Stages[Index - 1], Stages[Index]),
 				Stages[Index - 1] <= Stages[Index]);
 		}
 	}
@@ -967,6 +1054,64 @@ bool FVoxelStreamingViewPredecessorCompletionTest::RunTest(const FString& InPara
 		TestEqual(TEXT("Every distant layer waits for its predecessor"),
 			Active, CompletedKinds);
 	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelStreamingMultiSourceStageTest,
+	"WHFramework.Voxel.Streaming.View.MultiSourceStage",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelStreamingMultiSourceStageTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	TArray<FVoxelViewAdmission> Admissions = {
+		{ EVoxelViewAdmissionKind::Fine, 16.0, 0 },
+		{ EVoxelViewAdmissionKind::Fine, 24.0, 0 },
+		{ EVoxelViewAdmissionKind::VoxelProxy, 64.0, 0 },
+		{ EVoxelViewAdmissionKind::VoxelProxy, 72.0, 0 },
+		{ EVoxelViewAdmissionKind::Surface, 128.0, 0 },
+		{ EVoxelViewAdmissionKind::Macro, 256.0, 0 },
+		{ EVoxelViewAdmissionKind::Fine, 8.0, 100 }
+	};
+	FVoxelViewManager::SortAdmissionsByPriority(Admissions);
+	int32 Priority = MAX_int32;
+	TestEqual(TEXT("Two player sources start at fine stage"),
+		FVoxelViewManager::ResolveActiveAdmissionKind(Admissions,
+			[](const FVoxelViewAdmission&) { return false; }, &Priority), 0);
+	TestEqual(TEXT("Player sources share numeric priority"), Priority, 0);
+	TestEqual(TEXT("Both player fine regions complete before player proxy"),
+		FVoxelViewManager::ResolveActiveAdmissionKind(Admissions,
+			[](const FVoxelViewAdmission& Admission)
+			{
+				return Admission.Priority == 0 && Admission.Kind == EVoxelViewAdmissionKind::Fine;
+			}, &Priority), 1);
+	TestEqual(TEXT("Player far layers do not wait for lower-priority debug fine"),
+		FVoxelViewManager::ResolveActiveAdmissionKind(Admissions,
+			[](const FVoxelViewAdmission& Admission) { return Admission.Priority == 0; }, &Priority), 0);
+	TestEqual(TEXT("Remaining source has its own numeric priority"), Priority, 100);
+	const TMap<int32, int32> DataStages = FVoxelViewManager::ResolveAdmissionStages(Admissions,
+		[](const FVoxelViewAdmission& Admission)
+		{
+			return Admission.Priority == 0 && Admission.Kind == EVoxelViewAdmissionKind::Fine;
+		});
+	const TMap<int32, int32> MeshStages = FVoxelViewManager::ResolveAdmissionStages(Admissions,
+		[](const FVoxelViewAdmission&) { return false; });
+	TestEqual(TEXT("Player proxy data can prepare while fine meshes are unfinished"), DataStages.FindRef(0), 1);
+	TestEqual(TEXT("Player mesh still waits at fine"), MeshStages.FindRef(0), 0);
+	TestTrue(TEXT("Debug fine remains independently eligible while player proxy data prepares"),
+		DataStages.Contains(100) && DataStages.FindRef(100) == 0 && MeshStages.Contains(100));
+	TestEqual(TEXT("All source groups finish"),
+		FVoxelViewManager::ResolveActiveAdmissionKind(Admissions,
+			[](const FVoxelViewAdmission&) { return true; }, &Priority), 4);
+	FVoxelTaskRequest PlayerMacro;
+	PlayerMacro.Kind = EVoxelTaskKind::BuildMacro;
+	PlayerMacro.SourcePriority = 0;
+	FVoxelTaskRequest DebugFine;
+	DebugFine.Kind = EVoxelTaskKind::BuildFineMesh;
+	DebugFine.SourcePriority = 100;
+	TestTrue(TEXT("Higher-priority player macro outranks lower-priority debug fine"),
+		FVoxelTaskScheduler::IsHigherPriority(PlayerMacro, DebugFine));
 	return true;
 }
 

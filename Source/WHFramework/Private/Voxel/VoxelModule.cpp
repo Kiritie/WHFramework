@@ -114,12 +114,11 @@ namespace
 
 	bool StreamingSourceAffectsInterest(
 		const FVoxelStreamingSource& InA,
-		const FVoxelStreamingSource& InB,
-		const FVoxelViewSettings& InViewSettings)
+		const FVoxelStreamingSource& InB)
 	{
 		int32 CenterRefreshDistance = FMath::Max(1, FMath::RoundToInt(
-			(InB.FineRadiusCells >= 0 ? InB.FineRadiusCells : InViewSettings.FineRadius) *
-			InViewSettings.StreamingReplanFineRadiusFraction));
+			InB.View.FineRadiusCells *
+			InB.View.StreamingReplanFineRadiusFraction));
 		if (InB.bCollision)
 		{
 			CenterRefreshDistance = FMath::Min(CenterRefreshDistance,
@@ -131,14 +130,26 @@ namespace
 		if (static_cast<int64>(CenterDelta.X) * CenterDelta.X +
 			static_cast<int64>(CenterDelta.Y) * CenterDelta.Y +
 			static_cast<int64>(CenterDelta.Z) * CenterDelta.Z >= CenterRefreshDistanceSquared ||
+			InA.View.VoxelProxyRadiusCells != InB.View.VoxelProxyRadiusCells ||
+			InA.View.SurfaceRadiusCells != InB.View.SurfaceRadiusCells ||
+			InA.View.TargetScreenErrorPixels != InB.View.TargetScreenErrorPixels ||
+			InA.View.MaximumVoxelProxyLevel != InB.View.MaximumVoxelProxyLevel ||
+			InA.View.MaximumSurfaceLevel != InB.View.MaximumSurfaceLevel ||
 			InA.ExactRadius != InB.ExactRadius ||
-			InA.FineRadiusCells != InB.FineRadiusCells ||
+			InA.View.FineRadiusCells != InB.View.FineRadiusCells ||
+			InA.View.WarmupDataRadiusCells != InB.View.WarmupDataRadiusCells ||
+			InA.View.WarmupCollisionRadiusCells != InB.View.WarmupCollisionRadiusCells ||
+			InA.View.StreamingReplanFineRadiusFraction != InB.View.StreamingReplanFineRadiusFraction ||
+			InA.View.FineVerticalRadiusCells != InB.View.FineVerticalRadiusCells ||
+			InA.View.FinePreloadCells != InB.View.FinePreloadCells ||
 			InA.CollisionRadius != InB.CollisionRadius ||
 			InA.SimulationRadius != InB.SimulationRadius ||
 			InA.VerticalExactRadius != InB.VerticalExactRadius ||
 			InA.RenderMode != InB.RenderMode ||
 			InA.Purpose != InB.Purpose ||
 			InA.Priority != InB.Priority ||
+			InA.bLocalView != InB.bLocalView ||
+			InA.bWorldView != InB.bWorldView ||
 			InA.bAffectsGlobalReadiness != InB.bAffectsGlobalReadiness ||
 			InA.bRetainGenerationCache != InB.bRetainGenerationCache ||
 			InA.RetentionRadiusCells != InB.RetentionRadiusCells ||
@@ -340,6 +351,11 @@ void UVoxelModule::OnRefresh(
 	const double Now =
 		FPlatformTime::Seconds();
 
+	if (!bInterestBuildPending && !bInterestDirty && Now >= NextSourceRefinementRefresh)
+	{
+		NextSourceRefinementRefresh = Now + 0.1;
+		RefreshSourceRefinements();
+	}
 	if (bInterestDirty &&
 		(LastInterestRefresh < 0.0 ||
 			Now - LastInterestRefresh >= 0.1))
@@ -353,7 +369,7 @@ void UVoxelModule::OnRefresh(
 		CurrentInterest,
 		InterestRevision,
 		Now,
-		ViewManager ? ViewManager->GetDataAdmissionLimit() : MAX_dbl,
+		ViewManager ? ViewManager->GetDataAdmissionLimits() : TMap<int32, double>(),
 		ViewSettings.DataBuildsPerFrame,
 		ViewSettings.BuildAdmissionMilliseconds);
 
@@ -644,34 +660,13 @@ bool UVoxelModule::StartWorld(
 	ViewSettings = {};
 	if (UVoxelViewProfile* ViewProfile = WorldGenerationProfile->View.LoadSynchronous())
 	{
-		const int32 CellCentimeters = FMath::Max(1, Manifest.BlockSizeCentimeters);
-		auto ToCells = [CellCentimeters](const int32 InCentimeters)
-		{
-			return FMath::Max(0, FMath::DivideAndRoundUp(InCentimeters, CellCentimeters));
-		};
-		ViewSettings.WarmupDataRadius = ToCells(ViewProfile->WarmupDataRadiusCentimeters);
-		ViewSettings.WarmupCollisionRadius = ToCells(ViewProfile->WarmupCollisionRadiusCentimeters);
-		ViewSettings.FineRadius = ToCells(ViewProfile->FineRadiusCentimeters);
+		ViewSettings.DefaultSourceView = ViewProfile->DefaultSourceView;
 		ViewSettings.PlayableFineRadiusFraction = FMath::Clamp(ViewProfile->PlayableFineRadiusFraction, 0.01f, 1.0f);
-		ViewSettings.StreamingReplanFineRadiusFraction = FMath::Clamp(ViewProfile->StreamingReplanFineRadiusFraction, 0.001f, 1.0f);
-		ViewSettings.FineVerticalRadius = ToCells(ViewProfile->FineVerticalRadiusCentimeters);
-		ViewSettings.FinePreload = ToCells(ViewProfile->FinePreloadCentimeters);
-		ViewSettings.MaximumTextureStretchCells = FMath::Clamp(ViewProfile->MaximumTextureStretchCells, 1.0f, 16.0f);
-		ViewSettings.VoxelProxyRadius = ToCells(ViewProfile->VoxelProxyRadiusCentimeters);
-		ViewSettings.SurfaceRadius = ToCells(ViewProfile->SurfaceRadiusCentimeters);
-		ViewSettings.MacroRadius = ToCells(ViewProfile->MacroRadiusCentimeters);
-		ViewSettings.TargetScreenErrorPixels = FMath::Max(0.1f, ViewProfile->TargetScreenErrorPixels);
-		ViewSettings.MaximumVoxelProxyLevel = ViewProfile->MaximumVoxelProxyLevel;
-		ViewSettings.MaximumSurfaceLevel = ViewProfile->MaximumSurfaceLevel;
+		ViewSettings.MacroRadiusCells = ViewProfile->MacroRadiusCells;
 		ViewSettings.MaximumMacroLevel = ViewProfile->MaximumMacroLevel;
-		ViewSettings.MaximumSurfaceTilesPerSource = FMath::Clamp(
-			ViewProfile->MaximumSurfaceTilesPerSource,
-			32,
-			2048);
-		ViewSettings.MaximumMacroTilesPerSource = FMath::Clamp(
-			ViewProfile->MaximumMacroTilesPerSource,
-			32,
-			2048);
+		ViewSettings.MaximumSurfaceTiles = ViewProfile->MaximumSurfaceTiles;
+		ViewSettings.MaximumMacroTiles = ViewProfile->MaximumMacroTiles;
+		ViewSettings.MaximumTextureStretchCells = FMath::Clamp(ViewProfile->MaximumTextureStretchCells, 1.0f, 16.0f);
 		ViewSettings.FineBuildsPerFrame = FMath::Clamp(ViewProfile->FineBuildsPerFrame, 1, 256);
 		ViewSettings.VoxelProxyBuildsPerFrame = FMath::Clamp(ViewProfile->VoxelProxyBuildsPerFrame, 1, 256);
 		ViewSettings.SurfaceBuildsPerFrame = FMath::Clamp(ViewProfile->SurfaceBuildsPerFrame, 1, 256);
@@ -1186,7 +1181,10 @@ FGuid UVoxelModule::RegisterSource(UObject* InOwner, const FVoxelStreamingSource
 	FSource Source;
 	Source.Owner = InOwner;
 	Source.Value = InSource;
+	if (Source.Value.bInheritWorldView) Source.Value.View = ViewSettings.DefaultSourceView;
 	Source.Value.Id = Id;
+	Source.Value.RegistrationOrder = ++NextSourceRegistrationOrder;
+	Source.Value.bRefineView = false;
 	Source.PlannedValue = Source.Value;
 	Sources.Add(Id, MoveTemp(Source));
 	bInterestDirty = true;
@@ -1208,10 +1206,14 @@ bool UVoxelModule::UpdateSource(
 	}
 
 	FVoxelStreamingSource Updated = InSource;
+	if (Updated.bInheritWorldView) Updated.View = ViewSettings.DefaultSourceView;
 	Updated.Id = InId;
+	Updated.RegistrationOrder = Source->Value.RegistrationOrder;
+	Updated.bRefineView = Source->Value.bRefineView;
 
-	if (StreamingSourceAffectsInterest(Source->PlannedValue, Updated, ViewSettings))
+	if (StreamingSourceAffectsInterest(Source->PlannedValue, Updated))
 	{
+		Updated.bRefineView = false;
 		bInterestDirty = true;
 	}
 
@@ -1240,8 +1242,7 @@ bool UVoxelModule::IsSourceAdmitted(const FGuid& InId) const
 	const FSource* Source = Sources.Find(InId);
 	const FVoxelSourceInterest* Admitted = CurrentInterest.Sources.Find(InId);
 	return Source && Source->Owner.IsValid() && Admitted &&
-		Source->Value.Center == Admitted->Source.Center &&
-		!StreamingSourceAffectsInterest(Admitted->Source, Source->Value, ViewSettings);
+		!StreamingSourceAffectsInterest(Admitted->Source, Source->Value);
 }
 
 void UVoxelModule::CollectStreamingSourcesForOwner(const AActor* InOwner, TArray<FVoxelStreamingSource>& OutSources) const
@@ -1462,6 +1463,35 @@ UVoxelSceneRegion* UVoxelModule::GetSceneRegion(const FIntVector& InSection, con
 	return NewRegion;
 }
 
+void UVoxelModule::RefreshSourceRefinements()
+{
+	// Only the first deferred source may enter the render partition. Data requests
+	// for every registered source remain in the interest snapshot while it waits.
+	const FVoxelSourceInterest* Next = nullptr;
+	FSource* Pending = nullptr;
+	for (auto& Pair : Sources)
+	{
+		FSource& Source = Pair.Value;
+		if (Source.Value.bRefineView || Source.Value.RenderMode == EVoxelStreamingRenderMode::None) continue;
+		const FVoxelSourceInterest* Interest = CurrentInterest.Sources.Find(Pair.Key);
+		if (!Interest || StreamingSourceAffectsInterest(Interest->Source, Source.Value)) return;
+		if (!Next || Interest->Source.GetSchedulingPriority() < Next->Source.GetSchedulingPriority())
+		{
+			Next = Interest;
+			Pending = &Source;
+		}
+	}
+	if (!Next || !ViewManager || !ViewManager->AreHigherPriorityMeshesComplete(
+		Next->Source.GetSchedulingPriority(), InterestRevision)) return;
+	for (const FIntVector& Key : Next->FineDataSections)
+	{
+		const FVoxelSection* Section = Runtime->FindSection(Key);
+		if (!Section || Section->Status != EVoxelSectionStatus::DataReady) return;
+	}
+	Pending->Value.bRefineView = true;
+	bInterestDirty = true;
+}
+
 void UVoxelModule::RefreshInterest(
 	const double InNow)
 {
@@ -1486,6 +1516,25 @@ void UVoxelModule::RefreshInterest(
 
 		ActiveSources.Add(
 			Iterator.Value().Value);
+	}
+
+	ActiveSources.Sort([](const FVoxelStreamingSource& A, const FVoxelStreamingSource& B)
+	{
+		if (A.Priority != B.Priority) return A.Priority < B.Priority;
+		if (A.bLocalView != B.bLocalView) return A.bLocalView;
+		return A.RegistrationOrder < B.RegistrationOrder;
+	});
+	bool bHasPrimaryView = false;
+	for (int32 Index = 0; Index < ActiveSources.Num(); ++Index)
+	{
+		FVoxelStreamingSource& Source = ActiveSources[Index];
+		Source.SchedulingPriority = Index;
+		if (!bHasPrimaryView && Source.RenderMode != EVoxelStreamingRenderMode::None)
+		{
+			Source.bRefineView = true;
+			Sources.FindChecked(Source.Id).Value.bRefineView = true;
+			bHasPrimaryView = true;
+		}
 	}
 
 	// 一个观察者快照最多有一个规划任务；移动期间合并后续请求，旧分区保留到新结果提交。
@@ -1559,7 +1608,7 @@ void UVoxelModule::RefreshInterest(
 			FVoxelGenerationCacheRetentionPoint& Point = Retention.Points.AddDefaulted_GetRef();
 			Point.Center = FIntPoint(Source.Center.X, Source.Center.Y);
 			Point.NaturalRadiusCells = Source.RetentionRadiusCells > 0 ? Source.RetentionRadiusCells :
-				FMath::Max(ViewSettings.SurfaceRadius, ViewSettings.VoxelProxyRadius) + 512;
+				FMath::Max(ViewSettings.DefaultSourceView.SurfaceRadiusCells, ViewSettings.DefaultSourceView.VoxelProxyRadiusCells) + 512;
 			Point.PlanRadiusCells = Source.RetentionRadiusCells > 0 ? Source.RetentionRadiusCells : Point.NaturalRadiusCells + 512;
 			Point.HydrologyRadiusCells = Source.RetentionRadiusCells > 0 ? Source.RetentionRadiusCells :
 				static_cast<int32>(FMath::Min<int64>(MAX_int32, Point.PlanRadiusCells + HydrologySide));
@@ -1631,6 +1680,21 @@ void UVoxelModule::UpdateReadiness()
 	Snapshot.bAssetsValidated = Registry.GetSnapshot().IsValid() && Shapes.IsValid();
 	Snapshot.bRecipeFrozen = GenerationConfig && GenerationConfig->Recipe;
 	Snapshot.bSpawnPlanReady = false;
+	auto CheckRequiredSection = [this](const FIntVector& Key)
+	{
+		if (WorldState == EVoxelWorldState::Failed)
+		{
+			return;
+		}
+		const FVoxelSection* Section = Runtime->FindSection(Key);
+		if (Section && Section->Status == EVoxelSectionStatus::Failed)
+		{
+			WorldState = EVoxelWorldState::Failed;
+			UE_LOG(LogTemp, Error,
+				TEXT("Voxel loading failed: required section %s failed generation; see the preceding section generation error."),
+				*Key.ToString());
+		}
+	};
 	for (const TPair<FIntVector, FVoxelExactDemand>& Pair : CurrentInterest.Warmup)
 	{
 		if (!Pair.Value.bWarmupData)
@@ -1639,6 +1703,7 @@ void UVoxelModule::UpdateReadiness()
 		}
 		Snapshot.bSpawnPlanReady = true;
 		++Snapshot.RequiredSpawnSections;
+		CheckRequiredSection(Pair.Key);
 		const FVoxelSection* Section = Runtime->FindSection(Pair.Key);
 		if (Section && Section->Status == EVoxelSectionStatus::DataReady)
 		{
@@ -1651,6 +1716,23 @@ void UVoxelModule::UpdateReadiness()
 			{
 				++Snapshot.ReadyCollisionSections;
 			}
+		}
+	}
+	for (const FIntVector& Key : CurrentInterest.PlayableFineKeys)
+	{
+		CheckRequiredSection(Key);
+		for (int32 Face = 0; Face < 6; ++Face)
+		{
+			FIntVector Neighbor = Key;
+			Neighbor[Face / 2] += (Face & 1) ? -1 : 1;
+			if (CurrentInterest.Exact.Contains(Neighbor))
+			{
+				CheckRequiredSection(Neighbor);
+			}
+		}
+		if (WorldState == EVoxelWorldState::Failed)
+		{
+			break;
 		}
 	}
 	FVoxelPrimaryFineReadiness PrimaryFine;

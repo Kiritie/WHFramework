@@ -1,4 +1,5 @@
 #include "Voxel/Interaction/VoxelRaycast.h"
+#include "Voxel/Chunks/VoxelSectionKey.h"
 #include <limits>
 namespace
 {

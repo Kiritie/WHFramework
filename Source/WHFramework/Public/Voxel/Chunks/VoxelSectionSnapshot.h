@@ -9,6 +9,7 @@ struct WHFRAMEWORK_API FVoxelSectionSnapshot
 	FIntVector Section = FIntVector::ZeroValue;
 	FVoxelSectionStamp Stamp;
 	uint64 Revision = 0;
+	int32 GridSide = 16;
 	TArray<uint32> Blocks;
 	TArray<uint32> Halo[6];
 	bool Known[6] = { false, false, false, false, false, false };

@@ -6,7 +6,7 @@
 
 namespace
 {
-	constexpr int32 SectionSide = 16;
+
 
 	uint8 Opposite(const uint8 InFace)
 	{
@@ -17,6 +17,7 @@ namespace
 		const TArray<FVoxelBlockState>& InBlocks, const uint64 InRevision,
 		FVoxelBoundaryFaceSnapshot& OutSnapshot)
 	{
+		const int32 SectionSide = InKey.GetGridSide();
 		if (InFace >= 6 || InBlocks.Num() != SectionSide * SectionSide * SectionSide)
 		{
 			return false;
@@ -38,7 +39,7 @@ namespace
 				Local[UAxis] = U;
 				Local[VAxis] = V;
 				Snapshot.States[U + SectionSide * V] =
-					InBlocks[VoxelCoord::Linear(Local)].Pack();
+					InBlocks[Local.X + SectionSide * (Local.Y + SectionSide * Local.Z)].Pack();
 			}
 		}
 		OutSnapshot = MoveTemp(Snapshot);
@@ -68,6 +69,7 @@ bool FVoxelBoundaryFaceSnapshot::CaptureProxy(const FVoxelVoxelProxyData& InData
 bool FVoxelBoundaryFaceSnapshot::Sample(const FIntVector& InWorldCell,
 	FVoxelBlockState& OutState) const
 {
+	const int32 SectionSide = Key.GetGridSide();
 	if (Face >= 6 || States.Num() != SectionSide * SectionSide) return false;
 	const FVoxelGenerationBounds Bounds = Key.GetBounds();
 	const int32 Axis = Face / 2;
@@ -79,8 +81,8 @@ bool FVoxelBoundaryFaceSnapshot::Sample(const FIntVector& InWorldCell,
 		InWorldCell[UAxis] >= Bounds.Max[UAxis] ||
 		InWorldCell[VAxis] < Bounds.Min[VAxis] ||
 		InWorldCell[VAxis] >= Bounds.Max[VAxis]) return false;
-	const int32 U = (InWorldCell[UAxis] - Bounds.Min[UAxis]) / Key.GetStep();
-	const int32 V = (InWorldCell[VAxis] - Bounds.Min[VAxis]) / Key.GetStep();
+	const int32 U = (InWorldCell[UAxis] - Bounds.Min[UAxis]) / Key.GetSampleStep();
+	const int32 V = (InWorldCell[VAxis] - Bounds.Min[VAxis]) / Key.GetSampleStep();
 	OutState = FVoxelBlockState::Unpack(States[U + SectionSide * V]);
 	return true;
 }
@@ -88,11 +90,12 @@ bool FVoxelBoundaryFaceSnapshot::Sample(const FIntVector& InWorldCell,
 bool FVoxelBoundaryTransitionContext::CoversCell(const uint8 InFace,
 	const FIntVector& InLocalCell) const
 {
+	const int32 SectionSide = Owner.GetGridSide();
 	if (InFace >= 6) return false;
 	const int32 Axis = InFace / 2;
 	if (InLocalCell[Axis] != ((InFace & 1) ? 0 : SectionSide - 1)) return false;
 	const FVoxelGenerationBounds Bounds = Owner.GetBounds();
-	const FIntVector CellMin = Bounds.Min + InLocalCell * Owner.GetStep();
+	const FIntVector CellMin = Bounds.Min + InLocalCell * Owner.GetSampleStep();
 	const int32 UAxis = (Axis + 1) % 3;
 	const int32 VAxis = (Axis + 2) % 3;
 	for (const FVoxelBoundaryTransitionPatch& Patch : Patches)
@@ -100,9 +103,9 @@ bool FVoxelBoundaryTransitionContext::CoversCell(const uint8 InFace,
 		if (Patch.Face.Owner != Owner ||
 			static_cast<uint8>(Patch.Face.Direction) != InFace) continue;
 		if (CellMin[UAxis] >= Patch.Face.Min[UAxis] &&
-			CellMin[UAxis] + Owner.GetStep() <= Patch.Face.Max[UAxis] &&
+			CellMin[UAxis] + Owner.GetSampleStep() <= Patch.Face.Max[UAxis] &&
 			CellMin[VAxis] >= Patch.Face.Min[VAxis] &&
-			CellMin[VAxis] + Owner.GetStep() <= Patch.Face.Max[VAxis]) return true;
+			CellMin[VAxis] + Owner.GetSampleStep() <= Patch.Face.Max[VAxis]) return true;
 	}
 	return false;
 }
@@ -122,8 +125,8 @@ bool FVoxelBoundaryTransitionContext::Validate() const
 			Patch.Face.Neighbor != Patch.Neighbor.Key ||
 			Owner.Level <= Patch.Neighbor.Key.Level ||
 			Patch.Neighbor.Face != Opposite(Face) ||
-			Patch.Neighbor.States.Num() != SectionSide * SectionSide ||
-			Patch.Face.Ratio < 2 || Patch.Face.Ratio > SectionSide ||
+			Patch.Neighbor.States.Num() != FMath::Square(Patch.Neighbor.Key.GetGridSide()) ||
+			Patch.Face.Ratio < 2 || Patch.Face.Ratio > 16 ||
 			!FMath::IsPowerOfTwo(Patch.Face.Ratio) ||
 			Owner.GetStep() / Patch.Face.Ratio != Patch.Neighbor.Key.GetStep() ||
 			((Face & 1) ? OwnerBounds.Min[Axis] != NeighborBounds.Max[Axis]
@@ -134,10 +137,10 @@ bool FVoxelBoundaryTransitionContext::Validate() const
 			Patch.Face.Max[UAxis] > OwnerBounds.Max[UAxis] ||
 			Patch.Face.Min[VAxis] < OwnerBounds.Min[VAxis] ||
 			Patch.Face.Max[VAxis] > OwnerBounds.Max[VAxis] ||
-			(Patch.Face.Min[UAxis] - OwnerBounds.Min[UAxis]) % Owner.GetStep() != 0 ||
-			(Patch.Face.Max[UAxis] - OwnerBounds.Min[UAxis]) % Owner.GetStep() != 0 ||
-			(Patch.Face.Min[VAxis] - OwnerBounds.Min[VAxis]) % Owner.GetStep() != 0 ||
-			(Patch.Face.Max[VAxis] - OwnerBounds.Min[VAxis]) % Owner.GetStep() != 0)
+			(Patch.Face.Min[UAxis] - OwnerBounds.Min[UAxis]) % Owner.GetSampleStep() != 0 ||
+			(Patch.Face.Max[UAxis] - OwnerBounds.Min[UAxis]) % Owner.GetSampleStep() != 0 ||
+			(Patch.Face.Min[VAxis] - OwnerBounds.Min[VAxis]) % Owner.GetSampleStep() != 0 ||
+			(Patch.Face.Max[VAxis] - OwnerBounds.Min[VAxis]) % Owner.GetSampleStep() != 0)
 		{
 			return false;
 		}

@@ -7,8 +7,8 @@ uint8 VoxelViewLod::ResolveScreenErrorLevel(
 	const int32 InDistanceCells,
 	const int32 InBaseSampleStepCells,
 	const FVoxelStreamingSource& InSource,
-	const FVoxelViewSettings& InSettings,
-	const uint8 InMaximumLevel)
+	const uint8 InMaximumLevel,
+	const float InTargetScreenErrorPixels)
 {
 	const double Distance =
 		FMath::Max(
@@ -41,8 +41,7 @@ uint8 VoxelViewLod::ResolveScreenErrorLevel(
 	const double TargetPixels =
 		FMath::Max(
 			0.1f,
-			InSettings.
-				TargetScreenErrorPixels);
+			InTargetScreenErrorPixels);
 
 	uint8 Level = 0;
 

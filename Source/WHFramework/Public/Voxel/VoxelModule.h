@@ -264,6 +264,7 @@ private:
 
 	void ApplyTask(FVoxelTaskResult&& InResult);
 	void RefreshInterest(double InNow);
+	void RefreshSourceRefinements();
 	void UpdateReadiness();
 	TArray<FVector> CollectLocalViewObservers() const;
 	TArray<FVector> CollectDetailObservers() const;
@@ -315,6 +316,8 @@ private:
 	double LastDiagnosticsLog = -1.0;
 	TArray<double> DiagnosticFrameTimes;
 	TArray<double> DiagnosticModuleTimes;
+	uint64 NextSourceRegistrationOrder = 0;
+	double NextSourceRefinementRefresh = 0.0;
 	bool bInterestDirty = true;
 	bool bInterestBuildPending = false;
 	bool bMutating = false;

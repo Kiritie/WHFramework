@@ -3,6 +3,7 @@
 #include "Components/ActorComponent.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "Voxel/Interaction/VoxelEditTypes.h"
+#include "Voxel/Streaming/VoxelStreamingSource.h"
 
 #include "VoxelAgentComponent.generated.h"
 
@@ -91,6 +92,18 @@ public:
 		BlueprintReadWrite,
 		Category = "Voxel|Streaming")
 	bool bUseControllerView = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Streaming")
+	bool bInheritWorldView = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Streaming", meta = (EditCondition = "!bInheritWorldView"))
+	FVoxelStreamingSourceView StreamingView;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Streaming", meta = (ToolTip = "Request world Macro coverage in addition to this source's Fine, Proxy and Surface ranges."))
+	bool bProvideWorldView = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Streaming", meta = (ToolTip = "Smaller values are scheduled first."))
+	int32 StreamingPriority = 0;
 
 	UPROPERTY(
 		EditAnywhere,

@@ -68,7 +68,7 @@ void FVoxelCollisionPresenter::RebuildWanted(
 	}
 	CurrentInterestRevision = InInterestRevision;
 	Scheduler.UpdatePriorities([this](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp,
-		EVoxelWorkClass& WorkClass, EVoxelStreamingSourcePriority& Priority,
+		EVoxelWorkClass& WorkClass, int32& Priority,
 		double& Distance, double& Forward)
 	{
 		if (Kind != EVoxelTaskKind::BuildCollision) return;
