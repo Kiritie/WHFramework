@@ -14,7 +14,6 @@
 #include "Voxel/Save/VoxelWorldSaveAdapter.h"
 #include "Voxel/Streaming/VoxelEmergeManager.h"
 #include "Voxel/Streaming/VoxelInterest.h"
-#include "Voxel/Streaming/VoxelInterestManager.h"
 #include "Voxel/Streaming/VoxelResidencyManager.h"
 #include "Voxel/Streaming/VoxelStreamingSource.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
@@ -30,7 +29,7 @@ class FVoxelEmergeManager;
 class FVoxelGenerationPipeline;
 class FVoxelGenerationPlanCache;
 class IVoxelGenerationOverlay;
-class FVoxelInterestManager;
+class FVoxelInterestRuntime;
 class FVoxelMapTileCache;
 class FVoxelResidencyManager;
 class FVoxelShapeRegistry;
@@ -264,7 +263,6 @@ private:
 
 	void ApplyTask(FVoxelTaskResult&& InResult);
 	void RefreshInterest(double InNow);
-	void RefreshSourceRefinements();
 	void UpdateReadiness();
 	TArray<FVector> CollectLocalViewObservers() const;
 	TArray<FVector> CollectDetailObservers() const;
@@ -287,7 +285,7 @@ private:
 	TSharedPtr<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> GenerationCache;
 	TSharedPtr<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> Generator;
 	TUniquePtr<FVoxelWorldRuntime> Runtime;
-	TUniquePtr<FVoxelInterestManager> InterestManager;
+	TSharedPtr<FVoxelInterestRuntime, ESPMode::ThreadSafe> InterestRuntime;
 	TUniquePtr<FVoxelEmergeManager> EmergeManager;
 	TUniquePtr<FVoxelResidencyManager> ResidencyManager;
 	TUniquePtr<FVoxelTaskScheduler> Scheduler;
@@ -317,7 +315,6 @@ private:
 	TArray<double> DiagnosticFrameTimes;
 	TArray<double> DiagnosticModuleTimes;
 	uint64 NextSourceRegistrationOrder = 0;
-	double NextSourceRefinementRefresh = 0.0;
 	bool bInterestDirty = true;
 	bool bInterestBuildPending = false;
 	bool bMutating = false;

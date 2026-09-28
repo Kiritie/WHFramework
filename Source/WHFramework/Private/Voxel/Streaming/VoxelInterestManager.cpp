@@ -275,9 +275,7 @@ FVoxelInterestSet FVoxelInterestManager::Compute(
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewInterestPlan);
 
-	FVoxelInterestSet Result;
-	uint8 MaximumSurfaceLevel = 0;
-	uint8 MaximumMacroLevel = 0;
+	FVoxelInterestSet Prepared;
 
 	for (const FVoxelStreamingSource& Source :
 		InSources)
@@ -286,15 +284,55 @@ FVoxelInterestSet FVoxelInterestManager::Compute(
 			Source,
 			InManifest,
 			InViewSettings,
-			Result,
+			Prepared,
 			InPrevious);
 
 		AddViewSource(
 			Source,
 			InManifest,
 			InViewSettings,
-			Result);
-		if (Source.RenderMode == EVoxelStreamingRenderMode::Full)
+			Prepared, true, true, true);
+	}
+	return Finalize(InSources, InManifest, InViewSettings, MoveTemp(Prepared));
+}
+
+void FVoxelInterestManager::BuildSourceExact(const FVoxelStreamingSource& InSource,
+	const FVoxelWorldManifest& InManifest, const FVoxelViewSettings& InSettings,
+	FVoxelInterestSet& OutInterest, const FVoxelInterestSet* InPrevious) const
+{
+	AddExactSource(InSource, InManifest, InSettings, OutInterest, InPrevious);
+}
+
+void FVoxelInterestManager::BuildSourceProxy(const FVoxelStreamingSource& InSource,
+	const FVoxelWorldManifest& InManifest, const FVoxelViewSettings& InSettings,
+	FVoxelInterestSet& OutInterest) const
+{
+	AddViewSource(InSource, InManifest, InSettings, OutInterest, true, false, false);
+}
+
+void FVoxelInterestManager::BuildSourceSurface(const FVoxelStreamingSource& InSource,
+	const FVoxelWorldManifest& InManifest, const FVoxelViewSettings& InSettings,
+	FVoxelInterestSet& OutInterest) const
+{
+	AddViewSource(InSource, InManifest, InSettings, OutInterest, false, true, false);
+}
+
+void FVoxelInterestManager::BuildSourceMacro(const FVoxelStreamingSource& InSource,
+	const FVoxelWorldManifest& InManifest, const FVoxelViewSettings& InSettings,
+	FVoxelInterestSet& OutInterest) const
+{
+	AddViewSource(InSource, InManifest, InSettings, OutInterest, false, false, true);
+}
+
+FVoxelInterestSet FVoxelInterestManager::Finalize(TConstArrayView<FVoxelStreamingSource> InSources,
+	const FVoxelWorldManifest& InManifest, const FVoxelViewSettings& InViewSettings,
+	FVoxelInterestSet Result) const
+{
+	uint8 MaximumSurfaceLevel = 0;
+	uint8 MaximumMacroLevel = 0;
+	for (const FVoxelStreamingSource& Source : InSources)
+	{
+		if (Source.Has(EVoxelStreamingCapability::WorldVisual))
 		{
 			MaximumSurfaceLevel = FMath::Max(MaximumSurfaceLevel, Source.View.MaximumSurfaceLevel);
 			MaximumMacroLevel = FMath::Max(MaximumMacroLevel, InViewSettings.MaximumMacroLevel);
@@ -332,7 +370,7 @@ FVoxelInterestSet FVoxelInterestManager::Compute(
 			int32 RenderPriority = MAX_int32;
 			for (const FVoxelStreamingSource& Source : InSources)
 			{
-				if (Source.bRefineView && Source.RenderMode != EVoxelStreamingRenderMode::None)
+				if (Source.Has(EVoxelStreamingCapability::FineVisual))
 				{
 					Demand.DistanceCells = FMath::Min(Demand.DistanceCells, FVector::Distance(Center, FVector(Source.Center)));
 					Demand.HorizontalDistanceCells = FMath::Min(Demand.HorizontalDistanceCells,
@@ -342,7 +380,7 @@ FVoxelInterestSet FVoxelInterestManager::Compute(
 			for (const FVoxelStreamingSource& Source : InSources)
 			{
 				const int32 Radius = Source.View.FineRadiusCells;
-				if (Source.bRefineView && Source.RenderMode != EVoxelStreamingRenderMode::None &&
+				if (Source.Has(EVoxelStreamingCapability::FineVisual) &&
 					FVector2D::DistSquared(FVector2D(Center), FVector2D(Source.Center.X, Source.Center.Y)) <=
 					FMath::Square(static_cast<double>(Radius + Source.View.FinePreloadCells)))
 				{
@@ -354,7 +392,7 @@ FVoxelInterestSet FVoxelInterestManager::Compute(
 				double NearestDistanceSquared = MAX_dbl;
 				for (const FVoxelStreamingSource& Source : InSources)
 				{
-					if (!Source.bRefineView || Source.RenderMode == EVoxelStreamingRenderMode::None) continue;
+					if (!Source.Has(EVoxelStreamingCapability::FineVisual)) continue;
 					const double DistanceSquared = FVector::DistSquared(Center, FVector(Source.Center));
 					if (DistanceSquared < NearestDistanceSquared)
 					{
@@ -385,7 +423,7 @@ FVoxelInterestSet FVoxelInterestManager::Compute(
 		for (const FVoxelStreamingSource& Source : InSources)
 		{
 			const double PlayableRadius = Source.View.FineRadiusCells * InViewSettings.PlayableFineRadiusFraction;
-			if (Source.bAffectsGlobalReadiness && Source.RenderMode != EVoxelStreamingRenderMode::None &&
+			if (Source.Has(EVoxelStreamingCapability::Readiness) && Source.Has(EVoxelStreamingCapability::FineVisual) &&
 				FVector2D::DistSquared(Center, FVector2D(Source.Center.X, Source.Center.Y)) <= FMath::Square(PlayableRadius))
 			{
 				Result.PlayableFineKeys.Add(Key);
@@ -427,9 +465,8 @@ FVoxelInterestSet FVoxelInterestManager::Compute(
 		double Best = MAX_dbl;
 		for (const FVoxelStreamingSource& Source : InSources)
 		{
-			if (!Source.bRefineView || Source.GetSchedulingPriority() != InPriority ||
-				Source.RenderMode == EVoxelStreamingRenderMode::None ||
-				(bFullOnly && Source.RenderMode != EVoxelStreamingRenderMode::Full)) continue;
+			if (!Source.Has(EVoxelStreamingCapability::FineVisual) || Source.GetSchedulingPriority() != InPriority ||
+				(bFullOnly && !Source.Has(EVoxelStreamingCapability::WorldVisual))) continue;
 			FVector Position(Source.Center);
 			if (bColumn) Position.Z = 0.0;
 			Best = FMath::Min(Best, FMath::Sqrt(Bounds.ComputeSquaredDistanceToPoint(Position)));
@@ -445,7 +482,8 @@ FVoxelInterestSet FVoxelInterestManager::Compute(
 		double NearestDistanceSquared = MAX_dbl;
 		for (const FVoxelStreamingSource& Source : InSources)
 		{
-			if (!Source.bRefineView || Source.RenderMode == EVoxelStreamingRenderMode::None || (!RadiusField && !Source.bWorldView))
+			if (!Source.Has(EVoxelStreamingCapability::FineVisual) ||
+				(!RadiusField && !Source.Has(EVoxelStreamingCapability::WorldVisual)))
 			{
 				continue;
 			}
@@ -460,7 +498,8 @@ FVoxelInterestSet FVoxelInterestManager::Compute(
 				NearestDistanceSquared = DistanceSquared;
 				NearestPriority = Source.GetSchedulingPriority();
 			}
-			if (Source.RenderMode != EVoxelStreamingRenderMode::Full) continue;
+			if (!Source.Has(EVoxelStreamingCapability::WorldVisual) &&
+				!Source.Has(EVoxelStreamingCapability::LocalRefinement)) continue;
 			const int32 Radius = RadiusField ? Source.View.*RadiusField : WorldRadius;
 			if (Radius > 0 && DistanceSquared <= FMath::Square(static_cast<double>(Radius)))
 			{
@@ -550,26 +589,30 @@ void FVoxelInterestManager::AddExactSource(
 {
 	FVoxelSourceInterest& SourceInterest = InOutInterest.Sources.FindOrAdd(InSource.Id);
 	SourceInterest.Source = InSource;
+	if (!InSource.Has(EVoxelStreamingCapability::Data))
+	{
+		return;
+	}
 	const bool bPrewarm = InSource.Purpose == EVoxelStreamingSourcePurpose::TravelPrewarm ||
 		InSource.Purpose == EVoxelStreamingSourcePurpose::RespawnPrewarm;
 	const int32 ExactRadius = InSource.ExactRadius;
 
 	const int32 CollisionRadius =
-		InSource.bCollision
+		InSource.Has(EVoxelStreamingCapability::Collision)
 			? FMath::Max(
 				0,
 				InSource.CollisionRadius)
 			: 0;
 
 	const int32 SimulationRadius =
-		InSource.bSimulation
+		InSource.Has(EVoxelStreamingCapability::Simulation)
 			? FMath::Max(
 				0,
 				InSource.SimulationRadius)
 			: 0;
 
 	const bool bWantsFine =
-		InSource.RenderMode != EVoxelStreamingRenderMode::None &&
+		InSource.Has(EVoxelStreamingCapability::FineVisual) &&
 		InSource.View.FineRadiusCells > 0 &&
 		InSource.View.FineVerticalRadiusCells > 0;
 
@@ -586,14 +629,14 @@ void FVoxelInterestManager::AddExactSource(
 			ExactRadius);
 
 	const int32 WarmupCollisionRadius =
-		InSource.bCollision
+		InSource.Has(EVoxelStreamingCapability::Collision)
 			? FMath::Min(
 				bPrewarm ? CollisionRadius : FMath::Max(0, InSource.View.WarmupCollisionRadiusCells),
 				CollisionRadius)
 			: 0;
 
 	const int32 MovementCriticalCollisionRadius =
-		InSource.bCollision
+		InSource.Has(EVoxelStreamingCapability::Collision)
 			? FMath::Min(
 				CollisionRadius,
 				FMath::Max(0, InSource.MovementCriticalCollisionRadius))
@@ -672,19 +715,20 @@ void FVoxelInterestManager::AddExactSource(
 						ExactRadius);
 
 				const bool bCollision =
-					InSource.bCollision &&
+					InSource.Has(EVoxelStreamingCapability::Collision) &&
 					IsInsideRadius(
 						Delta,
 						CollisionRadius);
 
 				const bool bSimulation =
-					InSource.bSimulation &&
+					InSource.Has(EVoxelStreamingCapability::Simulation) &&
 					IsInsideRadius(
 						Delta,
 						SimulationRadius);
 
 				const FVoxelExactDemand* Previous = InPrevious ? InPrevious->Exact.Find(Key) : nullptr;
-				const bool bRetainFine = InSource.bWorldView && (InPrevious && InPrevious->FineSections
+				const bool bRetainFine = InSource.Has(EVoxelStreamingCapability::FineVisual) &&
+					!InSource.Has(EVoxelStreamingCapability::LocalRefinement) && (InPrevious && InPrevious->FineSections
 					? InPrevious->FineSections->Contains(Key) : Previous && Previous->bFineRender);
 				const bool bFineRender =
 					bWantsFine &&
@@ -699,11 +743,11 @@ void FVoxelInterestManager::AddExactSource(
 					SectionIntersectsRadius(Key, InSource.Center, WarmupDataRadius);
 
 				const bool bWarmupCollision =
-					InSource.bCollision &&
+					InSource.Has(EVoxelStreamingCapability::Collision) &&
 					SectionIntersectsRadius(Key, InSource.Center, WarmupCollisionRadius);
 
 				const bool bMovementCriticalCollision =
-					InSource.bCollision &&
+					InSource.Has(EVoxelStreamingCapability::Collision) &&
 					MovementCriticalCollisionRadius > 0 &&
 					IsInsideRadius(Delta, MovementCriticalCollisionRadius);
 
@@ -730,7 +774,7 @@ void FVoxelInterestManager::AddExactSource(
 				{
 					SourceInterest.CollisionSections.Add(Key);
 				}
-				if (InSource.bAffectsGlobalReadiness && bWarmupData)
+				if (InSource.Has(EVoxelStreamingCapability::Readiness) && bWarmupData)
 				{
 					FVoxelExactDemand& Global = InOutInterest.Warmup.FindOrAdd(Key);
 					Global.bWarmupData = true;
@@ -756,7 +800,7 @@ void FVoxelInterestManager::AddExactSource(
 				Demand.bExact |= bExact;
 				Demand.bCollision |= bCollision;
 				Demand.bSimulation |= bSimulation;
-				Demand.bFineRender |= bFineRender && InSource.bRefineView;
+				Demand.bFineRender |= bFineRender;
 				Demand.bFineData |= bFineRender;
 				Demand.bWarmupData |= bWarmupData;
 				Demand.bWarmupCollision |= bWarmupCollision;
@@ -791,9 +835,13 @@ void FVoxelInterestManager::AddViewSource(
 	const FVoxelStreamingSource& InSource,
 	const FVoxelWorldManifest& InManifest,
 	const FVoxelViewSettings& InViewSettings,
-	FVoxelInterestSet& InOutInterest) const
+	FVoxelInterestSet& InOutInterest,
+	const bool bBuildProxy,
+	const bool bBuildSurface,
+	const bool bBuildMacro) const
 {
-	if (!InSource.bRefineView || InSource.RenderMode != EVoxelStreamingRenderMode::Full)
+	if (!InSource.Has(EVoxelStreamingCapability::WorldVisual) &&
+		!InSource.Has(EVoxelStreamingCapability::LocalRefinement))
 	{
 		return;
 	}
@@ -806,7 +854,7 @@ void FVoxelInterestManager::AddViewSource(
 			FineRadius,
 			InSource.View.VoxelProxyRadiusCells);
 
-	if (ProxyRange > FineRadius)
+	if (bBuildProxy && ProxyRange > FineRadius)
 	{
 		const uint8 ProxyLevel = FMath::Max<uint8>(1, InSource.View.MaximumVoxelProxyLevel);
 
@@ -932,12 +980,17 @@ void FVoxelInterestManager::AddViewSource(
 		}
 	}
 
+	if (!InSource.Has(EVoxelStreamingCapability::WorldVisual))
+	{
+		return;
+	}
+
 	const int32 SurfaceRange =
 		FMath::Max(
 			ProxyRange,
 			InSource.View.SurfaceRadiusCells);
 
-	if (SurfaceRange > ProxyRange)
+	if (bBuildSurface && SurfaceRange > ProxyRange)
 	{
 		AddAdaptiveTwoDimensionalTiles(
 			InSource.Center,
@@ -959,7 +1012,7 @@ void FVoxelInterestManager::AddViewSource(
 			SurfaceRange,
 			InViewSettings.MacroRadiusCells);
 
-	if (InSource.bWorldView && MacroRange > SurfaceRange)
+	if (bBuildMacro && MacroRange > SurfaceRange)
 	{
 		AddAdaptiveTwoDimensionalTiles(
 			InSource.Center,

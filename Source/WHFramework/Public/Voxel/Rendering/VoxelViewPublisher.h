@@ -69,7 +69,7 @@ private:
 
 	void AdmitCoveragePreparation();
 	void AdmitBuilds();
-	bool PrepareUpdate(int32 InIndex, double InDeadline, bool& bOutComplete);
+	bool PrepareUpdate(int32 InIndex, double InDeadline, int32& InOutPreparedComponents, bool& bOutComplete);
 	void CommitBatch();
 	void DiscardBatch();
 	void CommitVisibility();

@@ -219,17 +219,15 @@ bool FVoxelViewManager::IsAdmissionDataReady(const FVoxelViewAdmission& InAdmiss
 
 void FVoxelViewManager::ProcessDataAdmissions()
 {
-	const int32 DataPriority = ResolveDataAdmissionPriority();
 	const TMap<int32, int32> Stages = ResolveAdmissionStages(Admissions,
 		[this](const FVoxelViewAdmission& Admission) { return IsAdmissionDataReady(Admission); });
 	LastActiveDataKind = 4;
 	const FVoxelViewSettings& Settings = Module.GetViewSettings();
-	const int32 Limits[] = { 0, Settings.DataBuildsPerFrame, Settings.DataBuildsPerFrame, Settings.DataBuildsPerFrame };
+	const int32 Limits[] = { 0, Settings.DataAdmissionPerFrame, Settings.DataAdmissionPerFrame, Settings.DataAdmissionPerFrame };
 	int32 Submitted[4] = {};
-	const double Deadline = FPlatformTime::Seconds() + Settings.BuildAdmissionMilliseconds / 1000.0;
+	const double Deadline = FPlatformTime::Seconds() + Settings.AdmissionMilliseconds / 1000.0;
 	for (const int32 Priority : AdmissionPriorities)
 	{
-		if (Priority != DataPriority) continue;
 		const int32* Stage = Stages.Find(Priority);
 		if (!Stage) continue;
 		const int32 Kind = *Stage;
@@ -368,7 +366,8 @@ void FVoxelViewManager::UpdateTaskPriorities()
 		case EVoxelTaskKind::BuildFineMesh:
 			if (const FVoxelExactDemand* Demand = Module.GetCurrentInterest().Exact.Find(Stamp.Section))
 			{
-				WorkClass = Demand->bWarmupData || Demand->bMovementCriticalCollision
+				WorkClass = Demand->bWarmupData || Demand->bMovementCriticalCollision ||
+					Demand->bMovementCriticalFine
 					? EVoxelWorkClass::Critical : EVoxelWorkClass::Interactive;
 				Priority = Demand->Priority;
 				Distance = Demand->DistanceCells;
@@ -417,25 +416,12 @@ void FVoxelViewManager::UpdateTaskPriorities()
 	});
 }
 
-bool FVoxelViewManager::AreHigherPriorityMeshesComplete(
-	const int32 InPriority, const uint64 InInterestRevision) const
-{
-	if (bHeightfieldPlanPending || bVolumePlanPending || AppliedInterestRevision != InInterestRevision || Publisher->IsBusy() || bCoverageDirty ||
-		!PendingTransitionSignatures.IsEmpty() || !PendingVolumeSignatures.IsEmpty() ||
-		!UnsubmittedTransitionOwners.IsEmpty() || !UnsubmittedVolumeOwners.IsEmpty()) return false;
-	for (const FVoxelViewAdmission& Admission : Admissions)
-	{
-		if (Admission.Priority < InPriority && !IsAdmissionSatisfied(Admission)) return false;
-	}
-	return true;
-}
-
 void FVoxelViewManager::ProcessAdmissions()
 {
 	const FVoxelInterestSet& Interest = Module.GetCurrentInterest();
 	const FVoxelViewSettings& Settings = Module.GetViewSettings();
-	const int32 Limits[] = { Settings.FineBuildsPerFrame, Settings.VoxelProxyBuildsPerFrame,
-		Settings.SurfaceBuildsPerFrame, Settings.MacroBuildsPerFrame };
+	const int32 Limits[] = { Settings.FineAdmissionPerFrame, Settings.VoxelProxyAdmissionPerFrame,
+		Settings.SurfaceAdmissionPerFrame, Settings.MacroAdmissionPerFrame };
 	const TMap<int32, int32> Stages = ResolveAdmissionStages(Admissions,
 		[this](const FVoxelViewAdmission& Admission)
 		{
@@ -450,12 +436,11 @@ void FVoxelViewManager::ProcessAdmissions()
 	LastActiveAdmissionPriority = MAX_int32;
 	LastResolvedFrontier = MAX_dbl;
 	int32 Submitted[4] = {};
-	const double Deadline = FPlatformTime::Seconds() + Settings.BuildAdmissionMilliseconds / 1000.0;
+	const double Deadline = FPlatformTime::Seconds() + Settings.AdmissionMilliseconds / 1000.0;
 	for (const int32 Priority : AdmissionPriorities)
 	{
 		const int32* Stage = Stages.Find(Priority);
 		if (!Stage) continue;
-		if (LastActiveAdmissionKind != 4) break;
 		const int32 Kind = *Stage;
 		const double Frontier = ResolveAdmissionFrontier(Admissions,
 			[this, Kind, Priority](const FVoxelViewAdmission& Admission)
@@ -606,27 +591,6 @@ bool FVoxelViewManager::IsAdmissionMeshReady(const FVoxelViewAdmission& A) const
 	}
 }
 
-bool FVoxelViewManager::IsAdmissionSatisfied(const FVoxelViewAdmission& A) const
-{
-	if (!IsAdmissionMeshReady(A)) return false;
-	switch (A.Kind)
-	{
-	case EVoxelViewAdmissionKind::Fine:
-		return !FineActors.Contains(A.FineKey) || Publisher->IsCommitted(FineActors.FindRef(A.FineKey));
-	case EVoxelViewAdmissionKind::VoxelProxy:
-		// Coarse predecessors remain buildable while finer sources replace them.
-		// A hidden predecessor must not gate the next stage on becoming visible again.
-		if (!Module.GetCurrentInterest().TerrainPlan.Leaves.Contains(A.ProxyKey)) return true;
-		return !VoxelProxyActors.Contains(A.ProxyKey) || Publisher->IsCommitted(VoxelProxyActors.FindRef(A.ProxyKey));
-	case EVoxelViewAdmissionKind::Surface:
-		return Publisher->IsCommitted(SurfaceActors.FindRef(A.SurfaceKey));
-	case EVoxelViewAdmissionKind::Macro:
-		return Publisher->IsCommitted(MacroActors.FindRef(A.MacroKey));
-	default:
-		return true;
-	}
-}
-
 bool FVoxelViewManager::IsAdmissionTerminalFailure(const FVoxelViewAdmission& A) const
 {
 	if (A.Kind != EVoxelViewAdmissionKind::Fine) return false;
@@ -637,14 +601,6 @@ bool FVoxelViewManager::IsAdmissionTerminalFailure(const FVoxelViewAdmission& A)
 TMap<int32, double> FVoxelViewManager::GetDataAdmissionLimits() const
 {
 	TMap<int32, double> Limits;
-	const int32 DataPriority = ResolveDataAdmissionPriority();
-	for (const auto& Pair : Module.GetCurrentInterest().Exact)
-	{
-		if (Pair.Value.Priority > DataPriority && !Limits.Contains(Pair.Value.Priority))
-		{
-			Limits.Add(Pair.Value.Priority, -1.0);
-		}
-	}
 	for (const FVoxelViewAdmission& Admission : Module.GetCurrentInterest().Admissions)
 	{
 		if (Admission.Kind == EVoxelViewAdmissionKind::Fine && !Limits.Contains(Admission.Priority) &&
@@ -654,28 +610,10 @@ TMap<int32, double> FVoxelViewManager::GetDataAdmissionLimits() const
 	return Limits;
 }
 
-int32 FVoxelViewManager::ResolveDataAdmissionPriority() const
+void FVoxelViewManager::RefreshTaskPriorities()
 {
-	int32 Priority = MAX_int32;
-	for (const auto& Pair : Module.GetCurrentInterest().Exact)
-	{
-		if (!Pair.Value.bData || Pair.Value.Priority >= Priority) continue;
-		const FVoxelSection* Section = Module.GetRuntime()->FindSection(Pair.Key);
-		if (!Section || (Section->Status != EVoxelSectionStatus::DataReady &&
-			Section->Status != EVoxelSectionStatus::Failed))
-		{
-			Priority = FMath::Min(Priority, Pair.Value.Priority);
-		}
-	}
-	for (const FVoxelViewAdmission& Admission : Module.GetCurrentInterest().Admissions)
-	{
-		if (Admission.Priority >= Priority) break;
-		if (!IsAdmissionDataReady(Admission) && !IsAdmissionTerminalFailure(Admission))
-		{
-			Priority = FMath::Min(Priority, Admission.Priority);
-		}
-	}
-	return Priority;
+	RebuildAdmissions(PriorityObservers);
+	UpdateTaskPriorities();
 }
 
 TMap<int32, int32> FVoxelViewManager::ResolveAdmissionStages(
@@ -2129,7 +2067,7 @@ void FVoxelViewManager::PumpVolumeTransitions()
 	const auto Registry = Module.GetRegistry();
 	const auto Shapes = Module.GetShapes();
 	if (!Registry || !Shapes) return;
-	const double Deadline = FPlatformTime::Seconds() + Module.GetViewSettings().BuildAdmissionMilliseconds / 1000.0;
+	const double Deadline = FPlatformTime::Seconds() + Module.GetViewSettings().AdmissionMilliseconds / 1000.0;
 	for (int32 Submitted = 0; Submitted < 4 && !UnsubmittedVolumeOwners.IsEmpty() &&
 		FPlatformTime::Seconds() < Deadline;)
 	{
@@ -2988,7 +2926,8 @@ bool FVoxelViewManager::RequestFine(
 	const FVoxelExactDemand* Demand =
 		Module.GetCurrentInterest().Exact.Find(InSection);
 	Request.WorkClass =
-		Demand && (Demand->bWarmupData || Demand->bMovementCriticalCollision)
+		Demand && (Demand->bWarmupData || Demand->bMovementCriticalCollision ||
+			Demand->bMovementCriticalFine)
 			? EVoxelWorkClass::Critical
 			: EVoxelWorkClass::Interactive;
 
@@ -2997,7 +2936,7 @@ bool FVoxelViewManager::RequestFine(
 	Request.DistanceScore = MinimumObserverDistanceCells(
 		FVector(InSection * ViewSectionSide + FIntVector(ViewSectionSide / 2)) * Module.BlockSize());
 	Request.SourcePriority = Demand ? Demand->Priority : 0;
-	Request.ForwardScore = 0.0;
+	Request.ForwardScore = Demand ? Demand->ForwardScore : 0.0;
 
 	Request.InputBytes =
 		Snapshot.Bytes();

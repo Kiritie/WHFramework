@@ -184,6 +184,7 @@ struct WHFRAMEWORK_API FVoxelTaskRequest
 struct WHFRAMEWORK_API FVoxelTaskBudget
 {
 	int32 MaxConcurrentTasks = 2;
+	int32 CriticalReservedTasks = 1;
 	int32 MaxPendingTasks = 256;
 	uint64 MaxReservedBytes = 128ull * 1024ull * 1024ull;
 	uint64 MaxInputBytes = 32ull * 1024ull * 1024ull;
@@ -199,6 +200,7 @@ struct WHFRAMEWORK_API FVoxelTaskBudget
 	int32 MaxConcurrentMacroTasks = 1;
 	int32 MaxConcurrentCoarseTerrainTasks = 1;
 	int32 MaxPendingCoarseTerrainTasks = 24;
+	int32 MaxWaitingDependencyTasks = 0;
 };
 
 struct WHFRAMEWORK_API FVoxelTaskKindDiagnostics
@@ -221,6 +223,9 @@ struct WHFRAMEWORK_API FVoxelTaskDiagnostics
 	int32 Pending = 0;
 	int32 Running = 0;
 	int32 Critical = 0;
+	int32 CriticalPending = 0;
+	int32 CriticalRunning = 0;
+	uint64 CriticalAdmissionDeferrals = 0;
 
 	uint64 ReservedBytes = 0;
 	uint64 QueuedInputBytes = 0;
@@ -334,4 +339,5 @@ private:
 	uint64 ReservedBytes = 0;
 	uint64 QueuedInputBytes = 0;
 	int32 CriticalTaskCount = 0;
+	uint64 CriticalAdmissionDeferrals = 0;
 };

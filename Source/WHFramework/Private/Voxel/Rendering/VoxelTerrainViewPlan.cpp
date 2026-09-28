@@ -97,7 +97,8 @@ void FVoxelTerrainViewPlan::Build(TConstArrayView<FVoxelStreamingSource> InSourc
 		double Error = 0.0;
 		for (const FVoxelStreamingSource& Source : InSources)
 		{
-			if (!Source.bRefineView || Source.RenderMode != EVoxelStreamingRenderMode::Full)
+			if (!Source.Has(EVoxelStreamingCapability::WorldVisual) &&
+				!Source.Has(EVoxelStreamingCapability::LocalRefinement))
 			{
 				continue;
 			}

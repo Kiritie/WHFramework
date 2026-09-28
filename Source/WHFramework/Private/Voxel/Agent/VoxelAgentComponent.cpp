@@ -550,8 +550,8 @@ void UVoxelAgentComponent::RefreshSource()
 	{
 		bActive =
 			bActive &&
-			BoundController.IsValid() &&
-			(GetOwner()->HasAuthority() || BoundController->IsLocalController());
+			(GetOwner()->HasAuthority() ||
+				(BoundController.IsValid() && BoundController->IsLocalController()));
 	}
 
 	if (!bActive)
@@ -569,12 +569,50 @@ void UVoxelAgentComponent::RefreshSource()
 
 	FVoxelStreamingSource Source;
 	Source.Purpose = bInitialCollisionGatePending ? EVoxelStreamingSourcePurpose::InitialSpawn : EVoxelStreamingSourcePurpose::Observer;
-	Source.bAffectsGlobalReadiness = true;
 	Source.bInheritWorldView = bInheritWorldView;
 	Source.View = StreamingView;
 	Source.bLocalView = BoundController.IsValid() && BoundController->IsLocalController();
-	Source.bWorldView = bProvideWorldView;
 	Source.Priority = StreamingPriority;
+	const ENetMode NetMode = GetWorld()->GetNetMode();
+	if (NetMode == NM_DedicatedServer)
+	{
+		Source.Capabilities = EVoxelStreamingCapability::Data |
+			EVoxelStreamingCapability::Collision |
+			EVoxelStreamingCapability::Readiness |
+			EVoxelStreamingCapability::RetainGenerationCache;
+	}
+	else if (Source.bLocalView)
+	{
+		Source.Capabilities = EVoxelStreamingCapability::Data |
+			EVoxelStreamingCapability::Collision |
+			EVoxelStreamingCapability::FineVisual |
+			EVoxelStreamingCapability::Readiness |
+			EVoxelStreamingCapability::RetainGenerationCache;
+		if (bProvideWorldView)
+		{
+			Source.Capabilities |= EVoxelStreamingCapability::WorldVisual;
+		}
+	}
+	else if (GetOwner()->HasAuthority())
+	{
+		Source.Capabilities = EVoxelStreamingCapability::Data |
+			EVoxelStreamingCapability::Collision |
+			EVoxelStreamingCapability::RetainGenerationCache;
+	}
+	else
+	{
+		if (SourceId.IsValid())
+		{
+			VoxelModule->UnregisterSource(SourceId);
+			SourceId.Invalidate();
+		}
+		return;
+	}
+	if (SimulationRadiusCells > 0)
+	{
+		Source.Capabilities |= EVoxelStreamingCapability::Simulation;
+	}
+	Source.Normalize();
 
 	FVector ViewOrigin;
 	FVector ViewDirection;
@@ -598,6 +636,11 @@ void UVoxelAgentComponent::RefreshSource()
 
 	Source.Direction =
 		ViewDirection;
+	if (const ACharacter* Character = Cast<ACharacter>(GetOwner()))
+	{
+		Source.VelocityCellsPerSecond = Character->GetVelocity() /
+			FMath::Max(VoxelModule->BlockSize(), UE_DOUBLE_SMALL_NUMBER);
+	}
 
 	Source.ExactRadius =
 		FMath::Max(
@@ -638,16 +681,6 @@ void UVoxelAgentComponent::RefreshSource()
 			Source.ViewportHeightPixels = Projection.GetConstrainedViewRect().Height();
 		}
 	}
-
-	Source.bCollision = true;
-
-	Source.bSimulation =
-		SimulationRadiusCells > 0;
-
-	Source.RenderMode =
-		GetWorld()->GetNetMode() == NM_DedicatedServer || (BoundController.IsValid() && !BoundController->IsLocalController())
-			? EVoxelStreamingRenderMode::None
-			: EVoxelStreamingRenderMode::Full;
 
 	if (!SourceId.IsValid())
 	{

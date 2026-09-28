@@ -14,6 +14,22 @@ public:
 		const FVoxelViewSettings& InViewSettings,
 		const FVoxelInterestSet* InPrevious = nullptr) const;
 
+	void BuildSourceExact(const FVoxelStreamingSource& InSource,
+		const FVoxelWorldManifest& InManifest, const FVoxelViewSettings& InSettings,
+		FVoxelInterestSet& OutInterest, const FVoxelInterestSet* InPrevious = nullptr) const;
+	void BuildSourceProxy(const FVoxelStreamingSource& InSource,
+		const FVoxelWorldManifest& InManifest, const FVoxelViewSettings& InSettings,
+		FVoxelInterestSet& OutInterest) const;
+	void BuildSourceSurface(const FVoxelStreamingSource& InSource,
+		const FVoxelWorldManifest& InManifest, const FVoxelViewSettings& InSettings,
+		FVoxelInterestSet& OutInterest) const;
+	void BuildSourceMacro(const FVoxelStreamingSource& InSource,
+		const FVoxelWorldManifest& InManifest, const FVoxelViewSettings& InSettings,
+		FVoxelInterestSet& OutInterest) const;
+	FVoxelInterestSet Finalize(TConstArrayView<FVoxelStreamingSource> InSources,
+		const FVoxelWorldManifest& InManifest, const FVoxelViewSettings& InSettings,
+		FVoxelInterestSet InPrepared) const;
+
 private:
 	void AddExactSource(
 		const FVoxelStreamingSource& InSource,
@@ -25,5 +41,8 @@ private:
 		const FVoxelStreamingSource& InSource,
 		const FVoxelWorldManifest& InManifest,
 		const FVoxelViewSettings& InViewSettings,
-		FVoxelInterestSet& InOutInterest) const;
+		FVoxelInterestSet& InOutInterest,
+		bool bBuildProxy,
+		bool bBuildSurface,
+		bool bBuildMacro) const;
 };

@@ -42,7 +42,7 @@
 #include "Voxel/Scene/VoxelSceneRegion.h"
 #include "Voxel/Serialization/VoxelBinaryCodec.h"
 #include "Voxel/Streaming/VoxelEmergeManager.h"
-#include "Voxel/Streaming/VoxelInterestManager.h"
+#include "Voxel/Streaming/VoxelInterestRuntime.h"
 #include "Voxel/Streaming/VoxelResidencyManager.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
 #include "Voxel/Voxels/Data/VoxelData.h"
@@ -53,6 +53,9 @@ namespace
 	struct FVoxelInterestTaskPayload : FVoxelTaskCustomPayload
 	{
 		TSharedPtr<FVoxelInterestSet, ESPMode::ThreadSafe> Interest;
+		FVoxelInterestDelta Delta;
+		bool bChanged = false;
+		bool bHasSnapshot = false;
 
 		virtual uint64 GetAllocatedBytes() const override
 		{
@@ -112,63 +115,6 @@ namespace
 			: Signature;
 	}
 
-	bool StreamingSourceAffectsInterest(
-		const FVoxelStreamingSource& InA,
-		const FVoxelStreamingSource& InB)
-	{
-		int32 CenterRefreshDistance = FMath::Max(1, FMath::RoundToInt(
-			InB.View.FineRadiusCells *
-			InB.View.StreamingReplanFineRadiusFraction));
-		if (InB.bCollision)
-		{
-			CenterRefreshDistance = FMath::Min(CenterRefreshDistance,
-				FMath::Max(1, InB.CollisionRadius / 2));
-		}
-		const int64 CenterRefreshDistanceSquared =
-			static_cast<int64>(CenterRefreshDistance) * CenterRefreshDistance;
-		const FIntVector CenterDelta = InA.Center - InB.Center;
-		if (static_cast<int64>(CenterDelta.X) * CenterDelta.X +
-			static_cast<int64>(CenterDelta.Y) * CenterDelta.Y +
-			static_cast<int64>(CenterDelta.Z) * CenterDelta.Z >= CenterRefreshDistanceSquared ||
-			InA.View.VoxelProxyRadiusCells != InB.View.VoxelProxyRadiusCells ||
-			InA.View.SurfaceRadiusCells != InB.View.SurfaceRadiusCells ||
-			InA.View.TargetScreenErrorPixels != InB.View.TargetScreenErrorPixels ||
-			InA.View.MaximumVoxelProxyLevel != InB.View.MaximumVoxelProxyLevel ||
-			InA.View.MaximumSurfaceLevel != InB.View.MaximumSurfaceLevel ||
-			InA.ExactRadius != InB.ExactRadius ||
-			InA.View.FineRadiusCells != InB.View.FineRadiusCells ||
-			InA.View.WarmupDataRadiusCells != InB.View.WarmupDataRadiusCells ||
-			InA.View.WarmupCollisionRadiusCells != InB.View.WarmupCollisionRadiusCells ||
-			InA.View.StreamingReplanFineRadiusFraction != InB.View.StreamingReplanFineRadiusFraction ||
-			InA.View.FineVerticalRadiusCells != InB.View.FineVerticalRadiusCells ||
-			InA.View.FinePreloadCells != InB.View.FinePreloadCells ||
-			InA.CollisionRadius != InB.CollisionRadius ||
-			InA.SimulationRadius != InB.SimulationRadius ||
-			InA.VerticalExactRadius != InB.VerticalExactRadius ||
-			InA.RenderMode != InB.RenderMode ||
-			InA.Purpose != InB.Purpose ||
-			InA.Priority != InB.Priority ||
-			InA.bLocalView != InB.bLocalView ||
-			InA.bWorldView != InB.bWorldView ||
-			InA.bAffectsGlobalReadiness != InB.bAffectsGlobalReadiness ||
-			InA.bRetainGenerationCache != InB.bRetainGenerationCache ||
-			InA.RetentionRadiusCells != InB.RetentionRadiusCells ||
-			InA.MovementCriticalCollisionRadius != InB.MovementCriticalCollisionRadius ||
-			InA.bCollision != InB.bCollision ||
-			InA.bSimulation != InB.bSimulation)
-		{
-			return true;
-		}
-
-		if (FMath::Abs(InA.VerticalFovDegrees - InB.VerticalFovDegrees) > 0.5f ||
-			FMath::Abs(InA.ViewportHeightPixels - InB.ViewportHeightPixels) >= 32)
-		{
-			return true;
-		}
-
-		// Direction only changes admission priority, not which cells are needed.
-		return false;
-	}
 }
 
 IMPLEMENTATION_MODULE(UVoxelModule)
@@ -339,7 +285,7 @@ void UVoxelModule::OnRefresh(
 		{
 			ApplyTask(
 				MoveTemp(InResult));
-		});
+		}, ViewSettings.ResultApplyMilliseconds);
 
 	const double AfterScheduler = FPlatformTime::Seconds();
 
@@ -351,11 +297,6 @@ void UVoxelModule::OnRefresh(
 	const double Now =
 		FPlatformTime::Seconds();
 
-	if (!bInterestBuildPending && !bInterestDirty && Now >= NextSourceRefinementRefresh)
-	{
-		NextSourceRefinementRefresh = Now + 0.1;
-		RefreshSourceRefinements();
-	}
 	if (bInterestDirty &&
 		(LastInterestRefresh < 0.0 ||
 			Now - LastInterestRefresh >= 0.1))
@@ -370,8 +311,8 @@ void UVoxelModule::OnRefresh(
 		InterestRevision,
 		Now,
 		ViewManager ? ViewManager->GetDataAdmissionLimits() : TMap<int32, double>(),
-		ViewSettings.DataBuildsPerFrame,
-		ViewSettings.BuildAdmissionMilliseconds);
+		ViewSettings.DataAdmissionPerFrame,
+		ViewSettings.AdmissionMilliseconds);
 
 	const double AfterEmerge = FPlatformTime::Seconds();
 
@@ -488,7 +429,7 @@ void UVoxelModule::OnRefresh(
 				Source.Center.X,
 				Source.Center.Y,
 				Source.Center.Z,
-				static_cast<int32>(Source.RenderMode),
+				static_cast<int32>(Source.Capabilities),
 				Source.ExactRadius,
 				Source.CollisionRadius);
 		}
@@ -667,14 +608,27 @@ bool UVoxelModule::StartWorld(
 		ViewSettings.MaximumSurfaceTiles = ViewProfile->MaximumSurfaceTiles;
 		ViewSettings.MaximumMacroTiles = ViewProfile->MaximumMacroTiles;
 		ViewSettings.MaximumTextureStretchCells = FMath::Clamp(ViewProfile->MaximumTextureStretchCells, 1.0f, 16.0f);
-		ViewSettings.FineBuildsPerFrame = FMath::Clamp(ViewProfile->FineBuildsPerFrame, 1, 256);
-		ViewSettings.VoxelProxyBuildsPerFrame = FMath::Clamp(ViewProfile->VoxelProxyBuildsPerFrame, 1, 256);
-		ViewSettings.SurfaceBuildsPerFrame = FMath::Clamp(ViewProfile->SurfaceBuildsPerFrame, 1, 256);
-		ViewSettings.MacroBuildsPerFrame = FMath::Clamp(ViewProfile->MacroBuildsPerFrame, 1, 256);
-		ViewSettings.DataBuildsPerFrame = FMath::Clamp(ViewProfile->DataBuildsPerFrame, 1, 1024);
+		ViewSettings.FineAdmissionPerFrame = FMath::Clamp(ViewProfile->FineAdmissionPerFrame, 1, 256);
+		ViewSettings.VoxelProxyAdmissionPerFrame = FMath::Clamp(ViewProfile->VoxelProxyAdmissionPerFrame, 1, 256);
+		ViewSettings.SurfaceAdmissionPerFrame = FMath::Clamp(ViewProfile->SurfaceAdmissionPerFrame, 1, 256);
+		ViewSettings.MacroAdmissionPerFrame = FMath::Clamp(ViewProfile->MacroAdmissionPerFrame, 1, 256);
+		ViewSettings.DataAdmissionPerFrame = FMath::Clamp(ViewProfile->DataAdmissionPerFrame, 1, 1024);
+		ViewSettings.FineApplyPerFrame = FMath::Clamp(ViewProfile->FineApplyPerFrame, 1, 256);
+		ViewSettings.VoxelProxyApplyPerFrame = FMath::Clamp(ViewProfile->VoxelProxyApplyPerFrame, 1, 256);
+		ViewSettings.SurfaceApplyPerFrame = FMath::Clamp(ViewProfile->SurfaceApplyPerFrame, 1, 256);
+		ViewSettings.MacroApplyPerFrame = FMath::Clamp(ViewProfile->MacroApplyPerFrame, 1, 256);
 		ViewSettings.CompletedResultsPerFrame = FMath::Clamp(ViewProfile->CompletedResultsPerFrame, 1, 256);
 		ViewSettings.HeavyResultsPerFrame = FMath::Clamp(ViewProfile->HeavyResultsPerFrame, 1, 256);
-		ViewSettings.BuildAdmissionMilliseconds = FMath::Clamp(ViewProfile->BuildAdmissionMilliseconds, 0.1f, 8.0f);
+		ViewSettings.AdmissionMilliseconds = FMath::Clamp(ViewProfile->AdmissionMilliseconds, 0.1f, 8.0f);
+		ViewSettings.ResultApplyMilliseconds = FMath::Clamp(ViewProfile->ResultApplyMilliseconds, 0.1f, 8.0f);
+		ViewSettings.MaxPublishComponentsPerFrame = FMath::Clamp(ViewProfile->MaxPublishComponentsPerFrame, 1, 256);
+		ViewSettings.MaxPublishGroupsPerFrame = FMath::Clamp(ViewProfile->MaxPublishGroupsPerFrame, 1, 32);
+		ViewSettings.PublishPrepareMilliseconds = FMath::Clamp(ViewProfile->PublishPrepareMilliseconds, 0.1f, 8.0f);
+		ViewSettings.PublishRetireMilliseconds = FMath::Clamp(ViewProfile->PublishRetireMilliseconds, 0.1f, 8.0f);
+		ViewSettings.CriticalReservedTasks = FMath::Clamp(ViewProfile->CriticalReservedTasks, 1, 16);
+		ViewSettings.MaxConcurrentSurfaceTasks = FMath::Clamp(ViewProfile->MaxConcurrentSurfaceTasks, 1, 16);
+		ViewSettings.MaxConcurrentMacroTasks = FMath::Clamp(ViewProfile->MaxConcurrentMacroTasks, 1, 16);
+		ViewSettings.MaxConcurrentCoarseTerrainTasks = FMath::Clamp(ViewProfile->MaxConcurrentCoarseTerrainTasks, 1, 16);
 	}
 	const uint64 ExpectedGenerationSignature =
 		BuildGenerationSignature(
@@ -740,13 +694,17 @@ bool UVoxelModule::StartWorld(
 	Scheduler = MakeUnique<FVoxelTaskScheduler>();
 	FVoxelTaskBudget TaskBudget;
 	TaskBudget.MaxConcurrentTasks = FMath::Clamp(FPlatformMisc::NumberOfCores() * 2, 1, 16);
+	TaskBudget.CriticalReservedTasks = ViewSettings.CriticalReservedTasks;
+	TaskBudget.MaxConcurrentSurfaceTasks = ViewSettings.MaxConcurrentSurfaceTasks;
+	TaskBudget.MaxConcurrentMacroTasks = ViewSettings.MaxConcurrentMacroTasks;
+	TaskBudget.MaxConcurrentCoarseTerrainTasks = ViewSettings.MaxConcurrentCoarseTerrainTasks;
 	TaskBudget.MaxReservedBytes = 256ull * 1024ull * 1024ull;
 	TaskBudget.MaxCompletedResultsPerFrame = ViewSettings.CompletedResultsPerFrame;
 	TaskBudget.MaxHeavyCompletedResultsPerFrame = FMath::Min(ViewSettings.HeavyResultsPerFrame, ViewSettings.CompletedResultsPerFrame);
-	TaskBudget.MaxFineApplyPerFrame = ViewSettings.FineBuildsPerFrame;
-	TaskBudget.MaxVoxelLODApplyPerFrame = ViewSettings.VoxelProxyBuildsPerFrame;
-	TaskBudget.MaxSurfaceApplyPerFrame = ViewSettings.SurfaceBuildsPerFrame;
-	TaskBudget.MaxMacroApplyPerFrame = ViewSettings.MacroBuildsPerFrame;
+	TaskBudget.MaxFineApplyPerFrame = ViewSettings.FineApplyPerFrame;
+	TaskBudget.MaxVoxelLODApplyPerFrame = ViewSettings.VoxelProxyApplyPerFrame;
+	TaskBudget.MaxSurfaceApplyPerFrame = ViewSettings.SurfaceApplyPerFrame;
+	TaskBudget.MaxMacroApplyPerFrame = ViewSettings.MacroApplyPerFrame;
 	Scheduler->SetBudget(TaskBudget);
 	if (GetWorld()->GetNetMode() != NM_DedicatedServer)
 	{
@@ -757,10 +715,10 @@ bool UVoxelModule::StartWorld(
 	UE_LOG(LogTemp, Display, TEXT("Voxel worker budget: cores=%d workers=%d reservedMiB=%llu"),
 		FPlatformMisc::NumberOfCores(), TaskBudget.MaxConcurrentTasks, TaskBudget.MaxReservedBytes / (1024ull * 1024ull));
 	UE_LOG(LogTemp, Display, TEXT("Voxel frame budget: Fine=%d Proxy=%d Surface=%d Macro=%d Data=%d Results=%d Heavy=%d AdmissionMs=%.2f"),
-		ViewSettings.FineBuildsPerFrame, ViewSettings.VoxelProxyBuildsPerFrame,
-		ViewSettings.SurfaceBuildsPerFrame, ViewSettings.MacroBuildsPerFrame, ViewSettings.DataBuildsPerFrame,
-		TaskBudget.MaxCompletedResultsPerFrame, TaskBudget.MaxHeavyCompletedResultsPerFrame, ViewSettings.BuildAdmissionMilliseconds);
-	InterestManager = MakeUnique<FVoxelInterestManager>();
+		ViewSettings.FineAdmissionPerFrame, ViewSettings.VoxelProxyAdmissionPerFrame,
+		ViewSettings.SurfaceAdmissionPerFrame, ViewSettings.MacroAdmissionPerFrame, ViewSettings.DataAdmissionPerFrame,
+		TaskBudget.MaxCompletedResultsPerFrame, TaskBudget.MaxHeavyCompletedResultsPerFrame, ViewSettings.AdmissionMilliseconds);
+	InterestRuntime = MakeShared<FVoxelInterestRuntime, ESPMode::ThreadSafe>();
 	EmergeManager = MakeUnique<FVoxelEmergeManager>(
 		*Runtime,
 		*Scheduler,
@@ -906,7 +864,7 @@ bool UVoxelModule::StopWorld(const bool bDiscardDirty, FString& OutError)
 	CapturedSceneFiles.Reset();
 	EmergeManager.Reset();
 	ResidencyManager.Reset();
-	InterestManager.Reset();
+	InterestRuntime.Reset();
 	Runtime.Reset();
 	Generator.Reset();
 
@@ -1181,10 +1139,10 @@ FGuid UVoxelModule::RegisterSource(UObject* InOwner, const FVoxelStreamingSource
 	FSource Source;
 	Source.Owner = InOwner;
 	Source.Value = InSource;
+	Source.Value.Normalize();
 	if (Source.Value.bInheritWorldView) Source.Value.View = ViewSettings.DefaultSourceView;
 	Source.Value.Id = Id;
 	Source.Value.RegistrationOrder = ++NextSourceRegistrationOrder;
-	Source.Value.bRefineView = false;
 	Source.PlannedValue = Source.Value;
 	Sources.Add(Id, MoveTemp(Source));
 	bInterestDirty = true;
@@ -1206,14 +1164,13 @@ bool UVoxelModule::UpdateSource(
 	}
 
 	FVoxelStreamingSource Updated = InSource;
+	Updated.Normalize();
 	if (Updated.bInheritWorldView) Updated.View = ViewSettings.DefaultSourceView;
 	Updated.Id = InId;
 	Updated.RegistrationOrder = Source->Value.RegistrationOrder;
-	Updated.bRefineView = Source->Value.bRefineView;
 
-	if (StreamingSourceAffectsInterest(Source->PlannedValue, Updated))
+	if (FVoxelInterestRuntime::NeedsUpdate(Source->PlannedValue, Updated))
 	{
-		Updated.bRefineView = false;
 		bInterestDirty = true;
 	}
 
@@ -1242,7 +1199,7 @@ bool UVoxelModule::IsSourceAdmitted(const FGuid& InId) const
 	const FSource* Source = Sources.Find(InId);
 	const FVoxelSourceInterest* Admitted = CurrentInterest.Sources.Find(InId);
 	return Source && Source->Owner.IsValid() && Admitted &&
-		!StreamingSourceAffectsInterest(Admitted->Source, Source->Value);
+		!FVoxelInterestRuntime::NeedsUpdate(Admitted->Source, Source->Value);
 }
 
 void UVoxelModule::CollectStreamingSourcesForOwner(const AActor* InOwner, TArray<FVoxelStreamingSource>& OutSources) const
@@ -1463,35 +1420,6 @@ UVoxelSceneRegion* UVoxelModule::GetSceneRegion(const FIntVector& InSection, con
 	return NewRegion;
 }
 
-void UVoxelModule::RefreshSourceRefinements()
-{
-	// Only the first deferred source may enter the render partition. Data requests
-	// for every registered source remain in the interest snapshot while it waits.
-	const FVoxelSourceInterest* Next = nullptr;
-	FSource* Pending = nullptr;
-	for (auto& Pair : Sources)
-	{
-		FSource& Source = Pair.Value;
-		if (Source.Value.bRefineView || Source.Value.RenderMode == EVoxelStreamingRenderMode::None) continue;
-		const FVoxelSourceInterest* Interest = CurrentInterest.Sources.Find(Pair.Key);
-		if (!Interest || StreamingSourceAffectsInterest(Interest->Source, Source.Value)) return;
-		if (!Next || Interest->Source.GetSchedulingPriority() < Next->Source.GetSchedulingPriority())
-		{
-			Next = Interest;
-			Pending = &Source;
-		}
-	}
-	if (!Next || !ViewManager || !ViewManager->AreHigherPriorityMeshesComplete(
-		Next->Source.GetSchedulingPriority(), InterestRevision)) return;
-	for (const FIntVector& Key : Next->FineDataSections)
-	{
-		const FVoxelSection* Section = Runtime->FindSection(Key);
-		if (!Section || Section->Status != EVoxelSectionStatus::DataReady) return;
-	}
-	Pending->Value.bRefineView = true;
-	bInterestDirty = true;
-}
-
 void UVoxelModule::RefreshInterest(
 	const double InNow)
 {
@@ -1524,17 +1452,10 @@ void UVoxelModule::RefreshInterest(
 		if (A.bLocalView != B.bLocalView) return A.bLocalView;
 		return A.RegistrationOrder < B.RegistrationOrder;
 	});
-	bool bHasPrimaryView = false;
 	for (int32 Index = 0; Index < ActiveSources.Num(); ++Index)
 	{
 		FVoxelStreamingSource& Source = ActiveSources[Index];
 		Source.SchedulingPriority = Index;
-		if (!bHasPrimaryView && Source.RenderMode != EVoxelStreamingRenderMode::None)
-		{
-			Source.bRefineView = true;
-			Sources.FindChecked(Source.Id).Value.bRefineView = true;
-			bHasPrimaryView = true;
-		}
 	}
 
 	// 一个观察者快照最多有一个规划任务；移动期间合并后续请求，旧分区保留到新结果提交。
@@ -1548,21 +1469,19 @@ void UVoxelModule::RefreshInterest(
 	Request.Stamp.WorldEpoch = Epoch;
 	Request.Stamp.Token = InterestRevision + 1;
 	Request.ReservedBytes = 32ull * 1024ull * 1024ull;
-	// 滞回只持有后台规划产生的不可变集合，移动时不再在主线程复制数万需求。
-	FVoxelInterestSet Previous;
-	Previous.FineSections = CurrentInterest.FineSections;
-	Request.InputBytes = Previous.GetAllocatedBytes();
+	Request.InputBytes = ActiveSources.GetAllocatedSize();
 	Request.Execute = [ActiveSources, WorldManifest = Manifest, Settings = ViewSettings,
-		Previous = MoveTemp(Previous)](const TAtomic<bool>& Cancel)
+		Runtime = InterestRuntime](const TAtomic<bool>& Cancel)
 	{
 		FVoxelTaskResult Result;
 		if (Cancel.Load())
 		{
 			return Result;
 		}
-		const auto Payload = MakeShared<FVoxelInterestTaskPayload, ESPMode::ThreadSafe>();
-		Payload->Interest = MakeShared<FVoxelInterestSet, ESPMode::ThreadSafe>(
-			FVoxelInterestManager().Compute(ActiveSources, WorldManifest, Settings, &Previous));
+		auto Payload = MakeShared<FVoxelInterestTaskPayload, ESPMode::ThreadSafe>();
+		Payload->Interest = MakeShared<FVoxelInterestSet, ESPMode::ThreadSafe>();
+		Payload->bChanged = Runtime->Update(ActiveSources, WorldManifest, Settings,
+			*Payload->Interest, Payload->Delta, Payload->bHasSnapshot);
 		Result.bSuccess = !Cancel.Load();
 		Result.CustomPayload = Payload;
 		return Result;
@@ -1576,12 +1495,23 @@ void UVoxelModule::RefreshInterest(
 		bInterestBuildPending = false;
 		if (!Result.bSuccess || Result.bCanceled)
 		{
+			InterestRuntime->Reset();
 			bInterestDirty = true;
 			return;
 		}
 		const auto Payload = StaticCastSharedPtr<const FVoxelInterestTaskPayload>(Result.CustomPayload);
-		CurrentInterest = MoveTemp(*Payload->Interest);
-		InterestRevision = InterestRevision == MAX_uint64 ? 1 : InterestRevision + 1;
+		if (Payload->bHasSnapshot)
+		{
+			CurrentInterest = MoveTemp(*Payload->Interest);
+			if (Payload->bChanged)
+			{
+				InterestRevision = InterestRevision == MAX_uint64 ? 1 : InterestRevision + 1;
+			}
+			else if (ViewManager)
+			{
+				ViewManager->RefreshTaskPriorities();
+			}
+		}
 		// 不清除执行期间新产生的移动请求，避免连续行走丢失末次位置。
 	};
 	if (!Scheduler->Enqueue(MoveTemp(Request)))
@@ -1604,7 +1534,7 @@ void UVoxelModule::RefreshInterest(
 		const int64 HydrologySide = static_cast<int64>(Retention.HydrologyRegionSide) * Retention.HydrologyCellSize;
 		for (const FVoxelStreamingSource& Source : ActiveSources)
 		{
-			if (!Source.bRetainGenerationCache) continue;
+			if (!Source.Has(EVoxelStreamingCapability::RetainGenerationCache)) continue;
 			FVoxelGenerationCacheRetentionPoint& Point = Retention.Points.AddDefaulted_GetRef();
 			Point.Center = FIntPoint(Source.Center.X, Source.Center.Y);
 			Point.NaturalRadiusCells = Source.RetentionRadiusCells > 0 ? Source.RetentionRadiusCells :

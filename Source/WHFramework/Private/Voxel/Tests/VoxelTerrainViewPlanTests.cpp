@@ -70,7 +70,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelTerrainBudgetSymmetryTest, "WHFramework.V
 bool FVoxelTerrainBudgetSymmetryTest::RunTest(const FString& InParameters)
 {
 	FVoxelStreamingSource Source;
-	Source.RenderMode = EVoxelStreamingRenderMode::Full;
+	Source.Capabilities = EVoxelStreamingCapability::Data |
+		EVoxelStreamingCapability::FineVisual |
+		EVoxelStreamingCapability::WorldVisual;
 	Source.Center = FIntVector::ZeroValue;
 	const FVoxelViewKey Left { FIntVector(-1, 0, 0), 3 };
 	const FVoxelViewKey Right { FIntVector(0, 0, 0), 3 };

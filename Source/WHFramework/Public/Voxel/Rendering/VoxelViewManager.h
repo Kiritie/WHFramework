@@ -54,6 +54,7 @@ public:
 	void Tick(
 		uint64 InInterestRevision,
 		TConstArrayView<FVector> InObservers);
+	void RefreshTaskPriorities();
 	bool OnTask(FVoxelTaskResult&& InResult);
 	void InvalidateSection(const FIntVector& InKey);
 	void InvalidateNeighbors(const FIntVector& InKey);
@@ -67,7 +68,6 @@ public:
 
 	void Reset();
 	bool HasPrimaryRepresentation() const;
-	bool AreHigherPriorityMeshesComplete(int32 InPriority, uint64 InInterestRevision) const;
 	bool RequiresSectionData(const FIntVector& InKey) const;
 	TMap<int32, double> GetDataAdmissionLimits() const;
 	FVoxelPrimaryFineReadiness GetPrimaryFineReadiness(
@@ -94,7 +94,6 @@ private:
 	void UpdateWantedTimestamps(double InNow);
 	void ProcessAdmissions();
 	void ProcessDataAdmissions();
-	int32 ResolveDataAdmissionPriority() const;
 	bool IsAdmissionDataReady(const FVoxelViewAdmission& InAdmission) const;
 	bool IsAdmissionMeshReady(const FVoxelViewAdmission& InAdmission) const;
 	bool IsPreparedDataCurrent(const FVoxelTaskKey& InKey) const;
@@ -108,7 +107,6 @@ private:
 	void RebuildReadyTerrainBranches();
 	double MinimumObserverDistanceCells(const FVector& InWorldCenter) const;
 	double MinimumObserverDistanceCells(const FVoxelGenerationBounds& InCellBounds) const;
-	bool IsAdmissionSatisfied(const FVoxelViewAdmission& InAdmission) const;
 	bool IsAdmissionTerminalFailure(const FVoxelViewAdmission& InAdmission) const;
 	bool TrySubmitAdmission(const FVoxelViewAdmission& InAdmission);
 	void CancelStaleViewTasks();

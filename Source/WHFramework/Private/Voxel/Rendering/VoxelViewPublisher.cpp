@@ -311,7 +311,8 @@ void FVoxelViewPublisher::AdmitBuilds()
 		++PendingBuilds;
 	}
 }
-bool FVoxelViewPublisher::PrepareUpdate(const int32 InIndex, const double InDeadline, bool& bOutComplete)
+bool FVoxelViewPublisher::PrepareUpdate(const int32 InIndex, const double InDeadline,
+	int32& InOutPreparedComponents, bool& bOutComplete)
 {
 	bOutComplete = true;
 	const double PrepareStart = FPlatformTime::Seconds();
@@ -322,6 +323,11 @@ bool FVoxelViewPublisher::PrepareUpdate(const int32 InIndex, const double InDead
 	const FVoxelSectionMeshResult& Mesh = *PreparedMeshes[InIndex];
 	while (Update.PreparedBatchIndex < Mesh.Batches.Num())
 	{
+		if (InOutPreparedComponents >= Module.GetViewSettings().MaxPublishComponentsPerFrame)
+		{
+			bOutComplete = false;
+			break;
+		}
 		const FVoxelRenderBatch& Batch = Mesh.Batches[Update.PreparedBatchIndex++];
 		if (Batch.Mesh.Triangles.IsEmpty()) continue;
 		const FVoxelMaterialBank* Bank = Module.GetMaterialSet()->FindBank(Batch.Group, Batch.Bank);
@@ -332,6 +338,7 @@ bool FVoxelViewPublisher::PrepareUpdate(const int32 InIndex, const double InDead
 		Component->RegisterComponent();
 		Update.Components.Add(Component);
 		if (!Component->Apply(Batch.Mesh, Update.Scale, Bank->Material)) return false;
+		++InOutPreparedComponents;
 		if (FPlatformTime::Seconds() >= InDeadline)
 		{
 			bOutComplete = Update.PreparedBatchIndex == Mesh.Batches.Num();
@@ -351,7 +358,8 @@ bool FVoxelViewPublisher::PrepareUpdate(const int32 InIndex, const double InDead
 
 void FVoxelViewPublisher::Tick()
 {
-	const double RetireDeadline = FPlatformTime::Seconds() + 0.001;
+	const double RetireDeadline = FPlatformTime::Seconds() +
+		Module.GetViewSettings().PublishRetireMilliseconds / 1000.0;
 	while (!RetiredComponents.IsEmpty())
 	{
 		if (UVoxelMeshComponent* Component = RetiredComponents.Pop().Get()) Component->DestroyComponent();
@@ -362,18 +370,21 @@ void FVoxelViewPublisher::Tick()
 	if (!bCoveragePrepared) return;
 	AdmitBuilds();
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewPrepareGT);
-	const double Deadline = FPlatformTime::Seconds() + 0.002;
+	const double Deadline = FPlatformTime::Seconds() +
+		Module.GetViewSettings().PublishPrepareMilliseconds / 1000.0;
+	int32 PreparedComponents = 0;
 	while (PrepareIndex < Updates.Num() && PreparedMeshes[PrepareIndex])
 	{
 		bool bComplete = false;
-		if (!PrepareUpdate(PrepareIndex, Deadline, bComplete))
+		if (!PrepareUpdate(PrepareIndex, Deadline, PreparedComponents, bComplete))
 		{
 			DiscardBatch();
 			bRetry = true;
 			return;
 		}
 		if (bComplete) ++PrepareIndex;
-		if (FPlatformTime::Seconds() >= Deadline)
+		if (PreparedComponents >= Module.GetViewSettings().MaxPublishComponentsPerFrame ||
+			FPlatformTime::Seconds() >= Deadline)
 		{
 			break;
 		}

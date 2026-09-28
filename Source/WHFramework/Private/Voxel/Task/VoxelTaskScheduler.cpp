@@ -690,6 +690,10 @@ void FVoxelTaskScheduler::SetBudget(
 		FMath::Max(
 			1,
 			InBudget.MaxConcurrentTasks);
+	Budget.CriticalReservedTasks = FMath::Clamp(
+		InBudget.CriticalReservedTasks,
+		1,
+		FMath::Max(1, Budget.MaxConcurrentTasks - 1));
 
 	Budget.MaxPendingTasks =
 		FMath::Max(
@@ -754,6 +758,7 @@ void FVoxelTaskScheduler::SetBudget(
 			InBudget.MaxPendingCoarseTerrainTasks,
 			1,
 			Budget.MaxPendingTasks);
+	Budget.MaxWaitingDependencyTasks = FMath::Max(0, InBudget.MaxWaitingDependencyTasks);
 }
 
 FVoxelTaskDiagnostics
@@ -769,6 +774,17 @@ FVoxelTaskScheduler::GetDiagnostics() const
 
 	Result.Running =
 		Running.Num();
+	Result.CriticalAdmissionDeferrals = CriticalAdmissionDeferrals;
+	Result.CriticalPending = 0;
+	for (const FVoxelTaskRequest& Request : Pending)
+	{
+		Result.CriticalPending += Request.WorkClass == EVoxelWorkClass::Critical ? 1 : 0;
+	}
+	Result.CriticalRunning = 0;
+	for (const FRunning& Task : Running)
+	{
+		Result.CriticalRunning += Task.WorkClass == EVoxelWorkClass::Critical ? 1 : 0;
+	}
 
 	Result.Critical =
 		CriticalTaskCount;
@@ -938,6 +954,18 @@ void FVoxelTaskScheduler::Pump()
 			Budget.MaxConcurrentTasks &&
 		!Pending.IsEmpty())
 	{
+		const bool bHasCriticalPending = Pending.ContainsByPredicate(
+			[](const FVoxelTaskRequest& Request)
+			{
+				return Request.WorkClass == EVoxelWorkClass::Critical;
+			});
+		int32 NonCriticalRunning = 0;
+		for (const FRunning& Task : Running)
+		{
+			NonCriticalRunning += Task.WorkClass != EVoxelWorkClass::Critical ? 1 : 0;
+		}
+		const int32 NonCriticalLimit = FMath::Max(
+			0, Budget.MaxConcurrentTasks - Budget.CriticalReservedTasks);
 		int32 BestIndex =
 			INDEX_NONE;
 
@@ -947,6 +975,17 @@ void FVoxelTaskScheduler::Pump()
 		{
 			const FVoxelTaskRequest& Request =
 				Pending[Index];
+			if (bHasCriticalPending && Request.WorkClass != EVoxelWorkClass::Critical)
+			{
+				if (NonCriticalRunning >= NonCriticalLimit ||
+					Request.Kind == EVoxelTaskKind::BuildSurface ||
+					Request.Kind == EVoxelTaskKind::BuildMacro ||
+					Request.WorkClass == EVoxelWorkClass::Prefetch)
+				{
+					++CriticalAdmissionDeferrals;
+					continue;
+				}
+			}
 
 			if (!CanStartKind(Request.Kind))
 			{
@@ -987,6 +1026,9 @@ void FVoxelTaskScheduler::Pump()
 				if (TerrainPriorityBand(Candidate) == TerrainPriorityBand(Pending[BestIndex]) &&
 					Candidate.SourcePriority == Pending[BestIndex].SourcePriority &&
 					IsVisualWorkClass(Candidate.WorkClass) && Candidate.QueuedAt <= Deadline &&
+					(!bHasCriticalPending || Candidate.WorkClass == EVoxelWorkClass::Critical ||
+						(NonCriticalRunning < NonCriticalLimit && Candidate.Kind != EVoxelTaskKind::BuildSurface &&
+						Candidate.Kind != EVoxelTaskKind::BuildMacro && Candidate.WorkClass != EVoxelWorkClass::Prefetch)) &&
 					CanStartKind(Candidate.Kind) && Candidate.ReservedBytes <= Budget.MaxReservedBytes - ReservedBytes &&
 					(Oldest == INDEX_NONE || Candidate.QueuedAt < Pending[Oldest].QueuedAt))
 				{
