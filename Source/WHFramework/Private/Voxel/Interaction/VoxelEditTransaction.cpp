@@ -1,5 +1,6 @@
 #include "Voxel/Interaction/VoxelEditTransaction.h"
 #include "Voxel/Save/VoxelBlockEntityCodec.h"
+#include "Voxel/Chunks/VoxelSectionKey.h"
 bool FVoxelEditTransaction::Build(const FVoxelWorldRuntime&W,const FVoxelRegistrySnapshot&R,const FVoxelShapeRegistry&Shapes,
     const FVoxelTraceResult&H,EVoxelEditAction Action,uint16 PlaceType,const FVector&View,double Size,FVoxelInteractionPlan&O,FString&Error)
 {
