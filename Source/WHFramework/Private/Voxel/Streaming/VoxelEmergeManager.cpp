@@ -8,12 +8,16 @@ FVoxelEmergeManager::FVoxelEmergeManager(
 	FVoxelWorldRuntime& InRuntime,
 	FVoxelTaskScheduler& InScheduler,
 	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator,
+	TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
+	TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> InCache,
 	const FVoxelRegionStore& InRegionStore,
 	const FVoxelWorldManifest& InManifest,
 	TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry)
 	: Runtime(InRuntime)
 	, Scheduler(InScheduler)
 	, Generator(InGenerator)
+	, PlanCoordinator(MakeUnique<FVoxelGenerationPlanCoordinator>(InScheduler,
+		InConfig, InCache, InRuntime.Epoch()))
 	, RegionStore(InRegionStore)
 	, Manifest(InManifest)
 	, Registry(InRegistry)
@@ -131,6 +135,7 @@ bool FVoxelEmergeManager::OnTask(
 			*InResult.Stamp.Section.ToString(), static_cast<int32>(InResult.Kind), *InResult.Error);
 		Section->Status =
 			EVoxelSectionStatus::Failed;
+		Section->Error = InResult.Error;
 
 		return true;
 	}
@@ -149,6 +154,7 @@ bool FVoxelEmergeManager::OnTask(
 		{
 			Section->Status =
 				EVoxelSectionStatus::Failed;
+			Section->Error = Error;
 		}
 
 		return true;
@@ -162,6 +168,7 @@ bool FVoxelEmergeManager::OnTask(
 	{
 		Section->Status =
 			EVoxelSectionStatus::Failed;
+		Section->Error = Error;
 
 		return true;
 	}
@@ -213,6 +220,8 @@ void FVoxelEmergeManager::SetRemoteChangeState(
 void FVoxelEmergeManager::Reset()
 {
 	CurrentDemand.Reset();
+	WaitingPlanSections.Reset();
+	PlanCoordinator->Reset();
 	RemoteChangeStates.Reset();
 	OrderedKeys.Reset();
 
@@ -222,7 +231,8 @@ void FVoxelEmergeManager::Reset()
 
 EVoxelWorkClass FVoxelEmergeManager::ResolveWorkClass(const FVoxelExactDemand& InDemand)
 {
-	if (InDemand.bMovementCriticalCollision || InDemand.bWarmupCollision) return EVoxelWorkClass::Critical;
+	if (InDemand.bMovementCriticalCollision || InDemand.bMovementCriticalFine ||
+		InDemand.bWarmupCollision) return EVoxelWorkClass::Critical;
 	if (InDemand.bWarmupData) return EVoxelWorkClass::Warmup;
 	return InDemand.bExact || InDemand.bCollision || InDemand.bSimulation
 		? EVoxelWorkClass::ExactData : EVoxelWorkClass::Visible;
@@ -234,6 +244,10 @@ void FVoxelEmergeManager::RebuildDemand(
 {
 	CurrentDemand = InInterest.Exact;
 	OrderedKeys = InInterest.ExactOrder;
+	for (auto Iterator = WaitingPlanSections.CreateIterator(); Iterator; ++Iterator)
+	{
+		if (!CurrentDemand.Contains(Iterator.Key())) Iterator.RemoveCurrent();
+	}
 	Scheduler.UpdatePriorities([this](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp,
 		EVoxelWorkClass& WorkClass, int32& Priority,
 		double& Distance, double& Forward)
@@ -315,6 +329,37 @@ bool FVoxelEmergeManager::RequestBase(
 	{
 		return false;
 	}
+	TArray<FVoxelGenerationPlanDependency>* Dependencies = WaitingPlanSections.Find(InKey);
+	if (!Dependencies)
+	{
+		TArray<FVoxelGenerationPlanDependency> Gathered;
+		const FIntVector Min = InKey * 16;
+		FString Error;
+		if (!PlanCoordinator->GatherForBounds({ Min, Min + FIntVector(16) },
+			Gathered, Error))
+		{
+			InSection.Status = EVoxelSectionStatus::Failed;
+			InSection.Error = MoveTemp(Error);
+			UE_LOG(LogTemp, Error, TEXT("Voxel plan preflight failed: section=%s error=%s"),
+				*InKey.ToString(), *InSection.Error);
+			return false;
+		}
+		Dependencies = &WaitingPlanSections.Add(InKey, MoveTemp(Gathered));
+	}
+	const FVoxelGenerationDependencyStatus PlanStatus = PlanCoordinator->Ensure(*Dependencies,
+		ResolveWorkClass(InDemand), InDemand.Priority,
+		InDemand.DistanceCells, InDemand.ForwardScore);
+	if (PlanStatus.bFailed)
+	{
+		InSection.Status = EVoxelSectionStatus::Failed;
+		InSection.Error = PlanStatus.Error;
+		WaitingPlanSections.Remove(InKey);
+		UE_LOG(LogTemp, Error, TEXT("Voxel plan dependency failed: section=%s error=%s"),
+			*InKey.ToString(), *InSection.Error);
+		return false;
+	}
+	if (!PlanStatus.bReady) return false;
+	WaitingPlanSections.Remove(InKey);
 
 	FVoxelTaskRequest Request;
 	Request.Kind =

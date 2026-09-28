@@ -51,6 +51,7 @@ enum class EVoxelTaskKind : uint8
 	// 不参与 Voxel 内部 ApplyTask switch。
 	ProjectBackground,
 	BuildInterest,
+	BuildGenerationPlan,
 	GenerateVoxelProxy,
 	GenerateSurface,
 	GenerateMacro

@@ -1,9 +1,197 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "HAL/PlatformProcess.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "Voxel/Generation/VoxelGenerationPlanCoordinator.h"
 #include "Voxel/Generation/VoxelGenerationQuery.h"
 #include "Voxel/Tests/VoxelTestUtilities.h"
+#include "Async/Async.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelGenerationCacheNoWaitTest,
+	"WHFramework.Voxel.Generation.CacheNoWait",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelGenerationCacheNoWaitTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelGenerationPlanCache Cache(false, false);
+	FVoxelHydrologyRegionKey Key;
+	Key.Coordinate = FIntPoint(2, -3);
+	TAtomic<bool> BuildEntered(false);
+	TAtomic<bool> ReleaseBuild(false);
+	TFuture<bool> Owner = Async(EAsyncExecution::ThreadPool,
+		[&Cache, &Key, &BuildEntered, &ReleaseBuild]()
+		{
+			FVoxelHydrologyPlanPtr Plan;
+			FString Error;
+			return Cache.GetOrBuildHydrology(Key,
+				[&BuildEntered, &ReleaseBuild](FVoxelHydrologyPlan&, FString&)
+				{
+					BuildEntered.Store(true);
+					while (!ReleaseBuild.Load()) FPlatformProcess::Sleep(0.001f);
+					return true;
+				}, Plan, Error);
+		});
+	const double Deadline = FPlatformTime::Seconds() + 5.0;
+	while (!BuildEntered.Load() && FPlatformTime::Seconds() < Deadline)
+	{
+		FPlatformProcess::Sleep(0.001f);
+	}
+	FVoxelHydrologyPlanPtr PendingPlan;
+	FString PendingError;
+	const bool bWaited = Cache.GetOrBuildHydrology(Key,
+		[](FVoxelHydrologyPlan&, FString&) { return true; },
+		PendingPlan, PendingError);
+	ReleaseBuild.Store(true);
+	const bool bOwnerSucceeded = Owner.Get();
+	TestTrue(TEXT("Owner begins building"), BuildEntered.Load());
+	TestFalse(TEXT("Concurrent consumer returns without waiting"), bWaited);
+	TestTrue(TEXT("Concurrent consumer reports pending dependency"),
+		PendingError.StartsWith(TEXT("DependencyNotReady")));
+	TestTrue(TEXT("Owner completes"), bOwnerSucceeded);
+	TestTrue(TEXT("Completed plan is cached"), Cache.FindHydrology(Key, PendingPlan));
+	TestEqual(TEXT("No cache gate wait is recorded"), Cache.GetStats().GateWaitCount, 0ull);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelGenerationPlanCoordinatorTest,
+	"WHFramework.Voxel.Generation.PlanCoordinator",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelGenerationPlanCoordinatorTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const auto Config = VoxelTest::MakeGenerationConfig();
+	const auto Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
+	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskBudget Budget;
+	Budget.MaxConcurrentTasks = 1;
+	Scheduler.SetBudget(Budget);
+	FVoxelGenerationPlanCoordinator Coordinator(Scheduler, Config, Cache, 7);
+	FVoxelGenerationPlanDependency Dependency;
+	Dependency.Kind = EVoxelGenerationPlanKind::Hydrology;
+	Dependency.HydrologyKey.Coordinate = FIntPoint(0, 0);
+	Dependency.StableHash = 713;
+	const TArray<FVoxelGenerationPlanDependency> Dependencies { Dependency };
+	const FVoxelGenerationDependencyStatus First = Coordinator.Ensure(
+		Dependencies, EVoxelWorkClass::Visible, 3, 128.0, 0.0);
+	TestFalse(TEXT("First consumer waits outside worker"), First.bReady);
+	TestEqual(TEXT("One task builds the shared plan"), Scheduler.ActiveCount(), 1);
+	Coordinator.Ensure(Dependencies, EVoxelWorkClass::Critical, 0, 8.0, 1.0);
+	TestEqual(TEXT("Second consumer reuses queued task"), Scheduler.ActiveCount(), 1);
+	const FVoxelTaskDiagnostics Priority = Scheduler.GetDiagnostics();
+	TestEqual(TEXT("Priority donation promotes queued or running plan"),
+		Priority.CriticalPending + Priority.CriticalRunning, 1);
+	FVoxelGenerationDependencyStatus Status;
+	const double Deadline = FPlatformTime::Seconds() + 30.0;
+	do
+	{
+		Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
+		Status = Coordinator.Ensure(Dependencies, EVoxelWorkClass::Critical, 0, 8.0, 1.0);
+		if (!Status.bReady) FPlatformProcess::Sleep(0.001f);
+	} while (!Status.bReady && !Status.bFailed && FPlatformTime::Seconds() < Deadline);
+	Scheduler.StopAndJoin();
+	TestFalse(TEXT("Shared plan succeeds"), Status.bFailed);
+	TestTrue(TEXT("Shared plan becomes ready"), Status.bReady);
+	TestEqual(TEXT("Single plan build does not wait on cache gate"),
+		Cache->GetStats().GateWaitCount, 0ull);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelGenerationPlanPreflightTest,
+	"WHFramework.Voxel.Generation.PlanPreflight",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelGenerationPlanPreflightTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const auto Config = VoxelTest::MakeGenerationConfig();
+	const auto Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>(false);
+	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskBudget Budget;
+	Budget.MaxConcurrentTasks = 4;
+	Budget.CriticalReservedTasks = 1;
+	Scheduler.SetBudget(Budget);
+	FVoxelGenerationPlanCoordinator Coordinator(Scheduler, Config, Cache, 11);
+	TArray<FVoxelGenerationPlanDependency> Dependencies;
+	FString Error;
+	if (!TestTrue(TEXT("Section dependencies are gathered"),
+		Coordinator.GatherForBounds({ FIntVector::ZeroValue, FIntVector(16) },
+			Dependencies, Error))) return false;
+	TestTrue(TEXT("Section has shared plan dependencies"), !Dependencies.IsEmpty());
+	FVoxelGenerationDependencyStatus Status;
+	const double Deadline = FPlatformTime::Seconds() + 90.0;
+	do
+	{
+		Status = Coordinator.Ensure(Dependencies, EVoxelWorkClass::Critical, 0, 0.0, 1.0);
+		Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
+		if (!Status.bReady && !Status.bFailed) FPlatformProcess::Sleep(0.001f);
+	} while (!Status.bReady && !Status.bFailed && FPlatformTime::Seconds() < Deadline);
+	Scheduler.StopAndJoin();
+	if (!TestFalse(TEXT("Section preflight does not fail: ") + Status.Error,
+		Status.bFailed) ||
+		!TestTrue(TEXT("Section preflight completes"), Status.bReady)) return false;
+	const FVoxelGenerationPipeline PreflightGenerator(Config, Cache, nullptr, true);
+	TArray<FVoxelBlockState> PreflightBlocks;
+	TArray<FVoxelBlockState> ReferenceBlocks;
+	FString ReferenceError;
+	const auto ReferenceGenerator = VoxelTest::MakeGenerator();
+	TFuture<bool> Generated = Async(EAsyncExecution::ThreadPool,
+		[&PreflightGenerator, &PreflightBlocks, &ReferenceBlocks,
+			&Error, &ReferenceError, ReferenceGenerator]()
+		{
+			return PreflightGenerator.GenerateSection(FIntVector::ZeroValue,
+				PreflightBlocks, Error) &&
+				ReferenceGenerator->GenerateSection(FIntVector::ZeroValue,
+					ReferenceBlocks, ReferenceError);
+		});
+	if (!TestTrue(TEXT("Worker exact generation consumes ready plans"),
+		Generated.Get()))
+	{
+		AddError(Error);
+		if (!ReferenceError.IsEmpty()) AddError(ReferenceError);
+		return false;
+	}
+	TestEqual(TEXT("Preflight preserves exact generation"),
+		VoxelTest::HashBlocks(PreflightBlocks), VoxelTest::HashBlocks(ReferenceBlocks));
+	TestEqual(TEXT("Preflight avoids cache gate waits"), Cache->GetStats().GateWaitCount, 0ull);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelGenerationPlanKeysTest,
+	"WHFramework.Voxel.Generation.PlanKeys",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelGenerationPlanKeysTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelGenerationSettings Settings;
+	Settings.CaveSpacing = 256;
+	Settings.Ecology.Tree.CrownRadius = 0;
+	Settings.Ecology.Grass.PatchRadius = 0;
+	const FVoxelGenerationBounds Bounds {
+		FIntVector(-16, -16, 0), FIntVector(0, 0, 16)
+	};
+	const FVoxelGenerationPlanKeys Keys = FVoxelGenerationQuery::GatherPlanKeys(
+		Bounds, Settings);
+	TestEqual(TEXT("Negative boundary uses nine plan tiles"), Keys.Tiles.Num(), 9);
+	TestTrue(TEXT("Negative owner tile included"), Keys.Tiles.Contains(
+		FVoxelGenerationTileKey { FIntVector(-1, -1, 0) }));
+	TestTrue(TEXT("Positive neighbor tile included"), Keys.Tiles.Contains(
+		FVoxelGenerationTileKey { FIntVector(0, 0, 0) }));
+	TestEqual(TEXT("Ecology margin crosses four tiles"), Keys.EcologyTiles.Num(), 4);
+	TestTrue(TEXT("Negative ecology tile included"), Keys.EcologyTiles.Contains(
+		FVoxelEcologyTileKey { FIntPoint(-1, -1) }));
+	TArray<FVoxelGenerationTileKey> StructureTiles;
+	FVoxelGenerationQuery::GatherStructureTiles(Bounds, StructureTiles);
+	TestEqual(TEXT("Structure preflight matches plan margin"), StructureTiles.Num(), 9);
+	return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FVoxelGenerationMathDeterminismTest,

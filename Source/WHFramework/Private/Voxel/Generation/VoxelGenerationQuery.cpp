@@ -33,12 +33,325 @@ namespace
 	}
 }
 
+FVoxelGenerationPlanKeys FVoxelGenerationQuery::GatherPlanKeys(
+	const FVoxelGenerationBounds& InBounds,
+	const FVoxelGenerationSettings& InSettings)
+{
+	FVoxelGenerationPlanKeys Keys;
+	const FVoxelGenerationBounds PlanningBounds = InBounds.Expand(
+		FMath::Max(InSettings.CaveSpacing, GenerationPlanTileSide));
+	const int32 MinTileX = VoxelGeneration::FloorDivide(
+		PlanningBounds.Min.X, GenerationPlanTileSide);
+	const int32 MaxTileX = VoxelGeneration::FloorDivide(
+		PlanningBounds.Max.X - 1, GenerationPlanTileSide);
+	const int32 MinTileY = VoxelGeneration::FloorDivide(
+		PlanningBounds.Min.Y, GenerationPlanTileSide);
+	const int32 MaxTileY = VoxelGeneration::FloorDivide(
+		PlanningBounds.Max.Y - 1, GenerationPlanTileSide);
+	for (int32 Y = MinTileY; Y <= MaxTileY; ++Y)
+	{
+		for (int32 X = MinTileX; X <= MaxTileX; ++X)
+		{
+			Keys.Tiles.Add({ FIntVector(X, Y, 0) });
+		}
+	}
+	const int32 EcologyMargin = FMath::Max(
+		InSettings.Ecology.Tree.CrownRadius,
+		InSettings.Ecology.Grass.PatchRadius) + 2;
+	const int32 EcologyMinX = VoxelGeneration::FloorDivide(
+		InBounds.Min.X - EcologyMargin, EcologyTileSide);
+	const int32 EcologyMaxX = VoxelGeneration::FloorDivide(
+		InBounds.Max.X - 1 + EcologyMargin, EcologyTileSide);
+	const int32 EcologyMinY = VoxelGeneration::FloorDivide(
+		InBounds.Min.Y - EcologyMargin, EcologyTileSide);
+	const int32 EcologyMaxY = VoxelGeneration::FloorDivide(
+		InBounds.Max.Y - 1 + EcologyMargin, EcologyTileSide);
+	for (int32 Y = EcologyMinY; Y <= EcologyMaxY; ++Y)
+	{
+		for (int32 X = EcologyMinX; X <= EcologyMaxX; ++X)
+		{
+			Keys.EcologyTiles.Add({ FIntPoint(X, Y) });
+		}
+	}
+	return Keys;
+}
+
+void FVoxelGenerationQuery::GatherStructureTiles(
+	const FVoxelGenerationBounds& InBounds,
+	TArray<FVoxelGenerationTileKey>& OutTiles)
+{
+	OutTiles.Reset();
+	const FVoxelGenerationBounds PlanningBounds = InBounds.Expand(GenerationPlanTileSide);
+	const int32 MinTileX = VoxelGeneration::FloorDivide(
+		PlanningBounds.Min.X, GenerationPlanTileSide);
+	const int32 MaxTileX = VoxelGeneration::FloorDivide(
+		PlanningBounds.Max.X - 1, GenerationPlanTileSide);
+	const int32 MinTileY = VoxelGeneration::FloorDivide(
+		PlanningBounds.Min.Y, GenerationPlanTileSide);
+	const int32 MaxTileY = VoxelGeneration::FloorDivide(
+		PlanningBounds.Max.Y - 1, GenerationPlanTileSide);
+	for (int32 Y = MinTileY; Y <= MaxTileY; ++Y)
+	{
+		for (int32 X = MinTileX; X <= MaxTileX; ++X)
+		{
+			OutTiles.Add({ FIntVector(X, Y, 0) });
+		}
+	}
+}
+
+FVoxelHydrologyRegionKey FVoxelGenerationQuery::HydrologyKeyForVoxel(
+	const int32 InX,
+	const int32 InY,
+	const FVoxelGenerationSettings& InSettings)
+{
+	const int32 CellSize = FMath::Max(1, InSettings.HydrologyCellSize);
+	const int32 RegionSide = FMath::Max(1, InSettings.HydrologyRegionSide);
+	return { FIntPoint(
+		VoxelGeneration::FloorDivide(VoxelGeneration::FloorDivide(InX, CellSize), RegionSide),
+		VoxelGeneration::FloorDivide(VoxelGeneration::FloorDivide(InY, CellSize), RegionSide)) };
+}
+
+bool FVoxelGenerationQuery::SamplePlanColumn(
+	const FIntVector& InPosition,
+	FVoxelColumnSample& OutColumn,
+	const TAtomic<bool>* InCancel) const
+{
+	FString Error;
+	if (SampleEnvironmentColumn(InPosition.X, InPosition.Y,
+		OutColumn, Error, InCancel)) return true;
+	PlanSampleError = Error.IsEmpty()
+		? TEXT("Voxel plan column sampling failed") : MoveTemp(Error);
+	return false;
+}
+
+bool FVoxelGenerationQuery::SamplePlanSymbol(
+	const FIntVector& InPosition,
+	uint32& OutSymbol,
+	const TAtomic<bool>* InCancel) const
+{
+	FVoxelColumnSample Column;
+	if (!SamplePlanColumn(InPosition, Column, InCancel)) return false;
+	const int32 Density = Terrain->SampleDensityQ16(InPosition,
+		{ Column.SurfaceZ, Column.DensityHeight, Column.SlopePermille });
+	OutSymbol = Density > 0 ? Config->Recipe->Palette.Stone : Config->Recipe->Palette.Air;
+	return true;
+}
+
+bool FVoxelGenerationQuery::EnsureHydrologyPlan(
+	const FVoxelHydrologyRegionKey& InKey,
+	FVoxelHydrologyPlanPtr& OutPlan,
+	FString& OutError,
+	const TAtomic<bool>* InCancel) const
+{
+	if (bRequireReadyPlans && Cache->FindHydrology(InKey, OutPlan))
+	{
+		OutError.Reset();
+		return true;
+	}
+	if (bRequireReadyPlans)
+	{
+		OutError = TEXT("DependencyNotReady: Hydrology");
+		return false;
+	}
+	return Cache->GetOrBuildHydrology(InKey,
+		[this, InKey, InCancel](FVoxelHydrologyPlan& Plan, FString& Error)
+		{
+			return Hydrology->BuildPlan(InKey, Plan, Error, InCancel);
+		}, OutPlan, OutError, InCancel);
+}
+
+bool FVoxelGenerationQuery::EnsureCavePlan(
+	const FVoxelGenerationTileKey& InKey,
+	FVoxelCavePlanPtr& OutPlan,
+	FString& OutError,
+	const TAtomic<bool>* InCancel) const
+{
+	if (bRequireReadyPlans)
+	{
+		if (Cache->FindCave(InKey, OutPlan))
+		{
+			OutError.Reset();
+			return true;
+		}
+		OutError = TEXT("DependencyNotReady: Cave");
+		return false;
+	}
+	const FVoxelGenerationBounds Bounds = MakeTileBounds(InKey);
+	return Cache->GetOrBuildCave(InKey,
+		[this, Bounds, InCancel](FVoxelCavePlan& Plan, FString& Error)
+		{
+			PlanSampleError.Reset();
+			auto ColumnSampler = [this, InCancel](
+				const FIntVector& Position, FVoxelColumnSample& Column)
+			{
+				return SamplePlanColumn(Position, Column, InCancel);
+			};
+			const bool bBuilt = Cave->BuildPlan(Bounds, ColumnSampler, Plan, Error, InCancel);
+			if (!PlanSampleError.IsEmpty()) Error = PlanSampleError;
+			return bBuilt && PlanSampleError.IsEmpty();
+		}, OutPlan, OutError, InCancel);
+}
+
+bool FVoxelGenerationQuery::EnsureStructurePlan(
+	const FVoxelGenerationTileKey& InKey,
+	FVoxelStructurePlanPtr& OutPlan,
+	FString& OutError,
+	const TAtomic<bool>* InCancel) const
+{
+	if (bRequireReadyPlans)
+	{
+		if (Cache->FindStructure(InKey, OutPlan))
+		{
+			OutError.Reset();
+			return true;
+		}
+		OutError = TEXT("DependencyNotReady: Structure");
+		return false;
+	}
+	const FVoxelGenerationBounds Bounds = MakeTileBounds(InKey);
+	return Cache->GetOrBuildStructure(InKey,
+		[this, Bounds, InCancel](FVoxelStructurePlan& Plan, FString& Error)
+		{
+			PlanSampleError.Reset();
+			auto ColumnSampler = [this, InCancel](
+				const FIntVector& Position, FVoxelColumnSample& Column)
+			{
+				return SamplePlanColumn(Position, Column, InCancel);
+			};
+			TArray<FVoxelStructureInstance> Instances;
+			FVoxelStructurePlanner Planner(Config->Recipe.ToSharedRef());
+			const bool bPlanned = Planner.Plan(Bounds, ColumnSampler, Instances, Error, InCancel);
+			if (!PlanSampleError.IsEmpty()) Error = PlanSampleError;
+			if (!bPlanned || !PlanSampleError.IsEmpty()) return false;
+			Plan = FVoxelStructurePlan();
+			Plan.Bounds = Bounds;
+			for (const FVoxelStructureInstance& Instance : Instances)
+			{
+				const int32 DefinitionIndex = Config->Recipe->FindStructure(Instance.DefinitionId);
+				if (!Config->Recipe->Structures.IsValidIndex(DefinitionIndex)) continue;
+				const EVoxelGenerationStage Stage = Config->Recipe->Structures[DefinitionIndex].Stage;
+				for (const FVoxelStructureClearVolume& Clear : Instance.ClearVolumes)
+				{
+					Plan.Clears.Add({ Clear.Bounds, Stage, Instance.Id });
+				}
+				for (const FVoxelStructureCellWrite& Write : Instance.Writes)
+				{
+					Plan.Writes.Add({ Write.Position, Write.Value, Stage, Instance.Id });
+				}
+				Plan.Details.Append(Instance.Details);
+			}
+			Plan.Finalize();
+			Error.Reset();
+			return true;
+		}, OutPlan, OutError, InCancel);
+}
+
+bool FVoxelGenerationQuery::EnsureFeaturePlan(
+	const FVoxelGenerationTileKey& InKey,
+	FVoxelFeaturePlanPtr& OutPlan,
+	FString& OutError,
+	const TAtomic<bool>* InCancel) const
+{
+	if (bRequireReadyPlans)
+	{
+		if (Cache->FindFeature(InKey, OutPlan))
+		{
+			OutError.Reset();
+			return true;
+		}
+		OutError = TEXT("DependencyNotReady: Feature");
+		return false;
+	}
+	const FVoxelGenerationBounds Bounds = MakeTileBounds(InKey);
+	return Cache->GetOrBuildFeature(InKey,
+		[this, Bounds, InCancel](FVoxelFeaturePlan& Plan, FString& Error)
+		{
+			PlanSampleError.Reset();
+			auto ColumnSampler = [this, InCancel](
+				const FIntVector& Position, FVoxelColumnSample& Column)
+			{
+				return SamplePlanColumn(Position, Column, InCancel);
+			};
+			auto SymbolSampler = [this, InCancel](
+				const FIntVector& Position, uint32& Symbol)
+			{
+				return SamplePlanSymbol(Position, Symbol, InCancel);
+			};
+			TArray<FVoxelFeatureInstance> Instances;
+			FVoxelFeaturePlanner Planner(Config->Recipe.ToSharedRef());
+			const bool bPlanned = Planner.Plan(Bounds, ColumnSampler, SymbolSampler,
+				Instances, Error, InCancel);
+			if (!PlanSampleError.IsEmpty()) Error = PlanSampleError;
+			if (!bPlanned || !PlanSampleError.IsEmpty()) return false;
+			Plan = FVoxelFeaturePlan();
+			Plan.Bounds = Bounds;
+			for (const FVoxelFeatureInstance& Instance : Instances)
+			{
+				const int32 DefinitionIndex = Config->Recipe->FindFeature(Instance.DefinitionId);
+				if (!Config->Recipe->Features.IsValidIndex(DefinitionIndex)) continue;
+				const EVoxelGenerationStage Stage = Config->Recipe->Features[DefinitionIndex].Stage;
+				for (const FVoxelFeatureCellWrite& Write : Instance.Writes)
+				{
+					Plan.Writes.Add({ Write.Position, Write.Value, Stage, Instance.Id });
+				}
+			}
+			Plan.Finalize();
+			Error.Reset();
+			return true;
+		}, OutPlan, OutError, InCancel);
+}
+
+bool FVoxelGenerationQuery::EnsureEcologyPlan(
+	const FVoxelEcologyTileKey& InKey,
+	FVoxelEcologyPlanPtr& OutPlan,
+	FString& OutError,
+	const TAtomic<bool>* InCancel) const
+{
+	if (bRequireReadyPlans)
+	{
+		if (Cache->FindEcology(InKey, OutPlan))
+		{
+			OutError.Reset();
+			return true;
+		}
+		OutError = TEXT("DependencyNotReady: Ecology");
+		return false;
+	}
+	const FIntPoint MinXY = InKey.Coordinate * EcologyTileSide;
+	const FVoxelGenerationBounds Bounds {
+		FIntVector(MinXY.X, MinXY.Y, Config->Recipe->Settings.MinZ),
+		FIntVector(MinXY.X + EcologyTileSide, MinXY.Y + EcologyTileSide,
+			Config->Recipe->Settings.MaxZ)
+	};
+	return Cache->GetOrBuildEcology(InKey,
+		[this, Bounds, InCancel](FVoxelEcologyPlan& Plan, FString& Error)
+		{
+			PlanSampleError.Reset();
+			auto ColumnSampler = [this, InCancel](
+				const FIntVector& Position, FVoxelColumnSample& Column)
+			{
+				return SamplePlanColumn(Position, Column, InCancel);
+			};
+			auto SymbolSampler = [this, InCancel](
+				const FIntVector& Position, uint32& Symbol)
+			{
+				return SamplePlanSymbol(Position, Symbol, InCancel);
+			};
+			const bool bBuilt = Ecology->BuildPlan(Bounds, ColumnSampler, SymbolSampler,
+				Plan, Error, InCancel);
+			if (!PlanSampleError.IsEmpty()) Error = PlanSampleError;
+			return bBuilt && PlanSampleError.IsEmpty();
+		}, OutPlan, OutError, InCancel);
+}
+
 bool FVoxelGenerationQuery::Create(
 	TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
 	TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> InCache,
 	FVoxelGenerationQuery& OutQuery,
 	FString& OutError,
-	const bool bInUseColumnCache)
+	const bool bInUseColumnCache,
+	const bool bInRequireReadyHydrology,
+	const bool bInRequireReadyPlans)
 {
 	if (!InConfig->IsValid() ||
 		!InConfig->Recipe)
@@ -54,6 +367,8 @@ bool FVoxelGenerationQuery::Create(
 	Query.Config = InConfig;
 	Query.Cache = InCache;
 	Query.bUseColumnCache = bInUseColumnCache;
+	Query.bRequireReadyHydrology = bInRequireReadyHydrology;
+	Query.bRequireReadyPlans = bInRequireReadyPlans;
 
 	Query.Climate =
 		MakeShared<
@@ -174,359 +489,31 @@ bool FVoxelGenerationQuery::Prepare(
 	const FVoxelGenerationSettings& Settings =
 		Config->Recipe->Settings;
 
-	const int32 PlanningMargin =
-		FMath::Max(
-			Settings.CaveSpacing,
-			VoxelGenerationPlanTileSide);
+	const FVoxelGenerationPlanKeys PlanKeys = GatherPlanKeys(InBounds, Settings);
 
-	const FVoxelGenerationBounds PlanningBounds =
-		InBounds.Expand(
-			PlanningMargin);
-
-	auto ColumnSampler =
-		[this, InCancel](
-			const FIntVector& InPosition,
-			FVoxelColumnSample& OutColumn)
-		{
-			FString Error;
-			return SampleEnvironmentColumn(
-				InPosition.X,
-				InPosition.Y,
-				OutColumn,
-				Error,
-				InCancel);
-		};
-
-	auto SymbolSampler =
-		[this, InCancel](
-			const FIntVector& InPosition,
-			uint32& OutSymbol)
-		{
-			FVoxelColumnSample Column;
-
-			FString Error;
-			if (!SampleEnvironmentColumn(
-				InPosition.X,
-				InPosition.Y,
-				Column,
-				Error,
-				InCancel))
-			{
-				return false;
-			}
-
-			const int32 Density =
-				Terrain->SampleDensityQ16(
-					InPosition,
-					{
-						Column.SurfaceZ,
-						Column.DensityHeight,
-						Column.SlopePermille
-					});
-
-			OutSymbol =
-				Density > 0
-					? Config->Recipe->
-						Palette.Stone
-					: Config->Recipe->
-						Palette.Air;
-
-			return true;
-		};
-
-	const int32 MinTileX =
-		VoxelGeneration::FloorDivide(
-			PlanningBounds.Min.X,
-			VoxelGenerationPlanTileSide);
-
-	const int32 MaxTileX =
-		VoxelGeneration::FloorDivide(
-			PlanningBounds.Max.X - 1,
-			VoxelGenerationPlanTileSide);
-
-	const int32 MinTileY =
-		VoxelGeneration::FloorDivide(
-			PlanningBounds.Min.Y,
-			VoxelGenerationPlanTileSide);
-
-	const int32 MaxTileY =
-		VoxelGeneration::FloorDivide(
-			PlanningBounds.Max.Y - 1,
-			VoxelGenerationPlanTileSide);
-
-	for (int32 TileY = MinTileY;
-		TileY <= MaxTileY;
-		++TileY)
+	for (const FVoxelGenerationTileKey& Key : PlanKeys.Tiles)
 	{
-		for (int32 TileX = MinTileX;
-			TileX <= MaxTileX;
-			++TileX)
+		if (InCancel && InCancel->Load())
 		{
-			if (InCancel &&
-				InCancel->Load())
-			{
-				OutError =
-					TEXT("Canceled");
-
-				return false;
-			}
-
-			const FVoxelGenerationTileKey Key {
-				FIntVector(
-					TileX,
-					TileY,
-					0)
-			};
-
-			const FVoxelGenerationBounds TileBounds =
-				MakeTileBounds(
-					Key);
-
-			FVoxelCavePlanPtr CavePlan;
-
-			if (!Cache->GetOrBuildCave(
-				Key,
-				[
-					this,
-					TileBounds,
-					&ColumnSampler,
-					InCancel
-				](
-					FVoxelCavePlan& OutPlan,
-					FString& BuildError)
-				{
-					return Cave->BuildPlan(
-						TileBounds,
-						ColumnSampler,
-						OutPlan,
-						BuildError,
-						InCancel);
-				},
-				CavePlan,
-				OutError,
-				InCancel))
-			{
-				return false;
-			}
-
-			PreparedCaves.Add(
-				CavePlan);
-
-			FVoxelStructurePlanPtr StructurePlan;
-
-			if (!Cache->GetOrBuildStructure(
-				Key,
-				[
-					this,
-					TileBounds,
-					&ColumnSampler,
-					InCancel
-				](
-					FVoxelStructurePlan& OutPlan,
-					FString& BuildError)
-				{
-					TArray<FVoxelStructureInstance> Instances;
-					FVoxelStructurePlanner Planner(
-						Config->Recipe.ToSharedRef());
-
-					if (!Planner.Plan(
-						TileBounds,
-						ColumnSampler,
-						Instances,
-						BuildError,
-						InCancel))
-					{
-						return false;
-					}
-
-					OutPlan =
-						FVoxelStructurePlan();
-
-					OutPlan.Bounds =
-						TileBounds;
-
-					for (const FVoxelStructureInstance& Instance :
-						Instances)
-					{
-						const int32 DefinitionIndex =
-							Config->Recipe->
-								FindStructure(
-									Instance.
-										DefinitionId);
-
-						if (!Config->Recipe->
-							Structures.
-								IsValidIndex(
-									DefinitionIndex))
-						{
-							continue;
-						}
-
-						const EVoxelGenerationStage Stage =
-							Config->Recipe->
-								Structures[
-									DefinitionIndex].
-									Stage;
-
-						for (const FVoxelStructureClearVolume& Clear :
-							Instance.ClearVolumes)
-						{
-							OutPlan.Clears.Add({
-								Clear.Bounds,
-								Stage,
-								Instance.Id
-							});
-						}
-
-						for (const FVoxelStructureCellWrite& Write :
-							Instance.Writes)
-						{
-							OutPlan.Writes.Add({
-								Write.Position,
-								Write.Value,
-								Stage,
-								Instance.Id
-							});
-						}
-
-						OutPlan.Details.Append(
-							Instance.Details);
-					}
-
-					OutPlan.Finalize();
-
-					BuildError.Reset();
-					return true;
-				},
-				StructurePlan,
-				OutError,
-				InCancel))
-			{
-				return false;
-			}
-
-			PreparedStructures.Add(
-				StructurePlan);
-
-			FVoxelFeaturePlanPtr FeaturePlan;
-
-			if (!Cache->GetOrBuildFeature(
-				Key,
-				[
-					this,
-					TileBounds,
-					&ColumnSampler,
-					&SymbolSampler,
-					InCancel
-				](
-					FVoxelFeaturePlan& OutPlan,
-					FString& BuildError)
-				{
-					TArray<FVoxelFeatureInstance> Instances;
-					FVoxelFeaturePlanner Planner(
-						Config->Recipe.ToSharedRef());
-
-					if (!Planner.Plan(
-						TileBounds,
-						ColumnSampler,
-						SymbolSampler,
-						Instances,
-						BuildError,
-						InCancel))
-					{
-						return false;
-					}
-
-					OutPlan =
-						FVoxelFeaturePlan();
-
-					OutPlan.Bounds =
-						TileBounds;
-
-					for (const FVoxelFeatureInstance& Instance :
-						Instances)
-					{
-						const int32 DefinitionIndex =
-							Config->Recipe->
-								FindFeature(
-									Instance.
-										DefinitionId);
-
-						if (!Config->Recipe->
-							Features.
-								IsValidIndex(
-									DefinitionIndex))
-						{
-							continue;
-						}
-
-						const EVoxelGenerationStage Stage =
-							Config->Recipe->
-								Features[
-									DefinitionIndex].
-									Stage;
-
-						for (const FVoxelFeatureCellWrite& Write :
-							Instance.Writes)
-						{
-							OutPlan.Writes.Add({
-								Write.Position,
-								Write.Value,
-								Stage,
-								Instance.Id
-							});
-						}
-					}
-
-					OutPlan.Finalize();
-
-					BuildError.Reset();
-					return true;
-				},
-				FeaturePlan,
-				OutError,
-				InCancel))
-			{
-				return false;
-			}
-
-			PreparedFeatures.Add(
-				FeaturePlan);
+			OutError = TEXT("Canceled");
+			return false;
 		}
+		FVoxelCavePlanPtr CavePlan;
+		if (!EnsureCavePlan(Key, CavePlan, OutError, InCancel)) return false;
+		PreparedCaves.Add(CavePlan);
+		FVoxelStructurePlanPtr StructurePlan;
+		if (!EnsureStructurePlan(Key, StructurePlan, OutError, InCancel)) return false;
+		PreparedStructures.Add(StructurePlan);
+		FVoxelFeaturePlanPtr FeaturePlan;
+		if (!EnsureFeaturePlan(Key, FeaturePlan, OutError, InCancel)) return false;
+		PreparedFeatures.Add(FeaturePlan);
 	}
 
-	const int32 EcologyMargin = FMath::Max(
-		Config->Recipe->Settings.Ecology.Tree.CrownRadius,
-		Config->Recipe->Settings.Ecology.Grass.PatchRadius) + 2;
-	const int32 EcologyMinX = VoxelGeneration::FloorDivide(InBounds.Min.X - EcologyMargin, EcologyTileSide);
-	const int32 EcologyMaxX = VoxelGeneration::FloorDivide(InBounds.Max.X - 1 + EcologyMargin, EcologyTileSide);
-	const int32 EcologyMinY = VoxelGeneration::FloorDivide(InBounds.Min.Y - EcologyMargin, EcologyTileSide);
-	const int32 EcologyMaxY = VoxelGeneration::FloorDivide(InBounds.Max.Y - 1 + EcologyMargin, EcologyTileSide);
-	for (int32 TileY = EcologyMinY; TileY <= EcologyMaxY; ++TileY)
+	for (const FVoxelEcologyTileKey& Key : PlanKeys.EcologyTiles)
 	{
-		for (int32 TileX = EcologyMinX; TileX <= EcologyMaxX; ++TileX)
-		{
-			const FVoxelEcologyTileKey Key { FIntPoint(TileX, TileY) };
-			const FIntPoint MinXY = Key.Coordinate * EcologyTileSide;
-			const FVoxelGenerationBounds Bounds {
-				FIntVector(MinXY.X, MinXY.Y, Config->Recipe->Settings.MinZ),
-				FIntVector(MinXY.X + EcologyTileSide, MinXY.Y + EcologyTileSide, Config->Recipe->Settings.MaxZ)
-			};
-			FVoxelEcologyPlanPtr Plan;
-			if (!Cache->GetOrBuildEcology(
-				Key,
-				[this, Bounds, &ColumnSampler, &SymbolSampler, InCancel](FVoxelEcologyPlan& OutPlan, FString& BuildError)
-				{
-					return Ecology->BuildPlan(Bounds, ColumnSampler, SymbolSampler, OutPlan, BuildError, InCancel);
-				},
-				Plan,
-				OutError,
-				InCancel))
-			{
-				return false;
-			}
-			PreparedEcology.Add(Plan);
-		}
+		FVoxelEcologyPlanPtr Plan;
+		if (!EnsureEcologyPlan(Key, Plan, OutError, InCancel)) return false;
+		PreparedEcology.Add(Plan);
 	}
 
 	// 在查询准备阶段剔除无关计划，避免对每个方块重复遍历整圈瓦片的空查询。
@@ -551,83 +538,18 @@ bool FVoxelGenerationQuery::PrepareStructuresOnly(
 		return false;
 	}
 
-	auto ColumnSampler = [this, InCancel](
-		const FIntVector& InPosition,
-		FVoxelColumnSample& OutColumn)
+	TArray<FVoxelGenerationTileKey> StructureTiles;
+	GatherStructureTiles(InBounds, StructureTiles);
+	for (const FVoxelGenerationTileKey& Key : StructureTiles)
 	{
-		FString Error;
-		return SampleEnvironmentColumn(
-			InPosition.X,
-			InPosition.Y,
-			OutColumn,
-			Error,
-			InCancel);
-	};
-
-	const FVoxelGenerationBounds PlanningBounds = InBounds.Expand(VoxelGenerationPlanTileSide);
-	const int32 MinTileX = VoxelGeneration::FloorDivide(PlanningBounds.Min.X, VoxelGenerationPlanTileSide);
-	const int32 MaxTileX = VoxelGeneration::FloorDivide(PlanningBounds.Max.X - 1, VoxelGenerationPlanTileSide);
-	const int32 MinTileY = VoxelGeneration::FloorDivide(PlanningBounds.Min.Y, VoxelGenerationPlanTileSide);
-	const int32 MaxTileY = VoxelGeneration::FloorDivide(PlanningBounds.Max.Y - 1, VoxelGenerationPlanTileSide);
-
-	for (int32 TileY = MinTileY; TileY <= MaxTileY; ++TileY)
-	{
-		for (int32 TileX = MinTileX; TileX <= MaxTileX; ++TileX)
+		if (InCancel && InCancel->Load())
 		{
-			if (InCancel && InCancel->Load())
-			{
-				OutError = TEXT("Canceled");
-				return false;
-			}
-
-			const FVoxelGenerationTileKey Key { FIntVector(TileX, TileY, 0) };
-			const FVoxelGenerationBounds TileBounds = MakeTileBounds(Key);
-			FVoxelStructurePlanPtr StructurePlan;
-			if (!Cache->GetOrBuildStructure(
-				Key,
-				[this, TileBounds, &ColumnSampler, InCancel](FVoxelStructurePlan& OutPlan, FString& BuildError)
-				{
-					TArray<FVoxelStructureInstance> Instances;
-					FVoxelStructurePlanner Planner(Config->Recipe.ToSharedRef());
-					if (!Planner.Plan(TileBounds, ColumnSampler, Instances, BuildError, InCancel))
-					{
-						return false;
-					}
-
-					OutPlan = FVoxelStructurePlan();
-					OutPlan.Bounds = TileBounds;
-					for (const FVoxelStructureInstance& Instance : Instances)
-					{
-						const int32 DefinitionIndex = Config->Recipe->FindStructure(Instance.DefinitionId);
-						if (!Config->Recipe->Structures.IsValidIndex(DefinitionIndex))
-						{
-							continue;
-						}
-
-						const EVoxelGenerationStage Stage = Config->Recipe->Structures[DefinitionIndex].Stage;
-						for (const FVoxelStructureClearVolume& Clear : Instance.ClearVolumes)
-						{
-							OutPlan.Clears.Add({ Clear.Bounds, Stage, Instance.Id });
-						}
-						for (const FVoxelStructureCellWrite& Write : Instance.Writes)
-						{
-							OutPlan.Writes.Add({ Write.Position, Write.Value, Stage, Instance.Id });
-						}
-						OutPlan.Details.Append(Instance.Details);
-					}
-
-					OutPlan.Finalize();
-					BuildError.Reset();
-					return true;
-				},
-				StructurePlan,
-				OutError,
-				InCancel))
-			{
-				return false;
-			}
-			PreparedStructures.Add(StructurePlan);
+			OutError = TEXT("Canceled");
+			return false;
 		}
+		FVoxelStructurePlanPtr StructurePlan;
+		if (!EnsureStructurePlan(Key, StructurePlan, OutError, InCancel)) return false;
+		PreparedStructures.Add(StructurePlan);
 	}
 
 	OutError.Reset();
@@ -792,18 +714,6 @@ bool FVoxelGenerationQuery::ComputeNaturalColumn(
 	return true;
 }
 
-FVoxelHydrologyRegionKey FVoxelGenerationQuery::HydrologyRegionForVoxel(
-	const int32 InX,
-	const int32 InY) const
-{
-	const FVoxelGenerationSettings& Settings = Config->Recipe->Settings;
-	const int32 CellSize = FMath::Max(1, Settings.HydrologyCellSize);
-	const int32 RegionSide = FMath::Max(1, Settings.HydrologyRegionSide);
-	return { FIntPoint(
-		VoxelGeneration::FloorDivide(VoxelGeneration::FloorDivide(InX, CellSize), RegionSide),
-		VoxelGeneration::FloorDivide(VoxelGeneration::FloorDivide(InY, CellSize), RegionSide)) };
-}
-
 bool FVoxelGenerationQuery::ApplyHydrology(
 	const int32 InX,
 	const int32 InY,
@@ -811,17 +721,16 @@ bool FVoxelGenerationQuery::ApplyHydrology(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
-	const FVoxelHydrologyRegionKey Key = HydrologyRegionForVoxel(InX, InY);
+	const FVoxelHydrologyRegionKey Key = HydrologyKeyForVoxel(
+		InX, InY, Config->Recipe->Settings);
 	FVoxelHydrologyPlanPtr Plan;
-	if (!Cache->GetOrBuildHydrology(
-		Key,
-		[this, Key, InCancel](FVoxelHydrologyPlan& OutPlan, FString& BuildError)
-		{
-			return Hydrology->BuildPlan(Key, OutPlan, BuildError, InCancel);
-		},
-		Plan,
-		OutError,
-		InCancel) || !Plan)
+	if (bRequireReadyHydrology && !Cache->FindHydrology(Key, Plan))
+	{
+		OutError = FString::Printf(TEXT("DependencyNotReady: Hydrology %s"),
+			*Key.Coordinate.ToString());
+		return false;
+	}
+	if (!EnsureHydrologyPlan(Key, Plan, OutError, InCancel) || !Plan)
 	{
 		return false;
 	}

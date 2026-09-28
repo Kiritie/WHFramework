@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Voxel/Generation/VoxelGenerationPipeline.h"
+#include "Voxel/Generation/VoxelGenerationPlanCoordinator.h"
 #include "Voxel/Generation/VoxelWorldManifest.h"
 #include "Voxel/Runtime/VoxelWorldRuntime.h"
 #include "Voxel/Streaming/VoxelInterest.h"
@@ -23,6 +24,8 @@ public:
 		FVoxelWorldRuntime& InRuntime,
 		FVoxelTaskScheduler& InScheduler,
 		TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator,
+		TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
+		TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> InCache,
 		const FVoxelRegionStore& InRegionStore,
 		const FVoxelWorldManifest& InManifest,
 		TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry);
@@ -67,11 +70,13 @@ private:
 	FVoxelWorldRuntime& Runtime;
 	FVoxelTaskScheduler& Scheduler;
 	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> Generator;
+	TUniquePtr<FVoxelGenerationPlanCoordinator> PlanCoordinator;
 	const FVoxelRegionStore& RegionStore;
 	FVoxelWorldManifest Manifest;
 	TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> Registry;
 
 	TMap<FIntVector, FVoxelExactDemand> CurrentDemand;
+	TMap<FIntVector, TArray<FVoxelGenerationPlanDependency>> WaitingPlanSections;
 	TMap<FIntVector, EVoxelSectionChangeState> RemoteChangeStates;
 	TArray<FIntVector> OrderedKeys;
 

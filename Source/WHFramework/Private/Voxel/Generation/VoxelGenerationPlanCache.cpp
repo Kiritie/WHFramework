@@ -27,6 +27,7 @@ namespace
 		FString& OutError,
 		const TAtomic<bool>* InCancel,
 		const bool bInAllowGameThreadBuilds,
+		const bool bInAllowWorkerWait,
 		TFunctionRef<void(uint64)> InRecordWait)
 	{
 		{
@@ -77,6 +78,11 @@ namespace
 
 		if (!bOwner)
 		{
+			if (!bInAllowWorkerWait)
+			{
+				OutError = TEXT("DependencyNotReady: voxel generation cache key is building");
+				return false;
+			}
 			if (!bInAllowGameThreadBuilds)
 			{
 				ensureAlwaysMsgf(
@@ -325,9 +331,11 @@ struct FVoxelGenerationPlanCache::FBuildGate
 };
 
 FVoxelGenerationPlanCache::FVoxelGenerationPlanCache(
-	const bool bInAllowGameThreadBuilds)
+	const bool bInAllowGameThreadBuilds,
+	const bool bInAllowWorkerWait)
 	: bAllowGameThreadBuilds(
 		bInAllowGameThreadBuilds)
+	, bAllowWorkerWait(bInAllowWorkerWait)
 {
 	NaturalShards.SetNum(
 		ShardCount);
@@ -421,6 +429,7 @@ bool FVoxelGenerationPlanCache::GetOrBuildBaseColumn(
 			OutError,
 			InCancel,
 			bAllowGameThreadBuilds,
+			bAllowWorkerWait,
 			[this](const uint64 InWait)
 			{
 				RecordGateWait(InWait);
@@ -455,6 +464,7 @@ bool FVoxelGenerationPlanCache::GetOrBuildNaturalColumn(
 			OutError,
 			InCancel,
 			bAllowGameThreadBuilds,
+			bAllowWorkerWait,
 			[this](const uint64 InWait)
 			{
 				RecordGateWait(InWait);
@@ -535,6 +545,7 @@ bool FVoxelGenerationPlanCache::GetOrBuildHydrology(
 			OutError,
 			InCancel,
 			bAllowGameThreadBuilds,
+			bAllowWorkerWait,
 			[this](const uint64 InWait)
 			{
 				RecordGateWait(InWait);
@@ -614,6 +625,7 @@ bool FVoxelGenerationPlanCache::GetOrBuildCave(
 			OutError,
 			InCancel,
 			bAllowGameThreadBuilds,
+			bAllowWorkerWait,
 			[this](const uint64 InWait)
 			{
 				RecordGateWait(InWait);
@@ -641,6 +653,20 @@ bool FVoxelGenerationPlanCache::FindFeature(
 	return false;
 }
 
+bool FVoxelGenerationPlanCache::FindEcology(
+	const FVoxelEcologyTileKey& InKey,
+	FVoxelEcologyPlanPtr& OutPlan) const
+{
+	const FPlanShard& Shard = *PlanShards[PlanShardIndex(InKey)];
+	FReadScopeLock Scope(Shard.Lock);
+	if (const FVoxelEcologyPlanPtr* Found = Shard.Ecology.Find(InKey))
+	{
+		OutPlan = *Found;
+		return OutPlan.IsValid();
+	}
+	return false;
+}
+
 bool FVoxelGenerationPlanCache::GetOrBuildEcology(
 	const FVoxelEcologyTileKey& InKey,
 	TFunctionRef<bool(FVoxelEcologyPlan&, FString&)> InBuild,
@@ -660,6 +686,7 @@ bool FVoxelGenerationPlanCache::GetOrBuildEcology(
 		OutError,
 		InCancel,
 		bAllowGameThreadBuilds,
+		bAllowWorkerWait,
 		[this](const uint64 InWait)
 		{
 			RecordGateWait(InWait);
@@ -719,6 +746,7 @@ bool FVoxelGenerationPlanCache::GetOrBuildFeature(
 			OutError,
 			InCancel,
 			bAllowGameThreadBuilds,
+			bAllowWorkerWait,
 			[this](const uint64 InWait)
 			{
 				RecordGateWait(InWait);
@@ -799,6 +827,7 @@ bool FVoxelGenerationPlanCache::GetOrBuildStructure(
 			OutError,
 			InCancel,
 			bAllowGameThreadBuilds,
+			bAllowWorkerWait,
 			[this](const uint64 InWait)
 			{
 				RecordGateWait(InWait);

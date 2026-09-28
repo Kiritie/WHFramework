@@ -15,7 +15,8 @@ public:
 		TSharedRef<
 			FVoxelGenerationPlanCache,
 			ESPMode::ThreadSafe> InCache,
-		TSharedPtr<const IVoxelGenerationOverlay, ESPMode::ThreadSafe> InOverlay = nullptr);
+		TSharedPtr<const IVoxelGenerationOverlay, ESPMode::ThreadSafe> InOverlay = nullptr,
+		bool bInRequirePlanPreflight = false);
 
 	bool GenerateSection(
 		const FIntVector& InSectionCoordinate,
@@ -87,4 +88,5 @@ private:
 		ESPMode::ThreadSafe> Cache;
 
 	TSharedPtr<const IVoxelGenerationOverlay, ESPMode::ThreadSafe> Overlay;
+	bool bRequirePlanPreflight = false;
 };

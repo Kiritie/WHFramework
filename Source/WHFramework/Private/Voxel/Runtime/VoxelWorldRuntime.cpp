@@ -152,6 +152,7 @@ bool FVoxelWorldRuntime::PublishBase(
 
 	Section->BaseBlocks = MakeShared<const TArray<FVoxelBlockState>, ESPMode::ThreadSafe>(MoveTemp(InBaseBlocks));
 	Section->Status = EVoxelSectionStatus::BaseReady;
+	Section->Error.Reset();
 	OutError.Reset();
 	return true;
 }
@@ -208,6 +209,7 @@ bool FVoxelWorldRuntime::PublishFinal(
 	Section->CommittedRevision = InRevision;
 	Section->PersistedRevision = InRevision;
 	Section->Status = EVoxelSectionStatus::DataReady;
+	Section->Error.Reset();
 	Section->bCollisionDirty = true;
 	Section->bFineMeshDirty = true;
 	ChangeIndex.SetModified(InSection, !Section->Overlay.IsEmpty() || !InEntities.IsEmpty());

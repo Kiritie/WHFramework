@@ -52,10 +52,12 @@ FVoxelGenerationPipeline::FVoxelGenerationPipeline(
 	TSharedRef<
 		FVoxelGenerationPlanCache,
 		ESPMode::ThreadSafe> InCache,
-	TSharedPtr<const IVoxelGenerationOverlay, ESPMode::ThreadSafe> InOverlay)
+	TSharedPtr<const IVoxelGenerationOverlay, ESPMode::ThreadSafe> InOverlay,
+	const bool bInRequirePlanPreflight)
 	: Config(InConfig)
 	, Cache(InCache)
 	, Overlay(MoveTemp(InOverlay))
+	, bRequirePlanPreflight(bInRequirePlanPreflight)
 {
 }
 
@@ -90,7 +92,10 @@ bool FVoxelGenerationPipeline::GenerateSection(
 			Config,
 			Cache,
 			Query,
-			OutError) ||
+			OutError,
+			!bRequirePlanPreflight,
+			false,
+			bRequirePlanPreflight) ||
 		!Query.Prepare(
 			Bounds,
 			OutError,

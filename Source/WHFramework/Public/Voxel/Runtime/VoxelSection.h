@@ -38,8 +38,9 @@ struct WHFRAMEWORK_API FVoxelSection
 {
     FVoxelSectionStamp Stamp;
 
-    EVoxelSectionStatus Status =
-        EVoxelSectionStatus::None;
+	EVoxelSectionStatus Status =
+		EVoxelSectionStatus::None;
+	FString Error;
 
     /**
      * Immutable natural base。

@@ -84,7 +84,8 @@ public:
 
 public:
 	explicit FVoxelGenerationPlanCache(
-		bool bInAllowGameThreadBuilds = true);
+		bool bInAllowGameThreadBuilds = true,
+		bool bInAllowWorkerWait = true);
 
 	~FVoxelGenerationPlanCache();
 
@@ -143,6 +144,10 @@ public:
 	bool FindFeature(
 		const FVoxelGenerationTileKey& InKey,
 		FVoxelFeaturePlanPtr& OutPlan) const;
+
+	bool FindEcology(
+		const FVoxelEcologyTileKey& InKey,
+		FVoxelEcologyPlanPtr& OutPlan) const;
 
 	void StoreFeature(
 		const FVoxelGenerationTileKey& InKey,
@@ -271,4 +276,5 @@ private:
 	TAtomic<uint64> GateWaitMicroseconds { 0 };
 
 	bool bAllowGameThreadBuilds = true;
+	bool bAllowWorkerWait = true;
 };

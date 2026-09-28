@@ -647,8 +647,8 @@ bool UVoxelModule::StartWorld(
 	GenerationCache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>(false);
 	const TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> NaturalGenerator =
 		MakeShared<const FVoxelGenerationPipeline, ESPMode::ThreadSafe>(
-		GenerationConfig.ToSharedRef(),
-		GenerationCache.ToSharedRef());
+			GenerationConfig.ToSharedRef(),
+			GenerationCache.ToSharedRef(), nullptr, true);
 	TSharedPtr<const IVoxelGenerationOverlay, ESPMode::ThreadSafe> Overlay;
 	if (!CreateGenerationOverlay(NaturalGenerator, Registry.GetSnapshot().ToSharedRef(),
 		Overlay, OutError))
@@ -660,7 +660,7 @@ bool UVoxelModule::StartWorld(
 	}
 	Generator = Overlay ?
 		MakeShared<const FVoxelGenerationPipeline, ESPMode::ThreadSafe>(
-			GenerationConfig.ToSharedRef(), GenerationCache.ToSharedRef(), Overlay) :
+			GenerationConfig.ToSharedRef(), GenerationCache.ToSharedRef(), Overlay, true) :
 		NaturalGenerator;
 
 	++Epoch;
@@ -723,6 +723,8 @@ bool UVoxelModule::StartWorld(
 		*Runtime,
 		*Scheduler,
 		Generator.ToSharedRef(),
+		GenerationConfig.ToSharedRef(),
+		GenerationCache.ToSharedRef(),
 		RegionStore,
 		Manifest,
 		Registry.GetSnapshot().ToSharedRef());
@@ -1621,8 +1623,8 @@ void UVoxelModule::UpdateReadiness()
 		{
 			WorldState = EVoxelWorldState::Failed;
 			UE_LOG(LogTemp, Error,
-				TEXT("Voxel loading failed: required section %s failed generation; see the preceding section generation error."),
-				*Key.ToString());
+				TEXT("Voxel loading failed: required section %s failed generation: %s"),
+				*Key.ToString(), *Section->Error);
 		}
 	};
 	for (const TPair<FIntVector, FVoxelExactDemand>& Pair : CurrentInterest.Warmup)

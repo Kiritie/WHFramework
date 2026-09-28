@@ -14,18 +14,69 @@ using FVoxelHydrologyPlanner = FVoxelHydrologyGenerator;
 class FVoxelSurfaceGenerator;
 class FVoxelTerrainGenerator;
 
+struct WHFRAMEWORK_API FVoxelGenerationPlanKeys
+{
+	TArray<FVoxelGenerationTileKey> Tiles;
+	TArray<FVoxelEcologyTileKey> EcologyTiles;
+};
+
 class WHFRAMEWORK_API FVoxelGenerationQuery
 {
 public:
 	static constexpr int32 GenerationPlanTileSide = 256;
 	static constexpr int32 EcologyTileSide = 64;
 
+	static FVoxelGenerationPlanKeys GatherPlanKeys(
+		const FVoxelGenerationBounds& InBounds,
+		const FVoxelGenerationSettings& InSettings);
+
+	static void GatherStructureTiles(
+		const FVoxelGenerationBounds& InBounds,
+		TArray<FVoxelGenerationTileKey>& OutTiles);
+
+	static FVoxelHydrologyRegionKey HydrologyKeyForVoxel(
+		int32 InX,
+		int32 InY,
+		const FVoxelGenerationSettings& InSettings);
+
+	bool EnsureHydrologyPlan(
+		const FVoxelHydrologyRegionKey& InKey,
+		FVoxelHydrologyPlanPtr& OutPlan,
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr) const;
+
+	bool EnsureCavePlan(
+		const FVoxelGenerationTileKey& InKey,
+		FVoxelCavePlanPtr& OutPlan,
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr) const;
+
+	bool EnsureStructurePlan(
+		const FVoxelGenerationTileKey& InKey,
+		FVoxelStructurePlanPtr& OutPlan,
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr) const;
+
+	bool EnsureFeaturePlan(
+		const FVoxelGenerationTileKey& InKey,
+		FVoxelFeaturePlanPtr& OutPlan,
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr) const;
+
+	bool EnsureEcologyPlan(
+		const FVoxelEcologyTileKey& InKey,
+		FVoxelEcologyPlanPtr& OutPlan,
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr) const;
+
 	static bool Create(
 		TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
 		TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> InCache,
 		FVoxelGenerationQuery& OutQuery,
 		FString& OutError,
-		bool bInUseColumnCache = true);
+		bool bInUseColumnCache = true,
+		bool bInRequireReadyHydrology = false,
+		bool bInRequireReadyPlans = false);
 
 	bool PrepareColumns(
 		const FVoxelGenerationBounds& InBounds,
@@ -74,6 +125,16 @@ public:
 		GetPreparedStructurePlans() const;
 
 private:
+	bool SamplePlanColumn(
+		const FIntVector& InPosition,
+		FVoxelColumnSample& OutColumn,
+		const TAtomic<bool>* InCancel) const;
+
+	bool SamplePlanSymbol(
+		const FIntVector& InPosition,
+		uint32& OutSymbol,
+		const TAtomic<bool>* InCancel) const;
+
 	bool ResolveSymbol(const FIntVector& InPosition, FVoxelColumnSample InColumn,
 		uint32& OutValue, FString& OutError) const;
 
@@ -103,9 +164,6 @@ private:
 		FString& OutError,
 		const TAtomic<bool>* InCancel) const;
 
-	FVoxelHydrologyRegionKey HydrologyRegionForVoxel(
-		int32 InX,
-		int32 InY) const;
 
 	bool IsInsidePreparedXY(
 		int32 InX,
@@ -136,6 +194,9 @@ private:
 	FVoxelGenerationBounds PreparedBounds;
 	const TAtomic<bool>* Cancel = nullptr;
 	bool bUseColumnCache = true;
+	bool bRequireReadyHydrology = false;
+	bool bRequireReadyPlans = false;
 	bool bColumnsPrepared = false;
 	bool bSymbolsPrepared = false;
+	mutable FString PlanSampleError;
 };
