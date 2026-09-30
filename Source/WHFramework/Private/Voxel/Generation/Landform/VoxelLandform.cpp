@@ -66,6 +66,19 @@ FVoxelLandformSample FVoxelLandformGenerator::Sample(
 	Result.MountainQ15 = static_cast<int32>(
 		static_cast<int64>(Result.MountainQ15) * 3 *
 		(24576 + Ridge / 4) / 32767);
+	const int32 Sharpness = FMath::Clamp(Settings.BlendSharpnessQ15, 0, 32767);
+	auto Sharpen = [Sharpness](const int32 Weight)
+	{
+		const int64 W = FMath::Clamp<int64>(Weight, 0, 32767);
+		return static_cast<int32>((W * (32767 - Sharpness) +
+			W * W * Sharpness / 32767) / 32767);
+	};
+	Result.PlainQ15 = Sharpen(Result.PlainQ15);
+	Result.HillsQ15 = Sharpen(Result.HillsQ15);
+	Result.HighlandQ15 = Sharpen(Result.HighlandQ15);
+	Result.MountainQ15 = Sharpen(Result.MountainQ15);
+	Result.PlateauQ15 = Sharpen(Result.PlateauQ15);
+	Result.BasinQ15 = Sharpen(Result.BasinQ15);
 
 	const int64 Sum = static_cast<int64>(Result.PlainQ15) + Result.HillsQ15 +
 		Result.HighlandQ15 + Result.MountainQ15 + Result.PlateauQ15 + Result.BasinQ15;

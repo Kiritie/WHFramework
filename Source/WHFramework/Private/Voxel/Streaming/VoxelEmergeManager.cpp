@@ -32,8 +32,6 @@ void FVoxelEmergeManager::Tick(
 	const int32 InMaxBuildsPerFrame,
 	const double InAdmissionMilliseconds)
 {
-	(void)InNow;
-
 	if (CurrentInterestRevision != InInterestRevision)
 	{
 		RebuildDemand(
@@ -91,6 +89,21 @@ void FVoxelEmergeManager::Tick(
 			}
 			Submitted += RequestSection(Key, *Demand) ? 1 : 0;
 		}
+	}
+	if (InNow - LastAdmissionDiagnosticTime >= 5.0)
+	{
+		UE_LOG(LogTemp, Display,
+			TEXT("Voxel emerge admission: exact=%d ordered=%d waiting=%d planPending=%d planReady=%d overlayPending=%d overlayReady=%d enqueueAttempts=%d enqueued=%d next=%d"),
+			CurrentDemand.Num(), OrderedKeys.Num(), WaitingPlanSections.Num(),
+			PlanPendingAttempts, PlanReadyAttempts, OverlayPendingAttempts,
+			OverlayReadyAttempts, EnqueueAttempts, EnqueuedTasks, NextAdmissionIndex);
+		LastAdmissionDiagnosticTime = InNow;
+		PlanPendingAttempts = 0;
+		PlanReadyAttempts = 0;
+		OverlayPendingAttempts = 0;
+		OverlayReadyAttempts = 0;
+		EnqueueAttempts = 0;
+		EnqueuedTasks = 0;
 	}
 }
 
@@ -227,6 +240,13 @@ void FVoxelEmergeManager::Reset()
 
 	CurrentInterestRevision = 0;
 	NextAdmissionIndex = 0;
+	LastAdmissionDiagnosticTime = 0.0;
+	PlanPendingAttempts = 0;
+	PlanReadyAttempts = 0;
+	OverlayPendingAttempts = 0;
+	OverlayReadyAttempts = 0;
+	EnqueueAttempts = 0;
+	EnqueuedTasks = 0;
 }
 
 EVoxelWorkClass FVoxelEmergeManager::ResolveWorkClass(const FVoxelExactDemand& InDemand)
@@ -329,8 +349,8 @@ bool FVoxelEmergeManager::RequestBase(
 	{
 		return false;
 	}
-	TArray<FVoxelGenerationPlanDependency>* Dependencies = WaitingPlanSections.Find(InKey);
-	if (!Dependencies)
+	FWaitingPlanSection* Waiting = WaitingPlanSections.Find(InKey);
+	if (!Waiting)
 	{
 		TArray<FVoxelGenerationPlanDependency> Gathered;
 		const FIntVector Min = InKey * 16;
@@ -344,9 +364,16 @@ bool FVoxelEmergeManager::RequestBase(
 				*InKey.ToString(), *InSection.Error);
 			return false;
 		}
-		Dependencies = &WaitingPlanSections.Add(InKey, MoveTemp(Gathered));
+		Waiting = &WaitingPlanSections.Add(InKey);
+		Waiting->Dependencies = MoveTemp(Gathered);
 	}
-	const FVoxelGenerationDependencyStatus PlanStatus = PlanCoordinator->Ensure(*Dependencies,
+	const double Now = FPlatformTime::Seconds();
+	if (Now < Waiting->RetryAfterSeconds)
+	{
+		return false;
+	}
+	const FVoxelGenerationDependencyStatus PlanStatus = PlanCoordinator->Ensure(
+		Waiting->Dependencies,
 		ResolveWorkClass(InDemand), InDemand.Priority,
 		InDemand.DistanceCells, InDemand.ForwardScore);
 	if (PlanStatus.bFailed)
@@ -358,7 +385,34 @@ bool FVoxelEmergeManager::RequestBase(
 			*InKey.ToString(), *InSection.Error);
 		return false;
 	}
-	if (!PlanStatus.bReady) return false;
+	if (!PlanStatus.bReady)
+	{
+		++PlanPendingAttempts;
+		Waiting->RetryAfterSeconds = Now + 0.2;
+		return false;
+	}
+	++PlanReadyAttempts;
+
+	const FVoxelOverlayPreflightStatus OverlayStatus =
+		Generator->EnsureOverlaySectionReady(InKey, ResolveWorkClass(InDemand),
+			InDemand.Priority, InDemand.DistanceCells, InDemand.ForwardScore);
+	if (OverlayStatus.bFailed)
+	{
+		InSection.Status = EVoxelSectionStatus::Failed;
+		InSection.Error = OverlayStatus.Error;
+		WaitingPlanSections.Remove(InKey);
+		UE_LOG(LogTemp, Error,
+			TEXT("Voxel overlay preflight failed: section=%s error=%s"),
+			*InKey.ToString(), *InSection.Error);
+		return false;
+	}
+	if (!OverlayStatus.bReady)
+	{
+		++OverlayPendingAttempts;
+		Waiting->RetryAfterSeconds = Now + 0.2;
+		return false;
+	}
+	++OverlayReadyAttempts;
 	WaitingPlanSections.Remove(InKey);
 
 	FVoxelTaskRequest Request;
@@ -401,7 +455,10 @@ bool FVoxelEmergeManager::RequestBase(
 			return Result;
 		};
 
-	return Scheduler.Enqueue(MoveTemp(Request));
+	++EnqueueAttempts;
+	const bool bEnqueued = Scheduler.Enqueue(MoveTemp(Request));
+	EnqueuedTasks += bEnqueued ? 1 : 0;
+	return bEnqueued;
 }
 
 bool FVoxelEmergeManager::ResolveOverlay(

@@ -15,6 +15,8 @@ namespace
 		Recipe.Palette.Air = 0;
 		Recipe.Palette.Stone = 1;
 		Recipe.Palette.Grass = 1;
+		Recipe.Palette.Sand = 2;
+		Recipe.Palette.Dirt = 3;
 		Recipe.Ecology.TreeTrunk = 2;
 		Recipe.Ecology.TreeLeaves = 3;
 		Recipe.Ecology.GrassPlant = 4;
@@ -311,9 +313,9 @@ bool FVoxelEcologyFlowerPlanTest::RunTest(const FString& InParameters)
 			Out.Climate.MoistureQ15 = 12000;
 			return true;
 		};
-		auto Base = [](const FIntVector& Position, uint32& Out)
+		auto Base = [InSurface](const FIntVector& Position, uint32& Out)
 		{
-			Out = Position.Z <= 0 ? 1 : 0;
+			Out = Position.Z <= 0 ? InSurface : 0;
 			return true;
 		};
 		FString Error;
@@ -344,7 +346,12 @@ bool FVoxelEcologyFlowerPlanTest::RunTest(const FString& InParameters)
 	FVoxelEcologyPlan Sand;
 	TestTrue(TEXT("Sand flower plan builds"),
 		Build(Recipe, EVoxelRiverSurfaceZone::None, 2, Sand));
-	TestEqual(TEXT("Sand contains no ordinary flowers"), Sand.FlowerWrites, 0);
+	TestEqual(TEXT("Ordinary flowers do not grow on sand"), Sand.FlowerWrites, 0);
+	FVoxelEcologyPlan Dirt;
+	TestTrue(TEXT("Non-grass flower plan builds"),
+		Build(Recipe, EVoxelRiverSurfaceZone::None, 3, Dirt));
+	TestTrue(TEXT("Flower-enabled biome accepts its non-grass soil"),
+		Dirt.FlowerPatchCandidates > 0 && Dirt.FlowerWrites > 0);
 	Recipe.Biomes[0].Ecology.bAllowFlowers = false;
 	FVoxelEcologyPlan DisabledBiome;
 	TestTrue(TEXT("Flower-disabled biome plan builds"),

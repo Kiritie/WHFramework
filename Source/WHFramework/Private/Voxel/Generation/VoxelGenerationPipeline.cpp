@@ -61,6 +61,18 @@ FVoxelGenerationPipeline::FVoxelGenerationPipeline(
 {
 }
 
+FVoxelOverlayPreflightStatus FVoxelGenerationPipeline::EnsureOverlaySectionReady(
+	const FIntVector& InSectionCoordinate,
+	const EVoxelWorkClass InWorkClass,
+	const int32 InSourcePriority,
+	const double InDistanceScore,
+	const double InForwardScore) const
+{
+	return Overlay ? Overlay->EnsureSectionReady(InSectionCoordinate, InWorkClass,
+		InSourcePriority, InDistanceScore, InForwardScore) :
+		FVoxelOverlayPreflightStatus();
+}
+
 bool FVoxelGenerationPipeline::GenerateSection(
 	const FIntVector& InSectionCoordinate,
 	TArray<FVoxelBlockState>& OutBaseBlocks,
@@ -193,7 +205,7 @@ bool FVoxelGenerationPipeline::SampleColumn(
 
 bool FVoxelGenerationPipeline::EnumerateTrees(
 	const FVoxelGenerationBounds& InBounds,
-	TFunctionRef<void(const FIntVector&, int32)> InVisit,
+	TFunctionRef<void(const FIntVector&, int32, FVoxelStableId)> InVisit,
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
@@ -220,9 +232,9 @@ bool FVoxelGenerationPipeline::EnumerateTrees(
 	int32 Candidates = 0;
 	int32 Accepted = 0;
 	Ecology.EnumerateTrees(InBounds, SampleColumn, SampleBase,
-		[&](const FIntVector& Anchor, const int32 Height, const FVoxelStableId)
+		[&](const FIntVector& Anchor, const int32 Height, const FVoxelStableId Id)
 		{
-			InVisit(Anchor, Height);
+			InVisit(Anchor, Height, Id);
 		}, Candidates, Accepted, InCancel);
 	if (bSampleFailed) return false;
 	if (InCancel && InCancel->Load())
@@ -254,6 +266,21 @@ bool FVoxelGenerationPipeline::SampleEnvironment(
 	}
 	return Query.SampleEnvironmentColumn(
 		InX, InY, OutSample.Column, OutError, InCancel);
+}
+
+TSharedRef<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>
+FVoxelGenerationPipeline::RetainHydrologyForPlanning(
+	const FIntPoint& InCenter,
+	const int32 InSampleRadiusCells) const
+{
+	const FVoxelGenerationSettings& Settings = Config->Recipe->Settings;
+	const int64 RegionSide = static_cast<int64>(FMath::Max(8, Settings.HydrologyRegionSide)) *
+		FMath::Max(1, Settings.HydrologyCellSize);
+	FVoxelGenerationCacheRetentionPoint Point;
+	Point.Center = InCenter;
+	Point.HydrologyRadiusCells = static_cast<int32>(FMath::Min<int64>(MAX_int32,
+		static_cast<int64>(FMath::Max(0, InSampleRadiusCells)) + RegionSide));
+	return Cache->RetainForTask(Point);
 }
 
 bool FVoxelGenerationPipeline::SampleEnvironments(

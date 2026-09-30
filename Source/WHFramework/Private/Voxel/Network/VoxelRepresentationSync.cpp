@@ -2,12 +2,13 @@
 
 #include "Voxel/Network/VoxelNetworkCodec.h"
 #include "Voxel/Serialization/VoxelBinaryCodec.h"
+#include "Voxel/Rendering/VoxelWaterView.h"
 #include "Voxel/VoxelModule.h"
 
 namespace
 {
 	constexpr uint32 RepresentationMagic = 0x34505256;
-	constexpr uint16 RepresentationVersion = 4;
+	constexpr uint16 RepresentationVersion = 5;
 	constexpr int32 MaxRepresentationRawBytes = 16 * 1024 * 1024;
 	constexpr int32 MaxCells = 4096;
 	constexpr uint32 MaxDistantCells = 16384;
@@ -114,6 +115,8 @@ namespace
 			InWriter.I32(Cell.Min.X); InWriter.I32(Cell.Min.Y); InWriter.I32(Cell.Min.Z);
 			InWriter.I32(Cell.Max.X); InWriter.I32(Cell.Max.Y); InWriter.I32(Cell.Max.Z);
 			InWriter.U32(Cell.State.Pack());
+			InWriter.U64(Cell.SourceTreeId.High);
+			InWriter.U64(Cell.SourceTreeId.Low);
 		}
 	}
 
@@ -127,6 +130,8 @@ namespace
 			Cell.Min.X = InReader.I32(); Cell.Min.Y = InReader.I32(); Cell.Min.Z = InReader.I32();
 			Cell.Max.X = InReader.I32(); Cell.Max.Y = InReader.I32(); Cell.Max.Z = InReader.I32();
 			Cell.State = FVoxelBlockState::Unpack(InReader.U32());
+			Cell.SourceTreeId.High = InReader.U64();
+			Cell.SourceTreeId.Low = InReader.U64();
 			if (Cell.State.IsAir() || Cell.Min.X >= Cell.Max.X ||
 				Cell.Min.Y >= Cell.Max.Y || Cell.Min.Z >= Cell.Max.Z) InReader.Reject();
 			if (InReader.IsValid()) OutCells.Add(Cell);
@@ -568,6 +573,7 @@ bool FVoxelRepresentationSync::EncodeMacro(
 {
 	const int32 Count = InData.Side * InData.Side;
 	if (Count <= 0 || Count > MaxCells || InData.Height.Num() != Count || InData.WaterHeight.Num() != Count ||
+		InData.WaterKind.Num() != Count ||
 		InData.SurfaceClass.Num() != Count || InData.ForestCoverage.Num() != Count || InData.SnowCoverage.Num() != Count ||
 		InData.LargeStructures.Num() > 4096 || InData.DistantCells.Num() > MaxDistantCells)
 	{
@@ -579,8 +585,12 @@ bool FVoxelRepresentationSync::EncodeMacro(
 	Writer.U64(InData.Revision); Writer.U16(InData.Side); Writer.I32(InData.Step); Writer.U32(Count);
 	for (int32 Index = 0; Index < Count; ++Index)
 	{
+		if (InData.WaterKind[Index] > static_cast<uint8>(EVoxelWaterKind::Edited))
+		{
+			OutError = TEXT("Voxel macro water kind is invalid"); return false;
+		}
 		Writer.I32(InData.Height[Index]); Writer.I32(InData.WaterHeight[Index]); Writer.U16(InData.SurfaceClass[Index]);
-		Writer.U8(InData.ForestCoverage[Index]); Writer.U8(InData.SnowCoverage[Index]);
+		Writer.U8(InData.WaterKind[Index]); Writer.U8(InData.ForestCoverage[Index]); Writer.U8(InData.SnowCoverage[Index]);
 	}
 	Writer.U16(InData.LargeStructures.Num());
 	for (const FVoxelMacroStructureProxy& Structure : InData.LargeStructures)
@@ -609,12 +619,14 @@ bool FVoxelRepresentationSync::DecodeMacro(
 	Data.Revision = Reader.U64(); Data.Side = Reader.U16(); Data.Step = Reader.I32();
 	const uint32 Count = Reader.U32();
 	if (Data.Side <= 0 || Count != static_cast<uint32>(Data.Side * Data.Side) || Count > MaxCells) Reader.Reject();
-	Data.Height.Reserve(Count); Data.WaterHeight.Reserve(Count); Data.SurfaceClass.Reserve(Count);
+	Data.Height.Reserve(Count); Data.WaterHeight.Reserve(Count); Data.WaterKind.Reserve(Count); Data.SurfaceClass.Reserve(Count);
 	Data.ForestCoverage.Reserve(Count); Data.SnowCoverage.Reserve(Count);
 	for (uint32 Index = 0; Index < Count && Reader.IsValid(); ++Index)
 	{
 		Data.Height.Add(Reader.I32()); Data.WaterHeight.Add(Reader.I32()); Data.SurfaceClass.Add(Reader.U16());
-		Data.ForestCoverage.Add(Reader.U8()); Data.SnowCoverage.Add(Reader.U8());
+		const uint8 Kind = Reader.U8();
+		if (Kind > static_cast<uint8>(EVoxelWaterKind::Edited)) Reader.Reject();
+		Data.WaterKind.Add(Kind); Data.ForestCoverage.Add(Reader.U8()); Data.SnowCoverage.Add(Reader.U8());
 	}
 	const uint16 StructureCount = Reader.U16();
 	if (StructureCount > 4096) Reader.Reject();

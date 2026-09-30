@@ -75,25 +75,43 @@ struct WHFRAMEWORK_API FVoxelLandformGenerationSettings
 	int32 HillsPeriod = 5000;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "512"))
+	int32 HillsDetailPeriod = 1400;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "512"))
 	int32 PlateauPeriod = 12000;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
-	int32 DomainWarpCells = 512;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "512"))
+	int32 ValleyPeriod = 7000;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
-	int32 PlainRelief = 32;
+	int32 DomainWarpCells = 1024;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
-	int32 HillRelief = 128;
+	int32 PlainRelief = 48;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
-	int32 HighlandUplift = 256;
+	int32 HillRelief = 208;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
-	int32 PlateauUplift = 320;
+	int32 HillsDetailRelief = 64;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
-	int32 BasinDepth = 160;
+	int32 HighlandUplift = 320;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	int32 MountainBaseUplift = 320;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	int32 PlateauUplift = 384;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	int32 BasinDepth = 224;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	int32 ValleyDepth = 160;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0", ClampMax = "32767"))
+	int32 BlendSharpnessQ15 = 22000;
 
 	bool Validate(FString& OutError) const;
 };
@@ -309,7 +327,7 @@ struct WHFRAMEWORK_API FVoxelGenerationSettings
 	int32 ContinentalAmplitude = 384;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Terrain", meta = (ClampMin = "0"))
-	int32 MountainAmplitude = 512;
+	int32 MountainAmplitude = 768;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Terrain", meta = (ClampMin = "0"))
 	int32 DetailAmplitude = 12;
@@ -399,13 +417,22 @@ struct WHFRAMEWORK_API FVoxelGenerationSettings
 	int32 CaveEntranceChancePermille = 80;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Cave", meta = (ClampMin = "4", ClampMax = "64"))
-	int32 CaveEntranceLength = 16;
+	int32 CaveEntranceLength = 32;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Cave", meta = (ClampMin = "1", ClampMax = "4"))
-	int32 CaveEntranceDropPerStep = 1;
+	int32 CaveEntranceDropPerStep = 2;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Cave", meta = (ClampMin = "4", ClampMax = "64"))
 	int32 CaveEntranceTransitionDepth = 12;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Cave", meta = (ClampMin = "2"))
+	int32 CaveEntranceMinWidth = 8;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Cave", meta = (ClampMin = "2"))
+	int32 CaveEntranceMinHeight = 10;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Cave", meta = (ClampMin = "1"))
+	int32 CaveEntranceClearance = 4;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Generation|Cave", meta = (ClampMin = "0", ClampMax = "1000"))
 	int32 CaveRoomChancePermille = 60;

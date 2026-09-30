@@ -135,7 +135,7 @@ FVoxelEcologySample FVoxelEcologyGenerator::Sample(const FVoxelColumnSample& InC
 	{
 		Result.FlowerRejectReason = EVoxelEcologyRejectReason::Biome;
 	}
-	else if (InColumn.bOcean || InColumn.bLake || InColumn.bRiver ||
+	else if (InColumn.bOcean || InColumn.bLake || InColumn.bRiver || InColumn.bCoast ||
 		bRiverBed || bWetMargin || bDryBank)
 	{
 		Result.FlowerRejectReason = EVoxelEcologyRejectReason::Water;
@@ -152,7 +152,9 @@ FVoxelEcologySample FVoxelEcologyGenerator::Sample(const FVoxelColumnSample& InC
 	{
 		Result.FlowerRejectReason = EVoxelEcologyRejectReason::Moisture;
 	}
-	else if (InColumn.SurfaceMaterial != Recipe->Palette.Grass)
+	else if (InColumn.SurfaceMaterial == Recipe->Palette.Air ||
+		InColumn.SurfaceMaterial == Recipe->Palette.Sand ||
+		InColumn.SurfaceMaterial == MAX_uint16)
 	{
 		Result.FlowerRejectReason = EVoxelEcologyRejectReason::Surface;
 	}
@@ -517,7 +519,8 @@ void FVoxelEcologyGenerator::BuildFlowers(
 					if (!InSampleBaseSymbol(Position, AirValue) ||
 						!InSampleBaseSymbol(Position - FIntVector(0, 0, 1), FloorValue) ||
 						static_cast<uint16>(AirValue & 0xffffu) != Recipe->Palette.Air ||
-						static_cast<uint16>(FloorValue & 0xffffu) != Recipe->Palette.Grass)
+						static_cast<uint16>(FloorValue & 0xffffu) == Recipe->Palette.Air ||
+						static_cast<uint16>(FloorValue & 0xffffu) != Column.SurfaceMaterial)
 					{
 						++InOutPlan.FlowerRejects.Surface;
 						continue;

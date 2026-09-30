@@ -1,9 +1,9 @@
 #include "Voxel/Rendering/VoxelWaterView.h"
 
-bool FVoxelWaterViewBuilder::Build(
+bool FVoxelWaterViewBuilder::BuildKindGrid(
 	const FVoxelSurfaceTileData& InSurface,
-	FVoxelWaterSurfaceTileData& OutWater,
-	FString& OutError) const
+	TArray<uint8>& OutKinds,
+	FString& OutError)
 {
 	const int32 Count =
 		InSurface.Side *
@@ -24,27 +24,7 @@ bool FVoxelWaterViewBuilder::Build(
 		return false;
 	}
 
-	FVoxelWaterSurfaceTileData Water;
-
-	Water.Key =
-		InSurface.Key;
-
-	Water.Revision =
-		InSurface.Revision;
-
-	Water.Side =
-		InSurface.Side;
-
-	Water.Step =
-		InSurface.Step;
-
-	Water.GroundZ =
-		InSurface.GroundZ;
-
-	Water.WaterZ =
-		InSurface.WaterZ;
-
-	Water.WaterKind.Init(
+	OutKinds.Init(
 		static_cast<uint8>(
 			EVoxelWaterKind::None),
 		Count);
@@ -53,10 +33,10 @@ bool FVoxelWaterViewBuilder::Build(
 		Index < Count;
 		++Index)
 	{
-		if (Water.WaterZ[Index] ==
+		if (InSurface.WaterZ[Index] ==
 				MIN_int32 ||
-			Water.WaterZ[Index] <
-				Water.GroundZ[Index])
+			InSurface.WaterZ[Index] <
+				InSurface.GroundZ[Index])
 		{
 			continue;
 		}
@@ -86,10 +66,30 @@ bool FVoxelWaterViewBuilder::Build(
 				EVoxelWaterKind::River;
 		}
 
-		Water.WaterKind[Index] =
+		OutKinds[Index] =
 			static_cast<uint8>(
 				Kind);
 	}
+	OutError.Reset();
+	return true;
+}
+
+bool FVoxelWaterViewBuilder::Build(
+	const FVoxelSurfaceTileData& InSurface,
+	FVoxelWaterSurfaceTileData& OutWater,
+	FString& OutError) const
+{
+	FVoxelWaterSurfaceTileData Water;
+	if (!BuildKindGrid(InSurface, Water.WaterKind, OutError))
+	{
+		return false;
+	}
+	Water.Key = InSurface.Key;
+	Water.Revision = InSurface.Revision;
+	Water.Side = InSurface.Side;
+	Water.Step = InSurface.Step;
+	Water.GroundZ = InSurface.GroundZ;
+	Water.WaterZ = InSurface.WaterZ;
 
 	OutWater =
 		MoveTemp(Water);

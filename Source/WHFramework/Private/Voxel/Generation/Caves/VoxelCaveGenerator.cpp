@@ -18,6 +18,7 @@ void FVoxelCavePlan::Finalize()
 {
 	InfluenceBounds.Init();
 	SegmentIndicesBySection.Reset();
+	ClearVolumeIndicesBySection.Reset();
 
 	for (int32 SegmentIndex = 0;
 		SegmentIndex < Segments.Num();
@@ -103,6 +104,34 @@ void FVoxelCavePlan::Finalize()
 			}
 		}
 	}
+	for (int32 VolumeIndex = 0; VolumeIndex < ClearVolumes.Num(); ++VolumeIndex)
+	{
+		const FVoxelGenerationBounds& Volume = ClearVolumes[VolumeIndex];
+		if (!Volume.IsValid())
+		{
+			continue;
+		}
+		InfluenceBounds += FVector(Volume.Min);
+		InfluenceBounds += FVector(Volume.Max);
+		const FIntVector MinSection(
+			VoxelGeneration::FloorDivide(Volume.Min.X, 16),
+			VoxelGeneration::FloorDivide(Volume.Min.Y, 16),
+			VoxelGeneration::FloorDivide(Volume.Min.Z, 16));
+		const FIntVector MaxSection(
+			VoxelGeneration::FloorDivide(Volume.Max.X - 1, 16),
+			VoxelGeneration::FloorDivide(Volume.Max.Y - 1, 16),
+			VoxelGeneration::FloorDivide(Volume.Max.Z - 1, 16));
+		for (int32 Z = MinSection.Z; Z <= MaxSection.Z; ++Z)
+		{
+			for (int32 Y = MinSection.Y; Y <= MaxSection.Y; ++Y)
+			{
+				for (int32 X = MinSection.X; X <= MaxSection.X; ++X)
+				{
+					ClearVolumeIndicesBySection.FindOrAdd(FIntVector(X, Y, Z)).Add(VolumeIndex);
+				}
+			}
+		}
+	}
 }
 
 bool FVoxelCavePlan::Carves(
@@ -118,6 +147,16 @@ bool FVoxelCavePlan::Carves(
 		VoxelGeneration::FloorDivide(
 			InCell.Z,
 			16));
+	if (const TArray<int32>* Volumes = ClearVolumeIndicesBySection.Find(Section))
+	{
+		for (const int32 Index : *Volumes)
+		{
+			if (ClearVolumes.IsValidIndex(Index) && ClearVolumes[Index].Contains(InCell))
+			{
+				return true;
+			}
+		}
+	}
 
 	const TArray<int32>* SegmentIndices =
 		SegmentIndicesBySection.Find(
@@ -164,8 +203,11 @@ uint64 FVoxelCavePlan::GetAllocatedBytes() const
 {
 	uint64 Bytes =
 		Segments.GetAllocatedSize() +
+		Entrances.GetAllocatedSize() +
+		ClearVolumes.GetAllocatedSize() +
 		SegmentIndicesBySection.
-			GetAllocatedSize();
+			GetAllocatedSize() +
+		ClearVolumeIndicesBySection.GetAllocatedSize();
 
 	for (const TPair<
 		FIntVector,
@@ -175,6 +217,10 @@ uint64 FVoxelCavePlan::GetAllocatedBytes() const
 		Bytes +=
 			Pair.Value.
 				GetAllocatedSize();
+	}
+	for (const auto& Pair : ClearVolumeIndicesBySection)
+	{
+		Bytes += Pair.Value.GetAllocatedSize();
 	}
 
 	return Bytes;
@@ -257,6 +303,8 @@ bool FVoxelCaveGenerator::BuildPlan(
 					InBounds,
 					InColumnSampler,
 					Plan.Segments,
+					Plan.Entrances,
+					Plan.ClearVolumes,
 					BuildError,
 					InCancel);
 
@@ -286,6 +334,8 @@ bool FVoxelCaveGenerator::TryBuildSystem(
 	const FVoxelGenerationBounds& InOwnerBounds,
 	FVoxelCaveColumnSampler InColumnSampler,
 	TArray<FVoxelCaveSegment>& OutSegments,
+	TArray<FVoxelCaveEntrance>& OutEntrances,
+	TArray<FVoxelGenerationBounds>& OutClearVolumes,
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
@@ -403,12 +453,15 @@ bool FVoxelCaveGenerator::TryBuildSystem(
 	if (bWantsEntrance)
 	{
 		FString EntranceError;
+		FVoxelCaveEntrance Entrance;
 		bHasEntrance = BuildEntranceCorridor(
 			Stream,
 			FIntPoint(StartX, StartY),
 			StartColumn,
 			InColumnSampler,
 			OutSegments,
+			OutClearVolumes,
+			Entrance,
 			Current,
 			Yaw,
 			EntranceError,
@@ -417,6 +470,13 @@ bool FVoxelCaveGenerator::TryBuildSystem(
 		{
 			OutError = MoveTemp(EntranceError);
 			return false;
+		}
+		if (bHasEntrance)
+		{
+			Entrance.Id = VoxelGeneration::MakeStableId(Recipe->Settings.Seed,
+				FIntVector(InAnchorGrid.X, InAnchorGrid.Y, 0),
+				0x43415645454E5452ull);
+			OutEntrances.Add(Entrance);
 		}
 	}
 	if (!bHasEntrance)
@@ -703,6 +763,8 @@ bool FVoxelCaveGenerator::BuildEntranceCorridor(
 	const FVoxelColumnSample& InStartColumn,
 	FVoxelCaveColumnSampler InColumnSampler,
 	TArray<FVoxelCaveSegment>& InOutSegments,
+	TArray<FVoxelGenerationBounds>& InOutClearVolumes,
+	FVoxelCaveEntrance& OutEntrance,
 	FIntVector& OutEnd,
 	double& OutYaw,
 	FString& OutError,
@@ -710,12 +772,37 @@ bool FVoxelCaveGenerator::BuildEntranceCorridor(
 {
 	const FVoxelGenerationSettings& Settings = Recipe->Settings;
 	const int32 TotalLength = FMath::Max(4, Settings.CaveEntranceLength);
-	const int32 DropPerStep = FMath::Clamp(Settings.CaveEntranceDropPerStep, 1, 4);
 	const int32 Radius = FMath::Max(2, Settings.CaveMainRadius);
+	const int32 HalfWidth = FMath::Max(Radius, (Settings.CaveEntranceMinWidth + 1) / 2);
+	const int32 Height = FMath::Max(Settings.CaveEntranceMinHeight, Radius * 2);
 	constexpr int32 HorizontalStep = 4;
+	const int32 Steps = FMath::DivideAndRoundUp(TotalLength, HorizontalStep);
+	const int32 RequiredDrop = FMath::DivideAndRoundUp(Radius + 1, Steps);
+	const int32 DropPerStep = FMath::Clamp(
+		FMath::Max(Settings.CaveEntranceDropPerStep, RequiredDrop), 1, 4);
 	OutYaw = InStream.FRandRange(-PI, PI);
 	FIntVector Current(InStartXY.X, InStartXY.Y, InStartColumn.SurfaceZ + 1);
+	const FIntVector Mouth = Current;
 	TArray<FVoxelCaveSegment> LocalSegments;
+	TArray<FVoxelGenerationBounds> LocalClearVolumes;
+	for (int32 Distance = 0; Distance <= Settings.CaveEntranceClearance; ++Distance)
+	{
+		const int32 LandingX = FMath::RoundToInt(InStartXY.X - FMath::Cos(OutYaw) * Distance);
+		const int32 LandingY = FMath::RoundToInt(InStartXY.Y - FMath::Sin(OutYaw) * Distance);
+		FVoxelColumnSample Landing;
+		if (!InColumnSampler(FIntVector(LandingX, LandingY, 0), Landing) ||
+			Landing.bOcean || Landing.bLake || Landing.bRiver || Landing.bCoast ||
+			Landing.SlopePermille > 450 ||
+			FMath::Abs(Landing.SurfaceZ - InStartColumn.SurfaceZ) > 1)
+		{
+			OutError.Reset();
+			return false;
+		}
+		LocalClearVolumes.Add({
+			FIntVector(LandingX - HalfWidth, LandingY - HalfWidth, Landing.SurfaceZ + 1),
+			FIntVector(LandingX + HalfWidth + 1, LandingY + HalfWidth + 1,
+				Landing.SurfaceZ + Height + 1)});
+	}
 
 	for (int32 Travelled = 0; Travelled < TotalLength;)
 	{
@@ -729,7 +816,8 @@ bool FVoxelCaveGenerator::BuildEntranceCorridor(
 		const int32 NextY = FMath::RoundToInt(Current.Y + FMath::Sin(OutYaw) * Step);
 		FVoxelColumnSample Column;
 		if (!InColumnSampler(FIntVector(NextX, NextY, 0), Column) ||
-			Column.bOcean || Column.bLake || Column.bRiver)
+			Column.bOcean || Column.bLake || Column.bRiver || Column.bCoast ||
+			Column.SlopePermille > 450)
 		{
 			OutError.Reset();
 			return false;
@@ -743,6 +831,13 @@ bool FVoxelCaveGenerator::BuildEntranceCorridor(
 		}
 		const FIntVector Next(NextX, NextY, NextZ);
 		LocalSegments.Add({ Current, Next, Radius });
+		LocalClearVolumes.Add({
+			FIntVector(FMath::Min(Current.X, Next.X) - HalfWidth,
+				FMath::Min(Current.Y, Next.Y) - HalfWidth,
+				FMath::Min(Current.Z, Next.Z)),
+			FIntVector(FMath::Max(Current.X, Next.X) + HalfWidth + 1,
+				FMath::Max(Current.Y, Next.Y) + HalfWidth + 1,
+				FMath::Max(Current.Z, Next.Z) + Height)});
 		Current = Next;
 		Travelled += Step;
 	}
@@ -755,6 +850,13 @@ bool FVoxelCaveGenerator::BuildEntranceCorridor(
 		return false;
 	}
 	InOutSegments.Append(MoveTemp(LocalSegments));
+	InOutClearVolumes.Append(MoveTemp(LocalClearVolumes));
+	OutEntrance.MouthCenter = Mouth;
+	OutEntrance.Facing = FVector2D(FMath::Cos(OutYaw), FMath::Sin(OutYaw));
+	OutEntrance.HalfWidth = HalfWidth;
+	OutEntrance.Height = Height;
+	OutEntrance.Clearance = Settings.CaveEntranceClearance;
+	OutEntrance.InteriorJoin = Current;
 	OutEnd = Current;
 	OutError.Reset();
 	return true;

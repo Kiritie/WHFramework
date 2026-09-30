@@ -417,7 +417,7 @@ bool FVoxelIndependentSourceViewTest::RunTest(const FString& InParameters)
 	Sources[1].View.FineRadiusCells = 48;
 	Sources[1].View.FineVerticalRadiusCells = 64;
 	Sources[1].View.FinePreloadCells = 0;
-	Sources[1].View.VoxelProxyRadiusCells = Sources[1].View.FineRadiusCells + 16;
+	Sources[1].View.VoxelProxyRadiusCells = 10000;
 
 	Sources[1].ExactRadius = -1;
 	Sources[1].CollisionRadius = 0;
@@ -435,6 +435,17 @@ bool FVoxelIndependentSourceViewTest::RunTest(const FString& InParameters)
 		TestEqual(TEXT("Debug fine uses numeric source priority"), DebugDemand->Priority, -25);
 	}
 	TestFalse(TEXT("Debug source retains local voxel proxy ancestors"), DebugOnly.VoxelProxy.IsEmpty());
+	bool bProxyRemainsLocal = true;
+	for (const FVoxelViewKey& Key : DebugOnly.VoxelProxy)
+	{
+		const FIntVector BoundsMin = Key.GetBounds().Min;
+		const FIntVector BoundsMax = Key.GetBounds().Max;
+		const FIntVector Center = (BoundsMin + BoundsMax) / 2;
+		bProxyRemainsLocal &= Key.Level == 1 &&
+			FMath::Abs(Center.X - Sources[1].Center.X) < 256 &&
+			FMath::Abs(Center.Y - Sources[1].Center.Y) < 256;
+	}
+	TestTrue(TEXT("Debug proxy ignores the global radius and stays near its fine island"), bProxyRemainsLocal);
 	TestTrue(TEXT("Debug source does not request surface"), DebugOnly.Surface.IsEmpty());
 	TestTrue(TEXT("Debug source does not request macro"), DebugOnly.Macro.IsEmpty());
 

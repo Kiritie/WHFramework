@@ -3,6 +3,7 @@
 #include "Misc/AutomationTest.h"
 #include "Voxel/Network/VoxelNetworkCodec.h"
 #include "Voxel/Network/VoxelRepresentationSync.h"
+#include "Voxel/Rendering/VoxelWaterView.h"
 #include "Voxel/Runtime/VoxelWorldRuntime.h"
 #include "Voxel/Tests/VoxelTestUtilities.h"
 
@@ -132,7 +133,8 @@ bool FVoxelNetworkRepresentationDataCodecTest::RunTest(const FString& InParamete
 	Surface.GroundZ = { 1, 2, 3, 4 }; Surface.WaterZ = { 4, 3, 2, 1 };
 	Surface.SurfaceMaterial = { 5, 6, 7, 8 }; Surface.Biome = { 9, 10, 11, 12 };
 	Surface.Flags = { 0, 1, 2, 4 };
-	Surface.DistantCells.Add({FIntVector(256, -320, 5), FIntVector(272, -304, 21), FVoxelBlockState(3, 9)});
+	Surface.DistantCells.Add({FIntVector(256, -320, 5), FIntVector(272, -304, 21),
+		FVoxelBlockState(3, 9), {17, 23}});
 	TestTrue(TEXT("Encode surface data"), FVoxelRepresentationSync::EncodeSurface(Surface, Bytes, Error));
 	FVoxelSurfaceTileData DecodedSurface;
 	TestTrue(TEXT("Decode surface data"), FVoxelRepresentationSync::DecodeSurface(Bytes, DecodedSurface, Error));
@@ -143,26 +145,34 @@ bool FVoxelNetworkRepresentationDataCodecTest::RunTest(const FString& InParamete
 	{
 		TestEqual(TEXT("Surface distant cell bounds"), DecodedSurface.DistantCells[0].Max, Surface.DistantCells[0].Max);
 		TestEqual(TEXT("Surface distant cell material"), DecodedSurface.DistantCells[0].State.Pack(), Surface.DistantCells[0].State.Pack());
+		TestTrue(TEXT("Surface distant tree identity"),
+			DecodedSurface.DistantCells[0].SourceTreeId == Surface.DistantCells[0].SourceTreeId);
 	}
 
 	FVoxelMacroTileData Macro;
 	Macro.Key = { FIntPoint(-2, 8), 0 };
 	Macro.Side = 2; Macro.Step = 64; Macro.Revision = 19;
 	Macro.Height = { 11, 12, 13, 14 }; Macro.WaterHeight = { 5, 6, 7, 8 };
+	Macro.WaterKind = {uint8(EVoxelWaterKind::River), uint8(EVoxelWaterKind::Lake),
+		uint8(EVoxelWaterKind::Ocean), uint8(EVoxelWaterKind::None)};
 	Macro.SurfaceClass = { 1, 2, 3, 4 }; Macro.ForestCoverage = { 5, 6, 7, 8 };
 	Macro.SnowCoverage = { 8, 7, 6, 5 };
 	Macro.LargeStructures.Add({ FIntPoint(4, 5), 6, 7, 8 });
-	Macro.DistantCells.Add({FIntVector(-4096, 16384, 12), FIntVector(-4048, 16432, 58), FVoxelBlockState(3, 9)});
+	Macro.DistantCells.Add({FIntVector(-4096, 16384, 12), FIntVector(-4048, 16432, 58),
+		FVoxelBlockState(3, 9), {31, 37}});
 	TestTrue(TEXT("Encode macro data"), FVoxelRepresentationSync::EncodeMacro(Macro, Bytes, Error));
 	FVoxelMacroTileData DecodedMacro;
 	TestTrue(TEXT("Decode macro data"), FVoxelRepresentationSync::DecodeMacro(Bytes, DecodedMacro, Error));
 	TestEqual(TEXT("Macro height"), DecodedMacro.Height, Macro.Height);
+	TestEqual(TEXT("Macro water semantics"), DecodedMacro.WaterKind, Macro.WaterKind);
 	TestEqual(TEXT("Macro structures"), DecodedMacro.LargeStructures.Num(), 1);
 	TestEqual(TEXT("Macro distant cell count"), DecodedMacro.DistantCells.Num(), 1);
 	if (DecodedMacro.DistantCells.Num() == 1)
 	{
 		TestEqual(TEXT("Macro distant cell bounds"), DecodedMacro.DistantCells[0].Min, Macro.DistantCells[0].Min);
 		TestEqual(TEXT("Macro distant cell material"), DecodedMacro.DistantCells[0].State.Pack(), Macro.DistantCells[0].State.Pack());
+		TestTrue(TEXT("Macro distant tree identity"),
+			DecodedMacro.DistantCells[0].SourceTreeId == Macro.DistantCells[0].SourceTreeId);
 	}
 	return true;
 }

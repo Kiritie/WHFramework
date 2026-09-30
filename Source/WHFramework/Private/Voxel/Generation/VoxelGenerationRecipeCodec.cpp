@@ -4,7 +4,7 @@
 namespace
 {
 	constexpr uint32 VoxelRecipeMagic = 0x31524356;
-	constexpr uint32 VoxelRecipeSchemaVersion = 8;
+	constexpr uint32 VoxelRecipeSchemaVersion = 11;
 	constexpr int32 MaxRecipeBytes = 32 * 1024 * 1024;
 	constexpr int32 MaxRecipeArrayCount = 1 << 20;
 
@@ -171,13 +171,19 @@ namespace
 		Writer.I32(Value.Landform.DomainPeriod);
 		Writer.I32(Value.Landform.ReliefPeriod);
 		Writer.I32(Value.Landform.HillsPeriod);
+		Writer.I32(Value.Landform.HillsDetailPeriod);
 		Writer.I32(Value.Landform.PlateauPeriod);
+		Writer.I32(Value.Landform.ValleyPeriod);
 		Writer.I32(Value.Landform.DomainWarpCells);
 		Writer.I32(Value.Landform.PlainRelief);
 		Writer.I32(Value.Landform.HillRelief);
+		Writer.I32(Value.Landform.HillsDetailRelief);
 		Writer.I32(Value.Landform.HighlandUplift);
+		Writer.I32(Value.Landform.MountainBaseUplift);
 		Writer.I32(Value.Landform.PlateauUplift);
 		Writer.I32(Value.Landform.BasinDepth);
+		Writer.I32(Value.Landform.ValleyDepth);
+		Writer.I32(Value.Landform.BlendSharpnessQ15);
 		Writer.I32(Value.HydrologyCellSize);
 		Writer.I32(Value.HydrologyRegionSide);
 		Writer.I32(Value.RiverSourceAccumulation);
@@ -208,6 +214,9 @@ namespace
 		Writer.I32(Value.CaveEntranceLength);
 		Writer.I32(Value.CaveEntranceDropPerStep);
 		Writer.I32(Value.CaveEntranceTransitionDepth);
+		Writer.I32(Value.CaveEntranceMinWidth);
+		Writer.I32(Value.CaveEntranceMinHeight);
+		Writer.I32(Value.CaveEntranceClearance);
 		Writer.I32(Value.CaveRoomChancePermille);
 		Writer.I32(Value.CaveBranchChancePermille);
 		Writer.I32(Value.AquiferSpacing);
@@ -237,13 +246,19 @@ namespace
 		Result.Landform.DomainPeriod = Reader.I32();
 		Result.Landform.ReliefPeriod = Reader.I32();
 		Result.Landform.HillsPeriod = Reader.I32();
+		Result.Landform.HillsDetailPeriod = Reader.I32();
 		Result.Landform.PlateauPeriod = Reader.I32();
+		Result.Landform.ValleyPeriod = Reader.I32();
 		Result.Landform.DomainWarpCells = Reader.I32();
 		Result.Landform.PlainRelief = Reader.I32();
 		Result.Landform.HillRelief = Reader.I32();
+		Result.Landform.HillsDetailRelief = Reader.I32();
 		Result.Landform.HighlandUplift = Reader.I32();
+		Result.Landform.MountainBaseUplift = Reader.I32();
 		Result.Landform.PlateauUplift = Reader.I32();
 		Result.Landform.BasinDepth = Reader.I32();
+		Result.Landform.ValleyDepth = Reader.I32();
+		Result.Landform.BlendSharpnessQ15 = Reader.I32();
 		Result.HydrologyCellSize = Reader.I32();
 		Result.HydrologyRegionSide = Reader.I32();
 		Result.RiverSourceAccumulation = Reader.I32();
@@ -274,6 +289,9 @@ namespace
 		Result.CaveEntranceLength = Reader.I32();
 		Result.CaveEntranceDropPerStep = Reader.I32();
 		Result.CaveEntranceTransitionDepth = Reader.I32();
+		Result.CaveEntranceMinWidth = Reader.I32();
+		Result.CaveEntranceMinHeight = Reader.I32();
+		Result.CaveEntranceClearance = Reader.I32();
 		Result.CaveRoomChancePermille = Reader.I32();
 		Result.CaveBranchChancePermille = Reader.I32();
 		Result.AquiferSpacing = Reader.I32();

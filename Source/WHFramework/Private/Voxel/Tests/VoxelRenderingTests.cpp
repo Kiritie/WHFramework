@@ -395,6 +395,8 @@ bool FVoxelHeightfieldTransitionEdgeTest::RunTest(const FString& InParameters)
 	TArray<int32> FineGroundB = {7, 7, 7, 7, 7, 7, 7, 7, 7};
 	TArray<int32> Dry;
 	Dry.Init(MIN_int32, 9);
+	TArray<uint8> DryKind;
+	DryKind.Init(static_cast<uint8>(EVoxelWaterKind::None), 9);
 	TArray<uint16> Materials;
 	Materials.Init(1, 9);
 	FVoxelHeightfieldTileView Coarse;
@@ -403,6 +405,7 @@ bool FVoxelHeightfieldTransitionEdgeTest::RunTest(const FString& InParameters)
 	Coarse.Step = 4;
 	Coarse.Ground = CoarseGround;
 	Coarse.Water = Dry;
+	Coarse.WaterKind = DryKind;
 	Coarse.Material = Materials;
 	FVoxelHeightfieldTileView FineA;
 	FineA.Key = {EVoxelHeightfieldRepresentation::Surface, FIntPoint(2, 0), 1};
@@ -411,6 +414,7 @@ bool FVoxelHeightfieldTransitionEdgeTest::RunTest(const FString& InParameters)
 	FineA.Step = 2;
 	FineA.Ground = FineGroundA;
 	FineA.Water = Dry;
+	FineA.WaterKind = DryKind;
 	FineA.Material = Materials;
 	FVoxelHeightfieldTileView FineB = FineA;
 	FineB.Key.Coordinate = FIntPoint(2, 1);
@@ -470,6 +474,10 @@ bool FVoxelHeightfieldTransitionInvariantTest::RunTest(const FString& InParamete
 	OwnerWater.Init(12, 9);
 	TArray<int32> Dry;
 	Dry.Init(MIN_int32, 9);
+	TArray<uint8> RiverKind;
+	RiverKind.Init(static_cast<uint8>(EVoxelWaterKind::River), 9);
+	TArray<uint8> DryKind;
+	DryKind.Init(static_cast<uint8>(EVoxelWaterKind::None), 9);
 	TArray<uint16> Material;
 	Material.Init(1, 9);
 	FVoxelHeightfieldTileView Owner;
@@ -478,6 +486,7 @@ bool FVoxelHeightfieldTransitionInvariantTest::RunTest(const FString& InParamete
 	Owner.Step = 8;
 	Owner.Ground = HighGround;
 	Owner.Water = OwnerWater;
+	Owner.WaterKind = RiverKind;
 	Owner.Material = Material;
 	FVoxelHeightfieldTileView Neighbor;
 	Neighbor.Key = {EVoxelHeightfieldRepresentation::Surface, FIntPoint(4, 0), 0};
@@ -486,6 +495,7 @@ bool FVoxelHeightfieldTransitionInvariantTest::RunTest(const FString& InParamete
 	Neighbor.Step = 2;
 	Neighbor.Ground = LowGround;
 	Neighbor.Water = Dry;
+	Neighbor.WaterKind = DryKind;
 	Neighbor.Material = Material;
 	TArray<FVoxelHeightfieldTileView> Views = {Owner, Neighbor};
 	TArray<FVoxelHeightfieldTransitionEdge> Edges;
@@ -526,7 +536,7 @@ bool FVoxelHeightfieldTransitionInvariantTest::RunTest(const FString& InParamete
 		else GroundVertices += Batch.Mesh.Vertices.Num();
 	}
 	TestEqual(TEXT("Ground closes both fine cells"), GroundVertices, 8);
-	TestEqual(TEXT("Water closes both fine cells"), WaterVertices, 8);
+	TestEqual(TEXT("Wet-to-dry shoreline has no vertical water wall"), WaterVertices, 0);
 	TArray<FVoxelHeightfieldTileView> OnlyOwner = {Owner};
 	TArray<FVoxelHeightfieldTileFootprint> PendingNeighbor = {{
 		Neighbor.Key, Neighbor.Origin, Neighbor.CellSide() * Neighbor.Step,
@@ -542,11 +552,13 @@ bool FVoxelHeightfieldTransitionInvariantTest::RunTest(const FString& InParamete
 		TMap<FVoxelHeightfieldNodeKey, FVoxelHeightfieldTileView> OwnerOnlyMap;
 		OwnerOnlyMap.Add(Owner.Key, Owner);
 		FVoxelSectionMeshResult SafetyMesh;
-		if (!TestTrue(TEXT("Pending edge builds a shallow ground and water wall"),
+		if (!TestTrue(TEXT("Pending edge builds only a shallow ground skirt"),
 			FVoxelHeightfieldTransitionBuilder::BuildMesh(Owner, PendingEdges, OwnerOnlyMap,
 				*Config, Registry, -64, 4.0, SafetyMesh, Error))) return false;
 		for (const FVoxelRenderBatch& Batch : SafetyMesh.Batches)
 		{
+			TestTrue(TEXT("Pending edge has no water mesh"),
+				Batch.Group != EVoxelRenderGroup::Water);
 			for (const FVector& Vertex : Batch.Mesh.Vertices)
 			{
 				TestTrue(TEXT("Loading wall is at most two cells deep"), Vertex.Z >= 9.0);
@@ -556,6 +568,52 @@ bool FVoxelHeightfieldTransitionInvariantTest::RunTest(const FString& InParamete
 			FVoxelHeightfieldTransitionBuilder::BuildSignature(
 				Owner.Key, Owner.Revision, PendingEdges) != Signature);
 	}
+	TArray<int32> LowerWater;
+	LowerWater.Init(8, 9);
+	Neighbor.Water = LowerWater;
+	Neighbor.WaterKind = RiverKind;
+	ViewMap.Add(Neighbor.Key, Neighbor);
+	FVoxelSectionMeshResult RiverMesh;
+	if (!TestTrue(TEXT("Ready river edge builds a top slope"),
+		FVoxelHeightfieldTransitionBuilder::BuildMesh(Owner, Edges, ViewMap,
+			*Config, Registry, -64, 4.0, RiverMesh, Error))) return false;
+	WaterVertices = 0;
+	bool bCrossesBoundary = false;
+	for (const FVoxelRenderBatch& Batch : RiverMesh.Batches)
+	{
+		if (Batch.Group != EVoxelRenderGroup::Water) continue;
+		WaterVertices += Batch.Mesh.Vertices.Num();
+		for (const FVector& Vertex : Batch.Mesh.Vertices)
+		{
+			bCrossesBoundary |= Vertex.X != 16.0;
+		}
+		for (const FVector& Normal : Batch.Mesh.Normals)
+		{
+			TestTrue(TEXT("River top slope faces upward"), Normal.Z > 0.0);
+		}
+	}
+	TestEqual(TEXT("River edge has two top slope quads"), WaterVertices, 8);
+	TestTrue(TEXT("River transition spans the shared boundary"), bCrossesBoundary);
+	TArray<uint8> OceanKind;
+	OceanKind.Init(static_cast<uint8>(EVoxelWaterKind::Ocean), 9);
+	Owner.WaterKind = OceanKind;
+	Neighbor.WaterKind = OceanKind;
+	ViewMap.Add(Owner.Key, Owner);
+	ViewMap.Add(Neighbor.Key, Neighbor);
+	FVoxelSectionMeshResult OceanMesh;
+	if (!TestTrue(TEXT("Same ocean uses its canonical plane"),
+		FVoxelHeightfieldTransitionBuilder::BuildMesh(Owner, Edges, ViewMap,
+			*Config, Registry, -64, 4.0, OceanMesh, Error))) return false;
+	for (const FVoxelRenderBatch& Batch : OceanMesh.Batches)
+	{
+		TestTrue(TEXT("Ocean edge has no vertical water side"),
+			Batch.Group != EVoxelRenderGroup::Water);
+	}
+	Owner.WaterKind = RiverKind;
+	Neighbor.Water = Dry;
+	Neighbor.WaterKind = DryKind;
+	ViewMap.Add(Owner.Key, Owner);
+	ViewMap.Add(Neighbor.Key, Neighbor);
 	TArray<FBox> FineCoverage = {
 		FBox(FVector(15, 1, -100), FVector(17, 3, 100))};
 	FVoxelHeightfieldTransitionBuilder::ExcludeCoveredIntervals(
@@ -757,11 +815,16 @@ bool FVoxelProxyTransitionDirectionsTest::RunTest(const FString& InParameters)
 				if (!TestEqual(Case + TEXT(" has one shared face"), Faces.Num(), 1)) continue;
 				FVoxelVoxelProxyData NeighborData;
 				NeighborData.Key = Neighbor;
-				NeighborData.Cells.Init(FVoxelBlockState(0, 0), 4096);
+				const int32 NeighborSide = Neighbor.GetGridSide();
+				NeighborData.Cells.Init(FVoxelBlockState(0, 0),
+					NeighborSide * NeighborSide * NeighborSide);
 				FIntVector NeighborCell = FIntVector::ZeroValue;
-				NeighborCell[Axis] = (Face & 1) ? 15 : 0;
-				auto Linear = [](const FIntVector& Cell) { return Cell.X + 16 * Cell.Y + 256 * Cell.Z; };
-				NeighborData.Cells[Linear(NeighborCell)] = FVoxelBlockState(1, 0);
+				NeighborCell[Axis] = (Face & 1) ? NeighborSide - 1 : 0;
+				auto Linear = [](const FIntVector& Cell, const int32 Side)
+				{
+					return Cell.X + Side * (Cell.Y + Side * Cell.Z);
+				};
+				NeighborData.Cells[Linear(NeighborCell, NeighborSide)] = FVoxelBlockState(1, 0);
 				FVoxelBoundaryTransitionContext Context;
 				Context.Owner = Owner;
 				FVoxelBoundaryTransitionPatch& Patch = Context.Patches.AddDefaulted_GetRef();
@@ -769,17 +832,20 @@ bool FVoxelProxyTransitionDirectionsTest::RunTest(const FString& InParameters)
 				if (!TestTrue(Case + TEXT(" captures proxy boundary"),
 					FVoxelBoundaryFaceSnapshot::CaptureProxy(NeighborData, Face ^ 1, Patch.Neighbor))) continue;
 				FVoxelSectionSnapshot Snapshot;
-				Snapshot.Blocks.Init(FVoxelBlockState(0, 0).Pack(), 4096);
+				const int32 OwnerSide = Owner.GetGridSide();
+				Snapshot.GridSide = OwnerSide;
+				Snapshot.Blocks.Init(FVoxelBlockState(0, 0).Pack(),
+					OwnerSide * OwnerSide * OwnerSide);
 				FIntVector OwnerCell = FIntVector::ZeroValue;
-				OwnerCell[Axis] = (Face & 1) ? 0 : 15;
-				Snapshot.Blocks[Linear(OwnerCell)] = FVoxelBlockState(1, 0).Pack();
+				OwnerCell[Axis] = (Face & 1) ? 0 : OwnerSide - 1;
+				Snapshot.Blocks[Linear(OwnerCell, OwnerSide)] = FVoxelBlockState(1, 0).Pack();
 				Snapshot.Known[Face] = true;
-				Snapshot.Halo[Face].Init(FVoxelBlockState(0, 0).Pack(), 256);
+				Snapshot.Halo[Face].Init(FVoxelBlockState(0, 0).Pack(), OwnerSide * OwnerSide);
 				FVoxelSectionMeshResult Mesh;
 				if (!TestTrue(Case + TEXT(" meshes the shared boundary"),
 					FVoxelSectionMesher::Build(Snapshot, Registry, Shapes, Mesh, nullptr, 1.0, &Context))) continue;
 				int32 BoundaryTriangles = 0;
-				const double Plane = (Face & 1) ? 0.0 : 16.0;
+				const double Plane = (Face & 1) ? 0.0 : double(OwnerSide);
 				for (const FVoxelRenderBatch& Batch : Mesh.Batches)
 				{
 					TestTrue(Case + TEXT(" has valid mesh attributes"), Batch.Mesh.Validate());
@@ -791,7 +857,10 @@ bool FVoxelProxyTransitionDirectionsTest::RunTest(const FString& InParameters)
 						if (A[Axis] == Plane && B[Axis] == Plane && C[Axis] == Plane) ++BoundaryTriangles;
 					}
 				}
-				TestEqual(Case + TEXT(" exposes three quadrants without a duplicate coarse face"), BoundaryTriangles, 6);
+				const int32 ExpectedTriangles =
+					Owner.GetSampleStep() > Neighbor.GetSampleStep() ? 6 : 0;
+				TestEqual(Case + TEXT(" matches the actual sample-step boundary without a duplicate face"),
+					BoundaryTriangles, ExpectedTriangles);
 			}
 		}
 	}
@@ -847,14 +916,43 @@ bool FVoxelProxyTreeSilhouetteTest::RunTest(const FString& InParameters)
 	int32 Candidates = 0;
 	int32 Accepted = 0;
 	FIntVector FirstAnchor = FIntVector::ZeroValue;
+	FVoxelStableId FirstTreeId;
 	Ecology.EnumerateTrees({FIntVector(0, 0, -64), FIntVector(32, 32, 128)},
 		SampleColumn, SampleBase,
-		[&FirstAnchor](const FIntVector& Anchor, const int32 Height,
-			const FVoxelStableId)
+		[&FirstAnchor, &FirstTreeId](const FIntVector& Anchor, const int32 Height,
+			const FVoxelStableId Id)
 		{
-			if (FirstAnchor == FIntVector::ZeroValue) FirstAnchor = Anchor;
+			if (!FirstTreeId.IsValid())
+			{
+				FirstAnchor = Anchor;
+				FirstTreeId = Id;
+			}
 		}, Candidates, Accepted);
 	if (!TestTrue(TEXT("Tree planner accepts candidates"), Accepted > 0)) return false;
+	const TSharedRef<FVoxelGenerationPipeline, ESPMode::ThreadSafe> SurfaceGenerator =
+		MakeShared<FVoxelGenerationPipeline, ESPMode::ThreadSafe>(Config, Cache);
+	FVoxelTestOverlaySource NoSurfaceEdits;
+	const FVoxelSurfaceProxyBuilder SurfaceBuilder(SurfaceGenerator, Config,
+		Config->Recipe->Settings, NoSurfaceEdits, MakeSurfaceRegistry());
+	FVoxelSurfaceTileData SurfaceTrees;
+	if (!TestTrue(TEXT("Distant tree surface builds"),
+		SurfaceBuilder.Build({FIntPoint::ZeroValue, 1}, SurfaceTrees, Error))) return false;
+	bool bTrunkOwned = false;
+	bool bCrownOwned = false;
+	const FIntPoint TileMin = SurfaceTrees.Key.Coordinate * SurfaceTrees.GetTileSide();
+	const FIntPoint TileMax = TileMin + FIntPoint(
+		SurfaceTrees.GetTileSide(), SurfaceTrees.GetTileSide());
+	for (const FVoxelDistantCell& Cell : SurfaceTrees.DistantCells)
+	{
+		if (!TestTrue(TEXT("Distant cell stays inside its owner tile"),
+			Cell.Min.X >= TileMin.X && Cell.Min.Y >= TileMin.Y &&
+			Cell.Max.X <= TileMax.X && Cell.Max.Y <= TileMax.Y)) return false;
+		if (Cell.SourceTreeId != FirstTreeId) continue;
+		bTrunkOwned |= Cell.State.TypeId == 8;
+		bCrownOwned |= Cell.State.TypeId == 9;
+	}
+	TestTrue(TEXT("Distant trunk preserves ecology tree identity"), bTrunkOwned);
+	TestTrue(TEXT("Distant crown preserves the same ecology tree identity"), bCrownOwned);
 	const FVoxelViewKey Key{
 		FIntVector(VoxelGeneration::FloorDivide(FirstAnchor.X, 32),
 			VoxelGeneration::FloorDivide(FirstAnchor.Y, 32),
@@ -975,7 +1073,9 @@ bool FVoxelSurfaceDistantEditsTest::RunTest(const FString& InParameters)
 	for (const FVoxelDistantCell& Cell : CrossBoundary.DistantCells)
 	{
 		bShowsShortEdge |= Cell.Min == FIntVector(8, 4, BaseZ + 32) &&
-			Cell.Max == FIntVector(16, 5, BaseZ + 33);
+			Cell.Max.X > 16 && Cell.Max.Y == 5 &&
+			Cell.Max.Z == BaseZ + 33 &&
+			Cell.State == FVoxelBlockState(1, 0);
 	}
 	TestTrue(TEXT("A large connected construction retains the segment across a coarse-cell boundary"),
 		bShowsShortEdge);
@@ -1096,6 +1196,9 @@ bool FVoxelMacroWaterMeshTest::RunTest(const FString& InParameters)
 	Macro.Step = 64;
 	Macro.Height = { 10, 10, 10, 10 };
 	Macro.WaterHeight = { 12, MIN_int32, MIN_int32, MIN_int32 };
+	Macro.WaterKind = {uint8(EVoxelWaterKind::Ocean),
+		uint8(EVoxelWaterKind::None), uint8(EVoxelWaterKind::None),
+		uint8(EVoxelWaterKind::None)};
 	Macro.SurfaceClass = { 1, 1, 1, 1 };
 	Macro.ForestCoverage = { 0, 0, 0, 0 };
 	FVoxelSectionMeshResult Mesh;

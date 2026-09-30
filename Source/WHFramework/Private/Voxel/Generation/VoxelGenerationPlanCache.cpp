@@ -844,6 +844,39 @@ void FVoxelGenerationPlanCache::UpdateRetention(
 		InRetention;
 }
 
+FVoxelGenerationCacheRetentionLease::FVoxelGenerationCacheRetentionLease(
+	TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> InCache,
+	const uint64 InId)
+	: Cache(InCache)
+	, Id(InId)
+{
+}
+
+FVoxelGenerationCacheRetentionLease::~FVoxelGenerationCacheRetentionLease()
+{
+	Cache->ReleaseTaskRetention(Id);
+}
+
+TSharedRef<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>
+FVoxelGenerationPlanCache::RetainForTask(
+	const FVoxelGenerationCacheRetentionPoint& InPoint)
+{
+	uint64 Id = 0;
+	{
+		FWriteScopeLock Scope(RetentionLock);
+		Id = NextTaskRetentionId++;
+		TaskRetentionPoints.Add(Id, InPoint);
+	}
+	return MakeShared<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>(
+		AsShared(), Id);
+}
+
+void FVoxelGenerationPlanCache::ReleaseTaskRetention(const uint64 InId)
+{
+	FWriteScopeLock Scope(RetentionLock);
+	TaskRetentionPoints.Remove(InId);
+}
+
 bool FVoxelGenerationPlanCache::IsRetained(
 	const FIntPoint& InPosition,
 	int32 FVoxelGenerationCacheRetentionPoint::* InRadius,
@@ -898,15 +931,22 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 	int32 EcologyBudget = TakeGroupBudget();
 	int32 FeatureBudget = TakeGroupBudget();
 	int32 StructureBudget = TakeGroupBudget();
+	TArray<FVoxelBaseColumnEntryPtr> RetiredBaseColumns;
+	TArray<FVoxelNaturalColumnEntryPtr> RetiredNaturalColumns;
+	TArray<FVoxelHydrologyPlanPtr> RetiredHydrology;
+	TArray<FVoxelCavePlanPtr> RetiredCaves;
+	TArray<FVoxelEcologyPlanPtr> RetiredEcology;
+	TArray<FVoxelFeaturePlanPtr> RetiredFeatures;
+	TArray<FVoxelStructurePlanPtr> RetiredStructures;
 
-	FVoxelGenerationCacheRetention Snapshot;
-
+	// Hold the read lock through trimming so a newly registered task cannot
+	// race with a maintenance snapshot and lose its plans after registration.
+	TOptional<FReadScopeLock> RetentionScope;
+	RetentionScope.Emplace(RetentionLock);
+	FVoxelGenerationCacheRetention Snapshot = Retention;
+	for (const TPair<uint64, FVoxelGenerationCacheRetentionPoint>& Entry : TaskRetentionPoints)
 	{
-		FReadScopeLock Scope(
-			RetentionLock);
-
-		Snapshot =
-			Retention;
+		Snapshot.Points.Add(Entry.Value);
 	}
 
 	if (Snapshot.Revision == 0)
@@ -921,9 +961,6 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 	MaintenanceShardCursor =
 		(MaintenanceShardCursor + 1) %
 		ShardCount;
-
-	TArray<FVoxelBaseColumnEntryPtr> RetiredBaseColumns;
-	TArray<FVoxelNaturalColumnEntryPtr> RetiredNaturalColumns;
 
 	{
 		FNaturalShard& Shard =
@@ -964,12 +1001,6 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			});
 
 	}
-
-	TArray<FVoxelHydrologyPlanPtr> RetiredHydrology;
-	TArray<FVoxelCavePlanPtr> RetiredCaves;
-	TArray<FVoxelEcologyPlanPtr> RetiredEcology;
-	TArray<FVoxelFeaturePlanPtr> RetiredFeatures;
-	TArray<FVoxelStructurePlanPtr> RetiredStructures;
 
 	{
 		FPlanShard& Shard =
@@ -1084,6 +1115,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			});
 
 	}
+	RetentionScope.Reset();
 }
 
 void FVoxelGenerationPlanCache::Reset()

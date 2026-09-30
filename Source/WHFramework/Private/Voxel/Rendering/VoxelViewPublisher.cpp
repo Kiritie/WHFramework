@@ -45,8 +45,14 @@ FVoxelViewPublisher::~FVoxelViewPublisher()
 	Reset();
 }
 
-bool FVoxelViewPublisher::Stage(AActor*& InOutActor, const FVector& InLocation,
-	const double InScale, FVoxelSectionMeshResult&& InMesh, const int32 InTerrainStage)
+bool FVoxelViewPublisher::Stage(
+	AActor*& InOutActor,
+	const FVector& InLocation,
+	const double InScale,
+	FVoxelSectionMeshResult&& InMesh,
+	const int32 InTerrainStage,
+	const FVoxelPublishGroupKey& InGroupKey,
+	const bool bInTransition)
 {
 	if (!Module.GetWorld() || !Module.GetMaterialSet() || !FMath::IsFinite(InScale) || InScale <= 0.0)
 	{
@@ -73,6 +79,8 @@ bool FVoxelViewPublisher::Stage(AActor*& InOutActor, const FVector& InLocation,
 	}
 	FEntry& Entry = Entries.FindOrAdd(TWeakObjectPtr<AActor>(InOutActor));
 	Entry.TerrainStage = InTerrainStage;
+	Entry.GroupKey = InGroupKey;
+	Entry.bTransition = bInTransition;
 	Entry.Location = InLocation;
 	Entry.Scale = InScale;
 	Entry.Bounds = FBox(ForceInit);
@@ -89,6 +97,7 @@ void FVoxelViewPublisher::BeginBatch()
 {
 	check(!bBusy);
 	Updates.Reset();
+	Groups.Reset();
 	Visibility.Reset();
 	bRetry = false;
 }
@@ -139,29 +148,111 @@ uint64 FVoxelViewCoverageResult::GetAllocatedBytes() const
 	return Meshes.GetAllocatedSize() + OwnedMeshBytes;
 }
 
-bool FVoxelViewPublisher::EndBatch(TFunction<void()> InOnCommitted)
+bool FVoxelViewPublisher::EndBatch(TFunction<void()> InOnCommitted,
+	TFunction<void(TConstArrayView<FVoxelPublishGroupKey>)> InOnGroupCommitted)
 {
 	OnCommitted = MoveTemp(InOnCommitted);
-	if (Updates.IsEmpty())
-	{
-		CommitBatch();
-		return true;
-	}
+	OnGroupCommitted = MoveTemp(InOnGroupCommitted);
 	Updates.StableSort([](const FUpdate& A, const FUpdate& B)
 	{
 		return A.TerrainStage < B.TerrainStage;
 	});
+	BuildGroups();
+#if !UE_BUILD_SHIPPING
+	static double NextGroupLogSeconds = 0.0;
+	const double GroupNowSeconds = FPlatformTime::Seconds();
+	if (Groups.Num() > 1 && GroupNowSeconds >= NextGroupLogSeconds)
+	{
+		UE_LOG(LogTemp, Display,
+			TEXT("Voxel local publish plan: groups=%d meshUpdates=%d visibilityChanges=%d maxGroupsPerFrame=%d"),
+			Groups.Num(), Updates.Num(), Visibility.Num(),
+			Module.GetViewSettings().MaxPublishGroupsPerFrame);
+		NextGroupLogSeconds = GroupNowSeconds + 5.0;
+	}
+#endif
+	if (Groups.IsEmpty())
+	{
+		FinishBatch();
+		return true;
+	}
 	++BatchSerial;
 	CoverageIndex = 0;
 	BuildIndex = 0;
-	PrepareIndex = 0;
 	PendingBuilds = 0;
 	PreparedMeshes.SetNum(Updates.Num());
 	bBusy = true;
-	bCoveragePrepared = false;
+	bCoveragePrepared = Updates.IsEmpty();
 	bCoveragePreparing = false;
-	AdmitCoveragePreparation();
+	if (!bCoveragePrepared) AdmitCoveragePreparation();
 	return true;
+}
+
+void FVoxelViewPublisher::BuildGroups()
+{
+	TArray<FVoxelPublishFootprint> Footprints;
+	TMap<TWeakObjectPtr<AActor>, int32> ActorIndices;
+	auto AddActor = [this, &Footprints, &ActorIndices](
+		const TWeakObjectPtr<AActor> Actor)
+	{
+		if (ActorIndices.Contains(Actor)) return;
+		const FEntry* Entry = Entries.Find(Actor);
+		FVoxelPublishFootprint& Footprint = Footprints.AddDefaulted_GetRef();
+		if (Entry)
+		{
+			Footprint.Key = Entry->GroupKey;
+			Footprint.bTransition = Entry->bTransition;
+			if (!Entry->bTransition)
+			{
+				Footprint.Bounds = FVoxelPublishGroupPlanner::OwnershipBounds(
+					Entry->GroupKey, Module.BlockSize());
+			}
+			else
+			{
+				Footprint.Bounds += Entry->PresentedWorldBounds;
+				if (Entry->Bounds.IsValid)
+				{
+					const FBox Desired(
+						Entry->Location + Entry->Bounds.Min * Entry->Scale,
+						Entry->Location + Entry->Bounds.Max * Entry->Scale);
+					Footprint.Bounds += Desired;
+				}
+			}
+		}
+		ActorIndices.Add(Actor, Footprints.Num() - 1);
+	};
+	for (const FUpdate& Update : Updates) AddActor(Update.Actor);
+	for (const auto& Pair : Visibility) AddActor(Pair.Key);
+
+	TArray<int32> GroupIndices;
+	FVoxelPublishGroupPlanner::Build(Footprints, GroupIndices);
+	int32 GroupCount = 0;
+	for (const int32 Index : GroupIndices)
+	{
+		GroupCount = FMath::Max(GroupCount, Index + 1);
+	}
+	Groups.SetNum(GroupCount);
+	for (int32 Index = 0; Index < Footprints.Num(); ++Index)
+	{
+		Groups[GroupIndices[Index]].Keys.AddUnique(Footprints[Index].Key);
+	}
+	for (FUpdate& Update : Updates)
+	{
+		Update.GroupIndex = GroupIndices[ActorIndices.FindChecked(Update.Actor)];
+	}
+	Updates.StableSort([](const FUpdate& A, const FUpdate& B)
+	{
+		return A.GroupIndex == B.GroupIndex
+			? A.TerrainStage < B.TerrainStage
+			: A.GroupIndex < B.GroupIndex;
+	});
+	for (int32 Index = 0; Index < Updates.Num(); ++Index)
+	{
+		Groups[Updates[Index].GroupIndex].UpdateIndices.Add(Index);
+	}
+	for (const auto& Pair : Visibility)
+	{
+		Groups[GroupIndices[ActorIndices.FindChecked(Pair.Key)]].VisibilityActors.Add(Pair.Key);
+	}
 }
 
 void FVoxelViewPublisher::AdmitCoveragePreparation()
@@ -251,9 +342,8 @@ void FVoxelViewPublisher::AdmitCoveragePreparation()
 
 void FVoxelViewPublisher::AdmitBuilds()
 {
-	if (!bCoveragePrepared) return;
 	constexpr int32 MaximumPendingBuilds = 4;
-	while (BuildIndex < Updates.Num() && PendingBuilds < MaximumPendingBuilds)
+	while (BuildIndex < CoverageIndex && PendingBuilds < MaximumPendingBuilds)
 	{
 		FUpdate& Update = Updates[BuildIndex];
 		if (Update.bUnchanged || Update.Exclusions.IsEmpty())
@@ -367,38 +457,61 @@ void FVoxelViewPublisher::Tick()
 	}
 	if (!bBusy) return;
 	AdmitCoveragePreparation();
-	if (!bCoveragePrepared) return;
 	AdmitBuilds();
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewPrepareGT);
 	const double Deadline = FPlatformTime::Seconds() +
 		Module.GetViewSettings().PublishPrepareMilliseconds / 1000.0;
 	int32 PreparedComponents = 0;
-	while (PrepareIndex < Updates.Num() && PreparedMeshes[PrepareIndex])
+	for (FGroup& Group : Groups)
 	{
-		bool bComplete = false;
-		if (!PrepareUpdate(PrepareIndex, Deadline, PreparedComponents, bComplete))
+		if (Group.bCommitted) continue;
+		while (Group.PreparedUpdates < Group.UpdateIndices.Num())
 		{
-			DiscardBatch();
-			bRetry = true;
-			return;
+			const int32 Index = Group.UpdateIndices[Group.PreparedUpdates];
+			if (!PreparedMeshes[Index]) break;
+			bool bComplete = false;
+			if (!PrepareUpdate(Index, Deadline, PreparedComponents, bComplete))
+			{
+				DiscardBatch();
+				bRetry = true;
+				return;
+			}
+			if (bComplete) ++Group.PreparedUpdates;
+			if (!bComplete) break;
 		}
-		if (bComplete) ++PrepareIndex;
 		if (PreparedComponents >= Module.GetViewSettings().MaxPublishComponentsPerFrame ||
 			FPlatformTime::Seconds() >= Deadline)
 		{
 			break;
 		}
 	}
-	if (PrepareIndex == Updates.Num()) CommitBatch();
+	CommitReadyGroups();
 }
 
-void FVoxelViewPublisher::CommitBatch()
+void FVoxelViewPublisher::CommitReadyGroups()
+{
+	int32 CommittedThisFrame = 0;
+	const int32 Limit = FMath::Max(1, Module.GetViewSettings().MaxPublishGroupsPerFrame);
+	for (FGroup& Group : Groups)
+	{
+		if (Group.bCommitted) continue;
+		if (Group.PreparedUpdates != Group.UpdateIndices.Num()) continue;
+		CommitGroup(Group);
+		if (++CommittedThisFrame >= Limit) break;
+	}
+	if (Groups.ContainsByPredicate([](const FGroup& Group) { return !Group.bCommitted; }) == false)
+	{
+		FinishBatch();
+	}
+}
+
+void FVoxelViewPublisher::CommitGroup(FGroup& InGroup)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewCommit);
 	const double CommitStart = FPlatformTime::Seconds();
-	const int32 UpdateCount = Updates.Num();
-	for (FUpdate& Update : Updates)
+	for (const int32 Index : InGroup.UpdateIndices)
 	{
+		FUpdate& Update = Updates[Index];
 		AActor* Actor = Update.Actor.Get();
 		FEntry* Entry = Entries.Find(Update.Actor);
 		if (!Actor || !Entry || Update.bUnchanged) continue;
@@ -416,18 +529,44 @@ void FVoxelViewPublisher::CommitBatch()
 		Entry->Exclusions = MoveTemp(Update.Exclusions);
 		Entry->bDirty = Entry->Source != Update.Source;
 		Entry->bPresented = true;
+		Entry->PresentedWorldBounds = Update.Bounds.IsValid
+			? FBox(Update.Location + Update.Bounds.Min * Update.Scale,
+				Update.Location + Update.Bounds.Max * Update.Scale)
+			: FBox(ForceInit);
 	}
-	CommitVisibility();
+	for (const TWeakObjectPtr<AActor> ActorKey : InGroup.VisibilityActors)
+	{
+		const bool* bHidden = Visibility.Find(ActorKey);
+		if (AActor* Actor = ActorKey.Get();
+			Actor && bHidden && Actor->IsHidden() != *bHidden)
+		{
+			Actor->SetActorHiddenInGame(*bHidden);
+		}
+		Visibility.Remove(ActorKey);
+	}
+	InGroup.bCommitted = true;
+	if (OnGroupCommitted)
+	{
+		OnGroupCommitted(InGroup.Keys);
+	}
 #if !UE_BUILD_SHIPPING
 	const double CommitMs = (FPlatformTime::Seconds() - CommitStart) * 1000.0;
 	if (CommitMs > 8.0)
 	{
-		UE_LOG(LogTemp, Display, TEXT("Voxel publish slow commit: ms=%.2f updates=%d"), CommitMs, UpdateCount);
+		UE_LOG(LogTemp, Display, TEXT("Voxel publish slow local commit: ms=%.2f updates=%d"),
+			CommitMs, InGroup.UpdateIndices.Num());
 	}
 #endif
+}
+
+void FVoxelViewPublisher::FinishBatch()
+{
 	Updates.Reset();
+	Groups.Reset();
+	Visibility.Reset();
 	PreparedMeshes.Reset();
 	bBusy = false;
+	OnGroupCommitted = {};
 	if (OnCommitted)
 	{
 		TFunction<void()> Completed = MoveTemp(OnCommitted);
@@ -435,21 +574,10 @@ void FVoxelViewPublisher::CommitBatch()
 	}
 }
 
-void FVoxelViewPublisher::CommitVisibility()
-{
-	for (const auto& Pair : Visibility)
-	{
-		if (AActor* Actor = Pair.Key.Get(); Actor && Actor->IsHidden() != Pair.Value)
-		{
-			Actor->SetActorHiddenInGame(Pair.Value);
-		}
-	}
-	Visibility.Reset();
-}
-
 void FVoxelViewPublisher::DiscardBatch()
 {
 	OnCommitted = {};
+	OnGroupCommitted = {};
 	++BatchSerial;
 	PendingBuilds = 0;
 	bCoveragePreparing = false;
@@ -463,6 +591,7 @@ void FVoxelViewPublisher::DiscardBatch()
 		}
 	}
 	Updates.Reset();
+	Groups.Reset();
 	Visibility.Reset();
 	PreparedMeshes.Reset();
 	bBusy = false;
@@ -489,6 +618,15 @@ void FVoxelViewPublisher::Reset()
 bool FVoxelViewPublisher::IsBusy() const
 {
 	return bBusy;
+}
+
+bool FVoxelViewPublisher::IsGroupBusy(const FVoxelPublishGroupKey& InKey) const
+{
+	if (!bBusy) return false;
+	return Groups.ContainsByPredicate([&InKey](const FGroup& Group)
+	{
+		return !Group.bCommitted && Group.Keys.Contains(InKey);
+	});
 }
 
 bool FVoxelViewPublisher::NeedsUpdate() const

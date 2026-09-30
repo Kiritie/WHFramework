@@ -21,6 +21,7 @@ struct WHFRAMEWORK_API FVoxelDistantCell
 	FIntVector Min = FIntVector::ZeroValue;
 	FIntVector Max = FIntVector::ZeroValue;
 	FVoxelBlockState State;
+	FVoxelStableId SourceTreeId;
 };
 
 struct WHFRAMEWORK_API FVoxelSurfaceTileData

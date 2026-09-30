@@ -463,6 +463,7 @@ bool FVoxelHeightfieldMesher::BuildMacro(
 	const int32 Count = InMacro.Side * InMacro.Side;
 	if (InMacro.Side < 2 || InMacro.Step <= 0 ||
 		InMacro.WaterHeight.Num() != Count || InMacro.Height.Num() != Count ||
+		InMacro.WaterKind.Num() != Count ||
 		InMacro.SurfaceClass.Num() != Count ||
 		(!InMacro.ForestCoverage.IsEmpty() && InMacro.ForestCoverage.Num() != Count))
 	{
@@ -509,14 +510,14 @@ bool FVoxelHeightfieldMesher::BuildMacro(
 	Water.Step = InMacro.Step;
 	Water.GroundZ = InMacro.Height;
 	Water.WaterZ = InMacro.WaterHeight;
-	Water.WaterKind.Init(static_cast<uint8>(EVoxelWaterKind::None), Count);
+	Water.WaterKind = InMacro.WaterKind;
 	bool bHasWater = false;
 	for (int32 Index = 0; Index < Count; ++Index)
 	{
-		if (Water.WaterZ[Index] != MIN_int32 &&
+		if (Water.WaterKind[Index] != static_cast<uint8>(EVoxelWaterKind::None) &&
+			Water.WaterZ[Index] != MIN_int32 &&
 			Water.WaterZ[Index] >= Water.GroundZ[Index])
 		{
-			Water.WaterKind[Index] = static_cast<uint8>(EVoxelWaterKind::Edited);
 			bHasWater = true;
 		}
 	}

@@ -18,6 +18,7 @@ struct FVoxelHeightfieldTileView
 	uint64 Revision = 0;
 	TConstArrayView<int32> Ground;
 	TConstArrayView<int32> Water;
+	TArray<uint8> WaterKind;
 	TConstArrayView<uint16> Material;
 	double ZBias = 0.0;
 

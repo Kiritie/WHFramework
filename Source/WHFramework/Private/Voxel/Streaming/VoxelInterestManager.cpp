@@ -849,14 +849,20 @@ void FVoxelInterestManager::AddViewSource(
 	const int32 FineRadius = FMath::Max(0, InSource.View.FineRadiusCells) + FMath::Max(0, InSource.View.FinePreloadCells);
 	const int32 FineVerticalRadius = FMath::Max(0, InSource.View.FineVerticalRadiusCells);
 
-	const int32 ProxyRange =
-		FMath::Max(
-			FineRadius,
-			InSource.View.VoxelProxyRadiusCells);
+	const bool bLocalRefinementOnly =
+		InSource.Has(EVoxelStreamingCapability::LocalRefinement) &&
+		!InSource.Has(EVoxelStreamingCapability::WorldVisual);
+	const int32 ProxyRange = bLocalRefinementOnly
+		? static_cast<int32>(FMath::Min<int64>(
+			static_cast<int64>(FineRadius) +
+			FMath::Max(InterestSectionSide, InViewSettings.VoxelProxyTileSide * 2),
+			MAX_int32))
+		: FMath::Max(FineRadius, InSource.View.VoxelProxyRadiusCells);
 
 	if (bBuildProxy && ProxyRange > FineRadius)
 	{
-		const uint8 ProxyLevel = FMath::Max<uint8>(1, InSource.View.MaximumVoxelProxyLevel);
+		const uint8 ProxyLevel = bLocalRefinementOnly ? 1 :
+			FMath::Max<uint8>(1, InSource.View.MaximumVoxelProxyLevel);
 
 		const int32 ProxySide =
 			FMath::Max(

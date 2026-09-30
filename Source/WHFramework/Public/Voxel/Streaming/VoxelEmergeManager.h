@@ -67,6 +67,12 @@ private:
 		const FVoxelExactDemand& InDemand);
 
 private:
+	struct FWaitingPlanSection
+	{
+		TArray<FVoxelGenerationPlanDependency> Dependencies;
+		double RetryAfterSeconds = 0.0;
+	};
+
 	FVoxelWorldRuntime& Runtime;
 	FVoxelTaskScheduler& Scheduler;
 	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> Generator;
@@ -76,10 +82,17 @@ private:
 	TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> Registry;
 
 	TMap<FIntVector, FVoxelExactDemand> CurrentDemand;
-	TMap<FIntVector, TArray<FVoxelGenerationPlanDependency>> WaitingPlanSections;
+	TMap<FIntVector, FWaitingPlanSection> WaitingPlanSections;
 	TMap<FIntVector, EVoxelSectionChangeState> RemoteChangeStates;
 	TArray<FIntVector> OrderedKeys;
 
 	uint64 CurrentInterestRevision = 0;
 	int32 NextAdmissionIndex = 0;
+	double LastAdmissionDiagnosticTime = 0.0;
+	int32 PlanPendingAttempts = 0;
+	int32 OverlayPendingAttempts = 0;
+	int32 PlanReadyAttempts = 0;
+	int32 OverlayReadyAttempts = 0;
+	int32 EnqueueAttempts = 0;
+	int32 EnqueuedTasks = 0;
 };

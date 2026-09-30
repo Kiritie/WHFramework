@@ -51,13 +51,17 @@ uint32 FVoxelSurfaceGenerator::ResolveSymbol(
         }
     }
 
+    const int32 ShoreWidth = FMath::Max(1, Recipe->Settings.RiverShoreWidth);
+    const int32 BankDistance = FMath::Max(0, InColumn.BankDistanceCells);
+    const int32 BankStrength = FMath::Clamp(
+        (ShoreWidth - BankDistance) * 32767 / ShoreWidth, 0, 32767);
+    const int32 PatchNoise = VoxelGeneration::Noise2D(
+        Recipe->Settings.Seed, InCell.X, InCell.Y, 96,
+        0x524956455242414Eull);
     if (InDepthFromSurface == 0 &&
         InColumn.RiverZone == EVoxelRiverSurfaceZone::DryBank &&
         Recipe->Palette.Sand != MAX_uint16 &&
-        VoxelGeneration::RandomRange(VoxelGeneration::MakeSeed(
-            Recipe->Settings.Seed,
-            FIntVector(InCell.X, InCell.Y, InColumn.SurfaceZ),
-            0x5249564552535552ull), 0, 99) < 35)
+        BankStrength + FMath::Max(0, PatchNoise) / 3 > 14000)
     {
         return Recipe->Palette.Sand;
     }

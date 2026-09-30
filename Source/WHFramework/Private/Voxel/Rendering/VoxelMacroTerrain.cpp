@@ -2,6 +2,7 @@
 
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Generation/Ecology/VoxelEcology.h"
+#include "Voxel/Rendering/VoxelWaterView.h"
 FVoxelMacroTerrainBuilder::FVoxelMacroTerrainBuilder(
 	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator,
 	TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
@@ -59,6 +60,11 @@ bool FVoxelMacroTerrainBuilder::Build(
 		return false;
 	}
 	Data.Revision = Surface.Revision;
+	if (!FVoxelWaterViewBuilder::BuildKindGrid(
+		Surface, Data.WaterKind, OutError))
+	{
+		return false;
+	}
 
 	const FVoxelEcologyGenerator Ecology(Config->Recipe.ToSharedRef());
 	for (int32 Index = 0;

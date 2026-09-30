@@ -328,7 +328,8 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 		}
 	}
 
-	auto AddCell = [&](FIntVector Min, FIntVector Max, const FVoxelBlockState State)
+	auto AddCell = [&](FIntVector Min, FIntVector Max, const FVoxelBlockState State,
+		const FVoxelStableId SourceTreeId = {})
 	{
 		Min.X = FMath::Max(Min.X, Origin.X);
 		Min.Y = FMath::Max(Min.Y, Origin.Y);
@@ -336,7 +337,7 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 		Max.Y = FMath::Min(Max.Y, End.Y);
 		if (!State.IsAir() && Min.X < Max.X && Min.Y < Max.Y && Min.Z < Max.Z)
 		{
-			InOutData.DistantCells.Add({Min, Max, State});
+			InOutData.DistantCells.Add({Min, Max, State, SourceTreeId});
 		}
 	};
 	if (Trees.bEnabled && FMath::Max(Trees.MaxHeight, Trees.CrownRadius * 2 + 1) >= Step)
@@ -350,7 +351,8 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 			return false;
 		}
 		if (!Generator->EnumerateTrees(Bounds,
-			[&](const FIntVector& Anchor, const int32 Height)
+			[&](const FIntVector& Anchor, const int32 Height,
+				const FVoxelStableId TreeId)
 			{
 				if (FMath::Max(Height, Trees.CrownRadius * 2 + 1) < Step) return;
 				const FIntVector CoarseAnchor(
@@ -377,9 +379,9 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 						DX * DX + DY * DY + DZ * DZ <= static_cast<int64>(Radius) * Radius &&
 						Edit.Value != Leaves && Edit.Value != Trunk) return;
 				}
-				AddCell(Anchor, Anchor + FIntVector(1, 1, Height), Trunk);
+				AddCell(Anchor, Anchor + FIntVector(1, 1, Height), Trunk, TreeId);
 				AddCell(CrownCenter - FIntVector(Radius),
-					CrownCenter + FIntVector(Radius + 1), Leaves);
+					CrownCenter + FIntVector(Radius + 1), Leaves, TreeId);
 			}, OutError, InCancel)) return false;
 	}
 
@@ -576,6 +578,7 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 		InOutData.DistantCells.Sort([Axis, U, V](const FVoxelDistantCell& A, const FVoxelDistantCell& B)
 		{
 			if (A.State.Pack() != B.State.Pack()) return A.State.Pack() < B.State.Pack();
+			if (A.SourceTreeId != B.SourceTreeId) return A.SourceTreeId < B.SourceTreeId;
 			for (const int32 Component : { U, V })
 			{
 				if (A.Min[Component] != B.Min[Component]) return A.Min[Component] < B.Min[Component];
@@ -590,7 +593,8 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 			if (Count > 0)
 			{
 				FVoxelDistantCell& Previous = InOutData.DistantCells[Count - 1];
-				if (Previous.State == Cell.State && Previous.Min[U] == Cell.Min[U] &&
+				if (Previous.State == Cell.State && Previous.SourceTreeId == Cell.SourceTreeId &&
+					Previous.Min[U] == Cell.Min[U] &&
 					Previous.Max[U] == Cell.Max[U] && Previous.Min[V] == Cell.Min[V] &&
 					Previous.Max[V] == Cell.Max[V] && Previous.Max[Axis] >= Cell.Min[Axis])
 				{
@@ -610,7 +614,8 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 		if (A.Max.X != B.Max.X) return A.Max.X < B.Max.X;
 		if (A.Max.Y != B.Max.Y) return A.Max.Y < B.Max.Y;
 		if (A.Max.Z != B.Max.Z) return A.Max.Z < B.Max.Z;
-		return A.State.Pack() < B.State.Pack();
+		if (A.State.Pack() != B.State.Pack()) return A.State.Pack() < B.State.Pack();
+		return A.SourceTreeId < B.SourceTreeId;
 	});
 	if (InCancel && InCancel->Load())
 	{

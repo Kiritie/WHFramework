@@ -21,9 +21,22 @@ struct WHFRAMEWORK_API FVoxelCaveSegment
 	}
 };
 
+struct WHFRAMEWORK_API FVoxelCaveEntrance
+{
+	FVoxelStableId Id;
+	FIntVector MouthCenter = FIntVector::ZeroValue;
+	FVector2D Facing = FVector2D(1.0, 0.0);
+	int32 HalfWidth = 0;
+	int32 Height = 0;
+	int32 Clearance = 0;
+	FIntVector InteriorJoin = FIntVector::ZeroValue;
+};
+
 struct WHFRAMEWORK_API FVoxelCavePlan
 {
 	TArray<FVoxelCaveSegment> Segments;
+	TArray<FVoxelCaveEntrance> Entrances;
+	TArray<FVoxelGenerationBounds> ClearVolumes;
 
 	// 生成所属瓦片不等于内容范围，跨瓦片树冠、结构和洞穴必须计入实际影响范围。
 	bool AffectsBounds(const FVoxelGenerationBounds& InBounds) const
@@ -40,6 +53,8 @@ private:
 	FBox InfluenceBounds = FBox(ForceInit);
 	TMap<FIntVector, TArray<int32>>
 		SegmentIndicesBySection;
+	TMap<FIntVector, TArray<int32>>
+		ClearVolumeIndicesBySection;
 };
 
 class WHFRAMEWORK_API FVoxelCaveGenerator
@@ -59,7 +74,7 @@ public:
 	{
 		return MaximumSegments * MaximumSegmentLength + MaximumRoomRadius +
 			FMath::Max(InSettings.CaveMainRadius, InSettings.CaveBranchRadius) +
-			InSettings.CaveEntranceLength + 8;
+			InSettings.CaveEntranceLength + InSettings.CaveEntranceClearance + 8;
 	}
 
 private:
@@ -68,6 +83,8 @@ private:
 		const FVoxelGenerationBounds& InOwnerBounds,
 		FVoxelCaveColumnSampler InColumnSampler,
 		TArray<FVoxelCaveSegment>& OutSegments,
+		TArray<FVoxelCaveEntrance>& OutEntrances,
+		TArray<FVoxelGenerationBounds>& OutClearVolumes,
 		FString& OutError,
 		const TAtomic<bool>* InCancel) const;
 
@@ -86,6 +103,8 @@ private:
 		const FVoxelColumnSample& InStartColumn,
 		FVoxelCaveColumnSampler InColumnSampler,
 		TArray<FVoxelCaveSegment>& InOutSegments,
+		TArray<FVoxelGenerationBounds>& InOutClearVolumes,
+		FVoxelCaveEntrance& OutEntrance,
 		FIntVector& OutEnd,
 		double& OutYaw,
 		FString& OutError,

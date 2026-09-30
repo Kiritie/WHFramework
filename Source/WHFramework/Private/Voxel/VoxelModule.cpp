@@ -1689,7 +1689,11 @@ void UVoxelModule::UpdateReadiness()
 		Snapshot.ReadySpawnSections >= Snapshot.RequiredSpawnSections;
 	const bool bSpawnCollisionReady = bSpawnDataReady &&
 		Snapshot.ReadyCollisionSections >= Snapshot.RequiredCollisionSections;
-	const bool bPrimaryViewReady = bSpawnCollisionReady && PrimaryFine.IsComplete() && PlayableFine.IsComplete();
+	// A preview source may request a playable fine radius without marking any
+	// warmup sections for fine rendering. In that case the warmup fine gate is
+	// vacuously satisfied, while the playable radius still must be presented.
+	const bool bPrimaryViewReady = bSpawnCollisionReady &&
+		(PrimaryFine.Required == 0 || PrimaryFine.IsComplete()) && PlayableFine.IsComplete();
 	if (WorldState == EVoxelWorldState::Failed)
 	{
 		Snapshot.bFailed = true;

@@ -10,7 +10,11 @@ namespace
 		FVoxelCavePlan& OutPlan,
 		FString& OutError,
 		const int32 InSystemChance = 1000,
-		const int32 InEntranceChance = 1000)
+		const int32 InEntranceChance = 1000,
+		const int32 InWetKind = 0,
+		const bool bInCoast = false,
+		const FVoxelGenerationBounds& InBounds =
+			{FIntVector(0, 0, -64), FIntVector(256, 256, 128)})
 	{
 		FVoxelGenerationRuntimeConfig Config = *VoxelTest::MakeGenerationConfig();
 		FVoxelGenerationRecipe Recipe = *Config.Recipe;
@@ -20,21 +24,25 @@ namespace
 		Recipe.Settings.CaveBranchRadius = 3;
 		Recipe.Settings.CaveSystemChancePermille = InSystemChance;
 		Recipe.Settings.CaveEntranceChancePermille = InEntranceChance;
-		Recipe.Settings.CaveEntranceLength = 16;
-		Recipe.Settings.CaveEntranceDropPerStep = 1;
+		Recipe.Settings.CaveEntranceLength = 32;
+		Recipe.Settings.CaveEntranceDropPerStep = 2;
 		Recipe.Settings.CaveEntranceTransitionDepth = 12;
 		Recipe.Settings.CaveRoomChancePermille = 1000;
 		Recipe.Settings.CaveBranchChancePermille = 1000;
 		const TSharedRef<const FVoxelGenerationRecipe, ESPMode::ThreadSafe> Shared =
 			MakeShared<const FVoxelGenerationRecipe, ESPMode::ThreadSafe>(MoveTemp(Recipe));
 		const FVoxelCaveGenerator Generator(Shared);
-		auto ColumnSampler = [](const FIntVector&, FVoxelColumnSample& OutColumn)
+		auto ColumnSampler = [InWetKind, bInCoast](const FIntVector&, FVoxelColumnSample& OutColumn)
 		{
 			OutColumn.SurfaceZ = 96;
+			OutColumn.bOcean = InWetKind == 1;
+			OutColumn.bLake = InWetKind == 2;
+			OutColumn.bRiver = InWetKind == 3;
+			OutColumn.bCoast = bInCoast;
 			return true;
 		};
 		return Generator.BuildPlan(
-			{ FIntVector(0, 0, -64), FIntVector(256, 256, 128) },
+			InBounds,
 			ColumnSampler,
 			OutPlan,
 			OutError);
@@ -154,6 +162,68 @@ bool FVoxelCaveEntranceSlopedTest::RunTest(const FString& InParameters)
 		}
 	}
 	TestTrue(TEXT("At least one surface entrance exists"), bFoundEntrance);
+	TestTrue(TEXT("Cave plan exposes stable entrance records"), !Plan.Entrances.IsEmpty());
+	FVoxelCavePlan Repeated;
+	TestTrue(TEXT("Repeated entrance plan builds"), BuildEntranceTestPlan(Repeated, Error));
+	TestEqual(TEXT("Entrance count is deterministic"), Plan.Entrances.Num(), Repeated.Entrances.Num());
+	for (int32 Index = 0; Index < Plan.Entrances.Num() && Index < Repeated.Entrances.Num(); ++Index)
+	{
+		const FVoxelCaveEntrance& Entrance = Plan.Entrances[Index];
+		TestTrue(TEXT("Entrance ID is deterministic"), Entrance.Id == Repeated.Entrances[Index].Id);
+		TestTrue(TEXT("Entrance has passable width"), Entrance.HalfWidth * 2 >= 8);
+		TestTrue(TEXT("Entrance has passable height"), Entrance.Height >= 10);
+		TestTrue(TEXT("Entrance has a landing"), Entrance.Clearance >= 4);
+		TestTrue(TEXT("Mouth is carved"), Plan.Carves(Entrance.MouthCenter));
+		TestTrue(TEXT("Mouth headroom is carved"), Plan.Carves(
+			Entrance.MouthCenter + FIntVector(0, 0, Entrance.Height - 1)));
+		TestTrue(TEXT("Corridor joins interior"), Plan.Carves(Entrance.InteriorJoin));
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelCaveEntranceOwnershipTest,
+	"WHFramework.Voxel.Cave.Entrance.Ownership",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelCaveEntranceOwnershipTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FString Error;
+	FVoxelCavePlan Base;
+	FVoxelCavePlan Shifted;
+	const FVoxelGenerationBounds ShiftedBounds{
+		FIntVector(1, 1, -64), FIntVector(257, 257, 128)};
+	if (!TestTrue(TEXT("Base entrance plan builds"), BuildEntranceTestPlan(Base, Error)) ||
+		!TestTrue(TEXT("Shifted entrance plan builds"),
+			BuildEntranceTestPlan(Shifted, Error, 1000, 1000, 0, false, ShiftedBounds)))
+	{
+		return false;
+	}
+	int32 SharedEntrances = 0;
+	for (const FVoxelCaveEntrance& Entrance : Base.Entrances)
+	{
+		for (const FVoxelCaveEntrance& Other : Shifted.Entrances)
+		{
+			if (Entrance.Id != Other.Id) continue;
+			++SharedEntrances;
+			TestEqual(TEXT("Shared mouth is stable"), Entrance.MouthCenter, Other.MouthCenter);
+			TestEqual(TEXT("Shared interior join is stable"), Entrance.InteriorJoin, Other.InteriorJoin);
+			break;
+		}
+	}
+	TestTrue(TEXT("Overlapping owner queries share stable entrance IDs"), SharedEntrances > 0);
+	for (int32 WetKind = 0; WetKind <= 4; ++WetKind)
+	{
+		FVoxelCavePlan Wet;
+		if (!TestTrue(TEXT("Wet or coastal cave plan builds"),
+			BuildEntranceTestPlan(Wet, Error, 1000, 1000,
+				WetKind <= 3 ? WetKind : 0, WetKind == 4))) return false;
+		if (WetKind > 0)
+		{
+			TestTrue(TEXT("Wet and coastal columns have no entrance"), Wet.Entrances.IsEmpty());
+		}
+	}
 	return true;
 }
 

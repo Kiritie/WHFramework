@@ -115,7 +115,10 @@ void FVoxelViewManager::Tick(
 	const double TickStart = FPlatformTime::Seconds();
 	Publisher->Tick();
 	const double AfterPublish = FPlatformTime::Seconds();
-	bCoverageDirty |= Publisher->NeedsUpdate();
+	if (Publisher->NeedsUpdate())
+	{
+		MarkCoverageDirty();
+	}
 	const double Now =
 		FPlatformTime::Seconds();
 
@@ -130,7 +133,7 @@ void FVoxelViewManager::Tick(
 		RebuildAdmissions(InObservers);
 		UpdateTaskPriorities();
 		AppliedInterestRevision = InInterestRevision;
-		bCoverageDirty = true;
+		MarkCoverageDirty();
 	}
 
 	const double AfterPlan = FPlatformTime::Seconds();
@@ -144,8 +147,13 @@ void FVoxelViewManager::Tick(
 	if (bCoverageDirty && !Publisher->IsBusy() && !bVolumePlanPending && !bHeightfieldPlanPending)
 	{
 		const double CoverageStart = FPlatformTime::Seconds();
+		bActiveCoverageFull = bCoverageDirtyFull;
+		ActiveDirtyCoverageRects = MoveTemp(DirtyCoverageRects);
+		bCoverageDirtyFull = false;
 		bCoverageDirty = false;
 		ResolveTransitionVisibility();
+		ActiveDirtyCoverageRects.Reset();
+		bActiveCoverageFull = true;
 		LastCoverageMilliseconds = (FPlatformTime::Seconds() - CoverageStart) * 1000.0;
 	}
 	const double AfterCoverage = FPlatformTime::Seconds();
@@ -325,7 +333,7 @@ bool FVoxelViewManager::EnqueuePreparedData(FVoxelTaskRequest&& InRequest)
 			if (PublishVoxelProxy(Result))
 			{
 				++SkippedProxyMeshes;
-				bCoverageDirty = true;
+				MarkCoverageDirty(VoxelProxyCoverageRect(Result.Stamp.ViewKey));
 				return;
 			}
 		}
@@ -1175,6 +1183,62 @@ bool FVoxelViewManager::IsMacroInsideRenderDomain(const FVoxelMacroTileKey& InKe
 	return VoxelCoverage::IntersectsAny2D(MacroCoverageRect(InKey), Domain);
 }
 
+void FVoxelViewManager::MarkCoverageDirty()
+{
+	bCoverageDirty = true;
+	bCoverageDirtyFull = true;
+	DirtyCoverageRects.Reset();
+}
+
+void FVoxelViewManager::MarkCoverageDirty(const FVoxelCoverageRect& InBounds)
+{
+	if (!InBounds.IsValid())
+	{
+		MarkCoverageDirty();
+		return;
+	}
+	bCoverageDirty = true;
+	if (bCoverageDirtyFull) return;
+	FVoxelCoverageRect Merged{InBounds.Min - FIntPoint(1, 1),
+		InBounds.Max + FIntPoint(1, 1)};
+	for (int32 Index = 0; Index < DirtyCoverageRects.Num();)
+	{
+		const FVoxelCoverageRect& Existing = DirtyCoverageRects[Index];
+		if (!Merged.Intersects(Existing))
+		{
+			++Index;
+			continue;
+		}
+		Merged.Min.X = FMath::Min(Merged.Min.X, Existing.Min.X);
+		Merged.Min.Y = FMath::Min(Merged.Min.Y, Existing.Min.Y);
+		Merged.Max.X = FMath::Max(Merged.Max.X, Existing.Max.X);
+		Merged.Max.Y = FMath::Max(Merged.Max.Y, Existing.Max.Y);
+		DirtyCoverageRects.RemoveAtSwap(Index, 1, EAllowShrinking::No);
+		Index = 0;
+	}
+	DirtyCoverageRects.Add(Merged);
+	if (DirtyCoverageRects.Num() > 128) MarkCoverageDirty();
+}
+
+bool FVoxelViewManager::CoverageAffects(const FVoxelCoverageRect& InBounds) const
+{
+	return bActiveCoverageFull ||
+		VoxelCoverage::IntersectsAny2D(InBounds, ActiveDirtyCoverageRects);
+}
+
+void FVoxelViewManager::RetryActiveCoverage()
+{
+	if (bActiveCoverageFull || ActiveDirtyCoverageRects.IsEmpty())
+	{
+		MarkCoverageDirty();
+		return;
+	}
+	bCoverageDirty = true;
+	if (bCoverageDirtyFull) return;
+	DirtyCoverageRects.Append(ActiveDirtyCoverageRects);
+	if (DirtyCoverageRects.Num() > 128) MarkCoverageDirty();
+}
+
 void FVoxelViewManager::ResolveTransitionVisibility()
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewHandoff);
@@ -1259,7 +1323,7 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 		RebuildVolumeTransitions(TargetTerrainNodes);
 	if (bVolumePlanPending)
 	{
-		bCoverageDirty = true;
+		RetryActiveCoverage();
 		return;
 	}
 	if (!bVolumeReady && !VisibleTerrainNodes.IsEmpty())
@@ -1282,7 +1346,9 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 				if (!Publisher->Stage(Host,
 					FVector(Pair.Key.GetBounds().Min) * Module.BlockSize(),
 					Module.BlockSize() * Pair.Key.GetSampleStep(),
-					FVoxelSectionMeshResult(*Mesh), VolumeTransitionWorkClass(Pair.Key) == EVoxelWorkClass::Interactive ? 0 : 1))
+					FVoxelSectionMeshResult(*Mesh),
+					VolumeTransitionWorkClass(Pair.Key) == EVoxelWorkClass::Interactive ? 0 : 1,
+					{1, FIntPoint(Pair.Key.Coordinate.X, Pair.Key.Coordinate.Y), Pair.Key.Level}))
 				{
 					bVolumeStageReady = false;
 					continue;
@@ -1296,7 +1362,49 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 	{
 		TargetTerrainNodes = VisibleTerrainNodes;
 		VolumeToCommit.Reset();
-		bCoverageDirty = true;
+		MarkCoverageDirty();
+		bActiveCoverageFull = true;
+	}
+	if (!bActiveCoverageFull)
+	{
+		auto TerrainRect = [this](const FVoxelViewKey& Key)
+		{
+			return Key.Level == 0
+				? FineCoverageRect(Key.Coordinate)
+				: VoxelProxyCoverageRect(Key);
+		};
+		for (const FVoxelViewKey& Key : TargetTerrainNodes)
+		{
+			if (!VisibleTerrainNodes.Contains(Key) && !CoverageAffects(TerrainRect(Key)))
+			{
+				bActiveCoverageFull = true;
+				break;
+			}
+		}
+		if (!bActiveCoverageFull)
+		{
+			for (const FVoxelViewKey& Key : VisibleTerrainNodes)
+			{
+				if (!TargetTerrainNodes.Contains(Key) && !CoverageAffects(TerrainRect(Key)))
+				{
+					bActiveCoverageFull = true;
+					break;
+				}
+			}
+		}
+		if (!bActiveCoverageFull)
+		{
+			for (const auto& Pair : DesiredVolumeSignatures)
+			{
+				const uint64* Built = VolumeTransitionSignatures.Find(Pair.Key);
+				if ((!Built || *Built != Pair.Value) &&
+					!CoverageAffects(VoxelProxyCoverageRect(Pair.Key)))
+				{
+					bActiveCoverageFull = true;
+					break;
+				}
+			}
+		}
 	}
 	const double PlanMilliseconds = (FPlatformTime::Seconds() - ResolveStart) * 1000.0;
 	const bool bNeedsExclusions = !bUsesTerrainPlan || !SurfaceActors.IsEmpty() || !MacroActors.IsEmpty();
@@ -1354,11 +1462,41 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 	VoxelMeshClipper::NormalizeBoxes(FineBoxes);
 	VoxelMeshClipper::NormalizeBoxes(ProxyBoxes);
 	VoxelMeshClipper::NormalizeBoxes(ProxySurfaceBoxes);
-	RebuildHeightfieldTransitions(FineBoxes, ProxySurfaceBoxes);
-	if (bHeightfieldPlanPending)
+	if (!RebuildHeightfieldTransitions(FineBoxes, ProxySurfaceBoxes))
 	{
-		bCoverageDirty = true;
+		RetryActiveCoverage();
 		return;
+	}
+	if (!bActiveCoverageFull)
+	{
+		for (const auto& Pair : DesiredTransitionSignatures)
+		{
+			const uint64* Built = HeightfieldTransitionSignatures.Find(Pair.Key);
+			if (Built && *Built == Pair.Value) continue;
+			const FVoxelCoverageRect Rect = Pair.Key.Representation == EVoxelHeightfieldRepresentation::Surface
+				? SurfaceCoverageRect({Pair.Key.Coordinate, Pair.Key.Level})
+				: MacroCoverageRect({Pair.Key.Coordinate, Pair.Key.Level});
+			if (!CoverageAffects(Rect))
+			{
+				bActiveCoverageFull = true;
+				break;
+			}
+		}
+		if (!bActiveCoverageFull)
+		{
+			for (const auto& Pair : HeightfieldTransitionSignatures)
+			{
+				if (DesiredTransitionSignatures.Contains(Pair.Key)) continue;
+				const FVoxelCoverageRect Rect = Pair.Key.Representation == EVoxelHeightfieldRepresentation::Surface
+					? SurfaceCoverageRect({Pair.Key.Coordinate, Pair.Key.Level})
+					: MacroCoverageRect({Pair.Key.Coordinate, Pair.Key.Level});
+				if (!CoverageAffects(Rect))
+				{
+					bActiveCoverageFull = true;
+					break;
+				}
+			}
+		}
 	}
 	TMap<FVoxelHeightfieldNodeKey, uint64> HeightfieldToCommit;
 	for (const auto& Pair : PreparedTransitionSignatures)
@@ -1373,9 +1511,11 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 		if (!Publisher->Stage(Host,
 			FVector(Pair.Key.Coordinate.X * TileSide, Pair.Key.Coordinate.Y * TileSide, 0) * Module.BlockSize(),
 			Module.BlockSize(), FVoxelSectionMeshResult(*Mesh),
-			Pair.Key.Representation == EVoxelHeightfieldRepresentation::Surface ? 2 : 3))
+			Pair.Key.Representation == EVoxelHeightfieldRepresentation::Surface ? 2 : 3,
+			{static_cast<uint8>(Pair.Key.Representation == EVoxelHeightfieldRepresentation::Surface ? 4 : 5),
+				Pair.Key.Coordinate, Pair.Key.Level}, true))
 		{
-			bCoverageDirty = true;
+			MarkCoverageDirty();
 			continue;
 		}
 		HeightfieldTransitionActors.Add(Pair.Key, Host);
@@ -1417,8 +1557,17 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 	{
 		return VoxelCoverage::IntersectsAny2D(Rect, PendingHeightfieldHandoffRects);
 	};
-	bool bRecheckAfterCommit = !VolumeToCommit.IsEmpty() ||
-		!HeightfieldToCommit.IsEmpty();
+	TArray<FVoxelCoverageRect> RecheckCoverageRects;
+	for (const auto& Pair : VolumeToCommit)
+	{
+		RecheckCoverageRects.Add(VoxelProxyCoverageRect(Pair.Key));
+	}
+	for (const auto& Pair : HeightfieldToCommit)
+	{
+		RecheckCoverageRects.Add(Pair.Key.Representation == EVoxelHeightfieldRepresentation::Surface
+			? SurfaceCoverageRect({Pair.Key.Coordinate, Pair.Key.Level})
+			: MacroCoverageRect({Pair.Key.Coordinate, Pair.Key.Level}));
+	}
 	const auto CommonHeightfieldBoxes = MakeShared<TArray<FBox>, ESPMode::ThreadSafe>(FineBoxes);
 	CommonHeightfieldBoxes->Append(ProxySurfaceBoxes);
 	const double BoxesMilliseconds = (FPlatformTime::Seconds() - ResolveStart) * 1000.0 - PlanMilliseconds;
@@ -1428,7 +1577,7 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 		if (bUsesTerrainPlan)
 		{
 			const bool bVisible = TargetTerrainNodes.Contains({ Pair.Key, 0 });
-			if (bVisible)
+			if (bVisible && CoverageAffects(FineCoverageRect(Pair.Key)))
 			{
 				Publisher->SetCoverage(Pair.Value, {});
 			}
@@ -1437,6 +1586,11 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 		}
 		const bool bWanted = FineWanted.Contains(Pair.Key);
 		const bool bHidden = !bWanted && IsFineReplacementReady(Pair.Key);
+		if (!CoverageAffects(FineCoverageRect(Pair.Key)))
+		{
+			Publisher->SetHidden(Pair.Value, bHidden);
+			continue;
+		}
 		TArray<FBox> Exclusions;
 		if (!bWanted)
 		{
@@ -1450,7 +1604,8 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 				if (MacroWanted.Contains(Key)) Exclusions.Add(Column(MacroCoverageRect(Key)));
 			}
 		}
-		if (!bHidden) Publisher->SetCoverage(Pair.Value, MoveTemp(Exclusions));
+		if (!bHidden)
+			Publisher->SetCoverage(Pair.Value, MoveTemp(Exclusions));
 		Publisher->SetHidden(Pair.Value, bHidden);
 	}
 	for (const TPair<FVoxelViewKey, TObjectPtr<AActor>>& Pair : VoxelProxyActors)
@@ -1459,7 +1614,7 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 		if (bUsesTerrainPlan)
 		{
 			const bool bVisible = TargetTerrainNodes.Contains(Pair.Key);
-			if (bVisible)
+			if (bVisible && CoverageAffects(VoxelProxyCoverageRect(Pair.Key)))
 			{
 				Publisher->SetCoverage(Pair.Value, {});
 			}
@@ -1468,6 +1623,11 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 		}
 		const bool bWanted = VoxelProxyWanted.Contains(Pair.Key);
 		const bool bHidden = !bWanted && IsProxyReplacementReady(Pair.Key);
+		if (!CoverageAffects(VoxelProxyCoverageRect(Pair.Key)))
+		{
+			Publisher->SetHidden(Pair.Value, bHidden);
+			continue;
+		}
 		TArray<FBox> Exclusions = FineBoxes;
 		for (const FVoxelViewKey& Key : VoxelProxyReady)
 		{
@@ -1485,7 +1645,8 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 				if (MacroWanted.Contains(Key)) Exclusions.Add(Column(MacroCoverageRect(Key)));
 			}
 		}
-		if (!bHidden) Publisher->SetCoverage(Pair.Value, MoveTemp(Exclusions));
+		if (!bHidden)
+			Publisher->SetCoverage(Pair.Value, MoveTemp(Exclusions));
 		Publisher->SetHidden(Pair.Value, bHidden);
 	}
 	for (const TPair<FVoxelSurfaceTileKey, TObjectPtr<AActor>>& Pair : SurfaceActors)
@@ -1501,6 +1662,12 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 		const bool bWanted = SurfaceWanted.Contains(Pair.Key);
 		const bool bHidden = !bWanted && IsSurfaceReplacementReady(Pair.Key);
 		const FVoxelCoverageRect ActorRect = SurfaceCoverageRect(Pair.Key);
+		if (!CoverageAffects(ActorRect))
+		{
+			Publisher->SetHidden(Pair.Value, bHidden);
+			if (AActor* Water = WaterActors.FindRef(Pair.Key)) Publisher->SetHidden(Water, bHidden);
+			continue;
+		}
 		TArray<FBox> Exclusions;
 		for (const FVoxelSurfaceTileKey& Key : SurfaceReady)
 		{
@@ -1521,7 +1688,7 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 		}
 		if (!bHidden)
 		{
-			bRecheckAfterCommit |= !Publisher->IsCommitted(Pair.Value);
+			if (!Publisher->IsCommitted(Pair.Value)) RecheckCoverageRects.Add(ActorRect);
 			Publisher->SetCoverage(Pair.Value, Exclusions, CommonHeightfieldBoxes);
 			if (AActor* Water = WaterActors.FindRef(Pair.Key)) Publisher->SetCoverage(Water, MoveTemp(Exclusions), CommonHeightfieldBoxes);
 		}
@@ -1541,6 +1708,11 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 		const bool bWanted = MacroWanted.Contains(Pair.Key);
 		const bool bHidden = !bWanted && IsMacroReplacementReady(Pair.Key);
 		const FVoxelCoverageRect ActorRect = MacroCoverageRect(Pair.Key);
+		if (!CoverageAffects(ActorRect))
+		{
+			Publisher->SetHidden(Pair.Value, bHidden);
+			continue;
+		}
 		TArray<FBox> Exclusions;
 		for (const FVoxelSurfaceTileKey& Key : SurfaceReady)
 		{
@@ -1558,7 +1730,7 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 		}
 		if (!bHidden)
 		{
-			bRecheckAfterCommit |= !Publisher->IsCommitted(Pair.Value);
+			if (!Publisher->IsCommitted(Pair.Value)) RecheckCoverageRects.Add(ActorRect);
 			Publisher->SetCoverage(Pair.Value, MoveTemp(Exclusions), CommonHeightfieldBoxes);
 		}
 		Publisher->SetHidden(Pair.Value, bHidden);
@@ -1575,9 +1747,37 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 			BlockedHeightfieldNodes.Contains(Pair.Key));
 	}
 	const double ActorsMilliseconds = (FPlatformTime::Seconds() - ResolveStart) * 1000.0 - PlanMilliseconds - BoxesMilliseconds;
+	TMap<FVoxelPublishGroupKey, TArray<FVoxelViewKey>> PreviousNodesByGroup;
+	TMap<FVoxelPublishGroupKey, TArray<FVoxelViewKey>> TargetNodesByGroup;
+	auto TerrainGroupKey = [](const FVoxelViewKey& Key)
+	{
+		return FVoxelPublishGroupKey{
+			static_cast<uint8>(Key.Level == 0 ? 0 : 1),
+			FIntPoint(Key.Coordinate.X, Key.Coordinate.Y), Key.Level};
+	};
+	for (const FVoxelViewKey& Key : VisibleTerrainNodes)
+	{
+		PreviousNodesByGroup.FindOrAdd(TerrainGroupKey(Key)).Add(Key);
+	}
+	for (const FVoxelViewKey& Key : TargetTerrainNodes)
+	{
+		TargetNodesByGroup.FindOrAdd(TerrainGroupKey(Key)).Add(Key);
+	}
+	TMap<FVoxelPublishGroupKey, TArray<FVoxelViewKey>> VolumeByGroup;
+	for (const auto& Pair : VolumeToCommit)
+	{
+		VolumeByGroup.FindOrAdd(TerrainGroupKey(Pair.Key)).Add(Pair.Key);
+	}
+	TMap<FVoxelPublishGroupKey, TArray<FVoxelHeightfieldNodeKey>> HeightfieldByGroup;
+	for (const auto& Pair : HeightfieldToCommit)
+	{
+		const FVoxelHeightfieldNodeKey& Key = Pair.Key;
+		const uint8 Representation = Key.Representation == EVoxelHeightfieldRepresentation::Surface ? 4 : 5;
+		HeightfieldByGroup.FindOrAdd({Representation, Key.Coordinate, Key.Level}).Add(Key);
+	}
 	if (!Publisher->EndBatch([this, Nodes = MoveTemp(TargetTerrainNodes),
 		Volume = MoveTemp(VolumeToCommit), Heightfield = MoveTemp(HeightfieldToCommit),
-		bRecheckAfterCommit]() mutable
+		Recheck = MoveTemp(RecheckCoverageRects)]() mutable
 	{
 		VisibleTerrainNodes = MoveTemp(Nodes);
 		for (const auto& Pair : Volume)
@@ -1608,10 +1808,50 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 			HeightfieldTransitionSignatures.Remove(It.Key());
 			It.RemoveCurrent();
 		}
-		bCoverageDirty |= bRecheckAfterCommit;
+		for (const FVoxelCoverageRect& Rect : Recheck) MarkCoverageDirty(Rect);
+	}, [this, Previous = MoveTemp(PreviousNodesByGroup),
+		Target = MoveTemp(TargetNodesByGroup), Volume = MoveTemp(VolumeByGroup),
+		Heightfield = MoveTemp(HeightfieldByGroup)](
+		TConstArrayView<FVoxelPublishGroupKey> Keys)
+	{
+		for (const FVoxelPublishGroupKey& Key : Keys)
+		{
+			if (const TArray<FVoxelViewKey>* Nodes = Previous.Find(Key))
+			{
+				for (const FVoxelViewKey& Node : *Nodes) VisibleTerrainNodes.Remove(Node);
+			}
+			if (const TArray<FVoxelViewKey>* Nodes = Target.Find(Key))
+			{
+				for (const FVoxelViewKey& Node : *Nodes) VisibleTerrainNodes.Add(Node);
+			}
+			if (const TArray<FVoxelViewKey>* Nodes = Volume.Find(Key))
+			{
+				for (const FVoxelViewKey& Node : *Nodes)
+				{
+					if (const uint64* Signature = PreparedVolumeSignatures.Find(Node))
+					{
+						VolumeTransitionSignatures.Add(Node, *Signature);
+					}
+					PreparedVolumeSignatures.Remove(Node);
+					PreparedVolumeMeshes.Remove(Node);
+				}
+			}
+			if (const TArray<FVoxelHeightfieldNodeKey>* Nodes = Heightfield.Find(Key))
+			{
+				for (const FVoxelHeightfieldNodeKey& Node : *Nodes)
+				{
+					if (const uint64* Signature = PreparedTransitionSignatures.Find(Node))
+					{
+						HeightfieldTransitionSignatures.Add(Node, *Signature);
+					}
+					PreparedTransitionSignatures.Remove(Node);
+					PreparedTransitionMeshes.Remove(Node);
+				}
+			}
+		}
 	}))
 	{
-		bCoverageDirty = true;
+		MarkCoverageDirty();
 	}
 	static double NextTimingLog = 0.0;
 	const double Now = FPlatformTime::Seconds();
@@ -1624,7 +1864,7 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 	}
 }
 
-void FVoxelViewManager::RebuildHeightfieldTransitions(
+bool FVoxelViewManager::RebuildHeightfieldTransitions(
 	const TArray<FBox>& InFineBoxes,
 	const TArray<FBox>& InProxySurfaceBoxes)
 {
@@ -1679,7 +1919,7 @@ void FVoxelViewManager::RebuildHeightfieldTransitions(
 	for (const FBox& Box : InProxySurfaceBoxes) { Mix(GetTypeHash(Box.Min)); Mix(GetTypeHash(Box.Max)); }
 	if (!HeightfieldCoveragePlan || HeightfieldCoveragePlan->Signature != PlanSignature)
 	{
-		if (bHeightfieldPlanPending) return;
+		if (bHeightfieldPlanPending) return false;
 		FVoxelTaskRequest Request;
 		Request.Kind = EVoxelTaskKind::BuildViewCoverage;
 		Request.WorkClass = EVoxelWorkClass::Visible;
@@ -1709,12 +1949,14 @@ void FVoxelViewManager::RebuildHeightfieldTransitions(
 			if (Serial != HeightfieldPlanSerial || Result.Stamp.WorldEpoch != WorldEpoch) return;
 			bHeightfieldPlanPending = false;
 			if (Result.bSuccess && !Result.bCanceled)
+			{
 				HeightfieldCoveragePlan = StaticCastSharedPtr<const FVoxelHeightfieldCoveragePlan>(Result.CustomPayload);
-			bCoverageDirty = true;
+				if (!bCoverageDirty) MarkCoverageDirty();
+			}
+			else MarkCoverageDirty();
 		};
 		bHeightfieldPlanPending = Scheduler.Enqueue(MoveTemp(Request));
-		bCoverageDirty = true;
-		return;
+		return false;
 	}
 	const TArray<FVoxelHeightfieldTransitionEdge>& Edges = HeightfieldCoveragePlan->Edges;
 	HeightfieldUnbalancedEdgeCount = 0;
@@ -1781,6 +2023,7 @@ void FVoxelViewManager::RebuildHeightfieldTransitions(
 		const uint64* WantedSignature = DesiredTransitionSignatures.Find(Owner);
 		return !WantedSignature || *WantedSignature != Stamp.Token;
 	});
+	return true;
 }
 
 void FVoxelViewManager::PumpHeightfieldTransitions()
@@ -1832,7 +2075,7 @@ void FVoxelViewManager::PumpHeightfieldTransitions()
 		if (!bValid)
 		{
 			UnsubmittedTransitionOwners.Pop();
-			bCoverageDirty = true;
+			MarkCoverageDirty();
 			continue;
 		}
 		FVoxelTaskRequest Request;
@@ -1910,7 +2153,9 @@ void FVoxelViewManager::ApplyHeightfieldTransition(
 	}
 	PreparedTransitionSignatures.Add(InOwner, InSignature);
 	PreparedTransitionMeshes.Add(InOwner, Payload->Mesh);
-	bCoverageDirty = true;
+	MarkCoverageDirty(InOwner.Representation == EVoxelHeightfieldRepresentation::Surface
+		? SurfaceCoverageRect({InOwner.Coordinate, InOwner.Level})
+		: MacroCoverageRect({InOwner.Coordinate, InOwner.Level}));
 }
 
 bool FVoxelViewManager::RebuildVolumeTransitions(
@@ -1947,11 +2192,14 @@ bool FVoxelViewManager::RebuildVolumeTransitions(
 			if (Serial != VolumePlanSerial || Result.Stamp.WorldEpoch != WorldEpoch) return;
 			bVolumePlanPending = false;
 			if (Result.bSuccess && !Result.bCanceled)
+			{
 				VolumeCoveragePlan = StaticCastSharedPtr<const FVoxelVolumeCoveragePlan>(Result.CustomPayload);
-			bCoverageDirty = true;
+				if (!bCoverageDirty) MarkCoverageDirty();
+			}
+			else MarkCoverageDirty();
 		};
 		bVolumePlanPending = Scheduler.Enqueue(MoveTemp(Request));
-		bCoverageDirty = true;
+		if (!bVolumePlanPending) RetryActiveCoverage();
 		return false;
 	}
 	const TArray<FVoxelVolumeTransitionFace>& Faces = VolumeCoveragePlan->Faces;
@@ -2098,7 +2346,7 @@ void FVoxelViewManager::PumpVolumeTransitions()
 			PreparedVolumeMeshes.Add(Owner, MakeShared<FVoxelSectionMeshResult>());
 			PreparedVolumeSignatures.Add(Owner, *Signature);
 			UnsubmittedVolumeOwners.Pop();
-			bCoverageDirty = true;
+			MarkCoverageDirty(VoxelProxyCoverageRect(Owner));
 			continue;
 		}
 		FVoxelTaskRequest Request;
@@ -2155,12 +2403,12 @@ void FVoxelViewManager::ApplyVolumeTransition(const FVoxelViewKey& InOwner,
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Volume transition build failed: %s"),
 			*InResult.Error);
-		bCoverageDirty = true;
+		MarkCoverageDirty();
 		return;
 	}
 	PreparedVolumeMeshes.Add(InOwner, InResult.VoxelProxyMesh);
 	PreparedVolumeSignatures.Add(InOwner, InSignature);
-	bCoverageDirty = true;
+	MarkCoverageDirty(VoxelProxyCoverageRect(InOwner));
 }
 
 void FVoxelViewManager::CleanupRetiredRepresentations(const double InNow)
@@ -2252,7 +2500,7 @@ void FVoxelViewManager::CleanupRetiredRepresentations(const double InNow)
 		WaterData.Remove(Key);
 		SurfaceRevisions.Remove(Key);
 		SurfaceLastWanted.Remove(Key);
-		bCoverageDirty = true;
+		MarkCoverageDirty(SurfaceCoverageRect(Key));
 	}
 	TSet<FVoxelMacroTileKey> MacroRetireKeys = MacroReady;
 	for (const auto& Pair : MacroActors) MacroRetireKeys.Add(Pair.Key);
@@ -2272,7 +2520,7 @@ void FVoxelViewManager::CleanupRetiredRepresentations(const double InNow)
 		MacroData.Remove(Key);
 		MacroRevisions.Remove(Key);
 		MacroLastWanted.Remove(Key);
-		bCoverageDirty = true;
+		MarkCoverageDirty(MacroCoverageRect(Key));
 	}
 }
 
@@ -2299,17 +2547,17 @@ bool FVoxelViewManager::OnTask(FVoxelTaskResult&& InResult)
 	switch (InResult.Kind)
 	{
 	case EVoxelTaskKind::BuildFineMesh:
-		bCoverageDirty |= PublishFine(InResult);
+		if (PublishFine(InResult)) MarkCoverageDirty(FineCoverageRect(InResult.Stamp.Section));
 		return true;
 	case EVoxelTaskKind::BuildVoxelProxy:
-		bCoverageDirty |= PublishVoxelProxy(InResult);
+		if (PublishVoxelProxy(InResult)) MarkCoverageDirty(VoxelProxyCoverageRect(InResult.Stamp.ViewKey));
 		return true;
 	case EVoxelTaskKind::BuildSurface:
 		if (InResult.Surface && SurfaceWanted.Contains(InResult.Stamp.SurfaceKey) && PublishSurface(InResult))
 		{
 			const FVoxelSurfaceTileKey Key = InResult.Stamp.SurfaceKey;
 			SurfaceData.Add(Key, InResult.Surface);
-			bCoverageDirty = true;
+			MarkCoverageDirty(SurfaceCoverageRect(Key));
 			if (InResult.Water) WaterData.Add(Key, InResult.Water);
 			else WaterData.Remove(Key);
 		}
@@ -2321,7 +2569,7 @@ bool FVoxelViewManager::OnTask(FVoxelTaskResult&& InResult)
 		if (InResult.Macro && MacroWanted.Contains(InResult.Stamp.MacroKey) && PublishMacro(InResult))
 		{
 			MacroData.Add(InResult.Stamp.MacroKey, MoveTemp(InResult.Macro));
-			bCoverageDirty = true;
+			MarkCoverageDirty(MacroCoverageRect(InResult.Stamp.MacroKey));
 		}
 		return true;
 	default:
@@ -2492,7 +2740,7 @@ void FVoxelViewManager::InvalidateRemoteRepresentations(
 	const FVoxelRepresentationInvalidate& InInvalidate)
 {
 	AppliedInterestRevision = 0;
-	bCoverageDirty = true;
+	MarkCoverageDirty();
 	for (const FVoxelRepresentationWireKey& WireKey : InInvalidate.Keys)
 	{
 		const FVoxelViewKey VoxelKey { WireKey.Coordinate, WireKey.Level };
@@ -2526,7 +2774,7 @@ void FVoxelViewManager::InvalidateSection(const FIntVector& InKey)
 {
 	PrunePreparedData();
 	InvalidateNeighbors(InKey);
-	bCoverageDirty = true;
+	MarkCoverageDirty();
 	FineRevisions.Remove(InKey);
 	bReadyTerrainBranchesDirty |= FineReady.Remove(InKey) > 0;
 	Scheduler.CancelSection(InKey);
@@ -2571,7 +2819,7 @@ void FVoxelViewManager::InvalidateNeighbors(const FIntVector& InKey)
 			if (!FineWanted.Contains(Key) && !FineReady.Contains(Key) && !FineActors.Contains(Key)) continue;
 			const bool bRemoved = FineReady.Remove(Key) > 0;
 			bReadyTerrainBranchesDirty |= bRemoved;
-			bCoverageDirty |= bRemoved;
+			if (bRemoved) MarkCoverageDirty(FineCoverageRect(Key));
 			FineRevisions.Remove(Key);
 			Neighbors.Add(Key);
 		}
@@ -2685,7 +2933,9 @@ void FVoxelViewManager::Reset()
 	AdmissionPriorities.Reset();
 	ActiveMeshStages.Reset();
 	LastResolvedFrontier = 0.0;
-	bCoverageDirty = true;
+	MarkCoverageDirty();
+	ActiveDirtyCoverageRects.Reset();
+	bActiveCoverageFull = true;
 	NextRetireCheck = 0.0;
 	LastRetireMilliseconds = 0.0;
 	NextRepresentationDebugLog = 0.0;
@@ -2870,7 +3120,7 @@ bool FVoxelViewManager::TryResolveFineWithoutMesh(
 	Result.bSuccess = true;
 	Result.FineMesh = MakeShared<FVoxelSectionMeshResult>();
 	const bool bPublished = PublishFine(Result);
-	bCoverageDirty |= bPublished;
+	if (bPublished) MarkCoverageDirty(FineCoverageRect(InSection));
 	return bPublished;
 }
 bool FVoxelViewManager::RequestFine(
@@ -3158,7 +3408,7 @@ bool FVoxelViewManager::RequestVoxelProxy(
 			Empty.VoxelProxyMesh = MakeShared<FVoxelSectionMeshResult>();
 			if (!PublishVoxelProxy(Empty)) return false;
 			++SkippedProxyMeshes;
-			bCoverageDirty = true;
+			MarkCoverageDirty(VoxelProxyCoverageRect(InKey));
 			RemovePreparedData(DataKey);
 			return true;
 		}
@@ -3802,7 +4052,9 @@ bool FVoxelViewManager::PublishFine(const FVoxelTaskResult& InResult)
 	}
 
 	AActor* Host = FineActors.FindRef(Key);
-	if (!Publisher->Stage(Host, FVector(Key * ViewSectionSide) * Module.BlockSize(), Module.BlockSize(), MoveTemp(*InResult.FineMesh), 0))
+	if (!Publisher->Stage(Host, FVector(Key * ViewSectionSide) * Module.BlockSize(),
+		Module.BlockSize(), MoveTemp(*InResult.FineMesh), 0,
+		{0, FIntPoint(Key.X, Key.Y), 0}))
 	{
 		bReadyTerrainBranchesDirty |= FineReady.Remove(Key) > 0;
 		FineRevisions.Remove(Key);
@@ -3841,7 +4093,8 @@ bool FVoxelViewManager::PublishVoxelProxy(const FVoxelTaskResult& InResult)
 
 	AActor* Host = VoxelProxyActors.FindRef(Key);
 	if (!Publisher->Stage(Host, FVector(Key.GetBounds().Min) * Module.BlockSize(),
-		Module.BlockSize() * Key.GetSampleStep(), MoveTemp(*InResult.VoxelProxyMesh), 1))
+		Module.BlockSize() * Key.GetSampleStep(), MoveTemp(*InResult.VoxelProxyMesh), 1,
+		{1, FIntPoint(Key.Coordinate.X, Key.Coordinate.Y), Key.Level}))
 	{
 		bReadyTerrainBranchesDirty |= VoxelProxyReady.Remove(Key) > 0;
 		VoxelProxyData.Remove(Key);
@@ -3867,7 +4120,8 @@ bool FVoxelViewManager::PublishSurface(const FVoxelTaskResult& InResult)
 	AActor* Host = SurfaceActors.FindRef(Key);
 	const int32 TileSide = InResult.Surface->GetTileSide();
 	if (!Publisher->Stage(Host, FVector(Key.Coordinate.X * TileSide, Key.Coordinate.Y * TileSide, 0) * Module.BlockSize(),
-		Module.BlockSize(), MoveTemp(*InResult.SurfaceMesh), 2))
+		Module.BlockSize(), MoveTemp(*InResult.SurfaceMesh), 2,
+		{2, Key.Coordinate, Key.Level}))
 	{
 		SurfaceReady.Remove(Key);
 		return false;
@@ -3921,7 +4175,8 @@ void FVoxelViewManager::PublishWater(
 			0) *
 			Module.BlockSize(),
 		Module.BlockSize(),
-		MoveTemp(*InResult.WaterMesh), 2))
+		MoveTemp(*InResult.WaterMesh), 2,
+		{2, Key.Coordinate, Key.Level}))
 	{
 		WaterActors.Add(
 			Key,
@@ -3970,7 +4225,8 @@ bool FVoxelViewManager::PublishMacro(
 			0) *
 			Module.BlockSize(),
 		Module.BlockSize(),
-		MoveTemp(*InResult.MacroMesh), 3))
+		MoveTemp(*InResult.MacroMesh), 3,
+		{3, Key.Coordinate, Key.Level}))
 	{
 		MacroActors.Add(
 			Key,

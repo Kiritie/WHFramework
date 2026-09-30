@@ -25,6 +25,7 @@ struct WHFRAMEWORK_API FVoxelMacroTileData
 	int32 Step = 0;
 	TArray<int32> Height;
 	TArray<int32> WaterHeight;
+	TArray<uint8> WaterKind;
 	TArray<uint16> SurfaceClass;
 	TArray<uint8> ForestCoverage;
 	TArray<uint8> SnowCoverage;

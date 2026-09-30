@@ -26,6 +26,11 @@ struct WHFRAMEWORK_API FVoxelWaterSurfaceTileData
 class WHFRAMEWORK_API FVoxelWaterViewBuilder
 {
 public:
+	static bool BuildKindGrid(
+		const FVoxelSurfaceTileData& InSurface,
+		TArray<uint8>& OutKinds,
+		FString& OutError);
+
 	bool Build(
 		const FVoxelSurfaceTileData& InSurface,
 		FVoxelWaterSurfaceTileData& OutWater,

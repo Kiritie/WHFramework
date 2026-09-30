@@ -133,7 +133,10 @@ bool FVoxelLandformGenerationSettings::Validate(FString& OutError) const
 	if (DomainPeriod < 512 || ReliefPeriod < 512 || HillsPeriod < 512 || PlateauPeriod < 512 ||
 		DomainWarpCells < 0 || DomainWarpCells > DomainPeriod / 8 ||
 		PlainRelief < 0 || HillRelief < 0 || HighlandUplift < 0 ||
-		PlateauUplift < 0 || BasinDepth < 0)
+		PlateauUplift < 0 || BasinDepth < 0 ||
+		HillsDetailPeriod < 512 || HillsDetailRelief < 0 ||
+		MountainBaseUplift < 0 || ValleyPeriod < 512 || ValleyDepth < 0 ||
+		BlendSharpnessQ15 < 0 || BlendSharpnessQ15 > 32767)
 	{
 		OutError = TEXT("Voxel landform settings are invalid");
 		return false;
@@ -188,6 +191,14 @@ bool FVoxelGenerationSettings::Validate(FString& OutError) const
 	if (CaveEntranceLength < 4 || CaveEntranceLength > 64) { OutError = TEXT("Voxel cave entrance length is outside the supported range"); return false; }
 	if (CaveEntranceDropPerStep < 1 || CaveEntranceDropPerStep > 4) { OutError = TEXT("Voxel cave entrance drop per step is outside the supported range"); return false; }
 	if (CaveEntranceTransitionDepth < 4 || CaveEntranceTransitionDepth > CaveMaxDepth) { OutError = TEXT("Voxel cave entrance transition depth is invalid"); return false; }
+	if (CaveEntranceMinWidth < 2 || CaveEntranceMinWidth > 64 ||
+		CaveEntranceMinHeight < 2 || CaveEntranceMinHeight > 64 ||
+		CaveEntranceClearance < 1 || CaveEntranceClearance > 32 ||
+		CaveEntranceLength < CaveEntranceClearance + 4)
+	{
+		OutError = TEXT("Voxel cave entrance clearance dimensions are invalid");
+		return false;
+	}
 	if (CaveRoomChancePermille < 0 || CaveRoomChancePermille > 1000 || CaveBranchChancePermille < 0 || CaveBranchChancePermille > 1000) { OutError = TEXT("Voxel cave room/branch chance must be in [0,1000]"); return false; }
 	if (AquiferSpacing <= 0) { OutError = TEXT("Voxel aquifer spacing must be positive"); return false; }
 	if (AquiferRadius <= 0 || AquiferRadius >= AquiferSpacing) { OutError = TEXT("Voxel aquifer radius must be smaller than aquifer spacing"); return false; }

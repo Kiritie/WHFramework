@@ -61,6 +61,22 @@ struct WHFRAMEWORK_API FVoxelGenerationCacheRetention
 	uint64 Revision = 0;
 };
 
+class FVoxelGenerationPlanCache;
+
+/** Keeps a planning task's cache area retained until the task finishes. */
+class WHFRAMEWORK_API FVoxelGenerationCacheRetentionLease
+{
+public:
+	FVoxelGenerationCacheRetentionLease(
+		TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> InCache,
+		uint64 InId);
+	~FVoxelGenerationCacheRetentionLease();
+
+private:
+	TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> Cache;
+	uint64 Id = 0;
+};
+
 struct WHFRAMEWORK_API FVoxelGenerationCacheStats
 {
 	int32 BaseColumns = 0;
@@ -77,7 +93,8 @@ struct WHFRAMEWORK_API FVoxelGenerationCacheStats
 	uint64 GateWaitMicroseconds = 0;
 };
 
-class WHFRAMEWORK_API FVoxelGenerationPlanCache
+class WHFRAMEWORK_API FVoxelGenerationPlanCache :
+	public TSharedFromThis<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>
 {
 public:
 	static constexpr int32 ShardCount = 32;
@@ -189,6 +206,9 @@ public:
 	void UpdateRetention(
 		const FVoxelGenerationCacheRetention& InRetention);
 
+	TSharedRef<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> RetainForTask(
+		const FVoxelGenerationCacheRetentionPoint& InPoint);
+
 	/**
 	 * 必须是有预算的增量维护。
 	 * 允许 GameThread 调用，但单帧最多检查 MaxEntries。
@@ -202,6 +222,9 @@ public:
 	uint64 GetAllocatedBytes() const;
 
 private:
+	friend class FVoxelGenerationCacheRetentionLease;
+	void ReleaseTaskRetention(uint64 InId);
+
 	struct FBuildGate;
 
 	struct FNaturalShard
@@ -269,6 +292,8 @@ private:
 
 	mutable FRWLock RetentionLock;
 	FVoxelGenerationCacheRetention Retention;
+	TMap<uint64, FVoxelGenerationCacheRetentionPoint> TaskRetentionPoints;
+	uint64 NextTaskRetentionId = 1;
 
 	int32 MaintenanceShardCursor = 0;
 

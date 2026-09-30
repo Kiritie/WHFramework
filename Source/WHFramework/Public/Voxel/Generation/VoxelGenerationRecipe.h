@@ -238,7 +238,7 @@ struct WHFRAMEWORK_API FVoxelStructureRuntimeDefinition
 
 struct WHFRAMEWORK_API FVoxelGenerationRecipe
 {
-	static constexpr uint32 CurrentAlgorithmVersion = 11;
+	static constexpr uint32 CurrentAlgorithmVersion = 12;
 
 	uint32 AlgorithmVersion = CurrentAlgorithmVersion;
 	uint64 RecipeHash = 0;

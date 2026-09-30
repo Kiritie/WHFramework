@@ -57,6 +57,58 @@ bool FVoxelGenerationCacheNoWaitTest::RunTest(const FString& InParameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelGenerationCacheTaskRetentionTest,
+	"WHFramework.Voxel.Generation.CacheTaskRetention",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelGenerationCacheTaskRetentionTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const auto Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
+	FVoxelGenerationCacheRetention Streaming;
+	Streaming.HydrologyRegionSide = 8;
+	Streaming.HydrologyCellSize = 1;
+	Streaming.Revision = 1;
+	FVoxelGenerationCacheRetentionPoint& StreamingPoint = Streaming.Points.AddDefaulted_GetRef();
+	StreamingPoint.Center = FIntPoint(4, 4);
+	StreamingPoint.HydrologyRadiusCells = 1;
+	Cache->UpdateRetention(Streaming);
+
+	FVoxelHydrologyRegionKey StreamingKey;
+	StreamingKey.Coordinate = FIntPoint::ZeroValue;
+	FVoxelHydrologyRegionKey TaskKey;
+	TaskKey.Coordinate = FIntPoint(5, 0);
+	Cache->StoreHydrology(StreamingKey,
+		MakeShared<FVoxelHydrologyPlan, ESPMode::ThreadSafe>());
+	Cache->StoreHydrology(TaskKey,
+		MakeShared<FVoxelHydrologyPlan, ESPMode::ThreadSafe>());
+	FVoxelGenerationCacheRetentionPoint TaskPoint;
+	TaskPoint.Center = FIntPoint(44, 4);
+	TaskPoint.HydrologyRadiusCells = 1;
+	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> Lease =
+		Cache->RetainForTask(TaskPoint);
+	for (int32 Index = 0; Index < FVoxelGenerationPlanCache::ShardCount * 2; ++Index)
+	{
+		Cache->TickMaintenance(256);
+	}
+	FVoxelHydrologyPlanPtr Plan;
+	TestTrue(TEXT("Task plan survives streaming maintenance"),
+		Cache->FindHydrology(TaskKey, Plan));
+	TestTrue(TEXT("Streaming plan remains retained"),
+		Cache->FindHydrology(StreamingKey, Plan));
+	Lease.Reset();
+	for (int32 Index = 0; Index < FVoxelGenerationPlanCache::ShardCount * 2; ++Index)
+	{
+		Cache->TickMaintenance(256);
+	}
+	TestFalse(TEXT("Task plan can be evicted after task completion"),
+		Cache->FindHydrology(TaskKey, Plan));
+	TestTrue(TEXT("Streaming plan remains retained after task completion"),
+		Cache->FindHydrology(StreamingKey, Plan));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FVoxelGenerationPlanCoordinatorTest,
 	"WHFramework.Voxel.Generation.PlanCoordinator",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

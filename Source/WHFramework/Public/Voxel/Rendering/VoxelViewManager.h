@@ -113,8 +113,12 @@ private:
 	FVector SurfaceWorldCenter(const FVoxelSurfaceTileKey& InKey) const;
 	FVector MacroWorldCenter(const FVoxelMacroTileKey& InKey) const;
 	void LogRepresentationState(TConstArrayView<FVector> InObservers);
+	void MarkCoverageDirty();
+	void MarkCoverageDirty(const FVoxelCoverageRect& InBounds);
+	void RetryActiveCoverage();
+	bool CoverageAffects(const FVoxelCoverageRect& InBounds) const;
 	void ResolveTransitionVisibility();
-	void RebuildHeightfieldTransitions(
+	bool RebuildHeightfieldTransitions(
 		const TArray<FBox>& InFineBoxes,
 		const TArray<FBox>& InProxySurfaceBoxes);
 	void ApplyHeightfieldTransition(
@@ -193,6 +197,10 @@ private:
 	int32 LastActiveAdmissionPriority = MAX_int32;
 	int32 LastActiveDataKind = 4;
 	bool bCoverageDirty = true;
+	bool bCoverageDirtyFull = true;
+	bool bActiveCoverageFull = true;
+	TArray<FVoxelCoverageRect> DirtyCoverageRects;
+	TArray<FVoxelCoverageRect> ActiveDirtyCoverageRects;
 	bool bVolumePlanPending = false;
 	bool bHeightfieldPlanPending = false;
 	uint64 HeightfieldPlanSerial = 0;

@@ -5,6 +5,7 @@
 #include "Voxel/Rendering/VoxelMacroTerrain.h"
 #include "Voxel/Rendering/VoxelSurfaceProxy.h"
 #include "Voxel/Rendering/VoxelViewLod.h"
+#include "Voxel/Rendering/VoxelWaterView.h"
 #include "Voxel/Runtime/VoxelRegistry.h"
 
 namespace
@@ -115,6 +116,8 @@ FVoxelHeightfieldTileView FVoxelHeightfieldTransitionBuilder::MakeView(
 	View.Revision = InData.Revision;
 	View.Ground = InData.GroundZ;
 	View.Water = InData.WaterZ;
+	FString KindError;
+	FVoxelWaterViewBuilder::BuildKindGrid(InData, View.WaterKind, KindError);
 	View.Material = InData.SurfaceMaterial;
 	View.ZBias = -0.02;
 	return View;
@@ -132,6 +135,7 @@ FVoxelHeightfieldTileView FVoxelHeightfieldTransitionBuilder::MakeView(
 	View.Revision = InData.Revision;
 	View.Ground = InData.Height;
 	View.Water = InData.WaterHeight;
+	View.WaterKind = InData.WaterKind;
 	View.Material = InData.SurfaceClass;
 	View.ZBias = -0.05;
 	return View;
@@ -152,7 +156,8 @@ bool FVoxelHeightfieldTransitionBuilder::BuildEdges(
 		const int32 Count = View.Side * View.Side;
 		if (View.Key.Representation == EVoxelHeightfieldRepresentation::None ||
 			View.Side < 2 || View.Step <= 0 || View.Ground.Num() != Count ||
-			View.Water.Num() != Count || View.Material.Num() != Count)
+			View.Water.Num() != Count || View.WaterKind.Num() != Count ||
+			View.Material.Num() != Count)
 		{
 			OutError = TEXT("Heightfield transition tile view is invalid");
 			return false;
@@ -492,6 +497,74 @@ namespace
 		Mesh.Triangles.Append({Base, Base + 2, Base + 1,
 			Base, Base + 3, Base + 2});
 	}
+
+	void AppendWaterSlope(FVoxelSectionMeshResult& InOutMesh,
+		const FVoxelRuntimeDefinition& InDefinition,
+		const FVoxelRuntimeFaceRef& InFace,
+		const EVoxelLodEdgeDirection InDirection,
+		const FVoxelHeightfieldTileView& InOwner,
+		const int32 InWorldFixed,
+		const int32 InStart,
+		const int32 InEnd,
+		const int32 InNeighborStep,
+		const double InOwnerTop,
+		const double InNeighborTop,
+		const double InTexturePeriod)
+	{
+		const bool bXEdge = InDirection == EVoxelLodEdgeDirection::NegativeX ||
+			InDirection == EVoxelLodEdgeDirection::PositiveX;
+		const double Fixed = InWorldFixed -
+			(bXEdge ? InOwner.Origin.X : InOwner.Origin.Y);
+		const double Start = InStart -
+			(bXEdge ? InOwner.Origin.Y : InOwner.Origin.X);
+		const double End = InEnd -
+			(bXEdge ? InOwner.Origin.Y : InOwner.Origin.X);
+		const double HalfWidth = FMath::Max(1.0, static_cast<double>(InNeighborStep));
+		const double Direction = InDirection == EVoxelLodEdgeDirection::PositiveX ||
+			InDirection == EVoxelLodEdgeDirection::PositiveY ? 1.0 : -1.0;
+		const double OwnerSide = Fixed - Direction * HalfWidth;
+		const double NeighborSide = Fixed + Direction * HalfWidth;
+		const double Raise = 0.02;
+		FVector Vertices[4];
+		if (bXEdge)
+		{
+			Vertices[0] = FVector(OwnerSide, Start, InOwnerTop + Raise);
+			Vertices[1] = FVector(OwnerSide, End, InOwnerTop + Raise);
+			Vertices[2] = FVector(NeighborSide, End, InNeighborTop + Raise);
+			Vertices[3] = FVector(NeighborSide, Start, InNeighborTop + Raise);
+		}
+		else
+		{
+			Vertices[0] = FVector(Start, OwnerSide, InOwnerTop + Raise);
+			Vertices[1] = FVector(End, OwnerSide, InOwnerTop + Raise);
+			Vertices[2] = FVector(End, NeighborSide, InNeighborTop + Raise);
+			Vertices[3] = FVector(Start, NeighborSide, InNeighborTop + Raise);
+		}
+		FVector Normal = FVector::CrossProduct(Vertices[1] - Vertices[0],
+			Vertices[2] - Vertices[0]).GetSafeNormal();
+		if (Normal.Z < 0.0)
+		{
+			Swap(Vertices[1], Vertices[3]);
+			Normal *= -1.0;
+		}
+		const FVector Tangent = (Vertices[1] - Vertices[0]).GetSafeNormal();
+		FVoxelMeshBuffers& Mesh = FindOrAddBatch(InOutMesh,
+			InDefinition.RenderGroup, InFace.Bank).Mesh;
+		const int32 Base = Mesh.Vertices.Num();
+		for (const FVector& Vertex : Vertices)
+		{
+			Mesh.Vertices.Add(Vertex);
+			Mesh.Normals.Add(Normal);
+			Mesh.UV0.Add(FVector2D(Vertex.X + InOwner.Origin.X,
+				Vertex.Y + InOwner.Origin.Y) / InTexturePeriod);
+			Mesh.UV1.Add(FVector2D(InFace.Layer, InFace.Frames));
+			Mesh.UV2.Add(FVector2D(InFace.FPS, 0.0));
+			Mesh.Colors.Add(InFace.Tint);
+			Mesh.Tangents.Add(FProcMeshTangent(Tangent, false));
+		}
+		Mesh.Triangles.Append({Base, Base + 1, Base + 2,
+			Base, Base + 2, Base + 3});
+	}
 }
 
 bool FVoxelHeightfieldTransitionBuilder::BuildMesh(
@@ -521,6 +594,7 @@ bool FVoxelHeightfieldTransitionBuilder::BuildMesh(
 			Edge.OwnerRevision != InOwner.Revision ||
 			InOwner.Ground.Num() != InOwner.Side * InOwner.Side ||
 			InOwner.Water.Num() != InOwner.Ground.Num() ||
+			InOwner.WaterKind.Num() != InOwner.Ground.Num() ||
 			InOwner.Material.Num() != InOwner.Ground.Num())
 		{
 			OutError = TEXT("Heightfield transition owner is stale or invalid");
@@ -571,23 +645,6 @@ bool FVoxelHeightfieldTransitionBuilder::BuildMesh(
 						Edge.Direction, InOwner, Fixed, Position, End,
 						Top - SafetySkirtDepthCells, Top, TexturePeriod);
 				}
-				const int32 Water = InOwner.Water[Index];
-				if (Water == MIN_int32 || (Ground != MIN_int32 && Water < Ground)) continue;
-				const double WaterTop = Water + 1.0;
-				const double GroundTop = Ground == MIN_int32
-					? static_cast<double>(InMinimumGroundZ) : Ground + 1.0;
-				const double Bottom = FMath::Max(GroundTop, WaterTop - SafetySkirtDepthCells);
-				if (Bottom >= WaterTop) continue;
-				const FVoxelRuntimeDefinition* Definition = InRegistry.Find(InConfig.Water.TypeId);
-				if (!Definition)
-				{
-					OutError = TEXT("Pending heightfield water is absent from registry");
-					return false;
-				}
-				AppendFace(Mesh, *Definition,
-					Definition->Face(InConfig.Water.State, FaceIndex(Edge.Direction)),
-					Edge.Direction, InOwner, Fixed, Position, End,
-					Bottom, WaterTop, TexturePeriod);
 			}
 			continue;
 		}
@@ -599,6 +656,7 @@ bool FVoxelHeightfieldTransitionBuilder::BuildMesh(
 			Edge.NeighborRevision != Neighbor->Revision ||
 			Neighbor->Ground.Num() != Neighbor->Side * Neighbor->Side ||
 			Neighbor->Water.Num() != Neighbor->Ground.Num() ||
+			Neighbor->WaterKind.Num() != Neighbor->Ground.Num() ||
 			Neighbor->Material.Num() != Neighbor->Ground.Num())
 		{
 			OutError = TEXT("Heightfield transition edge has stale or invalid ownership");
@@ -652,23 +710,20 @@ bool FVoxelHeightfieldTransitionBuilder::BuildMesh(
 			}
 			const int32 OwnerWater = InOwner.Water[OwnerIndex];
 			const int32 NeighborWater = Neighbor->Water[NeighborIndex];
-			const bool bOwnerWet = OwnerWater != MIN_int32 &&
+			const EVoxelWaterKind OwnerKind = static_cast<EVoxelWaterKind>(
+				InOwner.WaterKind[OwnerIndex]);
+			const EVoxelWaterKind NeighborKind = static_cast<EVoxelWaterKind>(
+				Neighbor->WaterKind[NeighborIndex]);
+			const bool bOwnerWet = OwnerKind != EVoxelWaterKind::None &&
+				OwnerWater != MIN_int32 &&
 				(OwnerGround == MIN_int32 || OwnerWater >= OwnerGround);
-			const bool bNeighborWet = NeighborWater != MIN_int32 &&
+			const bool bNeighborWet = NeighborKind != EVoxelWaterKind::None &&
+				NeighborWater != MIN_int32 &&
 				(NeighborGround == MIN_int32 || NeighborWater >= NeighborGround);
-			if (!bOwnerWet && !bNeighborWet) continue;
-			const bool bOwnerWaterHigher = bOwnerWet &&
-				(!bNeighborWet || OwnerWater > NeighborWater);
-			const double WaterTop = (bOwnerWaterHigher ? OwnerWater : NeighborWater) + 1.0;
-			auto GroundTop = [InMinimumGroundZ](const int32 Ground)
-			{
-				return Ground == MIN_int32 ? static_cast<double>(InMinimumGroundZ)
-					: static_cast<double>(Ground) + 1.0;
-			};
-			const double WaterBottom = bOwnerWet && bNeighborWet
-				? FMath::Min(OwnerWater, NeighborWater) + 1.0
-				: FMath::Max(GroundTop(OwnerGround), GroundTop(NeighborGround));
-			if (WaterBottom >= WaterTop) continue;
+			if (!bOwnerWet || !bNeighborWet ||
+				OwnerWater == NeighborWater ||
+				(OwnerKind == EVoxelWaterKind::Ocean &&
+					NeighborKind == EVoxelWaterKind::Ocean)) continue;
 			const FVoxelRuntimeDefinition* WaterDefinition =
 				InRegistry.Find(InConfig.Water.TypeId);
 			if (!WaterDefinition)
@@ -676,12 +731,11 @@ bool FVoxelHeightfieldTransitionBuilder::BuildMesh(
 				OutError = TEXT("Heightfield transition water is absent from registry");
 				return false;
 			}
-			const EVoxelLodEdgeDirection WaterDirection = bOwnerWaterHigher
-				? Edge.Direction : NeighborDirection;
-			AppendFace(Mesh, *WaterDefinition,
-				WaterDefinition->Face(InConfig.Water.State, FaceIndex(WaterDirection)),
-				WaterDirection, InOwner, Fixed, Position, End, WaterBottom,
-				WaterTop, TexturePeriod);
+			AppendWaterSlope(Mesh, *WaterDefinition,
+				WaterDefinition->Face(InConfig.Water.State, 4),
+				Edge.Direction, InOwner, Fixed, Position, End,
+				Neighbor->Step, OwnerWater + 1.0,
+				NeighborWater + 1.0, TexturePeriod);
 		}
 	}
 	for (const FVoxelRenderBatch& Batch : Mesh.Batches)

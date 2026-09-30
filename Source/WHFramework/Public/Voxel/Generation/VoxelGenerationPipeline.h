@@ -8,6 +8,13 @@
 class WHFRAMEWORK_API FVoxelGenerationPipeline
 {
 public:
+	FVoxelOverlayPreflightStatus EnsureOverlaySectionReady(
+		const FIntVector& InSectionCoordinate,
+		EVoxelWorkClass InWorkClass,
+		int32 InSourcePriority,
+		double InDistanceScore,
+		double InForwardScore) const;
+
 	FVoxelGenerationPipeline(
 		TSharedRef<
 			const FVoxelGenerationRuntimeConfig,
@@ -33,7 +40,7 @@ public:
 
 	bool EnumerateTrees(
 		const FVoxelGenerationBounds& InBounds,
-		TFunctionRef<void(const FIntVector&, int32)> InVisit,
+		TFunctionRef<void(const FIntVector&, int32, FVoxelStableId)> InVisit,
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr) const;
 
@@ -43,6 +50,10 @@ public:
 		FVoxelEnvironmentSample& OutSample,
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr) const;
+
+	TSharedRef<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> RetainHydrologyForPlanning(
+		const FIntPoint& InCenter,
+		int32 InSampleRadiusCells) const;
 
 	bool SampleEnvironments(
 		const FIntPoint& InOrigin,

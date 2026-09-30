@@ -48,6 +48,10 @@ int32 FVoxelTerrainGenerator::SampleRawHeight(
     const int32 Relief = InLandform.ReliefQ15;
     const int32 Hills = VoxelGeneration::Noise2D(
         Settings.Seed, InX, InY, Shape.HillsPeriod, 0x41E3B521AC5D7039ull);
+    const int32 HillDetail = VoxelGeneration::Noise2D(
+        Settings.Seed, InX, InY, Shape.HillsDetailPeriod, 0xA6432C559FAC107Bull);
+    const int32 ValleyNoise = VoxelGeneration::Noise2D(
+        Settings.Seed, InX, InY, Shape.ValleyPeriod, 0x21DFAD741E6C03B5ull);
     const int32 Plateau = VoxelGeneration::Noise2D(
         Settings.Seed, InX, InY, Shape.PlateauPeriod, 0xA92162DC8805EE4Bull);
     const int32 Ridge = FMath::Abs(InClimate.RidgeQ15);
@@ -55,11 +59,16 @@ int32 FVoxelTerrainGenerator::SampleRawHeight(
         32767 - FMath::Abs(InClimate.ErosionQ15), 8192, 32767);
 
     const int64 PlainHeight = static_cast<int64>(Relief) * Shape.PlainRelief / 32767;
-    const int64 HillHeight = static_cast<int64>(Hills) * Shape.HillRelief / 32767;
+    const int64 HillHeight = static_cast<int64>(Hills) * Shape.HillRelief / 32768 +
+        static_cast<int64>(HillDetail) * Shape.HillsDetailRelief / 32768;
     const int64 HighlandHeight = Shape.HighlandUplift +
-        static_cast<int64>(Relief) * Shape.HillRelief / 32767;
-    const int64 MountainHeight = static_cast<int64>(Settings.MountainAmplitude) *
-        (8192 + Ridge * 3 / 4) * Erosion / (32767ll * 32767);
+        static_cast<int64>(Hills) * Shape.HillRelief / 32768 +
+        static_cast<int64>(Relief) * Shape.PlainRelief / 32768;
+    const int64 RidgeSharp = static_cast<int64>(Ridge) * Ridge / 32767;
+    const int64 MountainHeight = Shape.MountainBaseUplift +
+        static_cast<int64>(Settings.MountainAmplitude) * RidgeSharp * Erosion /
+            (32767ll * 32767) +
+        static_cast<int64>(Relief) * Shape.HillRelief / 32768;
     const int64 PlateauHeight = Shape.PlateauUplift +
         static_cast<int64>(Plateau) * Shape.PlainRelief / 32767;
     const int64 BasinHeight = -static_cast<int64>(Shape.BasinDepth) +
@@ -73,6 +82,11 @@ int32 FVoxelTerrainGenerator::SampleRawHeight(
     Height += MountainHeight * InLandform.MountainQ15 / 32767;
     Height += PlateauHeight * InLandform.PlateauQ15 / 32767;
     Height += BasinHeight * InLandform.BasinQ15 / 32767;
+    const int32 ValleyMask = FMath::Clamp(-ValleyNoise, 0, 32767);
+    const int64 ValleyWeight = static_cast<int64>(InLandform.HillsQ15) +
+        InLandform.HighlandQ15 + InLandform.MountainQ15;
+    Height -= static_cast<int64>(ValleyMask) * Shape.ValleyDepth *
+        FMath::Min<int64>(ValleyWeight, 32767) / (32767ll * 32767);
 
     Height += static_cast<int64>(VoxelGeneration::Noise2D(
         Settings.Seed,
