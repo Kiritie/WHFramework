@@ -9,6 +9,61 @@
 #include "Async/Async.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelEnvironmentCacheReadTest,
+	"WHFramework.Voxel.Generation.EnvironmentCacheRead",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelEnvironmentCacheReadTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const auto Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>(false, false);
+	const FVoxelGenerationPipeline Pipeline(VoxelTest::MakeGenerationConfig(), Cache);
+	const FIntPoint Cell(-17, 31);
+	FVoxelNaturalColumnEntryPtr ColdEntry;
+	FString ColdError;
+	int32 GameThreadBuilds = 0;
+	TestFalse(TEXT("Cold GetOrBuild cannot invoke a runtime GameThread builder"), Cache->GetOrBuildNaturalColumn(Cell,
+		[&GameThreadBuilds](FVoxelNaturalColumnEntry&, FString&) { ++GameThreadBuilds; return true; }, ColdEntry, ColdError));
+	TestEqual(TEXT("Runtime builder is never entered on GameThread"), GameThreadBuilds, 0);
+	TestTrue(TEXT("Cold GetOrBuild reports a retryable dependency"), ColdError.StartsWith(TEXT("DependencyNotReady")));
+	FVoxelEnvironmentSample Sample;
+	TestFalse(TEXT("Cold environment read does not build on GameThread"), Pipeline.TrySampleEnvironment(Cell, Sample));
+	TestEqual(TEXT("Cold read leaves natural cache empty"), Cache->GetStats().NaturalColumns, 0);
+	TAtomic<bool> BuildEntered(false);
+	TAtomic<bool> ReleaseBuild(false);
+	TFuture<bool> Build = Async(EAsyncExecution::ThreadPool, [Cache, Cell, &BuildEntered, &ReleaseBuild]()
+	{
+		FVoxelNaturalColumnEntryPtr Entry;
+		FString Error;
+		return Cache->GetOrBuildNaturalColumn(Cell,
+			[Cell, &BuildEntered, &ReleaseBuild](FVoxelNaturalColumnEntry& OutEntry, FString&)
+			{
+				BuildEntered.Store(true);
+				while (!ReleaseBuild.Load()) FPlatformProcess::Sleep(0.001f);
+				OutEntry.Position = Cell;
+				OutEntry.Column.SurfaceZ = 237;
+				OutEntry.Column.Climate.MoistureQ15 = -1234;
+				return true;
+			}, Entry, Error);
+	});
+	const double Deadline = FPlatformTime::Seconds() + 5.0;
+	while (!BuildEntered.Load() && FPlatformTime::Seconds() < Deadline) FPlatformProcess::Sleep(0.001f);
+	TestFalse(TEXT("A read during a worker build returns pending immediately"), Pipeline.TrySampleEnvironment(Cell, Sample));
+	ReleaseBuild.Store(true);
+	TestTrue(TEXT("Worker publishes natural column"), Build.Get());
+	TestTrue(TEXT("Prepared environment reads on GameThread"), Pipeline.TrySampleEnvironment(Cell, Sample));
+	TestTrue(TEXT("Warm GetOrBuild remains readable on GameThread"), Cache->GetOrBuildNaturalColumn(Cell,
+		[&GameThreadBuilds](FVoxelNaturalColumnEntry&, FString&) { ++GameThreadBuilds; return true; }, ColdEntry, ColdError));
+	TestEqual(TEXT("Warm read does not enter its builder"), GameThreadBuilds, 0);
+	TestEqual(TEXT("Read preserves surface height"), Sample.Column.SurfaceZ, 237);
+	TestEqual(TEXT("Read preserves climate"), Sample.Column.Climate.MoistureQ15, -1234);
+	TestEqual(TEXT("Read never waits on a build gate"), Cache->GetStats().GateWaitCount, 0ull);
+	Cache->Reset();
+	TestFalse(TEXT("World cache reset invalidates environment"), Pipeline.TrySampleEnvironment(Cell, Sample));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FVoxelGenerationCacheNoWaitTest,
 	"WHFramework.Voxel.Generation.CacheNoWait",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -219,6 +274,59 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	"WHFramework.Voxel.Generation.PlanKeys",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelCoarseEnvironmentPreflightTest,
+	"WHFramework.Voxel.Generation.CoarseEnvironmentPreflight",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelCoarseEnvironmentPreflightTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const auto Config = VoxelTest::MakeGenerationConfig();
+	const auto Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>(false, false);
+	const FVoxelGenerationPipeline Pipeline(Config, Cache, nullptr, true);
+	FString Error;
+	TArray<FVoxelColumnSample> Columns;
+	const bool bColdSuccess = Async(EAsyncExecution::ThreadPool, [&]()
+	{
+		return Pipeline.SampleColumns(FIntPoint(-1, -1), 3, 3, 257, Columns, Error);
+	}).Get();
+	TestFalse(TEXT("Cold runtime coarse data cannot construct its own hydrology"), bColdSuccess);
+	TestTrue(TEXT("Cold coarse data yields to preflight"), Error.StartsWith(TEXT("DependencyNotReady")));
+	TestEqual(TEXT("Cold coarse worker leaves plan cache unbuilt"), Cache->GetStats().Hydrology, 0);
+	FVoxelTaskScheduler Scheduler;
+	FVoxelGenerationPlanCoordinator Coordinator(Scheduler, Config, Cache, 31);
+	const FVoxelGenerationBounds Bounds{FIntVector(-1, -1, -4096), FIntVector(514, 514, 4096)};
+	FVoxelGenerationDependencyStatus Status;
+	const double Deadline = FPlatformTime::Seconds() + 30.0;
+	do
+	{
+		Status = Coordinator.EnsureEnvironmentBounds(Bounds, EVoxelWorkClass::Prefetch, 0, 128.0, 0.0);
+		Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
+		if (!Status.bReady && !Status.bFailed) FPlatformProcess::Sleep(0.001f);
+	} while (!Status.bReady && !Status.bFailed && FPlatformTime::Seconds() < Deadline);
+	Scheduler.StopAndJoin();
+	if (!TestTrue(TEXT("Cross-boundary environment plans complete"), Status.bReady))
+	{
+		if (!Status.Error.IsEmpty()) AddError(Status.Error);
+		return false;
+	}
+	const auto Before = Cache->GetStats();
+	TestEqual(TEXT("Negative and positive grid bounds cover nine hydrology regions"), Before.Hydrology, 9);
+	TestEqual(TEXT("Coarse preflight does not request volumetric cave plans"), Before.Caves, 0);
+	TestEqual(TEXT("Coarse preflight does not request ecology tile plans"), Before.Ecology, 0);
+	TestEqual(TEXT("Coarse preflight does not request feature plans"), Before.Features, 0);
+	TestEqual(TEXT("Coarse preflight does not request structure plans"), Before.Structures, 0);
+	TestTrue(TEXT("Runtime coarse worker consumes ready environment plans"),
+		Async(EAsyncExecution::ThreadPool, [&]()
+		{
+			return Pipeline.SampleColumns(FIntPoint(-1, -1), 3, 3, 257, Columns, Error);
+		}).Get());
+	TestEqual(TEXT("All coarse samples are produced"), Columns.Num(), 9);
+	TestEqual(TEXT("Coarse consumption builds no additional hydrology"), Cache->GetStats().Hydrology, Before.Hydrology);
+	TestEqual(TEXT("Coarse generation never waits on a cache gate"), Cache->GetStats().GateWaitCount, 0ull);
+	return true;
+}
+
 bool FVoxelGenerationPlanKeysTest::RunTest(const FString& InParameters)
 {
 	(void)InParameters;
@@ -384,6 +492,14 @@ bool FVoxelSurfaceCandidateSupportTest::RunTest(const FString& InParameters)
 	Recipe.Settings.ContinentalAmplitude = 0;
 	Recipe.Settings.MountainAmplitude = 0;
 	Recipe.Settings.DetailAmplitude = 0;
+	Recipe.Settings.Landform.PlainRelief = 0;
+	Recipe.Settings.Landform.HillRelief = 0;
+	Recipe.Settings.Landform.HillsDetailRelief = 0;
+	Recipe.Settings.Landform.HighlandUplift = 0;
+	Recipe.Settings.Landform.MountainBaseUplift = 0;
+	Recipe.Settings.Landform.PlateauUplift = 0;
+	Recipe.Settings.Landform.BasinDepth = 0;
+	Recipe.Settings.Landform.ValleyDepth = 0;
 	Recipe.Settings.SeaLevel = -64;
 	Recipe.Settings.RiverSourceAccumulation = MAX_int32;
 	RuntimeConfig.Recipe = MakeShared<const FVoxelGenerationRecipe, ESPMode::ThreadSafe>(MoveTemp(Recipe));
@@ -456,6 +572,33 @@ bool FVoxelColumnSymbolsTest::RunTest(const FString& InParameters)
 			TestEqual(TEXT("Column batching preserves full generation semantics"), Symbols[Index], Point);
 		}
 	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelPlanBuildDiagnosticsTest,
+	"WHFramework.Voxel.Generation.PlanBuildDiagnostics",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelPlanBuildDiagnosticsTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelGenerationPlanCache Cache(true, false);
+	FVoxelHydrologyPlanPtr Plan;
+	FString Error;
+	int32 Builds = 0;
+	const auto Build = [&Builds](FVoxelHydrologyPlan&, FString&) { ++Builds; return true; };
+	TestTrue(TEXT("Cold cache builds an immutable plan"), Cache.GetOrBuildHydrology({{0, 0}}, Build, Plan, Error));
+	TestTrue(TEXT("Warm cache reuses the immutable plan"), Cache.GetOrBuildHydrology({{0, 0}}, Build, Plan, Error));
+	TestEqual(TEXT("A hit never calls the builder"), Builds, 1);
+	TestFalse(TEXT("Failed generation is recorded separately"), Cache.GetOrBuildHydrology({{1, 0}},
+		[](FVoxelHydrologyPlan&, FString& OutError) { OutError = TEXT("Invalid test plan"); return false; }, Plan, Error));
+	const auto Stats = Cache.GetPlanDiagnostics(EVoxelGenerationPlanKind::Hydrology);
+	TestEqual(TEXT("Statistics count actual builder executions"), Stats.BuildCount, 2ull);
+	TestEqual(TEXT("Statistics count warm cache hits"), Stats.HitCount, 1ull);
+	TestEqual(TEXT("Statistics count cold misses"), Stats.MissCount, 2ull);
+	TestEqual(TEXT("Statistics count actual failures"), Stats.FailedCount, 1ull);
+	TestTrue(TEXT("Build durations are finite and independently aggregated"),
+		FMath::IsFinite(Stats.TotalBuildMilliseconds) && Stats.TotalBuildMilliseconds >= Stats.MaximumBuildMilliseconds);
 	return true;
 }
 

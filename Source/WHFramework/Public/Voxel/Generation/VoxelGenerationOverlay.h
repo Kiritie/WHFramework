@@ -4,6 +4,7 @@
 #include "Voxel/Runtime/VoxelBlockState.h"
 
 enum class EVoxelWorkClass : uint8;
+struct FVoxelGenerationBounds;
 
 struct WHFRAMEWORK_API FVoxelOverlayPreflightStatus
 {
@@ -17,6 +18,22 @@ class WHFRAMEWORK_API IVoxelGenerationOverlay
 {
 public:
 	virtual ~IVoxelGenerationOverlay() = default;
+
+	virtual void ReleaseSectionConsumer(const FIntVector& InSectionCoordinate) const
+	{
+	}
+
+	virtual FVoxelOverlayPreflightStatus EnsureBoundsReady(const FVoxelGenerationBounds& InBounds,
+		EVoxelWorkClass InWorkClass, int32 InSourcePriority) const
+	{
+		return {};
+	}
+
+	virtual FVoxelOverlayPreflightStatus EnsureCoarseBoundsReady(const FVoxelGenerationBounds& InBounds,
+		EVoxelWorkClass InWorkClass, int32 InSourcePriority) const
+	{
+		return {};
+	}
 
 	/** Called on the admission thread before a section occupies a generation worker. */
 	virtual FVoxelOverlayPreflightStatus EnsureSectionReady(

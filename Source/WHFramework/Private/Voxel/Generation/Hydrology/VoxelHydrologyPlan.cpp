@@ -159,7 +159,7 @@ namespace
 
 	void BuildMeanderRoute(const TArray<FVoxelRiverShapePoint>& InShape,
 		const int32 InSeed, const int32 InStrength, const int32 InFrequency,
-		const int32 InOctaves, const int32 InMaxAngle,
+		const int32 InOctaves, const int32 InMaxAngle, const int32 InMinimumStep,
 		TArray<FVoxelRiverMeanderPoint>& OutPoints)
 	{
 		OutPoints.Reset();
@@ -226,6 +226,33 @@ namespace
 				static_cast<int64>(Tangent.X) * Offset / Length);
 			Result.MeanderOffset = Offset;
 		}
+		// 细分产生的单格阶梯无法表达平滑转角；按水文网格尺度重采样，固定锚点不移动。
+		const int64 MinimumDistanceSquared = static_cast<int64>(InMinimumStep) * InMinimumStep;
+		TArray<FVoxelRiverMeanderPoint> Resampled;
+		Resampled.Reserve(OutPoints.Num());
+		auto DistanceSquared = [](const FIntPoint& A, const FIntPoint& B)
+		{
+			const int64 X = static_cast<int64>(A.X) - B.X;
+			const int64 Y = static_cast<int64>(A.Y) - B.Y;
+			return X * X + Y * Y;
+		};
+		for (const FVoxelRiverMeanderPoint& Point : OutPoints)
+		{
+			if (Point.bAnchor)
+			{
+				while (Resampled.Num() > 1 && !Resampled.Last().bAnchor &&
+					DistanceSquared(Resampled.Last().Position, Point.Position) < MinimumDistanceSquared)
+				{
+					Resampled.Pop();
+				}
+			}
+			if (Resampled.IsEmpty() || Point.bAnchor ||
+				DistanceSquared(Resampled.Last().Position, Point.Position) >= MinimumDistanceSquared)
+			{
+				Resampled.Add(Point);
+			}
+		}
+		OutPoints = MoveTemp(Resampled);
 		const int32 TangentQ10 = MeanderTangentQ10(InMaxAngle);
 		auto PreservesAnchorTurns = [&OutPoints, TangentQ10](
 			const int32 Index, const FIntPoint& Position, const bool bRemove)
@@ -260,13 +287,19 @@ namespace
 						OutPoints[Index + 1].Position.X) / 2),
 					static_cast<int32>((static_cast<int64>(OutPoints[Index - 1].Position.Y) +
 						OutPoints[Index + 1].Position.Y) / 2));
-				if (Midpoint != OutPoints[Index].Position &&
-					Midpoint != OutPoints[Index - 1].Position &&
-					Midpoint != OutPoints[Index + 1].Position &&
-					PreservesAnchorTurns(Index, Midpoint, false))
+				// 整步中点可能越过邻接锚点的角度界限；在同一平滑方向上尝试较小步长。
+				// 保持锚点和原角度约束，避免量化短线段被卡在无法修正的折角。
+				for (int32 Fraction = 4; Fraction > 0; --Fraction)
 				{
-					OutPoints[Index].Position = Midpoint;
+					const FIntPoint Current = OutPoints[Index].Position;
+					const FIntPoint Candidate(
+						Current.X + static_cast<int32>((static_cast<int64>(Midpoint.X) - Current.X) * Fraction / 4),
+						Current.Y + static_cast<int32>((static_cast<int64>(Midpoint.Y) - Current.Y) * Fraction / 4));
+					if (Candidate == Current || Candidate == OutPoints[Index - 1].Position ||
+						Candidate == OutPoints[Index + 1].Position || !PreservesAnchorTurns(Index, Candidate, false)) continue;
+					OutPoints[Index].Position = Candidate;
 					bChanged = true;
+					break;
 				}
 			}
 			if (!bChanged) break;
@@ -290,14 +323,39 @@ namespace
 				++Index;
 				continue;
 			}
-			if (OutPoints[Index].bAnchor ||
-				!PreservesAnchorTurns(Index, OutPoints[Index].Position, true))
+			if (OutPoints[Index].bAnchor)
 			{
 				++Index;
 				continue;
 			}
-			OutPoints.RemoveAt(Index);
-			Index = FMath::Max(1, Index - 1);
+			int32 First = Index;
+			int32 Last = Index;
+			while (First > 1 && !OutPoints[First - 1].bAnchor) --First;
+			while (Last + 2 < OutPoints.Num() && !OutPoints[Last + 1].bAnchor) ++Last;
+			bool bRemoved = false;
+			for (int32 Count = 1; Count <= Last - First + 1 && !bRemoved; ++Count)
+			{
+				for (int32 Begin = FMath::Max(First, Index - Count + 1);
+					Begin <= Index && Begin + Count - 1 <= Last; ++Begin)
+				{
+					const int32 Before = Begin - 1;
+					const int32 After = Begin + Count;
+					if (OutPoints[Before].Position == OutPoints[After].Position ||
+						OutPoints[After].WaterZ > OutPoints[Before].WaterZ + 1) continue;
+					if (Before > 0 && !IsMeanderAngleWithinLimit(
+						OutPoints[Before - 1].Position, OutPoints[Before].Position,
+						OutPoints[After].Position, TangentQ10)) continue;
+					if (After + 1 < OutPoints.Num() && !IsMeanderAngleWithinLimit(
+						OutPoints[Before].Position, OutPoints[After].Position,
+						OutPoints[After + 1].Position, TangentQ10)) continue;
+					// 同时简化量化折角两侧，保留固定锚点以及两端的角度和水位约束。
+					OutPoints.RemoveAt(Begin, Count);
+					Index = FMath::Max(1, Begin - 1);
+					bRemoved = true;
+					break;
+				}
+			}
+			if (!bRemoved) ++Index;
 		}
 		for (int32 Index = 1; Index + 1 < OutPoints.Num(); ++Index)
 		{
@@ -329,6 +387,7 @@ void FVoxelHydrologyPlan::Finalize()
 		BuildMeanderRoute(River.ShapePoints, RiverSeed,
 			RiverMeanderStrength, RiverMeanderFrequency,
 			RiverMeanderOctaves, RiverMaxMeanderAngle,
+			FMath::Clamp(Grid.CellSize / 2, 2, 4),
 			River.MeanderPoints);
 		if (!River.MeanderPoints.IsEmpty())
 		{

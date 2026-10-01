@@ -8,6 +8,7 @@
 #include "Voxel/Generation/VoxelFeaturePlan.h"
 #include "Voxel/Generation/VoxelNaturalGenerationCache.h"
 #include "Voxel/Generation/VoxelStructurePlan.h"
+#include "Voxel/Generation/VoxelPlanDiagnostics.h"
 
 using FVoxelHydrologyPlanPtr =
 	TSharedPtr<
@@ -124,6 +125,8 @@ public:
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr);
 
+	bool FindNaturalColumn(const FIntPoint& InPosition, FVoxelNaturalColumnEntryPtr& OutEntry) const;
+
 	bool FindHydrology(
 		const FVoxelHydrologyRegionKey& InKey,
 		FVoxelHydrologyPlanPtr& OutPlan) const;
@@ -219,6 +222,8 @@ public:
 	void Reset();
 
 	FVoxelGenerationCacheStats GetStats() const;
+	FVoxelPlanDiagnostics GetPlanDiagnostics(EVoxelGenerationPlanKind InKind) const;
+	void RecordPlanDonation(EVoxelGenerationPlanKind InKind);
 	uint64 GetAllocatedBytes() const;
 
 private:
@@ -285,6 +290,8 @@ private:
 		const FVoxelGenerationCacheRetention& InRetention) const;
 
 	void RecordGateWait(uint64 InMicroseconds);
+	void RecordPlanLookup(EVoxelGenerationPlanKind InKind, bool bInHit) const;
+	void RecordPlanBuild(EVoxelGenerationPlanKind InKind, double InMilliseconds, bool bInFailed);
 
 private:
 	TArray<TUniquePtr<FNaturalShard>> NaturalShards;
@@ -299,6 +306,11 @@ private:
 
 	TAtomic<uint64> GateWaitCount { 0 };
 	TAtomic<uint64> GateWaitMicroseconds { 0 };
+	mutable TAtomic<uint64> PlanHits[5];
+	mutable TAtomic<uint64> PlanMisses[5];
+	TAtomic<uint64> PlanDonations[5];
+	mutable FCriticalSection PlanDiagnosticsMutex;
+	FVoxelPlanDiagnostics PlanBuildDiagnostics[5];
 
 	bool bAllowGameThreadBuilds = true;
 	bool bAllowWorkerWait = true;

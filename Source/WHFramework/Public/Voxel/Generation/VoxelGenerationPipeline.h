@@ -8,6 +8,11 @@
 class WHFRAMEWORK_API FVoxelGenerationPipeline
 {
 public:
+	void ReleaseOverlaySectionConsumer(const FIntVector& InSection) const;
+	FVoxelOverlayPreflightStatus EnsureOverlayBoundsReady(const FVoxelGenerationBounds& InBounds,
+		EVoxelWorkClass InWorkClass, int32 InSourcePriority) const;
+	FVoxelOverlayPreflightStatus EnsureCoarseOverlayBoundsReady(const FVoxelGenerationBounds& InBounds,
+		EVoxelWorkClass InWorkClass, int32 InSourcePriority) const;
 	FVoxelOverlayPreflightStatus EnsureOverlaySectionReady(
 		const FIntVector& InSectionCoordinate,
 		EVoxelWorkClass InWorkClass,
@@ -50,6 +55,9 @@ public:
 		FVoxelEnvironmentSample& OutSample,
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr) const;
+
+	bool TrySampleEnvironment(const FIntPoint& InCell, FVoxelEnvironmentSample& OutSample) const;
+	bool RequiresPlanPreflight() const { return bRequirePlanPreflight; }
 
 	TSharedRef<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> RetainHydrologyForPlanning(
 		const FIntPoint& InCenter,

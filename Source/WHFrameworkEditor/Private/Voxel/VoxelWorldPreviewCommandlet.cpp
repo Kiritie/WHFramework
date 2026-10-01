@@ -83,6 +83,7 @@ int32 UVoxelWorldPreviewCommandlet::Main(const FString& Params)
 	Filter.ClassPaths.Add(UVoxelData::StaticClass()->GetClassPathName());
 	Filter.PackagePaths.Add(TEXT("/WHFramework/Voxel/DataAssets"));
 	Filter.PackagePaths.Add(TEXT("/Game/DataAssets/Voxel"));
+	Filter.PackagePaths.Add(TEXT("/Game/VoxelStyle/Blocks"));
 	Filter.bRecursiveClasses = true;
 	Filter.bRecursivePaths = true;
 	TArray<FAssetData> Assets;
@@ -104,8 +105,10 @@ int32 UVoxelWorldPreviewCommandlet::Main(const FString& Params)
 		return 4;
 	}
 	FVoxelGenerationRuntimeConfig MutableConfig;
+	FVoxelGenerationSettings RuntimeSettings = Profile->Defaults;
+	FParse::Value(*Params, TEXT("WorldSeed="), RuntimeSettings.Seed);
 	if (!FVoxelGenerationBinding::Build(*Profile, *Registry.GetSnapshot(),
-		Profile->Defaults, Profile->TargetCellCentimeters, MutableConfig, Error))
+		RuntimeSettings, Profile->TargetCellCentimeters, MutableConfig, Error))
 	{
 		UE_LOG(LogTemp, Error, TEXT("Generation binding failed: %s"), *Error);
 		return 5;

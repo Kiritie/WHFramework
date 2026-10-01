@@ -61,6 +61,23 @@ FVoxelGenerationPipeline::FVoxelGenerationPipeline(
 {
 }
 
+void FVoxelGenerationPipeline::ReleaseOverlaySectionConsumer(const FIntVector& InSection) const
+{
+	if (Overlay) Overlay->ReleaseSectionConsumer(InSection);
+}
+
+FVoxelOverlayPreflightStatus FVoxelGenerationPipeline::EnsureOverlayBoundsReady(
+	const FVoxelGenerationBounds& InBounds, const EVoxelWorkClass InWorkClass, const int32 InSourcePriority) const
+{
+	return Overlay ? Overlay->EnsureBoundsReady(InBounds, InWorkClass, InSourcePriority) : FVoxelOverlayPreflightStatus();
+}
+
+FVoxelOverlayPreflightStatus FVoxelGenerationPipeline::EnsureCoarseOverlayBoundsReady(
+	const FVoxelGenerationBounds& InBounds, const EVoxelWorkClass InWorkClass, const int32 InSourcePriority) const
+{
+	return Overlay ? Overlay->EnsureCoarseBoundsReady(InBounds, InWorkClass, InSourcePriority) : FVoxelOverlayPreflightStatus();
+}
+
 FVoxelOverlayPreflightStatus FVoxelGenerationPipeline::EnsureOverlaySectionReady(
 	const FIntVector& InSectionCoordinate,
 	const EVoxelWorkClass InWorkClass,
@@ -210,7 +227,7 @@ bool FVoxelGenerationPipeline::EnumerateTrees(
 	const TAtomic<bool>* InCancel) const
 {
 	FVoxelGenerationQuery Query;
-	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError)) return false;
+	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError, true, bRequirePlanPreflight)) return false;
 	bool bSampleFailed = false;
 	auto SampleColumn = [&](const FIntVector& Position, FVoxelColumnSample& Column)
 	{
@@ -268,6 +285,14 @@ bool FVoxelGenerationPipeline::SampleEnvironment(
 		InX, InY, OutSample.Column, OutError, InCancel);
 }
 
+bool FVoxelGenerationPipeline::TrySampleEnvironment(const FIntPoint& InCell, FVoxelEnvironmentSample& OutSample) const
+{
+	FVoxelNaturalColumnEntryPtr Entry;
+	if (!Cache->FindNaturalColumn(InCell, Entry)) return false;
+	OutSample.Column = Entry->Column;
+	return true;
+}
+
 TSharedRef<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>
 FVoxelGenerationPipeline::RetainHydrologyForPlanning(
 	const FIntPoint& InCenter,
@@ -303,7 +328,7 @@ bool FVoxelGenerationPipeline::SampleEnvironments(
 
 	FVoxelGenerationQuery Query;
 	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError,
-			bInUseColumnCache) ||
+			bInUseColumnCache, bRequirePlanPreflight) ||
 		!Query.PrepareColumns(Bounds, OutError, InCancel))
 	{
 		return false;
@@ -363,7 +388,8 @@ bool FVoxelGenerationPipeline::SampleColumns(
 			Cache,
 			Query,
 			OutError,
-			bInUseColumnCache) ||
+			bInUseColumnCache,
+			bRequirePlanPreflight) ||
 		!Query.PrepareColumns(
 			Bounds,
 			OutError,

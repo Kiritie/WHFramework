@@ -28,7 +28,8 @@ namespace
 		const TAtomic<bool>* InCancel,
 		const bool bInAllowGameThreadBuilds,
 		const bool bInAllowWorkerWait,
-		TFunctionRef<void(uint64)> InRecordWait)
+		TFunctionRef<void(uint64)> InRecordWait,
+		TFunction<void(bool)> InRecordLookup = {})
 	{
 		{
 			FReadScopeLock Scope(InLock);
@@ -38,8 +39,18 @@ namespace
 			{
 				OutValue = *Found;
 				OutError.Reset();
+				if (InRecordLookup) InRecordLookup(OutValue.IsValid());
 				return OutValue.IsValid();
 			}
+		}
+		if (InRecordLookup) InRecordLookup(false);
+
+		// 运行时主线程只读取已发布值，冷查询不得创建构建门闩或执行构建器。
+		if (!bInAllowGameThreadBuilds && IsInGameThread())
+		{
+			OutValue.Reset();
+			OutError = TEXT("DependencyNotReady: voxel generation cache key is not published");
+			return false;
 		}
 
 		TSharedPtr<BuildGateType, ESPMode::ThreadSafe> Gate;
@@ -83,14 +94,6 @@ namespace
 				OutError = TEXT("DependencyNotReady: voxel generation cache key is building");
 				return false;
 			}
-			if (!bInAllowGameThreadBuilds)
-			{
-				ensureAlwaysMsgf(
-					!IsInGameThread(),
-					TEXT(
-						"Runtime GameThread attempted to wait for voxel generation cache key"));
-			}
-
 			const double WaitStart =
 				FPlatformTime::Seconds();
 
@@ -143,14 +146,6 @@ namespace
 					"Voxel generation cache build completed without publishing a value");
 
 			return false;
-		}
-
-		if (!bInAllowGameThreadBuilds)
-		{
-			ensureAlwaysMsgf(
-				!IsInGameThread(),
-				TEXT(
-					"Runtime GameThread is building a voxel generation cache miss synchronously"));
 		}
 
 		ValueType LocalValue;
@@ -337,6 +332,12 @@ FVoxelGenerationPlanCache::FVoxelGenerationPlanCache(
 		bInAllowGameThreadBuilds)
 	, bAllowWorkerWait(bInAllowWorkerWait)
 {
+	for (int32 Index = 0; Index < 5; ++Index)
+	{
+		PlanHits[Index].Store(0);
+		PlanMisses[Index].Store(0);
+		PlanDonations[Index].Store(0);
+	}
 	NaturalShards.SetNum(
 		ShardCount);
 
@@ -399,6 +400,34 @@ void FVoxelGenerationPlanCache::RecordGateWait(
 	++GateWaitCount;
 	GateWaitMicroseconds.AddExchange(
 		InMicroseconds);
+}
+
+FVoxelPlanDiagnostics FVoxelGenerationPlanCache::GetPlanDiagnostics(const EVoxelGenerationPlanKind InKind) const
+{
+	const int32 Index = static_cast<int32>(InKind);
+	FScopeLock Lock(&PlanDiagnosticsMutex);
+	FVoxelPlanDiagnostics Result = PlanBuildDiagnostics[Index];
+	Result.HitCount = PlanHits[Index].Load();
+	Result.MissCount = PlanMisses[Index].Load();
+	Result.PriorityDonations = PlanDonations[Index].Load();
+	return Result;
+}
+
+void FVoxelGenerationPlanCache::RecordPlanLookup(const EVoxelGenerationPlanKind InKind, const bool bInHit) const
+{
+	(bInHit ? PlanHits[static_cast<int32>(InKind)] : PlanMisses[static_cast<int32>(InKind)]).AddExchange(1);
+}
+
+void FVoxelGenerationPlanCache::RecordPlanBuild(const EVoxelGenerationPlanKind InKind,
+	const double InMilliseconds, const bool bInFailed)
+{
+	FScopeLock Lock(&PlanDiagnosticsMutex);
+	PlanBuildDiagnostics[static_cast<int32>(InKind)].RecordBuild(InMilliseconds, bInFailed);
+}
+
+void FVoxelGenerationPlanCache::RecordPlanDonation(const EVoxelGenerationPlanKind InKind)
+{
+	PlanDonations[static_cast<int32>(InKind)].AddExchange(1);
 }
 
 bool FVoxelGenerationPlanCache::GetOrBuildBaseColumn(
@@ -471,6 +500,15 @@ bool FVoxelGenerationPlanCache::GetOrBuildNaturalColumn(
 			});
 }
 
+bool FVoxelGenerationPlanCache::FindNaturalColumn(const FIntPoint& InPosition, FVoxelNaturalColumnEntryPtr& OutEntry) const
+{
+	const FNaturalShard& Shard = *NaturalShards[NaturalShardIndex(InPosition)];
+	FReadScopeLock Scope(Shard.Lock);
+	const FVoxelNaturalColumnEntryPtr* Found = Shard.NaturalColumns.Find(InPosition);
+	OutEntry = Found ? *Found : nullptr;
+	return OutEntry.IsValid();
+}
+
 bool FVoxelGenerationPlanCache::FindHydrology(
 	const FVoxelHydrologyRegionKey& InKey,
 	FVoxelHydrologyPlanPtr& OutPlan) const
@@ -486,9 +524,11 @@ bool FVoxelGenerationPlanCache::FindHydrology(
 		Shard.Hydrology.Find(InKey))
 	{
 		OutPlan = *Found;
+		RecordPlanLookup(EVoxelGenerationPlanKind::Hydrology, OutPlan.IsValid());
 		return OutPlan.IsValid();
 	}
 
+	RecordPlanLookup(EVoxelGenerationPlanKind::Hydrology, false);
 	return false;
 }
 
@@ -540,7 +580,14 @@ bool FVoxelGenerationPlanCache::GetOrBuildHydrology(
 			Shard.HydrologyBuilds,
 			Shard.HydrologyKeys,
 			InKey,
-			InBuild,
+			[this, &InBuild](FVoxelHydrologyPlan& Value, FString& Error)
+			{
+				const double Started = FPlatformTime::Seconds();
+				const bool bSuccess = InBuild(Value, Error);
+				if (bSuccess || (!Error.StartsWith(TEXT("DependencyNotReady")) && Error != TEXT("Canceled")))
+					RecordPlanBuild(EVoxelGenerationPlanKind::Hydrology, (FPlatformTime::Seconds() - Started) * 1000.0, !bSuccess);
+				return bSuccess;
+			},
 			OutPlan,
 			OutError,
 			InCancel,
@@ -549,7 +596,7 @@ bool FVoxelGenerationPlanCache::GetOrBuildHydrology(
 			[this](const uint64 InWait)
 			{
 				RecordGateWait(InWait);
-			});
+			}, [this](const bool bHit) { RecordPlanLookup(EVoxelGenerationPlanKind::Hydrology, bHit); });
 }
 
 bool FVoxelGenerationPlanCache::FindCave(
@@ -567,9 +614,11 @@ bool FVoxelGenerationPlanCache::FindCave(
 		Shard.Caves.Find(InKey))
 	{
 		OutPlan = *Found;
+		RecordPlanLookup(EVoxelGenerationPlanKind::Cave, OutPlan.IsValid());
 		return OutPlan.IsValid();
 	}
 
+	RecordPlanLookup(EVoxelGenerationPlanKind::Cave, false);
 	return false;
 }
 
@@ -620,7 +669,14 @@ bool FVoxelGenerationPlanCache::GetOrBuildCave(
 			Shard.CaveBuilds,
 			Shard.CaveKeys,
 			InKey,
-			InBuild,
+			[this, &InBuild](FVoxelCavePlan& Value, FString& Error)
+			{
+				const double Started = FPlatformTime::Seconds();
+				const bool bSuccess = InBuild(Value, Error);
+				if (bSuccess || (!Error.StartsWith(TEXT("DependencyNotReady")) && Error != TEXT("Canceled")))
+					RecordPlanBuild(EVoxelGenerationPlanKind::Cave, (FPlatformTime::Seconds() - Started) * 1000.0, !bSuccess);
+				return bSuccess;
+			},
 			OutPlan,
 			OutError,
 			InCancel,
@@ -629,7 +685,7 @@ bool FVoxelGenerationPlanCache::GetOrBuildCave(
 			[this](const uint64 InWait)
 			{
 				RecordGateWait(InWait);
-			});
+			}, [this](const bool bHit) { RecordPlanLookup(EVoxelGenerationPlanKind::Cave, bHit); });
 }
 
 bool FVoxelGenerationPlanCache::FindFeature(
@@ -647,9 +703,11 @@ bool FVoxelGenerationPlanCache::FindFeature(
 		Shard.Features.Find(InKey))
 	{
 		OutPlan = *Found;
+		RecordPlanLookup(EVoxelGenerationPlanKind::Feature, OutPlan.IsValid());
 		return OutPlan.IsValid();
 	}
 
+	RecordPlanLookup(EVoxelGenerationPlanKind::Feature, false);
 	return false;
 }
 
@@ -662,8 +720,10 @@ bool FVoxelGenerationPlanCache::FindEcology(
 	if (const FVoxelEcologyPlanPtr* Found = Shard.Ecology.Find(InKey))
 	{
 		OutPlan = *Found;
+		RecordPlanLookup(EVoxelGenerationPlanKind::Ecology, OutPlan.IsValid());
 		return OutPlan.IsValid();
 	}
+	RecordPlanLookup(EVoxelGenerationPlanKind::Ecology, false);
 	return false;
 }
 
@@ -681,7 +741,14 @@ bool FVoxelGenerationPlanCache::GetOrBuildEcology(
 		Shard.EcologyBuilds,
 		Shard.EcologyKeys,
 		InKey,
-		InBuild,
+			[this, &InBuild](FVoxelEcologyPlan& Value, FString& Error)
+			{
+				const double Started = FPlatformTime::Seconds();
+				const bool bSuccess = InBuild(Value, Error);
+				if (bSuccess || (!Error.StartsWith(TEXT("DependencyNotReady")) && Error != TEXT("Canceled")))
+					RecordPlanBuild(EVoxelGenerationPlanKind::Ecology, (FPlatformTime::Seconds() - Started) * 1000.0, !bSuccess);
+				return bSuccess;
+			},
 		OutPlan,
 		OutError,
 		InCancel,
@@ -690,7 +757,7 @@ bool FVoxelGenerationPlanCache::GetOrBuildEcology(
 		[this](const uint64 InWait)
 		{
 			RecordGateWait(InWait);
-		});
+		}, [this](const bool bHit) { RecordPlanLookup(EVoxelGenerationPlanKind::Ecology, bHit); });
 }
 
 void FVoxelGenerationPlanCache::StoreFeature(
@@ -741,7 +808,14 @@ bool FVoxelGenerationPlanCache::GetOrBuildFeature(
 			Shard.FeatureBuilds,
 			Shard.FeatureKeys,
 			InKey,
-			InBuild,
+			[this, &InBuild](FVoxelFeaturePlan& Value, FString& Error)
+			{
+				const double Started = FPlatformTime::Seconds();
+				const bool bSuccess = InBuild(Value, Error);
+				if (bSuccess || (!Error.StartsWith(TEXT("DependencyNotReady")) && Error != TEXT("Canceled")))
+					RecordPlanBuild(EVoxelGenerationPlanKind::Feature, (FPlatformTime::Seconds() - Started) * 1000.0, !bSuccess);
+				return bSuccess;
+			},
 			OutPlan,
 			OutError,
 			InCancel,
@@ -750,7 +824,7 @@ bool FVoxelGenerationPlanCache::GetOrBuildFeature(
 			[this](const uint64 InWait)
 			{
 				RecordGateWait(InWait);
-			});
+			}, [this](const bool bHit) { RecordPlanLookup(EVoxelGenerationPlanKind::Feature, bHit); });
 }
 
 bool FVoxelGenerationPlanCache::FindStructure(
@@ -768,9 +842,11 @@ bool FVoxelGenerationPlanCache::FindStructure(
 		Shard.Structures.Find(InKey))
 	{
 		OutPlan = *Found;
+		RecordPlanLookup(EVoxelGenerationPlanKind::Structure, OutPlan.IsValid());
 		return OutPlan.IsValid();
 	}
 
+	RecordPlanLookup(EVoxelGenerationPlanKind::Structure, false);
 	return false;
 }
 
@@ -822,7 +898,14 @@ bool FVoxelGenerationPlanCache::GetOrBuildStructure(
 			Shard.StructureBuilds,
 			Shard.StructureKeys,
 			InKey,
-			InBuild,
+			[this, &InBuild](FVoxelStructurePlan& Value, FString& Error)
+			{
+				const double Started = FPlatformTime::Seconds();
+				const bool bSuccess = InBuild(Value, Error);
+				if (bSuccess || (!Error.StartsWith(TEXT("DependencyNotReady")) && Error != TEXT("Canceled")))
+					RecordPlanBuild(EVoxelGenerationPlanKind::Structure, (FPlatformTime::Seconds() - Started) * 1000.0, !bSuccess);
+				return bSuccess;
+			},
 			OutPlan,
 			OutError,
 			InCancel,
@@ -831,7 +914,7 @@ bool FVoxelGenerationPlanCache::GetOrBuildStructure(
 			[this](const uint64 InWait)
 			{
 				RecordGateWait(InWait);
-			});
+			}, [this](const bool bHit) { RecordPlanLookup(EVoxelGenerationPlanKind::Structure, bHit); });
 }
 
 void FVoxelGenerationPlanCache::UpdateRetention(

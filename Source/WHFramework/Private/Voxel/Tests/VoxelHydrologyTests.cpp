@@ -531,6 +531,7 @@ bool FVoxelRiverSurfaceKeepsSubsoilTest::RunTest(const FString& InParameters)
 	Recipe.Palette.Dirt = 2;
 	Recipe.Palette.Stone = 1;
 	Recipe.Palette.Sand = 4;
+	Recipe.Settings.RiverShoreWidth = 8;
 	FVoxelSurfaceRuntimeRuleSet& Rules = Recipe.SurfaceRules.AddDefaulted_GetRef();
 	FVoxelSurfaceRuntimeRule& Grass = Rules.Rules.AddDefaulted_GetRef();
 	Grass.MinDepth = 0;
@@ -556,9 +557,10 @@ bool FVoxelRiverSurfaceKeepsSubsoilTest::RunTest(const FString& InParameters)
 	Column.bRiver = false;
 	Column.RiverZone = EVoxelRiverSurfaceZone::DryBank;
 	Column.RiverDistanceCells = 6;
+	Column.BankDistanceCells = 5;
 	int32 SandCount = 0;
 	int32 GrassCount = 0;
-	for (int32 X = 0; X < 100; ++X)
+	for (int32 X = -1024; X < 1024; ++X)
 	{
 		Surface.ResolveColumn(X, 0, Column);
 		SandCount += Column.SurfaceMaterial == 4 ? 1 : 0;

@@ -5,15 +5,6 @@
 #include "Voxel/Generation/VoxelGenerationPlanCache.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
 
-enum class EVoxelGenerationPlanKind : uint8
-{
-	Hydrology,
-	Cave,
-	Structure,
-	Feature,
-	Ecology
-};
-
 enum class EVoxelPlanDependencyState : uint8
 {
 	Missing,
@@ -66,7 +57,14 @@ public:
 		EVoxelWorkClass InWorkClass,
 		int32 InSourcePriority,
 		double InDistanceScore,
-		double InForwardScore);
+		double InForwardScore,
+		FIntVector InConsumer = FIntVector(MAX_int32));
+
+	FVoxelGenerationDependencyStatus EnsureEnvironment(const FIntPoint& InCell);
+	FVoxelGenerationDependencyStatus EnsureEnvironmentBounds(const FVoxelGenerationBounds& InBounds,
+		EVoxelWorkClass InWorkClass, int32 InSourcePriority, double InDistanceScore, double InForwardScore);
+	void ReleaseConsumer(const FIntVector& InConsumer);
+	uint64 GetWaitingConsumers(EVoxelGenerationPlanKind InKind) const;
 
 	void Reset();
 
@@ -79,6 +77,7 @@ private:
 		double DistanceScore = MAX_dbl;
 		double ForwardScore = 0.0;
 		FString Error;
+		TSet<FIntVector> Consumers;
 	};
 
 	bool IsCached(const FVoxelGenerationPlanDependency& InDependency) const;

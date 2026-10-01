@@ -146,6 +146,41 @@ bool FVoxelGenerationPlanCoordinator::GatherForBounds(
 	return true;
 }
 
+FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::EnsureEnvironment(const FIntPoint& InCell)
+{
+	const FVoxelHydrologyRegionKey Key = FVoxelGenerationQuery::HydrologyKeyForVoxel(
+		InCell.X, InCell.Y, Config->Recipe->Settings);
+	const FVoxelGenerationPlanDependency Dependency = MakeDependency(
+		EVoxelGenerationPlanKind::Hydrology, FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0));
+	return Ensure(MakeArrayView(&Dependency, 1), EVoxelWorkClass::Interactive, 0, 0.0, 0.0,
+		FIntVector(InCell.X, InCell.Y, MAX_int32));
+}
+
+FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::EnsureEnvironmentBounds(
+	const FVoxelGenerationBounds& InBounds, const EVoxelWorkClass InWorkClass,
+	const int32 InSourcePriority, const double InDistanceScore, const double InForwardScore)
+{
+	check(IsInGameThread());
+	if (!InBounds.IsValid() || !Config->Recipe)
+		return { false, true, TEXT("Environment preflight received invalid bounds or recipe") };
+	const auto& Settings = Config->Recipe->Settings;
+	const FIntPoint Min = FVoxelGenerationQuery::HydrologyKeyForVoxel(
+		InBounds.Min.X, InBounds.Min.Y, Settings).Coordinate;
+	const FIntPoint Max = FVoxelGenerationQuery::HydrologyKeyForVoxel(
+		InBounds.Max.X - 1, InBounds.Max.Y - 1, Settings).Coordinate;
+	const int64 Count = (static_cast<int64>(Max.X) - Min.X + 1) *
+		(static_cast<int64>(Max.Y) - Min.Y + 1);
+	if (Count > MaximumHydrologyDependencies)
+		return { false, true, TEXT("Environment preflight exceeds hydrology dependency limit") };
+	TArray<FVoxelGenerationPlanDependency> Dependencies;
+	Dependencies.Reserve(static_cast<int32>(Count));
+	for (int64 Y = Min.Y; Y <= Max.Y; ++Y)
+		for (int64 X = Min.X; X <= Max.X; ++X)
+			Dependencies.Add(MakeDependency(EVoxelGenerationPlanKind::Hydrology,
+				FIntVector(static_cast<int32>(X), static_cast<int32>(Y), 0)));
+	return Ensure(Dependencies, InWorkClass, InSourcePriority, InDistanceScore, InForwardScore);
+}
+
 bool FVoxelGenerationPlanCoordinator::IsCached(
 	const FVoxelGenerationPlanDependency& InDependency) const
 {
@@ -228,6 +263,7 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 {
 	FVoxelTaskRequest Request;
 	Request.Kind = EVoxelTaskKind::BuildGenerationPlan;
+	Request.TerrainStage = 0;
 	Request.WorkClass = InOutState.WorkClass;
 	Request.SourcePriority = InOutState.SourcePriority;
 	Request.DistanceScore = InOutState.DistanceScore;
@@ -290,7 +326,7 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 	{
 		FState* State = States.Find(Dependency);
 		if (!State) return;
-		if (Result.bCanceled)
+		if (Result.bCanceled || Result.Error.StartsWith(TEXT("DependencyNotReady")))
 		{
 			State->State = EVoxelPlanDependencyState::Missing;
 			return;
@@ -318,7 +354,8 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 	const EVoxelWorkClass InWorkClass,
 	const int32 InSourcePriority,
 	const double InDistanceScore,
-	const double InForwardScore)
+	const double InForwardScore,
+	const FIntVector InConsumer)
 {
 	FVoxelGenerationDependencyStatus Status;
 	bool bHydrologyReady = true;
@@ -331,6 +368,7 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 			return true;
 		}
 		FState& State = States.FindOrAdd(Dependency);
+		State.Consumers.Add(InConsumer);
 		if (State.State == EVoxelPlanDependencyState::Ready)
 		{
 			State.State = EVoxelPlanDependencyState::Missing;
@@ -342,8 +380,12 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 			return false;
 		}
 		const bool bWasQueued = State.State == EVoxelPlanDependencyState::Queued;
-		bPriorityChanged |= bWasQueued && DonatePriority(State, InWorkClass,
-			InSourcePriority, InDistanceScore, InForwardScore);
+		if (bWasQueued && DonatePriority(State, InWorkClass,
+			InSourcePriority, InDistanceScore, InForwardScore))
+		{
+			bPriorityChanged = true;
+			Cache->RecordPlanDonation(Dependency.Kind);
+		}
 		if (!bWasQueued)
 		{
 			DonatePriority(State, InWorkClass,
@@ -375,4 +417,20 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 void FVoxelGenerationPlanCoordinator::Reset()
 {
 	States.Reset();
+}
+
+void FVoxelGenerationPlanCoordinator::ReleaseConsumer(const FIntVector& InConsumer)
+{
+	for (auto& Pair : States) Pair.Value.Consumers.Remove(InConsumer);
+}
+
+uint64 FVoxelGenerationPlanCoordinator::GetWaitingConsumers(const EVoxelGenerationPlanKind InKind) const
+{
+	TSet<FIntVector> Consumers;
+	for (const auto& Pair : States)
+	{
+		if (Pair.Key.Kind == InKind && Pair.Value.State != EVoxelPlanDependencyState::Failed)
+			Consumers.Append(Pair.Value.Consumers);
+	}
+	return Consumers.Num();
 }
