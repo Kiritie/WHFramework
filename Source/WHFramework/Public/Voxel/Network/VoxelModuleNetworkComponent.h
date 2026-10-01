@@ -72,6 +72,7 @@ private:
 	void SendSectionState(const FIntVector& InSection);
 	void SendSectionSnapshot(const FIntVector& InSection);
 	void ApplyPendingSnapshots();
+	void RequestMissingSnapshots(double InNow);
 	void OnCommit(const FVoxelEditBatch& InBatch);
 	APlayerController* Controller() const;
 
@@ -83,6 +84,9 @@ private:
 	TWeakObjectPtr<AActor> AuthorizedObserver;
 	FVoxelNetworkTransfer Transfer;
 	TMap<FIntVector, FVoxelNetworkSectionSnapshot> PendingSnapshots;
+	TSet<FIntVector> PendingSnapshotReads;
+	TSet<FIntVector> KnownModifiedSections;
+	TMap<FIntVector, double> SnapshotRequests;
 	TSet<FIntVector> GameplayInterest;
 	TMap<FIntVector, uint64> SentChangeSummaryRevisions;
 	TMap<FVoxelRepresentationWireKey, uint8> RepresentationSubscriptions;

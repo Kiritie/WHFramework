@@ -28,6 +28,47 @@ namespace
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVoxelNaturalPublicationRevisionTest,
+	"WHFramework.Voxel.Runtime.NaturalPublicationRevision",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelNaturalPublicationRevisionTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelWorldRuntime Runtime(1, true, VoxelTest::MakeRegistry(), VoxelTest::MakeGenerator());
+	const FIntVector Origin = FIntVector::ZeroValue;
+	const FVoxelViewKey Proxy{FIntVector::ZeroValue, 1};
+	const FVoxelSurfaceTileKey Surface{FIntPoint::ZeroValue, 0};
+	const FVoxelMacroTileKey Macro{FIntPoint::ZeroValue, 0};
+	FString Error;
+	if (!TestTrue(TEXT("First natural section publishes"), PublishTestSection(Runtime, Origin, 0, Error))) return false;
+	const FVoxelChangeHierarchy& Hierarchy = Runtime.GetChangeHierarchy();
+	TestEqual(TEXT("Natural residency preserves procedural Proxy revision"), Hierarchy.GetVoxelProxyRevision(Proxy), 0ull);
+	TestEqual(TEXT("Natural residency preserves procedural Surface revision"), Hierarchy.GetSurfaceRevision(Surface), 0ull);
+	TestEqual(TEXT("Natural residency preserves procedural Macro revision"), Hierarchy.GetMacroRevision(Macro), 0ull);
+	FVoxelPreparedEdit Prepared;
+	if (!TestTrue(TEXT("An actual change prepares"),
+		Runtime.PrepareEdit({{Origin, FVoxelBlockState(), FVoxelBlockState(1, 0)}}, {}, Prepared, Error))) return false;
+	FVoxelEditBatch Batch;
+	if (!TestTrue(TEXT("An actual change commits"), Runtime.CommitPreparedEdit(MoveTemp(Prepared), Batch, Error))) return false;
+	const uint64 ChangedRevision = Hierarchy.GetVoxelProxyRevision(Proxy);
+	TestTrue(TEXT("An actual change invalidates every representation"), ChangedRevision > 0 &&
+		Hierarchy.GetSurfaceRevision(Surface) > 0 && Hierarchy.GetMacroRevision(Macro) > 0);
+	if (!TestTrue(TEXT("Neighbor natural section publishes"), PublishTestSection(Runtime, FIntVector(1, 0, 0), 0, Error))) return false;
+	TestEqual(TEXT("Neighbor residency cannot cancel a prepared changed Proxy"), Hierarchy.GetVoxelProxyRevision(Proxy), ChangedRevision);
+	FVoxelWorldRuntime Replica(1, false, VoxelTest::MakeRegistry(), VoxelTest::MakeGenerator());
+	if (!PublishTestSection(Replica, Origin, 0, Error)) return false;
+	const TMap<int32, FVoxelBlockState> Overlay{{0, FVoxelBlockState(1, 0)}};
+	TestTrue(TEXT("Remote replacement applies a modification"), Replica.PublishFinal(Origin, 1, Overlay, {}, Error));
+	const uint64 RemoteRevision = Replica.GetChangeHierarchy().GetVoxelProxyRevision(Proxy);
+	TestTrue(TEXT("Remote restoration publishes natural data"), Replica.PublishFinal(Origin, 2, {}, {}, Error));
+	TestTrue(TEXT("Restoring modified remote data still invalidates coarse representations"),
+		Replica.GetChangeHierarchy().GetVoxelProxyRevision(Proxy) > RemoteRevision);
+	TestFalse(TEXT("Remote restoration clears the modification index"), Replica.GetChangeIndex().IsModified(Origin));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FVoxelChangeHierarchyRevisionTest,
 	"WHFramework.Voxel.Runtime.ChangeHierarchyRevision",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -175,6 +216,14 @@ bool FVoxelPatchAtomicityTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("Matching revisions apply atomically"), Runtime.ApplyRemotePatchBatch(Batch, Error));
 	TestEqual(TEXT("First section advances"), Runtime.FindSection(SectionA)->CommittedRevision, uint64(6));
 	TestEqual(TEXT("Second section advances"), Runtime.FindSection(SectionB)->CommittedRevision, uint64(6));
+	TestTrue(TEXT("Remote resync replaces an already ready section"), Runtime.PublishFinal(SectionA, 8, {}, {}, Error));
+	TestEqual(TEXT("Resync advances committed revision"), Runtime.FindSection(SectionA)->CommittedRevision, uint64(8));
+	TestTrue(TEXT("Resync restores the authoritative natural base"), Runtime.FindSection(SectionA)->Blocks[0].IsAir());
+	TMap<int32, FVoxelBlockState> InvalidOverlay;
+	InvalidOverlay.Add(VoxelBlock::Volume, FVoxelBlockState(1, 0));
+	TestFalse(TEXT("Invalid resync cannot partially replace ready data"), Runtime.PublishFinal(SectionA, 9, InvalidOverlay, {}, Error));
+	TestEqual(TEXT("Invalid resync leaves revision unchanged"), Runtime.FindSection(SectionA)->CommittedRevision, uint64(8));
+	TestFalse(TEXT("Older resync cannot roll back committed data"), Runtime.PublishFinal(SectionA, 7, {}, {}, Error));
 	return true;
 }
 

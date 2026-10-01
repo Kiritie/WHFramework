@@ -7,6 +7,8 @@
 #include "Voxel/Network/VoxelRepresentationSync.h"
 #include "Voxel/Runtime/VoxelWorldRuntime.h"
 #include "Voxel/Serialization/VoxelBinaryCodec.h"
+#include "Voxel/Save/VoxelDeltaCodec.h"
+#include "Voxel/Save/VoxelRegionStore.h"
 #include "Voxel/Streaming/VoxelEmergeManager.h"
 #include "Voxel/Streaming/VoxelInterestManager.h"
 #include "Voxel/VoxelModule.h"
@@ -163,6 +165,7 @@ void UVoxelModuleNetworkComponent::TickComponent(
 		LastHello = Now;
 	}
 	ApplyPendingSnapshots();
+	if (bReady && GetOwner() && !GetOwner()->HasAuthority()) RequestMissingSnapshots(Now);
 }
 
 void UVoxelModuleNetworkComponent::GetLifetimeReplicatedProps(
@@ -301,6 +304,9 @@ void UVoxelModuleNetworkComponent::ResetProtocol()
 {
 	Transfer.Reset();
 	PendingSnapshots.Reset();
+	PendingSnapshotReads.Reset();
+	KnownModifiedSections.Reset();
+	SnapshotRequests.Reset();
 	GameplayInterest.Reset();
 	SentChangeSummaryRevisions.Reset();
 	RepresentationSubscriptions.Reset();
@@ -483,6 +489,9 @@ void UVoxelModuleNetworkComponent::Handle(
 			VoxelModule->SetRemoteChangeState(
 				Summary.Region * ChangeRegionSide + Local,
 				bModified ? EVoxelSectionChangeState::Modified : EVoxelSectionChangeState::Natural);
+			const FIntVector Key = Summary.Region * ChangeRegionSide + Local;
+			if (bModified) KnownModifiedSections.Add(Key);
+			else KnownModifiedSections.Remove(Key);
 		}
 		return;
 	}
@@ -499,6 +508,8 @@ void UVoxelModuleNetworkComponent::Handle(
 			State.Section,
 			State.State == EVoxelSectionWireState::Natural ?
 				EVoxelSectionChangeState::Natural : EVoxelSectionChangeState::Modified);
+		if (State.State == EVoxelSectionWireState::Modified) KnownModifiedSections.Add(State.Section);
+		else KnownModifiedSections.Remove(State.Section);
 		return;
 	}
 	if (!bInServer && InMessage.Kind == EVoxelMessage::SectionSnapshot)
@@ -510,7 +521,9 @@ void UVoxelModuleNetworkComponent::Handle(
 			Fail(Error.IsEmpty() ? TEXT("Invalid voxel section snapshot") : Error);
 			return;
 		}
-		PendingSnapshots.Add(Snapshot.Section, MoveTemp(Snapshot));
+		const FIntVector Section = Snapshot.Section;
+		PendingSnapshots.Add(Section, MoveTemp(Snapshot));
+		SnapshotRequests.Remove(Section);
 		return;
 	}
 	if (!bInServer && InMessage.Kind == EVoxelMessage::SectionPatch)
@@ -813,9 +826,28 @@ void UVoxelModuleNetworkComponent::RefreshInterest(const double InNow)
 	const FVoxelInterestSet ClientInterest = InterestManager.Compute(
 		AuthorizedSources,
 		VoxelModule->GetManifest(),
-		FVoxelViewSettings());
+		VoxelModule->GetViewSettings());
 	TSet<FIntVector> Next;
 	TSet<FIntVector> SummaryRegions;
+	// Fine 修改状态只订阅区域摘要，不把客户端的视觉范围变为服务器驻留或视觉需求。
+	for (const FVoxelStreamingSource& Authorized : AuthorizedSources)
+	{
+		const FVoxelStreamingSourceView& View = Authorized.bInheritWorldView ?
+			VoxelModule->GetViewSettings().DefaultSourceView : Authorized.View;
+		const int32 Prediction = FMath::CeilToInt(Observer->GetVelocity().Size2D() / VoxelModule->BlockSize() * View.FinePredictionSeconds);
+		const int32 Radius = View.FineRadiusCells + View.FinePreloadCells + View.FineReplanCells + Prediction + 32;
+		const int32 Vertical = View.FineVerticalRadiusCells + View.FineReplanCells + 32;
+		const FIntVector MinCell(Authorized.Center.X - Radius, Authorized.Center.Y - Radius,
+			FMath::Max(VoxelModule->GetManifest().Settings.MinZ, Authorized.Center.Z - Vertical));
+		const FIntVector MaxCell(Authorized.Center.X + Radius, Authorized.Center.Y + Radius,
+			FMath::Min(VoxelModule->GetManifest().Settings.MaxZ - 1, Authorized.Center.Z + Vertical));
+		const int32 Side = ChangeRegionSide * 16;
+		const FIntVector Min(VoxelGeneration::FloorDivide(MinCell.X, Side), VoxelGeneration::FloorDivide(MinCell.Y, Side), VoxelGeneration::FloorDivide(MinCell.Z, Side));
+		const FIntVector Max(VoxelGeneration::FloorDivide(MaxCell.X, Side), VoxelGeneration::FloorDivide(MaxCell.Y, Side), VoxelGeneration::FloorDivide(MaxCell.Z, Side));
+		for (int32 Z = Min.Z; Z <= Max.Z; ++Z)
+		for (int32 Y = Min.Y; Y <= Max.Y; ++Y)
+		for (int32 X = Min.X; X <= Max.X; ++X) SummaryRegions.Add(FIntVector(X, Y, Z));
+	}
 	for (const TPair<FIntVector, FVoxelExactDemand>& Pair : ClientInterest.Exact)
 	{
 		if (Pair.Value.bData)
@@ -884,7 +916,7 @@ void UVoxelModuleNetworkComponent::SendSectionState(const FIntVector& InSection)
 	{
 		Send(EVoxelMessage::SectionState, Payload, EVoxelTransferPriority::Normal);
 	}
-	if (State.State == EVoxelSectionWireState::Modified && Section)
+	if (State.State == EVoxelSectionWireState::Modified)
 	{
 		SendSectionSnapshot(InSection);
 	}
@@ -897,6 +929,47 @@ void UVoxelModuleNetworkComponent::SendSectionSnapshot(const FIntVector& InSecti
 		VoxelModule->GetRuntime()->FindSection(InSection) : nullptr;
 	if (!Section || Section->Status != EVoxelSectionStatus::DataReady)
 	{
+		if (!VoxelModule || !VoxelModule->GetRuntime() || PendingSnapshotReads.Contains(InSection)) return;
+		const auto Read = VoxelModule->GetRegionStore().CaptureRead(InSection);
+		const auto Manifest = VoxelModule->GetManifest();
+		const auto Registry = VoxelModule->GetRegistry();
+		if (!Registry) return;
+		FVoxelTaskRequest Task;
+		Task.Kind = EVoxelTaskKind::NetworkRepresentation;
+		Task.WorkClass = EVoxelWorkClass::Critical;
+		Task.Stamp.WorldEpoch = VoxelModule->GetWorldEpoch();
+		Task.Stamp.Section = InSection;
+		Task.Stamp.Token = static_cast<uint64>(reinterpret_cast<UPTRINT>(this));
+		Task.Stamp.Revision = 0x534e415053484f54ull;
+		Task.ReservedBytes = 4ull * 1024ull * 1024ull;
+		Task.Execute = [Read, Manifest, Registry](const TAtomic<bool>& Cancel)
+		{
+			FVoxelTaskResult Result;
+			TArray<uint8> Bytes;
+			if (Cancel.Load()) { Result.bCanceled = true; return Result; }
+			if (FVoxelRegionStore::Read(Read, Bytes, Result.Error) != EVoxelRegionRead::Loaded) return Result;
+			FVoxelPersistentSection Saved;
+			if (!FVoxelDeltaCodec::Decode(Bytes, Manifest, *Registry, Saved))
+			{
+				Result.Error = TEXT("Voxel snapshot delta could not be decoded");
+				return Result;
+			}
+			FVoxelNetworkSectionSnapshot Snapshot;
+			Snapshot.Section = Saved.Section;
+			Snapshot.Revision = Saved.Revision;
+			for (const auto& Pair : Saved.Blocks) { FVoxelSectionCellEdit Edit; Edit.CellIndex = Pair.Key; Edit.State = Pair.Value; Snapshot.Blocks.Add(Edit); }
+			for (const auto& Pair : Saved.Entities) { FVoxelEntityWrite Write; Write.CellIndex = Pair.Key; Write.Value = Pair.Value; Snapshot.Entities.Add(MoveTemp(Write)); }
+			Result.bSuccess = FVoxelNetworkCodec::EncodeSectionSnapshot(Snapshot, Result.Payload, Result.Error);
+			return Result;
+		};
+		Task.Apply = [Weak = TWeakObjectPtr<UVoxelModuleNetworkComponent>(this), CapturedSession = Session, InSection](FVoxelTaskResult&& Result)
+		{
+			auto* Component = Weak.Get();
+			if (!Component || Component->Session != CapturedSession) return;
+			Component->PendingSnapshotReads.Remove(InSection);
+			if (Result.bSuccess && !Result.bCanceled) Component->Send(EVoxelMessage::SectionSnapshot, Result.Payload, EVoxelTransferPriority::Normal);
+		};
+		if (VoxelModule->EnqueueNetworkRepresentationTask(MoveTemp(Task))) PendingSnapshotReads.Add(InSection);
 		return;
 	}
 	FVoxelNetworkSectionSnapshot Snapshot;
@@ -924,6 +997,37 @@ void UVoxelModuleNetworkComponent::SendSectionSnapshot(const FIntVector& InSecti
 	}
 }
 
+void UVoxelModuleNetworkComponent::RequestMissingSnapshots(const double InNow)
+{
+	UVoxelModule* VoxelModule = Module.Get();
+	if (!VoxelModule || !VoxelModule->GetRuntime()) return;
+	TArray<FIntVector> Requests;
+	for (const FIntVector& Key : KnownModifiedSections)
+	{
+		const auto* Section = VoxelModule->GetRuntime()->FindSection(Key);
+		if (!Section || (Section->Status != EVoxelSectionStatus::BaseReady &&
+			!(Section->Status == EVoxelSectionStatus::DataReady && Section->CommittedRevision == 0)) || PendingSnapshots.Contains(Key)) continue;
+		if (!VoxelModule->GetCurrentInterest().Exact.Contains(Key)) continue;
+		const double* Previous = SnapshotRequests.Find(Key);
+		if (Previous && InNow - *Previous < 1.0) continue;
+		Requests.Add(Key);
+		if (Requests.Num() == 32) break;
+	}
+	if (Requests.IsEmpty()) return;
+	FVoxelByteWriter Writer(512);
+	Writer.U16(Requests.Num());
+	for (const auto& Key : Requests) FVoxelNetworkCodec::WriteVector(Writer, Key);
+	TArray<uint8> Payload;
+	if (Writer.Finish(Payload) && Send(EVoxelMessage::Resync, Payload, EVoxelTransferPriority::Critical))
+	{
+		for (const auto& Key : Requests) SnapshotRequests.Add(Key, InNow);
+	}
+	for (auto It = SnapshotRequests.CreateIterator(); It; ++It)
+	{
+		if (!VoxelModule->GetCurrentInterest().Exact.Contains(It.Key())) It.RemoveCurrent();
+	}
+}
+
 void UVoxelModuleNetworkComponent::ApplyPendingSnapshots()
 {
 	UVoxelModule* VoxelModule = Module.Get();
@@ -934,10 +1038,11 @@ void UVoxelModuleNetworkComponent::ApplyPendingSnapshots()
 	for (auto Iterator = PendingSnapshots.CreateIterator(); Iterator; ++Iterator)
 	{
 		FVoxelSection* Section = VoxelModule->GetRuntime()->FindSection(Iterator.Key());
-		if (!Section || Section->Status != EVoxelSectionStatus::BaseReady)
+		if (!Section || (Section->Status != EVoxelSectionStatus::BaseReady && Section->Status != EVoxelSectionStatus::DataReady))
 		{
 			continue;
 		}
+		if (Section->CommittedRevision > Iterator.Value().Revision) { Iterator.RemoveCurrent(); continue; }
 		TMap<int32, FVoxelBlockState> Overlay;
 		TMap<int32, FVoxelBlockEntityState> Entities;
 		for (const FVoxelSectionCellEdit& Edit : Iterator.Value().Blocks)
@@ -1037,7 +1142,7 @@ void UVoxelModuleNetworkComponent::OnCommit(const FVoxelEditBatch& InBatch)
 	WireBatch.TransactionId = InBatch.TransactionId;
 	for (const FVoxelSectionPatch& Patch : InBatch.Sections)
 	{
-		if (GameplayInterest.Contains(Patch.Section))
+		if (GameplayInterest.Contains(Patch.Section) || SentChangeSummaryRevisions.Contains(ToChangeRegion(Patch.Section)))
 		{
 			WireBatch.Sections.Add(Patch);
 		}

@@ -166,7 +166,9 @@ bool FVoxelWorldRuntime::PublishFinal(
 {
 	check(IsInGameThread());
 	FVoxelSection* Section = FindSection(InSection);
-	if (!Section || Section->Status != EVoxelSectionStatus::BaseReady || !Section->BaseBlocks)
+	const bool bRemoteReplacement = Section && !IsServer() && Section->Status == EVoxelSectionStatus::DataReady &&
+		InRevision >= Section->CommittedRevision;
+	if (!Section || (Section->Status != EVoxelSectionStatus::BaseReady && !bRemoteReplacement) || !Section->BaseBlocks)
 	{
 		OutError = TEXT("Voxel final publish target is not BaseReady");
 		return false;
@@ -203,6 +205,8 @@ bool FVoxelWorldRuntime::PublishFinal(
 		return false;
 	}
 
+	const bool bPreviouslyModified = ChangeIndex.IsModified(InSection);
+	const bool bModified = !InOverlay.IsEmpty() || !InEntities.IsEmpty();
 	Section->Blocks = MoveTemp(Candidate);
 	Section->Overlay = InOverlay;
 	Section->Entities = MoveTemp(Entities);
@@ -212,8 +216,11 @@ bool FVoxelWorldRuntime::PublishFinal(
 	Section->Error.Reset();
 	Section->bCollisionDirty = true;
 	Section->bFineMeshDirty = true;
-	ChangeIndex.SetModified(InSection, !Section->Overlay.IsEmpty() || !InEntities.IsEmpty());
-	ChangeHierarchy.InvalidateSection(InSection);
+	ChangeIndex.SetModified(InSection, bModified);
+	if (bPreviouslyModified || bModified || bRemoteReplacement)
+	{
+		ChangeHierarchy.InvalidateSection(InSection);
+	}
 	OutError.Reset();
 	return true;
 }
