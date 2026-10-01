@@ -175,6 +175,45 @@ bool FVoxelHeightfieldTransitionBuilder::BuildEdges(
 	return true;
 }
 
+void FVoxelHeightfieldTransitionBuilder::GatherOwnerDependencies(TConstArrayView<FVoxelHeightfieldTileView> InTiles,
+	TConstArrayView<FVoxelHeightfieldTileFootprint> InPendingTiles,
+	TMap<FVoxelHeightfieldNodeKey, TArray<FVoxelHeightfieldNodeKey>>& OutDependencies)
+{
+	OutDependencies.Reset();
+	FEdgeIndex NegativeX, PositiveX, NegativeY, PositiveY;
+	for (const auto& View : InTiles)
+	{
+		OutDependencies.FindOrAdd(View.Key).Add(View.Key);
+		IndexFootprint(View.Key, View.Origin, View.CellSide() * View.Step, View.Step, View.Revision,
+			NegativeX, PositiveX, NegativeY, PositiveY);
+	}
+	for (const auto& Tile : InPendingTiles)
+	{
+		IndexFootprint(Tile.Key, Tile.Origin, Tile.TileSide, Tile.Step, 0,
+			NegativeX, PositiveX, NegativeY, PositiveY);
+	}
+	const auto Gather = [&OutDependencies](const FEdgeIndex& Positive, const FEdgeIndex& Negative)
+	{
+		for (const auto& Pair : Positive)
+		{
+			const auto* Across = Negative.Find(Pair.Key);
+			if (!Across) continue;
+			for (const auto& A : Pair.Value)
+			{
+				for (const auto& B : *Across)
+				{
+					if (FMath::Max(A.RangeMin, B.RangeMin) >= FMath::Min(A.RangeMax, B.RangeMax)) continue;
+					if (auto* Keys = OutDependencies.Find(A.Key)) Keys->AddUnique(B.Key);
+					if (auto* Keys = OutDependencies.Find(B.Key)) Keys->AddUnique(A.Key);
+				}
+			}
+		}
+	};
+	Gather(PositiveX, NegativeX);
+	Gather(PositiveY, NegativeY);
+	for (auto& Pair : OutDependencies) Pair.Value.Sort(KeyLess);
+}
+
 void FVoxelHeightfieldTransitionBuilder::ExcludeCoveredIntervals(
 	TConstArrayView<FVoxelHeightfieldTileView> InTiles,
 	TConstArrayView<FBox> InFineBoxes,

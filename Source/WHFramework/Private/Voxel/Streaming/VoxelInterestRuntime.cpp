@@ -19,6 +19,7 @@ namespace
 		InOutDemand.bWarmupData |= InDemand.bWarmupData;
 		InOutDemand.bWarmupCollision |= InDemand.bWarmupCollision;
 		InOutDemand.bMovementCriticalCollision |= InDemand.bMovementCriticalCollision;
+		InOutDemand.bMovementCriticalData |= InDemand.bMovementCriticalData;
 		InOutDemand.Priority = FMath::Min(InOutDemand.Priority, InSource.GetSchedulingPriority());
 		const FVector Delta = FVector(InKey * RuntimeInterestSectionSide + FIntVector(RuntimeInterestSectionSide / 2) - InSource.Center);
 		const double Distance = Delta.Size();
@@ -37,7 +38,8 @@ namespace
 			InA.bFineRender == InB.bFineRender && InA.bFineData == InB.bFineData &&
 			InA.bWarmupData == InB.bWarmupData && InA.bWarmupCollision == InB.bWarmupCollision &&
 			InA.bMovementCriticalCollision == InB.bMovementCriticalCollision &&
-			InA.bMovementCriticalFine == InB.bMovementCriticalFine && InA.Priority == InB.Priority;
+			InA.bMovementCriticalFine == InB.bMovementCriticalFine &&
+			InA.bMovementCriticalData == InB.bMovementCriticalData && InA.Priority == InB.Priority;
 	}
 
 	template<typename KeyType>
@@ -304,26 +306,6 @@ bool FVoxelInterestRuntime::Update(TConstArrayView<FVoxelStreamingSource> InSour
 		for (const FVoxelMacroTileKey& Key : State.Macro.Macro) Prepared.Macro.Add(Key);
 	}
 	FVoxelInterestSet Next = Manager.Finalize(InSources, InManifest, InSettings, MoveTemp(Prepared));
-	for (const FVoxelStreamingSource& Source : InSources)
-	{
-		if (!Source.Has(EVoxelStreamingCapability::FineVisual) ||
-			Source.Has(EVoxelStreamingCapability::LocalRefinement) ||
-			Source.View.MovementCriticalFineRadiusCells <= 0) continue;
-		const FVector Predicted = FVector(Source.Center) +
-			Source.VelocityCellsPerSecond * Source.View.FinePredictionSeconds;
-		const double RadiusSquared = FMath::Square(
-			static_cast<double>(Source.View.MovementCriticalFineRadiusCells));
-		for (auto& Pair : Next.Exact)
-		{
-			if (!Pair.Value.bFineRender) continue;
-			const FVector SectionCenter(Pair.Key * RuntimeInterestSectionSide +
-				FIntVector(RuntimeInterestSectionSide / 2));
-			if (FVector::DistSquared(SectionCenter, Predicted) <= RadiusSquared)
-			{
-				Pair.Value.bMovementCriticalFine = true;
-			}
-		}
-	}
 	TSet<FIntVector> PreviousExact;
 	TSet<FIntVector> NextExact;
 	TSet<FIntVector> PreviousFine;

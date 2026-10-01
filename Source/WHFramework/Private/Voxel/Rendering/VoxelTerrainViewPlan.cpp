@@ -230,20 +230,22 @@ bool FVoxelTerrainViewPlan::ResolveNode(const FVoxelViewKey& InNode,
 
 void FVoxelTerrainViewPlan::ResolveVisible(TFunctionRef<bool(const FVoxelViewKey&)> InIsReady,
 	TSet<FVoxelViewKey>& OutVisible, const TSet<FVoxelViewKey>* InPrevious,
-	const TSet<FVoxelViewKey>* InReadyNodes, const TSet<FVoxelViewKey>* InReadyBranches) const
+	const TSet<FVoxelViewKey>* InReadyNodes, const TSet<FVoxelViewKey>* InReadyBranches,
+	const TSet<FVoxelViewKey>* InResolveRoots) const
 {
+	const TSet<FVoxelViewKey>& EffectiveRoots = InResolveRoots ? *InResolveRoots : Roots;
 	TSet<FVoxelViewKey> PreviousAncestors;
 	if (InPrevious)
 	{
 		uint8 RootLevel = 0;
-		for (const FVoxelViewKey& Root : Roots)
+		for (const FVoxelViewKey& Root : EffectiveRoots)
 		{
 			RootLevel = FMath::Max(RootLevel, Root.Level);
 		}
 		for (FVoxelViewKey Node : *InPrevious)
 		{
 			// A previous node outside the new root domain cannot be visited by ResolveNode.
-			while (!Roots.Contains(Node) && Node.Level < RootLevel)
+			while (!EffectiveRoots.Contains(Node) && Node.Level < RootLevel)
 			{
 				Node = Node.GetParent();
 				bool bAlreadyPresent = false;
@@ -261,7 +263,7 @@ void FVoxelTerrainViewPlan::ResolveVisible(TFunctionRef<bool(const FVoxelViewKey
 			{
 				bool bAlreadyPresent = false;
 				BuiltReadyBranches.Add(Node, &bAlreadyPresent);
-				if (bAlreadyPresent || Roots.Contains(Node)) break;
+				if (bAlreadyPresent || EffectiveRoots.Contains(Node)) break;
 				Node = Node.GetParent();
 			}
 		}
@@ -273,7 +275,7 @@ void FVoxelTerrainViewPlan::ResolveVisible(TFunctionRef<bool(const FVoxelViewKey
 		return InIsReady(Key) || (InPrevious && InPrevious->Contains(Key));
 	};
 	OutVisible.Reset();
-	for (const FVoxelViewKey& Root : Roots)
+	for (const FVoxelViewKey& Root : EffectiveRoots)
 	{
 		TArray<FVoxelViewKey> Visible;
 		ResolveNode(Root, IsAvailable, PreviousAncestors, InPrevious, InReadyBranches, Visible);

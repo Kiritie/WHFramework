@@ -8,6 +8,7 @@
 class WHFRAMEWORK_API FVoxelInterestManager
 {
 public:
+	static void SortExactDemands(FVoxelInterestSet& InOutInterest);
 	FVoxelInterestSet Compute(
 		TConstArrayView<FVoxelStreamingSource> InSources,
 		const FVoxelWorldManifest& InManifest,

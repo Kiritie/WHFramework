@@ -196,6 +196,16 @@ bool FVoxelTerrainSparseResolveTest::RunTest(const FString& InParameters)
 		TestTrue(TEXT("Pruning preserves the complete visible ownership set"), Reference.Num() == Pruned.Num() && Reference.Difference(Pruned).IsEmpty());
 		TestTrue(TEXT("Cached branches preserve visible ownership after invalidation"), Reference.Num() == Cached.Num() && Reference.Difference(Cached).IsEmpty());
 		TestTrue(TEXT("Unbuilt branches do not query thousands of missing leaves"), PrunedQueries < ReferenceQueries / 4);
+		const TSet<FVoxelViewKey> ResolveRoots{*Plan.Roots.CreateConstIterator()};
+		FVoxelTerrainViewPlan ScopedReference = Plan;
+		ScopedReference.Roots = ResolveRoots;
+		TSet<FVoxelViewKey> ExpectedScope, ActualScope;
+		ScopedReference.ResolveVisible([&Ready](const FVoxelViewKey& Key) { return Ready.Contains(Key); },
+			ExpectedScope, &Previous, nullptr, &ReadyBranches);
+		Plan.ResolveVisible([&Ready](const FVoxelViewKey& Key) { return Ready.Contains(Key); },
+			ActualScope, &Previous, nullptr, &ReadyBranches, &ResolveRoots);
+		TestTrue(TEXT("Resolving selected roots reuses the complete plan with unchanged ownership semantics"),
+			ExpectedScope.Num() == ActualScope.Num() && ExpectedScope.Difference(ActualScope).IsEmpty());
 		Previous = MoveTemp(Pruned);
 	}
 	return true;

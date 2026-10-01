@@ -459,6 +459,38 @@ FVoxelInterestSet FVoxelInterestManager::Finalize(TConstArrayView<FVoxelStreamin
 		}
 	}
 
+	// 当前位置与预测位置之间都属于关键范围，前瞻距离不能把当前位置排除在外。
+	TSet<FIntVector> CriticalFine;
+	for (const FVoxelStreamingSource& Source : InSources)
+	{
+		if (!Source.Has(EVoxelStreamingCapability::FineVisual) ||
+			Source.Has(EVoxelStreamingCapability::LocalRefinement) ||
+			Source.View.MovementCriticalFineRadiusCells <= 0) continue;
+		const FVector Current(Source.Center);
+		const FVector Predicted = Current + Source.VelocityCellsPerSecond * Source.View.FinePredictionSeconds;
+		const double RadiusSquared = FMath::Square(static_cast<double>(Source.View.MovementCriticalFineRadiusCells));
+		for (auto& Pair : Result.Exact)
+		{
+			if (!Pair.Value.bFineRender) continue;
+			const FVector Center(Pair.Key * InterestSectionSide + FIntVector(InterestSectionSide / 2));
+			if (FMath::PointDistToSegmentSquared(Center, Current, Predicted) > RadiusSquared) continue;
+			Pair.Value.bMovementCriticalFine = true;
+			Pair.Value.bMovementCriticalData = true;
+			CriticalFine.Add(Pair.Key);
+		}
+	}
+	for (const FIntVector& Key : CriticalFine)
+	{
+		for (int32 Axis = 0; Axis < 3; ++Axis)
+		{
+			for (const int32 Sign : {-1, 1})
+			{
+				FIntVector Neighbor = Key;
+				Neighbor[Axis] += Sign;
+				if (FVoxelExactDemand* Demand = Result.Exact.Find(Neighbor)) Demand->bMovementCriticalData = true;
+			}
+		}
+	}
 	// 排序随不可变范围快照在后台完成，主线程只消费索引，不重新分配、排序数万个节点。
 	auto Distance = [&InSources](const FBox& Bounds, const bool bColumn, const bool bFullOnly, const int32 InPriority)
 	{
@@ -561,7 +593,29 @@ FVoxelInterestSet FVoxelInterestManager::Finalize(TConstArrayView<FVoxelStreamin
 		Result.AdmissionLanes[static_cast<uint8>(Result.Admissions[Index].Kind)].Add(Index);
 	}
 
-Result.Exact.GetKeys(Result.ExactOrder);
+	for (auto& Pair : Result.Sources)
+	{
+		FVoxelGenerationBounds& Bounds = Pair.Value.FineBounds;
+		Bounds = {};
+		for (const FIntVector& Section : Pair.Value.FineDataSections)
+		{
+			const FIntVector Min = Section * InterestSectionSide;
+			const FIntVector Max = Min + FIntVector(InterestSectionSide);
+			if (!Bounds.IsValid()) Bounds = {Min, Max};
+			else
+			{
+				Bounds.Min = Bounds.Min.ComponentMin(Min);
+				Bounds.Max = Bounds.Max.ComponentMax(Max);
+			}
+		}
+	}
+	SortExactDemands(Result);
+	return Result;
+}
+
+void FVoxelInterestManager::SortExactDemands(FVoxelInterestSet& Result)
+{
+	Result.Exact.GetKeys(Result.ExactOrder);
 	Result.ExactOrder.Sort([&Result](const FIntVector& Left, const FIntVector& Right)
 	{
 		const FVoxelExactDemand& A = Result.Exact.FindChecked(Left);
@@ -569,6 +623,9 @@ Result.Exact.GetKeys(Result.ExactOrder);
 		const bool bGameplayA = A.bExact || A.bCollision || A.bSimulation || A.bWarmupData;
 		const bool bGameplayB = B.bExact || B.bCollision || B.bSimulation || B.bWarmupData;
 		if (A.Priority != B.Priority) return A.Priority < B.Priority;
+		const bool bCriticalA = A.bMovementCriticalData || A.bMovementCriticalFine || A.bMovementCriticalCollision || A.bWarmupCollision;
+		const bool bCriticalB = B.bMovementCriticalData || B.bMovementCriticalFine || B.bMovementCriticalCollision || B.bWarmupCollision;
+		if (bCriticalA != bCriticalB) return bCriticalA;
 		if (bGameplayA != bGameplayB) return bGameplayA;
 		if (A.DistanceCells != B.DistanceCells) return A.DistanceCells < B.DistanceCells;
 		if (A.ForwardScore != B.ForwardScore) return A.ForwardScore > B.ForwardScore;
@@ -576,8 +633,14 @@ Result.Exact.GetKeys(Result.ExactOrder);
 		if (Left.Y != Right.Y) return Left.Y < Right.Y;
 		return Left.Z < Right.Z;
 	});
-
-	return Result;
+	for (auto& Lane : Result.ExactAdmissionLanes) Lane.Reset();
+	for (int32 Index = 0; Index < Result.ExactOrder.Num(); ++Index)
+	{
+		const FVoxelExactDemand& Demand = Result.Exact.FindChecked(Result.ExactOrder[Index]);
+		const bool bCritical = Demand.bMovementCriticalData || Demand.bMovementCriticalFine ||
+			Demand.bMovementCriticalCollision || Demand.bWarmupCollision;
+		Result.ExactAdmissionLanes[bCritical ? 0 : 1].Add(Index);
+	}
 }
 
 void FVoxelInterestManager::AddExactSource(
@@ -722,9 +785,8 @@ void FVoxelInterestManager::AddExactSource(
 
 				const bool bSimulation =
 					InSource.Has(EVoxelStreamingCapability::Simulation) &&
-					IsInsideRadius(
-						Delta,
-						SimulationRadius);
+					SimulationRadius > 0 &&
+					SectionIntersectsRadius(Key, InSource.Center, SimulationRadius);
 
 				const FVoxelExactDemand* Previous = InPrevious ? InPrevious->Exact.Find(Key) : nullptr;
 				const bool bRetainFine = InSource.Has(EVoxelStreamingCapability::FineVisual) &&

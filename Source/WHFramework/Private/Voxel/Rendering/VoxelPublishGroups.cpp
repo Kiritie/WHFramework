@@ -92,6 +92,19 @@ FBox FVoxelPublishGroupPlanner::OwnershipBounds(
 	return FBox(FVector(X0, Y0, 0.0), FVector(X1, Y1, 1.0));
 }
 
+FBox FVoxelPublishGroupPlanner::PublicationBounds(
+	const FVoxelPublishGroupKey& InKey,
+	const double InBlockSize,
+	const FBox& InPresentedBounds,
+	const FBox& InDesiredBounds,
+	const bool bInTransition)
+{
+	FBox Bounds = bInTransition ? FBox(ForceInit) : OwnershipBounds(InKey, InBlockSize);
+	Bounds += InPresentedBounds;
+	Bounds += InDesiredBounds;
+	return Bounds;
+}
+
 void FVoxelPublishGroupPlanner::Build(
 	TConstArrayView<FVoxelPublishFootprint> InFootprints,
 	TArray<int32>& OutGroupIndices)
@@ -137,8 +150,13 @@ void FVoxelPublishGroupPlanner::Build(
 		Active.Add(Index);
 	}
 	TMap<FVoxelPublishGroupKey, int32> Owners;
+	TMap<FVoxelPublishGroupKey, int32> Keys;
 	for (int32 Index = 0; Index < Count; ++Index)
 	{
+		// 同一 owner 的实体、水面和不同 Z section 必须使用同一次提交。
+		if (const int32* Other = Keys.Find(InFootprints[Index].Key))
+			Parents[FindRoot(Parents, *Other)] = FindRoot(Parents, Index);
+		else Keys.Add(InFootprints[Index].Key, Index);
 		if (!InFootprints[Index].bTransition)
 		{
 			Owners.Add(InFootprints[Index].Key, Index);

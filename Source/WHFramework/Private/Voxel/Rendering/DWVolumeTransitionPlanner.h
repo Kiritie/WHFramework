@@ -17,6 +17,9 @@ struct FVoxelVolumeTransitionFace
 class FVoxelVolumeTransitionPlanner
 {
 public:
+	static void GatherCoverageRegions(const TSet<FVoxelViewKey>& InVisible,
+		TMap<FVoxelViewKey, TSet<FVoxelViewKey>>& OutRegions);
+
 	static void Build(
 		const TSet<FVoxelViewKey>& InVisible,
 		uint8 InMaximumLevel,

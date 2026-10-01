@@ -1416,7 +1416,7 @@ bool FVoxelSurfaceStateTest::RunTest(const FString& InParameters)
 {
 	FVoxelGenerationRuntimeConfig MutableConfig = *VoxelTest::MakeGenerationConfig();
 	FVoxelGenerationRecipe Recipe = *MutableConfig.Recipe;
-	Recipe.Settings.MaxZ = 512;
+	Recipe.Settings.MaxZ = 4096;
 	MutableConfig.Recipe = MakeShared<const FVoxelGenerationRecipe, ESPMode::ThreadSafe>(MoveTemp(Recipe));
 	const auto Config = MakeShared<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe>(MoveTemp(MutableConfig));
 	const auto Generator = MakeShared<FVoxelGenerationPipeline, ESPMode::ThreadSafe>(Config,
@@ -1431,19 +1431,27 @@ bool FVoxelSurfaceStateTest::RunTest(const FString& InParameters)
 	FString Error;
 	if (!TestTrue(TEXT("Natural reference builds"), Builder.Build(Key, Data, Error))) return false;
 	const int32 Ground = Data.GroundZ[0];
-	Overlay.Set(FIntVector(0, 0, 510), FVoxelBlockState(9, 0));
-	TestTrue(TEXT("Decoration edit builds"), Builder.Build(Key, Data, Error));
+	const int32 EditedWaterZ = FMath::Max(Ground, Data.WaterZ[0]) + 8;
+	if (!TestTrue(TEXT("Water edit remains above natural ground and water within world bounds"),
+		EditedWaterZ + 1 < Config->Recipe->Settings.MaxZ)) return false;
+	Overlay.Set(FIntVector(0, 0, EditedWaterZ + 1), FVoxelBlockState(9, 0));
+	if (!TestTrue(FString::Printf(TEXT("Decoration edit builds: %s"), *Error),
+		Builder.Build(Key, Data, Error)))
+	{
+		AddError(Error);
+		return false;
+	}
 	TestEqual(TEXT("Non-solid decoration cannot raise terrain"), Data.GroundZ[0], Ground);
-	Overlay.Set(FIntVector(0, 0, 509), Config->Water);
+	Overlay.Set(FIntVector(0, 0, EditedWaterZ), Config->Water);
 	TestTrue(TEXT("Water edit builds"), Builder.Build(Key, Data, Error));
 	TestEqual(TEXT("Water is separate from solid ground"), Data.GroundZ[0], Ground);
-	TestEqual(TEXT("Edited water level is preserved"), Data.WaterZ[0], 509);
+	TestEqual(TEXT("Edited water level is preserved"), Data.WaterZ[0], EditedWaterZ);
 	FVoxelWaterSurfaceTileData Water;
 	TestTrue(TEXT("Edited water view builds"), FVoxelWaterViewBuilder().Build(Data, Water, Error));
 	TestTrue(TEXT("Water without natural hydrology flags remains visible"), Water.WaterKind[0] != uint8(EVoxelWaterKind::None));
-	Overlay.Set(FIntVector(0, 0, 509), Config->Air);
+	Overlay.Set(FIntVector(0, 0, EditedWaterZ), Config->Air);
 	TestTrue(TEXT("Removed water builds"), Builder.Build(Key, Data, Error));
-	TestTrue(TEXT("Removed water does not retain stale level"), Data.WaterZ[0] < 509);
+	TestTrue(TEXT("Removed water does not retain stale level"), Data.WaterZ[0] < EditedWaterZ);
 	for (int32 Z = Config->Recipe->Settings.MinZ; Z < Config->Recipe->Settings.MaxZ; ++Z)
 	{
 		Overlay.Set(FIntVector(0, 0, Z), Config->Air);
@@ -1517,6 +1525,57 @@ bool FVoxelHeightfieldNoUnconditionalSkirtTest::RunTest(const FString& InParamet
 		}
 	}
 	TestFalse(TEXT("Base terrain adds no unconditional deep perimeter wall"), bHasDeepPerimeterWall);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelChangedCoverageBoundsTest,
+	"WHFramework.Voxel.Rendering.ChangedCoverageBounds",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelChangedCoverageBoundsTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	for (const double Origin : {-64.0, 0.0})
+	{
+		for (const double Height : {0.0, 16.0})
+		{
+			const FBox Source(FVector(Origin, 0, 0), FVector(Origin + 64, 64, Height));
+			const TArray<FBox> Previous{FBox(FVector(Origin, 0, -8), FVector(Origin + 24, 64, 24))};
+			const TArray<FBox> Current{FBox(FVector(Origin + 8, 0, -8), FVector(Origin + 32, 64, 24))};
+			TArray<FBox> Changed;
+			VoxelMeshClipper::FindChangedCoverageBounds(Previous, Current, Source, Changed);
+			TestEqual(TEXT("A translated clipping window changes only its two edge strips"), Changed.Num(), 2);
+			for (int32 X = 1; X < 64; ++X)
+			{
+				const FVector Point(Origin + X + 0.25, 4, Height * 0.5);
+				const bool bExpected = Previous[0].IsInside(Point) != Current[0].IsInside(Point);
+				const bool bChanged = Changed.ContainsByPredicate([&Point](const FBox& Box) { return Box.IsInsideOrOn(Point); });
+				TestEqual(TEXT("Changed coverage matches the old/new exclusion union difference"), bChanged, bExpected);
+			}
+			TArray<FBox> Reverse;
+			VoxelMeshClipper::FindChangedCoverageBounds(Current, Previous, Source, Reverse);
+			TestTrue(TEXT("Clipping changes are symmetric under handoff direction"), Changed == Reverse);
+		}
+	}
+	const FBox Source(FVector::ZeroVector, FVector(64, 64, 16));
+	const TArray<FBox> Previous{FBox(FVector(16, 16, 0), FVector(48, 48, 8))};
+	const TArray<FBox> Current{FBox(FVector(16, 16, 4), FVector(48, 48, 12))};
+	TArray<FBox> Changed;
+	VoxelMeshClipper::FindChangedCoverageBounds(Previous, Current, Source, Changed);
+	for (const double Z : {2.0, 6.0, 10.0, 14.0})
+	{
+		const FVector Point(24, 24, Z);
+		TestEqual(TEXT("Vertical clipping changes retain height semantics"),
+			Changed.ContainsByPredicate([&Point](const FBox& Box) { return Box.IsInside(Point); }), Z == 2.0 || Z == 10.0);
+	}
+	const TArray<FBox> Split{
+		FBox(FVector(0, 0, 0), FVector(16, 32, 16)), FBox(FVector(16, 0, 0), FVector(32, 32, 16))};
+	const TArray<FBox> Merged{FBox(FVector::ZeroVector, FVector(32, 32, 16))};
+	VoxelMeshClipper::FindChangedCoverageBounds(Split, Merged, Source, Changed);
+	TestTrue(TEXT("Equivalent exclusion partitions produce no physical change"), Changed.IsEmpty());
+	const TArray<FBox> Outside{FBox(FVector(80, 80, 0), FVector(96, 96, 16))};
+	VoxelMeshClipper::FindChangedCoverageBounds({}, Outside, Source, Changed);
+	TestTrue(TEXT("Exclusions outside the source geometry create no dependency footprint"), Changed.IsEmpty());
 	return true;
 }
 

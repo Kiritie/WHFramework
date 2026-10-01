@@ -5,6 +5,24 @@
 #include "Voxel/Generation/VoxelGenerationTypes.h"
 #include "Voxel/Streaming/VoxelStreamingSource.h"
 
+struct WHFRAMEWORK_API FVoxelFrameTimings
+{
+	double AdmissionMilliseconds = 0.0;
+	double ResultApplyMilliseconds = 0.0;
+	double PublishPrepareMilliseconds = 0.0;
+	double PublishCommitMilliseconds = 0.0;
+	double RetireMilliseconds = 0.0;
+	double CoverageMilliseconds = 0.0;
+};
+
+struct WHFRAMEWORK_API FVoxelRepresentationReadiness
+{
+	int32 PresentedFine = 0;
+	int32 PresentedVoxelProxy = 0;
+	int32 PresentedSurface = 0;
+	int32 PresentedMacro = 0;
+};
+
 struct WHFRAMEWORK_API FVoxelViewKey
 {
 	FIntVector Coordinate = FIntVector::ZeroValue;

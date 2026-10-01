@@ -1,6 +1,7 @@
 #include "Voxel/Streaming/VoxelEmergeManager.h"
 
 #include "EngineGlobals.h"
+#include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Save/VoxelDeltaCodec.h"
 #include "Voxel/Save/VoxelRegionStore.h"
 
@@ -48,42 +49,40 @@ void FVoxelEmergeManager::Tick(
 	const int32 MaximumAttempts = FMath::Min(OrderedKeys.Num(), FMath::Max(64, BuildLimit * 8));
 	const double Deadline = FPlatformTime::Seconds() + FMath::Max(0.1, InAdmissionMilliseconds) / 1000.0;
 	int32 Submitted = 0;
-
-	for (int32 Attempt = 0; Attempt < MaximumAttempts && Submitted < BuildLimit &&
-		FPlatformTime::Seconds() < Deadline; ++Attempt)
+	if (!OverlayBoundsRequests.IsEmpty() && InNow >= OverlayBoundsRetryAfterSeconds)
 	{
-		if (NextAdmissionIndex >= OrderedKeys.Num())
+		NextOverlayBoundsIndex %= OverlayBoundsRequests.Num();
+		const FOverlayBoundsRequest& Request = OverlayBoundsRequests[NextOverlayBoundsIndex];
+		const auto Status = Generator->EnsureOverlayBoundsReady(Request.Bounds,
+			EVoxelWorkClass::ExactData, Request.SourcePriority);
+		if (Status.bReady || Status.bFailed) OverlayBoundsRequests.RemoveAt(NextOverlayBoundsIndex);
+		else ++NextOverlayBoundsIndex;
+		OverlayBoundsRetryAfterSeconds = InNow + 0.2;
+	}
+
+	for (int32 LaneIndex = 0; LaneIndex < 2; ++LaneIndex)
+	{
+		const TArray<int32>& Lane = AdmissionLanes[LaneIndex];
+		const double LaneDeadline = LaneIndex == 0 && !AdmissionLanes[1].IsEmpty()
+			? FPlatformTime::Seconds() + FMath::Max(0.0, Deadline - FPlatformTime::Seconds()) * 0.75 : Deadline;
+		int32& Scan = NextAdmissionIndices[LaneIndex];
+		for (int32 Attempt = 0; Attempt < FMath::Min(MaximumAttempts, Lane.Num()) && Submitted < BuildLimit &&
+			FPlatformTime::Seconds() < LaneDeadline; ++Attempt)
 		{
-			NextAdmissionIndex = 0;
-		}
-
-		const FIntVector Key =
-			OrderedKeys[NextAdmissionIndex++];
-
-		const FVoxelExactDemand* Demand =
-			CurrentDemand.Find(Key);
-
-		if (Demand)
-		{
-			const bool bGameplayData = Demand->bExact || Demand->bCollision || Demand->bSimulation || Demand->bWarmupData;
+			if (Scan >= Lane.Num()) Scan = 0;
+			const FIntVector Key = OrderedKeys[Lane[Scan++]];
+			const FVoxelExactDemand* Demand = CurrentDemand.Find(Key);
+			if (!Demand) continue;
+			const bool bGameplayData = Demand->bExact || Demand->bCollision || Demand->bSimulation || Demand->bWarmupData ||
+				Demand->bMovementCriticalData || Demand->bMovementCriticalFine;
 			const double* Limit = InDataAdmissionLimits.Find(Demand->Priority);
 			if (!bGameplayData && Limit && Demand->DistanceCells > *Limit)
 			{
-				// Distances are ordered within each source-priority group. Keep the
-				// single-source frontier, but let a later source use its own near range.
-				while (NextAdmissionIndex < OrderedKeys.Num())
+				while (Scan < Lane.Num())
 				{
-					const FVoxelExactDemand* Next = CurrentDemand.Find(OrderedKeys[NextAdmissionIndex]);
-					if (!Next || Next->Priority != Demand->Priority)
-					{
-						break;
-					}
-					++NextAdmissionIndex;
-				}
-				if (NextAdmissionIndex == OrderedKeys.Num())
-				{
-					NextAdmissionIndex = 0;
-					break;
+					const FVoxelExactDemand* Next = CurrentDemand.Find(OrderedKeys[Lane[Scan]]);
+					if (!Next || Next->Priority != Demand->Priority) break;
+					++Scan;
 				}
 				continue;
 			}
@@ -93,10 +92,10 @@ void FVoxelEmergeManager::Tick(
 	if (InNow - LastAdmissionDiagnosticTime >= 5.0)
 	{
 		UE_LOG(LogTemp, Display,
-			TEXT("Voxel emerge admission: exact=%d ordered=%d waiting=%d planPending=%d planReady=%d overlayPending=%d overlayReady=%d enqueueAttempts=%d enqueued=%d next=%d"),
+			TEXT("Voxel emerge admission: exact=%d ordered=%d waiting=%d planPending=%d planReady=%d overlayPending=%d overlayReady=%d enqueueAttempts=%d enqueued=%d nextCritical=%d nextOrdinary=%d"),
 			CurrentDemand.Num(), OrderedKeys.Num(), WaitingPlanSections.Num(),
 			PlanPendingAttempts, PlanReadyAttempts, OverlayPendingAttempts,
-			OverlayReadyAttempts, EnqueueAttempts, EnqueuedTasks, NextAdmissionIndex);
+			OverlayReadyAttempts, EnqueueAttempts, EnqueuedTasks, NextAdmissionIndices[0], NextAdmissionIndices[1]);
 		LastAdmissionDiagnosticTime = InNow;
 		PlanPendingAttempts = 0;
 		PlanReadyAttempts = 0;
@@ -144,6 +143,14 @@ bool FVoxelEmergeManager::OnTask(
 
 	if (!InResult.bSuccess)
 	{
+		if (InResult.Kind == EVoxelTaskKind::GenerateExactBase && InResult.Error.StartsWith(TEXT("DependencyNotReady")))
+		{
+			Section->Status = EVoxelSectionStatus::Allocated;
+			Section->Error.Reset();
+			PlanCoordinator->ReleaseConsumer(InResult.Stamp.Section);
+			WaitingPlanSections.Remove(InResult.Stamp.Section);
+			return true;
+		}
 		UE_LOG(LogTemp, Error, TEXT("Voxel section generation failed: section=%s kind=%d error=%s"),
 			*InResult.Stamp.Section.ToString(), static_cast<int32>(InResult.Kind), *InResult.Error);
 		Section->Status =
@@ -230,16 +237,77 @@ void FVoxelEmergeManager::SetRemoteChangeState(
 	}
 }
 
+FVoxelGenerationDependencyStatus FVoxelEmergeManager::QueryEnvironment(const FIntPoint& InCell, FVoxelEnvironmentSample& OutSample)
+{
+	if (InCell.X == MAX_int32 || InCell.Y == MAX_int32)
+	{
+		return { false, true, TEXT("Environment query exceeds world coordinates") };
+	}
+	if (Generator->TrySampleEnvironment(InCell, OutSample))
+	{
+		PlanCoordinator->ReleaseConsumer(FIntVector(InCell.X, InCell.Y, MAX_int32));
+		return { true, false, {} };
+	}
+	if (const FVoxelGenerationDependencyStatus* Existing = EnvironmentColumnStates.Find(InCell)) return *Existing;
+	const FVoxelGenerationDependencyStatus Status = PlanCoordinator->EnsureEnvironment(InCell);
+	if (!Status.bReady) return Status;
+	if (EnvironmentColumnStates.Num() >= 32) return {};
+	const auto Retention = Generator->RetainHydrologyForPlanning(InCell, 0);
+	FVoxelTaskRequest Request;
+	Request.Kind = EVoxelTaskKind::ProjectBackground;
+	Request.WorkClass = EVoxelWorkClass::Interactive;
+	Request.Stamp.WorldEpoch = Runtime.Epoch();
+	Request.Stamp.Section = FIntVector(InCell.X, InCell.Y, 0);
+	Request.Stamp.Token = VoxelGeneration::MakeSeed(Manifest.Settings.Seed,
+		Request.Stamp.Section, 0x454e56434f4c554dull);
+	Request.Stamp.Revision = 1;
+	Request.ReservedBytes = 4096;
+	Request.Execute = [Pipeline = Generator, InCell, Retention](const TAtomic<bool>& Cancel)
+	{
+		FVoxelTaskResult Result;
+		FVoxelEnvironmentSample Sample;
+		Result.bSuccess = !Cancel.Load() && Pipeline->SampleEnvironment(
+			InCell.X, InCell.Y, Sample, Result.Error, &Cancel);
+		Result.bCanceled = Cancel.Load();
+		return Result;
+	};
+	Request.Apply = [this, InCell](FVoxelTaskResult&& Result)
+	{
+		EnvironmentColumnStates.Remove(InCell);
+		if (!Result.bSuccess && !Result.bCanceled && !Result.Error.StartsWith(TEXT("DependencyNotReady")))
+		{
+			EnvironmentColumnStates.Add(InCell, { false, true, Result.Error });
+			UE_LOG(LogTemp, Error, TEXT("Environment column %s failed: %s"), *InCell.ToString(), *Result.Error);
+		}
+	};
+	if (Scheduler.Enqueue(MoveTemp(Request))) EnvironmentColumnStates.Add(InCell, {});
+	return {};
+}
+
+FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureEnvironmentBounds(
+	const FVoxelGenerationBounds& InBounds, const EVoxelWorkClass InWorkClass,
+	const int32 InSourcePriority, const double InDistanceScore, const double InForwardScore)
+{
+	return PlanCoordinator->EnsureEnvironmentBounds(InBounds, InWorkClass,
+		InSourcePriority, InDistanceScore, InForwardScore);
+}
+
 void FVoxelEmergeManager::Reset()
 {
 	CurrentDemand.Reset();
 	WaitingPlanSections.Reset();
+	EnvironmentColumnStates.Reset();
 	PlanCoordinator->Reset();
 	RemoteChangeStates.Reset();
 	OrderedKeys.Reset();
+	for (auto& Lane : AdmissionLanes) Lane.Reset();
+	OverlayBoundsRequests.Reset();
 
 	CurrentInterestRevision = 0;
-	NextAdmissionIndex = 0;
+	NextAdmissionIndices[0] = 0;
+	NextAdmissionIndices[1] = 0;
+	NextOverlayBoundsIndex = 0;
+	OverlayBoundsRetryAfterSeconds = 0.0;
 	LastAdmissionDiagnosticTime = 0.0;
 	PlanPendingAttempts = 0;
 	PlanReadyAttempts = 0;
@@ -251,7 +319,7 @@ void FVoxelEmergeManager::Reset()
 
 EVoxelWorkClass FVoxelEmergeManager::ResolveWorkClass(const FVoxelExactDemand& InDemand)
 {
-	if (InDemand.bMovementCriticalCollision || InDemand.bMovementCriticalFine ||
+	if (InDemand.bMovementCriticalCollision || InDemand.bMovementCriticalFine || InDemand.bMovementCriticalData ||
 		InDemand.bWarmupCollision) return EVoxelWorkClass::Critical;
 	if (InDemand.bWarmupData) return EVoxelWorkClass::Warmup;
 	return InDemand.bExact || InDemand.bCollision || InDemand.bSimulation
@@ -264,9 +332,23 @@ void FVoxelEmergeManager::RebuildDemand(
 {
 	CurrentDemand = InInterest.Exact;
 	OrderedKeys = InInterest.ExactOrder;
+	for (int32 Lane = 0; Lane < 2; ++Lane) AdmissionLanes[Lane] = InInterest.ExactAdmissionLanes[Lane];
+	OverlayBoundsRequests.Reset();
+	for (const auto& Pair : InInterest.Sources)
+	{
+		if (Pair.Value.FineBounds.IsValid())
+		{
+			OverlayBoundsRequests.Add({Pair.Value.FineBounds, Pair.Value.Source.GetSchedulingPriority()});
+		}
+	}
 	for (auto Iterator = WaitingPlanSections.CreateIterator(); Iterator; ++Iterator)
 	{
-		if (!CurrentDemand.Contains(Iterator.Key())) Iterator.RemoveCurrent();
+		if (!CurrentDemand.Contains(Iterator.Key()))
+		{
+			PlanCoordinator->ReleaseConsumer(Iterator.Key());
+			Generator->ReleaseOverlaySectionConsumer(Iterator.Key());
+			Iterator.RemoveCurrent();
+		}
 	}
 	Scheduler.UpdatePriorities([this](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp,
 		EVoxelWorkClass& WorkClass, int32& Priority,
@@ -285,7 +367,8 @@ void FVoxelEmergeManager::RebuildDemand(
 	CurrentInterestRevision =
 		InInterestRevision;
 
-	NextAdmissionIndex = 0;
+	NextAdmissionIndices[0] = 0;
+	NextAdmissionIndices[1] = AdmissionLanes[1].IsEmpty() ? 0 : NextAdmissionIndices[1] % AdmissionLanes[1].Num();
 }
 
 bool FVoxelEmergeManager::RequestSection(
@@ -375,24 +458,17 @@ bool FVoxelEmergeManager::RequestBase(
 	const FVoxelGenerationDependencyStatus PlanStatus = PlanCoordinator->Ensure(
 		Waiting->Dependencies,
 		ResolveWorkClass(InDemand), InDemand.Priority,
-		InDemand.DistanceCells, InDemand.ForwardScore);
+		InDemand.DistanceCells, InDemand.ForwardScore, InKey);
 	if (PlanStatus.bFailed)
 	{
 		InSection.Status = EVoxelSectionStatus::Failed;
 		InSection.Error = PlanStatus.Error;
+		PlanCoordinator->ReleaseConsumer(InKey);
 		WaitingPlanSections.Remove(InKey);
 		UE_LOG(LogTemp, Error, TEXT("Voxel plan dependency failed: section=%s error=%s"),
 			*InKey.ToString(), *InSection.Error);
 		return false;
 	}
-	if (!PlanStatus.bReady)
-	{
-		++PlanPendingAttempts;
-		Waiting->RetryAfterSeconds = Now + 0.2;
-		return false;
-	}
-	++PlanReadyAttempts;
-
 	const FVoxelOverlayPreflightStatus OverlayStatus =
 		Generator->EnsureOverlaySectionReady(InKey, ResolveWorkClass(InDemand),
 			InDemand.Priority, InDemand.DistanceCells, InDemand.ForwardScore);
@@ -400,19 +476,23 @@ bool FVoxelEmergeManager::RequestBase(
 	{
 		InSection.Status = EVoxelSectionStatus::Failed;
 		InSection.Error = OverlayStatus.Error;
+		PlanCoordinator->ReleaseConsumer(InKey);
 		WaitingPlanSections.Remove(InKey);
 		UE_LOG(LogTemp, Error,
 			TEXT("Voxel overlay preflight failed: section=%s error=%s"),
 			*InKey.ToString(), *InSection.Error);
 		return false;
 	}
-	if (!OverlayStatus.bReady)
+	PlanPendingAttempts += !PlanStatus.bReady;
+	PlanReadyAttempts += PlanStatus.bReady;
+	OverlayPendingAttempts += !OverlayStatus.bReady;
+	OverlayReadyAttempts += OverlayStatus.bReady;
+	if (!PlanStatus.bReady || !OverlayStatus.bReady)
 	{
-		++OverlayPendingAttempts;
 		Waiting->RetryAfterSeconds = Now + 0.2;
 		return false;
 	}
-	++OverlayReadyAttempts;
+	PlanCoordinator->ReleaseConsumer(InKey);
 	WaitingPlanSections.Remove(InKey);
 
 	FVoxelTaskRequest Request;
@@ -604,4 +684,9 @@ bool FVoxelEmergeManager::ResolveOverlay(
 		};
 
 	return Scheduler.Enqueue(MoveTemp(Request));
+}
+
+uint64 FVoxelEmergeManager::GetWaitingPlanConsumers(const EVoxelGenerationPlanKind InKind) const
+{
+	return PlanCoordinator->GetWaitingConsumers(InKind);
 }

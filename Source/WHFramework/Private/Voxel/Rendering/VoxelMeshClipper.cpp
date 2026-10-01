@@ -112,6 +112,57 @@ void VoxelMeshClipper::NormalizeBoxes(TArray<FBox>& InOutBoxes)
 	}
 }
 
+void VoxelMeshClipper::FindChangedCoverageBounds(TConstArrayView<FBox> InPrevious,
+	TConstArrayView<FBox> InCurrent, const FBox& InSourceBounds,
+	TArray<FBox>& OutBounds, const TAtomic<bool>* InCancel)
+{
+	OutBounds.Reset();
+	if (!InSourceBounds.IsValid) return;
+	// 裁剪范围的对称差只连接真实变化区；同一个网格的不同变化区仍由 owner 一起提交。
+	auto AppendDifference = [&](TConstArrayView<FBox> From, TConstArrayView<FBox> Against)
+	{
+		for (const FBox& Box : From)
+		{
+			if (InCancel && InCancel->Load()) return;
+			if (!Box.Intersect(InSourceBounds)) continue;
+			TArray<FBox> Fragments{Box.Overlap(InSourceBounds)};
+			for (const FBox& Other : Against)
+			{
+				if (InCancel && InCancel->Load()) return;
+				TArray<FBox> Remaining;
+				for (FBox Fragment : Fragments)
+				{
+					if (!Fragment.Intersect(Other)) { Remaining.Add(Fragment); continue; }
+					const FBox Intersection = Fragment.Overlap(Other);
+					for (int32 Axis = 0; Axis < 3; ++Axis)
+					{
+						if (Fragment.Min[Axis] < Intersection.Min[Axis])
+						{
+							FBox Part = Fragment;
+							Part.Max[Axis] = Intersection.Min[Axis];
+							Remaining.Add(Part);
+							Fragment.Min[Axis] = Intersection.Min[Axis];
+						}
+						if (Fragment.Max[Axis] > Intersection.Max[Axis])
+						{
+							FBox Part = Fragment;
+							Part.Min[Axis] = Intersection.Max[Axis];
+							Remaining.Add(Part);
+							Fragment.Max[Axis] = Intersection.Max[Axis];
+						}
+					}
+				}
+				Fragments = MoveTemp(Remaining);
+				if (Fragments.IsEmpty()) break;
+			}
+			OutBounds.Append(Fragments);
+		}
+	};
+	AppendDifference(InPrevious, InCurrent);
+	AppendDifference(InCurrent, InPrevious);
+	NormalizeBoxes(OutBounds);
+}
+
 void VoxelMeshClipper::Subtract(const FVoxelSectionMeshResult& InMesh,
 	TConstArrayView<FBox> InBoxes, FVoxelSectionMeshResult& OutMesh, const TAtomic<bool>* InCancel)
 {

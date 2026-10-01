@@ -241,7 +241,8 @@ bool FVoxelVoxelProxyBuilder::ApplyTreeSilhouettes(
 	ClearTreeSamples(InOutData.Cells);
 	for (TArray<FVoxelBlockState>& Face : InOutData.Halo) ClearTreeSamples(Face);
 	FVoxelGenerationQuery Query;
-	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError))
+	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError, true,
+		Generator && Generator->RequiresPlanPreflight()))
 	{
 		return false;
 	}
@@ -385,7 +386,9 @@ bool FVoxelVoxelProxyBuilder::BuildNatural(
 			Config,
 			Cache,
 			Query,
-			OutError))
+			OutError,
+			true,
+			Generator && Generator->RequiresPlanPreflight()))
 	{
 		return false;
 	}

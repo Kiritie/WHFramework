@@ -92,6 +92,7 @@ public:
 	bool IsCollisionReady(const FIntVector& InSection) const;
 	float GetWarmupProgress() const;
 	const FVoxelWorldReadinessSnapshot& GetReadiness() const;
+	FVoxelRepresentationReadiness GetRepresentationReadiness() const;
 	double BlockSize() const;
 	const FVoxelWorldManifest& GetManifest() const;
 	FGuid GetSessionId() const;
@@ -105,17 +106,25 @@ public:
 	UVoxelMaterialSet* GetMaterialSet() const;
 	UVoxelWorldGenerationProfile* GetWorldGenerationProfile() const;
 	TSharedPtr<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> GetGenerator() const;
+	FVoxelGenerationDependencyStatus QueryEnvironment(const FIntPoint& InCell, FVoxelEnvironmentSample& OutSample);
+	FVoxelGenerationDependencyStatus EnsureEnvironmentBounds(const FVoxelGenerationBounds& InBounds,
+		EVoxelWorkClass InWorkClass, int32 InSourcePriority, double InDistanceScore, double InForwardScore);
 	bool ResolveMapSurface(
 		const FVector2D& InMapPosition,
 		FVector& OutLocation,
 		FString& OutError) const;
 	TSharedPtr<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> GetGenerationConfig() const;
 	TSharedPtr<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> GetGenerationCache() const;
+	virtual TMap<FName, FVoxelPlanDiagnostics> GetPlanDiagnostics() const;
 	FVoxelMapTileCache* GetMapTileCache() const;
 	const FVoxelRegionStore& GetRegionStore() const;
 	const FVoxelInterestSet& GetCurrentInterest() const;
+	FVoxelTaskDiagnostics GetTaskDiagnostics() const;
+	FVoxelPrimaryFineReadiness QueryFineReadiness(TConstArrayView<FIntVector> InKeys) const;
 	const FVoxelViewSettings& GetViewSettings() const { return ViewSettings; }
 	bool EnqueueProjectBackgroundTask(FVoxelTaskRequest&& InRequest);
+	void DonateProjectTaskPriority(const FVoxelTaskStamp& InStamp, EVoxelWorkClass InClass,
+		int32 InSourcePriority, double InDistanceScore, double InForwardScore);
 	void SetPersistenceEnabled(bool bInEnabled);
 	bool IsPersistenceEnabled() const;
 	TSoftObjectPtr<UVoxelWorldGenerationProfile> GetWorldGenerationProfileAsset() const;
@@ -127,6 +136,7 @@ public:
 	bool IsSourceAdmitted(const FGuid& InId) const;
 	void CollectStreamingSourcesForOwner(const AActor* InOwner, TArray<FVoxelStreamingSource>& OutSources) const;
 	FVoxelStreamingReadiness QueryStreamingReadiness(const FGuid& InId) const;
+	FVoxelFrameTimings GetFrameTimings() const;
 	FVoxelStreamingReadiness QueryBoundsReadiness(const FVoxelGenerationBounds& InBounds, bool bInRequireCollision) const;
 	void ForceVoxelStreamingRefresh();
 	void SetRemoteChangeState(const FIntVector& InSection, EVoxelSectionChangeState InState);
@@ -314,6 +324,7 @@ private:
 	double LastDiagnosticsLog = -1.0;
 	TArray<double> DiagnosticFrameTimes;
 	TArray<double> DiagnosticModuleTimes;
+	double LastEmergeAdmissionMilliseconds = 0.0;
 	uint64 NextSourceRegistrationOrder = 0;
 	bool bInterestDirty = true;
 	bool bInterestBuildPending = false;

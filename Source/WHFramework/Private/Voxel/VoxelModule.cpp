@@ -315,6 +315,7 @@ void UVoxelModule::OnRefresh(
 		ViewSettings.AdmissionMilliseconds);
 
 	const double AfterEmerge = FPlatformTime::Seconds();
+	LastEmergeAdmissionMilliseconds = (AfterEmerge - AfterInterest) * 1000.0;
 
 	ResidencyManager->Tick(
 		CurrentInterest.Exact,
@@ -644,7 +645,7 @@ bool UVoxelModule::StartWorld(
 		return false;
 	}
 
-	GenerationCache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>(false);
+	GenerationCache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>(false, false);
 	const TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> NaturalGenerator =
 		MakeShared<const FVoxelGenerationPipeline, ESPMode::ThreadSafe>(
 			GenerationConfig.ToSharedRef(),
@@ -769,8 +770,9 @@ bool UVoxelModule::StartWorld(
 	if (GetWorld()->GetNetMode() != NM_DedicatedServer)
 	{
 		ViewManager = MakeUnique<FVoxelViewManager>(*this, *Scheduler, Epoch);
-		CollisionPresenter = MakeUnique<FVoxelCollisionPresenter>(*this, *Scheduler, Epoch);
 	}
+	// 服务端同样需要权威碰撞，碰撞发布不依赖视觉地形模块。
+	CollisionPresenter = MakeUnique<FVoxelCollisionPresenter>(*this, *Scheduler, Epoch);
 	DetailView = MakeUnique<FVoxelDetailView>(*this, *Scheduler, Epoch);
 	if (!DetailView->Initialize(OutError))
 	{
@@ -802,6 +804,8 @@ bool UVoxelModule::StartWorld(
 	WorldData->Seed =
 		Manifest.Settings.Seed;
 	FVoxelManifestCodec::Encode(Manifest, WorldData->ManifestBytes);
+	// 远端客户端没有 GameMode 的模块启动阶段；握手建立运行时后启用自身刷新。
+	if (bInRemote && GetModuleState() == EModuleState::None && IsModuleAutoRun()) Run();
 	OnWorldInitialized.Broadcast();
 	OutError.Reset();
 	return true;
@@ -1101,6 +1105,63 @@ const FVoxelInterestSet& UVoxelModule::GetCurrentInterest() const
 	return CurrentInterest;
 }
 
+FVoxelRepresentationReadiness UVoxelModule::GetRepresentationReadiness() const
+{
+	return ViewManager ? ViewManager->GetRepresentationReadiness() : FVoxelRepresentationReadiness{};
+}
+
+TMap<FName, FVoxelPlanDiagnostics> UVoxelModule::GetPlanDiagnostics() const
+{
+	TMap<FName, FVoxelPlanDiagnostics> Result;
+	const FName Names[]{TEXT("Hydrology"), TEXT("Cave"), TEXT("Structure"), TEXT("Feature"), TEXT("Ecology")};
+	for (uint8 Index = 0; Index < 5; ++Index)
+	{
+		const auto Kind = static_cast<EVoxelGenerationPlanKind>(Index);
+		FVoxelPlanDiagnostics Stats = GenerationCache ? GenerationCache->GetPlanDiagnostics(Kind) : FVoxelPlanDiagnostics{};
+		Stats.WaitingConsumers = EmergeManager ? EmergeManager->GetWaitingPlanConsumers(Kind) : 0;
+		Result.Add(Names[Index], Stats);
+	}
+	return Result;
+}
+
+FVoxelTaskDiagnostics UVoxelModule::GetTaskDiagnostics() const
+{
+	return Scheduler ? Scheduler->GetDiagnostics() : FVoxelTaskDiagnostics{};
+}
+
+FVoxelFrameTimings UVoxelModule::GetFrameTimings() const
+{
+	FVoxelFrameTimings Result = ViewManager ? ViewManager->GetFrameTimings() : FVoxelFrameTimings{};
+	Result.AdmissionMilliseconds += LastEmergeAdmissionMilliseconds;
+	if (Scheduler)
+	{
+		const auto Tasks = Scheduler->GetDiagnostics();
+		Result.AdmissionMilliseconds += Tasks.LastAdmissionMilliseconds;
+		Result.ResultApplyMilliseconds = Tasks.LastResultApplyMilliseconds;
+	}
+	return Result;
+}
+
+FVoxelPrimaryFineReadiness UVoxelModule::QueryFineReadiness(TConstArrayView<FIntVector> InKeys) const
+{
+	return ViewManager ? ViewManager->GetFineRadiusReadiness(InKeys) : FVoxelPrimaryFineReadiness{};
+}
+
+FVoxelGenerationDependencyStatus UVoxelModule::QueryEnvironment(const FIntPoint& InCell, FVoxelEnvironmentSample& OutSample)
+{
+	return EmergeManager ? EmergeManager->QueryEnvironment(InCell, OutSample)
+		: FVoxelGenerationDependencyStatus{ false, true, TEXT("Voxel world is unavailable") };
+}
+
+FVoxelGenerationDependencyStatus UVoxelModule::EnsureEnvironmentBounds(
+	const FVoxelGenerationBounds& InBounds, const EVoxelWorkClass InWorkClass,
+	const int32 InSourcePriority, const double InDistanceScore, const double InForwardScore)
+{
+	return EmergeManager ? EmergeManager->EnsureEnvironmentBounds(InBounds, InWorkClass,
+		InSourcePriority, InDistanceScore, InForwardScore)
+		: FVoxelGenerationDependencyStatus{ false, true, TEXT("Voxel world is unavailable") };
+}
+
 bool UVoxelModule::EnqueueProjectBackgroundTask(FVoxelTaskRequest&& InRequest)
 {
 	check(IsInGameThread());
@@ -1109,6 +1170,33 @@ bool UVoxelModule::EnqueueProjectBackgroundTask(FVoxelTaskRequest&& InRequest)
 		return false;
 	}
 	return Scheduler->Enqueue(MoveTemp(InRequest));
+}
+
+void UVoxelModule::DonateProjectTaskPriority(const FVoxelTaskStamp& InStamp, const EVoxelWorkClass InClass,
+	const int32 InSourcePriority, const double InDistanceScore, const double InForwardScore)
+{
+	check(IsInGameThread());
+	if (!Scheduler) return;
+	Scheduler->UpdatePriorities([&](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp,
+		EVoxelWorkClass& WorkClass, int32& SourcePriority, double& DistanceScore, double& ForwardScore)
+	{
+		if (Kind != EVoxelTaskKind::ProjectBackground || !(Stamp == InStamp)) return;
+		FVoxelTaskRequest Previous, Candidate;
+		Previous.Kind = Candidate.Kind = Kind;
+		Previous.WorkClass = WorkClass;
+		Previous.SourcePriority = SourcePriority;
+		Previous.DistanceScore = DistanceScore;
+		Previous.ForwardScore = ForwardScore;
+		Candidate.WorkClass = InClass;
+		Candidate.SourcePriority = InSourcePriority;
+		Candidate.DistanceScore = InDistanceScore;
+		Candidate.ForwardScore = InForwardScore;
+		if (!FVoxelTaskScheduler::IsHigherPriority(Candidate, Previous)) return;
+		WorkClass = InClass;
+		SourcePriority = InSourcePriority;
+		DistanceScore = InDistanceScore;
+		ForwardScore = InForwardScore;
+	});
 }
 
 void UVoxelModule::SetPersistenceEnabled(const bool bInEnabled)
@@ -1200,8 +1288,11 @@ bool UVoxelModule::IsSourceAdmitted(const FGuid& InId) const
 {
 	const FSource* Source = Sources.Find(InId);
 	const FVoxelSourceInterest* Admitted = CurrentInterest.Sources.Find(InId);
-	return Source && Source->Owner.IsValid() && Admitted &&
-		!FVoxelInterestRuntime::NeedsUpdate(Admitted->Source, Source->Value);
+	if (!Source || !Source->Owner.IsValid() || !Admitted) return false;
+	FVoxelStreamingSource Input = Admitted->Source;
+	// 排序生成的调度优先级不是来源输入，不能据此否认已准入的来源。
+	Input.SchedulingPriority = Source->Value.SchedulingPriority;
+	return !FVoxelInterestRuntime::NeedsUpdate(Input, Source->Value);
 }
 
 void UVoxelModule::CollectStreamingSourcesForOwner(const AActor* InOwner, TArray<FVoxelStreamingSource>& OutSources) const
@@ -1508,6 +1599,7 @@ void UVoxelModule::RefreshInterest(
 			if (Payload->bChanged)
 			{
 				InterestRevision = InterestRevision == MAX_uint64 ? 1 : InterestRevision + 1;
+				if (ViewManager) ViewManager->ApplyInterestDelta(Payload->Delta);
 			}
 			else if (ViewManager)
 			{
@@ -2474,8 +2566,18 @@ bool UVoxelModule::ValidateWorldData(const FParameter& InData, FString& OutError
 		return false;
 	}
 	FVoxelWorldManifest SavedManifest;
-	if (!FVoxelManifestCodec::Decode(Data->ManifestBytes, SavedManifest) ||
-		!Registry.GetSnapshot() ||
+	if (!FVoxelManifestCodec::Decode(Data->ManifestBytes, SavedManifest))
+	{
+		OutError = TEXT("Voxel save manifest is invalid or uses an unsupported generation identity protocol");
+		return false;
+	}
+	if (SavedManifest.GeneratorVersion != FVoxelGenerationRecipe::CurrentAlgorithmVersion)
+	{
+		OutError = FString::Printf(TEXT("Saved voxel terrain algorithm %u differs from current algorithm %u"),
+			SavedManifest.GeneratorVersion, FVoxelGenerationRecipe::CurrentAlgorithmVersion);
+		return false;
+	}
+	if (!Registry.GetSnapshot() ||
 		!WorldGenerationProfile ||
 		SavedManifest.RegistryHash != Registry.GetSnapshot()->Hash)
 	{
@@ -2489,10 +2591,13 @@ bool UVoxelModule::ValidateWorldData(const FParameter& InData, FString& OutError
 		SavedManifest.Settings,
 		SavedManifest.BlockSizeCentimeters,
 		Config,
-		OutError) ||
-		!Config.Recipe ||
-		Config.Recipe->RecipeHash != SavedManifest.RecipeHash)
+		OutError))
 	{
+		return false;
+	}
+	if (!Config.Recipe || Config.Recipe->RecipeHash != SavedManifest.RecipeHash)
+	{
+		OutError = TEXT("Saved voxel RecipeHash differs from the current generation profile");
 		return false;
 	}
 	const uint64 ExpectedGenerationSignature =

@@ -52,6 +52,10 @@ public:
 		TArray<FVoxelHeightfieldTransitionEdge>& OutEdges,
 		FString& OutError);
 
+	static void GatherOwnerDependencies(TConstArrayView<FVoxelHeightfieldTileView> InTiles,
+		TConstArrayView<FVoxelHeightfieldTileFootprint> InPendingTiles,
+		TMap<FVoxelHeightfieldNodeKey, TArray<FVoxelHeightfieldNodeKey>>& OutDependencies);
+
 	static void ExcludeCoveredIntervals(
 		TConstArrayView<FVoxelHeightfieldTileView> InTiles,
 		TConstArrayView<FBox> InFineBoxes,

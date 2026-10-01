@@ -222,7 +222,7 @@ void FVoxelMapTileCache::ApplyTile(
 	Pending.Remove(InKey);
 	if (!InResult.bSuccess || !InResult.CustomPayload)
 	{
-		if (!InResult.bCanceled && !InResult.Error.IsEmpty())
+		if (!InResult.bCanceled && !InResult.Error.IsEmpty() && !InResult.Error.StartsWith(TEXT("DependencyNotReady")))
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Voxel map tile %d,%d step %d: %s"),
 				InKey.Coordinate.X, InKey.Coordinate.Y, InKey.Step, *InResult.Error);

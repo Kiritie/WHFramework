@@ -4,6 +4,7 @@
 #include "Voxel/Task/VoxelTaskScheduler.h"
 #include "Voxel/Geometry/VoxelSectionMesher.h"
 #include "Voxel/Rendering/VoxelCoverage.h"
+#include "Voxel/Rendering/VoxelPublishGroups.h"
 #include "Voxel/Rendering/DWLodTransition.h"
 #include "Voxel/Rendering/VoxelSurfaceProxy.h"
 #include "Voxel/Streaming/VoxelInterest.h"
@@ -12,6 +13,9 @@ struct FVoxelHeightfieldCoveragePlan;
 struct FVoxelVolumeCoveragePlan;
 class AActor;
 class FVoxelTaskScheduler;
+class FVoxelGenerationPipeline;
+class FVoxelGenerationCacheRetentionLease;
+struct FVoxelGenerationBounds;
 class FVoxelViewPublisher;
 class UVoxelMeshComponent;
 class UVoxelModule;
@@ -24,6 +28,7 @@ struct FVoxelRepresentationReply;
 struct FVoxelSectionMeshResult;
 struct FVoxelSectionSnapshot;
 struct FVoxelTaskResult;
+struct FVoxelInterestDelta;
 struct FVoxelVoxelProxyData;
 struct FVoxelWaterSurfaceTileData;
 struct FVoxelBoundaryTransitionContext;
@@ -34,6 +39,9 @@ struct WHFRAMEWORK_API FVoxelPrimaryFineReadiness
 	int32 Ready = 0;
 	int32 Renderable = 0;
 	int32 Presented = 0;
+	int32 Owned = 0;
+	int32 Hidden = 0;
+	int32 PublicationPending = 0;
 
 	bool IsComplete() const
 	{
@@ -55,6 +63,8 @@ public:
 		uint64 InInterestRevision,
 		TConstArrayView<FVector> InObservers);
 	void RefreshTaskPriorities();
+	void ApplyInterestDelta(const FVoxelInterestDelta& InDelta);
+	FVoxelFrameTimings GetFrameTimings() const { return FrameTimings; }
 	bool OnTask(FVoxelTaskResult&& InResult);
 	void InvalidateSection(const FIntVector& InKey);
 	void InvalidateNeighbors(const FIntVector& InKey);
@@ -68,6 +78,7 @@ public:
 
 	void Reset();
 	bool HasPrimaryRepresentation() const;
+	FVoxelRepresentationReadiness GetRepresentationReadiness() const;
 	bool RequiresSectionData(const FIntVector& InKey) const;
 	TMap<int32, double> GetDataAdmissionLimits() const;
 	FVoxelPrimaryFineReadiness GetPrimaryFineReadiness(
@@ -75,9 +86,10 @@ public:
 	FVoxelPrimaryFineReadiness GetFineRadiusReadiness(
 		TConstArrayView<FIntVector> InFineKeys) const;
 	static void SortAdmissionsByPriority(TArray<FVoxelViewAdmission>& InOutAdmissions);
-	static TMap<int32, int32> ResolveAdmissionStages(
+	static TMap<int32, uint8> ResolveAdmissionLanes(
 		TConstArrayView<FVoxelViewAdmission> InAdmissions,
-		TFunctionRef<bool(const FVoxelViewAdmission&)> InIsReady);
+		TFunctionRef<bool(const FVoxelViewAdmission&)> InIsReady,
+		bool bMovementCriticalFinePending = false);
 	static int32 ResolveActiveAdmissionKind(
 		TConstArrayView<FVoxelViewAdmission> InAdmissions,
 		TFunctionRef<bool(const FVoxelViewAdmission&)> InIsReady,
@@ -88,16 +100,23 @@ public:
 		double InBandWidthCells);
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FVoxelManagerLocalCoverageTest;
+#endif
 	void UpdateFineAndVoxelProxy(TConstArrayView<FVector> InObservers);
 	void UpdateSurface(TConstArrayView<FVector> InObservers);
 	void UpdateMacro(TConstArrayView<FVector> InObservers);
 	void UpdateWantedTimestamps(double InNow);
 	void ProcessAdmissions();
 	void ProcessDataAdmissions();
+	bool HasMovementCriticalFinePending() const;
 	bool IsAdmissionDataReady(const FVoxelViewAdmission& InAdmission) const;
 	bool IsAdmissionMeshReady(const FVoxelViewAdmission& InAdmission) const;
 	bool IsPreparedDataCurrent(const FVoxelTaskKey& InKey) const;
 	void PrunePreparedData();
+	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> RetainPreparedEnvironment(
+		const FVoxelTaskKey& InKey, const FVoxelGenerationPipeline& InGenerator,
+		const FVoxelGenerationBounds& InBounds);
 	bool EnqueuePreparedData(FVoxelTaskRequest&& InRequest);
 	void RemovePreparedData(const FVoxelTaskKey& InKey);
 	void RebuildAdmissions(TConstArrayView<FVector> InObservers);
@@ -105,6 +124,7 @@ private:
 	EVoxelWorkClass VolumeTransitionWorkClass(const FVoxelViewKey& InOwner) const;
 	void TrackReadyTerrainNode(FVoxelViewKey InKey);
 	void RebuildReadyTerrainBranches();
+	bool CommitTerrainOwnership(const FVoxelPublishGroupKey& InKey, TConstArrayView<FVoxelViewKey> InTarget);
 	double MinimumObserverDistanceCells(const FVector& InWorldCenter) const;
 	double MinimumObserverDistanceCells(const FVoxelGenerationBounds& InCellBounds) const;
 	bool IsAdmissionTerminalFailure(const FVoxelViewAdmission& InAdmission) const;
@@ -115,18 +135,20 @@ private:
 	void LogRepresentationState(TConstArrayView<FVector> InObservers);
 	void MarkCoverageDirty();
 	void MarkCoverageDirty(const FVoxelCoverageRect& InBounds);
+	static void MergeCoverageRect(TArray<FVoxelCoverageRect>& InOutRects, const FVoxelCoverageRect& InBounds);
+	void ExpandActiveCoverage(const FVoxelCoverageRect& InBounds);
 	void RetryActiveCoverage();
+	FGuid BeginPublishGroup(const FVoxelPublishGroupKey& InKey);
 	bool CoverageAffects(const FVoxelCoverageRect& InBounds) const;
 	void ResolveTransitionVisibility();
-	bool RebuildHeightfieldTransitions(
-		const TArray<FBox>& InFineBoxes,
-		const TArray<FBox>& InProxySurfaceBoxes);
+	bool RebuildHeightfieldTransitions();
 	void ApplyHeightfieldTransition(
 		const FVoxelHeightfieldNodeKey& InOwner,
 		uint64 InSignature,
 		FVoxelTaskResult&& InResult);
 	void PumpHeightfieldTransitions();
 	bool RebuildVolumeTransitions(const TSet<FVoxelViewKey>& InTargetNodes);
+	bool VolumeHandoffAffectsHeightfield(const FVoxelHeightfieldNodeKey& InKey) const;
 	void PumpVolumeTransitions();
 	void ApplyVolumeTransition(const FVoxelViewKey& InOwner, uint64 InSignature,
 		FVoxelTaskResult&& InResult);
@@ -185,8 +207,8 @@ private:
 	TMap<int32, int32> AdmissionScanIndices[4];
 	TMap<int32, int32> DataScanIndices[4];
 	TArray<int32> AdmissionPriorities;
-	TMap<int32, int32> ActiveMeshStages;
 	TMap<FVoxelTaskKey, TSharedPtr<const FVoxelTaskResult, ESPMode::ThreadSafe>> PreparedData;
+	TMap<FVoxelTaskKey, TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>> PreparedEnvironmentRetentions;
 	uint64 PreparedDataBytes = 0;
 	uint64 PendingDataBytes = 0;
 	uint64 SkippedProxyMeshes = 0;
@@ -201,20 +223,30 @@ private:
 	bool bActiveCoverageFull = true;
 	TArray<FVoxelCoverageRect> DirtyCoverageRects;
 	TArray<FVoxelCoverageRect> ActiveDirtyCoverageRects;
-	bool bVolumePlanPending = false;
-	bool bHeightfieldPlanPending = false;
+	template<typename TPlan>
+	struct TLocalCoverageState
+	{
+		uint64 DesiredSignature = 0;
+		uint64 PendingSignature = 0;
+		TSharedPtr<const TPlan, ESPMode::ThreadSafe> Plan;
+	};
 	uint64 HeightfieldPlanSerial = 0;
-	TSharedPtr<const FVoxelHeightfieldCoveragePlan, ESPMode::ThreadSafe> HeightfieldCoveragePlan;
+	TMap<FVoxelHeightfieldNodeKey, TLocalCoverageState<FVoxelHeightfieldCoveragePlan>> HeightfieldCoveragePlans;
+	TSet<FVoxelHeightfieldNodeKey> PendingHeightfieldPlanOwners;
 	uint64 VolumePlanSerial = 0;
-	TSharedPtr<const FVoxelVolumeCoveragePlan, ESPMode::ThreadSafe> VolumeCoveragePlan;
+	TMap<FVoxelViewKey, TLocalCoverageState<FVoxelVolumeCoveragePlan>> VolumeCoveragePlans;
+	TArray<FVoxelCoverageBox> PendingVolumeHandoffBoxes;
 	double NextRetireCheck = 0.0;
 	double LastCoverageMilliseconds = 0.0;
 	double LastRetireMilliseconds = 0.0;
+	FVoxelFrameTimings FrameTimings;
 	double NextRepresentationDebugLog = 0.0;
 	TUniquePtr<FVoxelViewPublisher> Publisher;
+	TMap<FVoxelPublishGroupKey, FGuid> OpenPublishGroups;
 
 	TSet<FIntVector> FineWanted;
 	TSet<FVoxelViewKey> VisibleTerrainNodes;
+	TMap<FVoxelPublishGroupKey, TArray<FVoxelViewKey>> VisibleTerrainNodesByGroup;
 	TSet<FVoxelViewKey> ReadyTerrainBranches;
 	bool bReadyTerrainBranchesDirty = true;
 	TSet<FVoxelViewKey> VoxelProxyWanted;

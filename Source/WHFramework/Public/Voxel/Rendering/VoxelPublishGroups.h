@@ -32,6 +32,13 @@ public:
 		const FVoxelPublishGroupKey& InKey,
 		double InBlockSize);
 
+	static FBox PublicationBounds(
+		const FVoxelPublishGroupKey& InKey,
+		double InBlockSize,
+		const FBox& InPresentedBounds,
+		const FBox& InDesiredBounds,
+		bool bInTransition);
+
 	static void Build(
 		TConstArrayView<FVoxelPublishFootprint> InFootprints,
 		TArray<int32>& OutGroupIndices);

@@ -165,6 +165,8 @@ struct WHFRAMEWORK_API FVoxelTaskRequest
 	EVoxelWorkClass WorkClass = EVoxelWorkClass::None;
 	int32 SourcePriority = 0;
 	int32 TerrainStage = INDEX_NONE;
+	// 已接纳的局部发布准备/裁剪，持续数据压力下仍须有界完成。
+	bool bPublicationContinuation = false;
 
 	double DistanceScore = 0.0;
 	double ForwardScore = 0.0;
@@ -227,6 +229,8 @@ struct WHFRAMEWORK_API FVoxelTaskDiagnostics
 	int32 CriticalPending = 0;
 	int32 CriticalRunning = 0;
 	uint64 CriticalAdmissionDeferrals = 0;
+	double LastAdmissionMilliseconds = 0.0;
+	double LastResultApplyMilliseconds = 0.0;
 
 	uint64 ReservedBytes = 0;
 	uint64 QueuedInputBytes = 0;
@@ -288,6 +292,7 @@ private:
 		EVoxelWorkClass WorkClass = EVoxelWorkClass::None;
 		int32 SourcePriority = 0;
 		int32 TerrainStage = INDEX_NONE;
+		bool bPublicationContinuation = false;
 
 		double QueuedAt = 0.0;
 		double DistanceScore = 0.0;

@@ -23,7 +23,8 @@ struct WHFRAMEWORK_API FVoxelTerrainViewPlan
 	void ResolveVisible(TFunctionRef<bool(const FVoxelViewKey&)> InIsReady,
 		TSet<FVoxelViewKey>& OutVisible, const TSet<FVoxelViewKey>* InPrevious = nullptr,
 		const TSet<FVoxelViewKey>* InReadyNodes = nullptr,
-		const TSet<FVoxelViewKey>* InReadyBranches = nullptr) const;
+		const TSet<FVoxelViewKey>* InReadyBranches = nullptr,
+		const TSet<FVoxelViewKey>* InResolveRoots = nullptr) const;
 	bool Validate(FString& OutError) const;
 
 private:

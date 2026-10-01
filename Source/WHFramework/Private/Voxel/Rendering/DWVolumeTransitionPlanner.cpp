@@ -30,6 +30,50 @@ namespace
 	}
 }
 
+void FVoxelVolumeTransitionPlanner::GatherCoverageRegions(const TSet<FVoxelViewKey>& InVisible,
+	TMap<FVoxelViewKey, TSet<FVoxelViewKey>>& OutRegions)
+{
+	OutRegions.Reset();
+	uint8 Level = 6;
+	for (const auto& Key : InVisible) Level = FMath::Max(Level, Key.Level);
+	TMap<FVoxelViewKey, TSet<FVoxelViewKey>> Owned;
+	for (const auto& Key : InVisible)
+	{
+		FVoxelViewKey Region = Key;
+		while (Region.Level < Level) Region = Region.GetParent();
+		Owned.FindOrAdd(Region).Add(Key);
+	}
+	for (const auto& Pair : Owned)
+	{
+		auto& Local = OutRegions.Add(Pair.Key);
+		Local.Append(Pair.Value);
+		const FVoxelGenerationBounds Bounds = Pair.Key.GetBounds();
+		for (int32 Z = -1; Z <= 1; ++Z)
+		{
+			for (int32 Y = -1; Y <= 1; ++Y)
+			{
+				for (int32 X = -1; X <= 1; ++X)
+				{
+					if (X == 0 && Y == 0 && Z == 0) continue;
+					if (const auto* Nodes = Owned.Find({Pair.Key.Coordinate + FIntVector(X, Y, Z), Level}))
+					{
+						for (const FVoxelViewKey& Node : *Nodes)
+						{
+							const FVoxelGenerationBounds Neighbor = Node.GetBounds();
+							if (Neighbor.Min.X <= Bounds.Max.X && Neighbor.Max.X >= Bounds.Min.X &&
+								Neighbor.Min.Y <= Bounds.Max.Y && Neighbor.Max.Y >= Bounds.Min.Y &&
+								Neighbor.Min.Z <= Bounds.Max.Z && Neighbor.Max.Z >= Bounds.Min.Z)
+							{
+								Local.Add(Node);
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 void FVoxelVolumeTransitionPlanner::Build(
 	const TSet<FVoxelViewKey>& InVisible,
 	const uint8 InMaximumLevel,

@@ -46,6 +46,11 @@ public:
 
 	void Reset();
 
+	FVoxelGenerationDependencyStatus QueryEnvironment(const FIntPoint& InCell, FVoxelEnvironmentSample& OutSample);
+	FVoxelGenerationDependencyStatus EnsureEnvironmentBounds(const FVoxelGenerationBounds& InBounds,
+		EVoxelWorkClass InWorkClass, int32 InSourcePriority, double InDistanceScore, double InForwardScore);
+	uint64 GetWaitingPlanConsumers(EVoxelGenerationPlanKind InKind) const;
+
 private:
 	static EVoxelWorkClass ResolveWorkClass(const FVoxelExactDemand& InDemand);
 	void RebuildDemand(
@@ -73,6 +78,12 @@ private:
 		double RetryAfterSeconds = 0.0;
 	};
 
+	struct FOverlayBoundsRequest
+	{
+		FVoxelGenerationBounds Bounds;
+		int32 SourcePriority = 0;
+	};
+
 	FVoxelWorldRuntime& Runtime;
 	FVoxelTaskScheduler& Scheduler;
 	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> Generator;
@@ -85,9 +96,14 @@ private:
 	TMap<FIntVector, FWaitingPlanSection> WaitingPlanSections;
 	TMap<FIntVector, EVoxelSectionChangeState> RemoteChangeStates;
 	TArray<FIntVector> OrderedKeys;
+	TArray<int32> AdmissionLanes[2];
+	TArray<FOverlayBoundsRequest> OverlayBoundsRequests;
+	TMap<FIntPoint, FVoxelGenerationDependencyStatus> EnvironmentColumnStates;
 
 	uint64 CurrentInterestRevision = 0;
-	int32 NextAdmissionIndex = 0;
+	int32 NextAdmissionIndices[2] = {};
+	int32 NextOverlayBoundsIndex = 0;
+	double OverlayBoundsRetryAfterSeconds = 0.0;
 	double LastAdmissionDiagnosticTime = 0.0;
 	int32 PlanPendingAttempts = 0;
 	int32 OverlayPendingAttempts = 0;
