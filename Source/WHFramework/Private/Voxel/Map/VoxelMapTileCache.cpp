@@ -18,42 +18,7 @@ namespace
 		}
 	};
 
-	FColor ColorForColumn(const FVoxelColumnSample& InColumn,
-		const FVoxelGenerationRuntimeConfig& InConfig)
-	{
-		if (InColumn.bOcean)
-		{
-			return FColor(31, 112, 173);
-		}
-		if (InColumn.bLake)
-		{
-			return FColor(48, 151, 185);
-		}
-		if (InColumn.bRiver)
-		{
-			return FColor(55, 166, 197);
-		}
 
-		FLinearColor Color(0.38f, 0.68f, 0.37f);
-		if (InConfig.Recipe.IsValid() &&
-			InConfig.Recipe->Biomes.IsValidIndex(InColumn.BiomeIndex))
-		{
-			const uint32 Hash = GetTypeHash(
-				InConfig.Recipe->Biomes[InColumn.BiomeIndex].StableId);
-			Color = FLinearColor::MakeFromHSV8(
-				static_cast<uint8>(Hash & 0xffu), 135, 210);
-		}
-		const float HeightLight = FMath::Clamp(
-			static_cast<float>(InColumn.SurfaceZ) / 900.f, -0.12f, 0.18f);
-		const float SlopeShade = FMath::Clamp(
-			static_cast<float>(InColumn.SlopePermille) / 4000.f, 0.f, 0.18f);
-		Color = Color * (1.f + HeightLight - SlopeShade);
-		if (InColumn.bCoast)
-		{
-			Color = FLinearColor::LerpUsingHSV(Color, FLinearColor(0.96f, 0.81f, 0.55f), 0.5f);
-		}
-		return Color.ToFColor(true);
-	}
 }
 
 FVoxelMapTileCache::FVoxelMapTileCache(
@@ -72,7 +37,7 @@ FVoxelMapTileCache::FVoxelMapTileCache(
 
 int32 FVoxelMapTileCache::SelectStep(const float InCellPixelSize)
 {
-	for (const int32 Step : { 16, 32, 128 })
+	for (const int32 Step : { 4, 8, 16, 32, 128 })
 	{
 		if (InCellPixelSize * Step >= 4.f)
 		{
@@ -135,6 +100,10 @@ void FVoxelMapTileCache::Request(
 	const FSceneMapView& InView)
 {
 	check(IsInGameThread());
+	if (!ColorResolver)
+	{
+		return;
+	}
 	for (const FVoxelMapTileKey& Key : InKeys)
 	{
 		if (FTile* Tile = Tiles.Find(Key))
@@ -143,8 +112,22 @@ void FVoxelMapTileCache::Request(
 		}
 	}
 
-	int32 Admitted = 0;
+	TArray<FVoxelMapTileKey> Requests = InKeys;
 	for (const FVoxelMapTileKey& Key : InKeys)
+	{
+		if (Key.Step < 512) Requests.AddUnique(ParentKey(Key, 512));
+	}
+	Requests.Sort([&](const FVoxelMapTileKey& A, const FVoxelMapTileKey& B)
+	{
+		const bool bATarget = InKeys.Contains(A);
+		const bool bBTarget = InKeys.Contains(B);
+		if (bATarget != bBTarget) return bATarget;
+		const FVector2D Center = InView.Center / BlockSize;
+		return FVector2D::DistSquared((FVector2D(A.Coordinate) + FVector2D(0.5)) * TileSide * A.Step, Center) <
+			FVector2D::DistSquared((FVector2D(B.Coordinate) + FVector2D(0.5)) * TileSide * B.Step, Center);
+	});
+	int32 Admitted = 0;
+	for (const FVoxelMapTileKey& Key : Requests)
 	{
 		if (Admitted >= 4 || Pending.Num() >= 8)
 		{
@@ -170,7 +153,9 @@ void FVoxelMapTileCache::Request(
 			(static_cast<double>(Origin.X) + TileCells * 0.5),
 			(static_cast<double>(Origin.Y) + TileCells * 0.5));
 		Task.DistanceScore = FVector2D::Distance(TileCenter, InView.Center / BlockSize);
-		Task.Execute = [Key, Origin, WorkerGenerator, WorkerConfig](const TAtomic<bool>& Cancel)
+		const FVoxelMapColorResolver WorkerResolver = ColorResolver;
+		const uint64 RequestStyleEpoch = StyleEpoch;
+		Task.Execute = [Key, Origin, WorkerGenerator, WorkerConfig, WorkerResolver](const TAtomic<bool>& Cancel)
 		{
 			FVoxelTaskResult Result;
 			Result.Kind = EVoxelTaskKind::BuildMapTile;
@@ -189,16 +174,19 @@ void FVoxelMapTileCache::Request(
 				for (int32 X = 0; X < TileSide; ++X)
 				{
 					Pixels->Pixels[X + (TileSide - 1 - Y) * TileSide] =
-						ColorForColumn(Samples[X + Y * TileSide].Column, *WorkerConfig);
+						WorkerResolver(Samples[X + Y * TileSide].Column, *WorkerConfig);
 				}
 			}
 			Result.CustomPayload = Pixels;
 			Result.bSuccess = true;
 			return Result;
 		};
-		Task.Apply = [this, Key](FVoxelTaskResult&& Result)
+		Task.Apply = [this, Key, RequestStyleEpoch](FVoxelTaskResult&& Result)
 		{
-			ApplyTile(Key, MoveTemp(Result));
+			if (StyleEpoch == RequestStyleEpoch)
+			{
+				ApplyTile(Key, MoveTemp(Result));
+			}
 		};
 		if (Scheduler.Enqueue(MoveTemp(Task)))
 		{
@@ -212,6 +200,61 @@ const FSlateBrush* FVoxelMapTileCache::FindBrush(const FVoxelMapTileKey& InKey) 
 {
 	const FTile* Tile = Tiles.Find(InKey);
 	return Tile ? &Tile->Brush : nullptr;
+}
+
+void FVoxelMapTileCache::SetColorResolver(FVoxelMapColorResolver InResolver, const uint32 InStyleRevision)
+{
+	check(IsInGameThread());
+	if (ColorResolver && StyleRevision == InStyleRevision)
+	{
+		return;
+	}
+	ColorResolver = MoveTemp(InResolver);
+	StyleRevision = InStyleRevision;
+	++StyleEpoch;
+	Tiles.Reset();
+	Pending.Reset();
+	++Revision;
+}
+
+FVoxelMapTileKey FVoxelMapTileCache::ParentKey(const FVoxelMapTileKey& InKey, const int32 InParentStep)
+{
+	const int64 ParentCells = static_cast<int64>(TileSide) * InParentStep;
+	return { FIntPoint(
+		static_cast<int32>(FMath::FloorToInt64(static_cast<double>(InKey.Coordinate.X) * TileSide * InKey.Step / ParentCells)),
+		static_cast<int32>(FMath::FloorToInt64(static_cast<double>(InKey.Coordinate.Y) * TileSide * InKey.Step / ParentCells))), InParentStep };
+}
+
+FBox2f FVoxelMapTileCache::ParentUV(const FVoxelMapTileKey& InKey, const FVoxelMapTileKey& InParent)
+{
+	const double Scale = static_cast<double>(InKey.Step) / InParent.Step;
+	const double MinX = static_cast<double>(InKey.Coordinate.X) * Scale - InParent.Coordinate.X;
+	const double MinY = static_cast<double>(InKey.Coordinate.Y) * Scale - InParent.Coordinate.Y;
+	return FBox2f(FVector2f(MinX, 1.0 - MinY - Scale), FVector2f(MinX + Scale, 1.0 - MinY));
+}
+
+bool FVoxelMapTileCache::FindDrawBrush(const FVoxelMapTileKey& InKey, FSlateBrush& OutBrush) const
+{
+	if (const FSlateBrush* Brush = FindBrush(InKey))
+	{
+		OutBrush = *Brush;
+		return true;
+	}
+	for (const int32 Step : { 8, 16, 32, 128, 512 })
+	{
+		if (Step <= InKey.Step)
+		{
+			continue;
+		}
+		const FVoxelMapTileKey Parent = ParentKey(InKey, Step);
+		if (const FSlateBrush* Brush = FindBrush(Parent))
+		{
+			OutBrush = *Brush;
+			OutBrush.SetUVRegion(ParentUV(InKey, Parent));
+			return true;
+		}
+	}
+	return false;
 }
 
 void FVoxelMapTileCache::ApplyTile(

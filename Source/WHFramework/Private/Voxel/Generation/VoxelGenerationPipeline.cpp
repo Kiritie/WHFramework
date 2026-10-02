@@ -45,6 +45,36 @@ namespace
 	}
 }
 
+bool FVoxelGenerationPipeline::EnumerateCaveEntrances(const FIntPoint& InMin, const FIntPoint& InMax,
+	TArray<FVoxelCaveEntrance>& OutEntrances, FString& OutError) const
+{
+	OutEntrances.Reset();
+	if (!Config->Recipe || InMin.X > InMax.X || InMin.Y > InMax.Y) return false;
+	FVoxelGenerationQuery Query;
+	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError, true, IsInGameThread(), IsInGameThread())) return false;
+	const auto& Settings = Config->Recipe->Settings;
+	const FVoxelGenerationBounds Bounds{FIntVector(InMin.X, InMin.Y, Settings.MinZ), FIntVector(InMax.X, InMax.Y, Settings.MaxZ)};
+	const FVoxelGenerationPlanKeys Keys = FVoxelGenerationQuery::GatherPlanKeys(Bounds, Settings);
+	TSet<FVoxelStableId> Seen;
+	for (const FVoxelGenerationTileKey& Key : Keys.Tiles)
+	{
+		FVoxelCavePlanPtr Plan;
+		if (!Query.EnsureCavePlan(Key, Plan, OutError)) return false;
+		for (const FVoxelCaveEntrance& Entrance : Plan->Entrances)
+		{
+			const bool bMouth = Entrance.MouthCenter.X >= InMin.X && Entrance.MouthCenter.Y >= InMin.Y && Entrance.MouthCenter.X <= InMax.X && Entrance.MouthCenter.Y <= InMax.Y;
+			const bool bInterior = Entrance.InteriorJoin.X >= InMin.X && Entrance.InteriorJoin.Y >= InMin.Y && Entrance.InteriorJoin.X <= InMax.X && Entrance.InteriorJoin.Y <= InMax.Y;
+			if ((bMouth || bInterior) && !Seen.Contains(Entrance.Id))
+			{
+				Seen.Add(Entrance.Id);
+				OutEntrances.Add(Entrance);
+			}
+		}
+	}
+	OutError.Reset();
+	return true;
+}
+
 FVoxelGenerationPipeline::FVoxelGenerationPipeline(
 	TSharedRef<
 		const FVoxelGenerationRuntimeConfig,
@@ -59,6 +89,28 @@ FVoxelGenerationPipeline::FVoxelGenerationPipeline(
 	, Overlay(MoveTemp(InOverlay))
 	, bRequirePlanPreflight(bInRequirePlanPreflight)
 {
+}
+
+void FVoxelGenerationPipeline::QueryReadyWaterfalls(const FIntPoint& InMin, const FIntPoint& InMax,
+	TArray<FVoxelWaterfallSemantic>& OutWaterfalls) const
+{
+	OutWaterfalls.Reset();
+	if (InMin.X>InMax.X || InMin.Y>InMax.Y || !Config->Recipe) return;
+	const auto First=FVoxelGenerationQuery::HydrologyKeyForVoxel(InMin.X,InMin.Y,Config->Recipe->Settings);
+	const auto Last=FVoxelGenerationQuery::HydrologyKeyForVoxel(InMax.X,InMax.Y,Config->Recipe->Settings);
+	for (int32 Y=First.Coordinate.Y; Y<=Last.Coordinate.Y; ++Y)
+	{
+		for (int32 X=First.Coordinate.X; X<=Last.Coordinate.X; ++X)
+		{
+			FVoxelHydrologyPlanPtr Plan;
+			if (!Cache->FindHydrology({FIntPoint(X,Y)},Plan) || !Plan) continue;
+			for (const auto& Fall:Plan->Waterfalls)
+			{
+				if (Fall.Upstream.X>=InMin.X && Fall.Upstream.Y>=InMin.Y && Fall.Upstream.X<=InMax.X && Fall.Upstream.Y<=InMax.Y)
+					OutWaterfalls.Add(Fall);
+			}
+		}
+	}
 }
 
 void FVoxelGenerationPipeline::ReleaseOverlaySectionConsumer(const FIntVector& InSection) const

@@ -33,7 +33,14 @@ FIntVector FVoxelWorldObjectRegistry::Rotate(const FIntVector& InOffset, uint8 I
 
 FVoxelBlockState FVoxelWorldObjectRegistry::PartState(const FVoxelWorldObjectDefinitionRuntime& InDefinition, int32 InPart, uint8 InYaw, uint16 InFlags)
 {
-	return {InDefinition.Types[InPart], uint16(InDefinition.Parts[InPart].State | InYaw | (InFlags & InDefinition.ToggleMask))};
+	return {InDefinition.Types[InPart], uint16(InDefinition.Parts[InPart].State | InYaw | (InFlags & (InDefinition.ToggleMask | VoxelState::ObjectLockedMask)))};
+}
+
+int32 FVoxelWorldObjectRegistry::FindPartIndex(const FVoxelWorldObjectDefinitionRuntime& InDefinition, const FVoxelBlockState& InState)
+{
+	const uint16 Flags = uint16(VoxelState::FacingMask | InDefinition.ToggleMask | VoxelState::ObjectLockedMask);
+	const int32* Part = InDefinition.PartIndices.Find(FVoxelBlockState{InState.TypeId, uint16(InState.State & ~Flags)}.Pack());
+	return Part ? *Part : INDEX_NONE;
 }
 
 void FVoxelWorldObjectRegistry::Reset()
@@ -49,7 +56,7 @@ bool FVoxelWorldObjectRegistry::Build(const FVoxelRegistrySnapshot& InBlocks, co
 	for (UVoxelWorldObjectDefinition* Source : InDefinitions)
 	{
 		if (!Source || Source->DefinitionId.IsNone() || Candidate.Definitions.Contains(Source->DefinitionId) ||
-			Source->Footprint.IsEmpty() || Source->Footprint.Num() > 64 || Source->Footprint[0].Offset != FIntVector::ZeroValue ||
+			Source->Footprint.IsEmpty() || Source->Footprint.Num() > VoxelState::MaxObjectParts || Source->Footprint[0].Offset != FIntVector::ZeroValue ||
 			Source->ToggleMask < 0 || Source->ToggleMask > MAX_uint16 || (Source->ToggleMask & VoxelState::FacingMask))
 		{
 			OutError = TEXT("Invalid world object identity, anchor or footprint size");
@@ -61,6 +68,14 @@ bool FVoxelWorldObjectRegistry::Build(const FVoxelRegistrySnapshot& InBlocks, co
 		Definition.Source = Source;
 		Definition.Parts = Source->Footprint;
 		Definition.ToggleMask = uint16(Source->ToggleMask);
+		Definition.SupportMode = Source->SupportMode;
+		Definition.Dimensions = Source->Dimensions;
+		Definition.BackSupportDirection = Source->BackSupportDirection;
+		if (Definition.Dimensions.GetMin() < 1 || Definition.Dimensions.GetMax() > 64 || FMath::Abs(Definition.BackSupportDirection.X) + FMath::Abs(Definition.BackSupportDirection.Y) + FMath::Abs(Definition.BackSupportDirection.Z) != 1)
+		{
+			OutError = TEXT("Invalid world object dimensions or support direction");
+			return false;
+		}
 		if (!FMath::IsFinite(Source->MaterializationRadius) || Source->MaterializationRadius < 0.f)
 		{
 			OutError = TEXT("World object materialization radius must be finite and nonnegative");
@@ -102,6 +117,7 @@ bool FVoxelWorldObjectRegistry::Build(const FVoxelRegistrySnapshot& InBlocks, co
 			}
 			Offsets.Add(Part.Offset);
 			Signatures.Add(Signature);
+			Definition.PartIndices.Add(Signature, Index);
 			Definition.Types.Add(Block->TypeId);
 		}
 		for (uint16 Type : Definition.Types)
@@ -141,12 +157,9 @@ bool FVoxelWorldObjectRegistry::Resolve(const FVoxelWorldRuntime& InWorld, const
 		return false;
 	}
 	const uint8 Yaw = uint8(State.State & 3);
-	for (int32 Part = 0; Part < Definition->Parts.Num(); ++Part)
+	const int32 Part = FindPartIndex(*Definition, State);
+	if (Part != INDEX_NONE)
 	{
-		if (PartState(*Definition, Part, Yaw, State.State) != State)
-		{
-			continue;
-		}
 		const FIntVector Anchor = InCell - Rotate(Definition->Parts[Part].Offset, Yaw);
 		for (int32 Index = 0; Index < Definition->Parts.Num(); ++Index)
 		{

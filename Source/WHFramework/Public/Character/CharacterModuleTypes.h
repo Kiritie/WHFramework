@@ -36,4 +36,22 @@ public:
 
 	UPROPERTY()
 	FParameter PlayerControllerData;
+
+	virtual void MakeSaved() override
+	{
+		Super::MakeSaved();
+		auto Mark = [](FParameter& Data)
+		{
+			const UScriptStruct* Struct = Data.GetStructType();
+			if (Struct && Struct->IsChildOf(FSaveData::StaticStruct()))
+			{
+				reinterpret_cast<FSaveData*>(Data.GetMutableStructMemory())->MakeSaved();
+			}
+		};
+		Mark(PlayerControllerData);
+		for (FCharacterSaveRecord& Record : Characters)
+		{
+			Mark(Record.Data);
+		}
+	}
 };

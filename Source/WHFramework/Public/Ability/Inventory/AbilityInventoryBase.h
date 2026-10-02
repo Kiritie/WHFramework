@@ -54,6 +54,10 @@ public:
 
 public:
 	UFUNCTION(BlueprintCallable)
+	bool CanAddItems(const TArray<FAbilityItem>& InItems);
+	bool TryAddItems(const TArray<FAbilityItem>& InItems);
+
+	UFUNCTION(BlueprintCallable)
 	virtual void AddItemByRange(FAbilityItem& InItem, int32 InStartIndex = 0, int32 InEndIndex = -1, bool bBroadcast = true);
 
 	UFUNCTION(BlueprintCallable)
@@ -99,6 +103,14 @@ public:
 	virtual void DiscardItems();
 
 protected:
+	bool PlanItemAddition(const TArray<FAbilityItem>& InItems, TMap<UAbilityInventorySlotBase*, FAbilityItem>& OutSlots, bool bInPreservePlan = false);
+	bool bApplyingItemBatch = false;
+
+public:
+	bool TryExchangeItems(UAbilityInventoryBase* InOther, const TArray<FAbilityItem>& InGive, const TArray<FAbilityItem>& InReceive, bool bInCommit = true);
+
+protected:
+
 	UFUNCTION(BlueprintCallable)
 	virtual void AddItemBySlots(FAbilityItem& InItem, const TArray<UAbilityInventorySlotBase*>& InSlots, bool bBroadcast);
 

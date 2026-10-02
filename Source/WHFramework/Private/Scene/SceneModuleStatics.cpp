@@ -158,10 +158,11 @@ FGuid USceneModuleStatics::GetTrackedMarker()
 bool USceneModuleStatics::ProjectMarkerToMap(const FSceneMarkerView& InMarker, FVector2D InCenter, float InRange, FVector2D InSize, float InYaw, bool bClamp, FVector2D& OutPosition)
 {
 	if(InRange <= UE_SMALL_NUMBER || InSize.X <= 0.f || InSize.Y <= 0.f) return false;
-	FVector2D Delta = FVector2D(InMarker.Location) - InCenter;
-	Delta = Delta.GetRotated(-InYaw);
-	const float PixelsPerWorldUnit = InSize.X / InRange;
-	OutPosition = InSize * 0.5f + FVector2D(Delta.X, -Delta.Y) * PixelsPerWorldUnit;
+	FSceneMapView View;
+	View.Center = InCenter;
+	View.Range = InRange;
+	View.Yaw = InYaw;
+	OutPosition = View.WorldToPanel(FVector2D(InMarker.Location), InSize);
 	const bool bInside = OutPosition.X >= 0.f && OutPosition.X <= InSize.X && OutPosition.Y >= 0.f && OutPosition.Y <= InSize.Y;
 	if(!bInside && !bClamp) return false;
 	if(bClamp)

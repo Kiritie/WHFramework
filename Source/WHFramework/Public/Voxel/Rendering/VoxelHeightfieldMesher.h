@@ -58,7 +58,8 @@ private:
 	static FVoxelRenderBatch& FindOrAddBatch(
 		FVoxelSectionMeshResult& InOutMesh,
 		EVoxelRenderGroup InGroup,
-		uint16 InBank);
+		uint16 InBank,
+		uint8 InVariant = 0);
 
 	static void AppendQuad(
 		FVoxelMeshBuffers& InOutMesh,

@@ -3,6 +3,7 @@
 #include "Character/Base/CharacterBase.h"
 
 #include "AIController.h"
+#include "Net/UnrealNetwork.h"
 #include "AI/Base/AIControllerBase.h"
 #include "Main/MainModule.h"
 #include "Animation/AnimInstance.h"
@@ -532,4 +533,5 @@ FVector ACharacterBase::GetMoveDirection(bool bIgnoreZ) const
 void ACharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(ACharacterBase, ActorID);
 }

@@ -25,6 +25,36 @@ struct WHFRAMEWORK_API FVoxelWeightedPlantReference
 	int32 Weight = 100;
 };
 
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelTreeSpeciesReference
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere)
+	FName StableId;
+
+	UPROPERTY(EditAnywhere)
+	EVoxelTreeForm Form = EVoxelTreeForm::Broadleaf;
+
+	UPROPERTY(EditAnywhere)
+	FVoxelGenerationRange Temperature;
+
+	UPROPERTY(EditAnywhere)
+	FVoxelGenerationRange Moisture;
+
+	UPROPERTY(EditAnywhere)
+	TSoftObjectPtr<UVoxelData> Trunk;
+
+	UPROPERTY(EditAnywhere)
+	TSoftObjectPtr<UVoxelData> LeavesDark;
+
+	UPROPERTY(EditAnywhere)
+	TSoftObjectPtr<UVoxelData> LeavesMid;
+
+	UPROPERTY(EditAnywhere)
+	TSoftObjectPtr<UVoxelData> LeavesLight;
+};
+
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UVoxelWorldGenerationProfile : public UPrimaryAssetBase
 {
@@ -84,6 +114,13 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Voxel|Generation|Ecology")
 	TArray<FVoxelWeightedPlantReference> FlowerPalette;
+
+	UPROPERTY(EditAnywhere, Category = "Voxel|Generation|Ecology")
+	TArray<FVoxelTreeSpeciesReference> TreeSpecies;
+
+	/** Stable generation semantics: Reed, GrassSecondary, WetRock, Stalactite, Stalagmite, Mushroom, UndergroundPlant. */
+	UPROPERTY(EditAnywhere, Category = "Voxel|Generation|Ecology")
+	TMap<FName, TSoftObjectPtr<UVoxelData>> NaturalDecorations;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Voxel|View")
 	TSoftObjectPtr<UVoxelViewProfile> View;

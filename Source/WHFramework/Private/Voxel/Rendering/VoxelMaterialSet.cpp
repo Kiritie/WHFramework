@@ -2,6 +2,13 @@
 #include "Engine/Texture2DArray.h"
 const FVoxelMaterialBank* UVoxelMaterialSet::FindBank(EVoxelRenderGroup G,uint16 B)const
 {for(const auto&V:Banks)if(V.Group==G&&V.Bank==B)return &V;return nullptr;}
+UMaterialInterface* UVoxelMaterialSet::FindMaterial(const EVoxelRenderGroup Group, const uint16 Bank, const uint8 Variant) const
+{
+	const FVoxelMaterialBank* Entry = FindBank(Group, Bank);
+	if (!Entry) return nullptr;
+	if (const TObjectPtr<UMaterialInterface>* Override = Entry->Variants.Find(Variant)) return Override->Get();
+	return Entry->Material;
+}
 bool UVoxelMaterialSet::Validate(FString&E)const
 {
     if(BakeVersion!=3){E=TEXT("MaterialSet bake version mismatch");return false;}TSet<uint32>Seen;

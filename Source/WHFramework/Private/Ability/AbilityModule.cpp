@@ -141,7 +141,7 @@ AAbilityItemBase* UAbilityModule::SpawnAbilityItem(FAbilityItem InItem, AActor* 
 	return nullptr;
 }
 
-AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer)
+AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer, bool bEnableCollision)
 {
 	if(!InItem.IsValid()) return nullptr;
 
@@ -149,10 +149,10 @@ AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(FAbilityItem InItem, FVec
 	SaveData.Item = InItem;
 	SaveData.Location = InLocation;
 
-	return SpawnAbilityPickUp(FParameter(MoveTemp(SaveData)), InContainer);
+	return SpawnAbilityPickUp(FParameter(MoveTemp(SaveData)), InContainer, bEnableCollision);
 }
 
-AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(const FParameter& InSaveData, ISceneContainerInterface* InContainer)
+AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(const FParameter& InSaveData, ISceneContainerInterface* InContainer, bool bEnableCollision)
 {
 	const auto& SaveData = InSaveData.GetRef<FPickUpSaveData>();
 
@@ -160,6 +160,7 @@ AAbilityPickUpBase* UAbilityModule::SpawnAbilityPickUp(const FParameter& InSaveD
 	
 	if(AAbilityPickUpBase* PickUp = UObjectPoolModuleStatics::SpawnObject<AAbilityPickUpBase>(ItemData.PickUpClass))
 	{
+		PickUp->SetActorEnableCollision(bEnableCollision);
 		PickUp->LoadSaveData(InSaveData);
 		if(InContainer)
 		{

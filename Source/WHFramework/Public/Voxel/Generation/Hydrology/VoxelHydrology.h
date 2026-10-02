@@ -236,6 +236,14 @@ struct WHFRAMEWORK_API FVoxelLakePlan
     FVoxelBasinCertificate Certificate;
 };
 
+struct WHFRAMEWORK_API FVoxelWaterfallSemantic
+{
+	FVoxelStableId Id;
+	FIntVector Upstream = FIntVector::ZeroValue;
+	FIntVector Downstream = FIntVector::ZeroValue;
+	int32 HalfWidthCells = 1;
+};
+
 struct WHFRAMEWORK_API FVoxelRiverSegmentRef
 {
     int32 RiverIndex = INDEX_NONE;
@@ -279,6 +287,7 @@ struct WHFRAMEWORK_API FVoxelHydrologyPlan
 
     TArray<FVoxelRiverRoute> Rivers;
     TArray<FVoxelLakePlan> Lakes;
+	TArray<FVoxelWaterfallSemantic> Waterfalls;
 
 	void Finalize();
 	bool ValidateRiverRoutes(FString& OutError) const;

@@ -1008,6 +1008,7 @@ bool FVoxelTaskResult::HasHeavyApply() const
 	switch (Kind)
 	{
 	case EVoxelTaskKind::BuildCollision:
+	case EVoxelTaskKind::BuildNavigation:
 	case EVoxelTaskKind::BuildFineMesh:
 	case EVoxelTaskKind::BuildVoxelProxy:
 	case EVoxelTaskKind::BuildVolumeTransition:
@@ -1029,6 +1030,7 @@ bool FVoxelTaskScheduler::UsesSectionKey(
 	{
 	case EVoxelTaskKind::GenerateExactBase:
 	case EVoxelTaskKind::BuildCollision:
+	case EVoxelTaskKind::BuildNavigation:
 	case EVoxelTaskKind::BuildFineMesh:
 	case EVoxelTaskKind::DecodeOverlay:
 	case EVoxelTaskKind::EncodeRegion:

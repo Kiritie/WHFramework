@@ -575,3 +575,135 @@ UAbilityInventorySlotBase* UAbilityInventoryBase::GetSlotBySplitTypeAndItemID(ES
 	}
 	return nullptr;
 }
+
+bool UAbilityInventoryBase::PlanItemAddition(const TArray<FAbilityItem>& InItems, TMap<UAbilityInventorySlotBase*, FAbilityItem>& OutSlots, bool bInPreservePlan)
+{
+	if(!bInPreservePlan) OutSlots.Reset();
+	const TArray<UAbilityInventorySlotBase*> Slots = GetAllSlots();
+	for(const FAbilityItem& Source : InItems)
+	{
+		if(!Source.IsValid() || Source.Count <= 0) return false;
+		int32 Remaining = Source.Count;
+		for(int32 Pass = 0; Pass < 3 && Remaining > 0; ++Pass)
+		{
+			for(UAbilityInventorySlotBase* Slot : Slots)
+			{
+			if(!Slot || !Slot->IsEnabled() || !Slot->MatchItemLimit(Source, true)) continue;
+			FAbilityItem Planned = OutSlots.Contains(Slot) ? OutSlots.FindChecked(Slot) : Slot->GetItem();
+			const bool bEmpty = !Planned.IsValid() || Planned.Count <= 0;
+			if((Pass == 0 && bEmpty) || (Pass > 0 && !bEmpty) || (Pass == 1 && !Slot->MatchItemSplit(Source, true))) continue;
+			if(Planned.IsValid() && Planned.Count > 0 && !Planned.Match(Source)) continue;
+			const int32 Current = Planned.IsValid() ? Planned.Count : 0;
+			const int32 Added = FMath::Min(Remaining, FMath::Max(0, Slot->GetMaxVolume(Source) - Current));
+			if(Added <= 0) continue;
+			if(!Planned.IsValid() || Planned.Count <= 0) Planned = Source;
+			Planned.Count = Current + Added;
+			Planned.Level = FMath::Clamp(Planned.Level, 0, Slot->GetMaxLevel(Planned));
+			Planned.Payload = Slot;
+			OutSlots.Add(Slot, Planned);
+			Remaining -= Added;
+			if(Remaining <= 0) break;
+			}
+		}
+		if(Remaining > 0)
+		{
+			OutSlots.Reset();
+			return false;
+		}
+	}
+	return true;
+}
+
+bool UAbilityInventoryBase::CanAddItems(const TArray<FAbilityItem>& InItems)
+{
+	TMap<UAbilityInventorySlotBase*, FAbilityItem> Planned;
+	return PlanItemAddition(InItems, Planned);
+}
+
+bool UAbilityInventoryBase::TryAddItems(const TArray<FAbilityItem>& InItems)
+{
+	if(bApplyingItemBatch) return false;
+	TGuardValue<bool> Guard(bApplyingItemBatch, true);
+	TMap<UAbilityInventorySlotBase*, FAbilityItem> Planned;
+	if(!PlanItemAddition(InItems, Planned)) return false;
+	TMap<UAbilityInventorySlotBase*, FAbilityItem> Previous;
+	for(auto& Pair : Planned)
+	{
+		Previous.Add(Pair.Key, Pair.Key->GetItem());
+	}
+	for(auto& Pair : Planned) Pair.Key->OnItemPreChange(Pair.Value, true);
+	for(const auto& Pair : Previous)
+	{
+		const FAbilityItem& Current = Pair.Key->GetItem();
+		if(Current.ID != Pair.Value.ID || Current.Count != Pair.Value.Count || Current.Level != Pair.Value.Level) return false;
+	}
+	for(auto& Pair : Planned) Pair.Key->GetItem() = Pair.Value;
+	for(auto& Pair : Previous) Pair.Key->OnItemChanged(Pair.Value, true);
+	for(auto& Pair : Planned) Pair.Key->Refresh();
+	if(const auto Agent = GetOwnerAgent())
+	{
+		for(const FAbilityItem& Item : InItems) Agent->OnAdditionItem(Item);
+	}
+	return true;
+}
+
+bool UAbilityInventoryBase::TryExchangeItems(UAbilityInventoryBase* InOther, const TArray<FAbilityItem>& InGive, const TArray<FAbilityItem>& InReceive, bool bInCommit)
+{
+	if(!InOther || bApplyingItemBatch || InOther->bApplyingItemBatch) return false;
+	TGuardValue<bool> Guard(bApplyingItemBatch, true);
+	TGuardValue<bool> OtherGuard(InOther->bApplyingItemBatch, true);
+	TMap<UAbilityInventorySlotBase*, FAbilityItem> Ours;
+	TMap<UAbilityInventorySlotBase*, FAbilityItem> Theirs;
+	auto RemoveFromPlan = [](UAbilityInventoryBase* Inventory, const TArray<FAbilityItem>& Items, TMap<UAbilityInventorySlotBase*, FAbilityItem>& Plan)
+	{
+		TMap<UAbilityInventorySlotBase*, int32> Removed;
+		for(const FAbilityItem& Item : Items)
+		{
+			if(!Item.IsValid() || Item.Count <= 0) return false;
+			FAbilityItem QueryItem = Item;
+			QueryItem.Count = MAX_int32;
+			const FItemQueryData Query = Inventory->QueryItemByRange(EItemQueryType::Get, QueryItem);
+			int32 Remaining = Item.Count;
+			for(UAbilityInventorySlotBase* Slot : Query.Slots)
+			{
+				FAbilityItem& Planned = Plan.FindOrAdd(Slot, Slot->GetItem());
+				const int32 Count = FMath::Min(Remaining, Slot->GetItem().Count - Removed.FindRef(Slot));
+				if(Count <= 0) continue;
+				Planned.Count -= Count;
+				Removed.FindOrAdd(Slot) += Count;
+				Remaining -= Count;
+				if(Planned.Count == 0) Planned = FAbilityItem::Empty;
+				if(Remaining == 0) break;
+			}
+			if(Remaining > 0) return false;
+		}
+		return true;
+	};
+	if(!RemoveFromPlan(this, InGive, Ours) || (InOther != this && !RemoveFromPlan(InOther, InReceive, Theirs))) return false;
+	if(!PlanItemAddition(InReceive, Ours, true) || (InOther != this && !InOther->PlanItemAddition(InGive, Theirs, true))) return false;
+	if(!bInCommit) return true;
+	TMap<UAbilityInventorySlotBase*, FAbilityItem> Planned = Ours;
+	Planned.Append(Theirs);
+	TMap<UAbilityInventorySlotBase*, FAbilityItem> Before;
+	for(const auto& Pair : Planned) Before.Add(Pair.Key, Pair.Key->GetItem());
+	for(auto& Pair : Planned) Pair.Key->OnItemPreChange(Pair.Value, true);
+	for(const auto& Pair : Before)
+	{
+		const FAbilityItem& Current = Pair.Key->GetItem();
+		if(Current.ID != Pair.Value.ID || Current.Count != Pair.Value.Count || Current.Level != Pair.Value.Level) return false;
+	}
+	for(auto& Pair : Planned) Pair.Key->GetItem() = Pair.Value;
+	for(auto& Pair : Before) Pair.Key->OnItemChanged(Pair.Value, true);
+	for(auto& Pair : Planned) Pair.Key->Refresh();
+	if(const auto Agent = GetOwnerAgent())
+	{
+		for(const FAbilityItem& Item : InReceive) Agent->OnAdditionItem(Item);
+		for(const FAbilityItem& Item : InGive) Agent->OnRemoveItem(Item);
+	}
+	if(const auto Agent = InOther != this ? InOther->GetOwnerAgent() : TScriptInterface<IAbilityInventoryAgentInterface>())
+	{
+		for(const FAbilityItem& Item : InGive) Agent->OnAdditionItem(Item);
+		for(const FAbilityItem& Item : InReceive) Agent->OnRemoveItem(Item);
+	}
+	return true;
+}

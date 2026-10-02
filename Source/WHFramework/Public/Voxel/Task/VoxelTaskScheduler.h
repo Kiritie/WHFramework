@@ -54,7 +54,8 @@ enum class EVoxelTaskKind : uint8
 	BuildGenerationPlan,
 	GenerateVoxelProxy,
 	GenerateSurface,
-	GenerateMacro
+	GenerateMacro,
+	BuildNavigation
 };
 
 struct WHFRAMEWORK_API FVoxelTaskStamp

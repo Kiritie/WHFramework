@@ -18,7 +18,7 @@ bool UVoxelData::ValidateDefinition(bool Render,FString&E)const
     const FString N=BlockName.ToString();
     if(BlockName.IsNone()||!N.Contains(TEXT(":"))||N!=N.ToLower()||N==TEXT("core:air")){E=TEXT("Invalid stable block name");return false;}
     for(TCHAR C:N)if(!((C>='a'&&C<='z')||(C>='0'&&C<='9')||C==':'||C=='_'||C=='/'||C=='.'||C=='-')){E=TEXT("Block name must be lowercase ASCII");return false;}
-    if(uint8(Shape)>uint8(EVoxelShapeKind::Fluid)||uint8(RenderGroup)>uint8(EVoxelRenderGroup::Emissive)||
+    if(uint8(Shape)>uint8(EVoxelShapeKind::ObjectPart)||uint8(RenderGroup)>uint8(EVoxelRenderGroup::Emissive)||
        BreakMilliseconds<0||BreakMilliseconds>600000||DropCount<0||DropCount>64||EntityKind<0||EntityKind>65535||EntityVariant<0||EntityVariant>255)
     {E=TEXT("Invalid voxel definition range");return false;}
     if((Shape==EVoxelShapeKind::CrossPlant||Shape==EVoxelShapeKind::Fluid||Shape==EVoxelShapeKind::Torch||Shape==EVoxelShapeKind::Ladder)&&bSolid)

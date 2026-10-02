@@ -1,4 +1,5 @@
 #pragma once
+#include "Voxel/Navigation/VoxelNavigationPresenter.h"
 
 #include "CoreMinimal.h"
 #include "Main/Base/ModuleBase.h"
@@ -16,14 +17,17 @@
 #include "Voxel/Streaming/VoxelInterest.h"
 #include "Voxel/Streaming/VoxelResidencyManager.h"
 #include "Voxel/Streaming/VoxelStreamingSource.h"
+#include "Voxel/Streaming/VoxelSimulationResidency.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "Voxel/VoxelWorldReadiness.h"
 #include "VoxelModule.generated.h"
 
 class APlayerController;
+struct FAbilityItem;
 class FSaveGameStorage;
 class FVoxelCollisionPresenter;
+class FVoxelNavigationPresenter;
 class FVoxelDetailView;
 class FVoxelEmergeManager;
 class FVoxelGenerationPipeline;
@@ -90,6 +94,13 @@ public:
 	bool IsReady() const;
 	bool IsPlayable() const;
 	bool IsCollisionReady(const FIntVector& InSection) const;
+	bool IsNavigationReady(const FIntVector& InSection) const;
+
+	UPROPERTY(EditAnywhere, Category = "Voxel|Navigation", meta = (ClampMin = "1.0"))
+	double NavigationClearanceCentimeters = 180.0;
+	bool IsSimulationResident(const FIntVector& InSection) const;
+	const TSet<FIntVector>& GetSimulationSections() const;
+	uint64 GetSimulationResidencyRevision() const;
 	float GetWarmupProgress() const;
 	const FVoxelWorldReadinessSnapshot& GetReadiness() const;
 	FVoxelRepresentationReadiness GetRepresentationReadiness() const;
@@ -153,6 +164,8 @@ public:
 	bool IsProjectSceneSimulationEnabled() const;
 	AActor* FindSceneActor(const FGuid& InId) const;
 	UVoxelSceneRegion* GetSceneRegion(const FIntVector& InSection, bool bCreate);
+	// Only for transferring an already live actor. Never requests data or simulation.
+	UVoxelSceneRegion* GetSceneRegionForActor(AActor* InActor, const FIntVector& InSection);
 
 	FVoxelTraceResult Trace(const FVector& InStart, const FVector& InDirection, double InDistance = 600.0) const;
 	bool VerifyView(
@@ -193,6 +206,7 @@ public:
 
 protected:
 	virtual void OnWorldStopping();
+	virtual void OnSimulationResidencyChanged(const FVoxelSimulationResidencyDelta& InDelta);
 	virtual bool BuildInteractionPlan(
 		const FVoxelTraceResult& InHit,
 		EVoxelEditAction InAction,
@@ -208,6 +222,13 @@ protected:
 	virtual bool ValidateInteractionPlan(
 		FVoxelInteractionPlan& InOutPlan,
 		FString& OutError);
+
+	virtual void OnContainerTransferCommitted(
+		APlayerController* InController,
+		AActor* InSource,
+		const FIntVector& InAnchor,
+		const FAbilityItem& InTransferredItem,
+		bool bInTaken);
 
 	/** Project-specific authored content that changes the generated base world. */
 	virtual uint64 GetGenerationIdentitySalt() const;
@@ -273,6 +294,9 @@ private:
 
 	void ApplyTask(FVoxelTaskResult&& InResult);
 	void RefreshInterest(double InNow);
+	void RefreshSimulationResidency();
+	bool ActivateSimulationSection(const FIntVector& InSection);
+	void RemoveSimulationSection(const FIntVector& InSection);
 	void UpdateReadiness();
 	TArray<FVector> CollectLocalViewObservers() const;
 	TArray<FVector> CollectDetailObservers() const;
@@ -302,6 +326,7 @@ private:
 	TUniquePtr<FVoxelMapTileCache> MapTileCache;
 	TUniquePtr<FVoxelViewManager> ViewManager;
 	TUniquePtr<FVoxelCollisionPresenter> CollisionPresenter;
+	TUniquePtr<FVoxelNavigationPresenter> NavigationPresenter;
 	TUniquePtr<FVoxelDetailView> DetailView;
 	FVoxelRegionStore RegionStore;
 	FVoxelWorldSaveAdapter SaveAdapter;
@@ -320,6 +345,8 @@ private:
 	FString LastSaveError;
 	FString PendingCommitDirectory;
 	uint64 InterestRevision = 0;
+	TSet<FIntVector> SimulationSections;
+	uint64 SimulationResidencyRevision = 0;
 	double LastInterestRefresh = -1.0;
 	double LastDiagnosticsLog = -1.0;
 	TArray<double> DiagnosticFrameTimes;

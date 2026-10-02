@@ -157,6 +157,15 @@ struct WHFRAMEWORK_API FVoxelBiomeEcologyModifier
 	bool Validate(FString& OutError) const;
 };
 
+UENUM(BlueprintType)
+enum class EVoxelTreeForm : uint8
+{
+	Broadleaf,
+	LightTrunk,
+	Conifer,
+	Sparse
+};
+
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelTreeGenerationSettings
 {

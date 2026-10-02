@@ -2,6 +2,7 @@
 
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "Voxel/Generation/Ecology/VoxelEcology.h"
 
 namespace
 {
@@ -354,6 +355,11 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 			[&](const FIntVector& Anchor, const int32 Height,
 				const FVoxelStableId TreeId)
 			{
+				FVoxelColumnSample Column;
+				if (!Generator->SampleColumn(Anchor.X, Anchor.Y, Column, OutError, InCancel)) return;
+				const FVoxelEcologyGenerator Ecology(Config->Recipe.ToSharedRef());
+				const FVoxelTreeSpecies Species = Ecology.SelectTreeSpecies(Column, TreeId);
+				if (!Config->ToRuntime(Species.Trunk, Trunk) || !Config->ToRuntime(Species.LeavesMid, Leaves)) return;
 				if (FMath::Max(Height, Trees.CrownRadius * 2 + 1) < Step) return;
 				const FIntVector CoarseAnchor(
 					VoxelGeneration::FloorDivide(Anchor.X - Origin.X, StructureStep),
@@ -376,12 +382,31 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 					const int64 DZ = static_cast<int64>(Edit.Key.Z) - CrownCenter.Z;
 					if (FMath::Abs(DX) <= Radius && FMath::Abs(DY) <= Radius &&
 						FMath::Abs(DZ) <= Radius &&
-						DX * DX + DY * DY + DZ * DZ <= static_cast<int64>(Radius) * Radius &&
-						Edit.Value != Leaves && Edit.Value != Trunk) return;
+						FVoxelEcologyGenerator::ContainsCrown(FIntVector(DX, DY, DZ), Radius, TreeId, Species.Form))
+					{
+						FVoxelBlockState ExpectedLeaf;
+						Config->ToRuntime(FVoxelEcologyGenerator::SelectLeaf(Species, static_cast<int32>(DZ), Radius), ExpectedLeaf);
+						if (Edit.Value != ExpectedLeaf && Edit.Value != Trunk) return;
+					}
 				}
 				AddCell(Anchor, Anchor + FIntVector(1, 1, Height), Trunk, TreeId);
-				AddCell(CrownCenter - FIntVector(Radius),
-					CrownCenter + FIntVector(Radius + 1), Leaves, TreeId);
+				const int32 CrownStep = FMath::Max(1, Radius / 3);
+				for (int32 Z = -Radius; Z <= Radius; Z += CrownStep)
+				{
+					for (int32 Y = -Radius; Y <= Radius; Y += CrownStep)
+					{
+						for (int32 X = -Radius; X <= Radius; X += CrownStep)
+						{
+							const FIntVector Offset(X, Y, Z);
+							if (!FVoxelEcologyGenerator::ContainsCrown(Offset, Radius, TreeId, Species.Form)) continue;
+							Config->ToRuntime(FVoxelEcologyGenerator::SelectLeaf(Species, Z, Radius), Leaves);
+							const FIntVector Min = CrownCenter + Offset;
+							const FIntVector Max = Min + FIntVector(FMath::Min(CrownStep, Radius + 1 - X),
+								FMath::Min(CrownStep, Radius + 1 - Y), FMath::Min(CrownStep, Radius + 1 - Z));
+							AddCell(Min, Max, Leaves, TreeId);
+						}
+					}
+				}
 			}, OutError, InCancel)) return false;
 	}
 

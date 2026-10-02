@@ -77,9 +77,9 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// PickUp
-	static AAbilityPickUpBase* SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer = nullptr);
+	static AAbilityPickUpBase* SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer = nullptr, bool bEnableCollision = true);
 
-	static AAbilityPickUpBase* SpawnAbilityPickUp(const FParameter& InSaveData, ISceneContainerInterface* InContainer = nullptr);
+	static AAbilityPickUpBase* SpawnAbilityPickUp(const FParameter& InSaveData, ISceneContainerInterface* InContainer = nullptr, bool bEnableCollision = true);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Projectile

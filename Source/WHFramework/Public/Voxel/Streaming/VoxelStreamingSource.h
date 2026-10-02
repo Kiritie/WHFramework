@@ -21,6 +21,10 @@ ENUM_CLASS_FLAGS(EVoxelStreamingCapability)
 FORCEINLINE EVoxelStreamingCapability NormalizeVoxelStreamingCapabilities(
 	EVoxelStreamingCapability InCapabilities)
 {
+	if (EnumHasAnyFlags(InCapabilities, EVoxelStreamingCapability::Simulation))
+	{
+		InCapabilities |= EVoxelStreamingCapability::Collision;
+	}
 	if (EnumHasAnyFlags(InCapabilities,
 		EVoxelStreamingCapability::Collision |
 		EVoxelStreamingCapability::Simulation |

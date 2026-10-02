@@ -4,7 +4,7 @@
 namespace
 {
 	constexpr uint32 VoxelRecipeMagic = 0x31524356;
-	constexpr uint32 VoxelRecipeSchemaVersion = 11;
+	constexpr uint32 VoxelRecipeSchemaVersion = 12;
 	constexpr int32 MaxRecipeBytes = 32 * 1024 * 1024;
 	constexpr int32 MaxRecipeArrayCount = 1 << 20;
 
@@ -398,6 +398,23 @@ bool FVoxelGenerationRecipeCodec::Encode(const FVoxelGenerationRecipe& Recipe, T
 	Writer.U16(Recipe.Ecology.TreeTrunk);
 	Writer.U16(Recipe.Ecology.TreeLeaves);
 	Writer.U16(Recipe.Ecology.GrassPlant);
+	Writer.U32(Recipe.Ecology.TreeSpecies.Num());
+	for (const FVoxelTreeSpecies& Species : Recipe.Ecology.TreeSpecies)
+	{
+		WriteName(Writer, Species.StableId);
+		Writer.U8(static_cast<uint8>(Species.Form));
+		WriteRange(Writer, Species.Temperature);
+		WriteRange(Writer, Species.Moisture);
+		Writer.U16(Species.Trunk);
+		Writer.U16(Species.LeavesDark);
+		Writer.U16(Species.LeavesMid);
+		Writer.U16(Species.LeavesLight);
+	}
+	TArray<FName> DecorationNames;
+	Recipe.Ecology.NaturalDecorations.GetKeys(DecorationNames);
+	DecorationNames.Sort(FNameLexicalLess());
+	Writer.U32(DecorationNames.Num());
+	for (const FName Name : DecorationNames) { WriteName(Writer, Name); Writer.U16(Recipe.Ecology.NaturalDecorations.FindChecked(Name)); }
 	Writer.U32(Recipe.Ecology.Flowers.Num());
 	for (const FVoxelWeightedRuntimeSymbol& Flower : Recipe.Ecology.Flowers)
 	{
@@ -556,6 +573,27 @@ bool FVoxelGenerationRecipeCodec::Decode(TConstArrayView<uint8> Bytes, FVoxelGen
 	Result.Ecology.TreeTrunk = Reader.U16();
 	Result.Ecology.TreeLeaves = Reader.U16();
 	Result.Ecology.GrassPlant = Reader.U16();
+	if (!ReadCount(Reader, Count)) return false;
+	for (int32 Index = 0; Index < Count; ++Index)
+	{
+		FVoxelTreeSpecies& Species = Result.Ecology.TreeSpecies.AddDefaulted_GetRef();
+		Species.StableId = ReadName(Reader);
+		Species.Form = static_cast<EVoxelTreeForm>(Reader.U8());
+		Species.Temperature = ReadRange(Reader);
+		Species.Moisture = ReadRange(Reader);
+		Species.Trunk = Reader.U16();
+		Species.LeavesDark = Reader.U16();
+		Species.LeavesMid = Reader.U16();
+		Species.LeavesLight = Reader.U16();
+	}
+	if (!ReadCount(Reader, Count)) return false;
+	for (int32 Index = 0; Index < Count; ++Index)
+	{
+		const FName Name = ReadName(Reader);
+		const uint16 Symbol = Reader.U16();
+		if (Result.Ecology.NaturalDecorations.Contains(Name)) return false;
+		Result.Ecology.NaturalDecorations.Add(Name, Symbol);
+	}
 	if (!ReadCount(Reader, Count)) return false;
 	for (int32 Index = 0; Index < Count; ++Index)
 	{

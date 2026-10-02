@@ -9,6 +9,19 @@
 
 namespace
 {
+	TSet<uint32> TreeStates(const FVoxelGenerationRuntimeConfig& Config)
+	{
+		TSet<uint32> States;
+		auto Add = [&](uint16 Symbol) { FVoxelBlockState State; if (Config.ToRuntime(Symbol, State)) States.Add(State.Pack()); };
+		Add(Config.Recipe->Ecology.TreeTrunk);
+		Add(Config.Recipe->Ecology.TreeLeaves);
+		for (const FVoxelTreeSpecies& Species : Config.Recipe->Ecology.TreeSpecies)
+		{
+			Add(Species.Trunk); Add(Species.LeavesDark); Add(Species.LeavesMid); Add(Species.LeavesLight);
+		}
+		return States;
+	}
+
 	struct FCoarseOverlayCell
 	{
 		int32 Removed = 0;
@@ -27,7 +40,7 @@ namespace
 		}
 
 		void Apply(const int32 InStep, const bool bArchitecture,
-			const FVoxelBlockState InTrunk, const FVoxelBlockState InLeaves,
+			const TSet<uint32>& InTreeStates,
 			FVoxelBlockState& InOutState) const
 		{
 			int32 BestCount = 0;
@@ -41,7 +54,7 @@ namespace
 					BestState = Pair.Key;
 				}
 			}
-			const int32 RemovalThreshold = InOutState == InTrunk || InOutState == InLeaves ? 1 :
+			const int32 RemovalThreshold = InTreeStates.Contains(InOutState.Pack()) ? 1 :
 				(bArchitecture ? FMath::Max(1, InStep / 2) :
 					FMath::Max(1, (InStep * InStep + 1) / 2));
 			if (!InOutState.IsAir() && Removed >= RemovalThreshold &&
@@ -61,8 +74,7 @@ namespace
 		const TMap<FIntVector, FCoarseOverlayCell>& InEdits,
 		const TMap<FIntVector, FVoxelBlockState>& InArchitecture,
 		const int32 InStep,
-		const FVoxelBlockState InTrunk,
-		const FVoxelBlockState InLeaves,
+		const TSet<uint32>& InTreeStates,
 		FVoxelVoxelProxyData& InOutData)
 	{
 		const int32 Side = InOutData.GridSide;
@@ -75,8 +87,7 @@ namespace
 					if (const FCoarseOverlayCell* Edits = InEdits.Find(FIntVector(X, Y, Z)))
 					{
 						const FIntVector Local(X, Y, Z);
-						Edits->Apply(InStep, InArchitecture.Contains(Local), InTrunk,
-							InLeaves, InOutData.Cells[X + Y * Side + Z * (Side * Side)]);
+						Edits->Apply(InStep, InArchitecture.Contains(Local), InTreeStates, InOutData.Cells[X + Y * Side + Z * (Side * Side)]);
 					}
 				}
 			}
@@ -95,8 +106,7 @@ namespace
 					Local[(Axis + 2) % 3] = Y;
 					if (const FCoarseOverlayCell* Edits = InEdits.Find(Local))
 					{
-							Edits->Apply(InStep, InArchitecture.Contains(Local), InTrunk,
-								InLeaves, InOutData.Halo[Face][X + Y * Side]);
+							Edits->Apply(InStep, InArchitecture.Contains(Local), InTreeStates, InOutData.Halo[Face][X + Y * Side]);
 					}
 				}
 			}
@@ -198,7 +208,7 @@ bool FVoxelVoxelProxyBuilder::Build(const FVoxelViewKey& InKey, const FVoxelOver
 	FVoxelBlockState Leaves;
 	Config->ToRuntime(Config->Recipe->Ecology.TreeTrunk, Trunk);
 	Config->ToRuntime(Config->Recipe->Ecology.TreeLeaves, Leaves);
-	ApplyCoarseEdits(CoarseEdits, CoarseNatural, Step, Trunk, Leaves, Data);
+	ApplyCoarseEdits(CoarseEdits, CoarseNatural, Step, TreeStates(*Config), Data);
 	bool bHasAir = false;
 	bool bHasSolid = false;
 	for (const FVoxelBlockState State : Data.Cells)
@@ -231,11 +241,12 @@ bool FVoxelVoxelProxyBuilder::ApplyTreeSilhouettes(
 		OutError = TEXT("Tree silhouette symbols are invalid");
 		return false;
 	}
-	auto ClearTreeSamples = [Trunk, Leaves](TArray<FVoxelBlockState>& Cells)
+	const TSet<uint32> AllTreeStates = TreeStates(*Config);
+	auto ClearTreeSamples = [&AllTreeStates](TArray<FVoxelBlockState>& Cells)
 	{
 		for (FVoxelBlockState& Cell : Cells)
 		{
-			if (Cell == Trunk || Cell == Leaves) Cell = FVoxelBlockState();
+			if (AllTreeStates.Contains(Cell.Pack())) Cell = FVoxelBlockState();
 		}
 	};
 	ClearTreeSamples(InOutData.Cells);
@@ -278,7 +289,7 @@ bool FVoxelVoxelProxyBuilder::ApplyTreeSilhouettes(
 			Config->Recipe->Palette.Stone : Config->Recipe->Palette.Air;
 		return true;
 	};
-	auto Draw = [&InOutData, &Origin, Step, Side, Trunk, Leaves,
+	auto Draw = [&InOutData, &Origin, Step, Side, &Trunk, &Leaves,
 		Water = Config->Water](
 		const FIntVector& Position, const FVoxelBlockState State,
 		const bool bReplaceTrunk)
@@ -312,8 +323,12 @@ bool FVoxelVoxelProxyBuilder::ApplyTreeSilhouettes(
 	int32 Candidates = 0;
 	int32 Accepted = 0;
 	Ecology.EnumerateTrees(TreeBounds, SampleColumn, SampleBase,
-		[&](const FIntVector& Anchor, const int32 Height, const FVoxelStableId)
+		[&](const FIntVector& Anchor, const int32 Height, const FVoxelStableId TreeId)
 		{
+			FVoxelColumnSample Column;
+			if (!SampleColumn(Anchor, Column)) return;
+			const FVoxelTreeSpecies Species = Ecology.SelectTreeSpecies(Column, TreeId);
+			if (!Config->ToRuntime(Species.Trunk, Trunk) || !Config->ToRuntime(Species.LeavesMid, Leaves)) { bSampleFailed = true; return; }
 			for (int32 Z = 0; Z < Height; ++Z)
 			{
 				FVoxelBlockState EditedTrunk = Trunk;
@@ -334,7 +349,8 @@ bool FVoxelVoxelProxyBuilder::ApplyTreeSilhouettes(
 				{
 					for (int32 X = -Radius; X <= Radius; ++X)
 					{
-						if (FMath::Abs(X) == Radius && FMath::Abs(Y) == Radius && FMath::Abs(Z) == Radius) continue;
+						if (!FVoxelEcologyGenerator::ContainsCrown(FIntVector(X, Y, Z), Radius, TreeId, Species.Form)) continue;
+						Config->ToRuntime(FVoxelEcologyGenerator::SelectLeaf(Species, Z, Radius), Leaves);
 						Draw(FIntVector(Anchor.X + X * Step, Anchor.Y + Y * Step,
 							Origin.Z + (CrownZ + Z) * Step), Leaves, true);
 					}

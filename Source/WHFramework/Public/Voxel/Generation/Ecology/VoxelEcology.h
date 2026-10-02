@@ -94,6 +94,10 @@ public:
 
 	FVoxelEcologySample Sample(const FVoxelColumnSample& InColumn) const;
 
+	static bool ContainsCrown(const FIntVector& InOffset, int32 InRadius, const FVoxelStableId& InTreeId, EVoxelTreeForm InForm = EVoxelTreeForm::Broadleaf);
+	FVoxelTreeSpecies SelectTreeSpecies(const FVoxelColumnSample& InColumn, const FVoxelStableId& InTreeId) const;
+	static uint16 SelectLeaf(const FVoxelTreeSpecies& InSpecies, int32 InZ, int32 InRadius);
+
 	bool BuildPlan(
 		const FVoxelGenerationBounds& InBounds,
 		TFunctionRef<bool(const FIntVector& InPosition, FVoxelColumnSample& OutColumn)> InSampleColumn,

@@ -752,3 +752,29 @@ void UTaskBase::GrantRewards()
 	bRewardsGranted = true;
 	OnReward();
 }
+
+FTaskPresentationState UTaskBase::CapturePresentation() const
+{
+	FTaskPresentationState State;
+	State.TaskGUID = TaskGUID;
+	State.State = TaskState;
+	State.Result = TaskExecuteResult;
+	State.Target = Target;
+	State.Progress = ObjectiveProgress;
+	for(const FTaskObjective& Objective : Objectives) State.RequiredCounts.Add(Objective.ObjectiveID, Objective.RequiredCount);
+	return State;
+}
+
+void UTaskBase::ApplyPresentation(const FTaskPresentationState& InState)
+{
+	if(!GetTaskAsset() || !GetTaskAsset()->bPresentationOnly) return;
+	ClearTaskTimers();
+	TaskState = InState.State;
+	TaskExecuteResult = InState.Result;
+	Target = InState.Target;
+	ObjectiveProgress = InState.Progress;
+	for(FTaskObjective& Objective : Objectives)
+	{
+		if(const int32* Required = InState.RequiredCounts.Find(Objective.ObjectiveID)) Objective.RequiredCount = *Required;
+	}
+}

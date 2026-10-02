@@ -80,7 +80,7 @@ public:
 
 	/** 根据任务资产模板创建独立运行时副本 */
 	UFUNCTION(BlueprintCallable)
-	UTaskAsset* CreateAsset(UTaskAsset* InAsset, FGuid InAgentID);
+	UTaskAsset* CreateAsset(UTaskAsset* InAsset, FGuid InAgentID, FGuid InOwnerActorID = FGuid());
 	
 	UFUNCTION(BlueprintCallable)
 	void RemoveAsset(UTaskAsset* InAsset);
@@ -137,10 +137,15 @@ public:
 	bool TurnInTask(UTaskBase* InTask, AActor* InTarget);
 
 	UFUNCTION(BlueprintCallable)
-	void ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTargetTag, int32 InCount = 1, FPrimaryAssetId InTargetAssetID = FPrimaryAssetId(), FName InTargetName = NAME_None);
+	void ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTargetTag, int32 InCount = 1, FPrimaryAssetId InTargetAssetID = FPrimaryAssetId(), FName InTargetName = NAME_None, FGuid InOwnerActorID = FGuid());
 
 	UFUNCTION(BlueprintCallable)
 	void RefreshMarkers() { RequestTaskMarkersRefresh(); }
+
+	TArray<FTaskAssetPresentation> CaptureOwnerPresentation(const FGuid& InOwnerActorID) const;
+	void ApplyOwnerPresentation(const FGuid& InOwnerActorID, const TArray<FTaskAssetPresentation>& InAssets);
+	bool IsLocallyVisible(const UTaskAsset* InAsset) const;
+	TArray<UTaskAsset*> GetVisibleAssets() const;
 
 public:
 	UFUNCTION(BlueprintPure)
@@ -170,7 +175,7 @@ protected:
 	bool bResolvingAutomaticTasks = false;
 	void ClearRuntimeAssets();
 	UTaskBase* ResolveRuntimeTask(UTaskBase* Task) const;
-	UTaskAsset* AddAssetInternal(UTaskAsset* InAsset, FGuid InInstanceID, FGuid InAgentID);
+	UTaskAsset* AddAssetInternal(UTaskAsset* InAsset, FGuid InInstanceID, FGuid InAgentID, FGuid InOwnerActorID = FGuid(), bool bPresentationOnly = false);
 	void BeginTaskMutation();
 	void EndTaskMutation();
 	void RequestTaskMarkersRefresh();

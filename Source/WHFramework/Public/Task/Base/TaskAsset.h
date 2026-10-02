@@ -39,6 +39,15 @@ public:
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly)
 	FGuid AgentID;
 
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly)
+	FGuid OwnerActorID;
+
+	UPROPERTY()
+	FName InstanceKey;
+
+	UPROPERTY(Transient)
+	bool bPresentationOnly = false;
+
 	/** 发布者的最后已知位置，在流送角色不存在时保留 */
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly)
 	FVector AgentLocation = FVector::ZeroVector;

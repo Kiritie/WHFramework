@@ -20,6 +20,7 @@ public class WHFramework : ModuleRules
 				"Json",
 				"JsonUtilities",
 				"AIModule",
+				"NavigationSystem",
 				"CommonUI",
 				"CommonInput",
 				"EnhancedInput",

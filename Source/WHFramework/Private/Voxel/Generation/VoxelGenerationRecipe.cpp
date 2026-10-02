@@ -162,6 +162,22 @@ bool FVoxelEcologyRuntimePalette::Validate(
 		OutError = TEXT("Voxel recipe contains invalid default grass ecology symbol");
 		return false;
 	}
+	TSet<FName> SpeciesIds;
+	for (const auto& Decoration : NaturalDecorations)
+	{
+		if (Decoration.Key.IsNone() || !IsValid(Decoration.Value)) { OutError = TEXT("Invalid natural decoration symbol"); return false; }
+	}
+	for (const FVoxelTreeSpecies& Species : TreeSpecies)
+	{
+		if (Species.StableId.IsNone() || SpeciesIds.Contains(Species.StableId) || Species.Form > EVoxelTreeForm::Sparse ||
+			!Species.Temperature.Validate(OutError) || !Species.Moisture.Validate(OutError) ||
+			!IsValid(Species.Trunk) || !IsValid(Species.LeavesDark) || !IsValid(Species.LeavesMid) || !IsValid(Species.LeavesLight))
+		{
+			OutError = TEXT("Voxel recipe contains an invalid tree species palette");
+			return false;
+		}
+		SpeciesIds.Add(Species.StableId);
+	}
 	if (InSettings.Flower.bEnabled && Flowers.IsEmpty())
 	{
 		OutError = TEXT("Enabled flower ecology requires a flower palette");

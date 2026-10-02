@@ -3,7 +3,7 @@
 #include "VoxelShapeTypes.generated.h"
 UENUM(BlueprintType)
 enum class EVoxelShapeKind:uint8
-{ FullCube,Slab,Stair,Ladder,CrossPlant,Pane,Door,Trapdoor,Torch,Fluid };
+{ FullCube,Slab,Stair,Ladder,CrossPlant,Pane,Door,Trapdoor,Torch,Fluid,ObjectPart };
 struct WHFRAMEWORK_API FVoxelShapeQuad
 {
     FVector Vertices[4];

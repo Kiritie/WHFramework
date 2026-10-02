@@ -4,6 +4,9 @@
 #include "Task/TaskModule.h"
 
 #include "Main/MainModule.h"
+#include "Common/CommonModuleStatics.h"
+#include "GameFramework/Pawn.h"
+#include "Engine/World.h"
 #include "Task/Base/TaskBase.h"
 #include "Character/CharacterModuleTypes.h"
 #include "Event/EventModuleStatics.h"
@@ -77,7 +80,7 @@ void UTaskModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 	const TArray<UTaskAsset*> Snapshot = Assets;
 	for (UTaskAsset* Asset : Snapshot)
 	{
-		if (!Asset || !Assets.Contains(Asset)) continue;
+		if (!Asset || Asset->bPresentationOnly || !Assets.Contains(Asset)) continue;
 		const TArray<UTaskBase*> Roots = Asset->RootTasks;
 		for (UTaskBase* Task : Roots)
 		{
@@ -141,9 +144,10 @@ void UTaskModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 		{
 			if (UTaskAsset* Source = AssetData.Asset.LoadSynchronous())
 			{
-				if(UTaskAsset* RuntimeAsset = AddAssetInternal(Source, AssetData.InstanceID, AssetData.AgentID))
+				if(UTaskAsset* RuntimeAsset = AddAssetInternal(Source, AssetData.InstanceID, AssetData.AgentID, AssetData.OwnerActorID))
 				{
 					RuntimeAsset->AgentLocation = AssetData.AgentLocation;
+					RuntimeAsset->InstanceKey = AssetData.InstanceKey;
 				}
 			}
 			else
@@ -204,6 +208,8 @@ FParameter UTaskModule::ToData()
 		AssetData.Asset = Cast<UTaskAsset>(Asset->SourceObject);
 		AssetData.InstanceID = Asset->InstanceID;
 		AssetData.AgentID = Asset->AgentID;
+		AssetData.OwnerActorID = Asset->OwnerActorID;
+		AssetData.InstanceKey = Asset->InstanceKey;
 		AssetData.AgentLocation = Asset->AgentLocation;
 		SaveData.Assets.Add(AssetData);
 		for (const auto& Pair : Asset->TaskMap)
@@ -263,15 +269,15 @@ UTaskAsset* UTaskModule::AddAsset(UTaskAsset* InAsset)
 	return AddAssetInternal(InAsset, FGuid(), FGuid());
 }
 
-UTaskAsset* UTaskModule::CreateAsset(UTaskAsset* InAsset, FGuid InAgentID)
+UTaskAsset* UTaskModule::CreateAsset(UTaskAsset* InAsset, FGuid InAgentID, FGuid InOwnerActorID)
 {
 	if(!InAsset || !InAgentID.IsValid()) return nullptr;
 	FGuid InstanceID = FGuid::NewGuid();
 	while(GetAssetByInstance(InAsset, InstanceID)) InstanceID = FGuid::NewGuid();
-	return AddAssetInternal(InAsset, InstanceID, InAgentID);
+	return AddAssetInternal(InAsset, InstanceID, InAgentID, InOwnerActorID);
 }
 
-UTaskAsset* UTaskModule::AddAssetInternal(UTaskAsset* InAsset, FGuid InInstanceID, FGuid InAgentID)
+UTaskAsset* UTaskModule::AddAssetInternal(UTaskAsset* InAsset, FGuid InInstanceID, FGuid InAgentID, FGuid InOwnerActorID, bool bPresentationOnly)
 {
 	if(!InAsset) return nullptr;
 	UTaskAsset* Source = Cast<UTaskAsset>(InAsset->SourceObject ? InAsset->SourceObject : InAsset);
@@ -285,6 +291,8 @@ UTaskAsset* UTaskModule::AddAssetInternal(UTaskAsset* InAsset, FGuid InInstanceI
 	RuntimeAsset->SourceObject = Source;
 	RuntimeAsset->InstanceID = InInstanceID;
 	RuntimeAsset->AgentID = InAgentID;
+	RuntimeAsset->OwnerActorID = InOwnerActorID;
+	RuntimeAsset->bPresentationOnly = bPresentationOnly;
 	TArray<FText> ExpansionErrors;
 	if(!RuntimeAsset->ExpandTaskAssetReferences(ExpansionErrors))
 	{
@@ -338,6 +346,7 @@ void UTaskModule::RestoreTask(UTaskBase* InTask)
 	BeginTaskMutation();
 	ON_SCOPE_EXIT { EndTaskMutation(); };
 	InTask = ResolveRuntimeTask(InTask);
+	if(InTask && InTask->GetTaskAsset()->bPresentationOnly) return;
 	if(InTask && InTask->GetTaskState() != ETaskState::None)
 	{
 		if (CurrentTask == InTask || (CurrentTask && InTask->IsParentOf(CurrentTask))) SetCurrentTask(nullptr);
@@ -356,6 +365,7 @@ void UTaskModule::EnterTask(UTaskBase* InTask, bool bSetAsCurrent)
 	BeginTaskMutation();
 	ON_SCOPE_EXIT { EndTaskMutation(); };
 	InTask = ResolveRuntimeTask(InTask);
+	if(InTask && InTask->GetTaskAsset()->bPresentationOnly) return;
 	if (!InTask || InTask->TaskEnterType == ETaskEnterType::None || InTask->IsCompleted()) return;
 	const ETaskState PreviousState = InTask->TaskState;
 	if (InTask->TaskState == ETaskState::None)
@@ -396,6 +406,7 @@ void UTaskModule::EnterTaskByGUID(const FString& InTaskGUID, bool bSetAsCurrent)
 void UTaskModule::RefreshTask(UTaskBase* InTask)
 {
 	InTask = ResolveRuntimeTask(InTask);
+	if(InTask && InTask->GetTaskAsset()->bPresentationOnly) return;
 	if (InTask && InTask->IsEntered())
 	{
 		if(InTask->IsExecuting() && InTask->bTaskTickEnabled) InTask->OnRefresh();
@@ -412,6 +423,7 @@ void UTaskModule::RefreshTaskByGUID(const FString& InTaskGUID)
 void UTaskModule::GuideTask(UTaskBase* InTask)
 {
 	InTask = ResolveRuntimeTask(InTask);
+	if(InTask && InTask->GetTaskAsset()->bPresentationOnly) return;
 	if(InTask && InTask->IsEntered())
 	{
 		InTask->OnGuide();
@@ -428,6 +440,7 @@ void UTaskModule::ExecuteTask(UTaskBase* InTask)
 	BeginTaskMutation();
 	ON_SCOPE_EXIT { EndTaskMutation(); };
 	InTask = ResolveRuntimeTask(InTask);
+	if(InTask && InTask->GetTaskAsset()->bPresentationOnly) return;
 	if(InTask && InTask->GetTaskState() == ETaskState::Entered)
 	{
 		InTask->OnExecute();
@@ -445,6 +458,7 @@ void UTaskModule::CompleteTask(UTaskBase* InTask, ETaskExecuteResult InTaskExecu
 	BeginTaskMutation();
 	ON_SCOPE_EXIT { EndTaskMutation(); };
 	InTask = ResolveRuntimeTask(InTask);
+	if(InTask && InTask->GetTaskAsset()->bPresentationOnly) return;
 	if(!InTask || InTaskExecuteResult == ETaskExecuteResult::None) return;
 
 	if(InTaskExecuteResult == ETaskExecuteResult::Skipped)
@@ -480,6 +494,7 @@ void UTaskModule::LeaveTask(UTaskBase* InTask)
 	BeginTaskMutation();
 	ON_SCOPE_EXIT { EndTaskMutation(); };
 	InTask = ResolveRuntimeTask(InTask);
+	if(InTask && InTask->GetTaskAsset()->bPresentationOnly) return;
 	if(!InTask) return;
 	
 	if(!InTask->IsLeaved())
@@ -528,6 +543,7 @@ void UTaskModule::SetCurrentTask(UTaskBase* InTask)
 	BeginTaskMutation();
 	ON_SCOPE_EXIT { EndTaskMutation(); };
 	InTask = ResolveRuntimeTask(InTask);
+	if(InTask && !IsLocallyVisible(InTask->GetTaskAsset())) return;
 	if (CurrentTask == InTask) return;
 	CurrentTask = InTask;
 	RequestTaskMarkersRefresh();
@@ -603,7 +619,7 @@ UTaskBase* UTaskModule::EnsureTask(const FTaskReference& Reference)
 bool UTaskModule::TurnInTask(UTaskBase* InTask, AActor* InTarget)
 {
 	InTask = ResolveRuntimeTask(InTask);
-	if (!InTask || InTask->TaskState != ETaskState::Completed || InTask->TaskExecuteResult != ETaskExecuteResult::Succeed) return false;
+	if (!InTask || InTask->GetTaskAsset()->bPresentationOnly || InTask->TaskState != ETaskState::Completed || InTask->TaskExecuteResult != ETaskExecuteResult::Succeed) return false;
 	UTaskAsset* Asset = InTask->GetTaskAsset();
 	if (InTask->bRequireExplicitTurnIn)
 	{
@@ -616,7 +632,7 @@ bool UTaskModule::TurnInTask(UTaskBase* InTask, AActor* InTarget)
 	return InTask->TaskState == ETaskState::Leaved;
 }
 
-void UTaskModule::ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTargetTag, int32 InCount, FPrimaryAssetId InTargetAssetID, FName InTargetName)
+void UTaskModule::ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTargetTag, int32 InCount, FPrimaryAssetId InTargetAssetID, FName InTargetName, FGuid InOwnerActorID)
 {
 	if (!InEventTag.IsValid() || InCount <= 0 || bLoadingTasks || ModuleState == EModuleState::Paused) return;
 	BeginTaskMutation();
@@ -624,6 +640,7 @@ void UTaskModule::ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTarget
 	TArray<UTaskBase*> ExecutingTasks;
 	for (UTaskAsset* Asset : Assets)
 	{
+		if(!Asset || Asset->bPresentationOnly || Asset->OwnerActorID != InOwnerActorID) continue;
 		for (const auto& Pair : Asset->TaskMap)
 		{
 			if (Pair.Value->IsExecuting() && !Pair.Value->Objectives.IsEmpty()) ExecutingTasks.Add(Pair.Value);
@@ -684,7 +701,7 @@ void UTaskModule::EnterEligibleAutomaticTasks()
 	const TArray<UTaskAsset*> AssetSnapshot = Assets;
 	for(UTaskAsset* Asset : AssetSnapshot)
 	{
-		if(!Asset || !Assets.Contains(Asset)) continue;
+		if(!Asset || Asset->bPresentationOnly || !Assets.Contains(Asset)) continue;
 		const TArray<UTaskBase*> RootSnapshot = Asset->RootTasks;
 		for(UTaskBase* Task : RootSnapshot)
 		{
@@ -745,7 +762,7 @@ void UTaskModule::RefreshTaskMarkers()
 	UTaskBase* GuidanceTask = GetGuidanceTask();
 	for(UTaskAsset* Asset : Assets)
 	{
-		if(!Asset) continue;
+		if(!Asset || !IsLocallyVisible(Asset)) continue;
 		for(const auto& Pair : Asset->TaskMap)
 		{
 			UTaskBase* Task = Pair.Value;
@@ -792,4 +809,74 @@ void UTaskModule::RefreshTaskMarkers()
 	TaskMarkerIDs = MoveTemp(DesiredIDs);
 	Scene.SetTrackedMarker(CurrentMarkerID);
 	OnTaskAssetsChanged.Broadcast();
+}
+
+TArray<FTaskAssetPresentation> UTaskModule::CaptureOwnerPresentation(const FGuid& InOwnerActorID) const
+{
+	TArray<FTaskAssetPresentation> Result;
+	if(!InOwnerActorID.IsValid()) return Result;
+	for(const UTaskAsset* Asset : Assets)
+	{
+		if(!Asset || Asset->OwnerActorID != InOwnerActorID || Asset->bPresentationOnly) continue;
+		FTaskAssetPresentation& Snapshot = Result.AddDefaulted_GetRef();
+		Snapshot.Asset.Asset = Cast<UTaskAsset>(Asset->SourceObject);
+		Snapshot.Asset.InstanceID = Asset->InstanceID;
+		Snapshot.Asset.AgentID = Asset->AgentID;
+		Snapshot.Asset.OwnerActorID = Asset->OwnerActorID;
+		Snapshot.Asset.InstanceKey = Asset->InstanceKey;
+		Snapshot.Asset.AgentLocation = Asset->AgentLocation;
+		for(const auto& Pair : Asset->TaskMap)
+		{
+			if(Pair.Value) Snapshot.Tasks.Add(Pair.Value->CapturePresentation());
+		}
+		Snapshot.Tasks.Sort([](const FTaskPresentationState& A, const FTaskPresentationState& B) { return A.TaskGUID < B.TaskGUID; });
+	}
+	Result.Sort([](const FTaskAssetPresentation& A, const FTaskAssetPresentation& B) { return A.Asset.InstanceID < B.Asset.InstanceID; });
+	return Result;
+}
+
+void UTaskModule::ApplyOwnerPresentation(const FGuid& InOwnerActorID, const TArray<FTaskAssetPresentation>& InAssets)
+{
+	if(!GetWorld() || GetWorld()->GetNetMode() != NM_Client || !InOwnerActorID.IsValid()) return;
+	BeginTaskMutation();
+	ON_SCOPE_EXIT { EndTaskMutation(); };
+	TSet<FGuid> Present;
+	for(const FTaskAssetPresentation& Snapshot : InAssets)
+	{
+		if(Snapshot.Asset.OwnerActorID != InOwnerActorID) continue;
+		UTaskAsset* Source = Snapshot.Asset.Asset.LoadSynchronous();
+		UTaskAsset* Asset = AddAssetInternal(Source, Snapshot.Asset.InstanceID, Snapshot.Asset.AgentID, InOwnerActorID, true);
+		if(!Asset || !Asset->bPresentationOnly) continue;
+		Present.Add(Asset->InstanceID);
+		Asset->AgentLocation = Snapshot.Asset.AgentLocation;
+		Asset->InstanceKey = Snapshot.Asset.InstanceKey;
+		for(const FTaskPresentationState& State : Snapshot.Tasks)
+		{
+			if(UTaskBase* Task = Asset->TaskMap.FindRef(State.TaskGUID)) Task->ApplyPresentation(State);
+		}
+	}
+	const TArray<UTaskAsset*> Previous = Assets;
+	for(UTaskAsset* Asset : Previous)
+	{
+		if(Asset && Asset->bPresentationOnly && Asset->OwnerActorID == InOwnerActorID && !Present.Contains(Asset->InstanceID)) RemoveAsset(Asset);
+	}
+	RequestTaskMarkersRefresh();
+}
+
+bool UTaskModule::IsLocallyVisible(const UTaskAsset* InAsset) const
+{
+	if(!InAsset) return false;
+	if(!InAsset->OwnerActorID.IsValid()) return true;
+	const APawn* Player = UCommonModuleStatics::GetPlayerPawn<APawn>();
+	return Player && Player->Implements<USceneActorInterface>() && ISceneActorInterface::Execute_GetActorID(Player) == InAsset->OwnerActorID;
+}
+
+TArray<UTaskAsset*> UTaskModule::GetVisibleAssets() const
+{
+	TArray<UTaskAsset*> Result;
+	for(UTaskAsset* Asset : Assets)
+	{
+		if(IsLocallyVisible(Asset)) Result.Add(Asset);
+	}
+	return Result;
 }

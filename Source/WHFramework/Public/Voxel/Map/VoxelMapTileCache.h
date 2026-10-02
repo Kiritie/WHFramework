@@ -10,6 +10,9 @@ class FVoxelTaskScheduler;
 class UTexture2D;
 struct FVoxelGenerationRuntimeConfig;
 struct FVoxelTaskResult;
+struct FVoxelColumnSample;
+
+using FVoxelMapColorResolver = TFunction<FColor(const FVoxelColumnSample&, const FVoxelGenerationRuntimeConfig&)>;
 
 struct WHFRAMEWORK_API FVoxelMapTileKey
 {
@@ -48,6 +51,10 @@ public:
 		TArray<FVoxelMapTileKey>& OutKeys);
 
 	void Request(const TArray<FVoxelMapTileKey>& InKeys, const FSceneMapView& InView);
+	void SetColorResolver(FVoxelMapColorResolver InResolver, uint32 InStyleRevision);
+	static FVoxelMapTileKey ParentKey(const FVoxelMapTileKey& InKey, int32 InParentStep);
+	static FBox2f ParentUV(const FVoxelMapTileKey& InKey, const FVoxelMapTileKey& InParent);
+	bool FindDrawBrush(const FVoxelMapTileKey& InKey, FSlateBrush& OutBrush) const;
 	const FSlateBrush* FindBrush(const FVoxelMapTileKey& InKey) const;
 	uint64 GetRevision() const { return Revision; }
 
@@ -69,6 +76,9 @@ private:
 	double BlockSize = 1.0;
 	uint64 Sequence = 0;
 	uint64 Revision = 0;
+	uint32 StyleRevision = 0;
+	uint64 StyleEpoch = 0;
+	FVoxelMapColorResolver ColorResolver;
 	TMap<FVoxelMapTileKey, FTile> Tiles;
 	TSet<FVoxelMapTileKey> Pending;
 };

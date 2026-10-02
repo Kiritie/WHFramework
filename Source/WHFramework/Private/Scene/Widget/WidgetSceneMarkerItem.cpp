@@ -4,6 +4,7 @@
 #include "Components/HorizontalBox.h"
 #include "Components/HorizontalBoxSlot.h"
 #include "Components/Overlay.h"
+#include "Components/OverlaySlot.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
@@ -17,6 +18,7 @@ UWidgetSceneMarkerItem::UWidgetSceneMarkerItem(const FObjectInitializer& ObjectI
 {
 	ImgIcon = nullptr;
 	TxtSymbol = nullptr;
+	TxtBadge = nullptr;
 	TxtName = nullptr;
 	TxtDistance = nullptr;
 }
@@ -30,6 +32,7 @@ TSharedRef<SWidget> UWidgetSceneMarkerItem::RebuildWidget()
 		UOverlay* IconLayer = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("IconLayer"));
 		ImgIcon = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("ImgIcon"));
 		TxtSymbol = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("TxtSymbol"));
+		TxtBadge = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("TxtBadge"));
 		TxtName = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("TxtName"));
 		TxtDistance = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("TxtDistance"));
 
@@ -39,6 +42,12 @@ TSharedRef<SWidget> UWidgetSceneMarkerItem::RebuildWidget()
 		IconSizeBox->AddChild(IconLayer);
 		IconLayer->AddChild(ImgIcon);
 		IconLayer->AddChild(TxtSymbol);
+		if (UOverlaySlot* BadgeSlot = IconLayer->AddChildToOverlay(TxtBadge))
+		{
+			BadgeSlot->SetHorizontalAlignment(HAlign_Right);
+			BadgeSlot->SetVerticalAlignment(VAlign_Top);
+		}
+		TxtBadge->SetFont(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 10));
 		TxtSymbol->SetText(NSLOCTEXT("SceneMarker", "FallbackSymbol", "◆"));
 		TxtSymbol->SetJustification(ETextJustify::Center);
 		TxtSymbol->SetFont(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 18));
@@ -72,6 +81,12 @@ void UWidgetSceneMarkerItem::SetMarkerView(const FSceneMarkerView& InMarkerView,
 	MarkerView = InMarkerView;
 	bShowName = bInShowName;
 	bShowDistance = bInShowDistance;
+	SetToolTipText(MarkerView.Marker.Description.IsEmpty() ? MarkerView.Marker.DisplayName : MarkerView.Marker.Description);
+	if (TxtBadge)
+	{
+		TxtBadge->SetText(MarkerView.Marker.Badge);
+		TxtBadge->SetVisibility(MarkerView.Marker.Badge.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
+	}
 	if(ImgIcon)
 	{
 		const TSoftObjectPtr<UTexture2D> DesiredIcon = MarkerView.bPlayer && MarkerView.Marker.Icon.IsNull() ? PlayerIcon : MarkerView.Marker.Icon;
@@ -89,7 +104,8 @@ void UWidgetSceneMarkerItem::SetMarkerView(const FSceneMarkerView& InMarkerView,
 	}
 	if(TxtSymbol)
 	{
-		TxtSymbol->SetText(MarkerView.bPlayer ? NSLOCTEXT("SceneMarker", "PlayerSymbol", "▲") : NSLOCTEXT("SceneMarker", "FallbackSymbol", "◆"));
+		TxtSymbol->SetText(MarkerView.bPlayer ? NSLOCTEXT("SceneMarker", "PlayerSymbol", "▲") :
+			MarkerView.Marker.Symbol.IsEmpty() ? NSLOCTEXT("SceneMarker", "FallbackSymbol", "◆") : MarkerView.Marker.Symbol);
 		TxtSymbol->SetColorAndOpacity(FSlateColor(MarkerView.Marker.Color));
 		TxtSymbol->SetRenderScale(MarkerView.bPlayer ? FVector2D(4.f / 3.f) : FVector2D(1.f));
 		if(!MarkerView.bPlayer) TxtSymbol->SetRenderTransformAngle(0.f);

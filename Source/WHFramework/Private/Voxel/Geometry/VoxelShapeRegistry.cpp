@@ -107,6 +107,7 @@ bool FVoxelShapeRegistry::IsValidState(EVoxelShapeKind K,uint16 S)
         case EVoxelShapeKind::Trapdoor:Allowed=7|8|16;if(F>3)return false;break;
         case EVoxelShapeKind::Torch:Allowed=7;if(F>4)return false;break;
         case EVoxelShapeKind::CrossPlant:case EVoxelShapeKind::Fluid:Allowed=0;break;
+		case EVoxelShapeKind::ObjectPart:Allowed=uint16(VoxelState::ObjectPartMask | 3 | VoxelState::OpenMask | VoxelState::ObjectLockedMask);if(F>3 && !(S&VoxelState::ObjectLockedMask))return false;break;
         default:return false;
     }
     return (S&~Allowed)==0;
@@ -123,6 +124,15 @@ FVoxelResolvedShape FVoxelShapeRegistry::Build(EVoxelShapeKind K,uint16 S)
     auto Box=[&](double X0,double Y0,double Z0,double X1,double Y1,double Z1){B.Add(FBox(FVector(X0,Y0,Z0),FVector(X1,Y1,Z1)));};
     switch(K)
     {
+		case EVoxelShapeKind::ObjectPart:
+		{
+			O.SelectionBoxes.Add(FBox(FVector::ZeroVector, FVector::OneVector));
+			if (!(S & VoxelState::OpenMask))
+			{
+				O.CollisionBoxes = O.SelectionBoxes;
+			}
+			return O;
+		}
         case EVoxelShapeKind::FullCube:Box(0,0,0,1,1,1);break;
         case EVoxelShapeKind::Slab:Y=0;if(S&0x800)Box(0,0,0,1,1,1);else if(S&8)Box(0,0,.5,1,1,1);else Box(0,0,0,1,1,.5);break;
         case EVoxelShapeKind::Stair:
@@ -163,11 +173,11 @@ FVoxelResolvedShape FVoxelShapeRegistry::Build(EVoxelShapeKind K,uint16 S)
 void FVoxelShapeRegistry::BuildDefaults()
 {
     Templates.Reset();
-    for(uint8 K=0;K<=uint8(EVoxelShapeKind::Fluid);++K)
-    for(uint32 S=0;S<65536;++S)if(IsValidState(EVoxelShapeKind(K),uint16(S)))
+    for(uint8 K=0;K<=uint8(EVoxelShapeKind::ObjectPart);++K)
+    for(uint32 S=0;S<(K == uint8(EVoxelShapeKind::ObjectPart) ? 64u : 65536u);++S)if(IsValidState(EVoxelShapeKind(K),uint16(S)))
         Templates.Add(Key(EVoxelShapeKind(K),uint16(S)),Build(EVoxelShapeKind(K),uint16(S)));
 }
 const FVoxelResolvedShape* FVoxelShapeRegistry::Find(EVoxelShapeKind K,uint16 S)const
-{return Templates.Find(Key(K,S));}
+{return Templates.Find(Key(K,K == EVoxelShapeKind::ObjectPart ? uint16(S & ~VoxelState::ObjectPartMask) : S));}
 const FVoxelResolvedShape& FVoxelShapeRegistry::Get(EVoxelShapeKind K,uint16 S)const
 {const auto*V=Find(K,S);check(V);return *V;}

@@ -57,6 +57,10 @@ public:
 		const TAtomic<bool>* InCancel = nullptr) const;
 
 	bool TrySampleEnvironment(const FIntPoint& InCell, FVoxelEnvironmentSample& OutSample) const;
+	void QueryReadyWaterfalls(const FIntPoint& InMin, const FIntPoint& InMax,
+		TArray<FVoxelWaterfallSemantic>& OutWaterfalls) const;
+	bool EnumerateCaveEntrances(const FIntPoint& InMin, const FIntPoint& InMax,
+		TArray<FVoxelCaveEntrance>& OutEntrances, FString& OutError) const;
 	bool RequiresPlanPreflight() const { return bRequirePlanPreflight; }
 
 	TSharedRef<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> RetainHydrologyForPlanning(

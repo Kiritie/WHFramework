@@ -379,6 +379,7 @@ void FVoxelHydrologyPlan::Finalize()
 {
 	LakeWaterByCellOrigin.Reset();
 	RiverSegmentsByHydrologyCell.Reset();
+	Waterfalls.Reset();
 	for (FVoxelRiverRoute& River : Rivers)
 	{
 		BuildShapeRoute(River.Points, CoreMin, CoreMax,
@@ -389,6 +390,29 @@ void FVoxelHydrologyPlan::Finalize()
 			RiverMeanderOctaves, RiverMaxMeanderAngle,
 			FMath::Clamp(Grid.CellSize / 2, 2, 4),
 			River.MeanderPoints);
+		// Author steep drops once in the immutable hydrology plan; clients only present these records.
+		for (int32 Start=0; Start+1<River.MeanderPoints.Num(); ++Start)
+		{
+			const auto& Up = River.MeanderPoints[Start];
+			if (Up.Position.X<CoreMin.X || Up.Position.Y<CoreMin.Y || Up.Position.X>=CoreMax.X || Up.Position.Y>=CoreMax.Y) continue;
+			for (int32 End=Start+1; End<River.MeanderPoints.Num(); ++End)
+			{
+				const auto& Down=River.MeanderPoints[End];
+				const double Run=FVector2D(Down.Position-Up.Position).Size();
+				if (Run>24.0) break;
+				const int32 Drop=Up.WaterZ-Down.WaterZ;
+				if (Drop<8 || double(Drop)*2.0<Run) continue;
+				FVoxelWaterfallSemantic Fall;
+				Fall.Upstream=FIntVector(Up.Position.X,Up.Position.Y,Up.WaterZ);
+				Fall.Downstream=FIntVector(Down.Position.X,Down.Position.Y,Down.WaterZ);
+				Fall.HalfWidthCells=FMath::Min(Up.WaterHalfWidth,Down.WaterHalfWidth);
+				Fall.Id.High=VoxelGeneration::Mix(uint64(uint32(Up.Position.X))<<32 | uint32(Up.Position.Y));
+				Fall.Id.Low=VoxelGeneration::Mix(uint64(uint32(Down.Position.X))<<32 | uint32(Down.Position.Y)) ^ VoxelGeneration::Mix(uint64(uint32(RiverSeed)));
+				Waterfalls.Add(Fall);
+				Start=End;
+				break;
+			}
+		}
 		if (!River.MeanderPoints.IsEmpty())
 		{
 			River.Min = River.MeanderPoints[0].Position;
@@ -947,6 +971,7 @@ uint64 FVoxelHydrologyPlan::GetAllocatedBytes() const
 		Drainage.Accumulation.GetAllocatedSize() +
 		Rivers.GetAllocatedSize() +
 		Lakes.GetAllocatedSize() +
+		Waterfalls.GetAllocatedSize() +
 		LakeWaterByCellOrigin.GetAllocatedSize() +
 		RiverSegmentsByHydrologyCell.GetAllocatedSize();
 

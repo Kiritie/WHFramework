@@ -80,7 +80,8 @@ namespace
 FVoxelRenderBatch& FVoxelHeightfieldMesher::FindOrAddBatch(
 	FVoxelSectionMeshResult& InOutMesh,
 	const EVoxelRenderGroup InGroup,
-	const uint16 InBank)
+	const uint16 InBank,
+	const uint8 InVariant)
 {
 	for (FVoxelRenderBatch& Batch :
 		InOutMesh.Batches)
@@ -88,7 +89,7 @@ FVoxelRenderBatch& FVoxelHeightfieldMesher::FindOrAddBatch(
 		if (Batch.Group ==
 				InGroup &&
 			Batch.Bank ==
-				InBank)
+				InBank && Batch.MaterialVariant == InVariant)
 		{
 			return Batch;
 		}
@@ -103,6 +104,7 @@ FVoxelRenderBatch& FVoxelHeightfieldMesher::FindOrAddBatch(
 
 	Batch.Bank =
 		InBank;
+	Batch.MaterialVariant = InVariant;
 
 	return Batch;
 }
@@ -608,12 +610,6 @@ bool FVoxelHeightfieldMesher::BuildWater(
 
 	FVoxelSectionMeshResult Mesh;
 
-	FVoxelRenderBatch& Batch =
-		FindOrAddBatch(
-			Mesh,
-			EVoxelRenderGroup::Water,
-			Face.Bank);
-
 	const int32 CellSide =
 		InWater.Side - 1;
 
@@ -662,6 +658,8 @@ bool FVoxelHeightfieldMesher::BuildWater(
 				(bWet[1] ? 2 : 0) | (bWet[2] ? 4 : 0) |
 				(bWet[3] ? 8 : 0);
 			if (WetMask == 0) continue;
+			const int32 WetIndex = bWet[0] ? I00 : bWet[1] ? I10 : bWet[2] ? I11 : I01;
+			FVoxelRenderBatch& Batch = FindOrAddBatch(Mesh, EVoxelRenderGroup::Water, Face.Bank, InWater.WaterKind[WetIndex]);
 
 			const double X0 =
 				X *
@@ -720,8 +718,9 @@ bool FVoxelHeightfieldMesher::BuildWater(
 		}
 	}
 
-	if (!Batch.Mesh.Validate())
+	for (const FVoxelRenderBatch& Batch : Mesh.Batches)
 	{
+		if (Batch.Mesh.Validate()) continue;
 		OutError =
 			TEXT("Continuous water mesh validation failed");
 

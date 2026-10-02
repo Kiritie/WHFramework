@@ -23,6 +23,9 @@ class WHFRAMEWORK_API UTaskBase : public UWHObject, public ISaveDataAgentInterfa
 public:
 	UTaskBase();
 
+	FTaskPresentationState CapturePresentation() const;
+	void ApplyPresentation(const FTaskPresentationState& InState);
+
 	//////////////////////////////////////////////////////////////////////////
 	/// Task
 public:
@@ -212,7 +215,7 @@ public:
 	UFUNCTION(BlueprintPure)
 	bool ArePrerequisitesMet() const;
 
-	void ApplyObjectiveEvent(FGameplayTag EventTag, FGameplayTag TargetTag, int32 Count, FPrimaryAssetId TargetAssetID, FName TargetName);
+	virtual void ApplyObjectiveEvent(FGameplayTag EventTag, FGameplayTag TargetTag, int32 Count, FPrimaryAssetId TargetAssetID, FName TargetName);
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintPure)
 	bool CanTurnIn(AActor* InTarget, FText& OutReason) const;

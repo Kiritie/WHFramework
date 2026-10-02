@@ -6,6 +6,7 @@
 #include "Voxel/Generation/Caves/VoxelCaveGenerator.h"
 #include "Voxel/Generation/Climate/VoxelClimateGenerator.h"
 #include "Voxel/Generation/Ecology/VoxelEcology.h"
+#include "Voxel/Generation/Ecology/VoxelNaturalDecoration.h"
 #include "Voxel/Generation/Hydrology/VoxelHydrologyPlanner.h"
 #include "Voxel/Generation/Surface/VoxelSurfaceGenerator.h"
 #include "Voxel/Generation/Terrain/VoxelTerrainGenerator.h"
@@ -998,6 +999,28 @@ bool FVoxelGenerationQuery::ApplyStage(
 {
 	const FVoxelGenerationPalette& Palette =
 		Config->Recipe->Palette;
+	if (InStage == EVoxelGenerationStage::UndergroundDecoration)
+	{
+		auto Cavity = [&](const FIntVector& Position)
+		{
+			for (const FVoxelCavePlanPtr& Plan : PreparedCaves) if (Plan && Plan->Carves(Position)) return true;
+			return false;
+		};
+		auto Protected = [&](const FIntVector& Position)
+		{
+			for (const FVoxelCavePlanPtr& Plan : PreparedCaves)
+			{
+				if (!Plan) continue;
+				for (const FVoxelGenerationBounds& Bounds : Plan->ClearVolumes) if (Bounds.Contains(Position)) return true;
+			}
+			for (const FVoxelStructurePlanPtr& Plan : PreparedStructures)
+			{
+				if (Plan && (Plan->IsCleared(Position, EVoxelGenerationStage::UndergroundStructures) || Plan->IsCleared(Position, EVoxelGenerationStage::SurfaceStructures))) return true;
+			}
+			return false;
+		};
+		InOutValue = FVoxelNaturalDecoration::Resolve(*Config->Recipe, InOutColumn, InPosition, InOutValue, Cavity, Protected);
+	}
 
 	switch (InStage)
 	{
@@ -1070,6 +1093,13 @@ bool FVoxelGenerationQuery::ApplyStage(
 			{
 				InOutValue =
 					Palette.Air;
+				const bool bProtectedEntrance = Plan->ClearVolumes.ContainsByPredicate([&](const FVoxelGenerationBounds& Bounds) { return Bounds.Contains(InPosition); });
+				if (!bProtectedEntrance)
+				{
+					const FVoxelAquiferSample Fluid = Aquifer->Sample(InPosition, InOutColumn, -1);
+					if (Fluid.Fluid == EVoxelFluidKind::Water) InOutValue = Palette.Water;
+					else if (Fluid.Fluid == EVoxelFluidKind::Lava) InOutValue = Palette.Lava;
+				}
 
 				break;
 			}

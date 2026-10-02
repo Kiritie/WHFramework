@@ -96,7 +96,10 @@ void AWHPlayerController::OnPossess(APawn* InPawn)
 
 	SetPlayerPawn(InPawn);
 
-	SetControlRotation(UCameraModuleStatics::GetViewRotation());
+	if (IsLocalController())
+	{
+		SetControlRotation(UCameraModuleStatics::GetViewRotation());
+	}
 }
 
 void AWHPlayerController::OnUnPossess()

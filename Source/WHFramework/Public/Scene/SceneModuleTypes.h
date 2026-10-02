@@ -87,6 +87,18 @@ struct WHFRAMEWORK_API FSceneMapView
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float Yaw = 0.f;
+
+	FVector2D WorldToPanel(const FVector2D& InWorld, const FVector2D& InSize) const
+	{
+		const FVector2D Delta = (InWorld - Center).GetRotated(-Yaw);
+		return InSize * 0.5 + FVector2D(Delta.X, -Delta.Y) * (Range > UE_SMALL_NUMBER ? InSize.X / Range : 0.0);
+	}
+
+	FVector2D PanelToWorld(const FVector2D& InPanel, const FVector2D& InSize) const
+	{
+		const FVector2D Delta = InPanel - InSize * 0.5;
+		return Center + (FVector2D(Delta.X, -Delta.Y) * (InSize.X > UE_SMALL_NUMBER ? Range / InSize.X : 0.0)).GetRotated(Yaw);
+	}
 };
 
 /**
@@ -210,6 +222,15 @@ struct WHFRAMEWORK_API FSceneMarker
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FText DisplayName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FText Symbol;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FText Badge;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FText Description;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSoftObjectPtr<UTexture2D> Icon;

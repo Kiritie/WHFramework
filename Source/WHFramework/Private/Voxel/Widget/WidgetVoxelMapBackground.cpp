@@ -65,8 +65,8 @@ int32 UWidgetVoxelMapBackground::NativePaint(
 	const float PixelsPerWorldUnit = PanelSize.X / MapView.Range;
 	for (const FVoxelMapTileKey& Key : Visible)
 	{
-		const FSlateBrush* Brush = Module->GetMapTileCache()->FindBrush(Key);
-		if (!Brush)
+		FSlateBrush Brush;
+		if (!Module->GetMapTileCache()->FindDrawBrush(Key, Brush))
 		{
 			continue;
 		}
@@ -82,7 +82,7 @@ int32 UWidgetVoxelMapBackground::NativePaint(
 			OutDrawElements, BaseLayer + 2,
 			AllottedGeometry.ToPaintGeometry(
 				FVector2f(DrawSize), FSlateLayoutTransform(FVector2f(DrawPosition))),
-			Brush, ESlateDrawEffect::None, FMath::DegreesToRadians(MapView.Yaw),
+			&Brush, ESlateDrawEffect::None, FMath::DegreesToRadians(MapView.Yaw),
 			TOptional<FVector2f>(), FSlateDrawElement::RelativeToElement,
 			MapTintColor);
 	}

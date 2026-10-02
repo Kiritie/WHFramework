@@ -15,6 +15,8 @@
 #include "Common/Movement/FollowingMovementComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
 #include "Misc/ScopeExit.h"
@@ -112,6 +114,24 @@ void AAbilityPickUpVoxel::Tick(float Dt)
 }
 bool AAbilityPickUpVoxel::BuildVisual()
 {
+	const UVoxelData* Asset = UAssetModuleStatics::LoadPrimaryAsset<UVoxelData>(RepID, false);
+	if (Asset && !Asset->PickupMesh.IsNull())
+	{
+		UStaticMesh* StaticMesh = Asset->PickupMesh.LoadSynchronous();
+		if (!StaticMesh) return false;
+		if (!ObjectDisplayMesh)
+		{
+			ObjectDisplayMesh = NewObject<UStaticMeshComponent>(this);
+			ObjectDisplayMesh->SetupAttachment(GetRootComponent());
+			ObjectDisplayMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			ObjectDisplayMesh->RegisterComponent();
+		}
+		ObjectDisplayMesh->SetStaticMesh(StaticMesh);
+		const double Scale = 15.0 / FMath::Max(1.0, StaticMesh->GetBoundingBox().GetSize().GetMax());
+		ObjectDisplayMesh->SetRelativeScale3D(FVector(Scale));
+		ObjectDisplayMesh->SetRelativeLocation(-StaticMesh->GetBoundingBox().GetCenter() * Scale);
+		return true;
+	}
 	auto* M = UVoxelModule::GetPtr();
 	if (!M || !M->IsReady() || !M->GetMaterialSet())
 		return false;
@@ -153,6 +173,7 @@ bool AAbilityPickUpVoxel::BuildVisual()
 }
 UMeshComponent* AAbilityPickUpVoxel::GetMeshComponent() const
 {
+	if (ObjectDisplayMesh) return ObjectDisplayMesh;
 	return DisplayMeshes.IsEmpty() ? nullptr : DisplayMeshes[0].Get();
 }
 void AAbilityPickUpVoxel::OnPickUp(IAbilityPickerInterface* Picker)

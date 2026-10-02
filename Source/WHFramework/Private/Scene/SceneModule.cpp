@@ -820,7 +820,8 @@ bool USceneModule::UpdateMarker(const FSceneMarker& InMarker)
 {
 	FSceneMarker* Existing = InMarker.MarkerID.IsValid() ? Markers.Find(InMarker.MarkerID) : nullptr;
 	if(!Existing) return false;
-	if(Existing->MarkerTag == InMarker.MarkerTag && Existing->DisplayName.EqualTo(InMarker.DisplayName) && Existing->Icon == InMarker.Icon &&
+	if(Existing->MarkerTag == InMarker.MarkerTag && Existing->DisplayName.EqualTo(InMarker.DisplayName) &&
+		Existing->Symbol.EqualTo(InMarker.Symbol) && Existing->Badge.EqualTo(InMarker.Badge) && Existing->Description.EqualTo(InMarker.Description) && Existing->Icon == InMarker.Icon &&
 		Existing->Color.Equals(InMarker.Color) && Existing->Location.Equals(InMarker.Location) && Existing->Offset.Equals(InMarker.Offset) &&
 		Existing->ActorID == InMarker.ActorID && Existing->AreaName == InMarker.AreaName && Existing->Channels == InMarker.Channels &&
 		Existing->Priority == InMarker.Priority && FMath::IsNearlyEqual(Existing->MinDistance, InMarker.MinDistance) &&
@@ -901,7 +902,8 @@ TArray<FSceneMarkerView> USceneModule::GetMarkerViews(ESceneMarkerChannel InChan
 	TArray<FSceneMarkerView> Views;
 	for(const auto& Iter : Markers)
 	{
-		if(!Iter.Value.HasChannel(InChannel)) continue;
+		if(!Iter.Value.HasChannel(InChannel) && !(InChannel == ESceneMarkerChannel::Compass &&
+			Iter.Key == TrackedMarkerID && Iter.Value.HasChannel(ESceneMarkerChannel::Map))) continue;
 		FSceneMarkerView View = ResolveMarker(Iter.Value, InViewLocation, InViewYaw);
 		if(bFilterByDistance && (View.Distance < Iter.Value.MinDistance || (Iter.Value.MaxDistance > 0.f && View.Distance > Iter.Value.MaxDistance))) continue;
 		Views.Add(MoveTemp(View));

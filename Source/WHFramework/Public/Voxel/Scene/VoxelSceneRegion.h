@@ -39,6 +39,8 @@ public:
 	const FIntVector& GetRegionKey() const;
 	const TMap<FGuid, TObjectPtr<AActor>>& GetSceneActors() const;
 	bool HasActiveSections() const;
+	bool HasStoredActor(const FGuid& InId) const;
+	const TMap<FGuid, FParameter>& GetPendingActors() const;
 
 	bool bSceneReady = false;
 	bool bSceneLoading = false;
@@ -51,6 +53,15 @@ protected:
 	UPROPERTY(Transient)
 	TMap<FGuid, TObjectPtr<AActor>> SceneActorMap;
 
+	UPROPERTY(Transient)
+	TMap<FGuid, FParameter> PendingActors;
+
 	FIntVector RegionKey = FIntVector::ZeroValue;
 	TSet<FIntVector> ActiveSections;
+
+private:
+	bool CaptureInactiveActors(FString& OutError);
+	bool RestorePendingActor(const FGuid& InId, const FParameter& InData);
+	float ResidencyRefreshSeconds = 0.0f;
+	int32 PendingActorCursor = 0;
 };

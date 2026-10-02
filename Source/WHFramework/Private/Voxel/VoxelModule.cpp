@@ -18,6 +18,8 @@
 #include "Voxel/Authoring/VoxelWorldGenerationProfile.h"
 #include "Voxel/Authoring/VoxelViewProfile.h"
 #include "Voxel/Collision/VoxelCollisionPresenter.h"
+#include "Voxel/Navigation/VoxelNavigationPresenter.h"
+#include "Scene/Actor/SceneActorInterface.h"
 #include "Voxel/Generation/VoxelGenerationBinding.h"
 #include "Voxel/Generation/VoxelBuiltinFeatures.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
@@ -332,6 +334,10 @@ void UVoxelModule::OnRefresh(
 	}
 
 	const double AfterCollision = FPlatformTime::Seconds();
+	if (NavigationPresenter)
+	{
+		NavigationPresenter->Tick();
+	}
 
 	if (ViewManager)
 	{
@@ -348,16 +354,34 @@ void UVoxelModule::OnRefresh(
 			CollectDetailObservers());
 	}
 
-	for (const TPair<
-		FIntVector,
-		TObjectPtr<UVoxelSceneRegion>>& Pair :
-		SceneRegions)
+	TArray<TObjectPtr<UVoxelSceneRegion>> SceneTickRegions;
+	SceneRegions.GenerateValueArray(SceneTickRegions);
+	for (UVoxelSceneRegion* Region : SceneTickRegions)
 	{
-		if (Pair.Value)
+		if (Region)
 		{
-			Pair.Value->TickSceneActors(
+			Region->TickSceneActors(
 				InDeltaSeconds);
 		}
+	}
+	// A migrating actor may create a persistence-only destination region.
+	// Capture it without keeping a simulation actor or region resident.
+	for (auto Iterator = SceneRegions.CreateIterator(); Iterator; ++Iterator)
+	{
+		UVoxelSceneRegion* Region = Iterator.Value();
+		if (!Region || Region->HasActiveSections()) continue;
+		TArray<uint8> Bytes;
+		FString Error;
+		if (!Region->CaptureActors(Bytes, Error))
+		{
+			WorldState = EVoxelWorldState::Failed;
+			UE_LOG(LogTemp, Error, TEXT("Scene migration capture failed: %s"), *Error);
+			break;
+		}
+		const FIntVector Key = Region->GetRegionKey();
+		UnloadedSceneFiles.Add(FVoxelSceneColumnCodec::RelativePath(FIntPoint(Key.X, Key.Y)), MoveTemp(Bytes));
+		Region->Shutdown();
+		Iterator.RemoveCurrent();
 	}
 
 	const double AfterScenes = FPlatformTime::Seconds();
@@ -738,30 +762,7 @@ bool UVoxelModule::StartWorld(
 			{
 				CollisionPresenter->InvalidateSection(InSection);
 			}
-			if (UVoxelSceneRegion* Region = GetSceneRegion(InSection, false))
-			{
-				Region->OnSectionDeactivated(InSection);
-				if (!Region->HasActiveSections())
-				{
-					const FIntVector RegionKey = Region->GetRegionKey();
-					if (IsAuthority())
-					{
-						TArray<uint8> Bytes;
-						FString CaptureError;
-						if (!Region->CaptureActors(Bytes, CaptureError))
-						{
-							Region->bSceneFailed = true;
-							UE_LOG(LogTemp, Error, TEXT("Voxel scene eviction capture: %s"), *CaptureError);
-							return;
-						}
-						UnloadedSceneFiles.Add(
-							FVoxelSceneColumnCodec::RelativePath(FIntPoint(RegionKey.X, RegionKey.Y)),
-							MoveTemp(Bytes));
-					}
-					Region->Shutdown();
-					SceneRegions.Remove(RegionKey);
-				}
-			}
+			RemoveSimulationSection(InSection);
 		},
 		[this](const FIntVector& InSection)
 		{
@@ -773,6 +774,10 @@ bool UVoxelModule::StartWorld(
 	}
 	// 服务端同样需要权威碰撞，碰撞发布不依赖视觉地形模块。
 	CollisionPresenter = MakeUnique<FVoxelCollisionPresenter>(*this, *Scheduler, Epoch);
+	if (IsAuthority() && bEnableProjectSceneSimulation)
+	{
+		NavigationPresenter = MakeUnique<FVoxelNavigationPresenter>(*this, *Scheduler);
+	}
 	DetailView = MakeUnique<FVoxelDetailView>(*this, *Scheduler, Epoch);
 	if (!DetailView->Initialize(OutError))
 	{
@@ -812,6 +817,10 @@ bool UVoxelModule::StartWorld(
 }
 
 void UVoxelModule::OnWorldStopping()
+{
+}
+
+void UVoxelModule::OnSimulationResidencyChanged(const FVoxelSimulationResidencyDelta& InDelta)
 {
 }
 
@@ -857,6 +866,7 @@ bool UVoxelModule::StopWorld(const bool bDiscardDirty, FString& OutError)
 		CollisionPresenter->Reset();
 	}
 	ViewManager.Reset();
+	NavigationPresenter.Reset();
 	CollisionPresenter.Reset();
 	DetailView.Reset();
 	for (const TPair<FIntVector, TObjectPtr<UVoxelSceneRegion>>& Pair : SceneRegions)
@@ -867,6 +877,8 @@ bool UVoxelModule::StopWorld(const bool bDiscardDirty, FString& OutError)
 		}
 	}
 	SceneRegions.Reset();
+	SimulationSections.Reset();
+	SimulationResidencyRevision = 0;
 	CapturedSceneFiles.Reset();
 	EmergeManager.Reset();
 	ResidencyManager.Reset();
@@ -928,6 +940,27 @@ bool UVoxelModule::IsPlayable() const
 bool UVoxelModule::IsCollisionReady(const FIntVector& InSection) const
 {
 	return CollisionPresenter && CollisionPresenter->IsReady(InSection);
+}
+
+bool UVoxelModule::IsNavigationReady(const FIntVector& InSection) const
+{
+	return NavigationPresenter && SimulationSections.Contains(InSection) &&
+		(NavigationPresenter->IsReady(InSection) || NavigationPresenter->IsReady(InSection - FIntVector(0, 0, 1)));
+}
+
+bool UVoxelModule::IsSimulationResident(const FIntVector& InSection) const
+{
+	return IsAuthority() && SimulationSections.Contains(InSection);
+}
+
+const TSet<FIntVector>& UVoxelModule::GetSimulationSections() const
+{
+	return SimulationSections;
+}
+
+uint64 UVoxelModule::GetSimulationResidencyRevision() const
+{
+	return SimulationResidencyRevision;
 }
 
 float UVoxelModule::GetWarmupProgress() const
@@ -1449,6 +1482,10 @@ void UVoxelModule::PublishProjectEdit(const FVoxelEditBatch& InBatch)
 		{
 			CollisionPresenter->InvalidateSection(Patch.Section);
 		}
+		if (NavigationPresenter)
+		{
+			NavigationPresenter->InvalidateSection(Patch.Section);
+		}
 	}
 	OnBlocksCommitted.Broadcast(InBatch);
 }
@@ -1483,7 +1520,7 @@ UVoxelSceneRegion* UVoxelModule::GetSceneRegion(const FIntVector& InSection, con
 	{
 		return *Existing;
 	}
-	if (!bCreate || !SceneRegionClass)
+	if (!bCreate || !SceneRegionClass || !IsAuthority() || !SimulationSections.Contains(InSection))
 	{
 		return nullptr;
 	}
@@ -1511,6 +1548,127 @@ UVoxelSceneRegion* UVoxelModule::GetSceneRegion(const FIntVector& InSection, con
 	}
 	SceneRegions.Add(Region, NewRegion);
 	return NewRegion;
+}
+
+UVoxelSceneRegion* UVoxelModule::GetSceneRegionForActor(AActor* InActor, const FIntVector& InSection)
+{
+	if (!IsAuthority() || !::IsValid(InActor) || !SceneRegionClass ||
+		!InActor->Implements<USceneActorInterface>() ||
+		FindSceneActor(ISceneActorInterface::Execute_GetActorID(InActor)) != InActor) return nullptr;
+	if (UVoxelSceneRegion* Existing = GetSceneRegion(InSection, false)) return Existing;
+	const FIntVector Region(VoxelGeneration::FloorDivide(InSection.X,8),VoxelGeneration::FloorDivide(InSection.Y,8),0);
+	UVoxelSceneRegion* Storage = NewObject<UVoxelSceneRegion>(this,SceneRegionClass);
+	Storage->Initialize(this,Region);
+	const FString Path = FVoxelSceneColumnCodec::RelativePath(FIntPoint(Region.X,Region.Y));
+	if (const TArray<uint8>* Bytes = UnloadedSceneFiles.Find(Path))
+	{
+		FString Error;
+		if (!Storage->RestoreActors(*Bytes,Error))
+		{
+			Storage->Shutdown();
+			UE_LOG(LogTemp,Error,TEXT("Actor destination restore failed: %s"),*Error);
+			return nullptr;
+		}
+		UnloadedSceneFiles.Remove(Path);
+	}
+	else Storage->bSceneReady = true;
+	SceneRegions.Add(Region,Storage);
+	return Storage;
+}
+
+bool UVoxelModule::ActivateSimulationSection(const FIntVector& InSection)
+{
+	const FVoxelExactDemand* Demand = CurrentInterest.Exact.Find(InSection);
+	const FVoxelSection* Section = Runtime ? Runtime->FindSection(InSection) : nullptr;
+	if (!IsAuthority() || !bEnableProjectSceneSimulation || !Demand || !Demand->bSimulation ||
+		!Section || Section->Status != EVoxelSectionStatus::DataReady || !IsCollisionReady(InSection) ||
+		SimulationSections.Contains(InSection))
+	{
+		return false;
+	}
+	SimulationSections.Add(InSection);
+	UVoxelSceneRegion* Region = GetSceneRegion(InSection, true);
+	if (!Region)
+	{
+		SimulationSections.Remove(InSection);
+		WorldState = EVoxelWorldState::Failed;
+		UE_LOG(LogTemp, Error, TEXT("Simulation region activation failed at %s"), *InSection.ToString());
+		return false;
+	}
+	Region->OnSectionActivated(InSection);
+	if (NavigationPresenter)
+	{
+		NavigationPresenter->ActivateSection(InSection);
+	}
+	FVoxelSimulationResidencyDelta Delta;
+	Delta.AddedSections.Add(InSection);
+	Delta.Revision = ++SimulationResidencyRevision;
+	OnSimulationResidencyChanged(Delta);
+	return true;
+}
+
+void UVoxelModule::RemoveSimulationSection(const FIntVector& InSection)
+{
+	if (SimulationSections.Remove(InSection) == 0)
+	{
+		return;
+	}
+	FVoxelSimulationResidencyDelta Delta;
+	Delta.RemovedSections.Add(InSection);
+	Delta.Revision = ++SimulationResidencyRevision;
+	OnSimulationResidencyChanged(Delta);
+	if (NavigationPresenter)
+	{
+		NavigationPresenter->RetireSection(InSection);
+	}
+	if (UVoxelSceneRegion* Region = GetSceneRegion(InSection, false))
+	{
+		Region->OnSectionDeactivated(InSection);
+		if (!Region->HasActiveSections())
+		{
+			TArray<uint8> Bytes;
+			FString Error;
+			if (!Region->CaptureActors(Bytes, Error))
+			{
+				Region->bSceneFailed = true;
+				WorldState = EVoxelWorldState::Failed;
+				UE_LOG(LogTemp, Error, TEXT("Simulation region capture failed: %s"), *Error);
+				return;
+			}
+			const FIntVector Key = Region->GetRegionKey();
+			UnloadedSceneFiles.Add(FVoxelSceneColumnCodec::RelativePath(FIntPoint(Key.X, Key.Y)), MoveTemp(Bytes));
+			Region->Shutdown();
+			SceneRegions.Remove(Key);
+		}
+	}
+}
+
+void UVoxelModule::RefreshSimulationResidency()
+{
+	if (!IsAuthority() || !bEnableProjectSceneSimulation)
+	{
+		return;
+	}
+	const TArray<FIntVector> Previous = SimulationSections.Array();
+	for (const FIntVector& Section : Previous)
+	{
+		const FVoxelExactDemand* Demand = CurrentInterest.Exact.Find(Section);
+		if (!Demand || !Demand->bSimulation)
+		{
+			RemoveSimulationSection(Section);
+		}
+	}
+	if (NavigationPresenter)
+	{
+		NavigationPresenter->UpdateSources(CurrentInterest);
+	}
+	for (const auto& Pair : CurrentInterest.Exact)
+	{
+		if (Pair.Value.bSimulation)
+		{
+			ActivateSimulationSection(Pair.Key);
+		}
+	}
 }
 
 void UVoxelModule::RefreshInterest(
@@ -1600,6 +1758,7 @@ void UVoxelModule::RefreshInterest(
 			{
 				InterestRevision = InterestRevision == MAX_uint64 ? 1 : InterestRevision + 1;
 				if (ViewManager) ViewManager->ApplyInterestDelta(Payload->Delta);
+				RefreshSimulationResidency();
 			}
 			else if (ViewManager)
 			{
@@ -1659,9 +1818,10 @@ void UVoxelModule::ApplyTask(FVoxelTaskResult&& InResult)
 				{
 					ViewManager->InvalidateNeighbors(Section);
 				}
-				if (UVoxelSceneRegion* Region = GetSceneRegion(Section, true))
+				ActivateSimulationSection(Section);
+				if (NavigationPresenter)
 				{
-					Region->OnSectionActivated(Section);
+					NavigationPresenter->InvalidateSection(Section);
 				}
 			}
 		}
@@ -1670,7 +1830,9 @@ void UVoxelModule::ApplyTask(FVoxelTaskResult&& InResult)
 	case EVoxelTaskKind::BuildCollision:
 		if (CollisionPresenter)
 		{
+			const FIntVector Section = InResult.Stamp.Section;
 			CollisionPresenter->OnTask(MoveTemp(InResult));
+			ActivateSimulationSection(Section);
 		}
 		return;
 	case EVoxelTaskKind::BuildFineMesh:
@@ -2210,6 +2372,15 @@ bool UVoxelModule::ValidateInteractionPlan(FVoxelInteractionPlan& InOutPlan, FSt
 	return FVoxelEditTransaction::ValidateBatch(*Runtime, *Registry.GetSnapshot(), *Shapes, InOutPlan.Cells, OutError);
 }
 
+void UVoxelModule::OnContainerTransferCommitted(
+	APlayerController* InController,
+	AActor* InSource,
+	const FIntVector& InAnchor,
+	const FAbilityItem& InTransferredItem,
+	bool bInTaken)
+{
+}
+
 FVoxelEditReply UVoxelModule::TransferContainer(
 	APlayerController* InController,
 	AActor* InSource,
@@ -2316,6 +2487,9 @@ FVoxelEditReply UVoxelModule::TransferContainer(
 	}
 	FVoxelInventoryTransaction::Notify(*Slot, Before);
 	PublishProjectEdit(Batch);
+	FAbilityItem Transferred = InIntent.Action == EVoxelEditAction::ContainerTake ? After : Before;
+	Transferred.Count = Count;
+	OnContainerTransferCommitted(InController, InSource, InHit.Index, Transferred, InIntent.Action == EVoxelEditAction::ContainerTake);
 	Reply.Code = EVoxelEditCode::Accepted;
 	return Reply;
 }

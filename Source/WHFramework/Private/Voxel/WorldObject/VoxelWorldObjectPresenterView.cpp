@@ -95,6 +95,10 @@ void FVoxelWorldObjectPresenterView::Refresh(UVoxelModule& InModule, const FVoxe
 	const double RadiusSquared = FMath::Square(InObjects.GetMaxMaterializationRadius());
 	for (const FIntVector& Key : World.ResidentSections())
 	{
+		if (InModule.IsAuthority() && !InModule.IsSimulationResident(Key))
+		{
+			continue;
+		}
 		const FVector Min = FVector(Key) * (VoxelBlock::Size * InModule.BlockSize());
 		const FBox Bounds(Min, Min + FVector(VoxelBlock::Size * InModule.BlockSize()));
 		double DistanceSquared = TNumericLimits<double>::Max();
@@ -204,7 +208,8 @@ void FVoxelWorldObjectPresenterView::Refresh(UVoxelModule& InModule, const FVoxe
 		return Left.DistanceSquared < Right.DistanceSquared;
 	});
 	TSet<FIntVector> Wanted;
-	for (int32 Index = 0; Index < FMath::Min(Candidates.Num(), 128); ++Index)
+	int32 SpawnedThisRefresh = 0;
+	for (int32 Index = 0; Index < Candidates.Num(); ++Index)
 	{
 		const FCandidate& Candidate = Candidates[Index];
 		Wanted.Add(Candidate.Object.Anchor);
@@ -216,6 +221,11 @@ void FVoxelWorldObjectPresenterView::Refresh(UVoxelModule& InModule, const FVoxe
 		}
 		if (!Actor)
 		{
+			if (SpawnedThisRefresh >= 32)
+			{
+				continue;
+			}
+			++SpawnedThisRefresh;
 			UClass* Class = Candidate.Definition->PresenterClass ? Candidate.Definition->PresenterClass.Get() : AVoxelWorldObjectPresenter::StaticClass();
 			FActorSpawnParameters Parameters;
 			Parameters.ObjectFlags |= RF_Transient;

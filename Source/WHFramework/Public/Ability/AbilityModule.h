@@ -74,9 +74,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// PickUp
 public:
-	virtual AAbilityPickUpBase* SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer = nullptr);
+	virtual AAbilityPickUpBase* SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer = nullptr, bool bEnableCollision = true);
 
-	virtual AAbilityPickUpBase* SpawnAbilityPickUp(const FParameter& InSaveData, ISceneContainerInterface* InContainer = nullptr);
+	virtual AAbilityPickUpBase* SpawnAbilityPickUp(const FParameter& InSaveData, ISceneContainerInterface* InContainer = nullptr, bool bEnableCollision = true);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Projectile

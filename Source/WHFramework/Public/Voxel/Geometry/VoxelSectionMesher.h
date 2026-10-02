@@ -18,7 +18,11 @@ struct WHFRAMEWORK_API FVoxelMeshBuffers
 };
 struct WHFRAMEWORK_API FVoxelRenderBatch
 {
-    EVoxelRenderGroup Group=EVoxelRenderGroup::Opaque;uint16 Bank=0;FVoxelMeshBuffers Mesh;
+	EVoxelRenderGroup Group = EVoxelRenderGroup::Opaque;
+	uint16 Bank = 0;
+	/** Optional purely visual variant within a material bank (zero is the base). */
+	uint8 MaterialVariant = 0;
+	FVoxelMeshBuffers Mesh;
 };
 struct WHFRAMEWORK_API FVoxelSectionMeshResult
 {

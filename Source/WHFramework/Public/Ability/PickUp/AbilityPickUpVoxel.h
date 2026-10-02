@@ -4,6 +4,7 @@
 #include "AbilityPickUpVoxel.generated.h"
 class UVoxelMeshComponent;
 class UVoxelSceneRegion;
+class UStaticMeshComponent;
 UCLASS()
 class WHFRAMEWORK_API AAbilityPickUpVoxel : public AAbilityPickUpBase
 {
@@ -36,6 +37,8 @@ protected:
 	bool bActivated = false;
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UVoxelMeshComponent>> DisplayMeshes;
+	UPROPERTY(Transient)
+	TObjectPtr<UStaticMeshComponent> ObjectDisplayMesh;
 	UPROPERTY(Transient)
 	TObjectPtr<UVoxelSceneRegion> OwningRegion;
 

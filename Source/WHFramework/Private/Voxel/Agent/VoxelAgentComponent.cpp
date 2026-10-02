@@ -608,7 +608,7 @@ void UVoxelAgentComponent::RefreshSource()
 		}
 		return;
 	}
-	if (SimulationRadiusCells > 0)
+	if (SimulationRadiusCells > 0 && GetOwner()->HasAuthority())
 	{
 		Source.Capabilities |= EVoxelStreamingCapability::Simulation;
 	}

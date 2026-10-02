@@ -118,7 +118,8 @@ FVoxelEcologySample FVoxelEcologyGenerator::Sample(const FVoxelColumnSample& InC
 	Result.bGrassAllowed = Grass.bEnabled && Modifier.bAllowGrass &&
 		Modifier.GrassDensityScalePermille > 0 && !InColumn.bOcean &&
 		!InColumn.bLake && !bRiverBed &&
-		InColumn.SurfaceMaterial == Recipe->Palette.Grass &&
+		(InColumn.SurfaceMaterial == Recipe->Palette.Grass || InColumn.SurfaceMaterial == Recipe->Biomes[InColumn.BiomeIndex].DefaultSurface ||
+			((bWetMargin || bDryBank) && Recipe->Ecology.NaturalDecorations.Contains(TEXT("Reed")))) &&
 		InColumn.SlopePermille <= Grass.MaxSlopePermille &&
 		Grass.Temperature.Contains(InColumn.Climate.TemperatureQ15) &&
 		Grass.Moisture.Contains(InColumn.Climate.MoistureQ15) &&
@@ -170,6 +171,63 @@ FVoxelEcologySample FVoxelEcologyGenerator::Sample(const FVoxelColumnSample& InC
 	return Result;
 }
 
+FVoxelTreeSpecies FVoxelEcologyGenerator::SelectTreeSpecies(const FVoxelColumnSample& InColumn, const FVoxelStableId& InTreeId) const
+{
+	TArray<const FVoxelTreeSpecies*, TInlineAllocator<8>> Eligible;
+	for (const FVoxelTreeSpecies& Species : Recipe->Ecology.TreeSpecies)
+	{
+		if (Species.Temperature.Contains(InColumn.Climate.TemperatureQ15) && Species.Moisture.Contains(InColumn.Climate.MoistureQ15)) Eligible.Add(&Species);
+	}
+	if (!Eligible.IsEmpty()) return *Eligible[InTreeId.Low % Eligible.Num()];
+	FVoxelTreeSpecies Default;
+	Default.Trunk = Recipe->Ecology.TreeTrunk;
+	Default.LeavesDark = Recipe->Ecology.TreeLeaves;
+	Default.LeavesMid = Recipe->Ecology.TreeLeaves;
+	Default.LeavesLight = Recipe->Ecology.TreeLeaves;
+	return Default;
+}
+
+uint16 FVoxelEcologyGenerator::SelectLeaf(const FVoxelTreeSpecies& InSpecies, const int32 InZ, const int32 InRadius)
+{
+	return InZ < -InRadius / 3 ? InSpecies.LeavesDark : InZ > InRadius / 3 ? InSpecies.LeavesLight : InSpecies.LeavesMid;
+}
+
+bool FVoxelEcologyGenerator::ContainsCrown(const FIntVector& InOffset, const int32 InRadius, const FVoxelStableId& InTreeId, const EVoxelTreeForm InForm)
+{
+	if (InRadius <= 0)
+	{
+		return InOffset == FIntVector::ZeroValue;
+	}
+	if (FMath::Abs(InOffset.X) > InRadius || FMath::Abs(InOffset.Y) > InRadius || FMath::Abs(InOffset.Z) > InRadius)
+	{
+		return false;
+	}
+	const FVector Point = FVector(InOffset) / InRadius;
+	if (InForm == EVoxelTreeForm::Conifer)
+	{
+		const double ConeRadius = FMath::Clamp((1.0 - Point.Z) * 0.48, 0.08, 0.85);
+		return Point.X * Point.X + Point.Y * Point.Y <= ConeRadius * ConeRadius;
+	}
+	if (InForm == EVoxelTreeForm::Sparse && (FMath::Abs(Point.Z) > 0.55 || Point.X * Point.X + Point.Y * Point.Y > 0.75)) return false;
+	if (InForm == EVoxelTreeForm::LightTrunk && Point.X * Point.X + Point.Y * Point.Y > 0.65) return false;
+	const double Turn = static_cast<double>(InTreeId.Low % 360) * UE_PI / 180.0;
+	const double Cosine = FMath::Cos(Turn);
+	const double Sine = FMath::Sin(Turn);
+	const FVector Rotated(Point.X * Cosine - Point.Y * Sine, Point.X * Sine + Point.Y * Cosine, Point.Z);
+	const FVector Centers[] = { FVector(-0.26, 0.0, -0.13), FVector(0.26, 0.15, -0.08), FVector(0.0, -0.16, 0.30) };
+	const FVector Radii[] = { FVector(0.72, 0.69, 0.72), FVector(0.70, 0.72, 0.67), FVector(0.62, 0.60, 0.67) };
+	double Distance = MAX_dbl;
+	for (int32 Index = 0; Index < 3; ++Index)
+	{
+		const FVector Delta = (Rotated - Centers[Index]) / Radii[Index];
+		Distance = FMath::Min(Distance, Delta.SizeSquared());
+	}
+	if (Distance > 1.0) return false;
+	const uint64 CellHash = VoxelGeneration::Mix(InTreeId.Low ^ static_cast<uint64>(static_cast<uint32>(InOffset.X)) ^
+		(static_cast<uint64>(static_cast<uint32>(InOffset.Y)) << 21) ^ (static_cast<uint64>(static_cast<uint32>(InOffset.Z)) << 42));
+	return Distance < 0.88 || (CellHash % 100) >= 8;
+}
+
 void FVoxelEcologyGenerator::BuildTrees(
 	const FVoxelGenerationBounds& InBounds,
 	TFunctionRef<bool(const FIntVector&, FVoxelColumnSample&)> InSampleColumn,
@@ -178,13 +236,27 @@ void FVoxelEcologyGenerator::BuildTrees(
 	const TAtomic<bool>* InCancel) const
 {
 	EnumerateTrees(InBounds, InSampleColumn, InSampleBaseSymbol,
-		[this, &InOutPlan](const FIntVector& Anchor, const int32 Height,
+		[this, &InOutPlan, &InSampleColumn](const FIntVector& Anchor, const int32 Height,
 			const FVoxelStableId OwnerId)
 		{
+			FVoxelColumnSample Column;
+			if (!InSampleColumn(Anchor, Column)) return;
+			const FVoxelTreeSpecies Species = SelectTreeSpecies(Column, OwnerId);
 			for (int32 Z = 0; Z < Height; ++Z)
 			{
 				InOutPlan.Writes.Add({Anchor + FIntVector(0, 0, Z),
-					Recipe->Ecology.TreeTrunk, TrunkPriority, OwnerId});
+					Species.Trunk, TrunkPriority, OwnerId});
+			}
+			if (!Recipe->Ecology.TreeSpecies.IsEmpty())
+			{
+				for (const FIntVector Direction : { FIntVector(1, 0, 0), FIntVector(-1, 0, 0), FIntVector(0, 1, 0), FIntVector(0, -1, 0) })
+				{
+					if (Height >= 20) InOutPlan.Writes.Add({ Anchor + Direction, Species.Trunk, TrunkPriority, OwnerId });
+					if (Species.Form != EVoxelTreeForm::Conifer)
+					{
+						for (int32 Branch = 1; Branch <= 2; ++Branch) InOutPlan.Writes.Add({ Anchor + Direction * Branch + FIntVector(0, 0, Height - 5 + Branch), Species.Trunk, TrunkPriority, OwnerId });
+					}
+				}
 			}
 			const int32 CrownRadius = Recipe->Settings.Ecology.Tree.CrownRadius;
 			const FIntVector CrownCenter = Anchor + FIntVector(0, 0, Height - 1);
@@ -194,7 +266,7 @@ void FVoxelEcologyGenerator::BuildTrees(
 				{
 					for (int32 X = -CrownRadius; X <= CrownRadius; ++X)
 					{
-						if (X * X + Y * Y + Z * Z > CrownRadius * CrownRadius)
+						if (!ContainsCrown(FIntVector(X, Y, Z), CrownRadius, OwnerId, Species.Form))
 						{
 							continue;
 						}
@@ -204,7 +276,7 @@ void FVoxelEcologyGenerator::BuildTrees(
 						{
 							continue;
 						}
-						InOutPlan.Writes.Add({Position, Recipe->Ecology.TreeLeaves,
+						InOutPlan.Writes.Add({Position, SelectLeaf(Species, Z, CrownRadius),
 							LeafPriority, OwnerId});
 					}
 				}
@@ -392,7 +464,23 @@ void FVoxelEcologyGenerator::BuildGrass(
 					{
 						continue;
 					}
-					InOutPlan.Writes.Add({SurfacePosition, Recipe->Ecology.GrassPlant, GrassPriority, OwnerId});
+					uint16 Plant = Recipe->Ecology.GrassPlant;
+					const bool bBank = Column.RiverZone == EVoxelRiverSurfaceZone::WetMargin || Column.RiverZone == EVoxelRiverSurfaceZone::DryBank;
+					if (const uint16* Variant = Recipe->Ecology.NaturalDecorations.Find(bBank ? FName(TEXT("Reed")) : FName(TEXT("GrassSecondary"))))
+					{
+						if (bBank || (PointSeed & 1)) Plant = *Variant;
+					}
+					const FVoxelEcologySample Ecology = Sample(Column);
+					if (!bBank && Ecology.bTreeAllowed && PointSeed % 100000 < Ecology.TreeDensity)
+					{
+						const FVoxelTreeSpecies Species = SelectTreeSpecies(Column, OwnerId);
+						const FName SaplingRole(*(TEXT("Sapling.") + Species.StableId.ToString()));
+						if (const uint16* Sapling = Recipe->Ecology.NaturalDecorations.Find(SaplingRole))
+						{
+							Plant = *Sapling;
+						}
+					}
+					InOutPlan.Writes.Add({SurfacePosition, Plant, GrassPriority, OwnerId});
 					++InOutPlan.GrassWrites;
 				}
 			}

@@ -3,6 +3,112 @@
 #include "Voxel/Chunks/VoxelSectionKey.h"
 #include "Voxel/Save/VoxelBlockEntityCodec.h"
 
+bool FVoxelWorldObjectTransaction::HasSupport(const FVoxelWorldObjectDefinitionRuntime& InDefinition, const FIntVector& InAnchor, uint8 InYaw, const FVoxelRegistrySnapshot& InBlocks, const FVoxelShapeRegistry& InShapes, TFunctionRef<bool(const FIntVector&, FVoxelBlockState&)> InRead, bool& OutReady)
+{
+	OutReady = true;
+	if (InDefinition.SupportMode == EVoxelWorldObjectSupportMode::None)
+	{
+		return true;
+	}
+	TSet<FIntVector> Occupied;
+	for (const FVoxelWorldObjectPart& Part : InDefinition.Parts)
+	{
+		Occupied.Add(Part.Offset);
+	}
+	auto Supported = [&](const FIntVector& Local, const FIntVector& Direction)
+	{
+		const FIntVector RotatedDirection = FVoxelWorldObjectRegistry::Rotate(Direction, InYaw);
+		FVoxelBlockState State;
+		if (!InRead(InAnchor + FVoxelWorldObjectRegistry::Rotate(Local + Direction, InYaw), State))
+		{
+			OutReady = false;
+			return false;
+		}
+		const FVoxelRuntimeDefinition* Block = InBlocks.Find(State.TypeId);
+		const uint8 Face = RotatedDirection.X > 0 ? 1 : RotatedDirection.X < 0 ? 0 : RotatedDirection.Y > 0 ? 3 : RotatedDirection.Y < 0 ? 2 : RotatedDirection.Z > 0 ? 5 : 4;
+		if (!Block || !Block->bSolid) return false;
+		const FVoxelResolvedShape& Shape = InShapes.Get(Block->Shape, State.State);
+		if (Shape.OcclusionMask & (1u << Face)) return true;
+		return Shape.CollisionBoxes.ContainsByPredicate([Face](const FBox& Box)
+		{
+			const int32 Axis = Face / 2;
+			const bool bAtFace = (Face & 1) ? Box.Min[Axis] <= UE_SMALL_NUMBER : Box.Max[Axis] >= 1.0 - UE_SMALL_NUMBER;
+			const int32 First = (Axis + 1) % 3;
+			const int32 Second = (Axis + 2) % 3;
+			return bAtFace && Box.Min[First] <= UE_SMALL_NUMBER && Box.Min[Second] <= UE_SMALL_NUMBER && Box.Max[First] >= 1.0 - UE_SMALL_NUMBER && Box.Max[Second] >= 1.0 - UE_SMALL_NUMBER;
+		});
+	};
+	bool bAnyFloor = false;
+	bool bEveryFloor = true;
+	bool bAnyBack = false;
+	bool bAnyCeiling = false;
+	const bool bNeedsFloor = InDefinition.SupportMode == EVoxelWorldObjectSupportMode::AnyFloor || InDefinition.SupportMode == EVoxelWorldObjectSupportMode::EveryFloorCell || InDefinition.SupportMode == EVoxelWorldObjectSupportMode::FloorAndBackWall;
+	const bool bNeedsBack = InDefinition.SupportMode == EVoxelWorldObjectSupportMode::BackWall || InDefinition.SupportMode == EVoxelWorldObjectSupportMode::FloorAndBackWall;
+	for (const FVoxelWorldObjectPart& Part : InDefinition.Parts)
+	{
+		if (bNeedsFloor && !Occupied.Contains(Part.Offset - FIntVector(0, 0, 1)))
+		{
+			const bool bSolid = Supported(Part.Offset, FIntVector(0, 0, -1));
+			bAnyFloor |= bSolid;
+			bEveryFloor &= bSolid;
+		}
+		if (bNeedsBack && !Occupied.Contains(Part.Offset + InDefinition.BackSupportDirection))
+		{
+			bAnyBack |= Supported(Part.Offset, InDefinition.BackSupportDirection);
+		}
+		if (InDefinition.SupportMode == EVoxelWorldObjectSupportMode::Ceiling && !Occupied.Contains(Part.Offset + FIntVector(0, 0, 1)))
+		{
+			bAnyCeiling |= Supported(Part.Offset, FIntVector(0, 0, 1));
+		}
+	}
+	switch (InDefinition.SupportMode)
+	{
+		case EVoxelWorldObjectSupportMode::AnyFloor: return bAnyFloor;
+		case EVoxelWorldObjectSupportMode::EveryFloorCell: return bEveryFloor;
+		case EVoxelWorldObjectSupportMode::BackWall: return bAnyBack;
+		case EVoxelWorldObjectSupportMode::Ceiling: return bAnyCeiling;
+		case EVoxelWorldObjectSupportMode::FloorAndBackWall: return bAnyFloor && bAnyBack;
+		default: return true;
+	}
+}
+
+bool FVoxelWorldObjectTransaction::BuildRemoval(const FVoxelWorldRuntime& InWorld, const FVoxelRegistrySnapshot& InBlocks, const FVoxelWorldObjectRegistry& InObjects, const FVoxelWorldObjectInstance& InObject, FVoxelInteractionPlan& OutPlan, FString& OutError)
+{
+	const FVoxelWorldObjectDefinitionRuntime* Definition = InObjects.Find(InObject.DefinitionId);
+	if (!InWorld.IsServer() || !Definition)
+	{
+		OutError = TEXT("Object removal requires authority and a registered definition");
+		return false;
+	}
+	FVoxelInteractionPlan Plan;
+	Plan.ObjectId = InObject.StableId();
+	Plan.ObjectAnchor = InObject.Anchor;
+	const FVoxelRuntimeDefinition* Anchor = InBlocks.Find(Definition->Types[0]);
+	Plan.DropID = Anchor->DropAssetID;
+	Plan.DropCount = Anchor->DropCount;
+	for (int32 Index = 0; Index < Definition->Parts.Num(); ++Index)
+	{
+		FVoxelCellEdit Edit;
+		Edit.Position = InObject.Anchor + FVoxelWorldObjectRegistry::Rotate(Definition->Parts[Index].Offset, InObject.Yaw);
+		if (!InWorld.TryGetBlock(Edit.Position, Edit.Expected) || Edit.Expected != FVoxelWorldObjectRegistry::PartState(*Definition, Index, InObject.Yaw, InObject.State.State))
+		{
+			OutError = TEXT("Object removal requires its complete current footprint");
+			return false;
+		}
+		Plan.Cells.Add(Edit);
+	}
+	if (Anchor->EntityKind)
+	{
+		FVoxelEntityEdit Entity;
+		Entity.Position = InObject.Anchor;
+		Entity.bRemove = true;
+		Plan.Entities.Add(Entity);
+	}
+	OutPlan = MoveTemp(Plan);
+	OutError.Reset();
+	return true;
+}
+
 const FVoxelBlockEntityState* FVoxelWorldObjectTransaction::FindEntity(const FVoxelWorldRuntime& InWorld, const FIntVector& InAnchor)
 {
 	const FVoxelSectionKey Key = VoxelCoord::Section(InAnchor);
@@ -156,6 +262,7 @@ bool FVoxelWorldObjectTransaction::Validate(const FVoxelWorldRuntime& InWorld, c
 		}
 		return InWorld.TryGetBlock(Position, State);
 	};
+	TSet<FIntVector> ValidatedAnchors;
 	for (const FIntVector& Position : Inspect)
 	{
 		FVoxelBlockState State;
@@ -171,7 +278,7 @@ bool FVoxelWorldObjectTransaction::Validate(const FVoxelWorldRuntime& InWorld, c
 		}
 		const uint8 Yaw = uint8(State.State & 3);
 		bool bMatched = false;
-		for (int32 Part = 0; Part < Definition->Parts.Num(); ++Part)
+		for (int32 Part = FVoxelWorldObjectRegistry::FindPartIndex(*Definition, State); Part != INDEX_NONE; Part = INDEX_NONE)
 		{
 			if (FVoxelWorldObjectRegistry::PartState(*Definition, Part, Yaw, State.State) != State)
 			{
@@ -179,6 +286,11 @@ bool FVoxelWorldObjectTransaction::Validate(const FVoxelWorldRuntime& InWorld, c
 			}
 			bMatched = true;
 			const FIntVector Anchor = Position - FVoxelWorldObjectRegistry::Rotate(Definition->Parts[Part].Offset, Yaw);
+			if (ValidatedAnchors.Contains(Anchor))
+			{
+				break;
+			}
+			ValidatedAnchors.Add(Anchor);
 			for (int32 Index = 0; Index < Definition->Parts.Num(); ++Index)
 			{
 				const FIntVector Cell = Anchor + FVoxelWorldObjectRegistry::Rotate(Definition->Parts[Index].Offset, Yaw);
@@ -188,16 +300,16 @@ bool FVoxelWorldObjectTransaction::Validate(const FVoxelWorldRuntime& InWorld, c
 					OutError = TEXT("Edit would leave an incomplete object footprint");
 					return false;
 				}
-				if (Definition->Parts[Index].bNeedsFloor)
+			}
+			FVoxelBlockState PreviousAnchor;
+			const bool bExisting = InWorld.TryGetBlock(Anchor, PreviousAnchor) && PreviousAnchor.TypeId == Definition->Types[0];
+			if (!bExisting)
+			{
+				bool bReady = false;
+				if (!HasSupport(*Definition, Anchor, Yaw, InBlocks, InShapes, Read, bReady) || !bReady)
 				{
-					FVoxelBlockState Support;
-					const bool bLoaded = Read(Cell - FIntVector(0, 0, 1), Support);
-					const FVoxelRuntimeDefinition* Block = bLoaded ? InBlocks.Find(Support.TypeId) : nullptr;
-					if (!Block || !Block->bSolid || !(InShapes.Get(Block->Shape, Support.State).OcclusionMask & (1u << 4)))
-					{
-						OutError = TEXT("World object requires a solid floor");
-						return false;
-					}
+					OutError = TEXT("New world object requires complete loaded support");
+					return false;
 				}
 			}
 			break;

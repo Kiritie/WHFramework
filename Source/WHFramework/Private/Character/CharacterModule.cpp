@@ -101,9 +101,12 @@ void UCharacterModule::OnTermination(EPhase InPhase)
 void UCharacterModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData.GetRef<FCharacterModuleSaveData>();
-	if(ISaveDataAgentInterface* Controller = Cast<ISaveDataAgentInterface>(UCommonModuleStatics::GetPlayerController<AWHPlayerController>()))
+	if(AWHPlayerController* Player = UCommonModuleStatics::GetPlayerController<AWHPlayerController>(); Player && Player->IsLocalController())
 	{
-		Controller->LoadSaveData(SaveData.PlayerControllerData, InPhase);
+		if(ISaveDataAgentInterface* Controller = Cast<ISaveDataAgentInterface>(Player))
+		{
+			Controller->LoadSaveData(SaveData.PlayerControllerData, InPhase);
+		}
 	}
 
 	if(PHASEC(InPhase, EPhase::Primary))
@@ -154,9 +157,12 @@ FParameter UCharacterModule::ToData()
 			SaveData.Characters.Add(MoveTemp(Record));
 		}
 	}
-	if(ISaveDataAgentInterface* Controller = Cast<ISaveDataAgentInterface>(UCommonModuleStatics::GetPlayerController<AWHPlayerController>()))
+	if(AWHPlayerController* Player = UCommonModuleStatics::GetPlayerController<AWHPlayerController>(); Player && Player->IsLocalController())
 	{
-		SaveData.PlayerControllerData = Controller->GetSaveData(true);
+		if(ISaveDataAgentInterface* Controller = Cast<ISaveDataAgentInterface>(Player))
+		{
+			SaveData.PlayerControllerData = Controller->GetSaveData(true);
+		}
 	}
 
 	return FParameter(MoveTemp(SaveData));

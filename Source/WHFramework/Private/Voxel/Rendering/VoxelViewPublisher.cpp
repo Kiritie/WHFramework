@@ -79,8 +79,7 @@ bool FVoxelViewPublisher::Stage(
 	}
 	for (const FVoxelRenderBatch& Batch : InMesh.Batches)
 	{
-		const FVoxelMaterialBank* Bank = Module.GetMaterialSet()->FindBank(Batch.Group, Batch.Bank);
-		if (!Bank || !Bank->Material || !Batch.Mesh.Validate()) return false;
+		if (!Module.GetMaterialSet()->FindMaterial(Batch.Group, Batch.Bank, Batch.MaterialVariant) || !Batch.Mesh.Validate()) return false;
 	}
 	if (!InOutActor)
 	{
@@ -1233,14 +1232,14 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& Publication, cons
 		}
 		const FVoxelRenderBatch& Batch = Mesh.Batches[Update.PreparedBatchIndex++];
 		if (Batch.Mesh.Triangles.IsEmpty()) continue;
-		const FVoxelMaterialBank* Bank = Module.GetMaterialSet()->FindBank(Batch.Group, Batch.Bank);
-		if (!Bank || !Bank->Material) return false;
+		UMaterialInterface* Material = Module.GetMaterialSet()->FindMaterial(Batch.Group, Batch.Bank, Batch.MaterialVariant);
+		if (!Material) return false;
 		UVoxelMeshComponent* Component = NewObject<UVoxelMeshComponent>(Actor);
 		Component->SetVisibility(false);
 		Component->SetupAttachment(Actor->GetRootComponent());
 		Component->RegisterComponent();
 		Update.Components.Add(Component);
-		if (!Component->Apply(Batch.Mesh, Update.Scale, Bank->Material)) return false;
+		if (!Component->Apply(Batch.Mesh, Update.Scale, Material)) return false;
 		++InOutPreparedComponents;
 		if (FPlatformTime::Seconds() >= InDeadline)
 		{

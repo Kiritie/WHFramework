@@ -119,12 +119,26 @@ struct WHFRAMEWORK_API FVoxelWeightedRuntimeSymbol
 	uint16 Weight = 0;
 };
 
+struct WHFRAMEWORK_API FVoxelTreeSpecies
+{
+	FName StableId;
+	EVoxelTreeForm Form = EVoxelTreeForm::Broadleaf;
+	FVoxelGenerationRange Temperature;
+	FVoxelGenerationRange Moisture;
+	uint16 Trunk = MAX_uint16;
+	uint16 LeavesDark = MAX_uint16;
+	uint16 LeavesMid = MAX_uint16;
+	uint16 LeavesLight = MAX_uint16;
+};
+
 struct WHFRAMEWORK_API FVoxelEcologyRuntimePalette
 {
 	uint16 TreeTrunk = MAX_uint16;
 	uint16 TreeLeaves = MAX_uint16;
 	uint16 GrassPlant = MAX_uint16;
 	TArray<FVoxelWeightedRuntimeSymbol> Flowers;
+	TArray<FVoxelTreeSpecies> TreeSpecies;
+	TMap<FName, uint16> NaturalDecorations;
 
 	bool Validate(
 		int32 InBlockCount,
@@ -238,7 +252,7 @@ struct WHFRAMEWORK_API FVoxelStructureRuntimeDefinition
 
 struct WHFRAMEWORK_API FVoxelGenerationRecipe
 {
-	static constexpr uint32 CurrentAlgorithmVersion = 12;
+	static constexpr uint32 CurrentAlgorithmVersion = 13;
 
 	uint32 AlgorithmVersion = CurrentAlgorithmVersion;
 	uint64 RecipeHash = 0;

@@ -7,7 +7,7 @@
 
 TArray<UTaskAsset*> UTaskModuleStatics::GetTaskAssets()
 {
-	return UTaskModule::Get().GetAssets();
+	return UTaskModule::Get().GetVisibleAssets();
 }
 
 UTaskBase* UTaskModuleStatics::GetCurrentTask()

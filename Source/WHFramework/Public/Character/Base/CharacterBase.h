@@ -168,7 +168,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Actor
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SceneActor")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Replicated, Category = "SceneActor")
 	FGuid ActorID;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SceneActor")

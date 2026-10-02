@@ -8,6 +8,35 @@ class AVoxelWorldObjectPresenter;
 class UStaticMesh;
 
 UENUM(BlueprintType)
+enum class EVoxelWorldObjectSupportMode : uint8
+{
+	None = 0,
+	AnyFloor,
+	EveryFloorCell,
+	BackWall,
+	Ceiling,
+	FloorAndBackWall
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FVoxelWorldObjectVisualPart
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere)
+	TSoftObjectPtr<UStaticMesh> Mesh;
+
+	UPROPERTY(EditAnywhere)
+	FVector ClosedOffset = FVector::ZeroVector;
+
+	UPROPERTY(EditAnywhere)
+	FVector OpenOffset = FVector::ZeroVector;
+
+	UPROPERTY(EditAnywhere)
+	FRotator OpenRotation = FRotator::ZeroRotator;
+};
+
+UENUM(BlueprintType)
 enum class EVoxelWorldObjectPresentation : uint8
 {
 	None,
@@ -49,6 +78,21 @@ public:
 	TArray<FVoxelWorldObjectPart> Footprint;
 
 	UPROPERTY(EditAnywhere)
+	FIntVector Dimensions = FIntVector(1, 1, 1);
+
+	UPROPERTY(EditAnywhere)
+	EVoxelWorldObjectSupportMode SupportMode = EVoxelWorldObjectSupportMode::None;
+
+	UPROPERTY(EditAnywhere)
+	FIntVector BackSupportDirection = FIntVector(0, -1, 0);
+
+	UPROPERTY(EditAnywhere)
+	TArray<FVoxelWorldObjectVisualPart> VisualParts;
+
+	UPROPERTY(EditAnywhere)
+	float TransitionSeconds = 0.35f;
+
+	UPROPERTY(EditAnywhere)
 	FName UseAction;
 
 	UPROPERTY(EditAnywhere)
@@ -61,7 +105,7 @@ public:
 	EVoxelWorldObjectPresentation Presentation = EVoxelWorldObjectPresentation::SectionShape;
 
 	UPROPERTY(EditAnywhere)
-	TObjectPtr<UStaticMesh> Mesh;
+	TSoftObjectPtr<UStaticMesh> Mesh;
 
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<AVoxelWorldObjectPresenter> PresenterClass;

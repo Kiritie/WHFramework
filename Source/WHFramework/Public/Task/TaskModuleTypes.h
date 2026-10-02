@@ -131,6 +131,18 @@ struct WHFRAMEWORK_API FTaskTarget
 {
 	GENERATED_BODY()
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FText DisplayName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FText SubTargetName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FText RegionName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bApproximate = false;
+
 	/** 场景角色稳定标识，体素区块卸载并重新加载后仍可解析 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FGuid ActorID;
@@ -261,6 +273,12 @@ struct WHFRAMEWORK_API FTaskAssetSaveData
 	FGuid AgentID;
 
 	UPROPERTY()
+	FGuid OwnerActorID;
+
+	UPROPERTY()
+	FName InstanceKey;
+
+	UPROPERTY()
 	FVector AgentLocation = FVector::ZeroVector;
 };
 
@@ -278,4 +296,40 @@ struct WHFRAMEWORK_API FTaskModuleSaveData : public FSaveData
 	UPROPERTY()
 	TMap<FString, FTaskRuntimeSaveData> TaskRecords;
 
+};
+
+USTRUCT()
+struct WHFRAMEWORK_API FTaskPresentationState
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FString TaskGUID;
+
+	UPROPERTY()
+	ETaskState State = ETaskState::None;
+
+	UPROPERTY()
+	ETaskExecuteResult Result = ETaskExecuteResult::None;
+
+	UPROPERTY()
+	FTaskTarget Target;
+
+	UPROPERTY()
+	TMap<FName, int32> Progress;
+
+	UPROPERTY()
+	TMap<FName, int32> RequiredCounts;
+};
+
+USTRUCT()
+struct WHFRAMEWORK_API FTaskAssetPresentation
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FTaskAssetSaveData Asset;
+
+	UPROPERTY()
+	TArray<FTaskPresentationState> Tasks;
 };

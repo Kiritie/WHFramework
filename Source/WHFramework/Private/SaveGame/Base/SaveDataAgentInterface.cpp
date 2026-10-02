@@ -25,10 +25,8 @@ void ISaveDataAgentInterface::LoadSaveData(const FParameter& InSaveData, EPhase 
 	}
 
 	FParameter SaveData = InSaveData;
-	if(FSaveData* Data = ResolveSaveData(SaveData))
-	{
-		Data->MakeSaved();
-	}
+	// Defaults must keep their unsaved state so first-spawn initialization runs.
+	// Captured snapshots and deserialized files are marked at their origin.
 	if(PHASEC(InPhase, EPhase::Final) && HasArchive())
 	{
 		if(const FSaveData* Data = ResolveSaveData(SaveData))
@@ -56,6 +54,10 @@ FParameter ISaveDataAgentInterface::GetSaveData(bool bRefresh)
 		{
 			UCommonModuleStatics::SaveObjectDataToMemory(Cast<UObject>(this), Data->GetDatas());
 		}
+	}
+	if(FSaveData* Data = ResolveSaveData(SaveData))
+	{
+		Data->MakeSaved();
 	}
 	return SaveData;
 }

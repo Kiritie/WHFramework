@@ -592,6 +592,19 @@ bool FVoxelGenerationCompiler::GatherBuiltinEcologyBlockNames(
 	FString& OutError)
 {
 	const FVoxelEcologyGenerationSettings& Ecology = InProfile.Defaults.Ecology;
+	for (const FVoxelTreeSpeciesReference& Species : InProfile.TreeSpecies)
+	{
+		for (const TSoftObjectPtr<UVoxelData>& Reference : { Species.Trunk, Species.LeavesDark, Species.LeavesMid, Species.LeavesLight })
+		{
+			UVoxelData* Block = Reference.LoadSynchronous();
+			if (!Block || !AddReferencedVoxel(Block, InRegistry, InOutNames, OutError)) return false;
+		}
+	}
+	for (const auto& Entry : InProfile.NaturalDecorations)
+	{
+		UVoxelData* Block = Entry.Value.LoadSynchronous();
+		if (!Block || !AddReferencedVoxel(Block, InRegistry, InOutNames, OutError)) return false;
+	}
 	if (Ecology.Tree.bEnabled)
 	{
 		UVoxelData* Trunk = LoadBuiltinEcologyVoxel(DefaultTreeTrunkPath);
@@ -759,6 +772,25 @@ bool FVoxelGenerationCompiler::CompileBuiltinEcology(
 	FString& OutError)
 {
 	InOutRecipe.Ecology = FVoxelEcologyRuntimePalette();
+	for (const FVoxelTreeSpeciesReference& Source : InProfile.TreeSpecies)
+	{
+		FVoxelTreeSpecies& Species = InOutRecipe.Ecology.TreeSpecies.AddDefaulted_GetRef();
+		Species.StableId = Source.StableId;
+		Species.Form = Source.Form;
+		Species.Temperature = Source.Temperature;
+		Species.Moisture = Source.Moisture;
+		if (!ResolveBlockSymbol(Source.Trunk.LoadSynchronous(), InRegistry, InBlockSymbols, Species.Trunk, OutError) ||
+			!ResolveBlockSymbol(Source.LeavesDark.LoadSynchronous(), InRegistry, InBlockSymbols, Species.LeavesDark, OutError) ||
+			!ResolveBlockSymbol(Source.LeavesMid.LoadSynchronous(), InRegistry, InBlockSymbols, Species.LeavesMid, OutError) ||
+			!ResolveBlockSymbol(Source.LeavesLight.LoadSynchronous(), InRegistry, InBlockSymbols, Species.LeavesLight, OutError)) return false;
+	}
+	InOutRecipe.Ecology.TreeSpecies.Sort([](const FVoxelTreeSpecies& A, const FVoxelTreeSpecies& B) { return A.StableId.LexicalLess(B.StableId); });
+	for (const auto& Entry : InProfile.NaturalDecorations)
+	{
+		uint16 Symbol = MAX_uint16;
+		if (!ResolveBlockSymbol(Entry.Value.LoadSynchronous(), InRegistry, InBlockSymbols, Symbol, OutError)) return false;
+		InOutRecipe.Ecology.NaturalDecorations.Add(Entry.Key, Symbol);
+	}
 	const FVoxelEcologyGenerationSettings& Ecology = InProfile.Defaults.Ecology;
 	if (Ecology.Tree.bEnabled)
 	{

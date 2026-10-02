@@ -5,6 +5,7 @@
 #include "Voxel/Rendering/VoxelRenderTypes.h"
 #include "VoxelData.generated.h"
 class USoundBase;
+class UStaticMesh;
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelBakedFaceRef
 {
@@ -42,5 +43,7 @@ public:
     UPROPERTY(VisibleAnywhere,Category="Voxel|Baked") TArray<FVoxelBakedFaceRef> BakedFaces;
     UPROPERTY(VisibleAnywhere,Category="Voxel|Baked") TArray<FVoxelBakedFaceRef> BakedUpperFaces;
     UPROPERTY(VisibleAnywhere,Category="Voxel|Baked") int32 BakeVersion=0;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Voxel|Rendering")
+	TSoftObjectPtr<UStaticMesh> PickupMesh;
     bool ValidateDefinition(bool bRequireRender,FString& OutError)const;
 };

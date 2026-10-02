@@ -36,6 +36,9 @@ protected:
 	UTextBlock* TxtSymbol;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
+	UTextBlock* TxtBadge;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
 	UTextBlock* TxtName;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidgetOptional))
