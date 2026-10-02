@@ -65,10 +65,6 @@ namespace
 
 	int32 TerrainPriorityBand(const FVoxelTaskRequest& Request)
 	{
-		// 已接纳的发布裁剪是交接的延续，不能等待不断新增的普通 Fine 数据排空。
-		// WorkClass 和 SourcePriority 仍让 Critical Fine 及高优先级来源先行。
-		if (Request.Kind == EVoxelTaskKind::BuildViewCoverage && Request.bPublicationContinuation)
-			return 0;
 		if (Request.TerrainStage != INDEX_NONE) return Request.TerrainStage;
 		switch (Request.Kind)
 		{
@@ -93,6 +89,33 @@ namespace
 			return Request.WorkClass >= EVoxelWorkClass::Critical &&
 				Request.WorkClass <= EVoxelWorkClass::Interactive ? -1 : 4;
 		}
+	}
+
+	int32 TerrainMeshStage(const EVoxelTaskKind InKind, const EVoxelWorkClass InClass,
+		const int32 InStage, const bool bInPublicationContinuation = false, const bool bInTerrainDataOnly = false)
+	{
+		if (bInTerrainDataOnly) return INDEX_NONE;
+		switch (InKind)
+		{
+		case EVoxelTaskKind::BuildFineMesh: return 0;
+		case EVoxelTaskKind::BuildVoxelProxy: return 1;
+		case EVoxelTaskKind::BuildSurface:
+		case EVoxelTaskKind::BuildWater: return 2;
+		case EVoxelTaskKind::BuildMacro: return 3;
+		case EVoxelTaskKind::BuildViewCoverage: return bInPublicationContinuation ? InStage : INDEX_NONE;
+		case EVoxelTaskKind::BuildViewTransition: return InStage;
+		case EVoxelTaskKind::BuildVolumeTransition: return InClass <= EVoxelWorkClass::Interactive ? 0 : 1;
+		default: return INDEX_NONE;
+		}
+	}
+
+	bool IsBackgroundTerrainWork(const EVoxelTaskKind InKind, const EVoxelWorkClass InClass, const int32 InStage)
+	{
+		if (IsRepresentationDataKind(InKind)) return true;
+		if (InKind == EVoxelTaskKind::BuildViewCoverage && InStage > 0) return true;
+		if (TerrainMeshStage(InKind, InClass, InStage) > 0) return true;
+		return (InKind == EVoxelTaskKind::BuildGenerationPlan || InKind == EVoxelTaskKind::ProjectBackground) &&
+			InClass >= EVoxelWorkClass::Background;
 	}
 
 }
@@ -230,6 +253,20 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 		}
 	}
 
+	const bool bBackground = IsBackgroundTerrainWork(InRequest.Kind, InRequest.WorkClass, InRequest.TerrainStage);
+	if (bBackground)
+	{
+		uint64 BackgroundInput = 0;
+		int32 BackgroundPending = 0;
+		for (const FVoxelTaskRequest& Existing : Pending)
+		{
+			if (!IsBackgroundTerrainWork(Existing.Kind, Existing.WorkClass, Existing.TerrainStage)) continue;
+			BackgroundInput += Existing.InputBytes;
+			++BackgroundPending;
+		}
+		if (InRequest.InputBytes + BackgroundInput > Budget.MaxInputBytes / 2 ||
+			BackgroundPending >= FMath::Max(1, Budget.MaxPendingTasks - Budget.CriticalReservedTasks)) return false;
+	}
 	InRequest.QueuedAt = FPlatformTime::Seconds();
 	const int32 Lane = TerrainLane(InRequest);
 	const int32 ReservedPerLane = Budget.MaxPendingTasks >= 16 ? 2 : 0;
@@ -263,7 +300,9 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 			const int32 ExistingLane = TerrainLane(Existing);
 			const int32 Reserve = ExistingLane == 4 ? (ReservedPerLane > 0 ? 1 : 0) : ReservedPerLane;
 			if (ExistingLane != INDEX_NONE && ExistingLane != Lane && Counts[ExistingLane] <= Reserve) continue;
-			const bool bMayReplace = IsHigherPriority(InRequest, Existing);
+			const bool bExistingBackground = IsBackgroundTerrainWork(Existing.Kind, Existing.WorkClass, Existing.TerrainStage);
+			const bool bMayReplace = (!bBackground && bExistingBackground) ||
+				(bBackground == bExistingBackground && IsHigherPriority(InRequest, Existing));
 			if (bMayReplace && (Worst == INDEX_NONE || IsHigherPriority(Pending[Worst], Existing))) Worst = Index;
 		}
 		if (Worst == INDEX_NONE) return false;
@@ -322,6 +361,13 @@ void FVoxelTaskScheduler::UpdatePriorities(TFunctionRef<void(EVoxelTaskKind,
 	}
 }
 
+void FVoxelTaskScheduler::UpdateTerrainStages(TFunctionRef<void(EVoxelTaskKind, const FVoxelTaskStamp&, int32&)> InUpdate)
+{
+	check(IsInGameThread());
+	for (FVoxelTaskRequest& Request : Pending) InUpdate(Request.Kind, Request.Stamp, Request.TerrainStage);
+	for (FRunning& Request : Running) InUpdate(Request.Kind, Request.Stamp, Request.TerrainStage);
+}
+
 void FVoxelTaskScheduler::Tick(
 	TFunctionRef<void(FVoxelTaskResult&&)> InApply,
 	const double InMaxApplyMilliseconds)
@@ -336,13 +382,6 @@ void FVoxelTaskScheduler::Tick(
 	{
 		return;
 	}
-
-	const double EndTime =
-		FPlatformTime::Seconds() +
-		FMath::Max(
-			0.0,
-			InMaxApplyMilliseconds) /
-			1000.0;
 
 	int32 Applied = 0;
 	int32 HeavyApplied = 0;
@@ -392,178 +431,193 @@ void FVoxelTaskScheduler::Tick(
 			}
 		};
 
-	for (int32 Index = 0;
-		Index < Running.Num() &&
-		Applied < Budget.MaxCompletedResultsPerFrame &&
-		FPlatformTime::Seconds() <= EndTime;)
+	for (int32 Pass = 0; Pass < 2; ++Pass)
 	{
-		if (!Running[Index].Task.IsCompleted())
+		const bool bBackgroundPass = Pass == 1;
+		const double EndTime = FPlatformTime::Seconds() +
+			(bBackgroundPass ? FMath::Min(0.25, FMath::Max(0.0, InMaxApplyMilliseconds)) :
+				FMath::Max(0.0, InMaxApplyMilliseconds)) / 1000.0;
+		const int32 ApplyLimit = bBackgroundPass ? FMath::Min(4, Budget.MaxCompletedResultsPerFrame) :
+			Budget.MaxCompletedResultsPerFrame;
+		const int32 HeavyLimit = bBackgroundPass ? 1 : Budget.MaxHeavyCompletedResultsPerFrame;
+		Applied = 0;
+		HeavyApplied = 0;
+		for (int32 Index = 0;
+			Index < Running.Num() &&
+			Applied < ApplyLimit &&
+			FPlatformTime::Seconds() <= EndTime;)
 		{
-			++Index;
-			continue;
+			if (IsBackgroundTerrainWork(Running[Index].Kind, Running[Index].WorkClass,
+				Running[Index].TerrainStage) != bBackgroundPass ||
+				(!Running[Index].Slot->Cancel.Load() && !CanBuildTerrainStage(TerrainMeshStage(
+					Running[Index].Kind, Running[Index].WorkClass, Running[Index].TerrainStage,
+					Running[Index].bPublicationContinuation, Running[Index].bTerrainDataOnly))) ||
+				!Running[Index].Task.IsCompleted())
+			{
+				++Index;
+				continue;
+			}
+
+			if (Running[Index].Slot->Cancel.Load())
+			{
+				Running[Index].Slot->Result.bCanceled = true;
+				Running[Index].Slot->Result.bSuccess = false;
+			}
+			const bool bHeavy = Running[Index].Slot->Result.HasHeavyApply();
+
+			if (!CanApplyTerrainKind(Running[Index].Kind))
+			{
+				++Index;
+				continue;
+			}
+
+			if (bHeavy &&
+				HeavyApplied >=
+					HeavyLimit)
+			{
+				++Index;
+				continue;
+			}
+
+			FRunning Completed =
+				MoveTemp(Running[Index]);
+
+			Running.RemoveAt(Index, 1, EAllowShrinking::No);
+
+			ReservedBytes -=
+				Completed.ReservedBytes;
+
+			RemoveActive(
+				Completed.Stamp,
+				Completed.Kind,
+				Completed.WorkClass);
+
+			if (bHeavy)
+			{
+				++HeavyApplied;
+			}
+
+			switch (Completed.Kind)
+			{
+			case EVoxelTaskKind::BuildFineMesh:
+				++FineApplied;
+				break;
+			case EVoxelTaskKind::BuildVoxelProxy:
+			case EVoxelTaskKind::BuildVolumeTransition:
+				++VoxelLODApplied;
+				break;
+			case EVoxelTaskKind::BuildSurface:
+				++SurfaceApplied;
+				break;
+			case EVoxelTaskKind::BuildMacro:
+				++MacroApplied;
+				break;
+			default:
+				break;
+			}
+
+			FVoxelTaskResult& Result =
+				Completed.Slot->Result;
+
+			/**
+			 * Move 前缓存 diagnostics。
+			 */
+			const bool bResultSuccess =
+				Result.bSuccess;
+
+			const bool bResultCanceled =
+				Result.bCanceled;
+
+			const double QueueMilliseconds =
+				Result.QueueMilliseconds;
+
+			const double ExecuteMilliseconds =
+				Result.ExecuteMilliseconds;
+
+			const double ApplyStart =
+				FPlatformTime::Seconds();
+
+			if (Completed.Apply)
+			{
+				Completed.Apply(
+					MoveTemp(Result));
+			}
+			else
+			{
+				InApply(
+					MoveTemp(Result));
+			}
+
+			const double ApplyEnd =
+				FPlatformTime::Seconds();
+
+			FVoxelTaskResult Sample;
+
+			Sample.Kind =
+				Completed.Kind;
+
+			Sample.Stamp =
+				Completed.Stamp;
+
+			Sample.bSuccess =
+				bResultSuccess;
+
+			Sample.bCanceled =
+				bResultCanceled;
+
+			Sample.QueueMilliseconds =
+				QueueMilliseconds;
+
+			Sample.ExecuteMilliseconds =
+				ExecuteMilliseconds;
+
+			Sample.ApplyMilliseconds =
+				(ApplyEnd -
+				 ApplyStart) *
+				1000.0;
+			Diagnostics.LastResultApplyMilliseconds += Sample.ApplyMilliseconds;
+
+			RecordCompletedResult(
+				Sample);
+
+			++Applied;
 		}
 
-		if (Running[Index].Slot->Cancel.Load())
+		for (int32 Index = Canceled.Num() - 1; Index >= 0 &&
+			Applied < ApplyLimit && FPlatformTime::Seconds() <= EndTime; --Index)
 		{
-			Running[Index].Slot->Result.bCanceled = true;
-			Running[Index].Slot->Result.bSuccess = false;
+			if (IsBackgroundTerrainWork(Canceled[Index].Result.Kind, Canceled[Index].WorkClass,
+				Canceled[Index].TerrainStage) != bBackgroundPass) continue;
+			FCompleted Completed = MoveTemp(Canceled[Index]);
+			Canceled.RemoveAt(Index, 1, EAllowShrinking::No);
+
+			FVoxelTaskResult Sample;
+			Sample.Kind = Completed.Result.Kind;
+			Sample.Stamp = Completed.Result.Stamp;
+			Sample.bCanceled = true;
+
+			const double ApplyStart =
+				FPlatformTime::Seconds();
+
+			if (Completed.Apply)
+			{
+				Completed.Apply(
+					MoveTemp(Completed.Result));
+			}
+			else
+			{
+				InApply(
+					MoveTemp(Completed.Result));
+			}
+
+			Sample.ApplyMilliseconds =
+				(FPlatformTime::Seconds() - ApplyStart) *
+				1000.0;
+			Diagnostics.LastResultApplyMilliseconds += Sample.ApplyMilliseconds;
+
+			RecordCompletedResult(Sample);
+			++Applied;
 		}
-		const bool bHeavy = Running[Index].Slot->Result.HasHeavyApply();
-
-		if (!CanApplyTerrainKind(Running[Index].Kind))
-		{
-			++Index;
-			continue;
-		}
-
-		if (bHeavy &&
-			HeavyApplied >=
-				Budget.MaxHeavyCompletedResultsPerFrame)
-		{
-			++Index;
-			continue;
-		}
-
-		FRunning Completed =
-			MoveTemp(Running[Index]);
-
-		Running.RemoveAt(Index, 1, EAllowShrinking::No);
-
-		ReservedBytes -=
-			Completed.ReservedBytes;
-
-		RemoveActive(
-			Completed.Stamp,
-			Completed.Kind,
-			Completed.WorkClass);
-
-		if (bHeavy)
-		{
-			++HeavyApplied;
-		}
-
-		switch (Completed.Kind)
-		{
-		case EVoxelTaskKind::BuildFineMesh:
-			++FineApplied;
-			break;
-		case EVoxelTaskKind::BuildVoxelProxy:
-		case EVoxelTaskKind::BuildVolumeTransition:
-			++VoxelLODApplied;
-			break;
-		case EVoxelTaskKind::BuildSurface:
-			++SurfaceApplied;
-			break;
-		case EVoxelTaskKind::BuildMacro:
-			++MacroApplied;
-			break;
-		default:
-			break;
-		}
-
-		FVoxelTaskResult& Result =
-			Completed.Slot->Result;
-
-		/**
-		 * Move 前缓存 diagnostics。
-		 */
-		const bool bResultSuccess =
-			Result.bSuccess;
-
-		const bool bResultCanceled =
-			Result.bCanceled;
-
-		const double QueueMilliseconds =
-			Result.QueueMilliseconds;
-
-		const double ExecuteMilliseconds =
-			Result.ExecuteMilliseconds;
-
-		const double ApplyStart =
-			FPlatformTime::Seconds();
-
-		if (Completed.Apply)
-		{
-			Completed.Apply(
-				MoveTemp(Result));
-		}
-		else
-		{
-			InApply(
-				MoveTemp(Result));
-		}
-
-		const double ApplyEnd =
-			FPlatformTime::Seconds();
-
-		FVoxelTaskResult Sample;
-
-		Sample.Kind =
-			Completed.Kind;
-
-		Sample.Stamp =
-			Completed.Stamp;
-
-		Sample.bSuccess =
-			bResultSuccess;
-
-		Sample.bCanceled =
-			bResultCanceled;
-
-		Sample.QueueMilliseconds =
-			QueueMilliseconds;
-
-		Sample.ExecuteMilliseconds =
-			ExecuteMilliseconds;
-
-		Sample.ApplyMilliseconds =
-			(ApplyEnd -
-			 ApplyStart) *
-			1000.0;
-		Diagnostics.LastResultApplyMilliseconds += Sample.ApplyMilliseconds;
-
-		RecordCompletedResult(
-			Sample);
-
-		++Applied;
-	}
-
-	while (!Canceled.IsEmpty() &&
-		Applied < Budget.MaxCompletedResultsPerFrame &&
-		FPlatformTime::Seconds() <= EndTime)
-	{
-		FCompleted Completed =
-			MoveTemp(Canceled.Last());
-
-		Canceled.Pop(
-			EAllowShrinking::No);
-
-		FVoxelTaskResult Sample;
-		Sample.Kind = Completed.Result.Kind;
-		Sample.Stamp = Completed.Result.Stamp;
-		Sample.bCanceled = true;
-
-		const double ApplyStart =
-			FPlatformTime::Seconds();
-
-		if (Completed.Apply)
-		{
-			Completed.Apply(
-				MoveTemp(Completed.Result));
-		}
-		else
-		{
-			InApply(
-				MoveTemp(Completed.Result));
-		}
-
-		Sample.ApplyMilliseconds =
-			(FPlatformTime::Seconds() - ApplyStart) *
-			1000.0;
-		Diagnostics.LastResultApplyMilliseconds += Sample.ApplyMilliseconds;
-
-		RecordCompletedResult(Sample);
-		++Applied;
 	}
 
 	const double AdmissionStart = FPlatformTime::Seconds();
@@ -785,6 +839,34 @@ void FVoxelTaskScheduler::SetBudget(
 			1,
 			Budget.MaxPendingTasks);
 	Budget.MaxWaitingDependencyTasks = FMath::Max(0, InBudget.MaxWaitingDependencyTasks);
+}
+
+void FVoxelTaskScheduler::SetTerrainBuildStage(const int32 InStage)
+{
+	check(IsInGameThread());
+	const int32 Stage = FMath::Clamp(InStage, 0, 3);
+	if (Stage < TerrainBuildStage)
+	{
+		for (int32 Index = Pending.Num() - 1; Index >= 0; --Index)
+		{
+			if (TerrainMeshStage(Pending[Index].Kind, Pending[Index].WorkClass,
+				Pending[Index].TerrainStage, Pending[Index].bPublicationContinuation, Pending[Index].bTerrainDataOnly) <= Stage) continue;
+			FVoxelTaskRequest Request = MoveTemp(Pending[Index]);
+			Pending.RemoveAtSwap(Index, 1, EAllowShrinking::No);
+			QueuedInputBytes -= Request.InputBytes;
+			RemoveActive(Request.Stamp, Request.Kind, Request.WorkClass);
+			QueueCanceled(MoveTemp(Request));
+		}
+		for (FRunning& Task : Running)
+			if (TerrainMeshStage(Task.Kind, Task.WorkClass, Task.TerrainStage,
+				Task.bPublicationContinuation, Task.bTerrainDataOnly) > Stage) Task.Slot->Cancel.Store(true);
+	}
+	TerrainBuildStage = Stage;
+}
+
+bool FVoxelTaskScheduler::CanBuildTerrainStage(const int32 InStage) const
+{
+	return InStage == INDEX_NONE || InStage <= TerrainBuildStage;
 }
 
 FVoxelTaskDiagnostics
@@ -1013,8 +1095,19 @@ void FVoxelTaskScheduler::Pump()
 		}
 		const int32 NonCriticalLimit = FMath::Max(
 			0, Budget.MaxConcurrentTasks - Budget.CriticalReservedTasks);
-		int32 BestIndex =
-			INDEX_NONE;
+		const int32 BackgroundLimit = Budget.MaxConcurrentTasks > 1
+			? FMath::Clamp(Budget.MaxConcurrentCoarseTerrainTasks, 1,
+				FMath::Max(1, Budget.MaxConcurrentTasks - Budget.CriticalReservedTasks)) : 1;
+		const int32 ForegroundLimit = FMath::Max(1, Budget.MaxConcurrentTasks - BackgroundLimit);
+		int32 BackgroundRunning = 0;
+		uint64 BackgroundBytes = 0;
+		for (const FRunning& Task : Running)
+		{
+			if (!IsBackgroundTerrainWork(Task.Kind, Task.WorkClass, Task.TerrainStage)) continue;
+			++BackgroundRunning;
+			BackgroundBytes += Task.ReservedBytes;
+		}
+		int32 BestIndex = INDEX_NONE;
 
 		for (int32 Index = 0;
 			Index < Pending.Num();
@@ -1022,7 +1115,8 @@ void FVoxelTaskScheduler::Pump()
 		{
 			const FVoxelTaskRequest& Request =
 				Pending[Index];
-			if (bHasCriticalPending && Request.WorkClass != EVoxelWorkClass::Critical)
+			const bool bBackground = IsBackgroundTerrainWork(Request.Kind, Request.WorkClass, Request.TerrainStage);
+			if (bHasCriticalPending && !bBackground && Request.WorkClass != EVoxelWorkClass::Critical)
 			{
 				if (NonCriticalRunning >= NonCriticalLimit ||
 					Request.Kind == EVoxelTaskKind::BuildSurface ||
@@ -1034,6 +1128,11 @@ void FVoxelTaskScheduler::Pump()
 				}
 			}
 
+			if (!CanBuildTerrainStage(TerrainMeshStage(Request.Kind, Request.WorkClass,
+				Request.TerrainStage, Request.bPublicationContinuation, Request.bTerrainDataOnly)) ||
+				(bBackground && (BackgroundRunning >= BackgroundLimit ||
+					Request.ReservedBytes + BackgroundBytes > Budget.MaxReservedBytes / 2)) ||
+				(!bBackground && Running.Num() - BackgroundRunning >= ForegroundLimit)) continue;
 			if (!CanStartKind(Request.Kind))
 			{
 				continue;
@@ -1070,11 +1169,17 @@ void FVoxelTaskScheduler::Pump()
 			for (int32 Index = 0; Index < Pending.Num(); ++Index)
 			{
 				const FVoxelTaskRequest& Candidate = Pending[Index];
+				const bool bBackground = IsBackgroundTerrainWork(Candidate.Kind, Candidate.WorkClass, Candidate.TerrainStage);
+				if (!CanBuildTerrainStage(TerrainMeshStage(Candidate.Kind, Candidate.WorkClass,
+					Candidate.TerrainStage, Candidate.bPublicationContinuation, Candidate.bTerrainDataOnly)) ||
+					(bBackground && (BackgroundRunning >= BackgroundLimit ||
+						Candidate.ReservedBytes + BackgroundBytes > Budget.MaxReservedBytes / 2)) ||
+					(!bBackground && Running.Num() - BackgroundRunning >= ForegroundLimit)) continue;
 				if (TerrainPriorityBand(Candidate) == TerrainPriorityBand(Pending[BestIndex]) &&
 					Candidate.SourcePriority == Pending[BestIndex].SourcePriority &&
 					Candidate.bPublicationContinuation == Pending[BestIndex].bPublicationContinuation &&
 					IsVisualWorkClass(Candidate.WorkClass) && Candidate.QueuedAt <= Deadline &&
-					(!bHasCriticalPending || Candidate.WorkClass == EVoxelWorkClass::Critical ||
+					(!bHasCriticalPending || bBackground || Candidate.WorkClass == EVoxelWorkClass::Critical ||
 						(NonCriticalRunning < NonCriticalLimit && Candidate.Kind != EVoxelTaskKind::BuildSurface &&
 						Candidate.Kind != EVoxelTaskKind::BuildMacro && Candidate.WorkClass != EVoxelWorkClass::Prefetch)) &&
 					CanStartKind(Candidate.Kind) && Candidate.ReservedBytes <= Budget.MaxReservedBytes - ReservedBytes &&
@@ -1109,6 +1214,7 @@ void FVoxelTaskScheduler::Pump()
 		RunningTask.SourcePriority = Request.SourcePriority;
 		RunningTask.TerrainStage = Request.TerrainStage;
 		RunningTask.bPublicationContinuation = Request.bPublicationContinuation;
+		RunningTask.bTerrainDataOnly = Request.bTerrainDataOnly;
 		RunningTask.DistanceScore = Request.DistanceScore;
 		RunningTask.ForwardScore = Request.ForwardScore;
 		RunningTask.QueuedAt =
@@ -1216,7 +1322,8 @@ void FVoxelTaskScheduler::Pump()
 							MoveTemp(
 								ErrorResult);
 					}
-				});
+				}, IsBackgroundTerrainWork(RunningTask.Kind, RunningTask.WorkClass, RunningTask.TerrainStage)
+					? UE::Tasks::ETaskPriority::BackgroundNormal : UE::Tasks::ETaskPriority::Normal);
 
 		Running.Add(
 			MoveTemp(RunningTask));
@@ -1227,6 +1334,8 @@ void FVoxelTaskScheduler::QueueCanceled(
 	FVoxelTaskRequest&& InRequest)
 {
 	FCompleted Completed;
+	Completed.WorkClass = InRequest.WorkClass;
+	Completed.TerrainStage = InRequest.TerrainStage;
 
 	Completed.Result.Stamp =
 		InRequest.Stamp;

@@ -14,7 +14,7 @@ struct WHFRAMEWORK_API FVoxelPublishGroupKey
 FORCEINLINE uint32 GetTypeHash(const FVoxelPublishGroupKey& InKey)
 {
 	return HashCombineFast(
-		HashCombineFast(::GetTypeHash(InKey.Representation), ::GetTypeHash(InKey.Coordinate)),
+		HashCombineFast(::GetTypeHash(InKey.Representation), GetTypeHash(InKey.Coordinate)),
 		::GetTypeHash(InKey.Level));
 }
 

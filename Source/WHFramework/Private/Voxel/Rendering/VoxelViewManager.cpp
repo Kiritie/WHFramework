@@ -129,8 +129,10 @@ void FVoxelViewManager::Tick(
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewManager);
 	const double TickStart = FPlatformTime::Seconds();
+	RefreshTerrainBuildStage();
 	Publisher->SetObservers(InObservers);
 	Publisher->Tick();
+	RefreshTerrainBuildStage();
 	FrameTimings = Publisher->GetFrameTimings();
 	const double AfterPublish = FPlatformTime::Seconds();
 	if (Publisher->NeedsUpdate())
@@ -154,6 +156,7 @@ void FVoxelViewManager::Tick(
 	}
 
 	const double AfterPlan = FPlatformTime::Seconds();
+	bool bInitialPublication = false;
 	if (CVarVoxelDebugRepresentation.GetValueOnGameThread() > 0 &&
 		Now >= NextRepresentationDebugLog)
 	{
@@ -168,7 +171,8 @@ void FVoxelViewManager::Tick(
 		ActiveDirtyCoverageRects = MoveTemp(DirtyCoverageRects);
 		bCoverageDirtyFull = false;
 		bCoverageDirty = false;
-		ResolveTransitionVisibility();
+		bInitialPublication = TryPublishInitialTerrain();
+		if (!bInitialPublication) ResolveTransitionVisibility();
 		ActiveDirtyCoverageRects.Reset();
 		bActiveCoverageFull = true;
 		LastCoverageMilliseconds = (FPlatformTime::Seconds() - CoverageStart) * 1000.0;
@@ -176,7 +180,7 @@ void FVoxelViewManager::Tick(
 	const double AfterCoverage = FPlatformTime::Seconds();
 	FrameTimings.CoverageMilliseconds = (AfterCoverage - AfterPlan) * 1000.0;
 	PumpHeightfieldTransitions();
-	PumpVolumeTransitions();
+	if (!bInitialPublication) PumpVolumeTransitions();
 
 	if (Now >= NextRetireCheck)
 	{
@@ -204,7 +208,7 @@ void FVoxelViewManager::Tick(
 #endif
 }
 
-bool FVoxelViewManager::IsAdmissionDataReady(const FVoxelViewAdmission& InAdmission) const
+bool FVoxelViewManager::IsAdmissionDataReady(const FVoxelViewAdmission& InAdmission, const bool bIncludePending) const
 {
 	if (InAdmission.Kind == EVoxelViewAdmissionKind::Fine)
 	{
@@ -242,13 +246,14 @@ bool FVoxelViewManager::IsAdmissionDataReady(const FVoxelViewAdmission& InAdmiss
 	default:
 		return false;
 	}
-	return PreparedData.Contains(Key) || Scheduler.Has(Key.Stamp, MeshKind);
+	return PreparedData.Contains(Key) || Scheduler.Has(Key.Stamp, MeshKind) ||
+		(bIncludePending && Scheduler.Has(Key.Stamp, Key.Kind));
 }
 
 void FVoxelViewManager::ProcessDataAdmissions()
 {
 	const TMap<int32, uint8> Lanes = ResolveAdmissionLanes(Admissions,
-		[this](const FVoxelViewAdmission& Admission) { return IsAdmissionDataReady(Admission); }, HasMovementCriticalFinePending());
+		[this](const FVoxelViewAdmission& Admission) { return IsAdmissionDataReady(Admission, true); });
 	const int32 FirstKind = LastActiveDataKind < 4 ? LastActiveDataKind % 3 + 1 : 1;
 	LastActiveDataKind = 4;
 	const FVoxelViewSettings& Settings = Module.GetViewSettings();
@@ -272,6 +277,36 @@ void FVoxelViewManager::ProcessDataAdmissions()
 			const int32 First = Algo::LowerBoundBy(Lane, Priority, LanePriority);
 			const int32 End = Algo::UpperBoundBy(Lane, Priority, LanePriority);
 			if (First == End) continue;
+			const auto Submit = [this, Priority](const FVoxelViewAdmission& Admission)
+			{
+				switch (Admission.Kind)
+				{
+				case EVoxelViewAdmissionKind::VoxelProxy: return RequestVoxelProxy(Admission.ProxyKey, Priority, true);
+				case EVoxelViewAdmissionKind::Surface: return RequestSurface(Admission.SurfaceKey, Priority, true);
+				case EVoxelViewAdmissionKind::Macro: return RequestMacro(Admission.MacroKey, Priority, true);
+				default: return false;
+				}
+			};
+			// 近端预检暂未就绪时及时重试；其余时间片仍轮换全队列，后台数据不等待网格。
+			int32 FrontierFirst = First;
+			while (FrontierFirst < End && IsAdmissionDataReady(Admissions[Lane[FrontierFirst]], true)) ++FrontierFirst;
+			if (FrontierFirst < End)
+			{
+				const double FrontierDistance = Admissions[Lane[FrontierFirst]].DistanceCells + AdmissionBandWidthCells;
+				int32 FrontierEnd = FrontierFirst + 1;
+				while (FrontierEnd < End && Admissions[Lane[FrontierEnd]].DistanceCells <= FrontierDistance) ++FrontierEnd;
+				int32& FrontierScan = DataFrontierScanIndices[Kind].FindOrAdd(Priority);
+				if (FrontierScan < FrontierFirst || FrontierScan >= FrontierEnd) FrontierScan = FrontierFirst;
+				const double FrontierDeadline = FPlatformTime::Seconds() +
+					FMath::Max(0.0, LaneDeadline - FPlatformTime::Seconds()) * 0.5;
+				for (int32 Attempt = 0; Attempt < FMath::Min(64, FrontierEnd - FrontierFirst) &&
+					Submitted[Kind] < FMath::Max(1, Limits[Kind] / 2) && FPlatformTime::Seconds() < FrontierDeadline; ++Attempt)
+				{
+					const FVoxelViewAdmission& Admission = Admissions[Lane[FrontierScan]];
+					FrontierScan = FrontierScan + 1 < FrontierEnd ? FrontierScan + 1 : FrontierFirst;
+					if (!IsAdmissionDataReady(Admission, true)) Submitted[Kind] += Submit(Admission);
+				}
+			}
 			int32& Scan = DataScanIndices[Kind].FindOrAdd(Priority);
 			if (Scan < First || Scan >= End) Scan = First;
 			for (int32 Attempt = 0; Attempt < FMath::Min(FMath::Max(64, Limits[Kind] * 8), End - First) &&
@@ -279,20 +314,7 @@ void FVoxelViewManager::ProcessDataAdmissions()
 			{
 				const FVoxelViewAdmission& Admission = Admissions[Lane[Scan]];
 				Scan = Scan + 1 < End ? Scan + 1 : First;
-				if (IsAdmissionDataReady(Admission)) continue;
-				switch (Admission.Kind)
-				{
-				case EVoxelViewAdmissionKind::VoxelProxy:
-					Submitted[Kind] += RequestVoxelProxy(Admission.ProxyKey, Priority, true);
-					break;
-				case EVoxelViewAdmissionKind::Surface:
-					Submitted[Kind] += RequestSurface(Admission.SurfaceKey, Priority, true);
-					break;
-				case EVoxelViewAdmissionKind::Macro:
-					Submitted[Kind] += RequestMacro(Admission.MacroKey, Priority, true);
-					break;
-				default: break;
-				}
+				if (!IsAdmissionDataReady(Admission, true)) Submitted[Kind] += Submit(Admission);
 			}
 		}
 	}
@@ -363,7 +385,8 @@ bool FVoxelViewManager::EnqueuePreparedData(FVoxelTaskRequest&& InRequest)
 			return;
 		}
 		RemovePreparedData(Key);
-		if (Result.bKnownEmptyMesh && Result.VoxelProxy && !VoxelProxyActors.Contains(Result.Stamp.ViewKey))
+		if (Result.bKnownEmptyMesh && Result.VoxelProxy && !VoxelProxyActors.Contains(Result.Stamp.ViewKey) &&
+			Scheduler.CanBuildTerrainStage(1))
 		{
 			Result.VoxelProxyMesh = MakeShared<FVoxelSectionMeshResult>();
 			if (PublishVoxelProxy(Result))
@@ -484,7 +507,8 @@ void FVoxelViewManager::ProcessAdmissions()
 	const TMap<int32, uint8> Lanes = ResolveAdmissionLanes(Admissions,
 		[this, &FirstPendingAdmissions](const FVoxelViewAdmission& Admission)
 		{
-			const bool bReady = IsAdmissionMeshReady(Admission) || IsAdmissionTerminalFailure(Admission);
+			const bool bReady = IsAdmissionMeshReady(Admission) || IsAdmissionTerminalFailure(Admission) ||
+				(Admission.Kind != EVoxelViewAdmissionKind::Fine && !IsAdmissionDataReady(Admission));
 			if (!bReady)
 			{
 				auto* First = FirstPendingAdmissions.Find(Admission.Priority);
@@ -498,7 +522,7 @@ void FVoxelViewManager::ProcessAdmissions()
 				if (Index == INDEX_NONE) Index = &Admission - Admissions.GetData();
 			}
 			return bReady;
-		}, HasMovementCriticalFinePending());
+		});
 	LastActiveAdmissionKind = 4;
 	LastActiveAdmissionPriority = MAX_int32;
 	LastResolvedFrontier = MAX_dbl;
@@ -511,7 +535,7 @@ void FVoxelViewManager::ProcessAdmissions()
 		for (int32 Offset = 0; Offset < 4; ++Offset)
 		{
 			const int32 Kind = Offset == 0 ? 0 : (FirstCoarseKind + Offset - 2) % 3 + 1;
-			if ((*LaneMask & (1 << Kind)) == 0) continue;
+			if ((*LaneMask & (1 << Kind)) == 0 || !Scheduler.CanBuildTerrainStage(Kind)) continue;
 			const TArray<int32>& Lane = Interest.AdmissionLanes[Kind];
 			const int32 First = Algo::LowerBound(Lane, FirstPendingAdmissions.FindChecked(Priority)[Kind]);
 			const int32 End = Algo::UpperBoundBy(Lane, Priority,
@@ -521,7 +545,7 @@ void FVoxelViewManager::ProcessAdmissions()
 			for (int32 NextOffset = Offset; NextOffset < 4; ++NextOffset)
 			{
 				const int32 NextKind = NextOffset == 0 ? 0 : (FirstCoarseKind + NextOffset - 2) % 3 + 1;
-				RemainingLanes += (*LaneMask & (1 << NextKind)) != 0;
+				RemainingLanes += (*LaneMask & (1 << NextKind)) != 0 && Scheduler.CanBuildTerrainStage(NextKind);
 			}
 			const double LaneDeadline = FPlatformTime::Seconds() +
 				FMath::Max(0.0, Deadline - FPlatformTime::Seconds()) / RemainingLanes;
@@ -661,6 +685,108 @@ bool FVoxelViewManager::IsAdmissionMeshReady(const FVoxelViewAdmission& A) const
 	}
 }
 
+bool FVoxelViewManager::IsAdmissionPresented(const FVoxelViewAdmission& InAdmission) const
+{
+	if (!IsAdmissionMeshReady(InAdmission)) return false;
+	AActor* Actor = nullptr;
+	switch (InAdmission.Kind)
+	{
+	case EVoxelViewAdmissionKind::Fine:
+		if (!VisibleTerrainNodes.Contains({InAdmission.FineKey, 0})) return false;
+		Actor = FineActors.FindRef(InAdmission.FineKey);
+		break;
+	case EVoxelViewAdmissionKind::VoxelProxy:
+		if (!VisibleTerrainNodes.Contains(InAdmission.ProxyKey)) return false;
+		Actor = VoxelProxyActors.FindRef(InAdmission.ProxyKey);
+		break;
+	case EVoxelViewAdmissionKind::Surface:
+		Actor = SurfaceActors.FindRef(InAdmission.SurfaceKey);
+		break;
+	case EVoxelViewAdmissionKind::Macro:
+		Actor = MacroActors.FindRef(InAdmission.MacroKey);
+		break;
+	default:
+		return true;
+	}
+	return !Actor || Publisher->IsCommitted(Actor);
+}
+
+void FVoxelViewManager::RefreshTerrainBuildStage()
+{
+	if (!bTerrainBuildStageDirty) return;
+	bTerrainBuildStageDirty = false;
+	int32 Stage = 3;
+	for (const FVoxelViewAdmission& Admission : Module.GetCurrentInterest().Admissions)
+	{
+		const int32 Kind = static_cast<uint8>(Admission.Kind);
+		if (Kind < Stage && !IsAdmissionPresented(Admission)) Stage = Kind;
+		if (Stage == 0) break;
+	}
+	if (Stage != Scheduler.GetTerrainBuildStage())
+	{
+		UE_LOG(LogTemp, Display, TEXT("Voxel terrain mesh stage: %d -> %d interest=%llu"),
+			Scheduler.GetTerrainBuildStage(), Stage, Module.GetInterestRevision());
+		Scheduler.SetTerrainBuildStage(Stage);
+	}
+}
+
+bool FVoxelViewManager::TryPublishInitialTerrain()
+{
+	const FVoxelTerrainViewPlan& Plan = Module.GetCurrentInterest().TerrainPlan;
+	if (Plan.Roots.IsEmpty() || !SurfaceActors.IsEmpty() || !MacroActors.IsEmpty() ||
+		!HeightfieldTransitionActors.IsEmpty()) return false;
+	for (const FVoxelViewKey& Key : VisibleTerrainNodes)
+	{
+		AActor* Actor = Key.Level == 0 ? FineActors.FindRef(Key.Coordinate) : VoxelProxyActors.FindRef(Key);
+		if (!Plan.Leaves.Contains(Key) && Actor && !Actor->IsHidden() && Publisher->HasPresentation(Actor)) return false;
+	}
+	for (const auto& Pair : FineActors)
+		if (!FineWanted.Contains(Pair.Key) && Pair.Value && !Pair.Value->IsHidden() && Publisher->HasPresentation(Pair.Value)) return false;
+	for (const auto& Pair : VoxelProxyActors)
+		if (!VoxelProxyWanted.Contains(Pair.Key) && Pair.Value && !Pair.Value->IsHidden() && Publisher->HasPresentation(Pair.Value)) return false;
+	for (const auto& Pair : OpenPublishGroups)
+		if (Pair.Key.Representation > 1) return false;
+
+	TMap<FVoxelPublishGroupKey, TArray<FVoxelViewKey>> NodesByGroup;
+	for (const FIntVector& Key : FineReady)
+	{
+		const FVoxelPublishGroupKey GroupKey{0, FIntPoint(Key.X, Key.Y), 0};
+		if (!FineWanted.Contains(Key) || !Plan.Leaves.Contains({Key, 0}) || !OpenPublishGroups.Contains(GroupKey)) continue;
+		NodesByGroup.FindOrAdd(GroupKey).Add({Key, 0});
+		if (AActor* Actor = FineActors.FindRef(Key))
+		{
+			const FGuid Group = OpenPublishGroups.FindChecked(GroupKey);
+			Publisher->SetCoverage(Group, Actor, {});
+			Publisher->SetHidden(Group, Actor, false);
+		}
+	}
+	for (const FVoxelViewKey& Key : VoxelProxyReady)
+	{
+		const FVoxelPublishGroupKey GroupKey{1, FIntPoint(Key.Coordinate.X, Key.Coordinate.Y), Key.Level};
+		if (!VoxelProxyWanted.Contains(Key) || !Plan.Leaves.Contains(Key) || !OpenPublishGroups.Contains(GroupKey)) continue;
+		NodesByGroup.FindOrAdd(GroupKey).Add(Key);
+		if (AActor* Actor = VoxelProxyActors.FindRef(Key))
+		{
+			const FGuid Group = OpenPublishGroups.FindChecked(GroupKey);
+			Publisher->SetCoverage(Group, Actor, {});
+			Publisher->SetHidden(Group, Actor, false);
+		}
+	}
+	Publisher->SetCommitCallbacks({}, [this, Target = MoveTemp(NodesByGroup)](TConstArrayView<FVoxelPublishGroupKey> Keys)
+	{
+		for (const FVoxelPublishGroupKey& Key : Keys)
+			if (const auto* Nodes = Target.Find(Key)) CommitTerrainOwnership(Key, *Nodes);
+		bTerrainBuildStageDirty = true;
+	});
+	for (const auto& Pair : OpenPublishGroups)
+	{
+		Publisher->SetOwnershipChanged(Pair.Value, true);
+		if (!Publisher->CommitGroup(Pair.Value)) MarkCoverageDirty();
+	}
+	OpenPublishGroups.Reset();
+	return true;
+}
+
 bool FVoxelViewManager::IsAdmissionTerminalFailure(const FVoxelViewAdmission& A) const
 {
 	if (A.Kind != EVoxelViewAdmissionKind::Fine) return false;
@@ -682,6 +808,8 @@ TMap<int32, double> FVoxelViewManager::GetDataAdmissionLimits() const
 
 void FVoxelViewManager::RefreshTaskPriorities()
 {
+	bTerrainBuildStageDirty = true;
+	RefreshTerrainBuildStage();
 	RebuildAdmissions(PriorityObservers);
 	UpdateTaskPriorities();
 }
@@ -926,6 +1054,14 @@ void FVoxelViewManager::LogRepresentationState(const TConstArrayView<FVector> In
 
 	UE_LOG(LogTemp, Display, TEXT("Voxel transition dependencies: missingFine=%d missingProxy=%d invalidContext=%d skippedEmptyMeshes=%llu"),
 		MissingFineBoundaryCount, MissingProxyBoundaryCount, InvalidVolumeContextCount, SkippedVolumeMeshes);
+	int32 ProxyLevels[6] = {};
+	for (const FVoxelViewKey& Key : VoxelProxyWanted)
+		if (Key.Level < UE_ARRAY_COUNT(ProxyLevels)) ++ProxyLevels[Key.Level];
+	UE_LOG(LogTemp, Display, TEXT("Voxel proxy tiling: wanted L1/L2/L3/L4/L5=%d/%d/%d/%d/%d sides=32/64/128/256/512 sampleSteps=%d/%d/%d/%d/%d"),
+		ProxyLevels[1], ProxyLevels[2], ProxyLevels[3], ProxyLevels[4], ProxyLevels[5],
+		FVoxelViewKey{{}, 1}.GetSampleStep(), FVoxelViewKey{{}, 2}.GetSampleStep(),
+		FVoxelViewKey{{}, 3}.GetSampleStep(), FVoxelViewKey{{}, 4}.GetSampleStep(),
+		FVoxelViewKey{{}, 5}.GetSampleStep());
 	int32 PendingVolumePlans = 0;
 	for (const auto& Pair : VolumeCoveragePlans) PendingVolumePlans += Pair.Value.PendingSignature != 0 ? 1 : 0;
 	UE_LOG(LogTemp, Display, TEXT("Voxel handoff waits: volumePlans=%d pendingPlans=%d volumeRects=%d heightfieldPlans=%d pendingHeightfields=%d heightfieldRects=%d preparedVolume=%d preparedHeightfield=%d publisherBusy=%d"),
@@ -1092,7 +1228,9 @@ void FVoxelViewManager::GatherReadyWantedFineBoxes(TArray<FVoxelCoverageBox>& Ou
 	OutCoverage.Reserve(FineReady.Num());
 	for (const FIntVector& Key : FineReady)
 	{
-		if (FineWanted.Contains(Key)) OutCoverage.Add(FineCoverageBox(Key));
+		AActor* Actor = FineActors.FindRef(Key);
+		if (FineWanted.Contains(Key) && VisibleTerrainNodes.Contains({Key, 0}) &&
+			(!Actor || (!Actor->IsHidden() && Publisher->IsCommitted(Actor)))) OutCoverage.Add(FineCoverageBox(Key));
 	}
 }
 
@@ -1102,7 +1240,9 @@ void FVoxelViewManager::GatherReadyWantedProxyBoxes(TArray<FVoxelCoverageBox>& O
 	OutCoverage.Reserve(VoxelProxyReady.Num());
 	for (const FVoxelViewKey& Key : VoxelProxyReady)
 	{
-		if (VoxelProxyWanted.Contains(Key)) OutCoverage.Add(VoxelProxyCoverageBox(Key));
+		AActor* Actor = VoxelProxyActors.FindRef(Key);
+		if (VoxelProxyWanted.Contains(Key) && VisibleTerrainNodes.Contains(Key) &&
+			(!Actor || (!Actor->IsHidden() && Publisher->IsCommitted(Actor)))) OutCoverage.Add(VoxelProxyCoverageBox(Key));
 	}
 }
 
@@ -1137,7 +1277,9 @@ void FVoxelViewManager::GatherReadyWantedProxySurfaceRects(
 	OutCoverage.Reset();
 	for (const FVoxelViewKey& Key : VoxelProxyReady)
 	{
-		if (!VoxelProxyWanted.Contains(Key) || !VoxelProxyCoverageRect(Key).Intersects(InTarget))
+		AActor* Actor = VoxelProxyActors.FindRef(Key);
+		if (!VoxelProxyWanted.Contains(Key) || !VisibleTerrainNodes.Contains(Key) ||
+			!Actor || Actor->IsHidden() || !Publisher->IsCommitted(Actor) || !VoxelProxyCoverageRect(Key).Intersects(InTarget))
 		{
 			continue;
 		}
@@ -1322,6 +1464,8 @@ void FVoxelViewManager::ExpandActiveCoverage(const FVoxelCoverageRect& InBounds)
 
 void FVoxelViewManager::ApplyInterestDelta(const FVoxelInterestDelta& InDelta)
 {
+	bTerrainBuildStageDirty = true;
+	RefreshTerrainBuildStage();
 	if (bCoverageDirtyFull || !InDelta.bVisualPartitionChanged) return;
 	for (const FIntVector& Key : InDelta.AddedFine) MarkCoverageDirty(FineCoverageRect(Key));
 	for (const FIntVector& Key : InDelta.RemovedFine) MarkCoverageDirty(FineCoverageRect(Key));
@@ -1394,8 +1538,9 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 			}
 		}
 		if (bReadyTerrainBranchesDirty) RebuildReadyTerrainBranches();
-		auto IsReady = [this](const FVoxelViewKey& Key)
+		auto IsReady = [this, &Plan, &Previous](const FVoxelViewKey& Key)
 		{
+			if (!Plan.Leaves.Contains(Key) && !Previous.Contains(Key)) return false;
 			return Key.Level == 0 ? FineReady.Contains(Key.Coordinate) : VoxelProxyReady.Contains(Key);
 		};
 		if (bActiveCoverageFull)
@@ -1715,10 +1860,11 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 		{
 			if (Key.Level == 0)
 			{
-				FineBoxes.Add(Box(FineCoverageBox(Key.Coordinate)));
+				if (FineActors.FindRef(Key.Coordinate)) FineBoxes.Add(Box(FineCoverageBox(Key.Coordinate)));
 			}
 			else
 			{
+				if (!VoxelProxyActors.FindRef(Key)) continue;
 				ProxyBoxes.Add(Box(VoxelProxyCoverageBox(Key)));
 				if (const TArray<FVoxelCoverageRect>* Rects = ProxySurfaceCoverage.Find(Key))
 				{
@@ -1752,6 +1898,13 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 	}
 	VoxelMeshClipper::NormalizeBoxes(*CommonTransitionBoxes);
 	const double BoxesMilliseconds = (FPlatformTime::Seconds() - ResolveStart) * 1000.0 - PlanMilliseconds;
+	TArray<FVoxelCoverageRect> PresentedHeightfieldRects;
+	for (const auto& Pair : SurfaceActors)
+		if (Pair.Value && !Pair.Value->IsHidden() && Publisher->IsPresented(Pair.Value))
+			PresentedHeightfieldRects.Add(SurfaceCoverageRect(Pair.Key));
+	for (const auto& Pair : MacroActors)
+		if (Pair.Value && !Pair.Value->IsHidden() && Publisher->IsPresented(Pair.Value))
+			PresentedHeightfieldRects.Add(MacroCoverageRect(Pair.Key));
 	for (const TPair<FIntVector, TObjectPtr<AActor>>& Pair : FineActors)
 	{
 		if (!Pair.Value) continue;
@@ -1858,9 +2011,11 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 		if (!Pair.Value) continue;
 		if (!CoverageAffects(SurfaceCoverageRect(Pair.Key))) continue;
 		const FGuid Group = BeginPublishGroup({2, Pair.Key.Coordinate, Pair.Key.Level});
-		if (BlockedHeightfieldNodes.Contains({EVoxelHeightfieldRepresentation::Surface,
+		const bool bHasPreviousCoverage = Publisher->HasPresentation(Pair.Value) ||
+			VoxelCoverage::IntersectsAny2D(SurfaceCoverageRect(Pair.Key), PresentedHeightfieldRects);
+		if (bHasPreviousCoverage && (BlockedHeightfieldNodes.Contains({EVoxelHeightfieldRepresentation::Surface,
 			Pair.Key.Coordinate, Pair.Key.Level}) ||
-			(!SurfaceWanted.Contains(Pair.Key) && HandoffPending(SurfaceCoverageRect(Pair.Key))))
+			(!SurfaceWanted.Contains(Pair.Key) && HandoffPending(SurfaceCoverageRect(Pair.Key)))))
 		{
 			if (!Publisher->HasPresentation(Pair.Value)) Publisher->SetHidden(Group, Pair.Value, true);
 			else Publisher->SetSharedCoverage(Group, Pair.Value, CommonHeightfieldBoxes);
@@ -1909,9 +2064,11 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 		if (!Pair.Value) continue;
 		if (!CoverageAffects(MacroCoverageRect(Pair.Key))) continue;
 		const FGuid Group = BeginPublishGroup({3, Pair.Key.Coordinate, Pair.Key.Level});
-		if (BlockedHeightfieldNodes.Contains({EVoxelHeightfieldRepresentation::Macro,
+		const bool bHasPreviousCoverage = Publisher->HasPresentation(Pair.Value) ||
+			VoxelCoverage::IntersectsAny2D(MacroCoverageRect(Pair.Key), PresentedHeightfieldRects);
+		if (bHasPreviousCoverage && (BlockedHeightfieldNodes.Contains({EVoxelHeightfieldRepresentation::Macro,
 			Pair.Key.Coordinate, Pair.Key.Level}) ||
-			(!MacroWanted.Contains(Pair.Key) && HandoffPending(MacroCoverageRect(Pair.Key))))
+			(!MacroWanted.Contains(Pair.Key) && HandoffPending(MacroCoverageRect(Pair.Key)))))
 		{
 			if (!Publisher->HasPresentation(Pair.Value)) Publisher->SetHidden(Group, Pair.Value, true);
 			else Publisher->SetSharedCoverage(Group, Pair.Value, CommonHeightfieldBoxes);
@@ -2037,6 +2194,7 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 		HeightfieldSignatures = MoveTemp(HeightfieldToCommit)](
 		TConstArrayView<FVoxelPublishGroupKey> Keys)
 	{
+		bTerrainBuildStageDirty = true;
 		for (const FVoxelPublishGroupKey& Key : Keys)
 		{
 			const auto* Desired = Target.Find(Key);
@@ -2536,8 +2694,9 @@ bool FVoxelViewManager::RebuildVolumeTransitions(
 			continue;
 		}
 		// 同精度 Fine 使用 section 邻接网格，不存在 LOD 过渡面；规划快照更新不阻止其取得所有权。
-		auto NeedsTopologyHandoff = [Region](const FVoxelViewKey& Node, const TSet<FVoxelViewKey>& Nodes)
+		auto NeedsTopologyHandoff = [this, Region](const FVoxelViewKey& Node, const TSet<FVoxelViewKey>& Nodes)
 		{
+			if (AirVoxelProxyNodes.Contains(Node)) return false;
 			if (Node.Level > 0) return true;
 			const FVoxelGenerationBounds Bounds = Node.GetBounds();
 			for (int32 Axis = 0; Axis < 3; ++Axis)
@@ -2582,9 +2741,11 @@ bool FVoxelViewManager::RebuildVolumeTransitions(
 		FVoxelTaskRequest Request;
 		Request.Kind = EVoxelTaskKind::BuildViewCoverage;
 		Request.WorkClass = EVoxelWorkClass::Visible;
+		Request.TerrainStage = 1;
 		Request.SourcePriority = MAX_int32;
 		for (const auto& Node : Pair.Value)
 		{
+			if (Node.Level == 0) Request.TerrainStage = 0;
 			if (const auto* Demand = Node.Level == 0 ? Module.GetCurrentInterest().Exact.Find(Node.Coordinate) : nullptr)
 			{
 				Request.SourcePriority = FMath::Min(Request.SourcePriority, Demand->Priority);
@@ -2659,6 +2820,7 @@ bool FVoxelViewManager::RebuildVolumeTransitions(
 	for (const FVoxelVolumeTransitionFace& Face : Faces)
 	{
 		if (!InTargetNodes.Contains(Face.Owner) || !InTargetNodes.Contains(Face.Neighbor)) continue;
+		if (AirVoxelProxyNodes.Contains(Face.Owner)) continue;
 		if (VoxelCoverage::IntersectsAny3D(Face.Neighbor.Level == 0 ? FineCoverageBox(Face.Neighbor.Coordinate)
 			: VoxelProxyCoverageBox(Face.Neighbor), PendingTopologyBoxes))
 		{
@@ -2708,6 +2870,8 @@ bool FVoxelViewManager::RebuildVolumeTransitions(
 	for (const FVoxelViewKey& Key : InTargetNodes)
 	{
 		if (Key.Level == 0) continue;
+		// 全空气节点保留空间所有权和邻接数据，但不会产生接缝几何或网格交接。
+		if (AirVoxelProxyNodes.Contains(Key)) continue;
 		if (BlockedOwners.Contains(Key) || VoxelCoverage::IntersectsAny3D(VoxelProxyCoverageBox(Key), PendingTopologyBoxes)) continue;
 		const auto Data = VoxelProxyData.FindRef(Key);
 		if (!Data)
@@ -2932,6 +3096,7 @@ void FVoxelViewManager::CleanupRetiredRepresentations(const double InNow)
 		VoxelProxyActors.Remove(Key);
 		bReadyTerrainBranchesDirty |= VoxelProxyReady.Remove(Key) > 0;
 		VoxelProxyData.Remove(Key);
+		AirVoxelProxyNodes.Remove(Key);
 		ProxySurfaceCoverage.Remove(Key);
 		VoxelProxyRevisions.Remove(Key);
 		VolumeTransitionSignatures.Remove(Key);
@@ -3205,6 +3370,8 @@ bool FVoxelViewManager::ApplyRemoteRepresentation(
 void FVoxelViewManager::InvalidateRemoteRepresentations(
 	const FVoxelRepresentationInvalidate& InInvalidate)
 {
+	bTerrainBuildStageDirty = true;
+	Scheduler.SetTerrainBuildStage(0);
 	AppliedInterestRevision = 0;
 	MarkCoverageDirty();
 	for (const FVoxelRepresentationWireKey& WireKey : InInvalidate.Keys)
@@ -3212,6 +3379,7 @@ void FVoxelViewManager::InvalidateRemoteRepresentations(
 		const FVoxelViewKey VoxelKey { WireKey.Coordinate, WireKey.Level };
 		bReadyTerrainBranchesDirty |= VoxelProxyReady.Remove(VoxelKey) > 0;
 		VoxelProxyData.Remove(VoxelKey);
+		AirVoxelProxyNodes.Remove(VoxelKey);
 		ProxySurfaceCoverage.Remove(VoxelKey);
 		VoxelProxyRevisions.Remove(VoxelKey);
 		VolumeTransitionSignatures.Remove(VoxelKey);
@@ -3238,6 +3406,8 @@ void FVoxelViewManager::InvalidateRemoteRepresentations(
 
 void FVoxelViewManager::InvalidateSection(const FIntVector& InKey)
 {
+	bTerrainBuildStageDirty = true;
+	Scheduler.SetTerrainBuildStage(0);
 	PrunePreparedData();
 	InvalidateNeighbors(InKey);
 	MarkCoverageDirty();
@@ -3251,6 +3421,7 @@ void FVoxelViewManager::InvalidateSection(const FIntVector& InKey)
 		VoxelProxyRevisions.Remove(Key);
 		bReadyTerrainBranchesDirty |= VoxelProxyReady.Remove(Key) > 0;
 		VoxelProxyData.Remove(Key);
+		AirVoxelProxyNodes.Remove(Key);
 		VolumeTransitionSignatures.Remove(Key);
 		PreparedVolumeSignatures.Remove(Key);
 		PreparedVolumeMeshes.Remove(Key);
@@ -3275,6 +3446,8 @@ void FVoxelViewManager::InvalidateSection(const FIntVector& InKey)
 
 void FVoxelViewManager::InvalidateNeighbors(const FIntVector& InKey)
 {
+	bTerrainBuildStageDirty = true;
+	Scheduler.SetTerrainBuildStage(0);
 	TSet<FIntVector> Neighbors;
 	for (int32 Axis = 0; Axis < 3; ++Axis)
 	{
@@ -3299,6 +3472,8 @@ void FVoxelViewManager::InvalidateNeighbors(const FIntVector& InKey)
 
 void FVoxelViewManager::Reset()
 {
+	bTerrainBuildStageDirty = true;
+	Scheduler.SetTerrainBuildStage(0);
 	++VolumePlanSerial;
 	++HeightfieldPlanSerial;
 	HeightfieldCoveragePlans.Reset();
@@ -3342,6 +3517,7 @@ void FVoxelViewManager::Reset()
 	SkippedProxyMeshes = 0;
 	SkippedVolumeMeshes = 0;
 	for (auto& Scans : DataScanIndices) Scans.Reset();
+	for (auto& Scans : DataFrontierScanIndices) Scans.Reset();
 	FineActors.Reset();
 	FineRevisions.Reset();
 	VoxelProxyActors.Reset();
@@ -3382,6 +3558,7 @@ void FVoxelViewManager::Reset()
 	SurfaceReady.Reset();
 	MacroReady.Reset();
 	VoxelProxyData.Reset();
+	AirVoxelProxyNodes.Reset();
 	ProxySurfaceCoverage.Reset();
 	SurfaceData.Reset();
 	WaterData.Reset();
@@ -4553,12 +4730,14 @@ bool FVoxelViewManager::PublishFine(const FVoxelTaskResult& InResult)
 		return false;
 	}
 
+	bTerrainBuildStageDirty = true;
 	FineReady.Add(Key);
 	TrackReadyTerrainNode({ Key, 0 });
 	FineLastWanted.Add(Key, FPlatformTime::Seconds());
 	FineRevisions.Add(Key, InResult.Stamp.Revision);
 	if (!HasRenderableMesh(*InResult.FineMesh) && !FineActors.Contains(Key))
 	{
+		BeginPublishGroup({0, FIntPoint(Key.X, Key.Y), 0});
 		return true;
 	}
 
@@ -4586,6 +4765,9 @@ bool FVoxelViewManager::PublishVoxelProxy(const FVoxelTaskResult& InResult)
 	}
 
 	VoxelProxyData.Add(Key, InResult.VoxelProxy);
+	if (!InResult.VoxelProxy->Cells.IsEmpty() && !InResult.VoxelProxy->Cells.ContainsByPredicate(
+		[](const FVoxelBlockState& State) { return !State.IsAir(); })) AirVoxelProxyNodes.Add(Key);
+	else AirVoxelProxyNodes.Remove(Key);
 	PreparedVolumeSignatures.Remove(Key);
 	PreparedVolumeMeshes.Remove(Key);
 	FVoxelBoundaryTransitionContext BaseContext;
@@ -4593,12 +4775,14 @@ bool FVoxelViewManager::PublishVoxelProxy(const FVoxelTaskResult& InResult)
 	VolumeTransitionSignatures.Add(Key,
 		BaseContext.Signature(InResult.VoxelProxy->Revision));
 	UpdateProxySurfaceCoverage(*InResult.VoxelProxy);
+	bTerrainBuildStageDirty = true;
 	VoxelProxyReady.Add(Key);
 	TrackReadyTerrainNode(Key);
 	VoxelProxyLastWanted.Add(Key, FPlatformTime::Seconds());
 	VoxelProxyRevisions.Add(Key, InResult.Stamp.Revision);
 	if (!HasRenderableMesh(*InResult.VoxelProxyMesh) && !VoxelProxyActors.Contains(Key))
 	{
+		BeginPublishGroup({1, FIntPoint(Key.Coordinate.X, Key.Coordinate.Y), Key.Level});
 		return true;
 	}
 
@@ -4610,6 +4794,7 @@ bool FVoxelViewManager::PublishVoxelProxy(const FVoxelTaskResult& InResult)
 	{
 		bReadyTerrainBranchesDirty |= VoxelProxyReady.Remove(Key) > 0;
 		VoxelProxyData.Remove(Key);
+		AirVoxelProxyNodes.Remove(Key);
 		ProxySurfaceCoverage.Remove(Key);
 		VoxelProxyRevisions.Remove(Key);
 		VolumeTransitionSignatures.Remove(Key);
@@ -4639,6 +4824,7 @@ bool FVoxelViewManager::PublishSurface(const FVoxelTaskResult& InResult)
 		return false;
 	}
 	SurfaceActors.Add(Key, Host);
+	bTerrainBuildStageDirty = true;
 	SurfaceReady.Add(Key);
 	SurfaceLastWanted.Add(Key, FPlatformTime::Seconds());
 	SurfaceRevisions.Add(Key, InResult.Stamp.Revision);
@@ -4742,6 +4928,7 @@ bool FVoxelViewManager::PublishMacro(
 			Key,
 			Host);
 
+		bTerrainBuildStageDirty = true;
 		MacroReady.Add(
 			Key);
 		MacroLastWanted.Add(Key, FPlatformTime::Seconds());

@@ -28,9 +28,15 @@ struct WHFRAMEWORK_API FVoxelViewKey
 	FIntVector Coordinate = FIntVector::ZeroValue;
 	uint8 Level = 0;
 
+	static constexpr uint8 SampleLevelOffset = 1;
+
 	int32 GetStep() const;
-	// 覆盖尺度保持不变，内部采样格最多为四个基础体素。
-	int32 GetSampleStep() const { return FMath::Min(GetStep(), 4); }
+	// 覆盖层级比采样层级高一级，同等体素细度覆盖双倍边长；近景仍为 16 格。
+	int32 GetSampleStep() const
+	{
+		const int32 SampleLevel = FMath::Max(0, static_cast<int32>(Level) - SampleLevelOffset);
+		return FMath::Min(1 << SampleLevel, 8);
+	}
 	int32 GetGridSide() const { return GetSide() / GetSampleStep(); }
 	int32 GetSide() const;
 	FVoxelGenerationBounds GetBounds() const;

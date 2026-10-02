@@ -168,6 +168,7 @@ private:
 	double GroupDistance(const FGroup& InGroup) const;
 	double BoundsDistance(TConstArrayView<FBox> InBounds) const;
 	static int32 GroupStage(const FGroup& InGroup);
+	bool CanPublishGroup(const FGroup& InGroup) const;
 	static void MergePriority(FGroupPriority& InOutPriority, const FGroupPriority& InPriority);
 	static bool HigherGroupPriority(const FGroupPriority& InFirst, const FGroupPriority& InSecond);
 	FGroupPriority BoundsPriority(TConstArrayView<FBox> InBounds, int32 InStage) const;

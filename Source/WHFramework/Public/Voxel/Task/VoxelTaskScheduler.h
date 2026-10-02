@@ -167,6 +167,7 @@ struct WHFRAMEWORK_API FVoxelTaskRequest
 	int32 TerrainStage = INDEX_NONE;
 	// 已接纳的局部发布准备/裁剪，持续数据压力下仍须有界完成。
 	bool bPublicationContinuation = false;
+	bool bTerrainDataOnly = false;
 
 	double DistanceScore = 0.0;
 	double ForwardScore = 0.0;
@@ -252,6 +253,7 @@ public:
 	bool Enqueue(FVoxelTaskRequest&& InRequest);
 	void UpdatePriorities(TFunctionRef<void(EVoxelTaskKind, const FVoxelTaskStamp&,
 		EVoxelWorkClass&, int32&, double&, double&)> InUpdate);
+	void UpdateTerrainStages(TFunctionRef<void(EVoxelTaskKind, const FVoxelTaskStamp&, int32&)> InUpdate);
 
 	void Tick(
 		TFunctionRef<void(FVoxelTaskResult&&)> InApply,
@@ -272,6 +274,9 @@ public:
 	int32 CriticalCount() const;
 
 	void SetBudget(const FVoxelTaskBudget& InBudget);
+	void SetTerrainBuildStage(int32 InStage);
+	bool CanBuildTerrainStage(int32 InStage) const;
+	int32 GetTerrainBuildStage() const { return TerrainBuildStage; }
 
 	FVoxelTaskDiagnostics GetDiagnostics() const;
 	static bool IsHigherPriority(
@@ -293,6 +298,7 @@ private:
 		int32 SourcePriority = 0;
 		int32 TerrainStage = INDEX_NONE;
 		bool bPublicationContinuation = false;
+		bool bTerrainDataOnly = false;
 
 		double QueuedAt = 0.0;
 		double DistanceScore = 0.0;
@@ -307,6 +313,8 @@ private:
 	struct FCompleted
 	{
 		FVoxelTaskResult Result;
+		EVoxelWorkClass WorkClass = EVoxelWorkClass::None;
+		int32 TerrainStage = INDEX_NONE;
 		TFunction<void(FVoxelTaskResult&&)> Apply;
 	};
 
@@ -342,6 +350,7 @@ private:
 
 	double LastBudgetWarning = -10.0;
 	bool bStopped = false;
+	int32 TerrainBuildStage = 3;
 	uint64 ReservedBytes = 0;
 	uint64 QueuedInputBytes = 0;
 	int32 CriticalTaskCount = 0;

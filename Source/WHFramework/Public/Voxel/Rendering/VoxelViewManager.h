@@ -110,8 +110,11 @@ private:
 	void ProcessAdmissions();
 	void ProcessDataAdmissions();
 	bool HasMovementCriticalFinePending() const;
-	bool IsAdmissionDataReady(const FVoxelViewAdmission& InAdmission) const;
+	bool IsAdmissionDataReady(const FVoxelViewAdmission& InAdmission, bool bIncludePending = false) const;
 	bool IsAdmissionMeshReady(const FVoxelViewAdmission& InAdmission) const;
+	bool IsAdmissionPresented(const FVoxelViewAdmission& InAdmission) const;
+	void RefreshTerrainBuildStage();
+	bool TryPublishInitialTerrain();
 	bool IsPreparedDataCurrent(const FVoxelTaskKey& InKey) const;
 	void PrunePreparedData();
 	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> RetainPreparedEnvironment(
@@ -202,10 +205,12 @@ private:
 	FVoxelTaskScheduler& Scheduler;
 	uint64 WorldEpoch = 0;
 	uint64 AppliedInterestRevision = 0;
+	bool bTerrainBuildStageDirty = true;
 	TConstArrayView<FVoxelViewAdmission> Admissions;
 	TArray<FVector> PriorityObservers;
 	TMap<int32, int32> AdmissionScanIndices[4];
 	TMap<int32, int32> DataScanIndices[4];
+	TMap<int32, int32> DataFrontierScanIndices[4];
 	TArray<int32> AdmissionPriorities;
 	TMap<FVoxelTaskKey, TSharedPtr<const FVoxelTaskResult, ESPMode::ThreadSafe>> PreparedData;
 	TMap<FVoxelTaskKey, TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>> PreparedEnvironmentRetentions;
@@ -292,6 +297,7 @@ private:
 	TMap<FVoxelMacroTileKey, uint64> MacroRevisions;
 
 	TMap<FVoxelViewKey, TSharedPtr<const FVoxelVoxelProxyData>> VoxelProxyData;
+	TSet<FVoxelViewKey> AirVoxelProxyNodes;
 	TMap<FVoxelViewKey, TArray<FVoxelCoverageRect>> ProxySurfaceCoverage;
 	TMap<FVoxelSurfaceTileKey, TSharedPtr<const FVoxelSurfaceTileData>> SurfaceData;
 	TMap<FVoxelSurfaceTileKey, TSharedPtr<const FVoxelWaterSurfaceTileData>> WaterData;

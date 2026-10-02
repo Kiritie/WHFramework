@@ -104,7 +104,12 @@ void FVoxelTerrainViewPlan::Build(TConstArrayView<FVoxelStreamingSource> InSourc
 			}
 			const int32 Distance = FMath::FloorToInt(FMath::Sqrt(Box.ComputeSquaredDistanceToPoint(FVector(Source.Center))));
 			if (Distance > Source.View.VoxelProxyRadiusCells) continue;
-			const uint8 Level = FMath::Max<uint8>(1, VoxelViewLod::ResolveScreenErrorLevel(Distance, 1, Source, RootLevel, Source.View.TargetScreenErrorPixels));
+			// 屏幕误差控制采样细度，覆盖层级单独扩大，不能靠放大体素来减少 Actor。
+			const uint8 MaximumSampleLevel = RootLevel > FVoxelViewKey::SampleLevelOffset
+				? RootLevel - FVoxelViewKey::SampleLevelOffset : 0;
+			const uint8 SampleLevel = FMath::Max<uint8>(1, VoxelViewLod::ResolveScreenErrorLevel(
+				Distance, 1, Source, MaximumSampleLevel, Source.View.TargetScreenErrorPixels));
+			const uint8 Level = FMath::Max<uint8>(1, SampleLevel + FVoxelViewKey::SampleLevelOffset);
 			if (Level < Node.Level)
 			{
 				Error = FMath::Max(Error, static_cast<double>(Node.GetStep()) / FMath::Max(1, Distance));

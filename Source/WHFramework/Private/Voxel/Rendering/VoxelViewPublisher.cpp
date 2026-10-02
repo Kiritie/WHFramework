@@ -280,6 +280,11 @@ int32 FVoxelViewPublisher::GroupStage(const FGroup& InGroup)
 	return Stage;
 }
 
+bool FVoxelViewPublisher::CanPublishGroup(const FGroup& InGroup) const
+{
+	return Scheduler.CanBuildTerrainStage(FMath::Min(GroupStage(InGroup), InGroup.Priority.TerrainStage));
+}
+
 void FVoxelViewPublisher::MergePriority(FGroupPriority& InOutPriority, const FGroupPriority& InPriority)
 {
 	InOutPriority.ObserverDistance = FMath::Min(InOutPriority.ObserverDistance, InPriority.ObserverDistance);
@@ -434,9 +439,10 @@ void FVoxelViewPublisher::StartCommittedGroups()
 {
 	// 每个 owner 最多两代在途；远处旧组不占据独立新组的全局位置。
 	// 同时只比较一份新快照，覆盖比较后再按真实连接组检查 owner 容量。
-	if (PendingGroups.IsEmpty() || Publications.ContainsByPredicate([](const FPublicationRef& Active)
+	if (PendingGroups.IsEmpty() || Publications.ContainsByPredicate([this](const FPublicationRef& Active)
 	{
-		return !Active->bCanceled && !Active->bFinished && !Active->bGroupsPrepared;
+		return !Active->bCanceled && !Active->bFinished && !Active->bGroupsPrepared &&
+			Active->Groups.ContainsByPredicate([this](const FGroup& Group) { return CanPublishGroup(Group); });
 	})) return;
 	// Include uncommitted owners so a parent/child or seam handoff remains atomic.
 	// Independent committed components can start without the rest of the world.
@@ -910,6 +916,27 @@ void FVoxelViewPublisher::RefreshTaskPriorities()
 		DistanceScore = Priority.DistanceScore;
 		ForwardScore = Priority.ForwardScore;
 	});
+	Scheduler.UpdateTerrainStages([this, &Active](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp, int32& TerrainStage)
+	{
+		if (Kind != EVoxelTaskKind::BuildViewCoverage || Stamp.WorldEpoch != WorldEpoch ||
+			Stamp.Section.X != MIN_int32 || (Stamp.Section.Y != 2 && Stamp.Section.Y != 3)) return;
+		const FPublication* const* Found = Active.Find(Stamp.Token);
+		if (!Found) return;
+		const FPublication& Publication = **Found;
+		FGroupPriority Priority;
+		if (Stamp.Section.Y == 3)
+		{
+			if (!Publication.Updates.IsValidIndex(Stamp.Section.Z)) return;
+			MergePriority(Priority, Publication.Groups[Publication.Updates[Stamp.Section.Z].GroupIndex].Priority);
+		}
+		else
+		{
+			for (int32 Index = Publication.CoverageIndex;
+				Index < FMath::Min(Publication.Updates.Num(), Publication.CoverageIndex + 128); ++Index)
+				MergePriority(Priority, Publication.Groups[Publication.Updates[Index].GroupIndex].Priority);
+		}
+		TerrainStage = Priority.TerrainStage;
+	});
 }
 
 void FVoxelViewPublisher::AdmitCoveragePreparation(const FPublicationRef& Publication)
@@ -979,9 +1006,27 @@ void FVoxelViewPublisher::AdmitCoveragePreparation(const FPublicationRef& Public
 		Input.bDirty = Update.bSourceDirty;
 		InputBytes += Input.Boxes.GetAllocatedSize() + Input.Previous.GetAllocatedSize();
 	}
+	const bool bInitialUncovered = !Inputs.IsEmpty() && Inputs.ContainsByPredicate([](const FCoveragePreparationInput& Input)
+	{
+		return !Input.bDirty || !Input.Previous.IsEmpty() || !Input.Boxes.IsEmpty() ||
+			(Input.Common && !Input.Common->IsEmpty());
+	}) == false;
+	if (bInitialUncovered)
+	{
+		const int32 End = Publication->CoverageIndex + Inputs.Num();
+		for (int32 Index = Publication->CoverageIndex; Index < End; ++Index)
+		{
+			Publication->Updates[Index].PreviousExclusions.Reset();
+			Publication->PreparedMeshes[Index] = Publication->Updates[Index].Source;
+		}
+		Publication->CoverageIndex = End;
+		Publication->bCoveragePrepared = End == Publication->Updates.Num();
+		return;
+	}
 	FVoxelTaskRequest Request;
 	Request.Kind = EVoxelTaskKind::BuildViewCoverage;
 	Request.bPublicationContinuation = true;
+	Request.bTerrainDataOnly = true;
 	Request.WorkClass = EVoxelWorkClass::Visible;
 	TSet<int32> PriorityGroups;
 	for (int32 Index = Publication->CoverageIndex; Index < Publication->CoverageIndex + Inputs.Num(); ++Index)
@@ -1099,6 +1144,11 @@ void FVoxelViewPublisher::AdmitBuilds(const FPublicationRef& Publication)
 			continue;
 		}
 		FUpdate& Update = Publication->Updates[BuildIndex];
+		if (!CanPublishGroup(Publication->Groups[Update.GroupIndex]))
+		{
+			RetryIndices.Add(BuildIndex);
+			continue;
+		}
 		if (Update.bUnchanged || Update.Exclusions.IsEmpty())
 		{
 			Publication->PreparedMeshes[BuildIndex] = Update.Source;
@@ -1284,7 +1334,7 @@ void FVoxelViewPublisher::Tick()
 		for (const int32 GroupIndex : Publication->GroupOrder)
 		{
 			FGroup& Group = Publication->Groups[GroupIndex];
-			if (Group.bCommitted) continue;
+			if (Group.bCommitted || !CanPublishGroup(Group)) continue;
 			while (Group.PreparedUpdates < Group.UpdateIndices.Num())
 			{
 				const int32 Index = Group.UpdateIndices[Group.PreparedUpdates];
@@ -1428,7 +1478,7 @@ void FVoxelViewPublisher::CommitReadyGroups(const FPublicationRef& Publication, 
 	for (const int32 GroupIndex : Publication->GroupOrder)
 	{
 		FGroup& Group = Publication->Groups[GroupIndex];
-		if (Group.bCommitted) continue;
+		if (Group.bCommitted || !CanPublishGroup(Group)) continue;
 		if (Group.PreparedUpdates != Group.UpdateIndices.Num()) continue;
 		if (Group.Keys.ContainsByPredicate([&FirstOwners, &Publication](const FVoxelPublishGroupKey& Key)
 		{
