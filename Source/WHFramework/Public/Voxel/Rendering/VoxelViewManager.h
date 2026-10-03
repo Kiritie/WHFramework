@@ -102,6 +102,8 @@ public:
 private:
 #if WITH_DEV_AUTOMATION_TESTS
 	friend class FVoxelManagerLocalCoverageTest;
+	friend class FVoxelEmptyTransitionConvergenceTest;
+	friend class FVoxelFineProxyDependenciesTest;
 #endif
 	void UpdateFineAndVoxelProxy(TConstArrayView<FVector> InObservers);
 	void UpdateSurface(TConstArrayView<FVector> InObservers);
@@ -124,6 +126,8 @@ private:
 	void RemovePreparedData(const FVoxelTaskKey& InKey);
 	void RebuildAdmissions(TConstArrayView<FVector> InObservers);
 	void UpdateTaskPriorities();
+	int32 VoxelProxyTerrainStage(const FVoxelViewKey& InKey) const;
+	int32 AdmissionTerrainStage(const FVoxelViewAdmission& InAdmission) const;
 	EVoxelWorkClass VolumeTransitionWorkClass(const FVoxelViewKey& InOwner) const;
 	void TrackReadyTerrainNode(FVoxelViewKey InKey);
 	void RebuildReadyTerrainBranches();

@@ -62,6 +62,14 @@ FGuid FVoxelViewPublisher::BeginGroup(const FVoxelPublishGroupKey& InKey)
 	return Group;
 }
 
+bool FVoxelViewPublisher::SetTerrainStage(const FGuid& InGroup, const int32 InTerrainStage)
+{
+	FPendingGroup* Group = PendingGroups.Find(InGroup);
+	if (!Group) return false;
+	Group->TerrainStage = FMath::Min(Group->TerrainStage, FMath::Clamp(InTerrainStage, 0, 3));
+	return true;
+}
+
 bool FVoxelViewPublisher::Stage(
 	const FGuid& InGroup,
 	AActor*& InOutActor,
@@ -272,7 +280,7 @@ double FVoxelViewPublisher::GroupDistance(const FGroup& InGroup) const
 
 int32 FVoxelViewPublisher::GroupStage(const FGroup& InGroup)
 {
-	int32 Stage = 3;
+	int32 Stage = InGroup.TerrainStage;
 	for (const auto& Key : InGroup.Keys)
 		Stage = FMath::Min(Stage, Key.Representation < 4 ? FMath::Min<int32>(Key.Representation, 3)
 			: Key.Representation == 4 ? 2 : 3);
@@ -488,6 +496,7 @@ void FVoxelViewPublisher::StartCommittedGroups()
 		if (BlockedComponents.Contains(GroupIndices[KeyIndices.FindChecked(Key)])) continue;
 		ReadyKeys.Add(Key);
 		Publication->Callbacks.Add(Key, It.Value().Callback);
+		Publication->TerrainStages.Add(Key, It.Value().TerrainStage);
 		if (It.Value().DeferredPriorityBounds) Publication->DeferredPriorityBounds.Add(Key, It.Value().DeferredPriorityBounds);
 		if (It.Value().bOwnershipChanged) Publication->OwnershipChanges.Add(Key);
 		PendingGroupIds.Remove(Key);
@@ -640,7 +649,13 @@ void FVoxelViewPublisher::BuildGroups(const FPublicationRef& Publication, const 
 		if (Footprints[Index].Bounds.IsValid) Group.ChangedBounds.Add(Footprints[Index].Bounds);
 		Group.bTransition |= Footprints[Index].bTransition;
 	}
-	for (FGroup& Group : Publication->Groups) VoxelMeshClipper::NormalizeBoxes(Group.ChangedBounds);
+	for (FGroup& Group : Publication->Groups)
+	{
+		VoxelMeshClipper::NormalizeBoxes(Group.ChangedBounds);
+		for (const auto& Key : Group.Keys)
+			if (const int32* Stage = Publication->TerrainStages.Find(Key))
+				Group.TerrainStage = FMath::Min(Group.TerrainStage, *Stage);
+	}
 	for (FUpdate& Update : Publication->Updates)
 	{
 		Update.GroupIndex = GroupIndices[ActorIndices.FindChecked(Update.Actor)];
@@ -653,7 +668,10 @@ void FVoxelViewPublisher::BuildGroups(const FPublicationRef& Publication, const 
 	});
 	for (int32 Index = 0; Index < Publication->Updates.Num(); ++Index)
 	{
-		Publication->Groups[Publication->Updates[Index].GroupIndex].UpdateIndices.Add(Index);
+		const FUpdate& Update = Publication->Updates[Index];
+		FGroup& Group = Publication->Groups[Update.GroupIndex];
+		Group.UpdateIndices.Add(Index);
+		if (Update.TerrainStage != INDEX_NONE) Group.TerrainStage = FMath::Min(Group.TerrainStage, Update.TerrainStage);
 	}
 	for (const auto& Pair : Publication->Visibility)
 	{
@@ -700,7 +718,9 @@ void FVoxelViewPublisher::DeferSaturatedGroups(const FPublicationRef& Publicatio
 		const FGroupPriority Priority = GroupPriority(Group);
 		const auto PriorityBounds = MakeShared<FDeferredPriorityDemand, ESPMode::ThreadSafe>();
 		PriorityBounds->Bounds = Group.ChangedBounds.IsEmpty() ? TArray<FBox>{Group.Bounds} : Group.ChangedBounds;
+		PriorityBounds->Serial = Publication->Serial;
 		PriorityBounds->TerrainStage = GroupStage(Group);
+		PriorityBounds->bTransition = Group.bTransition;
 		for (const auto& Key : Group.Keys)
 		{
 			MergePriority(OutPriorities.FindOrAdd(Key), Priority);
@@ -741,7 +761,10 @@ void FVoxelViewPublisher::DeferSaturatedGroups(const FPublicationRef& Publicatio
 			else if (Publication->OwnershipChanges.Contains(Key))
 				PendingGroups.FindChecked(PendingGroupIds.FindChecked(Key)).bOwnershipChanged = true;
 			PendingGroups.FindChecked(PendingGroupIds.FindChecked(Key)).DeferredPriorityBounds = PriorityBounds;
+			FPendingGroup& Pending = PendingGroups.FindChecked(PendingGroupIds.FindChecked(Key));
+			Pending.TerrainStage = FMath::Min(Pending.TerrainStage, GroupStage(Group));
 			Publication->Callbacks.Remove(Key);
+			Publication->TerrainStages.Remove(Key);
 			Publication->OwnershipChanges.Remove(Key);
 		}
 		for (const int32 UpdateIndex : Group.UpdateIndices) DeferredActors.Add(Publication->Updates[UpdateIndex].Actor);
@@ -790,10 +813,18 @@ void FVoxelViewPublisher::DeferSaturatedGroups(const FPublicationRef& Publicatio
 void FVoxelViewPublisher::UpdateGroupPriorities(TMap<FVoxelPublishGroupKey, FGroupPriority> InPriorities)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewGroupPriority);
-	const auto IncludeDeferred = [this, &InPriorities](const FVoxelPublishGroupKey& Key, const FPriorityBoundsPtr& Bounds)
+	TSet<const FDeferredPriorityDemand*> SeenDeferred;
+	TArray<FPriorityBoundsPtr> DeferredDemands;
+	const auto IncludeDeferred = [this, &InPriorities, &SeenDeferred, &DeferredDemands](
+		const FVoxelPublishGroupKey& Key, const FPriorityBoundsPtr& Bounds)
 	{
 		if (!Bounds) return;
 		MergePriority(InPriorities.FindOrAdd(Key), BoundsPriority(Bounds->Bounds, Bounds->TerrainStage));
+		if (!SeenDeferred.Contains(Bounds.Get()))
+		{
+			SeenDeferred.Add(Bounds.Get());
+			DeferredDemands.Add(Bounds);
+		}
 	};
 	for (const auto& Pair : PendingGroups) IncludeDeferred(Pair.Value.Key, Pair.Value.DeferredPriorityBounds);
 	for (const auto& Publication : Publications)
@@ -811,6 +842,22 @@ void FVoxelViewPublisher::UpdateGroupPriorities(TMap<FVoxelPublishGroupKey, FGro
 		{
 			FGroup& Group = Publication->Groups[Index];
 			if (!Group.bCommitted && Group.Bounds.IsValid) SpatialGroups.Emplace(Publication->Serial, &Group);
+		}
+	}
+	// 饱和后退回待提交区的 Fine 仍依赖旧空间覆盖，必须把阶段需求传给这些前代。
+	for (const FPriorityBoundsPtr& Deferred : DeferredDemands)
+	{
+		FGroup Demand;
+		Demand.Bounds = FBox(ForceInit);
+		Demand.ChangedBounds = Deferred->Bounds;
+		Demand.bTransition = Deferred->bTransition;
+		for (const FBox& Bounds : Deferred->Bounds)
+			if (Bounds.IsValid) Demand.Bounds += Bounds;
+		const FGroupPriority Priority = BoundsPriority(Deferred->Bounds, Deferred->TerrainStage);
+		for (const auto& Candidate : SpatialGroups)
+		{
+			if (Candidate.Key >= Deferred->Serial || !GroupsInteract(Demand, *Candidate.Value)) continue;
+			MergePriority(SpatialPriorities.FindOrAdd(Candidate.Value), Priority);
 		}
 	}
 	for (const auto& Publication : Ordered)
@@ -1016,7 +1063,7 @@ void FVoxelViewPublisher::AdmitCoveragePreparation(const FPublicationRef& Public
 		for (int32 Index = Publication->CoverageIndex; Index < End; ++Index)
 		{
 			Publication->Updates[Index].PreviousExclusions.Reset();
-			Publication->PreparedMeshes[Index] = Publication->Updates[Index].Source;
+			// 覆盖比较后还会重排 Updates；直接网格在分组固定后按最终索引准备。
 		}
 		Publication->CoverageIndex = End;
 		Publication->bCoveragePrepared = End == Publication->Updates.Num();
@@ -1455,8 +1502,8 @@ void FVoxelViewPublisher::Tick()
 					SetPublicationPriority(Priority, *Publication, MakeArrayView(&Update.GroupIndex, 1));
 					const auto Tasks = Scheduler.GetDiagnostics();
 					UE_LOG(LogTemp, Display,
-						TEXT("Voxel publication missing mesh: serial=%llu index=%d stage=%d class=%d priority=%d distance=%.1f exclusions=%d sourceMiB=%.2f scheduler=%d/%d reservedMiB=%.2f"),
-						Publication->Serial, Index, Update.TerrainStage, static_cast<int32>(Priority.WorkClass),
+						TEXT("Voxel publication missing mesh: serial=%llu index=%d stage=%d effectiveStage=%d gate=%d class=%d priority=%d distance=%.1f exclusions=%d sourceMiB=%.2f scheduler=%d/%d reservedMiB=%.2f"),
+						Publication->Serial, Index, Update.TerrainStage, Priority.TerrainStage, Scheduler.GetTerrainBuildStage(), static_cast<int32>(Priority.WorkClass),
 						Priority.SourcePriority, Priority.DistanceScore, Update.Exclusions.Num(),
 						Update.Source ? Update.Source->Bytes() / 1048576.0 : 0.0, Tasks.Pending, Tasks.Running,
 						Tasks.ReservedBytes / 1048576.0);

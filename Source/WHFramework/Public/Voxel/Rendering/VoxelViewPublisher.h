@@ -38,6 +38,7 @@ public:
 		TFunction<void(TConstArrayView<FVoxelPublishGroupKey>)> InOnGroupCommitted);
 	bool CommitGroup(const FGuid& InGroup);
 	bool SetOwnershipChanged(const FGuid& InGroup, bool bInChanged);
+	bool SetTerrainStage(const FGuid& InGroup, int32 InTerrainStage);
 	void SetObservers(TConstArrayView<FVector> InObservers);
 	void Tick();
 	void Forget(AActor* InActor);
@@ -54,6 +55,7 @@ public:
 private:
 #if WITH_DEV_AUTOMATION_TESTS
 	friend class FVoxelConcurrentPublishCommitTest;
+	friend class FVoxelPublisherStageAndIndexTest;
 #endif
 	using FMeshPtr = TSharedPtr<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>;
 	using FGroupCallback = TFunction<void(TConstArrayView<FVoxelPublishGroupKey>)>;
@@ -70,7 +72,9 @@ private:
 	struct FDeferredPriorityDemand
 	{
 		TArray<FBox> Bounds;
+		uint64 Serial = 0;
 		int32 TerrainStage = 3;
+		bool bTransition = false;
 	};
 	using FPriorityBoundsPtr = TSharedPtr<const FDeferredPriorityDemand, ESPMode::ThreadSafe>;
 
@@ -117,6 +121,8 @@ private:
 	{
 		FBox Bounds = FBox(ForceInit);
 		TArray<FBox> ChangedBounds;
+		// Proxy 接缝可能服务于 Fine 交接，实际更新阶段不能仅由 owner 类别推断。
+		int32 TerrainStage = 3;
 		bool bTransition = false;
 		TArray<int32> UpdateIndices;
 		TArray<TWeakObjectPtr<AActor>> VisibilityActors;
@@ -133,6 +139,7 @@ private:
 		FGroupCallbackPtr Callback;
 		bool bOwnershipChanged = true;
 		FPriorityBoundsPtr DeferredPriorityBounds;
+		int32 TerrainStage = 3;
 	};
 
 	struct FPublication
@@ -143,6 +150,7 @@ private:
 		TArray<int32> GroupOrder;
 		TMap<TWeakObjectPtr<AActor>, bool> Visibility;
 		TMap<FVoxelPublishGroupKey, FGroupCallbackPtr> Callbacks;
+		TMap<FVoxelPublishGroupKey, int32> TerrainStages;
 		TSet<FVoxelPublishGroupKey> OwnershipChanges;
 		TMap<FVoxelPublishGroupKey, FPriorityBoundsPtr> DeferredPriorityBounds;
 		TArray<FMeshPtr> PreparedMeshes;

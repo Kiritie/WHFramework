@@ -105,11 +105,8 @@ void FVoxelTerrainViewPlan::Build(TConstArrayView<FVoxelStreamingSource> InSourc
 			const int32 Distance = FMath::FloorToInt(FMath::Sqrt(Box.ComputeSquaredDistanceToPoint(FVector(Source.Center))));
 			if (Distance > Source.View.VoxelProxyRadiusCells) continue;
 			// 屏幕误差控制采样细度，覆盖层级单独扩大，不能靠放大体素来减少 Actor。
-			const uint8 MaximumSampleLevel = RootLevel > FVoxelViewKey::SampleLevelOffset
-				? RootLevel - FVoxelViewKey::SampleLevelOffset : 0;
-			const uint8 SampleLevel = FMath::Max<uint8>(1, VoxelViewLod::ResolveScreenErrorLevel(
-				Distance, 1, Source, MaximumSampleLevel, Source.View.TargetScreenErrorPixels));
-			const uint8 Level = FMath::Max<uint8>(1, SampleLevel + FVoxelViewKey::SampleLevelOffset);
+			const uint8 Level = FMath::Max<uint8>(1 + FVoxelViewKey::SampleLevelOffset,
+				VoxelViewLod::ResolveVoxelProxyLevel(Distance, Source, RootLevel, Source.View.TargetScreenErrorPixels));
 			if (Level < Node.Level)
 			{
 				Error = FMath::Max(Error, static_cast<double>(Node.GetStep()) / FMath::Max(1, Distance));
@@ -182,7 +179,7 @@ void FVoxelTerrainViewPlan::Build(TConstArrayView<FVoxelStreamingSource> InSourc
 			}
 		}
 	}
-	FineDependencies.Reset();
+	// 保留 Fine 路径的祖先及兄弟依赖；仅保留 L0 会让粗区块被 Fine 阶段门禁阻塞。
 	for (const FVoxelViewKey& Node : Leaves)
 	{
 		if (Node.Level == 0)

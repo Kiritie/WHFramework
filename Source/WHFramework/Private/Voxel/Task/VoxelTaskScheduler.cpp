@@ -111,7 +111,7 @@ namespace
 		switch (InKind)
 		{
 		case EVoxelTaskKind::BuildFineMesh: return 0;
-		case EVoxelTaskKind::BuildVoxelProxy: return 1;
+		case EVoxelTaskKind::BuildVoxelProxy: return InStage == INDEX_NONE ? 1 : InStage;
 		case EVoxelTaskKind::BuildSurface:
 		case EVoxelTaskKind::BuildWater: return 2;
 		case EVoxelTaskKind::BuildMacro: return 3;

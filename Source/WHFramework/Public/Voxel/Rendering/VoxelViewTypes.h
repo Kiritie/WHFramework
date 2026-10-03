@@ -29,13 +29,14 @@ struct WHFRAMEWORK_API FVoxelViewKey
 	uint8 Level = 0;
 
 	static constexpr uint8 SampleLevelOffset = 1;
+	static constexpr int32 MaximumSampleStep = 16;
 
 	int32 GetStep() const;
 	// 覆盖层级比采样层级高一级，同等体素细度覆盖双倍边长；近景仍为 16 格。
 	int32 GetSampleStep() const
 	{
 		const int32 SampleLevel = FMath::Max(0, static_cast<int32>(Level) - SampleLevelOffset);
-		return FMath::Min(1 << SampleLevel, 8);
+		return 1 << FMath::Min(SampleLevel, static_cast<int32>(FMath::FloorLog2(MaximumSampleStep)));
 	}
 	int32 GetGridSide() const { return GetSide() / GetSampleStep(); }
 	int32 GetSide() const;
