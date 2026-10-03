@@ -1147,40 +1147,42 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 	FVoxelTaskRequest Fine;
 	Fine.Kind = EVoxelTaskKind::BuildFineMesh;
 	Fine.WorkClass = EVoxelWorkClass::Visible;
-	FVoxelTaskRequest CoarseCoverage;
-	CoarseCoverage.Kind = EVoxelTaskKind::BuildViewCoverage;
-	CoarseCoverage.TerrainStage = 2;
-	CoarseCoverage.bPublicationContinuation = true;
-	CoarseCoverage.WorkClass = EVoxelWorkClass::Critical;
-	TestTrue(TEXT("Coarse clipping required by Critical Fine inherits the Fine priority band"),
-		FVoxelTaskScheduler::IsHigherPriority(CoarseCoverage, Fine));
-	CoarseCoverage.WorkClass = EVoxelWorkClass::Visible;
+	FVoxelTaskRequest FineCoverage;
+	FineCoverage.Kind = EVoxelTaskKind::BuildViewCoverage;
+	// A Fine consumer explicitly requests stage zero; a coarse continuation keeps its own stage.
+	FineCoverage.TerrainStage = 0;
+	FineCoverage.bPublicationContinuation = true;
+	FineCoverage.WorkClass = EVoxelWorkClass::Critical;
+	TestTrue(TEXT("Clipping explicitly requested for Critical Fine shares its terrain band"),
+		FVoxelTaskScheduler::IsHigherPriority(FineCoverage, Fine));
+	FineCoverage.WorkClass = EVoxelWorkClass::Visible;
 	Fine.WorkClass = EVoxelWorkClass::Critical;
 	TestTrue(TEXT("Critical Fine remains ahead of an ordinary publication continuation"),
-		FVoxelTaskScheduler::IsHigherPriority(Fine, CoarseCoverage));
-	TestTrue(TEXT("An admitted coarse publication can finish before new coarse generation"),
-		FVoxelTaskScheduler::IsHigherPriority(CoarseCoverage, NearProxy));
-	FVoxelTaskRequest CoarsePlan = CoarseCoverage;
+		FVoxelTaskScheduler::IsHigherPriority(Fine, FineCoverage));
+	TestTrue(TEXT("A Fine publication finishes before new coarse generation"),
+		FVoxelTaskScheduler::IsHigherPriority(FineCoverage, NearProxy));
+	FVoxelTaskRequest CoarsePlan = FineCoverage;
 	CoarsePlan.bPublicationContinuation = false;
+	CoarsePlan.TerrainStage = 2;
 	Fine.WorkClass = EVoxelWorkClass::Visible;
 	Fine.DistanceScore = 0.0;
-	CoarseCoverage.DistanceScore = 100000.0;
+	FineCoverage.DistanceScore = 100000.0;
 	TestTrue(TEXT("An admitted handoff finishes ahead of new ordinary Fine visual work"),
-		FVoxelTaskScheduler::IsHigherPriority(CoarseCoverage, Fine));
+		FVoxelTaskScheduler::IsHigherPriority(FineCoverage, Fine));
 	TestFalse(TEXT("New nearer visual work cannot repeatedly displace an admitted handoff"),
-		FVoxelTaskScheduler::IsHigherPriority(Fine, CoarseCoverage));
-	FVoxelTaskRequest NewCoverage = CoarseCoverage;
-	CoarseCoverage.QueuedAt = 1.0;
+		FVoxelTaskScheduler::IsHigherPriority(Fine, FineCoverage));
+	FVoxelTaskRequest NewCoverage = FineCoverage;
+	FineCoverage.QueuedAt = 1.0;
 	NewCoverage.QueuedAt = 2.0;
 	NewCoverage.DistanceScore = 0.0;
 	TestTrue(TEXT("Earlier admitted handoffs retain their place ahead of newer nearby handoffs"),
-		FVoxelTaskScheduler::IsHigherPriority(CoarseCoverage, NewCoverage));
+		FVoxelTaskScheduler::IsHigherPriority(FineCoverage, NewCoverage));
 	NewCoverage.WorkClass = EVoxelWorkClass::Critical;
 	TestTrue(TEXT("Critical Fine handoffs still overtake older ordinary handoffs"),
-		FVoxelTaskScheduler::IsHigherPriority(NewCoverage, CoarseCoverage));
+		FVoxelTaskScheduler::IsHigherPriority(NewCoverage, FineCoverage));
 	TestTrue(TEXT("Independent coarse coverage planning retains its own terrain stage"),
 		FVoxelTaskScheduler::IsHigherPriority(Fine, CoarsePlan));
-	FVoxelTaskRequest CriticalCoverage = CoarseCoverage;
+	FVoxelTaskRequest CriticalCoverage = FineCoverage;
 	CriticalCoverage.WorkClass = EVoxelWorkClass::Critical;
 	CriticalCoverage.DistanceScore = 70.0;
 	FVoxelTaskRequest CriticalFine = Fine;
@@ -1209,11 +1211,104 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 	for (int32 Earlier = 0; Earlier < CriticalOrder.Num(); ++Earlier)
 		for (int32 Later = Earlier + 1; Later < CriticalOrder.Num(); ++Later)
 		{
-			TestTrue(TEXT("Critical upstream and publication ordering is transitive"),
+			TestTrue(TEXT("Expected Critical upstream and publication pair order"),
 				FVoxelTaskScheduler::IsHigherPriority(CriticalOrder[Earlier], CriticalOrder[Later]));
-			TestFalse(TEXT("Critical upstream and publication ordering is asymmetric"),
+			TestFalse(TEXT("Expected Critical pair cannot reverse its dependency order"),
 				FVoxelTaskScheduler::IsHigherPriority(CriticalOrder[Later], CriticalOrder[Earlier]));
 		}
+	TArray<FVoxelTaskRequest> PrioritySamples = CriticalOrder;
+	PrioritySamples.Append({Fine, NearProxy, CoarsePlan, PreferredSourceFine, NewCoverage});
+	const EVoxelTaskKind StageMeshes[] = {EVoxelTaskKind::BuildFineMesh, EVoxelTaskKind::BuildVoxelProxy,
+		EVoxelTaskKind::BuildSurface, EVoxelTaskKind::BuildMacro};
+	for (int32 Stage = 0; Stage < 4; ++Stage)
+	{
+		for (const EVoxelWorkClass WorkClass : {EVoxelWorkClass::Visible, EVoxelWorkClass::Critical})
+		{
+			FVoxelTaskRequest Handoff;
+			Handoff.Kind = EVoxelTaskKind::BuildViewCoverage;
+			Handoff.TerrainStage = Stage;
+			Handoff.WorkClass = WorkClass;
+			Handoff.bPublicationContinuation = true;
+			Handoff.QueuedAt = 1.0;
+			Handoff.DistanceScore = 100000.0;
+			PrioritySamples.Add(Handoff);
+			TArray<EVoxelTaskKind> MeshKinds{StageMeshes[Stage], EVoxelTaskKind::BuildViewTransition};
+			if (Stage <= 1) MeshKinds.Add(EVoxelTaskKind::BuildVolumeTransition);
+			if (Stage == 2) MeshKinds.Add(EVoxelTaskKind::BuildWater);
+			for (const EVoxelTaskKind Kind : MeshKinds)
+			{
+				FVoxelTaskRequest Mesh = Handoff;
+				Mesh.Kind = Kind;
+				Mesh.bPublicationContinuation = false;
+				Mesh.DistanceScore = 0.0;
+				Mesh.QueuedAt = 0.0;
+				PrioritySamples.Add(Mesh);
+				TestTrue(*FString::Printf(TEXT("Admitted handoff precedes new representation: stage=%d kind=%d class=%d"),
+					Stage, int32(Kind), int32(WorkClass)), FVoxelTaskScheduler::IsHigherPriority(Handoff, Mesh));
+				TestFalse(TEXT("New same-stage representation cannot displace admitted handoff"),
+					FVoxelTaskScheduler::IsHigherPriority(Mesh, Handoff));
+			}
+			if (Stage > 0)
+			{
+				FVoxelTaskRequest EarlierMesh = Fine;
+				EarlierMesh.TerrainStage = Stage - 1;
+				TestTrue(TEXT("A continuation cannot cross an earlier terrain stage"),
+					FVoxelTaskScheduler::IsHigherPriority(EarlierMesh, Handoff));
+				TestFalse(TEXT("Critical coarse continuation retains its declared terrain stage"),
+					FVoxelTaskScheduler::IsHigherPriority(Handoff, EarlierMesh));
+			}
+			if (WorkClass == EVoxelWorkClass::Critical)
+			{
+				for (const EVoxelTaskKind Kind : {EVoxelTaskKind::GenerateExactBase, EVoxelTaskKind::BuildCollision, EVoxelTaskKind::BuildNavigation})
+				{
+					FVoxelTaskRequest Upstream = Handoff;
+					Upstream.Kind = Kind;
+					Upstream.bPublicationContinuation = false;
+					PrioritySamples.Add(Upstream);
+					TestTrue(TEXT("Critical data collision and navigation remain upstream of same-stage publication"),
+						FVoxelTaskScheduler::IsHigherPriority(Upstream, Handoff));
+				}
+			}
+		}
+	}
+	for (const EVoxelWorkClass WorkClass : {EVoxelWorkClass::Warmup, EVoxelWorkClass::ExactData,
+		EVoxelWorkClass::Interactive, EVoxelWorkClass::Boundary, EVoxelWorkClass::Exploration,
+		EVoxelWorkClass::Background, EVoxelWorkClass::Prefetch})
+	{
+		FVoxelTaskRequest Sample = Fine;
+		Sample.WorkClass = WorkClass;
+		Sample.SourcePriority = int32(WorkClass) % 3 - 1;
+		PrioritySamples.Add(Sample);
+	}
+	for (const EVoxelTaskKind Kind : {EVoxelTaskKind::ProjectBackground, EVoxelTaskKind::BuildGenerationPlan,
+		EVoxelTaskKind::BuildDetails})
+	{
+		for (const int32 Source : {-10, 10})
+		{
+			FVoxelTaskRequest Sample = Fine;
+			Sample.Kind = Kind;
+			Sample.WorkClass = Kind == EVoxelTaskKind::ProjectBackground ? EVoxelWorkClass::ExactData : EVoxelWorkClass::Visible;
+			Sample.SourcePriority = Source;
+			PrioritySamples.Add(Sample);
+		}
+	}
+	for (int32 A = 0; A < PrioritySamples.Num(); ++A)
+	{
+		TestFalse(TEXT("Priority comparison is irreflexive"),
+			FVoxelTaskScheduler::IsHigherPriority(PrioritySamples[A], PrioritySamples[A]));
+		for (int32 B = 0; B < PrioritySamples.Num(); ++B)
+		{
+			if (!FVoxelTaskScheduler::IsHigherPriority(PrioritySamples[A], PrioritySamples[B])) continue;
+			TestFalse(*FString::Printf(TEXT("Priority comparison is asymmetric: a=%d b=%d"), A, B),
+				FVoxelTaskScheduler::IsHigherPriority(PrioritySamples[B], PrioritySamples[A]));
+			for (int32 C = 0; C < PrioritySamples.Num(); ++C)
+			{
+				if (!FVoxelTaskScheduler::IsHigherPriority(PrioritySamples[B], PrioritySamples[C])) continue;
+				TestTrue(*FString::Printf(TEXT("Priority comparison is transitive: a=%d b=%d c=%d"), A, B, C),
+					FVoxelTaskScheduler::IsHigherPriority(PrioritySamples[A], PrioritySamples[C]));
+			}
+		}
+	}
 	for (const EVoxelWorkClass FixtureClass : {EVoxelWorkClass::Visible, EVoxelWorkClass::Critical})
 	{
 		FVoxelTaskScheduler Scheduler;
@@ -1311,6 +1406,7 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 		Budget.MaxCompletedResultsPerFrame = 16;
 		Budget.MaxHeavyCompletedResultsPerFrame = 16;
 		Scheduler.SetBudget(Budget);
+		Scheduler.SetTerrainBuildStage(0);
 		auto Enqueue = [&](const int32 Index)
 		{
 			FVoxelTaskRequest Request;
@@ -1334,23 +1430,49 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 		if (WorkerCount == 1) FPlatformProcess::Sleep(1.05f);
 		Release.Store(true);
 		const double Deadline = FPlatformTime::Seconds() + 5.0;
-		if (WorkerCount > 1)
-		{
-			while (Finished.Load() < 9 && FPlatformTime::Seconds() < Deadline) FPlatformProcess::Sleep(0.001f);
-			// Execute increments Finished before the worker marks its task complete.
-			FPlatformProcess::Sleep(0.5f);
-		}
+		int32 Completed[9] = {};
+		int32 Canceled = 0;
+		int32 Failed = 0;
 		TArray<int32> Stages;
-		while (Scheduler.ActiveCount() > 0 && FPlatformTime::Seconds() < Deadline)
+		while ((Scheduler.GetDiagnostics().Running > 0 || Scheduler.GetDiagnostics().Pending > 0) &&
+			FPlatformTime::Seconds() < Deadline)
 		{
-			Scheduler.Tick([&Stages](FVoxelTaskResult&& Result)
+			Scheduler.Tick([&](FVoxelTaskResult&& Result)
 			{
-				if (Result.Stamp.Token < 8 && !Result.bCanceled) Stages.Add(static_cast<int32>(Result.Stamp.Token) / 2);
+				Canceled += Result.bCanceled ? 1 : 0;
+				Failed += !Result.bSuccess ? 1 : 0;
+				if (Result.Stamp.Token >= UE_ARRAY_COUNT(Completed))
+				{
+					AddError(TEXT("Terrain fixture received an unknown completion token"));
+					return;
+				}
+				++Completed[Result.Stamp.Token];
+				// Distant data may prefetch early; only mesh application follows the terrain gate.
+				if (Result.Stamp.Token < 8 && (Result.Stamp.Token & 1) && !Result.bCanceled)
+				{
+					const int32 Stage = static_cast<int32>(Result.Stamp.Token) / 2;
+					TestTrue(TEXT("Mesh cannot apply ahead of the consumer terrain stage"), Stage <= Scheduler.GetTerrainBuildStage());
+					Stages.Add(Stage);
+				}
 			}, 8.0);
+			const int32 Stage = Scheduler.GetTerrainBuildStage();
+			if (Stage < 3 && Completed[Stage * 2 + 1] == 1) Scheduler.SetTerrainBuildStage(Stage + 1);
 			FPlatformProcess::Sleep(0.001f);
 		}
+		TestEqual(TEXT("Foreground and background queues drain while completions are pumped"),
+			Scheduler.GetDiagnostics().Running + Scheduler.GetDiagnostics().Pending, 0);
+		TestEqual(TEXT("All fixture executions finish before shutdown"), Finished.Load(), 9);
+		TestEqual(TEXT("No terrain task is canceled to make progress"), Canceled, 0);
+		TestEqual(TEXT("All terrain results report success"), Failed, 0);
 		Scheduler.StopAndJoin();
-		TestEqual(TEXT("All terrain tasks finish without cancellation"), Stages.Num(), 8);
+		int32 TerrainCompleted = 0;
+		for (int32 Index = 0; Index < 9; ++Index)
+		{
+			TestEqual(*FString::Printf(TEXT("Task completes exactly once: workers=%d token=%d"), WorkerCount, Index), Completed[Index], 1);
+			if (Index < 8) TerrainCompleted += Completed[Index];
+		}
+		TestEqual(TEXT("All terrain tasks finish without cancellation"), TerrainCompleted, 8);
+		TestEqual(TEXT("Every terrain mesh stage applies"), Stages.Num(), 4);
 		for (int32 Index = 1; Index < Stages.Num(); ++Index)
 		{
 			TestTrue(*FString::Printf(TEXT("Stage application order: workers=%d index=%d previous=%d current=%d"),
@@ -1370,25 +1492,26 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelCriticalCapacitySchedulerTest,
 bool FVoxelCriticalCapacitySchedulerTest::RunTest(const FString& Parameters)
 {
 	(void)Parameters;
+	TAtomic<bool> ReleaseBackground(false);
+	TAtomic<bool> ReleaseForeground(false);
+	TAtomic<bool> ReleaseCritical(false);
 	FVoxelTaskScheduler Scheduler;
 	FVoxelTaskBudget Budget;
 	Budget.MaxConcurrentTasks = 2;
 	Budget.CriticalReservedTasks = 1;
 	Scheduler.SetBudget(Budget);
-	TAtomic<bool> ReleaseBackground(false);
-	TAtomic<bool> ReleaseCritical(false);
-	auto MakeRequest = [&ReleaseBackground, &ReleaseCritical](const uint64 Token, const EVoxelTaskKind Kind,
+	auto MakeRequest = [&](const uint64 Token, const EVoxelTaskKind Kind,
 		const EVoxelWorkClass WorkClass)
 	{
 		FVoxelTaskRequest Request;
 		Request.Kind = Kind;
 		Request.WorkClass = WorkClass;
 		Request.Stamp.Token = Token;
-		Request.ReservedBytes = WorkClass == EVoxelWorkClass::Critical
-			? 128ull * 1024ull * 1024ull : 1024;
-		Request.Execute = [&ReleaseBackground, &ReleaseCritical, WorkClass](const TAtomic<bool>& Cancel)
+		Request.ReservedBytes = Token <= 103 ? Budget.MaxReservedBytes / 2 : 1024;
+		Request.Execute = [&, WorkClass, Kind](const TAtomic<bool>& Cancel)
 		{
-			const TAtomic<bool>& Release = WorkClass == EVoxelWorkClass::Critical ? ReleaseCritical : ReleaseBackground;
+			const TAtomic<bool>& Release = WorkClass == EVoxelWorkClass::Critical ? ReleaseCritical
+				: Kind == EVoxelTaskKind::BuildFineMesh ? ReleaseForeground : ReleaseBackground;
 			while (!Release.Load() && !Cancel.Load()) FPlatformProcess::Sleep(0.001f);
 			FVoxelTaskResult Result;
 			Result.bSuccess = !Cancel.Load();
@@ -1396,81 +1519,137 @@ bool FVoxelCriticalCapacitySchedulerTest::RunTest(const FString& Parameters)
 		};
 		return Request;
 	};
-	TestTrue(TEXT("First background task starts"), Scheduler.Enqueue(
+	TestTrue(TEXT("Background task enters its default bounded lane"), Scheduler.Enqueue(
 		MakeRequest(101, EVoxelTaskKind::ProjectBackground, EVoxelWorkClass::Background)));
-	TestTrue(TEXT("Second background task fills worker slots"), Scheduler.Enqueue(
-		MakeRequest(102, EVoxelTaskKind::ProjectBackground, EVoxelWorkClass::Background)));
+	TestTrue(TEXT("Foreground mesh fills the independent foreground lane"), Scheduler.Enqueue(
+		MakeRequest(102, EVoxelTaskKind::BuildFineMesh, EVoxelWorkClass::Visible)));
+	TestEqual(TEXT("Both execution lanes are occupied"), Scheduler.GetDiagnostics().Running, 2);
+	TestEqual(TEXT("Fixture fills the shared reservation budget"), Scheduler.GetDiagnostics().ReservedBytes, Budget.MaxReservedBytes);
 	TestTrue(TEXT("Critical task queues behind running work"), Scheduler.Enqueue(
 		MakeRequest(103, EVoxelTaskKind::BuildCollision, EVoxelWorkClass::Critical)));
 	TestTrue(TEXT("Coarse work queues behind critical work"), Scheduler.Enqueue(
 		MakeRequest(104, EVoxelTaskKind::BuildSurface, EVoxelWorkClass::Visible)));
+	TestTrue(TEXT("New ordinary foreground work also waits"), Scheduler.Enqueue(
+		MakeRequest(105, EVoxelTaskKind::BuildFineMesh, EVoxelWorkClass::Visible)));
 	TestEqual(TEXT("Critical task is pending"), Scheduler.GetDiagnostics().CriticalPending, 1);
-	Scheduler.CancelMatching([](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
+	int32 Completed[5] = {};
+	int32 Canceled = 0;
+	auto Apply = [&](FVoxelTaskResult&& Result)
 	{
-		return Kind == EVoxelTaskKind::ProjectBackground && Stamp.Token == 101;
-	});
+		Canceled += Result.bCanceled ? 1 : 0;
+		TestTrue(TEXT("Capacity fixture completes successfully"), Result.bSuccess);
+		if (Result.Stamp.Token >= 101 && Result.Stamp.Token <= 105) ++Completed[Result.Stamp.Token - 101];
+		else AddError(TEXT("Capacity fixture received an unknown token"));
+	};
+	ReleaseForeground.Store(true);
 	const double Deadline = FPlatformTime::Seconds() + 5.0;
-	while (Scheduler.GetDiagnostics().CriticalAdmissionDeferrals == 0 && FPlatformTime::Seconds() < Deadline)
-	{
-		Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
-		FPlatformProcess::Sleep(0.001f);
-	}
-	TestTrue(TEXT("Coarse admission is deferred while critical needs capacity"),
-		Scheduler.GetDiagnostics().CriticalAdmissionDeferrals > 0);
-	TestEqual(TEXT("Coarse work stays pending"),
-		Scheduler.GetDiagnostics().PendingByKind.FindRef(EVoxelTaskKind::BuildSurface), 1);
-	ReleaseBackground.Store(true);
 	while (Scheduler.GetDiagnostics().CriticalRunning == 0 && FPlatformTime::Seconds() < Deadline)
 	{
-		Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
+		Scheduler.Tick(Apply, 8.0);
 		FPlatformProcess::Sleep(0.001f);
 	}
-	TestEqual(TEXT("Critical task takes released slot"), Scheduler.GetDiagnostics().CriticalRunning, 1);
+	TestTrue(TEXT("Ordinary foreground admission is deferred while Critical needs capacity"),
+		Scheduler.GetDiagnostics().CriticalAdmissionDeferrals > 0);
+	TestEqual(TEXT("Default background quota keeps coarse work queued"),
+		Scheduler.GetDiagnostics().PendingByKind.FindRef(EVoxelTaskKind::BuildSurface), 1);
+	TestEqual(TEXT("Critical task takes released foreground capacity"), Scheduler.GetDiagnostics().CriticalRunning, 1);
+	TestEqual(TEXT("Background work remains running while Critical makes progress"),
+		Scheduler.GetDiagnostics().RunningByKind.FindRef(EVoxelTaskKind::ProjectBackground), 1);
+	ReleaseCritical.Store(true);
+	while (Completed[2] == 0 && FPlatformTime::Seconds() < Deadline)
+	{
+		Scheduler.Tick(Apply, 8.0);
+		FPlatformProcess::Sleep(0.001f);
+	}
+	TestEqual(TEXT("Critical completes without waiting for background release"), Completed[2], 1);
+	TestEqual(TEXT("Background task is still held after Critical completion"), Completed[0], 0);
+	ReleaseBackground.Store(true);
+	while ((Scheduler.GetDiagnostics().Running > 0 || Scheduler.GetDiagnostics().Pending > 0) &&
+		FPlatformTime::Seconds() < Deadline)
+	{
+		Scheduler.Tick(Apply, 8.0);
+		FPlatformProcess::Sleep(0.001f);
+	}
+	TestEqual(TEXT("Capacity fixture drains every queue"), Scheduler.GetDiagnostics().Running + Scheduler.GetDiagnostics().Pending, 0);
+	TestEqual(TEXT("No capacity fixture task is canceled"), Canceled, 0);
+	for (int32 Index = 0; Index < UE_ARRAY_COUNT(Completed); ++Index)
+		TestEqual(*FString::Printf(TEXT("Capacity task completes exactly once: token=%d"), Index + 101), Completed[Index], 1);
 	Scheduler.StopAndJoin();
 	return true;
 }
 
 bool FVoxelDataPrefetchSchedulerTest::RunTest(const FString& Parameters)
 {
-	FVoxelTaskScheduler Scheduler;
-	FVoxelTaskBudget Budget;
-	Budget.MaxConcurrentTasks = 4;
-	Scheduler.SetBudget(Budget);
-	auto MakeRequest = [](uint64 Token, EVoxelTaskKind Kind, EVoxelWorkClass WorkClass)
+	(void)Parameters;
+	for (const int32 BackgroundSlots : {1, 2})
 	{
-		FVoxelTaskRequest Request;
-		Request.Kind = Kind;
-		Request.WorkClass = WorkClass;
-		Request.Stamp.Token = Token;
-		Request.ReservedBytes = 1024;
-		Request.Execute = [](const TAtomic<bool>& Cancel)
+		TAtomic<bool> Release(false);
+		FVoxelTaskScheduler Scheduler;
+		FVoxelTaskBudget Budget;
+		Budget.MaxConcurrentTasks = 4;
+		if (BackgroundSlots == 2) Budget.MaxConcurrentCoarseTerrainTasks = 2;
+		else TestEqual(TEXT("Default shared background quota remains bounded"), Budget.MaxConcurrentCoarseTerrainTasks, 1);
+		Scheduler.SetBudget(Budget);
+		auto MakeRequest = [&](uint64 Token, EVoxelTaskKind Kind, EVoxelWorkClass WorkClass)
 		{
-			while (!Cancel.Load()) FPlatformProcess::Sleep(0.001f);
-			return FVoxelTaskResult();
+			FVoxelTaskRequest Request;
+			Request.Kind = Kind;
+			Request.WorkClass = WorkClass;
+			Request.Stamp.Token = Token;
+			Request.ReservedBytes = 1024;
+			Request.Execute = [&Release](const TAtomic<bool>& Cancel)
+			{
+				while (!Release.Load() && !Cancel.Load()) FPlatformProcess::Sleep(0.001f);
+				FVoxelTaskResult Result;
+				Result.bSuccess = !Cancel.Load();
+				return Result;
+			};
+			return Request;
 		};
-		return Request;
-	};
-	FVoxelTaskRequest Prefetch = MakeRequest(1, EVoxelTaskKind::GenerateVoxelProxy, EVoxelWorkClass::Prefetch);
-	FVoxelTaskRequest Fine = MakeRequest(2, EVoxelTaskKind::BuildFineMesh, EVoxelWorkClass::Visible);
-	Fine.DistanceScore = 10000.0;
-	TestTrue(TEXT("Fine has priority over nearer speculative data"), FVoxelTaskScheduler::IsHigherPriority(Fine, Prefetch));
-	TestFalse(TEXT("Speculative data cannot outrank Fine"), FVoxelTaskScheduler::IsHigherPriority(Prefetch, Fine));
-	Scheduler.Enqueue(MoveTemp(Fine));
-	Scheduler.Enqueue(MoveTemp(Prefetch));
-	Scheduler.Enqueue(MakeRequest(3, EVoxelTaskKind::GenerateSurface, EVoxelWorkClass::Prefetch));
-	Scheduler.Enqueue(MakeRequest(4, EVoxelTaskKind::GenerateMacro, EVoxelWorkClass::Prefetch));
-	FVoxelTaskDiagnostics Stats = Scheduler.GetDiagnostics();
-	TestEqual(TEXT("Data starts while Fine is still running"), Stats.RunningByKind.FindRef(EVoxelTaskKind::GenerateVoxelProxy), 1);
-	TestEqual(TEXT("Data tasks leave foreground capacity available"), Stats.Running, 3);
-	TestEqual(TEXT("Excess speculative data remains queued"), Stats.Pending, 1);
-	Scheduler.Enqueue(MakeRequest(5, EVoxelTaskKind::BuildCollision, EVoxelWorkClass::Critical));
-	TestEqual(TEXT("New collision work starts without waiting for prefetch"), Scheduler.GetDiagnostics().RunningByKind.FindRef(EVoxelTaskKind::BuildCollision), 1);
-	Scheduler.CancelMatching([](EVoxelTaskKind Kind, const FVoxelTaskStamp&)
-	{
-		return Kind == EVoxelTaskKind::GenerateMacro;
-	});
-	TestEqual(TEXT("Obsolete queued data is removed"), Scheduler.GetDiagnostics().Pending, 0);
-	Scheduler.StopAndJoin();
+		FVoxelTaskRequest Prefetch = MakeRequest(1, EVoxelTaskKind::GenerateVoxelProxy, EVoxelWorkClass::Prefetch);
+		FVoxelTaskRequest Fine = MakeRequest(2, EVoxelTaskKind::BuildFineMesh, EVoxelWorkClass::Visible);
+		Fine.DistanceScore = 10000.0;
+		TestTrue(TEXT("Fine has priority over nearer speculative data"), FVoxelTaskScheduler::IsHigherPriority(Fine, Prefetch));
+		TestFalse(TEXT("Speculative data cannot outrank Fine"), FVoxelTaskScheduler::IsHigherPriority(Prefetch, Fine));
+		TestTrue(TEXT("Fine fixture is admitted"), Scheduler.Enqueue(MoveTemp(Fine)));
+		TestTrue(TEXT("Proxy data fixture is admitted"), Scheduler.Enqueue(MoveTemp(Prefetch)));
+		TestTrue(TEXT("Surface data fixture is admitted"), Scheduler.Enqueue(MakeRequest(3, EVoxelTaskKind::GenerateSurface, EVoxelWorkClass::Prefetch)));
+		TestTrue(TEXT("Macro data fixture is admitted"), Scheduler.Enqueue(MakeRequest(4, EVoxelTaskKind::GenerateMacro, EVoxelWorkClass::Prefetch)));
+		const FVoxelTaskDiagnostics Stats = Scheduler.GetDiagnostics();
+		TestEqual(TEXT("Data starts while Fine is still running"), Stats.RunningByKind.FindRef(EVoxelTaskKind::GenerateVoxelProxy), 1);
+		TestEqual(TEXT("Data obeys the configured background quota and leaves foreground capacity"), Stats.Running, 1 + BackgroundSlots);
+		TestEqual(TEXT("Excess speculative data remains queued"), Stats.Pending, 3 - BackgroundSlots);
+		TestTrue(TEXT("Collision fixture is admitted"), Scheduler.Enqueue(MakeRequest(5, EVoxelTaskKind::BuildCollision, EVoxelWorkClass::Critical)));
+		TestEqual(TEXT("New collision work starts without waiting for prefetch"), Scheduler.GetDiagnostics().RunningByKind.FindRef(EVoxelTaskKind::BuildCollision), 1);
+		Scheduler.CancelMatching([](EVoxelTaskKind Kind, const FVoxelTaskStamp&)
+		{
+			return Kind == EVoxelTaskKind::GenerateMacro;
+		});
+		TestEqual(TEXT("Obsolete queued data is removed"), Scheduler.GetDiagnostics().PendingByKind.FindRef(EVoxelTaskKind::GenerateMacro), 0);
+		TestEqual(TEXT("Canceling Macro preserves unrelated queued Surface data"), Scheduler.GetDiagnostics().Pending, 2 - BackgroundSlots);
+		int32 Completed[5] = {};
+		int32 Canceled = 0;
+		Release.Store(true);
+		const double Deadline = FPlatformTime::Seconds() + 5.0;
+		while ((Scheduler.GetDiagnostics().Running > 0 || Scheduler.GetDiagnostics().Pending > 0) &&
+			FPlatformTime::Seconds() < Deadline)
+		{
+			Scheduler.Tick([&](FVoxelTaskResult&& Result)
+			{
+				Canceled += Result.bCanceled ? 1 : 0;
+				TestEqual(TEXT("Only deliberately canceled Macro reports cancellation"), Result.bCanceled, Result.Stamp.Token == 4);
+				if (!Result.bCanceled) TestTrue(TEXT("Remaining foreground and data tasks succeed"), Result.bSuccess);
+				if (Result.Stamp.Token >= 1 && Result.Stamp.Token <= 5) ++Completed[Result.Stamp.Token - 1];
+				else AddError(TEXT("Prefetch fixture received an unknown token"));
+			}, 8.0);
+			FPlatformProcess::Sleep(0.001f);
+		}
+		TestEqual(TEXT("Prefetch fixture drains both execution lanes"), Scheduler.GetDiagnostics().Running + Scheduler.GetDiagnostics().Pending, 0);
+		TestEqual(TEXT("Queued cancellation notifies its owner exactly once"), Canceled, 1);
+		for (int32 Index = 0; Index < UE_ARRAY_COUNT(Completed); ++Index)
+			TestEqual(*FString::Printf(TEXT("Prefetch completion delivered once: quota=%d token=%d"), BackgroundSlots, Index + 1), Completed[Index], 1);
+		Scheduler.StopAndJoin();
+	}
 	return true;
 }
 
@@ -1612,6 +1791,11 @@ bool FVoxelMapTileBuildTest::RunTest(const FString& InParameters)
 		Config, MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>());
 	FVoxelTaskScheduler Scheduler;
 	FVoxelMapTileCache Cache(Scheduler, Generator, Config, 1, 25.0);
+	// 此夹具只验证栅格发布；正式配色由项目资产契约测试覆盖。
+	Cache.SetColorResolver([](const FVoxelColumnSample&, const FVoxelGenerationRuntimeConfig&)
+	{
+		return FColor(81, 146, 73);
+	}, 1);
 	const FVoxelMapTileKey Key { FIntPoint(-1, 0), 16 };
 	const FVoxelMapTileKey WorldKey { FIntPoint(0, 0), 512 };
 	TArray<FVoxelMapTileKey> Requested;

@@ -169,8 +169,6 @@ void UTaskModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 
 			}
 		}
-		CurrentTask = ResolveTask(Data.CurrentTask);
-		if (CurrentTask && CurrentTask->IsLeaved()) CurrentTask = nullptr;
 	}
 	if (PHASEC(InPhase, EPhase::Final))
 	{
@@ -183,6 +181,9 @@ void UTaskModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 				Pair.Key->ResumeRuntimeData(Pair.Value);
 				Pair.Key->SetTaskTimersPaused(ModuleState == EModuleState::Paused);
 			}
+		// 任务状态在 Final 阶段才反序列化，恢复运行状态后再判断追踪目标是否仍然有效。
+		CurrentTask = ResolveTask(Data.CurrentTask);
+		if (CurrentTask && CurrentTask->IsLeaved()) CurrentTask = nullptr;
 		bLoadingTasks = false;
 		RequestTaskMarkersRefresh();
 		UEventModuleStatics::BroadcastEvent<FEventCurrentTaskChanged>(this, {CurrentTask});

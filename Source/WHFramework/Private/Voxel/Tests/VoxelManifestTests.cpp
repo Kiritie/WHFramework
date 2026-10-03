@@ -5,11 +5,11 @@
 #include "Voxel/VoxelModule.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FVoxelManifestV12IdentityTest,
-	"WHFramework.Voxel.Generation.ManifestV12Identity",
+	FVoxelManifestIdentityTest,
+	"WHFramework.Voxel.Generation.ManifestIdentity",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-bool FVoxelManifestV12IdentityTest::RunTest(const FString& InParameters)
+bool FVoxelManifestIdentityTest::RunTest(const FString& InParameters)
 {
 	(void)InParameters;
 	FVoxelWorldManifest Manifest;
@@ -78,7 +78,7 @@ bool FVoxelManifestV12IdentityTest::RunTest(const FString& InParameters)
 	TestFalse(TEXT("Runtime refuses a previous terrain algorithm"),
 		Module->ValidateWorldData(FParameter(MoveTemp(PreviousWorld)), Error));
 	TestTrue(TEXT("Runtime explains the algorithm mismatch"),
-		Error.Contains(TEXT("algorithm 11 differs from current algorithm 12")));
+		Error.Contains(FString::Printf(TEXT("algorithm 11 differs from current algorithm %u"), FVoxelGenerationRecipe::CurrentAlgorithmVersion)));
 	return true;
 }
 

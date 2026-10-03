@@ -15,6 +15,7 @@ bool FSceneDeferredMarkerTrackingTest::RunTest(const FString& InParameters)
 	const FGuid PoiId(17, 29, 31, 43);
 	FSceneModuleSaveData SaveData;
 	SaveData.TrackedMarkerID = PoiId;
+	SaveData.MakeSaved();
 	Scene->LoadSaveData(FParameter(SaveData), EPhase::Primary);
 	TestEqual(TEXT("Tracking survives before derived marker registration"),
 		Scene->GetTrackedMarker(), PoiId);

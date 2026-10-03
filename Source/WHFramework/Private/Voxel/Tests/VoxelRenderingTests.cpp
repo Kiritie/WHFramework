@@ -335,23 +335,54 @@ bool FVoxelProxyOverlaySnapshotTest::RunTest(const FString& InParameters)
 {
 	const auto Config = VoxelTest::MakeGenerationConfig();
 	const auto Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
+	const FVoxelViewKey EditedKey{FIntVector(-1, 0, 0), 1};
+	const FVoxelGenerationBounds EditedBounds = EditedKey.GetBounds();
+	const FIntVector HaloOrigin(EditedBounds.Max.X, EditedBounds.Min.Y, EditedBounds.Min.Z);
+	const int32 EditedStep = EditedKey.GetSampleStep();
 	FVoxelOverlaySnapshotSet Overlays;
-	for (const FIntVector Section : { FIntVector(-2, 0, 0), FIntVector(0, 0, 0) })
+	auto SetEditedCells = [&](const FVoxelBlockState State)
 	{
-		FVoxelOverlaySnapshot& Overlay = Overlays.Sections.FindOrAdd(Section);
-		Overlay.Section = Section;
-		Overlay.Blocks.Add(272, FVoxelBlockState());
-		Overlay.Blocks.Add(273, FVoxelBlockState());
-	}
+		for (const FIntVector Origin : {EditedBounds.Min, HaloOrigin})
+		{
+			for (int32 Z = 0; Z < EditedStep; ++Z)
+			{
+				for (int32 Y = 0; Y < EditedStep; ++Y)
+				{
+					for (int32 X = 0; X < EditedStep; ++X)
+					{
+						const FIntVector Position = Origin + FIntVector(X, Y, Z);
+						const FIntVector Section(
+							VoxelGeneration::FloorDivide(Position.X, VoxelBlock::Size),
+							VoxelGeneration::FloorDivide(Position.Y, VoxelBlock::Size),
+							VoxelGeneration::FloorDivide(Position.Z, VoxelBlock::Size));
+						const FIntVector Local = Position - Section * VoxelBlock::Size;
+						FVoxelOverlaySnapshot& Overlay = Overlays.Sections.FindOrAdd(Section);
+						Overlay.Section = Section;
+						Overlay.Blocks.Add(Local.X + VoxelBlock::Size * (Local.Y + VoxelBlock::Size * Local.Z), State);
+					}
+				}
+			}
+		}
+	};
+	// The edited physical cells follow the key's sample footprint, including its positive-X halo.
+	SetEditedCells(FVoxelBlockState());
 	const FVoxelOverlaySnapshotSet Captured = Overlays;
-	Overlays.Sections.FindChecked(FIntVector(-2, 0, 0)).Blocks[273] = FVoxelBlockState(1, 0);
+	SetEditedCells(FVoxelBlockState(1, 0));
 	FVoxelVoxelProxyData Data;
 	FString Error;
 	const FVoxelVoxelProxyBuilder Builder(Config, Cache);
 	if (!TestTrue(TEXT("Proxy builds from immutable edits"),
-		Builder.Build({ FIntVector(-1, 0, 0), 1 }, Captured, Data, Error))) return false;
+		Builder.Build(EditedKey, Captured, Data, Error))) return false;
+	TestEqual(TEXT("Proxy grid follows its coverage and physical sample step"), Data.GridSide, EditedKey.GetGridSide());
 	TestTrue(TEXT("Negative-coordinate edit comes from captured version"), Data.Cells[0].IsAir());
 	TestTrue(TEXT("Neighbour halo uses the same edit snapshot"), Data.Halo[0][0].IsAir());
+	FVoxelVoxelProxyData Updated;
+	if (!TestTrue(TEXT("Later edits build independently of the captured snapshot"),
+		Builder.Build(EditedKey, Overlays, Updated, Error))) return false;
+	TestEqual(TEXT("Later negative-coordinate placement reaches the same physical cell"),
+		Updated.Cells[0].Pack(), FVoxelBlockState(1, 0).Pack());
+	TestEqual(TEXT("Later halo placement reaches the same physical neighbor"),
+		Updated.Halo[0][0].Pack(), FVoxelBlockState(1, 0).Pack());
 
 	FVoxelOverlaySnapshotSet Placed;
 	FVoxelOverlaySnapshot& AboveGround = Placed.Sections.FindOrAdd(FIntVector(0, 0, 128));
@@ -710,78 +741,104 @@ bool FVoxelVolumeTransitionMeshInvariantTest::RunTest(const FString& InParameter
 	Registry.Definitions[1].bOccludes = true;
 	FVoxelShapeRegistry Shapes;
 	Shapes.BuildDefaults();
-	const FVoxelViewKey Owner{FIntVector(0, 0, 0), 1};
-	const FVoxelViewKey Neighbor{FIntVector(2, 0, 0), 0};
-	TSet<FVoxelViewKey> Visible;
-	Visible.Add(Owner);
-	Visible.Add(Neighbor);
-	TArray<FVoxelVolumeTransitionFace> Faces;
-	FVoxelVolumeTransitionPlanner::Build(Visible, 1, Faces);
-	if (!TestEqual(TEXT("Visible coarse/fine boundary has one owner patch"), Faces.Num(), 1))
+	// Level 1/Fine shares a physical sample step; Level 2/Level 1 is a real 2:1 sample boundary.
+	for (const uint8 Level : {uint8(1), uint8(2)})
 	{
-		return false;
-	}
-	FVoxelSection Fine;
-	Fine.Status = EVoxelSectionStatus::DataReady;
-	Fine.Blocks.Init(FVoxelBlockState(0, 0), 4096);
-	Fine.Blocks[0] = FVoxelBlockState(1, 0);
-	Fine.CommittedRevision = 7;
-	FVoxelBoundaryTransitionContext Context;
-	Context.Owner = Owner;
-	FVoxelBoundaryTransitionPatch& Patch = Context.Patches.AddDefaulted_GetRef();
-	Patch.Face = Faces[0];
-	if (!TestTrue(TEXT("Fine boundary is copied from the runtime section"),
-		FVoxelBoundaryFaceSnapshot::CaptureFine(Neighbor, 1, Fine, Patch.Neighbor)))
-	{
-		return false;
-	}
-	if (!TestTrue(TEXT("Captured transition footprint is valid"), Context.Validate()))
-	{
-		return false;
-	}
-	FVoxelSectionSnapshot Coarse;
-	Coarse.Blocks.Init(FVoxelBlockState(0, 0).Pack(), 4096);
-	Coarse.Blocks[15] = FVoxelBlockState(1, 0).Pack();
-	Coarse.Known[0] = true;
-	Coarse.Halo[0].Init(FVoxelBlockState(0, 0).Pack(), 256);
-	auto CountBoundaryTriangles = [](const FVoxelSectionMeshResult& Mesh)
-	{
-		int32 Count = 0;
-		for (const FVoxelRenderBatch& Batch : Mesh.Batches)
+		const FString Case = FString::Printf(TEXT("OwnerLevel=%u"), Level);
+		const FVoxelViewKey Owner{FIntVector::ZeroValue, Level};
+		const FVoxelViewKey Neighbor{FIntVector(2, 0, 0), static_cast<uint8>(Level - 1)};
+		const int32 OwnerSide = Owner.GetGridSide();
+		const int32 NeighborSide = Neighbor.GetGridSide();
+		const int32 Ratio = Owner.GetSampleStep() / Neighbor.GetSampleStep();
+		TestEqual(Case + TEXT(" has the intended physical sample ratio"), Ratio, Level == 1 ? 1 : 2);
+		const TSet<FVoxelViewKey> Visible{Owner, Neighbor};
+		TArray<FVoxelVolumeTransitionFace> Faces;
+		FVoxelVolumeTransitionPlanner::Build(Visible, Level, Faces);
+		if (!TestEqual(Case + TEXT(" has one owner patch"), Faces.Num(), 1)) return false;
+
+		FVoxelSection Fine;
+		FVoxelVoxelProxyData NeighborProxy;
+		if (Neighbor.Level == 0)
 		{
-			for (int32 Index = 0; Index < Batch.Mesh.Triangles.Num(); Index += 3)
-			{
-				const FVector& A = Batch.Mesh.Vertices[Batch.Mesh.Triangles[Index]];
-				const FVector& B = Batch.Mesh.Vertices[Batch.Mesh.Triangles[Index + 1]];
-				const FVector& C = Batch.Mesh.Vertices[Batch.Mesh.Triangles[Index + 2]];
-				if (FMath::IsNearlyEqual(A.X, 16.0) && FMath::IsNearlyEqual(B.X, 16.0) &&
-					FMath::IsNearlyEqual(C.X, 16.0)) ++Count;
-			}
+			Fine.Status = EVoxelSectionStatus::DataReady;
+			Fine.Blocks.Init(FVoxelBlockState(), VoxelBlock::Volume);
+			Fine.Blocks[0] = FVoxelBlockState(1, 0);
+			Fine.CommittedRevision = 7;
 		}
-		return Count;
-	};
-	FVoxelSectionMeshResult Mesh;
-	if (!TestTrue(TEXT("Coarse boundary with transition builds"),
-		FVoxelSectionMesher::Build(Coarse, Registry, Shapes, Mesh, nullptr, 1.0, &Context)))
-	{
-		return false;
+		else
+		{
+			NeighborProxy.Key = Neighbor;
+			NeighborProxy.GridSide = NeighborSide;
+			NeighborProxy.Cells.Init(FVoxelBlockState(), NeighborSide * NeighborSide * NeighborSide);
+			NeighborProxy.Cells[0] = FVoxelBlockState(1, 0);
+			NeighborProxy.Revision = 7;
+		}
+		FVoxelBoundaryTransitionContext Context;
+		Context.Owner = Owner;
+		FVoxelBoundaryTransitionPatch& Patch = Context.Patches.AddDefaulted_GetRef();
+		Patch.Face = Faces[0];
+		auto CaptureNeighbor = [&]()
+		{
+			return Neighbor.Level == 0
+				? FVoxelBoundaryFaceSnapshot::CaptureFine(Neighbor, 1, Fine, Patch.Neighbor)
+				: FVoxelBoundaryFaceSnapshot::CaptureProxy(NeighborProxy, 1, Patch.Neighbor);
+		};
+		if (!TestTrue(Case + TEXT(" captures its physical neighbor"), CaptureNeighbor()) ||
+			!TestTrue(Case + TEXT(" has a valid transition footprint"), Context.Validate())) return false;
+		FVoxelSectionSnapshot Coarse;
+		Coarse.GridSide = OwnerSide;
+		Coarse.Blocks.Init(FVoxelBlockState().Pack(), OwnerSide * OwnerSide * OwnerSide);
+		Coarse.Blocks[OwnerSide - 1] = FVoxelBlockState(1, 0).Pack();
+		Coarse.Known[0] = true;
+		Coarse.Halo[0].Init(FVoxelBlockState().Pack(), OwnerSide * OwnerSide);
+		auto CheckBoundary = [&](const FVoxelSectionMeshResult& Mesh, const bool bNeighborSolid)
+		{
+			int32 Count = 0;
+			double Area = 0.;
+			bool bOverlapsSolid = false;
+			for (const FVoxelRenderBatch& Batch : Mesh.Batches)
+			{
+				TestTrue(Case + TEXT(" has valid mesh attributes"), Batch.Mesh.Validate());
+				for (int32 Index = 0; Index < Batch.Mesh.Triangles.Num(); Index += 3)
+				{
+					const FVector& A = Batch.Mesh.Vertices[Batch.Mesh.Triangles[Index]];
+					const FVector& B = Batch.Mesh.Vertices[Batch.Mesh.Triangles[Index + 1]];
+					const FVector& C = Batch.Mesh.Vertices[Batch.Mesh.Triangles[Index + 2]];
+					if (A.X != OwnerSide || B.X != OwnerSide || C.X != OwnerSide) continue;
+					++Count;
+					Area += FVector::CrossProduct(B - A, C - A).Size() * 0.5;
+					const FVector Center = (A + B + C) / 3.;
+					bOverlapsSolid |= bNeighborSolid && Center.Y < 1. / Ratio && Center.Z < 1. / Ratio;
+				}
+			}
+			const int32 ExposedSubfaces = Ratio * Ratio - (bNeighborSolid ? 1 : 0);
+			TestEqual(Case + (bNeighborSolid ? TEXT(" hides only the occupied subface without duplicates")
+				: TEXT(" exposes every subface after removal")), Count, ExposedSubfaces * 2);
+			TestTrue(Case + TEXT(" covers exactly the physically exposed boundary area"),
+				FMath::IsNearlyEqual(Area, double(ExposedSubfaces) / (Ratio * Ratio)));
+			TestFalse(Case + TEXT(" emits no face over the solid neighbor"), bOverlapsSolid);
+		};
+		FVoxelSectionMeshResult Mesh;
+		if (!TestTrue(Case + TEXT(" builds the occupied boundary"),
+			FVoxelSectionMesher::Build(Coarse, Registry, Shapes, Mesh, nullptr, 1.0, &Context))) return false;
+		CheckBoundary(Mesh, true);
+		const uint64 PreviousSignature = Context.Signature(3);
+		if (Neighbor.Level == 0)
+		{
+			Fine.Blocks[0] = FVoxelBlockState();
+			++Fine.CommittedRevision;
+		}
+		else
+		{
+			NeighborProxy.Cells[0] = FVoxelBlockState();
+			++NeighborProxy.Revision;
+		}
+		if (!TestTrue(Case + TEXT(" captures the player edit"), CaptureNeighbor())) return false;
+		TestTrue(Case + TEXT(" invalidates the transition mesh after the edit"), Context.Signature(3) != PreviousSignature);
+		if (!TestTrue(Case + TEXT(" remeshes after removal"),
+			FVoxelSectionMesher::Build(Coarse, Registry, Shapes, Mesh, nullptr, 1.0, &Context))) return false;
+		CheckBoundary(Mesh, false);
 	}
-	TestEqual(TEXT("One solid fine subface hides only its quadrant; no coarse duplicate"),
-		CountBoundaryTriangles(Mesh), 6);
-	const uint64 PreviousSignature = Context.Signature(3);
-	Fine.Blocks[0] = FVoxelBlockState(0, 0);
-	++Fine.CommittedRevision;
-	TestTrue(TEXT("Boundary snapshot updates after a player edit"),
-		FVoxelBoundaryFaceSnapshot::CaptureFine(Neighbor, 1, Fine, Patch.Neighbor));
-	TestTrue(TEXT("Fine edit invalidates the coarse transition mesh"),
-		Context.Signature(3) != PreviousSignature);
-	if (!TestTrue(TEXT("Edited transition remesh builds"),
-		FVoxelSectionMesher::Build(Coarse, Registry, Shapes, Mesh, nullptr, 1.0, &Context)))
-	{
-		return false;
-	}
-	TestEqual(TEXT("All four fine subfaces become visible after removal"),
-		CountBoundaryTriangles(Mesh), 8);
 	return true;
 }
 

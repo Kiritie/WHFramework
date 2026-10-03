@@ -146,6 +146,30 @@ bool FVoxelGenerationPlanCoordinator::GatherForBounds(
 	return true;
 }
 
+TSharedRef<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> FVoxelGenerationPlanCoordinator::RetainDependencies(
+	TConstArrayView<FVoxelGenerationPlanDependency> InDependencies,
+	const FIntPoint& InCenter) const
+{
+	FVoxelGenerationCacheRetentionPoint Point;
+	Point.Center = InCenter;
+	const auto& Settings = Config->Recipe->Settings;
+	const int64 HydrologySide = static_cast<int64>(FMath::Max(8, Settings.HydrologyRegionSide)) * FMath::Max(1, Settings.HydrologyCellSize);
+	for (const FVoxelGenerationPlanDependency& Dependency : InDependencies)
+	{
+		const FIntVector Coordinate = Dependency.Coordinate();
+		const bool bHydrology = Dependency.Kind == EVoxelGenerationPlanKind::Hydrology;
+		const bool bEcology = Dependency.Kind == EVoxelGenerationPlanKind::Ecology;
+		const int64 Side = bHydrology ? HydrologySide : bEcology ? FVoxelGenerationQuery::EcologyTileSide : FVoxelGenerationQuery::GenerationPlanTileSide;
+		// Cache 按水文/生态中心与其他计划原点回收；保留实际依赖键直到消费者完成。
+		const int64 Offset = bHydrology || bEcology ? Side / 2 : 0;
+		const int64 Distance = FMath::Max(FMath::Abs(static_cast<int64>(Coordinate.X) * Side + Offset - InCenter.X),
+			FMath::Abs(static_cast<int64>(Coordinate.Y) * Side + Offset - InCenter.Y));
+		int32& Radius = bHydrology ? Point.HydrologyRadiusCells : Point.PlanRadiusCells;
+		Radius = FMath::Max(Radius, static_cast<int32>(FMath::Min<int64>(MAX_int32, Distance)));
+	}
+	return Cache->RetainForTask(Point);
+}
+
 FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::EnsureEnvironment(const FIntPoint& InCell)
 {
 	const FVoxelHydrologyRegionKey Key = FVoxelGenerationQuery::HydrologyKeyForVoxel(

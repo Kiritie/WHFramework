@@ -3,6 +3,7 @@
 #pragma once
 
 #include "UObject/UObjectGlobals.h"
+#include "Common/CommonModuleStatics.h"
 #include "Main/MainModuleStatics.h"
 #include "Debug/DebugModuleTypes.h"
 
@@ -43,9 +44,10 @@ ModuleClass& ModuleClass::Get(bool bInEditor, bool bForce) \
 } \
 ModuleClass* ModuleClass::GetPtr(bool bInEditor, bool bForce) \
 { \
+	UWorld* CurrentWorld = UCommonModuleStatics::ResolveCurrentWorld(bInEditor); \
 	if(!bInEditor) \
 	{ \
-		if(!Instance || bForce) \
+		if(!::IsValid(Instance) || Instance->GetWorld() != CurrentWorld || bForce) \
 		{ \
 			Instance = UCommonModuleStatics::GetObjectInExistedWorld<ModuleClass>([](const UWorld* World) { \
 													return UGameplayStatics::GetActorOfClass(World, ModuleClass::StaticClass()); \
@@ -55,7 +57,7 @@ ModuleClass* ModuleClass::GetPtr(bool bInEditor, bool bForce) \
 	} \
 	else \
 	{ \
-		if(!InstanceEditor || bForce) \
+		if(!::IsValid(InstanceEditor) || InstanceEditor->GetWorld() != CurrentWorld || bForce) \
 		{ \
 			InstanceEditor = UCommonModuleStatics::GetObjectInExistedWorld<ModuleClass>([](const UWorld* World) { \
                              						return UGameplayStatics::GetActorOfClass(World, ModuleClass::StaticClass()); \
@@ -97,9 +99,10 @@ ModuleClass& ModuleClass::Get(bool bInEditor) \
 } \
 ModuleClass* ModuleClass::GetPtr(bool bInEditor) \
 { \
+	UWorld* CurrentWorld = UCommonModuleStatics::ResolveCurrentWorld(bInEditor); \
 	if(!bInEditor) \
 	{ \
-		if(!Instance) \
+		if(!::IsValid(Instance) || Instance->GetWorld() != CurrentWorld) \
 		{ \
 			Instance = Cast<ModuleClass>(UMainModuleStatics::GetModuleByClass(ModuleClass::StaticClass(), false)); \
 		} \
@@ -107,7 +110,7 @@ ModuleClass* ModuleClass::GetPtr(bool bInEditor) \
 	} \
 	else \
 	{ \
-		if(!InstanceEditor) \
+		if(!::IsValid(InstanceEditor) || InstanceEditor->GetWorld() != CurrentWorld) \
 		{ \
 			InstanceEditor = Cast<ModuleClass>(UMainModuleStatics::GetModuleByClass(ModuleClass::StaticClass(), true)); \
 		} \

@@ -14,6 +14,28 @@ bool GIsPlaying = true;
 
 bool GIsSimulating = false;
 
+namespace
+{
+	thread_local UObject* ScopedWorldContext = nullptr;
+}
+
+FScopedWorldContext::FScopedWorldContext(UObject* InContext)
+	: PreviousContext(ScopedWorldContext)
+{
+	check(IsInGameThread());
+	ScopedWorldContext = InContext;
+}
+
+FScopedWorldContext::~FScopedWorldContext()
+{
+	ScopedWorldContext = PreviousContext;
+}
+
+UObject* FScopedWorldContext::Get()
+{
+	return ScopedWorldContext;
+}
+
 const UObject* GetWorldContext(bool bInEditor)
 {
 	return UCommonModuleStatics::GetWorldContext(bInEditor);

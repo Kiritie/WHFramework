@@ -125,6 +125,28 @@ void UInputModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 
 	for(FInputPlayerRuntime& Runtime : PlayerRuntimes)
 	{
+		APlayerController* PlayerController = Runtime.LocalPlayer
+			? Runtime.LocalPlayer->GetPlayerController(GetWorld())
+			: nullptr;
+		UInputComponentBase* InputComponent = PlayerController
+			? Cast<UInputComponentBase>(PlayerController->InputComponent)
+			: nullptr;
+		// 客户端控制器和输入组件可能晚于模块准备完成，组件更换时迁移现有绑定。
+		if(Runtime.InputComponent != InputComponent)
+		{
+			for(UInputBindingBase* InputBinding : Runtime.InputBindings)
+			{
+				if(InputBinding) InputBinding->OnUnbindInput();
+			}
+			Runtime.InputComponent = InputComponent;
+			if(InputComponent)
+			{
+				for(UInputBindingBase* InputBinding : Runtime.InputBindings)
+				{
+					if(InputBinding) InputBinding->OnBindInput(InputComponent);
+				}
+			}
+		}
 		for(UInputBindingBase* InputBinding : Runtime.InputBindings)
 		{
 			if(InputBinding)

@@ -76,7 +76,8 @@ bool FVoxelNavigationSurfaceBuilder::Build(const FVoxelSectionSnapshot& InSectio
 						Result.Vertices.Add(Position);
 						Result.Bounds += Position;
 					}
-					Result.Indices.Append({FirstVertex, FirstVertex + 1, FirstVertex + 2, FirstVertex, FirstVertex + 2, FirstVertex + 3});
+					// Recast 的 UE 坐标转换会反转朝向；导航导出必须使转换后的法向朝 +Y。
+					Result.Indices.Append({FirstVertex, FirstVertex + 2, FirstVertex + 1, FirstVertex, FirstVertex + 3, FirstVertex + 2});
 				}
 			}
 		}

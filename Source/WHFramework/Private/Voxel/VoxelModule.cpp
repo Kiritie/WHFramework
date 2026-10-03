@@ -758,11 +758,7 @@ bool UVoxelModule::StartWorld(
 		*Scheduler,
 		[this](const FIntVector& InSection)
 		{
-			if (CollisionPresenter)
-			{
-				CollisionPresenter->InvalidateSection(InSection);
-			}
-			RemoveSimulationSection(InSection);
+			OnSectionEvicting(InSection);
 		},
 		[this](const FIntVector& InSection)
 		{
@@ -1605,6 +1601,19 @@ bool UVoxelModule::ActivateSimulationSection(const FIntVector& InSection)
 	Delta.Revision = ++SimulationResidencyRevision;
 	OnSimulationResidencyChanged(Delta);
 	return true;
+}
+
+void UVoxelModule::OnSectionEvicting(const FIntVector& InSection)
+{
+	if (CollisionPresenter)
+	{
+		CollisionPresenter->InvalidateSection(InSection);
+	}
+	if (NavigationPresenter)
+	{
+		NavigationPresenter->InvalidateSection(InSection);
+	}
+	RemoveSimulationSection(InSection);
 }
 
 void UVoxelModule::RemoveSimulationSection(const FIntVector& InSection)

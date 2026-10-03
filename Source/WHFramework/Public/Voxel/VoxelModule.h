@@ -65,6 +65,9 @@ struct WHFRAMEWORK_API FVoxelModuleSaveCapture
 UCLASS()
 class WHFRAMEWORK_API UVoxelModule : public UModuleBase
 {
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FVoxelNavigationResidencyTest;
+#endif
 	GENERATED_BODY()
 	GENERATED_MODULE(UVoxelModule)
 
@@ -295,6 +298,7 @@ private:
 	void ApplyTask(FVoxelTaskResult&& InResult);
 	void RefreshInterest(double InNow);
 	void RefreshSimulationResidency();
+	void OnSectionEvicting(const FIntVector& InSection);
 	bool ActivateSimulationSection(const FIntVector& InSection);
 	void RemoveSimulationSection(const FIntVector& InSection);
 	void UpdateReadiness();

@@ -39,6 +39,8 @@ public:
 	virtual void OnGenerate() override;
 
 	virtual void OnDestroy() override;
+
+	bool ValidateWorldWidgetConfigs(TArray<FText>& OutErrors, TArray<FText>& OutWarnings) const;
 #endif
 	
 	virtual void OnInitialize() override;
@@ -184,8 +186,6 @@ private:
 
 #if WITH_EDITOR
 	bool ValidateScreenWidgetConfigs(TArray<FText>& OutErrors, TArray<FText>& OutWarnings) const;
-
-	bool ValidateWorldWidgetConfigs(TArray<FText>& OutErrors, TArray<FText>& OutWarnings) const;
 
 	bool ValidateWidgetTheme(TArray<FText>& OutErrors, TArray<FText>& OutWarnings) const;
 

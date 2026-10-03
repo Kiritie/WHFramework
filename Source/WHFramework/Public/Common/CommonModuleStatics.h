@@ -293,28 +293,19 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Gameplay
+	static UWorld* ResolveCurrentWorld(bool bInEditor = false);
+
 	template<class T>
 	static T* GetObjectInExistedWorld(TFunction<UObject*(UWorld*)>&& Callback, bool bInEditor = false)
 	{
-		for(const FWorldContext& Context : GEngine->GetWorldContexts())
-		{
-			if(!Context.World()) continue;
-			
-			if(!bInEditor && Context.World()->IsGameWorld() || bInEditor && Context.World()->IsEditorWorld())
-			{
-				if(T* Object = Cast<T>(Callback(Context.World())))
-				{
-					return Object;
-				}
-			}
-		}
-		return nullptr;
+		UWorld* World = ResolveCurrentWorld(bInEditor);
+		return World ? Cast<T>(Callback(World)) : nullptr;
 	}
 
 	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics")
 	static UWorld* GetWorldFromObjectExisted(const UObject* InObject)
 	{
-		return InObject->GetWorld();
+		return InObject ? InObject->GetWorld() : nullptr;
 	}
 
 	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics")

@@ -14,6 +14,7 @@ UWHWorldSubsystem::UWHWorldSubsystem()
 
 void UWHWorldSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
+	const FScopedWorldContext WorldContextScope(&InWorld);
 	Super::OnWorldBeginPlay(InWorld);
 
 	if(AWHGameMode* GameMode = InWorld.GetAuthGameMode<AWHGameMode>())
@@ -24,7 +25,8 @@ void UWHWorldSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		}
 	}
 
-	if(AMainModule* MainModule = AMainModule::GetPtr())
+	AMainModule* MainModule = AMainModule::GetPtr();
+	if(MainModule)
 	{
 		if(!IWHActorInterface::Execute_IsInitialized(MainModule))
 		{
@@ -48,5 +50,11 @@ void UWHWorldSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		{
 			IWHActorInterface::Execute_OnInitialize(Actor);
 		}
+	}
+
+	// 全部 Actor 初始化后，由每个 World 统一准备模块；客户端同样需要完整阶段。
+	if (MainModule)
+	{
+		IWHActorInterface::Execute_OnPreparatory(MainModule);
 	}
 }

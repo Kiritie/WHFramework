@@ -118,14 +118,18 @@ bool FVoxelNetworkRepresentationDataCodecTest::RunTest(const FString& InParamete
 	FVoxelVoxelProxyData Proxy;
 	Proxy.Key = { FIntVector(-3, 2, 1), 2 };
 	Proxy.Revision = 17;
-	Proxy.GridSide = 16;
-	Proxy.Cells.Init(FVoxelBlockState { 3, 9 }, 4096);
-	TestTrue(TEXT("Encode voxel proxy data"), FVoxelRepresentationSync::EncodeVoxelProxy(Proxy, Bytes, Error));
+	Proxy.GridSide = Proxy.Key.GetGridSide();
+	Proxy.Cells.Init(FVoxelBlockState { 3, 9 }, Proxy.GridSide * Proxy.GridSide * Proxy.GridSide);
+	if (!TestTrue(TEXT("Encode voxel proxy data"), FVoxelRepresentationSync::EncodeVoxelProxy(Proxy, Bytes, Error))) return false;
 	FVoxelVoxelProxyData DecodedProxy;
-	TestTrue(TEXT("Decode voxel proxy data"), FVoxelRepresentationSync::DecodeVoxelProxy(Bytes, DecodedProxy, Error));
+	if (!TestTrue(TEXT("Decode voxel proxy data"), FVoxelRepresentationSync::DecodeVoxelProxy(Bytes, DecodedProxy, Error)) ||
+		!TestEqual(TEXT("Voxel proxy complete cell count"), DecodedProxy.Cells.Num(), Proxy.Cells.Num())) return false;
 	TestEqual(TEXT("Voxel proxy key"), DecodedProxy.Key.Coordinate, Proxy.Key.Coordinate);
 	TestEqual(TEXT("Voxel proxy revision"), DecodedProxy.Revision, Proxy.Revision);
 	TestEqual(TEXT("Voxel proxy cell"), DecodedProxy.Cells[2048].Pack(), Proxy.Cells[2048].Pack());
+	Proxy.GridSide = 16;
+	Proxy.Cells.SetNum(4096);
+	TestFalse(TEXT("Wrong proxy sampling resolution cannot encode"), FVoxelRepresentationSync::EncodeVoxelProxy(Proxy, Bytes, Error));
 
 	FVoxelSurfaceTileData Surface;
 	Surface.Key = { FIntPoint(4, -5), 1 };
@@ -135,9 +139,9 @@ bool FVoxelNetworkRepresentationDataCodecTest::RunTest(const FString& InParamete
 	Surface.Flags = { 0, 1, 2, 4 };
 	Surface.DistantCells.Add({FIntVector(256, -320, 5), FIntVector(272, -304, 21),
 		FVoxelBlockState(3, 9), {17, 23}});
-	TestTrue(TEXT("Encode surface data"), FVoxelRepresentationSync::EncodeSurface(Surface, Bytes, Error));
+	if (!TestTrue(TEXT("Encode surface data"), FVoxelRepresentationSync::EncodeSurface(Surface, Bytes, Error))) return false;
 	FVoxelSurfaceTileData DecodedSurface;
-	TestTrue(TEXT("Decode surface data"), FVoxelRepresentationSync::DecodeSurface(Bytes, DecodedSurface, Error));
+	if (!TestTrue(TEXT("Decode surface data"), FVoxelRepresentationSync::DecodeSurface(Bytes, DecodedSurface, Error))) return false;
 	TestEqual(TEXT("Surface heights"), DecodedSurface.GroundZ, Surface.GroundZ);
 	TestEqual(TEXT("Surface flags"), DecodedSurface.Flags, Surface.Flags);
 	TestEqual(TEXT("Surface distant cell count"), DecodedSurface.DistantCells.Num(), 1);
@@ -160,9 +164,9 @@ bool FVoxelNetworkRepresentationDataCodecTest::RunTest(const FString& InParamete
 	Macro.LargeStructures.Add({ FIntPoint(4, 5), 6, 7, 8 });
 	Macro.DistantCells.Add({FIntVector(-4096, 16384, 12), FIntVector(-4048, 16432, 58),
 		FVoxelBlockState(3, 9), {31, 37}});
-	TestTrue(TEXT("Encode macro data"), FVoxelRepresentationSync::EncodeMacro(Macro, Bytes, Error));
+	if (!TestTrue(TEXT("Encode macro data"), FVoxelRepresentationSync::EncodeMacro(Macro, Bytes, Error))) return false;
 	FVoxelMacroTileData DecodedMacro;
-	TestTrue(TEXT("Decode macro data"), FVoxelRepresentationSync::DecodeMacro(Bytes, DecodedMacro, Error));
+	if (!TestTrue(TEXT("Decode macro data"), FVoxelRepresentationSync::DecodeMacro(Bytes, DecodedMacro, Error))) return false;
 	TestEqual(TEXT("Macro height"), DecodedMacro.Height, Macro.Height);
 	TestEqual(TEXT("Macro water semantics"), DecodedMacro.WaterKind, Macro.WaterKind);
 	TestEqual(TEXT("Macro structures"), DecodedMacro.LargeStructures.Num(), 1);
@@ -204,12 +208,14 @@ bool FVoxelNetworkNaturalFarRepresentationTest::RunTest(const FString& InParamet
 	Input.Generator = Generator;
 	TArray<uint8> Bytes;
 	FString Error;
-	TestTrue(TEXT("Natural far representation builds locally"), FVoxelRepresentationSync::BuildServerData(Input, Bytes, Error));
+	if (!TestTrue(TEXT("Natural far representation builds locally"), FVoxelRepresentationSync::BuildServerData(Input, Bytes, Error))) return false;
 	TestEqual(TEXT("Natural far build does not allocate exact runtime"), Runtime.NumSections(), ResidentBefore);
 
 	FVoxelVoxelProxyData Decoded;
-	TestTrue(TEXT("Natural far representation decodes"), FVoxelRepresentationSync::DecodeVoxelProxy(Bytes, Decoded, Error));
-	TestEqual(TEXT("Natural far representation has proxy cells"), Decoded.Cells.Num(), VoxelBlock::Volume);
+	if (!TestTrue(TEXT("Natural far representation decodes"), FVoxelRepresentationSync::DecodeVoxelProxy(Bytes, Decoded, Error))) return false;
+	const FVoxelViewKey ExpectedKey{Input.Request.Key.Coordinate, Input.Request.Key.Level};
+	const int32 Side = ExpectedKey.GetGridSide();
+	TestEqual(TEXT("Natural far representation has complete proxy cells"), Decoded.Cells.Num(), Side * Side * Side);
 	return true;
 }
 

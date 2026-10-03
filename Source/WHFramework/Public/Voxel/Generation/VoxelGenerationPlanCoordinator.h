@@ -52,6 +52,10 @@ public:
 		TArray<FVoxelGenerationPlanDependency>& OutDependencies,
 		FString& OutError) const;
 
+	TSharedRef<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> RetainDependencies(
+		TConstArrayView<FVoxelGenerationPlanDependency> InDependencies,
+		const FIntPoint& InCenter) const;
+
 	FVoxelGenerationDependencyStatus Ensure(
 		TConstArrayView<FVoxelGenerationPlanDependency> InDependencies,
 		EVoxelWorkClass InWorkClass,

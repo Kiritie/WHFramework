@@ -692,23 +692,21 @@ bool UUserWidgetBase::DestroySubWidget(ISubWidgetInterface* InWidget, EObjectDes
 		}
 		return true;
 	}
-	InWidget->OnDestroy(InMode);
-	return true;
+	return false;
 }
 
 void UUserWidgetBase::DestroyAllSubWidget(EObjectDespawnMode InMode)
 {
-	const TArray<FSubWidgetRuntimeEntry> Entries = MoveTemp(SubWidgetEntries);
-	SubWidgetEntries.Reset();
-	for(const FSubWidgetRuntimeEntry& Entry : Entries)
+	// 回收回调可以注销同一面板中的嵌套项，尚未回收的条目必须保留所有权登记。
+	while(!SubWidgetEntries.IsEmpty())
 	{
-		if(ISubWidgetInterface* SubWidget = Cast<ISubWidgetInterface>(Entry.Widget))
+		if(ISubWidgetInterface* SubWidget = Cast<ISubWidgetInterface>(SubWidgetEntries[0].Widget))
 		{
-			SubWidget->OnDestroy(InMode);
-			if(!Entry.bDynamic)
-			{
-				IObjectPoolInterface::Execute_OnDespawn(Entry.Widget, InMode);
-			}
+			DestroySubWidget(SubWidget, InMode);
+		}
+		else
+		{
+			SubWidgetEntries.RemoveAt(0);
 		}
 	}
 }

@@ -29,6 +29,22 @@ struct WHFRAMEWORK_API FWHActorSpawnParameter : public FActorSpawnParameter
 extern WHFRAMEWORK_API bool GIsPlaying;
 extern WHFRAMEWORK_API bool GIsSimulating;
 
+// 同进程多个 World 的同步调用使用所属上下文；嵌套调用结束后恢复外层上下文。
+class WHFRAMEWORK_API FScopedWorldContext
+{
+public:
+	explicit FScopedWorldContext(UObject* InContext);
+	~FScopedWorldContext();
+
+	FScopedWorldContext(const FScopedWorldContext&) = delete;
+	FScopedWorldContext& operator=(const FScopedWorldContext&) = delete;
+
+	static UObject* Get();
+
+private:
+	UObject* PreviousContext;
+};
+
 //////////////////////////////////////////////////////////////////////////
 // Types
 UENUM(BlueprintType)

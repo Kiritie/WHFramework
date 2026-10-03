@@ -37,10 +37,6 @@ void AWHGameMode::OnInitialize_Implementation()
 
 void AWHGameMode::OnPreparatory_Implementation()
 {
-	if(AMainModule* MainModule = AMainModule::GetPtr())
-	{
-		MainModule->Execute_OnPreparatory(MainModule);
-	}
 }
 
 void AWHGameMode::OnRefresh_Implementation(float DeltaSeconds)

@@ -48,10 +48,9 @@ void AMainModule::OnDestroy()
 
 void AMainModule::OnInitialize_Implementation()
 {
+	const FScopedWorldContext WorldContextScope(this);
 	Super::OnInitialize_Implementation();
 	SetActorTickEnabled(false);
-
-	GWorldContext = this;
 
 	for(auto Iter : Modules)
 	{
@@ -63,6 +62,7 @@ void AMainModule::OnInitialize_Implementation()
 
 void AMainModule::OnPreparatory_Implementation()
 {
+	const FScopedWorldContext WorldContextScope(this);
 	Super::OnPreparatory_Implementation();
 
 	ITER_PHASE(Phase,
@@ -84,6 +84,7 @@ void AMainModule::OnPreparatory_Implementation()
 
 void AMainModule::OnRefresh_Implementation(float DeltaSeconds)
 {
+	const FScopedWorldContext WorldContextScope(this);
 	Super::OnRefresh_Implementation(DeltaSeconds);
 
 	for(auto Iter : Modules)
@@ -97,6 +98,7 @@ void AMainModule::OnRefresh_Implementation(float DeltaSeconds)
 
 void AMainModule::OnTermination_Implementation()
 {
+	const FScopedWorldContext WorldContextScope(this);
 	const double TerminationStartTime = FPlatformTime::Seconds();
 	UE_LOG(LogTemp, Display, TEXT("Main module termination started."));
 
@@ -129,7 +131,6 @@ void AMainModule::OnTermination_Implementation()
 	
 	UEventModuleStatics::BroadcastEvent<FEventGameExited>(this, { true });
 
-	ModuleMap.Empty();
 	UE_LOG(LogTemp,
 	       Display,
 	       TEXT("Main module termination finished in %.3fs."),

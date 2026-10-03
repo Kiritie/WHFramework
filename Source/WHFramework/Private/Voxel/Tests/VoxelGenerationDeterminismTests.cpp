@@ -230,12 +230,22 @@ bool FVoxelGenerationPlanPreflightTest::RunTest(const FString& InParameters)
 		Coordinator.GatherForBounds({ FIntVector::ZeroValue, FIntVector(16) },
 			Dependencies, Error))) return false;
 	TestTrue(TEXT("Section has shared plan dependencies"), !Dependencies.IsEmpty());
+	FVoxelGenerationCacheRetention StreamingRetention;
+	StreamingRetention.HydrologyRegionSide = Config->Recipe->Settings.HydrologyRegionSide;
+	StreamingRetention.HydrologyCellSize = Config->Recipe->Settings.HydrologyCellSize;
+	StreamingRetention.Revision = 1;
+	FVoxelGenerationCacheRetentionPoint& StreamingPoint = StreamingRetention.Points.AddDefaulted_GetRef();
+	StreamingPoint.NaturalRadiusCells = StreamingPoint.PlanRadiusCells = StreamingPoint.HydrologyRadiusCells = 32;
+	Cache->UpdateRetention(StreamingRetention);
+	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> ConsumerRetention =
+		Coordinator.RetainDependencies(Dependencies, FIntPoint(8, 8));
 	FVoxelGenerationDependencyStatus Status;
 	const double Deadline = FPlatformTime::Seconds() + 90.0;
 	do
 	{
 		Status = Coordinator.Ensure(Dependencies, EVoxelWorkClass::Critical, 0, 0.0, 1.0);
 		Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
+		Cache->TickMaintenance(256);
 		if (!Status.bReady && !Status.bFailed) FPlatformProcess::Sleep(0.001f);
 	} while (!Status.bReady && !Status.bFailed && FPlatformTime::Seconds() < Deadline);
 	Scheduler.StopAndJoin();
@@ -266,6 +276,10 @@ bool FVoxelGenerationPlanPreflightTest::RunTest(const FString& InParameters)
 	TestEqual(TEXT("Preflight preserves exact generation"),
 		VoxelTest::HashBlocks(PreflightBlocks), VoxelTest::HashBlocks(ReferenceBlocks));
 	TestEqual(TEXT("Preflight avoids cache gate waits"), Cache->GetStats().GateWaitCount, 0ull);
+	TestTrue(TEXT("A narrow streaming source keeps the consumer's completed hydrology available"), Cache->GetStats().Hydrology > 0);
+	ConsumerRetention.Reset();
+	for (int32 Index = 0; Index < FVoxelGenerationPlanCache::ShardCount * 4; ++Index) Cache->TickMaintenance(256);
+	TestEqual(TEXT("Consumer completion releases plans outside the narrow streaming retention"), Cache->GetStats().Hydrology, 0);
 	return true;
 }
 

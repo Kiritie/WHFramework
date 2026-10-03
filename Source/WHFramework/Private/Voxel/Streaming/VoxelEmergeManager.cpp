@@ -449,6 +449,7 @@ bool FVoxelEmergeManager::RequestBase(
 		}
 		Waiting = &WaitingPlanSections.Add(InKey);
 		Waiting->Dependencies = MoveTemp(Gathered);
+		Waiting->Retention = PlanCoordinator->RetainDependencies(Waiting->Dependencies, FIntPoint(Min.X + 8, Min.Y + 8));
 	}
 	const double Now = FPlatformTime::Seconds();
 	if (Now < Waiting->RetryAfterSeconds)
@@ -492,8 +493,7 @@ bool FVoxelEmergeManager::RequestBase(
 		Waiting->RetryAfterSeconds = Now + 0.2;
 		return false;
 	}
-	PlanCoordinator->ReleaseConsumer(InKey);
-	WaitingPlanSections.Remove(InKey);
+	const auto CapturedRetention = Waiting->Retention;
 
 	FVoxelTaskRequest Request;
 	Request.Kind =
@@ -517,7 +517,7 @@ bool FVoxelEmergeManager::RequestBase(
 			Generator;
 
 	Request.Execute =
-		[CapturedGenerator, InKey](
+		[CapturedGenerator, CapturedRetention, InKey](
 			const TAtomic<bool>& InCancel)
 		{
 			FVoxelTaskResult Result;
@@ -538,6 +538,12 @@ bool FVoxelEmergeManager::RequestBase(
 	++EnqueueAttempts;
 	const bool bEnqueued = Scheduler.Enqueue(MoveTemp(Request));
 	EnqueuedTasks += bEnqueued ? 1 : 0;
+	if (bEnqueued)
+	{
+		// 租约随任务捕获，覆盖排队与执行；撤销需求或任务完成后自动释放。
+		PlanCoordinator->ReleaseConsumer(InKey);
+		WaitingPlanSections.Remove(InKey);
+	}
 	return bEnqueued;
 }
 

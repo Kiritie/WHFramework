@@ -29,9 +29,22 @@ namespace
 
 	bool IsCriticalRepresentationWork(const FVoxelTaskRequest& InRequest)
 	{
-		return InRequest.WorkClass == EVoxelWorkClass::Critical &&
-			(InRequest.Kind == EVoxelTaskKind::BuildFineMesh || InRequest.Kind == EVoxelTaskKind::BuildVoxelProxy ||
-				(InRequest.Kind == EVoxelTaskKind::BuildViewCoverage && InRequest.bPublicationContinuation));
+		if (InRequest.WorkClass != EVoxelWorkClass::Critical) return false;
+		switch (InRequest.Kind)
+		{
+		case EVoxelTaskKind::BuildFineMesh:
+		case EVoxelTaskKind::BuildVoxelProxy:
+		case EVoxelTaskKind::BuildSurface:
+		case EVoxelTaskKind::BuildWater:
+		case EVoxelTaskKind::BuildMacro:
+		case EVoxelTaskKind::BuildViewTransition:
+		case EVoxelTaskKind::BuildVolumeTransition:
+			return true;
+		case EVoxelTaskKind::BuildViewCoverage:
+			return InRequest.bPublicationContinuation;
+		default:
+			return false;
+		}
 	}
 
 	int32 TerrainLane(const FVoxelTaskRequest& Request)

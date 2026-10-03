@@ -75,6 +75,7 @@ private:
 	struct FWaitingPlanSection
 	{
 		TArray<FVoxelGenerationPlanDependency> Dependencies;
+		TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> Retention;
 		double RetryAfterSeconds = 0.0;
 	};
 
