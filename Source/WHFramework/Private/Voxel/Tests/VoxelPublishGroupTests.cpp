@@ -495,7 +495,6 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 	PrioritySource.Capabilities = EVoxelStreamingCapability::FineVisual | EVoxelStreamingCapability::WorldVisual;
 	PrioritySource.Center = FIntVector(0, 0, 1000);
 	PrioritySource.SchedulingPriority = 7;
-	PrioritySource.View.MovementCriticalFineRadiusCells = 16;
 	FVoxelTaskRequest FarPriority;
 	FarPriority.WorkClass = EVoxelWorkClass::Visible;
 	const int32 FarGroupIndex = 0;
@@ -536,8 +535,8 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 	Publisher.SortGroups(MovingPublication);
 	Publisher.Publications.Add(MovingPublication);
 	auto& MovingSettings = const_cast<FVoxelViewSettings&>(Module->GetViewSettings());
-	const int32 PreviousGroupLimit = MovingSettings.MaxPublishGroupsPerFrame;
-	MovingSettings.MaxPublishGroupsPerFrame = 1;
+	const int32 PreviousGroupLimit = MovingSettings.Budget.MaxPublishGroupsPerFrame;
+	MovingSettings.Budget.MaxPublishGroupsPerFrame = 1;
 	const TArray<FVector> MovedObservers{FVector(16000.0 * BlockSize, 0, 0)};
 	Publisher.SetObservers(MovedObservers);
 	Publisher.Tick();
@@ -572,7 +571,6 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 	InheritedSource.Capabilities = EVoxelStreamingCapability::FineVisual | EVoxelStreamingCapability::WorldVisual;
 	InheritedSource.Center = FIntVector(16, 0, 1000);
 	InheritedSource.SchedulingPriority = 9;
-	InheritedSource.View.MovementCriticalFineRadiusCells = 16;
 	const auto RemoteDependency = ReadyPublication({Surface},
 		FBox(FVector(1000, 0, 0) * BlockSize, FVector(1016, 16, 1) * BlockSize));
 	const auto NearbyDependent = ReadyPublication({Surface, Slow},
@@ -865,7 +863,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 	TestEqual(TEXT("Fine-only local demand still donates its scheduling priority to its necessary coarse dependency"),
 		LocalWorkerPriority.SourcePriority, 9);
 	const_cast<FVoxelInterestSet&>(Module->GetCurrentInterest()).Sources.Reset();
-	MovingSettings.MaxPublishGroupsPerFrame = PreviousGroupLimit;
+	MovingSettings.Budget.MaxPublishGroupsPerFrame = PreviousGroupLimit;
 	FixtureWorld->DestroyWorld(false);
 	GEngine->DestroyWorldContext(FixtureWorld);
 	return true;

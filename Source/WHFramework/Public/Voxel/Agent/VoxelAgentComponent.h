@@ -131,13 +131,6 @@ public:
 		BlueprintReadWrite,
 		Category = "Voxel|Streaming",
 		meta = (ClampMin = "0"))
-	int32 VerticalExactRadiusCells = 16;
-
-	UPROPERTY(
-		EditAnywhere,
-		BlueprintReadWrite,
-		Category = "Voxel|Streaming",
-		meta = (ClampMin = "0"))
 	int32 MovementCriticalCollisionRadiusCells = 12;
 
 	UPROPERTY(

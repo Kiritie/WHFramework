@@ -105,7 +105,6 @@ namespace
 		const int32 InBaseTileSide,
 		const int32 InBaseSampleStepCells,
 		const uint8 InMaximumLevel,
-		const int32 InMaximumTiles,
 		const FVoxelStreamingSource& InSource,
 		const float InTargetScreenErrorPixels,
 		TSet<KeyType>& OutKeys)
@@ -199,10 +198,6 @@ namespace
 					}
 				}
 			}
-			if (Leaves.Num() - ParentCount + Children.Num() > InMaximumTiles)
-			{
-				break;
-			}
 			Leaves.RemoveAll([MaximumError](const FNode& Node)
 			{
 				return FMath::IsNearlyEqual(Node.Error, MaximumError, UE_DOUBLE_SMALL_NUMBER);
@@ -276,6 +271,7 @@ FVoxelInterestSet FVoxelInterestManager::Compute(
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewInterestPlan);
 
 	FVoxelInterestSet Prepared;
+	if (!VoxelViewLod::ValidateTopology(InViewSettings.Lod, Prepared.PlanningError)) return Prepared;
 
 	for (const FVoxelStreamingSource& Source :
 		InSources)
@@ -334,13 +330,13 @@ FVoxelInterestSet FVoxelInterestManager::Finalize(TConstArrayView<FVoxelStreamin
 	{
 		if (Source.Has(EVoxelStreamingCapability::WorldVisual))
 		{
-			MaximumSurfaceLevel = FMath::Max(MaximumSurfaceLevel, Source.View.MaximumSurfaceLevel);
-			MaximumMacroLevel = FMath::Max(MaximumMacroLevel, InViewSettings.MaximumMacroLevel);
+			MaximumSurfaceLevel = FMath::Max(MaximumSurfaceLevel, InViewSettings.Lod.MaximumSurfaceLevel);
+			MaximumMacroLevel = FMath::Max(MaximumMacroLevel, InViewSettings.Lod.MaximumMacroLevel);
 		}
 	}
-	BalanceAdaptiveTiles(Result.Surface, InViewSettings.SurfaceTileSide,
+	BalanceAdaptiveTiles(Result.Surface, InViewSettings.Lod.SurfaceMinimumTileSideCells,
 		MaximumSurfaceLevel);
-	BalanceAdaptiveTiles(Result.Macro, InViewSettings.MacroTileSide,
+	BalanceAdaptiveTiles(Result.Macro, InViewSettings.Lod.MacroMinimumTileSideCells,
 		MaximumMacroLevel);
 
 	if (!Result.VoxelProxy.IsEmpty())
@@ -353,7 +349,12 @@ FVoxelInterestSet FVoxelInterestManager::Finalize(TConstArrayView<FVoxelStreamin
 				FineSections.Add(Pair.Key);
 			}
 		}
-		Result.TerrainPlan.Build(InSources, FineSections, Result.VoxelProxy, InViewSettings, InViewSettings.MaximumTerrainLeaves);
+		FString PlanError;
+		if (!Result.TerrainPlan.Build(InSources, FineSections, Result.VoxelProxy, InViewSettings, PlanError))
+		{
+			Result.PlanningError = MoveTemp(PlanError);
+			return Result;
+		}
 		Result.VoxelProxy.Reset();
 		for (const FVoxelViewKey& Key : Result.TerrainPlan.Leaves)
 		{
@@ -382,7 +383,7 @@ FVoxelInterestSet FVoxelInterestManager::Finalize(TConstArrayView<FVoxelStreamin
 				const int32 Radius = Source.View.FineRadiusCells;
 				if (Source.Has(EVoxelStreamingCapability::FineVisual) &&
 					FVector2D::DistSquared(FVector2D(Center), FVector2D(Source.Center.X, Source.Center.Y)) <=
-					FMath::Square(static_cast<double>(Radius + Source.View.FinePreloadCells)))
+					FMath::Square(static_cast<double>(Radius)))
 				{
 					RenderPriority = FMath::Min(RenderPriority, Source.GetSchedulingPriority());
 				}
@@ -404,6 +405,38 @@ FVoxelInterestSet FVoxelInterestManager::Finalize(TConstArrayView<FVoxelStreamin
 			Demand.Priority = FMath::Min(Demand.Priority, RenderPriority);
 		}
 	}
+	// 预测只预取真实数据；FineWanted 继续由当前位置的 Fine 圆柱决定。
+	for (const FVoxelStreamingSource& Source : InSources)
+	{
+		if (!Source.Has(EVoxelStreamingCapability::Data) || !Source.Has(EVoxelStreamingCapability::FineVisual) ||
+			Source.VelocityCellsPerSecond.IsNearlyZero() || Source.View.FinePredictionSeconds <= 0.0f) continue;
+		const FVector Current(Source.Center);
+		const FVector Predicted = Current + Source.VelocityCellsPerSecond * Source.View.FinePredictionSeconds;
+		const double Radius = FMath::Max(Source.View.FineLevel0RadiusCells, Source.CollisionRadius) + InterestSectionSide;
+		const FVector Min = Current.ComponentMin(Predicted) - FVector(Radius);
+		const FVector Max = Current.ComponentMax(Predicted) + FVector(Radius);
+		const FIntVector MinSection(FMath::FloorToInt(Min.X / 16), FMath::FloorToInt(Min.Y / 16),
+			FMath::Max(FMath::FloorToInt(Min.Z / 16), VoxelGeneration::FloorDivide(InManifest.Settings.MinZ, 16)));
+		const FIntVector MaxSection(FMath::FloorToInt(Max.X / 16), FMath::FloorToInt(Max.Y / 16),
+			FMath::Min(FMath::FloorToInt(Max.Z / 16), VoxelGeneration::FloorDivide(InManifest.Settings.MaxZ - 1, 16)));
+		for (int32 Z = MinSection.Z; Z <= MaxSection.Z; ++Z)
+		{
+			for (int32 Y = MinSection.Y; Y <= MaxSection.Y; ++Y)
+			{
+				for (int32 X = MinSection.X; X <= MaxSection.X; ++X)
+				{
+					const FIntVector Key(X, Y, Z);
+					const FVector Center(Key * 16 + FIntVector(8));
+					if (FMath::PointDistToSegmentSquared(Center, Current, Predicted) > Radius * Radius) continue;
+					FVoxelExactDemand& Demand = Result.Exact.FindOrAdd(Key);
+					Demand.bData = true;
+					Demand.bMovementCriticalData = true;
+					Demand.Priority = FMath::Min(Demand.Priority, Source.GetSchedulingPriority());
+					Demand.DistanceCells = FMath::Min(Demand.DistanceCells, FVector::Distance(Center, Current));
+				}
+			}
+		}
+	}
 	// 精细边界需要真实相邻数据；只增加数据依赖，不扩张碰撞、模拟或可见几何。
 	TArray<FIntVector> FineKeys;
 	for (const auto& Pair : Result.Exact)
@@ -422,7 +455,7 @@ FVoxelInterestSet FVoxelInterestManager::Finalize(TConstArrayView<FVoxelStreamin
 			Key.Y * InterestSectionSide + InterestSectionSide * 0.5);
 		for (const FVoxelStreamingSource& Source : InSources)
 		{
-			const double PlayableRadius = Source.View.FineRadiusCells * InViewSettings.PlayableFineRadiusFraction;
+			const double PlayableRadius = Source.View.FineRadiusCells * InViewSettings.Readiness.PlayableFineRadiusFraction;
 			if (Source.Has(EVoxelStreamingCapability::Readiness) && Source.Has(EVoxelStreamingCapability::FineVisual) &&
 				FVector2D::DistSquared(Center, FVector2D(Source.Center.X, Source.Center.Y)) <= FMath::Square(PlayableRadius))
 			{
@@ -465,10 +498,10 @@ FVoxelInterestSet FVoxelInterestManager::Finalize(TConstArrayView<FVoxelStreamin
 	{
 		if (!Source.Has(EVoxelStreamingCapability::FineVisual) ||
 			Source.Has(EVoxelStreamingCapability::LocalRefinement) ||
-			Source.View.MovementCriticalFineRadiusCells <= 0) continue;
+			VoxelViewLod::MovementCriticalFineRadius(Source) <= 0) continue;
 		const FVector Current(Source.Center);
 		const FVector Predicted = Current + Source.VelocityCellsPerSecond * Source.View.FinePredictionSeconds;
-		const double RadiusSquared = FMath::Square(static_cast<double>(Source.View.MovementCriticalFineRadiusCells));
+		const double RadiusSquared = FMath::Square(static_cast<double>(VoxelViewLod::MovementCriticalFineRadius(Source)));
 		for (auto& Pair : Result.Exact)
 		{
 			if (!Pair.Value.bFineRender) continue;
@@ -523,7 +556,7 @@ FVoxelInterestSet FVoxelInterestManager::Finalize(TConstArrayView<FVoxelStreamin
 			if (bColumn) Position.Z = 0.0;
 			const double DistanceSquared = Bounds.ComputeSquaredDistanceToPoint(Position);
 			if (RadiusField == &FVoxelStreamingSourceView::VoxelProxyRadiusCells &&
-				DistanceSquared <= FMath::Square(static_cast<double>(Source.View.FineRadiusCells + Source.View.FinePreloadCells + InterestSectionSide)))
+				DistanceSquared <= FMath::Square(static_cast<double>(Source.View.FineRadiusCells)))
 				RefinementPriority = FMath::Min(RefinementPriority, Source.GetSchedulingPriority());
 			if (DistanceSquared < NearestDistanceSquared)
 			{
@@ -566,7 +599,7 @@ FVoxelInterestSet FVoxelInterestManager::Finalize(TConstArrayView<FVoxelStreamin
 		FVoxelViewAdmission& A = Result.Admissions.AddDefaulted_GetRef();
 		A.Kind = EVoxelViewAdmissionKind::Surface;
 		A.SurfaceKey = Key;
-		const int32 Side = InViewSettings.SurfaceTileSide << Key.Level;
+		const int32 Side = InViewSettings.Lod.SurfaceMinimumTileSideCells << Key.Level;
 		const FVector Center((Key.Coordinate.X + 0.5) * Side, (Key.Coordinate.Y + 0.5) * Side, 0.0);
 		const FVector Min(Key.Coordinate.X * Side, Key.Coordinate.Y * Side, 0.0);
 		A.Priority = ViewPriority(FBox(Min, Min + FVector(Side, Side, 0.0)), true,
@@ -579,11 +612,11 @@ FVoxelInterestSet FVoxelInterestManager::Finalize(TConstArrayView<FVoxelStreamin
 		FVoxelViewAdmission& A = Result.Admissions.AddDefaulted_GetRef();
 		A.Kind = EVoxelViewAdmissionKind::Macro;
 		A.MacroKey = Key;
-		const int32 Side = InViewSettings.MacroTileSide << Key.Level;
+		const int32 Side = InViewSettings.Lod.MacroMinimumTileSideCells << Key.Level;
 		const FVector Center((Key.Coordinate.X + 0.5) * Side, (Key.Coordinate.Y + 0.5) * Side, 0.0);
 		const FVector Min(Key.Coordinate.X * Side, Key.Coordinate.Y * Side, 0.0);
 		A.Priority = ViewPriority(FBox(Min, Min + FVector(Side, Side, 0.0)), true,
-			nullptr, InViewSettings.MacroRadiusCells);
+			&FVoxelStreamingSourceView::MacroRadiusCells);
 		A.DistanceCells = Distance(FBox(Center, Center), true, true, A.Priority);
 		Result.MacroPriorities.Add(Key, A.Priority);
 	}
@@ -677,24 +710,23 @@ void FVoxelInterestManager::AddExactSource(
 	const bool bWantsFine =
 		InSource.Has(EVoxelStreamingCapability::FineVisual) &&
 		InSource.View.FineRadiusCells > 0 &&
-		InSource.View.FineVerticalRadiusCells > 0;
+		InSource.View.FineVerticalHalfExtentCells > 0;
 
-		const int32 FineRadius = bWantsFine ? FMath::Max(0, InSource.View.FineRadiusCells) +
-		FMath::Max(0, InSource.View.FinePreloadCells) : 0;
+	const int32 FineRadius = bWantsFine ? FMath::Max(0, InSource.View.FineRadiusCells) : 0;
 	const int32 FineVerticalRadius =
 		bWantsFine
-			? FMath::Max(0, InSource.View.FineVerticalRadiusCells)
+			? FMath::Max(0, InSource.View.FineVerticalHalfExtentCells)
 			: 0;
 
 	const int32 WarmupDataRadius =
 		FMath::Min(
-			bPrewarm ? ExactRadius : FMath::Max(0, InSource.View.WarmupDataRadiusCells),
+			FMath::RoundToInt(FMath::Max(0, ExactRadius) * (bPrewarm ? 1.0f : FMath::Clamp(InViewSettings.Readiness.WarmupDataRadiusFraction, 0.0f, 1.0f))),
 			ExactRadius);
 
 	const int32 WarmupCollisionRadius =
 		InSource.Has(EVoxelStreamingCapability::Collision)
 			? FMath::Min(
-				bPrewarm ? CollisionRadius : FMath::Max(0, InSource.View.WarmupCollisionRadiusCells),
+				FMath::RoundToInt(CollisionRadius * (bPrewarm ? 1.0f : FMath::Clamp(InViewSettings.Readiness.WarmupCollisionRadiusFraction, 0.0f, 1.0f))),
 				CollisionRadius)
 			: 0;
 
@@ -722,7 +754,7 @@ void FVoxelInterestManager::AddExactSource(
 			InterestSectionSide);
 
 	const int32 VerticalSections = CeilDividePositive(
-		FMath::Max(FineRetainVerticalRadius, FMath::Max(0, InSource.VerticalExactRadius)), InterestSectionSide);
+		FMath::Max(FineRetainVerticalRadius, FMath::Max3(ExactRadius, CollisionRadius, SimulationRadius)), InterestSectionSide);
 
 	const FIntVector CenterSection =
 		InterestToSection(
@@ -788,18 +820,14 @@ void FVoxelInterestManager::AddExactSource(
 					SimulationRadius > 0 &&
 					SectionIntersectsRadius(Key, InSource.Center, SimulationRadius);
 
-				const FVoxelExactDemand* Previous = InPrevious ? InPrevious->Exact.Find(Key) : nullptr;
-				const bool bRetainFine = InSource.Has(EVoxelStreamingCapability::FineVisual) &&
-					!InSource.Has(EVoxelStreamingCapability::LocalRefinement) && (InPrevious && InPrevious->FineSections
-					? InPrevious->FineSections->Contains(Key) : Previous && Previous->bFineRender);
 				const bool bFineRender =
 					bWantsFine &&
 					IsInsideFineVolume(
 						FIntVector(FMath::Max(0, FMath::Abs(Delta.X) - InterestSectionSide / 2),
 							FMath::Max(0, FMath::Abs(Delta.Y) - InterestSectionSide / 2),
 							FMath::Max(0, FMath::Abs(Delta.Z) - InterestSectionSide / 2)),
-						bRetainFine ? FineRetainRadius : FineRadius,
-						bRetainFine ? FineRetainVerticalRadius : FineVerticalRadius);
+						FineRadius,
+						FineVerticalRadius);
 
 				const bool bWarmupData =
 					SectionIntersectsRadius(Key, InSource.Center, WarmupDataRadius);
@@ -908,8 +936,8 @@ void FVoxelInterestManager::AddViewSource(
 		return;
 	}
 
-	const int32 FineRadius = FMath::Max(0, InSource.View.FineRadiusCells) + FMath::Max(0, InSource.View.FinePreloadCells);
-	const int32 FineVerticalRadius = FMath::Max(0, InSource.View.FineVerticalRadiusCells);
+	const int32 FineRadius = VoxelViewLod::ResolveViewRanges(InSource).Fine;
+	const int32 FineVerticalRadius = FMath::Max(0, InSource.View.FineVerticalHalfExtentCells);
 
 	const bool bLocalRefinementOnly =
 		InSource.Has(EVoxelStreamingCapability::LocalRefinement) &&
@@ -917,21 +945,16 @@ void FVoxelInterestManager::AddViewSource(
 	const int32 ProxyRange = bLocalRefinementOnly
 		? static_cast<int32>(FMath::Min<int64>(
 			static_cast<int64>(FineRadius) +
-			FMath::Max(InterestSectionSide, InViewSettings.VoxelProxyTileSide * 2),
+			InViewSettings.Lod.VoxelProxyMinimumChunkSideCells,
 			MAX_int32))
 		: FMath::Max(FineRadius, InSource.View.VoxelProxyRadiusCells);
 
 	if (bBuildProxy && ProxyRange > FineRadius)
 	{
 		const uint8 ProxyLevel = bLocalRefinementOnly ? 1 :
-			FMath::Max<uint8>(1, InSource.View.MaximumVoxelProxyLevel);
+			FMath::Max<uint8>(1, InViewSettings.Lod.MaximumVoxelProxyLevel);
 
-		const int32 ProxySide =
-			FMath::Max(
-				InterestSectionSide,
-				InViewSettings.
-					VoxelProxyTileSide <<
-				ProxyLevel);
+		const int32 ProxySide = FVoxelViewKey{{}, ProxyLevel}.GetSide();
 
 		const int32 HorizontalRadius =
 			CeilDividePositive(
@@ -939,16 +962,7 @@ void FVoxelInterestManager::AddViewSource(
 				ProxySide) +
 			1;
 
-		const int32 VerticalRadius =
-			FMath::Max(
-				1,
-				CeilDividePositive(
-					FMath::Max(
-						FineVerticalRadius,
-						FMath::Max(
-							0,
-							InSource.VerticalExactRadius)),
-					ProxySide));
+		const int32 VerticalRadius = CeilDividePositive(FMath::Max(0, InSource.View.VoxelProxyVerticalHalfExtentCells), ProxySide) + 1;
 
 		const FIntVector ProxyCenter(
 			VoxelGeneration::FloorDivide(
@@ -1004,11 +1018,9 @@ void FVoxelInterestManager::AddViewSource(
 						FVector(
 							ProxySide * 0.5);
 
-					const double Distance =
-						FVector::Distance(
-							TileCenter,
-							FVector(
-								InSource.Center));
+					const double Distance = FVector2D::Distance(FVector2D(TileCenter), FVector2D(InSource.Center.X, InSource.Center.Y));
+					const double NearZ = FMath::Max(0.0, FMath::Abs(TileCenter.Z - InSource.Center.Z) - ProxySide * 0.5);
+					if (NearZ > InSource.View.VoxelProxyVerticalHalfExtentCells) continue;
 
 					if (Distance -
 						HalfDiagonal >
@@ -1017,26 +1029,6 @@ void FVoxelInterestManager::AddViewSource(
 						continue;
 					}
 
-					if (FineRadius > 0 && FineVerticalRadius > 0)
-					{
-						const FVector TileMin = FVector(Coordinate * ProxySide);
-						const FVector TileMax = TileMin + FVector(ProxySide);
-						const double FarX = FMath::Max(
-							FMath::Abs(TileMin.X - InSource.Center.X),
-							FMath::Abs(TileMax.X - InSource.Center.X));
-						const double FarY = FMath::Max(
-							FMath::Abs(TileMin.Y - InSource.Center.Y),
-							FMath::Abs(TileMax.Y - InSource.Center.Y));
-						const bool bInsideFineHorizontal =
-							FarX * FarX + FarY * FarY <= FMath::Square(static_cast<double>(FineRadius));
-						const bool bInsideFineVertical =
-							TileMin.Z >= InSource.Center.Z - FineVerticalRadius &&
-							TileMax.Z <= InSource.Center.Z + FineVerticalRadius;
-						if (bInsideFineHorizontal && bInsideFineVertical)
-						{
-							continue;
-						}
-					}
 
 					InOutInterest.
 						VoxelProxy.Add({
@@ -1066,19 +1058,18 @@ void FVoxelInterestManager::AddViewSource(
 			// Keep the heightfield below the finite-height volume. Visibility clips
 			// only actual replacement geometry, including underwater columns.
 			0,
-			InViewSettings.SurfaceTileSide,
+			InViewSettings.Lod.SurfaceMinimumTileSideCells,
 			1,
-			InSource.View.MaximumSurfaceLevel,
-			InViewSettings.MaximumSurfaceTiles,
+			InViewSettings.Lod.MaximumSurfaceLevel,
 			InSource,
-			InSource.View.TargetScreenErrorPixels,
+			InViewSettings.Lod.TargetScreenErrorPixels,
 			InOutInterest.Surface);
 	}
 
 	const int32 MacroRange =
 		FMath::Max(
 			SurfaceRange,
-			InViewSettings.MacroRadiusCells);
+			InSource.View.MacroRadiusCells);
 
 	if (bBuildMacro && MacroRange > SurfaceRange)
 	{
@@ -1086,12 +1077,11 @@ void FVoxelInterestManager::AddViewSource(
 			InSource.Center,
 			MacroRange,
 			SurfaceRange,
-			InViewSettings.MacroTileSide,
-			FVoxelMacroTileData::BaseStep,
-			InViewSettings.MaximumMacroLevel,
-			InViewSettings.MaximumMacroTiles,
+			InViewSettings.Lod.MacroMinimumTileSideCells,
+			InViewSettings.Lod.MacroBaseSampleStepCells,
+			InViewSettings.Lod.MaximumMacroLevel,
 			InSource,
-			InSource.View.TargetScreenErrorPixels,
+			InViewSettings.Lod.TargetScreenErrorPixels,
 			InOutInterest.Macro);
 	}
 }

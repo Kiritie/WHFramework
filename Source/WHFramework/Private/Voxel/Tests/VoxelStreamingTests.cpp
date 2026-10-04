@@ -80,9 +80,8 @@ bool FVoxelSurfaceTwoToOneBalanceTest::RunTest(const FString& InParameters)
 		Source.View.FineRadiusCells = 0;
 		Source.View.VoxelProxyRadiusCells = 64;
 		Source.View.SurfaceRadiusCells = 8192;
-		Settings.MacroRadiusCells = 16384;
-		Source.View.MaximumSurfaceLevel = 5;
-		Settings.MaximumSurfaceTiles = 512;
+		Settings.DefaultSourceView.MacroRadiusCells = 16384;
+		Settings.Lod.MaximumSurfaceLevel = 5;
 	}
 	Sources[0].Center = FIntVector::ZeroValue;
 	Sources[1].Center = FIntVector(3072, 1024, 0);
@@ -91,7 +90,7 @@ bool FVoxelSurfaceTwoToOneBalanceTest::RunTest(const FString& InParameters)
 	int32 Overlaps = 0;
 	int32 DifferentLevels = 0;
 	const int32 Violations = CountTwoToOneViolations(Interest.Surface,
-		Settings.SurfaceTileSide, Overlaps, DifferentLevels);
+		Settings.Lod.SurfaceMinimumTileSideCells, Overlaps, DifferentLevels);
 	TestTrue(TEXT("Surface plan contains neighboring LOD levels"), DifferentLevels > 0);
 	TestEqual(TEXT("Surface tiles do not overlap after source merge"), Overlaps, 0);
 	TestEqual(TEXT("Every shared surface edge is at most 2:1"), Violations, 0);
@@ -112,7 +111,6 @@ bool FVoxelSimulationAnchorBoundaryTest::RunTest(const FString& InParameters)
 	Source.Id = FGuid::NewGuid();
 	Source.Capabilities = EVoxelStreamingCapability::Data | EVoxelStreamingCapability::Simulation;
 	Source.Purpose = EVoxelStreamingSourcePurpose::SimulationAnchor;
-	Source.ExactRadius = Source.VerticalExactRadius = 16;
 	Source.SimulationRadius = 1;
 	for (const int32 X : {0, -16})
 	{
@@ -146,8 +144,7 @@ bool FVoxelMacroTwoToOneBalanceTest::RunTest(const FString& InParameters)
 		Source.View.FineRadiusCells = 0;
 		Source.View.VoxelProxyRadiusCells = 64;
 		Source.View.SurfaceRadiusCells = 2048;
-		Settings.MacroRadiusCells = 96000;
-		Settings.MaximumMacroTiles = 512;
+		Settings.DefaultSourceView.MacroRadiusCells = 96000;
 	}
 	Sources[0].Center = FIntVector::ZeroValue;
 	Sources[1].Center = FIntVector(16384, 4096, 0);
@@ -156,7 +153,7 @@ bool FVoxelMacroTwoToOneBalanceTest::RunTest(const FString& InParameters)
 	int32 Overlaps = 0;
 	int32 DifferentLevels = 0;
 	const int32 Violations = CountTwoToOneViolations(Interest.Macro,
-		Settings.MacroTileSide, Overlaps, DifferentLevels);
+		Settings.Lod.MacroMinimumTileSideCells, Overlaps, DifferentLevels);
 	TestTrue(TEXT("Macro plan contains neighboring LOD levels"), DifferentLevels > 0);
 	TestEqual(TEXT("Macro tiles do not overlap after source merge"), Overlaps, 0);
 	TestEqual(TEXT("Every shared macro edge is at most 2:1"), Violations, 0);
@@ -174,7 +171,7 @@ bool FVoxelInterestLayerAnchorTest::RunTest(const FString& InParameters)
 	Manifest.Settings.MinZ = -128;
 	Manifest.Settings.MaxZ = 128;
 	FVoxelViewSettings Settings;
-	Settings.MacroRadiusCells = 8192;
+	Settings.DefaultSourceView.MacroRadiusCells = 8192;
 	FVoxelStreamingSource Source;
 	Source.Id = FGuid::NewGuid();
 	Source.Capabilities = EVoxelStreamingCapability::Data |
@@ -184,7 +181,6 @@ bool FVoxelInterestLayerAnchorTest::RunTest(const FString& InParameters)
 	Source.ExactRadius = 16;
 	Source.CollisionRadius = 8;
 	Source.View.FineRadiusCells = 64;
-	Source.View.FinePreloadCells = 16;
 	Source.View.VoxelProxyRadiusCells = 256;
 	Source.View.SurfaceRadiusCells = 1024;
 	FVoxelInterestRuntime Runtime;
@@ -254,7 +250,7 @@ bool FVoxelInterestMultiSourceTest::RunTest(const FString& InParameters)
 	Manifest.Settings.MinZ = -128;
 	Manifest.Settings.MaxZ = 128;
 	FVoxelViewSettings Settings;
-	Settings.MacroRadiusCells = 4096;
+	Settings.DefaultSourceView.MacroRadiusCells = 4096;
 	FVoxelStreamingSource Sources[2];
 	Sources[0].Id = FGuid::NewGuid();
 	Sources[0].Capabilities = EVoxelStreamingCapability::Data |
@@ -264,7 +260,6 @@ bool FVoxelInterestMultiSourceTest::RunTest(const FString& InParameters)
 		EVoxelStreamingCapability::Readiness;
 	Sources[0].Center = FIntVector(-256, -64, 0);
 	Sources[0].View.FineRadiusCells = 64;
-	Sources[0].View.FinePreloadCells = 16;
 	Sources[0].View.VoxelProxyRadiusCells = 256;
 	Sources[0].View.SurfaceRadiusCells = 512;
 	Sources[0].VelocityCellsPerSecond = FVector(32.0, 0.0, 0.0);
@@ -351,8 +346,8 @@ bool FVoxelStreamingDemandTest::RunTest(const FString& InParameters)
 	Source.ExactRadius = 64;
 	FVoxelViewSettings SmallWarmupSettings;
 	Source.Capabilities |= EVoxelStreamingCapability::Readiness;
-	Source.View.WarmupDataRadiusCells = 12; // 600 cm at a 50 cm cell size.
-	Source.View.WarmupCollisionRadiusCells = 12;
+	SmallWarmupSettings.Readiness.WarmupDataRadiusFraction = 12.0f / Source.ExactRadius;
+	SmallWarmupSettings.Readiness.WarmupCollisionRadiusFraction = 12.0f / Source.CollisionRadius;
 	const FVoxelInterestSet SmallWarmup = Manager.Compute(
 		MakeArrayView(&Source, 1), Manifest, SmallWarmupSettings);
 	TestTrue(TEXT("Warmup includes the section containing a boundary-aligned source"),
@@ -378,7 +373,6 @@ bool FVoxelStreamingRenderScopeTest::RunTest(const FString& InParameters)
 	Source.Center = FIntVector::ZeroValue;
 	Source.ExactRadius = 32;
 	Source.CollisionRadius = 32;
-	Source.VerticalExactRadius = 16;
 	Source.Capabilities = EVoxelStreamingCapability::Data |
 		EVoxelStreamingCapability::Collision |
 		EVoxelStreamingCapability::FineVisual;
@@ -429,10 +423,9 @@ bool FVoxelIndependentSourceViewTest::RunTest(const FString& InParameters)
 		EVoxelStreamingCapability::WorldVisual;
 	Sources[0].Priority = 20;
 	Sources[0].View.FineRadiusCells = 32;
-	Sources[0].View.FinePreloadCells = 0;
 	Sources[0].View.VoxelProxyRadiusCells = 128;
 	Sources[0].View.SurfaceRadiusCells = 512;
-	Settings.MacroRadiusCells = 4096;
+	Settings.DefaultSourceView.MacroRadiusCells = 4096;
 
 	Sources[1].Id = FGuid::NewGuid();
 	Sources[1].Purpose = EVoxelStreamingSourcePurpose::DebugPOI;
@@ -442,14 +435,12 @@ bool FVoxelIndependentSourceViewTest::RunTest(const FString& InParameters)
 		EVoxelStreamingCapability::FineVisual |
 		EVoxelStreamingCapability::LocalRefinement;
 	Sources[1].View.FineRadiusCells = 48;
-	Sources[1].View.FineVerticalRadiusCells = 64;
-	Sources[1].View.FinePreloadCells = 0;
+	Sources[1].View.FineVerticalHalfExtentCells = 64;
 	Sources[1].View.VoxelProxyRadiusCells = 10000;
 
 	Sources[1].ExactRadius = -1;
 	Sources[1].CollisionRadius = 0;
 	Sources[1].SimulationRadius = 0;
-	Sources[1].VerticalExactRadius = 0;
 
 	const FVoxelInterestManager Manager;
 	const FVoxelInterestSet DebugOnly = Manager.Compute(MakeArrayView(&Sources[1], 1), Manifest, Settings);
@@ -534,18 +525,15 @@ bool FVoxelStreamingLodSymmetryTest::RunTest(const FString& InParameters)
 		EVoxelStreamingCapability::FineVisual |
 		EVoxelStreamingCapability::WorldVisual;
 	Source.View.FineRadiusCells = 64;
-	Source.View.FinePreloadCells = 0;
 	Source.View.VoxelProxyRadiusCells = 256;
 	Source.View.SurfaceRadiusCells = 1024;
-	Settings.MacroRadiusCells = 16000;
-	Settings.MaximumSurfaceTiles = 256;
-	Settings.MaximumMacroTiles = 128;
+	Settings.DefaultSourceView.MacroRadiusCells = 16000;
 	Source.ExactRadius = 64;
 	Source.Center = FIntVector::ZeroValue;
 	const FVoxelInterestManager Manager;
 	const FVoxelInterestSet Interest = Manager.Compute(MakeArrayView(&Source, 1), Manifest, Settings);
-	TestTrue(TEXT("Surface obeys tile budget"), Interest.Surface.Num() <= Settings.MaximumSurfaceTiles);
-	TestTrue(TEXT("Macro obeys tile budget"), Interest.Macro.Num() <= Settings.MaximumMacroTiles);
+	TestTrue(TEXT("Surface refines beyond the former count limit"), Interest.Surface.Num() > 256);
+	TestTrue(TEXT("Macro has adaptive coverage"), Interest.Macro.Num() > 0);
 	TestFalse(TEXT("Surface coverage remains available"), Interest.Surface.IsEmpty());
 	TestFalse(TEXT("Macro coverage remains available"), Interest.Macro.IsEmpty());
 	for (const FVoxelSurfaceTileKey& Key : Interest.Surface)
@@ -676,9 +664,7 @@ bool FVoxelFineLodHysteresisTest::RunTest(const FString& InParameters)
 	FVoxelViewSettings Settings;
 	FVoxelStreamingSource Source;
 	Source.View.FineRadiusCells = 64;
-	Source.View.FinePreloadCells = 0;
 	Source.ExactRadius = 64;
-	Source.VerticalExactRadius = 16;
 	Source.Capabilities = EVoxelStreamingCapability::Data |
 		EVoxelStreamingCapability::Collision |
 		EVoxelStreamingCapability::FineVisual;
@@ -887,11 +873,9 @@ bool FVoxelFineIndependentRadiusTest::RunTest(const FString& InParameters)
 	FVoxelViewSettings Settings;
 	FVoxelStreamingSource Source;
 	Source.View.FineRadiusCells = 96;
-	Source.View.FinePreloadCells = 16;
-	Source.View.FineVerticalRadiusCells = 32;
+	Source.View.FineVerticalHalfExtentCells = 32;
 	Source.ExactRadius = 16;
 	Source.CollisionRadius = 16;
-	Source.VerticalExactRadius = 16;
 	Source.Capabilities = EVoxelStreamingCapability::Data |
 		EVoxelStreamingCapability::Collision |
 		EVoxelStreamingCapability::FineVisual;
@@ -1842,15 +1826,13 @@ bool FVoxelCriticalFineDependencyClosureTest::RunTest(const FString& InParameter
 	Manifest.Settings.MinZ = -128;
 	Manifest.Settings.MaxZ = 128;
 	FVoxelViewSettings Settings;
-	Settings.MacroRadiusCells = 0;
+	Settings.DefaultSourceView.MacroRadiusCells = 0;
 	FVoxelStreamingSource Source;
 	Source.Id = FGuid::NewGuid();
 	Source.Capabilities = EVoxelStreamingCapability::Data | EVoxelStreamingCapability::FineVisual;
 	Source.View.FineRadiusCells = 80;
-	Source.View.FineVerticalRadiusCells = 64;
-	Source.View.FinePreloadCells = 16;
+	Source.View.FineVerticalHalfExtentCells = 64;
 	Source.View.FinePredictionSeconds = 2.0;
-	Source.View.MovementCriticalFineRadiusCells = 16;
 	Source.View.VoxelProxyRadiusCells = 0;
 	Source.View.SurfaceRadiusCells = 0;
 	Source.VelocityCellsPerSecond = FVector(32, 0, 0);

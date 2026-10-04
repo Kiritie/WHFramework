@@ -4,7 +4,6 @@
 
 namespace
 {
-	constexpr int32 MaximumCoverageEdgesPerAxis = 64;
 
 	void SortUnique(TArray<int32>& InOutValues)
 	{
@@ -90,7 +89,6 @@ bool VoxelCoverage::IsFullyCovered3D(const FVoxelCoverageBox& InTarget, const TC
 	}
 	if (Clipped.IsEmpty()) return false;
 	SortUnique(XEdges); SortUnique(YEdges); SortUnique(ZEdges);
-	if (XEdges.Num() > MaximumCoverageEdgesPerAxis || YEdges.Num() > MaximumCoverageEdgesPerAxis || ZEdges.Num() > MaximumCoverageEdgesPerAxis) return false;
 	for (int32 X = 0; X + 1 < XEdges.Num(); ++X)
 	{
 		for (int32 Y = 0; Y + 1 < YEdges.Num(); ++Y)

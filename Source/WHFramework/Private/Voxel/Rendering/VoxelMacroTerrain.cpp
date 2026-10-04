@@ -1,15 +1,24 @@
 #include "Voxel/Rendering/VoxelMacroTerrain.h"
 
 #include "ProfilingDebugging/CpuProfilerTrace.h"
+#include "Voxel/Rendering/VoxelViewLod.h"
 #include "Voxel/Generation/Ecology/VoxelEcology.h"
 #include "Voxel/Rendering/VoxelWaterView.h"
 FVoxelMacroTerrainBuilder::FVoxelMacroTerrainBuilder(
 	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator,
 	TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
 	const FVoxelGenerationSettings& InSettings, const IVoxelOverlaySource& InOverlays,
-		TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry)
-	: Config(InConfig)
-	, SurfaceBuilder(InGenerator, InConfig, InSettings, InOverlays, InRegistry)
+		TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry,
+	const FVoxelLodTopologySettings& InLod)
+	: Lod(InLod)
+	, Config(InConfig)
+	, SurfaceBuilder(InGenerator, InConfig, InSettings, InOverlays, InRegistry, [&InLod]()
+	{
+		FVoxelLodTopologySettings Sampling = InLod;
+		Sampling.SurfaceMinimumTileSideCells = InLod.MacroMinimumTileSideCells;
+		Sampling.SurfaceBaseSampleStepCells = InLod.MacroBaseSampleStepCells;
+		return Sampling;
+	}())
 {
 }
 
@@ -26,12 +35,9 @@ bool FVoxelMacroTerrainBuilder::Build(
 	Data.Key =
 		InKey;
 
-	Data.Side =
-		FVoxelMacroTileData::VertexSide;
+	Data.Side = Lod.MacroMinimumTileSideCells / Lod.MacroBaseSampleStepCells + 1;
 
-	Data.Step =
-		FVoxelMacroTileData::BaseStep <<
-		InKey.Level;
+	Data.Step = VoxelViewLod::MacroStep(Lod, InKey.Level);
 
 	const int32 Count =
 		Data.GetVertexCount();
@@ -45,7 +51,7 @@ bool FVoxelMacroTerrainBuilder::Build(
 	TArray<FVoxelColumnSample> Columns;
 	FVoxelSurfaceTileData Surface;
 	const FVoxelSurfaceTileKey SurfaceKey { InKey.Coordinate,
-		static_cast<uint8>(InKey.Level + FMath::FloorLog2(FVoxelMacroTileData::BaseStep)) };
+		InKey.Level };
 	if (!SurfaceBuilder.Build(SurfaceKey, Surface, OutError, InCancel, nullptr, &Columns))
 	{
 		return false;

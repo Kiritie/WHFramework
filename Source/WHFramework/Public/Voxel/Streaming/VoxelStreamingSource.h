@@ -74,60 +74,75 @@ struct WHFRAMEWORK_API FVoxelStreamingReadiness
 	}
 };
 
-// Each source owns its view ranges; components and temporary sources can set them independently.
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelStreamingSourceView
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Streaming", meta = (ClampMin = "0"))
-	int32 WarmupDataRadiusCells = 24;
+	// Fine Page F0 的最小完整分辨率区域。
+	// 它不改变 Fine 数据范围，只决定靠近 Source 的 Section 不能被合并到 F1+ Page。
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadWrite,
+		Category = "Voxel|Streaming",
+		meta = (ClampMin = "0"))
+	int32 FineLevel0RadiusCells = 32;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Streaming", meta = (ClampMin = "0"))
-	int32 WarmupCollisionRadiusCells = 24;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Streaming", meta = (ClampMin = "0"))
+	// Fine Representation 的水平外半径。
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadWrite,
+		Category = "Voxel|Streaming",
+		meta = (ClampMin = "0"))
 	int32 FineRadiusCells = 80;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Streaming", meta = (ClampMin = "1"))
-	int32 FineReplanCells = 16;
+	// Fine Representation 的 Z 半高；不是三维球半径。
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadWrite,
+		Category = "Voxel|Streaming",
+		meta = (ClampMin = "0"))
+	int32 FineVerticalHalfExtentCells = 64;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Streaming", meta = (ClampMin = "1"))
-	int32 ProxyReplanCells = 64;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Streaming", meta = (ClampMin = "1"))
-	int32 SurfaceReplanCells = 256;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Streaming", meta = (ClampMin = "1"))
-	int32 MacroReplanCells = 1024;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Streaming", meta = (ClampMin = "0.0"))
+	// 移动预测时间。只用于前向 Critical / Prefetch，不扩大 Fine 显示域。
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadWrite,
+		Category = "Voxel|Streaming",
+		meta = (ClampMin = "0.0"))
 	float FinePredictionSeconds = 0.75f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Streaming", meta = (ClampMin = "0"))
-	int32 MovementCriticalFineRadiusCells = 48;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Streaming", meta = (ClampMin = "0"))
-	int32 FineVerticalRadiusCells = 64;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|Streaming", meta = (ClampMin = "0"))
-	int32 FinePreloadCells = 32;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|View", meta = (ClampMin = "0"))
+	// VoxelProxy 的水平外半径。
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadWrite,
+		Category = "Voxel|View",
+		meta = (ClampMin = "0"))
 	int32 VoxelProxyRadiusCells = 1024;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|View", meta = (ClampMin = "0"))
+	// VoxelProxy 独立 Z 半高；禁止继续借 FineVerticalHalfExtentCells。
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadWrite,
+		Category = "Voxel|View",
+		meta = (ClampMin = "0"))
+	int32 VoxelProxyVerticalHalfExtentCells = 128;
+
+	// Surface 外半径。
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadWrite,
+		Category = "Voxel|View",
+		meta = (ClampMin = "0"))
 	int32 SurfaceRadiusCells = 3200;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|View", meta = (ClampMin = "0.1"))
-	float TargetScreenErrorPixels = 2.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|View", meta = (ClampMin = "1"))
-	uint8 MaximumVoxelProxyLevel = 4;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voxel|View", meta = (ClampMin = "1"))
-	uint8 MaximumSurfaceLevel = 4;
-
+	// Macro 外半径。原先在 ViewProfile 外层，本轮移入 SourceView，使四层 Domain 统一。
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadWrite,
+		Category = "Voxel|View",
+		meta = (ClampMin = "0"))
+	int32 MacroRadiusCells = 16000;
 };
 
 struct WHFRAMEWORK_API FVoxelStreamingSource
@@ -144,7 +159,6 @@ struct WHFRAMEWORK_API FVoxelStreamingSource
 	{
 		return SchedulingPriority == INDEX_NONE ? Priority : SchedulingPriority;
 	}
-	int32 RetentionRadiusCells = 0;
 	FIntVector Center = FIntVector::ZeroValue;
 	FVector Direction = FVector::ForwardVector;
 	FVector VelocityCellsPerSecond = FVector::ZeroVector;
@@ -155,7 +169,6 @@ struct WHFRAMEWORK_API FVoxelStreamingSource
 	FVoxelStreamingSourceView View;
 	int32 CollisionRadius = 8;
 	int32 SimulationRadius = 6;
-	int32 VerticalExactRadius = 8;
 	int32 MovementCriticalCollisionRadius = 0;
 	bool Has(const EVoxelStreamingCapability InCapability) const
 	{

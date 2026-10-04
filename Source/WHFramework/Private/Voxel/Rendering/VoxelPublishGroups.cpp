@@ -42,7 +42,8 @@ namespace
 				(Y >= 0.0 && X > 0.0);
 		}
 
-		return X > 0.0 && Y > 0.0;
+		const double Z = FMath::Min(A.Bounds.Max.Z, B.Bounds.Max.Z) - FMath::Max(A.Bounds.Min.Z, B.Bounds.Min.Z);
+		return X > 0.0 && Y > 0.0 && (A.Key.Representation >= 2 || B.Key.Representation >= 2 || Z > 0.0);
 	}
 
 	int32 FindRoot(TArray<int32>& InParents, int32 InIndex)
@@ -58,7 +59,7 @@ namespace
 
 FBox FVoxelPublishGroupPlanner::OwnershipBounds(
 	const FVoxelPublishGroupKey& InKey,
-	const double InBlockSize)
+	const double InBlockSize, const FVoxelLodTopologySettings& InLod)
 {
 	if (!FMath::IsFinite(InBlockSize) || InBlockSize <= 0.0 || InKey.Level > 20)
 	{
@@ -74,12 +75,11 @@ FBox FVoxelPublishGroupPlanner::OwnershipBounds(
 		break;
 	case 2:
 	case 4:
-		BaseSide = FVoxelSurfaceTileData::CellSide;
+		BaseSide = InLod.SurfaceMinimumTileSideCells;
 		break;
 	case 3:
 	case 5:
-		BaseSide = static_cast<int64>(FVoxelMacroTileData::CellSide) *
-			FVoxelMacroTileData::BaseStep;
+		BaseSide = InLod.MacroMinimumTileSideCells;
 		break;
 	default:
 		return FBox(ForceInit);
@@ -89,7 +89,9 @@ FBox FVoxelPublishGroupPlanner::OwnershipBounds(
 	const double Y0 = static_cast<double>(InKey.Coordinate.Y) * Side * InBlockSize;
 	const double X1 = X0 + static_cast<double>(Side) * InBlockSize;
 	const double Y1 = Y0 + static_cast<double>(Side) * InBlockSize;
-	return FBox(FVector(X0, Y0, 0.0), FVector(X1, Y1, 1.0));
+	const double Z0 = InKey.Representation < 2 ? static_cast<double>(InKey.Coordinate.Z) * Side * InBlockSize : 0.0;
+	const double Z1 = InKey.Representation < 2 ? Z0 + Side * InBlockSize : 1.0;
+	return FBox(FVector(X0, Y0, Z0), FVector(X1, Y1, Z1));
 }
 
 FBox FVoxelPublishGroupPlanner::PublicationBounds(
@@ -97,9 +99,9 @@ FBox FVoxelPublishGroupPlanner::PublicationBounds(
 	const double InBlockSize,
 	const FBox& InPresentedBounds,
 	const FBox& InDesiredBounds,
-	const bool bInTransition)
+	const bool bInTransition, const FVoxelLodTopologySettings& InLod)
 {
-	FBox Bounds = bInTransition ? FBox(ForceInit) : OwnershipBounds(InKey, InBlockSize);
+	FBox Bounds = bInTransition ? FBox(ForceInit) : OwnershipBounds(InKey, InBlockSize, InLod);
 	Bounds += InPresentedBounds;
 	Bounds += InDesiredBounds;
 	return Bounds;

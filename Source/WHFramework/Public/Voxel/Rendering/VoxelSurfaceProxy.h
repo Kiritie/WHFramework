@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Voxel/Authoring/VoxelViewProfile.h"
 #include "Voxel/Generation/VoxelGenerationPipeline.h"
 #include "Voxel/Generation/VoxelGenerationTypes.h"
 #include "Voxel/Rendering/VoxelViewTypes.h"
@@ -42,8 +43,7 @@ struct WHFRAMEWORK_API FVoxelSurfaceTileData
 
 	int32 GetTileSide() const
 	{
-		return CellSide *
-			Step;
+		return (Side - 1) * Step;
 	}
 
 	int32 GetVertexCount() const
@@ -67,7 +67,8 @@ public:
 		TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
 		const FVoxelGenerationSettings& InSettings,
 		const IVoxelOverlaySource& InOverlaySource,
-	TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry);
+	TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry,
+		const FVoxelLodTopologySettings& InLod = FVoxelLodTopologySettings());
 
 	bool Build(
 		const FVoxelSurfaceTileKey& InKey,
@@ -98,6 +99,7 @@ private:
 		const TAtomic<bool>* InCancel) const;
 
 private:
+	FVoxelLodTopologySettings Lod;
 	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> Generator;
 	TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config;
 	FVoxelGenerationSettings Settings;

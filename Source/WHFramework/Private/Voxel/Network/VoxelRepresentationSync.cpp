@@ -3,6 +3,7 @@
 #include "Voxel/Network/VoxelNetworkCodec.h"
 #include "Voxel/Serialization/VoxelBinaryCodec.h"
 #include "Voxel/Rendering/VoxelWaterView.h"
+#include "Voxel/Rendering/VoxelViewLod.h"
 #include "Voxel/VoxelModule.h"
 
 namespace
@@ -10,13 +11,14 @@ namespace
 	constexpr uint32 RepresentationMagic = 0x34505256;
 	constexpr uint16 RepresentationVersion = 5;
 	constexpr int32 MaxRepresentationRawBytes = 16 * 1024 * 1024;
-	constexpr int32 MaxCells = 4096;
+	constexpr int32 MaxCells = 1 << 20;
 	constexpr uint32 MaxDistantCells = 16384;
 
 	FVoxelGenerationBounds ResolveBuildBounds(
 		const EVoxelRepresentationWireType InType,
 		const FVoxelRepresentationWireKey& InKey,
-		const FVoxelGenerationSettings& InSettings)
+		const FVoxelGenerationSettings& InSettings,
+		const FVoxelLodTopologySettings& InLod)
 	{
 		if (InType ==
 			EVoxelRepresentationWireType::
@@ -29,20 +31,9 @@ namespace
 			return Bounds;
 		}
 
-		const int32 Side =
-			InType ==
-				EVoxelRepresentationWireType::
-					SurfaceProxy
-				? FVoxelSurfaceTileData::
-					CellSide *
-					(1 << InKey.Level)
-				: FVoxelMacroTileData::
-					CellSide *
-					(
-						FVoxelMacroTileData::
-							BaseStep <<
-						InKey.Level
-					);
+		const int32 Side = InType == EVoxelRepresentationWireType::SurfaceProxy
+			? VoxelViewLod::SurfaceSide(InLod, InKey.Level)
+			: VoxelViewLod::MacroSide(InLod, InKey.Level);
 
 		const FIntVector Min(
 			InKey.Coordinate.X *
@@ -52,7 +43,7 @@ namespace
 			InSettings.MinZ);
 
 		const int32 Step = InType == EVoxelRepresentationWireType::SurfaceProxy
-			? 1 << InKey.Level : FVoxelMacroTileData::BaseStep << InKey.Level;
+			? VoxelViewLod::SurfaceStep(InLod, InKey.Level) : VoxelViewLod::MacroStep(InLod, InKey.Level);
 		const int32 Margin = FMath::Max(Step, InSettings.Ecology.Tree.bEnabled
 			? InSettings.Ecology.Tree.CrownRadius : 0);
 		return {
@@ -171,6 +162,7 @@ bool FVoxelRepresentationSync::PrepareServerBuild(
 	FVoxelRepresentationBuildInput Input;
 	Input.Request = InRequest;
 	Input.Settings = InModule.GetManifest().Settings;
+	Input.Lod = InModule.GetViewSettings().Lod;
 	Input.Config = InModule.GetGenerationConfig();
 	Input.Cache = InModule.GetGenerationCache();
 	Input.Generator = InModule.GetGenerator();
@@ -184,7 +176,7 @@ bool FVoxelRepresentationSync::PrepareServerBuild(
 	const FVoxelGenerationBounds Bounds = ResolveBuildBounds(
 		InRequest.Type,
 		InRequest.Key,
-		Input.Settings);
+		Input.Settings, Input.Lod);
 	if (!InModule.CaptureOverlays(Bounds, Input.Overlays, OutError))
 	{
 		return false;
@@ -246,7 +238,7 @@ bool FVoxelRepresentationSync::BuildServerData(
 			InInput.Generator.ToSharedRef(),
 			InInput.Config.ToSharedRef(),
 			InInput.Settings,
-			OverlaySource, InInput.Registry.ToSharedRef());
+			OverlaySource, InInput.Registry.ToSharedRef(), InInput.Lod);
 		if (!Builder.Build(Key, Data, OutError, InCancel)) return false;
 		Data.Revision = InInput.Revision;
 		return EncodeSurface(Data, OutBytes, OutError);
@@ -257,7 +249,7 @@ bool FVoxelRepresentationSync::BuildServerData(
 			FIntPoint(InRequest.Key.Coordinate.X, InRequest.Key.Coordinate.Y),
 			InRequest.Key.Level };
 		FVoxelMacroTileData Data;
-		const FVoxelMacroTerrainBuilder Builder(InInput.Generator.ToSharedRef(), InInput.Config.ToSharedRef(), InInput.Settings, OverlaySource, InInput.Registry.ToSharedRef());
+		const FVoxelMacroTerrainBuilder Builder(InInput.Generator.ToSharedRef(), InInput.Config.ToSharedRef(), InInput.Settings, OverlaySource, InInput.Registry.ToSharedRef(), InInput.Lod);
 		if (!Builder.Build(Key, Data, OutError, InCancel)) return false;
 		Data.Revision = InInput.Revision;
 		return EncodeMacro(Data, OutBytes, OutError);
@@ -271,7 +263,7 @@ bool FVoxelRepresentationSync::EncodeVoxelProxy(
 	TArray<uint8>& OutBytes,
 	FString& OutError)
 {
-	if (InData.Key.Level > 5 || InData.GridSide !=
+	if (InData.Key.Level > 8 || InData.GridSide !=
 			InData.Key.GetGridSide() ||
 		InData.Cells.Num() !=
 			(InData.GridSide * InData.GridSide * InData.GridSide))
@@ -428,7 +420,7 @@ bool FVoxelRepresentationSync::DecodeVoxelProxy(
 	const uint32 Count =
 		Reader.U32();
 
-	if (Data.Key.Level > 5 || Data.GridSide != Data.Key.GetGridSide() || Data.GridSide > 128 ||
+	if (Data.Key.Level > 8 || Data.GridSide != Data.Key.GetGridSide() || Data.GridSide > 128 ||
 		Count != (Data.GridSide * Data.GridSide * Data.GridSide))
 	{
 		Reader.Reject();

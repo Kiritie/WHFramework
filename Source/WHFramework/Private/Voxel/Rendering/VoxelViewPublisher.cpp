@@ -1,4 +1,5 @@
 #include "Voxel/Rendering/VoxelViewPublisher.h"
+#include "Voxel/Rendering/VoxelViewLod.h"
 
 #include "Components/SceneComponent.h"
 #include "Engine/World.h"
@@ -272,7 +273,7 @@ double FVoxelViewPublisher::GroupDistance(const FGroup& InGroup) const
 	double Distance = MAX_dbl;
 	for (const auto& Key : InGroup.Keys)
 	{
-		const FBox Bounds = FVoxelPublishGroupPlanner::OwnershipBounds(Key, Module.BlockSize());
+		const FBox Bounds = FVoxelPublishGroupPlanner::OwnershipBounds(Key, Module.BlockSize(), Module.GetViewSettings().Lod);
 		Distance = FMath::Min(Distance, BoundsDistance(MakeArrayView(&Bounds, 1)));
 	}
 	return Observers.IsEmpty() ? 0.0 : Distance;
@@ -334,14 +335,14 @@ FVoxelViewPublisher::FGroupPriority FVoxelViewPublisher::BoundsPriority(const TC
 				NearestDistance = Distance;
 				NearestPriority = Source.GetSchedulingPriority();
 			}
-			const int32 Radius = InStage == 0 ? Source.View.FineRadiusCells + Source.View.FinePreloadCells
+			const int32 Radius = InStage == 0 ? Source.View.FineRadiusCells
 				: InStage == 1 ? Source.View.VoxelProxyRadiusCells
-				: InStage == 2 ? Source.View.SurfaceRadiusCells : Module.GetViewSettings().MacroRadiusCells;
+				: InStage == 2 ? Source.View.SurfaceRadiusCells : Source.View.MacroRadiusCells;
 			if (Distance <= Radius) Priority = FMath::Min(Priority, Source.GetSchedulingPriority());
 			Result.DistanceScore = FMath::Min(Result.DistanceScore, Distance);
 			if (!Source.Has(EVoxelStreamingCapability::LocalRefinement) &&
-				Source.View.MovementCriticalFineRadiusCells > 0 &&
-				Distance <= Source.View.MovementCriticalFineRadiusCells)
+				VoxelViewLod::MovementCriticalFineRadius(Source) > 0 &&
+				Distance <= VoxelViewLod::MovementCriticalFineRadius(Source))
 				Result.WorkClass = EVoxelWorkClass::Critical;
 		}
 		Result.SourcePriority = FMath::Min(Result.SourcePriority,
@@ -358,7 +359,7 @@ FVoxelViewPublisher::FGroupPriority FVoxelViewPublisher::GroupPriority(const FGr
 	FGroupPriority Result;
 	for (const auto& Key : InGroup.Keys)
 	{
-		const FBox Bounds = FVoxelPublishGroupPlanner::OwnershipBounds(Key, Module.BlockSize());
+		const FBox Bounds = FVoxelPublishGroupPlanner::OwnershipBounds(Key, Module.BlockSize(), Module.GetViewSettings().Lod);
 		MergePriority(Result, BoundsPriority(MakeArrayView(&Bounds, 1), Stage));
 	}
 	return Result;
@@ -462,7 +463,7 @@ void FVoxelViewPublisher::StartCommittedGroups()
 		Footprint.bTransition = Footprint.Key.Representation == 4 || Footprint.Key.Representation == 5;
 		if (!Footprint.bTransition)
 		{
-			Footprint.Bounds = FVoxelPublishGroupPlanner::OwnershipBounds(Footprint.Key, Module.BlockSize());
+			Footprint.Bounds = FVoxelPublishGroupPlanner::OwnershipBounds(Footprint.Key, Module.BlockSize(), Module.GetViewSettings().Lod);
 		}
 		KeyIndices.Add(Footprint.Key, Footprints.Num() - 1);
 	}
@@ -476,7 +477,7 @@ void FVoxelViewPublisher::StartCommittedGroups()
 				Entry.Location + Entry.Bounds.Max * Entry.Scale)
 			: FBox(ForceInit);
 		Footprints[*Index].Bounds += FVoxelPublishGroupPlanner::PublicationBounds(
-			Entry.GroupKey, Module.BlockSize(), Entry.PresentedWorldBounds, Desired, Entry.bTransition);
+			Entry.GroupKey, Module.BlockSize(), Entry.PresentedWorldBounds, Desired, Entry.bTransition, Module.GetViewSettings().Lod);
 	}
 	TArray<int32> GroupIndices;
 	FVoxelPublishGroupPlanner::Build(Footprints, GroupIndices);
@@ -537,7 +538,7 @@ void FVoxelViewPublisher::StartCommittedGroups()
 		UE_LOG(LogTemp, Display,
 			TEXT("Voxel local publish plan: groups=%d meshUpdates=%d visibilityChanges=%d maxGroupsPerFrame=%d"),
 			Publication->Groups.Num(), Publication->Updates.Num(), Publication->Visibility.Num(),
-			Module.GetViewSettings().MaxPublishGroupsPerFrame);
+			Module.GetViewSettings().Budget.MaxPublishGroupsPerFrame);
 		NextGroupLogSeconds = GroupNowSeconds + 5.0;
 	}
 #endif
@@ -594,9 +595,9 @@ void FVoxelViewPublisher::BuildGroups(const FPublicationRef& Publication, const 
 				: FBox(ForceInit);
 			if (bPhysicalChange)
 				Footprint.Bounds = FVoxelPublishGroupPlanner::PublicationBounds(
-					Entry->GroupKey, Module.BlockSize(), Entry->PresentedWorldBounds, Desired, Entry->bTransition);
+					Entry->GroupKey, Module.BlockSize(), Entry->PresentedWorldBounds, Desired, Entry->bTransition, Module.GetViewSettings().Lod);
 			else if (bLogicalChange && !Entry->bTransition)
-				Footprint.Bounds = FVoxelPublishGroupPlanner::OwnershipBounds(Entry->GroupKey, Module.BlockSize());
+				Footprint.Bounds = FVoxelPublishGroupPlanner::OwnershipBounds(Entry->GroupKey, Module.BlockSize(), Module.GetViewSettings().Lod);
 			if (bClippingChange && !bPhysicalChange)
 			{
 				FVoxelPublishFootprint Changed = Footprint;
@@ -623,7 +624,7 @@ void FVoxelViewPublisher::BuildGroups(const FPublicationRef& Publication, const 
 		const bool bLogicalChange = !bInPreparedCoverage || Publication->OwnershipChanges.Contains(Pair.Key);
 		Footprint.bTransition = bLogicalChange && (Pair.Key.Representation == 4 || Pair.Key.Representation == 5);
 		if (bLogicalChange && !Footprint.bTransition)
-			Footprint.Bounds = FVoxelPublishGroupPlanner::OwnershipBounds(Pair.Key, Module.BlockSize());
+			Footprint.Bounds = FVoxelPublishGroupPlanner::OwnershipBounds(Pair.Key, Module.BlockSize(), Module.GetViewSettings().Lod);
 	}
 
 	TArray<int32> GroupIndices;
@@ -732,8 +733,8 @@ void FVoxelViewPublisher::DeferSaturatedGroups(const FPublicationRef& Publicatio
 			if (Key.Representation != 0) return false;
 			for (const FVector& Observer : Observers)
 			{
-				const FIntPoint Cell(FMath::FloorToInt(Observer.X / Module.BlockSize()), FMath::FloorToInt(Observer.Y / Module.BlockSize()));
-				if (Key.Coordinate == FIntPoint(VoxelGeneration::FloorDivide(Cell.X, 16), VoxelGeneration::FloorDivide(Cell.Y, 16))) return true;
+				const FVector Cell = Observer / Module.BlockSize();
+				if (FVoxelPublishGroupPlanner::OwnershipBounds(Key, Module.BlockSize(), Module.GetViewSettings().Lod).IsInside(Cell)) return true;
 			}
 			return false;
 		}))
@@ -1272,7 +1273,7 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& Publication, cons
 	const FVoxelSectionMeshResult& Mesh = *Publication->PreparedMeshes[InIndex];
 	while (Update.PreparedBatchIndex < Mesh.Batches.Num())
 	{
-		if (InOutPreparedComponents >= Module.GetViewSettings().MaxPublishComponentsPerFrame)
+		if (InOutPreparedComponents >= Module.GetViewSettings().Budget.MaxPublishComponentsPerFrame)
 		{
 			bOutComplete = false;
 			break;
@@ -1311,7 +1312,7 @@ void FVoxelViewPublisher::Tick()
 	FrameTimings = {};
 	const double RetireStart = FPlatformTime::Seconds();
 	const double RetireDeadline = FPlatformTime::Seconds() +
-		Module.GetViewSettings().PublishRetireMilliseconds / 1000.0;
+		Module.GetViewSettings().Budget.PublishRetireMilliseconds / 1000.0;
 	while (!RetiredComponents.IsEmpty())
 	{
 		if (UVoxelMeshComponent* Component = RetiredComponents.Pop().Get()) Component->DestroyComponent();
@@ -1372,7 +1373,7 @@ void FVoxelViewPublisher::Tick()
 	const double PrepareStart = FPlatformTime::Seconds();
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewPrepareGT);
 	const double Deadline = FPlatformTime::Seconds() +
-		Module.GetViewSettings().PublishPrepareMilliseconds / 1000.0;
+		Module.GetViewSettings().Budget.PublishPrepareMilliseconds / 1000.0;
 	int32 PreparedComponents = 0;
 	for (const auto& Publication : Publications)
 	{
@@ -1395,10 +1396,10 @@ void FVoxelViewPublisher::Tick()
 				if (bComplete) ++Group.PreparedUpdates;
 				if (!bComplete) break;
 			}
-			if (Publication->bCanceled || PreparedComponents >= Module.GetViewSettings().MaxPublishComponentsPerFrame ||
+			if (Publication->bCanceled || PreparedComponents >= Module.GetViewSettings().Budget.MaxPublishComponentsPerFrame ||
 				FPlatformTime::Seconds() >= Deadline) break;
 		}
-		if (PreparedComponents >= Module.GetViewSettings().MaxPublishComponentsPerFrame ||
+		if (PreparedComponents >= Module.GetViewSettings().Budget.MaxPublishComponentsPerFrame ||
 			FPlatformTime::Seconds() >= Deadline)
 		{
 			break;
@@ -1406,7 +1407,7 @@ void FVoxelViewPublisher::Tick()
 	}
 	FrameTimings.PublishPrepareMilliseconds = (FPlatformTime::Seconds() - PrepareStart) * 1000.0;
 	const double CommitStart = FPlatformTime::Seconds();
-	const double CommitDeadline = CommitStart + Module.GetViewSettings().PublishPrepareMilliseconds / 1000.0;
+	const double CommitDeadline = CommitStart + Module.GetViewSettings().Budget.PublishPrepareMilliseconds / 1000.0;
 	int32 Committed = 0;
 	TMap<FVoxelPublishGroupKey, uint64> FirstOwners;
 	for (const auto& Publication : Publications)
@@ -1520,7 +1521,7 @@ void FVoxelViewPublisher::CommitReadyGroups(const FPublicationRef& Publication, 
 	const TMap<FVoxelPublishGroupKey, uint64>& FirstOwners)
 {
 	if (!Publication->bGroupsPrepared) return;
-	const int32 Limit = FMath::Max(1, Module.GetViewSettings().MaxPublishGroupsPerFrame);
+	const int32 Limit = FMath::Max(1, Module.GetViewSettings().Budget.MaxPublishGroupsPerFrame);
 	for (const int32 GroupIndex : Publication->GroupOrder)
 	{
 		FGroup& Group = Publication->Groups[GroupIndex];

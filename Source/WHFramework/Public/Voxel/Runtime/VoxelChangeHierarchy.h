@@ -1,11 +1,21 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Voxel/Authoring/VoxelViewProfile.h"
 #include "Voxel/Rendering/VoxelViewTypes.h"
+
+struct WHFRAMEWORK_API FVoxelAffectedRepresentationKeys
+{
+	TSet<FVoxelViewKey> Proxy;
+	TSet<FVoxelSurfaceTileKey> Surface;
+	TSet<FVoxelMacroTileKey> Macro;
+};
 
 struct WHFRAMEWORK_API FVoxelChangeHierarchy
 {
 public:
+	void SetTopology(const FVoxelLodTopologySettings& InLod);
+	FVoxelAffectedRepresentationKeys GatherAffectedKeys(const FIntVector& InSection) const;
 	void SetNaturalInfluence(int32 InHorizontalCells, int32 InUpwardCells);
 	uint64 InvalidateSection(const FIntVector& InSection);
 	uint64 GetSectionRevision(const FIntVector& InSection) const;
@@ -22,6 +32,7 @@ public:
 	void Reset();
 
 private:
+	FVoxelLodTopologySettings Lod;
 	mutable FRWLock Lock;
 	uint64 RevisionSerial = 0;
 	int32 NaturalHorizontalInfluence = 0;

@@ -128,33 +128,7 @@ USceneModule::~USceneModule()
 #if WITH_EDITOR
 void USceneModule::OnGenerate()
 {
-	if(!MiniMapCapture)
-	{
-		TArray<AActor*> ChildActors;
-		GetModuleOwner()->GetAttachedActors(ChildActors);
-		if(ChildActors.Num() > 0)
-		{
-			MiniMapCapture = Cast<AMiniMapCapture>(ChildActors[0]);
-		}
-	}
-	if(!MiniMapCapture)
-	{
-		FActorSpawnParameters ActorSpawnParameters;
-		ActorSpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		MiniMapCapture = GetWorld()->SpawnActor<AMiniMapCapture>(ActorSpawnParameters);
-		if(MiniMapCapture)
-		{
-			MiniMapCapture->SetActorLabel(TEXT("MiniMapCapture"));
-			MiniMapCapture->AttachToActor(GetModuleOwner(), FAttachmentTransformRules::KeepWorldTransform);
-		}
-	}
-	if(MiniMapCapture)
-	{
-		MiniMapCapture->GetCapture()->TextureTarget = MiniMapTexture;
-		MiniMapCapture->SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
-	}
-
-	Modify();
+	Super::OnGenerate();
 }
 
 void USceneModule::OnDestroy()
@@ -166,6 +140,7 @@ void USceneModule::OnDestroy()
 	if(MiniMapCapture)
 	{
 		MiniMapCapture->Destroy();
+		MiniMapCapture = nullptr;
 	}
 }
 #endif
@@ -174,6 +149,7 @@ void USceneModule::OnInitialize()
 {
 	Super::OnInitialize();
 
+	RefreshMiniMapCapture();
 	IDebuggerInterface::Register();
 	if(GetWorld() && GetWorld()->GetNetMode() != NM_DedicatedServer)
 	{
@@ -410,6 +386,11 @@ void USceneModule::OnTermination(EPhase InPhase)
 			CameraStreamingBridge->Destroy();
 			CameraStreamingBridge = nullptr;
 		}
+		if(MiniMapCapture)
+		{
+			MiniMapCapture->Destroy();
+			MiniMapCapture = nullptr;
+		}
 
 		FSceneArea Area;
 		while(PendingSceneAreas.Dequeue(Area)) { }
@@ -606,9 +587,10 @@ void USceneModule::PostEditChangeProperty(FPropertyChangedEvent& PropertyChanged
 	{
 		const FName PropertyName = Property->GetFName();
 
-		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(USceneModule, MiniMapTexture))
+		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(USceneModule, MiniMapSource) ||
+			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(USceneModule, MiniMapTexture))
 		{
-			MiniMapCapture->GetCapture()->TextureTarget = MiniMapTexture;
+			RefreshMiniMapCapture();
 		}
 	}
 
@@ -620,6 +602,50 @@ float USceneModule::GetAltitude(bool bUnsigned, bool bRefresh) const
 {
 	const float ReturnValue = bRefresh ? UCameraModuleStatics::GetViewLocation().Z - SeaLevel : Altitude;
 	return bUnsigned ? FMath::Max(ReturnValue, 0.f) : ReturnValue;
+}
+
+void USceneModule::RefreshMiniMapCapture()
+{
+	if(!GetWorld() || !GetWorld()->IsGameWorld()) return;
+	if(!::IsValid(MiniMapCapture))
+	{
+		MiniMapCapture = nullptr;
+	}
+	if(MiniMapSource != EWorldMiniMapSource::SceneCapture || GetWorld()->GetNetMode() == NM_DedicatedServer)
+	{
+		if(MiniMapCapture)
+		{
+			MiniMapCapture->Destroy();
+			MiniMapCapture = nullptr;
+		}
+		return;
+	}
+	if(!MiniMapCapture)
+	{
+		FActorSpawnParameters ActorSpawnParameters;
+		ActorSpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		ActorSpawnParameters.ObjectFlags |= RF_Transient;
+		ActorSpawnParameters.Owner = GetModuleOwner();
+		MiniMapCapture = GetWorld()->SpawnActor<AMiniMapCapture>(ActorSpawnParameters);
+		if(MiniMapCapture)
+		{
+#if WITH_EDITOR
+			MiniMapCapture->SetActorLabel(TEXT("MiniMapCapture"), false);
+#endif
+			MiniMapCapture->AttachToActor(GetModuleOwner(), FAttachmentTransformRules::KeepWorldTransform);
+		}
+	}
+	if(MiniMapCapture)
+	{
+		MiniMapCapture->GetCapture()->TextureTarget = MiniMapTexture;
+		MiniMapCapture->GetCapture()->SetActive(MiniMapMode != EWorldMiniMapMode::None, true);
+	}
+}
+
+void USceneModule::SetMiniMapSource(EWorldMiniMapSource InMiniMapSource)
+{
+	MiniMapSource = InMiniMapSource;
+	RefreshMiniMapCapture();
 }
 
 void USceneModule::SetMiniMapMode(EWorldMiniMapMode InMiniMapMode)

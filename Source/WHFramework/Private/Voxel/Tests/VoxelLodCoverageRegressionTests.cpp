@@ -16,6 +16,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelActualSamplingLodTest,
 
 bool FVoxelActualSamplingLodTest::RunTest(const FString& InParameters)
 {
+	FString BuildError;
 	(void)InParameters;
 	const int32 Steps[] = {1, 1, 2, 4, 8, 16, 16};
 	for (uint8 Level = 0; Level < UE_ARRAY_COUNT(Steps); ++Level)
@@ -28,21 +29,22 @@ bool FVoxelActualSamplingLodTest::RunTest(const FString& InParameters)
 	Source.Capabilities = EVoxelStreamingCapability::WorldVisual;
 	Source.VerticalFovDegrees = 90.0f;
 	Source.ViewportHeightPixels = 600;
-	Source.View.TargetScreenErrorPixels = 8.0f;
+	FVoxelViewSettings Settings;
+	Settings.Lod.TargetScreenErrorPixels = 8.0f;
 	Source.View.VoxelProxyRadiusCells = 4096;
 	TestEqual(TEXT("A 16-cell sample fails immediately before its pixel threshold"),
-		VoxelViewLod::ResolveVoxelProxyLevel(599, Source, 5, 8.0f), static_cast<uint8>(4));
+		VoxelViewLod::ResolveVoxelProxyLevel(599, Source, [&Settings]() { FVoxelViewSettings Policy = Settings; Policy.Lod.MaximumVoxelProxyLevel = 5; Policy.Lod.TargetScreenErrorPixels = 8.0f; return Policy; }()), static_cast<uint8>(4));
 	TestEqual(TEXT("L5 becomes eligible at its actual 16-cell threshold"),
-		VoxelViewLod::ResolveVoxelProxyLevel(601, Source, 5, 8.0f), static_cast<uint8>(5));
+		VoxelViewLod::ResolveVoxelProxyLevel(601, Source, [&Settings]() { FVoxelViewSettings Policy = Settings; Policy.Lod.MaximumVoxelProxyLevel = 5; Policy.Lod.TargetScreenErrorPixels = 8.0f; return Policy; }()), static_cast<uint8>(5));
 	TestEqual(TEXT("Saturated L6 is evaluated as 16 cells rather than an imaginary 32"),
-		VoxelViewLod::ResolveVoxelProxyLevel(601, Source, 6, 8.0f), static_cast<uint8>(6));
+		VoxelViewLod::ResolveVoxelProxyLevel(601, Source, [&Settings]() { FVoxelViewSettings Policy = Settings; Policy.Lod.MaximumVoxelProxyLevel = 6; Policy.Lod.TargetScreenErrorPixels = 8.0f; return Policy; }()), static_cast<uint8>(6));
 	TestEqual(TEXT("Texture period is capped independently at eight cells"), VoxelViewLod::TexturePeriodCells(16, 8.0), 8.0);
 	FVoxelTerrainViewPlan Plan;
 	const FVoxelViewKey Root{FIntVector(2, 0, 0), 5};
-	Plan.Build(MakeArrayView(&Source, 1), {}, {Root}, FVoxelViewSettings(), 8192);
+	Plan.Build(MakeArrayView(&Source, 1), {}, {Root}, FVoxelViewSettings(), BuildError);
 	TestTrue(TEXT("Eligible 512-cell node remains a planned leaf"), Plan.Leaves.Num() == 1 && Plan.Leaves.Contains(Root));
 	Source.Center.X = 425;
-	Plan.Build(MakeArrayView(&Source, 1), {}, {Root}, FVoxelViewSettings(), 8192);
+	Plan.Build(MakeArrayView(&Source, 1), {}, {Root}, FVoxelViewSettings(), BuildError);
 	TestFalse(TEXT("512-cell coverage refines when its actual sample exceeds screen error"), Plan.Leaves.Contains(Root));
 	FString Error;
 	TestTrue(TEXT("Refinement preserves complete ownership"), Plan.Validate(Error));
@@ -55,6 +57,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelPublisherStageAndIndexTest,
 
 bool FVoxelPublisherStageAndIndexTest::RunTest(const FString& InParameters)
 {
+	FString BuildError;
 	(void)InParameters;
 	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
 	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
@@ -175,6 +178,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelEmptyTransitionConvergenceTest,
 
 bool FVoxelEmptyTransitionConvergenceTest::RunTest(const FString& InParameters)
 {
+	FString BuildError;
 	(void)InParameters;
 	UVoxelModule* Module = NewObject<UVoxelModule>();
 	FVoxelTaskScheduler Scheduler;
@@ -224,6 +228,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelFineProxyDependenciesTest,
 
 bool FVoxelFineProxyDependenciesTest::RunTest(const FString& InParameters)
 {
+	FString BuildError;
 	(void)InParameters;
 	UVoxelModule* Module = NewObject<UVoxelModule>();
 	FVoxelTaskScheduler Scheduler;
@@ -233,7 +238,7 @@ bool FVoxelFineProxyDependenciesTest::RunTest(const FString& InParameters)
 	const FVoxelViewKey Distant{FIntVector(10, 0, 0), 1};
 	const FVoxelViewKey Root{FIntVector::ZeroValue, 5};
 	auto& Interest = const_cast<FVoxelInterestSet&>(Module->GetCurrentInterest());
-	Interest.TerrainPlan.Build({}, {FIntVector::ZeroValue}, {Root}, FVoxelViewSettings(), 8192);
+	Interest.TerrainPlan.Build({}, {FIntVector::ZeroValue}, {Root}, FVoxelViewSettings(), BuildError);
 	TestTrue(TEXT("Real terrain plan preserves the Fine ancestor dependency"),
 		Interest.TerrainPlan.FineDependencies.Contains(Dependency));
 	TestTrue(TEXT("Real terrain plan preserves the coarse sibling needed for atomic handoff"),
@@ -307,6 +312,7 @@ bool FVoxelFineProxyDependenciesTest::RunTest(const FString& InParameters)
 	Manager.RefreshTerrainBuildStage();
 	TestEqual(TEXT("Ready but unpresented Fine still holds the playable stage gate"), Scheduler.GetTerrainBuildStage(), 0);
 	Manager.VisibleTerrainNodes.Add({Fine.FineKey, 0});
+	Manager.PresentedFineSectionOwners.Add(Fine.FineKey, {Fine.FineKey, 0});
 	Manager.bTerrainBuildStageDirty = true;
 	Manager.RefreshTerrainBuildStage();
 	TestEqual(TEXT("Presented Fine releases dependent coarse construction"), Scheduler.GetTerrainBuildStage(), 2);

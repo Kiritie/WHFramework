@@ -1,6 +1,7 @@
 #include "Voxel/Rendering/VoxelSurfaceProxy.h"
 
 #include "ProfilingDebugging/CpuProfilerTrace.h"
+#include "Voxel/Rendering/VoxelViewLod.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/Ecology/VoxelEcology.h"
 
@@ -12,12 +13,10 @@ namespace
 		const FVoxelSurfaceTileKey& InKey,
 		const int32 InX,
 		const int32 InY,
-		const int32 InStep)
+		const int32 InStep, const int32 InGridSide)
 	{
 		const int32 TileSide =
-			FVoxelSurfaceTileData::
-				CellSide *
-			InStep;
+			InGridSide * InStep;
 
 		return
 			InKey.Coordinate *
@@ -67,8 +66,10 @@ FVoxelSurfaceProxyBuilder::FVoxelSurfaceProxyBuilder(
 	TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
 	const FVoxelGenerationSettings& InSettings,
 	const IVoxelOverlaySource& InOverlaySource,
-	TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry)
-	: Generator(InGenerator)
+	TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry,
+	const FVoxelLodTopologySettings& InLod)
+	: Lod(InLod)
+	, Generator(InGenerator)
 	, Config(InConfig)
 	, Settings(InSettings)
 	, OverlaySource(InOverlaySource)
@@ -90,13 +91,9 @@ bool FVoxelSurfaceProxyBuilder::Build(
 	Data.Key =
 		InKey;
 
-	Data.Side =
-		FVoxelSurfaceTileData::
-			VertexSide;
+	Data.Side = Lod.SurfaceMinimumTileSideCells / Lod.SurfaceBaseSampleStepCells + 1;
 
-	Data.Step =
-		1 <<
-		InKey.Level;
+	Data.Step = VoxelViewLod::SurfaceStep(Lod, InKey.Level);
 
 	const int32 Count =
 		Data.GetVertexCount();
@@ -692,7 +689,7 @@ bool FVoxelSurfaceProxyBuilder::ApplyModifiedSurface(
 					InKey,
 					X,
 					Y,
-					InOutData.Step);
+					InOutData.Step, InOutData.Side - 1);
 
 			const TMap<
 				int32,

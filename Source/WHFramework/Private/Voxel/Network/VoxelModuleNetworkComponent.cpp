@@ -1,4 +1,5 @@
 #include "Voxel/Network/VoxelModuleNetworkComponent.h"
+#include "Voxel/Rendering/VoxelViewLod.h"
 
 #include "GameFramework/PlayerController.h"
 #include "Net/UnrealNetwork.h"
@@ -39,14 +40,15 @@ namespace
 	auto ResolveWireRepresentationBounds(
 		EVoxelRepresentationWireType InType,
 		const FVoxelRepresentationWireKey& InKey,
-		const FVoxelGenerationSettings& InSettings) -> FVoxelGenerationBounds
+		const FVoxelGenerationSettings& InSettings,
+		const FVoxelLodTopologySettings& InLod) -> FVoxelGenerationBounds
 	{
 		if (InType == EVoxelRepresentationWireType::VoxelProxy)
 		{
 			return FVoxelViewKey { InKey.Coordinate, InKey.Level }.GetBounds();
 		}
 		const int32 Side = InType == EVoxelRepresentationWireType::SurfaceProxy ?
-			32 * (1 << InKey.Level) : 32 * (64 << InKey.Level);
+			VoxelViewLod::SurfaceSide(InLod, InKey.Level) : VoxelViewLod::MacroSide(InLod, InKey.Level);
 		const FIntVector Min(
 			InKey.Coordinate.X * Side,
 			InKey.Coordinate.Y * Side,
@@ -75,12 +77,17 @@ namespace
 	bool IsRepresentationInRange(
 		const FVector& InObserverCell,
 		const EVoxelRepresentationWireType InType,
-		const FVoxelGenerationBounds& InBounds)
+		const FVoxelGenerationBounds& InBounds,
+		const FVoxelViewSettings& InSettings)
 	{
-		const FVector Center = FVector(InBounds.Min + InBounds.Max) * 0.5;
-		const double Radius = InType == EVoxelRepresentationWireType::VoxelProxy ? 512.0 :
-			(InType == EVoxelRepresentationWireType::SurfaceProxy ? 4096.0 : 32768.0);
-		return FVector::DistSquared(InObserverCell, Center) <= FMath::Square(Radius + 0.5 * (InBounds.Max.X - InBounds.Min.X));
+		FVoxelStreamingSource Source;
+		Source.View = InSettings.DefaultSourceView;
+		const FVoxelResolvedViewRanges Ranges = VoxelViewLod::ResolveViewRanges(Source);
+		const double Radius = InType == EVoxelRepresentationWireType::VoxelProxy ? Ranges.Proxy :
+			(InType == EVoxelRepresentationWireType::SurfaceProxy ? Ranges.Surface : Ranges.Macro);
+		const FVector Nearest = FBox(FVector(InBounds.Min), FVector(InBounds.Max)).GetClosestPointTo(InObserverCell);
+		return FVector2D::DistSquared(FVector2D(InObserverCell), FVector2D(Nearest)) <= FMath::Square(Radius) &&
+			(InType != EVoxelRepresentationWireType::VoxelProxy || FMath::Abs(InObserverCell.Z - Nearest.Z) <= Source.View.VoxelProxyVerticalHalfExtentCells);
 	}
 }
 
@@ -666,9 +673,9 @@ void UVoxelModuleNetworkComponent::Handle(
 		const FVoxelGenerationBounds Bounds = ResolveWireRepresentationBounds(
 			Request.Type,
 			Request.Key,
-			VoxelModule->GetManifest().Settings);
+			VoxelModule->GetManifest().Settings, VoxelModule->GetViewSettings().Lod);
 		const FVector ObserverCell = Observer->GetActorLocation() / VoxelModule->BlockSize();
-		if (!IsRepresentationInRange(ObserverCell, Request.Type, Bounds))
+		if (!IsRepresentationInRange(ObserverCell, Request.Type, Bounds, VoxelModule->GetViewSettings()))
 		{
 			Fail(TEXT("Voxel representation request is outside the authorized visual radius"));
 			return;
@@ -835,8 +842,8 @@ void UVoxelModuleNetworkComponent::RefreshInterest(const double InNow)
 		const FVoxelStreamingSourceView& View = Authorized.bInheritWorldView ?
 			VoxelModule->GetViewSettings().DefaultSourceView : Authorized.View;
 		const int32 Prediction = FMath::CeilToInt(Observer->GetVelocity().Size2D() / VoxelModule->BlockSize() * View.FinePredictionSeconds);
-		const int32 Radius = View.FineRadiusCells + View.FinePreloadCells + View.FineReplanCells + Prediction + 32;
-		const int32 Vertical = View.FineVerticalRadiusCells + View.FineReplanCells + 32;
+		const int32 Radius = View.FineRadiusCells + VoxelViewLod::ResolveReplanSteps(Authorized, VoxelModule->GetViewSettings()).Fine + Prediction + 32;
+		const int32 Vertical = View.FineVerticalHalfExtentCells + VoxelViewLod::ResolveReplanSteps(Authorized, VoxelModule->GetViewSettings()).Fine + 32;
 		const FIntVector MinCell(Authorized.Center.X - Radius, Authorized.Center.Y - Radius,
 			FMath::Max(VoxelModule->GetManifest().Settings.MinZ, Authorized.Center.Z - Vertical));
 		const FIntVector MaxCell(Authorized.Center.X + Radius, Authorized.Center.Y + Radius,

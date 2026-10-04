@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Voxel/Authoring/VoxelViewProfile.h"
 #include "Voxel/Rendering/VoxelViewTypes.h"
 #include "Voxel/Rendering/VoxelTerrainViewPlan.h"
 #include "Voxel/Streaming/VoxelStreamingSource.h"
@@ -38,6 +39,7 @@ struct WHFRAMEWORK_API FVoxelInterestSet
 {
 	TMap<FGuid, FVoxelSourceInterest> Sources;
 	FVoxelTerrainViewPlan TerrainPlan;
+	FString PlanningError;
 	TSharedPtr<const TSet<FIntVector>, ESPMode::ThreadSafe> FineSections;
 	TArray<FVoxelViewAdmission> Admissions;
 	TArray<int32> AdmissionLanes[4];
@@ -71,43 +73,9 @@ struct WHFRAMEWORK_API FVoxelInterestSet
 struct WHFRAMEWORK_API FVoxelViewSettings
 {
 	FVoxelStreamingSourceView DefaultSourceView;
-	float PlayableFineRadiusFraction = 0.75f;
-
-
-	int32 MacroRadiusCells = 16000;
-
-
-
-
-	uint8 MaximumMacroLevel = 4;
-
-	int32 MaximumSurfaceTiles = 256;
-
-	int32 MaximumMacroTiles = 128;
-	double MaximumTextureStretchCells = 4.0;
-	int32 VoxelProxyTileSide = 16;
-	int32 SurfaceTileSide = 32;
-	int32 MacroTileSide = 2048;
-	int32 MaximumTerrainLeaves = 8192;
-	int32 FineAdmissionPerFrame = 24;
-	int32 VoxelProxyAdmissionPerFrame = 12;
-	int32 SurfaceAdmissionPerFrame = 8;
-	int32 MacroAdmissionPerFrame = 8;
-	int32 DataAdmissionPerFrame = 128;
-	int32 FineApplyPerFrame = 12;
-	int32 VoxelProxyApplyPerFrame = 8;
-	int32 SurfaceApplyPerFrame = 4;
-	int32 MacroApplyPerFrame = 4;
-	int32 CompletedResultsPerFrame = 32;
-	int32 HeavyResultsPerFrame = 8;
-	float AdmissionMilliseconds = 2.0f;
-	float ResultApplyMilliseconds = 2.0f;
-	int32 MaxPublishComponentsPerFrame = 16;
-	int32 MaxPublishGroupsPerFrame = 2;
-	float PublishPrepareMilliseconds = 2.0f;
-	float PublishRetireMilliseconds = 1.0f;
-	int32 CriticalReservedTasks = 4;
-	int32 MaxConcurrentSurfaceTasks = 2;
-	int32 MaxConcurrentMacroTasks = 2;
-	int32 MaxConcurrentCoarseTerrainTasks = 3;
+	FVoxelLodTopologySettings Lod;
+	FVoxelStreamingReadinessPolicy Readiness;
+	FVoxelStreamingPlanningPolicy Planning;
+	FVoxelStreamingPerformanceBudget Budget;
+	double MaximumTextureStretchCells = 8.0;
 };

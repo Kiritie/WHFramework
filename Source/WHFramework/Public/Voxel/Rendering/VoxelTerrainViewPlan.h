@@ -14,12 +14,10 @@ struct WHFRAMEWORK_API FVoxelTerrainViewPlan
 	TSet<FVoxelViewKey> Required;
 	// 精细区域交接依赖的完整兄弟组，必须先于无关远景构建。
 	TSet<FVoxelViewKey> FineDependencies;
-	int32 OverBudgetLeaves = 0;
-	bool bBudgetLimited = false;
 
-	void Build(TConstArrayView<FVoxelStreamingSource> InSources,
+	bool Build(TConstArrayView<FVoxelStreamingSource> InSources,
 		const TSet<FIntVector>& InFineSections, const TSet<FVoxelViewKey>& InRoots,
-		const FVoxelViewSettings& InSettings, int32 InMaximumLeaves);
+		const FVoxelViewSettings& InSettings, FString& OutError);
 	void ResolveVisible(TFunctionRef<bool(const FVoxelViewKey&)> InIsReady,
 		TSet<FVoxelViewKey>& OutVisible, const TSet<FVoxelViewKey>* InPrevious = nullptr,
 		const TSet<FVoxelViewKey>* InReadyNodes = nullptr,
@@ -28,6 +26,10 @@ struct WHFRAMEWORK_API FVoxelTerrainViewPlan
 	bool Validate(FString& OutError) const;
 
 private:
+	bool BuildInternal(TConstArrayView<FVoxelStreamingSource> InSources,
+		const TSet<FIntVector>& InFineSections, const TSet<FVoxelViewKey>& InRoots,
+		const FVoxelViewSettings& InSettings, FString& OutError);
+
 	bool ResolveNode(const FVoxelViewKey& InNode,
 		TFunctionRef<bool(const FVoxelViewKey&)> InIsReady,
 		const TSet<FVoxelViewKey>& InPreviousAncestors, const TSet<FVoxelViewKey>* InPrevious,

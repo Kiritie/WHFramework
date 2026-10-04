@@ -18,8 +18,8 @@ bool FVoxelWarmupDemandDefaultsTest::RunTest(const FString& Parameters)
 {
 	(void)Parameters;
 	const FVoxelStreamingSourceView SourceView;
-	TestTrue(TEXT("Warmup data is smaller than default fine radius"), SourceView.WarmupDataRadiusCells < SourceView.FineRadiusCells);
-	TestTrue(TEXT("Warmup collision is smaller than default fine radius"), SourceView.WarmupCollisionRadiusCells < SourceView.FineRadiusCells);
+	TestTrue(TEXT("Warmup data is smaller than default fine radius"), FVoxelStreamingSource().ExactRadius * FVoxelStreamingReadinessPolicy().WarmupDataRadiusFraction < SourceView.FineRadiusCells);
+	TestTrue(TEXT("Warmup collision is smaller than default fine radius"), FVoxelStreamingSource().CollisionRadius * FVoxelStreamingReadinessPolicy().WarmupCollisionRadiusFraction < SourceView.FineRadiusCells);
 	return true;
 }
 

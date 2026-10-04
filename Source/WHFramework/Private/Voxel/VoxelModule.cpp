@@ -1,4 +1,5 @@
 #include "Voxel/VoxelModule.h"
+#include "Voxel/Rendering/VoxelViewLod.h"
 
 #include "Async/Async.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
@@ -287,7 +288,7 @@ void UVoxelModule::OnRefresh(
 		{
 			ApplyTask(
 				MoveTemp(InResult));
-		}, ViewSettings.ResultApplyMilliseconds);
+		}, ViewSettings.Budget.ResultApplyMilliseconds);
 
 	const double AfterScheduler = FPlatformTime::Seconds();
 
@@ -313,8 +314,8 @@ void UVoxelModule::OnRefresh(
 		InterestRevision,
 		Now,
 		ViewManager ? ViewManager->GetDataAdmissionLimits() : TMap<int32, double>(),
-		ViewSettings.DataAdmissionPerFrame,
-		ViewSettings.AdmissionMilliseconds);
+		ViewSettings.Budget.DataAdmissionPerFrame,
+		ViewSettings.Budget.AdmissionMilliseconds);
 
 	const double AfterEmerge = FPlatformTime::Seconds();
 	LastEmergeAdmissionMilliseconds = (AfterEmerge - AfterInterest) * 1000.0;
@@ -627,33 +628,18 @@ bool UVoxelModule::StartWorld(
 	if (UVoxelViewProfile* ViewProfile = WorldGenerationProfile->View.LoadSynchronous())
 	{
 		ViewSettings.DefaultSourceView = ViewProfile->DefaultSourceView;
-		ViewSettings.PlayableFineRadiusFraction = FMath::Clamp(ViewProfile->PlayableFineRadiusFraction, 0.01f, 1.0f);
-		ViewSettings.MacroRadiusCells = ViewProfile->MacroRadiusCells;
-		ViewSettings.MaximumMacroLevel = ViewProfile->MaximumMacroLevel;
-		ViewSettings.MaximumSurfaceTiles = ViewProfile->MaximumSurfaceTiles;
-		ViewSettings.MaximumMacroTiles = ViewProfile->MaximumMacroTiles;
+		ViewSettings.Lod = ViewProfile->Lod;
+		ViewSettings.Readiness = ViewProfile->Readiness;
+		ViewSettings.Planning = ViewProfile->Planning;
+		ViewSettings.Budget = ViewProfile->Budget;
 		ViewSettings.MaximumTextureStretchCells = FMath::Clamp(ViewProfile->MaximumTextureStretchCells, 1.0f, 16.0f);
-		ViewSettings.FineAdmissionPerFrame = FMath::Clamp(ViewProfile->FineAdmissionPerFrame, 1, 256);
-		ViewSettings.VoxelProxyAdmissionPerFrame = FMath::Clamp(ViewProfile->VoxelProxyAdmissionPerFrame, 1, 256);
-		ViewSettings.SurfaceAdmissionPerFrame = FMath::Clamp(ViewProfile->SurfaceAdmissionPerFrame, 1, 256);
-		ViewSettings.MacroAdmissionPerFrame = FMath::Clamp(ViewProfile->MacroAdmissionPerFrame, 1, 256);
-		ViewSettings.DataAdmissionPerFrame = FMath::Clamp(ViewProfile->DataAdmissionPerFrame, 1, 1024);
-		ViewSettings.FineApplyPerFrame = FMath::Clamp(ViewProfile->FineApplyPerFrame, 1, 256);
-		ViewSettings.VoxelProxyApplyPerFrame = FMath::Clamp(ViewProfile->VoxelProxyApplyPerFrame, 1, 256);
-		ViewSettings.SurfaceApplyPerFrame = FMath::Clamp(ViewProfile->SurfaceApplyPerFrame, 1, 256);
-		ViewSettings.MacroApplyPerFrame = FMath::Clamp(ViewProfile->MacroApplyPerFrame, 1, 256);
-		ViewSettings.CompletedResultsPerFrame = FMath::Clamp(ViewProfile->CompletedResultsPerFrame, 1, 256);
-		ViewSettings.HeavyResultsPerFrame = FMath::Clamp(ViewProfile->HeavyResultsPerFrame, 1, 256);
-		ViewSettings.AdmissionMilliseconds = FMath::Clamp(ViewProfile->AdmissionMilliseconds, 0.1f, 8.0f);
-		ViewSettings.ResultApplyMilliseconds = FMath::Clamp(ViewProfile->ResultApplyMilliseconds, 0.1f, 8.0f);
-		ViewSettings.MaxPublishComponentsPerFrame = FMath::Clamp(ViewProfile->MaxPublishComponentsPerFrame, 1, 256);
-		ViewSettings.MaxPublishGroupsPerFrame = FMath::Clamp(ViewProfile->MaxPublishGroupsPerFrame, 1, 32);
-		ViewSettings.PublishPrepareMilliseconds = FMath::Clamp(ViewProfile->PublishPrepareMilliseconds, 0.1f, 8.0f);
-		ViewSettings.PublishRetireMilliseconds = FMath::Clamp(ViewProfile->PublishRetireMilliseconds, 0.1f, 8.0f);
-		ViewSettings.CriticalReservedTasks = FMath::Clamp(ViewProfile->CriticalReservedTasks, 1, 16);
-		ViewSettings.MaxConcurrentSurfaceTasks = FMath::Clamp(ViewProfile->MaxConcurrentSurfaceTasks, 1, 16);
-		ViewSettings.MaxConcurrentMacroTasks = FMath::Clamp(ViewProfile->MaxConcurrentMacroTasks, 1, 16);
-		ViewSettings.MaxConcurrentCoarseTerrainTasks = FMath::Clamp(ViewProfile->MaxConcurrentCoarseTerrainTasks, 1, 16);
+		if (!VoxelViewLod::ValidateTopology(ViewSettings.Lod, OutError))
+		{
+			GenerationConfig.Reset();
+			WorldState = EVoxelWorldState::Failed;
+			return false;
+		}
+
 	}
 	const uint64 ExpectedGenerationSignature =
 		BuildGenerationSignature(
@@ -694,6 +680,7 @@ bool UVoxelModule::StartWorld(
 		IsAuthority(),
 		Registry.GetSnapshot().ToSharedRef(),
 		Generator.ToSharedRef());
+	Runtime->GetChangeHierarchy().SetTopology(ViewSettings.Lod);
 	if (GenerationConfig->Recipe->Settings.Ecology.Tree.bEnabled)
 	{
 		const FVoxelTreeGenerationSettings& Tree =
@@ -719,17 +706,17 @@ bool UVoxelModule::StartWorld(
 	Scheduler = MakeUnique<FVoxelTaskScheduler>();
 	FVoxelTaskBudget TaskBudget;
 	TaskBudget.MaxConcurrentTasks = FMath::Clamp(FPlatformMisc::NumberOfCores() * 2, 1, 16);
-	TaskBudget.CriticalReservedTasks = ViewSettings.CriticalReservedTasks;
-	TaskBudget.MaxConcurrentSurfaceTasks = ViewSettings.MaxConcurrentSurfaceTasks;
-	TaskBudget.MaxConcurrentMacroTasks = ViewSettings.MaxConcurrentMacroTasks;
-	TaskBudget.MaxConcurrentCoarseTerrainTasks = ViewSettings.MaxConcurrentCoarseTerrainTasks;
+	TaskBudget.CriticalReservedTasks = ViewSettings.Budget.CriticalReservedTasks;
+	TaskBudget.MaxConcurrentSurfaceTasks = ViewSettings.Budget.MaxConcurrentSurfaceTasks;
+	TaskBudget.MaxConcurrentMacroTasks = ViewSettings.Budget.MaxConcurrentMacroTasks;
+	TaskBudget.MaxConcurrentCoarseTerrainTasks = ViewSettings.Budget.MaxConcurrentCoarseTerrainTasks;
 	TaskBudget.MaxReservedBytes = 256ull * 1024ull * 1024ull;
-	TaskBudget.MaxCompletedResultsPerFrame = ViewSettings.CompletedResultsPerFrame;
-	TaskBudget.MaxHeavyCompletedResultsPerFrame = FMath::Min(ViewSettings.HeavyResultsPerFrame, ViewSettings.CompletedResultsPerFrame);
-	TaskBudget.MaxFineApplyPerFrame = ViewSettings.FineApplyPerFrame;
-	TaskBudget.MaxVoxelLODApplyPerFrame = ViewSettings.VoxelProxyApplyPerFrame;
-	TaskBudget.MaxSurfaceApplyPerFrame = ViewSettings.SurfaceApplyPerFrame;
-	TaskBudget.MaxMacroApplyPerFrame = ViewSettings.MacroApplyPerFrame;
+	TaskBudget.MaxCompletedResultsPerFrame = ViewSettings.Budget.CompletedResultsPerFrame;
+	TaskBudget.MaxHeavyCompletedResultsPerFrame = FMath::Min(ViewSettings.Budget.HeavyResultsPerFrame, ViewSettings.Budget.CompletedResultsPerFrame);
+	TaskBudget.MaxFineApplyPerFrame = ViewSettings.Budget.FineApplyPerFrame;
+	TaskBudget.MaxVoxelLODApplyPerFrame = ViewSettings.Budget.VoxelProxyApplyPerFrame;
+	TaskBudget.MaxSurfaceApplyPerFrame = ViewSettings.Budget.SurfaceApplyPerFrame;
+	TaskBudget.MaxMacroApplyPerFrame = ViewSettings.Budget.MacroApplyPerFrame;
 	Scheduler->SetBudget(TaskBudget);
 	if (GetWorld()->GetNetMode() != NM_DedicatedServer)
 	{
@@ -740,9 +727,9 @@ bool UVoxelModule::StartWorld(
 	UE_LOG(LogTemp, Display, TEXT("Voxel worker budget: cores=%d workers=%d reservedMiB=%llu"),
 		FPlatformMisc::NumberOfCores(), TaskBudget.MaxConcurrentTasks, TaskBudget.MaxReservedBytes / (1024ull * 1024ull));
 	UE_LOG(LogTemp, Display, TEXT("Voxel frame budget: Fine=%d Proxy=%d Surface=%d Macro=%d Data=%d Results=%d Heavy=%d AdmissionMs=%.2f"),
-		ViewSettings.FineAdmissionPerFrame, ViewSettings.VoxelProxyAdmissionPerFrame,
-		ViewSettings.SurfaceAdmissionPerFrame, ViewSettings.MacroAdmissionPerFrame, ViewSettings.DataAdmissionPerFrame,
-		TaskBudget.MaxCompletedResultsPerFrame, TaskBudget.MaxHeavyCompletedResultsPerFrame, ViewSettings.AdmissionMilliseconds);
+		ViewSettings.Budget.FineAdmissionPerFrame, ViewSettings.Budget.VoxelProxyAdmissionPerFrame,
+		ViewSettings.Budget.SurfaceAdmissionPerFrame, ViewSettings.Budget.MacroAdmissionPerFrame, ViewSettings.Budget.DataAdmissionPerFrame,
+		TaskBudget.MaxCompletedResultsPerFrame, TaskBudget.MaxHeavyCompletedResultsPerFrame, ViewSettings.Budget.AdmissionMilliseconds);
 	InterestRuntime = MakeShared<FVoxelInterestRuntime, ESPMode::ThreadSafe>();
 	EmergeManager = MakeUnique<FVoxelEmergeManager>(
 		*Runtime,
@@ -1288,7 +1275,7 @@ bool UVoxelModule::UpdateSource(
 	Updated.Id = InId;
 	Updated.RegistrationOrder = Source->Value.RegistrationOrder;
 
-	if (FVoxelInterestRuntime::NeedsUpdate(Source->PlannedValue, Updated))
+	if (FVoxelInterestRuntime::NeedsUpdate(Source->PlannedValue, Updated, ViewSettings))
 	{
 		bInterestDirty = true;
 	}
@@ -1321,7 +1308,7 @@ bool UVoxelModule::IsSourceAdmitted(const FGuid& InId) const
 	FVoxelStreamingSource Input = Admitted->Source;
 	// 排序生成的调度优先级不是来源输入，不能据此否认已准入的来源。
 	Input.SchedulingPriority = Source->Value.SchedulingPriority;
-	return !FVoxelInterestRuntime::NeedsUpdate(Input, Source->Value);
+	return !FVoxelInterestRuntime::NeedsUpdate(Input, Source->Value, ViewSettings);
 }
 
 void UVoxelModule::CollectStreamingSourcesForOwner(const AActor* InOwner, TArray<FVoxelStreamingSource>& OutSources) const
@@ -1799,11 +1786,12 @@ void UVoxelModule::RefreshInterest(
 			if (!Source.Has(EVoxelStreamingCapability::RetainGenerationCache)) continue;
 			FVoxelGenerationCacheRetentionPoint& Point = Retention.Points.AddDefaulted_GetRef();
 			Point.Center = FIntPoint(Source.Center.X, Source.Center.Y);
-			Point.NaturalRadiusCells = Source.RetentionRadiusCells > 0 ? Source.RetentionRadiusCells :
-				FMath::Max(ViewSettings.DefaultSourceView.SurfaceRadiusCells, ViewSettings.DefaultSourceView.VoxelProxyRadiusCells) + 512;
-			Point.PlanRadiusCells = Source.RetentionRadiusCells > 0 ? Source.RetentionRadiusCells : Point.NaturalRadiusCells + 512;
-			Point.HydrologyRadiusCells = Source.RetentionRadiusCells > 0 ? Source.RetentionRadiusCells :
-				static_cast<int32>(FMath::Min<int64>(MAX_int32, Point.PlanRadiusCells + HydrologySide));
+			const int32 PlanningRadius = Source.Has(EVoxelStreamingCapability::WorldVisual)
+				? VoxelViewLod::ResolveViewRanges(Source).Surface
+				: FMath::Max3(Source.ExactRadius, Source.CollisionRadius, Source.View.FineRadiusCells);
+			Point.NaturalRadiusCells = PlanningRadius + FMath::CeilToInt(PlanningRadius * ViewSettings.Planning.GenerationCacheMarginFraction);
+			Point.PlanRadiusCells = Point.NaturalRadiusCells + FMath::CeilToInt(PlanningRadius * ViewSettings.Planning.PlanCacheMarginFraction);
+			Point.HydrologyRadiusCells = static_cast<int32>(FMath::Min<int64>(MAX_int32, Point.PlanRadiusCells + HydrologySide));
 		}
 		Retention.Revision = InterestRevision + 1;
 		GenerationCache->UpdateRetention(Retention);

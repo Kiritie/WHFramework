@@ -4,16 +4,41 @@
 #include "Voxel/Streaming/VoxelInterest.h"
 #include "Voxel/Streaming/VoxelStreamingSource.h"
 
-void FVoxelTerrainViewPlan::Build(TConstArrayView<FVoxelStreamingSource> InSources,
+bool FVoxelTerrainViewPlan::Build(TConstArrayView<FVoxelStreamingSource> InSources,
 	const TSet<FIntVector>& InFineSections, const TSet<FVoxelViewKey>& InRoots,
-	const FVoxelViewSettings& InSettings, const int32 InMaximumLeaves)
+	const FVoxelViewSettings& InSettings, FString& OutError)
 {
+	if (!VoxelViewLod::ValidateTopology(InSettings.Lod, OutError)) return false;
+	for (const FVoxelViewKey& Root : InRoots)
+	{
+		if (Root.Level > InSettings.Lod.MaximumVoxelProxyLevel)
+		{
+			OutError = TEXT("Terrain root exceeds the configured maximum level");
+			return false;
+		}
+	}
+	FVoxelTerrainViewPlan Candidate;
+	if (!Candidate.BuildInternal(InSources, InFineSections, InRoots, InSettings, OutError)) return false;
+	*this = MoveTemp(Candidate);
+	return true;
+}
+
+bool FVoxelTerrainViewPlan::BuildInternal(TConstArrayView<FVoxelStreamingSource> InSources,
+	const TSet<FIntVector>& InFineSections, const TSet<FVoxelViewKey>& InRoots,
+	const FVoxelViewSettings& InSettings, FString& OutError)
+{
+	constexpr int32 EmergencyMaximumPlannedNodes = 1 << 20;
+	const auto CheckSize = [this, &OutError]()
+	{
+		if (Required.Num() <= EmergencyMaximumPlannedNodes) return true;
+		OutError = TEXT("Terrain plan exceeds emergency node protection; no coarse fallback is published");
+		ensureMsgf(false, TEXT("Terrain plan exceeds emergency node protection"));
+		return false;
+	};
 	Roots = InRoots;
 	Leaves.Reset();
 	Required.Reset();
 	FineDependencies.Reset();
-	OverBudgetLeaves = 0;
-	bBudgetLimited = false;
 	uint8 RootLevel = 1;
 	for (const FVoxelViewKey& Root : Roots)
 	{
@@ -51,6 +76,7 @@ void FVoxelTerrainViewPlan::Build(TConstArrayView<FVoxelStreamingSource> InSourc
 	}
 	Leaves = Roots;
 	Required = Roots;
+	if (!CheckSize()) return false;
 	auto Split = [this](const FVoxelViewKey& Node)
 	{
 		TArray<FVoxelViewKey> Children;
@@ -69,6 +95,7 @@ void FVoxelTerrainViewPlan::Build(TConstArrayView<FVoxelStreamingSource> InSourc
 			if (Node.Level == Level)
 			{
 				Split(Node);
+				if (!CheckSize()) return false;
 				FineDependencies.Add(Node);
 				TArray<FVoxelViewKey> Children;
 				Node.GetChildren(Children);
@@ -88,7 +115,7 @@ void FVoxelTerrainViewPlan::Build(TConstArrayView<FVoxelStreamingSource> InSourc
 	auto HigherError = [](const FCandidate& Left, const FCandidate& Right) { return Left.Error > Right.Error; };
 	auto Admit = [&](const FVoxelViewKey& Node)
 	{
-		if (Node.Level <= 1)
+		if (Node.Level <= VoxelViewLod::MinimumVoxelProxyLevel(InSettings.Lod))
 		{
 			return;
 		}
@@ -105,8 +132,7 @@ void FVoxelTerrainViewPlan::Build(TConstArrayView<FVoxelStreamingSource> InSourc
 			const int32 Distance = FMath::FloorToInt(FMath::Sqrt(Box.ComputeSquaredDistanceToPoint(FVector(Source.Center))));
 			if (Distance > Source.View.VoxelProxyRadiusCells) continue;
 			// 屏幕误差控制采样细度，覆盖层级单独扩大，不能靠放大体素来减少 Actor。
-			const uint8 Level = FMath::Max<uint8>(1 + FVoxelViewKey::SampleLevelOffset,
-				VoxelViewLod::ResolveVoxelProxyLevel(Distance, Source, RootLevel, Source.View.TargetScreenErrorPixels));
+			const uint8 Level = VoxelViewLod::ResolveVoxelProxyLevel(Distance, Source, InSettings);
 			if (Level < Node.Level)
 			{
 				Error = FMath::Max(Error, static_cast<double>(Node.GetStep()) / FMath::Max(1, Distance));
@@ -121,8 +147,7 @@ void FVoxelTerrainViewPlan::Build(TConstArrayView<FVoxelStreamingSource> InSourc
 	{
 		Admit(Node);
 	}
-	const int32 RefinementLimit = FMath::Max(0, InMaximumLeaves) + FMath::Max(0, Leaves.Num() - Roots.Num());
-	while (!Pending.IsEmpty() && Leaves.Num() + 7 <= RefinementLimit)
+	while (!Pending.IsEmpty())
 	{
 		const double MaximumError = Pending[0].Error;
 		TArray<FVoxelViewKey> Candidates;
@@ -132,14 +157,10 @@ void FVoxelTerrainViewPlan::Build(TConstArrayView<FVoxelStreamingSource> InSourc
 			Pending.HeapPop(Candidate, HigherError, EAllowShrinking::No);
 			Candidates.Add(Candidate.Key);
 		}
-		if (Leaves.Num() + Candidates.Num() * 7 > RefinementLimit)
-		{
-			bBudgetLimited = true;
-			break;
-		}
 		for (const FVoxelViewKey& Node : Candidates)
 		{
 			Split(Node);
+			if (!CheckSize()) return false;
 			TArray<FVoxelViewKey> Children;
 			Node.GetChildren(Children);
 			for (const FVoxelViewKey& Child : Children)
@@ -148,7 +169,6 @@ void FVoxelTerrainViewPlan::Build(TConstArrayView<FVoxelStreamingSource> InSourc
 			}
 		}
 	}
-	bBudgetLimited |= !Pending.IsEmpty();
 	TArray<FVoxelViewKey> BalanceQueue = Leaves.Array();
 	for (int32 Index = 0; Index < BalanceQueue.Num(); ++Index)
 	{
@@ -172,6 +192,7 @@ void FVoxelTerrainViewPlan::Build(TConstArrayView<FVoxelStreamingSource> InSourc
 					continue;
 				}
 				Split(Neighbor);
+				if (!CheckSize()) return false;
 				TArray<FVoxelViewKey> Children;
 				Neighbor.GetChildren(Children);
 				BalanceQueue.Append(Children);
@@ -187,7 +208,8 @@ void FVoxelTerrainViewPlan::Build(TConstArrayView<FVoxelStreamingSource> InSourc
 			FineDependencies.Add(Node);
 		}
 	}
-	OverBudgetLeaves = FMath::Max(0, Leaves.Num() - InMaximumLeaves);
+	OutError.Reset();
+	return true;
 }
 
 bool FVoxelTerrainViewPlan::ResolveNode(const FVoxelViewKey& InNode,

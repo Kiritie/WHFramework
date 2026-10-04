@@ -9,9 +9,10 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelTerrainPartitionTest, "WHFramework.Voxel.
 
 bool FVoxelTerrainPartitionTest::RunTest(const FString& InParameters)
 {
+	FString BuildError;
 	FVoxelTerrainViewPlan Plan;
 	const TSet<FIntVector> Fine = { FIntVector(-1, -1, -1), FIntVector(0, 0, 0) };
-	Plan.Build({}, Fine, {}, FVoxelViewSettings(), 8);
+	Plan.Build({}, Fine, {}, FVoxelViewSettings(), BuildError);
 	FString Error;
 	TestTrue(TEXT("Fine coverage may exceed budget but cannot contain holes"), Plan.Validate(Error));
 	TestEqual(TEXT("Negative and positive octants have separate roots"), Plan.Roots.Num(), 2);
@@ -29,9 +30,10 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelTerrainHandoffTest, "WHFramework.Voxel.Re
 
 bool FVoxelTerrainHandoffTest::RunTest(const FString& InParameters)
 {
+	FString BuildError;
 	const FVoxelViewKey Root { FIntVector(-1, 0, 0), 1 };
 	FVoxelTerrainViewPlan Plan;
-	Plan.Build({}, { FIntVector(-1, 0, 0) }, { Root }, FVoxelViewSettings(), 64);
+	Plan.Build({}, { FIntVector(-1, 0, 0) }, { Root }, FVoxelViewSettings(), BuildError);
 	TSet<FVoxelViewKey> Ready { Root };
 	TSet<FVoxelViewKey> Visible;
 	const TSet<FVoxelViewKey> Presented { Root };
@@ -55,7 +57,7 @@ bool FVoxelTerrainHandoffTest::RunTest(const FString& InParameters)
 	Plan.ResolveVisible(IsReady, Visible, &Previous);
 	TestEqual(TEXT("Invalidation preserves committed empty and nonempty siblings"), Visible.Num(), 8);
 	TestTrue(TEXT("Invalidation retains the exact previous cut"), Visible.Difference(Previous).IsEmpty());
-	Plan.Build({}, {}, { Root }, FVoxelViewSettings(), 64);
+	Plan.Build({}, {}, { Root }, FVoxelViewSettings(), BuildError);
 	Ready.Remove(Root);
 	Plan.ResolveVisible(IsReady, Visible, &Previous);
 	TestEqual(TEXT("Merge retains previous children while parent builds"), Visible.Num(), 8);
@@ -65,10 +67,11 @@ bool FVoxelTerrainHandoffTest::RunTest(const FString& InParameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelTerrainBudgetSymmetryTest, "WHFramework.Voxel.Rendering.Plan.BudgetSymmetry", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelTerrainScreenErrorSymmetryTest, "WHFramework.Voxel.Rendering.Plan.ScreenErrorSymmetry", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-bool FVoxelTerrainBudgetSymmetryTest::RunTest(const FString& InParameters)
+bool FVoxelTerrainScreenErrorSymmetryTest::RunTest(const FString& InParameters)
 {
+	FString BuildError;
 	FVoxelStreamingSource Source;
 	Source.Capabilities = EVoxelStreamingCapability::Data |
 		EVoxelStreamingCapability::FineVisual |
@@ -77,10 +80,11 @@ bool FVoxelTerrainBudgetSymmetryTest::RunTest(const FString& InParameters)
 	const FVoxelViewKey Left { FIntVector(-1, 0, 0), 3 };
 	const FVoxelViewKey Right { FIntVector(0, 0, 0), 3 };
 	FVoxelTerrainViewPlan Plan;
-	Plan.Build(MakeArrayView(&Source, 1), {}, { Left, Right }, FVoxelViewSettings(), 9);
-	TestEqual(TEXT("Insufficient budget cannot refine only one equally near side"), Plan.Leaves.Num(), 2);
-	Plan.Build(MakeArrayView(&Source, 1), {}, { Right, Left }, FVoxelViewSettings(), 16);
-	TestEqual(TEXT("Equal priority regions refine together"), Plan.Leaves.Num(), 16);
+	Plan.Build(MakeArrayView(&Source, 1), {}, { Left, Right }, FVoxelViewSettings(), BuildError);
+	const TSet<FVoxelViewKey> First = Plan.Leaves;
+	TestTrue(TEXT("SSE refines both near roots without a count ceiling"), Plan.Leaves.Num() > 2);
+	Plan.Build(MakeArrayView(&Source, 1), {}, { Right, Left }, FVoxelViewSettings(), BuildError);
+	TestTrue(TEXT("Root insertion order does not change desired LOD"), Plan.Leaves.Difference(First).IsEmpty() && First.Difference(Plan.Leaves).IsEmpty());
 	FString Error;
 	TestTrue(TEXT("Budgeted refinement preserves full partition"), Plan.Validate(Error));
 	return true;
@@ -90,12 +94,13 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelTerrainNeighborBalanceTest, "WHFramework.
 
 bool FVoxelTerrainNeighborBalanceTest::RunTest(const FString& InParameters)
 {
+	FString BuildError;
 	FVoxelTerrainViewPlan Plan;
 	Plan.Build({}, { FIntVector(-1, 0, 0) },
-		{ { FIntVector(-1, 0, 0), 4 }, { FIntVector(0, 0, 0), 4 } }, FVoxelViewSettings(), 2);
+		{ { FIntVector(-1, 0, 0), 4 }, { FIntVector(0, 0, 0), 4 } }, FVoxelViewSettings(), BuildError);
 	FString Error;
 	TestTrue(TEXT("Balanced partition still covers both roots"), Plan.Validate(Error));
-	TestTrue(TEXT("Mandatory fine and boundary budget excess is explicit"), Plan.OverBudgetLeaves > 0);
+	TestTrue(TEXT("Mandatory fine and boundary budget excess is explicit"), Plan.Leaves.Num() > 2);
 	for (const FVoxelViewKey& Node : Plan.Leaves)
 	{
 		for (int32 Axis = 0; Axis < 3; ++Axis)
@@ -119,10 +124,11 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelTerrainFineDependenciesTest, "WHFramework
 
 bool FVoxelTerrainFineDependenciesTest::RunTest(const FString& InParameters)
 {
+	FString BuildError;
 	FVoxelTerrainViewPlan Plan;
 	const FVoxelViewKey Root { FIntVector(-1, 0, 0), 5 };
 	const FVoxelViewKey Fine { FIntVector(-1, 0, 0), 0 };
-	Plan.Build({}, { Fine.Coordinate }, { Root }, FVoxelViewSettings(), 8192);
+	Plan.Build({}, { Fine.Coordinate }, { Root }, FVoxelViewSettings(), BuildError);
 	TSet<FVoxelViewKey> Visible;
 	Plan.ResolveVisible([&Plan](const FVoxelViewKey& Key) { return Plan.FineDependencies.Contains(Key); }, Visible);
 	TestTrue(TEXT("Fine region can publish using only its dependency closure"), Visible.Contains(Fine));
@@ -131,7 +137,7 @@ bool FVoxelTerrainFineDependenciesTest::RunTest(const FString& InParameters)
 	{
 		TestTrue(TEXT("Every dependency is a scheduled build"), Plan.Required.Contains(Key));
 	}
-	Plan.Build({}, {}, { Root }, FVoxelViewSettings(), 8192);
+	Plan.Build({}, {}, { Root }, FVoxelViewSettings(), BuildError);
 	TestTrue(TEXT("Obsolete fine dependencies are cleared"), Plan.FineDependencies.IsEmpty());
 	return true;
 }
@@ -140,10 +146,11 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelTerrainInitialFineTest, "WHFramework.Voxe
 
 bool FVoxelTerrainInitialFineTest::RunTest(const FString& InParameters)
 {
+	FString BuildError;
 	FVoxelTerrainViewPlan Plan;
 	const FVoxelViewKey Root { FIntVector(0, 0, 0), 4 };
 	const FVoxelViewKey Fine { FIntVector(0, 0, 0), 0 };
-	Plan.Build({}, { Fine.Coordinate }, { Root }, FVoxelViewSettings(), 8192);
+	Plan.Build({}, { Fine.Coordinate }, { Root }, FVoxelViewSettings(), BuildError);
 	TSet<FVoxelViewKey> Ready { Root };
 	TSet<FVoxelViewKey> Visible;
 	auto IsReady = [&Ready](const FVoxelViewKey& Key) { return Ready.Contains(Key); };
@@ -163,13 +170,14 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelTerrainSparseResolveTest, "WHFramework.Vo
 
 bool FVoxelTerrainSparseResolveTest::RunTest(const FString& InParameters)
 {
+	FString BuildError;
 	FVoxelTerrainViewPlan Plan;
 	TSet<FIntVector> Fine;
 	for (int32 X = -8; X < 8; ++X)
 	{
 		for (int32 Y = -8; Y < 8; ++Y) Fine.Add(FIntVector(X, Y, 0));
 	}
-	Plan.Build({}, Fine, {}, FVoxelViewSettings(), 8192);
+	Plan.Build({}, Fine, {}, FVoxelViewSettings(), BuildError);
 	TSet<FVoxelViewKey> Ready;
 	TSet<FVoxelViewKey> Previous;
 	for (int32 Step = 0; Step < 12; ++Step)

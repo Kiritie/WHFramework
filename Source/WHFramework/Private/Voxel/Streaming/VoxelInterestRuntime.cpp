@@ -1,6 +1,7 @@
 #include "Voxel/Streaming/VoxelInterestRuntime.h"
 
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "Voxel/Rendering/VoxelViewLod.h"
 #include "Voxel/Streaming/VoxelInterestManager.h"
 
 namespace
@@ -104,49 +105,40 @@ bool FVoxelInterestRuntime::ConfigurationChanged(const FVoxelStreamingSource& In
 	return InA.Capabilities != InB.Capabilities || InA.Purpose != InB.Purpose ||
 		InA.bLocalView != InB.bLocalView ||
 		InA.bInheritWorldView != InB.bInheritWorldView ||
-		InA.RetentionRadiusCells != InB.RetentionRadiusCells ||
 		InA.Priority != InB.Priority || InA.GetSchedulingPriority() != InB.GetSchedulingPriority() ||
 		InA.ExactRadius != InB.ExactRadius || InA.CollisionRadius != InB.CollisionRadius ||
 		InA.SimulationRadius != InB.SimulationRadius ||
-		InA.VerticalExactRadius != InB.VerticalExactRadius ||
 		InA.MovementCriticalCollisionRadius != InB.MovementCriticalCollisionRadius ||
 		InA.VerticalFovDegrees != InB.VerticalFovDegrees ||
 		InA.ViewportHeightPixels != InB.ViewportHeightPixels ||
-		A.WarmupDataRadiusCells != B.WarmupDataRadiusCells ||
-		A.WarmupCollisionRadiusCells != B.WarmupCollisionRadiusCells ||
 		A.FineRadiusCells != B.FineRadiusCells ||
-		A.FineVerticalRadiusCells != B.FineVerticalRadiusCells ||
-		A.FinePreloadCells != B.FinePreloadCells ||
+		A.FineVerticalHalfExtentCells != B.FineVerticalHalfExtentCells ||
 		A.VoxelProxyRadiusCells != B.VoxelProxyRadiusCells ||
 		A.SurfaceRadiusCells != B.SurfaceRadiusCells ||
-		A.TargetScreenErrorPixels != B.TargetScreenErrorPixels ||
-		A.MaximumVoxelProxyLevel != B.MaximumVoxelProxyLevel ||
-		A.MaximumSurfaceLevel != B.MaximumSurfaceLevel ||
-		A.FineReplanCells != B.FineReplanCells ||
-		A.ProxyReplanCells != B.ProxyReplanCells ||
-		A.SurfaceReplanCells != B.SurfaceReplanCells ||
-		A.MacroReplanCells != B.MacroReplanCells ||
 		A.FinePredictionSeconds != B.FinePredictionSeconds ||
-		A.MovementCriticalFineRadiusCells != B.MovementCriticalFineRadiusCells;
+		A.FineLevel0RadiusCells != B.FineLevel0RadiusCells ||
+		A.VoxelProxyVerticalHalfExtentCells != B.VoxelProxyVerticalHalfExtentCells ||
+		A.MacroRadiusCells != B.MacroRadiusCells;
 }
 
 bool FVoxelInterestRuntime::NeedsUpdate(const FVoxelStreamingSource& InPrevious,
-	const FVoxelStreamingSource& InCurrent)
+	const FVoxelStreamingSource& InCurrent, const FVoxelViewSettings& InSettings)
 {
 	if (ConfigurationChanged(InPrevious, InCurrent)) return true;
 	const FIntVector& Previous = InPrevious.Center;
 	const FIntVector& Current = InCurrent.Center;
 	const FVoxelStreamingSourceView& View = InCurrent.View;
+	const FVoxelResolvedViewRanges Steps = VoxelViewLod::ResolveReplanSteps(InCurrent, InSettings);
 	if (Snap3D(Previous, FMath::Clamp(InCurrent.CollisionRadius / 2, 4, 16)) !=
 		Snap3D(Current, FMath::Clamp(InCurrent.CollisionRadius / 2, 4, 16)) ||
-		Snap3D(Previous, FMath::Max(16, View.FineReplanCells)) !=
-		Snap3D(Current, FMath::Max(16, View.FineReplanCells)) ||
-		Snap3D(Previous, FMath::Max(16, View.ProxyReplanCells)) !=
-		Snap3D(Current, FMath::Max(16, View.ProxyReplanCells)) ||
-		Snap2D(Previous, FMath::Max(32, View.SurfaceReplanCells)) !=
-		Snap2D(Current, FMath::Max(32, View.SurfaceReplanCells)) ||
-		Snap2D(Previous, FMath::Max(256, View.MacroReplanCells)) !=
-		Snap2D(Current, FMath::Max(256, View.MacroReplanCells)))
+		Snap3D(Previous, Steps.Fine) !=
+		Snap3D(Current, Steps.Fine) ||
+		Snap3D(Previous, Steps.Proxy) !=
+		Snap3D(Current, Steps.Proxy) ||
+		Snap2D(Previous, Steps.Surface) !=
+		Snap2D(Current, Steps.Surface) ||
+		Snap2D(Previous, Steps.Macro) !=
+		Snap2D(Current, Steps.Macro))
 	{
 		return true;
 	}
@@ -171,6 +163,15 @@ bool FVoxelInterestRuntime::Update(TConstArrayView<FVoxelStreamingSource> InSour
 {
 	OutDelta.Reset();
 	bOutSnapshot = false;
+	FString ConfigurationError;
+	if (!VoxelViewLod::ValidateTopology(InSettings.Lod, ConfigurationError))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Invalid terrain policy; retaining previous interest: %s"), *ConfigurationError);
+		OutInterest = LatestInterest;
+		return false;
+	}
+	const bool bPolicyChanged = !bHasSettings || !(LatestSettings.Lod == InSettings.Lod) ||
+		!(LatestSettings.Readiness == InSettings.Readiness) || !(LatestSettings.Planning == InSettings.Planning);
 	TSet<FGuid> ActiveIds;
 	for (const FVoxelStreamingSource& Source : InSources) ActiveIds.Add(Source.Id);
 	bool bAnyChanged = false;
@@ -186,17 +187,18 @@ bool FVoxelInterestRuntime::Update(TConstArrayView<FVoxelStreamingSource> InSour
 	for (const FVoxelStreamingSource& Source : InSources)
 	{
 		FSourceState& State = States.FindOrAdd(Source.Id);
-		const bool bConfigurationChanged = ConfigurationChanged(State.Source, Source);
+		const bool bConfigurationChanged = bPolicyChanged || ConfigurationChanged(State.Source, Source);
+		const FVoxelResolvedViewRanges Steps = VoxelViewLod::ResolveReplanSteps(Source, InSettings);
 		const FIntVector ExactAnchor = Snap3D(Source.Center,
 			FMath::Clamp(Source.CollisionRadius / 2, 4, 16));
 		const FIntVector FineAnchor = Snap3D(Source.Center,
-			FMath::Max(16, Source.View.FineReplanCells));
+			Steps.Fine);
 		const FIntVector ProxyAnchor = Snap3D(Source.Center,
-			FMath::Max(16, Source.View.ProxyReplanCells));
+			Steps.Proxy);
 		const FIntPoint SurfaceAnchor = Snap2D(Source.Center,
-			FMath::Max(32, Source.View.SurfaceReplanCells));
+			Steps.Surface);
 		const FIntPoint MacroAnchor = Snap2D(Source.Center,
-			FMath::Max(256, Source.View.MacroReplanCells));
+			Steps.Macro);
 		const FVector Predicted = FVector(Source.Center) +
 			Source.VelocityCellsPerSecond * Source.View.FinePredictionSeconds;
 		const FIntVector PredictedCenter(FMath::RoundToInt(Predicted.X),
@@ -230,10 +232,7 @@ bool FVoxelInterestRuntime::Update(TConstArrayView<FVoxelStreamingSource> InSour
 				FineSource.ExactRadius = -1;
 				FineSource.CollisionRadius = 0;
 				FineSource.SimulationRadius = 0;
-				FineSource.VerticalExactRadius = 0;
 				FineSource.MovementCriticalCollisionRadius = 0;
-				FineSource.View.WarmupDataRadiusCells = 0;
-				FineSource.View.WarmupCollisionRadiusCells = 0;
 				Manager.BuildSourceExact(FineSource, InManifest, InSettings, State.Fine,
 					&LatestInterest);
 			}
@@ -306,6 +305,13 @@ bool FVoxelInterestRuntime::Update(TConstArrayView<FVoxelStreamingSource> InSour
 		for (const FVoxelMacroTileKey& Key : State.Macro.Macro) Prepared.Macro.Add(Key);
 	}
 	FVoxelInterestSet Next = Manager.Finalize(InSources, InManifest, InSettings, MoveTemp(Prepared));
+	if (!Next.PlanningError.IsEmpty())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Terrain plan failed; preserving committed interest: %s"), *Next.PlanningError);
+		States.Reset();
+		OutInterest = LatestInterest;
+		return false;
+	}
 	TSet<FIntVector> PreviousExact;
 	TSet<FIntVector> NextExact;
 	TSet<FIntVector> PreviousFine;
@@ -381,6 +387,8 @@ bool FVoxelInterestRuntime::Update(TConstArrayView<FVoxelStreamingSource> InSour
 			}
 		}
 	}
+	LatestSettings = InSettings;
+	bHasSettings = true;
 	LatestInterest = MoveTemp(Next);
 	OutInterest = LatestInterest;
 	bOutSnapshot = true;
@@ -391,4 +399,6 @@ void FVoxelInterestRuntime::Reset()
 {
 	States.Reset();
 	LatestInterest = {};
+	LatestSettings = {};
+	bHasSettings = false;
 }

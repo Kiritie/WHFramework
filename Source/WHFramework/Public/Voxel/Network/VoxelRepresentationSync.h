@@ -12,6 +12,7 @@ struct WHFRAMEWORK_API FVoxelRepresentationBuildInput
 {
 	FVoxelRepresentationRequest Request;
 	FVoxelGenerationSettings Settings;
+	FVoxelLodTopologySettings Lod;
 	TSharedPtr<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config;
 	TSharedPtr<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> Cache;
 	TSharedPtr<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> Generator;

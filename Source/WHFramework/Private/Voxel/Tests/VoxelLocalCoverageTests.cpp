@@ -1,4 +1,4 @@
-﻿#if WITH_DEV_AUTOMATION_TESTS
+#if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
 #include "Engine/World.h"
@@ -229,6 +229,11 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 		Interest.TerrainPlan.Leaves.Add(Child);
 		Interest.TerrainPlan.Required.Add(Child);
 		ScopedManager.FineReady.Add(Child.Coordinate);
+		ScopedManager.FineWanted.Add(Child.Coordinate);
+		const FVoxelFinePageKey Page{Child.Coordinate, 0};
+		ScopedManager.FinePagePlan.Pages.Add(Page);
+		ScopedManager.FinePagePlan.SectionOwners.Add(Child.Coordinate, Page);
+		ScopedManager.FinePageReady.Add(Page);
 	}
 	Interest.TerrainPlan.Leaves.Add(FarRoot);
 	ScopedManager.CommitTerrainOwnership({1, FIntPoint(NearRoot.Coordinate.X, NearRoot.Coordinate.Y), NearRoot.Level}, MakeArrayView(&NearRoot, 1));
@@ -272,7 +277,7 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 	auto RevisedSurface = MakeShared<FVoxelSurfaceTileData>(*Surface);
 	RevisedSurface->Revision = 2;
 	ScopedManager.SurfaceData.Add(SurfaceKey, RevisedSurface);
-	ScopedManager.RebuildHeightfieldTransitions();
+	ScopedManager.RebuildHeightfieldTransitions({});
 	const auto& PendingState = ScopedManager.HeightfieldCoveragePlans.FindChecked(SurfaceOwner);
 	TestTrue(TEXT("Heightfield changes coalesce without canceling the in-flight immutable plan"),
 		FirstPending != 0 && PendingState.PendingSignature == FirstPending && PendingState.DesiredSignature != FirstPending);
@@ -284,13 +289,13 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 	}
 	TestTrue(TEXT("An immutable heightfield plan completes despite a newer desired revision"),
 		ScopedManager.HeightfieldCoveragePlans.FindChecked(SurfaceOwner).Plan.IsValid());
-	ScopedManager.RebuildHeightfieldTransitions();
+	ScopedManager.RebuildHeightfieldTransitions({});
 	while (ScopedScheduler.ActiveCount() > 0 && FPlatformTime::Seconds() < HeightfieldDeadline)
 	{
 		ScopedScheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
 		FPlatformProcess::Sleep(0.001f);
 	}
-	ScopedManager.RebuildHeightfieldTransitions();
+	ScopedManager.RebuildHeightfieldTransitions({});
 	TestTrue(TEXT("The coalesced heightfield revision eventually releases its topology wait"), ScopedManager.PendingHeightfieldPlanOwners.IsEmpty());
 	ScopedScheduler.StopAndJoin();
 	ScopedManager.Reset();

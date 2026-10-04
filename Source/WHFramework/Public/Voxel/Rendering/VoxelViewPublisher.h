@@ -56,6 +56,7 @@ private:
 #if WITH_DEV_AUTOMATION_TESTS
 	friend class FVoxelConcurrentPublishCommitTest;
 	friend class FVoxelPublisherStageAndIndexTest;
+	friend class FVoxelFinePageCoverageTest;
 #endif
 	using FMeshPtr = TSharedPtr<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>;
 	using FGroupCallback = TFunction<void(TConstArrayView<FVoxelPublishGroupKey>)>;

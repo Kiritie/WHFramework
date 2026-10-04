@@ -61,7 +61,7 @@ void FVoxelNavigationPresenter::UpdateSources(const FVoxelInterestSet& InInteres
 			continue;
 		}
 		const double Radius = (Source.SimulationRadius + 32.0) * Module.BlockSize();
-		const double Vertical = (Source.VerticalExactRadius + 32.0) * Module.BlockSize();
+		const double Vertical = (FMath::Max3(Source.ExactRadius, Source.CollisionRadius, Source.SimulationRadius) + 32.0) * Module.BlockSize();
 		const FVector Center = FVector(Source.Center) * Module.BlockSize();
 		Bounds->SetBounds(FBox(Center - FVector(Radius, Radius, Vertical), Center + FVector(Radius, Radius, Vertical)));
 		Navigation->RegisterNavigationInvoker(Bounds.Get(), Radius, Radius + 32.0 * Module.BlockSize());

@@ -657,11 +657,6 @@ void UVoxelAgentComponent::RefreshSource()
 			0,
 			SimulationRadiusCells);
 
-	Source.VerticalExactRadius =
-		FMath::Max(
-			0,
-			VerticalExactRadiusCells);
-
 	Source.MovementCriticalCollisionRadius =
 		FMath::Clamp(
 			MovementCriticalCollisionRadiusCells,

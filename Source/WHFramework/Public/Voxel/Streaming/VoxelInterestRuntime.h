@@ -28,7 +28,7 @@ class WHFRAMEWORK_API FVoxelInterestRuntime
 {
 public:
 	static bool NeedsUpdate(const FVoxelStreamingSource& InPrevious,
-		const FVoxelStreamingSource& InCurrent);
+		const FVoxelStreamingSource& InCurrent, const FVoxelViewSettings& InSettings = FVoxelViewSettings());
 
 	bool Update(TConstArrayView<FVoxelStreamingSource> InSources,
 		const FVoxelWorldManifest& InManifest, const FVoxelViewSettings& InSettings,
@@ -61,4 +61,6 @@ private:
 
 	TMap<FGuid, FSourceState> States;
 	FVoxelInterestSet LatestInterest;
+	FVoxelViewSettings LatestSettings;
+	bool bHasSettings = false;
 };

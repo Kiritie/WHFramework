@@ -99,8 +99,11 @@ public:
 	float GetAltitude(bool bUnsigned = false, bool bRefresh = false) const;
 	
 	//////////////////////////////////////////////////////////////////////////
+private:
+	void RefreshMiniMapCapture();
+
 protected:
-	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "MiniMap")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Transient, Category = "MiniMap")
 	AMiniMapCapture* MiniMapCapture;
 
 	UPROPERTY(EditAnywhere, Category = "MiniMap")
@@ -136,6 +139,9 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	EWorldMiniMapSource GetMiniMapSource() const { return MiniMapSource; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetMiniMapSource(EWorldMiniMapSource InMiniMapSource);
 
 	UFUNCTION(BlueprintPure)
 	TSubclassOf<UWidgetSceneMapBase> GetMapBackgroundWidgetClass() const { return MapBackgroundWidgetClass; }

@@ -1,12 +1,24 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Voxel/Authoring/VoxelViewProfile.h"
 
 struct WHFRAMEWORK_API FVoxelPublishGroupKey
 {
 	uint8 Representation = 0;
-	FIntPoint Coordinate = FIntPoint::ZeroValue;
+	FIntVector Coordinate = FIntVector::ZeroValue;
 	uint8 Level = 0;
+
+	FVoxelPublishGroupKey() = default;
+	FVoxelPublishGroupKey(uint8 InRepresentation, FIntVector InCoordinate, uint8 InLevel)
+		: Representation(InRepresentation), Coordinate(InCoordinate), Level(InLevel)
+	{
+	}
+
+	FVoxelPublishGroupKey(uint8 InRepresentation, FIntPoint InCoordinate, uint8 InLevel)
+		: FVoxelPublishGroupKey(InRepresentation, FIntVector(InCoordinate.X, InCoordinate.Y, 0), InLevel)
+	{
+	}
 
 	bool operator==(const FVoxelPublishGroupKey& InOther) const = default;
 };
@@ -30,14 +42,14 @@ class WHFRAMEWORK_API FVoxelPublishGroupPlanner
 public:
 	static FBox OwnershipBounds(
 		const FVoxelPublishGroupKey& InKey,
-		double InBlockSize);
+		double InBlockSize, const FVoxelLodTopologySettings& InLod = FVoxelLodTopologySettings());
 
 	static FBox PublicationBounds(
 		const FVoxelPublishGroupKey& InKey,
 		double InBlockSize,
 		const FBox& InPresentedBounds,
 		const FBox& InDesiredBounds,
-		bool bInTransition);
+		bool bInTransition, const FVoxelLodTopologySettings& InLod = FVoxelLodTopologySettings());
 
 	static void Build(
 		TConstArrayView<FVoxelPublishFootprint> InFootprints,

@@ -4,6 +4,7 @@
 #include "Voxel/Task/VoxelTaskScheduler.h"
 #include "Voxel/Geometry/VoxelSectionMesher.h"
 #include "Voxel/Rendering/VoxelCoverage.h"
+#include "Voxel/Rendering/VoxelFinePage.h"
 #include "Voxel/Rendering/VoxelPublishGroups.h"
 #include "Voxel/Rendering/DWLodTransition.h"
 #include "Voxel/Rendering/VoxelSurfaceProxy.h"
@@ -32,6 +33,7 @@ struct FVoxelInterestDelta;
 struct FVoxelVoxelProxyData;
 struct FVoxelWaterSurfaceTileData;
 struct FVoxelBoundaryTransitionContext;
+struct FVoxelAffectedRepresentationKeys;
 
 struct WHFRAMEWORK_API FVoxelPrimaryFineReadiness
 {
@@ -100,10 +102,36 @@ public:
 		double InBandWidthCells);
 
 private:
+	struct FCoveragePassSnapshot
+	{
+		TSet<FIntVector> PresentedFineSections;
+		TMap<FIntVector, FVoxelFinePageKey> PresentedFineOwners;
+		TSet<FVoxelViewKey> FineNodes;
+		TSet<FVoxelViewKey> ProxyNodes;
+		TSet<FVoxelViewKey> FineBranches;
+		TSet<FVoxelViewKey> ProxyBranches;
+		TArray<FVoxelCoverageBox> Fine;
+		TArray<FVoxelCoverageBox> Proxy;
+		TArray<FVoxelCoverageRect> ProxySurface;
+		TArray<FVoxelCoverageRect> Surface;
+		TArray<FVoxelCoverageRect> Macro;
+		TArray<FVoxelCoverageRect> Heightfield;
+		TArray<FVoxelCoverageRect> WantedHeightfield;
+	};
+	void BuildCoveragePassSnapshot(FCoveragePassSnapshot& OutSnapshot) const;
+	bool IsTerrainVolumeCovered(const FVoxelViewKey& InNode, const FCoveragePassSnapshot& InSnapshot, bool bByFine) const;
+	bool IsFinePageReplacementReady(const FVoxelFinePageKey& InPage, const FCoveragePassSnapshot& InSnapshot) const;
+	FVoxelCoverageRect TerrainCoverageRect(const FVoxelViewKey& InKey) const;
+	void GatherFinePageCandidates(const TSet<FVoxelViewKey>& InCandidates, TSet<FVoxelFinePageKey>& OutPages) const;
+	bool IsFineReplacementReady(const FIntVector& InKey, const FCoveragePassSnapshot& InSnapshot) const;
+	bool IsProxyReplacementReady(const FVoxelViewKey& InKey, const FCoveragePassSnapshot& InSnapshot) const;
+	bool IsSurfaceReplacementReady(const FVoxelSurfaceTileKey& InKey, const FCoveragePassSnapshot& InSnapshot) const;
+	bool IsMacroReplacementReady(const FVoxelMacroTileKey& InKey, const FCoveragePassSnapshot& InSnapshot) const;
 #if WITH_DEV_AUTOMATION_TESTS
 	friend class FVoxelManagerLocalCoverageTest;
 	friend class FVoxelEmptyTransitionConvergenceTest;
 	friend class FVoxelFineProxyDependenciesTest;
+	friend class FVoxelFinePageCoverageTest;
 #endif
 	void UpdateFineAndVoxelProxy(TConstArrayView<FVector> InObservers);
 	void UpdateSurface(TConstArrayView<FVector> InObservers);
@@ -116,7 +144,14 @@ private:
 	bool IsAdmissionMeshReady(const FVoxelViewAdmission& InAdmission) const;
 	bool IsAdmissionPresented(const FVoxelViewAdmission& InAdmission) const;
 	void RefreshTerrainBuildStage();
-	bool TryPublishInitialTerrain();
+	AActor* FineActor(const FIntVector& InSection) const;
+	bool IsFinePresented(const FIntVector& InSection) const;
+	void RebuildFinePagePlan();
+	void PrepareFinePages();
+	bool BuildFinePageMesh(const FVoxelFinePageKey& InPage, FVoxelSectionMeshResult& OutMesh) const;
+	TOptional<bool> UpdateFinePagePresentation(const FVoxelFinePageKey& InPage, const TSet<FVoxelViewKey>& InTarget, const FCoveragePassSnapshot& InSnapshot);
+	void InvalidateFinePresentation(const FIntVector& InSection);
+	void InvalidateRepresentationKeys(const FVoxelAffectedRepresentationKeys& InAffected);
 	bool IsPreparedDataCurrent(const FVoxelTaskKey& InKey) const;
 	void PrunePreparedData();
 	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> RetainPreparedEnvironment(
@@ -148,7 +183,7 @@ private:
 	FGuid BeginPublishGroup(const FVoxelPublishGroupKey& InKey);
 	bool CoverageAffects(const FVoxelCoverageRect& InBounds) const;
 	void ResolveTransitionVisibility();
-	bool RebuildHeightfieldTransitions();
+	bool RebuildHeightfieldTransitions(const FCoveragePassSnapshot& InSnapshot);
 	void ApplyHeightfieldTransition(
 		const FVoxelHeightfieldNodeKey& InOwner,
 		uint64 InSignature,
@@ -266,7 +301,21 @@ private:
 	TSet<FVoxelSurfaceTileKey> SurfaceReady;
 	TSet<FVoxelMacroTileKey> MacroReady;
 
-	TMap<FIntVector, TObjectPtr<AActor>> FineActors;
+	TMap<FIntVector, TSharedPtr<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>> FineSectionMeshes;
+	FVoxelFinePagePlan FinePagePlan;
+	TSet<FVoxelFinePageKey> FinePageReady;
+	TMap<FVoxelFinePageKey, TObjectPtr<AActor>> FinePageActors;
+	TMap<FIntVector, FVoxelFinePageKey> PresentedFineSectionOwners;
+	TSet<FVoxelFinePageKey> DirtyFinePages;
+	TSet<FVoxelFinePageKey> PendingFinePages;
+	bool bFinePresentationDirty = true;
+	bool bHeightfieldTopologyDirty = true;
+	uint64 FinePageLayoutRevision = 0;
+	mutable uint64 CoverageSnapshotBuildCount = 0;
+	uint64 HeightfieldTopologyRebuildCount = 0;
+	uint64 TerrainCandidateCount = 0;
+	uint64 FinePageCandidateCount = 0;
+	uint64 FullTerrainActorScanCount = 0;
 	TMap<FIntVector, uint64> FineRevisions;
 
 	TMap<FVoxelViewKey, TObjectPtr<AActor>> VoxelProxyActors;
