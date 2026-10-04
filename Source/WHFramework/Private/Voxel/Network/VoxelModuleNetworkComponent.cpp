@@ -37,24 +37,7 @@ namespace
 		return FMath::Max<uint64>(1, Hash);
 	}
 
-	auto ResolveWireRepresentationBounds(
-		EVoxelRepresentationWireType InType,
-		const FVoxelRepresentationWireKey& InKey,
-		const FVoxelGenerationSettings& InSettings,
-		const FVoxelLodTopologySettings& InLod) -> FVoxelGenerationBounds
-	{
-		if (InType == EVoxelRepresentationWireType::VoxelProxy)
-		{
-			return FVoxelViewKey { InKey.Coordinate, InKey.Level }.GetBounds();
-		}
-		const int32 Side = InType == EVoxelRepresentationWireType::SurfaceProxy ?
-			VoxelViewLod::SurfaceSide(InLod, InKey.Level) : VoxelViewLod::MacroSide(InLod, InKey.Level);
-		const FIntVector Min(
-			InKey.Coordinate.X * Side,
-			InKey.Coordinate.Y * Side,
-			InSettings.MinZ);
-		return { Min, FIntVector(Min.X + Side, Min.Y + Side, InSettings.MaxZ) };
-	}
+
 
 	uint64 RepresentationRevision(
 		const FVoxelWorldRuntime& InRuntime,
@@ -219,6 +202,12 @@ bool UVoxelModuleNetworkComponent::RequestRepresentation(
 	const FVoxelRepresentationWireKey& InKey,
 	const uint64 InKnownRevision)
 {
+	const auto* VoxelModule = Module.Get();
+	if (!VoxelModule) return false;
+	const FVoxelTerrainSpatialKey SpatialKey{static_cast<EVoxelTerrainRepresentation>(static_cast<uint8>(InType) + 1), InKey.Coordinate, InKey.Level};
+	const auto* Geometry = VoxelModule->GetCurrentInterest().Geometry.Find(SpatialKey);
+	if (!Geometry) return false;
+
 	if (!IsSessionReady() || !GetOwner() || GetOwner()->HasAuthority() ||
 		PendingRepresentationRequests.Num() >= NetworkSettings.MaxRepresentationRequests)
 	{
@@ -226,7 +215,7 @@ bool UVoxelModuleNetworkComponent::RequestRepresentation(
 	}
 	for (const TPair<uint64, FVoxelRepresentationRequest>& Pair : PendingRepresentationRequests)
 	{
-		if (Pair.Value.Type == InType && Pair.Value.Key == InKey)
+		if (Pair.Value.Type == InType && Pair.Value.Key == InKey && Pair.Value.Geometry == *Geometry)
 		{
 			return true;
 		}
@@ -235,6 +224,7 @@ bool UVoxelModuleNetworkComponent::RequestRepresentation(
 	Request.Type = InType;
 	Request.Key = InKey;
 	Request.KnownRevision = InKnownRevision;
+	Request.Geometry = *Geometry;
 	Request.Serial = AllocateRequestId();
 	TArray<uint8> Payload;
 	if (Request.Serial == 0 || !FVoxelNetworkCodec::EncodeRepresentationRequest(Request, Payload) ||
@@ -633,6 +623,10 @@ void UVoxelModuleNetworkComponent::Handle(
 			Fail(TEXT("Voxel representation reply does not match an active request"));
 			return;
 		}
+		const FVoxelTerrainSpatialKey Spatial{static_cast<EVoxelTerrainRepresentation>(static_cast<uint8>(Request->Type)), Request->Key.Coordinate, Request->Key.Level};
+		const auto* CurrentGeometry = VoxelModule->GetCurrentInterest().Geometry.Find(Spatial);
+		if (!CurrentGeometry || *CurrentGeometry != Request->Geometry)
+		{ PendingRepresentationRequests.Remove(Reply.Serial); return; }
 		PendingRepresentationRequests.Remove(Reply.Serial);
 		if (!VoxelModule->ApplyRemoteRepresentation(Reply, Error))
 		{
@@ -665,21 +659,37 @@ void UVoxelModuleNetworkComponent::Handle(
 		}
 		AActor* Observer = GetAuthorizedObserver();
 		FVoxelWorldRuntime* Runtime = VoxelModule->GetRuntime();
-		if (!Observer || !Runtime || Request.Key.Level > 10)
+		if (!Observer || !Runtime || Request.Key.Level > VoxelStreamingGeometry::MaximumSpatialLevel)
 		{
 			Fail(TEXT("Voxel representation request is outside supported limits"));
 			return;
 		}
-		const FVoxelGenerationBounds Bounds = ResolveWireRepresentationBounds(
-			Request.Type,
-			Request.Key,
-			VoxelModule->GetManifest().Settings, VoxelModule->GetViewSettings().Lod);
+		FIntVector GeometryMin, GeometryMax;
+		FString GeometryError;
+		if (!Request.Geometry.Validate(GeometryError) || Request.Geometry.GeneratorIdentity != VoxelModule->GetManifest().BaseSampleHash ||
+			Request.Geometry.MaterialRevision != VoxelModule->GetManifest().RegistryHash ||
+			Request.Geometry.WorldMinZ != VoxelModule->GetManifest().Settings.MinZ ||
+			Request.Geometry.WorldMaxZ != VoxelModule->GetManifest().Settings.MaxZ ||
+			!Request.Geometry.Key.TryBounds(Request.Geometry.WorldMinZ, Request.Geometry.WorldMaxZ, GeometryMin, GeometryMax))
+		{ Fail(TEXT("Voxel representation geometry identity is invalid")); return; }
+		const FVoxelGenerationBounds Bounds{GeometryMin, GeometryMax};
 		const FVector ObserverCell = Observer->GetActorLocation() / VoxelModule->BlockSize();
 		if (!IsRepresentationInRange(ObserverCell, Request.Type, Bounds, VoxelModule->GetViewSettings()))
 		{
 			Fail(TEXT("Voxel representation request is outside the authorized visual radius"));
 			return;
 		}
+		const auto& Lod = VoxelModule->GetViewSettings().Lod;
+		const uint8 MaximumLevel = Request.Type == EVoxelRepresentationWireType::VoxelProxy ? Lod.MaximumVoxelProxyLevel :
+			Request.Type == EVoxelRepresentationWireType::SurfaceProxy ? Lod.MaximumSurfaceSpatialLevel : Lod.MaximumMacroSpatialLevel;
+		const uint64 Samples = Request.Geometry.Key.SideCells() / Request.Geometry.SampleStepCells;
+		const uint64 Cells = Request.Geometry.Key.IsColumn() ? (Samples + 1) * (Samples + 1) : Samples * Samples * Samples;
+		TArray<FVoxelTerrainBuildShard> Shards;
+		if (Request.Key.Level > MaximumLevel || Cells > 1024ull * 1024ull ||
+			(!Request.Geometry.Key.IsColumn() && Samples > 128) ||
+			!VoxelStreamingGeometry::BuildShards(Request.Geometry, Request.Geometry.Key.IsColumn() ? 64 : 16, 4096, Shards, GeometryError))
+		{ Fail(TEXT("Voxel representation request exceeds authorized geometry or byte limits")); return; }
+		Runtime->GetChangeHierarchy().RegisterGeometry(Request.Geometry);
 		const uint8 TypeBit = 1u << (static_cast<uint8>(Request.Type) - 1);
 		if (!RepresentationSubscriptions.Contains(Request.Key) &&
 			RepresentationSubscriptions.Num() >= NetworkSettings.MaxRepresentationRequests)
@@ -698,7 +708,7 @@ void UVoxelModuleNetworkComponent::Handle(
 		Reply.Serial = Request.Serial;
 		Reply.Revision = CurrentRevision;
 		FString Error;
-		if (ModifiedSections.IsEmpty() || Request.KnownRevision == CurrentRevision)
+		if (ModifiedSections.IsEmpty())
 		{
 			Reply.Kind = EVoxelRepresentationReplyKind::Unchanged;
 			TArray<uint8> Payload;
@@ -725,12 +735,17 @@ void UVoxelModuleNetworkComponent::Handle(
 			return;
 		}
 
+		const auto PageBuild = MakeShared<FVoxelRepresentationPageBuild, ESPMode::ThreadSafe>();
+		if (!PageBuild->Initialize(MoveTemp(BuildInput), Error))
+		{ Fail(Error); return; }
 		FVoxelTaskRequest Task;
+		Task.bResumable = true;
 		Task.Kind = EVoxelTaskKind::NetworkRepresentation;
 		Task.WorkClass = EVoxelWorkClass::Exploration;
 		Task.Stamp.WorldEpoch = VoxelModule->GetWorldEpoch();
 		Task.Stamp.Token = Request.Serial ^ static_cast<uint64>(reinterpret_cast<UPTRINT>(this));
 		Task.Stamp.Revision = CurrentRevision;
+		Task.Stamp.GeometryRevision = GetTypeHash(Request.Geometry);
 		if (Request.Type == EVoxelRepresentationWireType::VoxelProxy)
 		{
 			Task.Stamp.ViewKey = { Request.Key.Coordinate, Request.Key.Level };
@@ -748,15 +763,13 @@ void UVoxelModuleNetworkComponent::Handle(
 				Request.Key.Level };
 		}
 		Task.ReservedBytes = 32ull * 1024ull * 1024ull;
-		Task.InputBytes = BuildInput.Overlays.GetAllocatedBytes();
-		Task.Execute = [BuildInput = MoveTemp(BuildInput)](const TAtomic<bool>& InCancel)
+		Task.InputBytes = PageBuild->InputBytes();
+		Task.Execute = [PageBuild](const TAtomic<bool>& InCancel)
 		{
 			FVoxelTaskResult Result;
-			Result.bSuccess = FVoxelRepresentationSync::BuildServerData(
-				BuildInput,
-				Result.Payload,
-				Result.Error,
-				&InCancel);
+			bool bComplete = false;
+			Result.bSuccess = PageBuild->Advance(Result.Payload, bComplete, Result.Error, &InCancel);
+			Result.bContinue = Result.bSuccess && !bComplete;
 			return Result;
 		};
 		const TWeakObjectPtr<UVoxelModuleNetworkComponent> WeakThis(this);
@@ -769,7 +782,8 @@ void UVoxelModuleNetworkComponent::Handle(
 				return;
 			}
 			Reply.Kind = InResult.bSuccess && !InResult.bCanceled ?
-				EVoxelRepresentationReplyKind::Data : EVoxelRepresentationReplyKind::Retry;
+				EVoxelRepresentationReplyKind::Data :
+				InResult.bCanceled ? EVoxelRepresentationReplyKind::Retry : EVoxelRepresentationReplyKind::Rejected;
 			Reply.Data = InResult.bSuccess ? MoveTemp(InResult.Payload) : TArray<uint8>();
 			TArray<uint8> Payload;
 			FString ReplyError;

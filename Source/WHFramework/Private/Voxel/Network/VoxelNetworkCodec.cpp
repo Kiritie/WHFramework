@@ -1,4 +1,5 @@
 #include "Voxel/Network/VoxelNetworkCodec.h"
+#include "Voxel/Network/VoxelGeometryWire.h"
 #include "Voxel/Generation/VoxelManifestCodec.h"
 
 namespace
@@ -498,12 +499,16 @@ bool FVoxelNetworkCodec::EncodeRepresentationRequest(
 	{
 		return false;
 	}
-	FVoxelByteWriter Writer(48);
+	TArray<uint8> GeometryBytes;
+	FString GeometryError;
+	if (!VoxelGeometryWire::Encode({InValue.Geometry, InValue.Serial, InValue.KnownRevision}, GeometryBytes, GeometryError)) return false;
+	FVoxelByteWriter Writer(128);
 	Writer.U8(static_cast<uint8>(InValue.Type));
 	WriteVector(Writer, InValue.Key.Coordinate);
 	Writer.U8(InValue.Key.Level);
 	Writer.U64(InValue.KnownRevision);
 	Writer.U64(InValue.Serial);
+	Writer.Raw(GeometryBytes);
 	return Writer.Finish(OutBytes);
 }
 
@@ -518,6 +523,15 @@ bool FVoxelNetworkCodec::DecodeRepresentationRequest(
 	Value.Key.Level = Reader.U8();
 	Value.KnownRevision = Reader.U64();
 	Value.Serial = Reader.U64();
+	TArray<uint8> GeometryBytes;
+	FVoxelGeometryWireHeader Header;
+	FString GeometryError;
+	if (!Reader.Raw(VoxelGeometryWire::HeaderBytes, GeometryBytes) ||
+		!VoxelGeometryWire::Decode(GeometryBytes, Header, GeometryError) ||
+		Header.RequestId != Value.Serial || Header.ContentRevision != Value.KnownRevision ||
+		Header.Geometry.Key.Coordinate != Value.Key.Coordinate || Header.Geometry.Key.Level != Value.Key.Level ||
+		static_cast<uint8>(Header.Geometry.Key.Representation) != static_cast<uint8>(Value.Type) + 1) return false;
+	Value.Geometry = Header.Geometry;
 	if (!Reader.End() ||
 		Value.Type == EVoxelRepresentationWireType::None ||
 		static_cast<uint8>(Value.Type) > static_cast<uint8>(EVoxelRepresentationWireType::MacroTerrain) ||
@@ -539,7 +553,7 @@ bool FVoxelNetworkCodec::EncodeRepresentationReply(
 		static_cast<uint8>(InValue.Type) > static_cast<uint8>(EVoxelRepresentationWireType::MacroTerrain) ||
 		InValue.Serial == 0 ||
 		!ValidateWireKey(InValue.Key) ||
-		static_cast<uint8>(InValue.Kind) > static_cast<uint8>(EVoxelRepresentationReplyKind::Data) ||
+		static_cast<uint8>(InValue.Kind) > static_cast<uint8>(EVoxelRepresentationReplyKind::Rejected) ||
 		(InValue.Kind != EVoxelRepresentationReplyKind::Data && !InValue.Data.IsEmpty()) ||
 		InValue.Data.Num() > MaxRepresentationBytes)
 	{
@@ -587,7 +601,7 @@ bool FVoxelNetworkCodec::DecodeRepresentationReply(
 		static_cast<uint8>(Value.Type) > static_cast<uint8>(EVoxelRepresentationWireType::MacroTerrain) ||
 		Value.Serial == 0 ||
 		!ValidateWireKey(Value.Key) ||
-		static_cast<uint8>(Value.Kind) > static_cast<uint8>(EVoxelRepresentationReplyKind::Data) ||
+		static_cast<uint8>(Value.Kind) > static_cast<uint8>(EVoxelRepresentationReplyKind::Rejected) ||
 		(Value.Kind != EVoxelRepresentationReplyKind::Data && !Value.Data.IsEmpty()))
 	{
 		OutError = TEXT("Voxel representation reply payload is invalid");

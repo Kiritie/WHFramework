@@ -11,6 +11,9 @@
 #include "Voxel/Rendering/DWHeightfieldTransitionBuilder.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Streaming/VoxelInterestRuntime.h"
+#include "Voxel/Streaming/VoxelInterestManager.h"
+#include "Voxel/Tests/VoxelTestUtilities.h"
+#include "Voxel/Runtime/VoxelWorldRuntime.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelCoverageRegionHaloTest,
 	"WHFramework.Voxel.Rendering.CoverageRegionHalo",
@@ -94,6 +97,19 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 	}
 	Manager.RebuildVolumeTransitions(Nodes);
 	TestTrue(TEXT("Ready regions release all local handoff waits"), Manager.PendingVolumeHandoffBoxes.IsEmpty());
+	const FVoxelViewKey ReadOnlyRegion{FIntVector(15, 0, 0), 6};
+	const uint64 DistantSignature = Manager.VolumeCoveragePlans.FindChecked(ReadOnlyRegion).DesiredSignature;
+	Manager.bActiveCoverageFull = false;
+	Manager.ActiveDirtyCoverageRects = {{FIntPoint::ZeroValue, FIntPoint(1024, 1024)}};
+	TSet<FVoxelViewKey> WithReadOnlyNeighbors = Nodes;
+	WithReadOnlyNeighbors.Add({FIntVector(1001, 0, 0), 0});
+	Manager.RebuildVolumeTransitions(WithReadOnlyNeighbors);
+	TestEqual(TEXT("Read-only neighboring input cannot replace a region outside the update scope"),
+		Manager.VolumeCoveragePlans.FindChecked(ReadOnlyRegion).DesiredSignature, DistantSignature);
+	TestEqual(TEXT("Unchanged neighboring ownership does not enqueue another plan"),
+		Manager.VolumeCoveragePlans.FindChecked(ReadOnlyRegion).PendingSignature, uint64(0));
+	Manager.bActiveCoverageFull = true;
+	Manager.ActiveDirtyCoverageRects.Reset();
 	TMap<FVoxelViewKey, TSet<FVoxelViewKey>> Before, After;
 	FVoxelVolumeTransitionPlanner::GatherCoverageRegions(Nodes, Before);
 	TSet<FVoxelViewKey> Changed = Nodes;
@@ -145,6 +161,7 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 	{
 		auto Data = MakeShared<FVoxelVoxelProxyData>();
 		Data->Key = Key;
+		Data->Geometry = {{EVoxelTerrainRepresentation::VoxelProxy, Key.Coordinate, Key.Level}, 1, -128, 256, 17, 23};
 		Data->Revision = 1;
 		Manager.VoxelProxyData.Add(Key, Data);
 	}
@@ -234,8 +251,20 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 		ScopedManager.FinePagePlan.Pages.Add(Page);
 		ScopedManager.FinePagePlan.SectionOwners.Add(Child.Coordinate, Page);
 		ScopedManager.FinePageReady.Add(Page);
+		ScopedManager.EmptyFinePages.Add(Page);
+		ScopedManager.IndexCoverage(Child);
 	}
 	Interest.TerrainPlan.Leaves.Add(FarRoot);
+	ScopedManager.MaximumTerrainRootLevel = 1;
+	for (const auto& Root : Interest.TerrainPlan.Roots)
+	{
+		auto Record = MakeShared<FVoxelCoverageRecord, ESPMode::ThreadSafe>();
+		Record->Geometry.Key = {EVoxelTerrainRepresentation::VoxelProxy, Root.Coordinate, Root.Level};
+		const auto Bounds = Root.GetBounds(); Record->Min = Bounds.Min; Record->Max = Bounds.Max;
+		FString IndexError;
+		TestTrue(TEXT("Fixture registers each terrain root"), ScopedManager.TerrainRootIndex.Upsert(Record, IndexError));
+		ScopedManager.IndexedTerrainRoots.Add(Root);
+	}
 	ScopedManager.CommitTerrainOwnership({1, FIntPoint(NearRoot.Coordinate.X, NearRoot.Coordinate.Y), NearRoot.Level}, MakeArrayView(&NearRoot, 1));
 	ScopedManager.CommitTerrainOwnership({1, FIntPoint(FarRoot.Coordinate.X, FarRoot.Coordinate.Y), FarRoot.Level}, MakeArrayView(&FarRoot, 1));
 	ScopedManager.bActiveCoverageFull = false;
@@ -248,9 +277,11 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("A distant unready root retains its previous committed ownership"), ScopedManager.VisibleTerrainNodes.Contains(FarRoot));
 	UWorld* FixtureWorld = UWorld::CreateWorld(EWorldType::Game, false);
 	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(FixtureWorld);
-	const FVoxelSurfaceTileKey SurfaceKey{FIntPoint::ZeroValue, 1};
+	const FVoxelSurfaceTileKey SurfaceKey{FIntPoint::ZeroValue, 2};
 	auto Surface = MakeShared<FVoxelSurfaceTileData>();
 	Surface->Key = SurfaceKey;
+	Surface->Geometry = {{EVoxelTerrainRepresentation::Surface, FIntVector(SurfaceKey.Coordinate.X, SurfaceKey.Coordinate.Y, 0), SurfaceKey.Level}, 2, -128, 256, 17, 23};
+	Surface->Side = 33;
 	Surface->Step = 2;
 	Surface->Revision = 1;
 	Surface->GroundZ.Init(32, Surface->GetVertexCount());
@@ -258,9 +289,13 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 	Surface->SurfaceMaterial.Init(0, Surface->GetVertexCount());
 	Surface->Flags.Init(0, Surface->GetVertexCount());
 	ScopedManager.SurfaceData.Add(SurfaceKey, Surface);
+	ScopedManager.SurfaceRevisions.Add(SurfaceKey, 1);
+	ScopedManager.bHeightfieldTopologyDirty = true;
 	ScopedManager.SurfaceReady.Add(SurfaceKey);
 	ScopedManager.SurfaceWanted.Add(SurfaceKey);
 	ScopedManager.SurfaceActors.Add(SurfaceKey, FixtureWorld->SpawnActor<AActor>());
+	Interest.Geometry.Add(Surface->Geometry.Key, Surface->Geometry);
+	ScopedManager.IndexCoverage(SurfaceKey);
 	ScopedManager.VisibleTerrainNodes.Reset();
 	ScopedManager.VisibleTerrainNodesByGroup.Reset();
 	ScopedManager.CommitTerrainOwnership({1, FIntPoint(NearRoot.Coordinate.X, NearRoot.Coordinate.Y), NearRoot.Level}, MakeArrayView(&NearRoot, 1));
@@ -273,10 +308,24 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 	for (const auto& Child : NearChildren)
 		TestTrue(TEXT("Ready Fine ownership does not wait on its enclosing heightfield topology"), ScopedManager.VisibleTerrainNodes.Contains(Child));
 	const FVoxelHeightfieldNodeKey SurfaceOwner{EVoxelHeightfieldRepresentation::Surface, SurfaceKey.Coordinate, SurfaceKey.Level};
-	const uint64 FirstPending = ScopedManager.HeightfieldCoveragePlans.FindChecked(SurfaceOwner).PendingSignature;
+	const auto* FirstPlan = ScopedManager.HeightfieldCoveragePlans.Find(SurfaceOwner);
+	if (!TestNotNull(TEXT("The actual Surface owner has an immutable local coverage plan"), FirstPlan))
+	{
+		AddInfo(FString::Printf(TEXT("Surface: level=%d ready=%d wanted=%d actor=%d plans=%d pendingOwners=%d full=%d scopes=%d"),
+			SurfaceKey.Level, ScopedManager.SurfaceReady.Contains(SurfaceKey), ScopedManager.SurfaceWanted.Contains(SurfaceKey),
+			ScopedManager.SurfaceActors.FindRef(SurfaceKey) != nullptr, ScopedManager.HeightfieldCoveragePlans.Num(),
+			ScopedManager.PendingHeightfieldPlanOwners.Num(), ScopedManager.bActiveCoverageFull, ScopedManager.ActiveDirtyCoverageRects.Num()));
+		for (const auto& Pair : ScopedManager.HeightfieldCoveragePlans)
+			AddInfo(FString::Printf(TEXT("Plan: rep=%d coordinate=%s level=%d"), int32(Pair.Key.Representation), *Pair.Key.Coordinate.ToString(), Pair.Key.Level));
+		ScopedScheduler.StopAndJoin();
+		return false;
+	}
+	const uint64 FirstPending = FirstPlan->PendingSignature;
 	auto RevisedSurface = MakeShared<FVoxelSurfaceTileData>(*Surface);
 	RevisedSurface->Revision = 2;
 	ScopedManager.SurfaceData.Add(SurfaceKey, RevisedSurface);
+	ScopedManager.SurfaceRevisions.Add(SurfaceKey, 2);
+	ScopedManager.IndexCoverage(SurfaceKey);
 	ScopedManager.RebuildHeightfieldTransitions({});
 	const auto& PendingState = ScopedManager.HeightfieldCoveragePlans.FindChecked(SurfaceOwner);
 	TestTrue(TEXT("Heightfield changes coalesce without canceling the in-flight immutable plan"),
@@ -287,8 +336,9 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 		ScopedScheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
 		FPlatformProcess::Sleep(0.001f);
 	}
-	TestTrue(TEXT("An immutable heightfield plan completes despite a newer desired revision"),
-		ScopedManager.HeightfieldCoveragePlans.FindChecked(SurfaceOwner).Plan.IsValid());
+	TestTrue(TEXT("A changed local input rejects the completed stale heightfield proof"),
+		!ScopedManager.HeightfieldCoveragePlans.FindChecked(SurfaceOwner).Plan.IsValid() &&
+		ScopedManager.HeightfieldCoveragePlans.FindChecked(SurfaceOwner).PendingSignature == 0);
 	ScopedManager.RebuildHeightfieldTransitions({});
 	while (ScopedScheduler.ActiveCount() > 0 && FPlatformTime::Seconds() < HeightfieldDeadline)
 	{
@@ -313,6 +363,8 @@ bool FVoxelHeightfieldLocalDependenciesTest::RunTest(const FString& InParameters
 	(void)InParameters;
 	TArray<int32> Ground, Water;
 	TArray<uint16> Materials;
+	TArray<uint8> WaterKinds;
+	WaterKinds.Init(0, 33 * 33);
 	Ground.Init(32, 33 * 33);
 	Water.Init(MIN_int32, 33 * 33);
 	Materials.Init(0, 33 * 33);
@@ -327,7 +379,7 @@ bool FVoxelHeightfieldLocalDependenciesTest::RunTest(const FString& InParameters
 		View.Revision = 1;
 		View.Ground = Ground;
 		View.Water = Water;
-		View.WaterKind.Init(0, 33 * 33);
+		View.WaterKind = WaterKinds;
 		View.Material = Materials;
 	};
 	AddView({-1, 0}, {-32, 0}, 1);
@@ -356,6 +408,68 @@ bool FVoxelHeightfieldLocalDependenciesTest::RunTest(const FString& InParameters
 	{
 		TestTrue(TEXT("Dependency order is independent of input loading order"), Reordered[Pair.Key] == Pair.Value);
 	}
+	return true;
+}
+
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelInterestInputBudgetTest,
+	"WHFramework.Voxel.Rendering.InterestInputBudget",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelInterestInputBudgetTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	UVoxelModule* Module = NewObject<UVoxelModule>();
+	Module->Runtime = MakeUnique<FVoxelWorldRuntime>(1024, false, VoxelTest::MakeRegistry(), VoxelTest::MakeGenerator());
+	FVoxelTaskScheduler Scheduler;
+	FVoxelViewManager Manager(*Module, Scheduler, 9);
+	FVoxelStreamingSource Source;
+	Source.Capabilities = EVoxelStreamingCapability::Data | EVoxelStreamingCapability::FineVisual;
+	Source.View.FineRadiusCells = 128;
+	Source.View.FineVerticalHalfExtentCells = 32;
+	Source.View.InitialChunkSideCells = 16;
+	FVoxelInterestManager Planner;
+	auto& Interest = const_cast<FVoxelInterestSet&>(Module->GetCurrentInterest());
+	Interest = Planner.Compute(MakeArrayView(&Source, 1), Module->GetManifest(), Module->GetViewSettings());
+	if (!TestTrue(TEXT("Budget fixture has a valid prepared interest"), Interest.PlanningError.IsEmpty() && Interest.PublicationInputs.IsValid())) return false;
+	const auto Advance = [&](uint64 Revision)
+	{
+		Manager.TerrainFrameBudget.Begin(FPlatformTime::Seconds(), 4.0, 8);
+		Manager.bTerrainFrameBudgetActive = true;
+		Manager.AdvanceInterestInputs(Revision, {});
+		Manager.bTerrainFrameBudgetActive = false;
+	};
+	Advance(1);
+	TestEqual(TEXT("A large interest is not applied in one publication slice"), Manager.AppliedInterestRevision, uint64(0));
+	TestTrue(TEXT("The first slice does not copy the complete Fine domain"), Manager.FineWanted.Num() < Interest.FineSections->Num());
+	Source.View.InitialChunkSideCells = 32;
+	Source.Center.X = 128;
+	Interest = Planner.Compute(MakeArrayView(&Source, 1), Module->GetManifest(), Module->GetViewSettings());
+	if (!TestTrue(TEXT("Superseding 32-cell interest remains valid"), Interest.PlanningError.IsEmpty())) return false;
+	for (int32 Slice = 0; Slice < 4096 && Manager.AppliedInterestRevision != 2; ++Slice) Advance(2);
+	TestEqual(TEXT("A superseded cursor converges to the latest interest"), Manager.AppliedInterestRevision, uint64(2));
+	TestTrue(TEXT("No Fine demand from the superseded interest remains"),
+		Manager.FineWanted.Num() == Interest.FineSections->Num() && Manager.FineWanted.Difference(*Interest.FineSections).IsEmpty());
+	TestTrue(TEXT("The complete 32-cell Page partition is accepted together"),
+		Manager.FinePagePlan.Pages.Num() == Interest.FinePagePlan->Pages.Num() &&
+		Manager.FinePagePlan.SectionOwners.Num() == Interest.FinePagePlan->SectionOwners.Num());
+	TestTrue(TEXT("Applied interest retains runnable admission priorities"), !Manager.AdmissionPriorities.IsEmpty());
+	TestEqual(TEXT("Applied admission entries match the accepted worker snapshot"), Manager.Admissions.Num(), Interest.Admissions.Num());
+	for (const auto& Pair : Interest.Exact)
+	{
+		FVoxelSection* Section = Module->Runtime->FindOrAllocate(Pair.Key, 1);
+		Section->Blocks.SetNum(4096);
+		Section->Status = EVoxelSectionStatus::DataReady;
+		Section->CommittedRevision = 1;
+	}
+	Manager.Publisher->BeginGroup({0, FIntVector(9999), 0});
+	Manager.bCoverageDirty = false;
+	for (int32 Frame = 0; Frame < 8 && Scheduler.ActiveCount() == 0 && Manager.FineReady.IsEmpty(); ++Frame)
+		Manager.Tick(2, {});
+	TestTrue(TEXT("An uncommitted publication cannot consume every shared operation and starve actual Fine mesh admission"),
+		Scheduler.ActiveCount() > 0 || !Manager.FineReady.IsEmpty());
+	Scheduler.StopAndJoin();
+	Manager.Reset();
 	return true;
 }
 

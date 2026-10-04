@@ -61,4 +61,6 @@ struct WHFRAMEWORK_API FVoxelHeightfieldTransitionEdge
 	uint64 NeighborRevision = 0;
 	bool bPending = false;
 	bool bUnbalanced = false;
+	uint64 OwnerGeometryRevision = 0;
+	uint64 NeighborGeometryRevision = 0;
 };

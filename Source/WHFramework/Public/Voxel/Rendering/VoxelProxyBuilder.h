@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Voxel/Rendering/VoxelStreamingGeometry.h"
 
 #include "Voxel/Generation/VoxelGenerationBinding.h"
 #include "Voxel/Generation/VoxelGenerationPlanCache.h"
@@ -13,10 +14,19 @@ class FVoxelGenerationPipeline;
 struct WHFRAMEWORK_API FVoxelVoxelProxyData
 {
 	FVoxelViewKey Key;
+	FVoxelTerrainGeometry Geometry;
+	uint64 RequestId = 1;
+	uint64 EstimatedMeshBytes = 0;
 
 	uint64 Revision = 0;
 
 	int32 GridSide = 16;
+	FIntVector LocalMinCells = FIntVector::ZeroValue;
+	FVoxelGenerationBounds GetBuildBounds() const
+	{
+		const FIntVector Min = Key.GetBounds().Min + LocalMinCells;
+		return {Min, Min + FIntVector(GridSide * Geometry.SampleStepCells)};
+	}
 
 	bool bHasVisibleSurfaceEvidence =
 		false;
@@ -63,7 +73,9 @@ public:
 		const FVoxelViewKey& InKey,
 		FVoxelVoxelProxyData& OutData,
 		FString& OutError,
-		const TAtomic<bool>* InCancel = nullptr) const;
+		const TAtomic<bool>* InCancel,
+		const FVoxelTerrainGeometry& InGeometry,
+		const FVoxelTerrainBuildShard* InShard = nullptr) const;
 
 	bool ApplyTreeSilhouettes(
 		const FVoxelViewKey& InKey,
@@ -72,7 +84,9 @@ public:
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr) const;
 	bool Build(const FVoxelViewKey& InKey, const FVoxelOverlaySnapshotSet& InOverlays,
-		FVoxelVoxelProxyData& OutData, FString& OutError, const TAtomic<bool>* InCancel = nullptr) const;
+		FVoxelVoxelProxyData& OutData, FString& OutError, const TAtomic<bool>* InCancel,
+		const FVoxelTerrainGeometry& InGeometry,
+		const FVoxelTerrainBuildShard* InShard = nullptr) const;
 
 private:
 	TSharedRef<

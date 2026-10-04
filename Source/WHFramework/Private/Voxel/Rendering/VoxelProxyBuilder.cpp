@@ -144,14 +144,15 @@ FVoxelVoxelProxyBuilder::FVoxelVoxelProxyBuilder(
 }
 
 bool FVoxelVoxelProxyBuilder::Build(const FVoxelViewKey& InKey, const FVoxelOverlaySnapshotSet& InOverlays,
-	FVoxelVoxelProxyData& OutData, FString& OutError, const TAtomic<bool>* InCancel) const
+	FVoxelVoxelProxyData& OutData, FString& OutError, const TAtomic<bool>* InCancel,
+	const FVoxelTerrainGeometry& InGeometry, const FVoxelTerrainBuildShard* InShard) const
 {
 	FVoxelVoxelProxyData Data;
-	if (!BuildNatural(InKey, Data, OutError, InCancel)) return false;
+	if (!BuildNatural(InKey, Data, OutError, InCancel, InGeometry, InShard)) return false;
 	if (!ApplyTreeSilhouettes(InKey, InOverlays, Data, OutError, InCancel)) return false;
-	const FIntVector Origin = InKey.GetBounds().Min;
+	const FIntVector Origin = Data.GetBuildBounds().Min;
 	const int32 Side = Data.GridSide;
-	const int32 Step = InKey.GetSampleStep();
+	const int32 Step = Data.Geometry.SampleStepCells;
 	TMap<FIntVector, FVoxelBlockState> CoarseNatural;
 	if (Generator && !Generator->BuildCoarseOverlay(
 			Origin, Step, Side, CoarseNatural, OutError, InCancel))
@@ -257,9 +258,9 @@ bool FVoxelVoxelProxyBuilder::ApplyTreeSilhouettes(
 	{
 		return false;
 	}
-	const FVoxelGenerationBounds Bounds = InKey.GetBounds();
+	const FVoxelGenerationBounds Bounds = InOutData.GetBuildBounds();
 	const int32 Side = InOutData.GridSide;
-	const int32 Step = InKey.GetSampleStep();
+	const int32 Step = InOutData.Geometry.SampleStepCells;
 	const FIntVector Origin = Bounds.Min;
 	const int32 CrownPadding = (FMath::Max(1, (Trees.CrownRadius - 1) / Step) + 1) * Step;
 	const FVoxelGenerationBounds TreeBounds {
@@ -371,7 +372,8 @@ bool FVoxelVoxelProxyBuilder::BuildNatural(
 	const FVoxelViewKey& InKey,
 	FVoxelVoxelProxyData& OutData,
 	FString& OutError,
-	const TAtomic<bool>* InCancel) const
+	const TAtomic<bool>* InCancel,
+	const FVoxelTerrainGeometry& InGeometry, const FVoxelTerrainBuildShard* InShard) const
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(
 		Voxel_ProxyBuild);
@@ -385,16 +387,22 @@ bool FVoxelVoxelProxyBuilder::BuildNatural(
 		return false;
 	}
 
-	const int32 GridSide = InKey.GetGridSide();
+	const FVoxelTerrainGeometry Geometry = InGeometry;
+	if (!Geometry.Validate(OutError)) return false;
+	if (Geometry.Key.Representation != EVoxelTerrainRepresentation::VoxelProxy ||
+		Geometry.Key.Coordinate != InKey.Coordinate || Geometry.Key.Level != InKey.Level)
+	{ OutError = TEXT("Proxy spatial key does not match its required geometry"); return false; }
+	const int32 GridSide = InShard ? InShard->CellCounts.X : InKey.GetSide() / Geometry.SampleStepCells;
+	if (InShard && (InShard->CellCounts.X != InShard->CellCounts.Y || InShard->CellCounts.X != InShard->CellCounts.Z))
+	{ OutError = TEXT("Proxy execution window must be cubic"); return false; }
 
 	const int32 ColumnSampleSide =
 		GridSide + 2;
 
-	const int32 Step =
-		InKey.GetSampleStep();
+	const int32 Step = Geometry.SampleStepCells;
 
-	const FVoxelGenerationBounds Bounds =
-		InKey.GetBounds();
+	const FIntVector WindowMin = InKey.GetBounds().Min + (InShard ? InShard->LocalMinCells : FIntVector::ZeroValue);
+	const FVoxelGenerationBounds Bounds{WindowMin, WindowMin + FIntVector(GridSide * Step)};
 
 	FVoxelGenerationQuery Query;
 
@@ -597,8 +605,9 @@ bool FVoxelVoxelProxyBuilder::BuildNatural(
 	Data.Key =
 		InKey;
 
-	Data.GridSide =
-		GridSide;
+	Data.Geometry = Geometry;
+	Data.LocalMinCells = InShard ? InShard->LocalMinCells : FIntVector::ZeroValue;
+	Data.GridSide = GridSide;
 
 	Data.Cells.SetNumUninitialized(
 		GridSide *

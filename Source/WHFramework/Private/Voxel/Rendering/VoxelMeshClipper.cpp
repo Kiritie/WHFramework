@@ -11,6 +11,7 @@ namespace
 		FVector2D UV2;
 		FLinearColor Color;
 		FProcMeshTangent Tangent;
+		int32 SourceIndex = INDEX_NONE;
 	};
 
 	using FClipPolygon = TArray<FClipVertex, TInlineAllocator<9>>;
@@ -51,7 +52,7 @@ namespace
 		}
 	}
 
-	void Append(const FClipPolygon& InPolygon, FVoxelMeshBuffers& OutMesh)
+	void Append(const FClipPolygon& InPolygon, FVoxelMeshBuffers& OutMesh, TArray<int32>& InOutSourceIndices)
 	{
 		for (int32 Index = 1; Index + 1 < InPolygon.Num(); ++Index)
 		{
@@ -60,10 +61,18 @@ namespace
 			{
 				continue;
 			}
-			const int32 Base = OutMesh.Vertices.Num();
 			for (const int32 VertexIndex : { 0, Index, Index + 1 })
 			{
 				const FClipVertex& Vertex = InPolygon[VertexIndex];
+				int32 OutputIndex = Vertex.SourceIndex != INDEX_NONE ? InOutSourceIndices[Vertex.SourceIndex] : INDEX_NONE;
+				if (OutputIndex != INDEX_NONE)
+				{
+					OutMesh.Triangles.Add(OutputIndex);
+					continue;
+				}
+				OutputIndex = OutMesh.Vertices.Num();
+				if (Vertex.SourceIndex != INDEX_NONE) InOutSourceIndices[Vertex.SourceIndex] = OutputIndex;
+				OutMesh.Triangles.Add(OutputIndex);
 				OutMesh.Vertices.Add(Vertex.Position);
 				OutMesh.Normals.Add(Vertex.Normal);
 				OutMesh.UV0.Add(Vertex.UV0);
@@ -72,7 +81,6 @@ namespace
 				OutMesh.Colors.Add(Vertex.Color);
 				OutMesh.Tangents.Add(Vertex.Tangent);
 			}
-			OutMesh.Triangles.Append({ Base, Base + 1, Base + 2 });
 		}
 	}
 }
@@ -173,7 +181,10 @@ void VoxelMeshClipper::Subtract(const FVoxelSectionMeshResult& InMesh,
 		FVoxelRenderBatch& Output = OutMesh.Batches.AddDefaulted_GetRef();
 		Output.Group = Batch.Group;
 		Output.Bank = Batch.Bank;
+		Output.MaterialVariant = Batch.MaterialVariant;
 		const FVoxelMeshBuffers& Mesh = Batch.Mesh;
+		TArray<int32> SourceIndices;
+		SourceIndices.Init(INDEX_NONE, Mesh.Vertices.Num());
 		for (int32 Triangle = 0; Triangle < Mesh.Triangles.Num(); Triangle += 3)
 		{
 			if (InCancel && InCancel->Load())
@@ -186,7 +197,7 @@ void VoxelMeshClipper::Subtract(const FVoxelSectionMeshResult& InMesh,
 			{
 				const int32 Index = Mesh.Triangles[Triangle + Corner];
 				Polygon.Add({ Mesh.Vertices[Index], Mesh.Normals[Index], Mesh.UV0[Index],
-					Mesh.UV1[Index], Mesh.UV2[Index], Mesh.Colors[Index], Mesh.Tangents[Index] });
+					Mesh.UV1[Index], Mesh.UV2[Index], Mesh.Colors[Index], Mesh.Tangents[Index], Index });
 				Bounds += Mesh.Vertices[Index];
 			}
 			TArray<FClipPolygon, TInlineAllocator<8>> Fragments;
@@ -212,7 +223,7 @@ void VoxelMeshClipper::Subtract(const FVoxelSectionMeshResult& InMesh,
 				Fragments = MoveTemp(Remaining);
 				if (Fragments.IsEmpty()) break;
 			}
-			for (const FClipPolygon& Fragment : Fragments) Append(Fragment, Output.Mesh);
+			for (const FClipPolygon& Fragment : Fragments) Append(Fragment, Output.Mesh, SourceIndices);
 		}
 	}
 }

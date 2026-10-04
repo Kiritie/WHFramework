@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "Voxel/Geometry/VoxelSectionMesher.h"
 #include "Voxel/Rendering/VoxelPublishGroups.h"
+#include "Voxel/Rendering/VoxelPublishBudget.h"
+#include "Voxel/Task/VoxelTaskFairSelection.h"
 
 class AActor;
 class UVoxelModule;
@@ -29,18 +31,30 @@ public:
 		FVoxelSectionMeshResult&& InMesh,
 		int32 InTerrainStage,
 		bool bInTransition = false);
+	bool StageImmutable(const FGuid& InGroup, AActor*& InOutActor,
+		const FVector& InLocation, double InScale,
+		TSharedPtr<const FVoxelSectionMeshResult, ESPMode::ThreadSafe> InMesh,
+		int32 InTerrainStage, bool bInTransition = false);
 	bool SetCoverage(const FGuid& InGroup, AActor* InActor, TArray<FBox> InWorldCellBoxes,
 		TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes = nullptr);
 	bool SetSharedCoverage(const FGuid& InGroup, AActor* InActor,
 		TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes);
+	bool SetScopedCoverage(const FGuid& InGroup, AActor* InActor, TArray<FBox> InWorldCellBoxes,
+		TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes,
+		TConstArrayView<FBox> InAffectedWorldCellBoxes, bool bInRetainPresented = false);
 	bool SetHidden(const FGuid& InGroup, AActor* InActor, bool bInHidden);
 	void SetCommitCallbacks(TFunction<void()> InOnCommitted,
 		TFunction<void(TConstArrayView<FVoxelPublishGroupKey>)> InOnGroupCommitted);
 	bool CommitGroup(const FGuid& InGroup);
+	bool DiscardUnchangedGroup(const FGuid& InGroup);
+	void SetValidation(const FGuid& InGroup, TFunction<bool()> InValidation);
+	TArray<FVoxelPublishGroupKey> TakeRetryOwners();
 	bool SetOwnershipChanged(const FGuid& InGroup, bool bInChanged);
 	bool SetTerrainStage(const FGuid& InGroup, int32 InTerrainStage);
 	void SetObservers(TConstArrayView<FVector> InObservers);
 	void Tick();
+	void Tick(FVoxelPublishBudget& InBudget);
+	void InvalidatePriorities();
 	void Forget(AActor* InActor);
 	void Reset();
 	bool IsBusy() const;
@@ -55,8 +69,10 @@ public:
 private:
 #if WITH_DEV_AUTOMATION_TESTS
 	friend class FVoxelConcurrentPublishCommitTest;
+	friend class FVoxelFrozenGenerationProgressTest;
 	friend class FVoxelPublisherStageAndIndexTest;
 	friend class FVoxelFinePageCoverageTest;
+	friend class FVoxelKnownEmptyPageIntegrationTest;
 #endif
 	using FMeshPtr = TSharedPtr<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>;
 	using FGroupCallback = TFunction<void(TConstArrayView<FVoxelPublishGroupKey>)>;
@@ -90,6 +106,8 @@ private:
 		FBox PresentedWorldBounds = FBox(ForceInit);
 		FVoxelPublishGroupKey GroupKey;
 		TArray<FBox> Exclusions;
+		TArray<FBox> DesiredWorldExclusions;
+		bool bHasDesiredExclusions = false;
 		TArray<FBox> LocalWorldBoxes;
 		TArray<TObjectPtr<UVoxelMeshComponent>> Components;
 		bool bTransition = false;
@@ -129,8 +147,13 @@ private:
 		TArray<TWeakObjectPtr<AActor>> VisibilityActors;
 		TArray<FVoxelPublishGroupKey> Keys;
 		FGroupPriority Priority;
+		double FirstQueuedAt = 0.0;
+		uint64 QueueSequence = 0;
 		int32 PreparedUpdates = 0;
 		bool bCommitted = false;
+		bool bPrepareQueued = false;
+		bool bCommitQueued = false;
+		bool bPriorityReady = false;
 	};
 
 	struct FPendingGroup
@@ -141,16 +164,35 @@ private:
 		bool bOwnershipChanged = true;
 		FPriorityBoundsPtr DeferredPriorityBounds;
 		int32 TerrainStage = 3;
+		TSharedPtr<TFunction<bool()>> Validation;
 	};
 
+	struct FPreparedPlan
+	{
+		TArray<FVoxelPublishFootprint> Footprints;
+		TMap<TWeakObjectPtr<AActor>, int32> ActorIndices;
+		TMap<TWeakObjectPtr<AActor>, const FUpdate*> Updates;
+		TSet<FVoxelPublishGroupKey> ActorKeys;
+		TSet<FVoxelPublishGroupKey> GroupKeys;
+		TArray<FGroup> Groups;
+		FVoxelPublishGroupContinuation Graph;
+		int32 Phase = 0;
+		int32 Cursor = 0;
+		int32 GraphCursor = 0;
+	};
 	struct FPublication
 	{
 		uint64 Serial = 0;
+		uint64 GroupRevision = 1;
+		uint64 IndexedGroupRevision = 0;
+		FVoxelPublishBoundsIndex DependencyIndex;
+		TUniquePtr<FPreparedPlan> Plan;
 		TArray<FUpdate> Updates;
 		TArray<FGroup> Groups;
 		TArray<int32> GroupOrder;
 		TMap<TWeakObjectPtr<AActor>, bool> Visibility;
 		TMap<FVoxelPublishGroupKey, FGroupCallbackPtr> Callbacks;
+		TMap<FVoxelPublishGroupKey, TSharedPtr<TFunction<bool()>>> Validations;
 		TMap<FVoxelPublishGroupKey, int32> TerrainStages;
 		TSet<FVoxelPublishGroupKey> OwnershipChanges;
 		TMap<FVoxelPublishGroupKey, FPriorityBoundsPtr> DeferredPriorityBounds;
@@ -158,7 +200,10 @@ private:
 		int32 CoverageIndex = 0;
 		TArray<int32> BuildOrder;
 		TSet<int32> PendingBuildIndices;
+		int32 BuildInitializationIndex = 0;
+		int32 BuildHeapifyIndex = INDEX_NONE;
 		bool bBuildOrderInitialized = false;
+		bool bBuildOrderDirty = true;
 		bool bCoveragePrepared = false;
 		bool bCoveragePreparing = false;
 		bool bGroupsPrepared = true;
@@ -166,10 +211,84 @@ private:
 		bool bCanceled = false;
 	};
 	using FPublicationRef = TSharedRef<FPublication>;
+	struct FPendingPlan
+	{
+		TMap<FGuid, FPendingGroup> Groups;
+		TMap<FVoxelPublishGroupKey, FGuid> GroupIds;
+		TArray<FUpdate> Updates;
+		TMap<TWeakObjectPtr<AActor>, int32> UpdateIndices;
+		TMap<TWeakObjectPtr<AActor>, bool> Visibility;
+		TArray<FGuid> Handles;
+		TArray<FVoxelPublishFootprint> Footprints;
+		TMap<FVoxelPublishGroupKey, int32> KeyIndices;
+		TSet<int32> BlockedComponents;
+		TMap<int32, int32> SelectedComponents;
+		TMap<FVoxelPublishGroupKey, int32> SelectedKeys;
+		TMap<TWeakObjectPtr<AActor>, FVoxelPublishGroupKey> ActorKeys;
+		FVoxelPublishGroupContinuation Graph;
+		FPublicationRef Publication = MakeShared<FPublication>();
+		int32 Phase = 0;
+		int32 Cursor = 0;
+		bool bCapacityFailure = false;
+	};
 
+	struct FPriorityGroup
+	{
+		FPublicationRef Key;
+		int32 Value = INDEX_NONE;
+		uint64 Revision = 0;
+		bool IsCurrent() const
+		{
+			return !Key->bCanceled && !Key->bFinished && Key->GroupRevision == Revision && Key->Groups.IsValidIndex(Value);
+		}
+	};
+	struct FPriorityPlan
+	{
+		TArray<FPublicationRef> Publications;
+		TArray<FPriorityGroup> Groups;
+		TArray<FPriorityBoundsPtr> Deferred;
+		FVoxelPublishBoundsIndex SpatialIndex;
+		FVoxelPublishBoundsIndex::FQuery SpatialQuery;
+		FGroup SpatialDemand;
+		bool bSpatialQueryActive = false;
+		TSet<const FDeferredPriorityDemand*> SeenDeferred;
+		TMap<FVoxelPublishGroupKey, FGroupPriority> Priorities;
+		uint64 Revision = 0;
+		int32 Phase = 0;
+		int32 Cursor = 0;
+		int32 InnerCursor = 0;
+		int32 PairCursor = 0;
+	};
+
+	struct FActorUpdateGeneration
+	{
+		FPublicationRef Publication;
+		int32 UpdateIndex = INDEX_NONE;
+	};
+	struct FActorVisibilityGeneration
+	{
+		FPublicationRef Publication;
+		bool bHidden = false;
+	};
+	struct FReadyGroup
+	{
+		FPublicationRef Publication;
+		int32 GroupIndex = INDEX_NONE;
+	};
+	void IndexPublicationUpdate(const FPublicationRef& Publication, int32 InIndex);
+	void ReleaseActorGeneration(TWeakObjectPtr<AActor> InActor, uint64 InSerial);
+	void QueueReadyGroup(const FPublicationRef& InPublication, int32 InGroupIndex);
+	void RebuildFirstOwners();
+	void SetOwnerActive(const FVoxelPublishGroupKey& InKey, uint64 InSerial, bool bInActive);
+	int32 SelectReadyGroup(TConstArrayView<FReadyGroup> InReady, FVoxelTaskFairSelection& InSelection, bool bInCommit = false);
+	bool HasOlderDependency(const FPublicationRef& InPublication, const FGroup& InGroup) const;
+	FPendingGroup* FindPendingGroup(const FGuid& InGroup);
 	void StartCommittedGroups();
+	void AdvancePendingPlan();
+	void AdvancePreparedPlan(const FPublicationRef& Publication);
 	void BuildGroups(const FPublicationRef& Publication, bool bInPreparedCoverage = false);
 	void DeferSaturatedGroups(const FPublicationRef& Publication, TMap<FVoxelPublishGroupKey, FGroupPriority>& OutPriorities);
+	void AdvancePriorities();
 	void UpdateGroupPriorities(TMap<FVoxelPublishGroupKey, FGroupPriority> InPriorities);
 	FUpdate TakePendingUpdate(int32 InIndex);
 	void SortGroups(const FPublicationRef& Publication);
@@ -185,11 +304,12 @@ private:
 	static bool GroupsInteract(const FGroup& InFirst, const FGroup& InSecond);
 	void SetPublicationPriority(FVoxelTaskRequest& InOutRequest, const FPublication& InPublication, TConstArrayView<int32> InGroupIndices) const;
 	void RefreshTaskPriorities();
-	void AdmitCoveragePreparation(const FPublicationRef& Publication);
+	void AdmitCoveragePreparation(const FPublicationRef& Publication, double InDeadline = MAX_dbl);
+	bool HigherBuildPriority(const FPublication& Publication, int32 First, int32 Second) const;
 	void AdmitBuilds(const FPublicationRef& Publication);
 	bool PrepareUpdate(const FPublicationRef& Publication, int32 InIndex, double InDeadline, int32& InOutPreparedComponents, bool& bOutComplete);
 	void CommitReadyGroups(const FPublicationRef& Publication, int32& InOutCommitted, double InDeadline,
-		const TMap<FVoxelPublishGroupKey, uint64>& InFirstOwners);
+		const TMap<FVoxelPublishGroupKey, uint64>& InFirstOwners, int32 InGroupIndex = INDEX_NONE);
 	void CommitReadyGroup(const FPublicationRef& Publication, FGroup& InGroup);
 	void FinishGroups();
 	void DiscardGroups();
@@ -201,12 +321,17 @@ private:
 	uint64 WorldEpoch = 0;
 	uint64 BatchSerial = 0;
 	TMap<TWeakObjectPtr<AActor>, FEntry> Entries;
+	TArray<FVoxelPublishGroupKey> RetryOwners;
+	TMap<FVoxelPublishGroupKey, TSet<TWeakObjectPtr<AActor>>> OwnerActors;
 	TMap<FGuid, FPendingGroup> PendingGroups;
 	TMap<FVoxelPublishGroupKey, FGuid> PendingGroupIds;
 	TArray<FUpdate> PendingUpdates;
 	TMap<TWeakObjectPtr<AActor>, int32> PendingUpdateIndices;
 	TMap<TWeakObjectPtr<AActor>, bool> PendingVisibility;
+	TUniquePtr<FPendingPlan> PendingPlan;
 	TArray<FPublicationRef> Publications;
+	TMap<TWeakObjectPtr<AActor>, TArray<FActorUpdateGeneration>> ActorUpdateGenerations;
+	TMap<TWeakObjectPtr<AActor>, TArray<FActorVisibilityGeneration>> ActorVisibilityGenerations;
 	// 发布分组的派生查询索引，避免每个 Actor 重扫全部在途 owner。
 	mutable TSet<FVoxelPublishGroupKey> ActiveBusyKeys;
 	mutable bool bActiveBusyKeysDirty = true;
@@ -214,6 +339,19 @@ private:
 	TArray<TWeakObjectPtr<UVoxelMeshComponent>> RetiredComponents;
 	TFunction<void()> OnCommitted;
 	FGroupCallbackPtr CurrentGroupCallback;
+	TArray<FReadyGroup> ReadyPrepareGroups;
+	TArray<FReadyGroup> ReadyCommitGroups;
+	FVoxelTaskFairSelection PrepareSelection;
+	FVoxelTaskFairSelection CommitSelection;
+	uint64 ReadySequence = 0;
+	TMap<FVoxelPublishGroupKey, uint64> OwnerFirstSerial;
+	TMap<FVoxelPublishGroupKey, TArray<uint64>> OwnerSerialQueues;
+	bool bFirstOwnersDirty = true;
+	uint64 PriorityRevision = 0;
+	TUniquePtr<FPriorityPlan> PriorityPlan;
+	bool bPrioritiesDirty = true;
+	int32 NextPhase = 0;
+	int32 AdmissionCursor = 0;
 	bool bRetry = false;
 	FVoxelFrameTimings FrameTimings;
 };

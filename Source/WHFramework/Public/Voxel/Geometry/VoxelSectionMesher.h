@@ -29,6 +29,9 @@ struct WHFRAMEWORK_API FVoxelSectionMeshResult
     FVoxelTaskStamp Stamp;
     TArray<FVoxelRenderBatch> Batches;
     uint64 Bytes()const;
+	bool ValidateAndCache();
+	FBox LocalBounds = FBox(ForceInit);
+	bool bValidated = false;
 };
 class WHFRAMEWORK_API FVoxelSectionMesher
 {
@@ -38,5 +41,8 @@ public:
     static bool Build(const FVoxelSectionSnapshot& Snapshot,const FVoxelRegistrySnapshot& Registry,
         const FVoxelShapeRegistry& Shapes,FVoxelSectionMeshResult& Out,const TAtomic<bool>* Cancel=nullptr,
         double InTextureRepeatsPerCell=1.0,
-        const FVoxelBoundaryTransitionContext* InTransition=nullptr);
+        const FVoxelBoundaryTransitionContext* InTransition=nullptr,
+		bool bBoundaryOnly = false, bool bIncludeBoundary = true,
+		const FIntVector& InLocalCellOffset = FIntVector::ZeroValue,
+		int32 InTextureGridSide = 0);
 };

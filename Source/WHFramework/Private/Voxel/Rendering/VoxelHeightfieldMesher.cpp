@@ -8,6 +8,9 @@
 
 namespace
 {
+	thread_local uint64* CountedMeshBytes = nullptr;
+	constexpr uint64 MeshVertexBytes = sizeof(FVector) * 2 + sizeof(FVector2D) * 3 +
+		sizeof(FLinearColor) + sizeof(FProcMeshTangent);
 	constexpr uint8 FacePositiveX = 0;
 	constexpr uint8 FaceNegativeX = 1;
 	constexpr uint8 FacePositiveY = 2;
@@ -59,6 +62,12 @@ namespace
 	void AppendWaterPolygon(FVoxelMeshBuffers& InOutMesh,
 		TConstArrayView<FVector> InVertices, const FVoxelRuntimeFaceRef& InFace)
 	{
+		if (CountedMeshBytes)
+		{
+			*CountedMeshBytes += uint64(InVertices.Num()) * MeshVertexBytes +
+				uint64(FMath::Max(0, InVertices.Num() - 2)) * 3 * sizeof(int32);
+			return;
+		}
 		const int32 Base = InOutMesh.Vertices.Num();
 		for (const FVector& Vertex : InVertices)
 		{
@@ -75,6 +84,18 @@ namespace
 			InOutMesh.Triangles.Append({Base, Base + Index + 1, Base + Index});
 		}
 	}
+}
+
+
+FVoxelHeightfieldMesher::FCountScope::FCountScope(uint64* InBytes)
+	: Previous(CountedMeshBytes)
+{
+	CountedMeshBytes = InBytes;
+}
+
+FVoxelHeightfieldMesher::FCountScope::~FCountScope()
+{
+	CountedMeshBytes = Previous;
 }
 
 FVoxelRenderBatch& FVoxelHeightfieldMesher::FindOrAddBatch(
@@ -118,6 +139,11 @@ void FVoxelHeightfieldMesher::AppendQuad(
 	const FVoxelRuntimeFaceRef& InFace,
 	const FLinearColor& InColor)
 {
+	if (CountedMeshBytes)
+	{
+		*CountedMeshBytes += 4 * MeshVertexBytes + 6 * sizeof(int32);
+		return;
+	}
 	const int32 Base =
 		InOutMesh.Vertices.Num();
 
@@ -212,14 +238,17 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 	TConstArrayView<uint8> InCoverage,
 	const double InZBiasCells,
 	const double InMaximumTextureStretchCells,
-	TConstArrayView<FLinearColor> InTopTints)
+	TConstArrayView<FLinearColor> InTopTints, const FIntRect& InWindow)
 {
+	const FIntRect Window = InWindow.IsEmpty() ? FIntRect(0, 0, InVertexSide - 1, InVertexSide - 1) : InWindow;
+	if (Window.Min.X < 0 || Window.Min.Y < 0 || Window.Max.X >= InVertexSide || Window.Max.Y >= InVertexSide)
+	{ OutError = TEXT("Invalid heightfield execution window"); return false; }
 	if (InVertexSide < 2 ||
 		InStep <= 0 ||
 		InHeights.Num() != InVertexSide * InVertexSide ||
 		InMaterials.Num() != InHeights.Num() ||
 		(!InCoverage.IsEmpty() && InCoverage.Num() != InHeights.Num()) ||
-		(!InTopTints.IsEmpty() && InTopTints.Num() != InHeights.Num()))
+		(!InTopTints.IsEmpty() && InTopTints.Num() != InHeights.Num() && InTopTints.Num() != Window.Width() * Window.Height()))
 	{
 		OutError = TEXT("Invalid blocky heightfield input");
 		return false;
@@ -252,7 +281,7 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 		};
 
 	auto AppendMaterialQuad =
-		[&Mesh, &InConfig, &InRegistry, &InMaterials, &InHeights, &InTopTints, &CellIndex, &OutError](
+		[&Mesh, &InConfig, &InRegistry, &InMaterials, &InHeights, &InTopTints, &CellIndex, &OutError, &Window, InVertexSide](
 			const int32 InMaterialX,
 			const int32 InMaterialY,
 			const uint8 InFaceIndex,
@@ -283,12 +312,14 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 
 			FVoxelRenderBatch& Batch = FindOrAddBatch(Mesh, Definition->RenderGroup, Face->Bank);
 			const FLinearColor Tint = InFaceIndex == FacePositiveZ && !InTopTints.IsEmpty()
-				? InTopTints[CellIndex(InMaterialX, InMaterialY)] : FLinearColor::White;
+				? InTopTints[InTopTints.Num() == InVertexSide * InVertexSide ? CellIndex(InMaterialX, InMaterialY)
+				: (FMath::Clamp(InMaterialX, Window.Min.X, Window.Max.X - 1) - Window.Min.X) + Window.Width() *
+				(FMath::Clamp(InMaterialY, Window.Min.Y, Window.Max.Y - 1) - Window.Min.Y)] : FLinearColor::White;
 			AppendQuad(Batch.Mesh, InA, InB, InC, InD, *Face, InColor * Tint);
 			return true;
 		};
 
-	for (int32 Y = 0; Y < CellSide; ++Y)
+	for (int32 Y = Window.Min.Y; Y < Window.Max.Y; ++Y)
 	{
 		if (InCancel && InCancel->Load())
 		{
@@ -296,7 +327,7 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 			return false;
 		}
 
-		for (int32 X = 0; X < CellSide; ++X)
+		for (int32 X = Window.Min.X; X < Window.Max.X; ++X)
 		{
 			const double X0 = static_cast<double>(X * InStep);
 			const double X1 = static_cast<double>((X + 1) * InStep);
@@ -318,7 +349,7 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 				return false;
 			}
 
-			if (X + 1 < InVertexSide && InHeights[CellIndex(X, Y)] != MIN_int32 &&
+			if (X + 1 < CellSide && InHeights[CellIndex(X, Y)] != MIN_int32 &&
 				InHeights[CellIndex(X + 1, Y)] != MIN_int32)
 			{
 				const double NeighborTop = TopZ(X + 1, Y);
@@ -343,7 +374,7 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 				}
 			}
 
-			if (Y + 1 < InVertexSide && InHeights[CellIndex(X, Y)] != MIN_int32 &&
+			if (Y + 1 < CellSide && InHeights[CellIndex(X, Y)] != MIN_int32 &&
 				InHeights[CellIndex(X, Y + 1)] != MIN_int32)
 			{
 				const double NeighborTop = TopZ(X, Y + 1);
@@ -388,6 +419,7 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 		}
 	}
 
+	if (!Mesh.ValidateAndCache()) { OutError = TEXT("Invalid heightfield mesh"); return false; }
 	OutMesh = MoveTemp(Mesh);
 	OutError.Reset();
 	return true;
@@ -401,11 +433,13 @@ bool FVoxelHeightfieldMesher::AppendDistantCells(
 	FVoxelSectionMeshResult& InOutMesh,
 	FString& OutError,
 	const TAtomic<bool>* InCancel,
-	const double InMaximumTextureStretchCells)
+	const double InMaximumTextureStretchCells, const FIntRect& InWindow)
 {
 	const double TexturePeriod = VoxelViewLod::TexturePeriodCells(InStep, InMaximumTextureStretchCells);
 	for (const FVoxelDistantCell& Cell : InCells)
 	{
+		const FIntPoint CellPosition((Cell.Min.X - InTileOrigin.X) / InStep, (Cell.Min.Y - InTileOrigin.Y) / InStep);
+		if (!InWindow.IsEmpty() && !InWindow.Contains(CellPosition)) continue;
 		if (InCancel && InCancel->Load())
 		{
 			OutError = TEXT("Canceled");
@@ -460,8 +494,9 @@ bool FVoxelHeightfieldMesher::BuildMacro(
 	FVoxelSectionMeshResult& OutMesh,
 	FString& OutError,
 	const TAtomic<bool>* InCancel,
-	const double InMaximumTextureStretchCells)
+	const double InMaximumTextureStretchCells, const FIntRect& InWindow)
 {
+	const FIntRect Window = InWindow.IsEmpty() ? FIntRect(0, 0, InMacro.Side - 1, InMacro.Side - 1) : InWindow;
 	const int32 Count = InMacro.Side * InMacro.Side;
 	if (InMacro.Side < 2 || InMacro.Step <= 0 ||
 		InMacro.WaterHeight.Num() != Count || InMacro.Height.Num() != Count ||
@@ -487,13 +522,15 @@ bool FVoxelHeightfieldMesher::BuildMacro(
 		}
 		FLinearColor LeafTint = LeafDefinition->Face(Leaves.State, TopMaterialFace).Tint;
 		LeafTint.A = 1.0f;
-		TopTints.Init(FLinearColor::White, Count);
-		for (int32 Index = 0; Index < Count; ++Index)
+		TopTints.Init(FLinearColor::White, Window.Width() * Window.Height());
+		for (int32 Y = Window.Min.Y; Y < Window.Max.Y; ++Y)
+		for (int32 X = Window.Min.X; X < Window.Max.X; ++X)
 		{
+			const int32 Index = X + Y * InMacro.Side;
 			if (InMacro.SurfaceClass[Index] == InConfig.Recipe->Palette.Grass &&
 				(InMacro.WaterHeight[Index] == MIN_int32 || InMacro.WaterHeight[Index] < InMacro.Height[Index]))
 			{
-				TopTints[Index] = FMath::Lerp(FLinearColor::White, LeafTint,
+				TopTints[(X - Window.Min.X) + Window.Width() * (Y - Window.Min.Y)] = FMath::Lerp(FLinearColor::White, LeafTint,
 					static_cast<float>(InMacro.ForestCoverage[Index]) / 255.0f);
 			}
 		}
@@ -502,51 +539,25 @@ bool FVoxelHeightfieldMesher::BuildMacro(
 	if (!BuildBlockyTerrain(
 		InMacro.Side, InMacro.Step, InMacro.Height, InMacro.SurfaceClass,
 		InConfig, InRegistry, Mesh, OutError, InCancel, {}, -0.05,
-		InMaximumTextureStretchCells, TopTints))
+		InMaximumTextureStretchCells, TopTints, Window))
 	{
 		return false;
 	}
 
-	FVoxelWaterSurfaceTileData Water;
-	Water.Side = InMacro.Side;
-	Water.Step = InMacro.Step;
-	Water.GroundZ = InMacro.Height;
-	Water.WaterZ = InMacro.WaterHeight;
-	Water.WaterKind = InMacro.WaterKind;
-	bool bHasWater = false;
-	for (int32 Index = 0; Index < Count; ++Index)
-	{
-		if (Water.WaterKind[Index] != static_cast<uint8>(EVoxelWaterKind::None) &&
-			Water.WaterZ[Index] != MIN_int32 &&
-			Water.WaterZ[Index] >= Water.GroundZ[Index])
-		{
-			bHasWater = true;
-		}
-	}
-	if (bHasWater)
-	{
-		FVoxelSectionMeshResult WaterMesh;
-		if (!BuildWater(Water, InRegistry, WaterMesh, OutError, InCancel,
-			InMaximumTextureStretchCells))
-		{
-			return false;
-		}
-		for (FVoxelRenderBatch& Batch : WaterMesh.Batches)
-		{
-			if (!Batch.Mesh.Vertices.IsEmpty())
-			{
-				Mesh.Batches.Add(MoveTemp(Batch));
-			}
-		}
-	}
+	FVoxelSectionMeshResult WaterMesh;
+	if (!BuildWaterGrid(InMacro.Side, InMacro.Step, InMacro.Height, InMacro.WaterHeight,
+		InMacro.WaterKind, InRegistry, WaterMesh, OutError, InCancel, InMaximumTextureStretchCells, Window)) return false;
+	for (auto& Batch : WaterMesh.Batches)
+		if (!Batch.Mesh.Triangles.IsEmpty()) Mesh.Batches.Add(MoveTemp(Batch));
 	if (!AppendDistantCells(InMacro.DistantCells,
-		InMacro.Key.Coordinate * (FVoxelMacroTileData::CellSide * InMacro.Step),
+		InMacro.GetBuildOrigin(),
 		InMacro.Step, InRegistry, Mesh, OutError, InCancel,
-		InMaximumTextureStretchCells))
+		InMaximumTextureStretchCells, Window))
 	{
 		return false;
 	}
 
+	if (!Mesh.ValidateAndCache()) { OutError = TEXT("Invalid heightfield mesh"); return false; }
 	OutMesh = MoveTemp(Mesh);
 	OutError.Reset();
 	return true;
@@ -558,19 +569,30 @@ bool FVoxelHeightfieldMesher::BuildWater(
 	FVoxelSectionMeshResult& OutMesh,
 	FString& OutError,
 	const TAtomic<bool>* InCancel,
-	const double InMaximumTextureStretchCells)
+	const double InMaximumTextureStretchCells, const FIntRect& InWindow)
 {
-	const int32 Count =
-		InWater.Side *
-		InWater.Side;
+	return BuildWaterGrid(InWater.Side, InWater.Step, InWater.GroundZ, InWater.WaterZ,
+		InWater.WaterKind, InRegistry, OutMesh, OutError, InCancel, InMaximumTextureStretchCells, InWindow);
+}
 
-	if (InWater.Side < 2 ||
-		InWater.Step <= 0 ||
-		InWater.WaterZ.Num() !=
+bool FVoxelHeightfieldMesher::BuildWaterGrid(const int32 InSide, const int32 InStep,
+	TConstArrayView<int32> InGroundZ, TConstArrayView<int32> InWaterZ,
+	TConstArrayView<uint8> InWaterKind, const FVoxelRegistrySnapshot& InRegistry,
+	FVoxelSectionMeshResult& OutMesh, FString& OutError, const TAtomic<bool>* InCancel,
+	const double InMaximumTextureStretchCells, const FIntRect& InWindow)
+{
+	const FIntRect Window = InWindow.IsEmpty() ? FIntRect(0, 0, InSide - 1, InSide - 1) : InWindow;
+	const int32 Count =
+		InSide *
+		InSide;
+
+	if (InSide < 2 ||
+		InStep <= 0 ||
+		InWaterZ.Num() !=
 			Count ||
-		InWater.GroundZ.Num() !=
+		InGroundZ.Num() !=
 			Count ||
-		InWater.WaterKind.Num() !=
+		InWaterKind.Num() !=
 			Count)
 	{
 		OutError =
@@ -610,25 +632,24 @@ bool FVoxelHeightfieldMesher::BuildWater(
 
 	FVoxelSectionMeshResult Mesh;
 
-	const int32 CellSide =
-		InWater.Side - 1;
+
 
 	auto IsWet =
-		[&InWater](
+		[&InWaterZ, &InWaterKind, &InGroundZ](
 			const int32 InIndex)
 		{
 			return
-				InWater.WaterKind[InIndex] !=
+				InWaterKind[InIndex] !=
 					static_cast<uint8>(
 						EVoxelWaterKind::None) &&
-				InWater.WaterZ[InIndex] !=
+				InWaterZ[InIndex] !=
 					MIN_int32 &&
-				InWater.WaterZ[InIndex] >=
-					InWater.GroundZ[InIndex];
+				InWaterZ[InIndex] >=
+					InGroundZ[InIndex];
 		};
 
-	for (int32 Y = 0;
-		Y < CellSide;
+	for (int32 Y = Window.Min.Y;
+		Y < Window.Max.Y;
 		++Y)
 	{
 		if (InCancel &&
@@ -640,48 +661,48 @@ bool FVoxelHeightfieldMesher::BuildWater(
 			return false;
 		}
 
-		for (int32 X = 0;
-			X < CellSide;
+		for (int32 X = Window.Min.X;
+			X < Window.Max.X;
 			++X)
 		{
 			const int32 I00 =
 				VertexIndex(
 					X,
 					Y,
-					InWater.Side);
+					InSide);
 
-			const int32 I10 = VertexIndex(X + 1, Y, InWater.Side);
-			const int32 I11 = VertexIndex(X + 1, Y + 1, InWater.Side);
-			const int32 I01 = VertexIndex(X, Y + 1, InWater.Side);
+			const int32 I10 = VertexIndex(X + 1, Y, InSide);
+			const int32 I11 = VertexIndex(X + 1, Y + 1, InSide);
+			const int32 I01 = VertexIndex(X, Y + 1, InSide);
 			const bool bWet[4] = {IsWet(I00), IsWet(I10), IsWet(I11), IsWet(I01)};
 			const uint8 WetMask = (bWet[0] ? 1 : 0) |
 				(bWet[1] ? 2 : 0) | (bWet[2] ? 4 : 0) |
 				(bWet[3] ? 8 : 0);
 			if (WetMask == 0) continue;
 			const int32 WetIndex = bWet[0] ? I00 : bWet[1] ? I10 : bWet[2] ? I11 : I01;
-			FVoxelRenderBatch& Batch = FindOrAddBatch(Mesh, EVoxelRenderGroup::Water, Face.Bank, InWater.WaterKind[WetIndex]);
+			FVoxelRenderBatch& Batch = FindOrAddBatch(Mesh, EVoxelRenderGroup::Water, Face.Bank, InWaterKind[WetIndex]);
 
 			const double X0 =
 				X *
-				InWater.Step;
+				InStep;
 
 			const double X1 =
 				(X + 1) *
-				InWater.Step;
+				InStep;
 
 			const double Y0 =
 				Y *
-				InWater.Step;
+				InStep;
 
 			const double Y1 =
 				(Y + 1) *
-				InWater.Step;
+				InStep;
 
 			const FVector Corners[4] = {
-				FVector(X0, Y0, bWet[0] ? InWater.WaterZ[I00] + 1.0 : 0.0),
-				FVector(X1, Y0, bWet[1] ? InWater.WaterZ[I10] + 1.0 : 0.0),
-				FVector(X1, Y1, bWet[2] ? InWater.WaterZ[I11] + 1.0 : 0.0),
-				FVector(X0, Y1, bWet[3] ? InWater.WaterZ[I01] + 1.0 : 0.0)};
+				FVector(X0, Y0, bWet[0] ? InWaterZ[I00] + 1.0 : 0.0),
+				FVector(X1, Y0, bWet[1] ? InWaterZ[I10] + 1.0 : 0.0),
+				FVector(X1, Y1, bWet[2] ? InWaterZ[I11] + 1.0 : 0.0),
+				FVector(X0, Y1, bWet[3] ? InWaterZ[I01] + 1.0 : 0.0)};
 			if (WetMask == 15)
 			{
 				AppendQuad(Batch.Mesh, Corners[0], Corners[1],
@@ -727,7 +748,7 @@ bool FVoxelHeightfieldMesher::BuildWater(
 		return false;
 	}
 
-	const double TexturePeriod = VoxelViewLod::TexturePeriodCells(InWater.Step, InMaximumTextureStretchCells);
+	const double TexturePeriod = VoxelViewLod::TexturePeriodCells(InStep, InMaximumTextureStretchCells);
 	for (FVoxelRenderBatch& OutputBatch : Mesh.Batches)
 	{
 		for (FVector2D& UV : OutputBatch.Mesh.UV0)
@@ -736,6 +757,7 @@ bool FVoxelHeightfieldMesher::BuildWater(
 		}
 	}
 
+	if (!Mesh.ValidateAndCache()) { OutError = TEXT("Invalid water mesh"); return false; }
 	OutMesh =
 		MoveTemp(Mesh);
 

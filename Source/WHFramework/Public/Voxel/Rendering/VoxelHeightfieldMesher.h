@@ -12,6 +12,17 @@ struct FVoxelWaterSurfaceTileData;
 class WHFRAMEWORK_API FVoxelHeightfieldMesher
 {
 public:
+	// Runs the same emission rules without allocating vertex buffers. Scoped to a worker shard.
+	class WHFRAMEWORK_API FCountScope
+	{
+	public:
+		explicit FCountScope(uint64* InBytes);
+		~FCountScope();
+		FCountScope(const FCountScope&) = delete;
+		FCountScope& operator=(const FCountScope&) = delete;
+	private:
+		uint64* Previous = nullptr;
+	};
 	static bool BuildBlockyTerrain(
 		int32 InVertexSide,
 		int32 InStep,
@@ -25,7 +36,8 @@ public:
 		TConstArrayView<uint8> InCoverage = {},
 		double InZBiasCells = 0.0,
 		double InMaximumTextureStretchCells = 4.0,
-		TConstArrayView<FLinearColor> InTopTints = {});
+		TConstArrayView<FLinearColor> InTopTints = {},
+		const FIntRect& InWindow = FIntRect());
 
 	static bool BuildMacro(
 		const FVoxelMacroTileData& InMacro,
@@ -34,7 +46,8 @@ public:
 		FVoxelSectionMeshResult& OutMesh,
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr,
-		double InMaximumTextureStretchCells = 4.0);
+		double InMaximumTextureStretchCells = 4.0,
+		const FIntRect& InWindow = FIntRect());
 
 	static bool AppendDistantCells(
 		TConstArrayView<FVoxelDistantCell> InCells,
@@ -44,7 +57,8 @@ public:
 		FVoxelSectionMeshResult& InOutMesh,
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr,
-		double InMaximumTextureStretchCells = 4.0);
+		double InMaximumTextureStretchCells = 4.0,
+		const FIntRect& InWindow = FIntRect());
 
 	static bool BuildWater(
 		const FVoxelWaterSurfaceTileData& InWater,
@@ -52,7 +66,15 @@ public:
 		FVoxelSectionMeshResult& OutMesh,
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr,
-		double InMaximumTextureStretchCells = 4.0);
+		double InMaximumTextureStretchCells = 4.0,
+		const FIntRect& InWindow = FIntRect());
+
+	static bool BuildWaterGrid(int32 InSide, int32 InStep,
+		TConstArrayView<int32> InGroundZ, TConstArrayView<int32> InWaterZ,
+		TConstArrayView<uint8> InWaterKind, const FVoxelRegistrySnapshot& InRegistry,
+		FVoxelSectionMeshResult& OutMesh, FString& OutError,
+		const TAtomic<bool>* InCancel, double InMaximumTextureStretchCells,
+		const FIntRect& InWindow);
 
 private:
 	static FVoxelRenderBatch& FindOrAddBatch(

@@ -12,6 +12,8 @@ struct FVoxelBoundaryFaceSnapshot
 {
 	FVoxelViewKey Key;
 	uint8 Face = 0;
+	int32 SampleStepCells = 0;
+	int32 GridSide = 0;
 	uint64 Revision = 0;
 	TArray<uint32> States;
 
@@ -32,7 +34,13 @@ struct FVoxelBoundaryTransitionPatch
 struct FVoxelBoundaryTransitionContext
 {
 	FVoxelViewKey Owner;
+	int32 SampleStepCells = 0;
+	int32 GetSampleStep() const { return SampleStepCells > 0 ? SampleStepCells : Owner.GetSampleStep(); }
+	int32 GetGridSide() const { return Owner.GetSide() / GetSampleStep(); }
 	TArray<FVoxelBoundaryTransitionPatch> Patches;
+	// The opposite consumer yields its original face to the single interface owner.
+	TArray<FVoxelVolumeTransitionFace> SuppressedFaces;
+	uint64 SuppressionRevision = 0;
 
 	bool CoversCell(uint8 InFace, const FIntVector& InLocalCell) const;
 	bool Validate() const;

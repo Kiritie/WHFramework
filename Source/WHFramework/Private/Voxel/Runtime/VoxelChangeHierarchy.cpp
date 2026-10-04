@@ -14,6 +14,45 @@ void FVoxelChangeHierarchy::SetNaturalInfluence(
 	NaturalUpwardInfluence = FMath::Max(0, InUpwardCells);
 }
 
+bool FVoxelChangeHierarchy::RegisterGeometry(const FVoxelTerrainGeometry& InGeometry)
+{
+	FWriteScopeLock Scope(Lock);
+	bUsesActualGeometry = true;
+	const auto Previous = GeometryIndex.Find(InGeometry.Key);
+	if (Previous && Previous->Geometry == InGeometry) return false;
+	auto Record = MakeShared<FVoxelCoverageRecord, ESPMode::ThreadSafe>();
+	Record->Geometry = InGeometry;
+	FString Error;
+	checkf(InGeometry.Validate(Error), TEXT("%s"), *Error);
+	check(InGeometry.Key.TryBounds(InGeometry.WorldMinZ, InGeometry.WorldMaxZ, Record->Min, Record->Max));
+	// The spatial index retains exact key bounds. Dependency halos are query/filter metadata.
+	const int32 OldStep = RetainedHaloSteps.FindRef(InGeometry.Key);
+	const int32 RetainedStep = FMath::Max(OldStep, InGeometry.SampleStepCells);
+	if (OldStep != RetainedStep)
+	{
+		if (OldStep > 0 && --HaloStepCounts.FindChecked(OldStep) == 0) HaloStepCounts.Remove(OldStep);
+		++HaloStepCounts.FindOrAdd(RetainedStep);
+		RetainedHaloSteps.Add(InGeometry.Key, RetainedStep);
+		MaximumHaloStep = FMath::Max(MaximumHaloStep, RetainedStep);
+	}
+	checkf(GeometryIndex.Upsert(Record, Error), TEXT("%s"), *Error);
+	return true;
+}
+
+void FVoxelChangeHierarchy::ReleaseGeometry(const FVoxelTerrainSpatialKey& InKey)
+{
+	FWriteScopeLock Scope(Lock);
+	GeometryIndex.Remove(InKey);
+	const int32 Step = RetainedHaloSteps.FindRef(InKey);
+	RetainedHaloSteps.Remove(InKey);
+	if (Step > 0 && --HaloStepCounts.FindChecked(Step) == 0) HaloStepCounts.Remove(Step);
+	if (Step == MaximumHaloStep && !HaloStepCounts.Contains(Step))
+	{
+		MaximumHaloStep = 1;
+		for (const auto& Pair : HaloStepCounts) MaximumHaloStep = FMath::Max(MaximumHaloStep, Pair.Key);
+	}
+}
+
 void FVoxelChangeHierarchy::SetTopology(const FVoxelLodTopologySettings& InLod)
 {
 	FWriteScopeLock Scope(Lock);
@@ -36,6 +75,33 @@ FVoxelAffectedRepresentationKeys FVoxelChangeHierarchy::GatherAffectedKeys(const
 {
 	FReadScopeLock Scope(Lock);
 	FVoxelAffectedRepresentationKeys Result;
+	if (bUsesActualGeometry)
+	{
+		const FIntVector EditMin = InSection * 16;
+		const FIntVector EditMax = EditMin + FIntVector(16);
+		const auto Cell = [](int64 Value) { return int32(FMath::Clamp<int64>(Value, MIN_int32, MAX_int32)); };
+		const int64 Horizontal = int64(MaximumHaloStep) + NaturalHorizontalInfluence;
+		FVoxelCoverageLocalSnapshot Local;
+		GeometryIndex.Capture(FIntVector(Cell(int64(EditMin.X) - Horizontal), Cell(int64(EditMin.Y) - Horizontal), Cell(int64(EditMin.Z) - MaximumHaloStep)),
+			FIntVector(Cell(int64(EditMax.X) + Horizontal), Cell(int64(EditMax.Y) + Horizontal), Cell(int64(EditMax.Z) + MaximumHaloStep + NaturalUpwardInfluence)), Local);
+		for (const auto& Record : Local.Records)
+		{
+			const auto& Key = Record->Geometry.Key;
+			const int64 Step = RetainedHaloSteps.FindChecked(Key);
+			const int64 Margin = Step + NaturalHorizontalInfluence;
+			if (int64(Record->Min.X) - Margin >= EditMax.X || int64(Record->Max.X) + Margin <= EditMin.X ||
+				int64(Record->Min.Y) - Margin >= EditMax.Y || int64(Record->Max.Y) + Margin <= EditMin.Y ||
+				int64(Record->Min.Z) - Step - NaturalUpwardInfluence >= EditMax.Z || int64(Record->Max.Z) + Step <= EditMin.Z) continue;
+			switch (Key.Representation)
+			{
+			case EVoxelTerrainRepresentation::VoxelProxy: Result.Proxy.Add({Key.Coordinate, Key.Level}); break;
+			case EVoxelTerrainRepresentation::Surface: Result.Surface.Add({FIntPoint(Key.Coordinate.X, Key.Coordinate.Y), Key.Level}); break;
+			case EVoxelTerrainRepresentation::Macro: Result.Macro.Add({FIntPoint(Key.Coordinate.X, Key.Coordinate.Y), Key.Level}); break;
+			default: break;
+			}
+		}
+		return Result;
+	}
 	const FIntVector CellMin = InSection * 16;
 	const FIntVector CellMax = CellMin + FIntVector(15);
 	for (uint8 Level = 0; Level <= Lod.MaximumVoxelProxyLevel; ++Level)
@@ -65,7 +131,7 @@ FVoxelAffectedRepresentationKeys FVoxelChangeHierarchy::GatherAffectedKeys(const
 			}
 		}
 	}
-	for (uint8 Level = 0; Level <= Lod.MaximumSurfaceLevel; ++Level)
+	for (uint8 Level = 0; Level <= Lod.MaximumSurfaceSpatialLevel; ++Level)
 	{
 		const int32 SurfaceSide = VoxelViewLod::SurfaceSide(Lod, Level);
 		const int32 SurfaceMargin = FMath::Max(VoxelViewLod::SurfaceStep(Lod, Level), NaturalHorizontalInfluence);
@@ -79,7 +145,7 @@ FVoxelAffectedRepresentationKeys FVoxelChangeHierarchy::GatherAffectedKeys(const
 			}
 		}
 	}
-	for (uint8 Level = 0; Level <= Lod.MaximumMacroLevel; ++Level)
+	for (uint8 Level = 0; Level <= Lod.MaximumMacroSpatialLevel; ++Level)
 	{
 		const int32 MacroSide = VoxelViewLod::MacroSide(Lod, Level);
 		const int32 MacroMargin = FMath::Max(VoxelViewLod::MacroStep(Lod, Level), NaturalHorizontalInfluence);
@@ -156,6 +222,13 @@ bool FVoxelChangeHierarchy::AffectsVoxelProxy(
 	const FIntVector& InSection) const
 {
 	FReadScopeLock Scope(Lock);
+	if (bUsesActualGeometry)
+	{
+		FVoxelCoverageLocalSnapshot Local;
+		GeometryIndex.Capture(InSection * 16, (InSection + FIntVector(1)) * 16, Local);
+		const FVoxelTerrainSpatialKey Key{EVoxelTerrainRepresentation::VoxelProxy, InKey.Coordinate, InKey.Level};
+		return Local.Records.ContainsByPredicate([&Key](const auto& Record) { return Record->Geometry.Key == Key; });
+	}
 	const FVoxelGenerationBounds SectionBounds { InSection * 16, (InSection + FIntVector(1)) * 16 };
 	FVoxelGenerationBounds Bounds = InKey.GetBounds();
 	Bounds.Min -= FIntVector(InKey.GetSampleStep() + NaturalHorizontalInfluence,
@@ -171,6 +244,13 @@ bool FVoxelChangeHierarchy::AffectsSurface(
 	const FIntVector& InSection) const
 {
 	FReadScopeLock Scope(Lock);
+	if (bUsesActualGeometry)
+	{
+		FVoxelCoverageLocalSnapshot Local;
+		GeometryIndex.Capture(InSection * 16, (InSection + FIntVector(1)) * 16, Local);
+		const FVoxelTerrainSpatialKey Key{EVoxelTerrainRepresentation::Surface, FIntVector(InKey.Coordinate.X, InKey.Coordinate.Y, 0), InKey.Level};
+		return Local.Records.ContainsByPredicate([&Key](const auto& Record) { return Record->Geometry.Key == Key; });
+	}
 	const int32 Side = VoxelViewLod::SurfaceSide(Lod, InKey.Level);
 	const FIntPoint Min = InKey.Coordinate * Side;
 	const FIntVector SectionMin = InSection * 16;
@@ -184,6 +264,13 @@ bool FVoxelChangeHierarchy::AffectsMacro(
 	const FIntVector& InSection) const
 {
 	FReadScopeLock Scope(Lock);
+	if (bUsesActualGeometry)
+	{
+		FVoxelCoverageLocalSnapshot Local;
+		GeometryIndex.Capture(InSection * 16, (InSection + FIntVector(1)) * 16, Local);
+		const FVoxelTerrainSpatialKey Key{EVoxelTerrainRepresentation::Macro, FIntVector(InKey.Coordinate.X, InKey.Coordinate.Y, 0), InKey.Level};
+		return Local.Records.ContainsByPredicate([&Key](const auto& Record) { return Record->Geometry.Key == Key; });
+	}
 	const int32 Side = VoxelViewLod::MacroSide(Lod, InKey.Level);
 	const FIntPoint Min = InKey.Coordinate * Side;
 	const FIntVector SectionMin = InSection * 16;
@@ -202,6 +289,9 @@ void FVoxelChangeHierarchy::ReleaseSection(const FIntVector& InSection)
 void FVoxelChangeHierarchy::Reset()
 {
 	FWriteScopeLock Scope(Lock);
+	GeometryIndex.Reset();
+	RetainedHaloSteps.Reset(); HaloStepCounts.Reset(); MaximumHaloStep = 1;
+	bUsesActualGeometry = false;
 	RevisionSerial = 0;
 	SectionRevision.Reset();
 	VoxelProxyRevision.Reset();

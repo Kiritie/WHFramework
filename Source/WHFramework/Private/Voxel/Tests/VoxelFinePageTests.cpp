@@ -20,6 +20,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelFinePageLayoutTest,
 
 bool FVoxelFinePageLayoutTest::RunTest(const FString& InParameters)
 {
+	FString PlanningError;
 	FVoxelViewSettings Settings;
 	Settings.Lod.MaximumFineLevel = 4;
 	FVoxelStreamingSource Source;
@@ -27,16 +28,17 @@ bool FVoxelFinePageLayoutTest::RunTest(const FString& InParameters)
 	Source.Capabilities = EVoxelStreamingCapability::FineVisual;
 	const auto Sources = MakeArrayView(&Source, 1);
 	TestEqual(TEXT("Near band is F0"), FVoxelFinePagePlanner::ResolveDesiredLevel({1, 0, 0}, Sources, Settings), uint8(0));
-	TestEqual(TEXT("32 cells begins F1"), FVoxelFinePagePlanner::ResolveDesiredLevel({2, 0, 0}, Sources, Settings), uint8(1));
-	TestEqual(TEXT("64 cells begins F2"), FVoxelFinePagePlanner::ResolveDesiredLevel({4, 0, 0}, Sources, Settings), uint8(2));
+	TestEqual(TEXT("32 cells begins F1"), FVoxelFinePagePlanner::ResolveDesiredLevel({3, 0, 0}, Sources, Settings), uint8(1));
+	TestEqual(TEXT("64 cells begins F2"), FVoxelFinePagePlanner::ResolveDesiredLevel({5, 0, 0}, Sources, Settings), uint8(2));
 	const FVoxelFinePageKey Parent{{2, 0, 0}, 2};
 	TArray<FIntVector> Sections;
 	FVoxelFinePagePlanner::GatherSections(Parent, Sections);
 	TSet<FIntVector> Wanted;
 	Wanted.Append(Sections);
 	Source.Center = FIntVector(-128, -128, 8);
+	Source.View.FineRadiusCells = 1024;
 	FVoxelFinePagePlan Complete;
-	FVoxelFinePagePlanner::Build(Wanted, Sources, Settings, Complete);
+	FVoxelFinePagePlanner::Build(Wanted, Sources, Settings, Complete, PlanningError);
 	TestTrue(TEXT("A complete distant family merges bottom up"), Complete.Pages.Contains(Parent));
 	FVoxelTerrainViewPlan Before, After;
 	const TSet<FVoxelViewKey> Roots{{Parent.Coordinate, Parent.Level}};
@@ -44,14 +46,14 @@ bool FVoxelFinePageLayoutTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("Logical terrain builds independently of Page layout"), Before.Build(Sources, Wanted, Roots, Settings, Error));
 	Source.Center = Parent.GetBounds().Min + FIntVector(8);
 	FVoxelFinePagePlan NearLayout;
-	FVoxelFinePagePlanner::Build(Wanted, Sources, Settings, NearLayout);
+	FVoxelFinePagePlanner::Build(Wanted, Sources, Settings, NearLayout, PlanningError);
 	TestFalse(TEXT("Moving into the near band splits the presentation Page"), NearLayout.Pages.Contains(Parent));
 	TestTrue(TEXT("The same Fine Sections retain their logical terrain plan"), After.Build(Sources, Wanted, Roots, Settings, Error) &&
 		Before.Leaves.Num() == After.Leaves.Num() && Before.Leaves.Includes(After.Leaves));
 	Source.Center = FIntVector(-128, -128, 8);
 	Wanted.Remove(Sections.Last());
 	FVoxelFinePagePlan Incomplete;
-	FVoxelFinePagePlanner::Build(Wanted, Sources, Settings, Incomplete);
+	FVoxelFinePagePlanner::Build(Wanted, Sources, Settings, Incomplete, PlanningError);
 	TestFalse(TEXT("One missing Section prevents the F2 owner"), Incomplete.Pages.Contains(Parent));
 	TestEqual(TEXT("Boundary split retains every remaining Section exactly once"), Incomplete.SectionOwners.Num(), Wanted.Num());
 	for (const FVoxelFinePageKey& Page : Incomplete.Pages)
@@ -67,7 +69,7 @@ bool FVoxelFinePageLayoutTest::RunTest(const FString& InParameters)
 	FVoxelInterestManager().BuildSourceExact(Source, Manifest, Settings, Raw);
 	Wanted.Reset();
 	for (const auto& Pair : Raw.Exact) if (Pair.Value.bFineRender) Wanted.Add(Pair.Key);
-	FVoxelFinePagePlanner::Build(Wanted, Sources, Settings, Complete);
+	FVoxelFinePagePlanner::Build(Wanted, Sources, Settings, Complete, PlanningError);
 	for (const auto& Page : Complete.Pages) TestTrue(TEXT("MaximumFineLevel does not force F3/F4 in an 80 cell domain"), Page.Level <= 2);
 	return true;
 }
@@ -78,6 +80,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelFinePageMeshTest,
 
 bool FVoxelFinePageMeshTest::RunTest(const FString& InParameters)
 {
+	FString PlanningError;
 	FVoxelSectionMeshResult Section;
 	for (const uint8 Variant : {uint8(0), uint8(1)})
 	{
@@ -127,16 +130,19 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelLodPolicyTest,
 
 bool FVoxelLodPolicyTest::RunTest(const FString& InParameters)
 {
+	FString PlanningError;
 	FVoxelStreamingSource Source;
 	FVoxelViewSettings Settings;
 	Source.Capabilities = EVoxelStreamingCapability::Data | EVoxelStreamingCapability::FineVisual | EVoxelStreamingCapability::WorldVisual;
-	const auto Steps = VoxelViewLod::ResolveReplanSteps(Source, Settings);
+	FVoxelSourceInterest Accepted;
+	Accepted.FirstSideCells[0] = 64; Accepted.FirstSideCells[1] = 256; Accepted.FirstSideCells[2] = 2048;
+	const auto Steps = VoxelViewLod::ResolveReplanSteps(Source, Settings, &Accepted);
 	TestEqual(TEXT("Fine replan is one Section"), Steps.Fine, 16);
 	TestEqual(TEXT("Proxy replan follows its radius"), Steps.Proxy, 64);
 	TestEqual(TEXT("Surface replan uses nearest power of two"), Steps.Surface, 256);
 	TestEqual(TEXT("Macro replan respects its independent minimum Tile side"), Steps.Macro, 2048);
 	Source.View.VoxelProxyRadiusCells *= 2;
-	TestEqual(TEXT("Changing radius automatically changes Proxy replan"), VoxelViewLod::ResolveReplanSteps(Source, Settings).Proxy, 128);
+	TestEqual(TEXT("Changing radius automatically changes Proxy replan"), VoxelViewLod::ResolveReplanSteps(Source, Settings, &Accepted).Proxy, 128);
 	Source.View.VoxelProxyRadiusCells /= 2;
 	TestTrue(TEXT("Max Proxy level does not force coarse sampling nearby"), VoxelViewLod::ResolveVoxelProxyLevel(256, Source, Settings) < Settings.Lod.MaximumVoxelProxyLevel);
 	TestEqual(TEXT("Sufficient distance permits the configured maximum"), VoxelViewLod::ResolveVoxelProxyLevel(100000, Source, Settings), Settings.Lod.MaximumVoxelProxyLevel);
@@ -148,7 +154,7 @@ bool FVoxelLodPolicyTest::RunTest(const FString& InParameters)
 	Settings.Budget.VoxelProxyAdmissionPerFrame = 1;
 	Settings.Budget.MaxConcurrentSurfaceTasks = 1;
 	const auto Slow = Manager.Compute(Sources, Manifest, Settings);
-	TestTrue(TEXT("Throughput cannot change terrain leaves"), Baseline.TerrainPlan.Leaves.Num() == Slow.TerrainPlan.Leaves.Num() && Baseline.TerrainPlan.Leaves.Includes(Slow.TerrainPlan.Leaves));
+	TestTrue(TEXT("Throughput cannot change actual volume pages"), Baseline.VoxelProxy.Num() == Slow.VoxelProxy.Num() && Baseline.VoxelProxy.Includes(Slow.VoxelProxy));
 	TestTrue(TEXT("Throughput cannot change heightfield topology"), Baseline.Surface.Num() == Slow.Surface.Num() && Baseline.Surface.Includes(Slow.Surface) && Baseline.Macro.Num() == Slow.Macro.Num() && Baseline.Macro.Includes(Slow.Macro));
 	FVoxelInterestSet ProxyA, ProxyB, FineA, FineB;
 	Manager.BuildSourceProxy(Source, Manifest, Settings, ProxyA);
@@ -167,7 +173,7 @@ bool FVoxelLodPolicyTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("Forward prefetch does not expand the Fine display domain"), Moving.FineSections->Num() == Slow.FineSections->Num() && Moving.FineSections->Includes(*Slow.FineSections));
 	FVoxelTerrainViewPlan Plan = Baseline.TerrainPlan;
 	const auto PreviousLeaves = Plan.Leaves;
-	Settings.Lod.VoxelProxyMinimumChunkSideCells = 48;
+	Settings.Lod.MaximumVoxelProxyLevel = 21;
 	FString Error;
 	TestFalse(TEXT("Invalid topology explicitly fails"), Plan.Build(Sources, *Baseline.FineSections, Baseline.TerrainPlan.Roots, Settings, Error));
 	TestTrue(TEXT("Failure preserves the previous valid plan"), !Error.IsEmpty() && Plan.Leaves.Num() == PreviousLeaves.Num() && Plan.Leaves.Includes(PreviousLeaves));
@@ -180,6 +186,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelFinePageCoverageTest,
 
 bool FVoxelFinePageCoverageTest::RunTest(const FString& InParameters)
 {
+	FString PlanningError;
 	UVoxelModule* Module = NewObject<UVoxelModule>();
 	FVoxelTaskScheduler Scheduler;
 	FVoxelViewManager Manager(*Module, Scheduler, 1);
@@ -199,6 +206,7 @@ bool FVoxelFinePageCoverageTest::RunTest(const FString& InParameters)
 		FVoxelSourceInterest SourceInterest;
 		SourceInterest.Source.Capabilities = EVoxelStreamingCapability::FineVisual;
 		SourceInterest.Source.Center = FIntVector(-128, -128, 8);
+		SourceInterest.Source.View.FineRadiusCells = 512;
 		const FGuid SourceId = FGuid::NewGuid();
 		Interest.Sources.Add(SourceId, SourceInterest);
 		MovingManager.RebuildFinePagePlan();
@@ -248,8 +256,8 @@ bool FVoxelFinePageCoverageTest::RunTest(const FString& InParameters)
 		Hierarchy.SetTopology(Lod);
 		const FVoxelAffectedRepresentationKeys Affected = Hierarchy.GatherAffectedKeys(FIntVector(3, 0, 15));
 		for (const auto& Key : Affected.Proxy) TestTrue(TEXT("Edit enumerates only configured Proxy levels"), Key.Level <= Lod.MaximumVoxelProxyLevel);
-		for (const auto& Key : Affected.Surface) TestTrue(TEXT("Edit enumerates only configured Surface levels"), Key.Level <= Lod.MaximumSurfaceLevel);
-		for (const auto& Key : Affected.Macro) TestTrue(TEXT("Edit enumerates only configured Macro levels"), Key.Level <= Lod.MaximumMacroLevel);
+		for (const auto& Key : Affected.Surface) TestTrue(TEXT("Edit enumerates only configured Surface levels"), Key.Level <= Lod.MaximumSurfaceSpatialLevel);
+		for (const auto& Key : Affected.Macro) TestTrue(TEXT("Edit enumerates only configured Macro levels"), Key.Level <= Lod.MaximumMacroSpatialLevel);
 		EditedManager.InvalidateRepresentationKeys(Affected);
 		TestFalse(TEXT("Affected ready Proxy is invalidated"), EditedManager.VoxelProxyReady.Contains(LocalProxy));
 		TestTrue(TEXT("Unrelated ready heightfields survive a local edit"), EditedManager.SurfaceReady.Contains(DistantSurface) && EditedManager.MacroReady.Contains(DistantMacro));
@@ -370,22 +378,26 @@ bool FVoxelFinePageCoverageTest::RunTest(const FString& InParameters)
 		TestFalse(TEXT("A pending replacement is not reported as newly committed Fine"), Manager.IsAdmissionPresented(Fine));
 		Manager.bTerrainBuildStageDirty = true;
 		Manager.RefreshTerrainBuildStage();
-		TestEqual(TEXT("Retained visible Fine with ready new meshes cannot deadlock its coarse handoff dependencies"), Scheduler.GetTerrainBuildStage(), 2);
+		TestEqual(TEXT("Retained visible Fine with ready new meshes cannot deadlock its coarse handoff dependencies"), Scheduler.GetObservedTerrainStage(), 2);
 		Manager.FineReady.Remove(Fine.FineKey);
 		Manager.bTerrainBuildStageDirty = true;
 		Manager.RefreshTerrainBuildStage();
-		TestEqual(TEXT("Incomplete new Fine meshes retain the near-field gate"), Scheduler.GetTerrainBuildStage(), 0);
+		TestEqual(TEXT("Incomplete new Fine meshes retain the near-field gate"), Scheduler.GetObservedTerrainStage(), 0);
 		Manager.FineReady.Add(Fine.FineKey);
 		Entry.bDirty = false;
 		Interest.Admissions.Reset();
-		Scheduler.SetTerrainBuildStage(3);
+		Scheduler.SetObservedTerrainStage(3);
 	}
 	Manager.FinePageReady.Add({Sections[0], 0});
 	Manager.ResolveTransitionVisibility();
 	for (int32 Frame = 0; Frame < 8; ++Frame) Manager.Publisher->Tick();
 	TestFalse(TEXT("Partial new layout keeps the old F2 visible"), OldActor->IsHidden());
 	for (const auto& Section : Sections) TestTrue(TEXT("Partial preparation cannot replace committed owners"), Manager.PresentedFineSectionOwners.FindChecked(Section) == OldLayout);
-	for (const auto& Section : Sections) Manager.FinePageReady.Add({Section, 0});
+	for (const auto& Section : Sections)
+	{
+		Manager.FinePageReady.Add({Section, 0});
+		Manager.EmptyFinePages.Add({Section, 0});
+	}
 	Manager.ResolveTransitionVisibility();
 	TestFalse(TEXT("Complete readiness alone cannot hide the old Page before commit"), OldActor->IsHidden());
 	for (int32 Frame = 0; Frame < 8; ++Frame) Manager.Publisher->Tick();
@@ -398,6 +410,13 @@ bool FVoxelFinePageCoverageTest::RunTest(const FString& InParameters)
 	Manager.FinePagePlan = {};
 	Manager.ResolveTransitionVisibility();
 	for (int32 Frame = 0; Frame < 8; ++Frame) Manager.Publisher->Tick();
+	for (int32 Frame = 0; Frame < 128 && !Manager.PresentedFineSectionOwners.IsEmpty(); ++Frame)
+	{
+		Manager.Publisher->Tick();
+		const auto RetryOwners = Manager.Publisher->TakeRetryOwners();
+		for (const auto& Key : RetryOwners) Manager.DirtyFinePages.Add({Key.Coordinate, Key.Level});
+		if (!RetryOwners.IsEmpty()) Manager.ResolveTransitionVisibility();
+	}
 	TestTrue(TEXT("Leaving a Fine-only domain retires logical empty Page ownership"), Manager.PresentedFineSectionOwners.IsEmpty() && Manager.VisibleTerrainNodes.IsEmpty());
 	Manager.Reset();
 	World->DestroyWorld(false);

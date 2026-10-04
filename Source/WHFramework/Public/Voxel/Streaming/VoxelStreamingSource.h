@@ -79,6 +79,9 @@ struct WHFRAMEWORK_API FVoxelStreamingSourceView
 {
 	GENERATED_BODY()
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "16", UIMin = "16"))
+	int32 InitialChunkSideCells = 16;
+
 	// Fine Page F0 的最小完整分辨率区域。
 	// 它不改变 Fine 数据范围，只决定靠近 Source 的 Section 不能被合并到 F1+ Page。
 	UPROPERTY(

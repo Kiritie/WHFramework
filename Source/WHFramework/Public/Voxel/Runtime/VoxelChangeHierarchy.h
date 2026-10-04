@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Voxel/Rendering/VoxelCoverageIndex.h"
 #include "Voxel/Authoring/VoxelViewProfile.h"
 #include "Voxel/Rendering/VoxelViewTypes.h"
 
@@ -14,6 +15,8 @@ struct WHFRAMEWORK_API FVoxelAffectedRepresentationKeys
 struct WHFRAMEWORK_API FVoxelChangeHierarchy
 {
 public:
+	bool RegisterGeometry(const FVoxelTerrainGeometry& InGeometry);
+	void ReleaseGeometry(const FVoxelTerrainSpatialKey& InKey);
 	void SetTopology(const FVoxelLodTopologySettings& InLod);
 	FVoxelAffectedRepresentationKeys GatherAffectedKeys(const FIntVector& InSection) const;
 	void SetNaturalInfluence(int32 InHorizontalCells, int32 InUpwardCells);
@@ -32,6 +35,11 @@ public:
 	void Reset();
 
 private:
+	FVoxelCoverageIndex GeometryIndex;
+	TMap<FVoxelTerrainSpatialKey, int32> RetainedHaloSteps;
+	TMap<int32, int32> HaloStepCounts;
+	int32 MaximumHaloStep = 1;
+	bool bUsesActualGeometry = false;
 	FVoxelLodTopologySettings Lod;
 	mutable FRWLock Lock;
 	uint64 RevisionSerial = 0;

@@ -16,6 +16,7 @@ struct WHFRAMEWORK_API FVoxelInterestDelta
 	TSet<FVoxelSurfaceTileKey> RemovedSurface;
 	TSet<FVoxelMacroTileKey> AddedMacro;
 	TSet<FVoxelMacroTileKey> RemovedMacro;
+	TArray<FVoxelTerrainSpatialKey> ChangedGeometry;
 	bool bVisualPartitionChanged = false;
 
 	void Reset()
@@ -28,7 +29,8 @@ class WHFRAMEWORK_API FVoxelInterestRuntime
 {
 public:
 	static bool NeedsUpdate(const FVoxelStreamingSource& InPrevious,
-		const FVoxelStreamingSource& InCurrent, const FVoxelViewSettings& InSettings = FVoxelViewSettings());
+		const FVoxelStreamingSource& InCurrent, const FVoxelViewSettings& InSettings = FVoxelViewSettings(),
+		const FVoxelSourceInterest* InAccepted = nullptr);
 
 	bool Update(TConstArrayView<FVoxelStreamingSource> InSources,
 		const FVoxelWorldManifest& InManifest, const FVoxelViewSettings& InSettings,
@@ -46,6 +48,9 @@ private:
 		FIntVector ProxyAnchor = FIntVector(MAX_int32);
 		FIntPoint SurfaceAnchor = FIntPoint(MAX_int32);
 		FIntPoint MacroAnchor = FIntPoint(MAX_int32);
+		FIntVector ProxyPlanCenter = FIntVector::ZeroValue;
+		FIntVector SurfacePlanCenter = FIntVector::ZeroValue;
+		FIntVector MacroPlanCenter = FIntVector::ZeroValue;
 		FIntVector PredictionAnchor = FIntVector(MAX_int32);
 		FVoxelInterestSet Exact;
 		FVoxelInterestSet Fine;

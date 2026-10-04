@@ -63,7 +63,7 @@ bool FVoxelPublisherStageAndIndexTest::RunTest(const FString& InParameters)
 	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
 	UVoxelModule* Module = NewObject<UVoxelModule>();
 	FVoxelTaskScheduler Scheduler;
-	Scheduler.SetTerrainBuildStage(3);
+	Scheduler.SetObservedTerrainStage(3);
 	FVoxelViewPublisher Publisher(*Module, Scheduler, 1);
 	const TArray<FVector> Observers{FVector::ZeroVector};
 	Publisher.SetObservers(Observers);
@@ -88,23 +88,24 @@ bool FVoxelPublisherStageAndIndexTest::RunTest(const FString& InParameters)
 		Publication->Callbacks.Add(Entry.GroupKey, {});
 	}
 	Publisher.BuildGroups(Publication);
-	Publisher.AdmitCoveragePreparation(Publication);
+	for (int32 Step = 0; Step < 16 && !Publication->bCoveragePrepared; ++Step) Publisher.AdmitCoveragePreparation(Publication);
 	TestTrue(TEXT("Uncovered initial comparison completes synchronously"), Publication->bCoveragePrepared);
 	// 覆盖精化重排 owner，先前批次中的 Source 不能留在旧物理索引。
 	Publisher.BuildGroups(Publication, true);
 	Publisher.SortGroups(Publication);
 	Publication->bGroupsPrepared = true;
-	Publisher.AdmitBuilds(Publication);
+	for (int32 Step = 0; Step < 16 && !Publication->bBuildOrderInitialized; ++Step) Publisher.AdmitBuilds(Publication);
+	TestTrue(TEXT("Build admission initialization completes within bounded work"), Publication->bBuildOrderInitialized);
 	for (int32 Index = 0; Index < Publication->Updates.Num(); ++Index)
 		TestTrue(TEXT("Every prepared direct mesh still belongs to its final update"),
 			Publication->PreparedMeshes[Index] == Publication->Updates[Index].Source);
-	Scheduler.SetTerrainBuildStage(0);
+	Scheduler.SetObservedTerrainStage(0);
 	for (const auto& Update : Publication->Updates)
 	{
 		const auto& Group = Publication->Groups[Update.GroupIndex];
 		if (Update.TerrainStage != 0)
 		{
-			TestFalse(TEXT("Independent distant mesh retains its later-stage gate"), Publisher.CanPublishGroup(Group));
+			TestTrue(TEXT("Independent distant mesh is eligible at observed Stage zero"), Publisher.CanPublishGroup(Group));
 			continue;
 		}
 		TestEqual(TEXT("A Proxy owner containing a Fine seam keeps actual Stage zero"), Publisher.GroupStage(Group), 0);
@@ -144,15 +145,18 @@ bool FVoxelPublisherStageAndIndexTest::RunTest(const FString& InParameters)
 	Future->Groups[0].Keys = {{2, FIntPoint(20, 0), 0}};
 	Future->Groups[0].Bounds = Older->Groups[1].Bounds;
 	Publisher.Publications = {Older, SecondGeneration, Demand, Future};
+	for (const auto& QueuedPublication : Publisher.Publications)
+		for (const auto& Group : QueuedPublication->Groups)
+			for (const auto& Key : Group.Keys) Publisher.SetOwnerActive(Key, QueuedPublication->Serial, true);
 	TMap<FVoxelPublishGroupKey, FVoxelViewPublisher::FGroupPriority> DeferredPriorities;
 	Publisher.DeferSaturatedGroups(Demand, DeferredPriorities);
 	TestTrue(TEXT("Third Fine generation moves back to the pending area"), Demand->Groups.IsEmpty());
 	Publisher.UpdateGroupPriorities(MoveTemp(DeferredPriorities));
 	TestTrue(TEXT("Deferred Fine donates Stage zero to its spatial Surface predecessor"),
 		Publisher.CanPublishGroup(Older->Groups[1]));
-	TestFalse(TEXT("Independent Surface remains behind its original stage gate"),
+	TestTrue(TEXT("Independent Surface remains eligible without global stage gating"),
 		Publisher.CanPublishGroup(Older->Groups[2]));
-	TestFalse(TEXT("Deferred demand never promotes a newer spatial publication"),
+	TestTrue(TEXT("Newer publication eligibility is checked separately from its local dependency"),
 		Publisher.CanPublishGroup(Future->Groups[0]));
 	Publisher.Reset();
 	bool bLogicalCommitted = false;
@@ -182,7 +186,7 @@ bool FVoxelEmptyTransitionConvergenceTest::RunTest(const FString& InParameters)
 	(void)InParameters;
 	UVoxelModule* Module = NewObject<UVoxelModule>();
 	FVoxelTaskScheduler Scheduler;
-	Scheduler.SetTerrainBuildStage(3);
+	Scheduler.SetObservedTerrainStage(3);
 	FVoxelViewManager Manager(*Module, Scheduler, 7);
 	const FVoxelViewKey Node{FIntVector::ZeroValue, 1};
 	const FVoxelPublishGroupKey Owner{1, FIntPoint::ZeroValue, 1};
@@ -195,6 +199,8 @@ bool FVoxelEmptyTransitionConvergenceTest::RunTest(const FString& InParameters)
 	Manager.CommitTerrainOwnership(Owner, MakeArrayView(&Node, 1));
 	auto Data = MakeShared<FVoxelVoxelProxyData>();
 	Data->Key = Node;
+	Data->Geometry = {{EVoxelTerrainRepresentation::VoxelProxy, Node.Coordinate, Node.Level}, 1, -128, 256, 17, 23};
+	Interest.Geometry.Add(Data->Geometry.Key, Data->Geometry);
 	Data->Revision = 1;
 	Manager.VoxelProxyData.Add(Node, Data);
 	Manager.RebuildVolumeTransitions({Node});
@@ -232,7 +238,7 @@ bool FVoxelFineProxyDependenciesTest::RunTest(const FString& InParameters)
 	(void)InParameters;
 	UVoxelModule* Module = NewObject<UVoxelModule>();
 	FVoxelTaskScheduler Scheduler;
-	Scheduler.SetTerrainBuildStage(0);
+	Scheduler.SetObservedTerrainStage(0);
 	FVoxelViewManager Manager(*Module, Scheduler, 11);
 	const FVoxelViewKey Dependency{FIntVector::ZeroValue, 1};
 	const FVoxelViewKey Distant{FIntVector(10, 0, 0), 1};
@@ -280,14 +286,14 @@ bool FVoxelFineProxyDependenciesTest::RunTest(const FString& InParameters)
 		if (Result.bSuccess && Result.Stamp.Token < 2) ++Applied[Result.Stamp.Token];
 	};
 	const double FineDeadline = FPlatformTime::Seconds() + 5.0;
-	while (Applied[0] == 0 && FPlatformTime::Seconds() < FineDeadline)
+	while ((Applied[0] == 0 || Applied[1] == 0) && FPlatformTime::Seconds() < FineDeadline)
 	{
 		Scheduler.Tick(Apply, 8.0);
 		FPlatformProcess::Sleep(0.001f);
 	}
 	TestEqual(TEXT("Fine-dependent Proxy builds and applies through Stage zero"), Applied[0], 1);
-	TestEqual(TEXT("Independent Proxy cannot execute ahead of its stage"), Executed[1].Load(), 0);
-	Scheduler.SetTerrainBuildStage(1);
+	TestEqual(TEXT("Independent Proxy executes while observed Stage remains zero"), Executed[1].Load(), 1);
+	Scheduler.SetObservedTerrainStage(1);
 	const double CoarseDeadline = FPlatformTime::Seconds() + 5.0;
 	while (Applied[1] == 0 && FPlatformTime::Seconds() < CoarseDeadline)
 	{
@@ -297,25 +303,31 @@ bool FVoxelFineProxyDependenciesTest::RunTest(const FString& InParameters)
 	TestEqual(TEXT("Independent Proxy resumes when the coarse stage opens"), Applied[1], 1);
 	Interest.Admissions = {Admission};
 	Manager.VoxelProxyReady.Add(Distant);
+	const auto ReadyProxy = MakeShared<FVoxelVoxelProxyData, ESPMode::ThreadSafe>();
+	ReadyProxy->Key = Distant;
+	ReadyProxy->Geometry = {{EVoxelTerrainRepresentation::VoxelProxy, Distant.Coordinate, Distant.Level}, 1, -128, 256, 17, 23};
+	Interest.Geometry.Add(ReadyProxy->Geometry.Key, ReadyProxy->Geometry);
+	Manager.VoxelProxyData.Add(Distant, ReadyProxy);
 	TestFalse(TEXT("Proxy fixture is ready but has not transferred visible ownership"), Manager.IsAdmissionPresented(Admission));
 	FVoxelViewAdmission Surface;
 	Surface.Kind = EVoxelViewAdmissionKind::Surface;
 	Interest.Admissions.Add(Surface);
 	Manager.bTerrainBuildStageDirty = true;
 	Manager.RefreshTerrainBuildStage();
-	TestEqual(TEXT("Ready Proxy permits its Surface replacement to build before ownership transfer"), Scheduler.GetTerrainBuildStage(), 2);
+	TestEqual(TEXT("Ready Proxy permits its Surface replacement to build before ownership transfer"), Scheduler.GetObservedTerrainStage(), 2);
 	FVoxelViewAdmission Fine;
 	Fine.Kind = EVoxelViewAdmissionKind::Fine;
 	Interest.Admissions.Add(Fine);
 	Manager.FineReady.Add(Fine.FineKey);
 	Manager.bTerrainBuildStageDirty = true;
 	Manager.RefreshTerrainBuildStage();
-	TestEqual(TEXT("Ready but unpresented Fine still holds the playable stage gate"), Scheduler.GetTerrainBuildStage(), 0);
+	TestEqual(TEXT("Ready but unpresented Fine still holds the playable stage gate"), Scheduler.GetObservedTerrainStage(), 0);
 	Manager.VisibleTerrainNodes.Add({Fine.FineKey, 0});
+	Manager.PresentedEmptyFinePages.Add({Fine.FineKey, 0});
 	Manager.PresentedFineSectionOwners.Add(Fine.FineKey, {Fine.FineKey, 0});
 	Manager.bTerrainBuildStageDirty = true;
 	Manager.RefreshTerrainBuildStage();
-	TestEqual(TEXT("Presented Fine releases dependent coarse construction"), Scheduler.GetTerrainBuildStage(), 2);
+	TestEqual(TEXT("Presented Fine releases dependent coarse construction"), Scheduler.GetObservedTerrainStage(), 2);
 	Scheduler.StopAndJoin();
 	Manager.Reset();
 	return true;

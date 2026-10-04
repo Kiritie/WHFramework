@@ -1,4 +1,5 @@
 #include "Voxel/VoxelModule.h"
+#include "Voxel/Rendering/VoxelStreamingGeometry.h"
 #include "Voxel/Rendering/VoxelViewLod.h"
 
 #include "Async/Async.h"
@@ -711,6 +712,9 @@ bool UVoxelModule::StartWorld(
 	TaskBudget.MaxConcurrentMacroTasks = ViewSettings.Budget.MaxConcurrentMacroTasks;
 	TaskBudget.MaxConcurrentCoarseTerrainTasks = ViewSettings.Budget.MaxConcurrentCoarseTerrainTasks;
 	TaskBudget.MaxReservedBytes = 256ull * 1024ull * 1024ull;
+	// Resumable pages retain their output while queued between shards. Their exact
+	// worker estimate participates in the same bounded input admission as other tasks.
+	TaskBudget.MaxInputBytes = TaskBudget.MaxReservedBytes;
 	TaskBudget.MaxCompletedResultsPerFrame = ViewSettings.Budget.CompletedResultsPerFrame;
 	TaskBudget.MaxHeavyCompletedResultsPerFrame = FMath::Min(ViewSettings.Budget.HeavyResultsPerFrame, ViewSettings.Budget.CompletedResultsPerFrame);
 	TaskBudget.MaxFineApplyPerFrame = ViewSettings.Budget.FineApplyPerFrame;
@@ -1241,12 +1245,22 @@ FGuid UVoxelModule::RegisterSource(UObject* InOwner, const FVoxelStreamingSource
 	{
 		return {};
 	}
-	FGuid Id = FGuid::NewGuid();
 	FSource Source;
 	Source.Owner = InOwner;
 	Source.Value = InSource;
 	Source.Value.Normalize();
-	if (Source.Value.bInheritWorldView) Source.Value.View = ViewSettings.DefaultSourceView;
+	if (Source.Value.bInheritWorldView)
+	{
+		Source.Value.View = ViewSettings.DefaultSourceView;
+	}
+	FString Error;
+	if (!VoxelStreamingGeometry::ValidateInitialSide(Source.Value.View.InitialChunkSideCells,
+		ViewSettings.Lod.MaximumFineLevel, Error))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Voxel source registration rejected: %s"), *Error);
+		return {};
+	}
+	const FGuid Id = FGuid::NewGuid();
 	Source.Value.Id = Id;
 	Source.Value.RegistrationOrder = ++NextSourceRegistrationOrder;
 	Source.PlannedValue = Source.Value;
@@ -1256,32 +1270,33 @@ FGuid UVoxelModule::RegisterSource(UObject* InOwner, const FVoxelStreamingSource
 	return Id;
 }
 
-bool UVoxelModule::UpdateSource(
-	const FGuid& InId,
-	const FVoxelStreamingSource& InSource)
+bool UVoxelModule::UpdateSource(const FGuid& InId, const FVoxelStreamingSource& InSource)
 {
-	FSource* Source =
-		Sources.Find(InId);
-
-	if (!Source ||
-		!Source->Owner.IsValid())
+	FSource* Source = Sources.Find(InId);
+	if (!Source || !Source->Owner.IsValid())
 	{
 		return false;
 	}
-
 	FVoxelStreamingSource Updated = InSource;
 	Updated.Normalize();
-	if (Updated.bInheritWorldView) Updated.View = ViewSettings.DefaultSourceView;
+	if (Updated.bInheritWorldView)
+	{
+		Updated.View = ViewSettings.DefaultSourceView;
+	}
+	FString Error;
+	if (!VoxelStreamingGeometry::ValidateInitialSide(Updated.View.InitialChunkSideCells,
+		ViewSettings.Lod.MaximumFineLevel, Error))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Voxel source update rejected: id=%s error=%s"), *InId.ToString(), *Error);
+		return false;
+	}
 	Updated.Id = InId;
 	Updated.RegistrationOrder = Source->Value.RegistrationOrder;
-
-	if (FVoxelInterestRuntime::NeedsUpdate(Source->PlannedValue, Updated, ViewSettings))
+	if (FVoxelInterestRuntime::NeedsUpdate(Source->PlannedValue, Updated, ViewSettings, CurrentInterest.Sources.Find(Updated.Id)))
 	{
 		bInterestDirty = true;
 	}
-
 	Source->Value = MoveTemp(Updated);
-
 	return true;
 }
 
@@ -1308,7 +1323,7 @@ bool UVoxelModule::IsSourceAdmitted(const FGuid& InId) const
 	FVoxelStreamingSource Input = Admitted->Source;
 	// 排序生成的调度优先级不是来源输入，不能据此否认已准入的来源。
 	Input.SchedulingPriority = Source->Value.SchedulingPriority;
-	return !FVoxelInterestRuntime::NeedsUpdate(Input, Source->Value, ViewSettings);
+	return !FVoxelInterestRuntime::NeedsUpdate(Input, Source->Value, ViewSettings, CurrentInterest.Sources.Find(Input.Id));
 }
 
 void UVoxelModule::CollectStreamingSourcesForOwner(const AActor* InOwner, TArray<FVoxelStreamingSource>& OutSources) const

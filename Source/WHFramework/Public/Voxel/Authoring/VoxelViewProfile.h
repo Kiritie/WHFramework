@@ -17,55 +17,29 @@ struct WHFRAMEWORK_API FVoxelLodTopologySettings
 		meta = (ClampMin = "0", ClampMax = "4"))
 	uint8 MaximumFineLevel = 3;
 
-	// Proxy 最小节点大小，必须是 16 * 2^N。
-	UPROPERTY(
-		EditAnywhere,
-		BlueprintReadOnly,
-		meta = (ClampMin = "32"))
-	int32 VoxelProxyMinimumChunkSideCells = 32;
 
-	// 这里继续使用 FVoxelViewKey 的逻辑 Tree Level；只是上限，不要求实际出现。
+	// 所有粗表示都使用固定 16-cell 基准的绝对空间级；这里只配置上限。
 	UPROPERTY(
 		EditAnywhere,
 		BlueprintReadOnly,
-		meta = (ClampMin = "1", ClampMax = "8"))
+		meta = (ClampMin = "1", ClampMax = "20"))
 	uint8 MaximumVoxelProxyLevel = 5;
 
-	UPROPERTY(
-		EditAnywhere,
-		BlueprintReadOnly,
-		meta = (ClampMin = "1"))
-	int32 SurfaceMinimumTileSideCells = 32;
+
 
 	UPROPERTY(
 		EditAnywhere,
 		BlueprintReadOnly,
-		meta = (ClampMin = "1"))
-	int32 SurfaceBaseSampleStepCells = 1;
+		meta = (ClampMin = "0", ClampMax = "20"))
+	uint8 MaximumSurfaceSpatialLevel = 8;
+
+
 
 	UPROPERTY(
 		EditAnywhere,
 		BlueprintReadOnly,
-		meta = (ClampMin = "0", ClampMax = "8"))
-	uint8 MaximumSurfaceLevel = 4;
-
-	UPROPERTY(
-		EditAnywhere,
-		BlueprintReadOnly,
-		meta = (ClampMin = "1"))
-	int32 MacroMinimumTileSideCells = 2048;
-
-	UPROPERTY(
-		EditAnywhere,
-		BlueprintReadOnly,
-		meta = (ClampMin = "1"))
-	int32 MacroBaseSampleStepCells = 64;
-
-	UPROPERTY(
-		EditAnywhere,
-		BlueprintReadOnly,
-		meta = (ClampMin = "0", ClampMax = "8"))
-	uint8 MaximumMacroLevel = 4;
+		meta = (ClampMin = "0", ClampMax = "20"))
+	uint8 MaximumMacroSpatialLevel = 12;
 
 	UPROPERTY(
 		EditAnywhere,
@@ -229,13 +203,8 @@ struct WHFRAMEWORK_API FVoxelStreamingPerformanceBudget
 		EditAnywhere,
 		BlueprintReadOnly,
 		meta = (ClampMin = "0.1"))
-	float PublishPrepareMilliseconds = 2.0f;
+	float TerrainPublishMilliseconds = 4.0f;
 
-	UPROPERTY(
-		EditAnywhere,
-		BlueprintReadOnly,
-		meta = (ClampMin = "0.1"))
-	float PublishRetireMilliseconds = 1.0f;
 
 	UPROPERTY(
 		EditAnywhere,

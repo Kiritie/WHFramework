@@ -86,9 +86,9 @@ bool FVoxelChangeHierarchyRevisionTest::RunTest(const FString& InParameters)
 	TestEqual(TEXT("Voxel proxy parent invalidated"), Hierarchy.GetVoxelProxyRevision({ FIntVector(-9, 1, -1), 1 }), Second);
 	const uint64 FarRevision = Hierarchy.InvalidateSection(FIntVector(100, 0, 0));
 	TestEqual(TEXT("Macro revision uses the actual 2048-cell tile"),
-		Hierarchy.GetMacroRevision({ FIntPoint(0, 0), 0 }), FarRevision);
+		Hierarchy.GetMacroRevision({ FIntPoint(0, 0), 7 }), FarRevision);
 	TestEqual(TEXT("Unrelated macro tile is unchanged"),
-		Hierarchy.GetMacroRevision({ FIntPoint(3, 0), 0 }), uint64(0));
+		Hierarchy.GetMacroRevision({ FIntPoint(3, 0), 7 }), uint64(0));
 	Hierarchy.SetVoxelProxyRevision({ FIntVector(20, 20, 20), 1 }, 100);
 	TestEqual(TEXT("Revision keys distinguish LOD levels"),
 		Hierarchy.GetVoxelProxyRevision({ FIntVector(20, 20, 20), 2 }), uint64(0));
@@ -111,6 +111,20 @@ bool FVoxelChangeHierarchyRevisionTest::RunTest(const FString& InParameters)
 		Hierarchy.GetSurfaceRevision({ FIntPoint(0, 0), 0 }), NeighborRevision);
 	TestTrue(TEXT("Surface dependency query includes neighboring crown"),
 		Hierarchy.AffectsSurface({ FIntPoint(0, 0), 0 }, NeighborTreeSection));
+	FVoxelChangeHierarchy Actual;
+	const FVoxelSurfaceTileKey SurfaceKey{FIntPoint::ZeroValue, 5};
+	FVoxelTerrainGeometry Descriptor{{EVoxelTerrainRepresentation::Surface, FIntVector::ZeroValue, 5}, 32, -128, 512, 17, 23};
+	TestTrue(TEXT("Actual sampling registers exact dyadic index bounds"), Actual.RegisterGeometry(Descriptor));
+	Descriptor.SampleStepCells = 1;
+	TestTrue(TEXT("Sampling handoff registers the new descriptor"), Actual.RegisterGeometry(Descriptor));
+	const uint64 RetainedRevision = Actual.InvalidateSection({-2, 0, 0});
+	TestEqual(TEXT("Retained coarse sampling still invalidates its wider halo"), Actual.GetSurfaceRevision(SurfaceKey), RetainedRevision);
+	const uint64 UnrelatedRevision = Actual.InvalidateSection({-10, 0, 0});
+	TestEqual(TEXT("An unrelated edit does not invalidate every registered page"), Actual.GetSurfaceRevision(SurfaceKey), RetainedRevision);
+	TestTrue(TEXT("Unrelated edit still advances its own section revision"), UnrelatedRevision > RetainedRevision);
+	Actual.ReleaseGeometry(Descriptor.Key);
+	Actual.InvalidateSection({0, 0, 0});
+	TestEqual(TEXT("Retired geometry is removed from edit dependencies"), Actual.GetSurfaceRevision(SurfaceKey), RetainedRevision);
 	return true;
 }
 

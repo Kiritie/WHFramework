@@ -116,19 +116,20 @@ bool FVoxelInterestRuntime::ConfigurationChanged(const FVoxelStreamingSource& In
 		A.VoxelProxyRadiusCells != B.VoxelProxyRadiusCells ||
 		A.SurfaceRadiusCells != B.SurfaceRadiusCells ||
 		A.FinePredictionSeconds != B.FinePredictionSeconds ||
+		A.InitialChunkSideCells != B.InitialChunkSideCells ||
 		A.FineLevel0RadiusCells != B.FineLevel0RadiusCells ||
 		A.VoxelProxyVerticalHalfExtentCells != B.VoxelProxyVerticalHalfExtentCells ||
 		A.MacroRadiusCells != B.MacroRadiusCells;
 }
 
 bool FVoxelInterestRuntime::NeedsUpdate(const FVoxelStreamingSource& InPrevious,
-	const FVoxelStreamingSource& InCurrent, const FVoxelViewSettings& InSettings)
+	const FVoxelStreamingSource& InCurrent, const FVoxelViewSettings& InSettings, const FVoxelSourceInterest* InAccepted)
 {
 	if (ConfigurationChanged(InPrevious, InCurrent)) return true;
 	const FIntVector& Previous = InPrevious.Center;
 	const FIntVector& Current = InCurrent.Center;
 	const FVoxelStreamingSourceView& View = InCurrent.View;
-	const FVoxelResolvedViewRanges Steps = VoxelViewLod::ResolveReplanSteps(InCurrent, InSettings);
+	const FVoxelResolvedViewRanges Steps = VoxelViewLod::ResolveReplanSteps(InCurrent, InSettings, InAccepted);
 	if (Snap3D(Previous, FMath::Clamp(InCurrent.CollisionRadius / 2, 4, 16)) !=
 		Snap3D(Current, FMath::Clamp(InCurrent.CollisionRadius / 2, 4, 16)) ||
 		Snap3D(Previous, Steps.Fine) !=
@@ -188,7 +189,7 @@ bool FVoxelInterestRuntime::Update(TConstArrayView<FVoxelStreamingSource> InSour
 	{
 		FSourceState& State = States.FindOrAdd(Source.Id);
 		const bool bConfigurationChanged = bPolicyChanged || ConfigurationChanged(State.Source, Source);
-		const FVoxelResolvedViewRanges Steps = VoxelViewLod::ResolveReplanSteps(Source, InSettings);
+		const FVoxelResolvedViewRanges Steps = VoxelViewLod::ResolveReplanSteps(Source, InSettings, LatestInterest.Sources.Find(Source.Id));
 		const FIntVector ExactAnchor = Snap3D(Source.Center,
 			FMath::Clamp(Source.CollisionRadius / 2, 4, 16));
 		const FIntVector FineAnchor = Snap3D(Source.Center,
@@ -244,6 +245,7 @@ bool FVoxelInterestRuntime::Update(TConstArrayView<FVoxelStreamingSource> InSour
 			State.Proxy = {};
 			Manager.BuildSourceProxy(Source, InManifest, InSettings, State.Proxy);
 			State.ProxyAnchor = ProxyAnchor;
+			State.ProxyPlanCenter = Source.Center;
 			bAnyChanged = true;
 		}
 		if (bConfigurationChanged || State.SurfaceAnchor != SurfaceAnchor)
@@ -251,6 +253,7 @@ bool FVoxelInterestRuntime::Update(TConstArrayView<FVoxelStreamingSource> InSour
 			State.Surface = {};
 			Manager.BuildSourceSurface(Source, InManifest, InSettings, State.Surface);
 			State.SurfaceAnchor = SurfaceAnchor;
+			State.SurfacePlanCenter = Source.Center;
 			bAnyChanged = true;
 		}
 		if (bConfigurationChanged || State.MacroAnchor != MacroAnchor)
@@ -258,6 +261,7 @@ bool FVoxelInterestRuntime::Update(TConstArrayView<FVoxelStreamingSource> InSour
 			State.Macro = {};
 			Manager.BuildSourceMacro(Source, InManifest, InSettings, State.Macro);
 			State.MacroAnchor = MacroAnchor;
+			State.MacroPlanCenter = Source.Center;
 			bAnyChanged = true;
 		}
 		if (State.PredictionAnchor != PredictionAnchor ||
@@ -280,6 +284,10 @@ bool FVoxelInterestRuntime::Update(TConstArrayView<FVoxelStreamingSource> InSour
 		const FSourceState& State = States.FindChecked(Source.Id);
 		FVoxelSourceInterest& SourceInterest = Prepared.Sources.FindOrAdd(Source.Id);
 		SourceInterest.Source = Source;
+		SourceInterest.bHasStageCenters = true;
+		SourceInterest.StageCenters[0] = State.ProxyPlanCenter;
+		SourceInterest.StageCenters[1] = State.SurfacePlanCenter;
+		SourceInterest.StageCenters[2] = State.MacroPlanCenter;
 		for (const FVoxelInterestSet* Layer : { &State.Exact, &State.Fine })
 		{
 			if (const FVoxelSourceInterest* Part = Layer->Sources.Find(Source.Id))
@@ -335,6 +343,12 @@ bool FVoxelInterestRuntime::Update(TConstArrayView<FVoxelStreamingSource> InSour
 		!OutDelta.AddedProxy.IsEmpty() || !OutDelta.RemovedProxy.IsEmpty() ||
 		!OutDelta.AddedSurface.IsEmpty() || !OutDelta.RemovedSurface.IsEmpty() ||
 		!OutDelta.AddedMacro.IsEmpty() || !OutDelta.RemovedMacro.IsEmpty();
+	for (const auto& Pair : Next.Geometry)
+	{
+		const auto* PreviousGeometry = LatestInterest.Geometry.Find(Pair.Key);
+		if (!PreviousGeometry || *PreviousGeometry != Pair.Value)
+		{ OutDelta.ChangedGeometry.Add(Pair.Key); OutDelta.bVisualPartitionChanged = true; }
+	}
 	bool bChanged = !OutDelta.AddedExact.IsEmpty() || !OutDelta.RemovedExact.IsEmpty() ||
 		OutDelta.bVisualPartitionChanged || Next.Warmup.Num() != LatestInterest.Warmup.Num() ||
 		Next.Sources.Num() != LatestInterest.Sources.Num() ||

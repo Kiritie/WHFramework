@@ -16,9 +16,13 @@ struct FVoxelHeightfieldTileView
 	int32 Side = 0;
 	int32 Step = 1;
 	uint64 Revision = 0;
+	uint64 GeometryRevision = 0;
 	TConstArrayView<int32> Ground;
 	TConstArrayView<int32> Water;
-	TArray<uint8> WaterKind;
+	TConstArrayView<uint8> WaterKind;
+	TConstArrayView<uint8> SurfaceFlags;
+	uint8 GetWaterKind(int32 InIndex) const;
+	int32 WaterKindCount() const { return SurfaceFlags.IsEmpty() ? WaterKind.Num() : SurfaceFlags.Num(); }
 	TConstArrayView<uint16> Material;
 	double ZBias = 0.0;
 

@@ -11,6 +11,12 @@ struct WHFRAMEWORK_API FVoxelFrameTimings
 	double ResultApplyMilliseconds = 0.0;
 	double PublishPrepareMilliseconds = 0.0;
 	double PublishCommitMilliseconds = 0.0;
+	double PublishPlanMilliseconds = 0.0;
+	double PublishPriorityMilliseconds = 0.0;
+	double PublishAdmissionMilliseconds = 0.0;
+	double PublishTotalMilliseconds = 0.0;
+	double PublishMaximumOperationMilliseconds = 0.0;
+	bool bPublishBudgetOverrun = false;
 	double RetireMilliseconds = 0.0;
 	double CoverageMilliseconds = 0.0;
 };

@@ -118,6 +118,8 @@ bool FVoxelNetworkRepresentationDataCodecTest::RunTest(const FString& InParamete
 	FVoxelVoxelProxyData Proxy;
 	Proxy.Key = { FIntVector(-3, 2, 1), 2 };
 	Proxy.Revision = 17;
+	Proxy.Geometry = {{EVoxelTerrainRepresentation::VoxelProxy, Proxy.Key.Coordinate, Proxy.Key.Level},
+		Proxy.Key.GetSampleStep(), -128, 128, 17, 23};
 	Proxy.GridSide = Proxy.Key.GetGridSide();
 	Proxy.Cells.Init(FVoxelBlockState { 3, 9 }, Proxy.GridSide * Proxy.GridSide * Proxy.GridSide);
 	if (!TestTrue(TEXT("Encode voxel proxy data"), FVoxelRepresentationSync::EncodeVoxelProxy(Proxy, Bytes, Error))) return false;
@@ -133,11 +135,13 @@ bool FVoxelNetworkRepresentationDataCodecTest::RunTest(const FString& InParamete
 
 	FVoxelSurfaceTileData Surface;
 	Surface.Key = { FIntPoint(4, -5), 1 };
-	Surface.Side = 2; Surface.Step = 2; Surface.Revision = 18;
+	Surface.Side = 2; Surface.Step = 32; Surface.Revision = 18;
+	Surface.Geometry = {{EVoxelTerrainRepresentation::Surface, FIntVector(Surface.Key.Coordinate.X, Surface.Key.Coordinate.Y, 0), Surface.Key.Level},
+		Surface.Step, -128, 128, 17, 23};
 	Surface.GroundZ = { 1, 2, 3, 4 }; Surface.WaterZ = { 4, 3, 2, 1 };
 	Surface.SurfaceMaterial = { 5, 6, 7, 8 }; Surface.Biome = { 9, 10, 11, 12 };
 	Surface.Flags = { 0, 1, 2, 4 };
-	Surface.DistantCells.Add({FIntVector(256, -320, 5), FIntVector(272, -304, 21),
+	Surface.DistantCells.Add({FIntVector(128, -160, 5), FIntVector(144, -144, 21),
 		FVoxelBlockState(3, 9), {17, 23}});
 	if (!TestTrue(TEXT("Encode surface data"), FVoxelRepresentationSync::EncodeSurface(Surface, Bytes, Error))) return false;
 	FVoxelSurfaceTileData DecodedSurface;
@@ -154,15 +158,17 @@ bool FVoxelNetworkRepresentationDataCodecTest::RunTest(const FString& InParamete
 	}
 
 	FVoxelMacroTileData Macro;
-	Macro.Key = { FIntPoint(-2, 8), 0 };
+	Macro.Key = { FIntPoint(-2, 8), 2 };
 	Macro.Side = 2; Macro.Step = 64; Macro.Revision = 19;
+	Macro.Geometry = {{EVoxelTerrainRepresentation::Macro, FIntVector(Macro.Key.Coordinate.X, Macro.Key.Coordinate.Y, 0), Macro.Key.Level},
+		Macro.Step, -128, 128, 17, 23};
 	Macro.Height = { 11, 12, 13, 14 }; Macro.WaterHeight = { 5, 6, 7, 8 };
 	Macro.WaterKind = {uint8(EVoxelWaterKind::River), uint8(EVoxelWaterKind::Lake),
 		uint8(EVoxelWaterKind::Ocean), uint8(EVoxelWaterKind::None)};
 	Macro.SurfaceClass = { 1, 2, 3, 4 }; Macro.ForestCoverage = { 5, 6, 7, 8 };
 	Macro.SnowCoverage = { 8, 7, 6, 5 };
 	Macro.LargeStructures.Add({ FIntPoint(4, 5), 6, 7, 8 });
-	Macro.DistantCells.Add({FIntVector(-4096, 16384, 12), FIntVector(-4048, 16432, 58),
+	Macro.DistantCells.Add({FIntVector(-128, 512, 12), FIntVector(-80, 560, 58),
 		FVoxelBlockState(3, 9), {31, 37}});
 	if (!TestTrue(TEXT("Encode macro data"), FVoxelRepresentationSync::EncodeMacro(Macro, Bytes, Error))) return false;
 	FVoxelMacroTileData DecodedMacro;
@@ -206,6 +212,10 @@ bool FVoxelNetworkNaturalFarRepresentationTest::RunTest(const FString& InParamet
 	Input.Config = Config;
 	Input.Cache = Cache;
 	Input.Generator = Generator;
+	Input.Registry = VoxelTest::MakeRegistry();
+	Input.Request.Serial = 1;
+	Input.Request.Geometry = {{EVoxelTerrainRepresentation::VoxelProxy, Input.Request.Key.Coordinate, Input.Request.Key.Level},
+		1, Input.Settings.MinZ, Input.Settings.MaxZ, 17, 23};
 	TArray<uint8> Bytes;
 	FString Error;
 	if (!TestTrue(TEXT("Natural far representation builds locally"), FVoxelRepresentationSync::BuildServerData(Input, Bytes, Error))) return false;

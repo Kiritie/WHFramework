@@ -12,13 +12,7 @@ FVoxelMacroTerrainBuilder::FVoxelMacroTerrainBuilder(
 	const FVoxelLodTopologySettings& InLod)
 	: Lod(InLod)
 	, Config(InConfig)
-	, SurfaceBuilder(InGenerator, InConfig, InSettings, InOverlays, InRegistry, [&InLod]()
-	{
-		FVoxelLodTopologySettings Sampling = InLod;
-		Sampling.SurfaceMinimumTileSideCells = InLod.MacroMinimumTileSideCells;
-		Sampling.SurfaceBaseSampleStepCells = InLod.MacroBaseSampleStepCells;
-		return Sampling;
-	}())
+	, SurfaceBuilder(InGenerator, InConfig, InSettings, InOverlays, InRegistry, InLod)
 {
 }
 
@@ -26,7 +20,7 @@ bool FVoxelMacroTerrainBuilder::Build(
 	const FVoxelMacroTileKey& InKey,
 	FVoxelMacroTileData& OutData,
 	FString& OutError,
-	const TAtomic<bool>* InCancel) const
+	const TAtomic<bool>* InCancel, const FVoxelTerrainGeometry& InGeometry, const FVoxelTerrainBuildShard* InShard) const
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_MacroBuild);
 
@@ -35,9 +29,14 @@ bool FVoxelMacroTerrainBuilder::Build(
 	Data.Key =
 		InKey;
 
-	Data.Side = Lod.MacroMinimumTileSideCells / Lod.MacroBaseSampleStepCells + 1;
-
-	Data.Step = VoxelViewLod::MacroStep(Lod, InKey.Level);
+	Data.Geometry = InGeometry;
+	if (!Data.Geometry.Validate(OutError)) return false;
+	if ((Data.Geometry.Key.Representation != EVoxelTerrainRepresentation::Macro) ||
+		Data.Geometry.Key.Coordinate != FIntVector(InKey.Coordinate.X, InKey.Coordinate.Y, 0) || Data.Geometry.Key.Level != InKey.Level)
+	{ OutError = TEXT("Macro spatial key does not match its required geometry"); return false; }
+	Data.Step = Data.Geometry.SampleStepCells;
+	Data.LocalMinCells = InShard ? FIntPoint(InShard->LocalMinCells.X, InShard->LocalMinCells.Y) : FIntPoint::ZeroValue;
+	Data.Side = InShard ? InShard->CellCounts.X + 1 : int32(Data.Geometry.Key.SideCells()) / Data.Step + 1;
 
 	const int32 Count =
 		Data.GetVertexCount();
@@ -52,7 +51,7 @@ bool FVoxelMacroTerrainBuilder::Build(
 	FVoxelSurfaceTileData Surface;
 	const FVoxelSurfaceTileKey SurfaceKey { InKey.Coordinate,
 		InKey.Level };
-	if (!SurfaceBuilder.Build(SurfaceKey, Surface, OutError, InCancel, nullptr, &Columns))
+	if (!SurfaceBuilder.Build(SurfaceKey, Surface, OutError, InCancel, nullptr, &Columns, Data.Geometry, InShard))
 	{
 		return false;
 	}

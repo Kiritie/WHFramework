@@ -5,6 +5,8 @@
 #include "Voxel/Rendering/VoxelMacroTerrain.h"
 #include "Voxel/Rendering/VoxelProxyBuilder.h"
 #include "Voxel/Rendering/VoxelSurfaceProxy.h"
+#include "Voxel/Rendering/VoxelProxyPageBuild.h"
+#include "Voxel/Rendering/VoxelHeightfieldPageBuild.h"
 
 class UVoxelModule;
 
@@ -21,11 +23,25 @@ struct WHFRAMEWORK_API FVoxelRepresentationBuildInput
 	uint64 Revision = 0;
 };
 
+class WHFRAMEWORK_API FVoxelRepresentationPageBuild
+{
+public:
+	bool Initialize(FVoxelRepresentationBuildInput&& InInput, FString& OutError);
+	bool Advance(TArray<uint8>& OutBytes, bool& bOutComplete, FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr);
+	uint64 InputBytes() const;
+
+private:
+	FVoxelRepresentationBuildInput Input;
+	FVoxelProxyPageBuild Proxy;
+	FVoxelHeightfieldPageBuild Heightfield;
+};
+
 class WHFRAMEWORK_API FVoxelRepresentationSync
 {
 public:
 	static bool PrepareServerBuild(
-		const UVoxelModule& InModule,
+		UVoxelModule& InModule,
 		const FVoxelRepresentationRequest& InRequest,
 		FVoxelRepresentationBuildInput& OutInput,
 		FString& OutError);

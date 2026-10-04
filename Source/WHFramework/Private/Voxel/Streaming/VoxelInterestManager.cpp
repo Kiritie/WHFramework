@@ -4,6 +4,24 @@
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Rendering/VoxelMacroTerrain.h"
 #include "Voxel/Rendering/VoxelViewLod.h"
+#include "Voxel/Rendering/VoxelFinePage.h"
+#include "Voxel/Streaming/VoxelTerrainDomainPlanner.h"
+#include "Voxel/Streaming/VoxelFineDomain.h"
+
+const FVoxelTerrainGeometry* FVoxelInterestSet::FindGeometry(const FVoxelViewKey& InKey) const
+{
+	return Geometry.Find({EVoxelTerrainRepresentation::VoxelProxy, InKey.Coordinate, InKey.Level});
+}
+
+const FVoxelTerrainGeometry* FVoxelInterestSet::FindGeometry(const FVoxelSurfaceTileKey& InKey) const
+{
+	return Geometry.Find({EVoxelTerrainRepresentation::Surface, FIntVector(InKey.Coordinate.X, InKey.Coordinate.Y, 0), InKey.Level});
+}
+
+const FVoxelTerrainGeometry* FVoxelInterestSet::FindGeometry(const FVoxelMacroTileKey& InKey) const
+{
+	return Geometry.Find({EVoxelTerrainRepresentation::Macro, FIntVector(InKey.Coordinate.X, InKey.Coordinate.Y, 0), InKey.Level});
+}
 
 namespace
 {
@@ -97,169 +115,7 @@ namespace
 			RadiusSquared;
 	}
 
-	template<typename KeyType>
-	void AddAdaptiveTwoDimensionalTiles(
-		const FIntVector& InCenter,
-		const int32 InOuterRadius,
-		const int32 InInnerRadius,
-		const int32 InBaseTileSide,
-		const int32 InBaseSampleStepCells,
-		const uint8 InMaximumLevel,
-		const FVoxelStreamingSource& InSource,
-		const float InTargetScreenErrorPixels,
-		TSet<KeyType>& OutKeys)
-	{
-		if (InOuterRadius <= 0 ||
-			InBaseTileSide <= 0)
-		{
-			return;
-		}
 
-		struct FNode
-		{
-			FIntPoint Coordinate;
-			uint8 Level = 0;
-			double Error = 0.0;
-		};
-
-		const int32 RootSide =
-			InBaseTileSide << InMaximumLevel;
-		const int32 RootX =
-			VoxelGeneration::FloorDivide(InCenter.X, RootSide);
-		const int32 RootY =
-			VoxelGeneration::FloorDivide(InCenter.Y, RootSide);
-		const int32 RootRadius =
-			CeilDividePositive(
-				InOuterRadius,
-				RootSide) +
-			1;
-
-		TArray<FNode> Leaves;
-		auto AddNode = [&](const FIntPoint& Coordinate, const uint8 Level, TArray<FNode>& Nodes)
-		{
-			const int32 Side = InBaseTileSide << Level;
-			const FVector2D Delta(
-				Coordinate.X * Side + Side * 0.5 - InCenter.X,
-				Coordinate.Y * Side + Side * 0.5 - InCenter.Y);
-			const FVector2D NearDelta(
-				FMath::Max(0.0, FMath::Abs(Delta.X) - Side * 0.5),
-				FMath::Max(0.0, FMath::Abs(Delta.Y) - Side * 0.5));
-			const FVector2D FarDelta(FMath::Abs(Delta.X) + Side * 0.5, FMath::Abs(Delta.Y) + Side * 0.5);
-			if (NearDelta.SizeSquared() > FMath::Square(static_cast<double>(InOuterRadius)) ||
-				(InInnerRadius > 0 && FarDelta.SizeSquared() <= FMath::Square(static_cast<double>(InInnerRadius))))
-			{
-				return;
-			}
-			const double Distance = FMath::Max(1.0, NearDelta.Size());
-			const uint8 DesiredLevel = VoxelViewLod::ResolveScreenErrorLevel(
-				FMath::FloorToInt(Distance), InBaseSampleStepCells, InSource, InMaximumLevel, InTargetScreenErrorPixels);
-			const double Error = Level > DesiredLevel ? static_cast<double>(InBaseSampleStepCells << Level) / Distance : 0.0;
-			Nodes.Add({ Coordinate, Level, Error });
-		};
-
-		for (int32 Y = -RootRadius;
-			Y <= RootRadius;
-			++Y)
-		{
-			for (int32 X = -RootRadius;
-				X <= RootRadius;
-				++X)
-			{
-				AddNode(FIntPoint(RootX + X, RootY + Y), InMaximumLevel, Leaves);
-			}
-		}
-
-		while (!Leaves.IsEmpty())
-		{
-			double MaximumError = 0.0;
-			for (const FNode& Node : Leaves)
-			{
-				MaximumError = FMath::Max(MaximumError, Node.Error);
-			}
-			if (MaximumError <= 0.0)
-			{
-				break;
-			}
-			TArray<FNode> Children;
-			int32 ParentCount = 0;
-			for (const FNode& Node : Leaves)
-			{
-				if (!FMath::IsNearlyEqual(Node.Error, MaximumError, UE_DOUBLE_SMALL_NUMBER))
-				{
-					continue;
-				}
-				++ParentCount;
-				const FIntPoint ChildBase = Node.Coordinate * 2;
-				for (int32 Y = 0; Y < 2; ++Y)
-				{
-					for (int32 X = 0; X < 2; ++X)
-					{
-						AddNode(ChildBase + FIntPoint(X, Y), Node.Level - 1, Children);
-					}
-				}
-			}
-			Leaves.RemoveAll([MaximumError](const FNode& Node)
-			{
-				return FMath::IsNearlyEqual(Node.Error, MaximumError, UE_DOUBLE_SMALL_NUMBER);
-			});
-			Leaves.Append(MoveTemp(Children));
-		}
-		for (const FNode& Node : Leaves)
-		{
-			OutKeys.Add({ Node.Coordinate, Node.Level });
-		}
-	}
-
-	template<typename KeyType>
-	void BalanceAdaptiveTiles(TSet<KeyType>& InOutTiles,
-		const int32 InBaseTileSide, const uint8 InMaximumLevel)
-	{
-		while (true)
-		{
-			TSet<KeyType> ParentsToSplit;
-			for (const KeyType& Tile : InOutTiles)
-			{
-				const int32 Side = InBaseTileSide << Tile.Level;
-				const FIntPoint Min = Tile.Coordinate * Side;
-				const FIntPoint Max = Min + FIntPoint(Side);
-				const FIntPoint Probes[] = {
-					FIntPoint(Min.X - 1, Min.Y), FIntPoint(Min.X - 1, Max.Y - 1),
-					FIntPoint(Max.X, Min.Y), FIntPoint(Max.X, Max.Y - 1),
-					FIntPoint(Min.X, Min.Y - 1), FIntPoint(Max.X - 1, Min.Y - 1),
-					FIntPoint(Min.X, Max.Y), FIntPoint(Max.X - 1, Max.Y)
-				};
-				for (uint8 Level = Tile.Level + 1; Level <= InMaximumLevel; ++Level)
-				{
-					const int32 CandidateSide = InBaseTileSide << Level;
-					const KeyType Ancestor{
-						FIntPoint(VoxelGeneration::FloorDivide(Min.X, CandidateSide),
-							VoxelGeneration::FloorDivide(Min.Y, CandidateSide)), Level};
-					if (InOutTiles.Contains(Ancestor)) ParentsToSplit.Add(Ancestor);
-					if (Level <= Tile.Level + 1) continue;
-					for (const FIntPoint& Probe : Probes)
-					{
-						const KeyType Neighbor{
-							FIntPoint(VoxelGeneration::FloorDivide(Probe.X, CandidateSide),
-								VoxelGeneration::FloorDivide(Probe.Y, CandidateSide)), Level};
-						if (InOutTiles.Contains(Neighbor)) ParentsToSplit.Add(Neighbor);
-					}
-				}
-			}
-			if (ParentsToSplit.IsEmpty()) break;
-			for (const KeyType& Parent : ParentsToSplit)
-			{
-				if (!InOutTiles.Remove(Parent)) continue;
-				const FIntPoint ChildBase = Parent.Coordinate * 2;
-				for (int32 Y = 0; Y < 2; ++Y)
-				{
-					for (int32 X = 0; X < 2; ++X)
-					{
-						InOutTiles.Add({ChildBase + FIntPoint(X, Y), static_cast<uint8>(Parent.Level - 1)});
-					}
-				}
-			}
-		}
-	}
 }
 
 FVoxelInterestSet FVoxelInterestManager::Compute(
@@ -324,87 +180,22 @@ FVoxelInterestSet FVoxelInterestManager::Finalize(TConstArrayView<FVoxelStreamin
 	const FVoxelWorldManifest& InManifest, const FVoxelViewSettings& InViewSettings,
 	FVoxelInterestSet Result) const
 {
-	uint8 MaximumSurfaceLevel = 0;
-	uint8 MaximumMacroLevel = 0;
-	for (const FVoxelStreamingSource& Source : InSources)
+	if (!VoxelFineDomain::CompleteInitialFamilies(InSources, InManifest, InViewSettings, Result, Result.PlanningError))
 	{
-		if (Source.Has(EVoxelStreamingCapability::WorldVisual))
-		{
-			MaximumSurfaceLevel = FMath::Max(MaximumSurfaceLevel, InViewSettings.Lod.MaximumSurfaceLevel);
-			MaximumMacroLevel = FMath::Max(MaximumMacroLevel, InViewSettings.Lod.MaximumMacroLevel);
-		}
+		return Result;
 	}
-	BalanceAdaptiveTiles(Result.Surface, InViewSettings.Lod.SurfaceMinimumTileSideCells,
-		MaximumSurfaceLevel);
-	BalanceAdaptiveTiles(Result.Macro, InViewSettings.Lod.MacroMinimumTileSideCells,
-		MaximumMacroLevel);
-
-	if (!Result.VoxelProxy.IsEmpty())
+	TSet<FIntVector> PlannedFineSections;
+	for (const auto& Pair : Result.Exact)
 	{
-		TSet<FIntVector> FineSections;
-		for (const TPair<FIntVector, FVoxelExactDemand>& Pair : Result.Exact)
-		{
-			if (Pair.Value.bFineRender)
-			{
-				FineSections.Add(Pair.Key);
-			}
-		}
-		FString PlanError;
-		if (!Result.TerrainPlan.Build(InSources, FineSections, Result.VoxelProxy, InViewSettings, PlanError))
-		{
-			Result.PlanningError = MoveTemp(PlanError);
-			return Result;
-		}
-		Result.VoxelProxy.Reset();
-		for (const FVoxelViewKey& Key : Result.TerrainPlan.Leaves)
-		{
-			if (Key.Level > 0)
-			{
-				Result.VoxelProxy.Add(Key);
-				continue;
-			}
-			FVoxelExactDemand& Demand = Result.Exact.FindOrAdd(Key.Coordinate);
-			Demand.bData = true;
-			Demand.bFineRender = true;
-			Demand.bFineData = true;
-			const FVector Center = FVector(Key.Coordinate * InterestSectionSide) + FVector(InterestSectionSide * 0.5);
-			int32 RenderPriority = MAX_int32;
-			for (const FVoxelStreamingSource& Source : InSources)
-			{
-				if (Source.Has(EVoxelStreamingCapability::FineVisual))
-				{
-					Demand.DistanceCells = FMath::Min(Demand.DistanceCells, FVector::Distance(Center, FVector(Source.Center)));
-					Demand.HorizontalDistanceCells = FMath::Min(Demand.HorizontalDistanceCells,
-						FVector2D::Distance(FVector2D(Center), FVector2D(Source.Center.X, Source.Center.Y)));
-				}
-			}
-			for (const FVoxelStreamingSource& Source : InSources)
-			{
-				const int32 Radius = Source.View.FineRadiusCells;
-				if (Source.Has(EVoxelStreamingCapability::FineVisual) &&
-					FVector2D::DistSquared(FVector2D(Center), FVector2D(Source.Center.X, Source.Center.Y)) <=
-					FMath::Square(static_cast<double>(Radius)))
-				{
-					RenderPriority = FMath::Min(RenderPriority, Source.GetSchedulingPriority());
-				}
-			}
-			if (RenderPriority == MAX_int32)
-			{
-				double NearestDistanceSquared = MAX_dbl;
-				for (const FVoxelStreamingSource& Source : InSources)
-				{
-					if (!Source.Has(EVoxelStreamingCapability::FineVisual)) continue;
-					const double DistanceSquared = FVector::DistSquared(Center, FVector(Source.Center));
-					if (DistanceSquared < NearestDistanceSquared)
-					{
-						NearestDistanceSquared = DistanceSquared;
-						RenderPriority = Source.GetSchedulingPriority();
-					}
-				}
-			}
-			Demand.Priority = FMath::Min(Demand.Priority, RenderPriority);
-		}
+		if (Pair.Value.bFineRender) PlannedFineSections.Add(Pair.Key);
 	}
+	auto FinePages = MakeShared<FVoxelFinePagePlan, ESPMode::ThreadSafe>();
+	if (!FVoxelFinePagePlanner::Build(PlannedFineSections, InSources, InViewSettings, *FinePages, Result.PlanningError))
+	{
+		return Result;
+	}
+	Result.FinePagePlan = FinePages;
+	if (!FVoxelTerrainDomainPlanner::Build(InSources, InManifest, InViewSettings, Result, Result.PlanningError)) return Result;
 	// 预测只预取真实数据；FineWanted 继续由当前位置的 Fine 圆柱决定。
 	for (const FVoxelStreamingSource& Source : InSources)
 	{
@@ -599,12 +390,12 @@ FVoxelInterestSet FVoxelInterestManager::Finalize(TConstArrayView<FVoxelStreamin
 		FVoxelViewAdmission& A = Result.Admissions.AddDefaulted_GetRef();
 		A.Kind = EVoxelViewAdmissionKind::Surface;
 		A.SurfaceKey = Key;
-		const int32 Side = InViewSettings.Lod.SurfaceMinimumTileSideCells << Key.Level;
+		const int32 Side = 16 << Key.Level;
 		const FVector Center((Key.Coordinate.X + 0.5) * Side, (Key.Coordinate.Y + 0.5) * Side, 0.0);
 		const FVector Min(Key.Coordinate.X * Side, Key.Coordinate.Y * Side, 0.0);
 		A.Priority = ViewPriority(FBox(Min, Min + FVector(Side, Side, 0.0)), true,
 			&FVoxelStreamingSourceView::SurfaceRadiusCells);
-		A.DistanceCells = Distance(FBox(Center, Center), true, true, A.Priority);
+		A.DistanceCells = Distance(FBox(Min, Min + FVector(Side, Side, 0.0)), true, false, A.Priority);
 		Result.SurfacePriorities.Add(Key, A.Priority);
 	}
 	for (const FVoxelMacroTileKey& Key : Result.Macro)
@@ -612,12 +403,12 @@ FVoxelInterestSet FVoxelInterestManager::Finalize(TConstArrayView<FVoxelStreamin
 		FVoxelViewAdmission& A = Result.Admissions.AddDefaulted_GetRef();
 		A.Kind = EVoxelViewAdmissionKind::Macro;
 		A.MacroKey = Key;
-		const int32 Side = InViewSettings.Lod.MacroMinimumTileSideCells << Key.Level;
+		const int32 Side = 16 << Key.Level;
 		const FVector Center((Key.Coordinate.X + 0.5) * Side, (Key.Coordinate.Y + 0.5) * Side, 0.0);
 		const FVector Min(Key.Coordinate.X * Side, Key.Coordinate.Y * Side, 0.0);
 		A.Priority = ViewPriority(FBox(Min, Min + FVector(Side, Side, 0.0)), true,
 			&FVoxelStreamingSourceView::MacroRadiusCells);
-		A.DistanceCells = Distance(FBox(Center, Center), true, true, A.Priority);
+		A.DistanceCells = Distance(FBox(Min, Min + FVector(Side, Side, 0.0)), true, false, A.Priority);
 		Result.MacroPriorities.Add(Key, A.Priority);
 	}
 	Result.Admissions.Sort();
@@ -643,6 +434,17 @@ FVoxelInterestSet FVoxelInterestManager::Finalize(TConstArrayView<FVoxelStreamin
 		}
 	}
 	SortExactDemands(Result);
+	auto Inputs = MakeShared<FVoxelTerrainPublicationInputs, ESPMode::ThreadSafe>();
+	Result.Geometry.GenerateValueArray(Inputs->Geometry);
+	Inputs->Roots = Result.TerrainPlan.Roots.Array();
+	Inputs->Fine = Result.FineSections->Array();
+	Inputs->Proxy = Result.VoxelProxy.Array();
+	Inputs->Surface = Result.Surface.Array();
+	Inputs->Macro = Result.Macro.Array();
+	Inputs->FinePages = Result.FinePagePlan->Pages.Array();
+	for (const auto& Pair : Result.FinePagePlan->SectionOwners) Inputs->FineOwners.Add(Pair);
+	Inputs->Admissions = Result.Admissions;
+	Result.PublicationInputs = MoveTemp(Inputs);
 	return Result;
 }
 
@@ -930,158 +732,5 @@ void FVoxelInterestManager::AddViewSource(
 	const bool bBuildSurface,
 	const bool bBuildMacro) const
 {
-	if (!InSource.Has(EVoxelStreamingCapability::WorldVisual) &&
-		!InSource.Has(EVoxelStreamingCapability::LocalRefinement))
-	{
-		return;
-	}
-
-	const int32 FineRadius = VoxelViewLod::ResolveViewRanges(InSource).Fine;
-	const int32 FineVerticalRadius = FMath::Max(0, InSource.View.FineVerticalHalfExtentCells);
-
-	const bool bLocalRefinementOnly =
-		InSource.Has(EVoxelStreamingCapability::LocalRefinement) &&
-		!InSource.Has(EVoxelStreamingCapability::WorldVisual);
-	const int32 ProxyRange = bLocalRefinementOnly
-		? static_cast<int32>(FMath::Min<int64>(
-			static_cast<int64>(FineRadius) +
-			InViewSettings.Lod.VoxelProxyMinimumChunkSideCells,
-			MAX_int32))
-		: FMath::Max(FineRadius, InSource.View.VoxelProxyRadiusCells);
-
-	if (bBuildProxy && ProxyRange > FineRadius)
-	{
-		const uint8 ProxyLevel = bLocalRefinementOnly ? 1 :
-			FMath::Max<uint8>(1, InViewSettings.Lod.MaximumVoxelProxyLevel);
-
-		const int32 ProxySide = FVoxelViewKey{{}, ProxyLevel}.GetSide();
-
-		const int32 HorizontalRadius =
-			CeilDividePositive(
-				ProxyRange,
-				ProxySide) +
-			1;
-
-		const int32 VerticalRadius = CeilDividePositive(FMath::Max(0, InSource.View.VoxelProxyVerticalHalfExtentCells), ProxySide) + 1;
-
-		const FIntVector ProxyCenter(
-			VoxelGeneration::FloorDivide(
-				InSource.Center.X,
-				ProxySide),
-			VoxelGeneration::FloorDivide(
-				InSource.Center.Y,
-				ProxySide),
-			VoxelGeneration::FloorDivide(
-				InSource.Center.Z,
-				ProxySide));
-
-		const int32 MinZ =
-			VoxelGeneration::FloorDivide(
-				InManifest.Settings.MinZ,
-				ProxySide);
-
-		const int32 MaxZ =
-			VoxelGeneration::FloorDivide(
-				InManifest.Settings.MaxZ - 1,
-				ProxySide);
-
-		const double HalfDiagonal =
-			static_cast<double>(ProxySide) *
-			0.8660254037844386;
-
-		for (int32 Z = -VerticalRadius;
-			Z <= VerticalRadius;
-			++Z)
-		{
-			for (int32 Y = -HorizontalRadius;
-				Y <= HorizontalRadius;
-				++Y)
-			{
-				for (int32 X = -HorizontalRadius;
-					X <= HorizontalRadius;
-					++X)
-				{
-					const FIntVector Coordinate =
-						ProxyCenter +
-						FIntVector(X, Y, Z);
-
-					if (Coordinate.Z < MinZ ||
-						Coordinate.Z > MaxZ)
-					{
-						continue;
-					}
-
-					const FVector TileCenter =
-						FVector(
-							Coordinate *
-								ProxySide) +
-						FVector(
-							ProxySide * 0.5);
-
-					const double Distance = FVector2D::Distance(FVector2D(TileCenter), FVector2D(InSource.Center.X, InSource.Center.Y));
-					const double NearZ = FMath::Max(0.0, FMath::Abs(TileCenter.Z - InSource.Center.Z) - ProxySide * 0.5);
-					if (NearZ > InSource.View.VoxelProxyVerticalHalfExtentCells) continue;
-
-					if (Distance -
-						HalfDiagonal >
-						ProxyRange)
-					{
-						continue;
-					}
-
-
-					InOutInterest.
-						VoxelProxy.Add({
-							Coordinate,
-							ProxyLevel
-						});
-				}
-			}
-		}
-	}
-
-	if (!InSource.Has(EVoxelStreamingCapability::WorldVisual))
-	{
-		return;
-	}
-
-	const int32 SurfaceRange =
-		FMath::Max(
-			ProxyRange,
-			InSource.View.SurfaceRadiusCells);
-
-	if (bBuildSurface && SurfaceRange > ProxyRange)
-	{
-		AddAdaptiveTwoDimensionalTiles(
-			InSource.Center,
-			SurfaceRange,
-			// Keep the heightfield below the finite-height volume. Visibility clips
-			// only actual replacement geometry, including underwater columns.
-			0,
-			InViewSettings.Lod.SurfaceMinimumTileSideCells,
-			1,
-			InViewSettings.Lod.MaximumSurfaceLevel,
-			InSource,
-			InViewSettings.Lod.TargetScreenErrorPixels,
-			InOutInterest.Surface);
-	}
-
-	const int32 MacroRange =
-		FMath::Max(
-			SurfaceRange,
-			InSource.View.MacroRadiusCells);
-
-	if (bBuildMacro && MacroRange > SurfaceRange)
-	{
-		AddAdaptiveTwoDimensionalTiles(
-			InSource.Center,
-			MacroRange,
-			SurfaceRange,
-			InViewSettings.Lod.MacroMinimumTileSideCells,
-			InViewSettings.Lod.MacroBaseSampleStepCells,
-			InViewSettings.Lod.MaximumMacroLevel,
-			InSource,
-			InViewSettings.Lod.TargetScreenErrorPixels,
-			InOutInterest.Macro);
-	}
+	// Coarse domains are computed together in Finalize from the actual preceding frontier.
 }

@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Tasks/Task.h"
+#include "Voxel/Task/VoxelTaskFairSelection.h"
 #include "Voxel/Rendering/VoxelViewTypes.h"
 #include "Voxel/Runtime/VoxelBlockState.h"
 
@@ -63,6 +64,7 @@ struct WHFRAMEWORK_API FVoxelTaskStamp
 	uint64 WorldEpoch = 0;
 	uint64 Token = 0;
 	uint64 Revision = 0;
+	uint64 GeometryRevision = 0;
 	FIntVector Section = FIntVector::ZeroValue;
 	FVoxelViewKey ViewKey;
 	FVoxelSurfaceTileKey SurfaceKey;
@@ -76,6 +78,7 @@ FORCEINLINE uint32 GetTypeHash(const FVoxelTaskStamp& InStamp)
 	uint32 Hash = ::GetTypeHash(InStamp.WorldEpoch);
 	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.Token));
 	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.Revision));
+	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.GeometryRevision));
 	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.Section));
 	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.ViewKey));
 	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.SurfaceKey));
@@ -129,6 +132,7 @@ struct WHFRAMEWORK_API FVoxelTaskResult
 	bool bSuccess = false;
 	bool bCanceled = false;
 	bool bKnownEmptyMesh = false;
+	bool bContinue = false;
 	FString Error;
 
 	// diagnostics
@@ -142,6 +146,7 @@ struct WHFRAMEWORK_API FVoxelTaskResult
 	TSharedPtr<FVoxelSectionCollisionResult> Collision;
 	TSharedPtr<FVoxelSectionMeshResult> FineMesh;
 	TSharedPtr<FVoxelSectionMeshResult> VoxelProxyMesh;
+	TSharedPtr<FVoxelSectionMeshResult> VolumeBoundaryMesh;
 	TSharedPtr<FVoxelSectionMeshResult> SurfaceMesh;
 	TSharedPtr<FVoxelSectionMeshResult> WaterMesh;
 	TSharedPtr<FVoxelSectionMeshResult> MacroMesh;
@@ -173,10 +178,13 @@ struct WHFRAMEWORK_API FVoxelTaskRequest
 	double DistanceScore = 0.0;
 	double ForwardScore = 0.0;
 	double QueuedAt = 0.0;
+	uint64 Sequence = 0;
+	EVoxelTaskBlockReason Blocked = EVoxelTaskBlockReason::None;
 
 	uint64 ReservedBytes = 0;
 	uint64 InputBytes = 0;
 
+	bool bResumable = false;
 	TFunction<FVoxelTaskResult(const TAtomic<bool>&)> Execute;
 
 	/**
@@ -240,6 +248,12 @@ struct WHFRAMEWORK_API FVoxelTaskDiagnostics
 	TMap<EVoxelTaskKind, FVoxelTaskKindDiagnostics> ByKind;
 	TMap<EVoxelTaskKind, int32> PendingByKind;
 	TMap<EVoxelTaskKind, int32> RunningByKind;
+	TMap<EVoxelTaskKind, TMap<EVoxelTaskBlockReason, int32>> BlockedByKind;
+	uint64 DuplicateRequests = 0;
+	uint64 OversizedRequests = 0;
+	uint64 CapacityDeferrals = 0;
+	TMap<EVoxelTaskKind, TMap<EVoxelTaskBlockReason, int32>> AdmissionBlockedByKind;
+	double OldestAdmissionWaitSeconds = 0.0;
 };
 
 class WHFRAMEWORK_API FVoxelTaskScheduler
@@ -252,6 +266,9 @@ public:
 	FVoxelTaskScheduler& operator=(const FVoxelTaskScheduler&) = delete;
 
 	bool Enqueue(FVoxelTaskRequest&& InRequest);
+	void ObserveDemand(EVoxelTaskKind InKind, const FVoxelTaskStamp& InStamp,
+		EVoxelTaskBlockReason InReason, uint64 InInputBytes = 0, uint64 InResultBytes = 0);
+	bool IsTerminal(const FVoxelTaskKey& InKey) const;
 	void UpdatePriorities(TFunctionRef<void(EVoxelTaskKind, const FVoxelTaskStamp&,
 		EVoxelWorkClass&, int32&, double&, double&)> InUpdate);
 	void UpdateTerrainStages(TFunctionRef<void(EVoxelTaskKind, const FVoxelTaskStamp&, int32&)> InUpdate);
@@ -275,9 +292,8 @@ public:
 	int32 CriticalCount() const;
 
 	void SetBudget(const FVoxelTaskBudget& InBudget);
-	void SetTerrainBuildStage(int32 InStage);
-	bool CanBuildTerrainStage(int32 InStage) const;
-	int32 GetTerrainBuildStage() const { return TerrainBuildStage; }
+	void SetObservedTerrainStage(int32 InStage);
+	int32 GetObservedTerrainStage() const { return ObservedTerrainStage; }
 
 	FVoxelTaskDiagnostics GetDiagnostics() const;
 	static bool IsHigherPriority(
@@ -301,6 +317,7 @@ private:
 		bool bPublicationContinuation = false;
 		bool bTerrainDataOnly = false;
 
+		uint64 Sequence = 0;
 		double QueuedAt = 0.0;
 		double DistanceScore = 0.0;
 		double ForwardScore = 0.0;
@@ -309,6 +326,7 @@ private:
 		TSharedPtr<FSlot, ESPMode::ThreadSafe> Slot;
 		UE::Tasks::FTask Task;
 		TFunction<void(FVoxelTaskResult&&)> Apply;
+		TUniquePtr<FVoxelTaskRequest> Resume;
 	};
 
 	struct FCompleted
@@ -348,12 +366,26 @@ private:
 
 	FVoxelTaskBudget Budget;
 	FVoxelTaskDiagnostics Diagnostics;
+	struct FAdmissionAttempt
+	{
+		double FirstRequested = 0.0;
+		uint64 Sequence = 0;
+		EVoxelTaskBlockReason Blocked = EVoxelTaskBlockReason::None;
+		uint64 InputBytes = 0;
+		uint64 ResultBytes = 0;
+		uint64 Rejections = 0;
+	};
+	TMap<FVoxelTaskKey, FAdmissionAttempt> AdmissionAttempts;
+	FVoxelTaskFairSelection FairSelection;
+	FVoxelTaskFairSelection CompletedSelection;
+	uint64 NextSequence = 0;
 
 	double LastBudgetWarning = -10.0;
 	bool bStopped = false;
-	int32 TerrainBuildStage = 3;
+	int32 ObservedTerrainStage = 3;
 	uint64 ReservedBytes = 0;
 	uint64 QueuedInputBytes = 0;
+	uint64 RunningContinuationInputBytes = 0;
 	int32 CriticalTaskCount = 0;
 	uint64 CriticalAdmissionDeferrals = 0;
 };

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Voxel/Rendering/VoxelStreamingGeometry.h"
 #include "Voxel/Authoring/VoxelViewProfile.h"
 #include "Voxel/Generation/VoxelGenerationPipeline.h"
 #include "Voxel/Generation/VoxelGenerationTypes.h"
@@ -31,6 +32,15 @@ struct WHFRAMEWORK_API FVoxelSurfaceTileData
 	static constexpr int32 VertexSide = CellSide + 1;
 
 	FVoxelSurfaceTileKey Key;
+	FVoxelTerrainGeometry Geometry;
+	uint64 RequestId = 1;
+	// Derived locally using the current material and emission rules; never part of wire identity.
+	uint64 EstimatedMeshBytes = 0;
+	FIntPoint LocalMinCells = FIntPoint::ZeroValue;
+	FIntPoint GetBuildOrigin() const
+	{
+		return Key.Coordinate * int32(Geometry.Key.SideCells()) + LocalMinCells;
+	}
 	int32 Side = VertexSide;
 	int32 Step = 0;
 	uint64 Revision = 0;
@@ -74,8 +84,10 @@ public:
 		const FVoxelSurfaceTileKey& InKey,
 		FVoxelSurfaceTileData& OutData,
 		FString& OutError,
-		const TAtomic<bool>* InCancel = nullptr,
-		FVoxelSurfaceBuildTiming* OutTiming = nullptr, TArray<FVoxelColumnSample>* OutColumns = nullptr) const;
+		const TAtomic<bool>* InCancel,
+		FVoxelSurfaceBuildTiming* OutTiming, TArray<FVoxelColumnSample>* OutColumns,
+		const FVoxelTerrainGeometry& InGeometry,
+		const FVoxelTerrainBuildShard* InShard = nullptr) const;
 
 private:
 	bool CaptureModifiedBlocks(

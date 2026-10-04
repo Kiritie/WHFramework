@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Voxel/Rendering/VoxelStreamingGeometry.h"
 #include "Voxel/Generation/VoxelWorldManifest.h"
 #include "Voxel/Interaction/VoxelEditTypes.h"
 #include "Voxel/Save/VoxelDeltaTypes.h"
@@ -8,7 +9,7 @@
 
 class UPackageMap;
 
-static constexpr uint32 VoxelProtocolVersion = 4;
+static constexpr uint32 VoxelProtocolVersion = 6;
 
 USTRUCT()
 struct WHFRAMEWORK_API FVoxelRPCPacket
@@ -72,7 +73,8 @@ enum class EVoxelRepresentationReplyKind : uint8
 {
 	Retry = 0,
 	Unchanged,
-	Data
+	Data,
+	Rejected
 };
 
 enum class EVoxelSectionWireState : uint8
@@ -159,6 +161,7 @@ struct WHFRAMEWORK_API FVoxelRepresentationRequest
 	EVoxelRepresentationWireType Type = EVoxelRepresentationWireType::None;
 	FVoxelRepresentationWireKey Key;
 	uint64 KnownRevision = 0;
+	FVoxelTerrainGeometry Geometry;
 	uint64 Serial = 0;
 };
 

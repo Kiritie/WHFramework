@@ -10,17 +10,15 @@ namespace
 	constexpr int32 SectionSide = 16;
 
 	FIntPoint ResolveWorldXY(
-		const FVoxelSurfaceTileKey& InKey,
+		const FIntPoint& InOrigin,
 		const int32 InX,
 		const int32 InY,
 		const int32 InStep, const int32 InGridSide)
 	{
-		const int32 TileSide =
-			InGridSide * InStep;
+		(void)InGridSide;
 
 		return
-			InKey.Coordinate *
-				TileSide +
+			InOrigin +
 			FIntPoint(
 				InX *
 					InStep,
@@ -50,7 +48,7 @@ namespace
 		const FVoxelTreeGenerationSettings& InTrees)
 	{
 		const int32 TileSide = InData.GetTileSide();
-		const FIntPoint Origin = InData.Key.Coordinate * TileSide;
+		const FIntPoint Origin = InData.GetBuildOrigin();
 		const int32 Crown = InTrees.bEnabled
 			? FMath::Max(InData.Step, InTrees.CrownRadius) : InData.Step;
 		return {
@@ -82,7 +80,7 @@ bool FVoxelSurfaceProxyBuilder::Build(
 	FVoxelSurfaceTileData& OutData,
 	FString& OutError,
 	const TAtomic<bool>* InCancel,
-	FVoxelSurfaceBuildTiming* OutTiming, TArray<FVoxelColumnSample>* OutColumns) const
+	FVoxelSurfaceBuildTiming* OutTiming, TArray<FVoxelColumnSample>* OutColumns, const FVoxelTerrainGeometry& InGeometry, const FVoxelTerrainBuildShard* InShard) const
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_SurfaceBuild);
 
@@ -91,9 +89,14 @@ bool FVoxelSurfaceProxyBuilder::Build(
 	Data.Key =
 		InKey;
 
-	Data.Side = Lod.SurfaceMinimumTileSideCells / Lod.SurfaceBaseSampleStepCells + 1;
-
-	Data.Step = VoxelViewLod::SurfaceStep(Lod, InKey.Level);
+	Data.Geometry = InGeometry;
+	if (!Data.Geometry.Validate(OutError)) return false;
+	if ((Data.Geometry.Key.Representation != EVoxelTerrainRepresentation::Surface && Data.Geometry.Key.Representation != EVoxelTerrainRepresentation::Macro) ||
+		Data.Geometry.Key.Coordinate != FIntVector(InKey.Coordinate.X, InKey.Coordinate.Y, 0) || Data.Geometry.Key.Level != InKey.Level)
+	{ OutError = TEXT("Surface spatial key does not match its required geometry"); return false; }
+	Data.Step = Data.Geometry.SampleStepCells;
+	Data.LocalMinCells = InShard ? FIntPoint(InShard->LocalMinCells.X, InShard->LocalMinCells.Y) : FIntPoint::ZeroValue;
+	Data.Side = InShard ? InShard->CellCounts.X + 1 : int32(Data.Geometry.Key.SideCells()) / Data.Step + 1;
 
 	const int32 Count =
 		Data.GetVertexCount();
@@ -104,12 +107,8 @@ bool FVoxelSurfaceProxyBuilder::Build(
 	Data.Biome.SetNumUninitialized(Count);
 	Data.Flags.Init(0, Count);
 
-	const int32 TileSide =
-		Data.GetTileSide();
 
-	const FIntPoint TileOrigin =
-		InKey.Coordinate *
-		TileSide;
+	const FIntPoint TileOrigin = Data.GetBuildOrigin();
 
 	TArray<FVoxelColumnSample> Columns;
 	const double ColumnsStart = FPlatformTime::Seconds();
@@ -272,7 +271,7 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 {
 	const int32 Step = InOutData.Step;
 	const int32 Side = InOutData.GetTileSide();
-	const FIntPoint Origin = InOutData.Key.Coordinate * Side;
+	const FIntPoint Origin = InOutData.GetBuildOrigin();
 	const FIntPoint End = Origin + FIntPoint(Side, Side);
 	const FVoxelTreeGenerationSettings& Trees = Config->Recipe->Settings.Ecology.Tree;
 	const FVoxelGenerationBounds Bounds = DistantInfluenceBounds(InOutData, Settings, Trees);
@@ -686,7 +685,7 @@ bool FVoxelSurfaceProxyBuilder::ApplyModifiedSurface(
 		{
 			const FIntPoint WorldXY =
 				ResolveWorldXY(
-					InKey,
+					InOutData.GetBuildOrigin(),
 					X,
 					Y,
 					InOutData.Step, InOutData.Side - 1);

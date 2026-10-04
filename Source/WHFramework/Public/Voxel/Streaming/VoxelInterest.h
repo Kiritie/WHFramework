@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "Voxel/Authoring/VoxelViewProfile.h"
 #include "Voxel/Rendering/VoxelViewTypes.h"
+#include "Voxel/Rendering/VoxelFinePage.h"
+#include "Voxel/Rendering/VoxelStreamingGeometry.h"
 #include "Voxel/Rendering/VoxelTerrainViewPlan.h"
 #include "Voxel/Streaming/VoxelStreamingSource.h"
 #include "Voxel/Generation/VoxelGenerationTypes.h"
@@ -10,6 +12,10 @@
 struct WHFRAMEWORK_API FVoxelSourceInterest
 {
 	FVoxelStreamingSource Source;
+	// Derived from the accepted predecessor frontier; never editable configuration.
+	int32 FirstSideCells[3] = {};
+	FIntVector StageCenters[3];
+	bool bHasStageCenters = false;
 	TSet<FIntVector> DataSections;
 	TSet<FIntVector> FineDataSections;
 	FVoxelGenerationBounds FineBounds;
@@ -35,10 +41,33 @@ struct WHFRAMEWORK_API FVoxelExactDemand
 	double ForwardScore = 0.0;
 };
 
+// Prepared by the existing Interest task. These arrays provide stable bounded GT cursors.
+struct WHFRAMEWORK_API FVoxelTerrainPublicationInputs
+{
+	TArray<FVoxelTerrainGeometry> Geometry;
+	TArray<FVoxelViewKey> Roots;
+	TArray<FIntVector> Fine;
+	TArray<FVoxelViewKey> Proxy;
+	TArray<FVoxelSurfaceTileKey> Surface;
+	TArray<FVoxelMacroTileKey> Macro;
+	TArray<FVoxelFinePageKey> FinePages;
+	TArray<TPair<FIntVector, FVoxelFinePageKey>> FineOwners;
+	TArray<FVoxelViewAdmission> Admissions;
+	uint64 GetAllocatedBytes() const
+	{
+		return Geometry.GetAllocatedSize() + Roots.GetAllocatedSize() + Fine.GetAllocatedSize() + Proxy.GetAllocatedSize() + Surface.GetAllocatedSize() +
+			Macro.GetAllocatedSize() + FinePages.GetAllocatedSize() + FineOwners.GetAllocatedSize() + Admissions.GetAllocatedSize();
+	}
+};
+
 struct WHFRAMEWORK_API FVoxelInterestSet
 {
 	TMap<FGuid, FVoxelSourceInterest> Sources;
 	FVoxelTerrainViewPlan TerrainPlan;
+	TSharedPtr<const FVoxelFinePagePlan, ESPMode::ThreadSafe> FinePagePlan;
+	TSharedPtr<const FVoxelTerrainPublicationInputs, ESPMode::ThreadSafe> PublicationInputs;
+	TMap<FVoxelTerrainSpatialKey, FVoxelTerrainGeometry> Geometry;
+	TSet<FVoxelTerrainSpatialKey> ResolutionFloorPages;
 	FString PlanningError;
 	TSharedPtr<const TSet<FIntVector>, ESPMode::ThreadSafe> FineSections;
 	TArray<FVoxelViewAdmission> Admissions;
@@ -55,6 +84,10 @@ struct WHFRAMEWORK_API FVoxelInterestSet
 	TMap<FVoxelSurfaceTileKey, int32> SurfacePriorities;
 	TMap<FVoxelMacroTileKey, int32> MacroPriorities;
 
+	const FVoxelTerrainGeometry* FindGeometry(const FVoxelViewKey& InKey) const;
+	const FVoxelTerrainGeometry* FindGeometry(const FVoxelSurfaceTileKey& InKey) const;
+	const FVoxelTerrainGeometry* FindGeometry(const FVoxelMacroTileKey& InKey) const;
+
 	uint64 GetAllocatedBytes() const
 	{
 		uint64 SourceBytes = Sources.GetAllocatedSize();
@@ -62,7 +95,7 @@ struct WHFRAMEWORK_API FVoxelInterestSet
 		{
 			SourceBytes += Pair.Value.DataSections.GetAllocatedSize() + Pair.Value.FineDataSections.GetAllocatedSize() + Pair.Value.CollisionSections.GetAllocatedSize();
 		}
-		return SourceBytes + (FineSections ? FineSections->GetAllocatedSize() : 0) + Warmup.GetAllocatedSize() + ExactOrder.GetAllocatedSize() + ExactAdmissionLanes[0].GetAllocatedSize() + ExactAdmissionLanes[1].GetAllocatedSize() + PlayableFineKeys.GetAllocatedSize() + Admissions.GetAllocatedSize() + AdmissionLanes[0].GetAllocatedSize() + AdmissionLanes[1].GetAllocatedSize() +
+		return (PublicationInputs ? PublicationInputs->GetAllocatedBytes() : 0) + Geometry.GetAllocatedSize() + ResolutionFloorPages.GetAllocatedSize() + (FinePagePlan ? FinePagePlan->Pages.GetAllocatedSize() + FinePagePlan->SectionOwners.GetAllocatedSize() : 0) + SourceBytes + (FineSections ? FineSections->GetAllocatedSize() : 0) + Warmup.GetAllocatedSize() + ExactOrder.GetAllocatedSize() + ExactAdmissionLanes[0].GetAllocatedSize() + ExactAdmissionLanes[1].GetAllocatedSize() + PlayableFineKeys.GetAllocatedSize() + Admissions.GetAllocatedSize() + AdmissionLanes[0].GetAllocatedSize() + AdmissionLanes[1].GetAllocatedSize() +
 			AdmissionLanes[2].GetAllocatedSize() + AdmissionLanes[3].GetAllocatedSize() + Exact.GetAllocatedSize() + VoxelProxy.GetAllocatedSize() + Surface.GetAllocatedSize() + Macro.GetAllocatedSize() +
 			VoxelProxyPriorities.GetAllocatedSize() + SurfacePriorities.GetAllocatedSize() + MacroPriorities.GetAllocatedSize() +
 			TerrainPlan.Roots.GetAllocatedSize() + TerrainPlan.Leaves.GetAllocatedSize() +

@@ -1,213 +1,170 @@
 #include "Voxel/Rendering/VoxelFinePage.h"
 
-#include "Voxel/Geometry/VoxelSectionMesher.h"
-#include "Voxel/Streaming/VoxelInterest.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "Voxel/Geometry/VoxelSectionMesher.h"
+#include "Voxel/Rendering/VoxelStreamingGeometry.h"
+#include "Voxel/Streaming/VoxelInterest.h"
 
-uint8 FVoxelFinePagePlanner::ResolveDesiredLevel(
-	const FIntVector& InSection,
-	TConstArrayView<FVoxelStreamingSource> InSources,
-	const FVoxelViewSettings& InSettings)
+uint8 FVoxelFinePagePlanner::ResolveBoundsLevel(const FVoxelGenerationBounds& InBounds,
+	TConstArrayView<FVoxelStreamingSource> InSources, const FVoxelViewSettings& InSettings)
 {
-	constexpr int32 SectionSide = 16;
+	uint8 Result = InSettings.Lod.MaximumFineLevel;
+	bool bHasInfluence = false;
+	for (const FVoxelStreamingSource& Source : InSources)
+	{
+		const int32 InitialSide = Source.View.InitialChunkSideCells;
+		if (!Source.Has(EVoxelStreamingCapability::FineVisual) || Source.View.FineRadiusCells <= 0)
+		{
+			continue;
+		}
+		FVector AlignedMin;
+		FVector AlignedMax;
+		for (int32 Axis = 0; Axis < 3; ++Axis)
+		{
+			AlignedMin[Axis] = double(VoxelStreamingGeometry::FloorDivide(InBounds.Min[Axis], InitialSide) * InitialSide);
+			AlignedMax[Axis] = double((VoxelStreamingGeometry::FloorDivide(int64(InBounds.Max[Axis]) - 1, InitialSide) + 1) * InitialSide);
+		}
+		if (AlignedMax.Z <= double(Source.Center.Z) - Source.View.FineVerticalHalfExtentCells ||
+			AlignedMin.Z >= double(Source.Center.Z) + Source.View.FineVerticalHalfExtentCells)
+		{
+			continue;
+		}
+		const double InfluenceX = FMath::Clamp(double(Source.Center.X), AlignedMin.X, AlignedMax.X);
+		const double InfluenceY = FMath::Clamp(double(Source.Center.Y), AlignedMin.Y, AlignedMax.Y);
+		const double InfluenceDistance = FVector2D::Distance(FVector2D(Source.Center.X, Source.Center.Y),
+			FVector2D(InfluenceX, InfluenceY));
+		if (InfluenceDistance > Source.View.FineRadiusCells)
+		{
+			continue;
+		}
+		bHasInfluence = true;
+		const double NearX = FMath::Clamp(double(Source.Center.X), double(InBounds.Min.X), double(InBounds.Max.X));
+		const double NearY = FMath::Clamp(double(Source.Center.Y), double(InBounds.Min.Y), double(InBounds.Max.Y));
+		const double Distance = FVector2D::Distance(FVector2D(Source.Center.X, Source.Center.Y), FVector2D(NearX, NearY));
+		const uint8 InitialLevel = static_cast<uint8>(FMath::FloorLog2(uint32(Source.View.InitialChunkSideCells / 16)));
+		const double FirstRadius = FMath::Max(16, Source.View.FineLevel0RadiusCells);
+		const int32 Growth = Distance < FirstRadius ? 0 : 1 + FMath::FloorToInt(FMath::Log2(Distance / FirstRadius));
+		const uint8 Desired = static_cast<uint8>(FMath::Min<int32>(InSettings.Lod.MaximumFineLevel, InitialLevel + Growth));
+		Result = FMath::Min(Result, Desired);
+	}
+	return bHasInfluence ? Result : 0;
+}
 
-	const FVector SectionCenter =
-		FVector(InSection * SectionSide) +
-		FVector(SectionSide * 0.5);
+uint8 FVoxelFinePagePlanner::ResolveDesiredLevel(const FIntVector& InSection,
+	TConstArrayView<FVoxelStreamingSource> InSources, const FVoxelViewSettings& InSettings)
+{
+	const FIntVector Min = InSection * 16;
+	return ResolveBoundsLevel({Min, Min + FIntVector(16)}, InSources, InSettings);
+}
 
-	double NearestHorizontalDistance = MAX_dbl;
-	int32 Level0Radius = MAX_int32;
-
+bool FVoxelFinePagePlanner::Build(const TSet<FIntVector>& InSections,
+	TConstArrayView<FVoxelStreamingSource> InSources, const FVoxelViewSettings& InSettings,
+	FVoxelFinePagePlan& OutPlan, FString& OutError)
+{
 	for (const FVoxelStreamingSource& Source : InSources)
 	{
 		if (!Source.Has(EVoxelStreamingCapability::FineVisual))
 		{
 			continue;
 		}
-
-		const double HorizontalDistance = FVector2D::Distance(
-			FVector2D(SectionCenter.X, SectionCenter.Y),
-			FVector2D(Source.Center.X, Source.Center.Y));
-
-		if (HorizontalDistance < NearestHorizontalDistance)
+		if (!VoxelStreamingGeometry::ValidateInitialSide(Source.View.InitialChunkSideCells,
+			InSettings.Lod.MaximumFineLevel, OutError))
 		{
-			NearestHorizontalDistance = HorizontalDistance;
-			Level0Radius = FMath::Max(
-				SectionSide,
-				Source.View.FineLevel0RadiusCells);
+			return false;
 		}
 	}
-
-	if (Level0Radius == MAX_int32 ||
-		NearestHorizontalDistance < Level0Radius)
-	{
-		return 0;
-	}
-
-	const double Ratio =
-		NearestHorizontalDistance /
-		FMath::Max(1.0, static_cast<double>(Level0Radius));
-
-	const int32 Level =
-		1 + FMath::FloorToInt(
-			FMath::Log2(FMath::Max(1.0, Ratio)));
-
-	return static_cast<uint8>(FMath::Clamp(
-		Level,
-		0,
-		static_cast<int32>(InSettings.Lod.MaximumFineLevel)));
-}
-
-void FVoxelFinePagePlanner::Build(
-	const TSet<FIntVector>& InFineSections,
-	TConstArrayView<FVoxelStreamingSource> InSources,
-	const FVoxelViewSettings& InSettings,
-	FVoxelFinePagePlan& OutPlan)
-{
-	OutPlan = {};
-
 	TMap<FVoxelFinePageKey, uint8> Leaves;
-
-	for (const FIntVector& Section : InFineSections)
+	for (const FIntVector& Section : InSections)
 	{
-		const FVoxelFinePageKey Key { Section, 0 };
-		Leaves.Add(
-			Key,
-			ResolveDesiredLevel(
-				Section,
-				InSources,
-				InSettings));
-	}
-
-	auto CanMergePage = [&](const FVoxelFinePageKey& Page)
-	{
-		const FVoxelGenerationBounds Bounds = Page.GetBounds();
-		const FVector2D Min(Bounds.Min.X, Bounds.Min.Y);
-		const FVector2D Max(Bounds.Max.X, Bounds.Max.Y);
-
-		for (const FVoxelStreamingSource& Source : InSources)
+		for (int32 Axis = 0; Axis < 3; ++Axis)
 		{
-			if (!Source.Has(EVoxelStreamingCapability::FineVisual))
+			if (int64(Section[Axis]) * 16 < MIN_int32 || (int64(Section[Axis]) + 1) * 16 > MAX_int32)
 			{
-				continue;
-			}
-
-			const FVector2D Center(Source.Center.X, Source.Center.Y);
-			const FVector2D Nearest(
-				FMath::Clamp(Center.X, Min.X, Max.X),
-				FMath::Clamp(Center.Y, Min.Y, Max.Y));
-
-			const double NearDistance = FVector2D::Distance(Center, Nearest);
-			const int32 LevelStartRadius = FMath::Max(
-				16,
-				Source.View.FineLevel0RadiusCells) <<
-				(Page.Level - 1);
-
-			// 只要 Page 任意部分侵入某个 Source 更精细的距离带，就必须继续拆。
-			if (NearDistance < LevelStartRadius)
-			{
+				OutError = TEXT("Fine section bounds exceed the supported cell coordinate range");
 				return false;
 			}
 		}
-
-		return true;
-	};
-
-	for (uint8 ParentLevel = 1;
-		 ParentLevel <= InSettings.Lod.MaximumFineLevel;
-		 ++ParentLevel)
+		Leaves.Add({Section, 0}, ResolveDesiredLevel(Section, InSources, InSettings));
+	}
+	for (uint8 Level = 1; Level <= InSettings.Lod.MaximumFineLevel; ++Level)
 	{
-		TMap<FVoxelFinePageKey, TArray<FVoxelFinePageKey>> Families;
-
+		TSet<FVoxelFinePageKey> Parents;
 		for (const TPair<FVoxelFinePageKey, uint8>& Pair : Leaves)
 		{
-			if (Pair.Key.Level != ParentLevel - 1 ||
-				Pair.Value < ParentLevel)
+			if (Pair.Key.Level != Level - 1 || Pair.Value < Level)
 			{
 				continue;
 			}
-
-			const FVoxelFinePageKey Parent {
-				FIntVector(
-					VoxelGeneration::FloorDivide(Pair.Key.Coordinate.X, 2),
-					VoxelGeneration::FloorDivide(Pair.Key.Coordinate.Y, 2),
-					VoxelGeneration::FloorDivide(Pair.Key.Coordinate.Z, 2)),
-				ParentLevel
-			};
-
-			Families.FindOrAdd(Parent).Add(Pair.Key);
+			Parents.Add({FIntVector(VoxelGeneration::FloorDivide(Pair.Key.Coordinate.X, 2),
+				VoxelGeneration::FloorDivide(Pair.Key.Coordinate.Y, 2),
+				VoxelGeneration::FloorDivide(Pair.Key.Coordinate.Z, 2)), Level});
 		}
-
-		for (const TPair<FVoxelFinePageKey, TArray<FVoxelFinePageKey>>& Family : Families)
+		for (const FVoxelFinePageKey& Parent : Parents)
 		{
-			if (Family.Value.Num() != 8 ||
-				!CanMergePage(Family.Key))
+			FVoxelTerrainSpatialKey Spatial{EVoxelTerrainRepresentation::Fine, Parent.Coordinate, Parent.Level};
+			FIntVector Min;
+			FIntVector Max;
+			if (!Spatial.TryBounds(0, 16, Min, Max) || ResolveBoundsLevel({Min, Max}, InSources, InSettings) < Level)
 			{
 				continue;
 			}
-
-			bool bComplete = true;
-			uint8 Desired = MAX_uint8;
-
-			for (const FVoxelFinePageKey& Child : Family.Value)
+			TArray<FVoxelFinePageKey, TInlineAllocator<8>> Children;
+			uint8 Desired = InSettings.Lod.MaximumFineLevel;
+			for (int32 ChildIndex = 0; ChildIndex < 8; ++ChildIndex)
 			{
+				const FVoxelFinePageKey Child{Parent.Coordinate * 2 +
+					FIntVector(ChildIndex & 1, (ChildIndex >> 1) & 1, (ChildIndex >> 2) & 1), uint8(Level - 1)};
 				const uint8* ChildDesired = Leaves.Find(Child);
-				if (!ChildDesired || *ChildDesired < ParentLevel)
+				if (!ChildDesired || *ChildDesired < Level)
 				{
-					bComplete = false;
 					break;
 				}
+				Children.Add(Child);
 				Desired = FMath::Min(Desired, *ChildDesired);
 			}
-
-			if (!bComplete)
+			if (Children.Num() != 8)
 			{
 				continue;
 			}
-
-			for (const FVoxelFinePageKey& Child : Family.Value)
+			for (const FVoxelFinePageKey& Child : Children)
 			{
 				Leaves.Remove(Child);
 			}
-
-			Leaves.Add(Family.Key, Desired);
+			Leaves.Add(Parent, Desired);
 		}
 	}
-
+	FVoxelFinePagePlan Candidate;
+	TArray<FIntVector> Sections;
 	for (const TPair<FVoxelFinePageKey, uint8>& Pair : Leaves)
 	{
-		OutPlan.Pages.Add(Pair.Key);
-
-		const FVoxelGenerationBounds Bounds = Pair.Key.GetBounds();
-		const FIntVector MinSection(
-			VoxelGeneration::FloorDivide(Bounds.Min.X, 16),
-			VoxelGeneration::FloorDivide(Bounds.Min.Y, 16),
-			VoxelGeneration::FloorDivide(Bounds.Min.Z, 16));
-		const int32 SectionsPerSide = Pair.Key.GetSide() / 16;
-
-		for (int32 Z = 0; Z < SectionsPerSide; ++Z)
+		Candidate.Pages.Add(Pair.Key);
+		GatherSections(Pair.Key, Sections);
+		for (const FIntVector& Section : Sections)
 		{
-			for (int32 Y = 0; Y < SectionsPerSide; ++Y)
+			if (!InSections.Contains(Section) || Candidate.SectionOwners.Contains(Section))
 			{
-				for (int32 X = 0; X < SectionsPerSide; ++X)
-				{
-					const FIntVector Section =
-						MinSection + FIntVector(X, Y, Z);
-					if (InFineSections.Contains(Section))
-					{
-						OutPlan.SectionOwners.Add(Section, Pair.Key);
-					}
-				}
+				OutError = TEXT("Fine page ownership must be complete, disjoint and limited to requested sections");
+				return false;
 			}
+			Candidate.SectionOwners.Add(Section, Pair.Key);
 		}
 	}
+	if (Candidate.SectionOwners.Num() != InSections.Num())
+	{
+		OutError = TEXT("Fine page plan lost requested sections");
+		return false;
+	}
+	OutPlan = MoveTemp(Candidate);
+	OutError.Reset();
+	return true;
 }
 
 void FVoxelFinePagePlanner::GatherSections(const FVoxelFinePageKey& InPage, TArray<FIntVector>& OutSections)
 {
-	OutSections.Reset();
-	const FIntVector Min = InPage.Coordinate * (1 << InPage.Level);
+	check(InPage.Level <= 4);
 	const int32 Side = 1 << InPage.Level;
+	const FIntVector Min = InPage.Coordinate * Side;
+	OutSections.Reset();
 	OutSections.Reserve(Side * Side * Side);
 	for (int32 Z = 0; Z < Side; ++Z)
 	{
@@ -221,13 +178,15 @@ void FVoxelFinePagePlanner::GatherSections(const FVoxelFinePageKey& InPage, TArr
 	}
 }
 
-void FVoxelFinePagePlanner::AppendMesh(const FVoxelSectionMeshResult& InMesh, const FVector& InOffsetCells, FVoxelSectionMeshResult& OutMesh)
+void FVoxelFinePagePlanner::AppendMesh(const FVoxelSectionMeshResult& InMesh,
+	const FVector& InOffsetCells, FVoxelSectionMeshResult& OutMesh)
 {
 	for (const FVoxelRenderBatch& Source : InMesh.Batches)
 	{
 		FVoxelRenderBatch* Target = OutMesh.Batches.FindByPredicate([&Source](const FVoxelRenderBatch& Batch)
 		{
-			return Batch.Group == Source.Group && Batch.Bank == Source.Bank && Batch.MaterialVariant == Source.MaterialVariant;
+			return Batch.Group == Source.Group && Batch.Bank == Source.Bank &&
+				Batch.MaterialVariant == Source.MaterialVariant;
 		});
 		if (!Target)
 		{
@@ -237,8 +196,14 @@ void FVoxelFinePagePlanner::AppendMesh(const FVoxelSectionMeshResult& InMesh, co
 			Target->MaterialVariant = Source.MaterialVariant;
 		}
 		const int32 Base = Target->Mesh.Vertices.Num();
-		for (const FVector& Vertex : Source.Mesh.Vertices) Target->Mesh.Vertices.Add(Vertex + InOffsetCells);
-		for (const int32 Index : Source.Mesh.Triangles) Target->Mesh.Triangles.Add(Base + Index);
+		for (const FVector& Vertex : Source.Mesh.Vertices)
+		{
+			Target->Mesh.Vertices.Add(Vertex + InOffsetCells);
+		}
+		for (const int32 Index : Source.Mesh.Triangles)
+		{
+			Target->Mesh.Triangles.Add(Base + Index);
+		}
 		Target->Mesh.Normals.Append(Source.Mesh.Normals);
 		Target->Mesh.Tangents.Append(Source.Mesh.Tangents);
 		Target->Mesh.UV0.Append(Source.Mesh.UV0);

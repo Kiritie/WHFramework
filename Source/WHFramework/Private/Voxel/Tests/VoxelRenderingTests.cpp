@@ -86,6 +86,18 @@ namespace
 	};
 }
 
+
+namespace
+{
+	FVoxelTerrainGeometry FixtureGeometry(const FVoxelViewKey& Key, int32 Step)
+	{
+		return {{EVoxelTerrainRepresentation::VoxelProxy, Key.Coordinate, Key.Level}, Step, -128, 4096, 17, 23};
+	}
+	FVoxelTerrainGeometry FixtureGeometry(const FVoxelSurfaceTileKey& Key, int32 Step)
+	{
+		return {{EVoxelTerrainRepresentation::Surface, FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0), Key.Level}, Step, -128, 4096, 17, 23};
+	}
+}
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelKnownEmptyMeshTest,
 	"WHFramework.Voxel.Rendering.KnownEmptyMesh", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
@@ -108,6 +120,7 @@ bool FVoxelKnownEmptyMeshTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Fully enclosed solid is ready without meshing"), FVoxelSectionMesher::IsKnownEmpty(Snapshot, Registry));
 	FVoxelBoundaryTransitionContext Transition;
 	Transition.Owner = {FIntVector::ZeroValue, 1};
+	Transition.SampleStepCells = 2;
 	FVoxelBoundaryTransitionPatch& Patch = Transition.Patches.AddDefaulted_GetRef();
 	Patch.Face.Owner = Transition.Owner;
 	Patch.Face.Neighbor = {FIntVector(2, 0, 0), 0};
@@ -170,6 +183,16 @@ bool FVoxelMeshCoverageClipTest::RunTest(const FString& InParameters)
 	FString Error;
 	if (!TestTrue(TEXT("Coarse test surface builds"), FVoxelHeightfieldMesher::BuildBlockyTerrain(
 		2, 8, Heights, Materials, *Config, *Registry, Source, Error))) return false;
+	Source.Batches[0].MaterialVariant = 2;
+	FVoxelSectionMeshResult Unclipped;
+	VoxelMeshClipper::Subtract(Source, {}, Unclipped);
+	for (int32 BatchIndex = 0; BatchIndex < Source.Batches.Num(); ++BatchIndex)
+	{
+		TestEqual(TEXT("Unchanged triangles retain shared vertices"),
+			Unclipped.Batches[BatchIndex].Mesh.Vertices.Num(), Source.Batches[BatchIndex].Mesh.Vertices.Num());
+		TestEqual(TEXT("Clipping preserves the material variant"),
+			Unclipped.Batches[BatchIndex].MaterialVariant, Source.Batches[BatchIndex].MaterialVariant);
+	}
 	TArray<FBox> Boxes = { FBox(FVector(2, 2, -100), FVector(6, 6, 100)) };
 	auto Check = [this, &Source, &Boxes](const double ExpectedArea)
 	{
@@ -372,13 +395,13 @@ bool FVoxelProxyOverlaySnapshotTest::RunTest(const FString& InParameters)
 	FString Error;
 	const FVoxelVoxelProxyBuilder Builder(Config, Cache);
 	if (!TestTrue(TEXT("Proxy builds from immutable edits"),
-		Builder.Build(EditedKey, Captured, Data, Error))) return false;
+		Builder.Build(EditedKey, Captured, Data, Error, nullptr, FixtureGeometry(EditedKey, EditedKey.GetSampleStep())))) return false;
 	TestEqual(TEXT("Proxy grid follows its coverage and physical sample step"), Data.GridSide, EditedKey.GetGridSide());
 	TestTrue(TEXT("Negative-coordinate edit comes from captured version"), Data.Cells[0].IsAir());
 	TestTrue(TEXT("Neighbour halo uses the same edit snapshot"), Data.Halo[0][0].IsAir());
 	FVoxelVoxelProxyData Updated;
 	if (!TestTrue(TEXT("Later edits build independently of the captured snapshot"),
-		Builder.Build(EditedKey, Overlays, Updated, Error))) return false;
+		Builder.Build(EditedKey, Overlays, Updated, Error, nullptr, FixtureGeometry(EditedKey, EditedKey.GetSampleStep())))) return false;
 	TestEqual(TEXT("Later negative-coordinate placement reaches the same physical cell"),
 		Updated.Cells[0].Pack(), FVoxelBlockState(1, 0).Pack());
 	TestEqual(TEXT("Later halo placement reaches the same physical neighbor"),
@@ -392,9 +415,9 @@ bool FVoxelProxyOverlaySnapshotTest::RunTest(const FString& InParameters)
 	FVoxelVoxelProxyData Built;
 	const FVoxelViewKey ElevatedKey{ FIntVector(0, 0, 64), 1 };
 	if (!TestTrue(TEXT("Elevated natural proxy builds"),
-		Builder.BuildNatural(ElevatedKey, Natural, Error))) return false;
+		Builder.BuildNatural(ElevatedKey, Natural, Error, nullptr, FixtureGeometry(ElevatedKey, ElevatedKey.GetSampleStep())))) return false;
 	if (!TestTrue(TEXT("Elevated edited proxy builds"),
-		Builder.Build(ElevatedKey, Placed, Built, Error))) return false;
+		Builder.Build(ElevatedKey, Placed, Built, Error, nullptr, FixtureGeometry(ElevatedKey, ElevatedKey.GetSampleStep())))) return false;
 	TestTrue(TEXT("Elevated natural cell is air"), Natural.Cells[0].IsAir());
 	TestEqual(TEXT("Off-center player block contributes to distant silhouette"),
 		Built.Cells[0].Pack(), FVoxelBlockState(1, 0).Pack());
@@ -406,8 +429,7 @@ bool FVoxelProxyOverlaySnapshotTest::RunTest(const FString& InParameters)
 	BuildingSection.Blocks.Add(1, FVoxelBlockState(1, 0));
 	FVoxelVoxelProxyData CoarseBuilt;
 	if (!TestTrue(TEXT("Coarse player-built silhouette builds"),
-		Builder.Build({ FIntVector(0, 0, 1), 3 }, CoarseBuilding,
-			CoarseBuilt, Error))) return false;
+		Builder.Build({ FIntVector(0, 0, 1), 3 }, CoarseBuilding, CoarseBuilt, Error, nullptr, FixtureGeometry(FVoxelViewKey{ FIntVector(0, 0, 1), 3 }, FVoxelViewKey{ FIntVector(0, 0, 1), 3 }.GetSampleStep())))) return false;
 	TestEqual(TEXT("Small wall fragment survives distant voxel coarsening"),
 		CoarseBuilt.Cells[0].Pack(), FVoxelBlockState(1, 0).Pack());
 	return true;
@@ -456,7 +478,10 @@ bool FVoxelHeightfieldTransitionEdgeTest::RunTest(const FString& InParameters)
 	FString Error;
 	if (!TestTrue(TEXT("Two-to-one heightfield edges build"),
 		FVoxelHeightfieldTransitionBuilder::BuildEdges(Views, Edges, Error))) return false;
-	TestEqual(TEXT("One coarse tile owns both fine boundary intervals"), Edges.Num(), 2);
+	TestEqual(TEXT("Coarse boundaries and the equal-step height discontinuity have one owner each"), Edges.Num(), 3);
+	TestEqual(TEXT("The coarse tile owns both fine boundary intervals"),
+		Edges.FilterByPredicate([&](const auto& Edge) { return Edge.Owner == Coarse.Key; }).Num(), 2);
+	Edges.RemoveAll([&](const auto& Edge) { return Edge.Owner != Coarse.Key; });
 	for (const FVoxelHeightfieldTransitionEdge& Edge : Edges)
 	{
 		TestTrue(TEXT("The coarser tile owns each interval"), Edge.Owner == Coarse.Key);
@@ -676,7 +701,13 @@ bool FVoxelHeightfieldTransitionInvariantTest::RunTest(const FString& InParamete
 	Views.Add(Neighbor);
 	if (!TestTrue(TEXT("Equal-resolution edge scan succeeds"),
 		FVoxelHeightfieldTransitionBuilder::BuildEdges(Views, Edges, Error))) return false;
-	TestTrue(TEXT("Equal-resolution neighbors add zero transition quads"), Edges.IsEmpty());
+	TestEqual(TEXT("Equal sampling still closes a real height discontinuity"), Edges.Num(), 1);
+	ViewMap.Reset();
+	for (const auto& View : Views) ViewMap.Add(View.Key, View);
+	FVoxelSectionMeshResult EqualStepMesh;
+	TestTrue(TEXT("Equal-step discontinuity builds its owning boundary"),
+		FVoxelHeightfieldTransitionBuilder::BuildMesh(ViewMap.FindChecked(Edges[0].Owner), Edges, ViewMap, *Config, Registry, -64, 4.0, EqualStepMesh, Error));
+	TestFalse(TEXT("Equal-step height difference produces actual boundary geometry"), EqualStepMesh.Batches.IsEmpty());
 	return true;
 }
 
@@ -873,6 +904,8 @@ bool FVoxelProxyTransitionDirectionsTest::RunTest(const FString& InParameters)
 				FVoxelVoxelProxyData NeighborData;
 				NeighborData.Key = Neighbor;
 				const int32 NeighborSide = Neighbor.GetGridSide();
+				NeighborData.GridSide = NeighborSide;
+				NeighborData.Geometry = {{EVoxelTerrainRepresentation::VoxelProxy, Neighbor.Coordinate, Neighbor.Level}, Neighbor.GetSampleStep(), -128, 256, 17, 23};
 				NeighborData.Cells.Init(FVoxelBlockState(0, 0),
 					NeighborSide * NeighborSide * NeighborSide);
 				FIntVector NeighborCell = FIntVector::ZeroValue;
@@ -884,6 +917,7 @@ bool FVoxelProxyTransitionDirectionsTest::RunTest(const FString& InParameters)
 				NeighborData.Cells[Linear(NeighborCell, NeighborSide)] = FVoxelBlockState(1, 0);
 				FVoxelBoundaryTransitionContext Context;
 				Context.Owner = Owner;
+				Context.SampleStepCells = Owner.GetSampleStep();
 				FVoxelBoundaryTransitionPatch& Patch = Context.Patches.AddDefaulted_GetRef();
 				Patch.Face = Faces[0];
 				if (!TestTrue(Case + TEXT(" captures proxy boundary"),
@@ -993,7 +1027,7 @@ bool FVoxelProxyTreeSilhouetteTest::RunTest(const FString& InParameters)
 		Config->Recipe->Settings, NoSurfaceEdits, MakeSurfaceRegistry());
 	FVoxelSurfaceTileData SurfaceTrees;
 	if (!TestTrue(TEXT("Distant tree surface builds"),
-		SurfaceBuilder.Build({FIntPoint::ZeroValue, 1}, SurfaceTrees, Error))) return false;
+		SurfaceBuilder.Build({FIntPoint::ZeroValue, 1}, SurfaceTrees, Error, nullptr, nullptr, nullptr, FixtureGeometry(FVoxelSurfaceTileKey{FIntPoint::ZeroValue, 1}, 1)))) return false;
 	bool bTrunkOwned = false;
 	bool bCrownOwned = false;
 	const FIntPoint TileMin = SurfaceTrees.Key.Coordinate * SurfaceTrees.GetTileSide();
@@ -1040,9 +1074,9 @@ bool FVoxelProxyTreeSilhouetteTest::RunTest(const FString& InParameters)
 	FVoxelVoxelProxyData Natural;
 	FVoxelVoxelProxyData Destroyed;
 	if (!TestTrue(TEXT("Tree proxy builds"),
-		Builder.Build(Key, {}, Natural, Error)) ||
+		Builder.Build(Key, {}, Natural, Error, nullptr, FixtureGeometry(Key, Key.GetSampleStep()))) ||
 		!TestTrue(TEXT("Destroyed tree proxy builds"),
-			Builder.Build(Key, Removed, Destroyed, Error))) return false;
+			Builder.Build(Key, Removed, Destroyed, Error, nullptr, FixtureGeometry(Key, Key.GetSampleStep())))) return false;
 	int32 NaturalTreeCells = 0;
 	int32 DestroyedTreeCells = 0;
 	for (int32 Index = 0; Index < Natural.Cells.Num(); ++Index)
@@ -1097,21 +1131,22 @@ bool FVoxelSurfaceDistantEditsTest::RunTest(const FString& InParameters)
 	Settings.MaxZ = 512;
 	FVoxelTestOverlaySource Overlay;
 	const FVoxelSurfaceProxyBuilder Builder(Generator, Config, Settings, Overlay, MakeSurfaceRegistry());
-	const FVoxelSurfaceTileKey Key{FIntPoint::ZeroValue, 4};
+	const FVoxelSurfaceTileKey Key{FIntPoint::ZeroValue, 5};
+	const FVoxelTerrainGeometry Geometry{{EVoxelTerrainRepresentation::Surface, FIntVector::ZeroValue, Key.Level}, 16, Settings.MinZ, Settings.MaxZ, 17, 23};
 	FString Error;
 	FVoxelSurfaceTileData Natural;
-	if (!TestTrue(TEXT("Coarse surface builds"), Builder.Build(Key, Natural, Error))) return false;
+	if (!TestTrue(TEXT("Coarse surface builds"), Builder.Build(Key, Natural, Error, nullptr, nullptr, nullptr, Geometry))) return false;
 	const int32 BaseZ = (VoxelGeneration::FloorDivide(Natural.GroundZ[0] + 31, 16) + 1) * 16;
 	Overlay.Set(FIntVector(0, 0, BaseZ), FVoxelBlockState(1, 0));
 	FVoxelSurfaceTileData Tiny;
-	if (!TestTrue(TEXT("Small player edit builds"), Builder.Build(Key, Tiny, Error))) return false;
+	if (!TestTrue(TEXT("Small player edit builds"), Builder.Build(Key, Tiny, Error, nullptr, nullptr, nullptr, Geometry))) return false;
 	TestEqual(TEXT("Subcell edit does not create a distant block"), Tiny.DistantCells.Num(), Natural.DistantCells.Num());
 	for (int32 Z = 1; Z < 16; ++Z)
 	{
 		Overlay.Set(FIntVector(0, 0, BaseZ + Z), FVoxelBlockState(1, 0));
 	}
 	FVoxelSurfaceTileData Built;
-	if (!TestTrue(TEXT("Visible player construction builds"), Builder.Build(Key, Built, Error))) return false;
+	if (!TestTrue(TEXT("Visible player construction builds"), Builder.Build(Key, Built, Error, nullptr, nullptr, nullptr, Geometry))) return false;
 	bool bFound = false;
 	for (const FVoxelDistantCell& Cell : Built.DistantCells)
 	{
@@ -1125,7 +1160,7 @@ bool FVoxelSurfaceDistantEditsTest::RunTest(const FString& InParameters)
 	}
 	FVoxelSurfaceTileData CrossBoundary;
 	if (!TestTrue(TEXT("Cross-boundary construction builds"),
-		Builder.Build(Key, CrossBoundary, Error))) return false;
+		Builder.Build(Key, CrossBoundary, Error, nullptr, nullptr, nullptr, Geometry))) return false;
 	bool bShowsShortEdge = false;
 	for (const FVoxelDistantCell& Cell : CrossBoundary.DistantCells)
 	{
@@ -1142,7 +1177,7 @@ bool FVoxelSurfaceDistantEditsTest::RunTest(const FString& InParameters)
 	}
 	FVoxelSurfaceTileData Removed;
 	if (!TestTrue(TEXT("Destroyed construction builds"),
-		Builder.Build(Key, Removed, Error))) return false;
+		Builder.Build(Key, Removed, Error, nullptr, nullptr, nullptr, Geometry))) return false;
 	bool bRetainsDestroyedColumn = false;
 	for (const FVoxelDistantCell& Cell : Removed.DistantCells)
 	{
@@ -1172,11 +1207,11 @@ bool FVoxelSurfaceProxyOverlayTest::RunTest(const FString& InParameters)
 	const FVoxelSurfaceTileKey Key{ FIntPoint::ZeroValue, 0 };
 	FVoxelSurfaceTileData Natural;
 	FString Error;
-	TestTrue(TEXT("Natural surface builds without exact runtime"), Builder.Build(Key, Natural, Error));
+	TestTrue(TEXT("Natural surface builds without exact runtime"), Builder.Build(Key, Natural, Error, nullptr, nullptr, nullptr, FixtureGeometry(Key, 1)));
 	const int32 NaturalGround = Natural.GroundZ[0];
 	Overlay.Set(FIntVector(-1, 0, NaturalGround + 1), FVoxelBlockState());
 	FVoxelSurfaceTileData BorderEdit;
-	TestTrue(TEXT("Border edit surface builds"), Builder.Build(Key, BorderEdit, Error));
+	TestTrue(TEXT("Border edit surface builds"), Builder.Build(Key, BorderEdit, Error, nullptr, nullptr, nullptr, FixtureGeometry(Key, 1)));
 	TestTrue(TEXT("Adjacent edit revision is captured for distant silhouettes"),
 		BorderEdit.Revision > Natural.Revision);
 	TestEqual(TEXT("Adjacent edit leaves sampled ground unchanged"),
@@ -1184,12 +1219,12 @@ bool FVoxelSurfaceProxyOverlayTest::RunTest(const FString& InParameters)
 
 	Overlay.Set(FIntVector(0, 0, NaturalGround - 20), FVoxelBlockState());
 	FVoxelSurfaceTileData UndergroundEdit;
-	TestTrue(TEXT("Underground overlay surface builds"), Builder.Build(Key, UndergroundEdit, Error));
+	TestTrue(TEXT("Underground overlay surface builds"), Builder.Build(Key, UndergroundEdit, Error, nullptr, nullptr, nullptr, FixtureGeometry(Key, 1)));
 	TestEqual(TEXT("Underground edit does not change surface"), UndergroundEdit.GroundZ[0], NaturalGround);
 
 	Overlay.Set(FIntVector(0, 0, NaturalGround), FVoxelBlockState());
 	FVoxelSurfaceTileData SurfaceEdit;
-	TestTrue(TEXT("Surface overlay builds"), Builder.Build(Key, SurfaceEdit, Error));
+	TestTrue(TEXT("Surface overlay builds"), Builder.Build(Key, SurfaceEdit, Error, nullptr, nullptr, nullptr, FixtureGeometry(Key, 1)));
 	TestTrue(
 		FString::Printf(
 			TEXT("Surface removal lowers the visible ground (natural=%d, edited=%d)"),
@@ -1209,7 +1244,7 @@ bool FVoxelSurfaceProxyOverlayTest::RunTest(const FString& InParameters)
 		SurfaceSettings,
 		MaterialOverlay, MakeSurfaceRegistry());
 	FVoxelSurfaceTileData MaterialEdit;
-	TestTrue(TEXT("Remapped material overlay builds"), RemappedBuilder.Build(Key, MaterialEdit, Error));
+	TestTrue(TEXT("Remapped material overlay builds"), RemappedBuilder.Build(Key, MaterialEdit, Error, nullptr, nullptr, nullptr, FixtureGeometry(Key, 1)));
 	TestEqual(TEXT("Overlay material remains in recipe symbol domain"), MaterialEdit.SurfaceMaterial[0], uint16(3));
 	return true;
 }
@@ -1227,7 +1262,10 @@ bool FVoxelMacroOverlayTest::RunTest(const FString& InParameters)
 	const FVoxelMacroTerrainBuilder MacroBuilder(Generator, Config, Settings, Overlay, MakeSurfaceRegistry());
 	FVoxelMacroTileData Macro;
 	FString Error;
-	if (!TestTrue(TEXT("Macro consumes immutable edits"), MacroBuilder.Build({ FIntPoint::ZeroValue, 0 }, Macro, Error)))
+	const FVoxelMacroTileKey Key{FIntPoint::ZeroValue, 7};
+	const FVoxelTerrainGeometry Geometry{{EVoxelTerrainRepresentation::Macro, FIntVector::ZeroValue, Key.Level},
+		FVoxelMacroTileData::BaseStep, Settings.MinZ, Settings.MaxZ, 17, 23};
+	if (!TestTrue(TEXT("Macro consumes immutable edits"), MacroBuilder.Build(Key, Macro, Error, nullptr, Geometry)))
 	{
 		return false;
 	}
@@ -1486,34 +1524,34 @@ bool FVoxelSurfaceStateTest::RunTest(const FString& InParameters)
 	const FVoxelSurfaceTileKey Key { FIntPoint::ZeroValue, 0 };
 	FVoxelSurfaceTileData Data;
 	FString Error;
-	if (!TestTrue(TEXT("Natural reference builds"), Builder.Build(Key, Data, Error))) return false;
+	if (!TestTrue(TEXT("Natural reference builds"), Builder.Build(Key, Data, Error, nullptr, nullptr, nullptr, FixtureGeometry(Key, 1)))) return false;
 	const int32 Ground = Data.GroundZ[0];
 	const int32 EditedWaterZ = FMath::Max(Ground, Data.WaterZ[0]) + 8;
 	if (!TestTrue(TEXT("Water edit remains above natural ground and water within world bounds"),
 		EditedWaterZ + 1 < Config->Recipe->Settings.MaxZ)) return false;
 	Overlay.Set(FIntVector(0, 0, EditedWaterZ + 1), FVoxelBlockState(9, 0));
 	if (!TestTrue(FString::Printf(TEXT("Decoration edit builds: %s"), *Error),
-		Builder.Build(Key, Data, Error)))
+		Builder.Build(Key, Data, Error, nullptr, nullptr, nullptr, FixtureGeometry(Key, 1))))
 	{
 		AddError(Error);
 		return false;
 	}
 	TestEqual(TEXT("Non-solid decoration cannot raise terrain"), Data.GroundZ[0], Ground);
 	Overlay.Set(FIntVector(0, 0, EditedWaterZ), Config->Water);
-	TestTrue(TEXT("Water edit builds"), Builder.Build(Key, Data, Error));
+	TestTrue(TEXT("Water edit builds"), Builder.Build(Key, Data, Error, nullptr, nullptr, nullptr, FixtureGeometry(Key, 1)));
 	TestEqual(TEXT("Water is separate from solid ground"), Data.GroundZ[0], Ground);
 	TestEqual(TEXT("Edited water level is preserved"), Data.WaterZ[0], EditedWaterZ);
 	FVoxelWaterSurfaceTileData Water;
 	TestTrue(TEXT("Edited water view builds"), FVoxelWaterViewBuilder().Build(Data, Water, Error));
 	TestTrue(TEXT("Water without natural hydrology flags remains visible"), Water.WaterKind[0] != uint8(EVoxelWaterKind::None));
 	Overlay.Set(FIntVector(0, 0, EditedWaterZ), Config->Air);
-	TestTrue(TEXT("Removed water builds"), Builder.Build(Key, Data, Error));
+	TestTrue(TEXT("Removed water builds"), Builder.Build(Key, Data, Error, nullptr, nullptr, nullptr, FixtureGeometry(Key, 1)));
 	TestTrue(TEXT("Removed water does not retain stale level"), Data.WaterZ[0] < EditedWaterZ);
 	for (int32 Z = Config->Recipe->Settings.MinZ; Z < Config->Recipe->Settings.MaxZ; ++Z)
 	{
 		Overlay.Set(FIntVector(0, 0, Z), Config->Air);
 	}
-	TestTrue(TEXT("Fully cleared column builds"), Builder.Build(Key, Data, Error));
+	TestTrue(TEXT("Fully cleared column builds"), Builder.Build(Key, Data, Error, nullptr, nullptr, nullptr, FixtureGeometry(Key, 1)));
 	TestEqual(TEXT("Cleared column has no phantom ground"), Data.GroundZ[0], MIN_int32);
 	TestEqual(TEXT("Cleared column has no phantom water"), Data.WaterZ[0], MIN_int32);
 	FVoxelSectionMeshResult Mesh;
@@ -1552,7 +1590,35 @@ bool FVoxelHeightfieldHaloSeamTest::RunTest(const FString& InParameters)
 			}
 		}
 	}
-	TestEqual(TEXT("The shared boundary has one owning wall"), Walls, 1);
+	TestEqual(TEXT("The replaced outer boundary is suppressed on the parent mesh"), Walls, 0);
+	FVoxelSurfaceTileData Owner, Neighbor;
+	Owner.Key = {FIntPoint::ZeroValue, 0};
+	Neighbor.Key = {FIntPoint(1, 0), 0};
+	Owner.Side = Neighbor.Side = 2;
+	Owner.Step = Neighbor.Step = 16;
+	Owner.Revision = Neighbor.Revision = 1;
+	Owner.GroundZ.Init(10, 4);
+	Neighbor.GroundZ.Init(4, 4);
+	Owner.WaterZ.Init(MIN_int32, 4);
+	Neighbor.WaterZ.Init(MIN_int32, 4);
+	Owner.Flags.Init(0, 4);
+	Neighbor.Flags.Init(0, 4);
+	Owner.SurfaceMaterial.Init(1, 4);
+	Neighbor.SurfaceMaterial.Init(1, 4);
+	const auto OwnerView = FVoxelHeightfieldTransitionBuilder::MakeView(Owner);
+	const auto NeighborView = FVoxelHeightfieldTransitionBuilder::MakeView(Neighbor);
+	const TArray<FVoxelHeightfieldTileView> Views{OwnerView, NeighborView};
+	TArray<FVoxelHeightfieldTransitionEdge> Edges;
+	TestTrue(TEXT("Real same-step boundary finds its unique owner"), FVoxelHeightfieldTransitionBuilder::BuildEdges(Views, Edges, Error));
+	TMap<FVoxelHeightfieldNodeKey, FVoxelHeightfieldTileView> ViewMap;
+	ViewMap.Add(OwnerView.Key, OwnerView);
+	ViewMap.Add(NeighborView.Key, NeighborView);
+	FVoxelSectionMeshResult Boundary;
+	TestTrue(TEXT("Actual replacement boundary builds"), FVoxelHeightfieldTransitionBuilder::BuildMesh(
+		OwnerView, Edges, ViewMap, *Config, *Registry, -64, 32.0, Boundary, Error));
+	int32 BoundaryWalls = 0;
+	for (const auto& Batch : Boundary.Batches) BoundaryWalls += Batch.Mesh.Vertices.Num() / 4;
+	TestEqual(TEXT("The real boundary has one owning wall"), BoundaryWalls, 1);
 	return true;
 }
 

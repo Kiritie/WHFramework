@@ -10,6 +10,7 @@
 #include "Voxel/Streaming/VoxelInterestRuntime.h"
 #include "Voxel/Streaming/VoxelResidencyManager.h"
 #include "Voxel/Rendering/VoxelViewManager.h"
+#include "Voxel/Rendering/VoxelCoveragePartition.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
 #include "Voxel/Tests/VoxelTestUtilities.h"
 
@@ -77,11 +78,11 @@ bool FVoxelSurfaceTwoToOneBalanceTest::RunTest(const FString& InParameters)
 		Source.Capabilities = EVoxelStreamingCapability::Data |
 			EVoxelStreamingCapability::FineVisual |
 			EVoxelStreamingCapability::WorldVisual;
-		Source.View.FineRadiusCells = 0;
+		Source.View.FineRadiusCells = 16;
 		Source.View.VoxelProxyRadiusCells = 64;
 		Source.View.SurfaceRadiusCells = 8192;
 		Settings.DefaultSourceView.MacroRadiusCells = 16384;
-		Settings.Lod.MaximumSurfaceLevel = 5;
+		Settings.Lod.MaximumSurfaceSpatialLevel = 10;
 	}
 	Sources[0].Center = FIntVector::ZeroValue;
 	Sources[1].Center = FIntVector(3072, 1024, 0);
@@ -90,7 +91,7 @@ bool FVoxelSurfaceTwoToOneBalanceTest::RunTest(const FString& InParameters)
 	int32 Overlaps = 0;
 	int32 DifferentLevels = 0;
 	const int32 Violations = CountTwoToOneViolations(Interest.Surface,
-		Settings.Lod.SurfaceMinimumTileSideCells, Overlaps, DifferentLevels);
+		16, Overlaps, DifferentLevels);
 	TestTrue(TEXT("Surface plan contains neighboring LOD levels"), DifferentLevels > 0);
 	TestEqual(TEXT("Surface tiles do not overlap after source merge"), Overlaps, 0);
 	TestEqual(TEXT("Every shared surface edge is at most 2:1"), Violations, 0);
@@ -141,7 +142,7 @@ bool FVoxelMacroTwoToOneBalanceTest::RunTest(const FString& InParameters)
 		Source.Capabilities = EVoxelStreamingCapability::Data |
 			EVoxelStreamingCapability::FineVisual |
 			EVoxelStreamingCapability::WorldVisual;
-		Source.View.FineRadiusCells = 0;
+		Source.View.FineRadiusCells = 16;
 		Source.View.VoxelProxyRadiusCells = 64;
 		Source.View.SurfaceRadiusCells = 2048;
 		Settings.DefaultSourceView.MacroRadiusCells = 96000;
@@ -153,7 +154,7 @@ bool FVoxelMacroTwoToOneBalanceTest::RunTest(const FString& InParameters)
 	int32 Overlaps = 0;
 	int32 DifferentLevels = 0;
 	const int32 Violations = CountTwoToOneViolations(Interest.Macro,
-		Settings.Lod.MacroMinimumTileSideCells, Overlaps, DifferentLevels);
+		16, Overlaps, DifferentLevels);
 	TestTrue(TEXT("Macro plan contains neighboring LOD levels"), DifferentLevels > 0);
 	TestEqual(TEXT("Macro tiles do not overlap after source merge"), Overlaps, 0);
 	TestEqual(TEXT("Every shared macro edge is at most 2:1"), Violations, 0);
@@ -532,7 +533,46 @@ bool FVoxelStreamingLodSymmetryTest::RunTest(const FString& InParameters)
 	Source.Center = FIntVector::ZeroValue;
 	const FVoxelInterestManager Manager;
 	const FVoxelInterestSet Interest = Manager.Compute(MakeArrayView(&Source, 1), Manifest, Settings);
-	TestTrue(TEXT("Surface refines beyond the former count limit"), Interest.Surface.Num() > 256);
+	if (!Interest.PlanningError.IsEmpty())
+	{
+		AddError(FString::Printf(TEXT("Symmetry plan rejected: %s"), *Interest.PlanningError));
+		return false;
+	}
+	// Spatial page counts no longer determine mesh quality. Validate the independently planned geometry.
+	for (const FVoxelSurfaceTileKey& Key : Interest.Surface)
+	{
+		const auto* Geometry = Interest.FindGeometry(Key);
+		if (!TestNotNull(TEXT("Every Surface page carries independent sampling geometry"), Geometry)) return false;
+		FString GeometryError;
+		TestTrue(TEXT("Adaptive Surface sampling geometry is valid"), Geometry->Validate(GeometryError));
+		TestEqual(TEXT("Spatial identity remains on the absolute 16-cell grid"), Geometry->Key.SideCells(), int64(16) << Key.Level);
+		FIntVector Min, Max;
+		Geometry->Key.TryBounds(Geometry->WorldMinZ, Geometry->WorldMaxZ, Min, Max);
+		TArray<FVoxelCoverageRegion> Remaining{{Min, Max}};
+		for (const auto& Pair : Interest.Geometry)
+		{
+			if (Pair.Key.Representation != EVoxelTerrainRepresentation::Fine && Pair.Key.Representation != EVoxelTerrainRepresentation::VoxelProxy) continue;
+			FIntVector CoverMin, CoverMax;
+			Pair.Key.TryBounds(Pair.Value.WorldMinZ, Pair.Value.WorldMaxZ, CoverMin, CoverMax);
+			TArray<FVoxelCoverageRegion> Next;
+			for (const auto& Piece : Remaining) FVoxelCoverageEvaluationTask::Subtract(Piece, {CoverMin, CoverMax}, Next);
+			Remaining = MoveTemp(Next);
+		}
+		double Nearest = MAX_dbl;
+		for (const auto& Piece : Remaining)
+		{
+			const FVector Closest(FMath::Clamp(double(Source.Center.X), double(Piece.Min.X), double(Piece.Max.X)),
+				FMath::Clamp(double(Source.Center.Y), double(Piece.Min.Y), double(Piece.Max.Y)),
+				FMath::Clamp(double(Source.Center.Z), double(Piece.Min.Z), double(Piece.Max.Z)));
+			if (FVector2D::Distance(FVector2D(Closest), FVector2D(Source.Center.X, Source.Center.Y)) <= Source.View.SurfaceRadiusCells)
+				Nearest = FMath::Min(Nearest, FVector::Distance(Closest, FVector(Source.Center)));
+		}
+		TestTrue(TEXT("Every Surface page has an actual uncovered contribution"), Nearest != MAX_dbl);
+		const double Pixels = Geometry->SampleStepCells * Source.ViewportHeightPixels /
+			(2.0 * FMath::Tan(FMath::DegreesToRadians(double(Source.VerticalFovDegrees)) * 0.5) * FMath::Max(0.001, Nearest));
+		TestTrue(TEXT("Surface sampling meets actual contribution SSE or the full-resolution floor"),
+			Geometry->SampleStepCells == 1 || Pixels <= Settings.Lod.TargetScreenErrorPixels + 0.001);
+	}
 	TestTrue(TEXT("Macro has adaptive coverage"), Interest.Macro.Num() > 0);
 	TestFalse(TEXT("Surface coverage remains available"), Interest.Surface.IsEmpty());
 	TestFalse(TEXT("Macro coverage remains available"), Interest.Macro.IsEmpty());
@@ -982,11 +1022,14 @@ bool FVoxelSchedulerTerrainReserveTest::RunTest(const FString& Parameters)
 		return Request;
 	};
 	Scheduler.Enqueue(MakeRequest(1, EVoxelTaskKind::GenerateExactBase, 0.0));
-	for (int32 Index = 0; Index < 7; ++Index)
+	int32 AcceptedGeneration = 0;
+	for (int32 Index = 0; Index < Budget.MaxPendingTasks; ++Index)
 	{
-		TestTrue(TEXT("Ordinary generation uses its available slots"), Scheduler.Enqueue(MakeRequest(2 + Index, EVoxelTaskKind::GenerateExactBase, Index)));
+		if (!Scheduler.Enqueue(MakeRequest(2 + Index, EVoxelTaskKind::GenerateExactBase, Index))) break;
+		++AcceptedGeneration;
 	}
-	TestFalse(TEXT("Generation cannot consume every representation slot"), Scheduler.Enqueue(MakeRequest(20, EVoxelTaskKind::GenerateExactBase, 100.0)));
+	TestTrue(TEXT("Generation receives capacity while reserving independent lanes"),
+		AcceptedGeneration > 0 && AcceptedGeneration < Budget.MaxPendingTasks);
 	const EVoxelTaskKind Kinds[] = { EVoxelTaskKind::BuildFineMesh, EVoxelTaskKind::BuildVoxelProxy, EVoxelTaskKind::BuildSurface, EVoxelTaskKind::BuildMacro };
 	for (int32 Index = 0; Index < 4; ++Index)
 	{
@@ -1390,7 +1433,7 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 		Budget.MaxCompletedResultsPerFrame = 16;
 		Budget.MaxHeavyCompletedResultsPerFrame = 16;
 		Scheduler.SetBudget(Budget);
-		Scheduler.SetTerrainBuildStage(0);
+		Scheduler.SetObservedTerrainStage(0);
 		auto Enqueue = [&](const int32 Index)
 		{
 			FVoxelTaskRequest Request;
@@ -1435,12 +1478,10 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 				if (Result.Stamp.Token < 8 && (Result.Stamp.Token & 1) && !Result.bCanceled)
 				{
 					const int32 Stage = static_cast<int32>(Result.Stamp.Token) / 2;
-					TestTrue(TEXT("Mesh cannot apply ahead of the consumer terrain stage"), Stage <= Scheduler.GetTerrainBuildStage());
+					TestEqual(TEXT("Stage remains an observation throughout independent mesh progress"), Scheduler.GetObservedTerrainStage(), 0);
 					Stages.Add(Stage);
 				}
 			}, 8.0);
-			const int32 Stage = Scheduler.GetTerrainBuildStage();
-			if (Stage < 3 && Completed[Stage * 2 + 1] == 1) Scheduler.SetTerrainBuildStage(Stage + 1);
 			FPlatformProcess::Sleep(0.001f);
 		}
 		TestEqual(TEXT("Foreground and background queues drain while completions are pumped"),
@@ -1457,12 +1498,7 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 		}
 		TestEqual(TEXT("All terrain tasks finish without cancellation"), TerrainCompleted, 8);
 		TestEqual(TEXT("Every terrain mesh stage applies"), Stages.Num(), 4);
-		for (int32 Index = 1; Index < Stages.Num(); ++Index)
-		{
-			TestTrue(*FString::Printf(TEXT("Stage application order: workers=%d index=%d previous=%d current=%d"),
-				WorkerCount, Index, Stages[Index - 1], Stages[Index]),
-				Stages[Index - 1] <= Stages[Index]);
-		}
+		TestEqual(TEXT("All four mesh lanes progress at observed Stage zero"), TSet<int32>(Stages).Num(), 4);
 	}
 	return true;
 }
@@ -1601,8 +1637,8 @@ bool FVoxelDataPrefetchSchedulerTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Macro data fixture is admitted"), Scheduler.Enqueue(MakeRequest(4, EVoxelTaskKind::GenerateMacro, EVoxelWorkClass::Prefetch)));
 		const FVoxelTaskDiagnostics Stats = Scheduler.GetDiagnostics();
 		TestEqual(TEXT("Data starts while Fine is still running"), Stats.RunningByKind.FindRef(EVoxelTaskKind::GenerateVoxelProxy), 1);
-		TestEqual(TEXT("Data obeys the configured background quota and leaves foreground capacity"), Stats.Running, 1 + BackgroundSlots);
-		TestEqual(TEXT("Excess speculative data remains queued"), Stats.Pending, 3 - BackgroundSlots);
+		TestEqual(TEXT("Idle capacity is borrowed within the bounded data window"), Stats.Running, 1 + Budget.MaxConcurrentTasks / 2);
+		TestEqual(TEXT("Excess speculative data remains queued"), Stats.Pending, 3 - Budget.MaxConcurrentTasks / 2);
 		TestTrue(TEXT("Collision fixture is admitted"), Scheduler.Enqueue(MakeRequest(5, EVoxelTaskKind::BuildCollision, EVoxelWorkClass::Critical)));
 		TestEqual(TEXT("New collision work starts without waiting for prefetch"), Scheduler.GetDiagnostics().RunningByKind.FindRef(EVoxelTaskKind::BuildCollision), 1);
 		Scheduler.CancelMatching([](EVoxelTaskKind Kind, const FVoxelTaskStamp&)
@@ -1610,7 +1646,7 @@ bool FVoxelDataPrefetchSchedulerTest::RunTest(const FString& Parameters)
 			return Kind == EVoxelTaskKind::GenerateMacro;
 		});
 		TestEqual(TEXT("Obsolete queued data is removed"), Scheduler.GetDiagnostics().PendingByKind.FindRef(EVoxelTaskKind::GenerateMacro), 0);
-		TestEqual(TEXT("Canceling Macro preserves unrelated queued Surface data"), Scheduler.GetDiagnostics().Pending, 2 - BackgroundSlots);
+		TestEqual(TEXT("Canceling Macro removes only the remaining queued data"), Scheduler.GetDiagnostics().Pending, 2 - Budget.MaxConcurrentTasks / 2);
 		int32 Completed[5] = {};
 		int32 Canceled = 0;
 		Release.Store(true);

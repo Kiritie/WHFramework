@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Voxel/Rendering/VoxelStreamingGeometry.h"
 #include "Voxel/Authoring/VoxelViewProfile.h"
 #include "Voxel/Generation/VoxelGenerationPipeline.h"
 #include "Voxel/Rendering/VoxelViewTypes.h"
@@ -21,6 +22,15 @@ struct WHFRAMEWORK_API FVoxelMacroTileData
 	static constexpr int32 BaseStep = 64;
 
 	FVoxelMacroTileKey Key;
+	FVoxelTerrainGeometry Geometry;
+	uint64 RequestId = 1;
+	// Derived locally using the current material and emission rules; never part of wire identity.
+	uint64 EstimatedMeshBytes = 0;
+	FIntPoint LocalMinCells = FIntPoint::ZeroValue;
+	FIntPoint GetBuildOrigin() const
+	{
+		return Key.Coordinate * int32(Geometry.Key.SideCells()) + LocalMinCells;
+	}
 	uint64 Revision = 0;
 	int32 Side = VertexSide;
 	int32 Step = 0;
@@ -57,7 +67,9 @@ public:
 		const FVoxelMacroTileKey& InKey,
 		FVoxelMacroTileData& OutData,
 		FString& OutError,
-		const TAtomic<bool>* InCancel = nullptr) const;
+		const TAtomic<bool>* InCancel,
+		const FVoxelTerrainGeometry& InGeometry,
+		const FVoxelTerrainBuildShard* InShard = nullptr) const;
 
 private:
 	FVoxelLodTopologySettings Lod;

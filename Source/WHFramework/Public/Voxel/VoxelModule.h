@@ -67,6 +67,7 @@ class WHFRAMEWORK_API UVoxelModule : public UModuleBase
 {
 #if WITH_DEV_AUTOMATION_TESTS
 	friend class FVoxelNavigationResidencyTest;
+	friend class FVoxelInterestInputBudgetTest;
 #endif
 	GENERATED_BODY()
 	GENERATED_MODULE(UVoxelModule)

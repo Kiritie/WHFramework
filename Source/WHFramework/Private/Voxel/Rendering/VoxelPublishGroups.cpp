@@ -3,6 +3,7 @@
 #include "Voxel/Rendering/VoxelMacroTerrain.h"
 #include "Voxel/Rendering/VoxelSurfaceProxy.h"
 #include "Voxel/Rendering/VoxelViewTypes.h"
+#include "Voxel/Rendering/VoxelStreamingGeometry.h"
 
 namespace
 {
@@ -57,6 +58,147 @@ namespace
 	}
 }
 
+int32 FVoxelPublishGroupContinuation::FindRoot(int32 InIndex)
+{
+	while (Parents[InIndex] != InIndex)
+	{
+		Parents[InIndex] = Parents[Parents[InIndex]];
+		InIndex = Parents[InIndex];
+	}
+	return InIndex;
+}
+
+void FVoxelPublishGroupContinuation::RefreshInterval(const int32 InNode)
+{
+	auto& Node = Intervals[InNode];
+	Node.MaximumEnd = Footprints[Node.Footprint].Bounds.Max.X;
+	if (Node.Left != INDEX_NONE) Node.MaximumEnd = FMath::Max(Node.MaximumEnd, Intervals[Node.Left].MaximumEnd);
+	if (Node.Right != INDEX_NONE) Node.MaximumEnd = FMath::Max(Node.MaximumEnd, Intervals[Node.Right].MaximumEnd);
+}
+
+int32 FVoxelPublishGroupContinuation::InsertInterval(const int32 InRoot, const int32 InNode)
+{
+	if (InRoot == INDEX_NONE) return InNode;
+	const double NodeMin = Footprints[Intervals[InNode].Footprint].Bounds.Min.X;
+	const double RootMin = Footprints[Intervals[InRoot].Footprint].Bounds.Min.X;
+	if (NodeMin < RootMin || (NodeMin == RootMin && InNode < InRoot))
+	{
+		const int32 Child = InsertInterval(Intervals[InRoot].Left, InNode);
+		Intervals[InRoot].Left = Child;
+		if (Intervals[Child].Priority < Intervals[InRoot].Priority)
+		{
+			Intervals[InRoot].Left = Intervals[Child].Right;
+			Intervals[Child].Right = InRoot;
+			RefreshInterval(InRoot);
+			RefreshInterval(Child);
+			return Child;
+		}
+	}
+	else
+	{
+		const int32 Child = InsertInterval(Intervals[InRoot].Right, InNode);
+		Intervals[InRoot].Right = Child;
+		if (Intervals[Child].Priority < Intervals[InRoot].Priority)
+		{
+			Intervals[InRoot].Right = Intervals[Child].Left;
+			Intervals[Child].Left = InRoot;
+			RefreshInterval(InRoot);
+			RefreshInterval(Child);
+			return Child;
+		}
+	}
+	RefreshInterval(InRoot);
+	return InRoot;
+}
+
+bool FVoxelPublishGroupContinuation::Add(const FVoxelPublishFootprint& InFootprint)
+{
+	if (Phase != 0 || Footprints.Num() >= 8192) return false;
+	const int32 Index = Footprints.Add(InFootprint);
+	Parents.Add(Index);
+	GroupIndices.Add(INDEX_NONE);
+	if (const int32* Previous = Keys.Find(InFootprint.Key)) Parents[FindRoot(*Previous)] = Index;
+	else Keys.Add(InFootprint.Key, Index);
+	if (!InFootprint.bTransition) Owners.Add(InFootprint.Key, Index);
+	if (InFootprint.Bounds.IsValid)
+	{
+		FInterval Node;
+		Node.Footprint = Index;
+		uint32 Priority = static_cast<uint32>(Index + 1);
+		Priority ^= Priority >> 16;
+		Priority *= 0x7feb352du;
+		Priority ^= Priority >> 15;
+		Priority *= 0x846ca68bu;
+		Node.Priority = Priority ^ (Priority >> 16);
+		Node.MaximumEnd = InFootprint.Bounds.Max.X;
+		const int32 NodeIndex = Intervals.Add(Node);
+		IntervalRoot = InsertInterval(IntervalRoot, NodeIndex);
+	}
+	return true;
+}
+
+bool FVoxelPublishGroupContinuation::Advance(const int32 InMaximumOperations)
+{
+	if (Phase == 0) { Phase = 1; Cursor = 0; }
+	for (int32 Operation = 0; Operation < FMath::Max(0, InMaximumOperations); ++Operation)
+	{
+		if (Phase == 1)
+		{
+			if (!Footprints.IsValidIndex(Cursor)) { Phase = 2; Cursor = 0; continue; }
+			const auto& Transition = Footprints[Cursor];
+			if (Transition.bTransition)
+			{
+				auto Owner = Transition.Key;
+				if (Owner.Representation == 4) Owner.Representation = 2;
+				else if (Owner.Representation == 5) Owner.Representation = 3;
+				if (const int32* Index = Owners.Find(Owner); Index && IsTransitionOwner(Transition, Footprints[*Index]))
+					Parents[FindRoot(*Index)] = FindRoot(Cursor);
+			}
+			++Cursor;
+		}
+		else if (Phase == 2)
+		{
+			if (!Footprints.IsValidIndex(Cursor)) { Phase = 3; Cursor = 0; continue; }
+			const auto& Current = Footprints[Cursor];
+			if (!Current.Bounds.IsValid) { ++Cursor; bQueryStarted = false; continue; }
+			if (!bQueryStarted)
+			{
+				if (IntervalRoot != INDEX_NONE) QueryStack.Add(IntervalRoot);
+				bQueryStarted = true;
+			}
+			if (QueryStack.IsEmpty()) { ++Cursor; bQueryStarted = false; continue; }
+			const auto& Node = Intervals[QueryStack.Pop(EAllowShrinking::No)];
+			if (Node.MaximumEnd < Current.Bounds.Min.X) continue;
+			const auto& Other = Footprints[Node.Footprint];
+			if (Node.Left != INDEX_NONE) QueryStack.Add(Node.Left);
+			if (Other.Bounds.Min.X > Current.Bounds.Max.X) continue;
+			if (Node.Right != INDEX_NONE) QueryStack.Add(Node.Right);
+			if (Node.Footprint >= Cursor) continue;
+			++ComparedFootprints;
+			if (Interacts(Current, Other)) Parents[FindRoot(Node.Footprint)] = FindRoot(Cursor);
+		}
+		else if (Phase == 3)
+		{
+			if (!Footprints.IsValidIndex(Cursor)) { Phase = 4; return true; }
+			const int32 Root = FindRoot(Cursor);
+			GroupIndices[Cursor++] = Ordinals.FindOrAdd(Root, Ordinals.Num());
+		}
+		else return true;
+	}
+	return Phase == 4;
+}
+
+const TArray<int32>& FVoxelPublishGroupContinuation::GetGroupIndices() const
+{
+	check(Phase == 4);
+	return GroupIndices;
+}
+
+uint64 FVoxelPublishGroupContinuation::GetComparedFootprints() const
+{
+	return ComparedFootprints;
+}
+
 FBox FVoxelPublishGroupPlanner::OwnershipBounds(
 	const FVoxelPublishGroupKey& InKey,
 	const double InBlockSize, const FVoxelLodTopologySettings& InLod)
@@ -75,11 +217,11 @@ FBox FVoxelPublishGroupPlanner::OwnershipBounds(
 		break;
 	case 2:
 	case 4:
-		BaseSide = InLod.SurfaceMinimumTileSideCells;
+		BaseSide = 16;
 		break;
 	case 3:
 	case 5:
-		BaseSide = InLod.MacroMinimumTileSideCells;
+		BaseSide = 16;
 		break;
 	default:
 		return FBox(ForceInit);
@@ -185,4 +327,74 @@ void FVoxelPublishGroupPlanner::Build(
 		const int32 Root = FindRoot(Parents, Index);
 		OutGroupIndices[Index] = Ordinals.FindOrAdd(Root, Ordinals.Num());
 	}
+}
+
+void FVoxelPublishBoundsIndex::Add(const int32 InOrdinal, const FBox& InBounds)
+{
+	if (!InBounds.IsValid) return;
+	Bounds.Add(InOrdinal, InBounds);
+	uint8 Level = 0;
+	double Side = 800.0;
+	const double Extent = FMath::Max(InBounds.Max.X - InBounds.Min.X, InBounds.Max.Y - InBounds.Min.Y);
+	while (Side < Extent && Level < 31) { ++Level; Side *= 2.0; }
+	const FIntPoint Min(FMath::FloorToInt(InBounds.Min.X / Side), FMath::FloorToInt(InBounds.Min.Y / Side));
+	const FIntPoint Max(FMath::FloorToInt(InBounds.Max.X / Side), FMath::FloorToInt(InBounds.Max.Y / Side));
+	for (int32 Y = Min.Y; Y <= Max.Y; ++Y)
+		for (int32 X = Min.X; X <= Max.X; ++X)
+		{
+			FKey Key{FIntPoint(X, Y), Level};
+			Nodes.FindOrAdd(Key).Own.Add(InOrdinal);
+			while (Key.Level < 31)
+			{
+				Key.Coordinate = FIntPoint(static_cast<int32>(VoxelStreamingGeometry::FloorDivide(Key.Coordinate.X, 2)),
+					static_cast<int32>(VoxelStreamingGeometry::FloorDivide(Key.Coordinate.Y, 2)));
+				++Key.Level;
+				Nodes.FindOrAdd(Key);
+			}
+		}
+}
+
+void FVoxelPublishBoundsIndex::BeginQuery(const FBox& InBounds, FQuery& OutQuery) const
+{
+	OutQuery = {};
+	OutQuery.Bounds = InBounds;
+	if (!InBounds.IsValid) return;
+	for (int32 Y : {-1, 0}) for (int32 X : {-1, 0}) OutQuery.Stack.Add({FIntPoint(X, Y), 31});
+}
+
+bool FVoxelPublishBoundsIndex::AdvanceQuery(FQuery& InOutQuery, int32& OutOrdinal) const
+{
+	OutOrdinal = INDEX_NONE;
+	if (InOutQuery.bHasCurrent)
+	{
+		const auto& Own = Nodes.FindChecked(InOutQuery.Current).Own;
+		if (InOutQuery.OwnCursor < Own.GetMaxIndex())
+		{
+			const auto Id = FSetElementId::FromInteger(InOutQuery.OwnCursor++);
+			if (!Own.IsValidId(Id)) return false;
+			const int32 Candidate = Own[Id];
+			if (InOutQuery.Seen.Contains(Candidate)) return false;
+			InOutQuery.Seen.Add(Candidate);
+			const FBox& Box = Bounds.FindChecked(Candidate);
+			if (Box.Min.X <= InOutQuery.Bounds.Max.X && Box.Max.X >= InOutQuery.Bounds.Min.X &&
+				Box.Min.Y <= InOutQuery.Bounds.Max.Y && Box.Max.Y >= InOutQuery.Bounds.Min.Y) OutOrdinal = Candidate;
+			return false;
+		}
+		InOutQuery.bHasCurrent = false;
+	}
+	if (InOutQuery.Stack.IsEmpty()) return true;
+	const FKey Key = InOutQuery.Stack.Pop(EAllowShrinking::No);
+	const FNode* Node = Nodes.Find(Key);
+	if (!Node) return false;
+	const double Side = 800.0 * static_cast<double>(1ull << Key.Level);
+	const double MinX = Key.Coordinate.X * Side, MinY = Key.Coordinate.Y * Side;
+	if (MinX > InOutQuery.Bounds.Max.X || MinX + Side < InOutQuery.Bounds.Min.X ||
+		MinY > InOutQuery.Bounds.Max.Y || MinY + Side < InOutQuery.Bounds.Min.Y) return false;
+	InOutQuery.Current = Key;
+	InOutQuery.OwnCursor = 0;
+	InOutQuery.bHasCurrent = !Node->Own.IsEmpty();
+	if (Key.Level > 0)
+		for (int32 Child = 0; Child < 4; ++Child)
+			InOutQuery.Stack.Add({Key.Coordinate * 2 + FIntPoint(Child & 1, (Child >> 1) & 1), uint8(Key.Level - 1)});
+	return false;
 }

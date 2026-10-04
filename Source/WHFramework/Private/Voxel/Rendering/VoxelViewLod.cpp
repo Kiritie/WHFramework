@@ -1,4 +1,5 @@
 #include "Voxel/Rendering/VoxelViewLod.h"
+#include "Voxel/Rendering/VoxelStreamingGeometry.h"
 
 #include "Voxel/Rendering/VoxelViewTypes.h"
 #include "Voxel/Streaming/VoxelInterest.h"
@@ -57,25 +58,11 @@ uint8 VoxelViewLod::ResolveVoxelProxyLevel(
 
 bool VoxelViewLod::ValidateTopology(const FVoxelLodTopologySettings& InSettings, FString& OutError)
 {
-	const int32 ProxySide = InSettings.VoxelProxyMinimumChunkSideCells;
-	if (ProxySide < 32 || ProxySide % 16 != 0 || !FMath::IsPowerOfTwo(ProxySide / 16) ||
-		InSettings.MaximumFineLevel > 4 || InSettings.MaximumVoxelProxyLevel > 8 ||
-		InSettings.MaximumSurfaceLevel > 8 || InSettings.MaximumMacroLevel > 8 ||
-		ProxySide > (16 << 8) ||
-		InSettings.MaximumVoxelProxyLevel < FMath::FloorLog2(ProxySide / 16) ||
-		!FMath::IsPowerOfTwo(InSettings.SurfaceMinimumTileSideCells) ||
-		!FMath::IsPowerOfTwo(InSettings.SurfaceBaseSampleStepCells) ||
-		!FMath::IsPowerOfTwo(InSettings.MacroMinimumTileSideCells) ||
-		!FMath::IsPowerOfTwo(InSettings.MacroBaseSampleStepCells) ||
-		InSettings.SurfaceMinimumTileSideCells < InSettings.SurfaceBaseSampleStepCells ||
-		InSettings.MacroMinimumTileSideCells < InSettings.MacroBaseSampleStepCells ||
-		InSettings.SurfaceMinimumTileSideCells > (MAX_int32 >> InSettings.MaximumSurfaceLevel) ||
-		InSettings.MacroMinimumTileSideCells > (MAX_int32 >> InSettings.MaximumMacroLevel) ||
-		InSettings.SurfaceMinimumTileSideCells / FMath::Max(1, InSettings.SurfaceBaseSampleStepCells) > 512 ||
-		InSettings.MacroMinimumTileSideCells / FMath::Max(1, InSettings.MacroBaseSampleStepCells) > 512 ||
+	if (InSettings.MaximumFineLevel > 4 || InSettings.MaximumVoxelProxyLevel > 20 ||
+		InSettings.MaximumSurfaceSpatialLevel > 20 || InSettings.MaximumMacroSpatialLevel > 20 ||
 		!FMath::IsFinite(InSettings.TargetScreenErrorPixels) || InSettings.TargetScreenErrorPixels < 0.1f)
 	{
-		OutError = TEXT("Invalid voxel LOD topology: aligned sizes, sampling steps, levels and screen error are required");
+		OutError = TEXT("Invalid absolute terrain level limit or screen error policy");
 		return false;
 	}
 	OutError.Reset();
@@ -84,7 +71,7 @@ bool VoxelViewLod::ValidateTopology(const FVoxelLodTopologySettings& InSettings,
 
 uint8 VoxelViewLod::MinimumVoxelProxyLevel(const FVoxelLodTopologySettings& InSettings)
 {
-	return static_cast<uint8>(FMath::FloorLog2(InSettings.VoxelProxyMinimumChunkSideCells / 16));
+	return 1;
 }
 
 FVoxelResolvedViewRanges VoxelViewLod::ResolveViewRanges(const FVoxelStreamingSource& InSource)
@@ -99,24 +86,23 @@ FVoxelResolvedViewRanges VoxelViewLod::ResolveViewRanges(const FVoxelStreamingSo
 
 int32 VoxelViewLod::ResolveReplanCells(const int32 InRadius, const float InFraction, const int32 InMinimumCells)
 {
-	const int32 Radius = FMath::Max(1, InRadius);
-	const double Raw = FMath::Max(1.0, Radius * FMath::Clamp(static_cast<double>(InFraction), 0.0, 1.0));
-	const int32 Lower = 1 << FMath::FloorLog2(FMath::Max(1, FMath::FloorToInt(Raw)));
-	const int32 Upper = Lower <= MAX_int32 / 2 ? Lower << 1 : Lower;
-	const int32 Quantized = FMath::Abs(Raw - Lower) <= FMath::Abs(Upper - Raw) ? Lower : Upper;
-	return FMath::Clamp(FMath::Max(InMinimumCells, Quantized), 1, Radius);
+	return VoxelStreamingGeometry::ResolveReplanStep(FMath::Max(1, InRadius),
+		FMath::Clamp(double(InFraction), 0.0, 1.0), FMath::Max(1, InMinimumCells));
 }
 
-FVoxelResolvedViewRanges VoxelViewLod::ResolveReplanSteps(const FVoxelStreamingSource& InSource, const FVoxelViewSettings& InSettings)
+FVoxelResolvedViewRanges VoxelViewLod::ResolveReplanSteps(const FVoxelStreamingSource& InSource,
+	const FVoxelViewSettings& InSettings, const FVoxelSourceInterest* InAccepted)
 {
-	const FVoxelResolvedViewRanges Ranges = ResolveViewRanges(InSource);
+	const auto Ranges = ResolveViewRanges(InSource);
 	const float Fraction = InSettings.Planning.ReplanDistanceFraction;
-	return {
-		ResolveReplanCells(Ranges.Fine, Fraction, 16),
-		ResolveReplanCells(Ranges.Proxy, Fraction, InSettings.Lod.VoxelProxyMinimumChunkSideCells),
-		ResolveReplanCells(Ranges.Surface, Fraction, InSettings.Lod.SurfaceMinimumTileSideCells),
-		ResolveReplanCells(Ranges.Macro, Fraction, InSettings.Lod.MacroMinimumTileSideCells)
+	const auto Minimum = [InAccepted](int32 Stage)
+	{
+		return InAccepted && InAccepted->FirstSideCells[Stage] > 0 ? InAccepted->FirstSideCells[Stage] : 16;
 	};
+	return {ResolveReplanCells(Ranges.Fine, Fraction, InSource.View.InitialChunkSideCells),
+		ResolveReplanCells(Ranges.Proxy, Fraction, Minimum(0)),
+		ResolveReplanCells(Ranges.Surface, Fraction, Minimum(1)),
+		ResolveReplanCells(Ranges.Macro, Fraction, Minimum(2))};
 }
 
 int32 VoxelViewLod::MovementCriticalFineRadius(const FVoxelStreamingSource& InSource)
@@ -128,22 +114,22 @@ int32 VoxelViewLod::MovementCriticalFineRadius(const FVoxelStreamingSource& InSo
 
 int32 VoxelViewLod::SurfaceSide(const FVoxelLodTopologySettings& InSettings, const uint8 InLevel)
 {
-	return InSettings.SurfaceMinimumTileSideCells << InLevel;
+	return 16 << InLevel;
 }
 
 int32 VoxelViewLod::SurfaceStep(const FVoxelLodTopologySettings& InSettings, const uint8 InLevel)
 {
-	return InSettings.SurfaceBaseSampleStepCells << InLevel;
+	return 1 << FMath::Max(0, int32(InLevel) - 5);
 }
 
 int32 VoxelViewLod::MacroSide(const FVoxelLodTopologySettings& InSettings, const uint8 InLevel)
 {
-	return InSettings.MacroMinimumTileSideCells << InLevel;
+	return 16 << InLevel;
 }
 
 int32 VoxelViewLod::MacroStep(const FVoxelLodTopologySettings& InSettings, const uint8 InLevel)
 {
-	return InSettings.MacroBaseSampleStepCells << InLevel;
+	return 1 << FMath::Max(0, int32(InLevel) - 5);
 }
 
 // 纹理尺度只由采样等级决定，不能随贪心合并面的宽高变化。

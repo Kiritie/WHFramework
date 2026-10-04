@@ -77,12 +77,12 @@ void FVoxelVolumeTransitionPlanner::GatherCoverageRegions(const TSet<FVoxelViewK
 void FVoxelVolumeTransitionPlanner::Build(
 	const TSet<FVoxelViewKey>& InVisible,
 	const uint8 InMaximumLevel,
-	TArray<FVoxelVolumeTransitionFace>& OutFaces)
+	TArray<FVoxelVolumeTransitionFace>& OutFaces, const TMap<FVoxelViewKey, int32>* InSampleSteps)
 {
 	OutFaces.Reset();
 	for (const FVoxelViewKey& Fine : InVisible)
 	{
-		if (Fine.Level >= InMaximumLevel) continue;
+		if (Fine.Level > InMaximumLevel) continue;
 		const FVoxelGenerationBounds FineBounds = Fine.GetBounds();
 		for (int32 Axis = 0; Axis < 3; ++Axis)
 		{
@@ -98,7 +98,17 @@ void FVoxelVolumeTransitionPlanner::Build(
 				}();
 				FIntVector SameCoordinate = Fine.Coordinate;
 				SameCoordinate[Axis] += Sign;
-				if (InVisible.Contains({SameCoordinate, Fine.Level})) continue;
+				const FVoxelViewKey Same{SameCoordinate, Fine.Level};
+				if (InVisible.Contains(Same))
+				{
+					const int32* FineStep = InSampleSteps ? InSampleSteps->Find(Fine) : nullptr;
+					const int32* SameStep = InSampleSteps ? InSampleSteps->Find(Same) : nullptr;
+					if (Fine.Level > 0 && FineStep && SameStep && *FineStep > *SameStep)
+					{
+						OutFaces.Add({Fine, Same, static_cast<EVoxelVolumeFaceDirection>(Axis * 2 + (Sign < 0 ? 1 : 0)), Same.GetBounds().Min, Same.GetBounds().Max, 1});
+					}
+					continue;
+				}
 				for (uint8 Level = Fine.Level + 1; Level <= InMaximumLevel; ++Level)
 				{
 					const int32 Side = VolumeTransitionSectionSide << Level;
@@ -107,7 +117,8 @@ void FVoxelVolumeTransitionPlanner::Build(
 							VoxelGeneration::FloorDivide(Point.Y, Side),
 							VoxelGeneration::FloorDivide(Point.Z, Side)), Level};
 					if (!InVisible.Contains(Coarse) ||
-						!TouchesFace(FineBounds, Coarse.GetBounds(), Axis, Sign)) continue;
+						!(TouchesFace(FineBounds, Coarse.GetBounds(), Axis, Sign) ||
+						(Coarse.GetBounds().Min[Axis] <= FineBounds.Min[Axis] && Coarse.GetBounds().Max[Axis] >= FineBounds.Max[Axis]))) continue;
 					FVoxelVolumeTransitionFace& Face = OutFaces.AddDefaulted_GetRef();
 					Face.Owner = Coarse;
 					Face.Neighbor = Fine;
