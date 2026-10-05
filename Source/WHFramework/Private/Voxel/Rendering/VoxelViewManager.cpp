@@ -175,6 +175,15 @@ void FVoxelViewManager::Tick(
 		const bool bCurrentInterest = AppliedInterestRevision == InInterestRevision;
 		if (Phase == 0 && !bCurrentInterest)
 			AdvanceInterestInputs(InInterestRevision, InObservers);
+		else if (Phase == 0 && bTaskPrioritiesDirty)
+			Run(EVoxelPublishPhase::Priority, [this, InObservers]
+			{
+				PriorityObservers = TArray<FVector>(InObservers);
+				RebuildAdmissions(InObservers);
+				UpdateTaskPriorities();
+				Publisher->InvalidatePriorities();
+				bTaskPrioritiesDirty = false;
+			});
 		else if (Phase == 1)
 		{
 			Publisher->Tick(TerrainFrameBudget);
@@ -847,9 +856,7 @@ void FVoxelViewManager::RefreshTaskPriorities()
 {
 	if (Module.GetCurrentInterest().PublicationInputs)
 	{
-		// A source-only snapshot still changes priorities/layout. Apply it under the terrain deadline.
-		AppliedInterestRevision = 0;
-		PendingPublicationInputs.Reset();
+		bTaskPrioritiesDirty = true;
 		bTerrainBuildStageDirty = true;
 		return;
 	}
@@ -2093,7 +2100,7 @@ void FVoxelViewManager::ResolveTransitionVisibility()
 		if (!Actor || !CoverageAffects(VoxelProxyCoverageRect(Key))) continue;
 		const bool bVisible = TargetTerrainNodes.Contains(Key);
 		const FVoxelPublishGroupKey GroupKey{1, Key.Coordinate, Key.Level};
-		if (Actor->IsHidden() == !bVisible && Publisher->IsCommitted(Actor) && !Publisher->IsGroupBusy(GroupKey)) continue;
+		if (!bVisible && Actor->IsHidden() && Publisher->IsCommitted(Actor) && !Publisher->IsGroupBusy(GroupKey)) continue;
 		const FGuid Group = BeginPublishGroup(GroupKey);
 		if (VoxelCoverage::IntersectsAny3D(VoxelProxyCoverageBox(Key), PendingVolumeHandoffBoxes))
 		{
@@ -3950,6 +3957,7 @@ void FVoxelViewManager::Reset()
 	Admissions = {};
 	PendingPublicationInputs.Reset();
 	PendingInterestRevision = 0;
+	bTaskPrioritiesDirty = false;
 	InterestInputPhase = InterestInputCursor = 0;
 	PendingFinePagePlan = {};
 	PendingAdmissions.Reset();

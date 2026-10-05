@@ -266,6 +266,7 @@ private:
 	uint64 WorldEpoch = 0;
 	uint64 AppliedInterestRevision = 0;
 	bool bTerrainBuildStageDirty = true;
+	bool bTaskPrioritiesDirty = false;
 	TArray<FVoxelViewAdmission> Admissions;
 	FVoxelPublishBudget TerrainFrameBudget;
 	bool bTerrainFrameBudgetActive = false;

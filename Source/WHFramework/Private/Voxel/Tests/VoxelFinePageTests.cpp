@@ -220,6 +220,27 @@ bool FVoxelFinePageCoverageTest::RunTest(const FString& InParameters)
 		TestFalse(TEXT("Source-only Page refresh does not dirty heightfield topology"), MovingManager.bHeightfieldTopologyDirty);
 		Interest.Sources.Reset();
 	}
+	{
+		auto& Interest = const_cast<FVoxelInterestSet&>(Module->GetCurrentInterest());
+		Interest.PublicationInputs = MakeShared<FVoxelTerrainPublicationInputs, ESPMode::ThreadSafe>();
+		FVoxelViewManager PendingManager(*Module, Scheduler, 1);
+		PendingManager.PendingPublicationInputs = Interest.PublicationInputs;
+		PendingManager.PendingInterestRevision = 2;
+		PendingManager.InterestInputPhase = 5;
+		PendingManager.InterestInputCursor = 137;
+		for (int32 Refresh = 0; Refresh < 10; ++Refresh)
+		{
+			PendingManager.RefreshTaskPriorities();
+		}
+		TestTrue(TEXT("Priority refresh retains pending publication inputs"), PendingManager.PendingPublicationInputs == Interest.PublicationInputs);
+		TestEqual(TEXT("Priority refresh preserves input phase"), PendingManager.InterestInputPhase, 5);
+		TestEqual(TEXT("Priority refresh preserves input cursor"), PendingManager.InterestInputCursor, 137);
+		PendingManager.AppliedInterestRevision = 2;
+		PendingManager.RefreshTaskPriorities();
+		TestEqual(TEXT("Priority refresh keeps committed coverage eligible"), PendingManager.AppliedInterestRevision, uint64(2));
+		TestTrue(TEXT("Priority refresh is deferred to the frame budget"), PendingManager.bTaskPrioritiesDirty);
+		Interest.PublicationInputs.Reset();
+	}
 	for (const bool bAdd : {true, false})
 	{
 		for (const bool bSurface : {true, false})
