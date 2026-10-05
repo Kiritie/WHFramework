@@ -23,44 +23,85 @@ FVoxelEmergeManager::FVoxelEmergeManager(
 	, Manifest(InManifest)
 	, Registry(InRegistry)
 {
+	PlanCoordinator->SetConsumerWakeCallback(
+		[this](const FIntVector& Key)
+		{
+			WakeCriticalSection(Key);
+		});
+	Generator->SetOverlayConsumerWakeCallback(
+		[this](const FIntVector& Key)
+		{
+			WakeCriticalSection(Key);
+		});
 }
 
-void FVoxelEmergeManager::Tick(
-	const FVoxelInterestSet& InInterest,
-	const uint64 InInterestRevision,
-	const double InNow,
-	const TMap<int32, double>& InDataAdmissionLimits,
-	const int32 InMaxBuildsPerFrame,
-	const double InAdmissionMilliseconds)
+void FVoxelEmergeManager::Tick(const FVoxelInterestSet& InInterest, const uint64 InInterestRevision, const double InNow,
+	const TMap<int32, double>& InDataAdmissionLimits, const int32 InMaxBuildsPerFrame, const double InAdmissionMilliseconds)
 {
-	if (CurrentInterestRevision != InInterestRevision)
+	if (CurrentInterestRevision != InInterestRevision || CurrentPriorityRevision != InInterest.PriorityRevision)
 	{
-		RebuildDemand(
-			InInterest,
-			InInterestRevision);
+		RebuildDemand(InInterest, InInterestRevision);
 	}
-
-	if (OrderedKeys.IsEmpty())
-	{
-		return;
-	}
-
+	const double Started = FPlatformTime::Seconds();
+	const double Deadline = Started + FMath::Max(0.1, InAdmissionMilliseconds) / 1000.0;
+	const double CriticalDeadline = AdmissionLanes[1].IsEmpty() ? Deadline : Started + (Deadline - Started) * 0.75;
 	const int32 BuildLimit = FMath::Clamp(InMaxBuildsPerFrame, 1, 1024);
-	const int32 MaximumAttempts = FMath::Min(OrderedKeys.Num(), FMath::Max(64, BuildLimit * 8));
-	const double Deadline = FPlatformTime::Seconds() + FMath::Max(0.1, InAdmissionMilliseconds) / 1000.0;
+	const int32 MaximumAttempts = FMath::Max(64, BuildLimit * 8);
 	int32 Submitted = 0;
-	if (!OverlayBoundsRequests.IsEmpty() && InNow >= OverlayBoundsRetryAfterSeconds)
+
+	for (int32 Attempt = 0; Attempt < FMath::Min(64, CriticalAdmissionKeys.Num()) && FPlatformTime::Seconds() < CriticalDeadline; ++Attempt)
+	{
+		CriticalFallbackCursor %= CriticalAdmissionKeys.Num();
+		const FIntVector Key = CriticalAdmissionKeys[CriticalFallbackCursor++];
+		const FVoxelSection* Section = Runtime.FindSection(Key);
+		if (Section && (Section->Status == EVoxelSectionStatus::DataReady || Section->Status == EVoxelSectionStatus::Failed))
+		{
+			continue;
+		}
+		FWaitingPlanSection* Waiting = WaitingPlanSections.Find(Key);
+		if (Waiting && Section && !(Waiting->Stamp == Section->Stamp))
+		{
+			PlanCoordinator->ReleaseConsumer(Key);
+			Generator->ReleaseOverlaySectionConsumer(Key);
+			WaitingPlanSections.Remove(Key);
+			Waiting = nullptr;
+		}
+		if (!Waiting || InNow >= Waiting->RetryAfterSeconds)
+		{
+			WakeCriticalSection(Key);
+		}
+	}
+
+	FIntVector CriticalKey;
+	for (int32 Attempt = 0;
+		Attempt < MaximumAttempts && Submitted < BuildLimit && FPlatformTime::Seconds() < CriticalDeadline && ReadyCriticalSections.Dequeue(CriticalKey);
+		++Attempt)
+	{
+		QueuedCriticalSections.Remove(CriticalKey);
+		const FVoxelExactDemand* Demand = CurrentDemand.Find(CriticalKey);
+		if (!Demand || !IsCriticalDemand(*Demand))
+		{
+			continue;
+		}
+		Submitted += RequestSection(CriticalKey, *Demand) ? 1 : 0;
+	}
+
+	if (!OverlayBoundsRequests.IsEmpty() && InNow >= OverlayBoundsRetryAfterSeconds && FPlatformTime::Seconds() < Deadline)
 	{
 		NextOverlayBoundsIndex %= OverlayBoundsRequests.Num();
 		const FOverlayBoundsRequest& Request = OverlayBoundsRequests[NextOverlayBoundsIndex];
-		const auto Status = Generator->EnsureOverlayBoundsReady(Request.Bounds,
-			EVoxelWorkClass::ExactData, Request.SourcePriority);
-		if (Status.bReady || Status.bFailed) OverlayBoundsRequests.RemoveAt(NextOverlayBoundsIndex);
-		else ++NextOverlayBoundsIndex;
+		const FVoxelOverlayPreflightStatus Status = Generator->EnsureOverlayBoundsReady(Request.Bounds, EVoxelWorkClass::Visible, Request.SourcePriority);
+		if (Status.bReady || Status.bFailed)
+		{
+			OverlayBoundsRequests.RemoveAt(NextOverlayBoundsIndex);
+		}
+		else
+		{
+			++NextOverlayBoundsIndex;
+		}
 		OverlayBoundsRetryAfterSeconds = InNow + 0.2;
 	}
-
-	for (int32 LaneIndex = 0; LaneIndex < 2; ++LaneIndex)
+	for (int32 LaneIndex = 1; LaneIndex < 2; ++LaneIndex)
 	{
 		const TArray<int32>& Lane = AdmissionLanes[LaneIndex];
 		const double LaneDeadline = LaneIndex == 0 && !AdmissionLanes[1].IsEmpty()
@@ -92,16 +133,28 @@ void FVoxelEmergeManager::Tick(
 	if (InNow - LastAdmissionDiagnosticTime >= 5.0)
 	{
 		UE_LOG(LogTemp, Display,
-			TEXT("Voxel emerge admission: exact=%d ordered=%d waiting=%d planPending=%d planReady=%d overlayPending=%d overlayReady=%d enqueueAttempts=%d enqueued=%d nextCritical=%d nextOrdinary=%d"),
-			CurrentDemand.Num(), OrderedKeys.Num(), WaitingPlanSections.Num(),
-			PlanPendingAttempts, PlanReadyAttempts, OverlayPendingAttempts,
-			OverlayReadyAttempts, EnqueueAttempts, EnqueuedTasks, NextAdmissionIndices[0], NextAdmissionIndices[1]);
+			TEXT("Voxel emerge admission: exact=%d critical=%d ready=%d blocked=%d fallback=%d planPending=%d overlayPending=%d enqueued=%d"),
+			CurrentDemand.Num(), CriticalAdmissionKeys.Num(), QueuedCriticalSections.Num(), WaitingPlanSections.Num(), CriticalFallbackCursor,
+			PlanPendingAttempts, OverlayPendingAttempts, EnqueuedTasks);
+		int32 Reported = 0;
+		for (const auto& Pair : WaitingPlanSections)
+		{
+			const FVoxelExactDemand* Demand = CurrentDemand.Find(Pair.Key);
+			if (Reported >= 8)
+				break;
+			if (!Demand || !IsCriticalDemand(*Demand))
+			{
+				continue;
+			}
+			const FVoxelSection* Section = Runtime.FindSection(Pair.Key);
+			UE_LOG(LogTemp, Display, TEXT("Voxel critical blocked: section=%s epoch=%llu token=%llu status=%d ageMs=%.2f blocker=%s"), *Pair.Key.ToString(),
+				Pair.Value.Stamp.Epoch, Pair.Value.Stamp.Token, Section ? static_cast<int32>(Section->Status) : -1,
+				(InNow - Pair.Value.BlockedSinceSeconds) * 1000.0, *Pair.Value.Blocker);
+			++Reported;
+		}
 		LastAdmissionDiagnosticTime = InNow;
 		PlanPendingAttempts = 0;
-		PlanReadyAttempts = 0;
 		OverlayPendingAttempts = 0;
-		OverlayReadyAttempts = 0;
-		EnqueueAttempts = 0;
 		EnqueuedTasks = 0;
 	}
 }
@@ -138,6 +191,7 @@ bool FVoxelEmergeManager::OnTask(
 
 	if (InResult.bCanceled)
 	{
+		WakeCriticalSection(InResult.Stamp.Section);
 		return true;
 	}
 
@@ -149,6 +203,7 @@ bool FVoxelEmergeManager::OnTask(
 			Section->Error.Reset();
 			PlanCoordinator->ReleaseConsumer(InResult.Stamp.Section);
 			WaitingPlanSections.Remove(InResult.Stamp.Section);
+			WakeCriticalSection(InResult.Stamp.Section);
 			return true;
 		}
 		UE_LOG(LogTemp, Error, TEXT("Voxel section generation failed: section=%s kind=%d error=%s"),
@@ -295,6 +350,10 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureEnvironmentBounds(
 void FVoxelEmergeManager::Reset()
 {
 	CurrentDemand.Reset();
+	CriticalAdmissionKeys.Reset();
+	ReadyCriticalSections.Empty();
+	QueuedCriticalSections.Reset();
+	CriticalFallbackCursor = 0;
 	WaitingPlanSections.Reset();
 	EnvironmentColumnStates.Reset();
 	PlanCoordinator->Reset();
@@ -304,6 +363,7 @@ void FVoxelEmergeManager::Reset()
 	OverlayBoundsRequests.Reset();
 
 	CurrentInterestRevision = 0;
+	CurrentPriorityRevision = 0;
 	NextAdmissionIndices[0] = 0;
 	NextAdmissionIndices[1] = 0;
 	NextOverlayBoundsIndex = 0;
@@ -319,18 +379,41 @@ void FVoxelEmergeManager::Reset()
 
 EVoxelWorkClass FVoxelEmergeManager::ResolveWorkClass(const FVoxelExactDemand& InDemand)
 {
-	if (InDemand.bMovementCriticalCollision || InDemand.bMovementCriticalFine || InDemand.bMovementCriticalData ||
-		InDemand.bWarmupCollision) return EVoxelWorkClass::Critical;
-	if (InDemand.bWarmupData) return EVoxelWorkClass::Warmup;
-	return InDemand.bExact || InDemand.bCollision || InDemand.bSimulation
-		? EVoxelWorkClass::ExactData : EVoxelWorkClass::Visible;
+	if (IsCriticalDemand(InDemand))
+	{
+		return EVoxelWorkClass::Critical;
+	}
+
+	return InDemand.bExact || InDemand.bCollision || InDemand.bSimulation ? EVoxelWorkClass::ExactData : EVoxelWorkClass::Visible;
 }
 
 void FVoxelEmergeManager::RebuildDemand(
 	const FVoxelInterestSet& InInterest,
 	const uint64 InInterestRevision)
 {
+	for (const auto& Pair : WaitingPlanSections)
+	{
+		const FVoxelExactDemand* Previous = CurrentDemand.Find(Pair.Key);
+		const FVoxelExactDemand* Next = InInterest.Exact.Find(Pair.Key);
+		if (Previous && Next &&
+			(ResolveWorkClass(*Previous) != ResolveWorkClass(*Next) || Previous->Priority != Next->Priority || Previous->DistanceCells != Next->DistanceCells ||
+				Previous->ForwardScore != Next->ForwardScore))
+		{
+			PlanCoordinator->Ensure(Pair.Value.Dependencies, ResolveWorkClass(*Next), Next->Priority, Next->DistanceCells, Next->ForwardScore, Pair.Key);
+			Generator->EnsureOverlaySectionReady(Pair.Key, ResolveWorkClass(*Next), Next->Priority, Next->DistanceCells, Next->ForwardScore);
+		}
+	}
 	CurrentDemand = InInterest.Exact;
+	CriticalAdmissionKeys.Reset();
+	for (const FIntVector& Key : InInterest.ExactOrder)
+	{
+		if (IsCriticalDemand(InInterest.Exact.FindChecked(Key)))
+		{
+			CriticalAdmissionKeys.Add(Key);
+			WakeCriticalSection(Key);
+		}
+	}
+	CriticalFallbackCursor = CriticalAdmissionKeys.IsEmpty() ? 0 : CriticalFallbackCursor % CriticalAdmissionKeys.Num();
 	OrderedKeys = InInterest.ExactOrder;
 	for (int32 Lane = 0; Lane < 2; ++Lane) AdmissionLanes[Lane] = InInterest.ExactAdmissionLanes[Lane];
 	OverlayBoundsRequests.Reset();
@@ -366,6 +449,7 @@ void FVoxelEmergeManager::RebuildDemand(
 
 	CurrentInterestRevision =
 		InInterestRevision;
+	CurrentPriorityRevision = InInterest.PriorityRevision;
 
 	NextAdmissionIndices[0] = 0;
 	NextAdmissionIndices[1] = AdmissionLanes[1].IsEmpty() ? 0 : NextAdmissionIndices[1] % AdmissionLanes[1].Num();
@@ -448,11 +532,13 @@ bool FVoxelEmergeManager::RequestBase(
 			return false;
 		}
 		Waiting = &WaitingPlanSections.Add(InKey);
+		Waiting->Stamp = InSection.Stamp;
+		Waiting->BlockedSinceSeconds = FPlatformTime::Seconds();
 		Waiting->Dependencies = MoveTemp(Gathered);
 		Waiting->Retention = PlanCoordinator->RetainDependencies(Waiting->Dependencies, FIntPoint(Min.X + 8, Min.Y + 8));
 	}
 	const double Now = FPlatformTime::Seconds();
-	if (Now < Waiting->RetryAfterSeconds)
+	if (!IsCriticalDemand(InDemand) && Now < Waiting->RetryAfterSeconds)
 	{
 		return false;
 	}
@@ -490,7 +576,8 @@ bool FVoxelEmergeManager::RequestBase(
 	OverlayReadyAttempts += OverlayStatus.bReady;
 	if (!PlanStatus.bReady || !OverlayStatus.bReady)
 	{
-		Waiting->RetryAfterSeconds = Now + 0.2;
+		Waiting->RetryAfterSeconds = Now + (IsCriticalDemand(InDemand) ? 0.05 : 0.2);
+		Waiting->Blocker = FString::Printf(TEXT("PlanReady=%d OverlayReady=%d %s"), PlanStatus.bReady, OverlayStatus.bReady, *OverlayStatus.Error);
 		return false;
 	}
 	const auto CapturedRetention = Waiting->Retention;
@@ -695,4 +782,38 @@ bool FVoxelEmergeManager::ResolveOverlay(
 uint64 FVoxelEmergeManager::GetWaitingPlanConsumers(const EVoxelGenerationPlanKind InKind) const
 {
 	return PlanCoordinator->GetWaitingConsumers(InKind);
+}
+
+bool FVoxelEmergeManager::IsCriticalDemand(const FVoxelExactDemand& InDemand)
+{
+	return InDemand.bWarmupData || InDemand.bWarmupCollision || InDemand.bMovementCriticalData || InDemand.bMovementCriticalFine ||
+		   InDemand.bMovementCriticalCollision;
+}
+
+FVoxelEmergeManager::~FVoxelEmergeManager()
+{
+	Generator->SetOverlayConsumerWakeCallback({});
+}
+
+void FVoxelEmergeManager::WakeCriticalSection(const FIntVector& InKey)
+{
+	const FVoxelExactDemand* Demand = CurrentDemand.Find(InKey);
+	if (!Demand || !IsCriticalDemand(*Demand))
+	{
+		return;
+	}
+	FWaitingPlanSection* Waiting = WaitingPlanSections.Find(InKey);
+	if (Waiting && !Runtime.IsCurrentStamp(InKey, Waiting->Stamp))
+	{
+		return;
+	}
+	if (Waiting)
+	{
+		Waiting->RetryAfterSeconds = 0.0;
+	}
+	if (!QueuedCriticalSections.Contains(InKey))
+	{
+		QueuedCriticalSections.Add(InKey);
+		ReadyCriticalSections.Enqueue(InKey);
+	}
 }

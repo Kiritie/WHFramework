@@ -4,6 +4,7 @@
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Rendering/VoxelMacroTerrain.h"
 #include "Voxel/Rendering/VoxelViewLod.h"
+#include "Voxel/Rendering/VoxelCoverageIndex.h"
 #include "Voxel/Rendering/VoxelFinePage.h"
 #include "Voxel/Streaming/VoxelTerrainDomainPlanner.h"
 #include "Voxel/Streaming/VoxelFineDomain.h"
@@ -285,6 +286,13 @@ FVoxelInterestSet FVoxelInterestManager::Finalize(TConstArrayView<FVoxelStreamin
 
 	// 当前位置与预测位置之间都属于关键范围，前瞻距离不能把当前位置排除在外。
 	TSet<FIntVector> CriticalFine;
+	for (const FIntVector& Key : Result.PlayableFineKeys)
+	{
+		FVoxelExactDemand& Demand = Result.Exact.FindChecked(Key);
+		Demand.bMovementCriticalFine = true;
+		Demand.bMovementCriticalData = true;
+		CriticalFine.Add(Key);
+	}
 	for (const FVoxelStreamingSource& Source : InSources)
 	{
 		if (!Source.Has(EVoxelStreamingCapability::FineVisual) ||
@@ -411,7 +419,49 @@ FVoxelInterestSet FVoxelInterestManager::Finalize(TConstArrayView<FVoxelStreamin
 		A.DistanceCells = Distance(FBox(Min, Min + FVector(Side, Side, 0.0)), true, false, A.Priority);
 		Result.MacroPriorities.Add(Key, A.Priority);
 	}
+	FVoxelCoverageIndex DependencyIndex;
+	for (const auto& Pair : Result.Geometry)
+	{
+		auto Record = MakeShared<FVoxelCoverageRecord, ESPMode::ThreadSafe>();
+		Record->Geometry = Pair.Value;
+		FString Error;
+		if (Pair.Key.TryBounds(Pair.Value.WorldMinZ, Pair.Value.WorldMaxZ, Record->Min, Record->Max))
+			DependencyIndex.Upsert(Record, Error);
+	}
+	for (const auto& Pair : Result.Exact)
+	{
+		const auto& Demand = Pair.Value;
+		const bool bCritical =
+			Demand.bWarmupData || Demand.bWarmupCollision || Demand.bMovementCriticalData || Demand.bMovementCriticalCollision || Demand.bMovementCriticalFine;
+		if (const auto* Page = Result.FinePagePlan->SectionOwners.Find(Pair.Key))
+		{
+			int32* Priority = Result.FinePagePriorities.Find(*Page);
+			if (Priority)
+			{
+				*Priority = FMath::Min(*Priority, Demand.Priority);
+			}
+			else
+			{
+				Result.FinePagePriorities.Add(*Page, Demand.Priority);
+			}
+			if (bCritical)
+			{
+				Result.CriticalFinePages.Add(*Page);
+			}
+		}
+		if (!bCritical)
+		{
+			continue;
+		}
+		FVoxelCoverageLocalSnapshot Local;
+		DependencyIndex.Capture(Pair.Key * 16 - FIntVector(1), Pair.Key * 16 + FIntVector(17), Local);
+		for (const auto& Record : Local.Records)
+			Result.CriticalDependencies.Add(Record->Geometry.Key);
+	}
 	Result.Admissions.Sort();
+	for (const auto& Admission : Result.Admissions)
+		if (Result.AdmissionPriorities.IsEmpty() || Result.AdmissionPriorities.Last() != Admission.Priority)
+			Result.AdmissionPriorities.Add(Admission.Priority);
 	for (int32 Index = 0; Index < Result.Admissions.Num(); ++Index)
 	{
 		Result.AdmissionLanes[static_cast<uint8>(Result.Admissions[Index].Kind)].Add(Index);
@@ -444,37 +494,77 @@ FVoxelInterestSet FVoxelInterestManager::Finalize(TConstArrayView<FVoxelStreamin
 	Inputs->FinePages = Result.FinePagePlan->Pages.Array();
 	for (const auto& Pair : Result.FinePagePlan->SectionOwners) Inputs->FineOwners.Add(Pair);
 	Inputs->Admissions = Result.Admissions;
+	Inputs->AdmissionPriorities = Result.AdmissionPriorities;
+	for (int32 Lane = 0; Lane < 4; ++Lane)
+	{
+		Inputs->AdmissionLanes[Lane] = Result.AdmissionLanes[Lane];
+	}
 	Result.PublicationInputs = MoveTemp(Inputs);
 	return Result;
 }
 
 void FVoxelInterestManager::SortExactDemands(FVoxelInterestSet& Result)
 {
-	Result.Exact.GetKeys(Result.ExactOrder);
-	Result.ExactOrder.Sort([&Result](const FIntVector& Left, const FIntVector& Right)
+	const auto IsCritical = [](const FVoxelExactDemand& Demand)
 	{
-		const FVoxelExactDemand& A = Result.Exact.FindChecked(Left);
-		const FVoxelExactDemand& B = Result.Exact.FindChecked(Right);
-		const bool bGameplayA = A.bExact || A.bCollision || A.bSimulation || A.bWarmupData;
-		const bool bGameplayB = B.bExact || B.bCollision || B.bSimulation || B.bWarmupData;
-		if (A.Priority != B.Priority) return A.Priority < B.Priority;
-		const bool bCriticalA = A.bMovementCriticalData || A.bMovementCriticalFine || A.bMovementCriticalCollision || A.bWarmupCollision;
-		const bool bCriticalB = B.bMovementCriticalData || B.bMovementCriticalFine || B.bMovementCriticalCollision || B.bWarmupCollision;
-		if (bCriticalA != bCriticalB) return bCriticalA;
-		if (bGameplayA != bGameplayB) return bGameplayA;
-		if (A.DistanceCells != B.DistanceCells) return A.DistanceCells < B.DistanceCells;
-		if (A.ForwardScore != B.ForwardScore) return A.ForwardScore > B.ForwardScore;
-		if (Left.X != Right.X) return Left.X < Right.X;
-		if (Left.Y != Right.Y) return Left.Y < Right.Y;
-		return Left.Z < Right.Z;
-	});
-	for (auto& Lane : Result.ExactAdmissionLanes) Lane.Reset();
+		return Demand.bWarmupData || Demand.bWarmupCollision || Demand.bMovementCriticalData || Demand.bMovementCriticalFine ||
+			   Demand.bMovementCriticalCollision;
+	};
+
+	Result.Exact.GetKeys(Result.ExactOrder);
+	Result.ExactOrder.Sort(
+		[&Result, &IsCritical](const FIntVector& Left, const FIntVector& Right)
+		{
+			const FVoxelExactDemand& A = Result.Exact.FindChecked(Left);
+			const FVoxelExactDemand& B = Result.Exact.FindChecked(Right);
+
+			const bool bCriticalA = IsCritical(A);
+			const bool bCriticalB = IsCritical(B);
+			if (bCriticalA != bCriticalB)
+			{
+				return bCriticalA;
+			}
+
+			if (A.Priority != B.Priority)
+			{
+				return A.Priority < B.Priority;
+			}
+
+			const bool bGameplayA = A.bExact || A.bCollision || A.bSimulation || A.bWarmupData;
+			const bool bGameplayB = B.bExact || B.bCollision || B.bSimulation || B.bWarmupData;
+			if (bGameplayA != bGameplayB)
+			{
+				return bGameplayA;
+			}
+
+			if (A.DistanceCells != B.DistanceCells)
+			{
+				return A.DistanceCells < B.DistanceCells;
+			}
+			if (A.ForwardScore != B.ForwardScore)
+			{
+				return A.ForwardScore > B.ForwardScore;
+			}
+			if (Left.X != Right.X)
+			{
+				return Left.X < Right.X;
+			}
+			if (Left.Y != Right.Y)
+			{
+				return Left.Y < Right.Y;
+			}
+			return Left.Z < Right.Z;
+		});
+
+	for (TArray<int32>& Lane : Result.ExactAdmissionLanes)
+	{
+		Lane.Reset();
+	}
+
 	for (int32 Index = 0; Index < Result.ExactOrder.Num(); ++Index)
 	{
 		const FVoxelExactDemand& Demand = Result.Exact.FindChecked(Result.ExactOrder[Index]);
-		const bool bCritical = Demand.bMovementCriticalData || Demand.bMovementCriticalFine ||
-			Demand.bMovementCriticalCollision || Demand.bWarmupCollision;
-		Result.ExactAdmissionLanes[bCritical ? 0 : 1].Add(Index);
+		Result.ExactAdmissionLanes[IsCritical(Demand) ? 0 : 1].Add(Index);
 	}
 }
 

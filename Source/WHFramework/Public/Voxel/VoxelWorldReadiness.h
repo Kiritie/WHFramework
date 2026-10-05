@@ -26,6 +26,9 @@ struct WHFRAMEWORK_API FVoxelWorldReadinessSnapshot
 	int64 WorldEpoch = 0;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	int64 InterestRevision = 0;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	bool bAssetsValidated = false;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)

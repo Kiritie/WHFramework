@@ -110,34 +110,6 @@ bool VoxelStreamingGeometry::ValidateInitialSide(const int32 InSide,
 	return true;
 }
 
-bool VoxelStreamingGeometry::DeriveNextStage(TConstArrayView<FVoxelTerrainGeometry> InActualBoundary,
-	const uint8 InMaximumLevel, FVoxelTerrainStageRange& OutRange, FString& OutError)
-{
-	if (InActualBoundary.IsEmpty() || InMaximumLevel > MaximumSpatialLevel)
-	{
-		OutError = TEXT("An actual predecessor frontier is required for stage derivation");
-		return false;
-	}
-	uint8 BoundaryMaximum = 0;
-	for (const FVoxelTerrainGeometry& Geometry : InActualBoundary)
-	{
-		if (!Geometry.Validate(OutError))
-		{
-			return false;
-		}
-		BoundaryMaximum = FMath::Max(BoundaryMaximum, Geometry.Key.Level);
-	}
-	if (BoundaryMaximum >= InMaximumLevel)
-	{
-		OutError = FString::Printf(TEXT("Required next stage level %u exceeds maximum %u"),
-			uint32(BoundaryMaximum) + 1, InMaximumLevel);
-		return false;
-	}
-	OutRange = {static_cast<uint8>(BoundaryMaximum + 1), InMaximumLevel};
-	OutError.Reset();
-	return true;
-}
-
 bool VoxelStreamingGeometry::ResolveSampleStep(const double InNearestDistanceCells,
 	const double InVerticalFovDegrees, const int32 InViewportHeight, const double InTargetPixels,
 	const int32 InMaximumStepCells, int32& OutStepCells, bool& bOutAtResolutionFloor, FString& OutError)

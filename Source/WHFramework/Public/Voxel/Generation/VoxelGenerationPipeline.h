@@ -8,60 +8,35 @@
 class WHFRAMEWORK_API FVoxelGenerationPipeline
 {
 public:
+	void SetOverlayConsumerWakeCallback(TFunction<void(const FIntVector&)> InCallback) const;
 	void ReleaseOverlaySectionConsumer(const FIntVector& InSection) const;
-	FVoxelOverlayPreflightStatus EnsureOverlayBoundsReady(const FVoxelGenerationBounds& InBounds,
-		EVoxelWorkClass InWorkClass, int32 InSourcePriority) const;
-	FVoxelOverlayPreflightStatus EnsureCoarseOverlayBoundsReady(const FVoxelGenerationBounds& InBounds,
-		EVoxelWorkClass InWorkClass, int32 InSourcePriority) const;
+	FVoxelOverlayPreflightStatus EnsureOverlayBoundsReady(const FVoxelGenerationBounds& InBounds, EVoxelWorkClass InWorkClass, int32 InSourcePriority) const;
+	FVoxelOverlayPreflightStatus EnsureCoarseOverlayBoundsReady(
+		const FVoxelGenerationBounds& InBounds, EVoxelWorkClass InWorkClass, int32 InSourcePriority) const;
 	FVoxelOverlayPreflightStatus EnsureOverlaySectionReady(
-		const FIntVector& InSectionCoordinate,
-		EVoxelWorkClass InWorkClass,
-		int32 InSourcePriority,
-		double InDistanceScore,
-		double InForwardScore) const;
+		const FIntVector& InSectionCoordinate, EVoxelWorkClass InWorkClass, int32 InSourcePriority, double InDistanceScore, double InForwardScore) const;
 
-	FVoxelGenerationPipeline(
-		TSharedRef<
-			const FVoxelGenerationRuntimeConfig,
-			ESPMode::ThreadSafe> InConfig,
-		TSharedRef<
-			FVoxelGenerationPlanCache,
-			ESPMode::ThreadSafe> InCache,
-		TSharedPtr<const IVoxelGenerationOverlay, ESPMode::ThreadSafe> InOverlay = nullptr,
+	FVoxelGenerationPipeline(TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
+		TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> InCache, TSharedPtr<const IVoxelGenerationOverlay, ESPMode::ThreadSafe> InOverlay = nullptr,
 		bool bInRequirePlanPreflight = false);
 
 	bool GenerateSection(
-		const FIntVector& InSectionCoordinate,
-		TArray<FVoxelBlockState>& OutBaseBlocks,
-		FString& OutError,
+		const FIntVector& InSectionCoordinate, TArray<FVoxelBlockState>& OutBaseBlocks, FString& OutError, const TAtomic<bool>* InCancel = nullptr) const;
+
+	bool SampleColumn(int32 InX, int32 InY, FVoxelColumnSample& OutColumn, FString& OutError, const TAtomic<bool>* InCancel = nullptr) const;
+
+	bool EnumerateTrees(const FVoxelGenerationBounds& InBounds, TFunctionRef<void(const FIntVector&, int32, FVoxelStableId)> InVisit, FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr) const;
 
-	bool SampleColumn(
-		int32 InX,
-		int32 InY,
-		FVoxelColumnSample& OutColumn,
-		FString& OutError,
-		const TAtomic<bool>* InCancel = nullptr) const;
-
-	bool EnumerateTrees(
-		const FVoxelGenerationBounds& InBounds,
-		TFunctionRef<void(const FIntVector&, int32, FVoxelStableId)> InVisit,
-		FString& OutError,
-		const TAtomic<bool>* InCancel = nullptr) const;
-
-	bool SampleEnvironment(
-		int32 InX,
-		int32 InY,
-		FVoxelEnvironmentSample& OutSample,
-		FString& OutError,
-		const TAtomic<bool>* InCancel = nullptr) const;
+	bool SampleEnvironment(int32 InX, int32 InY, FVoxelEnvironmentSample& OutSample, FString& OutError, const TAtomic<bool>* InCancel = nullptr) const;
 
 	bool TrySampleEnvironment(const FIntPoint& InCell, FVoxelEnvironmentSample& OutSample) const;
-	void QueryReadyWaterfalls(const FIntPoint& InMin, const FIntPoint& InMax,
-		TArray<FVoxelWaterfallSemantic>& OutWaterfalls) const;
-	bool EnumerateCaveEntrances(const FIntPoint& InMin, const FIntPoint& InMax,
-		TArray<FVoxelCaveEntrance>& OutEntrances, FString& OutError) const;
-	bool RequiresPlanPreflight() const { return bRequirePlanPreflight; }
+	void QueryReadyWaterfalls(const FIntPoint& InMin, const FIntPoint& InMax, TArray<FVoxelWaterfallSemantic>& OutWaterfalls) const;
+	bool EnumerateCaveEntrances(const FIntPoint& InMin, const FIntPoint& InMax, TArray<FVoxelCaveEntrance>& OutEntrances, FString& OutError) const;
+	bool RequiresPlanPreflight() const
+	{
+		return bRequirePlanPreflight;
+	}
 
 	TSharedRef<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> RetainHydrologyForPlanning(
 		const FIntPoint& InCenter,

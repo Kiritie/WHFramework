@@ -58,8 +58,14 @@ uint8 VoxelViewLod::ResolveVoxelProxyLevel(
 
 bool VoxelViewLod::ValidateTopology(const FVoxelLodTopologySettings& InSettings, FString& OutError)
 {
-	if (InSettings.MaximumFineLevel > 4 || InSettings.MaximumVoxelProxyLevel > 20 ||
-		InSettings.MaximumSurfaceSpatialLevel > 20 || InSettings.MaximumMacroSpatialLevel > 20 ||
+	if (InSettings.MaximumFineLevel > 4 || InSettings.MaximumVoxelProxyLevel < 1 || InSettings.MaximumVoxelProxyLevel > 20 ||
+		InSettings.MaximumVoxelProxySamplesPerAxis < 32 || InSettings.MaximumVoxelProxySamplesPerAxis > 128 ||
+		InSettings.MaximumHeightfieldSamplesPerAxis < 16 || InSettings.MaximumHeightfieldSamplesPerAxis > 256 ||
+		!FMath::IsPowerOfTwo(InSettings.MaximumVoxelProxySamplesPerAxis) || !FMath::IsPowerOfTwo(InSettings.MaximumHeightfieldSamplesPerAxis) ||
+		InSettings.MaximumPageEstimatedTriangles < 524288 || InSettings.MaximumPageEstimatedTriangles > 4194304 ||
+		InSettings.MaximumPageEstimatedMeshMegabytes < 128 || InSettings.MaximumPageEstimatedMeshMegabytes > 1024 ||
+		!FMath::IsFinite(InSettings.MaximumPageEstimatedBuildMilliseconds) || InSettings.MaximumPageEstimatedBuildMilliseconds < 8.0f ||
+		InSettings.MaximumPageEstimatedBuildMilliseconds > 100.0f || InSettings.MaximumSurfaceSpatialLevel > 20 || InSettings.MaximumMacroSpatialLevel > 20 ||
 		!FMath::IsFinite(InSettings.TargetScreenErrorPixels) || InSettings.TargetScreenErrorPixels < 0.1f)
 	{
 		OutError = TEXT("Invalid absolute terrain level limit or screen error policy");
@@ -90,19 +96,14 @@ int32 VoxelViewLod::ResolveReplanCells(const int32 InRadius, const float InFract
 		FMath::Clamp(double(InFraction), 0.0, 1.0), FMath::Max(1, InMinimumCells));
 }
 
-FVoxelResolvedViewRanges VoxelViewLod::ResolveReplanSteps(const FVoxelStreamingSource& InSource,
-	const FVoxelViewSettings& InSettings, const FVoxelSourceInterest* InAccepted)
+FVoxelResolvedViewRanges VoxelViewLod::ResolveReplanSteps(
+	const FVoxelStreamingSource& InSource, const FVoxelViewSettings& InSettings, const FVoxelSourceInterest* InAccepted)
 {
-	const auto Ranges = ResolveViewRanges(InSource);
+	(void)InAccepted;
+	const FVoxelResolvedViewRanges Ranges = ResolveViewRanges(InSource);
 	const float Fraction = InSettings.Planning.ReplanDistanceFraction;
-	const auto Minimum = [InAccepted](int32 Stage)
-	{
-		return InAccepted && InAccepted->FirstSideCells[Stage] > 0 ? InAccepted->FirstSideCells[Stage] : 16;
-	};
-	return {ResolveReplanCells(Ranges.Fine, Fraction, InSource.View.InitialChunkSideCells),
-		ResolveReplanCells(Ranges.Proxy, Fraction, Minimum(0)),
-		ResolveReplanCells(Ranges.Surface, Fraction, Minimum(1)),
-		ResolveReplanCells(Ranges.Macro, Fraction, Minimum(2))};
+	return {ResolveReplanCells(Ranges.Fine, Fraction, InSource.View.InitialChunkSideCells), ResolveReplanCells(Ranges.Proxy, Fraction, 16),
+		ResolveReplanCells(Ranges.Surface, Fraction, 16), ResolveReplanCells(Ranges.Macro, Fraction, 16)};
 }
 
 int32 VoxelViewLod::MovementCriticalFineRadius(const FVoxelStreamingSource& InSource)
@@ -136,4 +137,20 @@ int32 VoxelViewLod::MacroStep(const FVoxelLodTopologySettings& InSettings, const
 double VoxelViewLod::TexturePeriodCells(const int32 InStep, const double InMaximumStretchCells)
 {
 	return FMath::Clamp(static_cast<double>(InStep), 1.0, FMath::Max(1.0, InMaximumStretchCells));
+}
+
+bool VoxelViewLod::ValidatePerformanceBudget(const FVoxelStreamingPerformanceBudget& InBudget, FString& OutError)
+{
+	const double Total = InBudget.TerrainPublishMilliseconds;
+	const double Floor = InBudget.PublishOperationEstimateFloorMilliseconds;
+	const double Ceiling = InBudget.PublishOperationEstimateCeilingMilliseconds;
+	if (!FMath::IsFinite(Total) || Total < 0.1f || !FMath::IsFinite(Floor) || Floor < 0.01f || Floor > Total * 0.5 || !FMath::IsFinite(Ceiling) ||
+		Ceiling < Floor || Ceiling > 4.0 || InBudget.CoveragePreparationBatchSize < 1 || InBudget.CoveragePreparationBatchSize > 128 ||
+		InBudget.PublishAdmissionBatchSize < 1 || InBudget.PublishAdmissionBatchSize > 32)
+	{
+		OutError = TEXT("Invalid terrain publish budget: microstep floor must fit within half the frame budget, batches and estimates must be bounded");
+		return false;
+	}
+	OutError.Reset();
+	return true;
 }

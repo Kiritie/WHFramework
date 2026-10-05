@@ -7,6 +7,23 @@
 namespace
 {
 	constexpr int32 RuntimeInterestSectionSide = 16;
+	template <typename KeyType, typename ValueType> bool SameRuntimeMap(const TMap<KeyType, ValueType>& InA, const TMap<KeyType, ValueType>& InB)
+	{
+		if (InA.Num() != InB.Num())
+		{
+			return false;
+		}
+
+		for (const auto& Pair : InA)
+		{
+			const ValueType* Other = InB.Find(Pair.Key);
+			if (!Other || *Other != Pair.Value)
+			{
+				return false;
+			}
+		}
+		return true;
+	}
 
 	void MergeDemand(FVoxelExactDemand& InOutDemand, const FVoxelExactDemand& InDemand,
 		const FVoxelStreamingSource& InSource, const FIntVector& InKey)
@@ -19,6 +36,7 @@ namespace
 		InOutDemand.bFineData |= InDemand.bFineData;
 		InOutDemand.bWarmupData |= InDemand.bWarmupData;
 		InOutDemand.bWarmupCollision |= InDemand.bWarmupCollision;
+		InOutDemand.bMovementCriticalFine |= InDemand.bMovementCriticalFine;
 		InOutDemand.bMovementCriticalCollision |= InDemand.bMovementCriticalCollision;
 		InOutDemand.bMovementCriticalData |= InDemand.bMovementCriticalData;
 		InOutDemand.Priority = FMath::Min(InOutDemand.Priority, InSource.GetSchedulingPriority());
@@ -34,13 +52,10 @@ namespace
 
 	bool SameDemandSemantics(const FVoxelExactDemand& InA, const FVoxelExactDemand& InB)
 	{
-		return InA.bData == InB.bData && InA.bExact == InB.bExact &&
-			InA.bCollision == InB.bCollision && InA.bSimulation == InB.bSimulation &&
-			InA.bFineRender == InB.bFineRender && InA.bFineData == InB.bFineData &&
-			InA.bWarmupData == InB.bWarmupData && InA.bWarmupCollision == InB.bWarmupCollision &&
-			InA.bMovementCriticalCollision == InB.bMovementCriticalCollision &&
-			InA.bMovementCriticalFine == InB.bMovementCriticalFine &&
-			InA.bMovementCriticalData == InB.bMovementCriticalData && InA.Priority == InB.Priority;
+		return InA.bData == InB.bData && InA.bExact == InB.bExact && InA.bCollision == InB.bCollision && InA.bSimulation == InB.bSimulation &&
+			   InA.bFineRender == InB.bFineRender && InA.bFineData == InB.bFineData && InA.bWarmupData == InB.bWarmupData &&
+			   InA.bWarmupCollision == InB.bWarmupCollision && InA.bMovementCriticalCollision == InB.bMovementCriticalCollision &&
+			   InA.bMovementCriticalFine == InB.bMovementCriticalFine && InA.bMovementCriticalData == InB.bMovementCriticalData;
 	}
 
 	template<typename KeyType>
@@ -66,6 +81,21 @@ namespace
 			if (!InB.Contains(Key)) return false;
 		}
 		return true;
+	}
+
+	bool SameFinePagePlan(
+		const TSharedPtr<const FVoxelFinePagePlan, ESPMode::ThreadSafe>& InA, const TSharedPtr<const FVoxelFinePagePlan, ESPMode::ThreadSafe>& InB)
+	{
+		if (InA.IsValid() != InB.IsValid())
+		{
+			return false;
+		}
+		if (!InA)
+		{
+			return true;
+		}
+
+		return SameRuntimeSet(InA->Pages, InB->Pages) && SameRuntimeMap(InA->SectionOwners, InB->SectionOwners);
 	}
 
 	template<typename KeyType>
@@ -271,6 +301,7 @@ bool FVoxelInterestRuntime::Update(TConstArrayView<FVoxelStreamingSource> InSour
 			bAnyChanged = true;
 		}
 		State.PredictionAnchor = PredictionAnchor;
+		bAnyChanged |= State.Source.Center != Source.Center;
 		State.Source = Source;
 	}
 	if (!bAnyChanged)
@@ -349,6 +380,10 @@ bool FVoxelInterestRuntime::Update(TConstArrayView<FVoxelStreamingSource> InSour
 		if (!PreviousGeometry || *PreviousGeometry != Pair.Value)
 		{ OutDelta.ChangedGeometry.Add(Pair.Key); OutDelta.bVisualPartitionChanged = true; }
 	}
+	OutDelta.bVisualPartitionChanged |= !SameFinePagePlan(LatestInterest.FinePagePlan, Next.FinePagePlan) ||
+										!SameRuntimeSet(LatestInterest.TerrainPlan.Roots, Next.TerrainPlan.Roots) ||
+										!SameRuntimeSet(LatestInterest.TerrainPlan.Leaves, Next.TerrainPlan.Leaves) ||
+										!SameRuntimeSet(LatestInterest.TerrainPlan.FineDependencies, Next.TerrainPlan.FineDependencies);
 	bool bChanged = !OutDelta.AddedExact.IsEmpty() || !OutDelta.RemovedExact.IsEmpty() ||
 		OutDelta.bVisualPartitionChanged || Next.Warmup.Num() != LatestInterest.Warmup.Num() ||
 		Next.Sources.Num() != LatestInterest.Sources.Num() ||
@@ -401,6 +436,24 @@ bool FVoxelInterestRuntime::Update(TConstArrayView<FVoxelStreamingSource> InSour
 			}
 		}
 	}
+	bool bDemandChanged = Next.Exact.Num() != LatestInterest.Exact.Num() || Next.Warmup.Num() != LatestInterest.Warmup.Num();
+	bool bPriorityChanged = !SamePriorities(Next.VoxelProxyPriorities, LatestInterest.VoxelProxyPriorities) ||
+							!SamePriorities(Next.SurfacePriorities, LatestInterest.SurfacePriorities) ||
+							!SamePriorities(Next.MacroPriorities, LatestInterest.MacroPriorities);
+	for (const auto& Pair : Next.Exact)
+	{
+		const auto* Previous = LatestInterest.Exact.Find(Pair.Key);
+		bDemandChanged |= !Previous || !SameDemandSemantics(*Previous, Pair.Value);
+		bPriorityChanged |= !Previous || Previous->Priority != Pair.Value.Priority || Previous->DistanceCells != Pair.Value.DistanceCells ||
+							Previous->ForwardScore != Pair.Value.ForwardScore;
+	}
+	const auto NextRevision = [](const uint64 Revision, const bool bChanged)
+	{
+		return bChanged ? (Revision == MAX_uint64 ? 1 : Revision + 1) : Revision;
+	};
+	Next.PublicationRevision = PublicationSerial = NextRevision(PublicationSerial, OutDelta.bVisualPartitionChanged || PublicationSerial == 0);
+	Next.DemandRevision = DemandSerial = NextRevision(DemandSerial, bDemandChanged || DemandSerial == 0);
+	Next.PriorityRevision = PrioritySerial = NextRevision(PrioritySerial, bPriorityChanged || PrioritySerial == 0);
 	LatestSettings = InSettings;
 	bHasSettings = true;
 	LatestInterest = MoveTemp(Next);

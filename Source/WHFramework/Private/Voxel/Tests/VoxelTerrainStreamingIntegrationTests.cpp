@@ -418,15 +418,17 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelStageArrayIntegrationTest,
 
 bool FVoxelStageArrayIntegrationTest::RunTest(const FString& InParameters)
 {
+	(void)InParameters;
+
 	FVoxelWorldManifest Manifest;
 	Manifest.Settings.MinZ = -64;
 	Manifest.Settings.MaxZ = 128;
+
 	FVoxelViewSettings Settings;
 	FVoxelStreamingSource Source;
 	Source.Id = FGuid::NewGuid();
 	Source.Center = FIntVector(8);
-	Source.Capabilities = EVoxelStreamingCapability::Data | EVoxelStreamingCapability::FineVisual |
-		EVoxelStreamingCapability::WorldVisual;
+	Source.Capabilities = EVoxelStreamingCapability::Data | EVoxelStreamingCapability::FineVisual | EVoxelStreamingCapability::WorldVisual;
 	Source.bInheritWorldView = false;
 	Source.ExactRadius = -1;
 	Source.View.FineRadiusCells = 16;
@@ -435,14 +437,43 @@ bool FVoxelStageArrayIntegrationTest::RunTest(const FString& InParameters)
 	Source.View.VoxelProxyVerticalHalfExtentCells = 64;
 	Source.View.SurfaceRadiusCells = 128;
 	Source.View.MacroRadiusCells = 256;
+
 	const auto Interest = FVoxelInterestManager().Compute(MakeArrayView(&Source, 1), Manifest, Settings);
-	if (!Interest.PlanningError.IsEmpty()) { AddError(Interest.PlanningError); return false; }
+	if (!Interest.PlanningError.IsEmpty())
+	{
+		AddError(Interest.PlanningError);
+		return false;
+	}
+
 	const auto* Accepted = Interest.Sources.Find(Source.Id);
 	TestNotNull(TEXT("Effective source is retained"), Accepted);
-	if (!Accepted) return false;
-	TestTrue(TEXT("Proxy uses the first coarse-stage array entry"), Accepted->FirstSideCells[0] >= 32);
-	TestTrue(TEXT("Surface uses its own larger stage entry"), Accepted->FirstSideCells[1] > Accepted->FirstSideCells[0]);
-	TestTrue(TEXT("Macro uses the last coarse-stage array entry"), Accepted->FirstSideCells[2] > Accepted->FirstSideCells[1]);
+	if (!Accepted)
+	{
+		return false;
+	}
+
+	const auto MinimumSide = [&Interest](const EVoxelTerrainRepresentation Representation)
+	{
+		int32 Result = MAX_int32;
+		for (const auto& Pair : Interest.Geometry)
+		{
+			if (Pair.Key.Representation == Representation)
+			{
+				Result = FMath::Min(Result, static_cast<int32>(Pair.Key.SideCells()));
+			}
+		}
+		return Result == MAX_int32 ? 16 : Result;
+	};
+
+	TestEqual(TEXT("Proxy first side reports the actual plan"), Accepted->FirstSideCells[0], MinimumSide(EVoxelTerrainRepresentation::VoxelProxy));
+	TestEqual(TEXT("Surface first side reports the actual plan"), Accepted->FirstSideCells[1], MinimumSide(EVoxelTerrainRepresentation::Surface));
+	TestEqual(TEXT("Macro first side reports the actual plan"), Accepted->FirstSideCells[2], MinimumSide(EVoxelTerrainRepresentation::Macro));
+
+	for (const int32 Side : Accepted->FirstSideCells)
+	{
+		TestTrue(TEXT("Recorded page side is a valid power-of-two side"), Side >= 16 && FMath::IsPowerOfTwo(static_cast<uint32>(Side)));
+	}
+
 	return true;
 }
 

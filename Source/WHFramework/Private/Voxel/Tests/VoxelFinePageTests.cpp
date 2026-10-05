@@ -130,53 +130,81 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelLodPolicyTest,
 
 bool FVoxelLodPolicyTest::RunTest(const FString& InParameters)
 {
+	(void)InParameters;
+
 	FString PlanningError;
 	FVoxelStreamingSource Source;
 	FVoxelViewSettings Settings;
 	Source.Capabilities = EVoxelStreamingCapability::Data | EVoxelStreamingCapability::FineVisual | EVoxelStreamingCapability::WorldVisual;
+
 	FVoxelSourceInterest Accepted;
-	Accepted.FirstSideCells[0] = 64; Accepted.FirstSideCells[1] = 256; Accepted.FirstSideCells[2] = 2048;
+	Accepted.FirstSideCells[0] = 64;
+	Accepted.FirstSideCells[1] = 256;
+	Accepted.FirstSideCells[2] = 2048;
+
 	const auto Steps = VoxelViewLod::ResolveReplanSteps(Source, Settings, &Accepted);
+
 	TestEqual(TEXT("Fine replan is one Section"), Steps.Fine, 16);
-	TestEqual(TEXT("Proxy replan follows its radius"), Steps.Proxy, 64);
+	TestEqual(TEXT("Proxy replan follows its own radius"), Steps.Proxy, 64);
 	TestEqual(TEXT("Surface replan uses nearest power of two"), Steps.Surface, 256);
-	TestEqual(TEXT("Macro replan respects its independent minimum Tile side"), Steps.Macro, 2048);
+	TestEqual(TEXT("Macro replan no longer inherits accepted page side"), Steps.Macro, 1024);
+
 	Source.View.VoxelProxyRadiusCells *= 2;
 	TestEqual(TEXT("Changing radius automatically changes Proxy replan"), VoxelViewLod::ResolveReplanSteps(Source, Settings, &Accepted).Proxy, 128);
 	Source.View.VoxelProxyRadiusCells /= 2;
-	TestTrue(TEXT("Max Proxy level does not force coarse sampling nearby"), VoxelViewLod::ResolveVoxelProxyLevel(256, Source, Settings) < Settings.Lod.MaximumVoxelProxyLevel);
-	TestEqual(TEXT("Sufficient distance permits the configured maximum"), VoxelViewLod::ResolveVoxelProxyLevel(100000, Source, Settings), Settings.Lod.MaximumVoxelProxyLevel);
+
+	TestTrue(TEXT("Max Proxy level does not force coarse sampling nearby"),
+		VoxelViewLod::ResolveVoxelProxyLevel(256, Source, Settings) < Settings.Lod.MaximumVoxelProxyLevel);
+	TestEqual(TEXT("Sufficient distance permits the configured maximum"), VoxelViewLod::ResolveVoxelProxyLevel(100000, Source, Settings),
+		Settings.Lod.MaximumVoxelProxyLevel);
+
 	FVoxelWorldManifest Manifest;
 	FVoxelInterestManager Manager;
 	const auto Sources = MakeArrayView(&Source, 1);
 	const auto Baseline = Manager.Compute(Sources, Manifest, Settings);
+
 	Settings.Budget.FineAdmissionPerFrame = 1;
 	Settings.Budget.VoxelProxyAdmissionPerFrame = 1;
 	Settings.Budget.MaxConcurrentSurfaceTasks = 1;
 	const auto Slow = Manager.Compute(Sources, Manifest, Settings);
-	TestTrue(TEXT("Throughput cannot change actual volume pages"), Baseline.VoxelProxy.Num() == Slow.VoxelProxy.Num() && Baseline.VoxelProxy.Includes(Slow.VoxelProxy));
-	TestTrue(TEXT("Throughput cannot change heightfield topology"), Baseline.Surface.Num() == Slow.Surface.Num() && Baseline.Surface.Includes(Slow.Surface) && Baseline.Macro.Num() == Slow.Macro.Num() && Baseline.Macro.Includes(Slow.Macro));
-	FVoxelInterestSet ProxyA, ProxyB, FineA, FineB;
+
+	TestTrue(TEXT("Throughput cannot change actual volume pages"),
+		Baseline.VoxelProxy.Num() == Slow.VoxelProxy.Num() && Baseline.VoxelProxy.Includes(Slow.VoxelProxy));
+	TestTrue(TEXT("Throughput cannot change heightfield topology"), Baseline.Surface.Num() == Slow.Surface.Num() && Baseline.Surface.Includes(Slow.Surface) &&
+																		Baseline.Macro.Num() == Slow.Macro.Num() && Baseline.Macro.Includes(Slow.Macro));
+
+	FVoxelInterestSet ProxyA;
+	FVoxelInterestSet ProxyB;
+	FVoxelInterestSet FineA;
+	FVoxelInterestSet FineB;
 	Manager.BuildSourceProxy(Source, Manifest, Settings, ProxyA);
 	Manager.BuildSourceExact(Source, Manifest, Settings, FineA);
+
 	Source.View.FineVerticalHalfExtentCells += 64;
 	Manager.BuildSourceProxy(Source, Manifest, Settings, ProxyB);
-	TestTrue(TEXT("Fine vertical extent does not change Proxy source demand"), ProxyA.VoxelProxy.Num() == ProxyB.VoxelProxy.Num() && ProxyA.VoxelProxy.Includes(ProxyB.VoxelProxy));
+	TestTrue(TEXT("Fine vertical extent does not change Proxy source demand"),
+		ProxyA.VoxelProxy.Num() == ProxyB.VoxelProxy.Num() && ProxyA.VoxelProxy.Includes(ProxyB.VoxelProxy));
+
 	Source.View.FineVerticalHalfExtentCells -= 64;
 	Source.View.VoxelProxyVerticalHalfExtentCells += 128;
 	Manager.BuildSourceExact(Source, Manifest, Settings, FineB);
 	TestTrue(TEXT("Proxy vertical extent does not change Fine source demand"), FineA.Exact.Num() == FineB.Exact.Num());
 	Source.View.VoxelProxyVerticalHalfExtentCells -= 128;
+
 	Source.VelocityCellsPerSecond = FVector(512, 0, 0);
 	const auto Moving = Manager.Compute(Sources, Manifest, Settings);
 	TestTrue(TEXT("Forward prefetch adds data beyond the stationary set"), Moving.Exact.Num() > Slow.Exact.Num());
-	TestTrue(TEXT("Forward prefetch does not expand the Fine display domain"), Moving.FineSections->Num() == Slow.FineSections->Num() && Moving.FineSections->Includes(*Slow.FineSections));
+	TestTrue(TEXT("Forward prefetch does not expand the Fine display domain"),
+		Moving.FineSections->Num() == Slow.FineSections->Num() && Moving.FineSections->Includes(*Slow.FineSections));
+
 	FVoxelTerrainViewPlan Plan = Baseline.TerrainPlan;
 	const auto PreviousLeaves = Plan.Leaves;
 	Settings.Lod.MaximumVoxelProxyLevel = 21;
 	FString Error;
 	TestFalse(TEXT("Invalid topology explicitly fails"), Plan.Build(Sources, *Baseline.FineSections, Baseline.TerrainPlan.Roots, Settings, Error));
-	TestTrue(TEXT("Failure preserves the previous valid plan"), !Error.IsEmpty() && Plan.Leaves.Num() == PreviousLeaves.Num() && Plan.Leaves.Includes(PreviousLeaves));
+	TestTrue(TEXT("Failure preserves the previous valid plan"),
+		!Error.IsEmpty() && Plan.Leaves.Num() == PreviousLeaves.Num() && Plan.Leaves.Includes(PreviousLeaves));
+
 	return true;
 }
 

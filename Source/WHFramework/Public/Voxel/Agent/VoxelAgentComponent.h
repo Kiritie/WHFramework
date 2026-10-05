@@ -43,6 +43,7 @@ public:
 
 	void NotifyTravelTeleported();
 	bool IsTravelObserverReady() const;
+	bool IsStreamingLocationAdmitted(const FIntVector& InCell, uint64 InEpoch) const;
 
 	UFUNCTION(BlueprintCallable)
 	bool TraceVoxel(

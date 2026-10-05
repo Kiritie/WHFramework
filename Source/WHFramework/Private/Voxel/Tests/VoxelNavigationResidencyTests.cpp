@@ -88,10 +88,12 @@ bool FVoxelNavigationResidencyTest::RunTest(const FString& InParameters)
 		AddError(Error);
 		return false;
 	}
-	Module->CurrentInterest.Exact.Add(Above, FVoxelExactDemand());
+	const auto Interest = MakeShared<FVoxelInterestSet, ESPMode::ThreadSafe>();
+	Module->CurrentInterest = Interest;
+	Interest->Exact.Add(Above, FVoxelExactDemand());
 	for (const FIntVector& Key : {Lower, Distant})
 	{
-		FVoxelExactDemand& Demand = Module->CurrentInterest.Exact.Add(Key);
+		FVoxelExactDemand& Demand = Interest->Exact.Add(Key);
 		Demand.bSimulation = true;
 		TestFalse(TEXT("Simulation cannot activate before actual collision publication"), Module->ActivateSimulationSection(Key));
 		Demand.bSimulation = false;
@@ -111,7 +113,7 @@ bool FVoxelNavigationResidencyTest::RunTest(const FString& InParameters)
 		const double Deadline = FPlatformTime::Seconds() + 10.;
 		do
 		{
-			Module->CollisionPresenter->Tick(Module->CurrentInterest.Exact, 1);
+			Module->CollisionPresenter->Tick(Interest->Exact, 1);
 			Module->NavigationPresenter->Tick();
 			Module->Scheduler->Tick([Module](FVoxelTaskResult&& Result)
 			{
@@ -128,7 +130,8 @@ bool FVoxelNavigationResidencyTest::RunTest(const FString& InParameters)
 	}))) return false;
 	TestNull(TEXT("Collision/data residency alone creates no navigation surface"), FindSurface(Lower));
 	TestFalse(TEXT("Collision readiness without Simulation cannot activate a scene region"), Module->ActivateSimulationSection(Lower));
-	for (const FIntVector& Key : {Lower, Distant}) Module->CurrentInterest.Exact.FindChecked(Key).bSimulation = true;
+	for (const FIntVector& Key : {Lower, Distant})
+		Interest->Exact.FindChecked(Key).bSimulation = true;
 	Module->RefreshSimulationResidency();
 	if (!TestTrue(TEXT("Navigation exports actual geometry after Simulation activation"), Pump([&]()
 	{
@@ -139,10 +142,10 @@ bool FVoxelNavigationResidencyTest::RunTest(const FString& InParameters)
 	TestFalse(TEXT("Upper clearance section remains data-only"), Module->IsSimulationResident(Above));
 	TestEqual(TEXT("One support face is exported across the section boundary"), FindSurface(Lower)->GetSurface().Indices.Num(), 6);
 
-	Module->CurrentInterest.Exact.Remove(Above);
+	Interest->Exact.Remove(Above);
 	const uint64 PreviousFrame = GFrameCounter;
 	GFrameCounter += 15;
-	Module->ResidencyManager->Tick(Module->CurrentInterest.Exact, 2, 0.);
+	Module->ResidencyManager->Tick(Interest->Exact, 2, 0.);
 	GFrameCounter = PreviousFrame;
 	TestNull(TEXT("The actual residency owner evicts unneeded upper data"), Module->Runtime->FindSection(Above));
 	TestTrue(TEXT("Eviction immediately withdraws the dependent lower navigation face"), FindSurface(Lower)->GetSurface().Indices.IsEmpty());
@@ -172,7 +175,7 @@ bool FVoxelNavigationResidencyTest::RunTest(const FString& InParameters)
 	TestEqual(TEXT("Committed overhead edit leaves distant navigation intact"), FindSurface(Distant)->GetSurface().Indices.Num(), 6);
 
 	Module->NavigationPresenter->Tick();
-	Module->CurrentInterest.Exact.FindChecked(Lower).bSimulation = false;
+	Interest->Exact.FindChecked(Lower).bSimulation = false;
 	Module->RefreshSimulationResidency();
 	TestFalse(TEXT("Removing only Simulation retires the scene residency immediately"), Module->IsSimulationResident(Lower));
 	TestNull(TEXT("Removing only Simulation destroys its navigation component"), FindSurface(Lower));

@@ -184,6 +184,7 @@ struct WHFRAMEWORK_API FVoxelTaskRequest
 	uint64 ReservedBytes = 0;
 	uint64 InputBytes = 0;
 
+	double AccumulatedExecuteMilliseconds = 0.0;
 	bool bResumable = false;
 	TFunction<FVoxelTaskResult(const TAtomic<bool>&)> Execute;
 

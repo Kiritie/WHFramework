@@ -4,6 +4,7 @@
 #include "Voxel/Geometry/VoxelSectionMesher.h"
 #include "Voxel/Rendering/VoxelPublishGroups.h"
 #include "Voxel/Rendering/VoxelPublishBudget.h"
+#include "Voxel/Rendering/VoxelGameThreadContinuation.h"
 #include "Voxel/Task/VoxelTaskFairSelection.h"
 
 class AActor;
@@ -39,9 +40,16 @@ public:
 		TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes = nullptr);
 	bool SetSharedCoverage(const FGuid& InGroup, AActor* InActor,
 		TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes);
+	FVoxelGameThreadContinuation SetCoverageSteps(const FGuid& InGroup, AActor* InActor, TArray<FBox> InWorldCellBoxes,
+		TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, bool& OutSuccess);
+	FVoxelGameThreadContinuation SetSharedCoverageSteps(
+		const FGuid& InGroup, AActor* InActor, TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, bool& OutSuccess);
 	bool SetScopedCoverage(const FGuid& InGroup, AActor* InActor, TArray<FBox> InWorldCellBoxes,
 		TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes,
 		TConstArrayView<FBox> InAffectedWorldCellBoxes, bool bInRetainPresented = false);
+	FVoxelGameThreadContinuation SetScopedCoverageSteps(const FGuid& InGroup, AActor* InActor, TArray<FBox> InWorldCellBoxes,
+		TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, TConstArrayView<FBox> InAffectedWorldCellBoxes, bool& OutSuccess,
+		bool bInRetainPresented = false);
 	bool SetHidden(const FGuid& InGroup, AActor* InActor, bool bInHidden);
 	void SetCommitCallbacks(TFunction<void()> InOnCommitted,
 		TFunction<void(TConstArrayView<FVoxelPublishGroupKey>)> InOnGroupCommitted);
@@ -53,21 +61,28 @@ public:
 	bool SetTerrainStage(const FGuid& InGroup, int32 InTerrainStage);
 	void SetObservers(TConstArrayView<FVector> InObservers);
 	void Tick();
-	void Tick(FVoxelPublishBudget& InBudget);
+	void Tick(FVoxelPublishBudget& InBudget, bool bInAllowCommit = true);
 	void InvalidatePriorities();
 	void Forget(AActor* InActor);
 	void Reset();
 	bool IsBusy() const;
 	bool HasActiveGroups() const { return !Publications.IsEmpty(); }
+	bool HasReadyCommits() const
+	{
+		return !ReadyCommitGroups.IsEmpty();
+	}
 	bool IsGroupBusy(const FVoxelPublishGroupKey& InKey) const;
 	bool NeedsUpdate() const;
 	bool IsPresented(AActor* InActor) const;
 	bool IsCommitted(AActor* InActor) const;
 	bool HasPresentation(AActor* InActor) const;
+	bool GetPresentedMeshCost(AActor* InActor, uint64& OutVertices, uint64& OutTriangles, uint64& OutBytes) const;
 	FVoxelFrameTimings GetFrameTimings() const { return FrameTimings; }
 
 private:
 #if WITH_DEV_AUTOMATION_TESTS
+	friend class FVoxelScopedCoverageContinuationTest;
+	friend class FVoxelPublishEstimateRecoveryTest;
 	friend class FVoxelConcurrentPublishCommitTest;
 	friend class FVoxelFrozenGenerationProgressTest;
 	friend class FVoxelPublisherStageAndIndexTest;
@@ -99,6 +114,9 @@ private:
 	{
 		FMeshPtr Source;
 		FMeshPtr PresentedSource;
+		uint64 PresentedVertices = 0;
+		uint64 PresentedTriangles = 0;
+		uint64 PresentedBytes = 0;
 		int32 TerrainStage = INDEX_NONE;
 		FVector Location = FVector::ZeroVector;
 		double Scale = 1.0;
@@ -154,6 +172,11 @@ private:
 		bool bPrepareQueued = false;
 		bool bCommitQueued = false;
 		bool bPriorityReady = false;
+		mutable uint64 DependencyNextSerial = 0;
+		mutable uint64 DependencyQuerySerial = 0;
+		mutable uint64 DependencyQueryRevision = 0;
+		mutable bool bDependencyQueryActive = false;
+		mutable FVoxelPublishBoundsIndex::FQuery DependencyQuery;
 	};
 
 	struct FPendingGroup
@@ -185,6 +208,8 @@ private:
 		uint64 Serial = 0;
 		uint64 GroupRevision = 1;
 		uint64 IndexedGroupRevision = 0;
+		int32 DependencyIndexBuildCursor = 0;
+		uint64 DependencyIndexBuildRevision = 0;
 		FVoxelPublishBoundsIndex DependencyIndex;
 		TUniquePtr<FPreparedPlan> Plan;
 		TArray<FUpdate> Updates;
@@ -311,6 +336,10 @@ private:
 	void CommitReadyGroups(const FPublicationRef& Publication, int32& InOutCommitted, double InDeadline,
 		const TMap<FVoxelPublishGroupKey, uint64>& InFirstOwners, int32 InGroupIndex = INDEX_NONE);
 	void CommitReadyGroup(const FPublicationRef& Publication, FGroup& InGroup);
+	bool RunBudgetedPhase(FVoxelPublishBudget& InBudget, EVoxelPublishPhase InPhase, TFunctionRef<void()> InOperation);
+	double PhaseOperationEstimateMilliseconds[static_cast<uint8>(EVoxelPublishPhase::Count)] = {};
+	uint64 PhaseConsecutiveDeferrals[static_cast<uint8>(EVoxelPublishPhase::Count)] = {};
+	double NextPublisherDiagnostic = 0.0;
 	void FinishGroups();
 	void DiscardGroups();
 	void DiscardPublication(const FPublicationRef& Publication);

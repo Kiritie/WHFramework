@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Voxel/Rendering/VoxelGameThreadContinuation.h"
 #include "Voxel/Rendering/DWLodTransition.h"
 #include "Voxel/Geometry/VoxelSectionMesher.h"
 
@@ -59,6 +60,8 @@ public:
 	static void GatherOwnerDependencies(TConstArrayView<FVoxelHeightfieldTileView> InTiles,
 		TConstArrayView<FVoxelHeightfieldTileFootprint> InPendingTiles,
 		TMap<FVoxelHeightfieldNodeKey, TArray<FVoxelHeightfieldNodeKey>>& OutDependencies);
+	static FVoxelGameThreadContinuation GatherOwnerDependenciesSteps(TConstArrayView<FVoxelHeightfieldTileView> InTiles,
+		TConstArrayView<FVoxelHeightfieldTileFootprint> InPendingTiles, TMap<FVoxelHeightfieldNodeKey, TArray<FVoxelHeightfieldNodeKey>>& OutDependencies);
 
 	static void ExcludeCoveredIntervals(
 		TConstArrayView<FVoxelHeightfieldTileView> InTiles,

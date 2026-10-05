@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Voxel/Rendering/VoxelViewTypes.h"
+#include "Voxel/Rendering/VoxelGameThreadContinuation.h"
 
 struct FVoxelStreamingSource;
 struct FVoxelViewSettings;
@@ -23,15 +24,17 @@ struct WHFRAMEWORK_API FVoxelTerrainViewPlan
 		const TSet<FVoxelViewKey>* InReadyNodes = nullptr,
 		const TSet<FVoxelViewKey>* InReadyBranches = nullptr,
 		const TSet<FVoxelViewKey>* InResolveRoots = nullptr) const;
+	FVoxelGameThreadContinuation ResolveVisibleSteps(TFunction<bool(const FVoxelViewKey&)> InIsReady, TSet<FVoxelViewKey>& OutVisible,
+		const TSet<FVoxelViewKey>* InPrevious, const TSet<FVoxelViewKey>* InReadyBranches, const TSet<FVoxelViewKey>* InResolveRoots) const;
 	bool Validate(FString& OutError) const;
 
 private:
-	bool BuildInternal(TConstArrayView<FVoxelStreamingSource> InSources,
-		const TSet<FIntVector>& InFineSections, const TSet<FVoxelViewKey>& InRoots,
+	FVoxelGameThreadContinuation ResolveNodeSteps(FVoxelViewKey InNode, TFunction<bool(const FVoxelViewKey&)> InIsReady,
+		const TSet<FVoxelViewKey>& InPreviousAncestors, const TSet<FVoxelViewKey>* InPrevious, const TSet<FVoxelViewKey>* InReadyBranches,
+		TArray<FVoxelViewKey>& OutVisible, bool& bOutReady) const;
+	bool BuildInternal(TConstArrayView<FVoxelStreamingSource> InSources, const TSet<FIntVector>& InFineSections, const TSet<FVoxelViewKey>& InRoots,
 		const FVoxelViewSettings& InSettings, FString& OutError);
 
-	bool ResolveNode(const FVoxelViewKey& InNode,
-		TFunctionRef<bool(const FVoxelViewKey&)> InIsReady,
-		const TSet<FVoxelViewKey>& InPreviousAncestors, const TSet<FVoxelViewKey>* InPrevious,
-		const TSet<FVoxelViewKey>* InReadyBranches, TArray<FVoxelViewKey>& OutVisible) const;
+	bool ResolveNode(const FVoxelViewKey& InNode, TFunctionRef<bool(const FVoxelViewKey&)> InIsReady, const TSet<FVoxelViewKey>& InPreviousAncestors,
+		const TSet<FVoxelViewKey>* InPrevious, const TSet<FVoxelViewKey>* InReadyBranches, TArray<FVoxelViewKey>& OutVisible) const;
 };

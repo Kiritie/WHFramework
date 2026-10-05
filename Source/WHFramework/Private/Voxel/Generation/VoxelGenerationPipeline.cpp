@@ -556,3 +556,11 @@ bool FVoxelGenerationPipeline::BuildCoarseOverlay(
 	OutError.Reset();
 	return true;
 }
+
+void FVoxelGenerationPipeline::SetOverlayConsumerWakeCallback(TFunction<void(const FIntVector&)> InCallback) const
+{
+	if (Overlay)
+	{
+		Overlay->SetConsumerWakeCallback(MoveTemp(InCallback));
+	}
+}

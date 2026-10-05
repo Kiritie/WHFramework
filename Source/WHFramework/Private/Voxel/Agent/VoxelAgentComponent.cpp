@@ -1247,3 +1247,8 @@ void UVoxelAgentComponent::SetAgentEnabled(
 		RefreshSource();
 	}
 }
+
+bool UVoxelAgentComponent::IsStreamingLocationAdmitted(const FIntVector& InCell, const uint64 InEpoch) const
+{
+	return Module.IsValid() && Module->IsSourceAdmittedAt(SourceId, InCell, InEpoch);
+}

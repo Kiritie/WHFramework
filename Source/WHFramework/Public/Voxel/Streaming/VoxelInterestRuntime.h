@@ -68,4 +68,7 @@ private:
 	FVoxelInterestSet LatestInterest;
 	FVoxelViewSettings LatestSettings;
 	bool bHasSettings = false;
+	uint64 PublicationSerial = 0;
+	uint64 DemandSerial = 0;
+	uint64 PrioritySerial = 0;
 };

@@ -115,6 +115,8 @@ int32 TerrainLane(const FVoxelTaskRequest& Request)
 		const int32 InStage, const bool bInPublicationContinuation = false, const bool bInTerrainDataOnly = false)
 	{
 		if (bInTerrainDataOnly) return INDEX_NONE;
+		if (InClass == EVoxelWorkClass::Critical && !IsRepresentationDataKind(InKind))
+			return 0;
 		switch (InKind)
 		{
 		case EVoxelTaskKind::BuildFineMesh: return 0;
@@ -131,6 +133,8 @@ int32 TerrainLane(const FVoxelTaskRequest& Request)
 
 	bool IsBackgroundTerrainWork(const EVoxelTaskKind InKind, const EVoxelWorkClass InClass, const int32 InStage)
 	{
+		if (InClass == EVoxelWorkClass::Critical)
+			return false;
 		if (IsRepresentationDataKind(InKind)) return true;
 		if (InKind == EVoxelTaskKind::BuildViewCoverage && InStage > 0) return true;
 		if (TerrainMeshStage(InKind, InClass, InStage) > 0) return true;
@@ -299,7 +303,7 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 		return false;
 	}
 
-	if (IsCoarseTerrainKind(InRequest.Kind))
+	if (IsCoarseTerrainKind(InRequest.Kind) && InRequest.WorkClass != EVoxelWorkClass::Critical)
 	{
 		int32 PendingCoarseTerrainTasks = 0;
 
@@ -341,7 +345,8 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 			const FVoxelTaskRequest& Existing = Pending[Index];
 			const int32 ExistingLane = TerrainLane(Existing);
 			const int32 Reserve = ExistingLane == static_cast<int32>(EVoxelTaskServiceLane::Other) ? 0 : ReservedPerLane;
-			if (ExistingLane != INDEX_NONE && ExistingLane != Lane && Counts[ExistingLane] <= Reserve) continue;
+			if (ExistingLane != INDEX_NONE && ExistingLane != Lane && Counts[ExistingLane] <= Reserve)
+				continue;
 			const bool bExistingBackground = IsBackgroundTerrainWork(Existing.Kind, Existing.WorkClass, Existing.TerrainStage);
 			const bool bMayReplace = (!bBackground && bExistingBackground) ||
 				(bBackground == bExistingBackground && (IsHigherPriority(InRequest, Existing) ||
@@ -514,6 +519,7 @@ void FVoxelTaskScheduler::Tick(
 			if (Completed.Resume) RunningContinuationInputBytes -= Completed.Resume->InputBytes;
 			if (Completed.Resume && Completed.Slot->Result.bSuccess && Completed.Slot->Result.bContinue && !Completed.Slot->Result.bCanceled)
 			{
+				Completed.Resume->AccumulatedExecuteMilliseconds = Completed.Slot->Result.ExecuteMilliseconds;
 				QueuedInputBytes += Completed.Resume->InputBytes;
 				Pending.Add(MoveTemp(*Completed.Resume));
 				++Applied;
@@ -1250,20 +1256,12 @@ void FVoxelTaskScheduler::Pump()
 
 		const double QueuedAt =
 			RunningTask.QueuedAt;
+		const double AccumulatedExecuteMilliseconds = Request.AccumulatedExecuteMilliseconds;
 
 		RunningTask.Task =
 			UE::Tasks::Launch(
 				UE_SOURCE_LOCATION,
-				[
-					Slot,
-					Stamp,
-					Kind,
-					ResultBudget,
-					QueuedAt,
-					Execute =
-						MoveTemp(
-							Request.Execute)
-				]() mutable
+				[Slot, Stamp, Kind, ResultBudget, QueuedAt, AccumulatedExecuteMilliseconds, Execute = MoveTemp(Request.Execute)]() mutable
 				{
 					TRACE_CPUPROFILER_EVENT_SCOPE(
 						Voxel_TaskExecute);
@@ -1296,11 +1294,7 @@ void FVoxelTaskScheduler::Pump()
 							(Start - QueuedAt) *
 								1000.0);
 
-					Slot->Result.ExecuteMilliseconds =
-						FMath::Max(
-							0.0,
-							(End - Start) *
-								1000.0);
+					Slot->Result.ExecuteMilliseconds = FMath::Max(0.0, (End - Start) * 1000.0) + AccumulatedExecuteMilliseconds;
 
 					if (Slot->Result.ResultBytes() >
 						ResultBudget)
@@ -1328,7 +1322,8 @@ void FVoxelTaskScheduler::Pump()
 							MoveTemp(
 								ErrorResult);
 					}
-				}, UE::Tasks::ETaskPriority::Normal);
+				},
+				UE::Tasks::ETaskPriority::Normal);
 
 		Running.Add(
 			MoveTemp(RunningTask));

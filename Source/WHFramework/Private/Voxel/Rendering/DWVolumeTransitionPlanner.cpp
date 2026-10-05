@@ -144,3 +144,58 @@ void FVoxelVolumeTransitionPlanner::Build(
 		return KeyLess(A.Neighbor, B.Neighbor);
 	});
 }
+
+FVoxelGameThreadContinuation FVoxelVolumeTransitionPlanner::GatherCoverageRegionsSteps(
+	const TSet<FVoxelViewKey>& InVisible, TMap<FVoxelViewKey, TSet<FVoxelViewKey>>& OutRegions)
+{
+	OutRegions.Reset();
+	uint8 Level = 6;
+	for (const auto& Key : InVisible)
+	{
+		co_await FVoxelGameThreadContinuation::Yield();
+		Level = FMath::Max(Level, Key.Level);
+	}
+	TMap<FVoxelViewKey, TSet<FVoxelViewKey>> Owned;
+	for (const auto& Key : InVisible)
+	{
+		co_await FVoxelGameThreadContinuation::Yield();
+		FVoxelViewKey Region = Key;
+		while (Region.Level < Level)
+			Region = Region.GetParent();
+		Owned.FindOrAdd(Region).Add(Key);
+	}
+	for (const auto& Pair : Owned)
+	{
+		co_await FVoxelGameThreadContinuation::Yield();
+		auto& Local = OutRegions.Add(Pair.Key);
+		co_await VoxelGameThread::AppendSteps(Local, Pair.Value);
+		const FVoxelGenerationBounds Bounds = Pair.Key.GetBounds();
+		for (int32 Z = -1; Z <= 1; ++Z)
+		{
+			co_await FVoxelGameThreadContinuation::Yield();
+			for (int32 Y = -1; Y <= 1; ++Y)
+			{
+				co_await FVoxelGameThreadContinuation::Yield();
+				for (int32 X = -1; X <= 1; ++X)
+				{
+					co_await FVoxelGameThreadContinuation::Yield();
+					if (X == 0 && Y == 0 && Z == 0)
+						continue;
+					if (const auto* Nodes = Owned.Find({Pair.Key.Coordinate + FIntVector(X, Y, Z), Level}))
+					{
+						for (const FVoxelViewKey& Node : *Nodes)
+						{
+							co_await FVoxelGameThreadContinuation::Yield();
+							const FVoxelGenerationBounds Neighbor = Node.GetBounds();
+							if (Neighbor.Min.X <= Bounds.Max.X && Neighbor.Max.X >= Bounds.Min.X && Neighbor.Min.Y <= Bounds.Max.Y &&
+								Neighbor.Max.Y >= Bounds.Min.Y && Neighbor.Min.Z <= Bounds.Max.Z && Neighbor.Max.Z >= Bounds.Min.Z)
+							{
+								Local.Add(Node);
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}

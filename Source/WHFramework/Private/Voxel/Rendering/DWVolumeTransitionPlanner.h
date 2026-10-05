@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Voxel/Rendering/VoxelGameThreadContinuation.h"
 #include "Voxel/Rendering/DWLodTransition.h"
 #include "Voxel/Rendering/VoxelViewTypes.h"
 
@@ -19,6 +20,7 @@ class FVoxelVolumeTransitionPlanner
 public:
 	static void GatherCoverageRegions(const TSet<FVoxelViewKey>& InVisible,
 		TMap<FVoxelViewKey, TSet<FVoxelViewKey>>& OutRegions);
+	static FVoxelGameThreadContinuation GatherCoverageRegionsSteps(const TSet<FVoxelViewKey>& InVisible, TMap<FVoxelViewKey, TSet<FVoxelViewKey>>& OutRegions);
 
 	static void Build(
 		const TSet<FVoxelViewKey>& InVisible,

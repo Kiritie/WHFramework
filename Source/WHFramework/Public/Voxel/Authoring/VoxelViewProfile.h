@@ -25,7 +25,20 @@ struct WHFRAMEWORK_API FVoxelLodTopologySettings
 		meta = (ClampMin = "1", ClampMax = "20"))
 	uint8 MaximumVoxelProxyLevel = 5;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "32", ClampMax = "128"))
+	int32 MaximumVoxelProxySamplesPerAxis = 32;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "16", ClampMax = "256"))
+	int32 MaximumHeightfieldSamplesPerAxis = 64;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "524288", ClampMax = "4194304"))
+	int32 MaximumPageEstimatedTriangles = 524288;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "128", ClampMax = "1024"))
+	int32 MaximumPageEstimatedMeshMegabytes = 128;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "8", ClampMax = "100"))
+	float MaximumPageEstimatedBuildMilliseconds = 8.0f;
 
 	UPROPERTY(
 		EditAnywhere,
@@ -114,6 +127,18 @@ struct WHFRAMEWORK_API FVoxelStreamingPerformanceBudget
 		BlueprintReadOnly,
 		meta = (ClampMin = "1"))
 	int32 FineAdmissionPerFrame = 24;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1", ClampMax = "128"))
+	int32 CoveragePreparationBatchSize = 16;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1", ClampMax = "32"))
+	int32 PublishAdmissionBatchSize = 4;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.01", ClampMax = "2.0"))
+	float PublishOperationEstimateFloorMilliseconds = 0.05f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.05", ClampMax = "4.0"))
+	float PublishOperationEstimateCeilingMilliseconds = 1.0f;
 
 	UPROPERTY(
 		EditAnywhere,

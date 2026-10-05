@@ -6,6 +6,7 @@ struct FVoxelStreamingSource;
 struct FVoxelViewSettings;
 struct FVoxelSourceInterest;
 struct FVoxelLodTopologySettings;
+struct FVoxelStreamingPerformanceBudget;
 
 struct WHFRAMEWORK_API FVoxelResolvedViewRanges
 {
@@ -18,6 +19,7 @@ struct WHFRAMEWORK_API FVoxelResolvedViewRanges
 namespace VoxelViewLod
 {
 	WHFRAMEWORK_API bool ValidateTopology(const FVoxelLodTopologySettings& InSettings, FString& OutError);
+	WHFRAMEWORK_API bool ValidatePerformanceBudget(const FVoxelStreamingPerformanceBudget& InBudget, FString& OutError);
 	WHFRAMEWORK_API uint8 MinimumVoxelProxyLevel(const FVoxelLodTopologySettings& InSettings);
 	WHFRAMEWORK_API FVoxelResolvedViewRanges ResolveViewRanges(const FVoxelStreamingSource& InSource);
 	WHFRAMEWORK_API FVoxelResolvedViewRanges ResolveReplanSteps(const FVoxelStreamingSource& InSource, const FVoxelViewSettings& InSettings, const FVoxelSourceInterest* InAccepted = nullptr);

@@ -159,3 +159,53 @@ bool VoxelCoverage::HasProxyTopSurfaceInColumn(
 	}
 	return false;
 }
+
+FVoxelGameThreadContinuation VoxelCoverage::IsFullyCovered2DSteps(
+	const FVoxelCoverageRect InTarget, TConstArrayView<FVoxelCoverageRect> InCoverage, bool& OutCovered)
+{
+	OutCovered = false;
+	if (!InTarget.IsValid())
+		co_return;
+	TArray<FVoxelCoverageRect> Remaining{InTarget};
+	for (const auto& Coverage : InCoverage)
+	{
+		co_await FVoxelGameThreadContinuation::Yield();
+		if (!Coverage.IsValid() || !Coverage.Intersects(InTarget))
+			continue;
+		TArray<FVoxelCoverageRect> Next;
+		for (auto Fragment : Remaining)
+		{
+			co_await FVoxelGameThreadContinuation::Yield();
+			if (!Coverage.Intersects(Fragment))
+			{
+				Next.Add(Fragment);
+				continue;
+			}
+			const FVoxelCoverageRect Intersection{FIntPoint(FMath::Max(Coverage.Min.X, Fragment.Min.X), FMath::Max(Coverage.Min.Y, Fragment.Min.Y)),
+				FIntPoint(FMath::Min(Coverage.Max.X, Fragment.Max.X), FMath::Min(Coverage.Max.Y, Fragment.Max.Y))};
+			for (int32 Axis = 0; Axis < 2; ++Axis)
+			{
+				if (Fragment.Min[Axis] < Intersection.Min[Axis])
+				{
+					auto Part = Fragment;
+					Part.Max[Axis] = Intersection.Min[Axis];
+					Next.Add(Part);
+					Fragment.Min[Axis] = Intersection.Min[Axis];
+				}
+				if (Fragment.Max[Axis] > Intersection.Max[Axis])
+				{
+					auto Part = Fragment;
+					Part.Min[Axis] = Intersection.Max[Axis];
+					Next.Add(Part);
+					Fragment.Max[Axis] = Intersection.Max[Axis];
+				}
+			}
+		}
+		Remaining = MoveTemp(Next);
+		if (Remaining.IsEmpty())
+		{
+			OutCovered = true;
+			co_return;
+		}
+	}
+}

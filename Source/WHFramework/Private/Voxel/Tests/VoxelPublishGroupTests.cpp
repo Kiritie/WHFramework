@@ -720,7 +720,20 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 		BatchScheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
 		FPlatformProcess::Sleep(0.001f);
 	}
-	TestEqual(TEXT("One worker round trip compares a bounded batch of independent updates"), Batched->CoverageIndex, 32);
+	TestEqual(TEXT("One worker round trip respects the configured comparison batch"), Batched->CoverageIndex,
+		Module->GetViewSettings().Budget.CoveragePreparationBatchSize);
+	while (Batched->CoverageIndex < Batched->Updates.Num() && FPlatformTime::Seconds() < BatchDeadline)
+	{
+		BatchPublisher.AdmitCoveragePreparation(Batched);
+		BatchScheduler.Tick(
+			[](FVoxelTaskResult&&)
+			{
+			},
+			8.0);
+		FPlatformProcess::Sleep(0.001f);
+	}
+	TestTrue(
+		TEXT("Successive bounded batches finish every independent update"), Batched->bCoveragePrepared && Batched->CoverageIndex == Batched->Updates.Num());
 	BatchScheduler.StopAndJoin();
 	Publisher.Reset();
 	const auto Prioritized = MakeShared<FVoxelViewPublisher::FPublication>();
@@ -1091,8 +1104,8 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 		AdmissionPublication->PendingBuildIndices.Contains(DistantUpdates));
 	int32 InspectedMeshes = 0;
 	for (const auto& Mesh : AdmissionPublication->PreparedMeshes) InspectedMeshes += Mesh.IsValid();
-	TestEqual(TEXT("Priority admission inspects at most sixteen updates per slice"),
-		InspectedMeshes, 15);
+	TestEqual(
+		TEXT("Priority admission respects the configured inspection batch"), InspectedMeshes, Module->GetViewSettings().Budget.PublishAdmissionBatchSize - 1);
 	TestTrue(TEXT("Clipping admission preserves the accepted physical update and task indices"),
 		AdmissionPublication->Updates[DistantUpdates].GroupIndex == 1 &&
 		AdmissionPublication->Updates[DistantUpdates].Source == AdmissionMesh);

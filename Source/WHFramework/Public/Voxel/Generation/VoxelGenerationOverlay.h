@@ -19,6 +19,10 @@ class WHFRAMEWORK_API IVoxelGenerationOverlay
 public:
 	virtual ~IVoxelGenerationOverlay() = default;
 
+	virtual void SetConsumerWakeCallback(TFunction<void(const FIntVector&)> InCallback) const
+	{
+	}
+
 	virtual void ReleaseSectionConsumer(const FIntVector& InSectionCoordinate) const
 	{
 	}

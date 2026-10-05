@@ -268,7 +268,6 @@ void FVoxelTerrainViewPlan::ResolveVisible(TFunctionRef<bool(const FVoxelViewKey
 		}
 		for (FVoxelViewKey Node : *InPrevious)
 		{
-			// A previous node outside the new root domain cannot be visited by ResolveNode.
 			while (!EffectiveRoots.Contains(Node) && Node.Level < RootLevel)
 			{
 				Node = Node.GetParent();
@@ -366,4 +365,98 @@ bool FVoxelTerrainViewPlan::Validate(FString& OutError) const
 	}
 	OutError.Reset();
 	return true;
+}
+
+FVoxelGameThreadContinuation FVoxelTerrainViewPlan::ResolveNodeSteps(const FVoxelViewKey InNode, TFunction<bool(const FVoxelViewKey&)> InIsReady,
+	const TSet<FVoxelViewKey>& InPreviousAncestors, const TSet<FVoxelViewKey>* InPrevious, const TSet<FVoxelViewKey>* InReadyBranches,
+	TArray<FVoxelViewKey>& OutVisible, bool& bOutReady) const
+{
+	co_await FVoxelGameThreadContinuation::Yield();
+	if (InReadyBranches && !InReadyBranches->Contains(InNode) && !InPreviousAncestors.Contains(InNode) && (!InPrevious || !InPrevious->Contains(InNode)))
+	{
+		bOutReady = false;
+		co_return;
+	}
+	const bool bDesiredLeaf = Leaves.Contains(InNode);
+	if (bDesiredLeaf && InIsReady(InNode))
+	{
+		OutVisible.Add(InNode);
+		bOutReady = true;
+		co_return;
+	}
+	const int32 FirstChild = OutVisible.Num();
+	if (InNode.Level > 0 && ((!bDesiredLeaf && Required.Contains(InNode)) || InPreviousAncestors.Contains(InNode)))
+	{
+		bool bChildrenReady = true;
+		for (int32 Index = 0; Index < 8; ++Index)
+		{
+			co_await FVoxelGameThreadContinuation::Yield();
+			const FVoxelViewKey Child{InNode.Coordinate * 2 + FIntVector(Index & 1, (Index >> 1) & 1, (Index >> 2) & 1), static_cast<uint8>(InNode.Level - 1)};
+			bool bChildReady = false;
+			co_await ResolveNodeSteps(Child, InIsReady, InPreviousAncestors, InPrevious, InReadyBranches, OutVisible, bChildReady);
+			bChildrenReady &= bChildReady;
+		}
+		if (bChildrenReady)
+		{
+			bOutReady = true;
+			co_return;
+		}
+	}
+	// 初次加载也用已就绪的粗父节点补齐未完成的子节点；完整子族就绪后再整体交接。
+	if (InIsReady(InNode))
+	{
+		OutVisible.SetNum(FirstChild, EAllowShrinking::No);
+		OutVisible.Add(InNode);
+		bOutReady = true;
+		co_return;
+	}
+	bOutReady = false;
+	co_return;
+}
+
+FVoxelGameThreadContinuation FVoxelTerrainViewPlan::ResolveVisibleSteps(TFunction<bool(const FVoxelViewKey&)> InIsReady, TSet<FVoxelViewKey>& OutVisible,
+	const TSet<FVoxelViewKey>* InPrevious, const TSet<FVoxelViewKey>* InReadyBranches, const TSet<FVoxelViewKey>* InResolveRoots) const
+{
+	const TSet<FVoxelViewKey>& EffectiveRoots = InResolveRoots ? *InResolveRoots : Roots;
+	TSet<FVoxelViewKey> PreviousAncestors;
+	if (InPrevious)
+	{
+		uint8 RootLevel = 0;
+		for (const FVoxelViewKey& Root : EffectiveRoots)
+		{
+			co_await FVoxelGameThreadContinuation::Yield();
+			RootLevel = FMath::Max(RootLevel, Root.Level);
+		}
+		for (FVoxelViewKey Node : *InPrevious)
+		{
+			co_await FVoxelGameThreadContinuation::Yield();
+			while (!EffectiveRoots.Contains(Node) && Node.Level < RootLevel)
+			{
+				co_await FVoxelGameThreadContinuation::Yield();
+				Node = Node.GetParent();
+				bool bAlreadyPresent = false;
+				PreviousAncestors.Add(Node, &bAlreadyPresent);
+				if (bAlreadyPresent)
+					break;
+			}
+		}
+	}
+	// 上一已提交分区包含合法空节点；没有Actor不等于失去已发布的空间所有权。
+	auto IsAvailable = [&InIsReady, InPrevious](const FVoxelViewKey& Key)
+	{
+		return InIsReady(Key) || (InPrevious && InPrevious->Contains(Key));
+	};
+	OutVisible.Reset();
+	for (const FVoxelViewKey& Root : EffectiveRoots)
+	{
+		co_await FVoxelGameThreadContinuation::Yield();
+		TArray<FVoxelViewKey> Visible;
+		bool bReady = false;
+		co_await ResolveNodeSteps(Root, IsAvailable, PreviousAncestors, InPrevious, InReadyBranches, Visible, bReady);
+		for (const FVoxelViewKey& Node : Visible)
+		{
+			co_await FVoxelGameThreadContinuation::Yield();
+			OutVisible.Add(Node);
+		}
+	}
 }

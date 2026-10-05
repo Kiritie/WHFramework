@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Containers/Queue.h"
 #include "Voxel/Generation/VoxelGenerationPipeline.h"
 #include "Voxel/Generation/VoxelGenerationPlanCoordinator.h"
 #include "Voxel/Generation/VoxelWorldManifest.h"
@@ -30,6 +31,8 @@ public:
 		const FVoxelWorldManifest& InManifest,
 		TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry);
 
+	~FVoxelEmergeManager();
+
 	void Tick(
 		const FVoxelInterestSet& InInterest,
 		uint64 InInterestRevision,
@@ -52,30 +55,28 @@ public:
 	uint64 GetWaitingPlanConsumers(EVoxelGenerationPlanKind InKind) const;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FVoxelCriticalReadyQueueLivenessTest;
+#endif
+	static bool IsCriticalDemand(const FVoxelExactDemand& InDemand);
+	void WakeCriticalSection(const FIntVector& InKey);
 	static EVoxelWorkClass ResolveWorkClass(const FVoxelExactDemand& InDemand);
-	void RebuildDemand(
-		const FVoxelInterestSet& InInterest,
-		uint64 InInterestRevision);
+	void RebuildDemand(const FVoxelInterestSet& InInterest, uint64 InInterestRevision);
 
-	bool RequestSection(
-		const FIntVector& InKey,
-		const FVoxelExactDemand& InDemand);
+	bool RequestSection(const FIntVector& InKey, const FVoxelExactDemand& InDemand);
 
-	bool RequestBase(
-		FVoxelSection& InSection,
-		const FIntVector& InKey,
-		const FVoxelExactDemand& InDemand);
+	bool RequestBase(FVoxelSection& InSection, const FIntVector& InKey, const FVoxelExactDemand& InDemand);
 
-	bool ResolveOverlay(
-		FVoxelSection& InSection,
-		const FIntVector& InKey,
-		const FVoxelExactDemand& InDemand);
+	bool ResolveOverlay(FVoxelSection& InSection, const FIntVector& InKey, const FVoxelExactDemand& InDemand);
 
 private:
 	struct FWaitingPlanSection
 	{
 		TArray<FVoxelGenerationPlanDependency> Dependencies;
 		TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> Retention;
+		FVoxelSectionStamp Stamp;
+		double BlockedSinceSeconds = 0.0;
+		FString Blocker;
 		double RetryAfterSeconds = 0.0;
 	};
 
@@ -98,10 +99,15 @@ private:
 	TMap<FIntVector, EVoxelSectionChangeState> RemoteChangeStates;
 	TArray<FIntVector> OrderedKeys;
 	TArray<int32> AdmissionLanes[2];
+	TArray<FIntVector> CriticalAdmissionKeys;
+	TQueue<FIntVector> ReadyCriticalSections;
+	TSet<FIntVector> QueuedCriticalSections;
+	int32 CriticalFallbackCursor = 0;
 	TArray<FOverlayBoundsRequest> OverlayBoundsRequests;
 	TMap<FIntPoint, FVoxelGenerationDependencyStatus> EnvironmentColumnStates;
 
 	uint64 CurrentInterestRevision = 0;
+	uint64 CurrentPriorityRevision = 0;
 	int32 NextAdmissionIndices[2] = {};
 	int32 NextOverlayBoundsIndex = 0;
 	double OverlayBoundsRetryAfterSeconds = 0.0;

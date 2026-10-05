@@ -70,9 +70,17 @@ public:
 	void ReleaseConsumer(const FIntVector& InConsumer);
 	uint64 GetWaitingConsumers(EVoxelGenerationPlanKind InKind) const;
 
+	void SetConsumerWakeCallback(TFunction<void(const FIntVector&)> InCallback);
 	void Reset();
 
 private:
+	struct FDonation
+	{
+		EVoxelWorkClass WorkClass = EVoxelWorkClass::Background;
+		int32 Priority = MAX_int32;
+		double Distance = MAX_dbl;
+		double Forward = 0.0;
+	};
 	struct FState
 	{
 		EVoxelPlanDependencyState State = EVoxelPlanDependencyState::Missing;
@@ -82,12 +90,15 @@ private:
 		double ForwardScore = 0.0;
 		FString Error;
 		TSet<FIntVector> Consumers;
+		TMap<FIntVector, FDonation> Donations;
+		uint64 AttemptId = 0;
 	};
 
+	void ResolveDonations(FState& InOutState);
+	void ForgetDependency(const FVoxelGenerationPlanDependency& InDependency);
 	bool IsCached(const FVoxelGenerationPlanDependency& InDependency) const;
 	bool Queue(const FVoxelGenerationPlanDependency& InDependency, FState& InOutState);
-	bool DonatePriority(FState& InOutState, EVoxelWorkClass InWorkClass,
-		int32 InSourcePriority, double InDistanceScore, double InForwardScore);
+	bool DonatePriority(FState& InOutState, EVoxelWorkClass InWorkClass, int32 InSourcePriority, double InDistanceScore, double InForwardScore);
 	void RefreshQueuedPriorities();
 
 	FVoxelTaskScheduler& Scheduler;
@@ -95,4 +106,7 @@ private:
 	TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> Cache;
 	uint64 WorldEpoch = 0;
 	TMap<FVoxelGenerationPlanDependency, FState> States;
+	TMap<FIntVector, TSet<FVoxelGenerationPlanDependency>> ConsumerDependencies;
+	TFunction<void(const FIntVector&)> ConsumerWakeCallback;
+	uint64 NextAttemptId = 0;
 };

@@ -1,5 +1,6 @@
 #include "Voxel/Generation/VoxelGenerationPlanCoordinator.h"
 
+#include "Misc/ScopeExit.h"
 #include "Voxel/Generation/Caves/VoxelCaveGenerator.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelGenerationQuery.h"
@@ -293,7 +294,8 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 	Request.DistanceScore = InOutState.DistanceScore;
 	Request.ForwardScore = InOutState.ForwardScore;
 	Request.Stamp.WorldEpoch = WorldEpoch;
-	Request.Stamp.Token = InDependency.StableHash;
+	InOutState.AttemptId = ++NextAttemptId;
+	Request.Stamp.Token = InOutState.AttemptId;
 	Request.Stamp.Revision = static_cast<uint8>(InDependency.Kind);
 	Request.Stamp.Section = InDependency.Coordinate();
 	Request.ReservedBytes = InDependency.Kind == EVoxelGenerationPlanKind::Hydrology
@@ -349,7 +351,21 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 	Request.Apply = [this, Dependency = InDependency](FVoxelTaskResult&& Result)
 	{
 		FState* State = States.Find(Dependency);
-		if (!State) return;
+		if (!State || Result.Stamp.WorldEpoch != WorldEpoch || Result.Stamp.Token != State->AttemptId)
+		{
+			return;
+		}
+		const TSet<FIntVector> Consumers = State->Consumers;
+		ON_SCOPE_EXIT
+		{
+			if (ConsumerWakeCallback)
+			{
+				for (const FIntVector& Consumer : Consumers)
+				{
+					ConsumerWakeCallback(Consumer);
+				}
+			}
+		};
 		if (Result.bCanceled || Result.Error.StartsWith(TEXT("DependencyNotReady")))
 		{
 			State->State = EVoxelPlanDependencyState::Missing;
@@ -357,9 +373,7 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 		}
 		if (Result.bSuccess)
 		{
-			// The immutable cache owns completed plans. Keep coordinator state only
-			// while a key is queued or has a failure to report.
-			States.Remove(Dependency);
+			ForgetDependency(Dependency);
 			return;
 		}
 		State->State = EVoxelPlanDependencyState::Failed;
@@ -388,11 +402,17 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 	{
 		if (IsCached(Dependency))
 		{
-			States.Remove(Dependency);
+			ForgetDependency(Dependency);
 			return true;
 		}
 		FState& State = States.FindOrAdd(Dependency);
 		State.Consumers.Add(InConsumer);
+		State.Donations.Add(InConsumer, {InWorkClass, InSourcePriority, InDistanceScore, InForwardScore});
+		const FDonation Previous{State.WorkClass, State.SourcePriority, State.DistanceScore, State.ForwardScore};
+		ResolveDonations(State);
+		bPriorityChanged |= Previous.WorkClass != State.WorkClass || Previous.Priority != State.SourcePriority || Previous.Distance != State.DistanceScore ||
+							Previous.Forward != State.ForwardScore;
+		ConsumerDependencies.FindOrAdd(InConsumer).Add(Dependency);
 		if (State.State == EVoxelPlanDependencyState::Ready)
 		{
 			State.State = EVoxelPlanDependencyState::Missing;
@@ -441,11 +461,35 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 void FVoxelGenerationPlanCoordinator::Reset()
 {
 	States.Reset();
+	ConsumerDependencies.Reset();
 }
 
 void FVoxelGenerationPlanCoordinator::ReleaseConsumer(const FIntVector& InConsumer)
 {
-	for (auto& Pair : States) Pair.Value.Consumers.Remove(InConsumer);
+	TSet<FVoxelGenerationPlanDependency> Dependencies;
+	if (!ConsumerDependencies.RemoveAndCopyValue(InConsumer, Dependencies))
+		return;
+	for (const auto& Dependency : Dependencies)
+	{
+		FState* State = States.Find(Dependency);
+		if (!State)
+			continue;
+		State->Consumers.Remove(InConsumer);
+		State->Donations.Remove(InConsumer);
+		if (State->Consumers.IsEmpty())
+		{
+			const uint64 Attempt = State->AttemptId;
+			Scheduler.CancelMatching(
+				[Attempt, Epoch = WorldEpoch](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
+				{
+					return Kind == EVoxelTaskKind::BuildGenerationPlan && Stamp.WorldEpoch == Epoch && Stamp.Token == Attempt;
+				});
+			States.Remove(Dependency);
+		}
+		else
+			ResolveDonations(*State);
+	}
+	RefreshQueuedPriorities();
 }
 
 uint64 FVoxelGenerationPlanCoordinator::GetWaitingConsumers(const EVoxelGenerationPlanKind InKind) const
@@ -457,4 +501,38 @@ uint64 FVoxelGenerationPlanCoordinator::GetWaitingConsumers(const EVoxelGenerati
 			Consumers.Append(Pair.Value.Consumers);
 	}
 	return Consumers.Num();
+}
+
+void FVoxelGenerationPlanCoordinator::SetConsumerWakeCallback(TFunction<void(const FIntVector&)> InCallback)
+{
+	ConsumerWakeCallback = MoveTemp(InCallback);
+}
+
+void FVoxelGenerationPlanCoordinator::ResolveDonations(FState& InOutState)
+{
+	InOutState.WorkClass = EVoxelWorkClass::Background;
+	InOutState.SourcePriority = MAX_int32;
+	InOutState.DistanceScore = MAX_dbl;
+	InOutState.ForwardScore = 0.0;
+	for (const auto& Donation : InOutState.Donations)
+		DonatePriority(InOutState, Donation.Value.WorkClass, Donation.Value.Priority, Donation.Value.Distance, Donation.Value.Forward);
+}
+
+void FVoxelGenerationPlanCoordinator::ForgetDependency(const FVoxelGenerationPlanDependency& InDependency)
+{
+	if (const FState* State = States.Find(InDependency))
+	{
+		for (const FIntVector& Consumer : State->Consumers)
+		{
+			if (auto* Dependencies = ConsumerDependencies.Find(Consumer))
+			{
+				Dependencies->Remove(InDependency);
+				if (Dependencies->IsEmpty())
+				{
+					ConsumerDependencies.Remove(Consumer);
+				}
+			}
+		}
+	}
+	States.Remove(InDependency);
 }

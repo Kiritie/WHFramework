@@ -310,29 +310,19 @@ void UVoxelModule::OnRefresh(
 
 	const double AfterInterest = FPlatformTime::Seconds();
 
-	EmergeManager->Tick(
-		CurrentInterest,
-		InterestRevision,
-		Now,
-		ViewManager ? ViewManager->GetDataAdmissionLimits() : TMap<int32, double>(),
-		ViewSettings.Budget.DataAdmissionPerFrame,
-		ViewSettings.Budget.AdmissionMilliseconds);
+	EmergeManager->Tick(*CurrentInterest, CurrentInterest->DemandRevision, Now, ViewManager ? ViewManager->GetDataAdmissionLimits() : TMap<int32, double>(),
+		ViewSettings.Budget.DataAdmissionPerFrame, ViewSettings.Budget.AdmissionMilliseconds);
 
 	const double AfterEmerge = FPlatformTime::Seconds();
 	LastEmergeAdmissionMilliseconds = (AfterEmerge - AfterInterest) * 1000.0;
 
-	ResidencyManager->Tick(
-		CurrentInterest.Exact,
-		InterestRevision,
-		Now);
+	ResidencyManager->Tick(CurrentInterest->Exact, InterestRevision, Now);
 
 	const double AfterResidency = FPlatformTime::Seconds();
 
 	if (CollisionPresenter)
 	{
-		CollisionPresenter->Tick(
-			CurrentInterest.Exact,
-			InterestRevision);
+		CollisionPresenter->Tick(CurrentInterest->Exact, InterestRevision);
 	}
 
 	const double AfterCollision = FPlatformTime::Seconds();
@@ -417,10 +407,11 @@ void UVoxelModule::OnRefresh(
 			{
 				return Samples[FMath::Clamp(FMath::CeilToInt(Quantile * Samples.Num()) - 1, 0, Samples.Num() - 1)];
 			};
-			UE_LOG(LogTemp, Display, TEXT("Voxel frame timing samples=%d frameMs p50=%.2f p95=%.2f p99=%.2f max=%.2f voxelGT p95=%.2f max=%.2f"),
+			UE_LOG(LogTemp, Display,
+				TEXT("Voxel frame timing samples=%d frameMs p50=%.2f p95=%.2f p99=%.2f max=%.2f voxelGT p50=%.2f p95=%.2f p99=%.2f max=%.2f"),
 				DiagnosticFrameTimes.Num(), Percentile(DiagnosticFrameTimes, 0.5), Percentile(DiagnosticFrameTimes, 0.95),
-				Percentile(DiagnosticFrameTimes, 0.99), DiagnosticFrameTimes.Last(),
-				Percentile(DiagnosticModuleTimes, 0.95), DiagnosticModuleTimes.Last());
+				Percentile(DiagnosticFrameTimes, 0.99), DiagnosticFrameTimes.Last(), Percentile(DiagnosticModuleTimes, 0.5),
+				Percentile(DiagnosticModuleTimes, 0.95), Percentile(DiagnosticModuleTimes, 0.99), DiagnosticModuleTimes.Last());
 			DiagnosticFrameTimes.Reset();
 			DiagnosticModuleTimes.Reset();
 		}
@@ -634,7 +625,7 @@ bool UVoxelModule::StartWorld(
 		ViewSettings.Planning = ViewProfile->Planning;
 		ViewSettings.Budget = ViewProfile->Budget;
 		ViewSettings.MaximumTextureStretchCells = FMath::Clamp(ViewProfile->MaximumTextureStretchCells, 1.0f, 16.0f);
-		if (!VoxelViewLod::ValidateTopology(ViewSettings.Lod, OutError))
+		if (!VoxelViewLod::ValidateTopology(ViewSettings.Lod, OutError) || !VoxelViewLod::ValidatePerformanceBudget(ViewSettings.Budget, OutError))
 		{
 			GenerationConfig.Reset();
 			WorldState = EVoxelWorldState::Failed;
@@ -775,7 +766,7 @@ bool UVoxelModule::StartWorld(
 
 	SessionId = IsAuthority() ? FGuid::NewGuid() : FGuid();
 	Sources.Reset();
-	CurrentInterest = {};
+	CurrentInterest = MakeShared<FVoxelInterestSet, ESPMode::ThreadSafe>();
 	InterestRevision = 0;
 	LastInterestRefresh = -1.0;
 	bInterestBuildPending = false;
@@ -892,7 +883,7 @@ bool UVoxelModule::StopWorld(const bool bDiscardDirty, FString& OutError)
 	GenerationConfig.Reset();
 	Scheduler.Reset();
 	Sources.Reset();
-	CurrentInterest = {};
+	CurrentInterest = MakeShared<FVoxelInterestSet, ESPMode::ThreadSafe>();
 	InterestRevision = 0;
 	LastInterestRefresh = -1.0;
 	bInterestBuildPending = false;
@@ -1122,12 +1113,17 @@ const FVoxelRegionStore& UVoxelModule::GetRegionStore() const
 
 const FVoxelInterestSet& UVoxelModule::GetCurrentInterest() const
 {
-	return CurrentInterest;
+	return *CurrentInterest;
 }
 
 FVoxelRepresentationReadiness UVoxelModule::GetRepresentationReadiness() const
 {
 	return ViewManager ? ViewManager->GetRepresentationReadiness() : FVoxelRepresentationReadiness{};
+}
+
+FVoxelTerrainReadinessSnapshot UVoxelModule::CaptureTerrainReadiness() const
+{
+	return ViewManager ? ViewManager->CaptureTerrainReadiness() : FVoxelTerrainReadinessSnapshot{};
 }
 
 TMap<FName, FVoxelPlanDiagnostics> UVoxelModule::GetPlanDiagnostics() const
@@ -1292,7 +1288,8 @@ bool UVoxelModule::UpdateSource(const FGuid& InId, const FVoxelStreamingSource& 
 	}
 	Updated.Id = InId;
 	Updated.RegistrationOrder = Source->Value.RegistrationOrder;
-	if (FVoxelInterestRuntime::NeedsUpdate(Source->PlannedValue, Updated, ViewSettings, CurrentInterest.Sources.Find(Updated.Id)))
+	if (Source->Value.Center != Updated.Center ||
+		FVoxelInterestRuntime::NeedsUpdate(Source->PlannedValue, Updated, ViewSettings, CurrentInterest->Sources.Find(Updated.Id)))
 	{
 		bInterestDirty = true;
 	}
@@ -1318,12 +1315,12 @@ void UVoxelModule::ForceVoxelStreamingRefresh()
 bool UVoxelModule::IsSourceAdmitted(const FGuid& InId) const
 {
 	const FSource* Source = Sources.Find(InId);
-	const FVoxelSourceInterest* Admitted = CurrentInterest.Sources.Find(InId);
+	const FVoxelSourceInterest* Admitted = CurrentInterest->Sources.Find(InId);
 	if (!Source || !Source->Owner.IsValid() || !Admitted) return false;
 	FVoxelStreamingSource Input = Admitted->Source;
 	// 排序生成的调度优先级不是来源输入，不能据此否认已准入的来源。
 	Input.SchedulingPriority = Source->Value.SchedulingPriority;
-	return !FVoxelInterestRuntime::NeedsUpdate(Input, Source->Value, ViewSettings, CurrentInterest.Sources.Find(Input.Id));
+	return !FVoxelInterestRuntime::NeedsUpdate(Input, Source->Value, ViewSettings, CurrentInterest->Sources.Find(Input.Id));
 }
 
 void UVoxelModule::CollectStreamingSourcesForOwner(const AActor* InOwner, TArray<FVoxelStreamingSource>& OutSources) const
@@ -1346,7 +1343,7 @@ FVoxelStreamingReadiness UVoxelModule::QueryStreamingReadiness(const FGuid& InId
 	{
 		return Result;
 	}
-	const FVoxelSourceInterest& Interest = CurrentInterest.Sources.FindChecked(InId);
+	const FVoxelSourceInterest& Interest = CurrentInterest->Sources.FindChecked(InId);
 	Result.RequiredDataSections = Interest.DataSections.Num();
 	Result.RequiredCollisionSections = Interest.CollisionSections.Num();
 	for (const FIntVector& Key : Interest.DataSections)
@@ -1576,7 +1573,7 @@ UVoxelSceneRegion* UVoxelModule::GetSceneRegionForActor(AActor* InActor, const F
 
 bool UVoxelModule::ActivateSimulationSection(const FIntVector& InSection)
 {
-	const FVoxelExactDemand* Demand = CurrentInterest.Exact.Find(InSection);
+	const FVoxelExactDemand* Demand = CurrentInterest->Exact.Find(InSection);
 	const FVoxelSection* Section = Runtime ? Runtime->FindSection(InSection) : nullptr;
 	if (!IsAuthority() || !bEnableProjectSceneSimulation || !Demand || !Demand->bSimulation ||
 		!Section || Section->Status != EVoxelSectionStatus::DataReady || !IsCollisionReady(InSection) ||
@@ -1663,7 +1660,7 @@ void UVoxelModule::RefreshSimulationResidency()
 	const TArray<FIntVector> Previous = SimulationSections.Array();
 	for (const FIntVector& Section : Previous)
 	{
-		const FVoxelExactDemand* Demand = CurrentInterest.Exact.Find(Section);
+		const FVoxelExactDemand* Demand = CurrentInterest->Exact.Find(Section);
 		if (!Demand || !Demand->bSimulation)
 		{
 			RemoveSimulationSection(Section);
@@ -1671,9 +1668,9 @@ void UVoxelModule::RefreshSimulationResidency()
 	}
 	if (NavigationPresenter)
 	{
-		NavigationPresenter->UpdateSources(CurrentInterest);
+		NavigationPresenter->UpdateSources(*CurrentInterest);
 	}
-	for (const auto& Pair : CurrentInterest.Exact)
+	for (const auto& Pair : CurrentInterest->Exact)
 	{
 		if (Pair.Value.bSimulation)
 		{
@@ -1764,10 +1761,10 @@ void UVoxelModule::RefreshInterest(
 		const auto Payload = StaticCastSharedPtr<const FVoxelInterestTaskPayload>(Result.CustomPayload);
 		if (Payload->bHasSnapshot)
 		{
-			CurrentInterest = MoveTemp(*Payload->Interest);
+			CurrentInterest = Payload->Interest;
+			InterestRevision = InterestRevision == MAX_uint64 ? 1 : InterestRevision + 1;
 			if (Payload->bChanged)
 			{
-				InterestRevision = InterestRevision == MAX_uint64 ? 1 : InterestRevision + 1;
 				if (ViewManager) ViewManager->ApplyInterestDelta(Payload->Delta);
 				RefreshSimulationResidency();
 			}
@@ -1870,11 +1867,15 @@ void UVoxelModule::ApplyTask(FVoxelTaskResult&& InResult)
 
 void UVoxelModule::UpdateReadiness()
 {
+#if !UE_BUILD_SHIPPING
+	LogTerrainGeometryHistogram();
+#endif
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_Readiness);
 
 	const EVoxelWorldReadyStage PreviousReadyStage = ReadyStage;
 	FVoxelWorldReadinessSnapshot Snapshot;
 	Snapshot.WorldEpoch = static_cast<int64>(Epoch);
+	Snapshot.InterestRevision = static_cast<int64>(InterestRevision);
 	Snapshot.bAssetsValidated = Registry.GetSnapshot().IsValid() && Shapes.IsValid();
 	Snapshot.bRecipeFrozen = GenerationConfig && GenerationConfig->Recipe;
 	Snapshot.bSpawnPlanReady = false;
@@ -1893,7 +1894,7 @@ void UVoxelModule::UpdateReadiness()
 				*Key.ToString(), *Section->Error);
 		}
 	};
-	for (const TPair<FIntVector, FVoxelExactDemand>& Pair : CurrentInterest.Warmup)
+	for (const TPair<FIntVector, FVoxelExactDemand>& Pair : CurrentInterest->Warmup)
 	{
 		if (!Pair.Value.bWarmupData)
 		{
@@ -1916,14 +1917,14 @@ void UVoxelModule::UpdateReadiness()
 			}
 		}
 	}
-	for (const FIntVector& Key : CurrentInterest.PlayableFineKeys)
+	for (const FIntVector& Key : CurrentInterest->PlayableFineKeys)
 	{
 		CheckRequiredSection(Key);
 		for (int32 Face = 0; Face < 6; ++Face)
 		{
 			FIntVector Neighbor = Key;
 			Neighbor[Face / 2] += (Face & 1) ? -1 : 1;
-			if (CurrentInterest.Exact.Contains(Neighbor))
+			if (CurrentInterest->Exact.Contains(Neighbor))
 			{
 				CheckRequiredSection(Neighbor);
 			}
@@ -1937,8 +1938,8 @@ void UVoxelModule::UpdateReadiness()
 	FVoxelPrimaryFineReadiness PlayableFine;
 	if (ViewManager)
 	{
-		PrimaryFine = ViewManager->GetPrimaryFineReadiness(CurrentInterest.Warmup);
-		PlayableFine = ViewManager->GetFineRadiusReadiness(CurrentInterest.PlayableFineKeys);
+		PrimaryFine = ViewManager->GetPrimaryFineReadiness(CurrentInterest->Warmup);
+		PlayableFine = ViewManager->GetFineRadiusReadiness(CurrentInterest->PlayableFineKeys);
 	}
 	Snapshot.RequiredPrimaryFineSections = PrimaryFine.Required;
 	Snapshot.ReadyPrimaryFineSections = PrimaryFine.Ready;
@@ -1960,7 +1961,7 @@ void UVoxelModule::UpdateReadiness()
 	// vacuously satisfied, while the playable radius still must be presented.
 	const bool bPrimaryViewReady = bSpawnCollisionReady &&
 		(PrimaryFine.Required == 0 || PrimaryFine.IsComplete()) && PlayableFine.IsComplete();
-	if (WorldState == EVoxelWorldState::Failed)
+	if (WorldState == EVoxelWorldState::Failed || PrimaryFine.bFailed || PlayableFine.bFailed)
 	{
 		Snapshot.bFailed = true;
 		ReadyStage = EVoxelWorldReadyStage::Failed;
@@ -3192,4 +3193,93 @@ void UVoxelModule::OnAfterSaveData(const bool bInSuccess)
 	CapturedSceneFiles.Reset();
 	LastSaveError.Reset();
 	PendingCommitDirectory.Reset();
+}
+
+bool UVoxelModule::IsSourceAdmittedAt(const FGuid& InId, const FIntVector& InCell, const uint64 InEpoch) const
+{
+	const FVoxelSourceInterest* Accepted = CurrentInterest->Sources.Find(InId);
+	return Epoch == InEpoch && Accepted && Accepted->Source.Center == InCell && IsSourceAdmitted(InId);
+}
+
+void UVoxelModule::CancelProjectTask(const FVoxelTaskStamp& InStamp)
+{
+	if (Scheduler)
+	{
+		Scheduler->CancelMatching(
+			[&InStamp](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
+			{
+				return Kind == EVoxelTaskKind::ProjectBackground && Stamp == InStamp;
+			});
+	}
+}
+
+TSharedPtr<const FVoxelInterestSet, ESPMode::ThreadSafe> UVoxelModule::GetCurrentInterestSnapshot() const
+{
+	return CurrentInterest;
+}
+
+void UVoxelModule::LogTerrainGeometryHistogram() const
+{
+	const double Now = FPlatformTime::Seconds();
+	if (Now < NextTerrainGeometryLogSeconds)
+	{
+		return;
+	}
+	NextTerrainGeometryLogSeconds = Now + 5.0;
+	struct FBucket
+	{
+		EVoxelTerrainRepresentation Representation = EVoxelTerrainRepresentation::None;
+		uint8 Level = 0;
+		int32 SampleStepCells = 1;
+		int32 Pages = 0;
+		uint64 EstimatedSamples = 0;
+	};
+
+	TMap<uint64, FBucket> Buckets;
+
+	for (const auto& Pair : CurrentInterest->Geometry)
+	{
+		const FVoxelTerrainGeometry& Geometry = Pair.Value;
+		const int64 Side = Geometry.Key.SideCells();
+		const int64 SamplesPerAxis = Side / Geometry.SampleStepCells;
+
+		const uint64 Estimated = Geometry.Key.IsColumn()
+									 ? static_cast<uint64>(SamplesPerAxis) * static_cast<uint64>(SamplesPerAxis)
+									 : static_cast<uint64>(SamplesPerAxis) * static_cast<uint64>(SamplesPerAxis) * static_cast<uint64>(SamplesPerAxis);
+
+		const uint64 Key = (static_cast<uint64>(Geometry.Key.Representation) << 56) | (static_cast<uint64>(Geometry.Key.Level) << 48) |
+						   static_cast<uint32>(Geometry.SampleStepCells);
+
+		FBucket& Bucket = Buckets.FindOrAdd(Key);
+		Bucket.Representation = Geometry.Key.Representation;
+		Bucket.Level = Geometry.Key.Level;
+		Bucket.SampleStepCells = Geometry.SampleStepCells;
+		++Bucket.Pages;
+		Bucket.EstimatedSamples += Estimated;
+	}
+
+	TArray<FBucket> Ordered;
+	Buckets.GenerateValueArray(Ordered);
+	Ordered.Sort(
+		[](const FBucket& A, const FBucket& B)
+		{
+			if (A.Representation != B.Representation)
+			{
+				return static_cast<uint8>(A.Representation) < static_cast<uint8>(B.Representation);
+			}
+			if (A.Level != B.Level)
+			{
+				return A.Level < B.Level;
+			}
+			return A.SampleStepCells < B.SampleStepCells;
+		});
+
+	for (const FBucket& Bucket : Ordered)
+	{
+		UE_LOG(LogTemp, Display, TEXT("Voxel geometry histogram: rep=%d level=%u side=%lld stepCells=%d sampleCm=%.1f pages=%d estimatedSamples=%llu"),
+			static_cast<int32>(Bucket.Representation), Bucket.Level, int64(16) << Bucket.Level, Bucket.SampleStepCells,
+			static_cast<double>(Manifest.BlockSizeCentimeters) * Bucket.SampleStepCells, Bucket.Pages, Bucket.EstimatedSamples);
+	}
+	if (ViewManager)
+		ViewManager->LogTerrainGeometryMetrics();
 }

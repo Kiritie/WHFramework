@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Voxel/Rendering/VoxelGameThreadContinuation.h"
 
 struct FVoxelVoxelProxyData;
 
@@ -51,9 +52,11 @@ struct WHFRAMEWORK_API FVoxelCoverageBox
 
 namespace VoxelCoverage
 {
-	WHFRAMEWORK_API bool IsFullyCovered2D(const FVoxelCoverageRect& InTarget, TConstArrayView<FVoxelCoverageRect> InCoverage);
-	WHFRAMEWORK_API bool IsFullyCovered3D(const FVoxelCoverageBox& InTarget, TConstArrayView<FVoxelCoverageBox> InCoverage);
-	WHFRAMEWORK_API bool IntersectsAny2D(const FVoxelCoverageRect& InTarget, TConstArrayView<FVoxelCoverageRect> InCoverage);
-	WHFRAMEWORK_API bool IntersectsAny3D(const FVoxelCoverageBox& InTarget, TConstArrayView<FVoxelCoverageBox> InCoverage);
-	WHFRAMEWORK_API bool HasProxyTopSurfaceInColumn(const FVoxelVoxelProxyData& InData, int32 InX, int32 InY);
+WHFRAMEWORK_API FVoxelGameThreadContinuation IsFullyCovered2DSteps(
+	FVoxelCoverageRect InTarget, TConstArrayView<FVoxelCoverageRect> InCoverage, bool& OutCovered);
+WHFRAMEWORK_API bool IsFullyCovered2D(const FVoxelCoverageRect& InTarget, TConstArrayView<FVoxelCoverageRect> InCoverage);
+WHFRAMEWORK_API bool IsFullyCovered3D(const FVoxelCoverageBox& InTarget, TConstArrayView<FVoxelCoverageBox> InCoverage);
+WHFRAMEWORK_API bool IntersectsAny2D(const FVoxelCoverageRect& InTarget, TConstArrayView<FVoxelCoverageRect> InCoverage);
+WHFRAMEWORK_API bool IntersectsAny3D(const FVoxelCoverageBox& InTarget, TConstArrayView<FVoxelCoverageBox> InCoverage);
+WHFRAMEWORK_API bool HasProxyTopSurfaceInColumn(const FVoxelVoxelProxyData& InData, int32 InX, int32 InY);
 }

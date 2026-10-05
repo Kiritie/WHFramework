@@ -227,3 +227,42 @@ void VoxelMeshClipper::Subtract(const FVoxelSectionMeshResult& InMesh,
 		}
 	}
 }
+
+FVoxelGameThreadContinuation VoxelMeshClipper::NormalizeBoxesSteps(TArray<FBox>& InOutBoxes)
+{
+	// 合并共面的相邻覆盖区，避免每个粗三角形重复检查数百个细分块。
+	for (int32 Axis = 0; Axis < 3; ++Axis)
+	{
+		const int32 U = (Axis + 1) % 3;
+		const int32 V = (Axis + 2) % 3;
+		co_await VoxelGameThread::SortSteps(InOutBoxes,
+			[Axis, U, V](const FBox& A, const FBox& B)
+			{
+				for (const int32 Component : {U, V})
+				{
+					if (A.Min[Component] != B.Min[Component])
+						return A.Min[Component] < B.Min[Component];
+					if (A.Max[Component] != B.Max[Component])
+						return A.Max[Component] < B.Max[Component];
+				}
+				return A.Min[Axis] < B.Min[Axis];
+			});
+		int32 Count = 0;
+		for (const FBox& Box : InOutBoxes)
+		{
+			co_await FVoxelGameThreadContinuation::Yield();
+			if (Count > 0)
+			{
+				FBox& Previous = InOutBoxes[Count - 1];
+				if (Previous.Min[U] == Box.Min[U] && Previous.Max[U] == Box.Max[U] && Previous.Min[V] == Box.Min[V] && Previous.Max[V] == Box.Max[V] &&
+					Previous.Max[Axis] >= Box.Min[Axis])
+				{
+					Previous.Max[Axis] = FMath::Max(Previous.Max[Axis], Box.Max[Axis]);
+					continue;
+				}
+			}
+			InOutBoxes[Count++] = Box;
+		}
+		InOutBoxes.SetNum(Count, EAllowShrinking::No);
+	}
+}

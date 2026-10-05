@@ -196,7 +196,10 @@ void FVoxelHeightfieldTransitionBuilder::GatherOwnerDependencies(TConstArrayView
 	TMap<FVoxelHeightfieldNodeKey, TArray<FVoxelHeightfieldNodeKey>>& OutDependencies)
 {
 	OutDependencies.Reset();
-	FEdgeIndex NegativeX, PositiveX, NegativeY, PositiveY;
+	FEdgeIndex NegativeX;
+	FEdgeIndex PositiveX;
+	FEdgeIndex NegativeY;
+	FEdgeIndex PositiveY;
 	for (const auto& View : InTiles)
 	{
 		OutDependencies.FindOrAdd(View.Key).Add(View.Key);
@@ -816,4 +819,54 @@ bool FVoxelHeightfieldTransitionBuilder::BuildMesh(
 	OutMesh = MoveTemp(Mesh);
 	OutError.Reset();
 	return true;
+}
+
+FVoxelGameThreadContinuation FVoxelHeightfieldTransitionBuilder::GatherOwnerDependenciesSteps(TConstArrayView<FVoxelHeightfieldTileView> InTiles,
+	TConstArrayView<FVoxelHeightfieldTileFootprint> InPendingTiles, TMap<FVoxelHeightfieldNodeKey, TArray<FVoxelHeightfieldNodeKey>>& OutDependencies)
+{
+	OutDependencies.Reset();
+	FEdgeIndex NegativeX;
+	FEdgeIndex PositiveX;
+	FEdgeIndex NegativeY;
+	FEdgeIndex PositiveY;
+	for (const auto& View : InTiles)
+	{
+		co_await FVoxelGameThreadContinuation::Yield();
+		OutDependencies.FindOrAdd(View.Key).Add(View.Key);
+		IndexFootprint(
+			View.Key, View.Origin, View.CellSide() * View.Step, View.Step, View.Revision, NegativeX, PositiveX, NegativeY, PositiveY, View.GeometryRevision);
+	}
+	for (const auto& Tile : InPendingTiles)
+	{
+		co_await FVoxelGameThreadContinuation::Yield();
+		IndexFootprint(Tile.Key, Tile.Origin, Tile.TileSide, Tile.Step, 0, NegativeX, PositiveX, NegativeY, PositiveY);
+	}
+	const auto Gather = [&OutDependencies](const FEdgeIndex& Positive, const FEdgeIndex& Negative) -> FVoxelGameThreadContinuation
+	{
+		for (const auto& Pair : Positive)
+		{
+			co_await FVoxelGameThreadContinuation::Yield();
+			const auto* Across = Negative.Find(Pair.Key);
+			if (!Across)
+				continue;
+			for (const auto& A : Pair.Value)
+			{
+				co_await FVoxelGameThreadContinuation::Yield();
+				for (const auto& B : *Across)
+				{
+					co_await FVoxelGameThreadContinuation::Yield();
+					if (FMath::Max(A.RangeMin, B.RangeMin) >= FMath::Min(A.RangeMax, B.RangeMax))
+						continue;
+					if (auto* Keys = OutDependencies.Find(A.Key))
+						Keys->AddUnique(B.Key);
+					if (auto* Keys = OutDependencies.Find(B.Key))
+						Keys->AddUnique(A.Key);
+				}
+			}
+		}
+	};
+	co_await Gather(PositiveX, NegativeX);
+	co_await Gather(PositiveY, NegativeY);
+	for (auto& Pair : OutDependencies)
+		Pair.Value.Sort(KeyLess);
 }

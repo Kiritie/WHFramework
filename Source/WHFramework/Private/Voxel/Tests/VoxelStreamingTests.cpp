@@ -210,9 +210,14 @@ bool FVoxelInterestLayerAnchorTest::RunTest(const FString& InParameters)
 	SubcellSource.Center.X = 1;
 	TestFalse(TEXT("Movement within all anchors skips planning"),
 		FVoxelInterestRuntime::NeedsUpdate(Source, SubcellSource));
-	TestFalse(TEXT("Subcell movement does not change interest"), Runtime.Update(
-		MakeArrayView(&SubcellSource, 1), Manifest, Settings, Interest, Delta, bHasSnapshot));
-	TestFalse(TEXT("Subcell movement does not publish a snapshot"), bHasSnapshot);
+	const uint64 InitialPublicationRevision = Interest.PublicationRevision;
+	const uint64 InitialDemandRevision = Interest.DemandRevision;
+	Runtime.Update(MakeArrayView(&SubcellSource, 1), Manifest, Settings, Interest, Delta, bHasSnapshot);
+	TestTrue(TEXT("Subcell movement publishes the exact source center"), bHasSnapshot);
+	TestEqual(TEXT("Accepted source center follows subcell movement"), Interest.Sources.FindChecked(Source.Id).Source.Center, SubcellSource.Center);
+	TestTrue(TEXT("Crossing a Fine merge boundary advances its publication"),
+		Delta.bVisualPartitionChanged && Interest.PublicationRevision > InitialPublicationRevision);
+	TestEqual(TEXT("Subcell movement preserves the logical demand revision"), Interest.DemandRevision, InitialDemandRevision);
 	FVoxelStreamingSource NegativeSource = Source;
 	NegativeSource.Center.X = -1;
 	TestTrue(TEXT("Negative coordinate crossing invalidates exact anchor"),
@@ -222,6 +227,7 @@ bool FVoxelInterestLayerAnchorTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("Large direction change refreshes scores"),
 		FVoxelInterestRuntime::NeedsUpdate(Source, RotatedSource));
 	const TSet<FVoxelMacroTileKey> InitialMacro = Interest.Macro;
+	const FIntVector InitialMacroPlanCenter = Interest.Sources.FindChecked(Source.Id).StageCenters[2];
 	Source.Center.X = 4;
 	Runtime.Update(MakeArrayView(&Source, 1), Manifest, Settings, Interest, Delta, bHasSnapshot);
 	TestTrue(TEXT("Exact movement keeps macro tiles"), SameSet(Interest.Macro, InitialMacro));
@@ -232,10 +238,27 @@ bool FVoxelInterestLayerAnchorTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("Fine anchor movement keeps macro tiles"), SameSet(Interest.Macro, InitialMacro));
 	Source.Center.X = 80;
 	Runtime.Update(MakeArrayView(&Source, 1), Manifest, Settings, Interest, Delta, bHasSnapshot);
-	TestTrue(TEXT("Proxy anchor movement keeps macro tiles"), SameSet(Interest.Macro, InitialMacro));
+	TestEqual(
+		TEXT("Proxy anchor movement does not move the Macro planning anchor"), Interest.Sources.FindChecked(Source.Id).StageCenters[2], InitialMacroPlanCenter);
 	Source.Center.X = 300;
 	Runtime.Update(MakeArrayView(&Source, 1), Manifest, Settings, Interest, Delta, bHasSnapshot);
-	TestTrue(TEXT("Surface anchor movement keeps macro tiles"), SameSet(Interest.Macro, InitialMacro));
+	TestEqual(TEXT("Surface anchor movement does not move the Macro planning anchor"), Interest.Sources.FindChecked(Source.Id).StageCenters[2],
+		InitialMacroPlanCenter);
+	FVoxelStreamingSource DataSource = SubcellSource;
+	DataSource.Id = FGuid::NewGuid();
+	DataSource.Capabilities = EVoxelStreamingCapability::Data;
+	DataSource.Center = FIntVector::ZeroValue;
+	FVoxelInterestRuntime DataRuntime;
+	FVoxelInterestSet DataInterest;
+	DataRuntime.Update(MakeArrayView(&DataSource, 1), Manifest, Settings, DataInterest, Delta, bHasSnapshot);
+	const uint64 DataPublicationRevision = DataInterest.PublicationRevision;
+	const uint64 DataDemandRevision = DataInterest.DemandRevision;
+	DataSource.Center.X = 1;
+	DataRuntime.Update(MakeArrayView(&DataSource, 1), Manifest, Settings, DataInterest, Delta, bHasSnapshot);
+	TestTrue(TEXT("Data-only subcell movement still publishes a complete source snapshot"), bHasSnapshot);
+	TestEqual(TEXT("Data-only source acknowledgment is exact"), DataInterest.Sources.FindChecked(DataSource.Id).Source.Center, DataSource.Center);
+	TestEqual(TEXT("Source acknowledgment alone keeps the visual publication revision"), DataInterest.PublicationRevision, DataPublicationRevision);
+	TestEqual(TEXT("Source acknowledgment alone keeps the demand revision"), DataInterest.DemandRevision, DataDemandRevision);
 	return true;
 }
 

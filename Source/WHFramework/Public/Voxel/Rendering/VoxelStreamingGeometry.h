@@ -80,8 +80,6 @@ namespace VoxelStreamingGeometry
 	WHFRAMEWORK_API int64 FloorDivide(int64 InValue, int64 InDivisor);
 	WHFRAMEWORK_API bool ValidateInitialSide(int32 InSide, uint8 InMaximumFineLevel, FString& OutError);
 	WHFRAMEWORK_API bool TryLevel(int32 InSide, uint8& OutLevel, FString& OutError);
-	WHFRAMEWORK_API bool DeriveNextStage(TConstArrayView<FVoxelTerrainGeometry> InActualBoundary,
-		uint8 InMaximumLevel, FVoxelTerrainStageRange& OutRange, FString& OutError);
 	WHFRAMEWORK_API bool ResolveSampleStep(double InNearestDistanceCells, double InVerticalFovDegrees,
 		int32 InViewportHeight, double InTargetPixels, int32 InMaximumStepCells,
 		int32& OutStepCells, bool& bOutAtResolutionFloor, FString& OutError);

@@ -1,11 +1,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Voxel/Rendering/VoxelGameThreadContinuation.h"
 #include "Voxel/Geometry/VoxelSectionMesher.h"
 
 namespace VoxelMeshClipper
 {
 	WHFRAMEWORK_API void NormalizeBoxes(TArray<FBox>& InOutBoxes);
+	FVoxelGameThreadContinuation NormalizeBoxesSteps(TArray<FBox>& InOutBoxes);
 	WHFRAMEWORK_API void FindChangedCoverageBounds(
 		TConstArrayView<FBox> InPrevious,
 		TConstArrayView<FBox> InCurrent,

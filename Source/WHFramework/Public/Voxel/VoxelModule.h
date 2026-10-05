@@ -67,6 +67,9 @@ class WHFRAMEWORK_API UVoxelModule : public UModuleBase
 {
 #if WITH_DEV_AUTOMATION_TESTS
 	friend class FVoxelNavigationResidencyTest;
+	friend class FVoxelSourceAcceptanceBarrierTest;
+	friend class FVoxelCriticalDependencyAdmissionTest;
+	friend class FVoxelPublishEstimateRecoveryTest;
 	friend class FVoxelInterestInputBudgetTest;
 #endif
 	GENERATED_BODY()
@@ -108,11 +111,13 @@ public:
 	float GetWarmupProgress() const;
 	const FVoxelWorldReadinessSnapshot& GetReadiness() const;
 	FVoxelRepresentationReadiness GetRepresentationReadiness() const;
+	FVoxelTerrainReadinessSnapshot CaptureTerrainReadiness() const;
 	double BlockSize() const;
 	const FVoxelWorldManifest& GetManifest() const;
 	FGuid GetSessionId() const;
 	uint64 GetWorldEpoch() const;
 	uint64 GetInterestRevision() const;
+	TSharedPtr<const FVoxelInterestSet, ESPMode::ThreadSafe> GetCurrentInterestSnapshot() const;
 	FVoxelWorldRuntime* GetRuntime();
 	const FVoxelWorldRuntime* GetRuntime() const;
 	bool CaptureOverlays(const FVoxelGenerationBounds& InBounds, FVoxelOverlaySnapshotSet& OutSnapshot, FString& OutError) const;
@@ -149,6 +154,8 @@ public:
 	bool UpdateSource(const FGuid& InId, const FVoxelStreamingSource& InSource);
 	void UnregisterSource(const FGuid& InId);
 	bool IsSourceAdmitted(const FGuid& InId) const;
+	bool IsSourceAdmittedAt(const FGuid& InId, const FIntVector& InCell, uint64 InEpoch) const;
+	void CancelProjectTask(const FVoxelTaskStamp& InStamp);
 	void CollectStreamingSourcesForOwner(const AActor* InOwner, TArray<FVoxelStreamingSource>& OutSources) const;
 	FVoxelStreamingReadiness QueryStreamingReadiness(const FGuid& InId) const;
 	FVoxelFrameTimings GetFrameTimings() const;
@@ -302,6 +309,8 @@ private:
 	void OnSectionEvicting(const FIntVector& InSection);
 	bool ActivateSimulationSection(const FIntVector& InSection);
 	void RemoveSimulationSection(const FIntVector& InSection);
+	mutable double NextTerrainGeometryLogSeconds = 0.0;
+	void LogTerrainGeometryHistogram() const;
 	void UpdateReadiness();
 	TArray<FVector> CollectLocalViewObservers() const;
 	TArray<FVector> CollectDetailObservers() const;
@@ -336,7 +345,7 @@ private:
 	FVoxelRegionStore RegionStore;
 	FVoxelWorldSaveAdapter SaveAdapter;
 	FVoxelWorldManifest Manifest;
-	FVoxelInterestSet CurrentInterest;
+	TSharedPtr<const FVoxelInterestSet, ESPMode::ThreadSafe> CurrentInterest = MakeShared<FVoxelInterestSet, ESPMode::ThreadSafe>();
 	FVoxelViewSettings ViewSettings;
 	FVoxelWorldReadinessSnapshot ReadinessSnapshot;
 	EVoxelWorldReadyStage ReadyStage = EVoxelWorldReadyStage::None;
