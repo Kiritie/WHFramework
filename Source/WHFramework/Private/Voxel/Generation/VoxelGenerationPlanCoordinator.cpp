@@ -11,12 +11,12 @@ namespace
 	constexpr int32 MaximumHydrologyDependencies = 4096;
 	struct FPlanReadDependencies final : FVoxelTaskCustomPayload
 	{
-		TArray<FVoxelGenerationPlanDependency> Missing;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+		TArray<FVoxelGenerationPlanDependency> Missing;
 		bool bOverflow = false;
 		virtual uint64 GetAllocatedBytes() const override
 		{
-			return VoxelBoundedAllocation::SharedBytes<FPlanReadDependencies>() + Missing.GetAllocatedSize();
+			return VoxelBoundedAllocation::WorkerSharedBytes<FPlanReadDependencies>() + Missing.GetAllocatedSize();
 		}
 		virtual uint64 GetResourceAccountedBytes() const override { return GetAllocatedBytes(); }
 	};
@@ -73,6 +73,9 @@ FVoxelGenerationPlanCoordinator::FVoxelGenerationPlanCoordinator(
 	, Config(InConfig)
 	, Cache(InCache)
 	, WorldEpoch(InWorldEpoch)
+	, PriorityGraph(InScheduler.GetRuntimeResources(),
+		{EVoxelGenerationConsumerKind::WorldFact, InWorldEpoch, FGuid::NewGuid(), 1,
+			EVoxelGenerationSpatialKind::Column, FIntVector::ZeroValue, FIntVector::ZeroValue, 1})
 {
 }
 
@@ -308,15 +311,16 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 	Request.ReservedBytes = InDependency.Kind == EVoxelGenerationPlanKind::Hydrology
 		? 8ull * 1024ull * 1024ull : 4ull * 1024ull * 1024ull;
 	const FVoxelGenerationConsumerKey CaptureConsumer{EVoxelGenerationConsumerKind::WorldFact, WorldEpoch,
-		EnvironmentOwnerId, 1, EVoxelGenerationSpatialKind::Section, Request.Stamp.Section,
+		EnvironmentOwnerId, Request.Stamp.OwnerIncarnation, EVoxelGenerationSpatialKind::Section, Request.Stamp.Section,
 		Request.Stamp.Section, Request.Stamp.Token};
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ReadLease;
 	if (!Scheduler.GetRuntimeResources()->Acquire(CaptureConsumer, EVoxelTerrainResourcePool::Input,
-		VoxelBoundedAllocation::SharedBytes<FPlanReadDependencies>() +
+		VoxelBoundedAllocation::WorkerSharedBytes<FPlanReadDependencies>() +
 		VoxelBoundedAllocation::ArrayBytes<FVoxelGenerationPlanDependency>(MaximumHydrologyDependencies), ReadLease)) return false;
-	auto ReadDependencies = MakeShared<FPlanReadDependencies, ESPMode::ThreadSafe>();
+	auto ReadDependencies = VoxelBoundedAllocation::MakeWorkerShared<FPlanReadDependencies>(ReadLease);
 	ReadDependencies->Lease = MoveTemp(ReadLease);
 	ReadDependencies->Missing.Reserve(MaximumHydrologyDependencies);
+	check(ReadDependencies->GetAllocatedBytes() <= ReadDependencies->Lease->Bytes());
 	Request.InputBytes = ReadDependencies->Lease->Bytes();
 	Request.Execute = [Dependency = InDependency, CapturedConfig = Config,
 		CapturedCache = Cache, ReadDependencies](const TAtomic<bool>& Cancel)
@@ -393,6 +397,8 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 			const auto Reads = StaticCastSharedPtr<const FPlanReadDependencies>(Result.CustomPayload);
 			if (Reads)
 			{
+				FClosureRegistration Registration(*this);
+				bool bRegistered = true;
 				for (const auto& Missing : Reads->Missing)
 				{
 					if (!State->Prerequisites.Contains(Missing))
@@ -400,6 +406,7 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 						if (State->Prerequisites.Num() == MaximumHydrologyDependencies)
 						{
 							Result.Error = TEXT("生成事实的累计采样闭包超过上限");
+							bRegistered = false;
 							break;
 						}
 						State->Prerequisites.Add(Missing);
@@ -408,12 +415,14 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 				// 注册事实状态先于通知父消费者；下一次 Ensure 原子替换完整订阅闭包。
 				for (const auto& Missing : Reads->Missing)
 				{
+					if (!bRegistered) break;
 					State = States.Find(Dependency);
 					if (!State->Prerequisites.Contains(Missing)) continue;
 					FString Error;
-					if (!RegisterClosure(Missing, Error))
+					if (!RegisterClosure(Missing, Registration, Error))
 					{
 						Result.Error = MoveTemp(Error);
+						bRegistered = false;
 						break;
 					}
 				}
@@ -423,21 +432,32 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 				State->PrerequisiteRetention = RetainDependencies(State->Prerequisites,
 					FIntPoint(int32(FMath::Clamp<int64>(int64(Dependency.Coordinate().X) * Side, MIN_int32, MAX_int32)),
 						int32(FMath::Clamp<int64>(int64(Dependency.Coordinate().Y) * Side, MIN_int32, MAX_int32))));
-				TSet<FGuid> Edges;
-				for (const auto& Prerequisite : State->Prerequisites)
+				if (bRegistered)
 				{
-					if (const FState* PrerequisiteState = States.Find(Prerequisite))
-						Edges.Add(PrerequisiteState->PriorityNode);
-					else
-						Result.Error = TEXT("生成事实的实际采样闭包注册失败");
-				}
-				FString GraphError;
-				if (!PriorityGraph.SetDependencies(State->PriorityNode, Edges, GraphError))
-				{
-					Result.Error = MoveTemp(GraphError);
+					TSet<FGuid> Edges;
+					for (const auto& Prerequisite : State->Prerequisites)
+					{
+						if (const FState* PrerequisiteState = States.Find(Prerequisite))
+							Edges.Add(PrerequisiteState->PriorityNode);
+						else
+						{
+							Result.Error = TEXT("CapacityBlocked: generation read closure registration incomplete");
+							bRegistered = false;
+							break;
+						}
+					}
+					FString GraphError;
+					if (bRegistered && !PriorityGraph.SetDependencies(State->PriorityNode, Edges, GraphError))
+					{
+						Result.Error = MoveTemp(GraphError);
+						bRegistered = false;
+					}
+					if (bRegistered) Registration.Commit();
 				}
 			}
 		}
+		State = States.Find(Dependency);
+		check(State);
 		ON_SCOPE_EXIT
 		{
 			WakeConsumers(Dependency);
@@ -447,7 +467,8 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 				ForgetFact(Dependency);
 			}
 		};
-		if (Result.bCanceled || Result.Error.StartsWith(TEXT("DependencyNotReady")))
+		if (Result.bCanceled || Result.Error.StartsWith(TEXT("DependencyNotReady")) ||
+			Result.Error.StartsWith(TEXT("CapacityBlocked")))
 		{
 			State->State = EVoxelPlanDependencyState::Missing;
 			return;
@@ -509,37 +530,49 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 	}
 
 	// 完整事实及读依赖状态先注册，再观察 Ready，最后才允许排队。
+	FClosureRegistration Registration(*this);
 	TSet<FVoxelGenerationPlanDependency> Desired;
+	const auto AppendDependency = [this, &Desired](const auto& Append, const FVoxelGenerationPlanDependency& InDependency) -> void
+	{
+		if (Desired.Contains(InDependency)) return;
+		Desired.Add(InDependency);
+		for (const auto& Prerequisite : States.FindChecked(InDependency).Prerequisites) Append(Append, Prerequisite);
+	};
 	for (const FVoxelGenerationPlanDependency& Dependency : InDependencies)
 	{
 		FString Error;
-		if (!RegisterClosure(Dependency, Error)) return {false, true, MoveTemp(Error)};
-		Desired.Add(Dependency);
-		for (const auto& Prerequisite : States.FindChecked(Dependency).Prerequisites) Desired.Add(Prerequisite);
-	}
-	if (const auto* Previous = ConsumerDependencies.Find(InConsumer))
-	{
-		const auto PreviousEdges = *Previous;
-		for (const auto& Edge : PreviousEdges)
-		{
-			if (!Desired.Contains(Edge.Key))
-			{
-				RemoveSubscription(Edge.Key, InConsumer, Edge.Value);
-				ConsumerDependencies.FindChecked(InConsumer).Remove(Edge.Key);
-			}
-		}
+		if (!RegisterClosure(Dependency, Registration, Error))
+			return {false, !Error.StartsWith(TEXT("CapacityBlocked")), MoveTemp(Error)};
+		AppendDependency(AppendDependency, Dependency);
 	}
 	FGuid* ConsumerNode = ConsumerPriorityNodes.Find(InConsumer);
 	if (!ConsumerNode)
 	{
-		ConsumerNode = &ConsumerPriorityNodes.Add(InConsumer, FGuid::NewGuid());
-		PriorityGraph.Register(*ConsumerNode, Priority);
+		const FGuid Node = FGuid::NewGuid();
+		FString Error;
+		if (!PriorityGraph.Register(Node, Priority, Error))
+			return {false, !Error.StartsWith(TEXT("CapacityBlocked")), MoveTemp(Error)};
+		ConsumerNode = &ConsumerPriorityNodes.Add(InConsumer, Node);
 	}
 	else PriorityGraph.SetPriority(*ConsumerNode, Priority);
 	TSet<FGuid> DependencyNodes;
 	for (const auto& Dependency : Desired) DependencyNodes.Add(States.FindChecked(Dependency).PriorityNode);
 	FString GraphError;
-	if (!PriorityGraph.SetDependencies(*ConsumerNode, DependencyNodes, GraphError)) return {false, true, MoveTemp(GraphError)};
+	if (!PriorityGraph.SetDependencies(*ConsumerNode, DependencyNodes, GraphError))
+		return {false, !GraphError.StartsWith(TEXT("CapacityBlocked")), MoveTemp(GraphError)};
+	Registration.Commit();
+	// 新依赖边接纳前保留旧订阅；拒收不能提前撤销当前捐赠。
+	if (auto* Previous = ConsumerDependencies.Find(InConsumer))
+	{
+		for (auto Edge = Previous->CreateIterator(); Edge; ++Edge)
+		{
+			if (!Desired.Contains(Edge.Key()))
+			{
+				RemoveSubscription(Edge.Key(), InConsumer, Edge.Value());
+				Edge.RemoveCurrent();
+			}
+		}
+	}
 	FVoxelGenerationDependencyStatus Status;
 	Status.bReady = true;
 	for (const FVoxelGenerationPlanDependency& Dependency : Desired)
@@ -612,10 +645,7 @@ void FVoxelGenerationPlanCoordinator::ReleaseConsumer(const FVoxelGenerationCons
 {
 	check(IsInGameThread());
 	TMap<FVoxelGenerationPlanDependency, uint64> Dependencies;
-	if (!ConsumerDependencies.RemoveAndCopyValue(InConsumer, Dependencies))
-	{
-		return;
-	}
+	ConsumerDependencies.RemoveAndCopyValue(InConsumer, Dependencies);
 	FGuid ConsumerNode;
 	if (ConsumerPriorityNodes.RemoveAndCopyValue(InConsumer, ConsumerNode)) PriorityGraph.Remove(ConsumerNode);
 	if (InConsumer.Kind == EVoxelGenerationConsumerKind::Environment)
@@ -740,16 +770,59 @@ FVoxelGenerationConsumerKey FVoxelGenerationPlanCoordinator::EnvironmentConsumer
 	return Consumer;
 }
 
-bool FVoxelGenerationPlanCoordinator::RegisterClosure(const FVoxelGenerationPlanDependency& InDependency, FString& OutError)
+FVoxelGenerationPlanCoordinator::FClosureRegistration::FClosureRegistration(FVoxelGenerationPlanCoordinator& InOwner)
+	: Owner(InOwner)
 {
-	if (const auto* Existing = States.Find(InDependency); Existing && Existing->PriorityNode.IsValid())
+}
+
+FVoxelGenerationPlanCoordinator::FClosureRegistration::~FClosureRegistration()
+{
+	while (Head.IsValid())
 	{
+		const auto Dependency = Owner.PriorityFacts.FindChecked(Head);
+		auto& State = Owner.States.FindChecked(Dependency);
+		Head = State.NextRegistration;
+		State.NextRegistration.Invalidate();
+		if (!bCommitted)
+		{
+			check(State.Donations.IsEmpty() && !State.bInFlight);
+			Owner.ForgetFact(Dependency);
+		}
+	}
+}
+
+void FVoxelGenerationPlanCoordinator::FClosureRegistration::Add(FState& InState)
+{
+	InState.NextRegistration = Head;
+	Head = InState.PriorityNode;
+}
+
+void FVoxelGenerationPlanCoordinator::FClosureRegistration::Commit()
+{
+	bCommitted = true;
+}
+
+bool FVoxelGenerationPlanCoordinator::RegisterClosure(const FVoxelGenerationPlanDependency& InDependency,
+	FClosureRegistration& InRegistration, FString& OutError)
+{
+	if (auto* Existing = States.Find(InDependency); Existing && Existing->PriorityNode.IsValid())
+	{
+		if (Existing->bRegistering)
+		{
+			OutError = TEXT("生成事实的采样依赖形成循环");
+			return false;
+		}
+		Existing->bRegistering = true;
+		ON_SCOPE_EXIT
+		{
+			States.FindChecked(InDependency).bRegistering = false;
+		};
 		const int32 Count = Existing->Prerequisites.Num();
 		for (int32 Index = 0; Index < Count; ++Index)
 		{
 			// 递归注册可能移动 States，逐项重新取父状态，避免保留悬空引用。
 			const auto Prerequisite = States.FindChecked(InDependency).Prerequisites[Index];
-			if (!RegisterClosure(Prerequisite, OutError)) return false;
+			if (!RegisterClosure(Prerequisite, InRegistration, OutError)) return false;
 		}
 		const auto& State = States.FindChecked(InDependency);
 		TSet<FGuid> Edges;
@@ -760,13 +833,15 @@ bool FVoxelGenerationPlanCoordinator::RegisterClosure(const FVoxelGenerationPlan
 	if (!GatherPrerequisites(InDependency, Prerequisites, OutError)) return false;
 	for (const auto& Prerequisite : Prerequisites)
 	{
-		if (!RegisterClosure(Prerequisite, OutError)) return false;
+		if (!RegisterClosure(Prerequisite, InRegistration, OutError)) return false;
 	}
+	const FGuid Node = FGuid::NewGuid();
+	if (!PriorityGraph.Register(Node, {}, OutError)) return false;
 	auto& State = States.FindOrAdd(InDependency);
-	State.PriorityNode = FGuid::NewGuid();
+	State.PriorityNode = Node;
 	State.Prerequisites = MoveTemp(Prerequisites);
 	PriorityFacts.Add(State.PriorityNode, InDependency);
-	PriorityGraph.Register(State.PriorityNode, State.ServicePriority);
+	InRegistration.Add(State);
 	TSet<FGuid> Edges;
 	for (const auto& Prerequisite : State.Prerequisites) Edges.Add(States.FindChecked(Prerequisite).PriorityNode);
 	return PriorityGraph.SetDependencies(State.PriorityNode, Edges, OutError);

@@ -1,196 +1,307 @@
 #include "Voxel/Task/VoxelTerrainDependencyPriority.h"
 
-void FVoxelTerrainDependencyPriority::Register(const FGuid& InNode, const FVoxelTerrainServicePriority& InOwnPriority)
+#include "Voxel/Task/VoxelBoundedAllocation.h"
+
+FVoxelTerrainDependencyPriority::FVoxelTerrainDependencyPriority(
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+	const FVoxelGenerationConsumerKey& InConsumer)
+	: Resources(MoveTemp(InResources)), Consumer(InConsumer)
 {
-    check(InNode.IsValid());
-    if (Nodes.Contains(InNode))
-    {
-        SetPriority(InNode, InOwnPriority);
-        return;
-    }
-    FNode& Node = Nodes.Add(InNode);
-    Node.Own = InOwnPriority;
-    Node.Effective = InOwnPriority;
-    Dirty(InNode);
+	check(Consumer.IsValid());
+}
+
+FVoxelTerrainDependencyPriority::~FVoxelTerrainDependencyPriority()
+{
+}
+
+bool FVoxelTerrainDependencyPriority::PrepareNodes(const int32 InRequired, FString& OutError)
+{
+	if (InRequired <= 0 || InRequired > (1 << 20))
+	{
+		OutError = TEXT("Oversized: dependency priority node capacity");
+		return false;
+	}
+	if (!Storage)
+	{
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+		if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input,
+			VoxelBoundedAllocation::WorkerSharedBytes<FStorage>(), Lease))
+		{
+			OutError = TEXT("CapacityBlocked: dependency priority control storage");
+			return false;
+		}
+		Storage = VoxelBoundedAllocation::MakeWorkerShared<FStorage>(Lease);
+		Storage->ResourceLease = MoveTemp(Lease);
+	}
+	if (InRequired <= Storage->Capacity) return true;
+	const int32 Capacity = FMath::Max(InRequired, FMath::Max(16, Storage->Capacity * 2));
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+	if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input,
+		VoxelBoundedAllocation::MapBytes<FGuid, FNode>(Capacity), Lease))
+	{
+		OutError = TEXT("CapacityBlocked: dependency priority node growth");
+		return false;
+	}
+	Storage->Nodes.Reserve(Capacity);
+	check(Storage->Nodes.GetAllocatedSize() <= Lease->Bytes());
+	Storage->NodesLease = MoveTemp(Lease);
+	Storage->Capacity = Capacity;
+	return true;
+}
+
+bool FVoxelTerrainDependencyPriority::Register(const FGuid& InNode,
+	const FVoxelTerrainServicePriority& InOwnPriority, FString& OutError)
+{
+	if (!InNode.IsValid())
+	{
+		OutError = TEXT("Invalid dependency priority node identity");
+		return false;
+	}
+	if (Storage && Storage->Nodes.Contains(InNode))
+	{
+		SetPriority(InNode, InOwnPriority);
+		OutError.Reset();
+		return true;
+	}
+	if (!PrepareNodes(Storage ? Storage->Nodes.Num() + 1 : 1, OutError)) return false;
+	FNode& Node = Storage->Nodes.Add(InNode);
+	Node.Own = Node.Effective = InOwnPriority;
+	Dirty(InNode);
+	OutError.Reset();
+	return true;
 }
 
 void FVoxelTerrainDependencyPriority::Dirty(const FGuid& InNode)
 {
-    if (Nodes.Contains(InNode) && !Queued.Contains(InNode))
-    {
-        Queued.Add(InNode);
-        Queue.Add(InNode);
-    }
+	FNode* Node = Storage ? Storage->Nodes.Find(InNode) : nullptr;
+	if (!Node || Node->bDirty) return;
+	Node->bDirty = true;
+	Node->PreviousDirty = DirtyTail;
+	Node->NextDirty.Invalidate();
+	if (DirtyTail.IsValid()) Storage->Nodes.FindChecked(DirtyTail).NextDirty = InNode;
+	else DirtyHead = InNode;
+	DirtyTail = InNode;
 }
 
-bool FVoxelTerrainDependencyPriority::Reaches(const FGuid& InStart, const FGuid& InTarget) const
+void FVoxelTerrainDependencyPriority::UnlinkDirty(FNode& InNodeState)
 {
-    TArray<FGuid> Stack{InStart};
-    TSet<FGuid> Seen;
-    while (!Stack.IsEmpty())
-    {
-        const FGuid Current = Stack.Pop(EAllowShrinking::No);
-        if (Current == InTarget)
-        {
-            return true;
-        }
-        if (Seen.Contains(Current))
-        {
-            continue;
-        }
-        Seen.Add(Current);
-        if (const FNode* Node = Nodes.Find(Current))
-        {
-            for (const FGuid& Dependency : Node->Dependencies)
-            {
-                Stack.Add(Dependency);
-            }
-        }
-    }
-    return false;
+	if (!InNodeState.bDirty) return;
+	if (InNodeState.PreviousDirty.IsValid())
+		Storage->Nodes.FindChecked(InNodeState.PreviousDirty).NextDirty = InNodeState.NextDirty;
+	else DirtyHead = InNodeState.NextDirty;
+	if (InNodeState.NextDirty.IsValid())
+		Storage->Nodes.FindChecked(InNodeState.NextDirty).PreviousDirty = InNodeState.PreviousDirty;
+	else DirtyTail = InNodeState.PreviousDirty;
+	InNodeState.PreviousDirty.Invalidate();
+	InNodeState.NextDirty.Invalidate();
+	InNodeState.bDirty = false;
 }
 
-bool FVoxelTerrainDependencyPriority::SetDependencies(const FGuid& InNode, const TSet<FGuid>& InDependencies, FString& OutError)
+bool FVoxelTerrainDependencyPriority::Reaches(const FGuid& InStart, const FGuid& InTarget,
+	bool& bOutReaches, FString& OutError)
 {
-    FNode* Node = Nodes.Find(InNode);
-    if (!Node)
-    {
-        OutError = TEXT("依赖消费者尚未注册");
-        return false;
-    }
-    if (Node->Dependencies.Num() == InDependencies.Num())
-    {
-        bool bSame = true;
-        for (const FGuid& Dependency : InDependencies) bSame &= Node->Dependencies.Contains(Dependency);
-        if (bSame)
-        {
-            OutError.Reset();
-            return true;
-        }
-    }
-    for (const FGuid& Dependency : InDependencies)
-    {
-        if (!Nodes.Contains(Dependency) || Dependency == InNode ||
-            (!Node->Dependencies.Contains(Dependency) && Reaches(Dependency, InNode)))
-        {
-            OutError = TEXT("依赖不存在或形成循环");
-            return false;
-        }
-    }
-    const TSet<FGuid> Previous = Node->Dependencies;
-    for (const FGuid& Dependency : Previous)
-    {
-        if (!InDependencies.Contains(Dependency))
-        {
-            Nodes.FindChecked(Dependency).Consumers.Remove(InNode);
-            Dirty(Dependency);
-        }
-    }
-    Node->Dependencies = InDependencies;
-    for (const FGuid& Dependency : InDependencies)
-    {
-        if (!Previous.Contains(Dependency))
-        {
-            Nodes.FindChecked(Dependency).Consumers.Add(InNode);
-            Dirty(Dependency);
-        }
-    }
-    OutError.Reset();
-    return true;
+	bOutReaches = false;
+	if (SearchSerial == MAX_uint64)
+	{
+		OutError = TEXT("Dependency priority search serial exhausted");
+		return false;
+	}
+	const uint64 Serial = ++SearchSerial;
+	FGuid Head = InStart;
+	FNode& Start = Storage->Nodes.FindChecked(InStart);
+	Start.SearchVisited = Serial;
+	Start.SearchNext.Invalidate();
+	while (Head.IsValid())
+	{
+		const FGuid Current = Head;
+		FNode& Node = Storage->Nodes.FindChecked(Current);
+		Head = Node.SearchNext;
+		if (Current == InTarget)
+		{
+			bOutReaches = true;
+			return true;
+		}
+		for (const FGuid& Dependency : Node.Dependencies)
+		{
+			FNode& Child = Storage->Nodes.FindChecked(Dependency);
+			if (Child.SearchVisited == Serial) continue;
+			Child.SearchVisited = Serial;
+			Child.SearchNext = Head;
+			Head = Dependency;
+		}
+	}
+	return true;
 }
 
-void FVoxelTerrainDependencyPriority::SetPriority(const FGuid& InNode, const FVoxelTerrainServicePriority& InPriority)
+bool FVoxelTerrainDependencyPriority::SetDependencies(const FGuid& InNode,
+	const TSet<FGuid>& InDependencies, FString& OutError)
 {
-    FNode* Node = Nodes.Find(InNode);
-    check(Node);
-    if (Node->Own != InPriority)
-    {
-        Node->Own = InPriority;
-        Dirty(InNode);
-    }
+	FNode* Node = Storage ? Storage->Nodes.Find(InNode) : nullptr;
+	if (!Node)
+	{
+		OutError = TEXT("依赖消费者尚未注册");
+		return false;
+	}
+	if (Node->Dependencies.Num() == InDependencies.Num())
+	{
+		bool bSame = true;
+		for (const FGuid& Dependency : InDependencies) bSame &= Node->Dependencies.Contains(Dependency);
+		if (bSame)
+		{
+			OutError.Reset();
+			return true;
+		}
+	}
+	int32 GrowthCount = 0;
+	for (const FGuid& Dependency : InDependencies)
+	{
+		FNode* Child = Storage->Nodes.Find(Dependency);
+		if (!Child || Dependency == InNode)
+		{
+			OutError = TEXT("依赖不存在或形成循环");
+			return false;
+		}
+		if (!Node->Dependencies.Contains(Dependency))
+		{
+			bool bCycle = false;
+			if (!Reaches(Dependency, InNode, bCycle, OutError)) return false;
+			if (bCycle)
+			{
+				OutError = TEXT("依赖不存在或形成循环");
+				return false;
+			}
+			if (Child->Consumers.Num() + 1 > Child->ConsumersCapacity) ++GrowthCount;
+		}
+	}
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> GrowthLease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> DependenciesLease;
+	if ((GrowthCount && !Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Working,
+		VoxelBoundedAllocation::ArrayBytes<FConsumerGrowth>(GrowthCount), GrowthLease)) ||
+		(InDependencies.Num() && !Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input,
+			VoxelBoundedAllocation::SetBytes<FGuid>(InDependencies.Num()), DependenciesLease)))
+	{
+		OutError = TEXT("CapacityBlocked: dependency priority edge replacement");
+		return false;
+	}
+	TArray<FConsumerGrowth> Growth;
+	Growth.Reserve(GrowthCount);
+	for (const FGuid& Dependency : InDependencies)
+	{
+		const FNode& Child = Storage->Nodes.FindChecked(Dependency);
+		if (Node->Dependencies.Contains(Dependency) || Child.Consumers.Num() + 1 <= Child.ConsumersCapacity) continue;
+		FConsumerGrowth Plan;
+		Plan.Node = Dependency;
+		Plan.Capacity = FMath::Max(Child.Consumers.Num() + 1, FMath::Max(4, Child.ConsumersCapacity * 2));
+		if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input,
+			VoxelBoundedAllocation::SetBytes<FGuid>(Plan.Capacity), Plan.Lease))
+		{
+			OutError = TEXT("CapacityBlocked: dependency priority reverse consumers");
+			return false;
+		}
+		Growth.Add(MoveTemp(Plan));
+	}
+	TSet<FGuid> Candidate;
+	Candidate.Reserve(InDependencies.Num());
+	for (const FGuid& Dependency : InDependencies) Candidate.Add(Dependency);
+	check(!DependenciesLease || Candidate.GetAllocatedSize() <= DependenciesLease->Bytes());
+	// 所有峰值已授予后，才修改边、反向集合或捐赠状态。
+	for (FConsumerGrowth& Plan : Growth)
+	{
+		FNode& Child = Storage->Nodes.FindChecked(Plan.Node);
+		Child.Consumers.Reserve(Plan.Capacity);
+		check(Child.Consumers.GetAllocatedSize() <= Plan.Lease->Bytes());
+		Child.ConsumersLease = MoveTemp(Plan.Lease);
+		Child.ConsumersCapacity = Plan.Capacity;
+	}
+	for (const FGuid& Dependency : Node->Dependencies)
+	{
+		if (!Candidate.Contains(Dependency))
+		{
+			Storage->Nodes.FindChecked(Dependency).Consumers.Remove(InNode);
+			Dirty(Dependency);
+		}
+	}
+	for (const FGuid& Dependency : Candidate)
+	{
+		if (!Node->Dependencies.Contains(Dependency))
+		{
+			Storage->Nodes.FindChecked(Dependency).Consumers.Add(InNode);
+			Dirty(Dependency);
+		}
+	}
+	Node->Dependencies = MoveTemp(Candidate);
+	Node->DependenciesLease = MoveTemp(DependenciesLease);
+	OutError.Reset();
+	return true;
+}
+
+void FVoxelTerrainDependencyPriority::SetPriority(const FGuid& InNode,
+	const FVoxelTerrainServicePriority& InPriority)
+{
+	FNode* Node = Storage ? Storage->Nodes.Find(InNode) : nullptr;
+	check(Node);
+	if (Node->Own != InPriority)
+	{
+		Node->Own = InPriority;
+		Dirty(InNode);
+	}
 }
 
 void FVoxelTerrainDependencyPriority::Remove(const FGuid& InNode)
 {
-    FNode Removed;
-    if (!Nodes.RemoveAndCopyValue(InNode, Removed))
-    {
-        return;
-    }
-    for (const FGuid& Dependency : Removed.Dependencies)
-    {
-        if (FNode* Node = Nodes.Find(Dependency))
-        {
-            Node->Consumers.Remove(InNode);
-            Dirty(Dependency);
-        }
-    }
-    for (const FGuid& Consumer : Removed.Consumers)
-    {
-        if (FNode* Node = Nodes.Find(Consumer))
-        {
-            Node->Dependencies.Remove(InNode);
-        }
-    }
-    Queued.Remove(InNode);
+	FNode* Node = Storage ? Storage->Nodes.Find(InNode) : nullptr;
+	if (!Node) return;
+	UnlinkDirty(*Node);
+	for (const FGuid& Dependency : Node->Dependencies)
+	{
+		FNode& Child = Storage->Nodes.FindChecked(Dependency);
+		Child.Consumers.Remove(InNode);
+		Dirty(Dependency);
+	}
+	for (const FGuid& Parent : Node->Consumers)
+		Storage->Nodes.FindChecked(Parent).Dependencies.Remove(InNode);
+	Storage->Nodes.Remove(InNode);
 }
 
 int32 FVoxelTerrainDependencyPriority::Advance(const int32 InMaximumNodes,
-    TFunctionRef<void(const FGuid&, const FVoxelTerrainServicePriority&)> InOnChanged)
+	TFunctionRef<void(const FGuid&, const FVoxelTerrainServicePriority&)> InOnChanged)
 {
-    int32 Processed = 0;
-    while (Queue.IsValidIndex(Cursor) && Processed < FMath::Max(0, InMaximumNodes))
-    {
-        const FGuid Key = Queue[Cursor++];
-        Queued.Remove(Key);
-        FNode* Node = Nodes.Find(Key);
-        ++Processed;
-        if (!Node)
-        {
-            continue;
-        }
-        FVoxelTerrainServicePriority Effective = Node->Own;
-        for (const FGuid& Consumer : Node->Consumers)
-        {
-            if (const FNode* Parent = Nodes.Find(Consumer))
-            {
-                Effective = FVoxelTerrainWorkSelection::Promote(Effective, Parent->Effective);
-            }
-        }
-        if (Node->Effective != Effective)
-        {
-            Node->Effective = Effective;
-            const TSet<FGuid> Dependencies = Node->Dependencies;
-            InOnChanged(Key, Effective);
-            for (const FGuid& Dependency : Dependencies)
-            {
-                Dirty(Dependency);
-            }
-        }
-    }
-    if (Cursor == Queue.Num())
-    {
-        Queue.Reset();
-        Cursor = 0;
-    }
-    return Processed;
+	int32 Processed = 0;
+	while (DirtyHead.IsValid() && Processed < FMath::Max(0, InMaximumNodes))
+	{
+		const FGuid Key = DirtyHead;
+		FNode& Node = Storage->Nodes.FindChecked(Key);
+		UnlinkDirty(Node);
+		++Processed;
+		FVoxelTerrainServicePriority Effective = Node.Own;
+		for (const FGuid& Parent : Node.Consumers)
+			Effective = FVoxelTerrainWorkSelection::Promote(Effective, Storage->Nodes.FindChecked(Parent).Effective);
+		if (Node.Effective == Effective) continue;
+		Node.Effective = Effective;
+		for (const FGuid& Dependency : Node.Dependencies) Dirty(Dependency);
+		// 回调可删除或扩容图，集合遍历在回调前结束。
+		InOnChanged(Key, Effective);
+	}
+	return Processed;
 }
 
 const FVoxelTerrainServicePriority* FVoxelTerrainDependencyPriority::Find(const FGuid& InNode) const
 {
-    const FNode* Node = Nodes.Find(InNode);
-    return Node ? &Node->Effective : nullptr;
+	const FNode* Node = Storage ? Storage->Nodes.Find(InNode) : nullptr;
+	return Node ? &Node->Effective : nullptr;
 }
 
 bool FVoxelTerrainDependencyPriority::IsPending() const
 {
-    return Cursor < Queue.Num();
+	return DirtyHead.IsValid();
 }
 
 void FVoxelTerrainDependencyPriority::Reset()
 {
-    Nodes.Reset();
-    Queue.Reset();
-    Queued.Reset();
-    Cursor = 0;
+	Storage.Reset();
+	DirtyHead.Invalidate();
+	DirtyTail.Invalidate();
+	SearchSerial = 0;
+	check(Consumer.OwnerIncarnation != MAX_uint64);
+	++Consumer.OwnerIncarnation;
 }

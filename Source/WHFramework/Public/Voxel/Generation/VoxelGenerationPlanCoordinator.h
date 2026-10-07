@@ -87,6 +87,7 @@ private:
 #if WITH_DEV_AUTOMATION_TESTS
 	friend class FVoxelLocalPlanClosureTest;
 	friend class FVoxelEnvironmentAttemptIsolationTest;
+	friend class FVoxelGenerationGraphAdmissionTest;
 #endif
 	struct FDonation
 	{
@@ -97,6 +98,7 @@ private:
 	struct FState
 	{
 		FGuid PriorityNode;
+		FGuid NextRegistration;
 		TArray<FVoxelGenerationPlanDependency> Prerequisites;
 		TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> PrerequisiteRetention;
 		EVoxelPlanDependencyState State = EVoxelPlanDependencyState::Missing;
@@ -109,6 +111,17 @@ private:
 		TMap<FVoxelGenerationConsumerKey, FDonation> Donations;
 		uint64 AttemptId = 0;
 		bool bInFlight = false;
+		bool bRegistering = false;
+	};
+	struct FClosureRegistration
+	{
+		explicit FClosureRegistration(FVoxelGenerationPlanCoordinator& InOwner);
+		~FClosureRegistration();
+		void Add(FState& InState);
+		void Commit();
+		FVoxelGenerationPlanCoordinator& Owner;
+		FGuid Head;
+		bool bCommitted = false;
 	};
 
 	void ResolveDonations(FState& InOutState);
@@ -119,7 +132,7 @@ private:
 	bool IsCached(const FVoxelGenerationPlanDependency& InDependency) const;
 	bool Queue(const FVoxelGenerationPlanDependency& InDependency, FState& InOutState);
 	void RefreshQueuedPriorities();
-	bool RegisterClosure(const FVoxelGenerationPlanDependency& InDependency, FString& OutError);
+	bool RegisterClosure(const FVoxelGenerationPlanDependency& InDependency, FClosureRegistration& InRegistration, FString& OutError);
 	void AdvancePriorityDonations();
 	void ForgetFact(const FVoxelGenerationPlanDependency& InDependency);
 	bool ArePrerequisitesReady(const FState& InState) const;
