@@ -37,10 +37,10 @@ bool FVoxelLocalPlanClosureTest::RunTest(const FString& InParameters)
 	const FVoxelGenerationPlanDependency Facts[] = {Near, Far};
 	const auto Status = Coordinator.Ensure(MakeArrayView(Facts), EVoxelWorkClass::Critical, 0, 0.0, 1.0, Consumer);
 	TestFalse(TEXT("调用者仍等待完整请求结果"), Status.bReady);
-	TestTrue(TEXT("近处计划可在远处水文未完成时排队"), Coordinator.States.FindChecked(Near).bInFlight);
-	TestFalse(TEXT("远处计划等待自己的水文"), Coordinator.States.FindChecked(Far).bInFlight);
-	TestTrue(TEXT("远处水文拥有独立任务"), Coordinator.States.FindChecked(FarReads[0]).bInFlight);
-	const auto* Donated = Coordinator.PriorityGraph.Find(Coordinator.States.FindChecked(FarReads[0]).PriorityNode);
+	TestTrue(TEXT("近处计划可在远处水文未完成时排队"), Coordinator.Storage->States.FindChecked(Near).bInFlight);
+	TestFalse(TEXT("远处计划等待自己的水文"), Coordinator.Storage->States.FindChecked(Far).bInFlight);
+	TestTrue(TEXT("远处水文拥有独立任务"), Coordinator.Storage->States.FindChecked(FarReads[0]).bInFlight);
+	const auto* Donated = Coordinator.PriorityGraph.Find(Coordinator.Storage->States.FindChecked(FarReads[0]).PriorityNode);
 	TestTrue(TEXT("生产依赖图将完整 Source 优先级送至事实叶子"), Donated && Donated->SourceStableKey == Consumer.OwnerId &&
 		Donated->Band == EVoxelTerrainServiceBand::P0);
 	Coordinator.ReleaseConsumer(Consumer);
@@ -64,8 +64,8 @@ bool FVoxelEnvironmentAttemptIsolationTest::RunTest(const FString& InParameters)
 	Coordinator.ReleaseEnvironment(FIntPoint(-1, 8));
 	const auto Second = Coordinator.EnvironmentConsumer(Column, true);
 	TestTrue(TEXT("释放后新请求取得严格递增的尝试代"), Second.RequestSerial > First.RequestSerial);
-	TestFalse(TEXT("旧代已从完整订阅表移除"), Coordinator.ConsumerDependencies.Contains(First));
-	TestFalse(TEXT("新代不能被旧代图节点复用"), Coordinator.ConsumerPriorityNodes.Contains(First));
+	TestFalse(TEXT("旧代已从完整订阅表移除"), Coordinator.Storage->Consumers.Contains(First));
+	TestFalse(TEXT("新代不能被旧代图节点复用"), Coordinator.Storage->Consumers.Contains(First));
 	Coordinator.ReleaseEnvironment(FIntPoint(-1, 8));
 	Scheduler.StopAndJoin();
 	return true;
@@ -253,8 +253,8 @@ bool FVoxelGenerationGraphAdmissionTest::RunTest(const FString& InParameters)
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(61, FGuid::NewGuid(), 1, {}, 1);
 	if (!TestTrue(TEXT("Original cached fact is admitted through production Ensure"), Coordinator.Ensure(
 		MakeArrayView(&First, 1), EVoxelWorkClass::Critical, 0, 0.0, 1.0, Consumer).bReady)) return false;
-	const uint64 Subscription = Coordinator.ConsumerDependencies.FindChecked(Consumer).FindChecked(First);
-	const FGuid ConsumerNode = Coordinator.ConsumerPriorityNodes.FindChecked(Consumer);
+	const uint64 Subscription = Coordinator.Storage->Consumers.FindChecked(Consumer).Dependencies.FindChecked(First).Id;
+	const FGuid ConsumerNode = Coordinator.Storage->Consumers.FindChecked(Consumer).PriorityNode;
 	const auto Resources = Scheduler.GetRuntimeResources();
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> WorkingBlocker;
 	const auto BeforeWorking = Resources->Snapshot();
@@ -263,27 +263,27 @@ bool FVoxelGenerationGraphAdmissionTest::RunTest(const FString& InParameters)
 	FVoxelGenerationPlanDependency Cold;
 	Cold.Kind = EVoxelGenerationPlanKind::Structure;
 	Cold.TileKey.Coordinate = FIntVector(400, -30, 0);
-	const int32 BeforeColdStates = Coordinator.States.Num();
-	const int32 BeforeColdFacts = Coordinator.PriorityFacts.Num();
+	const int32 BeforeColdStates = Coordinator.Storage->States.Num();
+	const int32 BeforeColdFacts = Coordinator.Storage->PriorityFacts.Num();
 	for (int32 Index = 0; Index < 3; ++Index)
 	{
 		const auto ColdStatus = Coordinator.Ensure(MakeArrayView(&Cold, 1), EVoxelWorkClass::Critical, 0, 0.0, 1.0, Consumer);
 		TestTrue(TEXT("Cold closure is suspended by actual Working lease pressure"), !ColdStatus.bReady && !ColdStatus.bFailed && ColdStatus.Error.StartsWith(TEXT("CapacityBlocked")));
-		TestEqual(TEXT("Failed closure rolls back unowned fact states"), Coordinator.States.Num(), BeforeColdStates);
-		TestEqual(TEXT("Repeated rejection leaves no orphan priority facts"), Coordinator.PriorityFacts.Num(), BeforeColdFacts);
+		TestEqual(TEXT("Failed closure rolls back unowned fact states"), Coordinator.Storage->States.Num(), BeforeColdStates);
+		TestEqual(TEXT("Repeated rejection leaves no orphan priority facts"), Coordinator.Storage->PriorityFacts.Num(), BeforeColdFacts);
 	}
 	const auto Blocked = Coordinator.Ensure(MakeArrayView(&Second, 1), EVoxelWorkClass::Critical, 0, 0.0, 1.0, Consumer);
 	TestFalse(TEXT("Graph grant failure is not Ready"), Blocked.bReady);
 	TestFalse(TEXT("Graph grant failure is not terminal fact failure"), Blocked.bFailed);
 	TestTrue(TEXT("Graph grant failure exposes capacity reason"), Blocked.Error.StartsWith(TEXT("CapacityBlocked")));
-	TestEqual(TEXT("Failed topology retains old subscription"), Coordinator.ConsumerDependencies.FindChecked(Consumer).FindChecked(First), Subscription);
-	TestEqual(TEXT("Failed topology retains original consumer node"), Coordinator.ConsumerPriorityNodes.FindChecked(Consumer), ConsumerNode);
-	TestFalse(TEXT("Rejected first subscription removes its newly registered fact"), Coordinator.States.Contains(Second));
+	TestEqual(TEXT("Failed topology retains old subscription"), Coordinator.Storage->Consumers.FindChecked(Consumer).Dependencies.FindChecked(First).Id, Subscription);
+	TestEqual(TEXT("Failed topology retains original consumer node"), Coordinator.Storage->Consumers.FindChecked(Consumer).PriorityNode, ConsumerNode);
+	TestFalse(TEXT("Rejected first subscription removes its newly registered fact"), Coordinator.Storage->States.Contains(Second));
 	WorkingBlocker.Reset();
 	if (!TestTrue(TEXT("Original consumer resumes new requested topology"), Coordinator.Ensure(
 		MakeArrayView(&Second, 1), EVoxelWorkClass::Critical, 0, 0.0, 1.0, Consumer).bReady)) return false;
-	TestFalse(TEXT("Accepted topology withdraws old subscription"), Coordinator.ConsumerDependencies.FindChecked(Consumer).Contains(First));
-	TestTrue(TEXT("Accepted topology records new subscription"), Coordinator.ConsumerDependencies.FindChecked(Consumer).Contains(Second));
+	TestFalse(TEXT("Accepted topology withdraws old subscription"), Coordinator.Storage->Consumers.FindChecked(Consumer).Dependencies.Contains(First));
+	TestTrue(TEXT("Accepted topology records new subscription"), Coordinator.Storage->Consumers.FindChecked(Consumer).Dependencies.Contains(Second));
 	TArray<FVoxelGenerationConsumerKey> OtherConsumers;
 	for (int32 Index = 0; Index < 3; ++Index)
 	{
@@ -297,17 +297,18 @@ bool FVoxelGenerationGraphAdmissionTest::RunTest(const FString& InParameters)
 	const auto Denied = FVoxelGenerationConsumerKey::Section(61, FGuid::NewGuid(), 1, {}, 1);
 	const auto DeniedStatus = Coordinator.Ensure(MakeArrayView(&Second, 1), EVoxelWorkClass::Critical, 0, 0.0, 1.0, Denied);
 	TestTrue(TEXT("New consumer reaches reverse-edge capacity wait"), !DeniedStatus.bReady && !DeniedStatus.bFailed && DeniedStatus.Error.StartsWith(TEXT("CapacityBlocked")));
-	TestTrue(TEXT("Waiting consumer has only its original control node"), Coordinator.ConsumerPriorityNodes.Contains(Denied));
-	TestFalse(TEXT("Denied consumer has no accepted subscription"), Coordinator.ConsumerDependencies.Contains(Denied));
+	TestTrue(TEXT("Waiting consumer has only its original control node"), Coordinator.Storage->Consumers.Contains(Denied));
+	TestFalse(TEXT("Denied consumer has no accepted subscription"), !Coordinator.Storage->Consumers.FindChecked(Denied).Dependencies.IsEmpty());
 	Coordinator.ReleaseConsumer(Denied);
-	TestFalse(TEXT("Cancellation removes control node even before first subscription"), Coordinator.ConsumerPriorityNodes.Contains(Denied));
+	TestFalse(TEXT("Cancellation removes control node even before first subscription"), Coordinator.Storage->Consumers.Contains(Denied));
 	WorkingBlocker.Reset();
-	Coordinator.States.FindChecked(Second).Prerequisites.Add(Second);
+	if (!Coordinator.PreparePrerequisites(Coordinator.Storage->States.FindChecked(Second), 1, Error)) return false;
+	Coordinator.Storage->States.FindChecked(Second).Prerequisites.Add(Second);
 	const auto CycleStatus = Coordinator.Ensure(MakeArrayView(&Second, 1), EVoxelWorkClass::Critical, 0, 0.0, 1.0, Consumer);
 	TestTrue(TEXT("Stored read cycle is rejected before recursive re-registration"), CycleStatus.bFailed && CycleStatus.Error.Contains(TEXT("循环")));
-	TestFalse(TEXT("Rejected cycle clears its registration marker"), Coordinator.States.FindChecked(Second).bRegistering);
-	TestTrue(TEXT("Rejected read cycle retains accepted subscription"), Coordinator.ConsumerDependencies.FindChecked(Consumer).Contains(Second));
-	Coordinator.States.FindChecked(Second).Prerequisites.Reset();
+	TestFalse(TEXT("Rejected cycle clears its registration marker"), Coordinator.Storage->States.FindChecked(Second).bRegistering);
+	TestTrue(TEXT("Rejected read cycle retains accepted subscription"), Coordinator.Storage->Consumers.FindChecked(Consumer).Dependencies.Contains(Second));
+	Coordinator.Storage->States.FindChecked(Second).Prerequisites.Reset();
 	FVoxelGenerationPlanDependency Middle;
 	Middle.Kind = EVoxelGenerationPlanKind::Structure;
 	FVoxelGenerationPlanDependency Outer;
@@ -322,20 +323,167 @@ bool FVoxelGenerationGraphAdmissionTest::RunTest(const FString& InParameters)
 	const auto OuterConsumer = FVoxelGenerationConsumerKey::Section(61, FGuid::NewGuid(), 1, {}, 1);
 	if (!Coordinator.Ensure(MakeArrayView(&Middle, 1), EVoxelWorkClass::Critical, 0, 0.0, 1.0, MiddleConsumer).bReady ||
 		!Coordinator.Ensure(MakeArrayView(&Outer, 1), EVoxelWorkClass::Critical, 0, 0.0, 1.0, OuterConsumer).bReady) return false;
-	const uint64 LeafSubscription = Coordinator.ConsumerDependencies.FindChecked(Consumer).FindChecked(Second);
-	Coordinator.States.FindChecked(Middle).Prerequisites.Add(Second);
-	Coordinator.States.FindChecked(Outer).Prerequisites.Add(Middle);
+	const uint64 LeafSubscription = Coordinator.Storage->Consumers.FindChecked(Consumer).Dependencies.FindChecked(Second).Id;
+	if (!Coordinator.PreparePrerequisites(Coordinator.Storage->States.FindChecked(Middle),
+		Coordinator.Storage->States.FindChecked(Middle).Prerequisites.Num() + 1, Error) ||
+		!Coordinator.PreparePrerequisites(Coordinator.Storage->States.FindChecked(Outer),
+			Coordinator.Storage->States.FindChecked(Outer).Prerequisites.Num() + 1, Error)) return false;
+	Coordinator.Storage->States.FindChecked(Middle).Prerequisites.Add(Second);
+	Coordinator.Storage->States.FindChecked(Outer).Prerequisites.Add(Middle);
 	if (!Coordinator.Ensure(MakeArrayView(&Outer, 1), EVoxelWorkClass::Critical, 0, 0.0, 1.0, Consumer).bReady) return false;
-	const auto& Accepted = Coordinator.ConsumerDependencies.FindChecked(Consumer);
+	const auto& Accepted = Coordinator.Storage->Consumers.FindChecked(Consumer).Dependencies;
 	TestTrue(TEXT("Consumer subscribes the dynamically extended middle fact"), Accepted.Contains(Middle));
-	TestEqual(TEXT("Transitive replacement retains original leaf subscription identity"), Accepted.FindRef(Second), LeafSubscription);
-	for (const auto& Prerequisite : Coordinator.States.FindChecked(Middle).Prerequisites)
+	TestEqual(TEXT("Transitive replacement retains original leaf subscription identity"), Accepted.FindChecked(Second).Id, LeafSubscription);
+	for (const auto& Prerequisite : Coordinator.Storage->States.FindChecked(Middle).Prerequisites)
 		TestTrue(TEXT("Consumer retains every transitive leaf subscription"), Accepted.Contains(Prerequisite));
 	Coordinator.ReleaseConsumer(Consumer);
 	Coordinator.ReleaseConsumer(MiddleConsumer);
 	Coordinator.ReleaseConsumer(OuterConsumer);
 	for (const auto& Other : OtherConsumers) Coordinator.ReleaseConsumer(Other);
 	Coordinator.Reset();
+	Scheduler.StopAndJoin();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelCoordinatorStorageCapacityTest,
+	"WHFramework.Voxel.FineRefactor.Generation.CoordinatorStorageCapacity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelCoordinatorStorageCapacityTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const auto Config = VoxelTest::MakeGenerationConfig();
+	const auto Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
+	FVoxelTaskScheduler Scheduler;
+	FVoxelGenerationPlanCoordinator Coordinator(Scheduler, Config, Cache, 67);
+	const auto Resources = Scheduler.GetRuntimeResources();
+	FVoxelGenerationPlanDependency First;
+	FVoxelGenerationPlanDependency Second;
+	Second.HydrologyKey.Coordinate = FIntPoint(7, -3);
+	FString Error;
+	for (const auto& Fact : {First, Second})
+	{
+		FVoxelHydrologyPlanPtr Plan;
+		if (!Cache->GetOrBuildHydrology(Fact.HydrologyKey,
+			[](FVoxelHydrologyPlan&, FString& OutError) { OutError.Reset(); return true; }, Plan, Error)) return false;
+	}
+	const auto Consumer = FVoxelGenerationConsumerKey::Section(67, FGuid::NewGuid(), 1, {}, 1);
+	const auto Other = FVoxelGenerationConsumerKey::Section(67, FGuid::NewGuid(), 1, {}, 1);
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Blocker;
+	const auto Saturate = [&]()
+	{
+		if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input, 1, Blocker)) return false;
+		const auto Snapshot = Resources->Snapshot();
+		return Blocker->Resize(1 + Snapshot.Limits.InputBytes - Snapshot.Used[uint8(EVoxelTerrainResourcePool::Input)]);
+	};
+	if (!Saturate()) return false;
+	const auto NoStorage = Coordinator.Ensure(MakeArrayView(&First, 1), EVoxelWorkClass::Critical, 0, 0.0, 1.0, Consumer);
+	TestTrue(TEXT("Storage admission is a capacity wait"), !NoStorage.bReady && !NoStorage.bFailed && NoStorage.Error.StartsWith(TEXT("CapacityBlocked")));
+	TestTrue(TEXT("Rejected storage creates no uncharged owner"), Coordinator.Storage == nullptr);
+	const auto NoEnvironment = Coordinator.EnsureEnvironment(FIntPoint::ZeroValue);
+	TestTrue(TEXT("Environment identity allocation denial remains retryable"), !NoEnvironment.bReady && !NoEnvironment.bFailed);
+	Blocker.Reset();
+	if (!Coordinator.Ensure(MakeArrayView(&First, 1), EVoxelWorkClass::Critical, 0, 0.0, 1.0, Consumer).bReady ||
+		!Coordinator.Ensure(MakeArrayView(&Second, 1), EVoxelWorkClass::Visible, 1, 32.0, 0.0, Other).bReady) return false;
+	const auto& Body = *Coordinator.Storage;
+	TestTrue(TEXT("States backing is granted"), Body.States.GetAllocatedSize() <= Body.StatesLease->Bytes());
+	TestTrue(TEXT("Consumers backing is granted"), Body.Consumers.GetAllocatedSize() <= Body.ConsumersLease->Bytes());
+	TestTrue(TEXT("Fact identity backing is granted"), Body.PriorityFacts.GetAllocatedSize() <= Body.FactsLease->Bytes());
+	const auto& Original = Body.Consumers.FindChecked(Consumer);
+	const uint64 Id = Original.Dependencies.FindChecked(First).Id;
+	const uint64 EdgeLease = Original.DependenciesLease->Serial();
+	const uint64 DonationLease = Body.States.FindChecked(First).DonationsLease->Serial();
+	TestTrue(TEXT("Nested subscriptions backing is granted"), Original.Dependencies.GetAllocatedSize() <= Original.DependenciesLease->Bytes());
+	if (!Saturate()) return false;
+	TestTrue(TEXT("Accepted cached closure needs no new grant under input pressure"), Coordinator.Ensure(
+		MakeArrayView(&First, 1), EVoxelWorkClass::Critical, 0, 0.0, 1.0, Consumer).bReady);
+	const auto Blocked = Coordinator.Ensure(MakeArrayView(&Second, 1), EVoxelWorkClass::Critical, 0, 0.0, 1.0, Consumer);
+	TestTrue(TEXT("Metadata rejection preserves capacity wait"), !Blocked.bReady && !Blocked.bFailed);
+	const auto& Retained = Coordinator.Storage->Consumers.FindChecked(Consumer);
+	TestEqual(TEXT("Metadata rejection preserves old subscription"), Retained.Dependencies.FindChecked(First).Id, Id);
+	TestEqual(TEXT("Metadata rejection retains old subscription backing"), Retained.DependenciesLease->Serial(), EdgeLease);
+	TestEqual(TEXT("Metadata rejection retains old donation backing"), Coordinator.Storage->States.FindChecked(First).DonationsLease->Serial(), DonationLease);
+	TestFalse(TEXT("Rejected metadata does not add the new donation"), Coordinator.Storage->States.FindChecked(Second).Donations.Contains(Consumer));
+	Blocker.Reset();
+	if (!Coordinator.Ensure(MakeArrayView(&Second, 1), EVoxelWorkClass::Critical, 0, 0.0, 1.0, Consumer).bReady) return false;
+	TestFalse(TEXT("Restored input admits replacement"), Coordinator.Storage->Consumers.FindChecked(Consumer).Dependencies.Contains(First));
+	auto OldStorage = Coordinator.Storage;
+	const uint64 OldIncarnation = Coordinator.ControlConsumer.OwnerIncarnation;
+	Coordinator.Reset();
+	TestTrue(TEXT("Reset disconnects the old callback owner"), OldStorage->Owner == nullptr && Coordinator.Storage == nullptr);
+	TestTrue(TEXT("Old reader retains the owned backing"), OldStorage->StatesLease && OldStorage->Consumers.Num() == 2);
+	TestTrue(TEXT("Next storage has a distinct resource incarnation"), Coordinator.ControlConsumer.OwnerIncarnation > OldIncarnation);
+	if (!Coordinator.Ensure(MakeArrayView(&Second, 1), EVoxelWorkClass::Critical, 0, 0.0, 1.0, Consumer).bReady) return false;
+	TestTrue(TEXT("Old and new storage remain independent"), Coordinator.Storage != OldStorage && OldStorage->Owner == nullptr);
+	OldStorage.Reset();
+	Coordinator.ReleaseConsumer(Consumer);
+	Scheduler.StopAndJoin();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelCoordinatorWakeLifetimeTest,
+	"WHFramework.Voxel.FineRefactor.Generation.CoordinatorWakeLifetime",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelCoordinatorWakeLifetimeTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const auto Config = VoxelTest::MakeGenerationConfig();
+	const auto Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
+	FVoxelTaskScheduler Scheduler;
+	FVoxelGenerationPlanDependency Fact;
+	FVoxelHydrologyPlanPtr Plan;
+	FString Error;
+	if (!Cache->GetOrBuildHydrology(Fact.HydrologyKey,
+		[](FVoxelHydrologyPlan&, FString& OutError) { OutError.Reset(); return true; }, Plan, Error)) return false;
+	int32 Calls = 0;
+	{
+		FVoxelGenerationPlanCoordinator Coordinator(Scheduler, Config, Cache, 71);
+		const auto First = FVoxelGenerationConsumerKey::Section(71, FGuid::NewGuid(), 1, {}, 1);
+		const auto Second = FVoxelGenerationConsumerKey::Section(71, FGuid::NewGuid(), 1, {}, 1);
+		if (!Coordinator.Ensure(MakeArrayView(&Fact, 1), EVoxelWorkClass::Critical, 0, 0.0, 1.0, First).bReady ||
+			!Coordinator.Ensure(MakeArrayView(&Fact, 1), EVoxelWorkClass::Visible, 1, 32.0, 0.0, Second).bReady) return false;
+		Coordinator.SetConsumerWakeCallback([&](const FVoxelGenerationConsumerKey&) { ++Calls; });
+		const auto Before = Scheduler.GetRuntimeResources()->Snapshot();
+		Coordinator.WakeConsumers(Fact);
+		Coordinator.WakeConsumers(Fact);
+		const auto After = Scheduler.GetRuntimeResources()->Snapshot();
+		for (int32 Pool = 0; Pool < int32(EVoxelTerrainResourcePool::Count); ++Pool)
+			TestEqual(TEXT("Queued notification allocates no additional backing"), After.Used[Pool], Before.Used[Pool]);
+		TestEqual(TEXT("Notification is deferred"), Calls, 0);
+		TestEqual(TEXT("Expired frame deadline retains pending wakes"), Coordinator.AdvanceConsumerWakes(FPlatformTime::Seconds() - 1.0, 64), 0);
+		const auto Head = Coordinator.Storage->WakeHead;
+		const auto Removed = Head == First ? Second : First;
+		Coordinator.SetConsumerWakeCallback([&](const FVoxelGenerationConsumerKey& Key)
+		{
+			++Calls;
+			TestTrue(TEXT("Original complete consumer key is delivered"), Key == Head);
+			Coordinator.ReleaseConsumer(Removed);
+		});
+		TestEqual(TEXT("Reentrant cancellation removes the other pending wake"), Coordinator.AdvanceConsumerWakes(FPlatformTime::Seconds() + 1.0, 64), 1);
+		TestEqual(TEXT("Duplicate fact notifications coalesce per subscription"), Calls, 1);
+		Coordinator.WakeConsumers(Fact);
+		Coordinator.SetConsumerWakeCallback([&](const FVoxelGenerationConsumerKey&)
+		{
+			++Calls;
+			Coordinator.Reset();
+		});
+		TestEqual(TEXT("Reset inside callback leaves no dangling queue references"), Coordinator.AdvanceConsumerWakes(FPlatformTime::Seconds() + 1.0, 64), 1);
+		TestTrue(TEXT("Reset detaches the whole queue"), Coordinator.Storage == nullptr);
+	}
+	TSharedPtr<FVoxelGenerationPlanCoordinator::FStorage, ESPMode::ThreadSafe> Retired;
+	{
+		FVoxelGenerationPlanCoordinator Coordinator(Scheduler, Config, Cache, 73);
+		Fact.HydrologyKey.Coordinate = FIntPoint(9, -10);
+		const auto Consumer = FVoxelGenerationConsumerKey::Section(73, FGuid::NewGuid(), 1, {}, 1);
+		Coordinator.Ensure(MakeArrayView(&Fact, 1), EVoxelWorkClass::Critical, 0, 0.0, 1.0, Consumer);
+		Retired = Coordinator.Storage;
+		TestEqual(TEXT("Missing fact owns one queued production attempt"), Scheduler.ActiveCount(), 1);
+	}
+	TestTrue(TEXT("Destroyed coordinator invalidates even a pinned old storage owner"), Retired && Retired->Owner == nullptr);
+	Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
+	TestEqual(TEXT("Canceled callback can be consumed after coordinator destruction"), Scheduler.ActiveCount(), 0);
+	Retired.Reset();
 	Scheduler.StopAndJoin();
 	return true;
 }

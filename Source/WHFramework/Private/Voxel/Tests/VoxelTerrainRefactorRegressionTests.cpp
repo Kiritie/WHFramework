@@ -532,6 +532,7 @@ bool FVoxelPlanConsumerWakeTest::RunTest(const FString& InParameters)
 			{
 			},
 			8.0);
+		Coordinator.AdvanceConsumerWakes(WakeDeadline, 64);
 		FPlatformProcess::Sleep(0.001f);
 	}
 	TestTrue(TEXT("Matching cancellation wakes the remaining consumer"), Woken.Contains(Visible));

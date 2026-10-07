@@ -18,6 +18,9 @@ public:
 	void Remove(const FGuid& InNode);
 	int32 Advance(int32 InMaximumNodes, TFunctionRef<void(const FGuid&, const FVoxelTerrainServicePriority&)> InOnChanged);
 	const FVoxelTerrainServicePriority* Find(const FGuid& InNode) const;
+	bool HasConsumers(const FGuid& InNode) const;
+	int32 GetDependencyCount(const FGuid& InNode) const;
+	bool HasDependency(const FGuid& InNode, const FGuid& InDependency) const;
 	bool IsPending() const;
 	void Reset();
 

@@ -296,6 +296,24 @@ bool FVoxelTerrainDependencyPriority::IsPending() const
 	return DirtyHead.IsValid();
 }
 
+bool FVoxelTerrainDependencyPriority::HasConsumers(const FGuid& InNode) const
+{
+	const FNode* Node = Storage ? Storage->Nodes.Find(InNode) : nullptr;
+	return Node && !Node->Consumers.IsEmpty();
+}
+
+int32 FVoxelTerrainDependencyPriority::GetDependencyCount(const FGuid& InNode) const
+{
+	const FNode* Node = Storage ? Storage->Nodes.Find(InNode) : nullptr;
+	return Node ? Node->Dependencies.Num() : INDEX_NONE;
+}
+
+bool FVoxelTerrainDependencyPriority::HasDependency(const FGuid& InNode, const FGuid& InDependency) const
+{
+	const FNode* Node = Storage ? Storage->Nodes.Find(InNode) : nullptr;
+	return Node && Node->Dependencies.Contains(InDependency);
+}
+
 void FVoxelTerrainDependencyPriority::Reset()
 {
 	Storage.Reset();

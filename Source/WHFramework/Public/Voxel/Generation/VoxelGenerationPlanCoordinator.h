@@ -48,6 +48,7 @@ public:
 		TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
 		TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> InCache,
 		uint64 InWorldEpoch);
+	~FVoxelGenerationPlanCoordinator();
 
 	bool GatherForBounds(
 		const FVoxelGenerationBounds& InBounds,
@@ -81,6 +82,7 @@ public:
 	uint64 GetWaitingConsumers(EVoxelGenerationPlanKind InKind) const;
 
 	void SetConsumerWakeCallback(TFunction<void(const FVoxelGenerationConsumerKey&)> InCallback);
+	int32 AdvanceConsumerWakes(double InDeadline, int32 InMaximumEdges);
 	void Reset();
 
 private:
@@ -88,6 +90,8 @@ private:
 	friend class FVoxelLocalPlanClosureTest;
 	friend class FVoxelEnvironmentAttemptIsolationTest;
 	friend class FVoxelGenerationGraphAdmissionTest;
+	friend class FVoxelCoordinatorStorageCapacityTest;
+	friend class FVoxelCoordinatorWakeLifetimeTest;
 #endif
 	struct FDonation
 	{
@@ -97,8 +101,11 @@ private:
 	};
 	struct FState
 	{
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PrerequisitesLease;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> DonationsLease;
 		FGuid PriorityNode;
 		FGuid NextRegistration;
+		FGuid NextDesired;
 		TArray<FVoxelGenerationPlanDependency> Prerequisites;
 		TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> PrerequisiteRetention;
 		EVoxelPlanDependencyState State = EVoxelPlanDependencyState::Missing;
@@ -112,6 +119,53 @@ private:
 		uint64 AttemptId = 0;
 		bool bInFlight = false;
 		bool bRegistering = false;
+		bool bDesired = false;
+		int32 PrerequisitesCapacity = 0;
+		int32 DonationsCapacity = 0;
+	};
+	struct FSubscription
+	{
+		uint64 Id = 0;
+		FGuid PreviousWake;
+		FGuid NextWake;
+		bool bWakePending = false;
+	};
+	struct FConsumerState
+	{
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> DependenciesLease;
+		TMap<FVoxelGenerationPlanDependency, FSubscription> Dependencies;
+		FGuid PriorityNode;
+		FVoxelGenerationConsumerKey PreviousWake;
+		FVoxelGenerationConsumerKey NextWake;
+		FGuid WakeHead;
+		FGuid WakeTail;
+		int32 Capacity = 0;
+		bool bWakeQueued = false;
+	};
+	struct FStorage
+	{
+		FVoxelGenerationPlanCoordinator* Owner = nullptr;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> StatesLease;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ConsumersLease;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> FactsLease;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> EnvironmentLease;
+		TMap<FVoxelGenerationPlanDependency, FState> States;
+		TMap<FVoxelGenerationConsumerKey, FConsumerState> Consumers;
+		TMap<FGuid, FVoxelGenerationPlanDependency> PriorityFacts;
+		TMap<FVoxelGenerationConsumerKey, FVoxelGenerationConsumerKey> EnvironmentAttempts;
+		FVoxelGenerationConsumerKey WakeHead;
+		FVoxelGenerationConsumerKey WakeTail;
+		int32 StatesCapacity = 0;
+		int32 ConsumersCapacity = 0;
+		int32 FactsCapacity = 0;
+		int32 EnvironmentCapacity = 0;
+	};
+	struct FDonationGrowth
+	{
+		FGuid Node;
+		int32 Capacity = 0;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 	};
 	struct FClosureRegistration
 	{
@@ -123,32 +177,51 @@ private:
 		FGuid Head;
 		bool bCommitted = false;
 	};
+	struct FClosureDemand
+	{
+		explicit FClosureDemand(FVoxelGenerationPlanCoordinator& InOwner);
+		~FClosureDemand();
+		void Add(const FVoxelGenerationPlanDependency& InDependency);
+		bool Contains(const FVoxelGenerationPlanDependency& InDependency) const;
+		FVoxelGenerationPlanCoordinator& Owner;
+		FGuid Head;
+		int32 Count = 0;
+	};
+	template<typename KeyType, typename ValueType>
+	bool PrepareMap(TMap<KeyType, ValueType>& InMap, int32 InRequired, int32& InCapacity,
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& InLease, FString& OutError);
+	bool PrepareStorage(FString& OutError);
+	bool PreparePrerequisites(FState& InState, int32 InRequired, FString& OutError);
+	bool GetPrerequisiteRange(const FVoxelGenerationPlanDependency& InDependency, FIntPoint& OutMin,
+		FIntPoint& OutMax, int32& OutCount, FString& OutError) const;
+	bool SetFactDependencies(const FVoxelGenerationPlanDependency& InDependency, FString& OutError);
+	void LinkConsumerWake(const FVoxelGenerationConsumerKey& InConsumer, FConsumerState& InState);
+	void UnlinkConsumerWake(FConsumerState& InState);
+	void UnlinkSubscriptionWake(FConsumerState& InConsumer, FSubscription& InSubscription);
 
 	void ResolveDonations(FState& InOutState);
 	void RemoveSubscription(const FVoxelGenerationPlanDependency& InDependency,
 		const FVoxelGenerationConsumerKey& InConsumer, uint64 InSubscriptionId);
 	void WakeConsumers(const FVoxelGenerationPlanDependency& InDependency);
-	FVoxelGenerationConsumerKey EnvironmentConsumer(const FVoxelGenerationBounds& InBounds, bool bInColumn) const;
+	FVoxelGenerationConsumerKey EnvironmentConsumer(const FVoxelGenerationBounds& InBounds, bool bInColumn);
 	bool IsCached(const FVoxelGenerationPlanDependency& InDependency) const;
 	bool Queue(const FVoxelGenerationPlanDependency& InDependency, FState& InOutState);
 	void RefreshQueuedPriorities();
 	bool RegisterClosure(const FVoxelGenerationPlanDependency& InDependency, FClosureRegistration& InRegistration, FString& OutError);
 	void AdvancePriorityDonations();
-	void ForgetFact(const FVoxelGenerationPlanDependency& InDependency);
+	void ForgetFact(const FVoxelGenerationPlanDependency& InDependency, bool bReleasePrerequisites = true);
 	bool ArePrerequisitesReady(const FState& InState) const;
 
 	FVoxelTaskScheduler& Scheduler;
 	TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config;
 	TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> Cache;
 	uint64 WorldEpoch = 0;
-	TMap<FVoxelGenerationPlanDependency, FState> States;
-	TMap<FVoxelGenerationConsumerKey, TMap<FVoxelGenerationPlanDependency, uint64>> ConsumerDependencies;
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
+	FVoxelGenerationConsumerKey ControlConsumer;
+	TSharedPtr<FStorage, ESPMode::ThreadSafe> Storage;
 	FVoxelTerrainDependencyPriority PriorityGraph;
-	TMap<FVoxelGenerationConsumerKey, FGuid> ConsumerPriorityNodes;
-	TMap<FGuid, FVoxelGenerationPlanDependency> PriorityFacts;
 	// 环境请求按空间键保持在途身份；释放后再次请求必须使用新代，拒绝旧唤醒。
-	mutable TMap<FVoxelGenerationConsumerKey, FVoxelGenerationConsumerKey> EnvironmentAttempts;
-	mutable uint64 NextEnvironmentAttempt = 0;
+	uint64 NextEnvironmentAttempt = 0;
 	TFunction<void(const FVoxelGenerationConsumerKey&)> ConsumerWakeCallback;
 	FGuid EnvironmentOwnerId = FGuid::NewGuid();
 	uint64 EnvironmentOwnerIncarnation = 1;

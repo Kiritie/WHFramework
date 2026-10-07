@@ -153,6 +153,7 @@ void FVoxelEmergeManager::Tick(const FVoxelInterestSet& InInterest, const uint64
 	const int32 BuildLimit = FMath::Clamp(InMaxBuildsPerFrame, 1, 1024);
 	int32 Submitted = 0;
 	Generator->AdvanceOverlayConsumerWakes(Deadline, 64);
+	PlanCoordinator->AdvanceConsumerWakes(Deadline, 64);
 
 	TArray<FVoxelTerrainServiceCandidate> Candidates;
 	TArray<FIntVector> CandidateKeys;
