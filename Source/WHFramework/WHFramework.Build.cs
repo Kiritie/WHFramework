@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 using UnrealBuildTool;
 
@@ -9,7 +9,7 @@ public class WHFramework : ModuleRules
 		bLegacyPublicIncludePaths = false;
 
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
-		
+
 		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
@@ -33,13 +33,14 @@ public class WHFramework : ModuleRules
 				"WHFrameworkCore",
 				"WHFrameworkSlate"
 			});
-			
-		
-		PrivateDependencyModuleNames.AddRange(
+
+
+        PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
 				"RHI",
 				"RenderCore",
+				"Chaos",
 				"UMG",
 				"Slate",
 				"Paper2D",
@@ -58,5 +59,10 @@ public class WHFramework : ModuleRules
 				"MovieScene",
 				"CinematicCamera"
 			});
+		if (Target.bCompileRecast)
+		{
+			PrivateDependencyModuleNames.Add("Navmesh");
+		}
+		AddEngineThirdPartyPrivateStaticDependencies(Target, "zlib");
 	}
 }

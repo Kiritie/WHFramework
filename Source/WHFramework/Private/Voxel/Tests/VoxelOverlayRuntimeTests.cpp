@@ -1,4 +1,4 @@
-#if WITH_DEV_AUTOMATION_TESTS
+﻿#if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
 #include "Voxel/Runtime/VoxelChangeHierarchy.h"
@@ -59,11 +59,18 @@ bool FVoxelNaturalPublicationRevisionTest::RunTest(const FString& InParameters)
 	FVoxelWorldRuntime Replica(1, false, VoxelTest::MakeRegistry(), VoxelTest::MakeGenerator());
 	if (!PublishTestSection(Replica, Origin, 0, Error)) return false;
 	const TMap<int32, FVoxelBlockState> Overlay{{0, FVoxelBlockState(1, 0)}};
-	TestTrue(TEXT("Remote replacement applies a modification"), Replica.PublishFinal(Origin, 1, Overlay, {}, Error));
+	Replica.InvalidateRemoteSection(Origin);
 	const uint64 RemoteRevision = Replica.GetChangeHierarchy().GetVoxelProxyRevision(Proxy);
+	TestTrue(TEXT("Remote replacement applies a modification"), Replica.PublishFinal(Origin, 1, Overlay, {}, Error));
+	TestEqual(TEXT("Remote materialization does not duplicate replica content invalidation"),
+		Replica.GetChangeHierarchy().GetVoxelProxyRevision(Proxy), RemoteRevision);
+	Replica.InvalidateRemoteSection(Origin);
+	const uint64 RestoredRevision = Replica.GetChangeHierarchy().GetVoxelProxyRevision(Proxy);
 	TestTrue(TEXT("Remote restoration publishes natural data"), Replica.PublishFinal(Origin, 2, {}, {}, Error));
 	TestTrue(TEXT("Restoring modified remote data still invalidates coarse representations"),
-		Replica.GetChangeHierarchy().GetVoxelProxyRevision(Proxy) > RemoteRevision);
+		RestoredRevision > RemoteRevision);
+	TestEqual(TEXT("Restoration materialization preserves the replica event version"),
+		Replica.GetChangeHierarchy().GetVoxelProxyRevision(Proxy), RestoredRevision);
 	TestFalse(TEXT("Remote restoration clears the modification index"), Replica.GetChangeIndex().IsModified(Origin));
 	return true;
 }

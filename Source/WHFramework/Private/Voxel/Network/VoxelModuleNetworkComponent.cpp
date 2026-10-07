@@ -1,4 +1,7 @@
-#include "Voxel/Network/VoxelModuleNetworkComponent.h"
+﻿#include "Voxel/Network/VoxelModuleNetworkComponent.h"
+#include "VoxelModuleNetworkOverlayState.h"
+#include "VoxelServerRepresentationBuild.h"
+#include "VoxelRepresentationSubscriptionState.h"
 #include "Voxel/Rendering/VoxelViewLod.h"
 
 #include "GameFramework/PlayerController.h"
@@ -10,68 +13,26 @@
 #include "Voxel/Serialization/VoxelBinaryCodec.h"
 #include "Voxel/Save/VoxelDeltaCodec.h"
 #include "Voxel/Save/VoxelRegionStore.h"
+#include "Voxel/Network/VoxelOverlayReplica.h"
 #include "Voxel/Streaming/VoxelEmergeManager.h"
 #include "Voxel/Streaming/VoxelInterestManager.h"
+#include "Voxel/Task/VoxelTerrainPriority.h"
 #include "Voxel/VoxelModule.h"
+#include "Async/Async.h"
+#include "Voxel/Task/VoxelBoundedAllocation.h"
 
-namespace
+bool UVoxelModuleNetworkComponent::IsRepresentationInRange(
+	const FVector& InObserverCell, const EVoxelRepresentationWireType InType,
+	const FVoxelGenerationBounds& InBounds, const FVoxelViewSettings& InSettings)
 {
-	constexpr int32 ChangeRegionSide = 8;
-
-	FIntVector ToChangeRegion(const FIntVector& InSection)
-	{
-		return FIntVector(
-			VoxelGeneration::FloorDivide(InSection.X, ChangeRegionSide),
-			VoxelGeneration::FloorDivide(InSection.Y, ChangeRegionSide),
-			VoxelGeneration::FloorDivide(InSection.Z, ChangeRegionSide));
-	}
-
-	uint64 HashChangeMask(const TArray<uint64>& InMask)
-	{
-		uint64 Hash = 1469598103934665603ull;
-		for (const uint64 Word : InMask)
-		{
-			Hash ^= Word;
-			Hash *= 1099511628211ull;
-		}
-		return FMath::Max<uint64>(1, Hash);
-	}
-
-
-
-	uint64 RepresentationRevision(
-		const FVoxelWorldRuntime& InRuntime,
-		const EVoxelRepresentationWireType InType,
-		const FVoxelRepresentationWireKey& InKey)
-	{
-		switch (InType)
-		{
-		case EVoxelRepresentationWireType::VoxelProxy:
-			return InRuntime.GetChangeHierarchy().GetVoxelProxyRevision({ InKey.Coordinate, InKey.Level });
-		case EVoxelRepresentationWireType::SurfaceProxy:
-			return InRuntime.GetChangeHierarchy().GetSurfaceRevision({ FIntPoint(InKey.Coordinate.X, InKey.Coordinate.Y), InKey.Level });
-		case EVoxelRepresentationWireType::MacroTerrain:
-			return InRuntime.GetChangeHierarchy().GetMacroRevision({ FIntPoint(InKey.Coordinate.X, InKey.Coordinate.Y), InKey.Level });
-		default:
-			return 0;
-		}
-	}
-
-	bool IsRepresentationInRange(
-		const FVector& InObserverCell,
-		const EVoxelRepresentationWireType InType,
-		const FVoxelGenerationBounds& InBounds,
-		const FVoxelViewSettings& InSettings)
-	{
-		FVoxelStreamingSource Source;
-		Source.View = InSettings.DefaultSourceView;
-		const FVoxelResolvedViewRanges Ranges = VoxelViewLod::ResolveViewRanges(Source);
-		const double Radius = InType == EVoxelRepresentationWireType::VoxelProxy ? Ranges.Proxy :
-			(InType == EVoxelRepresentationWireType::SurfaceProxy ? Ranges.Surface : Ranges.Macro);
-		const FVector Nearest = FBox(FVector(InBounds.Min), FVector(InBounds.Max)).GetClosestPointTo(InObserverCell);
-		return FVector2D::DistSquared(FVector2D(InObserverCell), FVector2D(Nearest)) <= FMath::Square(Radius) &&
-			(InType != EVoxelRepresentationWireType::VoxelProxy || FMath::Abs(InObserverCell.Z - Nearest.Z) <= Source.View.VoxelProxyVerticalHalfExtentCells);
-	}
+	FVoxelStreamingSource Source;
+	Source.View = InSettings.DefaultSourceView;
+	const FVoxelResolvedViewRanges Ranges = VoxelViewLod::ResolveViewRanges(Source);
+	const double Radius = InType == EVoxelRepresentationWireType::VoxelProxy ? Ranges.Proxy :
+		(InType == EVoxelRepresentationWireType::SurfaceProxy ? Ranges.Surface : Ranges.Macro);
+	const FVector Nearest = FBox(FVector(InBounds.Min), FVector(InBounds.Max)).GetClosestPointTo(InObserverCell);
+	return FVector2D::DistSquared(FVector2D(InObserverCell), FVector2D(Nearest)) <= FMath::Square(Radius) &&
+		(InType != EVoxelRepresentationWireType::VoxelProxy || FMath::Abs(InObserverCell.Z - Nearest.Z) <= Source.View.VoxelProxyVerticalHalfExtentCells);
 }
 
 UVoxelModuleNetworkComponent::UVoxelModuleNetworkComponent()
@@ -79,6 +40,8 @@ UVoxelModuleNetworkComponent::UVoxelModuleNetworkComponent()
 	PrimaryComponentTick.bCanEverTick = true;
 	SetIsReplicatedByDefault(true);
 }
+
+UVoxelModuleNetworkComponent::~UVoxelModuleNetworkComponent() = default;
 
 void UVoxelModuleNetworkComponent::BeginPlay()
 {
@@ -92,6 +55,7 @@ void UVoxelModuleNetworkComponent::EndPlay(const EEndPlayReason::Type InReason)
 	if (UVoxelModule* VoxelModule = Module.Get())
 	{
 		VoxelModule->OnBlocksCommitted.Remove(CommitHandle);
+		VoxelModule->UnregisterTerrainNetwork(this);
 		if (SourceId.IsValid())
 		{
 			VoxelModule->UnregisterSource(SourceId);
@@ -112,11 +76,14 @@ void UVoxelModuleNetworkComponent::TickComponent(
 		BindModule();
 	}
 	UVoxelModule* VoxelModule = Module.Get();
+	if (VoxelModule && !VoxelModule->GetTerrainFrameContext().IsActive()) AdvanceDeferredWorldControl();
 	if (!VoxelModule || bRejected)
 	{
 		return;
 	}
 	const double Now = FPlatformTime::Seconds();
+	// 世界就绪后所有协议、传输和重试工作都由 Module 的同一个 FrameContext 推进。
+	if (VoxelModule->IsReady()) return;
 	Transfer.Tick(Now, [this](const TArray<uint8>& InFragment)
 	{
 		FVoxelRPCPacket Packet;
@@ -154,8 +121,6 @@ void UVoxelModuleNetworkComponent::TickComponent(
 		}
 		LastHello = Now;
 	}
-	ApplyPendingSnapshots();
-	if (bReady && GetOwner() && !GetOwner()->HasAuthority()) RequestMissingSnapshots(Now);
 }
 
 void UVoxelModuleNetworkComponent::GetLifetimeReplicatedProps(
@@ -203,19 +168,19 @@ bool UVoxelModuleNetworkComponent::RequestRepresentation(
 	const uint64 InKnownRevision)
 {
 	const auto* VoxelModule = Module.Get();
-	if (!VoxelModule) return false;
+	if (!VoxelModule || !OverlayNetwork) return false;
 	const FVoxelTerrainSpatialKey SpatialKey{static_cast<EVoxelTerrainRepresentation>(static_cast<uint8>(InType) + 1), InKey.Coordinate, InKey.Level};
 	const auto* Geometry = VoxelModule->GetCurrentInterest().Geometry.Find(SpatialKey);
 	if (!Geometry) return false;
 
 	if (!IsSessionReady() || !GetOwner() || GetOwner()->HasAuthority() ||
-		PendingRepresentationRequests.Num() >= NetworkSettings.MaxRepresentationRequests)
+		PendingRepresentationRequests.Num() >= FMath::Min(NetworkSettings.MaxRepresentationRequests, RepresentationTableCapacity))
 	{
 		return false;
 	}
-	for (const TPair<uint64, FVoxelRepresentationRequest>& Pair : PendingRepresentationRequests)
+	for (const auto& Pair : PendingRepresentationRequests)
 	{
-		if (Pair.Value.Type == InType && Pair.Value.Key == InKey && Pair.Value.Geometry == *Geometry)
+		if (Pair.Value.Request.Type == InType && Pair.Value.Request.Key == InKey && Pair.Value.Request.Geometry == *Geometry)
 		{
 			return true;
 		}
@@ -232,7 +197,11 @@ bool UVoxelModuleNetworkComponent::RequestRepresentation(
 	{
 		return false;
 	}
-	PendingRepresentationRequests.Add(Request.Serial, Request);
+	FPendingRepresentation Pending;
+	Pending.Request = Request; Pending.RequestSession = Session;
+	Pending.WorldEpoch = VoxelModule->GetWorldEpoch(); Pending.OwnerIncarnation = TaskOwnerIncarnation;
+	Pending.LastSentSeconds = FPlatformTime::Seconds();
+	PendingRepresentationRequests.Add(Request.Serial, MoveTemp(Pending));
 	return true;
 }
 
@@ -276,7 +245,7 @@ void UVoxelModuleNetworkComponent::ClientReceive_Implementation(const FVoxelRPCP
 
 void UVoxelModuleNetworkComponent::BindModule()
 {
-	UVoxelModule* VoxelModule = UVoxelModule::Find(GetWorld());
+	UVoxelModule* VoxelModule = UVoxelModule::GetPtr(GetWorld());
 	if (!VoxelModule)
 	{
 		return;
@@ -288,8 +257,10 @@ void UVoxelModuleNetworkComponent::BindModule()
 	if (UVoxelModule* Old = Module.Get())
 	{
 		Old->OnBlocksCommitted.Remove(CommitHandle);
+		Old->UnregisterTerrainNetwork(this);
 	}
 	Module = VoxelModule;
+	VoxelModule->RegisterTerrainNetwork(this);
 	CommitHandle = VoxelModule->OnBlocksCommitted.AddUObject(this, &UVoxelModuleNetworkComponent::OnCommit);
 	if (GetOwner() && GetOwner()->HasAuthority())
 	{
@@ -299,15 +270,12 @@ void UVoxelModuleNetworkComponent::BindModule()
 
 void UVoxelModuleNetworkComponent::ResetProtocol()
 {
+	check(TaskOwnerIncarnation < MAX_uint64);
+	++TaskOwnerIncarnation;
 	Transfer.Reset();
-	PendingSnapshots.Reset();
-	PendingSnapshotReads.Reset();
-	KnownModifiedSections.Reset();
-	SnapshotRequests.Reset();
-	GameplayInterest.Reset();
-	SentChangeSummaryRevisions.Reset();
-	RepresentationSubscriptions.Reset();
-	PendingRepresentationRequests.Reset();
+	OverlayNetwork.Reset();
+	GameplayInterest.Empty();
+	ResetRepresentationRequests();
 	Session.Invalidate();
 	SourceId.Invalidate();
 	ClientNonce = 0;
@@ -318,6 +286,18 @@ void UVoxelModuleNetworkComponent::ResetProtocol()
 	bReady = false;
 	bWelcomed = false;
 	bRejected = false;
+}
+
+void UVoxelModuleNetworkComponent::OnTerrainWorldStopping()
+{
+	ResetProtocol();
+}
+
+bool UVoxelModuleNetworkComponent::AdvanceDeferredWorldControl()
+{
+	auto* WorldModule = Module.Get();
+	if (!WorldModule || WorldModule->GetTerrainFrameContext().IsActive()) return false;
+	return ApplyDecodedEnvelope(true);
 }
 
 void UVoxelModuleNetworkComponent::Fail(const FString& InReason)
@@ -337,12 +317,48 @@ bool UVoxelModuleNetworkComponent::Send(
 	const EVoxelTransferPriority InPriority)
 {
 	TArray<uint8> Message;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Scratch;
+	if (OverlayNetwork)
+	{
+		const uint64 Bytes = VoxelBoundedAllocation::InitialGrowBytes<uint8>(InPayload.Num() + 29);
+		const auto Consumer = FVoxelGenerationConsumerKey::Section(Module->GetWorldEpoch(), TaskOwnerId,
+			TaskOwnerIncarnation, {}, ++NextTaskSerial);
+		if (!OverlayNetwork->Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Staged, Bytes, Lease) ||
+			!OverlayNetwork->Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Working, Bytes, Scratch)) return false;
+	}
 	const FGuid EnvelopeSession = InKind == EVoxelMessage::Hello ? FGuid() : Session;
-	return FVoxelNetworkCodec::Encode(InKind, EnvelopeSession, InPayload, Message) &&
-		Transfer.Enqueue(InPriority, MoveTemp(Message));
+	if (!FVoxelNetworkCodec::Encode(InKind, EnvelopeSession, InPayload, Message)) return false;
+	if (Lease)
+	{
+		if (uint64(Message.GetAllocatedSize()) > Lease->Bytes()) return false;
+		Lease->Resize(Message.GetAllocatedSize());
+	}
+	return Transfer.Enqueue(InPriority, MoveTemp(Message), MoveTemp(Lease));
 }
 
 void UVoxelModuleNetworkComponent::Receive(const FVoxelRPCPacket& InPacket, const bool bInServer)
+{
+	if (!OverlayNetwork || !Module.IsValid() || !Module->IsReady()) { ProcessPacket(InPacket, bInServer); return; }
+	const uint64 Bytes = VoxelBoundedAllocation::ArrayBytes<uint8>(InPacket.Bytes.Num()) + sizeof(FVoxelOverlayQueuedPacket) + sizeof(void*);
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+	if (InPacket.Bytes.Num() > 4608 || OverlayNetwork->PacketBytes + Bytes > 32ull * 1024 * 1024 ||
+		!OverlayNetwork->Resources->Acquire(FVoxelGenerationConsumerKey::Section(Module->GetWorldEpoch(), TaskOwnerId,
+			TaskOwnerIncarnation, {}, ++NextTaskSerial), EVoxelTerrainResourcePool::Input, Bytes, Lease))
+	{
+		Fail(TEXT("Voxel transport receive capacity exceeded"));
+		return;
+	}
+	FVoxelOverlayQueuedPacket Queued;
+	Queued.bServer = bInServer;
+	Queued.ResourceLease = MoveTemp(Lease);
+	Queued.Packet.Bytes.Reserve(InPacket.Bytes.Num());
+	Queued.Packet.Bytes.Append(InPacket.Bytes);
+	OverlayNetwork->PacketBytes += Bytes;
+	OverlayNetwork->Packets.Enqueue(MoveTemp(Queued));
+}
+
+void UVoxelModuleNetworkComponent::ProcessPacket(const FVoxelRPCPacket& InPacket, const bool bInServer)
 {
 	const double Now = FPlatformTime::Seconds();
 	if (Now - PacketWindow >= 1.0)
@@ -356,7 +372,12 @@ void UVoxelModuleNetworkComponent::Receive(const FVoxelRPCPacket& InPacket, cons
 		return;
 	}
 	TArray<uint8> Completed;
-	if (!Transfer.Receive(InPacket.Bytes, Now, Completed))
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> CompletedLease;
+	uint32 Crc = 0;
+	const bool bWorkerDecode = OverlayNetwork && Module.IsValid() && Module->IsReady();
+	const bool bAssembled = bWorkerDecode ? Transfer.Assemble(InPacket.Bytes, Now, Completed, Crc, &CompletedLease) :
+		Transfer.Receive(InPacket.Bytes, Now, Completed, &CompletedLease);
+	if (!bAssembled)
 	{
 		Fail(TEXT("Malformed voxel transfer fragment"));
 		return;
@@ -365,13 +386,32 @@ void UVoxelModuleNetworkComponent::Receive(const FVoxelRPCPacket& InPacket, cons
 	{
 		return;
 	}
+	if (bWorkerDecode)
+	{
+		FString Error;
+		const auto Consumer = FVoxelGenerationConsumerKey::Section(Module->GetWorldEpoch(), TaskOwnerId,
+			TaskOwnerIncarnation, {}, ++NextTaskSerial);
+		auto Work = FVoxelNetworkEnvelopeDecode::Create(OverlayNetwork->Resources.ToSharedRef(), Consumer,
+			MoveTemp(Completed), MoveTemp(CompletedLease), Crc, bInServer, Error);
+		if (!Work) { Fail(Error); return; }
+		const uint64 Quota = Work->GetIngressQuotaBytes();
+		if (Quota + PendingRepresentationBytes + OverlayNetwork->EnvelopeBytes + OverlayNetwork->PacketBytes + OverlayNetwork->InboundBytes > 32ull * 1024 * 1024)
+		{
+			Fail(TEXT("完整 Envelope 超过连接接收配额"));
+			return;
+		}
+		OverlayNetwork->EnvelopeBytes += Quota;
+		OverlayNetwork->Envelopes.Enqueue(MoveTemp(Work));
+		return;
+	}
 	FVoxelWireMessage Message;
 	if (!FVoxelNetworkCodec::Decode(Completed, Message))
 	{
 		Fail(TEXT("Malformed voxel V4 envelope"));
 		return;
 	}
-	if (Message.Kind != EVoxelMessage::Hello && bWelcomed && Message.Session != Session)
+	if (Message.Kind != EVoxelMessage::Hello && Message.Kind != EVoxelMessage::Welcome &&
+		bWelcomed && Message.Session != Session)
 	{
 		Fail(TEXT("Voxel session identity mismatch"));
 		return;
@@ -379,9 +419,160 @@ void UVoxelModuleNetworkComponent::Receive(const FVoxelRPCPacket& InPacket, cons
 	Handle(Message, bInServer);
 }
 
+void UVoxelModuleNetworkComponent::AdvanceEnvelopeDecode(const double InNow)
+{
+	auto* WorldModule = Module.Get();
+	if (!OverlayNetwork || !WorldModule || OverlayNetwork->bEnvelopeDecode) return;
+	if (!OverlayNetwork->EnvelopeHead)
+	{
+		if (!OverlayNetwork->Envelopes.Dequeue(OverlayNetwork->EnvelopeHead)) return;
+		OverlayNetwork->EnvelopeHeadFirstQueuedSeconds = InNow;
+		OverlayNetwork->EnvelopeHeadStamp.WorldEpoch = WorldModule->GetWorldEpoch();
+		OverlayNetwork->EnvelopeHeadStamp.OwnerId = TaskOwnerId;
+		OverlayNetwork->EnvelopeHeadStamp.OwnerIncarnation = TaskOwnerIncarnation;
+		check(NextTaskSerial != MAX_uint64);
+		OverlayNetwork->EnvelopeHeadStamp.Token = ++NextTaskSerial;
+	}
+	const auto Work = OverlayNetwork->EnvelopeHead;
+	FVoxelTaskRequest Task;
+	Task.Kind = EVoxelTaskKind::NetworkRepresentation;
+	Task.Stamp = OverlayNetwork->EnvelopeHeadStamp;
+	Task.WorkClass = EVoxelWorkClass::Visible;
+	Task.ServiceBand = EVoxelTerrainServiceBand::P2;
+	Task.SourceStableKey = TaskOwnerId;
+	Task.FirstRunnableSeconds = OverlayNetwork->EnvelopeHeadFirstQueuedSeconds;
+	Task.InputBytes = Work->GetResourceAccountedBytes();
+	Task.ReservedBytes = 1;
+	Task.bResumable = true;
+	Task.GetBlockReason = [Work] { return Work->GetBlockReason(); };
+	Task.Execute = [Work](const TAtomic<bool>& Cancel) { return Work->Advance(Cancel); };
+	Task.Apply = [Weak = TWeakObjectPtr<UVoxelModuleNetworkComponent>(this), Work](FVoxelTaskResult&& Result)
+	{
+		if (auto* Component = Weak.Get()) Component->StageDecodedEnvelope(Work, MoveTemp(Result));
+	};
+	if (WorldModule->EnqueueNetworkRepresentationTask(MoveTemp(Task)))
+	{
+		OverlayNetwork->bEnvelopeDecode = true;
+		OverlayNetwork->EnvelopeHead.Reset();
+	}
+	// 容量等待保持队首、尝试身份与排队时间，后续消息不能越过它。
+}
+
+bool UVoxelModuleNetworkComponent::StageDecodedEnvelope(
+	const TSharedPtr<FVoxelNetworkEnvelopeDecode, ESPMode::ThreadSafe>& InWork,
+	FVoxelTaskResult&& InResult)
+{
+	check(IsInGameThread());
+	if (!InWork || !OverlayNetwork || !Module.IsValid() || bRejected ||
+		TaskOwnerId != InResult.Stamp.OwnerId || TaskOwnerIncarnation != InResult.Stamp.OwnerIncarnation ||
+		Module->GetWorldEpoch() != InResult.Stamp.WorldEpoch ||
+		!OverlayNetwork->bEnvelopeDecode || !(OverlayNetwork->EnvelopeHeadStamp == InResult.Stamp) ||
+		OverlayNetwork->DecodedEnvelope) return false;
+	// Scheduler Apply 只转移引用，不触发协议回调或世界关闭。
+	OverlayNetwork->DecodedEnvelope = InWork;
+	OverlayNetwork->DecodedEnvelopeResult.Emplace(MoveTemp(InResult));
+	if (!InWork->IsServer() && InWork->GetMessage().Kind == EVoxelMessage::Welcome)
+		Module->QueueTerrainWorldControl(this);
+	return true;
+}
+
+bool UVoxelModuleNetworkComponent::ApplyDecodedEnvelope(const bool bInWorldControl)
+{
+	check(IsInGameThread());
+	auto* WorldModule = Module.Get();
+	if (!WorldModule || !OverlayNetwork || !OverlayNetwork->DecodedEnvelope ||
+		!OverlayNetwork->DecodedEnvelopeResult.IsSet()) return false;
+	const bool bWorldControl = !OverlayNetwork->DecodedEnvelope->IsServer() &&
+		OverlayNetwork->DecodedEnvelope->GetMessage().Kind == EVoxelMessage::Welcome;
+	if (bWorldControl != bInWorldControl || (bWorldControl && WorldModule->GetTerrainFrameContext().IsActive())) return false;
+
+	// Handle 可在帧外关闭并重建世界；移出完成槽后不再引用旧连接状态。
+	auto Work = MoveTemp(OverlayNetwork->DecodedEnvelope);
+	auto Result = MoveTemp(OverlayNetwork->DecodedEnvelopeResult.GetValue());
+	OverlayNetwork->DecodedEnvelopeResult.Reset();
+	OverlayNetwork->bEnvelopeDecode = false;
+	check(OverlayNetwork->EnvelopeBytes >= Work->GetIngressQuotaBytes());
+	OverlayNetwork->EnvelopeBytes -= Work->GetIngressQuotaBytes();
+	if (TaskOwnerId != Result.Stamp.OwnerId || TaskOwnerIncarnation != Result.Stamp.OwnerIncarnation ||
+		WorldModule->GetWorldEpoch() != Result.Stamp.WorldEpoch || bRejected) return true;
+	if (Result.bSuccess && !Result.bCanceled)
+	{
+		const auto& Message = Work->GetMessage();
+		if (bWorldControl)
+		{
+			if (HandleWelcome(Message)) Result.MarkWorkUsed();
+			return true;
+		}
+		if (Message.Kind != EVoxelMessage::Hello && Message.Kind != EVoxelMessage::Welcome &&
+			bWelcomed && Message.Session != Session) Fail(TEXT("Voxel session identity mismatch"));
+		else if (Work->IsOverlay())
+		{
+			if (!bReady) Fail(TEXT("Voxel message arrived before Ready"));
+			else HandleOverlayMessage(Message.Kind, Work->TakeOverlay(), Work->IsServer());
+		}
+		else Handle(Message, Work->IsServer(), Work->IsRepresentationReply() ? &Work->GetRepresentationReply() : nullptr);
+		if (!bRejected && TaskOwnerIncarnation == Result.Stamp.OwnerIncarnation &&
+			Module.Get() == WorldModule && WorldModule->GetWorldEpoch() == Result.Stamp.WorldEpoch) Result.MarkWorkUsed();
+	}
+	else if (!Result.bCanceled) Fail(Result.Error.IsEmpty() ? TEXT("Envelope 验证失败") : Result.Error);
+	return true;
+}
+
+bool UVoxelModuleNetworkComponent::HandleWelcome(const FVoxelWireMessage& InMessage)
+{
+	UVoxelModule* VoxelModule = Module.Get();
+	if (!VoxelModule) return false;
+	FVoxelNetworkWelcome Welcome;
+	FString Error;
+	if (!FVoxelNetworkCodec::DecodeWelcome(InMessage.Payload, Welcome) ||
+		Welcome.EchoNonce != ClientNonce || Welcome.Session != InMessage.Session)
+	{
+		Fail(TEXT("Voxel welcome is invalid"));
+		return false;
+	}
+	FVoxelOverlayHash IncomingManifest;
+	FVoxelOverlayHash CurrentManifest;
+	if (!FVoxelOverlayRegionCodec::ManifestHash(Welcome.Manifest, IncomingManifest)) { Fail(TEXT("Voxel welcome manifest identity invalid")); return false; }
+	const auto* PreviousReplica = VoxelModule->GetOverlayReplica();
+	const bool bWorldChanged = VoxelModule->GetRuntime() &&
+		(!VoxelModule->IsReady() || !FVoxelOverlayRegionCodec::ManifestHash(VoxelModule->GetManifest(), CurrentManifest) || CurrentManifest != IncomingManifest ||
+			Session != Welcome.Session || !PreviousReplica || PreviousReplica->GetAuthorityEpoch() != Welcome.AuthorityWorldEpoch);
+	if (bWorldChanged)
+	{
+		if (!VoxelModule->StopWorld(true, Error)) { Fail(Error); return false; }
+	}
+	Session = Welcome.Session;
+	if (!VoxelModule->IsReady() && !VoxelModule->StartWorld(Welcome.Manifest, true, Error))
+	{
+		Fail(Error.IsEmpty() ? TEXT("Voxel remote world could not start") : Error);
+		return false;
+	}
+	FVoxelOverlayHash ManifestIdentity;
+	if (auto* Replica = VoxelModule->GetOverlayReplica(); Replica &&
+		FVoxelOverlayRegionCodec::ManifestHash(Welcome.Manifest, ManifestIdentity))
+	{
+		Replica->SetAuthority(Welcome.AuthorityWorldEpoch, ManifestIdentity, Welcome.Session);
+	}
+	FVoxelNetworkReady Ready;
+	Ready.RecipeHash = Welcome.Manifest.RecipeHash;
+	Ready.RegistryHash = Welcome.Manifest.RegistryHash;
+	Ready.BaseSampleHash = Welcome.Manifest.BaseSampleHash;
+	TArray<uint8> Payload;
+	if (!FVoxelNetworkCodec::EncodeReady(Ready, Payload) ||
+		!Send(EVoxelMessage::Ready, Payload, EVoxelTransferPriority::Critical))
+	{
+		Fail(TEXT("Voxel ready could not be queued"));
+		return false;
+	}
+	bWelcomed = true;
+	bReady = true;
+	return true;
+}
+
 void UVoxelModuleNetworkComponent::Handle(
 	const FVoxelWireMessage& InMessage,
-	const bool bInServer)
+	const bool bInServer,
+	const FVoxelRepresentationReply* InPreparedReply)
 {
 	UVoxelModule* VoxelModule = Module.Get();
 	if (!VoxelModule)
@@ -403,6 +594,7 @@ void UVoxelModuleNetworkComponent::Handle(
 		Session = VoxelModule->GetSessionId();
 		FVoxelNetworkWelcome Welcome;
 		Welcome.EchoNonce = Hello.Nonce;
+		Welcome.AuthorityWorldEpoch = VoxelModule->GetWorldEpoch();
 		Welcome.Session = Session;
 		Welcome.Manifest = VoxelModule->GetManifest();
 		TArray<uint8> Payload;
@@ -417,33 +609,7 @@ void UVoxelModuleNetworkComponent::Handle(
 	}
 	if (!bInServer && InMessage.Kind == EVoxelMessage::Welcome)
 	{
-		FVoxelNetworkWelcome Welcome;
-		FString Error;
-		if (!FVoxelNetworkCodec::DecodeWelcome(InMessage.Payload, Welcome) ||
-			Welcome.EchoNonce != ClientNonce)
-		{
-			Fail(TEXT("Voxel welcome is invalid"));
-			return;
-		}
-		Session = Welcome.Session;
-		if (!VoxelModule->IsReady() && !VoxelModule->StartWorld(Welcome.Manifest, true, Error))
-		{
-			Fail(Error.IsEmpty() ? TEXT("Voxel remote world could not start") : Error);
-			return;
-		}
-		FVoxelNetworkReady Ready;
-		Ready.RecipeHash = Welcome.Manifest.RecipeHash;
-		Ready.RegistryHash = Welcome.Manifest.RegistryHash;
-		Ready.BaseSampleHash = Welcome.Manifest.BaseSampleHash;
-		TArray<uint8> Payload;
-		if (!FVoxelNetworkCodec::EncodeReady(Ready, Payload) ||
-			!Send(EVoxelMessage::Ready, Payload, EVoxelTransferPriority::Critical))
-		{
-			Fail(TEXT("Voxel ready could not be queued"));
-			return;
-		}
-		bWelcomed = true;
-		bReady = true;
+		HandleWelcome(InMessage);
 		return;
 	}
 	if (bInServer && InMessage.Kind == EVoxelMessage::Ready)
@@ -466,91 +632,9 @@ void UVoxelModuleNetworkComponent::Handle(
 		Fail(TEXT("Voxel message arrived before Ready"));
 		return;
 	}
-	if (!bInServer && InMessage.Kind == EVoxelMessage::ChangeSummary)
+	if (InMessage.Kind >= EVoxelMessage::SubscribeRegion && InMessage.Kind <= EVoxelMessage::ResyncRequest)
 	{
-		FVoxelRegionChangeSummary Summary;
-		FString Error;
-		if (!FVoxelNetworkCodec::DecodeChangeSummary(InMessage.Payload, Summary, Error))
-		{
-			Fail(Error.IsEmpty() ? TEXT("Invalid voxel change summary") : Error);
-			return;
-		}
-		VoxelModule->GetRuntime()->GetChangeIndex().SetRegionMask(Summary.Region, Summary.ModifiedMask);
-		for (int32 Bit = 0; Bit < ChangeRegionSide * ChangeRegionSide * ChangeRegionSide; ++Bit)
-		{
-			const bool bModified = (Summary.ModifiedMask[Bit >> 6] & (1ull << (Bit & 63))) != 0;
-			const FIntVector Local(
-				Bit % ChangeRegionSide,
-				(Bit / ChangeRegionSide) % ChangeRegionSide,
-				Bit / (ChangeRegionSide * ChangeRegionSide));
-			VoxelModule->SetRemoteChangeState(
-				Summary.Region * ChangeRegionSide + Local,
-				bModified ? EVoxelSectionChangeState::Modified : EVoxelSectionChangeState::Natural);
-			const FIntVector Key = Summary.Region * ChangeRegionSide + Local;
-			if (bModified) KnownModifiedSections.Add(Key);
-			else KnownModifiedSections.Remove(Key);
-		}
-		return;
-	}
-
-	if (!bInServer && InMessage.Kind == EVoxelMessage::SectionState)
-	{
-		FVoxelSectionState State;
-		if (!FVoxelNetworkCodec::DecodeSectionState(InMessage.Payload, State))
-		{
-			Fail(TEXT("Invalid voxel section state"));
-			return;
-		}
-		VoxelModule->SetRemoteChangeState(
-			State.Section,
-			State.State == EVoxelSectionWireState::Natural ?
-				EVoxelSectionChangeState::Natural : EVoxelSectionChangeState::Modified);
-		if (State.State == EVoxelSectionWireState::Modified) KnownModifiedSections.Add(State.Section);
-		else KnownModifiedSections.Remove(State.Section);
-		return;
-	}
-	if (!bInServer && InMessage.Kind == EVoxelMessage::SectionSnapshot)
-	{
-		FVoxelNetworkSectionSnapshot Snapshot;
-		FString Error;
-		if (!FVoxelNetworkCodec::DecodeSectionSnapshot(InMessage.Payload, Snapshot, Error))
-		{
-			Fail(Error.IsEmpty() ? TEXT("Invalid voxel section snapshot") : Error);
-			return;
-		}
-		const FIntVector Section = Snapshot.Section;
-		PendingSnapshots.Add(Section, MoveTemp(Snapshot));
-		SnapshotRequests.Remove(Section);
-		return;
-	}
-	if (!bInServer && InMessage.Kind == EVoxelMessage::SectionPatch)
-	{
-		FVoxelNetworkPatchBatch WireBatch;
-		FString Error;
-		if (!FVoxelNetworkCodec::DecodePatchBatch(InMessage.Payload, WireBatch, Error))
-		{
-			Fail(Error.IsEmpty() ? TEXT("Invalid voxel patch batch") : Error);
-			return;
-		}
-		FVoxelEditBatch Batch;
-		Batch.TransactionId = WireBatch.TransactionId;
-		Batch.Sections = MoveTemp(WireBatch.Sections);
-		if (!VoxelModule->GetRuntime()->ApplyRemotePatchBatch(Batch, Error))
-		{
-			TArray<uint8> Payload;
-			FVoxelByteWriter Writer(256);
-			Writer.U16(Batch.Sections.Num());
-			for (const FVoxelSectionPatch& Patch : Batch.Sections)
-			{
-				FVoxelNetworkCodec::WriteVector(Writer, Patch.Section);
-			}
-			if (Writer.Finish(Payload))
-			{
-				Send(EVoxelMessage::Resync, Payload, EVoxelTransferPriority::Critical);
-			}
-			return;
-		}
-		VoxelModule->PublishProjectEdit(Batch);
+		DecodeOverlayMessage(InMessage, bInServer);
 		return;
 	}
 	if (bInServer && InMessage.Kind == EVoxelMessage::Edit)
@@ -589,51 +673,34 @@ void UVoxelModuleNetworkComponent::Handle(
 		}
 		return;
 	}
-	if (bInServer && InMessage.Kind == EVoxelMessage::Resync)
-	{
-		FVoxelByteReader Reader(InMessage.Payload);
-		const uint16 Count = Reader.U16();
-		if (Count > 32)
-		{
-			Fail(TEXT("Voxel resync section count exceeded"));
-			return;
-		}
-		for (uint16 Index = 0; Index < Count; ++Index)
-		{
-			SendSectionSnapshot(FVoxelNetworkCodec::ReadVector(Reader));
-		}
-		if (!Reader.End())
-		{
-			Fail(TEXT("Malformed voxel resync request"));
-		}
-		return;
-	}
 	if (!bInServer && InMessage.Kind == EVoxelMessage::RepresentationReply)
 	{
 		FVoxelRepresentationReply Reply;
 		FString Error;
-		if (!FVoxelNetworkCodec::DecodeRepresentationReply(InMessage.Payload, Reply, Error))
+		if (InPreparedReply) Reply = *InPreparedReply;
+		else if (!FVoxelNetworkCodec::DecodeRepresentationReply(InMessage.Payload, Reply, Error))
 		{
 			Fail(Error.IsEmpty() ? TEXT("Invalid voxel representation reply") : Error);
 			return;
 		}
-		const FVoxelRepresentationRequest* Request = PendingRepresentationRequests.Find(Reply.Serial);
-		if (!Request || Request->Type != Reply.Type || !(Request->Key == Reply.Key))
+		auto* Pending = PendingRepresentationRequests.Find(Reply.Serial);
+		if (!Pending && Reply.Serial > 0 && Reply.Serial < NextOutboundId) return; // 已退休请求的重复/晚到回复。
+		if (!Pending || Pending->Request.Type != Reply.Type || !(Pending->Request.Key == Reply.Key))
 		{
 			Fail(TEXT("Voxel representation reply does not match an active request"));
 			return;
 		}
-		const FVoxelTerrainSpatialKey Spatial{static_cast<EVoxelTerrainRepresentation>(static_cast<uint8>(Request->Type)), Request->Key.Coordinate, Request->Key.Level};
-		const auto* CurrentGeometry = VoxelModule->GetCurrentInterest().Geometry.Find(Spatial);
-		if (!CurrentGeometry || *CurrentGeometry != Request->Geometry)
-		{ PendingRepresentationRequests.Remove(Reply.Serial); return; }
-		PendingRepresentationRequests.Remove(Reply.Serial);
-		if (!VoxelModule->ApplyRemoteRepresentation(Reply, Error))
-		{
-			Fail(Error.IsEmpty() ? TEXT("Voxel representation reply could not be applied") : Error);
-			return;
-		}
-		OnRepresentationReply.Broadcast(Reply);
+		if (Pending->bHasReply) return; // 已验证的原回复仍在接纳等待，重复正文不能覆盖它。
+		if (Reply.SharedData && (!Reply.SharedData->Lease || Reply.SharedData->Lease->Bytes() <
+			VoxelBoundedAllocation::WorkerSharedBytes<FVoxelRepresentationReplyData>() + Reply.SharedData->Bytes.GetAllocatedSize()))
+		{ Fail(TEXT("Voxel prepared representation has no valid body reservation")); return; }
+		const uint64 Bytes = Reply.SharedData ? Reply.SharedData->Lease->Bytes() : Reply.Data.GetAllocatedSize();
+		if (Bytes + PendingRepresentationBytes > 32ull * 1024 * 1024)
+		{ Fail(TEXT("Voxel prepared representation capacity exceeded")); return; }
+		PendingRepresentationBytes += Bytes;
+		const uint64 Serial = Reply.Serial;
+		Pending->Reply = MoveTemp(Reply); Pending->bHasReply = true;
+		TryApplyRepresentationReply(Serial);
 		return;
 	}
 	if (!bInServer && InMessage.Kind == EVoxelMessage::RepresentationInvalidate)
@@ -655,6 +722,16 @@ void UVoxelModuleNetworkComponent::Handle(
 		if (!FVoxelNetworkCodec::DecodeRepresentationRequest(InMessage.Payload, Request))
 		{
 			Fail(TEXT("Invalid voxel representation request"));
+			return;
+		}
+		if (!OverlayNetwork || !ReserveRepresentationTables())
+		{
+			FVoxelRepresentationReply Retry;
+			Retry.Type = Request.Type; Retry.Key = Request.Key; Retry.Serial = Request.Serial;
+			Retry.Kind = EVoxelRepresentationReplyKind::Retry;
+			TArray<uint8> Payload; FString Error;
+			if (FVoxelNetworkCodec::EncodeRepresentationReply(Retry, Payload, Error))
+				Send(EVoxelMessage::RepresentationReply, Payload, EVoxelTransferPriority::Bulk);
 			return;
 		}
 		AActor* Observer = GetAuthorizedObserver();
@@ -684,31 +761,36 @@ void UVoxelModuleNetworkComponent::Handle(
 			Request.Type == EVoxelRepresentationWireType::SurfaceProxy ? Lod.MaximumSurfaceSpatialLevel : Lod.MaximumMacroSpatialLevel;
 		const uint64 Samples = Request.Geometry.Key.SideCells() / Request.Geometry.SampleStepCells;
 		const uint64 Cells = Request.Geometry.Key.IsColumn() ? (Samples + 1) * (Samples + 1) : Samples * Samples * Samples;
-		TArray<FVoxelTerrainBuildShard> Shards;
+		const uint64 ShardSide = Request.Geometry.Key.IsColumn() ? 64 : 16;
+		const uint64 AxisShards = (Samples + ShardSide - 1) / ShardSide;
+		const uint64 ShardCount = Request.Geometry.Key.IsColumn() ? AxisShards * AxisShards : AxisShards * AxisShards * AxisShards;
 		if (Request.Key.Level > MaximumLevel || Cells > 1024ull * 1024ull ||
 			(!Request.Geometry.Key.IsColumn() && Samples > 128) ||
-			!VoxelStreamingGeometry::BuildShards(Request.Geometry, Request.Geometry.Key.IsColumn() ? 64 : 16, 4096, Shards, GeometryError))
+			ShardCount > 4096)
 		{ Fail(TEXT("Voxel representation request exceeds authorized geometry or byte limits")); return; }
-		Runtime->GetChangeHierarchy().RegisterGeometry(Request.Geometry);
-		const uint8 TypeBit = 1u << (static_cast<uint8>(Request.Type) - 1);
-		if (!RepresentationSubscriptions.Contains(Request.Key) &&
-			RepresentationSubscriptions.Num() >= NetworkSettings.MaxRepresentationRequests)
+		FVoxelCoverageRecord Subscription;
+		Subscription.Geometry = Request.Geometry;
+		Subscription.Min = GeometryMin;
+		Subscription.Max = GeometryMax;
+		if (!RepresentationSubscriptions || !RepresentationSubscriptions->Index.Upsert(Subscription, GeometryError))
 		{
-			Fail(TEXT("Voxel representation subscription limit exceeded"));
+			FVoxelRepresentationReply Retry;
+			Retry.Type = Request.Type; Retry.Key = Request.Key; Retry.Serial = Request.Serial;
+			Retry.Kind = EVoxelRepresentationReplyKind::Retry;
+			TArray<uint8> Payload;
+			if (FVoxelNetworkCodec::EncodeRepresentationReply(Retry, Payload, GeometryError))
+				Send(EVoxelMessage::RepresentationReply, Payload, EVoxelTransferPriority::Bulk);
 			return;
 		}
-		RepresentationSubscriptions.FindOrAdd(Request.Key) |= TypeBit;
-
-		TArray<FIntVector> ModifiedSections;
-		Runtime->GetChangeIndex().Enumerate(Bounds, ModifiedSections);
-		const uint64 CurrentRevision = RepresentationRevision(*Runtime, Request.Type, Request.Key);
+		RepresentationSubscriptions->MaximumHaloStep = FMath::Max(RepresentationSubscriptions->MaximumHaloStep, Request.Geometry.SampleStepCells);
+		const uint64 CurrentRevision = Runtime->GetChangeHierarchy().CaptureVersionSnapshot().GetGeometryRevision(Request.Geometry);
 		FVoxelRepresentationReply Reply;
 		Reply.Type = Request.Type;
 		Reply.Key = Request.Key;
 		Reply.Serial = Request.Serial;
 		Reply.Revision = CurrentRevision;
 		FString Error;
-		if (ModifiedSections.IsEmpty())
+		if (CurrentRevision == 0)
 		{
 			Reply.Kind = EVoxelRepresentationReplyKind::Unchanged;
 			TArray<uint8> Payload;
@@ -719,12 +801,19 @@ void UVoxelModuleNetworkComponent::Handle(
 			return;
 		}
 
+		FVoxelTaskRequest Task;
+		Task.bResumable = true; Task.Kind = EVoxelTaskKind::NetworkRepresentation; Task.WorkClass = EVoxelWorkClass::Exploration;
+		Task.Stamp.WorldEpoch = VoxelModule->GetWorldEpoch(); Task.Stamp.OwnerId = TaskOwnerId; Task.Stamp.OwnerIncarnation = TaskOwnerIncarnation;
+		check(NextTaskSerial < MAX_uint64); Task.Stamp.Token = ++NextTaskSerial;
+		const FVoxelGenerationConsumerKey Consumer{Request.Geometry.Key.IsColumn() ? EVoxelGenerationConsumerKind::Heightfield : EVoxelGenerationConsumerKind::VoxelProxy,
+			Task.Stamp.WorldEpoch, Task.Stamp.OwnerId, Task.Stamp.OwnerIncarnation, EVoxelGenerationSpatialKind::Bounds,
+			GeometryMin, GeometryMax, Task.Stamp.Token};
 		FVoxelRepresentationBuildInput BuildInput;
 		if (!FVoxelRepresentationSync::PrepareServerBuild(
 			*VoxelModule,
 			Request,
 			BuildInput,
-			Error))
+			Error, &Consumer))
 		{
 			Reply.Kind = EVoxelRepresentationReplyKind::Retry;
 			TArray<uint8> Payload;
@@ -735,17 +824,38 @@ void UVoxelModuleNetworkComponent::Handle(
 			return;
 		}
 
-		const auto PageBuild = MakeShared<FVoxelRepresentationPageBuild, ESPMode::ThreadSafe>();
-		if (!PageBuild->Initialize(MoveTemp(BuildInput), Error))
-		{ Fail(Error); return; }
-		FVoxelTaskRequest Task;
-		Task.bResumable = true;
-		Task.Kind = EVoxelTaskKind::NetworkRepresentation;
-		Task.WorkClass = EVoxelWorkClass::Exploration;
-		Task.Stamp.WorldEpoch = VoxelModule->GetWorldEpoch();
-		Task.Stamp.Token = Request.Serial ^ static_cast<uint64>(reinterpret_cast<UPTRINT>(this));
+		const auto Resources = VoxelModule->GetTerrainResources();
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MetadataLease;
+		const uint64 MetadataBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelServerRepresentationBuild>() +
+			2 * VoxelBoundedAllocation::ArrayBytes<FVoxelTerrainBuildShard>(4096);
+		if (!Resources || !Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input, MetadataBytes, MetadataLease))
+		{
+			Reply.Kind = EVoxelRepresentationReplyKind::Retry; TArray<uint8> Payload;
+			if (FVoxelNetworkCodec::EncodeRepresentationReply(Reply, Payload, Error)) Send(EVoxelMessage::RepresentationReply, Payload, EVoxelTransferPriority::Bulk);
+			return;
+		}
+		const auto PageBuild = VoxelBoundedAllocation::MakeWorkerShared<FVoxelServerRepresentationBuild>(MetadataLease, Resources.ToSharedRef(), Consumer);
+		PageBuild->MetadataLease = MoveTemp(MetadataLease);
+		if (!PageBuild->Initialize(MoveTemp(BuildInput), Reply, Session, Error)) { Fail(Error); return; }
+		FVoxelStreamingSource ServiceSource;
+		ServiceSource.Id = TaskOwnerId;
+		ServiceSource.Center = FIntVector(FMath::FloorToInt(ObserverCell.X), FMath::FloorToInt(ObserverCell.Y), FMath::FloorToInt(ObserverCell.Z));
+		ServiceSource.Direction = Observer->GetActorForwardVector();
+		FVoxelTerrainServicePriority ServicePriority;
+		if (!FVoxelTerrainPriority::Resolve(Request.Geometry, {}, MakeArrayView(&ServiceSource, 1),
+			VoxelModule->GetViewSettings().Fine.InteractiveRadiusCells, ServicePriority, Error))
+		{
+			Fail(Error);
+			return;
+		}
+		Task.SourcePriority = ServicePriority.SourcePriority;
+		Task.DistanceScore = ServicePriority.DistanceCells;
+		Task.ForwardScore = ServicePriority.ForwardScore;
+		Task.SourceStableKey = ServicePriority.SourceStableKey;
+		Task.ServiceBand = ServicePriority.Band;
 		Task.Stamp.Revision = CurrentRevision;
-		Task.Stamp.GeometryRevision = GetTypeHash(Request.Geometry);
+		Task.Stamp.bHasGeometryIdentity = true;
+		Task.Stamp.GeometryIdentity = Request.Geometry;
 		if (Request.Type == EVoxelRepresentationWireType::VoxelProxy)
 		{
 			Task.Stamp.ViewKey = { Request.Key.Coordinate, Request.Key.Level };
@@ -762,29 +872,37 @@ void UVoxelModuleNetworkComponent::Handle(
 				FIntPoint(Request.Key.Coordinate.X, Request.Key.Coordinate.Y),
 				Request.Key.Level };
 		}
-		Task.ReservedBytes = 32ull * 1024ull * 1024ull;
-		Task.InputBytes = PageBuild->InputBytes();
-		Task.Execute = [PageBuild](const TAtomic<bool>& InCancel)
-		{
-			FVoxelTaskResult Result;
-			bool bComplete = false;
-			Result.bSuccess = PageBuild->Advance(Result.Payload, bComplete, Result.Error, &InCancel);
-			Result.bContinue = Result.bSuccess && !bComplete;
-			return Result;
-		};
+		Task.ReservedBytes = 1;
+		Task.InputBytes = PageBuild->MetadataLease->Bytes();
+		Task.GetBlockReason = [PageBuild] { return PageBuild->BlockReason(); };
+		Task.Execute = [PageBuild](const TAtomic<bool>& InCancel) { return PageBuild->Advance(InCancel); };
 		const TWeakObjectPtr<UVoxelModuleNetworkComponent> WeakThis(this);
 		const FGuid RequestSession = Session;
-		Task.Apply = [WeakThis, RequestSession, Reply](FVoxelTaskResult&& InResult) mutable
+		Task.Apply = [WeakThis, RequestSession, Reply, PageBuild](FVoxelTaskResult&& InResult) mutable
 		{
 			UVoxelModuleNetworkComponent* Component = WeakThis.Get();
-			if (!Component || Component->Session != RequestSession || !Component->bReady)
+			if (!Component || Component->Session != RequestSession || !Component->bReady ||
+				Component->TaskOwnerId != InResult.Stamp.OwnerId || Component->TaskOwnerIncarnation != InResult.Stamp.OwnerIncarnation)
 			{
 				return;
 			}
-			Reply.Kind = InResult.bSuccess && !InResult.bCanceled ?
-				EVoxelRepresentationReplyKind::Data :
-				InResult.bCanceled ? EVoxelRepresentationReplyKind::Retry : EVoxelRepresentationReplyKind::Rejected;
-			Reply.Data = InResult.bSuccess ? MoveTemp(InResult.Payload) : TArray<uint8>();
+			const UVoxelModule* CurrentModule = Component->Module.Get();
+			const bool bCurrent = CurrentModule && CurrentModule->GetRuntime() && CurrentModule->GetWorldEpoch() == InResult.Stamp.WorldEpoch &&
+				CurrentModule->IsOverlayReadCurrent(PageBuild->Page.GetOverlayReadResult()) &&
+				CurrentModule->GetRuntime()->GetChangeHierarchy().CaptureVersionSnapshot().GetGeometryRevision(InResult.Stamp.GeometryIdentity) == Reply.Revision;
+			if (InResult.bSuccess && !InResult.bCanceled && bCurrent && InResult.CustomPayload)
+			{
+				const auto Prepared = StaticCastSharedPtr<const FVoxelServerRepresentationResult>(InResult.CustomPayload);
+				// 当前 Apply 唯一接管正文，不复制大数组、不重复计算 CRC。
+				auto Mutable = ConstCastSharedPtr<FVoxelServerRepresentationResult>(Prepared);
+				if (Component->Transfer.EnqueuePrepared(EVoxelTransferPriority::Bulk, MoveTemp(Mutable->Envelope), Mutable->Crc, Mutable->Lease))
+					InResult.MarkWorkUsed();
+				return;
+			}
+			Reply.Kind = InResult.bCanceled ? EVoxelRepresentationReplyKind::Retry :
+				!InResult.bSuccess ? EVoxelRepresentationReplyKind::Rejected :
+				EVoxelRepresentationReplyKind::Retry;
+			Reply.Data.Reset();
 			TArray<uint8> Payload;
 			FString ReplyError;
 			if (FVoxelNetworkCodec::EncodeRepresentationReply(Reply, Payload, ReplyError))
@@ -811,389 +929,28 @@ void UVoxelModuleNetworkComponent::Handle(
 
 void UVoxelModuleNetworkComponent::RefreshInterest(const double InNow)
 {
-	UVoxelModule* VoxelModule = Module.Get();
-	AActor* Observer = GetAuthorizedObserver();
-	if (!VoxelModule || !Observer || !VoxelModule->IsReady())
-	{
-		return;
-	}
+	auto* VoxelModule = Module.Get();
+	auto* Observer = GetAuthorizedObserver();
+	if (!VoxelModule || !Observer || !VoxelModule->IsReady()) return;
 	FVoxelStreamingSource Source;
 	const FVector Position = Observer->GetActorLocation() / VoxelModule->BlockSize();
-	Source.Center = FIntVector(
-		FMath::FloorToInt(Position.X),
-		FMath::FloorToInt(Position.Y),
-		FMath::FloorToInt(Position.Z));
+	Source.Center = FIntVector(FMath::FloorToInt(Position.X), FMath::FloorToInt(Position.Y), FMath::FloorToInt(Position.Z));
 	Source.Direction = Observer->GetActorForwardVector();
-	Source.Capabilities = EVoxelStreamingCapability::Data |
-		EVoxelStreamingCapability::Collision |
-		EVoxelStreamingCapability::Simulation;
+	Source.VelocityCellsPerSecond = Observer->GetVelocity() / VoxelModule->BlockSize();
+	Source.Capabilities = EVoxelStreamingCapability::Data | EVoxelStreamingCapability::Collision | EVoxelStreamingCapability::Simulation;
 	Source.Normalize();
-	Source.ExactRadius = 16;
-	Source.CollisionRadius = 8;
-	Source.SimulationRadius = 6;
-	if (SourceId.IsValid())
-	{
-		VoxelModule->UpdateSource(SourceId, Source);
-	}
-	else
-	{
-		SourceId = VoxelModule->RegisterSource(this, Source);
-	}
-
-	const FVoxelInterestManager InterestManager;
-	TArray<FVoxelStreamingSource> AuthorizedSources;
-	AuthorizedSources.Add(Source);
-	VoxelModule->CollectStreamingSourcesForOwner(Controller(), AuthorizedSources);
-	const FVoxelInterestSet ClientInterest = InterestManager.Compute(
-		AuthorizedSources,
-		VoxelModule->GetManifest(),
-		VoxelModule->GetViewSettings());
-	TSet<FIntVector> Next;
-	TSet<FIntVector> SummaryRegions;
-	// Fine 修改状态只订阅区域摘要，不把客户端的视觉范围变为服务器驻留或视觉需求。
-	for (const FVoxelStreamingSource& Authorized : AuthorizedSources)
-	{
-		const FVoxelStreamingSourceView& View = Authorized.bInheritWorldView ?
-			VoxelModule->GetViewSettings().DefaultSourceView : Authorized.View;
-		const int32 Prediction = FMath::CeilToInt(Observer->GetVelocity().Size2D() / VoxelModule->BlockSize() * View.FinePredictionSeconds);
-		const int32 Radius = View.FineRadiusCells + VoxelViewLod::ResolveReplanSteps(Authorized, VoxelModule->GetViewSettings()).Fine + Prediction + 32;
-		const int32 Vertical = View.FineVerticalHalfExtentCells + VoxelViewLod::ResolveReplanSteps(Authorized, VoxelModule->GetViewSettings()).Fine + 32;
-		const FIntVector MinCell(Authorized.Center.X - Radius, Authorized.Center.Y - Radius,
-			FMath::Max(VoxelModule->GetManifest().Settings.MinZ, Authorized.Center.Z - Vertical));
-		const FIntVector MaxCell(Authorized.Center.X + Radius, Authorized.Center.Y + Radius,
-			FMath::Min(VoxelModule->GetManifest().Settings.MaxZ - 1, Authorized.Center.Z + Vertical));
-		const int32 Side = ChangeRegionSide * 16;
-		const FIntVector Min(VoxelGeneration::FloorDivide(MinCell.X, Side), VoxelGeneration::FloorDivide(MinCell.Y, Side), VoxelGeneration::FloorDivide(MinCell.Z, Side));
-		const FIntVector Max(VoxelGeneration::FloorDivide(MaxCell.X, Side), VoxelGeneration::FloorDivide(MaxCell.Y, Side), VoxelGeneration::FloorDivide(MaxCell.Z, Side));
-		for (int32 Z = Min.Z; Z <= Max.Z; ++Z)
-		for (int32 Y = Min.Y; Y <= Max.Y; ++Y)
-		for (int32 X = Min.X; X <= Max.X; ++X) SummaryRegions.Add(FIntVector(X, Y, Z));
-	}
-	for (const TPair<FIntVector, FVoxelExactDemand>& Pair : ClientInterest.Exact)
-	{
-		if (Pair.Value.bData)
-		{
-			Next.Add(Pair.Key);
-			SummaryRegions.Add(ToChangeRegion(Pair.Key));
-			if (!GameplayInterest.Contains(Pair.Key))
-			{
-				SendSectionState(Pair.Key);
-			}
-		}
-	}
-	for (const FIntVector& Region : SummaryRegions)
-	{
-		FVoxelRegionChangeSummary Summary;
-		Summary.Region = Region;
-		VoxelModule->GetRuntime()->GetChangeIndex().GetRegionMask(Region, Summary.ModifiedMask);
-		Summary.Revision = HashChangeMask(Summary.ModifiedMask);
-		const uint64* SentRevision = SentChangeSummaryRevisions.Find(Region);
-		if (SentRevision && *SentRevision == Summary.Revision)
-		{
-			continue;
-		}
-		TArray<uint8> Payload;
-		FString Error;
-		if (FVoxelNetworkCodec::EncodeChangeSummary(Summary, Payload, Error) &&
-			Send(EVoxelMessage::ChangeSummary, Payload, EVoxelTransferPriority::Normal))
-		{
-			SentChangeSummaryRevisions.Add(Region, Summary.Revision);
-		}
-	}
-	for (auto Iterator = SentChangeSummaryRevisions.CreateIterator(); Iterator; ++Iterator)
-	{
-		if (!SummaryRegions.Contains(Iterator.Key()))
-		{
-			Iterator.RemoveCurrent();
-		}
-	}
-	GameplayInterest = MoveTemp(Next);
+	if (SourceId.IsValid()) VoxelModule->UpdateSource(SourceId, Source);
+	else SourceId = VoxelModule->RegisterSource(this, Source);
 	LastInterest = InNow;
 }
-
-void UVoxelModuleNetworkComponent::SendSectionState(const FIntVector& InSection)
-{
-	UVoxelModule* VoxelModule = Module.Get();
-	if (!VoxelModule)
-	{
-		return;
-	}
-	FVoxelSectionState State;
-	State.Section = InSection;
-	const FVoxelSection* Section = VoxelModule->GetRuntime()->FindSection(InSection);
-	if (Section && Section->Status == EVoxelSectionStatus::DataReady)
-	{
-		State.Revision = Section->CommittedRevision;
-		State.State = Section->Overlay.IsEmpty() && Section->Entities.IsEmpty() ?
-			EVoxelSectionWireState::Natural : EVoxelSectionWireState::Modified;
-	}
-	else
-	{
-		State.State = VoxelModule->GetRuntime()->GetChangeIndex().IsModified(InSection) ?
-			EVoxelSectionWireState::Modified : EVoxelSectionWireState::Natural;
-	}
-	TArray<uint8> Payload;
-	if (FVoxelNetworkCodec::EncodeSectionState(State, Payload))
-	{
-		Send(EVoxelMessage::SectionState, Payload, EVoxelTransferPriority::Normal);
-	}
-	if (State.State == EVoxelSectionWireState::Modified)
-	{
-		SendSectionSnapshot(InSection);
-	}
-}
-
-void UVoxelModuleNetworkComponent::SendSectionSnapshot(const FIntVector& InSection)
-{
-	UVoxelModule* VoxelModule = Module.Get();
-	const FVoxelSection* Section = VoxelModule && VoxelModule->GetRuntime() ?
-		VoxelModule->GetRuntime()->FindSection(InSection) : nullptr;
-	if (!Section || Section->Status != EVoxelSectionStatus::DataReady)
-	{
-		if (!VoxelModule || !VoxelModule->GetRuntime() || PendingSnapshotReads.Contains(InSection)) return;
-		const auto Read = VoxelModule->GetRegionStore().CaptureRead(InSection);
-		const auto Manifest = VoxelModule->GetManifest();
-		const auto Registry = VoxelModule->GetRegistry();
-		if (!Registry) return;
-		FVoxelTaskRequest Task;
-		Task.Kind = EVoxelTaskKind::NetworkRepresentation;
-		Task.WorkClass = EVoxelWorkClass::Critical;
-		Task.Stamp.WorldEpoch = VoxelModule->GetWorldEpoch();
-		Task.Stamp.Section = InSection;
-		Task.Stamp.Token = static_cast<uint64>(reinterpret_cast<UPTRINT>(this));
-		Task.Stamp.Revision = 0x534e415053484f54ull;
-		Task.ReservedBytes = 4ull * 1024ull * 1024ull;
-		Task.Execute = [Read, Manifest, Registry](const TAtomic<bool>& Cancel)
-		{
-			FVoxelTaskResult Result;
-			TArray<uint8> Bytes;
-			if (Cancel.Load()) { Result.bCanceled = true; return Result; }
-			if (FVoxelRegionStore::Read(Read, Bytes, Result.Error) != EVoxelRegionRead::Loaded) return Result;
-			FVoxelPersistentSection Saved;
-			if (!FVoxelDeltaCodec::Decode(Bytes, Manifest, *Registry, Saved))
-			{
-				Result.Error = TEXT("Voxel snapshot delta could not be decoded");
-				return Result;
-			}
-			FVoxelNetworkSectionSnapshot Snapshot;
-			Snapshot.Section = Saved.Section;
-			Snapshot.Revision = Saved.Revision;
-			for (const auto& Pair : Saved.Blocks) { FVoxelSectionCellEdit Edit; Edit.CellIndex = Pair.Key; Edit.State = Pair.Value; Snapshot.Blocks.Add(Edit); }
-			for (const auto& Pair : Saved.Entities) { FVoxelEntityWrite Write; Write.CellIndex = Pair.Key; Write.Value = Pair.Value; Snapshot.Entities.Add(MoveTemp(Write)); }
-			Result.bSuccess = FVoxelNetworkCodec::EncodeSectionSnapshot(Snapshot, Result.Payload, Result.Error);
-			return Result;
-		};
-		Task.Apply = [Weak = TWeakObjectPtr<UVoxelModuleNetworkComponent>(this), CapturedSession = Session, InSection](FVoxelTaskResult&& Result)
-		{
-			auto* Component = Weak.Get();
-			if (!Component || Component->Session != CapturedSession) return;
-			Component->PendingSnapshotReads.Remove(InSection);
-			if (Result.bSuccess && !Result.bCanceled) Component->Send(EVoxelMessage::SectionSnapshot, Result.Payload, EVoxelTransferPriority::Normal);
-		};
-		if (VoxelModule->EnqueueNetworkRepresentationTask(MoveTemp(Task))) PendingSnapshotReads.Add(InSection);
-		return;
-	}
-	FVoxelNetworkSectionSnapshot Snapshot;
-	Snapshot.Section = InSection;
-	Snapshot.Revision = Section->CommittedRevision;
-	for (const TPair<int32, FVoxelBlockState>& Pair : Section->Overlay)
-	{
-		FVoxelSectionCellEdit Edit;
-		Edit.CellIndex = Pair.Key;
-		Edit.State = Pair.Value;
-		Snapshot.Blocks.Add(Edit);
-	}
-	for (const TPair<int32, FVoxelBlockEntityState>& Pair : Section->Entities)
-	{
-		FVoxelEntityWrite Write;
-		Write.CellIndex = Pair.Key;
-		Write.Value = Pair.Value;
-		Snapshot.Entities.Add(MoveTemp(Write));
-	}
-	TArray<uint8> Payload;
-	FString Error;
-	if (FVoxelNetworkCodec::EncodeSectionSnapshot(Snapshot, Payload, Error))
-	{
-		Send(EVoxelMessage::SectionSnapshot, Payload, EVoxelTransferPriority::Normal);
-	}
-}
-
-void UVoxelModuleNetworkComponent::RequestMissingSnapshots(const double InNow)
-{
-	UVoxelModule* VoxelModule = Module.Get();
-	if (!VoxelModule || !VoxelModule->GetRuntime()) return;
-	TArray<FIntVector> Requests;
-	for (const FIntVector& Key : KnownModifiedSections)
-	{
-		const auto* Section = VoxelModule->GetRuntime()->FindSection(Key);
-		if (!Section || (Section->Status != EVoxelSectionStatus::BaseReady &&
-			!(Section->Status == EVoxelSectionStatus::DataReady && Section->CommittedRevision == 0)) || PendingSnapshots.Contains(Key)) continue;
-		if (!VoxelModule->GetCurrentInterest().Exact.Contains(Key)) continue;
-		const double* Previous = SnapshotRequests.Find(Key);
-		if (Previous && InNow - *Previous < 1.0) continue;
-		Requests.Add(Key);
-		if (Requests.Num() == 32) break;
-	}
-	if (Requests.IsEmpty()) return;
-	FVoxelByteWriter Writer(512);
-	Writer.U16(Requests.Num());
-	for (const auto& Key : Requests) FVoxelNetworkCodec::WriteVector(Writer, Key);
-	TArray<uint8> Payload;
-	if (Writer.Finish(Payload) && Send(EVoxelMessage::Resync, Payload, EVoxelTransferPriority::Critical))
-	{
-		for (const auto& Key : Requests) SnapshotRequests.Add(Key, InNow);
-	}
-	for (auto It = SnapshotRequests.CreateIterator(); It; ++It)
-	{
-		if (!VoxelModule->GetCurrentInterest().Exact.Contains(It.Key())) It.RemoveCurrent();
-	}
-}
-
-void UVoxelModuleNetworkComponent::ApplyPendingSnapshots()
-{
-	UVoxelModule* VoxelModule = Module.Get();
-	if (!VoxelModule || VoxelModule->IsAuthority() || !VoxelModule->GetRuntime())
-	{
-		return;
-	}
-	for (auto Iterator = PendingSnapshots.CreateIterator(); Iterator; ++Iterator)
-	{
-		FVoxelSection* Section = VoxelModule->GetRuntime()->FindSection(Iterator.Key());
-		if (!Section || (Section->Status != EVoxelSectionStatus::BaseReady && Section->Status != EVoxelSectionStatus::DataReady))
-		{
-			continue;
-		}
-		if (Section->CommittedRevision > Iterator.Value().Revision) { Iterator.RemoveCurrent(); continue; }
-		TMap<int32, FVoxelBlockState> Overlay;
-		TMap<int32, FVoxelBlockEntityState> Entities;
-		for (const FVoxelSectionCellEdit& Edit : Iterator.Value().Blocks)
-		{
-			Overlay.Add(Edit.CellIndex, Edit.State);
-		}
-		for (const FVoxelEntityWrite& Write : Iterator.Value().Entities)
-		{
-			if (!Write.bRemove)
-			{
-				Entities.Add(Write.CellIndex, Write.Value);
-			}
-		}
-		FString Error;
-		if (!VoxelModule->GetRuntime()->PublishFinal(
-			Iterator.Key(),
-			Iterator.Value().Revision,
-			Overlay,
-			Entities,
-			Error))
-		{
-			Fail(Error.IsEmpty() ? TEXT("Voxel snapshot apply failed") : Error);
-			return;
-		}
-		FVoxelEditBatch Batch;
-		FVoxelSectionPatch Patch;
-		Patch.Section = Iterator.Key();
-		Patch.ToRevision = Iterator.Value().Revision;
-		Batch.Sections.Add(Patch);
-		VoxelModule->PublishProjectEdit(Batch);
-		Iterator.RemoveCurrent();
-	}
-}
-
 void UVoxelModuleNetworkComponent::OnCommit(const FVoxelEditBatch& InBatch)
 {
-	if (!GetOwner() || !GetOwner()->HasAuthority() || !bReady)
-	{
-		return;
-	}
-	UVoxelModule* VoxelModule = Module.Get();
-	if (!VoxelModule || !VoxelModule->GetRuntime())
-	{
-		return;
-	}
-	FVoxelRepresentationInvalidate Invalidate;
-	for (const TPair<FVoxelRepresentationWireKey, uint8>& Subscription : RepresentationSubscriptions)
-	{
-		bool bAffected = false;
-		uint64 Revision = 0;
-		for (const FVoxelSectionPatch& Patch : InBatch.Sections)
-		{
-			const FVoxelChangeHierarchy& Hierarchy = VoxelModule->GetRuntime()->GetChangeHierarchy();
-			if ((Subscription.Value & 1u) != 0)
-			{
-				const FVoxelViewKey Key { Subscription.Key.Coordinate, Subscription.Key.Level };
-				bAffected |= Hierarchy.AffectsVoxelProxy(Key, Patch.Section);
-				Revision = FMath::Max(Revision, Hierarchy.GetVoxelProxyRevision(Key));
-			}
-			if ((Subscription.Value & 2u) != 0)
-			{
-				const FVoxelSurfaceTileKey Key {
-					FIntPoint(Subscription.Key.Coordinate.X, Subscription.Key.Coordinate.Y),
-					Subscription.Key.Level };
-				bAffected |= Hierarchy.AffectsSurface(Key, Patch.Section);
-				Revision = FMath::Max(Revision, Hierarchy.GetSurfaceRevision(Key));
-			}
-			if ((Subscription.Value & 4u) != 0)
-			{
-				const FVoxelMacroTileKey Key {
-					FIntPoint(Subscription.Key.Coordinate.X, Subscription.Key.Coordinate.Y),
-					Subscription.Key.Level };
-				bAffected |= Hierarchy.AffectsMacro(Key, Patch.Section);
-				Revision = FMath::Max(Revision, Hierarchy.GetMacroRevision(Key));
-			}
-		}
-		if (bAffected)
-		{
-			Invalidate.Keys.Add(Subscription.Key);
-			Invalidate.Revision = FMath::Max(Invalidate.Revision, Revision);
-		}
-	}
-	if (!Invalidate.Keys.IsEmpty())
-	{
-		Invalidate.Revision = FMath::Max<uint64>(1, Invalidate.Revision);
-		TArray<uint8> InvalidatePayload;
-		FString InvalidateError;
-		if (FVoxelNetworkCodec::EncodeRepresentationInvalidate(
-			Invalidate,
-			InvalidatePayload,
-			InvalidateError))
-		{
-			Send(EVoxelMessage::RepresentationInvalidate, InvalidatePayload, EVoxelTransferPriority::Normal);
-		}
-	}
-	FVoxelNetworkPatchBatch WireBatch;
-	WireBatch.TransactionId = InBatch.TransactionId;
-	for (const FVoxelSectionPatch& Patch : InBatch.Sections)
-	{
-		if (GameplayInterest.Contains(Patch.Section) || SentChangeSummaryRevisions.Contains(ToChangeRegion(Patch.Section)))
-		{
-			WireBatch.Sections.Add(Patch);
-		}
-	}
-	if (WireBatch.Sections.IsEmpty())
-	{
-		return;
-	}
-	// A prefab remains one authoritative transaction. Wire chunks are bounded
-	// independently so large edits can reach clients without a 32-section cap.
-	constexpr int32 SectionsPerMessage = 8;
-	for (int32 First = 0; First < WireBatch.Sections.Num(); First += SectionsPerMessage)
-	{
-		FVoxelNetworkPatchBatch WireChunk;
-		WireChunk.TransactionId = WireBatch.TransactionId;
-		const int32 End = FMath::Min(First + SectionsPerMessage, WireBatch.Sections.Num());
-		for (int32 Index = First; Index < End; ++Index)
-		{
-			WireChunk.Sections.Add(WireBatch.Sections[Index]);
-		}
-		TArray<uint8> Payload;
-		FString Error;
-		if (!FVoxelNetworkCodec::EncodePatchBatch(WireChunk, Payload, Error))
-		{
-			UE_LOG(LogTemp, Error, TEXT("Voxel patch transaction %s cannot be sent: %s"),
-				*WireChunk.TransactionId.ToString(), *Error);
-			return;
-		}
-		Send(EVoxelMessage::SectionPatch, Payload, EVoxelTransferPriority::Critical);
-	}
+	if (!GetOwner() || !GetOwner()->HasAuthority() || !bReady) return;
+	auto* WorldModule = Module.Get();
+	if (!WorldModule || !WorldModule->GetRuntime()) return;
+	if (RepresentationSubscriptions)
+		RepresentationSubscriptions->LatestCut = WorldModule->GetRuntime()->GetChangeHierarchy().CaptureVersionSnapshot();
+	CaptureOverlayCommit(InBatch);
 }
 
 APlayerController* UVoxelModuleNetworkComponent::Controller() const

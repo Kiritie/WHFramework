@@ -1,7 +1,10 @@
-#include "Voxel/Rendering/VoxelHeightfieldPageBuild.h"
+﻿#include "Voxel/Rendering/VoxelHeightfieldPageBuild.h"
+#include "Voxel/Task/VoxelBoundedAllocation.h"
 
 namespace
 {
+	constexpr int32 GenerationSamples = 32;
+	constexpr int32 MaximumWindowDistantCells = 16384;
 	template<typename T>
 	void CopyGrid(const TArray<T>& InSource, int32 InSide, TArray<T>& OutTarget, int32 OutSide, FIntPoint Offset)
 	{
@@ -13,57 +16,81 @@ namespace
 
 bool FVoxelHeightfieldPageBuild::Initialize(const FVoxelTerrainGeometry& InGeometry, FString& OutError)
 {
-	Geometry = InGeometry;
-	if (!VoxelStreamingGeometry::BuildShards(Geometry, 64, 4096, Shards, OutError)) return false;
-	if (MaximumRetainedBytes() > 24ull * 1024ull * 1024ull)
-	{ OutError = TEXT("Oversized: heightfield page completion exceeds retained-input capacity"); return false; }
+	if (!InGeometry.Validate(OutError))
+	{
+		return false;
+	}
+	if (!InGeometry.Key.IsColumn())
+	{
+		OutError = TEXT("Heightfield page requires an explicit Surface or Macro geometry");
+		return false;
+	}
+	FVoxelHeightfieldPageBuild Candidate;
+	Candidate.Geometry = InGeometry;
+	if (Candidate.MaximumRetainedBytes() > 24ull * 1024ull * 1024ull)
+	{
+		OutError = TEXT("Oversized: heightfield page completion exceeds retained-input capacity");
+		return false;
+	}
+	if (!VoxelStreamingGeometry::BuildShards(InGeometry, GenerationSamples, 4096, Candidate.Shards, OutError))
+	{
+		return false;
+	}
+	*this = MoveTemp(Candidate);
 	return true;
 }
 
 uint64 FVoxelHeightfieldPageBuild::MaximumRetainedBytes() const
 {
-	const uint64 Side = Geometry.Key.SideCells() / FMath::Max(1, Geometry.SampleStepCells) + 1;
-	return 64ull * 1024ull + 48 * Side * Side;
+	using namespace VoxelBoundedAllocation;
+	const int64 Cells = Geometry.Key.SideCells() / FMath::Max(1, Geometry.SampleStepCells);
+	if (Cells <= 0 || Cells > 256) return MAX_uint64;
+	const int32 Side = int32(Cells + 1), Parts = int32((Cells + GenerationSamples - 1) / GenerationSamples);
+	const int32 Count = Side * Side;
+	// Surface + Water 和 Macro 共用较大的 Surface 输出容量模型。
+	return WorkerSharedBytes<FVoxelHeightfieldPageBuild>() + ArrayBytes<FVoxelTerrainBuildShard>(Parts * Parts) +
+		4 * ArrayBytes<int32>(Count) + 2 * ArrayBytes<uint16>(Count) + 2 * ArrayBytes<uint8>(Count) +
+		ArrayBytes<FVoxelDistantCell>(MaximumWindowDistantCells * Parts * Parts);
 }
 
 bool FVoxelHeightfieldPageBuild::Advance(const FVoxelSurfaceProxyBuilder& InBuilder,
 	FVoxelSurfaceTileData& OutData, bool& bOutComplete, FString& OutError, const TAtomic<bool>* InCancel)
 {
 	bOutComplete = false;
-	const FVoxelSurfaceTileKey Key{FIntPoint(Geometry.Key.Coordinate.X, Geometry.Key.Coordinate.Y), Geometry.Key.Level};
-	if (Shards.IsValidIndex(NextShard))
+	if (InCancel && InCancel->Load()) { OutError = TEXT("Canceled"); return false; }
+	if (!Shards.IsValidIndex(NextShard)) { OutError = TEXT("Heightfield page result was already taken"); return false; }
+	if (!bAllocated)
 	{
-		FVoxelSurfaceTileData Part;
-		if (!InBuilder.Build(Key, Part, OutError, InCancel, nullptr, nullptr, Geometry, &Shards[NextShard])) return false;
-		SurfaceParts.Add(MoveTemp(Part));
-		++NextShard;
-		return true;
+		SurfacePage.Key = {FIntPoint(Geometry.Key.Coordinate.X, Geometry.Key.Coordinate.Y), Geometry.Key.Level};
+		SurfacePage.Geometry = Geometry;
+		SurfacePage.Step = Geometry.SampleStepCells;
+		SurfacePage.Side = int32(Geometry.Key.SideCells() / SurfacePage.Step) + 1;
+		const int32 Count = SurfacePage.Side * SurfacePage.Side;
+		SurfacePage.GroundZ.Reserve(Count); SurfacePage.WaterZ.Reserve(Count);
+		SurfacePage.SurfaceMaterial.Reserve(Count); SurfacePage.Biome.Reserve(Count); SurfacePage.Flags.Reserve(Count);
+		SurfacePage.GroundZ.SetNumUninitialized(Count); SurfacePage.WaterZ.SetNumUninitialized(Count);
+		SurfacePage.SurfaceMaterial.SetNumUninitialized(Count); SurfacePage.Biome.SetNumUninitialized(Count);
+		SurfacePage.Flags.SetNumUninitialized(Count);
+		SurfacePage.DistantCells.Reserve(MaximumWindowDistantCells * Shards.Num());
+		bAllocated = true;
 	}
-	FVoxelSurfaceTileData Page;
-	Page.Key = Key;
-	Page.Geometry = Geometry;
-	Page.Step = Geometry.SampleStepCells;
-	Page.Side = Geometry.Key.SideCells() / Page.Step + 1;
-	Page.GroundZ.SetNumUninitialized(Page.Side * Page.Side);
-	Page.WaterZ.SetNumUninitialized(Page.Side * Page.Side);
-	Page.SurfaceMaterial.SetNumUninitialized(Page.Side * Page.Side);
-	Page.Biome.SetNumUninitialized(Page.Side * Page.Side);
-	Page.Flags.SetNumUninitialized(Page.Side * Page.Side);
-	for (const auto& Part : SurfaceParts)
+	FVoxelSurfaceTileData Part;
+	if (!InBuilder.Build(SurfacePage.Key, Part, OutError, InCancel, nullptr, nullptr, Geometry, &Shards[NextShard])) return false;
+	if (Part.DistantCells.Num() > MaximumWindowDistantCells)
+	{ OutError = TEXT("Oversized: distant cells exceed admitted window capacity"); return false; }
+	const FIntPoint Offset = Part.LocalMinCells / SurfacePage.Step;
+	CopyGrid(Part.GroundZ, Part.Side, SurfacePage.GroundZ, SurfacePage.Side, Offset);
+	CopyGrid(Part.WaterZ, Part.Side, SurfacePage.WaterZ, SurfacePage.Side, Offset);
+	CopyGrid(Part.SurfaceMaterial, Part.Side, SurfacePage.SurfaceMaterial, SurfacePage.Side, Offset);
+	CopyGrid(Part.Biome, Part.Side, SurfacePage.Biome, SurfacePage.Side, Offset);
+	CopyGrid(Part.Flags, Part.Side, SurfacePage.Flags, SurfacePage.Side, Offset);
+	SurfacePage.Revision = FMath::Max(SurfacePage.Revision, Part.Revision);
+	SurfacePage.DistantCells.Append(Part.DistantCells);
+	if (++NextShard == Shards.Num())
 	{
-		if (InCancel && InCancel->Load()) { OutError = TEXT("Canceled"); return false; }
-		const FIntPoint Offset = Part.LocalMinCells / Page.Step;
-		CopyGrid(Part.GroundZ, Part.Side, Page.GroundZ, Page.Side, Offset);
-		CopyGrid(Part.WaterZ, Part.Side, Page.WaterZ, Page.Side, Offset);
-		CopyGrid(Part.SurfaceMaterial, Part.Side, Page.SurfaceMaterial, Page.Side, Offset);
-		CopyGrid(Part.Biome, Part.Side, Page.Biome, Page.Side, Offset);
-		CopyGrid(Part.Flags, Part.Side, Page.Flags, Page.Side, Offset);
-		Page.Revision = FMath::Max(Page.Revision, Part.Revision);
-		Page.DistantCells.Append(Part.DistantCells);
+		OutData = MoveTemp(SurfacePage);
+		bOutComplete = true;
 	}
-	SurfaceParts.Reset();
-	OutData = MoveTemp(Page);
-	bOutComplete = true;
 	return true;
 }
 
@@ -71,41 +98,40 @@ bool FVoxelHeightfieldPageBuild::Advance(const FVoxelMacroTerrainBuilder& InBuil
 	FVoxelMacroTileData& OutData, bool& bOutComplete, FString& OutError, const TAtomic<bool>* InCancel)
 {
 	bOutComplete = false;
-	const FVoxelMacroTileKey Key{FIntPoint(Geometry.Key.Coordinate.X, Geometry.Key.Coordinate.Y), Geometry.Key.Level};
-	if (Shards.IsValidIndex(NextShard))
+	if (InCancel && InCancel->Load()) { OutError = TEXT("Canceled"); return false; }
+	if (!Shards.IsValidIndex(NextShard)) { OutError = TEXT("Heightfield page result was already taken"); return false; }
+	if (!bAllocated)
 	{
-		FVoxelMacroTileData Part;
-		if (!InBuilder.Build(Key, Part, OutError, InCancel, Geometry, &Shards[NextShard])) return false;
-		MacroParts.Add(MoveTemp(Part));
-		++NextShard;
-		return true;
+		MacroPage.Key = {FIntPoint(Geometry.Key.Coordinate.X, Geometry.Key.Coordinate.Y), Geometry.Key.Level};
+		MacroPage.Geometry = Geometry;
+		MacroPage.Step = Geometry.SampleStepCells;
+		MacroPage.Side = int32(Geometry.Key.SideCells() / MacroPage.Step) + 1;
+		const int32 Count = MacroPage.Side * MacroPage.Side;
+		MacroPage.Height.Reserve(Count); MacroPage.WaterHeight.Reserve(Count); MacroPage.WaterKind.Reserve(Count);
+		MacroPage.SurfaceClass.Reserve(Count); MacroPage.ForestCoverage.Reserve(Count); MacroPage.SnowCoverage.Reserve(Count);
+		MacroPage.Height.SetNumUninitialized(Count); MacroPage.WaterHeight.SetNumUninitialized(Count);
+		MacroPage.WaterKind.SetNumUninitialized(Count); MacroPage.SurfaceClass.SetNumUninitialized(Count);
+		MacroPage.ForestCoverage.SetNumUninitialized(Count); MacroPage.SnowCoverage.SetNumUninitialized(Count);
+		MacroPage.DistantCells.Reserve(MaximumWindowDistantCells * Shards.Num());
+		bAllocated = true;
 	}
-	FVoxelMacroTileData Page;
-	Page.Key = Key;
-	Page.Geometry = Geometry;
-	Page.Step = Geometry.SampleStepCells;
-	Page.Side = Geometry.Key.SideCells() / Page.Step + 1;
-	Page.Height.SetNumUninitialized(Page.Side * Page.Side);
-	Page.WaterHeight.SetNumUninitialized(Page.Side * Page.Side);
-	Page.WaterKind.SetNumUninitialized(Page.Side * Page.Side);
-	Page.SurfaceClass.SetNumUninitialized(Page.Side * Page.Side);
-	Page.ForestCoverage.SetNumUninitialized(Page.Side * Page.Side);
-	Page.SnowCoverage.SetNumUninitialized(Page.Side * Page.Side);
-	for (const auto& Part : MacroParts)
+	FVoxelMacroTileData Part;
+	if (!InBuilder.Build(MacroPage.Key, Part, OutError, InCancel, Geometry, &Shards[NextShard])) return false;
+	if (Part.DistantCells.Num() > MaximumWindowDistantCells)
+	{ OutError = TEXT("Oversized: distant cells exceed admitted window capacity"); return false; }
+	const FIntPoint Offset = Part.LocalMinCells / MacroPage.Step;
+	CopyGrid(Part.Height, Part.Side, MacroPage.Height, MacroPage.Side, Offset);
+	CopyGrid(Part.WaterHeight, Part.Side, MacroPage.WaterHeight, MacroPage.Side, Offset);
+	CopyGrid(Part.WaterKind, Part.Side, MacroPage.WaterKind, MacroPage.Side, Offset);
+	CopyGrid(Part.SurfaceClass, Part.Side, MacroPage.SurfaceClass, MacroPage.Side, Offset);
+	CopyGrid(Part.ForestCoverage, Part.Side, MacroPage.ForestCoverage, MacroPage.Side, Offset);
+	CopyGrid(Part.SnowCoverage, Part.Side, MacroPage.SnowCoverage, MacroPage.Side, Offset);
+	MacroPage.Revision = FMath::Max(MacroPage.Revision, Part.Revision);
+	MacroPage.DistantCells.Append(Part.DistantCells);
+	if (++NextShard == Shards.Num())
 	{
-		if (InCancel && InCancel->Load()) { OutError = TEXT("Canceled"); return false; }
-		const FIntPoint Offset = Part.LocalMinCells / Page.Step;
-		CopyGrid(Part.Height, Part.Side, Page.Height, Page.Side, Offset);
-		CopyGrid(Part.WaterHeight, Part.Side, Page.WaterHeight, Page.Side, Offset);
-		CopyGrid(Part.WaterKind, Part.Side, Page.WaterKind, Page.Side, Offset);
-		CopyGrid(Part.SurfaceClass, Part.Side, Page.SurfaceClass, Page.Side, Offset);
-		CopyGrid(Part.ForestCoverage, Part.Side, Page.ForestCoverage, Page.Side, Offset);
-		CopyGrid(Part.SnowCoverage, Part.Side, Page.SnowCoverage, Page.Side, Offset);
-		Page.Revision = FMath::Max(Page.Revision, Part.Revision);
-		Page.DistantCells.Append(Part.DistantCells);
+		OutData = MoveTemp(MacroPage);
+		bOutComplete = true;
 	}
-	MacroParts.Reset();
-	OutData = MoveTemp(Page);
-	bOutComplete = true;
 	return true;
 }

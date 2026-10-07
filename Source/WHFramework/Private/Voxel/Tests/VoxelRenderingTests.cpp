@@ -1,4 +1,4 @@
-#if WITH_DEV_AUTOMATION_TESTS
+﻿#if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
 #include "Voxel/Rendering/VoxelViewLod.h"
@@ -129,6 +129,8 @@ bool FVoxelKnownEmptyMeshTest::RunTest(const FString& Parameters)
 	Patch.Face.Max = Patch.Face.Neighbor.GetBounds().Max;
 	Patch.Neighbor.Key = Patch.Face.Neighbor;
 	Patch.Neighbor.Face = 1;
+	Patch.Neighbor.SampleStepCells = 1;
+	Patch.Neighbor.GridSide = 16;
 	Patch.Neighbor.States.Init(Solid, 256);
 	TestTrue(TEXT("Empty check uses a valid fine boundary"), Transition.Validate());
 	TestTrue(TEXT("Enclosed fine boundary skips transition meshing"),
@@ -361,7 +363,8 @@ bool FVoxelProxyOverlaySnapshotTest::RunTest(const FString& InParameters)
 	const FVoxelViewKey EditedKey{FIntVector(-1, 0, 0), 1};
 	const FVoxelGenerationBounds EditedBounds = EditedKey.GetBounds();
 	const FIntVector HaloOrigin(EditedBounds.Max.X, EditedBounds.Min.Y, EditedBounds.Min.Z);
-	const int32 EditedStep = EditedKey.GetSampleStep();
+	const FVoxelTerrainGeometry EditedGeometry = FixtureGeometry(EditedKey, 2);
+	const int32 EditedStep = EditedGeometry.SampleStepCells;
 	FVoxelOverlaySnapshotSet Overlays;
 	auto SetEditedCells = [&](const FVoxelBlockState State)
 	{
@@ -387,7 +390,6 @@ bool FVoxelProxyOverlaySnapshotTest::RunTest(const FString& InParameters)
 			}
 		}
 	};
-	// The edited physical cells follow the key's sample footprint, including its positive-X halo.
 	SetEditedCells(FVoxelBlockState());
 	const FVoxelOverlaySnapshotSet Captured = Overlays;
 	SetEditedCells(FVoxelBlockState(1, 0));
@@ -395,13 +397,13 @@ bool FVoxelProxyOverlaySnapshotTest::RunTest(const FString& InParameters)
 	FString Error;
 	const FVoxelVoxelProxyBuilder Builder(Config, Cache);
 	if (!TestTrue(TEXT("Proxy builds from immutable edits"),
-		Builder.Build(EditedKey, Captured, Data, Error, nullptr, FixtureGeometry(EditedKey, EditedKey.GetSampleStep())))) return false;
-	TestEqual(TEXT("Proxy grid follows its coverage and physical sample step"), Data.GridSide, EditedKey.GetGridSide());
+		Builder.Build(EditedKey, Captured, Data, Error, nullptr, EditedGeometry))) return false;
+	TestEqual(TEXT("Proxy grid follows its coverage and physical sample step"), Data.GridSide, int32(EditedGeometry.Key.SideCells() / EditedGeometry.SampleStepCells));
 	TestTrue(TEXT("Negative-coordinate edit comes from captured version"), Data.Cells[0].IsAir());
 	TestTrue(TEXT("Neighbour halo uses the same edit snapshot"), Data.Halo[0][0].IsAir());
 	FVoxelVoxelProxyData Updated;
 	if (!TestTrue(TEXT("Later edits build independently of the captured snapshot"),
-		Builder.Build(EditedKey, Overlays, Updated, Error, nullptr, FixtureGeometry(EditedKey, EditedKey.GetSampleStep())))) return false;
+		Builder.Build(EditedKey, Overlays, Updated, Error, nullptr, EditedGeometry))) return false;
 	TestEqual(TEXT("Later negative-coordinate placement reaches the same physical cell"),
 		Updated.Cells[0].Pack(), FVoxelBlockState(1, 0).Pack());
 	TestEqual(TEXT("Later halo placement reaches the same physical neighbor"),
@@ -415,9 +417,9 @@ bool FVoxelProxyOverlaySnapshotTest::RunTest(const FString& InParameters)
 	FVoxelVoxelProxyData Built;
 	const FVoxelViewKey ElevatedKey{ FIntVector(0, 0, 64), 1 };
 	if (!TestTrue(TEXT("Elevated natural proxy builds"),
-		Builder.BuildNatural(ElevatedKey, Natural, Error, nullptr, FixtureGeometry(ElevatedKey, ElevatedKey.GetSampleStep())))) return false;
+		Builder.BuildNatural(ElevatedKey, Natural, Error, nullptr, FixtureGeometry(ElevatedKey, 2)))) return false;
 	if (!TestTrue(TEXT("Elevated edited proxy builds"),
-		Builder.Build(ElevatedKey, Placed, Built, Error, nullptr, FixtureGeometry(ElevatedKey, ElevatedKey.GetSampleStep())))) return false;
+		Builder.Build(ElevatedKey, Placed, Built, Error, nullptr, FixtureGeometry(ElevatedKey, 2)))) return false;
 	TestTrue(TEXT("Elevated natural cell is air"), Natural.Cells[0].IsAir());
 	TestEqual(TEXT("Off-center player block contributes to distant silhouette"),
 		Built.Cells[0].Pack(), FVoxelBlockState(1, 0).Pack());
@@ -429,7 +431,7 @@ bool FVoxelProxyOverlaySnapshotTest::RunTest(const FString& InParameters)
 	BuildingSection.Blocks.Add(1, FVoxelBlockState(1, 0));
 	FVoxelVoxelProxyData CoarseBuilt;
 	if (!TestTrue(TEXT("Coarse player-built silhouette builds"),
-		Builder.Build({ FIntVector(0, 0, 1), 3 }, CoarseBuilding, CoarseBuilt, Error, nullptr, FixtureGeometry(FVoxelViewKey{ FIntVector(0, 0, 1), 3 }, FVoxelViewKey{ FIntVector(0, 0, 1), 3 }.GetSampleStep())))) return false;
+		Builder.Build({ FIntVector(0, 0, 1), 3 }, CoarseBuilding, CoarseBuilt, Error, nullptr, FixtureGeometry(FVoxelViewKey{ FIntVector(0, 0, 1), 3 }, 4)))) return false;
 	TestEqual(TEXT("Small wall fragment survives distant voxel coarsening"),
 		CoarseBuilt.Cells[0].Pack(), FVoxelBlockState(1, 0).Pack());
 	return true;
@@ -772,19 +774,28 @@ bool FVoxelVolumeTransitionMeshInvariantTest::RunTest(const FString& InParameter
 	Registry.Definitions[1].bOccludes = true;
 	FVoxelShapeRegistry Shapes;
 	Shapes.BuildDefaults();
-	// Level 1/Fine shares a physical sample step; Level 2/Level 1 is a real 2:1 sample boundary.
-	for (const uint8 Level : {uint8(1), uint8(2)})
+	struct FBoundaryCase
 	{
-		const FString Case = FString::Printf(TEXT("OwnerLevel=%u"), Level);
-		const FVoxelViewKey Owner{FIntVector::ZeroValue, Level};
-		const FVoxelViewKey Neighbor{FIntVector(2, 0, 0), static_cast<uint8>(Level - 1)};
-		const int32 OwnerSide = Owner.GetGridSide();
-		const int32 NeighborSide = Neighbor.GetGridSide();
-		const int32 Ratio = Owner.GetSampleStep() / Neighbor.GetSampleStep();
-		TestEqual(Case + TEXT(" has the intended physical sample ratio"), Ratio, Level == 1 ? 1 : 2);
+		uint8 OwnerLevel;
+		uint8 NeighborLevel;
+		int32 OwnerStep;
+		int32 NeighborStep;
+	};
+	const FBoundaryCase Cases[] = {{1, 0, 2, 1}, {2, 1, 2, 2}, {2, 2, 4, 2}, {2, 1, 8, 2}};
+	for (const FBoundaryCase& Input : Cases)
+	{
+		const FString Case = FString::Printf(TEXT("OwnerLevel=%u NeighborLevel=%u OwnerStep=%d NeighborStep=%d"),
+			Input.OwnerLevel, Input.NeighborLevel, Input.OwnerStep, Input.NeighborStep);
+		const FVoxelViewKey Owner{FIntVector::ZeroValue, Input.OwnerLevel};
+		const FVoxelViewKey Neighbor{FIntVector(1 << (Input.OwnerLevel - Input.NeighborLevel), 0, 0), Input.NeighborLevel};
+		const FVoxelTerrainGeometry OwnerGeometry = FixtureGeometry(Owner, Input.OwnerStep);
+		const int32 OwnerSide = int32(OwnerGeometry.Key.SideCells() / OwnerGeometry.SampleStepCells);
+		const int32 NeighborSide = Neighbor.GetSide() / Input.NeighborStep;
+		const int32 Ratio = OwnerGeometry.SampleStepCells / Input.NeighborStep;
 		const TSet<FVoxelViewKey> Visible{Owner, Neighbor};
+		const TMap<FVoxelViewKey, int32> SampleSteps{{Owner, Input.OwnerStep}, {Neighbor, Input.NeighborStep}};
 		TArray<FVoxelVolumeTransitionFace> Faces;
-		FVoxelVolumeTransitionPlanner::Build(Visible, Level, Faces);
+		FVoxelVolumeTransitionPlanner::Build(Visible, Input.OwnerLevel, Faces, &SampleSteps);
 		if (!TestEqual(Case + TEXT(" has one owner patch"), Faces.Num(), 1)) return false;
 
 		FVoxelSection Fine;
@@ -799,6 +810,7 @@ bool FVoxelVolumeTransitionMeshInvariantTest::RunTest(const FString& InParameter
 		else
 		{
 			NeighborProxy.Key = Neighbor;
+			NeighborProxy.Geometry = FixtureGeometry(Neighbor, Input.NeighborStep);
 			NeighborProxy.GridSide = NeighborSide;
 			NeighborProxy.Cells.Init(FVoxelBlockState(), NeighborSide * NeighborSide * NeighborSide);
 			NeighborProxy.Cells[0] = FVoxelBlockState(1, 0);
@@ -806,6 +818,7 @@ bool FVoxelVolumeTransitionMeshInvariantTest::RunTest(const FString& InParameter
 		}
 		FVoxelBoundaryTransitionContext Context;
 		Context.Owner = Owner;
+		Context.SampleStepCells = OwnerGeometry.SampleStepCells;
 		FVoxelBoundaryTransitionPatch& Patch = Context.Patches.AddDefaulted_GetRef();
 		Patch.Face = Faces[0];
 		auto CaptureNeighbor = [&]()
@@ -889,10 +902,11 @@ bool FVoxelProxyTransitionDirectionsTest::RunTest(const FString& InParameters)
 	{
 		for (uint8 Level = 2; Level <= 4; ++Level)
 		{
+			for (const int32 OwnerStep : {2, 4, 8})
 			for (uint8 Face = 0; Face < 6; ++Face)
 			{
-				const FString Case = FString::Printf(TEXT("Origin=%s Level=%d Face=%d"),
-					*Origin.ToString(), Level, Face);
+				const FString Case = FString::Printf(TEXT("Origin=%s Level=%d Step=%d Face=%d"),
+					*Origin.ToString(), Level, OwnerStep, Face);
 				const int32 Axis = Face / 2;
 				const FVoxelViewKey Owner{Origin, Level};
 				FVoxelViewKey Neighbor{Origin * 2, static_cast<uint8>(Level - 1)};
@@ -903,9 +917,9 @@ bool FVoxelProxyTransitionDirectionsTest::RunTest(const FString& InParameters)
 				if (!TestEqual(Case + TEXT(" has one shared face"), Faces.Num(), 1)) continue;
 				FVoxelVoxelProxyData NeighborData;
 				NeighborData.Key = Neighbor;
-				const int32 NeighborSide = Neighbor.GetGridSide();
+				NeighborData.Geometry = FixtureGeometry(Neighbor, 2);
+				const int32 NeighborSide = int32(NeighborData.Geometry.Key.SideCells() / NeighborData.Geometry.SampleStepCells);
 				NeighborData.GridSide = NeighborSide;
-				NeighborData.Geometry = {{EVoxelTerrainRepresentation::VoxelProxy, Neighbor.Coordinate, Neighbor.Level}, Neighbor.GetSampleStep(), -128, 256, 17, 23};
 				NeighborData.Cells.Init(FVoxelBlockState(0, 0),
 					NeighborSide * NeighborSide * NeighborSide);
 				FIntVector NeighborCell = FIntVector::ZeroValue;
@@ -917,13 +931,14 @@ bool FVoxelProxyTransitionDirectionsTest::RunTest(const FString& InParameters)
 				NeighborData.Cells[Linear(NeighborCell, NeighborSide)] = FVoxelBlockState(1, 0);
 				FVoxelBoundaryTransitionContext Context;
 				Context.Owner = Owner;
-				Context.SampleStepCells = Owner.GetSampleStep();
+				const FVoxelTerrainGeometry OwnerGeometry = FixtureGeometry(Owner, OwnerStep);
+				Context.SampleStepCells = OwnerGeometry.SampleStepCells;
 				FVoxelBoundaryTransitionPatch& Patch = Context.Patches.AddDefaulted_GetRef();
 				Patch.Face = Faces[0];
 				if (!TestTrue(Case + TEXT(" captures proxy boundary"),
 					FVoxelBoundaryFaceSnapshot::CaptureProxy(NeighborData, Face ^ 1, Patch.Neighbor))) continue;
 				FVoxelSectionSnapshot Snapshot;
-				const int32 OwnerSide = Owner.GetGridSide();
+				const int32 OwnerSide = int32(OwnerGeometry.Key.SideCells() / OwnerGeometry.SampleStepCells);
 				Snapshot.GridSide = OwnerSide;
 				Snapshot.Blocks.Init(FVoxelBlockState(0, 0).Pack(),
 					OwnerSide * OwnerSide * OwnerSide);
@@ -948,8 +963,8 @@ bool FVoxelProxyTransitionDirectionsTest::RunTest(const FString& InParameters)
 						if (A[Axis] == Plane && B[Axis] == Plane && C[Axis] == Plane) ++BoundaryTriangles;
 					}
 				}
-				const int32 ExpectedTriangles =
-					Owner.GetSampleStep() > Neighbor.GetSampleStep() ? 6 : 0;
+				const int32 SampleRatio = OwnerGeometry.SampleStepCells / NeighborData.Geometry.SampleStepCells;
+				const int32 ExpectedTriangles = 2 * (SampleRatio * SampleRatio - 1);
 				TestEqual(Case + TEXT(" matches the actual sample-step boundary without a duplicate face"),
 					BoundaryTriangles, ExpectedTriangles);
 			}
@@ -1074,9 +1089,9 @@ bool FVoxelProxyTreeSilhouetteTest::RunTest(const FString& InParameters)
 	FVoxelVoxelProxyData Natural;
 	FVoxelVoxelProxyData Destroyed;
 	if (!TestTrue(TEXT("Tree proxy builds"),
-		Builder.Build(Key, {}, Natural, Error, nullptr, FixtureGeometry(Key, Key.GetSampleStep()))) ||
+		Builder.Build(Key, {}, Natural, Error, nullptr, FixtureGeometry(Key, 2))) ||
 		!TestTrue(TEXT("Destroyed tree proxy builds"),
-			Builder.Build(Key, Removed, Destroyed, Error, nullptr, FixtureGeometry(Key, Key.GetSampleStep())))) return false;
+			Builder.Build(Key, Removed, Destroyed, Error, nullptr, FixtureGeometry(Key, 2)))) return false;
 	int32 NaturalTreeCells = 0;
 	int32 DestroyedTreeCells = 0;
 	for (int32 Index = 0; Index < Natural.Cells.Num(); ++Index)
@@ -1264,14 +1279,14 @@ bool FVoxelMacroOverlayTest::RunTest(const FString& InParameters)
 	FString Error;
 	const FVoxelMacroTileKey Key{FIntPoint::ZeroValue, 7};
 	const FVoxelTerrainGeometry Geometry{{EVoxelTerrainRepresentation::Macro, FIntVector::ZeroValue, Key.Level},
-		FVoxelMacroTileData::BaseStep, Settings.MinZ, Settings.MaxZ, 17, 23};
+		64, Settings.MinZ, Settings.MaxZ, 17, 23};
 	if (!TestTrue(TEXT("Macro consumes immutable edits"), MacroBuilder.Build(Key, Macro, Error, nullptr, Geometry)))
 	{
 		return false;
 	}
 	TestEqual(TEXT("Edited top reaches distant representation"), Macro.Height[0], 511);
 	TestEqual(TEXT("Edited material reaches distant representation"), Macro.SurfaceClass[0], uint16(1));
-	TestEqual(TEXT("Macro preserves coarse sampling scale"), Macro.Step, FVoxelMacroTileData::BaseStep);
+	TestEqual(TEXT("Macro preserves coarse sampling scale"), Macro.Step, 64);
 	return true;
 }
 
@@ -1699,6 +1714,52 @@ bool FVoxelChangedCoverageBoundsTest::RunTest(const FString& InParameters)
 	const TArray<FBox> Outside{FBox(FVector(80, 80, 0), FVector(96, 96, 16))};
 	VoxelMeshClipper::FindChangedCoverageBounds({}, Outside, Source, Changed);
 	TestTrue(TEXT("Exclusions outside the source geometry create no dependency footprint"), Changed.IsEmpty());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelRepresentationWindowInputTest,
+	"WHFramework.Voxel.Rendering.RepresentationWindowInput",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelRepresentationWindowInputTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const auto Config = VoxelTest::MakeGenerationConfig();
+	const auto Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
+	const auto Generator = MakeShared<FVoxelGenerationPipeline, ESPMode::ThreadSafe>(Config, Cache);
+	const auto Registry = MakeSurfaceRegistry();
+	FVoxelTestOverlaySource Overlays;
+	const FVoxelSurfaceProxyBuilder SurfaceBuilder(Generator, Config, Config->Recipe->Settings, Overlays, Registry);
+	const FVoxelMacroTerrainBuilder MacroBuilder(Generator, Config, Config->Recipe->Settings, Overlays, Registry);
+	const FVoxelSurfaceTileKey SurfaceKey{FIntPoint::ZeroValue, 3};
+	const FVoxelMacroTileKey MacroKey{FIntPoint::ZeroValue, 3};
+	const FVoxelTerrainGeometry SurfaceGeometry = FixtureGeometry(SurfaceKey, 2);
+	FVoxelTerrainGeometry MacroGeometry = SurfaceGeometry;
+	MacroGeometry.Key.Representation = EVoxelTerrainRepresentation::Macro;
+	FVoxelSurfaceTileData Surface;
+	FVoxelMacroTileData Macro;
+	Surface.Revision = 73;
+	Surface.GroundZ.Add(11);
+	Macro.Revision = 91;
+	Macro.Height.Add(13);
+	FString Error;
+	const TArray<FVoxelTerrainBuildShard> InvalidWindows{
+		{FIntVector::ZeroValue, FIntVector(16, 8, 0)},
+		{FIntVector(1, 0, 0), FIntVector(16, 16, 0)},
+		{FIntVector::ZeroValue, FIntVector(16)},
+		{FIntVector(128, 0, 0), FIntVector(16, 16, 0)},
+		{FIntVector::ZeroValue, FIntVector(257, 257, 0)}};
+	for (const FVoxelTerrainBuildShard& Window : InvalidWindows)
+	{
+		TestFalse(TEXT("Surface rejects invalid execution windows before allocating a candidate"),
+			SurfaceBuilder.Build(SurfaceKey, Surface, Error, nullptr, nullptr, nullptr, SurfaceGeometry, &Window));
+		TestFalse(TEXT("Macro rejects invalid execution windows before allocating a candidate"),
+			MacroBuilder.Build(MacroKey, Macro, Error, nullptr, MacroGeometry, &Window));
+		TestEqual(TEXT("Rejected Surface input retains the original content revision"), Surface.Revision, uint64(73));
+		TestEqual(TEXT("Rejected Surface input retains the original height"), Surface.GroundZ[0], 11);
+		TestEqual(TEXT("Rejected Macro input retains the original content revision"), Macro.Revision, uint64(91));
+		TestEqual(TEXT("Rejected Macro input retains the original height"), Macro.Height[0], 13);
+	}
 	return true;
 }
 

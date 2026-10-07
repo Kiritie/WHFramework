@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "UObject/PrimaryAssetId.h"
 #include "CoreMinimal.h"
 #include "Voxel/Save/VoxelDeltaTypes.h"
@@ -11,6 +11,7 @@ class WHFRAMEWORK_API FVoxelBlockEntityCodec
 {
 public:
     using FMakeDefault = bool (*)(FVoxelBlockEntityState&, uint8);
+    // Validate 在冻结计数和 Worker 中使用；只读协议字节，不分配容器、不创建名称、不访问 UObject。
     using FValidate = bool (*)(const FVoxelBlockEntityState&);
 
     static bool Register(uint16 Kind, FMakeDefault MakeDefault, FValidate Validate);

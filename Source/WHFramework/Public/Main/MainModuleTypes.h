@@ -1,8 +1,9 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
 #include "UObject/UObjectGlobals.h"
+#include "Engine/World.h"
 #include "Common/CommonModuleStatics.h"
 #include "Main/MainModuleStatics.h"
 #include "Debug/DebugModuleTypes.h"
@@ -33,7 +34,8 @@ protected: \
 	static ModuleClass* InstanceEditor; \
 public: \
 	static ModuleClass& Get(bool bInEditor = false, bool bForce = false); \
-	static ModuleClass* GetPtr(bool bInEditor = false, bool bForce = false);
+	static ModuleClass* GetPtr(bool bInEditor = false, bool bForce = false); \
+	static ModuleClass* GetPtr(UWorld* InWorld, bool bForce = false);
 
 #define IMPLEMENTATION_MAIN_MODULE(ModuleClass) \
 ModuleClass* ModuleClass::Instance = nullptr; \
@@ -65,6 +67,13 @@ ModuleClass* ModuleClass::GetPtr(bool bInEditor, bool bForce) \
 		} \
 		return InstanceEditor; \
 	} \
+} \
+ModuleClass* ModuleClass::GetPtr(UWorld* InWorld, bool bForce) \
+{ \
+	if(!::IsValid(InWorld)) return nullptr; \
+	const FScopedWorldContext WorldContextScope(InWorld); \
+	ModuleClass* MainModule = ModuleClass::GetPtr(InWorld->IsEditorWorld(), bForce); \
+	return ::IsValid(MainModule) && MainModule->GetWorld() == InWorld ? MainModule : nullptr; \
 }
 
 #define TERMINATION_MAIN_MODULE(ModuleClass) \
@@ -85,6 +94,7 @@ public: \
 	static bool IsValid(bool bInEditor = false); \
 	static ModuleClass& Get(bool bInEditor = false); \
 	static ModuleClass* GetPtr(bool bInEditor = false); \
+	static ModuleClass* GetPtr(UWorld* InWorld); \
 
 #define IMPLEMENTATION_MODULE(ModuleClass) \
 ModuleClass* ModuleClass::Instance = nullptr; \
@@ -116,6 +126,15 @@ ModuleClass* ModuleClass::GetPtr(bool bInEditor) \
 		} \
 		return InstanceEditor; \
 	} \
+} \
+ModuleClass* ModuleClass::GetPtr(UWorld* InWorld) \
+{ \
+	if(!::IsValid(InWorld)) return nullptr; \
+	const FScopedWorldContext WorldContextScope(InWorld); \
+	const bool bInEditor = InWorld->IsEditorWorld(); \
+	if(!ModuleClass::IsValid(bInEditor)) return nullptr; \
+	ModuleClass* Module = ModuleClass::GetPtr(bInEditor); \
+	return ::IsValid(Module) && Module->GetWorld() == InWorld ? Module : nullptr; \
 }
 
 #define TERMINATION_MODULE(ModuleClass) \

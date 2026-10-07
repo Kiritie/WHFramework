@@ -1,4 +1,4 @@
-#include "Voxel/Rendering/VoxelProxyBuilder.h"
+﻿#include "Voxel/Rendering/VoxelProxyBuilder.h"
 
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 
@@ -117,7 +117,7 @@ namespace
 uint64 FVoxelVoxelProxyData::GetAllocatedBytes() const
 {
 	uint64 Bytes =
-		Cells.GetAllocatedSize();
+		Cells.GetAllocatedSize() + TopSurfaceCoverage.GetAllocatedSize();
 
 	for (const TArray<FVoxelBlockState>& Face :
 		Halo)
@@ -180,10 +180,10 @@ bool FVoxelVoxelProxyBuilder::Build(const FVoxelViewKey& InKey, const FVoxelOver
 		}
 	}
 	TMap<FIntVector, FCoarseOverlayCell> CoarseEdits;
-	for (const TPair<FIntVector, FVoxelOverlaySnapshot>& Section : InOverlays.Sections)
+	InOverlays.Visit([&](const FIntVector& SectionKey, const FVoxelOverlaySnapshot& Section)
 	{
-		const FIntVector SectionOrigin = Section.Key * 16;
-		for (const TPair<int32, FVoxelBlockState>& Edit : Section.Value.Blocks)
+		const FIntVector SectionOrigin = SectionKey * 16;
+		for (const TPair<int32, FVoxelBlockState>& Edit : Section.Blocks)
 		{
 			const int32 Index = Edit.Key;
 			const FIntVector Position = SectionOrigin + FIntVector(
@@ -199,7 +199,7 @@ bool FVoxelVoxelProxyBuilder::Build(const FVoxelViewKey& InKey, const FVoxelOver
 			}
 			CoarseEdits.FindOrAdd(Coarse).Add(Edit.Value);
 		}
-	}
+	});
 	if (InCancel && InCancel->Load())
 	{
 		OutError = TEXT("Canceled");
@@ -229,6 +229,22 @@ bool FVoxelVoxelProxyBuilder::ApplyTreeSilhouettes(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	if (InOutData.Geometry.Key != FVoxelTerrainSpatialKey{EVoxelTerrainRepresentation::VoxelProxy, InKey.Coordinate, InKey.Level} ||
+		InOutData.Key != InKey || InKey.Level == 0 ||
+		!FVoxelTerrainBuildShard{InOutData.LocalMinCells, FIntVector(InOutData.GridSide)}.Validate(InOutData.Geometry, 128, OutError) ||
+		InOutData.Cells.Num() != int64(InOutData.GridSide) * InOutData.GridSide * InOutData.GridSide)
+	{
+		OutError = TEXT("Tree silhouette input does not match its actual proxy geometry");
+		return false;
+	}
+	for (int32 Face = 0; Face < 6; ++Face)
+	{
+		if (InOutData.Known[Face] && InOutData.Halo[Face].Num() != InOutData.GridSide * InOutData.GridSide)
+		{
+			OutError = TEXT("Tree silhouette input has an invalid proxy halo");
+			return false;
+		}
+	}
 	const FVoxelTreeGenerationSettings& Trees = Config->Recipe->Settings.Ecology.Tree;
 	if (!Trees.bEnabled || Trees.ChancePermille <= 0 || Trees.DensityPermille <= 0)
 	{
@@ -240,6 +256,17 @@ bool FVoxelVoxelProxyBuilder::ApplyTreeSilhouettes(
 		!Config->ToRuntime(Config->Recipe->Ecology.TreeLeaves, Leaves))
 	{
 		OutError = TEXT("Tree silhouette symbols are invalid");
+		return false;
+	}
+	const int64 Padding = (FMath::Max<int64>(1, (int64(Trees.CrownRadius) - 1) / InOutData.Geometry.SampleStepCells) + 1) *
+		InOutData.Geometry.SampleStepCells;
+	FIntVector SamplingMin;
+	FIntVector SamplingMax;
+	if (Trees.CrownRadius < 0 || Padding > MAX_int32 ||
+		!VoxelStreamingGeometry::TrySamplingBounds(InOutData.Geometry, FIntVector(int32(Padding), int32(Padding), 0),
+			FIntVector(int32(Padding), int32(Padding), 0), SamplingMin, SamplingMax, OutError))
+	{
+		OutError = TEXT("Tree silhouette sampling exceeds the supported coordinate range");
 		return false;
 	}
 	const TSet<uint32> AllTreeStates = TreeStates(*Config);
@@ -262,7 +289,7 @@ bool FVoxelVoxelProxyBuilder::ApplyTreeSilhouettes(
 	const int32 Side = InOutData.GridSide;
 	const int32 Step = InOutData.Geometry.SampleStepCells;
 	const FIntVector Origin = Bounds.Min;
-	const int32 CrownPadding = (FMath::Max(1, (Trees.CrownRadius - 1) / Step) + 1) * Step;
+	const int32 CrownPadding = int32(Padding);
 	const FVoxelGenerationBounds TreeBounds {
 		FIntVector(Bounds.Min.X - CrownPadding,
 			Bounds.Min.Y - CrownPadding, Config->Recipe->Settings.MinZ),
@@ -392,9 +419,13 @@ bool FVoxelVoxelProxyBuilder::BuildNatural(
 	if (Geometry.Key.Representation != EVoxelTerrainRepresentation::VoxelProxy ||
 		Geometry.Key.Coordinate != InKey.Coordinate || Geometry.Key.Level != InKey.Level)
 	{ OutError = TEXT("Proxy spatial key does not match its required geometry"); return false; }
-	const int32 GridSide = InShard ? InShard->CellCounts.X : InKey.GetSide() / Geometry.SampleStepCells;
-	if (InShard && (InShard->CellCounts.X != InShard->CellCounts.Y || InShard->CellCounts.X != InShard->CellCounts.Z))
-	{ OutError = TEXT("Proxy execution window must be cubic"); return false; }
+	const int32 GridSide = InShard ? InShard->CellCounts.X : int32(Geometry.Key.SideCells()) / Geometry.SampleStepCells;
+	const FVoxelTerrainBuildShard Window = InShard ? *InShard :
+		FVoxelTerrainBuildShard{FIntVector::ZeroValue, FIntVector(GridSide)};
+	if (!Window.Validate(Geometry, 128, OutError))
+	{
+		return false;
+	}
 
 	const int32 ColumnSampleSide =
 		GridSide + 2;
@@ -403,6 +434,14 @@ bool FVoxelVoxelProxyBuilder::BuildNatural(
 
 	const FIntVector WindowMin = InKey.GetBounds().Min + (InShard ? InShard->LocalMinCells : FIntVector::ZeroValue);
 	const FVoxelGenerationBounds Bounds{WindowMin, WindowMin + FIntVector(GridSide * Step)};
+	for (int32 Axis = 0; Axis < 3; ++Axis)
+	{
+		if (int64(Bounds.Min[Axis]) - Step < MIN_int32 || int64(Bounds.Max[Axis]) + Step > MAX_int32)
+		{
+			OutError = TEXT("Proxy sampling halo exceeds the supported coordinate range");
+			return false;
+		}
+	}
 
 	FVoxelGenerationQuery Query;
 

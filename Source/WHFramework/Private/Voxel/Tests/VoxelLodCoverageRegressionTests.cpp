@@ -1,12 +1,16 @@
-#if WITH_DEV_AUTOMATION_TESTS
+﻿#if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Voxel/Rendering/VoxelViewLod.h"
+#include "Voxel/Rendering/VoxelTerrainStagePlanner.h"
 #include "Voxel/Rendering/VoxelViewManager.h"
 #include "Voxel/Rendering/VoxelViewPublisher.h"
 #include "Voxel/Rendering/VoxelProxyBuilder.h"
+#include "Voxel/Rendering/VoxelProxyPageBuild.h"
+#include "Voxel/Rendering/VoxelHeightfieldPageBuild.h"
+#include "Voxel/Tests/VoxelTestUtilities.h"
 #include "Voxel/Geometry/DWVoxelBoundaryTransition.h"
 #include "Voxel/VoxelModule.h"
 
@@ -16,38 +20,127 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelActualSamplingLodTest,
 
 bool FVoxelActualSamplingLodTest::RunTest(const FString& InParameters)
 {
-	FString BuildError;
-	(void)InParameters;
-	const int32 Steps[] = {1, 1, 2, 4, 8, 16, 16};
-	for (uint8 Level = 0; Level < UE_ARRAY_COUNT(Steps); ++Level)
-	{
-		const FVoxelViewKey Key{{}, Level};
-		TestEqual(TEXT("Actual sampling grows through L5 then saturates"), Key.GetSampleStep(), Steps[Level]);
-		TestEqual(TEXT("Grid and actual sampling cover the entire node"), Key.GetGridSide() * Key.GetSampleStep(), Key.GetSide());
-	}
-	FVoxelStreamingSource Source;
-	Source.Capabilities = EVoxelStreamingCapability::WorldVisual;
-	Source.VerticalFovDegrees = 90.0f;
-	Source.ViewportHeightPixels = 600;
-	FVoxelViewSettings Settings;
-	Settings.Lod.TargetScreenErrorPixels = 8.0f;
-	Source.View.VoxelProxyRadiusCells = 4096;
-	TestEqual(TEXT("A 16-cell sample fails immediately before its pixel threshold"),
-		VoxelViewLod::ResolveVoxelProxyLevel(599, Source, [&Settings]() { FVoxelViewSettings Policy = Settings; Policy.Lod.MaximumVoxelProxyLevel = 5; Policy.Lod.TargetScreenErrorPixels = 8.0f; return Policy; }()), static_cast<uint8>(4));
-	TestEqual(TEXT("L5 becomes eligible at its actual 16-cell threshold"),
-		VoxelViewLod::ResolveVoxelProxyLevel(601, Source, [&Settings]() { FVoxelViewSettings Policy = Settings; Policy.Lod.MaximumVoxelProxyLevel = 5; Policy.Lod.TargetScreenErrorPixels = 8.0f; return Policy; }()), static_cast<uint8>(5));
-	TestEqual(TEXT("Saturated L6 is evaluated as 16 cells rather than an imaginary 32"),
-		VoxelViewLod::ResolveVoxelProxyLevel(601, Source, [&Settings]() { FVoxelViewSettings Policy = Settings; Policy.Lod.MaximumVoxelProxyLevel = 6; Policy.Lod.TargetScreenErrorPixels = 8.0f; return Policy; }()), static_cast<uint8>(6));
-	TestEqual(TEXT("Texture period is capped independently at eight cells"), VoxelViewLod::TexturePeriodCells(16, 8.0), 8.0);
-	FVoxelTerrainViewPlan Plan;
-	const FVoxelViewKey Root{FIntVector(2, 0, 0), 5};
-	Plan.Build(MakeArrayView(&Source, 1), {}, {Root}, FVoxelViewSettings(), BuildError);
-	TestTrue(TEXT("Eligible 512-cell node remains a planned leaf"), Plan.Leaves.Num() == 1 && Plan.Leaves.Contains(Root));
-	Source.Center.X = 425;
-	Plan.Build(MakeArrayView(&Source, 1), {}, {Root}, FVoxelViewSettings(), BuildError);
-	TestFalse(TEXT("512-cell coverage refines when its actual sample exceeds screen error"), Plan.Leaves.Contains(Root));
 	FString Error;
-	TestTrue(TEXT("Refinement preserves complete ownership"), Plan.Validate(Error));
+	const FVoxelTerrainSpatialKey Spatial{EVoxelTerrainRepresentation::VoxelProxy, FIntVector(-1, 0, 0), 3};
+	for (const int32 Step : {2, 4, 8, 16, 32, 64})
+	{
+		const FVoxelTerrainGeometry Geometry{Spatial, Step, -128, 256, 17, 23};
+		TestTrue(TEXT("One spatial key admits multiple explicit legal sample steps"), Geometry.Validate(Error));
+		TestEqual(TEXT("Actual grid and physical step cover the entire spatial node"),
+			(Geometry.Key.SideCells() / Geometry.SampleStepCells) * Geometry.SampleStepCells, Geometry.Key.SideCells());
+	}
+	FVoxelTerrainGeometry Fine{{EVoxelTerrainRepresentation::Fine, FIntVector::ZeroValue, 0}, 1, -128, 256, 17, 23};
+	TestTrue(TEXT("Fine retains exact one-cell sampling"), Fine.Validate(Error));
+	Fine.SampleStepCells = 2;
+	TestFalse(TEXT("Fine cannot silently adopt coarse sampling"), Fine.Validate(Error));
+	FVoxelTerrainGeometry Invalid{Spatial, 1, -128, 256, 17, 23};
+	TestFalse(TEXT("Proxy rejects Fine sampling"), Invalid.Validate(Error));
+	Invalid.SampleStepCells = 3;
+	TestFalse(TEXT("Proxy rejects non-power-of-two sampling"), Invalid.Validate(Error));
+	Invalid.SampleStepCells = 256;
+	TestFalse(TEXT("Sampling must divide actual spatial coverage"), Invalid.Validate(Error));
+
+	int32 Step = 0;
+	bool bFloor = false;
+	TestTrue(TEXT("SSE immediately before the sixteen-cell threshold resolves"),
+		VoxelStreamingGeometry::ResolveSampleStep(599, 90.0, 600, 8.0, 128, Step, bFloor, Error, 2));
+	TestEqual(TEXT("Sixteen-cell sampling is ineligible before its actual pixel threshold"), Step, 8);
+	TestTrue(TEXT("SSE immediately after the sixteen-cell threshold resolves"),
+		VoxelStreamingGeometry::ResolveSampleStep(601, 90.0, 600, 8.0, 128, Step, bFloor, Error, 2));
+	TestEqual(TEXT("Sixteen-cell sampling becomes eligible independently of spatial level"), Step, 16);
+	TestTrue(TEXT("Sampling can exceed the removed legacy sixteen-cell ceiling"),
+		VoxelStreamingGeometry::ResolveSampleStep(5000, 90.0, 600, 8.0, 128, Step, bFloor, Error, 2));
+	TestEqual(TEXT("Distant sampling is capped by actual geometry bounds"), Step, 128);
+	TestEqual(TEXT("Texture period remains independent of spatial level"), VoxelViewLod::TexturePeriodCells(32, 8.0), 8.0);
+
+	TArray<FVoxelTerrainBuildShard> Shards;
+	const FVoxelTerrainGeometry Finer{Spatial, 2, -128, 256, 17, 23};
+	const FVoxelTerrainGeometry Coarser{Spatial, 4, -128, 256, 17, 23};
+	TestTrue(TEXT("Finer actual geometry splits into bounded execution shards"),
+		VoxelStreamingGeometry::BuildShards(Finer, 32, 64, Shards, Error));
+	TestEqual(TEXT("Sixty-four samples per axis require eight bounded shards"), Shards.Num(), 8);
+	TestTrue(TEXT("Same spatial coverage uses fewer shards with coarser actual sampling"),
+		VoxelStreamingGeometry::BuildShards(Coarser, 32, 64, Shards, Error));
+	TestEqual(TEXT("Thirty-two samples per axis fit one bounded shard"), Shards.Num(), 1);
+	TestFalse(TEXT("Invalid geometry is rejected before replacing the shard plan"),
+		VoxelStreamingGeometry::BuildShards(Invalid, 32, 64, Shards, Error));
+	TestEqual(TEXT("Rejected sampling retains the previous shard plan"), Shards.Num(), 1);
+	TestFalse(TEXT("Non-power-of-two execution limits cannot create incompatible edge windows"),
+		VoxelStreamingGeometry::BuildShards(Finer, 15, 512, Shards, Error));
+	TestEqual(TEXT("Rejected execution limits retain the previous shard plan"), Shards.Num(), 1);
+
+	FVoxelProxyPageBuild ProxyBuild;
+	TestTrue(TEXT("Production Proxy page admits explicit finer geometry"), ProxyBuild.Initialize(Finer, Error));
+	const uint64 ProxyRetainedBytes = ProxyBuild.MaximumRetainedBytes();
+	TestFalse(TEXT("Invalid Proxy page initialization is rejected"), ProxyBuild.Initialize(Invalid, Error));
+	TestEqual(TEXT("Rejected Proxy initialization preserves the old admitted geometry"), ProxyBuild.MaximumRetainedBytes(), ProxyRetainedBytes);
+	FVoxelHeightfieldPageBuild HeightfieldBuild;
+	const FVoxelTerrainGeometry Surface{{EVoxelTerrainRepresentation::Surface, FIntVector::ZeroValue, 1}, 1, -128, 256, 17, 23};
+	TestTrue(TEXT("Production heightfield page admits explicit column geometry"), HeightfieldBuild.Initialize(Surface, Error));
+	const uint64 HeightfieldRetainedBytes = HeightfieldBuild.MaximumRetainedBytes();
+	TestFalse(TEXT("Heightfield rejects a volume representation before replacing its state"), HeightfieldBuild.Initialize(Finer, Error));
+	TestEqual(TEXT("Rejected heightfield initialization preserves the admitted geometry"), HeightfieldBuild.MaximumRetainedBytes(), HeightfieldRetainedBytes);
+
+	FIntVector SamplingMin;
+	FIntVector SamplingMax;
+	const FVoxelTerrainGeometry Edge{{EVoxelTerrainRepresentation::VoxelProxy, FIntVector(MAX_int32 / 32 - 1, 0, 0), 1}, 2, -128, 256, 17, 23};
+	TestTrue(TEXT("Representable geometry has valid unpadded sampling bounds"),
+		VoxelStreamingGeometry::TrySamplingBounds(Edge, FIntVector::ZeroValue, FIntVector::ZeroValue, SamplingMin, SamplingMax, Error));
+	const FIntVector RetainedMin = SamplingMin;
+	const FIntVector RetainedMax = SamplingMax;
+	TestFalse(TEXT("Sampling padding cannot overflow the integer coordinate range"),
+		VoxelStreamingGeometry::TrySamplingBounds(Edge, FIntVector::ZeroValue, FIntVector(32), SamplingMin, SamplingMax, Error));
+	TestFalse(TEXT("Negative sampling padding is rejected"),
+		VoxelStreamingGeometry::TrySamplingBounds(Edge, FIntVector(-1, 0, 0), FIntVector::ZeroValue, SamplingMin, SamplingMax, Error));
+	TestEqual(TEXT("Rejected sampling bounds preserve the previous minimum"), SamplingMin, RetainedMin);
+	TestEqual(TEXT("Rejected sampling bounds preserve the previous maximum"), SamplingMax, RetainedMax);
+
+	const auto Config = VoxelTest::MakeGenerationConfig();
+	const auto Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
+	const FVoxelVoxelProxyBuilder Builder(Config, Cache);
+	FVoxelVoxelProxyData RetainedData;
+	RetainedData.Geometry = Coarser;
+	RetainedData.Revision = 73;
+	RetainedData.Cells.Add(FVoxelBlockState(1, 0));
+	const TArray<FVoxelTerrainBuildShard> InvalidWindows{
+		{FIntVector::ZeroValue, FIntVector(16, 8, 16)},
+		{FIntVector(1, 0, 0), FIntVector(16)},
+		{FIntVector::ZeroValue, FIntVector(-1)},
+		{FIntVector(128, 0, 0), FIntVector(16)},
+		{FIntVector::ZeroValue, FIntVector(129)}};
+	for (const FVoxelTerrainBuildShard& Window : InvalidWindows)
+	{
+		TestFalse(TEXT("Production Proxy builder rejects invalid windows before sampling"),
+			Builder.BuildNatural({Spatial.Coordinate, Spatial.Level}, RetainedData, Error, nullptr, Finer, &Window));
+		TestTrue(TEXT("Rejected Proxy sampling preserves the original geometry"), RetainedData.Geometry == Coarser);
+		TestEqual(TEXT("Rejected Proxy sampling preserves the original revision"), RetainedData.Revision, uint64(73));
+		TestEqual(TEXT("Rejected Proxy sampling preserves the original payload"), RetainedData.Cells.Num(), 1);
+	}
+
+	FVoxelTerrainStageSource Strict;
+	Strict.Source.Center = FIntVector::ZeroValue;
+	Strict.Source.VerticalFovDegrees = 90.0f;
+	Strict.Source.ViewportHeightPixels = 600;
+	Strict.OuterRadiusCells = 128;
+	Strict.VerticalHalfExtentCells = 32;
+	FVoxelTerrainStageSource Relaxed = Strict;
+	Relaxed.Source.ViewportHeightPixels = 100;
+	FVoxelTerrainStagePlan StrictPlan;
+	FVoxelTerrainStagePlan CombinedPlan;
+	const TArray<FVoxelTerrainStageSource> Sources{Relaxed, Strict};
+	if (!TestTrue(TEXT("Production planner resolves the strict local source"),
+		FVoxelTerrainStagePlanner::Build(EVoxelTerrainRepresentation::VoxelProxy, MakeArrayView(&Strict, 1),
+			3, 64, -32, 64, 8.0, 17, 23, StrictPlan, Error)) ||
+		!TestTrue(TEXT("Production planner resolves overlapping source projections"),
+		FVoxelTerrainStagePlanner::Build(EVoxelTerrainRepresentation::VoxelProxy, Sources,
+			3, 64, -32, 64, 8.0, 17, 23, CombinedPlan, Error))) return false;
+	TestEqual(TEXT("Relaxed source cannot coarsen the strict spatial plan"), CombinedPlan.Pages.Num(), StrictPlan.Pages.Num());
+	for (const auto& Pair : StrictPlan.Pages)
+	{
+		const FVoxelTerrainGeometry* Combined = CombinedPlan.Pages.Find(Pair.Key);
+		TestTrue(TEXT("Overlapping sources select the strictest actual local sampling"), Combined && *Combined == Pair.Value);
+	}
+	TestFalse(TEXT("Near Proxy quality floor is explicitly retained"), CombinedPlan.ResolutionFloorPages.IsEmpty());
 	return true;
 }
 
@@ -194,12 +287,12 @@ bool FVoxelEmptyTransitionConvergenceTest::RunTest(const FString& InParameters)
 	Interest.TerrainPlan.Roots = {Node};
 	Interest.TerrainPlan.Leaves = {Node};
 	Interest.TerrainPlan.Required = {Node};
-	Manager.VoxelProxyWanted.Add(Node);
+	Manager.GetInputRoot().ProxyWanted.Add(Node);
 	Manager.VoxelProxyReady.Add(Node);
 	Manager.CommitTerrainOwnership(Owner, MakeArrayView(&Node, 1));
-	auto Data = MakeShared<FVoxelVoxelProxyData>();
+	auto Data = MakeShared<FVoxelVoxelProxyData, ESPMode::ThreadSafe>();
 	Data->Key = Node;
-	Data->Geometry = {{EVoxelTerrainRepresentation::VoxelProxy, Node.Coordinate, Node.Level}, 1, -128, 256, 17, 23};
+	Data->Geometry = {{EVoxelTerrainRepresentation::VoxelProxy, Node.Coordinate, Node.Level}, 2, -128, 256, 17, 23};
 	Interest.Geometry.Add(Data->Geometry.Key, Data->Geometry);
 	Data->Revision = 1;
 	Manager.VoxelProxyData.Add(Node, Data);
@@ -213,7 +306,7 @@ bool FVoxelEmptyTransitionConvergenceTest::RunTest(const FString& InParameters)
 	Manager.RebuildVolumeTransitions({Node});
 	const uint64 Signature = Manager.DesiredVolumeSignatures.FindRef(Node);
 	Manager.PreparedVolumeSignatures.Add(Node, Signature);
-	Manager.PreparedVolumeMeshes.Add(Node, MakeShared<FVoxelSectionMeshResult>());
+	Manager.PreparedVolumeMeshes.Add(Node, MakeShared<FVoxelSectionMeshResult, ESPMode::ThreadSafe>());
 	Manager.ResolveTransitionVisibility();
 	Manager.Publisher->Tick();
 	TestEqual(TEXT("Empty seam result commits its signature without an Actor"), Manager.VolumeTransitionSignatures.FindRef(Node), Signature);
@@ -244,10 +337,26 @@ bool FVoxelFineProxyDependenciesTest::RunTest(const FString& InParameters)
 	const FVoxelViewKey Distant{FIntVector(10, 0, 0), 1};
 	const FVoxelViewKey Root{FIntVector::ZeroValue, 5};
 	auto& Interest = const_cast<FVoxelInterestSet&>(Module->GetCurrentInterest());
-	Interest.TerrainPlan.Build({}, {FIntVector::ZeroValue}, {Root}, FVoxelViewSettings(), BuildError);
-	TestTrue(TEXT("Real terrain plan preserves the Fine ancestor dependency"),
+	Interest.TerrainPlan.Roots = {Root};
+	Interest.TerrainPlan.Leaves = Interest.TerrainPlan.Required = Interest.TerrainPlan.Roots;
+	for (uint8 Level = Root.Level; Level > 0; --Level)
+	{
+		const FVoxelViewKey Parent{FIntVector::ZeroValue, Level};
+		Interest.TerrainPlan.Leaves.Remove(Parent);
+		Interest.TerrainPlan.FineDependencies.Add(Parent);
+		TArray<FVoxelViewKey> Children;
+		Parent.GetChildren(Children);
+		for (const FVoxelViewKey& Child : Children)
+		{
+			Interest.TerrainPlan.Leaves.Add(Child);
+			Interest.TerrainPlan.Required.Add(Child);
+			Interest.TerrainPlan.FineDependencies.Add(Child);
+		}
+	}
+	TestTrue(TEXT("Dependency fixture has a complete spatial partition"), Interest.TerrainPlan.Validate(BuildError));
+	TestTrue(TEXT("Spatial dependency fixture retains the Fine ancestor"),
 		Interest.TerrainPlan.FineDependencies.Contains(Dependency));
-	TestTrue(TEXT("Real terrain plan preserves the coarse sibling needed for atomic handoff"),
+	TestTrue(TEXT("Spatial dependency fixture includes the handoff sibling"),
 		Interest.TerrainPlan.FineDependencies.Contains({FIntVector(1, 0, 0), 1}));
 	FVoxelViewAdmission Admission;
 	Admission.Kind = EVoxelViewAdmissionKind::VoxelProxy;
@@ -305,7 +414,7 @@ bool FVoxelFineProxyDependenciesTest::RunTest(const FString& InParameters)
 	Manager.VoxelProxyReady.Add(Distant);
 	const auto ReadyProxy = MakeShared<FVoxelVoxelProxyData, ESPMode::ThreadSafe>();
 	ReadyProxy->Key = Distant;
-	ReadyProxy->Geometry = {{EVoxelTerrainRepresentation::VoxelProxy, Distant.Coordinate, Distant.Level}, 1, -128, 256, 17, 23};
+	ReadyProxy->Geometry = {{EVoxelTerrainRepresentation::VoxelProxy, Distant.Coordinate, Distant.Level}, 2, -128, 256, 17, 23};
 	Interest.Geometry.Add(ReadyProxy->Geometry.Key, ReadyProxy->Geometry);
 	Manager.VoxelProxyData.Add(Distant, ReadyProxy);
 	TestFalse(TEXT("Proxy fixture is ready but has not transferred visible ownership"), Manager.IsAdmissionPresented(Admission));

@@ -1,4 +1,4 @@
-#include "Voxel/Rendering/VoxelStreamingGeometry.h"
+﻿#include "Voxel/Rendering/VoxelStreamingGeometry.h"
 
 uint32 GetTypeHash(const FVoxelTerrainSpatialKey& InKey)
 {
@@ -56,12 +56,42 @@ bool FVoxelTerrainGeometry::Validate(FString& OutError) const
 {
 	FIntVector Min;
 	FIntVector Max;
-	if (!Key.TryBounds(WorldMinZ, WorldMaxZ, Min, Max) || SampleStepCells <= 0 ||
+	if (WorldMinZ >= WorldMaxZ || !Key.TryBounds(WorldMinZ, WorldMaxZ, Min, Max) || SampleStepCells <= 0 ||
 		!FMath::IsPowerOfTwo(SampleStepCells) || Key.SideCells() % SampleStepCells != 0 ||
-		(Key.Representation == EVoxelTerrainRepresentation::Fine && SampleStepCells != 1))
+		(Key.Representation == EVoxelTerrainRepresentation::Fine && SampleStepCells != 1) ||
+		(Key.Representation == EVoxelTerrainRepresentation::VoxelProxy && SampleStepCells < 2))
 	{
 		OutError = TEXT("Invalid terrain geometry: representation, bounds, alignment or sampling");
 		return false;
+	}
+	OutError.Reset();
+	return true;
+}
+
+bool FVoxelTerrainBuildShard::Validate(const FVoxelTerrainGeometry& InGeometry,
+	const int32 InMaximumSamplesPerAxis, FString& OutError) const
+{
+	if (!InGeometry.Validate(OutError))
+	{
+		return false;
+	}
+	const bool bColumn = InGeometry.Key.IsColumn();
+	if (InMaximumSamplesPerAxis <= 0 || CellCounts.X <= 0 || CellCounts.X > InMaximumSamplesPerAxis ||
+		CellCounts.X != CellCounts.Y || (!bColumn && CellCounts.X != CellCounts.Z) ||
+		(bColumn && (CellCounts.Z != 0 || LocalMinCells.Z != 0)))
+	{
+		OutError = TEXT("Terrain execution window has an invalid shape or sample count");
+		return false;
+	}
+	for (int32 Axis = 0; Axis < (bColumn ? 2 : 3); ++Axis)
+	{
+		const int64 Begin = LocalMinCells[Axis];
+		const int64 End = Begin + int64(CellCounts[Axis]) * InGeometry.SampleStepCells;
+		if (Begin < 0 || Begin % InGeometry.SampleStepCells != 0 || End > InGeometry.Key.SideCells())
+		{
+			OutError = TEXT("Terrain execution window lies outside or misaligns its actual geometry");
+			return false;
+		}
 	}
 	OutError.Reset();
 	return true;
@@ -110,14 +140,48 @@ bool VoxelStreamingGeometry::ValidateInitialSide(const int32 InSide,
 	return true;
 }
 
+bool VoxelStreamingGeometry::TrySamplingBounds(const FVoxelTerrainGeometry& InGeometry,
+	const FIntVector& InLowerPadding, const FIntVector& InUpperPadding,
+	FIntVector& OutMin, FIntVector& OutMax, FString& OutError)
+{
+	if (!InGeometry.Validate(OutError))
+	{
+		return false;
+	}
+	FIntVector Min;
+	FIntVector Max;
+	if (!InGeometry.Key.TryBounds(InGeometry.WorldMinZ, InGeometry.WorldMaxZ, Min, Max))
+	{
+		OutError = TEXT("Terrain sampling bounds are invalid");
+		return false;
+	}
+	for (int32 Axis = 0; Axis < 3; ++Axis)
+	{
+		const int64 Begin = int64(Min[Axis]) - InLowerPadding[Axis];
+		const int64 End = int64(Max[Axis]) + InUpperPadding[Axis];
+		if (InLowerPadding[Axis] < 0 || InUpperPadding[Axis] < 0 || Begin < MIN_int32 || End > MAX_int32)
+		{
+			OutError = TEXT("Terrain sampling padding exceeds the supported coordinate range");
+			return false;
+		}
+		Min[Axis] = int32(Begin);
+		Max[Axis] = int32(End);
+	}
+	OutMin = Min;
+	OutMax = Max;
+	OutError.Reset();
+	return true;
+}
+
 bool VoxelStreamingGeometry::ResolveSampleStep(const double InNearestDistanceCells,
 	const double InVerticalFovDegrees, const int32 InViewportHeight, const double InTargetPixels,
-	const int32 InMaximumStepCells, int32& OutStepCells, bool& bOutAtResolutionFloor, FString& OutError)
+	const int32 InMaximumStepCells, int32& OutStepCells, bool& bOutAtResolutionFloor, FString& OutError, const int32 InMinimumStepCells)
 {
 	if (!FMath::IsFinite(InNearestDistanceCells) || InNearestDistanceCells < 0.0 ||
 		!FMath::IsFinite(InVerticalFovDegrees) || InVerticalFovDegrees <= 0.0 || InVerticalFovDegrees >= 180.0 ||
 		InViewportHeight <= 0 || !FMath::IsFinite(InTargetPixels) || InTargetPixels <= 0.0 ||
-		InMaximumStepCells <= 0 || !FMath::IsPowerOfTwo(InMaximumStepCells))
+		InMinimumStepCells <= 0 || !FMath::IsPowerOfTwo(InMinimumStepCells) ||
+		InMaximumStepCells < InMinimumStepCells || !FMath::IsPowerOfTwo(InMaximumStepCells))
 	{
 		OutError = TEXT("Invalid projection or sample-step parameters");
 		return false;
@@ -126,13 +190,18 @@ bool VoxelStreamingGeometry::ResolveSampleStep(const double InNearestDistanceCel
 		(2.0 * FMath::Tan(FMath::DegreesToRadians(InVerticalFovDegrees * 0.5)));
 	const double Distance = FMath::Max(InNearestDistanceCells, 1.0);
 	const double AllowedStep = InTargetPixels * Distance / Projection;
-	int32 Step = 1;
+	if (!FMath::IsFinite(Projection) || Projection <= 0.0 || !FMath::IsFinite(AllowedStep) || AllowedStep < 0.0)
+	{
+		OutError = TEXT("Projection or screen-error calculation exceeds the supported numeric range");
+		return false;
+	}
+	int32 Step = InMinimumStepCells;
 	while (Step <= InMaximumStepCells / 2 && double(Step) * 2.0 <= AllowedStep)
 	{
 		Step *= 2;
 	}
 	OutStepCells = Step;
-	bOutAtResolutionFloor = AllowedStep < 1.0;
+	bOutAtResolutionFloor = AllowedStep < InMinimumStepCells;
 	OutError.Reset();
 	return true;
 }
@@ -180,7 +249,7 @@ bool VoxelStreamingGeometry::BuildShards(const FVoxelTerrainGeometry& InGeometry
 	{
 		return false;
 	}
-	if (InMaximumSamplesPerAxis <= 0 || InMaximumShardCount <= 0)
+	if (InMaximumSamplesPerAxis <= 0 || !FMath::IsPowerOfTwo(InMaximumSamplesPerAxis) || InMaximumShardCount <= 0)
 	{
 		OutError = TEXT("Invalid build shard limits");
 		return false;

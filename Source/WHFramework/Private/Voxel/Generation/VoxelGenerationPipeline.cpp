@@ -118,6 +118,47 @@ void FVoxelGenerationPipeline::ReleaseOverlaySectionConsumer(const FIntVector& I
 	if (Overlay) Overlay->ReleaseSectionConsumer(InSection);
 }
 
+void FVoxelGenerationPipeline::SetOverlayPlanningServices(FVoxelGenerationPlanningServices InServices) const
+{
+	if (Overlay) Overlay->SetPlanningServices(MoveTemp(InServices));
+}
+
+void FVoxelGenerationPipeline::NotifyOverlayPlanningDependencyReady(const FVoxelGenerationConsumerKey& InConsumer) const
+{
+	if (Overlay) Overlay->NotifyPlanningDependencyReady(InConsumer);
+}
+
+FVoxelOverlayPreflightStatus FVoxelGenerationPipeline::EnsureOverlayConsumerReady(
+	const FVoxelGenerationConsumerKey& InConsumer,
+	const FVoxelGenerationBounds& InBounds,
+	const EVoxelWorkClass InWorkClass,
+	const FVoxelTerrainServicePriority& InPriority) const
+{
+	return Overlay ? Overlay->EnsureConsumerReady(InConsumer, InBounds, InWorkClass, InPriority) : FVoxelOverlayPreflightStatus();
+}
+
+void FVoxelGenerationPipeline::ReleaseOverlayConsumer(const FVoxelGenerationConsumerKey& InConsumer) const
+{
+	if (Overlay) Overlay->ReleaseConsumer(InConsumer);
+}
+
+void FVoxelGenerationPipeline::SetTypedOverlayConsumerWakeCallback(
+	TFunction<void(const FVoxelGenerationConsumerKey&)> InCallback) const
+{
+	if (Overlay) Overlay->SetTypedConsumerWakeCallback(MoveTemp(InCallback));
+}
+
+void FVoxelGenerationPipeline::SetOverlayServicePriorityDonation(
+	TFunction<void(const FVoxelTaskStamp&, EVoxelWorkClass, const FVoxelTerrainServicePriority&)> InCallback) const
+{
+	if (Overlay) Overlay->SetServicePriorityDonation(MoveTemp(InCallback));
+}
+
+void FVoxelGenerationPipeline::AdvanceOverlayConsumerWakes(const double InDeadlineSeconds, const int32 InLimit) const
+{
+	if (Overlay) Overlay->AdvanceConsumerWakes(InDeadlineSeconds, InLimit);
+}
+
 FVoxelOverlayPreflightStatus FVoxelGenerationPipeline::EnsureOverlayBoundsReady(
 	const FVoxelGenerationBounds& InBounds, const EVoxelWorkClass InWorkClass, const int32 InSourcePriority) const
 {

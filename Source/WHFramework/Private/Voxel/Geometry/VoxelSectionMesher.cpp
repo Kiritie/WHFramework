@@ -4,6 +4,44 @@
 #include "Voxel/Chunks/VoxelSectionKey.h"
 #include "Voxel/Rendering/VoxelBoundaryRaster.h"
 #include "Voxel/Rendering/VoxelCoveragePartition.h"
+#include "Voxel/Rendering/VoxelProxyBuilder.h"
+#include "Voxel/Task/VoxelBoundedAllocation.h"
+
+namespace
+{
+    thread_local bool CountSectionMesh = false;
+    thread_local bool SectionCapacityValid = true;
+
+	int32 TransitionClipCapacity(const FVoxelBoundaryTransitionContext* Context, const FIntVector& Offset, const int32 Side)
+	{
+		if (!Context) return 0;
+		const int32 Step = Context->GetSampleStep();
+		const FIntVector WindowMin = Context->Owner.GetBounds().Min + Offset * Step;
+		const FIntVector WindowMax = WindowMin + FIntVector(Side * Step);
+		int64 MaximumCuts = 0;
+		for (uint8 Face = 0; Face < 6; ++Face)
+		{
+			const int32 Axis = Face / 2, U = (Axis + 1) % 3, V = (Axis + 2) % 3;
+			int64 Cuts = 0;
+			const auto Count = [&](const uint8 Direction, const int32 Plane, const FIntVector& Min, const FIntVector& Max)
+			{
+				if (Direction == Face && Plane >= WindowMin[Axis] && Plane <= WindowMax[Axis] &&
+					Min[U] < WindowMax[U] && Max[U] > WindowMin[U] && Min[V] < WindowMax[V] && Max[V] > WindowMin[V]) ++Cuts;
+			};
+			for (const auto& Suppression : Context->SuppressedFaces)
+				Count(uint8(Suppression.Direction), Suppression.Min[Axis], Suppression.Min, Suppression.Max);
+			for (const auto& Patch : Context->Patches)
+			{
+				const auto Bounds = Patch.Neighbor.Key.GetBounds();
+				Count(uint8(Patch.Face.Direction), (Face & 1) ? Bounds.Max[Axis] : Bounds.Min[Axis], Patch.Face.Min, Patch.Face.Max);
+			}
+			MaximumCuts = FMath::Max(MaximumCuts, Cuts);
+		}
+		// 所有矩形端点构成至多 (2N+1)^2 个互不相交区间，覆盖任意重叠裁切顺序。
+		if (MaximumCuts > 23169) return -1;
+		return int32((2 * MaximumCuts + 1) * (2 * MaximumCuts + 1));
+	}
+}
 
 bool FVoxelSectionMesher::IsKnownEmpty(const FVoxelSectionSnapshot& InSnapshot,
 	const FVoxelRegistrySnapshot& InRegistry, const FVoxelBoundaryTransitionContext* InTransition)
@@ -24,8 +62,11 @@ bool FVoxelSectionMesher::IsKnownEmpty(const FVoxelSectionSnapshot& InSnapshot,
 		}
 		if (InTransition)
 			for (const auto& Patch : InTransition->Patches)
-				for (const uint32 Packed : Patch.Neighbor.States)
-					if (!FVoxelBlockState::Unpack(Packed).IsAir()) return false;
+				for (int32 Index = 0; Index < Patch.Neighbor.GetStateCount(); ++Index)
+				{
+					uint32 Packed = 0;
+					if (!Patch.Neighbor.GetPackedState(Index, Packed) || !FVoxelBlockState::Unpack(Packed).IsAir()) return false;
+				}
 		return true;
 	}
 	for (const uint32 Packed : InSnapshot.Blocks)
@@ -44,9 +85,10 @@ bool FVoxelSectionMesher::IsKnownEmpty(const FVoxelSectionSnapshot& InSnapshot,
 	{
 		for (const FVoxelBoundaryTransitionPatch& Patch : InTransition->Patches)
 		{
-			for (const uint32 Packed : Patch.Neighbor.States)
+			for (int32 Index = 0; Index < Patch.Neighbor.GetStateCount(); ++Index)
 			{
-				if (!IsOpaqueCube(Packed)) return false;
+				uint32 Packed = 0;
+				if (!Patch.Neighbor.GetPackedState(Index, Packed) || !IsOpaqueCube(Packed)) return false;
 			}
 		}
 	}
@@ -64,14 +106,51 @@ bool FVoxelMeshBuffers::Validate()const
         !FMath::IsFinite(UV1[I].X)||!FMath::IsFinite(UV1[I].Y)||!FMath::IsFinite(UV2[I].X))return false;
     return true;
 }
-uint64 FVoxelSectionMeshResult::Bytes()const{uint64 N=0;for(const auto&B:Batches)N+=B.Mesh.Bytes();return N;}
+uint64 FVoxelMeshBuffers::AllocatedBytes() const
+{
+    return Vertices.GetAllocatedSize() + Normals.GetAllocatedSize() + Triangles.GetAllocatedSize() +
+        UV0.GetAllocatedSize() + UV1.GetAllocatedSize() + UV2.GetAllocatedSize() +
+        Colors.GetAllocatedSize() + Tangents.GetAllocatedSize();
+}
+uint64 FVoxelMeshBuffers::PlannedBytes() const
+{
+    using namespace VoxelBoundedAllocation;
+    return 2 * ArrayBytes<FVector>(PlannedVertices) + 3 * ArrayBytes<FVector2D>(PlannedVertices) +
+        ArrayBytes<FLinearColor>(PlannedVertices) + ArrayBytes<FProcMeshTangent>(PlannedVertices) +
+        ArrayBytes<int32>(PlannedIndices);
+}
+void FVoxelMeshBuffers::ReservePlan(const FVoxelMeshBuffers& InPlan)
+{
+    PlannedVertices = InPlan.PlannedVertices;
+    PlannedIndices = InPlan.PlannedIndices;
+    Vertices.Reserve(PlannedVertices); Normals.Reserve(PlannedVertices);
+    UV0.Reserve(PlannedVertices); UV1.Reserve(PlannedVertices); UV2.Reserve(PlannedVertices);
+    Colors.Reserve(PlannedVertices); Tangents.Reserve(PlannedVertices); Triangles.Reserve(PlannedIndices);
+}
+uint64 FVoxelSectionMeshResult::Bytes()const{if(bValidated)return MeshDataBytes;uint64 N=0;for(const auto&B:Batches)N+=B.Mesh.Bytes();return N;}
+uint64 FVoxelSectionMeshResult::AllocatedBytes() const
+{
+    uint64 Bytes = Batches.GetAllocatedSize();
+    for (const auto& Batch : Batches) Bytes += Batch.Mesh.AllocatedBytes();
+    return Bytes;
+}
+uint64 FVoxelSectionMeshResult::PlannedBytes() const
+{
+    uint64 Bytes = VoxelBoundedAllocation::ArrayBytes<FVoxelRenderBatch>(Batches.Num());
+    for (const auto& Batch : Batches) Bytes += Batch.Mesh.PlannedBytes();
+    return Bytes;
+}
 bool FVoxelSectionMeshResult::ValidateAndCache()
 {
 	LocalBounds = FBox(ForceInit);
 	bValidated = false;
+	VertexCount = TriangleCount = MeshDataBytes = 0;
 	for (const auto& Batch : Batches)
 	{
 		if (!Batch.Mesh.Validate()) return false;
+		VertexCount += Batch.Mesh.Vertices.Num();
+		TriangleCount += Batch.Mesh.Triangles.Num() / 3;
+		MeshDataBytes += Batch.Mesh.Bytes();
 		for (const auto& Vertex : Batch.Mesh.Vertices) LocalBounds += Vertex;
 	}
 	bValidated = true;
@@ -122,6 +201,13 @@ bool Visible(const FVoxelSectionSnapshot&S,const FVoxelRegistrySnapshot&R,const 
 }
 void AppendQuad(FVoxelMeshBuffers&O,const FVector*P,const FVector2D*UV,const FVoxelRuntimeFaceRef&T,EVoxelRenderGroup G,const FVector&Cell,bool bPlantWind=false)
 {
+    if (!SectionCapacityValid) return;
+    if (CountSectionMesh) { O.PlannedVertices += 4; O.PlannedIndices += 6; return; }
+    if (O.PlannedVertices > 0)
+    {
+        if (O.Vertices.Num() + 4 > O.PlannedVertices || O.Triangles.Num() + 6 > O.PlannedIndices)
+        { SectionCapacityValid = false; return; }
+    }
     int32 N=O.Vertices.Num();FVector Normal=FVector::CrossProduct(P[1]-P[0],P[2]-P[0]).GetSafeNormal();FVector Tangent=(P[1]-P[0]).GetSafeNormal();
     for(int32 I=0;I<4;++I)
     {
@@ -131,26 +217,71 @@ void AppendQuad(FVoxelMeshBuffers&O,const FVector*P,const FVector2D*UV,const FVo
     }
 	O.Triangles.Append({N, N + 2, N + 1, N, N + 3, N + 2});}
 }
+uint64 FVoxelSectionMesher::FaceMaskBytes(const int32 InSide)
+{
+    return VoxelBoundedAllocation::ArrayBytes<FFaceKey>(int64(InSide) * InSide);
+}
+uint64 FVoxelSectionMesher::TransitionClipScratchBytes(const FVoxelBoundaryTransitionContext* InTransition,
+	const FIntVector& InLocalCellOffset, const int32 InSide)
+{
+	const int32 Capacity = TransitionClipCapacity(InTransition, InLocalCellOffset, InSide);
+	return Capacity < 0 ? MAX_uint64 : 2 * VoxelBoundedAllocation::ArrayBytes<FBox2D>(Capacity);
+}
 bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegistrySnapshot&R,const FVoxelShapeRegistry&H,
     FVoxelSectionMeshResult&O,const TAtomic<bool>*Cancel, const double InTextureRepeatsPerCell,
-    const FVoxelBoundaryTransitionContext* InTransition, const bool bBoundaryOnly, const bool bIncludeBoundary, const FIntVector& InLocalCellOffset, const int32 InTextureGridSide)
+    const FVoxelBoundaryTransitionContext* InTransition, const bool bBoundaryOnly, const bool bIncludeBoundary, const FIntVector& InLocalCellOffset, const int32 InTextureGridSide,
+    const bool bCountOnly, const FVoxelSectionMeshResult* InCapacityPlan)
 {
+    TGuardValue<bool> CountGuard(CountSectionMesh, bCountOnly);
+    TGuardValue<bool> CapacityGuard(SectionCapacityValid, true);
     const int32 Side = S.GridSide;
-    if(S.Blocks.Num()!=Side * Side * Side)return false;for(uint32 P:S.Blocks)if(!R.IsValid(FVoxelBlockState::Unpack(P)))return false;
+    const bool bFrozenProxyBoundary = bBoundaryOnly && InTransition && InTransition->OwnerGeometry &&
+        InTransition->OwnerGeometry->GridSide == Side;
+    const bool bFrozenFineBoundary = bBoundaryOnly && InTransition && InTransition->FineOwnerGeometry && Side == 16;
+    if (!bFrozenProxyBoundary && !bFrozenFineBoundary && S.Blocks.Num() != Side * Side * Side) return false;
+    for(uint32 P:S.Blocks)if(!R.IsValid(FVoxelBlockState::Unpack(P)))return false;
     if(InTransition && (!InTransition->Validate() ||
         (bIncludeBoundary && InTransition->GetGridSide() != Side))) return false;
+	TArray<FBox2D> ClipRemaining, ClipNext;
+	if (InTransition && !bBoundaryOnly)
+	{
+		const int32 Capacity = TransitionClipCapacity(InTransition, InLocalCellOffset, Side);
+		if (Capacity < 0) return false;
+		ClipRemaining.Reserve(Capacity); ClipNext.Reserve(Capacity);
+	}
     FVoxelSectionMeshResult T;
     T.Stamp.WorldEpoch = S.Stamp.Epoch;
     T.Stamp.Token = S.Stamp.Token;
     T.Stamp.Revision = S.Revision;
     T.Stamp.Section = S.Section;
     TMap<uint32,int32>Groups;int32 TotalVertices=0;
+    FVoxelMeshBuffers RejectedBatch;
+    if (bCountOnly)
+    {
+        const int32 MaximumBatches = int32(FMath::Min(int64(6) * Side * Side * Side, int64(12) * R.Definitions.Num()));
+        T.Batches.Reserve(MaximumBatches);
+        Groups.Reserve(MaximumBatches);
+    }
+    if (InCapacityPlan)
+    {
+        T.Batches.Reserve(InCapacityPlan->Batches.Num());
+        Groups.Reserve(InCapacityPlan->Batches.Num());
+        for (const auto& Planned : InCapacityPlan->Batches)
+        {
+            auto& Batch = T.Batches.AddDefaulted_GetRef();
+            Batch.Group = Planned.Group; Batch.Bank = Planned.Bank; Batch.MaterialVariant = Planned.MaterialVariant;
+            Batch.Mesh.ReservePlan(Planned.Mesh);
+            Groups.Add((uint32(Batch.Group) << 16) | Batch.Bank, T.Batches.Num() - 1);
+        }
+    }
     auto Batch=[&](EVoxelRenderGroup G,uint16 Bank)->FVoxelMeshBuffers&
     {
         uint32 K=(uint32(G)<<16)|Bank;if(const int32*I=Groups.Find(K))return T.Batches[*I].Mesh;
+        if (InCapacityPlan) { SectionCapacityValid = false; return RejectedBatch; }
         FVoxelRenderBatch B;B.Group=G;B.Bank=Bank;int32 I=T.Batches.Add(MoveTemp(B));Groups.Add(K,I);return T.Batches[I].Mesh;
     };
-    auto OverBudget=[&](){return TotalVertices>262144;};
+    // Count 不分配顶点；由调用方依据完整计划拆分 Piece，不能先用旧固定顶点阈值截断计数。
+    auto OverBudget=[&](){return !bCountOnly && TotalVertices>262144;};
     // Clip only the physical interface rectangle. A finer neighbor may cover part
     // of a coarse sample face; discarding the whole cell would open a hole.
     const auto AppendVisibleQuad = [&](const uint8 Face, const FVector* Vertices,
@@ -166,39 +297,47 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
         const int32 Axis = Face / 2, U = (Axis + 1) % 3, V = (Axis + 2) % 3;
         const int32 Step = InTransition->GetSampleStep();
         const FIntVector Origin = InTransition->Owner.GetBounds().Min + InLocalCellOffset * Step;
-        const int32 Plane = Origin[Axis] + FMath::RoundToInt(Vertices[0][Axis] * Step);
+        const double Plane = Origin[Axis] + Vertices[0][Axis] * Step;
         FVector LocalMin = Vertices[0], LocalMax = Vertices[0];
         for (int32 Index = 1; Index < 4; ++Index)
             for (int32 Coordinate = 0; Coordinate < 3; ++Coordinate)
             { LocalMin[Coordinate] = FMath::Min(LocalMin[Coordinate], Vertices[Index][Coordinate]);
               LocalMax[Coordinate] = FMath::Max(LocalMax[Coordinate], Vertices[Index][Coordinate]); }
-        TArray<FVoxelCoverageRegion> Remaining;
-        Remaining.Add({FIntVector(Origin[U] + FMath::RoundToInt(LocalMin[U] * Step),
-            Origin[V] + FMath::RoundToInt(LocalMin[V] * Step), 0),
-            FIntVector(Origin[U] + FMath::RoundToInt(LocalMax[U] * Step),
-            Origin[V] + FMath::RoundToInt(LocalMax[V] * Step), 1)});
+		auto& Remaining = ClipRemaining;
+		Remaining.Reset();
+        Remaining.Add(FBox2D(FVector2D(Origin[U] + LocalMin[U] * Step, Origin[V] + LocalMin[V] * Step),
+            FVector2D(Origin[U] + LocalMax[U] * Step, Origin[V] + LocalMax[V] * Step)));
         const auto Cut = [&](const FIntVector& Min, const FIntVector& Max)
         {
-            TArray<FVoxelCoverageRegion> Next;
-            const FVoxelCoverageRegion Rect{FIntVector(Min[U], Min[V], 0), FIntVector(Max[U], Max[V], 1)};
-            for (const auto& Piece : Remaining) FVoxelCoverageEvaluationTask::Subtract(Piece, Rect, Next);
-            Remaining = MoveTemp(Next);
+			auto& Next = ClipNext;
+			Next.Reset();
+            for (const auto& Piece : Remaining)
+            {
+                const FVector2D Low(FMath::Max(Piece.Min.X, double(Min[U])), FMath::Max(Piece.Min.Y, double(Min[V])));
+                const FVector2D High(FMath::Min(Piece.Max.X, double(Max[U])), FMath::Min(Piece.Max.Y, double(Max[V])));
+                if (Low.X >= High.X || Low.Y >= High.Y) { Next.Add(Piece); continue; }
+                if (Piece.Min.X < Low.X) Next.Add(FBox2D(Piece.Min, FVector2D(Low.X, Piece.Max.Y)));
+                if (High.X < Piece.Max.X) Next.Add(FBox2D(FVector2D(High.X, Piece.Min.Y), Piece.Max));
+                if (Piece.Min.Y < Low.Y) Next.Add(FBox2D(FVector2D(Low.X, Piece.Min.Y), FVector2D(High.X, Low.Y)));
+                if (High.Y < Piece.Max.Y) Next.Add(FBox2D(FVector2D(Low.X, High.Y), FVector2D(High.X, Piece.Max.Y)));
+            }
+			Swap(Remaining, Next);
         };
         for (const auto& Suppression : InTransition->SuppressedFaces)
-            if (static_cast<uint8>(Suppression.Direction) == Face && Suppression.Min[Axis] == Plane)
+            if (static_cast<uint8>(Suppression.Direction) == Face && FMath::IsNearlyEqual(double(Suppression.Min[Axis]), Plane))
                 Cut(Suppression.Min, Suppression.Max);
         for (const auto& Patch : InTransition->Patches)
         {
             const auto Bounds = Patch.Neighbor.Key.GetBounds();
             const int32 PatchPlane = (Face & 1) ? Bounds.Max[Axis] : Bounds.Min[Axis];
-            if (static_cast<uint8>(Patch.Face.Direction) == Face && PatchPlane == Plane)
+            if (static_cast<uint8>(Patch.Face.Direction) == Face && FMath::IsNearlyEqual(double(PatchPlane), Plane))
                 Cut(Patch.Face.Min, Patch.Face.Max);
         }
         for (const auto& Piece : Remaining)
         {
             FVector Points[4]; FVector2D UV[4];
-            const int32 X[4] = {Piece.Min.X, Piece.Max.X, Piece.Max.X, Piece.Min.X};
-            const int32 Y[4] = {Piece.Min.Y, Piece.Min.Y, Piece.Max.Y, Piece.Max.Y};
+            const double X[4] = {Piece.Min.X, Piece.Max.X, Piece.Max.X, Piece.Min.X};
+            const double Y[4] = {Piece.Min.Y, Piece.Min.Y, Piece.Max.Y, Piece.Max.Y};
             for (int32 Index = 0; Index < 4; ++Index)
             {
                 Points[Index] = FVector::ZeroVector;
@@ -217,7 +356,7 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
     if (!bBoundaryOnly) for(uint8 F=0;F<6;++F)for(int32 Slice=0;Slice<Side;++Slice)
     {
         if(Cancel&&Cancel->Load())return false;
-        TArray<FFaceKey> Mask; Mask.SetNum(Side * Side);int32 A=F/2,U=(A+1)%3,V=(A+2)%3;
+        TArray<FFaceKey> Mask; Mask.Reserve(Side * Side); Mask.SetNum(Side * Side);int32 A=F/2,U=(A+1)%3,V=(A+2)%3;
         for(int32 Y=0;Y<Side;++Y)for(int32 X=0;X<Side;++X)
         {
             FIntVector P(0,0,0);P[A]=Slice;P[U]=X;P[V]=Y;FVoxelBlockState B=FVoxelBlockState::Unpack(S.Blocks[P.X + Side * (P.Y + Side * P.Z)]);
@@ -264,79 +403,121 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
             const auto NeighborBounds = Patch.Neighbor.Key.GetBounds();
             const int32 Plane = (Face & 1) ? NeighborBounds.Max[Axis] : NeighborBounds.Min[Axis];
             const int32 OwnerAxis = FMath::Clamp(((Face & 1) ? Plane : Plane - 1) - OwnerBounds.Min[Axis], 0, InTransition->Owner.GetSide() - 1) / OwnerStep;
-            const int32 NeighborStep = Patch.Neighbor.SampleStepCells > 0 ? Patch.Neighbor.SampleStepCells : Patch.Neighbor.Key.GetSampleStep();
-            FVoxelBoundaryRaster OwnerRaster, NeighborRaster;
-            OwnerRaster.Min = FIntPoint(OwnerBounds.Min[UAxis], OwnerBounds.Min[VAxis]);
-            OwnerRaster.Max = FIntPoint(OwnerBounds.Max[UAxis], OwnerBounds.Max[VAxis]);
-            OwnerRaster.StepCells = OwnerStep;
-            NeighborRaster.Min = FIntPoint(NeighborBounds.Min[UAxis], NeighborBounds.Min[VAxis]);
-            NeighborRaster.Max = FIntPoint(NeighborBounds.Max[UAxis], NeighborBounds.Max[VAxis]);
-            NeighborRaster.StepCells = NeighborStep;
-            const auto Filled = [&R](FVoxelBlockState State)
-            {
-                const auto* Definition = R.Find(State.TypeId);
-                return !State.IsAir() && Definition && Definition->Shape == EVoxelShapeKind::FullCube;
-            };
-            for (int32 V = 0; V < Side; ++V)
-                for (int32 U = 0; U < Side; ++U)
+            const int32 NeighborStep = Patch.Neighbor.SampleStepCells;
+            if (OwnerStep <= 0 || NeighborStep <= 0) return false;
+            const int32 FirstU = FMath::Max(OwnerBounds.Min[UAxis], Patch.Face.Min[UAxis]);
+            const int32 FirstV = FMath::Max(OwnerBounds.Min[VAxis], Patch.Face.Min[VAxis]);
+            const int32 LastU = FMath::Min(OwnerBounds.Max[UAxis], Patch.Face.Max[UAxis]);
+            const int32 LastV = FMath::Min(OwnerBounds.Max[VAxis], Patch.Face.Max[VAxis]);
+            const int32 TileStep = FMath::Min(OwnerStep, NeighborStep);
+            for (int32 V = FirstV; V < LastV; V += TileStep)
+                for (int32 U = FirstU; U < LastU; U += TileStep)
                 {
-                    FIntVector Local(0);
-                    Local[Axis] = OwnerAxis;
-                    Local[UAxis] = U; Local[VAxis] = V;
-                    const auto State = FVoxelBlockState::Unpack(S.Blocks[Local.X + Side * (Local.Y + Side * Local.Z)]);
-                    OwnerRaster.Cells.Add({State.TypeId, Filled(State)});
-                }
-            for (int32 V = NeighborRaster.Min.Y; V < NeighborRaster.Max.Y; V += NeighborStep)
-                for (int32 U = NeighborRaster.Min.X; U < NeighborRaster.Max.X; U += NeighborStep)
-                {
-                    FIntVector World(0);
-                    World[Axis] = (Face & 1) ? NeighborBounds.Max[Axis] - 1 : NeighborBounds.Min[Axis];
-                    World[UAxis] = U; World[VAxis] = V;
-                    FVoxelBlockState State;
-                    if (!Patch.Neighbor.Sample(World, State)) return false;
-                    NeighborRaster.Cells.Add({State.TypeId, Filled(State)});
-                }
-            TArray<FVoxelBoundaryFace> Faces;
-            FString Error;
-            const auto& Negative = (Face & 1) ? NeighborRaster : OwnerRaster;
-            const auto& Positive = (Face & 1) ? OwnerRaster : NeighborRaster;
-            if (!FVoxelBoundaryRasterBuilder::BuildVolume(Negative, Positive, Axis, Plane, 65536, Faces, Error)) return false;
-            for (const auto& Boundary : Faces)
-            {
-                const bool bOwnerFilled = Boundary.Normal[Axis] == ((Face & 1) ? -1.0 : 1.0);
-                const int32 U = FMath::FloorToInt(Boundary.Vertices[0][UAxis]);
-                const int32 V = FMath::FloorToInt(Boundary.Vertices[0][VAxis]);
-                FVoxelBlockState State;
-                if (bOwnerFilled)
-                {
-                    FIntVector Local(0);
+                    if (Cancel && Cancel->Load()) return false;
+                    FIntVector Local(0), NeighborCell(0);
                     Local[Axis] = OwnerAxis;
                     Local[UAxis] = (U - OwnerBounds.Min[UAxis]) / OwnerStep;
                     Local[VAxis] = (V - OwnerBounds.Min[VAxis]) / OwnerStep;
-                    State = FVoxelBlockState::Unpack(S.Blocks[Local.X + Side * (Local.Y + Side * Local.Z)]);
+                    const int32 OwnerIndex = Local.X + Side * (Local.Y + Side * Local.Z);
+                    FVoxelBlockState OwnerState;
+                    if (bFrozenFineBoundary)
+                    {
+                        if (!InTransition->FineOwnerGeometry->Boundary->SampleAtomFace(InTransition->Owner.Coordinate,
+                            Face, false, OwnerBounds.Min + Local, OwnerState)) return false;
+                    }
+                    else OwnerState = bFrozenProxyBoundary ? InTransition->OwnerGeometry->Cells[OwnerIndex]
+                        : FVoxelBlockState::Unpack(S.Blocks[OwnerIndex]);
+                    NeighborCell[Axis] = (Face & 1) ? NeighborBounds.Max[Axis] - 1 : NeighborBounds.Min[Axis];
+                    NeighborCell[UAxis] = U; NeighborCell[VAxis] = V;
+                    FVoxelBlockState NeighborState;
+                    if (!Patch.Neighbor.Sample(NeighborCell, NeighborState)) return false;
+                    const FVector OwnerCellMin = FVector(OwnerBounds.Min + Local * OwnerStep);
+                    FVector NeighborCellMin(NeighborBounds.Min);
+                    for (int32 Coordinate = 0; Coordinate < 3; ++Coordinate)
+                        NeighborCellMin[Coordinate] += FMath::FloorToDouble(
+                            double(NeighborCell[Coordinate] - NeighborBounds.Min[Coordinate]) / NeighborStep) * NeighborStep;
+                    const auto EmitSide = [&](const FVoxelBlockState State, const FVoxelBlockState Other,
+                        const FVector& CellMin, const FVector& OtherMin, const int32 StateStep,
+                        const int32 OtherStep, const uint8 OutputFace) -> bool
+                    {
+                        if (State.IsAir()) return true;
+                        const auto* Definition = R.Find(State.TypeId);
+                        const auto* OtherDefinition = Other.IsAir() ? nullptr : R.Find(Other.TypeId);
+                        const auto* Shape = Definition ? H.Find(Definition->Shape, State.State) : nullptr;
+                        const auto* OtherShape = OtherDefinition ? H.Find(OtherDefinition->Shape, Other.State) : nullptr;
+                        if (!Definition || !Shape || (!Other.IsAir() && (!OtherDefinition || !OtherShape))) return false;
+                        if (!Shape->Quads.ContainsByPredicate([OutputFace](const FVoxelShapeQuad& Quad)
+                            { return Quad.bBoundary && Quad.Face == OutputFace; })) return true;
+                        const bool bOtherOccludes = OtherDefinition && (OtherDefinition->bOccludes ||
+                            (State.TypeId == Other.TypeId && (Definition->RenderGroup == EVoxelRenderGroup::Water ||
+                                Definition->RenderGroup == EVoxelRenderGroup::Translucent)));
+                        if (OtherDefinition && OtherDefinition->Shape == EVoxelShapeKind::FullCube &&
+                            !VoxelFaceVisibility::ShouldRender(R, H, State, Other, OutputFace, nullptr)) return true;
+                        // 形状的规范分辨率是 1/16 cell。两侧使用实际 sample 的形状截面，不能把状态合并成 filled。
+                        bool Mask[256] = {};
+                        const auto Contains = [](const FVoxelResolvedShape& Resolved, const FVector& Point)
+                        {
+                            for (const FBox& Box : Resolved.SelectionBoxes) if (Box.IsInside(Point)) return true;
+                            return false;
+                        };
+                        const double ExtentU = FMath::Min(U + TileStep, LastU) - U;
+                        const double ExtentV = FMath::Min(V + TileStep, LastV) - V;
+                        for (int32 Y = 0; Y < 16; ++Y)
+                            for (int32 X = 0; X < 16; ++X)
+                            {
+                                FVector Point(0.0);
+                                Point[Axis] = Plane + ((OutputFace & 1) ? 1.e-6 : -1.e-6);
+                                Point[UAxis] = U + (X + .5) * ExtentU / 16;
+                                Point[VAxis] = V + (Y + .5) * ExtentV / 16;
+                                if (!Contains(*Shape, (Point - CellMin) / StateStep)) continue;
+                                Point[Axis] = Plane + ((OutputFace & 1) ? -1.e-6 : 1.e-6);
+                                Mask[X + Y * 16] = !bOtherOccludes || !Contains(*OtherShape, (Point - OtherMin) / OtherStep);
+                            }
+                        const uint8 MaterialFace = FVoxelShapeRegistry::RotateFace(OutputFace, uint8((4 - (State.State & 3)) & 3));
+                        const auto Texture = Definition->Face(State.State, MaterialFace);
+                        for (int32 Y = 0; Y < 16; ++Y)
+                            for (int32 X = 0; X < 16;)
+                            {
+                                if (!Mask[X + Y * 16]) { ++X; continue; }
+                                int32 Width = 1, Height = 1;
+                                while (X + Width < 16 && Mask[X + Width + Y * 16]) ++Width;
+                                bool bStop = false;
+                                while (Y + Height < 16 && !bStop)
+                                {
+                                    for (int32 Delta = 0; Delta < Width; ++Delta)
+                                        if (!Mask[X + Delta + (Y + Height) * 16]) { bStop = true; break; }
+                                    if (!bStop) ++Height;
+                                }
+                                FVector Points[4]; FVector2D UV[4];
+                                const double Us[4] = {double(X), double(X + Width), double(X + Width), double(X)};
+                                const double Vs[4] = {double(Y), double(Y), double(Y + Height), double(Y + Height)};
+                                for (int32 Vertex = 0; Vertex < 4; ++Vertex)
+                                {
+                                    FVector WorldPoint(0.0);
+                                    WorldPoint[Axis] = Plane;
+                                    WorldPoint[UAxis] = U + Us[Vertex] * ExtentU / 16;
+                                    WorldPoint[VAxis] = V + Vs[Vertex] * ExtentV / 16;
+                                    Points[Vertex] = (WorldPoint - FVector(OwnerBounds.Min)) / OwnerStep;
+                                    const double Period = FMath::Clamp(double(StateStep), 1.0,
+                                        InTransition->MaximumTextureStretchCells);
+                                    UV[Vertex] = MakeFaceUV(OutputFace, Points[Vertex], Side) * (OwnerStep / Period);
+                                }
+                                // U/V 为 BoundaryRaster 轴序，与普通 voxel face 的循环轴序不同。
+                                const bool bReverse = (Axis != 1) != ((OutputFace & 1) == 0);
+                                if (bReverse) { Swap(Points[1], Points[3]); Swap(UV[1], UV[3]); }
+                                AppendQuad(Batch(Definition->RenderGroup, Texture.Bank), Points, UV,
+                                    Texture, Definition->RenderGroup, FVector::ZeroVector);
+                                TotalVertices += 4;
+                                if (OverBudget()) return false;
+                                for (int32 DY = 0; DY < Height; ++DY)
+                                    for (int32 DX = 0; DX < Width; ++DX) Mask[X + DX + (Y + DY) * 16] = false;
+                                X += Width;
+                            }
+                        return true;
+                    };
+                    if (!EmitSide(OwnerState, NeighborState, OwnerCellMin, NeighborCellMin, OwnerStep, NeighborStep, Face) ||
+                        !EmitSide(NeighborState, OwnerState, NeighborCellMin, OwnerCellMin, NeighborStep, OwnerStep, Face ^ 1)) return false;
                 }
-                else
-                {
-                    FIntVector World(0);
-                    World[Axis] = (Face & 1) ? NeighborBounds.Max[Axis] - 1 : NeighborBounds.Min[Axis];
-                    World[UAxis] = U; World[VAxis] = V;
-                    if (!Patch.Neighbor.Sample(World, State)) return false;
-                }
-                const auto* Definition = R.Find(State.TypeId);
-                if (!Definition) return false;
-                const uint8 OutputFace = Boundary.Normal[Axis] > 0 ? Axis * 2 : Axis * 2 + 1;
-                const uint8 MaterialFace = FVoxelShapeRegistry::RotateFace(OutputFace, uint8((4 - (State.State & 3)) & 3));
-                const auto Texture = Definition->Face(State.State, MaterialFace);
-                FVector Vertices[4]; FVector2D UV[4];
-                for (int32 I = 0; I < 4; ++I)
-                {
-                    Vertices[I] = (Boundary.Vertices[I] - FVector(OwnerBounds.Min)) / OwnerStep;
-                    UV[I] = MakeFaceUV(OutputFace, Vertices[I], Side) * InTextureRepeatsPerCell;
-                }
-                if (Boundary.bReverseWinding) { Swap(Vertices[1], Vertices[3]); Swap(UV[1], UV[3]); }
-                AppendQuad(Batch(Definition->RenderGroup, Texture.Bank), Vertices, UV, Texture, Definition->RenderGroup, FVector::ZeroVector);
-                TotalVertices += 4; if (OverBudget()) return false;
-            }
         }
     }
     if (!bBoundaryOnly) for(int32 I=0;I<Side * Side * Side;++I)
@@ -347,10 +528,29 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
         FIntVector P=FIntVector(I % Side, (I / Side) % Side, I / (Side * Side));for(const auto&Q:Shape->Quads)
         {
             if(Q.bBoundary&&!Visible(S,R,H,P,B,Q.Face,&Q))continue;
-            const auto&Tex=D->Face(B.State,Q.MaterialFace);AppendQuad(Batch(D->RenderGroup,Tex.Bank),Q.Vertices,Q.UV,Tex,D->RenderGroup,FVector(P),D->Shape==EVoxelShapeKind::CrossPlant);
-            TotalVertices+=4;if(OverBudget())return false;
+            const auto& Tex = D->Face(B.State,Q.MaterialFace);
+            if (Q.bBoundary && InTransition)
+            {
+                FVector Points[4]; FVector2D UV[4];
+                for (int32 Vertex = 0; Vertex < 4; ++Vertex)
+                {
+                    Points[Vertex] = Q.Vertices[Vertex] + FVector(P);
+                    UV[Vertex] = MakeFaceUV(Q.Face, Points[Vertex] + FVector(InLocalCellOffset),
+                        double(InTextureGridSide > 0 ? InTextureGridSide : Side)) * InTextureRepeatsPerCell;
+                }
+                FFaceKey Material;
+                Material.Visible = true; Material.Packed = B.Pack(); Material.Group = D->RenderGroup; Material.Texture = Tex;
+                AppendVisibleQuad(Q.Face, Points, UV, Material);
+            }
+            else
+            {
+                AppendQuad(Batch(D->RenderGroup,Tex.Bank),Q.Vertices,Q.UV,Tex,D->RenderGroup,FVector(P),D->Shape==EVoxelShapeKind::CrossPlant);
+                TotalVertices += 4;
+            }
+            if(OverBudget())return false;
         }
     }
+    if (!SectionCapacityValid) return false;
     T.Batches.Sort([](const FVoxelRenderBatch&A,const FVoxelRenderBatch&B){return A.Group!=B.Group?uint8(A.Group)<uint8(B.Group):A.Bank<B.Bank;});
     for(const auto&B:T.Batches)if(!B.Mesh.Validate())return false;if (!T.ValidateAndCache()) return false; O=MoveTemp(T);return true;
 }

@@ -1,4 +1,4 @@
-#include "Voxel/Navigation/VoxelNavigationBounds.h"
+﻿#include "Voxel/Navigation/VoxelNavigationBounds.h"
 
 #include "Components/BrushComponent.h"
 #include "NavigationSystem.h"
@@ -6,7 +6,7 @@
 AVoxelNavigationBounds::AVoxelNavigationBounds()
 {
 	PrimaryActorTick.bCanEverTick = false;
-	// 导航 Invoker 读取 Actor 位置，必须与随模拟来源移动的边界中心一致。
+	// 导航 Invoker 读取 Actor 位置，保持为该固定消费区域的中心。
 	GetBrushComponent()->SetMobility(EComponentMobility::Movable);
 	SetReplicates(false);
 	SetActorHiddenInGame(true);

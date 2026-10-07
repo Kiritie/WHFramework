@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Main/Base/ModuleNetworkComponentBase.h"
@@ -9,6 +9,13 @@
 class APawn;
 class APlayerController;
 class UVoxelModule;
+struct FVoxelOverlayNetworkState;
+struct FVoxelRepresentationSubscriptionState;
+struct FVoxelOverlayRegionMessage;
+struct FVoxelTaskResult;
+class FVoxelNetworkEnvelopeDecode;
+class FVoxelTerrainFrameContext;
+struct FVoxelViewSettings;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FVoxelProtocolFailure, const FString&, Reason);
 DECLARE_MULTICAST_DELEGATE_OneParam(FVoxelIntentReplyReceived, const FVoxelEditReply&);
@@ -18,10 +25,14 @@ DECLARE_MULTICAST_DELEGATE_OneParam(FVoxelRepresentationInvalidated, const FVoxe
 UCLASS()
 class WHFRAMEWORK_API UVoxelModuleNetworkComponent : public UModuleNetworkComponentBase
 {
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FVoxelNetworkWorldControlTest;
+#endif
 	GENERATED_BODY()
 
 public:
 	UVoxelModuleNetworkComponent();
+	virtual ~UVoxelModuleNetworkComponent() override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type InReason) override;
 	virtual void TickComponent(
@@ -37,6 +48,9 @@ public:
 		const FVoxelRepresentationWireKey& InKey,
 		uint64 InKnownRevision);
 	bool IsSessionReady() const;
+	void AdvanceTerrainNetwork(FVoxelTerrainFrameContext& InFrame);
+	bool AdvanceDeferredWorldControl();
+	void OnTerrainWorldStopping();
 	void SetAuthorizedObserver(AActor* InObserver, bool bInAllowBuild);
 	AActor* GetAuthorizedObserver() const;
 	static void PushInventoryFor(AActor* InOwner);
@@ -63,16 +77,33 @@ protected:
 
 private:
 	void BindModule();
+	static bool IsRepresentationInRange(const FVector& InObserverCell, EVoxelRepresentationWireType InType,
+		const FVoxelGenerationBounds& InBounds, const FVoxelViewSettings& InSettings);
 	void ResetProtocol();
 	void Fail(const FString& InReason);
 	bool Send(EVoxelMessage InKind, const TArray<uint8>& InPayload, EVoxelTransferPriority InPriority);
 	void Receive(const FVoxelRPCPacket& InPacket, bool bInServer);
-	void Handle(const FVoxelWireMessage& InMessage, bool bInServer);
+	void ProcessPacket(const FVoxelRPCPacket& InPacket, bool bInServer);
+	void AdvanceEnvelopeDecode(double InNow);
+	bool StageDecodedEnvelope(const TSharedPtr<FVoxelNetworkEnvelopeDecode, ESPMode::ThreadSafe>& InWork,
+		FVoxelTaskResult&& InResult);
+	bool ApplyDecodedEnvelope(bool bInWorldControl);
+	bool HandleWelcome(const FVoxelWireMessage& InMessage);
+	void AdvancePendingRepresentations(double InDeadline);
+	void AdvanceRepresentationSubscriptions(double InNow, double InDeadline);
+	bool ReserveRepresentationTables();
+	void ResetRepresentationRequests();
+	bool TryApplyRepresentationReply(uint64 InSerial);
+	void Handle(const FVoxelWireMessage& InMessage, bool bInServer,
+		const FVoxelRepresentationReply* InPreparedReply = nullptr);
 	void RefreshInterest(double InNow);
-	void SendSectionState(const FIntVector& InSection);
-	void SendSectionSnapshot(const FIntVector& InSection);
-	void ApplyPendingSnapshots();
-	void RequestMissingSnapshots(double InNow);
+	void AdvanceOverlayProtocol(double InNow, double InDeadline);
+	void RefreshOverlaySubscription(double InNow);
+	void BeginOverlaySnapshot();
+	void DecodeOverlayMessage(const FVoxelWireMessage& InMessage, bool bInServer);
+	void HandleOverlayMessage(EVoxelMessage InKind, FVoxelOverlayRegionMessage&& InMessage, bool bInServer);
+	void CaptureOverlayCommit(const FVoxelEditBatch& InBatch);
+	bool SendOverlayControl(EVoxelMessage InKind, TConstArrayView<FIntVector> InRegions);
 	void OnCommit(const FVoxelEditBatch& InBatch);
 	APlayerController* Controller() const;
 
@@ -83,19 +114,33 @@ private:
 	TWeakObjectPtr<UVoxelModule> Module;
 	TWeakObjectPtr<AActor> AuthorizedObserver;
 	FVoxelNetworkTransfer Transfer;
-	TMap<FIntVector, FVoxelNetworkSectionSnapshot> PendingSnapshots;
-	TSet<FIntVector> PendingSnapshotReads;
-	TSet<FIntVector> KnownModifiedSections;
-	TMap<FIntVector, double> SnapshotRequests;
+	TSharedPtr<FVoxelOverlayNetworkState, ESPMode::ThreadSafe> OverlayNetwork;
 	TSet<FIntVector> GameplayInterest;
-	TMap<FIntVector, uint64> SentChangeSummaryRevisions;
-	TMap<FVoxelRepresentationWireKey, uint8> RepresentationSubscriptions;
-	TMap<uint64, FVoxelRepresentationRequest> PendingRepresentationRequests;
+	TUniquePtr<FVoxelRepresentationSubscriptionState> RepresentationSubscriptions;
+	struct FPendingRepresentation
+	{
+		FVoxelRepresentationRequest Request;
+		FVoxelRepresentationReply Reply;
+		FGuid RequestSession;
+		uint64 WorldEpoch = 0;
+		uint64 OwnerIncarnation = 0;
+		uint64 CapacityVersion = 0;
+		double LastSentSeconds = 0.0;
+		bool bHasReply = false;
+	};
+	TMap<uint64, FPendingRepresentation> PendingRepresentationRequests;
+	int32 PendingRepresentationCursor = 0;
+	uint64 PendingRepresentationBytes = 0;
+	int32 RepresentationTableCapacity = 0;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RepresentationTableLease;
 	FGuid Session;
 	FGuid SourceId;
 	FDelegateHandle CommitHandle;
 	uint64 ClientNonce = 0;
 	uint64 NextOutboundId = 1;
+	FGuid TaskOwnerId = FGuid::NewGuid();
+	uint64 TaskOwnerIncarnation = 1;
+	uint64 NextTaskSerial = 0;
 	uint64 LastInboundEditId = 0;
 	double LastHello = -10.0;
 	double LastInterest = -10.0;

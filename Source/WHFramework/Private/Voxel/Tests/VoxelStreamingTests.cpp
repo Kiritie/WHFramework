@@ -1,4 +1,4 @@
-#if WITH_DEV_AUTOMATION_TESTS
+﻿#if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
 #include "Voxel/Geometry/VoxelSectionMesher.h"
@@ -629,7 +629,8 @@ bool FVoxelResidencyPinTest::RunTest(const FString& InParameters)
 	{
 		return false;
 	}
-	Section->PinCount.Store(1);
+	const auto Identity = Section->GetResourceIdentity();
+	TestTrue(TEXT("Runtime grants an identity checked pin"), Runtime.TryPinSection(SectionKey, Identity));
 	int32 Evictions = 0;
 	FVoxelResidencyManager Manager(Runtime, Scheduler, [&Evictions](const FIntVector& InSection)
 	{
@@ -641,7 +642,7 @@ bool FVoxelResidencyPinTest::RunTest(const FString& InParameters)
 	TestNotNull(TEXT("Pinned section is retained"), Runtime.FindSection(SectionKey));
 	TestEqual(TEXT("Pinned section does not run eviction callback"), Evictions, 0);
 
-	Section->PinCount.Store(0);
+	TestTrue(TEXT("Last pin release emits a local retirement wake"), Runtime.ReleaseSectionPin(SectionKey, Identity));
 	const uint64 PreviousFrameCounter = GFrameCounter;
 	GFrameCounter += 15;
 	Manager.Tick({}, 1, 0.0);
@@ -672,6 +673,9 @@ bool FVoxelViewResidencyHandoffTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Leaving demand does not unload geometry still awaiting replacement"), Runtime.FindSection(Key));
 	TestEqual(TEXT("Retained boundary data does not trigger invalidation"), Evictions, 0);
 	bAwaitingReplacement = false;
+	const auto* Retained = Runtime.FindSection(Key);
+	TestTrue(TEXT("A committed replacement wakes the existing ticket"),
+		Manager.WakeRetirement(Key, Retained->Stamp, Retained->Retirement.Serial));
 	GFrameCounter += 15;
 	Manager.Tick({}, 1, 0.0);
 	TestNull(TEXT("Completed handoff releases data without another interest change"), Runtime.FindSection(Key));
@@ -1099,7 +1103,7 @@ bool FVoxelEmptyMeshApplyTest::RunTest(const FString& Parameters)
 	FVoxelTaskResult Result;
 	Result.Kind = EVoxelTaskKind::BuildFineMesh;
 	Result.bSuccess = true;
-	Result.FineMesh = MakeShared<FVoxelSectionMeshResult>();
+	Result.FineMesh = MakeShared<FVoxelSectionMeshResult, ESPMode::ThreadSafe>();
 	TestFalse(TEXT("Known empty sections do not block heavy mesh publication"), Result.HasHeavyApply());
 	Result.FineMesh->Batches.AddDefaulted_GetRef().Mesh.Triangles = { 0, 1, 2 };
 	TestTrue(TEXT("Renderable mesh still obeys the heavy result budget"), Result.HasHeavyApply());
@@ -1107,7 +1111,7 @@ bool FVoxelEmptyMeshApplyTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Canceled geometry does not consume publication quota"), Result.HasHeavyApply());
 	Result.bCanceled = false;
 	Result.Kind = EVoxelTaskKind::BuildVoxelProxy;
-	Result.VoxelProxyMesh = MakeShared<FVoxelSectionMeshResult>();
+	Result.VoxelProxyMesh = MakeShared<FVoxelSectionMeshResult, ESPMode::ThreadSafe>();
 	TestFalse(TEXT("Empty proxy does not consume heavy publication quota"), Result.HasHeavyApply());
 	Result.VoxelProxyMesh->Batches.AddDefaulted_GetRef().Mesh.Triangles = { 0, 1, 2 };
 	TestTrue(TEXT("Visible proxy keeps heavy publication quota"), Result.HasHeavyApply());

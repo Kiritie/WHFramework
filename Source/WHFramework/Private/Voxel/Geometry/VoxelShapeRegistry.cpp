@@ -176,8 +176,96 @@ void FVoxelShapeRegistry::BuildDefaults()
     for(uint8 K=0;K<=uint8(EVoxelShapeKind::ObjectPart);++K)
     for(uint32 S=0;S<(K == uint8(EVoxelShapeKind::ObjectPart) ? 64u : 65536u);++S)if(IsValidState(EVoxelShapeKind(K),uint16(S)))
         Templates.Add(Key(EVoxelShapeKind(K),uint16(S)),Build(EVoxelShapeKind(K),uint16(S)));
+	// 规范键顺序及逐字段内容签名，不把注册表版本借作 Shape 版本。
+	TArray<uint32> Keys;
+	Templates.GetKeys(Keys);
+	Keys.Sort();
+	ContentHash = 1469598103934665603ull;
+	const auto Mix = [this](const auto Value)
+	{
+		uint64 Bits = 0;
+		static_assert(sizeof(Value) <= sizeof(Bits));
+		FMemory::Memcpy(&Bits, &Value, sizeof(Value));
+		for (int32 Byte = 0; Byte < sizeof(Value); ++Byte)
+		{
+			ContentHash ^= uint8(Bits >> (Byte * 8));
+			ContentHash *= 1099511628211ull;
+		}
+	};
+	for (const uint32 TemplateKey : Keys)
+	{
+		Mix(TemplateKey);
+		const auto& Shape = Templates.FindChecked(TemplateKey);
+		Mix(Shape.Quads.Num());
+		for (const auto& Quad : Shape.Quads)
+		{
+			Mix(Quad.Face); Mix(Quad.MaterialFace); Mix(Quad.bBoundary); Mix(Quad.bTwoSided);
+			for (int32 Index = 0; Index < 4; ++Index)
+			{
+				Mix(Quad.Vertices[Index].X); Mix(Quad.Vertices[Index].Y); Mix(Quad.Vertices[Index].Z);
+				Mix(Quad.UV[Index].X); Mix(Quad.UV[Index].Y);
+			}
+		}
+		Mix(Shape.CollisionBoxes.Num());
+		for (const FBox& Box : Shape.CollisionBoxes)
+		{
+			Mix(Box.Min.X); Mix(Box.Min.Y); Mix(Box.Min.Z);
+			Mix(Box.Max.X); Mix(Box.Max.Y); Mix(Box.Max.Z);
+		}
+		Mix(Shape.SelectionBoxes.Num());
+		for (const FBox& Box : Shape.SelectionBoxes)
+		{
+			Mix(Box.Min.X); Mix(Box.Min.Y); Mix(Box.Min.Z);
+			Mix(Box.Max.X); Mix(Box.Max.Y); Mix(Box.Max.Z);
+		}
+		Mix(Shape.SelectionQuads.Num());
+		for (const auto& Quad : Shape.SelectionQuads)
+		{
+			Mix(Quad.Face); Mix(Quad.MaterialFace); Mix(Quad.bBoundary); Mix(Quad.bTwoSided);
+			for (int32 Index = 0; Index < 4; ++Index)
+			{
+				Mix(Quad.Vertices[Index].X); Mix(Quad.Vertices[Index].Y); Mix(Quad.Vertices[Index].Z);
+				Mix(Quad.UV[Index].X); Mix(Quad.UV[Index].Y);
+			}
+		}
+		Mix(Shape.OcclusionMask);
+		for (int32 Face = 0; Face < 6; ++Face)
+			for (int32 Word = 0; Word < 4; ++Word) Mix(Shape.Coverage[Face][Word]);
+	}
+}
+
+uint64 FVoxelShapeRegistry::GetContentHash() const
+{
+	return ContentHash;
 }
 const FVoxelResolvedShape* FVoxelShapeRegistry::Find(EVoxelShapeKind K,uint16 S)const
 {return Templates.Find(Key(K,K == EVoxelShapeKind::ObjectPart ? uint16(S & ~VoxelState::ObjectPartMask) : S));}
 const FVoxelResolvedShape& FVoxelShapeRegistry::Get(EVoxelShapeKind K,uint16 S)const
 {const auto*V=Find(K,S);check(V);return *V;}
+
+bool FVoxelShapeRegistry::ValidateCellBounds(FString& OutError) const
+{
+	for (const auto& Entry : Templates)
+	{
+		for (const FVoxelShapeQuad& Quad : Entry.Value.Quads)
+		{
+			if (Quad.Face >= 6 || Quad.MaterialFace >= 6)
+			{
+				OutError = TEXT("Fine shape contains an invalid face");
+				return false;
+			}
+			for (int32 Index = 0; Index < 4; ++Index)
+			{
+				const FVector& Vertex = Quad.Vertices[Index];
+				if (Vertex.ContainsNaN() || Vertex.GetMin() < 0.0 || Vertex.GetMax() > 1.0 ||
+					!FMath::IsFinite(Quad.UV[Index].X) || !FMath::IsFinite(Quad.UV[Index].Y))
+				{
+					OutError = TEXT("Fine shape requires extended source bounds; cell-bounded registry validation failed");
+					return false;
+				}
+			}
+		}
+	}
+	OutError.Reset();
+	return true;
+}

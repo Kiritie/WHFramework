@@ -1,4 +1,4 @@
-#include "Voxel/Agent/VoxelAgentComponent.h"
+﻿#include "Voxel/Agent/VoxelAgentComponent.h"
 
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
@@ -36,14 +36,8 @@ void UVoxelAgentComponent::BeginPlay()
 	Super::BeginPlay();
 
 	Module =
-		UVoxelModule::Find(
+		UVoxelModule::GetPtr(
 			GetWorld());
-
-	if (!Module.IsValid())
-	{
-		Module =
-			&UVoxelModule::Get();
-	}
 
 	if (APawn* Pawn =
 		Cast<APawn>(
@@ -509,69 +503,16 @@ void UVoxelAgentComponent::OnReply(
 	}
 }
 
-void UVoxelAgentComponent::RefreshSource()
+bool UVoxelAgentComponent::BuildStreamingSource(const bool bInLocalView, FVoxelStreamingSource& OutSource) const
 {
-	UVoxelModule* VoxelModule =
-		Module.Get();
-
-	if (!VoxelModule)
-	{
-		return;
-	}
-
-	if (APawn* Pawn =
-		Cast<APawn>(
-			GetOwner()))
-	{
-		APlayerController* PlayerController =
-			Cast<APlayerController>(
-				Pawn->GetController());
-
-		if (BoundController.Get() !=
-			PlayerController)
-		{
-			BindController(
-				PlayerController);
-		}
-	}
-
-	APawn* Pawn =
-		Cast<APawn>(
-			GetOwner());
-
-	bool bActive =
-		bEnableStreaming &&
-		(!Pawn ||
-		 Pawn->IsPlayerControlled() ||
-		 bEnableNonPlayerSource);
-
-	if (GetWorld()->GetNetMode() !=
-		NM_Standalone)
-	{
-		bActive =
-			bActive &&
-			(GetOwner()->HasAuthority() ||
-				(BoundController.IsValid() && BoundController->IsLocalController()));
-	}
-
-	if (!bActive)
-	{
-		if (SourceId.IsValid())
-		{
-			VoxelModule->
-				UnregisterSource(
-					SourceId);
-		}
-
-		SourceId.Invalidate();
-		return;
-	}
-
-	FVoxelStreamingSource Source;
+	UVoxelModule* VoxelModule = Module.Get();
+	if (!VoxelModule || !GetOwner()) return false;
+	FVoxelStreamingSource& Source = OutSource;
+	Source = {};
 	Source.Purpose = bInitialCollisionGatePending ? EVoxelStreamingSourcePurpose::InitialSpawn : EVoxelStreamingSourcePurpose::Observer;
 	Source.bInheritWorldView = bInheritWorldView;
 	Source.View = StreamingView;
-	Source.bLocalView = BoundController.IsValid() && BoundController->IsLocalController();
+	Source.bLocalView = bInLocalView;
 	Source.Priority = StreamingPriority;
 	const ENetMode NetMode = GetWorld()->GetNetMode();
 	if (NetMode == NM_DedicatedServer)
@@ -601,17 +542,14 @@ void UVoxelAgentComponent::RefreshSource()
 	}
 	else
 	{
-		if (SourceId.IsValid())
-		{
-			VoxelModule->UnregisterSource(SourceId);
-			SourceId.Invalidate();
-		}
-		return;
+		return false;
 	}
 	if (SimulationRadiusCells > 0 && GetOwner()->HasAuthority())
 	{
 		Source.Capabilities |= EVoxelStreamingCapability::Simulation;
 	}
+	if (Source.Purpose == EVoxelStreamingSourcePurpose::InitialSpawn || BoundController.IsValid())
+		Source.Capabilities |= EVoxelStreamingCapability::Readiness;
 	Source.Normalize();
 
 	FVector ViewOrigin;
@@ -626,7 +564,7 @@ void UVoxelAgentComponent::RefreshSource()
 			VoxelModule->BlockSize(),
 			Source.Center))
 	{
-		return;
+		return false;
 	}
 
 	Source.Id =
@@ -677,6 +615,74 @@ void UVoxelAgentComponent::RefreshSource()
 		}
 	}
 
+	return true;
+}
+
+void UVoxelAgentComponent::RefreshSource()
+{
+	UVoxelModule* VoxelModule =
+		Module.Get();
+
+	if (!VoxelModule)
+	{
+		return;
+	}
+
+	if (APawn* Pawn =
+		Cast<APawn>(
+			GetOwner()))
+	{
+		APlayerController* PlayerController =
+			Cast<APlayerController>(
+				Pawn->GetController());
+		if (!PlayerController && BirthClaim.IsValid()) PlayerController = BoundController.Get();
+
+		if (BoundController.Get() !=
+			PlayerController)
+		{
+			BindController(
+				PlayerController);
+		}
+	}
+
+	APawn* Pawn =
+		Cast<APawn>(
+			GetOwner());
+
+	bool bActive =
+		bEnableStreaming &&
+		(!Pawn ||
+		 Pawn->IsPlayerControlled() ||
+		 BirthClaim.IsValid() ||
+		 bEnableNonPlayerSource);
+
+	if (GetWorld()->GetNetMode() !=
+		NM_Standalone)
+	{
+		bActive =
+			bActive &&
+			(GetOwner()->HasAuthority() ||
+				(BoundController.IsValid() && BoundController->IsLocalController()));
+	}
+
+	if (!bActive)
+	{
+		if (SourceId.IsValid() && (VoxelModule->IsSourceOwnedBy(SourceId, this) ||
+			VoxelModule->IsSourceOwnedBy(SourceId, GetOwner())))
+		{
+			VoxelModule->
+				UnregisterSource(
+					SourceId);
+		}
+
+		SourceId.Invalidate();
+		return;
+	}
+
+	FVoxelStreamingSource Source;
+	if (!BuildStreamingSource(BoundController.IsValid() && BoundController->IsLocalController(), Source)) return;
+	if (BirthClaim.IsValid() && !IsBirthSourceCommitted()) Source.Purpose = EVoxelStreamingSourcePurpose::InitialSpawn;
+
 	if (!SourceId.IsValid())
 	{
 		SourceId =
@@ -692,6 +698,45 @@ void UVoxelAgentComponent::RefreshSource()
 	{
 		SourceId.Invalidate();
 	}
+	if (bInitialCollisionGatePending && SourceId.IsValid()) TryCommitBirthSource();
+}
+
+bool UVoxelAgentComponent::PrepareBirthSource(const FGuid& InSource)
+{
+	UVoxelModule* VoxelModule = Module.Get();
+	FIntVector Cell;
+	if (!VoxelModule || !VoxelModule->IsReady() || !GetOwner() ||
+		!VoxelCoord::FromWorld(GetOwner()->GetActorLocation(), VoxelModule->BlockSize(), Cell)) return false;
+	if (BirthClaim.IsValid() && BirthClaim.SourceId != InSource)
+	{
+		VoxelModule->AbortPlayerClaim(BirthClaim);
+		BirthClaim = {};
+	}
+	FVoxelPlayerClaimToken Prepared;
+	if (!VoxelModule->PreparePlayerClaim(InSource, GetOwner(), BirthPawnIncarnation, Cell, Prepared)) return false;
+	const FGuid Previous = SourceId;
+	BirthClaim = Prepared;
+	SourceId = InSource;
+	// Bootstrap 仍持有同一条记录；直到 Commit 成功都不能撤销它。
+	if (Previous.IsValid() && Previous != SourceId &&
+		(VoxelModule->IsSourceOwnedBy(Previous, this) || VoxelModule->IsSourceOwnedBy(Previous, GetOwner())))
+		VoxelModule->UnregisterSource(Previous);
+	bEnableStreaming = true;
+	SetComponentTickEnabled(true);
+	return true;
+}
+
+bool UVoxelAgentComponent::TryCommitBirthSource()
+{
+	if (IsBirthSourceCommitted()) return true;
+	if (!bBirthCandidateCommitted) return false;
+	if (!SourceId.IsValid() || !PrepareBirthSource(SourceId) || !Module.IsValid()) return false;
+	return Module->CommitPlayerClaim(BirthClaim, GetOwner());
+}
+
+bool UVoxelAgentComponent::IsBirthSourceCommitted() const
+{
+	return Module.IsValid() && Module->IsPlayerClaimCommitted(BirthClaim, GetOwner());
 }
 
 void UVoxelAgentComponent::RefreshStepHeight()
@@ -766,6 +811,9 @@ bool UVoxelAgentComponent::IsTravelObserverReady() const
 
 void UVoxelAgentComponent::ResetInitialCollisionGate()
 {
+	if (Module.IsValid()) Module->AbortPlayerClaim(BirthClaim);
+	BirthClaim = {};
+	BirthPawnIncarnation = FGuid::NewGuid();
 	bInitialCollisionGatePending =
 		bGateInitialSpawnUntilCollision;
 
@@ -823,14 +871,8 @@ bool UVoxelAgentComponent::IsCollisionReadyAt(
 		Radius + 1.0,
 		HalfHeight + 1.0);
 
-	return
-		UVoxelModuleStatics::
-			AreCollisionsReady(
-				*const_cast<UVoxelModule*>(
-					VoxelModule),
-				FBox(
-					InLocation - Extent,
-					InLocation + Extent));
+	return VoxelModule->IsTerrainSafeAt(SourceId,
+		FBox(InLocation - Extent, InLocation + Extent));
 }
 
 void UVoxelAgentComponent::ApplyInitialCollisionGate(
@@ -931,7 +973,7 @@ void UVoxelAgentComponent::RefreshCollisionMovementGuard()
 			GetActorLocation();
 
 	const bool bCurrentReady =
-		IsCollisionReadyAt(
+		(!bInitialCollisionGatePending || IsBirthSourceCommitted()) && IsCollisionReadyAt(
 			*Character,
 			CurrentLocation);
 
@@ -1134,8 +1176,9 @@ void UVoxelAgentComponent::EndPlay(
 {
 	EndBreak();
 
-	if (Module.IsValid() &&
-		SourceId.IsValid())
+	if (Module.IsValid()) Module->AbortPlayerClaim(BirthClaim);
+	if (Module.IsValid() && SourceId.IsValid() &&
+		(Module->IsSourceOwnedBy(SourceId, this) || Module->IsSourceOwnedBy(SourceId, GetOwner())))
 	{
 		Module->
 			UnregisterSource(
@@ -1192,12 +1235,19 @@ void UVoxelAgentComponent::EndPlay(
 void UVoxelAgentComponent::SetAgentEnabled(
 	const bool bInEnabled)
 {
+	if (bInEnabled == bEnableStreaming)
+	{
+		if (bInEnabled) RefreshSource();
+		return;
+	}
 	if (!bInEnabled)
 	{
 		EndBreak();
+		if (Module.IsValid()) Module->AbortPlayerClaim(BirthClaim);
+		BirthClaim = {};
 
-		if (Module.IsValid() &&
-			SourceId.IsValid())
+		if (Module.IsValid() && SourceId.IsValid() &&
+			(Module->IsSourceOwnedBy(SourceId, this) || Module->IsSourceOwnedBy(SourceId, GetOwner())))
 		{
 			Module->
 				UnregisterSource(

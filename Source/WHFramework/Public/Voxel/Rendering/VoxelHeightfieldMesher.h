@@ -12,6 +12,28 @@ struct FVoxelWaterSurfaceTileData;
 class WHFRAMEWORK_API FVoxelHeightfieldMesher
 {
 public:
+	// 顺序记录同一窗口的真实 batch 分配，再按相同 emission 顺序一次性 Reserve。
+	class WHFRAMEWORK_API FCapacityScope
+	{
+	public:
+		FCapacityScope(bool bInCount, TArray<FVoxelRenderBatch>& InPlan, int32 InBatchLimit);
+		~FCapacityScope();
+		FCapacityScope(const FCapacityScope&) = delete;
+		FCapacityScope& operator=(const FCapacityScope&) = delete;
+		bool IsValid() const;
+		void Bind(FVoxelRenderBatch& InBatch);
+		bool PrepareBatches(FVoxelSectionMeshResult& InMesh);
+		FVoxelRenderBatch& RejectedBatch();
+		bool Count(FVoxelMeshBuffers& InMesh, int32 InVertices, int32 InIndices);
+	private:
+		FCapacityScope* Previous = nullptr;
+		TArray<FVoxelRenderBatch>& Plan;
+		int32 NextBatch = 0;
+		int32 BatchLimit = 0;
+		FVoxelRenderBatch Rejected;
+		bool bCounting = false;
+		bool bValid = true;
+	};
 	// Runs the same emission rules without allocating vertex buffers. Scoped to a worker shard.
 	class WHFRAMEWORK_API FCountScope
 	{

@@ -1,10 +1,14 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Tasks/Task.h"
 #include "Voxel/Task/VoxelTaskFairSelection.h"
+#include "Voxel/Task/VoxelTerrainWorkSelection.h"
+#include "Voxel/Task/VoxelTerrainResources.h"
 #include "Voxel/Rendering/VoxelViewTypes.h"
+#include "Voxel/Rendering/VoxelStreamingGeometry.h"
 #include "Voxel/Runtime/VoxelBlockState.h"
+#include "Voxel/Rendering/VoxelTerrainStatistics.h"
 
 struct FVoxelSectionCollisionResult;
 struct FVoxelSectionMeshResult;
@@ -14,6 +18,8 @@ struct FVoxelWaterSurfaceTileData;
 struct FVoxelMacroTileData;
 struct FVoxelPersistentSection;
 struct FVoxelDetailPlan;
+struct FVoxelFineOverlayReadResult;
+class FVoxelTerrainFrameContext;
 
 enum class EVoxelWorkClass : uint8
 {
@@ -56,33 +62,49 @@ enum class EVoxelTaskKind : uint8
 	GenerateVoxelProxy,
 	GenerateSurface,
 	GenerateMacro,
-	BuildNavigation
+	BuildNavigation,
+	BuildFineShard
 };
 
 struct WHFRAMEWORK_API FVoxelTaskStamp
 {
+	FGuid OwnerId;
+	uint64 OwnerIncarnation = 0;
 	uint64 WorldEpoch = 0;
 	uint64 Token = 0;
 	uint64 Revision = 0;
 	uint64 GeometryRevision = 0;
+	bool bHasGeometryIdentity = false;
+	FVoxelTerrainGeometry GeometryIdentity;
 	FIntVector Section = FIntVector::ZeroValue;
 	FVoxelViewKey ViewKey;
 	FVoxelSurfaceTileKey SurfaceKey;
 	FVoxelMacroTileKey MacroKey;
+	uint64 RegistryRevision = 0;
+	uint64 ShapeRevision = 0;
 
 	bool operator==(const FVoxelTaskStamp& InOther) const;
 };
 
 FORCEINLINE uint32 GetTypeHash(const FVoxelTaskStamp& InStamp)
 {
-	uint32 Hash = ::GetTypeHash(InStamp.WorldEpoch);
+	uint32 Hash = ::GetTypeHash(InStamp.OwnerId);
+	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.OwnerIncarnation));
+	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.WorldEpoch));
 	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.Token));
 	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.Revision));
 	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.GeometryRevision));
+	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.bHasGeometryIdentity));
+	if (InStamp.bHasGeometryIdentity)
+	{
+		Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.GeometryIdentity));
+	}
 	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.Section));
 	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.ViewKey));
 	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.SurfaceKey));
 	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.MacroKey));
+	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.RegistryRevision));
+	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.ShapeRevision));
 	return Hash;
 }
 
@@ -110,11 +132,16 @@ FORCEINLINE uint32 GetTypeHash(const FVoxelTaskKey& InKey)
  */
 struct WHFRAMEWORK_API FVoxelTaskCustomPayload
 {
+	mutable TSharedPtr<FVoxelTerrainWorkReceipt, ESPMode::ThreadSafe> WorkReceipt;
 	virtual ~FVoxelTaskCustomPayload() = default;
 
 	virtual uint64 GetAllocatedBytes() const
 	{
 		return sizeof(FVoxelTaskCustomPayload);
+	}
+	virtual uint64 GetResourceAccountedBytes() const
+	{
+		return 0;
 	}
 };
 
@@ -143,29 +170,36 @@ struct WHFRAMEWORK_API FVoxelTaskResult
 	TArray<FVoxelBlockState> BaseBlocks;
 	TArray<uint8> Payload;
 
-	TSharedPtr<FVoxelSectionCollisionResult> Collision;
-	TSharedPtr<FVoxelSectionMeshResult> FineMesh;
-	TSharedPtr<FVoxelSectionMeshResult> VoxelProxyMesh;
-	TSharedPtr<FVoxelSectionMeshResult> VolumeBoundaryMesh;
-	TSharedPtr<FVoxelSectionMeshResult> SurfaceMesh;
-	TSharedPtr<FVoxelSectionMeshResult> WaterMesh;
-	TSharedPtr<FVoxelSectionMeshResult> MacroMesh;
+	TSharedPtr<FVoxelSectionCollisionResult, ESPMode::ThreadSafe> Collision;
+	TSharedPtr<FVoxelSectionMeshResult, ESPMode::ThreadSafe> FineMesh;
+	TSharedPtr<FVoxelSectionMeshResult, ESPMode::ThreadSafe> VoxelProxyMesh;
+	TSharedPtr<FVoxelSectionMeshResult, ESPMode::ThreadSafe> VolumeBoundaryMesh;
+	TSharedPtr<FVoxelSectionMeshResult, ESPMode::ThreadSafe> SurfaceMesh;
+	TSharedPtr<FVoxelSectionMeshResult, ESPMode::ThreadSafe> WaterMesh;
+	TSharedPtr<FVoxelSectionMeshResult, ESPMode::ThreadSafe> MacroMesh;
 
-	TSharedPtr<FVoxelVoxelProxyData> VoxelProxy;
-	TSharedPtr<FVoxelSurfaceTileData> Surface;
-	TSharedPtr<FVoxelWaterSurfaceTileData> Water;
-	TSharedPtr<FVoxelMacroTileData> Macro;
+	TSharedPtr<FVoxelVoxelProxyData, ESPMode::ThreadSafe> VoxelProxy;
+	TSharedPtr<FVoxelSurfaceTileData, ESPMode::ThreadSafe> Surface;
+	TSharedPtr<FVoxelWaterSurfaceTileData, ESPMode::ThreadSafe> Water;
+	TSharedPtr<FVoxelMacroTileData, ESPMode::ThreadSafe> Macro;
 	TSharedPtr<FVoxelDetailPlan, ESPMode::ThreadSafe> Details;
-	TSharedPtr<FVoxelPersistentSection> PersistentSection;
+	TSharedPtr<FVoxelPersistentSection, ESPMode::ThreadSafe> PersistentSection;
+	TSharedPtr<const FVoxelFineOverlayReadResult, ESPMode::ThreadSafe> OverlayReadResult;
 
 	TSharedPtr<const FVoxelTaskCustomPayload, ESPMode::ThreadSafe> CustomPayload;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InputResourceLease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> OutputResourceLease;
+	TSharedPtr<FVoxelTerrainWorkReceipt, ESPMode::ThreadSafe> WorkReceipt;
+	void MarkWorkUsed() const { if (WorkReceipt) WorkReceipt->Resolve(true); }
 
 	uint64 ResultBytes() const;
+	uint64 GetResourceAccountedBytes() const;
 	bool HasHeavyApply() const;
 };
 
 struct WHFRAMEWORK_API FVoxelTaskRequest
 {
+	TSharedPtr<FVoxelTerrainWorkReceipt, ESPMode::ThreadSafe> WorkReceipt;
 	FVoxelTaskStamp Stamp;
 	EVoxelTaskKind Kind = EVoxelTaskKind::None;
 	EVoxelWorkClass WorkClass = EVoxelWorkClass::None;
@@ -177,6 +211,9 @@ struct WHFRAMEWORK_API FVoxelTaskRequest
 
 	double DistanceScore = 0.0;
 	double ForwardScore = 0.0;
+	FGuid SourceStableKey;
+	EVoxelTerrainServiceBand ServiceBand = EVoxelTerrainServiceBand::None;
+	double FirstRunnableSeconds = -1.0;
 	double QueuedAt = 0.0;
 	uint64 Sequence = 0;
 	EVoxelTaskBlockReason Blocked = EVoxelTaskBlockReason::None;
@@ -186,6 +223,7 @@ struct WHFRAMEWORK_API FVoxelTaskRequest
 
 	double AccumulatedExecuteMilliseconds = 0.0;
 	bool bResumable = false;
+	TFunction<EVoxelTaskBlockReason()> GetBlockReason;
 	TFunction<FVoxelTaskResult(const TAtomic<bool>&)> Execute;
 
 	/**
@@ -272,6 +310,8 @@ public:
 	bool IsTerminal(const FVoxelTaskKey& InKey) const;
 	void UpdatePriorities(TFunctionRef<void(EVoxelTaskKind, const FVoxelTaskStamp&,
 		EVoxelWorkClass&, int32&, double&, double&)> InUpdate);
+	void UpdateServicePriorities(TFunctionRef<void(EVoxelTaskKind, const FVoxelTaskStamp&,
+		EVoxelWorkClass&, FVoxelTerrainServicePriority&)> InUpdate);
 	void UpdateTerrainStages(TFunctionRef<void(EVoxelTaskKind, const FVoxelTaskStamp&, int32&)> InUpdate);
 
 	void Tick(
@@ -288,24 +328,33 @@ public:
 		EVoxelTaskKind InKind) const;
 
 	bool HasSectionTask(const FIntVector& InSection) const;
+	void SetSectionIdleCallback(TFunction<void(const FIntVector&)> InCallback);
 
 	int32 ActiveCount() const;
 	int32 CriticalCount() const;
 
 	void SetBudget(const FVoxelTaskBudget& InBudget);
+	void BindFrameContext(const FVoxelTerrainFrameContext& InContext);
 	void SetObservedTerrainStage(int32 InStage);
 	int32 GetObservedTerrainStage() const { return ObservedTerrainStage; }
 
 	FVoxelTaskDiagnostics GetDiagnostics() const;
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> GetTerrainResources() const;
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> GetRuntimeResources() const;
+	bool InitializeStatistics(uint64 InWorldEpoch);
+	TSharedPtr<FVoxelTerrainStatistics, ESPMode::ThreadSafe> GetTerrainStatistics() const { return Statistics; }
 	static bool IsHigherPriority(
 		const FVoxelTaskRequest& InA,
 		const FVoxelTaskRequest& InB);
+	static FVoxelTerrainServicePriority ResolveServicePriority(const FVoxelTaskRequest& InRequest);
 
 private:
 	struct FSlot
 	{
+		TSharedPtr<FVoxelTerrainWorkReceipt, ESPMode::ThreadSafe> WorkReceipt;
 		TAtomic<bool> Cancel { false };
 		FVoxelTaskResult Result;
+		double ExecuteMicroseconds = 0.0;
 	};
 
 	struct FRunning
@@ -322,6 +371,11 @@ private:
 		double QueuedAt = 0.0;
 		double DistanceScore = 0.0;
 		double ForwardScore = 0.0;
+		FGuid SourceStableKey;
+		EVoxelTerrainServiceBand ServiceBand = EVoxelTerrainServiceBand::None;
+		uint64 ServiceChargeSerial = 0;
+		bool bServiceNear = false;
+		bool bServiceSettled = false;
 		uint64 ReservedBytes = 0;
 
 		TSharedPtr<FSlot, ESPMode::ThreadSafe> Slot;
@@ -359,14 +413,23 @@ private:
 
 private:
 	TArray<FVoxelTaskRequest> Pending;
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> TerrainResources =
+		MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> RuntimeResources =
+		MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
 	TArray<FRunning> Running;
 	TArray<FCompleted> Canceled;
 
 	TSet<FVoxelTaskKey> ActiveKeys;
 	TMap<FIntVector, int32> SectionTaskCounts;
+	TFunction<void(const FIntVector&)> SectionIdleCallback;
 
 	FVoxelTaskBudget Budget;
+	const FVoxelTerrainFrameContext* FrameContext = nullptr;
 	FVoxelTaskDiagnostics Diagnostics;
+	TSharedPtr<FVoxelTerrainStatistics, ESPMode::ThreadSafe> Statistics;
+	FGuid StatisticsOwnerId = FGuid::NewGuid();
+	uint64 StatisticsWorldEpoch = 0;
 	struct FAdmissionAttempt
 	{
 		double FirstRequested = 0.0;
@@ -377,8 +440,10 @@ private:
 		uint64 Rejections = 0;
 	};
 	TMap<FVoxelTaskKey, FAdmissionAttempt> AdmissionAttempts;
-	FVoxelTaskFairSelection FairSelection;
-	FVoxelTaskFairSelection CompletedSelection;
+	FVoxelTerrainWorkSelection WorkerSelection;
+	FVoxelTerrainWorkSelection CompletedSelection;
+	TMap<EVoxelTaskKind, double> WorkerCostEstimates;
+	TMap<EVoxelTaskKind, double> ApplyCostEstimates;
 	uint64 NextSequence = 0;
 
 	double LastBudgetWarning = -10.0;

@@ -178,16 +178,19 @@ bool FVoxelGenerationPlanCoordinatorTest::RunTest(const FString& InParameters)
 	Budget.MaxConcurrentTasks = 1;
 	Scheduler.SetBudget(Budget);
 	FVoxelGenerationPlanCoordinator Coordinator(Scheduler, Config, Cache, 7);
+	const FGuid Owner = FGuid::NewGuid();
+	const auto VisibleConsumer = FVoxelGenerationConsumerKey::Section(7, Owner, 1, FIntVector::ZeroValue, 1);
+	const auto CriticalConsumer = FVoxelGenerationConsumerKey::Section(7, Owner, 1, FIntVector(1, 0, 0), 2);
 	FVoxelGenerationPlanDependency Dependency;
 	Dependency.Kind = EVoxelGenerationPlanKind::Hydrology;
 	Dependency.HydrologyKey.Coordinate = FIntPoint(0, 0);
 	Dependency.StableHash = 713;
 	const TArray<FVoxelGenerationPlanDependency> Dependencies { Dependency };
 	const FVoxelGenerationDependencyStatus First = Coordinator.Ensure(
-		Dependencies, EVoxelWorkClass::Visible, 3, 128.0, 0.0);
+		Dependencies, EVoxelWorkClass::Visible, 3, 128.0, 0.0, VisibleConsumer);
 	TestFalse(TEXT("First consumer waits outside worker"), First.bReady);
 	TestEqual(TEXT("One task builds the shared plan"), Scheduler.ActiveCount(), 1);
-	Coordinator.Ensure(Dependencies, EVoxelWorkClass::Critical, 0, 8.0, 1.0);
+	Coordinator.Ensure(Dependencies, EVoxelWorkClass::Critical, 0, 8.0, 1.0, CriticalConsumer);
 	TestEqual(TEXT("Second consumer reuses queued task"), Scheduler.ActiveCount(), 1);
 	const FVoxelTaskDiagnostics Priority = Scheduler.GetDiagnostics();
 	TestEqual(TEXT("Priority donation promotes queued or running plan"),
@@ -197,7 +200,7 @@ bool FVoxelGenerationPlanCoordinatorTest::RunTest(const FString& InParameters)
 	do
 	{
 		Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
-		Status = Coordinator.Ensure(Dependencies, EVoxelWorkClass::Critical, 0, 8.0, 1.0);
+		Status = Coordinator.Ensure(Dependencies, EVoxelWorkClass::Critical, 0, 8.0, 1.0, CriticalConsumer);
 		if (!Status.bReady) FPlatformProcess::Sleep(0.001f);
 	} while (!Status.bReady && !Status.bFailed && FPlatformTime::Seconds() < Deadline);
 	Scheduler.StopAndJoin();
@@ -224,6 +227,7 @@ bool FVoxelGenerationPlanPreflightTest::RunTest(const FString& InParameters)
 	Budget.CriticalReservedTasks = 1;
 	Scheduler.SetBudget(Budget);
 	FVoxelGenerationPlanCoordinator Coordinator(Scheduler, Config, Cache, 11);
+	const auto Consumer = FVoxelGenerationConsumerKey::Section(11, FGuid::NewGuid(), 1, FIntVector::ZeroValue, 1);
 	TArray<FVoxelGenerationPlanDependency> Dependencies;
 	FString Error;
 	if (!TestTrue(TEXT("Section dependencies are gathered"),
@@ -243,7 +247,7 @@ bool FVoxelGenerationPlanPreflightTest::RunTest(const FString& InParameters)
 	const double Deadline = FPlatformTime::Seconds() + 90.0;
 	do
 	{
-		Status = Coordinator.Ensure(Dependencies, EVoxelWorkClass::Critical, 0, 0.0, 1.0);
+		Status = Coordinator.Ensure(Dependencies, EVoxelWorkClass::Critical, 0, 0.0, 1.0, Consumer);
 		Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
 		Cache->TickMaintenance(256);
 		if (!Status.bReady && !Status.bFailed) FPlatformProcess::Sleep(0.001f);

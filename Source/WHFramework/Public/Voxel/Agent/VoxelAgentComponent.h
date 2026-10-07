@@ -4,6 +4,7 @@
 #include "Voxel/VoxelModuleTypes.h"
 #include "Voxel/Interaction/VoxelEditTypes.h"
 #include "Voxel/Streaming/VoxelStreamingSource.h"
+#include "Voxel/VoxelWorldReadinessRuntime.h"
 
 #include "VoxelAgentComponent.generated.h"
 
@@ -44,6 +45,12 @@ public:
 	void NotifyTravelTeleported();
 	bool IsTravelObserverReady() const;
 	bool IsStreamingLocationAdmitted(const FIntVector& InCell, uint64 InEpoch) const;
+	bool BuildStreamingSource(bool bInLocalView, FVoxelStreamingSource& OutSource) const;
+	bool PrepareBirthSource(const FGuid& InSource);
+	bool TryCommitBirthSource();
+	bool IsBirthSourceCommitted() const;
+	void SetBirthCandidateCommitted(bool bInCommitted) { bBirthCandidateCommitted = bInCommitted; }
+	const FGuid& GetStreamingSourceId() const { return SourceId; }
 
 	UFUNCTION(BlueprintCallable)
 	bool TraceVoxel(
@@ -195,6 +202,9 @@ private:
 	TWeakObjectPtr<UVoxelModuleNetworkComponent> Network;
 
 	FGuid SourceId;
+	FGuid BirthPawnIncarnation = FGuid::NewGuid();
+	FVoxelPlayerClaimToken BirthClaim;
+	bool bBirthCandidateCommitted = true;
 	FDelegateHandle ReplyHandle;
 
 	bool bHeld = false;

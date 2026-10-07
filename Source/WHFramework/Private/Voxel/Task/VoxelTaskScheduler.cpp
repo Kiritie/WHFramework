@@ -1,4 +1,4 @@
-#include "Voxel/Task/VoxelTaskScheduler.h"
+﻿#include "Voxel/Task/VoxelTaskScheduler.h"
 
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 
@@ -10,6 +10,9 @@
 #include "Voxel/Rendering/VoxelSurfaceProxy.h"
 #include "Voxel/Rendering/VoxelWaterView.h"
 #include "Voxel/Save/VoxelDeltaTypes.h"
+#include "Voxel/Runtime/VoxelFineOverlayRead.h"
+#include "Voxel/Rendering/VoxelTerrainFrameContext.h"
+#include "Voxel/Task/VoxelBoundedAllocation.h"
 
 namespace
 {
@@ -32,6 +35,7 @@ namespace
 		if (InRequest.WorkClass != EVoxelWorkClass::Critical) return false;
 		switch (InRequest.Kind)
 		{
+		case EVoxelTaskKind::BuildFineShard:
 		case EVoxelTaskKind::BuildFineMesh:
 		case EVoxelTaskKind::BuildVoxelProxy:
 		case EVoxelTaskKind::BuildSurface:
@@ -55,6 +59,7 @@ int32 TerrainLane(const FVoxelTaskRequest& Request)
 		case EVoxelTaskKind::GenerateExactBase:
 		case EVoxelTaskKind::BuildCollision:
 		case EVoxelTaskKind::DecodeOverlay: return static_cast<int32>(EVoxelTaskServiceLane::Exact);
+		case EVoxelTaskKind::BuildFineShard:
 		case EVoxelTaskKind::BuildFineMesh: return static_cast<int32>(EVoxelTaskServiceLane::Fine);
 		case EVoxelTaskKind::GenerateVoxelProxy: return static_cast<int32>(EVoxelTaskServiceLane::ProxyData);
 		case EVoxelTaskKind::GenerateSurface: return static_cast<int32>(EVoxelTaskServiceLane::SurfaceData);
@@ -91,6 +96,7 @@ int32 TerrainLane(const FVoxelTaskRequest& Request)
 		case EVoxelTaskKind::BuildViewCoverage:
 		case EVoxelTaskKind::GenerateExactBase:
 		case EVoxelTaskKind::DecodeOverlay:
+		case EVoxelTaskKind::BuildFineShard:
 		case EVoxelTaskKind::BuildFineMesh:
 			return 0;
 		case EVoxelTaskKind::GenerateVoxelProxy:
@@ -119,6 +125,7 @@ int32 TerrainLane(const FVoxelTaskRequest& Request)
 			return 0;
 		switch (InKind)
 		{
+		case EVoxelTaskKind::BuildFineShard:
 		case EVoxelTaskKind::BuildFineMesh: return 0;
 		case EVoxelTaskKind::BuildVoxelProxy: return InStage == INDEX_NONE ? 1 : InStage;
 		case EVoxelTaskKind::BuildSurface:
@@ -146,14 +153,19 @@ int32 TerrainLane(const FVoxelTaskRequest& Request)
 
 bool FVoxelTaskStamp::operator==(const FVoxelTaskStamp& InOther) const
 {
-	return WorldEpoch == InOther.WorldEpoch &&
+	return OwnerId == InOther.OwnerId && OwnerIncarnation == InOther.OwnerIncarnation &&
+		WorldEpoch == InOther.WorldEpoch &&
 		Token == InOther.Token &&
 		Revision == InOther.Revision &&
 		GeometryRevision == InOther.GeometryRevision &&
+		bHasGeometryIdentity == InOther.bHasGeometryIdentity &&
+		(!bHasGeometryIdentity || GeometryIdentity == InOther.GeometryIdentity) &&
 		Section == InOther.Section &&
 		ViewKey == InOther.ViewKey &&
 		SurfaceKey == InOther.SurfaceKey &&
-		MacroKey == InOther.MacroKey;
+		MacroKey == InOther.MacroKey &&
+		RegistryRevision == InOther.RegistryRevision &&
+		ShapeRevision == InOther.ShapeRevision;
 }
 
 uint64 FVoxelTaskResult::ResultBytes() const
@@ -182,7 +194,8 @@ uint64 FVoxelTaskResult::ResultBytes() const
 	}
 	if (Water)
 	{
-		Bytes += sizeof(FVoxelWaterSurfaceTileData) + Water->WaterZ.GetAllocatedSize() + Water->WaterKind.GetAllocatedSize();
+		Bytes += sizeof(FVoxelWaterSurfaceTileData) + Water->GroundZ.GetAllocatedSize() +
+			Water->WaterZ.GetAllocatedSize() + Water->WaterKind.GetAllocatedSize();
 	}
 	if (Macro)
 	{
@@ -193,20 +206,17 @@ uint64 FVoxelTaskResult::ResultBytes() const
 	}
 
 	Bytes += Details ? Details->GetAllocatedBytes() : 0;
+	Bytes += OverlayReadResult ? OverlayReadResult->AllocatedBytes() : 0;
 
 	if (PersistentSection)
 	{
-		Bytes +=
-			static_cast<uint64>(PersistentSection->Blocks.Num()) *
-			(sizeof(int32) + sizeof(FVoxelBlockState));
+		Bytes += VoxelBoundedAllocation::WorkerSharedBytes<FVoxelPersistentSection>() +
+			PersistentSection->Blocks.GetAllocatedSize() + PersistentSection->Entities.GetAllocatedSize();
 
 		for (const TPair<int32, FVoxelBlockEntityState>& Pair :
 			PersistentSection->Entities)
 		{
-			Bytes +=
-				sizeof(int32) +
-				sizeof(FVoxelBlockEntityState) +
-				Pair.Value.Payload.Num();
+			Bytes += Pair.Value.Payload.GetAllocatedSize();
 		}
 	}
 
@@ -215,6 +225,36 @@ uint64 FVoxelTaskResult::ResultBytes() const
 			? CustomPayload->GetAllocatedBytes()
 			: 0;
 
+	return Bytes;
+}
+
+uint64 FVoxelTaskResult::GetResourceAccountedBytes() const
+{
+	const FVoxelTerrainResourceLease* Leases[13] = {};
+	int32 Count = 0;
+	uint64 Bytes = CustomPayload ? CustomPayload->GetResourceAccountedBytes() : 0;
+	Bytes += OverlayReadResult ? OverlayReadResult->ResourceAccountedBytes : 0;
+	const auto Add = [&](const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& Lease)
+	{
+		if (!Lease) return;
+		for (int32 Index = 0; Index < Count; ++Index) if (Leases[Index] == Lease.Get()) return;
+		check(Count < UE_ARRAY_COUNT(Leases));
+		Leases[Count++] = Lease.Get();
+		Bytes += Lease->Bytes();
+	};
+	Add(InputResourceLease);
+	Add(OutputResourceLease);
+	if (PersistentSection) Add(PersistentSection->ResourceLease);
+	if (VoxelProxy) Add(VoxelProxy->ResourceLease);
+	if (Surface) Add(Surface->ResourceLease);
+	if (Water) Add(Water->ResourceLease);
+	if (Macro) Add(Macro->ResourceLease);
+	if (FineMesh) Add(FineMesh->ResourceLease);
+	if (VoxelProxyMesh) Add(VoxelProxyMesh->ResourceLease);
+	if (VolumeBoundaryMesh) Add(VolumeBoundaryMesh->ResourceLease);
+	if (SurfaceMesh) Add(SurfaceMesh->ResourceLease);
+	if (WaterMesh) Add(WaterMesh->ResourceLease);
+	if (MacroMesh) Add(MacroMesh->ResourceLease);
 	return Bytes;
 }
 
@@ -288,7 +328,9 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 		InRequest.Kind == EVoxelTaskKind::None ||
 		InRequest.WorkClass == EVoxelWorkClass::None ||
 		!FMath::IsFinite(InRequest.DistanceScore) ||
+		InRequest.DistanceScore < 0.0 ||
 		!FMath::IsFinite(InRequest.ForwardScore) ||
+		static_cast<uint8>(InRequest.ServiceBand) >= static_cast<uint8>(EVoxelTerrainServiceBand::Count) ||
 		InRequest.ReservedBytes == 0 ||
 		InRequest.ReservedBytes > Budget.MaxReservedBytes ||
 		InRequest.InputBytes > Budget.MaxInputBytes)
@@ -395,6 +437,34 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 	return true;
 }
 
+TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> FVoxelTaskScheduler::GetTerrainResources() const
+{
+	return TerrainResources;
+}
+
+bool FVoxelTaskScheduler::InitializeStatistics(const uint64 InWorldEpoch)
+{
+	check(IsInGameThread());
+	if (Statistics || !InWorldEpoch) return false;
+	const auto Consumer = FVoxelGenerationConsumerKey::Section(InWorldEpoch, StatisticsOwnerId, 1, FIntVector::ZeroValue, 1);
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Metadata;
+	if (!RuntimeResources->Acquire(Consumer, EVoxelTerrainResourcePool::Input,
+		VoxelBoundedAllocation::WorkerSharedBytes<FVoxelTerrainStatistics>(), Metadata)) return false;
+	auto Candidate = VoxelBoundedAllocation::MakeWorkerShared<FVoxelTerrainStatistics>(Metadata);
+	if (!Candidate->Initialize(RuntimeResources, Consumer)) return false;
+	StatisticsWorldEpoch = InWorldEpoch;
+	const auto SelectionConsumer = FVoxelGenerationConsumerKey::Section(InWorldEpoch, StatisticsOwnerId, 1, {}, 1);
+	WorkerSelection.BindResources(TerrainResources, SelectionConsumer);
+	CompletedSelection.BindResources(TerrainResources, SelectionConsumer);
+	Statistics = MoveTemp(Candidate);
+	return true;
+}
+
+TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> FVoxelTaskScheduler::GetRuntimeResources() const
+{
+	return RuntimeResources;
+}
+
 void FVoxelTaskScheduler::UpdatePriorities(TFunctionRef<void(EVoxelTaskKind,
 	const FVoxelTaskStamp&, EVoxelWorkClass&, int32&, double&, double&)> InUpdate)
 {
@@ -423,6 +493,58 @@ void FVoxelTaskScheduler::UpdatePriorities(TFunctionRef<void(EVoxelTaskKind,
 			Request.Resume->SourcePriority = Request.SourcePriority;
 			Request.Resume->DistanceScore = Request.DistanceScore;
 			Request.Resume->ForwardScore = Request.ForwardScore;
+		}
+	}
+}
+
+void FVoxelTaskScheduler::UpdateServicePriorities(TFunctionRef<void(EVoxelTaskKind,
+	const FVoxelTaskStamp&, EVoxelWorkClass&, FVoxelTerrainServicePriority&)> InUpdate)
+{
+	check(IsInGameThread());
+	auto Update = [this, &InUpdate](auto& Request)
+	{
+		FVoxelTaskRequest Identity;
+		Identity.Kind = Request.Kind;
+		Identity.WorkClass = Request.WorkClass;
+		Identity.TerrainStage = Request.TerrainStage;
+		Identity.SourcePriority = Request.SourcePriority;
+		Identity.DistanceScore = Request.DistanceScore;
+		Identity.ForwardScore = Request.ForwardScore;
+		Identity.SourceStableKey = Request.SourceStableKey;
+		Identity.ServiceBand = Request.ServiceBand;
+		FVoxelTerrainServicePriority Priority = ResolveServicePriority(Identity);
+		EVoxelWorkClass WorkClass = Request.WorkClass;
+		InUpdate(Request.Kind, Request.Stamp, WorkClass, Priority);
+		if (!ensureMsgf(FMath::IsFinite(Priority.DistanceCells) && Priority.DistanceCells >= 0.0 &&
+			FMath::IsFinite(Priority.ForwardScore) && Priority.Band > EVoxelTerrainServiceBand::None &&
+			Priority.Band < EVoxelTerrainServiceBand::Count, TEXT("Invalid terrain priority update")))
+		{
+			return;
+		}
+		CriticalTaskCount += static_cast<int32>(WorkClass == EVoxelWorkClass::Critical) -
+			static_cast<int32>(Request.WorkClass == EVoxelWorkClass::Critical);
+		Request.WorkClass = WorkClass;
+		Request.SourcePriority = Priority.SourcePriority;
+		Request.DistanceScore = Priority.DistanceCells;
+		Request.ForwardScore = Priority.ForwardScore;
+		Request.SourceStableKey = Priority.SourceStableKey;
+		Request.ServiceBand = Priority.Band;
+	};
+	for (FVoxelTaskRequest& Request : Pending)
+	{
+		Update(Request);
+	}
+	for (FRunning& Request : Running)
+	{
+		Update(Request);
+		if (Request.Resume)
+		{
+			Request.Resume->WorkClass = Request.WorkClass;
+			Request.Resume->SourcePriority = Request.SourcePriority;
+			Request.Resume->DistanceScore = Request.DistanceScore;
+			Request.Resume->ForwardScore = Request.ForwardScore;
+			Request.Resume->SourceStableKey = Request.SourceStableKey;
+			Request.Resume->ServiceBand = Request.ServiceBand;
 		}
 	}
 }
@@ -461,7 +583,8 @@ void FVoxelTaskScheduler::Tick(
 		{
 			switch (Kind)
 			{
-			case EVoxelTaskKind::BuildFineMesh:
+			case EVoxelTaskKind::BuildFineShard:
+		case EVoxelTaskKind::BuildFineMesh:
 				return FineApplied < Budget.MaxFineApplyPerFrame;
 			case EVoxelTaskKind::BuildVoxelProxy:
 			case EVoxelTaskKind::BuildVolumeTransition:
@@ -475,32 +598,46 @@ void FVoxelTaskScheduler::Tick(
 			}
 		};
 
-	for (int32 Pass = 0; Pass < 2; ++Pass)
+	const double EndTime = FrameContext ? FrameContext->Deadline(InMaxApplyMilliseconds) :
+		FPlatformTime::Seconds() + FMath::Max(0.0, InMaxApplyMilliseconds) / 1000.0;
 	{
-		const bool bBackgroundPass = Pass == 1;
-		const double EndTime = FPlatformTime::Seconds() +
-			(bBackgroundPass ? FMath::Min(0.25, FMath::Max(0.0, InMaxApplyMilliseconds)) :
-				FMath::Max(0.0, InMaxApplyMilliseconds)) / 1000.0;
-		const int32 ApplyLimit = bBackgroundPass ? FMath::Min(4, Budget.MaxCompletedResultsPerFrame) :
-			Budget.MaxCompletedResultsPerFrame;
-		const int32 HeavyLimit = bBackgroundPass ? 1 : Budget.MaxHeavyCompletedResultsPerFrame;
+		const int32 ApplyLimit = Budget.MaxCompletedResultsPerFrame;
+		const int32 HeavyLimit = Budget.MaxHeavyCompletedResultsPerFrame;
 		Applied = 0;
 		HeavyApplied = 0;
 		while (!Running.IsEmpty() && Applied < ApplyLimit && FPlatformTime::Seconds() <= EndTime)
 		{
-			TArray<FVoxelTaskServiceCandidate> Candidates;
+			TArray<FVoxelTerrainServiceCandidate> Candidates;
 			for (int32 CandidateIndex = 0; CandidateIndex < Running.Num(); ++CandidateIndex)
 			{
 				const FRunning& Task = Running[CandidateIndex];
-				if (!Task.Task.IsCompleted() || IsBackgroundTerrainWork(Task.Kind, Task.WorkClass, Task.TerrainStage) != bBackgroundPass ||
+				if (!Task.Task.IsCompleted() ||
 					!CanApplyTerrainKind(Task.Kind) || (Task.Slot->Result.HasHeavyApply() && HeavyApplied >= HeavyLimit)) continue;
 				FVoxelTaskRequest Identity;
-				Identity.Kind = Task.Kind; Identity.WorkClass = Task.WorkClass;
-				Candidates.Add({CandidateIndex, static_cast<EVoxelTaskServiceLane>(TerrainLane(Identity)), EVoxelTaskBlockReason::None,
-					Task.SourcePriority, Task.DistanceScore, Task.QueuedAt, Task.Sequence, Task.bPublicationContinuation});
+				Identity.Kind = Task.Kind;
+				Identity.WorkClass = Task.WorkClass;
+				Identity.SourcePriority = Task.SourcePriority;
+				Identity.DistanceScore = Task.DistanceScore;
+				Identity.ForwardScore = Task.ForwardScore;
+				Identity.SourceStableKey = Task.SourceStableKey;
+				Identity.ServiceBand = Task.ServiceBand;
+				Identity.TerrainStage = Task.TerrainStage;
+				FVoxelTerrainServiceCandidate& Candidate = Candidates.AddDefaulted_GetRef();
+				Candidate.Index = CandidateIndex;
+				Candidate.Priority = ResolveServicePriority(Identity);
+				Candidate.FirstQueuedSeconds = Task.QueuedAt;
+				Candidate.Sequence = Task.Sequence;
+				const double* Estimate = ApplyCostEstimates.Find(Task.Kind);
+				Candidate.EstimatedMicroseconds = Estimate ? *Estimate : 50.0;
+				Candidate.bRunnable = true;
 			}
-			const int32 Index = CompletedSelection.Select(Candidates, FPlatformTime::Seconds());
+			FVoxelTerrainServiceCapacity Capacity;
+			Capacity.bAllowOverdueOpportunity = FrameContext && FrameContext->IsOverdueOpportunityAvailable();
+			FVoxelTerrainServiceCharge ApplyCharge;
+			const int32 Index = CompletedSelection.Select(Candidates, Capacity, FPlatformTime::Seconds(), ApplyCharge);
 			if (Index == INDEX_NONE) break;
+			if (ApplyCharge.bOverdueOpportunity) FrameContext->ConsumeOverdueOpportunity();
+			const double ServiceStart = FPlatformTime::Seconds();
 			if (Running[Index].Slot->Cancel.Load())
 			{
 				Running[Index].Slot->Result.bCanceled = true;
@@ -512,6 +649,14 @@ void FVoxelTaskScheduler::Tick(
 				MoveTemp(Running[Index]);
 
 			Running.RemoveAt(Index, 1, EAllowShrinking::No);
+			if (!Completed.bServiceSettled)
+			{
+				WorkerSelection.Settle(Completed.ServiceChargeSerial, Completed.Slot->ExecuteMicroseconds);
+				Completed.bServiceSettled = true;
+				const double ActualCost = FMath::Max(1.0, Completed.Slot->ExecuteMicroseconds);
+				double& Estimate = WorkerCostEstimates.FindOrAdd(Completed.Kind, ActualCost);
+				Estimate = FMath::Lerp(Estimate, ActualCost, 0.15);
+			}
 
 			ReservedBytes -=
 				Completed.ReservedBytes;
@@ -522,6 +667,7 @@ void FVoxelTaskScheduler::Tick(
 				Completed.Resume->AccumulatedExecuteMilliseconds = Completed.Slot->Result.ExecuteMilliseconds;
 				QueuedInputBytes += Completed.Resume->InputBytes;
 				Pending.Add(MoveTemp(*Completed.Resume));
+				CompletedSelection.Settle(ApplyCharge.Serial, (FPlatformTime::Seconds() - ServiceStart) * 1000000.0);
 				++Applied;
 				continue;
 			}
@@ -537,7 +683,8 @@ void FVoxelTaskScheduler::Tick(
 
 			switch (Completed.Kind)
 			{
-			case EVoxelTaskKind::BuildFineMesh:
+			case EVoxelTaskKind::BuildFineShard:
+		case EVoxelTaskKind::BuildFineMesh:
 				++FineApplied;
 				break;
 			case EVoxelTaskKind::BuildVoxelProxy:
@@ -556,6 +703,16 @@ void FVoxelTaskScheduler::Tick(
 
 			FVoxelTaskResult& Result =
 				Completed.Slot->Result;
+			Result.WorkReceipt = Completed.Slot->WorkReceipt;
+			if (Result.WorkReceipt)
+			{
+				verify(Result.WorkReceipt->Complete(Result.ExecuteMilliseconds));
+				if (Result.CustomPayload) Result.CustomPayload->WorkReceipt = Result.WorkReceipt;
+				if (Result.Collision) Result.Collision->WorkReceipt = Result.WorkReceipt;
+				FVoxelSectionMeshResult* Meshes[] = {Result.FineMesh.Get(), Result.VoxelProxyMesh.Get(), Result.VolumeBoundaryMesh.Get(),
+					Result.SurfaceMesh.Get(), Result.WaterMesh.Get(), Result.MacroMesh.Get()};
+				for (auto* Mesh : Meshes) if (Mesh) Mesh->WorkReceipt = Result.WorkReceipt;
+			}
 
 			/**
 			 * Move 前缓存 diagnostics。
@@ -614,6 +771,10 @@ void FVoxelTaskScheduler::Tick(
 				 ApplyStart) *
 				1000.0;
 			Diagnostics.LastResultApplyMilliseconds += Sample.ApplyMilliseconds;
+			const double ActualApply = FMath::Max(1.0, (ApplyEnd - ServiceStart) * 1000000.0);
+			CompletedSelection.Settle(ApplyCharge.Serial, ActualApply);
+			double& ApplyEstimate = ApplyCostEstimates.FindOrAdd(Completed.Kind, ActualApply);
+			ApplyEstimate = FMath::Lerp(ApplyEstimate, ActualApply, 0.15);
 
 			RecordCompletedResult(
 				Sample);
@@ -624,8 +785,6 @@ void FVoxelTaskScheduler::Tick(
 		for (int32 Index = Canceled.Num() - 1; Index >= 0 &&
 			Applied < ApplyLimit && FPlatformTime::Seconds() <= EndTime; --Index)
 		{
-			if (IsBackgroundTerrainWork(Canceled[Index].Result.Kind, Canceled[Index].WorkClass,
-				Canceled[Index].TerrainStage) != bBackgroundPass) continue;
 			FCompleted Completed = MoveTemp(Canceled[Index]);
 			Canceled.RemoveAt(Index, 1, EAllowShrinking::No);
 
@@ -751,17 +910,26 @@ void FVoxelTaskScheduler::StopAndJoin()
 
 	for (FRunning& Task : Running)
 	{
+		Task.Task.Wait();
+		if (Task.Slot->WorkReceipt)
+		{
+			Task.Slot->WorkReceipt->Complete(Task.Slot->Result.ExecuteMilliseconds);
+			Task.Slot->WorkReceipt->Resolve(false);
+		}
 		UE_LOG(
 			LogTemp,
 			Display,
 			TEXT("Waiting for voxel task shutdown: kind=%d executeMs=%.2f"),
 			static_cast<int32>(Task.Kind),
 			Task.Slot->Result.ExecuteMilliseconds);
-		Task.Task.Wait();
+		if (!Task.bServiceSettled)
+		{
+			WorkerSelection.Settle(Task.ServiceChargeSerial, Task.Slot->ExecuteMicroseconds);
+		}
 	}
 
 	Pending.Reset();
-	FairSelection.Reset();
+	WorkerSelection.Reset();
 	CompletedSelection.Reset();
 	AdmissionAttempts.Reset();
 	Running.Reset();
@@ -797,6 +965,12 @@ bool FVoxelTaskScheduler::HasSectionTask(
 		*Count > 0;
 }
 
+void FVoxelTaskScheduler::SetSectionIdleCallback(TFunction<void(const FIntVector&)> InCallback)
+{
+	check(IsInGameThread());
+	SectionIdleCallback = MoveTemp(InCallback);
+}
+
 int32 FVoxelTaskScheduler::ActiveCount() const
 {
 	return Running.Num();
@@ -805,6 +979,12 @@ int32 FVoxelTaskScheduler::ActiveCount() const
 int32 FVoxelTaskScheduler::CriticalCount() const
 {
 	return CriticalTaskCount;
+}
+
+void FVoxelTaskScheduler::BindFrameContext(const FVoxelTerrainFrameContext& InFrameContext)
+{
+	check(IsInGameThread());
+	FrameContext = &InFrameContext;
 }
 
 void FVoxelTaskScheduler::SetBudget(
@@ -956,80 +1136,74 @@ FVoxelTaskScheduler::GetDiagnostics() const
 	return Result;
 }
 
-bool FVoxelTaskScheduler::IsHigherPriority(
-	const FVoxelTaskRequest& InA,
-	const FVoxelTaskRequest& InB)
+FVoxelTerrainServicePriority FVoxelTaskScheduler::ResolveServicePriority(const FVoxelTaskRequest& InRequest)
 {
-	const int32 BandA = TerrainPriorityBand(InA);
-	const int32 BandB = TerrainPriorityBand(InB);
-	if (BandA >= -1 && BandA <= 3 && BandB >= -1 && BandB <= 3 &&
-		InA.SourcePriority != InB.SourcePriority)
+	FVoxelTerrainServicePriority Result;
+	Result.DistanceCells = InRequest.DistanceScore;
+	Result.ForwardScore = InRequest.ForwardScore;
+	Result.SourcePriority = InRequest.SourcePriority;
+	Result.SourceStableKey = InRequest.SourceStableKey;
+	if (InRequest.ServiceBand != EVoxelTerrainServiceBand::None)
 	{
-		return InA.SourcePriority < InB.SourcePriority;
+		Result.Band = InRequest.ServiceBand;
+		return Result;
 	}
-	if (BandA != BandB) return BandA < BandB;
-	if (InA.SourcePriority != InB.SourcePriority) return InA.SourcePriority < InB.SourcePriority;
-	if ((InA.WorkClass == EVoxelWorkClass::Prefetch) != (InB.WorkClass == EVoxelWorkClass::Prefetch))
+	const bool bNearRole = InRequest.WorkClass == EVoxelWorkClass::Critical ||
+		InRequest.WorkClass == EVoxelWorkClass::Warmup || InRequest.WorkClass == EVoxelWorkClass::Interactive ||
+		InRequest.Kind == EVoxelTaskKind::BuildCollision || InRequest.Kind == EVoxelTaskKind::BuildNavigation;
+	if (bNearRole || ((InRequest.Kind == EVoxelTaskKind::GenerateExactBase || InRequest.Kind == EVoxelTaskKind::BuildFineMesh ||
+		InRequest.Kind == EVoxelTaskKind::DecodeOverlay) && InRequest.DistanceScore <= 80.0))
 	{
-		return InB.WorkClass == EVoxelWorkClass::Prefetch;
+		Result.Band = InRequest.DistanceScore <= 32.0 ? EVoxelTerrainServiceBand::P0 : EVoxelTerrainServiceBand::P1;
+		return Result;
 	}
-	const bool bAVisual = IsVisualWorkClass(InA.WorkClass);
-	const bool bBVisual = IsVisualWorkClass(InB.WorkClass);
-	if (bAVisual != bBVisual)
+	switch (InRequest.Kind)
 	{
-		return !bAVisual;
+	case EVoxelTaskKind::GenerateExactBase:
+	case EVoxelTaskKind::BuildFineShard:
+		case EVoxelTaskKind::BuildFineMesh:
+	case EVoxelTaskKind::DecodeOverlay:
+		Result.Band = EVoxelTerrainServiceBand::P2;
+		break;
+	case EVoxelTaskKind::GenerateVoxelProxy:
+	case EVoxelTaskKind::BuildVoxelProxy:
+	case EVoxelTaskKind::BuildVolumeTransition:
+		Result.Band = EVoxelTerrainServiceBand::P3;
+		break;
+	case EVoxelTaskKind::GenerateSurface:
+	case EVoxelTaskKind::BuildSurface:
+	case EVoxelTaskKind::BuildWater:
+		Result.Band = EVoxelTerrainServiceBand::P4;
+		break;
+	case EVoxelTaskKind::GenerateMacro:
+	case EVoxelTaskKind::BuildMacro:
+		Result.Band = EVoxelTerrainServiceBand::P5;
+		break;
+	case EVoxelTaskKind::BuildViewCoverage:
+	case EVoxelTaskKind::BuildViewTransition:
+		Result.Band = static_cast<EVoxelTerrainServiceBand>(static_cast<uint8>(EVoxelTerrainServiceBand::P2) +
+			FMath::Clamp(InRequest.TerrainStage, 0, 3));
+		break;
+	default:
+		Result.Band = EVoxelTerrainServiceBand::P6;
+		break;
 	}
-	if (!bAVisual && InA.WorkClass != InB.WorkClass)
+	return Result;
+}
+
+bool FVoxelTaskScheduler::IsHigherPriority(const FVoxelTaskRequest& InA, const FVoxelTaskRequest& InB)
+{
+	const FVoxelTerrainServicePriority First = ResolveServicePriority(InA);
+	const FVoxelTerrainServicePriority Second = ResolveServicePriority(InB);
+	if (First != Second)
 	{
-		return
-			static_cast<uint8>(
-				InA.WorkClass) <
-			static_cast<uint8>(
-				InB.WorkClass);
+		return FVoxelTerrainWorkSelection::HigherPriority(First, Second);
 	}
-	if (InA.WorkClass == EVoxelWorkClass::Critical && InB.WorkClass == EVoxelWorkClass::Critical)
-	{
-		const bool bARepresentation = IsCriticalRepresentationWork(InA);
-		const bool bBRepresentation = IsCriticalRepresentationWork(InB);
-		if (bARepresentation != bBRepresentation) return !bARepresentation;
-		if (bARepresentation)
-		{
-			if (InA.bPublicationContinuation != InB.bPublicationContinuation)
-				return InA.bPublicationContinuation;
-			if (InA.bPublicationContinuation && InA.QueuedAt != InB.QueuedAt)
-				return InA.QueuedAt < InB.QueuedAt;
-		}
-	}
-	if (bAVisual && InA.bPublicationContinuation != InB.bPublicationContinuation)
-	{
-		return InA.bPublicationContinuation;
-	}
-	if (bAVisual && InA.bPublicationContinuation && InA.QueuedAt != InB.QueuedAt)
+	if (InA.QueuedAt != InB.QueuedAt)
 	{
 		return InA.QueuedAt < InB.QueuedAt;
 	}
-	if (InA.DistanceScore != InB.DistanceScore)
-	{
-		return
-			InA.DistanceScore <
-			InB.DistanceScore;
-	}
-	if (bAVisual && InA.WorkClass != InB.WorkClass)
-	{
-		return static_cast<uint8>(InA.WorkClass) < static_cast<uint8>(InB.WorkClass);
-	}
-
-	if (InA.ForwardScore !=
-		InB.ForwardScore)
-	{
-		return
-			InA.ForwardScore >
-			InB.ForwardScore;
-	}
-
-	return
-		InA.QueuedAt <
-		InB.QueuedAt;
+	return InA.Sequence < InB.Sequence;
 }
 
 bool FVoxelTaskResult::HasHeavyApply() const
@@ -1038,7 +1212,7 @@ bool FVoxelTaskResult::HasHeavyApply() const
 	if (Kind == EVoxelTaskKind::BuildFineMesh || Kind == EVoxelTaskKind::BuildVoxelProxy)
 	{
 		// 空网格只更新就绪/版本状态，不占据实体网格每帧一次的重发布配额。
-		const TSharedPtr<FVoxelSectionMeshResult>& Mesh = Kind == EVoxelTaskKind::BuildFineMesh ? FineMesh : VoxelProxyMesh;
+		const TSharedPtr<FVoxelSectionMeshResult, ESPMode::ThreadSafe>& Mesh = Kind == EVoxelTaskKind::BuildFineMesh ? FineMesh : VoxelProxyMesh;
 		return Mesh && Mesh->Batches.ContainsByPredicate([](const FVoxelRenderBatch& Batch)
 		{
 			return !Batch.Mesh.Triangles.IsEmpty();
@@ -1048,7 +1222,8 @@ bool FVoxelTaskResult::HasHeavyApply() const
 	{
 	case EVoxelTaskKind::BuildCollision:
 	case EVoxelTaskKind::BuildNavigation:
-	case EVoxelTaskKind::BuildFineMesh:
+	case EVoxelTaskKind::BuildFineShard:
+		case EVoxelTaskKind::BuildFineMesh:
 	case EVoxelTaskKind::BuildVoxelProxy:
 	case EVoxelTaskKind::BuildVolumeTransition:
 	case EVoxelTaskKind::BuildSurface:
@@ -1119,83 +1294,82 @@ bool FVoxelTaskScheduler::CanStartKind(const EVoxelTaskKind InKind) const
 
 void FVoxelTaskScheduler::Pump()
 {
-	while (!bStopped &&
-		Running.Num() <
-			Budget.MaxConcurrentTasks &&
-		!Pending.IsEmpty())
+	const int32 MaximumWorkers = FrameContext ? FMath::Min(Budget.MaxConcurrentTasks, FrameContext->GetAllocation().MaximumWorkers) : Budget.MaxConcurrentTasks;
+	const double Deadline = FrameContext ? FrameContext->Deadline() : MAX_dbl;
+	TArray<uint64, TInlineAllocator<64>> ReceiptBlocked;
+	while (!bStopped && Running.Num() < MaximumWorkers && !Pending.IsEmpty() && FPlatformTime::Seconds() < Deadline)
 	{
-
-		const bool bHasCriticalPending = Pending.ContainsByPredicate([](const FVoxelTaskRequest& Request)
-		{
-			return Request.WorkClass == EVoxelWorkClass::Critical;
-		});
-		int32 BackgroundRunning = 0;
-		int32 NonCriticalRunning = 0;
+		const double Now = FPlatformTime::Seconds();
+		FVoxelTerrainServiceCapacity Capacity;
+		Capacity.MaximumWorkers = MaximumWorkers;
+		Capacity.RunningWorkers = Running.Num();
+		Capacity.NearReservedWorkers = FMath::Min(Budget.CriticalReservedTasks, MaximumWorkers);
+		Capacity.bAllowOverdueOpportunity = FrameContext && FrameContext->IsOverdueOpportunityAvailable();
 		for (const FRunning& Task : Running)
 		{
-			BackgroundRunning += IsBackgroundTerrainWork(Task.Kind, Task.WorkClass, Task.TerrainStage);
-			NonCriticalRunning += Task.WorkClass != EVoxelWorkClass::Critical;
+			Capacity.RunningNearWorkers += Task.bServiceNear ? 1 : 0;
 		}
-		const int32 BackgroundLimit = Budget.MaxConcurrentTasks > 1
-			? FMath::Clamp(Budget.MaxConcurrentCoarseTerrainTasks, 1, Budget.MaxConcurrentTasks - 1) : 1;
-		const int32 ForegroundLimit = FMath::Max(1, Budget.MaxConcurrentTasks - BackgroundLimit);
-		TArray<FVoxelTaskServiceCandidate> Candidates;
+		TArray<FVoxelTerrainServiceCandidate> Candidates;
 		Candidates.Reserve(Pending.Num());
 		for (int32 Index = 0; Index < Pending.Num(); ++Index)
 		{
 			FVoxelTaskRequest& Request = Pending[Index];
-			Request.Blocked = EVoxelTaskBlockReason::None;
-			const bool bBackground = IsBackgroundTerrainWork(Request.Kind, Request.WorkClass, Request.TerrainStage);
-			const bool bReserveCritical = Budget.MaxConcurrentTasks > 1 && bHasCriticalPending &&
-				Request.WorkClass != EVoxelWorkClass::Critical &&
-				NonCriticalRunning >= Budget.MaxConcurrentTasks - Budget.CriticalReservedTasks;
-			if (bReserveCritical || (bBackground && BackgroundRunning >= BackgroundLimit && Pending.ContainsByPredicate([](const FVoxelTaskRequest& Other)
-				{ return !IsBackgroundTerrainWork(Other.Kind, Other.WorkClass, Other.TerrainStage); })) ||
-				(!bBackground && Running.Num() - BackgroundRunning >= ForegroundLimit && Pending.ContainsByPredicate([](const FVoxelTaskRequest& Other)
-				{ return IsBackgroundTerrainWork(Other.Kind, Other.WorkClass, Other.TerrainStage); })) || !CanStartKind(Request.Kind))
+			Request.Blocked = Request.GetBlockReason ? Request.GetBlockReason() : EVoxelTaskBlockReason::None;
+			if (ReceiptBlocked.Contains(Request.Sequence) || (ReceiptBlocked.Num() == 64 && !Request.WorkReceipt))
+				Request.Blocked = EVoxelTaskBlockReason::Memory;
+			if (!CanStartKind(Request.Kind))
 			{
 				Request.Blocked = EVoxelTaskBlockReason::LaneSlots;
-				CriticalAdmissionDeferrals += bReserveCritical;
 			}
-			if (Request.ReservedBytes > Budget.MaxReservedBytes - ReservedBytes)
+			if (ReservedBytes > Budget.MaxReservedBytes || Request.ReservedBytes > Budget.MaxReservedBytes - ReservedBytes)
 			{
 				Request.Blocked = static_cast<EVoxelTaskBlockReason>(static_cast<uint16>(Request.Blocked) |
 					static_cast<uint16>(EVoxelTaskBlockReason::Memory));
 			}
-			EVoxelTaskServiceLane Lane = EVoxelTaskServiceLane::Other;
-			if (Request.WorkClass == EVoxelWorkClass::Critical)
+			const bool bRunnable = Request.Blocked == EVoxelTaskBlockReason::None;
+			if (bRunnable && Request.FirstRunnableSeconds < 0.0)
 			{
-				Lane = EVoxelTaskServiceLane::Critical;
+				Request.FirstRunnableSeconds = Now;
 			}
-			else
-			{
-				switch (Request.Kind)
-				{
-				case EVoxelTaskKind::GenerateExactBase:
-				case EVoxelTaskKind::BuildCollision:
-				case EVoxelTaskKind::DecodeOverlay: Lane = EVoxelTaskServiceLane::Exact; break;
-				case EVoxelTaskKind::BuildFineMesh: Lane = EVoxelTaskServiceLane::Fine; break;
-				case EVoxelTaskKind::GenerateVoxelProxy: Lane = EVoxelTaskServiceLane::ProxyData; break;
-				case EVoxelTaskKind::GenerateSurface: Lane = EVoxelTaskServiceLane::SurfaceData; break;
-				case EVoxelTaskKind::GenerateMacro: Lane = EVoxelTaskServiceLane::MacroData; break;
-				case EVoxelTaskKind::BuildViewCoverage: Lane = EVoxelTaskServiceLane::Coverage; break;
-				case EVoxelTaskKind::BuildViewTransition:
-				case EVoxelTaskKind::BuildVolumeTransition: Lane = EVoxelTaskServiceLane::Transition; break;
-				case EVoxelTaskKind::BuildVoxelProxy: Lane = EVoxelTaskServiceLane::ProxyMesh; break;
-				case EVoxelTaskKind::BuildSurface:
-				case EVoxelTaskKind::BuildWater: Lane = EVoxelTaskServiceLane::SurfaceMesh; break;
-				case EVoxelTaskKind::BuildMacro: Lane = EVoxelTaskServiceLane::MacroMesh; break;
-				default: break;
-				}
-			}
-			Candidates.Add({Index, Lane, Request.Blocked, Request.SourcePriority, Request.DistanceScore,
-				Request.QueuedAt, Request.Sequence, Request.bPublicationContinuation});
+			FVoxelTerrainServiceCandidate& Candidate = Candidates.AddDefaulted_GetRef();
+			Candidate.Index = Index;
+			Candidate.Priority = ResolveServicePriority(Request);
+			Candidate.FirstQueuedSeconds = FMath::Max(0.0, Request.FirstRunnableSeconds);
+			Candidate.Sequence = Request.Sequence;
+			const double* Estimate = WorkerCostEstimates.Find(Request.Kind);
+			Candidate.EstimatedMicroseconds = Estimate ? *Estimate : 1000.0;
+			Candidate.bRunnable = bRunnable;
 		}
-		const int32 BestIndex = FairSelection.Select(Candidates, FPlatformTime::Seconds());
+		FVoxelTerrainServiceCharge Charge;
+		const int32 BestIndex = WorkerSelection.Select(Candidates, Capacity, Now, Charge);
 		if (BestIndex == INDEX_NONE)
 		{
 			break;
 		}
+		if (Statistics && !Pending[BestIndex].WorkReceipt)
+		{
+			const auto Consumer = FVoxelGenerationConsumerKey::Section(StatisticsWorldEpoch, StatisticsOwnerId, 1,
+				Pending[BestIndex].Stamp.Section, Pending[BestIndex].Sequence);
+			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+			if (!RuntimeResources->Acquire(Consumer, EVoxelTerrainResourcePool::Input,
+				VoxelBoundedAllocation::SharedBytes<FVoxelTerrainWorkReceipt>(), Lease))
+			{
+				WorkerSelection.RefundBeforeStart(Charge.Serial);
+				Pending[BestIndex].Blocked = EVoxelTaskBlockReason::Memory;
+				ReceiptBlocked.Add(Pending[BestIndex].Sequence);
+				continue;
+			}
+			auto Receipt = MakeShared<FVoxelTerrainWorkReceipt, ESPMode::ThreadSafe>(Statistics.ToSharedRef(), MoveTemp(Lease));
+			if (!Receipt->IsRegistered())
+			{
+				WorkerSelection.RefundBeforeStart(Charge.Serial);
+				Pending[BestIndex].Blocked = EVoxelTaskBlockReason::Memory;
+				ReceiptBlocked.Add(Pending[BestIndex].Sequence);
+				continue;
+			}
+			Pending[BestIndex].WorkReceipt = MoveTemp(Receipt);
+		}
+		if (Charge.bOverdueOpportunity) FrameContext->ConsumeOverdueOpportunity();
 
 		FVoxelTaskRequest Request =
 			MoveTemp(
@@ -1223,6 +1397,10 @@ void FVoxelTaskScheduler::Pump()
 		RunningTask.bTerrainDataOnly = Request.bTerrainDataOnly;
 		RunningTask.DistanceScore = Request.DistanceScore;
 		RunningTask.ForwardScore = Request.ForwardScore;
+		RunningTask.SourceStableKey = Request.SourceStableKey;
+		RunningTask.ServiceBand = Request.ServiceBand;
+		RunningTask.ServiceChargeSerial = Charge.Serial;
+		RunningTask.bServiceNear = FVoxelTerrainWorkSelection::IsNear(Charge.Band);
 		RunningTask.Sequence = Request.Sequence;
 		RunningTask.QueuedAt =
 			Request.QueuedAt;
@@ -1232,6 +1410,7 @@ void FVoxelTaskScheduler::Pump()
 			MakeShared<
 				FSlot,
 				ESPMode::ThreadSafe>();
+		RunningTask.Slot->WorkReceipt = Request.WorkReceipt;
 		if (Request.bResumable)
 		{
 			RunningTask.Resume = MakeUnique<FVoxelTaskRequest>(Request);
@@ -1295,9 +1474,10 @@ void FVoxelTaskScheduler::Pump()
 								1000.0);
 
 					Slot->Result.ExecuteMilliseconds = FMath::Max(0.0, (End - Start) * 1000.0) + AccumulatedExecuteMilliseconds;
+					Slot->ExecuteMicroseconds = FMath::Max(0.0, (End - Start) * 1000000.0);
 
-					if (Slot->Result.ResultBytes() >
-						ResultBudget)
+					const uint64 LeasedBytes = Slot->Result.GetResourceAccountedBytes();
+					if (Slot->Result.ResultBytes() > ResultBudget && Slot->Result.ResultBytes() - ResultBudget > LeasedBytes)
 					{
 						FVoxelTaskResult ErrorResult;
 
@@ -1334,6 +1514,8 @@ void FVoxelTaskScheduler::QueueCanceled(
 	FVoxelTaskRequest&& InRequest)
 {
 	FCompleted Completed;
+	Completed.Result.WorkReceipt = InRequest.WorkReceipt;
+	if (Completed.Result.WorkReceipt) Completed.Result.WorkReceipt->Complete(InRequest.AccumulatedExecuteMilliseconds);
 	Completed.WorkClass = InRequest.WorkClass;
 	Completed.TerrainStage = InRequest.TerrainStage;
 
@@ -1400,6 +1582,7 @@ void FVoxelTaskScheduler::RemoveActive(
 			{
 				SectionTaskCounts.Remove(
 					InStamp.Section);
+				if (SectionIdleCallback) SectionIdleCallback(InStamp.Section);
 			}
 		}
 	}

@@ -1,4 +1,4 @@
-#include "Voxel/Save/VoxelBlockEntityCodec.h"
+﻿#include "Voxel/Save/VoxelBlockEntityCodec.h"
 #include "Voxel/Serialization/VoxelBinaryCodec.h"
 #include "Misc/ScopeRWLock.h"
 
@@ -18,6 +18,38 @@ namespace
         FReadScopeLock Lock(VoxelEntityCodecLock);
         return VoxelEntityCodecs.FindRef(Kind);
     }
+
+	bool IsContainerAssetName(const TConstArrayView<uint8> InName)
+	{
+		auto IsName = [](const TConstArrayView<uint8> InPart)
+		{
+			return !InPart.IsEmpty() && !(InPart.Num() == 4 &&
+				(InPart[0] | 0x20) == 'n' && (InPart[1] | 0x20) == 'o' &&
+				(InPart[2] | 0x20) == 'n' && (InPart[3] | 0x20) == 'e');
+		};
+		for (int32 Index = 0; Index < InName.Num(); ++Index)
+		{
+			if (InName[Index] == ':') return IsName(InName.Slice(0, Index)) &&
+				IsName(InName.Slice(Index + 1, InName.Num() - Index - 1));
+		}
+		return false;
+	}
+
+	bool ValidateContainerPayload(const FVoxelBlockEntityState& InState)
+	{
+		if (InState.Schema != 1) return false;
+		FVoxelByteReader Reader(InState.Payload);
+		if (Reader.U8() != 27) return false;
+		for (int32 Index = 0; Index < 27; ++Index)
+		{
+			const auto Name = Reader.StringView(256);
+			const int32 Count = Reader.I32();
+			const int32 Level = Reader.I32();
+			if (!Reader.IsValid() || Count < 0 || Count > 100000 || Level < 0 || Level > 10000 ||
+				((Count > 0) != IsContainerAssetName(Name)) || (Count == 0 && (!Name.IsEmpty() || Level != 0))) return false;
+		}
+		return Reader.End();
+	}
 }
 
 bool FVoxelBlockEntityCodec::Register(uint16 Kind, FMakeDefault Make, FValidate Check)
@@ -82,7 +114,7 @@ bool FVoxelBlockEntityCodec::MakeDefault(uint16 K,FVoxelBlockEntityState&O,uint8
 bool FVoxelBlockEntityCodec::Validate(const FVoxelBlockEntityState&S)
 {
     if(S.Schema==0||S.Payload.Num()>32768)return false;
-    if(S.Kind==1){TArray<FVoxelItemStack>T;return DecodeContainer(S,T);}
+    if(S.Kind==1)return ValidateContainerPayload(S);
     FVoxelByteReader R(S.Payload);
     if(S.Kind==2){if(S.Schema!=1)return false;R.U64();}
     else

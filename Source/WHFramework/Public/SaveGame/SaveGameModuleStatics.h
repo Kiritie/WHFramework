@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "SaveGame/SaveGameModuleTypes.h"
@@ -34,6 +34,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "SaveGameModule")
 	static FSaveOperationResult SaveCurrentSlot();
+
+	UFUNCTION(BlueprintPure, Category = "SaveGameModule")
+	static FSaveOperationResult GetWorldSaveResult(const FGuid& InOperationId);
 
 	UFUNCTION(BlueprintCallable, Category = "SaveGameModule")
 	static void DetachActiveSave();

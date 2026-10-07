@@ -38,6 +38,10 @@ public:
 		int32 InX,
 		int32 InY,
 		const FVoxelGenerationSettings& InSettings);
+	void SetMissingHydrologyObserver(TFunction<void(const FVoxelHydrologyRegionKey&)> InObserver)
+	{
+		MissingHydrologyObserver = MoveTemp(InObserver);
+	}
 
 	bool EnsureHydrologyPlan(
 		const FVoxelHydrologyRegionKey& InKey,
@@ -199,4 +203,5 @@ private:
 	bool bColumnsPrepared = false;
 	bool bSymbolsPrepared = false;
 	mutable FString PlanSampleError;
+	TFunction<void(const FVoxelHydrologyRegionKey&)> MissingHydrologyObserver;
 };

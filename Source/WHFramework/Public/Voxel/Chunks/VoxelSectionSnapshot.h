@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Voxel/Runtime/VoxelBlockState.h"
@@ -6,6 +6,13 @@
 
 struct WHFRAMEWORK_API FVoxelSectionSnapshot
 {
+	FVoxelSectionSnapshot() = default;
+	FVoxelSectionSnapshot(const FVoxelSectionSnapshot&) = delete;
+	FVoxelSectionSnapshot& operator=(const FVoxelSectionSnapshot&) = delete;
+	FVoxelSectionSnapshot(FVoxelSectionSnapshot&&) = default;
+	FVoxelSectionSnapshot& operator=(FVoxelSectionSnapshot&& InOther);
+
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 	FIntVector Section = FIntVector::ZeroValue;
 	FVoxelSectionStamp Stamp;
 	uint64 Revision = 0;

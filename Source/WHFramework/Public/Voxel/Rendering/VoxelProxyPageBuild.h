@@ -14,6 +14,7 @@ public:
 private:
 	FVoxelTerrainGeometry Geometry;
 	TArray<FVoxelTerrainBuildShard> Shards;
-	TArray<FVoxelVoxelProxyData> Completed;
+	FVoxelVoxelProxyData Page;
+	bool bAllocated = false;
 	int32 NextShard = 0;
 };

@@ -1,11 +1,11 @@
-#include "Voxel/VoxelModuleStatics.h"
+﻿#include "Voxel/VoxelModuleStatics.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Prefabs/Data/VoxelPrefabData.h"
 #include "Voxel/Voxels/VoxelItemBridge.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 UVoxelModule* UVoxelModuleStatics::GetVoxelModule(const UObject*C)
-{return C&&GEngine?UVoxelModule::Find(GEngine->GetWorldFromContextObject(C,EGetWorldErrorMode::ReturnNull)):nullptr;}
+{return C&&GEngine?UVoxelModule::GetPtr(GEngine->GetWorldFromContextObject(C,EGetWorldErrorMode::ReturnNull)):nullptr;}
 bool UVoxelModuleStatics::IsVoxelWorldReady(const UObject*C){auto*M=GetVoxelModule(C);return M&&M->IsReady();}
 float UVoxelModuleStatics::GetVoxelWarmupProgress(const UObject*C){auto*M=GetVoxelModule(C);return M?M->GetWarmupProgress():0.f;}
 bool UVoxelModuleStatics::CreateVoxelWorld(const UObject*C,FVoxelGenerationSettings S,int32 Size,FString&E)

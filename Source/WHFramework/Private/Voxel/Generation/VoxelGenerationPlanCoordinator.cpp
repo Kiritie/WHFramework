@@ -4,10 +4,22 @@
 #include "Voxel/Generation/Caves/VoxelCaveGenerator.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelGenerationQuery.h"
+#include "Voxel/Task/VoxelBoundedAllocation.h"
 
 namespace
 {
 	constexpr int32 MaximumHydrologyDependencies = 4096;
+	struct FPlanReadDependencies final : FVoxelTaskCustomPayload
+	{
+		TArray<FVoxelGenerationPlanDependency> Missing;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+		bool bOverflow = false;
+		virtual uint64 GetAllocatedBytes() const override
+		{
+			return VoxelBoundedAllocation::SharedBytes<FPlanReadDependencies>() + Missing.GetAllocatedSize();
+		}
+		virtual uint64 GetResourceAccountedBytes() const override { return GetAllocatedBytes(); }
+	};
 
 	FVoxelGenerationPlanDependency MakeDependency(
 		const EVoxelGenerationPlanKind InKind,
@@ -78,72 +90,74 @@ bool FVoxelGenerationPlanCoordinator::GatherForBounds(
 	const FVoxelGenerationSettings& Settings = Config->Recipe->Settings;
 	const FVoxelGenerationPlanKeys Keys = FVoxelGenerationQuery::GatherPlanKeys(
 		InBounds, Settings);
-	int64 MinX = InBounds.Min.X;
-	int64 MinY = InBounds.Min.Y;
-	int64 MaxX = static_cast<int64>(InBounds.Max.X) - 1;
-	int64 MaxY = static_cast<int64>(InBounds.Max.Y) - 1;
-	const int64 CaveReach = FVoxelCaveGenerator::GetMaximumReach(Settings);
+	TSet<FVoxelGenerationPlanDependency> Closure;
+	const auto AppendFact = [this, &Closure, &OutError](const FVoxelGenerationPlanDependency& Fact)
+	{
+		Closure.Add(Fact);
+		TArray<FVoxelGenerationPlanDependency> Prerequisites;
+		if (!GatherPrerequisites(Fact, Prerequisites, OutError)) return false;
+		for (const auto& Prerequisite : Prerequisites) Closure.Add(Prerequisite);
+		return true;
+	};
 	for (const FVoxelGenerationTileKey& Tile : Keys.Tiles)
 	{
-		const int64 TileX = static_cast<int64>(Tile.Coordinate.X) *
-			FVoxelGenerationQuery::GenerationPlanTileSide;
-		const int64 TileY = static_cast<int64>(Tile.Coordinate.Y) *
-			FVoxelGenerationQuery::GenerationPlanTileSide;
-		MinX = FMath::Min(MinX, TileX - CaveReach);
-		MinY = FMath::Min(MinY, TileY - CaveReach);
-		MaxX = FMath::Max(MaxX, TileX + FVoxelGenerationQuery::GenerationPlanTileSide - 1 + CaveReach);
-		MaxY = FMath::Max(MaxY, TileY + FVoxelGenerationQuery::GenerationPlanTileSide - 1 + CaveReach);
+		for (const auto Kind : {EVoxelGenerationPlanKind::Cave, EVoxelGenerationPlanKind::Structure, EVoxelGenerationPlanKind::Feature})
+			if (!AppendFact(MakeDependency(Kind, Tile.Coordinate))) return false;
 	}
 	for (const FVoxelEcologyTileKey& Tile : Keys.EcologyTiles)
 	{
-		const int64 TileX = static_cast<int64>(Tile.Coordinate.X) *
-			FVoxelGenerationQuery::EcologyTileSide;
-		const int64 TileY = static_cast<int64>(Tile.Coordinate.Y) *
-			FVoxelGenerationQuery::EcologyTileSide;
-		MinX = FMath::Min(MinX, TileX);
-		MinY = FMath::Min(MinY, TileY);
-		MaxX = FMath::Max(MaxX, TileX + FVoxelGenerationQuery::EcologyTileSide - 1);
-		MaxY = FMath::Max(MaxY, TileY + FVoxelGenerationQuery::EcologyTileSide - 1);
+		if (!AppendFact(MakeDependency(EVoxelGenerationPlanKind::Ecology,
+			FIntVector(Tile.Coordinate.X, Tile.Coordinate.Y, 0)))) return false;
 	}
-	const auto HydrologyAt = [&Settings](const int64 X, const int64 Y)
+	const auto MinRegion = FVoxelGenerationQuery::HydrologyKeyForVoxel(InBounds.Min.X, InBounds.Min.Y, Settings).Coordinate;
+	const auto MaxRegion = FVoxelGenerationQuery::HydrologyKeyForVoxel(InBounds.Max.X - 1, InBounds.Max.Y - 1, Settings).Coordinate;
+	const int64 Count = (int64(MaxRegion.X) - MinRegion.X + 1) * (int64(MaxRegion.Y) - MinRegion.Y + 1);
+	if (Count > MaximumHydrologyDependencies)
 	{
-		return FVoxelGenerationQuery::HydrologyKeyForVoxel(
-			static_cast<int32>(FMath::Clamp<int64>(X, MIN_int32, MAX_int32)),
-			static_cast<int32>(FMath::Clamp<int64>(Y, MIN_int32, MAX_int32)), Settings);
-	};
-	const FIntPoint MinRegion = HydrologyAt(MinX, MinY).Coordinate;
-	const FIntPoint MaxRegion = HydrologyAt(MaxX, MaxY).Coordinate;
-	const int64 HydrologyCount =
-		(static_cast<int64>(MaxRegion.X) - MinRegion.X + 1) *
-		(static_cast<int64>(MaxRegion.Y) - MinRegion.Y + 1);
-	if (HydrologyCount > MaximumHydrologyDependencies)
-	{
-		OutError = FString::Printf(TEXT("Voxel plan preflight needs %lld hydrology regions; limit is %d"),
-			HydrologyCount, MaximumHydrologyDependencies);
+		OutError = TEXT("生成采样范围超过水文闭包上限");
 		return false;
 	}
-	OutDependencies.Reserve(static_cast<int32>(HydrologyCount) +
-		Keys.Tiles.Num() * 3 + Keys.EcologyTiles.Num());
-	for (int32 Y = MinRegion.Y; Y <= MaxRegion.Y; ++Y)
-	{
-		for (int32 X = MinRegion.X; X <= MaxRegion.X; ++X)
-		{
-			OutDependencies.Add(MakeDependency(EVoxelGenerationPlanKind::Hydrology,
-				FIntVector(X, Y, 0)));
-		}
-	}
-	for (const FVoxelGenerationTileKey& Tile : Keys.Tiles)
-	{
-		OutDependencies.Add(MakeDependency(EVoxelGenerationPlanKind::Cave, Tile.Coordinate));
-		OutDependencies.Add(MakeDependency(EVoxelGenerationPlanKind::Structure, Tile.Coordinate));
-		OutDependencies.Add(MakeDependency(EVoxelGenerationPlanKind::Feature, Tile.Coordinate));
-	}
-	for (const FVoxelEcologyTileKey& Tile : Keys.EcologyTiles)
-	{
-		OutDependencies.Add(MakeDependency(EVoxelGenerationPlanKind::Ecology,
-				FIntVector(Tile.Coordinate.X, Tile.Coordinate.Y, 0)));
-	}
+	for (int64 Y = MinRegion.Y; Y <= MaxRegion.Y; ++Y)
+		for (int64 X = MinRegion.X; X <= MaxRegion.X; ++X)
+			Closure.Add(MakeDependency(EVoxelGenerationPlanKind::Hydrology, FIntVector(int32(X), int32(Y), 0)));
+	OutDependencies.Reserve(Closure.Num());
+	for (const auto& Fact : Closure) OutDependencies.Add(Fact);
 	OutError.Reset();
+	return true;
+}
+
+bool FVoxelGenerationPlanCoordinator::GatherPrerequisites(const FVoxelGenerationPlanDependency& InDependency,
+	TArray<FVoxelGenerationPlanDependency>& OutDependencies, FString& OutError) const
+{
+	OutDependencies.Reset();
+	OutError.Reset();
+	if (InDependency.Kind == EVoxelGenerationPlanKind::Hydrology) return true;
+	if (!Config->Recipe) { OutError = TEXT("生成计划缺少配方"); return false; }
+	const auto& Settings = Config->Recipe->Settings;
+	const bool bEcology = InDependency.Kind == EVoxelGenerationPlanKind::Ecology;
+	const int64 Side = bEcology ? FVoxelGenerationQuery::EcologyTileSide : FVoxelGenerationQuery::GenerationPlanTileSide;
+	int64 Margin = 0;
+	if (InDependency.Kind == EVoxelGenerationPlanKind::Cave) Margin = FVoxelCaveGenerator::GetMaximumReach(Settings);
+	else if (bEcology) Margin = FMath::Max(Settings.Ecology.Grass.PatchRadius, Settings.Ecology.Flower.PatchRadius);
+	else if (InDependency.Kind == EVoxelGenerationPlanKind::Feature)
+	{
+		// 锚点来自与瓦片相交的格；实际算法的其他采样键由 Query 读依赖回执补齐。
+		for (const auto& Feature : Config->Recipe->Features) Margin = FMath::Max<int64>(Margin, Feature.Placement.Spacing - 1);
+	}
+	const auto Coordinate = InDependency.Coordinate();
+	const auto At = [&Settings](int64 X, int64 Y)
+	{
+		return FVoxelGenerationQuery::HydrologyKeyForVoxel(int32(FMath::Clamp<int64>(X, MIN_int32, MAX_int32)),
+			int32(FMath::Clamp<int64>(Y, MIN_int32, MAX_int32)), Settings).Coordinate;
+	};
+	const auto Min = At(int64(Coordinate.X) * Side - Margin, int64(Coordinate.Y) * Side - Margin);
+	const auto Max = At(int64(Coordinate.X) * Side + Side - 1 + Margin, int64(Coordinate.Y) * Side + Side - 1 + Margin);
+	const int64 Count = (int64(Max.X) - Min.X + 1) * (int64(Max.Y) - Min.Y + 1);
+	if (Count > MaximumHydrologyDependencies) { OutError = TEXT("单个生成事实的水文闭包超过上限"); return false; }
+	OutDependencies.Reserve(int32(Count));
+	for (int64 Y = Min.Y; Y <= Max.Y; ++Y)
+		for (int64 X = Min.X; X <= Max.X; ++X)
+			OutDependencies.Add(MakeDependency(EVoxelGenerationPlanKind::Hydrology, FIntVector(int32(X), int32(Y), 0)));
 	return true;
 }
 
@@ -178,7 +192,7 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::EnsureEnvironm
 	const FVoxelGenerationPlanDependency Dependency = MakeDependency(
 		EVoxelGenerationPlanKind::Hydrology, FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0));
 	return Ensure(MakeArrayView(&Dependency, 1), EVoxelWorkClass::Interactive, 0, 0.0, 0.0,
-		FIntVector(InCell.X, InCell.Y, MAX_int32));
+		EnvironmentConsumer({FIntVector(InCell.X, InCell.Y, 0), FIntVector(InCell.X, InCell.Y, 0)}, true));
 }
 
 FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::EnsureEnvironmentBounds(
@@ -203,7 +217,14 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::EnsureEnvironm
 		for (int64 X = Min.X; X <= Max.X; ++X)
 			Dependencies.Add(MakeDependency(EVoxelGenerationPlanKind::Hydrology,
 				FIntVector(static_cast<int32>(X), static_cast<int32>(Y), 0)));
-	return Ensure(Dependencies, InWorkClass, InSourcePriority, InDistanceScore, InForwardScore);
+	const FVoxelGenerationConsumerKey Consumer = EnvironmentConsumer(InBounds, false);
+	const FVoxelGenerationDependencyStatus Status = Ensure(Dependencies, InWorkClass,
+		InSourcePriority, InDistanceScore, InForwardScore, Consumer);
+	if (Status.bReady || Status.bFailed)
+	{
+		ReleaseConsumer(Consumer);
+	}
+	return Status;
 }
 
 bool FVoxelGenerationPlanCoordinator::IsCached(
@@ -241,31 +262,10 @@ bool FVoxelGenerationPlanCoordinator::IsCached(
 	}
 }
 
-bool FVoxelGenerationPlanCoordinator::DonatePriority(
-	FState& InOutState,
-	const EVoxelWorkClass InWorkClass,
-	const int32 InSourcePriority,
-	const double InDistanceScore,
-	const double InForwardScore)
-{
-	const EVoxelWorkClass PreviousClass = InOutState.WorkClass;
-	const int32 PreviousPriority = InOutState.SourcePriority;
-	const double PreviousDistance = InOutState.DistanceScore;
-	const double PreviousForward = InOutState.ForwardScore;
-	InOutState.WorkClass = static_cast<EVoxelWorkClass>(FMath::Min(
-		static_cast<uint8>(InOutState.WorkClass), static_cast<uint8>(InWorkClass)));
-	InOutState.SourcePriority = FMath::Min(InOutState.SourcePriority, InSourcePriority);
-	InOutState.DistanceScore = FMath::Min(InOutState.DistanceScore, InDistanceScore);
-	InOutState.ForwardScore = FMath::Max(InOutState.ForwardScore, InForwardScore);
-	return InOutState.WorkClass != PreviousClass || InOutState.SourcePriority != PreviousPriority ||
-		InOutState.DistanceScore != PreviousDistance || InOutState.ForwardScore != PreviousForward;
-}
-
 void FVoxelGenerationPlanCoordinator::RefreshQueuedPriorities()
 {
-	Scheduler.UpdatePriorities([this](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp,
-		EVoxelWorkClass& WorkClass, int32& SourcePriority,
-		double& DistanceScore, double& ForwardScore)
+	Scheduler.UpdateServicePriorities([this](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp,
+		EVoxelWorkClass& WorkClass, FVoxelTerrainServicePriority& Priority)
 	{
 		if (Kind != EVoxelTaskKind::BuildGenerationPlan || Stamp.WorldEpoch != WorldEpoch) return;
 		const uint64 KindValue = Stamp.Revision;
@@ -274,10 +274,12 @@ void FVoxelGenerationPlanCoordinator::RefreshQueuedPriorities()
 			static_cast<EVoxelGenerationPlanKind>(KindValue), Stamp.Section);
 		if (const FState* State = States.Find(Dependency))
 		{
+			if (State->AttemptId != Stamp.Token)
+			{
+				return;
+			}
 			WorkClass = State->WorkClass;
-			SourcePriority = State->SourcePriority;
-			DistanceScore = State->DistanceScore;
-			ForwardScore = State->ForwardScore;
+			Priority = State->ServicePriority;
 		}
 	});
 }
@@ -293,20 +295,43 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 	Request.SourcePriority = InOutState.SourcePriority;
 	Request.DistanceScore = InOutState.DistanceScore;
 	Request.ForwardScore = InOutState.ForwardScore;
+	Request.ServiceBand = InOutState.ServicePriority.Band;
+	Request.SourceStableKey = InOutState.ServicePriority.SourceStableKey;
 	Request.Stamp.WorldEpoch = WorldEpoch;
+	checkf(NextAttemptId != MAX_uint64, TEXT("Generation attempt serial exhausted"));
 	InOutState.AttemptId = ++NextAttemptId;
 	Request.Stamp.Token = InOutState.AttemptId;
+	Request.Stamp.OwnerId = EnvironmentOwnerId;
+	Request.Stamp.OwnerIncarnation = EnvironmentOwnerIncarnation;
 	Request.Stamp.Revision = static_cast<uint8>(InDependency.Kind);
 	Request.Stamp.Section = InDependency.Coordinate();
 	Request.ReservedBytes = InDependency.Kind == EVoxelGenerationPlanKind::Hydrology
 		? 8ull * 1024ull * 1024ull : 4ull * 1024ull * 1024ull;
+	const FVoxelGenerationConsumerKey CaptureConsumer{EVoxelGenerationConsumerKind::WorldFact, WorldEpoch,
+		EnvironmentOwnerId, 1, EVoxelGenerationSpatialKind::Section, Request.Stamp.Section,
+		Request.Stamp.Section, Request.Stamp.Token};
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ReadLease;
+	if (!Scheduler.GetRuntimeResources()->Acquire(CaptureConsumer, EVoxelTerrainResourcePool::Input,
+		VoxelBoundedAllocation::SharedBytes<FPlanReadDependencies>() +
+		VoxelBoundedAllocation::ArrayBytes<FVoxelGenerationPlanDependency>(MaximumHydrologyDependencies), ReadLease)) return false;
+	auto ReadDependencies = MakeShared<FPlanReadDependencies, ESPMode::ThreadSafe>();
+	ReadDependencies->Lease = MoveTemp(ReadLease);
+	ReadDependencies->Missing.Reserve(MaximumHydrologyDependencies);
+	Request.InputBytes = ReadDependencies->Lease->Bytes();
 	Request.Execute = [Dependency = InDependency, CapturedConfig = Config,
-		CapturedCache = Cache](const TAtomic<bool>& Cancel)
+		CapturedCache = Cache, ReadDependencies](const TAtomic<bool>& Cancel)
 	{
 		FVoxelTaskResult Result;
 		FVoxelGenerationQuery Query;
 		if (!FVoxelGenerationQuery::Create(CapturedConfig, CapturedCache,
 			Query, Result.Error, false, true)) return Result;
+		Query.SetMissingHydrologyObserver([ReadDependencies](const FVoxelHydrologyRegionKey& Key)
+		{
+			const auto Missing = MakeDependency(EVoxelGenerationPlanKind::Hydrology, FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0));
+			if (ReadDependencies->Missing.Contains(Missing)) return;
+			if (ReadDependencies->Missing.Num() == MaximumHydrologyDependencies) ReadDependencies->bOverflow = true;
+			else ReadDependencies->Missing.Add(Missing);
+		});
 		switch (Dependency.Kind)
 		{
 		case EVoxelGenerationPlanKind::Hydrology:
@@ -346,24 +371,80 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 		}
 		}
 		Result.bCanceled = Cancel.Load();
+		if (ReadDependencies->bOverflow)
+		{
+			Result.bSuccess = false;
+			Result.Error = TEXT("生成事实的实际采样闭包超过上限");
+		}
+		Result.CustomPayload = ReadDependencies;
 		return Result;
 	};
 	Request.Apply = [this, Dependency = InDependency](FVoxelTaskResult&& Result)
 	{
 		FState* State = States.Find(Dependency);
-		if (!State || Result.Stamp.WorldEpoch != WorldEpoch || Result.Stamp.Token != State->AttemptId)
+		if (!State || Result.Stamp.WorldEpoch != WorldEpoch || Result.Stamp.OwnerId != EnvironmentOwnerId ||
+			Result.Stamp.OwnerIncarnation != EnvironmentOwnerIncarnation || Result.Stamp.Token != State->AttemptId)
 		{
 			return;
 		}
-		const TSet<FIntVector> Consumers = State->Consumers;
+		State->bInFlight = false;
+		if (!Result.bCanceled && Result.Error.StartsWith(TEXT("DependencyNotReady")))
+		{
+			const auto Reads = StaticCastSharedPtr<const FPlanReadDependencies>(Result.CustomPayload);
+			if (Reads)
+			{
+				for (const auto& Missing : Reads->Missing)
+				{
+					if (!State->Prerequisites.Contains(Missing))
+					{
+						if (State->Prerequisites.Num() == MaximumHydrologyDependencies)
+						{
+							Result.Error = TEXT("生成事实的累计采样闭包超过上限");
+							break;
+						}
+						State->Prerequisites.Add(Missing);
+					}
+				}
+				// 注册事实状态先于通知父消费者；下一次 Ensure 原子替换完整订阅闭包。
+				for (const auto& Missing : Reads->Missing)
+				{
+					State = States.Find(Dependency);
+					if (!State->Prerequisites.Contains(Missing)) continue;
+					FString Error;
+					if (!RegisterClosure(Missing, Error))
+					{
+						Result.Error = MoveTemp(Error);
+						break;
+					}
+				}
+				State = States.Find(Dependency);
+				const int64 Side = Dependency.Kind == EVoxelGenerationPlanKind::Ecology ?
+					FVoxelGenerationQuery::EcologyTileSide : FVoxelGenerationQuery::GenerationPlanTileSide;
+				State->PrerequisiteRetention = RetainDependencies(State->Prerequisites,
+					FIntPoint(int32(FMath::Clamp<int64>(int64(Dependency.Coordinate().X) * Side, MIN_int32, MAX_int32)),
+						int32(FMath::Clamp<int64>(int64(Dependency.Coordinate().Y) * Side, MIN_int32, MAX_int32))));
+				TSet<FGuid> Edges;
+				for (const auto& Prerequisite : State->Prerequisites)
+				{
+					if (const FState* PrerequisiteState = States.Find(Prerequisite))
+						Edges.Add(PrerequisiteState->PriorityNode);
+					else
+						Result.Error = TEXT("生成事实的实际采样闭包注册失败");
+				}
+				FString GraphError;
+				if (!PriorityGraph.SetDependencies(State->PriorityNode, Edges, GraphError))
+				{
+					Result.Error = MoveTemp(GraphError);
+				}
+			}
+		}
 		ON_SCOPE_EXIT
 		{
-			if (ConsumerWakeCallback)
+			WakeConsumers(Dependency);
+			const FState* Current = States.Find(Dependency);
+			if (Current && Current->Donations.IsEmpty() && Current->State != EVoxelPlanDependencyState::Queued)
 			{
-				for (const FIntVector& Consumer : Consumers)
-				{
-					ConsumerWakeCallback(Consumer);
-				}
+				ForgetFact(Dependency);
 			}
 		};
 		if (Result.bCanceled || Result.Error.StartsWith(TEXT("DependencyNotReady")))
@@ -373,7 +454,9 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 		}
 		if (Result.bSuccess)
 		{
-			ForgetDependency(Dependency);
+			Result.MarkWorkUsed();
+			State->State = EVoxelPlanDependencyState::Ready;
+			State->Error.Reset();
 			return;
 		}
 		State->State = EVoxelPlanDependencyState::Failed;
@@ -384,6 +467,7 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 	};
 	if (!Scheduler.Enqueue(MoveTemp(Request))) return false;
 	InOutState.State = EVoxelPlanDependencyState::Queued;
+	InOutState.bInFlight = true;
 	return true;
 }
 
@@ -393,117 +477,209 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 	const int32 InSourcePriority,
 	const double InDistanceScore,
 	const double InForwardScore,
-	const FIntVector InConsumer)
+	const FVoxelGenerationConsumerKey& InConsumer)
 {
-	FVoxelGenerationDependencyStatus Status;
-	bool bHydrologyReady = true;
-	bool bPriorityChanged = false;
-	auto Process = [&](const FVoxelGenerationPlanDependency& Dependency)
+	check(IsInGameThread());
+	if (!InConsumer.IsValid() || InConsumer.WorldEpoch != WorldEpoch ||
+		!FMath::IsFinite(InDistanceScore) || InDistanceScore < 0.0 || !FMath::IsFinite(InForwardScore))
 	{
-		if (IsCached(Dependency))
+		return {false, true, TEXT("Invalid generation consumer or priority")};
+	}
+	FVoxelTaskRequest PriorityRequest;
+	PriorityRequest.Kind = EVoxelTaskKind::GenerateExactBase;
+	PriorityRequest.WorkClass = InWorkClass;
+	PriorityRequest.SourcePriority = InSourcePriority;
+	PriorityRequest.DistanceScore = InDistanceScore;
+	PriorityRequest.ForwardScore = InForwardScore;
+	PriorityRequest.SourceStableKey = InConsumer.OwnerId;
+	const FVoxelTerrainServicePriority Priority = FVoxelTaskScheduler::ResolveServicePriority(PriorityRequest);
+	return Ensure(InDependencies, InWorkClass, Priority, InConsumer);
+}
+
+FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
+	TConstArrayView<FVoxelGenerationPlanDependency> InDependencies, const EVoxelWorkClass InWorkClass,
+	const FVoxelTerrainServicePriority& Priority, const FVoxelGenerationConsumerKey& InConsumer)
+{
+	check(IsInGameThread());
+	if (!InConsumer.IsValid() || InConsumer.WorldEpoch != WorldEpoch || !Priority.SourceStableKey.IsValid() ||
+		!FMath::IsFinite(Priority.DistanceCells) || Priority.DistanceCells < 0.0 || !FMath::IsFinite(Priority.ForwardScore) ||
+		Priority.Band < EVoxelTerrainServiceBand::P0 || Priority.Band > EVoxelTerrainServiceBand::P6)
+	{
+		return {false, true, TEXT("生成事实需要完整Source优先级与Consumer身份")};
+	}
+
+	// 完整事实及读依赖状态先注册，再观察 Ready，最后才允许排队。
+	TSet<FVoxelGenerationPlanDependency> Desired;
+	for (const FVoxelGenerationPlanDependency& Dependency : InDependencies)
+	{
+		FString Error;
+		if (!RegisterClosure(Dependency, Error)) return {false, true, MoveTemp(Error)};
+		Desired.Add(Dependency);
+		for (const auto& Prerequisite : States.FindChecked(Dependency).Prerequisites) Desired.Add(Prerequisite);
+	}
+	if (const auto* Previous = ConsumerDependencies.Find(InConsumer))
+	{
+		const auto PreviousEdges = *Previous;
+		for (const auto& Edge : PreviousEdges)
 		{
-			ForgetDependency(Dependency);
-			return true;
+			if (!Desired.Contains(Edge.Key))
+			{
+				RemoveSubscription(Edge.Key, InConsumer, Edge.Value);
+				ConsumerDependencies.FindChecked(InConsumer).Remove(Edge.Key);
+			}
 		}
+	}
+	FGuid* ConsumerNode = ConsumerPriorityNodes.Find(InConsumer);
+	if (!ConsumerNode)
+	{
+		ConsumerNode = &ConsumerPriorityNodes.Add(InConsumer, FGuid::NewGuid());
+		PriorityGraph.Register(*ConsumerNode, Priority);
+	}
+	else PriorityGraph.SetPriority(*ConsumerNode, Priority);
+	TSet<FGuid> DependencyNodes;
+	for (const auto& Dependency : Desired) DependencyNodes.Add(States.FindChecked(Dependency).PriorityNode);
+	FString GraphError;
+	if (!PriorityGraph.SetDependencies(*ConsumerNode, DependencyNodes, GraphError)) return {false, true, MoveTemp(GraphError)};
+	FVoxelGenerationDependencyStatus Status;
+	Status.bReady = true;
+	for (const FVoxelGenerationPlanDependency& Dependency : Desired)
+	{
 		FState& State = States.FindOrAdd(Dependency);
-		State.Consumers.Add(InConsumer);
-		State.Donations.Add(InConsumer, {InWorkClass, InSourcePriority, InDistanceScore, InForwardScore});
-		const FDonation Previous{State.WorkClass, State.SourcePriority, State.DistanceScore, State.ForwardScore};
-		ResolveDonations(State);
-		bPriorityChanged |= Previous.WorkClass != State.WorkClass || Previous.Priority != State.SourcePriority || Previous.Distance != State.DistanceScore ||
-							Previous.Forward != State.ForwardScore;
-		ConsumerDependencies.FindOrAdd(InConsumer).Add(Dependency);
-		if (State.State == EVoxelPlanDependencyState::Ready)
+		auto& Edges = ConsumerDependencies.FindOrAdd(InConsumer);
+		uint64* Subscription = Edges.Find(Dependency);
+		if (!Subscription)
 		{
-			State.State = EVoxelPlanDependencyState::Missing;
+			checkf(NextSubscriptionId != MAX_uint64, TEXT("Generation subscription serial exhausted"));
+			Subscription = &Edges.Add(Dependency, ++NextSubscriptionId);
+		}
+		const FVoxelTerrainServicePriority Previous = State.ServicePriority;
+		State.Donations.Add(InConsumer, {InWorkClass, Priority, *Subscription});
+		ResolveDonations(State);
+		PriorityGraph.SetPriority(State.PriorityNode, State.ServicePriority);
+		if (State.bInFlight && Previous != State.ServicePriority)
+		{
+			Cache->RecordPlanDonation(Dependency.Kind);
+		}
+		const bool bCached = IsCached(Dependency);
+		if (bCached)
+		{
+			State.State = EVoxelPlanDependencyState::Ready;
+			State.Error.Reset();
+		}
+		else if (State.State == EVoxelPlanDependencyState::Ready)
+		{
+			State.State = State.bInFlight ? EVoxelPlanDependencyState::Queued : EVoxelPlanDependencyState::Missing;
 		}
 		if (State.State == EVoxelPlanDependencyState::Failed)
 		{
 			Status.bFailed = true;
 			Status.Error = State.Error;
-			return false;
 		}
-		const bool bWasQueued = State.State == EVoxelPlanDependencyState::Queued;
-		if (bWasQueued && DonatePriority(State, InWorkClass,
-			InSourcePriority, InDistanceScore, InForwardScore))
+		Status.bReady &= bCached;
+	}
+	AdvancePriorityDonations();
+	for (const FVoxelGenerationPlanDependency& Dependency : Desired)
+	{
+		FState& State = States.FindChecked(Dependency);
+		if (State.State == EVoxelPlanDependencyState::Missing && !State.bInFlight && ArePrerequisitesReady(State))
 		{
-			bPriorityChanged = true;
-			Cache->RecordPlanDonation(Dependency.Kind);
-		}
-		if (!bWasQueued)
-		{
-			DonatePriority(State, InWorkClass,
-				InSourcePriority, InDistanceScore, InForwardScore);
 			Queue(Dependency, State);
 		}
-		return false;
-	};
-	for (const FVoxelGenerationPlanDependency& Dependency : InDependencies)
-	{
-		if (Dependency.Kind != EVoxelGenerationPlanKind::Hydrology) continue;
-		bHydrologyReady &= Process(Dependency);
-		if (Status.bFailed) break;
 	}
-	if (bHydrologyReady && !Status.bFailed)
-	{
-		Status.bReady = true;
-		for (const FVoxelGenerationPlanDependency& Dependency : InDependencies)
-		{
-			if (Dependency.Kind == EVoxelGenerationPlanKind::Hydrology) continue;
-			Status.bReady &= Process(Dependency);
-			if (Status.bFailed) break;
-		}
-	}
-	if (bPriorityChanged) RefreshQueuedPriorities();
+	RefreshQueuedPriorities();
 	return Status;
 }
 
 void FVoxelGenerationPlanCoordinator::Reset()
 {
+	check(IsInGameThread());
+	check(EnvironmentOwnerIncarnation != MAX_uint64);
+	const uint64 PreviousIncarnation = EnvironmentOwnerIncarnation++;
+	Scheduler.CancelMatching([Epoch = WorldEpoch, Owner = EnvironmentOwnerId, PreviousIncarnation](EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
+	{
+		return Kind == EVoxelTaskKind::BuildGenerationPlan && Stamp.WorldEpoch == Epoch &&
+			Stamp.OwnerId == Owner && Stamp.OwnerIncarnation == PreviousIncarnation;
+	});
 	States.Reset();
 	ConsumerDependencies.Reset();
+	PriorityFacts.Reset();
+	ConsumerPriorityNodes.Reset();
+	PriorityGraph.Reset();
+	EnvironmentAttempts.Reset();
 }
 
-void FVoxelGenerationPlanCoordinator::ReleaseConsumer(const FIntVector& InConsumer)
+void FVoxelGenerationPlanCoordinator::ReleaseConsumer(const FVoxelGenerationConsumerKey& InConsumer)
 {
-	TSet<FVoxelGenerationPlanDependency> Dependencies;
+	check(IsInGameThread());
+	TMap<FVoxelGenerationPlanDependency, uint64> Dependencies;
 	if (!ConsumerDependencies.RemoveAndCopyValue(InConsumer, Dependencies))
-		return;
-	for (const auto& Dependency : Dependencies)
 	{
-		FState* State = States.Find(Dependency);
-		if (!State)
-			continue;
-		State->Consumers.Remove(InConsumer);
-		State->Donations.Remove(InConsumer);
-		if (State->Consumers.IsEmpty())
-		{
-			const uint64 Attempt = State->AttemptId;
-			Scheduler.CancelMatching(
-				[Attempt, Epoch = WorldEpoch](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
-				{
-					return Kind == EVoxelTaskKind::BuildGenerationPlan && Stamp.WorldEpoch == Epoch && Stamp.Token == Attempt;
-				});
-			States.Remove(Dependency);
-		}
-		else
-			ResolveDonations(*State);
+		return;
 	}
+	FGuid ConsumerNode;
+	if (ConsumerPriorityNodes.RemoveAndCopyValue(InConsumer, ConsumerNode)) PriorityGraph.Remove(ConsumerNode);
+	if (InConsumer.Kind == EVoxelGenerationConsumerKind::Environment)
+	{
+		auto Space = InConsumer;
+		Space.RequestSerial = 1;
+		if (const auto* Current = EnvironmentAttempts.Find(Space); Current && *Current == InConsumer) EnvironmentAttempts.Remove(Space);
+	}
+	for (const auto& Edge : Dependencies)
+	{
+		RemoveSubscription(Edge.Key, InConsumer, Edge.Value);
+	}
+	AdvancePriorityDonations();
 	RefreshQueuedPriorities();
+}
+
+void FVoxelGenerationPlanCoordinator::RemoveSubscription(const FVoxelGenerationPlanDependency& InDependency,
+	const FVoxelGenerationConsumerKey& InConsumer, const uint64 InSubscriptionId)
+{
+	FState* State = States.Find(InDependency);
+	const FDonation* Donation = State ? State->Donations.Find(InConsumer) : nullptr;
+	if (!Donation || Donation->SubscriptionId != InSubscriptionId)
+	{
+		return;
+	}
+	State->Donations.Remove(InConsumer);
+	ResolveDonations(*State);
+	PriorityGraph.SetPriority(State->PriorityNode, State->ServicePriority);
+	if (!State->Donations.IsEmpty())
+	{
+		return;
+	}
+	if (State->bInFlight)
+	{
+		const uint64 Attempt = State->AttemptId;
+		Scheduler.CancelMatching([Attempt, Epoch = WorldEpoch](EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
+		{
+			return Kind == EVoxelTaskKind::BuildGenerationPlan && Stamp.WorldEpoch == Epoch && Stamp.Token == Attempt;
+		});
+	}
+	else
+	{
+		ForgetFact(InDependency);
+	}
 }
 
 uint64 FVoxelGenerationPlanCoordinator::GetWaitingConsumers(const EVoxelGenerationPlanKind InKind) const
 {
-	TSet<FIntVector> Consumers;
+	TSet<FVoxelGenerationConsumerKey> Consumers;
 	for (const auto& Pair : States)
 	{
-		if (Pair.Key.Kind == InKind && Pair.Value.State != EVoxelPlanDependencyState::Failed)
-			Consumers.Append(Pair.Value.Consumers);
+		if (Pair.Key.Kind == InKind && Pair.Value.State != EVoxelPlanDependencyState::Ready &&
+			Pair.Value.State != EVoxelPlanDependencyState::Failed)
+		{
+			for (const auto& Donation : Pair.Value.Donations)
+			{
+				Consumers.Add(Donation.Key);
+			}
+		}
 	}
 	return Consumers.Num();
 }
 
-void FVoxelGenerationPlanCoordinator::SetConsumerWakeCallback(TFunction<void(const FIntVector&)> InCallback)
+void FVoxelGenerationPlanCoordinator::SetConsumerWakeCallback(TFunction<void(const FVoxelGenerationConsumerKey&)> InCallback)
 {
 	ConsumerWakeCallback = MoveTemp(InCallback);
 }
@@ -511,28 +687,132 @@ void FVoxelGenerationPlanCoordinator::SetConsumerWakeCallback(TFunction<void(con
 void FVoxelGenerationPlanCoordinator::ResolveDonations(FState& InOutState)
 {
 	InOutState.WorkClass = EVoxelWorkClass::Background;
-	InOutState.SourcePriority = MAX_int32;
-	InOutState.DistanceScore = MAX_dbl;
-	InOutState.ForwardScore = 0.0;
+	InOutState.ServicePriority = {};
+	const FDonation* Best = nullptr;
 	for (const auto& Donation : InOutState.Donations)
-		DonatePriority(InOutState, Donation.Value.WorkClass, Donation.Value.Priority, Donation.Value.Distance, Donation.Value.Forward);
-}
-
-void FVoxelGenerationPlanCoordinator::ForgetDependency(const FVoxelGenerationPlanDependency& InDependency)
-{
-	if (const FState* State = States.Find(InDependency))
 	{
-		for (const FIntVector& Consumer : State->Consumers)
+		if (!Best || FVoxelTerrainWorkSelection::HigherPriority(Donation.Value.Priority, Best->Priority) ||
+			(Donation.Value.Priority == Best->Priority && Donation.Value.WorkClass < Best->WorkClass))
 		{
-			if (auto* Dependencies = ConsumerDependencies.Find(Consumer))
-			{
-				Dependencies->Remove(InDependency);
-				if (Dependencies->IsEmpty())
-				{
-					ConsumerDependencies.Remove(Consumer);
-				}
-			}
+			Best = &Donation.Value;
 		}
 	}
-	States.Remove(InDependency);
+	if (Best)
+	{
+		InOutState.ServicePriority = Best->Priority;
+		InOutState.WorkClass = Best->WorkClass;
+	}
+	InOutState.SourcePriority = InOutState.ServicePriority.SourcePriority;
+	InOutState.DistanceScore = InOutState.ServicePriority.DistanceCells;
+	InOutState.ForwardScore = InOutState.ServicePriority.ForwardScore;
+}
+
+void FVoxelGenerationPlanCoordinator::WakeConsumers(const FVoxelGenerationPlanDependency& InDependency)
+{
+	const FState* State = States.Find(InDependency);
+	if (!State || !ConsumerWakeCallback)
+	{
+		return;
+	}
+	const auto Subscriptions = State->Donations;
+	for (const auto& Subscription : Subscriptions)
+	{
+		const auto* Edges = ConsumerDependencies.Find(Subscription.Key);
+		const uint64* CurrentId = Edges ? Edges->Find(InDependency) : nullptr;
+		if (CurrentId && *CurrentId == Subscription.Value.SubscriptionId && Subscription.Key.WorldEpoch == WorldEpoch)
+		{
+			ConsumerWakeCallback(Subscription.Key);
+		}
+	}
+}
+
+FVoxelGenerationConsumerKey FVoxelGenerationPlanCoordinator::EnvironmentConsumer(
+	const FVoxelGenerationBounds& InBounds, const bool bInColumn) const
+{
+	const FVoxelGenerationConsumerKey Space{EVoxelGenerationConsumerKind::Environment, WorldEpoch, EnvironmentOwnerId, EnvironmentOwnerIncarnation,
+		bInColumn ? EVoxelGenerationSpatialKind::Column : EVoxelGenerationSpatialKind::Bounds,
+		InBounds.Min, InBounds.Max, 1};
+	if (const auto* Existing = EnvironmentAttempts.Find(Space)) return *Existing;
+	checkf(NextEnvironmentAttempt != MAX_uint64, TEXT("环境请求代耗尽"));
+	auto Consumer = Space;
+	Consumer.RequestSerial = ++NextEnvironmentAttempt;
+	EnvironmentAttempts.Add(Space, Consumer);
+	return Consumer;
+}
+
+bool FVoxelGenerationPlanCoordinator::RegisterClosure(const FVoxelGenerationPlanDependency& InDependency, FString& OutError)
+{
+	if (const auto* Existing = States.Find(InDependency); Existing && Existing->PriorityNode.IsValid())
+	{
+		const int32 Count = Existing->Prerequisites.Num();
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			// 递归注册可能移动 States，逐项重新取父状态，避免保留悬空引用。
+			const auto Prerequisite = States.FindChecked(InDependency).Prerequisites[Index];
+			if (!RegisterClosure(Prerequisite, OutError)) return false;
+		}
+		const auto& State = States.FindChecked(InDependency);
+		TSet<FGuid> Edges;
+		for (const auto& Prerequisite : State.Prerequisites) Edges.Add(States.FindChecked(Prerequisite).PriorityNode);
+		return PriorityGraph.SetDependencies(State.PriorityNode, Edges, OutError);
+	}
+	TArray<FVoxelGenerationPlanDependency> Prerequisites;
+	if (!GatherPrerequisites(InDependency, Prerequisites, OutError)) return false;
+	for (const auto& Prerequisite : Prerequisites)
+	{
+		if (!RegisterClosure(Prerequisite, OutError)) return false;
+	}
+	auto& State = States.FindOrAdd(InDependency);
+	State.PriorityNode = FGuid::NewGuid();
+	State.Prerequisites = MoveTemp(Prerequisites);
+	PriorityFacts.Add(State.PriorityNode, InDependency);
+	PriorityGraph.Register(State.PriorityNode, State.ServicePriority);
+	TSet<FGuid> Edges;
+	for (const auto& Prerequisite : State.Prerequisites) Edges.Add(States.FindChecked(Prerequisite).PriorityNode);
+	return PriorityGraph.SetDependencies(State.PriorityNode, Edges, OutError);
+}
+
+bool FVoxelGenerationPlanCoordinator::ArePrerequisitesReady(const FState& InState) const
+{
+	for (const auto& Dependency : InState.Prerequisites) if (!IsCached(Dependency)) return false;
+	return true;
+}
+
+void FVoxelGenerationPlanCoordinator::AdvancePriorityDonations()
+{
+	PriorityGraph.Advance(128, [this](const FGuid& Node, const FVoxelTerrainServicePriority& Priority)
+	{
+		const auto* Fact = PriorityFacts.Find(Node);
+		auto* State = Fact ? States.Find(*Fact) : nullptr;
+		if (!State) return;
+		if (State->bInFlight && State->ServicePriority != Priority) Cache->RecordPlanDonation(Fact->Kind);
+		State->ServicePriority = Priority;
+		State->SourcePriority = Priority.SourcePriority;
+		State->DistanceScore = Priority.DistanceCells;
+		State->ForwardScore = Priority.ForwardScore;
+	});
+}
+
+void FVoxelGenerationPlanCoordinator::ForgetFact(const FVoxelGenerationPlanDependency& InDependency)
+{
+	if (const auto* State = States.Find(InDependency))
+	{
+		const auto Node = State->PriorityNode;
+		PriorityGraph.Remove(Node);
+		PriorityFacts.Remove(Node);
+		States.Remove(InDependency);
+	}
+}
+
+void FVoxelGenerationPlanCoordinator::ReleaseEnvironment(const FIntPoint& InCell)
+{
+	const FIntVector Cell(InCell.X, InCell.Y, 0);
+	const FVoxelGenerationConsumerKey Space{EVoxelGenerationConsumerKind::Environment, WorldEpoch, EnvironmentOwnerId, EnvironmentOwnerIncarnation,
+		EVoxelGenerationSpatialKind::Column, Cell, Cell, 1};
+	if (const auto* Current = EnvironmentAttempts.Find(Space))
+	{
+		const auto Consumer = *Current;
+		ReleaseConsumer(Consumer);
+		EnvironmentAttempts.Remove(Space);
+	}
 }

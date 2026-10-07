@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Gameplay/WHPlayerController.h"
 
@@ -37,7 +37,9 @@ void AWHPlayerController::OnInitialize_Implementation()
 
 void AWHPlayerController::OnPreparatory_Implementation()
 {
-	for (const auto Module : AMainModule::GetAllModule())
+	AMainModule* MainModule = AMainModule::GetPtr(GetWorld());
+	if (!MainModule) return;
+	for (const auto Module : MainModule->GetModules())
 	{
 		if (!Module || !Module->ModuleNetworkComponent)
 		{

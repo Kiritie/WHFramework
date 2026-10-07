@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "Containers/ArrayView.h"
 #include "CoreMinimal.h"
@@ -9,6 +9,9 @@ struct WHFRAMEWORK_API FVoxelSavedSceneActor
 	FGuid Id;
 	FParameter Data;
 };
+
+struct FVoxelSceneColumnCapture;
+struct FVoxelGenerationConsumerKey;
 
 class WHFRAMEWORK_API FVoxelSceneColumnCodec
 {
@@ -24,4 +27,6 @@ public:
 		TArray<FVoxelSavedSceneActor>& OutActors,
 		FParameter& OutProjectData,
 		FString& OutError);
+	static bool EncodePayloads(const FVoxelSceneColumnCapture& InCapture, FString& OutError,
+		const FVoxelGenerationConsumerKey* InEncodingConsumer = nullptr);
 };

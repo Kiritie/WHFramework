@@ -3,6 +3,7 @@
 #include "Misc/Crc.h"
 #include "Voxel/Network/VoxelNetworkCodec.h"
 #include "Voxel/Serialization/VoxelBinaryCodec.h"
+#include "Voxel/Task/VoxelBoundedAllocation.h"
 
 namespace
 {
@@ -19,7 +20,19 @@ FVoxelNetworkTransfer::FVoxelNetworkTransfer(const FVoxelNetworkSettings& InSett
 
 bool FVoxelNetworkTransfer::Enqueue(
 	const EVoxelTransferPriority InPriority,
-	TArray<uint8>&& InMessage)
+	TArray<uint8>&& InMessage,
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InLease)
+{
+	if (InMessage.IsEmpty() || InMessage.Num() > FVoxelNetworkCodec::MaxWireBytes) return false;
+	const uint32 Crc = FCrc::MemCrc32(InMessage.GetData(), InMessage.Num());
+	return EnqueuePrepared(InPriority, MoveTemp(InMessage), Crc, MoveTemp(InLease));
+}
+
+bool FVoxelNetworkTransfer::EnqueuePrepared(
+	const EVoxelTransferPriority InPriority,
+	TArray<uint8>&& InMessage,
+	const uint32 InCrc,
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InLease)
 {
 	if (InPriority == EVoxelTransferPriority::None ||
 		InMessage.IsEmpty() ||
@@ -33,10 +46,15 @@ bool FVoxelNetworkTransfer::Enqueue(
 	}
 
 	FSend Send;
+	if (Resources && !InLease)
+	{
+		if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Staged, InMessage.GetAllocatedSize(), InLease)) return false;
+	}
+	Send.ResourceLease = MoveTemp(InLease);
 	Send.Id = NextId++;
 	Send.Serial = NextSerial++;
 	Send.Priority = InPriority;
-	Send.Crc = FCrc::MemCrc32(InMessage.GetData(), InMessage.Num());
+	Send.Crc = InCrc;
 	Send.Bytes = MoveTemp(InMessage);
 	PendingBytes += Send.Bytes.Num();
 	Pending.Add(MoveTemp(Send));
@@ -45,7 +63,8 @@ bool FVoxelNetworkTransfer::Enqueue(
 
 void FVoxelNetworkTransfer::Tick(
 	const double InNow,
-	TFunctionRef<void(const TArray<uint8>&)> InSend)
+	TFunctionRef<void(const TArray<uint8>&)> InSend,
+	const double InDeadline)
 {
 	if (LastTick == 0.0)
 	{
@@ -58,6 +77,7 @@ void FVoxelNetworkTransfer::Tick(
 
 	for (int32 Count = 0; Count < 4 && !Pending.IsEmpty(); ++Count)
 	{
+		if (FPlatformTime::Seconds() >= InDeadline) break;
 		const int32 SendIndex = FindNextSend();
 		if (SendIndex == INDEX_NONE)
 		{
@@ -70,6 +90,9 @@ void FVoxelNetworkTransfer::Tick(
 			break;
 		}
 
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Scratch;
+		if (Resources && !Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Working,
+			VoxelBoundedAllocation::InitialGrowBytes<uint8>(MaxPacketBytes) * 3, Scratch)) break;
 		FVoxelByteWriter Writer(MaxPacketBytes);
 		Writer.U32(FragmentMagic);
 		Writer.U64(Send.Id);
@@ -106,9 +129,23 @@ void FVoxelNetworkTransfer::Tick(
 bool FVoxelNetworkTransfer::Receive(
 	TConstArrayView<uint8> InPacket,
 	const double InNow,
-	TArray<uint8>& OutCompleted)
+	TArray<uint8>& OutCompleted,
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>* OutLease)
+{
+	uint32 Crc = 0;
+	if (!Assemble(InPacket, InNow, OutCompleted, Crc, OutLease)) return false;
+	if (OutCompleted.IsEmpty() || FCrc::MemCrc32(OutCompleted.GetData(), OutCompleted.Num()) == Crc) return true;
+	OutCompleted.Reset();
+	if (OutLease) OutLease->Reset();
+	return false;
+}
+
+bool FVoxelNetworkTransfer::Assemble(TConstArrayView<uint8> InPacket, const double InNow,
+	TArray<uint8>& OutCompleted, uint32& OutCrc,
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>* OutLease)
 {
 	OutCompleted.Reset();
+	OutCrc = 0;
 	if (InPacket.Num() > MaxPacketBytes)
 	{
 		return false;
@@ -124,7 +161,7 @@ bool FVoxelNetworkTransfer::Receive(
 	const uint16 FragmentCount = Reader.U16();
 	const uint32 Total = Reader.U32();
 	const uint32 Crc = Reader.U32();
-	const TArray<uint8> Data = Reader.Blob(FragmentBytes);
+	const auto Data = Reader.BlobView(FragmentBytes);
 	if (!Reader.End() ||
 		Id == 0 ||
 		Total == 0 ||
@@ -145,8 +182,16 @@ bool FVoxelNetworkTransfer::Receive(
 			return false;
 		}
 		FReceive NewState;
+		if (Resources)
+		{
+			const uint64 Words = (uint64(FragmentCount) + 31) / 32;
+			const uint64 Bytes = VoxelBoundedAllocation::ArrayBytes<uint8>(Total) +
+				(Words > 4 ? VoxelBoundedAllocation::ArrayBytes<uint32>(Words) : 0);
+			if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input, Bytes, NewState.ResourceLease)) return false;
+		}
 		NewState.Total = static_cast<int32>(Total);
 		NewState.Crc = Crc;
+		NewState.Bytes.Reserve(NewState.Total);
 		NewState.Bytes.SetNumUninitialized(NewState.Total);
 		NewState.Received.Init(false, FragmentCount);
 		NewState.Since = InNow;
@@ -173,16 +218,12 @@ bool FVoxelNetworkTransfer::Receive(
 	++ReceiveState->Count;
 	if (ReceiveState->Count == FragmentCount)
 	{
-		const bool bValid = FCrc::MemCrc32(
-			ReceiveState->Bytes.GetData(),
-			ReceiveState->Bytes.Num()) == ReceiveState->Crc;
 		ReceivingBytes -= ReceiveState->Total;
-		if (bValid)
-		{
-			OutCompleted = MoveTemp(ReceiveState->Bytes);
-		}
+		OutCrc = ReceiveState->Crc;
+		OutCompleted = MoveTemp(ReceiveState->Bytes);
+		if (OutLease) *OutLease = MoveTemp(ReceiveState->ResourceLease);
 		Receiving.Remove(Id);
-		return bValid;
+		return true;
 	}
 	return true;
 }
@@ -195,6 +236,29 @@ void FVoxelNetworkTransfer::Reset()
 	ReceivingBytes = 0;
 	LastTick = 0.0;
 	Tokens = Settings.BurstBytes;
+}
+
+bool FVoxelNetworkTransfer::BindResources(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+	const FVoxelGenerationConsumerKey& InConsumer)
+{
+	if (Resources.Get() == &InResources.Get() && Consumer.WorldEpoch == InConsumer.WorldEpoch &&
+		Consumer.OwnerId == InConsumer.OwnerId && Consumer.OwnerIncarnation == InConsumer.OwnerIncarnation) return true;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+	const uint64 Bytes = VoxelBoundedAllocation::ArrayBytes<FSend>(256) +
+		VoxelBoundedAllocation::MapBytes<uint64, FReceive>(4);
+	if (!InResources->Acquire(InConsumer, EVoxelTerrainResourcePool::Resident, Bytes, Lease)) return false;
+	for (auto& PendingSend : Pending)
+		if (!PendingSend.ResourceLease && !InResources->Acquire(InConsumer, EVoxelTerrainResourcePool::Staged,
+			PendingSend.Bytes.GetAllocatedSize(), PendingSend.ResourceLease)) return false;
+	for (auto& PendingReceive : Receiving)
+		if (!PendingReceive.Value.ResourceLease && !InResources->Acquire(InConsumer, EVoxelTerrainResourcePool::Input,
+			PendingReceive.Value.Bytes.GetAllocatedSize() + PendingReceive.Value.Received.GetAllocatedSize(), PendingReceive.Value.ResourceLease)) return false;
+	Resources = InResources;
+	Consumer = InConsumer;
+	MetadataLease = MoveTemp(Lease);
+	Pending.Reserve(256);
+	Receiving.Reserve(4);
+	return true;
 }
 
 void FVoxelNetworkTransfer::SetSettings(const FVoxelNetworkSettings& InSettings)

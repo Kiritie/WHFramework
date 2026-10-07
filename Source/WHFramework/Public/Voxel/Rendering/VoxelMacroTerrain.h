@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Voxel/Rendering/VoxelStreamingGeometry.h"
@@ -17,9 +17,9 @@ struct WHFRAMEWORK_API FVoxelMacroStructureProxy
 
 struct WHFRAMEWORK_API FVoxelMacroTileData
 {
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 	static constexpr int32 CellSide = 32;
 	static constexpr int32 VertexSide = CellSide + 1;
-	static constexpr int32 BaseStep = 64;
 
 	FVoxelMacroTileKey Key;
 	FVoxelTerrainGeometry Geometry;

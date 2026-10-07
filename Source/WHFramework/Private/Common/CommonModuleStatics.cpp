@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Common/CommonModuleStatics.h"
@@ -22,6 +22,7 @@
 #include "Kismet/KismetStringLibrary.h"
 #include "Main/MainModule.h"
 #include "Main/MainModuleStatics.h"
+#include "SaveGame/SaveGameModule.h"
 #include "Widgets/SViewport.h"
 #include "Windows/WindowsPlatformApplicationMisc.h"
 
@@ -111,8 +112,12 @@ void UCommonModuleStatics::UnPauseGame(EPauseMode PauseMode)
 
 void UCommonModuleStatics::QuitGame(TEnumAsByte<EQuitPreference::Type> QuitPreference, bool bIgnorePlatformRestrictions)
 {
-	// Explicit user exits are save boundaries. SaveCurrentSlot() is synchronous,
-	// so the event handler finishes the generation commit before QuitGame returns.
+	if (auto* Save = USaveGameModule::GetPtr(); Save && Save->GetWorld() == GetCurrentWorld())
+	{
+		Save->RequestUserQuit(uint8(QuitPreference.GetValue()), bIgnorePlatformRestrictions);
+		return;
+	}
+	// 未配置保存模块的世界保留直接退出行为。
 	UEventModuleStatics::BroadcastEvent<FEventGameExited>(nullptr, { false });
 	UKismetSystemLibrary::QuitGame(GetWorldContext(), GetPlayerController<AWHPlayerController>(), QuitPreference, bIgnorePlatformRestrictions);
 }
@@ -465,7 +470,7 @@ UObject* UCommonModuleStatics::GetMutableWorldContext(bool bInEditor)
 TArray<AActor*> UCommonModuleStatics::GetAllActorsOfDataLayer(UDataLayerAsset* InDataLayer, TSubclassOf<AActor> InClass)
 {
 	if(!InClass) InClass = AActor::StaticClass();
-	
+
 	TArray<AActor*> ReturnValues;
 	if(InDataLayer)
 	{
@@ -495,7 +500,7 @@ TArray<AActor*> UCommonModuleStatics::GetAllActorsOfLevel(const FName InLevelNam
 			{
 				AActor* Actor = *It;
 				FString LevelName = Actor->GetPackage()->GetName().Replace(TEXT("UEDPIE_0_"), TEXT(""));
-				if (LevelName == InLevelName) 
+				if (LevelName == InLevelName)
 				{
 					ReturnValues.Add(Actor);
 				}

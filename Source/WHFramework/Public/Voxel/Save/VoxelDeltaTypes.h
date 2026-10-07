@@ -1,7 +1,9 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Voxel/Runtime/VoxelBlockState.h"
+
+class FVoxelTerrainResourceLease;
 
 struct WHFRAMEWORK_API FVoxelBlockEntityState
 {
@@ -42,12 +44,21 @@ struct WHFRAMEWORK_API FVoxelSectionPatch
 
 struct WHFRAMEWORK_API FVoxelEditBatch
 {
+	FVoxelEditBatch() = default;
+	~FVoxelEditBatch();
+	FVoxelEditBatch(const FVoxelEditBatch&) = delete;
+	FVoxelEditBatch& operator=(const FVoxelEditBatch&) = delete;
+	FVoxelEditBatch(FVoxelEditBatch&&) = default;
+	FVoxelEditBatch& operator=(FVoxelEditBatch&& InOther);
+
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 	FGuid TransactionId;
 	TArray<FVoxelSectionPatch> Sections;
 };
 
 struct WHFRAMEWORK_API FVoxelPersistentSection
 {
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 	FIntVector Section = FIntVector::ZeroValue;
 	uint64 Revision = 0;
 	TMap<int32, FVoxelBlockState> Blocks;

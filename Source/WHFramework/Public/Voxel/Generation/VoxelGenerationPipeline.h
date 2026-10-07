@@ -8,6 +8,19 @@
 class WHFRAMEWORK_API FVoxelGenerationPipeline
 {
 public:
+	void SetOverlayPlanningServices(FVoxelGenerationPlanningServices InServices) const;
+	void NotifyOverlayPlanningDependencyReady(const FVoxelGenerationConsumerKey& InConsumer) const;
+	FVoxelOverlayPreflightStatus EnsureOverlayConsumerReady(
+		const FVoxelGenerationConsumerKey& InConsumer,
+		const FVoxelGenerationBounds& InBounds,
+		EVoxelWorkClass InWorkClass,
+		const FVoxelTerrainServicePriority& InPriority) const;
+	void ReleaseOverlayConsumer(const FVoxelGenerationConsumerKey& InConsumer) const;
+	void SetTypedOverlayConsumerWakeCallback(
+		TFunction<void(const FVoxelGenerationConsumerKey&)> InCallback) const;
+	void SetOverlayServicePriorityDonation(
+		TFunction<void(const FVoxelTaskStamp&, EVoxelWorkClass, const FVoxelTerrainServicePriority&)> InCallback) const;
+	void AdvanceOverlayConsumerWakes(double InDeadlineSeconds, int32 InLimit) const;
 	void SetOverlayConsumerWakeCallback(TFunction<void(const FIntVector&)> InCallback) const;
 	void ReleaseOverlaySectionConsumer(const FIntVector& InSection) const;
 	FVoxelOverlayPreflightStatus EnsureOverlayBoundsReady(const FVoxelGenerationBounds& InBounds, EVoxelWorkClass InWorkClass, int32 InSourcePriority) const;

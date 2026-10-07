@@ -1,26 +1,70 @@
-#pragma once
+﻿#pragma once
+
 #include "CoreMinimal.h"
 #include "Voxel/Runtime/VoxelWorldRuntime.h"
 #include "Voxel/Save/VoxelRegionStore.h"
 #include "Voxel/Generation/VoxelWorldManifest.h"
+#include "Tasks/Task.h"
+
+struct FVoxelSceneSaveCapture;
+
+struct WHFRAMEWORK_API FVoxelWorldSaveCompletion
+{
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> OwnerLease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> TargetLease;
+	FGuid ExpectedSaveId;
+	TSharedPtr<const FString, ESPMode::ThreadSafe> ExpectedStorageRoot;
+	FGuid TransactionId;
+	uint64 WorldEpoch = 0;
+	FGuid TargetSaveId;
+	int32 TargetGeneration = 0;
+	TSharedPtr<const FString, ESPMode::ThreadSafe> TargetDirectory;
+	TSharedPtr<const FSaveGameGenerationReadLease, ESPMode::ThreadSafe> TargetReadLease;
+	TSharedPtr<const FVoxelRegionDirectorySnapshot, ESPMode::ThreadSafe> Directory;
+	bool bSceneFilesWritten = false;
+	bool bFilesFlushed = false;
+	bool bGenerationCommitted = false;
+};
+
 struct WHFRAMEWORK_API FVoxelWorldSaveCapture
 {
-    FGuid TransactionId;
-    uint64 WorldEpoch=0;
-    FVoxelWorldManifest Manifest;
-    FString SourceDirectory;
-    TSharedPtr<const FVoxelRegistrySnapshot,ESPMode::ThreadSafe> Registry;
-    TArray<FVoxelPersistentSection> Sections;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MetadataLease;
+	FGuid TransactionId;
+	uint64 WorldEpoch = 0;
+	FVoxelWorldManifest Manifest;
+	TSharedPtr<const FString, ESPMode::ThreadSafe> SourceDirectory;
+	TSharedPtr<const FSaveGameGenerationReadLease, ESPMode::ThreadSafe> SourceLease;
+	TSharedPtr<const FVoxelRegionDirectorySnapshot, ESPMode::ThreadSafe> SourceDirectoryRoot;
+	TSharedPtr<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> Registry;
+	FVoxelCommittedJournalCapture Journal;
+	// Worker写完后发布；GT仅在异步保存任务完成回执之后读取。
+	TSharedPtr<FVoxelWorldSaveCompletion, ESPMode::ThreadSafe> Completion;
+	TSharedPtr<const FVoxelSceneSaveCapture, ESPMode::ThreadSafe> SceneCapture;
+	TSharedPtr<const FVoxelSceneSaveCapture, ESPMode::ThreadSafe> RetiredSceneAttempt;
+	TSharedPtr<const FVoxelSceneSaveCapture, ESPMode::ThreadSafe> RetiredSceneReceipt;
 };
+
 class WHFRAMEWORK_API FVoxelWorldSaveAdapter
 {
 public:
-    bool Capture(FVoxelWorldRuntime& Runtime,const FVoxelWorldManifest& Manifest,
-        TSharedPtr<const FVoxelRegistrySnapshot,ESPMode::ThreadSafe> Registry,const FVoxelRegionStore& Store,FString& Error);
-    const FVoxelWorldSaveCapture* GetCapture()const{return Active.IsSet()?&Active.GetValue():nullptr;}
-    static bool WriteCapture(const FVoxelWorldSaveCapture& Capture,const FString& TempGenerationDirectory,FString& Error);
-    void Complete(FVoxelWorldRuntime& Runtime,FVoxelRegionStore& Store,bool bSuccess,const FString& CommittedDirectory);
-    bool IsBusy()const{return Active.IsSet();}
+	bool Capture(FVoxelWorldRuntime& InRuntime, const FVoxelWorldManifest& InManifest,
+		TSharedPtr<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry,
+		const FVoxelRegionStore& InStore, FString& OutError);
+	const FVoxelWorldSaveCapture* GetCapture() const;
+	bool AttachSceneCapture(TSharedPtr<const FVoxelSceneSaveCapture, ESPMode::ThreadSafe> InCapture);
+	static bool WriteCapture(const FVoxelWorldSaveCapture& InCapture,
+		const FString& InTemporaryGenerationDirectory, FString& OutError);
+	bool Complete(FVoxelWorldRuntime& InRuntime, FVoxelRegionStore& InStore,
+		bool bInSuccess, const FString& InCommittedDirectory,
+		TSharedPtr<const FVoxelSceneSaveCapture, ESPMode::ThreadSafe> InRetiredSceneAttempt = {},
+		TSharedPtr<const FVoxelSceneSaveCapture, ESPMode::ThreadSafe> InRetiredSceneReceipt = {});
+	bool IsBusy() const;
+	bool CanCapture() const;
+
 private:
-    TOptional<FVoxelWorldSaveCapture> Active;
+	friend class FVoxelJournalFixedCutSaveTest;
+	friend class FVoxelJournalSaveCapacityRecoveryTest;
+	TOptional<FVoxelWorldSaveCapture> Active;
+	UE::Tasks::FTask RetireCaptureTask;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RetireTaskLease;
 };

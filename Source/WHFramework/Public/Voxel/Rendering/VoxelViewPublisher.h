@@ -5,11 +5,17 @@
 #include "Voxel/Rendering/VoxelPublishGroups.h"
 #include "Voxel/Rendering/VoxelPublishBudget.h"
 #include "Voxel/Rendering/VoxelGameThreadContinuation.h"
-#include "Voxel/Task/VoxelTaskFairSelection.h"
+#include "Voxel/Task/VoxelTerrainWorkSelection.h"
+#include "Voxel/Rendering/VoxelTerrainRenderer.h"
 
 class AActor;
 class UVoxelModule;
 class UVoxelMeshComponent;
+class FVoxelTerrainRenderer;
+struct FVoxelTerrainCoarseMesh;
+struct FVoxelTerrainRenderCoarse;
+struct FVoxelFineOwnerEvidence;
+class FVoxelTerrainRenderChunk;
 
 struct WHFRAMEWORK_API FVoxelViewCoverageResult final : FVoxelTaskCustomPayload
 {
@@ -52,7 +58,11 @@ public:
 		bool bInRetainPresented = false);
 	bool SetHidden(const FGuid& InGroup, AActor* InActor, bool bInHidden);
 	void SetCommitCallbacks(TFunction<void()> InOnCommitted,
-		TFunction<void(TConstArrayView<FVoxelPublishGroupKey>)> InOnGroupCommitted);
+		TFunction<void(TConstArrayView<FVoxelPublishGroupKey>)> InOnGroupCommitted, TConstArrayView<FGuid> InGroups = {});
+	void SetCommitGate(TFunction<bool(const FVoxelPublishGroupKey&)> InGate)
+	{
+		CommitGate = MoveTemp(InGate);
+	}
 	bool CommitGroup(const FGuid& InGroup);
 	bool DiscardUnchangedGroup(const FGuid& InGroup);
 	void SetValidation(const FGuid& InGroup, TFunction<bool()> InValidation);
@@ -78,6 +88,16 @@ public:
 	bool HasPresentation(AActor* InActor) const;
 	bool GetPresentedMeshCost(AActor* InActor, uint64& OutVertices, uint64& OutTriangles, uint64& OutBytes) const;
 	FVoxelFrameTimings GetFrameTimings() const { return FrameTimings; }
+	FVoxelTerrainRenderer& GetTerrainRenderer() const { return *TerrainRenderer; }
+	bool IsCurrentAtomEvidence(const FIntVector& InSection, const FVoxelFineOwnerEvidence& InEvidence) const;
+	void SetGeometryValidator(TFunction<bool(const FVoxelTaskStamp&)> InValidator)
+	{
+		GeometryValidator = MoveTemp(InValidator);
+	}
+	void SetMeshValidator(TFunction<bool(const FVoxelSectionMeshResult&)> InValidator)
+	{
+		MeshValidator = MoveTemp(InValidator);
+	}
 
 private:
 #if WITH_DEV_AUTOMATION_TESTS
@@ -94,6 +114,7 @@ private:
 	using FGroupCallbackPtr = TSharedPtr<FGroupCallback>;
 	struct FGroupPriority
 	{
+		FVoxelTerrainServicePriority Service;
 		// GT 距离按世界 XY 平方；worker 距离按 streaming source 的 cell 空间。
 		double ObserverDistance = MAX_dbl;
 		double DistanceScore = MAX_dbl;
@@ -112,6 +133,10 @@ private:
 
 	struct FEntry
 	{
+		FGuid NativeSourceId = FGuid::NewGuid();
+		FVoxelTaskStamp NativeStamp;
+		FVoxelTaskStamp PresentedNativeStamp;
+		TSharedPtr<const FVoxelTerrainCoarseMesh, ESPMode::ThreadSafe> NativeMesh;
 		FMeshPtr Source;
 		FMeshPtr PresentedSource;
 		uint64 PresentedVertices = 0;
@@ -135,6 +160,9 @@ private:
 
 	struct FUpdate
 	{
+		FVoxelTaskStamp NativeStamp;
+		TSharedPtr<const FVoxelTerrainCoarseMesh, ESPMode::ThreadSafe> NativeMesh;
+		bool bNativeMeshPending = false;
 		TWeakObjectPtr<AActor> Actor;
 		FMeshPtr Source;
 		int32 TerrainStage = INDEX_NONE;
@@ -156,6 +184,16 @@ private:
 
 	struct FGroup
 	{
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> NativeGroupLease;
+		TArray<FVoxelTerrainCoarseMutation> NativeChanges;
+		// 粗层发布共享原始索引范围，局部裁切随 Fine 在同一呈现根提交。
+		TSharedPtr<FVoxelTerrainRenderCoarse, ESPMode::ThreadSafe> NativeCoarse;
+		TSharedPtr<const FVoxelTerrainRenderChunk, ESPMode::ThreadSafe> NativeLastChunk;
+		FGuid NativeTransaction;
+		int32 NativeSourceCursor = 0;
+		int32 NativeBatchCursor = 0;
+		int32 NativeTriangleCursor = 0;
+		bool bNativeSubmitted = false;
 		FBox Bounds = FBox(ForceInit);
 		TArray<FBox> ChangedBounds;
 		// Proxy 接缝可能服务于 Fine 交接，实际更新阶段不能仅由 owner 类别推断。
@@ -305,7 +343,10 @@ private:
 	void QueueReadyGroup(const FPublicationRef& InPublication, int32 InGroupIndex);
 	void RebuildFirstOwners();
 	void SetOwnerActive(const FVoxelPublishGroupKey& InKey, uint64 InSerial, bool bInActive);
-	int32 SelectReadyGroup(TConstArrayView<FReadyGroup> InReady, FVoxelTaskFairSelection& InSelection, bool bInCommit = false);
+	int32 SelectReadyGroup(TConstArrayView<FReadyGroup> InReady, FVoxelTerrainWorkSelection& InSelection,
+		FVoxelTerrainServiceCharge& OutCharge, bool bInCommit = false);
+	void SettleReadyGroup(FVoxelTerrainWorkSelection& InSelection, const FVoxelTerrainServiceCharge& InCharge,
+		double InStartedSeconds, bool bInCommit);
 	bool HasOlderDependency(const FPublicationRef& InPublication, const FGroup& InGroup) const;
 	FPendingGroup* FindPendingGroup(const FGuid& InGroup);
 	void StartCommittedGroups();
@@ -336,6 +377,8 @@ private:
 	void CommitReadyGroups(const FPublicationRef& Publication, int32& InOutCommitted, double InDeadline,
 		const TMap<FVoxelPublishGroupKey, uint64>& InFirstOwners, int32 InGroupIndex = INDEX_NONE);
 	void CommitReadyGroup(const FPublicationRef& Publication, FGroup& InGroup);
+	bool AdvanceNativeGroup(const FPublicationRef& InPublication, FGroup& InGroup);
+	bool IsNativeGeometryCurrent(const FVoxelTaskStamp& InStamp) const;
 	bool RunBudgetedPhase(FVoxelPublishBudget& InBudget, EVoxelPublishPhase InPhase, TFunctionRef<void()> InOperation);
 	double PhaseOperationEstimateMilliseconds[static_cast<uint8>(EVoxelPublishPhase::Count)] = {};
 	uint64 PhaseConsecutiveDeferrals[static_cast<uint8>(EVoxelPublishPhase::Count)] = {};
@@ -348,7 +391,10 @@ private:
 	UVoxelModule& Module;
 	FVoxelTaskScheduler& Scheduler;
 	uint64 WorldEpoch = 0;
+	TUniquePtr<FVoxelTerrainRenderer> TerrainRenderer;
 	uint64 BatchSerial = 0;
+	FGuid NativeOwnerId = FGuid::NewGuid();
+	uint64 NativeSourceSerial = 0;
 	TMap<TWeakObjectPtr<AActor>, FEntry> Entries;
 	TArray<FVoxelPublishGroupKey> RetryOwners;
 	TMap<FVoxelPublishGroupKey, TSet<TWeakObjectPtr<AActor>>> OwnerActors;
@@ -367,11 +413,17 @@ private:
 	TArray<FVector> Observers;
 	TArray<TWeakObjectPtr<UVoxelMeshComponent>> RetiredComponents;
 	TFunction<void()> OnCommitted;
+	TFunction<bool(const FVoxelPublishGroupKey&)> CommitGate;
+	TFunction<bool(const FVoxelTaskStamp&)> GeometryValidator;
+	TFunction<bool(const FVoxelSectionMeshResult&)> MeshValidator;
 	FGroupCallbackPtr CurrentGroupCallback;
+	TSharedPtr<bool> CommitCallbackLifetime;
 	TArray<FReadyGroup> ReadyPrepareGroups;
 	TArray<FReadyGroup> ReadyCommitGroups;
-	FVoxelTaskFairSelection PrepareSelection;
-	FVoxelTaskFairSelection CommitSelection;
+	FVoxelTerrainWorkSelection PrepareSelection;
+	FVoxelTerrainWorkSelection CommitSelection;
+	double ServiceCostEstimates[2][static_cast<uint8>(EVoxelTerrainServiceBand::Count)] = {};
+	int32 ReadySelectionCursors[2] = {};
 	uint64 ReadySequence = 0;
 	TMap<FVoxelPublishGroupKey, uint64> OwnerFirstSerial;
 	TMap<FVoxelPublishGroupKey, TArray<uint64>> OwnerSerialQueues;

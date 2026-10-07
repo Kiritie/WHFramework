@@ -2,9 +2,13 @@
 
 #include "CoreMinimal.h"
 #include "Voxel/Runtime/VoxelBlockState.h"
+#include "Voxel/Generation/VoxelGenerationConsumer.h"
+#include "Voxel/Generation/VoxelGenerationPlanningRead.h"
+#include "Voxel/Task/VoxelTerrainWorkSelection.h"
 
 enum class EVoxelWorkClass : uint8;
 struct FVoxelGenerationBounds;
+struct FVoxelTaskStamp;
 
 struct WHFRAMEWORK_API FVoxelOverlayPreflightStatus
 {
@@ -18,6 +22,42 @@ class WHFRAMEWORK_API IVoxelGenerationOverlay
 {
 public:
 	virtual ~IVoxelGenerationOverlay() = default;
+
+	virtual void SetPlanningServices(FVoxelGenerationPlanningServices InServices) const
+	{
+	}
+
+	virtual void NotifyPlanningDependencyReady(const FVoxelGenerationConsumerKey& InConsumer) const
+	{
+	}
+
+	/** 同一构建的完整消费者贯穿预检、唤醒与快照租用；准备完成不撤销订阅。 */
+	virtual FVoxelOverlayPreflightStatus EnsureConsumerReady(
+		const FVoxelGenerationConsumerKey& InConsumer,
+		const FVoxelGenerationBounds& InBounds,
+		EVoxelWorkClass InWorkClass,
+		const FVoxelTerrainServicePriority& InPriority) const
+	{
+		return {};
+	}
+
+	virtual void ReleaseConsumer(const FVoxelGenerationConsumerKey& InConsumer) const
+	{
+	}
+
+	virtual void SetTypedConsumerWakeCallback(
+		TFunction<void(const FVoxelGenerationConsumerKey&)> InCallback) const
+	{
+	}
+
+	virtual void SetServicePriorityDonation(
+		TFunction<void(const FVoxelTaskStamp&, EVoxelWorkClass, const FVoxelTerrainServicePriority&)> InCallback) const
+	{
+	}
+
+	virtual void AdvanceConsumerWakes(double InDeadlineSeconds, int32 InLimit) const
+	{
+	}
 
 	virtual void SetConsumerWakeCallback(TFunction<void(const FIntVector&)> InCallback) const
 	{

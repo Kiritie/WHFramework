@@ -14,6 +14,7 @@ enum class EVoxelWaterKind : uint8
 
 struct WHFRAMEWORK_API FVoxelWaterSurfaceTileData
 {
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 	FVoxelSurfaceTileKey Key;
 	uint64 Revision = 0;
 	int32 Side = 0;

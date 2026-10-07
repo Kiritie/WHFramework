@@ -1,9 +1,10 @@
-#include "Voxel/Network/VoxelRepresentationSync.h"
+﻿#include "Voxel/Network/VoxelRepresentationSync.h"
 #include "Voxel/Network/VoxelGeometryWire.h"
 
 #include "Voxel/Network/VoxelNetworkCodec.h"
 #include "Voxel/Serialization/VoxelBinaryCodec.h"
 #include "Voxel/Rendering/VoxelWaterView.h"
+#include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Rendering/VoxelViewLod.h"
 #include "Voxel/VoxelModule.h"
 
@@ -15,16 +16,50 @@ namespace
 	constexpr int32 MaxCells = 1 << 20;
 	constexpr uint32 MaxDistantCells = 16384;
 
-	FVoxelGenerationBounds ResolveBuildBounds(const FVoxelTerrainGeometry& InGeometry,
-		const FVoxelGenerationSettings& InSettings)
+	bool ValidateRepresentationRequest(const FVoxelRepresentationRequest& InRequest, FString& OutError)
+	{
+		if (!InRequest.Geometry.Validate(OutError))
+		{
+			return false;
+		}
+		EVoxelTerrainRepresentation Representation = EVoxelTerrainRepresentation::None;
+		switch (InRequest.Type)
+		{
+		case EVoxelRepresentationWireType::VoxelProxy:
+			Representation = EVoxelTerrainRepresentation::VoxelProxy;
+			break;
+		case EVoxelRepresentationWireType::SurfaceProxy:
+			Representation = EVoxelTerrainRepresentation::Surface;
+			break;
+		case EVoxelRepresentationWireType::MacroTerrain:
+			Representation = EVoxelTerrainRepresentation::Macro;
+			break;
+		default:
+			break;
+		}
+		if (Representation == EVoxelTerrainRepresentation::None || InRequest.Serial == 0 ||
+			InRequest.Geometry.Key != FVoxelTerrainSpatialKey{Representation, InRequest.Key.Coordinate, InRequest.Key.Level} ||
+			(Representation == EVoxelTerrainRepresentation::VoxelProxy && InRequest.Key.Level == 0))
+		{
+			OutError = TEXT("Representation request disagrees with its actual geometry identity");
+			return false;
+		}
+		return true;
+	}
+
+	bool ResolveBuildBounds(const FVoxelTerrainGeometry& InGeometry,
+		const FVoxelGenerationSettings& InSettings, FVoxelGenerationBounds& OutBounds, FString& OutError)
 	{
 		FIntVector Min, Max;
-		check(InGeometry.Key.TryBounds(InGeometry.WorldMinZ, InGeometry.WorldMaxZ, Min, Max));
 		const int32 Step = InGeometry.SampleStepCells;
 		const int32 Margin = FMath::Max(Step, InSettings.Ecology.Tree.bEnabled ? InSettings.Ecology.Tree.CrownRadius : 0);
-		Min -= FIntVector(Margin, Margin, InGeometry.Key.IsColumn() ? 0 : Step);
-		Max += FIntVector(Margin, Margin, InGeometry.Key.IsColumn() ? 0 : Step);
-		return {Min, Max};
+		const FIntVector Padding(Margin, Margin, InGeometry.Key.IsColumn() ? 0 : Step);
+		if (!VoxelStreamingGeometry::TrySamplingBounds(InGeometry, Padding, Padding, Min, Max, OutError))
+		{
+			return false;
+		}
+		OutBounds = {Min, Max};
+		return true;
 	}
 
 	bool WriteGeometry(FVoxelByteWriter& Writer, const FVoxelTerrainGeometry& Geometry,
@@ -38,31 +73,12 @@ namespace
 
 	void ReadGeometry(FVoxelByteReader& Reader, FVoxelTerrainGeometry& Geometry, uint64& RequestId, uint64 Revision)
 	{
-		TArray<uint8> Bytes;
 		FVoxelGeometryWireHeader Header;
 		FString Error;
-		if (!Reader.Raw(VoxelGeometryWire::HeaderBytes, Bytes) || !VoxelGeometryWire::Decode(Bytes, Header, Error) || Header.ContentRevision != Revision)
+		if (!VoxelGeometryWire::Decode(Reader.View(VoxelGeometryWire::HeaderBytes), Header, Error) || Header.ContentRevision != Revision)
 		{ Reader.Reject(); return; }
 		Geometry = Header.Geometry;
 		RequestId = Header.RequestId;
-	}
-
-	uint64 ResolveBuildRevision(
-		const FVoxelWorldRuntime& InRuntime,
-		const EVoxelRepresentationWireType InType,
-		const FVoxelRepresentationWireKey& InKey)
-	{
-		switch (InType)
-		{
-		case EVoxelRepresentationWireType::VoxelProxy:
-			return InRuntime.GetChangeHierarchy().GetVoxelProxyRevision({ InKey.Coordinate, InKey.Level });
-		case EVoxelRepresentationWireType::SurfaceProxy:
-			return InRuntime.GetChangeHierarchy().GetSurfaceRevision({ FIntPoint(InKey.Coordinate.X, InKey.Coordinate.Y), InKey.Level });
-		case EVoxelRepresentationWireType::MacroTerrain:
-			return InRuntime.GetChangeHierarchy().GetMacroRevision({ FIntPoint(InKey.Coordinate.X, InKey.Coordinate.Y), InKey.Level });
-		default:
-			return 0;
-		}
 	}
 
 	void WriteViewKey(FVoxelByteWriter& InWriter, const FVoxelViewKey& InKey)
@@ -106,7 +122,8 @@ namespace
 	void ReadDistantCells(FVoxelByteReader& InReader, TArray<FVoxelDistantCell>& OutCells)
 	{
 		const uint32 Count = InReader.U32();
-		if (Count > MaxDistantCells) InReader.Reject();
+		if (Count > MaxDistantCells || !InReader.IsValid() || uint64(Count) * 44 > uint64(InReader.Remaining())) { InReader.Reject(); return; }
+		OutCells.Reserve(Count);
 		for (uint32 Index = 0; Index < Count && InReader.IsValid(); ++Index)
 		{
 			FVoxelDistantCell Cell;
@@ -121,25 +138,80 @@ namespace
 		}
 	}
 
-	bool FinishCompressed(FVoxelByteWriter& InWriter, TArray<uint8>& OutBytes, FString& OutError)
+	bool ReserveRawWriter(const uint64 InBytes, FVoxelByteWriter& InWriter,
+		TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+		const FVoxelGenerationConsumerKey& InConsumer,
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutLease, FString& OutError)
+	{
+		if (!InConsumer.IsValid() || InBytes == 0 || InBytes > MaxRepresentationRawBytes)
+		{
+			OutError = TEXT("Oversized: invalid representation codec input");
+			return false;
+		}
+		const uint64 Bytes = VoxelBoundedAllocation::ArrayBytes<uint8>(int32(InBytes)) +
+			VoxelBoundedAllocation::ArrayBytes<uint8>(VoxelGeometryWire::HeaderBytes);
+		if (!InResources->Acquire(InConsumer, EVoxelTerrainResourcePool::Working, Bytes, OutLease))
+		{
+			OutError = TEXT("CapacityBlocked: representation raw writer");
+			return false;
+		}
+		return InWriter.Reserve(int32(InBytes));
+	}
+
+	bool FinishCompressed(FVoxelByteWriter& InWriter, FVoxelBinaryBuffer& OutBytes, FString& OutError,
+		TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+		const FVoxelGenerationConsumerKey& InConsumer)
 	{
 		TArray<uint8> Raw;
-		if (!InWriter.Finish(Raw) || !VoxelBinary::Compress(Raw, OutBytes, FVoxelNetworkCodec::MaxRepresentationBytes))
+		bool bCapacityBlocked = false;
+		if (!InWriter.Finish(Raw) || !VoxelBinary::CompressGranted(Raw, OutBytes, InResources,
+			InConsumer, MaxRepresentationRawBytes, FVoxelNetworkCodec::MaxRepresentationBytes, bCapacityBlocked))
 		{
-			OutError = TEXT("Voxel representation encoding failed");
+			OutError = bCapacityBlocked ? TEXT("CapacityBlocked: representation native compression") :
+				TEXT("Voxel representation encoding failed");
 			return false;
 		}
 		OutError.Reset();
 		return true;
 	}
 
-	bool OpenCompressed(TConstArrayView<uint8> InBytes, TArray<uint8>& OutRaw, FString& OutError)
+	bool OpenCompressed(TConstArrayView<uint8> InBytes, FVoxelBinaryBuffer& OutRaw, FString& OutError,
+		TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+		const FVoxelGenerationConsumerKey& InConsumer)
 	{
-		if (!VoxelBinary::Decompress(InBytes, OutRaw, MaxRepresentationRawBytes))
+		if (!InConsumer.IsValid() || InBytes.Num() > FVoxelNetworkCodec::MaxRepresentationBytes)
+		{
+			OutError = TEXT("Invalid representation compression input");
+			return false;
+		}
+		FVoxelByteReader Header(InBytes);
+		const uint32 Magic = Header.U32();
+		const uint32 RawBytes = Header.U32();
+		Header.U32();
+		const auto Compressed = Header.BlobView(MaxRepresentationRawBytes + 65536);
+		if (!Header.End() || Magic != 0x315a5856 || !RawBytes ||
+			RawBytes > MaxRepresentationRawBytes || Compressed.IsEmpty())
 		{
 			OutError = TEXT("Voxel representation compression envelope is invalid");
 			return false;
 		}
+		FVoxelBinaryBuffer Candidate;
+		if (!InResources->Acquire(InConsumer, EVoxelTerrainResourcePool::Working,
+			VoxelBoundedAllocation::ArrayBytes<uint8>(int32(RawBytes)), Candidate.ResourceLease))
+		{
+			OutError = TEXT("CapacityBlocked: representation raw decode input");
+			return false;
+		}
+		bool bCapacityBlocked = false;
+		if (!VoxelBinary::DecompressGranted(InBytes, Candidate.Bytes, InResources, InConsumer,
+			MaxRepresentationRawBytes, bCapacityBlocked))
+		{
+			OutError = bCapacityBlocked ? TEXT("CapacityBlocked: representation native decompression") :
+				TEXT("Voxel representation compression envelope is invalid");
+			return false;
+		}
+		check(Candidate.Bytes.GetAllocatedSize() <= Candidate.ResourceLease->Bytes());
+		OutRaw = MoveTemp(Candidate);
 		return true;
 	}
 }
@@ -148,7 +220,7 @@ bool FVoxelRepresentationSync::PrepareServerBuild(
 	UVoxelModule& InModule,
 	const FVoxelRepresentationRequest& InRequest,
 	FVoxelRepresentationBuildInput& OutInput,
-	FString& OutError)
+	FString& OutError, const FVoxelGenerationConsumerKey* InConsumer)
 {
 	const FVoxelWorldRuntime* Runtime = InModule.GetRuntime();
 	FVoxelRepresentationBuildInput Input;
@@ -165,42 +237,34 @@ bool FVoxelRepresentationSync::PrepareServerBuild(
 		return false;
 	}
 
-	if (!InRequest.Geometry.Validate(OutError)) return false;
-	const FVoxelGenerationBounds Bounds = ResolveBuildBounds(InRequest.Geometry, Input.Settings);
+	if (!ValidateRepresentationRequest(InRequest, OutError)) return false;
+	FVoxelGenerationBounds Bounds;
+	if (!ResolveBuildBounds(InRequest.Geometry, Input.Settings, Bounds, OutError)) return false;
 	if (!InModule.EnsureEnvironmentBounds(Bounds, EVoxelWorkClass::Exploration, 0, 0.0, 0.0).bReady ||
 		!Input.Generator->EnsureCoarseOverlayBoundsReady(Bounds, EVoxelWorkClass::Exploration, 0).bReady)
 	{ OutError = TEXT("DependencyNotReady: representation environment"); return false; }
-	if (!InModule.CaptureOverlays(Bounds, Input.Overlays, OutError))
+	if (!InModule.CaptureFineOverlays(Bounds, Input.OverlayCapture, OutError, InConsumer))
 	{
 		return false;
 	}
-	Input.Revision = ResolveBuildRevision(*Runtime, InRequest.Type, InRequest.Key);
+	Input.Revision = Runtime->GetChangeHierarchy().CaptureVersionSnapshot().GetGeometryRevision(InRequest.Geometry);
 	OutInput = MoveTemp(Input);
 	OutError.Reset();
 	return true;
 }
 
-bool FVoxelRepresentationSync::BuildServerData(const FVoxelRepresentationBuildInput& InInput,
-	TArray<uint8>& OutBytes, FString& OutError, const TAtomic<bool>* InCancel)
-{
-	FVoxelRepresentationPageBuild Build;
-	FVoxelRepresentationBuildInput Input = InInput;
-	if (!Build.Initialize(MoveTemp(Input), OutError)) return false;
-	bool bComplete = false;
-	while (!bComplete)
-		if (!Build.Advance(OutBytes, bComplete, OutError, InCancel)) return false;
-	return true;
-}
-
 bool FVoxelRepresentationSync::EncodeVoxelProxy(
 	const FVoxelVoxelProxyData& InData,
-	TArray<uint8>& OutBytes,
-	FString& OutError)
+	FVoxelBinaryBuffer& OutBytes,
+	FString& OutError,
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+	const FVoxelGenerationConsumerKey& InConsumer)
 {
-	if (InData.Key.Level > 20 || InData.Geometry.SampleStepCells <= 0 || InData.GridSide !=
+	if (!InData.Geometry.Validate(OutError) ||
+		InData.Geometry.Key != FVoxelTerrainSpatialKey{EVoxelTerrainRepresentation::VoxelProxy, InData.Key.Coordinate, InData.Key.Level} ||
+		InData.Key.Level == 0 || InData.GridSide <= 0 || InData.GridSide > 128 || InData.LocalMinCells != FIntVector::ZeroValue || InData.GridSide !=
 			InData.Key.GetSide() / InData.Geometry.SampleStepCells ||
-		InData.Cells.Num() !=
-			(InData.GridSide * InData.GridSide * InData.GridSide))
+		int64(InData.Cells.Num()) != int64(InData.GridSide) * InData.GridSide * InData.GridSide)
 	{
 		OutError =
 			TEXT(
@@ -227,7 +291,14 @@ bool FVoxelRepresentationSync::EncodeVoxelProxy(
 		}
 	}
 
-	FVoxelByteWriter Writer(MaxRepresentationRawBytes);
+	uint64 RawBytes = 105 + uint64(InData.Cells.Num()) * 4;
+	for (int32 Face = 0; Face < 6; ++Face)
+	{
+		if (InData.Known[Face]) RawBytes += uint64(InData.Halo[Face].Num()) * 4;
+	}
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RawLease;
+	FVoxelByteWriter Writer{int32(RawBytes)};
+	if (!ReserveRawWriter(RawBytes, Writer, InResources, InConsumer, RawLease, OutError)) return false;
 
 	Writer.U32(
 		RepresentationMagic);
@@ -289,29 +360,25 @@ bool FVoxelRepresentationSync::EncodeVoxelProxy(
 		}
 	}
 
-	return FinishCompressed(
-		Writer,
-		OutBytes,
-		OutError);
+	return FinishCompressed(Writer, OutBytes, OutError, InResources, InConsumer);
 }
 
 bool FVoxelRepresentationSync::DecodeVoxelProxy(
 	TConstArrayView<uint8> InBytes,
 	FVoxelVoxelProxyData& OutData,
-	FString& OutError)
+	FString& OutError,
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+	const FVoxelGenerationConsumerKey& InConsumer,
+	const FVoxelGeometryWireHeader* InExpected)
 {
-	TArray<uint8> Raw;
+	FVoxelBinaryBuffer Raw;
 
-	if (!OpenCompressed(
-			InBytes,
-			Raw,
-			OutError))
+	if (!OpenCompressed(InBytes, Raw, OutError, InResources, InConsumer))
 	{
 		return false;
 	}
 
-	FVoxelByteReader Reader(
-		Raw);
+	FVoxelByteReader Reader(Raw.Bytes);
 
 	if (Reader.U32() !=
 			RepresentationMagic ||
@@ -335,6 +402,8 @@ bool FVoxelRepresentationSync::DecodeVoxelProxy(
 
 	Data.Revision = Reader.U64();
 	ReadGeometry(Reader, Data.Geometry, Data.RequestId, Data.Revision);
+	if (!Reader.IsValid() || (InExpected && !VoxelGeometryWire::ValidateExpected(
+		{Data.Geometry, Data.RequestId, Data.Revision}, *InExpected, OutError))) return false;
 	if (Data.Geometry.Key != FVoxelTerrainSpatialKey{EVoxelTerrainRepresentation::VoxelProxy, Data.Key.Coordinate, Data.Key.Level})
 	{ OutError = TEXT("Representation payload key disagrees with geometry header"); return false; }
 
@@ -356,8 +425,10 @@ bool FVoxelRepresentationSync::DecodeVoxelProxy(
 	const uint32 Count =
 		Reader.U32();
 
-	if (Data.Key.Level > 20 || Data.Geometry.SampleStepCells <= 0 || Data.GridSide != Data.Key.GetSide() / Data.Geometry.SampleStepCells || Data.GridSide > 128 ||
-		Count != (Data.GridSide * Data.GridSide * Data.GridSide))
+	if (!Reader.IsValid() || Data.Key.Level == 0 || Data.Key.Level > 20 ||
+		Data.GridSide <= 0 || Data.GridSide > 128 || Data.Geometry.SampleStepCells <= 0 ||
+		Data.GridSide != Data.Key.GetSide() / Data.Geometry.SampleStepCells ||
+		Count != (Data.GridSide * Data.GridSide * Data.GridSide) || uint64(Count) * 4 + 6 > uint64(Reader.Remaining()))
 	{
 		Reader.Reject();
 		OutError = TEXT("Invalid proxy sampling resolution");
@@ -403,6 +474,11 @@ bool FVoxelRepresentationSync::DecodeVoxelProxy(
 			continue;
 		}
 
+		if (uint64(Data.GridSide) * Data.GridSide * 4 > uint64(Reader.Remaining()))
+		{
+			Reader.Reject();
+			break;
+		}
 		Data.Halo[
 			Face].
 			Reserve(
@@ -441,9 +517,16 @@ bool FVoxelRepresentationSync::DecodeVoxelProxy(
 
 bool FVoxelRepresentationSync::EncodeSurface(
 	const FVoxelSurfaceTileData& InData,
-	TArray<uint8>& OutBytes,
-	FString& OutError)
+	FVoxelBinaryBuffer& OutBytes,
+	FString& OutError,
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+	const FVoxelGenerationConsumerKey& InConsumer)
 {
+	if (!InData.Geometry.Validate(OutError) ||
+		InData.Geometry.Key != FVoxelTerrainSpatialKey{EVoxelTerrainRepresentation::Surface, FIntVector(InData.Key.Coordinate.X, InData.Key.Coordinate.Y, 0), InData.Key.Level} ||
+		InData.Side <= 1 || InData.Side > 257 || InData.Step != InData.Geometry.SampleStepCells || InData.LocalMinCells != FIntPoint::ZeroValue ||
+		int64(InData.Side - 1) * InData.Step != InData.Geometry.Key.SideCells())
+	{ OutError = TEXT("Surface representation disagrees with its actual geometry"); return false; }
 	const int32 Count = InData.Side * InData.Side;
 	if (Count <= 0 || Count > MaxCells || InData.GroundZ.Num() != Count || InData.WaterZ.Num() != Count ||
 		InData.SurfaceMaterial.Num() != Count || InData.Biome.Num() != Count || InData.Flags.Num() != Count ||
@@ -452,7 +535,10 @@ bool FVoxelRepresentationSync::EncodeSurface(
 		OutError = TEXT("Voxel surface representation is invalid");
 		return false;
 	}
-	FVoxelByteWriter Writer(FVoxelNetworkCodec::MaxRepresentationBytes);
+	const uint64 RawBytes = 102 + uint64(Count) * 13 + uint64(InData.DistantCells.Num()) * 44;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RawLease;
+	FVoxelByteWriter Writer{int32(RawBytes)};
+	if (!ReserveRawWriter(RawBytes, Writer, InResources, InConsumer, RawLease, OutError)) return false;
 	Writer.U32(RepresentationMagic); Writer.U16(RepresentationVersion); Writer.U8(2);
 	WriteTileKey(Writer, InData.Key.Coordinate, InData.Key.Level);
 	Writer.U64(InData.Revision);
@@ -464,17 +550,20 @@ bool FVoxelRepresentationSync::EncodeSurface(
 		Writer.U16(InData.SurfaceMaterial[Index]); Writer.U16(InData.Biome[Index]); Writer.U8(InData.Flags[Index]);
 	}
 	WriteDistantCells(Writer, InData.DistantCells);
-	return FinishCompressed(Writer, OutBytes, OutError);
+	return FinishCompressed(Writer, OutBytes, OutError, InResources, InConsumer);
 }
 
 bool FVoxelRepresentationSync::DecodeSurface(
 	TConstArrayView<uint8> InBytes,
 	FVoxelSurfaceTileData& OutData,
-	FString& OutError)
+	FString& OutError,
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+	const FVoxelGenerationConsumerKey& InConsumer,
+	const FVoxelGeometryWireHeader* InExpected)
 {
-	TArray<uint8> Raw;
-	if (!OpenCompressed(InBytes, Raw, OutError)) return false;
-	FVoxelByteReader Reader(Raw);
+	FVoxelBinaryBuffer Raw;
+	if (!OpenCompressed(InBytes, Raw, OutError, InResources, InConsumer)) return false;
+	FVoxelByteReader Reader(Raw.Bytes);
 	if (Reader.U32() != RepresentationMagic || Reader.U16() != RepresentationVersion || Reader.U8() != 2)
 	{
 		OutError = TEXT("Voxel surface representation header is invalid"); return false;
@@ -483,11 +572,14 @@ bool FVoxelRepresentationSync::DecodeSurface(
 	Data.Key.Coordinate.X = Reader.I32(); Data.Key.Coordinate.Y = Reader.I32(); Data.Key.Level = Reader.U8();
 	Data.Revision = Reader.U64();
 	ReadGeometry(Reader, Data.Geometry, Data.RequestId, Data.Revision);
+	if (!Reader.IsValid() || (InExpected && !VoxelGeometryWire::ValidateExpected(
+		{Data.Geometry, Data.RequestId, Data.Revision}, *InExpected, OutError))) return false;
 	if (Data.Geometry.Key != FVoxelTerrainSpatialKey{EVoxelTerrainRepresentation::Surface, FIntVector(Data.Key.Coordinate.X, Data.Key.Coordinate.Y, 0), Data.Key.Level})
 	{ OutError = TEXT("Representation payload key disagrees with geometry header"); return false; }
 	Data.Side = Reader.U16(); Data.Step = Reader.I32();
 	const uint32 Count = Reader.U32();
-	if (Data.Step != Data.Geometry.SampleStepCells || Data.Side <= 1 || int64(Data.Side - 1) * Data.Step != Data.Geometry.Key.SideCells() || Count != static_cast<uint32>(Data.Side * Data.Side) || Count > MaxCells) Reader.Reject();
+	if (Data.Step != Data.Geometry.SampleStepCells || Data.Side <= 1 || Data.Side > 257 || int64(Data.Side - 1) * Data.Step != Data.Geometry.Key.SideCells() || Count != static_cast<uint32>(Data.Side * Data.Side) || Count > MaxCells || !Reader.IsValid() || uint64(Count) * 13 > uint64(Reader.Remaining()))
+	{ OutError = TEXT("Invalid surface sampling resolution"); return false; }
 	Data.GroundZ.Reserve(Count); Data.WaterZ.Reserve(Count); Data.SurfaceMaterial.Reserve(Count);
 	Data.Biome.Reserve(Count); Data.Flags.Reserve(Count);
 	for (uint32 Index = 0; Index < Count && Reader.IsValid(); ++Index)
@@ -502,9 +594,16 @@ bool FVoxelRepresentationSync::DecodeSurface(
 
 bool FVoxelRepresentationSync::EncodeMacro(
 	const FVoxelMacroTileData& InData,
-	TArray<uint8>& OutBytes,
-	FString& OutError)
+	FVoxelBinaryBuffer& OutBytes,
+	FString& OutError,
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+	const FVoxelGenerationConsumerKey& InConsumer)
 {
+	if (!InData.Geometry.Validate(OutError) ||
+		InData.Geometry.Key != FVoxelTerrainSpatialKey{EVoxelTerrainRepresentation::Macro, FIntVector(InData.Key.Coordinate.X, InData.Key.Coordinate.Y, 0), InData.Key.Level} ||
+		InData.Side <= 1 || InData.Side > 257 || InData.Step != InData.Geometry.SampleStepCells || InData.LocalMinCells != FIntPoint::ZeroValue ||
+		int64(InData.Side - 1) * InData.Step != InData.Geometry.Key.SideCells())
+	{ OutError = TEXT("Macro representation disagrees with its actual geometry"); return false; }
 	const int32 Count = InData.Side * InData.Side;
 	if (Count <= 0 || Count > MaxCells || InData.Height.Num() != Count || InData.WaterHeight.Num() != Count ||
 		InData.WaterKind.Num() != Count ||
@@ -513,7 +612,11 @@ bool FVoxelRepresentationSync::EncodeMacro(
 	{
 		OutError = TEXT("Voxel macro representation is invalid"); return false;
 	}
-	FVoxelByteWriter Writer(FVoxelNetworkCodec::MaxRepresentationBytes);
+	const uint64 RawBytes = 104 + uint64(Count) * 13 + uint64(InData.LargeStructures.Num()) * 16 +
+		uint64(InData.DistantCells.Num()) * 44;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RawLease;
+	FVoxelByteWriter Writer{int32(RawBytes)};
+	if (!ReserveRawWriter(RawBytes, Writer, InResources, InConsumer, RawLease, OutError)) return false;
 	Writer.U32(RepresentationMagic); Writer.U16(RepresentationVersion); Writer.U8(3);
 	WriteTileKey(Writer, InData.Key.Coordinate, InData.Key.Level);
 	Writer.U64(InData.Revision);
@@ -535,17 +638,20 @@ bool FVoxelRepresentationSync::EncodeMacro(
 		Writer.U16(Structure.StructureIndex); Writer.U16(Structure.Radius);
 	}
 	WriteDistantCells(Writer, InData.DistantCells);
-	return FinishCompressed(Writer, OutBytes, OutError);
+	return FinishCompressed(Writer, OutBytes, OutError, InResources, InConsumer);
 }
 
 bool FVoxelRepresentationSync::DecodeMacro(
 	TConstArrayView<uint8> InBytes,
 	FVoxelMacroTileData& OutData,
-	FString& OutError)
+	FString& OutError,
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+	const FVoxelGenerationConsumerKey& InConsumer,
+	const FVoxelGeometryWireHeader* InExpected)
 {
-	TArray<uint8> Raw;
-	if (!OpenCompressed(InBytes, Raw, OutError)) return false;
-	FVoxelByteReader Reader(Raw);
+	FVoxelBinaryBuffer Raw;
+	if (!OpenCompressed(InBytes, Raw, OutError, InResources, InConsumer)) return false;
+	FVoxelByteReader Reader(Raw.Bytes);
 	if (Reader.U32() != RepresentationMagic || Reader.U16() != RepresentationVersion || Reader.U8() != 3)
 	{
 		OutError = TEXT("Voxel macro representation header is invalid"); return false;
@@ -554,11 +660,14 @@ bool FVoxelRepresentationSync::DecodeMacro(
 	Data.Key.Coordinate.X = Reader.I32(); Data.Key.Coordinate.Y = Reader.I32(); Data.Key.Level = Reader.U8();
 	Data.Revision = Reader.U64();
 	ReadGeometry(Reader, Data.Geometry, Data.RequestId, Data.Revision);
+	if (!Reader.IsValid() || (InExpected && !VoxelGeometryWire::ValidateExpected(
+		{Data.Geometry, Data.RequestId, Data.Revision}, *InExpected, OutError))) return false;
 	if (Data.Geometry.Key != FVoxelTerrainSpatialKey{EVoxelTerrainRepresentation::Macro, FIntVector(Data.Key.Coordinate.X, Data.Key.Coordinate.Y, 0), Data.Key.Level})
 	{ OutError = TEXT("Representation payload key disagrees with geometry header"); return false; }
 	Data.Side = Reader.U16(); Data.Step = Reader.I32();
 	const uint32 Count = Reader.U32();
-	if (Data.Step != Data.Geometry.SampleStepCells || Data.Side <= 1 || int64(Data.Side - 1) * Data.Step != Data.Geometry.Key.SideCells() || Count != static_cast<uint32>(Data.Side * Data.Side) || Count > MaxCells) Reader.Reject();
+	if (Data.Step != Data.Geometry.SampleStepCells || Data.Side <= 1 || Data.Side > 257 || int64(Data.Side - 1) * Data.Step != Data.Geometry.Key.SideCells() || Count != static_cast<uint32>(Data.Side * Data.Side) || Count > MaxCells || !Reader.IsValid() || uint64(Count) * 13 > uint64(Reader.Remaining()))
+	{ OutError = TEXT("Invalid macro sampling resolution"); return false; }
 	Data.Height.Reserve(Count); Data.WaterHeight.Reserve(Count); Data.WaterKind.Reserve(Count); Data.SurfaceClass.Reserve(Count);
 	Data.ForestCoverage.Reserve(Count); Data.SnowCoverage.Reserve(Count);
 	for (uint32 Index = 0; Index < Count && Reader.IsValid(); ++Index)
@@ -569,7 +678,8 @@ bool FVoxelRepresentationSync::DecodeMacro(
 		Data.WaterKind.Add(Kind); Data.ForestCoverage.Add(Reader.U8()); Data.SnowCoverage.Add(Reader.U8());
 	}
 	const uint16 StructureCount = Reader.U16();
-	if (StructureCount > 4096) Reader.Reject();
+	if (StructureCount > 4096 || !Reader.IsValid() || uint64(StructureCount) * 16 > uint64(Reader.Remaining())) { OutError = TEXT("Invalid macro structure count"); return false; }
+	Data.LargeStructures.Reserve(StructureCount);
 	for (uint16 Index = 0; Index < StructureCount && Reader.IsValid(); ++Index)
 	{
 		FVoxelMacroStructureProxy Structure;
@@ -581,55 +691,124 @@ bool FVoxelRepresentationSync::DecodeMacro(
 	OutData = MoveTemp(Data); OutError.Reset(); return true;
 }
 
+FVoxelRepresentationPageBuild::FVoxelRepresentationPageBuild(
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+	const FVoxelGenerationConsumerKey& InConsumer)
+	: Resources(MoveTemp(InResources)), Consumer(InConsumer)
+{
+}
+
 bool FVoxelRepresentationPageBuild::Initialize(FVoxelRepresentationBuildInput&& InInput, FString& OutError)
 {
-	if (!InInput.Config || !InInput.Cache || !InInput.Generator || !InInput.Registry ||
-		!InInput.Request.Geometry.Validate(OutError) || InInput.Request.Serial == 0)
+	if (!Consumer.IsValid() || !InInput.Config || !InInput.Cache || !InInput.Generator || !InInput.Registry)
 	{ OutError = TEXT("Invalid immutable representation build input"); return false; }
-	Input = MoveTemp(InInput);
-	return Input.Request.Type == EVoxelRepresentationWireType::VoxelProxy
-		? Proxy.Initialize(Input.Request.Geometry, OutError) : Heightfield.Initialize(Input.Request.Geometry, OutError);
+	if (!ValidateRepresentationRequest(InInput.Request, OutError)) return false;
+	const int64 Samples = InInput.Request.Geometry.Key.SideCells() / InInput.Request.Geometry.SampleStepCells;
+	if (Samples > (InInput.Request.Geometry.Key.IsColumn() ? 256 : 128))
+	{ OutError = TEXT("Oversized: server representation sampling exceeds wire limits"); return false; }
+	FVoxelRepresentationPageBuild Candidate(Resources, Consumer);
+	Candidate.Input = MoveTemp(InInput);
+	const bool bGeometryReady = Candidate.Input.Request.Type == EVoxelRepresentationWireType::VoxelProxy
+		? Candidate.Proxy.Initialize(Candidate.Input.Request.Geometry, OutError) : Candidate.Heightfield.Initialize(Candidate.Input.Request.Geometry, OutError);
+	if (!bGeometryReady || !Candidate.OverlayReader.Initialize(MoveTemp(Candidate.Input.OverlayCapture), OutError)) return false;
+	*this = MoveTemp(Candidate);
+	return true;
 }
 
 uint64 FVoxelRepresentationPageBuild::InputBytes() const
 {
-	return Input.Overlays.GetAllocatedBytes() + (Input.Request.Type == EVoxelRepresentationWireType::VoxelProxy
+	return OverlayReader.AllocatedBytes() + OverlayReadResult.ContentRevisions.GetAllocatedSize() +
+		(OverlayReadResult.Snapshot ? OverlayReadResult.Snapshot->GetAllocatedBytes() : 0) +
+		(OverlayReadResult.ReadLeaseSet ? OverlayReadResult.ReadLeaseSet->GetMetadataBytes() : 0) +
+		(Input.Request.Type == EVoxelRepresentationWireType::VoxelProxy
 		? Proxy.MaximumRetainedBytes() : Heightfield.MaximumRetainedBytes());
 }
 
-bool FVoxelRepresentationPageBuild::Advance(TArray<uint8>& OutBytes, bool& bOutComplete,
+uint64 FVoxelRepresentationPageBuild::RawCapacityBytes() const
+{
+	return Input.Request.Type == EVoxelRepresentationWireType::VoxelProxy ? Proxy.MaximumRetainedBytes() : Heightfield.MaximumRetainedBytes();
+}
+
+uint64 FVoxelRepresentationPageBuild::MaximumWireBytes() const
+{
+	FString Error;
+	if (!Input.Request.Geometry.Validate(Error)) return 0;
+	const int64 Samples = Input.Request.Geometry.Key.SideCells() / Input.Request.Geometry.SampleStepCells;
+	uint64 RawBytes = 0;
+	if (Input.Request.Type == EVoxelRepresentationWireType::VoxelProxy)
+	{
+		RawBytes = 105 + uint64(Samples * Samples) * (4 * Samples + 24);
+	}
+	else
+	{
+		RawBytes = 102 + uint64((Samples + 1) * (Samples + 1)) * 13 + uint64(MaxDistantCells) * 44;
+		if (Input.Request.Type == EVoxelRepresentationWireType::MacroTerrain) RawBytes += 2 + 4096 * 16;
+	}
+	if (RawBytes == 0 || RawBytes > MaxRepresentationRawBytes) return 0;
+	const int32 Bound = VoxelBinary::CompressionBound(int32(RawBytes));
+	return Bound > 0 ? FMath::Min(uint64(Bound) + 16, uint64(FVoxelNetworkCodec::MaxRepresentationBytes)) : 0;
+}
+
+const FVoxelFineOverlayReadResult& FVoxelRepresentationPageBuild::GetOverlayReadResult() const
+{
+	return OverlayReadResult;
+}
+
+bool FVoxelRepresentationPageBuild::Advance(FVoxelBinaryBuffer& OutBytes, bool& bOutComplete,
 	FString& OutError, const TAtomic<bool>* InCancel)
 {
 	bOutComplete = false;
 	if (InCancel && InCancel->Load()) { OutError = TEXT("Canceled"); return false; }
-	if (Input.Request.Type == EVoxelRepresentationWireType::VoxelProxy)
+	if (bEncodedTaken) { OutError = TEXT("Representation encoding result was already taken"); return false; }
+	if (!OverlayReadResult.Snapshot)
 	{
-		const FVoxelVoxelProxyBuilder Builder(Input.Config.ToSharedRef(), Input.Cache.ToSharedRef(), Input.Generator);
-		FVoxelVoxelProxyData Data;
-		if (!Proxy.Advance(Builder, Input.Overlays, Data, bOutComplete, OutError, InCancel)) return false;
-		if (!bOutComplete) return true;
-		Data.Revision = Input.Revision; Data.RequestId = Input.Request.Serial;
-		return FVoxelRepresentationSync::EncodeVoxelProxy(Data, OutBytes, OutError);
+		const TAtomic<bool> NeverCanceled(false);
+		bool bReadComplete = false;
+		if (!OverlayReader.Advance(1, InCancel ? *InCancel : NeverCanceled, bReadComplete, OutError)) return false;
+		if (!bReadComplete) return true;
+		if (!OverlayReader.TakeResult(OverlayReadResult))
+		{
+			OutError = TEXT("Overlay固定读取结果不能提交");
+			return false;
+		}
 	}
-	if (Input.Request.Type == EVoxelRepresentationWireType::SurfaceProxy)
+	if (!bGenerated)
 	{
-		const FVoxelSurfaceProxyBuilder Builder(Input.Generator.ToSharedRef(), Input.Config.ToSharedRef(),
-			Input.Settings, Input.Overlays, Input.Registry.ToSharedRef(), Input.Lod);
-		FVoxelSurfaceTileData Data;
-		if (!Heightfield.Advance(Builder, Data, bOutComplete, OutError, InCancel)) return false;
-		if (!bOutComplete) return true;
-		Data.Revision = Input.Revision; Data.RequestId = Input.Request.Serial;
-		return FVoxelRepresentationSync::EncodeSurface(Data, OutBytes, OutError);
+		const FVoxelOverlaySnapshotSet& Overlays = *OverlayReadResult.Snapshot;
+		if (Input.Request.Type == EVoxelRepresentationWireType::VoxelProxy)
+		{
+			const FVoxelVoxelProxyBuilder Builder(Input.Config.ToSharedRef(), Input.Cache.ToSharedRef(), Input.Generator);
+			if (!Proxy.Advance(Builder, Overlays, ProxyData, bGenerated, OutError, InCancel)) return false;
+			if (bGenerated) { ProxyData.Revision = Input.Revision; ProxyData.RequestId = Input.Request.Serial; }
+		}
+		else if (Input.Request.Type == EVoxelRepresentationWireType::SurfaceProxy)
+		{
+			const FVoxelSurfaceProxyBuilder Builder(Input.Generator.ToSharedRef(), Input.Config.ToSharedRef(),
+				Input.Settings, Overlays, Input.Registry.ToSharedRef(), Input.Lod);
+			if (!Heightfield.Advance(Builder, SurfaceData, bGenerated, OutError, InCancel)) return false;
+			if (bGenerated) { SurfaceData.Revision = Input.Revision; SurfaceData.RequestId = Input.Request.Serial; }
+		}
+		else if (Input.Request.Type == EVoxelRepresentationWireType::MacroTerrain)
+		{
+			const FVoxelMacroTerrainBuilder Builder(Input.Generator.ToSharedRef(), Input.Config.ToSharedRef(),
+				Input.Settings, Overlays, Input.Registry.ToSharedRef(), Input.Lod);
+			if (!Heightfield.Advance(Builder, MacroData, bGenerated, OutError, InCancel)) return false;
+			if (bGenerated) { MacroData.Revision = Input.Revision; MacroData.RequestId = Input.Request.Serial; }
+		}
+		else { OutError = TEXT("Invalid representation type"); return false; }
+		// 生成与编码是两个 Worker 片段，原生成 scratch 在压缩接纳前归还。
+		return true;
 	}
-	if (Input.Request.Type == EVoxelRepresentationWireType::MacroTerrain)
-	{
-		const FVoxelMacroTerrainBuilder Builder(Input.Generator.ToSharedRef(), Input.Config.ToSharedRef(),
-			Input.Settings, Input.Overlays, Input.Registry.ToSharedRef(), Input.Lod);
-		FVoxelMacroTileData Data;
-		if (!Heightfield.Advance(Builder, Data, bOutComplete, OutError, InCancel)) return false;
-		if (!bOutComplete) return true;
-		Data.Revision = Input.Revision; Data.RequestId = Input.Request.Serial;
-		return FVoxelRepresentationSync::EncodeMacro(Data, OutBytes, OutError);
-	}
-	OutError = TEXT("Invalid representation type"); return false;
+	// Codec 拒收保留冻结正文；再次执行只重试编码，不再次 Take/生成或更换身份。
+	const bool bEncoded = Input.Request.Type == EVoxelRepresentationWireType::VoxelProxy
+		? FVoxelRepresentationSync::EncodeVoxelProxy(ProxyData, OutBytes, OutError, Resources, Consumer)
+		: Input.Request.Type == EVoxelRepresentationWireType::SurfaceProxy
+		? FVoxelRepresentationSync::EncodeSurface(SurfaceData, OutBytes, OutError, Resources, Consumer)
+		: FVoxelRepresentationSync::EncodeMacro(MacroData, OutBytes, OutError, Resources, Consumer);
+	if (!bEncoded) return false;
+	ProxyData = FVoxelVoxelProxyData{};
+	SurfaceData = FVoxelSurfaceTileData{};
+	MacroData = FVoxelMacroTileData{};
+	bEncodedTaken = bOutComplete = true;
+	return true;
 }

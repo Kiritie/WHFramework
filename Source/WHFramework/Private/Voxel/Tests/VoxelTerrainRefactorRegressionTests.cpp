@@ -1,4 +1,4 @@
-#include "CoreMinimal.h"
+﻿#include "CoreMinimal.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -94,15 +94,23 @@ bool FVoxelFinePageObsoleteDirtyCleanupTest::RunTest(const FString& InParameters
 
 	const FVoxelFinePageKey Obsolete{FIntVector(5, 5, 0), 2};
 	Manager.DirtyFinePages.Add(Obsolete);
-	Manager.PreparedFinePageMeshes.Add(Obsolete, {17, MakeShared<FVoxelSectionMeshResult, ESPMode::ThreadSafe>()});
-	Manager.PendingFinePageBuilds.Add(Obsolete, {});
+	const FVoxelFineShardKey Retained{FIntVector::ZeroValue, 32};
+	FVoxelFineMeshInput Input;
+	Input.WorldEpoch = 1;
+	Input.Incarnation = 7;
+	Input.GeneratorIdentity = 11;
+	Input.Shard = Retained;
+	FString Error;
+	auto& Slot = Manager.FineShardSlots.Add(Retained);
+	if (!Slot.Build.Initialize(Input, Error)) return false;
+	const auto Attempt = Slot.Build.BeginAttempt();
 
-	Manager.FinePagePlan.Pages.Reset();
-	Manager.RetireFinePageBuildState(Obsolete, false);
+	Manager.GetInputRoot().FinePagePlan.Pages.Reset();
+	Manager.RetireFinePageLayoutState(Obsolete);
 
 	TestFalse(TEXT("Obsolete page leaves dirty workset"), Manager.DirtyFinePages.Contains(Obsolete));
-	TestFalse(TEXT("Obsolete page releases prepared mesh"), Manager.PreparedFinePageMeshes.Contains(Obsolete));
-	TestFalse(TEXT("Obsolete page releases pending signature"), Manager.PendingFinePageBuilds.Contains(Obsolete));
+	TestTrue(TEXT("Page layout retirement preserves the retained canonical Shard owner"), Manager.FineShardSlots.Contains(Retained));
+	TestTrue(TEXT("Page regrouping cannot cancel a retained Shard content attempt"), Slot.Build.GetPendingAttempt().IsSet() && Slot.Build.GetPendingAttempt().GetValue() == Attempt);
 
 	return true;
 }
@@ -148,64 +156,78 @@ bool FVoxelTerrainSampleWorkBoundTest::RunTest(const FString& InParameters)
 		TestTrue(TEXT("Proxy identity never aliases Fine L0"), Geometry.Key.Level >= 1);
 	}
 
-	TestTrue(TEXT("SSE is allowed to retain 25cm outside Fine"), bHasStepOneOutsideFine);
+	TestFalse(TEXT("Proxy cannot use Fine's 25cm sample step outside Fine"), bHasStepOneOutsideFine);
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelFinePageAttemptIsolationTest, "WHFramework.Voxel.Rendering.FinePageAttemptIsolation",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelFineShardAttemptIsolationTest, "WHFramework.Voxel.Rendering.FineShardAttemptIsolation",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
-bool FVoxelFinePageAttemptIsolationTest::RunTest(const FString& InParameters)
+bool FVoxelFineShardAttemptIsolationTest::RunTest(const FString& InParameters)
 {
+	(void)InParameters;
 	UVoxelModule* Module = NewObject<UVoxelModule>();
+	Module->Epoch = 11;
+	Module->Runtime = MakeUnique<FVoxelWorldRuntime>(11, true, VoxelTest::MakeRegistry(), VoxelTest::MakeGenerator());
 	FVoxelTaskScheduler Scheduler;
 	FVoxelViewManager Manager(*Module, Scheduler, 11);
-	const FVoxelFinePageKey Page{FIntVector::ZeroValue, 1};
 	const FVoxelFinePageKey Other{FIntVector(8, 0, 0), 1};
-	Manager.FinePagePlan.Pages.Add(Page);
-	Manager.FinePagePlan.Pages.Add(Other);
-	Manager.InvalidateFinePageLayout(Page);
+	const FVoxelFineShardKey Key{FIntVector::ZeroValue, 32};
+	FVoxelFineMeshInput Input;
+	Input.WorldEpoch = 11;
+	Input.Incarnation = 7;
+	Input.GeneratorIdentity = 11;
+	Input.Shard = Key;
+	FString Error;
+	auto& Slot = Manager.FineShardSlots.Add(Key);
+	if (!Slot.Build.Initialize(Input, Error)) return false;
+	const auto Old = Slot.Build.BeginAttempt();
+	const FGuid OwnerId = FGuid::NewGuid();
+	const FVoxelGenerationConsumerKey OldConsumer{EVoxelGenerationConsumerKind::FineShard, 11, OwnerId, 7,
+		EVoxelGenerationSpatialKind::Bounds, Key.Min, Key.Bounds().Max, Old.Serial};
+	Slot.Build.NotifyMeshPolicyChanged(2, 3);
+	const auto Current = Slot.Build.BeginAttempt();
+	Slot.Consumer = {EVoxelGenerationConsumerKind::FineShard, 11, OwnerId, 7,
+		EVoxelGenerationSpatialKind::Bounds, Key.Min, Key.Bounds().Max, Current.Serial};
+	Slot.SubmittedStamp.WorldEpoch = 11;
+	Slot.SubmittedStamp.Token = Current.Serial;
+	Slot.bSubmitted = true;
 	Manager.InvalidateFinePageLayout(Other);
-	const uint64 Version = Manager.FinePageVersions.FindRef(Page);
-	const uint64 Content = Manager.FinePageContentRevisions.FindRef(Page);
-	FVoxelTaskStamp Old;
-	Old.WorldEpoch = 11;
-	Old.Token = 1;
-	Old.ViewKey = {Page.Coordinate, Page.Level};
-	FVoxelTaskStamp Current = Old;
-	Current.Token = 2;
-	Manager.PendingFinePageBuilds.Add(Page, {Current, 73, Version, Content});
-	Manager.InvalidateFinePageLayout(Other);
-	TestEqual(TEXT("Unrelated page layout preserves this page version"), Manager.FinePageVersions.FindRef(Page), Version);
+	const uint64 ContentVersion = Slot.Build.GetInput().MeshRevision;
+	const uint64 TopologyVersion = Slot.Build.GetTopologyRevision();
+	Manager.OnOwnershipChanged(Key);
+	TestEqual(TEXT("Actual local ownership event advances only topology"), Slot.Build.GetTopologyRevision(), TopologyVersion + 1);
+	TestEqual(TEXT("Actual ownership event preserves the content version"), Slot.Build.GetInput().MeshRevision, ContentVersion);
+	TestTrue(TEXT("Unrelated page layout preserves this real Shard attempt"), Slot.Build.IsCurrent(Current));
 	FVoxelTaskResult Late;
-	Late.Stamp = Old;
+	Late.Stamp.WorldEpoch = 11;
+	Late.Stamp.Token = Old.Serial;
 	Late.bCanceled = true;
-	Manager.ApplyFinePageBuild(Page, 73, Version, Content, Old, MoveTemp(Late));
-	TestTrue(TEXT("Same-signature late callback cannot clear the new attempt"), Manager.PendingFinePageBuilds.Contains(Page));
-	TestEqual(TEXT("The new attempt still owns the page"), Manager.PendingFinePageBuilds.FindChecked(Page).Stamp.Token, uint64(2));
+	Manager.ApplyFineShardResult(Key, Old, OldConsumer, MoveTemp(Late));
+	TestTrue(TEXT("Late original-consumer callback cannot clear the real new Shard attempt"),
+		Slot.bSubmitted && Slot.Build.GetPendingAttempt().IsSet() && Slot.Build.GetPendingAttempt().GetValue() == Current);
 	FVoxelTaskResult Cancelled;
-	Cancelled.Stamp = Current;
+	Cancelled.Stamp = Slot.SubmittedStamp;
 	Cancelled.bCanceled = true;
-	Manager.ApplyFinePageBuild(Page, 73, Version, Content, Current, MoveTemp(Cancelled));
-	TestFalse(TEXT("Matching cancellation releases its attempt"), Manager.PendingFinePageBuilds.Contains(Page));
-	TestTrue(TEXT("Matching cancellation retains retry demand"), Manager.DirtyFinePages.Contains(Page));
-	Current.Token = 3;
-	Manager.PendingFinePageBuilds.Add(Page, {Current, 73, Version, Content});
+	Manager.ApplyFineShardResult(Key, Current, Slot.Consumer, MoveTemp(Cancelled));
+	TestFalse(TEXT("Matching native cancellation releases its original attempt"), Slot.Build.GetPendingAttempt().IsSet());
+	TestTrue(TEXT("Matching native cancellation permits retained demand retry"), Slot.Build.GetFailure().IsEmpty() && !Slot.bSubmitted);
+	const auto FailedAttempt = Slot.Build.BeginAttempt();
+	Slot.Consumer.RequestSerial = FailedAttempt.Serial;
+	Slot.SubmittedStamp.Token = FailedAttempt.Serial;
+	Slot.bSubmitted = true;
 	FVoxelTaskResult Failed;
-	Failed.Stamp = Current;
+	Failed.Stamp = Slot.SubmittedStamp;
 	Failed.Error = TEXT("Rejected mesh fixture");
-	AddExpectedError(TEXT("Fine page build failed"), EAutomationExpectedErrorFlags::Contains, 1);
-	Manager.ApplyFinePageBuild(Page, 73, Version, Content, Current, MoveTemp(Failed));
-	TestTrue(TEXT("A terminal failure is retained as an explicit page result"), Manager.FinePageFailures.Contains(Page));
-	TestFalse(TEXT("An unchanged failed input cannot spin in the dirty queue"), Manager.DirtyFinePages.Contains(Page));
+	AddExpectedError(TEXT("Fine shard build failed"), EAutomationExpectedErrorFlags::Contains, 1);
+	Manager.ApplyFineShardResult(Key, FailedAttempt, Slot.Consumer, MoveTemp(Failed));
+	TestTrue(TEXT("Native Shard failure remains an explicit terminal input result"), !Slot.Build.GetFailure().IsEmpty());
 	TestEqual(TEXT("Failure remains available to acceptance diagnostics"), Manager.GetTerrainWorkMetrics().Failed, uint64(1));
-	Manager.MarkFinePageDirty(Page);
-	TestFalse(TEXT("A real content change can recover from the previous failure"), Manager.FinePageFailures.Contains(Page));
-	Current.Token = 4;
-	Manager.PendingFinePageBuilds.Add(Page, {Current, 73, Version, Manager.FinePageContentRevisions.FindRef(Page)});
-	Manager.RetireFinePageBuildState(Page, true);
-	TestFalse(TEXT("Retirement releases dirty work"), Manager.DirtyFinePages.Contains(Page));
-	TestFalse(TEXT("Retirement releases attempt ownership"), Manager.PendingFinePageBuilds.Contains(Page));
+	Manager.InvalidateFinePageLayout(Other);
+	TestTrue(TEXT("Layout-only events do not clear a real content failure"), !Slot.Build.GetFailure().IsEmpty());
+	Slot.Build.NotifyDataChanged(1, 1);
+	TestTrue(TEXT("A real content change can recover from the native failure"), Slot.Build.GetFailure().IsEmpty());
 	TestEqual(TEXT("Late and canceled results are distinguished"), Manager.GetTerrainWorkMetrics().Stale, uint64(1));
+	TestEqual(TEXT("Matching native cancellation is accounted once"), Manager.GetTerrainWorkMetrics().Canceled, uint64(1));
 	return true;
 }
 
@@ -292,7 +314,7 @@ bool FVoxelCriticalDependencyAdmissionTest::RunTest(const FString& InParameters)
 	Demand.bMovementCriticalFine = true;
 	Interest.Exact.Add(FIntVector::ZeroValue, Demand);
 	Module->CurrentInterest = MakeShared<const FVoxelInterestSet, ESPMode::ThreadSafe>(Interest);
-	TestTrue(TEXT("Fine movement participates in the critical chain"), Manager.HasCriticalNearFieldPending());
+	TestFalse(TEXT("Critical demand alone is not presented Fine coverage"), Manager.IsFinePresented(FIntVector::ZeroValue));
 	TestTrue(TEXT("Proxy predecessor is explicitly admitted"), Manager.IsCriticalDependency(Dependency));
 	TestFalse(TEXT("Unrelated Proxy expansion does not inherit Critical"),
 		Manager.IsCriticalDependency({EVoxelTerrainRepresentation::VoxelProxy, FIntVector(100, 0, 0), 1}));
@@ -312,10 +334,10 @@ bool FVoxelCriticalDependencyAdmissionTest::RunTest(const FString& InParameters)
 	FVoxelSection* Section = Module->Runtime->FindOrAllocate(FIntVector::ZeroValue, 1);
 	Section->Status = EVoxelSectionStatus::DataReady;
 	Manager.FineReady.Add(FIntVector::ZeroValue);
-	TestTrue(TEXT("A ready critical mesh keeps expansion gated until ownership is presented"), Manager.HasCriticalNearFieldPending());
+	TestFalse(TEXT("Ready mesh still needs the render receipt"), Manager.IsFinePresented(FIntVector::ZeroValue));
 	Manager.PresentedFineSectionOwners.Add(FIntVector::ZeroValue, Page);
 	Manager.PresentedEmptyFinePages.Add(Page);
-	TestFalse(TEXT("Presented empty ownership releases the critical near-field gate"), Manager.HasCriticalNearFieldPending());
+	TestFalse(TEXT("Legacy page flags cannot impersonate the Native render receipt"), Manager.IsFinePresented(FIntVector::ZeroValue));
 	Interest.CriticalDependencies.Reset();
 	Interest.CriticalFinePages.Reset();
 	Interest.Exact.Reset();
@@ -483,11 +505,12 @@ bool FVoxelPlanConsumerWakeTest::RunTest(const FString& InParameters)
 	FVoxelGenerationPlanDependency Dependency;
 	Dependency.Kind = EVoxelGenerationPlanKind::Hydrology;
 	Dependency.HydrologyKey.Coordinate = FIntPoint::ZeroValue;
-	const FIntVector Critical(0, 0, 0);
-	const FIntVector Visible(1, 0, 0);
-	TSet<FIntVector> Woken;
+	const FGuid Owner = FGuid::NewGuid();
+	const auto Critical = FVoxelGenerationConsumerKey::Section(11, Owner, 1, FIntVector::ZeroValue, 1);
+	const auto Visible = FVoxelGenerationConsumerKey::Section(11, Owner, 1, FIntVector(1, 0, 0), 2);
+	TSet<FVoxelGenerationConsumerKey> Woken;
 	Coordinator.SetConsumerWakeCallback(
-		[&Woken](const FIntVector& Consumer)
+		[&Woken](const FVoxelGenerationConsumerKey& Consumer)
 		{
 			Woken.Add(Consumer);
 		});

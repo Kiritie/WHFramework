@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Voxel/Rendering/VoxelStreamingGeometry.h"
+#include "Voxel/Rendering/VoxelCoverage.h"
 
 #include "Voxel/Generation/VoxelGenerationBinding.h"
 #include "Voxel/Generation/VoxelGenerationPlanCache.h"
@@ -10,9 +11,11 @@
 #include "Voxel/Runtime/VoxelOverlaySnapshot.h"
 
 class FVoxelGenerationPipeline;
+class FVoxelTerrainResourceLease;
 
 struct WHFRAMEWORK_API FVoxelVoxelProxyData
 {
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 	FVoxelViewKey Key;
 	FVoxelTerrainGeometry Geometry;
 	uint64 RequestId = 1;
@@ -32,6 +35,10 @@ struct WHFRAMEWORK_API FVoxelVoxelProxyData
 		false;
 
 	TArray<FVoxelBlockState> Cells;
+	TArray<FVoxelCoverageRect> TopSurfaceCoverage;
+	int32 CapturedSurfaceRows = 0;
+	bool AdvanceSurfaceCoverage(int32 InMaximumRows, bool& bOutComplete, FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr);
 
 	/**
 	 * 与 FVoxelSectionSnapshot 面序一致：

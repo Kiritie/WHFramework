@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Asset/Primary/PrimaryAssetBase.h"
 #include "Voxel/Streaming/VoxelStreamingSource.h"
+#include "Voxel/Authoring/VoxelFineStreamingPolicy.h"
 #include "VoxelViewProfile.generated.h"
 
 USTRUCT(BlueprintType)
@@ -121,6 +122,21 @@ USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelStreamingPerformanceBudget
 {
 	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "128"))
+	int32 MaximumRuntimeFactsResidentMegabytes = 512;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "32"))
+	int32 MaximumRuntimeFactsWorkingMegabytes = 256;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "16"))
+	int32 MaximumRuntimeFactsInputMegabytes = 64;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "16"))
+	int32 MaximumRuntimeFactsStagedMegabytes = 128;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "16"))
+	int32 RuntimeFactsOverlapMegabytes = 128;
 
 	UPROPERTY(
 		EditAnywhere,
@@ -269,6 +285,15 @@ public:
 		BlueprintReadOnly,
 		Category = "Voxel|View")
 	FVoxelStreamingSourceView DefaultSourceView;
+
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadOnly,
+		Category = "Voxel|View")
+	FVoxelFineStreamingPolicy Fine;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Voxel|View")
+	FVoxelTerrainFrameBudgetSettings FrameBudget;
 
 	UPROPERTY(
 		EditAnywhere,

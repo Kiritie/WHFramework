@@ -8,8 +8,9 @@
 #include "VoxelNetworkTypes.generated.h"
 
 class UPackageMap;
+class FVoxelTerrainResourceLease;
 
-static constexpr uint32 VoxelProtocolVersion = 6;
+static constexpr uint32 VoxelProtocolVersion = 8;
 
 USTRUCT()
 struct WHFRAMEWORK_API FVoxelRPCPacket
@@ -48,7 +49,16 @@ enum class EVoxelMessage : uint8
 	Inventory = 13,
 	RepresentationRequest = 14,
 	RepresentationReply = 15,
-	RepresentationInvalidate = 16
+	RepresentationInvalidate = 16,
+	SubscribeRegion = 17,
+	SnapshotBegin = 18,
+	DirectoryPage = 19,
+	OverlayPayload = 20,
+	SnapshotEnd = 21,
+	RegionDelta = 22,
+	RegionAck = 23,
+	GapRequest = 24,
+	ResyncRequest = 25
 };
 
 UENUM()
@@ -101,6 +111,7 @@ struct WHFRAMEWORK_API FVoxelNetworkHello
 struct WHFRAMEWORK_API FVoxelNetworkWelcome
 {
 	uint64 EchoNonce = 0;
+	uint64 AuthorityWorldEpoch = 0;
 	FGuid Session;
 	FVoxelWorldManifest Manifest;
 };
@@ -165,6 +176,13 @@ struct WHFRAMEWORK_API FVoxelRepresentationRequest
 	uint64 Serial = 0;
 };
 
+// Worker 解码的不可变正文直接交给后续 Worker，租约覆盖其整个引用生命周期。
+struct WHFRAMEWORK_API FVoxelRepresentationReplyData
+{
+	TArray<uint8> Bytes;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+};
+
 struct WHFRAMEWORK_API FVoxelRepresentationReply
 {
 	EVoxelRepresentationWireType Type = EVoxelRepresentationWireType::None;
@@ -173,12 +191,23 @@ struct WHFRAMEWORK_API FVoxelRepresentationReply
 	uint64 Revision = 0;
 	EVoxelRepresentationReplyKind Kind = EVoxelRepresentationReplyKind::Retry;
 	TArray<uint8> Data;
+	TSharedPtr<const FVoxelRepresentationReplyData, ESPMode::ThreadSafe> SharedData;
+
+	TConstArrayView<uint8> DataView() const
+	{
+		return SharedData ? TConstArrayView<uint8>(SharedData->Bytes) : TConstArrayView<uint8>(Data);
+	}
+};
+
+struct WHFRAMEWORK_API FVoxelRepresentationInvalidation
+{
+	FVoxelTerrainGeometry Geometry;
+	uint64 Revision = 0;
 };
 
 struct WHFRAMEWORK_API FVoxelRepresentationInvalidate
 {
-	TArray<FVoxelRepresentationWireKey> Keys;
-	uint64 Revision = 0;
+	TArray<FVoxelRepresentationInvalidation> Entries;
 };
 
 USTRUCT()

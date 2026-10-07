@@ -1,4 +1,4 @@
-
+﻿
 #pragma once
 
 #include "Common/CommonModuleTypes.h"
@@ -28,7 +28,7 @@ protected:
 
 public:
 	virtual bool IsValid() const { return true; }
-	
+
 	virtual bool IsSaved() const { return bSaved; }
 
 	virtual void MakeSaved() { bSaved = true; }
@@ -80,7 +80,10 @@ enum class ESaveResultCode : uint8
 	ModuleMissing,
 	LoadFailed,
 	Unsupported,
-	Unknown
+	Unknown,
+	Accepted,
+	CapacityBlocked,
+	SlotBusy
 };
 
 USTRUCT(BlueprintType)
@@ -97,7 +100,11 @@ struct WHFRAMEWORK_API FSaveOperationResult
 	UPROPERTY(BlueprintReadOnly)
 	FText Message;
 
+	UPROPERTY(BlueprintReadOnly)
+	FGuid OperationId;
+
 	static FSaveOperationResult Success();
+	static FSaveOperationResult Accepted(const FGuid& InOperationId);
 
 	static FSaveOperationResult Failed(ESaveResultCode InCode, const FText& InMessage);
 

@@ -1,4 +1,4 @@
-#include "SaveGame/SaveGameModuleStatics.h"
+﻿#include "SaveGame/SaveGameModuleStatics.h"
 
 #include "SaveGame/SaveGameModule.h"
 
@@ -40,6 +40,11 @@ bool USaveGameModuleStatics::HasPendingSaveSlot()
 FSaveOperationResult USaveGameModuleStatics::SaveCurrentSlot()
 {
 	return USaveGameModule::Get().SaveCurrentSlot();
+}
+
+FSaveOperationResult USaveGameModuleStatics::GetWorldSaveResult(const FGuid& InOperationId)
+{
+	return USaveGameModule::Get().GetWorldSaveResult(InOperationId);
 }
 
 void USaveGameModuleStatics::DetachActiveSave()

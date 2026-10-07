@@ -1,4 +1,4 @@
-#include "Voxel/Widget/WidgetVoxelMapBackground.h"
+﻿#include "Voxel/Widget/WidgetVoxelMapBackground.h"
 
 #include "Rendering/DrawElements.h"
 #include "Styling/CoreStyle.h"
@@ -15,7 +15,7 @@ void UWidgetVoxelMapBackground::NativeTick(
 	const float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
-	UVoxelModule* Module = UVoxelModule::Find(GetWorld());
+	UVoxelModule* Module = UVoxelModule::GetPtr(GetWorld());
 	if (!Module || !Module->IsReady())
 	{
 		return;
@@ -53,7 +53,7 @@ int32 UWidgetVoxelMapBackground::NativePaint(
 		FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")),
 		ESlateDrawEffect::None, BackgroundColor);
 
-	UVoxelModule* Module = UVoxelModule::Find(GetWorld());
+	UVoxelModule* Module = UVoxelModule::GetPtr(GetWorld());
 	if (!Module || !Module->IsReady() || !Module->GetMapTileCache() ||
 		MapView.Range <= UE_SMALL_NUMBER)
 	{

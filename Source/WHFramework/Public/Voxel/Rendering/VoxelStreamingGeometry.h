@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 
@@ -63,6 +63,8 @@ struct WHFRAMEWORK_API FVoxelTerrainBuildShard
 {
 	FIntVector LocalMinCells = FIntVector::ZeroValue;
 	FIntVector CellCounts = FIntVector::ZeroValue;
+
+	bool Validate(const FVoxelTerrainGeometry& InGeometry, int32 InMaximumSamplesPerAxis, FString& OutError) const;
 };
 
 struct WHFRAMEWORK_API FVoxelTerrainStageRange
@@ -80,9 +82,12 @@ namespace VoxelStreamingGeometry
 	WHFRAMEWORK_API int64 FloorDivide(int64 InValue, int64 InDivisor);
 	WHFRAMEWORK_API bool ValidateInitialSide(int32 InSide, uint8 InMaximumFineLevel, FString& OutError);
 	WHFRAMEWORK_API bool TryLevel(int32 InSide, uint8& OutLevel, FString& OutError);
+	WHFRAMEWORK_API bool TrySamplingBounds(const FVoxelTerrainGeometry& InGeometry,
+		const FIntVector& InLowerPadding, const FIntVector& InUpperPadding,
+		FIntVector& OutMin, FIntVector& OutMax, FString& OutError);
 	WHFRAMEWORK_API bool ResolveSampleStep(double InNearestDistanceCells, double InVerticalFovDegrees,
 		int32 InViewportHeight, double InTargetPixels, int32 InMaximumStepCells,
-		int32& OutStepCells, bool& bOutAtResolutionFloor, FString& OutError);
+		int32& OutStepCells, bool& bOutAtResolutionFloor, FString& OutError, int32 InMinimumStepCells = 1);
 	WHFRAMEWORK_API uint8 ResolveCoverageLevel(int32 InSampleStepCells, int32 InPreferredSamples,
 		const FVoxelTerrainStageRange& InRange);
 	WHFRAMEWORK_API int32 ResolveReplanStep(int32 InRadiusCells, double InFraction, int32 InMinimumSideCells);

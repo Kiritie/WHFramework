@@ -16,7 +16,8 @@ public:
 private:
 	FVoxelTerrainGeometry Geometry;
 	TArray<FVoxelTerrainBuildShard> Shards;
-	TArray<FVoxelSurfaceTileData> SurfaceParts;
-	TArray<FVoxelMacroTileData> MacroParts;
+	FVoxelSurfaceTileData SurfacePage;
+	FVoxelMacroTileData MacroPage;
+	bool bAllocated = false;
 	int32 NextShard = 0;
 };

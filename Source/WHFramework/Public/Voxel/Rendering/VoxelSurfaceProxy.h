@@ -10,6 +10,8 @@
 #include "Voxel/Runtime/VoxelChangeIndex.h"
 #include "Voxel/Runtime/VoxelOverlaySnapshot.h"
 
+class FVoxelTerrainResourceLease;
+
 enum EVoxelSurfaceFlags : uint8
 {
 	VoxelSurface_River = 1 << 0,
@@ -28,6 +30,7 @@ struct WHFRAMEWORK_API FVoxelDistantCell
 
 struct WHFRAMEWORK_API FVoxelSurfaceTileData
 {
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 	static constexpr int32 CellSide = 32;
 	static constexpr int32 VertexSide = CellSide + 1;
 

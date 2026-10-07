@@ -1,4 +1,4 @@
-#include "Voxel/Rendering/VoxelSurfaceProxy.h"
+﻿#include "Voxel/Rendering/VoxelSurfaceProxy.h"
 
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Rendering/VoxelViewLod.h"
@@ -94,10 +94,28 @@ bool FVoxelSurfaceProxyBuilder::Build(
 	if ((Data.Geometry.Key.Representation != EVoxelTerrainRepresentation::Surface && Data.Geometry.Key.Representation != EVoxelTerrainRepresentation::Macro) ||
 		Data.Geometry.Key.Coordinate != FIntVector(InKey.Coordinate.X, InKey.Coordinate.Y, 0) || Data.Geometry.Key.Level != InKey.Level)
 	{ OutError = TEXT("Surface spatial key does not match its required geometry"); return false; }
+	const int32 SampleSide = InShard ? InShard->CellCounts.X : int32(Data.Geometry.Key.SideCells()) / Data.Geometry.SampleStepCells;
+	const FVoxelTerrainBuildShard Window = InShard ? *InShard :
+		FVoxelTerrainBuildShard{FIntVector::ZeroValue, FIntVector(SampleSide, SampleSide, 0)};
+	if (!Window.Validate(Data.Geometry, 256, OutError))
+	{
+		return false;
+	}
 	Data.Step = Data.Geometry.SampleStepCells;
 	Data.LocalMinCells = InShard ? FIntPoint(InShard->LocalMinCells.X, InShard->LocalMinCells.Y) : FIntPoint::ZeroValue;
-	Data.Side = InShard ? InShard->CellCounts.X + 1 : int32(Data.Geometry.Key.SideCells()) / Data.Step + 1;
+	Data.Side = SampleSide + 1;
 
+	const FVoxelTreeGenerationSettings& Trees = Config->Recipe->Settings.Ecology.Tree;
+	const int32 Padding = Trees.bEnabled ? FMath::Max(Data.Step, Trees.CrownRadius) : Data.Step;
+	FIntVector SamplingMin;
+	FIntVector SamplingMax;
+	if (Settings.MinZ >= Settings.MaxZ || Trees.CrownRadius < 0 ||
+		!VoxelStreamingGeometry::TrySamplingBounds(Data.Geometry, FIntVector(Padding, Padding, 0),
+			FIntVector(Padding, Padding, 0), SamplingMin, SamplingMax, OutError))
+	{
+		OutError = TEXT("Surface sampling bounds exceed the supported coordinate range");
+		return false;
+	}
 	const int32 Count =
 		Data.GetVertexCount();
 
@@ -471,8 +489,8 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 				VoxelGeneration::FloorDivide(Cell.X - Origin.X, Step),
 				VoxelGeneration::FloorDivide(Cell.Y - Origin.Y, Step),
 				VoxelGeneration::FloorDivide(Cell.Z, Step));
-			if (Key.X < 0 || Key.X >= FVoxelSurfaceTileData::CellSide ||
-				Key.Y < 0 || Key.Y >= FVoxelSurfaceTileData::CellSide) continue;
+			if (Key.X < 0 || Key.X >= (InOutData.Side - 1) ||
+				Key.Y < 0 || Key.Y >= (InOutData.Side - 1)) continue;
 			FEditVote& Vote = Votes.FindOrAdd(Key);
 			++Vote.Count;
 			Vote.Min.X = FMath::Min(Vote.Min.X, Cell.X);
@@ -575,9 +593,9 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 	{
 		const int32 X = Key.X;
 		const int32 Y = Key.Y;
-		const int32 GroundX = FMath::Min(FVoxelSurfaceTileData::CellSide,
+		const int32 GroundX = FMath::Min((InOutData.Side - 1),
 			VoxelGeneration::FloorDivide(X * StructureStep, Step));
-		const int32 GroundY = FMath::Min(FVoxelSurfaceTileData::CellSide,
+		const int32 GroundY = FMath::Min((InOutData.Side - 1),
 			VoxelGeneration::FloorDivide(Y * StructureStep, Step));
 		const int32 Ground = InOutData.GroundZ[GroundX + GroundY * InOutData.Side];
 		const int32 Z = Key.Z * StructureStep;

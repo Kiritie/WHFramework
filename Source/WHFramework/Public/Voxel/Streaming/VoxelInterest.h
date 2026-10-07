@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Voxel/Authoring/VoxelViewProfile.h"
@@ -8,6 +8,13 @@
 #include "Voxel/Rendering/VoxelTerrainViewPlan.h"
 #include "Voxel/Streaming/VoxelStreamingSource.h"
 #include "Voxel/Generation/VoxelGenerationTypes.h"
+#include "Voxel/Task/VoxelTerrainWorkSelection.h"
+#include "Voxel/Streaming/VoxelFineResidency.h"
+#include "Voxel/Rendering/VoxelFinePageLayout.h"
+
+class FVoxelTerrainResourceLease;
+class FVoxelTerrainWorkReceipt;
+struct FVoxelChangeHierarchySnapshot;
 
 struct WHFRAMEWORK_API FVoxelSourceInterest
 {
@@ -17,12 +24,42 @@ struct WHFRAMEWORK_API FVoxelSourceInterest
 	bool bHasStageCenters = false;
 	TSet<FIntVector> DataSections;
 	TSet<FIntVector> FineDataSections;
+	TSet<FIntVector> F0CoreSections;
 	FVoxelGenerationBounds FineBounds;
 	TSet<FIntVector> CollisionSections;
+	TSet<FIntVector> SimulationSections;
+	TSharedPtr<const FVoxelFineResidency, ESPMode::ThreadSafe> FineResidency;
+	bool bRequiresTravelBarrier = false;
+
+	const FVoxelFineWindow& GetCurrentWindow() const
+	{
+		static const FVoxelFineWindow Empty;
+		return FineResidency ? FineResidency->GetCurrent() : Empty;
+	}
+	const TOptional<FVoxelFineWindow>& GetPendingWindow() const
+	{
+		static const TOptional<FVoxelFineWindow> Empty;
+		return FineResidency ? FineResidency->GetPending() : Empty;
+	}
+	const TSet<FVoxelFineShardKey>& GetFineShards() const
+	{
+		static const TSet<FVoxelFineShardKey> Empty;
+		return FineResidency ? FineResidency->GetResidentShards() : Empty;
+	}
+};
+
+struct WHFRAMEWORK_API FVoxelFineShardDemand
+{
+	FVoxelTerrainServicePriority ServicePriority;
+	double FirstQueuedSeconds = 0.0;
+	uint64 QueueSequence = 0;
+	int32 SourceReferences = 0;
+	bool bCriticalDependency = false;
 };
 
 struct WHFRAMEWORK_API FVoxelExactDemand
 {
+	FVoxelTerrainServicePriority ServicePriority;
 	bool bData = false;
 	bool bExact = false;
 	bool bCollision = false;
@@ -43,13 +80,16 @@ struct WHFRAMEWORK_API FVoxelExactDemand
 // Interest 任务生成固定发布输入，供 GT 游标分步消费。
 struct WHFRAMEWORK_API FVoxelTerrainPublicationInputs
 {
+	int32 MaximumFeedbackSections = 0;
 	TArray<FVoxelTerrainGeometry> Geometry;
 	TArray<FVoxelViewKey> Roots;
 	TArray<FIntVector> Fine;
+	TArray<FIntVector> RuntimeSections;
 	TArray<FVoxelViewKey> Proxy;
 	TArray<FVoxelSurfaceTileKey> Surface;
 	TArray<FVoxelMacroTileKey> Macro;
 	TArray<FVoxelFinePageKey> FinePages;
+	TArray<FVoxelFineShardKey> FineShards;
 	TArray<TPair<FIntVector, FVoxelFinePageKey>> FineOwners;
 	TArray<FVoxelViewAdmission> Admissions;
 	TArray<int32> AdmissionPriorities;
@@ -59,7 +99,7 @@ struct WHFRAMEWORK_API FVoxelTerrainPublicationInputs
 		return AdmissionLanes[0].GetAllocatedSize() + AdmissionLanes[1].GetAllocatedSize() + AdmissionLanes[2].GetAllocatedSize() +
 			   AdmissionLanes[3].GetAllocatedSize() + Geometry.GetAllocatedSize() + Roots.GetAllocatedSize() + Fine.GetAllocatedSize() +
 			   Proxy.GetAllocatedSize() + Surface.GetAllocatedSize() + Macro.GetAllocatedSize() + FinePages.GetAllocatedSize() + FineOwners.GetAllocatedSize() +
-			   Admissions.GetAllocatedSize() + AdmissionPriorities.GetAllocatedSize();
+			   Admissions.GetAllocatedSize() + AdmissionPriorities.GetAllocatedSize() + FineShards.GetAllocatedSize() + RuntimeSections.GetAllocatedSize();
 	}
 };
 
@@ -68,6 +108,23 @@ struct WHFRAMEWORK_API FVoxelInterestSet
 	uint64 PublicationRevision = 0;
 	uint64 DemandRevision = 0;
 	uint64 PriorityRevision = 0;
+	uint64 ResidencyRevision = 0;
+	uint64 LayoutRevision = 0;
+	uint64 SafetyContentRevision = 0;
+	uint64 SafetyWorldEpoch = 0;
+	uint64 SafetyShapeRevision = 0;
+	uint64 SafetyRegistryRevision = 0;
+	TSharedPtr<const FVoxelChangeHierarchySnapshot, ESPMode::ThreadSafe> SafetyVersions;
+	TSharedPtr<FVoxelTerrainWorkReceipt, ESPMode::ThreadSafe> PlanningWorkReceipt;
+	uint64 RenderCoverageSerial = 0;
+	uint64 PhysicsCoverageSerial = 0;
+	int32 CoarseFailedRootCount = 0;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> CoarsePlanLeases[3];
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> DemandLease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> CompositionLease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> CopyLease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> FinalizationLease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> CoarseCompositionLease;
 	TMap<FGuid, FVoxelSourceInterest> Sources;
 	FVoxelTerrainViewPlan TerrainPlan;
 	TSharedPtr<const FVoxelFinePagePlan, ESPMode::ThreadSafe> FinePagePlan;
@@ -81,7 +138,12 @@ struct WHFRAMEWORK_API FVoxelInterestSet
 	TArray<int32> AdmissionPriorities;
 	TArray<int32> AdmissionLanes[4];
 	TMap<FIntVector, FVoxelExactDemand> Exact;
+	TMap<FVoxelFineShardKey, FVoxelFineShardDemand> FineShardDemands;
+	TMap<FVoxelFinePageKey, FVoxelFineLayoutPage> FineShardPages;
+	TMap<FVoxelFineShardKey, FVoxelFinePageKey> FineShardOwners;
 	TMap<FVoxelFinePageKey, int32> FinePagePriorities;
+	TMap<FVoxelFinePageKey, FVoxelTerrainServicePriority> FinePageServicePriorities;
+	TMap<FVoxelTerrainSpatialKey, FVoxelTerrainServicePriority> GeometryServicePriorities;
 	TSet<FVoxelFinePageKey> CriticalFinePages;
 	TArray<FIntVector> ExactOrder;
 	TArray<int32> ExactAdmissionLanes[2];
@@ -97,15 +159,25 @@ struct WHFRAMEWORK_API FVoxelInterestSet
 	const FVoxelTerrainGeometry* FindGeometry(const FVoxelViewKey& InKey) const;
 	const FVoxelTerrainGeometry* FindGeometry(const FVoxelSurfaceTileKey& InKey) const;
 	const FVoxelTerrainGeometry* FindGeometry(const FVoxelMacroTileKey& InKey) const;
+	uint64 GetOwnedAllocatedBytes() const;
+	uint64 GetResourceAccountedBytes() const;
 
 	uint64 GetAllocatedBytes() const
 	{
 		uint64 SourceBytes = Sources.GetAllocatedSize();
 		for (const auto& Pair : Sources)
 		{
-			SourceBytes += Pair.Value.DataSections.GetAllocatedSize() + Pair.Value.FineDataSections.GetAllocatedSize() + Pair.Value.CollisionSections.GetAllocatedSize();
+			SourceBytes += Pair.Value.DataSections.GetAllocatedSize() + Pair.Value.FineDataSections.GetAllocatedSize() + Pair.Value.F0CoreSections.GetAllocatedSize() + Pair.Value.CollisionSections.GetAllocatedSize() +
+				Pair.Value.SimulationSections.GetAllocatedSize();
 		}
-		return FinePagePriorities.GetAllocatedSize() + CriticalFinePages.GetAllocatedSize() + AdmissionPriorities.GetAllocatedSize() +
+		uint64 ShardPageBytes = FineShardPages.GetAllocatedSize();
+		for (const auto& Pair : FineShardPages)
+		{
+			ShardPageBytes += Pair.Value.Shards.GetAllocatedSize();
+		}
+		return ShardPageBytes + FineShardDemands.GetAllocatedSize() + FineShardOwners.GetAllocatedSize() +
+			   FinePageServicePriorities.GetAllocatedSize() + GeometryServicePriorities.GetAllocatedSize() +
+			   FinePagePriorities.GetAllocatedSize() + CriticalFinePages.GetAllocatedSize() + AdmissionPriorities.GetAllocatedSize() +
 			   (PublicationInputs ? PublicationInputs->GetAllocatedBytes() : 0) + Geometry.GetAllocatedSize() + ResolutionFloorPages.GetAllocatedSize() +
 			   CriticalDependencies.GetAllocatedSize() +
 			   (FinePagePlan ? FinePagePlan->Pages.GetAllocatedSize() + FinePagePlan->SectionOwners.GetAllocatedSize() : 0) + SourceBytes +
@@ -122,6 +194,8 @@ struct WHFRAMEWORK_API FVoxelInterestSet
 struct WHFRAMEWORK_API FVoxelViewSettings
 {
 	FVoxelStreamingSourceView DefaultSourceView;
+	FVoxelFineStreamingPolicy Fine;
+	FVoxelTerrainFrameBudgetSettings FrameBudget;
 	FVoxelLodTopologySettings Lod;
 	FVoxelStreamingReadinessPolicy Readiness;
 	FVoxelStreamingPlanningPolicy Planning;

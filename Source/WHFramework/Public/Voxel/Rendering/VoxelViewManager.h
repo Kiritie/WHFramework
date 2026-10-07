@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
@@ -11,6 +11,8 @@
 #include "Voxel/Rendering/DWLodTransition.h"
 #include "Voxel/Rendering/VoxelSurfaceProxy.h"
 #include "Voxel/Streaming/VoxelInterest.h"
+#include "Voxel/Rendering/VoxelFineBuildState.h"
+#include "Voxel/Runtime/VoxelChangeHierarchy.h"
 
 struct FVoxelHeightfieldCoveragePlan;
 struct FVoxelVolumeCoveragePlan;
@@ -35,7 +37,11 @@ struct FVoxelInterestDelta;
 struct FVoxelVoxelProxyData;
 struct FVoxelWaterSurfaceTileData;
 struct FVoxelBoundaryTransitionContext;
+struct FVoxelFrozenHeightfieldInputs;
 struct FVoxelAffectedRepresentationKeys;
+struct FVoxelFineShardGeometry;
+struct FVoxelTerrainRenderAtom;
+class IVoxelTerrainPresentedSnapshot;
 
 struct WHFRAMEWORK_API FVoxelTerrainGeometryMetrics
 {
@@ -126,6 +132,10 @@ public:
 	bool OnTask(FVoxelTaskResult&& InResult);
 	void InvalidateSection(const FIntVector& InKey);
 	void InvalidateNeighbors(const FIntVector& InKey);
+	void OnContentChanged(const FIntVector& InSection);
+	void OnOwnershipChanged(const FVoxelFineShardKey& InKey);
+	void OnPresentationReady(const FVoxelFineShardKey& InKey);
+	void OnGenerationDependencyReady(const FVoxelGenerationConsumerKey& InConsumer);
 
 	bool ApplyRemoteRepresentation(
 		const FVoxelRepresentationReply& InReply,
@@ -138,6 +148,9 @@ public:
 	bool HasPrimaryRepresentation() const;
 	FVoxelRepresentationReadiness GetRepresentationReadiness() const;
 	FVoxelTerrainReadinessSnapshot CaptureTerrainReadiness() const;
+	TSharedPtr<const IVoxelTerrainPresentedSnapshot, ESPMode::ThreadSafe> CapturePresentedSnapshot() const;
+	bool IsFinePresented(const FIntVector& InSection) const;
+	bool IsTerrainGeometryPresented(const FVoxelTerrainGeometry& InGeometry) const;
 	bool RequiresSectionData(const FIntVector& InKey) const;
 	TMap<int32, double> GetDataAdmissionLimits() const;
 	FVoxelPrimaryFineReadiness GetPrimaryFineReadiness(
@@ -159,8 +172,115 @@ public:
 		double InBandWidthCells);
 
 private:
+	struct FInterestInputRoot
+	{
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
+		TSet<FIntVector> FineWanted;
+		TSet<FVoxelViewKey> ProxyWanted;
+		TSet<FVoxelSurfaceTileKey> SurfaceWanted;
+		TSet<FVoxelMacroTileKey> MacroWanted;
+		FVoxelCoverageIndex TerrainRootIndex;
+		TSet<FVoxelViewKey> IndexedTerrainRoots;
+		uint8 MaximumTerrainRootLevel = 0;
+		FVoxelFinePagePlan FinePagePlan;
+	};
+	struct FInterestWorkspace
+	{
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MetadataLease;
+		TSharedPtr<FInterestInputRoot, ESPMode::ThreadSafe> Root;
+		TSharedPtr<const FVoxelInterestSet, ESPMode::ThreadSafe> Snapshot;
+		TArray<FVoxelPublishGroupKey> ChangedCoverage;
+		TArray<FVoxelPublishGroupKey> Retirements;
+		TArray<FVoxelFinePageKey> LayoutChanges;
+		TArray<FVoxelFineShardKey> RetiredShards;
+		TArray<FVoxelFineShardKey> ChangedShardOwners;
+		int32 Phase = 0;
+		int32 Cursor = 0;
+	};
+	FInterestInputRoot EmptyInputRoot;
+	TSharedPtr<FInterestInputRoot, ESPMode::ThreadSafe> AppliedInputRoot;
+	TSharedPtr<FInterestInputRoot, ESPMode::ThreadSafe> CoverageInputRoot;
+	bool bCoverageReadScope = false;
+	TSharedPtr<FInterestInputRoot, ESPMode::ThreadSafe> RetirementInputRoot;
+	bool bRetirementReadScope = false;
+	FInterestInputRoot& GetInputRoot();
+	const FInterestInputRoot& GetInputRoot() const;
+	TSharedPtr<FInterestWorkspace, ESPMode::ThreadSafe> InterestWorkspace;
+	TSharedPtr<FInterestWorkspace, ESPMode::ThreadSafe> CommittedWorkspaceEvents;
+	void ReleaseInputRoot(TSharedPtr<FInterestInputRoot, ESPMode::ThreadSafe>& InRoot);
+	void ReleaseInterestWorkspace(TSharedPtr<FInterestWorkspace, ESPMode::ThreadSafe>& InWorkspace);
+	bool BeginInterestWorkspace(TSharedPtr<const FVoxelInterestSet, ESPMode::ThreadSafe> InSnapshot);
+	void AdvanceInterestWorkspace(double InDeadline);
+	bool TryCommitInterestRoot();
+	void CancelInterestWorkspace();
+	void AdvanceCommittedInterestEvents(double InDeadline);
+	struct FFineShardSlot
+	{
+		FVoxelFineBuildState Build;
+		TSharedPtr<const void, ESPMode::ThreadSafe> RegistrationLease;
+		FVoxelGenerationConsumerKey Consumer;
+		FVoxelTaskStamp SubmittedStamp;
+		TSharedPtr<TAtomic<bool>, ESPMode::ThreadSafe> SamplesReady;
+		TSharedPtr<const FVoxelFineShardGeometry, ESPMode::ThreadSafe> RenderGeometry;
+		TMap<FIntVector, TSharedPtr<FVoxelTerrainRenderAtom, ESPMode::ThreadSafe>> RenderAtoms;
+		int32 RenderPieceCursor = 0;
+		int32 RenderBatchCursor = 0;
+		int32 RenderTriangleCursor = 0;
+		int32 RenderLeaseCursor = -2;
+		int32 RenderAtomCursor = 0;
+		bool bRenderPrepared = false;
+		bool bPresentationComplete = false;
+		bool bCycleNeedsPresentation = false;
+		double PresentationQueuedAt = 0.0;
+		int32 PresentationQueueIndex = INDEX_NONE;
+		uint8 PresentationQueueBand = 0;
+		double FirstQueuedSeconds = 0.0;
+		uint64 QueueSequence = 0;
+		bool bSubmitted = false;
+		bool bDependencyWake = true;
+		int32 OrderIndex = INDEX_NONE;
+	};
+	TMap<FVoxelFineShardKey, FFineShardSlot> FineShardSlots;
+	int64 FineShardOwnershipAtomCapacity = 0;
+	TSparseArray<FVoxelFineShardKey> FineShardSlotOrder;
+	int32 NativeFineRetirementCursor = 0;
+	TSparseArray<FVoxelFineShardKey> FinePresentationQueues[static_cast<uint8>(EVoxelTerrainServiceBand::Count)];
+	int32 FinePresentationQueueCursors[static_cast<uint8>(EVoxelTerrainServiceBand::Count)] = {};
+	FGuid FineShardOwnerId = FGuid::NewGuid();
+	uint64 NextFineShardIncarnation = 0;
+	uint64 NextFineShardSequence = 0;
+	int32 FineShardAdmissionCursor = 0;
+	int32 FineShardPresentationCursor = 0;
+	FVoxelTerrainWorkSelection FineShardAdmissionSelection;
+	FVoxelTerrainWorkSelection FineShardPresentationSelection;
+	double FineShardAdmissionCostMicroseconds = 50.0;
+	double FineShardPresentationCostMicroseconds = 25.0;
+	FVoxelTerrainWorkSelection TransitionAdmissionSelection[2];
+	int32 TransitionAdmissionCursor[2] = {};
+	double TransitionAdmissionCostMicroseconds[2] = {50.0, 50.0};
+	void ProcessFineShardAdmissions();
+	void PrepareFineShardPresentations();
+	void EnqueueFinePresentation(const FVoxelFineShardKey& InKey);
+	void OnFineOwnershipChanged(const FIntVector& InSection);
+	void OnPresentationReady(const FIntVector& InSection);
+	void AdvanceNativeFineRetirement();
+	void RefreshTerrainStatistics();
+	FVoxelTerrainMetricEvidence SampleTerrainMetric(const FVoxelTerrainMetricEvidence::FTarget& InTarget) const;
+	int32 StatisticsInputPhase = 0;
+	int32 StatisticsInputCursor = 0;
+	int32 StatisticsEvidenceCursor = 0;
+	uint64 StatisticsInputRevision = 0;
+	bool IsFineGeometryPrepared(const FIntVector& InSection) const;
+	bool IsLatestFinePresented(const FIntVector& InSection) const;
+	bool RequestFineShard(const FVoxelFineShardKey& InKey);
+	bool RequestF0Fine(const FIntVector& InSection, uint64 InRevision);
+	void ApplyFineShardResult(const FVoxelFineShardKey& InKey, const FVoxelFineBuildAttempt& InAttempt,
+		const FVoxelGenerationConsumerKey& InConsumer, FVoxelTaskResult&& InResult);
+	void RetireFineShard(const FVoxelFineShardKey& InKey);
 	struct FCoveragePassSnapshot
 	{
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
+		bool bComplete = false;
 		TSet<FIntVector> PresentedFineSections;
 		TMap<FIntVector, FVoxelFinePageKey> PresentedFineOwners;
 		TSet<FVoxelViewKey> FineNodes;
@@ -176,10 +296,15 @@ private:
 		TArray<FVoxelCoverageRect> WantedHeightfield;
 	};
 	FVoxelCoverageIndex CoverageIndex;
-	FVoxelCoverageIndex TerrainRootIndex;
-	TSet<FVoxelViewKey> IndexedTerrainRoots;
-	uint8 MaximumTerrainRootLevel = 0;
 	FVoxelCoverageIndex HeightfieldCoverageIndex;
+	TMap<FVoxelTerrainSpatialKey, uint64> CoverageIndexRetries;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> CoverageIndexRetryLease;
+	int32 CoverageIndexRetryCapacity = 0;
+	int32 CoverageIndexRetryCursor = 0;
+	void BindCoverageIndexResources();
+	bool ReserveCoverageIndexRetries(int32 InCount);
+	bool ApplyCoverageIndexRecord(const FVoxelCoverageRecord& InRecord);
+	void AdvanceCoverageIndexRecovery(double InDeadline);
 	void IndexCoverage(const FVoxelViewKey& InKey);
 	void IndexCoverage(const FVoxelSurfaceTileKey& InKey);
 	void IndexCoverage(const FVoxelMacroTileKey& InKey);
@@ -199,7 +324,7 @@ private:
 	bool IsSurfaceReplacementReady(const FVoxelSurfaceTileKey& InKey, const FCoveragePassSnapshot& InSnapshot) const;
 	bool IsMacroReplacementReady(const FVoxelMacroTileKey& InKey, const FCoveragePassSnapshot& InSnapshot) const;
 #if WITH_DEV_AUTOMATION_TESTS
-	friend class FVoxelFinePageAttemptIsolationTest;
+	friend class FVoxelFineShardAttemptIsolationTest;
 	friend class FVoxelCriticalDependencyAdmissionTest;
 	friend class FVoxelFinePageObsoleteDirtyCleanupTest;
 	friend class FVoxelManagerLocalCoverageTest;
@@ -213,31 +338,29 @@ private:
 	void UpdateSurface(TConstArrayView<FVector> InObservers);
 	void UpdateMacro(TConstArrayView<FVector> InObservers);
 	void UpdateWantedTimestamps(double InNow);
-	bool HasCriticalNearFieldPending() const;
 	bool IsCriticalDependency(const FVoxelViewAdmission& InAdmission) const;
 	bool IsCriticalDependency(const FVoxelTerrainSpatialKey& InKey) const;
 	void ProcessAdmissions();
 	void ProcessDataAdmissions();
+	void ProcessServiceAdmissions(bool bInDataOnly);
 	bool HasMovementCriticalFinePending() const;
 	bool IsAdmissionDataReady(const FVoxelViewAdmission& InAdmission, bool bIncludePending = false) const;
 	bool IsAdmissionMeshReady(const FVoxelViewAdmission& InAdmission) const;
 	bool IsAdmissionPresented(const FVoxelViewAdmission& InAdmission) const;
 	void RefreshTerrainBuildStage();
 	AActor* FineActor(const FIntVector& InSection) const;
-	bool IsFinePresented(const FIntVector& InSection) const;
 	void RebuildFinePagePlan();
 	void MarkFinePageDirty(const FVoxelFinePageKey& InPage);
 	void InvalidateFinePageLayout(const FVoxelFinePageKey& InPage);
-	void RetireFinePageBuildState(const FVoxelFinePageKey& InPage, bool bCancelTask);
+	void RetireFinePageLayoutState(const FVoxelFinePageKey& InPage);
 	FString LastFinePagePlanningError;
 	bool CommitFinePageOwnership(const FVoxelFinePageKey& InPage, TConstArrayView<FVoxelViewKey> InDesired, const TSet<FIntVector>& InRetainedFine, const TOptional<bool>& InVisible);
-	void ApplyFinePageBuild(const FVoxelFinePageKey& InPage, uint64 InSignature, uint64 InPageVersion, uint64 InContentRevision,
-		const FVoxelTaskStamp& InAttemptStamp, FVoxelTaskResult&& InResult);
-	void PrepareFinePages();
 	TOptional<bool> UpdateFinePagePresentation(const FVoxelFinePageKey& InPage, const TSet<FVoxelViewKey>& InTarget, const FCoveragePassSnapshot& InSnapshot);
 	void InvalidateFinePresentation(const FIntVector& InSection);
 	void InvalidateRepresentationKeys(const FVoxelAffectedRepresentationKeys& InAffected);
 	bool IsPreparedDataCurrent(const FVoxelTaskKey& InKey) const;
+	FVoxelTaskStamp MakeRepresentationStamp(const FVoxelTerrainGeometry& InGeometry, uint64 InRevision) const;
+	bool IsRepresentationStampCurrent(const FVoxelTaskStamp& InStamp) const;
 	void PrunePreparedData();
 	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> RetainPreparedEnvironment(
 		const FVoxelTaskKey& InKey, const FVoxelGenerationPipeline& InGenerator,
@@ -246,6 +369,8 @@ private:
 	void RemovePreparedData(const FVoxelTaskKey& InKey);
 	void RebuildAdmissions(TConstArrayView<FVector> InObservers);
 	void UpdateTaskPriorities();
+	bool ResolveTaskServicePriority(EVoxelTaskKind InKind, const FVoxelTaskStamp& InStamp,
+		EVoxelWorkClass& InOutWorkClass, FVoxelTerrainServicePriority& OutPriority) const;
 	int32 VoxelProxyTerrainStage(const FVoxelViewKey& InKey) const;
 	int32 AdmissionTerrainStage(const FVoxelViewAdmission& InAdmission) const;
 	EVoxelWorkClass VolumeTransitionWorkClass(const FVoxelViewKey& InOwner) const;
@@ -278,10 +403,17 @@ private:
 	void RetryActiveCoverage();
 	FGuid BeginPublishGroup(const FVoxelPublishGroupKey& InKey);
 	bool CoverageAffects(const FVoxelCoverageRect& InBounds) const;
+	bool ShouldDeferCoverage(const FVoxelCoverageRect& InBounds) const;
+	bool ShouldDeferCoverage(const FVoxelTaskStamp& InStamp) const;
+	FVoxelCoverageRect CoverageBounds(const FVoxelTaskStamp& InStamp) const;
+	void InvalidateRepresentationKey(const FVoxelTerrainSpatialKey& InKey);
 	void ResolveTransitionVisibility();
 	FVoxelGameThreadContinuation ResolveTransitionVisibilitySteps();
 	FVoxelGameThreadContinuation CaptureCoverageCandidateSteps(
-		TSet<FIntVector>& OutFine, TSet<FVoxelViewKey>& OutProxy, TSet<FVoxelSurfaceTileKey>& OutSurface, TSet<FVoxelMacroTileKey>& OutMacro) const;
+		TSet<FIntVector>& OutFine, TSet<FVoxelViewKey>& OutProxy, TSet<FVoxelSurfaceTileKey>& OutSurface, TSet<FVoxelMacroTileKey>& OutMacro,
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutLease, bool& OutComplete) const;
+	FVoxelGameThreadContinuation AcquireCoverageCapacitySteps(uint64 InBytes,
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& InOutLease, bool& OutComplete) const;
 	FVoxelGameThreadContinuation BuildCoverageSnapshotSteps(FCoveragePassSnapshot& OutSnapshot) const;
 	FVoxelGameThreadContinuation RebuildHeightfieldTransitionSteps(const FCoveragePassSnapshot& InSnapshot);
 	FVoxelGameThreadContinuation RebuildVolumeTransitionSteps(const TSet<FVoxelViewKey>& InTargetNodes);
@@ -294,10 +426,15 @@ private:
 	void RebuildVolumeTransitions(const TSet<FVoxelViewKey>& InTargetNodes);
 	bool VolumeHandoffAffectsHeightfield(const FVoxelHeightfieldNodeKey& InKey) const;
 	void PumpVolumeTransitions();
+	TSharedPtr<const FVoxelFineShardGeometry, ESPMode::ThreadSafe> FindFineBoundaryGeometry(const FIntVector& InSection) const;
+	bool AreBoundaryInputsCurrent(const FVoxelBoundaryTransitionContext& InContext) const;
+	bool AreHeightfieldInputsCurrent(const FVoxelFrozenHeightfieldInputs& InInputs) const;
 	void ApplyVolumeTransition(const FVoxelViewKey& InOwner, uint64 InSignature,
 		FVoxelTaskResult&& InResult);
 	void CleanupRetiredRepresentations(double InNow);
-	FVoxelGameThreadContinuation CleanupRetiredRepresentationSteps(double InNow);
+	FVoxelGameThreadContinuation CleanupRetiredRepresentationSteps(double InNow, FVoxelPublishGroupKey InCandidate);
+	bool IsRetirementWanted(const FVoxelPublishGroupKey& InCandidate) const;
+	void ResetRetirementContinuation();
 	void QueueRetirement(const FVoxelPublishGroupKey& InKey);
 	void RemoveRetirement(const FVoxelPublishGroupKey& InKey);
 
@@ -312,7 +449,7 @@ private:
 	void GatherReadyWantedSurfaceRects(TArray<FVoxelCoverageRect>& OutCoverage) const;
 	void GatherReadyWantedMacroRects(TArray<FVoxelCoverageRect>& OutCoverage) const;
 	void GatherReadyWantedProxySurfaceRects(const FVoxelCoverageRect& InTarget, TArray<FVoxelCoverageRect>& OutCoverage) const;
-	void UpdateProxySurfaceCoverage(const FVoxelVoxelProxyData& InData);
+	void UpdateProxySurfaceCoverage(TSharedPtr<const FVoxelVoxelProxyData, ESPMode::ThreadSafe> InData);
 	void GatherCurrentRenderDomainRects(TArray<FVoxelCoverageRect>& OutCoverage) const;
 	bool IsFineReplacementReady(const FIntVector& InKey) const;
 	bool IsProxyReplacementReady(const FVoxelViewKey& InKey) const;
@@ -348,11 +485,15 @@ private:
 	UVoxelModule& Module;
 	FVoxelTaskScheduler& Scheduler;
 	uint64 WorldEpoch = 0;
+	FGuid TaskOwnerId = FGuid::NewGuid();
+	uint64 TaskOwnerIncarnation = 1;
+	mutable uint64 NextRepresentationAttempt = 0;
+	mutable TMap<FVoxelTerrainSpatialKey, FVoxelTaskStamp> RepresentationAttempts;
 	uint64 AppliedInterestRevision = 0;
 	bool bTerrainBuildStageDirty = true;
 	bool bTaskPrioritiesDirty = false;
 	TConstArrayView<FVoxelViewAdmission> Admissions;
-	FVoxelPublishBudget TerrainFrameBudget;
+	FVoxelPublishBudget& TerrainFrameBudget;
 	bool bTerrainFrameBudgetActive = false;
 	int32 NextManagerPhase = 0;
 	TSharedPtr<const FVoxelTerrainPublicationInputs, ESPMode::ThreadSafe> PendingPublicationInputs;
@@ -373,6 +514,16 @@ private:
 	TMap<int32, int32> AdmissionScanIndices[4];
 	TMap<int32, int32> DataScanIndices[4];
 	TMap<int32, int32> DataFrontierScanIndices[4];
+	struct FAdmissionServiceAge
+	{
+		double FirstQueuedSeconds = 0.0;
+		uint64 Sequence = 0;
+	};
+	FVoxelTerrainWorkSelection AdmissionSelection[2];
+	TMap<FVoxelTaskKey, FAdmissionServiceAge> AdmissionAges[2];
+	int32 ServiceAdmissionScans[2][4] = {};
+	double AdmissionCostEstimates[2][4] = {};
+	uint64 NextAdmissionSequence = 0;
 	TConstArrayView<int32> AdmissionPriorities;
 	TMap<FVoxelTaskKey, TSharedPtr<const FVoxelTaskResult, ESPMode::ThreadSafe>> PreparedData;
 	TMap<FVoxelTaskKey, TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>> PreparedEnvironmentRetentions;
@@ -396,11 +547,27 @@ private:
 	double NextTimingLog = 0.0;
 	FVoxelGameThreadContinuation CoverageContinuation;
 	TSharedPtr<const FVoxelInterestSet, ESPMode::ThreadSafe> CoverageInterestSnapshot;
+	FVoxelGameThreadContinuation RetirementContinuation;
+	TSharedPtr<const FVoxelInterestSet, ESPMode::ThreadSafe> RetirementInterestSnapshot;
+	FVoxelCoverageIndex RetirementCoverageRoot;
+	FVoxelCoverageIndex RetirementHeightfieldRoot;
+	FVoxelChangeHierarchySnapshot RetirementContentSnapshot;
+	FIntVector RetirementContentMin;
+	FIntVector RetirementContentMax;
+	FVoxelCoverageRect RetirementBounds;
+	FVoxelPublishGroupKey RetirementCandidate;
+	TArray<FVoxelCoverageRect> RetirementScopeRects;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RetirementScopeLease;
 	TArray<FVoxelTaskResult> DeferredCoverageResults;
-	TQueue<TFunction<void()>> DeferredCoverageCallbacks;
+	int32 DeferredCoverageResultCursor = 0;
+	struct FDeferredCoverageCallback
+	{
+		FVoxelCoverageRect Bounds;
+		TFunction<void()> Apply;
+	};
+	TQueue<FDeferredCoverageCallback> DeferredCoverageCallbacks;
 	double NextBudgetLog = 0.0;
 	mutable double NextIncompleteFineLog = 0.0;
-	mutable double NextCriticalPendingLog = 0.0;
 	double CoverageStartedSeconds = 0.0;
 	uint64 CoverageMicrosteps = 0;
 	uint64 CoverageContentRevision = 0;
@@ -436,65 +603,18 @@ private:
 	double NextRepresentationDebugLog = 0.0;
 	TUniquePtr<FVoxelViewPublisher> Publisher;
 	TMap<FVoxelPublishGroupKey, FGuid> OpenPublishGroups;
+	TMap<FVoxelPublishGroupKey, FGuid> ActiveCoveragePublishGroups;
 
-	TSet<FIntVector> FineWanted;
 	TSet<FVoxelViewKey> VisibleTerrainNodes;
 	TMap<FVoxelPublishGroupKey, TArray<FVoxelViewKey>> VisibleTerrainNodesByGroup;
 	TSet<FVoxelViewKey> ReadyTerrainBranches;
 	bool bReadyTerrainBranchesDirty = true;
-	TSet<FVoxelViewKey> VoxelProxyWanted;
-	TSet<FVoxelSurfaceTileKey> SurfaceWanted;
-	TSet<FVoxelMacroTileKey> MacroWanted;
 	TSet<FIntVector> FineReady;
 	TSet<FVoxelViewKey> VoxelProxyReady;
 	TSet<FVoxelSurfaceTileKey> SurfaceReady;
 	TSet<FVoxelMacroTileKey> MacroReady;
 
 	TMap<FIntVector, TSharedPtr<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>> FineSectionMeshes;
-	struct FFinePageInput
-	{
-		FIntVector Section;
-		TSharedPtr<const FVoxelSectionMeshResult, ESPMode::ThreadSafe> Mesh;
-		uint8 SuppressedFaces = 0;
-	};
-	bool CaptureFinePageInput(const FIntVector& InSection, FFinePageInput& OutInput, uint64& InOutSignature) const;
-	bool AdvanceFinePageCapture(const FVoxelFinePageKey& InPage, TArray<FFinePageInput>& OutInputs, uint64& OutSignature, double InDeadline);
-	bool CaptureFinePageInputs(const FVoxelFinePageKey& InPage, TArray<FFinePageInput>& OutInputs, uint64& OutSignature) const;
-	struct FPreparedFinePage
-	{
-		uint64 Signature = 0;
-		TSharedPtr<const FVoxelSectionMeshResult, ESPMode::ThreadSafe> Mesh;
-		uint64 PageVersion = 0;
-		uint64 ContentRevision = 0;
-	};
-	TMap<FVoxelFinePageKey, FPreparedFinePage> PreparedFinePageMeshes;
-	struct FFinePageAttempt
-	{
-		FVoxelTaskStamp Stamp;
-		uint64 Signature = 0;
-		uint64 PageVersion = 0;
-		uint64 ContentRevision = 0;
-	};
-	struct FFinePageCapture
-	{
-		uint64 PageVersion = 0;
-		uint64 ContentRevision = 0;
-		uint64 Signature = 1469598103934665603ull;
-		int32 NextSection = 0;
-		TArray<FFinePageInput> Inputs;
-	};
-	TMap<FVoxelFinePageKey, FFinePageAttempt> PendingFinePageBuilds;
-	TMap<FVoxelFinePageKey, FString> FinePageFailures;
-	TMap<FVoxelFinePageKey, FFinePageCapture> FinePageCaptures;
-	TMap<FVoxelFinePageKey, uint64> FinePageVersions;
-	TMap<FVoxelFinePageKey, uint64> FinePageContentRevisions;
-	uint64 NextFinePageVersion = 0;
-	uint64 NextFinePageAttemptId = 0;
-	uint64 StaleFinePageResults = 0;
-	uint64 CanceledFinePageResults = 0;
-	int32 NextFinePreparationIndex = 0;
-	double NextFinePreparationDiagnostic = 0.0;
-	FVoxelFinePagePlan FinePagePlan;
 	TSet<FVoxelFinePageKey> FinePageReady;
 	TSet<FVoxelFinePageKey> EmptyFinePages;
 	TSet<FVoxelFinePageKey> PresentedEmptyFinePages;
@@ -521,19 +641,22 @@ private:
 	TMap<FVoxelHeightfieldNodeKey, TObjectPtr<AActor>> HeightfieldTransitionActors;
 	TMap<FVoxelHeightfieldNodeKey, uint64> HeightfieldTransitionSignatures;
 	TMap<FVoxelHeightfieldNodeKey, uint64> DesiredTransitionSignatures;
+	TMap<FVoxelHeightfieldNodeKey, TSharedPtr<const FVoxelFrozenHeightfieldInputs, ESPMode::ThreadSafe>> DesiredHeightfieldInputs;
+	uint64 NextHeightfieldInputSerial = 0;
 	TMap<FVoxelHeightfieldNodeKey, uint64> PendingTransitionSignatures;
 	TMap<FVoxelHeightfieldNodeKey, uint64> PreparedTransitionSignatures;
-	TMap<FVoxelHeightfieldNodeKey, TSharedPtr<FVoxelSectionMeshResult>> PreparedTransitionMeshes;
+	TMap<FVoxelHeightfieldNodeKey, TSharedPtr<FVoxelSectionMeshResult, ESPMode::ThreadSafe>> PreparedTransitionMeshes;
 	TMap<FVoxelHeightfieldNodeKey, TArray<FVoxelHeightfieldTransitionEdge>> DesiredTransitionEdges;
 	TArray<FVoxelHeightfieldNodeKey> UnsubmittedTransitionOwners;
 	TArray<FVoxelCoverageRect> PendingHeightfieldHandoffRects;
 	int32 HeightfieldUnbalancedEdgeCount = 0;
 	TMap<FVoxelViewKey, uint64> VolumeTransitionSignatures;
+	uint64 NextVolumeInputSerial = 0;
 	TMap<FVoxelViewKey, uint64> DesiredVolumeSignatures;
 	TMap<FVoxelViewKey, uint64> PendingVolumeSignatures;
 	TMap<FVoxelViewKey, uint64> PreparedVolumeSignatures;
-	TMap<FVoxelViewKey, TSharedPtr<FVoxelSectionMeshResult>> PreparedVolumeMeshes;
-	TMap<FVoxelViewKey, TSharedPtr<FVoxelSectionMeshResult>> PreparedVolumeBoundaryMeshes;
+	TMap<FVoxelViewKey, TSharedPtr<FVoxelSectionMeshResult, ESPMode::ThreadSafe>> PreparedVolumeMeshes;
+	TMap<FVoxelViewKey, TSharedPtr<FVoxelSectionMeshResult, ESPMode::ThreadSafe>> PreparedVolumeBoundaryMeshes;
 	TMap<FVoxelViewKey, TObjectPtr<AActor>> VolumeBoundaryActors;
 	TMap<FVoxelViewKey, TSharedPtr<const FVoxelBoundaryTransitionContext>> DesiredVolumeContexts;
 	TArray<FVoxelViewKey> UnsubmittedVolumeOwners;
@@ -545,12 +668,12 @@ private:
 	TMap<FVoxelSurfaceTileKey, uint64> SurfaceRevisions;
 	TMap<FVoxelMacroTileKey, uint64> MacroRevisions;
 
-	TMap<FVoxelViewKey, TSharedPtr<const FVoxelVoxelProxyData>> VoxelProxyData;
+	TMap<FVoxelViewKey, TSharedPtr<const FVoxelVoxelProxyData, ESPMode::ThreadSafe>> VoxelProxyData;
 	TSet<FVoxelViewKey> AirVoxelProxyNodes;
-	TMap<FVoxelViewKey, TArray<FVoxelCoverageRect>> ProxySurfaceCoverage;
-	TMap<FVoxelSurfaceTileKey, TSharedPtr<const FVoxelSurfaceTileData>> SurfaceData;
-	TMap<FVoxelSurfaceTileKey, TSharedPtr<const FVoxelWaterSurfaceTileData>> WaterData;
-	TMap<FVoxelMacroTileKey, TSharedPtr<const FVoxelMacroTileData>> MacroData;
+	TMap<FVoxelViewKey, TSharedPtr<const FVoxelVoxelProxyData, ESPMode::ThreadSafe>> ProxySurfaceCoverage;
+	TMap<FVoxelSurfaceTileKey, TSharedPtr<const FVoxelSurfaceTileData, ESPMode::ThreadSafe>> SurfaceData;
+	TMap<FVoxelSurfaceTileKey, TSharedPtr<const FVoxelWaterSurfaceTileData, ESPMode::ThreadSafe>> WaterData;
+	TMap<FVoxelMacroTileKey, TSharedPtr<const FVoxelMacroTileData, ESPMode::ThreadSafe>> MacroData;
 
 	TMap<FIntVector, double> FineLastWanted;
 	TMap<FVoxelViewKey, double> VoxelProxyLastWanted;

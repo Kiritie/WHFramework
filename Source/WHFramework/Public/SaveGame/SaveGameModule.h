@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "Main/Base/ModuleBase.h"
 #include "SaveGame/SaveGameModuleTypes.h"
@@ -13,6 +13,10 @@ UCLASS()
 class WHFRAMEWORK_API USaveGameModule : public UModuleBase
 {
 	GENERATED_BODY()
+
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FVoxelSaveCoordinatorTest;
+#endif
 
 	GENERATED_MODULE(USaveGameModule)
 
@@ -51,7 +55,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "SaveGame|World")
 	FSaveOperationResult SaveActiveSlotAsync();
 
-	FSaveOperationResult FinishPendingSave();
+	FSaveOperationResult PollPendingSave();
+
+	UFUNCTION(BlueprintPure, Category = "SaveGame|World")
+	FSaveOperationResult GetWorldSaveResult(const FGuid& InOperationId) const;
+	void AdvanceWorldSaveCapture(UVoxelModule& InVoxel);
+	bool HasWorldSaveWork(const UVoxelModule& InVoxel) const;
+	bool RequestUserQuit(uint8 InQuitPreference, bool bInIgnorePlatformRestrictions);
 
 	UPROPERTY(BlueprintAssignable)
 	FWorldSaveFinished OnWorldSaveFinished;
@@ -97,6 +107,11 @@ public:
 		return ActiveSaveId.IsValid();
 	}
 
+	bool IsSaveOperationRunning() const
+	{
+		return bSaveOperationRunning || bApplyingSaveCallbacks || !AsyncCreatedSlotCleanup.IsCompleted();
+	}
+
 	UFUNCTION(BlueprintPure, Category = "SaveGame|World")
 	FGuid GetActiveSaveId() const
 	{
@@ -125,7 +140,15 @@ public:
 	void SetUserIndex(int32 InUserIndex);
 
 private:
+	FSaveOperationResult PollNativeSave(FVoxelTerrainFrameContext* InFrame);
+	void AdvanceAsyncSaveCapture(FVoxelTerrainFrameContext* InFrame = nullptr);
+	bool AdvanceModuleFileCapture(FString& OutError, bool& bOutCapacityBlocked);
+	void ResetModuleFileCapture();
+	void FlushDeferredSaveTermination();
 	void CompleteAsyncSave(const FSaveOperationResult& Result);
+	void AdvanceAsyncSaveCompletion(FVoxelTerrainFrameContext* InFrame = nullptr, bool bForce = false);
+	void FinalizeAsyncSave();
+	void CompleteUserQuit(const FSaveOperationResult& InResult);
 	void RestoreLastActiveSave();
 	FSaveOperationResult LoadModulesFromGeneration(const FGuid& SaveId, int32 Generation, EPhase InPhase);
 	FSaveOperationResult RestoreSlotGeneration(const FPendingSaveLoadContext& Context, EPhase InPhase);
@@ -154,8 +177,59 @@ private:
 	FPendingSaveLoadContext PendingLoadContext;
 
 	TUniquePtr<FSaveGameStorage> Storage;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> AsyncExecutorLease;
 	TUniquePtr<FSaveGameAsyncExecutor> AsyncSave;
-	TArray<TWeakObjectPtr<UModuleBase>> AsyncCaptured;
+	UE::Tasks::FTask AsyncCreatedSlotCleanup;
+	TSharedPtr<FSaveGenerationPlan, ESPMode::ThreadSafe> AsyncPlan;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> AsyncCaptureMetadataLease;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UModuleBase>> AsyncCaptured;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UWorld> AsyncWorld;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UVoxelModule> AsyncVoxelOwner;
+
+	UPROPERTY(Transient)
+	FParameter AsyncModuleData;
+
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> AsyncModulePayloadLease;
+	TArray<uint8> AsyncModulePayload;
+	TOptional<FSaveModuleBytes> AsyncModuleFile;
+	uint8 AsyncModuleCapturePhase = 0;
+	int32 AsyncModulePayloadCursor = 0;
+	uint32 AsyncModulePayloadCrc = 0;
+
+	int32 AsyncBuildCursor = 0;
+	int32 AsyncPrepareCount = 0;
+	TOptional<FSaveOperationResult> AsyncCompletionResult;
+	int32 AsyncCompletionCursor = -1;
+	bool bAsyncCompletionFilesCommitted = false;
+	bool bApplyingSaveCallbacks = false;
+	bool bSaveTerminationRunning = false;
+	EPhase DeferredSaveTermination = EPhase::None;
+	double AsyncCaptureCostMilliseconds = 0.1;
+	double AsyncCompletionCostMilliseconds = 0.1;
+	FGuid AsyncOperationId;
+	FSaveOperationResult LastWorldSaveResult;
+	FGuid PendingCreatedSaveId;
+	FGuid PendingCreationPreviousSaveId;
+	bool bAsyncCompletesPendingSlot = false;
+	bool bAsyncWorkerStarted = false;
+	bool bAsyncWorkerCapacityBlocked = false;
+	uint64 AsyncWorkerBlockedReleaseVersion = 0;
+	FGuid PendingSlotSaveId;
+	bool bPendingUserQuit = false;
+	bool bQuitNeedsFreshCapture = false;
+	bool bQuitSaveCommitted = false;
+	bool bQuitWorldWasPaused = false;
+	bool bQuitSaveModuleWasPaused = false;
+	bool bQuitVoxelModuleWasPaused = false;
+	uint8 PendingQuitPreference = 0;
+	bool bPendingQuitIgnorePlatformRestrictions = false;
+	TWeakObjectPtr<APlayerController> QuitController;
+	TWeakObjectPtr<UVoxelModule> QuitVoxel;
 	FGuid AsyncSaveId;
-	FString AsyncCommittedDirectory;
 };

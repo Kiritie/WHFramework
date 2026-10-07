@@ -1,19 +1,22 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Voxel/Chunks/VoxelSectionSnapshot.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
+#include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Runtime/VoxelRegistry.h"
 #include "Voxel/Geometry/VoxelShapeRegistry.h"
 
 struct WHFRAMEWORK_API FVoxelSectionCollisionResult
 {
+	TSharedPtr<FVoxelTerrainWorkReceipt, ESPMode::ThreadSafe> WorkReceipt;
 	FVoxelTaskStamp Stamp;
 	TArray<FBox> Boxes;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 
 	uint64 Bytes() const
 	{
-		return uint64(Boxes.Num()) * sizeof(FBox);
+		return VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSectionCollisionResult>() + Boxes.GetAllocatedSize();
 	}
 };
 

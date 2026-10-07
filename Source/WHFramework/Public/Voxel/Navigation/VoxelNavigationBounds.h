@@ -1,9 +1,9 @@
-#pragma once
+﻿#pragma once
 
 #include "NavMesh/NavMeshBoundsVolume.h"
 #include "VoxelNavigationBounds.generated.h"
 
-/** 每个权威模拟流送源独立持有的局部导航边界。 */
+/** 实际导航消费者共同持有的固定局部边界，不随流送源移动。 */
 UCLASS(NotBlueprintable, Transient)
 class WHFRAMEWORK_API AVoxelNavigationBounds : public ANavMeshBoundsVolume
 {

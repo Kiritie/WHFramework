@@ -1,4 +1,4 @@
-#include "Voxel/Prefabs/VoxelPrefab.h"
+﻿#include "Voxel/Prefabs/VoxelPrefab.h"
 #include "Voxel/Prefabs/Data/VoxelPrefabData.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Voxels/VoxelItemBridge.h"
@@ -45,7 +45,7 @@ bool AVoxelPrefab::SetPreviewData(const FVoxelPrefabSaveData& Value, double Size
         Error = TEXT("Invalid prefab preview world or block size");
         return false;
     }
-    UVoxelModule* Module = UVoxelModule::Find(GetWorld());
+    UVoxelModule* Module = UVoxelModule::GetPtr(GetWorld());
     const auto Registry = Module ? Module->GetRegistry() : nullptr;
     const auto Shapes = Module ? Module->GetShapes() : nullptr;
     if (!Registry || !UVoxelPrefabData::ValidateCells(Value, *Registry, Error))

@@ -1,9 +1,89 @@
-#include "SaveGame/SaveDataSerializer.h"
+﻿#include "SaveGame/SaveDataSerializer.h"
 
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "Serialization/MemoryReader.h"
 #include "Serialization/MemoryWriter.h"
 #include "WHFrameworkCoreTypes.h"
+
+namespace
+{
+	class FBoundedParameterWriter final : public FArchive
+	{
+	public:
+		using FArchive::operator<<;
+
+		FBoundedParameterWriter(TArray<uint8>& InBytes, const int32 InMaximumBytes,
+			TFunctionRef<bool(TArray<uint8>&, int32)> InReserve)
+			: Bytes(InBytes), MaximumBytes(InMaximumBytes), Reserve(InReserve)
+		{
+			SetIsSaving(true);
+			SetIsPersistent(true);
+		}
+
+		virtual FArchive& operator<<(FName& InName) override
+		{
+			// 与原 FMemoryWriter 的名称格式一致，不能使用 FArchive 的默认空实现。
+			FString Name = InName.ToString();
+			*this << Name;
+			return *this;
+		}
+
+		virtual void Serialize(void* InData, const int64 InLength) override
+		{
+			if (IsError()) return;
+			if (InLength < 0 || Position < 0 || Position > MaximumBytes || InLength > MaximumBytes - Position)
+			{
+				SetError();
+				return;
+			}
+			const int32 Required = int32(Position + InLength);
+			if (Required > Bytes.Max() && (!Reserve(Bytes, Required) || Required > Bytes.Max()))
+			{
+				SetError();
+				return;
+			}
+			if (Required > Bytes.Num()) Bytes.SetNumZeroed(Required, EAllowShrinking::No);
+			if (InLength > 0) FMemory::Memcpy(Bytes.GetData() + Position, InData, InLength);
+			Position = Required;
+		}
+
+		virtual void Seek(const int64 InPosition) override
+		{
+			if (InPosition < 0 || InPosition > MaximumBytes) SetError();
+			else Position = InPosition;
+		}
+		virtual int64 Tell() override
+		{
+			return Position;
+		}
+		virtual int64 TotalSize() override
+		{
+			return Bytes.Num();
+		}
+		virtual FString GetArchiveName() const override
+		{
+			return TEXT("BoundedSaveParameterWriter");
+		}
+
+	private:
+		TArray<uint8>& Bytes;
+		int32 MaximumBytes;
+		TFunctionRef<bool(TArray<uint8>&, int32)> Reserve;
+		int64 Position = 0;
+	};
+}
+
+bool FSaveDataSerializer::SerializeParameterBounded(const FParameter& InData, const int32 InMaximumBytes,
+	TArray<uint8>& OutBytes, TFunctionRef<bool(TArray<uint8>&, int32)> InReserve)
+{
+	if (!InData.HasValue() || InMaximumBytes < 0) return false;
+	OutBytes.Reset();
+	FBoundedParameterWriter Writer(OutBytes, InMaximumBytes, InReserve);
+	FSaveDataArchive Archive(Writer);
+	Archive.ArIsSaveGame = false;
+	FParameter::StaticStruct()->SerializeItem(Archive, const_cast<FParameter*>(&InData), nullptr);
+	return !Writer.IsError() && !Archive.IsError();
+}
 
 bool FSaveDataSerializer::SerializeParameter(const FParameter& InData, TArray<uint8>& OutBytes)
 {
@@ -42,6 +122,25 @@ bool FSaveDataSerializer::DeserializeParameter(const TArray<uint8>& InBytes, FPa
 	return true;
 }
 
+bool FSaveDataSerializer::DeserializeParameterView(const TConstArrayView<uint8> InBytes, FParameter& OutData)
+{
+	check(IsInGameThread());
+	if (InBytes.IsEmpty()) return false;
+	FMemoryReaderView Reader(FMemoryView(InBytes.GetData(), uint64(InBytes.Num())), true);
+	Reader.ArMaxSerializeSize = InBytes.Num();
+	FSaveDataArchive Archive(Reader);
+	Archive.ArIsSaveGame = false;
+	OutData.Reset();
+	FParameter::StaticStruct()->SerializeItem(Archive, &OutData, nullptr);
+	if (Reader.IsError() || Archive.IsError() || Reader.Tell() != Reader.TotalSize() ||
+		!OutData.HasValue() || !MarkSaveDataSaved(OutData))
+	{
+		OutData.Reset();
+		return false;
+	}
+	return true;
+}
+
 bool FSaveDataSerializer::MarkSaveDataSaved(FParameter& InOutData)
 {
 	const UScriptStruct* Struct = InOutData.GetStructType();
@@ -73,6 +172,22 @@ bool FSaveDataSerializer::BuildModuleFile(FName ModuleName, int32 ModuleVersion,
 	FMemoryWriter Writer(OutFileBytes, true);
 	Writer << Header;
 	Writer.Serialize(Payload.GetData(), Payload.Num());
+	return !Writer.IsError();
+}
+
+bool FSaveDataSerializer::WriteModuleHeaderBounded(const FName InModuleName, const int32 InModuleVersion,
+	const int64 InPayloadSize, const uint32 InPayloadCrc, TArray<uint8>& OutFileBytes,
+	TFunctionRef<bool(TArray<uint8>&, int32)> InReserve)
+{
+	if (InPayloadSize <= 0 || InPayloadSize > MAX_int32) return false;
+	FModuleSaveFileHeader Header;
+	Header.ModuleName = InModuleName;
+	Header.ModuleVersion = InModuleVersion;
+	Header.PayloadSize = InPayloadSize;
+	Header.PayloadCrc = InPayloadCrc;
+	OutFileBytes.Reset();
+	FBoundedParameterWriter Writer(OutFileBytes, MAX_int32, InReserve);
+	Writer << Header;
 	return !Writer.IsError();
 }
 

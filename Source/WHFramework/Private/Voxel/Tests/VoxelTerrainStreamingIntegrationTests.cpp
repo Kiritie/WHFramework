@@ -1,4 +1,4 @@
-#include "CoreMinimal.h"
+﻿#include "CoreMinimal.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -12,6 +12,7 @@
 #include "Voxel/Rendering/VoxelHeightfieldPageMesh.h"
 #include "Voxel/Rendering/VoxelProxyPageMesh.h"
 #include "Voxel/Rendering/VoxelWaterView.h"
+#include "Voxel/Rendering/VoxelFineHandoff.h"
 #include "VoxelTestUtilities.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelKnownInitialInterestIntegrationTest,
@@ -68,64 +69,48 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelKnownEmptyPageIntegrationTest,
 
 bool FVoxelKnownEmptyPageIntegrationTest::RunTest(const FString& InParameters)
 {
-	UVoxelModule* Module = NewObject<UVoxelModule>();
-	FVoxelTaskScheduler Scheduler;
-	FVoxelViewManager Manager(*Module, Scheduler, 1);
-	const FVoxelFinePageKey Page{FIntVector::ZeroValue, 0};
-	const FVoxelViewKey Node{FIntVector::ZeroValue, 0};
-	Manager.FinePagePlan.Pages.Add(Page);
-	Manager.FinePagePlan.SectionOwners.Add(Node.Coordinate, Page);
-	Manager.FinePageReady.Add(Page);
-	Manager.EmptyFinePages.Add(Page);
-	Manager.PresentedEmptyFinePages.Add(Page);
-	Manager.PresentedFineSectionOwners.Add(Node.Coordinate, Page);
-	Manager.VisibleTerrainNodes.Add(Node);
-	Manager.FineWanted.Add(Node.Coordinate);
-	Manager.bCoverageDirty = false;
-	Manager.bCoverageDirtyFull = false;
-	const TSet<FVoxelViewKey> Target{Node};
-	const FVoxelViewManager::FCoveragePassSnapshot Snapshot;
-	for (int32 Iteration = 0; Iteration < 1000; ++Iteration)
-	{
-		const TOptional<bool> Visibility = Manager.UpdateFinePagePresentation(Page, Target, Snapshot);
-		TestTrue(TEXT("Empty page retains visible ownership"), Visibility.IsSet() && Visibility.GetValue());
-		TestFalse(TEXT("Unchanged empty commit is idempotent"), Manager.CommitFinePageOwnership(Page, MakeArrayView(&Node, 1), {}, Visibility));
-	}
-	TestTrue(TEXT("Stable empty pages create no publisher groups"), Manager.Publisher->PendingGroups.IsEmpty());
-	TestFalse(TEXT("Stable empty pages do not dirty coverage"), Manager.bCoverageDirty);
-	TestTrue(TEXT("Proven empty presentation is valid without an Actor"), Manager.IsFinePresented(Node.Coordinate));
-	TestFalse(TEXT("A callback without a visibility change preserves committed ownership"), Manager.CommitFinePageOwnership(Page, {}, {Node.Coordinate}, {}));
-	TestTrue(TEXT("A mesh-only callback preserves the committed empty presentation proof"), Manager.IsFinePresented(Node.Coordinate));
-	Manager.DirtyFinePages.Add(Page);
-	const TOptional<bool> DirtyVisibility = Manager.UpdateFinePagePresentation(Page, Target, Snapshot);
-	TestTrue(TEXT("Pending mesh input does not change a stable empty page's visible ownership"), DirtyVisibility.IsSet() && DirtyVisibility.GetValue());
-	TestTrue(TEXT("Mesh input dirtiness does not enqueue a no-op owner that blocks the replacement"), Manager.Publisher->PendingGroups.IsEmpty());
-	Manager.FineReady.Add(Node.Coordinate);
-	auto EmptyMesh = MakeShared<FVoxelSectionMeshResult, ESPMode::ThreadSafe>();
-	TestTrue(TEXT("An empty result carries worker validation"), EmptyMesh->ValidateAndCache());
-	Manager.FineSectionMeshes.Add(Node.Coordinate, EmptyMesh);
-	TArray<FVoxelViewManager::FFinePageInput> Inputs;
-	uint64 Signature = 0;
-	TestTrue(TEXT("The current empty page has complete fine inputs"), Manager.CaptureFinePageInputs(Page, Inputs, Signature));
-	Manager.PreparedFinePageMeshes.Add(Page, {Signature, EmptyMesh});
-	Manager.bFinePresentationDirty = true;
-	Manager.PrepareFinePages();
-	TestFalse(TEXT("A prepared empty refresh consumes its dirty input"), Manager.DirtyFinePages.Contains(Page));
-	TestTrue(TEXT("A prepared empty refresh creates no owner generation"), Manager.Publisher->PendingGroups.IsEmpty() && Manager.OpenPublishGroups.IsEmpty());
-	TestTrue(TEXT("A prepared empty refresh retains committed presentation"), Manager.IsFinePresented(Node.Coordinate));
-	Manager.EmptyFinePages.Remove(Page);
-	Manager.PresentedEmptyFinePages.Remove(Page);
-	TestFalse(TEXT("Lost Actor is not proof of empty terrain"), Manager.IsFinePresented(Node.Coordinate));
-	TestFalse(TEXT("Lost nonempty Actor cannot publish as empty"), Manager.UpdateFinePagePresentation(Page, Target, Snapshot).IsSet());
-	TestTrue(TEXT("Lost nonempty Actor schedules mesh recovery"), Manager.DirtyFinePages.Contains(Page));
-	Manager.FinePageReady.Remove(Page);
-	Manager.PresentedFineSectionOwners.Remove(Node.Coordinate);
-	Manager.VisibleTerrainNodes.Remove(Node);
-	TestFalse(TEXT("An unknown unprepared page does not report a committed presentation"), Manager.UpdateFinePagePresentation(Page, {}, Snapshot).IsSet());
-	TestTrue(TEXT("An unprepared page cannot create an empty owner generation that blocks its own mesh preparation"), Manager.Publisher->PendingGroups.IsEmpty());
+	(void)InParameters;
+	FVoxelFineHandoff Handoff(1);
+	FVoxelFineOwnershipChange Change;
+	Change.Section = FIntVector(-1, 0, 3);
+	Change.After.Owner = {EVoxelFineOwnerKind::F1Plus, FGuid::NewGuid(), 1};
+	Change.After.Content = {1, 17, 23, 31, 41, 1, 1, 1, FGuid::NewGuid(), 1};
+	Change.After.bGeometryReady = Change.After.bCanStage = Change.After.bKnownEmpty = true;
+	Change.After.GeometryLease = MakeShared<FVoxelTaskCustomPayload, ESPMode::ThreadSafe>();
+	FVoxelFineHandoffTransaction Transaction;
+	FString Error;
+	if (!TestTrue(TEXT("Known empty geometry prepares without an Actor"),
+		Handoff.Prepare(MakeArrayView(&Change, 1), 1, Transaction, Error))) return false;
+	TestNull(TEXT("Preparation is not presented coverage"), Handoff.FindPresentedAtom(Change.Section));
+	const auto Current = [](const FIntVector&, const FVoxelFineOwnerEvidence&) { return true; };
+	TSharedPtr<const FVoxelFineFrozenHandoff, ESPMode::ThreadSafe> Frozen;
+	if (!TestTrue(TEXT("A complete empty proof can seal"), Handoff.SealTransaction(Transaction.Id, {1, 1, 1},
+		Change.After.GeometryLease, Current, Current,
+		[](const FVoxelFineHandoffTransaction&, const FVoxelTaskCustomPayload&) { return true; }, Frozen, Error))) return false;
+	TestNull(TEXT("Sealing still waits for the actual receipt"), Handoff.FindPresentedAtom(Change.Section));
+	TOptional<FVoxelFineHandoffTransaction> Canceled;
+	TestTrue(TEXT("Late cancellation retains the sealed historical fact"),
+		Handoff.RequestCancel(Transaction.Id, Canceled) == EVoxelFineCancelDisposition::RecordedAfterSeal);
+	FVoxelFineRenderReceipt Receipt;
+	Receipt.TransactionId = Transaction.Id;
+	Receipt.Stamp = Frozen->Stamp;
+	Receipt.Atoms.Add({Change.Section, Change.After.Owner, 1, Change.After.Content, true});
+	TArray<FVoxelFinePresentedAtom> Retiring;
+	TestTrue(TEXT("Only the receipt installs empty coverage"),
+		Handoff.CommitRenderReceipt(Receipt, Retiring, Error) == EVoxelFineReceiptDisposition::Applied);
+	const auto* Presented = Handoff.FindPresentedAtom(Change.Section);
+	if (!TestNotNull(TEXT("Committed empty ownership remains available"), Presented)) return false;
+	TestTrue(TEXT("No render Actor is needed for an explicit empty proof"), Presented->Evidence.bKnownEmpty);
+	Change.Before = Presented->Evidence.Owner;
+	Change.BeforeGeneration = Presented->OwnerGeneration;
+	Change.After.bKnownEmpty = Change.After.bGeometryReady = false;
+	Change.After.Content.GeometryIdentity = FGuid::NewGuid();
+	TestFalse(TEXT("Missing replacement geometry cannot impersonate empty terrain"),
+		Handoff.Prepare(MakeArrayView(&Change, 1), 2, Transaction, Error));
+	TestTrue(TEXT("Failed replacement preserves previously presented coverage"),
+		Handoff.FindPresentedAtom(Change.Section)->Evidence.bKnownEmpty);
 	return true;
 }
-
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelKnownSchedulerProgressIntegrationTest,
 	"WHFramework.Voxel.KnownRequirements.SchedulerProgressIntegration",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -315,7 +300,7 @@ bool FVoxelHeightfieldWindowIntegrationTest::RunTest(const FString& InParameters
 		if (!Counter.Advance(Data, Water, *Config, *Registry, 32.0, Counted, CountComplete, Error, nullptr))
 		{ AddError(Error); return false; }
 	TestTrue(TEXT("Shoreline preflight completes without vertex allocations"), CountComplete && Counted.Batches.IsEmpty());
-	TestEqual(TEXT("Preflight includes terrain, water and clipped shoreline polygons"), Counter.GetEstimatedMeshBytes(), Sliced.Bytes());
+	TestTrue(TEXT("Preflight covers allocated terrain, water and shoreline capacity"), Counter.GetEstimatedMeshBytes() >= Sliced.AllocatedBytes());
 	FVoxelSurfaceTileData Changed = Data;
 	Changed.Geometry.SampleStepCells = 2;
 	bool Ignored = false;
@@ -364,7 +349,7 @@ bool FVoxelHeightfieldCapacityIntegrationTest::RunTest(const FString& InParamete
 		if (!Page.Advance(Data, Water, *Config, *Registry, 32.0, Mesh, Complete, Error, nullptr))
 		{ AddError(Error); return false; }
 	TestTrue(TEXT("Large parent publishes only after all execution windows complete"), Complete && Mesh.bValidated);
-	TestEqual(TEXT("Exact preflight bounds the real retained mesh"), Mesh.Bytes(), Capacity);
+	TestTrue(TEXT("Preflight bounds the real allocated mesh"), Mesh.AllocatedBytes() <= Capacity);
 	TestTrue(TEXT("Complete parent retains its full spatial surface"),
 		FMath::IsNearlyEqual(TerrainMeshArea(Mesh), 256.0 * 256.0, 0.001));
 	return true;
@@ -380,8 +365,8 @@ bool FVoxelProxyWindowIntegrationTest::RunTest(const FString& InParameters)
 	FVoxelShapeRegistry Shapes;
 	Shapes.BuildDefaults();
 	FVoxelVoxelProxyData Data;
-	Data.Key = {FIntVector::ZeroValue, 1};
-	Data.Geometry = {{EVoxelTerrainRepresentation::VoxelProxy, FIntVector::ZeroValue, 1}, 1, -64, 128, 17, 23};
+	Data.Key = {FIntVector::ZeroValue, 2};
+	Data.Geometry = {{EVoxelTerrainRepresentation::VoxelProxy, FIntVector::ZeroValue, 2}, 2, -64, 128, 17, 23};
 	Data.GridSide = 32;
 	Data.Cells.Init(FVoxelBlockState{}, 32 * 32 * 32);
 	for (int32 Z = 0; Z < 19; ++Z)

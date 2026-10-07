@@ -1,5 +1,24 @@
-#include "Voxel/Chunks/VoxelSectionSnapshot.h"
+﻿#include "Voxel/Chunks/VoxelSectionSnapshot.h"
 #include "Voxel/Chunks/VoxelSectionKey.h"
+
+FVoxelSectionSnapshot& FVoxelSectionSnapshot::operator=(FVoxelSectionSnapshot&& InOther)
+{
+	if (this == &InOther) return *this;
+	FVoxelSectionSnapshot Previous(MoveTemp(*this));
+	Section = InOther.Section;
+	Stamp = InOther.Stamp;
+	Revision = InOther.Revision;
+	GridSide = InOther.GridSide;
+	Blocks = MoveTemp(InOther.Blocks);
+	for (int32 Face = 0; Face < 6; ++Face)
+	{
+		Halo[Face] = MoveTemp(InOther.Halo[Face]);
+		Known[Face] = InOther.Known[Face];
+	}
+	ResourceLease = MoveTemp(InOther.ResourceLease);
+	return *this;
+}
+
 bool FVoxelSectionSnapshot::TrySample(const FIntVector&L,FVoxelBlockState&O)const
 {
     if(L.X>=0&&L.X<GridSide&&L.Y>=0&&L.Y<GridSide&&L.Z>=0&&L.Z<GridSide)

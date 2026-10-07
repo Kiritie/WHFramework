@@ -1,4 +1,4 @@
-#include "SaveGame/SaveGameStorage.h"
+﻿#include "SaveGame/SaveGameStorage.h"
 
 #include "HAL/FileManager.h"
 #include "HAL/PlatformFileManager.h"
@@ -6,15 +6,74 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "SaveGame/SaveGameModuleTypes.h"
+#include "SaveGame/SaveGameGenerationLease.h"
+#include "Voxel/Generation/VoxelGenerationConsumer.h"
 
-FSaveGameStorage::FSaveGameStorage(int32 InUserIndex)
-	: UserIndex(InUserIndex)
+#if PLATFORM_WINDOWS
+#include "Windows/WindowsHWrapper.h"
+#endif
+
+namespace
+{
+bool MoveCompletedSavePath(const FString& InSource, const FString& InTarget, const bool bInReplace)
+{
+	auto& Platform = FPlatformFileManager::Get().GetPlatformFile();
+#if PLATFORM_WINDOWS
+	const auto NativePath = [&Platform](const FString& InPath)
+	{
+		FString Path = Platform.ConvertToAbsolutePathForExternalAppForWrite(*InPath);
+		FPaths::MakePlatformFilename(Path);
+		if (Path.StartsWith(TEXT("\\\\?\\"))) return Path;
+		return Path.StartsWith(TEXT("\\\\")) ? TEXT("\\\\?\\UNC\\") + Path.Mid(2) : TEXT("\\\\?\\") + Path;
+	};
+	const FString Source = NativePath(InSource);
+	const FString Target = NativePath(InTarget);
+	// 同卷替换不先删除旧 manifest；文件 Flush 成功后才发布路径，失败保留旧代。
+	return ::MoveFileExW(*Source, *Target, MOVEFILE_WRITE_THROUGH | (bInReplace ? MOVEFILE_REPLACE_EXISTING : 0)) != 0;
+#else
+	if (!bInReplace && (Platform.FileExists(*InTarget) || Platform.DirectoryExists(*InTarget))) return false;
+	// 使用平台原生 rename，不能经过先 DeleteFile 再 MoveFile 的通用替换路径。
+	return Platform.MoveFile(*InTarget, *InSource);
+#endif
+}
+}
+
+FSaveGameStorage::FSaveGameStorage(int32 InUserIndex, const FString& InRootDirectory, const FGuid& InTransactionId)
+	: UserIndex(InUserIndex), RootDirectory(InRootDirectory.IsEmpty() ?
+		FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("SaveGames")) : InRootDirectory),
+		WriteTransactionId(InTransactionId.IsValid() ? InTransactionId : FGuid::NewGuid())
 {
 }
 
-FString FSaveGameStorage::GetRootDir() const
+ESaveWorldWriteResult FSaveGameStorage::BeginWorldWrite(const FGuid& SaveId,
+	const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& InResources, const FVoxelGenerationConsumerKey& InConsumer)
 {
-	return FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("SaveGames"));
+	if (!SaveId.IsValid() || ActiveWorldWrite) return ESaveWorldWriteResult::InvalidArgument;
+	return FSaveGameGenerationWriteLease::Acquire(GetWorldDir(SaveId), WriteTransactionId,
+		InResources, InConsumer, ActiveWorldWrite);
+}
+
+void FSaveGameStorage::EndWorldWrite()
+{
+	ActiveWorldWrite.Reset();
+}
+
+ESaveWorldWriteResult FSaveGameStorage::AcquireWorldWrite(const FGuid& SaveId,
+	TSharedPtr<const FSaveGameGenerationWriteLease, ESPMode::ThreadSafe>& OutWriter)
+{
+	if (!SaveId.IsValid() || OutWriter) return ESaveWorldWriteResult::InvalidArgument;
+	if (ActiveWorldWrite)
+	{
+		if (!ActiveWorldWrite->Matches(GetWorldDir(SaveId))) return ESaveWorldWriteResult::Busy;
+		OutWriter = ActiveWorldWrite;
+		return ESaveWorldWriteResult::Acquired;
+	}
+	return FSaveGameGenerationWriteLease::Acquire(GetWorldDir(SaveId), WriteTransactionId, nullptr, {}, OutWriter);
+}
+
+const FString& FSaveGameStorage::GetRootDir() const
+{
+	return RootDirectory;
 }
 
 FString FSaveGameStorage::GetProfilesDir() const
@@ -59,7 +118,7 @@ FString FSaveGameStorage::GetGenerationDir(const FGuid& SaveId, int32 Generation
 
 FString FSaveGameStorage::GetTempGenerationDir(const FGuid& SaveId, int32 Generation) const
 {
-	return GetGenerationDir(SaveId, Generation) + TEXT(".tmp");
+	return GetGenerationDir(SaveId, Generation) + TEXT(".") + WriteTransactionId.ToString(EGuidFormats::Digits) + TEXT(".tmp");
 }
 
 FString FSaveGameStorage::GetModuleFilePath(const FGuid& SaveId, int32 Generation, FName ModuleName) const
@@ -84,12 +143,16 @@ bool FSaveGameStorage::EnsureRoot()
 
 bool FSaveGameStorage::CreateWorldDirectory(const FGuid& SaveId)
 {
-	return SaveId.IsValid() && !IFileManager::Get().DirectoryExists(*GetWorldDir(SaveId)) && IFileManager::Get().MakeDirectory(*GetGenerationsDir(SaveId), true);
+	TSharedPtr<const FSaveGameGenerationWriteLease, ESPMode::ThreadSafe> Writer;
+	return AcquireWorldWrite(SaveId, Writer) == ESaveWorldWriteResult::Acquired &&
+		!IFileManager::Get().DirectoryExists(*GetWorldDir(SaveId)) && IFileManager::Get().MakeDirectory(*GetGenerationsDir(SaveId), true);
 }
 
 bool FSaveGameStorage::DeleteWorldDirectory(const FGuid& SaveId)
 {
-	return IFileManager::Get().DeleteDirectory(*GetWorldDir(SaveId), false, true);
+	TSharedPtr<const FSaveGameGenerationWriteLease, ESPMode::ThreadSafe> Writer;
+	return AcquireWorldWrite(SaveId, Writer) == ESaveWorldWriteResult::Acquired &&
+		FSaveGameGenerationReadLease::TryRetireDirectory(GetWorldDir(SaveId), Writer.Get());
 }
 
 bool FSaveGameStorage::ReadManifest(const FGuid& SaveId, FSaveManifest& OutManifest) const
@@ -100,6 +163,8 @@ bool FSaveGameStorage::ReadManifest(const FGuid& SaveId, FSaveManifest& OutManif
 
 bool FSaveGameStorage::WriteManifestAtomic(const FGuid& SaveId, const FSaveManifest& Manifest)
 {
+	TSharedPtr<const FSaveGameGenerationWriteLease, ESPMode::ThreadSafe> Writer;
+	if (Manifest.SaveId != SaveId || AcquireWorldWrite(SaveId, Writer) != ESaveWorldWriteResult::Acquired) return false;
 	FString Json;
 	return FJsonObjectConverter::UStructToJsonObjectString(Manifest, Json) && WriteTextAtomic(GetManifestPath(SaveId), Json);
 }
@@ -163,16 +228,24 @@ bool FSaveGameStorage::WriteBinary(const FString& Path, const TArray<uint8>& Byt
 	return FFileHelper::SaveArrayToFile(Bytes, *Path);
 }
 
+bool FSaveGameStorage::WriteBinaryDurable(const FString& Path, TConstArrayView<uint8> Bytes)
+{
+	auto& Platform = FPlatformFileManager::Get().GetPlatformFile();
+	if (!Platform.CreateDirectoryTree(*FPaths::GetPath(Path))) return false;
+	TUniquePtr<IFileHandle> File(Platform.OpenWrite(*Path));
+	return File && (Bytes.IsEmpty() || File->Write(Bytes.GetData(), Bytes.Num())) && File->Flush(true);
+}
+
 bool FSaveGameStorage::WriteBinaryAtomic(const FString& Path, const TArray<uint8>& Bytes)
 {
-	const FString TempPath = Path + TEXT(".tmp");
+	const FString TempPath = Path + TEXT(".") + FGuid::NewGuid().ToString(EGuidFormats::Digits) + TEXT(".tmp");
 	IFileManager::Get().MakeDirectory(*FPaths::GetPath(Path), true);
-	IFileManager::Get().Delete(*TempPath, false, true);
-	if(!FFileHelper::SaveArrayToFile(Bytes, *TempPath))
+	if(!WriteBinaryDurable(TempPath, Bytes))
 	{
+		IFileManager::Get().Delete(*TempPath, false, true);
 		return false;
 	}
-	if(!IFileManager::Get().Move(*Path, *TempPath, true, true, false, true))
+	if(!MoveCompletedSavePath(TempPath, Path, true))
 	{
 		IFileManager::Get().Delete(*TempPath, false, true);
 		return false;
@@ -193,19 +266,42 @@ bool FSaveGameStorage::WriteTextAtomic(const FString& Path, const FString& Text)
 	return WriteBinaryAtomic(Path, Bytes);
 }
 
-bool FSaveGameStorage::PrepareTempGeneration(const FGuid& SaveId, int32 PreviousGeneration, int32 NewGeneration)
+bool FSaveGameStorage::PrepareTempGeneration(const FGuid& SaveId, int32 PreviousGeneration, int32 NewGeneration,
+	const FString* InCapturedVoxelGeneration,
+	const TSharedPtr<const FSaveGameGenerationReadLease, ESPMode::ThreadSafe>* InCapturedSourceLease)
 {
+	TSharedPtr<const FSaveGameGenerationWriteLease, ESPMode::ThreadSafe> Writer;
+	if (PreviousGeneration < 0 || NewGeneration <= 0 ||
+		AcquireWorldWrite(SaveId, Writer) != ESaveWorldWriteResult::Acquired) return false;
 	const FString TempDirectory = GetTempGenerationDir(SaveId, NewGeneration);
-	IFileManager::Get().DeleteDirectory(*TempDirectory, false, true);
+	if (IFileManager::Get().DirectoryExists(*TempDirectory) && !FSaveGameGenerationReadLease::TryRetireDirectory(TempDirectory, Writer.Get()))
+	{
+		return false;
+	}
 	if(!IFileManager::Get().MakeDirectory(*FPaths::Combine(TempDirectory, TEXT("modules")), true))
 	{
 		return false;
 	}
-	if(PreviousGeneration > 0)
+	// Voxel 的不可变基线属于捕获的运行世界，另存目标槽不能决定该基线。
+	const FString SourceGeneration = InCapturedVoxelGeneration ? *InCapturedVoxelGeneration :
+		PreviousGeneration > 0 ? GetGenerationDir(SaveId, PreviousGeneration) : FString();
+	if (!SourceGeneration.IsEmpty())
 	{
-		const FString SourceRegions = FPaths::Combine(GetGenerationDir(SaveId, PreviousGeneration), TEXT("voxel"), TEXT("regions"));
+		const auto SourceLease = InCapturedSourceLease ? *InCapturedSourceLease : FSaveGameGenerationReadLease::Acquire(SourceGeneration);
+		if (!SourceLease || !SourceLease->Matches(SourceGeneration))
+		{
+			return false;
+		}
+		const FString SourceRegions = FPaths::Combine(SourceGeneration, TEXT("voxel"), TEXT("regions"));
 		const FString TargetRegions = FPaths::Combine(TempDirectory, TEXT("voxel"), TEXT("regions"));
 		if(IFileManager::Get().DirectoryExists(*SourceRegions) && !FPlatformFileManager::Get().GetPlatformFile().CopyDirectoryTree(*TargetRegions, *SourceRegions, true))
+		{
+			return false;
+		}
+		const FString SourceActors = FPaths::Combine(SourceGeneration, TEXT("voxel"), TEXT("actors"));
+		const FString TargetActors = FPaths::Combine(TempDirectory, TEXT("voxel"), TEXT("actors"));
+		if (IFileManager::Get().DirectoryExists(*SourceActors) &&
+			!FPlatformFileManager::Get().GetPlatformFile().CopyDirectoryTree(*TargetActors, *SourceActors, true))
 		{
 			return false;
 		}
@@ -213,23 +309,44 @@ bool FSaveGameStorage::PrepareTempGeneration(const FGuid& SaveId, int32 Previous
 	return true;
 }
 
-bool FSaveGameStorage::CommitGeneration(const FGuid& SaveId, int32 Generation)
+bool FSaveGameStorage::FlushTempGeneration(const FGuid& SaveId, const int32 Generation)
 {
-	return IFileManager::Get().Move(*GetGenerationDir(SaveId, Generation), *GetTempGenerationDir(SaveId, Generation), false, true, false, true);
+	TSharedPtr<const FSaveGameGenerationWriteLease, ESPMode::ThreadSafe> Writer;
+	if (Generation <= 0 || AcquireWorldWrite(SaveId, Writer) != ESaveWorldWriteResult::Acquired) return false;
+	// Worker 按文件逐一 flush，包含从旧代复制的文件；不先收集全部路径数组。
+	auto& Platform = FPlatformFileManager::Get().GetPlatformFile();
+	return Platform.IterateDirectoryRecursively(*GetTempGenerationDir(SaveId, Generation),
+		[&Platform](const TCHAR* Path, const bool bDirectory)
+		{
+			if (bDirectory) return true;
+			TUniquePtr<IFileHandle> File(Platform.OpenWrite(Path, true));
+			return File && File->Flush(true);
+		});
 }
 
-void FSaveGameStorage::CleanupUncommittedGenerations(const FGuid& SaveId, int32 CurrentGeneration)
+bool FSaveGameStorage::CommitGeneration(const FGuid& SaveId, int32 Generation)
 {
-	CleanupTempGenerations(SaveId);
+	TSharedPtr<const FSaveGameGenerationWriteLease, ESPMode::ThreadSafe> Writer;
+	return Generation > 0 && AcquireWorldWrite(SaveId, Writer) == ESaveWorldWriteResult::Acquired &&
+		MoveCompletedSavePath(GetTempGenerationDir(SaveId, Generation), GetGenerationDir(SaveId, Generation), false);
+}
+
+bool FSaveGameStorage::CleanupUncommittedGenerations(const FGuid& SaveId, int32 CurrentGeneration)
+{
+	TSharedPtr<const FSaveGameGenerationWriteLease, ESPMode::ThreadSafe> Writer;
+	if (CurrentGeneration < 0 || AcquireWorldWrite(SaveId, Writer) != ESaveWorldWriteResult::Acquired) return false;
+	TGuardValue<TSharedPtr<const FSaveGameGenerationWriteLease, ESPMode::ThreadSafe>> Writing(ActiveWorldWrite, Writer);
+	bool bCleaned = CleanupTempGenerations(SaveId);
 	TArray<FString> Directories;
 	IFileManager::Get().FindFiles(Directories, *(GetGenerationsDir(SaveId) / TEXT("*")), false, true);
 	for(const FString& Directory : Directories)
 	{
 		if(FCString::Atoi(*Directory) > CurrentGeneration)
 		{
-			IFileManager::Get().DeleteDirectory(*FPaths::Combine(GetGenerationsDir(SaveId), Directory), false, true);
+			bCleaned &= FSaveGameGenerationReadLease::TryRetireDirectory(FPaths::Combine(GetGenerationsDir(SaveId), Directory), Writer.Get());
 		}
 	}
+	return bCleaned;
 }
 
 void FSaveGameStorage::CleanupAllTempGenerations()
@@ -241,6 +358,9 @@ void FSaveGameStorage::CleanupAllTempGenerations()
 		FGuid SaveId;
 		if(FGuid::ParseExact(World, EGuidFormats::Digits, SaveId))
 		{
+			TSharedPtr<const FSaveGameGenerationWriteLease, ESPMode::ThreadSafe> Writer;
+			if (AcquireWorldWrite(SaveId, Writer) != ESaveWorldWriteResult::Acquired) continue;
+			TGuardValue<TSharedPtr<const FSaveGameGenerationWriteLease, ESPMode::ThreadSafe>> Writing(ActiveWorldWrite, Writer);
 			FSaveManifest Manifest;
 			if(ReadManifest(SaveId, Manifest))
 			{
@@ -258,17 +378,38 @@ void FSaveGameStorage::CleanupAllTempGenerations()
 
 bool FSaveGameStorage::CopyCurrentGeneration(const FGuid& Source, const FGuid& Target, int32 SourceGeneration, int32 TargetGeneration)
 {
-	return FPlatformFileManager::Get().GetPlatformFile().CopyDirectoryTree(*GetGenerationDir(Target, TargetGeneration), *GetGenerationDir(Source, SourceGeneration), true);
+	TSharedPtr<const FSaveGameGenerationWriteLease, ESPMode::ThreadSafe> Writer;
+	if (!Source.IsValid() || Source == Target || SourceGeneration <= 0 || TargetGeneration <= 0 ||
+		AcquireWorldWrite(Target, Writer) != ESaveWorldWriteResult::Acquired) return false;
+	TGuardValue<TSharedPtr<const FSaveGameGenerationWriteLease, ESPMode::ThreadSafe>> Writing(ActiveWorldWrite, Writer);
+	if (IFileManager::Get().DirectoryExists(*GetGenerationDir(Target, TargetGeneration))) return false;
+	const auto SourceLease = FSaveGameGenerationReadLease::Acquire(GetGenerationDir(Source, SourceGeneration));
+	if (!SourceLease)
+	{
+		return false;
+	}
+	const FString TempDirectory = GetTempGenerationDir(Target, TargetGeneration);
+	if (IFileManager::Get().DirectoryExists(*TempDirectory) &&
+		!FSaveGameGenerationReadLease::TryRetireDirectory(TempDirectory, Writer.Get())) return false;
+	const bool bCommitted = FPlatformFileManager::Get().GetPlatformFile().CopyDirectoryTree(
+		*TempDirectory, *GetGenerationDir(Source, SourceGeneration), false) &&
+		FlushTempGeneration(Target, TargetGeneration) && CommitGeneration(Target, TargetGeneration);
+	if (!bCommitted) FSaveGameGenerationReadLease::TryRetireDirectory(TempDirectory, Writer.Get());
+	return bCommitted;
 }
 
-void FSaveGameStorage::CleanupTempGenerations(const FGuid& SaveId)
+bool FSaveGameStorage::CleanupTempGenerations(const FGuid& SaveId)
 {
+	TSharedPtr<const FSaveGameGenerationWriteLease, ESPMode::ThreadSafe> Writer;
+	if (AcquireWorldWrite(SaveId, Writer) != ESaveWorldWriteResult::Acquired) return false;
+	bool bCleaned = true;
 	TArray<FString> Directories;
 	IFileManager::Get().FindFiles(Directories, *(GetGenerationsDir(SaveId) / TEXT("*.tmp")), false, true);
 	for(const FString& Directory : Directories)
 	{
-		IFileManager::Get().DeleteDirectory(*FPaths::Combine(GetGenerationsDir(SaveId), Directory), false, true);
+		bCleaned &= FSaveGameGenerationReadLease::TryRetireDirectory(FPaths::Combine(GetGenerationsDir(SaveId), Directory), Writer.Get());
 	}
+	return bCleaned;
 }
 
 bool FSaveGameStorage::IsGenerationComplete(const FGuid& SaveId, int32 Generation, const FSaveManifest& Manifest) const

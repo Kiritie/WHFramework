@@ -12,6 +12,7 @@
 #include "Voxel/Generation/Terrain/VoxelTerrainGenerator.h"
 #include "Voxel/Generation/VoxelFeature.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "Voxel/Generation/VoxelGenerationPlanningRead.h"
 #include "Voxel/Generation/VoxelStructure.h"
 
 namespace
@@ -151,6 +152,8 @@ bool FVoxelGenerationQuery::EnsureHydrologyPlan(
 	}
 	if (bRequireReadyPlans)
 	{
+		FVoxelGenerationPlanningReadScope::Missing(EVoxelGenerationPlanKind::Hydrology,
+			FIntVector(InKey.Coordinate.X, InKey.Coordinate.Y, 0));
 		OutError = TEXT("DependencyNotReady: Hydrology");
 		return false;
 	}
@@ -174,6 +177,7 @@ bool FVoxelGenerationQuery::EnsureCavePlan(
 			OutError.Reset();
 			return true;
 		}
+		FVoxelGenerationPlanningReadScope::Missing(EVoxelGenerationPlanKind::Cave, InKey.Coordinate);
 		OutError = TEXT("DependencyNotReady: Cave");
 		return false;
 	}
@@ -206,6 +210,7 @@ bool FVoxelGenerationQuery::EnsureStructurePlan(
 			OutError.Reset();
 			return true;
 		}
+		FVoxelGenerationPlanningReadScope::Missing(EVoxelGenerationPlanKind::Structure, InKey.Coordinate);
 		OutError = TEXT("DependencyNotReady: Structure");
 		return false;
 	}
@@ -260,6 +265,7 @@ bool FVoxelGenerationQuery::EnsureFeaturePlan(
 			OutError.Reset();
 			return true;
 		}
+		FVoxelGenerationPlanningReadScope::Missing(EVoxelGenerationPlanKind::Feature, InKey.Coordinate);
 		OutError = TEXT("DependencyNotReady: Feature");
 		return false;
 	}
@@ -315,6 +321,8 @@ bool FVoxelGenerationQuery::EnsureEcologyPlan(
 			OutError.Reset();
 			return true;
 		}
+		FVoxelGenerationPlanningReadScope::Missing(EVoxelGenerationPlanKind::Ecology,
+			FIntVector(InKey.Coordinate.X, InKey.Coordinate.Y, 0));
 		OutError = TEXT("DependencyNotReady: Ecology");
 		return false;
 	}
@@ -368,8 +376,8 @@ bool FVoxelGenerationQuery::Create(
 	Query.Config = InConfig;
 	Query.Cache = InCache;
 	Query.bUseColumnCache = bInUseColumnCache;
-	Query.bRequireReadyHydrology = bInRequireReadyHydrology;
-	Query.bRequireReadyPlans = bInRequireReadyPlans;
+	Query.bRequireReadyHydrology = bInRequireReadyHydrology || FVoxelGenerationPlanningReadScope::IsActive();
+	Query.bRequireReadyPlans = bInRequireReadyPlans || FVoxelGenerationPlanningReadScope::IsActive();
 
 	Query.Climate =
 		MakeShared<
@@ -727,6 +735,9 @@ bool FVoxelGenerationQuery::ApplyHydrology(
 	FVoxelHydrologyPlanPtr Plan;
 	if (bRequireReadyHydrology && !Cache->FindHydrology(Key, Plan))
 	{
+		FVoxelGenerationPlanningReadScope::Missing(EVoxelGenerationPlanKind::Hydrology,
+			FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0));
+		if (MissingHydrologyObserver) MissingHydrologyObserver(Key);
 		OutError = FString::Printf(TEXT("DependencyNotReady: Hydrology %s"),
 			*Key.Coordinate.ToString());
 		return false;

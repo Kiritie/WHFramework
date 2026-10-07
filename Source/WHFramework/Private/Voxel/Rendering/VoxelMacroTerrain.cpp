@@ -1,4 +1,4 @@
-#include "Voxel/Rendering/VoxelMacroTerrain.h"
+﻿#include "Voxel/Rendering/VoxelMacroTerrain.h"
 
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Rendering/VoxelViewLod.h"
@@ -34,9 +34,16 @@ bool FVoxelMacroTerrainBuilder::Build(
 	if ((Data.Geometry.Key.Representation != EVoxelTerrainRepresentation::Macro) ||
 		Data.Geometry.Key.Coordinate != FIntVector(InKey.Coordinate.X, InKey.Coordinate.Y, 0) || Data.Geometry.Key.Level != InKey.Level)
 	{ OutError = TEXT("Macro spatial key does not match its required geometry"); return false; }
+	const int32 SampleSide = InShard ? InShard->CellCounts.X : int32(Data.Geometry.Key.SideCells()) / Data.Geometry.SampleStepCells;
+	const FVoxelTerrainBuildShard Window = InShard ? *InShard :
+		FVoxelTerrainBuildShard{FIntVector::ZeroValue, FIntVector(SampleSide, SampleSide, 0)};
+	if (!Window.Validate(Data.Geometry, 256, OutError))
+	{
+		return false;
+	}
 	Data.Step = Data.Geometry.SampleStepCells;
 	Data.LocalMinCells = InShard ? FIntPoint(InShard->LocalMinCells.X, InShard->LocalMinCells.Y) : FIntPoint::ZeroValue;
-	Data.Side = InShard ? InShard->CellCounts.X + 1 : int32(Data.Geometry.Key.SideCells()) / Data.Step + 1;
+	Data.Side = SampleSide + 1;
 
 	const int32 Count =
 		Data.GetVertexCount();

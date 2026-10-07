@@ -1,4 +1,4 @@
-#include "CoreMinimal.h"
+﻿#include "CoreMinimal.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -11,7 +11,7 @@
 #include "Voxel/Rendering/VoxelPublishBudget.h"
 #include "Voxel/Rendering/VoxelBoundaryRaster.h"
 #include "Voxel/Network/VoxelGeometryWire.h"
-#include "Voxel/Streaming/VoxelFineDomain.h"
+#include "Voxel/Streaming/VoxelInterestManager.h"
 #include "Voxel/Streaming/VoxelInterest.h"
 #include "Voxel/Generation/VoxelWorldManifest.h"
 #include "Voxel/Task/VoxelTaskFairSelection.h"
@@ -57,22 +57,26 @@ bool FVoxelKnownFineFamiliesTest::RunTest(const FString& InParameters)
 	Source.View.FineVerticalHalfExtentCells = 1;
 	Source.Capabilities = EVoxelStreamingCapability::Data | EVoxelStreamingCapability::FineVisual;
 	FVoxelInterestSet Interest;
-	Interest.Sources.FindOrAdd(Source.Id).FineDataSections.Add(FIntVector::ZeroValue);
-	Interest.Exact.FindOrAdd(FIntVector::ZeroValue).bFineRender = true;
-	TestTrue(TEXT("Initial family closure"), VoxelFineDomain::CompleteInitialFamilies(Sources, Manifest, Settings, Interest, Error));
-	TestEqual(TEXT("Eight real section requests"), Interest.Exact.Num(), 8);
-	TSet<FIntVector> Sections;
-	for (const auto& Pair : Interest.Exact)
+	const FVoxelInterestManager Manager;
+	Interest = Manager.Compute(Sources, Manifest, Settings);
+	TestTrue(TEXT("Independent domains plan"), Interest.PlanningError.IsEmpty());
+	TestTrue(TEXT("Shard window has independent demand"), !Interest.FineShardDemands.IsEmpty());
+	const int32 RuntimeSections = Interest.Exact.Num();
+	const int32 Shards32 = Interest.FineShardDemands.Num();
+	Settings.Fine.ShardSideCells = 64;
+	Settings.Fine.VerticalShiftStepCells = 64;
+	const FVoxelInterestSet Shards64 = Manager.Compute(Sources, Manifest, Settings);
+	TestTrue(TEXT("64-cell canonical shards plan"), Shards64.PlanningError.IsEmpty());
+	TestEqual(TEXT("Shard size cannot expand Runtime demand"), Shards64.Exact.Num(), RuntimeSections);
+	TestTrue(TEXT("Larger canonical shards reduce shard count"), Shards64.FineShardDemands.Num() < Shards32);
+	for (const auto& Pair : Interest.FinePagePlan->SectionOwners)
 	{
-		Sections.Add(Pair.Key);
+		TestEqual(TEXT("Only F0 owns Runtime Section meshes"), Pair.Value.Level, uint8(0));
 	}
-	FVoxelFinePagePlan Plan;
-	TestTrue(TEXT("Complete family plans"), FVoxelFinePagePlanner::Build(Sections, Sources, Settings, Plan, Error));
-	TestEqual(TEXT("One 32-cell page"), Plan.Pages.Num(), 1);
-	TestEqual(TEXT("No section lost"), Plan.SectionOwners.Num(), 8);
-	Sections.Remove(FIntVector(1));
-	TestTrue(TEXT("Partial family remains legal"), FVoxelFinePagePlanner::Build(Sections, Sources, Settings, Plan, Error));
-	TestEqual(TEXT("Partial family must not claim a complete page"), Plan.Pages.Num(), 7);
+	for (const auto& Pair : Interest.FineShardOwners)
+	{
+		TestTrue(TEXT("Shard ownership is independent of Runtime Section ownership"), Pair.Value.Level > 0);
+	}
 	return true;
 }
 
@@ -88,12 +92,16 @@ bool FVoxelKnownSamplingTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("SSE calculation"), VoxelStreamingGeometry::ResolveSampleStep(1024, 90, 1080, 8, 4096, Step, bResolutionFloor, Error));
 	TestEqual(TEXT("Actual sample step"), Step, 8);
 	FVoxelTerrainGeometry Geometry;
-	Geometry.Key = {EVoxelTerrainRepresentation::VoxelProxy, FIntVector::ZeroValue, 5};
+	Geometry.Key = {EVoxelTerrainRepresentation::Fine, FIntVector::ZeroValue, 5};
 	Geometry.SampleStepCells = 1;
 	TArray<FVoxelTerrainBuildShard> Shards;
 	TestTrue(TEXT("Coverage and sampling are independent"), VoxelStreamingGeometry::BuildShards(Geometry, 64, 4096, Shards, Error));
 	TestEqual(TEXT("512-cell coverage at step 1 is sharded, not coarsened"), Shards.Num(), 512);
 	TestEqual(TEXT("Sample step unchanged"), Geometry.SampleStepCells, 1);
+	Geometry.Key.Representation = EVoxelTerrainRepresentation::VoxelProxy;
+	TestFalse(TEXT("Proxy cannot claim exact sampling"), Geometry.Validate(Error));
+	Geometry.SampleStepCells = 2;
+	TestTrue(TEXT("Actual Proxy step is explicit"), Geometry.Validate(Error));
 	return true;
 }
 
@@ -133,7 +141,7 @@ bool FVoxelKnownLocalIndexTest::RunTest(const FString& InParameters)
 	auto MakeRecord = [](const FIntVector& Coordinate, const uint64 Revision)
 	{
 		auto Record = MakeShared<FVoxelCoverageRecord, ESPMode::ThreadSafe>();
-		Record->Geometry.Key = {EVoxelTerrainRepresentation::VoxelProxy, Coordinate, 0};
+		Record->Geometry.Key = {EVoxelTerrainRepresentation::Fine, Coordinate, 0};
 		Record->Stamp = {1, 1, Revision, 1};
 		Record->Geometry.Key.TryBounds(0, 16, Record->Min, Record->Max);
 		return Record;

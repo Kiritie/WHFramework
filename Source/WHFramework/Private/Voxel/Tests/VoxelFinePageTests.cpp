@@ -1,4 +1,4 @@
-#if WITH_DEV_AUTOMATION_TESTS
+﻿#if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
 #include "Engine/Engine.h"
@@ -7,6 +7,7 @@
 #include "Voxel/Rendering/VoxelFinePage.h"
 #include "Voxel/Rendering/VoxelProxyBuilder.h"
 #include "Voxel/Rendering/VoxelViewLod.h"
+#include "Voxel/Rendering/VoxelTerrainStagePlanner.h"
 #include "Voxel/Rendering/VoxelViewManager.h"
 #include "Voxel/Rendering/VoxelViewPublisher.h"
 #include "Voxel/Runtime/VoxelChangeHierarchy.h"
@@ -40,16 +41,18 @@ bool FVoxelFinePageLayoutTest::RunTest(const FString& InParameters)
 	FVoxelFinePagePlan Complete;
 	FVoxelFinePagePlanner::Build(Wanted, Sources, Settings, Complete, PlanningError);
 	TestTrue(TEXT("A complete distant family merges bottom up"), Complete.Pages.Contains(Parent));
-	FVoxelTerrainViewPlan Before, After;
-	const TSet<FVoxelViewKey> Roots{{Parent.Coordinate, Parent.Level}};
-	FString Error;
-	TestTrue(TEXT("Logical terrain builds independently of Page layout"), Before.Build(Sources, Wanted, Roots, Settings, Error));
+	TSet<FIntVector> BeforeSections;
+	for (const auto& Pair : Complete.SectionOwners) BeforeSections.Add(Pair.Key);
+	TestTrue(TEXT("Page layout covers the exact logical Fine demand"),
+		BeforeSections.Num() == Wanted.Num() && BeforeSections.Includes(Wanted));
 	Source.Center = Parent.GetBounds().Min + FIntVector(8);
 	FVoxelFinePagePlan NearLayout;
 	FVoxelFinePagePlanner::Build(Wanted, Sources, Settings, NearLayout, PlanningError);
 	TestFalse(TEXT("Moving into the near band splits the presentation Page"), NearLayout.Pages.Contains(Parent));
-	TestTrue(TEXT("The same Fine Sections retain their logical terrain plan"), After.Build(Sources, Wanted, Roots, Settings, Error) &&
-		Before.Leaves.Num() == After.Leaves.Num() && Before.Leaves.Includes(After.Leaves));
+	TSet<FIntVector> AfterSections;
+	for (const auto& Pair : NearLayout.SectionOwners) AfterSections.Add(Pair.Key);
+	TestTrue(TEXT("The same Fine Sections survive presentation regrouping"),
+		BeforeSections.Num() == AfterSections.Num() && BeforeSections.Includes(AfterSections));
 	Source.Center = FIntVector(-128, -128, 8);
 	Wanted.Remove(Sections.Last());
 	FVoxelFinePagePlan Incomplete;
@@ -153,10 +156,16 @@ bool FVoxelLodPolicyTest::RunTest(const FString& InParameters)
 	TestEqual(TEXT("Changing radius automatically changes Proxy replan"), VoxelViewLod::ResolveReplanSteps(Source, Settings, &Accepted).Proxy, 128);
 	Source.View.VoxelProxyRadiusCells /= 2;
 
-	TestTrue(TEXT("Max Proxy level does not force coarse sampling nearby"),
-		VoxelViewLod::ResolveVoxelProxyLevel(256, Source, Settings) < Settings.Lod.MaximumVoxelProxyLevel);
-	TestEqual(TEXT("Sufficient distance permits the configured maximum"), VoxelViewLod::ResolveVoxelProxyLevel(100000, Source, Settings),
-		Settings.Lod.MaximumVoxelProxyLevel);
+	int32 NearStep = 0;
+	int32 FarStep = 0;
+	bool bResolutionFloor = false;
+	TestTrue(TEXT("Near Proxy sampling resolves independently of spatial level"),
+		VoxelStreamingGeometry::ResolveSampleStep(256, Source.VerticalFovDegrees, Source.ViewportHeightPixels,
+			Settings.Lod.TargetScreenErrorPixels, 1024, NearStep, bResolutionFloor, PlanningError, 2));
+	TestTrue(TEXT("Distant Proxy sampling resolves within its actual geometry bounds"),
+		VoxelStreamingGeometry::ResolveSampleStep(100000, Source.VerticalFovDegrees, Source.ViewportHeightPixels,
+			Settings.Lod.TargetScreenErrorPixels, 1024, FarStep, bResolutionFloor, PlanningError, 2));
+	TestTrue(TEXT("Increasing distance permits a coarser actual sample"), NearStep >= 2 && FarStep > NearStep);
 
 	FVoxelWorldManifest Manifest;
 	FVoxelInterestManager Manager;
@@ -197,13 +206,22 @@ bool FVoxelLodPolicyTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("Forward prefetch does not expand the Fine display domain"),
 		Moving.FineSections->Num() == Slow.FineSections->Num() && Moving.FineSections->Includes(*Slow.FineSections));
 
-	FVoxelTerrainViewPlan Plan = Baseline.TerrainPlan;
-	const auto PreviousLeaves = Plan.Leaves;
-	Settings.Lod.MaximumVoxelProxyLevel = 21;
+	FVoxelTerrainStageSource StageSource{Source, 128, 32, 0};
+	FVoxelTerrainStagePlan Plan;
 	FString Error;
-	TestFalse(TEXT("Invalid topology explicitly fails"), Plan.Build(Sources, *Baseline.FineSections, Baseline.TerrainPlan.Roots, Settings, Error));
-	TestTrue(TEXT("Failure preserves the previous valid plan"),
-		!Error.IsEmpty() && Plan.Leaves.Num() == PreviousLeaves.Num() && Plan.Leaves.Includes(PreviousLeaves));
+	if (!TestTrue(TEXT("Actual coarse planner provides the retained baseline"),
+		FVoxelTerrainStagePlanner::Build(EVoxelTerrainRepresentation::VoxelProxy, MakeArrayView(&StageSource, 1),
+			3, 64, -64, 64, 8.0, 17, 23, Plan, Error))) return false;
+	const auto PreviousPages = Plan.Pages;
+	TestFalse(TEXT("Invalid topology explicitly fails"),
+		FVoxelTerrainStagePlanner::Build(EVoxelTerrainRepresentation::VoxelProxy, MakeArrayView(&StageSource, 1),
+			21, 64, -64, 64, 8.0, 17, 23, Plan, Error));
+	TestTrue(TEXT("Failure preserves the previous valid geometry plan"), !Error.IsEmpty() && Plan.Pages.Num() == PreviousPages.Num());
+	for (const auto& Pair : PreviousPages)
+	{
+		const FVoxelTerrainGeometry* Retained = Plan.Pages.Find(Pair.Key);
+		TestTrue(TEXT("Rejected policy retains each exact previous geometry"), Retained && *Retained == Pair.Value);
+	}
 
 	return true;
 }
@@ -229,7 +247,7 @@ bool FVoxelFinePageCoverageTest::RunTest(const FString& InParameters)
 		const FVoxelFinePageKey Parent{FIntVector::ZeroValue, 2};
 		TArray<FIntVector> FixedSections;
 		FVoxelFinePagePlanner::GatherSections(Parent, FixedSections);
-		for (const FIntVector& Section : FixedSections) MovingManager.FineWanted.Add(Section);
+		for (const FIntVector& Section : FixedSections) MovingManager.GetInputRoot().FineWanted.Add(Section);
 		auto& Interest = const_cast<FVoxelInterestSet&>(Module->GetCurrentInterest());
 		FVoxelSourceInterest SourceInterest;
 		SourceInterest.Source.Capabilities = EVoxelStreamingCapability::FineVisual;
@@ -238,13 +256,13 @@ bool FVoxelFinePageCoverageTest::RunTest(const FString& InParameters)
 		const FGuid SourceId = FGuid::NewGuid();
 		Interest.Sources.Add(SourceId, SourceInterest);
 		MovingManager.RebuildFinePagePlan();
-		TestTrue(TEXT("Distant fixed demand initially merges into F2"), MovingManager.FinePagePlan.Pages.Contains(Parent));
+		TestTrue(TEXT("Distant fixed demand initially merges into F2"), MovingManager.GetInputRoot().FinePagePlan.Pages.Contains(Parent));
 		const uint64 LayoutRevision = MovingManager.FinePageLayoutRevision;
 		Interest.Sources[SourceId].Source.Center = FIntVector(8);
 		MovingManager.RefreshTaskPriorities();
 		TestTrue(TEXT("Source-only snapshot refreshes Page bands without logical demand changes"),
-			MovingManager.FinePageLayoutRevision > LayoutRevision && !MovingManager.FinePagePlan.Pages.Contains(Parent));
-		TestEqual(TEXT("Source-only Page refresh preserves Fine demand"), MovingManager.FineWanted.Num(), FixedSections.Num());
+			MovingManager.FinePageLayoutRevision > LayoutRevision && !MovingManager.GetInputRoot().FinePagePlan.Pages.Contains(Parent));
+		TestEqual(TEXT("Source-only Page refresh preserves Fine demand"), MovingManager.GetInputRoot().FineWanted.Num(), FixedSections.Num());
 		TestFalse(TEXT("Source-only Page refresh does not dirty heightfield topology"), MovingManager.bHeightfieldTopologyDirty);
 		Interest.Sources.Reset();
 	}
@@ -296,7 +314,7 @@ bool FVoxelFinePageCoverageTest::RunTest(const FString& InParameters)
 		const FVoxelViewKey LocalProxy{FIntVector::ZeroValue, 4};
 		const FVoxelSurfaceTileKey DistantSurface{FIntPoint(1000, 1000), 0};
 		const FVoxelMacroTileKey DistantMacro{FIntPoint(1000, 1000), 0};
-		EditedManager.VoxelProxyWanted.Add(LocalProxy);
+		EditedManager.GetInputRoot().ProxyWanted.Add(LocalProxy);
 		EditedManager.VoxelProxyReady.Add(LocalProxy);
 		EditedManager.SurfaceReady.Add(DistantSurface);
 		EditedManager.MacroReady.Add(DistantMacro);
@@ -324,16 +342,16 @@ bool FVoxelFinePageCoverageTest::RunTest(const FString& InParameters)
 	{
 		Manager.PresentedFineSectionOwners.Add(Section, Old);
 		const FVoxelFinePageKey Desired{Section, 0};
-		Manager.FinePagePlan.SectionOwners.Add(Section, Desired);
-		Manager.FinePagePlan.Pages.Add(Desired);
-		Manager.FineWanted.Add(Section);
+		Manager.GetInputRoot().FinePagePlan.SectionOwners.Add(Section, Desired);
+		Manager.GetInputRoot().FinePagePlan.Pages.Add(Desired);
+		Manager.GetInputRoot().FineWanted.Add(Section);
 	}
 	for (int32 Index = 0; Index < 1000; ++Index)
 	{
 		const FIntVector Distant(10000 + Index, 0, 0);
 		const FVoxelFinePageKey Page{Distant, 0};
-		Manager.FinePagePlan.SectionOwners.Add(Distant, Page);
-		Manager.FinePagePlan.Pages.Add(Page);
+		Manager.GetInputRoot().FinePagePlan.SectionOwners.Add(Distant, Page);
+		Manager.GetInputRoot().FinePagePlan.Pages.Add(Page);
 	}
 	TSet<FVoxelFinePageKey> Candidates;
 	Manager.bActiveCoverageFull = false;
@@ -409,10 +427,10 @@ bool FVoxelFinePageCoverageTest::RunTest(const FString& InParameters)
 	for (const auto& Section : Sections)
 	{
 		const FVoxelFinePageKey NewPage{Section, 0};
-		Manager.FinePagePlan.Pages.Add(NewPage);
-		Manager.FinePagePlan.SectionOwners.Add(Section, NewPage);
+		Manager.GetInputRoot().FinePagePlan.Pages.Add(NewPage);
+		Manager.GetInputRoot().FinePagePlan.SectionOwners.Add(Section, NewPage);
 		Manager.PresentedFineSectionOwners.Add(Section, OldLayout);
-		Manager.FineWanted.Add(Section);
+		Manager.GetInputRoot().FineWanted.Add(Section);
 		Manager.FineReady.Add(Section);
 		Manager.CommitTerrainOwnership({0, Section, 0}, TArray<FVoxelViewKey>{{Section, 0}});
 	}
@@ -455,8 +473,8 @@ bool FVoxelFinePageCoverageTest::RunTest(const FString& InParameters)
 	Manager.DirtyFinePages.Add(OldLayout);
 	Manager.UpdateFinePagePresentation(OldLayout, Manager.VisibleTerrainNodes, {});
 	TestFalse(TEXT("Already retired obsolete Page leaves the dirty set"), Manager.DirtyFinePages.Contains(OldLayout));
-	Manager.FineWanted.Reset();
-	Manager.FinePagePlan = {};
+	Manager.GetInputRoot().FineWanted.Reset();
+	Manager.GetInputRoot().FinePagePlan = {};
 	Manager.ResolveTransitionVisibility();
 	for (int32 Frame = 0; Frame < 8; ++Frame) Manager.Publisher->Tick();
 	for (int32 Frame = 0; Frame < 128 && !Manager.PresentedFineSectionOwners.IsEmpty(); ++Frame)

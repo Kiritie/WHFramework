@@ -3,9 +3,12 @@
 #include "CoreMinimal.h"
 #include "Voxel/Generation/VoxelGenerationTypes.h"
 
+struct FVoxelRegionDirectorySnapshot;
+
 class WHFRAMEWORK_API FVoxelChangeIndex
 {
 public:
+	void SetBaseline(TSharedPtr<const FVoxelRegionDirectorySnapshot, ESPMode::ThreadSafe> InBaseline);
 	void SetModified(const FIntVector& InSection, bool bInModified);
 	bool IsModified(const FIntVector& InSection) const;
 	void SetRegionMask(const FIntVector& InRegion, const TArray<uint64>& InMask);
@@ -15,6 +18,9 @@ public:
 		TArray<FIntVector>& OutSections,
 		const TAtomic<bool>* InCancel = nullptr) const;
 	bool HasAnyModified() const;
+	int32 Count(const FVoxelGenerationBounds& InBounds) const;
+	bool Visit(const FVoxelGenerationBounds& InBounds, TFunctionRef<void(const FIntVector&)> InVisit,
+		const TAtomic<bool>* InCancel = nullptr) const;
 	void Reset();
 
 private:
@@ -26,4 +32,6 @@ private:
 private:
 	mutable FRWLock Lock;
 	TMap<FIntVector, TArray<uint64>> RegionMasks;
+	TSharedPtr<const FVoxelRegionDirectorySnapshot, ESPMode::ThreadSafe> Baseline;
+	uint64 ModifiedCount = 0;
 };

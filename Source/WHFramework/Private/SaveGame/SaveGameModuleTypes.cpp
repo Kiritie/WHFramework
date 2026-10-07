@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "SaveGame/SaveGameModuleTypes.h"
@@ -10,6 +10,15 @@ FSaveOperationResult FSaveOperationResult::Success()
 	FSaveOperationResult Result;
 	Result.bSuccess = true;
 	Result.Code = ESaveResultCode::Success;
+	return Result;
+}
+
+FSaveOperationResult FSaveOperationResult::Accepted(const FGuid& InOperationId)
+{
+	FSaveOperationResult Result;
+	Result.bSuccess = true;
+	Result.Code = ESaveResultCode::Accepted;
+	Result.OperationId = InOperationId;
 	return Result;
 }
 

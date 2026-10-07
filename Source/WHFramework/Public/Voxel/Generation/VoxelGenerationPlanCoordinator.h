@@ -2,8 +2,10 @@
 
 #include "CoreMinimal.h"
 #include "Voxel/Generation/VoxelGenerationBinding.h"
+#include "Voxel/Generation/VoxelGenerationConsumer.h"
 #include "Voxel/Generation/VoxelGenerationPlanCache.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
+#include "Voxel/Task/VoxelTerrainDependencyPriority.h"
 
 enum class EVoxelPlanDependencyState : uint8
 {
@@ -51,6 +53,9 @@ public:
 		const FVoxelGenerationBounds& InBounds,
 		TArray<FVoxelGenerationPlanDependency>& OutDependencies,
 		FString& OutError) const;
+	// 每个事实只等待自己的采样闭包，远处事实未完成不阻塞本地计划。
+	bool GatherPrerequisites(const FVoxelGenerationPlanDependency& InDependency,
+		TArray<FVoxelGenerationPlanDependency>& OutDependencies, FString& OutError) const;
 
 	TSharedRef<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> RetainDependencies(
 		TConstArrayView<FVoxelGenerationPlanDependency> InDependencies,
@@ -58,55 +63,82 @@ public:
 
 	FVoxelGenerationDependencyStatus Ensure(
 		TConstArrayView<FVoxelGenerationPlanDependency> InDependencies,
+		EVoxelWorkClass InWorkClass, const FVoxelTerrainServicePriority& InPriority,
+		const FVoxelGenerationConsumerKey& InConsumer);
+	FVoxelGenerationDependencyStatus Ensure(
+		TConstArrayView<FVoxelGenerationPlanDependency> InDependencies,
 		EVoxelWorkClass InWorkClass,
 		int32 InSourcePriority,
 		double InDistanceScore,
 		double InForwardScore,
-		FIntVector InConsumer = FIntVector(MAX_int32));
+		const FVoxelGenerationConsumerKey& InConsumer);
 
 	FVoxelGenerationDependencyStatus EnsureEnvironment(const FIntPoint& InCell);
 	FVoxelGenerationDependencyStatus EnsureEnvironmentBounds(const FVoxelGenerationBounds& InBounds,
 		EVoxelWorkClass InWorkClass, int32 InSourcePriority, double InDistanceScore, double InForwardScore);
-	void ReleaseConsumer(const FIntVector& InConsumer);
+	void ReleaseConsumer(const FVoxelGenerationConsumerKey& InConsumer);
+	void ReleaseEnvironment(const FIntPoint& InCell);
 	uint64 GetWaitingConsumers(EVoxelGenerationPlanKind InKind) const;
 
-	void SetConsumerWakeCallback(TFunction<void(const FIntVector&)> InCallback);
+	void SetConsumerWakeCallback(TFunction<void(const FVoxelGenerationConsumerKey&)> InCallback);
 	void Reset();
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FVoxelLocalPlanClosureTest;
+	friend class FVoxelEnvironmentAttemptIsolationTest;
+#endif
 	struct FDonation
 	{
 		EVoxelWorkClass WorkClass = EVoxelWorkClass::Background;
-		int32 Priority = MAX_int32;
-		double Distance = MAX_dbl;
-		double Forward = 0.0;
+		FVoxelTerrainServicePriority Priority;
+		uint64 SubscriptionId = 0;
 	};
 	struct FState
 	{
+		FGuid PriorityNode;
+		TArray<FVoxelGenerationPlanDependency> Prerequisites;
+		TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> PrerequisiteRetention;
 		EVoxelPlanDependencyState State = EVoxelPlanDependencyState::Missing;
 		EVoxelWorkClass WorkClass = EVoxelWorkClass::Background;
 		int32 SourcePriority = MAX_int32;
 		double DistanceScore = MAX_dbl;
 		double ForwardScore = 0.0;
+		FVoxelTerrainServicePriority ServicePriority;
 		FString Error;
-		TSet<FIntVector> Consumers;
-		TMap<FIntVector, FDonation> Donations;
+		TMap<FVoxelGenerationConsumerKey, FDonation> Donations;
 		uint64 AttemptId = 0;
+		bool bInFlight = false;
 	};
 
 	void ResolveDonations(FState& InOutState);
-	void ForgetDependency(const FVoxelGenerationPlanDependency& InDependency);
+	void RemoveSubscription(const FVoxelGenerationPlanDependency& InDependency,
+		const FVoxelGenerationConsumerKey& InConsumer, uint64 InSubscriptionId);
+	void WakeConsumers(const FVoxelGenerationPlanDependency& InDependency);
+	FVoxelGenerationConsumerKey EnvironmentConsumer(const FVoxelGenerationBounds& InBounds, bool bInColumn) const;
 	bool IsCached(const FVoxelGenerationPlanDependency& InDependency) const;
 	bool Queue(const FVoxelGenerationPlanDependency& InDependency, FState& InOutState);
-	bool DonatePriority(FState& InOutState, EVoxelWorkClass InWorkClass, int32 InSourcePriority, double InDistanceScore, double InForwardScore);
 	void RefreshQueuedPriorities();
+	bool RegisterClosure(const FVoxelGenerationPlanDependency& InDependency, FString& OutError);
+	void AdvancePriorityDonations();
+	void ForgetFact(const FVoxelGenerationPlanDependency& InDependency);
+	bool ArePrerequisitesReady(const FState& InState) const;
 
 	FVoxelTaskScheduler& Scheduler;
 	TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config;
 	TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> Cache;
 	uint64 WorldEpoch = 0;
 	TMap<FVoxelGenerationPlanDependency, FState> States;
-	TMap<FIntVector, TSet<FVoxelGenerationPlanDependency>> ConsumerDependencies;
-	TFunction<void(const FIntVector&)> ConsumerWakeCallback;
+	TMap<FVoxelGenerationConsumerKey, TMap<FVoxelGenerationPlanDependency, uint64>> ConsumerDependencies;
+	FVoxelTerrainDependencyPriority PriorityGraph;
+	TMap<FVoxelGenerationConsumerKey, FGuid> ConsumerPriorityNodes;
+	TMap<FGuid, FVoxelGenerationPlanDependency> PriorityFacts;
+	// 环境请求按空间键保持在途身份；释放后再次请求必须使用新代，拒绝旧唤醒。
+	mutable TMap<FVoxelGenerationConsumerKey, FVoxelGenerationConsumerKey> EnvironmentAttempts;
+	mutable uint64 NextEnvironmentAttempt = 0;
+	TFunction<void(const FVoxelGenerationConsumerKey&)> ConsumerWakeCallback;
+	FGuid EnvironmentOwnerId = FGuid::NewGuid();
+	uint64 EnvironmentOwnerIncarnation = 1;
+	uint64 NextSubscriptionId = 0;
 	uint64 NextAttemptId = 0;
 };

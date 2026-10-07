@@ -1,5 +1,6 @@
-#include "Voxel/Rendering/VoxelHeightfieldMesher.h"
+﻿#include "Voxel/Rendering/VoxelHeightfieldMesher.h"
 #include "Voxel/Rendering/VoxelViewLod.h"
+#include "Voxel/Rendering/VoxelHeightfieldWaterTriangles.h"
 
 #include "Voxel/Generation/VoxelGenerationBinding.h"
 #include "Voxel/Rendering/VoxelMacroTerrain.h"
@@ -9,6 +10,7 @@
 namespace
 {
 	thread_local uint64* CountedMeshBytes = nullptr;
+	thread_local FVoxelHeightfieldMesher::FCapacityScope* CapacityScope = nullptr;
 	constexpr uint64 MeshVertexBytes = sizeof(FVector) * 2 + sizeof(FVector2D) * 3 +
 		sizeof(FLinearColor) + sizeof(FProcMeshTangent);
 	constexpr uint8 FacePositiveX = 0;
@@ -62,6 +64,7 @@ namespace
 	void AppendWaterPolygon(FVoxelMeshBuffers& InOutMesh,
 		TConstArrayView<FVector> InVertices, const FVoxelRuntimeFaceRef& InFace)
 	{
+		if (CapacityScope && CapacityScope->Count(InOutMesh, InVertices.Num(), FMath::Max(0, InVertices.Num() - 2) * 3)) return;
 		if (CountedMeshBytes)
 		{
 			*CountedMeshBytes += uint64(InVertices.Num()) * MeshVertexBytes +
@@ -86,6 +89,66 @@ namespace
 	}
 }
 
+FVoxelHeightfieldMesher::FCapacityScope::FCapacityScope(const bool bInCount,
+	TArray<FVoxelRenderBatch>& InPlan, const int32 InBatchLimit)
+	: Previous(CapacityScope), Plan(InPlan), BatchLimit(InBatchLimit), bCounting(bInCount)
+{
+	if (bCounting) { Plan.Reset(); Plan.Reserve(BatchLimit); }
+	CapacityScope = this;
+}
+FVoxelHeightfieldMesher::FCapacityScope::~FCapacityScope()
+{
+	CapacityScope = Previous;
+}
+bool FVoxelHeightfieldMesher::FCapacityScope::IsValid() const
+{
+	return bValid && (bCounting || NextBatch == Plan.Num());
+}
+void FVoxelHeightfieldMesher::FCapacityScope::Bind(FVoxelRenderBatch& InBatch)
+{
+	if (!bValid || NextBatch >= BatchLimit) { bValid = false; return; }
+	InBatch.Mesh.CapacityPlanIndex = NextBatch++;
+	if (bCounting)
+	{
+		auto& Entry = Plan.AddDefaulted_GetRef();
+		Entry.Group = InBatch.Group; Entry.Bank = InBatch.Bank; Entry.MaterialVariant = InBatch.MaterialVariant;
+		return;
+	}
+	if (!Plan.IsValidIndex(InBatch.Mesh.CapacityPlanIndex)) { bValid = false; return; }
+	const auto& Entry = Plan[InBatch.Mesh.CapacityPlanIndex];
+	if (Entry.Group != InBatch.Group || Entry.Bank != InBatch.Bank || Entry.MaterialVariant != InBatch.MaterialVariant)
+	{ bValid = false; return; }
+	InBatch.Mesh.ReservePlan(Entry.Mesh);
+}
+bool FVoxelHeightfieldMesher::FCapacityScope::Count(FVoxelMeshBuffers& InMesh, const int32 InVertices, const int32 InIndices)
+{
+	if (!bValid) return true;
+	if (!bCounting)
+	{
+		if (InMesh.Vertices.Num() + InVertices > InMesh.PlannedVertices ||
+			InMesh.Triangles.Num() + InIndices > InMesh.PlannedIndices)
+		{ bValid = false; return true; }
+		return false;
+	}
+	if (!Plan.IsValidIndex(InMesh.CapacityPlanIndex)) { bValid = false; return true; }
+	auto& Entry = Plan[InMesh.CapacityPlanIndex].Mesh;
+	Entry.PlannedVertices += InVertices; Entry.PlannedIndices += InIndices;
+	InMesh.PlannedVertices += InVertices; InMesh.PlannedIndices += InIndices;
+	return true;
+}
+
+bool FVoxelHeightfieldMesher::FCapacityScope::PrepareBatches(FVoxelSectionMeshResult& InMesh)
+{
+	if (!bValid || InMesh.Batches.Num() >= BatchLimit) { bValid = false; return false; }
+	if (InMesh.Batches.Max() < BatchLimit) InMesh.Batches.Reserve(BatchLimit);
+	return true;
+}
+
+FVoxelRenderBatch& FVoxelHeightfieldMesher::FCapacityScope::RejectedBatch()
+{
+	bValid = false;
+	return Rejected;
+}
 
 FVoxelHeightfieldMesher::FCountScope::FCountScope(uint64* InBytes)
 	: Previous(CountedMeshBytes)
@@ -116,6 +179,7 @@ FVoxelRenderBatch& FVoxelHeightfieldMesher::FindOrAddBatch(
 		}
 	}
 
+	if (CapacityScope && !CapacityScope->PrepareBatches(InOutMesh)) return CapacityScope->RejectedBatch();
 	FVoxelRenderBatch& Batch =
 		InOutMesh.Batches.
 			AddDefaulted_GetRef();
@@ -126,6 +190,7 @@ FVoxelRenderBatch& FVoxelHeightfieldMesher::FindOrAddBatch(
 	Batch.Bank =
 		InBank;
 	Batch.MaterialVariant = InVariant;
+	if (CapacityScope) CapacityScope->Bind(Batch);
 
 	return Batch;
 }
@@ -139,6 +204,7 @@ void FVoxelHeightfieldMesher::AppendQuad(
 	const FVoxelRuntimeFaceRef& InFace,
 	const FLinearColor& InColor)
 {
+	if (CapacityScope && CapacityScope->Count(InOutMesh, 4, 6)) return;
 	if (CountedMeshBytes)
 	{
 		*CountedMeshBytes += 4 * MeshVertexBytes + 6 * sizeof(int32);
@@ -522,6 +588,7 @@ bool FVoxelHeightfieldMesher::BuildMacro(
 		}
 		FLinearColor LeafTint = LeafDefinition->Face(Leaves.State, TopMaterialFace).Tint;
 		LeafTint.A = 1.0f;
+		TopTints.Reserve(Window.Width() * Window.Height());
 		TopTints.Init(FLinearColor::White, Window.Width() * Window.Height());
 		for (int32 Y = Window.Min.Y; Y < Window.Max.Y; ++Y)
 		for (int32 X = Window.Min.X; X < Window.Max.X; ++X)
@@ -548,7 +615,7 @@ bool FVoxelHeightfieldMesher::BuildMacro(
 	if (!BuildWaterGrid(InMacro.Side, InMacro.Step, InMacro.Height, InMacro.WaterHeight,
 		InMacro.WaterKind, InRegistry, WaterMesh, OutError, InCancel, InMaximumTextureStretchCells, Window)) return false;
 	for (auto& Batch : WaterMesh.Batches)
-		if (!Batch.Mesh.Triangles.IsEmpty()) Mesh.Batches.Add(MoveTemp(Batch));
+		if (!Batch.Mesh.Triangles.IsEmpty() || Batch.Mesh.PlannedVertices > 0) Mesh.Batches.Add(MoveTemp(Batch));
 	if (!AppendDistantCells(InMacro.DistantCells,
 		InMacro.GetBuildOrigin(),
 		InMacro.Step, InRegistry, Mesh, OutError, InCancel,
@@ -634,20 +701,6 @@ bool FVoxelHeightfieldMesher::BuildWaterGrid(const int32 InSide, const int32 InS
 
 
 
-	auto IsWet =
-		[&InWaterZ, &InWaterKind, &InGroundZ](
-			const int32 InIndex)
-		{
-			return
-				InWaterKind[InIndex] !=
-					static_cast<uint8>(
-						EVoxelWaterKind::None) &&
-				InWaterZ[InIndex] !=
-					MIN_int32 &&
-				InWaterZ[InIndex] >=
-					InGroundZ[InIndex];
-		};
-
 	for (int32 Y = Window.Min.Y;
 		Y < Window.Max.Y;
 		++Y)
@@ -665,77 +718,13 @@ bool FVoxelHeightfieldMesher::BuildWaterGrid(const int32 InSide, const int32 InS
 			X < Window.Max.X;
 			++X)
 		{
-			const int32 I00 =
-				VertexIndex(
-					X,
-					Y,
-					InSide);
-
-			const int32 I10 = VertexIndex(X + 1, Y, InSide);
-			const int32 I11 = VertexIndex(X + 1, Y + 1, InSide);
-			const int32 I01 = VertexIndex(X, Y + 1, InSide);
-			const bool bWet[4] = {IsWet(I00), IsWet(I10), IsWet(I11), IsWet(I01)};
-			const uint8 WetMask = (bWet[0] ? 1 : 0) |
-				(bWet[1] ? 2 : 0) | (bWet[2] ? 4 : 0) |
-				(bWet[3] ? 8 : 0);
-			if (WetMask == 0) continue;
-			const int32 WetIndex = bWet[0] ? I00 : bWet[1] ? I10 : bWet[2] ? I11 : I01;
-			FVoxelRenderBatch& Batch = FindOrAddBatch(Mesh, EVoxelRenderGroup::Water, Face.Bank, InWaterKind[WetIndex]);
-
-			const double X0 =
-				X *
-				InStep;
-
-			const double X1 =
-				(X + 1) *
-				InStep;
-
-			const double Y0 =
-				Y *
-				InStep;
-
-			const double Y1 =
-				(Y + 1) *
-				InStep;
-
-			const FVector Corners[4] = {
-				FVector(X0, Y0, bWet[0] ? InWaterZ[I00] + 1.0 : 0.0),
-				FVector(X1, Y0, bWet[1] ? InWaterZ[I10] + 1.0 : 0.0),
-				FVector(X1, Y1, bWet[2] ? InWaterZ[I11] + 1.0 : 0.0),
-				FVector(X0, Y1, bWet[3] ? InWaterZ[I01] + 1.0 : 0.0)};
-			if (WetMask == 15)
-			{
-				AppendQuad(Batch.Mesh, Corners[0], Corners[1],
-					Corners[2], Corners[3], Face);
-				continue;
-			}
-			auto Boundary = [&Corners](const int32 Wet, const int32 Dry)
-			{
-				const FVector& Water = Corners[Wet];
-				const FVector& Land = Corners[Dry];
-				return FVector((Water.X + Land.X) * 0.5,
-					(Water.Y + Land.Y) * 0.5, Water.Z);
-			};
-			for (int32 Start = 0; Start < 4; ++Start)
-			{
-				if (!bWet[Start] || bWet[(Start + 3) & 3]) continue;
-				TArray<FVector, TInlineAllocator<6>> Polygon;
-				Polygon.Add(Boundary(Start, (Start + 3) & 3));
-				int32 Corner = Start;
-				for (int32 RunIndex = 0; RunIndex < 4 && bWet[Corner]; ++RunIndex)
+			VoxelHeightfieldWater::VisitCellPolygons(InSide, InStep, InGroundZ, InWaterZ, InWaterKind, X, Y,
+				[&Mesh, &Face](TConstArrayView<FVector> Polygon, const uint8 Variant, const bool bFullCell)
 				{
-					Polygon.Add(Corners[Corner]);
-					const int32 Next = (Corner + 1) & 3;
-					if (!bWet[Next])
-					{
-						Polygon.Add(Boundary(Corner, Next));
-						break;
-					}
-					Corner = Next;
-				}
-				AppendWaterPolygon(Batch.Mesh,
-					MakeArrayView(Polygon.GetData(), Polygon.Num()), Face);
-			}
+					auto& Batch = FindOrAddBatch(Mesh, EVoxelRenderGroup::Water, Face.Bank, Variant);
+					if (bFullCell) AppendQuad(Batch.Mesh, Polygon[0], Polygon[1], Polygon[2], Polygon[3], Face);
+					else AppendWaterPolygon(Batch.Mesh, Polygon, Face);
+				});
 		}
 	}
 

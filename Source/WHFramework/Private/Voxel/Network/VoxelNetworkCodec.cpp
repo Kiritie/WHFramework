@@ -1,4 +1,4 @@
-#include "Voxel/Network/VoxelNetworkCodec.h"
+﻿#include "Voxel/Network/VoxelNetworkCodec.h"
 #include "Voxel/Network/VoxelGeometryWire.h"
 #include "Voxel/Generation/VoxelManifestCodec.h"
 
@@ -10,7 +10,7 @@ namespace
 	bool IsMessageValue(const uint8 InValue)
 	{
 		return InValue >= static_cast<uint8>(EVoxelMessage::Hello) &&
-			InValue <= static_cast<uint8>(EVoxelMessage::RepresentationInvalidate);
+			InValue <= static_cast<uint8>(EVoxelMessage::ResyncRequest);
 	}
 }
 
@@ -25,6 +25,7 @@ bool FVoxelNetworkCodec::Encode(
 		return false;
 	}
 	FVoxelByteWriter Writer(MaxWireBytes);
+	Writer.Reserve(InPayload.Num() + 29);
 	Writer.U32(WireMagic);
 	Writer.U32(VoxelProtocolVersion);
 	Writer.U8(static_cast<uint8>(InKind));
@@ -121,6 +122,7 @@ bool FVoxelNetworkCodec::EncodeWelcome(
 {
 	TArray<uint8> ManifestBytes;
 	if (InValue.EchoNonce == 0 ||
+		InValue.AuthorityWorldEpoch == 0 ||
 		!InValue.Session.IsValid() ||
 		!FVoxelManifestCodec::Encode(InValue.Manifest, ManifestBytes))
 	{
@@ -129,6 +131,7 @@ bool FVoxelNetworkCodec::EncodeWelcome(
 	FVoxelByteWriter Writer(FVoxelManifestCodec::MaxBytes + 64);
 	Writer.U64(InValue.EchoNonce);
 	Writer.Guid(InValue.Session);
+	Writer.U64(InValue.AuthorityWorldEpoch);
 	Writer.Blob(ManifestBytes, FVoxelManifestCodec::MaxBytes);
 	return Writer.Finish(OutBytes);
 }
@@ -141,9 +144,11 @@ bool FVoxelNetworkCodec::DecodeWelcome(
 	FVoxelNetworkWelcome Value;
 	Value.EchoNonce = Reader.U64();
 	Value.Session = Reader.Guid();
+	Value.AuthorityWorldEpoch = Reader.U64();
 	const TArray<uint8> ManifestBytes = Reader.Blob(FVoxelManifestCodec::MaxBytes);
 	if (!Reader.End() ||
 		Value.EchoNonce == 0 ||
+		Value.AuthorityWorldEpoch == 0 ||
 		!Value.Session.IsValid() ||
 		!FVoxelManifestCodec::Decode(ManifestBytes, Value.Manifest))
 	{
@@ -554,20 +559,21 @@ bool FVoxelNetworkCodec::EncodeRepresentationReply(
 		InValue.Serial == 0 ||
 		!ValidateWireKey(InValue.Key) ||
 		static_cast<uint8>(InValue.Kind) > static_cast<uint8>(EVoxelRepresentationReplyKind::Rejected) ||
-		(InValue.Kind != EVoxelRepresentationReplyKind::Data && !InValue.Data.IsEmpty()) ||
-		InValue.Data.Num() > MaxRepresentationBytes)
+		(InValue.Kind != EVoxelRepresentationReplyKind::Data && !InValue.DataView().IsEmpty()) ||
+		InValue.DataView().Num() > MaxRepresentationBytes)
 	{
 		OutError = TEXT("Voxel representation reply is invalid");
 		return false;
 	}
 	FVoxelByteWriter Writer(MaxRepresentationBytes + 64);
+	Writer.Reserve(InValue.DataView().Num() + 35);
 	Writer.U8(static_cast<uint8>(InValue.Type));
 	WriteVector(Writer, InValue.Key.Coordinate);
 	Writer.U8(InValue.Key.Level);
 	Writer.U64(InValue.Serial);
 	Writer.U64(InValue.Revision);
 	Writer.U8(static_cast<uint8>(InValue.Kind));
-	Writer.Blob(InValue.Data, MaxRepresentationBytes);
+	Writer.Blob(InValue.DataView(), MaxRepresentationBytes);
 	if (!Writer.Finish(OutBytes))
 	{
 		OutError = TEXT("Voxel representation reply encoding failed");
@@ -613,27 +619,23 @@ bool FVoxelNetworkCodec::DecodeRepresentationReply(
 }
 
 bool FVoxelNetworkCodec::EncodeRepresentationInvalidate(
-	const FVoxelRepresentationInvalidate& InValue,
-	TArray<uint8>& OutBytes,
-	FString& OutError)
+	const FVoxelRepresentationInvalidate& InValue, TArray<uint8>& OutBytes, FString& OutError)
 {
-	if (InValue.Keys.IsEmpty() || InValue.Keys.Num() > 256 || InValue.Revision == 0)
+	if (InValue.Entries.IsEmpty() || InValue.Entries.Num() > 256)
 	{
 		OutError = TEXT("Voxel representation invalidation is invalid");
 		return false;
 	}
-	FVoxelByteWriter Writer(8192);
-	Writer.U16(InValue.Keys.Num());
-	Writer.U64(InValue.Revision);
-	for (const FVoxelRepresentationWireKey& Key : InValue.Keys)
+	FVoxelByteWriter Writer(2 + 256 * VoxelGeometryWire::HeaderBytes);
+	Writer.Reserve(2 + InValue.Entries.Num() * VoxelGeometryWire::HeaderBytes);
+	Writer.U16(InValue.Entries.Num());
+	for (const auto& Entry : InValue.Entries)
 	{
-		if (!ValidateWireKey(Key))
-		{
-			OutError = TEXT("Voxel representation invalidation contains an invalid key");
-			return false;
-		}
-		WriteVector(Writer, Key.Coordinate);
-		Writer.U8(Key.Level);
+		TArray<uint8> Header;
+		if (Entry.Revision == 0 || Entry.Geometry.Key.Representation == EVoxelTerrainRepresentation::Fine)
+		{ OutError = TEXT("Voxel representation invalidation identity is invalid"); return false; }
+		if (!VoxelGeometryWire::Encode({Entry.Geometry, Entry.Revision, Entry.Revision}, Header, OutError)) return false;
+		Writer.Raw(Header);
 	}
 	if (!Writer.Finish(OutBytes))
 	{
@@ -645,31 +647,25 @@ bool FVoxelNetworkCodec::EncodeRepresentationInvalidate(
 }
 
 bool FVoxelNetworkCodec::DecodeRepresentationInvalidate(
-	TConstArrayView<uint8> InBytes,
-	FVoxelRepresentationInvalidate& OutValue,
-	FString& OutError)
+	TConstArrayView<uint8> InBytes, FVoxelRepresentationInvalidate& OutValue, FString& OutError)
 {
 	FVoxelByteReader Reader(InBytes);
 	const uint16 Count = Reader.U16();
-	FVoxelRepresentationInvalidate Value;
-	Value.Revision = Reader.U64();
-	if (Count == 0 || Count > 256 || Value.Revision == 0)
+	if (Count == 0 || Count > 256 || InBytes.Num() != 2 + Count * VoxelGeometryWire::HeaderBytes)
 	{
 		OutError = TEXT("Voxel representation invalidation header is invalid");
 		return false;
 	}
-	Value.Keys.Reserve(Count);
+	FVoxelRepresentationInvalidate Value;
+	Value.Entries.Reserve(Count);
 	for (uint16 Index = 0; Index < Count; ++Index)
 	{
-		FVoxelRepresentationWireKey Key;
-		Key.Coordinate = ReadVector(Reader);
-		Key.Level = Reader.U8();
-		if (!ValidateWireKey(Key))
-		{
-			OutError = TEXT("Voxel representation invalidation contains an invalid key");
-			return false;
-		}
-		Value.Keys.Add(Key);
+		FVoxelGeometryWireHeader Header;
+		if (!VoxelGeometryWire::Decode(Reader.View(VoxelGeometryWire::HeaderBytes), Header, OutError)) return false;
+		if (Header.ContentRevision == 0 || Header.RequestId != Header.ContentRevision ||
+			Header.Geometry.Key.Representation == EVoxelTerrainRepresentation::Fine)
+		{ OutError = TEXT("Voxel representation invalidation identity is invalid"); return false; }
+		Value.Entries.Add({Header.Geometry, Header.ContentRevision});
 	}
 	if (!Reader.End())
 	{

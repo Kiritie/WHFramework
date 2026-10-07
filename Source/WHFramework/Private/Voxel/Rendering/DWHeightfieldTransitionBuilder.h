@@ -4,11 +4,35 @@
 #include "Voxel/Rendering/VoxelGameThreadContinuation.h"
 #include "Voxel/Rendering/DWLodTransition.h"
 #include "Voxel/Geometry/VoxelSectionMesher.h"
+#include "Voxel/Rendering/VoxelHeightfieldMesher.h"
 
 struct FVoxelGenerationRuntimeConfig;
 struct FVoxelMacroTileData;
 struct FVoxelRegistrySnapshot;
 struct FVoxelSurfaceTileData;
+
+struct FVoxelFrozenHeightfieldSource
+{
+	FVoxelHeightfieldNodeKey Key;
+	TSharedPtr<const FVoxelSurfaceTileData, ESPMode::ThreadSafe> Surface;
+	TSharedPtr<const FVoxelMacroTileData, ESPMode::ThreadSafe> Macro;
+	bool operator==(const FVoxelFrozenHeightfieldSource& InOther) const = default;
+};
+
+struct FVoxelFrozenHeightfieldInputs
+{
+	FVoxelHeightfieldNodeKey Owner;
+	uint64 WorldEpoch = 0;
+	uint64 GeneratorIdentity = 0;
+	uint64 RegistryRevision = 0;
+	uint64 ShapeRevision = 0;
+	uint64 InputSerial = 0;
+	double FirstQueuedSeconds = 0.0;
+	TArray<FVoxelFrozenHeightfieldSource> Sources;
+	TArray<FVoxelHeightfieldTransitionEdge> Edges;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
+	bool SameInputs(const FVoxelFrozenHeightfieldInputs& InOther) const;
+};
 
 struct FVoxelHeightfieldTileView
 {
@@ -89,5 +113,6 @@ public:
 		double InMaximumTextureStretchCells,
 		FVoxelSectionMeshResult& OutMesh,
 		FString& OutError,
-		const TAtomic<bool>* InCancel = nullptr);
+		const TAtomic<bool>* InCancel = nullptr,
+		FVoxelHeightfieldMesher::FCapacityScope* InCapacity = nullptr);
 };

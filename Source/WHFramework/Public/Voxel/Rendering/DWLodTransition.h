@@ -63,4 +63,5 @@ struct WHFRAMEWORK_API FVoxelHeightfieldTransitionEdge
 	bool bUnbalanced = false;
 	uint64 OwnerGeometryRevision = 0;
 	uint64 NeighborGeometryRevision = 0;
+	bool operator==(const FVoxelHeightfieldTransitionEdge& InOther) const = default;
 };

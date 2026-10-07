@@ -1,8 +1,9 @@
-#include "Voxel/Streaming/VoxelInterestRuntime.h"
+﻿#include "Voxel/Streaming/VoxelInterestRuntime.h"
 
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Rendering/VoxelViewLod.h"
 #include "Voxel/Streaming/VoxelInterestManager.h"
+#include "Misc/ScopeExit.h"
 
 namespace
 {
@@ -127,205 +128,468 @@ FIntPoint FVoxelInterestRuntime::Snap2D(const FIntVector& InCell, const int32 In
 		VoxelGeneration::FloorDivide(InCell.Y, InStep) * InStep);
 }
 
-bool FVoxelInterestRuntime::ConfigurationChanged(const FVoxelStreamingSource& InA,
-	const FVoxelStreamingSource& InB)
+EVoxelSourceChange FVoxelInterestRuntime::ClassifySourceChange(const FVoxelStreamingSource& InA,
+	const FVoxelStreamingSource& InB, const FVoxelViewSettings& InSettings, const FVoxelSourceInterest* InAccepted)
 {
 	const FVoxelStreamingSourceView& A = InA.View;
 	const FVoxelStreamingSourceView& B = InB.View;
-	return InA.Capabilities != InB.Capabilities || InA.Purpose != InB.Purpose ||
-		InA.bLocalView != InB.bLocalView ||
-		InA.bInheritWorldView != InB.bInheritWorldView ||
-		InA.Priority != InB.Priority || InA.GetSchedulingPriority() != InB.GetSchedulingPriority() ||
+	const EVoxelSourceChange All = EVoxelSourceChange::Priority | EVoxelSourceChange::RuntimeDemand |
+		EVoxelSourceChange::FineResidency | EVoxelSourceChange::PageLayout | EVoxelSourceChange::CoarseTopology;
+	if (InA.Id != InB.Id || InA.Capabilities != InB.Capabilities || InA.Purpose != InB.Purpose ||
+		InA.bInheritWorldView != InB.bInheritWorldView)
+	{
+		return All;
+	}
+	EVoxelSourceChange Changed = EVoxelSourceChange::None;
+	if (InA.Center != InB.Center || InA.Direction != InB.Direction || InA.Priority != InB.Priority ||
+		InA.GetSchedulingPriority() != InB.GetSchedulingPriority() || InA.bLocalView != InB.bLocalView ||
+		InA.VelocityCellsPerSecond != InB.VelocityCellsPerSecond)
+	{
+		Changed |= EVoxelSourceChange::Priority;
+	}
+	const auto PredictionAnchor = [&InSettings](const FVoxelStreamingSource& Source)
+	{
+		const FVector Predicted = FVector(Source.Center) + Source.VelocityCellsPerSecond * InSettings.Fine.PredictionSeconds;
+		return FIntVector(FMath::FloorToInt(Predicted.X / 16.0), FMath::FloorToInt(Predicted.Y / 16.0), FMath::FloorToInt(Predicted.Z / 16.0));
+	};
+	if (Snap3D(InA.Center, 16) != Snap3D(InB.Center, 16) || PredictionAnchor(InA) != PredictionAnchor(InB) ||
 		InA.ExactRadius != InB.ExactRadius || InA.CollisionRadius != InB.CollisionRadius ||
 		InA.SimulationRadius != InB.SimulationRadius ||
 		InA.MovementCriticalCollisionRadius != InB.MovementCriticalCollisionRadius ||
-		InA.VerticalFovDegrees != InB.VerticalFovDegrees ||
-		InA.ViewportHeightPixels != InB.ViewportHeightPixels ||
-		A.FineRadiusCells != B.FineRadiusCells ||
-		A.FineVerticalHalfExtentCells != B.FineVerticalHalfExtentCells ||
+		A.FinePredictionSeconds != B.FinePredictionSeconds)
+	{
+		Changed |= EVoxelSourceChange::RuntimeDemand;
+	}
+	const FVoxelResolvedViewRanges Steps = VoxelViewLod::ResolveReplanSteps(InB, InSettings, InAccepted);
+	if (Snap3D(InA.Center, InSettings.Fine.ShardSideCells * 2) != Snap3D(InB.Center, InSettings.Fine.ShardSideCells * 2))
+	{
+		Changed |= EVoxelSourceChange::PageLayout;
+	}
+	if (A.InitialChunkSideCells != B.InitialChunkSideCells)
+	{
+		Changed |= EVoxelSourceChange::PageLayout | EVoxelSourceChange::CoarseTopology;
+	}
+	if (InA.VerticalFovDegrees != InB.VerticalFovDegrees || InA.ViewportHeightPixels != InB.ViewportHeightPixels ||
 		A.VoxelProxyRadiusCells != B.VoxelProxyRadiusCells ||
-		A.SurfaceRadiusCells != B.SurfaceRadiusCells ||
-		A.FinePredictionSeconds != B.FinePredictionSeconds ||
-		A.InitialChunkSideCells != B.InitialChunkSideCells ||
-		A.FineLevel0RadiusCells != B.FineLevel0RadiusCells ||
 		A.VoxelProxyVerticalHalfExtentCells != B.VoxelProxyVerticalHalfExtentCells ||
-		A.MacroRadiusCells != B.MacroRadiusCells;
+		A.SurfaceRadiusCells != B.SurfaceRadiusCells || A.MacroRadiusCells != B.MacroRadiusCells ||
+		Snap3D(InA.Center, Steps.Proxy) != Snap3D(InB.Center, Steps.Proxy) ||
+		Snap2D(InA.Center, Steps.Surface) != Snap2D(InB.Center, Steps.Surface) ||
+		Snap2D(InA.Center, Steps.Macro) != Snap2D(InB.Center, Steps.Macro))
+	{
+		Changed |= EVoxelSourceChange::CoarseTopology;
+	}
+	return Changed;
 }
 
 bool FVoxelInterestRuntime::NeedsUpdate(const FVoxelStreamingSource& InPrevious,
 	const FVoxelStreamingSource& InCurrent, const FVoxelViewSettings& InSettings, const FVoxelSourceInterest* InAccepted)
 {
-	if (ConfigurationChanged(InPrevious, InCurrent)) return true;
-	const FIntVector& Previous = InPrevious.Center;
-	const FIntVector& Current = InCurrent.Center;
-	const FVoxelStreamingSourceView& View = InCurrent.View;
-	const FVoxelResolvedViewRanges Steps = VoxelViewLod::ResolveReplanSteps(InCurrent, InSettings, InAccepted);
-	if (Snap3D(Previous, FMath::Clamp(InCurrent.CollisionRadius / 2, 4, 16)) !=
-		Snap3D(Current, FMath::Clamp(InCurrent.CollisionRadius / 2, 4, 16)) ||
-		Snap3D(Previous, Steps.Fine) !=
-		Snap3D(Current, Steps.Fine) ||
-		Snap3D(Previous, Steps.Proxy) !=
-		Snap3D(Current, Steps.Proxy) ||
-		Snap2D(Previous, Steps.Surface) !=
-		Snap2D(Current, Steps.Surface) ||
-		Snap2D(Previous, Steps.Macro) !=
-		Snap2D(Current, Steps.Macro))
-	{
-		return true;
-	}
-	const FVector PreviousPrediction = FVector(Previous) +
-		InPrevious.VelocityCellsPerSecond * View.FinePredictionSeconds;
-	const FVector CurrentPrediction = FVector(Current) +
-		InCurrent.VelocityCellsPerSecond * View.FinePredictionSeconds;
-	const FIntVector PreviousPredicted(FMath::RoundToInt(PreviousPrediction.X),
-		FMath::RoundToInt(PreviousPrediction.Y), FMath::RoundToInt(PreviousPrediction.Z));
-	const FIntVector CurrentPredicted(FMath::RoundToInt(CurrentPrediction.X),
-		FMath::RoundToInt(CurrentPrediction.Y), FMath::RoundToInt(CurrentPrediction.Z));
-	return Snap3D(PreviousPredicted, RuntimeInterestSectionSide) !=
-		Snap3D(CurrentPredicted, RuntimeInterestSectionSide) ||
-		FVector::DotProduct(InPrevious.Direction.GetSafeNormal(),
-			InCurrent.Direction.GetSafeNormal()) < 0.9;
+	return ClassifySourceChange(InPrevious, InCurrent, InSettings, InAccepted) != EVoxelSourceChange::None;
 }
 
 bool FVoxelInterestRuntime::Update(TConstArrayView<FVoxelStreamingSource> InSources,
 	const FVoxelWorldManifest& InManifest, const FVoxelViewSettings& InSettings,
 	FVoxelInterestSet& OutInterest, FVoxelInterestDelta& OutDelta,
-	bool& bOutSnapshot)
+	bool& bOutSnapshot, const FVoxelFineResidencyFeedback* InFeedback)
 {
+	TSharedPtr<FVoxelInterestSet, ESPMode::ThreadSafe> Snapshot;
+	const bool bChanged = UpdateSnapshot(InSources, InManifest, InSettings, Snapshot, OutDelta, bOutSnapshot, InFeedback);
+	if (Snapshot) OutInterest = *Snapshot;
+	else if (LatestInterest) OutInterest = *LatestInterest;
+	return bChanged;
+}
+
+bool FVoxelInterestRuntime::UpdateSnapshot(TConstArrayView<FVoxelStreamingSource> InSources,
+	const FVoxelWorldManifest& InManifest, const FVoxelViewSettings& InSettings,
+	TSharedPtr<FVoxelInterestSet, ESPMode::ThreadSafe>& OutInterest, FVoxelInterestDelta& OutDelta,
+	bool& bOutSnapshot, const FVoxelFineResidencyFeedback* InFeedback)
+{
+	OutInterest.Reset();
+	static const FVoxelInterestSet EmptyInterest;
+	const FVoxelInterestSet& PreviousInterest = LatestInterest ? *LatestInterest : EmptyInterest;
 	OutDelta.Reset();
+	LastPlanningError.Reset();
 	bOutSnapshot = false;
 	FString ConfigurationError;
-	if (!VoxelViewLod::ValidateTopology(InSettings.Lod, ConfigurationError))
+	ON_SCOPE_EXIT
+	{
+		if (!bOutSnapshot && !ConfigurationError.IsEmpty()) LastPlanningError = ConfigurationError;
+	};
+	if (!VoxelViewLod::ValidateTopology(InSettings.Lod, ConfigurationError) || !InSettings.Fine.Validate(ConfigurationError))
 	{
 		UE_LOG(LogTemp, Error, TEXT("Invalid terrain policy; retaining previous interest: %s"), *ConfigurationError);
-		OutInterest = LatestInterest;
+		OutInterest.Reset();
 		return false;
 	}
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> OutputMetadataLease;
+	if (PlanningResources && !PlanningResources->Acquire(PlanningConsumer, EVoxelTerrainResourcePool::Input,
+		VoxelBoundedAllocation::WorkerSharedBytes<FVoxelInterestSet>(), OutputMetadataLease))
+	{ ConfigurationError = TEXT("CapacityBlocked: interest output metadata"); return false; }
+	const auto MakeOutput = [&OutputMetadataLease](FVoxelInterestSet&& Value)
+	{
+		return OutputMetadataLease ? VoxelBoundedAllocation::MakeWorkerShared<FVoxelInterestSet>(OutputMetadataLease, MoveTemp(Value)) :
+			MakeShared<FVoxelInterestSet, ESPMode::ThreadSafe>(MoveTemp(Value));
+	};
 	const bool bPolicyChanged = !bHasSettings || !(LatestSettings.Lod == InSettings.Lod) ||
-		!(LatestSettings.Readiness == InSettings.Readiness) || !(LatestSettings.Planning == InSettings.Planning);
+		!(LatestSettings.Fine == InSettings.Fine) || !(LatestSettings.Readiness == InSettings.Readiness) ||
+		!(LatestSettings.Planning == InSettings.Planning);
+	static const TMap<FGuid, TSharedPtr<const FSourceState, ESPMode::ThreadSafe>> EmptyStates;
+	const auto& States = SourceRoot ? SourceRoot->Values : EmptyStates;
+	const int64 MaximumStates = int64(States.Num()) + InSources.Num();
+	if (MaximumStates > MAX_int32) { ConfigurationError = TEXT("Oversized: interest Source root"); return false; }
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> StateRootLease, ActiveLease;
+	if (PlanningResources)
+	{
+		const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FSourceRoot>() +
+			VoxelBoundedAllocation::MapBytes<FGuid, TSharedPtr<const FSourceState, ESPMode::ThreadSafe>>(int32(MaximumStates));
+		if (Bytes > PlanningResources->Snapshot().Limits.InputBytes)
+		{ ConfigurationError = TEXT("Oversized: interest Source root"); return false; }
+		if (!PlanningResources->Acquire(PlanningConsumer, EVoxelTerrainResourcePool::Input, Bytes, StateRootLease) ||
+			!PlanningResources->Acquire(PlanningConsumer, EVoxelTerrainResourcePool::Working,
+				FMath::Max<uint64>(1, VoxelBoundedAllocation::SetBytes<FGuid>(InSources.Num())), ActiveLease))
+		{ ConfigurationError = TEXT("CapacityBlocked: interest Source root"); return false; }
+	}
+	const auto CandidateRoot = StateRootLease ? VoxelBoundedAllocation::MakeWorkerShared<FSourceRoot>(StateRootLease) :
+		MakeShared<FSourceRoot, ESPMode::ThreadSafe>();
+	auto& CandidateStates = CandidateRoot->Values;
+	CandidateStates.Reserve(int32(MaximumStates));
+	for (const auto& Pair : States) CandidateStates.Add(Pair.Key, Pair.Value);
 	TSet<FGuid> ActiveIds;
-	for (const FVoxelStreamingSource& Source : InSources) ActiveIds.Add(Source.Id);
+	ActiveIds.Reserve(InSources.Num());
+	for (const FVoxelStreamingSource& Source : InSources)
+	{
+		if (!Source.Id.IsValid() || ActiveIds.Contains(Source.Id) || Source.Direction.ContainsNaN() ||
+			Source.VelocityCellsPerSecond.ContainsNaN())
+		{
+			OutInterest.Reset();
+			return false;
+		}
+		ActiveIds.Add(Source.Id);
+	}
 	bool bAnyChanged = false;
-	for (auto Iterator = States.CreateIterator(); Iterator; ++Iterator)
+	bool bPlanChanged = bPolicyChanged || CoarsePlanner.HasRetryReady();
+	TSharedPtr<FVoxelFineResidencyLeases, ESPMode::ThreadSafe> CandidateLeases;
+	TSharedPtr<FVoxelFinePageLayout, ESPMode::ThreadSafe> CandidateLayout;
+	const auto EditLeases = [&]() -> FVoxelFineResidencyLeases*
+	{
+		if (!CandidateLeases)
+		{
+			const FVoxelFineResidencyLeases Empty;
+			CandidateLeases = (FineLeases ? *FineLeases : Empty).Capture(PlanningResources, PlanningConsumer, ConfigurationError);
+		}
+		return CandidateLeases.Get();
+	};
+	const auto EditLayout = [&]() -> FVoxelFinePageLayout*
+	{
+		if (!CandidateLayout)
+		{
+			const FVoxelFinePageLayout Empty;
+			CandidateLayout = (FineLayout ? *FineLayout : Empty).Capture(PlanningResources, PlanningConsumer, ConfigurationError);
+		}
+		return CandidateLayout.Get();
+	};
+	bool bResidencyChanged = false;
+	bool bLayoutChanged = false;
+	bool bCoarsePlanChanged = bPlanChanged;
+	if (bPolicyChanged)
+	{
+		if (!EditLeases()) return false;
+		EditLeases()->Reset();
+		if (!EditLayout() || !EditLayout()->Initialize(InSettings.Fine.MaximumPageLevel, InSettings.Fine.ShardSideCells,
+			InSettings.Fine.FirstMergeDistanceCells, ConfigurationError))
+		{
+			OutInterest.Reset();
+			return false;
+		}
+	}
+	for (auto Iterator = CandidateStates.CreateIterator(); Iterator; ++Iterator)
 	{
 		if (!ActiveIds.Contains(Iterator.Key()))
 		{
+			TVoxelFineSetDelta<FVoxelFineShardKey> ResidencyDelta;
+			if (!EditLeases() || !EditLeases()->TryRemoveSource(Iterator.Key(), ResidencyDelta, ConfigurationError) ||
+				!EditLayout() || !EditLayout()->ApplyResidencyDelta(ResidencyDelta, ConfigurationError))
+			{
+				OutInterest.Reset();
+				return false;
+			}
+			if (!EditLayout()->RemoveSource(Iterator.Key(), ConfigurationError)) return false;
 			Iterator.RemoveCurrent();
-			bAnyChanged = true;
+			bAnyChanged = bPlanChanged = bCoarsePlanChanged = bResidencyChanged = bLayoutChanged = true;
 		}
 	}
-	const FVoxelInterestManager Manager;
+	FVoxelInterestManager Manager;
+	if (PlanningResources) Manager.BindResources(PlanningResources.ToSharedRef(), PlanningConsumer);
 	for (const FVoxelStreamingSource& Source : InSources)
 	{
-		FSourceState& State = States.FindOrAdd(Source.Id);
-		const bool bConfigurationChanged = bPolicyChanged || ConfigurationChanged(State.Source, Source);
-		const FVoxelResolvedViewRanges Steps = VoxelViewLod::ResolveReplanSteps(Source, InSettings, LatestInterest.Sources.Find(Source.Id));
-		const FIntVector ExactAnchor = Snap3D(Source.Center,
-			FMath::Clamp(Source.CollisionRadius / 2, 4, 16));
-		const FIntVector FineAnchor = Snap3D(Source.Center,
-			Steps.Fine);
-		const FIntVector ProxyAnchor = Snap3D(Source.Center,
-			Steps.Proxy);
-		const FIntPoint SurfaceAnchor = Snap2D(Source.Center,
-			Steps.Surface);
-		const FIntPoint MacroAnchor = Snap2D(Source.Center,
-			Steps.Macro);
-		const FVector Predicted = FVector(Source.Center) +
-			Source.VelocityCellsPerSecond * Source.View.FinePredictionSeconds;
-		const FIntVector PredictedCenter(FMath::RoundToInt(Predicted.X),
-			FMath::RoundToInt(Predicted.Y), FMath::RoundToInt(Predicted.Z));
-		const FIntVector PredictionAnchor = Snap3D(PredictedCenter, RuntimeInterestSectionSide);
-		if (bConfigurationChanged || State.ExactAnchor != ExactAnchor)
+		const auto* PreviousState = CandidateStates.Find(Source.Id);
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> StateLease;
+		if (PlanningResources && !PlanningResources->Acquire(PlanningConsumer, EVoxelTerrainResourcePool::Input,
+			VoxelBoundedAllocation::WorkerSharedBytes<FSourceState>(), StateLease))
+		{ ConfigurationError = TEXT("CapacityBlocked: interest Source state"); return false; }
+		const auto StateOwner = StateLease ?
+			VoxelBoundedAllocation::MakeWorkerShared<FSourceState>(StateLease, PreviousState ? **PreviousState : FSourceState()) :
+			MakeShared<FSourceState, ESPMode::ThreadSafe>(PreviousState ? **PreviousState : FSourceState());
+		FSourceState& State = *StateOwner;
+		if (PlanningResources) State.FineResidency.BindResources(PlanningResources.ToSharedRef(), PlanningConsumer);
+		const uint64 AcceptedResidency = State.FineResidency.GetResidencyRevision();
+		const bool bHadFineResidency = State.bHasFineResidency;
+		const EVoxelSourceChange Change = ClassifySourceChange(State.Source, Source, InSettings, PreviousInterest.Sources.Find(Source.Id));
+		bool bRuntimeChanged = bPolicyChanged || EnumHasAnyFlags(Change, EVoxelSourceChange::RuntimeDemand);
+		const bool bCoarseChanged = bPolicyChanged || EnumHasAnyFlags(Change, EVoxelSourceChange::CoarseTopology);
+		bAnyChanged |= Change != EVoxelSourceChange::None;
+		bCoarsePlanChanged |= bCoarseChanged;
+		const bool bFine = Source.Has(EVoxelStreamingCapability::FineVisual);
+		if (bFine)
 		{
-			State.Exact = {};
-			FVoxelStreamingSource ExactSource = Source;
-			ExactSource.Capabilities &= ~(EVoxelStreamingCapability::FineVisual |
-				EVoxelStreamingCapability::WorldVisual |
-				EVoxelStreamingCapability::LocalRefinement);
-			ExactSource.View.FineRadiusCells = 0;
-			Manager.BuildSourceExact(ExactSource, InManifest, InSettings, State.Exact,
-				&LatestInterest);
-			State.ExactAnchor = ExactAnchor;
-			bAnyChanged = true;
-		}
-		if (bConfigurationChanged || State.FineAnchor != FineAnchor)
-		{
-			State.Fine = {};
-			if (Source.Has(EVoxelStreamingCapability::FineVisual))
+			FVoxelFineMovementDelta Movement;
+			if (bPolicyChanged || !State.bHasFineResidency)
 			{
-				FVoxelStreamingSource FineSource = Source;
-				FineSource.Capabilities = EVoxelStreamingCapability::Data |
-					EVoxelStreamingCapability::FineVisual;
-				if (Source.Has(EVoxelStreamingCapability::LocalRefinement))
+				if (!State.FineResidency.Initialize(Source.Id, InSettings.Fine.WindowSettings(), Source.Center,
+					InSettings.Fine.InteractiveRadiusCells, InSettings.Fine.InteractiveVerticalHalfExtentCells,
+					InSettings.Fine.CollisionGuardRadiusCells, InManifest.Settings.MinZ, InManifest.Settings.MaxZ, ConfigurationError))
 				{
-					FineSource.Capabilities |= EVoxelStreamingCapability::LocalRefinement;
+					OutInterest.Reset();
+					return false;
 				}
-				FineSource.ExactRadius = -1;
-				FineSource.CollisionRadius = 0;
-				FineSource.SimulationRadius = 0;
-				FineSource.MovementCriticalCollisionRadius = 0;
-				Manager.BuildSourceExact(FineSource, InManifest, InSettings, State.Fine,
-					&LatestInterest);
+				State.bHasFineResidency = true;
+				bRuntimeChanged = true;
+				bResidencyChanged = true;
 			}
-			State.FineAnchor = FineAnchor;
+			if (!State.FineResidency.UpdateMovement(Source.Center, Source.VelocityCellsPerSecond, InSettings.Fine.PredictionSeconds,
+				Movement, ConfigurationError, false))
+			{
+				OutInterest.Reset();
+				return false;
+			}
+			bRuntimeChanged |= Movement.bCoreChanged || Movement.bGuardChanged;
+			const uint64 PreviousResidency = State.FineResidency.GetResidencyRevision();
+			FVoxelFineMigrationDecision Migration;
+			if (!State.FineResidency.PrepareWindow(Source.Center, Source.VelocityCellsPerSecond,
+				InFeedback ? InFeedback->PreparationSeconds : InSettings.Fine.MinimumPreparationSeconds, Migration, ConfigurationError, false))
+			{
+				OutInterest.Reset();
+				return false;
+			}
+			bool bTravelBarrier = true;
+			if (InFeedback && InFeedback->WorldEpoch != 0 && InFeedback->CoverageRootSerial != 0)
+			{
+				FVoxelFineSafetyContext Safety;
+				Safety.WorldEpoch = InFeedback->WorldEpoch;
+				Safety.CoverageRootSerial = InFeedback->CoverageRootSerial;
+				Safety.LastAcceptedPosition = InFeedback->LastAcceptedPositions.FindRef(Source.Id);
+				Safety.PredictionSeconds = InSettings.Fine.PredictionSeconds;
+				const auto Coverage = [InFeedback](const FIntVector& Key)
+				{
+					return InFeedback->Sections.FindRef(Key);
+				};
+				FVoxelFineSafetyResult SafetyResult;
+				if (InFeedback->LastAcceptedPositions.Contains(Source.Id) &&
+					State.FineResidency.EvaluateSafety(Safety, Coverage, SafetyResult, ConfigurationError, false))
+				{
+					bTravelBarrier = !SafetyResult.IsSafe();
+					if (State.FineResidency.GetPending().IsSet() && !bTravelBarrier)
+					{
+						TVoxelFineSetDelta<FVoxelFineShardKey> Committed;
+						State.FineResidency.CommitPending(State.FineResidency.GetPending()->Serial,
+							[InFeedback](const FVoxelFineShardKey& Key) { return InFeedback->Shards.FindRef(Key); },
+							[InFeedback](const FIntVector& Key) { return InFeedback->Sections.FindRef(Key).bWholeCollisionCommitted; },
+							Safety, Coverage, Committed, ConfigurationError, false);
+					}
+				}
+			}
+			if (ConfigurationError.StartsWith(TEXT("CapacityBlocked")) || ConfigurationError.StartsWith(TEXT("Oversized"))) return false;
+			ConfigurationError.Reset();
+			const auto* PreviousSource = PreviousInterest.Sources.Find(Source.Id);
+			bPlanChanged |= !PreviousSource || PreviousSource->bRequiresTravelBarrier != bTravelBarrier;
+			State.bRequiresTravelBarrier = bTravelBarrier;
+			bResidencyChanged |= PreviousResidency != State.FineResidency.GetResidencyRevision();
+			if (bPolicyChanged || !bHadFineResidency || AcceptedResidency != State.FineResidency.GetResidencyRevision())
+			{
+				TVoxelFineSetDelta<FVoxelFineShardKey> ResidencyDelta;
+				if (!EditLeases() || !EditLeases()->TrySetSource(Source.Id, State.FineResidency.GetResidentShards(),
+					ResidencyDelta, ConfigurationError)) return false;
+				bResidencyChanged |= !ResidencyDelta.Added.IsEmpty() || !ResidencyDelta.Removed.IsEmpty();
+				if (!EditLayout() || !EditLayout()->ApplyResidencyDelta(ResidencyDelta, ConfigurationError))
+				{
+					OutInterest.Reset();
+					return false;
+				}
+			}
+			if (bPolicyChanged || !bHadFineResidency || EnumHasAnyFlags(Change, EVoxelSourceChange::PageLayout))
+			{
+				if (!EditLayout() || !EditLayout()->SetSource(Source.Id, Source.Center, ConfigurationError)) return false;
+			}
+		}
+		else if (State.bHasFineResidency)
+		{
+			TVoxelFineSetDelta<FVoxelFineShardKey> ResidencyDelta;
+			if (!EditLeases() || !EditLeases()->TryRemoveSource(Source.Id, ResidencyDelta, ConfigurationError) ||
+				!EditLayout() || !EditLayout()->ApplyResidencyDelta(ResidencyDelta, ConfigurationError))
+			{
+				OutInterest.Reset();
+				return false;
+			}
+			if (!EditLayout()->RemoveSource(Source.Id, ConfigurationError)) return false;
+			State.FineResidency.Reset();
+			State.bHasFineResidency = false;
+			State.bRequiresTravelBarrier = false;
+			bResidencyChanged = true;
+			bRuntimeChanged = true;
+		}
+		if (bRuntimeChanged || !State.Source.Id.IsValid())
+		{
+			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ExactLease;
+			if (PlanningResources && !PlanningResources->Acquire(PlanningConsumer, EVoxelTerrainResourcePool::Input,
+				VoxelBoundedAllocation::WorkerSharedBytes<FVoxelInterestSet>(), ExactLease))
+			{ ConfigurationError = TEXT("CapacityBlocked: source demand metadata"); return false; }
+			const auto Exact = ExactLease ? VoxelBoundedAllocation::MakeWorkerShared<FVoxelInterestSet>(ExactLease) :
+				MakeShared<FVoxelInterestSet, ESPMode::ThreadSafe>();
+			Manager.BuildSourceExact(Source, InManifest, InSettings, *Exact, &PreviousInterest,
+				State.bHasFineResidency ? &State.FineResidency : nullptr);
+			if (!Exact->PlanningError.IsEmpty())
+			{
+				ConfigurationError = Exact->PlanningError;
+				OutInterest.Reset();
+				return false;
+			}
+			State.Exact = Exact;
 			bAnyChanged = true;
 		}
-		if (bConfigurationChanged || State.ProxyAnchor != ProxyAnchor)
+		const FVoxelResolvedViewRanges Steps = VoxelViewLod::ResolveReplanSteps(Source, InSettings, PreviousInterest.Sources.Find(Source.Id));
+		const FIntVector ProxyAnchor = Snap3D(Source.Center, Steps.Proxy);
+		const FIntPoint SurfaceAnchor = Snap2D(Source.Center, Steps.Surface);
+		const FIntPoint MacroAnchor = Snap2D(Source.Center, Steps.Macro);
+		if (bCoarseChanged || State.ProxyAnchor != ProxyAnchor)
 		{
-			State.Proxy = {};
-			Manager.BuildSourceProxy(Source, InManifest, InSettings, State.Proxy);
 			State.ProxyAnchor = ProxyAnchor;
 			State.ProxyPlanCenter = Source.Center;
-			bAnyChanged = true;
+			bCoarsePlanChanged = true;
 		}
-		if (bConfigurationChanged || State.SurfaceAnchor != SurfaceAnchor)
+		if (bCoarseChanged || State.SurfaceAnchor != SurfaceAnchor)
 		{
-			State.Surface = {};
-			Manager.BuildSourceSurface(Source, InManifest, InSettings, State.Surface);
 			State.SurfaceAnchor = SurfaceAnchor;
 			State.SurfacePlanCenter = Source.Center;
-			bAnyChanged = true;
+			bCoarsePlanChanged = true;
 		}
-		if (bConfigurationChanged || State.MacroAnchor != MacroAnchor)
+		if (bCoarseChanged || State.MacroAnchor != MacroAnchor)
 		{
-			State.Macro = {};
-			Manager.BuildSourceMacro(Source, InManifest, InSettings, State.Macro);
 			State.MacroAnchor = MacroAnchor;
 			State.MacroPlanCenter = Source.Center;
-			bAnyChanged = true;
+			bCoarsePlanChanged = true;
 		}
-		if (State.PredictionAnchor != PredictionAnchor ||
-			FVector::DotProduct(State.Source.Direction.GetSafeNormal(),
-				Source.Direction.GetSafeNormal()) < 0.9)
-		{
-			bAnyChanged = true;
-		}
-		State.PredictionAnchor = PredictionAnchor;
-		bAnyChanged |= State.Source.Center != Source.Center;
+		bPlanChanged |= bRuntimeChanged || bCoarsePlanChanged || bResidencyChanged;
 		State.Source = Source;
+		CandidateStates.Add(Source.Id, StateOwner);
 	}
+	while (CandidateLayout && CandidateLayout->IsPending())
+	{
+		FVoxelFinePageLayoutDelta LayoutDelta;
+		CandidateLayout->Advance(64, LayoutDelta, &ConfigurationError, false);
+		if (!ConfigurationError.IsEmpty()) return false;
+		bLayoutChanged |= LayoutDelta.bChanged;
+	}
+	// 布局 Page 的合并、拆分只改变 Fine 呈现；稳定 Shard 驻留变化才修改粗域前驱。
+	bCoarsePlanChanged |= bResidencyChanged;
+	bPlanChanged |= bCoarsePlanChanged;
+	bAnyChanged |= bPlanChanged;
+
 	if (!bAnyChanged)
 	{
 		return false;
 	}
+	if (!bPlanChanged)
+	{
+		FVoxelInterestSet PriorityOnly;
+		if (!Manager.CopyForPriority(PreviousInterest, PriorityOnly, ConfigurationError)) return false;
+		for (const FVoxelStreamingSource& Source : InSources)
+		{
+			PriorityOnly.Sources.FindChecked(Source.Id).Source = Source;
+		}
+		if (!Manager.RefreshPriorities(InSources, InSettings.Fine.InteractiveRadiusCells, PriorityOnly,
+			ConfigurationError, PlanningResources, PlanningConsumer))
+		{
+			OutInterest.Reset();
+			return false;
+		}
+		if (!Manager.BuildPublicationInputs(PriorityOnly, ConfigurationError)) return false;
+		check(PrioritySerial < MAX_uint64);
+		PriorityOnly.PriorityRevision = ++PrioritySerial;
+		SourceRoot = CandidateRoot;
+		LatestSettings = InSettings;
+		OutInterest = MakeOutput(MoveTemp(PriorityOnly));
+		LatestInterest = OutInterest;
+		bOutSnapshot = true;
+		return false;
+	}
 
 	FVoxelInterestSet Prepared;
+	const auto* AcceptedLayout = CandidateLayout ? CandidateLayout.Get() : FineLayout.Get();
+	int64 ExactRows64 = 0, WarmupRows64 = 0, ShardRows64 = 0, PageShardRows64 = 0;
+	uint64 SourceBytes = 0, PageBytes = 0;
+	for (const auto& Pair : CandidateStates)
+	{
+		const auto& State = *Pair.Value;
+		ExactRows64 += State.Exact->Exact.Num(); WarmupRows64 += State.Exact->Warmup.Num();
+		if (State.bHasFineResidency) ShardRows64 += State.FineResidency.GetResidentShards().Num();
+		for (const auto& Source : State.Exact->Sources)
+		{
+			SourceBytes += VoxelBoundedAllocation::SetBytes<FIntVector>(Source.Value.DataSections.Num()) +
+				VoxelBoundedAllocation::SetBytes<FIntVector>(Source.Value.FineDataSections.Num()) +
+				VoxelBoundedAllocation::SetBytes<FIntVector>(Source.Value.F0CoreSections.Num()) +
+				VoxelBoundedAllocation::SetBytes<FIntVector>(Source.Value.CollisionSections.Num()) +
+				VoxelBoundedAllocation::SetBytes<FIntVector>(Source.Value.SimulationSections.Num());
+		}
+	}
+	if (AcceptedLayout) for (const auto& Pair : AcceptedLayout->GetPages())
+	{
+		PageShardRows64 += Pair.Value.Shards.Num();
+		PageBytes += VoxelBoundedAllocation::ArrayBytes<FVoxelFineShardKey>(Pair.Value.Shards.Num());
+	}
+	if (ExactRows64 > MAX_int32 || WarmupRows64 > MAX_int32 || ShardRows64 > MAX_int32 || PageShardRows64 > MAX_int32)
+	{ ConfigurationError = TEXT("Oversized: composed interest rows"); return false; }
+	const int32 ExactRows = int32(ExactRows64), WarmupRows = int32(WarmupRows64), ShardRows = int32(ShardRows64);
+	const int32 PageCount = AcceptedLayout ? AcceptedLayout->GetPages().Num() : 0;
+	if (PlanningResources)
+	{
+		const uint64 Bytes = SourceBytes + PageBytes + VoxelBoundedAllocation::MapBytes<FGuid, FVoxelSourceInterest>(InSources.Num()) +
+			VoxelBoundedAllocation::MapBytes<FIntVector, FVoxelExactDemand>(ExactRows) +
+			VoxelBoundedAllocation::MapBytes<FIntVector, FVoxelExactDemand>(WarmupRows) +
+			VoxelBoundedAllocation::MapBytes<FVoxelFineShardKey, FVoxelFineShardDemand>(ShardRows) +
+			VoxelBoundedAllocation::MapBytes<FVoxelFinePageKey, FVoxelFineLayoutPage>(PageCount) +
+			VoxelBoundedAllocation::MapBytes<FVoxelFineShardKey, FVoxelFinePageKey>(int32(PageShardRows64));
+		if (Bytes > PlanningResources->Snapshot().Limits.InputBytes)
+		{ ConfigurationError = TEXT("Oversized: composed interest containers"); return false; }
+		if (!PlanningResources->Acquire(PlanningConsumer, EVoxelTerrainResourcePool::Input,
+			FMath::Max<uint64>(1, Bytes), Prepared.CompositionLease))
+		{ ConfigurationError = TEXT("CapacityBlocked: composed interest containers"); return false; }
+	}
+	Prepared.Sources.Reserve(InSources.Num()); Prepared.Exact.Reserve(ExactRows); Prepared.Warmup.Reserve(WarmupRows);
+	Prepared.FineShardDemands.Reserve(ShardRows); Prepared.FineShardPages.Reserve(PageCount); Prepared.FineShardOwners.Reserve(int32(PageShardRows64));
 	for (const FVoxelStreamingSource& Source : InSources)
 	{
-		const FSourceState& State = States.FindChecked(Source.Id);
+		const FSourceState& State = *CandidateStates.FindChecked(Source.Id);
 		FVoxelSourceInterest& SourceInterest = Prepared.Sources.FindOrAdd(Source.Id);
 		SourceInterest.Source = Source;
 		SourceInterest.bHasStageCenters = true;
 		SourceInterest.StageCenters[0] = State.ProxyPlanCenter;
 		SourceInterest.StageCenters[1] = State.SurfacePlanCenter;
 		SourceInterest.StageCenters[2] = State.MacroPlanCenter;
-		for (const FVoxelInterestSet* Layer : { &State.Exact, &State.Fine })
+		for (const FVoxelInterestSet* Layer : { State.Exact.Get() })
 		{
 			if (const FVoxelSourceInterest* Part = Layer->Sources.Find(Source.Id))
 			{
+				SourceInterest.DataSections.Reserve(Part->DataSections.Num());
+				SourceInterest.FineDataSections.Reserve(Part->FineDataSections.Num());
+				SourceInterest.F0CoreSections.Reserve(Part->F0CoreSections.Num());
+				SourceInterest.CollisionSections.Reserve(Part->CollisionSections.Num());
+				SourceInterest.SimulationSections.Reserve(Part->SimulationSections.Num());
 				for (const FIntVector& Key : Part->DataSections) SourceInterest.DataSections.Add(Key);
 				for (const FIntVector& Key : Part->FineDataSections) SourceInterest.FineDataSections.Add(Key);
+				for (const FIntVector& Key : Part->F0CoreSections) SourceInterest.F0CoreSections.Add(Key);
 				for (const FIntVector& Key : Part->CollisionSections) SourceInterest.CollisionSections.Add(Key);
+				for (const FIntVector& Key : Part->SimulationSections) SourceInterest.SimulationSections.Add(Key);
 			}
 			for (const auto& Pair : Layer->Exact)
 			{
@@ -339,70 +603,122 @@ bool FVoxelInterestRuntime::Update(TConstArrayView<FVoxelStreamingSource> InSour
 				Demand.bFineRender |= Pair.Value.bFineRender;
 			}
 		}
-		for (const FVoxelViewKey& Key : State.Proxy.VoxelProxy) Prepared.VoxelProxy.Add(Key);
-		for (const FVoxelSurfaceTileKey& Key : State.Surface.Surface) Prepared.Surface.Add(Key);
-		for (const FVoxelMacroTileKey& Key : State.Macro.Macro) Prepared.Macro.Add(Key);
+		if (State.bHasFineResidency)
+		{
+			if (!Manager.BuildFineShardDemand(Source, State.FineResidency, Prepared, ConfigurationError))
+			{
+				OutInterest.Reset();
+				return false;
+			}
+			SourceInterest.bRequiresTravelBarrier = State.bRequiresTravelBarrier;
+		}
 	}
-	FVoxelInterestSet Next = Manager.Finalize(InSources, InManifest, InSettings, MoveTemp(Prepared));
+	if (AcceptedLayout) for (const auto& Pair : AcceptedLayout->GetPages()) Prepared.FineShardPages.Add(Pair.Key, Pair.Value);
+	for (const auto& Pair : Prepared.FineShardPages)
+	{
+		for (const FVoxelFineShardKey& Shard : Pair.Value.Shards) Prepared.FineShardOwners.Add(Shard, Pair.Key);
+	}
+	FVoxelInterestSet Next = Manager.Finalize(InSources, InManifest, InSettings, MoveTemp(Prepared), &PreviousInterest, bCoarsePlanChanged, &CoarsePlanner);
+	for (auto& Pair : Next.FineShardDemands)
+	{
+		const auto* Previous = PreviousInterest.FineShardDemands.Find(Pair.Key);
+		Pair.Value.FirstQueuedSeconds = Previous ? Previous->FirstQueuedSeconds :
+			PlanningFirstQueuedSeconds > 0.0 ? PlanningFirstQueuedSeconds : FPlatformTime::Seconds();
+		Pair.Value.QueueSequence = Previous ? Previous->QueueSequence : ++FineDemandSequence;
+	}
 	if (!Next.PlanningError.IsEmpty())
 	{
+		LastPlanningError = Next.PlanningError;
 		UE_LOG(LogTemp, Error, TEXT("Terrain plan failed; preserving committed interest: %s"), *Next.PlanningError);
-		States.Reset();
-		OutInterest = LatestInterest;
+		OutInterest.Reset();
 		return false;
 	}
-	TSet<FIntVector> PreviousExact;
-	TSet<FIntVector> NextExact;
-	TSet<FIntVector> PreviousFine;
-	TSet<FIntVector> NextFine;
-	for (const auto& Pair : LatestInterest.Exact)
+	if (PlanningResources)
 	{
-		PreviousExact.Add(Pair.Key);
-		if (Pair.Value.bFineRender) PreviousFine.Add(Pair.Key);
+		const uint64 Bytes = 3 * VoxelBoundedAllocation::SetBytes<FIntVector>(PreviousInterest.Exact.Num()) +
+			3 * VoxelBoundedAllocation::SetBytes<FIntVector>(Next.Exact.Num()) +
+			VoxelBoundedAllocation::SetBytes<FVoxelFineShardKey>(Next.FineShardDemands.Num()) +
+			VoxelBoundedAllocation::SetBytes<FVoxelFineShardKey>(PreviousInterest.FineShardDemands.Num()) +
+			VoxelBoundedAllocation::SetBytes<FVoxelFineShardKey>(FMath::Min(Next.FineShardDemands.Num(), PreviousInterest.FineShardDemands.Num())) +
+			VoxelBoundedAllocation::SetBytes<FVoxelViewKey>(Next.VoxelProxy.Num()) + VoxelBoundedAllocation::SetBytes<FVoxelViewKey>(PreviousInterest.VoxelProxy.Num()) +
+			VoxelBoundedAllocation::SetBytes<FVoxelSurfaceTileKey>(Next.Surface.Num()) + VoxelBoundedAllocation::SetBytes<FVoxelSurfaceTileKey>(PreviousInterest.Surface.Num()) +
+			VoxelBoundedAllocation::SetBytes<FVoxelMacroTileKey>(Next.Macro.Num()) + VoxelBoundedAllocation::SetBytes<FVoxelMacroTileKey>(PreviousInterest.Macro.Num()) +
+			VoxelBoundedAllocation::ArrayBytes<FVoxelTerrainSpatialKey>(Next.Geometry.Num());
+		if (Bytes > PlanningResources->Snapshot().Limits.InputBytes)
+		{ ConfigurationError = TEXT("Oversized: interest delta containers"); return false; }
+		if (!PlanningResources->Acquire(PlanningConsumer, EVoxelTerrainResourcePool::Input, FMath::Max<uint64>(1, Bytes), OutDelta.ResourceLease))
+		{ ConfigurationError = TEXT("CapacityBlocked: interest delta containers"); return false; }
 	}
+	OutDelta.AddedExact.Reserve(Next.Exact.Num()); OutDelta.RemovedExact.Reserve(PreviousInterest.Exact.Num());
+	OutDelta.AddedFine.Reserve(Next.Exact.Num()); OutDelta.RemovedFine.Reserve(PreviousInterest.Exact.Num());
+	OutDelta.AddedSimulation.Reserve(Next.Exact.Num());
+	OutDelta.RemovedSimulation.Reserve(PreviousInterest.Exact.Num());
 	for (const auto& Pair : Next.Exact)
 	{
-		NextExact.Add(Pair.Key);
-		if (Pair.Value.bFineRender) NextFine.Add(Pair.Key);
+		const auto* Previous = PreviousInterest.Exact.Find(Pair.Key);
+		if (!Previous) OutDelta.AddedExact.Add(Pair.Key);
+		if (Pair.Value.bSimulation && (!Previous || !Previous->bSimulation)) OutDelta.AddedSimulation.Add(Pair.Key);
+		if (Pair.Value.bFineRender && (!Previous || !Previous->bFineRender)) OutDelta.AddedFine.Add(Pair.Key);
 	}
-	Difference(PreviousExact, NextExact, OutDelta.AddedExact, OutDelta.RemovedExact);
-	Difference(PreviousFine, NextFine, OutDelta.AddedFine, OutDelta.RemovedFine);
-	Difference(LatestInterest.VoxelProxy, Next.VoxelProxy, OutDelta.AddedProxy, OutDelta.RemovedProxy);
-	Difference(LatestInterest.Surface, Next.Surface, OutDelta.AddedSurface, OutDelta.RemovedSurface);
-	Difference(LatestInterest.Macro, Next.Macro, OutDelta.AddedMacro, OutDelta.RemovedMacro);
+	for (const auto& Pair : PreviousInterest.Exact)
+	{
+		const auto* Desired = Next.Exact.Find(Pair.Key);
+		if (!Desired) OutDelta.RemovedExact.Add(Pair.Key);
+		if (Pair.Value.bSimulation && (!Desired || !Desired->bSimulation)) OutDelta.RemovedSimulation.Add(Pair.Key);
+		if (Pair.Value.bFineRender && (!Desired || !Desired->bFineRender)) OutDelta.RemovedFine.Add(Pair.Key);
+	}
+	OutDelta.FineResidency.Added.Reserve(Next.FineShardDemands.Num());
+	OutDelta.FineResidency.Removed.Reserve(PreviousInterest.FineShardDemands.Num());
+	OutDelta.FineResidency.Retained.Reserve(FMath::Min(Next.FineShardDemands.Num(), PreviousInterest.FineShardDemands.Num()));
+	for (const auto& Pair : Next.FineShardDemands)
+	{
+		if (PreviousInterest.FineShardDemands.Contains(Pair.Key)) OutDelta.FineResidency.Retained.Add(Pair.Key);
+		else OutDelta.FineResidency.Added.Add(Pair.Key);
+	}
+	for (const auto& Pair : PreviousInterest.FineShardDemands)
+		if (!Next.FineShardDemands.Contains(Pair.Key)) OutDelta.FineResidency.Removed.Add(Pair.Key);
+	OutDelta.AddedProxy.Reserve(Next.VoxelProxy.Num()); OutDelta.RemovedProxy.Reserve(PreviousInterest.VoxelProxy.Num());
+	OutDelta.AddedSurface.Reserve(Next.Surface.Num()); OutDelta.RemovedSurface.Reserve(PreviousInterest.Surface.Num());
+	OutDelta.AddedMacro.Reserve(Next.Macro.Num()); OutDelta.RemovedMacro.Reserve(PreviousInterest.Macro.Num());
+	OutDelta.ChangedGeometry.Reserve(Next.Geometry.Num());
+	OutDelta.bFineResidencyChanged = bResidencyChanged;
+	OutDelta.bPageLayoutChanged = bLayoutChanged;
+	Difference(PreviousInterest.VoxelProxy, Next.VoxelProxy, OutDelta.AddedProxy, OutDelta.RemovedProxy);
+	Difference(PreviousInterest.Surface, Next.Surface, OutDelta.AddedSurface, OutDelta.RemovedSurface);
+	Difference(PreviousInterest.Macro, Next.Macro, OutDelta.AddedMacro, OutDelta.RemovedMacro);
 	OutDelta.bVisualPartitionChanged = !OutDelta.AddedFine.IsEmpty() || !OutDelta.RemovedFine.IsEmpty() ||
 		!OutDelta.AddedProxy.IsEmpty() || !OutDelta.RemovedProxy.IsEmpty() ||
 		!OutDelta.AddedSurface.IsEmpty() || !OutDelta.RemovedSurface.IsEmpty() ||
-		!OutDelta.AddedMacro.IsEmpty() || !OutDelta.RemovedMacro.IsEmpty();
+		!OutDelta.AddedMacro.IsEmpty() || !OutDelta.RemovedMacro.IsEmpty() || bResidencyChanged || bLayoutChanged;
 	for (const auto& Pair : Next.Geometry)
 	{
-		const auto* PreviousGeometry = LatestInterest.Geometry.Find(Pair.Key);
+		const auto* PreviousGeometry = PreviousInterest.Geometry.Find(Pair.Key);
 		if (!PreviousGeometry || *PreviousGeometry != Pair.Value)
 		{ OutDelta.ChangedGeometry.Add(Pair.Key); OutDelta.bVisualPartitionChanged = true; }
 	}
-	OutDelta.bVisualPartitionChanged |= !SameFinePagePlan(LatestInterest.FinePagePlan, Next.FinePagePlan) ||
-										!SameRuntimeSet(LatestInterest.TerrainPlan.Roots, Next.TerrainPlan.Roots) ||
-										!SameRuntimeSet(LatestInterest.TerrainPlan.Leaves, Next.TerrainPlan.Leaves) ||
-										!SameRuntimeSet(LatestInterest.TerrainPlan.FineDependencies, Next.TerrainPlan.FineDependencies);
+	OutDelta.bVisualPartitionChanged |= !SameFinePagePlan(PreviousInterest.FinePagePlan, Next.FinePagePlan) ||
+										!SameRuntimeSet(PreviousInterest.TerrainPlan.Roots, Next.TerrainPlan.Roots) ||
+										!SameRuntimeSet(PreviousInterest.TerrainPlan.Leaves, Next.TerrainPlan.Leaves) ||
+										!SameRuntimeSet(PreviousInterest.TerrainPlan.FineDependencies, Next.TerrainPlan.FineDependencies);
 	bool bChanged = !OutDelta.AddedExact.IsEmpty() || !OutDelta.RemovedExact.IsEmpty() ||
-		OutDelta.bVisualPartitionChanged || Next.Warmup.Num() != LatestInterest.Warmup.Num() ||
-		Next.Sources.Num() != LatestInterest.Sources.Num() ||
-		!SamePriorities(Next.VoxelProxyPriorities, LatestInterest.VoxelProxyPriorities) ||
-		!SamePriorities(Next.SurfacePriorities, LatestInterest.SurfacePriorities) ||
-		!SamePriorities(Next.MacroPriorities, LatestInterest.MacroPriorities);
+		OutDelta.bVisualPartitionChanged || Next.Warmup.Num() != PreviousInterest.Warmup.Num() ||
+		Next.Sources.Num() != PreviousInterest.Sources.Num() ||
+		!SamePriorities(Next.VoxelProxyPriorities, PreviousInterest.VoxelProxyPriorities) ||
+		!SamePriorities(Next.SurfacePriorities, PreviousInterest.SurfacePriorities) ||
+		!SamePriorities(Next.MacroPriorities, PreviousInterest.MacroPriorities);
 	if (!bChanged)
 	{
-		TSet<FIntVector> NextPlayable;
-		TSet<FIntVector> PreviousPlayable;
-		NextPlayable.Append(Next.PlayableFineKeys);
-		PreviousPlayable.Append(LatestInterest.PlayableFineKeys);
-		bChanged = !SameRuntimeSet(NextPlayable, PreviousPlayable);
+		bChanged = Next.PlayableFineKeys.Num() != PreviousInterest.PlayableFineKeys.Num();
+		for (const FIntVector& Key : Next.PlayableFineKeys)
+		{
+			if (!PreviousInterest.PlayableFineKeys.Contains(Key)) { bChanged = true; break; }
+		}
 	}
 	if (!bChanged)
 	{
 		for (const auto& Pair : Next.Sources)
 		{
-			const FVoxelSourceInterest* Previous = LatestInterest.Sources.Find(Pair.Key);
+			const FVoxelSourceInterest* Previous = PreviousInterest.Sources.Find(Pair.Key);
 			if (!Previous || !SameRuntimeSet(Pair.Value.DataSections, Previous->DataSections) ||
 				!SameRuntimeSet(Pair.Value.FineDataSections, Previous->FineDataSections) ||
 				!SameRuntimeSet(Pair.Value.CollisionSections, Previous->CollisionSections))
@@ -416,7 +732,7 @@ bool FVoxelInterestRuntime::Update(TConstArrayView<FVoxelStreamingSource> InSour
 	{
 		for (const auto& Pair : Next.Warmup)
 		{
-			const FVoxelExactDemand* Previous = LatestInterest.Warmup.Find(Pair.Key);
+			const FVoxelExactDemand* Previous = PreviousInterest.Warmup.Find(Pair.Key);
 			if (!Previous || !SameDemandSemantics(*Previous, Pair.Value))
 			{
 				bChanged = true;
@@ -428,7 +744,7 @@ bool FVoxelInterestRuntime::Update(TConstArrayView<FVoxelStreamingSource> InSour
 	{
 		for (const auto& Pair : Next.Exact)
 		{
-			const FVoxelExactDemand* Previous = LatestInterest.Exact.Find(Pair.Key);
+			const FVoxelExactDemand* Previous = PreviousInterest.Exact.Find(Pair.Key);
 			if (!Previous || !SameDemandSemantics(*Previous, Pair.Value))
 			{
 				bChanged = true;
@@ -436,36 +752,50 @@ bool FVoxelInterestRuntime::Update(TConstArrayView<FVoxelStreamingSource> InSour
 			}
 		}
 	}
-	bool bDemandChanged = Next.Exact.Num() != LatestInterest.Exact.Num() || Next.Warmup.Num() != LatestInterest.Warmup.Num();
-	bool bPriorityChanged = !SamePriorities(Next.VoxelProxyPriorities, LatestInterest.VoxelProxyPriorities) ||
-							!SamePriorities(Next.SurfacePriorities, LatestInterest.SurfacePriorities) ||
-							!SamePriorities(Next.MacroPriorities, LatestInterest.MacroPriorities);
+	bool bDemandChanged = Next.Exact.Num() != PreviousInterest.Exact.Num() || Next.Warmup.Num() != PreviousInterest.Warmup.Num();
+	bool bPriorityChanged = !SamePriorities(Next.VoxelProxyPriorities, PreviousInterest.VoxelProxyPriorities) ||
+							!SamePriorities(Next.SurfacePriorities, PreviousInterest.SurfacePriorities) ||
+							!SamePriorities(Next.MacroPriorities, PreviousInterest.MacroPriorities);
 	for (const auto& Pair : Next.Exact)
 	{
-		const auto* Previous = LatestInterest.Exact.Find(Pair.Key);
+		const auto* Previous = PreviousInterest.Exact.Find(Pair.Key);
 		bDemandChanged |= !Previous || !SameDemandSemantics(*Previous, Pair.Value);
-		bPriorityChanged |= !Previous || Previous->Priority != Pair.Value.Priority || Previous->DistanceCells != Pair.Value.DistanceCells ||
-							Previous->ForwardScore != Pair.Value.ForwardScore;
+		bPriorityChanged |= !Previous || Previous->ServicePriority != Pair.Value.ServicePriority;
 	}
+	bPriorityChanged |= !SameRuntimeMap(Next.GeometryServicePriorities, PreviousInterest.GeometryServicePriorities) ||
+		!SameRuntimeMap(Next.FinePageServicePriorities, PreviousInterest.FinePageServicePriorities);
 	const auto NextRevision = [](const uint64 Revision, const bool bChanged)
 	{
-		return bChanged ? (Revision == MAX_uint64 ? 1 : Revision + 1) : Revision;
+		check(!bChanged || Revision < MAX_uint64);
+		return bChanged ? Revision + 1 : Revision;
 	};
 	Next.PublicationRevision = PublicationSerial = NextRevision(PublicationSerial, OutDelta.bVisualPartitionChanged || PublicationSerial == 0);
 	Next.DemandRevision = DemandSerial = NextRevision(DemandSerial, bDemandChanged || DemandSerial == 0);
 	Next.PriorityRevision = PrioritySerial = NextRevision(PrioritySerial, bPriorityChanged || PrioritySerial == 0);
+	Next.ResidencyRevision = ResidencySerial = NextRevision(ResidencySerial, bResidencyChanged || ResidencySerial == 0);
+	Next.LayoutRevision = LayoutSerial = NextRevision(LayoutSerial, bLayoutChanged || LayoutSerial == 0);
+	OutDelta.bRuntimeDemandChanged = bDemandChanged;
+	bChanged |= bDemandChanged || bResidencyChanged || bLayoutChanged;
 	LatestSettings = InSettings;
 	bHasSettings = true;
-	LatestInterest = MoveTemp(Next);
-	OutInterest = LatestInterest;
+	SourceRoot = CandidateRoot;
+	if (CandidateLeases) FineLeases = MoveTemp(CandidateLeases);
+	if (CandidateLayout) FineLayout = MoveTemp(CandidateLayout);
+	OutInterest = MakeOutput(MoveTemp(Next));
+	LatestInterest = OutInterest;
 	bOutSnapshot = true;
 	return bChanged;
 }
 
 void FVoxelInterestRuntime::Reset()
 {
-	States.Reset();
+	SourceRoot.Reset();
+	FineLeases.Reset();
+	FineLayout.Reset();
+	CoarsePlanner.Reset();
+	LastPlanningError.Reset();
 	LatestInterest = {};
 	LatestSettings = {};
+	FineDemandSequence = 0;
 	bHasSettings = false;
 }
