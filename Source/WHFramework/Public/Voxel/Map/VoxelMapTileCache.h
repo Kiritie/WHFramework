@@ -73,6 +73,7 @@ private:
 	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> Generator;
 	TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config;
 	uint64 WorldEpoch = 0;
+	FGuid GenerationOwnerId = FGuid::NewGuid();
 	double BlockSize = 1.0;
 	uint64 Sequence = 0;
 	uint64 Revision = 0;

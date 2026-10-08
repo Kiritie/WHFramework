@@ -1,5 +1,6 @@
 #include "Voxel/Rendering/VoxelFineShardBuild.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
+#include "Voxel/Generation/VoxelGenerationPlanningRead.h"
 
 uint64 FVoxelFineShardGeometry::GetResourceAccountedBytes() const
 {
@@ -331,6 +332,7 @@ void FVoxelFineShardSampler::CopySection(const FIntVector& InSection, TConstArra
 EVoxelFineBuildProgress FVoxelFineShardSampler::Advance(const int32 InMaximumSections,
 	const TAtomic<bool>& InCancel, FString& OutError)
 {
+	FVoxelGenerationConsumerScope ConsumerScope(Consumer);
 	if (!Samples || InMaximumSections <= 0)
 	{
 		OutError = TEXT("Fine 采样任务没有有效执行窗口");
@@ -358,6 +360,7 @@ EVoxelFineBuildProgress FVoxelFineShardSampler::Advance(const int32 InMaximumSec
 				{
 					return EVoxelFineBuildProgress::Canceled;
 				}
+				if (OutError.StartsWith(TEXT("CapacityBlocked"))) return EVoxelFineBuildProgress::CapacityBlocked;
 				return OutError.StartsWith(TEXT("DependencyNotReady")) ?
 					EVoxelFineBuildProgress::DependencyNotReady : EVoxelFineBuildProgress::Failed;
 			}

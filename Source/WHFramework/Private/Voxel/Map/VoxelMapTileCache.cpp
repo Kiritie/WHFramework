@@ -4,6 +4,7 @@
 #include "Voxel/Generation/VoxelGenerationBinding.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelGenerationPipeline.h"
+#include "Voxel/Generation/VoxelGenerationCapacityWait.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
 
 namespace
@@ -148,6 +149,16 @@ void FVoxelMapTileCache::Request(
 		Task.WorkClass = EVoxelWorkClass::Background;
 		Task.Stamp.WorldEpoch = WorldEpoch;
 		Task.Stamp.Token = ++Sequence;
+		Task.Stamp.OwnerId = GenerationOwnerId;
+		Task.Stamp.OwnerIncarnation = StyleEpoch + 1;
+		Task.GenerationConsumer = {EVoxelGenerationConsumerKind::Environment, WorldEpoch, GenerationOwnerId,
+			Task.Stamp.OwnerIncarnation, EVoxelGenerationSpatialKind::Bounds,
+			FIntVector(Origin.X, Origin.Y, WorkerConfig->Recipe->Settings.MinZ),
+			FIntVector(Origin.X + (TileSide - 1) * Key.Step + 1, Origin.Y + (TileSide - 1) * Key.Step + 1, WorkerConfig->Recipe->Settings.MaxZ), Task.Stamp.Token};
+		const auto CapacityWait = FVoxelGenerationCapacityWait::Create(Scheduler.GetRuntimeResources(), Task.GenerationConsumer);
+		if (!CapacityWait) continue;
+		Task.bResumable = true;
+		Task.GetBlockReason = [CapacityWait] { return CapacityWait->BlockReason(); };
 		Task.ReservedBytes = 2ull * 1024ull * 1024ull;
 		const FVector2D TileCenter(
 			(static_cast<double>(Origin.X) + TileCells * 0.5),
@@ -155,15 +166,18 @@ void FVoxelMapTileCache::Request(
 		Task.DistanceScore = FVector2D::Distance(TileCenter, InView.Center / BlockSize);
 		const FVoxelMapColorResolver WorkerResolver = ColorResolver;
 		const uint64 RequestStyleEpoch = StyleEpoch;
-		Task.Execute = [Key, Origin, WorkerGenerator, WorkerConfig, WorkerResolver](const TAtomic<bool>& Cancel)
+		Task.Execute = [Key, Origin, WorkerGenerator, WorkerConfig, WorkerResolver, CapacityWait](const TAtomic<bool>& Cancel)
 		{
 			FVoxelTaskResult Result;
 			Result.Kind = EVoxelTaskKind::BuildMapTile;
+			const uint64 BeforeBuild = CapacityWait->Begin();
 			TArray<FVoxelEnvironmentSample> Samples;
 			if (!WorkerGenerator->SampleEnvironments(
 				Origin, TileSide, TileSide, Key.Step, Samples,
 				Result.Error, &Cancel, false))
 			{
+				Result.bCanceled = Cancel.Load();
+				CapacityWait->Continue(Result, BeforeBuild);
 				return Result;
 			}
 			TSharedRef<FMapTilePixels, ESPMode::ThreadSafe> Pixels =
@@ -211,6 +225,11 @@ void FVoxelMapTileCache::SetColorResolver(FVoxelMapColorResolver InResolver, con
 	}
 	ColorResolver = MoveTemp(InResolver);
 	StyleRevision = InStyleRevision;
+	const uint64 PreviousIncarnation = StyleEpoch + 1;
+	Scheduler.CancelMatching([Owner = GenerationOwnerId, PreviousIncarnation](EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
+	{
+		return Kind == EVoxelTaskKind::BuildMapTile && Stamp.OwnerId == Owner && Stamp.OwnerIncarnation == PreviousIncarnation;
+	});
 	++StyleEpoch;
 	Tiles.Reset();
 	Pending.Reset();

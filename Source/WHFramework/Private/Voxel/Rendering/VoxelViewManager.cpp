@@ -14,6 +14,7 @@
 #include "Voxel/Geometry/VoxelSectionMesher.h"
 #include "Voxel/Geometry/DWVoxelBoundaryTransition.h"
 #include "Voxel/Generation/VoxelGenerationBinding.h"
+#include "Voxel/Generation/VoxelGenerationPlanningRead.h"
 #include "Voxel/Generation/VoxelGenerationPlanCache.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Network/VoxelNetworkTypes.h"
@@ -77,11 +78,36 @@ FVoxelGameThreadContinuation GatherFinePageSectionSteps(FVoxelFinePageKey Page, 
 struct FRepresentationOverlayRead
 {
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> FactResources;
+	FVoxelGenerationConsumerKey FactConsumer;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MetadataLease;
 	TAtomic<bool> bWaitingFacts{false};
 	TAtomic<uint64> FactCapacityVersion{0};
+	uint64 BeforeFactBuild = 0;
 	FVoxelFineOverlayRead Reader;
 	TSharedPtr<FVoxelFineOverlayReadResult, ESPMode::ThreadSafe> Result;
+
+	void Begin()
+	{
+		bWaitingFacts.Store(false);
+		BeforeFactBuild = FactResources->ReleaseVersionExcludingOwner(FactConsumer);
+	}
+
+	bool IsBlocked() const
+	{
+		if (!bWaitingFacts.Load()) return false;
+		uint64 Version = 0;
+		return !FactResources->TryGetReleaseVersionExcludingOwner(FactConsumer, Version) || Version <= FactCapacityVersion.Load();
+	}
+
+	bool DeferFacts(FVoxelTaskResult& OutTask)
+	{
+		if (OutTask.bCanceled || !OutTask.Error.StartsWith(TEXT("CapacityBlocked"))) return false;
+		FactCapacityVersion.Store(BeforeFactBuild);
+		bWaitingFacts.Store(true);
+		OutTask.bSuccess = OutTask.bContinue = true;
+		OutTask.Error.Reset();
+		return true;
+	}
 
 	bool Advance(FVoxelTaskResult& OutTask, const TAtomic<bool>& InCancel)
 	{
@@ -93,7 +119,7 @@ struct FRepresentationOverlayRead
 			{
 				if (OutTask.Error.StartsWith(TEXT("CapacityBlocked")))
 				{
-					FactCapacityVersion.Store(FactResources->Snapshot().ReleaseVersion);
+					FactCapacityVersion.Store(BeforeFactBuild);
 					bWaitingFacts.Store(true);
 					OutTask.bSuccess = OutTask.bContinue = true;
 					OutTask.Error.Reset();
@@ -104,7 +130,7 @@ struct FRepresentationOverlayRead
 			{
 				if (OutTask.Error.StartsWith(TEXT("CapacityBlocked")))
 				{
-					FactCapacityVersion.Store(FactResources->Snapshot().ReleaseVersion);
+					FactCapacityVersion.Store(BeforeFactBuild);
 					bWaitingFacts.Store(true);
 					OutTask.Error.Reset();
 				}
@@ -234,16 +260,20 @@ struct FProxyMeshEstimate
 		}
 	};
 
+	FVoxelGenerationConsumerKey MakeCoarseGenerationConsumer(const FVoxelTerrainGeometry& Geometry, const FVoxelTaskStamp& Stamp)
+	{
+		FIntVector Min, Max;
+		if (!Geometry.Key.TryBounds(Geometry.WorldMinZ, Geometry.WorldMaxZ, Min, Max)) return {};
+		return {Geometry.Key.IsColumn() ? EVoxelGenerationConsumerKind::Heightfield : EVoxelGenerationConsumerKind::VoxelProxy,
+			Stamp.WorldEpoch, Stamp.OwnerId, Stamp.OwnerIncarnation, EVoxelGenerationSpatialKind::Bounds, Min, Max, Stamp.Token};
+	}
+
 	TSharedPtr<FVoxelCoarseBuildStorage, ESPMode::ThreadSafe> CreateCoarseBuildStorage(
 		FVoxelTaskScheduler& Scheduler, FVoxelTaskRequest& Request,
 		const FVoxelTerrainGeometry& Geometry, const uint64 InControllerBytes, const int32 InShardArrays = 2)
 	{
-		FIntVector Min, Max;
-		if (!Geometry.Key.TryBounds(Geometry.WorldMinZ, Geometry.WorldMaxZ, Min, Max)) return nullptr;
-		const FVoxelGenerationConsumerKey Consumer{
-			Geometry.Key.IsColumn() ? EVoxelGenerationConsumerKind::Heightfield : EVoxelGenerationConsumerKind::VoxelProxy,
-			Request.Stamp.WorldEpoch, Request.Stamp.OwnerId, Request.Stamp.OwnerIncarnation,
-			EVoxelGenerationSpatialKind::Bounds, Min, Max, Request.Stamp.Token};
+		const FVoxelGenerationConsumerKey Consumer = MakeCoarseGenerationConsumer(Geometry, Request.Stamp);
+		if (!Consumer.IsValid()) return nullptr;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Metadata;
 		const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelCoarseBuildStorage>() + InControllerBytes +
 			InShardArrays * VoxelBoundedAllocation::ArrayBytes<FVoxelTerrainBuildShard>(4096) +
@@ -257,6 +287,7 @@ struct FProxyMeshEstimate
 		}
 		auto Storage = VoxelBoundedAllocation::MakeWorkerShared<FVoxelCoarseBuildStorage>(Metadata,
 			Scheduler.GetTerrainResources(), Consumer, Metadata);
+		Request.GenerationConsumer = Consumer;
 		Request.GetBlockReason = [Storage] { return Storage->BlockReason(); };
 		// 自有租约已占用唯一四账本；旧 Scheduler 计数只保留未迁移任务。
 		Request.InputBytes = 0;
@@ -3318,6 +3349,9 @@ bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int3
 	Request.Stamp.Revision = Module.GetRuntime()->GetChangeHierarchy().GetVoxelProxyRevision(InKey);
 
 	Request.Stamp = MakeRepresentationStamp(Geometry, Request.Stamp.Revision);
+	Request.GenerationConsumer = MakeCoarseGenerationConsumer(Geometry, Request.Stamp);
+	if (!Request.GenerationConsumer.IsValid()) return false;
+	FVoxelGenerationConsumerScope ConsumerScope(Request.GenerationConsumer);
 
 	Request.ReservedBytes = 1;
 	const FVoxelGenerationBounds ProxyBounds = InKey.GetBounds();
@@ -3384,7 +3418,7 @@ bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int3
 		return false;
 	if (bDataOnly && !Generator->EnsureCoarseOverlayBoundsReady(OverlayBounds, Request.WorkClass, InPriority).bReady)
 		return false;
-	if (bDataOnly && !Module.CaptureFineOverlays(OverlayBounds, OverlayCapture, OverlayError))
+	if (bDataOnly && !Module.CaptureFineOverlays(OverlayBounds, OverlayCapture, OverlayError, &Request.GenerationConsumer))
 		return false;
 	Request.InputBytes = Prepared ? Prepared->ResultBytes() : OverlayCapture.AllocatedBytes();
 
@@ -3413,9 +3447,10 @@ bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int3
 		OverlayRead = VoxelBoundedAllocation::MakeWorkerShared<FRepresentationOverlayRead>(BuildStorage->MetadataLease);
         OverlayRead->MetadataLease = BuildStorage->MetadataLease;
         OverlayRead->FactResources = Scheduler.GetRuntimeResources();
+        OverlayRead->FactConsumer = BuildStorage->Consumer;
         Request.GetBlockReason = [BuildStorage, OverlayRead]
         {
-            if (OverlayRead->bWaitingFacts.Load() && OverlayRead->FactResources->Snapshot().ReleaseVersion <= OverlayRead->FactCapacityVersion.Load())
+            if (OverlayRead->IsBlocked())
                 return EVoxelTaskBlockReason::Memory;
             return BuildStorage->BlockReason();
         };
@@ -3444,6 +3479,7 @@ bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int3
 	{
 		FVoxelTaskResult Result;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> WorkingLease;
+		if (bDataOnly) OverlayRead->Begin();
 		if (!BuildStorage->Begin(Result, WorkingLease)) return Result;
 		Result.InputResourceLease = BuildStorage->MetadataLease;
 		if (bDataOnly && !OverlayRead->Advance(Result, InCancel))
@@ -3483,6 +3519,11 @@ bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int3
 			bool bComplete = false;
 			Result.bSuccess = PageBuild->Advance(Builder, *OverlayRead->Result->Snapshot, *Result.VoxelProxy, bComplete, Result.Error, &InCancel);
 			if (Result.VoxelProxy) Result.VoxelProxy->ResourceLease = BuildStorage->GeometryLease;
+			if (!Result.bSuccess && !InCancel.Load() && OverlayRead->DeferFacts(Result))
+			{
+				Result.VoxelProxy.Reset();
+				return Result;
+			}
 			if (Result.bSuccess && !bComplete)
 			{
 				Result.VoxelProxy.Reset();
@@ -3605,6 +3646,9 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 	Request.Stamp.Revision = Module.GetRuntime()->GetChangeHierarchy().GetSurfaceRevision(InKey);
 
 	Request.Stamp = MakeRepresentationStamp(Geometry, Request.Stamp.Revision);
+	Request.GenerationConsumer = MakeCoarseGenerationConsumer(Geometry, Request.Stamp);
+	if (!Request.GenerationConsumer.IsValid()) return false;
+	FVoxelGenerationConsumerScope ConsumerScope(Request.GenerationConsumer);
 
 	Request.ReservedBytes = 1;
 	Request.DistanceScore = MinimumObserverDistanceCells(SurfaceWorldCenter(InKey));
@@ -3646,7 +3690,7 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 		return false;
 	if (bDataOnly && !Generator->EnsureCoarseOverlayBoundsReady(OverlayBounds, Request.WorkClass, InPriority).bReady)
 		return false;
-	if (bDataOnly && !Module.CaptureFineOverlays(OverlayBounds, OverlayCapture, OverlayError))
+	if (bDataOnly && !Module.CaptureFineOverlays(OverlayBounds, OverlayCapture, OverlayError, &Request.GenerationConsumer))
 		return false;
 	Request.InputBytes = Prepared ? Prepared->ResultBytes() : OverlayCapture.AllocatedBytes();
 
@@ -3674,9 +3718,10 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 		OverlayRead = VoxelBoundedAllocation::MakeWorkerShared<FRepresentationOverlayRead>(BuildStorage->MetadataLease);
         OverlayRead->MetadataLease = BuildStorage->MetadataLease;
         OverlayRead->FactResources = Scheduler.GetRuntimeResources();
+        OverlayRead->FactConsumer = BuildStorage->Consumer;
         Request.GetBlockReason = [BuildStorage, OverlayRead]
         {
-            if (OverlayRead->bWaitingFacts.Load() && OverlayRead->FactResources->Snapshot().ReleaseVersion <= OverlayRead->FactCapacityVersion.Load())
+            if (OverlayRead->IsBlocked())
                 return EVoxelTaskBlockReason::Memory;
             return BuildStorage->BlockReason();
         };
@@ -3709,6 +3754,7 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 	{
 		FVoxelTaskResult Result;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> WorkingLease;
+		if (bDataOnly) OverlayRead->Begin();
 		if (!BuildStorage->Begin(Result, WorkingLease)) return Result;
 		Result.InputResourceLease = BuildStorage->MetadataLease;
 		if (bDataOnly && !OverlayRead->Advance(Result, InCancel))
@@ -3747,6 +3793,11 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 			bool bComplete = false;
 			Result.bSuccess = PageBuild->Advance(Builder, *Result.Surface, bComplete, Result.Error, &InCancel);
 			if (Result.Surface) Result.Surface->ResourceLease = BuildStorage->GeometryLease;
+			if (!Result.bSuccess && !InCancel.Load() && OverlayRead->DeferFacts(Result))
+			{
+				Result.Surface.Reset();
+				return Result;
+			}
 			if (Result.bSuccess && !bComplete)
 			{
 				Result.Surface.Reset();
@@ -3873,6 +3924,9 @@ bool FVoxelViewManager::RequestMacro(const FVoxelMacroTileKey& InKey, const int3
 	Request.Stamp.Revision = Module.GetRuntime()->GetChangeHierarchy().GetMacroRevision(InKey);
 
 	Request.Stamp = MakeRepresentationStamp(Geometry, Request.Stamp.Revision);
+	Request.GenerationConsumer = MakeCoarseGenerationConsumer(Geometry, Request.Stamp);
+	if (!Request.GenerationConsumer.IsValid()) return false;
+	FVoxelGenerationConsumerScope ConsumerScope(Request.GenerationConsumer);
 
 	Request.ReservedBytes = 1;
 	Request.DistanceScore = MinimumObserverDistanceCells(MacroWorldCenter(InKey));
@@ -3914,7 +3968,7 @@ bool FVoxelViewManager::RequestMacro(const FVoxelMacroTileKey& InKey, const int3
 		return false;
 	if (bDataOnly && !Generator->EnsureCoarseOverlayBoundsReady(Bounds, Request.WorkClass, InPriority).bReady)
 		return false;
-	if (bDataOnly && !Module.CaptureFineOverlays(Bounds, OverlayCapture, OverlayError))
+	if (bDataOnly && !Module.CaptureFineOverlays(Bounds, OverlayCapture, OverlayError, &Request.GenerationConsumer))
 	{
 		return false;
 	}
@@ -3943,9 +3997,10 @@ bool FVoxelViewManager::RequestMacro(const FVoxelMacroTileKey& InKey, const int3
 		OverlayRead = VoxelBoundedAllocation::MakeWorkerShared<FRepresentationOverlayRead>(BuildStorage->MetadataLease);
         OverlayRead->MetadataLease = BuildStorage->MetadataLease;
         OverlayRead->FactResources = Scheduler.GetRuntimeResources();
+        OverlayRead->FactConsumer = BuildStorage->Consumer;
         Request.GetBlockReason = [BuildStorage, OverlayRead]
         {
-            if (OverlayRead->bWaitingFacts.Load() && OverlayRead->FactResources->Snapshot().ReleaseVersion <= OverlayRead->FactCapacityVersion.Load())
+            if (OverlayRead->IsBlocked())
                 return EVoxelTaskBlockReason::Memory;
             return BuildStorage->BlockReason();
         };
@@ -3978,6 +4033,7 @@ bool FVoxelViewManager::RequestMacro(const FVoxelMacroTileKey& InKey, const int3
 	{
 		FVoxelTaskResult Result;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> WorkingLease;
+		if (bDataOnly) OverlayRead->Begin();
 		if (!BuildStorage->Begin(Result, WorkingLease)) return Result;
 		Result.InputResourceLease = BuildStorage->MetadataLease;
 		if (bDataOnly && !OverlayRead->Advance(Result, InCancel))
@@ -4015,6 +4071,11 @@ bool FVoxelViewManager::RequestMacro(const FVoxelMacroTileKey& InKey, const int3
 			bool bComplete = false;
 			Result.bSuccess = PageBuild->Advance(Builder, *Result.Macro, bComplete, Result.Error, &InCancel);
 			if (Result.Macro) Result.Macro->ResourceLease = BuildStorage->GeometryLease;
+			if (!Result.bSuccess && !InCancel.Load() && OverlayRead->DeferFacts(Result))
+			{
+				Result.Macro.Reset();
+				return Result;
+			}
 			if (Result.bSuccess && !bComplete)
 			{
 				Result.Macro.Reset();

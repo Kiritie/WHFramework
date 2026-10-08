@@ -35,6 +35,7 @@ public:
 		TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> InCache, TSharedPtr<const IVoxelGenerationOverlay, ESPMode::ThreadSafe> InOverlay = nullptr,
 		bool bInRequirePlanPreflight = false);
 
+	// 采样沿调用者显式绑定的原消费 scope；输出容器由调用者持有其容量与发布寿命。
 	bool GenerateSection(
 		const FIntVector& InSectionCoordinate, TArray<FVoxelBlockState>& OutBaseBlocks, FString& OutError, const TAtomic<bool>* InCancel = nullptr) const;
 

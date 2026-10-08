@@ -13,6 +13,11 @@ namespace
 	constexpr int32 GenerationPlanTileSide = 256;
 	constexpr int32 LakeAnchorSide = 64;
 	constexpr int32 MaximumControlEntries = 1 << 20;
+	constexpr int32 MaximumRetiredEntriesPerGroup = 64;
+
+	template<typename ValueType>
+	using TRetiredCacheValues = TArray<TSharedPtr<const ValueType, ESPMode::ThreadSafe>,
+		TFixedAllocator<MaximumRetiredEntriesPerGroup>>;
 
 	// 七族原生正文共用原消费者的构建额度与发布后的稳定缓存租约。
 	template<typename ValueType>
@@ -86,11 +91,22 @@ namespace
 			OutConsumer = {EVoxelGenerationConsumerKind::WorldFact, Stamp->WorldEpoch, Stamp->OwnerId,
 				Stamp->OwnerIncarnation, EVoxelGenerationSpatialKind::Section, Stamp->Section, Stamp->Section, Stamp->Token};
 		}
-		if (const auto* Consumer = FVoxelGenerationPlanningReadScope::GetConsumerKey())
+		const auto* ReadConsumer = FVoxelGenerationPlanningReadScope::GetConsumerKey();
+		if (ReadConsumer)
 		{
-			if (!Consumer->IsValid() || Consumer->WorldEpoch != InControlConsumer.WorldEpoch)
+			if (!ReadConsumer->IsValid() || ReadConsumer->WorldEpoch != InControlConsumer.WorldEpoch)
 			{
 				OutError = TEXT("InvalidConsumer: generation cache logical consumer belongs to another World");
+				return false;
+			}
+			OutConsumer = *ReadConsumer;
+		}
+		if (const auto* Consumer = FVoxelGenerationConsumerScope::GetConsumerKey())
+		{
+			if (!Consumer->IsValid() || Consumer->WorldEpoch != InControlConsumer.WorldEpoch ||
+				(ReadConsumer && !(*Consumer == *ReadConsumer)))
+			{
+				OutError = TEXT("InvalidConsumer: generation cache scopes require the same original World consumer");
 				return false;
 			}
 			OutConsumer = *Consumer;
@@ -672,17 +688,21 @@ namespace
 	}
 
 	template<typename KeyType, typename ValueType, typename KeepPredicate>
-	void TrimMapBudgeted(
+	bool TrimMapBudgeted(
 		TMap<KeyType, TSharedPtr<const ValueType, ESPMode::ThreadSafe>>& InValues,
 		TArray<KeyType>& InKeys,
 		int32& InOutCursor,
 		int32& InOutBudget,
-		TArray<TSharedPtr<const ValueType, ESPMode::ThreadSafe>>& OutRetired,
+		TRetiredCacheValues<ValueType>& OutRetired,
 		KeepPredicate&& InKeep)
 	{
 		while (InOutBudget > 0 &&
 			!InKeys.IsEmpty())
 		{
+			if (OutRetired.Num() == MaximumRetiredEntriesPerGroup)
+			{
+				return false;
+			}
 			InOutCursor =
 				FMath::Clamp(
 					InOutCursor,
@@ -743,6 +763,7 @@ namespace
 				(InOutCursor + 1) %
 				InKeys.Num();
 		}
+		return true;
 	}
 }
 
@@ -1431,15 +1452,122 @@ bool FVoxelGenerationPlanCache::GetOrBuildStructure(
 			}, [this](const bool bHit) { RecordPlanLookup(EVoxelGenerationPlanKind::Structure, bHit); });
 }
 
-void FVoxelGenerationPlanCache::UpdateRetention(
-	const FVoxelGenerationCacheRetention& InRetention)
+bool FVoxelGenerationPlanCache::UpdateRetention(
+	const FVoxelGenerationCacheRetention& InRetention,
+	const int32 InPointCount,
+	TFunctionRef<bool(TArrayView<FVoxelGenerationCacheRetentionPoint>, FString&)> InFill,
+	FString& OutError,
+	const TAtomic<bool>* InCancel)
 {
-	FWriteScopeLock Scope(
-		RetentionLock);
+	if (InPointCount < 0)
+	{
+		OutError = TEXT("Oversized: generation cache retention point count");
+		return false;
+	}
+	if (InCancel && InCancel->Load())
+	{
+		OutError = TEXT("Canceled");
+		return false;
+	}
+	if (Resources && !ControlConsumer.IsValid())
+	{
+		OutError = TEXT("InvalidConsumer: generation cache retention requires the original complete control identity");
+		return false;
+	}
+#if !WITH_DEV_AUTOMATION_TESTS
+	if (!Resources)
+	{
+		OutError = TEXT("InvalidConsumer: generation cache retention has no original World ledger");
+		return false;
+	}
+#endif
 
-	Retention =
-		InRetention;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> CandidateLease;
+	FVoxelGenerationCacheRetention Candidate;
+	Candidate.HydrologyRegionSide = InRetention.HydrologyRegionSide;
+	Candidate.HydrologyCellSize = InRetention.HydrologyCellSize;
+	Candidate.Revision = InRetention.Revision;
+	const uint64 Bytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<
+		FVoxelGenerationCacheRetentionPoint, FDefaultAllocator>(InPointCount);
+	if (Resources)
+	{
+		FReadScopeLock Scope(RetentionLock);
+		const uint64 PreviousBytes = RetentionLease ? RetentionLease->Bytes() : 0;
+		const uint64 Limit = Resources->Snapshot().Limits.InputBytes;
+		if (Bytes > Limit || PreviousBytes > Limit - Bytes)
+		{
+			OutError = TEXT("Oversized: generation cache retention snapshot allocation peak exceeds original input pool limit");
+			return false;
+		}
+		if (Bytes && !Resources->Acquire(ControlConsumer, EVoxelTerrainResourcePool::Input, Bytes, CandidateLease))
+		{
+			OutError = TEXT("CapacityBlocked: generation cache retention snapshot input capacity");
+			return false;
+		}
+	}
+	if (InCancel && InCancel->Load())
+	{
+		OutError = TEXT("Canceled");
+		return false;
+	}
+
+	Candidate.Points.Reserve(InPointCount);
+	Candidate.Points.SetNum(InPointCount);
+	if (CandidateLease)
+	{
+		const uint64 ActualBytes = VoxelGenerationAllocation::AllocatedBytes(Candidate.Points);
+		check(ActualBytes <= CandidateLease->Bytes());
+		const bool bResized = CandidateLease->Resize(ActualBytes);
+		check(bResized);
+	}
+	if (!InFill(MakeArrayView(Candidate.Points), OutError))
+	{
+		if (InCancel && InCancel->Load())
+		{
+			OutError = TEXT("Canceled");
+		}
+		else if (OutError.IsEmpty())
+		{
+			OutError = TEXT("Generation cache retention source fill failed");
+		}
+		return false;
+	}
+
+	{
+		FWriteScopeLock Scope(RetentionLock);
+		if (InCancel && InCancel->Load())
+		{
+			OutError = TEXT("Canceled");
+			return false;
+		}
+		Swap(Retention.Points, Candidate.Points);
+		Swap(RetentionLease, CandidateLease);
+		Retention.HydrologyRegionSide = Candidate.HydrologyRegionSide;
+		Retention.HydrologyCellSize = Candidate.HydrologyCellSize;
+		Retention.Revision = Candidate.Revision;
+	}
+	Candidate.Points.Empty();
+	CandidateLease.Reset();
+	OutError.Reset();
+	return true;
 }
+
+#if WITH_DEV_AUTOMATION_TESTS
+void FVoxelGenerationPlanCache::UpdateRetention(const FVoxelGenerationCacheRetention& InRetention)
+{
+	FString Error;
+	const bool bUpdated = UpdateRetention(InRetention, InRetention.Points.Num(),
+		[&InRetention](TArrayView<FVoxelGenerationCacheRetentionPoint> OutPoints, FString&)
+		{
+			for (int32 Index = 0; Index < OutPoints.Num(); ++Index)
+			{
+				OutPoints[Index] = InRetention.Points[Index];
+			}
+			return true;
+		}, Error);
+	checkf(bUpdated, TEXT("%s"), *Error);
+}
+#endif
 
 FVoxelGenerationCacheRetentionLease::FVoxelGenerationCacheRetentionLease(
 	TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> InCache,
@@ -1600,9 +1728,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 		{
 			const int32 GroupBudget =
 				RemainingGroups > 0
-					? FMath::DivideAndRoundUp(
-						RemainingBudget,
-						RemainingGroups)
+					? int32((int64(RemainingBudget) + RemainingGroups - 1) / RemainingGroups)
 					: 0;
 
 			RemainingBudget -= GroupBudget;
@@ -1617,13 +1743,13 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 	int32 EcologyBudget = TakeGroupBudget();
 	int32 FeatureBudget = TakeGroupBudget();
 	int32 StructureBudget = TakeGroupBudget();
-	TArray<FVoxelBaseColumnEntryPtr> RetiredBaseColumns;
-	TArray<FVoxelNaturalColumnEntryPtr> RetiredNaturalColumns;
-	TArray<FVoxelHydrologyPlanPtr> RetiredHydrology;
-	TArray<FVoxelCavePlanPtr> RetiredCaves;
-	TArray<FVoxelEcologyPlanPtr> RetiredEcology;
-	TArray<FVoxelFeaturePlanPtr> RetiredFeatures;
-	TArray<FVoxelStructurePlanPtr> RetiredStructures;
+	TRetiredCacheValues<FVoxelBaseColumnEntry> RetiredBaseColumns;
+	TRetiredCacheValues<FVoxelNaturalColumnEntry> RetiredNaturalColumns;
+	TRetiredCacheValues<FVoxelHydrologyPlan> RetiredHydrology;
+	TRetiredCacheValues<FVoxelCavePlan> RetiredCaves;
+	TRetiredCacheValues<FVoxelEcologyPlan> RetiredEcology;
+	TRetiredCacheValues<FVoxelFeaturePlan> RetiredFeatures;
+	TRetiredCacheValues<FVoxelStructurePlan> RetiredStructures;
 
 	// 保留锁覆盖逐项裁剪；任务点直接读取原节点，接纳与析构不能越过当前检查。
 	TOptional<FReadScopeLock> RetentionScope;
@@ -1638,9 +1764,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 		MaintenanceShardCursor %
 		ShardCount;
 
-	MaintenanceShardCursor =
-		(MaintenanceShardCursor + 1) %
-		ShardCount;
+	bool bRetirementLimited = false;
 
 	{
 		FNaturalShard& Shard =
@@ -1650,7 +1774,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 		FWriteScopeLock Scope(
 			Shard.Lock);
 
-		TrimMapBudgeted(
+		bRetirementLimited |= !TrimMapBudgeted(
 			Shard.BaseColumns,
 			Shard.BaseColumnKeys,
 			Shard.BaseColumnCursor,
@@ -1664,7 +1788,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 					&FVoxelGenerationCacheRetentionPoint::NaturalRadiusCells);
 			});
 
-		TrimMapBudgeted(
+		bRetirementLimited |= !TrimMapBudgeted(
 			Shard.NaturalColumns,
 			Shard.NaturalColumnKeys,
 			Shard.NaturalColumnCursor,
@@ -1688,7 +1812,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 		FWriteScopeLock Scope(
 			Shard.Lock);
 
-		TrimMapBudgeted(
+		bRetirementLimited |= !TrimMapBudgeted(
 			Shard.Hydrology,
 			Shard.HydrologyKeys,
 			Shard.HydrologyCursor,
@@ -1704,7 +1828,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 					&FVoxelGenerationCacheRetentionPoint::HydrologyRadiusCells);
 			});
 
-		TrimMapBudgeted(
+		bRetirementLimited |= !TrimMapBudgeted(
 			Shard.Caves,
 			Shard.CaveKeys,
 			Shard.CaveCursor,
@@ -1719,7 +1843,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 					&FVoxelGenerationCacheRetentionPoint::PlanRadiusCells);
 			});
 
-		TrimMapBudgeted(
+		bRetirementLimited |= !TrimMapBudgeted(
 			Shard.Ecology,
 			Shard.EcologyKeys,
 			Shard.EcologyCursor,
@@ -1734,7 +1858,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 					&FVoxelGenerationCacheRetentionPoint::PlanRadiusCells);
 			});
 
-		TrimMapBudgeted(
+		bRetirementLimited |= !TrimMapBudgeted(
 			Shard.Features,
 			Shard.FeatureKeys,
 			Shard.FeatureCursor,
@@ -1749,7 +1873,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 					&FVoxelGenerationCacheRetentionPoint::PlanRadiusCells);
 			});
 
-		TrimMapBudgeted(
+		bRetirementLimited |= !TrimMapBudgeted(
 			Shard.Structures,
 			Shard.StructureKeys,
 			Shard.StructureCursor,
@@ -1765,7 +1889,18 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			});
 
 	}
+	if (!bRetirementLimited)
+	{
+		MaintenanceShardCursor = (ShardIndex + 1) % ShardCount;
+	}
 	RetentionScope.Reset();
+	RetiredBaseColumns.Reset();
+	RetiredNaturalColumns.Reset();
+	RetiredHydrology.Reset();
+	RetiredCaves.Reset();
+	RetiredEcology.Reset();
+	RetiredFeatures.Reset();
+	RetiredStructures.Reset();
 }
 
 void FVoxelGenerationPlanCache::Reset()
@@ -1930,6 +2065,10 @@ FVoxelGenerationPlanCache::GetStats() const
 uint64 FVoxelGenerationPlanCache::GetAllocatedBytes() const
 {
 	uint64 Bytes = 0;
+	{
+		FReadScopeLock Scope(RetentionLock);
+		Bytes = VoxelGenerationAllocation::AllocatedBytes(Retention.Points);
+	}
 
 	for (int32 Index = 0;
 		Index < ShardCount;

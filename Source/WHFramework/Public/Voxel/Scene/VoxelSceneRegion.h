@@ -61,6 +61,9 @@ public:
 	bool bSceneFailed = false;
 
 protected:
+	const FGuid& GetSceneInstanceId() const { return SceneInstanceId; }
+	uint64 GetSceneRevision() const { return SceneRevision; }
+
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PendingActorStorageLease;
 
 	UPROPERTY(Transient)

@@ -1,6 +1,7 @@
 ﻿#include "Voxel/Task/VoxelTaskScheduler.h"
 
 #include "ProfilingDebugging/CpuProfilerTrace.h"
+#include "Voxel/Generation/VoxelGenerationPlanningRead.h"
 
 #include "Voxel/Geometry/VoxelCollisionBuilder.h"
 #include "Voxel/Geometry/VoxelSectionMesher.h"
@@ -325,13 +326,17 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 	}
 	if (bStopped ||
 		!InRequest.Execute ||
+		(InRequest.GenerationConsumer.Kind != EVoxelGenerationConsumerKind::None &&
+			(!InRequest.GenerationConsumer.IsValid() || InRequest.GenerationConsumer.WorldEpoch != InRequest.Stamp.WorldEpoch ||
+			InRequest.GenerationConsumer.OwnerId != InRequest.Stamp.OwnerId ||
+			InRequest.GenerationConsumer.OwnerIncarnation != InRequest.Stamp.OwnerIncarnation)) ||
 		InRequest.Kind == EVoxelTaskKind::None ||
 		InRequest.WorkClass == EVoxelWorkClass::None ||
 		!FMath::IsFinite(InRequest.DistanceScore) ||
 		InRequest.DistanceScore < 0.0 ||
 		!FMath::IsFinite(InRequest.ForwardScore) ||
 		static_cast<uint8>(InRequest.ServiceBand) >= static_cast<uint8>(EVoxelTerrainServiceBand::Count) ||
-		InRequest.ReservedBytes == 0 ||
+		(InRequest.ReservedBytes == 0 && (InRequest.Kind != EVoxelTaskKind::GenerationPlan || !InRequest.GenerationConsumer.IsValid())) ||
 		InRequest.ReservedBytes > Budget.MaxReservedBytes ||
 		InRequest.InputBytes > Budget.MaxInputBytes)
 	{
@@ -1432,6 +1437,7 @@ void FVoxelTaskScheduler::Pump()
 
 		const uint64 ResultBudget =
 			RunningTask.ReservedBytes;
+		const FVoxelGenerationConsumerKey GenerationConsumer = Request.GenerationConsumer;
 
 		const double QueuedAt =
 			RunningTask.QueuedAt;
@@ -1440,8 +1446,9 @@ void FVoxelTaskScheduler::Pump()
 		RunningTask.Task =
 			UE::Tasks::Launch(
 				UE_SOURCE_LOCATION,
-				[Slot, Stamp, Kind, ResultBudget, QueuedAt, AccumulatedExecuteMilliseconds, Execute = MoveTemp(Request.Execute)]() mutable
+				[Slot, Stamp, Kind, ResultBudget, GenerationConsumer, QueuedAt, AccumulatedExecuteMilliseconds, Execute = MoveTemp(Request.Execute)]() mutable
 				{
+					FVoxelGenerationConsumerScope ConsumerScope(GenerationConsumer);
 					TRACE_CPUPROFILER_EVENT_SCOPE(
 						Voxel_TaskExecute);
 

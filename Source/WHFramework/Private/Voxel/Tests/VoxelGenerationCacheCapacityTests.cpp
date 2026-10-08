@@ -454,8 +454,13 @@ namespace
 			Consumer.RequestSerial = 81;
 			const auto Config = VoxelTest::MakeGenerationConfig();
 			const auto BeforeQuery = Resources->Snapshot();
+			Test.TestFalse(TEXT("绑定 Cache 的 Query 不借用控制消费者"),
+				FVoxelGenerationQuery::Create(Config, Cache.ToSharedRef(), Query, Error));
+			Test.TestEqual(TEXT("缺少原身份在任何 grant 之前拒收"), Resources->Snapshot().Version, BeforeQuery.Version);
+			FVoxelGenerationConsumerScope OriginalConsumerScope(Consumer);
+			Test.TestFalse(TEXT("资源身份 scope 不改变 ready-only 读取权限"), FVoxelGenerationPlanningReadScope::IsActive());
 			if (!Test.TestTrue(TEXT("八个原生生成器全部授予后 Query 构造"),
-				FVoxelGenerationQuery::Create(Config, Cache.ToSharedRef(), Query, Error, false, false, false, &Consumer))) return;
+				FVoxelGenerationQuery::Create(Config, Cache.ToSharedRef(), Query, Error, false, false, false))) return;
 			Test.TestEqual(TEXT("每个真实生成器各有一个租约"), Resources->Snapshot().LeaseCount, BeforeQuery.LeaseCount + 8);
 			if (!Test.TestTrue(TEXT("准备旧 Query 的列范围"), Query.PrepareColumns(
 				{FIntVector(0, 0, -64), FIntVector(1, 1, 128)}, Error))) return;
@@ -512,6 +517,123 @@ namespace
 
 	private:
 		FVoxelGenerationQuery Query;
+	};
+
+	class FQueryPreparedCapacityCommand final : public FCacheCapacityCommand
+	{
+	public:
+		explicit FQueryPreparedCapacityCommand(FAutomationTestBase& InTest)
+			: FCacheCapacityCommand(InTest)
+		{
+		}
+
+	protected:
+		virtual void CheckFixture() override
+		{
+			const auto Control = MakeCacheControlConsumer();
+			if (!Test.TestTrue(TEXT("准备事务使用真实 Cache 与账本"), Resources->Configure({}) &&
+				FVoxelGenerationPlanCache::Create(Resources, Control, Cache, Error, true, false))) return;
+			auto Consumer = Control;
+			Consumer.OwnerId = FGuid::NewGuid();
+			Consumer.RequestSerial = 93;
+			FVoxelGenerationConsumerScope Scope(Consumer);
+			const auto Config = VoxelTest::MakeGenerationConfig();
+			if (!Test.TestTrue(TEXT("原 Query 构造"), FVoxelGenerationQuery::Create(Config, Cache.ToSharedRef(), Query, Error))) return;
+			const FVoxelGenerationBounds Bounds{FIntVector(0, 0, -64), FIntVector(1, 1, 128)};
+			if (!Test.TestTrue(TEXT("真实 Structure 计划引用准备"), Query.PrepareStructuresOnly(Bounds, Error))) return;
+			const auto Original = Query.GetPreparedStructurePlans();
+			if (!Test.TestTrue(TEXT("旧状态具有实际引用数组 backing"), !Original.IsEmpty())) return;
+			auto Other = Consumer;
+			Other.OwnerId = FGuid::NewGuid();
+			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Blocker;
+			if (!Test.TestTrue(TEXT("外部消费者占用输入容量"), Resources->Acquire(Other, EVoxelTerrainResourcePool::Input, 1, Blocker))) return;
+			const auto BeforeFill = Resources->Snapshot();
+			if (!Test.TestTrue(TEXT("填满原 Input 池"), Blocker->Resize(1 + BeforeFill.Limits.InputBytes -
+				BeforeFill.Used[int32(EVoxelTerrainResourcePool::Input)]))) return;
+			const auto Before = Resources->Snapshot();
+			const uint64 Release = Resources->ReleaseVersionExcludingOwner(Consumer);
+			Test.TestFalse(TEXT("旧新 backing 峰值拒收准备替换"), Query.PrepareStructuresOnly(Bounds, Error));
+			Test.TestTrue(TEXT("原尝试报告可恢复容量不足"), Error.StartsWith(TEXT("CapacityBlocked")));
+			const auto Preserved = Query.GetPreparedStructurePlans();
+			Test.TestTrue(TEXT("失败保留原数组地址、数量和正文"), Preserved.GetData() == Original.GetData() &&
+				Preserved.Num() == Original.Num() && Preserved[0] == Original[0]);
+			Test.TestEqual(TEXT("拒收不留下候选 Input backing"), Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Input)],
+				Before.Used[int32(EVoxelTerrainResourcePool::Input)]);
+			Test.TestEqual(TEXT("原拒收不自唤醒"), Resources->ReleaseVersionExcludingOwner(Consumer), Release);
+			Blocker.Reset();
+			Test.TestTrue(TEXT("外部释放后原 Query 同身份继续"), Query.PrepareStructuresOnly(Bounds, Error));
+			const auto BeforeMove = Query.GetPreparedStructurePlans();
+			FVoxelGenerationQuery Moved = MoveTemp(Query);
+			Test.TestTrue(TEXT("移动转移同一 backing 而不是复制引用数组"), Moved.GetPreparedStructurePlans().GetData() == BeforeMove.GetData());
+			TAtomic<bool> Cancel{true};
+			Test.TestFalse(TEXT("取消候选准备"), Moved.PrepareStructuresOnly(Bounds, Error, &Cancel));
+			Test.TestTrue(TEXT("取消仍保留已提交准备状态"), Error == TEXT("Canceled") &&
+				Moved.GetPreparedStructurePlans().GetData() == BeforeMove.GetData());
+			Query = MoveTemp(Moved);
+		}
+
+		virtual void ReleaseFixture() override
+		{
+			Query = FVoxelGenerationQuery();
+		}
+
+	private:
+		FVoxelGenerationQuery Query;
+	};
+
+	class FRetentionSnapshotCapacityCommand final : public FCacheCapacityCommand
+	{
+	public:
+		explicit FRetentionSnapshotCapacityCommand(FAutomationTestBase& InTest)
+			: FCacheCapacityCommand(InTest)
+		{
+		}
+
+	protected:
+		virtual void CheckFixture() override
+		{
+			const auto Consumer = MakeCacheControlConsumer();
+			if (!Test.TestTrue(TEXT("保留快照使用生产 Cache"), Resources->Configure({}) &&
+				FVoxelGenerationPlanCache::Create(Resources, Consumer, Cache, Error, true, false))) return;
+			FVoxelGenerationCacheRetention Retention;
+			Retention.Revision = 1;
+			if (!Test.TestTrue(TEXT("Count/Fill 接纳原保留点"), Cache->UpdateRetention(Retention, 1,
+				[](TArrayView<FVoxelGenerationCacheRetentionPoint> Points, FString&)
+				{
+					Points[0].Center = FIntPoint::ZeroValue;
+					Points[0].NaturalRadiusCells = 8;
+					return true;
+				}, Error))) return;
+			FVoxelBaseColumnEntryPtr Value;
+			if (!Test.TestTrue(TEXT("原点发布真实不可变列"), Cache->GetOrBuildBaseColumn({},
+				[](FVoxelBaseColumnEntry& Entry, FString&) { Entry.Position = {}; return true; }, Value, Error))) return;
+			const auto CheckRetained = [&]
+			{
+				for (int32 Pass = 0; Pass < 32; ++Pass) Cache->TickMaintenance(128);
+				FVoxelBaseColumnEntryPtr Found;
+				Test.TestTrue(TEXT("维护消费的仍是原快照，原点列未被退休"), Cache->FindBaseColumn({}, Found) && Found == Value);
+			};
+			TAtomic<bool> Cancel{false};
+			Test.TestFalse(TEXT("晚取消不发布候选保留点"), Cache->UpdateRetention(Retention, 1,
+				[&Cancel](TArrayView<FVoxelGenerationCacheRetentionPoint> Points, FString&)
+				{ Points[0].Center = FIntPoint(4096, 4096); Cancel.Store(true); return true; }, Error, &Cancel));
+			CheckRetained();
+			Test.TestFalse(TEXT("Fill 失败保持原快照"), Cache->UpdateRetention(Retention, 1,
+				[](TArrayView<FVoxelGenerationCacheRetentionPoint>, FString& FillError)
+				{ FillError = TEXT("Rejected frozen source"); return false; }, Error));
+			CheckRetained();
+			auto Other = Consumer;
+			Other.OwnerId = FGuid::NewGuid();
+			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Blocker;
+			if (!Test.TestTrue(TEXT("外部输入压力"), Resources->Acquire(Other, EVoxelTerrainResourcePool::Input, 1, Blocker))) return;
+			const auto State = Resources->Snapshot();
+			if (!Test.TestTrue(TEXT("填满输入池"), Blocker->Resize(1 + State.Limits.InputBytes - State.Used[int32(EVoxelTerrainResourcePool::Input)]))) return;
+			bool bFilled = false;
+			Test.TestFalse(TEXT("授额不足在 Fill 之前拒收"), Cache->UpdateRetention(Retention, 1,
+				[&bFilled](TArrayView<FVoxelGenerationCacheRetentionPoint>, FString&) { bFilled = true; return true; }, Error));
+			Test.TestTrue(TEXT("未分配候选、未读源"), !bFilled && Error.StartsWith(TEXT("CapacityBlocked")));
+			CheckRetained();
+		}
 	};
 
 	template<typename PlanType>
@@ -971,6 +1093,28 @@ bool FVoxelQueryGeneratorCapacityTest::RunTest(const FString& InParameters)
 {
 	(void)InParameters;
 	FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FQueryGeneratorCapacityCommand>(*this));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelQueryPreparedCapacityTest,
+	"WHFramework.Voxel.FineRefactor.Generation.QueryPreparedCapacity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelQueryPreparedCapacityTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FQueryPreparedCapacityCommand>(*this));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelRetentionSnapshotCapacityTest,
+	"WHFramework.Voxel.FineRefactor.Generation.RetentionSnapshotCapacity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelRetentionSnapshotCapacityTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FRetentionSnapshotCapacityCommand>(*this));
 	return true;
 }
 

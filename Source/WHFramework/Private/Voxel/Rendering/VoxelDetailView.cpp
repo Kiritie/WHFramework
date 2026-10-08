@@ -11,6 +11,7 @@
 #include "Chaos/SimCallbackObject.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelGenerationQuery.h"
+#include "Voxel/Generation/VoxelGenerationCapacityWait.h"
 #include "Voxel/Rendering/VoxelDetailData.h"
 #include "Voxel/Runtime/VoxelWorldRuntime.h"
 #include "Voxel/Runtime/VoxelRuntimeDefinition.h"
@@ -410,9 +411,16 @@ void FVoxelDetailView::Tick(const TConstArrayView<FVector> InObservers)
 	Request.Stamp.Token = Token;
 	Request.ReservedBytes = 8ull * 1024ull * 1024ull;
 	Request.InputBytes = ObserverCells.GetAllocatedSize();
-	Request.Execute = [Config, Cache, PlanLease, ObserverCells = MoveTemp(ObserverCells), Token](const TAtomic<bool>& InCancel)
+	Request.GenerationConsumer = {EVoxelGenerationConsumerKind::WorldFact, WorldEpoch, OwnerId, OwnerIncarnation,
+		EVoxelGenerationSpatialKind::Section, Request.Stamp.Section, Request.Stamp.Section, Token};
+	const auto CapacityWait = FVoxelGenerationCapacityWait::Create(Scheduler.GetRuntimeResources(), Request.GenerationConsumer);
+	if (!CapacityWait) return;
+	Request.bResumable = true;
+	Request.GetBlockReason = [CapacityWait] { return CapacityWait->BlockReason(); };
+	Request.Execute = [Config, Cache, PlanLease, CapacityWait, ObserverCells = MoveTemp(ObserverCells), Token](const TAtomic<bool>& InCancel)
 	{
 		FVoxelTaskResult Result;
+		const uint64 BeforeBuild = CapacityWait->Begin();
 		if (!Config || !Cache)
 		{
 			Result.Error = TEXT("Voxel detail generation dependencies are unavailable");
@@ -436,6 +444,8 @@ void FVoxelDetailView::Tick(const TConstArrayView<FVector> InObservers)
 				Query,
 				Result.Error))
 			{
+				Result.bCanceled = InCancel.Load();
+				CapacityWait->Continue(Result, BeforeBuild);
 				return Result;
 			}
 			const FVoxelGenerationBounds Bounds {
@@ -449,6 +459,8 @@ void FVoxelDetailView::Tick(const TConstArrayView<FVector> InObservers)
 					Config->Recipe->Settings.MaxZ) };
 			if (!Query.PrepareStructuresOnly(Bounds, Result.Error, &InCancel))
 			{
+				Result.bCanceled = InCancel.Load();
+				CapacityWait->Continue(Result, BeforeBuild);
 				return Result;
 			}
 			for (const FVoxelStructurePlanPtr& StructurePlan : Query.GetPreparedStructurePlans())

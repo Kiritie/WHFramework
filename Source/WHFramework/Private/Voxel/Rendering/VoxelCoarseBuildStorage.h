@@ -31,9 +31,9 @@ struct FVoxelCoarseBuildStorage
 			? EVoxelTaskBlockReason::Memory : EVoxelTaskBlockReason::None;
 	}
 
-	void DeferCapacity(FVoxelTaskResult& OutResult)
+	void DeferCapacity(FVoxelTaskResult& OutResult, const uint64 InBeforeAdmission)
 	{
-		CapacityVersion.Store(Resources->ReleaseVersionExcludingOwner(Consumer));
+		CapacityVersion.Store(InBeforeAdmission);
 		bWaitingCapacity.Store(true);
 		OutResult.Error.Reset();
 		OutResult.bSuccess = OutResult.bContinue = true;
@@ -47,11 +47,12 @@ struct FVoxelCoarseBuildStorage
 			OutResult.Error = TEXT("Oversized: coarse completion cannot fit Staged capacity");
 			return false;
 		}
+		const uint64 BeforeAdmission = Resources->ReleaseVersionExcludingOwner(Consumer);
 		if ((!GeometryLease && !Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Staged,
 			GeometryCapacityBytes, GeometryLease)) ||
 			(WorkingCapacityBytes && !Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Working, WorkingCapacityBytes, OutWorking)))
 		{
-			DeferCapacity(OutResult);
+			DeferCapacity(OutResult, BeforeAdmission);
 			return false;
 		}
 		bWaitingCapacity.Store(false);
@@ -61,9 +62,10 @@ struct FVoxelCoarseBuildStorage
 	bool BeginCount(FVoxelTaskResult& OutResult,
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutWorking)
 	{
+		const uint64 BeforeAdmission = Resources->ReleaseVersionExcludingOwner(Consumer);
 		if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Working, WorkingCapacityBytes, OutWorking))
 		{
-			DeferCapacity(OutResult);
+			DeferCapacity(OutResult, BeforeAdmission);
 			return false;
 		}
 		bWaitingCapacity.Store(false);

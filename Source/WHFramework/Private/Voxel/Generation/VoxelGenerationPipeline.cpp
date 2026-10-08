@@ -59,20 +59,23 @@ bool FVoxelGenerationPipeline::EnumerateCaveEntrances(const FIntPoint& InMin, co
 			int32(FMath::Min<int64>(int64(InMax.Y) + 1, MAX_int32)), Settings.MaxZ)};
 	FVoxelGenerationPlanKeyRanges Ranges;
 	if (!FVoxelGenerationQuery::GetPlanKeyRanges(Bounds, Settings, Ranges, OutError)) return false;
-	const FVoxelGenerationPlanKeys Keys = FVoxelGenerationQuery::GatherPlanKeys(Bounds, Settings);
 	TSet<FVoxelStableId> Seen;
-	for (const FVoxelGenerationTileKey& Key : Keys.Tiles)
+	for (int64 Y = Ranges.TileMin.Y; Y <= Ranges.TileMax.Y; ++Y)
 	{
-		FVoxelCavePlanPtr Plan;
-		if (!Query.EnsureCavePlan(Key, Plan, OutError)) return false;
-		for (const FVoxelCaveEntrance& Entrance : Plan->Entrances)
+		for (int64 X = Ranges.TileMin.X; X <= Ranges.TileMax.X; ++X)
 		{
-			const bool bMouth = Entrance.MouthCenter.X >= InMin.X && Entrance.MouthCenter.Y >= InMin.Y && Entrance.MouthCenter.X <= InMax.X && Entrance.MouthCenter.Y <= InMax.Y;
-			const bool bInterior = Entrance.InteriorJoin.X >= InMin.X && Entrance.InteriorJoin.Y >= InMin.Y && Entrance.InteriorJoin.X <= InMax.X && Entrance.InteriorJoin.Y <= InMax.Y;
-			if ((bMouth || bInterior) && !Seen.Contains(Entrance.Id))
+			const FVoxelGenerationTileKey Key{FIntVector(int32(X), int32(Y), 0)};
+			FVoxelCavePlanPtr Plan;
+			if (!Query.EnsureCavePlan(Key, Plan, OutError)) return false;
+			for (const FVoxelCaveEntrance& Entrance : Plan->Entrances)
 			{
-				Seen.Add(Entrance.Id);
-				OutEntrances.Add(Entrance);
+				const bool bMouth = Entrance.MouthCenter.X >= InMin.X && Entrance.MouthCenter.Y >= InMin.Y && Entrance.MouthCenter.X <= InMax.X && Entrance.MouthCenter.Y <= InMax.Y;
+				const bool bInterior = Entrance.InteriorJoin.X >= InMin.X && Entrance.InteriorJoin.Y >= InMin.Y && Entrance.InteriorJoin.X <= InMax.X && Entrance.InteriorJoin.Y <= InMax.Y;
+				if ((bMouth || bInterior) && !Seen.Contains(Entrance.Id))
+				{
+					Seen.Add(Entrance.Id);
+					OutEntrances.Add(Entrance);
+				}
 			}
 		}
 	}
@@ -249,13 +252,13 @@ bool FVoxelGenerationPipeline::GenerateSection(
 		SectionCellCount);
 
 	// 一列共享同一份自然采样，每格仍执行完整生成阶段，避免反复争用列缓存锁。
-	TArray<uint32> Symbols;
+	uint32 Symbols[SectionSide];
 	for (int32 Y = 0; Y < SectionSide; ++Y)
 	{
 		for (int32 X = 0; X < SectionSide; ++X)
 		{
 			if (!Query.SampleColumnSymbols(FIntPoint(WorldMin.X + X, WorldMin.Y + Y), WorldMin.Z,
-				SectionSide, Symbols, OutError))
+				MakeArrayView(Symbols), OutError))
 			{
 				return false;
 			}
@@ -430,6 +433,12 @@ FVoxelGenerationPipeline::RetainHydrologyForPlanning(
 		if (!CapturedConsumer->IsValid() || CapturedConsumer->WorldEpoch != RetentionConsumer.WorldEpoch) return nullptr;
 		// 重试使用原逻辑消费者，不能把本次任务 Token 的释放伪装成外部容量事件。
 		Consumer = *CapturedConsumer;
+	}
+	if (const auto* ScopeConsumer = FVoxelGenerationConsumerScope::GetConsumerKey())
+	{
+		if (!ScopeConsumer->IsValid() || ScopeConsumer->WorldEpoch != RetentionConsumer.WorldEpoch ||
+			(FVoxelGenerationPlanningReadScope::GetConsumerKey() && !(Consumer == *ScopeConsumer))) return nullptr;
+		Consumer = *ScopeConsumer;
 	}
 	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> Lease;
 	FString Error;

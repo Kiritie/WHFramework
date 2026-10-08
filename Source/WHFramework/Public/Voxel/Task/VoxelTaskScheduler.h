@@ -199,6 +199,8 @@ struct WHFRAMEWORK_API FVoxelTaskResult
 
 struct WHFRAMEWORK_API FVoxelTaskRequest
 {
+	// 在排队前冻结实际调用者；续跑沿用完整键，不从缓存控制身份推导。
+	FVoxelGenerationConsumerKey GenerationConsumer;
 	TSharedPtr<FVoxelTerrainWorkReceipt, ESPMode::ThreadSafe> WorkReceipt;
 	FVoxelTaskStamp Stamp;
 	EVoxelTaskKind Kind = EVoxelTaskKind::None;

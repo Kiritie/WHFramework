@@ -3,6 +3,23 @@
 #include "CoreMinimal.h"
 #include "Voxel/Generation/VoxelGenerationPlanCoordinator.h"
 
+/** 原请求的资源身份；不改变事实读取范围的 ready-only 或发布权限。 */
+class WHFRAMEWORK_API FVoxelGenerationConsumerScope
+{
+public:
+	explicit FVoxelGenerationConsumerScope(const FVoxelGenerationConsumerKey& InConsumer);
+	~FVoxelGenerationConsumerScope();
+	FVoxelGenerationConsumerScope(const FVoxelGenerationConsumerScope&) = delete;
+	FVoxelGenerationConsumerScope& operator=(const FVoxelGenerationConsumerScope&) = delete;
+
+	static const FVoxelGenerationConsumerKey* GetConsumerKey();
+
+private:
+	FVoxelGenerationConsumerKey Consumer;
+	FVoxelGenerationConsumerScope* Previous = nullptr;
+	static thread_local FVoxelGenerationConsumerScope* Active;
+};
+
 /** 项目 Worker 只观察实际读缺失；身份、订阅和重试由 GT 事实所有者管理。 */
 class WHFRAMEWORK_API FVoxelGenerationPlanningReadScope
 {

@@ -1,5 +1,25 @@
 #include "Voxel/Generation/VoxelGenerationPlanningRead.h"
 
+thread_local FVoxelGenerationConsumerScope* FVoxelGenerationConsumerScope::Active = nullptr;
+
+FVoxelGenerationConsumerScope::FVoxelGenerationConsumerScope(const FVoxelGenerationConsumerKey& InConsumer)
+	: Consumer(InConsumer)
+	, Previous(Active)
+{
+	Active = this;
+}
+
+FVoxelGenerationConsumerScope::~FVoxelGenerationConsumerScope()
+{
+	check(Active == this);
+	Active = Previous;
+}
+
+const FVoxelGenerationConsumerKey* FVoxelGenerationConsumerScope::GetConsumerKey()
+{
+	return Active && Active->Consumer.IsValid() ? &Active->Consumer : nullptr;
+}
+
 thread_local FVoxelGenerationPlanningReadScope* FVoxelGenerationPlanningReadScope::Active = nullptr;
 
 FVoxelGenerationPlanningReadScope::FVoxelGenerationPlanningReadScope(FObserver InObserver,

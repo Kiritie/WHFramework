@@ -57,6 +57,7 @@ struct FVoxelRemotePageBuild
 	{
 		FVoxelTaskResult Result;
 		if (Cancel.Load()) { Result.bCanceled = true; return Result; }
+		const uint64 BeforeAdmission = Storage->Resources->ReleaseVersionExcludingOwner(Storage->Consumer);
 		// 解压正文和 native inflate 由 codec 按头部真实大小授予。
 		Storage->WorkingCapacityBytes = bDecoded ? MeshPieceLimit : 0;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Working;
@@ -100,7 +101,7 @@ struct FVoxelRemotePageBuild
 				if (Result.Error.StartsWith(TEXT("CapacityBlocked")))
 				{
 					Working.Reset();
-					Storage->DeferCapacity(Result);
+					Storage->DeferCapacity(Result, BeforeAdmission);
 					return Result;
 				}
 				if (Result.Error.IsEmpty()) Result.Error = TEXT("Remote content revision differs from reply envelope");

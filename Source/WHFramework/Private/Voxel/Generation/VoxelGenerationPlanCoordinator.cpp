@@ -3,6 +3,7 @@
 #include "Misc/ScopeExit.h"
 #include "Voxel/Generation/Caves/VoxelCaveGenerator.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Generation/VoxelGenerationQuery.h"
 #include "Voxel/Generation/VoxelGenerationPlanningRead.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
@@ -125,13 +126,13 @@ bool FVoxelGenerationPlanCoordinator::PrepareMap(TMap<KeyType, ValueType>& InMap
 	const int32 Capacity = FMath::Max(InRequired, FMath::Max(4, InCapacity * 2));
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 	if (!Resources->Acquire(ControlConsumer, EVoxelTerrainResourcePool::Input,
-		VoxelBoundedAllocation::MapBytes<KeyType, ValueType>(Capacity), Lease))
+		VoxelGenerationAllocation::Private::SetReserveBytes<TPair<KeyType, ValueType>>(InMap, Capacity), Lease))
 	{
 		OutError = TEXT("CapacityBlocked: generation coordinator control map");
 		return false;
 	}
 	InMap.Reserve(Capacity);
-	check(InMap.GetAllocatedSize() <= Lease->Bytes());
+	check(VoxelGenerationAllocation::AllocatedBytes(InMap) <= Lease->Bytes());
 	InLease = MoveTemp(Lease);
 	InCapacity = Capacity;
 	return true;
@@ -205,7 +206,7 @@ bool FVoxelGenerationPlanCoordinator::GatherForBounds(
 		if (Closure.Num() == Capacity)
 		{
 			const int32 NewCapacity = FMath::Max(4, Capacity * 2);
-			const uint64 Bytes = VoxelBoundedAllocation::SetBytes<FVoxelGenerationPlanDependency>(NewCapacity);
+			const uint64 Bytes = VoxelGenerationAllocation::Private::SetReserveBytes<FVoxelGenerationPlanDependency>(Closure, NewCapacity);
 			if (Bytes + (ClosureLease ? ClosureLease->Bytes() : 0) > Resources->Snapshot().Limits.WorkingBytes)
 			{
 				OutError = TEXT("CapacityUnachievable: generation preflight closure backing");
@@ -219,7 +220,7 @@ bool FVoxelGenerationPlanCoordinator::GatherForBounds(
 				return false;
 			}
 			Closure.Reserve(NewCapacity);
-			check(Closure.GetAllocatedSize() <= NewLease->Bytes());
+			check(VoxelGenerationAllocation::AllocatedBytes(Closure) <= NewLease->Bytes());
 			ClosureLease = MoveTemp(NewLease);
 			Capacity = NewCapacity;
 		}
@@ -531,11 +532,12 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 	Request.Stamp.OwnerIncarnation = EnvironmentOwnerIncarnation;
 	Request.Stamp.Revision = static_cast<uint8>(InDependency.Kind);
 	Request.Stamp.Section = InDependency.Coordinate();
-	Request.ReservedBytes = InDependency.Kind == EVoxelGenerationPlanKind::Hydrology
-		? 8ull * 1024ull * 1024ull : 4ull * 1024ull * 1024ull;
+	// 正文由原 Cache 租约承担，任务只返回已经授额的读取闭包。
+	Request.ReservedBytes = 0;
 	const FVoxelGenerationConsumerKey CaptureConsumer{EVoxelGenerationConsumerKind::WorldFact, WorldEpoch,
 		EnvironmentOwnerId, Request.Stamp.OwnerIncarnation, EVoxelGenerationSpatialKind::Section, Request.Stamp.Section,
 		Request.Stamp.Section, Request.Stamp.Token};
+	Request.GenerationConsumer = CaptureConsumer;
 	if (InOutState.bWaitingCapacity && Resources->ReleaseVersionExcludingOwner(CaptureConsumer) <= InOutState.CapacityVersion) return false;
 	InOutState.bWaitingCapacity = false;
 	const uint64 BeforeAdmission = Resources->ReleaseVersionExcludingOwner(CaptureConsumer);
@@ -609,8 +611,9 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 		}
 		// 原生查询保留构建权限；随后绑定原任务身份，不把它变成项目只读 preflight。
 		FVoxelGenerationPlanningReadScope NativeReads({}, &CapturedStamp, &Cancel, &CaptureConsumer);
-		Query.SetMissingHydrologyObserver([ReadDependencies](const FVoxelHydrologyRegionKey& Key)
+		Query.SetMissingHydrologyObserver(ReadDependencies, [](void* InContext, const FVoxelHydrologyRegionKey& Key)
 		{
+			auto* ReadDependencies = static_cast<FPlanReadDependencies*>(InContext);
 			const auto Missing = MakeDependency(EVoxelGenerationPlanKind::Hydrology, FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0));
 			if (ReadDependencies->Missing.Contains(Missing)) return;
 			if (ReadDependencies->Missing.Num() == MaximumHydrologyDependencies) ReadDependencies->bOverflow = true;
@@ -855,8 +858,8 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 			Node = State.NextDesired;
 		}
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ScratchLease;
-		const uint64 ScratchBytes = VoxelBoundedAllocation::SetBytes<FGuid>(Desired.Count) +
-			VoxelBoundedAllocation::ArrayBytes<FDonationGrowth>(GrowthCount);
+		const uint64 ScratchBytes = VoxelGenerationAllocation::Private::SetReserveBytes<FGuid>(TSet<FGuid>{}, Desired.Count) +
+			VoxelGenerationAllocation::Private::ArrayReserveBytes<FDonationGrowth, FDefaultAllocator>(GrowthCount);
 		if (ScratchBytes && !Resources->Acquire(ControlConsumer, EVoxelTerrainResourcePool::Working, ScratchBytes, ScratchLease))
 			return {false, false, TEXT("CapacityBlocked: generation subscription plan")};
 		TSet<FGuid> DependencyNodes;
@@ -873,7 +876,7 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 				Plan.Node = Node;
 				Plan.Capacity = FMath::Max(State.Donations.Num() + 1, FMath::Max(4, State.DonationsCapacity * 2));
 				if (!Resources->Acquire(ControlConsumer, EVoxelTerrainResourcePool::Input,
-					VoxelBoundedAllocation::MapBytes<FVoxelGenerationConsumerKey, FDonation>(Plan.Capacity), Plan.Lease))
+					VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FVoxelGenerationConsumerKey, FDonation>>(State.Donations, Plan.Capacity), Plan.Lease))
 					return {false, false, TEXT("CapacityBlocked: generation donations")};
 				Growth.Add(MoveTemp(Plan));
 			}
@@ -885,11 +888,11 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 		{
 			auto& State = Storage->States.FindChecked(Storage->PriorityFacts.FindChecked(Plan.Node));
 			State.Donations.Reserve(Plan.Capacity);
-			check(State.Donations.GetAllocatedSize() <= Plan.Lease->Bytes());
+			check(VoxelGenerationAllocation::AllocatedBytes(State.Donations) <= Plan.Lease->Bytes());
 			State.DonationsLease = MoveTemp(Plan.Lease);
 			State.DonationsCapacity = Plan.Capacity;
 		}
-		check(!ScratchLease || DependencyNodes.GetAllocatedSize() + Growth.GetAllocatedSize() <= ScratchLease->Bytes());
+		check(!ScratchLease || VoxelGenerationAllocation::AllocatedBytes(DependencyNodes) + VoxelGenerationAllocation::AllocatedBytes(Growth) <= ScratchLease->Bytes());
 		if (!PriorityGraph.SetDependencies(Consumer->PriorityNode, DependencyNodes, Error))
 			return {false, !Error.StartsWith(TEXT("CapacityBlocked")), MoveTemp(Error)};
 	}

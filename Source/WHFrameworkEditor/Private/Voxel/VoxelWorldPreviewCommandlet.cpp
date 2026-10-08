@@ -11,6 +11,7 @@
 #include "Voxel/Generation/VoxelGenerationBinding.h"
 #include "Voxel/Generation/VoxelGenerationPlanCache.h"
 #include "Voxel/Generation/VoxelGenerationPipeline.h"
+#include "Voxel/Generation/VoxelGenerationPlanningRead.h"
 #include "Voxel/Generation/Climate/VoxelClimateGenerator.h"
 #include "Voxel/Generation/Terrain/VoxelTerrainGenerator.h"
 #include "Voxel/Runtime/VoxelRegistry.h"
@@ -140,6 +141,7 @@ int32 UVoxelWorldPreviewCommandlet::Main(const FString& Params)
 		}
 		const FVoxelGenerationPipeline Pipeline(Config, Cache.ToSharedRef());
 		Pipeline.BindRetentionResources(PlanningResources, RetentionConsumer);
+		FVoxelGenerationConsumerScope ConsumerScope(RetentionConsumer);
 		if (!Pipeline.SampleEnvironments(FIntPoint(OriginX, OriginY), Width,
 			Height, Step, Samples, Error, nullptr, false))
 		{

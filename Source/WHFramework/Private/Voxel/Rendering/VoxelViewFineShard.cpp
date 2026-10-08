@@ -49,6 +49,7 @@ namespace
 		FVoxelFineStreamingPolicy Policy;
 		TAtomic<bool> bWaitingCapacity{false};
 		TAtomic<uint64> CapacityVersion{0};
+		uint64 BeforeCapacityBuild = 0;
 
 		FF0FineWorker(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
 			TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry,
@@ -60,6 +61,7 @@ namespace
 		FVoxelTaskResult Advance(const TAtomic<bool>& InCancel)
 		{
 			FVoxelTaskResult Result;
+			BeforeCapacityBuild = Resources->ReleaseVersionExcludingOwner(Consumer);
 			if (!Mesher)
 			{
 				auto Candidate = MakeUnique<FVoxelFineShardMeshing>(Samples.ToSharedRef(), Registry, Shapes, Resources, Consumer);
@@ -68,7 +70,7 @@ namespace
 				{
 					if (Result.Error.StartsWith(TEXT("CapacityBlocked:")))
 					{
-						CapacityVersion.Store(Resources->Snapshot().ReleaseVersion);
+						CapacityVersion.Store(BeforeCapacityBuild);
 						bWaitingCapacity.Store(true);
 						Result.bSuccess = Result.bContinue = true;
 						Result.Error.Reset();
@@ -82,6 +84,7 @@ namespace
 			{
 				if (!Mesher->ResumeCapacity(Resources->Snapshot().ReleaseVersion, Result.Error))
 				{
+					CapacityVersion.Store(BeforeCapacityBuild);
 					Result.bSuccess = Result.bContinue = true;
 					Result.Error.Reset();
 					return Result;
@@ -91,7 +94,7 @@ namespace
 			const auto Progress = Mesher->Advance(InCancel, Result.Error);
 			if (Progress == EVoxelFineBuildProgress::CapacityBlocked && Mesher->IsCapacityResumable())
 			{
-				CapacityVersion.Store(Resources->Snapshot().ReleaseVersion);
+				CapacityVersion.Store(BeforeCapacityBuild);
 				bWaitingCapacity.Store(true);
 				Result.bSuccess = Result.bContinue = true;
 				Result.Error.Reset();
@@ -117,6 +120,7 @@ namespace
 		TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> FactResources;
 		TAtomic<bool> bWaitingFacts{false};
 		TAtomic<uint64> FactCapacityVersion{0};
+		uint64 BeforeFactBuild = 0;
 		TSharedPtr<const FVoxelFineOverlayReadResult, ESPMode::ThreadSafe> Overlay;
 		TUniquePtr<FVoxelFineShardSampler> Sampler;
 		TUniquePtr<FVoxelFineShardMeshing> Mesher;
@@ -133,6 +137,7 @@ namespace
 		int32 WorldMaxZ = 0;
 		TAtomic<bool> bWaitingCapacity{false};
 		TAtomic<uint64> CapacityVersion{0};
+		uint64 BeforeCapacityBuild = 0;
 
 		FFineShardWorker(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
 			TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator,
@@ -144,7 +149,7 @@ namespace
 
 		FVoxelTaskResult WaitFacts()
 		{
-			FactCapacityVersion.Store(FactResources->Snapshot().ReleaseVersion);
+			FactCapacityVersion.Store(BeforeFactBuild);
 			bWaitingFacts.Store(true);
 			FVoxelTaskResult Result;
 			Result.bSuccess = Result.bContinue = true;
@@ -153,7 +158,7 @@ namespace
 
 		FVoxelTaskResult WaitCapacity()
 		{
-			CapacityVersion.Store(Resources->Snapshot().ReleaseVersion);
+			CapacityVersion.Store(BeforeCapacityBuild);
 			bWaitingCapacity.Store(true);
 			FVoxelTaskResult Result;
 			Result.bSuccess = Result.bContinue = true;
@@ -164,22 +169,35 @@ namespace
 		{
 			FVoxelTaskResult Result;
 			if (InCancel.Load()) { Result.bCanceled = true; return Result; }
+			BeforeCapacityBuild = Resources->ReleaseVersionExcludingOwner(Consumer);
 			if (bWaitingFacts.Load())
 			{
-				if (FactResources->Snapshot().ReleaseVersion <= FactCapacityVersion.Load()) return WaitFacts();
+				if (FactResources->ReleaseVersionExcludingOwner(Consumer) <= FactCapacityVersion.Load())
+				{
+					Result.bSuccess = Result.bContinue = true;
+					return Result;
+				}
 				bWaitingFacts.Store(false);
 			}
+			BeforeFactBuild = FactResources->ReleaseVersionExcludingOwner(Consumer);
 			if (bWaitingCapacity.Load())
 			{
-				const uint64 Version = Resources->Snapshot().ReleaseVersion;
-				if (Version <= CapacityVersion.Load()) return WaitCapacity();
-				if (Mesher && !Mesher->ResumeCapacity(Version, Result.Error)) return WaitCapacity();
+				if (BeforeCapacityBuild <= CapacityVersion.Load())
+				{
+					Result.bSuccess = Result.bContinue = true;
+					return Result;
+				}
+				if (Mesher && !Mesher->ResumeCapacity(Resources->Snapshot().ReleaseVersion, Result.Error)) return WaitCapacity();
 				bWaitingCapacity.Store(false);
 			}
 			if (!Overlay)
 			{
 				bool bComplete = false;
-				if (!Reader.Advance(1, InCancel, bComplete, Result.Error)) return Result;
+				if (!Reader.Advance(1, InCancel, bComplete, Result.Error))
+				{
+					if (!InCancel.Load() && Result.Error.StartsWith(TEXT("CapacityBlocked"))) return WaitFacts();
+					return Result;
+				}
 				if (Result.Error.StartsWith(TEXT("CapacityBlocked:"))) return WaitFacts();
 				if (!bComplete) { Result.bSuccess = Result.bContinue = true; return Result; }
 				auto Read = MakeShared<FVoxelFineOverlayReadResult, ESPMode::ThreadSafe>();
@@ -202,6 +220,7 @@ namespace
 				if (!Samples)
 				{
 					const auto Progress = Sampler->Advance(1, InCancel, Result.Error);
+					if (Progress == EVoxelFineBuildProgress::CapacityBlocked) return WaitFacts();
 					if (Progress == EVoxelFineBuildProgress::Working) { Result.bSuccess = Result.bContinue = true; return Result; }
 					if (Progress != EVoxelFineBuildProgress::Complete) return Result;
 					Samples = Sampler->TakeResult();
@@ -356,7 +375,7 @@ bool FVoxelViewManager::RequestFineShard(const FVoxelFineShardKey& InKey)
 	if (!Facts.bReady) return false;
 	FVoxelFineOverlayCapture Capture;
 	FString Error;
-	if (!Module.CaptureFineOverlays(Bounds, Capture, Error)) return false;
+	if (!Module.CaptureFineOverlays(Bounds, Capture, Error, &Slot->Consumer)) return false;
 	const uint64 CaptureBytes = VoxelBoundedAllocation::WorkerSharedBytes<FFineShardWorker>() +
 		VoxelBoundedAllocation::SharedBytes<TAtomic<bool>>() +
 		VoxelBoundedAllocation::SharedBytes<FVoxelFineOverlayReadResult>() +
@@ -401,10 +420,16 @@ bool FVoxelViewManager::RequestFineShard(const FVoxelFineShardKey& InKey)
 	Request.ReservedBytes = sizeof(FVoxelFineShardGeometry);
 	Request.FirstRunnableSeconds = Slot->FirstQueuedSeconds;
 	Request.bResumable = true;
+	Request.GenerationConsumer = Worker->Consumer;
 	Request.GetBlockReason = [Worker]
 	{
-		return (Worker->bWaitingCapacity.Load() && Worker->Resources->Snapshot().ReleaseVersion <= Worker->CapacityVersion.Load()) ||
-			(Worker->bWaitingFacts.Load() && Worker->FactResources->Snapshot().ReleaseVersion <= Worker->FactCapacityVersion.Load()) ?
+		uint64 FactVersion = 0;
+		const bool bFactsBlocked = Worker->bWaitingFacts.Load() &&
+			(!Worker->FactResources->TryGetReleaseVersionExcludingOwner(Worker->Consumer, FactVersion) || FactVersion <= Worker->FactCapacityVersion.Load());
+		uint64 GeometryVersion = 0;
+		const bool bGeometryBlocked = Worker->bWaitingCapacity.Load() &&
+			(!Worker->Resources->TryGetReleaseVersionExcludingOwner(Worker->Consumer, GeometryVersion) || GeometryVersion <= Worker->CapacityVersion.Load());
+		return bGeometryBlocked || bFactsBlocked ?
 			EVoxelTaskBlockReason::Memory : EVoxelTaskBlockReason::None;
 	};
 	Request.Execute = [Worker](const TAtomic<bool>& Cancel) { return Worker->Advance(Cancel); };
@@ -653,7 +678,9 @@ bool FVoxelViewManager::RequestF0Fine(const FIntVector& InSection, const uint64 
 	Request.bResumable = true;
 	Request.GetBlockReason = [Worker]
 	{
-		return Worker->bWaitingCapacity.Load() && Worker->Resources->Snapshot().ReleaseVersion <= Worker->CapacityVersion.Load() ?
+		uint64 Version = 0;
+		return Worker->bWaitingCapacity.Load() &&
+			(!Worker->Resources->TryGetReleaseVersionExcludingOwner(Worker->Consumer, Version) || Version <= Worker->CapacityVersion.Load()) ?
 			EVoxelTaskBlockReason::Memory : EVoxelTaskBlockReason::None;
 	};
 	Request.Execute = [Worker](const TAtomic<bool>& Cancel) { return Worker->Advance(Cancel); };

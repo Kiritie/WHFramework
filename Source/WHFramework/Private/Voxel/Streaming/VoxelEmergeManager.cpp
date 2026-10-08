@@ -2,6 +2,8 @@
 
 #include "EngineGlobals.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "Voxel/Generation/VoxelGenerationCapacityWait.h"
+#include "Voxel/Generation/VoxelGenerationPlanningRead.h"
 #include "Voxel/Save/VoxelDeltaCodec.h"
 #include "Voxel/Save/VoxelRegionStore.h"
 #include "Voxel/Rendering/VoxelTerrainFrameContext.h"
@@ -454,8 +456,6 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::QueryEnvironment(const FIn
 	const FVoxelGenerationDependencyStatus Status = PlanCoordinator->EnsureEnvironment(InCell);
 	if (!Status.bReady) return Status;
 	if (EnvironmentColumnStates.Num() >= 32) return {};
-	const auto Retention = Generator->RetainHydrologyForPlanning(InCell, 0);
-	if (!Retention) return { false, false, TEXT("CapacityBlocked: environment cache retention") };
 	FVoxelTaskRequest Request;
 	Request.Kind = EVoxelTaskKind::ProjectBackground;
 	Request.WorkClass = EVoxelWorkClass::Interactive;
@@ -466,14 +466,26 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::QueryEnvironment(const FIn
 	check(NextEnvironmentTaskSerial != MAX_uint64);
 	Request.Stamp.Token = ++NextEnvironmentTaskSerial;
 	Request.Stamp.Revision = 1;
+	Request.GenerationConsumer = {EVoxelGenerationConsumerKind::Environment, Request.Stamp.WorldEpoch,
+		Request.Stamp.OwnerId, Request.Stamp.OwnerIncarnation, EVoxelGenerationSpatialKind::Column,
+		Request.Stamp.Section, Request.Stamp.Section, Request.Stamp.Token};
+	FVoxelGenerationConsumerScope ConsumerScope(Request.GenerationConsumer);
+	const auto Retention = Generator->RetainHydrologyForPlanning(InCell, 0);
+	if (!Retention) return { false, false, TEXT("CapacityBlocked: environment cache retention") };
+	const auto CapacityWait = FVoxelGenerationCapacityWait::Create(Scheduler.GetRuntimeResources(), Request.GenerationConsumer);
+	if (!CapacityWait) return { false, false, TEXT("CapacityBlocked: environment continuation") };
+	Request.bResumable = true;
+	Request.GetBlockReason = [CapacityWait] { return CapacityWait->BlockReason(); };
 	Request.ReservedBytes = 4096;
-	Request.Execute = [Pipeline = Generator, InCell, Retention](const TAtomic<bool>& Cancel)
+	Request.Execute = [Pipeline = Generator, InCell, Retention, CapacityWait](const TAtomic<bool>& Cancel)
 	{
 		FVoxelTaskResult Result;
+		const uint64 BeforeBuild = CapacityWait->Begin();
 		FVoxelEnvironmentSample Sample;
 		Result.bSuccess = !Cancel.Load() && Pipeline->SampleEnvironment(
 			InCell.X, InCell.Y, Sample, Result.Error, &Cancel);
 		Result.bCanceled = Cancel.Load();
+		if (!Result.bSuccess) CapacityWait->Continue(Result, BeforeBuild);
 		return Result;
 	};
 	Request.Apply = [this, InCell](FVoxelTaskResult&& Result)
@@ -482,7 +494,8 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::QueryEnvironment(const FIn
 		if (!Current || Current->Stamp != Result.Stamp || Result.Stamp.WorldEpoch != Runtime.Epoch() ||
 			Result.Stamp.OwnerIncarnation != EnvironmentTaskIncarnation) return;
 		EnvironmentColumnStates.Remove(InCell);
-		if (!Result.bSuccess && !Result.bCanceled && !Result.Error.StartsWith(TEXT("DependencyNotReady")))
+		if (!Result.bSuccess && !Result.bCanceled && !Result.Error.StartsWith(TEXT("DependencyNotReady")) &&
+			!Result.Error.StartsWith(TEXT("CapacityBlocked")))
 		{
 			EnvironmentColumnStates.Add(InCell, { Result.Stamp, { false, true, Result.Error } });
 			UE_LOG(LogTemp, Error, TEXT("Environment column %s failed: %s"), *InCell.ToString(), *Result.Error);
@@ -1035,6 +1048,11 @@ bool FVoxelEmergeManager::RequestBase(
 
 	Request.Stamp =
 		TaskStamp;
+	Request.GenerationConsumer = Waiting->Consumer;
+	const auto CapacityWait = FVoxelGenerationCapacityWait::Create(Scheduler.GetRuntimeResources(), Request.GenerationConsumer);
+	if (!CapacityWait) return false;
+	Request.bResumable = true;
+	Request.GetBlockReason = [CapacityWait] { return CapacityWait->BlockReason(); };
 
 	Request.DistanceScore = InDemand.DistanceCells;
 	Request.ForwardScore = InDemand.ForwardScore;
@@ -1051,10 +1069,11 @@ bool FVoxelEmergeManager::RequestBase(
 			Generator;
 
 	Request.Execute =
-		[CapturedGenerator, CapturedRetention, InKey, BaseLease](
+		[CapturedGenerator, CapturedRetention, InKey, BaseLease, CapacityWait](
 			const TAtomic<bool>& InCancel)
 		{
 			FVoxelTaskResult Result;
+			const uint64 BeforeBuild = CapacityWait->Begin();
 			Result.OutputResourceLease = BaseLease;
 
 			Result.bSuccess =
@@ -1066,6 +1085,7 @@ bool FVoxelEmergeManager::RequestBase(
 
 			Result.bCanceled =
 				InCancel.Load();
+			if (!Result.bSuccess) CapacityWait->Continue(Result, BeforeBuild);
 
 			return Result;
 		};

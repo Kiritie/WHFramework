@@ -1675,6 +1675,17 @@ void UVoxelModule::DonateProjectTaskPriority(const FVoxelTaskStamp& InStamp, con
 	});
 }
 
+void UVoxelModule::CancelProjectTasksByOwner(const FGuid& InOwnerId, const uint64 InOwnerIncarnation)
+{
+	check(IsInGameThread());
+	if (!Scheduler || !InOwnerId.IsValid() || InOwnerIncarnation == 0) return;
+	Scheduler->CancelMatching([InOwnerId, InOwnerIncarnation](EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
+	{
+		return Kind == EVoxelTaskKind::ProjectBackground && Stamp.OwnerId == InOwnerId &&
+			Stamp.OwnerIncarnation == InOwnerIncarnation;
+	});
+}
+
 void UVoxelModule::SetPersistenceEnabled(const bool bInEnabled)
 {
 	// 已接受的 SaveUncommitted 义务不能通过改变世界策略撤销。
@@ -2211,21 +2222,56 @@ void UVoxelModule::RefreshInterest(
 		FVoxelGenerationCacheRetention Retention;
 		Retention.HydrologyRegionSide = FMath::Max(8, Manifest.Settings.HydrologyRegionSide);
 		Retention.HydrologyCellSize = FMath::Max(1, Manifest.Settings.HydrologyCellSize);
-		const int64 HydrologySide = static_cast<int64>(Retention.HydrologyRegionSide) * Retention.HydrologyCellSize;
-		for (const FVoxelStreamingSource& Source : ActiveSources)
-		{
-			if (!Source.Has(EVoxelStreamingCapability::RetainGenerationCache)) continue;
-			FVoxelGenerationCacheRetentionPoint& Point = Retention.Points.AddDefaulted_GetRef();
-			Point.Center = FIntPoint(Source.Center.X, Source.Center.Y);
-			const int32 PlanningRadius = Source.Has(EVoxelStreamingCapability::WorldVisual)
-				? VoxelViewLod::ResolveViewRanges(Source).Surface
-				: FMath::Max3(Source.ExactRadius, Source.CollisionRadius, Source.View.FineRadiusCells);
-			Point.NaturalRadiusCells = PlanningRadius + FMath::CeilToInt(PlanningRadius * ViewSettings.Planning.GenerationCacheMarginFraction);
-			Point.PlanRadiusCells = Point.NaturalRadiusCells + FMath::CeilToInt(PlanningRadius * ViewSettings.Planning.PlanCacheMarginFraction);
-			Point.HydrologyRadiusCells = static_cast<int32>(FMath::Min<int64>(MAX_int32, Point.PlanRadiusCells + HydrologySide));
-		}
 		Retention.Revision = InterestRevision + 1;
-		GenerationCache->UpdateRetention(Retention);
+		const int64 HydrologySide = static_cast<int64>(Retention.HydrologyRegionSide) * Retention.HydrologyCellSize;
+		const TConstArrayView<FVoxelStreamingSource> RetentionSources = MakeArrayView(SourcesCapture->Values);
+		int32 PointCount = 0;
+		for (const FVoxelStreamingSource& Source : RetentionSources)
+		{
+			PointCount += Source.Has(EVoxelStreamingCapability::RetainGenerationCache) ? 1 : 0;
+		}
+		const float NaturalMarginFraction = ViewSettings.Planning.GenerationCacheMarginFraction;
+		const float PlanMarginFraction = ViewSettings.Planning.PlanCacheMarginFraction;
+		FString Error;
+		if (!GenerationCache->UpdateRetention(Retention, PointCount,
+			[RetentionSources, NaturalMarginFraction, PlanMarginFraction, HydrologySide](
+				TArrayView<FVoxelGenerationCacheRetentionPoint> OutPoints, FString& OutError)
+			{
+				int32 PointIndex = 0;
+				for (const FVoxelStreamingSource& Source : RetentionSources)
+				{
+					if (!Source.Has(EVoxelStreamingCapability::RetainGenerationCache))
+					{
+						continue;
+					}
+					if (PointIndex >= OutPoints.Num())
+					{
+						OutError = TEXT("Generation cache retention source changed during snapshot fill");
+						return false;
+					}
+					FVoxelGenerationCacheRetentionPoint& Point = OutPoints[PointIndex++];
+					Point.Center = FIntPoint(Source.Center.X, Source.Center.Y);
+					const int32 PlanningRadius = Source.Has(EVoxelStreamingCapability::WorldVisual)
+						? VoxelViewLod::ResolveViewRanges(Source).Surface
+						: FMath::Max3(Source.ExactRadius, Source.CollisionRadius, Source.View.FineRadiusCells);
+					Point.NaturalRadiusCells = PlanningRadius + FMath::CeilToInt(PlanningRadius * NaturalMarginFraction);
+					Point.PlanRadiusCells = Point.NaturalRadiusCells + FMath::CeilToInt(PlanningRadius * PlanMarginFraction);
+					Point.HydrologyRadiusCells = static_cast<int32>(FMath::Min<int64>(MAX_int32, Point.PlanRadiusCells + HydrologySide));
+				}
+				if (PointIndex != OutPoints.Num())
+				{
+					OutError = TEXT("Generation cache retention source changed during snapshot fill");
+					return false;
+				}
+				return true;
+			}, Error))
+		{
+			bInterestDirty = true;
+			if (!Error.StartsWith(TEXT("CapacityBlocked")))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Generation cache retention snapshot rejected: %s"), *Error);
+			}
+		}
 	}
 }
 

@@ -11,6 +11,7 @@
 #include "Voxel/Generation/Surface/VoxelSurfaceGenerator.h"
 #include "Voxel/Generation/Terrain/VoxelTerrainGenerator.h"
 #include "Voxel/Generation/VoxelFeature.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelGenerationPlanningRead.h"
 #include "Voxel/Generation/VoxelStructure.h"
@@ -46,6 +47,201 @@ namespace
 	}
 }
 
+FVoxelGenerationQuery::FPreparedState::FPreparedState()
+{
+}
+
+FVoxelGenerationQuery::FPreparedState::~FPreparedState()
+{
+}
+
+FVoxelGenerationQuery::FPreparedState::FPreparedState(FPreparedState&& InOther)
+{
+	*this = MoveTemp(InOther);
+}
+
+FVoxelGenerationQuery::FPreparedState& FVoxelGenerationQuery::FPreparedState::operator=(FPreparedState&& InOther)
+{
+	if (this != &InOther)
+	{
+		Reset();
+		Lease = MoveTemp(InOther.Lease);
+		Caves = MoveTemp(InOther.Caves);
+		Ecology = MoveTemp(InOther.Ecology);
+		Features = MoveTemp(InOther.Features);
+		Structures = MoveTemp(InOther.Structures);
+		Bounds = InOther.Bounds;
+		Cancel = InOther.Cancel;
+		bColumnsPrepared = InOther.bColumnsPrepared;
+		bSymbolsPrepared = InOther.bSymbolsPrepared;
+		InOther.Cancel = nullptr;
+		InOther.bColumnsPrepared = false;
+		InOther.bSymbolsPrepared = false;
+	}
+	return *this;
+}
+
+void FVoxelGenerationQuery::FPreparedState::Reset()
+{
+	Caves.Empty();
+	Ecology.Empty();
+	Features.Empty();
+	Structures.Empty();
+	Lease.Reset();
+	Cancel = nullptr;
+	bColumnsPrepared = false;
+	bSymbolsPrepared = false;
+}
+
+bool FVoxelGenerationQuery::FPreparedState::Reserve(
+	const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& InResources,
+	const FVoxelGenerationConsumerKey& InConsumer,
+	const int32 InTileCount,
+	const int32 InEcologyCount,
+	const bool bInStructuresOnly,
+	const uint64 InExistingInputBytes,
+	FString& OutError)
+{
+	check(!Lease && Caves.Max() == 0 && Ecology.Max() == 0 && Features.Max() == 0 && Structures.Max() == 0);
+	const uint64 CaveBytes = !bInStructuresOnly && InTileCount > 0
+		? VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelCavePlanPtr, FDefaultAllocator>(InTileCount) : 0;
+	const uint64 EcologyBytes = !bInStructuresOnly && InEcologyCount > 0
+		? VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelEcologyPlanPtr, FDefaultAllocator>(InEcologyCount) : 0;
+	const uint64 FeatureBytes = !bInStructuresOnly && InTileCount > 0
+		? VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelFeaturePlanPtr, FDefaultAllocator>(InTileCount) : 0;
+	const uint64 StructureBytes = InTileCount > 0
+		? VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelStructurePlanPtr, FDefaultAllocator>(InTileCount) : 0;
+	const uint64 NewBytes = CaveBytes + EcologyBytes + FeatureBytes + StructureBytes;
+	if (InResources && NewBytes > 0)
+	{
+		const uint64 InputLimit = InResources->Snapshot().Limits.InputBytes;
+		if (InExistingInputBytes > InputLimit || NewBytes > InputLimit - InExistingInputBytes)
+		{
+			OutError = TEXT("Oversized: generation query prepared references");
+			return false;
+		}
+		if (!InResources->Acquire(InConsumer, EVoxelTerrainResourcePool::Input, NewBytes, Lease))
+		{
+			OutError = TEXT("CapacityBlocked: generation query prepared references");
+			return false;
+		}
+	}
+#if !WITH_DEV_AUTOMATION_TESTS
+	else if (!InResources)
+	{
+		OutError = TEXT("InvalidConsumer: generation query prepared references have no original ledger");
+		return false;
+	}
+#endif
+	// 候选一次授予完整新 backing；已提交状态仍持有原 backing，覆盖替换峰值。
+	if (!bInStructuresOnly)
+	{
+		Caves.Reserve(InTileCount);
+		Ecology.Reserve(InEcologyCount);
+		Features.Reserve(InTileCount);
+	}
+	Structures.Reserve(InTileCount);
+	if (Lease)
+	{
+		const uint64 ActualBytes = VoxelGenerationAllocation::AllocatedBytes(Caves) +
+			VoxelGenerationAllocation::AllocatedBytes(Ecology) + VoxelGenerationAllocation::AllocatedBytes(Features) +
+			VoxelGenerationAllocation::AllocatedBytes(Structures);
+		check(ActualBytes <= NewBytes);
+		if (!Lease->Resize(ActualBytes))
+		{
+			OutError = TEXT("InvalidResource: generation query prepared reservation");
+			return false;
+		}
+	}
+	OutError.Reset();
+	return true;
+}
+
+FVoxelGenerationQuery::FVoxelGenerationQuery()
+{
+}
+
+FVoxelGenerationQuery::~FVoxelGenerationQuery()
+{
+}
+
+FVoxelGenerationQuery::FVoxelGenerationQuery(FVoxelGenerationQuery&& InOther)
+{
+	*this = MoveTemp(InOther);
+}
+
+FVoxelGenerationQuery& FVoxelGenerationQuery::operator=(FVoxelGenerationQuery&& InOther)
+{
+	if (this != &InOther)
+	{
+		Prepared = MoveTemp(InOther.Prepared);
+		Config = MoveTemp(InOther.Config);
+		Cache = MoveTemp(InOther.Cache);
+		Resources = MoveTemp(InOther.Resources);
+		Consumer = InOther.Consumer;
+		GeneratorInputBytes = InOther.GeneratorInputBytes;
+		InOther.GeneratorInputBytes = 0;
+		Climate = MoveTemp(InOther.Climate);
+		Terrain = MoveTemp(InOther.Terrain);
+		Biome = MoveTemp(InOther.Biome);
+		Hydrology = MoveTemp(InOther.Hydrology);
+		Cave = MoveTemp(InOther.Cave);
+		Aquifer = MoveTemp(InOther.Aquifer);
+		Surface = MoveTemp(InOther.Surface);
+		Ecology = MoveTemp(InOther.Ecology);
+		bUseColumnCache = InOther.bUseColumnCache;
+		bRequireReadyHydrology = InOther.bRequireReadyHydrology;
+		bRequireReadyPlans = InOther.bRequireReadyPlans;
+		FCString::Strncpy(PlanSampleError, InOther.PlanSampleError, UE_ARRAY_COUNT(PlanSampleError));
+		MissingHydrologyContext = MoveTemp(InOther.MissingHydrologyContext);
+		MissingHydrologyObserver = InOther.MissingHydrologyObserver;
+		InOther.MissingHydrologyObserver = nullptr;
+	}
+	return *this;
+}
+
+bool FVoxelGenerationQuery::ValidateConsumer(FString& OutError) const
+{
+	if (!Config || !Cache)
+	{
+		OutError = TEXT("Voxel query is not initialized");
+		return false;
+	}
+	if (!Resources)
+	{
+#if WITH_DEV_AUTOMATION_TESTS
+		return true;
+#else
+		OutError = TEXT("InvalidConsumer: generation query has no original World ledger");
+		return false;
+#endif
+	}
+	if (Cache->GetResources().Get() != Resources.Get() || !Consumer.IsValid() ||
+		Consumer.WorldEpoch != Cache->GetControlConsumer().WorldEpoch)
+	{
+		OutError = TEXT("InvalidConsumer: generation query lost its original World identity");
+		return false;
+	}
+	FVoxelGenerationConsumerKey CurrentConsumer;
+	if (!Cache->ResolveConsumer(CurrentConsumer, OutError))
+	{
+		return false;
+	}
+	if (const auto* ScopeConsumer = FVoxelGenerationConsumerScope::GetConsumerKey();
+		ScopeConsumer && (!ScopeConsumer->IsValid() || !(*ScopeConsumer == Consumer)))
+	{
+		OutError = TEXT("InvalidConsumer: generation query belongs to another execution consumer");
+		return false;
+	}
+	if (const auto* CapturedConsumer = FVoxelGenerationPlanningReadScope::GetConsumerKey();
+		CapturedConsumer && !(*CapturedConsumer == Consumer))
+	{
+		OutError = TEXT("InvalidConsumer: generation query belongs to another logical consumer");
+		return false;
+	}
+	return true;
+}
+
 bool FVoxelGenerationQuery::GetPlanKeyRanges(const FVoxelGenerationBounds& InBounds,
 	const FVoxelGenerationSettings& InSettings, FVoxelGenerationPlanKeyRanges& OutRanges, FString& OutError)
 {
@@ -72,20 +268,55 @@ bool FVoxelGenerationQuery::GetPlanKeyRanges(const FVoxelGenerationBounds& InBou
 		At(int64(InBounds.Max.Y) - 1 + EcologyMargin, EcologyTileSide));
 	const int64 Tiles = (int64(Candidate.TileMax.X) - Candidate.TileMin.X + 1) *
 		(int64(Candidate.TileMax.Y) - Candidate.TileMin.Y + 1);
-	const int64 Ecology = (int64(Candidate.EcologyMax.X) - Candidate.EcologyMin.X + 1) *
+	const int64 EcologyCount = (int64(Candidate.EcologyMax.X) - Candidate.EcologyMin.X + 1) *
 		(int64(Candidate.EcologyMax.Y) - Candidate.EcologyMin.Y + 1);
-	if (Tiles <= 0 || Ecology <= 0 || Tiles > MAX_int32 || Ecology > MAX_int32)
+	if (Tiles <= 0 || EcologyCount <= 0 || Tiles > MAX_int32 || EcologyCount > MAX_int32)
 	{
 		OutError = TEXT("Oversized: generation planning key ranges");
 		return false;
 	}
 	Candidate.TileCount = int32(Tiles);
-	Candidate.EcologyCount = int32(Ecology);
+	Candidate.EcologyCount = int32(EcologyCount);
 	OutRanges = Candidate;
 	OutError.Reset();
 	return true;
 }
 
+bool FVoxelGenerationQuery::GetStructureKeyRange(
+	const FVoxelGenerationBounds& InBounds,
+	FVoxelGenerationStructureKeyRange& OutRange,
+	FString& OutError)
+{
+	if (!InBounds.IsValid())
+	{
+		OutError = TEXT("Invalid structure planning bounds");
+		return false;
+	}
+	const auto At = [](const int64 InValue)
+	{
+		return int32(VoxelGeneration::FloorDivideWide(
+			FMath::Clamp<int64>(InValue, VoxelGeneration::WorldCellMin, VoxelGeneration::WorldCellMaxExclusive - 1),
+			GenerationPlanTileSide));
+	};
+	FVoxelGenerationStructureKeyRange Candidate;
+	Candidate.Min = FIntPoint(At(int64(InBounds.Min.X) - GenerationPlanTileSide),
+		At(int64(InBounds.Min.Y) - GenerationPlanTileSide));
+	Candidate.Max = FIntPoint(At(int64(InBounds.Max.X) - 1 + GenerationPlanTileSide),
+		At(int64(InBounds.Max.Y) - 1 + GenerationPlanTileSide));
+	const int64 Count = (int64(Candidate.Max.X) - Candidate.Min.X + 1) *
+		(int64(Candidate.Max.Y) - Candidate.Min.Y + 1);
+	if (Count <= 0 || Count > MAX_int32)
+	{
+		OutError = TEXT("Oversized: structure planning key range");
+		return false;
+	}
+	Candidate.Count = int32(Count);
+	OutRange = Candidate;
+	OutError.Reset();
+	return true;
+}
+
+#if WITH_DEV_AUTOMATION_TESTS
 FVoxelGenerationPlanKeys FVoxelGenerationQuery::GatherPlanKeys(
 	const FVoxelGenerationBounds& InBounds,
 	const FVoxelGenerationSettings& InSettings)
@@ -117,24 +348,24 @@ void FVoxelGenerationQuery::GatherStructureTiles(
 	const FVoxelGenerationBounds& InBounds,
 	TArray<FVoxelGenerationTileKey>& OutTiles)
 {
-	OutTiles.Reset();
-	const FVoxelGenerationBounds PlanningBounds = InBounds.Expand(GenerationPlanTileSide);
-	const int32 MinTileX = VoxelGeneration::FloorDivide(
-		PlanningBounds.Min.X, GenerationPlanTileSide);
-	const int32 MaxTileX = VoxelGeneration::FloorDivide(
-		PlanningBounds.Max.X - 1, GenerationPlanTileSide);
-	const int32 MinTileY = VoxelGeneration::FloorDivide(
-		PlanningBounds.Min.Y, GenerationPlanTileSide);
-	const int32 MaxTileY = VoxelGeneration::FloorDivide(
-		PlanningBounds.Max.Y - 1, GenerationPlanTileSide);
-	for (int32 Y = MinTileY; Y <= MaxTileY; ++Y)
+	FVoxelGenerationStructureKeyRange Range;
+	FString Error;
+	if (!GetStructureKeyRange(InBounds, Range, Error))
 	{
-		for (int32 X = MinTileX; X <= MaxTileX; ++X)
+		return;
+	}
+	TArray<FVoxelGenerationTileKey> Tiles;
+	Tiles.Reserve(Range.Count);
+	for (int64 Y = Range.Min.Y; Y <= Range.Max.Y; ++Y)
+	{
+		for (int64 X = Range.Min.X; X <= Range.Max.X; ++X)
 		{
-			OutTiles.Add({ FIntVector(X, Y, 0) });
+			Tiles.Add({ FIntVector(int32(X), int32(Y), 0) });
 		}
 	}
+	OutTiles = MoveTemp(Tiles);
 }
+#endif
 
 FVoxelHydrologyRegionKey FVoxelGenerationQuery::HydrologyKeyForVoxel(
 	const int32 InX,
@@ -156,8 +387,8 @@ bool FVoxelGenerationQuery::SamplePlanColumn(
 	FString Error;
 	if (SampleEnvironmentColumn(InPosition.X, InPosition.Y,
 		OutColumn, Error, InCancel)) return true;
-	PlanSampleError = Error.IsEmpty()
-		? TEXT("Voxel plan column sampling failed") : MoveTemp(Error);
+	FCString::Strncpy(PlanSampleError, Error.IsEmpty() ? TEXT("Voxel plan column sampling failed") : *Error,
+		UE_ARRAY_COUNT(PlanSampleError));
 	return false;
 }
 
@@ -180,6 +411,8 @@ bool FVoxelGenerationQuery::EnsureHydrologyPlan(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	if (!ValidateConsumer(OutError)) return false;
+	FVoxelGenerationPlanningReadScope ConsumerScope({}, nullptr, InCancel, Resources ? &Consumer : nullptr);
 	const auto& Settings = Config->Recipe->Settings;
 	const int64 MinCell = VoxelGeneration::FloorDivideWide(VoxelGeneration::WorldCellMin, Settings.HydrologyCellSize);
 	const int64 MaxCell = VoxelGeneration::FloorDivideWide(VoxelGeneration::WorldCellMaxExclusive - 1, Settings.HydrologyCellSize) + 1;
@@ -216,6 +449,8 @@ bool FVoxelGenerationQuery::EnsureCavePlan(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	if (!ValidateConsumer(OutError)) return false;
+	FVoxelGenerationPlanningReadScope ConsumerScope({}, nullptr, InCancel, Resources ? &Consumer : nullptr);
 	FVoxelGenerationBounds Bounds;
 	if (!MakeTileBounds(InKey, Bounds)) { OutError = TEXT("Invalid cave tile outside world cell domain"); return false; }
 	if (bRequireReadyPlans)
@@ -232,15 +467,15 @@ bool FVoxelGenerationQuery::EnsureCavePlan(
 	return Cache->GetOrBuildCave(InKey,
 		[this, Bounds, InCancel](FVoxelCavePlan& Plan, FString& Error)
 		{
-			PlanSampleError.Reset();
+			PlanSampleError[0] = 0;
 			auto ColumnSampler = [this, InCancel](
 				const FIntVector& Position, FVoxelColumnSample& Column)
 			{
 				return SamplePlanColumn(Position, Column, InCancel);
 			};
 			const bool bBuilt = Cave->BuildPlan(Bounds, ColumnSampler, Plan, Error, InCancel);
-			if (!PlanSampleError.IsEmpty()) Error = PlanSampleError;
-			return bBuilt && PlanSampleError.IsEmpty();
+			if (PlanSampleError[0] != 0) Error = PlanSampleError;
+			return bBuilt && (PlanSampleError[0] == 0);
 		}, OutPlan, OutError, InCancel);
 }
 
@@ -250,6 +485,8 @@ bool FVoxelGenerationQuery::EnsureStructurePlan(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	if (!ValidateConsumer(OutError)) return false;
+	FVoxelGenerationPlanningReadScope ConsumerScope({}, nullptr, InCancel, Resources ? &Consumer : nullptr);
 	FVoxelGenerationBounds Bounds;
 	if (!MakeTileBounds(InKey, Bounds)) { OutError = TEXT("Invalid structure tile outside world cell domain"); return false; }
 	if (bRequireReadyPlans)
@@ -266,7 +503,7 @@ bool FVoxelGenerationQuery::EnsureStructurePlan(
 	return Cache->GetOrBuildStructure(InKey,
 		[this, Bounds, InCancel](FVoxelStructurePlan& Plan, FString& Error)
 		{
-			PlanSampleError.Reset();
+			PlanSampleError[0] = 0;
 			auto ColumnSampler = [this, InCancel](
 				const FIntVector& Position, FVoxelColumnSample& Column)
 			{
@@ -274,8 +511,8 @@ bool FVoxelGenerationQuery::EnsureStructurePlan(
 			};
 			FVoxelStructurePlanner Planner(Config->Recipe.ToSharedRef());
 			const bool bBuilt = Planner.BuildPlan(Bounds, ColumnSampler, Plan, Error, InCancel);
-			if (!PlanSampleError.IsEmpty()) Error = PlanSampleError;
-			return bBuilt && PlanSampleError.IsEmpty();
+			if (PlanSampleError[0] != 0) Error = PlanSampleError;
+			return bBuilt && (PlanSampleError[0] == 0);
 		}, OutPlan, OutError, InCancel);
 }
 
@@ -285,6 +522,8 @@ bool FVoxelGenerationQuery::EnsureFeaturePlan(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	if (!ValidateConsumer(OutError)) return false;
+	FVoxelGenerationPlanningReadScope ConsumerScope({}, nullptr, InCancel, Resources ? &Consumer : nullptr);
 	FVoxelGenerationBounds Bounds;
 	if (!MakeTileBounds(InKey, Bounds)) { OutError = TEXT("Invalid feature tile outside world cell domain"); return false; }
 	if (bRequireReadyPlans)
@@ -301,7 +540,7 @@ bool FVoxelGenerationQuery::EnsureFeaturePlan(
 	return Cache->GetOrBuildFeature(InKey,
 		[this, Bounds, InCancel](FVoxelFeaturePlan& Plan, FString& Error)
 		{
-			PlanSampleError.Reset();
+			PlanSampleError[0] = 0;
 			auto ColumnSampler = [this, InCancel](
 				const FIntVector& Position, FVoxelColumnSample& Column)
 			{
@@ -315,8 +554,8 @@ bool FVoxelGenerationQuery::EnsureFeaturePlan(
 			FVoxelFeaturePlanner Planner(Config->Recipe.ToSharedRef());
 			const bool bBuilt = Planner.BuildPlan(Bounds, ColumnSampler, SymbolSampler,
 				Plan, Error, InCancel);
-			if (!PlanSampleError.IsEmpty()) Error = PlanSampleError;
-			return bBuilt && PlanSampleError.IsEmpty();
+			if (PlanSampleError[0] != 0) Error = PlanSampleError;
+			return bBuilt && (PlanSampleError[0] == 0);
 		}, OutPlan, OutError, InCancel);
 }
 
@@ -326,6 +565,8 @@ bool FVoxelGenerationQuery::EnsureEcologyPlan(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	if (!ValidateConsumer(OutError)) return false;
+	FVoxelGenerationPlanningReadScope ConsumerScope({}, nullptr, InCancel, Resources ? &Consumer : nullptr);
 	const FInt64Vector Min(int64(InKey.Coordinate.X) * EcologyTileSide, int64(InKey.Coordinate.Y) * EcologyTileSide,
 		Config->Recipe->Settings.MinZ);
 	FVoxelGenerationBounds Bounds;
@@ -346,7 +587,7 @@ bool FVoxelGenerationQuery::EnsureEcologyPlan(
 	return Cache->GetOrBuildEcology(InKey,
 		[this, Bounds, InCancel](FVoxelEcologyPlan& Plan, FString& Error)
 		{
-			PlanSampleError.Reset();
+			PlanSampleError[0] = 0;
 			auto ColumnSampler = [this, InCancel](
 				const FIntVector& Position, FVoxelColumnSample& Column)
 			{
@@ -359,8 +600,8 @@ bool FVoxelGenerationQuery::EnsureEcologyPlan(
 			};
 			const bool bBuilt = Ecology->BuildPlan(Bounds, ColumnSampler, SymbolSampler,
 				Plan, Error, InCancel);
-			if (!PlanSampleError.IsEmpty()) Error = PlanSampleError;
-			return bBuilt && PlanSampleError.IsEmpty();
+			if (PlanSampleError[0] != 0) Error = PlanSampleError;
+			return bBuilt && (PlanSampleError[0] == 0);
 		}, OutPlan, OutError, InCancel);
 }
 
@@ -383,21 +624,33 @@ bool FVoxelGenerationQuery::Create(
 		return false;
 	}
 
-	const auto& Resources = InCache->GetResources();
-	FVoxelGenerationConsumerKey Consumer;
+	const auto& QueryResources = InCache->GetResources();
+	FVoxelGenerationConsumerKey QueryConsumer;
+	uint64 NewGeneratorInputBytes = 0;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> GeneratorLeases[8];
-	if (Resources)
+	if (QueryResources)
 	{
-		if (!InCache->ResolveConsumer(Consumer, OutError)) return false;
-		if (InConsumer)
+		const auto* ScopeConsumer = FVoxelGenerationConsumerScope::GetConsumerKey();
+		const auto* ReadConsumer = FVoxelGenerationPlanningReadScope::GetConsumerKey();
+		if (!InConsumer && !ScopeConsumer && !ReadConsumer &&
+			!FVoxelGenerationPlanningReadScope::GetTaskStamp())
 		{
-			if (!InConsumer->IsValid() || InConsumer->WorldEpoch != Consumer.WorldEpoch ||
-				(FVoxelGenerationPlanningReadScope::GetConsumerKey() && !(*InConsumer == Consumer)))
+			OutError = TEXT("InvalidConsumer: generation query requires the original explicit or TLS consumer");
+			return false;
+		}
+		if (!InCache->ResolveConsumer(QueryConsumer, OutError)) return false;
+		const FVoxelGenerationConsumerKey* OriginalConsumer = InConsumer ? InConsumer :
+			(ScopeConsumer ? ScopeConsumer : ReadConsumer);
+		if (OriginalConsumer)
+		{
+			if (!OriginalConsumer->IsValid() || OriginalConsumer->WorldEpoch != InCache->GetControlConsumer().WorldEpoch ||
+				(ScopeConsumer && (!ScopeConsumer->IsValid() || !(*OriginalConsumer == *ScopeConsumer))) ||
+				(ReadConsumer && (!ReadConsumer->IsValid() || !(*OriginalConsumer == *ReadConsumer))))
 			{
 				OutError = TEXT("InvalidConsumer: generation query requires the original World consumer");
 				return false;
 			}
-			Consumer = *InConsumer;
+			QueryConsumer = *OriginalConsumer;
 		}
 		const uint64 GeneratorBytes[] = {
 			VoxelBoundedAllocation::WorkerSharedBytes<const FVoxelClimateGenerator>(),
@@ -409,9 +662,21 @@ bool FVoxelGenerationQuery::Create(
 			VoxelBoundedAllocation::WorkerSharedBytes<const FVoxelSurfaceGenerator>(),
 			VoxelBoundedAllocation::WorkerSharedBytes<const FVoxelEcologyGenerator>()
 		};
+		for (const uint64 Bytes : GeneratorBytes)
+		{
+			NewGeneratorInputBytes += Bytes;
+		}
+		const uint64 ExistingInputBytes = OutQuery.Resources.Get() == QueryResources.Get()
+			? OutQuery.GeneratorInputBytes + (OutQuery.Prepared.Lease ? OutQuery.Prepared.Lease->Bytes() : 0) : 0;
+		const uint64 InputLimit = QueryResources->Snapshot().Limits.InputBytes;
+		if (ExistingInputBytes > InputLimit || NewGeneratorInputBytes > InputLimit - ExistingInputBytes)
+		{
+			OutError = TEXT("Oversized: generation query native generator replacement");
+			return false;
+		}
 		for (int32 Index = 0; Index < UE_ARRAY_COUNT(GeneratorBytes); ++Index)
 		{
-			if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input, GeneratorBytes[Index], GeneratorLeases[Index]))
+			if (!QueryResources->Acquire(QueryConsumer, EVoxelTerrainResourcePool::Input, GeneratorBytes[Index], GeneratorLeases[Index]))
 			{
 				OutError = TEXT("CapacityBlocked: generation query native generators");
 				return false;
@@ -430,6 +695,9 @@ bool FVoxelGenerationQuery::Create(
 
 	Query.Config = InConfig;
 	Query.Cache = InCache;
+	Query.Resources = QueryResources;
+	Query.Consumer = QueryConsumer;
+	Query.GeneratorInputBytes = NewGeneratorInputBytes;
 	Query.bUseColumnCache = bInUseColumnCache;
 	Query.bRequireReadyHydrology = bInRequireReadyHydrology || FVoxelGenerationPlanningReadScope::IsActive();
 	Query.bRequireReadyPlans = bInRequireReadyPlans || FVoxelGenerationPlanningReadScope::IsActive();
@@ -457,6 +725,10 @@ bool FVoxelGenerationQuery::PrepareColumns(
 	FString& OutError,
 	const TAtomic<bool>* InCancel)
 {
+	if (!ValidateConsumer(OutError))
+	{
+		return false;
+	}
 	if (!InBounds.IsValid())
 	{
 		OutError =
@@ -474,16 +746,11 @@ bool FVoxelGenerationQuery::PrepareColumns(
 		return false;
 	}
 
-	PreparedCaves.Reset();
-	PreparedEcology.Reset();
-	PreparedFeatures.Reset();
-	PreparedStructures.Reset();
-	PreparedBounds =
-		InBounds;
-	Cancel = InCancel;
-
-	bColumnsPrepared = true;
-	bSymbolsPrepared = false;
+	FPreparedState Candidate;
+	Candidate.Bounds = InBounds;
+	Candidate.Cancel = InCancel;
+	Candidate.bColumnsPrepared = true;
+	Prepared = MoveTemp(Candidate);
 
 	OutError.Reset();
 	return true;
@@ -496,56 +763,78 @@ bool FVoxelGenerationQuery::Prepare(
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_QueryPrepare);
 
-	if (!Config || !Config->Recipe)
+	if (!ValidateConsumer(OutError))
 	{
-		OutError = TEXT("Voxel query is not initialized");
 		return false;
 	}
 	const FVoxelGenerationSettings& Settings = Config->Recipe->Settings;
 	FVoxelGenerationPlanKeyRanges Ranges;
 	if (!GetPlanKeyRanges(InBounds, Settings, Ranges, OutError)) return false;
-	if (!PrepareColumns(
-		InBounds,
-		OutError,
-		InCancel))
+	if (InCancel && InCancel->Load())
 	{
+		OutError = TEXT("Canceled");
 		return false;
 	}
 
-	const FVoxelGenerationPlanKeys PlanKeys = GatherPlanKeys(InBounds, Settings);
-
-	for (const FVoxelGenerationTileKey& Key : PlanKeys.Tiles)
+	FPreparedState Candidate;
+	const uint64 ExistingInputBytes = GeneratorInputBytes + (Prepared.Lease ? Prepared.Lease->Bytes() : 0);
+	if (!Candidate.Reserve(Resources, Consumer, Ranges.TileCount, Ranges.EcologyCount, false, ExistingInputBytes, OutError))
 	{
-		if (InCancel && InCancel->Load())
+		return false;
+	}
+	for (int64 Y = Ranges.TileMin.Y; Y <= Ranges.TileMax.Y; ++Y)
+	{
+		for (int64 X = Ranges.TileMin.X; X <= Ranges.TileMax.X; ++X)
 		{
-			OutError = TEXT("Canceled");
-			return false;
+			if (InCancel && InCancel->Load())
+			{
+				OutError = TEXT("Canceled");
+				return false;
+			}
+			const FVoxelGenerationTileKey Key{FIntVector(int32(X), int32(Y), 0)};
+			FVoxelCavePlanPtr CavePlan;
+			if (!EnsureCavePlan(Key, CavePlan, OutError, InCancel)) return false;
+			Candidate.Caves.Add(CavePlan);
+			FVoxelStructurePlanPtr StructurePlan;
+			if (!EnsureStructurePlan(Key, StructurePlan, OutError, InCancel)) return false;
+			Candidate.Structures.Add(StructurePlan);
+			FVoxelFeaturePlanPtr FeaturePlan;
+			if (!EnsureFeaturePlan(Key, FeaturePlan, OutError, InCancel)) return false;
+			Candidate.Features.Add(FeaturePlan);
 		}
-		FVoxelCavePlanPtr CavePlan;
-		if (!EnsureCavePlan(Key, CavePlan, OutError, InCancel)) return false;
-		PreparedCaves.Add(CavePlan);
-		FVoxelStructurePlanPtr StructurePlan;
-		if (!EnsureStructurePlan(Key, StructurePlan, OutError, InCancel)) return false;
-		PreparedStructures.Add(StructurePlan);
-		FVoxelFeaturePlanPtr FeaturePlan;
-		if (!EnsureFeaturePlan(Key, FeaturePlan, OutError, InCancel)) return false;
-		PreparedFeatures.Add(FeaturePlan);
 	}
 
-	for (const FVoxelEcologyTileKey& Key : PlanKeys.EcologyTiles)
+	for (int64 Y = Ranges.EcologyMin.Y; Y <= Ranges.EcologyMax.Y; ++Y)
 	{
-		FVoxelEcologyPlanPtr Plan;
-		if (!EnsureEcologyPlan(Key, Plan, OutError, InCancel)) return false;
-		PreparedEcology.Add(Plan);
+		for (int64 X = Ranges.EcologyMin.X; X <= Ranges.EcologyMax.X; ++X)
+		{
+			if (InCancel && InCancel->Load())
+			{
+				OutError = TEXT("Canceled");
+				return false;
+			}
+			const FVoxelEcologyTileKey Key{FIntPoint(int32(X), int32(Y))};
+			FVoxelEcologyPlanPtr Plan;
+			if (!EnsureEcologyPlan(Key, Plan, OutError, InCancel)) return false;
+			Candidate.Ecology.Add(Plan);
+		}
 	}
 
 	// 在查询准备阶段剔除无关计划，避免对每个方块重复遍历整圈瓦片的空查询。
-	PreparedCaves.RemoveAll([&InBounds](const FVoxelCavePlanPtr& Plan) { return !Plan || !Plan->AffectsBounds(InBounds); });
-	PreparedEcology.RemoveAll([&InBounds](const FVoxelEcologyPlanPtr& Plan) { return !Plan || !Plan->AffectsBounds(InBounds); });
-	PreparedStructures.RemoveAll([&InBounds](const FVoxelStructurePlanPtr& Plan) { return !Plan || !Plan->AffectsBounds(InBounds); });
-	PreparedFeatures.RemoveAll([&InBounds](const FVoxelFeaturePlanPtr& Plan) { return !Plan || !Plan->AffectsBounds(InBounds); });
-
-	bSymbolsPrepared = true;
+	Candidate.Caves.RemoveAll([&InBounds](const FVoxelCavePlanPtr& Plan) { return !Plan || !Plan->AffectsBounds(InBounds); });
+	Candidate.Ecology.RemoveAll([&InBounds](const FVoxelEcologyPlanPtr& Plan) { return !Plan || !Plan->AffectsBounds(InBounds); });
+	Candidate.Structures.RemoveAll([&InBounds](const FVoxelStructurePlanPtr& Plan) { return !Plan || !Plan->AffectsBounds(InBounds); });
+	Candidate.Features.RemoveAll([&InBounds](const FVoxelFeaturePlanPtr& Plan) { return !Plan || !Plan->AffectsBounds(InBounds); });
+	if (InCancel && InCancel->Load())
+	{
+		OutError = TEXT("Canceled");
+		return false;
+	}
+	Candidate.Bounds = InBounds;
+	Candidate.Cancel = InCancel;
+	Candidate.bColumnsPrepared = true;
+	Candidate.bSymbolsPrepared = true;
+	Prepared = MoveTemp(Candidate);
 
 	OutError.Reset();
 	return true;
@@ -556,24 +845,51 @@ bool FVoxelGenerationQuery::PrepareStructuresOnly(
 	FString& OutError,
 	const TAtomic<bool>* InCancel)
 {
-	if (!PrepareColumns(InBounds, OutError, InCancel))
+	if (!ValidateConsumer(OutError))
 	{
 		return false;
 	}
 
-	TArray<FVoxelGenerationTileKey> StructureTiles;
-	GatherStructureTiles(InBounds, StructureTiles);
-	for (const FVoxelGenerationTileKey& Key : StructureTiles)
+	FVoxelGenerationStructureKeyRange Range;
+	if (!GetStructureKeyRange(InBounds, Range, OutError))
 	{
-		if (InCancel && InCancel->Load())
-		{
-			OutError = TEXT("Canceled");
-			return false;
-		}
-		FVoxelStructurePlanPtr StructurePlan;
-		if (!EnsureStructurePlan(Key, StructurePlan, OutError, InCancel)) return false;
-		PreparedStructures.Add(StructurePlan);
+		return false;
 	}
+	if (InCancel && InCancel->Load())
+	{
+		OutError = TEXT("Canceled");
+		return false;
+	}
+	FPreparedState Candidate;
+	const uint64 ExistingInputBytes = GeneratorInputBytes + (Prepared.Lease ? Prepared.Lease->Bytes() : 0);
+	if (!Candidate.Reserve(Resources, Consumer, Range.Count, 0, true, ExistingInputBytes, OutError))
+	{
+		return false;
+	}
+	for (int64 Y = Range.Min.Y; Y <= Range.Max.Y; ++Y)
+	{
+		for (int64 X = Range.Min.X; X <= Range.Max.X; ++X)
+		{
+			if (InCancel && InCancel->Load())
+			{
+				OutError = TEXT("Canceled");
+				return false;
+			}
+			const FVoxelGenerationTileKey Key{FIntVector(int32(X), int32(Y), 0)};
+			FVoxelStructurePlanPtr StructurePlan;
+			if (!EnsureStructurePlan(Key, StructurePlan, OutError, InCancel)) return false;
+			Candidate.Structures.Add(StructurePlan);
+		}
+	}
+	if (InCancel && InCancel->Load())
+	{
+		OutError = TEXT("Canceled");
+		return false;
+	}
+	Candidate.Bounds = InBounds;
+	Candidate.Cancel = InCancel;
+	Candidate.bColumnsPrepared = true;
+	Prepared = MoveTemp(Candidate);
 
 	OutError.Reset();
 	return true;
@@ -586,6 +902,8 @@ bool FVoxelGenerationQuery::GetBaseColumn(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	if (!ValidateConsumer(OutError)) return false;
+	FVoxelGenerationPlanningReadScope ConsumerScope({}, nullptr, InCancel, Resources ? &Consumer : nullptr);
 	if (!VoxelGeneration::IsWorldCell(InX) || !VoxelGeneration::IsWorldCell(InY))
 	{
 		OutError = TEXT("Invalid base column outside world cell domain");
@@ -758,9 +1076,8 @@ bool FVoxelGenerationQuery::ApplyHydrology(
 	{
 		FVoxelGenerationPlanningReadScope::Missing(EVoxelGenerationPlanKind::Hydrology,
 			FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0));
-		if (MissingHydrologyObserver) MissingHydrologyObserver(Key);
-		OutError = FString::Printf(TEXT("DependencyNotReady: Hydrology %s"),
-			*Key.Coordinate.ToString());
+		if (MissingHydrologyObserver) MissingHydrologyObserver(MissingHydrologyContext.Get(), Key);
+		OutError = TEXT("DependencyNotReady: Hydrology");
 		return false;
 	}
 	if (!EnsureHydrologyPlan(Key, Plan, OutError, InCancel) || !Plan)
@@ -800,6 +1117,8 @@ bool FVoxelGenerationQuery::SampleEnvironmentColumn(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	if (!ValidateConsumer(OutError)) return false;
+	FVoxelGenerationPlanningReadScope ConsumerScope({}, nullptr, InCancel, Resources ? &Consumer : nullptr);
 	if (!VoxelGeneration::IsWorldCell(InX) || !VoxelGeneration::IsWorldCell(InY))
 	{
 		OutError = TEXT("Invalid column outside world cell domain");
@@ -866,16 +1185,16 @@ bool FVoxelGenerationQuery::IsInsidePreparedXY(
 	const int32 InY) const
 {
 	return
-		InX >= PreparedBounds.Min.X &&
-		InY >= PreparedBounds.Min.Y &&
-		InX < PreparedBounds.Max.X &&
-		InY < PreparedBounds.Max.Y;
+		InX >= Prepared.Bounds.Min.X &&
+		InY >= Prepared.Bounds.Min.Y &&
+		InX < Prepared.Bounds.Max.X &&
+		InY < Prepared.Bounds.Max.Y;
 }
 
 TConstArrayView<FVoxelStructurePlanPtr>
 FVoxelGenerationQuery::GetPreparedStructurePlans() const
 {
-	return PreparedStructures;
+	return Prepared.Structures;
 }
 
 bool FVoxelGenerationQuery::SampleColumn(
@@ -884,7 +1203,7 @@ bool FVoxelGenerationQuery::SampleColumn(
 	FVoxelColumnSample& OutColumn,
 	FString& OutError) const
 {
-	if (!bColumnsPrepared)
+	if (!Prepared.bColumnsPrepared)
 	{
 		OutError =
 			TEXT("Voxel generation column query is not prepared");
@@ -897,7 +1216,7 @@ bool FVoxelGenerationQuery::SampleColumn(
 		InY,
 		OutColumn,
 		OutError,
-		Cancel))
+		Prepared.Cancel))
 	{
 		return false;
 	}
@@ -923,8 +1242,8 @@ bool FVoxelGenerationQuery::SampleSymbol(
 	uint32& OutValue,
 	FString& OutError) const
 {
-	if (!bSymbolsPrepared ||
-		!PreparedBounds.Contains(
+	if (!Prepared.bSymbolsPrepared ||
+		!Prepared.Bounds.Contains(
 			InPosition))
 	{
 		OutError =
@@ -940,7 +1259,7 @@ bool FVoxelGenerationQuery::SampleSymbol(
 		InPosition.Y,
 		Column,
 		OutError,
-		Cancel))
+		Prepared.Cancel))
 	{
 		return false;
 	}
@@ -948,38 +1267,65 @@ bool FVoxelGenerationQuery::SampleSymbol(
 	return ResolveSymbol(InPosition, Column, OutValue, OutError);
 }
 
-bool FVoxelGenerationQuery::SampleColumnSymbols(const FIntPoint& InColumn, const int32 InMinZ,
-	const int32 InCount, TArray<uint32>& OutValues, FString& OutError) const
+bool FVoxelGenerationQuery::SampleColumnSymbols(
+	const FIntPoint& InColumn,
+	const int32 InMinZ,
+	const TArrayView<uint32> OutValues,
+	FString& OutError) const
 {
-	if (!bSymbolsPrepared || InCount <= 0 ||
-		!PreparedBounds.Contains(FIntVector(InColumn.X, InColumn.Y, InMinZ)) ||
-		static_cast<int64>(InMinZ) + InCount > PreparedBounds.Max.Z)
+	const int32 InCount = OutValues.Num();
+	if (!Prepared.bSymbolsPrepared || InCount <= 0 ||
+		!Prepared.Bounds.Contains(FIntVector(InColumn.X, InColumn.Y, InMinZ)) ||
+		static_cast<int64>(InMinZ) + InCount > Prepared.Bounds.Max.Z)
 	{
 		OutError = TEXT("Voxel symbol column is outside prepared bounds");
 		return false;
 	}
 	FVoxelColumnSample Column;
-	if (!SampleEnvironmentColumn(InColumn.X, InColumn.Y, Column, OutError, Cancel))
+	if (!SampleEnvironmentColumn(InColumn.X, InColumn.Y, Column, OutError, Prepared.Cancel))
 	{
 		return false;
 	}
-	TArray<uint32> Values;
-	Values.SetNumUninitialized(InCount);
 	for (int32 Index = 0; Index < InCount; ++Index)
 	{
-		if (Cancel && Cancel->Load())
+		if (Prepared.Cancel && Prepared.Cancel->Load())
 		{
 			OutError = TEXT("Canceled");
 			return false;
 		}
-		if (!ResolveSymbol(FIntVector(InColumn.X, InColumn.Y, InMinZ + Index), Column, Values[Index], OutError))
+		if (!ResolveSymbol(FIntVector(InColumn.X, InColumn.Y, InMinZ + Index), Column, OutValues[Index], OutError))
 		{
 			return false;
 		}
 	}
+	OutError.Reset();
+	return true;
+}
+
+#if WITH_DEV_AUTOMATION_TESTS
+bool FVoxelGenerationQuery::SampleColumnSymbols(const FIntPoint& InColumn, const int32 InMinZ,
+	const int32 InCount, TArray<uint32>& OutValues, FString& OutError) const
+{
+	if (Resources)
+	{
+		OutError = TEXT("InvalidResource: bound generation query requires a caller-owned symbol span");
+		return false;
+	}
+	if (InCount <= 0)
+	{
+		OutError = TEXT("Voxel symbol column count is invalid");
+		return false;
+	}
+	TArray<uint32> Values;
+	Values.SetNumUninitialized(InCount);
+	if (!SampleColumnSymbols(InColumn, InMinZ, MakeArrayView(Values), OutError))
+	{
+		return false;
+	}
 	OutValues = MoveTemp(Values);
 	return true;
 }
+#endif
 
 bool FVoxelGenerationQuery::ResolveSymbol(const FIntVector& InPosition, FVoxelColumnSample Column,
 	uint32& OutValue, FString& OutError) const
@@ -1040,17 +1386,17 @@ bool FVoxelGenerationQuery::ApplyStage(
 	{
 		auto Cavity = [&](const FIntVector& Position)
 		{
-			for (const FVoxelCavePlanPtr& Plan : PreparedCaves) if (Plan && Plan->Carves(Position)) return true;
+			for (const FVoxelCavePlanPtr& Plan : Prepared.Caves) if (Plan && Plan->Carves(Position)) return true;
 			return false;
 		};
 		auto Protected = [&](const FIntVector& Position)
 		{
-			for (const FVoxelCavePlanPtr& Plan : PreparedCaves)
+			for (const FVoxelCavePlanPtr& Plan : Prepared.Caves)
 			{
 				if (!Plan) continue;
 				for (const FVoxelGenerationBounds& Bounds : Plan->ClearVolumes) if (Bounds.Contains(Position)) return true;
 			}
-			for (const FVoxelStructurePlanPtr& Plan : PreparedStructures)
+			for (const FVoxelStructurePlanPtr& Plan : Prepared.Structures)
 			{
 				if (Plan && (Plan->IsCleared(Position, EVoxelGenerationStage::UndergroundStructures) || Plan->IsCleared(Position, EVoxelGenerationStage::SurfaceStructures))) return true;
 			}
@@ -1122,7 +1468,7 @@ bool FVoxelGenerationQuery::ApplyStage(
 
 	case EVoxelGenerationStage::Carving:
 		for (const FVoxelCavePlanPtr& Plan :
-			PreparedCaves)
+			Prepared.Caves)
 		{
 			if (Plan &&
 				Plan->Carves(
@@ -1161,14 +1507,14 @@ bool FVoxelGenerationQuery::ApplyStage(
 		{
 			break;
 		}
-		for (const FVoxelCavePlanPtr& Plan : PreparedCaves)
+		for (const FVoxelCavePlanPtr& Plan : Prepared.Caves)
 		{
 			if (Plan && Plan->Carves(InPosition))
 			{
 				return true;
 			}
 		}
-		for (const FVoxelEcologyPlanPtr& Plan : PreparedEcology)
+		for (const FVoxelEcologyPlanPtr& Plan : Prepared.Ecology)
 		{
 			uint32 PlannedValue = 0;
 			if (Plan && Plan->Sample(InPosition, PlannedValue))
@@ -1182,7 +1528,7 @@ bool FVoxelGenerationQuery::ApplyStage(
 	case EVoxelGenerationStage::UndergroundStructures:
 	case EVoxelGenerationStage::SurfaceStructures:
 		for (const FVoxelStructurePlanPtr& Plan :
-			PreparedStructures)
+			Prepared.Structures)
 		{
 			if (!Plan)
 			{
@@ -1212,7 +1558,7 @@ bool FVoxelGenerationQuery::ApplyStage(
 
 	default:
 		for (const FVoxelFeaturePlanPtr& Plan :
-			PreparedFeatures)
+			Prepared.Features)
 		{
 			uint32 PlannedValue = 0;
 

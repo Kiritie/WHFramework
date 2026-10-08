@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Containers/ArrayView.h"
 
 #include "Voxel/Generation/Caves/VoxelCaveGenerator.h"
 #include "Voxel/Generation/Ecology/VoxelEcology.h"
@@ -251,8 +252,18 @@ public:
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr);
 
-	void UpdateRetention(
-		const FVoxelGenerationCacheRetention& InRetention);
+	/** 冻结来源按 Count/Fill 写入已预授额的快照；拒收或取消保留旧正文与租约。 */
+	bool UpdateRetention(
+		const FVoxelGenerationCacheRetention& InRetention,
+		int32 InPointCount,
+		TFunctionRef<bool(TArrayView<FVoxelGenerationCacheRetentionPoint>, FString&)> InFill,
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr);
+
+#if WITH_DEV_AUTOMATION_TESTS
+	/** 旧夹具的数组入口；生产使用冻结来源的 Count/Fill 接口。 */
+	void UpdateRetention(const FVoxelGenerationCacheRetention& InRetention);
+#endif
 
 	/** 从调用方原Input池授予对象及控制器容量；拒收保留OutLease，旧节点按实际生命期解链退租。 */
 	bool RetainForTask(
@@ -378,6 +389,7 @@ private:
 	TArray<TUniquePtr<FPlanShard>> PlanShards;
 
 	mutable FRWLock RetentionLock;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RetentionLease;
 	FVoxelGenerationCacheRetention Retention;
 	FVoxelGenerationCacheRetentionLease* TaskRetentionHead = nullptr;
 	FVoxelGenerationCacheRetentionLease* TaskRetentionTail = nullptr;

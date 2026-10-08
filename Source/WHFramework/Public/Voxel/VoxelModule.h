@@ -191,6 +191,7 @@ public:
 	FVoxelPrimaryFineReadiness QueryFineReadiness(TConstArrayView<FIntVector> InKeys) const;
 	const FVoxelViewSettings& GetViewSettings() const { return ViewSettings; }
 	bool EnqueueProjectBackgroundTask(FVoxelTaskRequest&& InRequest);
+	void CancelProjectTasksByOwner(const FGuid& InOwnerId, uint64 InOwnerIncarnation);
 	void DonateProjectTaskPriority(const FVoxelTaskStamp& InStamp, EVoxelWorkClass InClass,
 		int32 InSourcePriority, double InDistanceScore, double InForwardScore);
 	void SetPersistenceEnabled(bool bInEnabled);
