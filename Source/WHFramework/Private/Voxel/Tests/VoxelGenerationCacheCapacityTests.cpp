@@ -3,12 +3,17 @@
 #if WITH_DEV_AUTOMATION_TESTS
 #include "HAL/PlatformTime.h"
 #include "Misc/AutomationTest.h"
+#include "Misc/ScopeExit.h"
+#include "Voxel/Generation/Caves/VoxelCaveGenerator.h"
 #include "Voxel/Generation/Ecology/VoxelEcology.h"
 #include "Voxel/Generation/Terrain/VoxelTerrainGenerator.h"
 #include "Voxel/Generation/Climate/VoxelClimateGenerator.h"
 #include "Voxel/Generation/VoxelGenerationPlanCache.h"
 #include "Voxel/Generation/VoxelGenerationPlanningRead.h"
 #include "Voxel/Generation/VoxelGenerationQuery.h"
+#include "Voxel/Generation/VoxelBuiltinFeatures.h"
+#include "Voxel/Generation/VoxelStructure.h"
+#include "Voxel/Serialization/VoxelBinaryCodec.h"
 #include "VoxelTestUtilities.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Task/VoxelTerrainResources.h"
@@ -509,6 +514,294 @@ namespace
 		FVoxelGenerationQuery Query;
 	};
 
+	template<typename PlanType>
+	struct TNativeFactPlanFamily
+	{
+		using Ptr = TSharedPtr<const PlanType, ESPMode::ThreadSafe>;
+
+		static bool Build(TSharedRef<const FVoxelGenerationRecipe, ESPMode::ThreadSafe> InRecipe,
+			const FVoxelGenerationBounds& InBounds, PlanType& OutPlan, FString& OutError)
+		{
+			auto ColumnSampler = [](const FIntVector&, FVoxelColumnSample& OutColumn)
+			{
+				OutColumn = FVoxelColumnSample();
+				OutColumn.SurfaceZ = 96;
+				OutColumn.BiomeIndex = 0;
+				return true;
+			};
+			if constexpr (std::is_same_v<PlanType, FVoxelCavePlan>)
+			{
+				return FVoxelCaveGenerator(InRecipe).BuildPlan(InBounds, ColumnSampler, OutPlan, OutError);
+			}
+			else if constexpr (std::is_same_v<PlanType, FVoxelStructurePlan>)
+			{
+				return FVoxelStructurePlanner(InRecipe).BuildPlan(InBounds, ColumnSampler, OutPlan, OutError);
+			}
+			else
+			{
+				auto SymbolSampler = [](const FIntVector&, uint32& OutSymbol)
+				{
+					OutSymbol = 1;
+					return true;
+				};
+				return FVoxelFeaturePlanner(InRecipe).BuildPlan(InBounds, ColumnSampler, SymbolSampler, OutPlan, OutError);
+			}
+		}
+
+		static bool Get(FVoxelGenerationPlanCache& InCache, const FVoxelGenerationTileKey& InKey,
+			TFunctionRef<bool(PlanType&, FString&)> InBuild, Ptr& OutPlan, FString& OutError)
+		{
+			if constexpr (std::is_same_v<PlanType, FVoxelCavePlan>)
+			{
+				return InCache.GetOrBuildCave(InKey, InBuild, OutPlan, OutError);
+			}
+			else if constexpr (std::is_same_v<PlanType, FVoxelStructurePlan>)
+			{
+				return InCache.GetOrBuildStructure(InKey, InBuild, OutPlan, OutError);
+			}
+			else
+			{
+				return InCache.GetOrBuildFeature(InKey, InBuild, OutPlan, OutError);
+			}
+		}
+
+		static bool HasOutput(const PlanType& InPlan)
+		{
+			if constexpr (std::is_same_v<PlanType, FVoxelCavePlan>) return !InPlan.Segments.IsEmpty();
+			else return !InPlan.Writes.IsEmpty();
+		}
+
+		static bool Matches(const PlanType& InExpected, const PlanType& InActual)
+		{
+			if constexpr (std::is_same_v<PlanType, FVoxelCavePlan>)
+			{
+				if (InExpected.Segments.Num() != InActual.Segments.Num() ||
+					InExpected.Entrances.Num() != InActual.Entrances.Num() ||
+					InExpected.ClearVolumes.Num() != InActual.ClearVolumes.Num()) return false;
+				for (int32 Index = 0; Index < InExpected.Segments.Num(); ++Index)
+				{
+					const auto& Expected = InExpected.Segments[Index];
+					const auto& Actual = InActual.Segments[Index];
+					if (Expected.Start != Actual.Start || Expected.End != Actual.End ||
+						Expected.Radius != Actual.Radius || !InActual.Carves(Expected.Start)) return false;
+				}
+				for (int32 Index = 0; Index < InExpected.Entrances.Num(); ++Index)
+				{
+					const auto& Expected = InExpected.Entrances[Index];
+					const auto& Actual = InActual.Entrances[Index];
+					if (!(Expected.Id == Actual.Id) || Expected.MouthCenter != Actual.MouthCenter ||
+						Expected.Facing != Actual.Facing || Expected.HalfWidth != Actual.HalfWidth ||
+						Expected.Height != Actual.Height || Expected.Clearance != Actual.Clearance ||
+						Expected.InteriorJoin != Actual.InteriorJoin) return false;
+				}
+				for (int32 Index = 0; Index < InExpected.ClearVolumes.Num(); ++Index)
+				{
+					const auto& Expected = InExpected.ClearVolumes[Index];
+					const auto& Actual = InActual.ClearVolumes[Index];
+					if (Expected.Min != Actual.Min || Expected.Max != Actual.Max || !InActual.Carves(Expected.Min)) return false;
+				}
+			}
+			else
+			{
+				if (InExpected.Writes.Num() != InActual.Writes.Num() ||
+					InExpected.Bounds.Min != InActual.Bounds.Min || InExpected.Bounds.Max != InActual.Bounds.Max) return false;
+				for (int32 Index = 0; Index < InExpected.Writes.Num(); ++Index)
+				{
+					const auto& Expected = InExpected.Writes[Index];
+					const auto& Actual = InActual.Writes[Index];
+					if (Expected.Position != Actual.Position || Expected.Value != Actual.Value ||
+						Expected.Stage != Actual.Stage || !(Expected.OwnerId == Actual.OwnerId)) return false;
+				}
+				for (const auto& Write : InExpected.Writes)
+				{
+					uint32 Expected = 0;
+					uint32 Actual = 0;
+					if (!InExpected.Sample(Write.Position, Write.Stage, Expected) ||
+						!InActual.Sample(Write.Position, Write.Stage, Actual) || Expected != Actual) return false;
+				}
+				if constexpr (std::is_same_v<PlanType, FVoxelStructurePlan>)
+				{
+					if (InExpected.Details.Num() != InActual.Details.Num() ||
+						InExpected.Clears.Num() != InActual.Clears.Num()) return false;
+					for (int32 Index = 0; Index < InExpected.Clears.Num(); ++Index)
+					{
+						const auto& Expected = InExpected.Clears[Index];
+						const auto& Actual = InActual.Clears[Index];
+						if (Expected.Bounds.Min != Actual.Bounds.Min || Expected.Bounds.Max != Actual.Bounds.Max ||
+							Expected.Stage != Actual.Stage || !(Expected.OwnerId == Actual.OwnerId) ||
+							!InActual.IsCleared(Expected.Bounds.Min, Expected.Stage)) return false;
+					}
+					for (int32 Index = 0; Index < InExpected.Details.Num(); ++Index)
+					{
+						const auto& Expected = InExpected.Details[Index];
+						const auto& Actual = InActual.Details[Index];
+						if (Expected.DetailId != Actual.DetailId || Expected.Position != Actual.Position ||
+							Expected.Yaw != Actual.Yaw || !(Expected.OwnerId == Actual.OwnerId)) return false;
+					}
+				}
+			}
+			return true;
+		}
+	};
+
+	template<typename PlanType>
+	class TNativeFactPlanCapacityCommand final : public FCacheCapacityCommand
+	{
+		using Family = TNativeFactPlanFamily<PlanType>;
+		using Ptr = typename Family::Ptr;
+
+	public:
+		explicit TNativeFactPlanCapacityCommand(FAutomationTestBase& InTest)
+			: FCacheCapacityCommand(InTest)
+		{
+		}
+
+	protected:
+		virtual void CheckFixture() override
+		{
+			const bool bOwnOreRegistration = !FVoxelFeatureAlgorithmRegistry::Get().Find(FVoxelOreVeinFeatureAlgorithm::AlgorithmId);
+			if (!Test.TestTrue(TEXT("真实 Ore 算法就绪"), VoxelBuiltinFeatures::Register(Error))) return;
+			ON_SCOPE_EXIT
+			{
+				if (bOwnOreRegistration) FVoxelFeatureAlgorithmRegistry::Get().Unregister(FVoxelOreVeinFeatureAlgorithm::AlgorithmId);
+			};
+			FVoxelGenerationRecipe Recipe = *VoxelTest::MakeGenerationConfig()->Recipe;
+			Recipe.Settings.MinZ = 0;
+			Recipe.Settings.MaxZ = 256;
+			Recipe.Settings.CaveSpacing = 128;
+			Recipe.Settings.CaveMainRadius = 2;
+			Recipe.Settings.CaveBranchChancePermille = 0;
+			Recipe.Settings.CaveRoomChancePermille = 0;
+			Recipe.Settings.CaveSystemChancePermille = 1000;
+			Recipe.Settings.CaveEntranceChancePermille = 1000;
+			FVoxelStructureRuntimeDefinition Structure;
+			Structure.StableId = TEXT("test:native_capacity_structure");
+			Structure.StableHash = 0x51bf0a1f39db2137ull;
+			Structure.Stage = EVoxelGenerationStage::SurfaceStructures;
+			Structure.Placement.Spacing = 128;
+			Structure.Placement.Separation = 0;
+			Structure.Placement.ChancePermille = 1000;
+			Structure.Placement.bRequireSurface = true;
+			FVoxelStructurePieceTemplate Piece;
+			Piece.StableId = TEXT("test:native_capacity_piece");
+			Piece.Bounds = {FIntVector(-4), FIntVector(5)};
+			Piece.Writes.Add({FIntVector::ZeroValue, 3, 1});
+			Piece.ClearVolumes.Add(Piece.Bounds);
+			Piece.Details.Add({TEXT("test:native_capacity_detail"), FIntVector::ZeroValue, 0});
+			Structure.Pieces.Add(MoveTemp(Piece));
+			Recipe.Structures = {MoveTemp(Structure)};
+			Recipe.Biomes[0].StructureIndices = {0};
+			FVoxelFeatureRuntimeDefinition Feature;
+			Feature.StableId = TEXT("test:native_capacity_ore");
+			Feature.StableHash = 0x69f3db8f23434ba1ull;
+			Feature.AlgorithmId = FVoxelOreVeinFeatureAlgorithm::AlgorithmId;
+			Feature.AlgorithmVersion = 1;
+			Feature.Stage = EVoxelGenerationStage::Vegetation;
+			Feature.Placement.Spacing = 64;
+			Feature.Placement.Separation = 0;
+			Feature.Placement.ChancePermille = 1000;
+			Feature.Placement.bRequireSurface = true;
+			FVoxelByteWriter Writer(4096);
+			Writer.U16(2);
+			Writer.U8(1);
+			Writer.U16(1);
+			Writer.I32(4);
+			Writer.I32(4);
+			Writer.I32(1);
+			if (!Test.TestTrue(TEXT("真实 Ore wire 配置编码"), Writer.Finish(Feature.ConfigBytes))) return;
+			Recipe.Features = {MoveTemp(Feature)};
+			Recipe.Biomes[0].FeatureIndices = {0};
+			if (!Test.TestTrue(TEXT("真实生成配方建立查找"), Recipe.BuildLookups(Error))) return;
+			const auto SharedRecipe = MakeShared<const FVoxelGenerationRecipe, ESPMode::ThreadSafe>(MoveTemp(Recipe));
+			const FVoxelGenerationTileKey WarmKey{FIntVector::ZeroValue};
+			FVoxelGenerationTileKey ColdKey;
+			bool bFoundKey = false;
+			for (int32 X = 1; X <= 4096; ++X)
+			{
+				const FVoxelGenerationTileKey Candidate{FIntVector(X, 0, 0)};
+				if (GetTypeHash(Candidate) % FVoxelGenerationPlanCache::ShardCount ==
+					GetTypeHash(WarmKey) % FVoxelGenerationPlanCache::ShardCount)
+				{
+					ColdKey = Candidate;
+					bFoundKey = true;
+					break;
+				}
+			}
+			if (!Test.TestTrue(TEXT("冷暖事实复用同 shard 控制 backing"), bFoundKey)) return;
+			const FVoxelGenerationBounds WarmBounds{FIntVector::ZeroValue, FIntVector(256)};
+			const FIntVector ColdMin = ColdKey.Coordinate * 256;
+			const FVoxelGenerationBounds ColdBounds{ColdMin, ColdMin + FIntVector(256)};
+			PlanType WarmBaseline;
+			PlanType ColdBaseline;
+			if (!Test.TestTrue(TEXT("真实算法生成暖事实基线"), Family::Build(SharedRecipe, WarmBounds, WarmBaseline, Error)) ||
+				!Test.TestTrue(TEXT("真实算法生成冷事实基线"), Family::Build(SharedRecipe, ColdBounds, ColdBaseline, Error)) ||
+				!Test.TestTrue(TEXT("两个基线都有实际输出"), Family::HasOutput(WarmBaseline) && Family::HasOutput(ColdBaseline))) return;
+			const uint64 RootBytes = VoxelBoundedAllocation::WorkerSharedBytes<const PlanType>();
+			const uint64 WarmBytes = RootBytes + WarmBaseline.GetAllocatedBytes();
+			const uint64 ColdBytes = RootBytes + ColdBaseline.GetAllocatedBytes();
+			FVoxelTerrainResourceLimits Limits;
+			Limits.OverlapBytes = FMath::Max(WarmBytes, ColdBytes);
+			Limits.ResidentBytes = WarmBytes + ColdBytes + Limits.OverlapBytes;
+			const auto Control = MakeCacheControlConsumer();
+			if (!Test.TestTrue(TEXT("原缓存工厂使用真实 native 正文容量"), Resources->Configure(Limits) &&
+				FVoxelGenerationPlanCache::Create(Resources, Control, Cache, Error, true, false))) return;
+			auto Consumer = Control;
+			Consumer.OwnerId = FGuid::NewGuid();
+			Consumer.RequestSerial = 107;
+			FVoxelTaskStamp Stamp;
+			Stamp.WorldEpoch = Consumer.WorldEpoch;
+			Stamp.OwnerId = Consumer.OwnerId;
+			Stamp.OwnerIncarnation = Consumer.OwnerIncarnation;
+			Stamp.Token = Consumer.RequestSerial;
+			FVoxelGenerationPlanningReadScope ReadScope({}, &Stamp, nullptr, &Consumer);
+			auto BuildWarm = [&](PlanType& OutPlan, FString& OutError)
+			{
+				return Family::Build(SharedRecipe, WarmBounds, OutPlan, OutError);
+			};
+			if (!Test.TestTrue(TEXT("暖事实经真实预算路径发布"), Family::Get(*Cache, WarmKey, BuildWarm, Warmed, Error))) return;
+			Test.TestTrue(TEXT("真实授额保留种子和全部可消费结果"), Family::Matches(WarmBaseline, *Warmed));
+			Test.TestEqual(TEXT("临时实例和索引 workspace 全部退 Working"),
+				Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Working)], uint64(0));
+			Test.TestEqual(TEXT("根和真实 array/map backing 只转一次 Resident"),
+				Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Resident)], WarmBytes);
+			auto OtherConsumer = Consumer;
+			OtherConsumer.OwnerId = FGuid::NewGuid();
+			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Blocker;
+			if (!Test.TestTrue(TEXT("冷事实只剩 root 额度"), Resources->Acquire(OtherConsumer,
+				EVoxelTerrainResourcePool::Resident, ColdBytes - RootBytes, Blocker))) return;
+			int32 ColdBuilds = 0;
+			auto BuildCold = [&](PlanType& OutPlan, FString& OutError)
+			{
+				++ColdBuilds;
+				return Family::Build(SharedRecipe, ColdBounds, OutPlan, OutError);
+			};
+			Ptr Cold = Warmed;
+			const uint64 BeforeRelease = Resources->ReleaseVersionExcludingOwner(Consumer);
+			Test.TestFalse(TEXT("真实动态 backing 在分配前因容量拒收"), Family::Get(*Cache, ColdKey, BuildCold, Cold, Error));
+			Test.TestEqual(TEXT("已通过 root 接纳，由实际构建中的增长拒收"), ColdBuilds, 1);
+			Test.TestTrue(TEXT("容量失败明确且保留旧 immutable Out"), Error.StartsWith(TEXT("CapacityBlocked")) && Cold == Warmed);
+			Test.TestEqual(TEXT("拒收临时 backing 释放后全部退 Working"),
+				Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Working)], uint64(0));
+			Test.TestEqual(TEXT("同完整 consumer 的失败退款不自唤醒"), Resources->ReleaseVersionExcludingOwner(Consumer), BeforeRelease);
+			Blocker.Reset();
+			Test.TestTrue(TEXT("真实外部释放推进原容量等待"), Resources->ReleaseVersionExcludingOwner(Consumer) > BeforeRelease);
+			if (!Test.TestTrue(TEXT("同原 consumer 重试同一事实成功"), Family::Get(*Cache, ColdKey, BuildCold, Cold, Error))) return;
+			Test.TestTrue(TEXT("重试保留真实冷事实内容和外部可消费结果"), Family::Matches(ColdBaseline, *Cold));
+			Test.TestEqual(TEXT("两个真实正文各持一次原 Resident 额度"),
+				Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Resident)], WarmBytes + ColdBytes);
+			Test.TestEqual(TEXT("成功 flatten 后 scratch 不残留 Working"),
+				Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Working)], uint64(0));
+		}
+
+		virtual void ReleaseFixture() override
+		{
+			Warmed.Reset();
+		}
+
+	private:
+		Ptr Warmed;
+	};
+
 	class FEcologyPlanCapacityCommand final : public FCacheCapacityCommand
 	{
 	public:
@@ -689,6 +982,19 @@ bool FVoxelEcologyPlanCapacityTest::RunTest(const FString& InParameters)
 {
 	(void)InParameters;
 	FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FEcologyPlanCapacityCommand>(*this));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelNativeFactPlanCapacityTest,
+	"WHFramework.Voxel.FineRefactor.Generation.NativeFactPlanCapacity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelNativeFactPlanCapacityTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<TNativeFactPlanCapacityCommand<FVoxelCavePlan>>(*this));
+	FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<TNativeFactPlanCapacityCommand<FVoxelStructurePlan>>(*this));
+	FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<TNativeFactPlanCapacityCommand<FVoxelFeaturePlan>>(*this));
 	return true;
 }
 #endif

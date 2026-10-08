@@ -25,8 +25,8 @@ namespace
 		virtual bool BuildLayout(const FVoxelStructureLayoutContext& InContext,
 			TArray<FVoxelStructurePiecePlacement>& OutPieces, FString& OutError) const override
 		{
-			(void)InContext;
 			OutPieces.Reset();
+			if (!InContext.ReservePieces(OutPieces, 1, OutError)) return false;
 			OutPieces.Add({0, FInt64Vector(0, MIN_int32, 0), 0});
 			OutError.Reset();
 			return true;

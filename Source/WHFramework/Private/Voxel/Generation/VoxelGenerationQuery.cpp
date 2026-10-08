@@ -272,31 +272,10 @@ bool FVoxelGenerationQuery::EnsureStructurePlan(
 			{
 				return SamplePlanColumn(Position, Column, InCancel);
 			};
-			TArray<FVoxelStructureInstance> Instances;
 			FVoxelStructurePlanner Planner(Config->Recipe.ToSharedRef());
-			const bool bPlanned = Planner.Plan(Bounds, ColumnSampler, Instances, Error, InCancel);
+			const bool bBuilt = Planner.BuildPlan(Bounds, ColumnSampler, Plan, Error, InCancel);
 			if (!PlanSampleError.IsEmpty()) Error = PlanSampleError;
-			if (!bPlanned || !PlanSampleError.IsEmpty()) return false;
-			Plan = FVoxelStructurePlan();
-			Plan.Bounds = Bounds;
-			for (const FVoxelStructureInstance& Instance : Instances)
-			{
-				const int32 DefinitionIndex = Config->Recipe->FindStructure(Instance.DefinitionId);
-				if (!Config->Recipe->Structures.IsValidIndex(DefinitionIndex)) continue;
-				const EVoxelGenerationStage Stage = Config->Recipe->Structures[DefinitionIndex].Stage;
-				for (const FVoxelStructureClearVolume& Clear : Instance.ClearVolumes)
-				{
-					Plan.Clears.Add({ Clear.Bounds, Stage, Instance.Id });
-				}
-				for (const FVoxelStructureCellWrite& Write : Instance.Writes)
-				{
-					Plan.Writes.Add({ Write.Position, Write.Value, Stage, Instance.Id });
-				}
-				Plan.Details.Append(Instance.Details);
-			}
-			Plan.Finalize();
-			Error.Reset();
-			return true;
+			return bBuilt && PlanSampleError.IsEmpty();
 		}, OutPlan, OutError, InCancel);
 }
 
@@ -333,27 +312,11 @@ bool FVoxelGenerationQuery::EnsureFeaturePlan(
 			{
 				return SamplePlanSymbol(Position, Symbol, InCancel);
 			};
-			TArray<FVoxelFeatureInstance> Instances;
 			FVoxelFeaturePlanner Planner(Config->Recipe.ToSharedRef());
-			const bool bPlanned = Planner.Plan(Bounds, ColumnSampler, SymbolSampler,
-				Instances, Error, InCancel);
+			const bool bBuilt = Planner.BuildPlan(Bounds, ColumnSampler, SymbolSampler,
+				Plan, Error, InCancel);
 			if (!PlanSampleError.IsEmpty()) Error = PlanSampleError;
-			if (!bPlanned || !PlanSampleError.IsEmpty()) return false;
-			Plan = FVoxelFeaturePlan();
-			Plan.Bounds = Bounds;
-			for (const FVoxelFeatureInstance& Instance : Instances)
-			{
-				const int32 DefinitionIndex = Config->Recipe->FindFeature(Instance.DefinitionId);
-				if (!Config->Recipe->Features.IsValidIndex(DefinitionIndex)) continue;
-				const EVoxelGenerationStage Stage = Config->Recipe->Features[DefinitionIndex].Stage;
-				for (const FVoxelFeatureCellWrite& Write : Instance.Writes)
-				{
-					Plan.Writes.Add({ Write.Position, Write.Value, Stage, Instance.Id });
-				}
-			}
-			Plan.Finalize();
-			Error.Reset();
-			return true;
+			return bBuilt && PlanSampleError.IsEmpty();
 		}, OutPlan, OutError, InCancel);
 }
 

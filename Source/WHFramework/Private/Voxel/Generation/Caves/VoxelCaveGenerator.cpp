@@ -1,6 +1,8 @@
 #include "Voxel/Generation/Caves/VoxelCaveGenerator.h"
 
 #include "ProfilingDebugging/CpuProfilerTrace.h"
+#include "Misc/ScopeExit.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 
 namespace
@@ -14,126 +16,256 @@ namespace
 	}
 }
 
-void FVoxelCavePlan::Finalize()
+namespace
 {
-	InfluenceBounds.Init();
-	SegmentIndicesBySection.Reset();
-	ClearVolumeIndicesBySection.Reset();
+	using FCaveSectionIndex = TMap<FIntVector, TArray<int32>>;
 
-	for (int32 SegmentIndex = 0;
-		SegmentIndex < Segments.Num();
-		++SegmentIndex)
+	template<typename ElementType>
+	bool RetainCaveAppend(TArray<ElementType>& InArray, const int32 InCount, FString& OutError)
 	{
-		const FVoxelCaveSegment& Segment =
-			Segments[SegmentIndex];
-
-		FVoxelGenerationBounds Bounds;
-		if (!Segment.IsValid() || !VoxelGeneration::ClipWorldBounds(FInt64Vector(
-			FMath::Min<int64>(
-				int64(Segment.Start.X),
-				Segment.End.X) -
-				Segment.Radius,
-			FMath::Min<int64>(
-				int64(Segment.Start.Y),
-				Segment.End.Y) -
-				Segment.Radius,
-			FMath::Min<int64>(
-				int64(Segment.Start.Z),
-				Segment.End.Z) -
-				Segment.Radius), FInt64Vector(
-			FMath::Max<int64>(
-				int64(Segment.Start.X),
-				Segment.End.X) +
-				Segment.Radius + 1,
-			FMath::Max<int64>(
-				int64(Segment.Start.Y),
-				Segment.End.Y) +
-				Segment.Radius + 1,
-			FMath::Max<int64>(
-				int64(Segment.Start.Z),
-				Segment.End.Z) +
-				Segment.Radius + 1), Bounds))
+		const int64 Capacity = int64(InArray.Num()) + InCount;
+		if (Capacity > MAX_int32)
 		{
-			continue;
-		}
-
-		InfluenceBounds += FVector(Bounds.Min);
-		InfluenceBounds += FVector(Bounds.Max);
-
-		const FIntVector MinSection(
-			VoxelGeneration::FloorDivide(
-				Bounds.Min.X,
-				16),
-			VoxelGeneration::FloorDivide(
-				Bounds.Min.Y,
-				16),
-			VoxelGeneration::FloorDivide(
-				Bounds.Min.Z,
-				16));
-
-		const FIntVector MaxSection(
-			VoxelGeneration::FloorDivide(
-				Bounds.Max.X - 1,
-				16),
-			VoxelGeneration::FloorDivide(
-				Bounds.Max.Y - 1,
-				16),
-			VoxelGeneration::FloorDivide(
-				Bounds.Max.Z - 1,
-				16));
-
-		for (int32 Z = MinSection.Z;
-			Z <= MaxSection.Z;
-			++Z)
-		{
-			for (int32 Y = MinSection.Y;
-				Y <= MaxSection.Y;
-				++Y)
+			if (FVoxelGenerationAllocationScope* Scope = FVoxelGenerationAllocationScope::Get())
 			{
-				for (int32 X = MinSection.X;
-					X <= MaxSection.X;
-					++X)
-				{
-					SegmentIndicesBySection.
-						FindOrAdd(
-							FIntVector(
-								X,
-								Y,
-								Z)).
-						Add(
-							SegmentIndex);
-				}
+				return Scope->Fail(TEXT("Oversized: cave output exceeds native slot domain"), OutError);
 			}
+			OutError = TEXT("Oversized: cave output exceeds native slot domain");
+			return false;
 		}
+		return VoxelGenerationAllocation::RetainArray(InArray, int32(Capacity), OutError);
 	}
-	for (int32 VolumeIndex = 0; VolumeIndex < ClearVolumes.Num(); ++VolumeIndex)
+
+	void FreeSectionIndex(FCaveSectionIndex& InIndex)
 	{
-		const FVoxelGenerationBounds& Volume = ClearVolumes[VolumeIndex];
-		if (!Volume.IsValid())
+		for (auto& Pair : InIndex)
 		{
-			continue;
+			VoxelGenerationAllocation::FreeRetainedArray(Pair.Value);
 		}
-		InfluenceBounds += FVector(Volume.Min);
-		InfluenceBounds += FVector(Volume.Max);
+		VoxelGenerationAllocation::FreeRetainedMap(InIndex);
+	}
+
+	template<typename VisitorType>
+	bool VisitCaveSections(
+		const FVoxelGenerationBounds& InBounds,
+		VisitorType&& InVisitor,
+		FString& OutError,
+		const TAtomic<bool>* InCancel)
+	{
+		if (!InBounds.IsValid())
+		{
+			return true;
+		}
 		const FIntVector MinSection(
-			VoxelGeneration::FloorDivide(Volume.Min.X, 16),
-			VoxelGeneration::FloorDivide(Volume.Min.Y, 16),
-			VoxelGeneration::FloorDivide(Volume.Min.Z, 16));
+			VoxelGeneration::FloorDivide(InBounds.Min.X, 16),
+			VoxelGeneration::FloorDivide(InBounds.Min.Y, 16),
+			VoxelGeneration::FloorDivide(InBounds.Min.Z, 16));
 		const FIntVector MaxSection(
-			VoxelGeneration::FloorDivide(Volume.Max.X - 1, 16),
-			VoxelGeneration::FloorDivide(Volume.Max.Y - 1, 16),
-			VoxelGeneration::FloorDivide(Volume.Max.Z - 1, 16));
+			VoxelGeneration::FloorDivide(InBounds.Max.X - 1, 16),
+			VoxelGeneration::FloorDivide(InBounds.Max.Y - 1, 16),
+			VoxelGeneration::FloorDivide(InBounds.Max.Z - 1, 16));
+		uint64 Count = 1;
+		for (int32 Axis = 0; Axis < 3; ++Axis)
+		{
+			const uint64 Side = uint64(int64(MaxSection[Axis]) - MinSection[Axis] + 1);
+			if (Side > uint64(MAX_int32) / Count)
+			{
+				OutError = TEXT("Oversized: cave section index exceeds native slot domain");
+				return false;
+			}
+			Count *= Side;
+		}
 		for (int32 Z = MinSection.Z; Z <= MaxSection.Z; ++Z)
 		{
 			for (int32 Y = MinSection.Y; Y <= MaxSection.Y; ++Y)
 			{
 				for (int32 X = MinSection.X; X <= MaxSection.X; ++X)
 				{
-					ClearVolumeIndicesBySection.FindOrAdd(FIntVector(X, Y, Z)).Add(VolumeIndex);
+					if (InCancel && InCancel->Load())
+					{
+						OutError = TEXT("Canceled");
+						return false;
+					}
+					if (!InVisitor(FIntVector(X, Y, Z)))
+					{
+						return false;
+					}
 				}
 			}
 		}
+		return true;
 	}
+
+	bool CaveSegmentBounds(const FVoxelCaveSegment& InSegment, FVoxelGenerationBounds& OutBounds)
+	{
+		return InSegment.IsValid() && VoxelGeneration::ClipWorldBounds(
+			FInt64Vector(
+				FMath::Min<int64>(InSegment.Start.X, InSegment.End.X) - InSegment.Radius,
+				FMath::Min<int64>(InSegment.Start.Y, InSegment.End.Y) - InSegment.Radius,
+				FMath::Min<int64>(InSegment.Start.Z, InSegment.End.Z) - InSegment.Radius),
+			FInt64Vector(
+				FMath::Max<int64>(InSegment.Start.X, InSegment.End.X) + InSegment.Radius + 1,
+				FMath::Max<int64>(InSegment.Start.Y, InSegment.End.Y) + InSegment.Radius + 1,
+				FMath::Max<int64>(InSegment.Start.Z, InSegment.End.Z) + InSegment.Radius + 1),
+			OutBounds);
+	}
+}
+
+bool FVoxelCavePlan::Finalize(FString& OutError, const TAtomic<bool>* InCancel)
+{
+	if (InCancel && InCancel->Load())
+	{
+		OutError = TEXT("Canceled");
+		return false;
+	}
+	// Count 只使用原 consumer 的 Working；新旧正文索引在提交前同时持租。
+	FVoxelGenerationWorkspace Workspace;
+	TMap<FIntVector, int32> SegmentCounts;
+	TMap<FIntVector, int32> VolumeCounts;
+	FCaveSectionIndex NewSegments;
+	FCaveSectionIndex NewVolumes;
+	ON_SCOPE_EXIT
+	{
+		FreeSectionIndex(NewSegments);
+		FreeSectionIndex(NewVolumes);
+	};
+	if (!Workspace.Check(OutError))
+	{
+		return false;
+	}
+	const auto CountSection = [&Workspace, &OutError](
+		TMap<FIntVector, int32>& InCounts, const FIntVector& InSection)
+	{
+		if (int32* Count = InCounts.Find(InSection))
+		{
+			if (*Count == MAX_int32)
+			{
+				return Workspace.Fail(TEXT("Oversized: cave section references exceed native slot domain"), OutError);
+			}
+			++*Count;
+			return true;
+		}
+		if (InCounts.Num() == MAX_int32 ||
+			!Workspace.ReserveMap(InCounts, InCounts.Num() + 1, OutError))
+		{
+			if (InCounts.Num() == MAX_int32)
+			{
+				Workspace.Fail(TEXT("Oversized: cave section count exceeds native slot domain"), OutError);
+			}
+			return false;
+		}
+		InCounts.Add(InSection, 1);
+		return true;
+	};
+	FBox NewInfluence(ForceInit);
+	for (const FVoxelCaveSegment& Segment : Segments)
+	{
+		FVoxelGenerationBounds Bounds;
+		if (!CaveSegmentBounds(Segment, Bounds))
+		{
+			continue;
+		}
+		NewInfluence += FVector(Bounds.Min);
+		NewInfluence += FVector(Bounds.Max);
+		if (!VisitCaveSections(Bounds, [&](const FIntVector& Section)
+			{ return CountSection(SegmentCounts, Section); }, OutError, InCancel))
+		{
+			return false;
+		}
+	}
+	for (const FVoxelGenerationBounds& Volume : ClearVolumes)
+	{
+		FVoxelGenerationBounds Bounds;
+		if (!VoxelGeneration::ClipWorldBounds(FInt64Vector(Volume.Min), FInt64Vector(Volume.Max), Bounds))
+		{
+			continue;
+		}
+		NewInfluence += FVector(Bounds.Min);
+		NewInfluence += FVector(Bounds.Max);
+		if (!VisitCaveSections(Bounds, [&](const FIntVector& Section)
+			{ return CountSection(VolumeCounts, Section); }, OutError, InCancel))
+		{
+			return false;
+		}
+	}
+	const auto ReserveIndex = [&OutError, InCancel](const TMap<FIntVector, int32>& InCounts, FCaveSectionIndex& OutIndex)
+	{
+		if (!VoxelGenerationAllocation::RetainMap(OutIndex, InCounts.Num(), OutError))
+		{
+			return false;
+		}
+		for (const auto& Pair : InCounts)
+		{
+			if (InCancel && InCancel->Load())
+			{
+				OutError = TEXT("Canceled");
+				return false;
+			}
+			TArray<int32>& Indices = OutIndex.Add(Pair.Key);
+			if (!VoxelGenerationAllocation::RetainArray(Indices, Pair.Value, OutError))
+			{
+				return false;
+			}
+		}
+		return true;
+	};
+	if (!ReserveIndex(SegmentCounts, NewSegments) || !ReserveIndex(VolumeCounts, NewVolumes))
+	{
+		return false;
+	}
+	Workspace.FreeMap(SegmentCounts);
+	Workspace.FreeMap(VolumeCounts);
+	for (int32 Index = 0; Index < Segments.Num(); ++Index)
+	{
+		FVoxelGenerationBounds Bounds;
+		if (CaveSegmentBounds(Segments[Index], Bounds) &&
+			!VisitCaveSections(Bounds, [&](const FIntVector& Section)
+				{ NewSegments.FindChecked(Section).Add(Index); return true; }, OutError, InCancel))
+		{
+			return false;
+		}
+	}
+	for (int32 Index = 0; Index < ClearVolumes.Num(); ++Index)
+	{
+		FVoxelGenerationBounds Bounds;
+		if (VoxelGeneration::ClipWorldBounds(FInt64Vector(ClearVolumes[Index].Min), FInt64Vector(ClearVolumes[Index].Max), Bounds) &&
+			!VisitCaveSections(Bounds, [&](const FIntVector& Section)
+				{ NewVolumes.FindChecked(Section).Add(Index); return true; }, OutError, InCancel))
+		{
+			return false;
+		}
+	}
+	if (InCancel && InCancel->Load())
+	{
+		OutError = TEXT("Canceled");
+		return false;
+	}
+	FreeSectionIndex(SegmentIndicesBySection);
+	FreeSectionIndex(ClearVolumeIndicesBySection);
+	SegmentIndicesBySection = MoveTemp(NewSegments);
+	ClearVolumeIndicesBySection = MoveTemp(NewVolumes);
+	InfluenceBounds = NewInfluence;
+	OutError.Reset();
+	return true;
+}
+
+#if WITH_DEV_AUTOMATION_TESTS
+void FVoxelCavePlan::Finalize()
+{
+	FString Error;
+	const bool bFinalized = Finalize(Error, nullptr);
+	checkf(bFinalized, TEXT("%s"), *Error);
+}
+#endif
+
+void FVoxelCavePlan::ReleaseBacking()
+{
+	VoxelGenerationAllocation::FreeRetainedArray(Segments);
+	VoxelGenerationAllocation::FreeRetainedArray(Entrances);
+	VoxelGenerationAllocation::FreeRetainedArray(ClearVolumes);
+	FreeSectionIndex(SegmentIndicesBySection);
+	FreeSectionIndex(ClearVolumeIndicesBySection);
+	InfluenceBounds.Init();
 }
 
 bool FVoxelCavePlan::Carves(
@@ -209,12 +341,11 @@ bool FVoxelCavePlan::ProtectsFloor(
 uint64 FVoxelCavePlan::GetAllocatedBytes() const
 {
 	uint64 Bytes =
-		Segments.GetAllocatedSize() +
-		Entrances.GetAllocatedSize() +
-		ClearVolumes.GetAllocatedSize() +
-		SegmentIndicesBySection.
-			GetAllocatedSize() +
-		ClearVolumeIndicesBySection.GetAllocatedSize();
+		VoxelGenerationAllocation::AllocatedBytes(Segments) +
+		VoxelGenerationAllocation::AllocatedBytes(Entrances) +
+		VoxelGenerationAllocation::AllocatedBytes(ClearVolumes) +
+		VoxelGenerationAllocation::AllocatedBytes(SegmentIndicesBySection) +
+		VoxelGenerationAllocation::AllocatedBytes(ClearVolumeIndicesBySection);
 
 	for (const TPair<
 		FIntVector,
@@ -222,12 +353,11 @@ uint64 FVoxelCavePlan::GetAllocatedBytes() const
 		SegmentIndicesBySection)
 	{
 		Bytes +=
-			Pair.Value.
-				GetAllocatedSize();
+			VoxelGenerationAllocation::AllocatedBytes(Pair.Value);
 	}
 	for (const auto& Pair : ClearVolumeIndicesBySection)
 	{
-		Bytes += Pair.Value.GetAllocatedSize();
+		Bytes += VoxelGenerationAllocation::AllocatedBytes(Pair.Value);
 	}
 
 	return Bytes;
@@ -282,6 +412,15 @@ bool FVoxelCaveGenerator::BuildPlan(
 			Spacing);
 
 	FVoxelCavePlan Plan;
+	ON_SCOPE_EXIT
+	{
+		Plan.ReleaseBacking();
+	};
+	FVoxelGenerationWorkspace Validation;
+	if (!Validation.Check(OutError))
+	{
+		return false;
+	}
 
 	for (int64 AnchorY = MinAnchorY;
 		AnchorY <= MaxAnchorY;
@@ -327,8 +466,12 @@ bool FVoxelCaveGenerator::BuildPlan(
 		}
 	}
 
-	Plan.Finalize();
+	if (!Plan.Finalize(OutError, InCancel))
+	{
+		return false;
+	}
 
+	OutPlan.ReleaseBacking();
 	OutPlan =
 		MoveTemp(Plan);
 
@@ -481,7 +624,7 @@ bool FVoxelCaveGenerator::TryBuildSystem(
 			Yaw,
 			EntranceError,
 			InCancel);
-		if (!bHasEntrance && EntranceError == TEXT("Canceled"))
+		if (!bHasEntrance && !EntranceError.IsEmpty())
 		{
 			OutError = MoveTemp(EntranceError);
 			return false;
@@ -491,6 +634,10 @@ bool FVoxelCaveGenerator::TryBuildSystem(
 			Entrance.Id = VoxelGeneration::MakeStableId(Recipe->Settings.Seed,
 				FIntVector(InAnchorGrid.X, InAnchorGrid.Y, 0),
 				0x43415645454E5452ull);
+			if (!RetainCaveAppend(OutEntrances, 1, OutError))
+			{
+				return false;
+			}
 			OutEntrances.Add(Entrance);
 		}
 	}
@@ -573,6 +720,10 @@ bool FVoxelCaveGenerator::TryBuildSystem(
 					-1,
 					0));
 
+		if (!RetainCaveAppend(OutSegments, 1, OutError))
+		{
+			return false;
+		}
 		OutSegments.Add(
 			Segment);
 
@@ -599,6 +750,10 @@ bool FVoxelCaveGenerator::TryBuildSystem(
 						2),
 					MaximumRoomRadius);
 
+			if (!RetainCaveAppend(OutSegments, 1, OutError))
+			{
+				return false;
+			}
 			OutSegments.Add(
 				Room);
 		}
@@ -616,9 +771,9 @@ bool FVoxelCaveGenerator::TryBuildSystem(
 				Pitch,
 				InColumnSampler,
 				OutSegments,
+				OutError,
 				InCancel))
 			{
-				OutError = TEXT("Canceled");
 				return false;
 			}
 		}
@@ -660,6 +815,7 @@ bool FVoxelCaveGenerator::AddBranch(
 	const double InPitch,
 	FVoxelCaveColumnSampler InColumnSampler,
 	TArray<FVoxelCaveSegment>& OutSegments,
+	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
 	FIntVector Current =
@@ -697,6 +853,7 @@ bool FVoxelCaveGenerator::AddBranch(
 	{
 		if (InCancel && InCancel->Load())
 		{
+			OutError = TEXT("Canceled");
 			return false;
 		}
 		const int32 Length =
@@ -735,6 +892,10 @@ bool FVoxelCaveGenerator::AddBranch(
 				Recipe->Settings.
 					CaveBranchRadius);
 
+		if (!RetainCaveAppend(OutSegments, 1, OutError))
+		{
+			return false;
+		}
 		OutSegments.Add(
 			Segment);
 
@@ -756,6 +917,7 @@ bool FVoxelCaveGenerator::AddBranch(
 				0.3);
 	}
 
+	OutError.Reset();
 	return true;
 }
 
@@ -798,13 +960,28 @@ bool FVoxelCaveGenerator::BuildEntranceCorridor(
 		return false;
 	}
 	const FIntVector Mouth = Current;
+	// 工作区先声明，所有临时 native 容器先析构，再归还同 consumer 的 Working。
+	FVoxelGenerationWorkspace Workspace;
 	TArray<FVoxelCaveSegment> LocalSegments;
 	TArray<FVoxelGenerationBounds> LocalClearVolumes;
-	const auto AppendRequiredClearance = [&LocalClearVolumes](const FInt64Vector& Min, const FInt64Vector& Max)
+	if (!Workspace.Check(OutError))
+	{
+		return false;
+	}
+	const auto AppendRequiredClearance = [&LocalClearVolumes, &Workspace, &OutError](const FInt64Vector& Min, const FInt64Vector& Max)
 	{
 		FVoxelGenerationBounds Bounds;
 		if (!VoxelGeneration::ClipWorldBounds(Min, Max, Bounds) ||
 			FInt64Vector(Bounds.Min) != Min || FInt64Vector(Bounds.Max) != Max)
+		{
+			OutError.Reset();
+			return false;
+		}
+		if (LocalClearVolumes.Num() == MAX_int32)
+		{
+			return Workspace.Fail(TEXT("Oversized: cave clearance exceeds native slot domain"), OutError);
+		}
+		if (!Workspace.ReserveArray(LocalClearVolumes, LocalClearVolumes.Num() + 1, OutError))
 		{
 			return false;
 		}
@@ -813,6 +990,11 @@ bool FVoxelCaveGenerator::BuildEntranceCorridor(
 	};
 	for (int64 Distance = 0; Distance <= Settings.CaveEntranceClearance; ++Distance)
 	{
+		if (InCancel && InCancel->Load())
+		{
+			OutError = TEXT("Canceled");
+			return false;
+		}
 		FIntVector LandingPosition;
 		if (!VoxelGeneration::TryRoundedWorldCell(FVector(InStartXY.X - FMath::Cos(OutYaw) * Distance,
 			InStartXY.Y - FMath::Sin(OutYaw) * Distance, 0.0), LandingPosition))
@@ -835,7 +1017,6 @@ bool FVoxelCaveGenerator::BuildEntranceCorridor(
 			FInt64Vector(int64(LandingPosition.X) + HalfWidth + 1, int64(LandingPosition.Y) + HalfWidth + 1,
 				int64(Landing.SurfaceZ) + Height + 1)))
 		{
-			OutError.Reset();
 			return false;
 		}
 	}
@@ -872,6 +1053,10 @@ bool FVoxelCaveGenerator::BuildEntranceCorridor(
 			OutError.Reset();
 			return false;
 		}
+		if (!Workspace.ReserveArray(LocalSegments, LocalSegments.Num() + 1, OutError))
+		{
+			return false;
+		}
 		LocalSegments.Add({ Current, Next, Radius });
 		if (!AppendRequiredClearance(
 			FInt64Vector(int64(FMath::Min(Current.X, Next.X)) - HalfWidth,
@@ -879,7 +1064,6 @@ bool FVoxelCaveGenerator::BuildEntranceCorridor(
 			FInt64Vector(int64(FMath::Max(Current.X, Next.X)) + HalfWidth + 1,
 				int64(FMath::Max(Current.Y, Next.Y)) + HalfWidth + 1, int64(FMath::Max(Current.Z, Next.Z)) + Height)))
 		{
-			OutError.Reset();
 			return false;
 		}
 		Current = Next;
@@ -893,8 +1077,19 @@ bool FVoxelCaveGenerator::BuildEntranceCorridor(
 		OutError.Reset();
 		return false;
 	}
-	InOutSegments.Append(MoveTemp(LocalSegments));
-	InOutClearVolumes.Append(MoveTemp(LocalClearVolumes));
+	if (int64(InOutSegments.Num()) + LocalSegments.Num() > MAX_int32 ||
+		int64(InOutClearVolumes.Num()) + LocalClearVolumes.Num() > MAX_int32)
+	{
+		return Workspace.Fail(TEXT("Oversized: cave entrance output exceeds native slot domain"), OutError);
+	}
+	if (!RetainCaveAppend(InOutSegments, LocalSegments.Num(), OutError) ||
+		!RetainCaveAppend(InOutClearVolumes, LocalClearVolumes.Num(), OutError))
+	{
+		return false;
+	}
+	// scratch 与新正文复制峰值同时授予，Append 不采用可能重分配的 copy assignment。
+	InOutSegments.Append(LocalSegments);
+	InOutClearVolumes.Append(LocalClearVolumes);
 	OutEntrance.MouthCenter = Mouth;
 	OutEntrance.Facing = FVector2D(FMath::Cos(OutYaw), FMath::Sin(OutYaw));
 	OutEntrance.HalfWidth = HalfWidth;

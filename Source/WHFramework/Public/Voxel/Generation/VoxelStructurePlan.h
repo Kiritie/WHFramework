@@ -69,7 +69,14 @@ struct WHFRAMEWORK_API FVoxelStructurePlan
 		return InfluenceBounds.IsValid && InfluenceBounds.Intersect(FBox(FVector(InBounds.Min), FVector(InBounds.Max)));
 	}
 
+	// bound scope 内，既有正文 backing 必须属于当前 scope；失败保留原索引和 InfluenceBounds。
+	bool Finalize(
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr);
+
+#if WITH_DEV_AUTOMATION_TESTS
 	void Finalize();
+#endif
 
 	bool IsCleared(
 		const FIntVector& InPosition,

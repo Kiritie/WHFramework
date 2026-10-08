@@ -1,5 +1,7 @@
 #include "Voxel/Generation/VoxelBuiltinFeatures.h"
 
+#include "Misc/ScopeExit.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Serialization/VoxelBinaryCodec.h"
 #include "Voxel/Voxels/Data/VoxelData.h"
@@ -44,12 +46,29 @@ namespace
 		return Writer.Finish(OutBytes);
 	}
 
-	bool DecodeOre(TConstArrayView<uint8> InBytes, FVoxelOreVeinRuntimeConfig& OutConfig, FString& OutError)
+	bool DecodeOre(
+		TConstArrayView<uint8> InBytes,
+		FVoxelOreVeinRuntimeConfig& OutConfig,
+		FVoxelGenerationWorkspace& InWorkspace,
+		FString& OutError)
 	{
 		FVoxelByteReader Reader(InBytes);
 		FVoxelOreVeinRuntimeConfig Config;
+		ON_SCOPE_EXIT
+		{
+			InWorkspace.FreeArray(Config.HostSymbols);
+		};
 		Config.OreSymbol = Reader.U16();
 		const uint8 HostCount = Reader.U8();
+		if (HostCount == 0 || HostCount > 64)
+		{
+			OutError = TEXT("Voxel ore vein host symbol count is invalid");
+			return false;
+		}
+		if (!InWorkspace.ReserveArray(Config.HostSymbols, HostCount, OutError))
+		{
+			return false;
+		}
 		Config.HostSymbols.SetNum(HostCount);
 		for (uint16& Symbol : Config.HostSymbols)
 		{
@@ -58,11 +77,18 @@ namespace
 		Config.MinLength = Reader.I32();
 		Config.MaxLength = Reader.I32();
 		Config.Radius = Reader.I32();
-		if (!Reader.End() || !ValidateOre(Config, OutError))
+		if (!Reader.End())
+		{
+			OutError = TEXT("Voxel ore vein configuration bytes are invalid");
+			return false;
+		}
+		if (!ValidateOre(Config, OutError))
 		{
 			return false;
 		}
+		InWorkspace.FreeArray(OutConfig.HostSymbols);
 		OutConfig = MoveTemp(Config);
+		OutError.Reset();
 		return true;
 	}
 
@@ -169,13 +195,22 @@ bool FVoxelOreVeinFeatureAlgorithm::Generate(
 	FVoxelFeatureInstance& OutInstance,
 	FString& OutError) const
 {
+	// decode 与去重集合先 native 析构，再退回原 attempt 的 Working。
+	FVoxelGenerationWorkspace Workspace;
 	FVoxelOreVeinRuntimeConfig Config;
-	if (!InContext.Definition || !DecodeOre(InConfigBytes, Config, OutError))
+	TSet<FIntVector> Written;
+	if (!InContext.Definition)
 	{
-		if (!InContext.Definition)
-		{
-			OutError = TEXT("Voxel ore vein has no runtime definition");
-		}
+		OutError = TEXT("Voxel ore vein has no runtime definition");
+		return false;
+	}
+	if (InContext.Cancel && InContext.Cancel->Load())
+	{
+		OutError = TEXT("Canceled");
+		return false;
+	}
+	if (!Workspace.Check(OutError) || !DecodeOre(InConfigBytes, Config, Workspace, OutError))
+	{
 		return false;
 	}
 	if (!VoxelGeneration::IsWorldCell(InContext.CandidateAnchor.X) ||
@@ -194,46 +229,92 @@ bool FVoxelOreVeinFeatureAlgorithm::Generate(
 		FIntVector(0, 1, 0), FIntVector(0, -1, 0),
 		FIntVector(0, 0, 1), FIntVector(0, 0, -1)
 	};
-	FVoxelFeatureInstance Instance;
-	InitializeInstance(InContext, Instance);
-	FInt64Vector Center(InContext.CandidateAnchor);
-	TSet<FIntVector> Written;
-	for (int32 Step = 0; Step < Length; ++Step)
+	const auto VisitCells = [&](auto&& Visitor)
 	{
-		for (int32 Z = -Config.Radius; Z <= Config.Radius; ++Z)
+		FInt64Vector Center(InContext.CandidateAnchor);
+		for (int32 Step = 0; Step < Length; ++Step)
 		{
-			for (int32 Y = -Config.Radius; Y <= Config.Radius; ++Y)
+			for (int32 Z = -Config.Radius; Z <= Config.Radius; ++Z)
 			{
-				for (int32 X = -Config.Radius; X <= Config.Radius; ++X)
+				for (int32 Y = -Config.Radius; Y <= Config.Radius; ++Y)
 				{
-					if (X * X + Y * Y + Z * Z > Config.Radius * Config.Radius)
+					for (int32 X = -Config.Radius; X <= Config.Radius; ++X)
 					{
-						continue;
-					}
-					FIntVector Position;
-					if (!VoxelGeneration::TryWorldCell(Center + FInt64Vector(X, Y, Z), Position))
-					{
-						continue;
-					}
-					uint32 BaseSymbol = 0;
-					if (!Written.Contains(Position) && InContext.SampleBaseSymbol(Position, BaseSymbol) &&
-						Config.HostSymbols.Contains(static_cast<uint16>(BaseSymbol & 0xffffu)))
-					{
-						Written.Add(Position);
-						Instance.Writes.Add({Position, Config.OreSymbol});
+						if (InContext.Cancel && InContext.Cancel->Load())
+						{
+							OutError = TEXT("Canceled");
+							return false;
+						}
+						if (X * X + Y * Y + Z * Z > Config.Radius * Config.Radius)
+						{
+							continue;
+						}
+						FIntVector Position;
+						if (VoxelGeneration::TryWorldCell(Center + FInt64Vector(X, Y, Z), Position) && !Visitor(Position))
+						{
+							return false;
+						}
 					}
 				}
 			}
+			const int32 DirectionIndex = VoxelGeneration::RandomRange(
+				VoxelGeneration::Mix(Seed + uint64(Step)), 0, UE_ARRAY_COUNT(Directions) - 1);
+			FIntVector NextCenter;
+			if (!VoxelGeneration::TryWorldCell(Center + FInt64Vector(Directions[DirectionIndex]), NextCenter))
+			{
+				break;
+			}
+			Center = FInt64Vector(NextCenter);
 		}
-		const int32 DirectionIndex = VoxelGeneration::RandomRange(
-			VoxelGeneration::Mix(Seed + static_cast<uint64>(Step)), 0, UE_ARRAY_COUNT(Directions) - 1);
-		FIntVector NextCenter;
-		if (!VoxelGeneration::TryWorldCell(Center + FInt64Vector(Directions[DirectionIndex]), NextCenter))
+		return true;
+	};
+	// Count 保留实际命中的坐标；Build 重放同一 walk 并移除集合键，无第二次采样或新集合。
+	if (!VisitCells([&](const FIntVector& Position)
+	{
+		uint32 BaseSymbol = 0;
+		if (!Written.Contains(Position) && InContext.SampleBaseSymbol(Position, BaseSymbol) &&
+			Config.HostSymbols.Contains(uint16(BaseSymbol & 0xffffu)))
 		{
-			break;
+			if (!Workspace.ReserveSet(Written, Written.Num() + 1, OutError))
+			{
+				return false;
+			}
+			Written.Add(Position);
 		}
-		Center = FInt64Vector(NextCenter);
+		return Workspace.Check(OutError);
+	}))
+	{
+		return false;
 	}
+	FVoxelFeatureInstance Instance;
+	ON_SCOPE_EXIT
+	{
+		InContext.FreeWrites(Instance.Writes);
+	};
+	InitializeInstance(InContext, Instance);
+	const int32 WriteCount = Written.Num();
+	if (!InContext.ReserveWrites(Instance.Writes, WriteCount, OutError) ||
+		!VisitCells([&](const FIntVector& Position)
+		{
+			if (Written.Remove(Position) != 0)
+			{
+				Instance.Writes.Add({ Position, Config.OreSymbol });
+			}
+			return true;
+		}))
+	{
+		return false;
+	}
+	if (Instance.Writes.Num() != WriteCount || !Workspace.Check(OutError))
+	{
+		return Workspace.Fail(TEXT("AllocationAccountingMismatch: ore count/build differs"), OutError);
+	}
+	if (InContext.Cancel && InContext.Cancel->Load())
+	{
+		OutError = TEXT("Canceled");
+		return false;
+	}
+	InContext.FreeWrites(OutInstance.Writes);
 	OutInstance = MoveTemp(Instance);
 	OutError.Reset();
 	return true;

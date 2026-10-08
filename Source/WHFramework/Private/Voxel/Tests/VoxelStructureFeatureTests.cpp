@@ -54,6 +54,10 @@ namespace
 			FString& OutError) const override
 		{
 			(void)InConfigBytes;
+			if (!InContext.ReserveWrites(OutInstance.Writes, OutInstance.Writes.Num() + 1, OutError))
+			{
+				return false;
+			}
 			OutInstance.Writes.Add({ InContext.CandidateAnchor, 1 });
 			OutError.Reset();
 			return true;

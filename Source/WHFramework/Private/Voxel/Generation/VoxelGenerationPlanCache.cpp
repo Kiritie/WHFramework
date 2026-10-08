@@ -14,7 +14,7 @@ namespace
 	constexpr int32 LakeAnchorSide = 64;
 	constexpr int32 MaximumControlEntries = 1 << 20;
 
-	// 逐族迁移；Cave/Feature/Structure 仍保留原路径，不能以事后测量冒充预授予。
+	// 七族原生正文共用原消费者的构建额度与发布后的稳定缓存租约。
 	template<typename ValueType>
 	struct TCacheBodyCapacity
 	{
@@ -22,6 +22,9 @@ namespace
 			std::is_same_v<ValueType, FVoxelBaseColumnEntry> ||
 			std::is_same_v<ValueType, FVoxelNaturalColumnEntry> ||
 			std::is_same_v<ValueType, FVoxelHydrologyPlan> ||
+			std::is_same_v<ValueType, FVoxelCavePlan> ||
+			std::is_same_v<ValueType, FVoxelFeaturePlan> ||
+			std::is_same_v<ValueType, FVoxelStructurePlan> ||
 			std::is_same_v<ValueType, FVoxelEcologyPlan>;
 
 		static uint64 BackingBytes(const ValueType& InValue)

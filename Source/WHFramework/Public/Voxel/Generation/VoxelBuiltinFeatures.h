@@ -57,6 +57,7 @@ public:
 		TArray<uint8>& OutBytes,
 		FString& OutError) const override;
 
+	/** HostSymbols/Written 为原 consumer 的 scratch，Writes 遵守 Context 的跨函数预算归属。 */
 	virtual bool Generate(
 		const FVoxelFeatureQueryContext& InContext,
 		TConstArrayView<uint8> InConfigBytes,

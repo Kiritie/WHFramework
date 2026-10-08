@@ -56,16 +56,26 @@ struct WHFRAMEWORK_API FVoxelFeaturePlan
 		return InfluenceBounds.IsValid && InfluenceBounds.Intersect(FBox(FVector(InBounds.Min), FVector(InBounds.Max)));
 	}
 
+	/** 可写 backing 必须属于当前 retained scope；失败保留旧索引，不裁合法跨 owner 内容。 */
+	bool Finalize(
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr);
+#if WITH_DEV_AUTOMATION_TESTS
 	void Finalize();
+#endif
 
 	bool Sample(
 		const FIntVector& InPosition,
 		EVoxelGenerationStage InStage,
 		uint32& OutValue) const;
 
+	/** 只计量化 heap backing，根对象/controller 由 Cache 单独授予。 */
 	uint64 GetAllocatedBytes() const;
 
 private:
+	friend class FVoxelFeaturePlanner;
+	void ReleaseBacking();
+
 	FBox InfluenceBounds = FBox(ForceInit);
 	TMap<
 		FVoxelFeaturePlanKey,

@@ -7,6 +7,8 @@
 
 struct FVoxelGenerationRuntimeConfig;
 struct FVoxelRegistrySnapshot;
+struct FVoxelFeaturePlan;
+class FVoxelGenerationWorkspace;
 
 struct WHFRAMEWORK_API FVoxelFeatureCellWrite
 {
@@ -71,6 +73,17 @@ struct WHFRAMEWORK_API FVoxelFeatureQueryContext
 	TFunctionRef<bool(
 		const FIntVector& InPosition,
 		uint32& OutBaseSymbol)> SampleBaseSymbol;
+
+	/** 输出归 caller Workspace；为空时归当前正文 retained scope，不得借局部工作区返回。 */
+	FVoxelGenerationWorkspace* Workspace = nullptr;
+	const TAtomic<bool>* Cancel = nullptr;
+
+	bool ReserveWrites(
+		TArray<FVoxelFeatureCellWrite>& InWrites,
+		int32 InCapacity,
+		FString& OutError) const;
+	void FreeWrites(
+		TArray<FVoxelFeatureCellWrite>& InWrites) const;
 };
 
 class WHFRAMEWORK_API IVoxelFeatureAlgorithm
@@ -103,6 +116,7 @@ public:
 	 * Anchor、offset 与写入坐标先使用 int64，再经 VoxelGeneration::TryWorldCell
 	 * 检查统一 cell 域后收窄；域外候选/写入跳过，不 Clamp Anchor 改变稳定身份。
 	 * 最终输出过滤不能识别算法内部已经溢出回域内的坐标，扩展算法也必须遵守此契约。
+	 * 所有 Writes 增长前调用 Context.ReserveWrites；失败保持旧 OutInstance，完整诊断向上传递。
 	 */
 	virtual bool Generate(
 		const FVoxelFeatureQueryContext& InContext,
@@ -146,6 +160,19 @@ public:
 		TSharedRef<const FVoxelGenerationRecipe, ESPMode::ThreadSafe> InRecipe);
 
 public:
+	/** active 输出只能是新正文或当前 scope 的 retained 正文；失败保持旧 OutPlan。 */
+	bool BuildPlan(
+		const FVoxelGenerationBounds& InBounds,
+		TFunctionRef<bool(const FIntVector&, FVoxelColumnSample&)> InSampleColumn,
+		TFunctionRef<bool(const FIntVector&, uint32&)> InSampleBaseSymbol,
+		FVoxelFeaturePlan& OutPlan,
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr) const;
+
+	/**
+	 * 成功输出及嵌套 Writes 使用同一 caller Workspace；无 Workspace 时归当前 retained scope。
+	 * 旧 OutInstances 必须使用同一预算，caller Workspace 应先于输出容器声明。
+	 */
 	bool Plan(
 		const FVoxelGenerationBounds& InBounds,
 		TFunctionRef<bool(
@@ -156,13 +183,17 @@ public:
 			uint32& OutBaseSymbol)> InSampleBaseSymbol,
 		TArray<FVoxelFeatureInstance>& OutInstances,
 		FString& OutError,
-		const TAtomic<bool>* InCancel = nullptr) const;
+		const TAtomic<bool>* InCancel = nullptr,
+		FVoxelGenerationWorkspace* InOutputWorkspace = nullptr) const;
 
 private:
-	void GatherCandidateAnchors(
+	bool GatherCandidateAnchors(
 		const FVoxelFeatureRuntimeDefinition& InDefinition,
 		const FVoxelGenerationBounds& InBounds,
-		TArray<FIntVector>& OutAnchors) const;
+		TArray<FIntVector>& OutAnchors,
+		FVoxelGenerationWorkspace& InWorkspace,
+		FString& OutError,
+		const TAtomic<bool>* InCancel) const;
 
 	bool IsPlacementAllowed(
 		const FVoxelFeatureRuntimeDefinition& InDefinition,

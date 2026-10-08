@@ -44,12 +44,22 @@ struct WHFRAMEWORK_API FVoxelCavePlan
 		return InfluenceBounds.IsValid && InfluenceBounds.Intersect(FBox(FVector(InBounds.Min), FVector(InBounds.Max)));
 	}
 
+	/** active 模式的可写 backing 必须属于当前 retained scope；完整跨瓦片内容不裁 owner bounds。 */
+	bool Finalize(
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr);
+#if WITH_DEV_AUTOMATION_TESTS
 	void Finalize();
+#endif
 	bool Carves(const FIntVector& InCell) const;
 	bool ProtectsFloor(const FIntVector& InCell) const;
+	/** 包含所有嵌套 section backing，不重复计根对象/controller。 */
 	uint64 GetAllocatedBytes() const;
 
 private:
+	friend class FVoxelCaveGenerator;
+	void ReleaseBacking();
+
 	FBox InfluenceBounds = FBox(ForceInit);
 	TMap<FIntVector, TArray<int32>>
 		SegmentIndicesBySection;
@@ -63,6 +73,7 @@ public:
 	explicit FVoxelCaveGenerator(
 		TSharedRef<const FVoxelGenerationRecipe, ESPMode::ThreadSafe> InRecipe);
 
+	/** active 输出只能是新正文或当前 scope 的 retained 正文；失败保持旧 OutPlan。 */
 	bool BuildPlan(
 		const FVoxelGenerationBounds& InBounds,
 		FVoxelCaveColumnSampler InColumnSampler,
@@ -95,6 +106,7 @@ private:
 		double InPitch,
 		FVoxelCaveColumnSampler InColumnSampler,
 		TArray<FVoxelCaveSegment>& OutSegments,
+		FString& OutError,
 		const TAtomic<bool>* InCancel) const;
 
 	bool BuildEntranceCorridor(
