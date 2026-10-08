@@ -9,6 +9,7 @@
 #include "Voxel/Generation/VoxelNaturalGenerationCache.h"
 #include "Voxel/Generation/VoxelStructurePlan.h"
 #include "Voxel/Generation/VoxelPlanDiagnostics.h"
+#include "Voxel/Generation/VoxelGenerationConsumer.h"
 
 using FVoxelHydrologyPlanPtr =
 	TSharedPtr<
@@ -123,11 +124,26 @@ public:
 	static constexpr int32 ShardCount = 32;
 
 public:
+	/** 原 World 账本在分配前授予根对象、控制器与 shard；拒收保留 OutCache，绑定终生不替换。 */
+	static bool Create(
+		TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+		const FVoxelGenerationConsumerKey& InControlConsumer,
+		TSharedPtr<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>& OutCache,
+		FString& OutError,
+		bool bInAllowGameThreadBuilds = false,
+		bool bInAllowWorkerWait = false);
+
+#if WITH_DEV_AUTOMATION_TESTS
+	/** 仅保留无账本的旧夹具；生产入口必须使用 Create。 */
 	explicit FVoxelGenerationPlanCache(
 		bool bInAllowGameThreadBuilds = true,
 		bool bInAllowWorkerWait = true);
+#endif
 
 	~FVoxelGenerationPlanCache();
+
+	const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& GetResources() const;
+	const FVoxelGenerationConsumerKey& GetControlConsumer() const;
 
 	bool GetOrBuildBaseColumn(
 		const FIntPoint& InPosition,
@@ -153,10 +169,11 @@ public:
 		const FVoxelHydrologyRegionKey& InKey,
 		FVoxelHydrologyPlanPtr& OutPlan) const;
 
-	/** 各 Store* 只发布非空的同 key 首个 immutable 正文并终结原 gate；既有正文不覆盖。 */
-	void StoreHydrology(
+	/** 各 Store* 先授予控制存储，仅发布非空首个 immutable；失败不改既有正文或 gate。 */
+	bool StoreHydrology(
 		const FVoxelHydrologyRegionKey& InKey,
-		FVoxelHydrologyPlanPtr InPlan);
+		FVoxelHydrologyPlanPtr InPlan,
+		FString* OutError = nullptr);
 
 	bool GetOrBuildHydrology(
 		const FVoxelHydrologyRegionKey& InKey,
@@ -171,9 +188,10 @@ public:
 		const FVoxelGenerationTileKey& InKey,
 		FVoxelCavePlanPtr& OutPlan) const;
 
-	void StoreCave(
+	bool StoreCave(
 		const FVoxelGenerationTileKey& InKey,
-		FVoxelCavePlanPtr InPlan);
+		FVoxelCavePlanPtr InPlan,
+		FString* OutError = nullptr);
 
 	bool GetOrBuildCave(
 		const FVoxelGenerationTileKey& InKey,
@@ -192,9 +210,10 @@ public:
 		const FVoxelEcologyTileKey& InKey,
 		FVoxelEcologyPlanPtr& OutPlan) const;
 
-	void StoreFeature(
+	bool StoreFeature(
 		const FVoxelGenerationTileKey& InKey,
-		FVoxelFeaturePlanPtr InPlan);
+		FVoxelFeaturePlanPtr InPlan,
+		FString* OutError = nullptr);
 
 	bool GetOrBuildFeature(
 		const FVoxelGenerationTileKey& InKey,
@@ -216,9 +235,10 @@ public:
 		const FVoxelGenerationTileKey& InKey,
 		FVoxelStructurePlanPtr& OutPlan) const;
 
-	void StoreStructure(
+	bool StoreStructure(
 		const FVoxelGenerationTileKey& InKey,
-		FVoxelStructurePlanPtr InPlan);
+		FVoxelStructurePlanPtr InPlan,
+		FString* OutError = nullptr);
 
 	bool GetOrBuildStructure(
 		const FVoxelGenerationTileKey& InKey,
@@ -247,7 +267,7 @@ public:
 	void TickMaintenance(
 		int32 InMaxEntries = 256);
 
-	/** 终结并唤醒当时在途的原 gate；外部已取得的 immutable 引用保持有效，不等待 worker。 */
+	/** 终结当时在途的原 gate；外部 immutable 引用保持有效，不等待 worker。gate 诊断保留前1023 TCHAR。 */
 	void Reset();
 
 	FVoxelGenerationCacheStats GetStats() const;
@@ -256,6 +276,13 @@ public:
 	uint64 GetAllocatedBytes() const;
 
 private:
+	FVoxelGenerationPlanCache(
+		TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+		const FVoxelGenerationConsumerKey& InControlConsumer,
+		bool bInAllowGameThreadBuilds,
+		bool bInAllowWorkerWait);
+	void InitializeShards();
+
 	friend class FVoxelGenerationCacheRetentionLease;
 #if WITH_DEV_AUTOMATION_TESTS
 	friend class FVoxelCacheLifecycleTestAccess;
@@ -264,9 +291,22 @@ private:
 
 	struct FBuildGate;
 
+	struct FBackingReservation
+	{
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ValuesLease;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> BuildsLease;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> KeysLease;
+		int32 ValuesCapacity = 0;
+		int32 BuildsCapacity = 0;
+		int32 KeysCapacity = 0;
+	};
+
 	struct FNaturalShard
 	{
 		mutable FRWLock Lock;
+		// 租约在容器前声明，原 native backing 先析构后退还容量。
+		FBackingReservation BaseColumnBacking;
+		FBackingReservation NaturalColumnBacking;
 
 		TMap<FIntPoint, FVoxelBaseColumnEntryPtr> BaseColumns;
 		TMap<FIntPoint, FVoxelNaturalColumnEntryPtr> NaturalColumns;
@@ -284,6 +324,11 @@ private:
 	struct FPlanShard
 	{
 		mutable FRWLock Lock;
+		FBackingReservation HydrologyBacking;
+		FBackingReservation CaveBacking;
+		FBackingReservation EcologyBacking;
+		FBackingReservation FeatureBacking;
+		FBackingReservation StructureBacking;
 
 		TMap<FVoxelHydrologyRegionKey, FVoxelHydrologyPlanPtr> Hydrology;
 		TMap<FVoxelGenerationTileKey, FVoxelCavePlanPtr> Caves;
@@ -325,6 +370,8 @@ private:
 	void RecordPlanBuild(EVoxelGenerationPlanKind InKind, double InMilliseconds, bool bInFailed);
 
 private:
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
+	FVoxelGenerationConsumerKey ControlConsumer;
 	TArray<TUniquePtr<FNaturalShard>> NaturalShards;
 	TArray<TUniquePtr<FPlanShard>> PlanShards;
 
@@ -341,7 +388,7 @@ private:
 	mutable TAtomic<uint64> PlanHits[5];
 	mutable TAtomic<uint64> PlanMisses[5];
 	TAtomic<uint64> PlanDonations[5];
-	mutable FCriticalSection PlanDiagnosticsMutex;
+	mutable FRWLock PlanDiagnosticsLock;
 	FVoxelPlanDiagnostics PlanBuildDiagnostics[5];
 
 	bool bAllowGameThreadBuilds = true;

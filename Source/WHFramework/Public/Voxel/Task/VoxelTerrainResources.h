@@ -50,6 +50,9 @@ public:
 
 	bool Resize(uint64 InBytes);
 	bool Transfer(EVoxelTerrainResourcePool InPool);
+	// 消费原尝试预授予的目标池额度，保留正文租约身份并交给发布后的稳定所有者。
+	bool CommitReservation(TSharedRef<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InReserved,
+		const FVoxelGenerationConsumerKey& InNewOwner);
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Split(uint64 InBytes);
 	uint64 Bytes() const;
 	uint64 Serial() const;
@@ -87,6 +90,8 @@ private:
 	bool PrepareEntries(int32 InAdditionalEntries, uint64 InAdditionalInputBytes);
 	bool Resize(uint64 InSerial, uint64 InBytes);
 	bool Transfer(uint64 InSerial, EVoxelTerrainResourcePool InPool);
+	bool CommitReservation(uint64 InSerial, uint64 InReservedSerial,
+		const FVoxelGenerationConsumerKey& InNewOwner);
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Split(uint64 InSerial, uint64 InBytes);
 	void Release(uint64 InSerial);
 	uint64 Bytes(uint64 InSerial) const;

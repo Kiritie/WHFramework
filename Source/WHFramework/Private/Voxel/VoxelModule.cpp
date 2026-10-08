@@ -666,10 +666,19 @@ bool UVoxelModule::StartWorld(
 
 	WorldState = EVoxelWorldState::Initializing;
 	Manifest = InManifest;
+	const auto FailInitialization = [this]()
+	{
+		Scheduler.Reset();
+		Generator.Reset();
+		GenerationCache.Reset();
+		GenerationConfig.Reset();
+		TerrainFrameContext.Reset();
+		WorldState = EVoxelWorldState::Failed;
+	};
 	if (Manifest.RegistryHash != Registry.GetSnapshot()->Hash)
 	{
 		OutError = TEXT("Voxel registry hash mismatch");
-		WorldState = EVoxelWorldState::Failed;
+		FailInitialization();
 		return false;
 	}
 	FVoxelGenerationRuntimeConfig Config;
@@ -683,7 +692,7 @@ bool UVoxelModule::StartWorld(
 		!Config.Recipe ||
 		Config.Recipe->RecipeHash != Manifest.RecipeHash)
 	{
-		WorldState = EVoxelWorldState::Failed;
+		FailInitialization();
 		if (OutError.IsEmpty())
 		{
 			OutError = TEXT("Voxel frozen recipe hash mismatch");
@@ -698,7 +707,7 @@ bool UVoxelModule::StartWorld(
 		 Config.Recipe->Ecology.GrassPlant == MAX_uint16))
 	{
 		OutError = TEXT("Enabled voxel ecology symbols are not bound");
-		WorldState = EVoxelWorldState::Failed;
+		FailInitialization();
 		return false;
 	}
 
@@ -719,8 +728,7 @@ bool UVoxelModule::StartWorld(
 	UVoxelViewProfile* ViewProfile = WorldGenerationProfile->View.LoadSynchronous();
 	if (!ViewProfile)
 	{
-		GenerationConfig.Reset();
-		WorldState = EVoxelWorldState::Failed;
+		FailInitialization();
 		OutError = TEXT("世界生成资产必须绑定地形ViewProfile");
 		return false;
 	}
@@ -743,8 +751,7 @@ bool UVoxelModule::StartWorld(
 			{
 				OutError = TEXT("地形纹理重复范围无效");
 			}
-			GenerationConfig.Reset();
-			WorldState = EVoxelWorldState::Failed;
+			FailInitialization();
 			return false;
 		}
 
@@ -757,55 +764,18 @@ bool UVoxelModule::StartWorld(
 		Manifest.BaseSampleHash != ExpectedGenerationSignature ||
 		Epoch == MAX_uint64)
 	{
-		GenerationConfig.Reset();
-		WorldState = EVoxelWorldState::Failed;
+		FailInitialization();
 		OutError = TEXT("Voxel generation signature mismatch");
 		return false;
 	}
 
-	GenerationCache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>(false, false);
-	const TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> NaturalGenerator =
-		MakeShared<const FVoxelGenerationPipeline, ESPMode::ThreadSafe>(
-			GenerationConfig.ToSharedRef(),
-			GenerationCache.ToSharedRef(), nullptr, true);
-	TSharedPtr<const IVoxelGenerationOverlay, ESPMode::ThreadSafe> Overlay;
-	if (!CreateGenerationOverlay(NaturalGenerator, Registry.GetSnapshot().ToSharedRef(),
-		Overlay, OutError))
-	{
-		GenerationCache.Reset();
-		GenerationConfig.Reset();
-		WorldState = EVoxelWorldState::Failed;
-		return false;
-	}
-	Generator = Overlay ?
-		MakeShared<const FVoxelGenerationPipeline, ESPMode::ThreadSafe>(
-			GenerationConfig.ToSharedRef(), GenerationCache.ToSharedRef(), Overlay, true) :
-		NaturalGenerator;
-
-	++Epoch;
-	Runtime = MakeUnique<FVoxelWorldRuntime>(
-		Epoch,
-		IsAuthority(),
-		Registry.GetSnapshot().ToSharedRef(),
-		Generator.ToSharedRef());
-	Runtime->GetChangeHierarchy().SetTopology(ViewSettings.Lod);
-	if (GenerationConfig->Recipe->Settings.Ecology.Tree.bEnabled)
-	{
-		const FVoxelTreeGenerationSettings& Tree =
-			GenerationConfig->Recipe->Settings.Ecology.Tree;
-		Runtime->GetChangeHierarchy().SetNaturalInfluence(
-			Tree.CrownRadius, Tree.MaxHeight + Tree.CrownRadius);
-	}
 	if (IsAuthority() && !RegionStore.GetDirectoryError().IsEmpty())
 	{
 		OutError = RegionStore.GetDirectoryError();
-		Runtime.Reset();
-		Generator.Reset();
-		GenerationCache.Reset();
-		GenerationConfig.Reset();
-		WorldState = EVoxelWorldState::Failed;
+		FailInitialization();
 		return false;
 	}
+	const uint64 NewWorldEpoch = Epoch + 1;
 	Scheduler = MakeUnique<FVoxelTaskScheduler>();
 	FVoxelTaskBudget TaskBudget;
 	TaskBudget.MaxConcurrentTasks = FMath::Clamp(FPlatformMisc::NumberOfCores() * 2, 1, 16);
@@ -838,23 +808,59 @@ bool UVoxelModule::StartWorld(
 		MemoryPolicy.RuntimeFactsOverlapMegabytes < 16 || !Scheduler->GetTerrainResources()->Configure(GeometryLimits) ||
 		!Scheduler->GetRuntimeResources()->Configure(FactLimits))
 	{
-		FString StopError;
-		StopWorld(true, StopError);
 		OutError = TEXT("ViewProfile 的几何或 Runtime/Facts 独立资源池上限不合法");
-		WorldState = EVoxelWorldState::Failed;
+		FailInitialization();
 		return false;
 	}
-	if (!Scheduler->InitializeStatistics(Epoch))
+	if (!Scheduler->InitializeStatistics(NewWorldEpoch))
 	{
-		FString StopError;
-		StopWorld(true, StopError);
 		OutError = TEXT("地形统计固定窗口容量无法预授予");
-		WorldState = EVoxelWorldState::Failed;
+		FailInitialization();
 		return false;
+	}
+	const FVoxelGenerationConsumerKey CacheControlConsumer = {
+		EVoxelGenerationConsumerKind::WorldFact, NewWorldEpoch, FGuid::NewGuid(), 1,
+		EVoxelGenerationSpatialKind::Column, FIntVector::ZeroValue, FIntVector::ZeroValue, 1
+	};
+	if (!FVoxelGenerationPlanCache::Create(Scheduler->GetRuntimeResources(),
+		CacheControlConsumer, GenerationCache, OutError))
+	{
+		FailInitialization();
+		return false;
+	}
+	const TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> NaturalGenerator =
+		MakeShared<const FVoxelGenerationPipeline, ESPMode::ThreadSafe>(
+			GenerationConfig.ToSharedRef(),
+			GenerationCache.ToSharedRef(), nullptr, true);
+	TSharedPtr<const IVoxelGenerationOverlay, ESPMode::ThreadSafe> Overlay;
+	if (!CreateGenerationOverlay(NaturalGenerator, Registry.GetSnapshot().ToSharedRef(),
+		Overlay, OutError))
+	{
+		FailInitialization();
+		return false;
+	}
+	Generator = Overlay ?
+		MakeShared<const FVoxelGenerationPipeline, ESPMode::ThreadSafe>(
+			GenerationConfig.ToSharedRef(), GenerationCache.ToSharedRef(), Overlay, true) :
+		NaturalGenerator;
+
+	Epoch = NewWorldEpoch;
+	Runtime = MakeUnique<FVoxelWorldRuntime>(
+		Epoch,
+		IsAuthority(),
+		Registry.GetSnapshot().ToSharedRef(),
+		Generator.ToSharedRef());
+	Runtime->BindTerrainResources(Scheduler->GetRuntimeResources());
+	Runtime->GetChangeHierarchy().SetTopology(ViewSettings.Lod);
+	if (GenerationConfig->Recipe->Settings.Ecology.Tree.bEnabled)
+	{
+		const FVoxelTreeGenerationSettings& Tree =
+			GenerationConfig->Recipe->Settings.Ecology.Tree;
+		Runtime->GetChangeHierarchy().SetNaturalInfluence(
+			Tree.CrownRadius, Tree.MaxHeight + Tree.CrownRadius);
 	}
 	if (IsAuthority() && RegionStore.IsDirectoryReady()) Runtime->GetChangeIndex().SetBaseline(RegionStore.GetDirectorySnapshot());
 	if (!IsAuthority()) OverlayReplica = MakeUnique<FVoxelOverlayReplica>(Epoch, Scheduler->GetRuntimeResources());
-	Runtime->BindTerrainResources(Scheduler->GetRuntimeResources());
 	Scheduler->BindFrameContext(TerrainFrameContext);
 	if (GetWorld()->GetNetMode() != NM_DedicatedServer)
 	{
@@ -935,7 +941,8 @@ bool UVoxelModule::StartWorld(
 	DetailView = MakeUnique<FVoxelDetailView>(*this, *Scheduler, Epoch);
 	if (!DetailView->Initialize(OutError))
 	{
-		StopWorld(true, OutError);
+		FString StopError;
+		StopWorld(true, StopError);
 		WorldState = EVoxelWorldState::Failed;
 		return false;
 	}

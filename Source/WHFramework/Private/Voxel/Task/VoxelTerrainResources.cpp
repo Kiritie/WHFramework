@@ -39,6 +39,17 @@ bool FVoxelTerrainResourceLease::Transfer(const EVoxelTerrainResourcePool InPool
 	return Owner->Transfer(LeaseSerial, InPool);
 }
 
+bool FVoxelTerrainResourceLease::CommitReservation(
+	TSharedRef<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InReserved,
+	const FVoxelGenerationConsumerKey& InNewOwner)
+{
+	if (&Owner.Get() != &InReserved->Owner.Get())
+	{
+		return false;
+	}
+	return Owner->CommitReservation(LeaseSerial, InReserved->LeaseSerial, InNewOwner);
+}
+
 TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> FVoxelTerrainResourceLease::Split(const uint64 InBytes)
 {
 	return Owner->Split(LeaseSerial, InBytes);
@@ -212,6 +223,30 @@ bool FVoxelTerrainResources::Transfer(const uint64 InSerial, const EVoxelTerrain
 	State.Used[static_cast<int32>(InPool)] += Entry->Bytes;
 	Entry->Pool = InPool;
 	AdvanceVersion(true, &Entry->Attempt);
+	return true;
+}
+
+bool FVoxelTerrainResources::CommitReservation(const uint64 InSerial, const uint64 InReservedSerial,
+	const FVoxelGenerationConsumerKey& InNewOwner)
+{
+	FScopeLock Lock(&Mutex);
+	FEntry* Entry = Entries.Find(InSerial);
+	FEntry* Reserved = Entries.Find(InReservedSerial);
+	if (!Entry || !Reserved || InSerial == InReservedSerial || !InNewOwner.IsValid() ||
+		Entry->Bytes == 0 || Reserved->Bytes < Entry->Bytes || Entry->Pool == Reserved->Pool ||
+		!(Entry->Attempt == Reserved->Attempt) || Entry->Attempt.WorldEpoch != InNewOwner.WorldEpoch)
+	{
+		return false;
+	}
+	const FVoxelGenerationConsumerKey PreviousOwner = Entry->Attempt;
+	uint64& PreviousUsed = State.Used[static_cast<int32>(Entry->Pool)];
+	check(PreviousUsed >= Entry->Bytes);
+	PreviousUsed -= Entry->Bytes;
+	Reserved->Bytes -= Entry->Bytes;
+	Entry->Pool = Reserved->Pool;
+	Entry->Attempt = InNewOwner;
+	// 目标池已含 standby；正文替换它，不重复授额，两个句柄及拆分额度继续各自存活。
+	AdvanceVersion(true, &PreviousOwner);
 	return true;
 }
 

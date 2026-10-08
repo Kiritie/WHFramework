@@ -192,4 +192,112 @@ bool FVoxelResourceExternalReleaseTest::RunTest(const FString& InParameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelResourceReservedPublicationTest,
+	"WHFramework.Voxel.FineRefactor.Resources.ReservedPublication",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelResourceReservedPublicationTest::RunTest(const FString& InParameters)
+{
+	const auto Resources = MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
+	FVoxelTerrainResourceLimits Limits;
+	Limits.WorkingBytes = 4096;
+	Limits.ResidentBytes = 8192;
+	Limits.OverlapBytes = 4096;
+	if (!Resources->Configure(Limits)) return false;
+	const auto Attempt = FVoxelGenerationConsumerKey::Section(37, FGuid::NewGuid(), 1, {}, 19);
+	auto CacheOwner = Attempt;
+	CacheOwner.Kind = EVoxelGenerationConsumerKind::WorldFact;
+	CacheOwner.OwnerId = FGuid::NewGuid();
+	CacheOwner.RequestSerial = 1;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Body;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Standby;
+	if (!Resources->Acquire(Attempt, EVoxelTerrainResourcePool::Working, 4096, Body, 2) ||
+		!Resources->Acquire(Attempt, EVoxelTerrainResourcePool::Resident, 4096, Standby, 1)) return false;
+	const auto Before = Resources->Snapshot();
+	const uint64 Serial = Body->Serial();
+	const uint64 AttemptExternal = Resources->ReleaseVersionExcludingOwner(Attempt);
+	TestTrue(TEXT("Resident 已满时消费原 standby，不请求第二份额度"),
+		Body->CommitReservation(Standby.ToSharedRef(), CacheOwner));
+	const auto Published = Resources->Snapshot();
+	TestEqual(TEXT("正文仍是原租约 serial"), Body->Serial(), Serial);
+	TestEqual(TEXT("正文保留完整字节"), Body->Bytes(), uint64(4096));
+	TestEqual(TEXT("只消费目标池 standby"), Standby->Bytes(), uint64(0));
+	TestEqual(TEXT("Working 已归还"), Published.Used[int32(EVoxelTerrainResourcePool::Working)], uint64(0));
+	TestEqual(TEXT("Resident 没有重复授额"), Published.Used[int32(EVoxelTerrainResourcePool::Resident)], uint64(4096));
+	TestEqual(TEXT("提交不创建句柄或新 backing"), Published.Used[int32(EVoxelTerrainResourcePool::Input)],
+		Before.Used[int32(EVoxelTerrainResourcePool::Input)]);
+	TestEqual(TEXT("两个租约的预授予拆分继续有效"), Published.ReservedSplitCount, Before.ReservedSplitCount);
+	TestEqual(TEXT("Working 转账不伪造原任务的外部唤醒"),
+		Resources->ReleaseVersionExcludingOwner(Attempt), AttemptExternal);
+	Standby.Reset();
+	TestEqual(TEXT("失败尝试原 standby 句柄退款也不自唤醒"),
+		Resources->ReleaseVersionExcludingOwner(Attempt), AttemptExternal);
+	auto Child = Body->Split(256);
+	if (!TestTrue(TEXT("正文提交后仍能消费原拆分保证"), Child.IsValid())) return false;
+	Body.Reset();
+	TestEqual(TEXT("缓存正文退休只留下真实子正文"),
+		Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Resident)], uint64(256));
+	TestTrue(TEXT("真实缓存释放以新稳定所有者唤醒原任务"),
+		Resources->ReleaseVersionExcludingOwner(Attempt) > AttemptExternal);
+	const uint64 CacheExternal = Resources->ReleaseVersionExcludingOwner(CacheOwner);
+	Child.Reset();
+	const auto Retired = Resources->Snapshot();
+	TestEqual(TEXT("子租约继承发布后的所有者，不自唤醒缓存"),
+		Resources->ReleaseVersionExcludingOwner(CacheOwner), CacheExternal);
+	TestEqual(TEXT("正文完整退休"), Retired.Used[int32(EVoxelTerrainResourcePool::Resident)], uint64(0));
+	TestEqual(TEXT("拆分保证完整归还"), Retired.ReservedSplitCount, 0);
+	TestEqual(TEXT("句柄完整退休"), Retired.LeaseCount, 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelResourceReservedPublicationRefusalTest,
+	"WHFramework.Voxel.FineRefactor.Resources.ReservedPublicationRefusal",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelResourceReservedPublicationRefusalTest::RunTest(const FString& InParameters)
+{
+	const auto Resources = MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
+	const auto Foreign = MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
+	if (!Resources->Configure({}) || !Foreign->Configure({})) return false;
+	const auto Attempt = FVoxelGenerationConsumerKey::Section(37, FGuid::NewGuid(), 1, {}, 19);
+	auto CacheOwner = Attempt;
+	CacheOwner.OwnerId = FGuid::NewGuid();
+	auto OtherAttempt = Attempt;
+	++OtherAttempt.RequestSerial;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Body;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Standby;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> SmallStandby;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> OtherStandby;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ForeignStandby;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> SamePoolStandby;
+	if (!Resources->Acquire(Attempt, EVoxelTerrainResourcePool::Working, 4096, Body) ||
+		!Resources->Acquire(Attempt, EVoxelTerrainResourcePool::Resident, 4096, Standby) ||
+		!Resources->Acquire(Attempt, EVoxelTerrainResourcePool::Resident, 2048, SmallStandby) ||
+		!Resources->Acquire(OtherAttempt, EVoxelTerrainResourcePool::Resident, 4096, OtherStandby) ||
+		!Resources->Acquire(Attempt, EVoxelTerrainResourcePool::Working, 4096, SamePoolStandby) ||
+		!Foreign->Acquire(Attempt, EVoxelTerrainResourcePool::Resident, 4096, ForeignStandby)) return false;
+	const auto Before = Resources->Snapshot();
+	const auto ForeignBefore = Foreign->Snapshot();
+	TestFalse(TEXT("拒绝正文自己充当 standby"), Body->CommitReservation(Body.ToSharedRef(), CacheOwner));
+	TestFalse(TEXT("拒绝消费其它账本的额度"), Body->CommitReservation(ForeignStandby.ToSharedRef(), CacheOwner));
+	TestFalse(TEXT("拒绝不足的 standby"), Body->CommitReservation(SmallStandby.ToSharedRef(), CacheOwner));
+	TestFalse(TEXT("同 owner 的另一 request 也不能借用额度"), Body->CommitReservation(OtherStandby.ToSharedRef(), CacheOwner));
+	TestFalse(TEXT("拒绝在同池伪造发布转账"), Body->CommitReservation(SamePoolStandby.ToSharedRef(), CacheOwner));
+	auto OtherWorld = CacheOwner;
+	++OtherWorld.WorldEpoch;
+	TestFalse(TEXT("拒绝跨 World 发布"), Body->CommitReservation(Standby.ToSharedRef(), OtherWorld));
+	TestFalse(TEXT("拒绝无效的新 owner"), Body->CommitReservation(Standby.ToSharedRef(), {}));
+	const auto After = Resources->Snapshot();
+	TestEqual(TEXT("拒收保留原正文"), Body->Bytes(), uint64(4096));
+	TestEqual(TEXT("拒收保留原 standby"), Standby->Bytes(), uint64(4096));
+	TestEqual(TEXT("拒收没有改版本"), After.Version, Before.Version);
+	TestEqual(TEXT("拒收没有伪造释放"), After.ReleaseVersion, Before.ReleaseVersion);
+	TestEqual(TEXT("拒收保留 Working"), After.Used[int32(EVoxelTerrainResourcePool::Working)],
+		Before.Used[int32(EVoxelTerrainResourcePool::Working)]);
+	TestEqual(TEXT("拒收保留 Resident"), After.Used[int32(EVoxelTerrainResourcePool::Resident)],
+		Before.Used[int32(EVoxelTerrainResourcePool::Resident)]);
+	TestEqual(TEXT("其它账本同样无副作用"), Foreign->Snapshot().Version, ForeignBefore.Version);
+	return true;
+}
+
 #endif

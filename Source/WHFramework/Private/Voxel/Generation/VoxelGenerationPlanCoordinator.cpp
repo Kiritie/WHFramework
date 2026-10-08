@@ -4,6 +4,7 @@
 #include "Voxel/Generation/Caves/VoxelCaveGenerator.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelGenerationQuery.h"
+#include "Voxel/Generation/VoxelGenerationPlanningRead.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 
 namespace
@@ -14,6 +15,8 @@ namespace
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 		TArray<FVoxelGenerationPlanDependency> Missing;
 		bool bOverflow = false;
+		TAtomic<bool> bWaitingCapacity{false};
+		TAtomic<uint64> CapacityVersion{0};
 		virtual uint64 GetAllocatedBytes() const override
 		{
 			return VoxelBoundedAllocation::WorkerSharedBytes<FPlanReadDependencies>() + Missing.GetAllocatedSize();
@@ -88,6 +91,13 @@ FVoxelGenerationPlanCoordinator::~FVoxelGenerationPlanCoordinator()
 bool FVoxelGenerationPlanCoordinator::PrepareStorage(FString& OutError)
 {
 	check(IsInGameThread());
+	const auto CacheResources = Cache->GetResources();
+	if (CacheResources && (CacheResources.Get() != &Resources.Get() ||
+		Cache->GetControlConsumer().WorldEpoch != WorldEpoch))
+	{
+		OutError = TEXT("Invalid original generation cache resource or world identity");
+		return false;
+	}
 	if (Storage) return true;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 	if (!Resources->Acquire(ControlConsumer, EVoxelTerrainResourcePool::Input,
@@ -560,13 +570,33 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 	ReadDependencies->Missing.Reserve(MaximumHydrologyDependencies);
 	check(ReadDependencies->GetAllocatedBytes() <= ReadDependencies->Lease->Bytes());
 	Request.InputBytes = ReadDependencies->Lease->Bytes();
+	Request.bResumable = true;
+	Request.GetBlockReason = [ReadDependencies, CapturedResources = Resources, CaptureConsumer]
+	{
+		if (!ReadDependencies->bWaitingCapacity.Load()) return EVoxelTaskBlockReason::None;
+		uint64 Version = 0;
+		return CapturedResources->TryGetReleaseVersionExcludingOwner(CaptureConsumer, Version) &&
+			Version > ReadDependencies->CapacityVersion.Load() ? EVoxelTaskBlockReason::None : EVoxelTaskBlockReason::Memory;
+	};
 	Request.Execute = [Dependency = InDependency, CapturedConfig = Config,
-		CapturedCache = Cache, PrerequisiteRetention = InOutState.PrerequisiteRetention, ReadDependencies](const TAtomic<bool>& Cancel)
+		CapturedCache = Cache, PrerequisiteRetention = InOutState.PrerequisiteRetention, ReadDependencies,
+		CapturedResources = Resources, CapturedStamp = Request.Stamp, CaptureConsumer](const TAtomic<bool>& Cancel)
 	{
 		FVoxelTaskResult Result;
+		if (Cancel.Load())
+		{
+			Result.bCanceled = true;
+			return Result;
+		}
+		ReadDependencies->bWaitingCapacity.Store(false);
+		ReadDependencies->Missing.Reset();
+		ReadDependencies->bOverflow = false;
+		const uint64 BeforeBuild = CapturedResources->ReleaseVersionExcludingOwner(CaptureConsumer);
 		FVoxelGenerationQuery Query;
 		if (!FVoxelGenerationQuery::Create(CapturedConfig, CapturedCache,
 			Query, Result.Error, false, true)) return Result;
+		// 原生查询保留构建权限；随后绑定原任务身份，不把它变成项目只读 preflight。
+		FVoxelGenerationPlanningReadScope NativeReads({}, &CapturedStamp, &Cancel, &CaptureConsumer);
 		Query.SetMissingHydrologyObserver([ReadDependencies](const FVoxelHydrologyRegionKey& Key)
 		{
 			const auto Missing = MakeDependency(EVoxelGenerationPlanKind::Hydrology, FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0));
@@ -619,6 +649,14 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 			Result.Error = TEXT("生成事实的实际采样闭包超过上限");
 		}
 		Result.CustomPayload = ReadDependencies;
+		if (!Result.bCanceled && !ReadDependencies->bOverflow && Result.Error.StartsWith(TEXT("CapacityBlocked")))
+		{
+			ReadDependencies->CapacityVersion.Store(BeforeBuild);
+			ReadDependencies->bWaitingCapacity.Store(true);
+			Result.bSuccess = true;
+			Result.bContinue = true;
+			Result.Error.Reset();
+		}
 		return Result;
 	};
 	Request.Apply = [this, WeakStorage = TWeakPtr<FStorage, ESPMode::ThreadSafe>(Storage), Dependency = InDependency](FVoxelTaskResult&& Result)
@@ -769,7 +807,7 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 	}
 
 	FString Error;
-	if (!PrepareStorage(Error)) return {false, false, MoveTemp(Error)};
+	if (!PrepareStorage(Error)) return {false, !Error.StartsWith(TEXT("CapacityBlocked")), MoveTemp(Error)};
 	FClosureRegistration Registration(*this);
 	FClosureDemand Desired(*this);
 	for (const auto& Dependency : InDependencies)

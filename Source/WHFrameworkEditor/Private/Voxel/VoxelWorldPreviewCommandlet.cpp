@@ -9,10 +9,12 @@
 #include "Voxel/Authoring/VoxelWorldGenerationProfile.h"
 #include "Voxel/Generation/VoxelBuiltinFeatures.h"
 #include "Voxel/Generation/VoxelGenerationBinding.h"
+#include "Voxel/Generation/VoxelGenerationPlanCache.h"
 #include "Voxel/Generation/VoxelGenerationPipeline.h"
 #include "Voxel/Generation/Climate/VoxelClimateGenerator.h"
 #include "Voxel/Generation/Terrain/VoxelTerrainGenerator.h"
 #include "Voxel/Runtime/VoxelRegistry.h"
+#include "Voxel/Task/VoxelTerrainResources.h"
 #include "Voxel/Voxels/Data/VoxelData.h"
 
 UVoxelWorldPreviewCommandlet::UVoxelWorldPreviewCommandlet()
@@ -119,9 +121,25 @@ int32 UVoxelWorldPreviewCommandlet::Main(const FString& Params)
 	TArray<FVoxelEnvironmentSample> Samples;
 	if (!bMacroOnly)
 	{
-		const TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> Cache =
-			MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
-		const FVoxelGenerationPipeline Pipeline(Config, Cache);
+		// 独立预览会话的 Cache 与规划保留节点共用固定资源域。
+		const auto PlanningResources = MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
+		const FVoxelGenerationConsumerKey RetentionConsumer = {
+			EVoxelGenerationConsumerKind::WorldFact, 1, FGuid::NewGuid(), 1,
+			EVoxelGenerationSpatialKind::Column, FIntVector::ZeroValue, FIntVector::ZeroValue, 1
+		};
+		TSharedPtr<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> Cache;
+		if (!PlanningResources->Configure({}))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Voxel preview resource limits are invalid"));
+			return 8;
+		}
+		if (!FVoxelGenerationPlanCache::Create(PlanningResources, RetentionConsumer, Cache, Error, true, true))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Voxel preview cache admission failed: %s"), *Error);
+			return 8;
+		}
+		const FVoxelGenerationPipeline Pipeline(Config, Cache.ToSharedRef());
+		Pipeline.BindRetentionResources(PlanningResources, RetentionConsumer);
 		if (!Pipeline.SampleEnvironments(FIntPoint(OriginX, OriginY), Width,
 			Height, Step, Samples, Error, nullptr, false))
 		{

@@ -66,7 +66,7 @@ namespace
 		{ \
 			return FVoxelCacheLifecycleTestAccess::Kind##References(InCache, InKey); \
 		} \
-		static constexpr void (FVoxelGenerationPlanCache::*Store)(const KeyType&, Ptr) = StorePointer; \
+		static constexpr bool (FVoxelGenerationPlanCache::*Store)(const KeyType&, Ptr, FString*) = StorePointer; \
 	};
 	VOXEL_CACHE_LIFECYCLE_FAMILY(FVoxelHydrologyPlan, FVoxelHydrologyRegionKey, Hydrology, &FVoxelGenerationPlanCache::StoreHydrology)
 	VOXEL_CACHE_LIFECYCLE_FAMILY(FVoxelCavePlan, FVoxelGenerationTileKey, Cave, &FVoxelGenerationPlanCache::StoreCave)
@@ -98,7 +98,7 @@ namespace
 		{
 			return FVoxelCacheLifecycleTestAccess::NaturalReferences(InCache, InKey);
 		}
-		static constexpr void (FVoxelGenerationPlanCache::*Store)(const KeyType&, Ptr) = nullptr;
+		static constexpr bool (FVoxelGenerationPlanCache::*Store)(const KeyType&, Ptr, FString*) = nullptr;
 	};
 
 	enum class ECacheLifecycleScenario : uint8
@@ -222,7 +222,7 @@ namespace
 				else if (Scenario == ECacheLifecycleScenario::Store)
 				{
 					check(Family::Store);
-					(State->Cache.Get().*Family::Store)(State->Key, State->Stored);
+					(State->Cache.Get().*Family::Store)(State->Key, State->Stored, nullptr);
 					State->Release[0]->Trigger();
 					SetPhase(EPhase::AllFinished);
 				}
