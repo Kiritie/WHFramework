@@ -14,6 +14,8 @@
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelGenerationPlanningRead.h"
 #include "Voxel/Generation/VoxelStructure.h"
+#include "Voxel/Task/VoxelBoundedAllocation.h"
+#include "Voxel/Task/VoxelTerrainResources.h"
 
 namespace
 {
@@ -24,6 +26,23 @@ namespace
 		const FInt64Vector Min(int64(InKey.Coordinate.X) * VoxelGenerationPlanTileSide,
 			int64(InKey.Coordinate.Y) * VoxelGenerationPlanTileSide, int64(InKey.Coordinate.Z) * VoxelGenerationPlanTileSide);
 		return VoxelGeneration::ClipWorldBounds(Min, Min + FInt64Vector(VoxelGenerationPlanTileSide), OutBounds);
+	}
+
+	template<typename GeneratorType, typename... ArgumentTypes>
+	TSharedPtr<const GeneratorType, ESPMode::ThreadSafe> MakeQueryGenerator(
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InLease, ArgumentTypes&&... InArguments)
+	{
+		if (InLease)
+		{
+			return VoxelBoundedAllocation::MakeWorkerShared<const GeneratorType>(MoveTemp(InLease),
+				Forward<ArgumentTypes>(InArguments)...);
+		}
+#if WITH_DEV_AUTOMATION_TESTS
+		return MakeShared<const GeneratorType, ESPMode::ThreadSafe>(Forward<ArgumentTypes>(InArguments)...);
+#else
+		checkNoEntry();
+		return nullptr;
+#endif
 	}
 }
 
@@ -389,7 +408,8 @@ bool FVoxelGenerationQuery::Create(
 	FString& OutError,
 	const bool bInUseColumnCache,
 	const bool bInRequireReadyHydrology,
-	const bool bInRequireReadyPlans)
+	const bool bInRequireReadyPlans,
+	const FVoxelGenerationConsumerKey* InConsumer)
 {
 	if (!InConfig->IsValid() ||
 		!InConfig->Recipe)
@@ -400,6 +420,49 @@ bool FVoxelGenerationQuery::Create(
 		return false;
 	}
 
+	const auto& Resources = InCache->GetResources();
+	FVoxelGenerationConsumerKey Consumer;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> GeneratorLeases[8];
+	if (Resources)
+	{
+		if (!InCache->ResolveConsumer(Consumer, OutError)) return false;
+		if (InConsumer)
+		{
+			if (!InConsumer->IsValid() || InConsumer->WorldEpoch != Consumer.WorldEpoch ||
+				(FVoxelGenerationPlanningReadScope::GetConsumerKey() && !(*InConsumer == Consumer)))
+			{
+				OutError = TEXT("InvalidConsumer: generation query requires the original World consumer");
+				return false;
+			}
+			Consumer = *InConsumer;
+		}
+		const uint64 GeneratorBytes[] = {
+			VoxelBoundedAllocation::WorkerSharedBytes<const FVoxelClimateGenerator>(),
+			VoxelBoundedAllocation::WorkerSharedBytes<const FVoxelTerrainGenerator>(),
+			VoxelBoundedAllocation::WorkerSharedBytes<const FVoxelBiomeGenerator>(),
+			VoxelBoundedAllocation::WorkerSharedBytes<const FVoxelHydrologyPlanner>(),
+			VoxelBoundedAllocation::WorkerSharedBytes<const FVoxelCaveGenerator>(),
+			VoxelBoundedAllocation::WorkerSharedBytes<const FVoxelAquiferGenerator>(),
+			VoxelBoundedAllocation::WorkerSharedBytes<const FVoxelSurfaceGenerator>(),
+			VoxelBoundedAllocation::WorkerSharedBytes<const FVoxelEcologyGenerator>()
+		};
+		for (int32 Index = 0; Index < UE_ARRAY_COUNT(GeneratorBytes); ++Index)
+		{
+			if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input, GeneratorBytes[Index], GeneratorLeases[Index]))
+			{
+				OutError = TEXT("CapacityBlocked: generation query native generators");
+				return false;
+			}
+		}
+	}
+#if !WITH_DEV_AUTOMATION_TESTS
+	else
+	{
+		OutError = TEXT("InvalidConsumer: generation query cache has no resource domain");
+		return false;
+	}
+#endif
+
 	FVoxelGenerationQuery Query;
 
 	Query.Config = InConfig;
@@ -408,62 +471,16 @@ bool FVoxelGenerationQuery::Create(
 	Query.bRequireReadyHydrology = bInRequireReadyHydrology || FVoxelGenerationPlanningReadScope::IsActive();
 	Query.bRequireReadyPlans = bInRequireReadyPlans || FVoxelGenerationPlanningReadScope::IsActive();
 
-	Query.Climate =
-		MakeShared<
-			FVoxelClimateGenerator,
-			ESPMode::ThreadSafe>(
-				InConfig->Recipe.
-					ToSharedRef());
-
-	Query.Terrain =
-		MakeShared<
-			FVoxelTerrainGenerator,
-			ESPMode::ThreadSafe>(
-				InConfig->Recipe.
-					ToSharedRef(),
-				Query.Climate.
-					ToSharedRef());
-
-	Query.Biome =
-		MakeShared<
-			FVoxelBiomeGenerator,
-			ESPMode::ThreadSafe>(
-				InConfig->Recipe.
-					ToSharedRef());
-
-	Query.Hydrology =
-		MakeShared<
-			FVoxelHydrologyPlanner,
-			ESPMode::ThreadSafe>(
-				InConfig->Recipe.
-					ToSharedRef(),
-				Query.Terrain.
-					ToSharedRef());
-
-	Query.Cave =
-		MakeShared<
-			FVoxelCaveGenerator,
-			ESPMode::ThreadSafe>(
-				InConfig->Recipe.
-					ToSharedRef());
-
-	Query.Aquifer =
-		MakeShared<
-			FVoxelAquiferGenerator,
-			ESPMode::ThreadSafe>(
-				InConfig->Recipe.
-					ToSharedRef());
-
-	Query.Surface =
-		MakeShared<
-			FVoxelSurfaceGenerator,
-			ESPMode::ThreadSafe>(
-				InConfig->Recipe.
-					ToSharedRef());
-
-	Query.Ecology =
-		MakeShared<FVoxelEcologyGenerator, ESPMode::ThreadSafe>(
-			InConfig->Recipe.ToSharedRef());
+	Query.Climate = MakeQueryGenerator<FVoxelClimateGenerator>(MoveTemp(GeneratorLeases[0]), InConfig->Recipe.ToSharedRef());
+	Query.Terrain = MakeQueryGenerator<FVoxelTerrainGenerator>(MoveTemp(GeneratorLeases[1]),
+		InConfig->Recipe.ToSharedRef(), Query.Climate.ToSharedRef());
+	Query.Biome = MakeQueryGenerator<FVoxelBiomeGenerator>(MoveTemp(GeneratorLeases[2]), InConfig->Recipe.ToSharedRef());
+	Query.Hydrology = MakeQueryGenerator<FVoxelHydrologyPlanner>(MoveTemp(GeneratorLeases[3]),
+		InConfig->Recipe.ToSharedRef(), Query.Terrain.ToSharedRef());
+	Query.Cave = MakeQueryGenerator<FVoxelCaveGenerator>(MoveTemp(GeneratorLeases[4]), InConfig->Recipe.ToSharedRef());
+	Query.Aquifer = MakeQueryGenerator<FVoxelAquiferGenerator>(MoveTemp(GeneratorLeases[5]), InConfig->Recipe.ToSharedRef());
+	Query.Surface = MakeQueryGenerator<FVoxelSurfaceGenerator>(MoveTemp(GeneratorLeases[6]), InConfig->Recipe.ToSharedRef());
+	Query.Ecology = MakeQueryGenerator<FVoxelEcologyGenerator>(MoveTemp(GeneratorLeases[7]), InConfig->Recipe.ToSharedRef());
 
 	OutQuery =
 		MoveTemp(Query);

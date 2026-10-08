@@ -8,19 +8,19 @@ FVoxelTerrainGenerator::FVoxelTerrainGenerator(
     TSharedRef<const FVoxelClimateGenerator, ESPMode::ThreadSafe> InClimate)
     : Recipe(InRecipe)
     , Climate(InClimate)
-    , Landform(MakeShared<const FVoxelLandformGenerator, ESPMode::ThreadSafe>(InRecipe))
+    , Landform(InRecipe)
 {
 }
 
 FVoxelLandformSample FVoxelTerrainGenerator::SampleLandform(int32 InX, int32 InY) const
 {
-    return Landform->Sample(InX, InY, Climate->Sample(InX, InY));
+    return Landform.Sample(InX, InY, Climate->Sample(InX, InY));
 }
 
 FVoxelMacroTerrainSample FVoxelTerrainGenerator::SampleMacro(int32 InX, int32 InY) const
 {
     const FVoxelClimateSample ClimateSample = Climate->Sample(InX, InY);
-    const FVoxelLandformSample LandformSample = Landform->Sample(InX, InY, ClimateSample);
+    const FVoxelLandformSample LandformSample = Landform.Sample(InX, InY, ClimateSample);
 
     FVoxelMacroTerrainSample Result;
     Result.SurfaceZ = SampleRawHeight(InX, InY, ClimateSample, LandformSample);
@@ -108,7 +108,7 @@ int32 FVoxelTerrainGenerator::SampleSlopePermille(int32 InX, int32 InY) const
 {
     const FVoxelClimateSample CenterClimate = Climate->Sample(InX, InY);
     const int32 CenterHeight = SampleRawHeight(
-        InX, InY, CenterClimate, Landform->Sample(InX, InY, CenterClimate));
+        InX, InY, CenterClimate, Landform.Sample(InX, InY, CenterClimate));
 
     // 边缘使用相同距离的单侧差分，不把域外样本 Clamp 成重复边缘 cell。
     const int32 SampleX = static_cast<int32>(VoxelGeneration::IsWorldCell(int64(InX) + 4) ? int64(InX) + 4 : int64(InX) - 4);
@@ -117,9 +117,9 @@ int32 FVoxelTerrainGenerator::SampleSlopePermille(int32 InX, int32 InY) const
     const FVoxelClimateSample YClimate = Climate->Sample(InX, SampleY);
 
     const int32 XHeight = SampleRawHeight(
-        SampleX, InY, XClimate, Landform->Sample(SampleX, InY, XClimate));
+        SampleX, InY, XClimate, Landform.Sample(SampleX, InY, XClimate));
     const int32 YHeight = SampleRawHeight(
-        InX, SampleY, YClimate, Landform->Sample(InX, SampleY, YClimate));
+        InX, SampleY, YClimate, Landform.Sample(InX, SampleY, YClimate));
 
     const int64 Delta = FMath::Max(
         FMath::Abs(int64(XHeight) - CenterHeight),

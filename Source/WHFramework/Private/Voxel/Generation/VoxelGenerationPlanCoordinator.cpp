@@ -594,7 +594,19 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 		const uint64 BeforeBuild = CapturedResources->ReleaseVersionExcludingOwner(CaptureConsumer);
 		FVoxelGenerationQuery Query;
 		if (!FVoxelGenerationQuery::Create(CapturedConfig, CapturedCache,
-			Query, Result.Error, false, true)) return Result;
+			Query, Result.Error, false, true, false, &CaptureConsumer))
+		{
+			Result.bCanceled = Cancel.Load();
+			if (!Result.bCanceled && Result.Error.StartsWith(TEXT("CapacityBlocked")))
+			{
+				ReadDependencies->CapacityVersion.Store(BeforeBuild);
+				ReadDependencies->bWaitingCapacity.Store(true);
+				Result.bSuccess = true;
+				Result.bContinue = true;
+				Result.Error.Reset();
+			}
+			return Result;
+		}
 		// 原生查询保留构建权限；随后绑定原任务身份，不把它变成项目只读 preflight。
 		FVoxelGenerationPlanningReadScope NativeReads({}, &CapturedStamp, &Cancel, &CaptureConsumer);
 		Query.SetMissingHydrologyObserver([ReadDependencies](const FVoxelHydrologyRegionKey& Key)

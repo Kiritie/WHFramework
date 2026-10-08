@@ -9,6 +9,7 @@
 
 struct FVoxelGenerationRecipe;
 class FVoxelTerrainGenerator;
+class FVoxelGenerationWorkspace;
 
 struct WHFRAMEWORK_API FVoxelDrainageInput
 {
@@ -122,7 +123,8 @@ namespace VoxelHydrology
         uint32 InSource,
         int32 InRouteBudget,
         TArray<uint32>& OutPath,
-        FString& OutError);
+        FString& OutError,
+        FVoxelGenerationWorkspace* InOutputWorkspace = nullptr);
 
     WHFRAMEWORK_API bool ValidateBasin(
         const FVoxelBasinInput& InInput,
@@ -290,7 +292,10 @@ struct WHFRAMEWORK_API FVoxelHydrologyPlan
     TArray<FVoxelLakePlan> Lakes;
 	TArray<FVoxelWaterfallSemantic> Waterfalls;
 
+	bool Finalize(FString& OutError, const TAtomic<bool>* InCancel = nullptr);
+#if WITH_DEV_AUTOMATION_TESTS
 	void Finalize();
+#endif
 	bool ValidateRiverRoutes(FString& OutError) const;
 
     bool Sample(
@@ -299,6 +304,7 @@ struct WHFRAMEWORK_API FVoxelHydrologyPlan
         int32 InOriginalGround,
         FVoxelHydrologyInfluence& OutInfluence) const;
 
+	/** 仅持有的 native heap backing；root、共享控制器与退休任务由 Cache 构建路径授予。 */
 	uint64 GetAllocatedBytes() const;
 
 private:
@@ -334,17 +340,21 @@ private:
         FString& OutError,
         const TAtomic<bool>* InCancel) const;
 
-    void AddOceanOutlets(
-        FVoxelHydrologyGrid& InOutGrid) const;
+    bool AddOceanOutlets(
+        FVoxelHydrologyGrid& InOutGrid,
+        FString& OutError) const;
 
-    void AddCanonicalSinkOutlets(
-        FVoxelHydrologyGrid& InOutGrid) const;
+    bool AddCanonicalSinkOutlets(
+        FVoxelHydrologyGrid& InOutGrid,
+        FString& OutError) const;
 
-    void SelectRiverSources(
+    bool SelectRiverSources(
         const FVoxelHydrologyGrid& InGrid,
         const FVoxelDrainageResult& InDrainage,
         const FVoxelHydrologyRegionKey& InOwnerRegion,
-        TArray<FVoxelRiverSource>& OutSources) const;
+        TArray<FVoxelRiverSource>& OutSources,
+        FString& OutError,
+        FVoxelGenerationWorkspace& InOutputWorkspace) const;
 
     bool TraceRiver(
         const FVoxelHydrologyGrid& InGrid,
@@ -353,6 +363,8 @@ private:
         const FVoxelHydrologyRegionKey& InOwnerRegion,
         const FVoxelRiverSource& InSource,
         TSet<uint32>& InOutClaimedDownstream,
+        int32& InOutClaimedCapacity,
+        FVoxelGenerationWorkspace& InWorkspace,
         FVoxelRiverRoute& OutRoute,
         FString& OutError) const;
 

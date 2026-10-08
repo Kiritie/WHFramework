@@ -2,6 +2,7 @@
 
 #include "HAL/PlatformProcess.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelGenerationPlanningRead.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
@@ -12,6 +13,58 @@ namespace
 	constexpr int32 GenerationPlanTileSide = 256;
 	constexpr int32 LakeAnchorSide = 64;
 	constexpr int32 MaximumControlEntries = 1 << 20;
+
+	// 逐族迁移；Cave/Feature/Structure 仍保留原路径，不能以事后测量冒充预授予。
+	template<typename ValueType>
+	struct TCacheBodyCapacity
+	{
+		static constexpr bool Enabled =
+			std::is_same_v<ValueType, FVoxelBaseColumnEntry> ||
+			std::is_same_v<ValueType, FVoxelNaturalColumnEntry> ||
+			std::is_same_v<ValueType, FVoxelHydrologyPlan> ||
+			std::is_same_v<ValueType, FVoxelEcologyPlan>;
+
+		static uint64 BackingBytes(const ValueType& InValue)
+		{
+			if constexpr (std::is_same_v<ValueType, FVoxelBaseColumnEntry> ||
+				std::is_same_v<ValueType, FVoxelNaturalColumnEntry>)
+			{
+				// 列正文的所有字段内嵌，GetAllocatedBytes 含 root，不能重复加入。
+				return 0;
+			}
+			else
+			{
+				return InValue.GetAllocatedBytes();
+			}
+		}
+	};
+
+	template<typename KeyType>
+	FVoxelGenerationConsumerKey CacheBodyOwner(
+		const FVoxelGenerationConsumerKey& InControlConsumer, const KeyType& InKey)
+	{
+		auto Consumer = InControlConsumer;
+		if constexpr (std::is_same_v<KeyType, FIntPoint>)
+		{
+			Consumer.SpatialKind = EVoxelGenerationSpatialKind::Column;
+			Consumer.Min = FIntVector(InKey.X, InKey.Y, 0);
+		}
+		else
+		{
+			// Region/Tile key 是元数据身份，不转换成 world cell。
+			Consumer.SpatialKind = EVoxelGenerationSpatialKind::Section;
+			if constexpr (std::is_same_v<KeyType, FVoxelGenerationTileKey>)
+			{
+				Consumer.Min = InKey.Coordinate;
+			}
+			else
+			{
+				Consumer.Min = FIntVector(InKey.Coordinate.X, InKey.Coordinate.Y, 0);
+			}
+		}
+		Consumer.Max = Consumer.Min;
+		return Consumer;
+	}
 
 	bool ResolveBuildConsumer(
 		const FVoxelGenerationConsumerKey& InControlConsumer,
@@ -65,7 +118,7 @@ namespace
 		const int32 Capacity = NextControlCapacity(InRequired, InCapacity);
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 		if (InResources && !InResources->Acquire(InControlConsumer, EVoxelTerrainResourcePool::Input,
-			VoxelBoundedAllocation::MapBytes<KeyType, ValueType>(Capacity), Lease))
+			VoxelGenerationAllocation::Private::SetReserveBytes<TPair<KeyType, ValueType>>(InMap, Capacity), Lease))
 		{
 			OutError = TEXT("CapacityBlocked: generation cache control map");
 			return false;
@@ -74,8 +127,8 @@ namespace
 		InMap.Reserve(Capacity);
 		if (Lease)
 		{
-			check(InMap.GetAllocatedSize() <= Lease->Bytes());
-			const bool bResized = Lease->Resize(InMap.GetAllocatedSize());
+			check(VoxelGenerationAllocation::AllocatedBytes(InMap) <= Lease->Bytes());
+			const bool bResized = Lease->Resize(VoxelGenerationAllocation::AllocatedBytes(InMap));
 			check(bResized);
 		}
 		InLease = MoveTemp(Lease);
@@ -100,7 +153,7 @@ namespace
 		const int32 Capacity = NextControlCapacity(InRequired, InCapacity);
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 		if (InResources && !InResources->Acquire(InControlConsumer, EVoxelTerrainResourcePool::Input,
-			VoxelBoundedAllocation::ArrayBytes<KeyType>(Capacity), Lease))
+			VoxelGenerationAllocation::Private::ArrayReserveBytes<KeyType, FDefaultAllocator>(Capacity), Lease))
 		{
 			OutError = TEXT("CapacityBlocked: generation cache control keys");
 			return false;
@@ -108,8 +161,8 @@ namespace
 		InKeys.Reserve(Capacity);
 		if (Lease)
 		{
-			check(InKeys.GetAllocatedSize() <= Lease->Bytes());
-			const bool bResized = Lease->Resize(InKeys.GetAllocatedSize());
+			check(VoxelGenerationAllocation::AllocatedBytes(InKeys) <= Lease->Bytes());
+			const bool bResized = Lease->Resize(VoxelGenerationAllocation::AllocatedBytes(InKeys));
 			check(bResized);
 		}
 		InLease = MoveTemp(Lease);
@@ -315,15 +368,23 @@ namespace
 					OutError = TEXT("CapacityBlocked: generation cache build gate");
 					return false;
 				}
-				if constexpr (std::is_same_v<ValueType, FVoxelBaseColumnEntry> || std::is_same_v<ValueType, FVoxelNaturalColumnEntry>)
+				if constexpr (TCacheBodyCapacity<ValueType>::Enabled)
 				{
 					const uint64 BodyBytes = VoxelBoundedAllocation::WorkerSharedBytes<const ValueType>();
-					if (InResources &&
-						(!InResources->Acquire(BuildConsumer, EVoxelTerrainResourcePool::Working, BodyBytes, BodyLease) ||
-						 !InResources->Acquire(BuildConsumer, EVoxelTerrainResourcePool::Resident, BodyBytes, ResidentReservation)))
+					if (InResources)
 					{
-						OutError = TEXT("CapacityBlocked: generation cache column body");
-						return false;
+						const auto Limits = InResources->Snapshot().Limits;
+						if (BodyBytes > Limits.WorkingBytes || BodyBytes > Limits.ResidentBytes - Limits.OverlapBytes)
+						{
+							OutError = TEXT("Oversized: generation cache native body exceeds original pool limit");
+							return false;
+						}
+						if (!InResources->Acquire(BuildConsumer, EVoxelTerrainResourcePool::Working, BodyBytes, BodyLease) ||
+							!InResources->Acquire(BuildConsumer, EVoxelTerrainResourcePool::Resident, BodyBytes, ResidentReservation))
+						{
+							OutError = TEXT("CapacityBlocked: generation cache native body");
+							return false;
+						}
 					}
 				}
 				Gate = GateLease ? VoxelBoundedAllocation::MakeWorkerShared<BuildGateType>(GateLease) :
@@ -420,14 +481,32 @@ namespace
 			return false;
 		}
 
+		// scope 与原租约先声明；失败正文先释放 native backing，随后才退出上下文与授额。
+		TOptional<FVoxelGenerationAllocationScope> AllocationScope;
+		if constexpr (TCacheBodyCapacity<ValueType>::Enabled)
+		{
+			AllocationScope.Emplace(InResources, BuildConsumer, BodyLease, ResidentReservation,
+				VoxelBoundedAllocation::WorkerSharedBytes<const ValueType>());
+		}
 		ValueType LocalValue;
 		FString BuildError;
 
-		const bool bSuccess =
+		bool bSuccess =
 			(!InCancel || !InCancel->Load()) &&
 			InBuild(
 				LocalValue,
 				BuildError);
+		if constexpr (TCacheBodyCapacity<ValueType>::Enabled)
+		{
+			if (!AllocationScope->Check(BuildError))
+			{
+				bSuccess = false;
+			}
+			else if (bSuccess)
+			{
+				bSuccess = AllocationScope->ValidateRetainedBytes(TCacheBodyCapacity<ValueType>::BackingBytes(LocalValue), BuildError);
+			}
+		}
 
 		TConstCachePtr<KeyType, ValueType> BuiltValue;
 
@@ -460,16 +539,13 @@ namespace
 				else if (BuiltValue)
 				{
 					bool bCanPublish = true;
-					if constexpr (std::is_same_v<ValueType, FVoxelBaseColumnEntry> || std::is_same_v<ValueType, FVoxelNaturalColumnEntry>)
+					if constexpr (TCacheBodyCapacity<ValueType>::Enabled)
 					{
 						if (BodyLease)
 						{
-							auto CacheOwner = InControlConsumer;
-							CacheOwner.SpatialKind = EVoxelGenerationSpatialKind::Column;
-							CacheOwner.Min = FIntVector(InKey.X, InKey.Y, 0);
-							CacheOwner.Max = CacheOwner.Min;
+							const auto CacheOwner = CacheBodyOwner(InControlConsumer, InKey);
 							bCanPublish = BodyLease->CommitReservation(ResidentReservation.ToSharedRef(), CacheOwner);
-							if (!bCanPublish) BuildError = TEXT("CapacityBlocked: generation cache column publication");
+							if (!bCanPublish) BuildError = TEXT("CapacityBlocked: generation cache native body publication");
 						}
 					}
 					if (bCanPublish)
@@ -556,6 +632,11 @@ namespace
 			}
 			else
 			{
+				if (InResources)
+				{
+					OutError = TEXT("InvalidResource: generation cache Store cannot prove the original native body lease");
+					return false;
+				}
 				const int32 Additional = InBuilds.Contains(InKey) ? 0 : 1;
 				if (!PrepareControlStorage(InValues, InBuilds, InKeys, InBacking, Additional, 0,
 					InResources, InControlConsumer, OutError))
@@ -778,6 +859,30 @@ const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& FVoxelGenerationP
 const FVoxelGenerationConsumerKey& FVoxelGenerationPlanCache::GetControlConsumer() const
 {
 	return ControlConsumer;
+}
+
+bool FVoxelGenerationPlanCache::ResolveConsumer(
+	FVoxelGenerationConsumerKey& OutConsumer, FString& OutError) const
+{
+	FVoxelGenerationConsumerKey Consumer;
+	if (!Resources)
+	{
+#if WITH_DEV_AUTOMATION_TESTS
+		OutConsumer = ControlConsumer;
+		OutError.Reset();
+		return true;
+#else
+		OutError = TEXT("InvalidConsumer: generation cache has no original World ledger");
+		return false;
+#endif
+	}
+	if (!ResolveBuildConsumer(ControlConsumer, Consumer, OutError))
+	{
+		return false;
+	}
+	OutConsumer = Consumer;
+	OutError.Reset();
+	return true;
 }
 
 int32 FVoxelGenerationPlanCache::NaturalShardIndex(

@@ -1,11 +1,18 @@
 #include "Voxel/Generation/Hydrology/VoxelHydrology.h"
 
 #include "Voxel/Generation/Terrain/VoxelTerrainGenerator.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelGenerationRecipe.h"
 
 namespace
 {
+    int32 NextHydrologyCapacity(const int32 InRequired, const int32 InCapacity)
+    {
+        return int32(FMath::Min<int64>(MAX_int32,
+            FMath::Max<int64>(InRequired, FMath::Max<int64>(4, int64(InCapacity) * 2))));
+    }
+
     bool GetWorldHydrologyCore(const FVoxelHydrologyRegionKey& InKey, const FVoxelGenerationSettings& Settings,
         FInt64Vector2& OutMin, FInt64Vector2& OutMax)
     {
@@ -206,10 +213,17 @@ namespace
             InB.WorldCell);
     }
 
-    void HydrologyHeapPush(
+    bool HydrologyHeapPush(
         TArray<FHydrologyHeapEntry>& InOutHeap,
-        const FHydrologyHeapEntry& InEntry)
+        const FHydrologyHeapEntry& InEntry,
+        FVoxelGenerationWorkspace& InWorkspace,
+        FString& OutError)
     {
+        if (InOutHeap.Num() == InOutHeap.Max() && !InWorkspace.ReserveArray(InOutHeap,
+            NextHydrologyCapacity(InOutHeap.Num() + 1, InOutHeap.Max()), OutError))
+        {
+            return false;
+        }
         int32 Child =
             InOutHeap.Add(InEntry);
 
@@ -231,6 +245,7 @@ namespace
 
             Child = Parent;
         }
+        return true;
     }
 
     bool HydrologyHeapPop(
@@ -376,6 +391,13 @@ bool VoxelHydrology::BuildDrainage(
     }
 
     FVoxelDrainageResult Result;
+    if (!VoxelGenerationAllocation::RetainArray(Result.SpillPlane, Count, OutError) ||
+        !VoxelGenerationAllocation::RetainArray(Result.Parent, Count, OutError) ||
+        !VoxelGenerationAllocation::RetainArray(Result.Accumulation, Count, OutError) ||
+        !VoxelGenerationAllocation::RetainArray(Result.SettledOrder, Count, OutError))
+    {
+        return false;
+    }
 
     Result.SpillPlane.Init(
         MAX_int32,
@@ -389,26 +411,30 @@ bool VoxelHydrology::BuildDrainage(
         0,
         Count);
 
-    Result.SettledOrder.Reserve(
-        Count);
-
+    FVoxelGenerationWorkspace Workspace;
     TArray<uint8> Settled;
+    TArray<uint8> Terminal;
+    TArray<FHydrologyHeapEntry> Heap;
+    TArray<uint32> SortedOutletIndices;
+    if (!Workspace.ReserveArray(Settled, Count, OutError) ||
+        !Workspace.ReserveArray(Terminal, Count, OutError) ||
+        !Workspace.ReserveArray(Heap, InInput.Outlets.Num(), OutError) ||
+        !Workspace.ReserveArray(SortedOutletIndices, InInput.Outlets.Num(), OutError))
+    {
+        return false;
+    }
     Settled.Init(
         0,
         Count);
 
-    TArray<uint8> Terminal;
     Terminal.Init(
         0,
         Count);
 
-    TArray<FHydrologyHeapEntry> Heap;
-    Heap.Reserve(
-        InInput.Outlets.Num());
-
-    TArray<uint32> SortedOutletIndices;
-    InInput.Outlets.GetKeys(
-        SortedOutletIndices);
+    for (const auto& Pair : InInput.Outlets)
+    {
+        SortedOutletIndices.Add(Pair.Key);
+    }
 
     SortedOutletIndices.Sort();
 
@@ -442,7 +468,7 @@ bool VoxelHydrology::BuildDrainage(
 
         Result.Parent[Index] = -1;
 
-        HydrologyHeapPush(
+        if (!HydrologyHeapPush(
             Heap,
             {
                 Result.SpillPlane[Index],
@@ -450,7 +476,10 @@ bool VoxelHydrology::BuildDrainage(
                 ResolveWorldCell(
                     InInput,
                     Index)
-            });
+            }, Workspace, OutError))
+        {
+            return false;
+        }
     }
 
     FHydrologyHeapEntry Entry;
@@ -516,7 +545,7 @@ bool VoxelHydrology::BuildDrainage(
                 Result.Parent[Neighbor] =
                     static_cast<int32>(Index);
 
-                HydrologyHeapPush(
+                if (!HydrologyHeapPush(
                     Heap,
                     {
                         Candidate,
@@ -524,7 +553,10 @@ bool VoxelHydrology::BuildDrainage(
                         ResolveWorldCell(
                             InInput,
                             Neighbor)
-                    });
+                    }, Workspace, OutError))
+                {
+                    return false;
+                }
             }
 
             /**
@@ -572,6 +604,10 @@ bool VoxelHydrology::BuildDrainage(
         }
     }
 
+    VoxelGenerationAllocation::FreeRetainedArray(OutResult.SpillPlane);
+    VoxelGenerationAllocation::FreeRetainedArray(OutResult.Parent);
+    VoxelGenerationAllocation::FreeRetainedArray(OutResult.Accumulation);
+    VoxelGenerationAllocation::FreeRetainedArray(OutResult.SettledOrder);
     OutResult =
         MoveTemp(Result);
 
@@ -585,7 +621,8 @@ bool VoxelHydrology::TraceDrainage(
     uint32 InSource,
     int32 InRouteBudget,
     TArray<uint32>& OutPath,
-    FString& OutError)
+    FString& OutError,
+    FVoxelGenerationWorkspace* InOutputWorkspace)
 {
     int32 Count = 0;
 
@@ -608,12 +645,19 @@ bool VoxelHydrology::TraceDrainage(
     }
 
     TArray<uint32> Path;
-    Path.Reserve(
-        FMath::Min(
-            InRouteBudget,
-            Count));
+    const int32 PathCapacity = FMath::Min(InRouteBudget, Count);
+    if (!(InOutputWorkspace ? InOutputWorkspace->ReserveArray(Path, PathCapacity, OutError) :
+        VoxelGenerationAllocation::RetainArray(Path, PathCapacity, OutError)))
+    {
+        return false;
+    }
 
+    FVoxelGenerationWorkspace Workspace;
     TArray<uint8> Seen;
+    if (!Workspace.ReserveArray(Seen, Count, OutError))
+    {
+        return false;
+    }
     Seen.Init(
         0,
         Count);
@@ -707,8 +751,15 @@ bool VoxelHydrology::TraceDrainage(
             static_cast<uint32>(Parent);
     }
 
-    OutPath =
-        MoveTemp(Path);
+    if (InOutputWorkspace)
+    {
+        InOutputWorkspace->FreeArray(OutPath);
+        OutPath = MoveTemp(Path);
+    }
+    else if (!VoxelGenerationAllocation::MoveRetainedArray(OutPath, Path, OutError))
+    {
+        return false;
+    }
 
     OutError.Reset();
     return true;
@@ -893,14 +944,17 @@ bool VoxelHydrology::ValidateBasin(
         return false;
     }
 
+    FVoxelGenerationWorkspace Workspace;
     TArray<uint8> Seen;
+    TArray<uint32> Queue;
+    if (!Workspace.ReserveArray(Seen, Count, OutError) ||
+        !Workspace.ReserveArray(Queue, int32(Certificate.WaterCells), OutError))
+    {
+        return false;
+    }
     Seen.Init(
         0,
         Count);
-
-    TArray<uint32> Queue;
-    Queue.Reserve(
-        Certificate.WaterCells);
 
     Queue.Add(
         FirstWaterCell);
@@ -1162,6 +1216,12 @@ bool FVoxelHydrologyGenerator::BuildHeightGrid(
     const int32 Count =
         Grid.Width *
         Grid.Height;
+    if (!VoxelGenerationAllocation::RetainArray(Grid.GroundPlane, Count, OutError) ||
+        !VoxelGenerationAllocation::RetainArray(Grid.RainWeight, Count, OutError) ||
+        !VoxelGenerationAllocation::RetainArray(Grid.Allowed, Count, OutError))
+    {
+        return false;
+    }
 
     Grid.GroundPlane.SetNumUninitialized(
         Count);
@@ -1238,8 +1298,10 @@ bool FVoxelHydrologyGenerator::BuildHeightGrid(
         }
     }
 
-    AddOceanOutlets(Grid);
-    AddCanonicalSinkOutlets(Grid);
+    if (!AddOceanOutlets(Grid, OutError) || !AddCanonicalSinkOutlets(Grid, OutError))
+    {
+        return false;
+    }
 
     if (Grid.OceanOutlets.IsEmpty() &&
         Grid.CanonicalSinkOutlets.IsEmpty())
@@ -1259,11 +1321,21 @@ bool FVoxelHydrologyGenerator::BuildHeightGrid(
     return true;
 }
 
-void FVoxelHydrologyGenerator::AddOceanOutlets(
-    FVoxelHydrologyGrid& InOutGrid) const
+bool FVoxelHydrologyGenerator::AddOceanOutlets(
+    FVoxelHydrologyGrid& InOutGrid,
+    FString& OutError) const
 {
     const int32 SeaLevel =
         Recipe->Settings.SeaLevel;
+    int32 OceanCount = 0;
+    for (const int32 Ground : InOutGrid.GroundPlane)
+    {
+        OceanCount += Ground <= SeaLevel ? 1 : 0;
+    }
+    if (!VoxelGenerationAllocation::RetainMap(InOutGrid.OceanOutlets, OceanCount, OutError))
+    {
+        return false;
+    }
 
     for (uint32 Index = 0;
         Index <
@@ -1279,10 +1351,13 @@ void FVoxelHydrologyGenerator::AddOceanOutlets(
                 SeaLevel);
         }
     }
+    OutError.Reset();
+    return true;
 }
 
-void FVoxelHydrologyGenerator::AddCanonicalSinkOutlets(
-    FVoxelHydrologyGrid& InOutGrid) const
+bool FVoxelHydrologyGenerator::AddCanonicalSinkOutlets(
+    FVoxelHydrologyGrid& InOutGrid,
+    FString& OutError) const
 {
     const int32 Spacing =
         Recipe->Settings.HydrologySinkSpacing;
@@ -1312,6 +1387,7 @@ void FVoxelHydrologyGenerator::AddCanonicalSinkOutlets(
         VoxelGeneration::FloorDivideWide(
             GridMaxExclusive.Y - 1,
             Spacing);
+    int32 SinkCapacity = 0;
 
     for (int64 SinkY = MinSinkY;
         SinkY <= MaxSinkY;
@@ -1396,12 +1472,23 @@ void FVoxelHydrologyGenerator::AddCanonicalSinkOutlets(
                 !InOutGrid.CanonicalSinkOutlets.Contains(
                     BestIndex))
             {
+                if (InOutGrid.CanonicalSinkOutlets.Num() == SinkCapacity)
+                {
+                    const int32 Capacity = NextHydrologyCapacity(SinkCapacity + 1, SinkCapacity);
+                    if (!VoxelGenerationAllocation::RetainMap(InOutGrid.CanonicalSinkOutlets, Capacity, OutError))
+                    {
+                        return false;
+                    }
+                    SinkCapacity = Capacity;
+                }
                 InOutGrid.CanonicalSinkOutlets.Add(
                     BestIndex,
                     BestGround);
             }
         }
     }
+    OutError.Reset();
+    return true;
 }
 
 bool FVoxelHydrologyGenerator::BuildPlan(
@@ -1410,6 +1497,11 @@ bool FVoxelHydrologyGenerator::BuildPlan(
     FString& OutError,
     const TAtomic<bool>* InCancel) const
 {
+    const auto* Allocation = FVoxelGenerationAllocationScope::Get();
+    if (!(Allocation ? Allocation->Check(OutError) : FVoxelGenerationAllocationScope::AllowPassive(OutError)))
+    {
+        return false;
+    }
     FVoxelHydrologyPlan Plan;
     Plan.RiverShapeSmoothingPasses = Recipe->Settings.RiverShapeSmoothingPasses;
     Plan.RiverSeed = Recipe->Settings.Seed;
@@ -1440,6 +1532,7 @@ bool FVoxelHydrologyGenerator::BuildPlan(
         return false;
     }
 
+    FVoxelGenerationWorkspace Workspace;
     FVoxelDrainageInput DrainageInput;
     DrainageInput.WorldMinCell =
         Plan.Grid.WorldMinCell;
@@ -1447,14 +1540,21 @@ bool FVoxelHydrologyGenerator::BuildPlan(
         Plan.Grid.Width;
     DrainageInput.Height =
         Plan.Grid.Height;
-    DrainageInput.GroundPlane =
-        Plan.Grid.GroundPlane;
-    DrainageInput.RainWeight =
-        Plan.Grid.RainWeight;
-    DrainageInput.Allowed =
-        Plan.Grid.Allowed;
-    DrainageInput.Outlets =
-        Plan.Grid.OceanOutlets;
+    if (!Workspace.ReserveArray(DrainageInput.GroundPlane, Plan.Grid.GroundPlane.Num(), OutError) ||
+        !Workspace.ReserveArray(DrainageInput.RainWeight, Plan.Grid.RainWeight.Num(), OutError) ||
+        !Workspace.ReserveArray(DrainageInput.Allowed, Plan.Grid.Allowed.Num(), OutError) ||
+        !Workspace.ReserveMap(DrainageInput.Outlets,
+            Plan.Grid.OceanOutlets.Num() + Plan.Grid.CanonicalSinkOutlets.Num(), OutError))
+    {
+        return false;
+    }
+    DrainageInput.GroundPlane.Append(Plan.Grid.GroundPlane);
+    DrainageInput.RainWeight.Append(Plan.Grid.RainWeight);
+    DrainageInput.Allowed.Append(Plan.Grid.Allowed);
+    for (const auto& Pair : Plan.Grid.OceanOutlets)
+    {
+        DrainageInput.Outlets.Add(Pair.Key, Pair.Value);
+    }
 
     for (const TPair<uint32, int32>& Pair :
         Plan.Grid.CanonicalSinkOutlets)
@@ -1475,13 +1575,19 @@ bool FVoxelHydrologyGenerator::BuildPlan(
 
     TArray<FVoxelRiverSource> Sources;
 
-    SelectRiverSources(
+    if (!SelectRiverSources(
         Plan.Grid,
         Plan.Drainage,
         InKey,
-        Sources);
+        Sources,
+        OutError,
+        Workspace))
+    {
+        return false;
+    }
 
     TSet<uint32> ClaimedDownstream;
+    int32 ClaimedCapacity = 0;
 
     for (const FVoxelRiverSource& Source :
         Sources)
@@ -1502,6 +1608,8 @@ bool FVoxelHydrologyGenerator::BuildPlan(
                 InKey,
                 Source,
                 ClaimedDownstream,
+                ClaimedCapacity,
+                Workspace,
                 Route,
                 OutError))
         {
@@ -1510,8 +1618,17 @@ bool FVoxelHydrologyGenerator::BuildPlan(
 
         if (Route.Points.Num() >= 2)
         {
+            if (Plan.Rivers.Num() == Plan.Rivers.Max() && !VoxelGenerationAllocation::RetainArray(
+                Plan.Rivers, NextHydrologyCapacity(Plan.Rivers.Num() + 1, Plan.Rivers.Max()), OutError))
+            {
+                return false;
+            }
             Plan.Rivers.Add(
                 MoveTemp(Route));
+        }
+        else
+        {
+            VoxelGenerationAllocation::FreeRetainedArray(Route.Points);
         }
     }
 
@@ -1526,6 +1643,12 @@ bool FVoxelHydrologyGenerator::BuildPlan(
     {
         return false;
     }
+	Workspace.FreeArray(DrainageInput.GroundPlane);
+	Workspace.FreeArray(DrainageInput.RainWeight);
+	Workspace.FreeArray(DrainageInput.Allowed);
+	Workspace.FreeMap(DrainageInput.Outlets);
+	Workspace.FreeArray(Sources);
+	Workspace.FreeSet(ClaimedDownstream);
 
     Plan.Rivers.Sort(
         [](const FVoxelRiverRoute& InA,
@@ -1541,7 +1664,10 @@ bool FVoxelHydrologyGenerator::BuildPlan(
             return InA.Id < InB.Id;
         });
 
-	Plan.Finalize();
+	if (!Plan.Finalize(OutError, InCancel))
+	{
+		return false;
+	}
 	if (!Plan.ValidateRiverRoutes(OutError)) return false;
 
     OutPlan =
@@ -1551,11 +1677,13 @@ bool FVoxelHydrologyGenerator::BuildPlan(
     return true;
 }
 
-void FVoxelHydrologyGenerator::SelectRiverSources(
+bool FVoxelHydrologyGenerator::SelectRiverSources(
     const FVoxelHydrologyGrid& InGrid,
     const FVoxelDrainageResult& InDrainage,
     const FVoxelHydrologyRegionKey& InOwnerRegion,
-    TArray<FVoxelRiverSource>& OutSources) const
+    TArray<FVoxelRiverSource>& OutSources,
+    FString& OutError,
+    FVoxelGenerationWorkspace& InOutputWorkspace) const
 {
     OutSources.Reset();
 
@@ -1566,11 +1694,17 @@ void FVoxelHydrologyGenerator::SelectRiverSources(
         Recipe->Settings.RiverSourceSpacing;
 
     FInt64Vector2 CoreMin, CoreMax;
-    if (!GetWorldHydrologyCore(InOwnerRegion, Recipe->Settings, CoreMin, CoreMax)) return;
+    if (!GetWorldHydrologyCore(InOwnerRegion, Recipe->Settings, CoreMin, CoreMax))
+    {
+        OutError = TEXT("Invalid hydrology source core outside world domain");
+        return false;
+    }
 
+    FVoxelGenerationWorkspace Workspace;
     TMap<FIntPoint, FVoxelRiverSource>
         BestPerSourceCell;
     TArray<FVoxelRiverSource> Continuations;
+    int32 SourceMapCapacity = 0;
 
     for (uint32 Index = 0;
         Index <
@@ -1689,6 +1823,11 @@ void FVoxelHydrologyGenerator::SelectRiverSources(
 
         if (bContinuation)
         {
+            if (Continuations.Num() == Continuations.Max() && !Workspace.ReserveArray(Continuations,
+                NextHydrologyCapacity(Continuations.Num() + 1, Continuations.Max()), OutError))
+            {
+                return false;
+            }
             Continuations.Add(Candidate);
             continue;
         }
@@ -1705,15 +1844,31 @@ void FVoxelHydrologyGenerator::SelectRiverSources(
              Candidate.Id <
                 Existing->Id))
         {
+            if (!Existing && BestPerSourceCell.Num() == SourceMapCapacity)
+            {
+                const int32 Capacity = NextHydrologyCapacity(SourceMapCapacity + 1, SourceMapCapacity);
+                if (!Workspace.ReserveMap(BestPerSourceCell, Capacity, OutError))
+                {
+                    return false;
+                }
+                SourceMapCapacity = Capacity;
+            }
             BestPerSourceCell.Add(
                 SourceBucket,
                 Candidate);
         }
     }
 
-    BestPerSourceCell.GenerateValueArray(
-        OutSources);
-    OutSources.Append(MoveTemp(Continuations));
+    if (!InOutputWorkspace.ReserveArray(OutSources,
+        BestPerSourceCell.Num() + Continuations.Num(), OutError))
+    {
+        return false;
+    }
+    for (const auto& Pair : BestPerSourceCell)
+    {
+        OutSources.Add(Pair.Value);
+    }
+    OutSources.Append(Continuations);
 
     OutSources.Sort(
         [](const FVoxelRiverSource& InA,
@@ -1721,6 +1876,8 @@ void FVoxelHydrologyGenerator::SelectRiverSources(
         {
             return InA.Id < InB.Id;
         });
+    OutError.Reset();
+    return true;
 }
 
 bool FVoxelHydrologyGenerator::TraceRiver(
@@ -1730,9 +1887,12 @@ bool FVoxelHydrologyGenerator::TraceRiver(
     const FVoxelHydrologyRegionKey& InOwnerRegion,
     const FVoxelRiverSource& InSource,
     TSet<uint32>& InOutClaimedDownstream,
+    int32& InOutClaimedCapacity,
+    FVoxelGenerationWorkspace& InWorkspace,
     FVoxelRiverRoute& OutRoute,
     FString& OutError) const
 {
+    FVoxelGenerationWorkspace Workspace;
     TArray<uint32> Path;
 
     if (!VoxelHydrology::TraceDrainage(
@@ -1741,13 +1901,18 @@ bool FVoxelHydrologyGenerator::TraceRiver(
             InSource.GridIndex,
             Recipe->Settings.RiverTraceBudget,
             Path,
-            OutError))
+            OutError,
+            &Workspace))
     {
         return false;
     }
 	if (InSource.bContinuation &&
 		InSource.ContinuationUpstreamIndex != MAX_uint32)
 	{
+		if (!Workspace.ReserveArray(Path, Path.Num() + 1, OutError))
+		{
+			return false;
+		}
 		Path.Insert(InSource.ContinuationUpstreamIndex, 0);
 	}
 
@@ -1757,6 +1922,10 @@ bool FVoxelHydrologyGenerator::TraceRiver(
     Route.OwnerRegion =
         InOwnerRegion;
     Route.bContinuation = InSource.bContinuation;
+    if (!VoxelGenerationAllocation::RetainArray(Route.Points, Path.Num(), OutError))
+    {
+        return false;
+    }
 
     bool bHasBounds = false;
 
@@ -1845,8 +2014,19 @@ bool FVoxelHydrologyGenerator::TraceRiver(
             break;
         }
 
-        InOutClaimedDownstream.Add(
-            GridIndex);
+        if (!InOutClaimedDownstream.Contains(GridIndex))
+        {
+            if (InOutClaimedDownstream.Num() == InOutClaimedCapacity)
+            {
+                const int32 Capacity = NextHydrologyCapacity(InOutClaimedCapacity + 1, InOutClaimedCapacity);
+                if (!InWorkspace.ReserveSet(InOutClaimedDownstream, Capacity, OutError))
+                {
+                    return false;
+                }
+                InOutClaimedCapacity = Capacity;
+            }
+            InOutClaimedDownstream.Add(GridIndex);
+        }
     }
 
     OutRoute =
@@ -1870,7 +2050,12 @@ bool FVoxelHydrologyGenerator::BuildLakes(
     const int32 Count =
         InGrid.GroundPlane.Num();
 
+    FVoxelGenerationWorkspace Workspace;
     TArray<int32> Root;
+    if (!Workspace.ReserveArray(Root, Count, OutError))
+    {
+        return false;
+    }
     Root.Init(
         INDEX_NONE,
         Count);
@@ -1882,9 +2067,6 @@ bool FVoxelHydrologyGenerator::BuildLakes(
             int32 Current =
                 InStart;
 
-            TArray<int32, TInlineAllocator<64>>
-                Chain;
-
             while (Current >= 0 &&
                 Current < Count)
             {
@@ -1895,9 +2077,6 @@ bool FVoxelHydrologyGenerator::BuildLakes(
                         Root[Current];
                     break;
                 }
-
-                Chain.Add(
-                    Current);
 
                 const int32 Parent =
                     InDrainage.Parent[Current];
@@ -1914,11 +2093,16 @@ bool FVoxelHydrologyGenerator::BuildLakes(
             const int32 Resolved =
                 Current;
 
-            for (int32 Cell :
-                Chain)
+            Current = InStart;
+            while (Current >= 0 && Current < Count && Root[Current] == INDEX_NONE)
             {
-                Root[Cell] =
-                    Resolved;
+                const int32 Parent = InDrainage.Parent[Current];
+                Root[Current] = Resolved;
+                if (Parent == -1)
+                {
+                    break;
+                }
+                Current = Parent;
             }
 
             return Resolved;
@@ -1939,6 +2123,7 @@ bool FVoxelHydrologyGenerator::BuildLakes(
     }
 
     TMap<int32, int32> MinimumSaddle;
+    int32 SaddleCapacity = 0;
 
     for (int32 Index = 0;
         Index < Count;
@@ -1983,6 +2168,15 @@ bool FVoxelHydrologyGenerator::BuildLakes(
             if (!Existing ||
                 Saddle < *Existing)
             {
+                if (!Existing && MinimumSaddle.Num() == SaddleCapacity)
+                {
+                    const int32 Capacity = NextHydrologyCapacity(SaddleCapacity + 1, SaddleCapacity);
+                    if (!Workspace.ReserveMap(MinimumSaddle, Capacity, OutError))
+                    {
+                        return false;
+                    }
+                    SaddleCapacity = Capacity;
+                }
                 MinimumSaddle.Add(
                     RootA,
                     Saddle);
@@ -1991,8 +2185,14 @@ bool FVoxelHydrologyGenerator::BuildLakes(
     }
 
     TArray<uint32> SinkIndices;
-    InGrid.CanonicalSinkOutlets.GetKeys(
-        SinkIndices);
+    if (!Workspace.ReserveArray(SinkIndices, InGrid.CanonicalSinkOutlets.Num(), OutError))
+    {
+        return false;
+    }
+    for (const auto& Pair : InGrid.CanonicalSinkOutlets)
+    {
+        SinkIndices.Add(Pair.Key);
+    }
 
     SinkIndices.Sort();
 
@@ -2035,7 +2235,12 @@ bool FVoxelHydrologyGenerator::BuildLakes(
             continue;
         }
 
+        FVoxelGenerationWorkspace LakeWorkspace;
         TArray<uint8> WaterMask;
+        if (!LakeWorkspace.ReserveArray(WaterMask, Count, OutError))
+        {
+            return false;
+        }
         WaterMask.Init(
             0,
             Count);
@@ -2094,13 +2299,17 @@ bool FVoxelHydrologyGenerator::BuildLakes(
             InGrid.Height;
         BasinInput.WaterPlane =
             WaterPlane;
-        BasinInput.GroundPlane =
-            InGrid.GroundPlane;
+        if (!LakeWorkspace.ReserveArray(BasinInput.GroundPlane, Count, OutError) ||
+            !LakeWorkspace.ReserveArray(BasinInput.Known, Count, OutError) ||
+            !LakeWorkspace.ReserveArray(BasinInput.WaterMask, Count, OutError))
+        {
+            return false;
+        }
+        BasinInput.GroundPlane.Append(InGrid.GroundPlane);
         BasinInput.Known.Init(
             1,
             Count);
-        BasinInput.WaterMask =
-            WaterMask;
+        BasinInput.WaterMask.Append(WaterMask);
 
         /**
          * 当前 Grid+Halo 已经完整包含候选 footprint。
@@ -2120,6 +2329,17 @@ bool FVoxelHydrologyGenerator::BuildLakes(
                 BasinError,
                 InCancel))
         {
+            const auto* Allocation = FVoxelGenerationAllocationScope::Get();
+            if (Allocation && !Allocation->Check(OutError))
+            {
+                return false;
+            }
+            if (BasinError == TEXT("Canceled") || BasinError.StartsWith(TEXT("InvalidAllocationScope")) ||
+                BasinError.StartsWith(TEXT("CapacityBlocked")) || BasinError.StartsWith(TEXT("Oversized")))
+            {
+                OutError = MoveTemp(BasinError);
+                return false;
+            }
             /**
              * 候选 Lake 不成立不是整个 Hydrology Plan 失败；
              * 它可能只是开放谷地/河谷。
@@ -2145,8 +2365,10 @@ bool FVoxelHydrologyGenerator::BuildLakes(
                 0x4C414B45504C414Eull,
                 0);
 
-        Lake.Cells.Reserve(
-            WaterCellCount);
+        if (!VoxelGenerationAllocation::RetainArray(Lake.Cells, WaterCellCount, OutError))
+        {
+            return false;
+        }
 
         for (uint32 Index = 0;
             Index <
@@ -2165,6 +2387,11 @@ bool FVoxelHydrologyGenerator::BuildLakes(
             }
         }
 
+        if (OutLakes.Num() == OutLakes.Max() && !VoxelGenerationAllocation::RetainArray(
+            OutLakes, NextHydrologyCapacity(OutLakes.Num() + 1, OutLakes.Max()), OutError))
+        {
+            return false;
+        }
         OutLakes.Add(
             MoveTemp(Lake));
     }

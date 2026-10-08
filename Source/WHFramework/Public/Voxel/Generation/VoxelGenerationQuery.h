@@ -94,7 +94,8 @@ public:
 		FString& OutError,
 		bool bInUseColumnCache = true,
 		bool bInRequireReadyHydrology = false,
-		bool bInRequireReadyPlans = false);
+		bool bInRequireReadyPlans = false,
+		const FVoxelGenerationConsumerKey* InConsumer = nullptr);
 
 	bool PrepareColumns(
 		const FVoxelGenerationBounds& InBounds,

@@ -2,6 +2,7 @@
 
 #include "Misc/ScopeLock.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 
 namespace
 {
@@ -135,14 +136,14 @@ bool FVoxelTerrainResources::PrepareEntries(const int32 InAdditionalEntries, con
 	if (Required <= EntryCapacity) return CanAdd(EVoxelTerrainResourcePool::Input, InAdditionalInputBytes);
 	int32 Capacity = FMath::Max(16, EntryCapacity);
 	while (Capacity < Required) Capacity = FMath::Min(MaximumTerrainResourceLeases, Capacity * 2);
-	const uint64 Bytes = VoxelBoundedAllocation::MapBytes<uint64, FEntry>(Capacity);
+	const uint64 Bytes = VoxelGenerationAllocation::Private::SetReserveBytes<TPair<uint64, FEntry>>(Entries, Capacity);
 	// 扩容期间旧表和新表并存。先同时授予新表、句柄及调用者输入，再进行 Reserve。
 	if (Bytes > MAX_uint64 - InAdditionalInputBytes ||
 		!CanAdd(EVoxelTerrainResourcePool::Input, Bytes + InAdditionalInputBytes)) return false;
 	uint64& Used = State.Used[static_cast<int32>(EVoxelTerrainResourcePool::Input)];
 	Used += Bytes;
 	Entries.Reserve(Capacity);
-	const uint64 ActualBytes = Entries.GetAllocatedSize();
+	const uint64 ActualBytes = VoxelGenerationAllocation::AllocatedBytes(Entries);
 	check(ActualBytes <= Bytes);
 	Used -= State.LedgerMetadataBytes + Bytes - ActualBytes;
 	State.LedgerMetadataBytes = ActualBytes;

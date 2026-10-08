@@ -144,6 +144,8 @@ public:
 
 	const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& GetResources() const;
 	const FVoxelGenerationConsumerKey& GetControlConsumer() const;
+	/** 解析原 TLS 完整身份；无 TLS 使用冻结 Control，拒收不修改 OutConsumer。 */
+	bool ResolveConsumer(FVoxelGenerationConsumerKey& OutConsumer, FString& OutError) const;
 
 	bool GetOrBuildBaseColumn(
 		const FIntPoint& InPosition,
@@ -169,7 +171,7 @@ public:
 		const FVoxelHydrologyRegionKey& InKey,
 		FVoxelHydrologyPlanPtr& OutPlan) const;
 
-	/** 各 Store* 先授予控制存储，仅发布非空首个 immutable；失败不改既有正文或 gate。 */
+	/** 各 Store* 同 key 首个 immutable 胜出；bound cache 拒收无法证明原租约的外来新正文，旧夹具先授予控制存储。 */
 	bool StoreHydrology(
 		const FVoxelHydrologyRegionKey& InKey,
 		FVoxelHydrologyPlanPtr InPlan,

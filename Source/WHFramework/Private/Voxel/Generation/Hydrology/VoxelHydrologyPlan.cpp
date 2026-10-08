@@ -1,9 +1,16 @@
 #include "Voxel/Generation/Hydrology/VoxelHydrologyPlan.h"
 
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 
 namespace
 {
+	int32 NextHydrologyPlanCapacity(const int32 InRequired, const int32 InCapacity)
+	{
+		return int32(FMath::Min<int64>(MAX_int32,
+			FMath::Max<int64>(InRequired, FMath::Max<int64>(4, int64(InCapacity) * 2))));
+	}
+
 	FVoxelRiverShapePoint ToShapePoint(const FVoxelRiverRoutePoint& InPoint)
 	{
 		FVoxelRiverShapePoint Result;
@@ -52,9 +59,9 @@ namespace
 		return Result;
 	}
 
-	void BuildShapeRoute(const TArray<FVoxelRiverRoutePoint>& InRaw,
+	bool BuildShapeRoute(const TArray<FVoxelRiverRoutePoint>& InRaw,
 		const FIntPoint& InCoreMin, const FIntPoint& InCoreMax,
-		const int32 InPasses, TArray<FVoxelRiverShapePoint>& OutShape)
+		const int32 InPasses, TArray<FVoxelRiverShapePoint>& OutShape, FString& OutError)
 	{
 		OutShape.Reset();
 		auto InsideCore = [&InCoreMin, &InCoreMax](const FIntPoint& Position)
@@ -62,6 +69,26 @@ namespace
 			return Position.X >= InCoreMin.X && Position.Y >= InCoreMin.Y &&
 				Position.X < InCoreMax.X && Position.Y < InCoreMax.Y;
 		};
+		int64 ShapeCount = InRaw.Num();
+		for (int32 Index = 1; Index < InRaw.Num(); ++Index)
+		{
+			if (InsideCore(InRaw[Index].Position) != InsideCore(InRaw[Index - 1].Position))
+			{
+				const auto Boundary = InterpolateShapePoint(ToShapePoint(InRaw[Index - 1]),
+					ToShapePoint(InRaw[Index]), 1, 2);
+				ShapeCount += Boundary.Position != InRaw[Index - 1].Position &&
+					Boundary.Position != InRaw[Index].Position ? 1 : 0;
+			}
+		}
+		if (ShapeCount > MAX_int32)
+		{
+			OutError = TEXT("Oversized: hydrology shape count exceeds native capacity");
+			return false;
+		}
+		if (!VoxelGenerationAllocation::RetainArray(OutShape, int32(ShapeCount), OutError))
+		{
+			return false;
+		}
 		for (int32 Index = 0; Index < InRaw.Num(); ++Index)
 		{
 			FVoxelRiverShapePoint Point = ToShapePoint(InRaw[Index]);
@@ -82,41 +109,84 @@ namespace
 		}
 		for (int32 Pass = 0; Pass < InPasses && OutShape.Num() >= 2; ++Pass)
 		{
+			FVoxelGenerationWorkspace Workspace;
 			TArray<FVoxelRiverShapePoint> Next;
-			Next.Reserve(OutShape.Num() * 2);
-			Next.Add(OutShape[0]);
-			for (int32 Index = 0; Index + 1 < OutShape.Num(); ++Index)
+			auto EmitPass = [&OutShape](TFunctionRef<void(const FVoxelRiverShapePoint&)> Emit)
 			{
-				for (const int32 Fraction : {1, 3})
+				FVoxelRiverShapePoint Last = OutShape[0];
+				auto AddPoint = [&Emit, &Last](const FVoxelRiverShapePoint& Point)
 				{
-					FVoxelRiverShapePoint Point = InterpolateShapePoint(
-						OutShape[Index], OutShape[Index + 1], Fraction, 4);
-					if (Point.Position != Next.Last().Position) Next.Add(MoveTemp(Point));
-				}
-				if (OutShape[Index + 1].bAnchor && Index + 2 < OutShape.Num())
+					Emit(Last);
+					Last = Point;
+				};
+				for (int32 Index = 0; Index + 1 < OutShape.Num(); ++Index)
 				{
-					if (OutShape[Index + 1].Position == Next.Last().Position)
+					for (const int32 Fraction : {1, 3})
 					{
-						Next.Last().bAnchor = true;
+						const auto Point = InterpolateShapePoint(OutShape[Index], OutShape[Index + 1], Fraction, 4);
+						if (Point.Position != Last.Position)
+						{
+							AddPoint(Point);
+						}
 					}
-					else
+					if (OutShape[Index + 1].bAnchor && Index + 2 < OutShape.Num())
 					{
-						Next.Add(OutShape[Index + 1]);
+						if (OutShape[Index + 1].Position == Last.Position)
+						{
+							Last.bAnchor = true;
+						}
+						else
+						{
+							AddPoint(OutShape[Index + 1]);
+						}
 					}
 				}
-			}
-			if (Next.Last().Position != OutShape.Last().Position)
+				if (Last.Position != OutShape.Last().Position)
+				{
+					AddPoint(OutShape.Last());
+				}
+				else
+				{
+					Last.bAnchor = true;
+				}
+				Emit(Last);
+			};
+			int64 NextCount = 0;
+			EmitPass([&NextCount](const FVoxelRiverShapePoint&)
 			{
-				Next.Add(OutShape.Last());
-			}
-			else
+				++NextCount;
+			});
+			if (NextCount > MAX_int32)
 			{
-				Next.Last().bAnchor = true;
+				OutError = TEXT("Oversized: hydrology smoothing count exceeds native capacity");
+				return false;
 			}
-			OutShape = MoveTemp(Next);
+			if (!Workspace.ReserveArray(Next, int32(NextCount), OutError))
+			{
+				return false;
+			}
+			EmitPass([&Next](const FVoxelRiverShapePoint& Point)
+			{
+				Next.Add(Point);
+			});
+			VoxelGenerationAllocation::FreeRetainedArray(OutShape);
+			if (!VoxelGenerationAllocation::RetainArray(OutShape, Next.Num(), OutError))
+			{
+				return false;
+			}
+			OutShape.Append(Next);
 		}
-		if (OutShape.Num() < 3) return;
-		const TArray<FVoxelRiverShapePoint> Original = OutShape;
+		if (OutShape.Num() < 3)
+		{
+			return true;
+		}
+		FVoxelGenerationWorkspace Workspace;
+		TArray<FVoxelRiverShapePoint> Original;
+		if (!Workspace.ReserveArray(Original, OutShape.Num(), OutError))
+		{
+			return false;
+		}
+		Original.Append(OutShape);
 		auto Smooth = [](const int32 A, const int32 B, const int32 C)
 		{
 			return static_cast<int32>((static_cast<int64>(A) +
@@ -131,6 +201,7 @@ namespace
 			OutShape[Index].Depth = Smooth(Original[Index - 1].Depth,
 				Original[Index].Depth, Original[Index + 1].Depth);
 		}
+		return true;
 	}
 
 	int32 MeanderTangentQ10(const int32 InDegrees)
@@ -157,15 +228,26 @@ namespace
 		return Dot > 0 && Cross * 1024 <= Dot * InTangentQ10;
 	}
 
-	void BuildMeanderRoute(const TArray<FVoxelRiverShapePoint>& InShape,
+	bool BuildMeanderRoute(const TArray<FVoxelRiverShapePoint>& InShape,
 		const int32 InSeed, const int32 InStrength, const int32 InFrequency,
 		const int32 InOctaves, const int32 InMaxAngle, const int32 InMinimumStep,
-		TArray<FVoxelRiverMeanderPoint>& OutPoints)
+		TArray<FVoxelRiverMeanderPoint>& OutPoints, FString& OutError)
 	{
 		OutPoints.Reset();
-		OutPoints.Reserve(InShape.Num());
-		if (InShape.Num() < 2) return;
+		if (!VoxelGenerationAllocation::RetainArray(OutPoints, InShape.Num(), OutError))
+		{
+			return false;
+		}
+		if (InShape.Num() < 2)
+		{
+			return true;
+		}
+		FVoxelGenerationWorkspace Workspace;
 		TArray<int32> DistanceToAnchor;
+		if (!Workspace.ReserveArray(DistanceToAnchor, InShape.Num(), OutError))
+		{
+			return false;
+		}
 		DistanceToAnchor.SetNum(InShape.Num());
 		int32 Distance = InShape.Num();
 		for (int32 Index = 0; Index < InShape.Num(); ++Index)
@@ -232,7 +314,10 @@ namespace
 		// 细分产生的单格阶梯无法表达平滑转角；按水文网格尺度重采样，固定锚点不移动。
 		const int64 MinimumDistanceSquared = static_cast<int64>(InMinimumStep) * InMinimumStep;
 		TArray<FVoxelRiverMeanderPoint> Resampled;
-		Resampled.Reserve(OutPoints.Num());
+		if (!Workspace.ReserveArray(Resampled, OutPoints.Num(), OutError))
+		{
+			return false;
+		}
 		auto DistanceSquared = [](const FIntPoint& A, const FIntPoint& B)
 		{
 			const double X = double(int64(A.X) - B.X);
@@ -246,7 +331,7 @@ namespace
 				while (Resampled.Num() > 1 && !Resampled.Last().bAnchor &&
 					DistanceSquared(Resampled.Last().Position, Point.Position) < MinimumDistanceSquared)
 				{
-					Resampled.Pop();
+					Resampled.Pop(EAllowShrinking::No);
 				}
 			}
 			if (Resampled.IsEmpty() || Point.bAnchor ||
@@ -255,7 +340,14 @@ namespace
 				Resampled.Add(Point);
 			}
 		}
-		OutPoints = MoveTemp(Resampled);
+		VoxelGenerationAllocation::FreeRetainedArray(OutPoints);
+		if (!VoxelGenerationAllocation::RetainArray(OutPoints, Resampled.Num(), OutError))
+		{
+			return false;
+		}
+		OutPoints.Append(Resampled);
+		Workspace.FreeArray(Resampled);
+		Workspace.FreeArray(DistanceToAnchor);
 		const int32 TangentQ10 = MeanderTangentQ10(InMaxAngle);
 		auto PreservesAnchorTurns = [&OutPoints, TangentQ10](
 			const int32 Index, const FIntPoint& Position, const bool bRemove)
@@ -314,7 +406,7 @@ namespace
 				OutPoints[Index].Position == OutPoints[Index + 1].Position) &&
 				PreservesAnchorTurns(Index, OutPoints[Index].Position, true))
 			{
-				OutPoints.RemoveAt(Index);
+				OutPoints.RemoveAt(Index, 1, EAllowShrinking::No);
 			}
 		}
 		for (int32 Index = 1; Index + 1 < OutPoints.Num();)
@@ -352,7 +444,7 @@ namespace
 						OutPoints[Before].Position, OutPoints[After].Position,
 						OutPoints[After + 1].Position, TangentQ10)) continue;
 					// 同时简化量化折角两侧，保留固定锚点以及两端的角度和水位约束。
-					OutPoints.RemoveAt(Begin, Count);
+					OutPoints.RemoveAt(Begin, Count, EAllowShrinking::No);
 					Index = FMath::Max(1, Begin - 1);
 					bRemoved = true;
 					break;
@@ -369,6 +461,7 @@ namespace
 			const double Cross = A.X * B.Y - A.Y * B.X;
 			OutPoints[Index].Curvature = Cross > 0 ? 1 : Cross < 0 ? -1 : 0;
 		}
+		return true;
 	}
 
 	int64 ResolveRiverInfluenceRadius(
@@ -379,21 +472,38 @@ namespace
 	}
 }
 
-void FVoxelHydrologyPlan::Finalize()
+bool FVoxelHydrologyPlan::Finalize(FString& OutError, const TAtomic<bool>* InCancel)
 {
+	const auto* Allocation = FVoxelGenerationAllocationScope::Get();
+	if (!(Allocation ? Allocation->Check(OutError) : FVoxelGenerationAllocationScope::AllowPassive(OutError)))
+	{
+		return false;
+	}
 	LakeWaterByCellOrigin.Reset();
+	for (auto& Pair : RiverSegmentsByHydrologyCell)
+	{
+		VoxelGenerationAllocation::FreeRetainedArray(Pair.Value);
+	}
 	RiverSegmentsByHydrologyCell.Reset();
 	Waterfalls.Reset();
 	for (FVoxelRiverRoute& River : Rivers)
 	{
-		BuildShapeRoute(River.Points, CoreMin, CoreMax,
+		if (InCancel && InCancel->Load())
+		{
+			OutError = TEXT("Canceled");
+			return false;
+		}
+		if (!BuildShapeRoute(River.Points, CoreMin, CoreMax,
 			RiverShapeSmoothingPasses,
-			River.ShapePoints);
-		BuildMeanderRoute(River.ShapePoints, RiverSeed,
+			River.ShapePoints, OutError) ||
+			!BuildMeanderRoute(River.ShapePoints, RiverSeed,
 			RiverMeanderStrength, RiverMeanderFrequency,
 			RiverMeanderOctaves, RiverMaxMeanderAngle,
 			FMath::Clamp(Grid.CellSize / 2, 2, 4),
-			River.MeanderPoints);
+			River.MeanderPoints, OutError))
+		{
+			return false;
+		}
 		// Author steep drops once in the immutable hydrology plan; clients only present these records.
 		for (int32 Start=0; Start+1<River.MeanderPoints.Num(); ++Start)
 		{
@@ -413,6 +523,11 @@ void FVoxelHydrologyPlan::Finalize()
 				Fall.HalfWidthCells=FMath::Min(Up.WaterHalfWidth,Down.WaterHalfWidth);
 				Fall.Id.High=VoxelGeneration::Mix(uint64(uint32(Up.Position.X))<<32 | uint32(Up.Position.Y));
 				Fall.Id.Low=VoxelGeneration::Mix(uint64(uint32(Down.Position.X))<<32 | uint32(Down.Position.Y)) ^ VoxelGeneration::Mix(uint64(uint32(RiverSeed)));
+				if (Waterfalls.Num() == Waterfalls.Max() && !VoxelGenerationAllocation::RetainArray(
+					Waterfalls, NextHydrologyPlanCapacity(Waterfalls.Num() + 1, Waterfalls.Max()), OutError))
+				{
+					return false;
+				}
 				Waterfalls.Add(Fall);
 				Start=End;
 				break;
@@ -432,12 +547,22 @@ void FVoxelHydrologyPlan::Finalize()
 		}
 	}
 
+	int32 LakeIndexCapacity = 0;
 	for (const FVoxelLakePlan& Lake :
 		Lakes)
 	{
 		for (const FIntPoint& Cell :
 			Lake.Cells)
 		{
+			if (!LakeWaterByCellOrigin.Contains(Cell) && LakeWaterByCellOrigin.Num() == LakeIndexCapacity)
+			{
+				const int32 Capacity = NextHydrologyPlanCapacity(LakeIndexCapacity + 1, LakeIndexCapacity);
+				if (!VoxelGenerationAllocation::RetainMap(LakeWaterByCellOrigin, Capacity, OutError))
+				{
+					return false;
+				}
+				LakeIndexCapacity = Capacity;
+			}
 			int32& WaterZ =
 				LakeWaterByCellOrigin.
 					FindOrAdd(
@@ -453,70 +578,143 @@ void FVoxelHydrologyPlan::Finalize()
 
 	if (Grid.CellSize <= 0)
 	{
-		return;
+		OutError.Reset();
+		return true;
 	}
 
-	for (int32 RiverIndex = 0;
-		RiverIndex < Rivers.Num();
-		++RiverIndex)
+	auto VisitSegments = [this, InCancel, &OutError](TFunctionRef<bool(const FIntPoint&, const FVoxelRiverSegmentRef&)> Visit)
 	{
-		const FVoxelRiverRoute& River =
-			Rivers[RiverIndex];
-
-		for (int32 PointIndex = 1;
-			PointIndex <
-				River.MeanderPoints.Num();
-			++PointIndex)
+		for (int32 RiverIndex = 0;
+			RiverIndex < Rivers.Num();
+			++RiverIndex)
 		{
-			const FVoxelRiverMeanderPoint& A =
-				River.MeanderPoints[
-					PointIndex - 1];
+			const FVoxelRiverRoute& River =
+				Rivers[RiverIndex];
 
-			const FVoxelRiverMeanderPoint& B =
-				River.MeanderPoints[
-					PointIndex];
-
-			const int64 Radius =
-				FMath::Max(
-					ResolveRiverInfluenceRadius(A),
-					ResolveRiverInfluenceRadius(B));
-
-			const int64 MinX = FMath::Max(int64(FMath::Min(A.Position.X, B.Position.X)) - Radius,
-				VoxelGeneration::WorldCellMin);
-			const int64 MinY = FMath::Max(int64(FMath::Min(A.Position.Y, B.Position.Y)) - Radius,
-				VoxelGeneration::WorldCellMin);
-			const int64 MaxX = FMath::Min(int64(FMath::Max(A.Position.X, B.Position.X)) + Radius,
-				VoxelGeneration::WorldCellMaxExclusive - 1);
-			const int64 MaxY = FMath::Min(int64(FMath::Max(A.Position.Y, B.Position.Y)) + Radius,
-				VoxelGeneration::WorldCellMaxExclusive - 1);
-			// 索引只覆盖本 plan 的物理 Grid；Sample 不消费 Grid 外的水文 cell。
-			const int64 MinCellX = FMath::Max(VoxelGeneration::FloorDivideWide(MinX, Grid.CellSize), int64(Grid.WorldMinCell.X));
-			const int64 MinCellY = FMath::Max(VoxelGeneration::FloorDivideWide(MinY, Grid.CellSize), int64(Grid.WorldMinCell.Y));
-			const int64 MaxCellX = FMath::Min(VoxelGeneration::FloorDivideWide(MaxX, Grid.CellSize), int64(Grid.WorldMinCell.X) + Grid.Width - 1);
-			const int64 MaxCellY = FMath::Min(VoxelGeneration::FloorDivideWide(MaxY, Grid.CellSize), int64(Grid.WorldMinCell.Y) + Grid.Height - 1);
-
-			for (int64 CellY = MinCellY;
-				CellY <= MaxCellY;
-				++CellY)
+			for (int32 PointIndex = 1;
+				PointIndex <
+					River.MeanderPoints.Num();
+				++PointIndex)
 			{
-				for (int64 CellX = MinCellX;
-					CellX <= MaxCellX;
-					++CellX)
+				if (InCancel && InCancel->Load())
 				{
-					RiverSegmentsByHydrologyCell.
-						FindOrAdd(
-							FIntPoint(
-								int32(CellX),
-								int32(CellY))).
-						Add({
-							RiverIndex,
-							PointIndex
-						});
+					OutError = TEXT("Canceled");
+					return false;
+				}
+				const FVoxelRiverMeanderPoint& A =
+					River.MeanderPoints[
+						PointIndex - 1];
+
+				const FVoxelRiverMeanderPoint& B =
+					River.MeanderPoints[
+						PointIndex];
+
+				const int64 Radius =
+					FMath::Max(
+						ResolveRiverInfluenceRadius(A),
+						ResolveRiverInfluenceRadius(B));
+
+				const int64 MinX = FMath::Max(int64(FMath::Min(A.Position.X, B.Position.X)) - Radius,
+					VoxelGeneration::WorldCellMin);
+				const int64 MinY = FMath::Max(int64(FMath::Min(A.Position.Y, B.Position.Y)) - Radius,
+					VoxelGeneration::WorldCellMin);
+				const int64 MaxX = FMath::Min(int64(FMath::Max(A.Position.X, B.Position.X)) + Radius,
+					VoxelGeneration::WorldCellMaxExclusive - 1);
+				const int64 MaxY = FMath::Min(int64(FMath::Max(A.Position.Y, B.Position.Y)) + Radius,
+					VoxelGeneration::WorldCellMaxExclusive - 1);
+				// 索引只覆盖本 plan 的物理 Grid；Sample 不消费 Grid 外的水文 cell。
+				const int64 MinCellX = FMath::Max(VoxelGeneration::FloorDivideWide(MinX, Grid.CellSize), int64(Grid.WorldMinCell.X));
+				const int64 MinCellY = FMath::Max(VoxelGeneration::FloorDivideWide(MinY, Grid.CellSize), int64(Grid.WorldMinCell.Y));
+				const int64 MaxCellX = FMath::Min(VoxelGeneration::FloorDivideWide(MaxX, Grid.CellSize), int64(Grid.WorldMinCell.X) + Grid.Width - 1);
+				const int64 MaxCellY = FMath::Min(VoxelGeneration::FloorDivideWide(MaxY, Grid.CellSize), int64(Grid.WorldMinCell.Y) + Grid.Height - 1);
+
+				for (int64 CellY = MinCellY;
+					CellY <= MaxCellY;
+					++CellY)
+				{
+					if (InCancel && InCancel->Load())
+					{
+						OutError = TEXT("Canceled");
+						return false;
+					}
+					for (int64 CellX = MinCellX;
+						CellX <= MaxCellX;
+						++CellX)
+					{
+						if (!Visit(FIntPoint(int32(CellX), int32(CellY)), {RiverIndex, PointIndex}))
+						{
+							return false;
+						}
+					}
 				}
 			}
 		}
+		return true;
+	};
+	FVoxelGenerationWorkspace Workspace;
+	TMap<FIntPoint, int32> SegmentCounts;
+	int32 SegmentCountCapacity = 0;
+	if (!VisitSegments([&](const FIntPoint& Cell, const FVoxelRiverSegmentRef&)
+	{
+		if (int32* Count = SegmentCounts.Find(Cell))
+		{
+			if (*Count == MAX_int32)
+			{
+				OutError = TEXT("Oversized: hydrology segment group exceeds native capacity");
+				return false;
+			}
+			++*Count;
+		}
+		else
+		{
+			if (SegmentCounts.Num() == SegmentCountCapacity)
+			{
+				const int32 Capacity = NextHydrologyPlanCapacity(SegmentCountCapacity + 1, SegmentCountCapacity);
+				if (!Workspace.ReserveMap(SegmentCounts, Capacity, OutError))
+				{
+					return false;
+				}
+				SegmentCountCapacity = Capacity;
+			}
+			SegmentCounts.Add(Cell, 1);
+		}
+		return true;
+	}))
+	{
+		return false;
 	}
+	if (!VoxelGenerationAllocation::RetainMap(RiverSegmentsByHydrologyCell, SegmentCounts.Num(), OutError))
+	{
+		return false;
+	}
+	for (const auto& Pair : SegmentCounts)
+	{
+		auto& Segments = RiverSegmentsByHydrologyCell.FindOrAdd(Pair.Key);
+		if (!VoxelGenerationAllocation::RetainArray(Segments, Pair.Value, OutError))
+		{
+			return false;
+		}
+	}
+	if (!VisitSegments([&](const FIntPoint& Cell, const FVoxelRiverSegmentRef& Ref)
+	{
+		RiverSegmentsByHydrologyCell.FindChecked(Cell).Add(Ref);
+		return true;
+	}))
+	{
+		return false;
+	}
+	OutError.Reset();
+	return true;
 }
+
+#if WITH_DEV_AUTOMATION_TESTS
+void FVoxelHydrologyPlan::Finalize()
+{
+	FString Error;
+	const bool bFinalized = Finalize(Error);
+	checkf(bFinalized, TEXT("Hydrology fixture finalization failed: %s"), *Error);
+}
+#endif
 
 bool FVoxelHydrologyPlan::ValidateRiverRoutes(FString& OutError) const
 {
@@ -866,35 +1064,33 @@ bool FVoxelHydrologyPlan::Sample(
 uint64 FVoxelHydrologyPlan::GetAllocatedBytes() const
 {
 	uint64 Bytes =
-		Grid.GroundPlane.GetAllocatedSize() +
-		Grid.RainWeight.GetAllocatedSize() +
-		Grid.Allowed.GetAllocatedSize() +
-		Grid.OceanOutlets.GetAllocatedSize() +
-		Grid.CanonicalSinkOutlets.GetAllocatedSize() +
-		Drainage.SpillPlane.GetAllocatedSize() +
-		Drainage.Parent.GetAllocatedSize() +
-		Drainage.SettledOrder.GetAllocatedSize() +
-		Drainage.Accumulation.GetAllocatedSize() +
-		Rivers.GetAllocatedSize() +
-		Lakes.GetAllocatedSize() +
-		Waterfalls.GetAllocatedSize() +
-		LakeWaterByCellOrigin.GetAllocatedSize() +
-		RiverSegmentsByHydrologyCell.GetAllocatedSize();
+		VoxelGenerationAllocation::AllocatedBytes(Grid.GroundPlane) +
+		VoxelGenerationAllocation::AllocatedBytes(Grid.RainWeight) +
+		VoxelGenerationAllocation::AllocatedBytes(Grid.Allowed) +
+		VoxelGenerationAllocation::AllocatedBytes(Grid.OceanOutlets) +
+		VoxelGenerationAllocation::AllocatedBytes(Grid.CanonicalSinkOutlets) +
+		VoxelGenerationAllocation::AllocatedBytes(Drainage.SpillPlane) +
+		VoxelGenerationAllocation::AllocatedBytes(Drainage.Parent) +
+		VoxelGenerationAllocation::AllocatedBytes(Drainage.SettledOrder) +
+		VoxelGenerationAllocation::AllocatedBytes(Drainage.Accumulation) +
+		VoxelGenerationAllocation::AllocatedBytes(Rivers) +
+		VoxelGenerationAllocation::AllocatedBytes(Lakes) +
+		VoxelGenerationAllocation::AllocatedBytes(Waterfalls) +
+		VoxelGenerationAllocation::AllocatedBytes(LakeWaterByCellOrigin) +
+		VoxelGenerationAllocation::AllocatedBytes(RiverSegmentsByHydrologyCell);
 
 	for (const FVoxelRiverRoute& River :
 		Rivers)
 	{
-		Bytes +=
-			River.Points.GetAllocatedSize();
-		Bytes += River.ShapePoints.GetAllocatedSize();
-		Bytes += River.MeanderPoints.GetAllocatedSize();
+		Bytes += VoxelGenerationAllocation::AllocatedBytes(River.Points);
+		Bytes += VoxelGenerationAllocation::AllocatedBytes(River.ShapePoints);
+		Bytes += VoxelGenerationAllocation::AllocatedBytes(River.MeanderPoints);
 	}
 
 	for (const FVoxelLakePlan& Lake :
 		Lakes)
 	{
-		Bytes +=
-			Lake.Cells.GetAllocatedSize();
+		Bytes += VoxelGenerationAllocation::AllocatedBytes(Lake.Cells);
 	}
 
 	for (const TPair<
@@ -902,8 +1098,7 @@ uint64 FVoxelHydrologyPlan::GetAllocatedBytes() const
 		TArray<FVoxelRiverSegmentRef>>& Pair :
 		RiverSegmentsByHydrologyCell)
 	{
-		Bytes +=
-			Pair.Value.GetAllocatedSize();
+		Bytes += VoxelGenerationAllocation::AllocatedBytes(Pair.Value);
 	}
 
 	return Bytes;

@@ -77,8 +77,10 @@ struct WHFRAMEWORK_API FVoxelEcologyPlan
 		return InfluenceBounds.IsValid && InfluenceBounds.Intersect(FBox(FVector(InBounds.Min), FVector(InBounds.Max)));
 	}
 
-	void Finalize();
+	bool Reserve(int32 InWriteCount, FString& OutError);
+	bool Finalize(FString* OutError = nullptr);
 	bool Sample(const FIntVector& InPosition, uint32& OutValue) const;
+	/** 仅持有的 native heap backing；root、共享控制器与退休任务由 Cache 构建路径授予。 */
 	uint64 GetAllocatedBytes() const;
 
 private:
@@ -118,7 +120,7 @@ public:
 
 private:
 	static bool AppendWorldWrite(
-		FVoxelEcologyPlan& InOutPlan,
+		TFunctionRef<bool(const FVoxelEcologyPlanWrite&)> InEmit,
 		const FInt64Vector& InPosition,
 		uint32 InValue,
 		uint8 InPriority,
@@ -129,6 +131,7 @@ private:
 		TFunctionRef<bool(const FIntVector&, FVoxelColumnSample&)> InSampleColumn,
 		TFunctionRef<bool(const FIntVector&, uint32&)> InSampleBaseSymbol,
 		FVoxelEcologyPlan& InOutPlan,
+		TFunctionRef<bool(const FVoxelEcologyPlanWrite&)> InEmit,
 		const TAtomic<bool>* InCancel) const;
 
 	void BuildGrass(
@@ -136,6 +139,7 @@ private:
 		TFunctionRef<bool(const FIntVector&, FVoxelColumnSample&)> InSampleColumn,
 		TFunctionRef<bool(const FIntVector&, uint32&)> InSampleBaseSymbol,
 		FVoxelEcologyPlan& InOutPlan,
+		TFunctionRef<bool(const FVoxelEcologyPlanWrite&)> InEmit,
 		const TAtomic<bool>* InCancel) const;
 
 	void BuildFlowers(
@@ -143,6 +147,7 @@ private:
 		TFunctionRef<bool(const FIntVector&, FVoxelColumnSample&)> InSampleColumn,
 		TFunctionRef<bool(const FIntVector&, uint32&)> InSampleBaseSymbol,
 		FVoxelEcologyPlan& InOutPlan,
+		TFunctionRef<bool(const FVoxelEcologyPlanWrite&)> InEmit,
 		const TAtomic<bool>* InCancel) const;
 
 	uint16 SelectFlowerSymbol(const FIntVector& InPosition,

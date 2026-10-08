@@ -2,9 +2,9 @@
 
 #include "CoreMinimal.h"
 #include "Voxel/Generation/VoxelGenerationRecipe.h"
+#include "Voxel/Generation/Landform/VoxelLandform.h"
 
 class FVoxelClimateGenerator;
-class FVoxelLandformGenerator;
 
 class WHFRAMEWORK_API FVoxelTerrainGenerator
 {
@@ -26,5 +26,5 @@ private:
 private:
     TSharedRef<const FVoxelGenerationRecipe, ESPMode::ThreadSafe> Recipe;
     TSharedRef<const FVoxelClimateGenerator, ESPMode::ThreadSafe> Climate;
-    TSharedRef<const FVoxelLandformGenerator, ESPMode::ThreadSafe> Landform;
+    FVoxelLandformGenerator Landform;
 };

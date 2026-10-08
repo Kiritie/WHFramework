@@ -3,8 +3,13 @@
 #if WITH_DEV_AUTOMATION_TESTS
 #include "HAL/PlatformTime.h"
 #include "Misc/AutomationTest.h"
+#include "Voxel/Generation/Ecology/VoxelEcology.h"
+#include "Voxel/Generation/Terrain/VoxelTerrainGenerator.h"
+#include "Voxel/Generation/Climate/VoxelClimateGenerator.h"
 #include "Voxel/Generation/VoxelGenerationPlanCache.h"
 #include "Voxel/Generation/VoxelGenerationPlanningRead.h"
+#include "Voxel/Generation/VoxelGenerationQuery.h"
+#include "VoxelTestUtilities.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Task/VoxelTerrainResources.h"
 
@@ -424,6 +429,222 @@ namespace
 		TWeakPtr<const ValueType, ESPMode::ThreadSafe> WeakWarmed;
 		bool bWeakRetirementPending = false;
 	};
+
+	class FQueryGeneratorCapacityCommand final : public FCacheCapacityCommand
+	{
+	public:
+		explicit FQueryGeneratorCapacityCommand(FAutomationTestBase& InTest)
+			: FCacheCapacityCommand(InTest)
+		{
+		}
+
+	protected:
+		virtual void CheckFixture() override
+		{
+			const auto Control = MakeCacheControlConsumer();
+			if (!Test.TestTrue(TEXT("Query 使用真实生产工厂与原账本"), Resources->Configure({}) &&
+				FVoxelGenerationPlanCache::Create(Resources, Control, Cache, Error, true, false))) return;
+			auto Consumer = Control;
+			Consumer.OwnerId = FGuid::NewGuid();
+			Consumer.RequestSerial = 81;
+			const auto Config = VoxelTest::MakeGenerationConfig();
+			const auto BeforeQuery = Resources->Snapshot();
+			if (!Test.TestTrue(TEXT("八个原生生成器全部授予后 Query 构造"),
+				FVoxelGenerationQuery::Create(Config, Cache.ToSharedRef(), Query, Error, false, false, false, &Consumer))) return;
+			Test.TestEqual(TEXT("每个真实生成器各有一个租约"), Resources->Snapshot().LeaseCount, BeforeQuery.LeaseCount + 8);
+			if (!Test.TestTrue(TEXT("准备旧 Query 的列范围"), Query.PrepareColumns(
+				{FIntVector(0, 0, -64), FIntVector(1, 1, 128)}, Error))) return;
+
+			FVoxelTaskStamp Stamp;
+			Stamp.WorldEpoch = Consumer.WorldEpoch;
+			Stamp.OwnerId = Consumer.OwnerId;
+			Stamp.OwnerIncarnation = Consumer.OwnerIncarnation;
+			Stamp.Token = Consumer.RequestSerial;
+			FVoxelGenerationPlanningReadScope Scope({}, &Stamp, nullptr, &Consumer);
+			FVoxelColumnSample Original;
+			if (!Test.TestTrue(TEXT("原 Query 沿真实水文链采样"), Query.SampleColumn(0, 0, Original, Error))) return;
+			auto Foreign = Consumer;
+			++Foreign.WorldEpoch;
+			const auto BeforeForeign = Resources->Snapshot();
+			Test.TestFalse(TEXT("Query 构造拒绝跨 World 的完整 consumer"),
+				FVoxelGenerationQuery::Create(Config, Cache.ToSharedRef(), Query, Error, false, false, false, &Foreign));
+			Test.TestEqual(TEXT("身份拒收发生在所有 native grant 之前"), Resources->Snapshot().Version, BeforeForeign.Version);
+
+			auto BlockerConsumer = Consumer;
+			BlockerConsumer.OwnerId = FGuid::NewGuid();
+			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Blocker;
+			if (!Test.TestTrue(TEXT("其它消费者接纳 Input 压力"),
+				Resources->Acquire(BlockerConsumer, EVoxelTerrainResourcePool::Input, 1, Blocker))) return;
+			const auto BeforeFill = Resources->Snapshot();
+			const uint64 LeaveBytes = VoxelBoundedAllocation::WorkerSharedBytes<const FVoxelClimateGenerator>() +
+				VoxelBoundedAllocation::WorkerSharedBytes<const FVoxelTerrainGenerator>() +
+				2 * VoxelBoundedAllocation::SharedBytes<FVoxelTerrainResourceLease>();
+			const uint64 Available = BeforeFill.Limits.InputBytes - BeforeFill.Used[int32(EVoxelTerrainResourcePool::Input)];
+			if (!Test.TestTrue(TEXT("留给部分生成器授予，但不足八个完整对象"), Available > LeaveBytes &&
+				Blocker->Resize(1 + Available - LeaveBytes))) return;
+			const auto BeforeDenied = Resources->Snapshot();
+			const uint64 BeforeRelease = Resources->ReleaseVersionExcludingOwner(Consumer);
+			Test.TestFalse(TEXT("八项预授予未齐时拒收构造并保留旧 Query"),
+				FVoxelGenerationQuery::Create(Config, Cache.ToSharedRef(), Query, Error, false, false, false, &Consumer));
+			Test.TestTrue(TEXT("报告真实 Input CapacityBlocked"), Error.StartsWith(TEXT("CapacityBlocked")));
+			const auto AfterDenied = Resources->Snapshot();
+			Test.TestTrue(TEXT("未创建部分生成器，拒收没有新增残留租约"), AfterDenied.LeaseCount <= BeforeDenied.LeaseCount);
+			Test.TestTrue(TEXT("拒收的原 Input payload 和 handles 全部退回"),
+				AfterDenied.Used[int32(EVoxelTerrainResourcePool::Input)] <= BeforeDenied.Used[int32(EVoxelTerrainResourcePool::Input)]);
+			Test.TestEqual(TEXT("本次预授予回退不自唤醒"), Resources->ReleaseVersionExcludingOwner(Consumer), BeforeRelease);
+			Blocker.Reset();
+			FVoxelColumnSample Preserved;
+			Test.TestTrue(TEXT("失败后旧 Query 的准备状态和原采样仍有效"), Query.SampleColumn(0, 0, Preserved, Error));
+			Test.TestEqual(TEXT("失败后旧列的 surface 不变"), Preserved.SurfaceZ, Original.SurfaceZ);
+			Test.TestTrue(TEXT("外部容量释放后同一 consumer 可重新构造"),
+				FVoxelGenerationQuery::Create(Config, Cache.ToSharedRef(), Query, Error, false, false, false, &Consumer));
+		}
+
+		virtual void ReleaseFixture() override
+		{
+			Query = FVoxelGenerationQuery();
+		}
+
+	private:
+		FVoxelGenerationQuery Query;
+	};
+
+	class FEcologyPlanCapacityCommand final : public FCacheCapacityCommand
+	{
+	public:
+		explicit FEcologyPlanCapacityCommand(FAutomationTestBase& InTest)
+			: FCacheCapacityCommand(InTest)
+		{
+		}
+
+	protected:
+		virtual void CheckFixture() override
+		{
+			FVoxelGenerationRecipe Recipe;
+			Recipe.Settings.Seed = 137;
+			Recipe.Settings.Ecology.Tree.bEnabled = false;
+			Recipe.Settings.Ecology.Flower.bEnabled = false;
+			Recipe.Settings.Ecology.Grass.bEnabled = true;
+			Recipe.Settings.Ecology.Grass.Spacing = 8;
+			Recipe.Settings.Ecology.Grass.PatchRadius = 0;
+			Recipe.Settings.Ecology.Grass.PatchFillPermille = 1000;
+			Recipe.Settings.Ecology.Grass.ChancePermille = 1000;
+			Recipe.Settings.Ecology.Grass.DensityPermille = 1000;
+			Recipe.Palette.Air = 0;
+			Recipe.Palette.Grass = 1;
+			Recipe.Ecology.GrassPlant = 4;
+			Recipe.Biomes.AddDefaulted_GetRef().DefaultSurface = 1;
+			const auto SharedRecipe = MakeShared<const FVoxelGenerationRecipe, ESPMode::ThreadSafe>(MoveTemp(Recipe));
+			const FVoxelEcologyGenerator Generator(SharedRecipe);
+			auto SampleColumn = [](const FIntVector&, FVoxelColumnSample& OutColumn)
+			{
+				OutColumn = FVoxelColumnSample();
+				OutColumn.BiomeIndex = 0;
+				OutColumn.SurfaceZ = 0;
+				OutColumn.SurfaceMaterial = 1;
+				OutColumn.Climate.MoistureQ15 = 12000;
+				return true;
+			};
+			auto SampleBase = [](const FIntVector& InPosition, uint32& OutValue)
+			{
+				OutValue = InPosition.Z <= 0 ? 1 : 0;
+				return true;
+			};
+			const FVoxelGenerationBounds Bounds{FIntVector(0, 0, -64), FIntVector(64, 64, 128)};
+			FVoxelEcologyPlan Baseline;
+			if (!Test.TestTrue(TEXT("真实 Count/Build 生成固定草地 fixture"),
+				Generator.BuildPlan(Bounds, SampleColumn, SampleBase, Baseline, Error))) return;
+			if (!Test.TestEqual(TEXT("每个无半径草地格输出一次"), Baseline.Writes.Num(), 64)) return;
+			const uint64 RootBytes = VoxelBoundedAllocation::WorkerSharedBytes<const FVoxelEcologyPlan>();
+			const uint64 BodyBytes = RootBytes + Baseline.GetAllocatedBytes();
+			FVoxelTerrainResourceLimits Limits;
+			Limits.WorkingBytes = 2 * BodyBytes + 65536;
+			Limits.ResidentBytes = 3 * BodyBytes;
+			Limits.OverlapBytes = BodyBytes;
+			const auto Control = MakeCacheControlConsumer();
+			if (!Test.TestTrue(TEXT("生态正文绑定实际动态容量的原账本"), Resources->Configure(Limits) &&
+				FVoxelGenerationPlanCache::Create(Resources, Control, Cache, Error, true, false))) return;
+			const FVoxelEcologyTileKey WarmKey{FIntPoint::ZeroValue};
+			FVoxelEcologyTileKey ColdKey;
+			bool bFoundKey = false;
+			for (int32 X = 1; X <= 4096; ++X)
+			{
+				const FVoxelEcologyTileKey Candidate{FIntPoint(X, 0)};
+				if (GetTypeHash(Candidate) % FVoxelGenerationPlanCache::ShardCount ==
+					GetTypeHash(WarmKey) % FVoxelGenerationPlanCache::ShardCount)
+				{
+					ColdKey = Candidate;
+					bFoundKey = true;
+					break;
+				}
+			}
+			if (!Test.TestTrue(TEXT("冷暖生态 key 复用已授予的控制 backing"), bFoundKey)) return;
+			auto Consumer = Control;
+			Consumer.OwnerId = FGuid::NewGuid();
+			Consumer.RequestSerial = 91;
+			FVoxelTaskStamp Stamp;
+			Stamp.WorldEpoch = Consumer.WorldEpoch;
+			Stamp.OwnerId = Consumer.OwnerId;
+			Stamp.OwnerIncarnation = Consumer.OwnerIncarnation;
+			Stamp.Token = Consumer.RequestSerial;
+			FVoxelGenerationPlanningReadScope Scope({}, &Stamp, nullptr, &Consumer);
+			auto BuildWarm = [&](FVoxelEcologyPlan& OutPlan, FString& OutError)
+			{
+				return Generator.BuildPlan(Bounds, SampleColumn, SampleBase, OutPlan, OutError);
+			};
+			if (!Test.TestTrue(TEXT("真实生态算法在授额后发布 immutable 正文"),
+				Cache->GetOrBuildEcology(WarmKey, BuildWarm, Warmed, Error))) return;
+			Test.TestEqual(TEXT("真实 array/map backing 与原正文租约一起转 Resident"),
+				Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Resident)], BodyBytes);
+			for (const FVoxelEcologyPlanWrite& Write : Baseline.Writes)
+			{
+				uint32 Value = MAX_uint32;
+				if (!Test.TestTrue(TEXT("授额后的真实 resolved 索引保持值"), Warmed->Sample(Write.Position, Value) && Value == Write.Value)) return;
+			}
+			const auto BeforeStore = Resources->Snapshot();
+			Test.TestFalse(TEXT("不能将现有正文的租约冒充另一个新 key 的原租约"),
+				Cache->StoreEcology(ColdKey, Warmed, Error));
+			Test.TestTrue(TEXT("无租约证明的 Store 明确拒收"), Error.StartsWith(TEXT("InvalidResource")));
+			Test.TestEqual(TEXT("拒收不发布另一个 immutable key"), Cache->GetStats().Ecology, 1);
+			Test.TestEqual(TEXT("拒收不重复占用 Resident"),
+				Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Resident)],
+				BeforeStore.Used[int32(EVoxelTerrainResourcePool::Resident)]);
+			Test.TestTrue(TEXT("同 key 已发布 immutable 继续优先"), Cache->StoreEcology(WarmKey, Warmed, Error));
+			auto OtherConsumer = Consumer;
+			OtherConsumer.OwnerId = FGuid::NewGuid();
+			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Blocker;
+			if (!Test.TestTrue(TEXT("剩余额度只容纳冷 root，不容纳动态 Writes"), Resources->Acquire(
+				OtherConsumer, EVoxelTerrainResourcePool::Resident, BodyBytes - RootBytes, Blocker))) return;
+			int32 ColdBuilds = 0;
+			auto BuildCold = [&](FVoxelEcologyPlan& OutPlan, FString& OutError)
+			{
+				++ColdBuilds;
+				const int32 MinX = ColdKey.Coordinate.X * 64;
+				return Generator.BuildPlan({FIntVector(MinX, 0, -64), FIntVector(MinX + 64, 64, 128)},
+					SampleColumn, SampleBase, OutPlan, OutError);
+			};
+			FVoxelEcologyPlanPtr Cold = Warmed;
+			const uint64 BeforeRelease = Resources->ReleaseVersionExcludingOwner(Consumer);
+			Test.TestFalse(TEXT("动态正文分配前 Resident 拒收"), Cache->GetOrBuildEcology(ColdKey, BuildCold, Cold, Error));
+			Test.TestEqual(TEXT("进入真实 Count 后由动态 grant 拒收"), ColdBuilds, 1);
+			Test.TestTrue(TEXT("明确可恢复 CapacityBlocked 并保留旧 Out"), Error.StartsWith(TEXT("CapacityBlocked")) && Cold == Warmed);
+			Test.TestEqual(TEXT("失败正文及重分配峰值全部退回 Working"),
+				Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Working)], uint64(0));
+			Test.TestEqual(TEXT("内部失败退租不自唤醒"), Resources->ReleaseVersionExcludingOwner(Consumer), BeforeRelease);
+			Blocker.Reset();
+			Test.TestTrue(TEXT("原 consumer 在外部释放后继续同一冷 key"), Cache->GetOrBuildEcology(ColdKey, BuildCold, Cold, Error));
+			Test.TestEqual(TEXT("重试成功后只驻留两个真实动态正文"),
+				Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Resident)], 2 * BodyBytes);
+		}
+
+		virtual void ReleaseFixture() override
+		{
+			Warmed.Reset();
+		}
+
+	private:
+		FVoxelEcologyPlanPtr Warmed;
+	};
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelCacheFactoryCapacityRefusalTest,
@@ -446,6 +667,28 @@ bool FVoxelCacheColumnReservedCapacityTest::RunTest(const FString& InParameters)
 	(void)InParameters;
 	FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<TCacheColumnCapacityCommand<FVoxelBaseColumnEntry>>(*this));
 	FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<TCacheColumnCapacityCommand<FVoxelNaturalColumnEntry>>(*this));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelQueryGeneratorCapacityTest,
+	"WHFramework.Voxel.FineRefactor.Generation.QueryGeneratorCapacity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelQueryGeneratorCapacityTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FQueryGeneratorCapacityCommand>(*this));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelEcologyPlanCapacityTest,
+	"WHFramework.Voxel.FineRefactor.Generation.EcologyPlanCapacity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelEcologyPlanCapacityTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FEcologyPlanCapacityCommand>(*this));
 	return true;
 }
 #endif

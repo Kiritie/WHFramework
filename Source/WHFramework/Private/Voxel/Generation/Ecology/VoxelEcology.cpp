@@ -1,8 +1,10 @@
 #include "Voxel/Generation/Ecology/VoxelEcology.h"
 
 #include "ProfilingDebugging/CpuProfilerTrace.h"
+#include "Misc/StringBuilder.h"
 
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 
 namespace
 {
@@ -19,8 +21,19 @@ namespace
 	constexpr uint8 TrunkPriority = 3;
 }
 
-void FVoxelEcologyPlan::Finalize()
+bool FVoxelEcologyPlan::Reserve(const int32 InWriteCount, FString& OutError)
 {
+	return VoxelGenerationAllocation::RetainArray(Writes, InWriteCount, OutError) &&
+		VoxelGenerationAllocation::RetainMap(ResolvedWrites, InWriteCount, OutError);
+}
+
+bool FVoxelEcologyPlan::Finalize(FString* OutError)
+{
+	FString LocalError;
+	if (!VoxelGenerationAllocation::RetainMap(ResolvedWrites, Writes.Num(), OutError ? *OutError : LocalError))
+	{
+		return false;
+	}
 	Writes.RemoveAll([](const FVoxelEcologyPlanWrite& Write)
 	{
 		return !VoxelGeneration::IsWorldCell(Write.Position.X) ||
@@ -29,7 +42,6 @@ void FVoxelEcologyPlan::Finalize()
 	});
 	InfluenceBounds.Init();
 	ResolvedWrites.Reset();
-	ResolvedWrites.Reserve(Writes.Num());
 
 	for (const FVoxelEcologyPlanWrite& Write : Writes)
 	{
@@ -42,6 +54,11 @@ void FVoxelEcologyPlan::Finalize()
 			ResolvedWrites.Add(Write.Position, Write);
 		}
 	}
+	if (OutError)
+	{
+		OutError->Reset();
+	}
+	return true;
 }
 
 bool FVoxelEcologyPlan::Sample(const FIntVector& InPosition, uint32& OutValue) const
@@ -57,8 +74,8 @@ bool FVoxelEcologyPlan::Sample(const FIntVector& InPosition, uint32& OutValue) c
 
 uint64 FVoxelEcologyPlan::GetAllocatedBytes() const
 {
-	return static_cast<uint64>(Writes.GetAllocatedSize()) +
-		static_cast<uint64>(ResolvedWrites.GetAllocatedSize());
+	return VoxelGenerationAllocation::AllocatedBytes(Writes) +
+		VoxelGenerationAllocation::AllocatedBytes(ResolvedWrites);
 }
 
 FVoxelEcologyGenerator::FVoxelEcologyGenerator(
@@ -179,12 +196,27 @@ FVoxelEcologySample FVoxelEcologyGenerator::Sample(const FVoxelColumnSample& InC
 
 FVoxelTreeSpecies FVoxelEcologyGenerator::SelectTreeSpecies(const FVoxelColumnSample& InColumn, const FVoxelStableId& InTreeId) const
 {
-	TArray<const FVoxelTreeSpecies*, TInlineAllocator<8>> Eligible;
+	int32 EligibleCount = 0;
 	for (const FVoxelTreeSpecies& Species : Recipe->Ecology.TreeSpecies)
 	{
-		if (Species.Temperature.Contains(InColumn.Climate.TemperatureQ15) && Species.Moisture.Contains(InColumn.Climate.MoistureQ15)) Eligible.Add(&Species);
+		if (Species.Temperature.Contains(InColumn.Climate.TemperatureQ15) &&
+			Species.Moisture.Contains(InColumn.Climate.MoistureQ15))
+		{
+			++EligibleCount;
+		}
 	}
-	if (!Eligible.IsEmpty()) return *Eligible[InTreeId.Low % Eligible.Num()];
+	if (EligibleCount > 0)
+	{
+		int32 SelectedIndex = static_cast<int32>(InTreeId.Low % EligibleCount);
+		for (const FVoxelTreeSpecies& Species : Recipe->Ecology.TreeSpecies)
+		{
+			if (Species.Temperature.Contains(InColumn.Climate.TemperatureQ15) &&
+				Species.Moisture.Contains(InColumn.Climate.MoistureQ15) && SelectedIndex-- == 0)
+			{
+				return Species;
+			}
+		}
+	}
 	FVoxelTreeSpecies Default;
 	Default.Trunk = Recipe->Ecology.TreeTrunk;
 	Default.LeavesDark = Recipe->Ecology.TreeLeaves;
@@ -237,7 +269,7 @@ bool FVoxelEcologyGenerator::ContainsCrown(const FIntVector& InOffset, const int
 }
 
 bool FVoxelEcologyGenerator::AppendWorldWrite(
-	FVoxelEcologyPlan& InOutPlan,
+	TFunctionRef<bool(const FVoxelEcologyPlanWrite&)> InEmit,
 	const FInt64Vector& InPosition,
 	const uint32 InValue,
 	const uint8 InPriority,
@@ -248,8 +280,7 @@ bool FVoxelEcologyGenerator::AppendWorldWrite(
 	{
 		return false;
 	}
-	InOutPlan.Writes.Add({Position, InValue, InPriority, InOwnerId});
-	return true;
+	return InEmit({Position, InValue, InPriority, InOwnerId});
 }
 
 void FVoxelEcologyGenerator::BuildTrees(
@@ -257,10 +288,11 @@ void FVoxelEcologyGenerator::BuildTrees(
 	TFunctionRef<bool(const FIntVector&, FVoxelColumnSample&)> InSampleColumn,
 	TFunctionRef<bool(const FIntVector&, uint32&)> InSampleBaseSymbol,
 	FVoxelEcologyPlan& InOutPlan,
+	TFunctionRef<bool(const FVoxelEcologyPlanWrite&)> InEmit,
 	const TAtomic<bool>* InCancel) const
 {
 	EnumerateTrees(InBounds, InSampleColumn, InSampleBaseSymbol,
-		[this, &InOutPlan, &InSampleColumn](const FIntVector& Anchor, const int32 Height,
+		[this, &InEmit, &InSampleColumn](const FIntVector& Anchor, const int32 Height,
 			const FVoxelStableId OwnerId)
 		{
 			FVoxelColumnSample Column;
@@ -271,7 +303,7 @@ void FVoxelEcologyGenerator::BuildTrees(
 			const int64 VisibleTrunkHeight = FMath::Min<int64>(Height, VoxelGeneration::WorldCellMaxExclusive - Anchor.Z);
 			for (int64 Z = 0; Z < VisibleTrunkHeight; ++Z)
 			{
-				AppendWorldWrite(InOutPlan, WideAnchor + FInt64Vector(0, 0, Z),
+				AppendWorldWrite(InEmit, WideAnchor + FInt64Vector(0, 0, Z),
 					Species.Trunk, TrunkPriority, OwnerId);
 			}
 			if (!Recipe->Ecology.TreeSpecies.IsEmpty())
@@ -280,14 +312,14 @@ void FVoxelEcologyGenerator::BuildTrees(
 				{
 					if (Height >= 20)
 					{
-						AppendWorldWrite(InOutPlan, WideAnchor + FInt64Vector(Direction),
+						AppendWorldWrite(InEmit, WideAnchor + FInt64Vector(Direction),
 							Species.Trunk, TrunkPriority, OwnerId);
 					}
 					if (Species.Form != EVoxelTreeForm::Conifer)
 					{
 						for (int32 Branch = 1; Branch <= 2; ++Branch)
 						{
-							AppendWorldWrite(InOutPlan, WideAnchor + FInt64Vector(Direction) * Branch +
+							AppendWorldWrite(InEmit, WideAnchor + FInt64Vector(Direction) * Branch +
 								FInt64Vector(0, 0, static_cast<int64>(Height) - 5 + Branch),
 								Species.Trunk, TrunkPriority, OwnerId);
 						}
@@ -323,7 +355,7 @@ void FVoxelEcologyGenerator::BuildTrees(
 						{
 							continue;
 						}
-						AppendWorldWrite(InOutPlan, Position, SelectLeaf(Species, static_cast<int32>(Z), CrownRadius),
+						AppendWorldWrite(InEmit, Position, SelectLeaf(Species, static_cast<int32>(Z), CrownRadius),
 							LeafPriority, OwnerId);
 					}
 				}
@@ -446,6 +478,7 @@ void FVoxelEcologyGenerator::BuildGrass(
 	TFunctionRef<bool(const FIntVector&, FVoxelColumnSample&)> InSampleColumn,
 	TFunctionRef<bool(const FIntVector&, uint32&)> InSampleBaseSymbol,
 	FVoxelEcologyPlan& InOutPlan,
+	TFunctionRef<bool(const FVoxelEcologyPlanWrite&)> InEmit,
 	const TAtomic<bool>* InCancel) const
 {
 	const FVoxelGrassGenerationSettings& Settings = Recipe->Settings.Ecology.Grass;
@@ -557,13 +590,19 @@ void FVoxelEcologyGenerator::BuildGrass(
 					if (!bBank && Ecology.bTreeAllowed && PointSeed % 100000 < Ecology.TreeDensity)
 					{
 						const FVoxelTreeSpecies Species = SelectTreeSpecies(Column, OwnerId);
-						const FName SaplingRole(*(TEXT("Sapling.") + Species.StableId.ToString()));
-						if (const uint16* Sapling = Recipe->Ecology.NaturalDecorations.Find(SaplingRole))
+						TStringBuilder<FName::StringBufferSize + 8> SaplingName;
+						SaplingName << TEXT("Sapling.");
+						Species.StableId.AppendString(SaplingName);
+						const FName SaplingRole(SaplingName.ToString(), FNAME_Find);
+						if (!SaplingRole.IsNone())
 						{
-							Plant = *Sapling;
+							if (const uint16* Sapling = Recipe->Ecology.NaturalDecorations.Find(SaplingRole))
+							{
+								Plant = *Sapling;
+							}
 						}
 					}
-					if (AppendWorldWrite(InOutPlan, FInt64Vector(SurfacePosition), Plant, GrassPriority, OwnerId))
+					if (AppendWorldWrite(InEmit, FInt64Vector(SurfacePosition), Plant, GrassPriority, OwnerId))
 					{
 						++InOutPlan.GrassWrites;
 					}
@@ -599,6 +638,7 @@ void FVoxelEcologyGenerator::BuildFlowers(
 	TFunctionRef<bool(const FIntVector&, FVoxelColumnSample&)> InSampleColumn,
 	TFunctionRef<bool(const FIntVector&, uint32&)> InSampleBaseSymbol,
 	FVoxelEcologyPlan& InOutPlan,
+	TFunctionRef<bool(const FVoxelEcologyPlanWrite&)> InEmit,
 	const TAtomic<bool>* InCancel) const
 {
 	const FVoxelFlowerGenerationSettings& Settings = Recipe->Settings.Ecology.Flower;
@@ -723,7 +763,7 @@ void FVoxelEcologyGenerator::BuildFlowers(
 						continue;
 					}
 					const uint16 Symbol = SelectFlowerSymbol(Position, OwnerId);
-					if (AppendWorldWrite(InOutPlan, FInt64Vector(Position), Symbol, FlowerPriority, OwnerId))
+					if (AppendWorldWrite(InEmit, FInt64Vector(Position), Symbol, FlowerPriority, OwnerId))
 					{
 						++InOutPlan.FlowerWrites;
 					}
@@ -748,27 +788,65 @@ bool FVoxelEcologyGenerator::BuildPlan(
 		return false;
 	}
 
+	uint64 WriteCount = 0;
+	auto CountWrite = [&WriteCount](const FVoxelEcologyPlanWrite&)
+	{
+		if (WriteCount <= MAX_int32) ++WriteCount;
+		return WriteCount <= MAX_int32;
+	};
+	FVoxelEcologyPlan CountPlan;
+	BuildTrees(InBounds, InSampleColumn, InSampleBaseSymbol, CountPlan, CountWrite, InCancel);
+	BuildGrass(InBounds, InSampleColumn, InSampleBaseSymbol, CountPlan, CountWrite, InCancel);
+	BuildFlowers(InBounds, InSampleColumn, InSampleBaseSymbol, CountPlan, CountWrite, InCancel);
+	if (InCancel && InCancel->Load())
+	{
+		OutError = TEXT("Canceled");
+		return false;
+	}
+	if (WriteCount > MAX_int32)
+	{
+		OutError = TEXT("Oversized: ecology plan write count");
+		return false;
+	}
+
 	FVoxelEcologyPlan Plan;
 	Plan.Bounds = InBounds;
-	BuildTrees(InBounds, InSampleColumn, InSampleBaseSymbol, Plan, InCancel);
+	if (!Plan.Reserve(static_cast<int32>(WriteCount), OutError)) return false;
+	bool bEmissionOverflow = false;
+	auto EmitWrite = [&Plan, WriteCount, &bEmissionOverflow](const FVoxelEcologyPlanWrite& InWrite)
+	{
+		if (static_cast<uint64>(Plan.Writes.Num()) >= WriteCount)
+		{
+			bEmissionOverflow = true;
+			return false;
+		}
+		Plan.Writes.Add(InWrite);
+		return true;
+	};
+	BuildTrees(InBounds, InSampleColumn, InSampleBaseSymbol, Plan, EmitWrite, InCancel);
 	if (InCancel && InCancel->Load())
 	{
 		OutError = TEXT("Canceled");
 		return false;
 	}
-	BuildGrass(InBounds, InSampleColumn, InSampleBaseSymbol, Plan, InCancel);
+	BuildGrass(InBounds, InSampleColumn, InSampleBaseSymbol, Plan, EmitWrite, InCancel);
 	if (InCancel && InCancel->Load())
 	{
 		OutError = TEXT("Canceled");
 		return false;
 	}
-	BuildFlowers(InBounds, InSampleColumn, InSampleBaseSymbol, Plan, InCancel);
+	BuildFlowers(InBounds, InSampleColumn, InSampleBaseSymbol, Plan, EmitWrite, InCancel);
 	if (InCancel && InCancel->Load())
 	{
 		OutError = TEXT("Canceled");
 		return false;
 	}
-	Plan.Finalize();
+	if (bEmissionOverflow || static_cast<uint64>(Plan.Writes.Num()) != WriteCount)
+	{
+		OutError = TEXT("Invalid ecology plan: Count and Build observed different frozen inputs");
+		return false;
+	}
+	if (!Plan.Finalize(&OutError)) return false;
 
 #if !UE_BUILD_SHIPPING
 	UE_LOG(
