@@ -87,8 +87,13 @@ FVoxelEmergeManager::FVoxelEmergeManager(
 {
 	AdmissionSelection.BindResources(Scheduler.GetTerrainResources(),
 		FVoxelGenerationConsumerKey::Section(Runtime.Epoch(), GenerationOwnerId, 1, {}, 1));
+	Generator->BindRetentionResources(Scheduler.GetRuntimeResources(),
+		{EVoxelGenerationConsumerKind::WorldFact, Runtime.Epoch(), GenerationOwnerId, 1,
+			EVoxelGenerationSpatialKind::Column, FIntVector::ZeroValue, FIntVector::ZeroValue, 1});
 	FVoxelGenerationPlanningServices PlanningServices;
 	PlanningServices.Resources = Scheduler.GetRuntimeResources();
+	PlanningServices.RetentionConsumer = {EVoxelGenerationConsumerKind::WorldFact, Runtime.Epoch(), GenerationOwnerId, 1,
+		EVoxelGenerationSpatialKind::Column, FIntVector::ZeroValue, FIntVector::ZeroValue, 1};
 	PlanningServices.Ensure = [this](TConstArrayView<FVoxelGenerationPlanDependency> Dependencies, EVoxelWorkClass WorkClass,
 		const FVoxelTerrainServicePriority& Priority, const FVoxelGenerationConsumerKey& Consumer)
 	{
@@ -102,10 +107,11 @@ FVoxelEmergeManager::FVoxelEmergeManager(
 			return Kind == EVoxelTaskKind::ProjectBackground && Stamp == Expected;
 		});
 	};
-	PlanningServices.Retain = [this](TConstArrayView<FVoxelGenerationPlanDependency> Dependencies, const FIntPoint& Center)
-		-> TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>
+	PlanningServices.Retain = [this](TConstArrayView<FVoxelGenerationPlanDependency> Dependencies, const FIntPoint& Center,
+		const FVoxelGenerationConsumerKey& Consumer, TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>& OutRetention,
+		FString& OutError)
 	{
-		return PlanCoordinator->RetainDependencies(Dependencies, Center);
+		return PlanCoordinator->RetainDependencies(Dependencies, Center, Consumer, OutRetention, OutError);
 	};
 	Generator->SetOverlayPlanningServices(MoveTemp(PlanningServices));
 	PlanCoordinator->SetConsumerWakeCallback(
@@ -449,6 +455,7 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::QueryEnvironment(const FIn
 	if (!Status.bReady) return Status;
 	if (EnvironmentColumnStates.Num() >= 32) return {};
 	const auto Retention = Generator->RetainHydrologyForPlanning(InCell, 0);
+	if (!Retention) return { false, false, TEXT("CapacityBlocked: environment cache retention") };
 	FVoxelTaskRequest Request;
 	Request.Kind = EVoxelTaskKind::ProjectBackground;
 	Request.WorkClass = EVoxelWorkClass::Interactive;
@@ -564,16 +571,42 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureGenerationFacts(
 	}
 	if (!Consumer)
 	{
+		FString Error;
+		if (!ReserveFactStorage(WaitingPlanSections.Num(), ExternalFactConsumers.Num() + 1, Error))
+			return {false, !Error.StartsWith(TEXT("CapacityBlocked")), MoveTemp(Error)};
 		FExternalFactConsumer Candidate;
 		Candidate.Bounds = InBounds;
-		FString Error;
-		if (!PlanCoordinator->GatherForBounds(InBounds, Candidate.Dependencies, Error)) return {false, true, MoveTemp(Error)};
-		Candidate.Retention = PlanCoordinator->RetainDependencies(Candidate.Dependencies,
-			FIntPoint(int32((int64(InBounds.Min.X) + InBounds.Max.X) / 2), int32((int64(InBounds.Min.Y) + InBounds.Max.Y) / 2)));
 		Consumer = &ExternalFactConsumers.Add(InConsumer, MoveTemp(Candidate));
 	}
+	const auto Resources = Scheduler.GetRuntimeResources();
+	if (Consumer->bWaitingCapacity && Resources->ReleaseVersionExcludingOwner(InConsumer) <= Consumer->CapacityVersion)
+		return {false, false, TEXT("CapacityBlocked: generation fact capture or retention")};
+	Consumer->bWaitingCapacity = false;
+	const uint64 Version = Resources->ReleaseVersionExcludingOwner(InConsumer);
+	if (!Consumer->Dependencies.Lease)
+	{
+		FString Error;
+		if (!PlanCoordinator->GatherForBounds(InBounds, InConsumer, Consumer->Dependencies, Error))
+		{
+			Consumer->bWaitingCapacity = Error.StartsWith(TEXT("CapacityBlocked"));
+			Consumer->CapacityVersion = Version;
+			return {false, !Consumer->bWaitingCapacity, MoveTemp(Error)};
+		}
+	}
+	if (!Consumer->Retention)
+	{
+		FString Error;
+		if (!PlanCoordinator->RetainDependencies(Consumer->Dependencies.Values,
+			FIntPoint(int32((int64(InBounds.Min.X) + InBounds.Max.X) / 2), int32((int64(InBounds.Min.Y) + InBounds.Max.Y) / 2)),
+			InConsumer, Consumer->Retention, Error))
+		{
+			Consumer->bWaitingCapacity = Error.StartsWith(TEXT("CapacityBlocked"));
+			Consumer->CapacityVersion = Version;
+			return {false, !Consumer->bWaitingCapacity, MoveTemp(Error)};
+		}
+	}
 	const EVoxelWorkClass WorkClass = InPriority.Band <= EVoxelTerrainServiceBand::P1 ? EVoxelWorkClass::Critical : EVoxelWorkClass::Visible;
-	const auto Natural = PlanCoordinator->Ensure(Consumer->Dependencies, WorkClass, InPriority, InConsumer);
+	const auto Natural = PlanCoordinator->Ensure(Consumer->Dependencies.Values, WorkClass, InPriority, InConsumer);
 	const auto Overlay = Generator->EnsureOverlayConsumerReady(InConsumer, InBounds, WorkClass, InPriority);
 	if (Natural.bFailed) return Natural;
 	if (Overlay.bFailed) return {false, true, Overlay.Error};
@@ -592,6 +625,45 @@ void FVoxelEmergeManager::SetExternalConsumerWakeCallback(TFunction<void(const F
 {
 	check(IsInGameThread());
 	ExternalConsumerWakeCallback = MoveTemp(InCallback);
+}
+
+bool FVoxelEmergeManager::ReserveFactStorage(const int32 InWaiting, const int32 InExternal, FString& OutError)
+{
+	if (InWaiting <= WaitingFactCapacity && InExternal <= ExternalFactCapacity) return true;
+	const int64 Waiting = InWaiting > WaitingFactCapacity ?
+		FMath::Max<int64>(InWaiting, FMath::Max<int64>(4, int64(WaitingFactCapacity) * 2)) : WaitingFactCapacity;
+	const int64 External = InExternal > ExternalFactCapacity ?
+		FMath::Max<int64>(InExternal, FMath::Max<int64>(4, int64(ExternalFactCapacity) * 2)) : ExternalFactCapacity;
+	if (Waiting > (1 << 20) || External > (1 << 20))
+	{
+		OutError = TEXT("Oversized: generation fact consumer storage");
+		return false;
+	}
+	const uint64 Bytes = VoxelBoundedAllocation::MapBytes<FIntVector, FWaitingPlanSection>(int32(Waiting)) +
+		VoxelBoundedAllocation::MapBytes<FVoxelGenerationConsumerKey, FExternalFactConsumer>(int32(External));
+	const auto Resources = Scheduler.GetRuntimeResources();
+	const uint64 Limit = Resources->Snapshot().Limits.InputBytes;
+	const uint64 Previous = FactStorageLease ? FactStorageLease->Bytes() : 0;
+	if (Bytes > Limit || Previous > Limit - Bytes)
+	{
+		OutError = TEXT("CapacityUnachievable: generation fact consumer storage");
+		return false;
+	}
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+	const auto Owner = FVoxelGenerationConsumerKey::Section(Runtime.Epoch(), GenerationOwnerId, 1, {}, 1);
+	if (!Resources->Acquire(Owner, EVoxelTerrainResourcePool::Input, Bytes, Lease))
+	{
+		OutError = TEXT("CapacityBlocked: generation fact consumer storage");
+		return false;
+	}
+	WaitingPlanSections.Reserve(int32(Waiting));
+	ExternalFactConsumers.Reserve(int32(External));
+	check(WaitingPlanSections.GetAllocatedSize() + ExternalFactConsumers.GetAllocatedSize() <= Lease->Bytes());
+	FactStorageLease = MoveTemp(Lease);
+	WaitingFactCapacity = int32(Waiting);
+	ExternalFactCapacity = int32(External);
+	OutError.Reset();
+	return true;
 }
 
 bool FVoxelEmergeManager::ReserveExternalDataStorage(const int32 InSectionCount, const int32 InConsumerCount)
@@ -715,11 +787,11 @@ void FVoxelEmergeManager::RebuildDemand(
 		const FVoxelExactDemand* Next = InInterest.Exact.Find(Pair.Key);
 		if (const auto* External = ExternalDataDemands.Find(Pair.Key);
 			External && (!Next || FVoxelTerrainWorkSelection::HigherPriority(External->Demand.ServicePriority, Next->ServicePriority))) Next = &External->Demand;
-		if (Previous && Next &&
+		if (Previous && Next && Pair.Value.Dependencies.Lease &&
 			(ResolveWorkClass(*Previous) != ResolveWorkClass(*Next) || Previous->Priority != Next->Priority || Previous->DistanceCells != Next->DistanceCells ||
 				Previous->ForwardScore != Next->ForwardScore))
 		{
-				PlanCoordinator->Ensure(Pair.Value.Dependencies, ResolveWorkClass(*Next), Next->ServicePriority, Pair.Value.Consumer);
+			PlanCoordinator->Ensure(Pair.Value.Dependencies.Values, ResolveWorkClass(*Next), Next->ServicePriority, Pair.Value.Consumer);
 			const FIntVector Min = Pair.Key * 16;
 			Generator->EnsureOverlayConsumerReady(Pair.Value.Consumer, {Min, Min + FIntVector(16)}, ResolveWorkClass(*Next), Next->ServicePriority);
 		}
@@ -846,16 +918,14 @@ bool FVoxelEmergeManager::RequestBase(
 	}
 	if (!Waiting)
 	{
-		TArray<FVoxelGenerationPlanDependency> Gathered;
-		const FIntVector Min = InKey * 16;
 		FString Error;
-		if (!PlanCoordinator->GatherForBounds({ Min, Min + FIntVector(16) },
-			Gathered, Error))
+		if (!ReserveFactStorage(WaitingPlanSections.Num() + 1, ExternalFactConsumers.Num(), Error))
 		{
-			InSection.Status = EVoxelSectionStatus::Failed;
-			InSection.Error = MoveTemp(Error);
-			UE_LOG(LogTemp, Error, TEXT("Voxel plan preflight failed: section=%s error=%s"),
-				*InKey.ToString(), *InSection.Error);
+			if (!Error.StartsWith(TEXT("CapacityBlocked")))
+			{
+				InSection.Status = EVoxelSectionStatus::Failed;
+				InSection.Error = MoveTemp(Error);
+			}
 			return false;
 		}
 		Waiting = &WaitingPlanSections.Add(InKey);
@@ -864,8 +934,49 @@ bool FVoxelEmergeManager::RequestBase(
 		Waiting->Consumer = FVoxelGenerationConsumerKey::Section(InSection.Stamp.Epoch, GenerationOwnerId,
 			InSection.Stamp.Token, InKey, ++NextGenerationRequestSerial);
 		Waiting->BlockedSinceSeconds = FPlatformTime::Seconds();
-		Waiting->Dependencies = MoveTemp(Gathered);
-		Waiting->Retention = PlanCoordinator->RetainDependencies(Waiting->Dependencies, FIntPoint(Min.X + 8, Min.Y + 8));
+	}
+	const auto FactResources = Scheduler.GetRuntimeResources();
+	if (Waiting->bWaitingCapacity && FactResources->ReleaseVersionExcludingOwner(Waiting->Consumer) <= Waiting->CapacityVersion) return false;
+	Waiting->bWaitingCapacity = false;
+	const uint64 Version = FactResources->ReleaseVersionExcludingOwner(Waiting->Consumer);
+	if (!Waiting->Dependencies.Lease)
+	{
+		const FIntVector Min = InKey * 16;
+		FString Error;
+		if (!PlanCoordinator->GatherForBounds({ Min, Min + FIntVector(16) }, Waiting->Consumer, Waiting->Dependencies, Error))
+		{
+			if (Error.StartsWith(TEXT("CapacityBlocked")))
+			{
+				Waiting->bWaitingCapacity = true;
+				Waiting->CapacityVersion = Version;
+				return false;
+			}
+			InSection.Status = EVoxelSectionStatus::Failed;
+			InSection.Error = MoveTemp(Error);
+			WaitingPlanSections.Remove(InKey);
+			UE_LOG(LogTemp, Error, TEXT("Voxel plan preflight failed: section=%s error=%s"),
+				*InKey.ToString(), *InSection.Error);
+			return false;
+		}
+	}
+	if (!Waiting->Retention)
+	{
+		const FIntVector Min = InKey * 16;
+		FString Error;
+		if (!PlanCoordinator->RetainDependencies(Waiting->Dependencies.Values, FIntPoint(Min.X + 8, Min.Y + 8),
+			Waiting->Consumer, Waiting->Retention, Error))
+		{
+			if (Error.StartsWith(TEXT("CapacityBlocked")))
+			{
+				Waiting->bWaitingCapacity = true;
+				Waiting->CapacityVersion = Version;
+				return false;
+			}
+			InSection.Status = EVoxelSectionStatus::Failed;
+			InSection.Error = MoveTemp(Error);
+			WaitingPlanSections.Remove(InKey);
+			return false;
+		}
 	}
 	const double Now = FPlatformTime::Seconds();
 	if (!IsCriticalDemand(InDemand) && Now < Waiting->RetryAfterSeconds)
@@ -873,7 +984,7 @@ bool FVoxelEmergeManager::RequestBase(
 		return false;
 	}
 	const FVoxelGenerationDependencyStatus PlanStatus = PlanCoordinator->Ensure(
-		Waiting->Dependencies,
+		Waiting->Dependencies.Values,
 		ResolveWorkClass(InDemand), InDemand.ServicePriority, Waiting->Consumer);
 	if (PlanStatus.bFailed)
 	{

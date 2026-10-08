@@ -3,6 +3,7 @@
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Generation/Ecology/VoxelEcology.h"
 #include "Voxel/Generation/VoxelGenerationQuery.h"
+#include "Voxel/Generation/VoxelGenerationPlanningRead.h"
 
 namespace
 {
@@ -53,7 +54,11 @@ bool FVoxelGenerationPipeline::EnumerateCaveEntrances(const FIntPoint& InMin, co
 	FVoxelGenerationQuery Query;
 	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError, true, IsInGameThread(), IsInGameThread())) return false;
 	const auto& Settings = Config->Recipe->Settings;
-	const FVoxelGenerationBounds Bounds{FIntVector(InMin.X, InMin.Y, Settings.MinZ), FIntVector(InMax.X, InMax.Y, Settings.MaxZ)};
+	const FVoxelGenerationBounds Bounds{FIntVector(InMin.X, InMin.Y, Settings.MinZ),
+		FIntVector(int32(FMath::Min<int64>(int64(InMax.X) + 1, MAX_int32)),
+			int32(FMath::Min<int64>(int64(InMax.Y) + 1, MAX_int32)), Settings.MaxZ)};
+	FVoxelGenerationPlanKeyRanges Ranges;
+	if (!FVoxelGenerationQuery::GetPlanKeyRanges(Bounds, Settings, Ranges, OutError)) return false;
 	const FVoxelGenerationPlanKeys Keys = FVoxelGenerationQuery::GatherPlanKeys(Bounds, Settings);
 	TSet<FVoxelStableId> Seen;
 	for (const FVoxelGenerationTileKey& Key : Keys.Tiles)
@@ -116,6 +121,19 @@ void FVoxelGenerationPipeline::QueryReadyWaterfalls(const FIntPoint& InMin, cons
 void FVoxelGenerationPipeline::ReleaseOverlaySectionConsumer(const FIntVector& InSection) const
 {
 	if (Overlay) Overlay->ReleaseSectionConsumer(InSection);
+}
+
+void FVoxelGenerationPipeline::BindRetentionResources(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+	const FVoxelGenerationConsumerKey& InConsumer) const
+{
+	check(IsInGameThread() && InConsumer.IsValid());
+	if (RetentionResources)
+	{
+		check(RetentionResources.Get() == &InResources.Get() && RetentionConsumer == InConsumer);
+		return;
+	}
+	RetentionResources = InResources;
+	RetentionConsumer = InConsumer;
 }
 
 void FVoxelGenerationPipeline::SetOverlayPlanningServices(FVoxelGenerationPlanningServices InServices) const
@@ -386,11 +404,12 @@ bool FVoxelGenerationPipeline::TrySampleEnvironment(const FIntPoint& InCell, FVo
 	return true;
 }
 
-TSharedRef<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>
+TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>
 FVoxelGenerationPipeline::RetainHydrologyForPlanning(
 	const FIntPoint& InCenter,
 	const int32 InSampleRadiusCells) const
 {
+	if (!RetentionResources || !RetentionConsumer.IsValid()) return nullptr;
 	const FVoxelGenerationSettings& Settings = Config->Recipe->Settings;
 	const int64 RegionSide = static_cast<int64>(FMath::Max(8, Settings.HydrologyRegionSide)) *
 		FMath::Max(1, Settings.HydrologyCellSize);
@@ -398,7 +417,23 @@ FVoxelGenerationPipeline::RetainHydrologyForPlanning(
 	Point.Center = InCenter;
 	Point.HydrologyRadiusCells = static_cast<int32>(FMath::Min<int64>(MAX_int32,
 		static_cast<int64>(FMath::Max(0, InSampleRadiusCells)) + RegionSide));
-	return Cache->RetainForTask(Point);
+	auto Consumer = RetentionConsumer;
+	if (const auto* Stamp = FVoxelGenerationPlanningReadScope::GetTaskStamp(); Stamp &&
+		Stamp->OwnerId.IsValid() && Stamp->OwnerIncarnation != 0 && Stamp->Token != 0)
+	{
+		if (Stamp->WorldEpoch != RetentionConsumer.WorldEpoch) return nullptr;
+		Consumer = {EVoxelGenerationConsumerKind::WorldFact, Stamp->WorldEpoch, Stamp->OwnerId, Stamp->OwnerIncarnation,
+			EVoxelGenerationSpatialKind::Section, Stamp->Section, Stamp->Section, Stamp->Token};
+	}
+	if (const auto* CapturedConsumer = FVoxelGenerationPlanningReadScope::GetConsumerKey())
+	{
+		if (!CapturedConsumer->IsValid() || CapturedConsumer->WorldEpoch != RetentionConsumer.WorldEpoch) return nullptr;
+		// 重试使用原逻辑消费者，不能把本次任务 Token 的释放伪装成外部容量事件。
+		Consumer = *CapturedConsumer;
+	}
+	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> Lease;
+	FString Error;
+	return Cache->RetainForTask(Point, RetentionResources.ToSharedRef(), Consumer, Lease, Error) ? Lease : nullptr;
 }
 
 bool FVoxelGenerationPipeline::SampleEnvironments(

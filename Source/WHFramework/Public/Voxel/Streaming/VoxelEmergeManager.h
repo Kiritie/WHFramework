@@ -88,17 +88,20 @@ private:
 	bool RequestBase(FVoxelSection& InSection, const FIntVector& InKey, const FVoxelExactDemand& InDemand);
 
 	bool ResolveOverlay(FVoxelSection& InSection, const FIntVector& InKey, const FVoxelExactDemand& InDemand);
+	bool ReserveFactStorage(int32 InWaiting, int32 InExternal, FString& OutError);
 
 private:
 	struct FWaitingPlanSection
 	{
 		FVoxelGenerationConsumerKey Consumer;
-		TArray<FVoxelGenerationPlanDependency> Dependencies;
+		FVoxelGenerationPlanDependencyCapture Dependencies;
 		TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> Retention;
 		FVoxelSectionStamp Stamp;
 		double BlockedSinceSeconds = 0.0;
 		FString Blocker;
 		double RetryAfterSeconds = 0.0;
+		uint64 CapacityVersion = 0;
+		bool bWaitingCapacity = false;
 	};
 
 	FVoxelWorldRuntime& Runtime;
@@ -139,12 +142,17 @@ private:
 	TMap<FIntVector, FAdmissionServiceAge> AdmissionAges;
 	uint64 NextAdmissionSequence = 0;
 	double AdmissionCostEstimateMicroseconds = 25.0;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> FactStorageLease;
+	int32 WaitingFactCapacity = 0;
+	int32 ExternalFactCapacity = 0;
 	TMap<FIntVector, FWaitingPlanSection> WaitingPlanSections;
 	struct FExternalFactConsumer
 	{
 		FVoxelGenerationBounds Bounds;
-		TArray<FVoxelGenerationPlanDependency> Dependencies;
+		FVoxelGenerationPlanDependencyCapture Dependencies;
 		TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> Retention;
+		uint64 CapacityVersion = 0;
+		bool bWaitingCapacity = false;
 	};
 	TMap<FVoxelGenerationConsumerKey, FExternalFactConsumer> ExternalFactConsumers;
 	TFunction<void(const FVoxelGenerationConsumerKey&)> ExternalConsumerWakeCallback;

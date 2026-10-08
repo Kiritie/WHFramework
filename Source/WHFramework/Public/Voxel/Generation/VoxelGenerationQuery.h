@@ -20,11 +20,25 @@ struct WHFRAMEWORK_API FVoxelGenerationPlanKeys
 	TArray<FVoxelEcologyTileKey> EcologyTiles;
 };
 
+struct WHFRAMEWORK_API FVoxelGenerationPlanKeyRanges
+{
+	FIntPoint TileMin;
+	FIntPoint TileMax;
+	FIntPoint EcologyMin;
+	FIntPoint EcologyMax;
+	int32 TileCount = 0;
+	int32 EcologyCount = 0;
+};
+
 class WHFRAMEWORK_API FVoxelGenerationQuery
 {
 public:
 	static constexpr int32 GenerationPlanTileSide = 256;
 	static constexpr int32 EcologyTileSide = 64;
+
+	// 只计算空间与数量，供原生容量接纳使用，不创建 Keys 正文。
+	static bool GetPlanKeyRanges(const FVoxelGenerationBounds& InBounds,
+		const FVoxelGenerationSettings& InSettings, FVoxelGenerationPlanKeyRanges& OutRanges, FString& OutError);
 
 	static FVoxelGenerationPlanKeys GatherPlanKeys(
 		const FVoxelGenerationBounds& InBounds,

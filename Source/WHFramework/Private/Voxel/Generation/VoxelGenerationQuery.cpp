@@ -35,44 +35,68 @@ namespace
 	}
 }
 
+bool FVoxelGenerationQuery::GetPlanKeyRanges(const FVoxelGenerationBounds& InBounds,
+	const FVoxelGenerationSettings& InSettings, FVoxelGenerationPlanKeyRanges& OutRanges, FString& OutError)
+{
+	if (!InBounds.IsValid())
+	{
+		OutError = TEXT("Invalid generation planning bounds");
+		return false;
+	}
+	const auto At = [](const int64 Value, const int32 Side)
+	{
+		return VoxelGeneration::FloorDivide(int32(FMath::Clamp<int64>(Value, MIN_int32, MAX_int32)), Side);
+	};
+	const int64 Margin = FMath::Max(InSettings.CaveSpacing, GenerationPlanTileSide);
+	const int64 EcologyMargin = int64(FMath::Max(0, FMath::Max(
+		InSettings.Ecology.Tree.CrownRadius, InSettings.Ecology.Grass.PatchRadius))) + 2;
+	FVoxelGenerationPlanKeyRanges Candidate;
+	Candidate.TileMin = FIntPoint(At(int64(InBounds.Min.X) - Margin, GenerationPlanTileSide),
+		At(int64(InBounds.Min.Y) - Margin, GenerationPlanTileSide));
+	Candidate.TileMax = FIntPoint(At(int64(InBounds.Max.X) - 1 + Margin, GenerationPlanTileSide),
+		At(int64(InBounds.Max.Y) - 1 + Margin, GenerationPlanTileSide));
+	Candidate.EcologyMin = FIntPoint(At(int64(InBounds.Min.X) - EcologyMargin, EcologyTileSide),
+		At(int64(InBounds.Min.Y) - EcologyMargin, EcologyTileSide));
+	Candidate.EcologyMax = FIntPoint(At(int64(InBounds.Max.X) - 1 + EcologyMargin, EcologyTileSide),
+		At(int64(InBounds.Max.Y) - 1 + EcologyMargin, EcologyTileSide));
+	const int64 Tiles = (int64(Candidate.TileMax.X) - Candidate.TileMin.X + 1) *
+		(int64(Candidate.TileMax.Y) - Candidate.TileMin.Y + 1);
+	const int64 Ecology = (int64(Candidate.EcologyMax.X) - Candidate.EcologyMin.X + 1) *
+		(int64(Candidate.EcologyMax.Y) - Candidate.EcologyMin.Y + 1);
+	if (Tiles <= 0 || Ecology <= 0 || Tiles > MAX_int32 || Ecology > MAX_int32)
+	{
+		OutError = TEXT("Oversized: generation planning key ranges");
+		return false;
+	}
+	Candidate.TileCount = int32(Tiles);
+	Candidate.EcologyCount = int32(Ecology);
+	OutRanges = Candidate;
+	OutError.Reset();
+	return true;
+}
+
 FVoxelGenerationPlanKeys FVoxelGenerationQuery::GatherPlanKeys(
 	const FVoxelGenerationBounds& InBounds,
 	const FVoxelGenerationSettings& InSettings)
 {
 	FVoxelGenerationPlanKeys Keys;
-	const FVoxelGenerationBounds PlanningBounds = InBounds.Expand(
-		FMath::Max(InSettings.CaveSpacing, GenerationPlanTileSide));
-	const int32 MinTileX = VoxelGeneration::FloorDivide(
-		PlanningBounds.Min.X, GenerationPlanTileSide);
-	const int32 MaxTileX = VoxelGeneration::FloorDivide(
-		PlanningBounds.Max.X - 1, GenerationPlanTileSide);
-	const int32 MinTileY = VoxelGeneration::FloorDivide(
-		PlanningBounds.Min.Y, GenerationPlanTileSide);
-	const int32 MaxTileY = VoxelGeneration::FloorDivide(
-		PlanningBounds.Max.Y - 1, GenerationPlanTileSide);
-	for (int32 Y = MinTileY; Y <= MaxTileY; ++Y)
+	FVoxelGenerationPlanKeyRanges Ranges;
+	FString Error;
+	if (!GetPlanKeyRanges(InBounds, InSettings, Ranges, Error)) return Keys;
+	Keys.Tiles.Reserve(Ranges.TileCount);
+	Keys.EcologyTiles.Reserve(Ranges.EcologyCount);
+	for (int64 Y = Ranges.TileMin.Y; Y <= Ranges.TileMax.Y; ++Y)
 	{
-		for (int32 X = MinTileX; X <= MaxTileX; ++X)
+		for (int64 X = Ranges.TileMin.X; X <= Ranges.TileMax.X; ++X)
 		{
-			Keys.Tiles.Add({ FIntVector(X, Y, 0) });
+			Keys.Tiles.Add({ FIntVector(int32(X), int32(Y), 0) });
 		}
 	}
-	const int32 EcologyMargin = FMath::Max(
-		InSettings.Ecology.Tree.CrownRadius,
-		InSettings.Ecology.Grass.PatchRadius) + 2;
-	const int32 EcologyMinX = VoxelGeneration::FloorDivide(
-		InBounds.Min.X - EcologyMargin, EcologyTileSide);
-	const int32 EcologyMaxX = VoxelGeneration::FloorDivide(
-		InBounds.Max.X - 1 + EcologyMargin, EcologyTileSide);
-	const int32 EcologyMinY = VoxelGeneration::FloorDivide(
-		InBounds.Min.Y - EcologyMargin, EcologyTileSide);
-	const int32 EcologyMaxY = VoxelGeneration::FloorDivide(
-		InBounds.Max.Y - 1 + EcologyMargin, EcologyTileSide);
-	for (int32 Y = EcologyMinY; Y <= EcologyMaxY; ++Y)
+	for (int64 Y = Ranges.EcologyMin.Y; Y <= Ranges.EcologyMax.Y; ++Y)
 	{
-		for (int32 X = EcologyMinX; X <= EcologyMaxX; ++X)
+		for (int64 X = Ranges.EcologyMin.X; X <= Ranges.EcologyMax.X; ++X)
 		{
-			Keys.EcologyTiles.Add({ FIntPoint(X, Y) });
+			Keys.EcologyTiles.Add({ FIntPoint(int32(X), int32(Y)) });
 		}
 	}
 	return Keys;
@@ -487,6 +511,14 @@ bool FVoxelGenerationQuery::Prepare(
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_QueryPrepare);
 
+	if (!Config || !Config->Recipe)
+	{
+		OutError = TEXT("Voxel query is not initialized");
+		return false;
+	}
+	const FVoxelGenerationSettings& Settings = Config->Recipe->Settings;
+	FVoxelGenerationPlanKeyRanges Ranges;
+	if (!GetPlanKeyRanges(InBounds, Settings, Ranges, OutError)) return false;
 	if (!PrepareColumns(
 		InBounds,
 		OutError,
@@ -494,9 +526,6 @@ bool FVoxelGenerationQuery::Prepare(
 	{
 		return false;
 	}
-
-	const FVoxelGenerationSettings& Settings =
-		Config->Recipe->Settings;
 
 	const FVoxelGenerationPlanKeys PlanKeys = GatherPlanKeys(InBounds, Settings);
 

@@ -108,6 +108,22 @@ bool FVoxelReservedContainerCapacityTest::RunTest(const FString& InParameters)
 		for (int32 Index = Values.Num(); Index < Count; ++Index) Values.Add(uint64(Index));
 		TestTrue(TEXT("预留后填充不绕过 Set 容量授予"), uint64(Values.GetAllocatedSize()) <= SetModel);
 	}
+	// 独立复现已经有 heap 位图的增长，不能仅验证从空容器首次 Reserve。
+	TSet<uint64> GrowingValues;
+	TMap<FGuid, uint64> GrowingIdentities;
+	TSparseArray<FGuid> GrowingSlots;
+	for (const int32 Count : {256, 512, 1024})
+	{
+		const uint64 SetModel = VoxelBoundedAllocation::SetBytes<uint64>(Count);
+		const uint64 MapModel = VoxelBoundedAllocation::MapBytes<FGuid, uint64>(Count);
+		const uint64 SparseModel = VoxelBoundedAllocation::SparseArrayBytes<FGuid>(Count);
+		GrowingValues.Reserve(Count);
+		GrowingIdentities.Reserve(Count);
+		GrowingSlots.Reserve(Count);
+		TestTrue(TEXT("已有 heap 位图的 Set 扩容不超过原授予模型"), uint64(GrowingValues.GetAllocatedSize()) <= SetModel);
+		TestTrue(TEXT("已有 heap 位图的 Map 扩容不超过原授予模型"), uint64(GrowingIdentities.GetAllocatedSize()) <= MapModel);
+		TestTrue(TEXT("已有 heap 位图的 SparseArray 扩容不超过原授予模型"), uint64(GrowingSlots.GetAllocatedSize()) <= SparseModel);
+	}
 	return true;
 }
 
@@ -122,7 +138,7 @@ bool FVoxelSharedAllocationCapacityTest::RunTest(const FString& InParameters)
 	{
 		using FProbe = decltype(InProbe);
 		// 与 MakeShared 相同的真实 UE 控制器分配；检查 allocator 实际块容量。
-		auto* Controller = SharedPointerInternals::NewIntrusiveReferenceController<FProbe, ESPMode::ThreadSafe>();
+		auto* Controller = SharedPointerInternals::NewIntrusiveReferenceController<ESPMode::ThreadSafe, FProbe>();
 		const uint64 ActualBytes = FMemory::GetAllocSize(Controller);
 		const uint64 GrantedBytes = VoxelBoundedAllocation::SharedBytes<FProbe>();
 		TestTrue(TEXT("分配器报告了控制器实际容量"), ActualBytes > 0);

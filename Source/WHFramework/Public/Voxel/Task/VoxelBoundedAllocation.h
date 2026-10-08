@@ -126,7 +126,7 @@ namespace VoxelBoundedAllocation
 			TWorkerDeleter<ObjectType, bAlwaysWorker>{MoveTemp(InLease)});
 	}
 
-	// 与空 TMap::Reserve 的 UE 5.8 分配布局一致；调用方必须先 Reserve 再填充。
+	// 覆盖 UE 5.8 位图首次与后续堆增长；调用方必须先 Reserve 再填充。
 	template<typename ElementType>
 	uint64 SetBytes(const int32 InCount)
 	{
@@ -138,8 +138,10 @@ namespace VoxelBoundedAllocation
 		using SparseElementType = TSparseSetElement<ElementType>;
 		using StorageType = TSparseArrayElementOrFreeListLink<TAlignedBytes<sizeof(SparseElementType), alignof(SparseElementType)>>;
 		const uint32 Words = (uint32(InCount) + 31) / 32;
-		FDefaultBitArrayAllocator::ForElementType<uint32> BitAllocator;
-		const uint64 BitBytes = Words > 4 ? uint64(BitAllocator.CalculateSlackGrow(int32(Words), 4, sizeof(uint32))) * sizeof(uint32) : 0;
+		FDefaultAllocator::ForElementType<uint32> BitAllocator;
+		const uint64 BitBytes = Words > 4 ? uint64(FMath::Max(
+			BitAllocator.CalculateSlackGrow(int32(Words), 0, sizeof(uint32)),
+			BitAllocator.CalculateSlackGrow(int32(Words), int32(Words) - 1, sizeof(uint32)))) * sizeof(uint32) : 0;
 		const uint32 HashBuckets = FDefaultSetAllocator::GetNumberOfHashBuckets(uint32(InCount));
 		return ArrayBytes<StorageType>(InCount) + BitBytes +
 			(HashBuckets > 1 ? uint64(HashBuckets) * sizeof(FSetElementId) : 0);
@@ -158,8 +160,10 @@ namespace VoxelBoundedAllocation
 		check(InCount >= 0);
 		using StorageType = TSparseArrayElementOrFreeListLink<TAlignedBytes<sizeof(ElementType), alignof(ElementType)>>;
 		const uint32 Words = (uint32(InCount) + 31) / 32;
-		FDefaultBitArrayAllocator::ForElementType<uint32> BitAllocator;
-		const uint64 BitBytes = Words > 4 ? uint64(BitAllocator.CalculateSlackGrow(int32(Words), 4, sizeof(uint32))) * sizeof(uint32) : 0;
+		FDefaultAllocator::ForElementType<uint32> BitAllocator;
+		const uint64 BitBytes = Words > 4 ? uint64(FMath::Max(
+			BitAllocator.CalculateSlackGrow(int32(Words), 0, sizeof(uint32)),
+			BitAllocator.CalculateSlackGrow(int32(Words), int32(Words) - 1, sizeof(uint32)))) * sizeof(uint32) : 0;
 		return ArrayBytes<StorageType>(InCount) + BitBytes;
 	}
 }

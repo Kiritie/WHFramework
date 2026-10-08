@@ -30,12 +30,13 @@ bool FVoxelNavigationDataDemandTest::RunTest(const FString& InParameters)
 	FVoxelRuntimeSectionPin First;
 	FVoxelRuntimeSectionPin Second;
 	const auto Resources = Scheduler.GetTerrainResources();
-	const auto ResourceState = Resources->Snapshot();
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> CapacityBlocker;
 	const auto CapacityConsumer = FVoxelGenerationConsumerKey::Section(Runtime.Epoch(), FGuid::NewGuid(), 1, Above, 1);
 	if (!TestTrue(TEXT("实际Input池可阻塞消费者控制表授予"), Resources->Acquire(CapacityConsumer,
-		EVoxelTerrainResourcePool::Input, ResourceState.Limits.InputBytes -
-			ResourceState.Used[int32(EVoxelTerrainResourcePool::Input)], CapacityBlocker))) return false;
+		EVoxelTerrainResourcePool::Input, 1, CapacityBlocker))) return false;
+	const auto ResourceState = Resources->Snapshot();
+	if (!TestTrue(TEXT("句柄和账本已授予后填满实际Input池"), CapacityBlocker->Resize(1 + ResourceState.Limits.InputBytes -
+		ResourceState.Used[int32(EVoxelTerrainResourcePool::Input)]))) return false;
 	TestFalse(TEXT("容量失败在表分配和Runtime接纳之前返回"), Emerge.AcquireDataDemand(Above, First));
 	TestNull(TEXT("容量失败不隐式申请Runtime或取得pin"), Runtime.FindSection(Above));
 	TestFalse(TEXT("失败不制造有效访问句柄"), First.ConsumerId.IsValid());

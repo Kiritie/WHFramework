@@ -153,50 +153,115 @@ bool FVoxelGenerationPlanCoordinator::PreparePrerequisites(FState& InState, cons
 
 bool FVoxelGenerationPlanCoordinator::GatherForBounds(
 	const FVoxelGenerationBounds& InBounds,
-	TArray<FVoxelGenerationPlanDependency>& OutDependencies,
+	const FVoxelGenerationConsumerKey& InConsumer,
+	FVoxelGenerationPlanDependencyCapture& OutDependencies,
 	FString& OutError) const
 {
-	OutDependencies.Reset();
-	if (!InBounds.IsValid() || !Config->Recipe)
+	if (!InBounds.IsValid() || !Config->Recipe || !InConsumer.IsValid() || InConsumer.WorldEpoch != WorldEpoch)
 	{
-		OutError = TEXT("Voxel plan preflight received invalid bounds or recipe");
+		OutError = TEXT("Voxel plan preflight received invalid bounds, recipe or consumer");
 		return false;
 	}
 	const FVoxelGenerationSettings& Settings = Config->Recipe->Settings;
-	const FVoxelGenerationPlanKeys Keys = FVoxelGenerationQuery::GatherPlanKeys(
-		InBounds, Settings);
-	TSet<FVoxelGenerationPlanDependency> Closure;
-	const auto AppendFact = [this, &Closure, &OutError](const FVoxelGenerationPlanDependency& Fact)
+	FVoxelGenerationPlanKeyRanges Ranges;
+	if (!FVoxelGenerationQuery::GetPlanKeyRanges(InBounds, Settings, Ranges, OutError)) return false;
+	constexpr int32 MaximumFacts = 1 << 20;
+	if (int64(Ranges.TileCount) * 3 + Ranges.EcologyCount > MaximumFacts)
 	{
-		Closure.Add(Fact);
-		TArray<FVoxelGenerationPlanDependency> Prerequisites;
-		if (!GatherPrerequisites(Fact, Prerequisites, OutError)) return false;
-		for (const auto& Prerequisite : Prerequisites) Closure.Add(Prerequisite);
-		return true;
-	};
-	for (const FVoxelGenerationTileKey& Tile : Keys.Tiles)
-	{
-		for (const auto Kind : {EVoxelGenerationPlanKind::Cave, EVoxelGenerationPlanKind::Structure, EVoxelGenerationPlanKind::Feature})
-			if (!AppendFact(MakeDependency(Kind, Tile.Coordinate))) return false;
-	}
-	for (const FVoxelEcologyTileKey& Tile : Keys.EcologyTiles)
-	{
-		if (!AppendFact(MakeDependency(EVoxelGenerationPlanKind::Ecology,
-			FIntVector(Tile.Coordinate.X, Tile.Coordinate.Y, 0)))) return false;
+		OutError = TEXT("Oversized: generation preflight root facts");
+		return false;
 	}
 	const auto MinRegion = FVoxelGenerationQuery::HydrologyKeyForVoxel(InBounds.Min.X, InBounds.Min.Y, Settings).Coordinate;
 	const auto MaxRegion = FVoxelGenerationQuery::HydrologyKeyForVoxel(InBounds.Max.X - 1, InBounds.Max.Y - 1, Settings).Coordinate;
-	const int64 Count = (int64(MaxRegion.X) - MinRegion.X + 1) * (int64(MaxRegion.Y) - MinRegion.Y + 1);
-	if (Count > MaximumHydrologyDependencies)
+	const int64 Width = int64(MaxRegion.X) - MinRegion.X + 1;
+	const int64 Height = int64(MaxRegion.Y) - MinRegion.Y + 1;
+	if (Width <= 0 || Height <= 0 || Width > MaximumHydrologyDependencies ||
+		Height > MaximumHydrologyDependencies || Width > MaximumHydrologyDependencies / Height)
 	{
 		OutError = TEXT("生成采样范围超过水文闭包上限");
 		return false;
 	}
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ClosureLease;
+	TSet<FVoxelGenerationPlanDependency> Closure;
+	int32 Capacity = 0;
+	const auto Append = [&](const FVoxelGenerationPlanDependency& Fact)
+	{
+		if (Closure.Contains(Fact)) return true;
+		if (Closure.Num() == MaximumFacts)
+		{
+			OutError = TEXT("Oversized: generation preflight closure");
+			return false;
+		}
+		if (Closure.Num() == Capacity)
+		{
+			const int32 NewCapacity = FMath::Max(4, Capacity * 2);
+			const uint64 Bytes = VoxelBoundedAllocation::SetBytes<FVoxelGenerationPlanDependency>(NewCapacity);
+			if (Bytes + (ClosureLease ? ClosureLease->Bytes() : 0) > Resources->Snapshot().Limits.WorkingBytes)
+			{
+				OutError = TEXT("CapacityUnachievable: generation preflight closure backing");
+				return false;
+			}
+			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> NewLease;
+			if (!Resources->Acquire(InConsumer, EVoxelTerrainResourcePool::Working,
+				Bytes, NewLease))
+			{
+				OutError = TEXT("CapacityBlocked: generation preflight closure backing");
+				return false;
+			}
+			Closure.Reserve(NewCapacity);
+			check(Closure.GetAllocatedSize() <= NewLease->Bytes());
+			ClosureLease = MoveTemp(NewLease);
+			Capacity = NewCapacity;
+		}
+		Closure.Add(Fact);
+		return true;
+	};
+	const auto AppendFact = [&](const FVoxelGenerationPlanDependency& Fact)
+	{
+		if (!Append(Fact)) return false;
+		FIntPoint Min;
+		FIntPoint Max;
+		int32 Reads = 0;
+		if (!GetPrerequisiteRange(Fact, Min, Max, Reads, OutError)) return false;
+		if (Reads)
+			for (int64 Y = Min.Y; Y <= Max.Y; ++Y)
+				for (int64 X = Min.X; X <= Max.X; ++X)
+					if (!Append(MakeDependency(EVoxelGenerationPlanKind::Hydrology, FIntVector(int32(X), int32(Y), 0)))) return false;
+		return true;
+	};
+	for (int64 Y = Ranges.TileMin.Y; Y <= Ranges.TileMax.Y; ++Y)
+	{
+		for (int64 X = Ranges.TileMin.X; X <= Ranges.TileMax.X; ++X)
+			for (const auto Kind : {EVoxelGenerationPlanKind::Cave, EVoxelGenerationPlanKind::Structure, EVoxelGenerationPlanKind::Feature})
+				if (!AppendFact(MakeDependency(Kind, FIntVector(int32(X), int32(Y), 0)))) return false;
+	}
+	for (int64 Y = Ranges.EcologyMin.Y; Y <= Ranges.EcologyMax.Y; ++Y)
+	{
+		for (int64 X = Ranges.EcologyMin.X; X <= Ranges.EcologyMax.X; ++X)
+			if (!AppendFact(MakeDependency(EVoxelGenerationPlanKind::Ecology, FIntVector(int32(X), int32(Y), 0)))) return false;
+	}
 	for (int64 Y = MinRegion.Y; Y <= MaxRegion.Y; ++Y)
 		for (int64 X = MinRegion.X; X <= MaxRegion.X; ++X)
-			Closure.Add(MakeDependency(EVoxelGenerationPlanKind::Hydrology, FIntVector(int32(X), int32(Y), 0)));
-	OutDependencies.Reserve(Closure.Num());
-	for (const auto& Fact : Closure) OutDependencies.Add(Fact);
+			if (!Append(MakeDependency(EVoxelGenerationPlanKind::Hydrology, FIntVector(int32(X), int32(Y), 0)))) return false;
+	FVoxelGenerationPlanDependencyCapture Candidate;
+	const uint64 Bytes = VoxelBoundedAllocation::ArrayBytes<FVoxelGenerationPlanDependency>(Closure.Num());
+	const uint64 Limit = Resources->Snapshot().Limits.InputBytes;
+	const uint64 Previous = OutDependencies.Lease && OutDependencies.Lease->IsOwnedBy(Resources.Get()) ? OutDependencies.Lease->Bytes() : 0;
+	if (Bytes > Limit || Previous > Limit - Bytes)
+	{
+		OutError = TEXT("CapacityUnachievable: generation preflight capture");
+		return false;
+	}
+	if (!Resources->Acquire(InConsumer, EVoxelTerrainResourcePool::Input,
+		Bytes, Candidate.Lease))
+	{
+		OutError = TEXT("CapacityBlocked: generation preflight capture");
+		return false;
+	}
+	Candidate.Values.Reserve(Closure.Num());
+	check(Candidate.Values.GetAllocatedSize() <= Candidate.Lease->Bytes());
+	for (const auto& Fact : Closure) Candidate.Values.Add(Fact);
+	OutDependencies = MoveTemp(Candidate);
 	OutError.Reset();
 	return true;
 }
@@ -226,36 +291,62 @@ bool FVoxelGenerationPlanCoordinator::GetPrerequisiteRange(const FVoxelGeneratio
 	};
 	OutMin = At(int64(Coordinate.X) * Side - Margin, int64(Coordinate.Y) * Side - Margin);
 	OutMax = At(int64(Coordinate.X) * Side + Side - 1 + Margin, int64(Coordinate.Y) * Side + Side - 1 + Margin);
-	const int64 Count = (int64(OutMax.X) - OutMin.X + 1) * (int64(OutMax.Y) - OutMin.Y + 1);
-	if (Count <= 0 || Count > MaximumHydrologyDependencies)
+	const int64 Width = int64(OutMax.X) - OutMin.X + 1;
+	const int64 Height = int64(OutMax.Y) - OutMin.Y + 1;
+	if (Width <= 0 || Height <= 0 || Width > MaximumHydrologyDependencies ||
+		Height > MaximumHydrologyDependencies || Width > MaximumHydrologyDependencies / Height)
 	{
 		OutError = TEXT("单个生成事实的水文闭包超过上限");
 		return false;
 	}
-	OutCount = int32(Count);
+	OutCount = int32(Width * Height);
 	return true;
 }
 
 bool FVoxelGenerationPlanCoordinator::GatherPrerequisites(const FVoxelGenerationPlanDependency& InDependency,
-	TArray<FVoxelGenerationPlanDependency>& OutDependencies, FString& OutError) const
+	FVoxelGenerationPlanDependencyCapture& OutDependencies, FString& OutError) const
 {
-	OutDependencies.Reset();
 	FIntPoint Min;
 	FIntPoint Max;
 	int32 Count = 0;
 	if (!GetPrerequisiteRange(InDependency, Min, Max, Count, OutError)) return false;
-	OutDependencies.Reserve(Count);
-	if (!Count) return true;
-	for (int64 Y = Min.Y; Y <= Max.Y; ++Y)
-		for (int64 X = Min.X; X <= Max.X; ++X)
-			OutDependencies.Add(MakeDependency(EVoxelGenerationPlanKind::Hydrology, FIntVector(int32(X), int32(Y), 0)));
+	FVoxelGenerationPlanDependencyCapture Candidate;
+	if (Count)
+	{
+		const uint64 Bytes = VoxelBoundedAllocation::ArrayBytes<FVoxelGenerationPlanDependency>(Count);
+		const uint64 Limit = Resources->Snapshot().Limits.InputBytes;
+		const uint64 Previous = OutDependencies.Lease && OutDependencies.Lease->IsOwnedBy(Resources.Get()) ? OutDependencies.Lease->Bytes() : 0;
+		if (Bytes > Limit || Previous > Limit - Bytes)
+		{
+			OutError = TEXT("CapacityUnachievable: generation prerequisite capture");
+			return false;
+		}
+		if (!Resources->Acquire(ControlConsumer, EVoxelTerrainResourcePool::Input,
+			Bytes, Candidate.Lease))
+		{
+			OutError = TEXT("CapacityBlocked: generation prerequisite capture");
+			return false;
+		}
+		Candidate.Values.Reserve(Count);
+		check(Candidate.Values.GetAllocatedSize() <= Candidate.Lease->Bytes());
+		for (int64 Y = Min.Y; Y <= Max.Y; ++Y)
+			for (int64 X = Min.X; X <= Max.X; ++X)
+				Candidate.Values.Add(MakeDependency(EVoxelGenerationPlanKind::Hydrology, FIntVector(int32(X), int32(Y), 0)));
+	}
+	OutDependencies = MoveTemp(Candidate);
 	return true;
 }
 
-TSharedRef<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> FVoxelGenerationPlanCoordinator::RetainDependencies(
+bool FVoxelGenerationPlanCoordinator::RetainDependencies(
 	TConstArrayView<FVoxelGenerationPlanDependency> InDependencies,
-	const FIntPoint& InCenter) const
+	const FIntPoint& InCenter, const FVoxelGenerationConsumerKey& InConsumer,
+	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>& OutRetention, FString& OutError) const
 {
+	if (!Config->Recipe || !InConsumer.IsValid() || InConsumer.WorldEpoch != WorldEpoch)
+	{
+		OutError = TEXT("InvalidConsumer: generation cache retention");
+		return false;
+	}
 	FVoxelGenerationCacheRetentionPoint Point;
 	Point.Center = InCenter;
 	const auto& Settings = Config->Recipe->Settings;
@@ -273,7 +364,7 @@ TSharedRef<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> FVoxelGener
 		int32& Radius = bHydrology ? Point.HydrologyRadiusCells : Point.PlanRadiusCells;
 		Radius = FMath::Max(Radius, static_cast<int32>(FMath::Min<int64>(MAX_int32, Distance)));
 	}
-	return Cache->RetainForTask(Point);
+	return Cache->RetainForTask(Point, Resources, InConsumer, OutRetention, OutError);
 }
 
 FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::EnsureEnvironment(const FIntPoint& InCell)
@@ -299,19 +390,25 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::EnsureEnvironm
 		InBounds.Min.X, InBounds.Min.Y, Settings).Coordinate;
 	const FIntPoint Max = FVoxelGenerationQuery::HydrologyKeyForVoxel(
 		InBounds.Max.X - 1, InBounds.Max.Y - 1, Settings).Coordinate;
-	const int64 Count = (static_cast<int64>(Max.X) - Min.X + 1) *
-		(static_cast<int64>(Max.Y) - Min.Y + 1);
-	if (Count > MaximumHydrologyDependencies)
+	const int64 Width = int64(Max.X) - Min.X + 1;
+	const int64 Height = int64(Max.Y) - Min.Y + 1;
+	if (Width <= 0 || Height <= 0 || Width > MaximumHydrologyDependencies ||
+		Height > MaximumHydrologyDependencies || Width > MaximumHydrologyDependencies / Height)
 		return { false, true, TEXT("Environment preflight exceeds hydrology dependency limit") };
-	TArray<FVoxelGenerationPlanDependency> Dependencies;
-	Dependencies.Reserve(static_cast<int32>(Count));
-	for (int64 Y = Min.Y; Y <= Max.Y; ++Y)
-		for (int64 X = Min.X; X <= Max.X; ++X)
-			Dependencies.Add(MakeDependency(EVoxelGenerationPlanKind::Hydrology,
-				FIntVector(static_cast<int32>(X), static_cast<int32>(Y), 0)));
+	const int32 Count = int32(Width * Height);
 	const FVoxelGenerationConsumerKey Consumer = EnvironmentConsumer(InBounds, false);
 	if (!Consumer.IsValid()) return {false, false, TEXT("CapacityBlocked: generation environment attempt")};
-	const FVoxelGenerationDependencyStatus Status = Ensure(Dependencies, InWorkClass,
+	FVoxelGenerationPlanDependencyCapture Dependencies;
+	if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input,
+		VoxelBoundedAllocation::ArrayBytes<FVoxelGenerationPlanDependency>(int32(Count)), Dependencies.Lease))
+		return {false, false, TEXT("CapacityBlocked: generation environment capture")};
+	Dependencies.Values.Reserve(static_cast<int32>(Count));
+	check(Dependencies.Values.GetAllocatedSize() <= Dependencies.Lease->Bytes());
+	for (int64 Y = Min.Y; Y <= Max.Y; ++Y)
+		for (int64 X = Min.X; X <= Max.X; ++X)
+			Dependencies.Values.Add(MakeDependency(EVoxelGenerationPlanKind::Hydrology,
+				FIntVector(static_cast<int32>(X), static_cast<int32>(Y), 0)));
+	const FVoxelGenerationDependencyStatus Status = Ensure(Dependencies.Values, InWorkClass,
 		InSourcePriority, InDistanceScore, InForwardScore, Consumer);
 	if (Status.bReady || Status.bFailed)
 	{
@@ -392,8 +489,12 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 	Request.ServiceBand = InOutState.ServicePriority.Band;
 	Request.SourceStableKey = InOutState.ServicePriority.SourceStableKey;
 	Request.Stamp.WorldEpoch = WorldEpoch;
-	checkf(NextAttemptId != MAX_uint64, TEXT("Generation attempt serial exhausted"));
-	InOutState.AttemptId = ++NextAttemptId;
+	if (!InOutState.bAttemptPendingAdmission)
+	{
+		checkf(NextAttemptId != MAX_uint64, TEXT("Generation attempt serial exhausted"));
+		InOutState.AttemptId = ++NextAttemptId;
+		InOutState.bAttemptPendingAdmission = true;
+	}
 	Request.Stamp.Token = InOutState.AttemptId;
 	Request.Stamp.OwnerId = EnvironmentOwnerId;
 	Request.Stamp.OwnerIncarnation = EnvironmentOwnerIncarnation;
@@ -404,17 +505,42 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 	const FVoxelGenerationConsumerKey CaptureConsumer{EVoxelGenerationConsumerKind::WorldFact, WorldEpoch,
 		EnvironmentOwnerId, Request.Stamp.OwnerIncarnation, EVoxelGenerationSpatialKind::Section, Request.Stamp.Section,
 		Request.Stamp.Section, Request.Stamp.Token};
+	if (InOutState.bWaitingCapacity && Resources->ReleaseVersionExcludingOwner(CaptureConsumer) <= InOutState.CapacityVersion) return false;
+	InOutState.bWaitingCapacity = false;
+	const uint64 BeforeAdmission = Resources->ReleaseVersionExcludingOwner(CaptureConsumer);
+	if ((!InOutState.PrerequisiteRetention || InOutState.bPrerequisiteRetentionPending) && !InOutState.Prerequisites.IsEmpty())
+	{
+		const int64 Side = InDependency.Kind == EVoxelGenerationPlanKind::Ecology ?
+			FVoxelGenerationQuery::EcologyTileSide : FVoxelGenerationQuery::GenerationPlanTileSide;
+		const FIntPoint Center(int32(FMath::Clamp<int64>(int64(InDependency.Coordinate().X) * Side, MIN_int32, MAX_int32)),
+			int32(FMath::Clamp<int64>(int64(InDependency.Coordinate().Y) * Side, MIN_int32, MAX_int32)));
+		FString Error;
+		if (!RetainDependencies(InOutState.Prerequisites, Center, CaptureConsumer, InOutState.PrerequisiteRetention, Error))
+		{
+			InOutState.bWaitingCapacity = Error.StartsWith(TEXT("CapacityBlocked"));
+			InOutState.CapacityVersion = BeforeAdmission;
+			if (!InOutState.bWaitingCapacity) { InOutState.State = EVoxelPlanDependencyState::Failed; InOutState.Error = MoveTemp(Error); }
+			return false;
+		}
+		InOutState.bPrerequisiteRetentionPending = false;
+	}
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ReadLease;
+	const uint64 BeforeReadAdmission = Resources->ReleaseVersionExcludingOwner(CaptureConsumer);
 	if (!Scheduler.GetRuntimeResources()->Acquire(CaptureConsumer, EVoxelTerrainResourcePool::Input,
 		VoxelBoundedAllocation::WorkerSharedBytes<FPlanReadDependencies>() +
-		VoxelBoundedAllocation::ArrayBytes<FVoxelGenerationPlanDependency>(MaximumHydrologyDependencies), ReadLease)) return false;
+		VoxelBoundedAllocation::ArrayBytes<FVoxelGenerationPlanDependency>(MaximumHydrologyDependencies), ReadLease))
+	{
+		InOutState.bWaitingCapacity = true;
+		InOutState.CapacityVersion = BeforeReadAdmission;
+		return false;
+	}
 	auto ReadDependencies = VoxelBoundedAllocation::MakeWorkerShared<FPlanReadDependencies>(ReadLease);
 	ReadDependencies->Lease = MoveTemp(ReadLease);
 	ReadDependencies->Missing.Reserve(MaximumHydrologyDependencies);
 	check(ReadDependencies->GetAllocatedBytes() <= ReadDependencies->Lease->Bytes());
 	Request.InputBytes = ReadDependencies->Lease->Bytes();
 	Request.Execute = [Dependency = InDependency, CapturedConfig = Config,
-		CapturedCache = Cache, ReadDependencies](const TAtomic<bool>& Cancel)
+		CapturedCache = Cache, PrerequisiteRetention = InOutState.PrerequisiteRetention, ReadDependencies](const TAtomic<bool>& Cancel)
 	{
 		FVoxelTaskResult Result;
 		FVoxelGenerationQuery Query;
@@ -525,9 +651,20 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 				State = Storage->States.Find(Dependency);
 				const int64 Side = Dependency.Kind == EVoxelGenerationPlanKind::Ecology ?
 					FVoxelGenerationQuery::EcologyTileSide : FVoxelGenerationQuery::GenerationPlanTileSide;
-				State->PrerequisiteRetention = RetainDependencies(State->Prerequisites,
+				const FVoxelGenerationConsumerKey RetentionConsumer{EVoxelGenerationConsumerKind::WorldFact, Result.Stamp.WorldEpoch,
+					Result.Stamp.OwnerId, Result.Stamp.OwnerIncarnation, EVoxelGenerationSpatialKind::Section,
+					Result.Stamp.Section, Result.Stamp.Section, Result.Stamp.Token};
+				FString RetentionError;
+				State->bPrerequisiteRetentionPending = true;
+				if (!RetainDependencies(State->Prerequisites,
 					FIntPoint(int32(FMath::Clamp<int64>(int64(Dependency.Coordinate().X) * Side, MIN_int32, MAX_int32)),
-						int32(FMath::Clamp<int64>(int64(Dependency.Coordinate().Y) * Side, MIN_int32, MAX_int32))));
+						int32(FMath::Clamp<int64>(int64(Dependency.Coordinate().Y) * Side, MIN_int32, MAX_int32))),
+					RetentionConsumer, State->PrerequisiteRetention, RetentionError))
+				{
+					Result.Error = MoveTemp(RetentionError);
+					bRegistered = false;
+				}
+				else State->bPrerequisiteRetentionPending = false;
 				if (bRegistered)
 				{
 					FString GraphError;
@@ -567,6 +704,7 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 			*State->Error);
 	};
 	if (!Scheduler.Enqueue(MoveTemp(Request))) return false;
+	InOutState.bAttemptPendingAdmission = false;
 	InOutState.State = EVoxelPlanDependencyState::Queued;
 	InOutState.bInFlight = true;
 	return true;

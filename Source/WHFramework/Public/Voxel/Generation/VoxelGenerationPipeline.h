@@ -9,6 +9,8 @@ class WHFRAMEWORK_API FVoxelGenerationPipeline
 {
 public:
 	void SetOverlayPlanningServices(FVoxelGenerationPlanningServices InServices) const;
+	void BindRetentionResources(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+		const FVoxelGenerationConsumerKey& InConsumer) const;
 	void NotifyOverlayPlanningDependencyReady(const FVoxelGenerationConsumerKey& InConsumer) const;
 	FVoxelOverlayPreflightStatus EnsureOverlayConsumerReady(
 		const FVoxelGenerationConsumerKey& InConsumer,
@@ -51,7 +53,7 @@ public:
 		return bRequirePlanPreflight;
 	}
 
-	TSharedRef<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> RetainHydrologyForPlanning(
+	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> RetainHydrologyForPlanning(
 		const FIntPoint& InCenter,
 		int32 InSampleRadiusCells) const;
 
@@ -100,4 +102,7 @@ private:
 
 	TSharedPtr<const IVoxelGenerationOverlay, ESPMode::ThreadSafe> Overlay;
 	bool bRequirePlanPreflight = false;
+	// 绑定一次原世界账本；Stop 清空 Overlay 服务时不替换在途 Worker 的原所有者。
+	mutable TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> RetentionResources;
+	mutable FVoxelGenerationConsumerKey RetentionConsumer;
 };

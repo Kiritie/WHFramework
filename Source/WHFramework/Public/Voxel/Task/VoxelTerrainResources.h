@@ -53,6 +53,7 @@ public:
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Split(uint64 InBytes);
 	uint64 Bytes() const;
 	uint64 Serial() const;
+	bool IsOwnedBy(const FVoxelTerrainResources& InOwner) const { return &Owner.Get() == &InOwner; }
 
 private:
 	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> Owner;

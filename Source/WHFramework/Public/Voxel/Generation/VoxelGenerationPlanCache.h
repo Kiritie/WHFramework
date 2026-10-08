@@ -63,18 +63,40 @@ struct WHFRAMEWORK_API FVoxelGenerationCacheRetention
 };
 
 class FVoxelGenerationPlanCache;
+class FVoxelTerrainResources;
+class FVoxelTerrainResourceLease;
+struct FVoxelGenerationConsumerKey;
 
-/** Keeps a planning task's cache area retained until the task finishes. */
+/** 最后一个任务引用释放后解链；原资源授予覆盖到对象及控制器实际退出。 */
 class WHFRAMEWORK_API FVoxelGenerationCacheRetentionLease
 {
-public:
+private:
+	friend class FVoxelGenerationPlanCache;
 	FVoxelGenerationCacheRetentionLease(
 		TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> InCache,
+		TSharedRef<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InResourceLease,
+		const FVoxelGenerationCacheRetentionPoint& InPoint,
 		uint64 InId);
+
+	struct FDeleter
+	{
+		TSharedRef<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
+		void operator()(FVoxelGenerationCacheRetentionLease* InLease) const;
+	};
+
+public:
 	~FVoxelGenerationCacheRetentionLease();
+	FVoxelGenerationCacheRetentionLease(const FVoxelGenerationCacheRetentionLease&) = delete;
+	FVoxelGenerationCacheRetentionLease& operator=(const FVoxelGenerationCacheRetentionLease&) = delete;
+
+	static uint64 GetRequiredAllocationBytes();
 
 private:
+	TSharedRef<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 	TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> Cache;
+	FVoxelGenerationCacheRetentionPoint Point;
+	FVoxelGenerationCacheRetentionLease* Previous = nullptr;
+	FVoxelGenerationCacheRetentionLease* Next = nullptr;
 	uint64 Id = 0;
 };
 
@@ -209,8 +231,13 @@ public:
 	void UpdateRetention(
 		const FVoxelGenerationCacheRetention& InRetention);
 
-	TSharedRef<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> RetainForTask(
-		const FVoxelGenerationCacheRetentionPoint& InPoint);
+	/** 从调用方原Input池授予对象及控制器容量；拒收保留OutLease，旧节点按实际生命期解链退租。 */
+	bool RetainForTask(
+		const FVoxelGenerationCacheRetentionPoint& InPoint,
+		TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+		const FVoxelGenerationConsumerKey& InConsumer,
+		TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>& OutLease,
+		FString& OutError);
 
 	/**
 	 * 必须是有预算的增量维护。
@@ -228,7 +255,7 @@ public:
 
 private:
 	friend class FVoxelGenerationCacheRetentionLease;
-	void ReleaseTaskRetention(uint64 InId);
+	void ReleaseTaskRetention(FVoxelGenerationCacheRetentionLease& InLease);
 
 	struct FBuildGate;
 
@@ -286,8 +313,7 @@ private:
 
 	bool IsRetained(
 		const FIntPoint& InPosition,
-		int32 FVoxelGenerationCacheRetentionPoint::* InRadius,
-		const FVoxelGenerationCacheRetention& InRetention) const;
+		int32 FVoxelGenerationCacheRetentionPoint::* InRadius) const;
 
 	void RecordGateWait(uint64 InMicroseconds);
 	void RecordPlanLookup(EVoxelGenerationPlanKind InKind, bool bInHit) const;
@@ -299,7 +325,8 @@ private:
 
 	mutable FRWLock RetentionLock;
 	FVoxelGenerationCacheRetention Retention;
-	TMap<uint64, FVoxelGenerationCacheRetentionPoint> TaskRetentionPoints;
+	FVoxelGenerationCacheRetentionLease* TaskRetentionHead = nullptr;
+	FVoxelGenerationCacheRetentionLease* TaskRetentionTail = nullptr;
 	uint64 NextTaskRetentionId = 1;
 
 	int32 MaintenanceShardCursor = 0;

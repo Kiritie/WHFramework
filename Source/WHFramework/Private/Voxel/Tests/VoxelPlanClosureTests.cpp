@@ -21,13 +21,13 @@ bool FVoxelLocalPlanClosureTest::RunTest(const FString& InParameters)
 	FVoxelGenerationPlanDependency Near, Far;
 	Near.Kind = Far.Kind = EVoxelGenerationPlanKind::Structure;
 	Far.TileKey.Coordinate = FIntVector(400, 0, 0);
-	TArray<FVoxelGenerationPlanDependency> NearReads, FarReads;
+	FVoxelGenerationPlanDependencyCapture NearReads, FarReads;
 	FString Error;
 	TestTrue(TEXT("近处事实具有独立闭包"), Coordinator.GatherPrerequisites(Near, NearReads, Error));
 	TestTrue(TEXT("远处事实具有独立闭包"), Coordinator.GatherPrerequisites(Far, FarReads, Error));
-	TestEqual(TEXT("结构只采样所属瓦片水文"), NearReads.Num(), 1);
-	TestFalse(TEXT("远处闭包不别名近处水文"), NearReads.Contains(FarReads[0]));
-	for (const auto& Read : NearReads)
+	TestEqual(TEXT("结构只采样所属瓦片水文"), NearReads.Values.Num(), 1);
+	TestFalse(TEXT("远处闭包不别名近处水文"), NearReads.Values.Contains(FarReads.Values[0]));
+	for (const auto& Read : NearReads.Values)
 	{
 		FVoxelHydrologyPlanPtr Plan;
 		TestTrue(TEXT("预置近处已完成的事实"), Cache->GetOrBuildHydrology(Read.HydrologyKey,
@@ -38,9 +38,12 @@ bool FVoxelLocalPlanClosureTest::RunTest(const FString& InParameters)
 	const auto Status = Coordinator.Ensure(MakeArrayView(Facts), EVoxelWorkClass::Critical, 0, 0.0, 1.0, Consumer);
 	TestFalse(TEXT("调用者仍等待完整请求结果"), Status.bReady);
 	TestTrue(TEXT("近处计划可在远处水文未完成时排队"), Coordinator.Storage->States.FindChecked(Near).bInFlight);
+	TestTrue(TEXT("初次派发即保留原生事实自己的完整已知采样闭包"),
+		Coordinator.Storage->States.FindChecked(Near).PrerequisiteRetention.IsValid());
+	TestFalse(TEXT("成功派发后不保留未接纳的尝试标记"), Coordinator.Storage->States.FindChecked(Near).bAttemptPendingAdmission);
 	TestFalse(TEXT("远处计划等待自己的水文"), Coordinator.Storage->States.FindChecked(Far).bInFlight);
-	TestTrue(TEXT("远处水文拥有独立任务"), Coordinator.Storage->States.FindChecked(FarReads[0]).bInFlight);
-	const auto* Donated = Coordinator.PriorityGraph.Find(Coordinator.Storage->States.FindChecked(FarReads[0]).PriorityNode);
+	TestTrue(TEXT("远处水文拥有独立任务"), Coordinator.Storage->States.FindChecked(FarReads.Values[0]).bInFlight);
+	const auto* Donated = Coordinator.PriorityGraph.Find(Coordinator.Storage->States.FindChecked(FarReads.Values[0]).PriorityNode);
 	TestTrue(TEXT("生产依赖图将完整 Source 优先级送至事实叶子"), Donated && Donated->SourceStableKey == Consumer.OwnerId &&
 		Donated->Band == EVoxelTerrainServiceBand::P0);
 	Coordinator.ReleaseConsumer(Consumer);
@@ -484,6 +487,83 @@ bool FVoxelCoordinatorWakeLifetimeTest::RunTest(const FString& InParameters)
 	Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
 	TestEqual(TEXT("Canceled callback can be consumed after coordinator destruction"), Scheduler.ActiveCount(), 0);
 	Retired.Reset();
+	Scheduler.StopAndJoin();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelPlanCaptureCapacityTest,
+	"WHFramework.Voxel.FineRefactor.Generation.PlanCaptureCapacity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelPlanCaptureCapacityTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const auto Config = VoxelTest::MakeGenerationConfig();
+	const auto Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
+	FVoxelTaskScheduler Scheduler;
+	FVoxelGenerationPlanCoordinator Coordinator(Scheduler, Config, Cache, 79);
+	const auto Resources = Scheduler.GetRuntimeResources();
+	const auto Consumer = FVoxelGenerationConsumerKey::Section(79, FGuid::NewGuid(), 1, {}, 1);
+	const FVoxelGenerationBounds Bounds{FIntVector(-16, 0, 0), FIntVector(0, 16, 16)};
+	FVoxelGenerationPlanDependencyCapture Capture;
+	FString Error;
+	if (!TestTrue(TEXT("原采集入口接受带租约的完整闭包"), Coordinator.GatherForBounds(Bounds, Consumer, Capture, Error))) return false;
+	TestTrue(TEXT("输出 backing 由原 Input 账本租约持有"), Capture.Lease && Capture.Values.GetAllocatedSize() <= Capture.Lease->Bytes());
+	const auto* AcceptedData = Capture.Values.GetData();
+	const int32 AcceptedCount = Capture.Values.Num();
+	const uint64 AcceptedLease = Capture.Lease->Serial();
+	FVoxelGenerationPlanKeyRanges Ranges;
+	if (!FVoxelGenerationQuery::GetPlanKeyRanges(Bounds, Config->Recipe->Settings, Ranges, Error)) return false;
+	TestEqual(TEXT("负坐标规划起点向负无穷取整"), Ranges.TileMin.X, -2);
+	TestEqual(TEXT("半开上界在零处不加入原边界外瓦片"), Ranges.TileMax.X, 0);
+	for (const auto& Fact : Capture.Values)
+	{
+		FVoxelGenerationPlanDependencyCapture Reads;
+		if (!Coordinator.GatherPrerequisites(Fact, Reads, Error)) return false;
+		for (const auto& Read : Reads.Values)
+			TestTrue(TEXT("每个真实事实的全部读取位于公开捕获内"), Capture.Values.Contains(Read));
+	}
+	const auto CheckPreserved = [&]
+	{
+		TestTrue(TEXT("拒收保留同一已接受正文地址"), Capture.Values.GetData() == AcceptedData);
+		TestEqual(TEXT("拒收保留原闭包数量"), Capture.Values.Num(), AcceptedCount);
+		TestEqual(TEXT("拒收保留原 Input 租约"), Capture.Lease->Serial(), AcceptedLease);
+	};
+	const auto Blocker = FVoxelGenerationConsumerKey::Section(79, FGuid::NewGuid(), 1, {}, 1);
+	for (const auto Pool : {EVoxelTerrainResourcePool::Working, EVoxelTerrainResourcePool::Input})
+	{
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Pressure;
+		if (!Resources->Acquire(Blocker, Pool, 1, Pressure)) return false;
+		const auto Snapshot = Resources->Snapshot();
+		const uint64 Limit = Pool == EVoxelTerrainResourcePool::Working ? Snapshot.Limits.WorkingBytes : Snapshot.Limits.InputBytes;
+		if (!Pressure->Resize(Pressure->Bytes() + Limit - Snapshot.Used[int32(Pool)])) return false;
+		TestFalse(TEXT("真实容量压力拒收新捕获"), Coordinator.GatherForBounds(Bounds, Consumer, Capture, Error));
+		TestTrue(TEXT("暂时拒收返回容量等待"), Error.StartsWith(TEXT("CapacityBlocked")));
+		CheckPreserved();
+		Pressure.Reset();
+	}
+	auto ForeignConsumer = Consumer;
+	++ForeignConsumer.WorldEpoch;
+	TestFalse(TEXT("另一世界不能向原 Coordinator 提交采集"), Coordinator.GatherForBounds(Bounds, ForeignConsumer, Capture, Error));
+	CheckPreserved();
+	const FVoxelGenerationBounds Huge{FIntVector(MIN_int32, MIN_int32, 0), FIntVector(MAX_int32, MAX_int32, 16)};
+	TestFalse(TEXT("完整整数范围在 Keys 或 Closure 分配前拒收"), Coordinator.GatherForBounds(Huge, Consumer, Capture, Error));
+	TestTrue(TEXT("非法容器规模不是可恢复容量等待"), Error.StartsWith(TEXT("Oversized")));
+	CheckPreserved();
+	const FVoxelGenerationBounds Edge{FIntVector(MAX_int32 - 16, 0, 0), FIntVector(MAX_int32, 16, 16)};
+	TestTrue(TEXT("世界末端扩展使用宽整数并截到合法坐标"), FVoxelGenerationQuery::GetPlanKeyRanges(Edge, Config->Recipe->Settings, Ranges, Error));
+	TestEqual(TEXT("世界末端保留真实最后瓦片"), Ranges.TileMax.X, MAX_int32 / FVoxelGenerationQuery::GenerationPlanTileSide);
+	FVoxelGenerationPlanDependencyCapture Replacement;
+	if (!Coordinator.GatherForBounds(Bounds, Consumer, Replacement, Error)) return false;
+	const uint64 ReplacementLease = Replacement.Lease->Serial();
+	const auto BeforeMove = Resources->Snapshot();
+	Capture = MoveTemp(Replacement);
+	TestEqual(TEXT("替换整体转交新正文的原租约"), Capture.Lease->Serial(), ReplacementLease);
+	TestTrue(TEXT("替换源不再拥有正文或租约"), !Replacement.Lease && Replacement.Values.IsEmpty());
+	TestTrue(TEXT("旧正文实际释放后才退还容量"), Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Input)] < BeforeMove.Used[int32(EVoxelTerrainResourcePool::Input)]);
+	FVoxelGenerationPlanDependency Hydrology;
+	TestTrue(TEXT("叶事实捕获为空且不分配正文"), Coordinator.GatherPrerequisites(Hydrology, Capture, Error));
+	TestTrue(TEXT("空捕获撤销旧正文与原租约"), !Capture.Lease && Capture.Values.IsEmpty());
 	Scheduler.StopAndJoin();
 	return true;
 }

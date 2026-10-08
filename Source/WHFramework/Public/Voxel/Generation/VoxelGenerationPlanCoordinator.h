@@ -33,6 +33,31 @@ FORCEINLINE uint32 GetTypeHash(const FVoxelGenerationPlanDependency& InDependenc
 		GetTypeHash(InDependency.Coordinate()));
 }
 
+// 捕获正文与原账本租约一起转交；拒收新捕获时保留调用方已接受的正文。
+struct WHFRAMEWORK_API FVoxelGenerationPlanDependencyCapture
+{
+	FVoxelGenerationPlanDependencyCapture() = default;
+	FVoxelGenerationPlanDependencyCapture(const FVoxelGenerationPlanDependencyCapture&) = delete;
+	FVoxelGenerationPlanDependencyCapture& operator=(const FVoxelGenerationPlanDependencyCapture&) = delete;
+	FVoxelGenerationPlanDependencyCapture(FVoxelGenerationPlanDependencyCapture&& InOther)
+		: Lease(MoveTemp(InOther.Lease))
+		, Values(MoveTemp(InOther.Values))
+	{
+	}
+	FVoxelGenerationPlanDependencyCapture& operator=(FVoxelGenerationPlanDependencyCapture&& InOther)
+	{
+		if (this != &InOther)
+		{
+			// 先释放旧正文，再释放旧租约；新正文的授予仍由 InOther 持有。
+			Values = MoveTemp(InOther.Values);
+			Lease = MoveTemp(InOther.Lease);
+		}
+		return *this;
+	}
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+	TArray<FVoxelGenerationPlanDependency> Values;
+};
+
 struct WHFRAMEWORK_API FVoxelGenerationDependencyStatus
 {
 	bool bReady = false;
@@ -52,15 +77,17 @@ public:
 
 	bool GatherForBounds(
 		const FVoxelGenerationBounds& InBounds,
-		TArray<FVoxelGenerationPlanDependency>& OutDependencies,
+		const FVoxelGenerationConsumerKey& InConsumer,
+		FVoxelGenerationPlanDependencyCapture& OutDependencies,
 		FString& OutError) const;
 	// 每个事实只等待自己的采样闭包，远处事实未完成不阻塞本地计划。
 	bool GatherPrerequisites(const FVoxelGenerationPlanDependency& InDependency,
-		TArray<FVoxelGenerationPlanDependency>& OutDependencies, FString& OutError) const;
+		FVoxelGenerationPlanDependencyCapture& OutDependencies, FString& OutError) const;
 
-	TSharedRef<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> RetainDependencies(
+	bool RetainDependencies(
 		TConstArrayView<FVoxelGenerationPlanDependency> InDependencies,
-		const FIntPoint& InCenter) const;
+		const FIntPoint& InCenter, const FVoxelGenerationConsumerKey& InConsumer,
+		TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>& OutRetention, FString& OutError) const;
 
 	FVoxelGenerationDependencyStatus Ensure(
 		TConstArrayView<FVoxelGenerationPlanDependency> InDependencies,
@@ -117,6 +144,10 @@ private:
 		FString Error;
 		TMap<FVoxelGenerationConsumerKey, FDonation> Donations;
 		uint64 AttemptId = 0;
+		uint64 CapacityVersion = 0;
+		bool bAttemptPendingAdmission = false;
+		bool bPrerequisiteRetentionPending = false;
+		bool bWaitingCapacity = false;
 		bool bInFlight = false;
 		bool bRegistering = false;
 		bool bDesired = false;

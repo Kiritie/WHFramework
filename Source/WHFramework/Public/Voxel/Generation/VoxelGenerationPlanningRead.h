@@ -10,7 +10,8 @@ public:
 	using FObserver = TFunction<void(EVoxelGenerationPlanKind, const FIntVector&)>;
 
 	explicit FVoxelGenerationPlanningReadScope(FObserver InObserver,
-		const FVoxelTaskStamp* InStamp = nullptr, const TAtomic<bool>* InCancel = nullptr);
+		const FVoxelTaskStamp* InStamp = nullptr, const TAtomic<bool>* InCancel = nullptr,
+		const FVoxelGenerationConsumerKey* InConsumer = nullptr);
 	~FVoxelGenerationPlanningReadScope();
 	FVoxelGenerationPlanningReadScope(const FVoxelGenerationPlanningReadScope&) = delete;
 	FVoxelGenerationPlanningReadScope& operator=(const FVoxelGenerationPlanningReadScope&) = delete;
@@ -19,12 +20,14 @@ public:
 	static bool CanPublish();
 	static FString PublishBlockError();
 	static const FVoxelTaskStamp* GetTaskStamp();
+	static const FVoxelGenerationConsumerKey* GetConsumerKey();
 	static void Missing(EVoxelGenerationPlanKind InKind, const FIntVector& InCoordinate);
 
 private:
 	FObserver Observer;
 	const FVoxelTaskStamp* Stamp = nullptr;
 	const TAtomic<bool>* Cancel = nullptr;
+	const FVoxelGenerationConsumerKey* Consumer = nullptr;
 	bool bMissing = false;
 	FVoxelGenerationPlanningReadScope* Previous = nullptr;
 	static thread_local FVoxelGenerationPlanningReadScope* Active;
@@ -34,10 +37,11 @@ private:
 struct WHFRAMEWORK_API FVoxelGenerationPlanningServices
 {
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
+	FVoxelGenerationConsumerKey RetentionConsumer;
 	TFunction<FVoxelGenerationDependencyStatus(TConstArrayView<FVoxelGenerationPlanDependency>,
 		EVoxelWorkClass, const FVoxelTerrainServicePriority&, const FVoxelGenerationConsumerKey&)> Ensure;
 	TFunction<void(const FVoxelGenerationConsumerKey&)> Release;
 	TFunction<void(const FVoxelTaskStamp&)> Cancel;
-	TFunction<TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>(
-		TConstArrayView<FVoxelGenerationPlanDependency>, const FIntPoint&)> Retain;
+	TFunction<bool(TConstArrayView<FVoxelGenerationPlanDependency>, const FIntPoint&, const FVoxelGenerationConsumerKey&,
+		TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>&, FString&)> Retain;
 };

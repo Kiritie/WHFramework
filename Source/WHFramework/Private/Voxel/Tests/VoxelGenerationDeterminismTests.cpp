@@ -140,8 +140,11 @@ bool FVoxelGenerationCacheTaskRetentionTest::RunTest(const FString& InParameters
 	FVoxelGenerationCacheRetentionPoint TaskPoint;
 	TaskPoint.Center = FIntPoint(44, 4);
 	TaskPoint.HydrologyRadiusCells = 1;
-	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> Lease =
-		Cache->RetainForTask(TaskPoint);
+	const auto Resources = MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
+	const auto Consumer = FVoxelGenerationConsumerKey::Section(1, FGuid::NewGuid(), 1, {}, 1);
+	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> Lease;
+	FString RetentionError;
+	if (!Cache->RetainForTask(TaskPoint, Resources, Consumer, Lease, RetentionError)) return false;
 	for (int32 Index = 0; Index < FVoxelGenerationPlanCache::ShardCount * 2; ++Index)
 	{
 		Cache->TickMaintenance(256);
@@ -228,12 +231,12 @@ bool FVoxelGenerationPlanPreflightTest::RunTest(const FString& InParameters)
 	Scheduler.SetBudget(Budget);
 	FVoxelGenerationPlanCoordinator Coordinator(Scheduler, Config, Cache, 11);
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(11, FGuid::NewGuid(), 1, FIntVector::ZeroValue, 1);
-	TArray<FVoxelGenerationPlanDependency> Dependencies;
+	FVoxelGenerationPlanDependencyCapture Dependencies;
 	FString Error;
 	if (!TestTrue(TEXT("Section dependencies are gathered"),
 		Coordinator.GatherForBounds({ FIntVector::ZeroValue, FIntVector(16) },
-			Dependencies, Error))) return false;
-	TestTrue(TEXT("Section has shared plan dependencies"), !Dependencies.IsEmpty());
+			Consumer, Dependencies, Error))) return false;
+	TestTrue(TEXT("Section has shared plan dependencies"), !Dependencies.Values.IsEmpty());
 	FVoxelGenerationCacheRetention StreamingRetention;
 	StreamingRetention.HydrologyRegionSide = Config->Recipe->Settings.HydrologyRegionSide;
 	StreamingRetention.HydrologyCellSize = Config->Recipe->Settings.HydrologyCellSize;
@@ -241,13 +244,13 @@ bool FVoxelGenerationPlanPreflightTest::RunTest(const FString& InParameters)
 	FVoxelGenerationCacheRetentionPoint& StreamingPoint = StreamingRetention.Points.AddDefaulted_GetRef();
 	StreamingPoint.NaturalRadiusCells = StreamingPoint.PlanRadiusCells = StreamingPoint.HydrologyRadiusCells = 32;
 	Cache->UpdateRetention(StreamingRetention);
-	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> ConsumerRetention =
-		Coordinator.RetainDependencies(Dependencies, FIntPoint(8, 8));
+	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> ConsumerRetention;
+	if (!Coordinator.RetainDependencies(Dependencies.Values, FIntPoint(8, 8), Consumer, ConsumerRetention, Error)) return false;
 	FVoxelGenerationDependencyStatus Status;
 	const double Deadline = FPlatformTime::Seconds() + 90.0;
 	do
 	{
-		Status = Coordinator.Ensure(Dependencies, EVoxelWorkClass::Critical, 0, 0.0, 1.0, Consumer);
+		Status = Coordinator.Ensure(Dependencies.Values, EVoxelWorkClass::Critical, 0, 0.0, 1.0, Consumer);
 		Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
 		Cache->TickMaintenance(256);
 		if (!Status.bReady && !Status.bFailed) FPlatformProcess::Sleep(0.001f);

@@ -3,10 +3,11 @@
 thread_local FVoxelGenerationPlanningReadScope* FVoxelGenerationPlanningReadScope::Active = nullptr;
 
 FVoxelGenerationPlanningReadScope::FVoxelGenerationPlanningReadScope(FObserver InObserver,
-	const FVoxelTaskStamp* InStamp, const TAtomic<bool>* InCancel)
+	const FVoxelTaskStamp* InStamp, const TAtomic<bool>* InCancel, const FVoxelGenerationConsumerKey* InConsumer)
 	: Observer(MoveTemp(InObserver))
 	, Stamp(InStamp)
 	, Cancel(InCancel)
+	, Consumer(InConsumer)
 	, Previous(Active)
 {
 	Active = this;
@@ -51,5 +52,12 @@ const FVoxelTaskStamp* FVoxelGenerationPlanningReadScope::GetTaskStamp()
 {
 	for (auto* Scope = Active; Scope; Scope = Scope->Previous)
 		if (Scope->Stamp) return Scope->Stamp;
+	return nullptr;
+}
+
+const FVoxelGenerationConsumerKey* FVoxelGenerationPlanningReadScope::GetConsumerKey()
+{
+	for (auto* Scope = Active; Scope; Scope = Scope->Previous)
+		if (Scope->Consumer) return Scope->Consumer;
 	return nullptr;
 }

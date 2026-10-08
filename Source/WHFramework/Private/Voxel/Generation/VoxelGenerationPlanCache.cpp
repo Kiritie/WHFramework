@@ -3,6 +3,7 @@
 #include "HAL/Event.h"
 #include "HAL/PlatformProcess.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
+#include "Voxel/Task/VoxelTerrainResources.h"
 
 namespace
 {
@@ -929,52 +930,136 @@ void FVoxelGenerationPlanCache::UpdateRetention(
 
 FVoxelGenerationCacheRetentionLease::FVoxelGenerationCacheRetentionLease(
 	TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> InCache,
+	TSharedRef<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InResourceLease,
+	const FVoxelGenerationCacheRetentionPoint& InPoint,
 	const uint64 InId)
-	: Cache(InCache)
+	: ResourceLease(MoveTemp(InResourceLease))
+	, Cache(MoveTemp(InCache))
+	, Point(InPoint)
 	, Id(InId)
 {
 }
 
 FVoxelGenerationCacheRetentionLease::~FVoxelGenerationCacheRetentionLease()
 {
-	Cache->ReleaseTaskRetention(Id);
+	Cache->ReleaseTaskRetention(*this);
 }
 
-TSharedRef<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>
-FVoxelGenerationPlanCache::RetainForTask(
-	const FVoxelGenerationCacheRetentionPoint& InPoint)
+void FVoxelGenerationCacheRetentionLease::FDeleter::operator()(FVoxelGenerationCacheRetentionLease* InLease) const
 {
-	uint64 Id = 0;
+	delete InLease;
+}
+
+uint64 FVoxelGenerationCacheRetentionLease::GetRequiredAllocationBytes()
+{
+	using FController = SharedPointerInternals::TReferenceControllerWithDeleter<
+		FVoxelGenerationCacheRetentionLease, FDeleter, ESPMode::ThreadSafe>;
+	return FMemory::QuantizeSize(sizeof(FVoxelGenerationCacheRetentionLease), alignof(FVoxelGenerationCacheRetentionLease)) +
+		FMemory::QuantizeSize(sizeof(FController), alignof(FController));
+}
+
+bool FVoxelGenerationPlanCache::RetainForTask(
+	const FVoxelGenerationCacheRetentionPoint& InPoint,
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+	const FVoxelGenerationConsumerKey& InConsumer,
+	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>& OutLease,
+	FString& OutError)
+{
+	if (!InConsumer.IsValid())
+	{
+		OutError = TEXT("InvalidConsumer: voxel cache retention requires a complete consumer key");
+		return false;
+	}
+
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
+	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> NewLease;
 	{
 		FWriteScopeLock Scope(RetentionLock);
-		Id = NextTaskRetentionId++;
-		TaskRetentionPoints.Add(Id, InPoint);
+		if (NextTaskRetentionId == MAX_uint64)
+		{
+			OutError = TEXT("CapacityUnachievable: voxel cache task retention identity exhausted");
+			return false;
+		}
+
+		if (!InResources->Acquire(InConsumer, EVoxelTerrainResourcePool::Input,
+			FVoxelGenerationCacheRetentionLease::GetRequiredAllocationBytes(), ResourceLease))
+		{
+			OutError = TEXT("CapacityBlocked: voxel cache task retention input capacity");
+			return false;
+		}
+
+		const uint64 Id = NextTaskRetentionId++;
+		// deleter 随控制器存活；对象析构不能让尚有 weak 引用的控制器提前退容量。
+		NewLease = TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>(
+			new FVoxelGenerationCacheRetentionLease(AsShared(), ResourceLease.ToSharedRef(), InPoint, Id),
+			FVoxelGenerationCacheRetentionLease::FDeleter{ResourceLease.ToSharedRef()});
+		NewLease->Previous = TaskRetentionTail;
+		if (TaskRetentionTail)
+		{
+			TaskRetentionTail->Next = NewLease.Get();
+		}
+		else
+		{
+			TaskRetentionHead = NewLease.Get();
+		}
+		TaskRetentionTail = NewLease.Get();
 	}
-	return MakeShared<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>(
-		AsShared(), Id);
+
+	OutLease = MoveTemp(NewLease);
+	OutError.Reset();
+	return true;
 }
 
-void FVoxelGenerationPlanCache::ReleaseTaskRetention(const uint64 InId)
+void FVoxelGenerationPlanCache::ReleaseTaskRetention(FVoxelGenerationCacheRetentionLease& InLease)
 {
 	FWriteScopeLock Scope(RetentionLock);
-	TaskRetentionPoints.Remove(InId);
+	if (InLease.Previous)
+	{
+		InLease.Previous->Next = InLease.Next;
+	}
+	else
+	{
+		TaskRetentionHead = InLease.Next;
+	}
+	if (InLease.Next)
+	{
+		InLease.Next->Previous = InLease.Previous;
+	}
+	else
+	{
+		TaskRetentionTail = InLease.Previous;
+	}
+	InLease.Previous = nullptr;
+	InLease.Next = nullptr;
+	InLease.Id = 0;
 }
 
 bool FVoxelGenerationPlanCache::IsRetained(
 	const FIntPoint& InPosition,
-	int32 FVoxelGenerationCacheRetentionPoint::* InRadius,
-	const FVoxelGenerationCacheRetention& InRetention) const
+	int32 FVoxelGenerationCacheRetentionPoint::* InRadius) const
 {
-	for (const FVoxelGenerationCacheRetentionPoint& Point : InRetention.Points)
+	const auto ContainsPoint = [&InPosition, InRadius](const FVoxelGenerationCacheRetentionPoint& InPoint)
 	{
-		if (FMath::Abs(static_cast<int64>(InPosition.X) - Point.Center.X) <= Point.*InRadius &&
-			FMath::Abs(static_cast<int64>(InPosition.Y) - Point.Center.Y) <= Point.*InRadius)
+		return FMath::Abs(static_cast<int64>(InPosition.X) - InPoint.Center.X) <= InPoint.*InRadius &&
+			FMath::Abs(static_cast<int64>(InPosition.Y) - InPoint.Center.Y) <= InPoint.*InRadius;
+	};
+	for (const FVoxelGenerationCacheRetentionPoint& Point : Retention.Points)
+	{
+		if (ContainsPoint(Point))
+		{
+			return true;
+		}
+	}
+	for (const FVoxelGenerationCacheRetentionLease* Lease = TaskRetentionHead; Lease; Lease = Lease->Next)
+	{
+		if (ContainsPoint(Lease->Point))
 		{
 			return true;
 		}
 	}
 	return false;
 }
+
 void FVoxelGenerationPlanCache::TickMaintenance(
 	const int32 InMaxEntries)
 {
@@ -1022,17 +1107,11 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 	TArray<FVoxelFeaturePlanPtr> RetiredFeatures;
 	TArray<FVoxelStructurePlanPtr> RetiredStructures;
 
-	// Hold the read lock through trimming so a newly registered task cannot
-	// race with a maintenance snapshot and lose its plans after registration.
+	// 保留锁覆盖逐项裁剪；任务点直接读取原节点，接纳与析构不能越过当前检查。
 	TOptional<FReadScopeLock> RetentionScope;
 	RetentionScope.Emplace(RetentionLock);
-	FVoxelGenerationCacheRetention Snapshot = Retention;
-	for (const TPair<uint64, FVoxelGenerationCacheRetentionPoint>& Entry : TaskRetentionPoints)
-	{
-		Snapshot.Points.Add(Entry.Value);
-	}
 
-	if (Snapshot.Revision == 0)
+	if (Retention.Revision == 0)
 	{
 		return;
 	}
@@ -1059,13 +1138,12 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			Shard.BaseColumnCursor,
 			BaseColumnBudget,
 			RetiredBaseColumns,
-			[this, &Snapshot](
+			[this](
 				const FIntPoint& InKey)
 			{
 				return IsRetained(
 					InKey,
-					&FVoxelGenerationCacheRetentionPoint::NaturalRadiusCells,
-					Snapshot);
+					&FVoxelGenerationCacheRetentionPoint::NaturalRadiusCells);
 			});
 
 		TrimMapBudgeted(
@@ -1074,13 +1152,12 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			Shard.NaturalColumnCursor,
 			NaturalColumnBudget,
 			RetiredNaturalColumns,
-			[this, &Snapshot](
+			[this](
 				const FIntPoint& InKey)
 			{
 				return IsRetained(
 					InKey,
-					&FVoxelGenerationCacheRetentionPoint::NaturalRadiusCells,
-					Snapshot);
+					&FVoxelGenerationCacheRetentionPoint::NaturalRadiusCells);
 			});
 
 	}
@@ -1099,13 +1176,13 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			Shard.HydrologyCursor,
 			HydrologyBudget,
 			RetiredHydrology,
-			[this, &Snapshot](
+			[this](
 				const FVoxelHydrologyRegionKey& InKey)
 			{
 				const int32 RegionCellSide =
 					static_cast<int32>(FMath::Clamp<int64>(
-						static_cast<int64>(FMath::Max(1, Snapshot.HydrologyRegionSide)) *
-							FMath::Max(1, Snapshot.HydrologyCellSize),
+						static_cast<int64>(FMath::Max(1, Retention.HydrologyRegionSide)) *
+							FMath::Max(1, Retention.HydrologyCellSize),
 						1,
 						MAX_int32));
 
@@ -1115,8 +1192,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 
 				return IsRetained(
 					RegionCenter,
-					&FVoxelGenerationCacheRetentionPoint::HydrologyRadiusCells,
-					Snapshot);
+					&FVoxelGenerationCacheRetentionPoint::HydrologyRadiusCells);
 			});
 
 		TrimMapBudgeted(
@@ -1125,7 +1201,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			Shard.CaveCursor,
 			CaveBudget,
 			RetiredCaves,
-			[this, &Snapshot](
+			[this](
 				const FVoxelGenerationTileKey& InKey)
 			{
 				const FIntVector Origin =
@@ -1136,8 +1212,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 					FIntPoint(
 						Origin.X,
 						Origin.Y),
-					&FVoxelGenerationCacheRetentionPoint::PlanRadiusCells,
-					Snapshot);
+					&FVoxelGenerationCacheRetentionPoint::PlanRadiusCells);
 			});
 
 		TrimMapBudgeted(
@@ -1146,13 +1221,12 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			Shard.EcologyCursor,
 			EcologyBudget,
 			RetiredEcology,
-			[this, &Snapshot](const FVoxelEcologyTileKey& InKey)
+			[this](const FVoxelEcologyTileKey& InKey)
 			{
 				const FIntPoint Center = InKey.Coordinate * 64 + FIntPoint(32, 32);
 				return IsRetained(
 					Center,
-					&FVoxelGenerationCacheRetentionPoint::PlanRadiusCells,
-					Snapshot);
+					&FVoxelGenerationCacheRetentionPoint::PlanRadiusCells);
 			});
 
 		TrimMapBudgeted(
@@ -1161,7 +1235,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			Shard.FeatureCursor,
 			FeatureBudget,
 			RetiredFeatures,
-			[this, &Snapshot](
+			[this](
 				const FVoxelGenerationTileKey& InKey)
 			{
 				const FIntVector Origin =
@@ -1172,8 +1246,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 					FIntPoint(
 						Origin.X,
 						Origin.Y),
-					&FVoxelGenerationCacheRetentionPoint::PlanRadiusCells,
-					Snapshot);
+					&FVoxelGenerationCacheRetentionPoint::PlanRadiusCells);
 			});
 
 		TrimMapBudgeted(
@@ -1182,7 +1255,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			Shard.StructureCursor,
 			StructureBudget,
 			RetiredStructures,
-			[this, &Snapshot](
+			[this](
 				const FVoxelGenerationTileKey& InKey)
 			{
 				const FIntVector Origin =
@@ -1193,8 +1266,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 					FIntPoint(
 						Origin.X,
 						Origin.Y),
-					&FVoxelGenerationCacheRetentionPoint::PlanRadiusCells,
-					Snapshot);
+					&FVoxelGenerationCacheRetentionPoint::PlanRadiusCells);
 			});
 
 	}
@@ -1203,6 +1275,8 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 
 void FVoxelGenerationPlanCache::Reset()
 {
+	// 与维护采用相同的 Retention -> shard 顺序，游标重置不与裁剪交错。
+	FWriteScopeLock RetentionScope(RetentionLock);
 	for (int32 Index = 0;
 		Index < ShardCount;
 		++Index)
