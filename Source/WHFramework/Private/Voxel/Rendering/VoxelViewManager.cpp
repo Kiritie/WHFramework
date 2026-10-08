@@ -65,6 +65,20 @@ struct FVoxelVolumeCoveragePlan final : FVoxelTaskCustomPayload
 
 namespace
 {
+	struct FGrantedCoverageApply
+	{
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MetadataLease;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PreviousLease;
+		TFunction<void(FVoxelTaskResult&&)> Apply;
+	};
+
+	struct FDeferredGrantedCoverageApply
+	{
+		TSharedPtr<FGrantedCoverageApply, ESPMode::ThreadSafe> Apply;
+		TSharedPtr<FVoxelTaskResult, ESPMode::ThreadSafe> Result;
+		void operator()() const { Apply->Apply(MoveTemp(*Result)); }
+	};
+
 	bool RetainRawPublication(const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& Lease,
 		const FVoxelTerrainGeometry& Geometry, FVoxelTerrainRenderer& Renderer)
 	{
@@ -288,7 +302,19 @@ struct FProxyMeshEstimate
 		auto Storage = VoxelBoundedAllocation::MakeWorkerShared<FVoxelCoarseBuildStorage>(Metadata,
 			Scheduler.GetTerrainResources(), Consumer, Metadata);
 		Request.GenerationConsumer = Consumer;
-		Request.GetBlockReason = [Storage] { return Storage->BlockReason(); };
+		Request.SetRequiredBindingInput(Request.GetRequiredBindingInputBytes() + Metadata->Bytes(),
+			Request.GetRequiredBindingInputLeaseCount() + 1);
+		{
+			FString CallbackBindingError;
+			if (!Request.BindGetBlockReason(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+				[Storage] { return Storage->BlockReason(); }, CallbackBindingError))
+			{
+				Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+					CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+						? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+				return nullptr;
+			}
+		}
 		// 自有租约已占用唯一四账本；旧 Scheduler 计数只保留未迁移任务。
 		Request.InputBytes = 0;
 		Request.ReservedBytes = 1;
@@ -883,7 +909,10 @@ bool FVoxelViewManager::EnqueuePreparedData(FVoxelTaskRequest&& InRequest)
 			InRequest.InputBytes, Reservation);
 		return false;
 	}
-	InRequest.Apply = [this, Reservation](FVoxelTaskResult&& Result)
+	{
+		FString CallbackBindingError;
+		if (!InRequest.BindApply(Scheduler.GetTerrainResources(), (InRequest.GenerationConsumer.IsValid() ? InRequest.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[this, Reservation](FVoxelTaskResult&& Result)
 	{
 		PendingDataBytes -= Reservation;
 		const FVoxelTaskKey Key { Result.Kind, Result.Stamp };
@@ -936,7 +965,14 @@ bool FVoxelViewManager::EnqueuePreparedData(FVoxelTaskRequest&& InRequest)
 			PreparedData.Add(Key, VoxelBoundedAllocation::MakeWorkerShared<FVoxelTaskResult>(Metadata, MoveTemp(Result)));
 		}
 		else PreparedData.Add(Key, MakeShared<FVoxelTaskResult, ESPMode::ThreadSafe>(MoveTemp(Result)));
-	};
+	}, CallbackBindingError))
+		{
+			Scheduler.ObserveDemand(InRequest.Kind, InRequest.Stamp,
+				CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+					? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+			return false;
+		}
+	}
 	const FVoxelTaskKey RetentionKey{InRequest.Kind, InRequest.Stamp};
 	if (!EnqueueViewTask(MoveTemp(InRequest)))
 		return false;
@@ -2020,14 +2056,27 @@ void FVoxelViewManager::PumpHeightfieldTransitions()
 		Worker->Storage = Storage; Worker->Inputs = Inputs;
 		Worker->GeometryLimit = uint64(Module.GetViewSettings().Fine.MaximumShardGeometryMegabytes) * 1024 * 1024;
 		Worker->TextureStretch = Module.GetViewSettings().MaximumTextureStretchCells;
-		Request.Execute = [Worker, Config, Registry](const TAtomic<bool>& Cancel) { return Worker->Advance(*Config, *Registry, Cancel); };
+		{
+			FString CallbackBindingError;
+			if (!Request.BindExecute(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+				[Worker, Config, Registry](const TAtomic<bool>& Cancel) { return Worker->Advance(*Config, *Registry, Cancel); }, CallbackBindingError))
+			{
+				Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+					CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+						? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+				continue;
+			}
+		}
 		FVoxelCoverageLocalSnapshot Guard;
 		const auto Rect = Owner.Representation == EVoxelHeightfieldRepresentation::Surface ? SurfaceCoverageRect({Owner.Coordinate, Owner.Level})
 																						   : MacroCoverageRect({Owner.Coordinate, Owner.Level});
 		HeightfieldCoverageIndex.Capture(FIntVector(Rect.Min.X - 1, Rect.Min.Y - 1, Module.GetManifest().Settings.MinZ),
 			FIntVector(Rect.Max.X + 1, Rect.Max.Y + 1, Module.GetManifest().Settings.MaxZ), Guard, false);
 		if (Guard.bCountOnly) continue;
-		Request.Apply = [this, Owner, Inputs, TaskSignature = *Signature, Guard = MoveTemp(Guard)](FVoxelTaskResult&& Result)
+		{
+			FString CallbackBindingError;
+			if (!Request.BindApply(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+				[this, Owner, Inputs, TaskSignature = *Signature, Guard = MoveTemp(Guard)](FVoxelTaskResult&& Result)
 		{
 			if (!AreHeightfieldInputsCurrent(*Inputs) || !HeightfieldCoverageIndex.IsCurrent(Guard))
 			{
@@ -2035,7 +2084,14 @@ void FVoxelViewManager::PumpHeightfieldTransitions()
 				Result.bCanceled = true;
 			}
 			ApplyHeightfieldTransition(Owner, TaskSignature, MoveTemp(Result));
-		};
+		}, CallbackBindingError))
+			{
+				Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+					CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+						? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+				continue;
+			}
+		}
 		if (Scheduler.IsTerminal({Request.Kind, Request.Stamp}))
 		{
 			UnsubmittedTransitionOwners.RemoveSingleSwap(Owner, EAllowShrinking::No);
@@ -2267,12 +2323,25 @@ void FVoxelViewManager::PumpVolumeTransitions()
 		const auto Worker = VoxelBoundedAllocation::MakeWorkerShared<FVoxelVolumeTransitionBuild>(Storage->MetadataLease);
 		Worker->Storage = Storage; Worker->Data = Data; Worker->Inputs = Context;
 		Worker->GeometryLimit = uint64(Module.GetViewSettings().Fine.MaximumShardGeometryMegabytes) * 1024 * 1024;
-		Request.Execute = [Worker, Registry, Shapes](const TAtomic<bool>& Cancel) { return Worker->Advance(*Registry, *Shapes, Cancel); };
+		{
+			FString CallbackBindingError;
+			if (!Request.BindExecute(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+				[Worker, Registry, Shapes](const TAtomic<bool>& Cancel) { return Worker->Advance(*Registry, *Shapes, Cancel); }, CallbackBindingError))
+			{
+				Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+					CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+						? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+				continue;
+			}
+		}
 		FVoxelCoverageLocalSnapshot Guard;
 		const auto Bounds = Owner.GetBounds();
 		CoverageIndex.Capture(Bounds.Min - FIntVector(1), Bounds.Max + FIntVector(1), Guard, false);
 		if (Guard.bCountOnly) continue;
-		Request.Apply = [this, Owner, Data, Context, TaskSignature = *Signature, Guard = MoveTemp(Guard)](FVoxelTaskResult&& Result)
+		{
+			FString CallbackBindingError;
+			if (!Request.BindApply(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+				[this, Owner, Data, Context, TaskSignature = *Signature, Guard = MoveTemp(Guard)](FVoxelTaskResult&& Result)
 		{
 			if (!AreBoundaryInputsCurrent(*Context) || VoxelProxyData.FindRef(Owner) != Data || !CoverageIndex.IsCurrent(Guard))
 			{
@@ -2280,7 +2349,14 @@ void FVoxelViewManager::PumpVolumeTransitions()
 				Result.bCanceled = true;
 			}
 			ApplyVolumeTransition(Owner, TaskSignature, MoveTemp(Result));
-		};
+		}, CallbackBindingError))
+			{
+				Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+					CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+						? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+				continue;
+			}
+		}
 		if (Scheduler.IsTerminal({Request.Kind, Request.Stamp}))
 		{
 			UnsubmittedVolumeOwners.RemoveSingleSwap(Owner, EAllowShrinking::No);
@@ -2510,10 +2586,20 @@ bool FVoxelViewManager::ApplyRemoteRepresentation(const FVoxelRepresentationRepl
 		Page->Bytes.Reserve(InReply.Data.Num());
 		Page->Bytes.Append(InReply.Data);
 	}
-	Request.Execute = [Page, Registry, Shapes, Config, TextureStretch = Module.GetViewSettings().MaximumTextureStretchCells](const TAtomic<bool>& Cancel)
+	{
+		FString CallbackBindingError;
+		if (!Request.BindExecute(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[Page, Registry, Shapes, Config, TextureStretch = Module.GetViewSettings().MaximumTextureStretchCells](const TAtomic<bool>& Cancel)
 	{
 		return Page->Advance(*Registry, *Shapes, *Config, TextureStretch, Cancel);
-	};
+	}, CallbackBindingError))
+		{
+			Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+				CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+					? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+			return false;
+		}
+	}
 	if (!EnqueuePreparedData(MoveTemp(Request)))
 	{
 		OutError = TEXT("Remote terrain admission deferred");
@@ -3448,12 +3534,22 @@ bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int3
         OverlayRead->MetadataLease = BuildStorage->MetadataLease;
         OverlayRead->FactResources = Scheduler.GetRuntimeResources();
         OverlayRead->FactConsumer = BuildStorage->Consumer;
-        Request.GetBlockReason = [BuildStorage, OverlayRead]
+        {
+			FString CallbackBindingError;
+			if (!Request.BindGetBlockReason(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+				[BuildStorage, OverlayRead]
         {
             if (OverlayRead->IsBlocked())
                 return EVoxelTaskBlockReason::Memory;
             return BuildStorage->BlockReason();
-        };
+        }, CallbackBindingError))
+			{
+				Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+					CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+						? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+				return false;
+			}
+        }
 		if (!OverlayRead->Reader.Initialize(MoveTemp(OverlayCapture), Error))
 		{
 			return false;
@@ -3473,7 +3569,10 @@ bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int3
 		BuildStorage->GeometryCapacityBytes = RetainedBytes + VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSectionMeshResult>();
 		Request.ReservedBytes = 1;
 	}
-	Request.Execute = [BuildStorage, bDataOnly, PageBuild, MeshEstimate, PageMesh, Prepared, Config, Cache, Generator, EnvironmentRetention, Registry, Shapes, RecipeHash,
+	{
+		FString CallbackBindingError;
+		if (!Request.BindExecute(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[BuildStorage, bDataOnly, PageBuild, MeshEstimate, PageMesh, Prepared, Config, Cache, Generator, EnvironmentRetention, Registry, Shapes, RecipeHash,
 						  OverlayRead, InKey, Geometry, TextureStretch = Module.GetViewSettings().MaximumTextureStretchCells,
 						  Lod = Module.GetViewSettings().Lod](const TAtomic<bool>& InCancel)
 	{
@@ -3566,7 +3665,14 @@ bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int3
 		}
 
 		return Result;
-	};
+	}, CallbackBindingError))
+		{
+			Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+				CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+					? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+			return false;
+		}
+	}
 
 	if (bDataOnly)
 		return EnqueuePreparedData(MoveTemp(Request));
@@ -3719,12 +3825,22 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
         OverlayRead->MetadataLease = BuildStorage->MetadataLease;
         OverlayRead->FactResources = Scheduler.GetRuntimeResources();
         OverlayRead->FactConsumer = BuildStorage->Consumer;
-        Request.GetBlockReason = [BuildStorage, OverlayRead]
+        {
+			FString CallbackBindingError;
+			if (!Request.BindGetBlockReason(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+				[BuildStorage, OverlayRead]
         {
             if (OverlayRead->IsBlocked())
                 return EVoxelTaskBlockReason::Memory;
             return BuildStorage->BlockReason();
-        };
+        }, CallbackBindingError))
+			{
+				Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+					CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+						? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+				return false;
+			}
+        }
 		if (!OverlayRead->Reader.Initialize(MoveTemp(OverlayCapture), Error))
 		{
 			return false;
@@ -3748,7 +3864,10 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 		BuildStorage->GeometryCapacityBytes = RetainedBytes + VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSectionMeshResult>();
 		Request.ReservedBytes = 1;
 	}
-	Request.Execute = [BuildStorage, bDataOnly, PageBuild, MeshEstimate, PageMesh, Prepared, OverlayRead, Generator, EnvironmentRetention, Config, Registry,
+	{
+		FString CallbackBindingError;
+		if (!Request.BindExecute(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[BuildStorage, bDataOnly, PageBuild, MeshEstimate, PageMesh, Prepared, OverlayRead, Generator, EnvironmentRetention, Config, Registry,
 						  Settings, InKey, Geometry, TextureStretch = Module.GetViewSettings().MaximumTextureStretchCells,
 						  Lod = Module.GetViewSettings().Lod](const TAtomic<bool>& InCancel)
 	{
@@ -3844,7 +3963,14 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 		Result.Water = Prepared->Water;
 
 		return Result;
-	};
+	}, CallbackBindingError))
+		{
+			Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+				CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+					? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+			return false;
+		}
+	}
 
 	if (bDataOnly)
 		return EnqueuePreparedData(MoveTemp(Request));
@@ -3998,12 +4124,22 @@ bool FVoxelViewManager::RequestMacro(const FVoxelMacroTileKey& InKey, const int3
         OverlayRead->MetadataLease = BuildStorage->MetadataLease;
         OverlayRead->FactResources = Scheduler.GetRuntimeResources();
         OverlayRead->FactConsumer = BuildStorage->Consumer;
-        Request.GetBlockReason = [BuildStorage, OverlayRead]
+        {
+			FString CallbackBindingError;
+			if (!Request.BindGetBlockReason(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+				[BuildStorage, OverlayRead]
         {
             if (OverlayRead->IsBlocked())
                 return EVoxelTaskBlockReason::Memory;
             return BuildStorage->BlockReason();
-        };
+        }, CallbackBindingError))
+			{
+				Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+					CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+						? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+				return false;
+			}
+        }
 		if (!OverlayRead->Reader.Initialize(MoveTemp(OverlayCapture), Error))
 		{
 			return false;
@@ -4027,7 +4163,10 @@ bool FVoxelViewManager::RequestMacro(const FVoxelMacroTileKey& InKey, const int3
 		BuildStorage->GeometryCapacityBytes = RetainedBytes + VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSectionMeshResult>();
 		Request.ReservedBytes = 1;
 	}
-	Request.Execute = [BuildStorage, bDataOnly, PageBuild, MeshEstimate, PageMesh, Prepared, OverlayRead, Settings, Generator, EnvironmentRetention, Config,
+	{
+		FString CallbackBindingError;
+		if (!Request.BindExecute(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[BuildStorage, bDataOnly, PageBuild, MeshEstimate, PageMesh, Prepared, OverlayRead, Settings, Generator, EnvironmentRetention, Config,
 						  Registry, InKey, Geometry, TextureStretch = Module.GetViewSettings().MaximumTextureStretchCells,
 						  Lod = Module.GetViewSettings().Lod](const TAtomic<bool>& InCancel)
 	{
@@ -4108,7 +4247,14 @@ bool FVoxelViewManager::RequestMacro(const FVoxelMacroTileKey& InKey, const int3
 		Result.Macro = Prepared->Macro;
 
 		return Result;
-	};
+	}, CallbackBindingError))
+		{
+			Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+				CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+					? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+			return false;
+		}
+	}
 
 	if (bDataOnly)
 		return EnqueuePreparedData(MoveTemp(Request));
@@ -5164,7 +5310,10 @@ FVoxelGameThreadContinuation FVoxelViewManager::RebuildHeightfieldTransitionStep
 			Request.DistanceScore = Owner.Representation == EVoxelHeightfieldRepresentation::Surface
 										? MinimumObserverDistanceCells(SurfaceWorldCenter({Owner.Coordinate, Owner.Level}))
 										: MinimumObserverDistanceCells(MacroWorldCenter({Owner.Coordinate, Owner.Level}));
-			Request.Execute = [Owner, LocalViews = MoveTemp(LocalViews), LocalPending = MoveTemp(LocalPending), Pins = MoveTemp(Pins), Signature](
+			{
+				FString CallbackBindingError;
+				if (!Request.BindExecute(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+					[Owner, LocalViews = MoveTemp(LocalViews), LocalPending = MoveTemp(LocalPending), Pins = MoveTemp(Pins), Signature](
 								  const TAtomic<bool>& Cancel)
 			{
 				FVoxelTaskResult Result;
@@ -5183,7 +5332,14 @@ FVoxelGameThreadContinuation FVoxelViewManager::RebuildHeightfieldTransitionStep
 				Result.CustomPayload = Payload;
 				Result.bSuccess = !Cancel.Load();
 				return Result;
-			};
+			}, CallbackBindingError))
+				{
+					Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+						CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+							? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+					continue;
+				}
+			}
 			const FVoxelCoverageRect OwnerRect = Owner.Representation == EVoxelHeightfieldRepresentation::Surface
 													 ? SurfaceCoverageRect({Owner.Coordinate, Owner.Level})
 													 : MacroCoverageRect({Owner.Coordinate, Owner.Level});
@@ -5192,7 +5348,10 @@ FVoxelGameThreadContinuation FVoxelViewManager::RebuildHeightfieldTransitionStep
 				FIntVector(OwnerRect.Max.X + 1, OwnerRect.Max.Y + 1, Module.GetManifest().Settings.MaxZ), Guard, false);
 			auto& ResumedState = HeightfieldCoveragePlans.FindChecked(Owner);
 			const uint64 Serial = HeightfieldPlanSerial;
-			Request.Apply = [this, Serial, Owner, Signature, Guard = MoveTemp(Guard)](FVoxelTaskResult&& Result)
+			{
+				FString CallbackBindingError;
+				if (!Request.BindApply(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+					[this, Serial, Owner, Signature, Guard = MoveTemp(Guard)](FVoxelTaskResult&& Result)
 			{
 				if (Serial != HeightfieldPlanSerial || Result.Stamp.WorldEpoch != WorldEpoch)
 					return;
@@ -5213,7 +5372,14 @@ FVoxelGameThreadContinuation FVoxelViewManager::RebuildHeightfieldTransitionStep
 				}
 				MarkCoverageDirty(Owner.Representation == EVoxelHeightfieldRepresentation::Surface ? SurfaceCoverageRect({Owner.Coordinate, Owner.Level})
 																								   : MacroCoverageRect({Owner.Coordinate, Owner.Level}));
-			};
+			}, CallbackBindingError))
+				{
+					Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+						CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+							? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+					continue;
+				}
+			}
 			if (EnqueueViewTask(MoveTemp(Request)))
 				ResumedState.PendingSignature = Signature;
 			continue;
@@ -5526,7 +5692,10 @@ FVoxelGameThreadContinuation FVoxelViewManager::RebuildVolumeTransitionSteps(con
 				SampleSteps.Add(Node, 1);
 			else if (const auto* Geometry = GetViewInterest().FindGeometry(Node))
 				SampleSteps.Add(Node, Geometry->SampleStepCells);
-		Request.Execute = [Region, Nodes = Pair.Value, Signature, SampleSteps = MoveTemp(SampleSteps)](const TAtomic<bool>& Cancel)
+		{
+			FString CallbackBindingError;
+			if (!Request.BindExecute(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+				[Region, Nodes = Pair.Value, Signature, SampleSteps = MoveTemp(SampleSteps)](const TAtomic<bool>& Cancel)
 		{
 			FVoxelTaskResult Result;
 			if (Cancel.Load())
@@ -5549,12 +5718,22 @@ FVoxelGameThreadContinuation FVoxelViewManager::RebuildVolumeTransitionSteps(con
 			Result.CustomPayload = Payload;
 			Result.bSuccess = !Cancel.Load();
 			return Result;
-		};
+		}, CallbackBindingError))
+			{
+				Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+					CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+						? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+				continue;
+			}
+		}
 		const auto Bounds = Region.GetBounds();
 		FVoxelCoverageLocalSnapshot Guard;
 		CoverageIndex.Capture(Bounds.Min - FIntVector(1), Bounds.Max + FIntVector(1), Guard, false);
 		const uint64 Serial = VolumePlanSerial;
-		Request.Apply = [this, Serial, Region, Signature, Guard = MoveTemp(Guard)](FVoxelTaskResult&& Result)
+		{
+			FString CallbackBindingError;
+			if (!Request.BindApply(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+				[this, Serial, Region, Signature, Guard = MoveTemp(Guard)](FVoxelTaskResult&& Result)
 		{
 			if (Serial != VolumePlanSerial || Result.Stamp.WorldEpoch != WorldEpoch)
 				return;
@@ -5573,7 +5752,14 @@ FVoxelGameThreadContinuation FVoxelViewManager::RebuildVolumeTransitionSteps(con
 				Current->Plan = StaticCastSharedPtr<const FVoxelVolumeCoveragePlan>(Result.CustomPayload);
 			}
 			MarkCoverageDirty(VoxelProxyCoverageRect(Region));
-		};
+		}, CallbackBindingError))
+			{
+				Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+					CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+						? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+				continue;
+			}
+		}
 		if (EnqueueViewTask(MoveTemp(Request)))
 			State.PendingSignature = Signature;
 	}
@@ -6933,8 +7119,33 @@ bool FVoxelViewManager::EnqueueViewTask(FVoxelTaskRequest&& InRequest)
 	}
 	if (InRequest.Apply)
 	{
-		const auto Apply = MakeShared<TFunction<void(FVoxelTaskResult&&)>>(MoveTemp(InRequest.Apply));
-		InRequest.Apply = [this, Apply, Kind = InRequest.Kind, Stage = InRequest.TerrainStage](FVoxelTaskResult&& InResult)
+		const auto Consumer = InRequest.GenerationConsumer.IsValid() ? InRequest.GenerationConsumer : Scheduler.GetControlConsumer();
+		const uint64 MetadataBytes = VoxelBoundedAllocation::WorkerSharedBytes<FGrantedCoverageApply>() +
+			VoxelBoundedAllocation::WorkerSharedBytes<FVoxelTaskResult>() +
+			VoxelBoundedAllocation::FunctionBytes<FDeferredGrantedCoverageApply, false>();
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MetadataLease;
+		const auto Admission = Scheduler.GetTerrainResources()->TryAcquire(Consumer, EVoxelTerrainResourcePool::Input,
+			MetadataBytes, MetadataLease, 0, InRequest.GetBindingBytes() + InRequest.GetRequiredBindingInputBytes(),
+			InRequest.GetBindingLeaseCount() + InRequest.GetRequiredBindingInputLeaseCount());
+		if (Admission != EVoxelTerrainResourceAdmission::Granted)
+		{
+			Scheduler.ObserveDemand(InRequest.Kind, InRequest.Stamp,
+				Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+			return false;
+		}
+		const uint64 PreviousRequiredInputBytes = InRequest.GetRequiredBindingInputBytes();
+		const int32 PreviousRequiredLeaseCount = InRequest.GetRequiredBindingInputLeaseCount();
+		InRequest.SetRequiredBindingInput(PreviousRequiredInputBytes + MetadataBytes, PreviousRequiredLeaseCount + 1);
+		FString BindingError;
+		if (!InRequest.WrapApply(Scheduler.GetTerrainResources(), Consumer,
+			[this, MetadataLease, Kind = InRequest.Kind, Stage = InRequest.TerrainStage](TFunction<void(FVoxelTaskResult&&)>&& Previous,
+				TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PreviousLease)
+		{
+			const auto Apply = VoxelBoundedAllocation::MakeWorkerShared<FGrantedCoverageApply>(MetadataLease);
+			Apply->MetadataLease = MetadataLease;
+			Apply->PreviousLease = MoveTemp(PreviousLease);
+			Apply->Apply = MoveTemp(Previous);
+			return [this, Apply, Kind, Stage](FVoxelTaskResult&& InResult)
 		{
 			const bool bLegacyHeightfield = !InResult.Stamp.bHasGeometryIdentity &&
 				(Kind == EVoxelTaskKind::BuildViewTransition || (Kind == EVoxelTaskKind::BuildViewCoverage && Stage >= 2));
@@ -6948,17 +7159,20 @@ bool FVoxelViewManager::EnqueueViewTask(FVoxelTaskRequest&& InRequest)
 				ShouldDeferCoverage(InResult.Stamp);
 			if (bDeferred)
 			{
-				const auto Result = MakeShared<FVoxelTaskResult>(MoveTemp(InResult));
+				const auto Result = VoxelBoundedAllocation::MakeWorkerShared<FVoxelTaskResult>(Apply->MetadataLease, MoveTemp(InResult));
 				const auto Bounds = bLegacyHeightfield ? Rect : bLegacyVolume ? VoxelProxyCoverageRect(Result->Stamp.ViewKey) : CoverageBounds(Result->Stamp);
-				DeferredCoverageCallbacks.Enqueue({Bounds,
-					[Apply, Result]
-					{
-						(*Apply)(MoveTemp(*Result));
-					}});
+				DeferredCoverageCallbacks.Enqueue({Bounds, FDeferredGrantedCoverageApply{Apply, Result}, Apply->MetadataLease});
 				return;
 			}
-			(*Apply)(MoveTemp(InResult));
+			Apply->Apply(MoveTemp(InResult));
 		};
+		}, BindingError))
+		{
+			InRequest.SetRequiredBindingInput(PreviousRequiredInputBytes, PreviousRequiredLeaseCount);
+			Scheduler.ObserveDemand(InRequest.Kind, InRequest.Stamp,
+				BindingError.StartsWith(TEXT("Oversized")) ? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+			return false;
+		}
 	}
 	return Scheduler.Enqueue(MoveTemp(InRequest));
 }

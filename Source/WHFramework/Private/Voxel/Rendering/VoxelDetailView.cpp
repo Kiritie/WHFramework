@@ -416,8 +416,21 @@ void FVoxelDetailView::Tick(const TConstArrayView<FVector> InObservers)
 	const auto CapacityWait = FVoxelGenerationCapacityWait::Create(Scheduler.GetRuntimeResources(), Request.GenerationConsumer);
 	if (!CapacityWait) return;
 	Request.bResumable = true;
-	Request.GetBlockReason = [CapacityWait] { return CapacityWait->BlockReason(); };
-	Request.Execute = [Config, Cache, PlanLease, CapacityWait, ObserverCells = MoveTemp(ObserverCells), Token](const TAtomic<bool>& InCancel)
+	{
+		FString CallbackBindingError;
+		if (!Request.BindGetBlockReason(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[CapacityWait] { return CapacityWait->BlockReason(); }, CallbackBindingError))
+		{
+			Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+				CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+					? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+			return;
+		}
+	}
+	{
+		FString CallbackBindingError;
+		if (!Request.BindExecute(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[Config, Cache, PlanLease, CapacityWait, ObserverCells = MoveTemp(ObserverCells), Token](const TAtomic<bool>& InCancel)
 	{
 		FVoxelTaskResult Result;
 		const uint64 BeforeBuild = CapacityWait->Begin();
@@ -504,7 +517,14 @@ void FVoxelDetailView::Tick(const TConstArrayView<FVector> InObservers)
 		Result.Details = MoveTemp(Plan);
 		Result.bSuccess = !InCancel.Load();
 		return Result;
-	};
+	}, CallbackBindingError))
+		{
+			Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+				CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+					? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+			return;
+		}
+	}
 	if (Scheduler.Enqueue(MoveTemp(Request)))
 	{
 		WaitingToken = Token;

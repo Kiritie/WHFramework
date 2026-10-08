@@ -49,7 +49,7 @@ bool FVoxelResidencyDemandQueueTest::RunTest(const FString& InParameters)
 {
 	(void)InParameters;
 	FVoxelWorldRuntime Runtime(4, false, VoxelTest::MakeRegistry(), VoxelTest::MakeGenerator());
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	int32 Evictions = 0;
 	FVoxelResidencyManager Manager(Runtime, Scheduler, [&Evictions](const FIntVector&) { ++Evictions; });
 	Manager.SetEvictGraceFrames(0);
@@ -112,7 +112,7 @@ bool FVoxelResidencyEventWakeTest::RunTest(const FString& InParameters)
 {
 	(void)InParameters;
 	FVoxelWorldRuntime Runtime(4, false, VoxelTest::MakeRegistry(), VoxelTest::MakeGenerator());
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	bool bReplacementPending = true;
 	int32 RetentionQueries = 0;
 	int32 Evictions = 0;
@@ -177,7 +177,7 @@ bool FVoxelResidencyGraceHeapTest::RunTest(const FString& InParameters)
 	ON_SCOPE_EXIT { GFrameCounter = PreviousFrame; };
 	GFrameCounter = 100;
 	FVoxelWorldRuntime Runtime(4, false, VoxelTest::MakeRegistry(), VoxelTest::MakeGenerator());
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	TArray<FIntVector> Detached;
 	FVoxelResidencyManager Manager(Runtime, Scheduler, [&Detached](const FIntVector& Key) { Detached.Add(Key); });
 	Manager.SetEvictGraceFrames(10);
@@ -222,7 +222,7 @@ bool FVoxelResidencyTaskZeroTest::RunTest(const FString& InParameters)
 {
 	(void)InParameters;
 	FVoxelWorldRuntime Runtime(4, false, VoxelTest::MakeRegistry(), VoxelTest::MakeGenerator());
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	if (!Scheduler.InitializeStatistics(4)) return false;
 	FVoxelResidencyManager Manager(Runtime, Scheduler, {});
 	Manager.SetEvictGraceFrames(0);

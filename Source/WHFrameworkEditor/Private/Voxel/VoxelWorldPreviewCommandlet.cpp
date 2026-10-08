@@ -9,6 +9,7 @@
 #include "Voxel/Authoring/VoxelWorldGenerationProfile.h"
 #include "Voxel/Generation/VoxelBuiltinFeatures.h"
 #include "Voxel/Generation/VoxelGenerationBinding.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Generation/VoxelGenerationPlanCache.h"
 #include "Voxel/Generation/VoxelGenerationPipeline.h"
 #include "Voxel/Generation/VoxelGenerationPlanningRead.h"
@@ -119,6 +120,7 @@ int32 UVoxelWorldPreviewCommandlet::Main(const FString& Params)
 
 	const TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config =
 		MakeShared<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe>(MoveTemp(MutableConfig));
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> SamplesLease;
 	TArray<FVoxelEnvironmentSample> Samples;
 	if (!bMacroOnly)
 	{
@@ -142,12 +144,23 @@ int32 UVoxelWorldPreviewCommandlet::Main(const FString& Params)
 		const FVoxelGenerationPipeline Pipeline(Config, Cache.ToSharedRef());
 		Pipeline.BindRetentionResources(PlanningResources, RetentionConsumer);
 		FVoxelGenerationConsumerScope ConsumerScope(RetentionConsumer);
+		FVoxelGenerationWorkspace Workspace(PlanningResources, RetentionConsumer,
+			Cache->GetRootInputBytes(), 1);
+		TArray<FVoxelEnvironmentSample> CandidateSamples;
+		if (!Workspace.ReserveArray(CandidateSamples, Width * Height, Error))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Preview sample admission failed: %s"), *Error);
+			return 6;
+		}
+		CandidateSamples.SetNumUninitialized(Width * Height);
 		if (!Pipeline.SampleEnvironments(FIntPoint(OriginX, OriginY), Width,
-			Height, Step, Samples, Error, nullptr, false))
+			Height, Step, MakeArrayView(CandidateSamples), Error, nullptr, false, Workspace.GetLease()))
 		{
 			UE_LOG(LogTemp, Error, TEXT("Environment sampling failed: %s"), *Error);
 			return 6;
 		}
+		Samples = MoveTemp(CandidateSamples);
+		SamplesLease = Workspace.TakeLease();
 	}
 
 	TArray<FString> Rows;

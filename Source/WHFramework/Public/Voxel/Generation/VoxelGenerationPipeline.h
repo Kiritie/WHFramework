@@ -5,6 +5,8 @@
 #include "Voxel/Generation/VoxelGenerationPlanCache.h"
 #include "Voxel/Generation/VoxelGenerationOverlay.h"
 
+class FVoxelGenerationWorkspace;
+
 class WHFRAMEWORK_API FVoxelGenerationPipeline
 {
 public:
@@ -35,9 +37,23 @@ public:
 		TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> InCache, TSharedPtr<const IVoxelGenerationOverlay, ESPMode::ThreadSafe> InOverlay = nullptr,
 		bool bInRequirePlanPreflight = false);
 
-	// 采样沿调用者显式绑定的原消费 scope；输出容器由调用者持有其容量与发布寿命。
+	// 调用者先授予并构造输出 span；原事实 Working 候选完成后才复制，失败保持旧输出。
+	// heap span 的原租约须由调用者强持到返回；同域租约计入必需峰值，nullptr 仅表示栈或另资源域输出。
 	bool GenerateSection(
-		const FIntVector& InSectionCoordinate, TArray<FVoxelBlockState>& OutBaseBlocks, FString& OutError, const TAtomic<bool>* InCancel = nullptr) const;
+		const FIntVector& InSectionCoordinate,
+		TArrayView<FVoxelBlockState> OutBaseBlocks,
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr,
+		const FVoxelTerrainResourceLease* InOutputLease = nullptr) const;
+
+#if WITH_DEV_AUTOMATION_TESTS
+	// 只兼容无账本夹具；绑定原账本时拒绝隐式分配 caller 数组。
+	bool GenerateSection(
+		const FIntVector& InSectionCoordinate,
+		TArray<FVoxelBlockState>& OutBaseBlocks,
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr) const;
+#endif
 
 	bool SampleColumn(int32 InX, int32 InY, FVoxelColumnSample& OutColumn, FString& OutError, const TAtomic<bool>* InCancel = nullptr) const;
 
@@ -47,17 +63,73 @@ public:
 	bool SampleEnvironment(int32 InX, int32 InY, FVoxelEnvironmentSample& OutSample, FString& OutError, const TAtomic<bool>* InCancel = nullptr) const;
 
 	bool TrySampleEnvironment(const FIntPoint& InCell, FVoxelEnvironmentSample& OutSample) const;
-	void QueryReadyWaterfalls(const FIntPoint& InMin, const FIntPoint& InMax, TArray<FVoxelWaterfallSemantic>& OutWaterfalls) const;
-	bool EnumerateCaveEntrances(const FIntPoint& InMin, const FIntPoint& InMax, TArray<FVoxelCaveEntrance>& OutEntrances, FString& OutError) const;
+	// 所有原生读取和 scratch 接纳先完成；visitor 失败可能接收前缀，调用者应在整体成功后发布候选。
+	// Source 仅在同步 callback 内有效；调用者扩容前继承其必需输入、租约数量及 Working 下限。
+	bool QueryReadyWaterfalls(
+		const FIntPoint& InMin,
+		const FIntPoint& InMax,
+		TFunctionRef<bool(const FVoxelWaterfallSemantic&, const FVoxelGenerationWorkspace&, FString&)> InVisit,
+		FString& OutError,
+		const FVoxelTerrainResourceLease* InOutputLease = nullptr) const;
+
+	bool EnumerateCaveEntrances(
+		const FIntPoint& InMin,
+		const FIntPoint& InMax,
+		TFunctionRef<bool(const FVoxelCaveEntrance&, const FVoxelGenerationWorkspace&, FString&)> InVisit,
+		FString& OutError,
+		const FVoxelTerrainResourceLease* InOutputLease = nullptr) const;
+
+#if WITH_DEV_AUTOMATION_TESTS
+	bool QueryReadyWaterfalls(
+		const FIntPoint& InMin,
+		const FIntPoint& InMax,
+		TArray<FVoxelWaterfallSemantic>& OutWaterfalls,
+		FString& OutError) const;
+
+	bool EnumerateCaveEntrances(
+		const FIntPoint& InMin,
+		const FIntPoint& InMax,
+		TArray<FVoxelCaveEntrance>& OutEntrances,
+		FString& OutError) const;
+#endif
 	bool RequiresPlanPreflight() const
 	{
 		return bRequirePlanPreflight;
+	}
+
+	const TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>& GetPlanCache() const
+	{
+		return Cache;
 	}
 
 	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> RetainHydrologyForPlanning(
 		const FIntPoint& InCenter,
 		int32 InSampleRadiusCells) const;
 
+	bool SampleEnvironments(
+		const FIntPoint& InOrigin,
+		int32 InWidth,
+		int32 InHeight,
+		int32 InStep,
+		TArrayView<FVoxelEnvironmentSample> OutSamples,
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr,
+		bool bInUseColumnCache = true,
+		const FVoxelTerrainResourceLease* InOutputLease = nullptr) const;
+
+	bool SampleColumns(
+		const FIntPoint& InOrigin,
+		int32 InWidth,
+		int32 InHeight,
+		int32 InStep,
+		TArrayView<FVoxelColumnSample> OutColumns,
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr,
+		bool bInUseColumnCache = true,
+		const FVoxelTerrainResourceLease* InOutputLease = nullptr) const;
+
+#if WITH_DEV_AUTOMATION_TESTS
+	// 输出 span 长度为 Width * Height；与 GenerateSection 使用相同的原租约和事务输出契约。
 	bool SampleEnvironments(
 		const FIntPoint& InOrigin,
 		int32 InWidth,
@@ -77,6 +149,7 @@ public:
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr,
 		bool bInUseColumnCache = true) const;
+#endif
 
 	bool SampleBlock(
 		const FIntVector& InPosition,
@@ -91,6 +164,19 @@ public:
 		TMap<FIntVector, FVoxelBlockState>& OutCells,
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr) const;
+
+private:
+	bool ResolveAllocation(
+		TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& OutResources,
+		FVoxelGenerationConsumerKey& OutConsumer,
+		FString& OutError) const;
+
+	bool AddOutputRequirements(
+		const FVoxelTerrainResourceLease* InOutputLease,
+		uint64& InOutRequiredInputBytes,
+		int32& InOutRequiredLeaseCount,
+		uint64& OutRequiredWorkingBytes,
+		FString& OutError) const;
 
 private:
 	TSharedRef<

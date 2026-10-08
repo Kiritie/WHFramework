@@ -176,7 +176,7 @@ bool FVoxelGenerationPlanCoordinatorTest::RunTest(const FString& InParameters)
 	(void)InParameters;
 	const auto Config = VoxelTest::MakeGenerationConfig();
 	const auto Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelTaskBudget Budget;
 	Budget.MaxConcurrentTasks = 1;
 	Scheduler.SetBudget(Budget);
@@ -224,7 +224,7 @@ bool FVoxelGenerationPlanPreflightTest::RunTest(const FString& InParameters)
 	(void)InParameters;
 	const auto Config = VoxelTest::MakeGenerationConfig();
 	const auto Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>(false);
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelTaskBudget Budget;
 	Budget.MaxConcurrentTasks = 4;
 	Budget.CriticalReservedTasks = 1;
@@ -260,8 +260,10 @@ bool FVoxelGenerationPlanPreflightTest::RunTest(const FString& InParameters)
 		Status.bFailed) ||
 		!TestTrue(TEXT("Section preflight completes"), Status.bReady)) return false;
 	const FVoxelGenerationPipeline PreflightGenerator(Config, Cache, nullptr, true);
-	TArray<FVoxelBlockState> PreflightBlocks;
-	TArray<FVoxelBlockState> ReferenceBlocks;
+	TArray<FVoxelBlockState, TFixedAllocator<4096>> PreflightBlocks;
+	TArray<FVoxelBlockState, TFixedAllocator<4096>> ReferenceBlocks;
+	PreflightBlocks.SetNumUninitialized(4096);
+	ReferenceBlocks.SetNumUninitialized(4096);
 	FString ReferenceError;
 	const auto ReferenceGenerator = VoxelTest::MakeGenerator();
 	TFuture<bool> Generated = Async(EAsyncExecution::ThreadPool,
@@ -269,9 +271,9 @@ bool FVoxelGenerationPlanPreflightTest::RunTest(const FString& InParameters)
 			&Error, &ReferenceError, ReferenceGenerator]()
 		{
 			return PreflightGenerator.GenerateSection(FIntVector::ZeroValue,
-				PreflightBlocks, Error) &&
+				MakeArrayView(PreflightBlocks), Error) &&
 				ReferenceGenerator->GenerateSection(FIntVector::ZeroValue,
-					ReferenceBlocks, ReferenceError);
+					MakeArrayView(ReferenceBlocks), ReferenceError);
 		});
 	if (!TestTrue(TEXT("Worker exact generation consumes ready plans"),
 		Generated.Get()))
@@ -306,15 +308,16 @@ bool FVoxelCoarseEnvironmentPreflightTest::RunTest(const FString& InParameters)
 	const auto Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>(false, false);
 	const FVoxelGenerationPipeline Pipeline(Config, Cache, nullptr, true);
 	FString Error;
-	TArray<FVoxelColumnSample> Columns;
+	TArray<FVoxelColumnSample, TFixedAllocator<9>> Columns;
+	Columns.SetNumUninitialized(9);
 	const bool bColdSuccess = Async(EAsyncExecution::ThreadPool, [&]()
 	{
-		return Pipeline.SampleColumns(FIntPoint(-1, -1), 3, 3, 257, Columns, Error);
+		return Pipeline.SampleColumns(FIntPoint(-1, -1), 3, 3, 257, MakeArrayView(Columns), Error);
 	}).Get();
 	TestFalse(TEXT("Cold runtime coarse data cannot construct its own hydrology"), bColdSuccess);
 	TestTrue(TEXT("Cold coarse data yields to preflight"), Error.StartsWith(TEXT("DependencyNotReady")));
 	TestEqual(TEXT("Cold coarse worker leaves plan cache unbuilt"), Cache->GetStats().Hydrology, 0);
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelGenerationPlanCoordinator Coordinator(Scheduler, Config, Cache, 31);
 	const FVoxelGenerationBounds Bounds{FIntVector(-1, -1, -4096), FIntVector(514, 514, 4096)};
 	FVoxelGenerationDependencyStatus Status;
@@ -340,7 +343,7 @@ bool FVoxelCoarseEnvironmentPreflightTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("Runtime coarse worker consumes ready environment plans"),
 		Async(EAsyncExecution::ThreadPool, [&]()
 		{
-			return Pipeline.SampleColumns(FIntPoint(-1, -1), 3, 3, 257, Columns, Error);
+			return Pipeline.SampleColumns(FIntPoint(-1, -1), 3, 3, 257, MakeArrayView(Columns), Error);
 		}).Get());
 	TestEqual(TEXT("All coarse samples are produced"), Columns.Num(), 9);
 	TestEqual(TEXT("Coarse consumption builds no additional hydrology"), Cache->GetStats().Hydrology, Before.Hydrology);
@@ -410,12 +413,14 @@ bool FVoxelGenerationMathDeterminismTest::RunTest(const FString& InParameters)
 	const TSharedRef<FVoxelGenerationPipeline, ESPMode::ThreadSafe> GeneratorB = VoxelTest::MakeGenerator();
 	for (const FIntVector& Coordinate : Coordinates)
 	{
-		TArray<FVoxelBlockState> BaseA;
-		TArray<FVoxelBlockState> BaseB;
+		TArray<FVoxelBlockState, TFixedAllocator<4096>> BaseA;
+		TArray<FVoxelBlockState, TFixedAllocator<4096>> BaseB;
+		BaseA.SetNumUninitialized(4096);
+		BaseB.SetNumUninitialized(4096);
 		FString ErrorA;
 		FString ErrorB;
-		TestTrue(TEXT("First exact base generates"), GeneratorA->GenerateSection(Coordinate, BaseA, ErrorA));
-		TestTrue(TEXT("Second exact base generates"), GeneratorB->GenerateSection(Coordinate, BaseB, ErrorB));
+		TestTrue(TEXT("First exact base generates"), GeneratorA->GenerateSection(Coordinate, MakeArrayView(BaseA), ErrorA));
+		TestTrue(TEXT("Second exact base generates"), GeneratorB->GenerateSection(Coordinate, MakeArrayView(BaseB), ErrorB));
 		TestEqual(TEXT("Exact base cell count is stable"), BaseA.Num(), BaseB.Num());
 		TestEqual(TEXT("Exact base fingerprint is stable"), VoxelTest::HashBlocks(BaseA), VoxelTest::HashBlocks(BaseB));
 	}
@@ -438,10 +443,11 @@ bool FVoxelLandformEnvironmentTest::RunTest(const FString& InParameters)
 	(void)InParameters;
 	const TSharedRef<FVoxelGenerationPipeline, ESPMode::ThreadSafe> First = VoxelTest::MakeGenerator(173);
 	const TSharedRef<FVoxelGenerationPipeline, ESPMode::ThreadSafe> Second = VoxelTest::MakeGenerator(173);
-	TArray<FVoxelEnvironmentSample> Grid;
+	TArray<FVoxelEnvironmentSample, TFixedAllocator<6>> Grid;
+	Grid.SetNumUninitialized(6);
 	FString GridError;
 	if (!TestTrue(TEXT("Natural environment grid resolves"),
-		First->SampleEnvironments(FIntPoint(-33, 29), 3, 2, 16, Grid, GridError)))
+		First->SampleEnvironments(FIntPoint(-33, 29), 3, 2, 16, MakeArrayView(Grid), GridError)))
 	{
 		AddError(GridError);
 		return false;
@@ -470,10 +476,11 @@ bool FVoxelLandformEnvironmentTest::RunTest(const FString& InParameters)
 		TestTrue(TEXT("Grid preserves river identity"),
 			Grid[Index].Column.RiverId == Single.Column.RiverId);
 	}
-	TArray<FVoxelEnvironmentSample> InvalidGrid;
+	TArray<FVoxelEnvironmentSample, TFixedAllocator<1>> InvalidGrid;
+	InvalidGrid.SetNumUninitialized(1);
 	TestFalse(TEXT("Grid rejects exclusive-bound overflow"),
 		First->SampleEnvironments(FIntPoint(MAX_int32, 0), 1, 1, 1,
-			InvalidGrid, GridError));
+			MakeArrayView(InvalidGrid), GridError));
 	for (const FIntPoint Point : { FIntPoint(0, 0), FIntPoint(-8193, 2048), FIntPoint(24000, -17000) })
 	{
 		FVoxelEnvironmentSample A;
@@ -584,8 +591,9 @@ bool FVoxelColumnSymbolsTest::RunTest(const FString& InParameters)
 		if (!TestTrue(TEXT("Surface resolves"), Query.SampleColumn(Column.X, Column.Y, Surface, Error))) return false;
 		const int32 MinZ = Surface.SurfaceZ - 24;
 		if (!TestTrue(TEXT("Full generation stages prepare"), Query.Prepare({ FIntVector(Column.X, Column.Y, MinZ), FIntVector(Column.X + 1, Column.Y + 1, MinZ + 48) }, Error))) return false;
-		TArray<uint32> Symbols;
-		if (!TestTrue(TEXT("Column symbols resolve"), Query.SampleColumnSymbols(Column, MinZ, 48, Symbols, Error))) return false;
+		TArray<uint32, TFixedAllocator<48>> Symbols;
+		Symbols.SetNumUninitialized(48);
+		if (!TestTrue(TEXT("Column symbols resolve"), Query.SampleColumnSymbols(Column, MinZ, MakeArrayView(Symbols), Error))) return false;
 		for (int32 Index = 0; Index < Symbols.Num(); ++Index)
 		{
 			uint32 Point = 0;

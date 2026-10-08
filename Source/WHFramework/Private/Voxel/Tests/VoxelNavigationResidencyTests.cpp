@@ -99,7 +99,7 @@ bool FVoxelNavigationResidencyTest::RunTest(const FString& InParameters)
 	Module->Shapes = Shapes;
 	Module->Generator = VoxelTest::MakeGenerator();
 	Module->Runtime = MakeUnique<FVoxelWorldRuntime>(Module->Epoch, true, Module->Registry.GetSnapshot().ToSharedRef(), Module->Generator.ToSharedRef());
-	Module->Scheduler = MakeUnique<FVoxelTaskScheduler>();
+	Module->Scheduler = MakeUnique<FVoxelTaskScheduler>(true);
 	Module->Runtime->BindTerrainResources(Module->Scheduler->GetRuntimeResources());
 	if (!Module->TerrainFrameContext.Configure({}, Error)) return false;
 	Module->Scheduler->BindFrameContext(Module->TerrainFrameContext);

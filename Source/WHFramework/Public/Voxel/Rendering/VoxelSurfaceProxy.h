@@ -83,6 +83,7 @@ public:
 	TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry,
 		const FVoxelLodTopologySettings& InLod = FVoxelLodTopologySettings());
 
+	// 返回列数组时同步移交其原事实 Working 租约；调用者须在列数组之前声明强租约。
 	bool Build(
 		const FVoxelSurfaceTileKey& InKey,
 		FVoxelSurfaceTileData& OutData,
@@ -90,7 +91,8 @@ public:
 		const TAtomic<bool>* InCancel,
 		FVoxelSurfaceBuildTiming* OutTiming, TArray<FVoxelColumnSample>* OutColumns,
 		const FVoxelTerrainGeometry& InGeometry,
-		const FVoxelTerrainBuildShard* InShard = nullptr) const;
+		const FVoxelTerrainBuildShard* InShard = nullptr,
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>* OutColumnsLease = nullptr) const;
 
 private:
 	bool CaptureModifiedBlocks(

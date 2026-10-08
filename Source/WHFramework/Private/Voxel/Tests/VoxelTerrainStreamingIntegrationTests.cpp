@@ -119,7 +119,7 @@ bool FVoxelKnownSchedulerProgressIntegrationTest::RunTest(const FString& InParam
 {
 	for (const int32 WorkerCount : {1, 4})
 	{
-		FVoxelTaskScheduler Scheduler;
+		FVoxelTaskScheduler Scheduler(true);
 		FVoxelTaskBudget Budget;
 		Budget.MaxConcurrentTasks = WorkerCount;
 		Budget.MaxConcurrentCoarseTerrainTasks = WorkerCount;
@@ -203,7 +203,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelResumablePageIntegrationTest,
 
 bool FVoxelResumablePageIntegrationTest::RunTest(const FString& InParameters)
 {
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelTaskBudget Budget;
 	Budget.MaxConcurrentTasks = 1;
 	Scheduler.SetBudget(Budget);

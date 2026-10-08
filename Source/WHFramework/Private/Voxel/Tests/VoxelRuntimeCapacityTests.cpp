@@ -229,7 +229,7 @@ bool FVoxelEmergeCapacityContinuationTest::RunTest(const FString&)
 	const auto Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
 	const auto Generator = MakeShared<FVoxelGenerationPipeline, ESPMode::ThreadSafe>(Config, Cache);
 	const auto Registry = VoxelTest::MakeRegistry();
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	if (!Scheduler.InitializeStatistics(11)) return false;
 	const auto Resources = Scheduler.GetRuntimeResources();
 	FVoxelWorldRuntime Runtime(11, true, Registry, Generator);

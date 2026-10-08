@@ -105,6 +105,8 @@ public:
     static int32 DistanceBucket(double InMeters);
     bool Initialize(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
         const FVoxelGenerationConsumerKey& InConsumer, int32 InMaximumTargets = 65536, int32 InMaximumAttempts = 16384);
+    uint64 GetStorageReservationBytes() const;
+    int32 GetStorageReservationLeaseCount() const;
     bool CanCompleteWork() const;
     bool RegisterWork(const FGuid& InAttempt);
     void AbandonWork(const FGuid& InAttempt);

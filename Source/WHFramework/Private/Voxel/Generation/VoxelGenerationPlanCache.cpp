@@ -828,15 +828,19 @@ bool FVoxelGenerationPlanCache::Create(
 		VoxelBoundedAllocation::ArrayBytes<TUniquePtr<FNaturalShard>>(ShardCount) +
 		VoxelBoundedAllocation::ArrayBytes<TUniquePtr<FPlanShard>>(ShardCount);
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-	if (!InResources->Acquire(InControlConsumer, EVoxelTerrainResourcePool::Input, RootBytes, Lease))
+	const auto Admission = InResources->TryAcquire(InControlConsumer, EVoxelTerrainResourcePool::Input, RootBytes, Lease);
+	if (Admission != EVoxelTerrainResourceAdmission::Granted)
 	{
-		OutError = TEXT("CapacityBlocked: generation cache root and shards");
+		OutError = Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable
+			? TEXT("CapacityUnachievable: generation cache root, shards and native ledger")
+			: TEXT("CapacityBlocked: generation cache root and shards");
 		return false;
 	}
 	// 在类工厂中调用私有构造器；控制器/deleter 与 WorkerSharedBytes 使用同一实际类型。
 	TSharedPtr<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> Cache(
 		new FVoxelGenerationPlanCache(InResources, InControlConsumer, bInAllowGameThreadBuilds, bInAllowWorkerWait),
 		VoxelBoundedAllocation::TWorkerDeleter<FVoxelGenerationPlanCache>{Lease});
+	Cache->RootInputBytes = RootBytes;
 	OutCache = MoveTemp(Cache);
 	OutError.Reset();
 	return true;
@@ -1499,9 +1503,13 @@ bool FVoxelGenerationPlanCache::UpdateRetention(
 			OutError = TEXT("Oversized: generation cache retention snapshot allocation peak exceeds original input pool limit");
 			return false;
 		}
-		if (Bytes && !Resources->Acquire(ControlConsumer, EVoxelTerrainResourcePool::Input, Bytes, CandidateLease))
+		const auto Admission = Bytes ? Resources->TryAcquire(ControlConsumer, EVoxelTerrainResourcePool::Input,
+			Bytes, CandidateLease, 0, RootInputBytes + PreviousBytes, 1 + int32(RetentionLease.IsValid())) : EVoxelTerrainResourceAdmission::Granted;
+		if (Admission != EVoxelTerrainResourceAdmission::Granted)
 		{
-			OutError = TEXT("CapacityBlocked: generation cache retention snapshot input capacity");
+			OutError = Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable
+				? TEXT("CapacityUnachievable: retention snapshot and fixed native input")
+				: TEXT("CapacityBlocked: generation cache retention snapshot input capacity");
 			return false;
 		}
 	}

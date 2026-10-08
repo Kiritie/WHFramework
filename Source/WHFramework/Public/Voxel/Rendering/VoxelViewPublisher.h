@@ -163,6 +163,8 @@ private:
 		FVoxelTaskStamp NativeStamp;
 		TSharedPtr<const FVoxelTerrainCoarseMesh, ESPMode::ThreadSafe> NativeMesh;
 		bool bNativeMeshPending = false;
+		bool bNativeAdmissionWaiting = false;
+		uint64 NativeAdmissionVersion = 0;
 		TWeakObjectPtr<AActor> Actor;
 		FMeshPtr Source;
 		int32 TerrainStage = INDEX_NONE;
@@ -385,7 +387,7 @@ private:
 	double NextPublisherDiagnostic = 0.0;
 	void FinishGroups();
 	void DiscardGroups();
-	void DiscardPublication(const FPublicationRef& Publication);
+	void DiscardPublication(const FPublicationRef& Publication, bool bInAllowRetry = true);
 
 private:
 	UVoxelModule& Module;

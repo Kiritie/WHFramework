@@ -92,7 +92,7 @@ public:
 
 	virtual bool ApplySection(
 		const FIntVector& InSectionCoordinate,
-		TArray<FVoxelBlockState>& InOutBlocks,
+		TArrayView<FVoxelBlockState> InOutBlocks,
 		FString& OutError,
 		const TAtomic<bool>* InCancel) const = 0;
 

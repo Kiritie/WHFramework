@@ -72,7 +72,7 @@ bool FVoxelMapStyleEpochTest::RunTest(const FString& InParameters)
 	const auto Config = MakeShared<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe>(MoveTemp(MapConfig));
 	const auto Generator = MakeShared<const FVoxelGenerationPipeline, ESPMode::ThreadSafe>(
 		Config, MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>());
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelMapTileCache Cache(Scheduler, Generator, Config, 71, 25.);
 	const FVoxelMapTileKey Parent{FIntPoint(-1, -1), 512};
 	const TArray<FVoxelMapTileKey> Requested{Parent};

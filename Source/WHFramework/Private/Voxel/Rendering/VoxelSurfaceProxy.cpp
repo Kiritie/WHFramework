@@ -2,7 +2,9 @@
 
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Rendering/VoxelViewLod.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "Voxel/Generation/VoxelGenerationPlanningRead.h"
 #include "Voxel/Generation/Ecology/VoxelEcology.h"
 
 namespace
@@ -80,9 +82,36 @@ bool FVoxelSurfaceProxyBuilder::Build(
 	FVoxelSurfaceTileData& OutData,
 	FString& OutError,
 	const TAtomic<bool>* InCancel,
-	FVoxelSurfaceBuildTiming* OutTiming, TArray<FVoxelColumnSample>* OutColumns, const FVoxelTerrainGeometry& InGeometry, const FVoxelTerrainBuildShard* InShard) const
+	FVoxelSurfaceBuildTiming* OutTiming,
+	TArray<FVoxelColumnSample>* OutColumns,
+	const FVoxelTerrainGeometry& InGeometry,
+	const FVoxelTerrainBuildShard* InShard,
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>* OutColumnsLease) const
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_SurfaceBuild);
+
+	const auto& Cache = Generator->GetPlanCache();
+	const auto& Resources = Cache->GetResources();
+	FVoxelGenerationConsumerKey Consumer;
+	if (Resources)
+	{
+		if (OutColumns && !OutColumnsLease)
+		{
+			OutError = TEXT("InvalidResource: surface column output requires its original strong lease slot");
+			return false;
+		}
+		if (!FVoxelGenerationConsumerScope::GetConsumerKey() &&
+			!FVoxelGenerationPlanningReadScope::GetConsumerKey() &&
+			!FVoxelGenerationPlanningReadScope::GetTaskStamp())
+		{
+			OutError = TEXT("InvalidConsumer: surface columns require their original execution consumer");
+			return false;
+		}
+		if (!Cache->ResolveConsumer(Consumer, OutError))
+		{
+			return false;
+		}
+	}
 
 	FVoxelSurfaceTileData Data;
 
@@ -128,7 +157,15 @@ bool FVoxelSurfaceProxyBuilder::Build(
 
 	const FIntPoint TileOrigin = Data.GetBuildOrigin();
 
+	// 列 scratch 独立于现有 Terrain Geometry 账本；数组先释放，再退出原事实 Working 租约。
+	FVoxelGenerationWorkspace ColumnsWorkspace(Resources, Consumer,
+		Cache->GetRootInputBytes(), Cache->GetRootInputBytes() ? 1 : 0);
 	TArray<FVoxelColumnSample> Columns;
+	if (!ColumnsWorkspace.ReserveArray(Columns, Count, OutError))
+	{
+		return false;
+	}
+	Columns.SetNumUninitialized(Count);
 	const double ColumnsStart = FPlatformTime::Seconds();
 
 	if (!Generator->SampleColumns(
@@ -136,10 +173,11 @@ bool FVoxelSurfaceProxyBuilder::Build(
 		Data.Side,
 		Data.Side,
 		Data.Step,
-		Columns,
+		MakeArrayView(Columns),
 		OutError,
 		InCancel,
-		false))
+		false,
+		ColumnsWorkspace.GetLease()))
 	{
 		return false;
 	}
@@ -230,6 +268,10 @@ bool FVoxelSurfaceProxyBuilder::Build(
 	if (OutColumns)
 	{
 		*OutColumns = MoveTemp(Columns);
+		if (OutColumnsLease)
+		{
+			*OutColumnsLease = ColumnsWorkspace.TakeLease();
+		}
 	}
 	OutData =
 		MoveTemp(Data);

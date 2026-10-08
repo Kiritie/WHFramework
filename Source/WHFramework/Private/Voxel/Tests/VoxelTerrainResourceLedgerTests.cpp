@@ -300,4 +300,47 @@ bool FVoxelResourceReservedPublicationRefusalTest::RunTest(const FString& InPara
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelResourceRequiredCapacityClassificationTest,
+	"WHFramework.Voxel.FineRefactor.Resources.RequiredCapacityClassification",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelResourceRequiredCapacityClassificationTest::RunTest(const FString& InParameters)
+{
+	const auto Resources = MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
+	FVoxelTerrainResourceLimits Limits;
+	Limits.InputBytes = 1;
+	if (!Resources->Configure(Limits)) return false;
+	const auto Consumer = FVoxelGenerationConsumerKey::Section(51, FGuid::NewGuid(), 1, {}, 1);
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+	const auto Before = Resources->Snapshot();
+	TestTrue(TEXT("Payload 小但 native ledger/全部拆分句柄永远无法容纳"),
+		Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Working, 1, Lease, 7) == EVoxelTerrainResourceAdmission::CapacityUnachievable);
+	TestFalse(TEXT("永久拒收不构造租约"), Lease.IsValid());
+	TestEqual(TEXT("永久拒收不先创建账本"), Resources->Snapshot().LedgerMetadataBytes, uint64(0));
+	TestEqual(TEXT("永久拒收不伪造释放事件"), Resources->Snapshot().ReleaseVersion, Before.ReleaseVersion);
+
+	Limits.InputBytes = 1024 * 1024;
+	Limits.WorkingBytes = 4096;
+	if (!Resources->Configure(Limits)) return false;
+	auto Other = Consumer;
+	++Other.RequestSerial;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Blocker;
+	if (Resources->TryAcquire(Other, EVoxelTerrainResourcePool::Working, Limits.WorkingBytes, Blocker) != EVoxelTerrainResourceAdmission::Granted) return false;
+	TestTrue(TEXT("外部可释放占用仅报告暂时阻塞"),
+		Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Working, 1024, Lease) == EVoxelTerrainResourceAdmission::CapacityBlocked);
+	const uint64 WaitingVersion = Resources->ReleaseVersionExcludingOwner(Consumer);
+	Blocker.Reset();
+	TestTrue(TEXT("完整其它 Consumer 的释放可唤醒原尝试"), Resources->ReleaseVersionExcludingOwner(Consumer) > WaitingVersion);
+	if (Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Working, 1024, Lease) != EVoxelTerrainResourceAdmission::Granted) return false;
+	const uint64 RequiredVersion = Resources->Snapshot().Version;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Candidate;
+	TestTrue(TEXT("声明的不可撤销 Input 下限包含新 native 句柄，不能等外部退款"),
+		Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Working, 1, Candidate, 0, Limits.InputBytes, 1) == EVoxelTerrainResourceAdmission::CapacityUnachievable);
+	TestEqual(TEXT("必需峰值拒收不改账本"), Resources->Snapshot().Version, RequiredVersion);
+	TestTrue(TEXT("原租约增长超固定 Working 上限明确不可达"),
+		Lease->TryResize(Limits.WorkingBytes + 1) == EVoxelTerrainResourceAdmission::CapacityUnachievable);
+	TestEqual(TEXT("拒收增长保留原 payload"), Lease->Bytes(), uint64(1024));
+	return true;
+}
+
 #endif

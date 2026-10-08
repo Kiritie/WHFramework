@@ -70,7 +70,7 @@ bool FVoxelFrozenGenerationProgressTest::RunTest(const FString& InParameters)
 {
 	(void)InParameters;
 	UVoxelModule* Module = NewObject<UVoxelModule>();
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelViewPublisher Publisher(*Module, Scheduler, 1);
 	const FVoxelPublishGroupKey Owner{0, FIntVector::ZeroValue, 1};
 	int32 Commits = 0;
@@ -168,7 +168,7 @@ bool FVoxelIndependentPublishCommitTest::RunTest(const FString& InParameters)
 {
 	(void)InParameters;
 	UVoxelModule* Module = NewObject<UVoxelModule>();
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelViewPublisher Publisher(*Module, Scheduler, 1);
 	const FVoxelPublishGroupKey Parent{1, {0, 0}, 1};
 	const FVoxelPublishGroupKey Child{0, {0, 0}, 0};
@@ -218,7 +218,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 {
 	(void)InParameters;
 	UVoxelModule* Module = NewObject<UVoxelModule>();
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelViewPublisher Publisher(*Module, Scheduler, 1);
 	const auto SignalFixtureReady = [&Publisher](const FVoxelViewPublisher::FPublicationRef& Ready)
 	{
@@ -699,7 +699,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 	Publisher.CommitReadyGroup(UnchangedPublication, UnchangedGroup);
 	TestTrue(TEXT("An older unchanged commit retains a newer source as dirty"), StableEntry.bDirty);
 	Publisher.Reset();
-	FVoxelTaskScheduler BatchScheduler;
+	FVoxelTaskScheduler BatchScheduler(true);
 	FVoxelViewPublisher BatchPublisher(*Module, BatchScheduler, 1);
 	const auto Batched = MakeShared<FVoxelViewPublisher::FPublication>();
 	Batched->Serial = ++BatchPublisher.BatchSerial;
@@ -927,7 +927,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 		FirstDeferredOwner->Groups[0].Priority.WorkClass, EVoxelWorkClass::Visible);
 	Publisher.DiscardGroups();
 	InheritedSource.Center.X = 16;
-	FVoxelTaskScheduler InheritanceScheduler;
+	FVoxelTaskScheduler InheritanceScheduler(true);
 	FVoxelTaskBudget InheritanceBudget;
 	InheritanceBudget.MaxConcurrentTasks = 1;
 	InheritanceBudget.CriticalReservedTasks = 0;
@@ -1037,7 +1037,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 	InheritanceScheduler.StopAndJoin();
 	TestTrue(TEXT("Actual worker execution preserves higher sources then releases the inherited clipping before same-source Fine"),
 		WorkerOrder == TArray<int32>{3, 1, 2});
-	FVoxelTaskScheduler AdmissionScheduler;
+	FVoxelTaskScheduler AdmissionScheduler(true);
 	AdmissionScheduler.SetBudget(InheritanceBudget);
 	TAtomic<bool> ReleaseAdmissionWorker {false};
 	FVoxelTaskRequest HoldAdmissionWorker;
@@ -1139,7 +1139,7 @@ bool FVoxelActiveGroupReplacementTest::RunTest(const FString& InParameters)
 {
 	(void)InParameters;
 	UVoxelModule* Module = NewObject<UVoxelModule>();
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelViewPublisher Publisher(*Module, Scheduler, 1);
 	const TArray<FVoxelPublishGroupKey> Keys{{0, {0, 0}, 0}, {0, {1000, 0}, 0}, {0, {2000, 0}, 0}};
 	int32 Completed = 0;
@@ -1181,7 +1181,7 @@ bool FVoxelPendingConnectedReplacementTest::RunTest(const FString& InParameters)
 {
 	(void)InParameters;
 	UVoxelModule* Module = NewObject<UVoxelModule>();
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelViewPublisher Publisher(*Module, Scheduler, 1);
 	const FVoxelPublishGroupKey Parent{1, {0, 0}, 1}, Child{0, {0, 0}, 0};
 	const FGuid ParentId = Publisher.BeginGroup(Parent), ChildId = Publisher.BeginGroup(Child);

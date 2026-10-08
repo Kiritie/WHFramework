@@ -4,6 +4,7 @@
 #include "Voxel/Network/VoxelNetworkTypes.h"
 #include "Voxel/Runtime/VoxelFineOverlayRead.h"
 #include "Voxel/Task/VoxelTerrainResources.h"
+#include "Voxel/Task/VoxelTaskScheduler.h"
 
 struct WHFRAMEWORK_API FVoxelOverlayHash
 {
@@ -148,6 +149,8 @@ public:
 	void SetAuthority(uint64 InAuthorityEpoch, const FVoxelOverlayHash& InManifest,
 		const FGuid& InDirectoryEpoch);
 	void SetTaskQueue(TFunction<bool(FVoxelTaskRequest&&)> InQueue);
+	void SetTaskBindingDomain(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+		const FVoxelGenerationConsumerKey& InConsumer);
 	void SetTaskCanceler(TFunction<void(const FVoxelTaskStamp&)> InCancel);
 	bool Receive(EVoxelMessage InKind, FVoxelOverlayRegionMessage&& InMessage, FString& OutError);
 	bool ExpectTicket(const FGuid& InSubscription, const FGuid& InTicket,
@@ -177,6 +180,8 @@ public:
 private:
 	friend struct FVoxelOverlayReplicaWork;
 	bool QueuePreparation(const FGuid& InIdentity, bool bInDelta, FString& OutError);
+	bool RetryPendingPreparation(FString& OutError);
+	void CancelPendingPreparation();
 	bool PrepareReceivingRegion(const FIntVector& InRegion, FString& OutError);
 	void ApplyPreparation(TSharedPtr<FVoxelOverlayReplicaWork, ESPMode::ThreadSafe> InWork,
 		FVoxelTaskResult&& InResult);
@@ -198,6 +203,11 @@ private:
 	TSharedPtr<FVoxelOverlayReplicaWork, ESPMode::ThreadSafe> Preparing;
 	TSharedPtr<FVoxelOverlayReplicaLifetime, ESPMode::ThreadSafe> Lifetime;
 	TFunction<bool(FVoxelTaskRequest&&)> TaskQueue;
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> TaskBindingResources;
+	FVoxelGenerationConsumerKey TaskBindingConsumer;
+	TOptional<FVoxelTaskRequest> PendingTask;
+	uint64 BindingCapacityVersion = 0;
+	bool bBindingCapacityBlocked = false;
 	TFunction<void(const FVoxelTaskStamp&)> TaskCanceler;
 	uint64 OwnerIncarnation = 1;
 	bool bDetachedWorker = false;

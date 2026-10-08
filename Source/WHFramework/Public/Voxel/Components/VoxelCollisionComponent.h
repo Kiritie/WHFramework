@@ -2,6 +2,7 @@
 
 #include "Components/PrimitiveComponent.h"
 #include "Voxel/Generation/VoxelGenerationConsumer.h"
+#include "Voxel/Task/VoxelTaskScheduler.h"
 #include "VoxelCollisionComponent.generated.h"
 
 class UBodySetup;
@@ -65,4 +66,10 @@ private:
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PreparedReclaimLease;
 	TSharedPtr<FVoxelPhysicsRetirement, ESPMode::ThreadSafe> Retirement;
 	TSharedPtr<FVoxelPhysicsRetirementTicket, ESPMode::ThreadSafe> NativeTicket;
+	TOptional<FVoxelTaskRequest> PendingCookTask;
+	FVoxelGenerationConsumerKey CookAttemptConsumer;
+	FVoxelGenerationConsumerKey CookCapacityConsumer;
+	uint64 CookCapacityVersion = 0;
+	bool bCookCapacityBlocked = false;
+	bool bCookAdmissionFailed = false;
 };

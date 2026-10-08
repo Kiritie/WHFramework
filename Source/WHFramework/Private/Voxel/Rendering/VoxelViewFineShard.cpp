@@ -421,7 +421,11 @@ bool FVoxelViewManager::RequestFineShard(const FVoxelFineShardKey& InKey)
 	Request.FirstRunnableSeconds = Slot->FirstQueuedSeconds;
 	Request.bResumable = true;
 	Request.GenerationConsumer = Worker->Consumer;
-	Request.GetBlockReason = [Worker]
+	Request.SetRequiredBindingInput(Worker->CaptureLease->Bytes(), 2);
+	{
+		FString CallbackBindingError;
+		if (!Request.BindGetBlockReason(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[Worker]
 	{
 		uint64 FactVersion = 0;
 		const bool bFactsBlocked = Worker->bWaitingFacts.Load() &&
@@ -431,15 +435,68 @@ bool FVoxelViewManager::RequestFineShard(const FVoxelFineShardKey& InKey)
 			(!Worker->Resources->TryGetReleaseVersionExcludingOwner(Worker->Consumer, GeometryVersion) || GeometryVersion <= Worker->CapacityVersion.Load());
 		return bGeometryBlocked || bFactsBlocked ?
 			EVoxelTaskBlockReason::Memory : EVoxelTaskBlockReason::None;
-	};
-	Request.Execute = [Worker](const TAtomic<bool>& Cancel) { return Worker->Advance(Cancel); };
-	Request.Apply = [this, InKey, Attempt, Consumer = Slot->Consumer](FVoxelTaskResult&& Result)
+	}, CallbackBindingError))
+		{
+			const bool bPermanent = !CallbackBindingError.StartsWith(TEXT("CapacityBlocked"));
+			Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+				bPermanent ? EVoxelTaskBlockReason::TerminalFailure : EVoxelTaskBlockReason::InputMemory);
+			if (bPermanent)
+			{
+				Slot->Build.Complete(Attempt, false, nullptr, CallbackBindingError);
+				Module.ReleaseGenerationFacts(Slot->Consumer);
+			}
+			return false;
+		}
+	}
+	{
+		FString CallbackBindingError;
+		if (!Request.BindExecute(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[Worker](const TAtomic<bool>& Cancel) { return Worker->Advance(Cancel); }, CallbackBindingError))
+		{
+			const bool bPermanent = !CallbackBindingError.StartsWith(TEXT("CapacityBlocked"));
+			Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+				bPermanent ? EVoxelTaskBlockReason::TerminalFailure : EVoxelTaskBlockReason::InputMemory);
+			if (bPermanent)
+			{
+				Slot->Build.Complete(Attempt, false, nullptr, CallbackBindingError);
+				Module.ReleaseGenerationFacts(Slot->Consumer);
+			}
+			return false;
+		}
+	}
+	{
+		FString CallbackBindingError;
+		if (!Request.BindApply(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[this, InKey, Attempt, Consumer = Slot->Consumer](FVoxelTaskResult&& Result)
 	{
 		ApplyFineShardResult(InKey, Attempt, Consumer, MoveTemp(Result));
-	};
+	}, CallbackBindingError))
+		{
+			const bool bPermanent = !CallbackBindingError.StartsWith(TEXT("CapacityBlocked"));
+			Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+				bPermanent ? EVoxelTaskBlockReason::TerminalFailure : EVoxelTaskBlockReason::InputMemory);
+			if (bPermanent)
+			{
+				Slot->Build.Complete(Attempt, false, nullptr, CallbackBindingError);
+				Module.ReleaseGenerationFacts(Slot->Consumer);
+			}
+			return false;
+		}
+	}
 	Slot->SubmittedStamp = Request.Stamp;
-	Slot->bSubmitted = Scheduler.Enqueue(MoveTemp(Request));
-	return Slot->bSubmitted;
+	const auto SubmittedConsumer = Slot->Consumer;
+	Slot->bSubmitted = true;
+	const bool bSubmitted = Scheduler.Enqueue(MoveTemp(Request));
+	if (bSubmitted) return true;
+	Slot = FineShardSlots.Find(InKey);
+	if (!Slot || Slot->Consumer != SubmittedConsumer || !Slot->Build.IsCurrent(Attempt)) return false;
+	Slot->bSubmitted = false;
+	if (Scheduler.IsTerminal({EVoxelTaskKind::BuildFineShard, Slot->SubmittedStamp}))
+	{
+		Slot->Build.Complete(Attempt, false, nullptr, TEXT("Fine callback or native task capacity is terminal"));
+		Module.ReleaseGenerationFacts(Slot->Consumer);
+	}
+	return false;
 }
 
 void FVoxelViewManager::ApplyFineShardResult(const FVoxelFineShardKey& InKey, const FVoxelFineBuildAttempt& InAttempt,
@@ -676,15 +733,50 @@ bool FVoxelViewManager::RequestF0Fine(const FIntVector& InSection, const uint64 
 	Request.InputBytes = InputBytes + WorkerBytes;
 	Request.ReservedBytes = sizeof(FVoxelFineShardGeometry);
 	Request.bResumable = true;
-	Request.GetBlockReason = [Worker]
+	Request.GenerationConsumer = Worker->Consumer;
+	Request.SetRequiredBindingInput(Samples->ResourceLease->Bytes() + WorkerLease->Bytes(), 3);
+	{
+		FString CallbackBindingError;
+		if (!Request.BindGetBlockReason(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[Worker]
 	{
 		uint64 Version = 0;
 		return Worker->bWaitingCapacity.Load() &&
 			(!Worker->Resources->TryGetReleaseVersionExcludingOwner(Worker->Consumer, Version) || Version <= Worker->CapacityVersion.Load()) ?
 			EVoxelTaskBlockReason::Memory : EVoxelTaskBlockReason::None;
-	};
-	Request.Execute = [Worker](const TAtomic<bool>& Cancel) { return Worker->Advance(Cancel); };
-	Request.Apply = [this, Key, InSection, InRevision, Attempt, CapturedSectionStamp, Consumer = Slot->Consumer](FVoxelTaskResult&& Result)
+	}, CallbackBindingError))
+		{
+			const bool bPermanent = !CallbackBindingError.StartsWith(TEXT("CapacityBlocked"));
+			Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+				bPermanent ? EVoxelTaskBlockReason::TerminalFailure : EVoxelTaskBlockReason::InputMemory);
+			if (bPermanent)
+			{
+				Slot->Build.Complete(Attempt, false, nullptr, CallbackBindingError);
+				Module.ReleaseGenerationFacts(Slot->Consumer);
+			}
+			return false;
+		}
+	}
+	{
+		FString CallbackBindingError;
+		if (!Request.BindExecute(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[Worker](const TAtomic<bool>& Cancel) { return Worker->Advance(Cancel); }, CallbackBindingError))
+		{
+			const bool bPermanent = !CallbackBindingError.StartsWith(TEXT("CapacityBlocked"));
+			Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+				bPermanent ? EVoxelTaskBlockReason::TerminalFailure : EVoxelTaskBlockReason::InputMemory);
+			if (bPermanent)
+			{
+				Slot->Build.Complete(Attempt, false, nullptr, CallbackBindingError);
+				Module.ReleaseGenerationFacts(Slot->Consumer);
+			}
+			return false;
+		}
+	}
+	{
+		FString CallbackBindingError;
+		if (!Request.BindApply(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[this, Key, InSection, InRevision, Attempt, CapturedSectionStamp, Consumer = Slot->Consumer](FVoxelTaskResult&& Result)
 	{
 		FFineShardSlot* Current = FineShardSlots.Find(Key);
 		const FVoxelSection* Data = Module.GetRuntime()->FindSection(InSection);
@@ -713,10 +805,33 @@ bool FVoxelViewManager::RequestF0Fine(const FIntVector& InSection, const uint64 
 			if (ShouldDeferCoverage(FineCoverageRect(InSection))) DeferredCoverageCallbacks.Enqueue({FineCoverageRect(InSection), UpdateDerivedCoverage});
 			else UpdateDerivedCoverage();
 		}
-	};
+	}, CallbackBindingError))
+		{
+			const bool bPermanent = !CallbackBindingError.StartsWith(TEXT("CapacityBlocked"));
+			Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+				bPermanent ? EVoxelTaskBlockReason::TerminalFailure : EVoxelTaskBlockReason::InputMemory);
+			if (bPermanent)
+			{
+				Slot->Build.Complete(Attempt, false, nullptr, CallbackBindingError);
+				Module.ReleaseGenerationFacts(Slot->Consumer);
+			}
+			return false;
+		}
+	}
 	Slot->SubmittedStamp = Request.Stamp;
-	Slot->bSubmitted = Scheduler.Enqueue(MoveTemp(Request));
-	return Slot->bSubmitted;
+	const auto SubmittedConsumer = Slot->Consumer;
+	Slot->bSubmitted = true;
+	const bool bSubmitted = Scheduler.Enqueue(MoveTemp(Request));
+	if (bSubmitted) return true;
+	Slot = FineShardSlots.Find(Key);
+	if (!Slot || Slot->Consumer != SubmittedConsumer || !Slot->Build.IsCurrent(Attempt)) return false;
+	Slot->bSubmitted = false;
+	if (Scheduler.IsTerminal({EVoxelTaskKind::BuildFineShard, Slot->SubmittedStamp}))
+	{
+		Slot->Build.Complete(Attempt, false, nullptr, TEXT("Fine callback or native task capacity is terminal"));
+		Module.ReleaseGenerationFacts(Slot->Consumer);
+	}
+	return false;
 }
 
 void FVoxelViewManager::EnqueueFinePresentation(const FVoxelFineShardKey& InKey)

@@ -423,6 +423,7 @@ void UVoxelModuleNetworkComponent::AdvanceEnvelopeDecode(const double InNow)
 {
 	auto* WorldModule = Module.Get();
 	if (!OverlayNetwork || !WorldModule || OverlayNetwork->bEnvelopeDecode) return;
+	const auto StateOwner = OverlayNetwork;
 	if (!OverlayNetwork->EnvelopeHead)
 	{
 		if (!OverlayNetwork->Envelopes.Dequeue(OverlayNetwork->EnvelopeHead)) return;
@@ -434,7 +435,9 @@ void UVoxelModuleNetworkComponent::AdvanceEnvelopeDecode(const double InNow)
 		OverlayNetwork->EnvelopeHeadStamp.Token = ++NextTaskSerial;
 	}
 	const auto Work = OverlayNetwork->EnvelopeHead;
-	FVoxelTaskRequest Task;
+	auto& Admission = OverlayNetwork->EnvelopeAdmission;
+	if (!Admission.Request.IsSet()) Admission.Request.Emplace();
+	auto& Task = Admission.Request.GetValue();
 	Task.Kind = EVoxelTaskKind::NetworkRepresentation;
 	Task.Stamp = OverlayNetwork->EnvelopeHeadStamp;
 	Task.WorkClass = EVoxelWorkClass::Visible;
@@ -444,17 +447,31 @@ void UVoxelModuleNetworkComponent::AdvanceEnvelopeDecode(const double InNow)
 	Task.InputBytes = Work->GetResourceAccountedBytes();
 	Task.ReservedBytes = 1;
 	Task.bResumable = true;
-	Task.GetBlockReason = [Work] { return Work->GetBlockReason(); };
-	Task.Execute = [Work](const TAtomic<bool>& Cancel) { return Work->Advance(Cancel); };
-	Task.Apply = [Weak = TWeakObjectPtr<UVoxelModuleNetworkComponent>(this), Work](FVoxelTaskResult&& Result)
+	auto GetBlockReason = [Work] { return Work->GetBlockReason(); };
+	auto Execute = [Work](const TAtomic<bool>& Cancel) { return Work->Advance(Cancel); };
+	auto Apply = [Weak = TWeakObjectPtr<UVoxelModuleNetworkComponent>(this), Work](FVoxelTaskResult&& Result)
 	{
 		if (auto* Component = Weak.Get()) Component->StageDecodedEnvelope(Work, MoveTemp(Result));
 	};
-	if (WorldModule->EnqueueNetworkRepresentationTask(MoveTemp(Task)))
+	FString BindingError;
+	const auto BindingResources = WorldModule->GetTerrainResources();
+	if (!BindingResources) return;
+	if (!Admission.Bind(BindingResources.ToSharedRef(), WorldModule->GetTerrainTaskControlConsumer(),
+		MoveTemp(GetBlockReason), MoveTemp(Execute), MoveTemp(Apply), BindingError))
 	{
+		if (!BindingError.StartsWith(TEXT("CapacityBlocked"))) Fail(BindingError);
+		return;
+	}
+	if (Admission.Enqueue([WorldModule](FVoxelTaskRequest&& Request)
+		{ return WorldModule->EnqueueNetworkRepresentationTask(MoveTemp(Request)); }, BindingResources.ToSharedRef(),
+		WorldModule->GetTerrainTaskControlConsumer(), BindingError))
+	{
+		if (OverlayNetwork != StateOwner || OverlayNetwork->EnvelopeHead != Work) return;
+		Admission.Reset();
 		OverlayNetwork->bEnvelopeDecode = true;
 		OverlayNetwork->EnvelopeHead.Reset();
 	}
+	else if (!BindingError.IsEmpty()) Fail(BindingError);
 	// 容量等待保持队首、尝试身份与排队时间，后续消息不能越过它。
 }
 
@@ -874,11 +891,13 @@ void UVoxelModuleNetworkComponent::Handle(
 		}
 		Task.ReservedBytes = 1;
 		Task.InputBytes = PageBuild->MetadataLease->Bytes();
-		Task.GetBlockReason = [PageBuild] { return PageBuild->BlockReason(); };
-		Task.Execute = [PageBuild](const TAtomic<bool>& InCancel) { return PageBuild->Advance(InCancel); };
+		Task.GenerationConsumer = Consumer;
+		Task.SetRequiredBindingInput(PageBuild->MetadataLease->Bytes(), 1);
+		auto GetBlockReason = [PageBuild] { return PageBuild->BlockReason(); };
+		auto Execute = [PageBuild](const TAtomic<bool>& InCancel) { return PageBuild->Advance(InCancel); };
 		const TWeakObjectPtr<UVoxelModuleNetworkComponent> WeakThis(this);
 		const FGuid RequestSession = Session;
-		Task.Apply = [WeakThis, RequestSession, Reply, PageBuild](FVoxelTaskResult&& InResult) mutable
+		auto Apply = [WeakThis, RequestSession, Reply, PageBuild](FVoxelTaskResult&& InResult) mutable
 		{
 			UVoxelModuleNetworkComponent* Component = WeakThis.Get();
 			if (!Component || Component->Session != RequestSession || !Component->bReady ||
@@ -913,7 +932,10 @@ void UVoxelModuleNetworkComponent::Handle(
 					EVoxelTransferPriority::Bulk);
 			}
 		};
-		if (!VoxelModule->EnqueueNetworkRepresentationTask(MoveTemp(Task)))
+		if (!Task.BindGetBlockReason(Resources.ToSharedRef(), Consumer, MoveTemp(GetBlockReason), Error) ||
+			!Task.BindExecute(Resources.ToSharedRef(), Consumer, MoveTemp(Execute), Error) ||
+			!Task.BindApply(Resources.ToSharedRef(), Consumer, MoveTemp(Apply), Error) ||
+			!VoxelModule->EnqueueNetworkRepresentationTask(MoveTemp(Task)))
 		{
 			Reply.Kind = EVoxelRepresentationReplyKind::Retry;
 			Reply.Data.Reset();

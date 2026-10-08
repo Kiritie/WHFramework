@@ -29,6 +29,7 @@ namespace VoxelOverlayReplicaTest
 			FVoxelOverlayRegionCodec::DirectoryHash({}, EmptyDirectory);
 			FVoxelOverlayRegionCodec::SnapshotHash({}, EmptySnapshot);
 			Replica.SetAuthority(2, Manifest, Directory);
+			Replica.SetTaskBindingDomain(Resources, FVoxelGenerationConsumerKey::Section(1, FGuid::NewGuid(), 1, {}, 1));
 			Replica.SetTaskQueue([this](FVoxelTaskRequest&& Request) { Tasks.Add(MoveTemp(Request)); return true; });
 			Replica.ExpectTicket(Subscription, Ticket, Regions);
 		}

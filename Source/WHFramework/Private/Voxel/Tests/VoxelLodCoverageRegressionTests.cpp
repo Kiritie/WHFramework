@@ -155,7 +155,7 @@ bool FVoxelPublisherStageAndIndexTest::RunTest(const FString& InParameters)
 	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
 	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
 	UVoxelModule* Module = NewObject<UVoxelModule>();
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	Scheduler.SetObservedTerrainStage(3);
 	FVoxelViewPublisher Publisher(*Module, Scheduler, 1);
 	const TArray<FVector> Observers{FVector::ZeroVector};
@@ -278,7 +278,7 @@ bool FVoxelEmptyTransitionConvergenceTest::RunTest(const FString& InParameters)
 	FString BuildError;
 	(void)InParameters;
 	UVoxelModule* Module = NewObject<UVoxelModule>();
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	Scheduler.SetObservedTerrainStage(3);
 	FVoxelViewManager Manager(*Module, Scheduler, 7);
 	const FVoxelViewKey Node{FIntVector::ZeroValue, 1};
@@ -330,7 +330,7 @@ bool FVoxelFineProxyDependenciesTest::RunTest(const FString& InParameters)
 	FString BuildError;
 	(void)InParameters;
 	UVoxelModule* Module = NewObject<UVoxelModule>();
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	Scheduler.SetObservedTerrainStage(0);
 	FVoxelViewManager Manager(*Module, Scheduler, 11);
 	const FVoxelViewKey Dependency{FIntVector::ZeroValue, 1};

@@ -9,9 +9,23 @@
 
 namespace
 {
+	bool NativePublisherHasExternalRelease(const TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe>& Resources,
+		const FVoxelGenerationConsumerKey& Consumer, const uint64 Version)
+	{
+		uint64 Current = 0;
+		return Resources->TryGetReleaseVersionExcludingOwner(Consumer, Current) && Current > Version;
+	}
+
+	bool NativePublisherIsTerminalAdmission(const EVoxelTaskBlockReason Reason)
+	{
+		return (static_cast<uint16>(Reason) & (static_cast<uint16>(EVoxelTaskBlockReason::Oversized) |
+			static_cast<uint16>(EVoxelTaskBlockReason::TerminalFailure))) != 0;
+	}
+
 	struct FNativeMeshWorker
 	{
 		TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
+		FVoxelGenerationConsumerKey Consumer;
 		FVoxelTerrainCoarseMeshBuilder Builder;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InputLease;
 		FVoxelTaskStamp InputStamp;
@@ -20,7 +34,7 @@ namespace
 
 		FNativeMeshWorker(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
 			const FVoxelGenerationConsumerKey& InConsumer)
-			: Resources(InResources), Builder(InResources, InConsumer)
+			: Resources(InResources), Consumer(InConsumer), Builder(InResources, InConsumer)
 		{
 		}
 
@@ -28,6 +42,7 @@ namespace
 		{
 			FVoxelTaskResult Result;
 			bWaitingCapacity.Store(false);
+			const uint64 BeforeBuild = Resources->ReleaseVersionExcludingOwner(Consumer);
 			const auto Progress = Builder.Advance(32, InCancel, Result.Error);
 			if (Progress == EVoxelTerrainCoarseMeshProgress::Complete)
 			{
@@ -39,7 +54,7 @@ namespace
 				Result.bSuccess = Result.bContinue = true;
 				if (Progress == EVoxelTerrainCoarseMeshProgress::CapacityBlocked)
 				{
-					CapacityVersion.Store(Resources->Snapshot().ReleaseVersion);
+					CapacityVersion.Store(BeforeBuild);
 					bWaitingCapacity.Store(true);
 				}
 			}
@@ -89,14 +104,41 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 	const auto Resources = Scheduler.GetTerrainResources();
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(WorldEpoch, NativeOwnerId,
 		InPublication->Serial, FIntVector(MIN_int32, 7, InIndex), Update.NativeStamp.Token);
+	if (Update.bNativeAdmissionWaiting && !NativePublisherHasExternalRelease(Resources, Consumer, Update.NativeAdmissionVersion)) return true;
+	Update.bNativeAdmissionWaiting = false;
+	const uint64 BeforeAdmission = Resources->ReleaseVersionExcludingOwner(Consumer);
+	const auto RejectAdmission = [&](const bool bTerminal, const EVoxelTaskBlockReason Reason)
+	{
+		FVoxelTaskStamp Stamp = Update.NativeStamp;
+		Stamp.OwnerId = NativeOwnerId;
+		Stamp.OwnerIncarnation = InPublication->Serial;
+		Stamp.Section = FIntVector(MIN_int32, 7, InIndex);
+		Scheduler.ObserveDemand(EVoxelTaskKind::BuildViewCoverage, Stamp, Reason);
+		if (bTerminal) DiscardPublication(InPublication, false);
+		else
+		{
+			Update.NativeAdmissionVersion = BeforeAdmission;
+			Update.bNativeAdmissionWaiting = true;
+		}
+	};
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InputLease;
-	if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input,
-		VoxelBoundedAllocation::WorkerSharedBytes<FNativeMeshWorker>(), InputLease)) return true;
+	const auto InputAdmission = Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Input,
+		VoxelBoundedAllocation::WorkerSharedBytes<FNativeMeshWorker>(), InputLease);
+	if (InputAdmission != EVoxelTerrainResourceAdmission::Granted)
+	{
+		const bool bTerminal = InputAdmission != EVoxelTerrainResourceAdmission::CapacityBlocked;
+		RejectAdmission(bTerminal, bTerminal ? EVoxelTaskBlockReason::TerminalFailure : EVoxelTaskBlockReason::InputMemory);
+		return true;
+	}
 	auto Worker = VoxelBoundedAllocation::MakeWorkerShared<FNativeMeshWorker>(InputLease, Resources, Consumer);
 	Worker->InputLease = MoveTemp(InputLease);
 	Worker->InputStamp = Update.NativeStamp;
 	FString Error;
-	if (!Worker->Builder.Initialize(Update.Source, Update.Location / Module.BlockSize(), Update.Scale / Module.BlockSize(), Update.NativeStamp, Error)) return true;
+	if (!Worker->Builder.Initialize(Update.Source, Update.Location / Module.BlockSize(), Update.Scale / Module.BlockSize(), Update.NativeStamp, Error))
+	{
+		RejectAdmission(true, EVoxelTaskBlockReason::TerminalFailure);
+		return true;
+	}
 	FVoxelTaskRequest Request;
 	Request.Kind = EVoxelTaskKind::BuildViewCoverage;
 	Request.Stamp = Update.NativeStamp;
@@ -109,14 +151,45 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 	Request.TerrainStage = Update.TerrainStage;
 	Request.WorkClass = EVoxelWorkClass::Visible;
 	Request.InputBytes = Worker->InputLease->Bytes();
-	SetPublicationPriority(Request, *InPublication, MakeArrayView(&Update.GroupIndex, 1));
-	Request.GetBlockReason = [Worker]
+	Request.GenerationConsumer = Consumer;
+	const auto& SourceLease = Update.Source->ResourceLease;
+	const bool bOwnSourceLease = SourceLease && SourceLease != Worker->InputLease && SourceLease->IsOwnedBy(Resources.Get());
+	const uint64 SourceInputBytes = bOwnSourceLease && SourceLease->GetPool() == EVoxelTerrainResourcePool::Input ? SourceLease->Bytes() : 0;
+	if (SourceInputBytes > MAX_uint64 - Worker->InputLease->Bytes())
 	{
-		return Worker->bWaitingCapacity.Load() && Worker->Resources->Snapshot().ReleaseVersion <= Worker->CapacityVersion.Load() ?
+		RejectAdmission(true, EVoxelTaskBlockReason::Oversized);
+		return true;
+	}
+	Request.SetRequiredBindingInput(Worker->InputLease->Bytes() + SourceInputBytes, 1 + int32(bOwnSourceLease));
+	SetPublicationPriority(Request, *InPublication, MakeArrayView(&Update.GroupIndex, 1));
+	{
+		FString CallbackBindingError;
+		if (!Request.BindGetBlockReason(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[Worker]
+	{
+		return Worker->bWaitingCapacity.Load() && !NativePublisherHasExternalRelease(Worker->Resources, Worker->Consumer, Worker->CapacityVersion.Load()) ?
 			EVoxelTaskBlockReason::Memory : EVoxelTaskBlockReason::None;
-	};
-	Request.Execute = [Worker](const TAtomic<bool>& InCancel) { return Worker->Advance(InCancel); };
-	Request.Apply = [this, InPublication, InIndex, Stamp = Update.NativeStamp](FVoxelTaskResult&& InResult)
+	}, CallbackBindingError))
+		{
+			const bool bTerminal = !CallbackBindingError.StartsWith(TEXT("CapacityBlocked"));
+			RejectAdmission(bTerminal, bTerminal ? EVoxelTaskBlockReason::TerminalFailure : EVoxelTaskBlockReason::InputMemory);
+			return true;
+		}
+	}
+	{
+		FString CallbackBindingError;
+		if (!Request.BindExecute(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[Worker](const TAtomic<bool>& InCancel) { return Worker->Advance(InCancel); }, CallbackBindingError))
+		{
+			const bool bTerminal = !CallbackBindingError.StartsWith(TEXT("CapacityBlocked"));
+			RejectAdmission(bTerminal, bTerminal ? EVoxelTaskBlockReason::TerminalFailure : EVoxelTaskBlockReason::InputMemory);
+			return true;
+		}
+	}
+	{
+		FString CallbackBindingError;
+		if (!Request.BindApply(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[this, InPublication, InIndex, Stamp = Update.NativeStamp](FVoxelTaskResult&& InResult)
 	{
 		if (InPublication->bCanceled || !InPublication->Updates.IsValidIndex(InIndex)) return;
 		auto& Target = InPublication->Updates[InIndex];
@@ -124,8 +197,10 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 		Target.bNativeMeshPending = false;
 		if (!InResult.bSuccess || InResult.bCanceled || InResult.Stamp.WorldEpoch != WorldEpoch || !IsNativeGeometryCurrent(Stamp))
 		{
-			DiscardPublication(InPublication);
-			bRetry = true;
+			const bool bTerminal = Scheduler.IsTerminal({InResult.Kind, InResult.Stamp}) ||
+				InResult.Error.StartsWith(TEXT("Oversized")) || InResult.Error.StartsWith(TEXT("CapacityUnachievable"));
+			DiscardPublication(InPublication, !bTerminal);
+			if (!bTerminal) bRetry = true;
 			return;
 		}
 		Target.NativeMesh = StaticCastSharedPtr<const FVoxelTerrainCoarseMesh>(InResult.CustomPayload);
@@ -135,8 +210,15 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 			bRetry = true;
 		}
 		else QueueReadyGroup(InPublication, Target.GroupIndex);
-	};
+	}, CallbackBindingError))
+		{
+			const bool bTerminal = !CallbackBindingError.StartsWith(TEXT("CapacityBlocked"));
+			RejectAdmission(bTerminal, bTerminal ? EVoxelTaskBlockReason::TerminalFailure : EVoxelTaskBlockReason::InputMemory);
+			return true;
+		}
+	}
 	Update.bNativeMeshPending = Scheduler.Enqueue(MoveTemp(Request));
+	if (!Update.bNativeMeshPending) RejectAdmission(NativePublisherIsTerminalAdmission(Request.Blocked), Request.Blocked);
 	return true;
 }
 
@@ -144,6 +226,11 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 {
 	if (InGroup.NativeTransaction.IsValid())
 	{
+		if (TerrainRenderer->ConsumeCoarseTransactionFailure(InGroup.NativeTransaction))
+		{
+			DiscardPublication(InPublication, false);
+			return false;
+		}
 		if (!InGroup.bNativeSubmitted)
 		{
 			if (TerrainRenderer->IsCoarseTransactionPending(InGroup.NativeTransaction)) return false;

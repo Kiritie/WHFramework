@@ -54,11 +54,13 @@ bool FVoxelMacroTerrainBuilder::Build(
 	Data.ForestCoverage.SetNumUninitialized(Count);
 	Data.SnowCoverage.SetNumUninitialized(Count);
 
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ColumnsLease;
 	TArray<FVoxelColumnSample> Columns;
 	FVoxelSurfaceTileData Surface;
 	const FVoxelSurfaceTileKey SurfaceKey { InKey.Coordinate,
 		InKey.Level };
-	if (!SurfaceBuilder.Build(SurfaceKey, Surface, OutError, InCancel, nullptr, &Columns, Data.Geometry, InShard))
+	if (!SurfaceBuilder.Build(SurfaceKey, Surface, OutError, InCancel,
+		nullptr, &Columns, Data.Geometry, InShard, &ColumnsLease))
 	{
 		return false;
 	}

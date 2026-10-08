@@ -14,6 +14,15 @@ enum class EVoxelTerrainResourcePool : uint8
 	Count
 };
 
+enum class EVoxelTerrainResourceAdmission : uint8
+{
+	None,
+	Granted,
+	CapacityBlocked,
+	CapacityUnachievable,
+	InvalidRequest
+};
+
 struct WHFRAMEWORK_API FVoxelTerrainResourceLimits
 {
 	uint64 InputBytes = 64ull * 1024 * 1024;
@@ -49,12 +58,14 @@ public:
 	FVoxelTerrainResourceLease& operator=(const FVoxelTerrainResourceLease&) = delete;
 
 	bool Resize(uint64 InBytes);
+	EVoxelTerrainResourceAdmission TryResize(uint64 InBytes, uint64 InRequiredInputBytes = 0, int32 InRequiredLeaseCount = 0);
 	bool Transfer(EVoxelTerrainResourcePool InPool);
 	// 消费原尝试预授予的目标池额度，保留正文租约身份并交给发布后的稳定所有者。
 	bool CommitReservation(TSharedRef<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InReserved,
 		const FVoxelGenerationConsumerKey& InNewOwner);
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Split(uint64 InBytes);
 	uint64 Bytes() const;
+	EVoxelTerrainResourcePool GetPool() const;
 	uint64 Serial() const;
 	bool IsOwnedBy(const FVoxelTerrainResources& InOwner) const { return &Owner.Get() == &InOwner; }
 
@@ -71,6 +82,10 @@ public:
 	bool Acquire(const FVoxelGenerationConsumerKey& InAttempt, EVoxelTerrainResourcePool InPool,
 		uint64 InBytes, TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutLease,
 		int32 InReservedSplits = 0);
+	// 必需输入由原持有者声明；可释放的外部占用只报告暂时阻塞。
+	EVoxelTerrainResourceAdmission TryAcquire(const FVoxelGenerationConsumerKey& InAttempt, EVoxelTerrainResourcePool InPool,
+		uint64 InBytes, TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutLease,
+		int32 InReservedSplits = 0, uint64 InRequiredInputBytes = 0, int32 InRequiredLeaseCount = 0);
 	FVoxelTerrainResourceSnapshot Snapshot() const;
 	// owner 由完整 ConsumerKey 标识；同模块其它任务的释放仍可唤醒容量等待。
 	// 最近两个不同 owner 的释放事件足以查询任一 owner 的最新外部释放，不增加监听表。
@@ -87,14 +102,18 @@ private:
 		int32 ReservedSplits = 0;
 	};
 	bool CanAdd(EVoxelTerrainResourcePool InPool, uint64 InBytes) const;
+	bool CanFitRequired(EVoxelTerrainResourcePool InPool, uint64 InBytes, int32 InReservedSplits,
+		uint64 InRequiredInputBytes, int32 InRequiredLeaseCount) const;
 	bool PrepareEntries(int32 InAdditionalEntries, uint64 InAdditionalInputBytes);
 	bool Resize(uint64 InSerial, uint64 InBytes);
+	EVoxelTerrainResourceAdmission TryResize(uint64 InSerial, uint64 InBytes, uint64 InRequiredInputBytes, int32 InRequiredLeaseCount);
 	bool Transfer(uint64 InSerial, EVoxelTerrainResourcePool InPool);
 	bool CommitReservation(uint64 InSerial, uint64 InReservedSerial,
 		const FVoxelGenerationConsumerKey& InNewOwner);
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Split(uint64 InSerial, uint64 InBytes);
 	void Release(uint64 InSerial);
 	uint64 Bytes(uint64 InSerial) const;
+	EVoxelTerrainResourcePool GetPool(uint64 InSerial) const;
 	void AdvanceVersion(bool bInCapacityReleased = false, const FVoxelGenerationConsumerKey* InReleasingOwner = nullptr);
 	struct FReleaseEvent
 	{

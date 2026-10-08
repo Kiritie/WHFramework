@@ -26,6 +26,9 @@ struct FVoxelSceneColumnLoadAttempt
 	uint64 RestoreCapacityVersion = 0;
 	bool bRestoreCapacityBlocked = false;
 	bool bQueued = false;
+	TOptional<FVoxelTaskRequest> PendingTask;
+	uint64 BindingCapacityVersion = 0;
+	bool bBindingCapacityBlocked = false;
 };
 
 namespace
@@ -85,6 +88,7 @@ void UVoxelSceneRegion::DetachSceneLoad()
 	if (SceneLoadAttempt)
 	{
 		SceneLoadAttempt->Detached.Store(true);
+		SceneLoadAttempt->PendingTask.Reset();
 		SceneLoadAttempt.Reset();
 	}
 	if (bSceneLoading && Module)
@@ -103,6 +107,7 @@ void UVoxelSceneRegion::RetrySceneLoad()
 	SceneLoadAttempt->ActorCursor = 0;
 	SceneLoadAttempt->CapacityBlocked.Store(false);
 	SceneLoadAttempt->bRestoreCapacityBlocked = false;
+	SceneLoadAttempt->bBindingCapacityBlocked = false;
 	bSceneFailed = false;
 	bSceneLoading = true;
 	++Module->SceneLoadingCount;
@@ -116,6 +121,8 @@ void UVoxelSceneRegion::AdvanceSceneLoad(FVoxelTaskScheduler& InScheduler)
 	const auto Fail = [&](const FString& InError)
 	{
 		if (!Module || SceneLoadAttempt != State || State->Detached.Load() || !bSceneLoading) return;
+		State->PendingTask.Reset();
+		State->bBindingCapacityBlocked = false;
 		bSceneFailed = true;
 		bSceneLoading = false;
 		check(Module->SceneLoadingCount > 0);
@@ -191,6 +198,31 @@ void UVoxelSceneRegion::AdvanceSceneLoad(FVoxelTaskScheduler& InScheduler)
 		return;
 	}
 	if (State->bQueued) return;
+	const auto BindingResources = InScheduler.GetTerrainResources();
+	const auto BindingConsumer = InScheduler.GetControlConsumer();
+	if (State->bBindingCapacityBlocked)
+	{
+		uint64 Current = 0;
+		if (!BindingResources->TryGetReleaseVersionExcludingOwner(BindingConsumer, Current) ||
+			Current <= State->BindingCapacityVersion) return;
+		State->bBindingCapacityBlocked = false;
+	}
+	const uint64 BeforeBinding = BindingResources->ReleaseVersionExcludingOwner(BindingConsumer);
+	if (!State->PendingTask.IsSet())
+	{
+		State->PendingTask.Emplace();
+		auto& Task = State->PendingTask.GetValue();
+		Task.Kind = EVoxelTaskKind::ProjectBackground;
+		Task.Stamp = State->Stamp;
+		Task.WorkClass = EVoxelWorkClass::Critical;
+		Task.ServiceBand = EVoxelTerrainServiceBand::P0;
+		Task.bTerrainDataOnly = true;
+		Task.bResumable = true;
+		Task.SourceStableKey = State->Stamp.OwnerId;
+		Task.FirstRunnableSeconds = State->FirstRunnableSeconds;
+		Task.ReservedBytes = 1;
+	}
+	auto& Task = State->PendingTask.GetValue();
 	auto GetBlockReason = [State]
 	{
 		if (State->Detached.Load() || !State->CapacityBlocked.Load()) return EVoxelTaskBlockReason::None;
@@ -250,22 +282,37 @@ void UVoxelSceneRegion::AdvanceSceneLoad(FVoxelTaskScheduler& InScheduler)
 		State->Read = Payload->Read;
 		InResult.MarkWorkUsed();
 	};
-	const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSceneColumnLoadAttempt>() +
-		VoxelBoundedAllocation::WorkerSharedBytes<FSceneColumnLoadPayload>() +
-		VoxelBoundedAllocation::FunctionBytes<decltype(GetBlockReason)>() +
-		VoxelBoundedAllocation::FunctionBytes<decltype(Execute)>() + VoxelBoundedAllocation::FunctionBytes<decltype(Apply)>();
-	if (!State->MetadataLease->Resize(Bytes)) return;
-	FVoxelTaskRequest Task;
-	Task.Kind = EVoxelTaskKind::ProjectBackground;
-	Task.Stamp = State->Stamp;
-	Task.WorkClass = EVoxelWorkClass::Critical;
-	Task.ServiceBand = EVoxelTerrainServiceBand::P0;
-	Task.bTerrainDataOnly = true;
-	Task.bResumable = true;
-	Task.SourceStableKey = State->Stamp.OwnerId;
-	Task.FirstRunnableSeconds = State->FirstRunnableSeconds;
-	Task.GetBlockReason = MoveTemp(GetBlockReason);
-	Task.Execute = MoveTemp(Execute);
-	Task.Apply = MoveTemp(Apply);
-	State->bQueued = InScheduler.Enqueue(MoveTemp(Task));
+	FString BindingError;
+	if ((!Task.bBlockBound && !Task.BindGetBlockReason(BindingResources, BindingConsumer, MoveTemp(GetBlockReason), BindingError)) ||
+		(!Task.bExecuteBound && !Task.BindExecute(BindingResources, BindingConsumer, MoveTemp(Execute), BindingError)) ||
+		(!Task.bApplyBound && !Task.BindApply(BindingResources, BindingConsumer, MoveTemp(Apply), BindingError)))
+	{
+		if (BindingError.StartsWith(TEXT("CapacityBlocked")))
+		{
+			State->bBindingCapacityBlocked = true;
+			State->BindingCapacityVersion = BeforeBinding;
+		}
+		else Fail(BindingError);
+		return;
+	}
+	FVoxelTaskRequest AdmissionRequest = MoveTemp(Task);
+	State->PendingTask.Reset();
+	if (InScheduler.Enqueue(MoveTemp(AdmissionRequest)))
+	{
+		State->bQueued = true;
+	}
+	else if (State->Detached.Load()) return;
+	else if (AdmissionRequest.Blocked == EVoxelTaskBlockReason::Oversized || AdmissionRequest.Blocked == EVoxelTaskBlockReason::TerminalFailure)
+	{
+		Fail(TEXT("Scene task admission cannot fit its original resource domain"));
+	}
+	else
+	{
+		State->PendingTask.Emplace(MoveTemp(AdmissionRequest));
+		if (State->PendingTask->Blocked == EVoxelTaskBlockReason::InputMemory || State->PendingTask->Blocked == EVoxelTaskBlockReason::Memory)
+		{
+			State->bBindingCapacityBlocked = true;
+			State->BindingCapacityVersion = BeforeBinding;
+		}
+	}
 }

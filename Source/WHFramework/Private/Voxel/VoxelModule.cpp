@@ -887,6 +887,7 @@ bool UVoxelModule::StartWorld(
 		Registry.GetSnapshot().ToSharedRef());
 	if (OverlayReplica)
 	{
+		OverlayReplica->SetTaskBindingDomain(Scheduler->GetTerrainResources(), Scheduler->GetControlConsumer());
 		OverlayReplica->SetTaskQueue([this](FVoxelTaskRequest&& InTask)
 		{
 			return Scheduler && Scheduler->Enqueue(MoveTemp(InTask));
@@ -911,7 +912,8 @@ bool UVoxelModule::StartWorld(
 	}
 	ResidencyManager = MakeUnique<FVoxelResidencyManager>(
 		*Runtime,
-		*Scheduler,
+		*Scheduler);
+	if (!ResidencyManager->Initialize(
 		[this](const FIntVector& InSection)
 		{
 			OnSectionEvicting(InSection);
@@ -923,7 +925,13 @@ bool UVoxelModule::StartWorld(
 		[this](const FIntVector& InSection, const FVoxelSectionStamp& InStamp, const EVoxelRuntimeSectionEvent InEvent)
 		{
 			OnSimulationSectionEvent(InSection, InStamp, InEvent);
-		});
+		}, OutError))
+	{
+		FString StopError;
+		StopWorld(true, StopError);
+		WorldState = EVoxelWorldState::Failed;
+		return false;
+	}
 	if (GetWorld()->GetNetMode() != NM_DedicatedServer)
 	{
 		ViewManager = MakeUnique<FVoxelViewManager>(*this, *Scheduler, Epoch);
@@ -1491,6 +1499,11 @@ TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> UVoxelModule::GetTerrain
 TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> UVoxelModule::GetTerrainResources() const
 {
 	return Scheduler ? Scheduler->GetTerrainResources() : nullptr;
+}
+
+FVoxelGenerationConsumerKey UVoxelModule::GetTerrainTaskControlConsumer() const
+{
+	return Scheduler ? Scheduler->GetControlConsumer() : FVoxelGenerationConsumerKey();
 }
 
 TSharedPtr<FVoxelPhysicsRetirement, ESPMode::ThreadSafe> UVoxelModule::GetPhysicsRetirement()
@@ -2104,12 +2117,26 @@ void UVoxelModule::RefreshInterest(
 	Request.InputBytes = 0;
 	Request.FirstRunnableSeconds = InNow;
 	Request.bResumable = true;
-	Request.GetBlockReason = [Payload, PlanningResources]
+	Request.SetRequiredBindingInput(SourcesCapture->Lease->Bytes() + Feedback->ResourceLease->Bytes() + Payload->MetadataLease->Bytes(), 3);
+	{
+		FString CallbackBindingError;
+		if (!Request.BindGetBlockReason((*Scheduler).GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : (*Scheduler).GetControlConsumer()),
+			[Payload, PlanningResources]
 	{
 		return Payload->bCapacityWaiting.Load() && PlanningResources->Snapshot().ReleaseVersion <= Payload->CapacityVersion.Load() ?
 			EVoxelTaskBlockReason::Memory : EVoxelTaskBlockReason::None;
-	};
-	Request.Execute = [SourcesCapture, WorldManifest = Manifest, Settings = ViewSettings,
+	}, CallbackBindingError))
+		{
+			(*Scheduler).ObserveDemand(Request.Kind, Request.Stamp,
+				CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+					? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+			return;
+		}
+	}
+	{
+		FString CallbackBindingError;
+		if (!Request.BindExecute((*Scheduler).GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : (*Scheduler).GetControlConsumer()),
+			[SourcesCapture, WorldManifest = Manifest, Settings = ViewSettings,
 		Runtime = InterestRuntime, Capture, Payload, ShapeRevision = Shapes->GetContentHash(),
 		Resources = Scheduler->GetTerrainResources(), PlanningStamp = Request.Stamp, PlanningAge = Request.FirstRunnableSeconds](const TAtomic<bool>& Cancel)
 	{
@@ -2154,8 +2181,18 @@ void UVoxelModule::RefreshInterest(
 		Result.bSuccess &= Result.Error.IsEmpty();
 		Result.CustomPayload = Payload;
 		return Result;
-	};
-	Request.Apply = [this, CapturedSourceRevision](FVoxelTaskResult&& Result)
+	}, CallbackBindingError))
+		{
+			(*Scheduler).ObserveDemand(Request.Kind, Request.Stamp,
+				CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+					? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+			return;
+		}
+	}
+	{
+		FString CallbackBindingError;
+		if (!Request.BindApply((*Scheduler).GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : (*Scheduler).GetControlConsumer()),
+			[this, CapturedSourceRevision](FVoxelTaskResult&& Result)
 	{
 		if (Result.Stamp.WorldEpoch != Epoch)
 		{
@@ -2209,7 +2246,14 @@ void UVoxelModule::RefreshInterest(
 			}
 		}
 		// 不清除执行期间新产生的移动请求，避免连续行走丢失末次位置。
-	};
+	}, CallbackBindingError))
+		{
+			(*Scheduler).ObserveDemand(Request.Kind, Request.Stamp,
+				CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+					? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+			return;
+		}
+	}
 	if (!Scheduler->Enqueue(MoveTemp(Request)))
 	{
 		return;

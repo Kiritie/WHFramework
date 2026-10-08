@@ -147,7 +147,7 @@ bool FVoxelNavigationNativeTileTest::RunTest(const FString& InParameters)
 	Module->Generator = VoxelTest::MakeGenerator();
 	Module->Runtime = MakeUnique<FVoxelWorldRuntime>(Module->Epoch, true,
 		Module->Registry.GetSnapshot().ToSharedRef(), Module->Generator.ToSharedRef());
-	Module->Scheduler = MakeUnique<FVoxelTaskScheduler>();
+	Module->Scheduler = MakeUnique<FVoxelTaskScheduler>(true);
 	if (!Module->TerrainFrameContext.Configure({}, Error)) return false;
 	Module->Scheduler->BindFrameContext(Module->TerrainFrameContext);
 	Module->CollisionPresenter = MakeUnique<FVoxelCollisionPresenter>(*Module, *Module->Scheduler, Module->Epoch);

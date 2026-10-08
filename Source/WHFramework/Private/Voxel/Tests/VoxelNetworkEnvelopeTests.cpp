@@ -166,7 +166,7 @@ bool FVoxelNetworkWorldControlTest::RunTest(const FString& InParameters)
 	Module->Generator = VoxelTest::MakeGenerator();
 	Module->Runtime = MakeUnique<FVoxelWorldRuntime>(23, false, VoxelTest::MakeRegistry(), Module->Generator.ToSharedRef());
 	Module->WorldState = EVoxelWorldState::Running;
-	Module->Scheduler = MakeUnique<FVoxelTaskScheduler>();
+	Module->Scheduler = MakeUnique<FVoxelTaskScheduler>(true);
 	Module->Scheduler->SetBudget({});
 	Module->Scheduler->BindFrameContext(Module->TerrainFrameContext);
 	Component->Module = Module;

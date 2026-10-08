@@ -193,7 +193,7 @@ bool UVoxelCollisionComponent::BeginPrepare(const int32 InBoxCount, const double
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InPhysicalLease)
 {
 	check(IsInGameThread());
-	if (IsPhysicsStateCreated() || InBoxCount < 0 || InBoxCount > 16384 ||
+	if (IsPhysicsStateCreated() || Cook || PendingCookTask.IsSet() || InBoxCount < 0 || InBoxCount > 16384 ||
 		!FMath::IsFinite(InBlockSize) || InBlockSize <= 0.0) return false;
 	if (InPhysicalLease)
 	{
@@ -211,6 +211,9 @@ bool UVoxelCollisionComponent::BeginPrepare(const int32 InBoxCount, const double
 	LocalBounds = FBox(ForceInit);
 	bPreparing = true;
 	bInstalled = false;
+	CookAttemptConsumer = {};
+	bCookCapacityBlocked = false;
+	bCookAdmissionFailed = false;
 	return true;
 }
 
@@ -246,49 +249,89 @@ bool UVoxelCollisionComponent::BeginDetachedCook(
 {
 	check(IsInGameThread());
 	if (!bPreparing || !Setup || Setup->AggGeom.BoxElems.Num() != ExpectedBoxes) return false;
-	if (ExpectedBoxes == 0 || Cook) return true;
+	if (ExpectedBoxes == 0 || bCookAdmissionFailed || (Cook && !PendingCookTask.IsSet())) return true;
 	if (!InRetirement) return false;
 	const auto InResources = InScheduler.GetTerrainResources();
-	FVoxelGenerationConsumerKey CookConsumer = InConsumer;
-	CookConsumer.OwnerId = CookOwnerId;
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Metadata, Reclaim;
-	if (!InResources->Acquire(CookConsumer, EVoxelTerrainResourcePool::Input,
-		DetachedPhysicsMetadataBytes(), Metadata) ||
-		!InResources->Acquire(CookConsumer, EVoxelTerrainResourcePool::Input,
-			VoxelBoundedAllocation::TaskBytes<FDetachedPhysicsReclaimTask>(), Reclaim)) return false;
-	auto* RawWork = new FVoxelDetachedPhysicsCook();
-	RawWork->MetadataLease = MoveTemp(Metadata);
-	TSharedPtr<FVoxelDetachedPhysicsCook, ESPMode::ThreadSafe> Work(RawWork, FDetachedPhysicsDeleter());
-	Work->ReclaimTaskLease = MoveTemp(Reclaim);
-	Work->PhysicalLease = MoveTemp(InPhysicalLease);
-	Work->Consumer = CookConsumer;
-	Work->Setup.Reset(Setup);
-	BodyInstance.OwnerComponent = this;
-	BodyInstance.SourceObject = GetOwner();
-	BodyInstance.BodySetup = Setup;
-	BodyInstance.Scale3D = FVector::OneVector;
-	BodyInstance.BuildBodyFilterData(Work->CollisionData.CollisionFilterData);
-	FBodyInstance::BuildBodyCollisionFlags(Work->CollisionData.CollisionFlags, ECollisionEnabled::QueryAndPhysics, false);
-	Work->Material.Reset(BodyInstance.GetSimplePhysicalMaterial());
-	// 材质的懒初始化只在 GT 执行；Worker 只消费冻结的物理材质。
-	if (Work->Material) Work->Material->GetPhysicsMaterial();
-	Work->Transform = GetComponentTransform();
-	FVoxelTaskRequest Request;
-	Request.Kind = EVoxelTaskKind::BuildCollision;
-	Request.Stamp.WorldEpoch = InConsumer.WorldEpoch;
-	Request.Stamp.OwnerId = CookConsumer.OwnerId;
-	Request.Stamp.OwnerIncarnation = InConsumer.OwnerIncarnation;
-	Request.Stamp.Section = InConsumer.Min;
-	Request.Stamp.Token = InConsumer.RequestSerial;
-	Request.WorkClass = FVoxelTerrainWorkSelection::IsNear(InPriority.Band) ? EVoxelWorkClass::Critical : EVoxelWorkClass::Interactive;
-	Request.ServiceBand = InPriority.Band;
-	Request.SourceStableKey = InPriority.SourceStableKey;
-	Request.SourcePriority = InPriority.SourcePriority;
-	Request.DistanceScore = InPriority.DistanceCells;
-	Request.ForwardScore = InPriority.ForwardScore;
-	Request.FirstRunnableSeconds = InFirstQueuedSeconds;
-	Request.InputBytes = Work->MetadataLease->Bytes() + Work->ReclaimTaskLease->Bytes();
-	Request.Execute = [Work](const TAtomic<bool>& InCancel)
+	if (!CookAttemptConsumer.IsValid())
+	{
+		CookAttemptConsumer = InConsumer;
+		CookAttemptConsumer.OwnerId = CookOwnerId;
+	}
+	const auto CookConsumer = CookAttemptConsumer;
+	if (bCookCapacityBlocked)
+	{
+		uint64 Current = 0;
+		if (!InResources->TryGetReleaseVersionExcludingOwner(CookCapacityConsumer, Current) || Current <= CookCapacityVersion) return false;
+		bCookCapacityBlocked = false;
+	}
+	if (!Cook)
+	{
+		const uint64 BeforeMetadata = InResources->ReleaseVersionExcludingOwner(CookConsumer);
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Metadata, Reclaim;
+		auto Admission = InResources->TryAcquire(CookConsumer, EVoxelTerrainResourcePool::Input, DetachedPhysicsMetadataBytes(), Metadata);
+		if (Admission == EVoxelTerrainResourceAdmission::Granted)
+		{
+			Admission = InResources->TryAcquire(CookConsumer, EVoxelTerrainResourcePool::Input,
+				VoxelBoundedAllocation::TaskBytes<FDetachedPhysicsReclaimTask>(), Reclaim, 0, Metadata->Bytes(), 1);
+		}
+		if (Admission != EVoxelTerrainResourceAdmission::Granted)
+		{
+			if (Admission == EVoxelTerrainResourceAdmission::CapacityBlocked)
+			{
+				bCookCapacityBlocked = true;
+				CookCapacityConsumer = CookConsumer;
+				CookCapacityVersion = BeforeMetadata;
+			}
+			else
+			{
+				bCookAdmissionFailed = true;
+				return true;
+			}
+			return false;
+		}
+		auto* RawWork = new FVoxelDetachedPhysicsCook();
+		RawWork->MetadataLease = MoveTemp(Metadata);
+		TSharedPtr<FVoxelDetachedPhysicsCook, ESPMode::ThreadSafe> Work(RawWork, FDetachedPhysicsDeleter());
+		Work->ReclaimTaskLease = MoveTemp(Reclaim);
+		Work->PhysicalLease = MoveTemp(InPhysicalLease);
+		Work->Consumer = CookConsumer;
+		Work->Setup.Reset(Setup);
+		BodyInstance.OwnerComponent = this;
+		BodyInstance.SourceObject = GetOwner();
+		BodyInstance.BodySetup = Setup;
+		BodyInstance.Scale3D = FVector::OneVector;
+		BodyInstance.BuildBodyFilterData(Work->CollisionData.CollisionFilterData);
+		FBodyInstance::BuildBodyCollisionFlags(Work->CollisionData.CollisionFlags, ECollisionEnabled::QueryAndPhysics, false);
+		Work->Material.Reset(BodyInstance.GetSimplePhysicalMaterial());
+		// 材质的懒初始化只在 GT 执行；Worker 只消费冻结的物理材质。
+		if (Work->Material) Work->Material->GetPhysicsMaterial();
+		Work->Transform = GetComponentTransform();
+		PendingCookTask.Emplace();
+		auto& Request = PendingCookTask.GetValue();
+		Request.Kind = EVoxelTaskKind::BuildCollision;
+		Request.Stamp.WorldEpoch = CookConsumer.WorldEpoch;
+		Request.Stamp.OwnerId = CookConsumer.OwnerId;
+		Request.Stamp.OwnerIncarnation = CookConsumer.OwnerIncarnation;
+		Request.Stamp.Section = CookConsumer.Min;
+		Request.Stamp.Token = CookConsumer.RequestSerial;
+		Request.WorkClass = FVoxelTerrainWorkSelection::IsNear(InPriority.Band) ? EVoxelWorkClass::Critical : EVoxelWorkClass::Interactive;
+		Request.ServiceBand = InPriority.Band;
+		Request.SourceStableKey = InPriority.SourceStableKey;
+		Request.SourcePriority = InPriority.SourcePriority;
+		Request.DistanceScore = InPriority.DistanceCells;
+		Request.ForwardScore = InPriority.ForwardScore;
+		Request.FirstRunnableSeconds = InFirstQueuedSeconds;
+		Request.InputBytes = Work->MetadataLease->Bytes() + Work->ReclaimTaskLease->Bytes();
+		Request.SetRequiredBindingInput(Request.InputBytes,
+			2 + int32(Work->PhysicalLease && Work->PhysicalLease->IsOwnedBy(InResources.Get())));
+		// 空结果使用既有接纳哨兵；Slot 与原生执行 backing 由 Scheduler 先授额。
+		Request.ReservedBytes = 1;
+		Cook = MoveTemp(Work);
+		Retirement = MoveTemp(InRetirement);
+	}
+	const auto Work = Cook;
+	auto& Request = PendingCookTask.GetValue();
+	auto Execute = [Work](const TAtomic<bool>& InCancel)
 	{
 		if (InCancel.Load()) Work->bCanceled.Store(true);
 		FDetachedPhysicsCookTask{Work}();
@@ -297,7 +340,7 @@ bool UVoxelCollisionComponent::BeginDetachedCook(
 		Result.bCanceled = Work->bCanceled.Load();
 		return Result;
 	};
-	Request.Apply = [Work](FVoxelTaskResult&& Result)
+	auto ApplyCallback = [Work](FVoxelTaskResult&& Result)
 	{
 		Work->WorkReceipt = Result.WorkReceipt;
 		if (Work->bPhysicsCommitted.Load()) Result.MarkWorkUsed();
@@ -308,28 +351,62 @@ bool UVoxelCollisionComponent::BeginDetachedCook(
 		}
 		Work->bApplied.Store(true);
 	};
-	if (!InScheduler.Enqueue(MoveTemp(Request)))
+	FString BindingError;
+	const auto BindingConsumer = InScheduler.GetControlConsumer();
+	const uint64 BeforeBinding = InResources->ReleaseVersionExcludingOwner(BindingConsumer);
+	if ((!Request.bExecuteBound && !Request.BindExecute(InResources, BindingConsumer, MoveTemp(Execute), BindingError)) ||
+		(!Request.bApplyBound && !Request.BindApply(InResources, BindingConsumer, MoveTemp(ApplyCallback), BindingError)))
 	{
-		Work->bComplete.Store(true);
-		Cook = MoveTemp(Work);
-		// 尚未有 Worker 读取输入；只撤销元数据，让同一已准备组件可在下一帧重试。
-		FDetachedPhysicsReclaimTask Retiring{MoveTemp(Cook->ReclaimTaskLease), nullptr, MoveTemp(Cook), {}};
-		UE::Tasks::Launch(UE_SOURCE_LOCATION, MoveTemp(Retiring));
+		if (BindingError.StartsWith(TEXT("CapacityBlocked")))
+		{
+			bCookCapacityBlocked = true;
+			CookCapacityConsumer = BindingConsumer;
+			CookCapacityVersion = BeforeBinding;
+		}
+		else
+		{
+			PendingCookTask.Reset();
+			Work->bFailed.Store(true);
+			Work->bComplete.Store(true);
+			Work->bApplied.Store(true);
+		}
 		return false;
 	}
-	Cook = MoveTemp(Work);
-	Retirement = MoveTemp(InRetirement);
+	FVoxelTaskRequest AdmissionRequest = MoveTemp(Request);
+	PendingCookTask.Reset();
+	if (!InScheduler.Enqueue(MoveTemp(AdmissionRequest)))
+	{
+		if (Cook != Work) return false;
+		if (AdmissionRequest.Blocked == EVoxelTaskBlockReason::Oversized || AdmissionRequest.Blocked == EVoxelTaskBlockReason::TerminalFailure)
+		{
+			PendingCookTask.Reset();
+			Work->bFailed.Store(true);
+			Work->bComplete.Store(true);
+			Work->bApplied.Store(true);
+		}
+		else
+		{
+			PendingCookTask.Emplace(MoveTemp(AdmissionRequest));
+			if (PendingCookTask->Blocked == EVoxelTaskBlockReason::InputMemory || PendingCookTask->Blocked == EVoxelTaskBlockReason::Memory)
+			{
+				bCookCapacityBlocked = true;
+				CookCapacityConsumer = BindingConsumer;
+				CookCapacityVersion = BeforeBinding;
+			}
+		}
+		return false;
+	}
 	return true;
 }
 
 bool UVoxelCollisionComponent::IsDetachedCookRunning() const
 {
-	return Cook && (!Cook->bComplete.Load() || !Cook->bApplied.Load());
+	return Cook && !PendingCookTask.IsSet() && (!Cook->bComplete.Load() || !Cook->bApplied.Load());
 }
 
 bool UVoxelCollisionComponent::HasDetachedCookFailed() const
 {
-	return Cook && Cook->bComplete.Load() && (Cook->bCanceled.Load() || Cook->bFailed.Load());
+	return bCookAdmissionFailed || (Cook && Cook->bComplete.Load() && (Cook->bCanceled.Load() || Cook->bFailed.Load()));
 }
 
 bool UVoxelCollisionComponent::PrepareNativeRetirement(
@@ -388,6 +465,12 @@ void UVoxelCollisionComponent::ReleasePreparedInputs(
 {
 	check(IsInGameThread());
 	if (bInstalled) return;
+	if (PendingCookTask.IsSet())
+	{
+		PendingCookTask.Reset();
+		if (Cook) Cook->bComplete.Store(true);
+	}
+	bCookCapacityBlocked = false;
 	if (!Cook)
 	{
 		// 已安装票据仍持有 Setup；其数组只能在真实 Native 退休后的 Payload 析构中释放。

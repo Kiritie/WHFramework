@@ -123,7 +123,8 @@ public:
 		bool bInUseColumnCache = true,
 		bool bInRequireReadyHydrology = false,
 		bool bInRequireReadyPlans = false,
-		const FVoxelGenerationConsumerKey* InConsumer = nullptr);
+		const FVoxelGenerationConsumerKey* InConsumer = nullptr,
+		const FVoxelTerrainResourceLease* InRequiredOutputLease = nullptr);
 
 	bool PrepareColumns(
 		const FVoxelGenerationBounds& InBounds,
@@ -180,6 +181,8 @@ public:
 
 	TConstArrayView<FVoxelStructurePlanPtr>
 		GetPreparedStructurePlans() const;
+	uint64 GetRequiredInputBytes() const;
+	int32 GetRequiredInputLeaseCount() const;
 
 private:
 	struct FPreparedState
@@ -198,7 +201,8 @@ private:
 			int32 InTileCount,
 			int32 InEcologyCount,
 			bool bInStructuresOnly,
-			uint64 InExistingInputBytes,
+		uint64 InExistingInputBytes,
+		int32 InRequiredLeaseCount,
 			FString& OutError);
 
 		// 数组先释放真实 backing，再销毁覆盖它们的原 Input 租约。
@@ -272,6 +276,9 @@ private:
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
 	FVoxelGenerationConsumerKey Consumer;
 	uint64 GeneratorInputBytes = 0;
+	// 同步调用者强持输出，Query 只冻结已授额下限，不接管其寿命。
+	uint64 RequiredOutputInputBytes = 0;
+	int32 RequiredOutputLeaseCount = 0;
 	TSharedPtr<const FVoxelClimateGenerator, ESPMode::ThreadSafe> Climate;
 	TSharedPtr<const FVoxelTerrainGenerator, ESPMode::ThreadSafe> Terrain;
 	TSharedPtr<const FVoxelBiomeGenerator, ESPMode::ThreadSafe> Biome;

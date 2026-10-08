@@ -234,7 +234,7 @@ bool FVoxelFinePageCoverageTest::RunTest(const FString& InParameters)
 {
 	FString PlanningError;
 	UVoxelModule* Module = NewObject<UVoxelModule>();
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelViewManager Manager(*Module, Scheduler, 1);
 	Manager.bFinePresentationDirty = false;
 	Manager.bHeightfieldTopologyDirty = false;

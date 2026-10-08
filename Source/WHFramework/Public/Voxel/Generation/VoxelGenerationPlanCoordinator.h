@@ -133,8 +133,13 @@ private:
 		FGuid PriorityNode;
 		FGuid NextRegistration;
 		FGuid NextDesired;
+		FGuid PreviousAdmission;
+		FGuid NextAdmission;
 		TArray<FVoxelGenerationPlanDependency> Prerequisites;
 		TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> PrerequisiteRetention;
+		// 在原状态槽持有实际捕获与部分绑定，拒收不能重新创建任务正文。
+		TSharedPtr<FVoxelTaskCustomPayload, ESPMode::ThreadSafe> PendingReadDependencies;
+		TOptional<FVoxelTaskRequest> PendingRequest;
 		EVoxelPlanDependencyState State = EVoxelPlanDependencyState::Missing;
 		EVoxelWorkClass WorkClass = EVoxelWorkClass::Background;
 		int32 SourcePriority = MAX_int32;
@@ -145,11 +150,15 @@ private:
 		TMap<FVoxelGenerationConsumerKey, FDonation> Donations;
 		uint64 AttemptId = 0;
 		uint64 CapacityVersion = 0;
+		uint64 TaskCapacityVersion = 0;
 		bool bAttemptPendingAdmission = false;
 		bool bPrerequisiteRetentionPending = false;
 		bool bWaitingCapacity = false;
+		bool bWaitingTaskCapacity = false;
+		bool bAdmissionLinked = false;
 		bool bInFlight = false;
 		bool bRegistering = false;
+		bool bRegistrationPending = false;
 		bool bDesired = false;
 		int32 PrerequisitesCapacity = 0;
 		int32 DonationsCapacity = 0;
@@ -187,6 +196,9 @@ private:
 		TMap<FVoxelGenerationConsumerKey, FVoxelGenerationConsumerKey> EnvironmentAttempts;
 		FVoxelGenerationConsumerKey WakeHead;
 		FVoxelGenerationConsumerKey WakeTail;
+		FGuid AdmissionHead;
+		FGuid AdmissionTail;
+		int32 AdmissionCount = 0;
 		int32 StatesCapacity = 0;
 		int32 ConsumersCapacity = 0;
 		int32 FactsCapacity = 0;
@@ -205,6 +217,7 @@ private:
 		void Add(FState& InState);
 		void Commit();
 		FVoxelGenerationPlanCoordinator& Owner;
+		TSharedPtr<FStorage, ESPMode::ThreadSafe> CapturedStorage;
 		FGuid Head;
 		bool bCommitted = false;
 	};
@@ -215,6 +228,7 @@ private:
 		void Add(const FVoxelGenerationPlanDependency& InDependency);
 		bool Contains(const FVoxelGenerationPlanDependency& InDependency) const;
 		FVoxelGenerationPlanCoordinator& Owner;
+		TSharedPtr<FStorage, ESPMode::ThreadSafe> CapturedStorage;
 		FGuid Head;
 		int32 Count = 0;
 	};
@@ -237,6 +251,15 @@ private:
 	FVoxelGenerationConsumerKey EnvironmentConsumer(const FVoxelGenerationBounds& InBounds, bool bInColumn);
 	bool IsCached(const FVoxelGenerationPlanDependency& InDependency) const;
 	bool Queue(const FVoxelGenerationPlanDependency& InDependency, FState& InOutState);
+	void LinkPendingAdmission(FState& InState);
+	void UnlinkPendingAdmission(FState& InState);
+	void ClearPendingRequest(FState& InState);
+	void FailAdmission(const FVoxelGenerationPlanDependency& InDependency, FState& InState,
+		const FString& InError, EVoxelTaskBlockReason InReason);
+	void WaitForTaskAdmission(FState& InState, uint64 InVersion, EVoxelTaskBlockReason InReason);
+	void RejectTaskBinding(const FVoxelGenerationPlanDependency& InDependency, FState& InState,
+		const FString& InError, uint64 InVersion);
+	int32 AdvancePendingAdmissions(double InDeadline, int32 InMaximumFacts);
 	void RefreshQueuedPriorities();
 	bool RegisterClosure(const FVoxelGenerationPlanDependency& InDependency, FClosureRegistration& InRegistration, FString& OutError);
 	void AdvancePriorityDonations();

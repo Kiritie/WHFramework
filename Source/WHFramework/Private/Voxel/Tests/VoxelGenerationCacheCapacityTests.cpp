@@ -127,7 +127,7 @@ namespace
 			Test.TestFalse(TEXT("根及 shards 未授予时 Create 拒收"),
 				FVoxelGenerationPlanCache::Create(DeniedResources, ControlConsumer, Cache, Error, true, false));
 			const auto After = DeniedResources->Snapshot();
-			Test.TestTrue(TEXT("拒收明确报告容量"), Error.StartsWith(TEXT("CapacityBlocked")));
+			Test.TestTrue(TEXT("固定 Input 无法容纳 root 时明确拒收"), Error.StartsWith(TEXT("CapacityUnachievable")));
 			if (!Test.TestTrue(TEXT("拒收保留调用方已存在的 Cache"), Cache.Get() == Original))
 			{
 				return;

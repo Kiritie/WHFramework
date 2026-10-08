@@ -37,79 +37,81 @@ namespace
 		}
 	};
 
-	struct FVoxelNavigationWorker
-	{
-		TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
-		FVoxelGenerationConsumerKey Consumer;
-		FVoxelSectionSnapshot Section;
-		FVoxelSectionSnapshot Above;
-		FVoxelSectionSnapshot SecondAbove;
-		FVoxelNavigationInputVersion Version;
-		TSharedPtr<FVoxelNavigationSectionConsumers, ESPMode::ThreadSafe> Consumers;
-		TSharedPtr<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> Registry;
-		TSharedPtr<const FVoxelShapeRegistry, ESPMode::ThreadSafe> Shapes;
-		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InputLease;
-		uint64 BlockedReleaseVersion = 0;
-		bool bCapacityBlocked = false;
-
-		EVoxelTaskBlockReason BlockReason() const
-		{
-			return bCapacityBlocked && Resources->Snapshot().ReleaseVersion <= BlockedReleaseVersion ?
-				EVoxelTaskBlockReason::Memory : EVoxelTaskBlockReason::None;
-		}
-
-		FVoxelTaskResult Execute(const TAtomic<bool>& InCancel)
-		{
-			FVoxelTaskResult Result;
-			Result.InputResourceLease = InputLease;
-			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PayloadLease;
-			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> SurfaceLease;
-			TSharedPtr<FVoxelNavigationTaskPayload, ESPMode::ThreadSafe> Payload;
-			TSharedPtr<FVoxelNavigationSurface, ESPMode::ThreadSafe> Surface;
-			bCapacityBlocked = false;
-			if (InCancel.Load()) return Result;
-			if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input,
-				VoxelBoundedAllocation::WorkerSharedBytes<FVoxelNavigationTaskPayload>(), PayloadLease) ||
-				!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Staged,
-					VoxelBoundedAllocation::WorkerSharedBytes<FVoxelNavigationSurface>() +
-					VoxelBoundedAllocation::WorkerSharedBytes<FVoxelNavigationSurfaceAccess>(), SurfaceLease))
-			{
-				Result.Error = TEXT("CapacityBlocked: navigation result metadata");
-			}
-			else
-			{
-				Payload = VoxelBoundedAllocation::MakeWorkerShared<FVoxelNavigationTaskPayload>(PayloadLease);
-				Payload->MetadataLease = MoveTemp(PayloadLease);
-				Payload->Version = Version;
-				Surface = VoxelBoundedAllocation::MakeWorkerShared<FVoxelNavigationSurface>(SurfaceLease);
-				Surface->MetadataLease = MoveTemp(SurfaceLease);
-				Result.bSuccess = FVoxelNavigationSurfaceBuilder::Build(Section, Version.AboveToken ? &Above : nullptr,
-					*Registry, *Shapes, Version.CellSize, Version.Clearance, *Surface, &InCancel,
-					Resources, Consumer, &Result.Error, Version.SecondAboveToken ? &SecondAbove : nullptr);
-				if (Result.bSuccess)
-				{
-					Surface->InputVersion = Version;
-					Surface->Access = VoxelBoundedAllocation::MakeWorkerShared<FVoxelNavigationSurfaceAccess>(
-						Surface->MetadataLease, Consumers.ToSharedRef());
-					Payload->Surface = MoveTemp(Surface);
-					Result.CustomPayload = MoveTemp(Payload);
-				}
-			}
-			if (!Result.bSuccess && Result.Error.StartsWith(TEXT("CapacityBlocked")))
-			{
-				Payload.Reset();
-				Surface.Reset();
-				PayloadLease.Reset();
-				SurfaceLease.Reset();
-				BlockedReleaseVersion = Resources->Snapshot().ReleaseVersion;
-				bCapacityBlocked = true;
-				Result.bSuccess = true;
-				Result.bContinue = true;
-			}
-			return Result;
-		}
-	};
 }
+
+struct FVoxelNavigationWorker
+{
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
+	FVoxelGenerationConsumerKey Consumer;
+	FVoxelSectionSnapshot Section;
+	FVoxelSectionSnapshot Above;
+	FVoxelSectionSnapshot SecondAbove;
+	FVoxelNavigationInputVersion Version;
+	TSharedPtr<FVoxelNavigationSectionConsumers, ESPMode::ThreadSafe> Consumers;
+	TSharedPtr<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> Registry;
+	TSharedPtr<const FVoxelShapeRegistry, ESPMode::ThreadSafe> Shapes;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InputLease;
+	uint64 BlockedReleaseVersion = 0;
+	bool bCapacityBlocked = false;
+
+	EVoxelTaskBlockReason BlockReason() const
+	{
+		return bCapacityBlocked && Resources->ReleaseVersionExcludingOwner(Consumer) <= BlockedReleaseVersion ?
+			EVoxelTaskBlockReason::Memory : EVoxelTaskBlockReason::None;
+	}
+
+	FVoxelTaskResult Execute(const TAtomic<bool>& InCancel)
+	{
+		FVoxelTaskResult Result;
+		Result.InputResourceLease = InputLease;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PayloadLease;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> SurfaceLease;
+		TSharedPtr<FVoxelNavigationTaskPayload, ESPMode::ThreadSafe> Payload;
+		TSharedPtr<FVoxelNavigationSurface, ESPMode::ThreadSafe> Surface;
+		bCapacityBlocked = false;
+		if (InCancel.Load()) return Result;
+		const uint64 BeforeAdmission = Resources->ReleaseVersionExcludingOwner(Consumer);
+		if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input,
+			VoxelBoundedAllocation::WorkerSharedBytes<FVoxelNavigationTaskPayload>(), PayloadLease) ||
+			!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Staged,
+				VoxelBoundedAllocation::WorkerSharedBytes<FVoxelNavigationSurface>() +
+				VoxelBoundedAllocation::WorkerSharedBytes<FVoxelNavigationSurfaceAccess>(), SurfaceLease))
+		{
+			Result.Error = TEXT("CapacityBlocked: navigation result metadata");
+		}
+		else
+		{
+			Payload = VoxelBoundedAllocation::MakeWorkerShared<FVoxelNavigationTaskPayload>(PayloadLease);
+			Payload->MetadataLease = MoveTemp(PayloadLease);
+			Payload->Version = Version;
+			Surface = VoxelBoundedAllocation::MakeWorkerShared<FVoxelNavigationSurface>(SurfaceLease);
+			Surface->MetadataLease = MoveTemp(SurfaceLease);
+			Result.bSuccess = FVoxelNavigationSurfaceBuilder::Build(Section, Version.AboveToken ? &Above : nullptr,
+				*Registry, *Shapes, Version.CellSize, Version.Clearance, *Surface, &InCancel,
+				Resources, Consumer, &Result.Error, Version.SecondAboveToken ? &SecondAbove : nullptr);
+			if (Result.bSuccess)
+			{
+				Surface->InputVersion = Version;
+				Surface->Access = VoxelBoundedAllocation::MakeWorkerShared<FVoxelNavigationSurfaceAccess>(
+					Surface->MetadataLease, Consumers.ToSharedRef());
+				Payload->Surface = MoveTemp(Surface);
+				Result.CustomPayload = MoveTemp(Payload);
+			}
+		}
+		if (!Result.bSuccess && Result.Error.StartsWith(TEXT("CapacityBlocked")))
+		{
+			Payload.Reset();
+			Surface.Reset();
+			PayloadLease.Reset();
+			SurfaceLease.Reset();
+			BlockedReleaseVersion = BeforeAdmission;
+			bCapacityBlocked = true;
+			Result.bSuccess = true;
+			Result.bContinue = true;
+		}
+		return Result;
+	}
+};
 
 FVoxelNavigationPresenter::FVoxelNavigationPresenter(UVoxelModule& InModule, FVoxelTaskScheduler& InScheduler)
 	: Module(InModule), Scheduler(InScheduler), WorldEpoch(InModule.GetWorldEpoch())
@@ -480,6 +482,9 @@ bool FVoxelNavigationPresenter::RequestSection(const FIntVector& InSection)
 		{
 			return Kind == EVoxelTaskKind::BuildNavigation && Stamp == PreviousStamp;
 		});
+		Admission.Request.Reset();
+		Admission.Worker.Reset();
+		Admission.bCapacityBlocked = false;
 		Admission.Version = Version;
 		Admission.FirstRunnableSeconds = FPlatformTime::Seconds();
 		Admission.Stamp.OwnerId = OwnerId;
@@ -497,57 +502,124 @@ bool FVoxelNavigationPresenter::RequestSection(const FIntVector& InSection)
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(WorldEpoch, OwnerId,
 		Version.SectionIncarnation, InSection, Stamp.Token);
 	const auto Resources = Scheduler.GetTerrainResources();
-	const uint64 InputBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelNavigationWorker>() +
-		(Version.SecondAboveToken ? 3 : (Version.AboveToken ? 2 : 1)) * (VoxelBoundedAllocation::InitialGrowBytes<uint32>(4096) +
-			6 * VoxelBoundedAllocation::InitialGrowBytes<uint32>(256));
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InputLease;
-	if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input, InputBytes, InputLease)) return false;
-	const auto Worker = VoxelBoundedAllocation::MakeWorkerShared<FVoxelNavigationWorker>(InputLease);
-	Worker->InputLease = MoveTemp(InputLease);
-	Worker->Resources = Resources;
-	Worker->Consumer = Consumer;
-	Worker->Version = Version;
-	Worker->Consumers = InputLeases.FindChecked(InSection).Consumers;
-	Worker->Registry = Module.GetRegistry();
-	Worker->Shapes = Module.GetShapes();
-	if (!Module.GetRuntime()->CaptureSnapshot(InSection, Worker->Section, Worker->InputLease) ||
-		(Version.AboveToken && !Module.GetRuntime()->CaptureSnapshot(InSection + FIntVector(0, 0, 1), Worker->Above, Worker->InputLease)) ||
-		(Version.SecondAboveToken && !Module.GetRuntime()->CaptureSnapshot(InSection + FIntVector(0, 0, 2), Worker->SecondAbove, Worker->InputLease)))
+	if (Admission.bCapacityBlocked)
 	{
-		return false;
+		uint64 Current = 0;
+		if (!Resources->TryGetReleaseVersionExcludingOwner(Consumer, Current) || Current <= Admission.CapacityVersion) return false;
+		Admission.bCapacityBlocked = false;
 	}
-	check(Worker->Section.Stamp.Token == Version.SectionToken && Worker->Section.Revision == Version.SectionRevision);
-	check(!Version.AboveToken || (Worker->Above.Stamp.Token == Version.AboveToken && Worker->Above.Revision == Version.AboveRevision));
-	check(!Version.SecondAboveToken || (Worker->SecondAbove.Stamp.Token == Version.SecondAboveToken &&
-		Worker->SecondAbove.Revision == Version.SecondAboveRevision));
-	FVoxelTaskRequest Request;
-	Request.Kind = EVoxelTaskKind::BuildNavigation;
-	Request.WorkClass = EVoxelWorkClass::Interactive;
-	Request.Stamp = Stamp;
-	if (const auto* Demand = Module.GetCurrentInterest().Exact.Find(InSection))
+	const uint64 BeforeAdmission = Resources->ReleaseVersionExcludingOwner(Consumer);
+	if (!Admission.Worker)
 	{
-		Request.ServiceBand = Demand->ServicePriority.Band;
-		Request.SourcePriority = Demand->ServicePriority.SourcePriority;
-		Request.SourceStableKey = Demand->ServicePriority.SourceStableKey;
-		Request.DistanceScore = Demand->ServicePriority.DistanceCells;
-		Request.ForwardScore = Demand->ServicePriority.ForwardScore;
+		const uint64 InputBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelNavigationWorker>() +
+			(Version.SecondAboveToken ? 3 : (Version.AboveToken ? 2 : 1)) * (VoxelBoundedAllocation::InitialGrowBytes<uint32>(4096) +
+				6 * VoxelBoundedAllocation::InitialGrowBytes<uint32>(256));
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InputLease;
+		const auto InputAdmission = Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Input, InputBytes, InputLease,
+			0, StorageLease ? StorageLease->Bytes() : 0, int32(StorageLease.IsValid()) + 1);
+		if (InputAdmission != EVoxelTerrainResourceAdmission::Granted)
+		{
+			if (InputAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked)
+			{
+				Admission.bCapacityBlocked = true;
+				Admission.CapacityVersion = BeforeAdmission;
+			}
+			else Failures.Add(InSection, Version);
+			return false;
+		}
+		Admission.Worker = VoxelBoundedAllocation::MakeWorkerShared<FVoxelNavigationWorker>(InputLease);
+		const auto Worker = Admission.Worker;
+		Worker->InputLease = MoveTemp(InputLease);
+		Worker->Resources = Resources;
+		Worker->Consumer = Consumer;
+		Worker->Version = Version;
+		Worker->Consumers = InputLeases.FindChecked(InSection).Consumers;
+		Worker->Registry = Module.GetRegistry();
+		Worker->Shapes = Module.GetShapes();
+		if (!Module.GetRuntime()->CaptureSnapshot(InSection, Worker->Section, Worker->InputLease) ||
+			(Version.AboveToken && !Module.GetRuntime()->CaptureSnapshot(InSection + FIntVector(0, 0, 1), Worker->Above, Worker->InputLease)) ||
+			(Version.SecondAboveToken && !Module.GetRuntime()->CaptureSnapshot(InSection + FIntVector(0, 0, 2), Worker->SecondAbove, Worker->InputLease)))
+		{
+			Admission.Worker.Reset();
+			return false;
+		}
+		check(Worker->Section.Stamp.Token == Version.SectionToken && Worker->Section.Revision == Version.SectionRevision);
+		check(!Version.AboveToken || (Worker->Above.Stamp.Token == Version.AboveToken && Worker->Above.Revision == Version.AboveRevision));
+		check(!Version.SecondAboveToken || (Worker->SecondAbove.Stamp.Token == Version.SecondAboveToken &&
+			Worker->SecondAbove.Revision == Version.SecondAboveRevision));
+		Admission.Request.Emplace();
+		auto& Request = Admission.Request.GetValue();
+		Request.Kind = EVoxelTaskKind::BuildNavigation;
+		Request.WorkClass = EVoxelWorkClass::Interactive;
+		Request.Stamp = Stamp;
+		Request.GenerationConsumer = Consumer;
+		Request.SetRequiredBindingInput(Worker->InputLease->Bytes() + StorageLease->Bytes(), 3);
+		if (const auto* Demand = Module.GetCurrentInterest().Exact.Find(InSection))
+		{
+			Request.ServiceBand = Demand->ServicePriority.Band;
+			Request.SourcePriority = Demand->ServicePriority.SourcePriority;
+			Request.SourceStableKey = Demand->ServicePriority.SourceStableKey;
+			Request.DistanceScore = Demand->ServicePriority.DistanceCells;
+			Request.ForwardScore = Demand->ServicePriority.ForwardScore;
+		}
+		Request.ReservedBytes = 1;
+		Request.FirstRunnableSeconds = Admission.FirstRunnableSeconds;
+		Request.bResumable = true;
 	}
-	Request.ReservedBytes = 1;
-	Request.FirstRunnableSeconds = Admission.FirstRunnableSeconds;
-	Request.bResumable = true;
-	Request.GetBlockReason = [Worker]()
+	const auto Worker = Admission.Worker;
+	auto& Request = Admission.Request.GetValue();
+	auto GetBlockReason = [Worker]()
 	{
 		return Worker->BlockReason();
 	};
-	Request.Execute = [Worker](const TAtomic<bool>& InCancel)
+	auto Execute = [Worker](const TAtomic<bool>& InCancel)
 	{
 		return Worker->Execute(InCancel);
 	};
-	Request.Apply = [this, Gate = Lifetime](FVoxelTaskResult&& InResult)
+	auto ApplyCallback = [this, Gate = Lifetime](FVoxelTaskResult&& InResult)
 	{
-		if (Gate->Load()) Apply(MoveTemp(InResult));
+		if (Gate->Load()) this->Apply(MoveTemp(InResult));
 	};
-	if (!Scheduler.Enqueue(MoveTemp(Request))) return false;
+	FString BindingError;
+	if ((!Request.bBlockBound && !Request.BindGetBlockReason(Resources, Consumer, MoveTemp(GetBlockReason), BindingError)) ||
+		(!Request.bExecuteBound && !Request.BindExecute(Resources, Consumer, MoveTemp(Execute), BindingError)) ||
+		(!Request.bApplyBound && !Request.BindApply(Resources, Consumer, MoveTemp(ApplyCallback), BindingError)))
+	{
+		if (BindingError.StartsWith(TEXT("CapacityBlocked")))
+		{
+			Admission.bCapacityBlocked = true;
+			Admission.CapacityVersion = BeforeAdmission;
+		}
+		else
+		{
+			Failures.Add(InSection, Version);
+			Admission.Request.Reset();
+			Admission.Worker.Reset();
+		}
+		return false;
+	}
+	FVoxelTaskRequest AdmissionRequest = MoveTemp(Request);
+	Admission.Request.Reset();
+	const bool bAccepted = Scheduler.Enqueue(MoveTemp(AdmissionRequest));
+	FAdmission* Current = Admissions.Find(InSection);
+	if (!Current || Current->Stamp != Stamp || Current->Worker != Worker || bStopped) return false;
+	if (!bAccepted)
+	{
+		Current->Request.Emplace(MoveTemp(AdmissionRequest));
+		if (Current->Request->Blocked == EVoxelTaskBlockReason::Oversized || Current->Request->Blocked == EVoxelTaskBlockReason::TerminalFailure)
+		{
+			Failures.Add(InSection, Version);
+			Current->Request.Reset();
+			Current->Worker.Reset();
+		}
+		else if (Current->Request->Blocked == EVoxelTaskBlockReason::InputMemory || Current->Request->Blocked == EVoxelTaskBlockReason::Memory)
+		{
+			Current->bCapacityBlocked = true;
+			Current->CapacityVersion = BeforeAdmission;
+		}
+		return false;
+	}
+	Current->Worker.Reset();
 	Requested.Add(InSection, Stamp);
 	return true;
 }

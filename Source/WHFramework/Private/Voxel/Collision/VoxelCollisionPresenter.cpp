@@ -453,6 +453,11 @@ void FVoxelCollisionPresenter::InstallEvidence(const FIntVector& InSection, FBod
 void FVoxelCollisionPresenter::BeginRetirement(FBodyRecord& InBody)
 {
 	if (InBody.bRetiring) return;
+	InBody.AdmissionRequest.Reset();
+	InBody.AdmissionSnapshot.Reset();
+	InBody.AdmissionInputLease.Reset();
+	InBody.AdmissionOutputLease.Reset();
+	InBody.bCapacityBlocked = false;
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(WorldEpoch, OwnerId,
 		InBody.RequestedStamp.OwnerIncarnation, InBody.Section, ++NextLeaseSerial);
 	if (!InBody.EvidenceLease && !Scheduler.GetTerrainResources()->Acquire(Consumer, EVoxelTerrainResourcePool::Resident,
@@ -491,34 +496,79 @@ void FVoxelCollisionPresenter::RequestCollision(const FIntVector& InSection, con
 	if (!Body) return;
 	if (Body->RequestedStamp != Stamp)
 	{
+		Body->AdmissionRequest.Reset();
+		Body->AdmissionSnapshot.Reset();
+		Body->AdmissionInputLease.Reset();
+		Body->AdmissionOutputLease.Reset();
+		Body->bCapacityBlocked = false;
+		Body->AdmissionConsumer = {};
 		Body->RequestedStamp = Stamp;
 		Body->bHasFailure = false;
 		Body->QueuedAt = FPlatformTime::Seconds();
 	}
 	if ((Body->Prepared && Body->PreparedStamp == Stamp) ||
 		(Body->SyncPrepared && Body->InstalledStamp == Stamp)) return;
+	if (!Body->AdmissionConsumer.IsValid()) Body->AdmissionConsumer = Consumer;
+	if (Body->bCapacityBlocked)
+	{
+		uint64 Current = 0;
+		if (!Resources->TryGetReleaseVersionExcludingOwner(Body->CapacityConsumer, Current) || Current <= Body->CapacityVersion) return;
+		Body->bCapacityBlocked = false;
+	}
 	const uint64 InputBytes = VoxelBoundedAllocation::InitialGrowBytes<uint32>(4096) +
 		6 * VoxelBoundedAllocation::InitialGrowBytes<uint32>(256) + VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSectionSnapshot>();
 	const uint64 OutputBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSectionCollisionResult>() +
 		VoxelBoundedAllocation::ArrayBytes<FBox>(16384);
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InputLease, OutputLease;
-	if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input, InputBytes, InputLease) ||
-		!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Staged, OutputBytes, OutputLease)) return;
-	auto Snapshot = VoxelBoundedAllocation::MakeWorkerShared<FVoxelSectionSnapshot>(InputLease);
-	if (!Module.GetRuntime()->CaptureSnapshot(InSection, *Snapshot, InputLease)) return;
-	FVoxelTaskRequest Request;
-	Request.Kind = EVoxelTaskKind::BuildCollision;
-	Request.Stamp = Stamp;
-	Request.ServiceBand = InDemand.ServicePriority.Band;
-	Request.SourceStableKey = InDemand.ServicePriority.SourceStableKey;
-	Request.SourcePriority = InDemand.ServicePriority.SourcePriority;
-	Request.DistanceScore = InDemand.ServicePriority.DistanceCells;
-	Request.ForwardScore = InDemand.ServicePriority.ForwardScore;
-	Request.WorkClass = FVoxelTerrainWorkSelection::IsNear(Request.ServiceBand) ? EVoxelWorkClass::Critical : EVoxelWorkClass::Interactive;
-	Request.FirstRunnableSeconds = Body->QueuedAt;
-	Request.InputBytes = InputBytes;
-	Request.ReservedBytes = OutputBytes;
-	Request.Execute = [Snapshot, Registry = Module.GetRegistry(), Shapes = Module.GetShapes(), InputLease, OutputLease, Stamp]
+	if (!Body->AdmissionSnapshot)
+	{
+		const uint64 BeforeInput = Resources->ReleaseVersionExcludingOwner(Body->AdmissionConsumer);
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InputLease, OutputLease;
+		auto Admission = Resources->TryAcquire(Body->AdmissionConsumer, EVoxelTerrainResourcePool::Input, InputBytes, InputLease);
+		if (Admission == EVoxelTerrainResourceAdmission::Granted)
+		{
+			Admission = Resources->TryAcquire(Body->AdmissionConsumer, EVoxelTerrainResourcePool::Staged,
+				OutputBytes, OutputLease, 0, InputLease->Bytes(), 1);
+		}
+		if (Admission != EVoxelTerrainResourceAdmission::Granted)
+		{
+			if (Admission == EVoxelTerrainResourceAdmission::CapacityBlocked)
+			{
+				Body->bCapacityBlocked = true;
+				Body->CapacityConsumer = Body->AdmissionConsumer;
+				Body->CapacityVersion = BeforeInput;
+			}
+			else
+			{
+				Body->FailedStamp = Stamp;
+				Body->bHasFailure = true;
+			}
+			return;
+		}
+		auto Snapshot = VoxelBoundedAllocation::MakeWorkerShared<FVoxelSectionSnapshot>(InputLease);
+		if (!Module.GetRuntime()->CaptureSnapshot(InSection, *Snapshot, InputLease)) return;
+		Body->AdmissionSnapshot = MoveTemp(Snapshot);
+		Body->AdmissionInputLease = MoveTemp(InputLease);
+		Body->AdmissionOutputLease = MoveTemp(OutputLease);
+		Body->AdmissionRequest.Emplace();
+		auto& Request = Body->AdmissionRequest.GetValue();
+		Request.Kind = EVoxelTaskKind::BuildCollision;
+		Request.Stamp = Stamp;
+		Request.ServiceBand = InDemand.ServicePriority.Band;
+		Request.SourceStableKey = InDemand.ServicePriority.SourceStableKey;
+		Request.SourcePriority = InDemand.ServicePriority.SourcePriority;
+		Request.DistanceScore = InDemand.ServicePriority.DistanceCells;
+		Request.ForwardScore = InDemand.ServicePriority.ForwardScore;
+		Request.WorkClass = FVoxelTerrainWorkSelection::IsNear(Request.ServiceBand) ? EVoxelWorkClass::Critical : EVoxelWorkClass::Interactive;
+		Request.FirstRunnableSeconds = Body->QueuedAt;
+		Request.InputBytes = InputBytes;
+		Request.SetRequiredBindingInput(Body->AdmissionInputLease->Bytes(), 2);
+		Request.ReservedBytes = OutputBytes;
+	}
+	auto& Request = Body->AdmissionRequest.GetValue();
+	const auto Snapshot = Body->AdmissionSnapshot;
+	const auto InputLease = Body->AdmissionInputLease;
+	const auto OutputLease = Body->AdmissionOutputLease;
+	auto Execute = [Snapshot, Registry = Module.GetRegistry(), Shapes = Module.GetShapes(), InputLease, OutputLease, Stamp]
 		(const TAtomic<bool>& InCancel)
 	{
 		FVoxelTaskResult Result;
@@ -528,12 +578,57 @@ void FVoxelCollisionPresenter::RequestCollision(const FIntVector& InSection, con
 		Result.bSuccess = Registry && Shapes && FVoxelCollisionBuilder::Build(*Snapshot, *Registry, *Shapes, *Result.Collision, &InCancel);
 		return Result;
 	};
-	Scheduler.Enqueue(MoveTemp(Request));
+	FString BindingError;
+	const auto BindingConsumer = Scheduler.GetControlConsumer();
+	const uint64 BeforeBinding = Resources->ReleaseVersionExcludingOwner(BindingConsumer);
+	const bool bBound = Request.bExecuteBound || Request.BindExecute(Resources, BindingConsumer, MoveTemp(Execute), BindingError);
+	if (bBound)
+	{
+		FVoxelTaskRequest AdmissionRequest = MoveTemp(Request);
+		Body->AdmissionRequest.Reset();
+		const bool bAccepted = Scheduler.Enqueue(MoveTemp(AdmissionRequest));
+		Body = FindBody(InSection);
+		if (!Body || Body->RequestedStamp != Stamp || Body->AdmissionSnapshot != Snapshot) return;
+		if (bAccepted)
+		{
+			Body->AdmissionSnapshot.Reset();
+			Body->AdmissionInputLease.Reset();
+			Body->AdmissionOutputLease.Reset();
+			return;
+		}
+		Body->AdmissionRequest.Emplace(MoveTemp(AdmissionRequest));
+	}
+	const auto Reason = Body->AdmissionRequest->Blocked;
+	if (BindingError.StartsWith(TEXT("CapacityBlocked")) || (bBound &&
+		(Reason == EVoxelTaskBlockReason::InputMemory || Reason == EVoxelTaskBlockReason::Memory)))
+	{
+		Body->bCapacityBlocked = true;
+		Body->CapacityConsumer = BindingConsumer;
+		Body->CapacityVersion = BeforeBinding;
+	}
+	else if (!bBound || Reason == EVoxelTaskBlockReason::Oversized || Reason == EVoxelTaskBlockReason::TerminalFailure)
+	{
+		Body->FailedStamp = Stamp;
+		Body->bHasFailure = true;
+		Body->AdmissionRequest.Reset();
+		Body->AdmissionSnapshot.Reset();
+		Body->AdmissionInputLease.Reset();
+		Body->AdmissionOutputLease.Reset();
+	}
 }
 
 void FVoxelCollisionPresenter::InvalidateSection(const FIntVector& InSection)
 {
-	if (auto* Body = FindBody(InSection)) Body->bHasFailure = false;
+	if (auto* Body = FindBody(InSection))
+	{
+		Body->bHasFailure = false;
+		Body->AdmissionRequest.Reset();
+		Body->AdmissionSnapshot.Reset();
+		Body->AdmissionInputLease.Reset();
+		Body->AdmissionOutputLease.Reset();
+		Body->AdmissionConsumer = {};
+		Body->bCapacityBlocked = false;
+	}
 	Scheduler.CancelMatching([&InSection](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
 	{
 		return Kind == EVoxelTaskKind::BuildCollision && Stamp.Section == InSection;

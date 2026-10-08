@@ -164,6 +164,7 @@ public:
 	void QueueTerrainWorldControl(UVoxelModuleNetworkComponent* InComponent);
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> GetTerrainFactResources() const;
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> GetTerrainResources() const;
+	FVoxelGenerationConsumerKey GetTerrainTaskControlConsumer() const;
 	TSharedPtr<FVoxelPhysicsRetirement, ESPMode::ThreadSafe> GetPhysicsRetirement();
 	FVoxelGenerationDependencyStatus EnsureGenerationFacts(const FVoxelGenerationConsumerKey& InConsumer,
 		const FVoxelGenerationBounds& InBounds, const FVoxelTerrainServicePriority& InPriority);

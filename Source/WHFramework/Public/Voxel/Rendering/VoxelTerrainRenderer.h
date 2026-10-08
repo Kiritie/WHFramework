@@ -126,6 +126,8 @@ public:
 		const FVoxelTerrainServicePriority& InPriority,
 		double InFirstQueuedSeconds);
 	bool IsCoarseTransactionPending(const FGuid& InTransaction) const;
+	// 消费原事务的永久失败；调用方保留旧表示且不为同一请求自动构造新事务。
+	bool ConsumeCoarseTransactionFailure(const FGuid& InTransaction);
 	void PollRenderReceipts();
 	void AdvanceFramePublication();
 	void AdvanceRetirement(TFunction<void(const FIntVector&)> InOnRetired);

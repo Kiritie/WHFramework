@@ -20,7 +20,7 @@ namespace
 		TAtomic<uint64> CapacityVersion{0};
 		virtual uint64 GetAllocatedBytes() const override
 		{
-			return VoxelBoundedAllocation::WorkerSharedBytes<FPlanReadDependencies>() + Missing.GetAllocatedSize();
+			return VoxelBoundedAllocation::WorkerSharedBytes<FPlanReadDependencies>() + VoxelGenerationAllocation::AllocatedBytes(Missing);
 		}
 		virtual uint64 GetResourceAccountedBytes() const override { return GetAllocatedBytes(); }
 	};
@@ -507,37 +507,201 @@ void FVoxelGenerationPlanCoordinator::RefreshQueuedPriorities()
 	});
 }
 
+void FVoxelGenerationPlanCoordinator::LinkPendingAdmission(FState& InState)
+{
+	if (InState.bAdmissionLinked)
+	{
+		return;
+	}
+	InState.bAdmissionLinked = true;
+	InState.PreviousAdmission = Storage->AdmissionTail;
+	InState.NextAdmission.Invalidate();
+	if (Storage->AdmissionTail.IsValid())
+	{
+		Storage->States.FindChecked(Storage->PriorityFacts.FindChecked(Storage->AdmissionTail)).NextAdmission = InState.PriorityNode;
+	}
+	else
+	{
+		Storage->AdmissionHead = InState.PriorityNode;
+	}
+	Storage->AdmissionTail = InState.PriorityNode;
+	++Storage->AdmissionCount;
+}
+
+void FVoxelGenerationPlanCoordinator::UnlinkPendingAdmission(FState& InState)
+{
+	if (!InState.bAdmissionLinked)
+	{
+		return;
+	}
+	if (InState.PreviousAdmission.IsValid())
+	{
+		Storage->States.FindChecked(Storage->PriorityFacts.FindChecked(InState.PreviousAdmission)).NextAdmission = InState.NextAdmission;
+	}
+	else
+	{
+		Storage->AdmissionHead = InState.NextAdmission;
+	}
+	if (InState.NextAdmission.IsValid())
+	{
+		Storage->States.FindChecked(Storage->PriorityFacts.FindChecked(InState.NextAdmission)).PreviousAdmission = InState.PreviousAdmission;
+	}
+	else
+	{
+		Storage->AdmissionTail = InState.PreviousAdmission;
+	}
+	InState.PreviousAdmission.Invalidate();
+	InState.NextAdmission.Invalidate();
+	InState.bAdmissionLinked = false;
+	check(Storage->AdmissionCount > 0);
+	--Storage->AdmissionCount;
+}
+
+void FVoxelGenerationPlanCoordinator::ClearPendingRequest(FState& InState)
+{
+	UnlinkPendingAdmission(InState);
+	// 原 Request 的 callable 先销毁，最后一个读取正文持有者再释放原 Worker 租约。
+	InState.PendingRequest.Reset();
+	InState.PendingReadDependencies.Reset();
+	InState.bAttemptPendingAdmission = false;
+	InState.bWaitingTaskCapacity = false;
+	InState.bWaitingCapacity = false;
+}
+
+void FVoxelGenerationPlanCoordinator::FailAdmission(const FVoxelGenerationPlanDependency& InDependency, FState& InState,
+	const FString& InError, const EVoxelTaskBlockReason InReason)
+{
+	if (InState.PendingRequest.IsSet())
+	{
+		const auto& Request = InState.PendingRequest.GetValue();
+		Scheduler.ObserveDemand(Request.Kind, Request.Stamp, InReason, Request.InputBytes, Request.ReservedBytes);
+	}
+	ClearPendingRequest(InState);
+	InState.State = EVoxelPlanDependencyState::Failed;
+	InState.Error = InError;
+	WakeConsumers(InDependency);
+}
+
+void FVoxelGenerationPlanCoordinator::WaitForTaskAdmission(FState& InState, const uint64 InVersion,
+	const EVoxelTaskBlockReason InReason)
+{
+	InState.bWaitingTaskCapacity = true;
+	InState.TaskCapacityVersion = InVersion;
+	LinkPendingAdmission(InState);
+	const auto& Request = InState.PendingRequest.GetValue();
+	Scheduler.ObserveDemand(Request.Kind, Request.Stamp, InReason, Request.InputBytes, Request.ReservedBytes);
+}
+
+void FVoxelGenerationPlanCoordinator::RejectTaskBinding(const FVoxelGenerationPlanDependency& InDependency, FState& InState,
+	const FString& InError, const uint64 InVersion)
+{
+	if (InError.StartsWith(TEXT("CapacityBlocked")))
+	{
+		WaitForTaskAdmission(InState, InVersion, EVoxelTaskBlockReason::InputMemory);
+	}
+	else
+	{
+		FailAdmission(InDependency, InState, InError,
+			InError.StartsWith(TEXT("Oversized")) || InError.StartsWith(TEXT("CapacityUnachievable")) ?
+			EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::TerminalFailure);
+	}
+}
+
+int32 FVoxelGenerationPlanCoordinator::AdvancePendingAdmissions(const double InDeadline, const int32 InMaximumFacts)
+{
+	if (!Storage)
+	{
+		return 0;
+	}
+	const int32 Maximum = FMath::Min(FMath::Max(0, InMaximumFacts), Storage->AdmissionCount);
+	int32 Processed = 0;
+	while (Storage && Storage->AdmissionHead.IsValid() && Processed < Maximum && FPlatformTime::Seconds() <= InDeadline)
+	{
+		const auto Dependency = Storage->PriorityFacts.FindChecked(Storage->AdmissionHead);
+		auto& State = Storage->States.FindChecked(Dependency);
+		UnlinkPendingAdmission(State);
+		++Processed;
+		if (State.Donations.IsEmpty() && !PriorityGraph.HasConsumers(State.PriorityNode))
+		{
+			ForgetFact(Dependency);
+			continue;
+		}
+		if (IsCached(Dependency))
+		{
+			ClearPendingRequest(State);
+			State.State = EVoxelPlanDependencyState::Ready;
+			State.Error.Reset();
+			WakeConsumers(Dependency);
+			continue;
+		}
+		if (ArePrerequisitesReady(State))
+		{
+			const auto CapturedStorage = Storage;
+			const FGuid CapturedNode = State.PriorityNode;
+			Queue(Dependency, State);
+			// Enqueue 可以触发外部回调，旧槽引用不能跨越它继续使用。
+			if (Storage != CapturedStorage || !Storage || Storage->Owner != this)
+			{
+				break;
+			}
+			const auto* Current = Storage->States.Find(Dependency);
+			if (Current && Current->PriorityNode == CapturedNode && Current->PendingRequest.IsSet())
+			{
+				LinkPendingAdmission(Storage->States.FindChecked(Dependency));
+			}
+		}
+		else if (State.PendingRequest.IsSet())
+		{
+			LinkPendingAdmission(State);
+		}
+	}
+	return Processed;
+}
+
 bool FVoxelGenerationPlanCoordinator::Queue(
 	const FVoxelGenerationPlanDependency& InDependency,
 	FState& InOutState)
 {
-	FVoxelTaskRequest Request;
-	Request.Kind = EVoxelTaskKind::BuildGenerationPlan;
-	Request.TerrainStage = 0;
+	if (!InOutState.PendingRequest.IsSet())
+	{
+		InOutState.PendingRequest.Emplace();
+		auto& NewRequest = InOutState.PendingRequest.GetValue();
+		NewRequest.Kind = EVoxelTaskKind::BuildGenerationPlan;
+		NewRequest.TerrainStage = 0;
+		NewRequest.Stamp.WorldEpoch = WorldEpoch;
+		if (!InOutState.bAttemptPendingAdmission)
+		{
+			checkf(NextAttemptId != MAX_uint64, TEXT("Generation attempt serial exhausted"));
+			InOutState.AttemptId = ++NextAttemptId;
+			InOutState.bAttemptPendingAdmission = true;
+		}
+		NewRequest.Stamp.Token = InOutState.AttemptId;
+		NewRequest.Stamp.OwnerId = EnvironmentOwnerId;
+		NewRequest.Stamp.OwnerIncarnation = EnvironmentOwnerIncarnation;
+		NewRequest.Stamp.Revision = static_cast<uint8>(InDependency.Kind);
+		NewRequest.Stamp.Section = InDependency.Coordinate();
+		NewRequest.GenerationConsumer = {EVoxelGenerationConsumerKind::WorldFact, WorldEpoch,
+			EnvironmentOwnerId, EnvironmentOwnerIncarnation, EVoxelGenerationSpatialKind::Section,
+			NewRequest.Stamp.Section, NewRequest.Stamp.Section, NewRequest.Stamp.Token};
+		// 等待绑定或队列容量不能重置原事实首次可运行年龄。
+		NewRequest.FirstRunnableSeconds = FPlatformTime::Seconds();
+		NewRequest.ReservedBytes = 0;
+	}
+	auto& Request = InOutState.PendingRequest.GetValue();
 	Request.WorkClass = InOutState.WorkClass;
 	Request.SourcePriority = InOutState.SourcePriority;
 	Request.DistanceScore = InOutState.DistanceScore;
 	Request.ForwardScore = InOutState.ForwardScore;
 	Request.ServiceBand = InOutState.ServicePriority.Band;
 	Request.SourceStableKey = InOutState.ServicePriority.SourceStableKey;
-	Request.Stamp.WorldEpoch = WorldEpoch;
-	if (!InOutState.bAttemptPendingAdmission)
-	{
-		checkf(NextAttemptId != MAX_uint64, TEXT("Generation attempt serial exhausted"));
-		InOutState.AttemptId = ++NextAttemptId;
-		InOutState.bAttemptPendingAdmission = true;
-	}
-	Request.Stamp.Token = InOutState.AttemptId;
-	Request.Stamp.OwnerId = EnvironmentOwnerId;
-	Request.Stamp.OwnerIncarnation = EnvironmentOwnerIncarnation;
-	Request.Stamp.Revision = static_cast<uint8>(InDependency.Kind);
-	Request.Stamp.Section = InDependency.Coordinate();
 	// 正文由原 Cache 租约承担，任务只返回已经授额的读取闭包。
-	Request.ReservedBytes = 0;
-	const FVoxelGenerationConsumerKey CaptureConsumer{EVoxelGenerationConsumerKind::WorldFact, WorldEpoch,
-		EnvironmentOwnerId, Request.Stamp.OwnerIncarnation, EVoxelGenerationSpatialKind::Section, Request.Stamp.Section,
-		Request.Stamp.Section, Request.Stamp.Token};
-	Request.GenerationConsumer = CaptureConsumer;
+	const auto CaptureConsumer = Request.GenerationConsumer;
+	if (InOutState.bWaitingTaskCapacity && Scheduler.GetTerrainResources()->ReleaseVersionExcludingOwner(CaptureConsumer) <=
+		InOutState.TaskCapacityVersion)
+	{
+		return false;
+	}
+	InOutState.bWaitingTaskCapacity = false;
 	if (InOutState.bWaitingCapacity && Resources->ReleaseVersionExcludingOwner(CaptureConsumer) <= InOutState.CapacityVersion) return false;
 	InOutState.bWaitingCapacity = false;
 	const uint64 BeforeAdmission = Resources->ReleaseVersionExcludingOwner(CaptureConsumer);
@@ -552,236 +716,373 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 		{
 			InOutState.bWaitingCapacity = Error.StartsWith(TEXT("CapacityBlocked"));
 			InOutState.CapacityVersion = BeforeAdmission;
-			if (!InOutState.bWaitingCapacity) { InOutState.State = EVoxelPlanDependencyState::Failed; InOutState.Error = MoveTemp(Error); }
+			if (InOutState.bWaitingCapacity)
+			{
+				LinkPendingAdmission(InOutState);
+			}
+			else
+			{
+				FailAdmission(InDependency, InOutState, Error,
+					Error.StartsWith(TEXT("Oversized")) || Error.StartsWith(TEXT("CapacityUnachievable")) ?
+					EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::TerminalFailure);
+			}
 			return false;
 		}
 		InOutState.bPrerequisiteRetentionPending = false;
 	}
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ReadLease;
-	const uint64 BeforeReadAdmission = Resources->ReleaseVersionExcludingOwner(CaptureConsumer);
-	if (!Scheduler.GetRuntimeResources()->Acquire(CaptureConsumer, EVoxelTerrainResourcePool::Input,
-		VoxelBoundedAllocation::WorkerSharedBytes<FPlanReadDependencies>() +
-		VoxelBoundedAllocation::ArrayBytes<FVoxelGenerationPlanDependency>(MaximumHydrologyDependencies), ReadLease))
+	if (!InOutState.PendingReadDependencies)
 	{
-		InOutState.bWaitingCapacity = true;
-		InOutState.CapacityVersion = BeforeReadAdmission;
-		return false;
+		// 这些原 Input 授额在本次读取构建期间不可释放；不能把永久峰值不足记成外部容量等待。
+		uint64 RequiredInputBytes = Cache->GetRootInputBytes();
+		int32 RequiredLeaseCount = RequiredInputBytes ? 1 : 0;
+		uint64 Serials[7] = {};
+		int32 SerialCount = 0;
+		const FVoxelTerrainResourceLease* RequiredLeases[] =
+		{
+			Storage->ResourceLease.Get(), Storage->StatesLease.Get(), Storage->ConsumersLease.Get(),
+			Storage->FactsLease.Get(), Storage->EnvironmentLease.Get(),
+			InOutState.PrerequisitesLease.Get(), InOutState.DonationsLease.Get()
+		};
+		for (const auto* Lease : RequiredLeases)
+		{
+			if (!Lease || !Lease->IsOwnedBy(Resources.Get()) || Lease->GetPool() != EVoxelTerrainResourcePool::Input)
+			{
+				continue;
+			}
+			const uint64 Serial = Lease->Serial();
+			bool bKnown = false;
+			for (int32 Index = 0; Index < SerialCount; ++Index)
+			{
+				bKnown |= Serials[Index] == Serial;
+			}
+			if (bKnown)
+			{
+				continue;
+			}
+			const uint64 Bytes = Lease->Bytes();
+			if (Bytes > MAX_uint64 - RequiredInputBytes)
+			{
+				FailAdmission(InDependency, InOutState, TEXT("Oversized: generation read input floor overflow"),
+					EVoxelTaskBlockReason::Oversized);
+				return false;
+			}
+			Serials[SerialCount++] = Serial;
+			RequiredInputBytes += Bytes;
+			++RequiredLeaseCount;
+		}
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ReadLease;
+		const uint64 BeforeReadAdmission = Resources->ReleaseVersionExcludingOwner(CaptureConsumer);
+		const auto Admission = Resources->TryAcquire(CaptureConsumer, EVoxelTerrainResourcePool::Input,
+			VoxelBoundedAllocation::WorkerSharedBytes<FPlanReadDependencies>() +
+			VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelGenerationPlanDependency, FDefaultAllocator>(MaximumHydrologyDependencies),
+			ReadLease, 0, RequiredInputBytes, RequiredLeaseCount);
+		if (Admission != EVoxelTerrainResourceAdmission::Granted)
+		{
+			if (Admission == EVoxelTerrainResourceAdmission::CapacityBlocked)
+			{
+				InOutState.bWaitingCapacity = true;
+				InOutState.CapacityVersion = BeforeReadAdmission;
+				LinkPendingAdmission(InOutState);
+			}
+			else
+			{
+				FailAdmission(InDependency, InOutState,
+					Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+					TEXT("Oversized: generation plan read capture is unreachable") : TEXT("InvalidResource: generation plan read capture"),
+					Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+					EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::TerminalFailure);
+			}
+			return false;
+		}
+		auto ReadDependencies = VoxelBoundedAllocation::MakeWorkerShared<FPlanReadDependencies>(ReadLease);
+		ReadDependencies->Lease = MoveTemp(ReadLease);
+		ReadDependencies->Missing.Reserve(MaximumHydrologyDependencies);
+		check(ReadDependencies->GetAllocatedBytes() <= ReadDependencies->Lease->Bytes());
+		InOutState.PendingReadDependencies = MoveTemp(ReadDependencies);
 	}
-	auto ReadDependencies = VoxelBoundedAllocation::MakeWorkerShared<FPlanReadDependencies>(ReadLease);
-	ReadDependencies->Lease = MoveTemp(ReadLease);
-	ReadDependencies->Missing.Reserve(MaximumHydrologyDependencies);
-	check(ReadDependencies->GetAllocatedBytes() <= ReadDependencies->Lease->Bytes());
+	const auto ReadDependencies = StaticCastSharedPtr<FPlanReadDependencies>(InOutState.PendingReadDependencies);
 	Request.InputBytes = ReadDependencies->Lease->Bytes();
 	Request.bResumable = true;
-	Request.GetBlockReason = [ReadDependencies, CapturedResources = Resources, CaptureConsumer]
+	const uint64 BeforeTaskAdmission = Scheduler.GetTerrainResources()->ReleaseVersionExcludingOwner(CaptureConsumer);
+	if (!Request.bBlockBound)
 	{
-		if (!ReadDependencies->bWaitingCapacity.Load()) return EVoxelTaskBlockReason::None;
-		uint64 Version = 0;
-		return CapturedResources->TryGetReleaseVersionExcludingOwner(CaptureConsumer, Version) &&
-			Version > ReadDependencies->CapacityVersion.Load() ? EVoxelTaskBlockReason::None : EVoxelTaskBlockReason::Memory;
-	};
-	Request.Execute = [Dependency = InDependency, CapturedConfig = Config,
-		CapturedCache = Cache, PrerequisiteRetention = InOutState.PrerequisiteRetention, ReadDependencies,
-		CapturedResources = Resources, CapturedStamp = Request.Stamp, CaptureConsumer](const TAtomic<bool>& Cancel)
-	{
-		FVoxelTaskResult Result;
-		if (Cancel.Load())
-		{
-			Result.bCanceled = true;
-			return Result;
-		}
-		ReadDependencies->bWaitingCapacity.Store(false);
-		ReadDependencies->Missing.Reset();
-		ReadDependencies->bOverflow = false;
-		const uint64 BeforeBuild = CapturedResources->ReleaseVersionExcludingOwner(CaptureConsumer);
-		FVoxelGenerationQuery Query;
-		if (!FVoxelGenerationQuery::Create(CapturedConfig, CapturedCache,
-			Query, Result.Error, false, true, false, &CaptureConsumer))
-		{
-			Result.bCanceled = Cancel.Load();
-			if (!Result.bCanceled && Result.Error.StartsWith(TEXT("CapacityBlocked")))
+		FString CallbackBindingError;
+		if (!Request.BindGetBlockReason(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[ReadDependencies, CapturedResources = Resources, CaptureConsumer]
 			{
-				ReadDependencies->CapacityVersion.Store(BeforeBuild);
-				ReadDependencies->bWaitingCapacity.Store(true);
-				Result.bSuccess = true;
-				Result.bContinue = true;
-				Result.Error.Reset();
-			}
-			return Result;
-		}
-		// 原生查询保留构建权限；随后绑定原任务身份，不把它变成项目只读 preflight。
-		FVoxelGenerationPlanningReadScope NativeReads({}, &CapturedStamp, &Cancel, &CaptureConsumer);
-		Query.SetMissingHydrologyObserver(ReadDependencies, [](void* InContext, const FVoxelHydrologyRegionKey& Key)
+				if (!ReadDependencies->bWaitingCapacity.Load()) return EVoxelTaskBlockReason::None;
+				uint64 Version = 0;
+				return CapturedResources->TryGetReleaseVersionExcludingOwner(CaptureConsumer, Version) &&
+					Version > ReadDependencies->CapacityVersion.Load() ? EVoxelTaskBlockReason::None : EVoxelTaskBlockReason::Memory;
+			}, CallbackBindingError))
 		{
-			auto* ReadDependencies = static_cast<FPlanReadDependencies*>(InContext);
-			const auto Missing = MakeDependency(EVoxelGenerationPlanKind::Hydrology, FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0));
-			if (ReadDependencies->Missing.Contains(Missing)) return;
-			if (ReadDependencies->Missing.Num() == MaximumHydrologyDependencies) ReadDependencies->bOverflow = true;
-			else ReadDependencies->Missing.Add(Missing);
-		});
-		switch (Dependency.Kind)
-		{
-		case EVoxelGenerationPlanKind::Hydrology:
-		{
-			FVoxelHydrologyPlanPtr Plan;
-			Result.bSuccess = Query.EnsureHydrologyPlan(Dependency.HydrologyKey,
-				Plan, Result.Error, &Cancel);
-			break;
+			RejectTaskBinding(InDependency, InOutState, CallbackBindingError, BeforeTaskAdmission);
+			return false;
 		}
-		case EVoxelGenerationPlanKind::Cave:
-		{
-			FVoxelCavePlanPtr Plan;
-			Result.bSuccess = Query.EnsureCavePlan(Dependency.TileKey,
-				Plan, Result.Error, &Cancel);
-			break;
-		}
-		case EVoxelGenerationPlanKind::Structure:
-		{
-			FVoxelStructurePlanPtr Plan;
-			Result.bSuccess = Query.EnsureStructurePlan(Dependency.TileKey,
-				Plan, Result.Error, &Cancel);
-			break;
-		}
-		case EVoxelGenerationPlanKind::Feature:
-		{
-			FVoxelFeaturePlanPtr Plan;
-			Result.bSuccess = Query.EnsureFeaturePlan(Dependency.TileKey,
-				Plan, Result.Error, &Cancel);
-			break;
-		}
-		case EVoxelGenerationPlanKind::Ecology:
-		{
-			FVoxelEcologyPlanPtr Plan;
-			Result.bSuccess = Query.EnsureEcologyPlan(Dependency.EcologyKey,
-				Plan, Result.Error, &Cancel);
-			break;
-		}
-		}
-		Result.bCanceled = Cancel.Load();
-		if (ReadDependencies->bOverflow)
-		{
-			Result.bSuccess = false;
-			Result.Error = TEXT("生成事实的实际采样闭包超过上限");
-		}
-		Result.CustomPayload = ReadDependencies;
-		if (!Result.bCanceled && !ReadDependencies->bOverflow && Result.Error.StartsWith(TEXT("CapacityBlocked")))
-		{
-			ReadDependencies->CapacityVersion.Store(BeforeBuild);
-			ReadDependencies->bWaitingCapacity.Store(true);
-			Result.bSuccess = true;
-			Result.bContinue = true;
-			Result.Error.Reset();
-		}
-		return Result;
-	};
-	Request.Apply = [this, WeakStorage = TWeakPtr<FStorage, ESPMode::ThreadSafe>(Storage), Dependency = InDependency](FVoxelTaskResult&& Result)
+	}
+	if (!Request.bExecuteBound)
 	{
-		const auto CapturedStorage = WeakStorage.Pin();
-		if (!CapturedStorage || CapturedStorage->Owner != this) return;
-		FState* State = Storage->States.Find(Dependency);
-		if (!State || Result.Stamp.WorldEpoch != WorldEpoch || Result.Stamp.OwnerId != EnvironmentOwnerId ||
-			Result.Stamp.OwnerIncarnation != EnvironmentOwnerIncarnation || Result.Stamp.Token != State->AttemptId)
-		{
-			return;
-		}
-		State->bInFlight = false;
-		if (!Result.bCanceled && Result.Error.StartsWith(TEXT("DependencyNotReady")))
-		{
-			const auto Reads = StaticCastSharedPtr<const FPlanReadDependencies>(Result.CustomPayload);
-			if (Reads)
+		FString CallbackBindingError;
+		if (!Request.BindExecute(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[Dependency = InDependency, CapturedConfig = Config,
+			CapturedCache = Cache, PrerequisiteRetention = InOutState.PrerequisiteRetention, ReadDependencies,
+			CapturedResources = Resources, CapturedStamp = Request.Stamp, CaptureConsumer](const TAtomic<bool>& Cancel)
 			{
-				FClosureRegistration Registration(*this);
-				int32 Required = State->Prerequisites.Num();
-				for (const auto& Missing : Reads->Missing) if (!State->Prerequisites.Contains(Missing)) ++Required;
-				bool bRegistered = PreparePrerequisites(*State, Required, Result.Error);
-				for (const auto& Missing : Reads->Missing)
+				FVoxelTaskResult Result;
+				if (Cancel.Load())
 				{
-					if (!bRegistered) break;
-					if (!State->Prerequisites.Contains(Missing))
-					{
-						if (State->Prerequisites.Num() == MaximumHydrologyDependencies)
-						{
-							Result.Error = TEXT("生成事实的累计采样闭包超过上限");
-							bRegistered = false;
-							break;
-						}
-						State->Prerequisites.Add(Missing);
-					}
+					Result.bCanceled = true;
+					return Result;
 				}
-				// 注册事实状态先于通知父消费者；下一次 Ensure 原子替换完整订阅闭包。
-				for (const auto& Missing : Reads->Missing)
+				ReadDependencies->bWaitingCapacity.Store(false);
+				ReadDependencies->Missing.Reset();
+				ReadDependencies->bOverflow = false;
+				const uint64 BeforeBuild = CapturedResources->ReleaseVersionExcludingOwner(CaptureConsumer);
+				FVoxelGenerationQuery Query;
+				if (!FVoxelGenerationQuery::Create(CapturedConfig, CapturedCache,
+					Query, Result.Error, false, true, false, &CaptureConsumer, ReadDependencies->Lease.Get()))
 				{
-					if (!bRegistered) break;
-					State = Storage->States.Find(Dependency);
-					if (!State->Prerequisites.Contains(Missing)) continue;
-					FString Error;
-					if (!RegisterClosure(Missing, Registration, Error))
+					Result.bCanceled = Cancel.Load();
+					if (!Result.bCanceled && Result.Error.StartsWith(TEXT("CapacityBlocked")))
 					{
-						Result.Error = MoveTemp(Error);
-						bRegistered = false;
-						break;
+						ReadDependencies->CapacityVersion.Store(BeforeBuild);
+						ReadDependencies->bWaitingCapacity.Store(true);
+						Result.bSuccess = true;
+						Result.bContinue = true;
+						Result.Error.Reset();
+					}
+					return Result;
+				}
+				// 原生查询保留构建权限；随后绑定原任务身份，不把它变成项目只读 preflight。
+				FVoxelGenerationPlanningReadScope NativeReads({}, &CapturedStamp, &Cancel, &CaptureConsumer);
+				Query.SetMissingHydrologyObserver(ReadDependencies, [](void* InContext, const FVoxelHydrologyRegionKey& Key)
+				{
+					auto* ReadDependencies = static_cast<FPlanReadDependencies*>(InContext);
+					const auto Missing = MakeDependency(EVoxelGenerationPlanKind::Hydrology, FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0));
+					if (ReadDependencies->Missing.Contains(Missing)) return;
+					if (ReadDependencies->Missing.Num() == MaximumHydrologyDependencies) ReadDependencies->bOverflow = true;
+					else ReadDependencies->Missing.Add(Missing);
+				});
+				switch (Dependency.Kind)
+				{
+				case EVoxelGenerationPlanKind::Hydrology:
+				{
+					FVoxelHydrologyPlanPtr Plan;
+					Result.bSuccess = Query.EnsureHydrologyPlan(Dependency.HydrologyKey,
+						Plan, Result.Error, &Cancel);
+					break;
+				}
+				case EVoxelGenerationPlanKind::Cave:
+				{
+					FVoxelCavePlanPtr Plan;
+					Result.bSuccess = Query.EnsureCavePlan(Dependency.TileKey,
+						Plan, Result.Error, &Cancel);
+					break;
+				}
+				case EVoxelGenerationPlanKind::Structure:
+				{
+					FVoxelStructurePlanPtr Plan;
+					Result.bSuccess = Query.EnsureStructurePlan(Dependency.TileKey,
+						Plan, Result.Error, &Cancel);
+					break;
+				}
+				case EVoxelGenerationPlanKind::Feature:
+				{
+					FVoxelFeaturePlanPtr Plan;
+					Result.bSuccess = Query.EnsureFeaturePlan(Dependency.TileKey,
+						Plan, Result.Error, &Cancel);
+					break;
+				}
+				case EVoxelGenerationPlanKind::Ecology:
+				{
+					FVoxelEcologyPlanPtr Plan;
+					Result.bSuccess = Query.EnsureEcologyPlan(Dependency.EcologyKey,
+						Plan, Result.Error, &Cancel);
+					break;
+				}
+				}
+				Result.bCanceled = Cancel.Load();
+				if (ReadDependencies->bOverflow)
+				{
+					Result.bSuccess = false;
+					Result.Error = TEXT("生成事实的实际采样闭包超过上限");
+				}
+				Result.CustomPayload = ReadDependencies;
+				if (!Result.bCanceled && !ReadDependencies->bOverflow && Result.Error.StartsWith(TEXT("CapacityBlocked")))
+				{
+					ReadDependencies->CapacityVersion.Store(BeforeBuild);
+					ReadDependencies->bWaitingCapacity.Store(true);
+					Result.bSuccess = true;
+					Result.bContinue = true;
+					Result.Error.Reset();
+				}
+				return Result;
+			}, CallbackBindingError))
+		{
+			RejectTaskBinding(InDependency, InOutState, CallbackBindingError, BeforeTaskAdmission);
+			return false;
+		}
+	}
+	if (!Request.bApplyBound)
+	{
+		FString CallbackBindingError;
+		if (!Request.BindApply(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[this, WeakStorage = TWeakPtr<FStorage, ESPMode::ThreadSafe>(Storage), Dependency = InDependency](FVoxelTaskResult&& Result)
+			{
+				const auto CapturedStorage = WeakStorage.Pin();
+				if (!CapturedStorage || CapturedStorage->Owner != this) return;
+				FState* State = Storage->States.Find(Dependency);
+				if (!State || Result.Stamp.WorldEpoch != WorldEpoch || Result.Stamp.OwnerId != EnvironmentOwnerId ||
+					Result.Stamp.OwnerIncarnation != EnvironmentOwnerIncarnation || Result.Stamp.Token != State->AttemptId)
+				{
+					return;
+				}
+				State->bInFlight = false;
+				if (!Result.bCanceled && Result.Error.StartsWith(TEXT("DependencyNotReady")))
+				{
+					const auto Reads = StaticCastSharedPtr<const FPlanReadDependencies>(Result.CustomPayload);
+					if (Reads)
+					{
+						FClosureRegistration Registration(*this);
+						int32 Required = State->Prerequisites.Num();
+						for (const auto& Missing : Reads->Missing) if (!State->Prerequisites.Contains(Missing)) ++Required;
+						bool bRegistered = PreparePrerequisites(*State, Required, Result.Error);
+						for (const auto& Missing : Reads->Missing)
+						{
+							if (!bRegistered) break;
+							if (!State->Prerequisites.Contains(Missing))
+							{
+								if (State->Prerequisites.Num() == MaximumHydrologyDependencies)
+								{
+									Result.Error = TEXT("生成事实的累计采样闭包超过上限");
+									bRegistered = false;
+									break;
+								}
+								State->Prerequisites.Add(Missing);
+							}
+						}
+						// 注册事实状态先于通知父消费者；下一次 Ensure 原子替换完整订阅闭包。
+						for (const auto& Missing : Reads->Missing)
+						{
+							if (!bRegistered) break;
+							State = Storage->States.Find(Dependency);
+							if (!State->Prerequisites.Contains(Missing)) continue;
+							FString Error;
+							if (!RegisterClosure(Missing, Registration, Error))
+							{
+								Result.Error = MoveTemp(Error);
+								bRegistered = false;
+								break;
+							}
+						}
+						State = Storage->States.Find(Dependency);
+						const int64 Side = Dependency.Kind == EVoxelGenerationPlanKind::Ecology ?
+							FVoxelGenerationQuery::EcologyTileSide : FVoxelGenerationQuery::GenerationPlanTileSide;
+						const FVoxelGenerationConsumerKey RetentionConsumer{EVoxelGenerationConsumerKind::WorldFact, Result.Stamp.WorldEpoch,
+							Result.Stamp.OwnerId, Result.Stamp.OwnerIncarnation, EVoxelGenerationSpatialKind::Section,
+							Result.Stamp.Section, Result.Stamp.Section, Result.Stamp.Token};
+						FString RetentionError;
+						State->bPrerequisiteRetentionPending = true;
+						if (!RetainDependencies(State->Prerequisites,
+							FIntPoint(int32(FMath::Clamp<int64>(int64(Dependency.Coordinate().X) * Side, MIN_int32, MAX_int32)),
+								int32(FMath::Clamp<int64>(int64(Dependency.Coordinate().Y) * Side, MIN_int32, MAX_int32))),
+							RetentionConsumer, State->PrerequisiteRetention, RetentionError))
+						{
+							Result.Error = MoveTemp(RetentionError);
+							bRegistered = false;
+						}
+						else State->bPrerequisiteRetentionPending = false;
+						if (bRegistered)
+						{
+							FString GraphError;
+							if (SetFactDependencies(Dependency, GraphError)) Registration.Commit();
+							else Result.Error = MoveTemp(GraphError);
+						}
 					}
 				}
 				State = Storage->States.Find(Dependency);
-				const int64 Side = Dependency.Kind == EVoxelGenerationPlanKind::Ecology ?
-					FVoxelGenerationQuery::EcologyTileSide : FVoxelGenerationQuery::GenerationPlanTileSide;
-				const FVoxelGenerationConsumerKey RetentionConsumer{EVoxelGenerationConsumerKind::WorldFact, Result.Stamp.WorldEpoch,
-					Result.Stamp.OwnerId, Result.Stamp.OwnerIncarnation, EVoxelGenerationSpatialKind::Section,
-					Result.Stamp.Section, Result.Stamp.Section, Result.Stamp.Token};
-				FString RetentionError;
-				State->bPrerequisiteRetentionPending = true;
-				if (!RetainDependencies(State->Prerequisites,
-					FIntPoint(int32(FMath::Clamp<int64>(int64(Dependency.Coordinate().X) * Side, MIN_int32, MAX_int32)),
-						int32(FMath::Clamp<int64>(int64(Dependency.Coordinate().Y) * Side, MIN_int32, MAX_int32))),
-					RetentionConsumer, State->PrerequisiteRetention, RetentionError))
+				check(State);
+				ON_SCOPE_EXIT
 				{
-					Result.Error = MoveTemp(RetentionError);
-					bRegistered = false;
-				}
-				else State->bPrerequisiteRetentionPending = false;
-				if (bRegistered)
+					WakeConsumers(Dependency);
+					const FState* Current = Storage->States.Find(Dependency);
+					if (Current && Current->Donations.IsEmpty() && Current->State != EVoxelPlanDependencyState::Queued)
+					{
+						ForgetFact(Dependency);
+					}
+				};
+				if (Result.bCanceled || Result.Error.StartsWith(TEXT("DependencyNotReady")) ||
+					Result.Error.StartsWith(TEXT("CapacityBlocked")))
 				{
-					FString GraphError;
-					if (SetFactDependencies(Dependency, GraphError)) Registration.Commit();
-					else Result.Error = MoveTemp(GraphError);
+					State->State = EVoxelPlanDependencyState::Missing;
+					return;
 				}
-			}
-		}
-		State = Storage->States.Find(Dependency);
-		check(State);
-		ON_SCOPE_EXIT
+				if (Result.bSuccess)
+				{
+					Result.MarkWorkUsed();
+					State->State = EVoxelPlanDependencyState::Ready;
+					State->Error.Reset();
+					return;
+				}
+				State->State = EVoxelPlanDependencyState::Failed;
+				State->Error = MoveTemp(Result.Error);
+				UE_LOG(LogTemp, Error, TEXT("Voxel plan build failed: kind=%d key=%s error=%s"),
+					static_cast<int32>(Dependency.Kind), *Dependency.Coordinate().ToString(),
+					*State->Error);
+			}, CallbackBindingError))
 		{
-			WakeConsumers(Dependency);
-			const FState* Current = Storage->States.Find(Dependency);
-			if (Current && Current->Donations.IsEmpty() && Current->State != EVoxelPlanDependencyState::Queued)
-			{
-				ForgetFact(Dependency);
-			}
-		};
-		if (Result.bCanceled || Result.Error.StartsWith(TEXT("DependencyNotReady")) ||
-			Result.Error.StartsWith(TEXT("CapacityBlocked")))
-		{
-			State->State = EVoxelPlanDependencyState::Missing;
-			return;
+			RejectTaskBinding(InDependency, InOutState, CallbackBindingError, BeforeTaskAdmission);
+			return false;
 		}
-		if (Result.bSuccess)
-		{
-			Result.MarkWorkUsed();
-			State->State = EVoxelPlanDependencyState::Ready;
-			State->Error.Reset();
-			return;
-		}
-		State->State = EVoxelPlanDependencyState::Failed;
-		State->Error = MoveTemp(Result.Error);
-		UE_LOG(LogTemp, Error, TEXT("Voxel plan build failed: kind=%d key=%s error=%s"),
-			static_cast<int32>(Dependency.Kind), *Dependency.Coordinate().ToString(),
-			*State->Error);
-	};
-	if (!Scheduler.Enqueue(MoveTemp(Request))) return false;
+	}
+	// Scheduler 的成功入队会 Pump 并通知外部；Request 与槽引用必须在调用前分离。
+	const auto AdmissionStorage = Storage;
+	const FGuid AdmissionNode = InOutState.PriorityNode;
+	const FVoxelTaskStamp AdmissionStamp = Request.Stamp;
+	FVoxelTaskRequest Submission = MoveTemp(Request);
+	UnlinkPendingAdmission(InOutState);
+	InOutState.PendingRequest.Reset();
+	InOutState.PendingReadDependencies.Reset();
 	InOutState.bAttemptPendingAdmission = false;
+	InOutState.bWaitingTaskCapacity = false;
+	InOutState.bWaitingCapacity = false;
 	InOutState.State = EVoxelPlanDependencyState::Queued;
 	InOutState.bInFlight = true;
-	return true;
+	if (Scheduler.Enqueue(MoveTemp(Submission)))
+	{
+		return true;
+	}
+	if (Storage != AdmissionStorage || !Storage || Storage->Owner != this ||
+		AdmissionStamp.OwnerIncarnation != EnvironmentOwnerIncarnation)
+	{
+		return false;
+	}
+	auto* Current = Storage->States.Find(InDependency);
+	if (!Current || Current->PriorityNode != AdmissionNode || Current->AttemptId != AdmissionStamp.Token ||
+		Current->PendingRequest.IsSet() || !Current->bInFlight || Current->State != EVoxelPlanDependencyState::Queued ||
+		Submission.GenerationConsumer != CaptureConsumer)
+	{
+		return false;
+	}
+	Current->bInFlight = false;
+	Current->State = EVoxelPlanDependencyState::Missing;
+	Current->bAttemptPendingAdmission = true;
+	Current->PendingReadDependencies = ReadDependencies;
+	Current->PendingRequest.Emplace(MoveTemp(Submission));
+	const auto Reason = Current->PendingRequest.GetValue().Blocked;
+	{
+		const uint16 Reasons = static_cast<uint16>(Reason);
+		if (Reasons & (static_cast<uint16>(EVoxelTaskBlockReason::Oversized) | static_cast<uint16>(EVoxelTaskBlockReason::TerminalFailure)))
+		{
+			FailAdmission(InDependency, *Current, Reasons & static_cast<uint16>(EVoxelTaskBlockReason::Oversized) ?
+				TEXT("Oversized: generation task admission is unreachable") : TEXT("InvalidRequest: generation task admission rejected"), Reason);
+		}
+		else
+		{
+			WaitForTaskAdmission(*Current, BeforeTaskAdmission, Reason);
+		}
+	}
+	return false;
 }
 
 FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
@@ -928,6 +1229,11 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 		const bool bCached = IsCached(Dependency);
 		if (bCached)
 		{
+			if (State.PendingRequest.IsSet())
+			{
+				ClearPendingRequest(State);
+				WakeConsumers(Dependency);
+			}
 			State.State = EVoxelPlanDependencyState::Ready;
 			State.Error.Reset();
 		}
@@ -946,8 +1252,21 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 	{
 		const auto Dependency = Storage->PriorityFacts.FindChecked(Node);
 		auto& State = Storage->States.FindChecked(Dependency);
+		const FGuid Next = State.NextDesired;
 		if (State.State == EVoxelPlanDependencyState::Missing && !State.bInFlight && ArePrerequisitesReady(State)) Queue(Dependency, State);
-		Node = State.NextDesired;
+		if (Storage != Desired.CapturedStorage || !Storage || Storage->Owner != this || !Storage->Consumers.Contains(InConsumer))
+		{
+			Status.bReady = false;
+			return Status;
+		}
+		const auto* Current = Storage->States.Find(Dependency);
+		if (Current && Current->State == EVoxelPlanDependencyState::Failed)
+		{
+			Status.bReady = false;
+			Status.bFailed = true;
+			Status.Error = Current->Error;
+		}
+		Node = Next;
 	}
 	RefreshQueuedPriorities();
 	return Status;
@@ -958,33 +1277,51 @@ void FVoxelGenerationPlanCoordinator::Reset()
 	check(IsInGameThread());
 	check(EnvironmentOwnerIncarnation != MAX_uint64 && ControlConsumer.OwnerIncarnation != MAX_uint64);
 	const uint64 PreviousIncarnation = EnvironmentOwnerIncarnation++;
+	if (Storage)
+	{
+		// 先解除本地未入队捕获，再撤销 Scheduler 中的旧代。
+		Storage->Owner = nullptr;
+		for (auto& Pair : Storage->States)
+		{
+			ClearPendingRequest(Pair.Value);
+		}
+	}
+	// 在任何 Scheduler 通知之前撤掉旧存储，重入的新代不能被本次 Reset 再删除。
+	auto RetiringStorage = MoveTemp(Storage);
+	++ControlConsumer.OwnerIncarnation;
+	PriorityGraph.Reset();
 	Scheduler.CancelMatching([Epoch = WorldEpoch, Owner = EnvironmentOwnerId, PreviousIncarnation](EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
 	{
 		return Kind == EVoxelTaskKind::BuildGenerationPlan && Stamp.WorldEpoch == Epoch &&
 			Stamp.OwnerId == Owner && Stamp.OwnerIncarnation == PreviousIncarnation;
 	});
-	if (Storage) Storage->Owner = nullptr;
-	Storage.Reset();
-	++ControlConsumer.OwnerIncarnation;
-	PriorityGraph.Reset();
 }
 
 void FVoxelGenerationPlanCoordinator::ReleaseConsumer(const FVoxelGenerationConsumerKey& InConsumer)
 {
 	check(IsInGameThread());
 	if (!Storage) return;
+	const auto CapturedStorage = Storage;
 	if (auto* Consumer = Storage->Consumers.Find(InConsumer))
 	{
 		const FGuid Node = Consumer->PriorityNode;
-		for (auto Edge = Consumer->Dependencies.CreateIterator(); Edge; ++Edge)
+		for (auto& Edge : Consumer->Dependencies)
 		{
-			UnlinkSubscriptionWake(*Consumer, Edge.Value());
-			RemoveSubscription(Edge.Key(), InConsumer, Edge.Value().Id);
-			Edge.RemoveCurrent();
+			UnlinkSubscriptionWake(*Consumer, Edge.Value);
 		}
 		UnlinkConsumerWake(*Consumer);
-		PriorityGraph.Remove(Node);
+		// 先脱离可重入查找表，再逐个撤销；旧依赖正文与授额在局部一起持有。
+		FConsumerState Releasing = MoveTemp(*Consumer);
 		Storage->Consumers.Remove(InConsumer);
+		PriorityGraph.Remove(Node);
+		for (const auto& Edge : Releasing.Dependencies)
+		{
+			RemoveSubscription(Edge.Key, InConsumer, Edge.Value.Id);
+			if (Storage != CapturedStorage || !Storage || Storage->Owner != this)
+			{
+				return;
+			}
+		}
 	}
 	if (InConsumer.Kind == EVoxelGenerationConsumerKind::Environment)
 	{
@@ -1136,8 +1473,11 @@ void FVoxelGenerationPlanCoordinator::WakeConsumers(const FVoxelGenerationPlanDe
 int32 FVoxelGenerationPlanCoordinator::AdvanceConsumerWakes(const double InDeadline, const int32 InMaximumEdges)
 {
 	check(IsInGameThread());
+	const int32 Maximum = FMath::Max(0, InMaximumEdges);
+	const int32 AdmissionBudget = Storage && Storage->WakeHead.IsValid() ? Maximum / 2 : Maximum;
+	const int32 AdmissionSteps = AdvancePendingAdmissions(InDeadline, AdmissionBudget);
 	int32 Processed = 0;
-	while (Storage && Storage->WakeHead.IsValid() && Processed < FMath::Max(0, InMaximumEdges) && FPlatformTime::Seconds() <= InDeadline)
+	while (Storage && Storage->WakeHead.IsValid() && Processed < Maximum - AdmissionSteps && FPlatformTime::Seconds() <= InDeadline)
 	{
 		const auto ConsumerKey = Storage->WakeHead;
 		auto& Consumer = Storage->Consumers.FindChecked(ConsumerKey);
@@ -1179,17 +1519,23 @@ FVoxelGenerationConsumerKey FVoxelGenerationPlanCoordinator::EnvironmentConsumer
 
 FVoxelGenerationPlanCoordinator::FClosureRegistration::FClosureRegistration(FVoxelGenerationPlanCoordinator& InOwner)
 	: Owner(InOwner)
+	, CapturedStorage(InOwner.Storage)
 {
 }
 
 FVoxelGenerationPlanCoordinator::FClosureRegistration::~FClosureRegistration()
 {
-	while (Head.IsValid())
+	if (Owner.Storage != CapturedStorage)
+	{
+		return;
+	}
+	while (Head.IsValid() && Owner.Storage == CapturedStorage)
 	{
 		const auto Dependency = Owner.Storage->PriorityFacts.FindChecked(Head);
 		auto& State = Owner.Storage->States.FindChecked(Dependency);
 		Head = State.NextRegistration;
 		State.NextRegistration.Invalidate();
+		State.bRegistrationPending = false;
 		if (!bCommitted)
 		{
 			check(State.Donations.IsEmpty() && !State.bInFlight);
@@ -1201,27 +1547,45 @@ FVoxelGenerationPlanCoordinator::FClosureRegistration::~FClosureRegistration()
 void FVoxelGenerationPlanCoordinator::FClosureRegistration::Add(FState& InState)
 {
 	InState.NextRegistration = Head;
+	InState.bRegistrationPending = true;
 	Head = InState.PriorityNode;
 }
 
 void FVoxelGenerationPlanCoordinator::FClosureRegistration::Commit()
 {
 	bCommitted = true;
+	while (Head.IsValid())
+	{
+		auto& State = CapturedStorage->States.FindChecked(CapturedStorage->PriorityFacts.FindChecked(Head));
+		Head = State.NextRegistration;
+		State.NextRegistration.Invalidate();
+		State.bRegistrationPending = false;
+	}
 }
 
 FVoxelGenerationPlanCoordinator::FClosureDemand::FClosureDemand(FVoxelGenerationPlanCoordinator& InOwner)
 	: Owner(InOwner)
+	, CapturedStorage(InOwner.Storage)
 {
 }
 
 FVoxelGenerationPlanCoordinator::FClosureDemand::~FClosureDemand()
 {
-	while (Head.IsValid())
+	if (Owner.Storage != CapturedStorage)
 	{
-		auto& State = Owner.Storage->States.FindChecked(Owner.Storage->PriorityFacts.FindChecked(Head));
+		return;
+	}
+	while (Head.IsValid() && Owner.Storage == CapturedStorage)
+	{
+		const auto Dependency = CapturedStorage->PriorityFacts.FindChecked(Head);
+		auto& State = CapturedStorage->States.FindChecked(Dependency);
 		Head = State.NextDesired;
 		State.NextDesired.Invalidate();
 		State.bDesired = false;
+		if (State.Donations.IsEmpty() && !State.bInFlight && !Owner.PriorityGraph.HasConsumers(State.PriorityNode))
+		{
+			Owner.ForgetFact(Dependency);
+		}
 	}
 }
 
@@ -1368,16 +1732,42 @@ void FVoxelGenerationPlanCoordinator::ForgetFact(const FVoxelGenerationPlanDepen
 {
 	if (auto* State = Storage->States.Find(InDependency))
 	{
+		// 同步 Enqueue 通知可释放消费者；原 Ensure 闭包结束后再移除其正在遍历的槽。
+		if (State->bDesired || State->bRegistrationPending)
+		{
+			return;
+		}
 		const auto Node = State->PriorityNode;
+		const uint64 Attempt = State->AttemptId;
+		const auto CapturedStorage = Storage;
+		const uint64 Incarnation = EnvironmentOwnerIncarnation;
+		ClearPendingRequest(*State);
 		auto PrerequisitesLease = MoveTemp(State->PrerequisitesLease);
 		auto Prerequisites = MoveTemp(State->Prerequisites);
 		PriorityGraph.Remove(Node);
 		Storage->PriorityFacts.Remove(Node);
 		Storage->States.Remove(InDependency);
+		if (Attempt)
+		{
+			Scheduler.CancelMatching([Attempt, Epoch = WorldEpoch, Owner = EnvironmentOwnerId,
+				Incarnation](EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
+			{
+				return Kind == EVoxelTaskKind::BuildGenerationPlan && Stamp.WorldEpoch == Epoch && Stamp.OwnerId == Owner &&
+					Stamp.OwnerIncarnation == Incarnation && Stamp.Token == Attempt;
+			});
+		}
+		if (Storage != CapturedStorage || !Storage || Storage->Owner != this)
+		{
+			return;
+		}
 		if (bReleasePrerequisites)
 		{
 			for (const auto& Prerequisite : Prerequisites)
 			{
+				if (Storage != CapturedStorage || !Storage || Storage->Owner != this)
+				{
+					break;
+				}
 				const auto* Child = Storage->States.Find(Prerequisite);
 				if (Child && Child->Donations.IsEmpty() && !Child->bInFlight && !PriorityGraph.HasConsumers(Child->PriorityNode))
 					ForgetFact(Prerequisite);
@@ -1389,6 +1779,7 @@ void FVoxelGenerationPlanCoordinator::ForgetFact(const FVoxelGenerationPlanDepen
 void FVoxelGenerationPlanCoordinator::ReleaseEnvironment(const FIntPoint& InCell)
 {
 	if (!Storage) return;
+	const auto CapturedStorage = Storage;
 	const FIntVector Cell(InCell.X, InCell.Y, 0);
 	const FVoxelGenerationConsumerKey Space{EVoxelGenerationConsumerKind::Environment, WorldEpoch, EnvironmentOwnerId, EnvironmentOwnerIncarnation,
 		EVoxelGenerationSpatialKind::Column, Cell, Cell, 1};
@@ -1396,6 +1787,9 @@ void FVoxelGenerationPlanCoordinator::ReleaseEnvironment(const FIntPoint& InCell
 	{
 		const auto Consumer = *Current;
 		ReleaseConsumer(Consumer);
-		Storage->EnvironmentAttempts.Remove(Space);
+		if (Storage == CapturedStorage && Storage && Storage->Owner == this)
+		{
+			Storage->EnvironmentAttempts.Remove(Space);
+		}
 	}
 }

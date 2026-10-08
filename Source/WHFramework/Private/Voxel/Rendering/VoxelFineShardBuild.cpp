@@ -350,11 +350,12 @@ EVoxelFineBuildProgress FVoxelFineShardSampler::Advance(const int32 InMaximumSec
 	for (int32 Work = 0; Work < InMaximumSections && RequiredSections.IsValidIndex(NextSection); ++Work)
 	{
 		const FIntVector Key = RequiredSections[NextSection];
-		TArray<FVoxelBlockState> Blocks;
+		TArray<FVoxelBlockState, TFixedAllocator<4096>> Blocks;
+		Blocks.SetNumUninitialized(4096);
 		const int64 SectionMinZ = int64(Key.Z) * 16;
 		if (SectionMinZ >= WorldMinZ && SectionMinZ + 16 <= WorldMaxZ)
 		{
-			if (!Generator->GenerateSection(Key, Blocks, OutError, &InCancel))
+			if (!Generator->GenerateSection(Key, MakeArrayView(Blocks), OutError, &InCancel))
 			{
 				if (InCancel.Load())
 				{

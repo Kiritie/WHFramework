@@ -9,6 +9,7 @@
 #include "Voxel/Rendering/VoxelStreamingGeometry.h"
 #include "Voxel/Runtime/VoxelBlockState.h"
 #include "Voxel/Rendering/VoxelTerrainStatistics.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 
 struct FVoxelSectionCollisionResult;
 struct FVoxelSectionMeshResult;
@@ -151,7 +152,10 @@ struct WHFRAMEWORK_API FVoxelTaskResult
 	FVoxelTaskResult(const FVoxelTaskResult&) = delete;
 	FVoxelTaskResult& operator=(const FVoxelTaskResult&) = delete;
 	FVoxelTaskResult(FVoxelTaskResult&&) = default;
-	FVoxelTaskResult& operator=(FVoxelTaskResult&&) = default;
+	FVoxelTaskResult& operator=(FVoxelTaskResult&& InOther);
+
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InputResourceLease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> OutputResourceLease;
 
 	EVoxelTaskKind Kind = EVoxelTaskKind::None;
 	FVoxelTaskStamp Stamp;
@@ -187,8 +191,6 @@ struct WHFRAMEWORK_API FVoxelTaskResult
 	TSharedPtr<const FVoxelFineOverlayReadResult, ESPMode::ThreadSafe> OverlayReadResult;
 
 	TSharedPtr<const FVoxelTaskCustomPayload, ESPMode::ThreadSafe> CustomPayload;
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InputResourceLease;
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> OutputResourceLease;
 	TSharedPtr<FVoxelTerrainWorkReceipt, ESPMode::ThreadSafe> WorkReceipt;
 	void MarkWorkUsed() const { if (WorkReceipt) WorkReceipt->Resolve(true); }
 
@@ -199,6 +201,26 @@ struct WHFRAMEWORK_API FVoxelTaskResult
 
 struct WHFRAMEWORK_API FVoxelTaskRequest
 {
+	FVoxelTaskRequest() = default;
+	~FVoxelTaskRequest() = default;
+	FVoxelTaskRequest(const FVoxelTaskRequest&) = delete;
+	FVoxelTaskRequest& operator=(const FVoxelTaskRequest&) = delete;
+	FVoxelTaskRequest(FVoxelTaskRequest&&) = default;
+	FVoxelTaskRequest& operator=(FVoxelTaskRequest&& InOther);
+#if WITH_DEV_AUTOMATION_TESTS
+	// 仅纯选择夹具；不复制回调、租约或回执，返回值不可用于原生接纳。
+	FVoxelTaskRequest MakePriorityCopy() const;
+#endif
+
+	// 捕获先销毁，再释放对应原账本租约；绑定后不得直接替换函数。
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ExecuteBindingLease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ApplyBindingLease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> BlockBindingLease;
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> BindingResources;
+	FVoxelGenerationConsumerKey BindingConsumer;
+	bool bExecuteBound = false;
+	bool bApplyBound = false;
+	bool bBlockBound = false;
 	// 在排队前冻结实际调用者；续跑沿用完整键，不从缓存控制身份推导。
 	FVoxelGenerationConsumerKey GenerationConsumer;
 	TSharedPtr<FVoxelTerrainWorkReceipt, ESPMode::ThreadSafe> WorkReceipt;
@@ -225,6 +247,10 @@ struct WHFRAMEWORK_API FVoxelTaskRequest
 
 	double AccumulatedExecuteMilliseconds = 0.0;
 	bool bResumable = false;
+	bool bNativeCapacityBlocked = false;
+	uint64 NativeCapacityVersion = 0;
+	bool bReceiptCapacityBlocked = false;
+	uint64 ReceiptCapacityVersion = 0;
 	TFunction<EVoxelTaskBlockReason()> GetBlockReason;
 	TFunction<FVoxelTaskResult(const TAtomic<bool>&)> Execute;
 
@@ -233,6 +259,166 @@ struct WHFRAMEWORK_API FVoxelTaskRequest
 	 * 为空时回到 UVoxelModule::ApplyTask。
 	 */
 	TFunction<void(FVoxelTaskResult&&)> Apply;
+
+	template<typename FunctorType>
+	bool BindExecute(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+		const FVoxelGenerationConsumerKey& InConsumer, FunctorType&& InFunction, FString& OutError)
+	{
+		return BindFunction(InResources, InConsumer, Forward<FunctorType>(InFunction), Execute,
+			ExecuteBindingLease, bExecuteBound, ExecuteBindingBytes, ExecuteBindingCount, OutError);
+	}
+
+	template<typename FunctorType>
+	bool BindApply(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+		const FVoxelGenerationConsumerKey& InConsumer, FunctorType&& InFunction, FString& OutError)
+	{
+		return BindFunction(InResources, InConsumer, Forward<FunctorType>(InFunction), Apply,
+			ApplyBindingLease, bApplyBound, ApplyBindingBytes, ApplyBindingCount, OutError);
+	}
+
+	template<typename FunctorType>
+	bool BindGetBlockReason(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+		const FVoxelGenerationConsumerKey& InConsumer, FunctorType&& InFunction, FString& OutError)
+	{
+		return BindFunction(InResources, InConsumer, Forward<FunctorType>(InFunction), GetBlockReason,
+			BlockBindingLease, bBlockBound, BlockBindingBytes, BlockBindingCount, OutError);
+	}
+
+	template<typename FactoryType>
+	bool WrapExecute(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+		const FVoxelGenerationConsumerKey& InConsumer, FactoryType&& InFactory, FString& OutError)
+	{
+		return WrapFunction(InResources, InConsumer, Forward<FactoryType>(InFactory), Execute,
+			ExecuteBindingLease, bExecuteBound, ExecuteBindingBytes, ExecuteBindingCount, OutError);
+	}
+
+	template<typename FactoryType>
+	bool WrapApply(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+		const FVoxelGenerationConsumerKey& InConsumer, FactoryType&& InFactory, FString& OutError)
+	{
+		return WrapFunction(InResources, InConsumer, Forward<FactoryType>(InFactory), Apply,
+			ApplyBindingLease, bApplyBound, ApplyBindingBytes, ApplyBindingCount, OutError);
+	}
+
+	uint64 GetBindingBytes() const { return ExecuteBindingBytes + ApplyBindingBytes + BlockBindingBytes; }
+	int32 GetBindingLeaseCount() const { return ExecuteBindingCount + ApplyBindingCount + BlockBindingCount; }
+	uint64 GetRequiredBindingInputBytes() const { return RequiredBindingInputBytes; }
+	int32 GetRequiredBindingInputLeaseCount() const { return RequiredBindingInputLeaseCount; }
+	void SetRequiredBindingInput(const uint64 InBytes, const int32 InLeaseCount)
+	{
+		check(InLeaseCount >= 0);
+		RequiredBindingInputBytes = InBytes;
+		RequiredBindingInputLeaseCount = InLeaseCount;
+	}
+
+private:
+	uint64 ExecuteBindingBytes = 0;
+	uint64 ApplyBindingBytes = 0;
+	uint64 BlockBindingBytes = 0;
+	int32 ExecuteBindingCount = 0;
+	int32 ApplyBindingCount = 0;
+	int32 BlockBindingCount = 0;
+	uint64 RequiredBindingInputBytes = 0;
+	int32 RequiredBindingInputLeaseCount = 0;
+
+	template<typename SignatureType, typename FunctorType>
+	bool BindFunction(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+		const FVoxelGenerationConsumerKey& InConsumer, FunctorType&& InFunction,
+		TFunction<SignatureType>& OutFunction,
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutLease, bool& bOutBound,
+		uint64& OutBytes, int32& OutCount, FString& OutError)
+	{
+		using FFunctor = std::decay_t<FunctorType>;
+		static_assert(!std::is_same_v<FFunctor, TFunction<SignatureType>>, "Bind the concrete callable before TFunction allocates");
+		if (!InConsumer.IsValid() || (BindingResources &&
+			(BindingResources.Get() != &InResources.Get() || BindingConsumer != InConsumer)))
+		{
+			OutError = TEXT("InvalidConsumer: scheduler callback binding domain mismatch");
+			return false;
+		}
+		const uint64 Bytes = VoxelBoundedAllocation::FunctionBytes<FFunctor, false>();
+		if (GetBindingBytes() > MAX_uint64 - RequiredBindingInputBytes ||
+			GetBindingLeaseCount() > MAX_int32 - RequiredBindingInputLeaseCount)
+		{
+			OutError = TEXT("Oversized: scheduler callback required input overflow");
+			return false;
+		}
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> CandidateLease;
+		if (Bytes)
+		{
+			const auto Admission = InResources->TryAcquire(InConsumer, EVoxelTerrainResourcePool::Input,
+				Bytes, CandidateLease, 0, GetBindingBytes() + RequiredBindingInputBytes,
+				GetBindingLeaseCount() + RequiredBindingInputLeaseCount);
+			if (Admission != EVoxelTerrainResourceAdmission::Granted)
+			{
+				OutError = Admission == EVoxelTerrainResourceAdmission::InvalidRequest ?
+					TEXT("InvalidConsumer: scheduler callback admission request") : Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+					TEXT("Oversized: scheduler callback binding peak is unreachable") : TEXT("CapacityBlocked: scheduler callback binding input");
+				return false;
+			}
+		}
+		TFunction<SignatureType> Candidate(Forward<FunctorType>(InFunction));
+		OutFunction = nullptr;
+		OutFunction = MoveTemp(Candidate);
+		OutLease = MoveTemp(CandidateLease);
+		OutBytes = Bytes;
+		OutCount = int32(OutLease.IsValid());
+		BindingResources = InResources;
+		BindingConsumer = InConsumer;
+		bOutBound = true;
+		OutError.Reset();
+		return true;
+	}
+
+	// Factory 必须以明确成员生命周期同时持有原函数及原租约，并先销毁函数再退租。
+	template<typename SignatureType, typename FactoryType>
+	bool WrapFunction(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+		const FVoxelGenerationConsumerKey& InConsumer, FactoryType&& InFactory,
+		TFunction<SignatureType>& OutFunction,
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutLease, const bool bInBound,
+		uint64& OutBytes, int32& OutCount, FString& OutError)
+	{
+		using FLease = TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>;
+		using FFunctor = std::decay_t<decltype(std::declval<FactoryType>()(
+			std::declval<TFunction<SignatureType>&&>(), std::declval<FLease>()))>;
+		static_assert(!std::is_same_v<FFunctor, TFunction<SignatureType>>, "Wrap with a concrete callable before TFunction allocates");
+		if (!bInBound || !OutFunction || !InConsumer.IsValid() ||
+			BindingResources.Get() != &InResources.Get() || BindingConsumer != InConsumer)
+		{
+			OutError = TEXT("InvalidConsumer: scheduler callback wrapper domain mismatch");
+			return false;
+		}
+		const uint64 Bytes = VoxelBoundedAllocation::FunctionBytes<FFunctor, false>();
+		if (GetBindingBytes() > MAX_uint64 - RequiredBindingInputBytes ||
+			Bytes > MAX_uint64 - GetBindingBytes() - RequiredBindingInputBytes ||
+			GetBindingLeaseCount() >= MAX_int32 - RequiredBindingInputLeaseCount)
+		{
+			OutError = TEXT("Oversized: scheduler callback wrapper peak overflow");
+			return false;
+		}
+		FLease CandidateLease;
+		if (Bytes)
+		{
+			const auto Admission = InResources->TryAcquire(InConsumer, EVoxelTerrainResourcePool::Input,
+				Bytes, CandidateLease, 0, GetBindingBytes() + RequiredBindingInputBytes,
+				GetBindingLeaseCount() + RequiredBindingInputLeaseCount);
+			if (Admission != EVoxelTerrainResourceAdmission::Granted)
+			{
+				OutError = Admission == EVoxelTerrainResourceAdmission::InvalidRequest ?
+					TEXT("InvalidConsumer: scheduler wrapper admission request") : Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+					TEXT("Oversized: scheduler callback wrapper peak is unreachable") : TEXT("CapacityBlocked: scheduler callback wrapper input");
+				return false;
+			}
+		}
+		FFunctor Wrapped = Forward<FactoryType>(InFactory)(MoveTemp(OutFunction), MoveTemp(OutLease));
+		TFunction<SignatureType> Candidate(MoveTemp(Wrapped));
+		OutFunction = MoveTemp(Candidate);
+		OutLease = MoveTemp(CandidateLease);
+		OutBytes += Bytes;
+		OutCount += int32(OutLease.IsValid());
+		OutError.Reset();
+		return true;
+	}
 };
 
 struct WHFRAMEWORK_API FVoxelTaskBudget
@@ -274,6 +460,10 @@ struct WHFRAMEWORK_API FVoxelTaskKindDiagnostics
 
 struct WHFRAMEWORK_API FVoxelTaskDiagnostics
 {
+	static constexpr int32 KindCapacity = 32;
+	using FKindCounts = TMap<EVoxelTaskKind, int32, TFixedSetAllocator<KindCapacity>>;
+	using FBlockCounts = TMap<EVoxelTaskBlockReason, int32, TFixedSetAllocator<16>>;
+	using FKindBlockCounts = TMap<EVoxelTaskKind, FBlockCounts, TFixedSetAllocator<KindCapacity>>;
 	int32 Pending = 0;
 	int32 Running = 0;
 	int32 Critical = 0;
@@ -286,14 +476,17 @@ struct WHFRAMEWORK_API FVoxelTaskDiagnostics
 	uint64 ReservedBytes = 0;
 	uint64 QueuedInputBytes = 0;
 
-	TMap<EVoxelTaskKind, FVoxelTaskKindDiagnostics> ByKind;
-	TMap<EVoxelTaskKind, int32> PendingByKind;
-	TMap<EVoxelTaskKind, int32> RunningByKind;
-	TMap<EVoxelTaskKind, TMap<EVoxelTaskBlockReason, int32>> BlockedByKind;
+	TMap<EVoxelTaskKind, FVoxelTaskKindDiagnostics, TFixedSetAllocator<KindCapacity>> ByKind;
+	FKindCounts PendingByKind;
+	FKindCounts RunningByKind;
+	// 单 flag 可重叠计数，不能求和解释为任务数。
+	FKindBlockCounts BlockedByKind;
+	int32 BlockedRequests = 0;
 	uint64 DuplicateRequests = 0;
 	uint64 OversizedRequests = 0;
 	uint64 CapacityDeferrals = 0;
-	TMap<EVoxelTaskKind, TMap<EVoxelTaskBlockReason, int32>> AdmissionBlockedByKind;
+	FKindBlockCounts AdmissionBlockedByKind;
+	int32 AdmissionBlockedRequests = 0;
 	double OldestAdmissionWaitSeconds = 0.0;
 };
 
@@ -301,13 +494,16 @@ class WHFRAMEWORK_API FVoxelTaskScheduler
 {
 public:
 	FVoxelTaskScheduler();
+#if WITH_DEV_AUTOMATION_TESTS
+	explicit FVoxelTaskScheduler(bool bInAllowPassive);
+#endif
 	~FVoxelTaskScheduler();
 
 	FVoxelTaskScheduler(const FVoxelTaskScheduler&) = delete;
 	FVoxelTaskScheduler& operator=(const FVoxelTaskScheduler&) = delete;
 
 	bool Enqueue(FVoxelTaskRequest&& InRequest);
-	void ObserveDemand(EVoxelTaskKind InKind, const FVoxelTaskStamp& InStamp,
+	bool ObserveDemand(EVoxelTaskKind InKind, const FVoxelTaskStamp& InStamp,
 		EVoxelTaskBlockReason InReason, uint64 InInputBytes = 0, uint64 InResultBytes = 0);
 	bool IsTerminal(const FVoxelTaskKey& InKey) const;
 	void UpdatePriorities(TFunctionRef<void(EVoxelTaskKind, const FVoxelTaskStamp&,
@@ -330,7 +526,43 @@ public:
 		EVoxelTaskKind InKind) const;
 
 	bool HasSectionTask(const FIntVector& InSection) const;
+	void ClearSectionIdleCallback();
+#if WITH_DEV_AUTOMATION_TESTS
 	void SetSectionIdleCallback(TFunction<void(const FIntVector&)> InCallback);
+#endif
+	template<typename FunctorType>
+	bool SetSectionIdleCallback(FunctorType&& InCallback, FString& OutError)
+	{
+		using FFunctor = std::decay_t<FunctorType>;
+		static_assert(!std::is_same_v<FFunctor, TFunction<void(const FIntVector&)>>, "Bind the concrete idle callback");
+		if (!ControlConsumer.IsValid())
+		{
+			OutError = TEXT("CapacityBlocked: scheduler control is not initialized");
+			return false;
+		}
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> CandidateLease;
+		const uint64 Bytes = VoxelBoundedAllocation::FunctionBytes<FFunctor, false>();
+		if (Bytes)
+		{
+			const auto Admission = TerrainResources->TryAcquire(ControlConsumer, EVoxelTerrainResourcePool::Input,
+				Bytes, CandidateLease, 0, BackingBytes + (IdleBindingLease ? IdleBindingLease->Bytes() : 0),
+				int32(BackingLease.IsValid()) + int32(IdleBindingLease.IsValid()));
+			if (Admission != EVoxelTerrainResourceAdmission::Granted)
+			{
+				OutError = Admission == EVoxelTerrainResourceAdmission::InvalidRequest ?
+					TEXT("InvalidConsumer: scheduler idle callback admission request") : Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+					TEXT("Oversized: scheduler idle callback peak is unreachable") : TEXT("CapacityBlocked: scheduler idle callback input");
+				return false;
+			}
+		}
+		TFunction<void(const FIntVector&)> Candidate(Forward<FunctorType>(InCallback));
+		SectionIdleCallback = nullptr;
+		SectionIdleCallback = MoveTemp(Candidate);
+		IdleBindingLease = MoveTemp(CandidateLease);
+		++IdleBindingGeneration;
+		OutError.Reset();
+		return true;
+	}
 
 	int32 ActiveCount() const;
 	int32 CriticalCount() const;
@@ -344,6 +576,8 @@ public:
 	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> GetTerrainResources() const;
 	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> GetRuntimeResources() const;
 	bool InitializeStatistics(uint64 InWorldEpoch);
+	FVoxelGenerationConsumerKey GetControlConsumer() const { return ControlConsumer; }
+	EVoxelTerrainResourceAdmission GetLastResourceAdmission() const { return BackingAdmission; }
 	TSharedPtr<FVoxelTerrainStatistics, ESPMode::ThreadSafe> GetTerrainStatistics() const { return Statistics; }
 	static bool IsHigherPriority(
 		const FVoxelTaskRequest& InA,
@@ -351,12 +585,31 @@ public:
 	static FVoxelTerrainServicePriority ResolveServicePriority(const FVoxelTaskRequest& InRequest);
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend struct FVoxelSchedulerNativeBackingTestAccess;
+#endif
+	struct FNativeTask : UE::Tasks::FTask
+	{
+		bool CanRetire() const;
+		void Retire();
+	};
+
 	struct FSlot
 	{
 		TSharedPtr<FVoxelTerrainWorkReceipt, ESPMode::ThreadSafe> WorkReceipt;
+		FVoxelTaskRequest Request;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> BudgetErrorLease;
+		FString BudgetError;
 		TAtomic<bool> Cancel { false };
 		FVoxelTaskResult Result;
 		double ExecuteMicroseconds = 0.0;
+	};
+
+	struct FTaskBody
+	{
+		TSharedPtr<FSlot, ESPMode::ThreadSafe> Slot;
+		FVoxelTaskStamp Stamp;
+		void operator()() const;
 	};
 
 	struct FRunning
@@ -379,11 +632,12 @@ private:
 		bool bServiceNear = false;
 		bool bServiceSettled = false;
 		uint64 ReservedBytes = 0;
+		uint64 BudgetErrorBytes = 0;
 
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> SlotLease;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> NativeLease;
 		TSharedPtr<FSlot, ESPMode::ThreadSafe> Slot;
-		UE::Tasks::FTask Task;
-		TFunction<void(FVoxelTaskResult&&)> Apply;
-		TUniquePtr<FVoxelTaskRequest> Resume;
+		FNativeTask Task;
 	};
 
 	struct FCompleted
@@ -391,7 +645,7 @@ private:
 		FVoxelTaskResult Result;
 		EVoxelWorkClass WorkClass = EVoxelWorkClass::None;
 		int32 TerrainStage = INDEX_NONE;
-		TFunction<void(FVoxelTaskResult&&)> Apply;
+		FVoxelTaskRequest Request;
 	};
 
 	static bool UsesSectionKey(EVoxelTaskKind InKind);
@@ -412,8 +666,47 @@ private:
 		EVoxelWorkClass InWorkClass);
 
 	void RecordCompletedResult(const FVoxelTaskResult& InResult);
+	bool PrepareBacking(uint64 InNewBytes);
+	void SettleBacking(uint64 InOldBytes, uint64 InReservedBytes, uint64 InActualBytes);
+	bool PrepareAdmission(const FVoxelTaskKey& InKey);
+	bool PrepareQueues(int32 InAdditionalTasks);
+	void FreeBacking();
+	void FlushSectionIdleNotifications();
+	void RefreshBlockReasons();
+	void VisitPriorityStates(TFunctionRef<void(FVoxelTaskRequest&)> InUpdate);
+	FVoxelGenerationConsumerKey ResolveNativeConsumer(const FVoxelTaskRequest& InRequest) const;
+
+	template<typename ElementType, typename AllocatorType>
+	bool ReserveArray(TArray<ElementType, AllocatorType>& InArray, const int32 InCount)
+	{
+		if (InCount <= InArray.Max()) return true;
+		const uint64 OldBytes = VoxelGenerationAllocation::AllocatedBytes(InArray);
+		const uint64 NewBytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<ElementType, AllocatorType>(InCount);
+		if (!PrepareBacking(NewBytes)) return false;
+		InArray.Reserve(InCount);
+		SettleBacking(OldBytes, NewBytes, VoxelGenerationAllocation::AllocatedBytes(InArray));
+		return true;
+	}
+
+	template<typename ElementType, typename ContainerType>
+	bool ReserveSet(ContainerType& InContainer, const int32 InCount)
+	{
+		if (VoxelGenerationAllocation::Private::SetCanReserve<ElementType>(InContainer, InCount)) return true;
+		const uint64 OldBytes = VoxelGenerationAllocation::Private::SetAllocatedBytes<ElementType>(InContainer);
+		const uint64 NewBytes = VoxelGenerationAllocation::Private::SetReserveBytes<ElementType>(InContainer, InCount);
+		if (!PrepareBacking(NewBytes)) return false;
+		InContainer.Reserve(InCount);
+		SettleBacking(OldBytes, NewBytes, VoxelGenerationAllocation::Private::SetAllocatedBytes<ElementType>(InContainer));
+		return true;
+	}
 
 private:
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> BackingLease;
+	FVoxelGenerationConsumerKey ControlConsumer;
+	EVoxelTerrainResourceAdmission BackingAdmission = EVoxelTerrainResourceAdmission::None;
+	uint64 BackingBytes = 0;
+	uint64 RequiredAdmissionInputBytes = 0;
+	int32 RequiredAdmissionLeaseCount = 0;
 	TArray<FVoxelTaskRequest> Pending;
 	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> TerrainResources =
 		MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
@@ -421,9 +714,15 @@ private:
 		MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
 	TArray<FRunning> Running;
 	TArray<FCompleted> Canceled;
+	TArray<FVoxelTerrainServiceCandidate> WorkerCandidates;
+	TArray<FVoxelTerrainServiceCandidate> CompletedCandidates;
+	TArray<int32> DisplacedIndices;
+	TArray<FIntVector> SectionIdleNotifications;
 
 	TSet<FVoxelTaskKey> ActiveKeys;
 	TMap<FIntVector, int32> SectionTaskCounts;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> IdleBindingLease;
+	uint64 IdleBindingGeneration = 0;
 	TFunction<void(const FIntVector&)> SectionIdleCallback;
 
 	FVoxelTaskBudget Budget;
@@ -432,6 +731,7 @@ private:
 	TSharedPtr<FVoxelTerrainStatistics, ESPMode::ThreadSafe> Statistics;
 	FGuid StatisticsOwnerId = FGuid::NewGuid();
 	uint64 StatisticsWorldEpoch = 0;
+	uint64 StatisticsRootInputBytes = 0;
 	struct FAdmissionAttempt
 	{
 		double FirstRequested = 0.0;
@@ -444,12 +744,17 @@ private:
 	TMap<FVoxelTaskKey, FAdmissionAttempt> AdmissionAttempts;
 	FVoxelTerrainWorkSelection WorkerSelection;
 	FVoxelTerrainWorkSelection CompletedSelection;
-	TMap<EVoxelTaskKind, double> WorkerCostEstimates;
-	TMap<EVoxelTaskKind, double> ApplyCostEstimates;
+	TMap<EVoxelTaskKind, double, TFixedSetAllocator<FVoxelTaskDiagnostics::KindCapacity>> WorkerCostEstimates;
+	TMap<EVoxelTaskKind, double, TFixedSetAllocator<FVoxelTaskDiagnostics::KindCapacity>> ApplyCostEstimates;
 	uint64 NextSequence = 0;
+	uint64 BlockRefreshSequence = 0;
 
 	double LastBudgetWarning = -10.0;
 	bool bStopped = false;
+	bool bAllowPassive = false;
+	bool bPumping = false;
+	bool bTicking = false;
+	bool bFlushingIdle = false;
 	int32 ObservedTerrainStage = 3;
 	uint64 ReservedBytes = 0;
 	uint64 QueuedInputBytes = 0;

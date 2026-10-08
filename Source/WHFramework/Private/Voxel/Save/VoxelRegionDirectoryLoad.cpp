@@ -17,6 +17,9 @@ struct FVoxelRegionDirectoryLoadAttempt
 	TAtomic<uint64> CapacityVersion{0};
 	bool bQueued = false;
 	TFunction<void(TSharedPtr<const FVoxelRegionDirectorySnapshot, ESPMode::ThreadSafe>)> OnReady;
+	TOptional<FVoxelTaskRequest> PendingTask;
+	uint64 BindingCapacityVersion = 0;
+	bool bBindingCapacityBlocked = false;
 };
 
 namespace
@@ -62,6 +65,7 @@ void FVoxelRegionStore::DetachDirectoryLoad()
 	{
 		DirectoryLoadAttempt->Owner = nullptr;
 		DirectoryLoadAttempt->Detached.Store(true);
+		DirectoryLoadAttempt->PendingTask.Reset();
 		DirectoryLoadAttempt.Reset();
 	}
 }
@@ -120,23 +124,46 @@ void FVoxelRegionStore::AdvanceDirectoryLoad(FVoxelTaskScheduler& InScheduler, c
 	}
 	const auto State = DirectoryLoadAttempt;
 	if (State->bQueued) return;
-	FVoxelTaskRequest Task;
-	Task.Kind = EVoxelTaskKind::ProjectBackground;
-	Task.Stamp = State->Stamp;
-	Task.WorkClass = EVoxelWorkClass::Critical;
-	Task.bTerrainDataOnly = true;
-	Task.ServiceBand = EVoxelTerrainServiceBand::P0;
-	Task.SourceStableKey = DirectoryOwnerId;
-	Task.FirstRunnableSeconds = DirectoryFirstRunnable;
-	Task.bResumable = true;
-	Task.GetBlockReason = [State]
+	if (State->Stamp.WorldEpoch != InWorldEpoch || State->Stamp.OwnerId != DirectoryOwnerId ||
+		State->Stamp.OwnerIncarnation != DirectoryOwnerIncarnation || State->Detached.Load())
+	{
+		State->PendingTask.Reset();
+		DirectoryError = TEXT("Voxel启动目录任务不再属于原世界与文件代");
+		return;
+	}
+	const auto BindingResources = InScheduler.GetTerrainResources();
+	const auto BindingConsumer = InScheduler.GetControlConsumer();
+	if (State->bBindingCapacityBlocked)
+	{
+		uint64 Current = 0;
+		if (!BindingResources->TryGetReleaseVersionExcludingOwner(BindingConsumer, Current) ||
+			Current <= State->BindingCapacityVersion) return;
+		State->bBindingCapacityBlocked = false;
+	}
+	const uint64 BeforeBinding = BindingResources->ReleaseVersionExcludingOwner(BindingConsumer);
+	if (!State->PendingTask.IsSet())
+	{
+		State->PendingTask.Emplace();
+		auto& Task = State->PendingTask.GetValue();
+		Task.Kind = EVoxelTaskKind::ProjectBackground;
+		Task.Stamp = State->Stamp;
+		Task.WorkClass = EVoxelWorkClass::Critical;
+		Task.bTerrainDataOnly = true;
+		Task.ServiceBand = EVoxelTerrainServiceBand::P0;
+		Task.SourceStableKey = DirectoryOwnerId;
+		Task.FirstRunnableSeconds = DirectoryFirstRunnable;
+		Task.bResumable = true;
+		Task.ReservedBytes = 1;
+	}
+	auto& Task = State->PendingTask.GetValue();
+	auto GetBlockReason = [State]
 	{
 		if (State->Detached.Load() || !State->CapacityBlocked.Load()) return EVoxelTaskBlockReason::None;
 		uint64 ReleaseVersion = 0;
 		return State->Resources->TryGetReleaseVersionExcludingOwner(State->Consumer, ReleaseVersion) &&
 			ReleaseVersion > State->CapacityVersion.Load() ? EVoxelTaskBlockReason::None : EVoxelTaskBlockReason::Memory;
 	};
-	Task.Execute = [State](const TAtomic<bool>& Cancel)
+	auto Execute = [State](const TAtomic<bool>& Cancel)
 	{
 		FVoxelTaskResult Result;
 		if (Cancel.Load() || State->Detached.Load()) { Result.bCanceled = true; return Result; }
@@ -164,7 +191,7 @@ void FVoxelRegionStore::AdvanceDirectoryLoad(FVoxelTaskScheduler& InScheduler, c
 		Result.bSuccess = true;
 		return Result;
 	};
-	Task.Apply = [State](FVoxelTaskResult&& Result)
+	auto Apply = [State](FVoxelTaskResult&& Result)
 	{
 		FVoxelRegionStore* Owner = State->Owner;
 		if (!Owner || Owner->DirectoryLoadAttempt != State || State->Detached.Load() ||
@@ -189,5 +216,42 @@ void FVoxelRegionStore::AdvanceDirectoryLoad(FVoxelTaskScheduler& InScheduler, c
 		State->SourceLease.Reset();
 		Owner->DirectoryLoadAttempt.Reset();
 	};
-	State->bQueued = InScheduler.Enqueue(MoveTemp(Task));
+	FString BindingError;
+	if ((!Task.bBlockBound && !Task.BindGetBlockReason(BindingResources, BindingConsumer, MoveTemp(GetBlockReason), BindingError)) ||
+		(!Task.bExecuteBound && !Task.BindExecute(BindingResources, BindingConsumer, MoveTemp(Execute), BindingError)) ||
+		(!Task.bApplyBound && !Task.BindApply(BindingResources, BindingConsumer, MoveTemp(Apply), BindingError)))
+	{
+		if (BindingError.StartsWith(TEXT("CapacityBlocked")))
+		{
+			State->bBindingCapacityBlocked = true;
+			State->BindingCapacityVersion = BeforeBinding;
+		}
+		else
+		{
+			State->PendingTask.Reset();
+			DirectoryError = BindingError;
+		}
+		return;
+	}
+	FVoxelTaskRequest AdmissionRequest = MoveTemp(Task);
+	State->PendingTask.Reset();
+	if (InScheduler.Enqueue(MoveTemp(AdmissionRequest)))
+	{
+		State->bQueued = true;
+	}
+	else if (State->Detached.Load()) return;
+	else if (AdmissionRequest.Blocked == EVoxelTaskBlockReason::Oversized || AdmissionRequest.Blocked == EVoxelTaskBlockReason::TerminalFailure)
+	{
+		State->PendingTask.Reset();
+		DirectoryError = TEXT("Voxel启动目录任务无法在原资源域内接纳");
+	}
+	else
+	{
+		State->PendingTask.Emplace(MoveTemp(AdmissionRequest));
+		if (State->PendingTask->Blocked == EVoxelTaskBlockReason::InputMemory || State->PendingTask->Blocked == EVoxelTaskBlockReason::Memory)
+		{
+			State->bBindingCapacityBlocked = true;
+			State->BindingCapacityVersion = BeforeBinding;
+		}
+	}
 }

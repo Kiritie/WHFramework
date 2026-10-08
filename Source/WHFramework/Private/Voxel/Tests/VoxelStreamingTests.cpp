@@ -621,7 +621,7 @@ bool FVoxelResidencyPinTest::RunTest(const FString& InParameters)
 {
 	(void)InParameters;
 	FVoxelWorldRuntime Runtime(4, false, VoxelTest::MakeRegistry(), VoxelTest::MakeGenerator());
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	const FIntVector SectionKey(3, -2, 1);
 	FVoxelSection* Section = Runtime.FindOrAllocate(SectionKey, 0);
 	TestNotNull(TEXT("Residency test section allocates"), Section);
@@ -658,7 +658,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelViewResidencyHandoffTest,
 bool FVoxelViewResidencyHandoffTest::RunTest(const FString& Parameters)
 {
 	FVoxelWorldRuntime Runtime(4, true, VoxelTest::MakeRegistry(), VoxelTest::MakeGenerator());
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	const FIntVector Key(-3, 2, 1);
 	Runtime.FindOrAllocate(Key, 0);
 	bool bAwaitingReplacement = true;
@@ -689,7 +689,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelPersistedResidencyTest, "WHFramework.Voxe
 bool FVoxelPersistedResidencyTest::RunTest(const FString& InParameters)
 {
 	FVoxelWorldRuntime Runtime(4, true, VoxelTest::MakeRegistry(), VoxelTest::MakeGenerator());
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	const FIntVector Key(-3, 2, 1);
 	FVoxelSection* Section = Runtime.FindOrAllocate(Key, 0);
 	if (!TestNotNull(TEXT("Edited section allocates"), Section))
@@ -977,7 +977,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelSchedulerAdmissionTest, "WHFramework.Voxe
 
 bool FVoxelSchedulerAdmissionTest::RunTest(const FString& InParameters)
 {
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelTaskBudget Budget;
 	Budget.MaxConcurrentTasks = 1;
 	Budget.MaxPendingTasks = 1;
@@ -1028,7 +1028,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelSchedulerTerrainReserveTest,
 
 bool FVoxelSchedulerTerrainReserveTest::RunTest(const FString& Parameters)
 {
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelTaskBudget Budget;
 	Budget.MaxConcurrentTasks = 1;
 	Budget.MaxPendingTasks = 16;
@@ -1128,7 +1128,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelMovingPrioritySchedulerTest,
 bool FVoxelMovingPrioritySchedulerTest::RunTest(const FString& Parameters)
 {
 	TAtomic<bool> Release(false);
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelTaskBudget Budget;
 	Budget.MaxConcurrentTasks = 1;
 	Scheduler.SetBudget(Budget);
@@ -1215,7 +1215,7 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 		FVoxelTaskScheduler::IsHigherPriority(Fine, FineCoverage));
 	TestTrue(TEXT("A Fine publication finishes before new coarse generation"),
 		FVoxelTaskScheduler::IsHigherPriority(FineCoverage, NearProxy));
-	FVoxelTaskRequest CoarsePlan = FineCoverage;
+	FVoxelTaskRequest CoarsePlan = FineCoverage.MakePriorityCopy();
 	CoarsePlan.bPublicationContinuation = false;
 	CoarsePlan.TerrainStage = 2;
 	Fine.WorkClass = EVoxelWorkClass::Visible;
@@ -1225,7 +1225,7 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 		FVoxelTaskScheduler::IsHigherPriority(FineCoverage, Fine));
 	TestFalse(TEXT("New nearer visual work cannot repeatedly displace an admitted handoff"),
 		FVoxelTaskScheduler::IsHigherPriority(Fine, FineCoverage));
-	FVoxelTaskRequest NewCoverage = FineCoverage;
+	FVoxelTaskRequest NewCoverage = FineCoverage.MakePriorityCopy();
 	FineCoverage.QueuedAt = 1.0;
 	NewCoverage.QueuedAt = 2.0;
 	NewCoverage.DistanceScore = 0.0;
@@ -1236,32 +1236,34 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 		FVoxelTaskScheduler::IsHigherPriority(NewCoverage, FineCoverage));
 	TestTrue(TEXT("Independent coarse coverage planning retains its own terrain stage"),
 		FVoxelTaskScheduler::IsHigherPriority(Fine, CoarsePlan));
-	FVoxelTaskRequest CriticalCoverage = FineCoverage;
+	FVoxelTaskRequest CriticalCoverage = FineCoverage.MakePriorityCopy();
 	CriticalCoverage.WorkClass = EVoxelWorkClass::Critical;
 	CriticalCoverage.DistanceScore = 70.0;
-	FVoxelTaskRequest CriticalFine = Fine;
+	FVoxelTaskRequest CriticalFine = Fine.MakePriorityCopy();
 	CriticalFine.WorkClass = EVoxelWorkClass::Critical;
 	CriticalFine.DistanceScore = 0.0;
 	CriticalFine.ForwardScore = 1.0;
 	TestTrue(TEXT("Critical publication completion is not displaced by new nearer Critical Fine meshes"),
 		FVoxelTaskScheduler::IsHigherPriority(CriticalCoverage, CriticalFine));
-	FVoxelTaskRequest CriticalData = CriticalFine;
+	FVoxelTaskRequest CriticalData = CriticalFine.MakePriorityCopy();
 	CriticalData.Kind = EVoxelTaskKind::GenerateExactBase;
 	CriticalData.DistanceScore = 30.0;
 	TestTrue(TEXT("Upstream Critical exact data remains ahead of publication clipping"),
 		FVoxelTaskScheduler::IsHigherPriority(CriticalData, CriticalCoverage));
 	TestTrue(TEXT("Upstream Critical data precedes new meshes without introducing a cyclic comparison"),
 		FVoxelTaskScheduler::IsHigherPriority(CriticalData, CriticalFine));
-	FVoxelTaskRequest NewCriticalCoverage = CriticalCoverage;
+	FVoxelTaskRequest NewCriticalCoverage = CriticalCoverage.MakePriorityCopy();
 	NewCriticalCoverage.QueuedAt = 2.0;
 	NewCriticalCoverage.DistanceScore = 0.0;
 	TestTrue(TEXT("Earlier Critical publication completes before new nearby Critical publication"),
 		FVoxelTaskScheduler::IsHigherPriority(CriticalCoverage, NewCriticalCoverage));
-	FVoxelTaskRequest PreferredSourceFine = CriticalFine;
+	FVoxelTaskRequest PreferredSourceFine = CriticalFine.MakePriorityCopy();
 	PreferredSourceFine.SourcePriority = CriticalCoverage.SourcePriority - 1;
 	TestTrue(TEXT("Higher source priority still precedes another source's publication completion"),
 		FVoxelTaskScheduler::IsHigherPriority(PreferredSourceFine, CriticalCoverage));
-	const TArray<FVoxelTaskRequest> CriticalOrder{CriticalData, CriticalCoverage, NewCriticalCoverage, CriticalFine};
+	TArray<FVoxelTaskRequest> CriticalOrder;
+	for (const FVoxelTaskRequest* Request : {&CriticalData, &CriticalCoverage, &NewCriticalCoverage, &CriticalFine})
+		CriticalOrder.Add(Request->MakePriorityCopy());
 	for (int32 Earlier = 0; Earlier < CriticalOrder.Num(); ++Earlier)
 		for (int32 Later = Earlier + 1; Later < CriticalOrder.Num(); ++Later)
 		{
@@ -1270,8 +1272,10 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 			TestFalse(TEXT("Expected Critical pair cannot reverse its dependency order"),
 				FVoxelTaskScheduler::IsHigherPriority(CriticalOrder[Later], CriticalOrder[Earlier]));
 		}
-	TArray<FVoxelTaskRequest> PrioritySamples = CriticalOrder;
-	PrioritySamples.Append({Fine, NearProxy, CoarsePlan, PreferredSourceFine, NewCoverage});
+	TArray<FVoxelTaskRequest> PrioritySamples;
+	for (const FVoxelTaskRequest& Request : CriticalOrder) PrioritySamples.Add(Request.MakePriorityCopy());
+	for (const FVoxelTaskRequest* Request : {&Fine, &NearProxy, &CoarsePlan, &PreferredSourceFine, &NewCoverage})
+		PrioritySamples.Add(Request->MakePriorityCopy());
 	const EVoxelTaskKind StageMeshes[] = {EVoxelTaskKind::BuildFineMesh, EVoxelTaskKind::BuildVoxelProxy,
 		EVoxelTaskKind::BuildSurface, EVoxelTaskKind::BuildMacro};
 	for (int32 Stage = 0; Stage < 4; ++Stage)
@@ -1285,18 +1289,18 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 			Handoff.bPublicationContinuation = true;
 			Handoff.QueuedAt = 1.0;
 			Handoff.DistanceScore = 100000.0;
-			PrioritySamples.Add(Handoff);
+			PrioritySamples.Add(Handoff.MakePriorityCopy());
 			TArray<EVoxelTaskKind> MeshKinds{StageMeshes[Stage], EVoxelTaskKind::BuildViewTransition};
 			if (Stage <= 1) MeshKinds.Add(EVoxelTaskKind::BuildVolumeTransition);
 			if (Stage == 2) MeshKinds.Add(EVoxelTaskKind::BuildWater);
 			for (const EVoxelTaskKind Kind : MeshKinds)
 			{
-				FVoxelTaskRequest Mesh = Handoff;
+				FVoxelTaskRequest Mesh = Handoff.MakePriorityCopy();
 				Mesh.Kind = Kind;
 				Mesh.bPublicationContinuation = false;
 				Mesh.DistanceScore = 0.0;
 				Mesh.QueuedAt = 0.0;
-				PrioritySamples.Add(Mesh);
+				PrioritySamples.Add(Mesh.MakePriorityCopy());
 				TestTrue(*FString::Printf(TEXT("Admitted handoff precedes new representation: stage=%d kind=%d class=%d"),
 					Stage, int32(Kind), int32(WorkClass)), FVoxelTaskScheduler::IsHigherPriority(Handoff, Mesh));
 				TestFalse(TEXT("New same-stage representation cannot displace admitted handoff"),
@@ -1304,7 +1308,7 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 			}
 			if (Stage > 0)
 			{
-				FVoxelTaskRequest EarlierMesh = Fine;
+				FVoxelTaskRequest EarlierMesh = Fine.MakePriorityCopy();
 				EarlierMesh.TerrainStage = Stage - 1;
 				TestTrue(TEXT("A continuation cannot cross an earlier terrain stage"),
 					FVoxelTaskScheduler::IsHigherPriority(EarlierMesh, Handoff));
@@ -1315,10 +1319,10 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 			{
 				for (const EVoxelTaskKind Kind : {EVoxelTaskKind::GenerateExactBase, EVoxelTaskKind::BuildCollision, EVoxelTaskKind::BuildNavigation})
 				{
-					FVoxelTaskRequest Upstream = Handoff;
+					FVoxelTaskRequest Upstream = Handoff.MakePriorityCopy();
 					Upstream.Kind = Kind;
 					Upstream.bPublicationContinuation = false;
-					PrioritySamples.Add(Upstream);
+					PrioritySamples.Add(Upstream.MakePriorityCopy());
 					TestTrue(TEXT("Critical data collision and navigation remain upstream of same-stage publication"),
 						FVoxelTaskScheduler::IsHigherPriority(Upstream, Handoff));
 				}
@@ -1329,21 +1333,21 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 		EVoxelWorkClass::Interactive, EVoxelWorkClass::Boundary, EVoxelWorkClass::Exploration,
 		EVoxelWorkClass::Background, EVoxelWorkClass::Prefetch})
 	{
-		FVoxelTaskRequest Sample = Fine;
+		FVoxelTaskRequest Sample = Fine.MakePriorityCopy();
 		Sample.WorkClass = WorkClass;
 		Sample.SourcePriority = int32(WorkClass) % 3 - 1;
-		PrioritySamples.Add(Sample);
+		PrioritySamples.Add(Sample.MakePriorityCopy());
 	}
 	for (const EVoxelTaskKind Kind : {EVoxelTaskKind::ProjectBackground, EVoxelTaskKind::BuildGenerationPlan,
 		EVoxelTaskKind::BuildDetails})
 	{
 		for (const int32 Source : {-10, 10})
 		{
-			FVoxelTaskRequest Sample = Fine;
+			FVoxelTaskRequest Sample = Fine.MakePriorityCopy();
 			Sample.Kind = Kind;
 			Sample.WorkClass = Kind == EVoxelTaskKind::ProjectBackground ? EVoxelWorkClass::ExactData : EVoxelWorkClass::Visible;
 			Sample.SourcePriority = Source;
-			PrioritySamples.Add(Sample);
+			PrioritySamples.Add(Sample.MakePriorityCopy());
 		}
 	}
 	for (int32 A = 0; A < PrioritySamples.Num(); ++A)
@@ -1365,7 +1369,7 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 	}
 	for (const EVoxelWorkClass FixtureClass : {EVoxelWorkClass::Visible, EVoxelWorkClass::Critical})
 	{
-		FVoxelTaskScheduler Scheduler;
+		FVoxelTaskScheduler Scheduler(true);
 		FVoxelTaskBudget Budget;
 		Budget.MaxConcurrentTasks = 1;
 		Budget.MaxPendingTasks = 4;
@@ -1409,7 +1413,7 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 	LowPriorityPlanning.Kind = EVoxelTaskKind::ProjectBackground;
 	LowPriorityPlanning.WorkClass = EVoxelWorkClass::ExactData;
 	LowPriorityPlanning.SourcePriority = 10;
-	FVoxelTaskRequest HighPriorityFine = CriticalTransition;
+	FVoxelTaskRequest HighPriorityFine = CriticalTransition.MakePriorityCopy();
 	HighPriorityFine.SourcePriority = -25;
 	TestTrue(TEXT("Lower source planning cannot outrank another source's critical Fine"),
 		FVoxelTaskScheduler::IsHigherPriority(HighPriorityFine, LowPriorityPlanning));
@@ -1451,7 +1455,7 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 	{
 		TAtomic<bool> Release(false);
 		TAtomic<int32> Finished(0);
-		FVoxelTaskScheduler Scheduler;
+		FVoxelTaskScheduler Scheduler(true);
 		FVoxelTaskBudget Budget;
 		Budget.MaxConcurrentTasks = WorkerCount;
 		Budget.MaxConcurrentCoarseTerrainTasks = WorkerCount;
@@ -1542,7 +1546,7 @@ bool FVoxelCriticalCapacitySchedulerTest::RunTest(const FString& Parameters)
 	TAtomic<bool> ReleaseBackground(false);
 	TAtomic<bool> ReleaseForeground(false);
 	TAtomic<bool> ReleaseCritical(false);
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelTaskBudget Budget;
 	Budget.MaxConcurrentTasks = 2;
 	Budget.CriticalReservedTasks = 1;
@@ -1631,7 +1635,7 @@ bool FVoxelDataPrefetchSchedulerTest::RunTest(const FString& Parameters)
 	for (const int32 BackgroundSlots : {1, 2})
 	{
 		TAtomic<bool> Release(false);
-		FVoxelTaskScheduler Scheduler;
+		FVoxelTaskScheduler Scheduler(true);
 		FVoxelTaskBudget Budget;
 		Budget.MaxConcurrentTasks = 4;
 		if (BackgroundSlots == 2) Budget.MaxConcurrentCoarseTerrainTasks = 2;
@@ -1836,7 +1840,7 @@ bool FVoxelMapTileBuildTest::RunTest(const FString& InParameters)
 	const auto Config = MakeShared<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe>(MoveTemp(MapConfig));
 	const auto Generator = MakeShared<const FVoxelGenerationPipeline, ESPMode::ThreadSafe>(
 		Config, MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>());
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelMapTileCache Cache(Scheduler, Generator, Config, 1, 25.0);
 	// 此夹具只验证栅格发布；正式配色由项目资产契约测试覆盖。
 	Cache.SetColorResolver([](const FVoxelColumnSample&, const FVoxelGenerationRuntimeConfig&)

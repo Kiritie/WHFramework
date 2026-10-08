@@ -564,10 +564,10 @@ uint32 GetTypeHash(const FReplicaMessageKey& Key)
 
 struct FVoxelOverlayReplicaWork final : FVoxelTaskCustomPayload
 {
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InputLease;
 	TSharedPtr<FVoxelOverlayReplica, ESPMode::ThreadSafe> Worker;
 	TSharedPtr<const FVoxelOverlayReplicaRoot, ESPMode::ThreadSafe> Basis;
 	TSharedPtr<const FVoxelOverlayCommitNotification, ESPMode::ThreadSafe> Notification;
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InputLease;
 	TSharedPtr<const FVoxelOverlayRegionMessage, ESPMode::ThreadSafe> Cohort;
 	TMap<FIntVector, FGuid> Snapshots;
 	TMap<FReplicaMessageKey, FVoxelOverlayHash> MessageDigests;
@@ -644,6 +644,15 @@ void FVoxelOverlayReplica::SetTaskQueue(TFunction<bool(FVoxelTaskRequest&&)> InQ
 	TaskQueue = MoveTemp(InQueue);
 }
 
+void FVoxelOverlayReplica::SetTaskBindingDomain(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+	const FVoxelGenerationConsumerKey& InConsumer)
+{
+	check(IsInGameThread());
+	check(InConsumer.IsValid() && InConsumer.WorldEpoch == LocalEpoch && !PendingTask.IsSet());
+	TaskBindingResources = InResources;
+	TaskBindingConsumer = InConsumer;
+}
+
 void FVoxelOverlayReplica::SetTaskCanceler(TFunction<void(const FVoxelTaskStamp&)> InCancel)
 {
 	TaskCanceler = MoveTemp(InCancel);
@@ -716,6 +725,7 @@ bool FVoxelOverlayReplica::Receive(const EVoxelMessage InKind, FVoxelOverlayRegi
 			return FailRegion(M.Region, TEXT("Ticket Head 超过连接配额"), OutError);
 		if (bOldPreparing) Receiving->PreparingBytes += PreviousBytes;
 		if (Preparing && Preparing->CoverageTicket == M.CoverageTicket && TaskCanceler) TaskCanceler(Preparing->Stamp);
+		if (PendingTask.IsSet() && Preparing && Preparing->CoverageTicket == M.CoverageTicket) CancelPendingPreparation();
 		Receiving->Bytes = Receiving->Bytes - PreviousBytes + M.AllocatedBytes();
 		Ticket->Cohort = MakeShared<FVoxelOverlayRegionMessage, ESPMode::ThreadSafe>(MoveTemp(M));
 		++ProgressSerial;
@@ -877,7 +887,7 @@ bool FVoxelOverlayReplica::Receive(const EVoxelMessage InKind, FVoxelOverlayRegi
 bool FVoxelOverlayReplica::QueuePreparation(const FGuid& InIdentity, const bool bInDelta, FString& OutError)
 {
 	check(IsInGameThread());
-	if (Preparing) return true;
+	if (Preparing) return PendingTask.IsSet() ? RetryPendingPreparation(OutError) : true;
 	const FVoxelOverlayRegionMessage* Header = nullptr;
 	TArray<FIntVector, TInlineAllocator<FVoxelOverlayRegionCodec::MaximumRegions>> Keys;
 	bool bRegionOnly = false;
@@ -954,6 +964,11 @@ bool FVoxelOverlayReplica::QueuePreparation(const FGuid& InIdentity, const bool 
 	}
 	if (!Header || Keys.IsEmpty()) return true;
 	if (!TaskQueue) { OutError = TEXT("Replica 验证 Worker 尚未接入 Scheduler"); return false; }
+	if (!TaskBindingResources || !TaskBindingConsumer.IsValid() || TaskBindingConsumer.WorldEpoch != LocalEpoch)
+	{
+		OutError = TEXT("InvalidConsumer: Replica task binding domain is not initialized");
+		return false;
+	}
 	int32 MessageCount = 0;
 	uint64 CopyBytes = 0;
 	if (bInDelta)
@@ -1058,7 +1073,8 @@ bool FVoxelOverlayReplica::QueuePreparation(const FGuid& InIdentity, const bool 
 	{
 		if (const auto Active = WeakWork.Pin()) Active->Notification = MoveTemp(Notification);
 	};
-	FVoxelTaskRequest Task;
+	PendingTask.Emplace();
+	auto& Task = PendingTask.GetValue();
 	Task.Kind = EVoxelTaskKind::NetworkRepresentation;
 	Task.Stamp.OwnerId = OwnerId;
 	Task.Stamp.OwnerIncarnation = OwnerIncarnation;
@@ -1071,35 +1087,84 @@ bool FVoxelOverlayReplica::QueuePreparation(const FGuid& InIdentity, const bool 
 	Task.SourceStableKey = OwnerId;
 	Task.FirstRunnableSeconds = FPlatformTime::Seconds();
 	Task.bResumable = true;
-	Task.GetBlockReason = [Work, WorkResources = Resources]
+	Task.ReservedBytes = 1;
+	Preparing = Work;
+	return RetryPendingPreparation(OutError);
+}
+
+bool FVoxelOverlayReplica::RetryPendingPreparation(FString& OutError)
+{
+	if (!PendingTask.IsSet() || !Preparing) return true;
+	if (bBindingCapacityBlocked)
+	{
+		uint64 Current = 0;
+		if (!TaskBindingResources->TryGetReleaseVersionExcludingOwner(TaskBindingConsumer, Current) || Current <= BindingCapacityVersion)
+		{
+			OutError.Reset();
+			return true;
+		}
+		bBindingCapacityBlocked = false;
+	}
+	const auto Work = Preparing;
+	auto& Task = PendingTask.GetValue();
+	const uint64 BeforeBinding = TaskBindingResources->ReleaseVersionExcludingOwner(TaskBindingConsumer);
+	auto GetBlockReason = [Work, WorkResources = Resources]
 	{
 		return Work->bWaitingCapacity.Load() && WorkResources->Snapshot().ReleaseVersion <= Work->CapacityVersion ?
 			EVoxelTaskBlockReason::Memory : EVoxelTaskBlockReason::None;
 	};
-	Task.Execute = [Work](const TAtomic<bool>& Cancel)
+	auto Execute = [Work](const TAtomic<bool>& Cancel)
 	{
 		auto Result = Work->Advance(Cancel);
 		if (Result.bSuccess && !Result.bContinue) Result.CustomPayload = Work;
 		return Result;
 	};
 	const TWeakPtr<FVoxelOverlayReplicaLifetime, ESPMode::ThreadSafe> WeakLifetime = Lifetime;
-	Task.Apply = [WeakLifetime, Work](FVoxelTaskResult&& Result)
+	auto Apply = [WeakLifetime, Work](FVoxelTaskResult&& Result)
 	{
 		if (const auto Owner = WeakLifetime.Pin(); Owner && Owner->Owner) Owner->Owner->ApplyPreparation(Work, MoveTemp(Result));
 	};
-	Preparing = Work;
-	if (TaskQueue(MoveTemp(Task))) return true;
-	if (bInDelta)
+	if ((!Task.bBlockBound && !Task.BindGetBlockReason(TaskBindingResources.ToSharedRef(), TaskBindingConsumer, MoveTemp(GetBlockReason), OutError)) ||
+		(!Task.bExecuteBound && !Task.BindExecute(TaskBindingResources.ToSharedRef(), TaskBindingConsumer, MoveTemp(Execute), OutError)) ||
+		(!Task.bApplyBound && !Task.BindApply(TaskBindingResources.ToSharedRef(), TaskBindingConsumer, MoveTemp(Apply), OutError)))
 	{
-		Receiving->Transactions.Add(InIdentity, MoveTemp(Work->Worker->Receiving->Transactions.FindChecked(InIdentity)));
-		Receiving->DeltaOrder.AddUnique(InIdentity);
+		if (!OutError.StartsWith(TEXT("CapacityBlocked"))) return false;
+		bBindingCapacityBlocked = true;
+		BindingCapacityVersion = BeforeBinding;
+		OutError.Reset();
+		return true;
 	}
-	else if (bRegionOnly)
-		Receiving->Regions.Add(Keys[0], MoveTemp(Work->Worker->Receiving->Regions.FindChecked(Keys[0])));
-	Receiving->Bytes += Work->Bytes;
+	FVoxelTaskRequest Candidate = MoveTemp(Task);
+	PendingTask.Reset();
+	if (TaskQueue(MoveTemp(Candidate)))
+	{
+		OutError.Reset();
+		return true;
+	}
+	if (Preparing != Work || PendingTask.IsSet())
+	{
+		OutError.Reset();
+		return true;
+	}
+	PendingTask.Emplace(MoveTemp(Candidate));
+	if (PendingTask->Blocked == EVoxelTaskBlockReason::Oversized || PendingTask->Blocked == EVoxelTaskBlockReason::TerminalFailure)
+	{
+		OutError = TEXT("Oversized: Replica original task admission is unreachable or invalid");
+		return false;
+	}
+	bBindingCapacityBlocked = (uint16(PendingTask->Blocked) & (uint16(EVoxelTaskBlockReason::Memory) | uint16(EVoxelTaskBlockReason::InputMemory))) != 0;
+	BindingCapacityVersion = BeforeBinding;
+	OutError.Reset();
+	return true;
+}
+
+void FVoxelOverlayReplica::CancelPendingPreparation()
+{
+	check(PendingTask.IsSet());
+	PendingTask.Reset();
+	bBindingCapacityBlocked = false;
 	Receiving->PreparingBytes = 0;
 	Preparing.Reset();
-	return true;
 }
 void FVoxelOverlayReplica::ApplyPreparation(TSharedPtr<FVoxelOverlayReplicaWork, ESPMode::ThreadSafe> Work,
 	FVoxelTaskResult&& Result)
@@ -1565,6 +1630,7 @@ void FVoxelOverlayReplica::CancelTicket(const FGuid& InTicket)
 {
 	check(IsInGameThread());
 	if (Preparing && Preparing->CoverageTicket == InTicket && TaskCanceler) TaskCanceler(Preparing->Stamp);
+	if (PendingTask.IsSet() && Preparing && Preparing->CoverageTicket == InTicket) CancelPendingPreparation();
 	if (const auto* Ticket = Receiving->Tickets.Find(InTicket); Ticket && Ticket->Cohort)
 		Receiving->Bytes -= Ticket->Cohort->AllocatedBytes();
 	Receiving->Tickets.Remove(InTicket);
@@ -1581,6 +1647,7 @@ void FVoxelOverlayReplica::CancelTicket(const FGuid& InTicket)
 bool FVoxelOverlayReplica::Advance(const int32 InMaximumOperations, FString& OutError)
 {
 	check(IsInGameThread());
+	if (PendingTask.IsSet() && !RetryPendingPreparation(OutError)) return false;
 	for (int32 Work = 0; Work < InMaximumOperations; ++Work)
 	{
 		if (!Receiving->TicketOrder.IsEmpty() && ((Work & 1) == 0 || Receiving->DeltaOrder.IsEmpty()))
@@ -1782,6 +1849,8 @@ void FVoxelOverlayReplica::Reset()
 	check(OwnerIncarnation < MAX_uint64);
 	if (Preparing && TaskCanceler) TaskCanceler(Preparing->Stamp);
 	++OwnerIncarnation;
+	PendingTask.Reset();
+	bBindingCapacityBlocked = false;
 	Preparing.Reset();
 	Root.Reset();
 	Receiving = MakeUnique<FVoxelOverlayReplicaReceiving>();

@@ -16,7 +16,7 @@ bool FVoxelLocalPlanClosureTest::RunTest(const FString& InParameters)
 {
 	const auto Config = VoxelTest::MakeGenerationConfig();
 	const auto Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelGenerationPlanCoordinator Coordinator(Scheduler, Config, Cache, 17);
 	FVoxelGenerationPlanDependency Near, Far;
 	Near.Kind = Far.Kind = EVoxelGenerationPlanKind::Structure;
@@ -57,7 +57,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelEnvironmentAttemptIsolationTest, "WHFrame
 bool FVoxelEnvironmentAttemptIsolationTest::RunTest(const FString& InParameters)
 {
 	const auto Config = VoxelTest::MakeGenerationConfig();
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelGenerationPlanCoordinator Coordinator(Scheduler, Config, MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>(), 19);
 	const FVoxelGenerationBounds Column{FIntVector(-1, 8, 0), FIntVector(-1, 8, 0)};
 	const auto First = Coordinator.EnvironmentConsumer(Column, true);
@@ -241,7 +241,7 @@ bool FVoxelGenerationGraphAdmissionTest::RunTest(const FString& InParameters)
 	(void)InParameters;
 	const auto Config = VoxelTest::MakeGenerationConfig();
 	const auto Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelGenerationPlanCoordinator Coordinator(Scheduler, Config, Cache, 61);
 	FVoxelGenerationPlanDependency First;
 	FVoxelGenerationPlanDependency Second;
@@ -357,7 +357,7 @@ bool FVoxelCoordinatorStorageCapacityTest::RunTest(const FString& InParameters)
 	(void)InParameters;
 	const auto Config = VoxelTest::MakeGenerationConfig();
 	const auto Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelGenerationPlanCoordinator Coordinator(Scheduler, Config, Cache, 67);
 	const auto Resources = Scheduler.GetRuntimeResources();
 	FVoxelGenerationPlanDependency First;
@@ -433,7 +433,7 @@ bool FVoxelCoordinatorWakeLifetimeTest::RunTest(const FString& InParameters)
 	(void)InParameters;
 	const auto Config = VoxelTest::MakeGenerationConfig();
 	const auto Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelGenerationPlanDependency Fact;
 	FVoxelHydrologyPlanPtr Plan;
 	FString Error;
@@ -500,7 +500,7 @@ bool FVoxelPlanCaptureCapacityTest::RunTest(const FString& InParameters)
 	(void)InParameters;
 	const auto Config = VoxelTest::MakeGenerationConfig();
 	const auto Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelGenerationPlanCoordinator Coordinator(Scheduler, Config, Cache, 79);
 	const auto Resources = Scheduler.GetRuntimeResources();
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(79, FGuid::NewGuid(), 1, {}, 1);

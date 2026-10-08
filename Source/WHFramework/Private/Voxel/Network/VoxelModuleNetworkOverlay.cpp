@@ -280,6 +280,12 @@ void UVoxelModuleNetworkComponent::HandleOverlayMessage(const EVoxelMessage Kind
 		State.Identity.Ticket = Message.CoverageTicket;
 		if (State.bBuild) WorldModule->CancelTerrainNetworkTask(State.BuildStamp);
 		if (State.bEncode) WorldModule->CancelTerrainNetworkTask(State.EncodeStamp);
+		State.BuildAdmission.Reset();
+		State.EncodeAdmission.Reset();
+		State.SnapshotBuildHead.Reset();
+		State.DeltaBuildHead.Reset();
+		State.DeltaBuildBasis.Reset();
+		State.EncodeHead.Reset();
 		++State.BuildSerial;
 		State.bBuild = State.bEncode = false;
 		State.AuthorityRoot.Reset();
@@ -331,57 +337,74 @@ void UVoxelModuleNetworkComponent::BeginOverlaySnapshot()
 {
 	auto* WorldModule = Module.Get();
 	if (!OverlayNetwork || !WorldModule || !WorldModule->IsAuthority() || OverlayNetwork->Regions.IsEmpty()) return;
-	auto& State = *OverlayNetwork;
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> CaptureLease;
-	const auto Consumer = FVoxelGenerationConsumerKey::Section(WorldModule->GetWorldEpoch(), TaskOwnerId,
-		TaskOwnerIncarnation, State.Regions[0], ++NextTaskSerial);
-	const uint64 Metadata = VoxelBoundedAllocation::SharedBytes<FVoxelOverlayAuthoritySnapshotBuild>() +
-		VoxelBoundedAllocation::ArrayBytes<FVoxelOverlayAuthorityRegionCapture>(State.Regions.Num());
-	if (!State.Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input, Metadata, CaptureLease)) return;
-	TArray<FVoxelOverlayAuthorityRegionCapture> Captures;
-	Captures.Reserve(State.Regions.Num());
-	State.Identity.Cut = WorldModule->GetRuntime()->GetAuthorityCommitCut();
-	for (const auto& Key : State.Regions)
+	const auto StateOwner = OverlayNetwork;
+	auto& State = *StateOwner;
+	if (State.DeltaBuildHead)
 	{
-		FVoxelOverlayAuthorityRegionCapture Capture;
-		Capture.Head.Region = Key;
-		Capture.Head.Sequence = WorldModule->GetRuntime()->GetOverlayRegionSequence(Key);
-		FString Error;
-		if (!WorldModule->CaptureFineOverlays({Key * 128, (Key + FIntVector(1)) * 128}, Capture.Capture, Error))
-		{
-			UE_LOG(LogTemp, Warning, TEXT("Overlay 切点捕获等待：%s"), *Error);
-			return;
-		}
-		Captures.Add(MoveTemp(Capture));
+		State.BuildAdmission.Reset();
+		State.DeltaBuildHead.Reset();
+		State.DeltaBuildBasis.Reset();
 	}
-	const auto Identity = State.Identity;
-	const uint64 BuildSerial = ++State.BuildSerial;
-	auto Build = MakeShared<FVoxelOverlayAuthoritySnapshotBuild, ESPMode::ThreadSafe>(Identity, MoveTemp(Captures),
-		State.Resources.ToSharedRef(), Consumer, MoveTemp(CaptureLease));
-	FVoxelTaskRequest Task;
-	Task.Kind = EVoxelTaskKind::NetworkRepresentation;
-	Task.Stamp.OwnerId = TaskOwnerId;
-	Task.Stamp.OwnerIncarnation = TaskOwnerIncarnation;
-	Task.Stamp.WorldEpoch = WorldModule->GetWorldEpoch();
-	Task.Stamp.Token = ++NextTaskSerial;
-	Task.Stamp.Section = State.Regions[0];
-	State.BuildStamp = Task.Stamp;
-	Task.ServiceBand = EVoxelTerrainServiceBand::P2;
-	Task.WorkClass = EVoxelWorkClass::Visible;
-	Task.SourceStableKey = TaskOwnerId;
-	Task.FirstRunnableSeconds = FPlatformTime::Seconds();
-	Task.bResumable = true;
-	Task.GetBlockReason = [Build, Resources = State.Resources]
+	if (!State.SnapshotBuildHead)
+	{
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> CaptureLease;
+		const auto Consumer = FVoxelGenerationConsumerKey::Section(WorldModule->GetWorldEpoch(), TaskOwnerId,
+			TaskOwnerIncarnation, State.Regions[0], ++NextTaskSerial);
+		const uint64 Metadata = VoxelBoundedAllocation::SharedBytes<FVoxelOverlayAuthoritySnapshotBuild>() +
+			VoxelBoundedAllocation::ArrayBytes<FVoxelOverlayAuthorityRegionCapture>(State.Regions.Num());
+		if (!State.Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input, Metadata, CaptureLease)) return;
+		TArray<FVoxelOverlayAuthorityRegionCapture> Captures;
+		Captures.Reserve(State.Regions.Num());
+		State.Identity.Cut = WorldModule->GetRuntime()->GetAuthorityCommitCut();
+		for (const auto& Key : State.Regions)
+		{
+			FVoxelOverlayAuthorityRegionCapture Capture;
+			Capture.Head.Region = Key;
+			Capture.Head.Sequence = WorldModule->GetRuntime()->GetOverlayRegionSequence(Key);
+			FString Error;
+			if (!WorldModule->CaptureFineOverlays({Key * 128, (Key + FIntVector(1)) * 128}, Capture.Capture, Error))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Overlay 切点捕获等待：%s"), *Error);
+				return;
+			}
+			Captures.Add(MoveTemp(Capture));
+		}
+		State.SnapshotBuildIdentity = State.Identity;
+		++State.BuildSerial;
+		State.SnapshotBuildHead = MakeShared<FVoxelOverlayAuthoritySnapshotBuild, ESPMode::ThreadSafe>(State.SnapshotBuildIdentity, MoveTemp(Captures),
+			State.Resources.ToSharedRef(), Consumer, MoveTemp(CaptureLease));
+		State.BuildAdmission.Request.Emplace();
+		auto& Task = State.BuildAdmission.Request.GetValue();
+		Task.Kind = EVoxelTaskKind::NetworkRepresentation;
+		Task.Stamp.OwnerId = TaskOwnerId;
+		Task.Stamp.OwnerIncarnation = TaskOwnerIncarnation;
+		Task.Stamp.WorldEpoch = WorldModule->GetWorldEpoch();
+		Task.Stamp.Token = ++NextTaskSerial;
+		Task.Stamp.Section = State.Regions[0];
+		State.BuildStamp = Task.Stamp;
+		Task.ServiceBand = EVoxelTerrainServiceBand::P2;
+		Task.WorkClass = EVoxelWorkClass::Visible;
+		Task.SourceStableKey = TaskOwnerId;
+		Task.FirstRunnableSeconds = FPlatformTime::Seconds();
+		Task.bResumable = true;
+		Task.ReservedBytes = 1;
+	}
+	const auto Build = State.SnapshotBuildHead;
+	const auto Identity = State.SnapshotBuildIdentity;
+	const uint64 BuildSerial = State.BuildSerial;
+
+	auto GetBlockReason = [Build, Resources = State.Resources]
 	{
 		return Build->IsCapacityBlocked() && Resources->Snapshot().ReleaseVersion <= Build->GetCapacityVersion() ?
 			EVoxelTaskBlockReason::Memory : EVoxelTaskBlockReason::None;
 	};
-	Task.Execute = [Build](const TAtomic<bool>& Cancel) { return Build->Advance(Cancel); };
-	Task.Apply = [Weak = TWeakObjectPtr<UVoxelModuleNetworkComponent>(this), Identity, BuildSerial](FVoxelTaskResult&& Result)
+	auto Execute = [Build](const TAtomic<bool>& Cancel) { return Build->Advance(Cancel); };
+	auto Apply = [Weak = TWeakObjectPtr<UVoxelModuleNetworkComponent>(this), Identity, BuildSerial](FVoxelTaskResult&& Result)
 	{
 		auto* Component = Weak.Get();
 		if (!Component || !Component->OverlayNetwork || Component->TaskOwnerId != Result.Stamp.OwnerId ||
-			Component->TaskOwnerIncarnation != Result.Stamp.OwnerIncarnation) return;
+			Component->TaskOwnerIncarnation != Result.Stamp.OwnerIncarnation || !Component->Module.IsValid() ||
+			Component->Module->GetWorldEpoch() != Result.Stamp.WorldEpoch || Component->OverlayNetwork->BuildStamp != Result.Stamp) return;
 		auto& Current = *Component->OverlayNetwork;
 		auto* CurrentModule = Component->Module.Get();
 		if (!CurrentModule || CurrentModule->GetWorldEpoch() != Result.Stamp.WorldEpoch ||
@@ -407,12 +430,27 @@ void UVoxelModuleNetworkComponent::BeginOverlaySnapshot()
 			MoveTemp(Targets), Current.Resources.ToSharedRef(), FVoxelGenerationConsumerKey::Section(Result.Stamp.WorldEpoch,
 				Result.Stamp.OwnerId, Result.Stamp.OwnerIncarnation, Result.Stamp.Section, Result.Stamp.Token));
 	};
-	if (WorldModule->EnqueueNetworkRepresentationTask(MoveTemp(Task)))
+	FString BindingError;
+	const auto BindingResources = WorldModule->GetTerrainResources();
+	if (!BindingResources) return;
+	if (!State.BuildAdmission.Bind(BindingResources.ToSharedRef(), WorldModule->GetTerrainTaskControlConsumer(),
+		MoveTemp(GetBlockReason), MoveTemp(Execute), MoveTemp(Apply), BindingError))
 	{
+		if (!BindingError.StartsWith(TEXT("CapacityBlocked"))) Fail(BindingError);
+		return;
+	}
+	if (State.BuildAdmission.Enqueue([WorldModule](FVoxelTaskRequest&& Request)
+		{ return WorldModule->EnqueueNetworkRepresentationTask(MoveTemp(Request)); }, BindingResources.ToSharedRef(),
+		WorldModule->GetTerrainTaskControlConsumer(), BindingError))
+	{
+		if (OverlayNetwork != StateOwner || State.SnapshotBuildHead != Build) return;
+		State.BuildAdmission.Reset();
+		State.SnapshotBuildHead.Reset();
 		State.LastRetry = FPlatformTime::Seconds();
 		State.bBuild = true;
 		State.bNeedsSnapshot = false;
-		State.Edits.Reset();
+		for (int32 Index = State.Edits.Num() - 1; Index >= 0; --Index)
+			if (State.Edits[Index].Cut <= Identity.Cut) State.Edits.RemoveAt(Index, 1, EAllowShrinking::No);
 		State.Replay.Reset();
 		State.ReplayBytes = 0;
 		State.Acknowledged.Reset();
@@ -421,6 +459,7 @@ void UVoxelModuleNetworkComponent::BeginOverlaySnapshot()
 		State.Outbound.Reset();
 		State.bEncode = false;
 	}
+	else if (!BindingError.IsEmpty()) Fail(BindingError);
 }
 
 void UVoxelModuleNetworkComponent::CaptureOverlayCommit(const FVoxelEditBatch& Batch)
@@ -428,7 +467,7 @@ void UVoxelModuleNetworkComponent::CaptureOverlayCommit(const FVoxelEditBatch& B
 	auto* WorldModule = Module.Get();
 	if (!OverlayNetwork || !WorldModule || !WorldModule->IsAuthority() || !OverlayNetwork->Identity.Ticket.IsValid()) return;
 	auto& State = *OverlayNetwork;
-	if (State.bNeedsSnapshot || Batch.Sections.IsEmpty()) return;
+	if ((State.bNeedsSnapshot && !State.SnapshotBuildHead) || Batch.Sections.IsEmpty()) return;
 	if (State.Edits.Num() >= 256) { State.bNeedsSnapshot = true; return; }
 	int32 Count = 0;
 	for (const auto& Patch : Batch.Sections)
@@ -471,24 +510,31 @@ void UVoxelModuleNetworkComponent::AdvanceOverlayProtocol(const double Now, cons
 {
 	auto* WorldModule = Module.Get();
 	if (!OverlayNetwork || !WorldModule) return;
-	auto& State = *OverlayNetwork;
+	const auto StateOwner = OverlayNetwork;
+	auto& State = *StateOwner;
 	const bool bServer = GetOwner() && GetOwner()->HasAuthority();
 	if (!State.bDecode)
 	{
-		TSharedPtr<FVoxelOverlayInboundWork, ESPMode::ThreadSafe> Work;
-		if (State.Inbound.Dequeue(Work))
+		if (State.InboundHead || State.Inbound.Dequeue(State.InboundHead))
 		{
-			FVoxelTaskRequest Task;
-			Task.Kind = EVoxelTaskKind::NetworkRepresentation;
-			Task.Stamp.WorldEpoch = WorldModule->GetWorldEpoch();
-			Task.Stamp.OwnerId = TaskOwnerId;
-			Task.Stamp.OwnerIncarnation = TaskOwnerIncarnation;
-			Task.Stamp.Token = ++NextTaskSerial;
-			Task.WorkClass = EVoxelWorkClass::Visible;
-			Task.ServiceBand = EVoxelTerrainServiceBand::P2;
-			Task.SourceStableKey = TaskOwnerId;
-			Task.FirstRunnableSeconds = Now;
-			Task.Execute = [Work](const TAtomic<bool>& Cancel)
+			const auto Work = State.InboundHead;
+			if (!State.DecodeAdmission.Request.IsSet())
+			{
+				State.DecodeAdmission.Request.Emplace();
+				auto& Task = State.DecodeAdmission.Request.GetValue();
+				Task.Kind = EVoxelTaskKind::NetworkRepresentation;
+				Task.Stamp.WorldEpoch = WorldModule->GetWorldEpoch();
+				Task.Stamp.OwnerId = TaskOwnerId;
+				Task.Stamp.OwnerIncarnation = TaskOwnerIncarnation;
+				Task.Stamp.Token = ++NextTaskSerial;
+				Task.WorkClass = EVoxelWorkClass::Visible;
+				Task.ServiceBand = EVoxelTerrainServiceBand::P2;
+				Task.SourceStableKey = TaskOwnerId;
+				Task.FirstRunnableSeconds = Now;
+				Task.ReservedBytes = 1;
+			}
+
+			auto Execute = [Work](const TAtomic<bool>& Cancel)
 			{
 				FVoxelTaskResult Result;
 				if (Cancel.Load()) { Result.bCanceled = true; return Result; }
@@ -497,7 +543,7 @@ void UVoxelModuleNetworkComponent::AdvanceOverlayProtocol(const double Now, cons
 				if (Result.bSuccess) Result.CustomPayload = Work;
 				return Result;
 			};
-			Task.Apply = [Weak = TWeakObjectPtr<UVoxelModuleNetworkComponent>(this), Work](FVoxelTaskResult&& Result)
+			auto Apply = [Weak = TWeakObjectPtr<UVoxelModuleNetworkComponent>(this), Work](FVoxelTaskResult&& Result)
 			{
 				auto* Component = Weak.Get();
 				if (!Component || !Component->OverlayNetwork || Component->TaskOwnerId != Result.Stamp.OwnerId ||
@@ -510,8 +556,31 @@ void UVoxelModuleNetworkComponent::AdvanceOverlayProtocol(const double Now, cons
 				if (Result.bSuccess && !Result.bCanceled) Component->HandleOverlayMessage(Work->Kind, MoveTemp(Work->Message), Work->bServer);
 				else if (!Result.bCanceled) Component->Fail(Result.Error.IsEmpty() ? TEXT("Overlay 区域消息验证失败") : Result.Error);
 			};
-			if (WorldModule->EnqueueNetworkRepresentationTask(MoveTemp(Task))) State.bDecode = true;
-			else State.Inbound.Enqueue(MoveTemp(Work));
+			FString BindingError;
+			const auto BindingResources = WorldModule->GetTerrainResources();
+			if (BindingResources && State.DecodeAdmission.Bind(BindingResources.ToSharedRef(), WorldModule->GetTerrainTaskControlConsumer(),
+				[] { return EVoxelTaskBlockReason::None; }, MoveTemp(Execute), MoveTemp(Apply), BindingError))
+			{
+				if (State.DecodeAdmission.Enqueue([WorldModule](FVoxelTaskRequest&& Request)
+					{ return WorldModule->EnqueueNetworkRepresentationTask(MoveTemp(Request)); }, BindingResources.ToSharedRef(),
+					WorldModule->GetTerrainTaskControlConsumer(), BindingError))
+				{
+					if (OverlayNetwork != StateOwner || State.InboundHead != Work) return;
+					State.bDecode = true;
+					State.DecodeAdmission.Reset();
+					State.InboundHead.Reset();
+				}
+				else if (!BindingError.IsEmpty())
+				{
+					Fail(BindingError);
+					return;
+				}
+			}
+			else if (!BindingError.IsEmpty() && !BindingError.StartsWith(TEXT("CapacityBlocked")))
+			{
+				Fail(BindingError);
+				return;
+			}
 		}
 	}
 	if (FPlatformTime::Seconds() >= Deadline) return;
@@ -585,36 +654,45 @@ void UVoxelModuleNetworkComponent::AdvanceOverlayProtocol(const double Now, cons
 	}
 	if (!State.bEncode && (State.SnapshotEncoder || State.DeltaEncoder))
 	{
-		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-		const auto Consumer = FVoxelGenerationConsumerKey::Section(WorldModule->GetWorldEpoch(), TaskOwnerId,
-			TaskOwnerIncarnation, {}, ++NextTaskSerial);
-		if (!State.Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Working,
-			VoxelBoundedAllocation::SharedBytes<FVoxelOverlayOutboundWork>(), Lease)) return;
-		auto Work = MakeShared<FVoxelOverlayOutboundWork, ESPMode::ThreadSafe>();
-		Work->ResourceLease = MoveTemp(Lease);
+		if (!State.EncodeHead)
+		{
+			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+			State.EncodeConsumer = FVoxelGenerationConsumerKey::Section(WorldModule->GetWorldEpoch(), TaskOwnerId,
+				TaskOwnerIncarnation, {}, ++NextTaskSerial);
+			if (!State.Resources->Acquire(State.EncodeConsumer, EVoxelTerrainResourcePool::Working,
+				VoxelBoundedAllocation::SharedBytes<FVoxelOverlayOutboundWork>(), Lease)) return;
+			State.EncodeHead = MakeShared<FVoxelOverlayOutboundWork, ESPMode::ThreadSafe>();
+			State.EncodeHead->ResourceLease = MoveTemp(Lease);
+			State.EncodeAdmission.Request.Emplace();
+			auto& Task = State.EncodeAdmission.Request.GetValue();
+			Task.Kind = EVoxelTaskKind::NetworkRepresentation;
+			Task.Stamp.WorldEpoch = WorldModule->GetWorldEpoch();
+			Task.Stamp.OwnerId = TaskOwnerId;
+			Task.Stamp.OwnerIncarnation = TaskOwnerIncarnation;
+			Task.Stamp.Token = ++NextTaskSerial;
+			Task.bResumable = true;
+			State.EncodeStamp = Task.Stamp;
+			Task.WorkClass = EVoxelWorkClass::Visible;
+			Task.ServiceBand = EVoxelTerrainServiceBand::P2;
+			Task.SourceStableKey = TaskOwnerId;
+			Task.FirstRunnableSeconds = Now;
+			Task.ReservedBytes = 1;
+		}
+		const auto Work = State.EncodeHead;
 		const auto SnapshotEncoder = State.SnapshotEncoder;
 		const auto DeltaEncoder = State.DeltaEncoder;
-		FVoxelTaskRequest Task;
-		Task.Kind = EVoxelTaskKind::NetworkRepresentation;
-		Task.Stamp.WorldEpoch = WorldModule->GetWorldEpoch();
-		Task.Stamp.OwnerId = TaskOwnerId;
-		Task.Stamp.OwnerIncarnation = TaskOwnerIncarnation;
-		Task.Stamp.Token = ++NextTaskSerial;
-		Task.bResumable = true;
-		State.EncodeStamp = Task.Stamp;
-		Task.WorkClass = EVoxelWorkClass::Visible;
-		Task.ServiceBand = EVoxelTerrainServiceBand::P2;
-		Task.SourceStableKey = TaskOwnerId;
-		Task.FirstRunnableSeconds = Now;
-		Task.GetBlockReason = [Work, Resources = State.Resources]
+		const auto Consumer = State.EncodeConsumer;
+
+		auto GetBlockReason = [Work, Resources = State.Resources, Consumer]
 		{
-			return Work->bCapacityBlocked.Load() && Resources->Snapshot().ReleaseVersion <= Work->CapacityVersion.Load() ?
+			return Work->bCapacityBlocked.Load() && Resources->ReleaseVersionExcludingOwner(Consumer) <= Work->CapacityVersion.Load() ?
 				EVoxelTaskBlockReason::Memory : EVoxelTaskBlockReason::None;
 		};
-		Task.Execute = [Work, SnapshotEncoder, DeltaEncoder, Resources = State.Resources, Consumer, EnvelopeSession = Session](const TAtomic<bool>& Cancel)
+		auto Execute = [Work, SnapshotEncoder, DeltaEncoder, Resources = State.Resources, Consumer, EnvelopeSession = Session](const TAtomic<bool>& Cancel)
 		{
 			FVoxelTaskResult Result;
 			if (Cancel.Load()) { Result.bCanceled = true; return Result; }
+			const uint64 BeforeBodyAdmission = Resources->ReleaseVersionExcludingOwner(Consumer);
 			Work->bCapacityBlocked.Store(false);
 			if (!Work->bBodyReady)
 			{
@@ -668,7 +746,7 @@ void UVoxelModuleNetworkComponent::AdvanceOverlayProtocol(const double Now, cons
 			}
 			if (!Result.bSuccess && Result.Error.StartsWith(TEXT("CapacityBlocked:")))
 			{
-				Work->CapacityVersion.Store(Resources->Snapshot().ReleaseVersion);
+				Work->CapacityVersion.Store(BeforeBodyAdmission);
 				Work->bCapacityBlocked.Store(true);
 				Result.bSuccess = Result.bContinue = true;
 				Result.Error.Reset();
@@ -676,7 +754,7 @@ void UVoxelModuleNetworkComponent::AdvanceOverlayProtocol(const double Now, cons
 			else if (Result.bSuccess) { Work->bCapacityBlocked.Store(false); Result.CustomPayload = Work; }
 			return Result;
 		};
-		Task.Apply = [Weak = TWeakObjectPtr<UVoxelModuleNetworkComponent>(this), Work, SnapshotEncoder, DeltaEncoder](FVoxelTaskResult&& Result)
+		auto Apply = [Weak = TWeakObjectPtr<UVoxelModuleNetworkComponent>(this), Work, SnapshotEncoder, DeltaEncoder](FVoxelTaskResult&& Result)
 		{
 			auto* Component = Weak.Get();
 			if (!Component || !Component->OverlayNetwork || !Component->Module.IsValid() || Component->TaskOwnerId != Result.Stamp.OwnerId ||
@@ -688,41 +766,69 @@ void UVoxelModuleNetworkComponent::AdvanceOverlayProtocol(const double Now, cons
 			if (Result.bSuccess && !Result.bCanceled) Current.Outbound = Work;
 			else Current.bNeedsSnapshot = true;
 		};
-		if (WorldModule->EnqueueNetworkRepresentationTask(MoveTemp(Task))) State.bEncode = true;
+		FString BindingError;
+		const auto BindingResources = WorldModule->GetTerrainResources();
+		if (!BindingResources) return;
+		if (!State.EncodeAdmission.Bind(BindingResources.ToSharedRef(), WorldModule->GetTerrainTaskControlConsumer(),
+			MoveTemp(GetBlockReason), MoveTemp(Execute), MoveTemp(Apply), BindingError))
+		{
+			if (!BindingError.StartsWith(TEXT("CapacityBlocked"))) Fail(BindingError);
+			return;
+		}
+		if (State.EncodeAdmission.Enqueue([WorldModule](FVoxelTaskRequest&& Request)
+			{ return WorldModule->EnqueueNetworkRepresentationTask(MoveTemp(Request)); }, BindingResources.ToSharedRef(),
+			WorldModule->GetTerrainTaskControlConsumer(), BindingError))
+		{
+			if (OverlayNetwork != StateOwner || State.EncodeHead != Work) return;
+			State.bEncode = true;
+			State.EncodeAdmission.Reset();
+			State.EncodeHead.Reset();
+		}
+		else if (!BindingError.IsEmpty()) Fail(BindingError);
 		return;
 	}
-	if (State.bBuild || State.SnapshotEncoder || State.DeltaEncoder || State.Edits.IsEmpty() || !State.AuthorityRoot) return;
+	if (State.bBuild || State.SnapshotEncoder || State.DeltaEncoder ||
+		(!State.DeltaBuildHead && State.Edits.IsEmpty()) || !State.AuthorityRoot) return;
 	if (State.ReplayBytes >= OverlayConnectionBytes || State.Replay.Num() >= 256) { State.bNeedsSnapshot = true; return; }
-	auto Edit = MoveTemp(State.Edits[0]);
-	State.Edits.RemoveAt(0, 1, EAllowShrinking::No);
-	if (Edit.Cut <= State.AuthorityRoot->Identity.Cut) return;
-	const auto Basis = State.AuthorityRoot;
-	const auto Consumer = FVoxelGenerationConsumerKey::Section(WorldModule->GetWorldEpoch(), TaskOwnerId,
-		TaskOwnerIncarnation, {}, ++NextTaskSerial);
-	auto Build = MakeShared<FVoxelOverlayAuthorityDeltaBuild, ESPMode::ThreadSafe>(Basis.ToSharedRef(), MoveTemp(Edit), State.Resources.ToSharedRef(), Consumer);
-	FVoxelTaskRequest Task;
-	Task.Kind = EVoxelTaskKind::NetworkRepresentation;
-	Task.Stamp.WorldEpoch = WorldModule->GetWorldEpoch();
-	Task.Stamp.OwnerId = TaskOwnerId;
-	Task.Stamp.OwnerIncarnation = TaskOwnerIncarnation;
-	Task.Stamp.Token = ++NextTaskSerial;
-	Task.WorkClass = EVoxelWorkClass::Visible;
-	State.BuildStamp = Task.Stamp;
-	Task.ServiceBand = EVoxelTerrainServiceBand::P2;
-	Task.SourceStableKey = TaskOwnerId;
-	Task.FirstRunnableSeconds = Now;
-	Task.bResumable = true;
-	Task.GetBlockReason = [Build, Resources = State.Resources]
+	if (!State.DeltaBuildHead)
+	{
+		auto Edit = MoveTemp(State.Edits[0]);
+		State.Edits.RemoveAt(0, 1, EAllowShrinking::No);
+		if (Edit.Cut <= State.AuthorityRoot->Identity.Cut) return;
+		State.DeltaBuildBasis = State.AuthorityRoot;
+		const auto Consumer = FVoxelGenerationConsumerKey::Section(WorldModule->GetWorldEpoch(), TaskOwnerId,
+			TaskOwnerIncarnation, {}, ++NextTaskSerial);
+		State.DeltaBuildHead = MakeShared<FVoxelOverlayAuthorityDeltaBuild, ESPMode::ThreadSafe>(State.DeltaBuildBasis.ToSharedRef(), MoveTemp(Edit), State.Resources.ToSharedRef(), Consumer);
+		State.BuildAdmission.Request.Emplace();
+		auto& Task = State.BuildAdmission.Request.GetValue();
+		Task.Kind = EVoxelTaskKind::NetworkRepresentation;
+		Task.Stamp.WorldEpoch = WorldModule->GetWorldEpoch();
+		Task.Stamp.OwnerId = TaskOwnerId;
+		Task.Stamp.OwnerIncarnation = TaskOwnerIncarnation;
+		Task.Stamp.Token = ++NextTaskSerial;
+		Task.WorkClass = EVoxelWorkClass::Visible;
+		State.BuildStamp = Task.Stamp;
+		Task.ServiceBand = EVoxelTerrainServiceBand::P2;
+		Task.SourceStableKey = TaskOwnerId;
+		Task.FirstRunnableSeconds = Now;
+		Task.bResumable = true;
+		Task.ReservedBytes = 1;
+	}
+	const auto Build = State.DeltaBuildHead;
+	const auto Basis = State.DeltaBuildBasis;
+
+	auto GetBlockReason = [Build, Resources = State.Resources]
 	{
 		return Build->IsCapacityBlocked() && Resources->Snapshot().ReleaseVersion <= Build->GetCapacityVersion() ?
 			EVoxelTaskBlockReason::Memory : EVoxelTaskBlockReason::None;
 	};
-	Task.Execute = [Build](const TAtomic<bool>& Cancel) { return Build->Advance(Cancel); };
-	Task.Apply = [Weak = TWeakObjectPtr<UVoxelModuleNetworkComponent>(this), Basis](FVoxelTaskResult&& Result)
+	auto Execute = [Build](const TAtomic<bool>& Cancel) { return Build->Advance(Cancel); };
+	auto Apply = [Weak = TWeakObjectPtr<UVoxelModuleNetworkComponent>(this), Basis](FVoxelTaskResult&& Result)
 	{
 		auto* Component = Weak.Get();
 		if (!Component || !Component->OverlayNetwork || Component->TaskOwnerId != Result.Stamp.OwnerId ||
-			Component->TaskOwnerIncarnation != Result.Stamp.OwnerIncarnation) return;
+			Component->TaskOwnerIncarnation != Result.Stamp.OwnerIncarnation || !Component->Module.IsValid() ||
+			Component->Module->GetWorldEpoch() != Result.Stamp.WorldEpoch || Component->OverlayNetwork->BuildStamp != Result.Stamp) return;
 		auto& Current = *Component->OverlayNetwork;
 		if (Current.AuthorityRoot != Basis) return;
 		Current.bBuild = false;
@@ -737,6 +843,24 @@ void UVoxelModuleNetworkComponent::AdvanceOverlayProtocol(const double Now, cons
 		Current.DeltaEncoder = MakeShared<FVoxelOverlayDeltaEncoder, ESPMode::ThreadSafe>(Delta.ToSharedRef(), Current.Resources.ToSharedRef(),
 			FVoxelGenerationConsumerKey::Section(Result.Stamp.WorldEpoch, Result.Stamp.OwnerId, Result.Stamp.OwnerIncarnation, {}, Result.Stamp.Token));
 	};
-	if (WorldModule->EnqueueNetworkRepresentationTask(MoveTemp(Task))) State.bBuild = true;
-	else State.bNeedsSnapshot = true;
+	FString BindingError;
+	const auto BindingResources = WorldModule->GetTerrainResources();
+	if (!BindingResources) return;
+	if (!State.BuildAdmission.Bind(BindingResources.ToSharedRef(), WorldModule->GetTerrainTaskControlConsumer(),
+		MoveTemp(GetBlockReason), MoveTemp(Execute), MoveTemp(Apply), BindingError))
+	{
+		if (!BindingError.StartsWith(TEXT("CapacityBlocked"))) Fail(BindingError);
+		return;
+	}
+	if (State.BuildAdmission.Enqueue([WorldModule](FVoxelTaskRequest&& Request)
+		{ return WorldModule->EnqueueNetworkRepresentationTask(MoveTemp(Request)); }, BindingResources.ToSharedRef(),
+		WorldModule->GetTerrainTaskControlConsumer(), BindingError))
+	{
+		if (OverlayNetwork != StateOwner || State.DeltaBuildHead != Build) return;
+		State.bBuild = true;
+		State.BuildAdmission.Reset();
+		State.DeltaBuildHead.Reset();
+		State.DeltaBuildBasis.Reset();
+	}
+	else if (!BindingError.IsEmpty()) Fail(BindingError);
 }

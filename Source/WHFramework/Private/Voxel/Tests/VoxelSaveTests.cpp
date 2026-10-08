@@ -975,7 +975,7 @@ bool FVoxelDirectoryBootstrapIsolationTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("Bootstrap replacement Tombstone encodes"), FVoxelDeltaCodec::Encode(Manifest, *Registry, Original, Bytes));
 	TestTrue(TEXT("Bootstrap replacement Tombstone stages"), FVoxelRegionStore::StageSection(Second, Original.Section, MoveTemp(Bytes)));
 	if (!TestTrue(TEXT("Bootstrap replacement generation writes"), FVoxelRegionStore::WritePendingRegions(Second, SecondDirectory, Error))) return false;
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	const auto Resources = Scheduler.GetRuntimeResources();
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Blocker;
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(83, FGuid::NewGuid(), 1, {}, 1);

@@ -145,6 +145,7 @@ public:
 
 	const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& GetResources() const;
 	const FVoxelGenerationConsumerKey& GetControlConsumer() const;
+	uint64 GetRootInputBytes() const { return RootInputBytes; }
 	/** 解析原 TLS 完整身份；无 TLS 使用冻结 Control，拒收不修改 OutConsumer。 */
 	bool ResolveConsumer(FVoxelGenerationConsumerKey& OutConsumer, FString& OutError) const;
 
@@ -385,6 +386,7 @@ private:
 private:
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
 	FVoxelGenerationConsumerKey ControlConsumer;
+	uint64 RootInputBytes = 0;
 	TArray<TUniquePtr<FNaturalShard>> NaturalShards;
 	TArray<TUniquePtr<FPlanShard>> PlanShards;
 

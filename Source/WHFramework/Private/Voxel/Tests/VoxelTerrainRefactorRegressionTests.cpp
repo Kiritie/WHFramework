@@ -89,7 +89,7 @@ bool FVoxelFinePageObsoleteDirtyCleanupTest::RunTest(const FString& InParameters
 	(void)InParameters;
 
 	UVoxelModule* Module = NewObject<UVoxelModule>();
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelViewManager Manager(*Module, Scheduler, 1);
 
 	const FVoxelFinePageKey Obsolete{FIntVector(5, 5, 0), 2};
@@ -168,7 +168,7 @@ bool FVoxelFineShardAttemptIsolationTest::RunTest(const FString& InParameters)
 	UVoxelModule* Module = NewObject<UVoxelModule>();
 	Module->Epoch = 11;
 	Module->Runtime = MakeUnique<FVoxelWorldRuntime>(11, true, VoxelTest::MakeRegistry(), VoxelTest::MakeGenerator());
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelViewManager Manager(*Module, Scheduler, 11);
 	const FVoxelFinePageKey Other{FIntVector(8, 0, 0), 1};
 	const FVoxelFineShardKey Key{FIntVector::ZeroValue, 32};
@@ -305,7 +305,7 @@ bool FVoxelCriticalDependencyAdmissionTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("Fixture covers the cylinder boundary beyond the movement sphere"), bHasVerticalBoundary);
 	UVoxelModule* Module = NewObject<UVoxelModule>();
 	Module->Runtime = MakeUnique<FVoxelWorldRuntime>(1024, false, VoxelTest::MakeRegistry(), VoxelTest::MakeGenerator());
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelViewManager Manager(*Module, Scheduler, 11);
 	FVoxelInterestSet Interest;
 	const FVoxelTerrainSpatialKey Dependency{EVoxelTerrainRepresentation::VoxelProxy, FIntVector::ZeroValue, 1};
@@ -458,7 +458,7 @@ bool FVoxelCriticalReadyQueueLivenessTest::RunTest(const FString& InParameters)
 	const auto Generator = MakeShared<FVoxelGenerationPipeline, ESPMode::ThreadSafe>(Config, Cache);
 	const auto Registry = VoxelTest::MakeRegistry();
 	FVoxelWorldRuntime Runtime(11, false, Registry, Generator);
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelRegionStore Store;
 	FVoxelWorldManifest Manifest;
 	FVoxelEmergeManager Manager(Runtime, Scheduler, Generator, Config, Cache, Store, Manifest, Registry);
@@ -500,7 +500,7 @@ bool FVoxelPlanConsumerWakeTest::RunTest(const FString& InParameters)
 {
 	const auto Config = VoxelTest::MakeGenerationConfig();
 	const auto Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelGenerationPlanCoordinator Coordinator(Scheduler, Config, Cache, 11);
 	FVoxelGenerationPlanDependency Dependency;
 	Dependency.Kind = EVoxelGenerationPlanKind::Hydrology;
@@ -550,7 +550,7 @@ bool FVoxelScopedCoverageContinuationTest::RunTest(const FString& InParameters)
 	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
 	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
 	UVoxelModule* Module = NewObject<UVoxelModule>();
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelViewPublisher Publisher(*Module, Scheduler, 11);
 	AActor* Actor = World->SpawnActor<AActor>();
 	const FVoxelPublishGroupKey Key{0, FIntVector::ZeroValue, 0};
@@ -593,7 +593,7 @@ bool FVoxelPublishEstimateRecoveryTest::RunTest(const FString& InParameters)
 	Module->ViewSettings.Budget.TerrainPublishMilliseconds = 0.1f;
 	Module->ViewSettings.Budget.PublishOperationEstimateFloorMilliseconds = 0.01f;
 	Module->ViewSettings.Budget.PublishOperationEstimateCeilingMilliseconds = 1.0;
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelViewPublisher Publisher(*Module, Scheduler, 11);
 	const uint8 Phase = uint8(EVoxelPublishPhase::Plan);
 	Publisher.PhaseOperationEstimateMilliseconds[Phase] = 8.0;

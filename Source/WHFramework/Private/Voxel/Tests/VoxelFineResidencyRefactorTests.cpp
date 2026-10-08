@@ -372,7 +372,7 @@ namespace VoxelFineRefactorTest
     class FAuthoredOverlay final : public IVoxelGenerationOverlay
     {
     public:
-        virtual bool ApplySection(const FIntVector& InSectionCoordinate, TArray<FVoxelBlockState>& InOutBlocks,
+        virtual bool ApplySection(const FIntVector& InSectionCoordinate, TArrayView<FVoxelBlockState> InOutBlocks,
             FString& OutError, const TAtomic<bool>* InCancel) const override
         {
             if (InCancel && InCancel->Load())
@@ -451,12 +451,14 @@ bool FVoxelFineExactSamplingTest::RunTest(const FString& InParameters)
     TMap<FIntVector, TArray<FVoxelBlockState>> Expected;
     for (const FIntVector& Key : RequiredSections)
     {
-        TArray<FVoxelBlockState> Blocks;
-        if (!Generator->GenerateSection(Key, Blocks, Error, &Cancel))
+        FVoxelBlockState Generated[4096];
+        if (!Generator->GenerateSection(Key, MakeArrayView(Generated), Error, &Cancel))
         {
             AddError(Error);
             return false;
         }
+        TArray<FVoxelBlockState> Blocks;
+        Blocks.Append(Generated, UE_ARRAY_COUNT(Generated));
         Expected.Add(Key, MoveTemp(Blocks));
     }
     bool bEqual = true;

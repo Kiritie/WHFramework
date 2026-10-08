@@ -94,6 +94,8 @@ FVoxelEmergeManager::FVoxelEmergeManager(
 			EVoxelGenerationSpatialKind::Column, FIntVector::ZeroValue, FIntVector::ZeroValue, 1});
 	FVoxelGenerationPlanningServices PlanningServices;
 	PlanningServices.Resources = Scheduler.GetRuntimeResources();
+	PlanningServices.TaskResources = Scheduler.GetTerrainResources();
+	PlanningServices.TaskControlConsumer = Scheduler.GetControlConsumer();
 	PlanningServices.RetentionConsumer = {EVoxelGenerationConsumerKind::WorldFact, Runtime.Epoch(), GenerationOwnerId, 1,
 		EVoxelGenerationSpatialKind::Column, FIntVector::ZeroValue, FIntVector::ZeroValue, 1};
 	PlanningServices.Ensure = [this](TConstArrayView<FVoxelGenerationPlanDependency> Dependencies, EVoxelWorkClass WorkClass,
@@ -475,9 +477,22 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::QueryEnvironment(const FIn
 	const auto CapacityWait = FVoxelGenerationCapacityWait::Create(Scheduler.GetRuntimeResources(), Request.GenerationConsumer);
 	if (!CapacityWait) return { false, false, TEXT("CapacityBlocked: environment continuation") };
 	Request.bResumable = true;
-	Request.GetBlockReason = [CapacityWait] { return CapacityWait->BlockReason(); };
+	{
+		FString CallbackBindingError;
+		if (!Request.BindGetBlockReason(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[CapacityWait] { return CapacityWait->BlockReason(); }, CallbackBindingError))
+		{
+			Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+				CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+					? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+			return {false, CallbackBindingError.StartsWith(TEXT("Oversized")), CallbackBindingError};
+		}
+	}
 	Request.ReservedBytes = 4096;
-	Request.Execute = [Pipeline = Generator, InCell, Retention, CapacityWait](const TAtomic<bool>& Cancel)
+	{
+		FString CallbackBindingError;
+		if (!Request.BindExecute(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[Pipeline = Generator, InCell, Retention, CapacityWait](const TAtomic<bool>& Cancel)
 	{
 		FVoxelTaskResult Result;
 		const uint64 BeforeBuild = CapacityWait->Begin();
@@ -487,8 +502,18 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::QueryEnvironment(const FIn
 		Result.bCanceled = Cancel.Load();
 		if (!Result.bSuccess) CapacityWait->Continue(Result, BeforeBuild);
 		return Result;
-	};
-	Request.Apply = [this, InCell](FVoxelTaskResult&& Result)
+	}, CallbackBindingError))
+		{
+			Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+				CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+					? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+			return {false, CallbackBindingError.StartsWith(TEXT("Oversized")), CallbackBindingError};
+		}
+	}
+	{
+		FString CallbackBindingError;
+		if (!Request.BindApply(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[this, InCell](FVoxelTaskResult&& Result)
 	{
 		const auto* Current = EnvironmentColumnStates.Find(InCell);
 		if (!Current || Current->Stamp != Result.Stamp || Result.Stamp.WorldEpoch != Runtime.Epoch() ||
@@ -500,7 +525,14 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::QueryEnvironment(const FIn
 			EnvironmentColumnStates.Add(InCell, { Result.Stamp, { false, true, Result.Error } });
 			UE_LOG(LogTemp, Error, TEXT("Environment column %s failed: %s"), *InCell.ToString(), *Result.Error);
 		}
-	};
+	}, CallbackBindingError))
+		{
+			Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+				CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+					? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+			return {false, CallbackBindingError.StartsWith(TEXT("Oversized")), CallbackBindingError};
+		}
+	}
 	const auto Stamp = Request.Stamp;
 	if (Scheduler.Enqueue(MoveTemp(Request))) EnvironmentColumnStates.Add(InCell, { Stamp, {} });
 	return {};
@@ -1052,7 +1084,17 @@ bool FVoxelEmergeManager::RequestBase(
 	const auto CapacityWait = FVoxelGenerationCapacityWait::Create(Scheduler.GetRuntimeResources(), Request.GenerationConsumer);
 	if (!CapacityWait) return false;
 	Request.bResumable = true;
-	Request.GetBlockReason = [CapacityWait] { return CapacityWait->BlockReason(); };
+	{
+		FString CallbackBindingError;
+		if (!Request.BindGetBlockReason(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[CapacityWait] { return CapacityWait->BlockReason(); }, CallbackBindingError))
+		{
+			Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+				CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+					? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+			return false;
+		}
+	}
 
 	Request.DistanceScore = InDemand.DistanceCells;
 	Request.ForwardScore = InDemand.ForwardScore;
@@ -1061,6 +1103,7 @@ bool FVoxelEmergeManager::RequestBase(
 		VoxelBoundedAllocation::ArrayBytes<FVoxelBlockState>(4096);
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> BaseLease;
 	if (!Runtime.GetTerrainResources()->Acquire(Waiting->Consumer, EVoxelTerrainResourcePool::Staged, BaseBytes, BaseLease)) return false;
+	Request.SetRequiredBindingInput(0, 1);
 	Request.ReservedBytes = BaseBytes;
 
 	const TSharedRef<
@@ -1068,27 +1111,37 @@ bool FVoxelEmergeManager::RequestBase(
 		ESPMode::ThreadSafe> CapturedGenerator =
 			Generator;
 
-	Request.Execute =
-		[CapturedGenerator, CapturedRetention, InKey, BaseLease, CapacityWait](
+	{
+		FString CallbackBindingError;
+		if (!Request.BindExecute(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[CapturedGenerator, CapturedRetention, InKey, BaseLease, CapacityWait](
 			const TAtomic<bool>& InCancel)
 		{
 			FVoxelTaskResult Result;
 			const uint64 BeforeBuild = CapacityWait->Begin();
 			Result.OutputResourceLease = BaseLease;
+			Result.BaseBlocks.SetNumUninitialized(4096);
 
 			Result.bSuccess =
 				CapturedGenerator->GenerateSection(
 					InKey,
-					Result.BaseBlocks,
+					MakeArrayView(Result.BaseBlocks),
 					Result.Error,
-					&InCancel);
+					&InCancel, BaseLease.Get());
 
 			Result.bCanceled =
 				InCancel.Load();
 			if (!Result.bSuccess) CapacityWait->Continue(Result, BeforeBuild);
 
 			return Result;
-		};
+		}, CallbackBindingError))
+		{
+			Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+				CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+					? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+			return false;
+		}
+	}
 
 	++EnqueueAttempts;
 	const bool bEnqueued = Scheduler.Enqueue(MoveTemp(Request));
@@ -1204,12 +1257,34 @@ bool FVoxelEmergeManager::ResolveOverlay(
 	Request.InputBytes = InputBytes;
 	Request.ReservedBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelPersistentSection>();
 	Request.bResumable = true;
-	Request.GetBlockReason = [Work]
+	Request.GenerationConsumer = Consumer;
+	Request.SetRequiredBindingInput(InputLease->Bytes(), 1);
+	{
+		FString CallbackBindingError;
+		if (!Request.BindGetBlockReason(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[Work]
 	{
 		return Work->bWaitingCapacity.Load() && Work->Resources->Snapshot().ReleaseVersion <= Work->CapacityVersion.Load() ?
 			EVoxelTaskBlockReason::Memory : EVoxelTaskBlockReason::None;
-	};
-	Request.Execute = [Work](const TAtomic<bool>& InCancel) { return Work->Advance(InCancel); };
+	}, CallbackBindingError))
+		{
+			Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+				CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+					? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+			return false;
+		}
+	}
+	{
+		FString CallbackBindingError;
+		if (!Request.BindExecute(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
+			[Work](const TAtomic<bool>& InCancel) { return Work->Advance(InCancel); }, CallbackBindingError))
+		{
+			Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
+				CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
+					? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+			return false;
+		}
+	}
 
 	return Scheduler.Enqueue(MoveTemp(Request));
 }

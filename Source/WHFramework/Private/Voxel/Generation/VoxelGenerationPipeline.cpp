@@ -2,11 +2,64 @@
 
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Generation/Ecology/VoxelEcology.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
+#include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelGenerationQuery.h"
 #include "Voxel/Generation/VoxelGenerationPlanningRead.h"
 
 namespace
 {
+	int32 NextPipelineScratchCapacity(const int32 InRequired, const int32 InCapacity)
+	{
+		return int32(FMath::Min<int64>(MAX_int32,
+			FMath::Max<int64>(InRequired, FMath::Max<int64>(4, int64(InCapacity) * 2))));
+	}
+
+	template<typename ElementType>
+	bool AppendPipelineScratch(
+		FVoxelGenerationWorkspace& InWorkspace,
+		TArray<ElementType>& InArray,
+		const ElementType& InValue,
+		FString& OutError)
+	{
+		if (InArray.Num() == MAX_int32)
+		{
+			OutError = TEXT("Oversized: generation pipeline scratch element count");
+			return false;
+		}
+		if (InArray.Num() == InArray.Max() &&
+			!InWorkspace.ReserveArray(InArray, NextPipelineScratchCapacity(InArray.Num() + 1, InArray.Max()), OutError))
+		{
+			return false;
+		}
+		InArray.Add(InValue);
+		return true;
+	}
+
+	template<typename ElementType>
+	void CopyPipelineOutput(const TArray<ElementType>& InValues, const TArrayView<ElementType> OutValues)
+	{
+		check(InValues.Num() == OutValues.Num());
+		for (int32 Index = 0; Index < InValues.Num(); ++Index)
+		{
+			OutValues[Index] = InValues[Index];
+		}
+	}
+
+#if WITH_DEV_AUTOMATION_TESTS
+	bool AllowLegacyPipelineArrayOutput(
+		const TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>& InCache,
+		FString& OutError)
+	{
+		if (InCache->GetResources())
+		{
+			OutError = TEXT("InvalidResource: bound generation pipeline requires an explicitly granted caller span or visitor");
+			return false;
+		}
+		return true;
+	}
+#endif
+
 	bool MakeColumnGridBounds(
 		const FVoxelGenerationSettings& InSettings,
 		const FIntPoint& InOrigin,
@@ -46,37 +99,174 @@ namespace
 	}
 }
 
-bool FVoxelGenerationPipeline::EnumerateCaveEntrances(const FIntPoint& InMin, const FIntPoint& InMax,
-	TArray<FVoxelCaveEntrance>& OutEntrances, FString& OutError) const
+bool FVoxelGenerationPipeline::ResolveAllocation(
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& OutResources,
+	FVoxelGenerationConsumerKey& OutConsumer,
+	FString& OutError) const
 {
-	OutEntrances.Reset();
-	if (!Config->Recipe || InMin.X > InMax.X || InMin.Y > InMax.Y) return false;
+	OutResources = Cache->GetResources();
+	if (OutResources)
+	{
+		if (!FVoxelGenerationConsumerScope::GetConsumerKey() &&
+			!FVoxelGenerationPlanningReadScope::GetConsumerKey() &&
+			!FVoxelGenerationPlanningReadScope::GetTaskStamp())
+		{
+			OutError = TEXT("InvalidConsumer: generation pipeline requires its original execution consumer");
+			return false;
+		}
+		if (!Cache->ResolveConsumer(OutConsumer, OutError))
+		{
+			return false;
+		}
+		OutError.Reset();
+		return true;
+	}
+#if WITH_DEV_AUTOMATION_TESTS
+	OutError.Reset();
+	return true;
+#else
+	OutError = TEXT("InvalidConsumer: generation pipeline has no original resource ledger");
+	return false;
+#endif
+}
+
+bool FVoxelGenerationPipeline::AddOutputRequirements(
+	const FVoxelTerrainResourceLease* InOutputLease,
+	uint64& InOutRequiredInputBytes,
+	int32& InOutRequiredLeaseCount,
+	uint64& OutRequiredWorkingBytes,
+	FString& OutError) const
+{
+	OutRequiredWorkingBytes = 0;
+	const auto& Resources = Cache->GetResources();
+	if (!InOutputLease || !Resources || !InOutputLease->IsOwnedBy(*Resources))
+	{
+		return true;
+	}
+	const uint64 Bytes = InOutputLease->Bytes();
+	const EVoxelTerrainResourcePool Pool = InOutputLease->GetPool();
+	if (Pool >= EVoxelTerrainResourcePool::Count)
+	{
+		OutError = TEXT("InvalidResource: generation pipeline output lease is not active");
+		return false;
+	}
+	if (InOutRequiredLeaseCount == MAX_int32)
+	{
+		OutError = TEXT("CapacityUnachievable: generation pipeline required output lease count");
+		return false;
+	}
+	if (Pool == EVoxelTerrainResourcePool::Input)
+	{
+		if (Bytes > MAX_uint64 - InOutRequiredInputBytes)
+		{
+			OutError = TEXT("CapacityUnachievable: generation pipeline required output input peak");
+			return false;
+		}
+		InOutRequiredInputBytes += Bytes;
+	}
+	else if (Pool == EVoxelTerrainResourcePool::Working)
+	{
+		OutRequiredWorkingBytes = Bytes;
+	}
+	// 零字节的原租约仍有活跃 handle，不能因 payload 已释放而漏计其固定输入。
+	++InOutRequiredLeaseCount;
+	return true;
+}
+
+bool FVoxelGenerationPipeline::EnumerateCaveEntrances(
+	const FIntPoint& InMin,
+	const FIntPoint& InMax,
+	TFunctionRef<bool(const FVoxelCaveEntrance&, const FVoxelGenerationWorkspace&, FString&)> InVisit,
+	FString& OutError,
+	const FVoxelTerrainResourceLease* InOutputLease) const
+{
+	if (!Config->Recipe || InMin.X > InMax.X || InMin.Y > InMax.Y ||
+		!VoxelGeneration::IsWorldCell(InMin.X) || !VoxelGeneration::IsWorldCell(InMin.Y) ||
+		!VoxelGeneration::IsWorldCell(InMax.X) || !VoxelGeneration::IsWorldCell(InMax.Y))
+	{
+		OutError = TEXT("Invalid cave entrance bounds");
+		return false;
+	}
 	FVoxelGenerationQuery Query;
-	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError, true, IsInGameThread(), IsInGameThread())) return false;
+	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError, true,
+		IsInGameThread(), IsInGameThread(), nullptr, InOutputLease))
+	{
+		return false;
+	}
 	const auto& Settings = Config->Recipe->Settings;
 	const FVoxelGenerationBounds Bounds{FIntVector(InMin.X, InMin.Y, Settings.MinZ),
 		FIntVector(int32(FMath::Min<int64>(int64(InMax.X) + 1, MAX_int32)),
 			int32(FMath::Min<int64>(int64(InMax.Y) + 1, MAX_int32)), Settings.MaxZ)};
 	FVoxelGenerationPlanKeyRanges Ranges;
-	if (!FVoxelGenerationQuery::GetPlanKeyRanges(Bounds, Settings, Ranges, OutError)) return false;
+	if (!FVoxelGenerationQuery::GetPlanKeyRanges(Bounds, Settings, Ranges, OutError))
+	{
+		return false;
+	}
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
+	FVoxelGenerationConsumerKey Consumer;
+	if (!ResolveAllocation(Resources, Consumer, OutError))
+	{
+		return false;
+	}
+	// 工作区先声明，候选数组和去重表的 native backing 先于原租约销毁。
+	const uint64 SourceInputBytes = Query.GetRequiredInputBytes();
+	const int32 SourceLeaseCount = Query.GetRequiredInputLeaseCount();
+	uint64 RequiredInputBytes = SourceInputBytes;
+	int32 RequiredLeaseCount = SourceLeaseCount;
+	uint64 RequiredWorkingBytes = 0;
+	if (!AddOutputRequirements(InOutputLease, RequiredInputBytes, RequiredLeaseCount, RequiredWorkingBytes, OutError))
+	{
+		return false;
+	}
+	FVoxelGenerationWorkspace Workspace(Resources, Consumer,
+		RequiredInputBytes, RequiredLeaseCount, RequiredWorkingBytes);
 	TSet<FVoxelStableId> Seen;
+	TArray<FVoxelCaveEntrance> Entrances;
 	for (int64 Y = Ranges.TileMin.Y; Y <= Ranges.TileMax.Y; ++Y)
 	{
 		for (int64 X = Ranges.TileMin.X; X <= Ranges.TileMax.X; ++X)
 		{
 			const FVoxelGenerationTileKey Key{FIntVector(int32(X), int32(Y), 0)};
 			FVoxelCavePlanPtr Plan;
-			if (!Query.EnsureCavePlan(Key, Plan, OutError)) return false;
+			if (!Query.EnsureCavePlan(Key, Plan, OutError))
+			{
+				return false;
+			}
 			for (const FVoxelCaveEntrance& Entrance : Plan->Entrances)
 			{
 				const bool bMouth = Entrance.MouthCenter.X >= InMin.X && Entrance.MouthCenter.Y >= InMin.Y && Entrance.MouthCenter.X <= InMax.X && Entrance.MouthCenter.Y <= InMax.Y;
 				const bool bInterior = Entrance.InteriorJoin.X >= InMin.X && Entrance.InteriorJoin.Y >= InMin.Y && Entrance.InteriorJoin.X <= InMax.X && Entrance.InteriorJoin.Y <= InMax.Y;
 				if ((bMouth || bInterior) && !Seen.Contains(Entrance.Id))
 				{
+					if (Seen.Num() == MAX_int32)
+					{
+						OutError = TEXT("Oversized: generation pipeline cave entrance identities");
+						return false;
+					}
+					if (!Workspace.ReserveSet(Seen, Seen.Num() + 1, OutError) ||
+						!AppendPipelineScratch(Workspace, Entrances, Entrance, OutError))
+					{
+						return false;
+					}
 					Seen.Add(Entrance.Id);
-					OutEntrances.Add(Entrance);
 				}
 			}
+		}
+	}
+	// 去重已结束，先释放表再退相应授额，为调用者的候选输出保留真实峰值空间。
+	Workspace.FreeSet(Seen);
+	// visitor 的工作区已经计入自己原输出，Source 只声明自己仍强持的依赖，避免回传重复计费。
+	Workspace.SetRequirements(SourceInputBytes, SourceLeaseCount, 0);
+	// 完整读集已成功，输出 callback 不再触发后续原生采样或去重增长。
+	for (const FVoxelCaveEntrance& Entrance : Entrances)
+	{
+		if (!InVisit(Entrance, Workspace, OutError))
+		{
+			if (OutError.IsEmpty())
+			{
+				OutError = TEXT("Voxel cave entrance output visitor rejected a candidate");
+			}
+			return false;
 		}
 	}
 	OutError.Reset();
@@ -99,26 +289,76 @@ FVoxelGenerationPipeline::FVoxelGenerationPipeline(
 {
 }
 
-void FVoxelGenerationPipeline::QueryReadyWaterfalls(const FIntPoint& InMin, const FIntPoint& InMax,
-	TArray<FVoxelWaterfallSemantic>& OutWaterfalls) const
+bool FVoxelGenerationPipeline::QueryReadyWaterfalls(
+	const FIntPoint& InMin,
+	const FIntPoint& InMax,
+	TFunctionRef<bool(const FVoxelWaterfallSemantic&, const FVoxelGenerationWorkspace&, FString&)> InVisit,
+	FString& OutError,
+	const FVoxelTerrainResourceLease* InOutputLease) const
 {
-	OutWaterfalls.Reset();
-	if (InMin.X>InMax.X || InMin.Y>InMax.Y || !Config->Recipe) return;
-	const auto First=FVoxelGenerationQuery::HydrologyKeyForVoxel(InMin.X,InMin.Y,Config->Recipe->Settings);
-	const auto Last=FVoxelGenerationQuery::HydrologyKeyForVoxel(InMax.X,InMax.Y,Config->Recipe->Settings);
-	for (int32 Y=First.Coordinate.Y; Y<=Last.Coordinate.Y; ++Y)
+	if (InMin.X > InMax.X || InMin.Y > InMax.Y || !Config->Recipe ||
+		!VoxelGeneration::IsWorldCell(InMin.X) || !VoxelGeneration::IsWorldCell(InMin.Y) ||
+		!VoxelGeneration::IsWorldCell(InMax.X) || !VoxelGeneration::IsWorldCell(InMax.Y))
 	{
-		for (int32 X=First.Coordinate.X; X<=Last.Coordinate.X; ++X)
+		OutError = TEXT("Invalid waterfall query bounds");
+		return false;
+	}
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
+	FVoxelGenerationConsumerKey Consumer;
+	if (!ResolveAllocation(Resources, Consumer, OutError))
+	{
+		return false;
+	}
+	const uint64 SourceInputBytes = Cache->GetRootInputBytes();
+	const int32 SourceLeaseCount = SourceInputBytes ? 1 : 0;
+	uint64 RequiredInputBytes = SourceInputBytes;
+	int32 RequiredLeaseCount = SourceLeaseCount;
+	uint64 RequiredWorkingBytes = 0;
+	if (!AddOutputRequirements(InOutputLease, RequiredInputBytes, RequiredLeaseCount, RequiredWorkingBytes, OutError))
+	{
+		return false;
+	}
+	FVoxelGenerationWorkspace Workspace(Resources, Consumer,
+		RequiredInputBytes, RequiredLeaseCount, RequiredWorkingBytes);
+	TArray<FVoxelWaterfallSemantic> Waterfalls;
+	const auto First = FVoxelGenerationQuery::HydrologyKeyForVoxel(InMin.X, InMin.Y, Config->Recipe->Settings);
+	const auto Last = FVoxelGenerationQuery::HydrologyKeyForVoxel(InMax.X, InMax.Y, Config->Recipe->Settings);
+	for (int64 Y = First.Coordinate.Y; Y <= Last.Coordinate.Y; ++Y)
+	{
+		for (int64 X = First.Coordinate.X; X <= Last.Coordinate.X; ++X)
 		{
 			FVoxelHydrologyPlanPtr Plan;
-			if (!Cache->FindHydrology({FIntPoint(X,Y)},Plan) || !Plan) continue;
-			for (const auto& Fall:Plan->Waterfalls)
+			if (!Cache->FindHydrology({FIntPoint(int32(X), int32(Y))}, Plan) || !Plan)
 			{
-				if (Fall.Upstream.X>=InMin.X && Fall.Upstream.Y>=InMin.Y && Fall.Upstream.X<=InMax.X && Fall.Upstream.Y<=InMax.Y)
-					OutWaterfalls.Add(Fall);
+				continue;
+			}
+			for (const FVoxelWaterfallSemantic& Fall : Plan->Waterfalls)
+			{
+				if (Fall.Upstream.X >= InMin.X && Fall.Upstream.Y >= InMin.Y &&
+					Fall.Upstream.X <= InMax.X && Fall.Upstream.Y <= InMax.Y)
+				{
+					if (!AppendPipelineScratch(Workspace, Waterfalls, Fall, OutError))
+					{
+						return false;
+					}
+				}
 			}
 		}
 	}
+	Workspace.SetRequirements(SourceInputBytes, SourceLeaseCount, 0);
+	for (const FVoxelWaterfallSemantic& Fall : Waterfalls)
+	{
+		if (!InVisit(Fall, Workspace, OutError))
+		{
+			if (OutError.IsEmpty())
+			{
+				OutError = TEXT("Voxel waterfall output visitor rejected a candidate");
+			}
+			return false;
+		}
+	}
+	OutError.Reset();
+	return true;
 }
 
 void FVoxelGenerationPipeline::ReleaseOverlaySectionConsumer(const FIntVector& InSection) const
@@ -206,9 +446,10 @@ FVoxelOverlayPreflightStatus FVoxelGenerationPipeline::EnsureOverlaySectionReady
 
 bool FVoxelGenerationPipeline::GenerateSection(
 	const FIntVector& InSectionCoordinate,
-	TArray<FVoxelBlockState>& OutBaseBlocks,
+	const TArrayView<FVoxelBlockState> OutBaseBlocks,
 	FString& OutError,
-	const TAtomic<bool>* InCancel) const
+	const TAtomic<bool>* InCancel,
+	const FVoxelTerrainResourceLease* InOutputLease) const
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_GenerateSection);
 
@@ -217,10 +458,23 @@ bool FVoxelGenerationPipeline::GenerateSection(
 		SectionSide *
 		SectionSide *
 		SectionSide;
+	if (OutBaseBlocks.Num() != SectionCellCount)
+	{
+		OutError = TEXT("InvalidResource: generation section requires a caller-owned 4096-cell output span");
+		return false;
+	}
 
-	const FIntVector WorldMin =
-		InSectionCoordinate *
-		SectionSide;
+	const FInt64Vector WideMin(int64(InSectionCoordinate.X) * SectionSide,
+		int64(InSectionCoordinate.Y) * SectionSide, int64(InSectionCoordinate.Z) * SectionSide);
+	const FInt64Vector WideMax = WideMin + FInt64Vector(SectionSide);
+	if (WideMin.X < VoxelGeneration::WorldCellMin || WideMin.Y < VoxelGeneration::WorldCellMin ||
+		WideMin.Z < VoxelGeneration::WorldCellMin || WideMax.X > VoxelGeneration::WorldCellMaxExclusive ||
+		WideMax.Y > VoxelGeneration::WorldCellMaxExclusive || WideMax.Z > VoxelGeneration::WorldCellMaxExclusive)
+	{
+		OutError = TEXT("Invalid generation section outside world cell domain");
+		return false;
+	}
+	const FIntVector WorldMin(int32(WideMin.X), int32(WideMin.Y), int32(WideMin.Z));
 
 	const FVoxelGenerationBounds Bounds {
 		WorldMin,
@@ -238,7 +492,9 @@ bool FVoxelGenerationPipeline::GenerateSection(
 			OutError,
 			!bRequirePlanPreflight,
 			false,
-			bRequirePlanPreflight) ||
+			bRequirePlanPreflight,
+			nullptr,
+			InOutputLease) ||
 		!Query.Prepare(
 			Bounds,
 			OutError,
@@ -247,7 +503,26 @@ bool FVoxelGenerationPipeline::GenerateSection(
 		return false;
 	}
 
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
+	FVoxelGenerationConsumerKey Consumer;
+	if (!ResolveAllocation(Resources, Consumer, OutError))
+	{
+		return false;
+	}
+	uint64 RequiredInputBytes = Query.GetRequiredInputBytes();
+	int32 RequiredLeaseCount = Query.GetRequiredInputLeaseCount();
+	uint64 RequiredWorkingBytes = 0;
+	if (!AddOutputRequirements(InOutputLease, RequiredInputBytes, RequiredLeaseCount, RequiredWorkingBytes, OutError))
+	{
+		return false;
+	}
+	FVoxelGenerationWorkspace Workspace(Resources, Consumer,
+		RequiredInputBytes, RequiredLeaseCount, RequiredWorkingBytes);
 	TArray<FVoxelBlockState> Blocks;
+	if (!Workspace.ReserveArray(Blocks, SectionCellCount, OutError))
+	{
+		return false;
+	}
 	Blocks.SetNumUninitialized(
 		SectionCellCount);
 
@@ -273,14 +548,18 @@ bool FVoxelGenerationPipeline::GenerateSection(
 		}
 	}
 
-	if (Overlay && !Overlay->ApplySection(InSectionCoordinate, Blocks,
+	if (Overlay && !Overlay->ApplySection(InSectionCoordinate, MakeArrayView(Blocks),
 		OutError, InCancel))
 	{
 		return false;
 	}
 
-	OutBaseBlocks =
-		MoveTemp(Blocks);
+	if (InCancel && InCancel->Load())
+	{
+		OutError = TEXT("Canceled");
+		return false;
+	}
+	CopyPipelineOutput(Blocks, OutBaseBlocks);
 
 	OutError.Reset();
 	return true;
@@ -450,10 +729,11 @@ bool FVoxelGenerationPipeline::SampleEnvironments(
 	const int32 InWidth,
 	const int32 InHeight,
 	const int32 InStep,
-	TArray<FVoxelEnvironmentSample>& OutSamples,
+	const TArrayView<FVoxelEnvironmentSample> OutSamples,
 	FString& OutError,
 	const TAtomic<bool>* InCancel,
-	const bool bInUseColumnCache) const
+	const bool bInUseColumnCache,
+	const FVoxelTerrainResourceLease* InOutputLease) const
 {
 	FVoxelGenerationBounds Bounds;
 	int32 Count = 0;
@@ -462,16 +742,40 @@ bool FVoxelGenerationPipeline::SampleEnvironments(
 	{
 		return false;
 	}
+	if (OutSamples.Num() != Count)
+	{
+		OutError = TEXT("InvalidResource: environment sampling requires the complete caller-owned output span");
+		return false;
+	}
 
 	FVoxelGenerationQuery Query;
 	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError,
-			bInUseColumnCache, bRequirePlanPreflight) ||
+			bInUseColumnCache, bRequirePlanPreflight, false, nullptr, InOutputLease) ||
 		!Query.PrepareColumns(Bounds, OutError, InCancel))
 	{
 		return false;
 	}
 
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
+	FVoxelGenerationConsumerKey Consumer;
+	if (!ResolveAllocation(Resources, Consumer, OutError))
+	{
+		return false;
+	}
+	uint64 RequiredInputBytes = Query.GetRequiredInputBytes();
+	int32 RequiredLeaseCount = Query.GetRequiredInputLeaseCount();
+	uint64 RequiredWorkingBytes = 0;
+	if (!AddOutputRequirements(InOutputLease, RequiredInputBytes, RequiredLeaseCount, RequiredWorkingBytes, OutError))
+	{
+		return false;
+	}
+	FVoxelGenerationWorkspace Workspace(Resources, Consumer,
+		RequiredInputBytes, RequiredLeaseCount, RequiredWorkingBytes);
 	TArray<FVoxelEnvironmentSample> Samples;
+	if (!Workspace.ReserveArray(Samples, Count, OutError))
+	{
+		return false;
+	}
 	Samples.SetNumUninitialized(Count);
 	int32 Index = 0;
 	for (int32 Y = 0; Y < InHeight; ++Y)
@@ -495,7 +799,12 @@ bool FVoxelGenerationPipeline::SampleEnvironments(
 		}
 	}
 
-	OutSamples = MoveTemp(Samples);
+	if (InCancel && InCancel->Load())
+	{
+		OutError = TEXT("Canceled");
+		return false;
+	}
+	CopyPipelineOutput(Samples, OutSamples);
 	OutError.Reset();
 	return true;
 }
@@ -505,16 +814,22 @@ bool FVoxelGenerationPipeline::SampleColumns(
 	const int32 InWidth,
 	const int32 InHeight,
 	const int32 InStep,
-	TArray<FVoxelColumnSample>& OutColumns,
+	const TArrayView<FVoxelColumnSample> OutColumns,
 	FString& OutError,
 	const TAtomic<bool>* InCancel,
-	const bool bInUseColumnCache) const
+	const bool bInUseColumnCache,
+	const FVoxelTerrainResourceLease* InOutputLease) const
 {
 	FVoxelGenerationBounds Bounds;
 	int32 Count = 0;
 	if (!MakeColumnGridBounds(Config->Recipe->Settings, InOrigin,
 		InWidth, InHeight, InStep, Bounds, Count, OutError))
 	{
+		return false;
+	}
+	if (OutColumns.Num() != Count)
+	{
+		OutError = TEXT("InvalidResource: column sampling requires the complete caller-owned output span");
 		return false;
 	}
 
@@ -526,7 +841,10 @@ bool FVoxelGenerationPipeline::SampleColumns(
 			Query,
 			OutError,
 			bInUseColumnCache,
-			bRequirePlanPreflight) ||
+			bRequirePlanPreflight,
+			false,
+			nullptr,
+			InOutputLease) ||
 		!Query.PrepareColumns(
 			Bounds,
 			OutError,
@@ -535,7 +853,26 @@ bool FVoxelGenerationPipeline::SampleColumns(
 		return false;
 	}
 
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
+	FVoxelGenerationConsumerKey Consumer;
+	if (!ResolveAllocation(Resources, Consumer, OutError))
+	{
+		return false;
+	}
+	uint64 RequiredInputBytes = Query.GetRequiredInputBytes();
+	int32 RequiredLeaseCount = Query.GetRequiredInputLeaseCount();
+	uint64 RequiredWorkingBytes = 0;
+	if (!AddOutputRequirements(InOutputLease, RequiredInputBytes, RequiredLeaseCount, RequiredWorkingBytes, OutError))
+	{
+		return false;
+	}
+	FVoxelGenerationWorkspace Workspace(Resources, Consumer,
+		RequiredInputBytes, RequiredLeaseCount, RequiredWorkingBytes);
 	TArray<FVoxelColumnSample> Columns;
+	if (!Workspace.ReserveArray(Columns, Count, OutError))
+	{
+		return false;
+	}
 	Columns.SetNumUninitialized(Count);
 
 	int32 Index = 0;
@@ -568,8 +905,12 @@ bool FVoxelGenerationPipeline::SampleColumns(
 		}
 	}
 
-	OutColumns =
-		MoveTemp(Columns);
+	if (InCancel && InCancel->Load())
+	{
+		OutError = TEXT("Canceled");
+		return false;
+	}
+	CopyPipelineOutput(Columns, OutColumns);
 
 	OutError.Reset();
 	return true;
@@ -655,3 +996,137 @@ void FVoxelGenerationPipeline::SetOverlayConsumerWakeCallback(TFunction<void(con
 		Overlay->SetConsumerWakeCallback(MoveTemp(InCallback));
 	}
 }
+
+#if WITH_DEV_AUTOMATION_TESTS
+bool FVoxelGenerationPipeline::GenerateSection(
+	const FIntVector& InSectionCoordinate,
+	TArray<FVoxelBlockState>& OutBaseBlocks,
+	FString& OutError,
+	const TAtomic<bool>* InCancel) const
+{
+	if (!AllowLegacyPipelineArrayOutput(Cache, OutError))
+	{
+		return false;
+	}
+	TArray<FVoxelBlockState> Candidate;
+	Candidate.SetNumUninitialized(16 * 16 * 16);
+	if (!GenerateSection(InSectionCoordinate, MakeArrayView(Candidate), OutError, InCancel))
+	{
+		return false;
+	}
+	OutBaseBlocks = MoveTemp(Candidate);
+	return true;
+}
+
+bool FVoxelGenerationPipeline::SampleEnvironments(
+	const FIntPoint& InOrigin,
+	const int32 InWidth,
+	const int32 InHeight,
+	const int32 InStep,
+	TArray<FVoxelEnvironmentSample>& OutSamples,
+	FString& OutError,
+	const TAtomic<bool>* InCancel,
+	const bool bInUseColumnCache) const
+{
+	if (!AllowLegacyPipelineArrayOutput(Cache, OutError))
+	{
+		return false;
+	}
+	FVoxelGenerationBounds Bounds;
+	int32 Count = 0;
+	if (!MakeColumnGridBounds(Config->Recipe->Settings, InOrigin,
+		InWidth, InHeight, InStep, Bounds, Count, OutError))
+	{
+		return false;
+	}
+	TArray<FVoxelEnvironmentSample> Candidate;
+	Candidate.SetNumUninitialized(Count);
+	if (!SampleEnvironments(InOrigin, InWidth, InHeight, InStep,
+		MakeArrayView(Candidate), OutError, InCancel, bInUseColumnCache))
+	{
+		return false;
+	}
+	OutSamples = MoveTemp(Candidate);
+	return true;
+}
+
+bool FVoxelGenerationPipeline::SampleColumns(
+	const FIntPoint& InOrigin,
+	const int32 InWidth,
+	const int32 InHeight,
+	const int32 InStep,
+	TArray<FVoxelColumnSample>& OutColumns,
+	FString& OutError,
+	const TAtomic<bool>* InCancel,
+	const bool bInUseColumnCache) const
+{
+	if (!AllowLegacyPipelineArrayOutput(Cache, OutError))
+	{
+		return false;
+	}
+	FVoxelGenerationBounds Bounds;
+	int32 Count = 0;
+	if (!MakeColumnGridBounds(Config->Recipe->Settings, InOrigin,
+		InWidth, InHeight, InStep, Bounds, Count, OutError))
+	{
+		return false;
+	}
+	TArray<FVoxelColumnSample> Candidate;
+	Candidate.SetNumUninitialized(Count);
+	if (!SampleColumns(InOrigin, InWidth, InHeight, InStep,
+		MakeArrayView(Candidate), OutError, InCancel, bInUseColumnCache))
+	{
+		return false;
+	}
+	OutColumns = MoveTemp(Candidate);
+	return true;
+}
+
+bool FVoxelGenerationPipeline::QueryReadyWaterfalls(
+	const FIntPoint& InMin,
+	const FIntPoint& InMax,
+	TArray<FVoxelWaterfallSemantic>& OutWaterfalls,
+	FString& OutError) const
+{
+	if (!AllowLegacyPipelineArrayOutput(Cache, OutError))
+	{
+		return false;
+	}
+	TArray<FVoxelWaterfallSemantic> Candidate;
+	if (!QueryReadyWaterfalls(InMin, InMax,
+		[&Candidate](const FVoxelWaterfallSemantic& InFall, const FVoxelGenerationWorkspace&, FString&)
+		{
+			Candidate.Add(InFall);
+			return true;
+		}, OutError))
+	{
+		return false;
+	}
+	OutWaterfalls = MoveTemp(Candidate);
+	return true;
+}
+
+bool FVoxelGenerationPipeline::EnumerateCaveEntrances(
+	const FIntPoint& InMin,
+	const FIntPoint& InMax,
+	TArray<FVoxelCaveEntrance>& OutEntrances,
+	FString& OutError) const
+{
+	if (!AllowLegacyPipelineArrayOutput(Cache, OutError))
+	{
+		return false;
+	}
+	TArray<FVoxelCaveEntrance> Candidate;
+	if (!EnumerateCaveEntrances(InMin, InMax,
+		[&Candidate](const FVoxelCaveEntrance& InEntrance, const FVoxelGenerationWorkspace&, FString&)
+		{
+			Candidate.Add(InEntrance);
+			return true;
+		}, OutError))
+	{
+		return false;
+	}
+	OutEntrances = MoveTemp(Candidate);
+	return true;
+}
+#endif

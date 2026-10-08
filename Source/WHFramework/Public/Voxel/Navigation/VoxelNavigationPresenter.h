@@ -11,6 +11,7 @@ class FVoxelTaskScheduler;
 class UVoxelNavigationSurfaceComponent;
 class AVoxelNavigationBounds;
 struct FVoxelTaskResult;
+struct FVoxelNavigationWorker;
 
 class WHFRAMEWORK_API FVoxelNavigationPresenter
 {
@@ -63,6 +64,10 @@ private:
 		FVoxelNavigationInputVersion Version;
 		FVoxelTaskStamp Stamp;
 		double FirstRunnableSeconds = 0.0;
+		TSharedPtr<FVoxelNavigationWorker, ESPMode::ThreadSafe> Worker;
+		TOptional<FVoxelTaskRequest> Request;
+		uint64 CapacityVersion = 0;
+		bool bCapacityBlocked = false;
 	};
 
 	UVoxelModule& Module;

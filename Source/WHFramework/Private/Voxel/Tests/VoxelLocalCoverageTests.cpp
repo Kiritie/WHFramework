@@ -61,7 +61,7 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 {
 	(void)InParameters;
 	UVoxelModule* Module = NewObject<UVoxelModule>();
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelTaskBudget Budget;
 	Budget.MaxConcurrentTasks = 2;
 	Budget.MaxCompletedResultsPerFrame = 1;
@@ -234,7 +234,7 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 	TestFalse(TEXT("Extending a distant handoff preserves unrelated intermediate space"),
 		Manager.CoverageAffects(Manager.FineCoverageRect(FIntVector(100, 100, 0))));
 	Manager.Reset();
-	FVoxelTaskScheduler ScopedScheduler;
+	FVoxelTaskScheduler ScopedScheduler(true);
 	FVoxelViewManager ScopedManager(*Module, ScopedScheduler, 8);
 	auto& Interest = const_cast<FVoxelInterestSet&>(Module->GetCurrentInterest());
 	const FVoxelViewKey NearRoot{FIntVector::ZeroValue, 1};
@@ -431,7 +431,7 @@ bool FVoxelInterestInputBudgetTest::RunTest(const FString& InParameters)
 	Module->Shapes = Shapes;
 	Module->Generator = VoxelTest::MakeGenerator();
 	Module->Runtime = MakeUnique<FVoxelWorldRuntime>(9, false, Module->Registry.GetSnapshot().ToSharedRef(), Module->Generator.ToSharedRef());
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelViewManager Manager(*Module, Scheduler, 9);
 	uint64 FrameSerial = 0;
 	TSharedPtr<const FVoxelInterestSet, ESPMode::ThreadSafe> QueuedDesired;

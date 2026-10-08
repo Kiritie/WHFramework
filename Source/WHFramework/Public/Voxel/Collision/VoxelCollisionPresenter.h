@@ -9,6 +9,7 @@ class UVoxelModule;
 class UVoxelCollisionComponent;
 struct FVoxelSectionCollisionResult;
 struct FVoxelCollisionEvidenceNode;
+struct FVoxelSectionSnapshot;
 
 struct WHFRAMEWORK_API FVoxelPhysicsReceipt
 {
@@ -88,6 +89,14 @@ private:
 		bool bInstalled = false;
 		bool bRetiring = false;
 		bool bHasFailure = false;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> AdmissionInputLease;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> AdmissionOutputLease;
+		TSharedPtr<FVoxelSectionSnapshot, ESPMode::ThreadSafe> AdmissionSnapshot;
+		TOptional<FVoxelTaskRequest> AdmissionRequest;
+		FVoxelGenerationConsumerKey AdmissionConsumer;
+		FVoxelGenerationConsumerKey CapacityConsumer;
+		uint64 CapacityVersion = 0;
+		bool bCapacityBlocked = false;
 	};
 	FBodyRecord* FindBody(const FIntVector& InSection) const;
 	FBodyRecord* FindOrAddBody(const FVoxelGenerationConsumerKey& InConsumer);

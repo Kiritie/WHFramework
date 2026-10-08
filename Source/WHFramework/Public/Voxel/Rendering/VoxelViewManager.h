@@ -563,7 +563,32 @@ private:
 	struct FDeferredCoverageCallback
 	{
 		FVoxelCoverageRect Bounds;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 		TFunction<void()> Apply;
+
+		FDeferredCoverageCallback() = default;
+		FDeferredCoverageCallback(const FVoxelCoverageRect& InBounds, TFunction<void()> InApply,
+			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InResourceLease = nullptr)
+			: Bounds(InBounds), ResourceLease(MoveTemp(InResourceLease)), Apply(MoveTemp(InApply))
+		{
+		}
+		FDeferredCoverageCallback(FDeferredCoverageCallback&& InOther)
+			: Bounds(InOther.Bounds), ResourceLease(MoveTemp(InOther.ResourceLease)), Apply(MoveTemp(InOther.Apply))
+		{
+		}
+		FDeferredCoverageCallback& operator=(FDeferredCoverageCallback&& InOther)
+		{
+			if (this != &InOther)
+			{
+				Apply = nullptr;
+				ResourceLease = MoveTemp(InOther.ResourceLease);
+				Bounds = InOther.Bounds;
+				Apply = MoveTemp(InOther.Apply);
+			}
+			return *this;
+		}
+		FDeferredCoverageCallback(const FDeferredCoverageCallback&) = delete;
+		FDeferredCoverageCallback& operator=(const FDeferredCoverageCallback&) = delete;
 	};
 	TQueue<FDeferredCoverageCallback> DeferredCoverageCallbacks;
 	double NextBudgetLog = 0.0;

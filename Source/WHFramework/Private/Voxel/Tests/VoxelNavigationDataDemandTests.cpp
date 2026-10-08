@@ -18,7 +18,7 @@ bool FVoxelNavigationDataDemandTest::RunTest(const FString& InParameters)
 	const auto Cache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
 	const auto Generator = MakeShared<FVoxelGenerationPipeline, ESPMode::ThreadSafe>(Config, Cache);
 	const auto Registry = VoxelTest::MakeRegistry();
-	FVoxelTaskScheduler Scheduler;
+	FVoxelTaskScheduler Scheduler(true);
 	FVoxelWorldRuntime Runtime(57, true, Registry, Generator);
 	Runtime.BindTerrainResources(Scheduler.GetRuntimeResources());
 	FVoxelRegionStore Store;

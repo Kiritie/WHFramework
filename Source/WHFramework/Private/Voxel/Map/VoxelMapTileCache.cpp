@@ -5,17 +5,24 @@
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelGenerationPipeline.h"
 #include "Voxel/Generation/VoxelGenerationCapacityWait.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
 
 namespace
 {
 	struct FMapTilePixels : FVoxelTaskCustomPayload
 	{
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 		TArray<FColor> Pixels;
 
 		virtual uint64 GetAllocatedBytes() const override
 		{
-			return sizeof(*this) + Pixels.GetAllocatedSize();
+			return VoxelBoundedAllocation::WorkerSharedBytes<FMapTilePixels>() + VoxelGenerationAllocation::AllocatedBytes(Pixels);
+		}
+
+		virtual uint64 GetResourceAccountedBytes() const override
+		{
+			return Lease ? Lease->Bytes() : 0;
 		}
 	};
 
@@ -157,31 +164,60 @@ void FVoxelMapTileCache::Request(
 			FIntVector(Origin.X + (TileSide - 1) * Key.Step + 1, Origin.Y + (TileSide - 1) * Key.Step + 1, WorkerConfig->Recipe->Settings.MaxZ), Task.Stamp.Token};
 		const auto CapacityWait = FVoxelGenerationCapacityWait::Create(Scheduler.GetRuntimeResources(), Task.GenerationConsumer);
 		if (!CapacityWait) continue;
+		const auto OutputCapacityWait = FVoxelGenerationCapacityWait::Create(Scheduler.GetTerrainResources(), Task.GenerationConsumer);
+		if (!OutputCapacityWait) continue;
+		Task.SetRequiredBindingInput(VoxelBoundedAllocation::WorkerSharedBytes<FVoxelGenerationCapacityWait>(), 1);
 		Task.bResumable = true;
-		Task.GetBlockReason = [CapacityWait] { return CapacityWait->BlockReason(); };
-		Task.ReservedBytes = 2ull * 1024ull * 1024ull;
+		FString BindingError;
+		if (!Task.BindGetBlockReason(Scheduler.GetTerrainResources(), Task.GenerationConsumer,
+			[CapacityWait, OutputCapacityWait] { return CapacityWait->BlockReason() | OutputCapacityWait->BlockReason(); }, BindingError)) continue;
+		Task.ReservedBytes = 1;
 		const FVector2D TileCenter(
 			(static_cast<double>(Origin.X) + TileCells * 0.5),
 			(static_cast<double>(Origin.Y) + TileCells * 0.5));
 		Task.DistanceScore = FVector2D::Distance(TileCenter, InView.Center / BlockSize);
 		const FVoxelMapColorResolver WorkerResolver = ColorResolver;
 		const uint64 RequestStyleEpoch = StyleEpoch;
-		Task.Execute = [Key, Origin, WorkerGenerator, WorkerConfig, WorkerResolver, CapacityWait](const TAtomic<bool>& Cancel)
+		if (!Task.BindExecute(Scheduler.GetTerrainResources(), Task.GenerationConsumer,
+			[Key, Origin, WorkerGenerator, WorkerConfig, WorkerResolver, CapacityWait, OutputCapacityWait,
+			OutputResources = Scheduler.GetTerrainResources(), Consumer = Task.GenerationConsumer](const TAtomic<bool>& Cancel)
 		{
 			FVoxelTaskResult Result;
 			Result.Kind = EVoxelTaskKind::BuildMapTile;
 			const uint64 BeforeBuild = CapacityWait->Begin();
+			const uint64 BeforeOutput = OutputCapacityWait->Begin();
+			const auto& Cache = WorkerGenerator->GetPlanCache();
+			const auto& FactResources = Cache->GetResources();
+			FVoxelGenerationWorkspace SamplesWorkspace(FactResources, Consumer, Cache->GetRootInputBytes(), 1);
 			TArray<FVoxelEnvironmentSample> Samples;
+			if (!SamplesWorkspace.ReserveArray(Samples, TileSide * TileSide, Result.Error))
+			{
+				CapacityWait->Continue(Result, BeforeBuild);
+				return Result;
+			}
+			Samples.SetNumUninitialized(TileSide * TileSide);
 			if (!WorkerGenerator->SampleEnvironments(
-				Origin, TileSide, TileSide, Key.Step, Samples,
-				Result.Error, &Cancel, false))
+				Origin, TileSide, TileSide, Key.Step, MakeArrayView(Samples),
+				Result.Error, &Cancel, false, SamplesWorkspace.GetLease()))
 			{
 				Result.bCanceled = Cancel.Load();
 				CapacityWait->Continue(Result, BeforeBuild);
 				return Result;
 			}
-			TSharedRef<FMapTilePixels, ESPMode::ThreadSafe> Pixels =
-				MakeShared<FMapTilePixels, ESPMode::ThreadSafe>();
+			const uint64 PixelBytes = VoxelBoundedAllocation::WorkerSharedBytes<FMapTilePixels>() +
+				VoxelGenerationAllocation::Private::ArrayReserveBytes<FColor, FDefaultAllocator>(TileSide * TileSide);
+			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PixelLease;
+			const auto Admission = OutputResources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Staged, PixelBytes, PixelLease);
+			if (Admission != EVoxelTerrainResourceAdmission::Granted)
+			{
+				Result.Error = Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable
+					? TEXT("CapacityUnachievable: map tile pixel output") : TEXT("CapacityBlocked: map tile pixel output");
+				OutputCapacityWait->Continue(Result, BeforeOutput);
+				return Result;
+			}
+			const auto Pixels = VoxelBoundedAllocation::MakeWorkerShared<FMapTilePixels>(PixelLease);
+			Pixels->Lease = MoveTemp(PixelLease);
+			Pixels->Pixels.Reserve(TileSide * TileSide);
 			Pixels->Pixels.SetNumUninitialized(TileSide * TileSide);
 			for (int32 Y = 0; Y < TileSide; ++Y)
 			{
@@ -194,14 +230,15 @@ void FVoxelMapTileCache::Request(
 			Result.CustomPayload = Pixels;
 			Result.bSuccess = true;
 			return Result;
-		};
-		Task.Apply = [this, Key, RequestStyleEpoch](FVoxelTaskResult&& Result)
+		}, BindingError)) continue;
+		if (!Task.BindApply(Scheduler.GetTerrainResources(), Task.GenerationConsumer,
+			[this, Key, RequestStyleEpoch](FVoxelTaskResult&& Result)
 		{
 			if (StyleEpoch == RequestStyleEpoch)
 			{
 				ApplyTile(Key, MoveTemp(Result));
 			}
-		};
+		}, BindingError)) continue;
 		if (Scheduler.Enqueue(MoveTemp(Task)))
 		{
 			Pending.Add(Key);

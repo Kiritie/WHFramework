@@ -197,6 +197,19 @@ void VoxelGenerationAllocation::Private::FSetCapacityArchive::CountBytes(const S
 FVoxelGenerationWorkspace::FVoxelGenerationWorkspace()
 	: Scope(FVoxelGenerationAllocationScope::Get())
 {
+	if (Scope)
+	{
+		Resources = Scope->Resources;
+		Consumer = Scope->Consumer;
+	}
+}
+
+FVoxelGenerationWorkspace::FVoxelGenerationWorkspace(TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+	const FVoxelGenerationConsumerKey& InConsumer, const uint64 InRequiredInputBytes, const int32 InRequiredLeaseCount,
+	const uint64 InRequiredWorkingBytes)
+	: Resources(MoveTemp(InResources)), Consumer(InConsumer), RequiredInputBytes(InRequiredInputBytes), RequiredLeaseCount(InRequiredLeaseCount),
+	RequiredWorkingBytes(InRequiredWorkingBytes)
+{
 }
 
 FVoxelGenerationWorkspace::~FVoxelGenerationWorkspace()
@@ -210,7 +223,13 @@ bool FVoxelGenerationWorkspace::Check(FString& OutError) const
 	{
 		return Scope->Fail(TEXT("InvalidAllocationScope: workspace used outside its original body scope"), OutError);
 	}
-	return Scope ? Scope->Check(OutError) : FVoxelGenerationAllocationScope::AllowPassive(OutError);
+	if (Scope) return Scope->Check(OutError);
+	if (Resources && !Consumer.IsValid())
+	{
+		OutError = TEXT("InvalidConsumer: standalone workspace requires original complete identity");
+		return false;
+	}
+	return Resources ? true : FVoxelGenerationAllocationScope::AllowPassive(OutError);
 }
 
 bool FVoxelGenerationWorkspace::Fail(const TCHAR* InError, FString& OutError)
@@ -230,7 +249,7 @@ bool FVoxelGenerationWorkspace::PrepareBytes(
 	{
 		return false;
 	}
-	if (!Scope || !Scope->Resources)
+	if (!Resources)
 	{
 		return true;
 	}
@@ -239,7 +258,9 @@ bool FVoxelGenerationWorkspace::PrepareBytes(
 	{
 		return Fail(TEXT("AllocationAccountingMismatch: scratch backing is not covered by its workspace"), OutError);
 	}
-	if (InNewBytes > MAX_uint64 - Current || Current + InNewBytes > Scope->Resources->Snapshot().Limits.WorkingBytes)
+	const uint64 WorkingLimit = Resources->Snapshot().Limits.WorkingBytes;
+	if (RequiredWorkingBytes > WorkingLimit || Current > WorkingLimit - RequiredWorkingBytes ||
+		InNewBytes > WorkingLimit - RequiredWorkingBytes - Current)
 	{
 		return Fail(TEXT("Oversized: native workspace allocation peak exceeds original pool limit"), OutError);
 	}
@@ -248,10 +269,13 @@ bool FVoxelGenerationWorkspace::PrepareBytes(
 	{
 		return true;
 	}
-	if (Lease ? !Lease->Resize(Peak) :
-		!Scope->Resources->Acquire(Scope->Consumer, EVoxelTerrainResourcePool::Working, Peak, Lease))
+	const auto Admission = Lease ? Lease->TryResize(Peak, RequiredInputBytes, RequiredLeaseCount) :
+		Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Working, Peak, Lease, 0, RequiredInputBytes, RequiredLeaseCount);
+	if (Admission != EVoxelTerrainResourceAdmission::Granted)
 	{
-		return Fail(TEXT("CapacityBlocked: native workspace working allocation peak"), OutError);
+		return Fail(Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable
+			? TEXT("CapacityUnachievable: native workspace and required input")
+			: TEXT("CapacityBlocked: native workspace working allocation peak"), OutError);
 	}
 	return true;
 }
@@ -259,7 +283,7 @@ bool FVoxelGenerationWorkspace::PrepareBytes(
 bool FVoxelGenerationWorkspace::SettleBytes(
 	const uint64 InOldBytes, const uint64 InReservedBytes, const uint64 InActualBytes, FString& OutError)
 {
-	if (!Scope || !Scope->Resources)
+	if (!Resources)
 	{
 		return true;
 	}

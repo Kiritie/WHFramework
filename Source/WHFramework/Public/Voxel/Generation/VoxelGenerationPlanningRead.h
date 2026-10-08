@@ -54,6 +54,8 @@ private:
 struct WHFRAMEWORK_API FVoxelGenerationPlanningServices
 {
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> TaskResources;
+	FVoxelGenerationConsumerKey TaskControlConsumer;
 	FVoxelGenerationConsumerKey RetentionConsumer;
 	TFunction<FVoxelGenerationDependencyStatus(TConstArrayView<FVoxelGenerationPlanDependency>,
 		EVoxelWorkClass, const FVoxelTerrainServicePriority&, const FVoxelGenerationConsumerKey&)> Ensure;

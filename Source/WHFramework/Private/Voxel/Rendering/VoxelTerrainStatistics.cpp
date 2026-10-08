@@ -33,6 +33,18 @@ bool FVoxelTerrainStatistics::CanCompleteWork() const
     return Old && Old->bResolved;
 }
 
+uint64 FVoxelTerrainStatistics::GetStorageReservationBytes() const
+{
+    FScopeLock Lock(&Mutex);
+    return StorageLease && StorageLease->GetPool() == EVoxelTerrainResourcePool::Input ? StorageLease->Bytes() : 0;
+}
+
+int32 FVoxelTerrainStatistics::GetStorageReservationLeaseCount() const
+{
+    FScopeLock Lock(&Mutex);
+    return StorageLease ? 1 : 0;
+}
+
 bool FVoxelTerrainStatistics::RegisterWorkLocked(const FGuid& InAttempt)
 {
     if (!InAttempt.IsValid() || Attempts.Contains(InAttempt)) return false;

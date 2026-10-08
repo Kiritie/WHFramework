@@ -35,6 +35,12 @@ bool FVoxelTerrainResourceLease::Resize(const uint64 InBytes)
 	return Owner->Resize(LeaseSerial, InBytes);
 }
 
+EVoxelTerrainResourceAdmission FVoxelTerrainResourceLease::TryResize(const uint64 InBytes,
+	const uint64 InRequiredInputBytes, const int32 InRequiredLeaseCount)
+{
+	return Owner->TryResize(LeaseSerial, InBytes, InRequiredInputBytes, InRequiredLeaseCount);
+}
+
 bool FVoxelTerrainResourceLease::Transfer(const EVoxelTerrainResourcePool InPool)
 {
 	return Owner->Transfer(LeaseSerial, InPool);
@@ -59,6 +65,11 @@ TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> FVoxelTerrainResourc
 uint64 FVoxelTerrainResourceLease::Bytes() const
 {
 	return Owner->Bytes(LeaseSerial);
+}
+
+EVoxelTerrainResourcePool FVoxelTerrainResourceLease::GetPool() const
+{
+	return Owner->GetPool(LeaseSerial);
 }
 
 uint64 FVoxelTerrainResourceLease::Serial() const
@@ -155,18 +166,57 @@ bool FVoxelTerrainResources::Acquire(const FVoxelGenerationConsumerKey& InAttemp
 	const EVoxelTerrainResourcePool InPool, const uint64 InBytes,
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutLease, const int32 InReservedSplits)
 {
-	if (!InAttempt.IsValid() || InBytes == 0 || OutLease || InReservedSplits < 0 ||
-		InReservedSplits >= MaximumTerrainResourceLeases)
+	return TryAcquire(InAttempt, InPool, InBytes, OutLease, InReservedSplits) == EVoxelTerrainResourceAdmission::Granted;
+}
+
+bool FVoxelTerrainResources::CanFitRequired(const EVoxelTerrainResourcePool InPool, const uint64 InBytes,
+	const int32 InReservedSplits, const uint64 InRequiredInputBytes, const int32 InRequiredLeaseCount) const
+{
+	const uint64 Limits[] = {State.Limits.InputBytes, State.Limits.WorkingBytes, State.Limits.StagedBytes,
+		State.Limits.ResidentBytes - State.Limits.OverlapBytes, State.Limits.OverlapBytes};
+	if (InBytes > Limits[static_cast<int32>(InPool)]) return false;
+	const int64 RequiredEntries = int64(InRequiredLeaseCount) + InReservedSplits + 1;
+	if (RequiredEntries > MaximumTerrainResourceLeases) return false;
+	const uint64 Handles = uint64(RequiredEntries) * TerrainLeaseHandleBytes();
+	uint64 MetadataPeak = State.LedgerMetadataBytes;
+	if (RequiredEntries > EntryCapacity)
 	{
-		return false;
+		int32 Capacity = FMath::Max(16, EntryCapacity);
+		while (Capacity < RequiredEntries) Capacity = FMath::Min(MaximumTerrainResourceLeases, Capacity * 2);
+		const uint64 NewMetadata = VoxelGenerationAllocation::Private::SetReserveBytes<TPair<uint64, FEntry>>(Entries, Capacity);
+		if (NewMetadata > MAX_uint64 - MetadataPeak) return false;
+		MetadataPeak += NewMetadata;
+	}
+	uint64 Remaining = State.Limits.InputBytes;
+	for (const uint64 Bytes : {MetadataPeak, Handles, InRequiredInputBytes, InPool == EVoxelTerrainResourcePool::Input ? InBytes : uint64(0)})
+	{
+		if (Bytes > Remaining) return false;
+		Remaining -= Bytes;
+	}
+	return true;
+}
+
+EVoxelTerrainResourceAdmission FVoxelTerrainResources::TryAcquire(const FVoxelGenerationConsumerKey& InAttempt,
+	const EVoxelTerrainResourcePool InPool, const uint64 InBytes,
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutLease, const int32 InReservedSplits,
+	const uint64 InRequiredInputBytes, const int32 InRequiredLeaseCount)
+{
+	if (!InAttempt.IsValid() || InBytes == 0 || OutLease || InReservedSplits < 0 ||
+		InReservedSplits >= MaximumTerrainResourceLeases || InRequiredLeaseCount < 0 || InPool >= EVoxelTerrainResourcePool::Count)
+	{
+		return EVoxelTerrainResourceAdmission::InvalidRequest;
 	}
 	FScopeLock Lock(&Mutex);
+	if (!CanFitRequired(InPool, InBytes, InReservedSplits, InRequiredInputBytes, InRequiredLeaseCount))
+	{
+		return EVoxelTerrainResourceAdmission::CapacityUnachievable;
+	}
 	const uint64 InputBytes = InPool == EVoxelTerrainResourcePool::Input ? InBytes : 0;
 	const uint64 Handles = uint64(InReservedSplits + 1) * TerrainLeaseHandleBytes();
 	if (!CanAdd(InPool, InBytes) || InputBytes > MAX_uint64 - Handles ||
 		!PrepareEntries(InReservedSplits + 1, InputBytes + Handles))
 	{
-		return false;
+		return EVoxelTerrainResourceAdmission::CapacityBlocked;
 	}
 	checkf(NextSerial != MAX_uint64, TEXT("Terrain reservation serial exhausted"));
 	const uint64 Serial = ++NextSerial;
@@ -178,16 +228,28 @@ bool FVoxelTerrainResources::Acquire(const FVoxelGenerationConsumerKey& InAttemp
 	State.ReservedSplitCount += InReservedSplits;
 	OutLease = MakeShared<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>(AsShared(), Serial);
 	AdvanceVersion();
-	return true;
+	return EVoxelTerrainResourceAdmission::Granted;
 }
 
 bool FVoxelTerrainResources::Resize(const uint64 InSerial, const uint64 InBytes)
 {
+	return TryResize(InSerial, InBytes, 0, 0) == EVoxelTerrainResourceAdmission::Granted;
+}
+
+EVoxelTerrainResourceAdmission FVoxelTerrainResources::TryResize(const uint64 InSerial, const uint64 InBytes,
+	const uint64 InRequiredInputBytes, const int32 InRequiredLeaseCount)
+{
 	FScopeLock Lock(&Mutex);
 	FEntry* Entry = Entries.Find(InSerial);
-	if (!Entry || (InBytes > Entry->Bytes && !CanAdd(Entry->Pool, InBytes - Entry->Bytes)))
+	if (!Entry || InRequiredLeaseCount < 0)
 	{
-		return false;
+		return EVoxelTerrainResourceAdmission::InvalidRequest;
+	}
+	if (InBytes > Entry->Bytes)
+	{
+		if (!CanFitRequired(Entry->Pool, InBytes, Entry->ReservedSplits, InRequiredInputBytes, InRequiredLeaseCount))
+			return EVoxelTerrainResourceAdmission::CapacityUnachievable;
+		if (!CanAdd(Entry->Pool, InBytes - Entry->Bytes)) return EVoxelTerrainResourceAdmission::CapacityBlocked;
 	}
 	if (Entry->Bytes != InBytes)
 	{
@@ -198,7 +260,7 @@ bool FVoxelTerrainResources::Resize(const uint64 InSerial, const uint64 InBytes)
 		Entry->Bytes = InBytes;
 		AdvanceVersion(bReleased, &Entry->Attempt);
 	}
-	return true;
+	return EVoxelTerrainResourceAdmission::Granted;
 }
 
 bool FVoxelTerrainResources::Transfer(const uint64 InSerial, const EVoxelTerrainResourcePool InPool)
@@ -315,6 +377,13 @@ FVoxelTerrainResourceSnapshot FVoxelTerrainResources::Snapshot() const
 {
 	FScopeLock Lock(&Mutex);
 	return State;
+}
+
+EVoxelTerrainResourcePool FVoxelTerrainResources::GetPool(const uint64 InSerial) const
+{
+	FScopeLock Lock(&Mutex);
+	const FEntry* Entry = Entries.Find(InSerial);
+	return Entry ? Entry->Pool : EVoxelTerrainResourcePool::Count;
 }
 
 uint64 FVoxelTerrainResources::ReleaseVersionExcludingOwner(const FVoxelGenerationConsumerKey& InOwner) const

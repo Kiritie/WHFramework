@@ -335,6 +335,9 @@ class WHFRAMEWORK_API FVoxelGenerationWorkspace
 {
 public:
 	FVoxelGenerationWorkspace();
+	FVoxelGenerationWorkspace(TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+		const FVoxelGenerationConsumerKey& InConsumer, uint64 InRequiredInputBytes = 0, int32 InRequiredLeaseCount = 0,
+		uint64 InRequiredWorkingBytes = 0);
 	~FVoxelGenerationWorkspace();
 	FVoxelGenerationWorkspace(const FVoxelGenerationWorkspace&) = delete;
 	FVoxelGenerationWorkspace& operator=(const FVoxelGenerationWorkspace&) = delete;
@@ -344,6 +347,23 @@ public:
 	bool PrepareBytes(uint64 InOldBytes, uint64 InNewBytes, FString& OutError);
 	bool SettleBytes(uint64 InOldBytes, uint64 InReservedBytes, uint64 InActualBytes, FString& OutError);
 	void ReleaseBytes(uint64 InBytes);
+	const FVoxelTerrainResourceLease* GetLease() const { return Lease.Get(); }
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> TakeLease() { return MoveTemp(Lease); }
+	uint64 GetRequiredInputBytes() const
+	{
+		return RequiredInputBytes + (Lease && Lease->GetPool() == EVoxelTerrainResourcePool::Input ? Lease->Bytes() : 0);
+	}
+	int32 GetRequiredLeaseCount() const { return RequiredLeaseCount + (Lease ? 1 : 0); }
+	uint64 GetRequiredWorkingBytes() const
+	{
+		return RequiredWorkingBytes + (Lease && Lease->GetPool() == EVoxelTerrainResourcePool::Working ? Lease->Bytes() : 0);
+	}
+	void SetRequirements(uint64 InInputBytes, int32 InLeaseCount, uint64 InWorkingBytes)
+	{
+		RequiredInputBytes = InInputBytes;
+		RequiredLeaseCount = InLeaseCount;
+		RequiredWorkingBytes = InWorkingBytes;
+	}
 
 	template<typename ElementType, typename AllocatorType>
 	bool ReserveArray(TArray<ElementType, AllocatorType>& InArray, const int32 InCapacity, FString& OutError)
@@ -383,5 +403,10 @@ public:
 
 private:
 	FVoxelGenerationAllocationScope* Scope = nullptr;
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
+	FVoxelGenerationConsumerKey Consumer;
+	uint64 RequiredInputBytes = 0;
+	int32 RequiredLeaseCount = 0;
+	uint64 RequiredWorkingBytes = 0;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 };

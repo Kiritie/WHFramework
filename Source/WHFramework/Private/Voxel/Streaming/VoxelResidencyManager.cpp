@@ -16,6 +16,13 @@ namespace
 }
 
 FVoxelResidencyManager::FVoxelResidencyManager(
+	FVoxelWorldRuntime& InRuntime, FVoxelTaskScheduler& InScheduler)
+	: Runtime(InRuntime), Scheduler(InScheduler)
+{
+}
+
+#if WITH_DEV_AUTOMATION_TESTS
+FVoxelResidencyManager::FVoxelResidencyManager(
 	FVoxelWorldRuntime& InRuntime,
 	FVoxelTaskScheduler& InScheduler,
 	TFunction<void(const FIntVector&)> InBeforeEvict,
@@ -37,6 +44,13 @@ FVoxelResidencyManager::FVoxelResidencyManager(
 		if (const auto* Section = Runtime.FindSection(Key))
 			WakeRetirement(Key, Section->Stamp, Section->Retirement.Serial);
 	});
+	bInitialized = true;
+	RegisterExistingSections();
+}
+#endif
+
+void FVoxelResidencyManager::RegisterExistingSections()
+{
 	// 接管已有 Runtime 的一次性登记；生产世界在首个 Section 分配前创建 Manager。
 	for (const FIntVector& Key : Runtime.GetResidencyOrder())
 	{
@@ -47,8 +61,9 @@ FVoxelResidencyManager::FVoxelResidencyManager(
 
 FVoxelResidencyManager::~FVoxelResidencyManager()
 {
+	if (!bInitialized) return;
 	Runtime.SetSectionEventCallback({});
-	Scheduler.SetSectionIdleCallback({});
+	Scheduler.ClearSectionIdleCallback();
 	for (const FIntVector& Key : Runtime.GetResidencyOrder()) Revive(*Runtime.FindSection(Key));
 	DemandEvents.Reset();
 }

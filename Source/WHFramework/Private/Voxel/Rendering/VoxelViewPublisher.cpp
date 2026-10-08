@@ -2040,14 +2040,14 @@ void FVoxelViewPublisher::DiscardGroups()
 	CurrentGroupCallback.Reset();
 }
 
-void FVoxelViewPublisher::DiscardPublication(const FPublicationRef& Publication)
+void FVoxelViewPublisher::DiscardPublication(const FPublicationRef& Publication, const bool bInAllowRetry)
 {
 	Publication->bCanceled = true;
 	for (const auto& Group : Publication->Groups) if (!Group.bCommitted)
 		for (const auto& Key : Group.Keys)
 		{
 			SetOwnerActive(Key, Publication->Serial, false);
-			RetryOwners.AddUnique(Key);
+			if (bInAllowRetry) RetryOwners.AddUnique(Key);
 		}
 	bFirstOwnersDirty = true;
 	++PriorityRevision;
@@ -2254,7 +2254,25 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 		if (Ready.Publication->bCanceled || !Ready.Publication->Groups.IsValidIndex(Ready.GroupIndex)) return Index;
 		const FGroup& Group = Ready.Publication->Groups[Ready.GroupIndex];
 		if (Group.bCommitted) return Index;
+		if (bInCommit && Group.NativeTransaction.IsValid() && TerrainRenderer->ConsumeCoarseTransactionFailure(Group.NativeTransaction))
+		{
+			DiscardPublication(Ready.Publication, false);
+			return Index;
+		}
 		if (!Group.bPriorityReady) continue;
+		if (!bInCommit && Group.UpdateIndices.IsValidIndex(Group.PreparedUpdates))
+		{
+			const int32 UpdateIndex = Group.UpdateIndices[Group.PreparedUpdates];
+			const auto& Update = Ready.Publication->Updates[UpdateIndex];
+			if (Update.bNativeAdmissionWaiting && IsNativeGeometryCurrent(Update.NativeStamp))
+			{
+				const auto Consumer = FVoxelGenerationConsumerKey::Section(WorldEpoch, NativeOwnerId,
+					Ready.Publication->Serial, FIntVector(MIN_int32, 7, UpdateIndex), Update.NativeStamp.Token);
+				uint64 Current = 0;
+				if (!Scheduler.GetTerrainResources()->TryGetReleaseVersionExcludingOwner(Consumer, Current) ||
+					Current <= Update.NativeAdmissionVersion) continue;
+			}
+		}
 		if (bInCommit)
 		{
 			if (CommitGate && Group.Keys.ContainsByPredicate([this](const auto& Key) { return !CommitGate(Key); })) continue;
