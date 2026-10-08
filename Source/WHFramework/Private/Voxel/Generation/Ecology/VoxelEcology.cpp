@@ -21,6 +21,12 @@ namespace
 
 void FVoxelEcologyPlan::Finalize()
 {
+	Writes.RemoveAll([](const FVoxelEcologyPlanWrite& Write)
+	{
+		return !VoxelGeneration::IsWorldCell(Write.Position.X) ||
+			!VoxelGeneration::IsWorldCell(Write.Position.Y) ||
+			!VoxelGeneration::IsWorldCell(Write.Position.Z);
+	});
 	InfluenceBounds.Init();
 	ResolvedWrites.Reset();
 	ResolvedWrites.Reserve(Writes.Num());
@@ -198,7 +204,9 @@ bool FVoxelEcologyGenerator::ContainsCrown(const FIntVector& InOffset, const int
 	{
 		return InOffset == FIntVector::ZeroValue;
 	}
-	if (FMath::Abs(InOffset.X) > InRadius || FMath::Abs(InOffset.Y) > InRadius || FMath::Abs(InOffset.Z) > InRadius)
+	if (FMath::Abs(static_cast<int64>(InOffset.X)) > InRadius ||
+		FMath::Abs(static_cast<int64>(InOffset.Y)) > InRadius ||
+		FMath::Abs(static_cast<int64>(InOffset.Z)) > InRadius)
 	{
 		return false;
 	}
@@ -228,6 +236,22 @@ bool FVoxelEcologyGenerator::ContainsCrown(const FIntVector& InOffset, const int
 	return Distance < 0.88 || (CellHash % 100) >= 8;
 }
 
+bool FVoxelEcologyGenerator::AppendWorldWrite(
+	FVoxelEcologyPlan& InOutPlan,
+	const FInt64Vector& InPosition,
+	const uint32 InValue,
+	const uint8 InPriority,
+	const FVoxelStableId& InOwnerId)
+{
+	FIntVector Position;
+	if (!VoxelGeneration::TryWorldCell(InPosition, Position))
+	{
+		return false;
+	}
+	InOutPlan.Writes.Add({Position, InValue, InPriority, InOwnerId});
+	return true;
+}
+
 void FVoxelEcologyGenerator::BuildTrees(
 	const FVoxelGenerationBounds& InBounds,
 	TFunctionRef<bool(const FIntVector&, FVoxelColumnSample&)> InSampleColumn,
@@ -242,42 +266,65 @@ void FVoxelEcologyGenerator::BuildTrees(
 			FVoxelColumnSample Column;
 			if (!InSampleColumn(Anchor, Column)) return;
 			const FVoxelTreeSpecies Species = SelectTreeSpecies(Column, OwnerId);
-			for (int32 Z = 0; Z < Height; ++Z)
+			const FInt64Vector WideAnchor(Anchor);
+			const int64 TrunkTop = static_cast<int64>(Anchor.Z) + Height;
+			const int64 VisibleTrunkHeight = FMath::Min<int64>(Height, VoxelGeneration::WorldCellMaxExclusive - Anchor.Z);
+			for (int64 Z = 0; Z < VisibleTrunkHeight; ++Z)
 			{
-				InOutPlan.Writes.Add({Anchor + FIntVector(0, 0, Z),
-					Species.Trunk, TrunkPriority, OwnerId});
+				AppendWorldWrite(InOutPlan, WideAnchor + FInt64Vector(0, 0, Z),
+					Species.Trunk, TrunkPriority, OwnerId);
 			}
 			if (!Recipe->Ecology.TreeSpecies.IsEmpty())
 			{
 				for (const FIntVector Direction : { FIntVector(1, 0, 0), FIntVector(-1, 0, 0), FIntVector(0, 1, 0), FIntVector(0, -1, 0) })
 				{
-					if (Height >= 20) InOutPlan.Writes.Add({ Anchor + Direction, Species.Trunk, TrunkPriority, OwnerId });
+					if (Height >= 20)
+					{
+						AppendWorldWrite(InOutPlan, WideAnchor + FInt64Vector(Direction),
+							Species.Trunk, TrunkPriority, OwnerId);
+					}
 					if (Species.Form != EVoxelTreeForm::Conifer)
 					{
-						for (int32 Branch = 1; Branch <= 2; ++Branch) InOutPlan.Writes.Add({ Anchor + Direction * Branch + FIntVector(0, 0, Height - 5 + Branch), Species.Trunk, TrunkPriority, OwnerId });
+						for (int32 Branch = 1; Branch <= 2; ++Branch)
+						{
+							AppendWorldWrite(InOutPlan, WideAnchor + FInt64Vector(Direction) * Branch +
+								FInt64Vector(0, 0, static_cast<int64>(Height) - 5 + Branch),
+								Species.Trunk, TrunkPriority, OwnerId);
+						}
 					}
 				}
 			}
 			const int32 CrownRadius = Recipe->Settings.Ecology.Tree.CrownRadius;
-			const FIntVector CrownCenter = Anchor + FIntVector(0, 0, Height - 1);
-			for (int32 Z = -CrownRadius; Z <= CrownRadius; ++Z)
+			// 树冠中心可暂时域外；逐格检查最终位置以保留合法的边缘冠层。
+			const FInt64Vector CrownCenter = WideAnchor + FInt64Vector(0, 0, static_cast<int64>(Height) - 1);
+			FVoxelGenerationBounds CrownBounds;
+			if (!VoxelGeneration::ClipWorldBounds(CrownCenter - FInt64Vector(CrownRadius),
+				CrownCenter + FInt64Vector(static_cast<int64>(CrownRadius) + 1), CrownBounds))
 			{
-				for (int32 Y = -CrownRadius; Y <= CrownRadius; ++Y)
+				return;
+			}
+			for (int64 Z = static_cast<int64>(CrownBounds.Min.Z) - CrownCenter.Z;
+				Z < static_cast<int64>(CrownBounds.Max.Z) - CrownCenter.Z; ++Z)
+			{
+				for (int64 Y = static_cast<int64>(CrownBounds.Min.Y) - CrownCenter.Y;
+					Y < static_cast<int64>(CrownBounds.Max.Y) - CrownCenter.Y; ++Y)
 				{
-					for (int32 X = -CrownRadius; X <= CrownRadius; ++X)
+					for (int64 X = static_cast<int64>(CrownBounds.Min.X) - CrownCenter.X;
+						X < static_cast<int64>(CrownBounds.Max.X) - CrownCenter.X; ++X)
 					{
-						if (!ContainsCrown(FIntVector(X, Y, Z), CrownRadius, OwnerId, Species.Form))
+						if (!ContainsCrown(FIntVector(static_cast<int32>(X), static_cast<int32>(Y), static_cast<int32>(Z)),
+							CrownRadius, OwnerId, Species.Form))
 						{
 							continue;
 						}
-						const FIntVector Position = CrownCenter + FIntVector(X, Y, Z);
+						const FInt64Vector Position = CrownCenter + FInt64Vector(X, Y, Z);
 						if (X == 0 && Y == 0 && Position.Z >= Anchor.Z &&
-							Position.Z < Anchor.Z + Height)
+							Position.Z < TrunkTop)
 						{
 							continue;
 						}
-						InOutPlan.Writes.Add({Position, SelectLeaf(Species, Z, CrownRadius),
-							LeafPriority, OwnerId});
+						AppendWorldWrite(InOutPlan, Position, SelectLeaf(Species, static_cast<int32>(Z), CrownRadius),
+							LeafPriority, OwnerId);
 					}
 				}
 			}
@@ -296,33 +343,38 @@ void FVoxelEcologyGenerator::EnumerateTrees(
 {
 	const FVoxelTreeGenerationSettings& Settings = Recipe->Settings.Ecology.Tree;
 	const int32 Chance = EffectiveChance(Settings.ChancePermille, Settings.DensityPermille);
-	if (!Settings.bEnabled || Chance <= 0)
+	if (!InBounds.IsValid() || !Settings.bEnabled || Chance <= 0)
 	{
 		return;
 	}
 
 	const int32 Spacing = FMath::Max(4, Settings.Spacing);
-	const int32 MinGridX = VoxelGeneration::FloorDivide(InBounds.Min.X, Spacing);
-	const int32 MaxGridX = VoxelGeneration::FloorDivide(InBounds.Max.X - 1, Spacing);
-	const int32 MinGridY = VoxelGeneration::FloorDivide(InBounds.Min.Y, Spacing);
-	const int32 MaxGridY = VoxelGeneration::FloorDivide(InBounds.Max.Y - 1, Spacing);
+	const int64 MinGridX = VoxelGeneration::FloorDivideWide(InBounds.Min.X, Spacing);
+	const int64 MaxGridX = VoxelGeneration::FloorDivideWide(static_cast<int64>(InBounds.Max.X) - 1, Spacing);
+	const int64 MinGridY = VoxelGeneration::FloorDivideWide(InBounds.Min.Y, Spacing);
+	const int64 MaxGridY = VoxelGeneration::FloorDivideWide(static_cast<int64>(InBounds.Max.Y) - 1, Spacing);
 
-	for (int32 GridY = MinGridY; GridY <= MaxGridY; ++GridY)
+	for (int64 GridY = MinGridY; GridY <= MaxGridY; ++GridY)
 	{
-		for (int32 GridX = MinGridX; GridX <= MaxGridX; ++GridX)
+		for (int64 GridX = MinGridX; GridX <= MaxGridX; ++GridX)
 		{
 			if (InCancel && InCancel->Load())
 			{
 				return;
 			}
 
-			const FIntVector Grid(GridX, GridY, 0);
+			const FIntVector Grid(static_cast<int32>(GridX), static_cast<int32>(GridY), 0);
 			const uint64 CandidateSeed = VoxelGeneration::MakeSeed(Recipe->Settings.Seed, Grid, TreeSalt);
 			const int32 OffsetX = VoxelGeneration::RandomRange(
 				VoxelGeneration::Mix(CandidateSeed ^ 0x91827211ABF49D33ull), 0, Spacing - 1);
 			const int32 OffsetY = VoxelGeneration::RandomRange(
 				VoxelGeneration::Mix(CandidateSeed ^ 0x42CF9A177A16C593ull), 0, Spacing - 1);
-			const FIntVector XY(GridX * Spacing + OffsetX, GridY * Spacing + OffsetY, 0);
+			FIntVector XY;
+			if (!VoxelGeneration::TryWorldCell(FInt64Vector(
+				GridX * Spacing + OffsetX, GridY * Spacing + OffsetY, 0), XY))
+			{
+				continue;
+			}
 			if (XY.X < InBounds.Min.X || XY.X >= InBounds.Max.X ||
 				XY.Y < InBounds.Min.Y || XY.Y >= InBounds.Max.Y)
 			{
@@ -354,7 +406,14 @@ void FVoxelEcologyGenerator::EnumerateTrees(
 				continue;
 			}
 
-			const FIntVector Anchor(XY.X, XY.Y, Column.SurfaceZ + 1);
+			FIntVector Anchor;
+			FIntVector FloorPosition;
+			if (!VoxelGeneration::TryWorldCell(FInt64Vector(XY.X, XY.Y, static_cast<int64>(Column.SurfaceZ) + 1), Anchor) ||
+				!VoxelGeneration::TryWorldCell(FInt64Vector(XY.X, XY.Y, Column.SurfaceZ), FloorPosition))
+			{
+				if (OutRejects) ++OutRejects->Base;
+				continue;
+			}
 			if (VoxelGeneration::RandomRange(VoxelGeneration::Mix(CandidateSeed), 0, 999) >= Ecology.TreeDensity)
 			{
 				if (OutRejects) ++OutRejects->Chance;
@@ -364,7 +423,7 @@ void FVoxelEcologyGenerator::EnumerateTrees(
 			uint32 AirValue = MAX_uint32;
 			uint32 FloorValue = MAX_uint32;
 			if (!InSampleBaseSymbol(Anchor, AirValue) ||
-				!InSampleBaseSymbol(Anchor - FIntVector(0, 0, 1), FloorValue) ||
+				!InSampleBaseSymbol(FloorPosition, FloorValue) ||
 				static_cast<uint16>(AirValue & 0xffffu) != Recipe->Palette.Air ||
 				static_cast<uint16>(FloorValue & 0xffffu) == Recipe->Palette.Air)
 			{
@@ -397,27 +456,32 @@ void FVoxelEcologyGenerator::BuildGrass(
 	}
 
 	const int32 Spacing = FMath::Max(2, Settings.Spacing);
-	const int32 MinGridX = VoxelGeneration::FloorDivide(InBounds.Min.X, Spacing);
-	const int32 MaxGridX = VoxelGeneration::FloorDivide(InBounds.Max.X - 1, Spacing);
-	const int32 MinGridY = VoxelGeneration::FloorDivide(InBounds.Min.Y, Spacing);
-	const int32 MaxGridY = VoxelGeneration::FloorDivide(InBounds.Max.Y - 1, Spacing);
+	const int64 MinGridX = VoxelGeneration::FloorDivideWide(InBounds.Min.X, Spacing);
+	const int64 MaxGridX = VoxelGeneration::FloorDivideWide(static_cast<int64>(InBounds.Max.X) - 1, Spacing);
+	const int64 MinGridY = VoxelGeneration::FloorDivideWide(InBounds.Min.Y, Spacing);
+	const int64 MaxGridY = VoxelGeneration::FloorDivideWide(static_cast<int64>(InBounds.Max.Y) - 1, Spacing);
 
-	for (int32 GridY = MinGridY; GridY <= MaxGridY; ++GridY)
+	for (int64 GridY = MinGridY; GridY <= MaxGridY; ++GridY)
 	{
-		for (int32 GridX = MinGridX; GridX <= MaxGridX; ++GridX)
+		for (int64 GridX = MinGridX; GridX <= MaxGridX; ++GridX)
 		{
 			if (InCancel && InCancel->Load())
 			{
 				return;
 			}
-			const FIntVector Grid(GridX, GridY, 0);
+			const FIntVector Grid(static_cast<int32>(GridX), static_cast<int32>(GridY), 0);
 			const uint64 CandidateSeed = VoxelGeneration::MakeSeed(Recipe->Settings.Seed, Grid, GrassSalt);
 			const int32 OffsetX = VoxelGeneration::RandomRange(
 				VoxelGeneration::Mix(CandidateSeed ^ 0xFA9170D133E38A21ull), 0, Spacing - 1);
 			const int32 OffsetY = VoxelGeneration::RandomRange(
 				VoxelGeneration::Mix(CandidateSeed ^ 0x5A738CB14268F9E1ull), 0, Spacing - 1);
-			const FIntVector PatchCenter(GridX * Spacing + OffsetX, GridY * Spacing + OffsetY, 0);
 			++InOutPlan.GrassPatchCandidates;
+			FIntVector PatchCenter;
+			if (!VoxelGeneration::TryWorldCell(FInt64Vector(
+				GridX * Spacing + OffsetX, GridY * Spacing + OffsetY, 0), PatchCenter))
+			{
+				continue;
+			}
 			if (PatchCenter.X < InBounds.Min.X || PatchCenter.X >= InBounds.Max.X ||
 				PatchCenter.Y < InBounds.Min.Y || PatchCenter.Y >= InBounds.Max.Y)
 			{
@@ -434,21 +498,40 @@ void FVoxelEcologyGenerator::BuildGrass(
 
 			const FVoxelStableId OwnerId = VoxelGeneration::MakeStableId(
 				Recipe->Settings.Seed, PatchCenter, GrassSalt);
-			for (int32 Y = -Settings.PatchRadius; Y <= Settings.PatchRadius; ++Y)
+			const int64 PatchRadius = Settings.PatchRadius;
+			FVoxelGenerationBounds PatchBounds;
+			if (!VoxelGeneration::ClipWorldBounds(
+				FInt64Vector(static_cast<int64>(PatchCenter.X) - PatchRadius, static_cast<int64>(PatchCenter.Y) - PatchRadius, 0),
+				FInt64Vector(static_cast<int64>(PatchCenter.X) + PatchRadius + 1, static_cast<int64>(PatchCenter.Y) + PatchRadius + 1, 1),
+				PatchBounds))
 			{
-				for (int32 X = -Settings.PatchRadius; X <= Settings.PatchRadius; ++X)
+				continue;
+			}
+			for (int64 Y = PatchBounds.Min.Y; Y < PatchBounds.Max.Y; ++Y)
+			{
+				for (int64 X = PatchBounds.Min.X; X < PatchBounds.Max.X; ++X)
 				{
 					if (InCancel && InCancel->Load())
 					{
 						return;
 					}
-					const FIntVector XY(PatchCenter.X + X, PatchCenter.Y + Y, 0);
+					FIntVector XY;
+					if (!VoxelGeneration::TryWorldCell(FInt64Vector(X, Y, 0), XY))
+					{
+						continue;
+					}
 					FVoxelColumnSample Column;
 					if (!InSampleColumn(XY, Column) || !Sample(Column).bGrassAllowed)
 					{
 						continue;
 					}
-					const FIntVector SurfacePosition(XY.X, XY.Y, Column.SurfaceZ + 1);
+					FIntVector SurfacePosition;
+					FIntVector FloorPosition;
+					if (!VoxelGeneration::TryWorldCell(FInt64Vector(XY.X, XY.Y, static_cast<int64>(Column.SurfaceZ) + 1), SurfacePosition) ||
+						!VoxelGeneration::TryWorldCell(FInt64Vector(XY.X, XY.Y, Column.SurfaceZ), FloorPosition))
+					{
+						continue;
+					}
 					const uint64 PointSeed = VoxelGeneration::MakeSeed(
 						Recipe->Settings.Seed, SurfacePosition, GrassFillSalt);
 					if (VoxelGeneration::RandomRange(PointSeed, 0, 999) >= Settings.PatchFillPermille)
@@ -458,7 +541,7 @@ void FVoxelEcologyGenerator::BuildGrass(
 					uint32 AirValue = MAX_uint32;
 					uint32 FloorValue = MAX_uint32;
 					if (!InSampleBaseSymbol(SurfacePosition, AirValue) ||
-						!InSampleBaseSymbol(SurfacePosition - FIntVector(0, 0, 1), FloorValue) ||
+						!InSampleBaseSymbol(FloorPosition, FloorValue) ||
 						static_cast<uint16>(AirValue & 0xffffu) != Recipe->Palette.Air ||
 						static_cast<uint16>(FloorValue & 0xffffu) == Recipe->Palette.Air)
 					{
@@ -480,8 +563,10 @@ void FVoxelEcologyGenerator::BuildGrass(
 							Plant = *Sapling;
 						}
 					}
-					InOutPlan.Writes.Add({SurfacePosition, Plant, GrassPriority, OwnerId});
-					++InOutPlan.GrassWrites;
+					if (AppendWorldWrite(InOutPlan, FInt64Vector(SurfacePosition), Plant, GrassPriority, OwnerId))
+					{
+						++InOutPlan.GrassWrites;
+					}
 				}
 			}
 		}
@@ -519,10 +604,10 @@ void FVoxelEcologyGenerator::BuildFlowers(
 	const FVoxelFlowerGenerationSettings& Settings = Recipe->Settings.Ecology.Flower;
 	if (!Settings.bEnabled || Recipe->Ecology.Flowers.IsEmpty()) return;
 	const int32 Spacing = Settings.Spacing;
-	const int32 MinGridX = VoxelGeneration::FloorDivide(InBounds.Min.X, Spacing);
-	const int32 MaxGridX = VoxelGeneration::FloorDivide(InBounds.Max.X - 1, Spacing);
-	const int32 MinGridY = VoxelGeneration::FloorDivide(InBounds.Min.Y, Spacing);
-	const int32 MaxGridY = VoxelGeneration::FloorDivide(InBounds.Max.Y - 1, Spacing);
+	const int64 MinGridX = VoxelGeneration::FloorDivideWide(InBounds.Min.X, Spacing);
+	const int64 MaxGridX = VoxelGeneration::FloorDivideWide(static_cast<int64>(InBounds.Max.X) - 1, Spacing);
+	const int64 MinGridY = VoxelGeneration::FloorDivideWide(InBounds.Min.Y, Spacing);
+	const int64 MaxGridY = VoxelGeneration::FloorDivideWide(static_cast<int64>(InBounds.Max.Y) - 1, Spacing);
 	auto RecordReject = [&InOutPlan](const EVoxelEcologyRejectReason Reason)
 	{
 		switch (Reason)
@@ -535,20 +620,24 @@ void FVoxelEcologyGenerator::BuildFlowers(
 		default: ++InOutPlan.FlowerRejects.Surface; break;
 		}
 	};
-	for (int32 GridY = MinGridY; GridY <= MaxGridY; ++GridY)
+	for (int64 GridY = MinGridY; GridY <= MaxGridY; ++GridY)
 	{
-		for (int32 GridX = MinGridX; GridX <= MaxGridX; ++GridX)
+		for (int64 GridX = MinGridX; GridX <= MaxGridX; ++GridX)
 		{
 			if (InCancel && InCancel->Load()) return;
-			const FIntVector Grid(GridX, GridY, 0);
+			const FIntVector Grid(static_cast<int32>(GridX), static_cast<int32>(GridY), 0);
 			const uint64 CandidateSeed = VoxelGeneration::MakeSeed(
 				Recipe->Settings.Seed, Grid, FlowerSalt);
 			const int32 OffsetX = VoxelGeneration::RandomRange(
 				VoxelGeneration::Mix(CandidateSeed ^ 0xFA9170D133E38A21ull), 0, Spacing - 1);
 			const int32 OffsetY = VoxelGeneration::RandomRange(
 				VoxelGeneration::Mix(CandidateSeed ^ 0x5A738CB14268F9E1ull), 0, Spacing - 1);
-			const FIntVector Center(GridX * Spacing + OffsetX,
-				GridY * Spacing + OffsetY, 0);
+			FIntVector Center;
+			if (!VoxelGeneration::TryWorldCell(FInt64Vector(
+				GridX * Spacing + OffsetX, GridY * Spacing + OffsetY, 0), Center))
+			{
+				continue;
+			}
 			if (Center.X < InBounds.Min.X || Center.X >= InBounds.Max.X ||
 				Center.Y < InBounds.Min.Y || Center.Y >= InBounds.Max.Y)
 			{
@@ -575,12 +664,25 @@ void FVoxelEcologyGenerator::BuildFlowers(
 			}
 			const FVoxelStableId OwnerId = VoxelGeneration::MakeStableId(
 				Recipe->Settings.Seed, Center, FlowerSalt);
-			for (int32 Y = -Settings.PatchRadius; Y <= Settings.PatchRadius; ++Y)
+			const int64 PatchRadius = Settings.PatchRadius;
+			FVoxelGenerationBounds PatchBounds;
+			if (!VoxelGeneration::ClipWorldBounds(
+				FInt64Vector(static_cast<int64>(Center.X) - PatchRadius, static_cast<int64>(Center.Y) - PatchRadius, 0),
+				FInt64Vector(static_cast<int64>(Center.X) + PatchRadius + 1, static_cast<int64>(Center.Y) + PatchRadius + 1, 1),
+				PatchBounds))
 			{
-				for (int32 X = -Settings.PatchRadius; X <= Settings.PatchRadius; ++X)
+				continue;
+			}
+			for (int64 Y = PatchBounds.Min.Y; Y < PatchBounds.Max.Y; ++Y)
+			{
+				for (int64 X = PatchBounds.Min.X; X < PatchBounds.Max.X; ++X)
 				{
 					if (InCancel && InCancel->Load()) return;
-					const FIntVector XY(Center.X + X, Center.Y + Y, 0);
+					FIntVector XY;
+					if (!VoxelGeneration::TryWorldCell(FInt64Vector(X, Y, 0), XY))
+					{
+						continue;
+					}
 					const uint64 PointSeed = VoxelGeneration::MakeSeed(
 						Recipe->Settings.Seed, XY, FlowerFillSalt);
 					if (VoxelGeneration::RandomRange(PointSeed, 0, 999) >=
@@ -601,11 +703,18 @@ void FVoxelEcologyGenerator::BuildFlowers(
 						RecordReject(Ecology.FlowerRejectReason);
 						continue;
 					}
-					const FIntVector Position(XY.X, XY.Y, Column.SurfaceZ + 1);
+					FIntVector Position;
+					FIntVector FloorPosition;
+					if (!VoxelGeneration::TryWorldCell(FInt64Vector(XY.X, XY.Y, static_cast<int64>(Column.SurfaceZ) + 1), Position) ||
+						!VoxelGeneration::TryWorldCell(FInt64Vector(XY.X, XY.Y, Column.SurfaceZ), FloorPosition))
+					{
+						++InOutPlan.FlowerRejects.Surface;
+						continue;
+					}
 					uint32 AirValue = MAX_uint32;
 					uint32 FloorValue = MAX_uint32;
 					if (!InSampleBaseSymbol(Position, AirValue) ||
-						!InSampleBaseSymbol(Position - FIntVector(0, 0, 1), FloorValue) ||
+						!InSampleBaseSymbol(FloorPosition, FloorValue) ||
 						static_cast<uint16>(AirValue & 0xffffu) != Recipe->Palette.Air ||
 						static_cast<uint16>(FloorValue & 0xffffu) == Recipe->Palette.Air ||
 						static_cast<uint16>(FloorValue & 0xffffu) != Column.SurfaceMaterial)
@@ -614,8 +723,10 @@ void FVoxelEcologyGenerator::BuildFlowers(
 						continue;
 					}
 					const uint16 Symbol = SelectFlowerSymbol(Position, OwnerId);
-					InOutPlan.Writes.Add({Position, Symbol, FlowerPriority, OwnerId});
-					++InOutPlan.FlowerWrites;
+					if (AppendWorldWrite(InOutPlan, FInt64Vector(Position), Symbol, FlowerPriority, OwnerId))
+					{
+						++InOutPlan.FlowerWrites;
+					}
 				}
 			}
 		}

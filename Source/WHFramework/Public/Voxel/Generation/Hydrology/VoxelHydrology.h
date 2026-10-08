@@ -158,7 +158,7 @@ struct WHFRAMEWORK_API FVoxelHydrologyGrid
     uint32 ToIndex(int32 InX, int32 InY) const;
     FIntPoint ToLocal(uint32 InIndex) const;
     FIntPoint ToWorldHydrologyCell(uint32 InIndex) const;
-    FIntPoint ToWorldVoxelXY(uint32 InIndex) const;
+    bool TryToWorldVoxelXY(uint32 InIndex, FIntPoint& OutPoint) const;
 };
 
 struct WHFRAMEWORK_API FVoxelRiverSource
@@ -276,6 +276,7 @@ struct WHFRAMEWORK_API FVoxelHydrologyPlan
     int32 RiverMeanderOctaves = 2;
     int32 RiverMaxMeanderAngle = 35;
 
+	// Voxel cell 单位的半开 core；Grid.WorldMinCell 则是 hydrology 格点单位。
 	FIntPoint CoreMin =
 		FIntPoint::ZeroValue;
 

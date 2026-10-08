@@ -6,6 +6,17 @@
 
 namespace VoxelGeneration
 {
+	// int32 半开 Bounds 的统一 cell 域；MAX_int32 仅作排他上界。
+	inline constexpr int64 WorldCellMin = MIN_int32;
+	inline constexpr int64 WorldCellMaxExclusive = MAX_int32;
+	WHFRAMEWORK_API int64 FloorDivideWide(int64 InValue, int32 InDivisor);
+	WHFRAMEWORK_API bool IsWorldCell(int64 InCoordinate);
+	WHFRAMEWORK_API bool TryWorldPoint(const FInt64Vector2& InCoordinate, FIntPoint& OutPoint);
+	WHFRAMEWORK_API bool TryWorldCell(const FInt64Vector& InCoordinate, FIntVector& OutCell);
+	WHFRAMEWORK_API bool TryRoundedWorldCell(const FVector& InCoordinate, FIntVector& OutCell);
+	WHFRAMEWORK_API bool ClipWorldBounds(const FInt64Vector& InMin, const FInt64Vector& InMax,
+		FVoxelGenerationBounds& OutBounds);
+
 	WHFRAMEWORK_API int32 FloorDivide(int32 InValue, int32 InDivisor);
 	WHFRAMEWORK_API int32 CeilDividePositive(int32 InValue, int32 InDivisor);
 
@@ -47,6 +58,10 @@ namespace VoxelGeneration
 	WHFRAMEWORK_API bool IsInsideEllipsoid(
 		const FIntVector& InPosition,
 		const FIntVector& InCenter,
+		const FIntVector& InRadius);
+	WHFRAMEWORK_API bool IsInsideEllipsoid(
+		const FIntVector& InPosition,
+		const FInt64Vector& InCenter,
 		const FIntVector& InRadius);
 
 	WHFRAMEWORK_API bool IsInsideCapsule(

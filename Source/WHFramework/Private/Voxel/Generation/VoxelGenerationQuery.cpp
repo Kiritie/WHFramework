@@ -19,19 +19,11 @@ namespace
 {
 	constexpr int32 VoxelGenerationPlanTileSide = 256;
 
-	FVoxelGenerationBounds MakeTileBounds(
-		const FVoxelGenerationTileKey& InKey)
+	bool MakeTileBounds(const FVoxelGenerationTileKey& InKey, FVoxelGenerationBounds& OutBounds)
 	{
-		const FIntVector Min =
-			InKey.Coordinate *
-			VoxelGenerationPlanTileSide;
-
-		return {
-			Min,
-			Min +
-				FIntVector(
-					VoxelGenerationPlanTileSide)
-		};
+		const FInt64Vector Min(int64(InKey.Coordinate.X) * VoxelGenerationPlanTileSide,
+			int64(InKey.Coordinate.Y) * VoxelGenerationPlanTileSide, int64(InKey.Coordinate.Z) * VoxelGenerationPlanTileSide);
+		return VoxelGeneration::ClipWorldBounds(Min, Min + FInt64Vector(VoxelGenerationPlanTileSide), OutBounds);
 	}
 }
 
@@ -45,7 +37,7 @@ bool FVoxelGenerationQuery::GetPlanKeyRanges(const FVoxelGenerationBounds& InBou
 	}
 	const auto At = [](const int64 Value, const int32 Side)
 	{
-		return VoxelGeneration::FloorDivide(int32(FMath::Clamp<int64>(Value, MIN_int32, MAX_int32)), Side);
+		return VoxelGeneration::FloorDivide(int32(FMath::Clamp<int64>(Value, MIN_int32, MAX_int32 - 1)), Side);
 	};
 	const int64 Margin = FMath::Max(InSettings.CaveSpacing, GenerationPlanTileSide);
 	const int64 EcologyMargin = int64(FMath::Max(0, FMath::Max(
@@ -169,6 +161,17 @@ bool FVoxelGenerationQuery::EnsureHydrologyPlan(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	const auto& Settings = Config->Recipe->Settings;
+	const int64 MinCell = VoxelGeneration::FloorDivideWide(VoxelGeneration::WorldCellMin, Settings.HydrologyCellSize);
+	const int64 MaxCell = VoxelGeneration::FloorDivideWide(VoxelGeneration::WorldCellMaxExclusive - 1, Settings.HydrologyCellSize) + 1;
+	const FInt64Vector2 Core(int64(InKey.Coordinate.X) * Settings.HydrologyRegionSide,
+		int64(InKey.Coordinate.Y) * Settings.HydrologyRegionSide);
+	if (Core.X >= MaxCell || Core.Y >= MaxCell || Core.X + Settings.HydrologyRegionSide <= MinCell ||
+		Core.Y + Settings.HydrologyRegionSide <= MinCell)
+	{
+		OutError = TEXT("Invalid hydrology region outside world cell domain");
+		return false;
+	}
 	if (bRequireReadyPlans && Cache->FindHydrology(InKey, OutPlan))
 	{
 		OutError.Reset();
@@ -194,6 +197,8 @@ bool FVoxelGenerationQuery::EnsureCavePlan(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	FVoxelGenerationBounds Bounds;
+	if (!MakeTileBounds(InKey, Bounds)) { OutError = TEXT("Invalid cave tile outside world cell domain"); return false; }
 	if (bRequireReadyPlans)
 	{
 		if (Cache->FindCave(InKey, OutPlan))
@@ -205,7 +210,6 @@ bool FVoxelGenerationQuery::EnsureCavePlan(
 		OutError = TEXT("DependencyNotReady: Cave");
 		return false;
 	}
-	const FVoxelGenerationBounds Bounds = MakeTileBounds(InKey);
 	return Cache->GetOrBuildCave(InKey,
 		[this, Bounds, InCancel](FVoxelCavePlan& Plan, FString& Error)
 		{
@@ -227,6 +231,8 @@ bool FVoxelGenerationQuery::EnsureStructurePlan(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	FVoxelGenerationBounds Bounds;
+	if (!MakeTileBounds(InKey, Bounds)) { OutError = TEXT("Invalid structure tile outside world cell domain"); return false; }
 	if (bRequireReadyPlans)
 	{
 		if (Cache->FindStructure(InKey, OutPlan))
@@ -238,7 +244,6 @@ bool FVoxelGenerationQuery::EnsureStructurePlan(
 		OutError = TEXT("DependencyNotReady: Structure");
 		return false;
 	}
-	const FVoxelGenerationBounds Bounds = MakeTileBounds(InKey);
 	return Cache->GetOrBuildStructure(InKey,
 		[this, Bounds, InCancel](FVoxelStructurePlan& Plan, FString& Error)
 		{
@@ -282,6 +287,8 @@ bool FVoxelGenerationQuery::EnsureFeaturePlan(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	FVoxelGenerationBounds Bounds;
+	if (!MakeTileBounds(InKey, Bounds)) { OutError = TEXT("Invalid feature tile outside world cell domain"); return false; }
 	if (bRequireReadyPlans)
 	{
 		if (Cache->FindFeature(InKey, OutPlan))
@@ -293,7 +300,6 @@ bool FVoxelGenerationQuery::EnsureFeaturePlan(
 		OutError = TEXT("DependencyNotReady: Feature");
 		return false;
 	}
-	const FVoxelGenerationBounds Bounds = MakeTileBounds(InKey);
 	return Cache->GetOrBuildFeature(InKey,
 		[this, Bounds, InCancel](FVoxelFeaturePlan& Plan, FString& Error)
 		{
@@ -338,6 +344,11 @@ bool FVoxelGenerationQuery::EnsureEcologyPlan(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	const FInt64Vector Min(int64(InKey.Coordinate.X) * EcologyTileSide, int64(InKey.Coordinate.Y) * EcologyTileSide,
+		Config->Recipe->Settings.MinZ);
+	FVoxelGenerationBounds Bounds;
+	if (!VoxelGeneration::ClipWorldBounds(Min, FInt64Vector(Min.X + EcologyTileSide, Min.Y + EcologyTileSide,
+		Config->Recipe->Settings.MaxZ), Bounds)) { OutError = TEXT("Invalid ecology tile outside world cell domain"); return false; }
 	if (bRequireReadyPlans)
 	{
 		if (Cache->FindEcology(InKey, OutPlan))
@@ -350,12 +361,6 @@ bool FVoxelGenerationQuery::EnsureEcologyPlan(
 		OutError = TEXT("DependencyNotReady: Ecology");
 		return false;
 	}
-	const FIntPoint MinXY = InKey.Coordinate * EcologyTileSide;
-	const FVoxelGenerationBounds Bounds {
-		FIntVector(MinXY.X, MinXY.Y, Config->Recipe->Settings.MinZ),
-		FIntVector(MinXY.X + EcologyTileSide, MinXY.Y + EcologyTileSide,
-			Config->Recipe->Settings.MaxZ)
-	};
 	return Cache->GetOrBuildEcology(InKey,
 		[this, Bounds, InCancel](FVoxelEcologyPlan& Plan, FString& Error)
 		{
@@ -601,6 +606,11 @@ bool FVoxelGenerationQuery::GetBaseColumn(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	if (!VoxelGeneration::IsWorldCell(InX) || !VoxelGeneration::IsWorldCell(InY))
+	{
+		OutError = TEXT("Invalid base column outside world cell domain");
+		return false;
+	}
 	if (InCancel && InCancel->Load())
 	{
 		OutError = TEXT("Canceled");
@@ -707,9 +717,11 @@ bool FVoxelGenerationQuery::ComputeBaseColumn(
 		for (const FIntPoint& Offset :
 			CoastNeighbors)
 		{
+			FIntPoint Neighbor;
+			if (!VoxelGeneration::TryWorldPoint(FInt64Vector2(int64(InX) + Offset.X, int64(InY) + Offset.Y), Neighbor)) continue;
 			if (Terrain->SampleMacro(
-				InX + Offset.X,
-				InY + Offset.Y).
+				Neighbor.X,
+				Neighbor.Y).
 				SurfaceZ <=
 				SeaLevel)
 			{
@@ -808,6 +820,11 @@ bool FVoxelGenerationQuery::SampleEnvironmentColumn(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	if (!VoxelGeneration::IsWorldCell(InX) || !VoxelGeneration::IsWorldCell(InY))
+	{
+		OutError = TEXT("Invalid column outside world cell domain");
+		return false;
+	}
 	if (!bUseColumnCache)
 	{
 		return ComputeNaturalColumn(
@@ -859,7 +876,7 @@ bool FVoxelGenerationQuery::ResolveSurfaceCandidate(
 	OutCandidate.bOcean = Column.bOcean;
 	OutCandidate.bCoast = Column.bCoast;
 	OutCandidate.bValid = OutCandidate.GroundZ >= Config->Recipe->Settings.MinZ &&
-		OutCandidate.GroundZ < Config->Recipe->Settings.MaxZ - 2;
+		int64(OutCandidate.GroundZ) < int64(Config->Recipe->Settings.MaxZ) - 2;
 	OutError.Reset();
 	return true;
 }
@@ -1118,7 +1135,7 @@ bool FVoxelGenerationQuery::ApplyStage(
 				Surface->ResolveSymbol(
 					InPosition,
 					InOutColumn,
-					InOutColumn.SurfaceZ -
+					int64(InOutColumn.SurfaceZ) -
 						InPosition.Z);
 		}
 		break;

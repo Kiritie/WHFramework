@@ -35,8 +35,8 @@ namespace
 	{
 		auto Blend = [Numerator, Denominator](const int32 First, const int32 Second)
 		{
-			return First + static_cast<int32>(
-				(static_cast<int64>(Second) - First) * Numerator / Denominator);
+			return static_cast<int32>(int64(First) +
+				(int64(Second) - First) * Numerator / Denominator);
 		};
 		FVoxelRiverShapePoint Result;
 		Result.Position.X = Blend(A.Position.X, B.Position.X);
@@ -148,12 +148,12 @@ namespace
 		const FIntPoint& InCurrent, const FIntPoint& InNext,
 		const int32 InTangentQ10)
 	{
-		const FIntPoint A = InCurrent - InPrevious;
-		const FIntPoint B = InNext - InCurrent;
-		const int64 Dot = static_cast<int64>(A.X) * B.X +
-			static_cast<int64>(A.Y) * B.Y;
-		const int64 Cross = FMath::Abs(static_cast<int64>(A.X) * B.Y -
-			static_cast<int64>(A.Y) * B.X);
+		const FVector2D A(double(int64(InCurrent.X) - InPrevious.X),
+			double(int64(InCurrent.Y) - InPrevious.Y));
+		const FVector2D B(double(int64(InNext.X) - InCurrent.X),
+			double(int64(InNext.Y) - InCurrent.Y));
+		const double Dot = A.X * B.X + A.Y * B.Y;
+		const double Cross = FMath::Abs(A.X * B.Y - A.Y * B.X);
 		return Dot > 0 && Cross * 1024 <= Dot * InTangentQ10;
 	}
 
@@ -196,10 +196,10 @@ namespace
 			{
 				continue;
 			}
-			const FIntPoint Tangent = InShape[Index + 1].Position -
-				InShape[Index - 1].Position;
-			const int64 Length = FMath::Abs(static_cast<int64>(Tangent.X)) +
-				FMath::Abs(static_cast<int64>(Tangent.Y));
+			const FInt64Vector2 Tangent(
+				int64(InShape[Index + 1].Position.X) - InShape[Index - 1].Position.X,
+				int64(InShape[Index + 1].Position.Y) - InShape[Index - 1].Position.Y);
+			const int64 Length = FMath::Abs(Tangent.X) + FMath::Abs(Tangent.Y);
 			if (Length == 0) continue;
 			int64 Noise = 0;
 			int64 Weight = 0;
@@ -220,11 +220,14 @@ namespace
 			const int32 Offset = static_cast<int32>(
 				Noise * InStrength * Taper / FMath::Max<int64>(1,
 					Weight * 32768 * 1024));
-			Result.Position.X += static_cast<int32>(
-				-static_cast<int64>(Tangent.Y) * Offset / Length);
-			Result.Position.Y += static_cast<int32>(
-				static_cast<int64>(Tangent.X) * Offset / Length);
-			Result.MeanderOffset = Offset;
+			FIntPoint MeanderPosition;
+			if (VoxelGeneration::TryWorldPoint(FInt64Vector2(
+				int64(Source.Position.X) - Tangent.Y * Offset / Length,
+				int64(Source.Position.Y) + Tangent.X * Offset / Length), MeanderPosition))
+			{
+				Result.Position = MeanderPosition;
+				Result.MeanderOffset = Offset;
+			}
 		}
 		// 细分产生的单格阶梯无法表达平滑转角；按水文网格尺度重采样，固定锚点不移动。
 		const int64 MinimumDistanceSquared = static_cast<int64>(InMinimumStep) * InMinimumStep;
@@ -232,8 +235,8 @@ namespace
 		Resampled.Reserve(OutPoints.Num());
 		auto DistanceSquared = [](const FIntPoint& A, const FIntPoint& B)
 		{
-			const int64 X = static_cast<int64>(A.X) - B.X;
-			const int64 Y = static_cast<int64>(A.Y) - B.Y;
+			const double X = double(int64(A.X) - B.X);
+			const double Y = double(int64(A.Y) - B.Y);
 			return X * X + Y * Y;
 		};
 		for (const FVoxelRiverMeanderPoint& Point : OutPoints)
@@ -293,8 +296,8 @@ namespace
 				{
 					const FIntPoint Current = OutPoints[Index].Position;
 					const FIntPoint Candidate(
-						Current.X + static_cast<int32>((static_cast<int64>(Midpoint.X) - Current.X) * Fraction / 4),
-						Current.Y + static_cast<int32>((static_cast<int64>(Midpoint.Y) - Current.Y) * Fraction / 4));
+						int32(int64(Current.X) + (int64(Midpoint.X) - Current.X) * Fraction / 4),
+						int32(int64(Current.Y) + (int64(Midpoint.Y) - Current.Y) * Fraction / 4));
 					if (Candidate == Current || Candidate == OutPoints[Index - 1].Position ||
 						Candidate == OutPoints[Index + 1].Position || !PreservesAnchorTurns(Index, Candidate, false)) continue;
 					OutPoints[Index].Position = Candidate;
@@ -341,7 +344,7 @@ namespace
 					const int32 Before = Begin - 1;
 					const int32 After = Begin + Count;
 					if (OutPoints[Before].Position == OutPoints[After].Position ||
-						OutPoints[After].WaterZ > OutPoints[Before].WaterZ + 1) continue;
+						int64(OutPoints[After].WaterZ) > int64(OutPoints[Before].WaterZ) + 1) continue;
 					if (Before > 0 && !IsMeanderAngleWithinLimit(
 						OutPoints[Before - 1].Position, OutPoints[Before].Position,
 						OutPoints[After].Position, TangentQ10)) continue;
@@ -359,18 +362,19 @@ namespace
 		}
 		for (int32 Index = 1; Index + 1 < OutPoints.Num(); ++Index)
 		{
-			const FIntPoint A = OutPoints[Index].Position - OutPoints[Index - 1].Position;
-			const FIntPoint B = OutPoints[Index + 1].Position - OutPoints[Index].Position;
-			const int64 Cross = static_cast<int64>(A.X) * B.Y -
-				static_cast<int64>(A.Y) * B.X;
+			const FVector2D A(double(int64(OutPoints[Index].Position.X) - OutPoints[Index - 1].Position.X),
+				double(int64(OutPoints[Index].Position.Y) - OutPoints[Index - 1].Position.Y));
+			const FVector2D B(double(int64(OutPoints[Index + 1].Position.X) - OutPoints[Index].Position.X),
+				double(int64(OutPoints[Index + 1].Position.Y) - OutPoints[Index].Position.Y));
+			const double Cross = A.X * B.Y - A.Y * B.X;
 			OutPoints[Index].Curvature = Cross > 0 ? 1 : Cross < 0 ? -1 : 0;
 		}
 	}
 
-	int32 ResolveRiverInfluenceRadius(
+	int64 ResolveRiverInfluenceRadius(
 		const FVoxelRiverMeanderPoint& InPoint)
 	{
-		return InPoint.WaterHalfWidth + InPoint.BankWidth +
+		return int64(InPoint.WaterHalfWidth) + InPoint.BankWidth +
 			InPoint.ShoreWidth;
 	}
 }
@@ -398,9 +402,10 @@ void FVoxelHydrologyPlan::Finalize()
 			for (int32 End=Start+1; End<River.MeanderPoints.Num(); ++End)
 			{
 				const auto& Down=River.MeanderPoints[End];
-				const double Run=FVector2D(Down.Position-Up.Position).Size();
+				const double Run=FVector2D(double(int64(Down.Position.X)-Up.Position.X),
+					double(int64(Down.Position.Y)-Up.Position.Y)).Size();
 				if (Run>24.0) break;
-				const int32 Drop=Up.WaterZ-Down.WaterZ;
+				const int64 Drop=int64(Up.WaterZ)-Down.WaterZ;
 				if (Drop<8 || double(Drop)*2.0<Run) continue;
 				FVoxelWaterfallSemantic Fall;
 				Fall.Upstream=FIntVector(Up.Position.X,Up.Position.Y,Up.WaterZ);
@@ -471,68 +476,38 @@ void FVoxelHydrologyPlan::Finalize()
 				River.MeanderPoints[
 					PointIndex];
 
-			const int32 Radius =
+			const int64 Radius =
 				FMath::Max(
 					ResolveRiverInfluenceRadius(A),
 					ResolveRiverInfluenceRadius(B));
 
-			const int32 MinX =
-				FMath::Min(
-					A.Position.X,
-					B.Position.X) -
-				Radius;
+			const int64 MinX = FMath::Max(int64(FMath::Min(A.Position.X, B.Position.X)) - Radius,
+				VoxelGeneration::WorldCellMin);
+			const int64 MinY = FMath::Max(int64(FMath::Min(A.Position.Y, B.Position.Y)) - Radius,
+				VoxelGeneration::WorldCellMin);
+			const int64 MaxX = FMath::Min(int64(FMath::Max(A.Position.X, B.Position.X)) + Radius,
+				VoxelGeneration::WorldCellMaxExclusive - 1);
+			const int64 MaxY = FMath::Min(int64(FMath::Max(A.Position.Y, B.Position.Y)) + Radius,
+				VoxelGeneration::WorldCellMaxExclusive - 1);
+			// 索引只覆盖本 plan 的物理 Grid；Sample 不消费 Grid 外的水文 cell。
+			const int64 MinCellX = FMath::Max(VoxelGeneration::FloorDivideWide(MinX, Grid.CellSize), int64(Grid.WorldMinCell.X));
+			const int64 MinCellY = FMath::Max(VoxelGeneration::FloorDivideWide(MinY, Grid.CellSize), int64(Grid.WorldMinCell.Y));
+			const int64 MaxCellX = FMath::Min(VoxelGeneration::FloorDivideWide(MaxX, Grid.CellSize), int64(Grid.WorldMinCell.X) + Grid.Width - 1);
+			const int64 MaxCellY = FMath::Min(VoxelGeneration::FloorDivideWide(MaxY, Grid.CellSize), int64(Grid.WorldMinCell.Y) + Grid.Height - 1);
 
-			const int32 MinY =
-				FMath::Min(
-					A.Position.Y,
-					B.Position.Y) -
-				Radius;
-
-			const int32 MaxX =
-				FMath::Max(
-					A.Position.X,
-					B.Position.X) +
-				Radius;
-
-			const int32 MaxY =
-				FMath::Max(
-					A.Position.Y,
-					B.Position.Y) +
-				Radius;
-
-			const int32 MinCellX =
-				VoxelGeneration::FloorDivide(
-					MinX,
-					Grid.CellSize);
-
-			const int32 MinCellY =
-				VoxelGeneration::FloorDivide(
-					MinY,
-					Grid.CellSize);
-
-			const int32 MaxCellX =
-				VoxelGeneration::FloorDivide(
-					MaxX,
-					Grid.CellSize);
-
-			const int32 MaxCellY =
-				VoxelGeneration::FloorDivide(
-					MaxY,
-					Grid.CellSize);
-
-			for (int32 CellY = MinCellY;
+			for (int64 CellY = MinCellY;
 				CellY <= MaxCellY;
 				++CellY)
 			{
-				for (int32 CellX = MinCellX;
+				for (int64 CellX = MinCellX;
 					CellX <= MaxCellX;
 					++CellX)
 				{
 					RiverSegmentsByHydrologyCell.
 						FindOrAdd(
 							FIntPoint(
-								CellX,
-								CellY)).
+								int32(CellX),
+								int32(CellY))).
 						Add({
 							RiverIndex,
 							PointIndex
@@ -556,6 +531,11 @@ bool FVoxelHydrologyPlan::ValidateRiverRoutes(FString& OutError) const
 		for (int32 Index = 0; Index < River.MeanderPoints.Num(); ++Index)
 		{
 			const FVoxelRiverMeanderPoint& Point = River.MeanderPoints[Index];
+			if (!VoxelGeneration::IsWorldCell(Point.Position.X) || !VoxelGeneration::IsWorldCell(Point.Position.Y))
+			{
+				OutError = TEXT("River shape contains a point outside world cell domain");
+				return false;
+			}
 			if (Point.BedHalfWidth < 1 || Point.WaterHalfWidth < Point.BedHalfWidth ||
 				Point.BankWidth < 1 || Point.ShoreWidth < 1 || Point.Depth < 1)
 			{
@@ -564,7 +544,7 @@ bool FVoxelHydrologyPlan::ValidateRiverRoutes(FString& OutError) const
 			}
 			if (Index == 0) continue;
 			const FVoxelRiverMeanderPoint& Previous = River.MeanderPoints[Index - 1];
-			if (Point.Position == Previous.Position || Point.WaterZ > Previous.WaterZ + 1)
+			if (Point.Position == Previous.Position || int64(Point.WaterZ) > int64(Previous.WaterZ) + 1)
 			{
 				OutError = TEXT("River shape has a zero segment or uphill discontinuity");
 				return false;
@@ -593,7 +573,8 @@ bool FVoxelHydrologyPlan::Sample(
 	const int32 InOriginalGround,
 	FVoxelHydrologyInfluence& OutInfluence) const
 {
-	if (Grid.CellSize <= 0 ||
+	if (!VoxelGeneration::IsWorldCell(InWorldX) || !VoxelGeneration::IsWorldCell(InWorldY) ||
+		Grid.CellSize <= 0 ||
 		Grid.Width <= 0 ||
 		Grid.Height <= 0)
 	{
@@ -608,17 +589,15 @@ bool FVoxelHydrologyPlan::Sample(
 			InWorldY,
 			Grid.CellSize));
 
-	const FIntPoint LocalCell =
-		WorldHydrologyCell -
-		Grid.WorldMinCell;
+	const FInt64Vector2 LocalWide(int64(WorldHydrologyCell.X) - Grid.WorldMinCell.X,
+		int64(WorldHydrologyCell.Y) - Grid.WorldMinCell.Y);
 
-	if (LocalCell.X < 0 ||
-		LocalCell.Y < 0 ||
-		LocalCell.X >= Grid.Width ||
-		LocalCell.Y >= Grid.Height)
+	if (LocalWide.X < 0 || LocalWide.Y < 0 ||
+		LocalWide.X >= Grid.Width || LocalWide.Y >= Grid.Height)
 	{
 		return false;
 	}
+	const FIntPoint LocalCell(int32(LocalWide.X), int32(LocalWide.Y));
 
 	FVoxelHydrologyInfluence Result;
 
@@ -673,11 +652,8 @@ bool FVoxelHydrologyPlan::Sample(
 		}
 	}
 
-	const FIntPoint SampleCellOrigin(
-		WorldHydrologyCell.X *
-			Grid.CellSize,
-		WorldHydrologyCell.Y *
-			Grid.CellSize);
+	FIntPoint SampleCellOrigin;
+	if (!Grid.TryToWorldVoxelXY(GridIndex, SampleCellOrigin)) return false;
 
 	if (const int32* LakeWaterZ =
 		LakeWaterByCellOrigin.Find(
@@ -766,61 +742,16 @@ bool FVoxelHydrologyPlan::Sample(
 					Sample.Y) -
 				A.Position.Y;
 
-			const int64 LengthSquared =
-				ABX * ABX +
-				ABY * ABY;
+			const double LengthSquared = double(ABX) * ABX + double(ABY) * ABY;
 
-			const int32 AlphaQ16 =
-				LengthSquared > 0
-					? static_cast<int32>(
-						FMath::Clamp<int64>(
-							(APX * ABX +
-							 APY * ABY) *
-								65536 /
-								LengthSquared,
-							0,
-							65536))
-					: 0;
-
-			const int64 ClosestXQ16 =
-				static_cast<int64>(
-					A.Position.X) *
-					65536 +
-				ABX *
-					AlphaQ16;
-
-			const int64 ClosestYQ16 =
-				static_cast<int64>(
-					A.Position.Y) *
-					65536 +
-				ABY *
-					AlphaQ16;
-
-			const int64 DX =
-				FMath::Abs(
-					static_cast<int64>(
-						Sample.X) *
-						65536 -
-					ClosestXQ16);
-
-			const int64 DY =
-				FMath::Abs(
-					static_cast<int64>(
-						Sample.Y) *
-						65536 -
-					ClosestYQ16);
-
-			const int32 Distance =
-				static_cast<int32>(
-					(FMath::Max(
-						DX,
-						DY) +
-					 FMath::Min(
-						DX,
-						DY) *
-						3 /
-						8) /
-					65536);
+			const double Alpha = LengthSquared > 0.0 ? FMath::Clamp(
+				(double(APX) * ABX + double(APY) * ABY) / LengthSquared, 0.0, 1.0) : 0.0;
+			const int32 AlphaQ16 = int32(Alpha * 65536.0);
+			// Q16 只插值内容属性；超长段不能用量化 Alpha 求几何最近点。
+			const double DX = FMath::Abs(double(APX) - double(ABX) * Alpha);
+			const double DY = FMath::Abs(double(APY) - double(ABY) * Alpha);
+			const int32 Distance = int32(FMath::Min(double(MAX_int32),
+				FMath::Max(DX, DY) + FMath::Min(DX, DY) * 3.0 / 8.0));
 
 			if (Distance >=
 				BestDistance)
@@ -828,46 +759,21 @@ bool FVoxelHydrologyPlan::Sample(
 				continue;
 			}
 
-			const int32 WaterZ =
-				A.WaterZ +
-				static_cast<int32>(
-					static_cast<int64>(
-						B.WaterZ -
-						A.WaterZ) *
-					AlphaQ16 /
-					65536);
+			auto Blend = [AlphaQ16](const int32 First, const int32 Second)
+			{
+				return int32(int64(First) + (int64(Second) - First) * AlphaQ16 / 65536);
+			};
+			const int32 WaterZ = Blend(A.WaterZ, B.WaterZ);
 
 			FVoxelRiverShape Shape;
 
-			Shape.BedHalfWidth =
-				A.BedHalfWidth +
-				static_cast<int32>(
-					static_cast<int64>(
-						B.BedHalfWidth -
-						A.BedHalfWidth) *
-					AlphaQ16 /
-					65536);
-			Shape.WaterHalfWidth = A.WaterHalfWidth +
-				static_cast<int32>(static_cast<int64>(
-					B.WaterHalfWidth - A.WaterHalfWidth) * AlphaQ16 / 65536);
-
-			Shape.Depth =
-				A.Depth +
-				static_cast<int32>(
-					static_cast<int64>(
-						B.Depth -
-						A.Depth) *
-					AlphaQ16 /
-					65536);
-
-			Shape.BankWidth = A.BankWidth +
-				static_cast<int32>(static_cast<int64>(
-					B.BankWidth - A.BankWidth) * AlphaQ16 / 65536);
-			Shape.ShoreWidth = A.ShoreWidth +
-				static_cast<int32>(static_cast<int64>(
-					B.ShoreWidth - A.ShoreWidth) * AlphaQ16 / 65536);
+			Shape.BedHalfWidth = Blend(A.BedHalfWidth, B.BedHalfWidth);
+			Shape.WaterHalfWidth = Blend(A.WaterHalfWidth, B.WaterHalfWidth);
+			Shape.Depth = Blend(A.Depth, B.Depth);
+			Shape.BankWidth = Blend(A.BankWidth, B.BankWidth);
+			Shape.ShoreWidth = Blend(A.ShoreWidth, B.ShoreWidth);
 			const int32 Curvature = AlphaQ16 < 32768 ? A.Curvature : B.Curvature;
-			const int64 Side = ABX * APY - ABY * APX;
+			const double Side = double(ABX) * APY - double(ABY) * APX;
 			if (Curvature != 0 && Side != 0)
 			{
 				if ((Curvature > 0 && Side < 0) ||

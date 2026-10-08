@@ -178,6 +178,13 @@ bool FVoxelOreVeinFeatureAlgorithm::Generate(
 		}
 		return false;
 	}
+	if (!VoxelGeneration::IsWorldCell(InContext.CandidateAnchor.X) ||
+		!VoxelGeneration::IsWorldCell(InContext.CandidateAnchor.Y) ||
+		!VoxelGeneration::IsWorldCell(InContext.CandidateAnchor.Z))
+	{
+		OutError = TEXT("Voxel ore vein received an anchor outside the world cell domain");
+		return false;
+	}
 	const uint64 Seed = VoxelGeneration::MakeSeed(
 		InContext.WorldSeed, InContext.CandidateAnchor, InContext.Definition->StableHash);
 	const int32 Length = VoxelGeneration::RandomRange(Seed, Config.MinLength, Config.MaxLength);
@@ -189,7 +196,7 @@ bool FVoxelOreVeinFeatureAlgorithm::Generate(
 	};
 	FVoxelFeatureInstance Instance;
 	InitializeInstance(InContext, Instance);
-	FIntVector Center = InContext.CandidateAnchor;
+	FInt64Vector Center(InContext.CandidateAnchor);
 	TSet<FIntVector> Written;
 	for (int32 Step = 0; Step < Length; ++Step)
 	{
@@ -203,7 +210,11 @@ bool FVoxelOreVeinFeatureAlgorithm::Generate(
 					{
 						continue;
 					}
-					const FIntVector Position = Center + FIntVector(X, Y, Z);
+					FIntVector Position;
+					if (!VoxelGeneration::TryWorldCell(Center + FInt64Vector(X, Y, Z), Position))
+					{
+						continue;
+					}
 					uint32 BaseSymbol = 0;
 					if (!Written.Contains(Position) && InContext.SampleBaseSymbol(Position, BaseSymbol) &&
 						Config.HostSymbols.Contains(static_cast<uint16>(BaseSymbol & 0xffffu)))
@@ -216,7 +227,12 @@ bool FVoxelOreVeinFeatureAlgorithm::Generate(
 		}
 		const int32 DirectionIndex = VoxelGeneration::RandomRange(
 			VoxelGeneration::Mix(Seed + static_cast<uint64>(Step)), 0, UE_ARRAY_COUNT(Directions) - 1);
-		Center += Directions[DirectionIndex];
+		FIntVector NextCenter;
+		if (!VoxelGeneration::TryWorldCell(Center + FInt64Vector(Directions[DirectionIndex]), NextCenter))
+		{
+			break;
+		}
+		Center = FInt64Vector(NextCenter);
 	}
 	OutInstance = MoveTemp(Instance);
 	OutError.Reset();

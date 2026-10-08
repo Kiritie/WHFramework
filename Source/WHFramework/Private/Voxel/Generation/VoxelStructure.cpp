@@ -5,8 +5,8 @@
 
 namespace
 {
-	FIntVector RotateCell(
-		FIntVector InPosition,
+	FInt64Vector RotateCell(
+		FInt64Vector InPosition,
 		uint8 InYaw)
 	{
 		for (uint8 Turn = 0;
@@ -14,7 +14,7 @@ namespace
 			++Turn)
 		{
 			InPosition =
-				FIntVector(
+				FInt64Vector(
 					-InPosition.Y - 1,
 					InPosition.X,
 					InPosition.Z);
@@ -23,8 +23,8 @@ namespace
 		return InPosition;
 	}
 
-	FIntVector RotateCorner(
-		FIntVector InPosition,
+	FInt64Vector RotateCorner(
+		FInt64Vector InPosition,
 		uint8 InYaw)
 	{
 		for (uint8 Turn = 0;
@@ -32,7 +32,7 @@ namespace
 			++Turn)
 		{
 			InPosition =
-				FIntVector(
+				FInt64Vector(
 					-InPosition.Y,
 					InPosition.X,
 					InPosition.Z);
@@ -41,30 +41,24 @@ namespace
 		return InPosition;
 	}
 
-	FVoxelGenerationBounds TransformBounds(
+	bool TransformBounds(
 		const FVoxelGenerationBounds& InBounds,
-		const FIntVector& InOrigin,
-		uint8 InYaw)
+		const FInt64Vector& InOrigin,
+		uint8 InYaw,
+		FVoxelGenerationBounds& OutBounds)
 	{
-		FVoxelGenerationBounds Result;
-
-		Result.Min =
-			FIntVector(
-				MAX_int32,
-				MAX_int32,
-				MAX_int32);
-
-		Result.Max =
-			FIntVector(
-				MIN_int32,
-				MIN_int32,
-				MIN_int32);
+		if (!InBounds.IsValid())
+		{
+			return false;
+		}
+		FInt64Vector Min(MAX_int64, MAX_int64, MAX_int64);
+		FInt64Vector Max(MIN_int64, MIN_int64, MIN_int64);
 
 		for (int32 CornerIndex = 0;
 			CornerIndex < 8;
 			++CornerIndex)
 		{
-			const FIntVector Corner(
+			const FInt64Vector Corner(
 				(CornerIndex & 1)
 					? InBounds.Max.X
 					: InBounds.Min.X,
@@ -75,44 +69,44 @@ namespace
 					? InBounds.Max.Z
 					: InBounds.Min.Z);
 
-			const FIntVector Transformed =
+			const FInt64Vector Transformed =
 				RotateCorner(
 					Corner,
 					InYaw) +
 				InOrigin;
 
-			Result.Min.X =
+			Min.X =
 				FMath::Min(
-					Result.Min.X,
+					Min.X,
 					Transformed.X);
 
-			Result.Min.Y =
+			Min.Y =
 				FMath::Min(
-					Result.Min.Y,
+					Min.Y,
 					Transformed.Y);
 
-			Result.Min.Z =
+			Min.Z =
 				FMath::Min(
-					Result.Min.Z,
+					Min.Z,
 					Transformed.Z);
 
-			Result.Max.X =
+			Max.X =
 				FMath::Max(
-					Result.Max.X,
+					Max.X,
 					Transformed.X);
 
-			Result.Max.Y =
+			Max.Y =
 				FMath::Max(
-					Result.Max.Y,
+					Max.Y,
 					Transformed.Y);
 
-			Result.Max.Z =
+			Max.Z =
 				FMath::Max(
-					Result.Max.Z,
+					Max.Z,
 					Transformed.Z);
 		}
 
-		return Result;
+		return VoxelGeneration::ClipWorldBounds(Min, Max, OutBounds);
 	}
 }
 
@@ -297,12 +291,12 @@ bool FVoxelStructurePlanner::Plan(
 				continue;
 			}
 
-			const int32 CandidateZ =
+			const int64 CandidateZ =
 				Definition.Placement.bRequireSurface
-					? Column.SurfaceZ + 1
+					? int64(Column.SurfaceZ) + 1
 					: Candidate.Z;
 
-			if (CandidateZ <
+			if (!VoxelGeneration::IsWorldCell(CandidateZ) || CandidateZ <
 					Definition.Placement.MinZ ||
 				CandidateZ >
 					Definition.Placement.MaxZ)
@@ -310,14 +304,17 @@ bool FVoxelStructurePlanner::Plan(
 				continue;
 			}
 
-			const FIntVector Anchor =
-				ResolveTerrainAdaptedAnchor(
+			FIntVector Anchor;
+			if (!ResolveTerrainAdaptedAnchor(
 					Definition,
 					FIntVector(
 						Candidate.X,
 						Candidate.Y,
-						CandidateZ),
-					Column);
+						int32(CandidateZ)),
+					Column, Anchor))
+			{
+				continue;
+			}
 
 			const uint64 CandidateSeed =
 				VoxelGeneration::MakeSeed(
@@ -447,37 +444,41 @@ void FVoxelStructurePlanner::GatherCandidates(
 				0,
 				Spacing / 2 - 1));
 
-	const int32 MinGridX =
-		VoxelGeneration::FloorDivide(
+	const int64 MinGridX =
+		VoxelGeneration::FloorDivideWide(
 			InBounds.Min.X,
 			Spacing) - 1;
 
-	const int32 MaxGridX =
-		VoxelGeneration::FloorDivide(
+	const int64 MaxGridX =
+		VoxelGeneration::FloorDivideWide(
 			InBounds.Max.X - 1,
 			Spacing);
 
-	const int32 MinGridY =
-		VoxelGeneration::FloorDivide(
+	const int64 MinGridY =
+		VoxelGeneration::FloorDivideWide(
 			InBounds.Min.Y,
 			Spacing) - 1;
 
-	const int32 MaxGridY =
-		VoxelGeneration::FloorDivide(
+	const int64 MaxGridY =
+		VoxelGeneration::FloorDivideWide(
 			InBounds.Max.Y - 1,
 			Spacing);
 
-	for (int32 GridY = MinGridY;
+	for (int64 GridY = MinGridY;
 		GridY <= MaxGridY;
 		++GridY)
 	{
-		for (int32 GridX = MinGridX;
+		for (int64 GridX = MinGridX;
 			GridX <= MaxGridX;
 			++GridX)
 		{
+			if (GridX < MIN_int32 || GridX > MAX_int32 || GridY < MIN_int32 || GridY > MAX_int32)
+			{
+				continue;
+			}
 			const FIntVector Grid(
-				GridX,
-				GridY,
+				int32(GridX),
+				int32(GridY),
 				0);
 
 			const uint64 Seed =
@@ -510,10 +511,12 @@ void FVoxelStructurePlanner::GatherCandidates(
 					MinOffset,
 					MaxOffset);
 
-			const FIntVector Candidate(
-				GridX * Spacing + OffsetX,
-				GridY * Spacing + OffsetY,
-				0);
+			FIntVector Candidate;
+			if (!VoxelGeneration::TryWorldCell(FInt64Vector(GridX * Spacing + OffsetX,
+				GridY * Spacing + OffsetY, 0), Candidate))
+			{
+				continue;
+			}
 
 			if (Candidate.X < InBounds.Min.X ||
 				Candidate.Y < InBounds.Min.Y ||
@@ -537,6 +540,12 @@ bool FVoxelStructurePlanner::BuildInstance(
 	TOptional<FVoxelStableId> InId,
 	TOptional<uint8> InRootYaw) const
 {
+	if (!VoxelGeneration::IsWorldCell(InCandidate.X) || !VoxelGeneration::IsWorldCell(InCandidate.Y) ||
+		!VoxelGeneration::IsWorldCell(InCandidate.Z))
+	{
+		OutError = TEXT("CoordinateOutOfRange: voxel structure anchor");
+		return false;
+	}
 	const uint64 CandidateSeed =
 		VoxelGeneration::MakeSeed(
 			Recipe->Settings.Seed,
@@ -553,6 +562,19 @@ bool FVoxelStructurePlanner::BuildInstance(
 		OutError))
 	{
 		return false;
+	}
+
+	// 超过全部 int32 模板与世界坐标可抵消范围的偏移不可能产生合法 cell。
+	constexpr int64 MaximumLocalOffset = 6ll * (int64(MAX_int32) + 1);
+	for (const FVoxelStructurePiecePlacement& Placement : Pieces)
+	{
+		if (Placement.Origin.X < -MaximumLocalOffset || Placement.Origin.X > MaximumLocalOffset ||
+			Placement.Origin.Y < -MaximumLocalOffset || Placement.Origin.Y > MaximumLocalOffset ||
+			Placement.Origin.Z < -MaximumLocalOffset || Placement.Origin.Z > MaximumLocalOffset)
+		{
+			OutError = TEXT("CoordinateOutOfRange: voxel structure local origin");
+			return false;
+		}
 	}
 
 	if (InRootYaw.IsSet())
@@ -607,13 +629,17 @@ bool FVoxelStructurePlanner::BuildInstance(
 
 		const FVoxelStructurePieceTemplate& Piece =
 			InDefinition.Pieces[Placement.PieceIndex];
-		const FIntVector PieceOrigin =
-			InCandidate + Placement.Origin - RotateCorner(Piece.Entrance, Placement.Yaw);
+		const FInt64Vector PieceOrigin =
+			FInt64Vector(InCandidate) + Placement.Origin - RotateCorner(FInt64Vector(Piece.Entrance), Placement.Yaw);
 		for (const FVoxelStructureDetailRuntimeSocket& Socket : Piece.Details)
 		{
 			FVoxelStructureDetailPlacement Detail;
 			Detail.DetailId = Socket.DetailId;
-			Detail.Position = PieceOrigin + RotateCorner(Socket.SourceCorner, Placement.Yaw);
+			if (!VoxelGeneration::TryWorldCell(PieceOrigin + RotateCorner(FInt64Vector(Socket.SourceCorner), Placement.Yaw),
+				Detail.Position))
+			{
+				continue;
+			}
 			Detail.Yaw = (Socket.Yaw + Placement.Yaw) & 3;
 			Detail.OwnerId = Instance.Id;
 			Instance.Details.Add(MoveTemp(Detail));
@@ -720,7 +746,7 @@ bool FVoxelStructurePlanner::BuildPiecePlacements(
 
 	Placement.PieceIndex = 0;
 	Placement.Origin =
-		FIntVector::ZeroValue;
+		FInt64Vector::ZeroValue;
 
 	Placement.Yaw =
 		static_cast<uint8>(
@@ -757,11 +783,11 @@ bool FVoxelStructurePlanner::RasterizePiece(
 		InDefinition.Pieces[
 			InPlacement.PieceIndex];
 
-	const FIntVector PieceOrigin =
-		InStructureAnchor +
+	const FInt64Vector PieceOrigin =
+		FInt64Vector(InStructureAnchor) +
 		InPlacement.Origin -
 		RotateCorner(
-			Piece.Entrance,
+			FInt64Vector(Piece.Entrance),
 			InPlacement.Yaw);
 
 	for (const FVoxelStructureRun& Run :
@@ -771,20 +797,22 @@ bool FVoxelStructurePlanner::RasterizePiece(
 			RunOffset < Run.Length;
 			++RunOffset)
 		{
-			const FIntVector LocalCell =
-				Run.Start +
-				FIntVector(
+			const FInt64Vector LocalCell =
+				FInt64Vector(Run.Start) +
+				FInt64Vector(
 					RunOffset,
 					0,
 					0);
 
 			FVoxelStructureCellWrite Write;
 
-			Write.Position =
-				PieceOrigin +
+			if (!VoxelGeneration::TryWorldCell(PieceOrigin +
 				RotateCell(
 					LocalCell,
-					InPlacement.Yaw);
+					InPlacement.Yaw), Write.Position))
+			{
+				continue;
+			}
 
 			Write.Value =
 				Run.Value;
@@ -799,11 +827,13 @@ bool FVoxelStructurePlanner::RasterizePiece(
 	{
 		FVoxelStructureClearVolume RuntimeClear;
 
-		RuntimeClear.Bounds =
-			TransformBounds(
+		if (!TransformBounds(
 				ClearVolume,
 				PieceOrigin,
-				InPlacement.Yaw);
+				InPlacement.Yaw, RuntimeClear.Bounds))
+		{
+			continue;
+		}
 
 		OutClearVolumes.Add(
 			MoveTemp(RuntimeClear));
@@ -813,13 +843,13 @@ bool FVoxelStructurePlanner::RasterizePiece(
 	return true;
 }
 
-FIntVector FVoxelStructurePlanner::ResolveTerrainAdaptedAnchor(
+bool FVoxelStructurePlanner::ResolveTerrainAdaptedAnchor(
 	const FVoxelStructureRuntimeDefinition& InDefinition,
 	const FIntVector& InCandidate,
-	const FVoxelColumnSample& InColumn) const
+	const FVoxelColumnSample& InColumn,
+	FIntVector& OutAnchor) const
 {
-	FIntVector Result =
-		InCandidate;
+	FInt64Vector Result(InCandidate);
 
 	switch (InDefinition.Adaptation)
 	{
@@ -837,5 +867,5 @@ FIntVector FVoxelStructurePlanner::ResolveTerrainAdaptedAnchor(
 		break;
 	}
 
-	return Result;
+	return VoxelGeneration::TryWorldCell(Result, OutAnchor);
 }

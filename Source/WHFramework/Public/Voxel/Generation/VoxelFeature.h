@@ -100,6 +100,9 @@ public:
 
 	/**
 	 * Runtime 纯值生成。
+	 * Anchor、offset 与写入坐标先使用 int64，再经 VoxelGeneration::TryWorldCell
+	 * 检查统一 cell 域后收窄；域外候选/写入跳过，不 Clamp Anchor 改变稳定身份。
+	 * 最终输出过滤不能识别算法内部已经溢出回域内的坐标，扩展算法也必须遵守此契约。
 	 */
 	virtual bool Generate(
 		const FVoxelFeatureQueryContext& InContext,

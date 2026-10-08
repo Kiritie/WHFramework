@@ -6,6 +6,23 @@
 
 namespace
 {
+    bool GetWorldHydrologyCore(const FVoxelHydrologyRegionKey& InKey, const FVoxelGenerationSettings& Settings,
+        FInt64Vector2& OutMin, FInt64Vector2& OutMax)
+    {
+        if (Settings.HydrologyRegionSide <= 0 || Settings.HydrologyCellSize <= 0) return false;
+        const int64 DomainMin = VoxelGeneration::FloorDivideWide(VoxelGeneration::WorldCellMin, Settings.HydrologyCellSize);
+        const int64 DomainMax = VoxelGeneration::FloorDivideWide(VoxelGeneration::WorldCellMaxExclusive - 1, Settings.HydrologyCellSize) + 1;
+        const FInt64Vector2 Min(int64(InKey.Coordinate.X) * Settings.HydrologyRegionSide,
+            int64(InKey.Coordinate.Y) * Settings.HydrologyRegionSide);
+        const FInt64Vector2 ClippedMin(FMath::Max(Min.X, DomainMin), FMath::Max(Min.Y, DomainMin));
+        const FInt64Vector2 ClippedMax(FMath::Min(Min.X + Settings.HydrologyRegionSide, DomainMax),
+            FMath::Min(Min.Y + Settings.HydrologyRegionSide, DomainMax));
+        if (ClippedMin.X >= ClippedMax.X || ClippedMin.Y >= ClippedMax.Y) return false;
+        OutMin = ClippedMin;
+        OutMax = ClippedMax;
+        return true;
+    }
+
     constexpr int32 HydrologyMinPlane = -32768;
     constexpr int32 HydrologyMaxPlane = 32768;
 
@@ -329,6 +346,8 @@ bool VoxelHydrology::BuildDrainage(
         InInput.GroundPlane.Num() != Count ||
         InInput.RainWeight.Num() != Count ||
         InInput.Allowed.Num() != Count ||
+        int64(InInput.WorldMinCell.X) + InInput.Width > VoxelGeneration::WorldCellMaxExclusive ||
+        int64(InInput.WorldMinCell.Y) + InInput.Height > VoxelGeneration::WorldCellMaxExclusive ||
         InInput.Outlets.IsEmpty())
     {
         OutError =
@@ -1034,9 +1053,7 @@ bool VoxelHydrology::EvaluateRiverSection(
 bool FVoxelHydrologyGrid::IsValidIndex(
     uint32 InIndex) const
 {
-    return InIndex <
-        static_cast<uint32>(
-            Width * Height);
+    return Width > 0 && Height > 0 && uint64(InIndex) < uint64(Width) * uint64(Height);
 }
 
 uint32 FVoxelHydrologyGrid::ToIndex(
@@ -1048,9 +1065,9 @@ uint32 FVoxelHydrologyGrid::ToIndex(
     check(InX < Width);
     check(InY < Height);
 
-    return static_cast<uint32>(
-        InX +
-        InY * Width);
+    const int64 Index = int64(InX) + int64(InY) * Width;
+    check(Index <= MAX_uint32);
+    return uint32(Index);
 }
 
 FIntPoint FVoxelHydrologyGrid::ToLocal(
@@ -1074,15 +1091,16 @@ FIntPoint FVoxelHydrologyGrid::ToWorldHydrologyCell(
         ToLocal(InIndex);
 }
 
-FIntPoint FVoxelHydrologyGrid::ToWorldVoxelXY(
-    uint32 InIndex) const
+bool FVoxelHydrologyGrid::TryToWorldVoxelXY(const uint32 InIndex, FIntPoint& OutPoint) const
 {
-    const FIntPoint HydrologyCell =
-        ToWorldHydrologyCell(InIndex);
-
-    return FIntPoint(
-        HydrologyCell.X * CellSize,
-        HydrologyCell.Y * CellSize);
+    if (Width <= 0 || Height <= 0 || CellSize <= 0 || uint64(InIndex) >= uint64(Width) * uint64(Height)) return false;
+    const FIntPoint Local = ToLocal(InIndex);
+    const int64 X = (int64(WorldMinCell.X) + Local.X) * CellSize;
+    const int64 Y = (int64(WorldMinCell.Y) + Local.Y) * CellSize;
+    if (X + CellSize <= VoxelGeneration::WorldCellMin || Y + CellSize <= VoxelGeneration::WorldCellMin) return false;
+    // 边界格点只采自己的非空 cell 交集，不创建域外 halo 或复制边缘样本。
+    return VoxelGeneration::TryWorldPoint(FInt64Vector2(FMath::Max(X, VoxelGeneration::WorldCellMin),
+        FMath::Max(Y, VoxelGeneration::WorldCellMin)), OutPoint);
 }
 
 FVoxelHydrologyGenerator::FVoxelHydrologyGenerator(
@@ -1112,19 +1130,9 @@ bool FVoxelHydrologyGenerator::BuildHeightGrid(
     const int32 Halo =
         Settings.HydrologyHaloCells;
 
-    const FIntPoint CoreMin(
-        InKey.Coordinate.X * RegionSide,
-        InKey.Coordinate.Y * RegionSide);
-
-    const FIntPoint GridMin =
-        CoreMin -
-        FIntPoint(Halo, Halo);
-
-    const int32 GridSide =
-        RegionSide +
-        Halo * 2;
-
-    if (GridSide <= 0 ||
+    const int64 GridSide = int64(RegionSide) + int64(Halo) * 2;
+    FInt64Vector2 CoreMin, CoreMax;
+    if (Halo < 0 || !GetWorldHydrologyCore(InKey, Settings, CoreMin, CoreMax) || GridSide <= 0 ||
         GridSide > 4096)
     {
         OutError =
@@ -1133,16 +1141,20 @@ bool FVoxelHydrologyGenerator::BuildHeightGrid(
         return false;
     }
 
+    const int64 DomainMin = VoxelGeneration::FloorDivideWide(VoxelGeneration::WorldCellMin, Settings.HydrologyCellSize);
+    const int64 DomainMax = VoxelGeneration::FloorDivideWide(VoxelGeneration::WorldCellMaxExclusive - 1, Settings.HydrologyCellSize) + 1;
+    const FInt64Vector2 GridMin(FMath::Max(CoreMin.X - Halo, DomainMin), FMath::Max(CoreMin.Y - Halo, DomainMin));
+    const FInt64Vector2 GridMax(FMath::Min(CoreMax.X + Halo, DomainMax), FMath::Min(CoreMax.Y + Halo, DomainMax));
     FVoxelHydrologyGrid Grid;
 
     Grid.WorldMinCell =
-        GridMin;
+        FIntPoint(int32(GridMin.X), int32(GridMin.Y));
 
     Grid.Width =
-        GridSide;
+        int32(GridMax.X - GridMin.X);
 
     Grid.Height =
-        GridSide;
+        int32(GridMax.Y - GridMin.Y);
 
     Grid.CellSize =
         Settings.HydrologyCellSize;
@@ -1181,24 +1193,18 @@ bool FVoxelHydrologyGenerator::BuildHeightGrid(
                     LocalX,
                     LocalY);
 
-            const FIntPoint HydroCell =
-                Grid.WorldMinCell +
-                FIntPoint(
-                    LocalX,
-                    LocalY);
-
-            const int32 WorldX =
-                HydroCell.X *
-                Grid.CellSize;
-
-            const int32 WorldY =
-                HydroCell.Y *
-                Grid.CellSize;
+            const FIntPoint HydroCell = Grid.ToWorldHydrologyCell(Index);
+            FIntPoint World;
+            if (!Grid.TryToWorldVoxelXY(Index, World))
+            {
+                OutError = TEXT("Invalid hydrology grid cell outside world domain");
+                return false;
+            }
 
             const FVoxelMacroTerrainSample TerrainSample =
                 Terrain->SampleMacro(
-                    WorldX,
-                    WorldY);
+                    World.X,
+                    World.Y);
 
             Grid.GroundPlane[Index] =
                 TerrainSample.SurfaceZ;
@@ -1280,54 +1286,50 @@ void FVoxelHydrologyGenerator::AddCanonicalSinkOutlets(
 {
     const int32 Spacing =
         Recipe->Settings.HydrologySinkSpacing;
+	const int64 DomainMin = VoxelGeneration::FloorDivideWide(VoxelGeneration::WorldCellMin, InOutGrid.CellSize);
+	const int64 DomainMax = VoxelGeneration::FloorDivideWide(VoxelGeneration::WorldCellMaxExclusive - 1, InOutGrid.CellSize) + 1;
 
-    const FIntPoint GridMaxExclusive =
-        InOutGrid.WorldMinCell +
-        FIntPoint(
-            InOutGrid.Width,
-            InOutGrid.Height);
+    const FInt64Vector2 GridMaxExclusive(
+        int64(InOutGrid.WorldMinCell.X) + InOutGrid.Width,
+        int64(InOutGrid.WorldMinCell.Y) + InOutGrid.Height);
 
-    const int32 MinSinkX =
-        VoxelGeneration::FloorDivide(
+    const int64 MinSinkX =
+        VoxelGeneration::FloorDivideWide(
             InOutGrid.WorldMinCell.X,
             Spacing);
 
-    const int32 MinSinkY =
-        VoxelGeneration::FloorDivide(
+    const int64 MinSinkY =
+        VoxelGeneration::FloorDivideWide(
             InOutGrid.WorldMinCell.Y,
             Spacing);
 
-    const int32 MaxSinkX =
-        VoxelGeneration::FloorDivide(
+    const int64 MaxSinkX =
+        VoxelGeneration::FloorDivideWide(
             GridMaxExclusive.X - 1,
             Spacing);
 
-    const int32 MaxSinkY =
-        VoxelGeneration::FloorDivide(
+    const int64 MaxSinkY =
+        VoxelGeneration::FloorDivideWide(
             GridMaxExclusive.Y - 1,
             Spacing);
 
-    for (int32 SinkY = MinSinkY;
+    for (int64 SinkY = MinSinkY;
         SinkY <= MaxSinkY;
         ++SinkY)
     {
-        for (int32 SinkX = MinSinkX;
+        for (int64 SinkX = MinSinkX;
             SinkX <= MaxSinkX;
             ++SinkX)
         {
-            const FIntPoint SinkMin(
-                SinkX * Spacing,
-                SinkY * Spacing);
-
-            const FIntPoint SinkMax =
-                SinkMin +
-                FIntPoint(
-                    Spacing,
-                    Spacing);
+            const FInt64Vector2 SinkOrigin(SinkX * Spacing, SinkY * Spacing);
+            const FInt64Vector2 SinkMin(FMath::Max(SinkOrigin.X, DomainMin), FMath::Max(SinkOrigin.Y, DomainMin));
+            const FInt64Vector2 SinkMax(FMath::Min(SinkOrigin.X + Spacing, DomainMax),
+                FMath::Min(SinkOrigin.Y + Spacing, DomainMax));
 
             /**
-             * 只有完整 Sink Tile 被当前 Grid+Halo 包住
+             * 只有完整物理 Sink Tile 被当前 Grid+Halo 包住
              * 才允许选 Canonical Sink。
+             * 世界边缘只裁掉全局物理域外部分，所有 Region 使用同一裁切。
              *
              * 这样相邻 Region 不会因为缺少 Tile 一部分
              * 而选出不同的局部最低点。
@@ -1350,21 +1352,17 @@ void FVoxelHydrologyGenerator::AddCanonicalSinkOutlets(
             uint32 BestIndex =
                 MAX_uint32;
 
-            for (int32 WorldY = SinkMin.Y;
+            for (int64 WorldY = SinkMin.Y;
                 WorldY < SinkMax.Y;
                 ++WorldY)
             {
-                for (int32 WorldX = SinkMin.X;
+                for (int64 WorldX = SinkMin.X;
                     WorldX < SinkMax.X;
                     ++WorldX)
                 {
-                    const int32 LocalX =
-                        WorldX -
-                        InOutGrid.WorldMinCell.X;
+                    const int32 LocalX = int32(WorldX - InOutGrid.WorldMinCell.X);
 
-                    const int32 LocalY =
-                        WorldY -
-                        InOutGrid.WorldMinCell.Y;
+                    const int32 LocalY = int32(WorldY - InOutGrid.WorldMinCell.Y);
 
                     const uint32 Index =
                         InOutGrid.ToIndex(
@@ -1421,21 +1419,17 @@ bool FVoxelHydrologyGenerator::BuildPlan(
     Plan.RiverMaxMeanderAngle = Recipe->Settings.RiverMaxMeanderAngle;
     Plan.Key = InKey;
 
-    const int32 RegionSide =
-        Recipe->Settings.HydrologyRegionSide;
-
-    Plan.CoreMin =
-        FIntPoint(
-            InKey.Coordinate.X *
-                RegionSide,
-            InKey.Coordinate.Y *
-                RegionSide);
-
-    Plan.CoreMax =
-        Plan.CoreMin +
-        FIntPoint(
-            RegionSide,
-            RegionSide);
+    FInt64Vector2 CoreMin, CoreMax;
+    if (!GetWorldHydrologyCore(InKey, Recipe->Settings, CoreMin, CoreMax))
+    {
+        OutError = TEXT("Invalid hydrology core outside world domain");
+        return false;
+    }
+    const int64 CellSize = Recipe->Settings.HydrologyCellSize;
+    Plan.CoreMin = FIntPoint(int32(FMath::Max(CoreMin.X * CellSize, VoxelGeneration::WorldCellMin)),
+        int32(FMath::Max(CoreMin.Y * CellSize, VoxelGeneration::WorldCellMin)));
+    Plan.CoreMax = FIntPoint(int32(FMath::Min(CoreMax.X * CellSize, VoxelGeneration::WorldCellMaxExclusive)),
+        int32(FMath::Min(CoreMax.Y * CellSize, VoxelGeneration::WorldCellMaxExclusive)));
 
     if (!BuildHeightGrid(
             InKey,
@@ -1565,26 +1559,14 @@ void FVoxelHydrologyGenerator::SelectRiverSources(
 {
     OutSources.Reset();
 
-    const int32 RegionSide =
-        Recipe->Settings.HydrologyRegionSide;
-
     const int32 SourceThreshold =
         Recipe->Settings.RiverSourceAccumulation;
 
     const int32 SourceSpacing =
         Recipe->Settings.RiverSourceSpacing;
 
-    const FIntPoint CoreMin(
-        InOwnerRegion.Coordinate.X *
-            RegionSide,
-        InOwnerRegion.Coordinate.Y *
-            RegionSide);
-
-    const FIntPoint CoreMax =
-        CoreMin +
-        FIntPoint(
-            RegionSide,
-            RegionSide);
+    FInt64Vector2 CoreMin, CoreMax;
+    if (!GetWorldHydrologyCore(InOwnerRegion, Recipe->Settings, CoreMin, CoreMax)) return;
 
     TMap<FIntPoint, FVoxelRiverSource>
         BestPerSourceCell;
@@ -1785,9 +1767,12 @@ bool FVoxelHydrologyGenerator::TraceRiver(
         const uint32 GridIndex =
             Path[PathIndex];
 
-        const FIntPoint WorldVoxel =
-            InGrid.ToWorldVoxelXY(
-                GridIndex);
+        FIntPoint WorldVoxel;
+        if (!InGrid.TryToWorldVoxelXY(GridIndex, WorldVoxel))
+        {
+            OutError = TEXT("Invalid river route cell outside world domain");
+            return false;
+        }
 
         const uint64 Accumulation =
             InDrainage.Accumulation[
@@ -2170,9 +2155,13 @@ bool FVoxelHydrologyGenerator::BuildLakes(
         {
             if (WaterMask[Index] != 0)
             {
-                Lake.Cells.Add(
-                    InGrid.ToWorldVoxelXY(
-                        Index));
+                FIntPoint WorldPoint;
+                if (!InGrid.TryToWorldVoxelXY(Index, WorldPoint))
+                {
+                    OutError = TEXT("Invalid lake cell outside world domain");
+                    return false;
+                }
+                Lake.Cells.Add(WorldPoint);
             }
         }
 

@@ -72,9 +72,9 @@ public:
 
 	static int32 GetMaximumReach(const FVoxelGenerationSettings& InSettings)
 	{
-		return MaximumSegments * MaximumSegmentLength + MaximumRoomRadius +
+		return int32(FMath::Min<int64>(MAX_int32, int64(MaximumSegments) * MaximumSegmentLength + MaximumRoomRadius +
 			FMath::Max(InSettings.CaveMainRadius, InSettings.CaveBranchRadius) +
-			InSettings.CaveEntranceLength + InSettings.CaveEntranceClearance + 8;
+			int64(InSettings.CaveEntranceLength) + InSettings.CaveEntranceClearance + 8));
 	}
 
 private:
@@ -110,9 +110,10 @@ private:
 		FString& OutError,
 		const TAtomic<bool>* InCancel) const;
 
-	FIntVector ClampBelowSurface(
+	bool ClampBelowSurface(
 		const FIntVector& InPosition,
-		FVoxelCaveColumnSampler InColumnSampler) const;
+		FVoxelCaveColumnSampler InColumnSampler,
+		FIntVector& OutPosition) const;
 
 	bool IsDeepEnoughForInterior(
 		const FIntVector& InPosition,

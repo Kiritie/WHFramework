@@ -271,11 +271,33 @@ bool FVoxelGenerationPlanCoordinator::GetPrerequisiteRange(const FVoxelGeneratio
 {
 	OutCount = 0;
 	OutError.Reset();
-	if (InDependency.Kind == EVoxelGenerationPlanKind::Hydrology) return true;
 	if (!Config->Recipe) { OutError = TEXT("生成计划缺少配方"); return false; }
 	const auto& Settings = Config->Recipe->Settings;
+	const auto Coordinate = InDependency.Coordinate();
+	if (InDependency.Kind == EVoxelGenerationPlanKind::Hydrology)
+	{
+		const int64 DomainMin = VoxelGeneration::FloorDivideWide(VoxelGeneration::WorldCellMin, Settings.HydrologyCellSize);
+		const int64 DomainMax = VoxelGeneration::FloorDivideWide(VoxelGeneration::WorldCellMaxExclusive - 1, Settings.HydrologyCellSize) + 1;
+		const FInt64Vector2 Core(int64(Coordinate.X) * Settings.HydrologyRegionSide, int64(Coordinate.Y) * Settings.HydrologyRegionSide);
+		if (Coordinate.Z != 0 || Core.X >= DomainMax || Core.Y >= DomainMax ||
+			Core.X + Settings.HydrologyRegionSide <= DomainMin || Core.Y + Settings.HydrologyRegionSide <= DomainMin)
+		{
+			OutError = TEXT("Invalid hydrology dependency outside world cell domain");
+			return false;
+		}
+		return true;
+	}
 	const bool bEcology = InDependency.Kind == EVoxelGenerationPlanKind::Ecology;
 	const int64 Side = bEcology ? FVoxelGenerationQuery::EcologyTileSide : FVoxelGenerationQuery::GenerationPlanTileSide;
+	const FInt64Vector CoreMin(int64(Coordinate.X) * Side, int64(Coordinate.Y) * Side,
+		bEcology ? Settings.MinZ : int64(Coordinate.Z) * Side);
+	FVoxelGenerationBounds CoreBounds;
+	if ((bEcology && Coordinate.Z != 0) || !VoxelGeneration::ClipWorldBounds(CoreMin,
+		FInt64Vector(CoreMin.X + Side, CoreMin.Y + Side, bEcology ? Settings.MaxZ : CoreMin.Z + Side), CoreBounds))
+	{
+		OutError = TEXT("Invalid generation dependency outside world cell domain");
+		return false;
+	}
 	int64 Margin = 0;
 	if (InDependency.Kind == EVoxelGenerationPlanKind::Cave) Margin = FVoxelCaveGenerator::GetMaximumReach(Settings);
 	else if (bEcology) Margin = FMath::Max(Settings.Ecology.Grass.PatchRadius, Settings.Ecology.Flower.PatchRadius);
@@ -283,14 +305,13 @@ bool FVoxelGenerationPlanCoordinator::GetPrerequisiteRange(const FVoxelGeneratio
 	{
 		for (const auto& Feature : Config->Recipe->Features) Margin = FMath::Max<int64>(Margin, Feature.Placement.Spacing - 1);
 	}
-	const auto Coordinate = InDependency.Coordinate();
 	const auto At = [&Settings](int64 X, int64 Y)
 	{
-		return FVoxelGenerationQuery::HydrologyKeyForVoxel(int32(FMath::Clamp<int64>(X, MIN_int32, MAX_int32)),
-			int32(FMath::Clamp<int64>(Y, MIN_int32, MAX_int32)), Settings).Coordinate;
+		return FVoxelGenerationQuery::HydrologyKeyForVoxel(int32(FMath::Clamp<int64>(X, MIN_int32, MAX_int32 - 1)),
+			int32(FMath::Clamp<int64>(Y, MIN_int32, MAX_int32 - 1)), Settings).Coordinate;
 	};
-	OutMin = At(int64(Coordinate.X) * Side - Margin, int64(Coordinate.Y) * Side - Margin);
-	OutMax = At(int64(Coordinate.X) * Side + Side - 1 + Margin, int64(Coordinate.Y) * Side + Side - 1 + Margin);
+	OutMin = At(int64(CoreBounds.Min.X) - Margin, int64(CoreBounds.Min.Y) - Margin);
+	OutMax = At(int64(CoreBounds.Max.X) - 1 + Margin, int64(CoreBounds.Max.Y) - 1 + Margin);
 	const int64 Width = int64(OutMax.X) - OutMin.X + 1;
 	const int64 Height = int64(OutMax.Y) - OutMin.Y + 1;
 	if (Width <= 0 || Height <= 0 || Width > MaximumHydrologyDependencies ||

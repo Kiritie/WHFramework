@@ -34,7 +34,8 @@ int32 FVoxelTerrainGenerator::SampleDensityQ16(
     const FIntVector& InCell,
     const FVoxelMacroTerrainSample& InMacro) const
 {
-    return (InMacro.DensityHeight - InCell.Z + 1) * 65536;
+    const int64 Density = (int64(InMacro.DensityHeight) - InCell.Z + 1) * 65536;
+    return int32(FMath::Clamp<int64>(Density, MIN_int32, MAX_int32));
 }
 
 int32 FVoxelTerrainGenerator::SampleRawHeight(
@@ -109,17 +110,20 @@ int32 FVoxelTerrainGenerator::SampleSlopePermille(int32 InX, int32 InY) const
     const int32 CenterHeight = SampleRawHeight(
         InX, InY, CenterClimate, Landform->Sample(InX, InY, CenterClimate));
 
-    const FVoxelClimateSample XClimate = Climate->Sample(InX + 4, InY);
-    const FVoxelClimateSample YClimate = Climate->Sample(InX, InY + 4);
+    // 边缘使用相同距离的单侧差分，不把域外样本 Clamp 成重复边缘 cell。
+    const int32 SampleX = static_cast<int32>(VoxelGeneration::IsWorldCell(int64(InX) + 4) ? int64(InX) + 4 : int64(InX) - 4);
+    const int32 SampleY = static_cast<int32>(VoxelGeneration::IsWorldCell(int64(InY) + 4) ? int64(InY) + 4 : int64(InY) - 4);
+    const FVoxelClimateSample XClimate = Climate->Sample(SampleX, InY);
+    const FVoxelClimateSample YClimate = Climate->Sample(InX, SampleY);
 
     const int32 XHeight = SampleRawHeight(
-        InX + 4, InY, XClimate, Landform->Sample(InX + 4, InY, XClimate));
+        SampleX, InY, XClimate, Landform->Sample(SampleX, InY, XClimate));
     const int32 YHeight = SampleRawHeight(
-        InX, InY + 4, YClimate, Landform->Sample(InX, InY + 4, YClimate));
+        InX, SampleY, YClimate, Landform->Sample(InX, SampleY, YClimate));
 
-    const int32 Delta = FMath::Max(
-        FMath::Abs(XHeight - CenterHeight),
-        FMath::Abs(YHeight - CenterHeight));
+    const int64 Delta = FMath::Max(
+        FMath::Abs(int64(XHeight) - CenterHeight),
+        FMath::Abs(int64(YHeight) - CenterHeight));
 
-    return FMath::Clamp(Delta * 250, 0, 1000);
+    return int32(FMath::Clamp<int64>(Delta * 250, 0, 1000));
 }

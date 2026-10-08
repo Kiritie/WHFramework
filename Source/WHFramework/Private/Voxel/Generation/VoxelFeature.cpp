@@ -238,17 +238,20 @@ bool FVoxelFeaturePlanner::Plan(
 				continue;
 			}
 
-			const FIntVector SurfaceAnchor(
-				Anchor.X,
-				Anchor.Y,
-				Definition.Placement.bRequireSurface
-					? Column.SurfaceZ + 1
-					: Anchor.Z);
+			FIntVector SurfaceAnchor;
+			if (!VoxelGeneration::TryWorldCell(
+				FInt64Vector(Anchor.X, Anchor.Y, Definition.Placement.bRequireSurface
+					? static_cast<int64>(Column.SurfaceZ) + 1 : Anchor.Z), SurfaceAnchor))
+			{
+				continue;
+			}
 
 			if (Definition.Placement.bRequireSolidFloor)
 			{
+				FIntVector FloorPosition;
 				uint32 FloorValue = 0;
-				if (!InSampleBaseSymbol(SurfaceAnchor - FIntVector(0, 0, 1), FloorValue))
+				if (!VoxelGeneration::TryWorldCell(FInt64Vector(SurfaceAnchor) - FInt64Vector(0, 0, 1), FloorPosition) ||
+					!InSampleBaseSymbol(FloorPosition, FloorValue))
 				{
 					continue;
 				}
@@ -315,6 +318,13 @@ bool FVoxelFeaturePlanner::Plan(
 			Instance.Anchor =
 				SurfaceAnchor;
 
+			Instance.Writes.RemoveAll([](const FVoxelFeatureCellWrite& Write)
+			{
+				return !VoxelGeneration::IsWorldCell(Write.Position.X) ||
+					!VoxelGeneration::IsWorldCell(Write.Position.Y) ||
+					!VoxelGeneration::IsWorldCell(Write.Position.Z);
+			});
+
 			for (const FVoxelFeatureCellWrite& Write :
 				Instance.Writes)
 			{
@@ -358,37 +368,37 @@ void FVoxelFeaturePlanner::GatherCandidateAnchors(
 			1,
 			InDefinition.Placement.Spacing);
 
-	const int32 MinGridX =
-		VoxelGeneration::FloorDivide(
+	const int64 MinGridX =
+		VoxelGeneration::FloorDivideWide(
 			InBounds.Min.X,
 			Spacing);
 
-	const int32 MaxGridX =
-		VoxelGeneration::FloorDivide(
-			InBounds.Max.X - 1,
+	const int64 MaxGridX =
+		VoxelGeneration::FloorDivideWide(
+			static_cast<int64>(InBounds.Max.X) - 1,
 			Spacing);
 
-	const int32 MinGridY =
-		VoxelGeneration::FloorDivide(
+	const int64 MinGridY =
+		VoxelGeneration::FloorDivideWide(
 			InBounds.Min.Y,
 			Spacing);
 
-	const int32 MaxGridY =
-		VoxelGeneration::FloorDivide(
-			InBounds.Max.Y - 1,
+	const int64 MaxGridY =
+		VoxelGeneration::FloorDivideWide(
+			static_cast<int64>(InBounds.Max.Y) - 1,
 			Spacing);
 
-	for (int32 GridY = MinGridY;
+	for (int64 GridY = MinGridY;
 		GridY <= MaxGridY;
 		++GridY)
 	{
-		for (int32 GridX = MinGridX;
+		for (int64 GridX = MinGridX;
 			GridX <= MaxGridX;
 			++GridX)
 		{
 			const FIntVector Grid(
-				GridX,
-				GridY,
+				static_cast<int32>(GridX),
+				static_cast<int32>(GridY),
 				0);
 
 			const uint64 Seed =
@@ -411,11 +421,13 @@ void FVoxelFeaturePlanner::GatherCandidateAnchors(
 					0,
 					Spacing - 1);
 
-			OutAnchors.Add(
-				FIntVector(
-					GridX * Spacing + OffsetX,
-					GridY * Spacing + OffsetY,
-					0));
+			// grid 是种子身份；原点越界仍可能经原 jitter 回到合法世界域。
+			FIntVector Anchor;
+			if (VoxelGeneration::TryWorldCell(FInt64Vector(
+				GridX * Spacing + OffsetX, GridY * Spacing + OffsetY, 0), Anchor))
+			{
+				OutAnchors.Add(Anchor);
+			}
 		}
 	}
 }
@@ -428,12 +440,13 @@ bool FVoxelFeaturePlanner::IsPlacementAllowed(
 	const FVoxelFeaturePlacement& Placement =
 		InDefinition.Placement;
 
-	const int32 CandidateZ =
+	const int64 CandidateZ =
 		Placement.bRequireSurface
-			? InColumn.SurfaceZ + 1
+			? static_cast<int64>(InColumn.SurfaceZ) + 1
 			: InAnchor.Z;
 
-	if (CandidateZ < Placement.MinZ ||
+	if (!VoxelGeneration::IsWorldCell(CandidateZ) ||
+		CandidateZ < Placement.MinZ ||
 		CandidateZ > Placement.MaxZ)
 	{
 		return false;

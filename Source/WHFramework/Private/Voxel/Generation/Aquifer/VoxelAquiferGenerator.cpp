@@ -13,12 +13,14 @@ FVoxelAquiferSample FVoxelAquiferGenerator::Sample(
 {
     FVoxelAquiferSample Result;
 
-    if (InDensityQ16 > 0)
+    if (InDensityQ16 > 0 || !VoxelGeneration::IsWorldCell(InCell.X) ||
+        !VoxelGeneration::IsWorldCell(InCell.Y) || !VoxelGeneration::IsWorldCell(InCell.Z))
     {
         return Result;
     }
 
     const FVoxelGenerationSettings& Settings = Recipe->Settings;
+    if (Settings.AquiferSpacing <= 0) return Result;
 
     if (InCell.Z <= Settings.LavaCeiling)
     {
@@ -46,24 +48,25 @@ FVoxelAquiferSample FVoxelAquiferGenerator::Sample(
         Region,
         0xA9F129B7D41C2E63ull);
 
-    FIntVector Center;
-    Center.X = RegionX * Settings.AquiferSpacing +
+    const int32 MaximumJitter = int32(int64(Settings.AquiferSpacing) * 3 / 4);
+    FInt64Vector Center;
+    Center.X = int64(RegionX) * Settings.AquiferSpacing +
         VoxelGeneration::RandomRange(
             Seed,
             Settings.AquiferSpacing / 4,
-            Settings.AquiferSpacing * 3 / 4);
+            MaximumJitter);
 
-    Center.Y = RegionY * Settings.AquiferSpacing +
+    Center.Y = int64(RegionY) * Settings.AquiferSpacing +
         VoxelGeneration::RandomRange(
             VoxelGeneration::Mix(Seed),
             Settings.AquiferSpacing / 4,
-            Settings.AquiferSpacing * 3 / 4);
+            MaximumJitter);
 
-    Center.Z = RegionZ * Settings.AquiferSpacing +
+    Center.Z = int64(RegionZ) * Settings.AquiferSpacing +
         VoxelGeneration::RandomRange(
             VoxelGeneration::Mix(Seed ^ 0xBE12C07Bull),
             Settings.AquiferSpacing / 4,
-            Settings.AquiferSpacing * 3 / 4);
+            MaximumJitter);
 
     const FIntVector Radius(
         Settings.AquiferRadius,
@@ -78,14 +81,14 @@ FVoxelAquiferSample FVoxelAquiferGenerator::Sample(
         return Result;
     }
 
-    const int32 LocalWaterZ = FMath::Min(
-        InColumn.SurfaceZ - 8,
+    const int64 LocalWaterZ = FMath::Min(
+        int64(InColumn.SurfaceZ) - 8,
         Center.Z + Radius.Z / 2);
 
-    if (InCell.Z <= LocalWaterZ)
+    if (InCell.Z <= LocalWaterZ && VoxelGeneration::IsWorldCell(LocalWaterZ))
     {
         Result.Fluid = EVoxelFluidKind::Water;
-        Result.SurfaceZ = LocalWaterZ;
+        Result.SurfaceZ = int32(LocalWaterZ);
     }
 
     return Result;

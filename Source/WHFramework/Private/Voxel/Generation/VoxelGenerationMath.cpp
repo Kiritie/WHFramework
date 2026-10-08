@@ -2,6 +2,28 @@
 
 namespace
 {
+	uint64 EllipsoidTermQ24(const int64 InDelta, const int64 InRadius)
+	{
+		const uint64 AbsoluteDelta = uint64(FMath::Abs(InDelta));
+		const uint64 Numerator = AbsoluteDelta * AbsoluteDelta;
+		const uint64 Denominator = 4ull * uint64(InRadius) * uint64(InRadius);
+		if (Numerator <= (MAX_uint64 >> 24)) return (Numerator << 24) / Denominator;
+		// 极端半径仍保留原 Q24 整数取整语义，不构造会溢出的乘积。
+		uint64 Result = Numerator / Denominator;
+		uint64 Remainder = Numerator % Denominator;
+		for (int32 Bit = 0; Bit < 24; ++Bit)
+		{
+			Result <<= 1;
+			if (Remainder >= Denominator - Remainder)
+			{
+				Remainder -= Denominator - Remainder;
+				++Result;
+			}
+			else Remainder *= 2;
+		}
+		return Result;
+	}
+
 	int64 VoxelGenerationLerp(
 		int64 InA,
 		int64 InB,
@@ -38,6 +60,52 @@ namespace
 
 		return static_cast<int32>(Smooth);
 	}
+}
+
+int64 VoxelGeneration::FloorDivideWide(const int64 InValue, const int32 InDivisor)
+{
+	if (!ensureMsgf(InDivisor > 0, TEXT("VoxelGeneration::FloorDivideWide requires a positive divisor"))) return 0;
+	return InValue / InDivisor - (InValue % InDivisor < 0 ? 1 : 0);
+}
+
+bool VoxelGeneration::IsWorldCell(const int64 InCoordinate)
+{
+	return InCoordinate >= WorldCellMin && InCoordinate < WorldCellMaxExclusive;
+}
+
+bool VoxelGeneration::TryWorldPoint(const FInt64Vector2& InCoordinate, FIntPoint& OutPoint)
+{
+	if (!IsWorldCell(InCoordinate.X) || !IsWorldCell(InCoordinate.Y)) return false;
+	OutPoint = FIntPoint(int32(InCoordinate.X), int32(InCoordinate.Y));
+	return true;
+}
+
+bool VoxelGeneration::TryWorldCell(const FInt64Vector& InCoordinate, FIntVector& OutCell)
+{
+	if (!IsWorldCell(InCoordinate.X) || !IsWorldCell(InCoordinate.Y) || !IsWorldCell(InCoordinate.Z)) return false;
+	OutCell = FIntVector(int32(InCoordinate.X), int32(InCoordinate.Y), int32(InCoordinate.Z));
+	return true;
+}
+
+bool VoxelGeneration::TryRoundedWorldCell(const FVector& InCoordinate, FIntVector& OutCell)
+{
+	// 先检查有限值及安全转换范围，不能先 RoundToInt 再检查已经溢出的结果。
+	if (!FMath::IsFinite(InCoordinate.X) || !FMath::IsFinite(InCoordinate.Y) || !FMath::IsFinite(InCoordinate.Z) ||
+		InCoordinate.X < double(WorldCellMin) - 1.0 || InCoordinate.X > double(WorldCellMaxExclusive) + 1.0 ||
+		InCoordinate.Y < double(WorldCellMin) - 1.0 || InCoordinate.Y > double(WorldCellMaxExclusive) + 1.0 ||
+		InCoordinate.Z < double(WorldCellMin) - 1.0 || InCoordinate.Z > double(WorldCellMaxExclusive) + 1.0) return false;
+	return TryWorldCell(FInt64Vector(FMath::RoundToInt64(InCoordinate.X), FMath::RoundToInt64(InCoordinate.Y),
+		FMath::RoundToInt64(InCoordinate.Z)), OutCell);
+}
+
+bool VoxelGeneration::ClipWorldBounds(const FInt64Vector& InMin, const FInt64Vector& InMax, FVoxelGenerationBounds& OutBounds)
+{
+	const FInt64Vector Min(FMath::Max(InMin.X, WorldCellMin), FMath::Max(InMin.Y, WorldCellMin), FMath::Max(InMin.Z, WorldCellMin));
+	const FInt64Vector Max(FMath::Min(InMax.X, WorldCellMaxExclusive), FMath::Min(InMax.Y, WorldCellMaxExclusive),
+		FMath::Min(InMax.Z, WorldCellMaxExclusive));
+	if (Min.X >= Max.X || Min.Y >= Max.Y || Min.Z >= Max.Z) return false;
+	OutBounds = {FIntVector(int32(Min.X), int32(Min.Y), int32(Min.Z)), FIntVector(int32(Max.X), int32(Max.Y), int32(Max.Z))};
+	return true;
 }
 
 int32 VoxelGeneration::FloorDivide(
@@ -133,10 +201,8 @@ int32 VoxelGeneration::RandomRange(
 		return InMin;
 	}
 
-	return InMin +
-		static_cast<int32>(
-			InSeed %
-			static_cast<uint64>(SignedWidth));
+	return static_cast<int32>(static_cast<int64>(InMin) +
+		static_cast<int64>(InSeed % static_cast<uint64>(SignedWidth)));
 }
 
 int32 VoxelGeneration::Noise2D(
@@ -195,15 +261,16 @@ int32 VoxelGeneration::Noise3D(
 
 		for (int32 YOffset = 0; YOffset < 2; ++YOffset)
 		{
+			// 格点是32位种子坐标，角点加法显式按无符号位模式进行，不受 world cell 域限制。
 			const FIntVector Cell0(
 				BaseCell.X,
-				BaseCell.Y + YOffset,
-				BaseCell.Z + ZOffset);
+				static_cast<int32>(static_cast<uint32>(BaseCell.Y) + uint32(YOffset)),
+				static_cast<int32>(static_cast<uint32>(BaseCell.Z) + uint32(ZOffset)));
 
 			const FIntVector Cell1(
-				BaseCell.X + 1,
-				BaseCell.Y + YOffset,
-				BaseCell.Z + ZOffset);
+				static_cast<int32>(static_cast<uint32>(BaseCell.X) + 1u),
+				static_cast<int32>(static_cast<uint32>(BaseCell.Y) + uint32(YOffset)),
+				static_cast<int32>(static_cast<uint32>(BaseCell.Z) + uint32(ZOffset)));
 
 			const int64 Value0 =
 				static_cast<int64>(
@@ -256,12 +323,24 @@ bool VoxelGeneration::IsInsideEllipsoid(
 	const FIntVector& InCenter,
 	const FIntVector& InRadius)
 {
+	return IsInsideEllipsoid(InPosition, FInt64Vector(InCenter), InRadius);
+}
+
+bool VoxelGeneration::IsInsideEllipsoid(
+	const FIntVector& InPosition,
+	const FInt64Vector& InCenter,
+	const FIntVector& InRadius)
+{
 	if (InRadius.X <= 0 ||
 		InRadius.Y <= 0 ||
 		InRadius.Z <= 0)
 	{
 		return false;
 	}
+	// 宽几何中心可以在世界域外，先以安全包围范围排除远点再求差。
+	if (InCenter.X < int64(InPosition.X) - InRadius.X || InCenter.X > int64(InPosition.X) + InRadius.X ||
+		InCenter.Y < int64(InPosition.Y) - InRadius.Y || InCenter.Y > int64(InPosition.Y) + InRadius.Y ||
+		InCenter.Z < int64(InPosition.Z) - InRadius.Z || InCenter.Z > int64(InPosition.Z) + InRadius.Z) return false;
 
 	const int64 DeltaX =
 		2ll * (static_cast<int64>(InPosition.X) - InCenter.X) + 1;
@@ -288,17 +367,9 @@ bool VoxelGeneration::IsInsideEllipsoid(
 
 	constexpr int64 Scale = 1ll << 24;
 
-	const int64 XTerm =
-		DeltaX * DeltaX * Scale /
-		(4ll * RadiusX * RadiusX);
-
-	const int64 YTerm =
-		DeltaY * DeltaY * Scale /
-		(4ll * RadiusY * RadiusY);
-
-	const int64 ZTerm =
-		DeltaZ * DeltaZ * Scale /
-		(4ll * RadiusZ * RadiusZ);
+	const uint64 XTerm = EllipsoidTermQ24(DeltaX, RadiusX);
+	const uint64 YTerm = EllipsoidTermQ24(DeltaY, RadiusY);
+	const uint64 ZTerm = EllipsoidTermQ24(DeltaZ, RadiusZ);
 
 	return XTerm + YTerm + ZTerm <= Scale;
 }
@@ -314,33 +385,39 @@ bool VoxelGeneration::IsInsideCapsule(
 		return false;
 	}
 
-	const FIntVector Segment = InEnd - InStart;
-	const FIntVector Relative = InPosition - InStart;
-
-	const int64 SegmentLengthSquared = Dot(Segment, Segment);
-	const int64 Projection = Dot(Relative, Segment);
-	const int64 RadiusSquared =
-		static_cast<int64>(InRadius) * InRadius;
-
-	if (SegmentLengthSquared <= 0 ||
-		Projection <= 0)
+	const FInt64Vector WideSegment(int64(InEnd.X) - InStart.X,
+		int64(InEnd.Y) - InStart.Y, int64(InEnd.Z) - InStart.Z);
+	const FInt64Vector WideRelative(int64(InPosition.X) - InStart.X,
+		int64(InPosition.Y) - InStart.Y, int64(InPosition.Z) - InStart.Z);
+	const auto FitsExactProduct = [](const FInt64Vector& Vector)
 	{
-		return Dot(Relative, Relative) <= RadiusSquared;
-	}
-
-	if (Projection >= SegmentLengthSquared)
+		return FMath::Abs(Vector.X) <= 16383 && FMath::Abs(Vector.Y) <= 16383 && FMath::Abs(Vector.Z) <= 16383;
+	};
+	if (InRadius <= 16383 && FitsExactProduct(WideSegment) && FitsExactProduct(WideRelative))
 	{
-		const FIntVector EndRelative =
-			InPosition - InEnd;
-
-		return Dot(EndRelative, EndRelative) <= RadiusSquared;
+		// 保留普通洞穴的整数边缘包含语义；此范围内所有四次乘积均可表示。
+		const auto WideDot = [](const FInt64Vector& A, const FInt64Vector& B)
+		{
+			return A.X * B.X + A.Y * B.Y + A.Z * B.Z;
+		};
+		const int64 LengthSquared = WideDot(WideSegment, WideSegment);
+		const int64 Projection = WideDot(WideRelative, WideSegment);
+		const int64 RadiusSquared = int64(InRadius) * InRadius;
+		if (LengthSquared == 0 || Projection <= 0) return WideDot(WideRelative, WideRelative) <= RadiusSquared;
+		if (Projection >= LengthSquared)
+		{
+			const FInt64Vector EndRelative = WideRelative - WideSegment;
+			return WideDot(EndRelative, EndRelative) <= RadiusSquared;
+		}
+		return WideDot(WideRelative, WideRelative) * LengthSquared - Projection * Projection <= RadiusSquared * LengthSquared;
 	}
-
-	return Dot(Relative, Relative) *
-		SegmentLengthSquared -
-		Projection * Projection <=
-		RadiusSquared *
-		SegmentLengthSquared;
+	// 全域差值与四次乘积可能超出整数容器；最近点残差避免巨大四次项相减。
+	const FVector Segment(double(WideSegment.X), double(WideSegment.Y), double(WideSegment.Z));
+	const FVector Relative(double(WideRelative.X), double(WideRelative.Y), double(WideRelative.Z));
+	const double SegmentLengthSquared = Segment.SizeSquared();
+	const double Alpha = SegmentLengthSquared > 0.0 ?
+		FMath::Clamp(FVector::DotProduct(Relative, Segment) / SegmentLengthSquared, 0.0, 1.0) : 0.0;
+	return (Relative - Segment * Alpha).SizeSquared() <= double(InRadius) * InRadius;
 }
 
 uint64 VoxelGeneration::HashBytes(

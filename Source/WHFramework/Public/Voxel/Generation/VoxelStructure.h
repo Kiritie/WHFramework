@@ -7,8 +7,8 @@ struct WHFRAMEWORK_API FVoxelStructurePiecePlacement
 {
 	int32 PieceIndex = INDEX_NONE;
 
-	FIntVector Origin =
-		FIntVector::ZeroValue;
+	FInt64Vector Origin =
+		FInt64Vector::ZeroValue;
 
 	uint8 Yaw = 0;
 };
@@ -177,10 +177,11 @@ private:
 		TArray<FVoxelStructureClearVolume>& OutClearVolumes,
 		FString& OutError) const;
 
-	FIntVector ResolveTerrainAdaptedAnchor(
+	bool ResolveTerrainAdaptedAnchor(
 		const FVoxelStructureRuntimeDefinition& InDefinition,
 		const FIntVector& InCandidate,
-		const FVoxelColumnSample& InColumn) const;
+		const FVoxelColumnSample& InColumn,
+		FIntVector& OutAnchor) const;
 
 private:
 	TSharedRef<

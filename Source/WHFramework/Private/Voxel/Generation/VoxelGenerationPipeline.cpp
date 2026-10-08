@@ -572,6 +572,12 @@ bool FVoxelGenerationPipeline::SampleBlock(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	if (!VoxelGeneration::IsWorldCell(InPosition.X) || !VoxelGeneration::IsWorldCell(InPosition.Y) ||
+		!VoxelGeneration::IsWorldCell(InPosition.Z))
+	{
+		OutError = TEXT("Invalid block position outside world cell domain");
+		return false;
+	}
 	FVoxelGenerationQuery Query;
 
 	const FVoxelGenerationBounds Bounds {

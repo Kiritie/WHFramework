@@ -117,6 +117,13 @@ public:
 		FVoxelTreeRejectDiagnostics* OutRejects = nullptr) const;
 
 private:
+	static bool AppendWorldWrite(
+		FVoxelEcologyPlan& InOutPlan,
+		const FInt64Vector& InPosition,
+		uint32 InValue,
+		uint8 InPriority,
+		const FVoxelStableId& InOwnerId);
+
 	void BuildTrees(
 		const FVoxelGenerationBounds& InBounds,
 		TFunctionRef<bool(const FIntVector&, FVoxelColumnSample&)> InSampleColumn,

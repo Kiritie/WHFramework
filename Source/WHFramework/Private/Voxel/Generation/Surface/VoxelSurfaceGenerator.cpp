@@ -16,7 +16,7 @@ void FVoxelSurfaceGenerator::ResolveColumn(const int32 InX, const int32 InY,
             !InOutColumn.bRiver &&
             !InOutColumn.bLake &&
             FMath::Abs(
-                InOutColumn.SurfaceZ -
+                int64(InOutColumn.SurfaceZ) -
                 InOutColumn.SurfaceWaterZ) <= 2;
     }
 
@@ -27,14 +27,14 @@ void FVoxelSurfaceGenerator::ResolveColumn(const int32 InX, const int32 InY,
 uint32 FVoxelSurfaceGenerator::ResolveSymbol(
     const FIntVector& InCell,
     const FVoxelColumnSample& InColumn,
-    int32 InDepthFromSurface) const
+    int64 InDepthFromSurface) const
 {
     const bool bUnderWater = InColumn.SurfaceWaterZ != MIN_int32 &&
         InColumn.SurfaceWaterZ >= InColumn.SurfaceZ;
     const bool bKeepSubsoil = bUnderWater || InColumn.bOcean || InColumn.bLake ||
         InColumn.RiverZone == EVoxelRiverSurfaceZone::ChannelBed ||
         InColumn.RiverZone == EVoxelRiverSurfaceZone::WetMargin;
-    const int32 SurfaceDepth = InDepthFromSurface == 0 && bKeepSubsoil
+    const int64 SurfaceDepth = InDepthFromSurface == 0 && bKeepSubsoil
         ? 1 : InDepthFromSurface;
     const FVoxelSurfaceRuntimeRuleSet* RuleSet =
         GetRuleSet(InColumn.BiomeIndex);
@@ -53,8 +53,8 @@ uint32 FVoxelSurfaceGenerator::ResolveSymbol(
 
     const int32 ShoreWidth = FMath::Max(1, Recipe->Settings.RiverShoreWidth);
     const int32 BankDistance = FMath::Max(0, InColumn.BankDistanceCells);
-    const int32 BankStrength = FMath::Clamp(
-        (ShoreWidth - BankDistance) * 32767 / ShoreWidth, 0, 32767);
+    const int32 BankStrength = int32(FMath::Clamp<int64>(
+        (int64(ShoreWidth) - BankDistance) * 32767 / ShoreWidth, 0, 32767));
     const int32 PatchNoise = VoxelGeneration::Noise2D(
         Recipe->Settings.Seed, InCell.X, InCell.Y, 96,
         0x524956455242414Eull);
@@ -115,7 +115,7 @@ const FVoxelSurfaceRuntimeRuleSet* FVoxelSurfaceGenerator::GetRuleSet(uint16 InB
 bool FVoxelSurfaceGenerator::Matches(
     const FVoxelSurfaceRuntimeRule& InRule,
     const FVoxelColumnSample& InColumn,
-    int32 InDepthFromSurface) const
+    int64 InDepthFromSurface) const
 {
     if (!InRule.Height.Contains(InColumn.SurfaceZ) ||
         !InRule.Slope.Contains(InColumn.SlopePermille) ||

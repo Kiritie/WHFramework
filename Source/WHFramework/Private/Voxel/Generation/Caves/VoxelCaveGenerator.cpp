@@ -27,57 +27,59 @@ void FVoxelCavePlan::Finalize()
 		const FVoxelCaveSegment& Segment =
 			Segments[SegmentIndex];
 
-		const FIntVector Min(
-			FMath::Min(
-				Segment.Start.X,
+		FVoxelGenerationBounds Bounds;
+		if (!Segment.IsValid() || !VoxelGeneration::ClipWorldBounds(FInt64Vector(
+			FMath::Min<int64>(
+				int64(Segment.Start.X),
 				Segment.End.X) -
 				Segment.Radius,
-			FMath::Min(
-				Segment.Start.Y,
+			FMath::Min<int64>(
+				int64(Segment.Start.Y),
 				Segment.End.Y) -
 				Segment.Radius,
-			FMath::Min(
-				Segment.Start.Z,
+			FMath::Min<int64>(
+				int64(Segment.Start.Z),
 				Segment.End.Z) -
-				Segment.Radius);
-
-		const FIntVector Max(
-			FMath::Max(
-				Segment.Start.X,
+				Segment.Radius), FInt64Vector(
+			FMath::Max<int64>(
+				int64(Segment.Start.X),
 				Segment.End.X) +
-				Segment.Radius,
-			FMath::Max(
-				Segment.Start.Y,
+				Segment.Radius + 1,
+			FMath::Max<int64>(
+				int64(Segment.Start.Y),
 				Segment.End.Y) +
-				Segment.Radius,
-			FMath::Max(
-				Segment.Start.Z,
+				Segment.Radius + 1,
+			FMath::Max<int64>(
+				int64(Segment.Start.Z),
 				Segment.End.Z) +
-				Segment.Radius);
+				Segment.Radius + 1), Bounds))
+		{
+			continue;
+		}
 
-		InfluenceBounds += FVector(Min);
-		InfluenceBounds += FVector(Max) + FVector(1.0);
+		InfluenceBounds += FVector(Bounds.Min);
+		InfluenceBounds += FVector(Bounds.Max);
 
 		const FIntVector MinSection(
 			VoxelGeneration::FloorDivide(
-				Min.X,
+				Bounds.Min.X,
 				16),
 			VoxelGeneration::FloorDivide(
-				Min.Y,
+				Bounds.Min.Y,
 				16),
 			VoxelGeneration::FloorDivide(
-				Min.Z,
+				Bounds.Min.Z,
 				16));
 
 		const FIntVector MaxSection(
 			VoxelGeneration::FloorDivide(
-				Max.X,
+				Bounds.Max.X - 1,
 				16),
 			VoxelGeneration::FloorDivide(
-				Max.Y,
+				Bounds.Max.Y - 1,
 				16),
 			VoxelGeneration::FloorDivide(
-				Max.Z,
+				Bounds.Max.Z - 1,
 				16));
 
 		for (int32 Z = MinSection.Z;
@@ -137,6 +139,11 @@ void FVoxelCavePlan::Finalize()
 bool FVoxelCavePlan::Carves(
 	const FIntVector& InCell) const
 {
+	if (!VoxelGeneration::IsWorldCell(InCell.X) || !VoxelGeneration::IsWorldCell(InCell.Y) ||
+		!VoxelGeneration::IsWorldCell(InCell.Z))
+	{
+		return false;
+	}
 	const FIntVector Section(
 		VoxelGeneration::FloorDivide(
 			InCell.X,
@@ -254,33 +261,33 @@ bool FVoxelCaveGenerator::BuildPlan(
 			Recipe->Settings.
 				CaveSpacing);
 
-	const int32 MinAnchorX =
-		VoxelGeneration::FloorDivide(
+	const int64 MinAnchorX =
+		VoxelGeneration::FloorDivideWide(
 			InBounds.Min.X,
 			Spacing) - 1;
 
-	const int32 MaxAnchorX =
-		VoxelGeneration::FloorDivide(
+	const int64 MaxAnchorX =
+		VoxelGeneration::FloorDivideWide(
 			InBounds.Max.X - 1,
 			Spacing);
 
-	const int32 MinAnchorY =
-		VoxelGeneration::FloorDivide(
+	const int64 MinAnchorY =
+		VoxelGeneration::FloorDivideWide(
 			InBounds.Min.Y,
 			Spacing) - 1;
 
-	const int32 MaxAnchorY =
-		VoxelGeneration::FloorDivide(
+	const int64 MaxAnchorY =
+		VoxelGeneration::FloorDivideWide(
 			InBounds.Max.Y - 1,
 			Spacing);
 
 	FVoxelCavePlan Plan;
 
-	for (int32 AnchorY = MinAnchorY;
+	for (int64 AnchorY = MinAnchorY;
 		AnchorY <= MaxAnchorY;
 		++AnchorY)
 	{
-		for (int32 AnchorX = MinAnchorX;
+		for (int64 AnchorX = MinAnchorX;
 			AnchorX <= MaxAnchorX;
 			++AnchorX)
 		{
@@ -298,8 +305,8 @@ bool FVoxelCaveGenerator::BuildPlan(
 			const bool bBuilt =
 				TryBuildSystem(
 					FIntPoint(
-						AnchorX,
-						AnchorY),
+						int32(AnchorX),
+						int32(AnchorY)),
 					InBounds,
 					InColumnSampler,
 					Plan.Segments,
@@ -373,20 +380,28 @@ bool FVoxelCaveGenerator::TryBuildSystem(
 		MakeStreamSeed(
 			Seed));
 
-	const int32 StartX =
-		InAnchorGrid.X *
+	const int64 StartXWide =
+		int64(InAnchorGrid.X) *
 			Spacing +
 		Stream.RandRange(
 			0,
 			Spacing - 1);
 
-	const int32 StartY =
-		InAnchorGrid.Y *
+	const int64 StartYWide =
+		int64(InAnchorGrid.Y) *
 			Spacing +
 		Stream.RandRange(
 			0,
 			Spacing - 1);
 
+	FIntPoint StartXY;
+	if (!VoxelGeneration::TryWorldPoint(FInt64Vector2(StartXWide, StartYWide), StartXY))
+	{
+		OutError.Reset();
+		return false;
+	}
+	const int32 StartX = StartXY.X;
+	const int32 StartY = StartXY.Y;
 	if (StartX < InOwnerBounds.Min.X ||
 		StartY < InOwnerBounds.Min.Y ||
 		StartX >= InOwnerBounds.Max.X ||
@@ -409,8 +424,8 @@ bool FVoxelCaveGenerator::TryBuildSystem(
 		return false;
 	}
 
-	if (StartColumn.SurfaceZ <=
-		Recipe->Settings.SeaLevel +
+	if (int64(StartColumn.SurfaceZ) <=
+		int64(Recipe->Settings.SeaLevel) +
 			1)
 	{
 		OutError.Reset();
@@ -428,8 +443,8 @@ bool FVoxelCaveGenerator::TryBuildSystem(
 			999) <
 		Recipe->Settings.CaveEntranceChancePermille;
 
-	const int32 MinimumWorldZ =
-		Recipe->Settings.MinZ +
+	const int64 MinimumWorldZ =
+		int64(Recipe->Settings.MinZ) +
 		3;
 
 	const int32 MinimumSurfaceDepth =
@@ -440,10 +455,10 @@ bool FVoxelCaveGenerator::TryBuildSystem(
 					CaveMinDepth,
 				12));
 
-	const int32 UndergroundMaximum =
+	const int64 UndergroundMaximum =
 		FMath::Max(
 			MinimumWorldZ + 4,
-			StartColumn.SurfaceZ -
+			int64(StartColumn.SurfaceZ) -
 				MinimumSurfaceDepth -
 				4);
 
@@ -481,10 +496,21 @@ bool FVoxelCaveGenerator::TryBuildSystem(
 	}
 	if (!bHasEntrance)
 	{
+		const int64 UndergroundMinimum = MinimumWorldZ + 3;
+		if (!VoxelGeneration::IsWorldCell(UndergroundMinimum) ||
+			!VoxelGeneration::IsWorldCell(UndergroundMaximum) || UndergroundMinimum > UndergroundMaximum)
+		{
+			OutError.Reset();
+			return false;
+		}
 		Current = FIntVector(
 			StartX,
 			StartY,
-			Stream.RandRange(MinimumWorldZ + 3, UndergroundMaximum));
+			0);
+		const int64 UndergroundRange = UndergroundMaximum - UndergroundMinimum + 1;
+		Current.Z = UndergroundRange <= MAX_int32
+			? Stream.RandRange(int32(UndergroundMinimum), int32(UndergroundMaximum))
+			: int32(UndergroundMinimum + FMath::TruncToInt64(double(Stream.GetFraction()) * UndergroundRange));
 		Yaw = Stream.FRandRange(-PI, PI);
 	}
 
@@ -523,24 +549,12 @@ bool FVoxelCaveGenerator::TryBuildSystem(
 				FMath::Cos(Pitch),
 			FMath::Sin(Pitch));
 
-		FIntVector End(
-			FMath::RoundToInt(
-				Current.X +
-				Direction.X *
-					Length),
-			FMath::RoundToInt(
-				Current.Y +
-				Direction.Y *
-					Length),
-			FMath::RoundToInt(
-				Current.Z +
-				Direction.Z *
-					Length));
-
-		End =
-			ClampBelowSurface(
-				End,
-				InColumnSampler);
+		FIntVector End;
+		if (!VoxelGeneration::TryRoundedWorldCell(FVector(Current) + Direction * Length, End) ||
+			!ClampBelowSurface(End, InColumnSampler, End))
+		{
+			break;
+		}
 
 		FVoxelCaveSegment Segment;
 
@@ -700,24 +714,12 @@ bool FVoxelCaveGenerator::AddBranch(
 				FMath::Cos(Pitch),
 			FMath::Sin(Pitch));
 
-		FIntVector End(
-			FMath::RoundToInt(
-				Current.X +
-				Direction.X *
-					Length),
-			FMath::RoundToInt(
-				Current.Y +
-					Direction.Y *
-					Length),
-			FMath::RoundToInt(
-				Current.Z +
-					Direction.Z *
-						Length));
-
-		End =
-			ClampBelowSurface(
-				End,
-				InColumnSampler);
+		FIntVector End;
+		if (!VoxelGeneration::TryRoundedWorldCell(FVector(Current) + Direction * Length, End) ||
+			!ClampBelowSurface(End, InColumnSampler, End))
+		{
+			break;
+		}
 
 		FVoxelCaveSegment Segment;
 
@@ -773,35 +775,69 @@ bool FVoxelCaveGenerator::BuildEntranceCorridor(
 	const FVoxelGenerationSettings& Settings = Recipe->Settings;
 	const int32 TotalLength = FMath::Max(4, Settings.CaveEntranceLength);
 	const int32 Radius = FMath::Max(2, Settings.CaveMainRadius);
-	const int32 HalfWidth = FMath::Max(Radius, (Settings.CaveEntranceMinWidth + 1) / 2);
-	const int32 Height = FMath::Max(Settings.CaveEntranceMinHeight, Radius * 2);
+	const int64 HalfWidthWide = FMath::Max<int64>(Radius, (int64(Settings.CaveEntranceMinWidth) + 1) / 2);
+	const int64 HeightWide = FMath::Max<int64>(Settings.CaveEntranceMinHeight, int64(Radius) * 2);
+	if (HalfWidthWide > MAX_int32 || HeightWide > MAX_int32)
+	{
+		OutError.Reset();
+		return false;
+	}
+	const int32 HalfWidth = int32(HalfWidthWide);
+	const int32 Height = int32(HeightWide);
 	constexpr int32 HorizontalStep = 4;
-	const int32 Steps = FMath::DivideAndRoundUp(TotalLength, HorizontalStep);
-	const int32 RequiredDrop = FMath::DivideAndRoundUp(Radius + 1, Steps);
+	const int32 Steps = int32((int64(TotalLength) + HorizontalStep - 1) / HorizontalStep);
+	const int32 RequiredDrop = int32((int64(Radius) + Steps) / Steps);
 	const int32 DropPerStep = FMath::Clamp(
 		FMath::Max(Settings.CaveEntranceDropPerStep, RequiredDrop), 1, 4);
 	OutYaw = InStream.FRandRange(-PI, PI);
-	FIntVector Current(InStartXY.X, InStartXY.Y, InStartColumn.SurfaceZ + 1);
+	FIntVector Current;
+	if (!VoxelGeneration::TryWorldCell(FInt64Vector(InStartXY.X, InStartXY.Y,
+		int64(InStartColumn.SurfaceZ) + 1), Current))
+	{
+		OutError.Reset();
+		return false;
+	}
 	const FIntVector Mouth = Current;
 	TArray<FVoxelCaveSegment> LocalSegments;
 	TArray<FVoxelGenerationBounds> LocalClearVolumes;
-	for (int32 Distance = 0; Distance <= Settings.CaveEntranceClearance; ++Distance)
+	const auto AppendRequiredClearance = [&LocalClearVolumes](const FInt64Vector& Min, const FInt64Vector& Max)
 	{
-		const int32 LandingX = FMath::RoundToInt(InStartXY.X - FMath::Cos(OutYaw) * Distance);
-		const int32 LandingY = FMath::RoundToInt(InStartXY.Y - FMath::Sin(OutYaw) * Distance);
-		FVoxelColumnSample Landing;
-		if (!InColumnSampler(FIntVector(LandingX, LandingY, 0), Landing) ||
-			Landing.bOcean || Landing.bLake || Landing.bRiver || Landing.bCoast ||
-			Landing.SlopePermille > 450 ||
-			FMath::Abs(Landing.SurfaceZ - InStartColumn.SurfaceZ) > 1)
+		FVoxelGenerationBounds Bounds;
+		if (!VoxelGeneration::ClipWorldBounds(Min, Max, Bounds) ||
+			FInt64Vector(Bounds.Min) != Min || FInt64Vector(Bounds.Max) != Max)
+		{
+			return false;
+		}
+		LocalClearVolumes.Add(Bounds);
+		return true;
+	};
+	for (int64 Distance = 0; Distance <= Settings.CaveEntranceClearance; ++Distance)
+	{
+		FIntVector LandingPosition;
+		if (!VoxelGeneration::TryRoundedWorldCell(FVector(InStartXY.X - FMath::Cos(OutYaw) * Distance,
+			InStartXY.Y - FMath::Sin(OutYaw) * Distance, 0.0), LandingPosition))
 		{
 			OutError.Reset();
 			return false;
 		}
-		LocalClearVolumes.Add({
-			FIntVector(LandingX - HalfWidth, LandingY - HalfWidth, Landing.SurfaceZ + 1),
-			FIntVector(LandingX + HalfWidth + 1, LandingY + HalfWidth + 1,
-				Landing.SurfaceZ + Height + 1)});
+		FVoxelColumnSample Landing;
+		if (!InColumnSampler(LandingPosition, Landing) ||
+			Landing.bOcean || Landing.bLake || Landing.bRiver || Landing.bCoast ||
+			Landing.SlopePermille > 450 ||
+			FMath::Abs(int64(Landing.SurfaceZ) - InStartColumn.SurfaceZ) > 1)
+		{
+			OutError.Reset();
+			return false;
+		}
+		if (!AppendRequiredClearance(
+			FInt64Vector(int64(LandingPosition.X) - HalfWidth, int64(LandingPosition.Y) - HalfWidth,
+				int64(Landing.SurfaceZ) + 1),
+			FInt64Vector(int64(LandingPosition.X) + HalfWidth + 1, int64(LandingPosition.Y) + HalfWidth + 1,
+				int64(Landing.SurfaceZ) + Height + 1)))
+		{
+			OutError.Reset();
+			return false;
+		}
 	}
 
 	for (int32 Travelled = 0; Travelled < TotalLength;)
@@ -812,39 +848,47 @@ bool FVoxelCaveGenerator::BuildEntranceCorridor(
 			return false;
 		}
 		const int32 Step = FMath::Min(HorizontalStep, TotalLength - Travelled);
-		const int32 NextX = FMath::RoundToInt(Current.X + FMath::Cos(OutYaw) * Step);
-		const int32 NextY = FMath::RoundToInt(Current.Y + FMath::Sin(OutYaw) * Step);
+		FIntVector NextXY;
+		if (!VoxelGeneration::TryRoundedWorldCell(FVector(Current.X + FMath::Cos(OutYaw) * Step,
+			Current.Y + FMath::Sin(OutYaw) * Step, 0.0), NextXY))
+		{
+			OutError.Reset();
+			return false;
+		}
 		FVoxelColumnSample Column;
-		if (!InColumnSampler(FIntVector(NextX, NextY, 0), Column) ||
+		if (!InColumnSampler(NextXY, Column) ||
 			Column.bOcean || Column.bLake || Column.bRiver || Column.bCoast ||
 			Column.SlopePermille > 450)
 		{
 			OutError.Reset();
 			return false;
 		}
-		const int32 DesiredZ = Current.Z - DropPerStep;
-		const int32 NextZ = FMath::Min(DesiredZ, Column.SurfaceZ + 1);
-		if (Current.Z - NextZ > DropPerStep + 1)
+		const int64 DesiredZ = int64(Current.Z) - DropPerStep;
+		const int64 NextZ = FMath::Min(DesiredZ, int64(Column.SurfaceZ) + 1);
+		FIntVector Next;
+		if (int64(Current.Z) - NextZ > DropPerStep + 1 ||
+			!VoxelGeneration::TryWorldCell(FInt64Vector(NextXY.X, NextXY.Y, NextZ), Next))
 		{
 			OutError.Reset();
 			return false;
 		}
-		const FIntVector Next(NextX, NextY, NextZ);
 		LocalSegments.Add({ Current, Next, Radius });
-		LocalClearVolumes.Add({
-			FIntVector(FMath::Min(Current.X, Next.X) - HalfWidth,
-				FMath::Min(Current.Y, Next.Y) - HalfWidth,
-				FMath::Min(Current.Z, Next.Z)),
-			FIntVector(FMath::Max(Current.X, Next.X) + HalfWidth + 1,
-				FMath::Max(Current.Y, Next.Y) + HalfWidth + 1,
-				FMath::Max(Current.Z, Next.Z) + Height)});
+		if (!AppendRequiredClearance(
+			FInt64Vector(int64(FMath::Min(Current.X, Next.X)) - HalfWidth,
+				int64(FMath::Min(Current.Y, Next.Y)) - HalfWidth, FMath::Min(Current.Z, Next.Z)),
+			FInt64Vector(int64(FMath::Max(Current.X, Next.X)) + HalfWidth + 1,
+				int64(FMath::Max(Current.Y, Next.Y)) + HalfWidth + 1, int64(FMath::Max(Current.Z, Next.Z)) + Height)))
+		{
+			OutError.Reset();
+			return false;
+		}
 		Current = Next;
 		Travelled += Step;
 	}
 
 	FVoxelColumnSample EndColumn;
 	if (!InColumnSampler(FIntVector(Current.X, Current.Y, 0), EndColumn) ||
-		EndColumn.SurfaceZ - Current.Z < Radius)
+		int64(EndColumn.SurfaceZ) - Current.Z < Radius)
 	{
 		OutError.Reset();
 		return false;
@@ -868,13 +912,14 @@ bool FVoxelCaveGenerator::IsDeepEnoughForInterior(
 {
 	FVoxelColumnSample Column;
 	return InColumnSampler(FIntVector(InPosition.X, InPosition.Y, 0), Column) &&
-		Column.SurfaceZ - InPosition.Z >=
+		int64(Column.SurfaceZ) - InPosition.Z >=
 		FMath::Max(4, Recipe->Settings.CaveEntranceTransitionDepth);
 }
 
-FIntVector FVoxelCaveGenerator::ClampBelowSurface(
+bool FVoxelCaveGenerator::ClampBelowSurface(
 	const FIntVector& InPosition,
-	FVoxelCaveColumnSampler InColumnSampler) const
+	FVoxelCaveColumnSampler InColumnSampler,
+	FIntVector& OutPosition) const
 {
 	FVoxelColumnSample Column;
 
@@ -885,7 +930,7 @@ FIntVector FVoxelCaveGenerator::ClampBelowSurface(
 			0),
 		Column))
 	{
-		return InPosition;
+		return false;
 	}
 
 	const int32 MinimumSurfaceDepth =
@@ -893,16 +938,12 @@ FIntVector FVoxelCaveGenerator::ClampBelowSurface(
 			4,
 			Recipe->Settings.CaveMinDepth);
 
-	FIntVector Result =
-		InPosition;
-
-	Result.Z =
-		FMath::Clamp(
-			Result.Z,
-			Recipe->Settings.MinZ +
-				3,
-			Column.SurfaceZ -
-				MinimumSurfaceDepth);
-
-	return Result;
+	const int64 MinimumZ = int64(Recipe->Settings.MinZ) + 3;
+	const int64 MaximumZ = int64(Column.SurfaceZ) - MinimumSurfaceDepth;
+	if (MinimumZ > MaximumZ)
+	{
+		return false;
+	}
+	return VoxelGeneration::TryWorldCell(FInt64Vector(InPosition.X, InPosition.Y,
+		FMath::Clamp<int64>(InPosition.Z, MinimumZ, MaximumZ)), OutPosition);
 }

@@ -15,7 +15,7 @@ public:
     uint32 ResolveSymbol(
         const FIntVector& InCell,
         const FVoxelColumnSample& InColumn,
-        int32 InDepthFromSurface) const;
+        int64 InDepthFromSurface) const;
 
 private:
     const FVoxelSurfaceRuntimeRuleSet* GetRuleSet(uint16 InBiomeIndex) const;
@@ -23,7 +23,7 @@ private:
     bool Matches(
         const FVoxelSurfaceRuntimeRule& InRule,
         const FVoxelColumnSample& InColumn,
-        int32 InDepthFromSurface) const;
+        int64 InDepthFromSurface) const;
 
 private:
     TSharedRef<const FVoxelGenerationRecipe, ESPMode::ThreadSafe> Recipe;
