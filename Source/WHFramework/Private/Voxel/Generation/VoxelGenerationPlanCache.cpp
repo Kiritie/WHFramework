@@ -3,6 +3,7 @@
 #include "HAL/Event.h"
 #include "HAL/PlatformProcess.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
+#include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Task/VoxelTerrainResources.h"
 
 namespace
@@ -10,11 +11,92 @@ namespace
 	constexpr int32 GenerationPlanTileSide = 256;
 	constexpr int32 LakeAnchorSide = 64;
 
+	bool TryTileRetentionPosition(
+		const FIntVector& InCoordinate,
+		const int32 InSide,
+		const bool bInUseCenter,
+		FInt64Vector2& OutPosition)
+	{
+		const FInt64Vector Origin(
+			static_cast<int64>(InCoordinate.X) * InSide,
+			static_cast<int64>(InCoordinate.Y) * InSide,
+			static_cast<int64>(InCoordinate.Z) * InSide);
+		FVoxelGenerationBounds Bounds;
+		if (!VoxelGeneration::ClipWorldBounds(
+			Origin,
+			FInt64Vector(Origin.X + InSide, Origin.Y + InSide, Origin.Z + InSide),
+			Bounds))
+		{
+			return false;
+		}
+
+		// 完整 lattice 的元数据代表点允许域外；交集只验 key，不改变其中心或身份。
+		OutPosition = FInt64Vector2(
+			Origin.X + (bInUseCenter ? InSide / 2 : 0),
+			Origin.Y + (bInUseCenter ? InSide / 2 : 0));
+		return true;
+	}
+
+	bool TryHydrologyRetentionPosition(
+		const FVoxelHydrologyRegionKey& InKey,
+		const int32 InRegionSide,
+		const int32 InCellSize,
+		FInt64Vector2& OutPosition)
+	{
+		const int64 RegionSide = FMath::Max(1, InRegionSide);
+		const int32 CellSize = FMath::Max(1, InCellSize);
+		const int64 CellMin = VoxelGeneration::FloorDivideWide(VoxelGeneration::WorldCellMin, CellSize);
+		const int64 CellMax = VoxelGeneration::FloorDivideWide(
+			VoxelGeneration::WorldCellMaxExclusive - 1, CellSize) + 1;
+		const auto ClipAxis = [RegionSide, CellSize, CellMin, CellMax](
+			const int32 InCoordinate, int64& OutCenter)
+		{
+			// 两因子乘积在 int64 内；先验 logical 交集再乘 CellSize，非法 key 不计算第三因子。
+			const int64 Origin = static_cast<int64>(InCoordinate) * RegionSide;
+			const int64 MinCell = FMath::Max(Origin, CellMin);
+			const int64 MaxCell = FMath::Min(Origin + RegionSide, CellMax);
+			if (MinCell >= MaxCell)
+			{
+				return false;
+			}
+			// 保留原完整 region 中心语义；此元数据不用于采样或转换成 world cell。
+			OutCenter = Origin * CellSize + (RegionSide * CellSize) / 2;
+			return true;
+		};
+
+		FInt64Vector2 Center;
+		if (!ClipAxis(InKey.Coordinate.X, Center.X) || !ClipAxis(InKey.Coordinate.Y, Center.Y))
+		{
+			return false;
+		}
+		OutPosition = Center;
+		return true;
+	}
+
 	template<typename KeyType, typename ValueType>
 	using TConstCachePtr =
 		TSharedPtr<
 			const ValueType,
 			ESPMode::ThreadSafe>;
+
+	// 调用方持有原 shard 写锁；每个门闩的正文与错误只能完成一次。
+	template<typename BuildGateType>
+	bool CompleteBuildGate(
+		BuildGateType& InGate,
+		const TSharedPtr<const void, ESPMode::ThreadSafe>& InResult,
+		const FString& InError)
+	{
+		if (InGate.bCompleted)
+		{
+			return false;
+		}
+
+		InGate.Result = InResult;
+		InGate.bSuccess = InResult.IsValid();
+		InGate.Error = InGate.bSuccess ? FString() : InError;
+		InGate.bCompleted = true;
+		return true;
+	}
 
 	template<typename KeyType, typename ValueType, typename BuildGateType>
 	bool GetOrBuildValue(
@@ -32,24 +114,28 @@ namespace
 		TFunctionRef<void(uint64)> InRecordWait,
 		TFunction<void(bool)> InRecordLookup = {})
 	{
+		TConstCachePtr<KeyType, ValueType> ReadyValue;
 		{
 			FReadScopeLock Scope(InLock);
 
 			if (const TConstCachePtr<KeyType, ValueType>* Found =
 				InValues.Find(InKey))
 			{
-				OutValue = *Found;
-				OutError.Reset();
-				if (InRecordLookup) InRecordLookup(OutValue.IsValid());
-				return OutValue.IsValid();
+				ReadyValue = *Found;
 			}
+		}
+		if (ReadyValue)
+		{
+			OutValue = MoveTemp(ReadyValue);
+			OutError.Reset();
+			if (InRecordLookup) InRecordLookup(true);
+			return true;
 		}
 		if (InRecordLookup) InRecordLookup(false);
 
 		// 运行时主线程只读取已发布值，冷查询不得创建构建门闩或执行构建器。
 		if (!bInAllowGameThreadBuilds && IsInGameThread())
 		{
-			OutValue.Reset();
 			OutError = TEXT("DependencyNotReady: voxel generation cache key is not published");
 			return false;
 		}
@@ -63,12 +149,9 @@ namespace
 			if (const TConstCachePtr<KeyType, ValueType>* Found =
 				InValues.Find(InKey))
 			{
-				OutValue = *Found;
-				OutError.Reset();
-				return OutValue.IsValid();
+				ReadyValue = *Found;
 			}
-
-			if (TSharedPtr<BuildGateType, ESPMode::ThreadSafe>* Existing =
+			else if (TSharedPtr<BuildGateType, ESPMode::ThreadSafe>* Existing =
 				InBuilds.Find(InKey))
 			{
 				Gate = *Existing;
@@ -87,10 +170,21 @@ namespace
 				bOwner = true;
 			}
 		}
+		if (ReadyValue)
+		{
+			OutValue = MoveTemp(ReadyValue);
+			OutError.Reset();
+			return true;
+		}
+		if (!Gate)
+		{
+			OutError = TEXT("Voxel generation cache contains an invalid published value");
+			return false;
+		}
 
 		if (!bOwner)
 		{
-			if (!bInAllowWorkerWait)
+			if (!bInAllowWorkerWait || IsInGameThread())
 			{
 				OutError = TEXT("DependencyNotReady: voxel generation cache key is building");
 				return false;
@@ -121,25 +215,26 @@ namespace
 			InRecordWait(
 				WaitMicroseconds);
 
-			if (!Gate->bSuccess)
 			{
-				OutError =
-					Gate->Error;
-
-				return false;
+				FReadScopeLock Scope(InLock);
+				if (InCancel && InCancel->Load())
+				{
+					OutError = TEXT("Canceled");
+					return false;
+				}
+				if (!Gate->bCompleted || !Gate->bSuccess)
+				{
+					OutError = Gate->Error;
+					return false;
+				}
+				// 读取原门闩持有的正文，Reset 后的新同 key 不属于本次等待。
+				ReadyValue = StaticCastSharedPtr<const ValueType>(Gate->Result);
 			}
-
-			FReadScopeLock Scope(
-				InLock);
-
-			if (const TConstCachePtr<KeyType, ValueType>* Found =
-				InValues.Find(InKey))
+			if (ReadyValue)
 			{
-				OutValue =
-					*Found;
-
+				OutValue = MoveTemp(ReadyValue);
 				OutError.Reset();
-				return OutValue.IsValid();
+				return true;
 			}
 
 			OutError =
@@ -160,7 +255,7 @@ namespace
 
 		TConstCachePtr<KeyType, ValueType> BuiltValue;
 
-		if (bSuccess)
+		if (bSuccess && (!InCancel || !InCancel->Load()))
 		{
 			BuiltValue =
 				MakeShared<
@@ -170,58 +265,136 @@ namespace
 							LocalValue));
 		}
 
+		bool bTrigger = false;
+		FString ResultError;
 		{
 			FWriteScopeLock Scope(
 				InLock);
 
-			if (BuiltValue)
+			// builder 返回 true 仍可能已经撤销；发布前在原锁内重新验收。
+			const bool bCanceled = InCancel && InCancel->Load();
+			const TSharedPtr<BuildGateType, ESPMode::ThreadSafe>* Current =
+				InBuilds.Find(InKey);
+			if (Current && *Current == Gate && !Gate->bCompleted)
 			{
-				const bool bWasAbsent =
-					!InValues.Contains(
-						InKey);
-
-				InValues.Add(
-					InKey,
-					BuiltValue);
-
-				if (bWasAbsent)
+				if (bCanceled)
 				{
-					InKeys.Add(
-						InKey);
+					BuildError = TEXT("Canceled");
 				}
+				else if (const TConstCachePtr<KeyType, ValueType>* Published = InValues.Find(InKey))
+				{
+					// 同 key 的已发布 immutable 优先，旧 owner 不得覆盖。
+					ReadyValue = *Published;
+				}
+				else if (BuiltValue)
+				{
+					InValues.Add(InKey, BuiltValue);
+					InKeys.Add(InKey);
+					ReadyValue = BuiltValue;
+				}
+
+				if (!ReadyValue && BuildError.IsEmpty())
+				{
+					BuildError = TEXT("Voxel generation cache build failed");
+				}
+				bTrigger = CompleteBuildGate(*Gate, ReadyValue, BuildError);
+				InBuilds.Remove(InKey);
 			}
 
-			Gate->bSuccess =
-				BuiltValue.IsValid();
-
-			Gate->Error =
-				Gate->bSuccess
-					? FString()
-					: BuildError;
-
-			InBuilds.Remove(
-				InKey);
+			if (bCanceled)
+			{
+				ReadyValue.Reset();
+				ResultError = TEXT("Canceled");
+			}
+			else if (Gate->bCompleted)
+			{
+				ReadyValue = StaticCastSharedPtr<const ValueType>(Gate->Result);
+				ResultError = Gate->Error;
+			}
+			else
+			{
+				ResultError = TEXT("DependencyNotReady: voxel generation cache build gate was replaced");
+			}
 		}
 
-		/**
-		 * Trigger 在锁外。
-		 */
-		Gate->Event->Trigger();
-
-		if (!Gate->bSuccess)
+		// 只有完成原门闩的一方唤醒；旧 owner 不再修改或触发 Reset/Store 的结果。
+		if (bTrigger)
 		{
-			OutError =
-				Gate->Error;
+			Gate->Event->Trigger();
+		}
 
+		if (!ReadyValue)
+		{
+			OutError = MoveTemp(ResultError);
 			return false;
 		}
 
 		OutValue =
 			MoveTemp(
-				BuiltValue);
+				ReadyValue);
 
 		OutError.Reset();
 		return true;
+	}
+
+	template<typename KeyType, typename ValueType, typename BuildGateType>
+	void StoreValue(
+		FRWLock& InLock,
+		TMap<KeyType, TConstCachePtr<KeyType, ValueType>>& InValues,
+		TMap<KeyType, TSharedPtr<BuildGateType, ESPMode::ThreadSafe>>& InBuilds,
+		TArray<KeyType>& InKeys,
+		const KeyType& InKey,
+		TConstCachePtr<KeyType, ValueType> InValue)
+	{
+		if (!InValue)
+		{
+			return;
+		}
+
+		TSharedPtr<BuildGateType, ESPMode::ThreadSafe> Gate;
+		bool bTrigger = false;
+		{
+			FWriteScopeLock Scope(InLock);
+			if (const TConstCachePtr<KeyType, ValueType>* Published = InValues.Find(InKey))
+			{
+				// 已发布的同 key 正文不更换，传入引用也在锁外退出。
+				bTrigger = false;
+				if (const TSharedPtr<BuildGateType, ESPMode::ThreadSafe>* Existing = InBuilds.Find(InKey))
+				{
+					Gate = *Existing;
+					bTrigger = CompleteBuildGate(*Gate, *Published, FString());
+					InBuilds.Remove(InKey);
+				}
+			}
+			else
+			{
+				InValues.Add(InKey, InValue);
+				InKeys.Add(InKey);
+				if (const TSharedPtr<BuildGateType, ESPMode::ThreadSafe>* Existing = InBuilds.Find(InKey))
+				{
+					Gate = *Existing;
+					bTrigger = CompleteBuildGate(*Gate, InValue, FString());
+					InBuilds.Remove(InKey);
+				}
+			}
+		}
+		if (bTrigger)
+		{
+			Gate->Event->Trigger();
+		}
+	}
+
+	template<typename KeyType, typename BuildGateType>
+	void CancelBuildGates(TMap<KeyType, TSharedPtr<BuildGateType, ESPMode::ThreadSafe>>& InBuilds)
+	{
+		for (auto& Pair : InBuilds)
+		{
+			if (CompleteBuildGate(*Pair.Value, nullptr, TEXT("DependencyNotReady: voxel generation cache reset during build")))
+			{
+				// Trigger 只唤醒，不等待线程；仍持原锁保证随后 detach 不漏终结。
+				Pair.Value->Event->Trigger();
+			}
+		}
 	}
 
 	template<typename KeyType, typename ValueType, typename KeepPredicate>
@@ -322,6 +495,9 @@ struct FVoxelGenerationPlanCache::FBuildGate
 	}
 
 	FEvent* Event = nullptr;
+	// Result/Error/bSuccess/bCompleted 仅在所属 shard 锁下读写。
+	TSharedPtr<const void, ESPMode::ThreadSafe> Result;
+	bool bCompleted = false;
 	bool bSuccess = false;
 	FString Error;
 };
@@ -541,22 +717,8 @@ void FVoxelGenerationPlanCache::StoreHydrology(
 		*PlanShards[
 			PlanShardIndex(InKey)];
 
-	FWriteScopeLock Scope(
-		Shard.Lock);
-
-	const bool bNew =
-		!Shard.Hydrology.Contains(
-			InKey);
-
-	Shard.Hydrology.Add(
-		InKey,
-		MoveTemp(InPlan));
-
-	if (bNew)
-	{
-		Shard.HydrologyKeys.Add(
-			InKey);
-	}
+	StoreValue(Shard.Lock, Shard.Hydrology, Shard.HydrologyBuilds,
+		Shard.HydrologyKeys, InKey, MoveTemp(InPlan));
 }
 
 bool FVoxelGenerationPlanCache::GetOrBuildHydrology(
@@ -631,21 +793,8 @@ void FVoxelGenerationPlanCache::StoreCave(
 		*PlanShards[
 			PlanShardIndex(InKey)];
 
-	FWriteScopeLock Scope(
-		Shard.Lock);
-
-	const bool bNew =
-		!Shard.Caves.Contains(InKey);
-
-	Shard.Caves.Add(
-		InKey,
-		MoveTemp(InPlan));
-
-	if (bNew)
-	{
-		Shard.CaveKeys.Add(
-			InKey);
-	}
+	StoreValue(Shard.Lock, Shard.Caves, Shard.CaveBuilds,
+		Shard.CaveKeys, InKey, MoveTemp(InPlan));
 }
 
 bool FVoxelGenerationPlanCache::GetOrBuildCave(
@@ -769,22 +918,8 @@ void FVoxelGenerationPlanCache::StoreFeature(
 		*PlanShards[
 			PlanShardIndex(InKey)];
 
-	FWriteScopeLock Scope(
-		Shard.Lock);
-
-	const bool bNew =
-		!Shard.Features.Contains(
-			InKey);
-
-	Shard.Features.Add(
-		InKey,
-		MoveTemp(InPlan));
-
-	if (bNew)
-	{
-		Shard.FeatureKeys.Add(
-			InKey);
-	}
+	StoreValue(Shard.Lock, Shard.Features, Shard.FeatureBuilds,
+		Shard.FeatureKeys, InKey, MoveTemp(InPlan));
 }
 
 bool FVoxelGenerationPlanCache::GetOrBuildFeature(
@@ -859,22 +994,8 @@ void FVoxelGenerationPlanCache::StoreStructure(
 		*PlanShards[
 			PlanShardIndex(InKey)];
 
-	FWriteScopeLock Scope(
-		Shard.Lock);
-
-	const bool bNew =
-		!Shard.Structures.Contains(
-			InKey);
-
-	Shard.Structures.Add(
-		InKey,
-		MoveTemp(InPlan));
-
-	if (bNew)
-	{
-		Shard.StructureKeys.Add(
-			InKey);
-	}
+	StoreValue(Shard.Lock, Shard.Structures, Shard.StructureBuilds,
+		Shard.StructureKeys, InKey, MoveTemp(InPlan));
 }
 
 bool FVoxelGenerationPlanCache::GetOrBuildStructure(
@@ -1035,13 +1156,13 @@ void FVoxelGenerationPlanCache::ReleaseTaskRetention(FVoxelGenerationCacheRetent
 }
 
 bool FVoxelGenerationPlanCache::IsRetained(
-	const FIntPoint& InPosition,
+	const FInt64Vector2& InPosition,
 	int32 FVoxelGenerationCacheRetentionPoint::* InRadius) const
 {
 	const auto ContainsPoint = [&InPosition, InRadius](const FVoxelGenerationCacheRetentionPoint& InPoint)
 	{
-		return FMath::Abs(static_cast<int64>(InPosition.X) - InPoint.Center.X) <= InPoint.*InRadius &&
-			FMath::Abs(static_cast<int64>(InPosition.Y) - InPoint.Center.Y) <= InPoint.*InRadius;
+		return FMath::Abs(InPosition.X - InPoint.Center.X) <= InPoint.*InRadius &&
+			FMath::Abs(InPosition.Y - InPoint.Center.Y) <= InPoint.*InRadius;
 	};
 	for (const FVoxelGenerationCacheRetentionPoint& Point : Retention.Points)
 	{
@@ -1141,8 +1262,8 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			[this](
 				const FIntPoint& InKey)
 			{
-				return IsRetained(
-					InKey,
+				return VoxelGeneration::IsWorldCell(InKey.X) && VoxelGeneration::IsWorldCell(InKey.Y) && IsRetained(
+					FInt64Vector2(InKey.X, InKey.Y),
 					&FVoxelGenerationCacheRetentionPoint::NaturalRadiusCells);
 			});
 
@@ -1155,8 +1276,8 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			[this](
 				const FIntPoint& InKey)
 			{
-				return IsRetained(
-					InKey,
+				return VoxelGeneration::IsWorldCell(InKey.X) && VoxelGeneration::IsWorldCell(InKey.Y) && IsRetained(
+					FInt64Vector2(InKey.X, InKey.Y),
 					&FVoxelGenerationCacheRetentionPoint::NaturalRadiusCells);
 			});
 
@@ -1179,18 +1300,9 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			[this](
 				const FVoxelHydrologyRegionKey& InKey)
 			{
-				const int32 RegionCellSide =
-					static_cast<int32>(FMath::Clamp<int64>(
-						static_cast<int64>(FMath::Max(1, Retention.HydrologyRegionSide)) *
-							FMath::Max(1, Retention.HydrologyCellSize),
-						1,
-						MAX_int32));
-
-				const FIntPoint RegionCenter =
-					InKey.Coordinate * RegionCellSide +
-					FIntPoint(RegionCellSide / 2);
-
-				return IsRetained(
+				FInt64Vector2 RegionCenter;
+				return TryHydrologyRetentionPosition(InKey, Retention.HydrologyRegionSide,
+					Retention.HydrologyCellSize, RegionCenter) && IsRetained(
 					RegionCenter,
 					&FVoxelGenerationCacheRetentionPoint::HydrologyRadiusCells);
 			});
@@ -1204,14 +1316,9 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			[this](
 				const FVoxelGenerationTileKey& InKey)
 			{
-				const FIntVector Origin =
-					InKey.Coordinate *
-					GenerationPlanTileSide;
-
-				return IsRetained(
-					FIntPoint(
-						Origin.X,
-						Origin.Y),
+				FInt64Vector2 Origin;
+				return TryTileRetentionPosition(InKey.Coordinate, GenerationPlanTileSide, false, Origin) && IsRetained(
+					Origin,
 					&FVoxelGenerationCacheRetentionPoint::PlanRadiusCells);
 			});
 
@@ -1223,8 +1330,9 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			RetiredEcology,
 			[this](const FVoxelEcologyTileKey& InKey)
 			{
-				const FIntPoint Center = InKey.Coordinate * 64 + FIntPoint(32, 32);
-				return IsRetained(
+				FInt64Vector2 Center;
+				return TryTileRetentionPosition(FIntVector(InKey.Coordinate.X, InKey.Coordinate.Y, 0),
+					64, true, Center) && IsRetained(
 					Center,
 					&FVoxelGenerationCacheRetentionPoint::PlanRadiusCells);
 			});
@@ -1238,14 +1346,9 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			[this](
 				const FVoxelGenerationTileKey& InKey)
 			{
-				const FIntVector Origin =
-					InKey.Coordinate *
-					GenerationPlanTileSide;
-
-				return IsRetained(
-					FIntPoint(
-						Origin.X,
-						Origin.Y),
+				FInt64Vector2 Origin;
+				return TryTileRetentionPosition(InKey.Coordinate, GenerationPlanTileSide, false, Origin) && IsRetained(
+					Origin,
 					&FVoxelGenerationCacheRetentionPoint::PlanRadiusCells);
 			});
 
@@ -1258,14 +1361,9 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			[this](
 				const FVoxelGenerationTileKey& InKey)
 			{
-				const FIntVector Origin =
-					InKey.Coordinate *
-					GenerationPlanTileSide;
-
-				return IsRetained(
-					FIntPoint(
-						Origin.X,
-						Origin.Y),
+				FInt64Vector2 Origin;
+				return TryTileRetentionPosition(InKey.Coordinate, GenerationPlanTileSide, false, Origin) && IsRetained(
+					Origin,
 					&FVoxelGenerationCacheRetentionPoint::PlanRadiusCells);
 			});
 
@@ -1275,8 +1373,12 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 
 void FVoxelGenerationPlanCache::Reset()
 {
-	// 与维护采用相同的 Retention -> shard 顺序，游标重置不与裁剪交错。
-	FWriteScopeLock RetentionScope(RetentionLock);
+	{
+		FWriteScopeLock RetentionScope(RetentionLock);
+		MaintenanceShardCursor = 0;
+	}
+
+	// 每个 shard 采用 Retention -> shard 顺序；原正文及 backing 在两把锁外退休。
 	for (int32 Index = 0;
 		Index < ShardCount;
 		++Index)
@@ -1285,56 +1387,66 @@ void FVoxelGenerationPlanCache::Reset()
 			FNaturalShard& Shard =
 				*NaturalShards[Index];
 
-			FWriteScopeLock Scope(
-				Shard.Lock);
+			TMap<FIntPoint, FVoxelBaseColumnEntryPtr> RetiredBaseColumns;
+			TMap<FIntPoint, FVoxelNaturalColumnEntryPtr> RetiredNaturalColumns;
+			{
+				FWriteScopeLock RetentionScope(RetentionLock);
+				FWriteScopeLock Scope(Shard.Lock);
+				CancelBuildGates(Shard.BaseColumnBuilds);
+				CancelBuildGates(Shard.NaturalColumnBuilds);
+				Shard.BaseColumnBuilds.Reset();
+				Shard.NaturalColumnBuilds.Reset();
 
-			Shard.BaseColumns.Reset();
-			Shard.NaturalColumns.Reset();
-
-			Shard.BaseColumnBuilds.Reset();
-			Shard.NaturalColumnBuilds.Reset();
-
-			Shard.BaseColumnKeys.Reset();
-			Shard.NaturalColumnKeys.Reset();
-
-			Shard.BaseColumnCursor = 0;
-			Shard.NaturalColumnCursor = 0;
+				RetiredBaseColumns = MoveTemp(Shard.BaseColumns);
+				RetiredNaturalColumns = MoveTemp(Shard.NaturalColumns);
+				Shard.BaseColumnKeys.Reset();
+				Shard.NaturalColumnKeys.Reset();
+				Shard.BaseColumnCursor = 0;
+				Shard.NaturalColumnCursor = 0;
+			}
 		}
 
 		{
 			FPlanShard& Shard =
 				*PlanShards[Index];
 
-			FWriteScopeLock Scope(
-				Shard.Lock);
+			TMap<FVoxelHydrologyRegionKey, FVoxelHydrologyPlanPtr> RetiredHydrology;
+			TMap<FVoxelGenerationTileKey, FVoxelCavePlanPtr> RetiredCaves;
+			TMap<FVoxelEcologyTileKey, FVoxelEcologyPlanPtr> RetiredEcology;
+			TMap<FVoxelGenerationTileKey, FVoxelFeaturePlanPtr> RetiredFeatures;
+			TMap<FVoxelGenerationTileKey, FVoxelStructurePlanPtr> RetiredStructures;
+			{
+				FWriteScopeLock RetentionScope(RetentionLock);
+				FWriteScopeLock Scope(Shard.Lock);
+				CancelBuildGates(Shard.HydrologyBuilds);
+				CancelBuildGates(Shard.CaveBuilds);
+				CancelBuildGates(Shard.EcologyBuilds);
+				CancelBuildGates(Shard.FeatureBuilds);
+				CancelBuildGates(Shard.StructureBuilds);
+				Shard.HydrologyBuilds.Reset();
+				Shard.CaveBuilds.Reset();
+				Shard.EcologyBuilds.Reset();
+				Shard.FeatureBuilds.Reset();
+				Shard.StructureBuilds.Reset();
 
-			Shard.Hydrology.Reset();
-			Shard.Caves.Reset();
-			Shard.Ecology.Reset();
-			Shard.Features.Reset();
-			Shard.Structures.Reset();
-
-			Shard.HydrologyBuilds.Reset();
-			Shard.CaveBuilds.Reset();
-			Shard.EcologyBuilds.Reset();
-			Shard.FeatureBuilds.Reset();
-			Shard.StructureBuilds.Reset();
-
-			Shard.HydrologyKeys.Reset();
-			Shard.CaveKeys.Reset();
-			Shard.EcologyKeys.Reset();
-			Shard.FeatureKeys.Reset();
-			Shard.StructureKeys.Reset();
-
-			Shard.HydrologyCursor = 0;
-			Shard.CaveCursor = 0;
-			Shard.EcologyCursor = 0;
-			Shard.FeatureCursor = 0;
-			Shard.StructureCursor = 0;
+				RetiredHydrology = MoveTemp(Shard.Hydrology);
+				RetiredCaves = MoveTemp(Shard.Caves);
+				RetiredEcology = MoveTemp(Shard.Ecology);
+				RetiredFeatures = MoveTemp(Shard.Features);
+				RetiredStructures = MoveTemp(Shard.Structures);
+				Shard.HydrologyKeys.Reset();
+				Shard.CaveKeys.Reset();
+				Shard.EcologyKeys.Reset();
+				Shard.FeatureKeys.Reset();
+				Shard.StructureKeys.Reset();
+				Shard.HydrologyCursor = 0;
+				Shard.CaveCursor = 0;
+				Shard.EcologyCursor = 0;
+				Shard.FeatureCursor = 0;
+				Shard.StructureCursor = 0;
+			}
 		}
 	}
-
-	MaintenanceShardCursor = 0;
 }
 
 FVoxelGenerationCacheStats

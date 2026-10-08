@@ -153,6 +153,7 @@ public:
 		const FVoxelHydrologyRegionKey& InKey,
 		FVoxelHydrologyPlanPtr& OutPlan) const;
 
+	/** 各 Store* 只发布非空的同 key 首个 immutable 正文并终结原 gate；既有正文不覆盖。 */
 	void StoreHydrology(
 		const FVoxelHydrologyRegionKey& InKey,
 		FVoxelHydrologyPlanPtr InPlan);
@@ -246,6 +247,7 @@ public:
 	void TickMaintenance(
 		int32 InMaxEntries = 256);
 
+	/** 终结并唤醒当时在途的原 gate；外部已取得的 immutable 引用保持有效，不等待 worker。 */
 	void Reset();
 
 	FVoxelGenerationCacheStats GetStats() const;
@@ -255,6 +257,9 @@ public:
 
 private:
 	friend class FVoxelGenerationCacheRetentionLease;
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FVoxelCacheLifecycleTestAccess;
+#endif
 	void ReleaseTaskRetention(FVoxelGenerationCacheRetentionLease& InLease);
 
 	struct FBuildGate;
@@ -312,7 +317,7 @@ private:
 	int32 PlanShardIndex(const FVoxelEcologyTileKey& InKey) const;
 
 	bool IsRetained(
-		const FIntPoint& InPosition,
+		const FInt64Vector2& InPosition,
 		int32 FVoxelGenerationCacheRetentionPoint::* InRadius) const;
 
 	void RecordGateWait(uint64 InMicroseconds);
