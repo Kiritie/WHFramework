@@ -54,32 +54,76 @@ bool UVoxelSceneRegion::BeginSceneLoad(FVoxelTaskScheduler& InScheduler,
 	TSharedPtr<const FSaveGameGenerationReadLease, ESPMode::ThreadSafe> InSource, const uint32 InExpectedBytes)
 {
 	check(IsInGameThread());
-	if (!Module || bSceneReady || bSceneLoading || SceneLoadAttempt || !InSource) return false;
-	const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources = InScheduler.GetRuntimeResources();
+	if (!Module || bSceneReady || bSceneLoading || SceneLoadAttempt || SceneLoadSource || !InSource) return false;
+	SceneLoadResources = InScheduler.GetRuntimeResources();
+	if (!InSource->IsResourceAccountedFor(SceneLoadResources.Get(), Module->GetWorldEpoch()))
+	{ SceneLoadResources.Reset(); return false; }
 	check(SceneLoadSerial < MAX_uint64);
-	const auto Consumer = FVoxelGenerationConsumerKey::Section(Module->GetWorldEpoch(), SceneInstanceId,
+	SceneLoadConsumer = FVoxelGenerationConsumerKey::Section(Module->GetWorldEpoch(), SceneInstanceId,
 		1, RegionKey, ++SceneLoadSerial);
+	SceneLoadSource = MoveTemp(InSource);
+	SceneLoadSourceIncarnation = Module->SceneSourceIncarnation;
+	SceneLoadExpectedBytes = InExpectedBytes;
+	SceneLoadFirstRunnableSeconds = FPlatformTime::Seconds();
+	SceneLoadAdmission = EVoxelTerrainResourceAdmission::None;
+	bSceneLoading = true;
+	++Module->SceneLoadingCount;
+	// The original Region owns the scalar cut and directory pin before native admission.
+	// A blocked grant is an accepted load obligation, not a reason to recreate the Region.
+	PrepareSceneLoadAttempt();
+	return true;
+}
+
+bool UVoxelSceneRegion::PrepareSceneLoadAttempt()
+{
+	if (SceneLoadAttempt) return true;
+	if (!Module || !bSceneLoading || !SceneLoadResources || !SceneLoadSource) return false;
+	const auto Fail = [&]()
+	{
+		bSceneFailed = true;
+		bSceneLoading = false;
+		check(Module->SceneLoadingCount > 0);
+		--Module->SceneLoadingCount;
+		UE_LOG(LogTemp, Error, TEXT("Scene load control admission failed; original Region and source retained: %d"), int32(SceneLoadAdmission));
+		return false;
+	};
+	if (Module->GetWorldEpoch() != SceneLoadConsumer.WorldEpoch ||
+		Module->SceneSourceIncarnation != SceneLoadSourceIncarnation)
+	{ SceneLoadAdmission = EVoxelTerrainResourceAdmission::InvalidRequest; return Fail(); }
+	if (SceneLoadAdmission != EVoxelTerrainResourceAdmission::None &&
+		SceneLoadAdmission != EVoxelTerrainResourceAdmission::CapacityBlocked) return Fail();
+	if (SceneLoadAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked)
+	{
+		uint64 Version = 0;
+		if (!SceneLoadResources->TryGetReleaseVersionExcludingOwner(SceneLoadConsumer, Version) ||
+			Version <= SceneLoadCapacityVersion) return false;
+	}
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 	const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSceneColumnLoadAttempt>() +
 		VoxelBoundedAllocation::WorkerSharedBytes<FSceneColumnLoadPayload>();
-	if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input, Bytes, Lease)) return false;
+	const auto& SourceLease = SceneLoadSource->GetResourceLease();
+	const uint64 InputFloor = SourceLease && SourceLease->GetPool() == EVoxelTerrainResourcePool::Input ? SourceLease->Bytes() : 0;
+	SceneLoadCapacityVersion = SceneLoadResources->ReleaseVersionExcludingOwner(SceneLoadConsumer);
+	SceneLoadAdmission = SceneLoadResources->TryAcquire(SceneLoadConsumer, EVoxelTerrainResourcePool::Input,
+		Bytes, Lease, 0, InputFloor, SourceLease ? 1 : 0);
+	if (SceneLoadAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked) return false;
+	if (SceneLoadAdmission != EVoxelTerrainResourceAdmission::Granted) return Fail();
 	auto State = VoxelBoundedAllocation::MakeWorkerShared<FVoxelSceneColumnLoadAttempt>(Lease);
 	State->MetadataLease = MoveTemp(Lease);
-	State->Resources = Resources;
-	State->Source = MoveTemp(InSource);
-	State->Consumer = Consumer;
+	State->Resources = SceneLoadResources;
+	State->Source = SceneLoadSource;
+	State->Consumer = SceneLoadConsumer;
 	State->Column = FIntPoint(RegionKey.X, RegionKey.Y);
-	State->ExpectedBytes = InExpectedBytes;
-	State->SourceIncarnation = Module->SceneSourceIncarnation;
-	State->FirstRunnableSeconds = FPlatformTime::Seconds();
+	State->ExpectedBytes = SceneLoadExpectedBytes;
+	State->SourceIncarnation = SceneLoadSourceIncarnation;
+	State->FirstRunnableSeconds = SceneLoadFirstRunnableSeconds;
 	State->Owner = this;
 	State->Stamp.OwnerId = SceneInstanceId;
 	State->Stamp.OwnerIncarnation = 1;
-	State->Stamp.WorldEpoch = Consumer.WorldEpoch;
-	State->Stamp.Token = Consumer.RequestSerial;
+	State->Stamp.WorldEpoch = SceneLoadConsumer.WorldEpoch;
+	State->Stamp.Token = SceneLoadConsumer.RequestSerial;
 	SceneLoadAttempt = MoveTemp(State);
-	bSceneLoading = true;
-	++Module->SceneLoadingCount;
+	SceneLoadAttempt->MetadataLease->MarkPublished();
 	return true;
 }
 
@@ -91,6 +135,10 @@ void UVoxelSceneRegion::DetachSceneLoad()
 		SceneLoadAttempt->PendingTask.Reset();
 		SceneLoadAttempt.Reset();
 	}
+	SceneLoadSource.Reset();
+	SceneLoadResources.Reset();
+	SceneLoadConsumer = {};
+	SceneLoadAdmission = EVoxelTerrainResourceAdmission::None;
 	if (bSceneLoading && Module)
 	{
 		check(Module->SceneLoadingCount > 0);
@@ -101,13 +149,17 @@ void UVoxelSceneRegion::DetachSceneLoad()
 
 void UVoxelSceneRegion::RetrySceneLoad()
 {
-	if (!Module || !SceneLoadAttempt || bSceneLoading || bSceneReady) return;
+	if (!Module || (!SceneLoadAttempt && !SceneLoadSource) || bSceneLoading || bSceneReady) return;
 	PendingActors.Empty();
 	PendingActorStorageLease.Reset();
-	SceneLoadAttempt->ActorCursor = 0;
-	SceneLoadAttempt->CapacityBlocked.Store(false);
-	SceneLoadAttempt->bRestoreCapacityBlocked = false;
-	SceneLoadAttempt->bBindingCapacityBlocked = false;
+	if (SceneLoadAttempt)
+	{
+		SceneLoadAttempt->ActorCursor = 0;
+		SceneLoadAttempt->CapacityBlocked.Store(false);
+		SceneLoadAttempt->bRestoreCapacityBlocked = false;
+		SceneLoadAttempt->bBindingCapacityBlocked = false;
+	}
+	else SceneLoadAdmission = EVoxelTerrainResourceAdmission::None;
 	bSceneFailed = false;
 	bSceneLoading = true;
 	++Module->SceneLoadingCount;
@@ -116,6 +168,7 @@ void UVoxelSceneRegion::RetrySceneLoad()
 void UVoxelSceneRegion::AdvanceSceneLoad(FVoxelTaskScheduler& InScheduler)
 {
 	check(IsInGameThread());
+	if (!SceneLoadAttempt && !PrepareSceneLoadAttempt()) return;
 	const auto State = SceneLoadAttempt;
 	if (!Module || !State || !bSceneLoading || State->Detached.Load()) return;
 	const auto Fail = [&](const FString& InError)
@@ -150,13 +203,35 @@ void UVoxelSceneRegion::AdvanceSceneLoad(FVoxelTaskScheduler& InScheduler)
 			const uint64 Bytes = VoxelBoundedAllocation::MapBytes<FGuid, FParameter>(Read->Actors.Num());
 			uint64 Version = 0;
 			if (!State->Resources->TryGetReleaseVersionExcludingOwner(State->Consumer, Version)) return;
-			if (Bytes > 0 && !State->Resources->Acquire(State->Consumer, EVoxelTerrainResourcePool::Resident,
-				Bytes, PendingActorStorageLease))
+			uint64 InputFloor = 0;
+			int32 LeaseCount = 0;
+			const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Required[] =
+				{State->MetadataLease, State->Source->GetResourceLease(), Read->MetadataLease, Read->Body.ResourceLease};
+			const FVoxelTerrainResourceLease* Seen[UE_ARRAY_COUNT(Required)] = {};
+			for (const auto& Lease : Required)
+			{
+				if (!Lease) continue;
+				if (!Lease->IsOwnedBy(*State->Resources)) { Fail(TEXT("InvalidRequest: Scene restore source domain")); return; }
+				bool bSeen = false;
+				for (int32 Index = 0; Index < LeaseCount; ++Index) bSeen |= Seen[Index]->Serial() == Lease->Serial();
+				if (bSeen) continue;
+				const uint64 Input = Lease->GetPool() == EVoxelTerrainResourcePool::Input ? Lease->Bytes() : 0;
+				if (Input > MAX_uint64 - InputFloor) { Fail(TEXT("CapacityUnachievable: Scene restore source floor")); return; }
+				InputFloor += Input;
+				Seen[LeaseCount++] = Lease.Get();
+			}
+			const auto Admission = Bytes == 0 ? EVoxelTerrainResourceAdmission::Granted :
+				State->Resources->TryAcquire(State->Consumer, EVoxelTerrainResourcePool::Resident,
+					Bytes, PendingActorStorageLease, 0, InputFloor, LeaseCount);
+			if (Admission == EVoxelTerrainResourceAdmission::CapacityBlocked)
 			{
 				State->RestoreCapacityVersion = Version;
 				State->bRestoreCapacityBlocked = true;
 				return;
 			}
+			if (Admission != EVoxelTerrainResourceAdmission::Granted)
+			{ Fail(Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+				TEXT("CapacityUnachievable: Scene restore actor directory") : TEXT("InvalidRequest: Scene restore actor directory")); return; }
 			PendingActors.Reserve(Read->Actors.Num());
 			check(PendingActors.GetAllocatedSize() <= Bytes);
 		}
@@ -194,6 +269,8 @@ void UVoxelSceneRegion::AdvanceSceneLoad(FVoxelTaskScheduler& InScheduler)
 		check(Module->SceneLoadingCount > 0);
 		--Module->SceneLoadingCount;
 		SceneLoadAttempt.Reset();
+		SceneLoadSource.Reset();
+		SceneLoadResources.Reset();
 		MarkSceneChanged();
 		return;
 	}
@@ -242,7 +319,7 @@ void UVoxelSceneRegion::AdvanceSceneLoad(FVoxelTaskScheduler& InScheduler)
 		const uint64 Version = State->Resources->ReleaseVersionExcludingOwner(State->Consumer);
 		TSharedPtr<const FVoxelSceneColumnRead, ESPMode::ThreadSafe> Read;
 		if (!FVoxelSceneColumnRead::Load(State->Source, State->Column, State->ExpectedBytes, State->Resources,
-			State->Consumer, Read, Result.Error, &InCancel, &State->Detached))
+			State->Consumer, Read, Result.Error, &InCancel, &State->Detached, State->MetadataLease))
 		{
 			if (Result.Error.StartsWith(TEXT("CapacityBlocked:")))
 			{
@@ -280,6 +357,8 @@ void UVoxelSceneRegion::AdvanceSceneLoad(FVoxelTaskScheduler& InScheduler)
 		}
 		const auto Payload = StaticCastSharedPtr<const FSceneColumnLoadPayload>(InResult.CustomPayload);
 		State->Read = Payload->Read;
+		State->Read->MetadataLease->MarkPublished();
+		State->Read->Body.ResourceLease->MarkPublished();
 		InResult.MarkWorkUsed();
 	};
 	FString BindingError;
@@ -297,12 +376,14 @@ void UVoxelSceneRegion::AdvanceSceneLoad(FVoxelTaskScheduler& InScheduler)
 	}
 	FVoxelTaskRequest AdmissionRequest = MoveTemp(Task);
 	State->PendingTask.Reset();
+	State->bQueued = true;
 	if (InScheduler.Enqueue(MoveTemp(AdmissionRequest)))
 	{
-		State->bQueued = true;
+		return;
 	}
-	else if (State->Detached.Load()) return;
-	else if (AdmissionRequest.Blocked == EVoxelTaskBlockReason::Oversized || AdmissionRequest.Blocked == EVoxelTaskBlockReason::TerminalFailure)
+	if (State->Detached.Load() || !Module || SceneLoadAttempt != State || !bSceneLoading) return;
+	State->bQueued = false;
+	if (AdmissionRequest.Blocked == EVoxelTaskBlockReason::Oversized || AdmissionRequest.Blocked == EVoxelTaskBlockReason::TerminalFailure)
 	{
 		Fail(TEXT("Scene task admission cannot fit its original resource domain"));
 	}

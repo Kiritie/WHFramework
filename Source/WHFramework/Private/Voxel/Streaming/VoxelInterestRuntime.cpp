@@ -520,6 +520,7 @@ bool FVoxelInterestRuntime::UpdateSnapshot(TConstArrayView<FVoxelStreamingSource
 		LatestSettings = InSettings;
 		OutInterest = MakeOutput(MoveTemp(PriorityOnly));
 		LatestInterest = OutInterest;
+		if (LatestInterest && LatestInterest->CoarseCompositionLease) LatestInterest->CoarseCompositionLease->MarkPublished();
 		bOutSnapshot = true;
 		return false;
 	}
@@ -628,8 +629,13 @@ bool FVoxelInterestRuntime::UpdateSnapshot(TConstArrayView<FVoxelStreamingSource
 	}
 	if (!Next.PlanningError.IsEmpty())
 	{
-		LastPlanningError = Next.PlanningError;
-		UE_LOG(LogTemp, Error, TEXT("Terrain plan failed; preserving committed interest: %s"), *Next.PlanningError);
+		const bool bPlanningPending = Next.PlanningError.StartsWith(TEXT("PlanningPending"));
+		if (bPlanningPending) LastPlanningError.Reset();
+		else
+		{
+			LastPlanningError = Next.PlanningError;
+			UE_LOG(LogTemp, Error, TEXT("Terrain plan failed; preserving committed interest: %s"), *Next.PlanningError);
+		}
 		OutInterest.Reset();
 		return false;
 	}
@@ -783,6 +789,7 @@ bool FVoxelInterestRuntime::UpdateSnapshot(TConstArrayView<FVoxelStreamingSource
 	if (CandidateLayout) FineLayout = MoveTemp(CandidateLayout);
 	OutInterest = MakeOutput(MoveTemp(Next));
 	LatestInterest = OutInterest;
+	if (LatestInterest && LatestInterest->CoarseCompositionLease) LatestInterest->CoarseCompositionLease->MarkPublished();
 	bOutSnapshot = true;
 	return bChanged;
 }

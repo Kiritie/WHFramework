@@ -53,7 +53,7 @@ bool FVoxelNavigationDataDemandTest::RunTest(const FString& InParameters)
 	{
 		// Priority 重建不能取消独立 Nav 的真实生成/Overlay/Facts 依赖。
 		++EmptyInterest.PriorityRevision;
-		Emerge.Tick(EmptyInterest, uint64(Frame++), FPlatformTime::Seconds(), {}, 2, 1.0);
+		Emerge.Tick(EmptyInterest, uint64(Frame++), FPlatformTime::Seconds(), 2, 1.0);
 		Scheduler.Tick([&Emerge](FVoxelTaskResult&& Result) { Emerge.OnTask(MoveTemp(Result)); }, 2.0);
 		Residency.Tick(EmptyInterest.Exact, uint64(Frame), FPlatformTime::Seconds());
 		FPlatformProcess::Sleep(0.001f);

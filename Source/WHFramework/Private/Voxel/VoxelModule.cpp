@@ -26,8 +26,10 @@
 #include "Physics/Experimental/PhysScene_Chaos.h"
 #include "Voxel/Navigation/VoxelNavigationPresenter.h"
 #include "Scene/Actor/SceneActorInterface.h"
+#include "SaveGame/SaveGameModule.h"
 #include "SaveGame/SaveGameStorage.h"
 #include "Voxel/Generation/VoxelGenerationBinding.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Generation/VoxelBuiltinFeatures.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelGenerationPipeline.h"
@@ -162,6 +164,11 @@ namespace
 }
 
 IMPLEMENTATION_MODULE(UVoxelModule)
+
+UVoxelModule::UVoxelModule(FVTableHelper& Helper)
+	: Super(Helper)
+{
+}
 
 UVoxelModule::UVoxelModule()
 {
@@ -385,18 +392,66 @@ void UVoxelModule::OnRefresh(
 		{
 			if (!OverlayChangeQueue.Dequeue(ApplyingOverlayChange)) break;
 			OverlayChangeCursor = 0;
+			bWaitingOverlayChangeCapacity = false;
+			bOverlayChangeInvalidated = false;
+			bOverlayChangeWaitingEmerge = false;
 		}
 		if (!ApplyingOverlayChange->Sections.IsValidIndex(OverlayChangeCursor))
 		{
 			ApplyingOverlayChange.Reset();
+			bWaitingOverlayChangeCapacity = false;
+			bOverlayChangeInvalidated = false;
+			bOverlayChangeWaitingEmerge = false;
 			continue;
 		}
-		const FIntVector Key = ApplyingOverlayChange->Sections[OverlayChangeCursor++];
-		Runtime->InvalidateRemoteSection(Key);
+		const auto ChangeResources = bOverlayChangeWaitingEmerge ? Scheduler->GetTerrainResources() : Scheduler->GetRuntimeResources();
+		const auto ChangeOwner = bOverlayChangeWaitingEmerge ? EmergeManager->GetControlConsumer() :
+			Runtime->GetChangeHierarchy().GetControlConsumer();
+		const uint64 BeforeChange = ChangeResources->ReleaseVersionExcludingOwner(ChangeOwner);
+		if (bWaitingOverlayChangeCapacity && BeforeChange <= OverlayChangeCapacityVersion) break;
+		const FIntVector Key = ApplyingOverlayChange->Sections[OverlayChangeCursor];
+		FString ChangeError;
+		if (!bOverlayChangeInvalidated && !Runtime->InvalidateRemoteSection(Key, ChangeError))
+		{
+			if (ChangeError.StartsWith(TEXT("CapacityBlocked")))
+			{
+				bWaitingOverlayChangeCapacity = true;
+				OverlayChangeCapacityVersion = BeforeChange;
+			}
+			else
+			{
+				WorldState = EVoxelWorldState::Failed;
+				UE_LOG(LogTemp, Error, TEXT("Voxel remote change rejected: %s"), *ChangeError);
+			}
+			break;
+		}
+		bOverlayChangeInvalidated = true;
 		uint64 Revision = 0;
 		TSharedPtr<const FVoxelOverlaySnapshot, ESPMode::ThreadSafe> Overlay;
 		if (OverlayReplica->LookupSection(Key, Revision, Overlay))
-			EmergeManager->SetRemoteChangeState(Key, Overlay ? EVoxelSectionChangeState::Modified : EVoxelSectionChangeState::Natural);
+		{
+			const uint64 BeforeEmerge = Scheduler->GetTerrainResources()->ReleaseVersionExcludingOwner(EmergeManager->GetControlConsumer());
+			if (!EmergeManager->SetRemoteChangeState(Key,
+				Overlay ? EVoxelSectionChangeState::Modified : EVoxelSectionChangeState::Natural, ChangeError))
+			{
+				if (ChangeError.StartsWith(TEXT("CapacityBlocked")))
+				{
+					bWaitingOverlayChangeCapacity = true;
+					bOverlayChangeWaitingEmerge = true;
+					OverlayChangeCapacityVersion = BeforeEmerge;
+				}
+				else
+				{
+					WorldState = EVoxelWorldState::Failed;
+					UE_LOG(LogTemp, Error, TEXT("Voxel remote state rejected: %s"), *ChangeError);
+				}
+				break;
+			}
+		}
+		bWaitingOverlayChangeCapacity = false;
+		bOverlayChangeWaitingEmerge = false;
+		bOverlayChangeInvalidated = false;
+		++OverlayChangeCursor;
 		FVoxelEditBatch Batch;
 		auto& Patch = Batch.Sections.AddDefaulted_GetRef();
 		Patch.Section = Key;
@@ -427,8 +482,19 @@ void UVoxelModule::OnRefresh(
 
 	const double AfterInterest = FPlatformTime::Seconds();
 
-	EmergeManager->Tick(*CurrentInterest, CurrentInterest->DemandRevision, Now, ViewManager ? ViewManager->GetDataAdmissionLimits() : TMap<int32, double>(),
+	EmergeManager->Tick(*CurrentInterest, CurrentInterest->DemandRevision, Now,
 		ViewSettings.Budget.DataAdmissionPerFrame, ViewSettings.Budget.AdmissionMilliseconds, &TerrainFrameContext);
+	const auto EmergeAdmission = EmergeManager->GetLastResourceAdmission();
+	if (EmergeAdmission == EVoxelTerrainResourceAdmission::CapacityUnachievable ||
+		EmergeAdmission == EVoxelTerrainResourceAdmission::InvalidRequest)
+	{
+		WorldState = EVoxelWorldState::Failed;
+		UE_LOG(LogTemp, Error, TEXT("Voxel Emerge admission failed: %s"),
+			EmergeAdmission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable") : TEXT("InvalidRequest"));
+		UpdateReadiness();
+		TerrainFrameContext.End(FPlatformTime::Seconds());
+		return;
+	}
 
 	const double AfterEmerge = FPlatformTime::Seconds();
 	LastEmergeAdmissionMilliseconds = (AfterEmerge - AfterInterest) * 1000.0;
@@ -443,6 +509,12 @@ void UVoxelModule::OnRefresh(
 	}
 	if (PhysicsRetirement) PhysicsRetirement->Advance(TerrainFrameContext);
 	ReconcileSimulationDemand();
+	if (WorldState == EVoxelWorldState::Failed)
+	{
+		UpdateReadiness();
+		TerrainFrameContext.End(FPlatformTime::Seconds());
+		return;
+	}
 
 	const double AfterCollision = FPlatformTime::Seconds();
 	if (NavigationPresenter)
@@ -455,6 +527,17 @@ void UVoxelModule::OnRefresh(
 		ViewManager->Tick(
 			InterestRevision,
 			CollectLocalViewObservers());
+		const auto ServiceAdmission = ViewManager->GetLastServiceResourceAdmission();
+		if (ServiceAdmission == EVoxelTerrainResourceAdmission::CapacityUnachievable ||
+			ServiceAdmission == EVoxelTerrainResourceAdmission::InvalidRequest)
+		{
+			WorldState = EVoxelWorldState::Failed;
+			UE_LOG(LogTemp, Error, TEXT("Voxel service admission failed: %s"),
+				ServiceAdmission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable") : TEXT("InvalidRequest"));
+			UpdateReadiness();
+			TerrainFrameContext.End(FPlatformTime::Seconds());
+			return;
+		}
 	}
 
 	const double AfterView = FPlatformTime::Seconds();
@@ -668,11 +751,20 @@ bool UVoxelModule::StartWorld(
 	Manifest = InManifest;
 	const auto FailInitialization = [this]()
 	{
+		if (PendingTerrainFactResources && PendingTerrainFactControl.WorldEpoch > Epoch)
+			Epoch = PendingTerrainFactControl.WorldEpoch;
+		for (const auto& Component : TerrainNetworkComponents)
+		{
+			if (auto* Network = Component.Get()) Network->OnTerrainWorldStopping();
+		}
+		PendingTerrainWorldControl.Reset();
 		Scheduler.Reset();
 		Generator.Reset();
 		GenerationCache.Reset();
 		GenerationConfig.Reset();
 		TerrainFrameContext.Reset();
+		PendingTerrainFactResources.Reset();
+		PendingTerrainFactControl = {};
 		WorldState = EVoxelWorldState::Failed;
 	};
 	if (Manifest.RegistryHash != Registry.GetSnapshot()->Hash)
@@ -723,7 +815,6 @@ bool UVoxelModule::StartWorld(
 		Config.Recipe->Ecology.GrassPlant);
 #endif
 
-	GenerationConfig = MakeShared<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe>(MoveTemp(Config));
 	ViewSettings = {};
 	UVoxelViewProfile* ViewProfile = WorldGenerationProfile->View.LoadSynchronous();
 	if (!ViewProfile)
@@ -776,42 +867,48 @@ bool UVoxelModule::StartWorld(
 		return false;
 	}
 	const uint64 NewWorldEpoch = Epoch + 1;
-	Scheduler = MakeUnique<FVoxelTaskScheduler>();
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> RuntimeResources;
+	FVoxelGenerationConsumerKey SchedulerControlConsumer;
+	if (!EnsureTerrainFactBootstrap(RuntimeResources, SchedulerControlConsumer, OutError))
+	{
+		FailInitialization();
+		return false;
+	}
 	FVoxelTaskBudget TaskBudget;
 	TaskBudget.MaxConcurrentTasks = FMath::Clamp(FPlatformMisc::NumberOfCores() * 2, 1, 16);
 	TaskBudget.CriticalReservedTasks = ViewSettings.Budget.CriticalReservedTasks;
 	TaskBudget.MaxConcurrentSurfaceTasks = ViewSettings.Budget.MaxConcurrentSurfaceTasks;
 	TaskBudget.MaxConcurrentMacroTasks = ViewSettings.Budget.MaxConcurrentMacroTasks;
 	TaskBudget.MaxConcurrentCoarseTerrainTasks = ViewSettings.Budget.MaxConcurrentCoarseTerrainTasks;
-	TaskBudget.MaxReservedBytes = 256ull * 1024ull * 1024ull;
+	TaskBudget.MaxReservedBytes = ViewSettings.Fine.GeometryLimits().WorkingBytes;
 	// Resumable pages retain their output while queued between shards. Their exact
 	// worker estimate participates in the same bounded input admission as other tasks.
-	TaskBudget.MaxInputBytes = TaskBudget.MaxReservedBytes;
+	TaskBudget.MaxInputBytes = ViewSettings.Fine.GeometryLimits().InputBytes;
 	TaskBudget.MaxCompletedResultsPerFrame = ViewSettings.Budget.CompletedResultsPerFrame;
 	TaskBudget.MaxHeavyCompletedResultsPerFrame = FMath::Min(ViewSettings.Budget.HeavyResultsPerFrame, ViewSettings.Budget.CompletedResultsPerFrame);
 	TaskBudget.MaxFineApplyPerFrame = ViewSettings.Budget.FineApplyPerFrame;
 	TaskBudget.MaxVoxelLODApplyPerFrame = ViewSettings.Budget.VoxelProxyApplyPerFrame;
 	TaskBudget.MaxSurfaceApplyPerFrame = ViewSettings.Budget.SurfaceApplyPerFrame;
 	TaskBudget.MaxMacroApplyPerFrame = ViewSettings.Budget.MacroApplyPerFrame;
-	Scheduler->SetBudget(TaskBudget);
 	const auto& MemoryPolicy = ViewSettings.Budget;
-	FVoxelTerrainResourceLimits GeometryLimits;
-	FVoxelTerrainResourceLimits FactLimits;
-	GeometryLimits.ResidentBytes = uint64(ViewSettings.Fine.MaximumResidentGeometryMegabytes) * 1024 * 1024;
-	FactLimits.InputBytes = uint64(MemoryPolicy.MaximumRuntimeFactsInputMegabytes) * 1024 * 1024;
-	FactLimits.WorkingBytes = uint64(MemoryPolicy.MaximumRuntimeFactsWorkingMegabytes) * 1024 * 1024;
-	FactLimits.StagedBytes = uint64(MemoryPolicy.MaximumRuntimeFactsStagedMegabytes) * 1024 * 1024;
-	FactLimits.ResidentBytes = uint64(MemoryPolicy.MaximumRuntimeFactsResidentMegabytes) * 1024 * 1024;
-	FactLimits.OverlapBytes = uint64(MemoryPolicy.RuntimeFactsOverlapMegabytes) * 1024 * 1024;
+	const FVoxelTerrainResourceLimits GeometryLimits = ViewSettings.Fine.GeometryLimits();
 	if (MemoryPolicy.MaximumRuntimeFactsInputMegabytes < 16 || MemoryPolicy.MaximumRuntimeFactsWorkingMegabytes < 32 ||
 		MemoryPolicy.MaximumRuntimeFactsStagedMegabytes < 16 || MemoryPolicy.MaximumRuntimeFactsResidentMegabytes < 128 ||
-		MemoryPolicy.RuntimeFactsOverlapMegabytes < 16 || !Scheduler->GetTerrainResources()->Configure(GeometryLimits) ||
-		!Scheduler->GetRuntimeResources()->Configure(FactLimits))
+		MemoryPolicy.RuntimeFactsOverlapMegabytes < 16)
 	{
 		OutError = TEXT("ViewProfile 的几何或 Runtime/Facts 独立资源池上限不合法");
 		FailInitialization();
 		return false;
 	}
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> TerrainResources;
+	if (!FVoxelTerrainResources::Create(GeometryLimits, SchedulerControlConsumer, TerrainResources, OutError) ||
+		!FVoxelTaskScheduler::Create(TerrainResources.ToSharedRef(), RuntimeResources.ToSharedRef(),
+			SchedulerControlConsumer, Scheduler, OutError))
+	{
+		FailInitialization();
+		return false;
+	}
+	Scheduler->SetBudget(TaskBudget);
 	if (!Scheduler->InitializeStatistics(NewWorldEpoch))
 	{
 		OutError = TEXT("地形统计固定窗口容量无法预授予");
@@ -828,10 +925,21 @@ bool UVoxelModule::StartWorld(
 		FailInitialization();
 		return false;
 	}
-	const TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> NaturalGenerator =
-		MakeShared<const FVoxelGenerationPipeline, ESPMode::ThreadSafe>(
-			GenerationConfig.ToSharedRef(),
-			GenerationCache.ToSharedRef(), nullptr, true);
+	if (!FVoxelGenerationBinding::Freeze(Config, Scheduler->GetRuntimeResources(), CacheControlConsumer,
+		GenerationConfig, OutError, GenerationCache->GetRootInputBytes(), 1))
+	{
+		FailInitialization();
+		return false;
+	}
+	Config = FVoxelGenerationRuntimeConfig{};
+	TSharedPtr<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> NaturalPipeline;
+	if (!FVoxelGenerationPipeline::Create(GenerationConfig.ToSharedRef(), GenerationCache.ToSharedRef(),
+		NaturalPipeline, OutError, nullptr, true))
+	{
+		FailInitialization();
+		return false;
+	}
+	const TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> NaturalGenerator = NaturalPipeline.ToSharedRef();
 	TSharedPtr<const IVoxelGenerationOverlay, ESPMode::ThreadSafe> Overlay;
 	if (!CreateGenerationOverlay(NaturalGenerator, Registry.GetSnapshot().ToSharedRef(),
 		Overlay, OutError))
@@ -839,18 +947,38 @@ bool UVoxelModule::StartWorld(
 		FailInitialization();
 		return false;
 	}
-	Generator = Overlay ?
-		MakeShared<const FVoxelGenerationPipeline, ESPMode::ThreadSafe>(
-			GenerationConfig.ToSharedRef(), GenerationCache.ToSharedRef(), Overlay, true) :
-		NaturalGenerator;
+	if (Overlay)
+	{
+		FVoxelGenerationRequiredSourceScope NaturalSources(&Scheduler->GetRuntimeResources().Get(), NaturalPipeline.Get(),
+			[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+			{
+				static_cast<const FVoxelGenerationPipeline*>(InContext)->VisitRequiredSources(InVisit);
+			});
+		if (!FVoxelGenerationPipeline::Create(GenerationConfig.ToSharedRef(), GenerationCache.ToSharedRef(),
+			Generator, OutError, Overlay, true))
+		{
+			FailInitialization();
+			return false;
+		}
+	}
+	else
+	{
+		Generator = NaturalGenerator;
+	}
 
 	Epoch = NewWorldEpoch;
+	PendingTerrainFactResources.Reset();
+	PendingTerrainFactControl = {};
 	Runtime = MakeUnique<FVoxelWorldRuntime>(
 		Epoch,
 		IsAuthority(),
 		Registry.GetSnapshot().ToSharedRef(),
-		Generator.ToSharedRef());
-	Runtime->BindTerrainResources(Scheduler->GetRuntimeResources());
+		Generator.ToSharedRef(), Scheduler->GetRuntimeResources());
+	GenerationConfig->InputLease->MarkPublished();
+	GenerationConfig->RecipeInputLease->MarkPublished();
+	GenerationCache->MarkPublished();
+	NaturalGenerator->MarkPublished();
+	Generator->MarkPublished();
 	Runtime->GetChangeHierarchy().SetTopology(ViewSettings.Lod);
 	if (GenerationConfig->Recipe->Settings.Ecology.Tree.bEnabled)
 	{
@@ -1022,6 +1150,18 @@ bool UVoxelModule::StopWorld(const bool bDiscardDirty, FString& OutError)
 	}
 	if (!Runtime)
 	{
+		if (PendingTerrainFactResources)
+		{
+			WorldState = EVoxelWorldState::Closing;
+			Epoch = PendingTerrainFactControl.WorldEpoch;
+			for (const auto& Component : TerrainNetworkComponents)
+			{
+				if (auto* Network = Component.Get()) Network->OnTerrainWorldStopping();
+			}
+			PendingTerrainWorldControl.Reset();
+			PendingTerrainFactResources.Reset();
+			PendingTerrainFactControl = {};
+		}
 		WorldState = EVoxelWorldState::None;
 		OutError.Reset();
 		return true;
@@ -1120,6 +1260,10 @@ bool UVoxelModule::StopWorld(const bool bDiscardDirty, FString& OutError)
 	ApplyingOverlayChange.Reset();
 	OverlayChangeQueue.Empty();
 	OverlayChangeCursor = 0;
+	bWaitingOverlayChangeCapacity = false;
+	bOverlayChangeInvalidated = false;
+	bOverlayChangeWaitingEmerge = false;
+	OverlayChangeCapacityVersion = 0;
 	Runtime.Reset();
 	Generator.Reset();
 
@@ -1141,6 +1285,8 @@ bool UVoxelModule::StopWorld(const bool bDiscardDirty, FString& OutError)
 	}
 	GenerationConfig.Reset();
 	Scheduler.Reset();
+	PendingTerrainFactResources.Reset();
+	PendingTerrainFactControl = {};
 	TerrainFrameContext.Reset();
 	Sources.Reset();
 	CurrentInterest = MakeShared<FVoxelInterestSet, ESPMode::ThreadSafe>();
@@ -1243,8 +1389,14 @@ bool UVoxelModule::AcquireNavigationDataSection(const FIntVector& InSection, FVo
 void UVoxelModule::ReleaseNavigationDataSection(const FIntVector& InSection, const FVoxelRuntimeSectionPin& InPin)
 {
 	check(IsInGameThread());
-	if (EmergeManager) verify(EmergeManager->ReleaseDataDemand(InSection, InPin));
-	else if (Runtime) verify(Runtime->ReleaseSectionPin(InSection, InPin.Resource));
+	if (EmergeManager)
+	{
+		verify(EmergeManager->ReleaseDataDemand(InSection, InPin));
+	}
+	else if (Runtime)
+	{
+		verify(Runtime->ReleaseSectionPin(InSection, InPin.Resource));
+	}
 }
 
 TSet<FIntVector> UVoxelModule::GetSimulationSections() const
@@ -1355,16 +1507,10 @@ bool UVoxelModule::CaptureFineOverlays(const FVoxelGenerationBounds& InBounds,
 	check(NextOverlayCaptureSerial < MAX_uint64);
 	const auto Consumer = InConsumer && InConsumer->IsValid() ? *InConsumer :
 		FVoxelGenerationConsumerKey::Section(Epoch, Manifest.WorldId, 1, InBounds.Min, ++NextOverlayCaptureSerial);
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> EnumerationLease;
-	if (MaximumSections > 0 && !Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Working,
-		VoxelBoundedAllocation::ArrayBytes<FIntVector>(MaximumSections), EnumerationLease))
-	{
-		OutError = TEXT("CapacityBlocked: Overlay 描述枚举容量未授予");
-		return false;
-	}
+	FVoxelGenerationWorkspace EnumerationWorkspace(Resources, Consumer);
 	TArray<FIntVector> Modified;
-	Modified.Reserve(MaximumSections);
-	if (!Runtime->GetChangeIndex().Enumerate(InBounds, Modified)) { OutError = TEXT("Overlay目录枚举失败"); return false; }
+	if (!Runtime->GetChangeIndex().Enumerate(InBounds, Modified, EnumerationWorkspace, OutError) ||
+		!EnumerationWorkspace.ReserveArray(Modified, MaximumSections, OutError)) return false;
 	Runtime->GatherCommittedOverlaySections(InBounds, Modified);
 	Modified.Sort([](const FIntVector& Left, const FIntVector& Right)
 	{
@@ -1383,9 +1529,14 @@ bool UVoxelModule::CaptureFineOverlays(const FVoxelGenerationBounds& InBounds,
 		VoxelBoundedAllocation::ArrayBytes<FVoxelRegionReadView>(ReadCount) + PathBytes +
 		FVoxelRegionStore::OverlayReadLeaseBytes(PinnedCount, ReadCount, PathBytes, Modified.Num());
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> CaptureLease;
-	if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input, MetadataBytes, CaptureLease))
+	const auto CaptureAdmission = Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Input,
+		MetadataBytes, CaptureLease, 0, EnumerationWorkspace.GetRequiredInputBytes(), EnumerationWorkspace.GetRequiredLeaseCount());
+	if (CaptureAdmission != EVoxelTerrainResourceAdmission::Granted)
 	{
-		OutError = TEXT("CapacityBlocked: Overlay 固定切点元数据容量未授予");
+		OutError = CaptureAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked ?
+			TEXT("CapacityBlocked: Overlay 固定切点元数据容量未授予") :
+			CaptureAdmission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+			TEXT("Oversized: Overlay 固定切点元数据容量不可达") : TEXT("InvalidRequest: Overlay capture resource domain");
 		return false;
 	}
 	FVoxelFineOverlayCapture Capture;
@@ -1442,24 +1593,23 @@ bool UVoxelModule::IsOverlayReadCurrent(const FVoxelFineOverlayReadResult& InRes
 	}
 	if (InResult.ReadLeaseSet->IsRemoteDirectory()) return OverlayReplica && OverlayReplica->IsCurrent(InResult);
 	if (!RegionStore.IsDirectoryReady()) return false;
-	TArray<FIntVector> Modified;
-	if (!Runtime->GetChangeIndex().Enumerate(InResult.Bounds, Modified)) return false;
-	Runtime->GatherCommittedOverlaySections(InResult.Bounds, Modified);
-	if (
-		Modified.Num() != InResult.ContentRevisions.Num() || Modified.Num() != InResult.Snapshot->Num())
-	{
-		return false;
-	}
-	for (const FIntVector& Key : Modified)
+	if (InResult.ContentRevisions.Num() != InResult.Snapshot->Num()) return false;
+	bool bCurrent = true;
+	const auto CheckSection = [&](const FIntVector& Key)
 	{
 		const uint64* CapturedRevision = InResult.ContentRevisions.Find(Key);
 		if (!CapturedRevision || *CapturedRevision != Runtime->GetChangeHierarchy().GetSectionRevision(Key) ||
-			!InResult.Snapshot->Find(Key))
-		{
-			return false;
-		}
+			!InResult.Snapshot->Find(Key)) bCurrent = false;
+	};
+	if (!Runtime->GetChangeIndex().Visit(InResult.Bounds, CheckSection)) return false;
+	Runtime->VisitCommittedOverlaySections(InResult.Bounds, CheckSection);
+	if (!bCurrent) return false;
+	for (const auto& Pair : InResult.ContentRevisions)
+	{
+		if (!Runtime->GetChangeIndex().IsModified(Pair.Key) && !Runtime->FindCommittedOverlay(Pair.Key)) return false;
+		CheckSection(Pair.Key);
 	}
-	return true;
+	return bCurrent;
 }
 
 FVoxelOverlayReplica* UVoxelModule::GetOverlayReplica() const
@@ -1492,13 +1642,12 @@ bool UVoxelModule::IsOverlayVersionCurrent(
 
 TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> UVoxelModule::GetTerrainFactResources() const
 {
-	if (!Scheduler) return nullptr;
-	return Scheduler->GetRuntimeResources();
+	return Scheduler ? TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>(Scheduler->GetRuntimeResources()) : PendingTerrainFactResources;
 }
 
 TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> UVoxelModule::GetTerrainResources() const
 {
-	return Scheduler ? Scheduler->GetTerrainResources() : nullptr;
+	return Scheduler ? TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>(Scheduler->GetTerrainResources()) : nullptr;
 }
 
 FVoxelGenerationConsumerKey UVoxelModule::GetTerrainTaskControlConsumer() const
@@ -1927,14 +2076,16 @@ FVoxelStreamingReadiness UVoxelModule::QueryBoundsReadiness(const FVoxelGenerati
 	return Result;
 }
 
-void UVoxelModule::SetRemoteChangeState(
+bool UVoxelModule::SetRemoteChangeState(
 	const FIntVector& InSection,
-	const EVoxelSectionChangeState InState)
+	const EVoxelSectionChangeState InState, FString& OutError)
 {
 	if (EmergeManager)
 	{
-		EmergeManager->SetRemoteChangeState(InSection, InState);
+		return EmergeManager->SetRemoteChangeState(InSection, InState, OutError);
 	}
+	OutError = TEXT("InvalidRequest: Voxel Emerge manager is unavailable");
+	return false;
 }
 
 bool UVoxelModule::ApplyRemoteRepresentation(
@@ -1949,13 +2100,15 @@ bool UVoxelModule::ApplyRemoteRepresentation(
 	return ViewManager->ApplyRemoteRepresentation(InReply, OutError);
 }
 
-void UVoxelModule::InvalidateRemoteRepresentations(
-	const FVoxelRepresentationInvalidate& InInvalidate)
+bool UVoxelModule::InvalidateRemoteRepresentations(const FVoxelRepresentationInvalidate& InInvalidate,
+	int32& InOutCursor, FString& OutError, const int32 InMaximumEntries)
 {
-	if (ViewManager)
+	if (!ViewManager)
 	{
-		ViewManager->InvalidateRemoteRepresentations(InInvalidate);
+		OutError = TEXT("InvalidResource: voxel view manager is unavailable");
+		return false;
 	}
+	return ViewManager->InvalidateRemoteRepresentations(InInvalidate, InOutCursor, OutError, InMaximumEntries);
 }
 
 bool UVoxelModule::RequestRemoteRepresentation(
@@ -3620,7 +3773,8 @@ EVoxelSceneCaptureStep UVoxelModule::GetSaveCaptureState(FString& OutError) cons
 	check(IsInGameThread());
 	OutError = LastSaveError;
 	if (!OutError.IsEmpty()) return EVoxelSceneCaptureStep::Failed;
-	if (SceneSaveBuilder.IsSet()) return SceneSaveBuilder->bCapacityBlocked ?
+	if (SceneSaveBuilder.IsSet()) return (SceneSaveBuilder->bCapacityBlocked || SceneSaveBuilder->Column.bCapacityBlocked ||
+		SaveAdapter.IsCaptureCapacityBlocked()) ?
 		EVoxelSceneCaptureStep::CapacityBlocked : EVoxelSceneCaptureStep::Pending;
 	if (SaveAdapter.GetCapture() && CapturedSceneSave) return EVoxelSceneCaptureStep::Complete;
 	OutError = TEXT("Voxel save was not captured");
@@ -3641,20 +3795,18 @@ EVoxelSceneCaptureStep UVoxelModule::AdvanceSaveCaptureStep()
 {
 	check(SceneSaveBuilder.IsSet() && Runtime && Scheduler);
 	auto& Builder = SceneSaveBuilder.GetValue();
-	if (Builder.WorldEpoch != Epoch || (Builder.Phase > 0 && (Builder.SceneRevision != SceneCaptureRevision ||
-		Builder.ProjectRevision != GetSceneProjectCaptureRevision())))
+	if (Builder.WorldEpoch != Epoch || Builder.SceneRevision != SceneCaptureRevision ||
+		Builder.ProjectRevision != GetSceneProjectCaptureRevision())
 	{
 		LastSaveError = TEXT("Scene producer changed during its incremental fixed save cut");
 		return EVoxelSceneCaptureStep::Failed;
 	}
-	const auto Resources = Scheduler->GetRuntimeResources();
-	if (Builder.bCapacityBlocked && Resources->Snapshot().ReleaseVersion <= Builder.BlockedReleaseVersion)
-		return EVoxelSceneCaptureStep::CapacityBlocked;
-	Builder.bCapacityBlocked = false;
+	const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources = Scheduler->GetRuntimeResources();
+	uint64 BeforeCapacity = 0;
 	const auto Blocked = [&]()
 	{
 		Builder.bCapacityBlocked = true;
-		Builder.BlockedReleaseVersion = Resources->Snapshot().ReleaseVersion;
+		Builder.BlockedReleaseVersion = BeforeCapacity;
 		LastSaveError.Reset();
 		return EVoxelSceneCaptureStep::CapacityBlocked;
 	};
@@ -3663,11 +3815,13 @@ EVoxelSceneCaptureStep UVoxelModule::AdvanceSaveCaptureStep()
 		// 只有真实释放任务完成后才重用捕获槽；不在 GT join 旧任务。
 		if (bMutating || SceneLoadingCount > 0 || !SaveAdapter.CanCapture() || !RegionStore.IsDirectoryReady())
 			return EVoxelSceneCaptureStep::Pending;
-		Builder.SceneRevision = SceneCaptureRevision;
-		Builder.ProjectRevision = GetSceneProjectCaptureRevision();
-		Builder.NextRegion = SceneRegionHead;
 		if (!SaveAdapter.Capture(*Runtime, Manifest, Registry.GetSnapshot(), RegionStore, LastSaveError))
-			return LastSaveError.StartsWith(TEXT("CapacityBlocked:")) ? Blocked() : EVoxelSceneCaptureStep::Failed;
+		{
+			if (!LastSaveError.StartsWith(TEXT("CapacityBlocked:"))) return EVoxelSceneCaptureStep::Failed;
+			// Adapter保存原事务授予前的外部版本，外层仅转交等待状态。
+			LastSaveError.Reset();
+			return EVoxelSceneCaptureStep::CapacityBlocked;
+		}
 		Builder.Phase = 1;
 		return EVoxelSceneCaptureStep::Pending;
 	}
@@ -3677,6 +3831,33 @@ EVoxelSceneCaptureStep UVoxelModule::AdvanceSaveCaptureStep()
 		LastSaveError = TEXT("Scene producer lost its authoritative voxel transaction");
 		return EVoxelSceneCaptureStep::Failed;
 	}
+	if (!Builder.Consumer.IsValid()) Builder.Consumer = FVoxelGenerationConsumerKey::Section(
+		Epoch, VoxelCapture->TransactionId, 1, {}, 1);
+	if (!Resources->TryGetReleaseVersionExcludingOwner(Builder.Consumer, BeforeCapacity))
+		return EVoxelSceneCaptureStep::CapacityBlocked;
+	if (Builder.bCapacityBlocked && BeforeCapacity <= Builder.BlockedReleaseVersion)
+		return EVoxelSceneCaptureStep::CapacityBlocked;
+	Builder.bCapacityBlocked = false;
+	const FVoxelGenerationRequiredSourceScope CaptureMetadataSource(Resources.Get(), VoxelCapture->MetadataLease.Get());
+	const FVoxelGenerationRequiredSourceScope CaptureRetirementSource(Resources.Get(), SaveAdapter.GetRetirementResourceLease().Get());
+	const FVoxelGenerationRequiredSourceScope DirectorySource(Resources.Get(),
+		VoxelCapture->SourceDirectoryRoot ? VoxelCapture->SourceDirectoryRoot->ResourceLease.Get() : nullptr);
+	const FVoxelGenerationRequiredSourceScope GenerationSource(Resources.Get(),
+		VoxelCapture->SourceLease ? VoxelCapture->SourceLease->GetResourceLease().Get() : nullptr);
+	const FVoxelGenerationRequiredSourceScope SceneSources(Resources.Get(), &Builder,
+		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+		{
+			const auto& Source = *static_cast<const FVoxelSceneSaveCaptureBuilder*>(Context);
+			if (Source.Scenes && Source.Scenes->Resources)
+				Source.Scenes->VisitRequiredSources(*Source.Scenes->Resources, Visit);
+		});
+	const auto Grant = [&](const uint64 Bytes, TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& Lease)
+	{
+		const auto Admission = FVoxelSceneColumnCapture::TryGrantCapacity(*Resources, Builder.Consumer,
+			EVoxelTerrainResourcePool::Input, Bytes, Lease, LastSaveError);
+		return Admission == EVoxelTerrainResourceAdmission::Granted ? EVoxelSceneCaptureStep::Pending :
+			Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? Blocked() : EVoxelSceneCaptureStep::Failed;
+	};
 	if (Builder.Phase == 1)
 	{
 		const int64 FileCount = int64(UnloadedSceneFiles.Num()) + SceneRegions.Num();
@@ -3685,16 +3866,19 @@ EVoxelSceneCaptureStep UVoxelModule::AdvanceSaveCaptureStep()
 			LastSaveError = TEXT("Scene save directory exceeded its protocol capacity");
 			return EVoxelSceneCaptureStep::Failed;
 		}
+		const FVoxelSceneSaveCapture Shape;
 		Builder.MetadataBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSceneSaveCapture>() +
-			VoxelBoundedAllocation::MapBytes<FIntVector, FVoxelSceneSaveCut>(SceneRegions.Num()) +
-			VoxelBoundedAllocation::MapBytes<FString, TArray<uint8>>(int32(FileCount)) +
-			VoxelBoundedAllocation::MapBytes<FString, TSharedPtr<const FVoxelSceneColumnCapture, ESPMode::ThreadSafe>>(SceneRegions.Num());
+			VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FIntVector, FVoxelSceneSaveCut>>(Shape.Regions, SceneRegions.Num()) +
+			VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FString, TArray<uint8>>>(Shape.Files, int32(FileCount)) +
+			VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FString, TSharedPtr<const FVoxelSceneColumnCapture, ESPMode::ThreadSafe>>>(
+				Shape.Columns, SceneRegions.Num());
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-		if (!Resources->Acquire(FVoxelGenerationConsumerKey::Section(Epoch, VoxelCapture->TransactionId, 1, {}, 5),
-			EVoxelTerrainResourcePool::Input, Builder.MetadataBytes, Lease)) return Blocked();
+		const auto Step = Grant(Builder.MetadataBytes, Lease);
+		if (Step != EVoxelSceneCaptureStep::Pending) return Step;
 		Builder.Scenes = VoxelBoundedAllocation::MakeWorkerShared<FVoxelSceneSaveCapture>(Lease);
 		auto& Scenes = *Builder.Scenes;
 		Scenes.MetadataLease = Lease;
+		Scenes.Resources = Resources;
 		Scenes.TransactionId = VoxelCapture->TransactionId;
 		Scenes.WorldEpoch = VoxelCapture->WorldEpoch;
 		Scenes.Completion = VoxelCapture->Completion;
@@ -3703,6 +3887,12 @@ EVoxelSceneCaptureStep UVoxelModule::AdvanceSaveCaptureStep()
 		Scenes.Regions.Reserve(SceneRegions.Num());
 		Scenes.Files.Reserve(int32(FileCount));
 		Scenes.Columns.Reserve(SceneRegions.Num());
+		const uint64 Actual = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSceneSaveCapture>() +
+			VoxelGenerationAllocation::AllocatedBytes(Scenes.Regions) + VoxelGenerationAllocation::AllocatedBytes(Scenes.Files) +
+			VoxelGenerationAllocation::AllocatedBytes(Scenes.Columns);
+		check(Actual <= Builder.MetadataBytes);
+		verify(Scenes.MetadataLease->TryResize(Actual) == EVoxelTerrainResourceAdmission::Granted);
+		Builder.MetadataBytes = Actual;
 		Builder.Phase = 2;
 		return EVoxelSceneCaptureStep::Pending;
 	}
@@ -3726,12 +3916,23 @@ EVoxelSceneCaptureStep UVoxelModule::AdvanceSaveCaptureStep()
 			LastSaveError = TEXT("Unloaded Scene file is outside its bounded protocol");
 			return EVoxelSceneCaptureStep::Failed;
 		}
-		const uint64 Bytes = VoxelBoundedAllocation::ArrayBytes<uint8>(File.Value.Num()) +
-			2 * VoxelBoundedAllocation::ArrayBytes<TCHAR>(File.Key.Len() + 1);
-		if (!Scenes.MetadataLease->Resize(Builder.MetadataBytes + Bytes)) return Blocked();
-		Builder.MetadataBytes += Bytes;
+		const uint64 RawBytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(File.Value.Num());
+		const uint64 PathBytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<TCHAR, FDefaultAllocator>(File.Key.Len() + 1);
+		const uint64 OldPathBytes = VoxelGenerationAllocation::AllocatedBytes(Builder.CurrentFilePath.GetCharArray());
+		const bool bPathGrows = Builder.CurrentFilePath.GetCharArray().Max() < File.Key.Len() + 1;
+		const uint64 PeakBytes = Builder.MetadataBytes + RawBytes + PathBytes + (bPathGrows ? PathBytes : 0);
+		const auto Step = Grant(PeakBytes, Scenes.MetadataLease);
+		if (Step != EVoxelSceneCaptureStep::Pending) return Step;
+		Builder.CurrentFilePath.GetCharArray().Reserve(File.Key.Len() + 1);
 		Builder.CurrentFilePath = File.Key;
-		Scenes.Files.Add(File.Key).Reserve(File.Value.Num());
+		auto& SavedBytes = Scenes.Files.Add(File.Key);
+		SavedBytes.Reserve(File.Value.Num());
+		const uint64 ActualBytes = Builder.MetadataBytes - OldPathBytes +
+			VoxelGenerationAllocation::AllocatedBytes(Builder.CurrentFilePath.GetCharArray()) +
+			VoxelGenerationAllocation::AllocatedBytes(SavedBytes) + PathBytes;
+		check(ActualBytes <= PeakBytes);
+		verify(Scenes.MetadataLease->TryResize(ActualBytes) == EVoxelTerrainResourceAdmission::Granted);
+		Builder.MetadataBytes = ActualBytes;
 		Builder.FileOffset = 0;
 		Builder.Phase = 3;
 		return EVoxelSceneCaptureStep::Pending;
@@ -3776,29 +3977,67 @@ EVoxelSceneCaptureStep UVoxelModule::AdvanceSaveCaptureStep()
 			return EVoxelSceneCaptureStep::Failed;
 		}
 		const FIntVector Key = Region->GetRegionKey();
-		const FString Path = FVoxelSceneColumnCodec::RelativePath(FIntPoint(Key.X, Key.Y));
+		if (Builder.CurrentFilePath.IsEmpty())
+		{
+			TCHAR RelativePath[64];
+			FCString::Snprintf(RelativePath, UE_ARRAY_COUNT(RelativePath), TEXT("voxel/actors/c_%d_%d.bin"), Key.X, Key.Y);
+			const int32 PathLength = FCString::Strlen(RelativePath);
+			const uint64 OldPathBytes = VoxelGenerationAllocation::AllocatedBytes(Builder.CurrentFilePath.GetCharArray());
+			const bool bGrows = Builder.CurrentFilePath.GetCharArray().Max() < PathLength + 1;
+			const uint64 NewPathBytes = bGrows ?
+				VoxelGenerationAllocation::Private::ArrayReserveBytes<TCHAR, FDefaultAllocator>(PathLength + 1) : 0;
+			const auto PathStep = Grant(Builder.MetadataBytes + NewPathBytes, Scenes.MetadataLease);
+			if (PathStep != EVoxelSceneCaptureStep::Pending) return PathStep;
+			Builder.CurrentFilePath.GetCharArray().Reserve(PathLength + 1);
+			Builder.CurrentFilePath = RelativePath;
+			const uint64 ActualBytes = Builder.MetadataBytes - OldPathBytes +
+				VoxelGenerationAllocation::AllocatedBytes(Builder.CurrentFilePath.GetCharArray());
+			verify(Scenes.MetadataLease->TryResize(ActualBytes) == EVoxelTerrainResourceAdmission::Granted);
+			Builder.MetadataBytes = ActualBytes;
+		}
+		const FString& Path = Builder.CurrentFilePath;
 		if (!Scenes.Columns.Contains(Path))
 		{
-			const uint64 Bytes = VoxelBoundedAllocation::ArrayBytes<TCHAR>(Path.Len() + 1);
-			if (!Scenes.MetadataLease->Resize(Builder.MetadataBytes + Bytes)) return Blocked();
+			const uint64 Bytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<TCHAR, FDefaultAllocator>(Path.Len() + 1);
+			const auto KeyStep = Grant(Builder.MetadataBytes + Bytes, Scenes.MetadataLease);
+			if (KeyStep != EVoxelSceneCaptureStep::Pending) return KeyStep;
 			Builder.MetadataBytes += Bytes;
 			Scenes.Columns.Add(Path);
 			Scenes.Regions.Add(Key, {Region->SceneInstanceId, Region->SceneRevision});
 		}
 		const auto Step = Region->AdvanceSavePayloads(Builder.Column, LastSaveError);
 		if (Builder.Column.Capture) Scenes.Columns.FindChecked(Path) = Builder.Column.Capture;
-		if (Step == EVoxelSceneCaptureStep::CapacityBlocked) return Blocked();
+		if (Step == EVoxelSceneCaptureStep::CapacityBlocked)
+		{
+			// Column已保存grant前的原Consumer外部版本；外层不能改写为较晚的全局版本。
+			LastSaveError.Reset();
+			return Step;
+		}
 		if (Step == EVoxelSceneCaptureStep::Failed) return Step;
 		if (Step == EVoxelSceneCaptureStep::Complete)
 		{
 			Scenes.Regions.Add(Key, {Builder.Column.RegionInstanceId, Builder.Column.Revision});
-			Scenes.Files.Remove(FVoxelSceneColumnCodec::RelativePath(FIntPoint(Key.X, Key.Y)));
+			if (const auto* OldFile = Scenes.Files.Find(Path))
+			{
+				const uint64 FreedBytes = VoxelGenerationAllocation::AllocatedBytes(*OldFile) +
+					VoxelGenerationAllocation::Private::ArrayReserveBytes<TCHAR, FDefaultAllocator>(Path.Len() + 1);
+				Scenes.Files.Remove(Path);
+				check(FreedBytes <= Builder.MetadataBytes);
+				Builder.MetadataBytes -= FreedBytes;
+				verify(Scenes.MetadataLease->TryResize(Builder.MetadataBytes) == EVoxelTerrainResourceAdmission::Granted);
+			}
 			Builder.Column = {};
 			Builder.CurrentRegion.Reset();
+			Builder.CurrentFilePath.Reset();
 			++Builder.RegionCount;
 		}
 		return EVoxelSceneCaptureStep::Pending;
 	}
+	const uint64 CursorPathBytes = VoxelGenerationAllocation::AllocatedBytes(Builder.CurrentFilePath.GetCharArray());
+	Builder.CurrentFilePath.Empty();
+	check(CursorPathBytes <= Builder.MetadataBytes);
+	Builder.MetadataBytes -= CursorPathBytes;
+	verify(Scenes.MetadataLease->TryResize(Builder.MetadataBytes) == EVoxelTerrainResourceAdmission::Granted);
 	CapturedSceneSave = Builder.Scenes;
 	bSceneSaveRequested = false;
 	return EVoxelSceneCaptureStep::Complete;

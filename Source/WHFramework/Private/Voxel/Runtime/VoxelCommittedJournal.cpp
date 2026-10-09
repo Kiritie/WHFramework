@@ -2,6 +2,7 @@
 
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 
 struct FVoxelCommittedJournalNode
 {
@@ -148,16 +149,35 @@ bool FVoxelCommittedJournalCapture::VisitDirty(TFunctionRef<bool(const FVoxelOve
 	return VisitDirtyNode(Root, PersistedRoot, InVisit);
 }
 
-bool FVoxelCommittedJournalCapture::PrepareSaveNotifications(const FGuid& InTransactionId)
+bool FVoxelCommittedJournalCapture::PrepareSaveNotifications(const FGuid& InTransactionId,
+	EVoxelTerrainResourceAdmission* OutAdmission)
 {
 	check(IsInGameThread());
+	if (OutAdmission) *OutAdmission = EVoxelTerrainResourceAdmission::Granted;
 	if (!Root && !PersistedRoot) return true;
-	if (SaveNotifications) return !SaveNotifications->bQueued;
+	if (SaveNotifications)
+	{
+		if (SaveNotifications->bQueued && OutAdmission) *OutAdmission = EVoxelTerrainResourceAdmission::InvalidRequest;
+		return !SaveNotifications->bQueued;
+	}
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-	if (Resources && !Resources->Acquire(
-		FVoxelGenerationConsumerKey::Section(WorldEpoch, InTransactionId, 1, {}, 5),
-		EVoxelTerrainResourcePool::Input,
-		VoxelBoundedAllocation::WorkerSharedBytes<FVoxelJournalSaveNotifications>(), Lease)) return false;
+	if (Resources)
+	{
+		FVoxelGenerationRequiredCapacity Required;
+		FString Error;
+		if (!FVoxelGenerationRequiredSourceScope::Collect(*Resources, nullptr, Required, Error))
+		{
+			if (OutAdmission) *OutAdmission = EVoxelTerrainResourceAdmission::CapacityUnachievable;
+			return false;
+		}
+		const auto Admission = Resources->TryAcquire(
+			FVoxelGenerationConsumerKey::Section(WorldEpoch, InTransactionId, 1, {}, 1),
+			EVoxelTerrainResourcePool::Input,
+			VoxelBoundedAllocation::WorkerSharedBytes<FVoxelJournalSaveNotifications>(), Lease,
+			0, Required.Bytes[0], Required.LeaseCount);
+		if (OutAdmission) *OutAdmission = Admission;
+		if (Admission != EVoxelTerrainResourceAdmission::Granted) return false;
+	}
 	SaveNotifications = Resources ? VoxelBoundedAllocation::MakeWorkerShared<FVoxelJournalSaveNotifications>(MoveTemp(Lease)) :
 		TSharedPtr<FVoxelJournalSaveNotifications, ESPMode::ThreadSafe>(new FVoxelJournalSaveNotifications,
 			VoxelBoundedAllocation::TWorkerDeleter<FVoxelJournalSaveNotifications>{});

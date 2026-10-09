@@ -80,6 +80,7 @@ public:
 
 	void Reset();
 	bool HasPlanningRetry() const { return CoarsePlanner.HasRetryReady(); }
+	bool GetCoarsePlanningPending() const { return CoarsePlanner.HasPendingWork(); }
 	const FString& GetPlanningError() const { return LastPlanningError; }
 	void BindPlanningResources(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
 		const FVoxelGenerationConsumerKey& InConsumer, const double InFirstQueuedSeconds = 0.0)

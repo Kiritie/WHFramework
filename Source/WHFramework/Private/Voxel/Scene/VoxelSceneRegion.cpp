@@ -8,6 +8,7 @@
 #include "Scene/Actor/SceneActorInterface.h"
 #include "Voxel/Save/VoxelSceneColumnCodec.h"
 #include "Voxel/Save/VoxelSceneColumnCapture.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Chunks/VoxelSectionKey.h"
@@ -135,15 +136,14 @@ void UVoxelSceneRegion::TickSceneActors(float InDeltaSeconds)
 		return;
 	}
 	int32 Remaining = 2;
-	TArray<FGuid> PendingIds;
-	PendingActors.GenerateKeyArray(PendingIds);
-	int32 Attempts = FMath::Min(16, PendingIds.Num());
-	while (Remaining > 0 && Attempts-- > 0)
+	int32 Attempts = FMath::Min(16, PendingActors.GetMaxIndex());
+	while (Remaining > 0 && Attempts-- > 0 && !PendingActors.IsEmpty())
 	{
-		PendingActorCursor %= PendingIds.Num();
-		const FGuid Id = PendingIds[PendingActorCursor++];
-		const FParameter* Data = PendingActors.Find(Id);
-		if (Data && RestorePendingActor(Id, *Data))
+		PendingActorCursor %= PendingActors.GetMaxIndex();
+		const FSetElementId Index = FSetElementId::FromInteger(PendingActorCursor++);
+		if (!PendingActors.IsValidId(Index)) continue;
+		const FGuid Id = PendingActors.Get(Index).Key;
+		if (RestorePendingActor(Id, PendingActors.Get(Index).Value))
 		{
 			PendingActors.Remove(Id);
 			MarkSceneChanged();
@@ -161,6 +161,7 @@ bool UVoxelSceneRegion::CaptureInactiveActors(FString& OutError, const FIntVecto
 	{
 		return true;
 	}
+	const uint64 CapturedSceneRevision = SceneRevision;
 	struct FRetiringActor
 	{
 		AActor* Actor = nullptr;
@@ -199,6 +200,11 @@ bool UVoxelSceneRegion::CaptureInactiveActors(FString& OutError, const FIntVecto
 		}
 		if (Destination != this)
 		{
+			if (Destination->SceneActorMap.Contains(Pair.Key) || Destination->PendingActors.Contains(Pair.Key))
+			{
+				OutError = TEXT("Scene migration destination already owns the actor identity");
+				return false;
+			}
 			Migrating.Add({Actor, Destination});
 			MigratingIds.Add(Pair.Key);
 			continue;
@@ -257,13 +263,32 @@ bool UVoxelSceneRegion::CaptureInactiveActors(FString& OutError, const FIntVecto
 		}
 		return false;
 	}
+	if (SceneRevision != CapturedSceneRevision)
+	{
+		OutError = TEXT("Scene actor cut changed during capture or project validation");
+		return false;
+	}
+	int32 AcceptedTransfers = 0;
 	for (const auto& Transfer : Migrating)
 	{
-		if (!Transfer.Value->AddSceneActor(Transfer.Key))
+		if (!Transfer.Value->AddSceneActor(Transfer.Key) || SceneRevision != CapturedSceneRevision)
 		{
+			// 原Region仍持全体Actor；只有所有目标都接纳后才撤原Map。
+			// 包括可能先登记、随后拒收的当前目标，回滚目标登记和Actor的container。
+			for (int32 Index = 0; Index <= AcceptedTransfers; ++Index)
+			{
+				const auto& Rollback = Migrating[Index];
+				Rollback.Value->RemoveSceneActor(Rollback.Key);
+				if (IsValid(Rollback.Key))
+					ISceneActorInterface::Execute_SetContainer(Rollback.Key, TScriptInterface<ISceneContainerInterface>(this));
+			}
 			OutError = TEXT("Scene actor region transfer rejected");
 			return false;
 		}
+		++AcceptedTransfers;
+	}
+	for (const auto& Transfer : Migrating)
+	{
 		RemoveSceneActor(Transfer.Key);
 	}
 	for (auto& Item : Retiring)
@@ -306,6 +331,7 @@ bool UVoxelSceneRegion::RestorePendingActor(const FGuid& InId, const FParameter&
 		bSceneFailed = true;
 		return false;
 	}
+	TGuardValue<FGuid> RestoreIdentity(RestoringActorId, InId);
 	AActor* Actor = Pickup ? static_cast<AActor*>(UAbilityModuleStatics::SpawnAbilityPickUp(InData, this))
 		: UAbilityModuleStatics::SpawnAbilityActor(InData, this);
 	if (!Actor || !Actor->Implements<USceneActorInterface>())
@@ -440,30 +466,56 @@ EVoxelSceneCaptureStep UVoxelSceneRegion::AdvanceSavePayloads(
 		OutError = TEXT("Scene column producer no longer matches its frozen Region cut");
 		return EVoxelSceneCaptureStep::Failed;
 	}
-	if (InCursor.bCapacityBlocked && Resources->Snapshot().ReleaseVersion <= InCursor.BlockedReleaseVersion)
-		return EVoxelSceneCaptureStep::CapacityBlocked;
+	if (InCursor.WorldEpoch == 0)
+	{
+		const int64 ActorCount = int64(PendingActors.Num()) + SceneActorMap.Num();
+		InCursor.WorldEpoch = Module->GetWorldEpoch();
+		InCursor.RegionInstanceId = SceneInstanceId;
+		InCursor.Revision = SceneRevision;
+		InCursor.ActorCapacity = int32(FMath::Min<int64>(1024, ActorCount));
+		InCursor.Consumer = FVoxelGenerationConsumerKey::Section(InCursor.WorldEpoch, SceneInstanceId,
+			SceneRevision, RegionKey, 1);
+	}
+	if (InCursor.bCapacityBlocked)
+	{
+		uint64 Version = 0;
+		if (!Resources->TryGetReleaseVersionExcludingOwner(InCursor.Consumer, Version) || Version <= InCursor.BlockedReleaseVersion)
+			return EVoxelSceneCaptureStep::CapacityBlocked;
+	}
 	InCursor.bCapacityBlocked = false;
+	OutError.Reset();
+	FVoxelGenerationRequiredSourceScope PendingSource(Resources.Get(), PendingActorStorageLease.Get());
+	FVoxelGenerationRequiredSourceScope ProjectStateSource(Resources.Get(), InCursor.ProjectStateLease.Get());
+	FVoxelGenerationRequiredSourceScope CaptureSource(Resources.Get(), InCursor.Capture.Get(),
+		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+		{
+			const auto& Capture = *static_cast<const FVoxelSceneColumnCapture*>(Context);
+			Capture.VisitRequiredSources(*Capture.Resources, Visit);
+		});
 	if (InCursor.Phase == 0)
 	{
-		const int32 Capacity = int32(FMath::Min<int64>(1024, int64(PendingActors.Num()) + SceneActorMap.Num()));
-		const auto Consumer = FVoxelGenerationConsumerKey::Section(Module->GetWorldEpoch(), SceneInstanceId, SceneRevision, RegionKey, 1);
+		const int32 Capacity = InCursor.ActorCapacity;
+		const auto Consumer = InCursor.Consumer;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MetadataLease;
 		const uint64 MetadataBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSceneColumnCapture>() +
 			VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSceneColumnCompletion>() +
-			VoxelBoundedAllocation::ArrayBytes<FVoxelSceneActorPayload>(Capacity);
-		if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input, MetadataBytes, MetadataLease))
+			VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelSceneActorPayload, FDefaultAllocator>(Capacity);
+		const uint64 BeforeGrant = Resources->ReleaseVersionExcludingOwner(Consumer);
+		const auto Admission = FVoxelSceneColumnCapture::TryGrantCapacity(*Resources, Consumer,
+			EVoxelTerrainResourcePool::Input, MetadataBytes, MetadataLease, OutError);
+		if (Admission != EVoxelTerrainResourceAdmission::Granted)
 		{
-			OutError = TEXT("CapacityBlocked: Scene column payload metadata was not granted");
-			InCursor.bCapacityBlocked = true;
-			InCursor.BlockedReleaseVersion = Resources->Snapshot().ReleaseVersion;
-			return EVoxelSceneCaptureStep::CapacityBlocked;
+			InCursor.bCapacityBlocked = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked;
+			InCursor.BlockedReleaseVersion = BeforeGrant;
+			return InCursor.bCapacityBlocked ? EVoxelSceneCaptureStep::CapacityBlocked : EVoxelSceneCaptureStep::Failed;
 		}
 		auto Capture = VoxelBoundedAllocation::MakeWorkerShared<FVoxelSceneColumnCapture>(MetadataLease);
 		Capture->MetadataLease = MetadataLease;
 		Capture->Resources = Resources;
 		Capture->Consumer = Consumer;
 		Capture->Actors.Reserve(Capacity);
-		check(Capture->Actors.GetAllocatedSize() <= VoxelBoundedAllocation::ArrayBytes<FVoxelSceneActorPayload>(Capacity));
+		check((VoxelGenerationAllocation::AllocatedBytes(Capture->Actors) <=
+			VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelSceneActorPayload, FDefaultAllocator>(Capacity)));
 		Capture->Completion = VoxelBoundedAllocation::MakeWorkerShared<FVoxelSceneColumnCompletion>(MetadataLease);
 		InCursor.Capture = MoveTemp(Capture);
 		InCursor.WorldEpoch = Module->GetWorldEpoch();
@@ -481,9 +533,11 @@ EVoxelSceneCaptureStep UVoxelSceneRegion::AdvanceSavePayloads(
 	}
 	const auto Consumer = Capture->Consumer;
 	bool bCapacityBlocked = false;
+	uint64 BlockedVersion = Resources->ReleaseVersionExcludingOwner(Consumer);
 	auto Serialize = [&](FParameter Data, const int32 MaximumBytes, TArray<uint8>& Bytes,
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& Lease)
 	{
+		FVoxelGenerationRequiredSourceScope ProjectSource(Resources.Get(), InCursor.ProjectStateLease.Get());
 		if (!FSaveDataSerializer::MarkSaveDataSaved(Data))
 		{
 			OutError = TEXT("Scene payload has no supported SaveData owner");
@@ -491,25 +545,27 @@ EVoxelSceneCaptureStep UVoxelSceneRegion::AdvanceSavePayloads(
 		}
 		const auto Reserve = [&](TArray<uint8>& Buffer, const int32 Required)
 		{
+			if (Required <= Buffer.Max()) return true;
 			const int32 Grow = Buffer.Max() <= MaximumBytes / 2 ? Buffer.Max() * 2 : MaximumBytes;
 			const int32 Target = FMath::Min(MaximumBytes, FMath::Max(Required, FMath::Max(64, Grow)));
-			const uint64 NewBytes = VoxelBoundedAllocation::ArrayBytes<uint8>(Target);
-			const uint64 Peak = Buffer.GetAllocatedSize() + NewBytes;
-			if ((!Lease && !Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input, Peak, Lease)) ||
-				!Lease->Resize(Peak))
+			const uint64 NewBytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(Target);
+			const uint64 Peak = VoxelGenerationAllocation::AllocatedBytes(Buffer) + NewBytes;
+			BlockedVersion = Resources->ReleaseVersionExcludingOwner(Consumer);
+			const auto Admission = FVoxelSceneColumnCapture::TryGrantCapacity(*Resources, Consumer,
+				EVoxelTerrainResourcePool::Input, Peak, Lease, OutError);
+			if (Admission != EVoxelTerrainResourceAdmission::Granted)
 			{
-				bCapacityBlocked = true;
+				bCapacityBlocked = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked;
 				return false;
 			}
 			Buffer.Reserve(Target);
-			check(Buffer.GetAllocatedSize() <= NewBytes);
-			verify(Lease->Resize(Buffer.GetAllocatedSize()));
+			check(VoxelGenerationAllocation::AllocatedBytes(Buffer) <= NewBytes);
+			verify(Lease->TryResize(VoxelGenerationAllocation::AllocatedBytes(Buffer)) == EVoxelTerrainResourceAdmission::Granted);
 			return true;
 		};
 		if (!FSaveDataSerializer::SerializeParameterBounded(Data, MaximumBytes, Bytes, Reserve))
 		{
-			OutError = bCapacityBlocked ? TEXT("CapacityBlocked: Scene serialized payload backing was not granted") :
-				TEXT("Scene serialized payload is invalid or exceeds its protocol limit");
+			if (OutError.IsEmpty()) OutError = TEXT("Scene serialized payload is invalid or exceeds its protocol limit");
 			return false;
 		}
 		return true;
@@ -564,6 +620,7 @@ EVoxelSceneCaptureStep UVoxelSceneRegion::AdvanceSavePayloads(
 	}
 	else if (InCursor.Phase == 3)
 	{
+		BlockedVersion = Resources->ReleaseVersionExcludingOwner(Consumer);
 		const auto Step = AdvanceProjectSaveCapture(InCursor, OutError);
 		if (Step == EVoxelSceneCaptureStep::Complete) InCursor.Phase = 4;
 		else if (Step == EVoxelSceneCaptureStep::Failed) return Step;
@@ -572,10 +629,15 @@ EVoxelSceneCaptureStep UVoxelSceneRegion::AdvanceSavePayloads(
 	else if (InCursor.Phase == 4)
 	{
 		// 项目游标已完成后仍必须验证其版本，序列化不能接受较早帧的失效值。
+		BlockedVersion = Resources->ReleaseVersionExcludingOwner(Consumer);
 		const auto ProjectStep = AdvanceProjectSaveCapture(InCursor, OutError);
-		if (ProjectStep != EVoxelSceneCaptureStep::Complete) return ProjectStep;
-		bSuccess = !InCursor.ProjectData.HasValue() || Serialize(InCursor.ProjectData, 1024 * 1024, Capture->ProjectBytes, Capture->ProjectLease);
-		if (bSuccess) InCursor.Phase = 5;
+		if (ProjectStep == EVoxelSceneCaptureStep::CapacityBlocked) bCapacityBlocked = true;
+		else if (ProjectStep != EVoxelSceneCaptureStep::Complete) return ProjectStep;
+		else
+		{
+			bSuccess = !InCursor.ProjectData.HasValue() || Serialize(InCursor.ProjectData, 1024 * 1024, Capture->ProjectBytes, Capture->ProjectLease);
+			if (bSuccess) InCursor.Phase = 5;
+		}
 	}
 	if (!Module || InCursor.RegionInstanceId != SceneInstanceId || InCursor.Revision != SceneRevision || InCursor.WorldEpoch != Module->GetWorldEpoch())
 	{
@@ -585,7 +647,7 @@ EVoxelSceneCaptureStep UVoxelSceneRegion::AdvanceSavePayloads(
 	if (bCapacityBlocked)
 	{
 		InCursor.bCapacityBlocked = true;
-		InCursor.BlockedReleaseVersion = Resources->Snapshot().ReleaseVersion;
+		InCursor.BlockedReleaseVersion = BlockedVersion;
 		return EVoxelSceneCaptureStep::CapacityBlocked;
 	}
 	if (!bSuccess) return EVoxelSceneCaptureStep::Failed;
@@ -605,8 +667,7 @@ bool UVoxelSceneRegion::RestoreActors(
 
 	TArray<FVoxelSavedSceneActor> Records;
 	FParameter ProjectData;
-	if (!FVoxelSceneColumnCodec::Decode(InBytes, Records, ProjectData, OutError) ||
-		!RestoreProjectData(ProjectData, OutError))
+	if (!FVoxelSceneColumnCodec::Decode(InBytes, Records, ProjectData, OutError))
 	{
 		return false;
 	}
@@ -618,8 +679,10 @@ bool UVoxelSceneRegion::RestoreActors(
 			OutError = TEXT("Duplicate stored voxel scene actor GUID");
 			return false;
 		}
-		PendingActors.Add(Record.Id, Record.Data);
 	}
+	// Validate the whole actor cut before project restoration can publish side effects.
+	if (!RestoreProjectData(ProjectData, OutError)) return false;
+	for (auto& Record : Records) PendingActors.Add(Record.Id, MoveTemp(Record.Data));
 
 	bSceneReady = true;
 	bSceneLoading = false;
@@ -665,6 +728,8 @@ bool UVoxelSceneRegion::AddSceneActor(AActor* InActor)
 	{
 		return false;
 	}
+	if ((PendingActors.Contains(Id) && RestoringActorId != Id) ||
+		(SceneActorMap.Contains(Id) && SceneActorMap.FindRef(Id) != InActor)) return false;
 	if (AActor* Existing = Module->FindSceneActor(Id))
 	{
 		if (Existing != InActor)

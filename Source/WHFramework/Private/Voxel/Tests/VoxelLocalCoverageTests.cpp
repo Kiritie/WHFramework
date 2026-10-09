@@ -252,8 +252,6 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 		const FVoxelFinePageKey Page{Child.Coordinate, 0};
 		ScopedManager.GetInputRoot().FinePagePlan.Pages.Add(Page);
 		ScopedManager.GetInputRoot().FinePagePlan.SectionOwners.Add(Child.Coordinate, Page);
-		ScopedManager.FinePageReady.Add(Page);
-		ScopedManager.EmptyFinePages.Add(Page);
 		ScopedManager.IndexCoverage(Child);
 	}
 	Interest.TerrainPlan.Leaves.Add(FarRoot);
@@ -274,9 +272,9 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 	ScopedManager.ActiveDirtyCoverageRects = {{FIntPoint::ZeroValue, FIntPoint(16, 16)}};
 	ScopedManager.ResolveTransitionVisibility();
 	ScopedManager.Publisher->Tick();
-	TestFalse(TEXT("Local ready children retire their coarse parent"), ScopedManager.VisibleTerrainNodes.Contains(NearRoot));
+	TestTrue(TEXT("Prepared children retain the coarse parent until their Native Atom receipts"), ScopedManager.VisibleTerrainNodes.Contains(NearRoot));
 	for (const auto& Child : NearChildren)
-		TestTrue(TEXT("A dirty root publishes its entire ready sibling partition"), ScopedManager.VisibleTerrainNodes.Contains(Child));
+		TestFalse(TEXT("A dirty root cannot publish a prepared child without a Native Atom receipt"), ScopedManager.VisibleTerrainNodes.Contains(Child));
 	TestTrue(TEXT("A distant unready root retains its previous committed ownership"), ScopedManager.VisibleTerrainNodes.Contains(FarRoot));
 	UWorld* FixtureWorld = UWorld::CreateWorld(EWorldType::Game, false);
 	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(FixtureWorld);
@@ -309,7 +307,7 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 	ScopedManager.Publisher->Tick();
 	TestTrue(TEXT("Fixture has a pending heightfield topology plan"), !ScopedManager.PendingHeightfieldPlanOwners.IsEmpty());
 	for (const auto& Child : NearChildren)
-		TestTrue(TEXT("Ready Fine ownership does not wait on its enclosing heightfield topology"), ScopedManager.VisibleTerrainNodes.Contains(Child));
+		TestFalse(TEXT("A pending heightfield plan cannot substitute for a Native Fine receipt"), ScopedManager.VisibleTerrainNodes.Contains(Child));
 	const FVoxelHeightfieldNodeKey SurfaceOwner{EVoxelHeightfieldRepresentation::Surface, SurfaceKey.Coordinate, SurfaceKey.Level};
 	const auto* FirstPlan = ScopedManager.HeightfieldCoveragePlans.Find(SurfaceOwner);
 	if (!TestNotNull(TEXT("The actual Surface owner has an immutable local coverage plan"), FirstPlan))

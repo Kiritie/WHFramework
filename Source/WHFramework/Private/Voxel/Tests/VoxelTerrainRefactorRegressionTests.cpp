@@ -336,8 +336,7 @@ bool FVoxelCriticalDependencyAdmissionTest::RunTest(const FString& InParameters)
 	Manager.FineReady.Add(FIntVector::ZeroValue);
 	TestFalse(TEXT("Ready mesh still needs the render receipt"), Manager.IsFinePresented(FIntVector::ZeroValue));
 	Manager.PresentedFineSectionOwners.Add(FIntVector::ZeroValue, Page);
-	Manager.PresentedEmptyFinePages.Add(Page);
-	TestFalse(TEXT("Legacy page flags cannot impersonate the Native render receipt"), Manager.IsFinePresented(FIntVector::ZeroValue));
+	TestFalse(TEXT("Derived layout ownership cannot impersonate the Native render receipt"), Manager.IsFinePresented(FIntVector::ZeroValue));
 	Interest.CriticalDependencies.Reset();
 	Interest.CriticalFinePages.Reset();
 	Interest.Exact.Reset();
@@ -479,7 +478,7 @@ bool FVoxelCriticalReadyQueueLivenessTest::RunTest(const FString& InParameters)
 	for (int32 Frame = 0; Frame < 8 && !Runtime.FindSection(Tail)->bSimulationWanted; ++Frame)
 	{
 		++Interest.PriorityRevision;
-		Manager.Tick(Interest, 1, Frame, {}, 1, 1000.0);
+		Manager.Tick(Interest, 1, Frame, 1, 1000.0);
 	}
 	TestTrue(TEXT("Ready tail progresses behind blocked heads across continuous priority updates"), Runtime.FindSection(Tail)->bSimulationWanted);
 	Manager.ReadyCriticalSections.Empty();
@@ -487,6 +486,46 @@ bool FVoxelCriticalReadyQueueLivenessTest::RunTest(const FString& InParameters)
 	Manager.WakeCriticalSection(Tail);
 	Manager.WakeCriticalSection(Tail);
 	TestEqual(TEXT("Duplicate dependency wakeups share one ready entry"), Manager.QueuedCriticalSections.Num(), 1);
+	const auto Resources = Scheduler.GetTerrainResources();
+	const auto State = Resources->Snapshot();
+	const auto OtherConsumer = FVoxelGenerationConsumerKey::Section(Runtime.Epoch(), FGuid::NewGuid(), 1, {}, 1);
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> WorkingBlocker;
+	const auto BlockAdmission = Resources->TryAcquire(OtherConsumer, EVoxelTerrainResourcePool::Working,
+		State.Limits.WorkingBytes - State.Used[int32(EVoxelTerrainResourcePool::Working)], WorkingBlocker);
+	TestTrue(TEXT("External consumer fills original Working pool"), BlockAdmission == EVoxelTerrainResourceAdmission::Granted);
+	if (WorkingBlocker)
+	{
+		FIntVector BeforeHead;
+		TestTrue(TEXT("Original ready head is present"), Manager.ReadyCriticalSections.Peek(BeforeHead));
+		const int32 BeforeLane0 = Manager.NextAdmissionIndices[0];
+		const int32 BeforeLane1 = Manager.NextAdmissionIndices[1];
+		const int32 BeforeAges = Manager.AdmissionAges.Num();
+		const uint64 BeforeSequence = Manager.NextAdmissionSequence;
+		Manager.Tick(Interest, 1, 10.0, 1, 1000.0);
+		TestTrue(TEXT("Tick scratch reports recoverable original pool refusal"),
+			Manager.GetLastResourceAdmission() == EVoxelTerrainResourceAdmission::CapacityBlocked);
+		FIntVector AfterHead;
+		TestTrue(TEXT("Refused scratch retains ready head"), Manager.ReadyCriticalSections.Peek(AfterHead));
+		TestEqual(TEXT("Ready head identity is unchanged"), AfterHead, BeforeHead);
+		TestEqual(TEXT("First lane cursor is unchanged"), Manager.NextAdmissionIndices[0], BeforeLane0);
+		TestEqual(TEXT("Second lane cursor is unchanged"), Manager.NextAdmissionIndices[1], BeforeLane1);
+		TestEqual(TEXT("Service age map is unchanged"), Manager.AdmissionAges.Num(), BeforeAges);
+		TestEqual(TEXT("Refusal does not mint a service sequence"), Manager.NextAdmissionSequence, BeforeSequence);
+		const uint64 BeforeWaitVersion = Manager.TickCapacityVersion;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> OwnRefund;
+		TestTrue(TEXT("Original control can hold an Input fixture lease"), Resources->TryAcquire(Manager.GetAdmissionConsumer(),
+			EVoxelTerrainResourcePool::Input, 1, OwnRefund) == EVoxelTerrainResourceAdmission::Granted);
+		OwnRefund.Reset();
+		Manager.Tick(Interest, 1, 11.0, 1, 1000.0);
+		TestEqual(TEXT("Own refund does not advance the original wait version"), Manager.TickCapacityVersion, BeforeWaitVersion);
+		TestTrue(TEXT("Own refund leaves the original ready head pending"), Manager.ReadyCriticalSections.Peek(AfterHead));
+		TestEqual(TEXT("Own refund retains head identity"), AfterHead, BeforeHead);
+		WorkingBlocker.Reset();
+		Manager.Tick(Interest, 1, 12.0, 1, 1000.0);
+		TestTrue(TEXT("Different consumer release resumes the original Tick"),
+			Manager.GetLastResourceAdmission() == EVoxelTerrainResourceAdmission::Granted);
+		TestTrue(TEXT("Resumed Tick consumes the retained ready head"), Manager.ReadyCriticalSections.IsEmpty());
+	}
 	Manager.Reset();
 	Manager.WakeCriticalSection(Tail);
 	TestTrue(TEXT("A removed consumer cannot be awakened"), Manager.QueuedCriticalSections.IsEmpty());

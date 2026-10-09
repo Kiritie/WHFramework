@@ -51,6 +51,7 @@ struct WHFRAMEWORK_API FVoxelOverlayDirectoryEntry
 // 目录、正文分片和增量共享同一完整身份；消息摘要包含固定序列化的全部字段。
 struct WHFRAMEWORK_API FVoxelOverlayRegionMessage
 {
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 	uint64 WorldEpoch = 0;
 	FVoxelOverlayHash ManifestIdentity;
 	FGuid SubscriptionId;
@@ -75,12 +76,12 @@ struct WHFRAMEWORK_API FVoxelOverlayRegionMessage
 	TArray<FVoxelOverlayRegionHead> Heads;
 	TArray<FVoxelOverlayDirectoryEntry> Entries;
 	TArray<uint8> Payload;
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 	uint64 AllocatedBytes() const;
 };
 
 struct WHFRAMEWORK_API FVoxelOverlayRegionSnapshot
 {
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 	FIntVector Region = FIntVector::ZeroValue;
 	FGuid InitialCoverageTicket;
 	FGuid DirectoryEpoch;
@@ -90,7 +91,6 @@ struct WHFRAMEWORK_API FVoxelOverlayRegionSnapshot
 	FVoxelOverlayHash DirectoryHash;
 	TMap<FIntVector, FVoxelOverlayDirectoryEntry> Directory;
 	TMap<FIntVector, TSharedPtr<const FVoxelOverlaySnapshot, ESPMode::ThreadSafe>> Overlays;
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 };
 
 class WHFRAMEWORK_API FVoxelOverlayRegionCodec
@@ -106,8 +106,12 @@ public:
 	static bool ManifestHash(const FVoxelWorldManifest& InManifest, FVoxelOverlayHash& OutHash);
 	static bool Encode(EVoxelMessage InKind, const FVoxelOverlayRegionMessage& InMessage,
 		TArray<uint8>& OutBytes);
+	static bool EncodedByteCount(const FVoxelOverlayRegionMessage& InMessage, int32& OutBytes,
+		int32 InPlannedHeadCount = INDEX_NONE);
 	static bool Decode(EVoxelMessage InKind, TConstArrayView<uint8> InBytes,
 		FVoxelOverlayRegionMessage& OutMessage, FString& OutError);
+	static bool MeasureDecode(EVoxelMessage InKind, TConstArrayView<uint8> InBytes,
+		uint64& OutBytes, FString& OutError);
 	static bool DirectoryHash(TConstArrayView<FVoxelOverlayDirectoryEntry> InEntries,
 		FVoxelOverlayHash& OutHash);
 	static bool SnapshotHash(TConstArrayView<FVoxelOverlayDirectoryEntry> InEntries,
@@ -133,10 +137,10 @@ struct FVoxelTaskStamp;
 
 struct WHFRAMEWORK_API FVoxelOverlayCommitNotification
 {
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 	FGuid AuthorityTransaction;
 	TArray<FIntVector> Sections;
 	TArray<FVoxelOverlayRegionHead> Heads;
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 };
 
 // GT 唯一写者；Worker 只消费捕获的 Region 强引用，不读取可变网络状态。
@@ -153,8 +157,12 @@ public:
 		const FVoxelGenerationConsumerKey& InConsumer);
 	void SetTaskCanceler(TFunction<void(const FVoxelTaskStamp&)> InCancel);
 	bool Receive(EVoxelMessage InKind, FVoxelOverlayRegionMessage&& InMessage, FString& OutError);
+	EVoxelTerrainResourceAdmission TryExpectTicket(const FGuid& InSubscription, const FGuid& InTicket,
+		TConstArrayView<FIntVector> InRegions, const FVoxelGenerationConsumerKey& InConsumer, FString& OutError);
+#if WITH_DEV_AUTOMATION_TESTS
 	bool ExpectTicket(const FGuid& InSubscription, const FGuid& InTicket,
 		TConstArrayView<FIntVector> InRegions);
+#endif
 	void CancelTicket(const FGuid& InTicket);
 	bool Advance(int32 InMaximumOperations, FString& OutError);
 	bool Capture(const FVoxelGenerationBounds& InBounds, const FVoxelWorldManifest& InManifest,
@@ -162,7 +170,8 @@ public:
 		FVoxelFineOverlayCapture& OutCapture, FString& OutError) const;
 	bool IsCurrent(const FVoxelFineOverlayReadResult& InRead) const;
 	bool CaptureVersion(const FVoxelGenerationBounds& InBounds,
-		TSharedPtr<const FVoxelFineOverlayVersionProof, ESPMode::ThreadSafe>& OutProof, FString& OutError) const;
+		TSharedPtr<const FVoxelFineOverlayVersionProof, ESPMode::ThreadSafe>& OutProof, FString& OutError,
+		const FVoxelGenerationConsumerKey& InConsumer = {}) const;
 	bool IsCurrent(const FVoxelFineOverlayVersionProof& InProof) const;
 	bool LookupSection(const FIntVector& InSection, uint64& OutRevision,
 		TSharedPtr<const FVoxelOverlaySnapshot, ESPMode::ThreadSafe>& OutOverlay) const;
@@ -189,7 +198,9 @@ private:
 	bool TryApplyDelta(const FGuid& InTransaction, FString& OutError);
 	bool FailRegion(const FIntVector& InRegion, FString InReason, FString& OutError);
 	TSharedPtr<const FVoxelOverlayCommitNotification, ESPMode::ThreadSafe> PrepareNotification(
-		const FGuid& InTransaction, TArray<FIntVector>&& InSections, TConstArrayView<FVoxelOverlayRegionHead> InHeads);
+		const FGuid& InTransaction, TArray<FIntVector>&& InSections, TConstArrayView<FVoxelOverlayRegionHead> InHeads, FString& OutError);
+	EVoxelTerrainResourceAdmission GrantBody(EVoxelTerrainResourcePool InPool, uint64 InBytes,
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutLease, FString& OutError, int32 InSplits = 0);
 	uint64 LocalEpoch = 0;
 	uint64 AuthorityEpoch = 0;
 	uint64 NextSerial = 0;
@@ -211,4 +222,7 @@ private:
 	TFunction<void(const FVoxelTaskStamp&)> TaskCanceler;
 	uint64 OwnerIncarnation = 1;
 	bool bDetachedWorker = false;
+	FVoxelGenerationConsumerKey BodyConsumer;
+	EVoxelTerrainResourceAdmission BodyAdmission = EVoxelTerrainResourceAdmission::None;
+	uint64 BodyCapacityVersion = 0;
 };

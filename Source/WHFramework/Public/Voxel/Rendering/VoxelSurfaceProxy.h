@@ -100,7 +100,8 @@ private:
 		TMap<FIntVector, FVoxelBlockState>& OutBlocks,
 		uint64& OutRevision,
 		FString& OutError,
-		const TAtomic<bool>* InCancel) const;
+		const TAtomic<bool>* InCancel,
+		FVoxelGenerationWorkspace& InWorkspace) const;
 
 	bool ApplyModifiedSurface(
 		const FVoxelSurfaceTileKey& InKey,

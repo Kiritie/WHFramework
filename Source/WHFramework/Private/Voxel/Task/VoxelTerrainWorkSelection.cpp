@@ -1,5 +1,6 @@
 ﻿#include "Voxel/Task/VoxelTerrainWorkSelection.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 
 FVoxelTerrainWorkSelection::FVoxelTerrainWorkSelection()
 {
@@ -21,21 +22,59 @@ void FVoxelTerrainWorkSelection::BindResources(TSharedRef<FVoxelTerrainResources
 
 bool FVoxelTerrainWorkSelection::ReserveCharges()
 {
-	if (OutstandingCharges.Num() < ChargeCapacity) return true;
+	if (OutstandingCharges.Num() < ChargeCapacity)
+	{
+		Admission = EVoxelTerrainResourceAdmission::Granted;
+		return true;
+	}
+	if (OutstandingCharges.Num() >= MaximumOutstandingCharges)
+	{
+		Admission = EVoxelTerrainResourceAdmission::CapacityBlocked;
+		return false;
+	}
 	const int32 Capacity = FMath::Min(MaximumOutstandingCharges, FMath::Max(8, ChargeCapacity * 2));
-	const uint64 Bytes = VoxelBoundedAllocation::MapBytes<uint64, FVoxelTerrainServiceCharge>(Capacity);
-	if (Resources && ((!ResourceLease && !Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input,
-		OutstandingCharges.GetAllocatedSize() + Bytes, ResourceLease)) ||
-		!ResourceLease->Resize(OutstandingCharges.GetAllocatedSize() + Bytes))) return false;
+	const uint64 Bytes = VoxelGenerationAllocation::Private::SetReserveBytes<TPair<uint64, FVoxelTerrainServiceCharge>>(OutstandingCharges, Capacity);
+	const uint64 Previous = VoxelGenerationAllocation::AllocatedBytes(OutstandingCharges);
+	if (Resources)
+	{
+		FVoxelGenerationRequiredCapacity Required;
+		FString Error;
+		if (Bytes > MAX_uint64 - Previous ||
+			!FVoxelGenerationRequiredSourceScope::Collect(*Resources, ResourceLease.Get(), Required, Error))
+		{
+			Admission = EVoxelTerrainResourceAdmission::CapacityUnachievable;
+			return false;
+		}
+		Admission = ResourceLease ? ResourceLease->TryResize(Previous + Bytes, Required.Bytes[0], Required.LeaseCount) :
+			Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Input, Previous + Bytes, ResourceLease,
+				0, Required.Bytes[0], Required.LeaseCount);
+		if (Admission != EVoxelTerrainResourceAdmission::Granted) return false;
+	}
+	else
+	{
+#if !WITH_DEV_AUTOMATION_TESTS
+		Admission = EVoxelTerrainResourceAdmission::InvalidRequest;
+		return false;
+#endif
+	}
 	OutstandingCharges.Reserve(Capacity);
-	check(OutstandingCharges.GetAllocatedSize() <= Bytes);
+	check(VoxelGenerationAllocation::AllocatedBytes(OutstandingCharges) <= Bytes);
 	if (ResourceLease)
 	{
-		const bool bResized = ResourceLease->Resize(OutstandingCharges.GetAllocatedSize());
-		check(bResized);
+		verify(ResourceLease->TryResize(VoxelGenerationAllocation::AllocatedBytes(OutstandingCharges)) == EVoxelTerrainResourceAdmission::Granted);
 	}
 	ChargeCapacity = Capacity;
+	Admission = EVoxelTerrainResourceAdmission::Granted;
 	return true;
+}
+
+bool FVoxelTerrainWorkSelection::Prepare(FString& OutError)
+{
+	if (ReserveCharges()) { OutError.Reset(); return true; }
+	OutError = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: terrain selection charge backing") :
+		Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: terrain selection charge backing") :
+		TEXT("InvalidRequest: terrain selection charge owner");
+	return false;
 }
 
 bool FVoxelTerrainWorkSelection::IsNear(const EVoxelTerrainServiceBand InBand)

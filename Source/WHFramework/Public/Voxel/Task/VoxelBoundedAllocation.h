@@ -14,10 +14,16 @@ namespace VoxelBoundedAllocation
 	{
 #if defined(NUM_TFUNCTION_INLINE_BYTES) && NUM_TFUNCTION_INLINE_BYTES > 0
 		using FInlineObject = UE::Core::Private::Function::TFunction_OwnedObject<FunctorType, bUnique, false>;
-		if constexpr (sizeof(FInlineObject) <= NUM_TFUNCTION_INLINE_BYTES) return 0;
+		if constexpr (sizeof(FInlineObject) <= NUM_TFUNCTION_INLINE_BYTES)
+		{
+			return 0;
+		}
+		else
 #endif
-		using FHeapObject = UE::Core::Private::Function::TFunction_OwnedObject<FunctorType, bUnique, true>;
-		return FMemory::QuantizeSize(sizeof(FHeapObject), alignof(FHeapObject));
+		{
+			using FHeapObject = UE::Core::Private::Function::TFunction_OwnedObject<FunctorType, bUnique, true>;
+			return FMemory::QuantizeSize(sizeof(FHeapObject), alignof(FHeapObject));
+		}
 	}
 
 	template<typename TaskBodyType>

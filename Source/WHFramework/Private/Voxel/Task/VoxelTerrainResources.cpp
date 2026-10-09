@@ -13,6 +13,53 @@ namespace
 	constexpr int32 MaximumTerrainResourceLeases = 1 << 20;
 }
 
+#if WITH_DEV_AUTOMATION_TESTS
+FVoxelTerrainResources::FVoxelTerrainResources()
+{
+}
+#endif
+
+FVoxelTerrainResources::FVoxelTerrainResources(FConstructionKey, const FVoxelTerrainResourceLimits& InLimits,
+	const FVoxelGenerationConsumerKey& InControlConsumer, const uint64 InRootInputBytes)
+	: ControlConsumer(InControlConsumer)
+{
+	State.Limits = InLimits;
+	State.RootInputBytes = InRootInputBytes;
+	State.Used[static_cast<int32>(EVoxelTerrainResourcePool::Input)] = InRootInputBytes;
+}
+
+FVoxelTerrainResources::~FVoxelTerrainResources()
+{
+	check(Entries.IsEmpty());
+}
+
+bool FVoxelTerrainResources::Create(const FVoxelTerrainResourceLimits& InLimits,
+	const FVoxelGenerationConsumerKey& InControlConsumer,
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& OutResources, FString& OutError)
+{
+	if (!InLimits.IsValid())
+	{
+		OutError = TEXT("InvalidResource: resource ledger bootstrap limits");
+		return false;
+	}
+	if (!InControlConsumer.IsValid())
+	{
+		OutError = TEXT("InvalidConsumer: resource ledger bootstrap control identity");
+		return false;
+	}
+	const uint64 RootBytes = VoxelBoundedAllocation::SharedBytes<FVoxelTerrainResources>();
+	if (RootBytes > InLimits.InputBytes)
+	{
+		OutError = TEXT("Oversized: resource ledger root exceeds its Input limit");
+		return false;
+	}
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Candidate =
+		MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>(FConstructionKey{}, InLimits, InControlConsumer, RootBytes);
+	OutResources = MoveTemp(Candidate);
+	OutError.Reset();
+	return true;
+}
+
 bool FVoxelTerrainResourceLimits::IsValid() const
 {
 	return InputBytes > 0 && WorkingBytes > 0 && StagedBytes > 0 &&
@@ -77,6 +124,16 @@ uint64 FVoxelTerrainResourceLease::Serial() const
 	return LeaseSerial;
 }
 
+void FVoxelTerrainResourceLease::MarkPublished()
+{
+	Owner->MarkPublished(LeaseSerial);
+}
+
+bool FVoxelTerrainResourceLease::IsPublished() const
+{
+	return Owner->IsPublished(LeaseSerial);
+}
+
 bool FVoxelTerrainResources::FReleaseEvent::IsOwner(const FVoxelGenerationConsumerKey& InOwner) const
 {
 	return Consumer == InOwner;
@@ -126,7 +183,7 @@ bool FVoxelTerrainResources::CanAdd(const EVoxelTerrainResourcePool InPool, cons
 bool FVoxelTerrainResources::Configure(const FVoxelTerrainResourceLimits& InLimits)
 {
 	FScopeLock Lock(&Mutex);
-	if (!InLimits.IsValid() || !Entries.IsEmpty())
+	if (!InLimits.IsValid() || InLimits.InputBytes < State.RootInputBytes || !Entries.IsEmpty())
 	{
 		return false;
 	}
@@ -136,7 +193,7 @@ bool FVoxelTerrainResources::Configure(const FVoxelTerrainResourceLimits& InLimi
 	State.LedgerMetadataBytes = 0;
 	EntryCapacity = 0;
 	State.Limits = InLimits;
-	AdvanceVersion(true);
+	AdvanceVersion(true, ControlConsumer.IsValid() ? &ControlConsumer : nullptr);
 	return true;
 }
 
@@ -188,7 +245,7 @@ bool FVoxelTerrainResources::CanFitRequired(const EVoxelTerrainResourcePool InPo
 		MetadataPeak += NewMetadata;
 	}
 	uint64 Remaining = State.Limits.InputBytes;
-	for (const uint64 Bytes : {MetadataPeak, Handles, InRequiredInputBytes, InPool == EVoxelTerrainResourcePool::Input ? InBytes : uint64(0)})
+	for (const uint64 Bytes : {State.RootInputBytes, MetadataPeak, Handles, InRequiredInputBytes, InPool == EVoxelTerrainResourcePool::Input ? InBytes : uint64(0)})
 	{
 		if (Bytes > Remaining) return false;
 		Remaining -= Bytes;
@@ -201,7 +258,8 @@ EVoxelTerrainResourceAdmission FVoxelTerrainResources::TryAcquire(const FVoxelGe
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutLease, const int32 InReservedSplits,
 	const uint64 InRequiredInputBytes, const int32 InRequiredLeaseCount)
 {
-	if (!InAttempt.IsValid() || InBytes == 0 || OutLease || InReservedSplits < 0 ||
+	if (!InAttempt.IsValid() || (ControlConsumer.IsValid() && InAttempt.WorldEpoch != ControlConsumer.WorldEpoch) ||
+		InBytes == 0 || OutLease || InReservedSplits < 0 ||
 		InReservedSplits >= MaximumTerrainResourceLeases || InRequiredLeaseCount < 0 || InPool >= EVoxelTerrainResourcePool::Count)
 	{
 		return EVoxelTerrainResourceAdmission::InvalidRequest;
@@ -326,6 +384,7 @@ TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> FVoxelTerrainResourc
 	check(Parent);
 	check(NextSerial != MAX_uint64);
 	FEntry Child = *Parent;
+	Child.bPublished = false;
 	Child.Bytes = InBytes;
 	Child.ReservedSplits = 0;
 	Parent->Bytes -= InBytes;
@@ -364,6 +423,28 @@ void FVoxelTerrainResources::Release(const uint64 InSerial)
 	State.ReservedSplitCount -= Entry.ReservedSplits;
 	--State.LeaseCount;
 	AdvanceVersion(true, &Entry.Attempt);
+	// 使用同一release时钟；只有已发布正文最后释放可绕过原owner过滤。
+	if (Entry.bPublished)
+	{
+		State.PublishedRetirementVersion = State.ReleaseVersion;
+	}
+}
+
+void FVoxelTerrainResources::MarkPublished(const uint64 InSerial)
+{
+	FScopeLock Lock(&Mutex);
+	if (FEntry* Entry = Entries.Find(InSerial); Entry && !Entry->bPublished)
+	{
+		Entry->bPublished = true;
+		AdvanceVersion();
+	}
+}
+
+bool FVoxelTerrainResources::IsPublished(const uint64 InSerial) const
+{
+	FScopeLock Lock(&Mutex);
+	const FEntry* Entry = Entries.Find(InSerial);
+	return Entry && Entry->bPublished;
 }
 
 uint64 FVoxelTerrainResources::Bytes(const uint64 InSerial) const
@@ -389,13 +470,15 @@ EVoxelTerrainResourcePool FVoxelTerrainResources::GetPool(const uint64 InSerial)
 uint64 FVoxelTerrainResources::ReleaseVersionExcludingOwner(const FVoxelGenerationConsumerKey& InOwner) const
 {
 	FScopeLock Lock(&Mutex);
-	return LatestRelease.IsOwner(InOwner) ? PreviousRelease.Version : LatestRelease.Version;
+	const uint64 External = LatestRelease.IsOwner(InOwner) ? PreviousRelease.Version : LatestRelease.Version;
+	return FMath::Max(External, State.PublishedRetirementVersion);
 }
 
 bool FVoxelTerrainResources::TryGetReleaseVersionExcludingOwner(const FVoxelGenerationConsumerKey& InOwner, uint64& OutVersion) const
 {
 	if (!Mutex.TryLock()) return false;
-	OutVersion = LatestRelease.IsOwner(InOwner) ? PreviousRelease.Version : LatestRelease.Version;
+	const uint64 External = LatestRelease.IsOwner(InOwner) ? PreviousRelease.Version : LatestRelease.Version;
+	OutVersion = FMath::Max(External, State.PublishedRetirementVersion);
 	Mutex.Unlock();
 	return true;
 }

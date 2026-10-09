@@ -7,6 +7,7 @@
 #include "Voxel/Generation/VoxelWorldManifest.h"
 #include "Voxel/Task/VoxelTerrainResources.h"
 #include "Voxel/Save/VoxelDeltaCodec.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 
 struct FVoxelFineOverlayCapture;
 
@@ -30,6 +31,8 @@ public:
 	virtual bool ValidateRead(const FVoxelRegionReadView& InRead, TConstArrayView<uint8> InBytes,
 		uint64 InDecodedRevision, FString& OutError) const = 0;
 	virtual uint64 GetMetadataBytes() const = 0;
+	virtual void VisitResourceSources(const FVoxelTerrainResources& InResources,
+		FVoxelGenerationRequiredSourceScope::FVisit InVisit) const = 0;
 };
 
 struct WHFRAMEWORK_API FVoxelFineOverlayCapture
@@ -49,6 +52,8 @@ struct WHFRAMEWORK_API FVoxelFineOverlayCapture
 	TSharedPtr<const IVoxelFineOverlayReadLeaseSet, ESPMode::ThreadSafe> ReadLeaseSet;
 
 	uint64 AllocatedBytes() const;
+	void VisitResourceSources(const FVoxelTerrainResources& InResources,
+		FVoxelGenerationRequiredSourceScope::FVisit InVisit) const;
 };
 
 struct WHFRAMEWORK_API FVoxelFineOverlayReadResult
@@ -88,6 +93,8 @@ public:
 	uint64 GetWorldEpoch() const;
 	uint64 AllocatedBytes() const;
 	EVoxelFineOverlayReadState GetState() const;
+	void VisitResourceSources(const FVoxelTerrainResources& InResources,
+		FVoxelGenerationRequiredSourceScope::FVisit InVisit) const;
 
 private:
 	bool Fail(EVoxelFineOverlayReadState InState, FString InError, FString& OutError);

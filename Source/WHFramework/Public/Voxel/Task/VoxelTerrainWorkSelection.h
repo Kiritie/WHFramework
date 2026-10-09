@@ -78,6 +78,9 @@ public:
 	FVoxelTerrainWorkSelection& operator=(const FVoxelTerrainWorkSelection&) = delete;
 	void BindResources(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
 		const FVoxelGenerationConsumerKey& InConsumer);
+	bool Prepare(FString& OutError);
+	EVoxelTerrainResourceAdmission GetLastResourceAdmission() const { return Admission; }
+	const FVoxelTerrainResourceLease* GetResourceLease() const { return ResourceLease.Get(); }
 	int32 Select(TConstArrayView<FVoxelTerrainServiceCandidate> InCandidates,
 		const FVoxelTerrainServiceCapacity& InCapacity, double InNowSeconds,
 		FVoxelTerrainServiceCharge& OutCharge);
@@ -116,4 +119,5 @@ private:
 	int32 ChargeCapacity = 0;
 	uint64 NextChargeSerial = 0;
 	bool bAccountingFault = false;
+	EVoxelTerrainResourceAdmission Admission = EVoxelTerrainResourceAdmission::None;
 };

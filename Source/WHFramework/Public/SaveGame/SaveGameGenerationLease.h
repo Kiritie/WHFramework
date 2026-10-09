@@ -49,6 +49,7 @@ public:
 	uint64 GenerationIdentity() const;
 	bool Matches(const FString& InDirectory) const;
 	bool IsResourceAccountedFor(const FVoxelTerrainResources* InResources, uint64 InWorldEpoch) const;
+	const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& GetResourceLease() const { return ResourceLease; }
 
 	static TSharedPtr<const FSaveGameGenerationReadLease, ESPMode::ThreadSafe> Acquire(const FString& InDirectory);
 	static bool AcquireGranted(const FString& InDirectory,

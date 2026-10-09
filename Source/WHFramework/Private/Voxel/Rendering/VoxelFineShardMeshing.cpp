@@ -323,6 +323,32 @@ FVoxelFineMeshEstimate FVoxelFineShardMeshing::MinimumPieceMemory(const int32 In
 	return Estimate;
 }
 
+void FVoxelFineShardMeshing::VisitResourceSources(FVoxelGenerationRequiredSourceScope::FVisit InVisit) const
+{
+	const auto Visit = [&](const FVoxelTerrainResourceLease* InLease)
+	{
+		if (InLease && InLease->IsOwnedBy(*Resources))
+		{
+			FVoxelGenerationRequiredSourceScope::VisitLease(InLease, InVisit);
+		}
+	};
+	Visit(Samples ? Samples->ResourceLease.Get() : nullptr);
+	Visit(Samples && Samples->OverlayVersion ? Samples->OverlayVersion->ResourceLease.Get() : nullptr);
+	Visit(PendingLease.Get());
+	Visit(CapacityWorkingLease.Get());
+	Visit(CapacityResultLease.Get());
+	if (Geometry)
+	{
+		Visit(Geometry->MetadataLease.Get());
+		Visit(Geometry->OverlayVersion ? Geometry->OverlayVersion->ResourceLease.Get() : nullptr);
+		Visit(Geometry->Boundary ? Geometry->Boundary->ResourceLease.Get() : nullptr);
+		for (const FVoxelFineMeshPiece& Piece : Geometry->Pieces)
+		{
+			Visit(Piece.Mesh ? Piece.Mesh->ResourceLease.Get() : nullptr);
+		}
+	}
+}
+
 bool FVoxelFineShardMeshing::Initialize(const uint64 InMaximumPieceBytes,
 	const uint64 InMaximumTotalGeometryBytes, FString& OutError)
 {
@@ -337,7 +363,7 @@ bool FVoxelFineShardMeshing::Initialize(const uint64 InMaximumPieceBytes,
 		(Consumer.Kind == EVoxelGenerationConsumerKind::F0Section &&
 			(Consumer.SpatialKind != EVoxelGenerationSpatialKind::Section || Samples->Attempt.Input.Shard.SideCells != 16 ||
 				Consumer.Min * 16 != Samples->Attempt.Input.Shard.Min)) || !Samples->ResourceLease ||
-		Samples->ResourceLease->Bytes() < Samples->AllocatedBytes() || !Samples->Attempt.Input.Shard.Validate(OutError) ||
+		!Samples->ResourceLease->IsOwnedBy(*Resources) || Samples->ResourceLease->Bytes() < Samples->AllocatedBytes() || !Samples->Attempt.Input.Shard.Validate(OutError) ||
 		!Shapes->ValidateCellBounds(OutError))
 	{
 		if (OutError.IsEmpty())
@@ -346,6 +372,11 @@ bool FVoxelFineShardMeshing::Initialize(const uint64 InMaximumPieceBytes,
 		}
 		return false;
 	}
+	FVoxelGenerationRequiredSourceScope SourceScope(&Resources.Get(), this,
+		[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+		{
+			static_cast<const FVoxelFineShardMeshing*>(InContext)->VisitResourceSources(InVisit);
+		});
 	const int32 Side = Samples->Attempt.Input.Shard.SideCells;
 	if (Samples->Snapshot.GridSide != Side || Samples->Snapshot.Blocks.Num() != Side * Side * Side)
 	{
@@ -392,17 +423,17 @@ bool FVoxelFineShardMeshing::Initialize(const uint64 InMaximumPieceBytes,
 		OutError = TEXT("CapacityUnachievable: Fine 边界与元数据超过单 Shard 上限");
 		return false;
 	}
-	if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Working,
-			sizeof(*this) + VoxelBoundedAllocation::ArrayBytes<FVoxelFineShardKey>(Count), PendingLease))
+	if (VoxelFineShardCapacity::TryReserve(Resources, Consumer, EVoxelTerrainResourcePool::Working,
+		VoxelBoundedAllocation::ArrayBytes<FVoxelFineShardKey>(Count), PendingLease,
+		OutError, CapacityVersion, 0, MetadataBytes + BoundaryBytes, 2) != EVoxelTerrainResourceAdmission::Granted)
 	{
-		OutError = TEXT("CapacityBlocked: Fine metadata admission failed");
 		return false;
 	}
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MetadataLease;
-	if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Staged, MetadataBytes, MetadataLease))
+	if (VoxelFineShardCapacity::TryReserve(Resources, Consumer, EVoxelTerrainResourcePool::Staged,
+		MetadataBytes, MetadataLease, OutError, CapacityVersion, 0, BoundaryBytes, 1) != EVoxelTerrainResourceAdmission::Granted)
 	{
 		PendingLease.Reset();
-		OutError = TEXT("CapacityBlocked: Fine result metadata admission failed");
 		return false;
 	}
 	Geometry = VoxelBoundedAllocation::MakeWorkerShared<FVoxelFineShardGeometry>(MetadataLease);
@@ -413,10 +444,10 @@ bool FVoxelFineShardMeshing::Initialize(const uint64 InMaximumPieceBytes,
 	Geometry->OverlayVersion = Samples->OverlayVersion;
 	Geometry->bKnownEmpty = true;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> BoundaryLease;
-	if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Staged, BoundaryBytes, BoundaryLease))
+	if (VoxelFineShardCapacity::TryReserve(Resources, Consumer, EVoxelTerrainResourcePool::Staged,
+		BoundaryBytes, BoundaryLease, OutError, CapacityVersion) != EVoxelTerrainResourceAdmission::Granted)
 	{
 		Abort();
-		OutError = TEXT("CapacityBlocked: Fine 边界快照等待 Staged 资源");
 		return false;
 	}
 	const auto Boundary = VoxelBoundedAllocation::MakeWorkerShared<FVoxelFineBoundarySnapshot>(BoundaryLease);
@@ -501,12 +532,11 @@ bool FVoxelFineShardMeshing::Initialize(const uint64 InMaximumPieceBytes,
 			}
 		}
 	}
-	verify(Boundary->ResourceLease->Resize(Boundary->GetAllocatedBytes()));
+	verify(Boundary->ResourceLease->TryResize(Boundary->GetAllocatedBytes()) == EVoxelTerrainResourceAdmission::Granted);
 	Geometry->Boundary = Boundary;
-	if (!ReserveMetadata(Count, Count))
+	if (!ReserveMetadata(Count, Count, OutError))
 	{
 		Abort();
-		OutError = TEXT("Fine metadata allocation differs from its reservation");
 		return false;
 	}
 	for (int32 Z = 0; Z < Side; Z += PieceSide)
@@ -520,13 +550,13 @@ bool FVoxelFineShardMeshing::Initialize(const uint64 InMaximumPieceBytes,
 		}
 	}
 	GeometryBytes = Geometry->GetAllocatedBytes();
-	CapacityVersion = Resources->Snapshot().ReleaseVersion;
+	CapacityVersion = Resources->ReleaseVersionExcludingOwner(Consumer);
 	State = EVoxelFineBuildProgress::Working;
 	OutError.Reset();
 	return true;
 }
 
-bool FVoxelFineShardMeshing::ReserveMetadata(const int32 InPendingCount, const int32 InPieceCount)
+bool FVoxelFineShardMeshing::ReserveMetadata(const int32 InPendingCount, const int32 InPieceCount, FString& OutError)
 {
 	using namespace VoxelBoundedAllocation;
 	const uint64 PendingBytes = FMath::Max<uint64>(Pending.GetAllocatedSize(), ArrayBytes<FVoxelFineShardKey>(InPendingCount));
@@ -536,37 +566,51 @@ bool FVoxelFineShardMeshing::ReserveMetadata(const int32 InPendingCount, const i
 	if (ExistingResults + GeometryBase + PiecesBytes > MaximumTotalGeometryBytes)
 	{
 		CapacityReason = EVoxelFineCapacityReason::CapacityUnachievable;
+		OutError = TEXT("CapacityUnachievable: Fine subdivision metadata exceeds Shard limit");
 		return false;
 	}
 	if (InPendingCount > Pending.Max())
 	{
-		const uint64 Peak = sizeof(*this) + Pending.GetAllocatedSize() + PendingBytes;
-		if (!PendingLease->Resize(Peak))
+		const uint64 Peak = Pending.GetAllocatedSize() + PendingBytes;
+		const uint64 ResultPeak = GeometryBase + Geometry->Pieces.GetAllocatedSize() + PiecesBytes;
+		const uint64 AdditionalResult = InPieceCount > Geometry->Pieces.Max()
+			? ResultPeak - Geometry->MetadataLease->Bytes() : 0;
+		const auto Admission = VoxelFineShardCapacity::TryReserve(Resources, Consumer, EVoxelTerrainResourcePool::Working,
+			Peak, PendingLease, OutError, CapacityVersion, 0, AdditionalResult);
+		if (Admission != EVoxelTerrainResourceAdmission::Granted)
 		{
-			CapacityReason = EVoxelFineCapacityReason::WorkingTokenUnavailable;
+			CapacityReason = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked
+				? EVoxelFineCapacityReason::WorkingTokenUnavailable : EVoxelFineCapacityReason::CapacityUnachievable;
 			RequiredWorkingBytes = Peak - PendingLease->Bytes();
 			return false;
 		}
 		if (!Reserve(Pending, InPendingCount, PendingBytes))
 		{
+			CapacityReason = EVoxelFineCapacityReason::CapacityUnachievable;
+			OutError = TEXT("EstimateMismatch: Fine pending allocator capacity");
 			return false;
 		}
-		PendingLease->Resize(sizeof(*this) + Pending.GetAllocatedSize());
+		verify(PendingLease->TryResize(Pending.GetAllocatedSize()) == EVoxelTerrainResourceAdmission::Granted);
 	}
 	if (InPieceCount > Geometry->Pieces.Max())
 	{
 		const uint64 Peak = GeometryBase + Geometry->Pieces.GetAllocatedSize() + PiecesBytes;
-		if (!Geometry->MetadataLease->Resize(Peak))
+		const auto Admission = VoxelFineShardCapacity::TryReserve(Resources, Consumer, EVoxelTerrainResourcePool::Staged,
+			Peak, Geometry->MetadataLease, OutError, CapacityVersion);
+		if (Admission != EVoxelTerrainResourceAdmission::Granted)
 		{
-			CapacityReason = EVoxelFineCapacityReason::ResultTokenUnavailable;
+			CapacityReason = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked
+				? EVoxelFineCapacityReason::ResultTokenUnavailable : EVoxelFineCapacityReason::CapacityUnachievable;
 			RequiredResultBytes = Peak - Geometry->MetadataLease->Bytes();
 			return false;
 		}
 		if (!Reserve(Geometry->Pieces, InPieceCount, PiecesBytes))
 		{
+			CapacityReason = EVoxelFineCapacityReason::CapacityUnachievable;
+			OutError = TEXT("EstimateMismatch: Fine pieces allocator capacity");
 			return false;
 		}
-		Geometry->MetadataLease->Resize(GeometryBase + Geometry->Pieces.GetAllocatedSize());
+		verify(Geometry->MetadataLease->TryResize(GeometryBase + Geometry->Pieces.GetAllocatedSize()) == EVoxelTerrainResourceAdmission::Granted);
 	}
 	GeometryBytes = Geometry->GetAllocatedBytes();
 	return true;
@@ -579,8 +623,11 @@ EVoxelFineBuildProgress FVoxelFineShardMeshing::Block(const EVoxelFineCapacityRe
 	RequiredWorkingBytes = InWorkingBytes;
 	RequiredResultBytes = InResultBytes;
 	bCapacityResumable = InReason != EVoxelFineCapacityReason::CapacityUnachievable;
-	CapacityVersion = Resources->Snapshot().ReleaseVersion;
-	State = EVoxelFineBuildProgress::CapacityBlocked;
+	State = bCapacityResumable ? EVoxelFineBuildProgress::CapacityBlocked : EVoxelFineBuildProgress::Failed;
+	if (!bCapacityResumable)
+	{
+		Abort();
+	}
 	return State;
 }
 
@@ -593,12 +640,11 @@ bool FVoxelFineShardMeshing::SplitPending(FString& OutError)
 		OutError = TEXT("CapacityUnachievable: minimum Fine piece exceeds its hard limit");
 		return false;
 	}
-	if (!ReserveMetadata(Pending.Num() + 7, Geometry->Pieces.Num() + Pending.Num() + 7))
+	if (!ReserveMetadata(Pending.Num() + 7, Geometry->Pieces.Num() + Pending.Num() + 7, OutError))
 	{
 		BlockedPendingCount = Pending.Num() + 7;
 		BlockedPieceCount = Geometry->Pieces.Num() + Pending.Num() + 7;
 		Block(CapacityReason, RequiredWorkingBytes, RequiredResultBytes);
-		OutError = TEXT("CapacityBlocked: Fine subdivision metadata");
 		return false;
 	}
 	Pending.Pop(EAllowShrinking::No);
@@ -637,6 +683,11 @@ EVoxelFineBuildProgress FVoxelFineShardMeshing::Advance(const TAtomic<bool>& InC
 		State = EVoxelFineBuildProgress::Failed;
 		return State;
 	}
+	FVoxelGenerationRequiredSourceScope SourceScope(&Resources.Get(), this,
+		[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+		{
+			static_cast<const FVoxelFineShardMeshing*>(InContext)->VisitResourceSources(InVisit);
+		});
 	const FVoxelFineShardKey Key = Pending.Last();
 	const FIntVector Offset = Key.Min - Samples->Attempt.Input.Shard.Min;
 	int32 Bound = 0;
@@ -658,10 +709,44 @@ EVoxelFineBuildProgress FVoxelFineShardMeshing::Advance(const TAtomic<bool>& InC
 	}
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> WorkingLease = MoveTemp(CapacityWorkingLease);
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResultLease = MoveTemp(CapacityResultLease);
-	if ((!WorkingLease && !Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Working, RequiredWorkingBytes, WorkingLease)) ||
-		(WorkingLease && WorkingLease->Bytes() < RequiredWorkingBytes && !WorkingLease->Resize(RequiredWorkingBytes)))
+	struct FLocalSources
 	{
-		return Block(EVoxelFineCapacityReason::WorkingTokenUnavailable, RequiredWorkingBytes, 0);
+		const FVoxelTerrainResources* Resources;
+		const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>* Working;
+		const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>* Result;
+	};
+	const FLocalSources LocalSources{&Resources.Get(), &WorkingLease, &ResultLease};
+	FVoxelGenerationRequiredSourceScope LocalScope(&Resources.Get(), &LocalSources,
+		[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+		{
+			const auto& Local = *static_cast<const FLocalSources*>(InContext);
+			for (const auto* Lease : {Local.Working->Get(), Local.Result->Get()})
+			{
+				if (Lease && Lease->IsOwnedBy(*Local.Resources))
+				{
+					FVoxelGenerationRequiredSourceScope::VisitLease(Lease, InVisit);
+				}
+			}
+		});
+	const uint64 MinimumResult = WorkerSharedBytes<FVoxelSectionMeshResult>();
+	const uint64 AdditionalMinimumResult = ResultLease && ResultLease->Bytes() >= MinimumResult
+		? 0 : MinimumResult - (ResultLease ? ResultLease->Bytes() : 0);
+	EVoxelTerrainResourcePool UnachievablePool = EVoxelTerrainResourcePool::Count;
+	const auto CountAdmission = VoxelFineShardCapacity::TryReserve(Resources, Consumer, EVoxelTerrainResourcePool::Working,
+		RequiredWorkingBytes, WorkingLease, OutError, CapacityVersion, 0, AdditionalMinimumResult, ResultLease ? 0 : 1,
+		&UnachievablePool);
+	if (CountAdmission != EVoxelTerrainResourceAdmission::Granted)
+	{
+		if (UnachievablePool == EVoxelTerrainResourcePool::Working && Key.SideCells > 1)
+		{
+			WorkingLease.Reset();
+			ResultLease.Reset();
+			SplitPending(OutError);
+			return State;
+		}
+		return Block(CountAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked
+			? EVoxelFineCapacityReason::WorkingTokenUnavailable : EVoxelFineCapacityReason::CapacityUnachievable,
+			RequiredWorkingBytes, 0);
 	}
 	FBuildPlan Plan;
 	Plan.Estimate = Minimum;
@@ -720,6 +805,9 @@ EVoxelFineBuildProgress FVoxelFineShardMeshing::Advance(const TAtomic<bool>& InC
 	RequiredResultBytes = Plan.Estimate.ResultCapacityBytes;
 	if (Plan.Estimate.AdditionalPeakBytes > MaximumPieceBytes || Plan.Estimate.MaximumVertices > 262144)
 	{
+		Plan.Batches.Empty();
+		WorkingLease.Reset();
+		ResultLease.Reset();
 		SplitPending(OutError);
 		return State;
 	}
@@ -728,14 +816,32 @@ EVoxelFineBuildProgress FVoxelFineShardMeshing::Advance(const TAtomic<bool>& InC
 		OutError = TEXT("CapacityUnachievable: counted Fine geometry exceeds the Shard hard limit");
 		return Block(EVoxelFineCapacityReason::CapacityUnachievable, RequiredWorkingBytes, RequiredResultBytes);
 	}
-	if (!WorkingLease->Resize(RequiredWorkingBytes))
+	const uint64 AdditionalResult = ResultLease && ResultLease->Bytes() >= RequiredResultBytes
+		? 0 : RequiredResultBytes - (ResultLease ? ResultLease->Bytes() : 0);
+	const auto WorkingAdmission = VoxelFineShardCapacity::TryReserve(Resources, Consumer, EVoxelTerrainResourcePool::Working,
+		RequiredWorkingBytes, WorkingLease, OutError, CapacityVersion, 0, AdditionalResult, ResultLease ? 0 : 1,
+		&UnachievablePool);
+	if (WorkingAdmission != EVoxelTerrainResourceAdmission::Granted)
 	{
-		return Block(EVoxelFineCapacityReason::WorkingTokenUnavailable, RequiredWorkingBytes, RequiredResultBytes);
+		if (UnachievablePool == EVoxelTerrainResourcePool::Working && Key.SideCells > 1)
+		{
+			Plan.Batches.Empty();
+			WorkingLease.Reset();
+			ResultLease.Reset();
+			SplitPending(OutError);
+			return State;
+		}
+		return Block(WorkingAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked
+			? EVoxelFineCapacityReason::WorkingTokenUnavailable : EVoxelFineCapacityReason::CapacityUnachievable,
+			RequiredWorkingBytes, RequiredResultBytes);
 	}
-	if ((!ResultLease && !Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Staged, RequiredResultBytes, ResultLease)) ||
-		(ResultLease && ResultLease->Bytes() < RequiredResultBytes && !ResultLease->Resize(RequiredResultBytes)))
+	const auto ResultAdmission = VoxelFineShardCapacity::TryReserve(Resources, Consumer, EVoxelTerrainResourcePool::Staged,
+		RequiredResultBytes, ResultLease, OutError, CapacityVersion);
+	if (ResultAdmission != EVoxelTerrainResourceAdmission::Granted)
 	{
-		return Block(EVoxelFineCapacityReason::ResultTokenUnavailable, RequiredWorkingBytes, RequiredResultBytes);
+		return Block(ResultAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked
+			? EVoxelFineCapacityReason::ResultTokenUnavailable : EVoxelFineCapacityReason::CapacityUnachievable,
+			RequiredWorkingBytes, RequiredResultBytes);
 	}
 	FVoxelSectionSnapshot SliceSnapshot;
 	if (!Slice(*Samples, Key, SliceSnapshot, OutError) ||
@@ -848,7 +954,7 @@ EVoxelFineBuildProgress FVoxelFineShardMeshing::Advance(const TAtomic<bool>& InC
 		State = InCancel.Load() ? EVoxelFineBuildProgress::Canceled : EVoxelFineBuildProgress::Failed;
 		return State;
 	}
-	ResultLease->Resize(ActualResult);
+	verify(ResultLease->TryResize(ActualResult) == EVoxelTerrainResourceAdmission::Granted);
 	check(Geometry->Pieces.Num() < Geometry->Pieces.Max());
 	Geometry->Pieces.Add({Key, Candidate});
 	Geometry->bKnownEmpty &= !bHasTriangles;
@@ -880,42 +986,79 @@ EVoxelFineBuildProgress FVoxelFineShardMeshing::Advance(const TAtomic<bool>& InC
 
 bool FVoxelFineShardMeshing::ResumeCapacity(const uint64 InCapacityVersion, FString& OutError)
 {
-	if (State != EVoxelFineBuildProgress::CapacityBlocked || !bCapacityResumable ||
-		InCapacityVersion <= CapacityVersion || Resources->Snapshot().ReleaseVersion != InCapacityVersion)
+	if (State != EVoxelFineBuildProgress::CapacityBlocked || !bCapacityResumable)
 	{
-		OutError = TEXT("Fine capacity block requires a newer resource event and a resumable reason");
+		OutError = TEXT("InvalidRequest: Fine capacity reason is not resumable");
 		return false;
 	}
-	CapacityVersion = InCapacityVersion;
+	if (InCapacityVersion <= CapacityVersion ||
+		Resources->ReleaseVersionExcludingOwner(Consumer) < InCapacityVersion)
+	{
+		OutError = TEXT("CapacityBlocked: Fine capacity requires a newer external resource event");
+		return false;
+	}
+	FVoxelGenerationRequiredSourceScope SourceScope(&Resources.Get(), this,
+		[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+		{
+			static_cast<const FVoxelFineShardMeshing*>(InContext)->VisitResourceSources(InVisit);
+		});
 	if (BlockedPendingCount > 0)
 	{
-		if (!ReserveMetadata(BlockedPendingCount, BlockedPieceCount))
+		if (!ReserveMetadata(BlockedPendingCount, BlockedPieceCount, OutError))
 		{
-			CapacityVersion = Resources->Snapshot().ReleaseVersion;
-			bCapacityResumable = CapacityReason != EVoxelFineCapacityReason::CapacityUnachievable;
-			OutError = TEXT("CapacityBlocked: Fine metadata remains unavailable");
+			Block(CapacityReason, RequiredWorkingBytes, RequiredResultBytes);
 			return false;
 		}
 		BlockedPendingCount = 0;
 		BlockedPieceCount = 0;
 		RequiredWorkingBytes = 0;
 		RequiredResultBytes = 0;
-		CapacityReason = EVoxelFineCapacityReason::None;
-		bCapacityResumable = false;
-		State = EVoxelFineBuildProgress::Working;
-		OutError.Reset();
-		return true;
 	}
-	if ((RequiredWorkingBytes > 0 && !Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Working,
-		RequiredWorkingBytes, CapacityWorkingLease)) ||
-		(RequiredResultBytes > 0 && !Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Staged,
-			RequiredResultBytes, CapacityResultLease)))
+	else
 	{
-		CapacityWorkingLease.Reset();
-		CapacityResultLease.Reset();
-		CapacityVersion = Resources->Snapshot().ReleaseVersion;
-		OutError = TEXT("CapacityBlocked: Fine resources are still unavailable");
-		return false;
+		if (RequiredWorkingBytes > 0)
+		{
+			const uint64 AdditionalResult = CapacityResultLease && CapacityResultLease->Bytes() >= RequiredResultBytes
+				? 0 : RequiredResultBytes - (CapacityResultLease ? CapacityResultLease->Bytes() : 0);
+			EVoxelTerrainResourcePool UnachievablePool = EVoxelTerrainResourcePool::Count;
+			const auto Admission = VoxelFineShardCapacity::TryReserve(Resources, Consumer, EVoxelTerrainResourcePool::Working,
+				RequiredWorkingBytes, CapacityWorkingLease, OutError, CapacityVersion, 0, AdditionalResult,
+				RequiredResultBytes && !CapacityResultLease ? 1 : 0, &UnachievablePool);
+			if (Admission != EVoxelTerrainResourceAdmission::Granted)
+			{
+				CapacityWorkingLease.Reset();
+				CapacityResultLease.Reset();
+				if (UnachievablePool == EVoxelTerrainResourcePool::Working && !Pending.IsEmpty() && Pending.Last().SideCells > 1)
+				{
+					if (!SplitPending(OutError))
+					{
+						return false;
+					}
+					CapacityReason = EVoxelFineCapacityReason::None;
+					bCapacityResumable = false;
+					State = EVoxelFineBuildProgress::Working;
+					return true;
+				}
+				Block(Admission == EVoxelTerrainResourceAdmission::CapacityBlocked
+					? EVoxelFineCapacityReason::WorkingTokenUnavailable : EVoxelFineCapacityReason::CapacityUnachievable,
+					RequiredWorkingBytes, RequiredResultBytes);
+				return false;
+			}
+		}
+		if (RequiredResultBytes > 0)
+		{
+			const auto Admission = VoxelFineShardCapacity::TryReserve(Resources, Consumer, EVoxelTerrainResourcePool::Staged,
+				RequiredResultBytes, CapacityResultLease, OutError, CapacityVersion);
+			if (Admission != EVoxelTerrainResourceAdmission::Granted)
+			{
+				CapacityWorkingLease.Reset();
+				CapacityResultLease.Reset();
+				Block(Admission == EVoxelTerrainResourceAdmission::CapacityBlocked
+					? EVoxelFineCapacityReason::ResultTokenUnavailable : EVoxelFineCapacityReason::CapacityUnachievable,
+					RequiredWorkingBytes, RequiredResultBytes);
+				return false;
+			}
+		}
 	}
 	CapacityReason = EVoxelFineCapacityReason::None;
 	bCapacityResumable = false;

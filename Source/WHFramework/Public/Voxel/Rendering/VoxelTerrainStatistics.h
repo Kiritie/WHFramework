@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Voxel/Task/VoxelTerrainResources.h"
+#include "Voxel/Generation/VoxelGenerationTypes.h"
 
 enum class EVoxelTerrainMetricRepresentation : uint8
 {

@@ -12,6 +12,7 @@
 #include "Voxel/Network/VoxelNetworkTransfer.h"
 #include "Voxel/Runtime/VoxelWorldRuntime.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Tests/VoxelTestUtilities.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Network/VoxelModuleNetworkOverlayState.h"
@@ -24,7 +25,7 @@ namespace VoxelNetworkEnvelopeTest
 	{
 		const auto Consumer = FVoxelGenerationConsumerKey::Section(23, FGuid::NewGuid(), 1, {}, 1);
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Input;
-		if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input, Wire.GetAllocatedSize(), Input)) return nullptr;
+		if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input, VoxelGenerationAllocation::AllocatedBytes(Wire), Input)) return nullptr;
 		return FVoxelNetworkEnvelopeDecode::Create(Resources, Consumer, MoveTemp(Wire), MoveTemp(Input), Crc, false, Error);
 	}
 }
@@ -46,14 +47,14 @@ bool FVoxelNetworkEnvelopeBoundedCrcTest::RunTest(const FString& InParameters)
 	auto Work = VoxelNetworkEnvelopeTest::MakeWork(Resources, MoveTemp(Wire), Crc, Error);
 	if (!TestTrue(TEXT("输入及对象分配前收费"), Work.IsValid())) { AddError(Error); return false; }
 	TAtomic<bool> Cancel{false};
-	auto First = Async(EAsyncExecution::ThreadPool, [Work, &Cancel] { return Work->Advance(Cancel); }).Get();
+	auto First = Async(EAsyncExecution::ThreadPool, [Work, &Cancel] { return Work->Advance(Cancel); }).Consume();
 	TestTrue(TEXT("首微步不能遍历完整大正文"), First.bSuccess && First.bContinue);
 	TestTrue(TEXT("CRC 完成前没有复制 Envelope 正文"), Work->GetMessage().Payload.IsEmpty());
 	TestEqual(TEXT("CRC 阶段尚未申请解码工作区"), Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Working)], uint64(0));
 	bool bComplete = false;
 	for (int32 Step = 0; Step < 128; ++Step)
 	{
-		auto Result = Async(EAsyncExecution::ThreadPool, [Work, &Cancel] { return Work->Advance(Cancel); }).Get();
+		auto Result = Async(EAsyncExecution::ThreadPool, [Work, &Cancel] { return Work->Advance(Cancel); }).Consume();
 		if (!Result.bSuccess) { AddError(Result.Error); return false; }
 		if (!Result.bContinue) { bComplete = true; break; }
 	}
@@ -78,7 +79,7 @@ bool FVoxelNetworkEnvelopeCorruptionTest::RunTest(const FString& InParameters)
 	auto Work = VoxelNetworkEnvelopeTest::MakeWork(Resources, MoveTemp(Wire), Crc, Error);
 	if (!Work) { AddError(Error); return false; }
 	TAtomic<bool> Cancel{false};
-	auto Result = Async(EAsyncExecution::ThreadPool, [Work, &Cancel] { return Work->Advance(Cancel); }).Get();
+	auto Result = Async(EAsyncExecution::ThreadPool, [Work, &Cancel] { return Work->Advance(Cancel); }).Consume();
 	TestFalse(TEXT("损坏完整传输正文拒收"), Result.bSuccess);
 	TestTrue(TEXT("损坏正文不会生成可应用的 Wire 消息"), Work->GetMessage().Kind == EVoxelMessage::None && !Result.CustomPayload);
 	TestEqual(TEXT("CRC 拒收先于解码分配"), Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Working)], uint64(0));
@@ -99,6 +100,7 @@ bool FVoxelNetworkEnvelopeCapacityRecoveryTest::RunTest(const FString& InParamet
 	const uint8 Identity[] = {7, 8, 9};
 	FVoxelOverlayHash::Compute(MakeArrayView(Identity), M.ManifestIdentity);
 	M.Heads.AddDefaulted();
+	M.Payload.Init(17, 4096);
 	TArray<uint8> Body, Wire;
 	if (!TestTrue(TEXT("编码区域控制正文"), FVoxelOverlayRegionCodec::Encode(EVoxelMessage::RegionAck, M, Body)) ||
 		!TestTrue(TEXT("编码区域外层 Envelope"), FVoxelNetworkCodec::Encode(EVoxelMessage::RegionAck, FGuid::NewGuid(), Body, Wire))) return false;
@@ -107,15 +109,16 @@ bool FVoxelNetworkEnvelopeCapacityRecoveryTest::RunTest(const FString& InParamet
 	auto Work = VoxelNetworkEnvelopeTest::MakeWork(Resources, MoveTemp(Wire), Crc, Error);
 	if (!Work) { AddError(Error); return false; }
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Blocker;
-	Resources->Acquire(FVoxelGenerationConsumerKey::Section(23, FGuid::NewGuid(), 1, {}, 1),
-		EVoxelTerrainResourcePool::Working, Limits.WorkingBytes - 1024, Blocker);
+	if (!TestTrue(TEXT("外部输入占用接纳"), Resources->Acquire(
+		FVoxelGenerationConsumerKey::Section(23, FGuid::NewGuid(), 1, {}, 1), EVoxelTerrainResourcePool::Input,
+		Limits.InputBytes - Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Input)] - 2048, Blocker))) return false;
 	TAtomic<bool> Cancel{false};
-	auto Waiting = Async(EAsyncExecution::ThreadPool, [Work, &Cancel] { return Work->Advance(Cancel); }).Get();
-	TestTrue(TEXT("容量不足保留输入并等待"), Waiting.bSuccess && Waiting.bContinue && Work->GetBlockReason() == EVoxelTaskBlockReason::Memory);
+	auto Waiting = Async(EAsyncExecution::ThreadPool, [Work, &Cancel] { return Work->Advance(Cancel); }).Consume();
+	TestTrue(TEXT("容量不足保留输入并等待"), Waiting.bSuccess && Waiting.bContinue && Work->GetBlockReason() == EVoxelTaskBlockReason::InputMemory);
 	TestTrue(TEXT("等待期间仍未解析区域正文"), Work->GetMessage().Payload.IsEmpty());
 	Blocker.Reset();
 	TestTrue(TEXT("资源释放后立即恢复可运行"), Work->GetBlockReason() == EVoxelTaskBlockReason::None);
-	auto Ready = Async(EAsyncExecution::ThreadPool, [Work, &Cancel] { return Work->Advance(Cancel); }).Get();
+	auto Ready = Async(EAsyncExecution::ThreadPool, [Work, &Cancel] { return Work->Advance(Cancel); }).Consume();
 	TestTrue(TEXT("同一尝试完成外层和区域正文校验"), Ready.bSuccess && !Ready.bContinue && Work->IsOverlay());
 	const auto Overlay = Work->TakeOverlay();
 	TestTrue(TEXT("解码后的区域正文持有独立输出租约"), Overlay.ResourceLease.IsValid());
@@ -169,6 +172,7 @@ bool FVoxelNetworkWorldControlTest::RunTest(const FString& InParameters)
 	Module->Scheduler = MakeUnique<FVoxelTaskScheduler>(true);
 	Module->Scheduler->SetBudget({});
 	Module->Scheduler->BindFrameContext(Module->TerrainFrameContext);
+	if (!TestTrue(TEXT("初始化原任务控制身份"), Module->Scheduler->InitializeStatistics(23))) return false;
 	Component->Module = Module;
 	Module->RegisterTerrainNetwork(Component);
 	ON_SCOPE_EXIT
@@ -183,7 +187,7 @@ bool FVoxelNetworkWorldControlTest::RunTest(const FString& InParameters)
 	if (!Module->TerrainFrameContext.Configure({}, Error)) { AddError(Error); return false; }
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(23, Component->TaskOwnerId, Component->TaskOwnerIncarnation, {}, 1);
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> StateLease;
-	if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Resident,
+	if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input,
 		VoxelBoundedAllocation::WorkerSharedBytes<FVoxelOverlayNetworkState>(), StateLease)) return false;
 	Component->OverlayNetwork = VoxelBoundedAllocation::MakeWorkerShared<FVoxelOverlayNetworkState>(StateLease);
 	Component->OverlayNetwork->Resources = Resources;
@@ -198,7 +202,11 @@ bool FVoxelNetworkWorldControlTest::RunTest(const FString& InParameters)
 	if (!Work) { AddError(Error); return false; }
 	const uint64 Quota = Work->GetIngressQuotaBytes();
 	Component->OverlayNetwork->EnvelopeBytes = Quota;
-	Component->OverlayNetwork->Envelopes.Enqueue(Work);
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> NodeLease;
+	if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input,
+		TVoxelNetworkQueue<TSharedPtr<FVoxelNetworkEnvelopeDecode, ESPMode::ThreadSafe>>::NodeBytes(), NodeLease)) return false;
+	auto QueuedWork = Work;
+	if (!Component->OverlayNetwork->Envelopes.Enqueue(MoveTemp(QueuedWork), MoveTemp(NodeLease))) return false;
 	FVoxelTaskScheduler* const Scheduler = Module->Scheduler.Get();
 	uint64 FrameCounter = GFrameCounter;
 	Module->TerrainFrameContext.Begin(23, ++FrameCounter, FPlatformTime::Seconds(), {});

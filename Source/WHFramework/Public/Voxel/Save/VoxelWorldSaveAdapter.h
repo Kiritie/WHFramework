@@ -60,11 +60,17 @@ public:
 		TSharedPtr<const FVoxelSceneSaveCapture, ESPMode::ThreadSafe> InRetiredSceneReceipt = {});
 	bool IsBusy() const;
 	bool CanCapture() const;
+	bool IsCaptureCapacityBlocked() const { return bCaptureCapacityBlocked; }
+	const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& GetRetirementResourceLease() const { return RetireTaskLease; }
 
 private:
 	friend class FVoxelJournalFixedCutSaveTest;
 	friend class FVoxelJournalSaveCapacityRecoveryTest;
-	TOptional<FVoxelWorldSaveCapture> Active;
-	UE::Tasks::FTask RetireCaptureTask;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RetireTaskLease;
+	TOptional<FVoxelWorldSaveCapture> Active;
+	TOptional<FVoxelWorldSaveCapture> Pending;
+	UE::Tasks::FTask RetireCaptureTask;
+	uint64 CaptureCapacityVersion = 0;
+	bool bCaptureCapacityBlocked = false;
+	bool bCaptureRootsFrozen = false;
 };

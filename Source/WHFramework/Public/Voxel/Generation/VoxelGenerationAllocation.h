@@ -6,6 +6,64 @@
 #include "Voxel/Task/VoxelTerrainResources.h"
 
 class FVoxelGenerationWorkspace;
+class FVoxelGenerationAllocationScope;
+
+/** 当前调用强持的原生来源；同原账本 serial 或 immutable 地址只计一次。 */
+struct WHFRAMEWORK_API FVoxelGenerationRequiredSource
+{
+	const void* Object = nullptr;
+	uint64 Serial = 0;
+	EVoxelTerrainResourcePool Pool = EVoxelTerrainResourcePool::Input;
+	uint64 Bytes = 0;
+	int32 LeaseCount = 1;
+};
+
+struct WHFRAMEWORK_API FVoxelGenerationRequiredCapacity
+{
+	uint64 Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Count)] = {};
+	int32 LeaseCount = 0;
+};
+
+/** 栈上来源链，不分配 tracking backing；来源的原持有者必须覆盖整个 scope。 */
+class WHFRAMEWORK_API FVoxelGenerationRequiredSourceScope
+{
+public:
+	using FVisit = TFunctionRef<void(const FVoxelGenerationRequiredSource&)>;
+	using FEnumerate = void (*)(const void*, FVisit);
+
+	FVoxelGenerationRequiredSourceScope(
+		const FVoxelTerrainResources* InResources,
+		const void* InContext,
+		FEnumerate InEnumerate);
+	FVoxelGenerationRequiredSourceScope(
+		const FVoxelTerrainResources* InResources,
+		const FVoxelTerrainResourceLease* InLease);
+	~FVoxelGenerationRequiredSourceScope();
+	FVoxelGenerationRequiredSourceScope(const FVoxelGenerationRequiredSourceScope&) = delete;
+	FVoxelGenerationRequiredSourceScope& operator=(const FVoxelGenerationRequiredSourceScope&) = delete;
+
+	static void VisitLease(const FVoxelTerrainResourceLease* InLease, FVisit InVisit);
+	static bool Measure(
+		const void* InContext,
+		FEnumerate InEnumerate,
+		FVoxelGenerationRequiredCapacity& OutCapacity,
+		FString& OutError);
+	static bool Collect(
+		const FVoxelTerrainResources& InResources,
+		const FVoxelTerrainResourceLease* InExcludedLease,
+		FVoxelGenerationRequiredCapacity& OutCapacity,
+		FString& OutError);
+
+private:
+	static bool MeasureSources(TFunctionRef<void(FVisit)> InEnumerate, uint64 InExcludedSerial,
+		FVoxelGenerationRequiredCapacity& OutCapacity, FString& OutError);
+	static void Enumerate(const FVoxelTerrainResources& InResources, FVisit InVisit);
+	static FVoxelGenerationRequiredSourceScope*& ActiveScopeSlot();
+	FVoxelGenerationRequiredSourceScope* Previous = nullptr;
+	const FVoxelTerrainResources* Resources = nullptr;
+	const void* Context = nullptr;
+	FEnumerate Enumerator = nullptr;
+};
 
 /** 原账本的正文构建上下文；只保存聚合字节，不另建容器跟踪表。 */
 class WHFRAMEWORK_API FVoxelGenerationAllocationScope
@@ -35,7 +93,8 @@ public:
 
 private:
 	friend class FVoxelGenerationWorkspace;
-	static thread_local FVoxelGenerationAllocationScope* ActiveScope;
+	friend class FVoxelGenerationRequiredSourceScope;
+	static FVoxelGenerationAllocationScope*& ActiveScopeSlot();
 	FVoxelGenerationAllocationScope* Previous = nullptr;
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
 	FVoxelGenerationConsumerKey Consumer;
@@ -335,6 +394,8 @@ class WHFRAMEWORK_API FVoxelGenerationWorkspace
 {
 public:
 	FVoxelGenerationWorkspace();
+	// 新 scratch 租约沿原输出上下文，不复制或转移其 backing 所有权。
+	explicit FVoxelGenerationWorkspace(const FVoxelGenerationWorkspace* InSource);
 	FVoxelGenerationWorkspace(TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
 		const FVoxelGenerationConsumerKey& InConsumer, uint64 InRequiredInputBytes = 0, int32 InRequiredLeaseCount = 0,
 		uint64 InRequiredWorkingBytes = 0);
@@ -343,11 +404,16 @@ public:
 	FVoxelGenerationWorkspace& operator=(const FVoxelGenerationWorkspace&) = delete;
 
 	bool Check(FString& OutError) const;
+	bool IsOwnedBy(const FVoxelTerrainResources& InResources, const FVoxelGenerationConsumerKey& InConsumer) const
+	{
+		return Resources.Get() == &InResources && Consumer == InConsumer;
+	}
 	bool Fail(const TCHAR* InError, FString& OutError);
 	bool PrepareBytes(uint64 InOldBytes, uint64 InNewBytes, FString& OutError);
 	bool SettleBytes(uint64 InOldBytes, uint64 InReservedBytes, uint64 InActualBytes, FString& OutError);
 	void ReleaseBytes(uint64 InBytes);
 	const FVoxelTerrainResourceLease* GetLease() const { return Lease.Get(); }
+	const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& GetLeaseRef() const { return Lease; }
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> TakeLease() { return MoveTemp(Lease); }
 	uint64 GetRequiredInputBytes() const
 	{
@@ -402,6 +468,9 @@ public:
 	}
 
 private:
+	friend class FVoxelGenerationRequiredSourceScope;
+	static FVoxelGenerationWorkspace*& ActiveWorkspaceSlot();
+	FVoxelGenerationWorkspace* PreviousWorkspace = nullptr;
 	FVoxelGenerationAllocationScope* Scope = nullptr;
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
 	FVoxelGenerationConsumerKey Consumer;

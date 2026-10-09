@@ -38,6 +38,8 @@ struct WHFRAMEWORK_API FVoxelTerrainResourceSnapshot
 {
 	uint64 Version = 0;
 	uint64 ReleaseVersion = 0;
+	uint64 PublishedRetirementVersion = 0;
+	uint64 RootInputBytes = 0;
 	uint64 LedgerMetadataBytes = 0;
 	uint64 LeaseHandleBytes = 0;
 	int32 LeaseCount = 0;
@@ -67,6 +69,9 @@ public:
 	uint64 Bytes() const;
 	EVoxelTerrainResourcePool GetPool() const;
 	uint64 Serial() const;
+	// authority已成功发布的不可变正文；保持原账本、serial和consumer身份。
+	void MarkPublished();
+	bool IsPublished() const;
 	bool IsOwnedBy(const FVoxelTerrainResources& InOwner) const { return &Owner.Get() == &InOwner; }
 
 private:
@@ -77,7 +82,22 @@ private:
 /** Scheduler-owned byte ledger, shared by input, workers, Apply and publishers. */
 class WHFRAMEWORK_API FVoxelTerrainResources final : public TSharedFromThis<FVoxelTerrainResources, ESPMode::ThreadSafe>
 {
+private:
+	struct FConstructionKey
+	{
+		explicit FConstructionKey() = default;
+	};
+
 public:
+#if WITH_DEV_AUTOMATION_TESTS
+	FVoxelTerrainResources();
+#endif
+	FVoxelTerrainResources(FConstructionKey, const FVoxelTerrainResourceLimits& InLimits,
+		const FVoxelGenerationConsumerKey& InControlConsumer, uint64 InRootInputBytes);
+	~FVoxelTerrainResources();
+	static bool Create(const FVoxelTerrainResourceLimits& InLimits,
+		const FVoxelGenerationConsumerKey& InControlConsumer,
+		TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& OutResources, FString& OutError);
 	bool Configure(const FVoxelTerrainResourceLimits& InLimits);
 	bool Acquire(const FVoxelGenerationConsumerKey& InAttempt, EVoxelTerrainResourcePool InPool,
 		uint64 InBytes, TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutLease,
@@ -87,6 +107,7 @@ public:
 		uint64 InBytes, TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutLease,
 		int32 InReservedSplits = 0, uint64 InRequiredInputBytes = 0, int32 InRequiredLeaseCount = 0);
 	FVoxelTerrainResourceSnapshot Snapshot() const;
+	FVoxelGenerationConsumerKey GetControlConsumer() const { return ControlConsumer; }
 	// owner 由完整 ConsumerKey 标识；同模块其它任务的释放仍可唤醒容量等待。
 	// 最近两个不同 owner 的释放事件足以查询任一 owner 的最新外部释放，不增加监听表。
 	uint64 ReleaseVersionExcludingOwner(const FVoxelGenerationConsumerKey& InOwner) const;
@@ -100,6 +121,7 @@ private:
 		EVoxelTerrainResourcePool Pool = EVoxelTerrainResourcePool::Input;
 		uint64 Bytes = 0;
 		int32 ReservedSplits = 0;
+		bool bPublished = false;
 	};
 	bool CanAdd(EVoxelTerrainResourcePool InPool, uint64 InBytes) const;
 	bool CanFitRequired(EVoxelTerrainResourcePool InPool, uint64 InBytes, int32 InReservedSplits,
@@ -112,6 +134,8 @@ private:
 		const FVoxelGenerationConsumerKey& InNewOwner);
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Split(uint64 InSerial, uint64 InBytes);
 	void Release(uint64 InSerial);
+	void MarkPublished(uint64 InSerial);
+	bool IsPublished(uint64 InSerial) const;
 	uint64 Bytes(uint64 InSerial) const;
 	EVoxelTerrainResourcePool GetPool(uint64 InSerial) const;
 	void AdvanceVersion(bool bInCapacityReleased = false, const FVoxelGenerationConsumerKey* InReleasingOwner = nullptr);
@@ -130,4 +154,5 @@ private:
 	uint64 NextSerial = 0;
 	FReleaseEvent LatestRelease;
 	FReleaseEvent PreviousRelease;
+	FVoxelGenerationConsumerKey ControlConsumer;
 };

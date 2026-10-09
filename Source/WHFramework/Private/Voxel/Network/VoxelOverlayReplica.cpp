@@ -7,15 +7,30 @@
 #include "Voxel/Network/VoxelNetworkCodec.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 
 namespace
 {
 	constexpr uint64 MaximumReceivingBytes = 32ull * 1024 * 1024;
+	template<typename KeyType, typename ValueType>
+	uint64 ReplicaNativeMapBytes(const int32 Count)
+	{
+		const TMap<KeyType, ValueType> Empty;
+		return VoxelGenerationAllocation::Private::SetReserveBytes<TPair<KeyType, ValueType>>(Empty, Count);
+	}
+
 	bool LessKey(const FIntVector& A, const FIntVector& B)
 	{
 		if (A.X != B.X) return A.X < B.X;
 		if (A.Y != B.Y) return A.Y < B.Y;
 		return A.Z < B.Z;
+	}
+	template<typename ElementType, typename LeftAllocator, typename RightAllocator>
+	bool EqualArray(const TArray<ElementType, LeftAllocator>& A, const TArray<ElementType, RightAllocator>& B)
+	{
+		if (A.Num() != B.Num()) return false;
+		for (int32 Index = 0; Index < A.Num(); ++Index) if (!(A[Index] == B[Index])) return false;
+		return true;
 	}
 	template<typename KeyType, typename ValueType>
 	bool EqualMap(const TMap<KeyType, ValueType>& A, const TMap<KeyType, ValueType>& B)
@@ -76,6 +91,8 @@ namespace
 	bool HashEntries(TConstArrayView<FVoxelOverlayDirectoryEntry> Entries, const bool bSnapshot, FVoxelOverlayHash& OutHash)
 	{
 		FVoxelByteWriter Writer(FVoxelOverlayRegionCodec::MaximumSnapshotBytes);
+		const uint64 ByteCount = 4 + uint64(Entries.Num()) * (bSnapshot ? 89 : 57);
+		if (ByteCount > FVoxelOverlayRegionCodec::MaximumSnapshotBytes || !Writer.Reserve(int32(ByteCount))) return false;
 		Writer.U32(Entries.Num());
 		FIntVector Previous;
 		bool bPrevious = false;
@@ -156,10 +173,10 @@ bool FVoxelOverlayRegionCodec::ManifestHash(const FVoxelWorldManifest& InManifes
 
 bool FVoxelOverlayRegionCodec::Encode(const EVoxelMessage InKind, const FVoxelOverlayRegionMessage& M, TArray<uint8>& OutBytes)
 {
-	if (!IsRegionMessage(InKind) || M.WorldEpoch == 0 || M.ManifestIdentity.IsZero() || !M.SubscriptionId.IsValid() ||
-		!M.CoverageTicket.IsValid() || M.Heads.Num() > MaximumRegions || M.Entries.Num() > MaximumPageEntries ||
-		M.Payload.Num() > MaximumPartBytes || M.TotalBytes > MaximumSnapshotBytes) return false;
+	int32 EncodedBytes = 0;
+	if (!IsRegionMessage(InKind) || !EncodedByteCount(M, EncodedBytes)) return false;
 	FVoxelByteWriter Writer(MaximumMessageBytes);
+	if (!Writer.Reserve(EncodedBytes)) return false;
 	Writer.U8(uint8(InKind));
 	Writer.U64(M.WorldEpoch);
 	WriteHash(Writer, M.ManifestIdentity);
@@ -183,15 +200,32 @@ bool FVoxelOverlayRegionCodec::Encode(const EVoxelMessage InKind, const FVoxelOv
 	TArray<uint8> Body;
 	FVoxelOverlayHash Hash;
 	if (!Writer.Finish(Body) || !FVoxelOverlayHash::Compute(Body, Hash)) return false;
+	if (Body.Num() != EncodedBytes - 32) return false;
 	Body.Append(Hash.Bytes, 32);
 	OutBytes = MoveTemp(Body);
 	return true;
 }
 
-bool FVoxelOverlayRegionCodec::Decode(const EVoxelMessage InKind, TConstArrayView<uint8> InBytes,
-	FVoxelOverlayRegionMessage& OutMessage, FString& OutError)
+bool FVoxelOverlayRegionCodec::EncodedByteCount(const FVoxelOverlayRegionMessage& M, int32& OutBytes,
+	const int32 InPlannedHeadCount)
 {
-	if (!IsRegionMessage(InKind) || InBytes.Num() < 32 || InBytes.Num() > MaximumMessageBytes) return false;
+	const int32 HeadCount = InPlannedHeadCount == INDEX_NONE ? M.Heads.Num() : InPlannedHeadCount;
+	if (M.WorldEpoch == 0 || M.ManifestIdentity.IsZero() || !M.SubscriptionId.IsValid() ||
+		!M.CoverageTicket.IsValid() || HeadCount < 0 || HeadCount > MaximumRegions || M.Entries.Num() > MaximumPageEntries ||
+		M.Payload.Num() > MaximumPartBytes || M.TotalBytes > MaximumSnapshotBytes) return false;
+	const int32 Bytes = 304 + HeadCount * 92 + M.Entries.Num() * 97 + M.Payload.Num();
+	if (Bytes > MaximumMessageBytes) return false;
+	OutBytes = Bytes;
+	return true;
+}
+
+namespace
+{
+template<bool bBuild>
+bool DecodeRegionMessage(const EVoxelMessage InKind, TConstArrayView<uint8> InBytes,
+	FVoxelOverlayRegionMessage& OutMessage, uint64& OutBytes, FString& OutError)
+{
+	if (!IsRegionMessage(InKind) || InBytes.Num() < 32 || InBytes.Num() > FVoxelOverlayRegionCodec::MaximumMessageBytes) return false;
 	FVoxelOverlayHash Hash;
 	if (!FVoxelOverlayHash::Compute(InBytes.Left(InBytes.Num() - 32), Hash) ||
 		FMemory::Memcmp(Hash.Bytes, InBytes.GetData() + InBytes.Num() - 32, 32) != 0)
@@ -213,33 +247,59 @@ bool FVoxelOverlayRegionCodec::Decode(const EVoxelMessage InKind, TConstArrayVie
 	M.Index = Reader.U32(); M.Count = Reader.U32(); M.EntryCount = Reader.U32(); M.TotalBytes = Reader.U32();
 	M.DirectoryHash = ReadHash(Reader); M.ContentHash = ReadHash(Reader);
 	const uint16 HeadCount = Reader.U16();
-	if (HeadCount > MaximumRegions || M.TotalBytes > MaximumSnapshotBytes) return false;
-	M.Heads.Reserve(HeadCount);
-	TSet<FIntVector> Regions;
+	if (HeadCount > FVoxelOverlayRegionCodec::MaximumRegions || M.TotalBytes > FVoxelOverlayRegionCodec::MaximumSnapshotBytes) return false;
+	if constexpr (bBuild) M.Heads.Reserve(HeadCount);
+	FIntVector Regions[FVoxelOverlayRegionCodec::MaximumRegions];
 	for (int32 Index = 0; Index < HeadCount; ++Index)
 	{
 		FVoxelOverlayRegionHead Head;
 		Head.Region = FVoxelNetworkCodec::ReadVector(Reader);
 		Head.PreviousSequence = Reader.U64(); Head.Sequence = Reader.U64();
 		Head.BeforeHash = ReadHash(Reader); Head.Hash = ReadHash(Reader);
-		if (Regions.Contains(Head.Region)) return false;
-		Regions.Add(Head.Region); M.Heads.Add(Head);
+		for (int32 Previous = 0; Previous < Index; ++Previous) if (Regions[Previous] == Head.Region) return false;
+		Regions[Index] = Head.Region;
+		if constexpr (bBuild) M.Heads.Add(Head);
 	}
 	const uint8 EntryCount = Reader.U8();
-	if (EntryCount > MaximumPageEntries) return false;
-	M.Entries.Reserve(EntryCount);
+	if (EntryCount > FVoxelOverlayRegionCodec::MaximumPageEntries) return false;
+	if constexpr (bBuild) M.Entries.Reserve(EntryCount);
 	for (int32 Index = 0; Index < EntryCount; ++Index)
 	{
 		FVoxelOverlayDirectoryEntry Entry;
 		if (!ReadEntry(Reader, Entry, true)) return false;
-		M.Entries.Add(Entry);
+		if constexpr (bBuild) M.Entries.Add(Entry);
 	}
-	M.Payload = Reader.Blob(MaximumPartBytes);
+	const auto Payload = Reader.BlobView(FVoxelOverlayRegionCodec::MaximumPartBytes);
 	if (!Reader.End() || M.WorldEpoch == 0 || M.ManifestIdentity.IsZero() || !M.SubscriptionId.IsValid() ||
 		!M.CoverageTicket.IsValid()) return false;
-	OutMessage = MoveTemp(M);
+	OutBytes = sizeof(FVoxelOverlayRegionMessage) +
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelOverlayRegionHead, FDefaultAllocator>(HeadCount) +
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelOverlayDirectoryEntry, FDefaultAllocator>(EntryCount) +
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(Payload.Num());
+	if constexpr (bBuild)
+	{
+		M.Payload.Reserve(Payload.Num());
+		M.Payload.Append(Payload.GetData(), Payload.Num());
+		OutMessage = MoveTemp(M);
+	}
 	OutError.Reset();
 	return true;
+}
+
+}
+
+bool FVoxelOverlayRegionCodec::Decode(const EVoxelMessage InKind, TConstArrayView<uint8> InBytes,
+	FVoxelOverlayRegionMessage& OutMessage, FString& OutError)
+{
+	uint64 Bytes = 0;
+	return DecodeRegionMessage<true>(InKind, InBytes, OutMessage, Bytes, OutError);
+}
+
+bool FVoxelOverlayRegionCodec::MeasureDecode(const EVoxelMessage InKind, TConstArrayView<uint8> InBytes,
+	uint64& OutBytes, FString& OutError)
+{
+	FVoxelOverlayRegionMessage Scalars;
+	return DecodeRegionMessage<false>(InKind, InBytes, Scalars, OutBytes, OutError);
 }
 
 bool FVoxelOverlayRegionCodec::DirectoryHash(TConstArrayView<FVoxelOverlayDirectoryEntry> InEntries, FVoxelOverlayHash& OutHash)
@@ -254,13 +314,57 @@ bool FVoxelOverlayRegionCodec::SnapshotHash(TConstArrayView<FVoxelOverlayDirecto
 
 bool FVoxelOverlayRegionCodec::EncodeOverlay(const FVoxelOverlaySnapshot& InOverlay, TArray<uint8>& OutBytes, FString& OutError)
 {
+	if (!InOverlay.Revision || InOverlay.Blocks.Num() > 4096 || InOverlay.Entities.Num() > 4096)
+	{ OutError = TEXT("InvalidResource: Overlay Section identity or cell count"); return false; }
+	uint64 WireBytes = 24 + uint64(InOverlay.Blocks.Num()) * 7 + uint64(InOverlay.Entities.Num()) * 11;
+	for (const auto& Pair : InOverlay.Blocks) if (Pair.Key < 0 || Pair.Key >= 4096)
+	{ OutError = TEXT("InvalidResource: Overlay block cell index"); return false; }
+	for (const auto& Pair : InOverlay.Entities)
+	{
+		if (Pair.Key < 0 || Pair.Key >= 4096 || Pair.Value.Payload.Num() > 256 * 1024)
+		{ OutError = TEXT("InvalidResource: Overlay entity cell or payload limit"); return false; }
+		WireBytes += Pair.Value.Payload.Num();
+	}
+	if (WireBytes > FVoxelNetworkCodec::MaxRepresentationBytes)
+	{ OutError = TEXT("CapacityUnachievable: Overlay Section wire limit"); return false; }
+	// 调用方 Authority 已授予这两数组、各 payload 副本与完整编码 buffer 的 native 容量。
 	FVoxelNetworkSectionSnapshot Snapshot;
 	Snapshot.Section = InOverlay.Section; Snapshot.Revision = InOverlay.Revision;
+	Snapshot.Blocks.Reserve(InOverlay.Blocks.Num());
+	Snapshot.Entities.Reserve(InOverlay.Entities.Num());
 	for (const auto& Pair : InOverlay.Blocks) Snapshot.Blocks.Add({Pair.Key, false, Pair.Value});
-	for (const auto& Pair : InOverlay.Entities) Snapshot.Entities.Add({Pair.Key, false, Pair.Value});
+	for (const auto& Pair : InOverlay.Entities)
+	{
+		FVoxelEntityWrite Edit;
+		Edit.CellIndex = Pair.Key;
+		Edit.bRemove = false;
+		Edit.Value.Kind = Pair.Value.Kind;
+		Edit.Value.Schema = Pair.Value.Schema;
+		Edit.Value.Payload.Reserve(Pair.Value.Payload.Num());
+		Edit.Value.Payload.Append(Pair.Value.Payload);
+		Snapshot.Entities.Add(MoveTemp(Edit));
+	}
 	Snapshot.Blocks.Sort([](const auto& A, const auto& B) { return A.CellIndex < B.CellIndex; });
 	Snapshot.Entities.Sort([](const auto& A, const auto& B) { return A.CellIndex < B.CellIndex; });
-	return FVoxelNetworkCodec::EncodeSectionSnapshot(Snapshot, OutBytes, OutError);
+	FVoxelByteWriter Writer(FVoxelNetworkCodec::MaxRepresentationBytes);
+	if (!Writer.Reserve(int32(WireBytes)))
+	{ OutError = TEXT("InvalidResource: Overlay native wire reserve"); return false; }
+	FVoxelNetworkCodec::WriteVector(Writer, Snapshot.Section);
+	Writer.U64(Snapshot.Revision);
+	Writer.U16(uint16(Snapshot.Blocks.Num()));
+	for (const auto& Edit : Snapshot.Blocks) { Writer.U16(uint16(Edit.CellIndex)); Writer.U8(0); Writer.U32(Edit.State.Pack()); }
+	Writer.U16(uint16(Snapshot.Entities.Num()));
+	for (const auto& Edit : Snapshot.Entities)
+	{
+		Writer.U16(uint16(Edit.CellIndex)); Writer.U8(0); Writer.U16(Edit.Value.Kind); Writer.U16(Edit.Value.Schema);
+		Writer.Blob(Edit.Value.Payload, 256 * 1024);
+	}
+	TArray<uint8> Candidate;
+	if (!Writer.Finish(Candidate) || Candidate.Num() != int32(WireBytes))
+	{ OutError = TEXT("InvalidResource: Overlay exact wire size"); return false; }
+	OutBytes = MoveTemp(Candidate);
+	OutError.Reset();
+	return true;
 }
 
 bool FVoxelOverlayRegionCodec::DecodeOverlay(TConstArrayView<uint8> InBytes, FVoxelOverlaySnapshot& OutOverlay, FString& OutError)
@@ -326,13 +430,13 @@ bool FVoxelOverlayRegionCodec::OverlayCapacity(TConstArrayView<uint8> InBytes, u
 		if (Cell >= 4096 || Cell <= Previous || Reader.U8() != 0) return false;
 		Reader.U16(); Reader.U16();
 		const auto Payload = Reader.BlobView(256 * 1024);
-		PayloadBytes += VoxelBoundedAllocation::ArrayBytes<uint8>(Payload.Num());
+		PayloadBytes += VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(Payload.Num());
 		Previous = Cell;
 	}
 	if (!Reader.End()) return false;
 	OutBytes = VoxelBoundedAllocation::SharedBytes<FVoxelOverlaySnapshot>() +
-		VoxelBoundedAllocation::MapBytes<int32, FVoxelBlockState>(Blocks) +
-		VoxelBoundedAllocation::MapBytes<int32, FVoxelBlockEntityState>(Entities) + PayloadBytes;
+		ReplicaNativeMapBytes<int32, FVoxelBlockState>(Blocks) +
+		ReplicaNativeMapBytes<int32, FVoxelBlockEntityState>(Entities) + PayloadBytes;
 	return true;
 }
 
@@ -370,15 +474,21 @@ bool FVoxelOverlayRegionCodec::DecodeDelta(TConstArrayView<uint8> InBytes,
 
 struct FVoxelOverlayReplicaRoot
 {
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 	TSharedPtr<const FVoxelOverlayReplicaRoot, ESPMode::ThreadSafe> Children[8];
 	TSharedPtr<const FVoxelOverlayRegionSnapshot, ESPMode::ThreadSafe> Region;
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 };
 
 namespace
 {
 	using FRootPtr = TSharedPtr<const FVoxelOverlayReplicaRoot, ESPMode::ThreadSafe>;
 	using FRegionPtr = TSharedPtr<const FVoxelOverlayRegionSnapshot, ESPMode::ThreadSafe>;
+	void VisitReplicaRegionSources(const FVoxelOverlayRegionSnapshot* Region, const FVoxelTerrainResources& Resources,
+		FVoxelGenerationRequiredSourceScope::FVisit Visit);
+	void VisitReplicaRootSources(const FVoxelOverlayReplicaRoot* Node, const FVoxelTerrainResources& Resources,
+		FVoxelGenerationRequiredSourceScope::FVisit Visit);
+	void MarkReplicaRegionPublished(const FVoxelOverlayRegionSnapshot* Region);
+	void MarkReplicaRootPublished(const FVoxelOverlayReplicaRoot* Root);
 	FRegionPtr RegionAt(const FRootPtr& Root, const FIntVector& Key)
 	{
 		const auto* Node = Root.Get();
@@ -411,11 +521,25 @@ namespace
 	}
 	struct FRemoteReadLease final : IVoxelFineOverlayReadLeaseSet
 	{
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 		uint64 Epoch = 0;
 		FGuid DirectoryEpoch;
 		FVoxelGenerationBounds Bounds;
 		TArray<FRegionPtr> Regions;
-		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
+		virtual void VisitResourceSources(const FVoxelTerrainResources& Resources, FVoxelGenerationRequiredSourceScope::FVisit Visit) const override
+		{
+			const auto Add = [&](const FVoxelTerrainResourceLease* Lease)
+			{
+				if (Lease && Lease->IsOwnedBy(Resources)) FVoxelGenerationRequiredSourceScope::VisitLease(Lease, Visit);
+			};
+			Add(ResourceLease.Get());
+			for (const auto& Region : Regions)
+			{
+				if (!Region) continue;
+				Add(Region->ResourceLease.Get());
+				for (const auto& Pair : Region->Overlays) if (Pair.Value) { Add(Pair.Value->ResourceLease.Get()); Add(Pair.Value->IndexLease.Get()); }
+			}
+		}
 		virtual uint64 GetWorldEpoch() const override { return Epoch; }
 		virtual bool IsRemoteDirectory() const override { return true; }
 		virtual uint64 GetMetadataBytes() const override { return sizeof(*this) + Regions.GetAllocatedSize(); }
@@ -450,8 +574,27 @@ namespace
 			return false;
 		}
 	};
+	// Inline admission belongs to the original reliable ticket/transaction; rejection creates no new attempt.
+	struct FReplicaPreparationAdmission
+	{
+		FVoxelGenerationConsumerKey Consumer;
+		FVoxelTerrainResourceLimits Limits;
+		FGuid Ticket;
+		FGuid Snapshot;
+		FIntVector Region = FIntVector::ZeroValue;
+		FVoxelOverlayHash WireDigest;
+		const FVoxelOverlayReplicaRoot* Basis = nullptr;
+		uint64 BasisLeaseSerial = 0;
+		uint64 Cut = 0;
+		uint64 CapacityVersion = 0;
+		EVoxelTerrainResourceAdmission Admission = EVoxelTerrainResourceAdmission::None;
+		bool bRegionOnly = false;
+		bool bCandidate = false;
+	};
 	struct FPartSet
 	{
+		FReplicaPreparationAdmission Admission;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PreparationLease;
 		uint64 StoredBytes = 0;
 		uint32 TotalBytes = 0;
 		uint32 Count = 0;
@@ -460,7 +603,6 @@ namespace
 		TMap<uint32, FVoxelOverlayRegionMessage> Parts;
 		TArray<uint8> Assembly;
 		TUniquePtr<FVoxelByteReader> Reader;
-		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PreparationLease;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PathLease;
 		TMap<FIntVector, TSharedPtr<FVoxelOverlayRegionSnapshot, ESPMode::ThreadSafe>> PreparedRegions;
 		TMap<FIntVector, bool> SeenSections;
@@ -474,13 +616,20 @@ namespace
 		bool Assemble(TArray<uint8>& Out, FString& Error) const
 		{
 			if (Parts.Num() != int32(Count)) return false;
-			Out.Reserve(TotalBytes);
+			uint64 AssembledBytes = 0;
 			for (uint32 Index = 0; Index < Count; ++Index)
 			{
 				const auto* Part = Parts.Find(Index);
 				if (!Part) return false;
-				Out.Append(Part->Payload);
+				AssembledBytes += Part->Payload.Num();
 			}
+			if (AssembledBytes != TotalBytes)
+			{
+				Error = TEXT("完整区域正文的分片长度超出原声明容量");
+				return false;
+			}
+			Out.Reserve(TotalBytes);
+			for (uint32 Index = 0; Index < Count; ++Index) Out.Append(Parts.FindChecked(Index).Payload);
 			FVoxelOverlayHash Actual;
 			if (Out.Num() != int32(TotalBytes) || !FVoxelOverlayHash::Compute(Out, Actual) || Actual != Hash)
 			{
@@ -492,6 +641,7 @@ namespace
 	};
 	struct FReceivingRegion
 	{
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PreparationLease;
 		uint64 StoredBytes = 0;
 		FVoxelOverlayRegionMessage Begin;
 		FVoxelOverlayRegionMessage End;
@@ -500,7 +650,6 @@ namespace
 		TSet<FIntVector> ExpectedPayloadSections;
 		TSharedPtr<FVoxelOverlayRegionSnapshot, ESPMode::ThreadSafe> Prepared;
 		TSharedPtr<const FVoxelOverlayReplicaWork, ESPMode::ThreadSafe> PreparedProof;
-		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PreparationLease;
 		TArray<FVoxelOverlayDirectoryEntry> PreparedEntries;
 		TArray<uint8> Assembly;
 		int32 EntryCursor = 0;
@@ -516,11 +665,14 @@ struct FVoxelOverlayReplicaReceiving
 {
 	struct FTicket
 	{
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
+		FReplicaPreparationAdmission Admission;
 		FGuid Subscription;
 		TArray<FIntVector> Regions;
 		TSharedPtr<const FVoxelOverlayRegionMessage, ESPMode::ThreadSafe> Cohort;
 		TSharedPtr<const FVoxelOverlayReplicaRoot, ESPMode::ThreadSafe> Candidate;
 	};
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> TicketStorageLease;
 	TMap<FGuid, FTicket> Tickets;
 	TMap<FIntVector, uint64> RequiredSequences;
 	TMap<FIntVector, FReceivingRegion> Regions;
@@ -555,16 +707,23 @@ struct FReplicaMessageKey
 
 uint32 GetTypeHash(const FReplicaMessageKey& Key)
 {
-	uint32 Hash = HashCombineFast(::GetTypeHash(uint8(Key.Kind)), ::GetTypeHash(Key.Region));
-	Hash = HashCombineFast(Hash, ::GetTypeHash(Key.Section));
-	Hash = HashCombineFast(Hash, ::GetTypeHash(Key.Index));
-	Hash = HashCombineFast(Hash, ::GetTypeHash(Key.Snapshot));
-	return HashCombineFast(Hash, ::GetTypeHash(Key.Transaction));
+	uint32 Hash = HashCombineFast(GetTypeHash(uint8(Key.Kind)), GetTypeHash(Key.Region));
+	Hash = HashCombineFast(Hash, GetTypeHash(Key.Section));
+	Hash = HashCombineFast(Hash, GetTypeHash(Key.Index));
+	Hash = HashCombineFast(Hash, GetTypeHash(Key.Snapshot));
+	return HashCombineFast(Hash, GetTypeHash(Key.Transaction));
 }
 
 struct FVoxelOverlayReplicaWork final : FVoxelTaskCustomPayload
 {
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InputLease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> AuthorityTicketStorageLease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> AuthorityTicketLease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ExecuteBindingLease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ApplyBindingLease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> BlockBindingLease;
+	FVoxelGenerationConsumerKey Consumer;
+	TSharedPtr<const FVoxelOverlayReplicaRoot, ESPMode::ThreadSafe> AuthorityBasis;
 	TSharedPtr<FVoxelOverlayReplica, ESPMode::ThreadSafe> Worker;
 	TSharedPtr<const FVoxelOverlayReplicaRoot, ESPMode::ThreadSafe> Basis;
 	TSharedPtr<const FVoxelOverlayCommitNotification, ESPMode::ThreadSafe> Notification;
@@ -588,15 +747,61 @@ struct FVoxelOverlayReplicaWork final : FVoxelTaskCustomPayload
 		return {Kind, Message.Region, Message.Section, Message.Index, Message.SnapshotId, Message.AuthorityTransaction};
 	}
 
+	void VisitResourceSources(const FVoxelTerrainResources& InResources, FVoxelGenerationRequiredSourceScope::FVisit Visit,
+		const bool bIncludeBindings = true) const
+	{
+		const auto Add = [&](const FVoxelTerrainResourceLease* Lease)
+		{
+			if (Lease && Lease->IsOwnedBy(InResources)) FVoxelGenerationRequiredSourceScope::VisitLease(Lease, Visit);
+		};
+		Add(InputLease.Get()); Add(AuthorityTicketStorageLease.Get()); Add(AuthorityTicketLease.Get());
+		if (bIncludeBindings) { Add(ExecuteBindingLease.Get()); Add(ApplyBindingLease.Get()); Add(BlockBindingLease.Get()); }
+		VisitReplicaRootSources(AuthorityBasis.Get(), InResources, Visit);
+		VisitReplicaRootSources(Basis.Get(), InResources, Visit);
+		if (Cohort) Add(Cohort->ResourceLease.Get());
+		if (Notification) Add(Notification->ResourceLease.Get());
+		if (!Worker) return;
+		VisitReplicaRootSources(Worker->Root.Get(), InResources, Visit);
+		for (const auto& Pair : Worker->Receiving->Regions)
+		{
+			const auto& Region = Pair.Value;
+			Add(Region.Begin.ResourceLease.Get()); Add(Region.End.ResourceLease.Get()); Add(Region.PreparationLease.Get());
+			if (Region.Cohort) Add(Region.Cohort->ResourceLease.Get());
+			VisitReplicaRegionSources(Region.Prepared.Get(), InResources, Visit);
+			for (const auto& Page : Region.Pages) Add(Page.Value.ResourceLease.Get());
+			for (const auto& Payload : Region.Payloads)
+				for (const auto& Part : Payload.Value.Parts) Add(Part.Value.ResourceLease.Get());
+		}
+		for (const auto& Pair : Worker->Receiving->Transactions)
+		{
+			const auto& Parts = Pair.Value;
+			Add(Parts.PreparationLease.Get());
+			if (Parts.PathLease && Parts.PathLease->IsOwnedBy(InResources))
+				Visit({nullptr, Parts.PathLease->Serial(), Parts.PathLease->GetPool(), Parts.PathLease->Bytes(),
+					1 + int32(Parts.PathLease->Bytes() / RootNodeBytes())});
+			if (Parts.Cohort) Add(Parts.Cohort->ResourceLease.Get());
+			for (const auto& Part : Parts.Parts) Add(Part.Value.ResourceLease.Get());
+			for (const auto& Prepared : Parts.PreparedRegions) VisitReplicaRegionSources(Prepared.Value.Get(), InResources, Visit);
+			VisitReplicaRootSources(Parts.PreparedRoot.Get(), InResources, Visit);
+		}
+	}
+
 	FVoxelTaskResult Advance(const TAtomic<bool>& Cancel)
 	{
 		FVoxelTaskResult Result;
 		if (Cancel.Load()) { Result.bCanceled = true; return Result; }
-		if (bWaitingCapacity.Load() && Worker->Resources->Snapshot().ReleaseVersion <= CapacityVersion)
+		if (bWaitingCapacity.Load() && Worker->Resources->ReleaseVersionExcludingOwner(Consumer) <= CapacityVersion)
 		{
 			Result.bSuccess = Result.bContinue = true;
 			return Result;
 		}
+		Worker->BodyAdmission = EVoxelTerrainResourceAdmission::None;
+		FVoxelGenerationRequiredSourceScope Sources(&Worker->Resources.Get(), this,
+			[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+			{
+				const auto& Work = *static_cast<const FVoxelOverlayReplicaWork*>(Context);
+				Work.VisitResourceSources(*Work.Worker->Resources, Visit);
+			});
 		const bool bSucceeded = bRegionOnly ? Worker->PrepareReceivingRegion(Stamp.Section, Result.Error) :
 			(bDelta ? Worker->TryApplyDelta(Identity, Result.Error) : Worker->TryCommitTicket(Identity, Result.Error));
 		if (!bSucceeded) return Result;
@@ -605,7 +810,7 @@ struct FVoxelOverlayReplicaWork final : FVoxelTaskCustomPayload
 		{
 			// 正常逐步推进不等待资源事件；只有明确的容量拒绝才暂停调度。
 			const bool bBlocked = Result.Error.StartsWith(TEXT("CapacityBlocked:"));
-			if (bBlocked) CapacityVersion = Worker->Resources->Snapshot().ReleaseVersion;
+			if (bBlocked) CapacityVersion = Worker->BodyCapacityVersion;
 			bWaitingCapacity.Store(bBlocked);
 			Result.Error.Reset();
 			Result.bSuccess = Result.bContinue = true;
@@ -625,6 +830,61 @@ struct FVoxelOverlayReplicaWork final : FVoxelTaskCustomPayload
 		return InputLease ? InputLease->Bytes() : 0;
 	}
 };
+
+
+namespace
+{
+	struct FReplicaWorkCommitted
+	{
+		TWeakPtr<FVoxelOverlayReplicaWork, ESPMode::ThreadSafe> Work;
+		void operator()(TSharedPtr<const FVoxelOverlayCommitNotification, ESPMode::ThreadSafe> Notification) const
+		{
+			if (const auto Active = Work.Pin()) Active->Notification = MoveTemp(Notification);
+		}
+	};
+	uint64 ReplicaMessageCopyBytes(const FVoxelOverlayRegionMessage& Message)
+	{
+		return VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelOverlayRegionHead, FDefaultAllocator>(Message.Heads.Num()) +
+			VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelOverlayDirectoryEntry, FDefaultAllocator>(Message.Entries.Num()) +
+			VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(Message.Payload.Num());
+	}
+	void CopyReplicaMessage(const FVoxelOverlayRegionMessage& From, FVoxelOverlayRegionMessage& To)
+	{
+		To.ResourceLease = From.ResourceLease;
+		To.WorldEpoch = From.WorldEpoch;
+		To.ManifestIdentity = From.ManifestIdentity;
+		To.SubscriptionId = From.SubscriptionId;
+		To.CoverageTicket = From.CoverageTicket;
+		To.DirectoryEpoch = From.DirectoryEpoch;
+		To.SnapshotId = From.SnapshotId;
+		To.AuthorityTransaction = From.AuthorityTransaction;
+		To.Region = From.Region;
+		To.Section = From.Section;
+		To.AuthorityCut = From.AuthorityCut;
+		To.DirectoryRevision = From.DirectoryRevision;
+		To.BaseSequence = From.BaseSequence;
+		To.TargetSequence = From.TargetSequence;
+		To.OverlayRevision = From.OverlayRevision;
+		To.Index = From.Index;
+		To.Count = From.Count;
+		To.EntryCount = From.EntryCount;
+		To.TotalBytes = From.TotalBytes;
+		To.DirectoryHash = From.DirectoryHash;
+		To.ContentHash = From.ContentHash;
+		To.WireDigest = From.WireDigest;
+		To.Heads.Reserve(From.Heads.Num());
+		To.Heads.Append(From.Heads);
+		To.Entries.Reserve(From.Entries.Num());
+		To.Entries.Append(From.Entries);
+		To.Payload.Reserve(From.Payload.Num());
+		To.Payload.Append(From.Payload);
+	}
+	bool SameReplicaLimits(const FVoxelTerrainResourceLimits& A, const FVoxelTerrainResourceLimits& B)
+	{
+		return A.InputBytes == B.InputBytes && A.WorkingBytes == B.WorkingBytes && A.StagedBytes == B.StagedBytes &&
+			A.ResidentBytes == B.ResidentBytes && A.OverlapBytes == B.OverlapBytes;
+	}
+}
 
 FVoxelOverlayReplica::FVoxelOverlayReplica(const uint64 InLocalEpoch,
 	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources)
@@ -984,24 +1244,120 @@ bool FVoxelOverlayReplica::QueuePreparation(const FGuid& InIdentity, const bool 
 			MessageCount += 2 + Region.Pages.Num();
 			for (const auto& Payload : Region.Payloads) MessageCount += Payload.Value.Parts.Num();
 		}
-		else CopyBytes += Region.Begin.Heads.GetAllocatedSize() + Region.End.Heads.GetAllocatedSize();
+		else CopyBytes += ReplicaMessageCopyBytes(Region.Begin) + ReplicaMessageCopyBytes(Region.End);
 	}
 	const int32 RegionCount = Keys.Num();
-	const uint64 Metadata = VoxelBoundedAllocation::SharedBytes<FVoxelOverlayReplicaWork>() +
-		VoxelBoundedAllocation::SharedBytes<FVoxelOverlayReplica>() + sizeof(FVoxelOverlayReplicaReceiving) +
-		VoxelBoundedAllocation::MapBytes<FIntVector, FReceivingRegion>(bInDelta ? 0 : RegionCount) +
-		VoxelBoundedAllocation::MapBytes<FIntVector, uint64>(RegionCount) +
-		VoxelBoundedAllocation::MapBytes<FIntVector, EVoxelOverlayReplicaState>(RegionCount) +
-		VoxelBoundedAllocation::MapBytes<FIntVector, FGuid>(RegionCount) +
-		VoxelBoundedAllocation::MapBytes<FReplicaMessageKey, FVoxelOverlayHash>(MessageCount) +
-		VoxelBoundedAllocation::MapBytes<FGuid, FPartSet>(bInDelta ? 1 : 0) +
-		VoxelBoundedAllocation::MapBytes<FGuid, FVoxelOverlayHash>(1) +
-		VoxelBoundedAllocation::ArrayBytes<FGuid>(1) * 3 + CopyBytes + 512;
+	const auto* Expected = Receiving->Tickets.Find(Header->CoverageTicket);
+	if (!Expected) { OutError = TEXT("InvalidRequest: Replica original coverage ticket retired"); return false; }
+	auto& Attempt = bInDelta ? Receiving->Transactions.FindChecked(InIdentity).Admission : Receiving->Tickets.FindChecked(InIdentity).Admission;
+	const auto Limits = Resources->Snapshot().Limits;
+	const bool bSameSource = Attempt.Consumer.IsValid() && Attempt.Ticket == Header->CoverageTicket && Attempt.Snapshot == Header->SnapshotId &&
+		Attempt.Region == Keys[0] && Attempt.Cut == Header->AuthorityCut && Attempt.WireDigest == Header->WireDigest &&
+		Attempt.Basis == Basis.Get() && Attempt.BasisLeaseSerial == (Basis && Basis->Lease ? Basis->Lease->Serial() : 0) && Attempt.bRegionOnly == bRegionOnly && Attempt.bCandidate == bCandidate;
+	if (bSameSource && (Attempt.Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ||
+		Attempt.Admission == EVoxelTerrainResourceAdmission::InvalidRequest))
+		return FailRegion(Keys[0], Attempt.Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+			TEXT("CapacityUnachievable: Replica frozen worker native input requires resync") : TEXT("InvalidRequest: Replica frozen worker native input requires resync"), OutError);
+	if (!bSameSource || !SameReplicaLimits(Attempt.Limits, Limits))
+	{
+		Attempt = FReplicaPreparationAdmission();
+		Attempt.Ticket = Header->CoverageTicket;
+		Attempt.Snapshot = Header->SnapshotId;
+		Attempt.Region = Keys[0];
+		Attempt.Cut = Header->AuthorityCut;
+		Attempt.WireDigest = Header->WireDigest;
+		Attempt.Basis = Basis.Get();
+		Attempt.BasisLeaseSerial = Basis && Basis->Lease ? Basis->Lease->Serial() : 0;
+		Attempt.bRegionOnly = bRegionOnly;
+		Attempt.bCandidate = bCandidate;
+		Attempt.Limits = Limits;
+		if (NextSerial == MAX_uint64)
+		{
+			Attempt.Admission = EVoxelTerrainResourceAdmission::CapacityUnachievable;
+			return FailRegion(Keys[0], TEXT("CapacityUnachievable: Replica preparation serial exhausted"), OutError);
+		}
+		Attempt.Consumer = FVoxelGenerationConsumerKey::Section(LocalEpoch, OwnerId, OwnerIncarnation, Keys[0], ++NextSerial);
+	}
+	const auto ReportAdmission = [&](const EVoxelTerrainResourceAdmission Admission)
+	{
+		if (Admission == EVoxelTerrainResourceAdmission::CapacityBlocked) { OutError.Reset(); return true; }
+		return FailRegion(Keys[0], Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+			TEXT("CapacityUnachievable: Replica frozen worker native input") : TEXT("InvalidRequest: Replica frozen worker native input"), OutError);
+	};
+	if (Attempt.Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable || Attempt.Admission == EVoxelTerrainResourceAdmission::InvalidRequest)
+		return ReportAdmission(Attempt.Admission);
+	const uint64 BeforeAdmission = Resources->ReleaseVersionExcludingOwner(Attempt.Consumer);
+	if (Attempt.Admission == EVoxelTerrainResourceAdmission::CapacityBlocked && BeforeAdmission <= Attempt.CapacityVersion)
+	{ OutError.Reset(); return true; }
+	const uint64 Metadata = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelOverlayReplicaWork>() +
+		VoxelBoundedAllocation::WorkerSharedBytes<FVoxelOverlayReplica>() + FMemory::QuantizeSize(sizeof(FVoxelOverlayReplicaReceiving), alignof(FVoxelOverlayReplicaReceiving)) +
+		VoxelBoundedAllocation::SharedBytes<FVoxelOverlayReplicaLifetime>() + VoxelBoundedAllocation::FunctionBytes<FReplicaWorkCommitted, false>() +
+		ReplicaNativeMapBytes<FIntVector, FReceivingRegion>(bInDelta ? 0 : RegionCount) +
+		ReplicaNativeMapBytes<FIntVector, uint64>(RegionCount) +
+		ReplicaNativeMapBytes<FIntVector, EVoxelOverlayReplicaState>(RegionCount) +
+		ReplicaNativeMapBytes<FIntVector, FGuid>(RegionCount) +
+		ReplicaNativeMapBytes<FReplicaMessageKey, FVoxelOverlayHash>(MessageCount) +
+		ReplicaNativeMapBytes<FGuid, FPartSet>(bInDelta ? 1 : 0) +
+		ReplicaNativeMapBytes<FGuid, FVoxelOverlayHash>(1) + ReplicaNativeMapBytes<FGuid, uint64>(1) +
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<FGuid, FDefaultAllocator>(1) * 3 + CopyBytes;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-	if (!Resources->Acquire(FVoxelGenerationConsumerKey::Section(LocalEpoch, OwnerId, OwnerIncarnation,
-		Header->Region, ++NextSerial), EVoxelTerrainResourcePool::Input, Metadata, Lease)) return true;
-	auto Work = MakeShared<FVoxelOverlayReplicaWork, ESPMode::ThreadSafe>();
+	{
+		struct FInput
+		{
+			const FVoxelOverlayReplica& Owner;
+			const FVoxelOverlayReplicaReceiving::FTicket& Ticket;
+			const FRootPtr& Basis;
+			TConstArrayView<FIntVector> Keys;
+			const FPartSet* Parts;
+		} Input{*this, *Expected, Basis, MakeArrayView(Keys), bInDelta ? Receiving->Transactions.Find(InIdentity) : nullptr};
+		FVoxelGenerationRequiredSourceScope Sources(&Resources.Get(), &Input,
+			[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+			{
+				const auto& Input = *static_cast<const FInput*>(Context);
+				const auto& Resources = *Input.Owner.Resources;
+				const auto Add = [&](const FVoxelTerrainResourceLease* Lease)
+				{
+					if (Lease && Lease->IsOwnedBy(Resources)) FVoxelGenerationRequiredSourceScope::VisitLease(Lease, Visit);
+				};
+				Add(Input.Owner.Receiving->TicketStorageLease.Get()); Add(Input.Ticket.ResourceLease.Get());
+				if (Input.Ticket.Cohort) Add(Input.Ticket.Cohort->ResourceLease.Get());
+				VisitReplicaRootSources(Input.Owner.Root.Get(), Resources, Visit);
+				VisitReplicaRootSources(Input.Basis.Get(), Resources, Visit);
+				if (Input.Parts)
+				{
+					if (Input.Parts->Cohort) Add(Input.Parts->Cohort->ResourceLease.Get());
+					for (const auto& Part : Input.Parts->Parts) Add(Part.Value.ResourceLease.Get());
+				}
+				else for (const auto& Key : Input.Keys)
+				{
+					const auto& Region = Input.Owner.Receiving->Regions.FindChecked(Key);
+					Add(Region.Begin.ResourceLease.Get()); Add(Region.End.ResourceLease.Get()); Add(Region.PreparationLease.Get());
+					if (Region.Cohort) Add(Region.Cohort->ResourceLease.Get());
+					VisitReplicaRegionSources(Region.Prepared.Get(), Resources, Visit);
+					if (Region.PreparedProof) Region.PreparedProof->VisitResourceSources(Resources, Visit);
+					for (const auto& Page : Region.Pages) Add(Page.Value.ResourceLease.Get());
+					for (const auto& Payload : Region.Payloads)
+						for (const auto& Part : Payload.Value.Parts) Add(Part.Value.ResourceLease.Get());
+				}
+			});
+		FVoxelGenerationRequiredCapacity Required;
+		if (!FVoxelGenerationRequiredSourceScope::Collect(*Resources, nullptr, Required, OutError))
+		{
+			Attempt.Admission = EVoxelTerrainResourceAdmission::InvalidRequest;
+			return ReportAdmission(Attempt.Admission);
+		}
+		Attempt.Admission = Resources->TryAcquire(Attempt.Consumer, EVoxelTerrainResourcePool::Input, Metadata, Lease, 0,
+			Required.Bytes[int32(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+		Attempt.CapacityVersion = BeforeAdmission;
+		if (Attempt.Admission != EVoxelTerrainResourceAdmission::Granted) return ReportAdmission(Attempt.Admission);
+	}
+	const auto Consumer = Attempt.Consumer;
+	auto Work = VoxelBoundedAllocation::MakeWorkerShared<FVoxelOverlayReplicaWork>(Lease);
 	Work->InputLease = MoveTemp(Lease);
+	Work->Consumer = Consumer;
+	Work->AuthorityBasis = Root;
+	Work->AuthorityTicketStorageLease = Receiving->TicketStorageLease;
+	Work->AuthorityTicketLease = Expected->ResourceLease;
 	Work->Identity = InIdentity;
 	Work->CoverageTicket = Header->CoverageTicket;
 	Work->Subscription = Header->SubscriptionId;
@@ -1011,8 +1367,9 @@ bool FVoxelOverlayReplica::QueuePreparation(const FGuid& InIdentity, const bool 
 	Work->Basis = Basis;
 	Work->Snapshots.Reserve(RegionCount);
 	Work->MessageDigests.Reserve(MessageCount);
-	Work->Worker = MakeShared<FVoxelOverlayReplica, ESPMode::ThreadSafe>(LocalEpoch, Resources);
+	Work->Worker = VoxelBoundedAllocation::MakeWorkerShared<FVoxelOverlayReplica>(Work->InputLease, LocalEpoch, Resources);
 	Work->Worker->bDetachedWorker = true;
+	Work->Worker->BodyConsumer = Consumer;
 	Work->Worker->AuthorityEpoch = AuthorityEpoch;
 	Work->Worker->ManifestIdentity = ManifestIdentity;
 	Work->Worker->DirectoryEpoch = DirectoryEpoch;
@@ -1020,7 +1377,25 @@ bool FVoxelOverlayReplica::QueuePreparation(const FGuid& InIdentity, const bool 
 	Work->Worker->Receiving->Regions.Reserve(bInDelta ? 0 : RegionCount);
 	Work->Worker->Receiving->RequiredSequences.Reserve(RegionCount);
 	Work->Worker->Receiving->States.Reserve(RegionCount);
-	const auto* Expected = Receiving->Tickets.Find(Work->CoverageTicket);
+	Work->Worker->Receiving->Transactions.Reserve(bInDelta ? 1 : 0);
+	Work->Worker->Receiving->SettledTransactions.Reserve(1);
+	Work->Worker->Receiving->CapacityBlockedTickets.Reserve(1);
+	Work->Worker->Receiving->SettledOrder.Reserve(1);
+	Work->Worker->Receiving->DeltaOrder.Reserve(1);
+	Work->Worker->Receiving->TicketOrder.Reserve(1);
+	const uint64 NativeTables = VoxelGenerationAllocation::AllocatedBytes(Work->Snapshots) + VoxelGenerationAllocation::AllocatedBytes(Work->MessageDigests) +
+		VoxelGenerationAllocation::AllocatedBytes(Work->Worker->Receiving->Regions) + VoxelGenerationAllocation::AllocatedBytes(Work->Worker->Receiving->RequiredSequences) +
+		VoxelGenerationAllocation::AllocatedBytes(Work->Worker->Receiving->States) + VoxelGenerationAllocation::AllocatedBytes(Work->Worker->Receiving->Transactions) +
+		VoxelGenerationAllocation::AllocatedBytes(Work->Worker->Receiving->CapacityBlockedTickets) + VoxelGenerationAllocation::AllocatedBytes(Work->Worker->Receiving->SettledTransactions) + VoxelGenerationAllocation::AllocatedBytes(Work->Worker->Receiving->SettledOrder) +
+		VoxelGenerationAllocation::AllocatedBytes(Work->Worker->Receiving->DeltaOrder) + VoxelGenerationAllocation::AllocatedBytes(Work->Worker->Receiving->TicketOrder);
+	const uint64 NativeBodies = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelOverlayReplicaWork>() + VoxelBoundedAllocation::WorkerSharedBytes<FVoxelOverlayReplica>() +
+		FMemory::QuantizeSize(sizeof(FVoxelOverlayReplicaReceiving), alignof(FVoxelOverlayReplicaReceiving)) + VoxelBoundedAllocation::SharedBytes<FVoxelOverlayReplicaLifetime>() +
+		VoxelBoundedAllocation::FunctionBytes<FReplicaWorkCommitted, false>();
+	if (NativeBodies > Metadata || CopyBytes > Metadata - NativeBodies || NativeTables > Metadata - NativeBodies - CopyBytes)
+	{
+		Attempt.Admission = EVoxelTerrainResourceAdmission::InvalidRequest;
+		return ReportAdmission(Attempt.Admission);
+	}
 	if (Expected) Work->Cohort = Expected->Cohort;
 	const auto Remember = [&Work](const EVoxelMessage Kind, const FVoxelOverlayRegionMessage& Message)
 	{
@@ -1056,8 +1431,16 @@ bool FVoxelOverlayReplica::QueuePreparation(const FGuid& InIdentity, const bool 
 		else
 		{
 			FReceivingRegion Frozen;
-			Frozen.Begin = Region.Begin;
-			Frozen.End = Region.End;
+			CopyReplicaMessage(Region.Begin, Frozen.Begin);
+			CopyReplicaMessage(Region.End, Frozen.End);
+			const uint64 CopiedArrays = VoxelGenerationAllocation::AllocatedBytes(Frozen.Begin.Heads) + VoxelGenerationAllocation::AllocatedBytes(Frozen.Begin.Entries) +
+				VoxelGenerationAllocation::AllocatedBytes(Frozen.Begin.Payload) + VoxelGenerationAllocation::AllocatedBytes(Frozen.End.Heads) +
+				VoxelGenerationAllocation::AllocatedBytes(Frozen.End.Entries) + VoxelGenerationAllocation::AllocatedBytes(Frozen.End.Payload);
+			if (CopiedArrays > ReplicaMessageCopyBytes(Region.Begin) + ReplicaMessageCopyBytes(Region.End))
+			{
+				Attempt.Admission = EVoxelTerrainResourceAdmission::InvalidRequest;
+				return ReportAdmission(Attempt.Admission);
+			}
 			Frozen.Cohort = Region.Cohort;
 			Frozen.Prepared = Expected && Expected->Candidate ?
 				ConstCastSharedPtr<FVoxelOverlayRegionSnapshot>(RegionAt(Expected->Candidate, Key)) : Region.Prepared;
@@ -1068,11 +1451,8 @@ bool FVoxelOverlayReplica::QueuePreparation(const FGuid& InIdentity, const bool 
 	Receiving->Bytes -= Work->Bytes;
 	Receiving->PreparingBytes = Work->Bytes;
 	Work->Worker->Receiving->Bytes = Work->Bytes;
-	const TWeakPtr<FVoxelOverlayReplicaWork, ESPMode::ThreadSafe> WeakWork = Work;
-	Work->Worker->OnCommitted = [WeakWork](TSharedPtr<const FVoxelOverlayCommitNotification, ESPMode::ThreadSafe> Notification)
-	{
-		if (const auto Active = WeakWork.Pin()) Active->Notification = MoveTemp(Notification);
-	};
+	Work->Worker->OnCommitted = FReplicaWorkCommitted{Work};
+	Work->InputLease->MarkPublished();
 	PendingTask.Emplace();
 	auto& Task = PendingTask.GetValue();
 	Task.Kind = EVoxelTaskKind::NetworkRepresentation;
@@ -1080,7 +1460,7 @@ bool FVoxelOverlayReplica::QueuePreparation(const FGuid& InIdentity, const bool 
 	Task.Stamp.OwnerIncarnation = OwnerIncarnation;
 	Task.Stamp.WorldEpoch = LocalEpoch;
 	Task.Stamp.Section = Keys[0];
-	Task.Stamp.Token = ++NextSerial;
+	Task.Stamp.Token = Consumer.RequestSerial;
 	Work->Stamp = Task.Stamp;
 	Task.WorkClass = EVoxelWorkClass::Visible;
 	Task.ServiceBand = EVoxelTerrainServiceBand::P2;
@@ -1108,9 +1488,36 @@ bool FVoxelOverlayReplica::RetryPendingPreparation(FString& OutError)
 	const auto Work = Preparing;
 	auto& Task = PendingTask.GetValue();
 	const uint64 BeforeBinding = TaskBindingResources->ReleaseVersionExcludingOwner(TaskBindingConsumer);
+	struct FBindingInput
+	{
+		const FVoxelOverlayReplica& Owner;
+		const FVoxelOverlayReplicaWork& Work;
+		const FVoxelTerrainResources& Resources;
+	} Input{*this, *Work, *TaskBindingResources};
+	FVoxelGenerationRequiredSourceScope Sources(TaskBindingResources.Get(), &Input,
+		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+		{
+			const auto& Input = *static_cast<const FBindingInput*>(Context);
+			// Bind itself adds the request's existing callback leases exactly once.
+			Input.Work.VisitResourceSources(Input.Resources, Visit, false);
+			const auto Add = [&](const FVoxelTerrainResourceLease* Lease)
+			{
+				if (Lease && Lease->IsOwnedBy(Input.Resources)) FVoxelGenerationRequiredSourceScope::VisitLease(Lease, Visit);
+			};
+			Add(Input.Owner.Receiving->TicketStorageLease.Get());
+			if (const auto* Ticket = Input.Owner.Receiving->Tickets.Find(Input.Work.CoverageTicket))
+			{
+				Add(Ticket->ResourceLease.Get());
+				if (Ticket->Cohort) Add(Ticket->Cohort->ResourceLease.Get());
+			}
+			VisitReplicaRootSources(Input.Owner.Root.Get(), Input.Resources, Visit);
+		});
+	FVoxelGenerationRequiredCapacity Required;
+	if (!FVoxelGenerationRequiredSourceScope::Collect(*TaskBindingResources, nullptr, Required, OutError)) return false;
+	Task.SetRequiredBindingInput(Required.Bytes[int32(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
 	auto GetBlockReason = [Work, WorkResources = Resources]
 	{
-		return Work->bWaitingCapacity.Load() && WorkResources->Snapshot().ReleaseVersion <= Work->CapacityVersion ?
+		return Work->bWaitingCapacity.Load() && WorkResources->ReleaseVersionExcludingOwner(Work->Consumer) <= Work->CapacityVersion ?
 			EVoxelTaskBlockReason::Memory : EVoxelTaskBlockReason::None;
 	};
 	auto Execute = [Work](const TAtomic<bool>& Cancel)
@@ -1124,9 +1531,13 @@ bool FVoxelOverlayReplica::RetryPendingPreparation(FString& OutError)
 	{
 		if (const auto Owner = WeakLifetime.Pin(); Owner && Owner->Owner) Owner->Owner->ApplyPreparation(Work, MoveTemp(Result));
 	};
-	if ((!Task.bBlockBound && !Task.BindGetBlockReason(TaskBindingResources.ToSharedRef(), TaskBindingConsumer, MoveTemp(GetBlockReason), OutError)) ||
-		(!Task.bExecuteBound && !Task.BindExecute(TaskBindingResources.ToSharedRef(), TaskBindingConsumer, MoveTemp(Execute), OutError)) ||
-		(!Task.bApplyBound && !Task.BindApply(TaskBindingResources.ToSharedRef(), TaskBindingConsumer, MoveTemp(Apply), OutError)))
+	const bool bBound = (Task.bBlockBound || Task.BindGetBlockReason(TaskBindingResources.ToSharedRef(), TaskBindingConsumer, MoveTemp(GetBlockReason), OutError)) &&
+		(Task.bExecuteBound || Task.BindExecute(TaskBindingResources.ToSharedRef(), TaskBindingConsumer, MoveTemp(Execute), OutError)) &&
+		(Task.bApplyBound || Task.BindApply(TaskBindingResources.ToSharedRef(), TaskBindingConsumer, MoveTemp(Apply), OutError));
+	Work->ExecuteBindingLease = Task.ExecuteBindingLease;
+	Work->ApplyBindingLease = Task.ApplyBindingLease;
+	Work->BlockBindingLease = Task.BlockBindingLease;
+	if (!bBound)
 	{
 		if (!OutError.StartsWith(TEXT("CapacityBlocked"))) return false;
 		bBindingCapacityBlocked = true;
@@ -1194,6 +1605,7 @@ void FVoxelOverlayReplica::ApplyPreparation(TSharedPtr<FVoxelOverlayReplicaWork,
 		Ready.PreparedProof = Work;
 		Ready.bEnded = Ready.bDirectoryVerified = Ready.bPreparationComplete = true;
 		Ready.StoredBytes = Ready.Begin.AllocatedBytes() + Ready.End.AllocatedBytes();
+		MarkReplicaRegionPublished(Ready.Prepared.Get());
 		Receiving->Bytes += Ready.StoredBytes;
 		Receiving->Regions.Add(Work->Stamp.Section, MoveTemp(Ready));
 		++ProgressSerial;
@@ -1211,12 +1623,15 @@ void FVoxelOverlayReplica::ApplyPreparation(TSharedPtr<FVoxelOverlayReplicaWork,
 		{
 			// 初始追赶期间只推进私有候选根；可采样根和通知仍保持上一个完整切点。
 			Ticket->Candidate = Work->Worker->Root;
+			MarkReplicaRootPublished(Ticket->Candidate.Get());
 			for (const auto& Key : Ticket->Regions) Receiving->States.Add(Key, EVoxelOverlayReplicaState::CatchingUp);
 			Receiving->TicketOrder.AddUnique(Work->CoverageTicket);
 		}
 		else
 		{
 			Root = Work->Worker->Root;
+			MarkReplicaRootPublished(Root.Get());
+			if (Work->Notification->ResourceLease) Work->Notification->ResourceLease->MarkPublished();
 			for (const auto& Head : Work->Notification->Heads)
 				Receiving->States.Add(Head.Region, Head.Sequence >= Receiving->RequiredSequences.FindRef(Head.Region) ?
 					EVoxelOverlayReplicaState::Complete : EVoxelOverlayReplicaState::Gap);
@@ -1246,20 +1661,77 @@ void FVoxelOverlayReplica::ApplyPreparation(TSharedPtr<FVoxelOverlayReplicaWork,
 	}
 	else if (!Result.bCanceled && bTicketAlive)
 	{
-		for (const auto& Pair : Work->Snapshots) Receiving->States.Add(Pair.Key, EVoxelOverlayReplicaState::ResyncRequired);
-		if (Work->Notification) for (const auto& Head : Work->Notification->Heads)
-			Receiving->States.Add(Head.Region, EVoxelOverlayReplicaState::ResyncRequired);
-		UE_LOG(LogTemp, Warning, TEXT("Replica 准备不能提交，保留旧根：%s"), *Result.Error);
+		// A terminal worker never discards the reliable messages moved out of the GT owner.
+		const auto Admission = Work->Worker->BodyAdmission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+			EVoxelTerrainResourceAdmission::CapacityUnachievable : EVoxelTerrainResourceAdmission::InvalidRequest;
+		if (Work->bRegionOnly && !Receiving->Regions.Contains(Work->Stamp.Section))
+		{
+			if (auto* Pending = Work->Worker->Receiving->Regions.Find(Work->Stamp.Section))
+			{
+				Pending->Prepared.Reset(); Pending->PreparedProof.Reset();
+				Pending->PreparedEntries.Empty(); Pending->Assembly.Empty(); Pending->PreparationLease.Reset();
+				Pending->EntryCursor = 0; Pending->bDirectoryVerified = Pending->bPreparationComplete = false;
+				Receiving->Bytes += Pending->StoredBytes;
+				Receiving->Regions.Add(Work->Stamp.Section, MoveTemp(*Pending));
+				Work->Worker->Receiving->Regions.Remove(Work->Stamp.Section);
+			}
+		}
+		else if (Work->bDelta && !Receiving->Transactions.Contains(Work->Identity))
+		{
+			if (auto* Pending = Work->Worker->Receiving->Transactions.Find(Work->Identity))
+			{
+				Pending->PreparedRoot.Reset(); Pending->PreparedRegions.Empty(); Pending->SeenSections.Empty();
+				Pending->ChangedSections.Empty(); Pending->Reader.Reset(); Pending->Assembly.Empty();
+				Pending->PathLease.Reset(); Pending->PreparationLease.Reset();
+				Pending->EntryCount = Pending->EntryCursor = 0; Pending->HeadCursor = 0; Pending->Phase = 0;
+				if (bBasisCurrent) Pending->Admission.Admission = Admission;
+				Receiving->Bytes += Pending->StoredBytes;
+				Receiving->Transactions.Add(Work->Identity, MoveTemp(*Pending));
+				Receiving->DeltaOrder.AddUnique(Work->Identity);
+				Work->Worker->Receiving->Transactions.Remove(Work->Identity);
+			}
+		}
+		if (!Work->bDelta && bBasisCurrent) Ticket->Admission.Admission = Admission;
+		for (const auto& Key : Ticket->Regions) Receiving->States.Add(Key, EVoxelOverlayReplicaState::ResyncRequired);
+		UE_LOG(LogTemp, Warning, TEXT("Replica 准备不能提交，保留旧根与可靠消息：%s"), *Result.Error);
 	}
 	Receiving->PreparingBytes = 0;
 	Preparing.Reset();
-	// 区域证明只保留摘要与输入元数据租约；原始页、正文分片和旧根在后台退休。
-	auto RetiringWorker = MoveTemp(Work->Worker);
-	auto RetiringBasis = MoveTemp(Work->Basis);
+	// MakeWorkerShared already reserves the concrete retirement callback and keeps native backing charged.
+	Work->Worker.Reset();
+	Work->Basis.Reset(); Work->AuthorityBasis.Reset();
+	Work->AuthorityTicketStorageLease.Reset(); Work->AuthorityTicketLease.Reset();
+	Work->ExecuteBindingLease.Reset(); Work->ApplyBindingLease.Reset(); Work->BlockBindingLease.Reset();
 	Work->Notification.Reset();
-	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask,
-		[RetiringWorker = MoveTemp(RetiringWorker), RetiringBasis = MoveTemp(RetiringBasis)] {});
 }
+
+EVoxelTerrainResourceAdmission FVoxelOverlayReplica::GrantBody(const EVoxelTerrainResourcePool InPool, const uint64 InBytes,
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutLease, FString& OutError, const int32 InSplits)
+{
+	BodyCapacityVersion = Resources->ReleaseVersionExcludingOwner(BodyConsumer);
+	FVoxelGenerationRequiredCapacity Required;
+	if (!BodyConsumer.IsValid() || !FVoxelGenerationRequiredSourceScope::Collect(*Resources, OutLease.Get(), Required, OutError))
+		BodyAdmission = EVoxelTerrainResourceAdmission::InvalidRequest;
+	else
+	{
+		const auto Limits = Resources->Snapshot().Limits;
+		const uint64 Limit = InPool == EVoxelTerrainResourcePool::Input ? Limits.InputBytes :
+			InPool == EVoxelTerrainResourcePool::Working ? Limits.WorkingBytes :
+			InPool == EVoxelTerrainResourcePool::Staged ? Limits.StagedBytes :
+			InPool == EVoxelTerrainResourcePool::Resident ? Limits.ResidentBytes - Limits.OverlapBytes : Limits.OverlapBytes;
+		const uint64 Held = Required.Bytes[int32(InPool)];
+		if (Held > Limit || InBytes > Limit - Held) BodyAdmission = EVoxelTerrainResourceAdmission::CapacityUnachievable;
+		else if (!InBytes) { OutLease.Reset(); BodyAdmission = EVoxelTerrainResourceAdmission::Granted; }
+		else BodyAdmission = OutLease ? OutLease->TryResize(InBytes, Required.Bytes[int32(EVoxelTerrainResourcePool::Input)], Required.LeaseCount) :
+			Resources->TryAcquire(BodyConsumer, InPool, InBytes, OutLease, InSplits, Required.Bytes[int32(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+	}
+	if (BodyAdmission == EVoxelTerrainResourceAdmission::Granted) OutError.Reset();
+	else OutError = BodyAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: Replica worker original resource source") :
+		BodyAdmission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: Replica worker irreducible resource source") :
+		TEXT("InvalidRequest: Replica worker original resource source");
+	return BodyAdmission;
+}
+
 bool FVoxelOverlayReplica::PrepareReceivingRegion(const FIntVector& InRegion, FString& OutError)
 {
 	auto& Pending = Receiving->Regions.FindChecked(InRegion);
@@ -1268,26 +1740,27 @@ bool FVoxelOverlayReplica::PrepareReceivingRegion(const FIntVector& InRegion, FS
 	{
 		uint64 MaximumPayload = 0;
 		for (const auto& Payload : Pending.Payloads) MaximumPayload = FMath::Max(MaximumPayload, uint64(Payload.Value.TotalBytes));
-		const uint64 Bytes = VoxelBoundedAllocation::ArrayBytes<FVoxelOverlayDirectoryEntry>(Pending.Begin.EntryCount) +
-			VoxelBoundedAllocation::ArrayBytes<uint8>(MaximumPayload) +
-			2 * VoxelBoundedAllocation::InitialGrowBytes<uint8>(Pending.Begin.EntryCount * 128 + 4);
-		if (!Resources->Acquire(FVoxelGenerationConsumerKey::Section(LocalEpoch, OwnerId, 1, InRegion, ++NextSerial),
-			EVoxelTerrainResourcePool::Working, Bytes, Pending.PreparationLease))
-		{
-			OutError = TEXT("CapacityBlocked: Region 验证 scratch 尚未准入");
-			return true;
-		}
+		const uint64 Bytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelOverlayDirectoryEntry, FDefaultAllocator>(Pending.Begin.EntryCount) +
+			VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(MaximumPayload) +
+			VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(Pending.Begin.EntryCount * 89 + 4);
+		const auto Admission = GrantBody(EVoxelTerrainResourcePool::Working, Bytes, Pending.PreparationLease, OutError);
+		if (Admission != EVoxelTerrainResourceAdmission::Granted) return Admission == EVoxelTerrainResourceAdmission::CapacityBlocked;
 		Pending.PreparedEntries.Reserve(Pending.Begin.EntryCount);
 		Pending.Assembly.Reserve(MaximumPayload);
 	}
 	if (!Pending.bDirectoryVerified)
 	{
+		uint64 EntryCount = 0;
 		for (uint32 Page = 0; Page < Pending.Begin.Count; ++Page)
 		{
 			const auto* Message = Pending.Pages.Find(Page);
 			if (!Message) { OutError = TEXT("快照准备缺少完整目录页"); return false; }
-			Pending.PreparedEntries.Append(Message->Entries);
+			EntryCount += Message->Entries.Num();
 		}
+		if (EntryCount != Pending.Begin.EntryCount)
+			return FailRegion(InRegion, TEXT("快照目录条数超出原声明容量"), OutError);
+		for (uint32 Page = 0; Page < Pending.Begin.Count; ++Page)
+			Pending.PreparedEntries.Append(Pending.Pages.FindChecked(Page).Entries);
 		FVoxelOverlayHash DirectoryHash;
 		FVoxelOverlayHash SnapshotHash;
 		const auto* Head = Pending.Heads().FindByPredicate([&InRegion](const auto& Value) { return Value.Region == InRegion; });
@@ -1302,15 +1775,11 @@ bool FVoxelOverlayReplica::PrepareReceivingRegion(const FIntVector& InRegion, FS
 	{
 		const int32 Count = Pending.PreparedEntries.Num();
 		const uint64 Bytes = VoxelBoundedAllocation::SharedBytes<FVoxelOverlayRegionSnapshot>() +
-			VoxelBoundedAllocation::MapBytes<FIntVector, FVoxelOverlayDirectoryEntry>(Count) +
-			VoxelBoundedAllocation::MapBytes<FIntVector, TSharedPtr<const FVoxelOverlaySnapshot, ESPMode::ThreadSafe>>(Count);
+			ReplicaNativeMapBytes<FIntVector, FVoxelOverlayDirectoryEntry>(Count) +
+			ReplicaNativeMapBytes<FIntVector, TSharedPtr<const FVoxelOverlaySnapshot, ESPMode::ThreadSafe>>(Count);
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-		if (!Resources->Acquire(FVoxelGenerationConsumerKey::Section(LocalEpoch, OwnerId, 1, InRegion, ++NextSerial),
-			EVoxelTerrainResourcePool::Resident, Bytes, Lease))
-		{
-			OutError = TEXT("CapacityBlocked: Region 不可变目录尚未准入");
-			return true;
-		}
+		const auto Admission = GrantBody(EVoxelTerrainResourcePool::Resident, Bytes, Lease, OutError);
+		if (Admission != EVoxelTerrainResourceAdmission::Granted) return Admission == EVoxelTerrainResourceAdmission::CapacityBlocked;
 		auto Snapshot = MakeShared<FVoxelOverlayRegionSnapshot, ESPMode::ThreadSafe>();
 		Snapshot->ResourceLease = MoveTemp(Lease);
 		Snapshot->Region = InRegion;
@@ -1338,12 +1807,8 @@ bool FVoxelOverlayReplica::PrepareReceivingRegion(const FIntVector& InRegion, FS
 			if (!FVoxelOverlayRegionCodec::OverlayCapacity(Pending.Assembly, Capacity))
 				return FailRegion(InRegion, TEXT("Overlay 正文规范容量或编码无效"), OutError);
 			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-			if (!Resources->Acquire(FVoxelGenerationConsumerKey::Section(LocalEpoch, OwnerId, 1, Entry.Section, ++NextSerial),
-				EVoxelTerrainResourcePool::Resident, Capacity, Lease))
-			{
-				OutError = TEXT("CapacityBlocked: Overlay 正文驻留配额不足");
-				return true;
-			}
+			const auto Admission = GrantBody(EVoxelTerrainResourcePool::Resident, Capacity, Lease, OutError);
+			if (Admission != EVoxelTerrainResourceAdmission::Granted) return Admission == EVoxelTerrainResourceAdmission::CapacityBlocked;
 			auto Overlay = MakeShared<FVoxelOverlaySnapshot, ESPMode::ThreadSafe>();
 			if (!FVoxelOverlayRegionCodec::DecodeOverlay(Pending.Assembly, *Overlay, OutError) ||
 				Overlay->Section != Entry.Section || Overlay->Revision != Entry.Revision)
@@ -1376,22 +1841,46 @@ bool FVoxelOverlayReplica::TryCommitTicket(const FGuid& InTicket, FString& OutEr
 	{
 		auto* Pending = Receiving->Regions.Find(Head.Region);
 		if (!Pending || Pending->Begin.CoverageTicket != InTicket || !Pending->bEnded ||
-			Pending->Begin.AuthorityCut != Cut || Pending->Heads() != Heads) return true;
+			Pending->Begin.AuthorityCut != Cut || !EqualArray(Pending->Heads(), Heads)) return true;
 		if (Pending->bPreparationComplete) continue;
 		if (Pending->Pages.Num() != int32(Pending->Begin.Count)) return true;
 		if (!PrepareReceivingRegion(Head.Region, OutError)) return false;
 		if (!Pending->bPreparationComplete) return true;
 	}
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PathLease;
-	if (!Resources->Acquire(FVoxelGenerationConsumerKey::Section(LocalEpoch, OwnerId, 1, Heads[0].Region, ++NextSerial),
-		EVoxelTerrainResourcePool::Resident, 33 * Heads.Num() * RootNodeBytes(), PathLease, 33 * Heads.Num()))
-	{
-		Receiving->CapacityBlockedTickets.Add(InTicket, Resources->Snapshot().ReleaseVersion);
-		OutError = TEXT("CapacityBlocked: Ticket 根路径尚未准入");
-		return true;
-	}
+	const auto PathAdmission = GrantBody(EVoxelTerrainResourcePool::Resident, 33 * Heads.Num() * RootNodeBytes(),
+		PathLease, OutError, 33 * Heads.Num());
+	if (PathAdmission != EVoxelTerrainResourceAdmission::Granted) return PathAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked;
 	FRootPtr NextRoot = Root;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ChangedLease;
+	struct FCommitInput
+	{
+		const FVoxelTerrainResources& Resources;
+		const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& Path;
+		const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& Changed;
+		const FRootPtr& Root;
+	} Input{*Resources, PathLease, ChangedLease, NextRoot};
+	FVoxelGenerationRequiredSourceScope CommitSources(&Resources.Get(), &Input,
+		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+		{
+			const auto& Input = *static_cast<const FCommitInput*>(Context);
+			if (Input.Path && Input.Path->IsOwnedBy(Input.Resources))
+				Visit({nullptr, Input.Path->Serial(), Input.Path->GetPool(), Input.Path->Bytes(),
+					1 + int32(Input.Path->Bytes() / RootNodeBytes())});
+			if (Input.Changed && Input.Changed->IsOwnedBy(Input.Resources)) FVoxelGenerationRequiredSourceScope::VisitLease(Input.Changed.Get(), Visit);
+			VisitReplicaRootSources(Input.Root.Get(), Input.Resources, Visit);
+		});
+	int32 ChangedCapacity = 0;
+	for (const auto& Head : Heads)
+	{
+		ChangedCapacity += Receiving->Regions.FindChecked(Head.Region).Prepared->Directory.Num();
+		if (const auto* Old = FindRegion(Head.Region)) ChangedCapacity += Old->Directory.Num();
+	}
+	const auto ChangedAdmission = GrantBody(EVoxelTerrainResourcePool::Working,
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<FIntVector, FDefaultAllocator>(ChangedCapacity), ChangedLease, OutError);
+	if (ChangedAdmission != EVoxelTerrainResourceAdmission::Granted) return ChangedAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked;
 	TArray<FIntVector> Changed;
+	Changed.Reserve(ChangedCapacity);
 	for (const auto& Head : Heads)
 	{
 		auto& Pending = Receiving->Regions.FindChecked(Head.Region);
@@ -1407,8 +1896,8 @@ bool FVoxelOverlayReplica::TryCommitTicket(const FGuid& InTicket, FString& OutEr
 		Head.Sequence = Prepared->Sequence;
 		Head.Hash = Prepared->DirectoryHash;
 	}
-	const auto Notification = PrepareNotification(FGuid(), MoveTemp(Changed), Heads);
-	if (!Notification) { OutError = TEXT("CapacityBlocked: 提交通知尚未准入"); return true; }
+	const auto Notification = PrepareNotification(FGuid(), MoveTemp(Changed), Heads, OutError);
+	if (!Notification) return BodyAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked;
 	Root = MoveTemp(NextRoot);
 	Receiving->CapacityBlockedTickets.Remove(InTicket);
 	Receiving->TicketOrder.Remove(InTicket);
@@ -1425,9 +1914,7 @@ bool FVoxelOverlayReplica::TryCommitTicket(const FGuid& InTicket, FString& OutEr
 		Receiving->Bytes -= Receiving->Regions.FindChecked(Head.Region).StoredBytes;
 		Receiving->Regions.Remove(Head.Region);
 	}
-	TArray<FGuid> Transactions;
-	Receiving->Transactions.GetKeys(Transactions);
-	for (const auto& Transaction : Transactions) if (!TryApplyDelta(Transaction, OutError)) return false;
+	// Detached worker owns one operation; the original GT queue schedules later transactions.
 	return true;
 }
 
@@ -1450,16 +1937,13 @@ bool FVoxelOverlayReplica::TryApplyDelta(const FGuid& InTransaction, FString& Ou
 		}
 		if (!Pending->PreparationLease)
 		{
-			const uint64 Bytes = VoxelBoundedAllocation::ArrayBytes<uint8>(Pending->TotalBytes) +
-				VoxelBoundedAllocation::MapBytes<FIntVector, TSharedPtr<FVoxelOverlayRegionSnapshot, ESPMode::ThreadSafe>>(First->Heads.Num()) +
-				VoxelBoundedAllocation::MapBytes<FIntVector, bool>(32768) +
-				VoxelBoundedAllocation::ArrayBytes<FIntVector>(32768) + sizeof(FVoxelByteReader);
-			if (!Resources->Acquire(FVoxelGenerationConsumerKey::Section(LocalEpoch, OwnerId, 1, First->Region, ++NextSerial),
-				EVoxelTerrainResourcePool::Working, Bytes, Pending->PreparationLease))
-			{
-				OutError = TEXT("CapacityBlocked: 增量读取 scratch 尚未准入");
-				return true;
-			}
+			const uint64 Bytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(Pending->TotalBytes) +
+				ReplicaNativeMapBytes<FIntVector, TSharedPtr<FVoxelOverlayRegionSnapshot, ESPMode::ThreadSafe>>(First->Heads.Num()) +
+				ReplicaNativeMapBytes<FIntVector, bool>(32768) +
+				VoxelGenerationAllocation::Private::ArrayReserveBytes<FIntVector, FDefaultAllocator>(32768) +
+				FMemory::QuantizeSize(sizeof(FVoxelByteReader), alignof(FVoxelByteReader));
+			const auto Admission = GrantBody(EVoxelTerrainResourcePool::Working, Bytes, Pending->PreparationLease, OutError);
+			if (Admission != EVoxelTerrainResourceAdmission::Granted) return Admission == EVoxelTerrainResourceAdmission::CapacityBlocked;
 			Pending->Assembly.Reserve(Pending->TotalBytes);
 			Pending->PreparedRegions.Reserve(First->Heads.Num());
 			Pending->SeenSections.Reserve(32768);
@@ -1479,14 +1963,10 @@ bool FVoxelOverlayReplica::TryApplyDelta(const FGuid& InTransaction, FString& Ou
 		const auto Previous = RegionAt(Root, Head.Region);
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 		const uint64 Bytes = VoxelBoundedAllocation::SharedBytes<FVoxelOverlayRegionSnapshot>() +
-			VoxelBoundedAllocation::MapBytes<FIntVector, FVoxelOverlayDirectoryEntry>(512) +
-			VoxelBoundedAllocation::MapBytes<FIntVector, TSharedPtr<const FVoxelOverlaySnapshot, ESPMode::ThreadSafe>>(512);
-		if (!Resources->Acquire(FVoxelGenerationConsumerKey::Section(LocalEpoch, OwnerId, 1, Head.Region, ++NextSerial),
-			EVoxelTerrainResourcePool::Resident, Bytes, Lease))
-		{
-			OutError = TEXT("CapacityBlocked: 增量 Region 不可变目录尚未准入");
-			return true;
-		}
+			ReplicaNativeMapBytes<FIntVector, FVoxelOverlayDirectoryEntry>(512) +
+			ReplicaNativeMapBytes<FIntVector, TSharedPtr<const FVoxelOverlaySnapshot, ESPMode::ThreadSafe>>(512);
+		const auto Admission = GrantBody(EVoxelTerrainResourcePool::Resident, Bytes, Lease, OutError);
+		if (Admission != EVoxelTerrainResourceAdmission::Granted) return Admission == EVoxelTerrainResourceAdmission::CapacityBlocked;
 		auto Region = MakeShared<FVoxelOverlayRegionSnapshot, ESPMode::ThreadSafe>();
 		Region->ResourceLease = MoveTemp(Lease);
 		Region->Region = Previous->Region;
@@ -1534,12 +2014,8 @@ bool FVoxelOverlayReplica::TryApplyDelta(const FGuid& InTransaction, FString& Ou
 			if (!FVoxelOverlayRegionCodec::OverlayCapacity(Payload, Bytes))
 				return FailRegion(First->Region, TEXT("增量 Overlay 容量或编码不合法"), OutError);
 			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-			if (!Resources->Acquire(FVoxelGenerationConsumerKey::Section(LocalEpoch, OwnerId, 1, Entry.Section, ++NextSerial),
-				EVoxelTerrainResourcePool::Resident, Bytes, Lease))
-			{
-				OutError = TEXT("CapacityBlocked: 增量 Overlay 正文驻留尚未准入");
-				return true;
-			}
+			const auto Admission = GrantBody(EVoxelTerrainResourcePool::Resident, Bytes, Lease, OutError);
+			if (Admission != EVoxelTerrainResourceAdmission::Granted) return Admission == EVoxelTerrainResourceAdmission::CapacityBlocked;
 			auto Overlay = MakeShared<FVoxelOverlaySnapshot, ESPMode::ThreadSafe>();
 			if (!FVoxelOverlayRegionCodec::DecodeOverlay(Payload, *Overlay, OutError) ||
 				Overlay->Section != Entry.Section || Overlay->Revision != Entry.Revision)
@@ -1558,12 +2034,9 @@ bool FVoxelOverlayReplica::TryApplyDelta(const FGuid& InTransaction, FString& Ou
 	}
 	if (!Pending->PathLease)
 	{
-		if (!Resources->Acquire(FVoxelGenerationConsumerKey::Section(LocalEpoch, OwnerId, 1, First->Region, ++NextSerial),
-			EVoxelTerrainResourcePool::Resident, 33 * First->Heads.Num() * RootNodeBytes(), Pending->PathLease, 33 * First->Heads.Num()))
-		{
-			OutError = TEXT("CapacityBlocked: 增量根路径尚未准入");
-			return true;
-		}
+		const auto Admission = GrantBody(EVoxelTerrainResourcePool::Resident, 33 * First->Heads.Num() * RootNodeBytes(),
+			Pending->PathLease, OutError, 33 * First->Heads.Num());
+		if (Admission != EVoxelTerrainResourceAdmission::Granted) return Admission == EVoxelTerrainResourceAdmission::CapacityBlocked;
 		Pending->PreparedRoot = Root;
 	}
 	if (Pending->HeadCursor < First->Heads.Num())
@@ -1571,14 +2044,10 @@ bool FVoxelOverlayReplica::TryApplyDelta(const FGuid& InTransaction, FString& Ou
 		const auto& Head = First->Heads[Pending->HeadCursor];
 		auto Region = Pending->PreparedRegions.FindChecked(Head.Region);
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Scratch;
-		const uint64 Bytes = VoxelBoundedAllocation::ArrayBytes<FVoxelOverlayDirectoryEntry>(Region->Directory.Num()) +
-			VoxelBoundedAllocation::InitialGrowBytes<uint8>(Region->Directory.Num() * 128 + 4);
-		if (!Resources->Acquire(FVoxelGenerationConsumerKey::Section(LocalEpoch, OwnerId, 1, Head.Region, ++NextSerial),
-			EVoxelTerrainResourcePool::Working, Bytes, Scratch))
-		{
-			OutError = TEXT("CapacityBlocked: 增量目录 Hash scratch 尚未准入");
-			return true;
-		}
+		const uint64 Bytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelOverlayDirectoryEntry, FDefaultAllocator>(Region->Directory.Num()) +
+			VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(Region->Directory.Num() * 57 + 4);
+		const auto Admission = GrantBody(EVoxelTerrainResourcePool::Working, Bytes, Scratch, OutError);
+		if (Admission != EVoxelTerrainResourceAdmission::Granted) return Admission == EVoxelTerrainResourceAdmission::CapacityBlocked;
 		TArray<FVoxelOverlayDirectoryEntry> Directory;
 		Directory.Reserve(Region->Directory.Num());
 		Region->Directory.GenerateValueArray(Directory);
@@ -1589,8 +2058,8 @@ bool FVoxelOverlayReplica::TryApplyDelta(const FGuid& InTransaction, FString& Ou
 		++Pending->HeadCursor;
 		return true;
 	}
-	const auto Notification = PrepareNotification(InTransaction, MoveTemp(Pending->ChangedSections), First->Heads);
-	if (!Notification) { OutError = TEXT("CapacityBlocked: 增量提交通知尚未准入"); return true; }
+	const auto Notification = PrepareNotification(InTransaction, MoveTemp(Pending->ChangedSections), First->Heads, OutError);
+	if (!Notification) return BodyAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked;
 	Root = Pending->PreparedRoot;
 	for (const auto& Head : First->Heads)
 		Receiving->States.Add(Head.Region, Head.Sequence >= Receiving->RequiredSequences.FindRef(Head.Region) ?
@@ -1603,28 +2072,156 @@ bool FVoxelOverlayReplica::TryApplyDelta(const FGuid& InTransaction, FString& Ou
 	if (OnCommitted) OnCommitted(Notification);
 	return true;
 }
+namespace
+{
+	void MarkReplicaRegionPublished(const FVoxelOverlayRegionSnapshot* Region)
+	{
+		if (!Region || (Region->ResourceLease && Region->ResourceLease->IsPublished())) return;
+		if (Region->ResourceLease) Region->ResourceLease->MarkPublished();
+		for (const auto& Pair : Region->Overlays) if (Pair.Value)
+		{
+			if (Pair.Value->ResourceLease) Pair.Value->ResourceLease->MarkPublished();
+			if (Pair.Value->IndexLease) Pair.Value->IndexLease->MarkPublished();
+		}
+	}
+	void MarkReplicaRootPublished(const FVoxelOverlayReplicaRoot* Node)
+	{
+		if (!Node || (Node->Lease && Node->Lease->IsPublished())) return;
+		if (Node->Lease) Node->Lease->MarkPublished();
+		MarkReplicaRegionPublished(Node->Region.Get());
+		for (const auto& Child : Node->Children) MarkReplicaRootPublished(Child.Get());
+	}
+	void VisitReplicaRegionSources(const FVoxelOverlayRegionSnapshot* Region, const FVoxelTerrainResources& Resources,
+		FVoxelGenerationRequiredSourceScope::FVisit Visit)
+	{
+		if (!Region) return;
+		const auto Add = [&](const FVoxelTerrainResourceLease* Lease)
+		{
+			if (Lease && Lease->IsOwnedBy(Resources)) FVoxelGenerationRequiredSourceScope::VisitLease(Lease, Visit);
+		};
+		Add(Region->ResourceLease.Get());
+		for (const auto& Pair : Region->Overlays) if (Pair.Value) { Add(Pair.Value->ResourceLease.Get()); Add(Pair.Value->IndexLease.Get()); }
+	}
+	void VisitReplicaRootSources(const FVoxelOverlayReplicaRoot* Node, const FVoxelTerrainResources& Resources,
+		FVoxelGenerationRequiredSourceScope::FVisit Visit)
+	{
+		if (!Node) return;
+		if (Node->Lease && Node->Lease->IsOwnedBy(Resources)) FVoxelGenerationRequiredSourceScope::VisitLease(Node->Lease.Get(), Visit);
+		VisitReplicaRegionSources(Node->Region.Get(), Resources, Visit);
+		for (const auto& Child : Node->Children) VisitReplicaRootSources(Child.Get(), Resources, Visit);
+	}
+}
+
+EVoxelTerrainResourceAdmission FVoxelOverlayReplica::TryExpectTicket(const FGuid& InSubscription, const FGuid& InTicket,
+	TConstArrayView<FIntVector> InRegions, const FVoxelGenerationConsumerKey& InConsumer, FString& OutError)
+{
+	check(IsInGameThread());
+	const auto Fail = [&](const EVoxelTerrainResourceAdmission Admission)
+	{
+		OutError = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: Replica expected ticket input") :
+			Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: Replica expected ticket input") :
+			TEXT("InvalidResource: Replica expected ticket identity or native capacity");
+		return Admission;
+	};
+	if (!InSubscription.IsValid() || !InTicket.IsValid() || InRegions.IsEmpty() ||
+		InRegions.Num() > FVoxelOverlayRegionCodec::MaximumRegions || !InConsumer.IsValid() || InConsumer.WorldEpoch != LocalEpoch)
+		return Fail(EVoxelTerrainResourceAdmission::InvalidRequest);
+	if (const auto* Existing = Receiving->Tickets.Find(InTicket))
+	{
+		if (Existing->Subscription != InSubscription || Existing->Regions.Num() != InRegions.Num()) return Fail(EVoxelTerrainResourceAdmission::InvalidRequest);
+		for (int32 Index = 0; Index < InRegions.Num(); ++Index) if (Existing->Regions[Index] != InRegions[Index]) return Fail(EVoxelTerrainResourceAdmission::InvalidRequest);
+		OutError.Reset();
+		return EVoxelTerrainResourceAdmission::Granted;
+	}
+	for (int32 Index = 0; Index < InRegions.Num(); ++Index)
+		for (int32 Previous = 0; Previous < Index; ++Previous)
+			if (InRegions[Index] == InRegions[Previous]) return Fail(EVoxelTerrainResourceAdmission::InvalidRequest);
+	// 已存在的同 Ticket 不受目录上限影响；新 Ticket 等待真实退休。
+	if (Receiving->Tickets.Num() >= 1024) return Fail(EVoxelTerrainResourceAdmission::CapacityBlocked);
+	struct FInput
+	{
+		const FVoxelTerrainResources& Resources;
+		const FVoxelOverlayReplicaReceiving& Receiving;
+		const FVoxelOverlayReplicaRoot* Root;
+		const FVoxelOverlayReplicaWork* Preparing;
+	} Input{*Resources, *Receiving, Root.Get(), Preparing.Get()};
+	FVoxelGenerationRequiredSourceScope Sources(&Resources.Get(), &Input,
+		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+		{
+			const auto& Input = *static_cast<const FInput*>(Context);
+			const auto Add = [&](const FVoxelTerrainResourceLease* Lease)
+			{
+				if (Lease && Lease->IsOwnedBy(Input.Resources)) FVoxelGenerationRequiredSourceScope::VisitLease(Lease, Visit);
+			};
+			Add(Input.Receiving.TicketStorageLease.Get());
+			VisitReplicaRootSources(Input.Root, Input.Resources, Visit);
+			for (const auto& Pair : Input.Receiving.Tickets)
+			{
+				Add(Pair.Value.ResourceLease.Get());
+				if (Pair.Value.Cohort) Add(Pair.Value.Cohort->ResourceLease.Get());
+				VisitReplicaRootSources(Pair.Value.Candidate.Get(), Input.Resources, Visit);
+			}
+			if (Input.Preparing)
+			{
+				Add(Input.Preparing->InputLease.Get());
+				VisitReplicaRootSources(Input.Preparing->Basis.Get(), Input.Resources, Visit);
+				if (Input.Preparing->Cohort) Add(Input.Preparing->Cohort->ResourceLease.Get());
+				if (Input.Preparing->Notification) Add(Input.Preparing->Notification->ResourceLease.Get());
+			}
+		});
+	const auto Grant = [&](const uint64 Bytes, TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& Lease)
+	{
+		FVoxelGenerationRequiredCapacity Required;
+		if (!FVoxelGenerationRequiredSourceScope::Collect(*Resources, nullptr, Required, OutError)) return EVoxelTerrainResourceAdmission::InvalidRequest;
+		return Resources->TryAcquire(InConsumer, EVoxelTerrainResourcePool::Input, Bytes, Lease, 0,
+			Required.Bytes[int32(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+	};
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RegionLease;
+	const uint64 RegionBytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<FIntVector, FDefaultAllocator>(InRegions.Num());
+	auto Admission = Grant(RegionBytes, RegionLease);
+	if (Admission != EVoxelTerrainResourceAdmission::Granted) return Fail(Admission);
+	FVoxelGenerationRequiredSourceScope RegionSource(&Resources.Get(), RegionLease.Get());
+	using FPair = TPair<FGuid, FVoxelOverlayReplicaReceiving::FTicket>;
+	const int32 RequiredCapacity = Receiving->Tickets.Num() + 1;
+	if (!VoxelGenerationAllocation::Private::SetCanReserve<FPair>(Receiving->Tickets, RequiredCapacity))
+	{
+		const int32 Capacity = FMath::Min(1024, FMath::Max(16, RequiredCapacity * 2));
+		const uint64 Bytes = VoxelGenerationAllocation::Private::SetReserveBytes<FPair>(Receiving->Tickets, Capacity);
+		if (Bytes == MAX_uint64) return Fail(EVoxelTerrainResourceAdmission::CapacityUnachievable);
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> StorageLease;
+		Admission = Grant(Bytes, StorageLease);
+		if (Admission != EVoxelTerrainResourceAdmission::Granted) return Fail(Admission);
+		// 原目录 backing 直到 Reserve 真正释放后才退租；旧新峰值已分别接纳。
+		const auto OldStorage = Receiving->TicketStorageLease;
+		Receiving->Tickets.Reserve(Capacity);
+		const uint64 Actual = VoxelGenerationAllocation::Private::SetAllocatedBytes<FPair>(Receiving->Tickets);
+		if (Actual > Bytes || !VoxelGenerationAllocation::Private::SetCanReserve<FPair>(Receiving->Tickets, RequiredCapacity))
+			return Fail(EVoxelTerrainResourceAdmission::InvalidRequest);
+		Receiving->TicketStorageLease = MoveTemp(StorageLease);
+		if (Receiving->TicketStorageLease->TryResize(Actual) != EVoxelTerrainResourceAdmission::Granted) return Fail(EVoxelTerrainResourceAdmission::InvalidRequest);
+		Receiving->TicketStorageLease->MarkPublished();
+	}
+	FVoxelOverlayReplicaReceiving::FTicket Ticket;
+	Ticket.ResourceLease = MoveTemp(RegionLease);
+	Ticket.Subscription = InSubscription;
+	Ticket.Regions.Reserve(InRegions.Num());
+	if (VoxelGenerationAllocation::AllocatedBytes(Ticket.Regions) != RegionBytes) return Fail(EVoxelTerrainResourceAdmission::InvalidRequest);
+	Ticket.Regions.Append(InRegions.GetData(), InRegions.Num());
+	Receiving->Tickets.Add(InTicket, MoveTemp(Ticket));
+	Receiving->Tickets.FindChecked(InTicket).ResourceLease->MarkPublished();
+	OutError.Reset();
+	return EVoxelTerrainResourceAdmission::Granted;
+}
+
+#if WITH_DEV_AUTOMATION_TESTS
 bool FVoxelOverlayReplica::ExpectTicket(const FGuid& InSubscription, const FGuid& InTicket,
 	TConstArrayView<FIntVector> InRegions)
 {
-	check(IsInGameThread());
-	if (!InSubscription.IsValid() || !InTicket.IsValid() || InRegions.IsEmpty() ||
-		InRegions.Num() > FVoxelOverlayRegionCodec::MaximumRegions || Receiving->Tickets.Num() >= 1024) return false;
-	if (const auto* Existing = Receiving->Tickets.Find(InTicket))
-	{
-		if (Existing->Subscription != InSubscription || Existing->Regions.Num() != InRegions.Num()) return false;
-		for (int32 Index = 0; Index < InRegions.Num(); ++Index) if (Existing->Regions[Index] != InRegions[Index]) return false;
-		return true;
-	}
-	FVoxelOverlayReplicaReceiving::FTicket Ticket;
-	Ticket.Subscription = InSubscription;
-	for (const auto& Region : InRegions)
-	{
-		if (Ticket.Regions.Contains(Region)) return false;
-		Ticket.Regions.Add(Region);
-	}
-	Receiving->Tickets.Add(InTicket, MoveTemp(Ticket));
-	return true;
+	FString Error;
+	return TryExpectTicket(InSubscription, InTicket, InRegions,
+		FVoxelGenerationConsumerKey::Section(LocalEpoch, OwnerId, OwnerIncarnation, {}, ++NextSerial), Error) == EVoxelTerrainResourceAdmission::Granted;
 }
+#endif
 
 void FVoxelOverlayReplica::CancelTicket(const FGuid& InTicket)
 {
@@ -1654,9 +2251,7 @@ bool FVoxelOverlayReplica::Advance(const int32 InMaximumOperations, FString& Out
 		{
 			Receiving->TicketCursor %= Receiving->TicketOrder.Num();
 			const FGuid Ticket = Receiving->TicketOrder[Receiving->TicketCursor++];
-			const uint64* Blocked = Receiving->CapacityBlockedTickets.Find(Ticket);
-			if (!Blocked || Resources->Snapshot().ReleaseVersion > *Blocked)
-				if (!TryCommitTicket(Ticket, OutError)) return false;
+			if (!TryCommitTicket(Ticket, OutError)) return false;
 		}
 		else if (!Receiving->DeltaOrder.IsEmpty())
 		{
@@ -1736,7 +2331,7 @@ bool FVoxelOverlayReplica::Capture(const FVoxelGenerationBounds& InBounds, const
 	Capture.Resident.PinnedSections.Reserve(ModifiedCount);
 	Capture.ContentRevisions.Reserve(ModifiedCount);
 	Capture.ReplicaRegionSequences.Reserve(RegionKeys.Num());
-	if (!CaptureVersion(InBounds, Capture.VersionProof, OutError)) return false;
+	if (!CaptureVersion(InBounds, Capture.VersionProof, OutError, Consumer)) return false;
 	for (const auto& Key : RegionKeys)
 	{
 		const auto* Node = Root.Get();
@@ -1768,37 +2363,55 @@ bool FVoxelOverlayReplica::IsCurrent(const FVoxelFineOverlayReadResult& InRead) 
 }
 
 bool FVoxelOverlayReplica::CaptureVersion(const FVoxelGenerationBounds& InBounds,
-	TSharedPtr<const FVoxelFineOverlayVersionProof, ESPMode::ThreadSafe>& OutProof, FString& OutError) const
+	TSharedPtr<const FVoxelFineOverlayVersionProof, ESPMode::ThreadSafe>& OutProof, FString& OutError,
+	const FVoxelGenerationConsumerKey& InConsumer) const
 {
 	check(IsInGameThread());
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-	const uint64 Peak = VoxelBoundedAllocation::SharedBytes<FVoxelFineOverlayVersionProof>() +
-		VoxelBoundedAllocation::MapBytes<FIntVector, uint64>(FVoxelOverlayRegionCodec::MaximumRegions) +
-		VoxelBoundedAllocation::ArrayBytes<FIntVector>(FVoxelOverlayRegionCodec::MaximumRegions);
-	if (!Resources->Acquire(FVoxelGenerationConsumerKey::Section(LocalEpoch, OwnerId, 1, InBounds.Min,
-		FPlatformTime::Cycles64() | 1), EVoxelTerrainResourcePool::Resident, Peak, Lease)) return false;
-	TArray<FIntVector> Regions;
-	if (!FVoxelOverlayRegionCodec::GatherRegions(InBounds, Regions) || Regions.IsEmpty()) return false;
-	auto Proof = MakeShared<FVoxelFineOverlayVersionProof, ESPMode::ThreadSafe>();
-	Proof->WorldEpoch = LocalEpoch;
-	Proof->DirectoryEpoch = DirectoryEpoch;
-	Proof->RegionSequences.Reserve(Regions.Num());
-	Proof->ResourceLease = Lease;
+	if (!InBounds.IsValid()) { OutError = TEXT("InvalidRequest: Replica version bounds"); return false; }
+	const FIntVector Min(VoxelGeneration::FloorDivide(InBounds.Min.X, 128),
+		VoxelGeneration::FloorDivide(InBounds.Min.Y, 128), VoxelGeneration::FloorDivide(InBounds.Min.Z, 128));
+	const FIntVector Max(VoxelGeneration::FloorDivide(InBounds.Max.X - 1, 128),
+		VoxelGeneration::FloorDivide(InBounds.Max.Y - 1, 128), VoxelGeneration::FloorDivide(InBounds.Max.Z - 1, 128));
+	const FIntVector Size = Max - Min + FIntVector(1);
+	if (Size.GetMin() <= 0 || Size.GetMax() > FVoxelOverlayRegionCodec::MaximumRegions)
+	{ OutError = TEXT("CapacityUnachievable: Replica version region count"); return false; }
+	const int64 RegionCount = int64(Size.X) * Size.Y * Size.Z;
+	if (RegionCount > FVoxelOverlayRegionCodec::MaximumRegions)
+	{ OutError = TEXT("CapacityUnachievable: Replica version region count"); return false; }
 	FGuid Ticket;
-	for (const auto& Key : Regions)
+	for (int32 X = Min.X; X <= Max.X; ++X) for (int32 Y = Min.Y; Y <= Max.Y; ++Y) for (int32 Z = Min.Z; Z <= Max.Z; ++Z)
 	{
+		const FIntVector Key(X, Y, Z);
 		const auto* Region = FindRegion(Key);
 		if (!Region || GetState(Key) != EVoxelOverlayReplicaState::Complete ||
 			(Ticket.IsValid() && Ticket != Region->InitialCoverageTicket))
-		{
-			OutError = TEXT("WaitingOverlay: 正文与 Halo 未形成完整连续的同一切点");
-			return false;
-		}
+		{ OutError = TEXT("WaitingOverlay: 正文与 Halo 未形成完整连续的同一切点"); return false; }
 		Ticket = Region->InitialCoverageTicket;
-		Proof->RegionSequences.Add(Key, Region->Sequence);
 	}
-	Regions.Empty();
-	Lease->Resize(VoxelBoundedAllocation::SharedBytes<FVoxelFineOverlayVersionProof>() + Proof->RegionSequences.GetAllocatedSize());
+	const auto Consumer = InConsumer.IsValid() ? InConsumer :
+		FVoxelGenerationConsumerKey::Section(LocalEpoch, OwnerId, 1, InBounds.Min, FPlatformTime::Cycles64() | 1);
+	const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelFineOverlayVersionProof>() +
+		VoxelBoundedAllocation::MapBytes<FIntVector, uint64>(int32(RegionCount));
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+	const auto Admission = Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Input, Bytes, Lease);
+	if (Admission != EVoxelTerrainResourceAdmission::Granted)
+	{
+		OutError = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: Replica version proof") :
+			Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: Replica version proof") :
+			TEXT("InvalidRequest: Replica version resource owner");
+		return false;
+	}
+	auto Proof = VoxelBoundedAllocation::MakeWorkerShared<FVoxelFineOverlayVersionProof>(Lease);
+	Proof->ResourceLease = MoveTemp(Lease);
+	Proof->WorldEpoch = LocalEpoch;
+	Proof->DirectoryEpoch = DirectoryEpoch;
+	Proof->RegionSequences.Reserve(int32(RegionCount));
+	for (int32 X = Min.X; X <= Max.X; ++X) for (int32 Y = Min.Y; Y <= Max.Y; ++Y) for (int32 Z = Min.Z; Z <= Max.Z; ++Z)
+	{
+		const FIntVector Key(X, Y, Z);
+		Proof->RegionSequences.Add(Key, FindRegion(Key)->Sequence);
+	}
+	check(VoxelBoundedAllocation::WorkerSharedBytes<FVoxelFineOverlayVersionProof>() + Proof->RegionSequences.GetAllocatedSize() <= Bytes);
 	OutProof = MoveTemp(Proof);
 	OutError.Reset();
 	return true;
@@ -1828,19 +2441,19 @@ bool FVoxelOverlayReplica::LookupSection(const FIntVector& InSection, uint64& Ou
 }
 
 TSharedPtr<const FVoxelOverlayCommitNotification, ESPMode::ThreadSafe> FVoxelOverlayReplica::PrepareNotification(
-	const FGuid& InTransaction, TArray<FIntVector>&& InSections, TConstArrayView<FVoxelOverlayRegionHead> InHeads)
+	const FGuid& InTransaction, TArray<FIntVector>&& InSections, TConstArrayView<FVoxelOverlayRegionHead> InHeads, FString& OutError)
 {
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 	const uint64 Bytes = VoxelBoundedAllocation::SharedBytes<FVoxelOverlayCommitNotification>() +
-		InSections.GetAllocatedSize() + VoxelBoundedAllocation::ArrayBytes<FVoxelOverlayRegionHead>(InHeads.Num()) + 128;
-	if (!Resources->Acquire(FVoxelGenerationConsumerKey::Section(LocalEpoch, OwnerId, 1,
-		InHeads[0].Region, ++NextSerial), EVoxelTerrainResourcePool::Resident, Bytes, Lease)) return nullptr;
+		VoxelGenerationAllocation::AllocatedBytes(InSections) +
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelOverlayRegionHead, FDefaultAllocator>(InHeads.Num());
+	if (GrantBody(EVoxelTerrainResourcePool::Resident, Bytes, Lease, OutError) != EVoxelTerrainResourceAdmission::Granted) return nullptr;
 	auto Notification = MakeShared<FVoxelOverlayCommitNotification, ESPMode::ThreadSafe>();
+	Notification->ResourceLease = MoveTemp(Lease);
 	Notification->AuthorityTransaction = InTransaction;
 	Notification->Sections = MoveTemp(InSections);
 	Notification->Heads.Reserve(InHeads.Num());
 	Notification->Heads.Append(InHeads.GetData(), InHeads.Num());
-	Notification->ResourceLease = MoveTemp(Lease);
 	return Notification;
 }
 

@@ -12,8 +12,9 @@ public:
 	static TSharedPtr<FVoxelNetworkEnvelopeDecode, ESPMode::ThreadSafe> Create(
 		TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
 		const FVoxelGenerationConsumerKey& InConsumer, TArray<uint8>&& InBytes,
-		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InInputLease,
-		uint32 InCrc, bool bInServer, FString& OutError);
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>&& InInputLease,
+		uint32 InCrc, bool bInServer, FString& OutError,
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>&& InMetadataLease = nullptr);
 	FVoxelTaskResult Advance(const TAtomic<bool>& InCancel);
 	EVoxelTaskBlockReason GetBlockReason() const;
 	uint64 GetIngressQuotaBytes() const;
@@ -23,21 +24,29 @@ public:
 	bool IsServer() const { return bServer; }
 	bool IsRepresentationReply() const { return bRepresentationReply; }
 	const FVoxelRepresentationReply& GetRepresentationReply() const { return RepresentationReply; }
+	void VisitResourceLeases(TFunctionRef<void(const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>&)> InVisit) const
+	{
+		InVisit(InputLease);
+		InVisit(MetadataLease);
+		InVisit(DecodeLease);
+		InVisit(OverlayLease);
+		InVisit(RepresentationLease);
+	}
 	virtual uint64 GetAllocatedBytes() const override;
 	virtual uint64 GetResourceAccountedBytes() const override;
 
 private:
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
 	FVoxelGenerationConsumerKey Consumer;
-	TArray<uint8> Bytes;
-	FVoxelWireMessage Message;
-	FVoxelOverlayRegionMessage Overlay;
-	FVoxelRepresentationReply RepresentationReply;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InputLease;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MetadataLease;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> DecodeLease;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> OverlayLease;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RepresentationLease;
+	TArray<uint8> Bytes;
+	FVoxelWireMessage Message;
+	FVoxelOverlayRegionMessage Overlay;
+	FVoxelRepresentationReply RepresentationReply;
 	uint64 DecodeBytes = 0;
 	uint64 IngressQuotaBytes = 0;
 	uint64 CapacityVersion = 0;
@@ -48,6 +57,7 @@ private:
 	bool bServer = false;
 	bool bOverlay = false;
 	bool bRepresentationReply = false;
+	bool bMeasured = false;
 	bool bDecoded = false;
 	bool bComplete = false;
 };

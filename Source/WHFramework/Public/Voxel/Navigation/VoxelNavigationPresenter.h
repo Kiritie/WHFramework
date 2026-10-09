@@ -18,7 +18,14 @@ class WHFRAMEWORK_API FVoxelNavigationPresenter
 public:
 	FVoxelNavigationPresenter(UVoxelModule& InModule, FVoxelTaskScheduler& InScheduler);
 	~FVoxelNavigationPresenter();
+	FVoxelNavigationPresenter(const FVoxelNavigationPresenter&) = delete;
+	FVoxelNavigationPresenter& operator=(const FVoxelNavigationPresenter&) = delete;
 	bool ActivateSection(const FIntVector& InSection);
+	// GT 调用者在 ActivateSection 返回后立即读取，区分固定准入的硬失败与等待。
+	EVoxelTerrainResourceAdmission GetActivationAdmission() const
+	{
+		return ActivationAdmission;
+	}
 	void RetireSection(const FIntVector& InSection);
 	void InvalidateSection(const FIntVector& InSection);
 	void Tick();
@@ -86,6 +93,7 @@ private:
 	double PromotionCostMilliseconds = 0.005;
 	double RetirementCostMilliseconds = 0.005;
 	bool bStopped = false;
+	EVoxelTerrainResourceAdmission ActivationAdmission = EVoxelTerrainResourceAdmission::None;
 	TSet<FIntVector> Wanted;
 	TMap<FIntVector, FInputLeases> InputLeases;
 	TSet<FIntVector> PendingPromotion;

@@ -59,6 +59,12 @@ struct WHFRAMEWORK_API FVoxelFineOwnershipChange
 
 struct WHFRAMEWORK_API FVoxelFineHandoffTransaction
 {
+	FVoxelFineHandoffTransaction() = default;
+	FVoxelFineHandoffTransaction(const FVoxelFineHandoffTransaction&) = default;
+	FVoxelFineHandoffTransaction(FVoxelFineHandoffTransaction&&) = default;
+	FVoxelFineHandoffTransaction& operator=(const FVoxelFineHandoffTransaction& InOther);
+	FVoxelFineHandoffTransaction& operator=(FVoxelFineHandoffTransaction&& InOther);
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 	FGuid Id;
 	uint64 WorldEpoch = 0;
 	uint64 DemandRevision = 0;
@@ -76,9 +82,10 @@ struct WHFRAMEWORK_API FVoxelFinePublishStamp
 
 struct WHFRAMEWORK_API FVoxelFineFrozenHandoff
 {
+	// Publication owns the native transaction array through its final reader.
+	TSharedPtr<const FVoxelTaskCustomPayload, ESPMode::ThreadSafe> PublicationLease;
 	FVoxelFineHandoffTransaction Transaction;
 	FVoxelFinePublishStamp Stamp;
-	TSharedPtr<const FVoxelTaskCustomPayload, ESPMode::ThreadSafe> PublicationLease;
 };
 
 struct WHFRAMEWORK_API FVoxelFineRenderReceiptAtom
@@ -131,9 +138,13 @@ class WHFRAMEWORK_API FVoxelFineHandoff
 {
 public:
 	explicit FVoxelFineHandoff(uint64 InWorldEpoch);
+	bool BindResources(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+		const FVoxelGenerationConsumerKey& InConsumer,
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InControlLease = nullptr);
 	void SetSectionChangedCallback(TFunction<void(const FIntVector&)> InCallback);
 	bool Prepare(TConstArrayView<FVoxelFineOwnershipChange> InChanges, uint64 InDemandRevision,
-		FVoxelFineHandoffTransaction& OutTransaction, FString& OutError);
+		FVoxelFineHandoffTransaction& OutTransaction, FString& OutError,
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InPreparationLease = nullptr);
 	bool ValidateBeforeSeal(const FGuid& InTransaction,
 		TFunctionRef<bool(const FIntVector&, const FVoxelFineOwnerEvidence&)> InIsEvidenceCurrent,
 		TFunctionRef<bool(const FIntVector&, const FVoxelFineOwnerEvidence&)> InIsCollisionCurrent,
@@ -170,7 +181,13 @@ private:
 	};
 
 	bool ValidateEvidence(const FVoxelFineOwnerEvidence& InEvidence) const;
+	bool PrepareNativeTables(int32 InAdditionalChanges,
+		const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& InPreparationLease, FString& OutError);
 	void ReleaseLocks(const FVoxelFineHandoffTransaction& InTransaction);
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
+	FVoxelGenerationConsumerKey Consumer;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ControlLease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> NativeLease;
 	uint64 WorldEpoch = 0;
 	uint64 HighestSealedPresentationSerial = 0;
 	uint64 HighestSealedFrameCounter = 0;

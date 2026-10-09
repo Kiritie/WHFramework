@@ -70,7 +70,7 @@ bool AVoxelNavigationData::AdmitRepath(const FNavPathSharedPtr& InPath, const EN
 	Control->Reason = InReason;
 	Control->EndLocation = Query.EndLocation;
 	Control->ExpectedSemanticInputs = FindPathInputs(InPath);
-	const auto Callback = FNavPathQueryDelegate::CreateSP(Control, &FVoxelNavigationRepathControl::OnComplete);
+	const auto Callback = FNavPathQueryDelegate::CreateSP(Control.ToSharedRef(), &FVoxelNavigationRepathControl::OnComplete);
 	check(Callback.GetAllocatedSize() <= CallbackBytes);
 	Control->QueryId = System->FindPathAsync(Query.NavAgentProperties, Query, Callback);
 	if (Control->QueryId == INVALID_NAVQUERYID) return false;

@@ -4,6 +4,7 @@
 #include "CoreMinimal.h"
 #include "Common/Base/WHObject.h"
 #include "Scene/Container/SceneContainerInterface.h"
+#include "Voxel/Task/VoxelTerrainResources.h"
 #include "VoxelSceneRegion.generated.h"
 
 class UVoxelModule;
@@ -85,7 +86,16 @@ private:
 	void AdvanceSceneLoad(FVoxelTaskScheduler& InScheduler);
 	void DetachSceneLoad();
 	void RetrySceneLoad();
+	bool PrepareSceneLoadAttempt();
 	TSharedPtr<FVoxelSceneColumnLoadAttempt, ESPMode::ThreadSafe> SceneLoadAttempt;
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> SceneLoadResources;
+	TSharedPtr<const FSaveGameGenerationReadLease, ESPMode::ThreadSafe> SceneLoadSource;
+	FVoxelGenerationConsumerKey SceneLoadConsumer;
+	EVoxelTerrainResourceAdmission SceneLoadAdmission = EVoxelTerrainResourceAdmission::None;
+	uint64 SceneLoadCapacityVersion = 0;
+	uint64 SceneLoadSourceIncarnation = 0;
+	uint32 SceneLoadExpectedBytes = 0;
+	double SceneLoadFirstRunnableSeconds = -1.0;
 	uint64 SceneLoadSerial = 0;
 	UVoxelSceneRegion* PreviousRegion = nullptr;
 	UVoxelSceneRegion* NextRegion = nullptr;
@@ -95,6 +105,7 @@ private:
 	FVoxelSection* SimulationSaveHead = nullptr;
 	FVoxelSection* SimulationSaveTail = nullptr;
 	FGuid SceneInstanceId;
+	FGuid RestoringActorId;
 	uint64 SceneRevision = 0;
 	uint64 DurableSceneRevision = 0;
 	bool bIdleSaveWaiting = false;

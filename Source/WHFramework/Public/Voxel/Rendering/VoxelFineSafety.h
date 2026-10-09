@@ -6,8 +6,6 @@
 #include "Voxel/Collision/VoxelCollisionPresenter.h"
 #include "Voxel/Runtime/VoxelChangeHierarchy.h"
 
-class FVoxelChangeHierarchy;
-
 // 既有 Scheduler 的有界 continuation；只读两个实际回执根，不读取 UObject。
 class WHFRAMEWORK_API FVoxelFineFeedbackCapture
 {

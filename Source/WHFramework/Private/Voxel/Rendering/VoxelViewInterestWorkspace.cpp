@@ -120,6 +120,16 @@ void FVoxelViewManager::AdvanceInterestWorkspace(const double InDeadline)
 {
 	if (!InterestWorkspace) return;
 	auto& Workspace = *InterestWorkspace;
+	if (Workspace.HierarchyAdmission != EVoxelTerrainResourceAdmission::Granted &&
+		Workspace.HierarchyAdmission != EVoxelTerrainResourceAdmission::CapacityBlocked) return;
+	if (Workspace.bWaitingHierarchyCapacity)
+	{
+		const auto Owner = Module.GetRuntime()->GetChangeHierarchy().GetControlConsumer();
+		uint64 Version = 0;
+		if (!Scheduler.GetRuntimeResources()->TryGetReleaseVersionExcludingOwner(Owner, Version) ||
+			Version <= Workspace.HierarchyCapacityVersion) return;
+		Workspace.bWaitingHierarchyCapacity = false;
+	}
 	const auto& Inputs = *Workspace.Snapshot->PublicationInputs;
 	const auto NextPhase = [&Workspace] { ++Workspace.Phase; Workspace.Cursor = 0; };
 	const auto AddOne = [&Workspace, &NextPhase](const auto& Keys, auto&& Operation)
@@ -137,6 +147,7 @@ void FVoxelViewManager::AdvanceInterestWorkspace(const double InDeadline)
 	{
 		const double Start = FPlatformTime::Seconds();
 		if (!TerrainFrameBudget.TryStart(EVoxelPublishPhase::Plan, Start, InterestMicrostepEstimateMilliseconds)) return;
+		bool bStop = false;
 		switch (Workspace.Phase)
 		{
 		case 0:
@@ -241,7 +252,27 @@ void FVoxelViewManager::AdvanceInterestWorkspace(const double InDeadline)
 			}
 			break;
 		case 13:
-			NextPhase();
+			if (!Inputs.Geometry.IsValidIndex(Workspace.Cursor)) { NextPhase(); break; }
+			{
+				auto& Hierarchy = Module.GetRuntime()->GetChangeHierarchy();
+				const auto Owner = Hierarchy.GetControlConsumer();
+				const uint64 Before = Scheduler.GetRuntimeResources()->ReleaseVersionExcludingOwner(Owner);
+				FString Error;
+				if (!Hierarchy.RegisterGeometry(Inputs.Geometry[Workspace.Cursor], Error))
+				{
+					Workspace.HierarchyAdmission = Hierarchy.GetLastResourceAdmission();
+					Workspace.bWaitingHierarchyCapacity = Workspace.HierarchyAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked;
+					Workspace.HierarchyCapacityVersion = Before;
+					bStop = true;
+					if (!Workspace.bWaitingHierarchyCapacity)
+						UE_LOG(LogTemp, Error, TEXT("Voxel interest geometry rejected before commit: %s"), *Error);
+				}
+				else
+				{
+					Workspace.HierarchyAdmission = EVoxelTerrainResourceAdmission::Granted;
+					++Workspace.Cursor;
+				}
+			}
 			break;
 		}
 		const double End = FPlatformTime::Seconds();
@@ -249,6 +280,7 @@ void FVoxelViewManager::AdvanceInterestWorkspace(const double InDeadline)
 		TerrainFrameBudget.Finish(EVoxelPublishPhase::Plan, Start, End);
 		InterestInputPhase = Workspace.Phase;
 		InterestInputCursor = Workspace.Cursor;
+		if (bStop) return;
 	}
 }
 
@@ -347,7 +379,6 @@ void FVoxelViewManager::AdvanceCommittedInterestEvents(const double InDeadline)
 		case 5:
 			Visit(Events.Snapshot->PublicationInputs->Geometry, [this](const FVoxelTerrainGeometry& Geometry)
 			{
-				if (!Module.GetRuntime()->GetChangeHierarchy().RegisterGeometry(Geometry)) return;
 				FIntVector Min, Max;
 				if (Geometry.Key.TryBounds(Geometry.WorldMinZ, Geometry.WorldMaxZ, Min, Max)) MarkCoverageDirty({FIntPoint(Min.X, Min.Y), FIntPoint(Max.X, Max.Y)});
 				bHeightfieldTopologyDirty |= Geometry.Key.IsColumn();

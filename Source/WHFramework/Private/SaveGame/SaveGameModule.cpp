@@ -338,9 +338,9 @@ FSaveOperationResult USaveGameModule::SaveSlotAsync(FGuid SaveId)
 	Plan.Modules.Reserve(MaximumModules);
 	for (UModuleBase* Module : Main->GetModules())
 		if (Module && Module->GetSaveScope() == ESaveScope::World && Module->IsSaveEnabled()) AsyncCaptured.Add(Module);
-	AsyncCaptured.Sort([](const TObjectPtr<UModuleBase>& A, const TObjectPtr<UModuleBase>& B)
+	AsyncCaptured.Sort([](const UModuleBase& A, const UModuleBase& B)
 	{
-		return A->GetModuleIndex() < B->GetModuleIndex();
+		return A.GetModuleIndex() < B.GetModuleIndex();
 	});
 	AsyncPrepareCount = 0;
 	AsyncBuildCursor = 0;

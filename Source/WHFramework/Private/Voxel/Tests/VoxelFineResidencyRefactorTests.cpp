@@ -7,6 +7,7 @@
 #include "Voxel/Rendering/VoxelFineBuildState.h"
 #include "Voxel/Rendering/VoxelFineShardBuild.h"
 #include "Voxel/Rendering/VoxelFineHandoff.h"
+#include "Voxel/Rendering/VoxelViewManager.h"
 #include "Voxel/Task/VoxelTerrainWorkSelection.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 
@@ -490,6 +491,96 @@ bool FVoxelFineExactSamplingTest::RunTest(const FString& InParameters)
         }
     }
     TestTrue(TEXT("核心和六个面 Halo 与相同世界事实逐格一致"), bEqual);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelFineAdmissionRetentionTest,
+    "WHFramework.Voxel.FineRefactor.AdmissionRetention",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelFineAdmissionRetentionTest::RunTest(const FString& InParameters)
+{
+    struct FExecuteBody
+    {
+        uint8 Data[2048]{};
+        FVoxelTaskResult operator()(const TAtomic<bool>&) const
+        {
+            FVoxelTaskResult Result;
+            Result.bSuccess = true;
+            return Result;
+        }
+    };
+    const auto Resources = MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
+    FVoxelViewManager::FFineShardSlot Slot;
+    FVoxelFineMeshInput Input;
+    Input.WorldEpoch = 37;
+    Input.Incarnation = 3;
+    Input.GeneratorIdentity = 59;
+    Input.Shard = {FIntVector::ZeroValue, 32};
+    Input.MeshRevision = 1;
+    FString Error;
+    if (!TestTrue(TEXT("原Fine槽建立完整内容身份"), Slot.Build.Initialize(Input, Error))) return false;
+    const auto Attempt = Slot.Build.BeginAttempt();
+    Slot.Consumer = {EVoxelGenerationConsumerKind::FineShard, 37, FGuid::NewGuid(), 3,
+        EVoxelGenerationSpatialKind::Bounds, {}, {32, 32, 32}, Attempt.Serial};
+    const auto FactResources = MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
+    Slot.PendingCapture.Emplace();
+    auto& Capture = Slot.PendingCapture.GetValue();
+    Capture.Resources = FactResources;
+    Capture.Consumer = Slot.Consumer;
+    Capture.WorldEpoch = 37;
+    Capture.Bounds = {{}, {32, 32, 32}};
+    Capture.ReplicaDirectoryEpoch = FGuid::NewGuid();
+    const auto OriginalDirectory = Capture.ReplicaDirectoryEpoch;
+    if (!TestTrue(TEXT("目录切点元数据由原事实账本保活"), FactResources->Acquire(Slot.Consumer,
+        EVoxelTerrainResourcePool::Input, VoxelBoundedAllocation::MapBytes<FIntVector, uint64>(1),
+        Capture.Resident.ResourceLease))) return false;
+    Capture.ContentRevisions.Reserve(1);
+    Capture.ContentRevisions.Add({}, 7);
+    const uint64 OriginalCaptureLease = Capture.Resident.ResourceLease->Serial();
+    Slot.PendingRequest.Emplace();
+    auto& Request = Slot.PendingRequest.GetValue();
+    Request.Kind = EVoxelTaskKind::BuildFineShard;
+    Request.GenerationConsumer = Slot.Consumer;
+    Request.Stamp.WorldEpoch = 37;
+    Request.Stamp.OwnerId = Slot.Consumer.OwnerId;
+    Request.Stamp.OwnerIncarnation = 3;
+    Request.Stamp.Token = Attempt.Serial;
+    Request.Stamp.Revision = 1;
+    Request.FirstRunnableSeconds = 17.5;
+    if (!TestTrue(TEXT("真实owned callable先授额"), Request.BindExecute(Resources, Slot.Consumer, FExecuteBody(), Error))) return false;
+    const auto OriginalStamp = Request.Stamp;
+    const uint64 OriginalLease = Request.ExecuteBindingLease->Serial();
+    auto Foreign = Slot.Consumer;
+    Foreign.OwnerId = FGuid::NewGuid();
+    TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ForeignLease;
+    if (!TestTrue(TEXT("外部消费者保持实际输入占用"), Resources->Acquire(Foreign,
+        EVoxelTerrainResourcePool::Input, 256, ForeignLease))) return false;
+    FVoxelViewManager::WaitFineShardAdmission(Slot, Resources,
+        Resources->ReleaseVersionExcludingOwner(Slot.Consumer));
+    TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> OwnLease;
+    if (!TestTrue(TEXT("原尝试临时工作占用"), Resources->Acquire(Slot.Consumer,
+        EVoxelTerrainResourcePool::Working, 64, OwnLease))) return false;
+    OwnLease.Reset();
+    TestTrue(TEXT("自己的退款不能重试冻结Fine请求"), FVoxelViewManager::IsFineShardAdmissionWaiting(Slot));
+    TestTrue(TEXT("等待保存完整Request"), Slot.PendingRequest.IsSet());
+    TestTrue(TEXT("Worker接纳等待保留原固定目录切点"), Slot.PendingCapture.IsSet() &&
+        Capture.ReplicaDirectoryEpoch == OriginalDirectory && Capture.ContentRevisions.FindRef({}) == 7);
+    TestEqual(TEXT("原切点不释放后重新捕获"), Capture.Resident.ResourceLease->Serial(), OriginalCaptureLease);
+    TestTrue(TEXT("等待保持原Stamp及attempt"), Request.Stamp == OriginalStamp && Slot.Build.BeginAttempt() == Attempt);
+    TestEqual(TEXT("等待保持首次年龄"), Request.FirstRunnableSeconds, 17.5);
+    TestEqual(TEXT("部分绑定保留同一个原生租约"), Request.ExecuteBindingLease->Serial(), OriginalLease);
+    ForeignLease.Reset();
+    TestFalse(TEXT("外部退款解除原Fine槽等待"), FVoxelViewManager::IsFineShardAdmissionWaiting(Slot));
+    const TAtomic<bool> Cancel(false);
+    TestTrue(TEXT("原冻结callable恢复后仍可消费"), Request.Execute(Cancel).bSuccess);
+    TestFalse(TEXT("容量释放不制造Fine mesh Ready"), Slot.Build.IsMeshReady());
+    FVoxelViewManager::ClearFineShardAdmission(Slot);
+    TestFalse(TEXT("撤销清除部分绑定Request"), Slot.PendingRequest.IsSet());
+    TestFalse(TEXT("撤销释放原固定目录切点"), Slot.PendingCapture.IsSet());
+    TestFalse(TEXT("撤销解除原资源等待"), Slot.bWaitingAdmissionCapacity);
+    TestEqual(TEXT("真实callable销毁后才归还原租约"), Resources->Snapshot().LeaseCount, 0);
+    TestEqual(TEXT("切点退出后原事实账本归零"), FactResources->Snapshot().LeaseCount, 0);
     return true;
 }
 

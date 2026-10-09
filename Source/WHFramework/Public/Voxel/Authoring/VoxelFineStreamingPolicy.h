@@ -5,6 +5,8 @@
 #include "Voxel/Rendering/VoxelTerrainFrameBudget.h"
 #include "VoxelFineStreamingPolicy.generated.h"
 
+struct FVoxelTerrainResourceLimits;
+
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelFineStreamingPolicy
 {
@@ -64,8 +66,20 @@ struct WHFRAMEWORK_API FVoxelFineStreamingPolicy
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1", ClampMax = "1024"))
 	int32 MaximumShardGeometryMegabytes = 64;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1"))
+	int32 MaximumInputGeometryMegabytes = 64;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1"))
+	int32 MaximumWorkingGeometryMegabytes = 256;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1"))
+	int32 MaximumStagedGeometryMegabytes = 128;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "64"))
 	int32 MaximumResidentGeometryMegabytes = 512;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1"))
+	int32 ResidentGeometryOverlapMegabytes = 128;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1"))
 	int32 ReservedNearWorkers = 4;
@@ -74,6 +88,7 @@ struct WHFRAMEWORK_API FVoxelFineStreamingPolicy
 	double MaximumBackgroundWaitSeconds = 0.5;
 
 	FVoxelFineWindowSettings WindowSettings() const;
+	FVoxelTerrainResourceLimits GeometryLimits() const;
 	bool Validate(FString& OutError) const;
 	bool operator==(const FVoxelFineStreamingPolicy& InOther) const = default;
 };

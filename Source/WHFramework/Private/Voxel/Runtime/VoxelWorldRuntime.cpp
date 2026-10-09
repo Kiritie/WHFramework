@@ -71,15 +71,30 @@ FVoxelWorldRuntime::FVoxelWorldRuntime(
 	const uint64 InWorldEpoch,
 	const bool bInAuthority,
 	TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry,
-	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator)
+	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator,
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources)
 	: WorldEpoch(InWorldEpoch)
 	, bAuthority(bInAuthority)
 	, Registry(InRegistry)
 	, Generator(InGenerator)
 	, CommittedJournal(InWorldEpoch)
+	, TerrainResources(InResources)
 {
 	CommittedJournal.BindResources(TerrainResources.ToSharedRef());
+	const auto Control = FVoxelGenerationConsumerKey::Section(WorldEpoch, RuntimeOwnerId, 1, {}, 1);
+	ChangeIndex.BindResources(TerrainResources.ToSharedRef(), Control);
+	ChangeHierarchy.BindResources(TerrainResources.ToSharedRef(), Control);
 }
+
+#if WITH_DEV_AUTOMATION_TESTS
+FVoxelWorldRuntime::FVoxelWorldRuntime(const uint64 InWorldEpoch, const bool bInAuthority,
+	TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry,
+	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator)
+	: FVoxelWorldRuntime(InWorldEpoch, bInAuthority, InRegistry, InGenerator,
+		MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>())
+{
+}
+#endif
 
 FVoxelSection* FVoxelWorldRuntime::FindSection(const FIntVector& InSection)
 {
@@ -381,6 +396,7 @@ bool FVoxelWorldRuntime::PublishFinal(
 	TMap<int32, FVoxelBlockState> Overlay;
 	Overlay.Reserve(InOverlay.Num());
 	for (const auto& Pair : InOverlay) Overlay.Add(Pair.Key, Pair.Value);
+	if (!ChangeIndex.SetModified(InSection, bModified, OutError)) return false;
 	RetireRuntimeData(*Section);
 	Section->Blocks = MoveTemp(Candidate);
 	Section->Overlay = MoveTemp(Overlay);
@@ -392,7 +408,6 @@ bool FVoxelWorldRuntime::PublishFinal(
 	Section->Error.Reset();
 	Section->bCollisionDirty = true;
 	Section->bFineMeshDirty = true;
-	ChangeIndex.SetModified(InSection, bModified);
 	if (Journal && Journal != ExistingJournal) RetainJournal(InSection, MoveTemp(Journal));
 	// 物化已提交事实不产生新的内容版本；编辑提交与 Replica 根交换负责内容失效。
 	OutError.Reset();
@@ -461,6 +476,37 @@ bool FVoxelWorldRuntime::CaptureSnapshot(
 	}
 
 	OutSnapshot = MoveTemp(Snapshot);
+	return true;
+}
+
+bool FVoxelWorldRuntime::CompleteSnapshotHalo(FVoxelSectionSnapshot& InOutSnapshot, const uint8 InFace) const
+{
+	check(IsInGameThread());
+	if (InFace >= 6 || InOutSnapshot.GridSide != RuntimeSectionSide ||
+		InOutSnapshot.Halo[InFace].Num() != RuntimeSectionSide * RuntimeSectionSide) return false;
+	if (InOutSnapshot.Known[InFace]) return true;
+	const auto* Section = FindSection(InOutSnapshot.Section);
+	if (!Section || Section->Status != EVoxelSectionStatus::DataReady || Section->Stamp != InOutSnapshot.Stamp ||
+		Section->CommittedRevision != InOutSnapshot.Revision) return false;
+	const int32 Axis = InFace / 2, UAxis = (Axis + 1) % 3, VAxis = (Axis + 2) % 3;
+	FIntVector NeighborKey = InOutSnapshot.Section;
+	const int64 NeighborCoordinate = int64(NeighborKey[Axis]) + ((InFace & 1) ? -1 : 1);
+	if (NeighborCoordinate < MIN_int32 || NeighborCoordinate > MAX_int32) return false;
+	NeighborKey[Axis] = int32(NeighborCoordinate);
+	const auto* Neighbor = FindSection(NeighborKey);
+	if (!Neighbor || Neighbor->Status != EVoxelSectionStatus::DataReady ||
+		Neighbor->Blocks.Num() != RuntimeSectionSide * RuntimeSectionSide * RuntimeSectionSide ||
+		(!bAuthority && (!RemoteSectionValidator || !RemoteSectionValidator(NeighborKey, Neighbor->CommittedRevision)))) return false;
+	for (int32 V = 0; V < RuntimeSectionSide; ++V) for (int32 U = 0; U < RuntimeSectionSide; ++U)
+	{
+		FIntVector Local = FIntVector::ZeroValue;
+		Local[Axis] = (InFace & 1) ? RuntimeSectionSide - 1 : 0;
+		Local[UAxis] = U;
+		Local[VAxis] = V;
+		const int32 Index = Local.X + RuntimeSectionSide * (Local.Y + RuntimeSectionSide * Local.Z);
+		InOutSnapshot.Halo[InFace][U + RuntimeSectionSide * V] = Neighbor->Blocks[Index].Pack();
+	}
+	InOutSnapshot.Known[InFace] = true;
 	return true;
 }
 
@@ -824,6 +870,20 @@ bool FVoxelWorldRuntime::CommitPreparedEdit(
 		OutError = TEXT("CapacityBlocked: Runtime编辑Region序号目录");
 		return false;
 	}
+	const auto SectionAt = [&InPrepared](int32 Index) { return InPrepared.Sections[Index].Patch.Section; };
+	FVoxelPreparedChangeInvalidations Changes;
+	if (!ChangeIndex.PrepareModified(InPrepared.Sections.Num(), SectionAt, OutError)) return false;
+	const auto ModifiedLease = ChangeIndex.GetStorageLease();
+	const auto DirectoryLease = ChangeIndex.GetBaselineLease();
+	FVoxelGenerationRequiredSourceScope ModifiedSource(TerrainResources.Get(), ModifiedLease.Get());
+	FVoxelGenerationRequiredSourceScope DirectorySource(TerrainResources.Get(), DirectoryLease.Get());
+	if (!ChangeHierarchy.PrepareInvalidations(InPrepared.Sections.Num(), SectionAt, Changes, OutError) ||
+		!ChangeHierarchy.CommitInvalidations(MoveTemp(Changes), SectionAt, OutError)) return false;
+	for (const auto& Candidate : InPrepared.Sections)
+	{
+		const bool bIndexed = ChangeIndex.SetModified(Candidate.Patch.Section, !Candidate.Overlay.IsEmpty() || !Candidate.Entities.IsEmpty(), OutError);
+		checkf(bIndexed, TEXT("Prepared change-index capacity must cover the stable edit source"));
+	}
 	Batch.ResourceLease = MoveTemp(InPrepared.ResourceLease);
 	int32 JournalIndex = 0;
 	for (FVoxelPreparedSection& PreparedSection : InPrepared.Sections)
@@ -889,6 +949,17 @@ bool FVoxelWorldRuntime::ApplyPatch(const FVoxelSectionPatch& InPatch, FString& 
 		OutError = TEXT("CapacityBlocked: Runtime补丁Region序号目录");
 		return false;
 	}
+	const auto SectionAt = [&InPatch](int32) { return InPatch.Section; };
+	FVoxelPreparedChangeInvalidations Changes;
+	if (!ChangeIndex.PrepareModified(1, SectionAt, OutError)) return false;
+	const auto ModifiedLease = ChangeIndex.GetStorageLease();
+	const auto DirectoryLease = ChangeIndex.GetBaselineLease();
+	FVoxelGenerationRequiredSourceScope ModifiedSource(TerrainResources.Get(), ModifiedLease.Get());
+	FVoxelGenerationRequiredSourceScope DirectorySource(TerrainResources.Get(), DirectoryLease.Get());
+	if (!ChangeHierarchy.PrepareInvalidations(1, SectionAt, Changes, OutError) ||
+		!ChangeHierarchy.CommitInvalidations(MoveTemp(Changes), SectionAt, OutError)) return false;
+	const bool bIndexed = ChangeIndex.SetModified(InPatch.Section, !CandidateOverlay.IsEmpty() || !CandidateEntities.IsEmpty(), OutError);
+	checkf(bIndexed, TEXT("Prepared change-index capacity must cover the stable patch source"));
 	PublishPatchCandidate(
 		*Section,
 		InPatch,
@@ -968,6 +1039,20 @@ bool FVoxelWorldRuntime::ApplyRemotePatchBatch(
 		if (!PrepareJournal(Patch.Section, Patch.ToRevision, Candidate.Overlay, Candidate.Entities, Candidate.Journal, OutError)) return false;
 	}
 
+	const auto SectionAt = [&Candidates](int32 Index) { return Candidates[Index].Patch->Section; };
+	FVoxelPreparedChangeInvalidations Changes;
+	if (!ChangeIndex.PrepareModified(Candidates.Num(), SectionAt, OutError)) return false;
+	const auto ModifiedLease = ChangeIndex.GetStorageLease();
+	const auto DirectoryLease = ChangeIndex.GetBaselineLease();
+	FVoxelGenerationRequiredSourceScope ModifiedSource(TerrainResources.Get(), ModifiedLease.Get());
+	FVoxelGenerationRequiredSourceScope DirectorySource(TerrainResources.Get(), DirectoryLease.Get());
+	if (!ChangeHierarchy.PrepareInvalidations(Candidates.Num(), SectionAt, Changes, OutError) ||
+		!ChangeHierarchy.CommitInvalidations(MoveTemp(Changes), SectionAt, OutError)) return false;
+	for (const auto& Candidate : Candidates)
+	{
+		const bool bIndexed = ChangeIndex.SetModified(Candidate.Patch->Section, !Candidate.Overlay.IsEmpty() || !Candidate.Entities.IsEmpty(), OutError);
+		checkf(bIndexed, TEXT("Prepared change-index capacity must cover the stable remote source"));
+	}
 	for (FCandidate& Candidate : Candidates)
 	{
 		PublishPatchCandidate(
@@ -989,11 +1074,12 @@ void FVoxelWorldRuntime::SetRemoteSectionValidator(TFunction<bool(const FIntVect
 	RemoteSectionValidator = MoveTemp(InValidator);
 }
 
-void FVoxelWorldRuntime::InvalidateRemoteSection(const FIntVector& InSection)
+bool FVoxelWorldRuntime::InvalidateRemoteSection(const FIntVector& InSection, FString& OutError)
 {
 	check(IsInGameThread());
-	if (bAuthority) return;
-	ChangeHierarchy.InvalidateSection(InSection);
+	if (bAuthority) { OutError.Reset(); return true; }
+	uint64 Revision = 0;
+	if (!ChangeHierarchy.InvalidateSection(InSection, Revision, OutError)) return false;
 	if (auto* Section = FindSection(InSection); Section && Section->Status == EVoxelSectionStatus::DataReady)
 	{
 		NotifySectionEvent(InSection, EVoxelRuntimeSectionEvent::IdentityChanging);
@@ -1003,6 +1089,8 @@ void FVoxelWorldRuntime::InvalidateRemoteSection(const FIntVector& InSection)
 		Section->bCollisionDirty = Section->bFineMeshDirty = true;
 		NotifySectionEvent(InSection, EVoxelRuntimeSectionEvent::Allocated);
 	}
+	OutError.Reset();
+	return true;
 }
 
 bool FVoxelWorldRuntime::RemoveSection(
@@ -1356,8 +1444,7 @@ void FVoxelWorldRuntime::PublishPatchCandidate(
 	InSection.CommittedRevision = InPatch.ToRevision;
 	InSection.bCollisionDirty = true;
 	InSection.bFineMeshDirty = true;
-	ChangeIndex.SetModified(InPatch.Section, !InSection.Overlay.IsEmpty() || !InSection.Entities.IsEmpty());
-	ChangeHierarchy.InvalidateSection(InPatch.Section);
+	// 调用方已在正文交换前授予索引容量并提交不可变change根。
 	check(InJournal && InJournal->Revision == InPatch.ToRevision);
 	RetainJournal(InPatch.Section, MoveTemp(InJournal));
 }
@@ -1368,6 +1455,9 @@ void FVoxelWorldRuntime::BindTerrainResources(TSharedRef<FVoxelTerrainResources,
 	check(Sections.IsEmpty() && !StorageLease && OverlayRegionSequences.IsEmpty());
 	TerrainResources = InResources;
 	CommittedJournal.BindResources(InResources);
+	const auto Control = FVoxelGenerationConsumerKey::Section(WorldEpoch, RuntimeOwnerId, 1, {}, 1);
+	ChangeIndex.BindResources(InResources, Control);
+	ChangeHierarchy.BindResources(InResources, Control);
 }
 
 bool FVoxelWorldRuntime::PrepareJournal(const FIntVector& InSection, const uint64 InRevision,

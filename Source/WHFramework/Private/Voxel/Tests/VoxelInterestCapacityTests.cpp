@@ -144,7 +144,7 @@ bool FVoxelFinePendingReverseCapacityTest::RunTest(const FString& InParameters)
 	Resources->Configure({});
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(31, FGuid::NewGuid(), 1, {}, 1);
 	FVoxelFineResidency Residency;
-	Residency.BindResources(Resources.ToSharedRef(), Consumer);
+	Residency.BindResources(Resources, Consumer);
 	FString Error;
 	if (!Residency.Initialize(FGuid::NewGuid(), {}, {}, 32, 64, 80, -512, 512, Error)) return false;
 	const uint64 CurrentSerial = Residency.GetCurrent().Serial;
@@ -200,7 +200,7 @@ bool FVoxelTerrainSelectionCapacityTest::RunTest(const FString& InParameters)
 	if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input, Available, Blocker)) return false;
 	{
 		FVoxelTerrainWorkSelection Selection;
-		Selection.BindResources(Resources.ToSharedRef(), Consumer);
+		Selection.BindResources(Resources, Consumer);
 		FVoxelTerrainServiceCandidate Candidate;
 		Candidate.Index = 3;
 		Candidate.Priority = {EVoxelTerrainServiceBand::P2, 1.0, 0.0, 0, FGuid::NewGuid()};

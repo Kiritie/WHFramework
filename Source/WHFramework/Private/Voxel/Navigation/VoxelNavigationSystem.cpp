@@ -59,7 +59,7 @@ void UVoxelNavigationSystem::Tick(const float InDeltaSeconds)
 		{
 			if (bCleanupRequested) break;
 			ENavigationQueryResult::Type Result = Query.Result.Result;
-			if (auto* Data = Cast<AVoxelNavigationData>(Query.NavData.Get()))
+			if (auto* Data = const_cast<AVoxelNavigationData*>(Cast<AVoxelNavigationData>(Query.NavData.Get())))
 			{
 				Result = Data->ValidateAsyncResult(Query);
 				Data->ReleaseAsyncQuery(Query);
@@ -71,7 +71,7 @@ void UVoxelNavigationSystem::Tick(const float InDeltaSeconds)
 	bool bPrepared = true;
 	for (FAsyncPathFindingQuery& Query : AsyncPathFindingQueries)
 	{
-		if (auto* Data = Cast<AVoxelNavigationData>(Query.NavData.Get()))
+		if (auto* Data = const_cast<AVoxelNavigationData*>(Cast<AVoxelNavigationData>(Query.NavData.Get())))
 		{
 			bPrepared &= Data->PrepareAsyncQuery(Query);
 		}

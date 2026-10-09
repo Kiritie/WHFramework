@@ -4,6 +4,7 @@
 #include "Voxel/Streaming/VoxelInterest.h"
 #include "Voxel/Generation/VoxelWorldManifest.h"
 #include "Voxel/Rendering/VoxelTerrainStagePlanner.h"
+#include "Voxel/Rendering/VoxelCoverageIndex.h"
 
 struct FVoxelTerrainDomainSourceBatch;
 
@@ -22,8 +23,18 @@ public:
 		const FVoxelTerrainPageCostLimits& InLimits);
 	void Reset();
 	bool HasRetryReady() const;
+	bool HasPendingWork() const;
 
 private:
+	bool AccumulateRetainedInput(const FVoxelTerrainResources& InResources, const FVoxelTerrainDomainPlanner* InOther,
+		TConstArrayView<uint64> InExcludedSerials, int32 InSkipStage, uint64& InOutBytes, int32& InOutLeaseCount) const;
+	FVoxelCoverageIndex FinePredecessor;
+	FVoxelCoverageIndex Predecessors[3];
+	uint64 PrefixAppliedVersions[3] = {};
 	FVoxelTerrainStageCache Stages[3];
 	TSharedPtr<const FVoxelTerrainDomainSourceBatch, ESPMode::ThreadSafe> Sources[3];
+	uint64 AdditionalRequiredInput = 0, AdditionalRequiredWorking = 0;
+	int32 AdditionalRequiredCount = 0;
+	bool bCapacityBlocked = false;
+	uint64 RetryCapacityVersion = 0;
 };

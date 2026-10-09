@@ -173,7 +173,7 @@ void FVoxelTerrainStatistics::RemoveEvidence(const FVoxelTerrainMetricEvidence::
         Accumulate(*Previous, -1);
         Evidence.Remove(InTarget);
         int32 Index = INDEX_NONE;
-        check(EvidenceIndices.RemoveAndCopyValue(InTarget, Index));
+        verify(EvidenceIndices.RemoveAndCopyValue(InTarget, Index));
         EvidenceOrder.RemoveAtSwap(Index, 1, EAllowShrinking::No);
         if (EvidenceOrder.IsValidIndex(Index)) EvidenceIndices.FindChecked(EvidenceOrder[Index]) = Index;
     }

@@ -3,6 +3,7 @@
 #include "Misc/AutomationTest.h"
 #include "Voxel/Runtime/VoxelChangeHierarchy.h"
 #include "Voxel/Runtime/VoxelChangeIndex.h"
+#include "Voxel/Runtime/VoxelOverlaySnapshot.h"
 #include "Voxel/Runtime/VoxelWorldRuntime.h"
 #include "Voxel/Tests/VoxelTestUtilities.h"
 
@@ -260,7 +261,11 @@ bool FVoxelBulkHaloSnapshotTest::RunTest(const FString& Parameters)
 		if (!TestTrue(TEXT("Center publishes"), PublishTestSection(Runtime, Center, 0, Error))) return false;
 		FVoxelSectionSnapshot Snapshot;
 		TestTrue(TEXT("Snapshot without neighbors is valid"), Runtime.CaptureSnapshot(Center, Snapshot));
+		const auto* OriginalBody = Snapshot.Blocks.GetData();
+		const FVoxelSectionStamp OriginalStamp = Snapshot.Stamp;
+		const uint64 OriginalRevision = Snapshot.Revision;
 		for (uint8 Face = 0; Face < 6; ++Face) TestFalse(TEXT("Absent neighbor stays unknown"), Snapshot.Known[Face]);
+		TestFalse(TEXT("Missing halo retains the original snapshot"), Runtime.CompleteSnapshotHalo(Snapshot, 0));
 		for (uint8 Face = 0; Face < 6; ++Face)
 		{
 			const int32 Axis = Face / 2;
@@ -272,9 +277,14 @@ bool FVoxelBulkHaloSnapshotTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("Neighbor base publishes"), Runtime.PublishBase(Key, Section->Stamp, MoveTemp(Blocks), Error));
 			TestTrue(TEXT("Neighbor final publishes"), Runtime.PublishFinal(Key, 0, {}, {}, Error));
 		}
-		TestTrue(TEXT("Complete snapshot captures"), Runtime.CaptureSnapshot(Center, Snapshot));
 		for (uint8 Face = 0; Face < 6; ++Face)
 		{
+			const auto* OriginalHalo = Snapshot.Halo[Face].GetData();
+			TestTrue(TEXT("Missing halo completes in the frozen original snapshot"), Runtime.CompleteSnapshotHalo(Snapshot, Face));
+			TestTrue(TEXT("Halo completion does not allocate another body"), Snapshot.Blocks.GetData() == OriginalBody);
+			TestTrue(TEXT("Halo completion uses the prepaid face backing"), Snapshot.Halo[Face].GetData() == OriginalHalo);
+			TestTrue(TEXT("Halo completion preserves the original instance"), Snapshot.Stamp == OriginalStamp);
+			TestEqual(TEXT("Halo completion preserves the original revision"), Snapshot.Revision, OriginalRevision);
 			TestTrue(TEXT("Loaded neighbor is known"), Snapshot.Known[Face]);
 			const int32 Axis = Face / 2;
 			for (int32 V = 0; V < 16; ++V)
@@ -292,6 +302,68 @@ bool FVoxelBulkHaloSnapshotTest::RunTest(const FString& Parameters)
 			}
 		}
 	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelOverlayBorrowedVisitorTest,
+	"WHFramework.Voxel.Runtime.OverlayBorrowedVisitor", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelOverlayBorrowedVisitorTest::RunTest(const FString& Parameters)
+{
+	FVoxelOverlaySnapshotSet Source;
+	const FIntVector OwnedKey(-1, 0, 0);
+	const FIntVector PinnedKey(0, 0, 0);
+	FVoxelOverlaySnapshot& Owned = Source.Sections.Add(OwnedKey);
+	Owned.Section = OwnedKey;
+	Owned.Blocks.Add(3, FVoxelBlockState(1, 0));
+	TSharedRef<FVoxelOverlaySnapshot, ESPMode::ThreadSafe> Pinned = MakeShared<FVoxelOverlaySnapshot, ESPMode::ThreadSafe>();
+	Pinned->Section = PinnedKey;
+	Pinned->Blocks.Add(7, FVoxelBlockState(2, 0));
+	Source.PinnedSections.Add(PinnedKey, Pinned);
+	FString Error;
+	int32 Visited = 0;
+	TestTrue(TEXT("Visitor borrows both frozen storage kinds"), Source.VisitModifiedOverlays(
+		{FIntVector(-16, 0, 0), FIntVector(16)}, [&](const FIntVector& Key, const FVoxelOverlaySnapshot& Snapshot)
+		{
+			++Visited;
+			TestTrue(TEXT("Visitor retains the original snapshot body"), &Snapshot == Source.Find(Key));
+			const int32 Index = Key == OwnedKey ? 3 : 7;
+			TestTrue(TEXT("Visitor retains the original block storage"), Snapshot.Blocks.Find(Index) == Source.Find(Key)->Blocks.Find(Index));
+			return true;
+		}, Error));
+	TestEqual(TEXT("Each frozen section is visited once"), Visited, 2);
+	Visited = 0;
+	TestTrue(TEXT("Half-open bounds exclude the neighboring section"), Source.VisitModifiedOverlays(
+		{FIntVector(-16, 0, 0), FIntVector(0, 16, 16)}, [&](const FIntVector& Key, const FVoxelOverlaySnapshot& Snapshot)
+		{
+			++Visited;
+			TestTrue(TEXT("Only the negative section intersects"), Key == OwnedKey);
+			return true;
+		}, Error));
+	TestEqual(TEXT("The section touching the maximum plane is excluded"), Visited, 1);
+	TAtomic<bool> Cancel(false);
+	TestFalse(TEXT("Cancellation from the final callback is retained"), Source.VisitModifiedOverlays(
+		{FIntVector(-16, 0, 0), FIntVector(0, 16, 16)}, [&](const FIntVector&, const FVoxelOverlaySnapshot&)
+		{
+			Cancel.Store(true);
+			return true;
+		}, Error, &Cancel));
+	TestEqual(TEXT("Cancellation remains explicit"), Error, FString(TEXT("Canceled")));
+	TestFalse(TEXT("Consumer refusal keeps its typed error"), Source.VisitModifiedOverlays(
+		{FIntVector(-16, 0, 0), FIntVector(0, 16, 16)}, [&](const FIntVector&, const FVoxelOverlaySnapshot&)
+		{
+			Error = TEXT("CapacityBlocked");
+			return false;
+		}, Error));
+	TestEqual(TEXT("Borrowed visitor does not replace the admission error"), Error, FString(TEXT("CapacityBlocked")));
+	FVoxelOverlaySnapshotSet Invalid;
+	Invalid.Sections.Add(FIntVector(MAX_int32, 0, 0));
+	TestFalse(TEXT("Section to cell overflow is rejected before visiting"), Invalid.VisitModifiedOverlays(
+		{FIntVector::ZeroValue, FIntVector(16)}, [&](const FIntVector&, const FVoxelOverlaySnapshot&)
+		{
+			AddError(TEXT("Overflowing storage reached the consumer"));
+			return true;
+		}, Error));
 	return true;
 }
 

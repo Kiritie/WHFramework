@@ -19,6 +19,8 @@ public:
 		TConstArrayView<uint8> InPayload,
 		TArray<uint8>& OutBytes);
 	static bool Decode(TConstArrayView<uint8> InBytes, FVoxelWireMessage& OutMessage);
+	static bool DecodeView(TConstArrayView<uint8> InBytes, EVoxelMessage& OutKind,
+		FGuid& OutSession, TConstArrayView<uint8>& OutPayload);
 
 	static void WriteVector(FVoxelByteWriter& InWriter, const FIntVector& InValue);
 	static FIntVector ReadVector(FVoxelByteReader& InReader);
@@ -41,6 +43,8 @@ public:
 	static bool DecodeRepresentationRequest(TConstArrayView<uint8> InBytes, FVoxelRepresentationRequest& OutValue);
 	static bool EncodeRepresentationReply(const FVoxelRepresentationReply& InValue, TArray<uint8>& OutBytes, FString& OutError);
 	static bool DecodeRepresentationReply(TConstArrayView<uint8> InBytes, FVoxelRepresentationReply& OutValue, FString& OutError);
+	static bool DecodeRepresentationReplyView(TConstArrayView<uint8> InBytes, FVoxelRepresentationReply& OutValue,
+		TConstArrayView<uint8>& OutData, FString& OutError);
 	static bool EncodeRepresentationInvalidate(const FVoxelRepresentationInvalidate& InValue, TArray<uint8>& OutBytes, FString& OutError);
 	static bool DecodeRepresentationInvalidate(TConstArrayView<uint8> InBytes, FVoxelRepresentationInvalidate& OutValue, FString& OutError);
 	static bool EncodeIntent(const FVoxelEditIntent& InIntent, TArray<uint8>& OutBytes);

@@ -22,6 +22,27 @@ namespace
 {
 	constexpr int32 VoxelGenerationPlanTileSide = 256;
 
+	void EnumerateQueryRequiredSources(const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+	{
+		static_cast<const FVoxelGenerationQuery*>(InContext)->VisitRequiredSources(InVisit);
+	}
+
+	FVoxelGenerationRequiredCapacity MeasureQueryOwnedSources(const FVoxelGenerationQuery& InQuery)
+	{
+		FVoxelGenerationRequiredCapacity Capacity;
+		FString Error;
+		if (!FVoxelGenerationRequiredSourceScope::Measure(&InQuery,
+			[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+			{
+				static_cast<const FVoxelGenerationQuery*>(InContext)->VisitRequiredSources(InVisit, false);
+			}, Capacity, Error))
+		{
+			Capacity.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)] = MAX_uint64;
+			Capacity.LeaseCount = MAX_int32;
+		}
+		return Capacity;
+	}
+
 	bool MakeTileBounds(const FVoxelGenerationTileKey& InKey, FVoxelGenerationBounds& OutBounds)
 	{
 		const FInt64Vector Min(int64(InKey.Coordinate.X) * VoxelGenerationPlanTileSide,
@@ -115,14 +136,19 @@ bool FVoxelGenerationQuery::FPreparedState::Reserve(
 	const uint64 NewBytes = CaveBytes + EcologyBytes + FeatureBytes + StructureBytes;
 	if (InResources && NewBytes > 0)
 	{
+		FVoxelGenerationRequiredCapacity Sources;
+		if (!FVoxelGenerationRequiredSourceScope::Collect(*InResources, nullptr, Sources, OutError)) return false;
+		const uint64 RequiredInput = FMath::Max(InExistingInputBytes,
+			Sources.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)]);
+		const int32 RequiredCount = FMath::Max(InRequiredLeaseCount, Sources.LeaseCount);
 		const uint64 InputLimit = InResources->Snapshot().Limits.InputBytes;
-		if (InExistingInputBytes > InputLimit || NewBytes > InputLimit - InExistingInputBytes)
+		if (RequiredInput > InputLimit || NewBytes > InputLimit - RequiredInput)
 		{
 			OutError = TEXT("Oversized: generation query prepared references");
 			return false;
 		}
 		const auto Admission = InResources->TryAcquire(InConsumer, EVoxelTerrainResourcePool::Input, NewBytes, Lease,
-			0, InExistingInputBytes, InRequiredLeaseCount);
+			0, RequiredInput, RequiredCount);
 		if (Admission != EVoxelTerrainResourceAdmission::Granted)
 		{
 			OutError = Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable
@@ -172,22 +198,68 @@ FVoxelGenerationQuery::~FVoxelGenerationQuery()
 
 uint64 FVoxelGenerationQuery::GetRequiredInputBytes() const
 {
-	return GeneratorInputBytes + (Prepared.Lease ? Prepared.Lease->Bytes() : 0) + (Cache ? Cache->GetRootInputBytes() : 0);
+	return MeasureQueryOwnedSources(*this).Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)];
 }
 
 int32 FVoxelGenerationQuery::GetRequiredInputLeaseCount() const
 {
-	int32 Count = (GeneratorInputBytes ? 8 : 0) + (Prepared.Lease ? 1 : 0) + (Cache && Cache->GetRootInputBytes() ? 1 : 0);
-	if (Resources)
+	return MeasureQueryOwnedSources(*this).LeaseCount;
+}
+
+void FVoxelGenerationQuery::VisitRequiredSources(FVoxelGenerationRequiredSourceScope::FVisit InVisit,
+	const bool bInIncludeCallerOutput) const
+{
+	if (!Resources) return;
+	if (Cache)
 	{
-		// 生产按唯一 tile key 准备，每个非空原 immutable body 保有一个 Resident handle；
-		// Reset cache 也不能释放这些 reader 强持的原生控制器与租约。
-		for (const auto& Plan : Prepared.Caves) Count += Plan ? 1 : 0;
-		for (const auto& Plan : Prepared.Ecology) Count += Plan ? 1 : 0;
-		for (const auto& Plan : Prepared.Features) Count += Plan ? 1 : 0;
-		for (const auto& Plan : Prepared.Structures) Count += Plan ? 1 : 0;
+		uint64 Bytes;
+		int32 Count;
+		Cache->GetRequiredInputCapacity(Bytes, Count);
+		if (Count) InVisit({Cache.Get(), 0, EVoxelTerrainResourcePool::Input, Bytes, Count});
 	}
-	return Count;
+	if (Config)
+	{
+		FVoxelGenerationRequiredSourceScope::VisitLease(Config->InputLease.Get(), InVisit);
+		FVoxelGenerationRequiredSourceScope::VisitLease(Config->RecipeInputLease.Get(), InVisit);
+	}
+	const auto VisitGenerator = [&InVisit](const auto& InGenerator)
+	{
+		if (InGenerator)
+		{
+			using FGenerator = std::remove_const_t<std::remove_reference_t<decltype(*InGenerator)>>;
+			InVisit({InGenerator.Get(), 0, EVoxelTerrainResourcePool::Input,
+				VoxelBoundedAllocation::WorkerSharedBytes<const FGenerator>()});
+		}
+	};
+	VisitGenerator(Climate);
+	VisitGenerator(Terrain);
+	VisitGenerator(Biome);
+	VisitGenerator(Hydrology);
+	VisitGenerator(Cave);
+	VisitGenerator(Aquifer);
+	VisitGenerator(Surface);
+	VisitGenerator(Ecology);
+	const auto VisitPrepared = [this, &InVisit](const FPreparedState& InState)
+	{
+		FVoxelGenerationRequiredSourceScope::VisitLease(InState.Lease.Get(), InVisit);
+		const auto VisitPlans = [this, &InVisit](const auto& InPlans)
+		{
+			for (const auto& Plan : InPlans)
+			{
+				if (Plan && Plan->ResourceLease && Plan->ResourceLease->IsOwnedBy(*Resources))
+				{
+					FVoxelGenerationRequiredSourceScope::VisitLease(Plan->ResourceLease.Get(), InVisit);
+				}
+			}
+		};
+		VisitPlans(InState.Caves);
+		VisitPlans(InState.Ecology);
+		VisitPlans(InState.Features);
+		VisitPlans(InState.Structures);
+	};
+	VisitPrepared(Prepared);
+	if (Preparing) VisitPrepared(*Preparing);
+	if (bInIncludeCallerOutput && RequiredOutputLeaseCount) InVisit(RequiredOutputSource);
 }
 
 FVoxelGenerationQuery::FVoxelGenerationQuery(FVoxelGenerationQuery&& InOther)
@@ -199,6 +271,7 @@ FVoxelGenerationQuery& FVoxelGenerationQuery::operator=(FVoxelGenerationQuery&& 
 {
 	if (this != &InOther)
 	{
+		check(!Preparing && !InOther.Preparing);
 		Prepared = MoveTemp(InOther.Prepared);
 		Config = MoveTemp(InOther.Config);
 		Cache = MoveTemp(InOther.Cache);
@@ -208,6 +281,7 @@ FVoxelGenerationQuery& FVoxelGenerationQuery::operator=(FVoxelGenerationQuery&& 
 		InOther.GeneratorInputBytes = 0;
 		RequiredOutputInputBytes = InOther.RequiredOutputInputBytes;
 		RequiredOutputLeaseCount = InOther.RequiredOutputLeaseCount;
+		RequiredOutputSource = InOther.RequiredOutputSource;
 		InOther.RequiredOutputInputBytes = 0;
 		InOther.RequiredOutputLeaseCount = 0;
 		Climate = MoveTemp(InOther.Climate);
@@ -441,7 +515,8 @@ bool FVoxelGenerationQuery::EnsureHydrologyPlan(
 	const TAtomic<bool>* InCancel) const
 {
 	if (!ValidateConsumer(OutError)) return false;
-	FVoxelGenerationPlanningReadScope ConsumerScope({}, nullptr, InCancel, Resources ? &Consumer : nullptr);
+	FVoxelGenerationRequiredSourceScope Sources(Resources.Get(), this, EnumerateQueryRequiredSources);
+	FVoxelGenerationPlanningReadScope ConsumerScope(nullptr, nullptr, InCancel, Resources ? &Consumer : nullptr);
 	const auto& Settings = Config->Recipe->Settings;
 	const int64 MinCell = VoxelGeneration::FloorDivideWide(VoxelGeneration::WorldCellMin, Settings.HydrologyCellSize);
 	const int64 MaxCell = VoxelGeneration::FloorDivideWide(VoxelGeneration::WorldCellMaxExclusive - 1, Settings.HydrologyCellSize) + 1;
@@ -479,7 +554,8 @@ bool FVoxelGenerationQuery::EnsureCavePlan(
 	const TAtomic<bool>* InCancel) const
 {
 	if (!ValidateConsumer(OutError)) return false;
-	FVoxelGenerationPlanningReadScope ConsumerScope({}, nullptr, InCancel, Resources ? &Consumer : nullptr);
+	FVoxelGenerationRequiredSourceScope Sources(Resources.Get(), this, EnumerateQueryRequiredSources);
+	FVoxelGenerationPlanningReadScope ConsumerScope(nullptr, nullptr, InCancel, Resources ? &Consumer : nullptr);
 	FVoxelGenerationBounds Bounds;
 	if (!MakeTileBounds(InKey, Bounds)) { OutError = TEXT("Invalid cave tile outside world cell domain"); return false; }
 	if (bRequireReadyPlans)
@@ -515,7 +591,8 @@ bool FVoxelGenerationQuery::EnsureStructurePlan(
 	const TAtomic<bool>* InCancel) const
 {
 	if (!ValidateConsumer(OutError)) return false;
-	FVoxelGenerationPlanningReadScope ConsumerScope({}, nullptr, InCancel, Resources ? &Consumer : nullptr);
+	FVoxelGenerationRequiredSourceScope Sources(Resources.Get(), this, EnumerateQueryRequiredSources);
+	FVoxelGenerationPlanningReadScope ConsumerScope(nullptr, nullptr, InCancel, Resources ? &Consumer : nullptr);
 	FVoxelGenerationBounds Bounds;
 	if (!MakeTileBounds(InKey, Bounds)) { OutError = TEXT("Invalid structure tile outside world cell domain"); return false; }
 	if (bRequireReadyPlans)
@@ -552,7 +629,8 @@ bool FVoxelGenerationQuery::EnsureFeaturePlan(
 	const TAtomic<bool>* InCancel) const
 {
 	if (!ValidateConsumer(OutError)) return false;
-	FVoxelGenerationPlanningReadScope ConsumerScope({}, nullptr, InCancel, Resources ? &Consumer : nullptr);
+	FVoxelGenerationRequiredSourceScope Sources(Resources.Get(), this, EnumerateQueryRequiredSources);
+	FVoxelGenerationPlanningReadScope ConsumerScope(nullptr, nullptr, InCancel, Resources ? &Consumer : nullptr);
 	FVoxelGenerationBounds Bounds;
 	if (!MakeTileBounds(InKey, Bounds)) { OutError = TEXT("Invalid feature tile outside world cell domain"); return false; }
 	if (bRequireReadyPlans)
@@ -595,7 +673,8 @@ bool FVoxelGenerationQuery::EnsureEcologyPlan(
 	const TAtomic<bool>* InCancel) const
 {
 	if (!ValidateConsumer(OutError)) return false;
-	FVoxelGenerationPlanningReadScope ConsumerScope({}, nullptr, InCancel, Resources ? &Consumer : nullptr);
+	FVoxelGenerationRequiredSourceScope Sources(Resources.Get(), this, EnumerateQueryRequiredSources);
+	FVoxelGenerationPlanningReadScope ConsumerScope(nullptr, nullptr, InCancel, Resources ? &Consumer : nullptr);
 	const FInt64Vector Min(int64(InKey.Coordinate.X) * EcologyTileSide, int64(InKey.Coordinate.Y) * EcologyTileSide,
 		Config->Recipe->Settings.MinZ);
 	FVoxelGenerationBounds Bounds;
@@ -655,11 +734,47 @@ bool FVoxelGenerationQuery::Create(
 	}
 
 	const auto& QueryResources = InCache->GetResources();
+	FVoxelGenerationRequiredSourceScope OldSources(OutQuery.Resources.Get(), &OutQuery, EnumerateQueryRequiredSources);
+	struct FCreateSources
+	{
+		const FVoxelGenerationRuntimeConfig& Config;
+		const FVoxelGenerationPlanCache& Cache;
+		const FVoxelTerrainResourceLease* Output;
+	};
+	const FCreateSources CreateSources{InConfig.Get(), InCache.Get(),
+		QueryResources && InRequiredOutputLease && InRequiredOutputLease->IsOwnedBy(*QueryResources) ? InRequiredOutputLease : nullptr};
+	FVoxelGenerationRequiredSourceScope NewSources(QueryResources.Get(), &CreateSources,
+		[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+		{
+			const auto& Source = *static_cast<const FCreateSources*>(InContext);
+			uint64 Bytes;
+			int32 Count;
+			Source.Cache.GetRequiredInputCapacity(Bytes, Count);
+			if (Count) InVisit({&Source.Cache, 0, EVoxelTerrainResourcePool::Input, Bytes, Count});
+			FVoxelGenerationRequiredSourceScope::VisitLease(Source.Config.InputLease.Get(), InVisit);
+			FVoxelGenerationRequiredSourceScope::VisitLease(Source.Config.RecipeInputLease.Get(), InVisit);
+			FVoxelGenerationRequiredSourceScope::VisitLease(Source.Output, InVisit);
+		});
 	FVoxelGenerationConsumerKey QueryConsumer;
 	uint64 NewGeneratorInputBytes = 0;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> GeneratorLeases[8];
 	if (QueryResources)
 	{
+		if ((InConfig->InputLease && (!InConfig->InputLease->IsOwnedBy(*QueryResources) ||
+			InConfig->InputLease->GetPool() != EVoxelTerrainResourcePool::Input)) ||
+			(InConfig->RecipeInputLease && (!InConfig->RecipeInputLease->IsOwnedBy(*QueryResources) ||
+			InConfig->RecipeInputLease->GetPool() != EVoxelTerrainResourcePool::Input)))
+		{
+			OutError = TEXT("InvalidResource: frozen generation snapshot belongs to another original Fact ledger");
+			return false;
+		}
+#if !WITH_DEV_AUTOMATION_TESTS
+		if (!InConfig->InputLease || !InConfig->RecipeInputLease)
+		{
+			OutError = TEXT("InvalidResource: generation query requires a pregranted frozen snapshot");
+			return false;
+		}
+#endif
 		const auto* ScopeConsumer = FVoxelGenerationConsumerScope::GetConsumerKey();
 		const auto* ReadConsumer = FVoxelGenerationPlanningReadScope::GetConsumerKey();
 		if (!InConsumer && !ScopeConsumer && !ReadConsumer &&
@@ -696,13 +811,10 @@ bool FVoxelGenerationQuery::Create(
 		{
 			NewGeneratorInputBytes += Bytes;
 		}
-		const bool bSameResources = OutQuery.Resources.Get() == QueryResources.Get();
-		const bool bRequiredOutput = InRequiredOutputLease && InRequiredOutputLease->IsOwnedBy(*QueryResources);
-		const uint64 ExistingInputBytes = (bSameResources ? OutQuery.GetRequiredInputBytes() : 0) +
-			(bRequiredOutput && InRequiredOutputLease->GetPool() == EVoxelTerrainResourcePool::Input ? InRequiredOutputLease->Bytes() : 0) +
-			(!bSameResources || OutQuery.Cache.Get() != &InCache.Get() ? InCache->GetRootInputBytes() : 0);
-		const int32 RequiredLeaseCount = (bSameResources ? OutQuery.GetRequiredInputLeaseCount() : 0) + (bRequiredOutput ? 1 : 0) +
-			(!bSameResources || OutQuery.Cache.Get() != &InCache.Get() ? 1 : 0);
+		FVoxelGenerationRequiredCapacity Required;
+		if (!FVoxelGenerationRequiredSourceScope::Collect(*QueryResources, nullptr, Required, OutError)) return false;
+		const uint64 ExistingInputBytes = Required.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)];
+		const int32 RequiredLeaseCount = Required.LeaseCount;
 		const uint64 InputLimit = QueryResources->Snapshot().Limits.InputBytes;
 		if (ExistingInputBytes > InputLimit || NewGeneratorInputBytes > InputLimit - ExistingInputBytes)
 		{
@@ -745,6 +857,8 @@ bool FVoxelGenerationQuery::Create(
 	{
 		Query.RequiredOutputInputBytes = InRequiredOutputLease->GetPool() == EVoxelTerrainResourcePool::Input ? InRequiredOutputLease->Bytes() : 0;
 		Query.RequiredOutputLeaseCount = 1;
+		Query.RequiredOutputSource = {nullptr, InRequiredOutputLease->Serial(),
+			InRequiredOutputLease->GetPool(), InRequiredOutputLease->Bytes()};
 	}
 	Query.bUseColumnCache = bInUseColumnCache;
 	Query.bRequireReadyHydrology = bInRequireReadyHydrology || FVoxelGenerationPlanningReadScope::IsActive();
@@ -824,7 +938,9 @@ bool FVoxelGenerationQuery::Prepare(
 		return false;
 	}
 
+	FVoxelGenerationRequiredSourceScope Sources(Resources.Get(), this, EnumerateQueryRequiredSources);
 	FPreparedState Candidate;
+	TGuardValue<const FPreparedState*> PreparingGuard(Preparing, &Candidate);
 	const uint64 ExistingInputBytes = GetRequiredInputBytes() + RequiredOutputInputBytes;
 	if (!Candidate.Reserve(Resources, Consumer, Ranges.TileCount, Ranges.EcologyCount, false, ExistingInputBytes, GetRequiredInputLeaseCount() + RequiredOutputLeaseCount, OutError))
 	{
@@ -908,7 +1024,9 @@ bool FVoxelGenerationQuery::PrepareStructuresOnly(
 		OutError = TEXT("Canceled");
 		return false;
 	}
+	FVoxelGenerationRequiredSourceScope Sources(Resources.Get(), this, EnumerateQueryRequiredSources);
 	FPreparedState Candidate;
+	TGuardValue<const FPreparedState*> PreparingGuard(Preparing, &Candidate);
 	const uint64 ExistingInputBytes = GetRequiredInputBytes() + RequiredOutputInputBytes;
 	if (!Candidate.Reserve(Resources, Consumer, Range.Count, 0, true, ExistingInputBytes, GetRequiredInputLeaseCount() + RequiredOutputLeaseCount, OutError))
 	{
@@ -951,7 +1069,8 @@ bool FVoxelGenerationQuery::GetBaseColumn(
 	const TAtomic<bool>* InCancel) const
 {
 	if (!ValidateConsumer(OutError)) return false;
-	FVoxelGenerationPlanningReadScope ConsumerScope({}, nullptr, InCancel, Resources ? &Consumer : nullptr);
+	FVoxelGenerationRequiredSourceScope Sources(Resources.Get(), this, EnumerateQueryRequiredSources);
+	FVoxelGenerationPlanningReadScope ConsumerScope(nullptr, nullptr, InCancel, Resources ? &Consumer : nullptr);
 	if (!VoxelGeneration::IsWorldCell(InX) || !VoxelGeneration::IsWorldCell(InY))
 	{
 		OutError = TEXT("Invalid base column outside world cell domain");
@@ -1166,7 +1285,8 @@ bool FVoxelGenerationQuery::SampleEnvironmentColumn(
 	const TAtomic<bool>* InCancel) const
 {
 	if (!ValidateConsumer(OutError)) return false;
-	FVoxelGenerationPlanningReadScope ConsumerScope({}, nullptr, InCancel, Resources ? &Consumer : nullptr);
+	FVoxelGenerationRequiredSourceScope Sources(Resources.Get(), this, EnumerateQueryRequiredSources);
+	FVoxelGenerationPlanningReadScope ConsumerScope(nullptr, nullptr, InCancel, Resources ? &Consumer : nullptr);
 	if (!VoxelGeneration::IsWorldCell(InX) || !VoxelGeneration::IsWorldCell(InY))
 	{
 		OutError = TEXT("Invalid column outside world cell domain");

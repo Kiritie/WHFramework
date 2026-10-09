@@ -17,9 +17,32 @@ namespace
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutLease, FString& Error)
 	{
 		if (Bytes == 0) { OutLease.Reset(); return true; }
-		if (OutLease && OutLease->Resize(Bytes)) return true;
-		if (Resources->Acquire(Consumer, Pool, Bytes, OutLease)) return true;
-		Error = TEXT("CapacityBlocked: Overlay 协议资源池不足");
+		FVoxelGenerationRequiredCapacity Required;
+		if (!FVoxelGenerationRequiredSourceScope::Collect(*Resources, OutLease.Get(), Required, Error)) return false;
+		const auto Limits = Resources->Snapshot().Limits;
+		uint64 PoolLimit = MAX_uint64;
+		switch (Pool)
+		{
+		case EVoxelTerrainResourcePool::Working: PoolLimit = Limits.WorkingBytes; break;
+		case EVoxelTerrainResourcePool::Staged: PoolLimit = Limits.StagedBytes; break;
+		case EVoxelTerrainResourcePool::Resident: PoolLimit = Limits.ResidentBytes - Limits.OverlapBytes; break;
+		case EVoxelTerrainResourcePool::ResidentOverlap: PoolLimit = Limits.OverlapBytes; break;
+		default: break;
+		}
+		const uint64 Retained = Required.Bytes[int32(Pool)];
+		if (Retained > PoolLimit || Bytes > PoolLimit - Retained)
+		{
+			Error = TEXT("CapacityUnachievable: Overlay 原尝试所持池峰值不可达");
+			return false;
+		}
+		const auto Admission = OutLease ? OutLease->TryResize(Bytes,
+			Required.Bytes[int32(EVoxelTerrainResourcePool::Input)], Required.LeaseCount) :
+			Resources->TryAcquire(Consumer, Pool, Bytes, OutLease, 0,
+				Required.Bytes[int32(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+		if (Admission == EVoxelTerrainResourceAdmission::Granted) return true;
+		Error = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: Overlay 协议资源池不足") :
+			Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: Overlay 协议容量不可达") :
+			TEXT("InvalidResource: Overlay 原请求资源身份无效");
 		return false;
 	}
 
@@ -27,30 +50,50 @@ namespace
 		const FVoxelOverlaySnapshot& Overlay, TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources,
 		const FVoxelGenerationConsumerKey& Consumer, FString& Error)
 	{
-		// 编码器的临时编辑数组、正文增长和最终正文同时存在，分别保留。
-		uint64 EntityBytes = 0;
-		for (const auto& Pair : Overlay.Entities) EntityBytes += VoxelBoundedAllocation::InitialGrowBytes<uint8>(Pair.Value.Payload.Num());
-		const uint64 WireBound = 24 + uint64(Overlay.Blocks.Num()) * 7 + uint64(Overlay.Entities.Num()) * 16 + EntityBytes;
-		if (WireBound > uint64(FVoxelNetworkCodec::MaxRepresentationBytes))
+		if (Overlay.Revision == 0 || Overlay.Blocks.Num() > 4096 || Overlay.Entities.Num() > 4096)
+		{
+			Error = TEXT("InvalidResource: Overlay Section identity or cell count");
+			return nullptr;
+		}
+		uint64 EntityScratch = 0;
+		uint64 EntityWire = 0;
+		for (const auto& Pair : Overlay.Blocks) if (Pair.Key < 0 || Pair.Key >= 4096)
+		{
+			Error = TEXT("InvalidResource: Overlay block cell index");
+			return nullptr;
+		}
+		for (const auto& Pair : Overlay.Entities)
+		{
+			if (Pair.Key < 0 || Pair.Key >= 4096 || Pair.Value.Payload.Num() > 256 * 1024)
+			{
+				Error = TEXT("CapacityUnachievable: Overlay entity cell or payload limit");
+				return nullptr;
+			}
+			EntityScratch += VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(Pair.Value.Payload.Num());
+			EntityWire += Pair.Value.Payload.Num();
+		}
+		const bool bHasContent = !Overlay.Blocks.IsEmpty() || !Overlay.Entities.IsEmpty();
+		const uint64 WireBytes = bHasContent ? 24 + uint64(Overlay.Blocks.Num()) * 7 + uint64(Overlay.Entities.Num()) * 11 + EntityWire : 0;
+		if (WireBytes > uint64(FVoxelNetworkCodec::MaxRepresentationBytes))
 		{
 			Error = TEXT("CapacityUnachievable: 单 Section Overlay 超过协议正文上限");
 			return nullptr;
 		}
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Scratch;
 		if (!Grant(Resources, Consumer, EVoxelTerrainResourcePool::Working,
-			VoxelBoundedAllocation::InitialGrowBytes<FVoxelSectionCellEdit>(Overlay.Blocks.Num()) +
-			VoxelBoundedAllocation::InitialGrowBytes<FVoxelEntityWrite>(Overlay.Entities.Num()) +
-			EntityBytes + VoxelBoundedAllocation::InitialGrowBytes<uint8>(WireBound) * 2, Scratch, Error)) return nullptr;
+			VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelSectionCellEdit, FDefaultAllocator>(Overlay.Blocks.Num()) +
+			VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelEntityWrite, FDefaultAllocator>(Overlay.Entities.Num()) + EntityScratch,
+			Scratch, Error)) return nullptr;
+		FVoxelGenerationRequiredSourceScope ScratchSource(&Resources.Get(), Scratch.Get());
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> BodyLease;
 		if (!Grant(Resources, Consumer, EVoxelTerrainResourcePool::Staged,
 			VoxelBoundedAllocation::SharedBytes<FVoxelOverlayWirePayload>() +
-			VoxelBoundedAllocation::InitialGrowBytes<uint8>(WireBound), BodyLease, Error)) return nullptr;
+			VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(int32(WireBytes)), BodyLease, Error)) return nullptr;
 		auto Body = MakeShared<FVoxelOverlayWirePayload, ESPMode::ThreadSafe>();
 		Body->ResourceLease = MoveTemp(BodyLease);
-		if (!Overlay.Blocks.IsEmpty() || !Overlay.Entities.IsEmpty())
-			if (!FVoxelOverlayRegionCodec::EncodeOverlay(Overlay, Body->Bytes, Error)) return nullptr;
-		const uint64 Actual = VoxelBoundedAllocation::SharedBytes<FVoxelOverlayWirePayload>() + Body->Bytes.GetAllocatedSize();
-		if (Actual > Body->ResourceLease->Bytes()) { Error = TEXT("EstimateMismatch: Overlay 正文容量"); return nullptr; }
+		if (bHasContent && !FVoxelOverlayRegionCodec::EncodeOverlay(Overlay, Body->Bytes, Error)) return nullptr;
+		const uint64 Actual = VoxelBoundedAllocation::SharedBytes<FVoxelOverlayWirePayload>() + VoxelGenerationAllocation::AllocatedBytes(Body->Bytes);
+		if (Body->Bytes.Num() != int32(WireBytes) || Actual > Body->ResourceLease->Bytes()) { Error = TEXT("EstimateMismatch: Overlay 精确正文容量"); return nullptr; }
 		Body->ResourceLease->Resize(Actual);
 		return Body;
 	}
@@ -80,35 +123,69 @@ uint64 FVoxelOverlayAuthorityPrepared::GetResourceAccountedBytes() const
 
 struct FVoxelOverlayAuthoritySnapshotBuild::FState
 {
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> NativeLease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> CaptureLease;
 	FVoxelOverlayAuthorityIdentity Identity;
 	TArray<FVoxelOverlayAuthorityRegionCapture> Captures;
 	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
 	FVoxelGenerationConsumerKey Consumer;
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> CaptureLease;
 	FVoxelFineOverlayRead Reader;
 	FVoxelFineOverlayReadResult Read;
 	TSharedPtr<FVoxelOverlayAuthorityDirectoryRoot, ESPMode::ThreadSafe> Root;
 	TSharedPtr<FVoxelOverlayAuthorityPrepared, ESPMode::ThreadSafe> Result;
 	TSharedPtr<FVoxelOverlayAuthorityDirectory, ESPMode::ThreadSafe> Directory;
-	TArray<FIntVector> Sections;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> SectionOrderLease;
+	TArray<FIntVector> Sections;
 	int32 RegionCursor = 0;
 	int32 SectionCursor = 0;
 	bool bReading = false;
 	TAtomic<bool> bCapacityBlocked{false};
 	TAtomic<uint64> CapacityVersion{0};
+	uint64 BeforeAdmissionVersion = 0;
 
-	FState(const FVoxelOverlayAuthorityIdentity& InIdentity, TArray<FVoxelOverlayAuthorityRegionCapture>&& InCaptures,
+	FState(TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InNativeLease, const FVoxelOverlayAuthorityIdentity& InIdentity, TArray<FVoxelOverlayAuthorityRegionCapture>&& InCaptures,
 		TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources, const FVoxelGenerationConsumerKey& InConsumer,
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InCaptureLease)
-		: Identity(InIdentity), Captures(MoveTemp(InCaptures)), Resources(InResources), Consumer(InConsumer), CaptureLease(MoveTemp(InCaptureLease))
+		: NativeLease(MoveTemp(InNativeLease)), CaptureLease(MoveTemp(InCaptureLease)), Identity(InIdentity), Captures(MoveTemp(InCaptures)), Resources(InResources), Consumer(InConsumer)
 	{
+	}
+
+	void VisitSources(FVoxelGenerationRequiredSourceScope::FVisit Visit) const
+	{
+		const auto Add = [&](const FVoxelTerrainResourceLease* Lease)
+		{
+			if (Lease && Lease->IsOwnedBy(*Resources)) FVoxelGenerationRequiredSourceScope::VisitLease(Lease, Visit);
+		};
+		Add(NativeLease.Get()); Add(CaptureLease.Get()); Add(SectionOrderLease.Get());
+		for (const auto& Capture : Captures) FVoxelOverlayAuthoritySnapshotBuild::VisitCaptureSources(Capture.Capture, *Resources, Visit);
+		Reader.VisitResourceSources(*Resources, Visit);
+		if (Read.Snapshot)
+		{
+			Add(Read.Snapshot->ResourceLease.Get());
+			Read.Snapshot->Visit([&](const FIntVector&, const FVoxelOverlaySnapshot& Overlay) { Add(Overlay.ResourceLease.Get()); Add(Overlay.IndexLease.Get()); });
+		}
+		if (Read.VersionProof) Add(Read.VersionProof->ResourceLease.Get());
+		FVoxelRegionStore::VisitOverlayReadLeaseSources(Read.ReadLeaseSet, *Resources, Visit);
+		if (Root) FVoxelOverlayAuthorityDeltaBuild::VisitRootSources(*Root, *Resources, Visit);
+		if (Result)
+		{
+			Add(Result->ResourceLease.Get());
+			for (const auto& Body : Result->Bodies) if (Body.Snapshot)
+			{
+				Add(Body.Snapshot->ResourceLease.Get());
+				Body.Snapshot->Visit([&](const FIntVector&, const FVoxelOverlaySnapshot& Overlay) { Add(Overlay.ResourceLease.Get()); Add(Overlay.IndexLease.Get()); });
+			}
+		}
+		if (Directory) Add(Directory->ResourceLease.Get());
 	}
 
 	FVoxelTaskResult Advance(const TAtomic<bool>& Cancel)
 	{
 		FVoxelTaskResult Task;
 		if (Cancel.Load()) { Task.bCanceled = true; return Task; }
+		BeforeAdmissionVersion = Resources->ReleaseVersionExcludingOwner(Consumer);
+		FVoxelGenerationRequiredSourceScope Sources(&Resources.Get(), this,
+			[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit) { static_cast<const FState*>(Context)->VisitSources(Visit); });
 		if (!Result)
 		{
 			const int32 Count = Captures.Num();
@@ -119,12 +196,18 @@ struct FVoxelOverlayAuthoritySnapshotBuild::FState
 			}
 			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RootLease;
 			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResultLease;
+			TMap<FIntVector, TSharedPtr<const FVoxelOverlayAuthorityDirectory, ESPMode::ThreadSafe>> EmptyRootRegions;
+			FVoxelGenerationRequiredSourceScope PendingRootSource(&Resources.Get(), &RootLease,
+				[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+				{
+					FVoxelGenerationRequiredSourceScope::VisitLease(static_cast<const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>*>(Context)->Get(), Visit);
+				});
 			if (!Grant(Resources, Consumer, EVoxelTerrainResourcePool::Resident,
 				VoxelBoundedAllocation::SharedBytes<FVoxelOverlayAuthorityDirectoryRoot>() +
-				VoxelBoundedAllocation::MapBytes<FIntVector, TSharedPtr<const FVoxelOverlayAuthorityDirectory, ESPMode::ThreadSafe>>(Count), RootLease, Task.Error) ||
+				VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FIntVector, TSharedPtr<const FVoxelOverlayAuthorityDirectory, ESPMode::ThreadSafe>>>(EmptyRootRegions, Count), RootLease, Task.Error) ||
 				!Grant(Resources, Consumer, EVoxelTerrainResourcePool::Staged,
 				VoxelBoundedAllocation::SharedBytes<FVoxelOverlayAuthorityPrepared>() +
-				VoxelBoundedAllocation::ArrayBytes<FVoxelOverlayAuthorityRegionBody>(Count), ResultLease, Task.Error)) return Block(MoveTemp(Task));
+				VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelOverlayAuthorityRegionBody, FDefaultAllocator>(Count), ResultLease, Task.Error)) return Block(MoveTemp(Task));
 			Root = MakeShared<FVoxelOverlayAuthorityDirectoryRoot, ESPMode::ThreadSafe>();
 			Root->Identity = Identity;
 			Root->Regions.Reserve(Count);
@@ -163,14 +246,20 @@ struct FVoxelOverlayAuthoritySnapshotBuild::FState
 			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> DirectoryLease;
 			if (Count > 512) { Task.Error = TEXT("Region 目录超出 512 个 Section"); return Task; }
 			if (!Grant(Resources, Consumer, EVoxelTerrainResourcePool::Working,
-				VoxelBoundedAllocation::ArrayBytes<FIntVector>(Count), SectionOrderLease, Task.Error) ||
+				VoxelGenerationAllocation::Private::ArrayReserveBytes<FIntVector, FDefaultAllocator>(Count), SectionOrderLease, Task.Error) ||
 				!Grant(Resources, Consumer, EVoxelTerrainResourcePool::Resident,
 				VoxelBoundedAllocation::SharedBytes<FVoxelOverlayAuthorityDirectory>() +
-				VoxelBoundedAllocation::ArrayBytes<FVoxelOverlayDirectoryEntry>(Count), DirectoryLease, Task.Error)) return Block(MoveTemp(Task));
+				VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelOverlayDirectoryEntry, FDefaultAllocator>(Count), DirectoryLease, Task.Error)) return Block(MoveTemp(Task));
 			Sections.Reserve(Count);
-			if (!Read.Snapshot->EnumerateModifiedSections(Read.Bounds, Sections, &Cancel))
+			if (!Read.Snapshot->VisitModifiedOverlays(Read.Bounds,
+				[this](const FIntVector& Section, const FVoxelOverlaySnapshot&)
+				{
+					check(Sections.Num() < Sections.Max());
+					Sections.Add(Section);
+					return true;
+				}, Task.Error, &Cancel))
 			{
-				Task.bCanceled = true;
+				Task.bCanceled = Cancel.Load();
 				return Task;
 			}
 			Sections.Sort(LessSection);
@@ -233,7 +322,7 @@ struct FVoxelOverlayAuthoritySnapshotBuild::FState
 	{
 		if (Task.Error.StartsWith(TEXT("CapacityBlocked:")))
 		{
-			CapacityVersion.Store(Resources->Snapshot().ReleaseVersion);
+			CapacityVersion.Store(BeforeAdmissionVersion);
 			bCapacityBlocked.Store(true);
 			Task.Error.Reset();
 			Task.bSuccess = Task.bContinue = true;
@@ -242,10 +331,79 @@ struct FVoxelOverlayAuthoritySnapshotBuild::FState
 	}
 };
 
-FVoxelOverlayAuthoritySnapshotBuild::FVoxelOverlayAuthoritySnapshotBuild(const FVoxelOverlayAuthorityIdentity& Identity,
+uint64 FVoxelOverlayAuthoritySnapshotBuild::NativeInputBytes()
+{
+	return VoxelBoundedAllocation::WorkerSharedBytes<FVoxelOverlayAuthoritySnapshotBuild>() +
+		FMemory::QuantizeSize(sizeof(FState), alignof(FState));
+}
+
+void FVoxelOverlayAuthoritySnapshotBuild::VisitCaptureSources(const FVoxelFineOverlayCapture& Capture,
+	const FVoxelTerrainResources& Resources, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+{
+	Capture.VisitResourceSources(Resources, Visit);
+}
+
+EVoxelTerrainResourceAdmission FVoxelOverlayAuthoritySnapshotBuild::Create(const FVoxelOverlayAuthorityIdentity& Identity,
+	TArray<FVoxelOverlayAuthorityRegionCapture>&& Captures, TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources,
+	const FVoxelGenerationConsumerKey& Consumer,
+	const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& CaptureLease,
+	TSharedPtr<FVoxelOverlayAuthoritySnapshotBuild, ESPMode::ThreadSafe>& OutBuild, FString& Error)
+{
+	if (!Consumer.IsValid() || Consumer.WorldEpoch != Identity.WorldEpoch || Captures.IsEmpty() ||
+		Captures.Num() > FVoxelOverlayRegionCodec::MaximumRegions || !CaptureLease || !CaptureLease->IsOwnedBy(*Resources) ||
+		CaptureLease->GetPool() != EVoxelTerrainResourcePool::Input ||
+		VoxelGenerationAllocation::AllocatedBytes(Captures) > CaptureLease->Bytes())
+	{
+		Error = TEXT("InvalidResource: Snapshot factory requires original captured input and array grant");
+		return EVoxelTerrainResourceAdmission::InvalidRequest;
+	}
+	for (const auto& Region : Captures)
+		if (Region.Capture.WorldEpoch != Consumer.WorldEpoch || !(Region.Capture.Consumer == Consumer) ||
+			Region.Capture.Resources.Get() != &Resources.Get() || !Region.Capture.ReadLeaseSet)
+		{
+			Error = TEXT("InvalidResource: Snapshot capture belongs to a different original consumer or ledger");
+			return EVoxelTerrainResourceAdmission::InvalidRequest;
+		}
+	struct FInput
+	{
+		const FVoxelTerrainResources& Resources;
+		const TArray<FVoxelOverlayAuthorityRegionCapture>& Captures;
+		const FVoxelTerrainResourceLease* Lease;
+		const FVoxelOverlayAuthoritySnapshotBuild* Previous;
+	} Input{*Resources, Captures, CaptureLease.Get(), OutBuild.Get()};
+	FVoxelGenerationRequiredSourceScope Sources(&Resources.Get(), &Input,
+		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+		{
+			const auto& Input = *static_cast<const FInput*>(Context);
+			FVoxelGenerationRequiredSourceScope::VisitLease(Input.Lease, Visit);
+			for (const auto& Region : Input.Captures) VisitCaptureSources(Region.Capture, Input.Resources, Visit);
+			if (Input.Previous && Input.Previous->NativeLease->IsOwnedBy(Input.Resources)) Input.Previous->State->VisitSources(Visit);
+		});
+	FVoxelGenerationRequiredCapacity Required;
+	if (!FVoxelGenerationRequiredSourceScope::Collect(*Resources, nullptr, Required, Error)) return EVoxelTerrainResourceAdmission::InvalidRequest;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+	const auto Admission = Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Input, NativeInputBytes(), Lease, 0,
+		Required.Bytes[int32(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+	if (Admission != EVoxelTerrainResourceAdmission::Granted)
+	{
+		Error = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: Snapshot native factory") :
+			Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: Snapshot native factory") :
+			TEXT("InvalidResource: Snapshot native factory domain");
+		return Admission;
+	}
+	auto Candidate = VoxelBoundedAllocation::MakeWorkerShared<FVoxelOverlayAuthoritySnapshotBuild>(Lease,
+		FConstructionKey{}, Lease, Identity, MoveTemp(Captures), Resources, Consumer, CaptureLease);
+	OutBuild = MoveTemp(Candidate);
+	Error.Reset();
+	return EVoxelTerrainResourceAdmission::Granted;
+}
+
+FVoxelOverlayAuthoritySnapshotBuild::FVoxelOverlayAuthoritySnapshotBuild(FConstructionKey,
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InNativeLease,
+	const FVoxelOverlayAuthorityIdentity& Identity,
 	TArray<FVoxelOverlayAuthorityRegionCapture>&& Regions, TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources,
 	const FVoxelGenerationConsumerKey& Consumer, TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> CaptureLease)
-	: State(MakeUnique<FState>(Identity, MoveTemp(Regions), Resources, Consumer, MoveTemp(CaptureLease)))
+	: NativeLease(InNativeLease), State(MakeUnique<FState>(MoveTemp(InNativeLease), Identity, MoveTemp(Regions), Resources, Consumer, MoveTemp(CaptureLease)))
 {
 }
 
@@ -253,7 +411,8 @@ FVoxelOverlayAuthoritySnapshotBuild::~FVoxelOverlayAuthoritySnapshotBuild() = de
 
 FVoxelTaskResult FVoxelOverlayAuthoritySnapshotBuild::Advance(const TAtomic<bool>& Cancel)
 {
-	if (State->bCapacityBlocked.Load() && State->Resources->Snapshot().ReleaseVersion <= State->CapacityVersion.Load())
+	if (Cancel.Load()) { FVoxelTaskResult Result; Result.bCanceled = true; return Result; }
+	if (State->bCapacityBlocked.Load() && State->Resources->ReleaseVersionExcludingOwner(State->Consumer) <= State->CapacityVersion.Load())
 	{
 		FVoxelTaskResult Result;
 		Result.bSuccess = Result.bContinue = true;
@@ -265,26 +424,115 @@ FVoxelTaskResult FVoxelOverlayAuthoritySnapshotBuild::Advance(const TAtomic<bool
 
 bool FVoxelOverlayAuthoritySnapshotBuild::IsCapacityBlocked() const { return State->bCapacityBlocked.Load(); }
 uint64 FVoxelOverlayAuthoritySnapshotBuild::GetCapacityVersion() const { return State->CapacityVersion.Load(); }
+FVoxelGenerationConsumerKey FVoxelOverlayAuthoritySnapshotBuild::GetConsumer() const { return State->Consumer; }
 
-FVoxelOverlaySnapshotEncoder::FVoxelOverlaySnapshotEncoder(
+void FVoxelOverlaySnapshotEncoder::VisitSnapshotSources(const FVoxelOverlayAuthorityPrepared& InSnapshot,
+	const FVoxelTerrainResources& InResources, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+{
+	const auto Add = [&](const FVoxelTerrainResourceLease* Lease)
+	{
+		if (Lease && Lease->IsOwnedBy(InResources)) FVoxelGenerationRequiredSourceScope::VisitLease(Lease, InVisit);
+	};
+	Add(InSnapshot.ResourceLease.Get());
+	if (InSnapshot.Root) FVoxelOverlayAuthorityDeltaBuild::VisitRootSources(*InSnapshot.Root, InResources, InVisit);
+	for (const auto& Body : InSnapshot.Bodies)
+	{
+		if (Body.Directory) Add(Body.Directory->ResourceLease.Get());
+		if (!Body.Snapshot) continue;
+		Add(Body.Snapshot->ResourceLease.Get());
+		Body.Snapshot->Visit([&](const FIntVector&, const FVoxelOverlaySnapshot& Overlay) { Add(Overlay.ResourceLease.Get()); Add(Overlay.IndexLease.Get()); });
+	}
+}
+
+void FVoxelOverlaySnapshotEncoder::VisitResourceSources(const FVoxelTerrainResources& InResources,
+	FVoxelGenerationRequiredSourceScope::FVisit InVisit) const
+{
+	VisitSnapshotSources(*Snapshot, InResources, InVisit);
+	for (const auto* Lease : {NativeLease.Get(), HeadLease.Get(), ActivePayload ? ActivePayload->ResourceLease.Get() : nullptr})
+		if (Lease && Lease->IsOwnedBy(InResources)) FVoxelGenerationRequiredSourceScope::VisitLease(Lease, InVisit);
+}
+
+EVoxelTerrainResourceAdmission FVoxelOverlaySnapshotEncoder::Create(
+	TSharedRef<const FVoxelOverlayAuthorityPrepared, ESPMode::ThreadSafe> InSnapshot, TArray<FVoxelOverlayRegionHead>&& InCatchupHeads,
+	const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& InHeadLease,
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources, const FVoxelGenerationConsumerKey& InConsumer,
+	TSharedPtr<FVoxelOverlaySnapshotEncoder, ESPMode::ThreadSafe>& OutEncoder, FString& OutError)
+{
+	if (!InSnapshot->Root || InSnapshot->Bodies.IsEmpty() || InCatchupHeads.Num() != InSnapshot->Bodies.Num() ||
+		InCatchupHeads.Num() > FVoxelOverlayRegionCodec::MaximumRegions || !InConsumer.IsValid() ||
+		InConsumer.WorldEpoch != InSnapshot->Root->Identity.WorldEpoch || !InHeadLease || !InHeadLease->IsOwnedBy(*InResources) ||
+		InHeadLease->GetPool() != EVoxelTerrainResourcePool::Input || VoxelGenerationAllocation::AllocatedBytes(InCatchupHeads) > InHeadLease->Bytes())
+	{
+		OutError = TEXT("InvalidResource: Snapshot encoder original input or head grant");
+		return EVoxelTerrainResourceAdmission::InvalidRequest;
+	}
+	for (int32 Index = 0; Index < InSnapshot->Bodies.Num(); ++Index)
+		if (!InSnapshot->Bodies[Index].Directory || InCatchupHeads[Index].Region != InSnapshot->Bodies[Index].Directory->Head.Region ||
+			InCatchupHeads[Index].Sequence < InSnapshot->Bodies[Index].Directory->Head.Sequence)
+		{
+			OutError = TEXT("InvalidResource: Snapshot encoder frozen head identity");
+			return EVoxelTerrainResourceAdmission::InvalidRequest;
+		}
+	struct FInput
+	{
+		const FVoxelTerrainResources& Resources;
+		const FVoxelOverlayAuthorityPrepared& Snapshot;
+		const FVoxelTerrainResourceLease* Heads;
+		const FVoxelOverlaySnapshotEncoder* Previous;
+	} Input{*InResources, *InSnapshot, InHeadLease.Get(), OutEncoder.Get()};
+	FVoxelGenerationRequiredSourceScope Sources(&InResources.Get(), &Input,
+		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+		{
+			const auto& Input = *static_cast<const FInput*>(Context);
+			VisitSnapshotSources(Input.Snapshot, Input.Resources, Visit);
+			FVoxelGenerationRequiredSourceScope::VisitLease(Input.Heads, Visit);
+			if (Input.Previous) Input.Previous->VisitResourceSources(Input.Resources, Visit);
+		});
+	FVoxelGenerationRequiredCapacity Required;
+	if (!FVoxelGenerationRequiredSourceScope::Collect(*InResources, nullptr, Required, OutError)) return EVoxelTerrainResourceAdmission::InvalidRequest;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+	const auto Admission = InResources->TryAcquire(InConsumer, EVoxelTerrainResourcePool::Input,
+		VoxelBoundedAllocation::WorkerSharedBytes<FVoxelOverlaySnapshotEncoder>(), Lease, 0, Required.Bytes[0], Required.LeaseCount);
+	if (Admission != EVoxelTerrainResourceAdmission::Granted)
+	{
+		OutError = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: Snapshot encoder native factory") :
+			Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: Snapshot encoder native factory") :
+			TEXT("InvalidResource: Snapshot encoder native factory");
+		return Admission;
+	}
+	OutEncoder = VoxelBoundedAllocation::MakeWorkerShared<FVoxelOverlaySnapshotEncoder>(Lease, FConstructionKey{}, Lease,
+		InSnapshot, MoveTemp(InCatchupHeads), InHeadLease, InResources, InConsumer);
+	Lease->MarkPublished();
+	OutError.Reset();
+	return EVoxelTerrainResourceAdmission::Granted;
+}
+
+FVoxelOverlaySnapshotEncoder::FVoxelOverlaySnapshotEncoder(FConstructionKey,
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InNativeLease,
 	TSharedRef<const FVoxelOverlayAuthorityPrepared, ESPMode::ThreadSafe> InSnapshot,
-	TArray<FVoxelOverlayRegionHead>&& InCatchupHeads, TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
-	const FVoxelGenerationConsumerKey& InConsumer)
-	: Snapshot(InSnapshot), CatchupHeads(MoveTemp(InCatchupHeads)), Resources(InResources), Consumer(InConsumer)
+	TArray<FVoxelOverlayRegionHead>&& InCatchupHeads, TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InHeadLease,
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources, const FVoxelGenerationConsumerKey& InConsumer)
+	: NativeLease(MoveTemp(InNativeLease)), HeadLease(MoveTemp(InHeadLease)), Snapshot(InSnapshot),
+	CatchupHeads(MoveTemp(InCatchupHeads)), Resources(InResources), Consumer(InConsumer)
 {
 }
 
 bool FVoxelOverlaySnapshotEncoder::Advance(FVoxelOverlayEncodedMessage& OutMessage, bool& Complete, FString& Error)
 {
 	Complete = false;
-	if (!MetadataLease)
-		if (!Grant(Resources, Consumer, EVoxelTerrainResourcePool::Working, sizeof(*this) + CatchupHeads.GetAllocatedSize(), MetadataLease, Error)) return false;
+	FVoxelGenerationRequiredSourceScope Sources(&Resources.Get(), this,
+		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+		{
+			const auto& Encoder = *static_cast<const FVoxelOverlaySnapshotEncoder*>(Context);
+			Encoder.VisitResourceSources(*Encoder.Resources, Visit);
+		});
+	FVoxelGenerationRequiredSourceScope PreviousOutput(&Resources.Get(), OutMessage.ResourceLease.Get());
 	if (!Snapshot->Root || CatchupHeads.Num() != Snapshot->Bodies.Num() || Snapshot->Bodies.IsEmpty())
 	{
 		Error = TEXT("Overlay 编码缺少完整捕获或 Catchup 向量");
 		return false;
 	}
-	if (RegionCursor == Snapshot->Bodies.Num()) { Complete = true; return true; }
+	if (RegionCursor == Snapshot->Bodies.Num()) { Complete = true; Error.Reset(); return true; }
 	const auto& Body = Snapshot->Bodies[RegionCursor];
 	const auto& Directory = *Body.Directory;
 	if (Phase == 3)
@@ -313,11 +561,18 @@ bool FVoxelOverlaySnapshotEncoder::Advance(FVoxelOverlayEncodedMessage& OutMessa
 	}
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Scratch;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Output;
-	const uint64 MessagePeak = VoxelBoundedAllocation::InitialGrowBytes<uint8>(FVoxelOverlayRegionCodec::MaximumMessageBytes);
+	const int32 HeadCount = Phase == 0 ? Snapshot->Bodies.Num() : 0;
+	const int32 EntryCount = Phase == 2 ? FMath::Min(FVoxelOverlayRegionCodec::MaximumPageEntries,
+		Directory.Entries.Num() - DirectoryPage * FVoxelOverlayRegionCodec::MaximumPageEntries) : 0;
+	const int32 PayloadCount = Phase == 3 ? FMath::Min(FVoxelOverlayRegionCodec::MaximumPartBytes,
+		ActivePayload->Bytes.Num() - PayloadPart * FVoxelOverlayRegionCodec::MaximumPartBytes) : 0;
+	// DirectoryHash 仍使用 native grow；两份最终 allocator 容量覆盖其真实旧新增长峰值。
+	const uint64 HashPeak = EntryCount ? uint64(FMemory::QuantizeSize(VoxelBoundedAllocation::InitialGrowBytes<uint8>(4 + EntryCount * 57), DEFAULT_ALIGNMENT)) * 2 : 0;
 	if (!Grant(Resources, Consumer, EVoxelTerrainResourcePool::Working,
-		MessagePeak * 3 + VoxelBoundedAllocation::ArrayBytes<FVoxelOverlayRegionHead>(Snapshot->Bodies.Num()) +
-		VoxelBoundedAllocation::ArrayBytes<FVoxelOverlayDirectoryEntry>(FVoxelOverlayRegionCodec::MaximumPageEntries), Scratch, Error) ||
-		!Grant(Resources, Consumer, EVoxelTerrainResourcePool::Staged, sizeof(FVoxelOverlayEncodedMessage) + MessagePeak, Output, Error)) return false;
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelOverlayRegionHead, FDefaultAllocator>(HeadCount) +
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelOverlayDirectoryEntry, FDefaultAllocator>(EntryCount) +
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(PayloadCount) + HashPeak, Scratch, Error)) return false;
+	FVoxelGenerationRequiredSourceScope ScratchSource(&Resources.Get(), Scratch.Get());
 	auto Message = BaseMessage(Snapshot->Root->Identity);
 	Message.SnapshotId = SnapshotId;
 	Message.Region = Directory.Head.Region;
@@ -385,23 +640,29 @@ bool FVoxelOverlaySnapshotEncoder::Advance(FVoxelOverlayEncodedMessage& OutMessa
 		NextPhase = 1;
 		NextPage = NextPayload = NextPart = 0;
 	}
+	int32 EncodedBytes = 0;
+	if (!FVoxelOverlayRegionCodec::EncodedByteCount(Message, EncodedBytes)) { Error = TEXT("InvalidResource: Snapshot message encoded count"); return false; }
+	if (!Grant(Resources, Consumer, EVoxelTerrainResourcePool::Staged,
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(EncodedBytes), Output, Error)) return false;
 	TArray<uint8> Bytes;
 	if (!FVoxelOverlayRegionCodec::Encode(Kind, Message, Bytes)) { Error = TEXT("Overlay 区域消息编码失败"); return false; }
-	if (uint64(Bytes.GetAllocatedSize()) + sizeof(FVoxelOverlayEncodedMessage) > Output->Bytes())
+	if (Bytes.Num() != EncodedBytes || VoxelGenerationAllocation::AllocatedBytes(Bytes) > Output->Bytes())
 	{
 		Error = TEXT("EstimateMismatch: 区域消息输出容量");
 		return false;
 	}
-	Output->Resize(Bytes.GetAllocatedSize() + sizeof(FVoxelOverlayEncodedMessage));
+	Output->Resize(VoxelGenerationAllocation::AllocatedBytes(Bytes));
 	OutMessage.Kind = Kind;
 	OutMessage.Bytes = MoveTemp(Bytes);
 	OutMessage.ResourceLease = MoveTemp(Output);
+	OutMessage.ResourceLease->MarkPublished();
 	if (NextPayload != PayloadCursor || AdvanceRegion) ActivePayload.Reset();
 	Phase = NextPhase;
 	DirectoryPage = NextPage;
 	PayloadCursor = NextPayload;
 	PayloadPart = NextPart;
 	if (AdvanceRegion) ++RegionCursor;
+	Error.Reset();
 	return true;
 }
 
@@ -417,6 +678,10 @@ uint64 FVoxelOverlayAuthorityDelta::GetResourceAccountedBytes() const
 
 struct FVoxelOverlayAuthorityDeltaBuild::FState
 {
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> NativeLease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> WorkingLease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> EncodingLease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> WriterLease;
 	TSharedRef<const FVoxelOverlayAuthorityDirectoryRoot, ESPMode::ThreadSafe> Basis;
 	FVoxelOverlayAuthorityEditCapture Edit;
 	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
@@ -426,8 +691,6 @@ struct FVoxelOverlayAuthorityDeltaBuild::FState
 	TArray<FVoxelOverlayDirectoryEntry> Entries;
 	TArray<TSharedPtr<const FVoxelOverlayWirePayload, ESPMode::ThreadSafe>> Bodies;
 	TMap<FIntVector, TSharedPtr<FVoxelOverlayAuthorityDirectory, ESPMode::ThreadSafe>> Changed;
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> WorkingLease;
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> EncodingLease;
 	TUniquePtr<FVoxelByteWriter> Writer;
 	int32 Cursor = 0;
 	int32 HeadCursor = 0;
@@ -435,11 +698,12 @@ struct FVoxelOverlayAuthorityDeltaBuild::FState
 	uint8 Phase = 0;
 	TAtomic<bool> bCapacityBlocked{false};
 	TAtomic<uint64> CapacityVersion{0};
+	uint64 BeforeAdmissionVersion = 0;
 
-	FState(TSharedRef<const FVoxelOverlayAuthorityDirectoryRoot, ESPMode::ThreadSafe> InRoot,
+	FState(TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InNativeLease, TSharedRef<const FVoxelOverlayAuthorityDirectoryRoot, ESPMode::ThreadSafe> InRoot,
 		FVoxelOverlayAuthorityEditCapture&& InEdit, TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
 		const FVoxelGenerationConsumerKey& InConsumer)
-		: Basis(InRoot), Edit(MoveTemp(InEdit)), Resources(InResources), Consumer(InConsumer)
+		: NativeLease(MoveTemp(InNativeLease)), Basis(InRoot), Edit(MoveTemp(InEdit)), Resources(InResources), Consumer(InConsumer)
 	{
 	}
 
@@ -447,7 +711,7 @@ struct FVoxelOverlayAuthorityDeltaBuild::FState
 	{
 		if (Task.Error.StartsWith(TEXT("CapacityBlocked:")))
 		{
-			CapacityVersion.Store(Resources->Snapshot().ReleaseVersion);
+			CapacityVersion.Store(BeforeAdmissionVersion);
 			bCapacityBlocked.Store(true);
 			Task.Error.Reset();
 			Task.bSuccess = Task.bContinue = true;
@@ -455,10 +719,32 @@ struct FVoxelOverlayAuthorityDeltaBuild::FState
 		return MoveTemp(Task);
 	}
 
+	void VisitSources(FVoxelGenerationRequiredSourceScope::FVisit Visit) const
+	{
+		const auto Add = [&](const FVoxelTerrainResourceLease* Lease)
+		{
+			if (Lease && Lease->IsOwnedBy(*Resources)) FVoxelGenerationRequiredSourceScope::VisitLease(Lease, Visit);
+		};
+		Add(NativeLease.Get()); Add(WorkingLease.Get()); Add(EncodingLease.Get()); Add(WriterLease.Get());
+		FVoxelOverlayAuthorityDeltaBuild::VisitRootSources(*Basis, *Resources, Visit);
+		FVoxelOverlayAuthorityDeltaBuild::VisitEditSources(Edit, *Resources, Visit);
+		if (Root) FVoxelOverlayAuthorityDeltaBuild::VisitRootSources(*Root, *Resources, Visit);
+		if (Result)
+		{
+			Add(Result->ResourceLease.Get());
+			if (Result->Payload) Add(Result->Payload->ResourceLease.Get());
+		}
+		for (const auto& Pair : Changed) Add(Pair.Value->ResourceLease.Get());
+		for (const auto& Body : Bodies) if (Body) Add(Body->ResourceLease.Get());
+	}
+
 	FVoxelTaskResult Advance(const TAtomic<bool>& Cancel)
 	{
 		FVoxelTaskResult Task;
 		if (Cancel.Load()) { Task.bCanceled = true; return Task; }
+		BeforeAdmissionVersion = Resources->ReleaseVersionExcludingOwner(Consumer);
+		FVoxelGenerationRequiredSourceScope Sources(&Resources.Get(), this,
+			[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit) { static_cast<const FState*>(Context)->VisitSources(Visit); });
 		if (!Result)
 		{
 			if (!Edit.Transaction.IsValid() || Edit.Overlays.IsEmpty() || Edit.Overlays.Num() > 32768 ||
@@ -469,16 +755,22 @@ struct FVoxelOverlayAuthorityDeltaBuild::FState
 			}
 			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RootLease;
 			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResultLease;
+			TMap<FIntVector, TSharedPtr<const FVoxelOverlayAuthorityDirectory, ESPMode::ThreadSafe>> EmptyRootRegions;
+			FVoxelGenerationRequiredSourceScope PendingRootSource(&Resources.Get(), &RootLease,
+				[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+				{
+					FVoxelGenerationRequiredSourceScope::VisitLease(static_cast<const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>*>(Context)->Get(), Visit);
+				});
 			if (!Grant(Resources, Consumer, EVoxelTerrainResourcePool::Working,
-				VoxelBoundedAllocation::ArrayBytes<FVoxelOverlayDirectoryEntry>(Edit.Overlays.Num()) +
-				VoxelBoundedAllocation::ArrayBytes<TSharedPtr<const FVoxelOverlayWirePayload, ESPMode::ThreadSafe>>(Edit.Overlays.Num()) +
-				VoxelBoundedAllocation::MapBytes<FIntVector, TSharedPtr<FVoxelOverlayAuthorityDirectory, ESPMode::ThreadSafe>>(Edit.Heads.Num()), WorkingLease, Task.Error) ||
+				VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelOverlayDirectoryEntry, FDefaultAllocator>(Edit.Overlays.Num()) +
+				VoxelGenerationAllocation::Private::ArrayReserveBytes<TSharedPtr<const FVoxelOverlayWirePayload, ESPMode::ThreadSafe>, FDefaultAllocator>(Edit.Overlays.Num()) +
+				VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FIntVector, TSharedPtr<FVoxelOverlayAuthorityDirectory, ESPMode::ThreadSafe>>>(Changed, Edit.Heads.Num()), WorkingLease, Task.Error) ||
 				!Grant(Resources, Consumer, EVoxelTerrainResourcePool::Resident,
 				VoxelBoundedAllocation::SharedBytes<FVoxelOverlayAuthorityDirectoryRoot>() +
-				VoxelBoundedAllocation::MapBytes<FIntVector, TSharedPtr<const FVoxelOverlayAuthorityDirectory, ESPMode::ThreadSafe>>(Basis->Regions.Num()), RootLease, Task.Error) ||
+				VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FIntVector, TSharedPtr<const FVoxelOverlayAuthorityDirectory, ESPMode::ThreadSafe>>>(EmptyRootRegions, Basis->Regions.Num()), RootLease, Task.Error) ||
 				!Grant(Resources, Consumer, EVoxelTerrainResourcePool::Staged,
 				VoxelBoundedAllocation::SharedBytes<FVoxelOverlayAuthorityDelta>() +
-				VoxelBoundedAllocation::ArrayBytes<FVoxelOverlayRegionHead>(Edit.Heads.Num()), ResultLease, Task.Error)) return Block(MoveTemp(Task));
+				VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelOverlayRegionHead, FDefaultAllocator>(Edit.Heads.Num()), ResultLease, Task.Error)) return Block(MoveTemp(Task));
 			Root = MakeShared<FVoxelOverlayAuthorityDirectoryRoot, ESPMode::ThreadSafe>();
 			Root->Identity = Basis->Identity;
 			Root->Identity.Cut = Edit.Cut;
@@ -522,7 +814,7 @@ struct FVoxelOverlayAuthorityDeltaBuild::FState
 				TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 				if (!Grant(Resources, Consumer, EVoxelTerrainResourcePool::Resident,
 					VoxelBoundedAllocation::SharedBytes<FVoxelOverlayAuthorityDirectory>() +
-					VoxelBoundedAllocation::ArrayBytes<FVoxelOverlayDirectoryEntry>(LocalCount), Lease, Task.Error)) return Block(MoveTemp(Task));
+					VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelOverlayDirectoryEntry, FDefaultAllocator>(LocalCount), Lease, Task.Error)) return Block(MoveTemp(Task));
 				auto Next = MakeShared<FVoxelOverlayAuthorityDirectory, ESPMode::ThreadSafe>();
 				Next->ResourceLease = MoveTemp(Lease);
 				Next->Head = *Target;
@@ -589,10 +881,13 @@ struct FVoxelOverlayAuthorityDeltaBuild::FState
 				Task.Error = TEXT("CapacityUnachievable: 整个权威事务超过协议上限");
 				return Task;
 			}
-			if (!Grant(Resources, Consumer, EVoxelTerrainResourcePool::Staged,
-				VoxelBoundedAllocation::SharedBytes<FVoxelOverlayWirePayload>() +
-				VoxelBoundedAllocation::InitialGrowBytes<uint8>(Bound), EncodingLease, Task.Error)) return Block(MoveTemp(Task));
+			if (!Grant(Resources, Consumer, EVoxelTerrainResourcePool::Working,
+				FMemory::QuantizeSize(sizeof(FVoxelByteWriter), alignof(FVoxelByteWriter)), WriterLease, Task.Error) ||
+				!Grant(Resources, Consumer, EVoxelTerrainResourcePool::Staged,
+					VoxelBoundedAllocation::SharedBytes<FVoxelOverlayWirePayload>() +
+					VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(int32(Bound)), EncodingLease, Task.Error)) return Block(MoveTemp(Task));
 			Writer = MakeUnique<FVoxelByteWriter>(FVoxelOverlayRegionCodec::MaximumSnapshotBytes);
+			if (!Writer->Reserve(int32(Bound))) { Task.Error = TEXT("InvalidResource: 权威事务精确编码容量"); return Task; }
 			Writer->U32(Entries.Num());
 		}
 		if (EncodeCursor < Entries.Num())
@@ -611,24 +906,103 @@ struct FVoxelOverlayAuthorityDeltaBuild::FState
 			return Task;
 		}
 		auto Payload = MakeShared<FVoxelOverlayWirePayload, ESPMode::ThreadSafe>();
-		Payload->ResourceLease = MoveTemp(EncodingLease);
+		// Finish 拒收时 Writer 仍可能持有 buffer；原编码租约保留到真正转移完成。
+		Payload->ResourceLease = EncodingLease;
 		if (!Writer->Finish(Payload->Bytes) || !FVoxelOverlayHash::Compute(Payload->Bytes, Result->Hash)) return Task;
 		const uint64 Actual = VoxelBoundedAllocation::SharedBytes<FVoxelOverlayWirePayload>() + Payload->Bytes.GetAllocatedSize();
 		if (Actual > Payload->ResourceLease->Bytes()) { Task.Error = TEXT("EstimateMismatch: 整个权威事务编码容量"); return Task; }
 		Payload->ResourceLease->Resize(Actual);
 		Result->Payload = MoveTemp(Payload);
+		EncodingLease.Reset();
 		Writer.Reset();
+		WriterLease.Reset();
 		Task.bSuccess = true;
 		Task.CustomPayload = Result;
 		return Task;
 	}
 };
 
-FVoxelOverlayAuthorityDeltaBuild::FVoxelOverlayAuthorityDeltaBuild(
+uint64 FVoxelOverlayAuthorityDeltaBuild::NativeInputBytes()
+{
+	return VoxelBoundedAllocation::WorkerSharedBytes<FVoxelOverlayAuthorityDeltaBuild>() +
+		FMemory::QuantizeSize(sizeof(FState), alignof(FState));
+}
+
+void FVoxelOverlayAuthorityDeltaBuild::VisitRootSources(const FVoxelOverlayAuthorityDirectoryRoot& Root,
+	const FVoxelTerrainResources& Resources, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+{
+	const auto Add = [&](const FVoxelTerrainResourceLease* Lease)
+	{
+		if (Lease && Lease->IsOwnedBy(Resources)) FVoxelGenerationRequiredSourceScope::VisitLease(Lease, Visit);
+	};
+	Add(Root.ResourceLease.Get());
+	for (const auto& Pair : Root.Regions) if (Pair.Value) Add(Pair.Value->ResourceLease.Get());
+}
+
+void FVoxelOverlayAuthorityDeltaBuild::VisitEditSources(const FVoxelOverlayAuthorityEditCapture& Edit,
+	const FVoxelTerrainResources& Resources, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+{
+	const auto Add = [&](const FVoxelTerrainResourceLease* Lease)
+	{
+		if (Lease && Lease->IsOwnedBy(Resources)) FVoxelGenerationRequiredSourceScope::VisitLease(Lease, Visit);
+	};
+	Add(Edit.ResourceLease.Get());
+	for (const auto& Overlay : Edit.Overlays) if (Overlay) { Add(Overlay->ResourceLease.Get()); Add(Overlay->IndexLease.Get()); }
+}
+
+EVoxelTerrainResourceAdmission FVoxelOverlayAuthorityDeltaBuild::Create(
+	TSharedRef<const FVoxelOverlayAuthorityDirectoryRoot, ESPMode::ThreadSafe> Root,
+	FVoxelOverlayAuthorityEditCapture&& Edit, TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources,
+	const FVoxelGenerationConsumerKey& Consumer,
+	TSharedPtr<FVoxelOverlayAuthorityDeltaBuild, ESPMode::ThreadSafe>& OutBuild, FString& Error)
+{
+	if (!Consumer.IsValid() || Consumer.WorldEpoch != Root->Identity.WorldEpoch || !Edit.Transaction.IsValid() ||
+		Edit.Cut <= Root->Identity.Cut || !Edit.ResourceLease || !Edit.ResourceLease->IsOwnedBy(*Resources) ||
+		Edit.Overlays.IsEmpty() || Edit.Overlays.Num() > 32768 || Edit.Heads.IsEmpty() || Edit.Heads.Num() > FVoxelOverlayRegionCodec::MaximumRegions)
+	{
+		Error = TEXT("InvalidResource: Delta factory requires original basis and complete captured edit");
+		return EVoxelTerrainResourceAdmission::InvalidRequest;
+	}
+	struct FInput
+	{
+		const FVoxelTerrainResources& Resources;
+		const FVoxelOverlayAuthorityDirectoryRoot& Root;
+		const FVoxelOverlayAuthorityEditCapture& Edit;
+		const FVoxelOverlayAuthorityDeltaBuild* Previous;
+	} Input{*Resources, Root.Get(), Edit, OutBuild.Get()};
+	FVoxelGenerationRequiredSourceScope Sources(&Resources.Get(), &Input,
+		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+		{
+			const auto& Input = *static_cast<const FInput*>(Context);
+			VisitRootSources(Input.Root, Input.Resources, Visit);
+			VisitEditSources(Input.Edit, Input.Resources, Visit);
+			if (Input.Previous && Input.Previous->NativeLease->IsOwnedBy(Input.Resources)) Input.Previous->State->VisitSources(Visit);
+		});
+	FVoxelGenerationRequiredCapacity Required;
+	if (!FVoxelGenerationRequiredSourceScope::Collect(*Resources, nullptr, Required, Error)) return EVoxelTerrainResourceAdmission::InvalidRequest;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+	const auto Admission = Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Input, NativeInputBytes(), Lease, 0,
+		Required.Bytes[int32(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+	if (Admission != EVoxelTerrainResourceAdmission::Granted)
+	{
+		Error = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: Delta native factory") :
+			Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: Delta native factory") :
+			TEXT("InvalidResource: Delta native factory domain");
+		return Admission;
+	}
+	auto Candidate = VoxelBoundedAllocation::MakeWorkerShared<FVoxelOverlayAuthorityDeltaBuild>(Lease,
+		FConstructionKey{}, Lease, Root, MoveTemp(Edit), Resources, Consumer);
+	OutBuild = MoveTemp(Candidate);
+	Error.Reset();
+	return EVoxelTerrainResourceAdmission::Granted;
+}
+
+FVoxelOverlayAuthorityDeltaBuild::FVoxelOverlayAuthorityDeltaBuild(FConstructionKey,
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InNativeLease,
 	TSharedRef<const FVoxelOverlayAuthorityDirectoryRoot, ESPMode::ThreadSafe> Root,
 	FVoxelOverlayAuthorityEditCapture&& Edit, TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources,
 	const FVoxelGenerationConsumerKey& Consumer)
-	: State(MakeUnique<FState>(Root, MoveTemp(Edit), Resources, Consumer))
+	: NativeLease(InNativeLease), State(MakeUnique<FState>(MoveTemp(InNativeLease), Root, MoveTemp(Edit), Resources, Consumer))
 {
 }
 
@@ -637,7 +1011,7 @@ FVoxelOverlayAuthorityDeltaBuild::~FVoxelOverlayAuthorityDeltaBuild() = default;
 FVoxelTaskResult FVoxelOverlayAuthorityDeltaBuild::Advance(const TAtomic<bool>& Cancel)
 {
 	if (Cancel.Load()) { FVoxelTaskResult Result; Result.bCanceled = true; return Result; }
-	if (State->bCapacityBlocked.Load() && State->Resources->Snapshot().ReleaseVersion <= State->CapacityVersion.Load())
+	if (State->bCapacityBlocked.Load() && State->Resources->ReleaseVersionExcludingOwner(State->Consumer) <= State->CapacityVersion.Load())
 	{
 		FVoxelTaskResult Result;
 		Result.bSuccess = Result.bContinue = true;
@@ -657,26 +1031,93 @@ uint64 FVoxelOverlayAuthorityDeltaBuild::GetCapacityVersion() const
 	return State->CapacityVersion.Load();
 }
 
-FVoxelOverlayDeltaEncoder::FVoxelOverlayDeltaEncoder(
+FVoxelGenerationConsumerKey FVoxelOverlayAuthorityDeltaBuild::GetConsumer() const
+{
+	return State->Consumer;
+}
+
+void FVoxelOverlayDeltaEncoder::VisitDeltaSources(const FVoxelOverlayAuthorityDelta& InDelta,
+	const FVoxelTerrainResources& InResources, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+{
+	if (InDelta.ResourceLease && InDelta.ResourceLease->IsOwnedBy(InResources)) FVoxelGenerationRequiredSourceScope::VisitLease(InDelta.ResourceLease.Get(), InVisit);
+	if (InDelta.Payload && InDelta.Payload->ResourceLease && InDelta.Payload->ResourceLease->IsOwnedBy(InResources)) FVoxelGenerationRequiredSourceScope::VisitLease(InDelta.Payload->ResourceLease.Get(), InVisit);
+	if (InDelta.Root) FVoxelOverlayAuthorityDeltaBuild::VisitRootSources(*InDelta.Root, InResources, InVisit);
+}
+
+void FVoxelOverlayDeltaEncoder::VisitResourceSources(const FVoxelTerrainResources& InResources,
+	FVoxelGenerationRequiredSourceScope::FVisit InVisit) const
+{
+	VisitDeltaSources(*Delta, InResources, InVisit);
+	if (NativeLease && NativeLease->IsOwnedBy(InResources)) FVoxelGenerationRequiredSourceScope::VisitLease(NativeLease.Get(), InVisit);
+}
+
+EVoxelTerrainResourceAdmission FVoxelOverlayDeltaEncoder::Create(
+	TSharedRef<const FVoxelOverlayAuthorityDelta, ESPMode::ThreadSafe> InDelta,
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources, const FVoxelGenerationConsumerKey& InConsumer,
+	TSharedPtr<FVoxelOverlayDeltaEncoder, ESPMode::ThreadSafe>& OutEncoder, FString& OutError)
+{
+	if (!InDelta->Root || !InDelta->Payload || InDelta->Heads.IsEmpty() || InDelta->Heads.Num() > FVoxelOverlayRegionCodec::MaximumRegions ||
+		!InConsumer.IsValid() || InConsumer.WorldEpoch != InDelta->Root->Identity.WorldEpoch)
+	{
+		OutError = TEXT("InvalidResource: Delta encoder original input");
+		return EVoxelTerrainResourceAdmission::InvalidRequest;
+	}
+	struct FInput { const FVoxelTerrainResources& Resources; const FVoxelOverlayAuthorityDelta& Delta; const FVoxelOverlayDeltaEncoder* Previous; }
+		Input{*InResources, *InDelta, OutEncoder.Get()};
+	FVoxelGenerationRequiredSourceScope Sources(&InResources.Get(), &Input,
+		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+		{
+			const auto& Input = *static_cast<const FInput*>(Context);
+			VisitDeltaSources(Input.Delta, Input.Resources, Visit);
+			if (Input.Previous) Input.Previous->VisitResourceSources(Input.Resources, Visit);
+		});
+	FVoxelGenerationRequiredCapacity Required;
+	if (!FVoxelGenerationRequiredSourceScope::Collect(*InResources, nullptr, Required, OutError)) return EVoxelTerrainResourceAdmission::InvalidRequest;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+	const auto Admission = InResources->TryAcquire(InConsumer, EVoxelTerrainResourcePool::Input,
+		VoxelBoundedAllocation::WorkerSharedBytes<FVoxelOverlayDeltaEncoder>(), Lease, 0, Required.Bytes[0], Required.LeaseCount);
+	if (Admission != EVoxelTerrainResourceAdmission::Granted)
+	{
+		OutError = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: Delta encoder native factory") :
+			Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: Delta encoder native factory") :
+			TEXT("InvalidResource: Delta encoder native factory");
+		return Admission;
+	}
+	OutEncoder = VoxelBoundedAllocation::MakeWorkerShared<FVoxelOverlayDeltaEncoder>(Lease, FConstructionKey{}, Lease, InDelta, InResources, InConsumer);
+	Lease->MarkPublished();
+	OutError.Reset();
+	return EVoxelTerrainResourceAdmission::Granted;
+}
+
+FVoxelOverlayDeltaEncoder::FVoxelOverlayDeltaEncoder(FConstructionKey, TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InNativeLease,
 	TSharedRef<const FVoxelOverlayAuthorityDelta, ESPMode::ThreadSafe> InDelta,
 	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources, const FVoxelGenerationConsumerKey& InConsumer)
-	: Delta(InDelta), Resources(InResources), Consumer(InConsumer)
+	: NativeLease(MoveTemp(InNativeLease)), Delta(InDelta), Resources(InResources), Consumer(InConsumer)
 {
 }
 
 bool FVoxelOverlayDeltaEncoder::Advance(FVoxelOverlayEncodedMessage& OutMessage, bool& Complete, FString& Error)
 {
 	Complete = false;
+	FVoxelGenerationRequiredSourceScope Sources(&Resources.Get(), this,
+		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+		{
+			const auto& Encoder = *static_cast<const FVoxelOverlayDeltaEncoder*>(Context);
+			Encoder.VisitResourceSources(*Encoder.Resources, Visit);
+		});
+	FVoxelGenerationRequiredSourceScope PreviousOutput(&Resources.Get(), OutMessage.ResourceLease.Get());
 	if (!Delta->Root || !Delta->Payload || Delta->Heads.IsEmpty()) { Error = TEXT("增量编码缺少完整事务"); return false; }
 	const uint32 Count = FMath::DivideAndRoundUp(Delta->Payload->Bytes.Num(), FVoxelOverlayRegionCodec::MaximumPartBytes);
-	if (bHeaderSent && Part == Count) { Complete = true; return true; }
+	if (bHeaderSent && Part == Count) { Complete = true; Error.Reset(); return true; }
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Scratch;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Output;
-	const uint64 MessagePeak = VoxelBoundedAllocation::InitialGrowBytes<uint8>(FVoxelOverlayRegionCodec::MaximumMessageBytes);
+	const int32 HeadCount = bHeaderSent ? 0 : Delta->Heads.Num();
+	const int32 PayloadCount = bHeaderSent ? FMath::Min<int32>(FVoxelOverlayRegionCodec::MaximumPartBytes,
+		Delta->Payload->Bytes.Num() - Part * FVoxelOverlayRegionCodec::MaximumPartBytes) : 0;
 	if (!Grant(Resources, Consumer, EVoxelTerrainResourcePool::Working,
-		MessagePeak * 3 + VoxelBoundedAllocation::ArrayBytes<FVoxelOverlayRegionHead>(Delta->Heads.Num()), Scratch, Error) ||
-		!Grant(Resources, Consumer, EVoxelTerrainResourcePool::Staged,
-		sizeof(FVoxelOverlayEncodedMessage) + MessagePeak, Output, Error)) return false;
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelOverlayRegionHead, FDefaultAllocator>(HeadCount) +
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(PayloadCount), Scratch, Error)) return false;
+	FVoxelGenerationRequiredSourceScope ScratchSource(&Resources.Get(), Scratch.Get());
 	auto Message = BaseMessage(Delta->Root->Identity);
 	Message.AuthorityTransaction = Delta->Transaction;
 	Message.Region = Delta->Heads[0].Region;
@@ -698,18 +1139,24 @@ bool FVoxelOverlayDeltaEncoder::Advance(FVoxelOverlayEncodedMessage& OutMessage,
 		Message.Payload.Reserve(Bytes);
 		Message.Payload.Append(Delta->Payload->Bytes.GetData() + Offset, Bytes);
 	}
+	int32 EncodedBytes = 0;
+	if (!FVoxelOverlayRegionCodec::EncodedByteCount(Message, EncodedBytes)) { Error = TEXT("InvalidResource: Delta message encoded count"); return false; }
+	if (!Grant(Resources, Consumer, EVoxelTerrainResourcePool::Staged,
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(EncodedBytes), Output, Error)) return false;
 	TArray<uint8> Bytes;
 	if (!FVoxelOverlayRegionCodec::Encode(EVoxelMessage::RegionDelta, Message, Bytes)) { Error = TEXT("增量消息编码失败"); return false; }
-	if (uint64(Bytes.GetAllocatedSize()) + sizeof(FVoxelOverlayEncodedMessage) > Output->Bytes())
+	if (Bytes.Num() != EncodedBytes || VoxelGenerationAllocation::AllocatedBytes(Bytes) > Output->Bytes())
 	{
 		Error = TEXT("EstimateMismatch: 增量消息输出容量");
 		return false;
 	}
-	Output->Resize(Bytes.GetAllocatedSize() + sizeof(FVoxelOverlayEncodedMessage));
+	Output->Resize(VoxelGenerationAllocation::AllocatedBytes(Bytes));
 	OutMessage.Kind = EVoxelMessage::RegionDelta;
 	OutMessage.Bytes = MoveTemp(Bytes);
 	OutMessage.ResourceLease = MoveTemp(Output);
+	OutMessage.ResourceLease->MarkPublished();
 	if (bHeaderSent) ++Part;
 	else bHeaderSent = true;
+	Error.Reset();
 	return true;
 }

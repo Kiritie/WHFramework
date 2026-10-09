@@ -118,34 +118,41 @@ int32 UVoxelWorldPreviewCommandlet::Main(const FString& Params)
 		return 5;
 	}
 
-	const TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config =
-		MakeShared<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe>(MoveTemp(MutableConfig));
+	const FVoxelGenerationConsumerKey RetentionConsumer = {
+		EVoxelGenerationConsumerKind::WorldFact, 1, FGuid::NewGuid(), 1,
+		EVoxelGenerationSpatialKind::Column, FIntVector::ZeroValue, FIntVector::ZeroValue, 1
+	};
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> PlanningResources;
+	TSharedPtr<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> FrozenConfig;
+	if (!FVoxelTerrainResources::Create({}, RetentionConsumer, PlanningResources, Error) ||
+		!FVoxelGenerationBinding::Freeze(MutableConfig, PlanningResources.ToSharedRef(), RetentionConsumer, FrozenConfig, Error))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Voxel preview native admission failed: %s"), *Error);
+		return 8;
+	}
+	const auto Config = FrozenConfig.ToSharedRef();
+	MutableConfig = FVoxelGenerationRuntimeConfig{};
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> SamplesLease;
 	TArray<FVoxelEnvironmentSample> Samples;
 	if (!bMacroOnly)
 	{
 		// 独立预览会话的 Cache 与规划保留节点共用固定资源域。
-		const auto PlanningResources = MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
-		const FVoxelGenerationConsumerKey RetentionConsumer = {
-			EVoxelGenerationConsumerKind::WorldFact, 1, FGuid::NewGuid(), 1,
-			EVoxelGenerationSpatialKind::Column, FIntVector::ZeroValue, FIntVector::ZeroValue, 1
-		};
 		TSharedPtr<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> Cache;
-		if (!PlanningResources->Configure({}))
-		{
-			UE_LOG(LogTemp, Error, TEXT("Voxel preview resource limits are invalid"));
-			return 8;
-		}
-		if (!FVoxelGenerationPlanCache::Create(PlanningResources, RetentionConsumer, Cache, Error, true, true))
+		if (!FVoxelGenerationPlanCache::Create(PlanningResources.ToSharedRef(), RetentionConsumer, Cache, Error, true, true))
 		{
 			UE_LOG(LogTemp, Error, TEXT("Voxel preview cache admission failed: %s"), *Error);
 			return 8;
 		}
-		const FVoxelGenerationPipeline Pipeline(Config, Cache.ToSharedRef());
-		Pipeline.BindRetentionResources(PlanningResources, RetentionConsumer);
+		TSharedPtr<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> Pipeline;
+		if (!FVoxelGenerationPipeline::Create(Config, Cache.ToSharedRef(), Pipeline, Error))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Voxel preview pipeline admission failed: %s"), *Error);
+			return 8;
+		}
+		Pipeline->BindRetentionResources(PlanningResources.ToSharedRef(), RetentionConsumer);
 		FVoxelGenerationConsumerScope ConsumerScope(RetentionConsumer);
 		FVoxelGenerationWorkspace Workspace(PlanningResources, RetentionConsumer,
-			Cache->GetRootInputBytes(), 1);
+			Pipeline->GetRequiredInputBytes(), Pipeline->GetRequiredInputLeaseCount());
 		TArray<FVoxelEnvironmentSample> CandidateSamples;
 		if (!Workspace.ReserveArray(CandidateSamples, Width * Height, Error))
 		{
@@ -153,7 +160,7 @@ int32 UVoxelWorldPreviewCommandlet::Main(const FString& Params)
 			return 6;
 		}
 		CandidateSamples.SetNumUninitialized(Width * Height);
-		if (!Pipeline.SampleEnvironments(FIntPoint(OriginX, OriginY), Width,
+		if (!Pipeline->SampleEnvironments(FIntPoint(OriginX, OriginY), Width,
 			Height, Step, MakeArrayView(CandidateSamples), Error, nullptr, false, Workspace.GetLease()))
 		{
 			UE_LOG(LogTemp, Error, TEXT("Environment sampling failed: %s"), *Error);

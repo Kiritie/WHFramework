@@ -38,6 +38,18 @@ bool FVoxelNetworkCodec::Decode(
 	TConstArrayView<uint8> InBytes,
 	FVoxelWireMessage& OutMessage)
 {
+	FVoxelWireMessage Value;
+	TConstArrayView<uint8> Payload;
+	if (!DecodeView(InBytes, Value.Kind, Value.Session, Payload)) return false;
+	Value.Payload.Reserve(Payload.Num());
+	Value.Payload.Append(Payload.GetData(), Payload.Num());
+	OutMessage = MoveTemp(Value);
+	return true;
+}
+
+bool FVoxelNetworkCodec::DecodeView(TConstArrayView<uint8> InBytes, EVoxelMessage& OutKind,
+	FGuid& OutSession, TConstArrayView<uint8>& OutPayload)
+{
 	if (InBytes.Num() > MaxWireBytes)
 	{
 		return false;
@@ -52,15 +64,15 @@ bool FVoxelNetworkCodec::Decode(
 	{
 		return false;
 	}
-	FVoxelWireMessage Value;
-	Value.Kind = static_cast<EVoxelMessage>(Kind);
-	Value.Session = Reader.Guid();
-	Value.Payload = Reader.Blob(MaxWireBytes - 64);
+	const FGuid Session = Reader.Guid();
+	const auto Payload = Reader.BlobView(MaxWireBytes - 64);
 	if (!Reader.End())
 	{
 		return false;
 	}
-	OutMessage = MoveTemp(Value);
+	OutKind = static_cast<EVoxelMessage>(Kind);
+	OutSession = Session;
+	OutPayload = Payload;
 	return true;
 }
 
@@ -90,6 +102,7 @@ bool FVoxelNetworkCodec::EncodeHello(
 		return false;
 	}
 	FVoxelByteWriter Writer(32);
+	Writer.Reserve(20);
 	Writer.U32(InValue.ProtocolVersion);
 	Writer.U64(InValue.Nonce);
 	Writer.U64(InValue.RegistryHash);
@@ -129,6 +142,7 @@ bool FVoxelNetworkCodec::EncodeWelcome(
 		return false;
 	}
 	FVoxelByteWriter Writer(FVoxelManifestCodec::MaxBytes + 64);
+	Writer.Reserve(FVoxelManifestCodec::MaxBytes + 64);
 	Writer.U64(InValue.EchoNonce);
 	Writer.Guid(InValue.Session);
 	Writer.U64(InValue.AuthorityWorldEpoch);
@@ -145,7 +159,7 @@ bool FVoxelNetworkCodec::DecodeWelcome(
 	Value.EchoNonce = Reader.U64();
 	Value.Session = Reader.Guid();
 	Value.AuthorityWorldEpoch = Reader.U64();
-	const TArray<uint8> ManifestBytes = Reader.Blob(FVoxelManifestCodec::MaxBytes);
+	const auto ManifestBytes = Reader.BlobView(FVoxelManifestCodec::MaxBytes);
 	if (!Reader.End() ||
 		Value.EchoNonce == 0 ||
 		Value.AuthorityWorldEpoch == 0 ||
@@ -167,6 +181,7 @@ bool FVoxelNetworkCodec::EncodeReady(
 		return false;
 	}
 	FVoxelByteWriter Writer(32);
+	Writer.Reserve(24);
 	Writer.U64(InValue.RecipeHash);
 	Writer.U64(InValue.RegistryHash);
 	Writer.U64(InValue.BaseSampleHash);
@@ -588,6 +603,18 @@ bool FVoxelNetworkCodec::DecodeRepresentationReply(
 	FVoxelRepresentationReply& OutValue,
 	FString& OutError)
 {
+	FVoxelRepresentationReply Value;
+	TConstArrayView<uint8> Data;
+	if (!DecodeRepresentationReplyView(InBytes, Value, Data, OutError)) return false;
+	Value.Data.Reserve(Data.Num());
+	Value.Data.Append(Data.GetData(), Data.Num());
+	OutValue = MoveTemp(Value);
+	return true;
+}
+
+bool FVoxelNetworkCodec::DecodeRepresentationReplyView(TConstArrayView<uint8> InBytes,
+	FVoxelRepresentationReply& OutValue, TConstArrayView<uint8>& OutData, FString& OutError)
+{
 	if (InBytes.Num() > MaxRepresentationBytes + 64)
 	{
 		OutError = TEXT("Voxel representation reply payload is too large");
@@ -601,19 +628,20 @@ bool FVoxelNetworkCodec::DecodeRepresentationReply(
 	Value.Serial = Reader.U64();
 	Value.Revision = Reader.U64();
 	Value.Kind = static_cast<EVoxelRepresentationReplyKind>(Reader.U8());
-	Value.Data = Reader.Blob(MaxRepresentationBytes);
+	const auto Data = Reader.BlobView(MaxRepresentationBytes);
 	if (!Reader.End() ||
 		Value.Type == EVoxelRepresentationWireType::None ||
 		static_cast<uint8>(Value.Type) > static_cast<uint8>(EVoxelRepresentationWireType::MacroTerrain) ||
 		Value.Serial == 0 ||
 		!ValidateWireKey(Value.Key) ||
 		static_cast<uint8>(Value.Kind) > static_cast<uint8>(EVoxelRepresentationReplyKind::Rejected) ||
-		(Value.Kind != EVoxelRepresentationReplyKind::Data && !Value.Data.IsEmpty()))
+		(Value.Kind != EVoxelRepresentationReplyKind::Data && !Data.IsEmpty()))
 	{
 		OutError = TEXT("Voxel representation reply payload is invalid");
 		return false;
 	}
 	OutValue = MoveTemp(Value);
+	OutData = Data;
 	OutError.Reset();
 	return true;
 }

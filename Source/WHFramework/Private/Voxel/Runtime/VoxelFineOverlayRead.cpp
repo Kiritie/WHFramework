@@ -2,6 +2,7 @@
 
 #include "Voxel/Save/VoxelDeltaCodec.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 
 uint64 FVoxelFineOverlayCapture::AllocatedBytes() const
 {
@@ -12,6 +13,48 @@ uint64 FVoxelFineOverlayCapture::AllocatedBytes() const
 		Bytes += Read.SourceDirectory.GetAllocatedSize();
 	}
 	return Bytes;
+}
+
+void FVoxelFineOverlayCapture::VisitResourceSources(const FVoxelTerrainResources& InResources,
+	FVoxelGenerationRequiredSourceScope::FVisit InVisit) const
+{
+	const auto VisitLease = [&](const FVoxelTerrainResourceLease* Lease)
+	{
+		if (Lease && Lease->IsOwnedBy(InResources))
+			FVoxelGenerationRequiredSourceScope::VisitLease(Lease, InVisit);
+	};
+	VisitLease(Resident.ResourceLease.Get());
+	Resident.Visit([&](const FIntVector&, const FVoxelOverlaySnapshot& Entry)
+	{
+		VisitLease(Entry.ResourceLease.Get());
+		VisitLease(Entry.IndexLease.Get());
+	});
+	VisitLease(VersionProof ? VersionProof->ResourceLease.Get() : nullptr);
+	for (const FVoxelRegionReadView& Read : Reads)
+		if (Read.GenerationLease) VisitLease(Read.GenerationLease->GetResourceLease().Get());
+	FVoxelRegionStore::VisitOverlayReadLeaseSources(ReadLeaseSet, InResources, InVisit);
+}
+
+void FVoxelFineOverlayRead::VisitResourceSources(const FVoxelTerrainResources& InResources,
+	FVoxelGenerationRequiredSourceScope::FVisit InVisit) const
+{
+	Capture.VisitResourceSources(InResources, InVisit);
+	const auto VisitLease = [&](const FVoxelTerrainResourceLease* Lease)
+	{
+		if (Lease && Lease->IsOwnedBy(InResources))
+			FVoxelGenerationRequiredSourceScope::VisitLease(Lease, InVisit);
+	};
+	VisitLease(PendingReadLease.Get());
+	VisitLease(Decoder.GetResourceLease().Get());
+	if (Snapshot)
+	{
+		VisitLease(Snapshot->ResourceLease.Get());
+		Snapshot->Visit([&](const FIntVector&, const FVoxelOverlaySnapshot& Entry)
+		{
+			VisitLease(Entry.ResourceLease.Get());
+			VisitLease(Entry.IndexLease.Get());
+		});
+	}
 }
 
 uint64 FVoxelFineOverlayReadResult::AllocatedBytes() const
@@ -29,12 +72,39 @@ bool FVoxelFineOverlayRead::Initialize(FVoxelFineOverlayCapture&& InCapture, FSt
 		OutError = TEXT("Overlay 解码必须接收同一不可变目录切点下的完整读取租约");
 		return false;
 	}
+	const FVoxelGenerationRequiredSourceScope CaptureSource(InCapture.Resources.Get(), &InCapture,
+		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+		{
+			const auto& Source = *static_cast<const FVoxelFineOverlayCapture*>(Context);
+			if (Source.Resources) Source.VisitResourceSources(*Source.Resources, Visit);
+		});
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ValidationLease;
-	if (InCapture.Resources && !InCapture.Reads.IsEmpty() && !InCapture.Resources->Acquire(InCapture.Consumer, EVoxelTerrainResourcePool::Working,
-		VoxelBoundedAllocation::SetBytes<FIntVector>(InCapture.Reads.Num()), ValidationLease))
+	if (InCapture.Resources && !InCapture.Reads.IsEmpty())
 	{
-		OutError = TEXT("CapacityBlocked: Overlay 读取描述校验容量不足");
-		return false;
+		FVoxelGenerationRequiredCapacity Required;
+		if (!FVoxelGenerationRequiredSourceScope::Collect(*InCapture.Resources, nullptr, Required, OutError))
+		{
+			OutError = TEXT("Oversized: Overlay metadata input floor overflow");
+			return false;
+		}
+		const TSet<FIntVector> ValidationShape;
+		const uint64 ValidationBytes = VoxelGenerationAllocation::Private::SetReserveBytes<FIntVector>(ValidationShape, InCapture.Reads.Num());
+		const uint64 WorkingLimit = InCapture.Resources->Snapshot().Limits.WorkingBytes;
+		if (Required.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Working)] > WorkingLimit ||
+			ValidationBytes > WorkingLimit - Required.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Working)])
+		{
+			OutError = TEXT("Oversized: Overlay validation working sources are unreachable");
+			return false;
+		}
+		const auto Admission = InCapture.Resources->TryAcquire(InCapture.Consumer, EVoxelTerrainResourcePool::Working,
+			ValidationBytes, ValidationLease, 0, Required.Bytes[0], Required.LeaseCount);
+		if (Admission != EVoxelTerrainResourceAdmission::Granted)
+		{
+			OutError = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ?
+				TEXT("CapacityBlocked: Overlay 读取描述校验容量不足") : Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+				TEXT("Oversized: Overlay validation input is unreachable") : TEXT("InvalidRequest: Overlay validation resource domain");
+			return false;
+		}
 	}
 	if (!InCapture.ReadLeaseSet->ValidateCapture(InCapture, OutError))
 	{
@@ -89,6 +159,12 @@ bool FVoxelFineOverlayRead::Advance(const int32 InMaximumReads, const TAtomic<bo
 	{
 		return Fail(EVoxelFineOverlayReadState::Failed, TEXT("Overlay 解码任务的快照、读取租约或批次限额无效"), OutError);
 	}
+	const FVoxelGenerationRequiredSourceScope ReaderSource(Capture.Resources.Get(), this,
+		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+		{
+			const auto& Reader = *static_cast<const FVoxelFineOverlayRead*>(Context);
+			if (Reader.Capture.Resources) Reader.VisitResourceSources(*Reader.Capture.Resources, Visit);
+		});
 	for (int32 Work = 0; Work < InMaximumReads && Capture.Reads.IsValidIndex(NextRead); ++Work)
 	{
 		if (InCancel.Load())
@@ -96,14 +172,36 @@ bool FVoxelFineOverlayRead::Advance(const int32 InMaximumReads, const TAtomic<bo
 			return Fail(EVoxelFineOverlayReadState::Canceled, TEXT("Canceled"), OutError);
 		}
 		const FVoxelRegionReadView& Read = Capture.Reads[NextRead];
+		const FVoxelGenerationRequiredSourceScope SnapshotSource(Capture.Resources.Get(), Snapshot->ResourceLease.Get());
+		const FVoxelGenerationRequiredSourceScope ProofSource(Capture.Resources.Get(), Capture.VersionProof ? Capture.VersionProof->ResourceLease.Get() : nullptr);
+		const FVoxelGenerationRequiredSourceScope ReadSource(Capture.Resources.Get(), PendingReadLease.Get());
+		const FVoxelGenerationRequiredSourceScope GenerationSource(Capture.Resources.Get(),
+			Read.GenerationLease && Capture.Resources && Read.GenerationLease->IsResourceAccountedFor(Capture.Resources.Get(), Capture.WorldEpoch) ?
+			Read.GenerationLease->GetResourceLease().Get() : nullptr);
+		const FVoxelGenerationRequiredSourceScope RetainedOutputs(Capture.Resources.Get(), Snapshot.Get(),
+			[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+			{
+				for (const auto& Pair : static_cast<const FVoxelOverlaySnapshotSet*>(Context)->Sections)
+					FVoxelGenerationRequiredSourceScope::VisitLease(Pair.Value.ResourceLease.Get(), Visit);
+			});
 		FString ReadError;
 		if (PendingBytes.IsEmpty())
 		{
-			if (Capture.Resources && !Capture.Resources->Acquire(Capture.Consumer, EVoxelTerrainResourcePool::Working,
-				FVoxelRegionStore::ReadWorkingBytes(Read), PendingReadLease))
+			if (Capture.Resources)
 			{
-				OutError = TEXT("CapacityBlocked: 固定文件代读取峰值未准入");
-				return true;
+				FVoxelGenerationRequiredCapacity Required;
+				if (!FVoxelGenerationRequiredSourceScope::Collect(*Capture.Resources, nullptr, Required, ReadError))
+					return Fail(EVoxelFineOverlayReadState::Failed, TEXT("Oversized: Overlay metadata input floor overflow"), OutError);
+				const auto Admission = Capture.Resources->TryAcquire(Capture.Consumer, EVoxelTerrainResourcePool::Working,
+					FVoxelRegionStore::ReadWorkingBytes(Read), PendingReadLease, 0, Required.Bytes[0], Required.LeaseCount);
+				if (Admission != EVoxelTerrainResourceAdmission::Granted)
+				{
+					if (Admission != EVoxelTerrainResourceAdmission::CapacityBlocked)
+						return Fail(EVoxelFineOverlayReadState::Failed, Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+							TEXT("Oversized: Overlay pinned file read is unreachable") : TEXT("InvalidRequest: Overlay file read resource domain"), OutError);
+					OutError = TEXT("CapacityBlocked: 固定文件代读取峰值未准入");
+					return true;
+				}
 			}
 			if (FVoxelRegionStore::Read(Read, PendingBytes, ReadError) != EVoxelRegionRead::Loaded)
 			{
@@ -118,6 +216,7 @@ bool FVoxelFineOverlayRead::Advance(const int32 InMaximumReads, const TAtomic<bo
 		TSharedPtr<FVoxelPersistentSection, ESPMode::ThreadSafe> Decoded;
 		if (Capture.Resources)
 		{
+			const FVoxelGenerationRequiredSourceScope AcquiredReadSource(Capture.Resources.Get(), PendingReadLease.Get());
 			if (!Decoder.Advance(PendingBytes, Capture.Manifest, *Capture.Registry, Capture.Resources.ToSharedRef(),
 				Capture.Consumer, EVoxelTerrainResourcePool::Input, Decoded, ReadError))
 			{
@@ -196,7 +295,8 @@ bool FVoxelFineOverlayRead::TakeResult(FVoxelFineOverlayReadResult& OutResult)
 		if (Entry.IndexLease && Entry.IndexLease != Entry.ResourceLease) Result.ResourceAccountedBytes += Entry.IndexLease->Bytes();
 	});
 	OutResult = MoveTemp(Result);
-	Capture.Reads.Reset();
+	// 结果持有原 metadata lease；Reader不能在移交后另留无租约的读取数组容量。
+	Capture.Reads.Empty();
 	Capture.Registry.Reset();
 	State = EVoxelFineOverlayReadState::Taken;
 	return true;

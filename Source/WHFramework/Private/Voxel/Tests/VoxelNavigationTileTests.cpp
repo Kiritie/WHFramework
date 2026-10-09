@@ -197,7 +197,7 @@ bool FVoxelNavigationNativeTileTest::RunTest(const FString& InParameters)
 	Agent.SetNavDataClass(AVoxelNavigationData::StaticClass());
 	Navigation->OverrideSupportedAgents({Agent});
 	Navigation->OnWorldInitDone(FNavigationSystemRunMode::GameMode);
-	Navigation->ProcessRegistrationCandidates();
+	Navigation->Tick(0.f);
 	auto* Data = Cast<AVoxelNavigationData>(Navigation->GetDefaultNavDataInstance(FNavigationSystem::DontCreate));
 	if (!TestNotNull(TEXT("夹具真实创建带tile提交证明的NavData"), Data)) return false;
 	Navigation->AddNavigationBuildLock(ENavigationBuildLock::Custom);

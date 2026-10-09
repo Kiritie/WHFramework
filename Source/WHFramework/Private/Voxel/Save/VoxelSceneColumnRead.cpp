@@ -75,7 +75,8 @@ bool FVoxelSceneColumnRead::Load(
 	const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& InResources,
 	const FVoxelGenerationConsumerKey& InConsumer,
 	TSharedPtr<const FVoxelSceneColumnRead, ESPMode::ThreadSafe>& OutRead,
-	FString& OutError, const TAtomic<bool>* InCancel, const TAtomic<bool>* InDetached)
+	FString& OutError, const TAtomic<bool>* InCancel, const TAtomic<bool>* InDetached,
+	const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& InControlLease)
 {
 	OutError.Reset();
 	if (!InSource || !InResources || !InConsumer.IsValid() || OutRead ||
@@ -95,12 +96,40 @@ bool FVoxelSceneColumnRead::Load(
 		return false;
 	}
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PathLease;
-	const uint64 PathBytes = 2 * VoxelBoundedAllocation::ArrayBytes<TCHAR>(InSource->Directory().Len() + 96);
-	if (!InResources->Acquire(InConsumer, EVoxelTerrainResourcePool::Working, PathBytes, PathLease))
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MetadataLease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> BodyLease;
+	const auto& SourceLease = InSource->GetResourceLease();
+	const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>* Required[] =
+		{&SourceLease, &InControlLease, &PathLease, &MetadataLease};
+	const auto Acquire = [&](const EVoxelTerrainResourcePool Pool, const uint64 Bytes,
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& Lease)
 	{
-		OutError = TEXT("CapacityBlocked: Scene read path backing was not granted");
+		uint64 InputBytes = 0;
+		int32 Count = 0;
+		const FVoxelTerrainResourceLease* Seen[UE_ARRAY_COUNT(Required)] = {};
+		for (const auto* RequiredLease : Required)
+		{
+			if (!*RequiredLease) continue;
+			if (!(*RequiredLease)->IsOwnedBy(*InResources))
+			{ OutError = TEXT("InvalidRequest: Scene read source resource domain"); return false; }
+			bool bSeen = false;
+			for (int32 Index = 0; Index < Count; ++Index) bSeen |= Seen[Index]->Serial() == (*RequiredLease)->Serial();
+			if (bSeen) continue;
+			const uint64 Input = (*RequiredLease)->GetPool() == EVoxelTerrainResourcePool::Input ? (*RequiredLease)->Bytes() : 0;
+			if (Input > MAX_uint64 - InputBytes)
+			{ OutError = TEXT("CapacityUnachievable: Scene read source floor"); return false; }
+			InputBytes += Input;
+			Seen[Count++] = RequiredLease->Get();
+		}
+		const auto Admission = InResources->TryAcquire(InConsumer, Pool, Bytes, Lease, 0, InputBytes, Count);
+		if (Admission == EVoxelTerrainResourceAdmission::Granted) return true;
+		OutError = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: Scene read backing") :
+			Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: Scene read backing") :
+			TEXT("InvalidRequest: Scene read backing");
 		return false;
-	}
+	};
+	const uint64 PathBytes = 2 * VoxelBoundedAllocation::ArrayBytes<TCHAR>(InSource->Directory().Len() + 96);
+	if (!Acquire(EVoxelTerrainResourcePool::Working, PathBytes, PathLease)) return false;
 	const FString Path = FPaths::Combine(InSource->Directory(), FVoxelSceneColumnCodec::RelativePath(InColumn));
 	TUniquePtr<IFileHandle> File(FPlatformFileManager::Get().GetPlatformFile().OpenRead(*Path));
 	if (!File || File->Size() != InExpectedBytes)
@@ -122,17 +151,11 @@ bool FVoxelSceneColumnRead::Load(
 		OutError = TEXT("Invalid Scene column header/count");
 		return false;
 	}
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MetadataLease;
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> BodyLease;
 	const uint64 MetadataBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSceneColumnRead>() +
 		VoxelBoundedAllocation::ArrayBytes<FVoxelSceneActorRead>(Count);
 	const uint64 BodyBytes = VoxelBoundedAllocation::ArrayBytes<uint8>(int32(InExpectedBytes));
-	if (!InResources->Acquire(InConsumer, EVoxelTerrainResourcePool::Input, MetadataBytes, MetadataLease) ||
-		!InResources->Acquire(InConsumer, EVoxelTerrainResourcePool::Input, BodyBytes, BodyLease))
-	{
-		OutError = TEXT("CapacityBlocked: Scene read metadata/body backing was not granted");
-		return false;
-	}
+	if (!Acquire(EVoxelTerrainResourcePool::Input, MetadataBytes, MetadataLease) ||
+		!Acquire(EVoxelTerrainResourcePool::Input, BodyBytes, BodyLease)) return false;
 	auto Read = VoxelBoundedAllocation::MakeWorkerShared<FVoxelSceneColumnRead>(MetadataLease);
 	Read->MetadataLease = MoveTemp(MetadataLease);
 	Read->SourceLease = InSource;

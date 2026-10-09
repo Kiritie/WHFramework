@@ -1,5 +1,7 @@
 #pragma once
 
+class FVoxelTerrainResourceLease;
+
 #include "CoreMinimal.h"
 #include "Containers/Array.h"
 #include "Containers/Map.h"
@@ -270,6 +272,8 @@ struct WHFRAMEWORK_API FVoxelHydrologyInfluence
 
 struct WHFRAMEWORK_API FVoxelHydrologyPlan
 {
+	// 原正文 grant 的共享来源；深层 backing 先析构，controller deleter 仍保活到最后 weak。
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
     FVoxelHydrologyRegionKey Key;
     int32 RiverShapeSmoothingPasses = 1;
     int32 RiverSeed = 0;

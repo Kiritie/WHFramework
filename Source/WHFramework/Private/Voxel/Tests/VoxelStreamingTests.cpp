@@ -1806,8 +1806,8 @@ bool FVoxelStreamingMultiSourceStageTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("Debug fine remains independently eligible while player proxy data prepares"),
 		DataLanes.FindRef(100) == 1 && MeshLanes.FindRef(100) == 1);
 	const auto CriticalLanes = FVoxelViewManager::ResolveAdmissionLanes(Admissions,
-		[](const FVoxelViewAdmission&) { return false; }, true);
-	TestEqual(TEXT("Movement critical fine suppresses distant admissions"), CriticalLanes.FindRef(0), static_cast<uint8>(1));
+		[](const FVoxelViewAdmission&) { return false; });
+	TestEqual(TEXT("Critical fine retains all runnable distant lanes"), CriticalLanes.FindRef(0), static_cast<uint8>(15));
 	TestEqual(TEXT("Critical protection retains each source fine lane"), CriticalLanes.FindRef(100), static_cast<uint8>(1));
 	TestEqual(TEXT("All source groups finish"),
 		FVoxelViewManager::ResolveActiveAdmissionKind(Admissions,

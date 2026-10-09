@@ -1,11 +1,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Rendering/VoxelFineHandoff.h"
 #include "Voxel/Rendering/VoxelTerrainCoarseMesh.h"
 #include "Voxel/Task/VoxelTerrainResources.h"
 #include "Voxel/Task/VoxelTerrainWorkSelection.h"
 
+class UWorld;
 class UVoxelModule;
 class FVoxelTaskScheduler;
 class FVoxelTerrainRenderChunk;
@@ -36,6 +38,18 @@ struct WHFRAMEWORK_API FVoxelTerrainCoarseDrawNode
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 };
 
+// 原 Coarse 正文持有退休尝试；仅 GT 修改，不参与几何身份或 RT 绘制。
+struct WHFRAMEWORK_API FVoxelTerrainCoarseRetirementAttempt
+{
+	FVoxelGenerationConsumerKey Consumer;
+	FGuid Transaction;
+	EVoxelTerrainResourceAdmission Admission = EVoxelTerrainResourceAdmission::None;
+	FVoxelTerrainResourceLimits Limits;
+	uint64 CapacityVersion = 0;
+	uint64 FrontendVersion = 0;
+	double FirstQueuedSeconds = -1.0;
+};
+
 // 粗层按实际空间 Key 保持一份原始网格；覆盖 Atom 不分配独立粗层几何。
 struct WHFRAMEWORK_API FVoxelTerrainRenderCoarse final : FVoxelTaskCustomPayload
 {
@@ -49,6 +63,7 @@ struct WHFRAMEWORK_API FVoxelTerrainRenderCoarse final : FVoxelTaskCustomPayload
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MetadataLease;
 	FBox OwnershipBounds = FBox(ForceInit);
 	mutable TAtomic<bool> bResidentResourcesReady{false};
+	mutable FVoxelTerrainCoarseRetirementAttempt RetirementAttempt;
 	bool IsResourceReady() const;
 	virtual uint64 GetAllocatedBytes() const override;
 };
@@ -84,6 +99,7 @@ struct WHFRAMEWORK_API FVoxelTerrainRenderAtom final : FVoxelTaskCustomPayload
 	TArray<TSharedPtr<const FVoxelFineBoundarySnapshot, ESPMode::ThreadSafe>> Boundaries;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MetadataLease;
 	mutable TAtomic<bool> bResidentResourcesReady{false};
+	bool HasMatchingFineInputs() const;
 	bool IsResourceReady() const;
 	virtual uint64 GetAllocatedBytes() const override;
 };
@@ -94,11 +110,23 @@ class WHFRAMEWORK_API FVoxelTerrainRenderer
 public:
 	FVoxelTerrainRenderer(UVoxelModule& InModule, FVoxelTaskScheduler& InScheduler, uint64 InWorldEpoch);
 	~FVoxelTerrainRenderer();
+	FVoxelTerrainRenderer(const FVoxelTerrainRenderer&) = delete;
+	FVoxelTerrainRenderer& operator=(const FVoxelTerrainRenderer&) = delete;
+	EVoxelTerrainResourceAdmission GetNativeStateAdmission() const;
+	uint64 GetCoarseAdmissionVersion() const;
+	void VisitNativeControlSources(FVoxelGenerationRequiredSourceScope::FVisit InVisit) const;
+	static void VisitCoarseSources(const FVoxelTerrainRenderCoarse& InCoarse, const FVoxelTerrainResources& InResources,
+		FVoxelGenerationRequiredSourceScope::FVisit InVisit);
+	static void VisitMeshSources(const FVoxelSectionMeshResult& InMesh, const FVoxelTerrainResources& InResources,
+		FVoxelGenerationRequiredSourceScope::FVisit InVisit);
+	static void VisitFineSources(const FVoxelFineShardGeometry& InGeometry, const FVoxelTerrainResources& InResources,
+		FVoxelGenerationRequiredSourceScope::FVisit InVisit);
 	TSharedPtr<const FVoxelTerrainRenderChunk, ESPMode::ThreadSafe> PrepareChunk(
 		const FVoxelGenerationConsumerKey& InConsumer,
 		TSharedPtr<const FVoxelSectionMeshResult, ESPMode::ThreadSafe> InMesh,
 		int32 InBatch, const FVector& InWorldOrigin, double InWorldScale,
-		int32 InFirstTriangle = 0, int32 InTriangleCount = INDEX_NONE);
+		int32 InFirstTriangle = 0, int32 InTriangleCount = INDEX_NONE,
+		EVoxelTerrainResourceAdmission* OutAdmission = nullptr);
 	void AppendSourceChunk(FVoxelTerrainRenderCoarse& InItem, int32 InBatch,
 		TSharedPtr<const FVoxelTerrainRenderChunk, ESPMode::ThreadSafe>& InOutLast,
 		TSharedPtr<const FVoxelTerrainRenderChunk, ESPMode::ThreadSafe> InChunk);
@@ -109,7 +137,9 @@ public:
 		TFunction<bool(const FIntVector&, const FVoxelFineOwnerEvidence&)> InIsCollisionCurrent,
 		TFunction<void()> InOnSubmitted, FGuid& OutTransaction,
 		const FVoxelTerrainServicePriority& InPriority = FVoxelTerrainServicePriority(),
-		double InFirstQueuedSeconds = -1.0);
+		double InFirstQueuedSeconds = -1.0,
+		EVoxelTerrainResourceAdmission* OutAdmission = nullptr,
+		const FVoxelGenerationConsumerKey& InConsumer = {});
 	bool PrepareCoarseTransaction(
 		TSharedPtr<const FVoxelTerrainRenderCoarse, ESPMode::ThreadSafe> InCoarse,
 		bool bInRemove,
@@ -117,17 +147,23 @@ public:
 		TFunction<void()> InOnSubmitted,
 		FGuid& OutTransaction,
 		const FVoxelTerrainServicePriority& InPriority,
-		double InFirstQueuedSeconds);
+		double InFirstQueuedSeconds,
+		EVoxelTerrainResourceAdmission* OutAdmission = nullptr,
+		const FVoxelGenerationConsumerKey& InConsumer = {},
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InCallbackLease = nullptr);
 	bool PrepareCoarseTransaction(
 		TConstArrayView<FVoxelTerrainCoarseMutation> InChanges,
 		TFunction<bool()> InIsCurrent,
 		TFunction<void()> InOnSubmitted,
 		FGuid& OutTransaction,
 		const FVoxelTerrainServicePriority& InPriority,
-		double InFirstQueuedSeconds);
-	bool IsCoarseTransactionPending(const FGuid& InTransaction) const;
+		double InFirstQueuedSeconds,
+		EVoxelTerrainResourceAdmission* OutAdmission = nullptr,
+		const FVoxelGenerationConsumerKey& InConsumer = {},
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InCallbackLease = nullptr);
+	bool IsTransactionPending(const FGuid& InTransaction) const;
 	// 消费原事务的永久失败；调用方保留旧表示且不为同一请求自动构造新事务。
-	bool ConsumeCoarseTransactionFailure(const FGuid& InTransaction);
+	bool ConsumeTransactionFailure(const FGuid& InTransaction);
 	void PollRenderReceipts();
 	void AdvanceFramePublication();
 	void AdvanceRetirement(TFunction<void(const FIntVector&)> InOnRetired);
@@ -141,5 +177,15 @@ public:
 	void Reset();
 
 private:
+	bool EnsureState();
+
+	TWeakObjectPtr<UVoxelModule> BoundModule;
+	TWeakObjectPtr<UWorld> BoundWorld;
+	FVoxelTaskScheduler* BoundScheduler = nullptr;
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> BoundResources;
+	FVoxelGenerationConsumerKey BootstrapConsumer;
+	EVoxelTerrainResourceAdmission BootstrapAdmission = EVoxelTerrainResourceAdmission::None;
+	uint64 BootstrapCapacityVersion = 0;
+	bool bStopped = false;
 	TSharedPtr<FVoxelTerrainRendererState, ESPMode::ThreadSafe> State;
 };

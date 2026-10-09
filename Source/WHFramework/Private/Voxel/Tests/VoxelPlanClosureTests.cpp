@@ -86,12 +86,14 @@ bool FVoxelPlanningReadScopeTest::RunTest(const FString& InParameters)
 	FVoxelGenerationPlanDependency Actual;
 	FString Error;
 	{
-		FVoxelGenerationPlanningReadScope Scope([&](EVoxelGenerationPlanKind Kind, const FIntVector& Coordinate)
+		const auto ObserveOuter = [&](EVoxelGenerationPlanKind Kind, const FIntVector& Coordinate)
 		{
 			++OuterReads;
 			Actual.Kind = Kind;
 			Actual.TileKey.Coordinate = Coordinate;
-		});
+		};
+		const FVoxelGenerationPlanningReadScope::FObserver OuterObserver(ObserveOuter);
+		FVoxelGenerationPlanningReadScope Scope(&OuterObserver);
 		FVoxelGenerationQuery Query;
 		TestTrue(TEXT("普通 Query 构造受 Worker 观察范围约束"), FVoxelGenerationQuery::Create(Config, Cache, Query, Error));
 		FVoxelCavePlanPtr Cave;
@@ -100,7 +102,9 @@ bool FVoxelPlanningReadScopeTest::RunTest(const FString& InParameters)
 			Actual.Kind == EVoxelGenerationPlanKind::Cave && Actual.Coordinate() == FIntVector(7, -3, 2));
 		TestFalse(TEXT("Cache 中没有隐式生成的洞穴事实"), Cache->FindCave({FIntVector(7, -3, 2)}, Cave));
 		{
-			FVoxelGenerationPlanningReadScope Nested([&](EVoxelGenerationPlanKind, const FIntVector&) { ++InnerReads; });
+			const auto ObserveInner = [&](EVoxelGenerationPlanKind, const FIntVector&) { ++InnerReads; };
+			const FVoxelGenerationPlanningReadScope::FObserver InnerObserver(ObserveInner);
+			FVoxelGenerationPlanningReadScope Nested(&InnerObserver);
 			FVoxelHydrologyPlanPtr Hydro;
 			TestFalse(TEXT("嵌套观察仍禁止同步水文构建"), Query.EnsureHydrologyPlan({FIntPoint(9, 10)}, Hydro, Error));
 		}
@@ -113,9 +117,9 @@ bool FVoxelPlanningReadScopeTest::RunTest(const FString& InParameters)
 	Stamp.OwnerId = FGuid::NewGuid();
 	TAtomic<bool> Cancel(false);
 	{
-		FVoxelGenerationPlanningReadScope Outer({}, &Stamp, &Cancel);
+		FVoxelGenerationPlanningReadScope Outer(nullptr, &Stamp, &Cancel);
 		{
-			FVoxelGenerationPlanningReadScope Inner({});
+			FVoxelGenerationPlanningReadScope Inner(nullptr);
 			TestTrue(TEXT("无新Owner的嵌套采样继承完整任务Stamp"), FVoxelGenerationPlanningReadScope::GetTaskStamp() == &Stamp);
 			Cancel.Store(true);
 			TestFalse(TEXT("嵌套范围不能忽略父任务撤销后发布缓存"), FVoxelGenerationPlanningReadScope::CanPublish());
@@ -137,7 +141,7 @@ bool FVoxelDependencyPriorityCapacityTest::RunTest(const FString& InParameters)
 	(void)InParameters;
 	const auto Resources = MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(59, FGuid::NewGuid(), 1, {}, 1);
-	FVoxelTerrainDependencyPriority Graph(Resources.ToSharedRef(), Consumer);
+	FVoxelTerrainDependencyPriority Graph(Resources, Consumer);
 	FVoxelTerrainServicePriority Critical;
 	Critical.Band = EVoxelTerrainServiceBand::P0;
 	Critical.DistanceCells = 1;

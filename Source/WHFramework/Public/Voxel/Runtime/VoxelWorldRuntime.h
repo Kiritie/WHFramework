@@ -62,7 +62,13 @@ public:
 		uint64 InWorldEpoch,
 		bool bInAuthority,
 		TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry,
+		TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator,
+		TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources);
+#if WITH_DEV_AUTOMATION_TESTS
+	FVoxelWorldRuntime(uint64 InWorldEpoch, bool bInAuthority,
+		TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry,
 		TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator);
+#endif
 	~FVoxelWorldRuntime();
 
 	FVoxelWorldRuntime(const FVoxelWorldRuntime&) = delete;
@@ -93,6 +99,8 @@ public:
 		FString& OutError);
 	bool CaptureSnapshot(const FIntVector& InSection, FVoxelSectionSnapshot& OutSnapshot,
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InResourceLease = nullptr) const;
+	// 原已授额快照只补齐一个缺失面，不重分配或重捕已冻结正文及邻面。
+	bool CompleteSnapshotHalo(FVoxelSectionSnapshot& InOutSnapshot, uint8 InFace) const;
 
 	bool PrepareEdit(
 		const TArray<FVoxelCellEdit>& InCells,
@@ -137,7 +145,14 @@ public:
 	void VisitCommittedOverlaySections(const FVoxelGenerationBounds& InBounds,
 		TFunctionRef<void(const FIntVector&)> InVisit) const;
 	uint64 GetContentRevision() const;
-	void InvalidateRemoteSection(const FIntVector& InSection);
+	bool InvalidateRemoteSection(const FIntVector& InSection, FString& OutError);
+#if WITH_DEV_AUTOMATION_TESTS
+	void InvalidateRemoteSection(const FIntVector& InSection)
+	{
+		FString Error;
+		check(InvalidateRemoteSection(InSection, Error));
+	}
+#endif
 	void SetRemoteSectionValidator(TFunction<bool(const FIntVector&, uint64)> InValidator);
 
 private:
@@ -213,8 +228,7 @@ private:
 		uint64 LastCommitCut = 0;
 	};
 	TMap<FIntVector, FOverlayRegionSequence> OverlayRegionSequences;
-	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> TerrainResources =
-		MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> TerrainResources;
 	FGuid RuntimeOwnerId = FGuid::NewGuid();
 	mutable uint64 NextAllocationSerial = 0;
 	FGuid JournalOwnerId = FGuid::NewGuid();

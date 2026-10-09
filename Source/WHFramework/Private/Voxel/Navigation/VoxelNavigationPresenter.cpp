@@ -7,6 +7,7 @@
 #include "Voxel/Navigation/VoxelNavigationData.h"
 #include "Voxel/Navigation/VoxelNavigationSurfaceComponent.h"
 #include "Voxel/Geometry/VoxelShapeRegistry.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Runtime/VoxelRegistry.h"
 #include "Voxel/Rendering/VoxelTerrainFrameContext.h"
@@ -71,21 +72,36 @@ struct FVoxelNavigationWorker
 		bCapacityBlocked = false;
 		if (InCancel.Load()) return Result;
 		const uint64 BeforeAdmission = Resources->ReleaseVersionExcludingOwner(Consumer);
-		if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input,
-			VoxelBoundedAllocation::WorkerSharedBytes<FVoxelNavigationTaskPayload>(), PayloadLease) ||
-			!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Staged,
-				VoxelBoundedAllocation::WorkerSharedBytes<FVoxelNavigationSurface>() +
+		const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>* MetadataLeases[] = {&InputLease, &PayloadLease, &SurfaceLease};
+		FVoxelGenerationRequiredSourceScope MetadataSources(Resources.Get(), MetadataLeases,
+			[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+			{
+				const auto Leases = static_cast<const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>* const*>(Context);
+				for (int32 Index = 0; Index < 3; ++Index)
+					if (*Leases[Index]) FVoxelGenerationRequiredSourceScope::VisitLease(Leases[Index]->Get(), Visit);
+			});
+		const auto GrantMetadata = [&](const EVoxelTerrainResourcePool Pool, const uint64 Bytes,
+			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& Lease)
+		{
+			FVoxelGenerationRequiredCapacity Required;
+			if (!FVoxelGenerationRequiredSourceScope::Collect(*Resources, nullptr, Required, Result.Error)) return false;
+			const auto Admission = Resources->TryAcquire(Consumer, Pool, Bytes, Lease, 0,
+				Required.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+			if (Admission == EVoxelTerrainResourceAdmission::Granted) return true;
+			Result.Error = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: navigation result metadata") :
+				Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: navigation result metadata and original inputs") :
+				TEXT("InvalidRequest: navigation result metadata");
+			return false;
+		};
+		if (GrantMetadata(EVoxelTerrainResourcePool::Input, VoxelBoundedAllocation::WorkerSharedBytes<FVoxelNavigationTaskPayload>(), PayloadLease) &&
+			GrantMetadata(EVoxelTerrainResourcePool::Staged, VoxelBoundedAllocation::WorkerSharedBytes<FVoxelNavigationSurface>() +
 				VoxelBoundedAllocation::WorkerSharedBytes<FVoxelNavigationSurfaceAccess>(), SurfaceLease))
 		{
-			Result.Error = TEXT("CapacityBlocked: navigation result metadata");
-		}
-		else
-		{
 			Payload = VoxelBoundedAllocation::MakeWorkerShared<FVoxelNavigationTaskPayload>(PayloadLease);
-			Payload->MetadataLease = MoveTemp(PayloadLease);
+			Payload->MetadataLease = PayloadLease;
 			Payload->Version = Version;
 			Surface = VoxelBoundedAllocation::MakeWorkerShared<FVoxelNavigationSurface>(SurfaceLease);
-			Surface->MetadataLease = MoveTemp(SurfaceLease);
+			Surface->MetadataLease = SurfaceLease;
 			Result.bSuccess = FVoxelNavigationSurfaceBuilder::Build(Section, Version.AboveToken ? &Above : nullptr,
 				*Registry, *Shapes, Version.CellSize, Version.Clearance, *Surface, &InCancel,
 				Resources, Consumer, &Result.Error, Version.SecondAboveToken ? &SecondAbove : nullptr);
@@ -125,13 +141,21 @@ FVoxelNavigationPresenter::~FVoxelNavigationPresenter()
 
 bool FVoxelNavigationPresenter::ReserveStorage(const int32 InSectionCount, const int32 InBoundsCount)
 {
-	if (bStopped || InSectionCount < 0 || InBoundsCount < 0) return false;
+	if (bStopped || InSectionCount < 0 || InBoundsCount < 0)
+	{
+		ActivationAdmission = EVoxelTerrainResourceAdmission::InvalidRequest;
+		return false;
+	}
 	if (StorageLease && InSectionCount <= SectionCapacity && InBoundsCount <= BoundsCapacity) return true;
 	const int64 SectionRows = FMath::Max<int64>(16, InSectionCount > SectionCapacity ?
 		FMath::Max<int64>(InSectionCount, int64(SectionCapacity) * 2) : SectionCapacity);
 	const int64 BoundsRows = FMath::Max<int64>(8, InBoundsCount > BoundsCapacity ?
 		FMath::Max<int64>(InBoundsCount, int64(BoundsCapacity) * 2) : BoundsCapacity);
-	if (SectionRows > MAX_int32 || BoundsRows > MAX_int32) return false;
+	if (SectionRows > MAX_int32 || BoundsRows > MAX_int32)
+	{
+		ActivationAdmission = EVoxelTerrainResourceAdmission::CapacityUnachievable;
+		return false;
+	}
 	const int32 Sections = int32(SectionRows);
 	const int32 Bounds = int32(BoundsRows);
 	const uint64 OldBytes = Wanted.GetAllocatedSize() + InputLeases.GetAllocatedSize() + PendingPromotion.GetAllocatedSize() +
@@ -155,8 +179,18 @@ bool FVoxelNavigationPresenter::ReserveStorage(const int32 InSectionCount, const
 	const uint64 Metadata = sizeof(*this) + VoxelBoundedAllocation::WorkerSharedBytes<TAtomic<bool>>();
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(WorldEpoch, OwnerId, 1, {}, 1);
 	const auto Resources = Scheduler.GetTerrainResources();
-	if ((!StorageLease && !Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input,
-		Metadata + OldBytes + NewBytes, StorageLease)) || !StorageLease->Resize(Metadata + OldBytes + NewBytes)) return false;
+	FVoxelGenerationRequiredCapacity Required;
+	FString Error;
+	if (!FVoxelGenerationRequiredSourceScope::Collect(Resources.Get(), StorageLease.Get(), Required, Error))
+	{
+		ActivationAdmission = EVoxelTerrainResourceAdmission::CapacityUnachievable;
+		return false;
+	}
+	const uint64 RequiredInput = Required.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)];
+	ActivationAdmission = StorageLease ? StorageLease->TryResize(Metadata + OldBytes + NewBytes, RequiredInput, Required.LeaseCount) :
+		Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Input, Metadata + OldBytes + NewBytes,
+			StorageLease, 0, RequiredInput, Required.LeaseCount);
+	if (ActivationAdmission != EVoxelTerrainResourceAdmission::Granted) return false;
 	Wanted.Reserve(Sections);
 	InputLeases.Reserve(Sections);
 	PendingPromotion.Reserve(Sections);
@@ -246,23 +280,49 @@ void FVoxelNavigationPresenter::ReleaseBounds(const FIntVector& InSection)
 
 bool FVoxelNavigationPresenter::ActivateSection(const FIntVector& InSection)
 {
-	if (bStopped || WorldEpoch != Module.GetWorldEpoch()) return false;
+	ActivationAdmission = EVoxelTerrainResourceAdmission::CapacityBlocked;
+	if (bStopped || WorldEpoch != Module.GetWorldEpoch())
+	{
+		ActivationAdmission = EVoxelTerrainResourceAdmission::InvalidRequest;
+		return false;
+	}
 	if (Wanted.Contains(InSection))
 	{
 		InputLeases.FindChecked(InSection).Consumers->SetAdmissionOpen(true);
 		PendingRetirement.Remove(InSection);
+		ActivationAdmission = EVoxelTerrainResourceAdmission::Granted;
 		return true;
 	}
-	if (Wanted.Num() == MAX_int32 || RegionBounds.Num() == MAX_int32 ||
-		!ReserveStorage(Wanted.Num() + 1, RegionBounds.Num() + (RegionBounds.Contains(BoundsGroup(InSection)) ? 0 : 1))) return false;
+	if (Wanted.Num() == MAX_int32 || RegionBounds.Num() == MAX_int32)
+	{
+		ActivationAdmission = EVoxelTerrainResourceAdmission::CapacityUnachievable;
+		return false;
+	}
+	if (!ReserveStorage(Wanted.Num() + 1, RegionBounds.Num() + (RegionBounds.Contains(BoundsGroup(InSection)) ? 0 : 1))) return false;
 	FInputLeases Leases;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ConsumerLease;
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(WorldEpoch, OwnerId, 1, InSection, 1);
-	if (!Scheduler.GetTerrainResources()->Acquire(Consumer, EVoxelTerrainResourcePool::Resident,
-		VoxelBoundedAllocation::WorkerSharedBytes<FVoxelNavigationSectionConsumers>(), ConsumerLease)) return false;
+	const auto Resources = Scheduler.GetTerrainResources();
+	FVoxelGenerationRequiredSourceScope StorageSource(&Resources.Get(), StorageLease.Get());
+	FVoxelGenerationRequiredCapacity Required;
+	FString Error;
+	if (!FVoxelGenerationRequiredSourceScope::Collect(Resources.Get(), nullptr, Required, Error))
+	{
+		ActivationAdmission = EVoxelTerrainResourceAdmission::CapacityUnachievable;
+		return false;
+	}
+	ActivationAdmission = Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Resident,
+		VoxelBoundedAllocation::WorkerSharedBytes<FVoxelNavigationSectionConsumers>(), ConsumerLease, 0,
+		Required.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+	if (ActivationAdmission != EVoxelTerrainResourceAdmission::Granted) return false;
 	Leases.Consumers = VoxelBoundedAllocation::MakeWorkerShared<FVoxelNavigationSectionConsumers>(MoveTemp(ConsumerLease));
 	if (InSection.Z > MAX_int32 - 2 || !FMath::IsFinite(Module.NavigationClearanceCentimeters) ||
-		Module.NavigationClearanceCentimeters <= 0.0 || Module.NavigationClearanceCentimeters > 32.0 * Module.BlockSize()) return false;
+		Module.NavigationClearanceCentimeters <= 0.0 || Module.NavigationClearanceCentimeters > 32.0 * Module.BlockSize())
+	{
+		ActivationAdmission = EVoxelTerrainResourceAdmission::InvalidRequest;
+		return false;
+	}
+	ActivationAdmission = EVoxelTerrainResourceAdmission::CapacityBlocked;
 	if (!Module.AcquireNavigationDataSection(InSection, Leases.Section)) return false;
 	if (!Module.AcquireNavigationDataSection(InSection + FIntVector(0, 0, 1), Leases.Above))
 	{
@@ -294,6 +354,7 @@ bool FVoxelNavigationPresenter::ActivateSection(const FIntVector& InSection)
 	InputLeases.Add(InSection, Leases);
 	Wanted.Add(InSection);
 	InvalidateSection(InSection);
+	ActivationAdmission = EVoxelTerrainResourceAdmission::Granted;
 	return true;
 }
 

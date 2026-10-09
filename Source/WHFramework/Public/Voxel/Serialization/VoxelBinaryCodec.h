@@ -4,6 +4,7 @@
 
 class FVoxelTerrainResources;
 class FVoxelTerrainResourceLease;
+enum class EVoxelTerrainResourceAdmission : uint8;
 struct FVoxelGenerationConsumerKey;
 
 // 字节容器先释放，实际输出租约随后归还；禁止隐式复制正文。
@@ -67,9 +68,10 @@ namespace VoxelBinary
 	WHFRAMEWORK_API bool CompressGranted(TConstArrayView<uint8> InRaw, FVoxelBinaryBuffer& OutBuffer,
 		const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& InResources,
 		const FVoxelGenerationConsumerKey& InConsumer, int32 InRawLimit, int32 InStoredLimit,
-		bool& OutCapacityBlocked);
+		bool& OutCapacityBlocked, EVoxelTerrainResourceAdmission* OutAdmission = nullptr);
 	// OutRaw 的正文 backing 由调用方提前授予并保留；此入口另授予每次原生 inflate 分配。
 	WHFRAMEWORK_API bool DecompressGranted(TConstArrayView<uint8> InStored, TArray<uint8>& OutRaw,
 		const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& InResources,
-		const FVoxelGenerationConsumerKey& InConsumer, int32 InRawLimit, bool& OutCapacityBlocked);
+		const FVoxelGenerationConsumerKey& InConsumer, int32 InRawLimit, bool& OutCapacityBlocked,
+		EVoxelTerrainResourceAdmission* OutAdmission = nullptr);
 }

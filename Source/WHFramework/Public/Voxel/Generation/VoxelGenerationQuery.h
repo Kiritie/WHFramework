@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Generation/VoxelGenerationBinding.h"
 #include "Voxel/Generation/VoxelGenerationPlanCache.h"
 
@@ -183,6 +184,8 @@ public:
 		GetPreparedStructurePlans() const;
 	uint64 GetRequiredInputBytes() const;
 	int32 GetRequiredInputLeaseCount() const;
+	// 原读者强持的 lease/native immutable 来源，不转移所有权、不分配枚举 backing。
+	void VisitRequiredSources(FVoxelGenerationRequiredSourceScope::FVisit InVisit, bool bInIncludeCallerOutput = true) const;
 
 private:
 	struct FPreparedState
@@ -279,6 +282,7 @@ private:
 	// 同步调用者强持输出，Query 只冻结已授额下限，不接管其寿命。
 	uint64 RequiredOutputInputBytes = 0;
 	int32 RequiredOutputLeaseCount = 0;
+	FVoxelGenerationRequiredSource RequiredOutputSource;
 	TSharedPtr<const FVoxelClimateGenerator, ESPMode::ThreadSafe> Climate;
 	TSharedPtr<const FVoxelTerrainGenerator, ESPMode::ThreadSafe> Terrain;
 	TSharedPtr<const FVoxelBiomeGenerator, ESPMode::ThreadSafe> Biome;
@@ -288,6 +292,7 @@ private:
 	TSharedPtr<const FVoxelSurfaceGenerator, ESPMode::ThreadSafe> Surface;
 	TSharedPtr<const FVoxelEcologyGenerator, ESPMode::ThreadSafe> Ecology;
 	FPreparedState Prepared;
+	const FPreparedState* Preparing = nullptr;
 	bool bUseColumnCache = true;
 	bool bRequireReadyHydrology = false;
 	bool bRequireReadyPlans = false;

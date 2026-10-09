@@ -19,6 +19,13 @@
 namespace
 {
 	constexpr TCHAR TaskBudgetError[] = TEXT("Oversized: voxel task result exceeds its declared unleased budget");
+	struct FSchedulerAllocation
+	{
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+	};
+
+	constexpr SIZE_T SchedulerAllocationOffset = Align(sizeof(FSchedulerAllocation), alignof(FVoxelTaskScheduler));
+	constexpr uint32 SchedulerAllocationAlignment = FMath::Max(alignof(FSchedulerAllocation), alignof(FVoxelTaskScheduler));
 	struct FReceiptDeleter
 	{
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
@@ -238,6 +245,16 @@ void FVoxelTaskScheduler::FTaskBody::operator()() const
 {
 	FVoxelTaskRequest& Request = Slot->Request;
 	FVoxelGenerationConsumerScope ConsumerScope(Request.GenerationConsumer);
+	const auto* Resources = Request.BindingResources.Get();
+	FVoxelGenerationRequiredSourceScope NativeSources(Resources, Slot.Get(),
+		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+		{
+			const auto& Source = *static_cast<const FSlot*>(Context);
+			const auto* Ledger = Source.Request.BindingResources.Get();
+			for (const auto* Lease : {Source.SlotLease.Get(), Source.BudgetErrorLease.Get(),
+				Source.Request.ExecuteBindingLease.Get(), Source.Request.ApplyBindingLease.Get(), Source.Request.BlockBindingLease.Get()})
+				if (Ledger && Lease && Lease->IsOwnedBy(*Ledger)) FVoxelGenerationRequiredSourceScope::VisitLease(Lease, Visit);
+		});
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_TaskExecute);
 	const double Start = FPlatformTime::Seconds();
 	if (!Slot->Cancel.Load())
@@ -355,20 +372,86 @@ uint64 FVoxelTaskResult::GetResourceAccountedBytes() const
 	return Bytes;
 }
 
+#if WITH_DEV_AUTOMATION_TESTS
 FVoxelTaskScheduler::FVoxelTaskScheduler()
+	: TerrainResources(MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>())
+	, RuntimeResources(MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>())
 {
 }
 
-#if WITH_DEV_AUTOMATION_TESTS
 FVoxelTaskScheduler::FVoxelTaskScheduler(const bool bInAllowPassive)
-	: bAllowPassive(bInAllowPassive)
+	: FVoxelTaskScheduler()
 {
+	bAllowPassive = bInAllowPassive;
+}
+
+void* FVoxelTaskScheduler::operator new(const size_t InSize)
+{
+	check(InSize == sizeof(FVoxelTaskScheduler));
+	void* Allocation = FMemory::Malloc(SchedulerAllocationOffset + InSize, SchedulerAllocationAlignment);
+	::new(Allocation) FSchedulerAllocation;
+	return static_cast<uint8*>(Allocation) + SchedulerAllocationOffset;
 }
 #endif
+
+FVoxelTaskScheduler::FVoxelTaskScheduler(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InTerrainResources,
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InRuntimeResources,
+	const FVoxelGenerationConsumerKey& InControlConsumer, const uint64 InRootInputBytes)
+	: ControlConsumer(InControlConsumer)
+	, RootInputBytes(InRootInputBytes)
+	, TerrainResources(InTerrainResources)
+	, RuntimeResources(InRuntimeResources)
+	, StatisticsOwnerId(InControlConsumer.OwnerId)
+{
+}
+
+bool FVoxelTaskScheduler::Create(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InTerrainResources,
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InRuntimeResources,
+	const FVoxelGenerationConsumerKey& InControlConsumer, TUniquePtr<FVoxelTaskScheduler>& OutScheduler, FString& OutError)
+{
+	if (!InControlConsumer.IsValid() || InControlConsumer != FVoxelGenerationConsumerKey::Section(
+		InControlConsumer.WorldEpoch, InControlConsumer.OwnerId, 1, {}, 1) ||
+		InTerrainResources->Snapshot().RootInputBytes == 0 || InRuntimeResources->Snapshot().RootInputBytes == 0 ||
+		InTerrainResources->GetControlConsumer() != InControlConsumer || InRuntimeResources->GetControlConsumer() != InControlConsumer)
+	{
+		OutError = TEXT("InvalidConsumer: scheduler bootstrap requires original bound ledgers and control identity");
+		return false;
+	}
+	const uint64 RootBytes = FMemory::QuantizeSize(SchedulerAllocationOffset + sizeof(FVoxelTaskScheduler), SchedulerAllocationAlignment);
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RootLease;
+	const bool bOriginalPrevious = OutScheduler && &OutScheduler->TerrainResources.Get() == &InTerrainResources.Get();
+	const uint64 PreviousRootBytes = bOriginalPrevious ? OutScheduler->RootInputBytes : 0;
+	const auto Admission = InTerrainResources->TryAcquire(InControlConsumer, EVoxelTerrainResourcePool::Input,
+		RootBytes, RootLease, 0, PreviousRootBytes, int32(PreviousRootBytes != 0));
+	if (Admission != EVoxelTerrainResourceAdmission::Granted)
+	{
+		OutError = Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+			TEXT("Oversized: scheduler root exceeds its original Input limit") : TEXT("CapacityBlocked: scheduler root input");
+		return false;
+	}
+	void* Allocation = FMemory::Malloc(SchedulerAllocationOffset + sizeof(FVoxelTaskScheduler), SchedulerAllocationAlignment);
+	::new(Allocation) FSchedulerAllocation{MoveTemp(RootLease)};
+	FVoxelTaskScheduler* Candidate = ::new(static_cast<uint8*>(Allocation) + SchedulerAllocationOffset)
+		FVoxelTaskScheduler(InTerrainResources, InRuntimeResources, InControlConsumer, RootBytes);
+	OutScheduler.Reset(Candidate);
+	OutError.Reset();
+	return true;
+}
 
 FVoxelTaskScheduler::~FVoxelTaskScheduler()
 {
 	StopAndJoin();
+}
+
+void FVoxelTaskScheduler::operator delete(void* InAddress)
+{
+	if (!InAddress) return;
+	void* Allocation = static_cast<uint8*>(InAddress) - SchedulerAllocationOffset;
+	FSchedulerAllocation* Header = static_cast<FSchedulerAllocation*>(Allocation);
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease = MoveTemp(Header->Lease);
+	Header->~FSchedulerAllocation();
+	FMemory::Free(Allocation);
+	Lease.Reset();
 }
 
 bool FVoxelTaskScheduler::PrepareBacking(const uint64 InNewBytes)
@@ -378,7 +461,7 @@ bool FVoxelTaskScheduler::PrepareBacking(const uint64 InNewBytes)
 		BackingAdmission = EVoxelTerrainResourceAdmission::CapacityUnachievable;
 		return false;
 	}
-	if (!ControlConsumer.IsValid())
+	if (!ControlConsumer.IsValid() || !Statistics)
 	{
 #if WITH_DEV_AUTOMATION_TESTS
 		if (!bAllowPassive)
@@ -395,14 +478,15 @@ bool FVoxelTaskScheduler::PrepareBacking(const uint64 InNewBytes)
 #endif
 	}
 	const uint64 Peak = BackingBytes + InNewBytes;
-	if (RequiredAdmissionInputBytes > MAX_uint64 - (IdleBindingLease ? IdleBindingLease->Bytes() : 0) ||
-		RequiredAdmissionLeaseCount > MAX_int32 - int32(IdleBindingLease.IsValid()))
+	if (RequiredAdmissionInputBytes > MAX_uint64 - RootInputBytes ||
+		RequiredAdmissionInputBytes + RootInputBytes > MAX_uint64 - (IdleBindingLease ? IdleBindingLease->Bytes() : 0) ||
+		RequiredAdmissionLeaseCount > MAX_int32 - int32(RootInputBytes != 0) - int32(IdleBindingLease.IsValid()))
 	{
 		BackingAdmission = EVoxelTerrainResourceAdmission::CapacityUnachievable;
 		return false;
 	}
-	const uint64 Required = RequiredAdmissionInputBytes + (IdleBindingLease ? IdleBindingLease->Bytes() : 0);
-	const int32 RequiredLeases = RequiredAdmissionLeaseCount + int32(IdleBindingLease.IsValid());
+	const uint64 Required = RootInputBytes + RequiredAdmissionInputBytes + (IdleBindingLease ? IdleBindingLease->Bytes() : 0);
+	const int32 RequiredLeases = int32(RootInputBytes != 0) + RequiredAdmissionLeaseCount + int32(IdleBindingLease.IsValid());
 	BackingAdmission = BackingLease ? BackingLease->TryResize(Peak, Required, RequiredLeases) :
 		TerrainResources->TryAcquire(ControlConsumer, EVoxelTerrainResourcePool::Input, Peak,
 			BackingLease, 0, Required, RequiredLeases);
@@ -754,6 +838,7 @@ bool FVoxelTaskScheduler::InitializeStatistics(const uint64 InWorldEpoch)
 	check(IsInGameThread());
 	if (Statistics || !InWorldEpoch || BackingBytes) return false;
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(InWorldEpoch, StatisticsOwnerId, 1, FIntVector::ZeroValue, 1);
+	if (ControlConsumer.IsValid() && ControlConsumer != Consumer) return false;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Metadata;
 	if (!RuntimeResources->Acquire(Consumer, EVoxelTerrainResourcePool::Input,
 		VoxelBoundedAllocation::WorkerSharedBytes<FVoxelTerrainStatistics>(), Metadata)) return false;
@@ -1793,10 +1878,11 @@ void FVoxelTaskScheduler::Pump()
 		const uint64 CallbackInputs = Selected.GetBindingBytes() + Selected.GetRequiredBindingInputBytes();
 		const int32 CallbackLeases = Selected.GetBindingLeaseCount() + Selected.GetRequiredBindingInputLeaseCount();
 		const uint64 SlotBytes = VoxelBoundedAllocation::SharedBytes<FSlot>();
-		const int32 BackingHandles = int32(BackingLease.IsValid());
-		const bool bFloorOverflow = CallbackInputs > MAX_uint64 - BackingBytes ||
-			CallbackInputs + BackingBytes > MAX_uint64 - SlotBytes || CallbackLeases > MAX_int32 - BackingHandles - 1;
-		const uint64 RequiredInputs = bFloorOverflow ? 0 : BackingBytes + CallbackInputs;
+		const uint64 ControlInputs = RootInputBytes + BackingBytes + (IdleBindingLease ? IdleBindingLease->Bytes() : 0);
+		const int32 BackingHandles = int32(RootInputBytes != 0) + int32(BackingLease.IsValid()) + int32(IdleBindingLease.IsValid());
+		const bool bFloorOverflow = CallbackInputs > MAX_uint64 - ControlInputs ||
+			CallbackInputs + ControlInputs > MAX_uint64 - SlotBytes || CallbackLeases > MAX_int32 - BackingHandles - 1;
+		const uint64 RequiredInputs = bFloorOverflow ? 0 : ControlInputs + CallbackInputs;
 		const int32 RequiredLeases = bFloorOverflow ? 0 : BackingHandles + CallbackLeases;
 		using FEngineTask = UE::Tasks::Private::TExecutableTask<FTaskBody>;
 		static_assert(sizeof(FEngineTask) > UE::Tasks::Private::SmallTaskSize, "Scheduler task requires direct native allocation accounting");
@@ -1864,6 +1950,7 @@ void FVoxelTaskScheduler::Pump()
 		RunningTask.SlotLease = MoveTemp(SlotLease);
 		RunningTask.NativeLease = MoveTemp(NativeLease);
 		RunningTask.Slot = MakeShared<FSlot, ESPMode::ThreadSafe>();
+		RunningTask.Slot->SlotLease = RunningTask.SlotLease;
 		RunningTask.Slot->BudgetErrorLease = RunningTask.NativeLease;
 		RunningTask.Slot->BudgetError.GetCharArray().Reserve(UE_ARRAY_COUNT(TaskBudgetError));
 		RunningTask.Slot->BudgetError.GetCharArray().Append(TaskBudgetError, UE_ARRAY_COUNT(TaskBudgetError));

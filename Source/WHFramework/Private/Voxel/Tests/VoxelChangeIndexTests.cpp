@@ -70,7 +70,8 @@ bool FVoxelChangeIndexCancellationTest::RunTest(const FString& InParameters)
 			{ FIntVector(MIN_int32), FIntVector(MAX_int32) },
 			Sections,
 			&Cancel));
-	TestTrue(TEXT("Canceled enumeration does not publish partial results"), Sections.IsEmpty());
+	TestTrue(TEXT("Canceled enumeration preserves the previous complete output"),
+		Sections.Num() == 1 && Sections[0] == FIntVector::ZeroValue);
 	return true;
 }
 

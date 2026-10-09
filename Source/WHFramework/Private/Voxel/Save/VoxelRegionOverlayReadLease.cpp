@@ -27,6 +27,25 @@ namespace
 			return Epoch;
 		}
 
+		virtual void VisitResourceSources(const FVoxelTerrainResources& InResources,
+			FVoxelGenerationRequiredSourceScope::FVisit InVisit) const override
+		{
+			const auto VisitLease = [&](const FVoxelTerrainResourceLease* Lease)
+			{
+				if (Lease && Lease->IsOwnedBy(InResources))
+					FVoxelGenerationRequiredSourceScope::VisitLease(Lease, InVisit);
+			};
+			VisitLease(Resident.ResourceLease.Get());
+			Resident.Visit([&](const FIntVector&, const FVoxelOverlaySnapshot& Entry)
+			{
+				VisitLease(Entry.ResourceLease.Get());
+				VisitLease(Entry.IndexLease.Get());
+			});
+			for (const auto& Pair : Reads)
+				if (Pair.Value.GenerationLease)
+					VisitLease(Pair.Value.GenerationLease->GetResourceLease().Get());
+		}
+
 		virtual bool ValidateCapture(const FVoxelFineOverlayCapture& InCapture, FString& OutError) const override
 		{
 			if (InCapture.ReadLeaseSet.Get() != this || InCapture.WorldEpoch != Epoch ||
@@ -39,19 +58,26 @@ namespace
 				OutError = TEXT("Overlay捕获描述不属于固定读取租约");
 				return false;
 			}
-			TSet<FIntVector> Seen;
-			Seen.Reserve(InCapture.Reads.Num());
-			for (const FVoxelRegionReadView& Read : InCapture.Reads)
+			for (int32 Index = 0; Index < InCapture.Reads.Num(); ++Index)
 			{
+				const FVoxelRegionReadView& Read = InCapture.Reads[Index];
 				const FVoxelRegionReadView* Expected = Reads.Find(Read.Section);
-				if (!Expected || Seen.Contains(Read.Section) || !SameRead(Read, *Expected) ||
+				if (!Expected || !SameRead(Read, *Expected) ||
 					Read.ExpectedRecordBytes == 0 || !Read.GenerationLease ||
 					!Read.GenerationLease->Matches(Read.SourceDirectory) || Resident.Find(Read.Section))
 				{
 					OutError = TEXT("Overlay读取描述重复、缺失或与驻留记录重叠");
 					return false;
 				}
-				Seen.Add(Read.Section);
+				// 直接核对原捕获的前缀，校验不得另行分配未授予的去重集合。
+				for (int32 Previous = 0; Previous < Index; ++Previous)
+				{
+					if (InCapture.Reads[Previous].Section == Read.Section)
+					{
+						OutError = TEXT("Overlay读取描述重复、缺失或与驻留记录重叠");
+						return false;
+					}
+				}
 			}
 			for (const auto& Pair : InCapture.Resident.Sections)
 			{
@@ -129,6 +155,13 @@ TSharedRef<const IVoxelFineOverlayReadLeaseSet, ESPMode::ThreadSafe> FVoxelRegio
 	const FVoxelFineOverlayCapture& InCapture)
 {
 	return MakeShared<FVoxelRegionOverlayReadLease, ESPMode::ThreadSafe>(InCapture);
+}
+
+void FVoxelRegionStore::VisitOverlayReadLeaseSources(
+	const TSharedPtr<const IVoxelFineOverlayReadLeaseSet, ESPMode::ThreadSafe>& InReadLeaseSet,
+	const FVoxelTerrainResources& InResources, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+{
+	if (InReadLeaseSet) InReadLeaseSet->VisitResourceSources(InResources, InVisit);
 }
 
 uint64 FVoxelRegionStore::OverlayReadLeaseBytes(const int32 InPinnedSections, const int32 InReads,

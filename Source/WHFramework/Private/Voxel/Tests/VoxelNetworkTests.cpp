@@ -251,7 +251,7 @@ bool FVoxelNetworkNaturalFarRepresentationTest::RunTest(const FString& InParamet
 	FVoxelBinaryBuffer Bytes;
 	FString Error;
 	const FVoxelTerrainGeometry ExpectedGeometry = Input.Request.Geometry;
-	FVoxelRepresentationPageBuild Build(Resources.ToSharedRef(), Consumer);
+	FVoxelRepresentationPageBuild Build(Resources, Consumer);
 	if (!TestTrue(TEXT("Natural far representation initializes"), Build.Initialize(MoveTemp(Input), Error))) return false;
 	bool bComplete = false;
 	for (int32 StepIndex = 0; StepIndex < 4096 && !bComplete; ++StepIndex)
@@ -305,9 +305,11 @@ bool FVoxelNetworkGrantedCompressionLimitTest::RunTest(const FString& InParamete
 	FVoxelTerrainResourceLimits Limits;
 	Limits.WorkingBytes = 64 * 1024;
 	if (!TestTrue(TEXT("Constrain native scratch without invalidating live output"), Resources->Configure(Limits))) return false;
-	TestFalse(TEXT("Native allocation denial suspends compression"), VoxelBinary::CompressGranted(
-		Raw, Encoded, Resources, Consumer, Raw.Num(), 4096, bCapacityBlocked));
-	TestTrue(TEXT("Native allocation denial reports capacity"), bCapacityBlocked);
+	EVoxelTerrainResourceAdmission Admission;
+	TestFalse(TEXT("Native required allocation exceeds the configured limit"), VoxelBinary::CompressGranted(
+		Raw, Encoded, Resources, Consumer, Raw.Num(), 4096, bCapacityBlocked, &Admission));
+	TestTrue(TEXT("Unreachable native layout is terminal for the current limits"), Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable);
+	TestFalse(TEXT("Unreachable layout does not wait on external release"), bCapacityBlocked);
 	TestEqual(TEXT("Denied attempt preserves old bytes"), Encoded.Bytes, Original);
 	TestEqual(TEXT("Denied attempt preserves old ownership"), Encoded.ResourceLease->Serial(), OriginalLease);
 	Limits.WorkingBytes = 256ull * 1024 * 1024;
@@ -353,7 +355,7 @@ bool FVoxelNetworkFrozenPageCodecRetryTest::RunTest(const FString& InParameters)
 	Input.OverlayCapture.Registry = Input.Registry;
 	Input.OverlayCapture.ReadLeaseSet = FVoxelRegionStore::CreateOverlayReadLeaseSet(Input.OverlayCapture);
 	const FVoxelTerrainGeometry ExpectedGeometry = Input.Request.Geometry;
-	FVoxelRepresentationPageBuild Build(Resources.ToSharedRef(), Consumer);
+	FVoxelRepresentationPageBuild Build(Resources, Consumer);
 	FString Error;
 	if (!TestTrue(TEXT("Frozen page initializes"), Build.Initialize(MoveTemp(Input), Error))) return false;
 	FVoxelBinaryBuffer Encoded;
@@ -363,7 +365,7 @@ bool FVoxelNetworkFrozenPageCodecRetryTest::RunTest(const FString& InParameters)
 	{
 		if (!Build.Advance(Encoded, bComplete, Error))
 		{
-			bBlocked = Error.StartsWith(TEXT("CapacityBlocked"));
+			bBlocked = Error.StartsWith(TEXT("CapacityBlocked")) || Error.StartsWith(TEXT("CapacityUnachievable"));
 			break;
 		}
 	}
@@ -416,7 +418,7 @@ bool FVoxelNetworkRemoteAdmissionCapacityTest::RunTest(const FString& InParamete
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> OtherLease, OwnLease;
 	if (!Resources->Acquire(OtherAttempt, EVoxelTerrainResourcePool::Working, 6 * 1024 * 1024, OtherLease) ||
 		!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Working, 32768, OwnLease)) return false;
-	FVoxelCoarseBuildStorage Storage(Resources.ToSharedRef(), Consumer, nullptr);
+	FVoxelCoarseBuildStorage Storage(Resources, Consumer, nullptr);
 	Storage.WorkingCapacityBytes = 4 * 1024 * 1024;
 	FVoxelTaskResult Result;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Working;

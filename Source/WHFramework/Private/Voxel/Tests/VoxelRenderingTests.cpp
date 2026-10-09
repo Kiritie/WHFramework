@@ -23,6 +23,24 @@ namespace
 	class FVoxelTestOverlaySource final : public IVoxelOverlaySource
 	{
 	public:
+		virtual bool VisitModifiedOverlays(const FVoxelGenerationBounds& InBounds,
+			TFunctionRef<bool(const FIntVector&, const FVoxelOverlaySnapshot&)> InVisit,
+			FString& OutError, const TAtomic<bool>* InCancel = nullptr) const override
+		{
+			OutError.Reset();
+			for (const auto& Pair : Overlays)
+			{
+				if (InCancel && InCancel->Load())
+				{
+					OutError = TEXT("Canceled");
+					return false;
+				}
+				const FVoxelGenerationBounds Bounds{Pair.Key * VoxelBlock::Size, (Pair.Key + FIntVector(1)) * VoxelBlock::Size};
+				if (Bounds.Intersects(InBounds) && !InVisit(Pair.Key, Pair.Value)) return false;
+			}
+			return true;
+		}
+
 		virtual bool EnumerateModifiedSections(
 			const FVoxelGenerationBounds& InBounds,
 			TArray<FIntVector>& OutSections,

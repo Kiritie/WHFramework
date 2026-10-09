@@ -174,6 +174,7 @@ private:
 		TArray<FBox> ChangedBounds;
 		TArray<FBox> LocalWorldBoxes;
 		bool bSourceDirty = true;
+		bool bTransition = false;
 		bool bRetainSource = false;
 		bool bUnchanged = false;
 		int32 GroupIndex = INDEX_NONE;
@@ -196,6 +197,11 @@ private:
 		int32 NativeBatchCursor = 0;
 		int32 NativeTriangleCursor = 0;
 		bool bNativeSubmitted = false;
+		FVoxelGenerationConsumerKey NativeControlConsumer;
+		uint64 NativeControlVersion = 0;
+		uint64 NativeFrontendVersion = 0;
+		bool bNativeControlWaiting = false;
+		bool bNativeBootstrapWaiting = false;
 		FBox Bounds = FBox(ForceInit);
 		TArray<FBox> ChangedBounds;
 		// Proxy 接缝可能服务于 Fine 交接，实际更新阶段不能仅由 owner 类别推断。
@@ -393,7 +399,7 @@ private:
 	UVoxelModule& Module;
 	FVoxelTaskScheduler& Scheduler;
 	uint64 WorldEpoch = 0;
-	TUniquePtr<FVoxelTerrainRenderer> TerrainRenderer;
+	mutable TOptional<FVoxelTerrainRenderer> TerrainRenderer;
 	uint64 BatchSerial = 0;
 	FGuid NativeOwnerId = FGuid::NewGuid();
 	uint64 NativeSourceSerial = 0;

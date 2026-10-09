@@ -27,6 +27,7 @@ public:
 		const FVoxelGenerationConsumerKey& InConsumer, EVoxelTerrainResourcePool InOutputPool,
 		TSharedPtr<FVoxelPersistentSection, ESPMode::ThreadSafe>& OutSection, FString& OutError);
 	uint64 GetRetainedWorkingBytes() const;
+	const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& GetResourceLease() const { return WorkingLease; }
 
 private:
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> WorkingLease;

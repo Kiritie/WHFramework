@@ -48,7 +48,7 @@ FVoxelViewPublisher::FVoxelViewPublisher(UVoxelModule& InModule, FVoxelTaskSched
 	const auto SelectionConsumer = FVoxelGenerationConsumerKey::Section(WorldEpoch, NativeOwnerId, 1, {}, 1);
 	PrepareSelection.BindResources(Scheduler.GetTerrainResources(), SelectionConsumer);
 	CommitSelection.BindResources(Scheduler.GetTerrainResources(), SelectionConsumer);
-	TerrainRenderer = MakeUnique<FVoxelTerrainRenderer>(Module, Scheduler, WorldEpoch);
+	TerrainRenderer.Emplace(Module, Scheduler, WorldEpoch);
 }
 
 FVoxelViewPublisher::~FVoxelViewPublisher()
@@ -323,6 +323,7 @@ FVoxelGameThreadContinuation FVoxelViewPublisher::SetCoverageSteps(
 	Update.Bounds = Entry->Bounds;
 	Update.PreviousExclusions = MoveTemp(PreviousExclusions);
 	Update.bSourceDirty = Entry->bDirty;
+	Update.bTransition = Entry->bTransition;
 	OutSuccess = true;
 }
 
@@ -2254,12 +2255,19 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 		if (Ready.Publication->bCanceled || !Ready.Publication->Groups.IsValidIndex(Ready.GroupIndex)) return Index;
 		const FGroup& Group = Ready.Publication->Groups[Ready.GroupIndex];
 		if (Group.bCommitted) return Index;
-		if (bInCommit && Group.NativeTransaction.IsValid() && TerrainRenderer->ConsumeCoarseTransactionFailure(Group.NativeTransaction))
+		if (bInCommit && Group.NativeTransaction.IsValid() && TerrainRenderer->ConsumeTransactionFailure(Group.NativeTransaction))
 		{
 			DiscardPublication(Ready.Publication, false);
 			return Index;
 		}
 		if (!Group.bPriorityReady) continue;
+		if (bInCommit && Group.bNativeControlWaiting && TerrainRenderer->GetCoarseAdmissionVersion() == Group.NativeFrontendVersion &&
+			!(Group.bNativeBootstrapWaiting && TerrainRenderer->GetNativeStateAdmission() == EVoxelTerrainResourceAdmission::Granted))
+		{
+			uint64 Current = 0;
+			if (!Scheduler.GetTerrainResources()->TryGetReleaseVersionExcludingOwner(Group.NativeControlConsumer, Current) ||
+				Current <= Group.NativeControlVersion) continue;
+		}
 		if (!bInCommit && Group.UpdateIndices.IsValidIndex(Group.PreparedUpdates))
 		{
 			const int32 UpdateIndex = Group.UpdateIndices[Group.PreparedUpdates];

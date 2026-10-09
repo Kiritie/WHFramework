@@ -1,6 +1,22 @@
 #include "Voxel/Generation/VoxelGenerationAllocation.h"
 
-thread_local FVoxelGenerationAllocationScope* FVoxelGenerationAllocationScope::ActiveScope = nullptr;
+FVoxelGenerationAllocationScope*& FVoxelGenerationAllocationScope::ActiveScopeSlot()
+{
+	static thread_local FVoxelGenerationAllocationScope* Scope = nullptr;
+	return Scope;
+}
+
+FVoxelGenerationWorkspace*& FVoxelGenerationWorkspace::ActiveWorkspaceSlot()
+{
+	static thread_local FVoxelGenerationWorkspace* Workspace = nullptr;
+	return Workspace;
+}
+
+FVoxelGenerationRequiredSourceScope*& FVoxelGenerationRequiredSourceScope::ActiveScopeSlot()
+{
+	static thread_local FVoxelGenerationRequiredSourceScope* Scope = nullptr;
+	return Scope;
+}
 
 namespace
 {
@@ -10,22 +26,151 @@ namespace
 	}
 }
 
+FVoxelGenerationRequiredSourceScope::FVoxelGenerationRequiredSourceScope(
+	const FVoxelTerrainResources* InResources,
+	const void* InContext,
+	FEnumerate InEnumerate)
+	: Previous(ActiveScopeSlot())
+	, Resources(InContext && InEnumerate ? InResources : nullptr)
+	, Context(InContext)
+	, Enumerator(InEnumerate)
+{
+	ActiveScopeSlot() = this;
+}
+
+FVoxelGenerationRequiredSourceScope::FVoxelGenerationRequiredSourceScope(
+	const FVoxelTerrainResources* InResources,
+	const FVoxelTerrainResourceLease* InLease)
+	: FVoxelGenerationRequiredSourceScope(
+		InResources && InLease && InLease->IsOwnedBy(*InResources) ? InResources : nullptr,
+		InResources && InLease && InLease->IsOwnedBy(*InResources) ? InLease : nullptr,
+		[](const void* InContext, FVisit InVisit)
+		{
+			VisitLease(static_cast<const FVoxelTerrainResourceLease*>(InContext), InVisit);
+		})
+{
+}
+
+FVoxelGenerationRequiredSourceScope::~FVoxelGenerationRequiredSourceScope()
+{
+	check(ActiveScopeSlot() == this);
+	ActiveScopeSlot() = Previous;
+}
+
+void FVoxelGenerationRequiredSourceScope::VisitLease(const FVoxelTerrainResourceLease* InLease, FVisit InVisit)
+{
+	if (InLease)
+	{
+		InVisit({nullptr, InLease->Serial(), InLease->GetPool(), InLease->Bytes()});
+	}
+}
+
+void FVoxelGenerationRequiredSourceScope::Enumerate(const FVoxelTerrainResources& InResources, FVisit InVisit)
+{
+	for (auto* Scope = ActiveScopeSlot(); Scope; Scope = Scope->Previous)
+	{
+		if (Scope->Resources == &InResources && Scope->Enumerator)
+		{
+			Scope->Enumerator(Scope->Context, InVisit);
+		}
+	}
+	for (auto* Scope = FVoxelGenerationAllocationScope::ActiveScopeSlot(); Scope; Scope = Scope->Previous)
+	{
+		if (Scope->Resources.Get() == &InResources)
+		{
+			VisitLease(Scope->WorkingLease.Get(), InVisit);
+			VisitLease(Scope->ResidentReservation.Get(), InVisit);
+		}
+	}
+	for (auto* Workspace = FVoxelGenerationWorkspace::ActiveWorkspaceSlot(); Workspace; Workspace = Workspace->PreviousWorkspace)
+	{
+		if (Workspace->Resources.Get() == &InResources)
+		{
+			VisitLease(Workspace->Lease.Get(), InVisit);
+		}
+	}
+}
+
+bool FVoxelGenerationRequiredSourceScope::Collect(
+	const FVoxelTerrainResources& InResources,
+	const FVoxelTerrainResourceLease* InExcludedLease,
+	FVoxelGenerationRequiredCapacity& OutCapacity,
+	FString& OutError)
+{
+	return MeasureSources([&InResources](FVisit InVisit) { Enumerate(InResources, InVisit); },
+		InExcludedLease ? InExcludedLease->Serial() : 0, OutCapacity, OutError);
+}
+
+bool FVoxelGenerationRequiredSourceScope::Measure(const void* InContext, FEnumerate InEnumerate,
+	FVoxelGenerationRequiredCapacity& OutCapacity, FString& OutError)
+{
+	return MeasureSources([InContext, InEnumerate](FVisit InVisit) { InEnumerate(InContext, InVisit); },
+		0, OutCapacity, OutError);
+}
+
+bool FVoxelGenerationRequiredSourceScope::MeasureSources(TFunctionRef<void(FVisit)> InEnumerate,
+	const uint64 InExcludedSerial, FVoxelGenerationRequiredCapacity& OutCapacity, FString& OutError)
+{
+	FVoxelGenerationRequiredCapacity Capacity;
+	uint64 Index = 0;
+	bool bValid = true;
+	InEnumerate([&](const FVoxelGenerationRequiredSource& InSource)
+	{
+		const uint64 SourceIndex = Index++;
+		if (!bValid || (InSource.Serial && InSource.Serial == InExcludedSerial)) return;
+		if ((!InSource.Serial && !InSource.Object) || InSource.Pool >= EVoxelTerrainResourcePool::Count || InSource.LeaseCount < 0)
+		{
+			bValid = false;
+			return;
+		}
+		bool bDuplicate = false;
+		uint64 PrefixIndex = 0;
+		// 枚举前缀而不建立 heap set；同一事实由多个 reader/scope 强持仍只计一次。
+		InEnumerate([&](const FVoxelGenerationRequiredSource& InPrevious)
+		{
+			if (PrefixIndex++ < SourceIndex && (InSource.Serial
+				? InPrevious.Serial == InSource.Serial
+				: !InPrevious.Serial && InPrevious.Object == InSource.Object)) bDuplicate = true;
+		});
+		if (bDuplicate) return;
+		uint64& Bytes = Capacity.Bytes[static_cast<int32>(InSource.Pool)];
+		if (InSource.Bytes > MAX_uint64 - Bytes || InSource.LeaseCount > MAX_int32 - Capacity.LeaseCount)
+		{
+			bValid = false;
+			return;
+		}
+		Bytes += InSource.Bytes;
+		Capacity.LeaseCount += InSource.LeaseCount;
+	});
+	if (!bValid)
+	{
+		OutError = TEXT("CapacityUnachievable: original generation source capacity overflow or inactive lease");
+		return false;
+	}
+	OutCapacity = Capacity;
+	return true;
+}
+
 FVoxelGenerationAllocationScope::FVoxelGenerationAllocationScope(
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
 	const FVoxelGenerationConsumerKey& InConsumer,
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InWorkingLease,
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InResidentReservation,
 	const uint64 InRootBytes)
-	: Previous(ActiveScope)
+	: Previous(ActiveScopeSlot())
 	, Resources(MoveTemp(InResources))
 	, Consumer(InConsumer)
 	, WorkingLease(MoveTemp(InWorkingLease))
 	, ResidentReservation(MoveTemp(InResidentReservation))
 	, RootBytes(InRootBytes)
 {
-	ActiveScope = this;
-	if (Resources && (!Consumer.IsValid() || !WorkingLease || !ResidentReservation || RootBytes == 0 ||
+	ActiveScopeSlot() = this;
+	if (Resources && (!Consumer.IsValid() ||
+		(Resources->GetControlConsumer().IsValid() && Consumer.WorldEpoch != Resources->GetControlConsumer().WorldEpoch) ||
+		!WorkingLease || !ResidentReservation || RootBytes == 0 ||
 		!WorkingLease->IsOwnedBy(*Resources) || !ResidentReservation->IsOwnedBy(*Resources) ||
+		WorkingLease->GetPool() != EVoxelTerrainResourcePool::Working ||
+		ResidentReservation->GetPool() != EVoxelTerrainResourcePool::Resident ||
 		WorkingLease->Bytes() != RootBytes || ResidentReservation->Bytes() != RootBytes))
 	{
 		FCString::Strncpy(Error, TEXT("InvalidAllocationScope: native body requires original complete reservations"), UE_ARRAY_COUNT(Error));
@@ -34,13 +179,13 @@ FVoxelGenerationAllocationScope::FVoxelGenerationAllocationScope(
 
 FVoxelGenerationAllocationScope::~FVoxelGenerationAllocationScope()
 {
-	check(ActiveScope == this);
-	ActiveScope = Previous;
+	check(ActiveScopeSlot() == this);
+	ActiveScopeSlot() = Previous;
 }
 
 FVoxelGenerationAllocationScope* FVoxelGenerationAllocationScope::Get()
 {
-	return ActiveScope;
+	return ActiveScopeSlot();
 }
 
 bool FVoxelGenerationAllocationScope::AllowPassive(FString& OutError)
@@ -102,19 +247,37 @@ bool FVoxelGenerationAllocationScope::PrepareBytes(
 	const uint64 Peak = Current + InNewBytes;
 	const uint64 Final = Current - InOldBytes + InNewBytes;
 	const FVoxelTerrainResourceLimits Limits = Resources->Snapshot().Limits;
-	if (Peak > Limits.WorkingBytes || Final > GenerationResidentLimit(Limits))
+	FVoxelGenerationRequiredCapacity ResidentSources;
+	FVoxelGenerationRequiredCapacity WorkingSources;
+	if (!FVoxelGenerationRequiredSourceScope::Collect(*Resources, ResidentReservation.Get(), ResidentSources, OutError) ||
+		!FVoxelGenerationRequiredSourceScope::Collect(*Resources, WorkingLease.Get(), WorkingSources, OutError))
+	{
+		return Fail(*OutError, OutError);
+	}
+	const uint64 OtherWorking = WorkingSources.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Working)];
+	const uint64 OtherResident = ResidentSources.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Resident)];
+	if (OtherWorking > Limits.WorkingBytes || Peak > Limits.WorkingBytes - OtherWorking ||
+		OtherResident > GenerationResidentLimit(Limits) || Final > GenerationResidentLimit(Limits) - OtherResident)
 	{
 		return Fail(TEXT("Oversized: retained body or allocation peak exceeds original pool limit"), OutError);
 	}
-	if (!ResidentReservation->Resize(Final))
+	const auto ResidentAdmission = ResidentReservation->TryResize(Final,
+		ResidentSources.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], ResidentSources.LeaseCount);
+	if (ResidentAdmission != EVoxelTerrainResourceAdmission::Granted)
 	{
-		return Fail(TEXT("CapacityBlocked: native retained resident standby"), OutError);
+		return Fail(ResidentAdmission == EVoxelTerrainResourceAdmission::CapacityUnachievable
+			? TEXT("CapacityUnachievable: native retained resident standby and original sources")
+			: TEXT("CapacityBlocked: native retained resident standby"), OutError);
 	}
-	if (!WorkingLease->Resize(Peak))
+	const auto WorkingAdmission = WorkingLease->TryResize(Peak,
+		WorkingSources.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], WorkingSources.LeaseCount);
+	if (WorkingAdmission != EVoxelTerrainResourceAdmission::Granted)
 	{
 		const bool bRestored = ResidentReservation->Resize(Current);
 		check(bRestored);
-		return Fail(TEXT("CapacityBlocked: native retained working allocation peak"), OutError);
+		return Fail(WorkingAdmission == EVoxelTerrainResourceAdmission::CapacityUnachievable
+			? TEXT("CapacityUnachievable: native retained working peak and original sources")
+			: TEXT("CapacityBlocked: native retained working allocation peak"), OutError);
 	}
 	return true;
 }
@@ -195,8 +358,10 @@ void VoxelGenerationAllocation::Private::FSetCapacityArchive::CountBytes(const S
 }
 
 FVoxelGenerationWorkspace::FVoxelGenerationWorkspace()
-	: Scope(FVoxelGenerationAllocationScope::Get())
+	: PreviousWorkspace(ActiveWorkspaceSlot())
+	, Scope(FVoxelGenerationAllocationScope::Get())
 {
+	ActiveWorkspaceSlot() = this;
 	if (Scope)
 	{
 		Resources = Scope->Resources;
@@ -207,14 +372,31 @@ FVoxelGenerationWorkspace::FVoxelGenerationWorkspace()
 FVoxelGenerationWorkspace::FVoxelGenerationWorkspace(TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
 	const FVoxelGenerationConsumerKey& InConsumer, const uint64 InRequiredInputBytes, const int32 InRequiredLeaseCount,
 	const uint64 InRequiredWorkingBytes)
-	: Resources(MoveTemp(InResources)), Consumer(InConsumer), RequiredInputBytes(InRequiredInputBytes), RequiredLeaseCount(InRequiredLeaseCount),
-	RequiredWorkingBytes(InRequiredWorkingBytes)
+	: PreviousWorkspace(ActiveWorkspaceSlot()), Resources(MoveTemp(InResources)), Consumer(InConsumer), RequiredInputBytes(InRequiredInputBytes), RequiredLeaseCount(InRequiredLeaseCount),
+RequiredWorkingBytes(InRequiredWorkingBytes)
 {
+	ActiveWorkspaceSlot() = this;
+}
+
+FVoxelGenerationWorkspace::FVoxelGenerationWorkspace(const FVoxelGenerationWorkspace* InSource)
+	: FVoxelGenerationWorkspace()
+{
+	if (InSource)
+	{
+		Scope = InSource->Scope;
+		Resources = InSource->Resources;
+		Consumer = InSource->Consumer;
+		RequiredInputBytes = InSource->GetRequiredInputBytes();
+		RequiredLeaseCount = InSource->GetRequiredLeaseCount();
+		RequiredWorkingBytes = InSource->GetRequiredWorkingBytes();
+	}
 }
 
 FVoxelGenerationWorkspace::~FVoxelGenerationWorkspace()
 {
 	// 受管容器按声明顺序已经销毁；原 Working 租约在此生命周期之后退出。
+	check(ActiveWorkspaceSlot() == this);
+	ActiveWorkspaceSlot() = PreviousWorkspace;
 }
 
 bool FVoxelGenerationWorkspace::Check(FString& OutError) const
@@ -224,7 +406,8 @@ bool FVoxelGenerationWorkspace::Check(FString& OutError) const
 		return Scope->Fail(TEXT("InvalidAllocationScope: workspace used outside its original body scope"), OutError);
 	}
 	if (Scope) return Scope->Check(OutError);
-	if (Resources && !Consumer.IsValid())
+	if (Resources && (!Consumer.IsValid() ||
+		(Resources->GetControlConsumer().IsValid() && Consumer.WorldEpoch != Resources->GetControlConsumer().WorldEpoch)))
 	{
 		OutError = TEXT("InvalidConsumer: standalone workspace requires original complete identity");
 		return false;
@@ -259,8 +442,18 @@ bool FVoxelGenerationWorkspace::PrepareBytes(
 		return Fail(TEXT("AllocationAccountingMismatch: scratch backing is not covered by its workspace"), OutError);
 	}
 	const uint64 WorkingLimit = Resources->Snapshot().Limits.WorkingBytes;
-	if (RequiredWorkingBytes > WorkingLimit || Current > WorkingLimit - RequiredWorkingBytes ||
-		InNewBytes > WorkingLimit - RequiredWorkingBytes - Current)
+	FVoxelGenerationRequiredCapacity Sources;
+	if (!FVoxelGenerationRequiredSourceScope::Collect(*Resources, Lease.Get(), Sources, OutError))
+	{
+		return Fail(*OutError, OutError);
+	}
+	const uint64 RequiredWorking = FMath::Max(RequiredWorkingBytes,
+		Sources.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Working)]);
+	const uint64 RequiredInput = FMath::Max(RequiredInputBytes,
+		Sources.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)]);
+	const int32 RequiredCount = FMath::Max(RequiredLeaseCount, Sources.LeaseCount);
+	if (RequiredWorking > WorkingLimit || Current > WorkingLimit - RequiredWorking ||
+		InNewBytes > WorkingLimit - RequiredWorking - Current)
 	{
 		return Fail(TEXT("Oversized: native workspace allocation peak exceeds original pool limit"), OutError);
 	}
@@ -269,8 +462,8 @@ bool FVoxelGenerationWorkspace::PrepareBytes(
 	{
 		return true;
 	}
-	const auto Admission = Lease ? Lease->TryResize(Peak, RequiredInputBytes, RequiredLeaseCount) :
-		Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Working, Peak, Lease, 0, RequiredInputBytes, RequiredLeaseCount);
+	const auto Admission = Lease ? Lease->TryResize(Peak, RequiredInput, RequiredCount) :
+		Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Working, Peak, Lease, 0, RequiredInput, RequiredCount);
 	if (Admission != EVoxelTerrainResourceAdmission::Granted)
 	{
 		return Fail(Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable

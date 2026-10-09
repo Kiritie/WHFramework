@@ -92,6 +92,13 @@ bool FVoxelSurfaceProxyBuilder::Build(
 
 	const auto& Cache = Generator->GetPlanCache();
 	const auto& Resources = Cache->GetResources();
+	FVoxelGenerationRequiredSourceScope RootSources(Resources.Get(), &Generator.Get(),
+		[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+		{
+			static_cast<const FVoxelGenerationPipeline*>(InContext)->VisitRequiredSources(InVisit);
+		});
+	FVoxelGenerationRequiredSourceScope OldColumnsSources(Resources.Get(),
+		OutColumnsLease && *OutColumnsLease ? OutColumnsLease->Get() : nullptr);
 	FVoxelGenerationConsumerKey Consumer;
 	if (Resources)
 	{
@@ -159,7 +166,7 @@ bool FVoxelSurfaceProxyBuilder::Build(
 
 	// 列 scratch 独立于现有 Terrain Geometry 账本；数组先释放，再退出原事实 Working 租约。
 	FVoxelGenerationWorkspace ColumnsWorkspace(Resources, Consumer,
-		Cache->GetRootInputBytes(), Cache->GetRootInputBytes() ? 1 : 0);
+		Generator->GetRequiredInputBytes(), Generator->GetRequiredInputLeaseCount());
 	TArray<FVoxelColumnSample> Columns;
 	if (!ColumnsWorkspace.ReserveArray(Columns, Count, OutError))
 	{
@@ -239,8 +246,10 @@ bool FVoxelSurfaceProxyBuilder::Build(
 	}
 
 	const double OverlayStart = FPlatformTime::Seconds();
+	FVoxelGenerationWorkspace ModifiedWorkspace(Resources, Consumer,
+		Generator->GetRequiredInputBytes(), Generator->GetRequiredInputLeaseCount());
 	TMap<FIntVector, FVoxelBlockState> ModifiedBlocks;
-	if (!CaptureModifiedBlocks(Data, ModifiedBlocks, Data.Revision, OutError, InCancel))
+	if (!CaptureModifiedBlocks(Data, ModifiedBlocks, Data.Revision, OutError, InCancel, ModifiedWorkspace))
 	{
 		return false;
 	}
@@ -285,40 +294,47 @@ bool FVoxelSurfaceProxyBuilder::CaptureModifiedBlocks(
 	TMap<FIntVector, FVoxelBlockState>& OutBlocks,
 	uint64& OutRevision,
 	FString& OutError,
-	const TAtomic<bool>* InCancel) const
+	const TAtomic<bool>* InCancel,
+	FVoxelGenerationWorkspace& InWorkspace) const
 {
 	const FVoxelTreeGenerationSettings& Trees = Config->Recipe->Settings.Ecology.Tree;
 	const FVoxelGenerationBounds Bounds = DistantInfluenceBounds(InData, Settings, Trees);
-	TArray<FIntVector> ModifiedSections;
-	if (!OverlaySource.EnumerateModifiedSections(Bounds, ModifiedSections, InCancel))
+	int64 Count = 0;
+	if (!OverlaySource.VisitModifiedOverlays(Bounds,
+		[&](const FIntVector&, const FVoxelOverlaySnapshot& Snapshot)
+		{
+			Count += Snapshot.Blocks.Num();
+			if (Count <= MAX_int32) return true;
+			OutError = TEXT("Oversized: surface modified block count");
+			return false;
+		}, OutError, InCancel) || !InWorkspace.ReserveMap(OutBlocks, int32(Count), OutError))
 	{
-		OutError = TEXT("Canceled");
 		return false;
 	}
-	for (const FIntVector& Section : ModifiedSections)
-	{
-		if (InCancel && InCancel->Load())
+	uint64 Revision = OutRevision;
+	if (!OverlaySource.VisitModifiedOverlays(Bounds,
+		[&](const FIntVector& Section, const FVoxelOverlaySnapshot& Snapshot)
 		{
-			OutError = TEXT("Canceled");
-			return false;
-		}
-		FVoxelOverlaySnapshot Snapshot;
-		if (!OverlaySource.ReadOverlay(Section, Snapshot))
-		{
-			OutError = TEXT("Distant voxel overlay could not be read");
-			return false;
-		}
-		OutRevision = FMath::Max(OutRevision, Snapshot.Revision);
-		for (const TPair<int32, FVoxelBlockState>& Edit : Snapshot.Blocks)
-		{
-			if (Edit.Key < 0 || Edit.Key >= SectionSide * SectionSide * SectionSide)
+			Revision = FMath::Max(Revision, Snapshot.Revision);
+			for (const TPair<int32, FVoxelBlockState>& Edit : Snapshot.Blocks)
 			{
-				OutError = TEXT("Distant voxel overlay contains an invalid cell index");
-				return false;
+				if (Edit.Key < 0 || Edit.Key >= SectionSide * SectionSide * SectionSide)
+				{
+					OutError = TEXT("Distant voxel overlay contains an invalid cell index");
+					return false;
+				}
+				const FIntVector Local = UnpackCell(Edit.Key);
+				FIntVector Cell;
+				if (!VoxelGeneration::TryWorldCell(FInt64Vector(
+					int64(Section.X) * SectionSide + Local.X,
+					int64(Section.Y) * SectionSide + Local.Y,
+					int64(Section.Z) * SectionSide + Local.Z), Cell)) continue;
+				if (!OutBlocks.Contains(Cell) && !InWorkspace.ReserveMap(OutBlocks, OutBlocks.Num() + 1, OutError)) return false;
+				OutBlocks.Add(Cell, Edit.Value);
 			}
-			OutBlocks.Add(Section * SectionSide + UnpackCell(Edit.Key), Edit.Value);
-		}
-	}
+			return true;
+		}, OutError, InCancel)) return false;
+	OutRevision = Revision;
 	OutError.Reset();
 	return true;
 }
@@ -353,6 +369,16 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 	}
 	const int32 StructureStep = FMath::Min(Step, 8);
 	const int32 StructureSide = Side / StructureStep;
+	const auto& FactResources = Generator->GetPlanCache()->GetResources();
+	FVoxelGenerationRequiredSourceScope RootSources(FactResources.Get(), &Generator.Get(),
+		[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+		{
+			static_cast<const FVoxelGenerationPipeline*>(InContext)->VisitRequiredSources(InVisit);
+		});
+	FVoxelGenerationConsumerKey CoarseConsumer;
+	if (FactResources && !Generator->GetPlanCache()->ResolveConsumer(CoarseConsumer, OutError)) return false;
+	FVoxelGenerationWorkspace StructureWorkspace(FactResources, CoarseConsumer,
+		Generator->GetRequiredInputBytes(), Generator->GetRequiredInputLeaseCount());
 	TMap<FIntVector, FVoxelBlockState> StructureCells;
 	const int32 FirstZ = VoxelGeneration::FloorDivide(
 		FMath::Max(Settings.MinZ, MinGround - 16), StructureStep) * StructureStep;
@@ -365,24 +391,29 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 			OutError = TEXT("Canceled");
 			return false;
 		}
-		TMap<FIntVector, FVoxelBlockState> Band;
+		FVoxelCoarseOverlayCapture Band;
 		if (!Generator->BuildCoarseOverlay(FIntVector(Origin.X, Origin.Y,
 			static_cast<int32>(BaseZ)), StructureStep, StructureSide,
 			Band, OutError, InCancel))
 		{
 			return false;
 		}
-		for (const TPair<FIntVector, FVoxelBlockState>& Entry : Band)
+		StructureWorkspace.SetRequirements(Generator->GetRequiredInputBytes(),
+			Generator->GetRequiredInputLeaseCount() + (Band.Lease ? 1 : 0), Band.Lease ? Band.Lease->Bytes() : 0);
+		FVoxelGenerationRequiredSourceScope BandSource(FactResources.Get(), Band.Lease.Get());
+		for (const TPair<FIntVector, FVoxelBlockState>& Entry : Band.Cells)
 		{
 			if (Entry.Key.X >= 0 && Entry.Key.X < StructureSide &&
 				Entry.Key.Y >= 0 && Entry.Key.Y < StructureSide &&
 				Entry.Key.Z >= 0 && Entry.Key.Z < StructureSide)
 			{
-				StructureCells.Add(FIntVector(Entry.Key.X, Entry.Key.Y,
-					VoxelGeneration::FloorDivide(static_cast<int32>(BaseZ) + Entry.Key.Z * StructureStep, StructureStep)),
-					Entry.Value);
+				const FIntVector Key(Entry.Key.X, Entry.Key.Y,
+					VoxelGeneration::FloorDivide(static_cast<int32>(BaseZ) + Entry.Key.Z * StructureStep, StructureStep));
+				if (!StructureCells.Contains(Key) && !StructureWorkspace.ReserveMap(StructureCells, StructureCells.Num() + 1, OutError)) return false;
+				StructureCells.Add(Key, Entry.Value);
 			}
 		}
+		StructureWorkspace.SetRequirements(Generator->GetRequiredInputBytes(), Generator->GetRequiredInputLeaseCount(), 0);
 	}
 
 	auto AddCell = [&](FIntVector Min, FIntVector Max, const FVoxelBlockState State,
@@ -491,7 +522,11 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 	{
 		const int32 Class = EditClass(Edit.Value);
 		if (Class == 0 || VisitedEdits.Contains(Edit.Key)) continue;
+		FVoxelGenerationWorkspace ComponentWorkspace(FactResources, CoarseConsumer,
+			Generator->GetRequiredInputBytes(), Generator->GetRequiredInputLeaseCount());
 		TArray<FIntVector> Component;
+		if (!ComponentWorkspace.ReserveArray(Component, 1, OutError) ||
+			!StructureWorkspace.ReserveSet(VisitedEdits, VisitedEdits.Num() + 1, OutError)) return false;
 		Component.Add(Edit.Key);
 		VisitedEdits.Add(Edit.Key);
 		FIntVector Min = Edit.Key;
@@ -517,6 +552,8 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 				if (NeighborState && EditClass(*NeighborState) == Class &&
 					!VisitedEdits.Contains(Neighbor))
 				{
+					if (!StructureWorkspace.ReserveSet(VisitedEdits, VisitedEdits.Num() + 1, OutError) ||
+						!ComponentWorkspace.ReserveArray(Component, Component.Num() + 1, OutError)) return false;
 					VisitedEdits.Add(Neighbor);
 					Component.Add(Neighbor);
 				}
@@ -533,6 +570,7 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 				VoxelGeneration::FloorDivide(Cell.Z, Step));
 			if (Key.X < 0 || Key.X >= (InOutData.Side - 1) ||
 				Key.Y < 0 || Key.Y >= (InOutData.Side - 1)) continue;
+			if (!Votes.Contains(Key) && !StructureWorkspace.ReserveMap(Votes, Votes.Num() + 1, OutError)) return false;
 			FEditVote& Vote = Votes.FindOrAdd(Key);
 			++Vote.Count;
 			Vote.Min.X = FMath::Min(Vote.Min.X, Cell.X);
@@ -542,7 +580,13 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 			Vote.Max.Y = FMath::Max(Vote.Max.Y, Cell.Y);
 			Vote.Max.Z = FMath::Max(Vote.Max.Z, Cell.Z);
 			if (Class == 1) ++Vote.Removed;
-			else ++Vote.Placed.FindOrAdd(InModifiedBlocks.FindChecked(Cell).Pack());
+			else
+			{
+				const uint32 PackedState = InModifiedBlocks.FindChecked(Cell).Pack();
+				if (!Vote.Placed.Contains(PackedState) &&
+					!StructureWorkspace.ReserveMap(Vote.Placed, Vote.Placed.Num() + 1, OutError)) return false;
+				++Vote.Placed.FindOrAdd(PackedState);
+			}
 		}
 	}
 	TArray<FVoxelDistantCell> PlayerCells;
@@ -564,6 +608,7 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 		}
 		if (Vote.Removed >= BestCount)
 		{
+			if (!SuppressedCells.Contains(Entry.Key) && !StructureWorkspace.ReserveSet(SuppressedCells, SuppressedCells.Num() + 1, OutError)) return false;
 			SuppressedCells.Add(Entry.Key);
 		}
 		else if (BestCount > Vote.Removed)
@@ -572,6 +617,8 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 			const FVoxelRuntimeDefinition* Definition = Registry->Find(State.TypeId);
 			if (Definition && Definition->bSolid)
 			{
+				if ((!SuppressedCells.Contains(Entry.Key) && !StructureWorkspace.ReserveSet(SuppressedCells, SuppressedCells.Num() + 1, OutError)) ||
+					!StructureWorkspace.ReserveArray(PlayerCells, PlayerCells.Num() + 1, OutError)) return false;
 				SuppressedCells.Add(Entry.Key);
 				PlayerCells.Add({Vote.Min, Vote.Max + FIntVector(1), State});
 			}
@@ -589,11 +636,17 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 	{
 		for (const TPair<FIntVector, FVoxelBlockState>& Entry : StructureCells)
 		{
-			if (!Entry.Value.IsAir() && !IsSuppressed(Entry.Key)) VisibleStructureCells.Add(Entry.Key);
+			if (!Entry.Value.IsAir() && !IsSuppressed(Entry.Key))
+			{
+				if (!StructureWorkspace.ReserveSet(VisibleStructureCells, VisibleStructureCells.Num() + 1, OutError)) return false;
+				VisibleStructureCells.Add(Entry.Key);
+			}
 		}
 	}
 	else
 	{
+		FVoxelGenerationWorkspace VisibilityWorkspace(FactResources, CoarseConsumer,
+			Generator->GetRequiredInputBytes(), Generator->GetRequiredInputLeaseCount());
 		TSet<FIntVector> Visited;
 		const FIntVector Neighbors[] = {
 			FIntVector(1, 0, 0), FIntVector(-1, 0, 0),
@@ -603,7 +656,12 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 		for (const TPair<FIntVector, FVoxelBlockState>& Entry : StructureCells)
 		{
 			if (Entry.Value.IsAir() || IsSuppressed(Entry.Key) || Visited.Contains(Entry.Key)) continue;
-			TArray<FIntVector> Component{Entry.Key};
+			FVoxelGenerationWorkspace ComponentWorkspace(FactResources, CoarseConsumer,
+				Generator->GetRequiredInputBytes(), Generator->GetRequiredInputLeaseCount());
+			TArray<FIntVector> Component;
+			if (!ComponentWorkspace.ReserveArray(Component, 1, OutError) ||
+				!VisibilityWorkspace.ReserveSet(Visited, Visited.Num() + 1, OutError)) return false;
+			Component.Add(Entry.Key);
 			Visited.Add(Entry.Key);
 			FIntVector Min = Entry.Key;
 			FIntVector Max = Entry.Key;
@@ -618,6 +676,8 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 					const FVoxelBlockState* State = StructureCells.Find(Next);
 					if (State && !State->IsAir() && !IsSuppressed(Next) && !Visited.Contains(Next))
 					{
+						if (!VisibilityWorkspace.ReserveSet(Visited, Visited.Num() + 1, OutError) ||
+							!ComponentWorkspace.ReserveArray(Component, Component.Num() + 1, OutError)) return false;
 						Visited.Add(Next);
 						Component.Add(Next);
 					}
@@ -627,7 +687,12 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 				Max.Y - Min.Y + 1, Max.Z - Min.Z + 1) * StructureStep;
 			if (Span >= Step)
 			{
-				for (const FIntVector& Cell : Component) VisibleStructureCells.Add(Cell);
+				for (const FIntVector& Cell : Component)
+				{
+					if (!VisibleStructureCells.Contains(Cell) &&
+						!StructureWorkspace.ReserveSet(VisibleStructureCells, VisibleStructureCells.Num() + 1, OutError)) return false;
+					VisibleStructureCells.Add(Cell);
+				}
 			}
 		}
 	}

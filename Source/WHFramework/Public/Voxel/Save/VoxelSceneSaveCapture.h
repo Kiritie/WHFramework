@@ -18,12 +18,22 @@ struct WHFRAMEWORK_API FVoxelSceneSaveCut
 struct WHFRAMEWORK_API FVoxelSceneSaveCapture
 {
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MetadataLease;
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
 	FGuid TransactionId;
 	uint64 WorldEpoch = 0;
 	TMap<FIntVector, FVoxelSceneSaveCut> Regions;
 	TMap<FString, TArray<uint8>> Files;
 	TMap<FString, TSharedPtr<const FVoxelSceneColumnCapture, ESPMode::ThreadSafe>> Columns;
 	TSharedPtr<FVoxelWorldSaveCompletion, ESPMode::ThreadSafe> Completion;
+
+	void VisitRequiredSources(const FVoxelTerrainResources& InResources,
+		FVoxelGenerationRequiredSourceScope::FVisit InVisit) const
+	{
+		if (MetadataLease && MetadataLease->IsOwnedBy(InResources))
+			FVoxelGenerationRequiredSourceScope::VisitLease(MetadataLease.Get(), InVisit);
+		for (const auto& Pair : Columns)
+			if (Pair.Value) Pair.Value->VisitRequiredSources(InResources, InVisit);
+	}
 
 	const TArray<uint8>* FindEncodedFile(const FString& InPath) const
 	{
@@ -42,6 +52,7 @@ struct WHFRAMEWORK_API FVoxelSceneSaveCaptureBuilder
 	FVoxelSceneColumnCaptureCursor Column;
 	TWeakObjectPtr<UVoxelSceneRegion> NextRegion;
 	TWeakObjectPtr<UVoxelSceneRegion> CurrentRegion;
+	FVoxelGenerationConsumerKey Consumer;
 	FString CurrentFilePath;
 	uint64 WorldEpoch = 0;
 	uint64 SceneRevision = 0;

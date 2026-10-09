@@ -46,6 +46,10 @@ void FVoxelViewManager::ResetRetirementContinuation()
 	RetirementCoverageRoot.Reset();
 	RetirementHeightfieldRoot.Reset();
 	RetirementContentSnapshot = {};
+	RetirementHierarchyResources.Reset();
+	RetirementHierarchyConsumer = {};
+	RetirementHierarchyAdmission = EVoxelTerrainResourceAdmission::Granted;
+	RetirementHierarchyCapacityVersion = 0;
 	RetirementScopeRects.Empty();
 	RetirementScopeLease.Reset();
 	bRetirementReadScope = false;
@@ -91,6 +95,8 @@ void FVoxelViewManager::CleanupRetiredRepresentations(const double InNow)
 		RetirementCoverageRoot = CoverageIndex;
 		RetirementHeightfieldRoot = HeightfieldCoverageIndex;
 		RetirementContentSnapshot = Module.GetRuntime()->GetChangeHierarchy().CaptureVersionSnapshot();
+		RetirementHierarchyResources = Module.GetRuntime()->GetTerrainResources();
+		RetirementHierarchyConsumer = Module.GetRuntime()->GetChangeHierarchy().GetControlConsumer();
 		const bool bVolume = RetirementCandidate.Representation <= 1 || RetirementCandidate.Representation == 4;
 		const int32 Side = 16 << RetirementCandidate.Level;
 		RetirementContentMin = FIntVector(RetirementBounds.Min.X, RetirementBounds.Min.Y,
@@ -119,6 +125,20 @@ void FVoxelViewManager::CleanupRetiredRepresentations(const double InNow)
 			ResetRetirementContinuation();
 			break;
 		}
+		if (RetirementHierarchyAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked)
+		{
+			uint64 Version = 0;
+			if (!RetirementHierarchyResources ||
+				!RetirementHierarchyResources->TryGetReleaseVersionExcludingOwner(RetirementHierarchyConsumer, Version) ||
+				Version <= RetirementHierarchyCapacityVersion)
+			{
+				const EVoxelTerrainRepresentation Representation = RetirementCandidate.Representation == 1 ? EVoxelTerrainRepresentation::VoxelProxy :
+					RetirementCandidate.Representation == 2 ? EVoxelTerrainRepresentation::Surface : EVoxelTerrainRepresentation::Macro;
+				const FVoxelTerrainSpatialKey Spatial{Representation, RetirementCandidate.Coordinate, RetirementCandidate.Level};
+				if (!Module.GetRuntime()->GetChangeHierarchy().CanReleaseGeometryWithoutAllocation(Spatial)) break;
+			}
+			RetirementHierarchyAdmission = EVoxelTerrainResourceAdmission::Granted;
+		}
 		// 只在当前微步借用局部读取范围，Yield 后立即恢复 coverage pass 的原范围。
 		TGuardValue<bool> ReadScope(bRetirementReadScope, true);
 		TGuardValue<bool> FullScope(bActiveCoverageFull, false);
@@ -128,6 +148,28 @@ void FVoxelViewManager::CleanupRetiredRepresentations(const double InNow)
 	}
 	if (RetirementContinuation.IsComplete()) ResetRetirementContinuation();
 	LastRetireMilliseconds = (FPlatformTime::Seconds() - Start) * 1000.0;
+}
+
+bool FVoxelViewManager::ReleaseRetirementGeometry(const FVoxelTerrainSpatialKey& InKey)
+{
+	const auto* Runtime = Module.GetRuntime();
+	if (!Runtime || &Runtime->GetTerrainResources().Get() != RetirementHierarchyResources.Get() ||
+		Runtime->GetChangeHierarchy().GetControlConsumer() != RetirementHierarchyConsumer)
+	{
+		RetirementHierarchyAdmission = EVoxelTerrainResourceAdmission::InvalidRequest;
+		return false;
+	}
+	RetirementHierarchyCapacityVersion = RetirementHierarchyResources->ReleaseVersionExcludingOwner(RetirementHierarchyConsumer);
+	FString Error;
+	if (Module.GetRuntime()->GetChangeHierarchy().ReleaseGeometry(InKey, Error))
+	{
+		RetirementHierarchyAdmission = EVoxelTerrainResourceAdmission::Granted;
+		return true;
+	}
+	RetirementHierarchyAdmission = Module.GetRuntime()->GetChangeHierarchy().GetLastResourceAdmission();
+	if (RetirementHierarchyAdmission != EVoxelTerrainResourceAdmission::CapacityBlocked)
+		UE_LOG(LogTemp, Error, TEXT("Terrain retirement geometry release failed: %s"), *Error);
+	return false;
 }
 
 FVoxelGameThreadContinuation FVoxelViewManager::CleanupRetiredRepresentationSteps(const double InNow, const FVoxelPublishGroupKey Candidate)
@@ -151,21 +193,8 @@ FVoxelGameThreadContinuation FVoxelViewManager::CleanupRetiredRepresentationStep
 	if (Candidate.Representation == 0)
 	{
 		const FVoxelFinePageKey Page{Candidate.Coordinate, Candidate.Level};
-		if (GetInputRoot().FinePagePlan.Pages.Contains(Page) || Publisher->IsGroupBusy({0, Page.Coordinate, Page.Level}))
-			co_return;
-		bool bReplacement = false;
-		co_await IsFinePageReplacementReadySteps(Page, Snapshot, bReplacement);
-		if (FinePageActors.FindRef(Page) && !FinePageActors.FindRef(Page)->IsHidden() && !bReplacement)
-			co_return;
-		if (AActor* Actor = FinePageActors.FindRef(Page))
-		{
-			Publisher->Forget(Actor);
-			Actor->Destroy();
-		}
-		FinePageReady.Remove(Page);
-		FinePageActors.Remove(Page);
-		EmptyFinePages.Remove(Page);
-		PresentedEmptyFinePages.Remove(Page);
+		if (GetInputRoot().FinePagePlan.Pages.Contains(Page)) co_return;
+		RetireFinePageLayoutState(Page);
 		RemoveRetirement(Candidate);
 		if (Candidate.Representation <= 3)
 		{
@@ -174,9 +203,6 @@ FVoxelGameThreadContinuation FVoxelViewManager::CleanupRetiredRepresentationStep
 			GeometryMetrics.Remove(Spatial);
 			PresentedGeometryMetrics.Remove(Spatial);
 		}
-		if (Candidate.Representation >= 1 && Candidate.Representation <= 3)
-			Module.GetRuntime()->GetChangeHierarchy().ReleaseGeometry(
-				{static_cast<EVoxelTerrainRepresentation>(Candidate.Representation + 1), Candidate.Coordinate, Candidate.Level});
 	}
 	if (Candidate.Representation == 4)
 	{
@@ -198,9 +224,6 @@ FVoxelGameThreadContinuation FVoxelViewManager::CleanupRetiredRepresentationStep
 			GeometryMetrics.Remove(Spatial);
 			PresentedGeometryMetrics.Remove(Spatial);
 		}
-		if (Candidate.Representation >= 1 && Candidate.Representation <= 3)
-			Module.GetRuntime()->GetChangeHierarchy().ReleaseGeometry(
-				{static_cast<EVoxelTerrainRepresentation>(Candidate.Representation + 1), Candidate.Coordinate, Candidate.Level});
 		bReadyTerrainBranchesDirty = true;
 	}
 	if (Candidate.Representation == 1)
@@ -218,6 +241,11 @@ FVoxelGameThreadContinuation FVoxelViewManager::CleanupRetiredRepresentationStep
 		if (!CanRetire(LastWanted, bReplacement, InsideCurrentDomain([this, Key] { return IsProxyInsideRenderDomain(Key); })))
 		{
 			co_return;
+		}
+		while (!ReleaseRetirementGeometry({EVoxelTerrainRepresentation::VoxelProxy, Key.Coordinate, Key.Level}))
+		{
+			if (RetirementHierarchyAdmission != EVoxelTerrainResourceAdmission::CapacityBlocked) co_return;
+			co_await FVoxelGameThreadContinuation::Yield();
 		}
 		if (AActor* Actor = VoxelProxyActors.FindRef(Key))
 		{
@@ -250,9 +278,6 @@ FVoxelGameThreadContinuation FVoxelViewManager::CleanupRetiredRepresentationStep
 			GeometryMetrics.Remove(Spatial);
 			PresentedGeometryMetrics.Remove(Spatial);
 		}
-		if (Candidate.Representation >= 1 && Candidate.Representation <= 3)
-			Module.GetRuntime()->GetChangeHierarchy().ReleaseGeometry(
-				{static_cast<EVoxelTerrainRepresentation>(Candidate.Representation + 1), Candidate.Coordinate, Candidate.Level});
 	}
 	if (Candidate.Representation == 2)
 	{
@@ -270,6 +295,11 @@ FVoxelGameThreadContinuation FVoxelViewManager::CleanupRetiredRepresentationStep
 		if (GetInputRoot().SurfaceWanted.Contains(Key) || !CanRetire(SurfaceLastWanted.FindRef(Key), bReplacement,
 			InsideCurrentDomain([this, Key] { return IsSurfaceInsideRenderDomain(Key); })))
 			co_return;
+		while (!ReleaseRetirementGeometry({EVoxelTerrainRepresentation::Surface, FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0), Key.Level}))
+		{
+			if (RetirementHierarchyAdmission != EVoxelTerrainResourceAdmission::CapacityBlocked) co_return;
+			co_await FVoxelGameThreadContinuation::Yield();
+		}
 		if (AActor* Actor = SurfaceActors.FindRef(Key))
 		{
 			Publisher->Forget(Actor);
@@ -296,9 +326,6 @@ FVoxelGameThreadContinuation FVoxelViewManager::CleanupRetiredRepresentationStep
 			GeometryMetrics.Remove(Spatial);
 			PresentedGeometryMetrics.Remove(Spatial);
 		}
-		if (Candidate.Representation >= 1 && Candidate.Representation <= 3)
-			Module.GetRuntime()->GetChangeHierarchy().ReleaseGeometry(
-				{static_cast<EVoxelTerrainRepresentation>(Candidate.Representation + 1), Candidate.Coordinate, Candidate.Level});
 		MarkCoverageDirty(SurfaceCoverageRect(Key));
 	}
 	if (Candidate.Representation == 3)
@@ -315,6 +342,11 @@ FVoxelGameThreadContinuation FVoxelViewManager::CleanupRetiredRepresentationStep
 		if (GetInputRoot().MacroWanted.Contains(Key) || !CanRetire(MacroLastWanted.FindRef(Key), bReplacement,
 			InsideCurrentDomain([this, Key] { return IsMacroInsideRenderDomain(Key); })))
 			co_return;
+		while (!ReleaseRetirementGeometry({EVoxelTerrainRepresentation::Macro, FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0), Key.Level}))
+		{
+			if (RetirementHierarchyAdmission != EVoxelTerrainResourceAdmission::CapacityBlocked) co_return;
+			co_await FVoxelGameThreadContinuation::Yield();
+		}
 		if (AActor* Actor = MacroActors.FindRef(Key))
 		{
 			Publisher->Forget(Actor);
@@ -334,9 +366,6 @@ FVoxelGameThreadContinuation FVoxelViewManager::CleanupRetiredRepresentationStep
 			GeometryMetrics.Remove(Spatial);
 			PresentedGeometryMetrics.Remove(Spatial);
 		}
-		if (Candidate.Representation >= 1 && Candidate.Representation <= 3)
-			Module.GetRuntime()->GetChangeHierarchy().ReleaseGeometry(
-				{static_cast<EVoxelTerrainRepresentation>(Candidate.Representation + 1), Candidate.Coordinate, Candidate.Level});
 		MarkCoverageDirty(MacroCoverageRect(Key));
 	}
 }

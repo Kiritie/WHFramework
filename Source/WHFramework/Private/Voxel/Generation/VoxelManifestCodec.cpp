@@ -115,6 +115,12 @@ namespace
 
 	void ReadSettings(FVoxelByteReader& InReader, FVoxelGenerationSettings& OutSettings)
 	{
+		const auto ReadBool = [&InReader]()
+		{
+			const uint8 Value = InReader.U8();
+			if (Value > 1) InReader.Reject();
+			return Value == 1;
+		};
 		OutSettings.Seed = InReader.I32();
 		OutSettings.MinZ = InReader.I32();
 		OutSettings.MaxZ = InReader.I32();
@@ -182,7 +188,7 @@ namespace
 		OutSettings.AquiferSpacing = InReader.I32();
 		OutSettings.AquiferRadius = InReader.I32();
 		OutSettings.LavaCeiling = InReader.I32();
-		OutSettings.Ecology.Tree.bEnabled = InReader.U8() != 0;
+		OutSettings.Ecology.Tree.bEnabled = ReadBool();
 		OutSettings.Ecology.Tree.MinHeight = InReader.I32();
 		OutSettings.Ecology.Tree.MaxHeight = InReader.I32();
 		OutSettings.Ecology.Tree.Spacing = InReader.I32();
@@ -194,8 +200,8 @@ namespace
 		OutSettings.Ecology.Tree.Temperature.Max = InReader.I32();
 		OutSettings.Ecology.Tree.Moisture.Min = InReader.I32();
 		OutSettings.Ecology.Tree.Moisture.Max = InReader.I32();
-		OutSettings.Ecology.Tree.bAllowNearWater = InReader.U8() != 0;
-		OutSettings.Ecology.Grass.bEnabled = InReader.U8() != 0;
+		OutSettings.Ecology.Tree.bAllowNearWater = ReadBool();
+		OutSettings.Ecology.Grass.bEnabled = ReadBool();
 		OutSettings.Ecology.Grass.Spacing = InReader.I32();
 		OutSettings.Ecology.Grass.DensityPermille = InReader.I32();
 		OutSettings.Ecology.Grass.ChancePermille = InReader.I32();
@@ -206,8 +212,8 @@ namespace
 		OutSettings.Ecology.Grass.Temperature.Max = InReader.I32();
 		OutSettings.Ecology.Grass.Moisture.Min = InReader.I32();
 		OutSettings.Ecology.Grass.Moisture.Max = InReader.I32();
-		OutSettings.Ecology.Grass.bAllowNearWater = InReader.U8() != 0;
-		OutSettings.Ecology.Flower.bEnabled = InReader.U8() != 0;
+		OutSettings.Ecology.Grass.bAllowNearWater = ReadBool();
+		OutSettings.Ecology.Flower.bEnabled = ReadBool();
 		OutSettings.Ecology.Flower.Spacing = InReader.I32();
 		OutSettings.Ecology.Flower.DensityPermille = InReader.I32();
 		OutSettings.Ecology.Flower.ChancePermille = InReader.I32();
@@ -253,6 +259,7 @@ bool FVoxelManifestCodec::Encode(
 	}
 
 	FVoxelByteWriter Writer(MaxBytes);
+	Writer.Reserve(MaxBytes);
 	Writer.U32(ManifestMagic);
 	Writer.U32(FVoxelWorldManifest::ProtocolVersion);
 	Writer.Guid(InManifest.WorldId);

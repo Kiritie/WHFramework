@@ -32,7 +32,7 @@ bool FVoxelSaveExecutorCapacityCutTest::RunTest(const FString& InParameters)
 	const auto Resources = MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
 	Resources->Configure({});
 	FVoxelWorldRuntime Runtime(81, true, Registry, VoxelTest::MakeGenerator());
-	Runtime.BindTerrainResources(Resources.ToSharedRef());
+	Runtime.BindTerrainResources(Resources);
 	FVoxelWorldManifest WorldManifest;
 	WorldManifest.WorldId = FGuid::NewGuid();
 	WorldManifest.RegistryHash = Registry->Hash;
@@ -139,7 +139,7 @@ bool FVoxelSaveExecutorCapacityCutTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("原目标代回执完成"), Completion->bFilesFlushed && Completion->bGenerationCommitted);
 	TestTrue(TEXT("原后台事务已经准备并授予目标文件代读租约"), Completion->TargetReadLease &&
 		Completion->TargetReadLease->Matches(Storage.GetGenerationDir(Manifest.SaveId, 1)) &&
-		Completion->TargetReadLease->IsResourceAccountedFor(Resources.Get(), 81));
+		Completion->TargetReadLease->IsResourceAccountedFor(&Resources.Get(), 81));
 	FVoxelRegionStore ReadStore;
 	ReadStore.AdvanceSource(Storage.GetGenerationDir(Manifest.SaveId, 1));
 	TArray<uint8> ReadBytes;

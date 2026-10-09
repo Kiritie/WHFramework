@@ -1,5 +1,6 @@
 #include "Voxel/Rendering/VoxelViewManager.h"
 
+#include "Voxel/Rendering/VoxelFineShardBuild.h"
 #include "Voxel/Rendering/VoxelTerrainRenderer.h"
 #include "Voxel/Rendering/VoxelViewPublisher.h"
 #include "Voxel/Runtime/VoxelWorldRuntime.h"

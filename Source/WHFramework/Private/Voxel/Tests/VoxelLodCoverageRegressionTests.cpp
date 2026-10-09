@@ -432,11 +432,10 @@ bool FVoxelFineProxyDependenciesTest::RunTest(const FString& InParameters)
 	Manager.RefreshTerrainBuildStage();
 	TestEqual(TEXT("Ready but unpresented Fine still holds the playable stage gate"), Scheduler.GetObservedTerrainStage(), 0);
 	Manager.VisibleTerrainNodes.Add({Fine.FineKey, 0});
-	Manager.PresentedEmptyFinePages.Add({Fine.FineKey, 0});
 	Manager.PresentedFineSectionOwners.Add(Fine.FineKey, {Fine.FineKey, 0});
 	Manager.bTerrainBuildStageDirty = true;
 	Manager.RefreshTerrainBuildStage();
-	TestEqual(TEXT("Presented Fine releases dependent coarse construction"), Scheduler.GetObservedTerrainStage(), 2);
+	TestEqual(TEXT("Derived ownership still requires a Native Fine receipt before opening the stage"), Scheduler.GetObservedTerrainStage(), 0);
 	Scheduler.StopAndJoin();
 	Manager.Reset();
 	return true;

@@ -47,12 +47,26 @@ bool FVoxelBinaryGrantedCompressionTest::RunTest(const FString& InParameters)
 	FString Error;
 	TestFalse(TEXT("数组可授予时原生 zlib 内部分配仍受容量约束"),
 		FVoxelDeltaCodec::EncodeGranted(Manifest, *Registry, View, Limited, Consumer, Refused, Error));
-	TestTrue(TEXT("实际原生容量拒收保留 CapacityBlocked"), Error.StartsWith(TEXT("CapacityBlocked:")));
+	TestTrue(TEXT("原生必需工作区超过总上限明确失败"), Error.StartsWith(TEXT("CapacityUnachievable:")));
 	TestTrue(TEXT("失败不覆盖原输出正文"), Refused.Bytes == TArray<uint8>({7, 8, 9}));
 	TestEqual(TEXT("部分 deflateInit 分配实际释放后才归还"),
 		Limited->Snapshot().Used[int32(EVoxelTerrainResourcePool::Working)], Retained);
 	Refused = FVoxelBinaryBuffer();
 	TestEqual(TEXT("原正文释放后归还输出租约"), Limited->Snapshot().Used[int32(EVoxelTerrainResourcePool::Working)], uint64(0));
+	const auto Pressured = MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
+	Limits.WorkingBytes = 1024 * 1024;
+	if (!Pressured->Configure(Limits)) return false;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Blocker;
+	const auto Other = FVoxelGenerationConsumerKey::Section(81, FGuid::NewGuid(), 1, Section.Section, 2);
+	if (!Pressured->Acquire(Other, EVoxelTerrainResourcePool::Working, Limits.WorkingBytes - 32 * 1024, Blocker)) return false;
+	FVoxelBinaryBuffer Waiting;
+	TestFalse(TEXT("外部占用拒收真实原生分配"),
+		FVoxelDeltaCodec::EncodeGranted(Manifest, *Registry, View, Pressured, Consumer, Waiting, Error));
+	TestTrue(TEXT("必需工作区可达时保持临时容量分类"), Error.StartsWith(TEXT("CapacityBlocked:")));
+	Blocker.Reset();
+	TestTrue(TEXT("释放外部占用后同consumer可完成原编码"),
+		FVoxelDeltaCodec::EncodeGranted(Manifest, *Registry, View, Pressured, Consumer, Waiting, Error));
+	TestTrue(TEXT("重试仍保持原协议字节"), Waiting.Bytes == Original);
 	const auto Resources = MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
 	Resources->Configure({});
 	FVoxelBinaryBuffer Encoded;
@@ -65,7 +79,7 @@ bool FVoxelBinaryGrantedCompressionTest::RunTest(const FString& InParameters)
 	FVoxelDeltaDecoder Decoder;
 	TSharedPtr<FVoxelPersistentSection, ESPMode::ThreadSafe> Decoded;
 	if (!TestTrue(TEXT("原生授予的 inflate 可读回冻结记录"), Decoder.Advance(Encoded.Bytes, Manifest, *Registry,
-		Resources.ToSharedRef(), Consumer, EVoxelTerrainResourcePool::Staged, Decoded, Error))) return false;
+		Resources, Consumer, EVoxelTerrainResourcePool::Staged, Decoded, Error))) return false;
 	TestEqual(TEXT("负坐标和内容版本保持原语义"), Decoded->Section, Section.Section);
 	TestEqual(TEXT("切点版本保持"), Decoded->Revision, Section.Revision);
 	TestTrue(TEXT("实体正文未丢失"), Decoded->Entities.FindChecked(4095).Payload == Section.Entities.FindChecked(4095).Payload);

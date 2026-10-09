@@ -150,7 +150,7 @@ private:
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> StorageLease;
 	struct FCommittedTile
 	{
-		FNavTileRef Reference = 0;
+		FNavTileRef Reference{0};
 		TSharedPtr<const FVoxelNavigationTileCapture, ESPMode::ThreadSafe> Capture;
 	};
 	// Native slot 的数量固定；salt 换代直接替换该槽，不累积历史 Ref 目录。

@@ -36,6 +36,7 @@ enum class EVoxelTaskBlockReason : uint16
 	PendingCapacity = 1 << 9,
 	Oversized = 1 << 10
 };
+ENUM_CLASS_FLAGS(EVoxelTaskBlockReason)
 
 struct WHFRAMEWORK_API FVoxelTaskServiceCandidate
 {

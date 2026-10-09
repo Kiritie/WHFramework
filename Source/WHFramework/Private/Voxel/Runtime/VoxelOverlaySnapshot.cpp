@@ -2,6 +2,67 @@
 
 #include "Voxel/Chunks/VoxelSectionKey.h"
 
+bool FVoxelOverlaySnapshotSet::VisitModifiedOverlays(const FVoxelGenerationBounds& InBounds,
+	TFunctionRef<bool(const FIntVector&, const FVoxelOverlaySnapshot&)> InVisit,
+	FString& OutError, const TAtomic<bool>* InCancel) const
+{
+	OutError.Reset();
+	if (InCancel && InCancel->Load())
+	{
+		OutError = TEXT("Canceled");
+		return false;
+	}
+	if (!InBounds.IsValid())
+	{
+		OutError = TEXT("InvalidRequest: Overlay visitor bounds are invalid");
+		return false;
+	}
+	const auto VisitSection = [&](const FIntVector& Section, const FVoxelOverlaySnapshot& Snapshot)
+	{
+		if (InCancel && InCancel->Load())
+		{
+			OutError = TEXT("Canceled");
+			return false;
+		}
+		FIntVector Min;
+		for (int32 Axis = 0; Axis < 3; ++Axis)
+		{
+			const int64 Cell = int64(Section[Axis]) * 16;
+			if (Cell < MIN_int32 || Cell > MAX_int32 - 16)
+			{
+				OutError = TEXT("InvalidRequest: Overlay Section bounds overflow");
+				return false;
+			}
+			Min[Axis] = int32(Cell);
+		}
+		if (InBounds.Intersects({Min, Min + FIntVector(16)}) && !InVisit(Section, Snapshot))
+		{
+			if (OutError.IsEmpty()) OutError = TEXT("InvalidRequest: Overlay visitor rejected input");
+			return false;
+		}
+		if (InCancel && InCancel->Load())
+		{
+			OutError = TEXT("Canceled");
+			return false;
+		}
+		return true;
+	};
+	for (const auto& Pair : Sections)
+		if (!VisitSection(Pair.Key, Pair.Value)) return false;
+	for (const auto& Pair : PinnedSections)
+	{
+		if (!Pair.Value || Sections.Contains(Pair.Key))
+		{
+			OutError = TEXT("InvalidRequest: Overlay snapshot contains duplicate or missing pinned Sections");
+			return false;
+		}
+		if (!VisitSection(Pair.Key, *Pair.Value)) return false;
+	}
+	OutError.Reset();
+	return true;
+}
+
+#if WITH_DEV_AUTOMATION_TESTS
 bool FVoxelOverlaySnapshotSet::EnumerateModifiedSections(const FVoxelGenerationBounds& InBounds,
 	TArray<FIntVector>& OutSections, const TAtomic<bool>* InCancel) const
 {
@@ -41,6 +102,7 @@ bool FVoxelOverlaySnapshotSet::ReadOverlay(const FIntVector& InSection, FVoxelOv
 	}
 	return false;
 }
+#endif
 
 void FVoxelOverlaySnapshotSet::ApplyAt(const FIntVector& InCell, FVoxelBlockState& InOutState) const
 {

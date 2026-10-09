@@ -24,9 +24,14 @@ class WHFRAMEWORK_API IVoxelOverlaySource
 {
 public:
 	virtual ~IVoxelOverlaySource() = default;
+	virtual bool VisitModifiedOverlays(const FVoxelGenerationBounds& InBounds,
+		TFunctionRef<bool(const FIntVector&, const FVoxelOverlaySnapshot&)> InVisit,
+		FString& OutError, const TAtomic<bool>* InCancel = nullptr) const = 0;
+#if WITH_DEV_AUTOMATION_TESTS
 	virtual bool EnumerateModifiedSections(const FVoxelGenerationBounds& InBounds,
 		TArray<FIntVector>& OutSections, const TAtomic<bool>* InCancel = nullptr) const = 0;
 	virtual bool ReadOverlay(const FIntVector& InSection, FVoxelOverlaySnapshot& OutOverlay) const = 0;
+#endif
 };
 
 struct WHFRAMEWORK_API FVoxelOverlaySnapshotSet final : public IVoxelOverlaySource
@@ -35,9 +40,14 @@ struct WHFRAMEWORK_API FVoxelOverlaySnapshotSet final : public IVoxelOverlaySour
 	TMap<FIntVector, FVoxelOverlaySnapshot> Sections;
 	TMap<FIntVector, TSharedPtr<const FVoxelOverlaySnapshot, ESPMode::ThreadSafe>> PinnedSections;
 
+	virtual bool VisitModifiedOverlays(const FVoxelGenerationBounds& InBounds,
+		TFunctionRef<bool(const FIntVector&, const FVoxelOverlaySnapshot&)> InVisit,
+		FString& OutError, const TAtomic<bool>* InCancel = nullptr) const override;
+#if WITH_DEV_AUTOMATION_TESTS
 	virtual bool EnumerateModifiedSections(const FVoxelGenerationBounds& InBounds,
 		TArray<FIntVector>& OutSections, const TAtomic<bool>* InCancel = nullptr) const override;
 	virtual bool ReadOverlay(const FIntVector& InSection, FVoxelOverlaySnapshot& OutOverlay) const override;
+#endif
 	void ApplyAt(const FIntVector& InCell, FVoxelBlockState& InOutState) const;
 	const FVoxelOverlaySnapshot* Find(const FIntVector& InSection) const;
 	int32 Num() const;

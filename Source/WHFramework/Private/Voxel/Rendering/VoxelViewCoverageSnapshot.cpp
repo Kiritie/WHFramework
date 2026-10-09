@@ -162,7 +162,7 @@ FVoxelGameThreadContinuation FVoxelViewManager::BuildCoverageSnapshotSteps(FCove
 	for (const FIntVector& Section : FineCandidates)
 	{
 		co_await FVoxelGameThreadContinuation::Yield();
-		if (!FineReady.Contains(Section) || !GetInputRoot().FineWanted.Contains(Section) || !VisibleTerrainNodes.Contains({Section, 0}) || !IsFinePresented(Section)) continue;
+		if (!GetInputRoot().FineWanted.Contains(Section) || !VisibleTerrainNodes.Contains({Section, 0}) || !IsFinePresented(Section)) continue;
 		OutSnapshot.PresentedFineSections.Add(Section);
 		if (const auto* Owner = PresentedFineSectionOwners.Find(Section)) OutSnapshot.PresentedFineOwners.Add(Section, *Owner);
 		OutSnapshot.Fine.Add(FineCoverageBox(Section));

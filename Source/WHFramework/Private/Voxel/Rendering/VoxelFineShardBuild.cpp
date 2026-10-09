@@ -2,6 +2,79 @@
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Generation/VoxelGenerationPlanningRead.h"
 
+EVoxelTerrainResourceAdmission VoxelFineShardCapacity::TryReserve(
+	const TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe>& InResources,
+	const FVoxelGenerationConsumerKey& InConsumer, const EVoxelTerrainResourcePool InPool, const uint64 InBytes,
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& InOutLease, FString& OutError,
+	uint64& OutBeforeVersion, const uint64 InAdditionalWorkingBytes, const uint64 InAdditionalStagedBytes,
+	const int32 InAdditionalLeaseCount, EVoxelTerrainResourcePool* OutUnachievablePool)
+{
+	if (OutUnachievablePool)
+	{
+		*OutUnachievablePool = EVoxelTerrainResourcePool::Count;
+	}
+	OutBeforeVersion = InResources->ReleaseVersionExcludingOwner(InConsumer);
+	if (!InConsumer.IsValid() || InPool >= EVoxelTerrainResourcePool::Count || InBytes == 0 ||
+		InAdditionalLeaseCount < 0 || (InOutLease &&
+			(!InOutLease->IsOwnedBy(*InResources) || InOutLease->GetPool() != InPool)) ||
+		(InResources->GetControlConsumer().IsValid() &&
+			InConsumer.WorldEpoch != InResources->GetControlConsumer().WorldEpoch))
+	{
+		OutError = TEXT("InvalidRequest: Fine capacity domain or lease");
+		return EVoxelTerrainResourceAdmission::InvalidRequest;
+	}
+	FVoxelGenerationRequiredCapacity Sources;
+	if (!FVoxelGenerationRequiredSourceScope::Collect(*InResources, InOutLease.Get(), Sources, OutError))
+	{
+		OutError = TEXT("CapacityUnachievable: Fine required source capacity cannot be represented");
+		return EVoxelTerrainResourceAdmission::CapacityUnachievable;
+	}
+	const auto Limits = InResources->Snapshot().Limits;
+	const uint64 PoolLimits[] = {Limits.InputBytes, Limits.WorkingBytes, Limits.StagedBytes,
+		Limits.ResidentBytes - Limits.OverlapBytes, Limits.OverlapBytes};
+	for (int32 Pool = 0; Pool < static_cast<int32>(EVoxelTerrainResourcePool::Count); ++Pool)
+	{
+		uint64 Remaining = PoolLimits[Pool];
+		const uint64 Additional = Pool == static_cast<int32>(EVoxelTerrainResourcePool::Working)
+			? InAdditionalWorkingBytes : Pool == static_cast<int32>(EVoxelTerrainResourcePool::Staged)
+				? InAdditionalStagedBytes : 0;
+		for (const uint64 Bytes : {Sources.Bytes[Pool], Additional,
+			Pool == static_cast<int32>(InPool) ? InBytes : uint64(0)})
+		{
+			if (Bytes > Remaining)
+			{
+				if (OutUnachievablePool)
+				{
+					*OutUnachievablePool = static_cast<EVoxelTerrainResourcePool>(Pool);
+				}
+				OutError = TEXT("CapacityUnachievable: Fine retained inputs and indivisible native peak exceed pool limit");
+				return EVoxelTerrainResourceAdmission::CapacityUnachievable;
+			}
+			Remaining -= Bytes;
+		}
+	}
+	if (InAdditionalLeaseCount > MAX_int32 - Sources.LeaseCount)
+	{
+		OutError = TEXT("CapacityUnachievable: Fine required lease count exceeds integer range");
+		return EVoxelTerrainResourceAdmission::CapacityUnachievable;
+	}
+	const uint64 InputBytes = Sources.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)];
+	const int32 LeaseCount = Sources.LeaseCount + InAdditionalLeaseCount;
+	const auto Admission = InOutLease ? InOutLease->TryResize(InBytes, InputBytes, LeaseCount) :
+		InResources->TryAcquire(InConsumer, InPool, InBytes, InOutLease, 0, InputBytes, LeaseCount);
+	if (Admission != EVoxelTerrainResourceAdmission::Granted)
+	{
+		OutError = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked
+			? TEXT("CapacityBlocked: Fine native capacity admission")
+			: Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable
+				? TEXT("CapacityUnachievable: Fine native capacity and required inputs")
+				: TEXT("InvalidRequest: Fine native capacity admission");
+		return Admission;
+	}
+	OutError.Reset();
+	return Admission;
+}
+
 uint64 FVoxelFineShardGeometry::GetResourceAccountedBytes() const
 {
 	uint64 Bytes = MetadataLease ? MetadataLease->Bytes() : 0;
@@ -203,6 +276,27 @@ bool FVoxelFineShardSampler::GatherRequiredSections(const FVoxelFineShardKey& In
 	return true;
 }
 
+void FVoxelFineShardSampler::VisitResourceSources(FVoxelGenerationRequiredSourceScope::FVisit InVisit) const
+{
+	const auto Visit = [&](const FVoxelTerrainResourceLease* InLease)
+	{
+		if (InLease && InLease->IsOwnedBy(*Resources))
+		{
+			FVoxelGenerationRequiredSourceScope::VisitLease(InLease, InVisit);
+		}
+	};
+	Visit(InputLease.Get());
+	Visit(SamplingLease.Get());
+	Visit(Samples ? Samples->ResourceLease.Get() : nullptr);
+	Visit(OverlayVersion ? OverlayVersion->ResourceLease.Get() : nullptr);
+	Visit(Overlay->ResourceLease.Get());
+	Overlay->Visit([&](const FIntVector&, const FVoxelOverlaySnapshot& InSnapshot)
+	{
+		Visit(InSnapshot.ResourceLease.Get());
+		Visit(InSnapshot.IndexLease.Get());
+	});
+}
+
 bool FVoxelFineShardSampler::Initialize(const FVoxelFineBuildAttempt& InAttempt, const uint64 InRecipeHash,
 	const int32 InWorldMinZ, const int32 InWorldMaxZ, FString& OutError)
 {
@@ -219,6 +313,11 @@ bool FVoxelFineShardSampler::Initialize(const FVoxelFineBuildAttempt& InAttempt,
 		}
 		return false;
 	}
+	FVoxelGenerationRequiredSourceScope SourceScope(&Resources.Get(), this,
+		[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+		{
+			static_cast<const FVoxelFineShardSampler*>(InContext)->VisitResourceSources(InVisit);
+		});
 	WorldMinZ = InWorldMinZ;
 	WorldMaxZ = InWorldMaxZ;
 	using namespace VoxelBoundedAllocation;
@@ -228,14 +327,16 @@ bool FVoxelFineShardSampler::Initialize(const FVoxelFineBuildAttempt& InAttempt,
 		6 * ArrayBytes<uint32>(Side * Side);
 	// The pipeline produces one temporary 16^3 section and a 16-symbol column.
 	// Its own generation/overlay workers retain their independent fact reservations.
-	const uint64 SamplingBytes = sizeof(*this) + ArrayBytes<FIntVector>(AxisCount * AxisCount * AxisCount) +
+	const uint64 SamplingBytes = ArrayBytes<FIntVector>(AxisCount * AxisCount * AxisCount) +
 		InitialGrowBytes<FVoxelBlockState>(4096) + 2 * InitialGrowBytes<uint32>(16);
-	if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input, SampleBytes, InputLease) ||
-		!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Working, SamplingBytes, SamplingLease))
+	uint64 BeforeAdmission = 0;
+	if (VoxelFineShardCapacity::TryReserve(Resources, Consumer, EVoxelTerrainResourcePool::Input,
+		SampleBytes, InputLease, OutError, BeforeAdmission, SamplingBytes, 0, 1) != EVoxelTerrainResourceAdmission::Granted ||
+		VoxelFineShardCapacity::TryReserve(Resources, Consumer, EVoxelTerrainResourcePool::Working,
+			SamplingBytes, SamplingLease, OutError, BeforeAdmission) != EVoxelTerrainResourceAdmission::Granted)
 	{
 		InputLease.Reset();
 		SamplingLease.Reset();
-		OutError = TEXT("CapacityBlocked: Fine sampling reservation unavailable");
 		return false;
 	}
 	if (!GatherRequiredSections(InAttempt.Input.Shard, RequiredSections, OutError))
@@ -405,7 +506,7 @@ TSharedPtr<const FVoxelFineShardSamples, ESPMode::ThreadSafe> FVoxelFineShardSam
 	bComplete = false;
 	Samples.Reset();
 	RequiredSections.Empty();
-	InputLease->Resize(Result->AllocatedBytes());
+	verify(InputLease->TryResize(Result->AllocatedBytes()) == EVoxelTerrainResourceAdmission::Granted);
 	InputLease.Reset();
 	SamplingLease.Reset();
 	return Result;

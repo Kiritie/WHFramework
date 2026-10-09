@@ -28,7 +28,8 @@ struct WHFRAMEWORK_API FVoxelSceneColumnRead
 		const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& InResources,
 		const FVoxelGenerationConsumerKey& InConsumer,
 		TSharedPtr<const FVoxelSceneColumnRead, ESPMode::ThreadSafe>& OutRead,
-		FString& OutError, const TAtomic<bool>* InCancel = nullptr, const TAtomic<bool>* InDetached = nullptr);
+		FString& OutError, const TAtomic<bool>* InCancel = nullptr, const TAtomic<bool>* InDetached = nullptr,
+		const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& InControlLease = nullptr);
 	static bool Validate(TConstArrayView<uint8> InBytes, FString& OutError);
 	TConstArrayView<uint8> ActorPayload(int32 InIndex) const;
 	TConstArrayView<uint8> ProjectPayload() const;

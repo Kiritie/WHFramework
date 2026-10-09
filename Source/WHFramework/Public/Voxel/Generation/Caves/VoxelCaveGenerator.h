@@ -1,5 +1,7 @@
 #pragma once
 
+class FVoxelTerrainResourceLease;
+
 #include "CoreMinimal.h"
 #include "Voxel/Generation/VoxelGenerationRecipe.h"
 
@@ -34,6 +36,8 @@ struct WHFRAMEWORK_API FVoxelCaveEntrance
 
 struct WHFRAMEWORK_API FVoxelCavePlan
 {
+	// 原正文 grant 的共享来源；深层 backing 先析构，controller deleter 仍保活到最后 weak。
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 	TArray<FVoxelCaveSegment> Segments;
 	TArray<FVoxelCaveEntrance> Entrances;
 	TArray<FVoxelGenerationBounds> ClearVolumes;

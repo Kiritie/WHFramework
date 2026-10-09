@@ -6,9 +6,20 @@
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelGenerationQuery.h"
 #include "Voxel/Generation/VoxelGenerationPlanningRead.h"
+#include "Voxel/Task/VoxelBoundedAllocation.h"
 
 namespace
 {
+	void EnumeratePipelineRootSources(const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+	{
+		static_cast<const FVoxelGenerationPipeline*>(InContext)->VisitRequiredSources(InVisit);
+	}
+
+	void EnumeratePipelineQuerySources(const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+	{
+		static_cast<const FVoxelGenerationQuery*>(InContext)->VisitRequiredSources(InVisit);
+	}
+
 	int32 NextPipelineScratchCapacity(const int32 InRequired, const int32 InCapacity)
 	{
 		return int32(FMath::Min<int64>(MAX_int32,
@@ -99,6 +110,66 @@ namespace
 	}
 }
 
+FVoxelCoarseOverlayCapture::FVoxelCoarseOverlayCapture()
+{
+}
+
+FVoxelCoarseOverlayCapture::~FVoxelCoarseOverlayCapture()
+{
+}
+
+FVoxelCoarseOverlayCapture::FVoxelCoarseOverlayCapture(FVoxelCoarseOverlayCapture&& InOther)
+	: Lease(MoveTemp(InOther.Lease)), Consumer(InOther.Consumer), Cells(MoveTemp(InOther.Cells))
+{
+}
+
+FVoxelCoarseOverlayCapture& FVoxelCoarseOverlayCapture::operator=(FVoxelCoarseOverlayCapture&& InOther)
+{
+	if (this != &InOther)
+	{
+		Cells = MoveTemp(InOther.Cells);
+		Lease = MoveTemp(InOther.Lease);
+		Consumer = InOther.Consumer;
+	}
+	return *this;
+}
+
+uint64 FVoxelGenerationPipeline::GetRequiredInputBytes() const
+{
+	FVoxelGenerationRequiredCapacity Capacity;
+	FString Error;
+	return FVoxelGenerationRequiredSourceScope::Measure(this, EnumeratePipelineRootSources, Capacity, Error)
+		? Capacity.Bytes[int32(EVoxelTerrainResourcePool::Input)] : MAX_uint64;
+}
+
+int32 FVoxelGenerationPipeline::GetRequiredInputLeaseCount() const
+{
+	FVoxelGenerationRequiredCapacity Capacity;
+	FString Error;
+	return FVoxelGenerationRequiredSourceScope::Measure(this, EnumeratePipelineRootSources, Capacity, Error)
+		? Capacity.LeaseCount : MAX_int32;
+}
+
+void FVoxelGenerationPipeline::VisitRequiredSources(FVoxelGenerationRequiredSourceScope::FVisit InVisit) const
+{
+	const auto& Resources = Cache->GetResources();
+	if (!Resources) return;
+	uint64 Bytes;
+	int32 Count;
+	Cache->GetRequiredInputCapacity(Bytes, Count);
+	if (Count) InVisit({&Cache.Get(), 0, EVoxelTerrainResourcePool::Input, Bytes, Count});
+	FVoxelGenerationRequiredSourceScope::VisitLease(RootLease.Get(), InVisit);
+	FVoxelGenerationRequiredSourceScope::VisitLease(Config->InputLease.Get(), InVisit);
+	FVoxelGenerationRequiredSourceScope::VisitLease(Config->RecipeInputLease.Get(), InVisit);
+	if (Overlay) Overlay->VisitRequiredSources(InVisit);
+}
+
+void FVoxelGenerationPipeline::MarkPublished() const
+{
+	if (RootLease) RootLease->MarkPublished();
+	if (Overlay) Overlay->MarkPublished();
+}
+
 bool FVoxelGenerationPipeline::ResolveAllocation(
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& OutResources,
 	FVoxelGenerationConsumerKey& OutConsumer,
@@ -187,7 +258,9 @@ bool FVoxelGenerationPipeline::EnumerateCaveEntrances(
 		OutError = TEXT("Invalid cave entrance bounds");
 		return false;
 	}
+	FVoxelGenerationRequiredSourceScope RootSources(Cache->GetResources().Get(), this, EnumeratePipelineRootSources);
 	FVoxelGenerationQuery Query;
+	FVoxelGenerationRequiredSourceScope QuerySources(Cache->GetResources().Get(), &Query, EnumeratePipelineQuerySources);
 	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError, true,
 		IsInGameThread(), IsInGameThread(), nullptr, InOutputLease))
 	{
@@ -273,6 +346,78 @@ bool FVoxelGenerationPipeline::EnumerateCaveEntrances(
 	return true;
 }
 
+bool FVoxelGenerationPipeline::Create(
+	TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
+	TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> InCache,
+	TSharedPtr<const FVoxelGenerationPipeline, ESPMode::ThreadSafe>& OutPipeline,
+	FString& OutError,
+	TSharedPtr<const IVoxelGenerationOverlay, ESPMode::ThreadSafe> InOverlay,
+	const bool bInRequirePlanPreflight)
+{
+	const auto& Resources = InCache->GetResources();
+	const FVoxelGenerationConsumerKey& Consumer = InCache->GetControlConsumer();
+	if (!Resources || !Consumer.IsValid() || !InConfig->Recipe ||
+		!InConfig->InputLease || !InConfig->InputLease->IsOwnedBy(*Resources) ||
+		InConfig->InputLease->GetPool() != EVoxelTerrainResourcePool::Input ||
+		!InConfig->RecipeInputLease || !InConfig->RecipeInputLease->IsOwnedBy(*Resources) ||
+		InConfig->RecipeInputLease->GetPool() != EVoxelTerrainResourcePool::Input)
+	{
+		OutError = TEXT("InvalidResource: generation pipeline requires its original frozen config and fact cache");
+		return false;
+	}
+	if (InOverlay && InOverlay->GetResourceOwner() != Resources.Get())
+	{
+		OutError = TEXT("InvalidResource: pipeline overlay requires the same original fact ledger");
+		return false;
+	}
+	FVoxelGenerationRequiredSourceScope OverlaySources(Resources.Get(), InOverlay.Get(),
+		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+		{
+			static_cast<const IVoxelGenerationOverlay*>(Context)->VisitRequiredSources(Visit);
+		});
+	struct FRootSources
+	{
+		const FVoxelGenerationRuntimeConfig& Config;
+		const FVoxelGenerationPlanCache& Cache;
+	};
+	const FRootSources Inputs{InConfig.Get(), InCache.Get()};
+	FVoxelGenerationRequiredSourceScope InputSources(Resources.Get(), &Inputs,
+		[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+		{
+			const FRootSources& Sources = *static_cast<const FRootSources*>(InContext);
+			uint64 Bytes;
+			int32 Count;
+			Sources.Cache.GetRequiredInputCapacity(Bytes, Count);
+			if (Count) InVisit({&Sources.Cache, 0, EVoxelTerrainResourcePool::Input, Bytes, Count});
+			FVoxelGenerationRequiredSourceScope::VisitLease(Sources.Config.InputLease.Get(), InVisit);
+			FVoxelGenerationRequiredSourceScope::VisitLease(Sources.Config.RecipeInputLease.Get(), InVisit);
+		});
+	FVoxelGenerationRequiredSourceScope OldSources(Resources.Get(),
+		OutPipeline && OutPipeline->Cache->GetResources() == Resources ? OutPipeline.Get() : nullptr,
+		EnumeratePipelineRootSources);
+	FVoxelGenerationRequiredCapacity Required;
+	if (!FVoxelGenerationRequiredSourceScope::Collect(*Resources, nullptr, Required, OutError)) return false;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+	const EVoxelTerrainResourceAdmission Admission = Resources->TryAcquire(Consumer,
+		EVoxelTerrainResourcePool::Input, VoxelBoundedAllocation::WorkerSharedBytes<FVoxelGenerationPipeline>(),
+		Lease, 0, Required.Bytes[int32(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+	if (Admission != EVoxelTerrainResourceAdmission::Granted)
+	{
+		OutError = Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable
+			? TEXT("CapacityUnachievable: generation pipeline root")
+			: Admission == EVoxelTerrainResourceAdmission::InvalidRequest
+			? TEXT("InvalidResource: generation pipeline root") : TEXT("CapacityBlocked: generation pipeline root");
+		return false;
+	}
+	TSharedPtr<FVoxelGenerationPipeline, ESPMode::ThreadSafe> Candidate =
+		VoxelBoundedAllocation::MakeWorkerShared<FVoxelGenerationPipeline>(Lease,
+			InConfig, InCache, MoveTemp(InOverlay), bInRequirePlanPreflight);
+	Candidate->RootLease = MoveTemp(Lease);
+	OutPipeline = MoveTemp(Candidate);
+	OutError.Reset();
+	return true;
+}
+
 FVoxelGenerationPipeline::FVoxelGenerationPipeline(
 	TSharedRef<
 		const FVoxelGenerationRuntimeConfig,
@@ -309,8 +454,11 @@ bool FVoxelGenerationPipeline::QueryReadyWaterfalls(
 	{
 		return false;
 	}
-	const uint64 SourceInputBytes = Cache->GetRootInputBytes();
-	const int32 SourceLeaseCount = SourceInputBytes ? 1 : 0;
+	FVoxelGenerationRequiredSourceScope RootSources(Resources.Get(), this, EnumeratePipelineRootSources);
+	FVoxelGenerationRequiredSourceScope OutputSources(Resources.Get(),
+		InOutputLease && Resources && InOutputLease->IsOwnedBy(*Resources) ? InOutputLease : nullptr);
+	const uint64 SourceInputBytes = GetRequiredInputBytes();
+	const int32 SourceLeaseCount = GetRequiredInputLeaseCount();
 	uint64 RequiredInputBytes = SourceInputBytes;
 	int32 RequiredLeaseCount = SourceLeaseCount;
 	uint64 RequiredWorkingBytes = 0;
@@ -332,6 +480,8 @@ bool FVoxelGenerationPipeline::QueryReadyWaterfalls(
 			{
 				continue;
 			}
+			FVoxelGenerationRequiredSourceScope PlanSources(Resources.Get(),
+				Plan->ResourceLease && Resources && Plan->ResourceLease->IsOwnedBy(*Resources) ? Plan->ResourceLease.Get() : nullptr);
 			for (const FVoxelWaterfallSemantic& Fall : Plan->Waterfalls)
 			{
 				if (Fall.Upstream.X >= InMin.X && Fall.Upstream.Y >= InMin.Y &&
@@ -483,7 +633,9 @@ bool FVoxelGenerationPipeline::GenerateSection(
 				SectionSide)
 	};
 
+	FVoxelGenerationRequiredSourceScope RootSources(Cache->GetResources().Get(), this, EnumeratePipelineRootSources);
 	FVoxelGenerationQuery Query;
+	FVoxelGenerationRequiredSourceScope QuerySources(Cache->GetResources().Get(), &Query, EnumeratePipelineQuerySources);
 
 	if (!FVoxelGenerationQuery::Create(
 			Config,
@@ -591,7 +743,9 @@ bool FVoxelGenerationPipeline::SampleColumn(
 				Settings.MaxZ)
 	};
 
+	FVoxelGenerationRequiredSourceScope RootSources(Cache->GetResources().Get(), this, EnumeratePipelineRootSources);
 	FVoxelGenerationQuery Query;
+	FVoxelGenerationRequiredSourceScope QuerySources(Cache->GetResources().Get(), &Query, EnumeratePipelineQuerySources);
 
 	if (!FVoxelGenerationQuery::Create(
 			Config,
@@ -619,7 +773,9 @@ bool FVoxelGenerationPipeline::EnumerateTrees(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	FVoxelGenerationRequiredSourceScope RootSources(Cache->GetResources().Get(), this, EnumeratePipelineRootSources);
 	FVoxelGenerationQuery Query;
+	FVoxelGenerationRequiredSourceScope QuerySources(Cache->GetResources().Get(), &Query, EnumeratePipelineQuerySources);
 	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError, true, bRequirePlanPreflight)) return false;
 	bool bSampleFailed = false;
 	auto SampleColumn = [&](const FIntVector& Position, FVoxelColumnSample& Column)
@@ -669,7 +825,9 @@ bool FVoxelGenerationPipeline::SampleEnvironment(
 		return false;
 	}
 
+	FVoxelGenerationRequiredSourceScope RootSources(Cache->GetResources().Get(), this, EnumeratePipelineRootSources);
 	FVoxelGenerationQuery Query;
+	FVoxelGenerationRequiredSourceScope QuerySources(Cache->GetResources().Get(), &Query, EnumeratePipelineQuerySources);
 	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError))
 	{
 		return false;
@@ -689,9 +847,20 @@ bool FVoxelGenerationPipeline::TrySampleEnvironment(const FIntPoint& InCell, FVo
 TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>
 FVoxelGenerationPipeline::RetainHydrologyForPlanning(
 	const FIntPoint& InCenter,
-	const int32 InSampleRadiusCells) const
+	const int32 InSampleRadiusCells, FString* OutError) const
 {
-	if (!RetentionResources || !RetentionConsumer.IsValid()) return nullptr;
+	if (!RetentionResources || !RetentionConsumer.IsValid())
+	{
+		if (OutError) *OutError = TEXT("InvalidResource: planning retention requires original fact resources");
+		return nullptr;
+	}
+	FVoxelGenerationConsumerKey FrozenConsumer;
+	FString Error;
+	if (!Cache->ResolveConsumer(FrozenConsumer, Error))
+	{
+		if (OutError) *OutError = MoveTemp(Error);
+		return nullptr;
+	}
 	const FVoxelGenerationSettings& Settings = Config->Recipe->Settings;
 	const int64 RegionSide = static_cast<int64>(FMath::Max(8, Settings.HydrologyRegionSide)) *
 		FMath::Max(1, Settings.HydrologyCellSize);
@@ -720,8 +889,9 @@ FVoxelGenerationPipeline::RetainHydrologyForPlanning(
 		Consumer = *ScopeConsumer;
 	}
 	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> Lease;
-	FString Error;
-	return Cache->RetainForTask(Point, RetentionResources.ToSharedRef(), Consumer, Lease, Error) ? Lease : nullptr;
+	const bool bRetained = Cache->RetainForTask(Point, RetentionResources.ToSharedRef(), Cache->GetResources() ? FrozenConsumer : Consumer, Lease, Error);
+	if (OutError) *OutError = MoveTemp(Error);
+	return bRetained ? Lease : nullptr;
 }
 
 bool FVoxelGenerationPipeline::SampleEnvironments(
@@ -748,7 +918,9 @@ bool FVoxelGenerationPipeline::SampleEnvironments(
 		return false;
 	}
 
+	FVoxelGenerationRequiredSourceScope RootSources(Cache->GetResources().Get(), this, EnumeratePipelineRootSources);
 	FVoxelGenerationQuery Query;
+	FVoxelGenerationRequiredSourceScope QuerySources(Cache->GetResources().Get(), &Query, EnumeratePipelineQuerySources);
 	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError,
 			bInUseColumnCache, bRequirePlanPreflight, false, nullptr, InOutputLease) ||
 		!Query.PrepareColumns(Bounds, OutError, InCancel))
@@ -833,7 +1005,9 @@ bool FVoxelGenerationPipeline::SampleColumns(
 		return false;
 	}
 
+	FVoxelGenerationRequiredSourceScope RootSources(Cache->GetResources().Get(), this, EnumeratePipelineRootSources);
 	FVoxelGenerationQuery Query;
+	FVoxelGenerationRequiredSourceScope QuerySources(Cache->GetResources().Get(), &Query, EnumeratePipelineQuerySources);
 
 	if (!FVoxelGenerationQuery::Create(
 			Config,
@@ -928,7 +1102,9 @@ bool FVoxelGenerationPipeline::SampleBlock(
 		OutError = TEXT("Invalid block position outside world cell domain");
 		return false;
 	}
+	FVoxelGenerationRequiredSourceScope RootSources(Cache->GetResources().Get(), this, EnumeratePipelineRootSources);
 	FVoxelGenerationQuery Query;
+	FVoxelGenerationRequiredSourceScope QuerySources(Cache->GetResources().Get(), &Query, EnumeratePipelineQuerySources);
 
 	const FVoxelGenerationBounds Bounds {
 		InPosition,
@@ -976,15 +1152,50 @@ bool FVoxelGenerationPipeline::BuildCoarseOverlay(
 	const FIntVector& InOrigin,
 	const int32 InStep,
 	const int32 InGridSide,
-	TMap<FIntVector, FVoxelBlockState>& OutCells,
+	FVoxelCoarseOverlayCapture& OutCells,
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
+	FVoxelGenerationConsumerKey Consumer;
+	if (!ResolveAllocation(Resources, Consumer, OutError)) return false;
+	FVoxelGenerationRequiredSourceScope RootSources(Resources.Get(), this, EnumeratePipelineRootSources);
+	FVoxelGenerationRequiredSourceScope OldOutputSources(Resources.Get(),
+		OutCells.Lease && Resources && OutCells.Lease->IsOwnedBy(*Resources) ? OutCells.Lease.Get() : nullptr);
+	if (Resources && OutCells.Lease && !(OutCells.Consumer == Consumer))
+	{
+		OutError = TEXT("InvalidConsumer: coarse overlay replacement requires its original consumer");
+		return false;
+	}
+	if (Resources && VoxelGenerationAllocation::AllocatedBytes(OutCells.Cells) &&
+		(!OutCells.Lease || !OutCells.Lease->IsOwnedBy(*Resources) ||
+			OutCells.Lease->GetPool() != EVoxelTerrainResourcePool::Working ||
+			OutCells.Lease->Bytes() != VoxelGenerationAllocation::AllocatedBytes(OutCells.Cells)))
+	{
+		OutError = TEXT("InvalidResource: coarse overlay replacement requires its original native map lease");
+		return false;
+	}
+	uint64 RequiredInputBytes = GetRequiredInputBytes();
+	int32 RequiredLeaseCount = GetRequiredInputLeaseCount();
+	uint64 RequiredWorkingBytes = 0;
+	if (!AddOutputRequirements(OutCells.Lease.Get(), RequiredInputBytes, RequiredLeaseCount, RequiredWorkingBytes, OutError)) return false;
+	FVoxelGenerationWorkspace Workspace(Resources, Consumer, RequiredInputBytes, RequiredLeaseCount, RequiredWorkingBytes);
+	FVoxelCoarseOverlayCapture Candidate;
 	if (Overlay)
 	{
-		return Overlay->BuildCoarse(InOrigin, InStep, InGridSide, OutCells, OutError, InCancel);
+		if (!Overlay->BuildCoarse(InOrigin, InStep, InGridSide, Candidate.Cells, OutError, InCancel, &Workspace))
+		{
+			return false;
+		}
 	}
-	OutCells.Reset();
+	if (InCancel && InCancel->Load())
+	{
+		OutError = TEXT("Canceled");
+		return false;
+	}
+	Candidate.Lease = Workspace.TakeLease();
+	Candidate.Consumer = Consumer;
+	OutCells = MoveTemp(Candidate);
 	OutError.Reset();
 	return true;
 }

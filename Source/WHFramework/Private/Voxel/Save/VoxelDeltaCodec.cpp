@@ -5,9 +5,44 @@
 #include "Voxel/Save/VoxelBlockEntityCodec.h"
 #include "Voxel/Serialization/VoxelBinaryCodec.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 
 namespace
 {
+	template<typename KeyType, typename ValueType>
+	uint64 EmptyMapBytes(const int32 Count)
+	{
+		const TMap<KeyType, ValueType> Empty;
+		return VoxelGenerationAllocation::Private::SetReserveBytes<TPair<KeyType, ValueType>>(Empty, Count);
+	}
+
+	bool AcquireDelta(const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& Resources,
+		const FVoxelGenerationConsumerKey& Consumer, const EVoxelTerrainResourcePool Pool, const uint64 Bytes,
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutLease, FString& OutError)
+	{
+		if (!Resources) return true;
+		FVoxelGenerationRequiredCapacity Required;
+		if (!FVoxelGenerationRequiredSourceScope::Collect(*Resources, nullptr, Required, OutError)) return false;
+		const auto Limits = Resources->Snapshot().Limits;
+		const uint64 PoolLimits[] = {Limits.InputBytes, Limits.WorkingBytes, Limits.StagedBytes,
+			Limits.ResidentBytes - Limits.OverlapBytes, Limits.OverlapBytes};
+		const auto Admission = Bytes > PoolLimits[int32(Pool)] || Required.Bytes[int32(Pool)] > PoolLimits[int32(Pool)] - Bytes ?
+			EVoxelTerrainResourceAdmission::CapacityUnachievable :
+			Resources->TryAcquire(Consumer, Pool, Bytes, OutLease, 0, Required.Bytes[0], Required.LeaseCount);
+		if (Admission == EVoxelTerrainResourceAdmission::Granted) return true;
+		OutError = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: Voxel codec native layout") :
+			Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: Voxel codec native layout") :
+			TEXT("InvalidRequest: Voxel codec native source");
+		return false;
+	}
+
+	FString CodecError(const EVoxelTerrainResourceAdmission Admission)
+	{
+		return Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: Voxel原生codec分配未授予") :
+			Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: Voxel原生codec必需工作区") :
+			Admission == EVoxelTerrainResourceAdmission::InvalidRequest ? TEXT("InvalidRequest: Voxel原生codec资源来源") :
+			TEXT("Voxel原生codec或冻结计数失败");
+	}
 	constexpr uint32 DeltaMagic = 0x34445856;
 	constexpr int32 MaxRawBytes = FVoxelDeltaCodec::MaximumRawBytes;
 	bool DecodeRaw(TConstArrayView<uint8> InRaw, const FVoxelWorldManifest& InWorld,
@@ -167,13 +202,12 @@ namespace
 			const auto Payload = Reader.BlobView(FVoxelDeltaCodec::MaximumEntityPayloadBytes);
 			PayloadBytes += Payload.Num();
 			if (!Reader.IsValid() || PayloadBytes > 256 * 1024) return false;
-			PayloadStorage += VoxelBoundedAllocation::ArrayBytes<uint8>(Payload.Num());
+			PayloadStorage += VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(Payload.Num());
 		}
 		if (!Reader.End()) return false;
 		OutBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelPersistentSection>() +
-			VoxelBoundedAllocation::MapBytes<int32, FVoxelBlockState>(BlockCount) +
-			VoxelBoundedAllocation::MapBytes<int32, FVoxelBlockEntityState>(EntityCount) + PayloadStorage;
-		OutScratchBytes = VoxelBoundedAllocation::ArrayBytes<uint16>(PaletteCount);
+			EmptyMapBytes<int32, FVoxelBlockState>(BlockCount) + EmptyMapBytes<int32, FVoxelBlockEntityState>(EntityCount) + PayloadStorage;
+		OutScratchBytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<uint16, FDefaultAllocator>(PaletteCount);
 		return true;
 	}
 }
@@ -227,16 +261,13 @@ bool FVoxelDeltaCodec::EncodeGranted(const FVoxelWorldManifest& InWorld, const F
 		OutError = TEXT("Voxel固定增量计数或实体校验失败");
 		return false;
 	}
-	const uint64 ScratchBytes = VoxelBoundedAllocation::ArrayBytes<uint8>(Measure.RawBytes) +
-		VoxelBoundedAllocation::ArrayBytes<int32>(FMath::Max(InSection.Blocks.Num(), InSection.Entities.Num())) +
-		VoxelBoundedAllocation::ArrayBytes<uint16>(Measure.TypeCount) +
-		VoxelBoundedAllocation::ArrayBytes<FVoxelDeltaPaletteIndex>(Measure.TypeCount);
+	const uint64 ScratchBytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(Measure.RawBytes) +
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<int32, FDefaultAllocator>(FMath::Max(InSection.Blocks.Num(), InSection.Entities.Num())) +
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<uint16, FDefaultAllocator>(Measure.TypeCount) +
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelDeltaPaletteIndex, FDefaultAllocator>(Measure.TypeCount);
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ScratchLease;
-	if (InResources && !InResources->Acquire(InConsumer, EVoxelTerrainResourcePool::Working, ScratchBytes, ScratchLease))
-	{
-		OutError = TEXT("CapacityBlocked: Voxel实际增量正文和排序工作区未授予");
-		return false;
-	}
+	if (!AcquireDelta(InResources, InConsumer, EVoxelTerrainResourcePool::Working, ScratchBytes, ScratchLease, OutError)) return false;
+	const FVoxelGenerationRequiredSourceScope ScratchSource(InResources.Get(), ScratchLease.Get());
 	TArray<uint8> Raw;
 	if (!EncodeDeltaRaw(InWorld, InRegistry, InSection, Measure, Raw))
 	{
@@ -245,14 +276,15 @@ bool FVoxelDeltaCodec::EncodeGranted(const FVoxelWorldManifest& InWorld, const F
 	}
 	if (ScratchLease)
 	{
-		check(Raw.GetAllocatedSize() <= ScratchLease->Bytes());
-		verify(ScratchLease->Resize(Raw.GetAllocatedSize()));
+		check(VoxelGenerationAllocation::AllocatedBytes(Raw) <= ScratchLease->Bytes());
+		verify(ScratchLease->Resize(VoxelGenerationAllocation::AllocatedBytes(Raw)));
 	}
 	bool bCapacityBlocked = false;
+	EVoxelTerrainResourceAdmission Admission;
 	if (!VoxelBinary::CompressGranted(Raw, OutBuffer, InResources, InConsumer, MaximumRawBytes,
-		int32(MaxSectionWireBytes), bCapacityBlocked))
+		int32(MaxSectionWireBytes), bCapacityBlocked, &Admission))
 	{
-		OutError = bCapacityBlocked ? TEXT("CapacityBlocked: Voxel原生压缩分配未授予") : TEXT("Voxel原生增量压缩失败");
+		OutError = CodecError(Admission);
 		return false;
 	}
 	OutError.Reset();
@@ -382,34 +414,27 @@ bool FVoxelDeltaDecoder::Advance(const TConstArrayView<uint8> InBytes, const FVo
 			OutError = TEXT("Voxel压缩增量头无效");
 			return false;
 		}
-		const uint64 ScratchBytes = VoxelBoundedAllocation::ArrayBytes<uint8>(int32(RawSize));
-		if (!InResources->Acquire(InConsumer, EVoxelTerrainResourcePool::Working, ScratchBytes, WorkingLease))
-		{
-			OutError = TEXT("CapacityBlocked: Voxel增量解压与Codec工作区");
-			return false;
-		}
+		const uint64 ScratchBytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(int32(RawSize));
+		if (!AcquireDelta(InResources, InConsumer, EVoxelTerrainResourcePool::Working, ScratchBytes, WorkingLease, OutError)) return false;
+		const FVoxelGenerationRequiredSourceScope WorkingSource(&InResources.Get(), WorkingLease.Get());
 		bool bCapacityBlocked = false;
+		EVoxelTerrainResourceAdmission Admission;
 		if (!VoxelBinary::DecompressGranted(InBytes, Raw, InResources, InConsumer, FVoxelDeltaCodec::MaximumRawBytes,
-			bCapacityBlocked) || !MeasureDecodedStorage(Raw, InWorld, OutputBytes, DecodeWorkingBytes))
+			bCapacityBlocked, &Admission) || !MeasureDecodedStorage(Raw, InWorld, OutputBytes, DecodeWorkingBytes))
 		{
 			Raw.Empty();
 			WorkingLease.Reset();
-			OutError = bCapacityBlocked ? TEXT("CapacityBlocked: Voxel原生解压分配未授予") : TEXT("Voxel增量解压或冻结计数失败");
+			OutError = CodecError(Admission);
 			return false;
 		}
 	}
+	const FVoxelGenerationRequiredSourceScope WorkingSource(&InResources.Get(), WorkingLease.Get());
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> DecodeLease;
-	if (DecodeWorkingBytes && !InResources->Acquire(InConsumer, EVoxelTerrainResourcePool::Working, DecodeWorkingBytes, DecodeLease))
-	{
-		OutError = TEXT("CapacityBlocked: Voxel实际解码Palette未授予");
-		return false;
-	}
+	if (DecodeWorkingBytes && !AcquireDelta(InResources, InConsumer, EVoxelTerrainResourcePool::Working,
+		DecodeWorkingBytes, DecodeLease, OutError)) return false;
+	const FVoxelGenerationRequiredSourceScope DecodeSource(&InResources.Get(), DecodeLease.Get());
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> OutputLease;
-	if (!InResources->Acquire(InConsumer, InOutputPool, OutputBytes, OutputLease))
-	{
-		OutError = TEXT("CapacityBlocked: Voxel增量冻结输出");
-		return false;
-	}
+	if (!AcquireDelta(InResources, InConsumer, InOutputPool, OutputBytes, OutputLease, OutError)) return false;
 	auto Candidate = VoxelBoundedAllocation::MakeWorkerShared<FVoxelPersistentSection>(OutputLease);
 	if (!DecodeRaw(Raw, InWorld, InRegistry, *Candidate))
 	{
@@ -418,8 +443,8 @@ bool FVoxelDeltaDecoder::Advance(const TConstArrayView<uint8> InBytes, const FVo
 	}
 	Candidate->ResourceLease = MoveTemp(OutputLease);
 	uint64 Actual = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelPersistentSection>() +
-		Candidate->Blocks.GetAllocatedSize() + Candidate->Entities.GetAllocatedSize();
-	for (const auto& Pair : Candidate->Entities) Actual += Pair.Value.Payload.GetAllocatedSize();
+		VoxelGenerationAllocation::AllocatedBytes(Candidate->Blocks) + VoxelGenerationAllocation::AllocatedBytes(Candidate->Entities);
+	for (const auto& Pair : Candidate->Entities) Actual += VoxelGenerationAllocation::AllocatedBytes(Pair.Value.Payload);
 	check(Actual <= Candidate->ResourceLease->Bytes());
 	verify(Candidate->ResourceLease->Resize(Actual));
 	OutSection = MoveTemp(Candidate);
@@ -433,5 +458,5 @@ bool FVoxelDeltaDecoder::Advance(const TConstArrayView<uint8> InBytes, const FVo
 
 uint64 FVoxelDeltaDecoder::GetRetainedWorkingBytes() const
 {
-	return Raw.GetAllocatedSize();
+	return VoxelGenerationAllocation::AllocatedBytes(Raw);
 }

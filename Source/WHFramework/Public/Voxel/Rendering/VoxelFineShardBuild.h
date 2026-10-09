@@ -2,9 +2,20 @@
 
 #include "CoreMinimal.h"
 #include "Voxel/Generation/VoxelGenerationPipeline.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Runtime/VoxelOverlaySnapshot.h"
 #include "Voxel/Runtime/VoxelFineOverlayRead.h"
 #include "Voxel/Rendering/VoxelFineBuildState.h"
+
+namespace VoxelFineShardCapacity
+{
+	EVoxelTerrainResourceAdmission TryReserve(
+		const TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe>& InResources,
+		const FVoxelGenerationConsumerKey& InConsumer, EVoxelTerrainResourcePool InPool, uint64 InBytes,
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& InOutLease, FString& OutError,
+		uint64& OutBeforeVersion, uint64 InAdditionalWorkingBytes = 0, uint64 InAdditionalStagedBytes = 0,
+		int32 InAdditionalLeaseCount = 0, EVoxelTerrainResourcePool* OutUnachievablePool = nullptr);
+}
 
 struct WHFRAMEWORK_API FVoxelFineShardSamples
 {
@@ -46,6 +57,7 @@ public:
 	static bool GatherRequiredSections(const FVoxelFineShardKey& InKey, TArray<FIntVector>& OutSections, FString& OutError);
 
 private:
+	void VisitResourceSources(FVoxelGenerationRequiredSourceScope::FVisit InVisit) const;
 	void CopySection(const FIntVector& InSection, TConstArrayView<FVoxelBlockState> InBlocks);
 	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> Generator;
 	TSharedRef<const FVoxelOverlaySnapshotSet, ESPMode::ThreadSafe> Overlay;
@@ -149,6 +161,7 @@ public:
 		const FVoxelGenerationConsumerKey& InConsumer, double InTextureRepeatsPerCell = 1.0);
 	bool Initialize(uint64 InMaximumPieceBytes, uint64 InMaximumTotalGeometryBytes, FString& OutError);
 	EVoxelFineBuildProgress Advance(const TAtomic<bool>& InCancel, FString& OutError);
+	// InCapacityVersion 是原 Consumer 排除自身退款后的外部释放版本。
 	bool ResumeCapacity(uint64 InCapacityVersion, FString& OutError);
 	TSharedPtr<const FVoxelFineShardGeometry, ESPMode::ThreadSafe> TakeResult();
 	uint64 AllocatedBytes() const;
@@ -159,9 +172,10 @@ public:
 		FVoxelSectionSnapshot& OutSnapshot, FString& OutError);
 
 private:
+	void VisitResourceSources(FVoxelGenerationRequiredSourceScope::FVisit InVisit) const;
 	void Abort();
 	bool SplitPending(FString& OutError);
-	bool ReserveMetadata(int32 InPendingCount, int32 InPieceCount);
+	bool ReserveMetadata(int32 InPendingCount, int32 InPieceCount, FString& OutError);
 	EVoxelFineBuildProgress Block(EVoxelFineCapacityReason InReason, uint64 InWorkingBytes, uint64 InResultBytes);
 	TSharedPtr<const FVoxelFineShardSamples, ESPMode::ThreadSafe> Samples;
 	TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> Registry;

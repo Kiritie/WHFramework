@@ -243,6 +243,9 @@ bool FVoxelEmergeCapacityContinuationTest::RunTest(const FString&)
 	FVoxelExactDemand Demand;
 	Demand.bExact = true;
 	Manager.CurrentDemand.Add(Key, Demand);
+	const auto* Waiting = Manager.FindOrCreateWaiting(*Section, Key);
+	if (!TestNotNull(TEXT("完成结果保留真实原等待槽"), Waiting)) return false;
+	const auto Consumer = Waiting->Consumer;
 	FVoxelTaskResult Result;
 	Result.Kind = EVoxelTaskKind::GenerateExactBase;
 	Result.bSuccess = true;
@@ -251,9 +254,9 @@ bool FVoxelEmergeCapacityContinuationTest::RunTest(const FString&)
 	Result.Stamp.WorldEpoch = Runtime.Epoch();
 	Result.Stamp.Token = Section->Stamp.Token;
 	Result.Stamp.Section = Key;
+	Result.Stamp.Revision = Consumer.RequestSerial;
 	const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<TArray<FVoxelBlockState>>() +
 		VoxelBoundedAllocation::ArrayBytes<FVoxelBlockState>(4096);
-	const auto Consumer = FVoxelGenerationConsumerKey::Section(Runtime.Epoch(), Manager.GenerationOwnerId, Section->Stamp.Token, Key, 1);
 	if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Staged, Bytes, Result.OutputResourceLease)) return false;
 	Result.BaseBlocks.Init(FVoxelBlockState(), 4096);
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ReceiptLease;
@@ -286,6 +289,7 @@ bool FVoxelEmergeCapacityContinuationTest::RunTest(const FString&)
 	Late.Stamp.WorldEpoch = Old.Epoch;
 	Late.Stamp.Token = Old.Token;
 	Late.Stamp.Section = Key;
+	Late.Stamp.Revision = Consumer.RequestSerial;
 	Late.BaseBlocks.Init(FVoxelBlockState(), 4096);
 	Manager.OnTask(MoveTemp(Late));
 	TestTrue(TEXT("旧代结果不能写入新代或完成槽"), Section->Status == EVoxelSectionStatus::Allocated &&
@@ -293,6 +297,10 @@ bool FVoxelEmergeCapacityContinuationTest::RunTest(const FString&)
 	const FIntVector CanceledKey(4, 0, 0);
 	auto* CanceledSection = Runtime.FindOrAllocate(CanceledKey, 2);
 	if (!CanceledSection) return false;
+	Manager.CurrentDemand.Add(CanceledKey, Demand);
+	const auto* CanceledWaiting = Manager.FindOrCreateWaiting(*CanceledSection, CanceledKey);
+	if (!TestNotNull(TEXT("撤销夹具保留真实原等待槽"), CanceledWaiting)) return false;
+	const auto CanceledConsumer = CanceledWaiting->Consumer;
 	FVoxelTaskResult Canceled;
 	Canceled.Kind = EVoxelTaskKind::GenerateExactBase;
 	Canceled.bSuccess = true;
@@ -301,8 +309,7 @@ bool FVoxelEmergeCapacityContinuationTest::RunTest(const FString&)
 	Canceled.Stamp.WorldEpoch = Runtime.Epoch();
 	Canceled.Stamp.Token = CanceledSection->Stamp.Token;
 	Canceled.Stamp.Section = CanceledKey;
-	const auto CanceledConsumer = FVoxelGenerationConsumerKey::Section(Runtime.Epoch(), Manager.GenerationOwnerId,
-		CanceledSection->Stamp.Token, CanceledKey, 1);
+	Canceled.Stamp.Revision = CanceledConsumer.RequestSerial;
 	if (!Resources->Acquire(CanceledConsumer, EVoxelTerrainResourcePool::Staged, Bytes, Canceled.OutputResourceLease)) return false;
 	Canceled.BaseBlocks.Init(FVoxelBlockState(), 4096);
 	ReceiptLease.Reset();

@@ -7,7 +7,10 @@
 #include "GameFramework/PlayerController.h"
 #include "Net/UnrealNetwork.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
+#include "Voxel/Network/VoxelGeometryWire.h"
 #include "Voxel/Network/VoxelNetworkCodec.h"
+#include "Voxel/Generation/VoxelManifestCodec.h"
 #include "Voxel/Network/VoxelRepresentationSync.h"
 #include "Voxel/Runtime/VoxelWorldRuntime.h"
 #include "Voxel/Serialization/VoxelBinaryCodec.h"
@@ -39,6 +42,11 @@ UVoxelModuleNetworkComponent::UVoxelModuleNetworkComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
 	SetIsReplicatedByDefault(true);
+}
+
+UVoxelModuleNetworkComponent::UVoxelModuleNetworkComponent(FVTableHelper& Helper)
+	: Super(Helper)
+{
 }
 
 UVoxelModuleNetworkComponent::~UVoxelModuleNetworkComponent() = default;
@@ -84,10 +92,10 @@ void UVoxelModuleNetworkComponent::TickComponent(
 	const double Now = FPlatformTime::Seconds();
 	// 世界就绪后所有协议、传输和重试工作都由 Module 的同一个 FrameContext 推进。
 	if (VoxelModule->IsReady()) return;
-	Transfer.Tick(Now, [this](const TArray<uint8>& InFragment)
+	Transfer.Tick(Now, [this](TArray<uint8>&& InFragment)
 	{
 		FVoxelRPCPacket Packet;
-		Packet.Bytes = InFragment;
+		Packet.Bytes = MoveTemp(InFragment);
 		if (GetOwner() && GetOwner()->HasAuthority())
 		{
 			ClientReceive(Packet);
@@ -105,21 +113,9 @@ void UVoxelModuleNetworkComponent::TickComponent(
 			RefreshInterest(Now);
 		}
 	}
-	else if (!bWelcomed && Now - LastHello >= 1.0)
+	else if (!bWelcomed && !bPendingReady && Now - LastHello >= 1.0)
 	{
-		if (ClientNonce == 0)
-		{
-			ClientNonce = FMath::Max<uint64>(1, FPlatformTime::Cycles64());
-		}
-		FVoxelNetworkHello Hello;
-		Hello.Nonce = ClientNonce;
-		Hello.RegistryHash = VoxelModule->GetRegistry() ? VoxelModule->GetRegistry()->Hash : 0;
-		TArray<uint8> Payload;
-		if (FVoxelNetworkCodec::EncodeHello(Hello, Payload))
-		{
-			Send(EVoxelMessage::Hello, Payload, EVoxelTransferPriority::Critical);
-		}
-		LastHello = Now;
+		SendHello(Now);
 	}
 }
 
@@ -280,6 +276,26 @@ void UVoxelModuleNetworkComponent::ResetProtocol()
 	SourceId.Invalidate();
 	ClientNonce = 0;
 	NextOutboundId = 1;
+	NetworkStateConsumer = {};
+	NetworkTransferConsumer = {};
+	NetworkStateCapacityConsumer = {};
+	NetworkStateCapacityVersion = 0;
+	bNetworkStateWaitingCapacity = false;
+	bNetworkTransferBound = false;
+	PendingWelcomeConsumer = {};
+	PendingWelcomeSession.Invalidate();
+	PendingWelcomeNonce = 0;
+	PendingWelcomeCapacityVersion = 0;
+	HelloCapacityVersion = 0;
+	bPendingWelcome = false;
+	bPendingWelcomeWaitingCapacity = false;
+	bHelloWaitingCapacity = false;
+	PendingReadyConsumer = {};
+	PendingReadySession.Invalidate();
+	PendingReadyCapacityVersion = 0;
+	bPendingReady = false;
+	bPendingReadyServer = false;
+	bPendingReadyWaitingCapacity = false;
 	LastInboundEditId = 0;
 	LastHello = -10.0;
 	LastInterest = -10.0;
@@ -297,7 +313,74 @@ bool UVoxelModuleNetworkComponent::AdvanceDeferredWorldControl()
 {
 	auto* WorldModule = Module.Get();
 	if (!WorldModule || WorldModule->GetTerrainFrameContext().IsActive()) return false;
+	if (bPendingWelcome) return FinishPendingWelcome();
+	if (bPendingReady) return FinishPendingReady();
 	return ApplyDecodedEnvelope(true);
+}
+
+bool UVoxelModuleNetworkComponent::FinishPendingReady()
+{
+	auto* WorldModule = Module.Get();
+	if (!bPendingReady || !WorldModule || bRejected) return false;
+	if (!PendingReadyConsumer.IsValid() || PendingReadyConsumer.WorldEpoch != WorldModule->GetWorldEpoch() ||
+		PendingReadyConsumer.OwnerId != TaskOwnerId || PendingReadyConsumer.OwnerIncarnation != TaskOwnerIncarnation ||
+		PendingReadySession != Session)
+	{
+		Fail(TEXT("InvalidResource: original Ready control cut changed"));
+		return false;
+	}
+	FString Error;
+	if (!EnsureNetworkState(Error))
+	{
+		if (!Error.StartsWith(TEXT("CapacityBlocked"))) Fail(Error);
+		else WorldModule->QueueTerrainWorldControl(this);
+		return false;
+	}
+	if (bPendingReadyServer)
+	{
+		bPendingReady = false;
+		bReady = true;
+		return true;
+	}
+	const auto Resources = OverlayNetwork->Resources;
+	uint64 BeforeAdmission = 0;
+	if (!Resources->TryGetReleaseVersionExcludingOwner(PendingReadyConsumer, BeforeAdmission) ||
+		(bPendingReadyWaitingCapacity && BeforeAdmission <= PendingReadyCapacityVersion))
+	{
+		WorldModule->QueueTerrainWorldControl(this);
+		return false;
+	}
+	bPendingReadyWaitingCapacity = false;
+	const auto& Manifest = WorldModule->GetManifest();
+	const uint64 Values[] = {Manifest.RecipeHash, Manifest.RegistryHash, Manifest.BaseSampleHash};
+	uint8 Payload[sizeof(Values)];
+	for (int32 Index = 0; Index < UE_ARRAY_COUNT(Values); ++Index)
+	{
+		if (Values[Index] == 0)
+		{
+			Fail(TEXT("InvalidResource: original Ready manifest identity"));
+			return false;
+		}
+		for (int32 Byte = 0; Byte < sizeof(uint64); ++Byte)
+			Payload[Index * sizeof(uint64) + Byte] = uint8(Values[Index] >> (Byte * 8));
+	}
+	FVoxelGenerationRequiredSourceScope StateSource(Resources.Get(), OverlayNetwork->ResourceLease.Get());
+	if (!Send(EVoxelMessage::Ready, MakeArrayView(Payload), EVoxelTransferPriority::Critical, &PendingReadyConsumer, &Error))
+	{
+		if (!Error.StartsWith(TEXT("CapacityBlocked")) && !Error.StartsWith(TEXT("PlanningPending")))
+		{
+			Fail(Error);
+			return false;
+		}
+		bPendingReadyWaitingCapacity = Error.StartsWith(TEXT("CapacityBlocked"));
+		PendingReadyCapacityVersion = BeforeAdmission;
+		WorldModule->QueueTerrainWorldControl(this);
+		return false;
+	}
+	bPendingReady = false;
+	bWelcomed = true;
+	bReady = true;
+	return true;
 }
 
 void UVoxelModuleNetworkComponent::Fail(const FString& InReason)
@@ -311,55 +394,292 @@ void UVoxelModuleNetworkComponent::Fail(const FString& InReason)
 	OnProtocolFailure.Broadcast(InReason);
 }
 
-bool UVoxelModuleNetworkComponent::Send(
-	const EVoxelMessage InKind,
-	const TArray<uint8>& InPayload,
-	const EVoxelTransferPriority InPriority)
+void UVoxelModuleNetworkComponent::SendHello(const double InNow)
 {
-	TArray<uint8> Message;
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Scratch;
-	if (OverlayNetwork)
+	auto* WorldModule = Module.Get();
+	if (!WorldModule || bRejected || bWelcomed || bPendingReady) return;
+	if (ClientNonce == 0) ClientNonce = FPlatformTime::Cycles64() | 1;
+	FString Error;
+	if (!EnsureTransferResources(Error))
 	{
-		const uint64 Bytes = VoxelBoundedAllocation::InitialGrowBytes<uint8>(InPayload.Num() + 29);
-		const auto Consumer = FVoxelGenerationConsumerKey::Section(Module->GetWorldEpoch(), TaskOwnerId,
+		if (!Error.StartsWith(TEXT("CapacityBlocked"))) Fail(Error);
+		return;
+	}
+	const auto Resources = Transfer.GetResources();
+	uint64 BeforeAdmission = 0;
+	if (!Resources->TryGetReleaseVersionExcludingOwner(NetworkTransferConsumer, BeforeAdmission) ||
+		(bHelloWaitingCapacity && BeforeAdmission <= HelloCapacityVersion)) return;
+	bHelloWaitingCapacity = false;
+	const uint64 RegistryHash = WorldModule->GetRegistry() ? WorldModule->GetRegistry()->Hash : 0;
+	if (RegistryHash == 0) return;
+	uint8 Payload[20];
+	for (int32 Byte = 0; Byte < 4; ++Byte) Payload[Byte] = uint8(VoxelProtocolVersion >> (Byte * 8));
+	for (int32 Byte = 0; Byte < 8; ++Byte)
+	{
+		Payload[4 + Byte] = uint8(ClientNonce >> (Byte * 8));
+		Payload[12 + Byte] = uint8(RegistryHash >> (Byte * 8));
+	}
+	if (!Send(EVoxelMessage::Hello, MakeArrayView(Payload), EVoxelTransferPriority::Critical, &NetworkTransferConsumer, &Error))
+	{
+		bHelloWaitingCapacity = Error.StartsWith(TEXT("CapacityBlocked"));
+		HelloCapacityVersion = BeforeAdmission;
+		if (!bHelloWaitingCapacity && !Error.StartsWith(TEXT("PlanningPending"))) Fail(Error);
+		return;
+	}
+	LastHello = InNow;
+}
+
+bool UVoxelModuleNetworkComponent::Send(const EVoxelMessage InKind,
+	const TConstArrayView<uint8> InPayload, const EVoxelTransferPriority InPriority,
+	const FVoxelGenerationConsumerKey* InConsumer, FString* OutError)
+{
+	if (InPayload.Num() > FVoxelNetworkCodec::MaxWireBytes - 64)
+	{
+		if (OutError) *OutError = TEXT("Oversized: voxel envelope wire length");
+		return false;
+	}
+	FString Error;
+	if (!EnsureTransferResources(Error))
+	{
+		if (OutError) *OutError = MoveTemp(Error);
+		return false;
+	}
+	const auto Resources = Transfer.GetResources();
+	FVoxelGenerationConsumerKey Consumer;
+	if (InConsumer) Consumer = *InConsumer;
+	else
+	{
+		if (NextTaskSerial == MAX_uint64)
+		{
+			if (OutError) *OutError = TEXT("Oversized: voxel send identity");
+			return false;
+		}
+		Consumer = FVoxelGenerationConsumerKey::Section(Resources->GetControlConsumer().WorldEpoch, TaskOwnerId,
 			TaskOwnerIncarnation, {}, ++NextTaskSerial);
-		if (!OverlayNetwork->Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Staged, Bytes, Lease) ||
-			!OverlayNetwork->Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Working, Bytes, Scratch)) return false;
+	}
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+	TArray<uint8> Message;
+	FVoxelGenerationRequiredSourceScope TransferSource(Resources.Get(), Transfer.GetMetadataLease().Get());
+	FVoxelGenerationRequiredCapacity Required;
+	if (!FVoxelGenerationRequiredSourceScope::Collect(*Resources, nullptr, Required, Error))
+	{
+		if (OutError) *OutError = MoveTemp(Error);
+		return false;
+	}
+	const uint64 Bytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(InPayload.Num() + 29);
+	const auto Admission = Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Staged, Bytes, Lease, 0,
+		Required.Bytes[int32(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+	if (Admission != EVoxelTerrainResourceAdmission::Granted)
+	{
+		if (OutError) *OutError = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ?
+			TEXT("CapacityBlocked: original voxel envelope send") : Admission == EVoxelTerrainResourceAdmission::InvalidRequest ?
+			TEXT("InvalidResource: original voxel envelope consumer") : TEXT("Oversized: original voxel envelope send");
+		return false;
 	}
 	const FGuid EnvelopeSession = InKind == EVoxelMessage::Hello ? FGuid() : Session;
-	if (!FVoxelNetworkCodec::Encode(InKind, EnvelopeSession, InPayload, Message)) return false;
-	if (Lease)
+	if (!FVoxelNetworkCodec::Encode(InKind, EnvelopeSession, InPayload, Message) ||
+		VoxelGenerationAllocation::AllocatedBytes(Message) != Lease->Bytes())
 	{
-		if (uint64(Message.GetAllocatedSize()) > Lease->Bytes()) return false;
-		Lease->Resize(Message.GetAllocatedSize());
+		if (OutError) *OutError = TEXT("InvalidResource: voxel envelope reserve contract");
+		return false;
 	}
-	return Transfer.Enqueue(InPriority, MoveTemp(Message), MoveTemp(Lease));
+	if (!Transfer.Enqueue(InPriority, MoveTemp(Message), MoveTemp(Lease), &Error))
+	{
+		if (OutError) *OutError = MoveTemp(Error);
+		return false;
+	}
+	if (OutError) OutError->Reset();
+	return true;
+}
+
+void UVoxelModuleNetworkComponent::ProcessBootstrapPacket(const FVoxelRPCPacket& InPacket, const bool bInServer)
+{
+	FVoxelByteReader Fragment(InPacket.Bytes);
+	const uint32 Magic = Fragment.U32();
+	const uint64 Id = Fragment.U64();
+	const uint16 Index = Fragment.U16();
+	const uint16 Count = Fragment.U16();
+	const uint32 Total = Fragment.U32();
+	const uint32 Crc = Fragment.U32();
+	const auto Bytes = Fragment.BlobView(4096);
+	if (Magic != 0x34475246 || Id == 0 || Index != 0 || Count != 1 || Total != uint32(Bytes.Num()) ||
+		!Fragment.End() || Total > uint32(FVoxelManifestCodec::MaxBytes + 64 + 29) ||
+		FCrc::MemCrc32(Bytes.GetData(), Bytes.Num()) != Crc)
+	{
+		Fail(TEXT("InvalidResource: malformed original bootstrap fragment"));
+		return;
+	}
+	FVoxelByteReader Envelope(Bytes);
+	const uint32 WireMagic = Envelope.U32();
+	const uint32 Protocol = Envelope.U32();
+	const auto Kind = EVoxelMessage(Envelope.U8());
+	const FGuid InSession = Envelope.Guid();
+	const auto Payload = Envelope.BlobView(FVoxelManifestCodec::MaxBytes + 64);
+	const bool bHello = bInServer && Kind == EVoxelMessage::Hello && !InSession.IsValid();
+	const bool bReadyControl = bInServer && Kind == EVoxelMessage::Ready && bWelcomed && InSession == Session;
+	const bool bWelcome = !bInServer && Kind == EVoxelMessage::Welcome && InSession.IsValid();
+	if (WireMagic != 0x34544E56 || Protocol != VoxelProtocolVersion || !Envelope.End() ||
+		(!bHello && !bReadyControl && !bWelcome))
+	{
+		Fail(TEXT("InvalidResource: original bootstrap envelope identity"));
+		return;
+	}
+	if (bReadyControl) HandleReadyPayload(Payload);
+	else if (bInServer) HandleHelloPayload(Payload);
+	else HandleWelcomePayload(Payload, InSession);
+}
+
+void UVoxelModuleNetworkComponent::DeferIngressResync(const FVoxelGenerationConsumerKey& InConsumer,
+	const uint64 InBeforeAdmission, const bool bInServer, const bool bInAwaitRelease)
+{
+	const auto StateOwner = OverlayNetwork;
+	auto* WorldModule = Module.Get();
+	if (!StateOwner || !WorldModule || !WorldModule->IsReady() || !InConsumer.IsValid() ||
+		InConsumer.WorldEpoch != WorldModule->GetWorldEpoch() || InConsumer.OwnerId != TaskOwnerId ||
+		InConsumer.OwnerIncarnation != TaskOwnerIncarnation ||
+		(StateOwner->Resources->GetControlConsumer().IsValid() &&
+			StateOwner->Resources->GetControlConsumer().WorldEpoch != InConsumer.WorldEpoch)) return;
+	StateOwner->IngressCapacityConsumer = InConsumer;
+	StateOwner->IngressCapacityVersion = InBeforeAdmission;
+	StateOwner->bIngressWaitingCapacity = bInAwaitRelease;
+	if (!StateOwner->bIngressResyncPending)
+	{
+		StateOwner->bIngressResyncPending = true;
+		UE_LOG(LogTemp, Warning, TEXT("Voxel transport gap; original subscription requires resynchronization"));
+	}
+	if (bInServer)
+	{
+		StateOwner->bNeedsSnapshot |= !StateOwner->Regions.IsEmpty();
+		return;
+	}
+	auto* Replica = WorldModule->GetOverlayReplica();
+	if (Replica)
+	{
+		for (const auto& Key : StateOwner->Regions)
+		{
+			if (Replica->GetState(Key) != EVoxelOverlayReplicaState::Unknown) Replica->MarkGap(Key);
+		}
+	}
+	StateOwner->RetryCount = FMath::Max(StateOwner->RetryCount, 3);
+	StateOwner->LastRetry = -10.0;
+}
+
+bool UVoxelModuleNetworkComponent::HandleHelloPayload(const TConstArrayView<uint8> InPayload)
+{
+	auto* WorldModule = Module.Get();
+	FVoxelNetworkHello Hello;
+	if (!WorldModule || !FVoxelNetworkCodec::DecodeHello(InPayload, Hello) ||
+		!WorldModule->GetRegistry() || Hello.RegistryHash != WorldModule->GetRegistry()->Hash || !WorldModule->IsReady())
+	{
+		Fail(TEXT("Voxel hello is incompatible with the authoritative world"));
+		return false;
+	}
+	if (Hello.Nonce == PendingWelcomeNonce && bWelcomed && !bPendingWelcome &&
+		PendingWelcomeConsumer.WorldEpoch == WorldModule->GetWorldEpoch() &&
+		PendingWelcomeConsumer.OwnerId == TaskOwnerId && PendingWelcomeConsumer.OwnerIncarnation == TaskOwnerIncarnation &&
+		PendingWelcomeSession == WorldModule->GetSessionId()) return true;
+	if (!bPendingWelcome || PendingWelcomeNonce != Hello.Nonce)
+	{
+		if (NextTaskSerial == MAX_uint64)
+		{
+			Fail(TEXT("Oversized: original Welcome identity"));
+			return false;
+		}
+		PendingWelcomeConsumer = FVoxelGenerationConsumerKey::Section(WorldModule->GetWorldEpoch(), TaskOwnerId,
+			TaskOwnerIncarnation, {}, ++NextTaskSerial);
+		PendingWelcomeNonce = Hello.Nonce;
+		PendingWelcomeSession = WorldModule->GetSessionId();
+		bPendingWelcomeWaitingCapacity = false;
+		bPendingWelcome = true;
+	}
+	Session = PendingWelcomeSession;
+	if (!WorldModule->GetTerrainFrameContext().IsActive()) FinishPendingWelcome();
+	else WorldModule->QueueTerrainWorldControl(this);
+	return !bRejected;
+}
+
+bool UVoxelModuleNetworkComponent::FinishPendingWelcome()
+{
+	auto* WorldModule = Module.Get();
+	if (!WorldModule || !bPendingWelcome || bRejected) return false;
+	if (WorldModule->GetTerrainFrameContext().IsActive())
+	{
+		WorldModule->QueueTerrainWorldControl(this);
+		return false;
+	}
+	if (!WorldModule->IsReady() || PendingWelcomeConsumer.WorldEpoch != WorldModule->GetWorldEpoch() ||
+		PendingWelcomeConsumer.OwnerId != TaskOwnerId || PendingWelcomeConsumer.OwnerIncarnation != TaskOwnerIncarnation ||
+		PendingWelcomeSession != WorldModule->GetSessionId() || PendingWelcomeSession != Session)
+	{
+		Fail(TEXT("InvalidResource: original Welcome control cut changed"));
+		return false;
+	}
+	FString Error;
+	if (!EnsureNetworkState(Error))
+	{
+		if (Error.StartsWith(TEXT("CapacityBlocked"))) WorldModule->QueueTerrainWorldControl(this);
+		else Fail(Error);
+		return false;
+	}
+	const auto Resources = Transfer.GetResources();
+	uint64 BeforeAdmission = 0;
+	if (!Resources->TryGetReleaseVersionExcludingOwner(PendingWelcomeConsumer, BeforeAdmission) ||
+		(bPendingWelcomeWaitingCapacity && BeforeAdmission <= PendingWelcomeCapacityVersion))
+	{
+		WorldModule->QueueTerrainWorldControl(this);
+		return false;
+	}
+	bPendingWelcomeWaitingCapacity = false;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Scratch;
+	TArray<uint8> Payload;
+	FVoxelGenerationRequiredSourceScope StateSource(Resources.Get(), OverlayNetwork->ResourceLease.Get());
+	FVoxelGenerationRequiredSourceScope DirectorySource(Resources.Get(), Transfer.GetMetadataLease().Get());
+	FVoxelGenerationRequiredCapacity Required;
+	if (!FVoxelGenerationRequiredSourceScope::Collect(*Resources, nullptr, Required, Error))
+	{
+		Fail(Error);
+		return false;
+	}
+	const uint64 Bytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(FVoxelManifestCodec::MaxBytes) +
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(FVoxelManifestCodec::MaxBytes + 64);
+	const auto Admission = Resources->TryAcquire(PendingWelcomeConsumer, EVoxelTerrainResourcePool::Working, Bytes, Scratch, 0,
+		Required.Bytes[int32(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+	if (Admission != EVoxelTerrainResourceAdmission::Granted)
+	{
+		bPendingWelcomeWaitingCapacity = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked;
+		PendingWelcomeCapacityVersion = BeforeAdmission;
+		if (bPendingWelcomeWaitingCapacity) WorldModule->QueueTerrainWorldControl(this);
+		else Fail(Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+			TEXT("Oversized: original Welcome native buffers") : TEXT("InvalidResource: original Welcome consumer"));
+		return false;
+	}
+	FVoxelNetworkWelcome Welcome;
+	Welcome.EchoNonce = PendingWelcomeNonce;
+	Welcome.AuthorityWorldEpoch = WorldModule->GetWorldEpoch();
+	Welcome.Session = Session;
+	Welcome.Manifest = WorldModule->GetManifest();
+	FVoxelGenerationRequiredSourceScope ScratchSource(Resources.Get(), Scratch.Get());
+	if (!FVoxelNetworkCodec::EncodeWelcome(Welcome, Payload))
+	{
+		Fail(TEXT("InvalidResource: original Welcome encoding"));
+		return false;
+	}
+	if (!Send(EVoxelMessage::Welcome, Payload, EVoxelTransferPriority::Critical, &PendingWelcomeConsumer, &Error))
+	{
+		bPendingWelcomeWaitingCapacity = Error.StartsWith(TEXT("CapacityBlocked"));
+		PendingWelcomeCapacityVersion = BeforeAdmission;
+		if (bPendingWelcomeWaitingCapacity || Error.StartsWith(TEXT("PlanningPending"))) WorldModule->QueueTerrainWorldControl(this);
+		else Fail(Error);
+		return false;
+	}
+	bPendingWelcome = false;
+	bWelcomed = true;
+	return true;
 }
 
 void UVoxelModuleNetworkComponent::Receive(const FVoxelRPCPacket& InPacket, const bool bInServer)
 {
-	if (!OverlayNetwork || !Module.IsValid() || !Module->IsReady()) { ProcessPacket(InPacket, bInServer); return; }
-	const uint64 Bytes = VoxelBoundedAllocation::ArrayBytes<uint8>(InPacket.Bytes.Num()) + sizeof(FVoxelOverlayQueuedPacket) + sizeof(void*);
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-	if (InPacket.Bytes.Num() > 4608 || OverlayNetwork->PacketBytes + Bytes > 32ull * 1024 * 1024 ||
-		!OverlayNetwork->Resources->Acquire(FVoxelGenerationConsumerKey::Section(Module->GetWorldEpoch(), TaskOwnerId,
-			TaskOwnerIncarnation, {}, ++NextTaskSerial), EVoxelTerrainResourcePool::Input, Bytes, Lease))
-	{
-		Fail(TEXT("Voxel transport receive capacity exceeded"));
-		return;
-	}
-	FVoxelOverlayQueuedPacket Queued;
-	Queued.bServer = bInServer;
-	Queued.ResourceLease = MoveTemp(Lease);
-	Queued.Packet.Bytes.Reserve(InPacket.Bytes.Num());
-	Queued.Packet.Bytes.Append(InPacket.Bytes);
-	OverlayNetwork->PacketBytes += Bytes;
-	OverlayNetwork->Packets.Enqueue(MoveTemp(Queued));
-}
-
-void UVoxelModuleNetworkComponent::ProcessPacket(const FVoxelRPCPacket& InPacket, const bool bInServer)
-{
+	if (bRejected) return;
 	const double Now = FPlatformTime::Seconds();
 	if (Now - PacketWindow >= 1.0)
 	{
@@ -371,52 +691,156 @@ void UVoxelModuleNetworkComponent::ProcessPacket(const FVoxelRPCPacket& InPacket
 		Fail(TEXT("Voxel network packet rate exceeded"));
 		return;
 	}
-	TArray<uint8> Completed;
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> CompletedLease;
-	uint32 Crc = 0;
-	const bool bWorkerDecode = OverlayNetwork && Module.IsValid() && Module->IsReady();
-	const bool bAssembled = bWorkerDecode ? Transfer.Assemble(InPacket.Bytes, Now, Completed, Crc, &CompletedLease) :
-		Transfer.Receive(InPacket.Bytes, Now, Completed, &CompletedLease);
-	if (!bAssembled)
+	if ((!OverlayNetwork && (!bReady || !bNetworkTransferBound)) || (bInServer && !bReady))
 	{
-		Fail(TEXT("Malformed voxel transfer fragment"));
+		ProcessBootstrapPacket(InPacket, bInServer);
 		return;
 	}
-	if (Completed.IsEmpty())
+	if (!OverlayNetwork || !Module.IsValid() || !Module->IsReady() || !bNetworkTransferBound)
 	{
+		Fail(TEXT("InvalidResource: original network packet world is unavailable"));
 		return;
 	}
-	if (bWorkerDecode)
+	if (InPacket.Bytes.Num() > 4608 || NextTaskSerial == MAX_uint64)
 	{
-		FString Error;
-		const auto Consumer = FVoxelGenerationConsumerKey::Section(Module->GetWorldEpoch(), TaskOwnerId,
-			TaskOwnerIncarnation, {}, ++NextTaskSerial);
-		auto Work = FVoxelNetworkEnvelopeDecode::Create(OverlayNetwork->Resources.ToSharedRef(), Consumer,
-			MoveTemp(Completed), MoveTemp(CompletedLease), Crc, bInServer, Error);
-		if (!Work) { Fail(Error); return; }
-		const uint64 Quota = Work->GetIngressQuotaBytes();
-		if (Quota + PendingRepresentationBytes + OverlayNetwork->EnvelopeBytes + OverlayNetwork->PacketBytes + OverlayNetwork->InboundBytes > 32ull * 1024 * 1024)
+		Fail(TEXT("Oversized: original network packet length or identity"));
+		return;
+	}
+	const uint64 Bytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(InPacket.Bytes.Num());
+	const uint64 NodeBytes = TVoxelNetworkQueue<FVoxelOverlayQueuedPacket>::NodeBytes();
+	if (InPacket.Bytes.IsEmpty())
+	{
+		Fail(TEXT("InvalidResource: original network packet is empty"));
+		return;
+	}
+	const auto StateOwner = OverlayNetwork;
+	const auto Resources = StateOwner->Resources;
+	if (StateOwner->bIngressWaitingCapacity)
+	{
+		uint64 Current = 0;
+		if (!Resources->TryGetReleaseVersionExcludingOwner(StateOwner->IngressCapacityConsumer, Current) ||
+			Current <= StateOwner->IngressCapacityVersion) return;
+		StateOwner->bIngressWaitingCapacity = false;
+	}
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+	FVoxelOverlayQueuedPacket Queued;
+	Queued.Consumer = FVoxelGenerationConsumerKey::Section(Module->GetWorldEpoch(), TaskOwnerId,
+		TaskOwnerIncarnation, {}, ++NextTaskSerial);
+	const uint64 BeforeAdmission = Resources->ReleaseVersionExcludingOwner(Queued.Consumer);
+	if (StateOwner->PacketBytes + Bytes > 32ull * 1024 * 1024)
+	{
+		DeferIngressResync(Queued.Consumer, BeforeAdmission, bInServer);
+		return;
+	}
+	const auto DirectoryLease = Transfer.GetMetadataLease();
+	FVoxelGenerationRequiredSourceScope StateSource(Resources.Get(), StateOwner->ResourceLease.Get());
+	FVoxelGenerationRequiredSourceScope DirectorySource(Resources.Get(), DirectoryLease.Get());
+	FVoxelGenerationRequiredCapacity Required;
+	FString Error;
+	if (!FVoxelGenerationRequiredSourceScope::Collect(*Resources, nullptr, Required, Error)) { Fail(Error); return; }
+	const auto Admission = Resources->TryAcquire(Queued.Consumer, EVoxelTerrainResourcePool::Input, Bytes + NodeBytes, Lease, 1,
+		Required.Bytes[int32(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+	if (Admission != EVoxelTerrainResourceAdmission::Granted)
+	{
+		if (Admission == EVoxelTerrainResourceAdmission::CapacityBlocked)
 		{
-			Fail(TEXT("完整 Envelope 超过连接接收配额"));
+			DeferIngressResync(Queued.Consumer, BeforeAdmission, bInServer);
 			return;
 		}
-		OverlayNetwork->EnvelopeBytes += Quota;
-		OverlayNetwork->Envelopes.Enqueue(MoveTemp(Work));
+		DeferIngressResync(Queued.Consumer, BeforeAdmission, bInServer);
+		Fail(Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("Oversized: original RPC packet ingress") :
+			TEXT("InvalidResource: original RPC packet consumer"));
 		return;
 	}
-	FVoxelWireMessage Message;
-	if (!FVoxelNetworkCodec::Decode(Completed, Message))
+	auto NodeLease = Lease->Split(NodeBytes);
+	if (!NodeLease) { Fail(TEXT("InvalidResource: packet queue prepaid node")); return; }
+	Queued.bServer = bInServer;
+	Queued.ResourceLease = MoveTemp(Lease);
+	Queued.Packet.Bytes.Reserve(InPacket.Bytes.Num());
+	Queued.Packet.Bytes.Append(InPacket.Bytes);
+	const auto BodyLease = Queued.ResourceLease;
+	StateOwner->PacketBytes += Bytes;
+	if (!StateOwner->Packets.Enqueue(MoveTemp(Queued), MoveTemp(NodeLease)))
 	{
-		Fail(TEXT("Malformed voxel V4 envelope"));
+		Fail(TEXT("InvalidResource: packet queue node grant"));
 		return;
 	}
-	if (Message.Kind != EVoxelMessage::Hello && Message.Kind != EVoxelMessage::Welcome &&
-		bWelcomed && Message.Session != Session)
+	BodyLease->MarkPublished();
+}
+
+bool UVoxelModuleNetworkComponent::ProcessPacket(const FVoxelOverlayQueuedPacket& InPacket)
+{
+	const auto StateOwner = OverlayNetwork;
+	auto* WorldModule = Module.Get();
+	if (!StateOwner || !WorldModule || !WorldModule->IsReady() || !bNetworkTransferBound ||
+		InPacket.Consumer.WorldEpoch != WorldModule->GetWorldEpoch() || InPacket.Consumer.OwnerId != TaskOwnerId ||
+		InPacket.Consumer.OwnerIncarnation != TaskOwnerIncarnation)
 	{
-		Fail(TEXT("Voxel session identity mismatch"));
-		return;
+		Fail(TEXT("InvalidResource: original packet head identity changed"));
+		return true;
 	}
-	Handle(Message, bInServer);
+	const auto Resources = StateOwner->Resources;
+	uint64 BeforeAdmission = 0;
+	if (!Resources->TryGetReleaseVersionExcludingOwner(InPacket.Consumer, BeforeAdmission) ||
+		(StateOwner->bPacketHeadWaitingCapacity && BeforeAdmission <= StateOwner->PacketHeadCapacityVersion)) return false;
+	StateOwner->bPacketHeadWaitingCapacity = false;
+	const auto DirectoryLease = Transfer.GetMetadataLease();
+	FVoxelGenerationRequiredSourceScope PacketSource(Resources.Get(), InPacket.ResourceLease.Get());
+	FVoxelGenerationRequiredSourceScope StateSource(Resources.Get(), StateOwner->ResourceLease.Get());
+	FVoxelGenerationRequiredSourceScope DirectorySource(Resources.Get(), DirectoryLease.Get());
+	FVoxelGenerationRequiredCapacity Required;
+	FString Error;
+	if (!FVoxelGenerationRequiredSourceScope::Collect(*Resources, nullptr, Required, Error)) { Fail(Error); return true; }
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Metadata;
+	const uint64 NodeBytes = TVoxelNetworkQueue<TSharedPtr<FVoxelNetworkEnvelopeDecode, ESPMode::ThreadSafe>>::NodeBytes();
+	const uint64 MetadataBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelNetworkEnvelopeDecode>();
+	const auto Admission = Resources->TryAcquire(InPacket.Consumer, EVoxelTerrainResourcePool::Input, MetadataBytes + NodeBytes,
+		Metadata, 1, Required.Bytes[int32(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+	if (Admission != EVoxelTerrainResourceAdmission::Granted)
+	{
+		StateOwner->bPacketHeadWaitingCapacity = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked;
+		StateOwner->PacketHeadCapacityVersion = BeforeAdmission;
+		if (!StateOwner->bPacketHeadWaitingCapacity) Fail(Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+			TEXT("Oversized: original envelope ingress metadata") : TEXT("InvalidResource: original envelope ingress consumer"));
+		return !StateOwner->bPacketHeadWaitingCapacity;
+	}
+	auto NodeLease = Metadata->Split(NodeBytes);
+	if (!NodeLease) { Fail(TEXT("InvalidResource: envelope queue prepaid node")); return true; }
+	FVoxelGenerationRequiredSourceScope MetadataSource(Resources.Get(), Metadata.Get());
+	FVoxelGenerationRequiredSourceScope NodeSource(Resources.Get(), NodeLease.Get());
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> CompletedLease;
+	TArray<uint8> Completed;
+	uint32 Crc = 0;
+	if (!Transfer.Assemble(InPacket.Packet.Bytes, FPlatformTime::Seconds(), Completed, Crc, &CompletedLease, &Error))
+	{
+		StateOwner->bPacketHeadWaitingCapacity = Error.StartsWith(TEXT("CapacityBlocked"));
+		StateOwner->PacketHeadCapacityVersion = BeforeAdmission;
+		if (StateOwner->bPacketHeadWaitingCapacity || Error.StartsWith(TEXT("PlanningPending"))) return false;
+		Fail(Error);
+		return true;
+	}
+	if (Completed.IsEmpty()) return true;
+	auto Work = FVoxelNetworkEnvelopeDecode::Create(Resources.ToSharedRef(), InPacket.Consumer,
+		MoveTemp(Completed), MoveTemp(CompletedLease), Crc, InPacket.bServer, Error, MoveTemp(Metadata));
+	if (!Work) { Fail(Error); return true; }
+	const uint64 Quota = Work->GetIngressQuotaBytes();
+	if (Quota + PendingRepresentationBytes + StateOwner->EnvelopeBytes + StateOwner->PacketBytes + StateOwner->InboundBytes > 32ull * 1024 * 1024)
+	{
+		Fail(TEXT("完整 Envelope 超过连接接收配额"));
+		return true;
+	}
+	StateOwner->EnvelopeBytes += Quota;
+	const auto AcceptedWork = Work;
+	if (!StateOwner->Envelopes.Enqueue(MoveTemp(Work), MoveTemp(NodeLease)))
+	{
+		Fail(TEXT("InvalidResource: envelope queue node grant"));
+		return true;
+	}
+	AcceptedWork->VisitResourceLeases([](const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& InLease)
+	{
+		if (InLease) InLease->MarkPublished();
+	});
+	return true;
 }
 
 void UVoxelModuleNetworkComponent::AdvanceEnvelopeDecode(const double InNow)
@@ -502,12 +926,61 @@ bool UVoxelModuleNetworkComponent::ApplyDecodedEnvelope(const bool bInWorldContr
 	const bool bWorldControl = !OverlayNetwork->DecodedEnvelope->IsServer() &&
 		OverlayNetwork->DecodedEnvelope->GetMessage().Kind == EVoxelMessage::Welcome;
 	if (bWorldControl != bInWorldControl || (bWorldControl && WorldModule->GetTerrainFrameContext().IsActive())) return false;
+	const auto StateOwner = OverlayNetwork;
+	const auto& PendingResult = StateOwner->DecodedEnvelopeResult.GetValue();
+	if (StateOwner->DecodedEnvelope->IsServer() && StateOwner->DecodedEnvelope->GetMessage().Kind == EVoxelMessage::Hello &&
+		PendingResult.bSuccess && !PendingResult.bCanceled && !bRejected &&
+		TaskOwnerId == PendingResult.Stamp.OwnerId && TaskOwnerIncarnation == PendingResult.Stamp.OwnerIncarnation &&
+		WorldModule->GetWorldEpoch() == PendingResult.Stamp.WorldEpoch)
+	{
+		HandleHelloPayload(StateOwner->DecodedEnvelope->GetMessage().Payload);
+		if (bPendingWelcome) return false;
+		if (OverlayNetwork != StateOwner) return true;
+	}
+	const bool bInvalidation = !StateOwner->DecodedEnvelope->IsServer() &&
+		StateOwner->DecodedEnvelope->GetMessage().Kind == EVoxelMessage::RepresentationInvalidate;
+	if (bInvalidation && PendingResult.bSuccess && !PendingResult.bCanceled && !bRejected &&
+		TaskOwnerId == PendingResult.Stamp.OwnerId && TaskOwnerIncarnation == PendingResult.Stamp.OwnerIncarnation &&
+		WorldModule->GetWorldEpoch() == PendingResult.Stamp.WorldEpoch)
+	{
+		if (!AdvanceDecodedInvalidation()) return false;
+		if (OverlayNetwork != StateOwner) return true;
+		auto InvalidationLease = MoveTemp(StateOwner->InvalidationLease);
+		auto Invalidation = MoveTemp(StateOwner->Invalidation);
+		auto Work = MoveTemp(StateOwner->DecodedEnvelope);
+		auto Result = MoveTemp(StateOwner->DecodedEnvelopeResult.GetValue());
+		StateOwner->DecodedEnvelopeResult.Reset();
+		StateOwner->bEnvelopeDecode = false;
+		check(StateOwner->EnvelopeBytes >= Work->GetIngressQuotaBytes());
+		StateOwner->EnvelopeBytes -= Work->GetIngressQuotaBytes();
+		StateOwner->InvalidationCapacityConsumer = {};
+		StateOwner->InvalidationCapacityVersion = 0;
+		StateOwner->InvalidationCursor = 0;
+		StateOwner->bInvalidationDecoded = false;
+		StateOwner->bInvalidationWaitingCapacity = false;
+		if (!bRejected)
+		{
+			Result.MarkWorkUsed();
+			OnRepresentationInvalidated.Broadcast(Invalidation);
+		}
+		// 回调可关闭世界；局部原通知先销毁backing，再退原租约。
+		Invalidation.Entries.Empty();
+		InvalidationLease.Reset();
+		return true;
+	}
 
 	// Handle 可在帧外关闭并重建世界；移出完成槽后不再引用旧连接状态。
 	auto Work = MoveTemp(OverlayNetwork->DecodedEnvelope);
 	auto Result = MoveTemp(OverlayNetwork->DecodedEnvelopeResult.GetValue());
 	OverlayNetwork->DecodedEnvelopeResult.Reset();
 	OverlayNetwork->bEnvelopeDecode = false;
+	OverlayNetwork->Invalidation.Entries.Empty();
+	OverlayNetwork->InvalidationLease.Reset();
+	OverlayNetwork->InvalidationCapacityConsumer = {};
+	OverlayNetwork->InvalidationCapacityVersion = 0;
+	OverlayNetwork->InvalidationCursor = 0;
+	OverlayNetwork->bInvalidationDecoded = false;
+	OverlayNetwork->bInvalidationWaitingCapacity = false;
 	check(OverlayNetwork->EnvelopeBytes >= Work->GetIngressQuotaBytes());
 	OverlayNetwork->EnvelopeBytes -= Work->GetIngressQuotaBytes();
 	if (TaskOwnerId != Result.Stamp.OwnerId || TaskOwnerIncarnation != Result.Stamp.OwnerIncarnation ||
@@ -535,25 +1008,139 @@ bool UVoxelModuleNetworkComponent::ApplyDecodedEnvelope(const bool bInWorldContr
 	return true;
 }
 
+bool UVoxelModuleNetworkComponent::AdvanceDecodedInvalidation()
+{
+	const auto State = OverlayNetwork;
+	auto* WorldModule = Module.Get();
+	if (!State || !State->DecodedEnvelope || !State->DecodedEnvelopeResult.IsSet() || !WorldModule) return false;
+	const auto& Message = State->DecodedEnvelope->GetMessage();
+	if (!bReady || (bWelcomed && Message.Session != Session))
+	{
+		Fail(!bReady ? TEXT("Voxel message arrived before Ready") : TEXT("Voxel session identity mismatch"));
+		return true;
+	}
+	const auto Resources = State->Resources;
+	if (!Resources) return false;
+	if (State->bInvalidationWaitingCapacity)
+	{
+		uint64 CurrentVersion = 0;
+		if (!Resources->TryGetReleaseVersionExcludingOwner(State->InvalidationCapacityConsumer, CurrentVersion) ||
+			CurrentVersion <= State->InvalidationCapacityVersion) return false;
+		State->bInvalidationWaitingCapacity = false;
+	}
+	FVoxelGenerationRequiredSourceScope Sources(Resources.Get(), State.Get(),
+		[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+		{
+			const auto& Source = *static_cast<const FVoxelOverlayNetworkState*>(InContext);
+			const auto VisitLease = [&Source, InVisit](const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& Lease)
+			{
+				if (Lease && Lease->IsOwnedBy(*Source.Resources)) FVoxelGenerationRequiredSourceScope::VisitLease(Lease.Get(), InVisit);
+			};
+			VisitLease(Source.ResourceLease);
+			VisitLease(Source.InvalidationLease);
+			Source.DecodedEnvelope->VisitResourceLeases(VisitLease);
+		});
+	FString Error;
+	if (!State->bInvalidationDecoded)
+	{
+		FVoxelByteReader Reader(Message.Payload);
+		const uint16 Count = Reader.U16();
+		if (Count == 0 || Count > 256 || Message.Payload.Num() != 2 + Count * VoxelGeometryWire::HeaderBytes)
+		{
+			Fail(TEXT("Voxel representation invalidation header is invalid"));
+			return true;
+		}
+		const auto& Stamp = State->DecodedEnvelopeResult.GetValue().Stamp;
+		const auto Consumer = FVoxelGenerationConsumerKey::Section(Stamp.WorldEpoch, Stamp.OwnerId, Stamp.OwnerIncarnation, {}, Stamp.Token);
+		const uint64 BeforeAdmission = Resources->ReleaseVersionExcludingOwner(Consumer);
+		FVoxelGenerationRequiredCapacity Required;
+		if (!FVoxelGenerationRequiredSourceScope::Collect(*Resources, nullptr, Required, Error))
+		{
+			Fail(Error);
+			return true;
+		}
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+		const uint64 Bytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelRepresentationInvalidation, FDefaultAllocator>(Count);
+		const auto Admission = Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Input, Bytes, Lease, 0,
+			Required.Bytes[int32(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+		if (Admission != EVoxelTerrainResourceAdmission::Granted)
+		{
+			if (Admission != EVoxelTerrainResourceAdmission::CapacityBlocked)
+			{
+				Fail(Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+					TEXT("Oversized: original invalidation native input") : TEXT("InvalidResource: original invalidation input domain"));
+				return true;
+			}
+			State->InvalidationCapacityConsumer = Consumer;
+			State->InvalidationCapacityVersion = BeforeAdmission;
+			State->bInvalidationWaitingCapacity = true;
+			return false;
+		}
+		FVoxelRepresentationInvalidate Candidate;
+		if (!FVoxelNetworkCodec::DecodeRepresentationInvalidate(Message.Payload, Candidate, Error))
+		{
+			Fail(Error);
+			return true;
+		}
+		if (VoxelGenerationAllocation::AllocatedBytes(Candidate.Entries) != Bytes)
+		{
+			Fail(TEXT("InvalidResource: invalidation codec native allocation contract"));
+			return true;
+		}
+		State->Invalidation = MoveTemp(Candidate);
+		State->InvalidationLease = MoveTemp(Lease);
+		State->bInvalidationDecoded = true;
+	}
+	const auto Consumer = WorldModule->GetRuntime()->GetChangeHierarchy().GetControlConsumer();
+	const uint64 BeforeAdmission = Resources->ReleaseVersionExcludingOwner(Consumer);
+	if (!WorldModule->InvalidateRemoteRepresentations(State->Invalidation, State->InvalidationCursor, Error))
+	{
+		if (Error.StartsWith(TEXT("PlanningPending"))) return false;
+		if (!Error.StartsWith(TEXT("CapacityBlocked")))
+		{
+			Fail(Error);
+			return true;
+		}
+		State->InvalidationCapacityConsumer = Consumer;
+		State->InvalidationCapacityVersion = BeforeAdmission;
+		State->bInvalidationWaitingCapacity = true;
+		return false;
+	}
+	return true;
+}
+
 bool UVoxelModuleNetworkComponent::HandleWelcome(const FVoxelWireMessage& InMessage)
+{
+	return HandleWelcomePayload(InMessage.Payload, InMessage.Session);
+}
+
+bool UVoxelModuleNetworkComponent::HandleWelcomePayload(const TConstArrayView<uint8> InPayload, const FGuid& InSession)
 {
 	UVoxelModule* VoxelModule = Module.Get();
 	if (!VoxelModule) return false;
 	FVoxelNetworkWelcome Welcome;
 	FString Error;
-	if (!FVoxelNetworkCodec::DecodeWelcome(InMessage.Payload, Welcome) ||
-		Welcome.EchoNonce != ClientNonce || Welcome.Session != InMessage.Session)
+	if (!FVoxelNetworkCodec::DecodeWelcome(InPayload, Welcome) ||
+		Welcome.EchoNonce != ClientNonce || Welcome.Session != InSession)
 	{
 		Fail(TEXT("Voxel welcome is invalid"));
 		return false;
 	}
+	FVoxelByteReader IdentityReader(InPayload);
+	IdentityReader.U64();
+	IdentityReader.Guid();
+	IdentityReader.U64();
+	const auto ManifestBytes = IdentityReader.BlobView(FVoxelManifestCodec::MaxBytes);
 	FVoxelOverlayHash IncomingManifest;
-	FVoxelOverlayHash CurrentManifest;
-	if (!FVoxelOverlayRegionCodec::ManifestHash(Welcome.Manifest, IncomingManifest)) { Fail(TEXT("Voxel welcome manifest identity invalid")); return false; }
+	if (!IdentityReader.End() || !FVoxelOverlayHash::Compute(ManifestBytes, IncomingManifest))
+	{
+		Fail(TEXT("Voxel welcome manifest identity invalid"));
+		return false;
+	}
 	const auto* PreviousReplica = VoxelModule->GetOverlayReplica();
 	const bool bWorldChanged = VoxelModule->GetRuntime() &&
-		(!VoxelModule->IsReady() || !FVoxelOverlayRegionCodec::ManifestHash(VoxelModule->GetManifest(), CurrentManifest) || CurrentManifest != IncomingManifest ||
-			Session != Welcome.Session || !PreviousReplica || PreviousReplica->GetAuthorityEpoch() != Welcome.AuthorityWorldEpoch);
+		(!VoxelModule->IsReady() || !PreviousReplica || PreviousReplica->GetManifestIdentity() != IncomingManifest ||
+			Session != Welcome.Session || PreviousReplica->GetAuthorityEpoch() != Welcome.AuthorityWorldEpoch);
 	if (bWorldChanged)
 	{
 		if (!VoxelModule->StopWorld(true, Error)) { Fail(Error); return false; }
@@ -564,26 +1151,52 @@ bool UVoxelModuleNetworkComponent::HandleWelcome(const FVoxelWireMessage& InMess
 		Fail(Error.IsEmpty() ? TEXT("Voxel remote world could not start") : Error);
 		return false;
 	}
-	FVoxelOverlayHash ManifestIdentity;
-	if (auto* Replica = VoxelModule->GetOverlayReplica(); Replica &&
-		FVoxelOverlayRegionCodec::ManifestHash(Welcome.Manifest, ManifestIdentity))
+	// StartWorld可结束旧协议；恢复已经验证的同一Welcome控制身份。
+	Session = Welcome.Session;
+	ClientNonce = Welcome.EchoNonce;
+	if (auto* Replica = VoxelModule->GetOverlayReplica())
 	{
-		Replica->SetAuthority(Welcome.AuthorityWorldEpoch, ManifestIdentity, Welcome.Session);
+		Replica->SetAuthority(Welcome.AuthorityWorldEpoch, IncomingManifest, Welcome.Session);
 	}
+	if (!bPendingReady)
+	{
+		check(NextTaskSerial != MAX_uint64);
+		PendingReadyConsumer = FVoxelGenerationConsumerKey::Section(VoxelModule->GetWorldEpoch(), TaskOwnerId,
+			TaskOwnerIncarnation, {}, ++NextTaskSerial);
+		PendingReadySession = Session;
+		bPendingReadyServer = false;
+		bPendingReady = true;
+	}
+	FinishPendingReady();
+	return !bRejected;
+}
+
+void UVoxelModuleNetworkComponent::HandleReadyPayload(const TConstArrayView<uint8> InPayload)
+{
+	auto* VoxelModule = Module.Get();
+	if (!VoxelModule) return;
 	FVoxelNetworkReady Ready;
-	Ready.RecipeHash = Welcome.Manifest.RecipeHash;
-	Ready.RegistryHash = Welcome.Manifest.RegistryHash;
-	Ready.BaseSampleHash = Welcome.Manifest.BaseSampleHash;
-	TArray<uint8> Payload;
-	if (!FVoxelNetworkCodec::EncodeReady(Ready, Payload) ||
-		!Send(EVoxelMessage::Ready, Payload, EVoxelTransferPriority::Critical))
+	const FVoxelWorldManifest& Manifest = VoxelModule->GetManifest();
+	if (!FVoxelNetworkCodec::DecodeReady(InPayload, Ready) ||
+		Ready.RecipeHash != Manifest.RecipeHash ||
+		Ready.RegistryHash != Manifest.RegistryHash ||
+		Ready.BaseSampleHash != Manifest.BaseSampleHash)
 	{
-		Fail(TEXT("Voxel ready could not be queued"));
-		return false;
+		Fail(TEXT("Voxel ready identity mismatch"));
+		return;
 	}
-	bWelcomed = true;
-	bReady = true;
-	return true;
+	if (!bReady && !bPendingReady)
+	{
+		check(NextTaskSerial != MAX_uint64);
+		PendingReadyConsumer = FVoxelGenerationConsumerKey::Section(VoxelModule->GetWorldEpoch(), TaskOwnerId,
+			TaskOwnerIncarnation, {}, ++NextTaskSerial);
+		PendingReadySession = Session;
+		bPendingReadyServer = true;
+		bPendingReady = true;
+	}
+	if (!VoxelModule->GetTerrainFrameContext().IsActive()) FinishPendingReady();
+	else if (bPendingReady) VoxelModule->QueueTerrainWorldControl(this);
+	return;
 }
 
 void UVoxelModuleNetworkComponent::Handle(
@@ -598,30 +1211,7 @@ void UVoxelModuleNetworkComponent::Handle(
 	}
 	if (bInServer && InMessage.Kind == EVoxelMessage::Hello)
 	{
-		FVoxelNetworkHello Hello;
-		if (!FVoxelNetworkCodec::DecodeHello(InMessage.Payload, Hello) ||
-			Hello.ProtocolVersion != VoxelProtocolVersion ||
-			!VoxelModule->GetRegistry() ||
-			Hello.RegistryHash != VoxelModule->GetRegistry()->Hash ||
-			!VoxelModule->IsReady())
-		{
-			Fail(TEXT("Voxel hello is incompatible with the authoritative world"));
-			return;
-		}
-		Session = VoxelModule->GetSessionId();
-		FVoxelNetworkWelcome Welcome;
-		Welcome.EchoNonce = Hello.Nonce;
-		Welcome.AuthorityWorldEpoch = VoxelModule->GetWorldEpoch();
-		Welcome.Session = Session;
-		Welcome.Manifest = VoxelModule->GetManifest();
-		TArray<uint8> Payload;
-		if (!FVoxelNetworkCodec::EncodeWelcome(Welcome, Payload) ||
-			!Send(EVoxelMessage::Welcome, Payload, EVoxelTransferPriority::Critical))
-		{
-			Fail(TEXT("Voxel welcome could not be queued"));
-			return;
-		}
-		bWelcomed = true;
+		HandleHelloPayload(InMessage.Payload);
 		return;
 	}
 	if (!bInServer && InMessage.Kind == EVoxelMessage::Welcome)
@@ -631,17 +1221,7 @@ void UVoxelModuleNetworkComponent::Handle(
 	}
 	if (bInServer && InMessage.Kind == EVoxelMessage::Ready)
 	{
-		FVoxelNetworkReady Ready;
-		const FVoxelWorldManifest& Manifest = VoxelModule->GetManifest();
-		if (!FVoxelNetworkCodec::DecodeReady(InMessage.Payload, Ready) ||
-			Ready.RecipeHash != Manifest.RecipeHash ||
-			Ready.RegistryHash != Manifest.RegistryHash ||
-			Ready.BaseSampleHash != Manifest.BaseSampleHash)
-		{
-			Fail(TEXT("Voxel ready identity mismatch"));
-			return;
-		}
-		bReady = true;
+		HandleReadyPayload(InMessage.Payload);
 		return;
 	}
 	if (!bReady)
@@ -722,15 +1302,7 @@ void UVoxelModuleNetworkComponent::Handle(
 	}
 	if (!bInServer && InMessage.Kind == EVoxelMessage::RepresentationInvalidate)
 	{
-		FVoxelRepresentationInvalidate Invalidate;
-		FString Error;
-		if (!FVoxelNetworkCodec::DecodeRepresentationInvalidate(InMessage.Payload, Invalidate, Error))
-		{
-			Fail(Error.IsEmpty() ? TEXT("Invalid voxel representation invalidation") : Error);
-			return;
-		}
-		VoxelModule->InvalidateRemoteRepresentations(Invalidate);
-		OnRepresentationInvalidated.Broadcast(Invalidate);
+		Fail(TEXT("InvalidResource: representation invalidation requires its original decoded envelope slot"));
 		return;
 	}
 	if (bInServer && InMessage.Kind == EVoxelMessage::RepresentationRequest)

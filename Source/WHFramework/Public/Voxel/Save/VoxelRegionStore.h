@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "SaveGame/SaveGameGenerationLease.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 
 class FSaveGameStorage;
 class FVoxelTerrainResources;
@@ -115,6 +116,9 @@ public:
 	bool TryRetireFileGeneration(const FString& InDirectory) const;
 	static TSharedRef<const IVoxelFineOverlayReadLeaseSet, ESPMode::ThreadSafe> CreateOverlayReadLeaseSet(
 		const FVoxelFineOverlayCapture& InCapture);
+	static void VisitOverlayReadLeaseSources(
+		const TSharedPtr<const IVoxelFineOverlayReadLeaseSet, ESPMode::ThreadSafe>& InReadLeaseSet,
+		const FVoxelTerrainResources& InResources, FVoxelGenerationRequiredSourceScope::FVisit InVisit);
 	static uint64 OverlayReadLeaseBytes(int32 InPinnedSections, int32 InReads,
 		uint64 InReadPathBytes, int32 InContentRevisions);
 	EVoxelRegionRead ReadSection(

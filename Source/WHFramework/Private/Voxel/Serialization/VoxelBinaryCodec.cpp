@@ -4,13 +4,30 @@
 #include "Containers/StringConv.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Task/VoxelTerrainResources.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "zlib.h"
 
 namespace
 {
+	EVoxelTerrainResourceAdmission AcquireCodecWorking(const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& Resources,
+		const FVoxelGenerationConsumerKey& Consumer, const uint64 Bytes,
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutLease)
+	{
+		if (!Resources) return EVoxelTerrainResourceAdmission::Granted;
+		FVoxelGenerationRequiredCapacity Required;
+		FString Error;
+		if (!FVoxelGenerationRequiredSourceScope::Collect(*Resources, nullptr, Required, Error))
+			return EVoxelTerrainResourceAdmission::InvalidRequest;
+		const uint64 Limit = Resources->Snapshot().Limits.WorkingBytes;
+		if (Bytes > Limit || Required.Bytes[1] > Limit - Bytes) return EVoxelTerrainResourceAdmission::CapacityUnachievable;
+		return Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Working, Bytes, OutLease, 0, Required.Bytes[0], Required.LeaseCount);
+	}
+
 	struct FVoxelZlibAllocation
 	{
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
+		FVoxelZlibAllocation* Previous = nullptr;
+		FVoxelZlibAllocation* Next = nullptr;
 	};
 
 	struct FVoxelZlibAllocator
@@ -18,8 +35,16 @@ namespace
 		const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& Resources;
 		const FVoxelGenerationConsumerKey& Consumer;
 		bool bCapacityBlocked = false;
+		EVoxelTerrainResourceAdmission Admission = EVoxelTerrainResourceAdmission::Granted;
+		FVoxelZlibAllocation* Head = nullptr;
 		static constexpr uint32 Alignment = 16;
 		static constexpr SIZE_T HeaderBytes = Align(sizeof(FVoxelZlibAllocation), Alignment);
+
+		static void Enumerate(const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+		{
+			for (auto* Node = static_cast<const FVoxelZlibAllocator*>(Context)->Head; Node; Node = Node->Next)
+				FVoxelGenerationRequiredSourceScope::VisitLease(Node->ResourceLease.Get(), Visit);
+		}
 
 		static voidpf Allocate(voidpf InOpaque, uInt InCount, uInt InElementBytes)
 		{
@@ -28,15 +53,18 @@ namespace
 			if (PayloadBytes == 0 || PayloadBytes > MAX_int32) return Z_NULL;
 			const SIZE_T Bytes = FMemory::QuantizeSize(HeaderBytes + SIZE_T(PayloadBytes), Alignment);
 			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-			if (Allocator.Resources && !Allocator.Resources->Acquire(Allocator.Consumer,
-				EVoxelTerrainResourcePool::Working, Bytes, Lease))
+			const auto Admission = AcquireCodecWorking(Allocator.Resources, Allocator.Consumer, Bytes, Lease);
+			if (Admission != EVoxelTerrainResourceAdmission::Granted)
 			{
-				Allocator.bCapacityBlocked = true;
+				Allocator.Admission = Admission;
+				Allocator.bCapacityBlocked = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked;
 				return Z_NULL;
 			}
 			void* Allocation = FMemory::Malloc(Bytes, Alignment);
 			if (!Allocation) return Z_NULL;
-			new (Allocation) FVoxelZlibAllocation{MoveTemp(Lease)};
+			auto* Node = new (Allocation) FVoxelZlibAllocation{MoveTemp(Lease), nullptr, Allocator.Head};
+			if (Allocator.Head) Allocator.Head->Previous = Node;
+			Allocator.Head = Node;
 			void* Payload = static_cast<uint8*>(Allocation) + HeaderBytes;
 			FMemory::Memzero(Payload, PayloadBytes);
 			return Payload;
@@ -45,7 +73,11 @@ namespace
 		static void Free(voidpf InOpaque, voidpf InPayload)
 		{
 			if (!InPayload) return;
+			auto& Allocator = *static_cast<FVoxelZlibAllocator*>(InOpaque);
 			auto* Allocation = reinterpret_cast<FVoxelZlibAllocation*>(static_cast<uint8*>(InPayload) - HeaderBytes);
+			if (Allocation->Previous) Allocation->Previous->Next = Allocation->Next;
+			else Allocator.Head = Allocation->Next;
+			if (Allocation->Next) Allocation->Next->Previous = Allocation->Previous;
 			auto Lease = MoveTemp(Allocation->ResourceLease);
 			Allocation->~FVoxelZlibAllocation();
 			FMemory::Free(Allocation);
@@ -191,9 +223,10 @@ bool VoxelBinary::Decompress(TConstArrayView<uint8>S,TArray<uint8>&O,int32 Limit
 bool VoxelBinary::CompressGranted(const TConstArrayView<uint8> InRaw, FVoxelBinaryBuffer& OutBuffer,
 	const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& InResources,
 	const FVoxelGenerationConsumerKey& InConsumer, const int32 InRawLimit, const int32 InStoredLimit,
-	bool& OutCapacityBlocked)
+	bool& OutCapacityBlocked, EVoxelTerrainResourceAdmission* OutAdmission)
 {
 	OutCapacityBlocked = false;
+	if (OutAdmission) *OutAdmission = EVoxelTerrainResourceAdmission::Granted;
 	if (InRawLimit <= 0 || InStoredLimit <= 16 || InRaw.IsEmpty() || InRaw.Num() > InRawLimit) return false;
 	const int32 Bound = CompressionBound(InRaw.Num());
 	if (Bound <= 0) return false;
@@ -201,18 +234,29 @@ bool VoxelBinary::CompressGranted(const TConstArrayView<uint8> InRaw, FVoxelBina
 	const int32 OutputCapacity = FMath::Min(Bound, InStoredLimit - 16);
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ScratchLease;
 	FVoxelBinaryBuffer Candidate;
-	if (InResources && (!InResources->Acquire(InConsumer, EVoxelTerrainResourcePool::Working,
-		VoxelBoundedAllocation::ArrayBytes<uint8>(OutputCapacity), ScratchLease) ||
-		!InResources->Acquire(InConsumer, EVoxelTerrainResourcePool::Working,
-			VoxelBoundedAllocation::ArrayBytes<uint8>(OutputCapacity + 16), Candidate.ResourceLease)))
+	const auto ScratchAdmission = AcquireCodecWorking(InResources, InConsumer,
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(OutputCapacity), ScratchLease);
+	if (ScratchAdmission != EVoxelTerrainResourceAdmission::Granted)
 	{
-		OutCapacityBlocked = true;
+		OutCapacityBlocked = ScratchAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked;
+		if (OutAdmission) *OutAdmission = ScratchAdmission;
 		return false;
 	}
+	const FVoxelGenerationRequiredSourceScope ScratchSource(InResources.Get(), ScratchLease.Get());
+	const auto CandidateAdmission = AcquireCodecWorking(InResources, InConsumer,
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(OutputCapacity + 16), Candidate.ResourceLease);
+	if (CandidateAdmission != EVoxelTerrainResourceAdmission::Granted)
+	{
+		OutCapacityBlocked = CandidateAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked;
+		if (OutAdmission) *OutAdmission = CandidateAdmission;
+		return false;
+	}
+	const FVoxelGenerationRequiredSourceScope CandidateSource(InResources.Get(), Candidate.ResourceLease.Get());
 	TArray<uint8> Compressed;
 	Compressed.Reserve(OutputCapacity);
 	Compressed.SetNumUninitialized(OutputCapacity);
 	FVoxelZlibAllocator Allocator{InResources, InConsumer};
+	const FVoxelGenerationRequiredSourceScope NativeSource(InResources.Get(), &Allocator, FVoxelZlibAllocator::Enumerate);
 	z_stream Stream{};
 	Stream.zalloc = FVoxelZlibAllocator::Allocate;
 	Stream.zfree = FVoxelZlibAllocator::Free;
@@ -229,6 +273,7 @@ bool VoxelBinary::CompressGranted(const TConstArrayView<uint8> InRaw, FVoxelBina
 		if (EndResult != Z_OK) Result = EndResult;
 	}
 	OutCapacityBlocked = Allocator.bCapacityBlocked;
+	if (OutAdmission) *OutAdmission = Allocator.Admission;
 	if (Result != Z_STREAM_END || Stream.total_out > uLong(OutputCapacity) || Stream.total_in != uLong(InRaw.Num())) return false;
 	Compressed.SetNum(int32(Stream.total_out), EAllowShrinking::No);
 	FVoxelByteWriter Writer(InStoredLimit);
@@ -245,9 +290,11 @@ bool VoxelBinary::CompressGranted(const TConstArrayView<uint8> InRaw, FVoxelBina
 
 bool VoxelBinary::DecompressGranted(const TConstArrayView<uint8> InStored, TArray<uint8>& OutRaw,
 	const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& InResources,
-	const FVoxelGenerationConsumerKey& InConsumer, const int32 InRawLimit, bool& OutCapacityBlocked)
+	const FVoxelGenerationConsumerKey& InConsumer, const int32 InRawLimit, bool& OutCapacityBlocked,
+	EVoxelTerrainResourceAdmission* OutAdmission)
 {
 	OutCapacityBlocked = false;
+	if (OutAdmission) *OutAdmission = EVoxelTerrainResourceAdmission::Granted;
 	if (InRawLimit <= 0 || InRawLimit > MAX_int32 - 65536 ||
 		int64(InStored.Num()) > int64(InRawLimit) + 65536 + 16) return false;
 	FVoxelByteReader Header(InStored);
@@ -259,6 +306,7 @@ bool VoxelBinary::DecompressGranted(const TConstArrayView<uint8> InStored, TArra
 	OutRaw.Reserve(int32(RawBytes));
 	OutRaw.SetNumUninitialized(int32(RawBytes));
 	FVoxelZlibAllocator Allocator{InResources, InConsumer};
+	const FVoxelGenerationRequiredSourceScope NativeSource(InResources.Get(), &Allocator, FVoxelZlibAllocator::Enumerate);
 	z_stream Stream{};
 	Stream.zalloc = FVoxelZlibAllocator::Allocate;
 	Stream.zfree = FVoxelZlibAllocator::Free;
@@ -275,6 +323,7 @@ bool VoxelBinary::DecompressGranted(const TConstArrayView<uint8> InStored, TArra
 		if (EndResult != Z_OK) Result = EndResult;
 	}
 	OutCapacityBlocked = Allocator.bCapacityBlocked;
+	if (OutAdmission) *OutAdmission = Allocator.Admission;
 	return Result == Z_STREAM_END && Stream.total_out == RawBytes &&
 		Stream.total_in == uLong(Compressed.Num()) && FCrc::MemCrc32(OutRaw.GetData(), OutRaw.Num()) == Crc;
 }

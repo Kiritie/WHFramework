@@ -3,24 +3,44 @@
 #include "Misc/Crc.h"
 #include "Async/Async.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 
 TSharedPtr<FVoxelNetworkEnvelopeDecode, ESPMode::ThreadSafe> FVoxelNetworkEnvelopeDecode::Create(
 	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources, const FVoxelGenerationConsumerKey& InConsumer,
-	TArray<uint8>&& InBytes, TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InInputLease,
-	const uint32 InCrc, const bool bInServer, FString& OutError)
+	TArray<uint8>&& InBytes, TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>&& InInputLease,
+	const uint32 InCrc, const bool bInServer, FString& OutError,
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>&& InMetadataLease)
 {
 	if (!InConsumer.IsValid() || InBytes.IsEmpty() || InBytes.Num() > FVoxelNetworkCodec::MaxWireBytes ||
-		!InInputLease || uint64(InBytes.GetAllocatedSize()) > InInputLease->Bytes())
+		!InInputLease || !InInputLease->IsOwnedBy(InResources.Get()) || InInputLease->GetPool() != EVoxelTerrainResourcePool::Input ||
+		VoxelGenerationAllocation::AllocatedBytes(InBytes) > InInputLease->Bytes() ||
+		(InResources->GetControlConsumer().IsValid() && InConsumer.WorldEpoch != InResources->GetControlConsumer().WorldEpoch))
 	{
 		OutError = TEXT("完整 Envelope 缺少有界输入租约");
 		return nullptr;
 	}
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Metadata;
-	if (!InResources->Acquire(InConsumer, EVoxelTerrainResourcePool::Input,
-		VoxelBoundedAllocation::WorkerSharedBytes<FVoxelNetworkEnvelopeDecode>(), Metadata))
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Metadata = InMetadataLease;
+	if (Metadata && (!Metadata->IsOwnedBy(InResources.Get()) || Metadata->GetPool() != EVoxelTerrainResourcePool::Input ||
+		Metadata->Bytes() != VoxelBoundedAllocation::WorkerSharedBytes<FVoxelNetworkEnvelopeDecode>()))
 	{
-		OutError = TEXT("CapacityBlocked: Envelope 输入元数据");
+		OutError = TEXT("InvalidResource: Envelope original metadata reservation");
 		return nullptr;
+	}
+	if (!Metadata)
+	{
+		FVoxelGenerationRequiredSourceScope InputSource(&InResources.Get(), InInputLease.Get());
+		FVoxelGenerationRequiredCapacity Required;
+		if (!FVoxelGenerationRequiredSourceScope::Collect(*InResources, nullptr, Required, OutError)) return nullptr;
+		const auto Admission = InResources->TryAcquire(InConsumer, EVoxelTerrainResourcePool::Input,
+			VoxelBoundedAllocation::WorkerSharedBytes<FVoxelNetworkEnvelopeDecode>(), Metadata, 0,
+			Required.Bytes[int32(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+		if (Admission != EVoxelTerrainResourceAdmission::Granted)
+		{
+			OutError = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: Envelope 输入元数据") :
+				Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("Oversized: Envelope 输入元数据") :
+				TEXT("InvalidResource: Envelope consumer");
+			return nullptr;
+		}
 	}
 	auto Work = VoxelBoundedAllocation::MakeWorkerShared<FVoxelNetworkEnvelopeDecode>(Metadata);
 	Work->Resources = InResources;
@@ -28,15 +48,16 @@ TSharedPtr<FVoxelNetworkEnvelopeDecode, ESPMode::ThreadSafe> FVoxelNetworkEnvelo
 	Work->Bytes = MoveTemp(InBytes);
 	Work->InputLease = MoveTemp(InInputLease);
 	Work->MetadataLease = MoveTemp(Metadata);
+	InMetadataLease.Reset();
 	Work->ExpectedCrc = InCrc;
 	Work->bServer = bInServer;
-	// Decode 的临时正文与结果同时存在；区域数组及 Part 正文也在授予之后分配。
-	Work->DecodeBytes = VoxelBoundedAllocation::InitialGrowBytes<uint8>(Work->Bytes.Num()) * 2 +
-		VoxelBoundedAllocation::ArrayBytes<FVoxelOverlayRegionHead>(FVoxelOverlayRegionCodec::MaximumRegions) * 2 +
-		VoxelBoundedAllocation::ArrayBytes<FVoxelOverlayDirectoryEntry>(FVoxelOverlayRegionCodec::MaximumPageEntries) * 2 +
-		VoxelBoundedAllocation::InitialGrowBytes<uint8>(FVoxelOverlayRegionCodec::MaximumPartBytes) * 2 +
-		VoxelBoundedAllocation::WorkerSharedBytes<FVoxelRepresentationReplyData>() + 1024;
-	Work->IngressQuotaBytes = Work->InputLease->Bytes() + Work->MetadataLease->Bytes() + Work->DecodeBytes;
+	// 连接队列的保守上界不作为资源授予；Worker 验证原 wire 后按实际布局计数。
+	Work->IngressQuotaBytes = Work->InputLease->Bytes() + Work->MetadataLease->Bytes() +
+		2 * VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(Work->Bytes.Num()) +
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelOverlayRegionHead, FDefaultAllocator>(FVoxelOverlayRegionCodec::MaximumRegions) +
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelOverlayDirectoryEntry, FDefaultAllocator>(FVoxelOverlayRegionCodec::MaximumPageEntries) +
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(FVoxelOverlayRegionCodec::MaximumPartBytes) +
+		sizeof(FVoxelOverlayRegionMessage) + VoxelBoundedAllocation::WorkerSharedBytes<FVoxelRepresentationReplyData>();
 	OutError.Reset();
 	return Work;
 }
@@ -56,12 +77,56 @@ FVoxelTaskResult FVoxelNetworkEnvelopeDecode::Advance(const TAtomic<bool>& InCan
 	}
 	if (VerifiedBytes < Bytes.Num()) { Result.bSuccess = Result.bContinue = true; return Result; }
 	if (RunningCrc != ExpectedCrc) { Result.Error = TEXT("完整传输正文 CRC 不匹配"); return Result; }
-	if (!DecodeLease && !Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Working, DecodeBytes, DecodeLease, 1))
+	if (!bMeasured)
 	{
-		CapacityVersion = Resources->Snapshot().ReleaseVersion;
-		bWaitingCapacity = true;
-		Result.bSuccess = Result.bContinue = true;
-		return Result;
+		EVoxelMessage Kind;
+		FGuid Session;
+		TConstArrayView<uint8> Payload;
+		if (!FVoxelNetworkCodec::DecodeView(Bytes, Kind, Session, Payload))
+		{
+			Result.Error = TEXT("Voxel V4 Envelope 格式不合法");
+			return Result;
+		}
+		bOverlay = Kind >= EVoxelMessage::SubscribeRegion && Kind <= EVoxelMessage::ResyncRequest;
+		bRepresentationReply = !bServer && Kind == EVoxelMessage::RepresentationReply;
+		DecodeBytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(Payload.Num());
+		if (bOverlay)
+		{
+			uint64 OverlayBytes = 0;
+			if (!FVoxelOverlayRegionCodec::MeasureDecode(Kind, Payload, OverlayBytes, Result.Error)) return Result;
+			DecodeBytes += OverlayBytes;
+		}
+		if (bRepresentationReply)
+		{
+			FVoxelRepresentationReply Scalars;
+			TConstArrayView<uint8> Data;
+			if (!FVoxelNetworkCodec::DecodeRepresentationReplyView(Payload, Scalars, Data, Result.Error)) return Result;
+			DecodeBytes += VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(Data.Num()) +
+				VoxelBoundedAllocation::WorkerSharedBytes<FVoxelRepresentationReplyData>();
+		}
+		bMeasured = true;
+	}
+	if (!DecodeLease && DecodeBytes)
+	{
+		CapacityVersion = Resources->ReleaseVersionExcludingOwner(Consumer);
+		const FVoxelGenerationRequiredSourceScope InputSource(Resources.Get(), InputLease.Get());
+		const FVoxelGenerationRequiredSourceScope MetadataSource(Resources.Get(), MetadataLease.Get());
+		FVoxelGenerationRequiredCapacity Required;
+		if (!FVoxelGenerationRequiredSourceScope::Collect(*Resources, nullptr, Required, Result.Error)) return Result;
+		const auto Admission = Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Input, DecodeBytes, DecodeLease,
+			int32(bOverlay) + int32(bRepresentationReply), Required.Bytes[0], Required.LeaseCount);
+		if (Admission != EVoxelTerrainResourceAdmission::Granted)
+		{
+			if (Admission != EVoxelTerrainResourceAdmission::CapacityBlocked)
+			{
+				Result.Error = Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+					TEXT("Oversized: Envelope 解码原生布局不可接纳") : TEXT("InvalidResource: Envelope 解码授予");
+				return Result;
+			}
+			bWaitingCapacity = true;
+			Result.bSuccess = Result.bContinue = true;
+			return Result;
+		}
 	}
 	if (!bDecoded)
 	{
@@ -70,11 +135,13 @@ FVoxelTaskResult FVoxelNetworkEnvelopeDecode::Advance(const TAtomic<bool>& InCan
 		if (bOverlay && !FVoxelOverlayRegionCodec::Decode(Message.Kind, Message.Payload, Overlay, Result.Error)) return Result;
 		bRepresentationReply = !bServer && Message.Kind == EVoxelMessage::RepresentationReply;
 		if (bRepresentationReply && !FVoxelNetworkCodec::DecodeRepresentationReply(Message.Payload, RepresentationReply, Result.Error)) return Result;
-		const uint64 OverlayBytes = bOverlay ? Overlay.AllocatedBytes() : 0;
-		const uint64 RepresentationBytes = bRepresentationReply ? RepresentationReply.Data.GetAllocatedSize() +
+		const uint64 OverlayBytes = bOverlay ? sizeof(FVoxelOverlayRegionMessage) +
+			VoxelGenerationAllocation::AllocatedBytes(Overlay.Heads) + VoxelGenerationAllocation::AllocatedBytes(Overlay.Entries) +
+			VoxelGenerationAllocation::AllocatedBytes(Overlay.Payload) : 0;
+		const uint64 RepresentationBytes = bRepresentationReply ? VoxelGenerationAllocation::AllocatedBytes(RepresentationReply.Data) +
 			VoxelBoundedAllocation::WorkerSharedBytes<FVoxelRepresentationReplyData>() : 0;
-		const uint64 ActualBytes = Message.Payload.GetAllocatedSize() + OverlayBytes + RepresentationBytes;
-		if (ActualBytes > DecodeLease->Bytes() || !DecodeLease->Resize(ActualBytes))
+		const uint64 ActualBytes = VoxelGenerationAllocation::AllocatedBytes(Message.Payload) + OverlayBytes + RepresentationBytes;
+		if (ActualBytes > DecodeBytes || (DecodeLease && !DecodeLease->Resize(ActualBytes)))
 		{
 			Result.Error = TEXT("Envelope 解码输出超过分配前授予");
 			return Result;
@@ -96,14 +163,9 @@ FVoxelTaskResult FVoxelNetworkEnvelopeDecode::Advance(const TAtomic<bool>& InCan
 		}
 		bDecoded = true;
 	}
-	if ((OverlayLease && !OverlayLease->Transfer(EVoxelTerrainResourcePool::Input)) ||
-		(RepresentationLease && !RepresentationLease->Transfer(EVoxelTerrainResourcePool::Input)))
-	{
-		CapacityVersion = Resources->Snapshot().ReleaseVersion;
-		bWaitingCapacity = true;
-		Result.bSuccess = Result.bContinue = true;
-		return Result;
-	}
+	if (DecodeLease) DecodeLease->MarkPublished();
+	if (OverlayLease) OverlayLease->MarkPublished();
+	if (RepresentationLease) RepresentationLease->MarkPublished();
 	bComplete = Result.bSuccess = true;
 	Result.CustomPayload = AsShared();
 	return Result;
@@ -111,8 +173,9 @@ FVoxelTaskResult FVoxelNetworkEnvelopeDecode::Advance(const TAtomic<bool>& InCan
 
 EVoxelTaskBlockReason FVoxelNetworkEnvelopeDecode::GetBlockReason() const
 {
-	return bWaitingCapacity && Resources->Snapshot().ReleaseVersion <= CapacityVersion ?
-		EVoxelTaskBlockReason::Memory : EVoxelTaskBlockReason::None;
+	uint64 Released = 0;
+	return bWaitingCapacity && (!Resources->TryGetReleaseVersionExcludingOwner(Consumer, Released) || Released <= CapacityVersion) ?
+		EVoxelTaskBlockReason::InputMemory : EVoxelTaskBlockReason::None;
 }
 
 uint64 FVoxelNetworkEnvelopeDecode::GetIngressQuotaBytes() const

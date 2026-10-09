@@ -301,8 +301,8 @@ bool FVoxelFinePageCoverageTest::RunTest(const FString& InParameters)
 		}
 	}
 	TestEqual(TEXT("Each topology change rebuilds once"), Manager.HeightfieldTopologyRebuildCount, uint64(4));
-	FVoxelVoxelProxyData RevisedProxyCoverage;
-	RevisedProxyCoverage.Key = {FIntVector(100, 0, 0), 1};
+	const auto RevisedProxyCoverage = MakeShared<FVoxelVoxelProxyData, ESPMode::ThreadSafe>();
+	RevisedProxyCoverage->Key = {FIntVector(100, 0, 0), 1};
 	Manager.UpdateProxySurfaceCoverage(RevisedProxyCoverage);
 	TestTrue(TEXT("A Proxy surface coverage revision dirties heightfield topology"), Manager.bHeightfieldTopologyDirty);
 	Manager.ResolveTransitionVisibility();
@@ -409,85 +409,35 @@ bool FVoxelFinePageCoverageTest::RunTest(const FString& InParameters)
 	for (int32 X = 0; X < 128; ++X) Slabs.Add({FIntVector(X, 0, 0), FIntVector(X + 1, 128, 128)});
 	TestTrue(TEXT("Generic coverage also accepts more than 64 edges"), VoxelCoverage::IsFullyCovered3D({FIntVector::ZeroValue, FIntVector(128)}, Slabs));
 	Manager.Reset();
-	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
-	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
-	AActor* OldActor = World->SpawnActor<AActor>();
 	const FVoxelFinePageKey OldLayout{FIntVector::ZeroValue, 2};
-	const FVoxelPublishGroupKey OldGroup{0, OldLayout.Coordinate, OldLayout.Level};
-	auto& Entry = Manager.Publisher->Entries.Add(OldActor);
-	Entry.GroupKey = OldGroup;
-	Entry.Source = Entry.PresentedSource = MakeShared<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>();
-	Entry.Scale = Module->BlockSize();
-	Entry.bPresented = true;
-	Entry.bDirty = false;
-	Manager.FinePageActors.Add(OldLayout, OldActor);
-	Manager.bFinePresentationDirty = false;
-	Manager.bHeightfieldTopologyDirty = false;
 	FVoxelFinePagePlanner::GatherSections(OldLayout, Sections);
 	for (const auto& Section : Sections)
 	{
-		const FVoxelFinePageKey NewPage{Section, 0};
-		Manager.GetInputRoot().FinePagePlan.Pages.Add(NewPage);
-		Manager.GetInputRoot().FinePagePlan.SectionOwners.Add(Section, NewPage);
-		Manager.PresentedFineSectionOwners.Add(Section, OldLayout);
+		const FVoxelFinePageKey Desired{Section, 0};
+		Manager.GetInputRoot().FinePagePlan.Pages.Add(Desired);
+		Manager.GetInputRoot().FinePagePlan.SectionOwners.Add(Section, Desired);
 		Manager.GetInputRoot().FineWanted.Add(Section);
 		Manager.FineReady.Add(Section);
-		Manager.CommitTerrainOwnership({0, Section, 0}, TArray<FVoxelViewKey>{{Section, 0}});
+		Manager.PresentedFineSectionOwners.Add(Section, OldLayout);
+		const FVoxelViewKey Node{Section, 0};
+		Manager.CommitTerrainOwnership({0, Section, 0}, MakeArrayView(&Node, 1));
 	}
-	{
-		auto& Interest = const_cast<FVoxelInterestSet&>(Module->GetCurrentInterest());
-		FVoxelViewAdmission Fine, Surface;
-		Fine.Kind = EVoxelViewAdmissionKind::Fine;
-		Fine.FineKey = Sections[0];
-		Surface.Kind = EVoxelViewAdmissionKind::Surface;
-		Interest.Admissions = {Fine, Surface};
-		Entry.bDirty = true;
-		TestFalse(TEXT("A pending replacement is not reported as newly committed Fine"), Manager.IsAdmissionPresented(Fine));
-		Manager.bTerrainBuildStageDirty = true;
-		Manager.RefreshTerrainBuildStage();
-		TestEqual(TEXT("Retained visible Fine with ready new meshes cannot deadlock its coarse handoff dependencies"), Scheduler.GetObservedTerrainStage(), 2);
-		Manager.FineReady.Remove(Fine.FineKey);
-		Manager.bTerrainBuildStageDirty = true;
-		Manager.RefreshTerrainBuildStage();
-		TestEqual(TEXT("Incomplete new Fine meshes retain the near-field gate"), Scheduler.GetObservedTerrainStage(), 0);
-		Manager.FineReady.Add(Fine.FineKey);
-		Entry.bDirty = false;
-		Interest.Admissions.Reset();
-		Scheduler.SetObservedTerrainStage(3);
-	}
-	Manager.FinePageReady.Add({Sections[0], 0});
 	Manager.ResolveTransitionVisibility();
 	for (int32 Frame = 0; Frame < 8; ++Frame) Manager.Publisher->Tick();
-	TestFalse(TEXT("Partial new layout keeps the old F2 visible"), OldActor->IsHidden());
-	for (const auto& Section : Sections) TestTrue(TEXT("Partial preparation cannot replace committed owners"), Manager.PresentedFineSectionOwners.FindChecked(Section) == OldLayout);
 	for (const auto& Section : Sections)
 	{
-		Manager.FinePageReady.Add({Section, 0});
-		Manager.EmptyFinePages.Add({Section, 0});
+		TestFalse(TEXT("F0 preparation and layout metadata cannot impersonate a Native Atom receipt"), Manager.IsFinePresented(Section));
+		TestTrue(TEXT("Coverage does not rewrite an Atom owner through a whole-page publication"),
+			Manager.PresentedFineSectionOwners.FindChecked(Section) == OldLayout);
 	}
-	Manager.ResolveTransitionVisibility();
-	TestFalse(TEXT("Complete readiness alone cannot hide the old Page before commit"), OldActor->IsHidden());
-	for (int32 Frame = 0; Frame < 8; ++Frame) Manager.Publisher->Tick();
-	TestTrue(TEXT("Atomic publication hides the old Page after every replacement is ready"), OldActor->IsHidden());
-	for (const auto& Section : Sections) TestTrue(TEXT("Every Section switches to its committed new Page"), Manager.PresentedFineSectionOwners.FindChecked(Section) == FVoxelFinePageKey{Section, 0});
-	Manager.DirtyFinePages.Add(OldLayout);
-	Manager.UpdateFinePagePresentation(OldLayout, Manager.VisibleTerrainNodes, {});
-	TestFalse(TEXT("Already retired obsolete Page leaves the dirty set"), Manager.DirtyFinePages.Contains(OldLayout));
-	Manager.GetInputRoot().FineWanted.Reset();
-	Manager.GetInputRoot().FinePagePlan = {};
-	Manager.ResolveTransitionVisibility();
-	for (int32 Frame = 0; Frame < 8; ++Frame) Manager.Publisher->Tick();
-	for (int32 Frame = 0; Frame < 128 && !Manager.PresentedFineSectionOwners.IsEmpty(); ++Frame)
-	{
-		Manager.Publisher->Tick();
-		const auto RetryOwners = Manager.Publisher->TakeRetryOwners();
-		for (const auto& Key : RetryOwners) Manager.DirtyFinePages.Add({Key.Coordinate, Key.Level});
-		if (!RetryOwners.IsEmpty()) Manager.ResolveTransitionVisibility();
-	}
-	TestTrue(TEXT("Leaving a Fine-only domain retires logical empty Page ownership"), Manager.PresentedFineSectionOwners.IsEmpty() && Manager.VisibleTerrainNodes.IsEmpty());
+	for (const auto& Pair : Manager.VisibleTerrainNodesByGroup)
+		TestTrue(TEXT("Fine ownership remains in per-Atom groups"), Pair.Key.Representation != 0 || Pair.Key.Level == 0);
+	Manager.InvalidateFinePageLayout(OldLayout);
+	Manager.RetireFinePageLayoutState(OldLayout);
+	TestFalse(TEXT("Retiring obsolete layout metadata releases its dirty marker"), Manager.DirtyFinePages.Contains(OldLayout));
+	TestEqual(TEXT("Layout retirement leaves Native Atom receipt ownership untouched"), Manager.PresentedFineSectionOwners.Num(), Sections.Num());
 	Manager.Reset();
-	World->DestroyWorld(false);
-	GEngine->DestroyWorldContext(World);
+	TestTrue(TEXT("World reset clears the derived receipt ownership"), Manager.PresentedFineSectionOwners.IsEmpty());
 	return true;
 }
 

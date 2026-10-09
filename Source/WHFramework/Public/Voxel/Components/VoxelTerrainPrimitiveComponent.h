@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Components/MeshComponent.h"
+#include "Voxel/Task/VoxelTerrainResources.h"
 #include "VoxelTerrainPrimitiveComponent.generated.h"
 
 struct FVoxelTerrainRendererState;
@@ -14,12 +15,17 @@ class WHFRAMEWORK_API UVoxelTerrainPrimitiveComponent :
 public:
 	explicit UVoxelTerrainPrimitiveComponent(
 		const FObjectInitializer& InObjectInitializer);
+	virtual ~UVoxelTerrainPrimitiveComponent() override;
 	virtual FPrimitiveSceneProxy* CreateSceneProxy() override;
 	virtual FBoxSphereBounds CalcBounds(
 		const FTransform& InLocalToWorld) const override;
 	void InitializeTerrain(
 		TSharedPtr<FVoxelTerrainRendererState, ESPMode::ThreadSafe> InState);
-	int32 RetainMaterial(UMaterialInterface* InMaterial);
+	int32 RetainMaterial(UMaterialInterface* InMaterial, EVoxelTerrainResourceAdmission* OutAdmission = nullptr);
+	const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& GetNativeMaterialLease() const { return MaterialLease; }
 
 	TSharedPtr<FVoxelTerrainRendererState, ESPMode::ThreadSafe> TerrainState;
+
+private:
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MaterialLease;
 };

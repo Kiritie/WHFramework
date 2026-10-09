@@ -4,6 +4,7 @@
 #include "Scene/Actor/SceneActorInterface.h"
 #include "SaveGame/SaveGameModule.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Save/VoxelSceneColumnCodec.h"
 #include "Voxel/Scene/VoxelSceneRegion.h"
 #include "Voxel/Streaming/VoxelInterestRuntime.h"
@@ -17,14 +18,39 @@ bool UVoxelModule::ReserveSimulationStorage(const int32 InSectionCount, const in
 		FMath::Max<int64>(InSectionCount, int64(SimulationSectionCapacity) * 2) : SimulationSectionCapacity);
 	const int64 RegionRows = FMath::Max<int64>(4, InRegionCount > SceneRegionCapacity ?
 		FMath::Max<int64>(InRegionCount, int64(SceneRegionCapacity) * 2) : SceneRegionCapacity);
-	if (SectionRows > MAX_int32 || RegionRows > MAX_int32) return false;
+	if (SectionRows > MAX_int32 || RegionRows > MAX_int32)
+	{
+		WorldState = EVoxelWorldState::Failed;
+		UE_LOG(LogTemp, Error, TEXT("CapacityUnachievable: simulation directory count exceeds native capacity"));
+		return false;
+	}
 	const uint64 OldBytes = SimulationSections.GetAllocatedSize() + SceneRegions.GetAllocatedSize();
 	const uint64 NewBytes = VoxelBoundedAllocation::SetBytes<FIntVector>(int32(SectionRows)) +
 		VoxelBoundedAllocation::MapBytes<FIntVector, TObjectPtr<UVoxelSceneRegion>>(int32(RegionRows));
 	const auto Resources = Scheduler->GetRuntimeResources();
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(Epoch, TerrainPlanningOwnerId, 1, {}, 1);
-	if ((!SimulationStorageLease && !Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Resident,
-		OldBytes + NewBytes, SimulationStorageLease)) || !SimulationStorageLease->Resize(OldBytes + NewBytes)) return false;
+	FVoxelGenerationRequiredCapacity Required;
+	FString Error;
+	if (!FVoxelGenerationRequiredSourceScope::Collect(Resources.Get(), SimulationStorageLease.Get(), Required, Error))
+	{
+		WorldState = EVoxelWorldState::Failed;
+		UE_LOG(LogTemp, Error, TEXT("Simulation directory admission failed: %s"), *Error);
+		return false;
+	}
+	const uint64 RequiredInput = Required.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)];
+	const auto Admission = SimulationStorageLease ? SimulationStorageLease->TryResize(OldBytes + NewBytes, RequiredInput, Required.LeaseCount) :
+		Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Resident, OldBytes + NewBytes,
+			SimulationStorageLease, 0, RequiredInput, Required.LeaseCount);
+	if (Admission != EVoxelTerrainResourceAdmission::Granted)
+	{
+		if (Admission != EVoxelTerrainResourceAdmission::CapacityBlocked)
+		{
+			WorldState = EVoxelWorldState::Failed;
+			UE_LOG(LogTemp, Error, TEXT("Simulation directory admission failed: %s"),
+				Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable") : TEXT("InvalidRequest"));
+		}
+		return false;
+	}
 	SimulationSections.Reserve(int32(SectionRows));
 	SceneRegions.Reserve(int32(RegionRows));
 	SimulationSectionCapacity = int32(SectionRows);
@@ -33,6 +59,25 @@ bool UVoxelModule::ReserveSimulationStorage(const int32 InSectionCount, const in
 	check(ActualBytes <= NewBytes);
 	verify(SimulationStorageLease->Resize(ActualBytes));
 	return true;
+}
+
+void UVoxelModule::RecordSimulationAdmissionFailure(
+	FVoxelSection& InSection,
+	const EVoxelTerrainResourceAdmission InAdmission)
+{
+	if (InAdmission == EVoxelTerrainResourceAdmission::CapacityUnachievable ||
+		InAdmission == EVoxelTerrainResourceAdmission::InvalidRequest)
+	{
+		// 保留已持有的 Simulation/Nav pin；静态不可达不能伪装成等待外部释放。
+		InSection.bSimulationCapacityBlocked = false;
+		WorldState = EVoxelWorldState::Failed;
+		UE_LOG(LogTemp, Error, TEXT("Simulation navigation admission failed for %s: %s"), *InSection.SimulationKey.ToString(),
+			InAdmission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable") : TEXT("InvalidRequest"));
+	}
+	else
+	{
+		InSection.bSimulationCapacityBlocked = true;
+	}
 }
 
 void UVoxelModule::QueueSimulationDemandEvents(TSharedPtr<const FVoxelResidencyDemandEvents, ESPMode::ThreadSafe> InEvents)
@@ -144,7 +189,8 @@ bool UVoxelModule::ReviveSimulationSection(FVoxelSection& InSection, UVoxelScene
 	ReleaseSimulationSectionFromSave(InSection);
 	InRegion.bSceneFailed = InRegion.bSceneSaveFailed = false;
 	InRegion.OnSectionActivated(Key);
-	if (NavigationPresenter && !NavigationPresenter->ActivateSection(Key)) InSection.bSimulationCapacityBlocked = true;
+	if (NavigationPresenter && !NavigationPresenter->ActivateSection(Key))
+		RecordSimulationAdmissionFailure(InSection, NavigationPresenter->GetActivationAdmission());
 	FVoxelSimulationResidencyDelta Delta;
 	Delta.AddedSections.Add(Key);
 	Delta.Revision = ++SimulationResidencyRevision;
@@ -277,7 +323,8 @@ void UVoxelModule::ReconcileSimulationDemand()
 {
 	if (!Runtime || !Scheduler || !IsAuthority() || !bEnableProjectSceneSimulation) return;
 	const double Deadline = TerrainFrameContext.Deadline(0.35);
-	for (int32 Step = 0; Step < 32 && SimulationDemandEvents && FPlatformTime::Seconds() < Deadline; ++Step)
+	for (int32 Step = 0; Step < 32 && SimulationDemandEvents && WorldState != EVoxelWorldState::Failed &&
+		FPlatformTime::Seconds() < Deadline; ++Step)
 	{
 		const double Started = FPlatformTime::Seconds();
 		if (TerrainFrameContext.IsActive() && !TerrainFrameContext.GetPublishBudget().TryStart(EVoxelPublishPhase::Admission,
@@ -306,7 +353,8 @@ void UVoxelModule::ReconcileSimulationDemand()
 		if (TerrainFrameContext.IsActive()) TerrainFrameContext.GetPublishBudget().Finish(EVoxelPublishPhase::Admission, Started, Finished);
 	}
 	// 仅处理由需求、数据完成、真实物理提交或显式恢复唤醒的局部票据。
-	for (int32 Step = 0; Step < 16 && SimulationReadyHead && FPlatformTime::Seconds() < Deadline; ++Step)
+	for (int32 Step = 0; Step < 16 && SimulationReadyHead && WorldState != EVoxelWorldState::Failed &&
+		FPlatformTime::Seconds() < Deadline; ++Step)
 	{
 		const double Started = FPlatformTime::Seconds();
 		if (TerrainFrameContext.IsActive() && !TerrainFrameContext.GetPublishBudget().TryStart(EVoxelPublishPhase::Prepare,
@@ -342,9 +390,10 @@ void UVoxelModule::ReconcileSimulationDemand()
 				if (!SimulationSections.Contains(Key))
 				{
 					if (ReserveSimulationStorage(SimulationSections.Num() + 1, SceneRegions.Num() + (Region ? 0 : 1))) ActivateSimulationSection(Key);
-					else Section->bSimulationCapacityBlocked = true;
+					else Section->bSimulationCapacityBlocked = WorldState != EVoxelWorldState::Failed;
 				}
-				else if (NavigationPresenter && !NavigationPresenter->ActivateSection(Key)) Section->bSimulationCapacityBlocked = true;
+				else if (NavigationPresenter && !NavigationPresenter->ActivateSection(Key))
+					RecordSimulationAdmissionFailure(*Section, NavigationPresenter->GetActivationAdmission());
 			}
 			else HoldSimulationSectionForRegion(*Section, *Region);
 			// 领域回调可使 Section 或世界换代；不再沿用回调前的裸地址。
@@ -607,10 +656,10 @@ UVoxelSceneRegion* UVoxelModule::GetSceneRegionForActor(AActor* InActor, const F
 	else
 	{
 		const auto& Directory = RegionStore.GetDirectorySnapshot();
-		const auto* Bytes = Directory ? Directory->SceneColumns.Find(FIntPoint(Region.X, Region.Y)) : nullptr;
-		if (Bytes)
+		const auto* ExpectedBytes = Directory ? Directory->SceneColumns.Find(FIntPoint(Region.X, Region.Y)) : nullptr;
+		if (ExpectedBytes)
 		{
-			if (!Storage->BeginSceneLoad(*Scheduler, RegionStore.GetSourceLease(), *Bytes))
+			if (!Storage->BeginSceneLoad(*Scheduler, RegionStore.GetSourceLease(), *ExpectedBytes))
 			{
 				Storage->Shutdown();
 				return nullptr;
@@ -653,7 +702,7 @@ bool UVoxelModule::ActivateSimulationSection(const FIntVector& InSection)
 		Section->bSimulationPinned = false;
 		verify(Runtime->ReleaseSectionPin(InSection, Identity));
 		if (Region) HoldSimulationSectionForRegion(*Section, *Region);
-		else Section->bSimulationCapacityBlocked = true;
+		else Section->bSimulationCapacityBlocked = WorldState != EVoxelWorldState::Failed;
 		return false;
 	}
 	ReleaseSimulationSectionFromRegion(*Section);
@@ -662,12 +711,12 @@ bool UVoxelModule::ActivateSimulationSection(const FIntVector& InSection)
 	{
 		if (!NavigationPresenter->ActivateSection(InSection))
 		{
-			Section->bSimulationCapacityBlocked = true;
+			RecordSimulationAdmissionFailure(*Section, NavigationPresenter->GetActivationAdmission());
 			Section->SimulationKey = InSection;
 			Section->SimulationIdentity = Identity;
 			Section->SimulationCapacityVersion = Scheduler->GetRuntimeResources()->Snapshot().ReleaseVersion;
 			Section->SimulationGeometryCapacityVersion = Scheduler->GetTerrainResources()->Snapshot().ReleaseVersion;
-			QueueSimulationSection(*Section);
+			if (Section->bSimulationCapacityBlocked) QueueSimulationSection(*Section);
 		}
 	}
 	FVoxelSimulationResidencyDelta Delta;

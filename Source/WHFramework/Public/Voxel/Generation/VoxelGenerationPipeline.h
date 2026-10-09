@@ -1,15 +1,39 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Generation/VoxelGenerationBinding.h"
 #include "Voxel/Generation/VoxelGenerationPlanCache.h"
 #include "Voxel/Generation/VoxelGenerationOverlay.h"
 
 class FVoxelGenerationWorkspace;
 
+// Map 与原 Working 授额一起移交；最后一个消费点先释放 backing，再退租。
+struct WHFRAMEWORK_API FVoxelCoarseOverlayCapture
+{
+	FVoxelCoarseOverlayCapture();
+	~FVoxelCoarseOverlayCapture();
+	FVoxelCoarseOverlayCapture(const FVoxelCoarseOverlayCapture&) = delete;
+	FVoxelCoarseOverlayCapture& operator=(const FVoxelCoarseOverlayCapture&) = delete;
+	FVoxelCoarseOverlayCapture(FVoxelCoarseOverlayCapture&& InOther);
+	FVoxelCoarseOverlayCapture& operator=(FVoxelCoarseOverlayCapture&& InOther);
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+	FVoxelGenerationConsumerKey Consumer;
+	TMap<FIntVector, FVoxelBlockState> Cells;
+};
+
 class WHFRAMEWORK_API FVoxelGenerationPipeline
 {
 public:
+	// 原事实账本在对象、控制器与 Worker 删除分配前授予；失败保持原 OutPipeline。
+	static bool Create(
+		TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
+		TSharedRef<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> InCache,
+		TSharedPtr<const FVoxelGenerationPipeline, ESPMode::ThreadSafe>& OutPipeline,
+		FString& OutError,
+		TSharedPtr<const IVoxelGenerationOverlay, ESPMode::ThreadSafe> InOverlay = nullptr,
+		bool bInRequirePlanPreflight = false);
+
 	void SetOverlayPlanningServices(FVoxelGenerationPlanningServices InServices) const;
 	void BindRetentionResources(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
 		const FVoxelGenerationConsumerKey& InConsumer) const;
@@ -101,10 +125,19 @@ public:
 	{
 		return Cache;
 	}
+	const TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe>& GetRuntimeConfig() const
+	{
+		return Config;
+	}
+	uint64 GetRequiredInputBytes() const;
+	int32 GetRequiredInputLeaseCount() const;
+	void VisitRequiredSources(FVoxelGenerationRequiredSourceScope::FVisit InVisit) const;
+	void MarkPublished() const;
 
 	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> RetainHydrologyForPlanning(
 		const FIntPoint& InCenter,
-		int32 InSampleRadiusCells) const;
+		int32 InSampleRadiusCells,
+		FString* OutError = nullptr) const;
 
 	bool SampleEnvironments(
 		const FIntPoint& InOrigin,
@@ -161,7 +194,7 @@ public:
 		const FIntVector& InOrigin,
 		int32 InStep,
 		int32 InGridSide,
-		TMap<FIntVector, FVoxelBlockState>& OutCells,
+		FVoxelCoarseOverlayCapture& OutCells,
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr) const;
 
@@ -179,6 +212,8 @@ private:
 		FString& OutError) const;
 
 private:
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RootLease;
+
 	TSharedRef<
 		const FVoxelGenerationRuntimeConfig,
 		ESPMode::ThreadSafe> Config;

@@ -17,16 +17,17 @@ public:
 private:
 	FVoxelGenerationConsumerKey Consumer;
 	FVoxelGenerationConsumerScope* Previous = nullptr;
-	static thread_local FVoxelGenerationConsumerScope* Active;
+	static FVoxelGenerationConsumerScope*& ActiveScopeSlot();
 };
 
 /** 项目 Worker 只观察实际读缺失；身份、订阅和重试由 GT 事实所有者管理。 */
 class WHFRAMEWORK_API FVoxelGenerationPlanningReadScope
 {
 public:
-	using FObserver = TFunction<void(EVoxelGenerationPlanKind, const FIntVector&)>;
+	using FObserver = TFunctionRef<void(EVoxelGenerationPlanKind, const FIntVector&)>;
 
-	explicit FVoxelGenerationPlanningReadScope(FObserver InObserver,
+	// Observer及其callable由调用栈持有，必须比Scope更晚析构。
+	explicit FVoxelGenerationPlanningReadScope(const FObserver* InObserver = nullptr,
 		const FVoxelTaskStamp* InStamp = nullptr, const TAtomic<bool>* InCancel = nullptr,
 		const FVoxelGenerationConsumerKey* InConsumer = nullptr);
 	~FVoxelGenerationPlanningReadScope();
@@ -41,13 +42,13 @@ public:
 	static void Missing(EVoxelGenerationPlanKind InKind, const FIntVector& InCoordinate);
 
 private:
-	FObserver Observer;
+	const FObserver* Observer = nullptr;
 	const FVoxelTaskStamp* Stamp = nullptr;
 	const TAtomic<bool>* Cancel = nullptr;
 	const FVoxelGenerationConsumerKey* Consumer = nullptr;
 	bool bMissing = false;
 	FVoxelGenerationPlanningReadScope* Previous = nullptr;
-	static thread_local FVoxelGenerationPlanningReadScope* Active;
+	static FVoxelGenerationPlanningReadScope*& ActiveScopeSlot();
 };
 
 /** 由世界 Emerge 所有者绑定，不让项目持有裸 Coordinator 或越线程修改事实。 */

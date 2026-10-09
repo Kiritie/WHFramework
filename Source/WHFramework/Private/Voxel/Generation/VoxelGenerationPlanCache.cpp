@@ -15,6 +15,15 @@ namespace
 	constexpr int32 MaximumControlEntries = 1 << 20;
 	constexpr int32 MaximumRetiredEntriesPerGroup = 64;
 
+	void EnumerateCacheRequiredSources(const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+	{
+		const auto& Cache = *static_cast<const FVoxelGenerationPlanCache*>(InContext);
+		uint64 Bytes;
+		int32 Count;
+		Cache.GetRequiredInputCapacity(Bytes, Count);
+		if (Count) InVisit({&Cache, 0, EVoxelTerrainResourcePool::Input, Bytes, Count});
+	}
+
 	template<typename ValueType>
 	using TRetiredCacheValues = TArray<TSharedPtr<const ValueType, ESPMode::ThreadSafe>,
 		TFixedAllocator<MaximumRetiredEntriesPerGroup>>;
@@ -120,12 +129,13 @@ namespace
 			FMath::Max(InRequired, FMath::Max(4, InCapacity * 2)));
 	}
 
-	template<typename KeyType, typename ValueType>
+	template<typename KeyType, typename ValueType, typename CapacityType>
 	bool PrepareControlMap(
 		TMap<KeyType, ValueType>& InMap,
 		const int32 InRequired,
 		int32& InCapacity,
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& InLease,
+		CapacityType& InControlCapacity,
 		const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& InResources,
 		const FVoxelGenerationConsumerKey& InControlConsumer,
 		FString& OutError)
@@ -136,11 +146,20 @@ namespace
 		}
 		const int32 Capacity = NextControlCapacity(InRequired, InCapacity);
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-		if (InResources && !InResources->Acquire(InControlConsumer, EVoxelTerrainResourcePool::Input,
-			VoxelGenerationAllocation::Private::SetReserveBytes<TPair<KeyType, ValueType>>(InMap, Capacity), Lease))
+		if (InResources)
 		{
-			OutError = TEXT("CapacityBlocked: generation cache control map");
-			return false;
+			FVoxelGenerationRequiredCapacity Sources;
+			if (!FVoxelGenerationRequiredSourceScope::Collect(*InResources, nullptr, Sources, OutError)) return false;
+			const auto Admission = InResources->TryAcquire(InControlConsumer, EVoxelTerrainResourcePool::Input,
+				VoxelGenerationAllocation::Private::SetReserveBytes<TPair<KeyType, ValueType>>(InMap, Capacity), Lease,
+				0, Sources.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], Sources.LeaseCount);
+			if (Admission != EVoxelTerrainResourceAdmission::Granted)
+			{
+				OutError = Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable
+					? TEXT("CapacityUnachievable: generation cache control map and original sources")
+					: TEXT("CapacityBlocked: generation cache control map");
+				return false;
+			}
 		}
 		// 原 backing 租约仍在，完整新 backing 在 Reserve 前覆盖重分配峰值。
 		InMap.Reserve(Capacity);
@@ -150,17 +169,19 @@ namespace
 			const bool bResized = Lease->Resize(VoxelGenerationAllocation::AllocatedBytes(InMap));
 			check(bResized);
 		}
+		InControlCapacity.Replace(InLease.Get(), Lease.Get());
 		InLease = MoveTemp(Lease);
 		InCapacity = Capacity;
 		return true;
 	}
 
-	template<typename KeyType>
+	template<typename KeyType, typename CapacityType>
 	bool PrepareControlKeys(
 		TArray<KeyType>& InKeys,
 		const int32 InRequired,
 		int32& InCapacity,
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& InLease,
+		CapacityType& InControlCapacity,
 		const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& InResources,
 		const FVoxelGenerationConsumerKey& InControlConsumer,
 		FString& OutError)
@@ -171,11 +192,20 @@ namespace
 		}
 		const int32 Capacity = NextControlCapacity(InRequired, InCapacity);
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-		if (InResources && !InResources->Acquire(InControlConsumer, EVoxelTerrainResourcePool::Input,
-			VoxelGenerationAllocation::Private::ArrayReserveBytes<KeyType, FDefaultAllocator>(Capacity), Lease))
+		if (InResources)
 		{
-			OutError = TEXT("CapacityBlocked: generation cache control keys");
-			return false;
+			FVoxelGenerationRequiredCapacity Sources;
+			if (!FVoxelGenerationRequiredSourceScope::Collect(*InResources, nullptr, Sources, OutError)) return false;
+			const auto Admission = InResources->TryAcquire(InControlConsumer, EVoxelTerrainResourcePool::Input,
+				VoxelGenerationAllocation::Private::ArrayReserveBytes<KeyType, FDefaultAllocator>(Capacity), Lease,
+				0, Sources.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], Sources.LeaseCount);
+			if (Admission != EVoxelTerrainResourceAdmission::Granted)
+			{
+				OutError = Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable
+					? TEXT("CapacityUnachievable: generation cache control keys and original sources")
+					: TEXT("CapacityBlocked: generation cache control keys");
+				return false;
+			}
 		}
 		InKeys.Reserve(Capacity);
 		if (Lease)
@@ -184,17 +214,19 @@ namespace
 			const bool bResized = Lease->Resize(VoxelGenerationAllocation::AllocatedBytes(InKeys));
 			check(bResized);
 		}
+		InControlCapacity.Replace(InLease.Get(), Lease.Get());
 		InLease = MoveTemp(Lease);
 		InCapacity = Capacity;
 		return true;
 	}
 
-	template<typename KeyType, typename ValueType, typename BuildGateType, typename BackingType>
+	template<typename KeyType, typename ValueType, typename BuildGateType, typename BackingType, typename CapacityType>
 	bool PrepareControlStorage(
 		TMap<KeyType, TSharedPtr<const ValueType, ESPMode::ThreadSafe>>& InValues,
 		TMap<KeyType, TSharedPtr<BuildGateType, ESPMode::ThreadSafe>>& InBuilds,
 		TArray<KeyType>& InKeys,
 		BackingType& InBacking,
+		CapacityType& InControlCapacity,
 		const int32 InAdditionalValues,
 		const int32 InAdditionalBuilds,
 		const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& InResources,
@@ -210,11 +242,11 @@ namespace
 			return false;
 		}
 		// 预留所有在途 gate 的发布槽，成功完成不会再增长 values 或 keys。
-		return PrepareControlMap(InValues, int32(ValuesRequired), InBacking.ValuesCapacity, InBacking.ValuesLease,
+		return PrepareControlMap(InValues, int32(ValuesRequired), InBacking.ValuesCapacity, InBacking.ValuesLease, InControlCapacity,
 			InResources, InControlConsumer, OutError) &&
-			PrepareControlKeys(InKeys, int32(KeysRequired), InBacking.KeysCapacity, InBacking.KeysLease,
+			PrepareControlKeys(InKeys, int32(KeysRequired), InBacking.KeysCapacity, InBacking.KeysLease, InControlCapacity,
 				InResources, InControlConsumer, OutError) &&
-			PrepareControlMap(InBuilds, int32(BuildsRequired), InBacking.BuildsCapacity, InBacking.BuildsLease,
+			PrepareControlMap(InBuilds, int32(BuildsRequired), InBacking.BuildsCapacity, InBacking.BuildsLease, InControlCapacity,
 				InResources, InControlConsumer, OutError);
 	}
 
@@ -305,13 +337,15 @@ namespace
 		return true;
 	}
 
-	template<typename KeyType, typename ValueType, typename BuildGateType, typename BackingType>
+	template<typename KeyType, typename ValueType, typename BuildGateType, typename BackingType, typename CapacityType>
 	bool GetOrBuildValue(
 		FRWLock& InLock,
 		TMap<KeyType, TConstCachePtr<KeyType, ValueType>>& InValues,
 		TMap<KeyType, TSharedPtr<BuildGateType, ESPMode::ThreadSafe>>& InBuilds,
 		TArray<KeyType>& InKeys,
 		BackingType& InBacking,
+		CapacityType& InControlCapacity,
+		const FVoxelGenerationPlanCache& InCache,
 		const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& InResources,
 		const FVoxelGenerationConsumerKey& InControlConsumer,
 		const KeyType& InKey,
@@ -324,6 +358,31 @@ namespace
 		TFunctionRef<void(uint64)> InRecordWait,
 		TFunction<void(bool)> InRecordLookup = {})
 	{
+		struct FOutputSource
+		{
+			const TConstCachePtr<KeyType, ValueType>& Value;
+			const FVoxelTerrainResources* Resources;
+		};
+		const FOutputSource OutputSource{OutValue, InResources.Get()};
+		FVoxelGenerationRequiredSourceScope OutputSources(InResources.Get(), &OutputSource,
+			[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+			{
+				const auto& Source = *static_cast<const FOutputSource*>(InContext);
+				const auto& Value = Source.Value;
+				if (Value && Value->ResourceLease && Source.Resources && Value->ResourceLease->IsOwnedBy(*Source.Resources))
+				{
+					FVoxelGenerationRequiredSourceScope::VisitLease(Value->ResourceLease.Get(), InVisit);
+				}
+			});
+		FVoxelGenerationRequiredSourceScope CacheSources(InResources.Get(), &InCache,
+			[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+			{
+				const auto& Cache = *static_cast<const FVoxelGenerationPlanCache*>(InContext);
+				uint64 Bytes;
+				int32 Count;
+				Cache.GetRequiredInputCapacity(Bytes, Count);
+				if (Count) InVisit({&Cache, 0, EVoxelTerrainResourcePool::Input, Bytes, Count});
+			});
 		FVoxelGenerationConsumerKey BuildConsumer;
 		if (InResources && !ResolveBuildConsumer(InControlConsumer, BuildConsumer, OutError))
 		{
@@ -375,33 +434,53 @@ namespace
 			}
 			else
 			{
-				if (!PrepareControlStorage(InValues, InBuilds, InKeys, InBacking, 1, 1,
+				if (!PrepareControlStorage(InValues, InBuilds, InKeys, InBacking, InControlCapacity, 1, 1,
 					InResources, InControlConsumer, OutError))
 				{
 					return false;
 				}
 				TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> GateLease;
-				if (InResources && !InResources->Acquire(BuildConsumer, EVoxelTerrainResourcePool::Input,
-					VoxelBoundedAllocation::WorkerSharedBytes<BuildGateType>(), GateLease))
+				FVoxelGenerationRequiredCapacity Sources;
+				if (InResources && !FVoxelGenerationRequiredSourceScope::Collect(*InResources, nullptr, Sources, OutError)) return false;
+				const auto GateAdmission = InResources ? InResources->TryAcquire(BuildConsumer, EVoxelTerrainResourcePool::Input,
+					VoxelBoundedAllocation::WorkerSharedBytes<BuildGateType>(), GateLease, 0,
+					Sources.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], Sources.LeaseCount) : EVoxelTerrainResourceAdmission::Granted;
+				if (GateAdmission != EVoxelTerrainResourceAdmission::Granted)
 				{
-					OutError = TEXT("CapacityBlocked: generation cache build gate");
+					OutError = GateAdmission == EVoxelTerrainResourceAdmission::CapacityUnachievable
+						? TEXT("CapacityUnachievable: generation cache build gate and original sources")
+						: TEXT("CapacityBlocked: generation cache build gate");
 					return false;
 				}
+				FVoxelGenerationRequiredSourceScope GateSources(InResources.Get(), GateLease.Get());
 				if constexpr (TCacheBodyCapacity<ValueType>::Enabled)
 				{
 					const uint64 BodyBytes = VoxelBoundedAllocation::WorkerSharedBytes<const ValueType>();
 					if (InResources)
 					{
+						if (!FVoxelGenerationRequiredSourceScope::Collect(*InResources, nullptr, Sources, OutError)) return false;
 						const auto Limits = InResources->Snapshot().Limits;
-						if (BodyBytes > Limits.WorkingBytes || BodyBytes > Limits.ResidentBytes - Limits.OverlapBytes)
+						const uint64 Working = Sources.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Working)];
+						const uint64 Resident = Sources.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Resident)];
+						if (Working > Limits.WorkingBytes || BodyBytes > Limits.WorkingBytes - Working ||
+							Resident > Limits.ResidentBytes - Limits.OverlapBytes ||
+							BodyBytes > Limits.ResidentBytes - Limits.OverlapBytes - Resident)
 						{
-							OutError = TEXT("Oversized: generation cache native body exceeds original pool limit");
+							OutError = TEXT("Oversized: generation cache native body and original sources exceed pool limit");
 							return false;
 						}
-						if (!InResources->Acquire(BuildConsumer, EVoxelTerrainResourcePool::Working, BodyBytes, BodyLease) ||
-							!InResources->Acquire(BuildConsumer, EVoxelTerrainResourcePool::Resident, BodyBytes, ResidentReservation))
+						const auto WorkingAdmission = InResources->TryAcquire(BuildConsumer, EVoxelTerrainResourcePool::Working,
+							BodyBytes, BodyLease, 0, Sources.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], Sources.LeaseCount);
+						const auto ResidentAdmission = WorkingAdmission == EVoxelTerrainResourceAdmission::Granted
+							? InResources->TryAcquire(BuildConsumer, EVoxelTerrainResourcePool::Resident, BodyBytes, ResidentReservation,
+								0, Sources.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], Sources.LeaseCount + 1)
+							: WorkingAdmission;
+						if (WorkingAdmission != EVoxelTerrainResourceAdmission::Granted || ResidentAdmission != EVoxelTerrainResourceAdmission::Granted)
 						{
-							OutError = TEXT("CapacityBlocked: generation cache native body");
+							OutError = WorkingAdmission == EVoxelTerrainResourceAdmission::CapacityUnachievable ||
+								ResidentAdmission == EVoxelTerrainResourceAdmission::CapacityUnachievable
+								? TEXT("CapacityUnachievable: generation cache native body and original sources")
+								: TEXT("CapacityBlocked: generation cache native body");
 							return false;
 						}
 					}
@@ -427,6 +506,13 @@ namespace
 			OutError = TEXT("Voxel generation cache contains an invalid published value");
 			return false;
 		}
+		const FVoxelGenerationRequiredSource GateSource{Gate.Get(), 0, EVoxelTerrainResourcePool::Input,
+			VoxelBoundedAllocation::WorkerSharedBytes<BuildGateType>()};
+		FVoxelGenerationRequiredSourceScope ActiveGateSource(InResources.Get(), &GateSource,
+			[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+			{
+				InVisit(*static_cast<const FVoxelGenerationRequiredSource*>(InContext));
+			});
 
 		if (!bOwner)
 		{
@@ -531,6 +617,7 @@ namespace
 
 		if (bSuccess && (!InCancel || !InCancel->Load()))
 		{
+			LocalValue.ResourceLease = BodyLease;
 			BuiltValue = BodyLease ? VoxelBoundedAllocation::MakeWorkerShared<const ValueType>(BodyLease, MoveTemp(LocalValue)) :
 				MakeShared<const ValueType, ESPMode::ThreadSafe>(MoveTemp(LocalValue));
 		}
@@ -573,6 +660,7 @@ namespace
 						check(InKeys.Num() < InBacking.KeysCapacity);
 						InValues.Add(InKey, BuiltValue);
 						InKeys.Add(InKey);
+						if (BodyLease) BodyLease->MarkPublished();
 						ReadyValue = BuiltValue;
 					}
 				}
@@ -615,13 +703,14 @@ namespace
 		return true;
 	}
 
-	template<typename KeyType, typename ValueType, typename BuildGateType, typename BackingType>
+	template<typename KeyType, typename ValueType, typename BuildGateType, typename BackingType, typename CapacityType>
 	bool StoreValue(
 		FRWLock& InLock,
 		TMap<KeyType, TConstCachePtr<KeyType, ValueType>>& InValues,
 		TMap<KeyType, TSharedPtr<BuildGateType, ESPMode::ThreadSafe>>& InBuilds,
 		TArray<KeyType>& InKeys,
 		BackingType& InBacking,
+		CapacityType& InControlCapacity,
 		const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& InResources,
 		const FVoxelGenerationConsumerKey& InControlConsumer,
 		const KeyType& InKey,
@@ -657,7 +746,7 @@ namespace
 					return false;
 				}
 				const int32 Additional = InBuilds.Contains(InKey) ? 0 : 1;
-				if (!PrepareControlStorage(InValues, InBuilds, InKeys, InBacking, Additional, 0,
+				if (!PrepareControlStorage(InValues, InBuilds, InKeys, InBacking, InControlCapacity, Additional, 0,
 					InResources, InControlConsumer, OutError))
 				{
 					return false;
@@ -817,7 +906,8 @@ bool FVoxelGenerationPlanCache::Create(
 	const bool bInAllowGameThreadBuilds,
 	const bool bInAllowWorkerWait)
 {
-	if (!InControlConsumer.IsValid())
+	if (!InControlConsumer.IsValid() || (InResources->GetControlConsumer().IsValid() &&
+		InResources->GetControlConsumer().WorldEpoch != InControlConsumer.WorldEpoch))
 	{
 		OutError = TEXT("InvalidConsumer: generation cache requires a complete World control identity");
 		return false;
@@ -828,7 +918,13 @@ bool FVoxelGenerationPlanCache::Create(
 		VoxelBoundedAllocation::ArrayBytes<TUniquePtr<FNaturalShard>>(ShardCount) +
 		VoxelBoundedAllocation::ArrayBytes<TUniquePtr<FPlanShard>>(ShardCount);
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-	const auto Admission = InResources->TryAcquire(InControlConsumer, EVoxelTerrainResourcePool::Input, RootBytes, Lease);
+	FVoxelGenerationRequiredSourceScope OldCacheSources(
+		OutCache && OutCache->GetResources().Get() == &InResources.Get() ? &InResources.Get() : nullptr,
+		OutCache.Get(), EnumerateCacheRequiredSources);
+	FVoxelGenerationRequiredCapacity Required;
+	if (!FVoxelGenerationRequiredSourceScope::Collect(InResources.Get(), nullptr, Required, OutError)) return false;
+	const auto Admission = InResources->TryAcquire(InControlConsumer, EVoxelTerrainResourcePool::Input, RootBytes, Lease,
+		0, Required.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
 	if (Admission != EVoxelTerrainResourceAdmission::Granted)
 	{
 		OutError = Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable
@@ -841,6 +937,7 @@ bool FVoxelGenerationPlanCache::Create(
 		new FVoxelGenerationPlanCache(InResources, InControlConsumer, bInAllowGameThreadBuilds, bInAllowWorkerWait),
 		VoxelBoundedAllocation::TWorkerDeleter<FVoxelGenerationPlanCache>{Lease});
 	Cache->RootInputBytes = RootBytes;
+	Cache->RootLease = Lease;
 	OutCache = MoveTemp(Cache);
 	OutError.Reset();
 	return true;
@@ -882,6 +979,31 @@ FVoxelGenerationPlanCache::~FVoxelGenerationPlanCache()
 const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& FVoxelGenerationPlanCache::GetResources() const
 {
 	return Resources;
+}
+
+void FVoxelGenerationPlanCache::FControlBackingCapacity::Replace(
+	const FVoxelTerrainResourceLease* InOldLease,
+	const FVoxelTerrainResourceLease* InNewLease)
+{
+	const uint64 OldBytes = InOldLease ? InOldLease->Bytes() : 0;
+	const uint64 NewBytes = InNewLease ? InNewLease->Bytes() : 0;
+	FWriteScopeLock Scope(Lock);
+	check(OldBytes <= Bytes && NewBytes <= MAX_uint64 - (Bytes - OldBytes));
+	Bytes = Bytes - OldBytes + NewBytes;
+	LeaseCount += int32(InNewLease != nullptr) - int32(InOldLease != nullptr);
+	check(LeaseCount >= 0);
+}
+
+void FVoxelGenerationPlanCache::MarkPublished() const
+{
+	if (RootLease) RootLease->MarkPublished();
+}
+
+void FVoxelGenerationPlanCache::GetRequiredInputCapacity(uint64& OutBytes, int32& OutLeaseCount) const
+{
+	FReadScopeLock Scope(ControlBackingCapacity.Lock);
+	OutBytes = RootInputBytes + ControlBackingCapacity.Bytes;
+	OutLeaseCount = int32(RootInputBytes != 0) + ControlBackingCapacity.LeaseCount;
 }
 
 const FVoxelGenerationConsumerKey& FVoxelGenerationPlanCache::GetControlConsumer() const
@@ -1005,6 +1127,8 @@ bool FVoxelGenerationPlanCache::GetOrBuildBaseColumn(
 			Shard.BaseColumnBuilds,
 			Shard.BaseColumnKeys,
 			Shard.BaseColumnBacking,
+			ControlBackingCapacity,
+			*this,
 			Resources,
 			ControlConsumer,
 			InPosition,
@@ -1043,6 +1167,8 @@ bool FVoxelGenerationPlanCache::GetOrBuildNaturalColumn(
 			Shard.NaturalColumnBuilds,
 			Shard.NaturalColumnKeys,
 			Shard.NaturalColumnBacking,
+			ControlBackingCapacity,
+			*this,
 			Resources,
 			ControlConsumer,
 			InPosition,
@@ -1101,7 +1227,7 @@ bool FVoxelGenerationPlanCache::StoreHydrology(
 
 	FString Error;
 	const bool bStored = StoreValue(Shard.Lock, Shard.Hydrology, Shard.HydrologyBuilds,
-		Shard.HydrologyKeys, Shard.HydrologyBacking, Resources, ControlConsumer, InKey, MoveTemp(InPlan), Error);
+		Shard.HydrologyKeys, Shard.HydrologyBacking, ControlBackingCapacity, Resources, ControlConsumer, InKey, MoveTemp(InPlan), Error);
 	if (OutError) *OutError = MoveTemp(Error);
 	return bStored;
 }
@@ -1128,6 +1254,8 @@ bool FVoxelGenerationPlanCache::GetOrBuildHydrology(
 			Shard.HydrologyBuilds,
 			Shard.HydrologyKeys,
 			Shard.HydrologyBacking,
+			ControlBackingCapacity,
+			*this,
 			Resources,
 			ControlConsumer,
 			InKey,
@@ -1185,7 +1313,7 @@ bool FVoxelGenerationPlanCache::StoreCave(
 
 	FString Error;
 	const bool bStored = StoreValue(Shard.Lock, Shard.Caves, Shard.CaveBuilds,
-		Shard.CaveKeys, Shard.CaveBacking, Resources, ControlConsumer, InKey, MoveTemp(InPlan), Error);
+		Shard.CaveKeys, Shard.CaveBacking, ControlBackingCapacity, Resources, ControlConsumer, InKey, MoveTemp(InPlan), Error);
 	if (OutError) *OutError = MoveTemp(Error);
 	return bStored;
 }
@@ -1212,6 +1340,8 @@ bool FVoxelGenerationPlanCache::GetOrBuildCave(
 			Shard.CaveBuilds,
 			Shard.CaveKeys,
 			Shard.CaveBacking,
+			ControlBackingCapacity,
+			*this,
 			Resources,
 			ControlConsumer,
 			InKey,
@@ -1288,6 +1418,8 @@ bool FVoxelGenerationPlanCache::GetOrBuildEcology(
 		Shard.EcologyBuilds,
 		Shard.EcologyKeys,
 		Shard.EcologyBacking,
+		ControlBackingCapacity,
+		*this,
 		Resources,
 		ControlConsumer,
 		InKey,
@@ -1322,7 +1454,7 @@ bool FVoxelGenerationPlanCache::StoreFeature(
 
 	FString Error;
 	const bool bStored = StoreValue(Shard.Lock, Shard.Features, Shard.FeatureBuilds,
-		Shard.FeatureKeys, Shard.FeatureBacking, Resources, ControlConsumer, InKey, MoveTemp(InPlan), Error);
+		Shard.FeatureKeys, Shard.FeatureBacking, ControlBackingCapacity, Resources, ControlConsumer, InKey, MoveTemp(InPlan), Error);
 	if (OutError) *OutError = MoveTemp(Error);
 	return bStored;
 }
@@ -1349,6 +1481,8 @@ bool FVoxelGenerationPlanCache::GetOrBuildFeature(
 			Shard.FeatureBuilds,
 			Shard.FeatureKeys,
 			Shard.FeatureBacking,
+			ControlBackingCapacity,
+			*this,
 			Resources,
 			ControlConsumer,
 			InKey,
@@ -1406,7 +1540,7 @@ bool FVoxelGenerationPlanCache::StoreStructure(
 
 	FString Error;
 	const bool bStored = StoreValue(Shard.Lock, Shard.Structures, Shard.StructureBuilds,
-		Shard.StructureKeys, Shard.StructureBacking, Resources, ControlConsumer, InKey, MoveTemp(InPlan), Error);
+		Shard.StructureKeys, Shard.StructureBacking, ControlBackingCapacity, Resources, ControlConsumer, InKey, MoveTemp(InPlan), Error);
 	if (OutError) *OutError = MoveTemp(Error);
 	return bStored;
 }
@@ -1433,6 +1567,8 @@ bool FVoxelGenerationPlanCache::GetOrBuildStructure(
 			Shard.StructureBuilds,
 			Shard.StructureKeys,
 			Shard.StructureBacking,
+			ControlBackingCapacity,
+			*this,
 			Resources,
 			ControlConsumer,
 			InKey,
@@ -1487,6 +1623,7 @@ bool FVoxelGenerationPlanCache::UpdateRetention(
 #endif
 
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> CandidateLease;
+	FVoxelGenerationRequiredSourceScope CacheSources(Resources.Get(), this, EnumerateCacheRequiredSources);
 	FVoxelGenerationCacheRetention Candidate;
 	Candidate.HydrologyRegionSide = InRetention.HydrologyRegionSide;
 	Candidate.HydrologyCellSize = InRetention.HydrologyCellSize;
@@ -1496,15 +1633,17 @@ bool FVoxelGenerationPlanCache::UpdateRetention(
 	if (Resources)
 	{
 		FReadScopeLock Scope(RetentionLock);
-		const uint64 PreviousBytes = RetentionLease ? RetentionLease->Bytes() : 0;
+		FVoxelGenerationRequiredCapacity Required;
+		if (!FVoxelGenerationRequiredSourceScope::Collect(*Resources, nullptr, Required, OutError)) return false;
 		const uint64 Limit = Resources->Snapshot().Limits.InputBytes;
+		const uint64 PreviousBytes = Required.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)];
 		if (Bytes > Limit || PreviousBytes > Limit - Bytes)
 		{
 			OutError = TEXT("Oversized: generation cache retention snapshot allocation peak exceeds original input pool limit");
 			return false;
 		}
 		const auto Admission = Bytes ? Resources->TryAcquire(ControlConsumer, EVoxelTerrainResourcePool::Input,
-			Bytes, CandidateLease, 0, RootInputBytes + PreviousBytes, 1 + int32(RetentionLease.IsValid())) : EVoxelTerrainResourceAdmission::Granted;
+			Bytes, CandidateLease, 0, PreviousBytes, Required.LeaseCount) : EVoxelTerrainResourceAdmission::Granted;
 		if (Admission != EVoxelTerrainResourceAdmission::Granted)
 		{
 			OutError = Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable
@@ -1549,6 +1688,7 @@ bool FVoxelGenerationPlanCache::UpdateRetention(
 			return false;
 		}
 		Swap(Retention.Points, Candidate.Points);
+		ControlBackingCapacity.Replace(RetentionLease.Get(), CandidateLease.Get());
 		Swap(RetentionLease, CandidateLease);
 		Retention.HydrologyRegionSide = Candidate.HydrologyRegionSide;
 		Retention.HydrologyCellSize = Candidate.HydrologyCellSize;
@@ -1627,6 +1767,9 @@ bool FVoxelGenerationPlanCache::RetainForTask(
 
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> NewLease;
+	FVoxelGenerationRequiredSourceScope CacheSources(Resources.Get(), this, EnumerateCacheRequiredSources);
+	FVoxelGenerationRequiredSourceScope OldOutputSources(&InResources.Get(),
+		OutLease && OutLease->ResourceLease->IsOwnedBy(InResources.Get()) ? &OutLease->ResourceLease.Get() : nullptr);
 	{
 		FWriteScopeLock Scope(RetentionLock);
 		if (NextTaskRetentionId == MAX_uint64)
@@ -1635,10 +1778,16 @@ bool FVoxelGenerationPlanCache::RetainForTask(
 			return false;
 		}
 
-		if (!InResources->Acquire(InConsumer, EVoxelTerrainResourcePool::Input,
-			FVoxelGenerationCacheRetentionLease::GetRequiredAllocationBytes(), ResourceLease))
+		FVoxelGenerationRequiredCapacity Required;
+		if (!FVoxelGenerationRequiredSourceScope::Collect(InResources.Get(), nullptr, Required, OutError)) return false;
+		const auto Admission = InResources->TryAcquire(InConsumer, EVoxelTerrainResourcePool::Input,
+			FVoxelGenerationCacheRetentionLease::GetRequiredAllocationBytes(), ResourceLease,
+			0, Required.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+		if (Admission != EVoxelTerrainResourceAdmission::Granted)
 		{
-			OutError = TEXT("CapacityBlocked: voxel cache task retention input capacity");
+			OutError = Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable
+				? TEXT("CapacityUnachievable: voxel cache task retention and original native sources")
+				: TEXT("CapacityBlocked: voxel cache task retention input capacity");
 			return false;
 		}
 
@@ -1941,6 +2090,8 @@ void FVoxelGenerationPlanCache::Reset()
 
 				RetiredBaseColumns = MoveTemp(Shard.BaseColumns);
 				RetiredNaturalColumns = MoveTemp(Shard.NaturalColumns);
+				ControlBackingCapacity.Replace(Shard.BaseColumnBacking.ValuesLease.Get(), nullptr);
+				ControlBackingCapacity.Replace(Shard.NaturalColumnBacking.ValuesLease.Get(), nullptr);
 				RetiredBaseLease = MoveTemp(Shard.BaseColumnBacking.ValuesLease);
 				RetiredNaturalLease = MoveTemp(Shard.NaturalColumnBacking.ValuesLease);
 				Shard.BaseColumnBacking.ValuesCapacity = 0;
@@ -1985,6 +2136,11 @@ void FVoxelGenerationPlanCache::Reset()
 				RetiredEcology = MoveTemp(Shard.Ecology);
 				RetiredFeatures = MoveTemp(Shard.Features);
 				RetiredStructures = MoveTemp(Shard.Structures);
+				ControlBackingCapacity.Replace(Shard.HydrologyBacking.ValuesLease.Get(), nullptr);
+				ControlBackingCapacity.Replace(Shard.CaveBacking.ValuesLease.Get(), nullptr);
+				ControlBackingCapacity.Replace(Shard.EcologyBacking.ValuesLease.Get(), nullptr);
+				ControlBackingCapacity.Replace(Shard.FeatureBacking.ValuesLease.Get(), nullptr);
+				ControlBackingCapacity.Replace(Shard.StructureBacking.ValuesLease.Get(), nullptr);
 				RetiredHydrologyLease = MoveTemp(Shard.HydrologyBacking.ValuesLease);
 				RetiredCaveLease = MoveTemp(Shard.CaveBacking.ValuesLease);
 				RetiredEcologyLease = MoveTemp(Shard.EcologyBacking.ValuesLease);

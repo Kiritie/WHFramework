@@ -21,7 +21,8 @@ struct WHFRAMEWORK_API FVoxelCommittedJournalCapture
 	FGuid OwnerId;
 	uint64 PersistedCut = 0;
 
-	bool PrepareSaveNotifications(const FGuid& InTransactionId);
+	bool PrepareSaveNotifications(const FGuid& InTransactionId,
+		EVoxelTerrainResourceAdmission* OutAdmission = nullptr);
 	bool VisitDirty(TFunctionRef<bool(const FVoxelOverlaySnapshot&)> InVisit) const;
 	TSharedPtr<const FVoxelOverlaySnapshot, ESPMode::ThreadSafe> FindDirty(const FIntVector& InSection) const;
 };

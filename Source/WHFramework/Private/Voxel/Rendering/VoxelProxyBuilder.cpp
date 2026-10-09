@@ -5,21 +5,24 @@
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelGenerationQuery.h"
 #include "Voxel/Generation/VoxelGenerationPipeline.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Generation/Ecology/VoxelEcology.h"
 
 namespace
 {
-	TSet<uint32> TreeStates(const FVoxelGenerationRuntimeConfig& Config)
+	bool IsProxyTreeState(const FVoxelGenerationRuntimeConfig& Config, const uint32 InState)
 	{
-		TSet<uint32> States;
-		auto Add = [&](uint16 Symbol) { FVoxelBlockState State; if (Config.ToRuntime(Symbol, State)) States.Add(State.Pack()); };
-		Add(Config.Recipe->Ecology.TreeTrunk);
-		Add(Config.Recipe->Ecology.TreeLeaves);
+		const auto Matches = [&](uint16 Symbol)
+		{
+			FVoxelBlockState State;
+			return Config.ToRuntime(Symbol, State) && State.Pack() == InState;
+		};
+		if (Matches(Config.Recipe->Ecology.TreeTrunk) || Matches(Config.Recipe->Ecology.TreeLeaves)) return true;
 		for (const FVoxelTreeSpecies& Species : Config.Recipe->Ecology.TreeSpecies)
 		{
-			Add(Species.Trunk); Add(Species.LeavesDark); Add(Species.LeavesMid); Add(Species.LeavesLight);
+			if (Matches(Species.Trunk) || Matches(Species.LeavesDark) || Matches(Species.LeavesMid) || Matches(Species.LeavesLight)) return true;
 		}
-		return States;
+		return false;
 	}
 
 	struct FCoarseOverlayCell
@@ -27,7 +30,7 @@ namespace
 		int32 Removed = 0;
 		TMap<uint32, int32> Placed;
 
-		void Add(const FVoxelBlockState& InState)
+		bool Add(const FVoxelBlockState& InState, FVoxelGenerationWorkspace& InWorkspace, FString& OutError)
 		{
 			if (InState.IsAir())
 			{
@@ -35,12 +38,14 @@ namespace
 			}
 			else
 			{
+				if (!Placed.Contains(InState.Pack()) && !InWorkspace.ReserveMap(Placed, Placed.Num() + 1, OutError)) return false;
 				++Placed.FindOrAdd(InState.Pack());
 			}
+			return true;
 		}
 
 		void Apply(const int32 InStep, const bool bArchitecture,
-			const TSet<uint32>& InTreeStates,
+			const FVoxelGenerationRuntimeConfig& InConfig,
 			FVoxelBlockState& InOutState) const
 		{
 			int32 BestCount = 0;
@@ -54,7 +59,7 @@ namespace
 					BestState = Pair.Key;
 				}
 			}
-			const int32 RemovalThreshold = InTreeStates.Contains(InOutState.Pack()) ? 1 :
+			const int32 RemovalThreshold = IsProxyTreeState(InConfig, InOutState.Pack()) ? 1 :
 				(bArchitecture ? FMath::Max(1, InStep / 2) :
 					FMath::Max(1, (InStep * InStep + 1) / 2));
 			if (!InOutState.IsAir() && Removed >= RemovalThreshold &&
@@ -74,7 +79,7 @@ namespace
 		const TMap<FIntVector, FCoarseOverlayCell>& InEdits,
 		const TMap<FIntVector, FVoxelBlockState>& InArchitecture,
 		const int32 InStep,
-		const TSet<uint32>& InTreeStates,
+		const FVoxelGenerationRuntimeConfig& InConfig,
 		FVoxelVoxelProxyData& InOutData)
 	{
 		const int32 Side = InOutData.GridSide;
@@ -87,7 +92,7 @@ namespace
 					if (const FCoarseOverlayCell* Edits = InEdits.Find(FIntVector(X, Y, Z)))
 					{
 						const FIntVector Local(X, Y, Z);
-						Edits->Apply(InStep, InArchitecture.Contains(Local), InTreeStates, InOutData.Cells[X + Y * Side + Z * (Side * Side)]);
+						Edits->Apply(InStep, InArchitecture.Contains(Local), InConfig, InOutData.Cells[X + Y * Side + Z * (Side * Side)]);
 					}
 				}
 			}
@@ -106,7 +111,7 @@ namespace
 					Local[(Axis + 2) % 3] = Y;
 					if (const FCoarseOverlayCell* Edits = InEdits.Find(Local))
 					{
-							Edits->Apply(InStep, InArchitecture.Contains(Local), InTreeStates, InOutData.Halo[Face][X + Y * Side]);
+							Edits->Apply(InStep, InArchitecture.Contains(Local), InConfig, InOutData.Halo[Face][X + Y * Side]);
 					}
 				}
 			}
@@ -153,12 +158,20 @@ bool FVoxelVoxelProxyBuilder::Build(const FVoxelViewKey& InKey, const FVoxelOver
 	const FIntVector Origin = Data.GetBuildBounds().Min;
 	const int32 Side = Data.GridSide;
 	const int32 Step = Data.Geometry.SampleStepCells;
-	TMap<FIntVector, FVoxelBlockState> CoarseNatural;
+	FVoxelCoarseOverlayCapture CoarseCapture;
 	if (Generator && !Generator->BuildCoarseOverlay(
-			Origin, Step, Side, CoarseNatural, OutError, InCancel))
+			Origin, Step, Side, CoarseCapture, OutError, InCancel))
 	{
 		return false;
 	}
+	const auto& CoarseNatural = CoarseCapture.Cells;
+	const auto& FactResources = Cache->GetResources();
+	FVoxelGenerationConsumerKey Consumer;
+	if (FactResources && !Cache->ResolveConsumer(Consumer, OutError)) return false;
+	FVoxelGenerationRequiredSourceScope CoarseSource(FactResources.Get(), CoarseCapture.Lease.Get());
+	FVoxelGenerationWorkspace Workspace(FactResources, Consumer,
+		Generator ? Generator->GetRequiredInputBytes() : Cache->GetRootInputBytes(),
+		Generator ? Generator->GetRequiredInputLeaseCount() : int32(Cache->GetRootInputBytes() != 0));
 	for (const TPair<FIntVector, FVoxelBlockState>& Entry : CoarseNatural)
 	{
 		const FIntVector& Local = Entry.Key;
@@ -180,8 +193,10 @@ bool FVoxelVoxelProxyBuilder::Build(const FVoxelViewKey& InKey, const FVoxelOver
 		}
 	}
 	TMap<FIntVector, FCoarseOverlayCell> CoarseEdits;
+	bool bScratchReady = true;
 	InOverlays.Visit([&](const FIntVector& SectionKey, const FVoxelOverlaySnapshot& Section)
 	{
+		if (!bScratchReady) return;
 		const FIntVector SectionOrigin = SectionKey * 16;
 		for (const TPair<int32, FVoxelBlockState>& Edit : Section.Blocks)
 		{
@@ -197,9 +212,15 @@ bool FVoxelVoxelProxyBuilder::Build(const FVoxelViewKey& InKey, const FVoxelOver
 			{
 				continue;
 			}
-			CoarseEdits.FindOrAdd(Coarse).Add(Edit.Value);
+			if ((!CoarseEdits.Contains(Coarse) && !Workspace.ReserveMap(CoarseEdits, CoarseEdits.Num() + 1, OutError)) ||
+				!CoarseEdits.FindOrAdd(Coarse).Add(Edit.Value, Workspace, OutError))
+			{
+				bScratchReady = false;
+				return;
+			}
 		}
 	});
+	if (!bScratchReady) return false;
 	if (InCancel && InCancel->Load())
 	{
 		OutError = TEXT("Canceled");
@@ -209,7 +230,7 @@ bool FVoxelVoxelProxyBuilder::Build(const FVoxelViewKey& InKey, const FVoxelOver
 	FVoxelBlockState Leaves;
 	Config->ToRuntime(Config->Recipe->Ecology.TreeTrunk, Trunk);
 	Config->ToRuntime(Config->Recipe->Ecology.TreeLeaves, Leaves);
-	ApplyCoarseEdits(CoarseEdits, CoarseNatural, Step, TreeStates(*Config), Data);
+	ApplyCoarseEdits(CoarseEdits, CoarseNatural, Step, *Config, Data);
 	bool bHasAir = false;
 	bool bHasSolid = false;
 	for (const FVoxelBlockState State : Data.Cells)
@@ -269,17 +290,21 @@ bool FVoxelVoxelProxyBuilder::ApplyTreeSilhouettes(
 		OutError = TEXT("Tree silhouette sampling exceeds the supported coordinate range");
 		return false;
 	}
-	const TSet<uint32> AllTreeStates = TreeStates(*Config);
-	auto ClearTreeSamples = [&AllTreeStates](TArray<FVoxelBlockState>& Cells)
+	auto ClearTreeSamples = [this](TArray<FVoxelBlockState>& Cells)
 	{
 		for (FVoxelBlockState& Cell : Cells)
 		{
-			if (AllTreeStates.Contains(Cell.Pack())) Cell = FVoxelBlockState();
+			if (IsProxyTreeState(*Config, Cell.Pack())) Cell = FVoxelBlockState();
 		}
 	};
 	ClearTreeSamples(InOutData.Cells);
 	for (TArray<FVoxelBlockState>& Face : InOutData.Halo) ClearTreeSamples(Face);
 	FVoxelGenerationQuery Query;
+	FVoxelGenerationRequiredSourceScope QuerySources(Cache->GetResources().Get(), &Query,
+		[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+		{
+			static_cast<const FVoxelGenerationQuery*>(InContext)->VisitRequiredSources(InVisit);
+		});
 	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError, true,
 		Generator && Generator->RequiresPlanPreflight()))
 	{
@@ -444,6 +469,11 @@ bool FVoxelVoxelProxyBuilder::BuildNatural(
 	}
 
 	FVoxelGenerationQuery Query;
+	FVoxelGenerationRequiredSourceScope QuerySources(Cache->GetResources().Get(), &Query,
+		[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+		{
+			static_cast<const FVoxelGenerationQuery*>(InContext)->VisitRequiredSources(InVisit);
+		});
 
 	if (!FVoxelGenerationQuery::Create(
 			Config,
@@ -485,7 +515,15 @@ bool FVoxelVoxelProxyBuilder::BuildNatural(
 		return false;
 	}
 
+	const auto& FactResources = Cache->GetResources();
+	FVoxelGenerationConsumerKey Consumer;
+	if (FactResources && !Cache->ResolveConsumer(Consumer, OutError)) return false;
+	FVoxelGenerationWorkspace ColumnsWorkspace(FactResources, Consumer,
+		Query.GetRequiredInputBytes(), Query.GetRequiredInputLeaseCount());
 	TArray<FVoxelColumnSample> Columns;
+
+	// 原查询根及其读者仍活着；先授予真实 sample backing，再 SetNum。
+	if (!ColumnsWorkspace.ReserveArray(Columns, ColumnSampleSide * ColumnSampleSide, OutError)) return false;
 
 	Columns.SetNumUninitialized(
 		ColumnSampleSide *

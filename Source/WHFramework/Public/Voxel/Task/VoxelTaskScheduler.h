@@ -89,23 +89,23 @@ struct WHFRAMEWORK_API FVoxelTaskStamp
 
 FORCEINLINE uint32 GetTypeHash(const FVoxelTaskStamp& InStamp)
 {
-	uint32 Hash = ::GetTypeHash(InStamp.OwnerId);
-	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.OwnerIncarnation));
-	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.WorldEpoch));
-	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.Token));
-	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.Revision));
-	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.GeometryRevision));
-	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.bHasGeometryIdentity));
+	uint32 Hash = GetTypeHash(InStamp.OwnerId);
+	Hash = HashCombineFast(Hash, GetTypeHash(InStamp.OwnerIncarnation));
+	Hash = HashCombineFast(Hash, GetTypeHash(InStamp.WorldEpoch));
+	Hash = HashCombineFast(Hash, GetTypeHash(InStamp.Token));
+	Hash = HashCombineFast(Hash, GetTypeHash(InStamp.Revision));
+	Hash = HashCombineFast(Hash, GetTypeHash(InStamp.GeometryRevision));
+	Hash = HashCombineFast(Hash, GetTypeHash(InStamp.bHasGeometryIdentity));
 	if (InStamp.bHasGeometryIdentity)
 	{
-		Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.GeometryIdentity));
+		Hash = HashCombineFast(Hash, GetTypeHash(InStamp.GeometryIdentity));
 	}
-	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.Section));
-	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.ViewKey));
-	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.SurfaceKey));
-	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.MacroKey));
-	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.RegistryRevision));
-	Hash = HashCombineFast(Hash, ::GetTypeHash(InStamp.ShapeRevision));
+	Hash = HashCombineFast(Hash, GetTypeHash(InStamp.Section));
+	Hash = HashCombineFast(Hash, GetTypeHash(InStamp.ViewKey));
+	Hash = HashCombineFast(Hash, GetTypeHash(InStamp.SurfaceKey));
+	Hash = HashCombineFast(Hash, GetTypeHash(InStamp.MacroKey));
+	Hash = HashCombineFast(Hash, GetTypeHash(InStamp.RegistryRevision));
+	Hash = HashCombineFast(Hash, GetTypeHash(InStamp.ShapeRevision));
 	return Hash;
 }
 
@@ -123,8 +123,8 @@ struct WHFRAMEWORK_API FVoxelTaskKey
 FORCEINLINE uint32 GetTypeHash(const FVoxelTaskKey& InKey)
 {
 	return HashCombineFast(
-		::GetTypeHash(static_cast<uint8>(InKey.Kind)),
-		::GetTypeHash(InKey.Stamp));
+		GetTypeHash(static_cast<uint8>(InKey.Kind)),
+		GetTypeHash(InKey.Stamp));
 }
 
 /**
@@ -164,6 +164,9 @@ struct WHFRAMEWORK_API FVoxelTaskResult
 	bool bCanceled = false;
 	bool bKnownEmptyMesh = false;
 	bool bContinue = false;
+	// 原准备结果的版本接纳状态；容量续跑不重建Worker或尝试身份。
+	EVoxelTerrainResourceAdmission PreparedRevisionAdmission = EVoxelTerrainResourceAdmission::None;
+	uint64 PreparedRevisionCapacityVersion = 0;
 	FString Error;
 
 	// diagnostics
@@ -460,10 +463,68 @@ struct WHFRAMEWORK_API FVoxelTaskKindDiagnostics
 
 struct WHFRAMEWORK_API FVoxelTaskDiagnostics
 {
-	static constexpr int32 KindCapacity = 32;
-	using FKindCounts = TMap<EVoxelTaskKind, int32, TFixedSetAllocator<KindCapacity>>;
-	using FBlockCounts = TMap<EVoxelTaskBlockReason, int32, TFixedSetAllocator<16>>;
-	using FKindBlockCounts = TMap<EVoxelTaskKind, FBlockCounts, TFixedSetAllocator<KindCapacity>>;
+	static constexpr int32 KindCapacity = static_cast<int32>(EVoxelTaskKind::BuildFineShard) + 1;
+	static constexpr int32 BlockCapacity = 11;
+	static_assert((1u << (BlockCapacity - 1)) == static_cast<uint32>(EVoxelTaskBlockReason::Oversized));
+
+	template<typename KeyType, typename ValueType, int32 Capacity>
+	class TCounts
+	{
+	public:
+		ValueType* Find(const KeyType InKey)
+		{
+			for (int32 Index = 0; Index < Count; ++Index)
+			{
+				if (Items[Index].Key == InKey) return &Items[Index].Value;
+			}
+			return nullptr;
+		}
+
+		const ValueType* Find(const KeyType InKey) const
+		{
+			for (int32 Index = 0; Index < Count; ++Index)
+			{
+				if (Items[Index].Key == InKey) return &Items[Index].Value;
+			}
+			return nullptr;
+		}
+
+		ValueType& FindOrAdd(const KeyType InKey, const ValueType& InDefault = ValueType{})
+		{
+			if (ValueType* Value = Find(InKey)) return *Value;
+			check(Count < Capacity);
+			Items[Count].Key = InKey;
+			Items[Count].Value = InDefault;
+			return Items[Count++].Value;
+		}
+
+		ValueType FindRef(const KeyType InKey) const
+		{
+			const ValueType* Value = Find(InKey);
+			return Value ? *Value : ValueType{};
+		}
+
+		bool Contains(const KeyType InKey) const { return Find(InKey) != nullptr; }
+		int32 Num() const { return Count; }
+		TPair<KeyType, ValueType>* begin() { return Items; }
+		TPair<KeyType, ValueType>* end() { return Items + Count; }
+		const TPair<KeyType, ValueType>* begin() const { return Items; }
+		const TPair<KeyType, ValueType>* end() const { return Items + Count; }
+
+		void Reset()
+		{
+			for (int32 Index = 0; Index < Count; ++Index) Items[Index].Value = ValueType{};
+			Count = 0;
+		}
+
+	private:
+		TPair<KeyType, ValueType> Items[Capacity] = {};
+		int32 Count = 0;
+	};
+
+	using FKindCounts = TCounts<EVoxelTaskKind, int32, KindCapacity>;
+	using FBlockCounts = TCounts<EVoxelTaskBlockReason, int32, BlockCapacity>;
+	using FKindBlockCounts = TCounts<EVoxelTaskKind, FBlockCounts, KindCapacity>;
 	int32 Pending = 0;
 	int32 Running = 0;
 	int32 Critical = 0;
@@ -476,7 +537,7 @@ struct WHFRAMEWORK_API FVoxelTaskDiagnostics
 	uint64 ReservedBytes = 0;
 	uint64 QueuedInputBytes = 0;
 
-	TMap<EVoxelTaskKind, FVoxelTaskKindDiagnostics, TFixedSetAllocator<KindCapacity>> ByKind;
+	TCounts<EVoxelTaskKind, FVoxelTaskKindDiagnostics, KindCapacity> ByKind;
 	FKindCounts PendingByKind;
 	FKindCounts RunningByKind;
 	// 单 flag 可重叠计数，不能求和解释为任务数。
@@ -493,11 +554,16 @@ struct WHFRAMEWORK_API FVoxelTaskDiagnostics
 class WHFRAMEWORK_API FVoxelTaskScheduler
 {
 public:
-	FVoxelTaskScheduler();
 #if WITH_DEV_AUTOMATION_TESTS
+	FVoxelTaskScheduler();
 	explicit FVoxelTaskScheduler(bool bInAllowPassive);
+	static void* operator new(size_t InSize);
 #endif
 	~FVoxelTaskScheduler();
+	static void operator delete(void* InAddress);
+	static bool Create(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InTerrainResources,
+		TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InRuntimeResources,
+		const FVoxelGenerationConsumerKey& InControlConsumer, TUniquePtr<FVoxelTaskScheduler>& OutScheduler, FString& OutError);
 
 	FVoxelTaskScheduler(const FVoxelTaskScheduler&) = delete;
 	FVoxelTaskScheduler& operator=(const FVoxelTaskScheduler&) = delete;
@@ -535,7 +601,7 @@ public:
 	{
 		using FFunctor = std::decay_t<FunctorType>;
 		static_assert(!std::is_same_v<FFunctor, TFunction<void(const FIntVector&)>>, "Bind the concrete idle callback");
-		if (!ControlConsumer.IsValid())
+		if (!ControlConsumer.IsValid() || !Statistics)
 		{
 			OutError = TEXT("CapacityBlocked: scheduler control is not initialized");
 			return false;
@@ -545,8 +611,8 @@ public:
 		if (Bytes)
 		{
 			const auto Admission = TerrainResources->TryAcquire(ControlConsumer, EVoxelTerrainResourcePool::Input,
-				Bytes, CandidateLease, 0, BackingBytes + (IdleBindingLease ? IdleBindingLease->Bytes() : 0),
-				int32(BackingLease.IsValid()) + int32(IdleBindingLease.IsValid()));
+				Bytes, CandidateLease, 0, RootInputBytes + BackingBytes + (IdleBindingLease ? IdleBindingLease->Bytes() : 0),
+				int32(RootInputBytes != 0) + int32(BackingLease.IsValid()) + int32(IdleBindingLease.IsValid()));
 			if (Admission != EVoxelTerrainResourceAdmission::Granted)
 			{
 				OutError = Admission == EVoxelTerrainResourceAdmission::InvalidRequest ?
@@ -585,6 +651,9 @@ public:
 	static FVoxelTerrainServicePriority ResolveServicePriority(const FVoxelTaskRequest& InRequest);
 
 private:
+	FVoxelTaskScheduler(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InTerrainResources,
+		TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InRuntimeResources,
+		const FVoxelGenerationConsumerKey& InControlConsumer, uint64 InRootInputBytes);
 #if WITH_DEV_AUTOMATION_TESTS
 	friend struct FVoxelSchedulerNativeBackingTestAccess;
 #endif
@@ -596,6 +665,7 @@ private:
 
 	struct FSlot
 	{
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> SlotLease;
 		TSharedPtr<FVoxelTerrainWorkReceipt, ESPMode::ThreadSafe> WorkReceipt;
 		FVoxelTaskRequest Request;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> BudgetErrorLease;
@@ -705,13 +775,12 @@ private:
 	FVoxelGenerationConsumerKey ControlConsumer;
 	EVoxelTerrainResourceAdmission BackingAdmission = EVoxelTerrainResourceAdmission::None;
 	uint64 BackingBytes = 0;
+	uint64 RootInputBytes = 0;
 	uint64 RequiredAdmissionInputBytes = 0;
 	int32 RequiredAdmissionLeaseCount = 0;
 	TArray<FVoxelTaskRequest> Pending;
-	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> TerrainResources =
-		MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
-	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> RuntimeResources =
-		MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> TerrainResources;
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> RuntimeResources;
 	TArray<FRunning> Running;
 	TArray<FCompleted> Canceled;
 	TArray<FVoxelTerrainServiceCandidate> WorkerCandidates;
@@ -744,8 +813,8 @@ private:
 	TMap<FVoxelTaskKey, FAdmissionAttempt> AdmissionAttempts;
 	FVoxelTerrainWorkSelection WorkerSelection;
 	FVoxelTerrainWorkSelection CompletedSelection;
-	TMap<EVoxelTaskKind, double, TFixedSetAllocator<FVoxelTaskDiagnostics::KindCapacity>> WorkerCostEstimates;
-	TMap<EVoxelTaskKind, double, TFixedSetAllocator<FVoxelTaskDiagnostics::KindCapacity>> ApplyCostEstimates;
+	FVoxelTaskDiagnostics::TCounts<EVoxelTaskKind, double, FVoxelTaskDiagnostics::KindCapacity> WorkerCostEstimates;
+	FVoxelTaskDiagnostics::TCounts<EVoxelTaskKind, double, FVoxelTaskDiagnostics::KindCapacity> ApplyCostEstimates;
 	uint64 NextSequence = 0;
 	uint64 BlockRefreshSequence = 0;
 

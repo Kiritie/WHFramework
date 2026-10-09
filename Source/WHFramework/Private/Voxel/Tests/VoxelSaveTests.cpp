@@ -299,7 +299,7 @@ bool FVoxelSceneColumnPinnedReadTest::RunTest(const FString& InParameters)
 	(void)InParameters;
 	const FString Root = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation"),
 		TEXT("VoxelSceneRead"), FGuid::NewGuid().ToString(EGuidFormats::Digits));
-	FSaveGameStorage Storage(Root);
+	FSaveGameStorage Storage(0, Root);
 	const FGuid SaveId = FGuid::NewGuid();
 	if (!Storage.CreateWorldDirectory(SaveId)) return false;
 	const FString SourceDirectory = Storage.GetGenerationDir(SaveId, 1);
@@ -514,8 +514,8 @@ bool FVoxelSaveGenerationGrantedLeaseTest::RunTest(const FString& InParameters)
 		FSaveGameGenerationReadLease::GetPinCount(Root) == 0);
 	if (!Resources->Configure(FVoxelTerrainResourceLimits()) ||
 		!FSaveGameGenerationReadLease::AcquireGranted(Directory, Resources, Consumer, First, bCapacityBlocked)) return false;
-	TestTrue(TEXT("实际租约绑定原资源所有者和 World"), First->IsResourceAccountedFor(Resources.Get(), 85));
-	TestFalse(TEXT("另一个 World 不能借用原资源归属"), First->IsResourceAccountedFor(Resources.Get(), 86));
+	TestTrue(TEXT("实际租约绑定原资源所有者和 World"), First->IsResourceAccountedFor(&Resources.Get(), 85));
+	TestFalse(TEXT("另一个 World 不能借用原资源归属"), First->IsResourceAccountedFor(&Resources.Get(), 86));
 	TestTrue(TEXT("实际节点和路径计入 Input"), Resources->Snapshot().Used[static_cast<int32>(EVoxelTerrainResourcePool::Input)] > 0);
 	const FString Alias = FPaths::Combine(Directory, TEXT(".."), TEXT("generation"));
 	if (!FSaveGameGenerationReadLease::AcquireGranted(Alias, Resources, Consumer, Second, bCapacityBlocked)) return false;
@@ -689,7 +689,7 @@ bool FVoxelJournalFixedCutSaveTest::RunTest(const FString& InParameters)
 	FVoxelWorldRuntime Runtime(51, true, Registry, VoxelTest::MakeGenerator());
 	const auto Resources = MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
 	TestTrue(TEXT("Journal test resource limits configure"), Resources->Configure({}));
-	Runtime.BindTerrainResources(Resources.ToSharedRef());
+	Runtime.BindTerrainResources(Resources);
 	const FIntVector SectionA(-1, 0, 0);
 	const FIntVector SectionB(-2, 0, 0);
 	FString Error;
@@ -872,7 +872,7 @@ bool FVoxelJournalSaveCapacityRecoveryTest::RunTest(const FString& InParameters)
 	const auto Resources = MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
 	TestTrue(TEXT("Capacity test resource limits configure"), Resources->Configure({}));
 	FVoxelWorldRuntime Runtime(71, true, Registry, VoxelTest::MakeGenerator());
-	Runtime.BindTerrainResources(Resources.ToSharedRef());
+	Runtime.BindTerrainResources(Resources);
 	const FIntVector Key(4, -3, 2);
 	FString Error;
 	FVoxelSection* Section = Runtime.FindOrAllocate(Key, 0);
@@ -898,10 +898,15 @@ bool FVoxelJournalSaveCapacityRecoveryTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("All remaining Input capacity can be withheld"), Blocker->Resize(1 + Capacity.Limits.InputBytes -
 		Capacity.Used[static_cast<int32>(EVoxelTerrainResourcePool::Input)]));
 	TestFalse(TEXT("Capture waits before allocating metadata without Input grant"), Adapter.Capture(Runtime, Manifest, Registry, Store, Error));
-	TestFalse(TEXT("Blocked capture leaves no active save"), Adapter.IsBusy());
+	TestTrue(TEXT("Blocked capture retains its original pending save"), Adapter.IsBusy());
+	TestNull(TEXT("Pending save has not published its capture"), Adapter.GetCapture());
+	const FGuid PendingTransaction = Adapter.Pending->TransactionId;
+	TestFalse(TEXT("No external release keeps the same capture waiting"), Adapter.Capture(Runtime, Manifest, Registry, Store, Error));
+	TestEqual(TEXT("Waiting does not create a new transaction"), Adapter.Pending->TransactionId, PendingTransaction);
 	TestEqual(TEXT("Blocked capture cannot advance persisted proof"), Runtime.GetPersistedRevision(Key), uint64(0));
 	Blocker.Reset();
 	TestTrue(TEXT("Capture succeeds after Input release"), Adapter.Capture(Runtime, Manifest, Registry, Store, Error));
+	TestEqual(TEXT("Successful continuation retains its transaction"), Adapter.GetCapture()->TransactionId, PendingTransaction);
 	TestTrue(TEXT("All Working capacity can be withheld"), Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Working,
 		Resources->Snapshot().Limits.WorkingBytes, Blocker));
 	TestFalse(TEXT("Write waits before encoding without Working peak grant"), FVoxelWorldSaveAdapter::WriteCapture(*Adapter.GetCapture(), Directory, Error));

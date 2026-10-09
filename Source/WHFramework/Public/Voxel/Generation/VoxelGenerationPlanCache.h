@@ -92,6 +92,10 @@ public:
 	FVoxelGenerationCacheRetentionLease& operator=(const FVoxelGenerationCacheRetentionLease&) = delete;
 
 	static uint64 GetRequiredAllocationBytes();
+	const TSharedRef<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& GetResourceLease() const
+	{
+		return ResourceLease;
+	}
 
 private:
 	TSharedRef<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
@@ -146,6 +150,9 @@ public:
 	const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& GetResources() const;
 	const FVoxelGenerationConsumerKey& GetControlConsumer() const;
 	uint64 GetRootInputBytes() const { return RootInputBytes; }
+	/** 根和当前控制 backing 的同锁快照；不含可淘汰的已发布正文。 */
+	void GetRequiredInputCapacity(uint64& OutBytes, int32& OutLeaseCount) const;
+	void MarkPublished() const;
 	/** 解析原 TLS 完整身份；无 TLS 使用冻结 Control，拒收不修改 OutConsumer。 */
 	bool ResolveConsumer(FVoxelGenerationConsumerKey& OutConsumer, FString& OutError) const;
 
@@ -384,7 +391,16 @@ private:
 	void RecordPlanBuild(EVoxelGenerationPlanKind InKind, double InMilliseconds, bool bInFailed);
 
 private:
+	struct FControlBackingCapacity
+	{
+		mutable FRWLock Lock;
+		uint64 Bytes = 0;
+		int32 LeaseCount = 0;
+		void Replace(const FVoxelTerrainResourceLease* InOldLease, const FVoxelTerrainResourceLease* InNewLease);
+	};
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RootLease;
+	FControlBackingCapacity ControlBackingCapacity;
 	FVoxelGenerationConsumerKey ControlConsumer;
 	uint64 RootInputBytes = 0;
 	TArray<TUniquePtr<FNaturalShard>> NaturalShards;

@@ -343,4 +343,32 @@ bool FVoxelResourceRequiredCapacityClassificationTest::RunTest(const FString& In
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelResourceFrozenWorldDomainTest,
+	"WHFramework.Voxel.FineRefactor.Resources.FrozenWorldDomain",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelResourceFrozenWorldDomainTest::RunTest(const FString& InParameters)
+{
+	const auto Control = FVoxelGenerationConsumerKey::Section(73, FGuid::NewGuid(), 1, {}, 1);
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
+	FString Error;
+	if (!TestTrue(TEXT("生产工厂冻结原世界"), FVoxelTerrainResources::Create({}, Control, Resources, Error))) return false;
+	const auto Before = Resources->Snapshot();
+	auto Foreign = Control;
+	++Foreign.WorldEpoch;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+	TestTrue(TEXT("另一世界的合法消费者不能借原账本"), Resources->TryAcquire(Foreign,
+		EVoxelTerrainResourcePool::Working, 256, Lease) == EVoxelTerrainResourceAdmission::InvalidRequest);
+	TestFalse(TEXT("跨世界拒收不构造句柄"), Lease.IsValid());
+	TestEqual(TEXT("跨世界拒收不扩容控制表"), Resources->Snapshot().LedgerMetadataBytes, Before.LedgerMetadataBytes);
+	TestEqual(TEXT("跨世界拒收不改变原版本"), Resources->Snapshot().Version, Before.Version);
+	auto SameWorld = Control;
+	SameWorld.OwnerId = FGuid::NewGuid();
+	if (!TestTrue(TEXT("同世界的独立原所有者可正常授额"), Resources->TryAcquire(SameWorld,
+		EVoxelTerrainResourcePool::Working, 256, Lease) == EVoxelTerrainResourceAdmission::Granted)) return false;
+	Lease.Reset();
+	TestEqual(TEXT("原消费者退出后无遗留句柄"), Resources->Snapshot().LeaseCount, 0);
+	return true;
+}
+
 #endif

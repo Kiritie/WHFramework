@@ -4,11 +4,13 @@
 #include "Voxel/Runtime/VoxelBlockState.h"
 #include "Voxel/Generation/VoxelGenerationConsumer.h"
 #include "Voxel/Generation/VoxelGenerationPlanningRead.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Task/VoxelTerrainWorkSelection.h"
 
 enum class EVoxelWorkClass : uint8;
 struct FVoxelGenerationBounds;
 struct FVoxelTaskStamp;
+class FVoxelGenerationWorkspace;
 
 struct WHFRAMEWORK_API FVoxelOverlayPreflightStatus
 {
@@ -22,6 +24,13 @@ class WHFRAMEWORK_API IVoxelGenerationOverlay
 {
 public:
 	virtual ~IVoxelGenerationOverlay() = default;
+	virtual const FVoxelTerrainResources* GetResourceOwner() const { return nullptr; }
+	virtual void VisitRequiredSources(FVoxelGenerationRequiredSourceScope::FVisit InVisit) const
+	{
+	}
+	virtual void MarkPublished() const
+	{
+	}
 
 	virtual void SetPlanningServices(FVoxelGenerationPlanningServices InServices) const
 	{
@@ -102,7 +111,8 @@ public:
 		int32,
 		TMap<FIntVector, FVoxelBlockState>& OutCells,
 		FString& OutError,
-		const TAtomic<bool>*) const
+		const TAtomic<bool>*,
+		FVoxelGenerationWorkspace* InOutputWorkspace = nullptr) const
 	{
 		OutCells.Reset();
 		OutError.Reset();

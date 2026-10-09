@@ -12,6 +12,7 @@ class UVoxelModule;
 struct FVoxelOverlayNetworkState;
 struct FVoxelRepresentationSubscriptionState;
 struct FVoxelOverlayRegionMessage;
+struct FVoxelOverlayQueuedPacket;
 struct FVoxelTaskResult;
 class FVoxelNetworkEnvelopeDecode;
 class FVoxelTerrainFrameContext;
@@ -32,6 +33,7 @@ class WHFRAMEWORK_API UVoxelModuleNetworkComponent : public UModuleNetworkCompon
 
 public:
 	UVoxelModuleNetworkComponent();
+	UVoxelModuleNetworkComponent(FVTableHelper& Helper);
 	virtual ~UVoxelModuleNetworkComponent() override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type InReason) override;
@@ -81,13 +83,25 @@ private:
 		const FVoxelGenerationBounds& InBounds, const FVoxelViewSettings& InSettings);
 	void ResetProtocol();
 	void Fail(const FString& InReason);
-	bool Send(EVoxelMessage InKind, const TArray<uint8>& InPayload, EVoxelTransferPriority InPriority);
+	bool Send(EVoxelMessage InKind, TConstArrayView<uint8> InPayload, EVoxelTransferPriority InPriority,
+		const FVoxelGenerationConsumerKey* InConsumer = nullptr, FString* OutError = nullptr);
+	bool EnsureNetworkState(FString& OutError);
+	bool EnsureTransferResources(FString& OutError);
+	void ProcessBootstrapPacket(const FVoxelRPCPacket& InPacket, bool bInServer);
+	bool HandleHelloPayload(TConstArrayView<uint8> InPayload);
+	bool HandleWelcomePayload(TConstArrayView<uint8> InPayload, const FGuid& InSession);
+	void HandleReadyPayload(TConstArrayView<uint8> InPayload);
+	void DeferIngressResync(const FVoxelGenerationConsumerKey& InConsumer, uint64 InBeforeAdmission, bool bInServer, bool bInAwaitRelease = true);
+	bool FinishPendingWelcome();
+	void SendHello(double InNow);
+	bool FinishPendingReady();
 	void Receive(const FVoxelRPCPacket& InPacket, bool bInServer);
-	void ProcessPacket(const FVoxelRPCPacket& InPacket, bool bInServer);
+	bool ProcessPacket(const FVoxelOverlayQueuedPacket& InPacket);
 	void AdvanceEnvelopeDecode(double InNow);
 	bool StageDecodedEnvelope(const TSharedPtr<FVoxelNetworkEnvelopeDecode, ESPMode::ThreadSafe>& InWork,
 		FVoxelTaskResult&& InResult);
 	bool ApplyDecodedEnvelope(bool bInWorldControl);
+	bool AdvanceDecodedInvalidation();
 	bool HandleWelcome(const FVoxelWireMessage& InMessage);
 	void AdvancePendingRepresentations(double InDeadline);
 	void AdvanceRepresentationSubscriptions(double InNow, double InDeadline);
@@ -141,6 +155,26 @@ private:
 	FGuid TaskOwnerId = FGuid::NewGuid();
 	uint64 TaskOwnerIncarnation = 1;
 	uint64 NextTaskSerial = 0;
+	FVoxelGenerationConsumerKey NetworkStateConsumer;
+	FVoxelGenerationConsumerKey NetworkTransferConsumer;
+	FVoxelGenerationConsumerKey NetworkStateCapacityConsumer;
+	uint64 NetworkStateCapacityVersion = 0;
+	bool bNetworkStateWaitingCapacity = false;
+	bool bNetworkTransferBound = false;
+	FVoxelGenerationConsumerKey PendingWelcomeConsumer;
+	FGuid PendingWelcomeSession;
+	uint64 PendingWelcomeNonce = 0;
+	uint64 PendingWelcomeCapacityVersion = 0;
+	uint64 HelloCapacityVersion = 0;
+	bool bPendingWelcome = false;
+	bool bPendingWelcomeWaitingCapacity = false;
+	bool bHelloWaitingCapacity = false;
+	FVoxelGenerationConsumerKey PendingReadyConsumer;
+	FGuid PendingReadySession;
+	uint64 PendingReadyCapacityVersion = 0;
+	bool bPendingReady = false;
+	bool bPendingReadyServer = false;
+	bool bPendingReadyWaitingCapacity = false;
 	uint64 LastInboundEditId = 0;
 	double LastHello = -10.0;
 	double LastInterest = -10.0;

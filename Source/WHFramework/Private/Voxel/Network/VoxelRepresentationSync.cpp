@@ -1,5 +1,6 @@
 ﻿#include "Voxel/Network/VoxelRepresentationSync.h"
 #include "Voxel/Network/VoxelGeometryWire.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 
 #include "Voxel/Network/VoxelNetworkCodec.h"
 #include "Voxel/Serialization/VoxelBinaryCodec.h"
@@ -138,6 +139,30 @@ namespace
 		}
 	}
 
+	bool AcquireRepresentationWorking(const uint64 Bytes,
+		TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources, const FVoxelGenerationConsumerKey& Consumer,
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutLease, FString& OutError)
+	{
+		FVoxelGenerationRequiredCapacity Required;
+		if (!FVoxelGenerationRequiredSourceScope::Collect(Resources.Get(), nullptr, Required, OutError)) return false;
+		const uint64 Limit = Resources->Snapshot().Limits.WorkingBytes;
+		const auto Admission = Bytes > Limit || Required.Bytes[1] > Limit - Bytes ? EVoxelTerrainResourceAdmission::CapacityUnachievable :
+			Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Working, Bytes, OutLease, 0, Required.Bytes[0], Required.LeaseCount);
+		if (Admission == EVoxelTerrainResourceAdmission::Granted) return true;
+		OutError = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: representation codec Working") :
+			Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: representation codec Working") :
+			TEXT("InvalidRequest: representation codec native source");
+		return false;
+	}
+
+	FString RepresentationCodecError(const EVoxelTerrainResourceAdmission Admission)
+	{
+		return Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: representation native codec") :
+			Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: representation native codec") :
+			Admission == EVoxelTerrainResourceAdmission::InvalidRequest ? TEXT("InvalidRequest: representation native codec") :
+			TEXT("Voxel representation codec is invalid");
+	}
+
 	bool ReserveRawWriter(const uint64 InBytes, FVoxelByteWriter& InWriter,
 		TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
 		const FVoxelGenerationConsumerKey& InConsumer,
@@ -148,27 +173,24 @@ namespace
 			OutError = TEXT("Oversized: invalid representation codec input");
 			return false;
 		}
-		const uint64 Bytes = VoxelBoundedAllocation::ArrayBytes<uint8>(int32(InBytes)) +
-			VoxelBoundedAllocation::ArrayBytes<uint8>(VoxelGeometryWire::HeaderBytes);
-		if (!InResources->Acquire(InConsumer, EVoxelTerrainResourcePool::Working, Bytes, OutLease))
-		{
-			OutError = TEXT("CapacityBlocked: representation raw writer");
-			return false;
-		}
+		const uint64 Bytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(int32(InBytes)) +
+			VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(VoxelGeometryWire::HeaderBytes);
+		if (!AcquireRepresentationWorking(Bytes, InResources, InConsumer, OutLease, OutError)) return false;
 		return InWriter.Reserve(int32(InBytes));
 	}
 
 	bool FinishCompressed(FVoxelByteWriter& InWriter, FVoxelBinaryBuffer& OutBytes, FString& OutError,
 		TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
-		const FVoxelGenerationConsumerKey& InConsumer)
+		const FVoxelGenerationConsumerKey& InConsumer, const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& RawLease)
 	{
+		const FVoxelGenerationRequiredSourceScope RawSource(&InResources.Get(), RawLease.Get());
 		TArray<uint8> Raw;
 		bool bCapacityBlocked = false;
+		EVoxelTerrainResourceAdmission Admission = EVoxelTerrainResourceAdmission::Granted;
 		if (!InWriter.Finish(Raw) || !VoxelBinary::CompressGranted(Raw, OutBytes, InResources,
-			InConsumer, MaxRepresentationRawBytes, FVoxelNetworkCodec::MaxRepresentationBytes, bCapacityBlocked))
+			InConsumer, MaxRepresentationRawBytes, FVoxelNetworkCodec::MaxRepresentationBytes, bCapacityBlocked, &Admission))
 		{
-			OutError = bCapacityBlocked ? TEXT("CapacityBlocked: representation native compression") :
-				TEXT("Voxel representation encoding failed");
+			OutError = RepresentationCodecError(Admission);
 			return false;
 		}
 		OutError.Reset();
@@ -196,18 +218,15 @@ namespace
 			return false;
 		}
 		FVoxelBinaryBuffer Candidate;
-		if (!InResources->Acquire(InConsumer, EVoxelTerrainResourcePool::Working,
-			VoxelBoundedAllocation::ArrayBytes<uint8>(int32(RawBytes)), Candidate.ResourceLease))
-		{
-			OutError = TEXT("CapacityBlocked: representation raw decode input");
-			return false;
-		}
+		if (!AcquireRepresentationWorking(VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(int32(RawBytes)),
+			InResources, InConsumer, Candidate.ResourceLease, OutError)) return false;
+		const FVoxelGenerationRequiredSourceScope RawSource(&InResources.Get(), Candidate.ResourceLease.Get());
 		bool bCapacityBlocked = false;
+		EVoxelTerrainResourceAdmission Admission;
 		if (!VoxelBinary::DecompressGranted(InBytes, Candidate.Bytes, InResources, InConsumer,
-			MaxRepresentationRawBytes, bCapacityBlocked))
+			MaxRepresentationRawBytes, bCapacityBlocked, &Admission))
 		{
-			OutError = bCapacityBlocked ? TEXT("CapacityBlocked: representation native decompression") :
-				TEXT("Voxel representation compression envelope is invalid");
+			OutError = RepresentationCodecError(Admission);
 			return false;
 		}
 		check(Candidate.Bytes.GetAllocatedSize() <= Candidate.ResourceLease->Bytes());
@@ -360,7 +379,7 @@ bool FVoxelRepresentationSync::EncodeVoxelProxy(
 		}
 	}
 
-	return FinishCompressed(Writer, OutBytes, OutError, InResources, InConsumer);
+	return FinishCompressed(Writer, OutBytes, OutError, InResources, InConsumer, RawLease);
 }
 
 bool FVoxelRepresentationSync::DecodeVoxelProxy(
@@ -550,7 +569,7 @@ bool FVoxelRepresentationSync::EncodeSurface(
 		Writer.U16(InData.SurfaceMaterial[Index]); Writer.U16(InData.Biome[Index]); Writer.U8(InData.Flags[Index]);
 	}
 	WriteDistantCells(Writer, InData.DistantCells);
-	return FinishCompressed(Writer, OutBytes, OutError, InResources, InConsumer);
+	return FinishCompressed(Writer, OutBytes, OutError, InResources, InConsumer, RawLease);
 }
 
 bool FVoxelRepresentationSync::DecodeSurface(
@@ -638,7 +657,7 @@ bool FVoxelRepresentationSync::EncodeMacro(
 		Writer.U16(Structure.StructureIndex); Writer.U16(Structure.Radius);
 	}
 	WriteDistantCells(Writer, InData.DistantCells);
-	return FinishCompressed(Writer, OutBytes, OutError, InResources, InConsumer);
+	return FinishCompressed(Writer, OutBytes, OutError, InResources, InConsumer, RawLease);
 }
 
 bool FVoxelRepresentationSync::DecodeMacro(

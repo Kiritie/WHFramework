@@ -101,10 +101,27 @@ bool FVoxelGenerationPlanCoordinator::PrepareStorage(FString& OutError)
 	}
 	if (Storage) return true;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-	if (!Resources->Acquire(ControlConsumer, EVoxelTerrainResourcePool::Input,
-		VoxelBoundedAllocation::WorkerSharedBytes<FStorage>(), Lease))
+	FVoxelGenerationRequiredSourceScope RootSources(&Resources.Get(), this,
+		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+		{
+			const auto& Owner = *static_cast<const FVoxelGenerationPlanCoordinator*>(Context);
+			uint64 CacheBytes;
+			int32 CacheLeaseCount;
+			Owner.Cache->GetRequiredInputCapacity(CacheBytes, CacheLeaseCount);
+			if (CacheLeaseCount) Visit({&Owner.Cache.Get(), 0, EVoxelTerrainResourcePool::Input, CacheBytes, CacheLeaseCount});
+			for (const auto* Original : {Owner.Config->InputLease.Get(), Owner.Config->RecipeInputLease.Get()})
+				if (Original && Original->IsOwnedBy(Owner.Resources.Get())) FVoxelGenerationRequiredSourceScope::VisitLease(Original, Visit);
+		});
+	FVoxelGenerationRequiredCapacity Required;
+	if (!FVoxelGenerationRequiredSourceScope::Collect(Resources.Get(), nullptr, Required, OutError)) return false;
+	const auto Admission = Resources->TryAcquire(ControlConsumer, EVoxelTerrainResourcePool::Input,
+		VoxelBoundedAllocation::WorkerSharedBytes<FStorage>(), Lease, 0,
+		Required.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+	if (Admission != EVoxelTerrainResourceAdmission::Granted)
 	{
-		OutError = TEXT("CapacityBlocked: generation coordinator storage");
+		OutError = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: generation coordinator storage") :
+			Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: generation coordinator storage and original roots") :
+			TEXT("InvalidRequest: generation coordinator storage");
 		return false;
 	}
 	Storage = VoxelBoundedAllocation::MakeWorkerShared<FStorage>(Lease);
@@ -125,10 +142,31 @@ bool FVoxelGenerationPlanCoordinator::PrepareMap(TMap<KeyType, ValueType>& InMap
 	if (InRequired <= InCapacity) return true;
 	const int32 Capacity = FMath::Max(InRequired, FMath::Max(4, InCapacity * 2));
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-	if (!Resources->Acquire(ControlConsumer, EVoxelTerrainResourcePool::Input,
-		VoxelGenerationAllocation::Private::SetReserveBytes<TPair<KeyType, ValueType>>(InMap, Capacity), Lease))
+	FVoxelGenerationRequiredSourceScope RootSources(&Resources.Get(), this,
+		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+		{
+			const auto& Owner = *static_cast<const FVoxelGenerationPlanCoordinator*>(Context);
+			uint64 CacheBytes;
+			int32 CacheLeaseCount;
+			Owner.Cache->GetRequiredInputCapacity(CacheBytes, CacheLeaseCount);
+			if (CacheLeaseCount) Visit({&Owner.Cache.Get(), 0, EVoxelTerrainResourcePool::Input, CacheBytes, CacheLeaseCount});
+			for (const auto* Original : {Owner.Config->InputLease.Get(), Owner.Config->RecipeInputLease.Get(),
+				Owner.Storage->ResourceLease.Get(), Owner.Storage->StatesLease.Get(), Owner.Storage->ConsumersLease.Get(),
+				Owner.Storage->FactsLease.Get(), Owner.Storage->EnvironmentLease.Get()})
+				if (Original && Original->IsOwnedBy(Owner.Resources.Get())) FVoxelGenerationRequiredSourceScope::VisitLease(Original, Visit);
+		});
+	// 原map仍占有旧backing；新租约与它同时存在，来源按原serial去重。
+	FVoxelGenerationRequiredSourceScope PreviousMapSource(&Resources.Get(), InLease.Get());
+	FVoxelGenerationRequiredCapacity Required;
+	if (!FVoxelGenerationRequiredSourceScope::Collect(Resources.Get(), nullptr, Required, OutError)) return false;
+	const auto Admission = Resources->TryAcquire(ControlConsumer, EVoxelTerrainResourcePool::Input,
+		VoxelGenerationAllocation::Private::SetReserveBytes<TPair<KeyType, ValueType>>(InMap, Capacity), Lease, 0,
+		Required.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+	if (Admission != EVoxelTerrainResourceAdmission::Granted)
 	{
-		OutError = TEXT("CapacityBlocked: generation coordinator control map");
+		OutError = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: generation coordinator control map") :
+			Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: generation coordinator control map and retained inputs") :
+			TEXT("InvalidRequest: generation coordinator control map");
 		return false;
 	}
 	InMap.Reserve(Capacity);
@@ -140,7 +178,7 @@ bool FVoxelGenerationPlanCoordinator::PrepareMap(TMap<KeyType, ValueType>& InMap
 
 bool FVoxelGenerationPlanCoordinator::PreparePrerequisites(FState& InState, const int32 InRequired, FString& OutError)
 {
-	if (InRequired > MaximumHydrologyDependencies)
+	if (InRequired < 0 || InRequired > MaximumHydrologyDependencies)
 	{
 		OutError = TEXT("生成事实的累计采样闭包超过上限");
 		return false;
@@ -149,10 +187,38 @@ bool FVoxelGenerationPlanCoordinator::PreparePrerequisites(FState& InState, cons
 	const int32 Capacity = FMath::Min(MaximumHydrologyDependencies,
 		FMath::Max(InRequired, FMath::Max(4, InState.PrerequisitesCapacity * 2)));
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-	if (!Resources->Acquire(ControlConsumer, EVoxelTerrainResourcePool::Input,
-		VoxelBoundedAllocation::ArrayBytes<FVoxelGenerationPlanDependency>(Capacity), Lease))
+	FVoxelGenerationRequiredSourceScope RootSources(&Resources.Get(), this,
+		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+		{
+			const auto& Owner = *static_cast<const FVoxelGenerationPlanCoordinator*>(Context);
+			uint64 CacheBytes;
+			int32 CacheLeaseCount;
+			Owner.Cache->GetRequiredInputCapacity(CacheBytes, CacheLeaseCount);
+			if (CacheLeaseCount) Visit({&Owner.Cache.Get(), 0, EVoxelTerrainResourcePool::Input, CacheBytes, CacheLeaseCount});
+			for (const auto* Original : {Owner.Config->InputLease.Get(), Owner.Config->RecipeInputLease.Get(),
+				Owner.Storage->ResourceLease.Get(), Owner.Storage->StatesLease.Get(), Owner.Storage->ConsumersLease.Get(),
+				Owner.Storage->FactsLease.Get(), Owner.Storage->EnvironmentLease.Get()})
+				if (Original && Original->IsOwnedBy(Owner.Resources.Get())) FVoxelGenerationRequiredSourceScope::VisitLease(Original, Visit);
+		});
+	FVoxelGenerationRequiredSourceScope StateSources(&Resources.Get(), &InState,
+		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+		{
+			const auto& State = *static_cast<const FState*>(Context);
+			for (const auto* Original : {State.PrerequisitesLease.Get(), State.DonationsLease.Get()})
+				if (Original) FVoxelGenerationRequiredSourceScope::VisitLease(Original, Visit);
+			if (State.PrerequisiteRetention)
+				FVoxelGenerationRequiredSourceScope::VisitLease(&State.PrerequisiteRetention->GetResourceLease().Get(), Visit);
+		});
+	FVoxelGenerationRequiredCapacity Required;
+	if (!FVoxelGenerationRequiredSourceScope::Collect(Resources.Get(), nullptr, Required, OutError)) return false;
+	const auto Admission = Resources->TryAcquire(ControlConsumer, EVoxelTerrainResourcePool::Input,
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelGenerationPlanDependency, FDefaultAllocator>(Capacity), Lease, 0,
+		Required.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+	if (Admission != EVoxelTerrainResourceAdmission::Granted)
 	{
-		OutError = TEXT("CapacityBlocked: generation prerequisite array");
+		OutError = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: generation prerequisite array") :
+			Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: generation prerequisite array and retained inputs") :
+			TEXT("InvalidRequest: generation prerequisite array");
 		return false;
 	}
 	InState.Prerequisites.Reserve(Capacity);
@@ -854,7 +920,7 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 					return Result;
 				}
 				// 原生查询保留构建权限；随后绑定原任务身份，不把它变成项目只读 preflight。
-				FVoxelGenerationPlanningReadScope NativeReads({}, &CapturedStamp, &Cancel, &CaptureConsumer);
+				FVoxelGenerationPlanningReadScope NativeReads(nullptr, &CapturedStamp, &Cancel, &CaptureConsumer);
 				Query.SetMissingHydrologyObserver(ReadDependencies, [](void* InContext, const FVoxelHydrologyRegionKey& Key)
 				{
 					auto* ReadDependencies = static_cast<FPlanReadDependencies*>(InContext);
@@ -1124,6 +1190,19 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 
 	FString Error;
 	if (!PrepareStorage(Error)) return {false, !Error.StartsWith(TEXT("CapacityBlocked")), MoveTemp(Error)};
+	FVoxelGenerationRequiredSourceScope RootSources(&Resources.Get(), this,
+		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+		{
+			const auto& Owner = *static_cast<const FVoxelGenerationPlanCoordinator*>(Context);
+			uint64 CacheBytes;
+			int32 CacheLeaseCount;
+			Owner.Cache->GetRequiredInputCapacity(CacheBytes, CacheLeaseCount);
+			if (CacheLeaseCount) Visit({&Owner.Cache.Get(), 0, EVoxelTerrainResourcePool::Input, CacheBytes, CacheLeaseCount});
+			for (const auto* Original : {Owner.Config->InputLease.Get(), Owner.Config->RecipeInputLease.Get(),
+				Owner.Storage->ResourceLease.Get(), Owner.Storage->StatesLease.Get(), Owner.Storage->ConsumersLease.Get(),
+				Owner.Storage->FactsLease.Get(), Owner.Storage->EnvironmentLease.Get()})
+				if (Original && Original->IsOwnedBy(Owner.Resources.Get())) FVoxelGenerationRequiredSourceScope::VisitLease(Original, Visit);
+		});
 	FClosureRegistration Registration(*this);
 	FClosureDemand Desired(*this);
 	for (const auto& Dependency : InDependencies)
@@ -1158,15 +1237,28 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 			if (!State.Donations.Contains(InConsumer) && State.Donations.Num() + 1 > State.DonationsCapacity) ++GrowthCount;
 			Node = State.NextDesired;
 		}
-		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ScratchLease;
-		const uint64 ScratchBytes = VoxelGenerationAllocation::Private::SetReserveBytes<FGuid>(TSet<FGuid>{}, Desired.Count) +
-			VoxelGenerationAllocation::Private::ArrayReserveBytes<FDonationGrowth, FDefaultAllocator>(GrowthCount);
-		if (ScratchBytes && !Resources->Acquire(ControlConsumer, EVoxelTerrainResourcePool::Working, ScratchBytes, ScratchLease))
-			return {false, false, TEXT("CapacityBlocked: generation subscription plan")};
+		FVoxelGenerationRequiredSourceScope PreviousDependenciesSource(&Resources.Get(), Consumer->DependenciesLease.Get());
+		FVoxelGenerationRequiredCapacity RequiredScratch;
+		if (!FVoxelGenerationRequiredSourceScope::Collect(Resources.Get(), nullptr, RequiredScratch, Error))
+			return {false, true, MoveTemp(Error)};
+		FVoxelGenerationWorkspace Scratch(Resources, ControlConsumer,
+			RequiredScratch.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], RequiredScratch.LeaseCount);
 		TSet<FGuid> DependencyNodes;
 		TArray<FDonationGrowth> Growth;
-		DependencyNodes.Reserve(Desired.Count);
-		Growth.Reserve(GrowthCount);
+		ON_SCOPE_EXIT
+		{
+			Scratch.FreeArray(Growth);
+			Scratch.FreeSet(DependencyNodes);
+		};
+		if (!Scratch.ReserveSet(DependencyNodes, Desired.Count, Error) ||
+			!Scratch.ReserveArray(Growth, GrowthCount, Error))
+			return {false, !Error.StartsWith(TEXT("CapacityBlocked")), MoveTemp(Error)};
+		FVoxelGenerationRequiredSourceScope GrowthSources(&Resources.Get(), &Growth,
+			[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+			{
+				for (const auto& Plan : *static_cast<const TArray<FDonationGrowth>*>(Context))
+					if (Plan.Lease) FVoxelGenerationRequiredSourceScope::VisitLease(Plan.Lease.Get(), Visit);
+			});
 		for (FGuid Node = Desired.Head; Node.IsValid();)
 		{
 			const auto& State = Storage->States.FindChecked(Storage->PriorityFacts.FindChecked(Node));
@@ -1176,9 +1268,20 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 				FDonationGrowth Plan;
 				Plan.Node = Node;
 				Plan.Capacity = FMath::Max(State.Donations.Num() + 1, FMath::Max(4, State.DonationsCapacity * 2));
-				if (!Resources->Acquire(ControlConsumer, EVoxelTerrainResourcePool::Input,
-					VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FVoxelGenerationConsumerKey, FDonation>>(State.Donations, Plan.Capacity), Plan.Lease))
-					return {false, false, TEXT("CapacityBlocked: generation donations")};
+				FVoxelGenerationRequiredSourceScope PreviousDonationSource(&Resources.Get(), State.DonationsLease.Get());
+				FVoxelGenerationRequiredCapacity Required;
+				if (!FVoxelGenerationRequiredSourceScope::Collect(Resources.Get(), nullptr, Required, Error))
+					return {false, true, MoveTemp(Error)};
+				const auto Admission = Resources->TryAcquire(ControlConsumer, EVoxelTerrainResourcePool::Input,
+					VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FVoxelGenerationConsumerKey, FDonation>>(State.Donations, Plan.Capacity),
+					Plan.Lease, 0, Required.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+				if (Admission != EVoxelTerrainResourceAdmission::Granted)
+				{
+					return {false, Admission != EVoxelTerrainResourceAdmission::CapacityBlocked,
+						Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: generation donations") :
+						Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: generation donations and retained inputs") :
+						TEXT("InvalidRequest: generation donations")};
+				}
 				Growth.Add(MoveTemp(Plan));
 			}
 			Node = State.NextDesired;
@@ -1193,7 +1296,6 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 			State.DonationsLease = MoveTemp(Plan.Lease);
 			State.DonationsCapacity = Plan.Capacity;
 		}
-		check(!ScratchLease || VoxelGenerationAllocation::AllocatedBytes(DependencyNodes) + VoxelGenerationAllocation::AllocatedBytes(Growth) <= ScratchLease->Bytes());
 		if (!PriorityGraph.SetDependencies(Consumer->PriorityNode, DependencyNodes, Error))
 			return {false, !Error.StartsWith(TEXT("CapacityBlocked")), MoveTemp(Error)};
 	}

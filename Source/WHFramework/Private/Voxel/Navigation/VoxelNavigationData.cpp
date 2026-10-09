@@ -404,7 +404,8 @@ class FVoxelRecastTileGenerator final : public FRecastTileGenerator
 {
 public:
 	FVoxelRecastTileGenerator(FRecastNavMeshGenerator& InParent, const FIntPoint& InCoordinate, const double InCreated)
-		: FRecastTileGenerator(InParent, InCoordinate, InCreated), Navigation(CastChecked<AVoxelNavigationData>(InParent.GetOwner()))
+		: FRecastTileGenerator(InParent, InCoordinate, InCreated),
+		Navigation(const_cast<AVoxelNavigationData*>(CastChecked<AVoxelNavigationData>(InParent.GetOwner())))
 	{
 	}
 
@@ -522,7 +523,7 @@ public:
 
 	virtual bool RebuildAll() override
 	{
-		auto* Navigation = CastChecked<AVoxelNavigationData>(GetOwner());
+		auto* Navigation = CastChecked<AVoxelNavigationData>(DestNavMesh);
 		Navigation->bNativeRebuildPending = true;
 		Navigation->bNativeCancelPending = false;
 		if (!Navigation->TryBeginNativeWrite()) return false;
@@ -536,7 +537,7 @@ public:
 
 	virtual void TickAsyncBuild(float InDeltaSeconds) override
 	{
-		auto* Navigation = CastChecked<AVoxelNavigationData>(GetOwner());
+		auto* Navigation = CastChecked<AVoxelNavigationData>(DestNavMesh);
 		if (!Navigation->TryBeginNativeWrite()) return;
 		ON_SCOPE_EXIT { Navigation->FinishNativeWrite(); };
 		if (!ApplyDeferredNativeChanges()) return;
@@ -545,7 +546,7 @@ public:
 
 	virtual void EnsureBuildCompletion() override
 	{
-		auto* Navigation = CastChecked<AVoxelNavigationData>(GetOwner());
+		auto* Navigation = CastChecked<AVoxelNavigationData>(DestNavMesh);
 		if (!Navigation->TryBeginNativeWrite()) return;
 		ON_SCOPE_EXIT { Navigation->FinishNativeWrite(); };
 		if (!ApplyDeferredNativeChanges()) return;
@@ -554,7 +555,7 @@ public:
 
 	virtual void CancelBuild() override
 	{
-		auto* Navigation = CastChecked<AVoxelNavigationData>(GetOwner());
+		auto* Navigation = CastChecked<AVoxelNavigationData>(DestNavMesh);
 		Navigation->bNativeCancelPending = true;
 		Navigation->bNativeRebuildPending = false;
 		if (!Navigation->TryBeginNativeWrite()) return;
@@ -566,7 +567,7 @@ public:
 
 	virtual void OnNavigationBoundsChanged() override
 	{
-		auto* Navigation = CastChecked<AVoxelNavigationData>(GetOwner());
+		auto* Navigation = CastChecked<AVoxelNavigationData>(DestNavMesh);
 		Navigation->bNativeBoundsPending = true;
 		if (!Navigation->TryBeginNativeWrite()) return;
 		ON_SCOPE_EXIT { Navigation->FinishNativeWrite(); };
@@ -577,7 +578,7 @@ public:
 	virtual void RebuildDirtyAreas(const TArray<FNavigationDirtyArea>& InAreas) override
 	{
 		// 已有Detour时此入口只修改GT generator dirty表，不安装或删除原生tile。
-		auto* Navigation = CastChecked<AVoxelNavigationData>(GetOwner());
+		auto* Navigation = CastChecked<AVoxelNavigationData>(DestNavMesh);
 		if (Navigation->GetRecastMesh())
 		{
 			FRecastNavMeshGenerator::RebuildDirtyAreas(InAreas);
@@ -606,7 +607,7 @@ protected:
 private:
 	bool ApplyDeferredNativeChanges()
 	{
-		auto* Navigation = CastChecked<AVoxelNavigationData>(GetOwner());
+		auto* Navigation = CastChecked<AVoxelNavigationData>(DestNavMesh);
 		if (Navigation->bNativeCleanupPending) return false;
 		if (Navigation->bTerrainClearPending) Navigation->ClearTerrainEvidence();
 		if (Navigation->bNativeCancelPending)
@@ -804,8 +805,8 @@ FPathFindingResult AVoxelNavigationData::FindTerrainPathWithWait(const FNavAgent
 	}
 	// 容量和前置投影失败保留原路径；实际填充开始时才结束旧尝试的写入权限。
 	if (!Data->ReservePathInputSlot(InQuery.PathInstanceToFill, Inputs->PreviousAttempt)) return ENavigationQueryResult::Error;
-	bool bRegistered = false;
-	ON_SCOPE_EXIT { Data->ReleasePathInputSlot(InQuery.PathInstanceToFill, bRegistered); };
+	bool bPathInputsRegistered = false;
+	ON_SCOPE_EXIT { Data->ReleasePathInputSlot(InQuery.PathInstanceToFill, bPathInputsRegistered); };
 	FPathFindingResult Result = ARecastNavMesh::FindPath(InAgent, Guarded);
 	if (Result.Path)
 	{
@@ -822,13 +823,13 @@ FPathFindingResult AVoxelNavigationData::FindTerrainPathWithWait(const FNavAgent
 	}
 	if (Result.Path && (Result.Path->IsReady() || (Result.IsSuccessful() && Result.Path->GetPathPoints().Num() == 1)))
 	{
-		bRegistered = Data->RegisterPathInputs(Result.Path, Inputs.ToSharedRef());
-		if (!bRegistered || !Inputs->PublishPath(*Data, Result.Path))
+		bPathInputsRegistered = Data->RegisterPathInputs(Result.Path, Inputs.ToSharedRef());
+		if (!bPathInputsRegistered || !Inputs->PublishPath(*Data, Result.Path))
 		{
 			Inputs->SuspendForRepath();
 			Result.Path->ResetForRepath();
 			Result.Result = ENavigationQueryResult::Fail;
-			if (bRegistered && Inputs->PreviousAttempt && Result.Path == InQuery.PathInstanceToFill)
+			if (bPathInputsRegistered && Inputs->PreviousAttempt && Result.Path == InQuery.PathInstanceToFill)
 			{
 				Inputs->PreviousAttempt->RestoreWaitingPath(Result.Path);
 				FScopeLock Lock(&Data->PathInputsLock);
@@ -843,10 +844,10 @@ FPathFindingResult AVoxelNavigationData::FindTerrainPathWithWait(const FNavAgent
 	{
 		Result.Result = ENavigationQueryResult::Fail;
 	}
-	if (!bRegistered && Inputs->PreviousAttempt && InQuery.PathInstanceToFill)
+	if (!bPathInputsRegistered && Inputs->PreviousAttempt && InQuery.PathInstanceToFill)
 	{
 		Inputs->PreviousAttempt->RestoreWaitingPath(InQuery.PathInstanceToFill);
-		bRegistered = Data->RegisterPathInputs(InQuery.PathInstanceToFill, Inputs->PreviousAttempt.ToSharedRef());
+		bPathInputsRegistered = Data->RegisterPathInputs(InQuery.PathInstanceToFill, Inputs->PreviousAttempt.ToSharedRef());
 	}
 	Inputs->PreviousAttempt.Reset();
 	if (AsyncTicket)
@@ -972,13 +973,13 @@ TSharedPtr<FVoxelNavigationQueryInputs, ESPMode::ThreadSafe> AVoxelNavigationDat
 	Inputs->ReaderSections.Reserve(Capacity);
 	Inputs->Tiles.Reserve(TileCapacity);
 	Inputs->TileIndices.Reserve(TileCapacity);
-	check(Inputs->Readers.GetAllocatedSize() + Inputs->ReaderIndices.GetAllocatedSize() + Inputs->ReaderSections.GetAllocatedSize() +
+	check((Inputs->Readers.GetAllocatedSize() + Inputs->ReaderIndices.GetAllocatedSize() + Inputs->ReaderSections.GetAllocatedSize() +
 		Inputs->Tiles.GetAllocatedSize() + Inputs->TileIndices.GetAllocatedSize() <=
 		VoxelBoundedAllocation::ArrayBytes<FVoxelNavigationQueryInputs::FSurfaceReader>(Capacity) +
 		VoxelBoundedAllocation::MapBytes<const FVoxelNavigationSurface*, int32>(Capacity) +
 		VoxelBoundedAllocation::MapBytes<FIntVector, int32>(Capacity) +
 		VoxelBoundedAllocation::ArrayBytes<FVoxelNavigationQueryInputs::FTileReader>(TileCapacity) +
-		VoxelBoundedAllocation::MapBytes<const FVoxelNavigationTileCapture*, int32>(TileCapacity));
+		VoxelBoundedAllocation::MapBytes<const FVoxelNavigationTileCapture*, int32>(TileCapacity)));
 	return Inputs;
 #else
 	return nullptr;

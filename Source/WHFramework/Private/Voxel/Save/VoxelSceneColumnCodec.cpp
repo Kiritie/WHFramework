@@ -5,6 +5,77 @@
 #include "Voxel/Save/VoxelSceneColumnCapture.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 
+FVoxelSceneColumnCaptureCursor& FVoxelSceneColumnCaptureCursor::operator=(FVoxelSceneColumnCaptureCursor&& InOther)
+{
+	if (this == &InOther) return *this;
+	// 旧反射正文先销毁；旧 lease 与来方 lease 都覆盖到数据移动结束。
+	ProjectData = MoveTemp(InOther.ProjectData);
+	ProjectStateLease = MoveTemp(InOther.ProjectStateLease);
+	Capture = MoveTemp(InOther.Capture);
+	Consumer = InOther.Consumer;
+	RegionInstanceId = InOther.RegionInstanceId;
+	WorldEpoch = InOther.WorldEpoch;
+	Revision = InOther.Revision;
+	ProjectRevision = InOther.ProjectRevision;
+	BlockedReleaseVersion = InOther.BlockedReleaseVersion;
+	Phase = InOther.Phase;
+	PendingCursor = InOther.PendingCursor;
+	ActorCursor = InOther.ActorCursor;
+	ProjectCursor = InOther.ProjectCursor;
+	ActorCapacity = InOther.ActorCapacity;
+	bCapacityBlocked = InOther.bCapacityBlocked;
+	return *this;
+}
+
+void FVoxelSceneColumnCapture::VisitRequiredSources(const FVoxelTerrainResources& InResources,
+	FVoxelGenerationRequiredSourceScope::FVisit InVisit) const
+{
+	const auto Visit = [&](const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& Lease)
+	{
+		if (Lease && Lease->IsOwnedBy(InResources)) FVoxelGenerationRequiredSourceScope::VisitLease(Lease.Get(), InVisit);
+	};
+	Visit(MetadataLease);
+	Visit(ProjectLease);
+	if (Completion) Visit(Completion->ResourceLease);
+	for (const auto& Actor : Actors) Visit(Actor.ResourceLease);
+}
+
+EVoxelTerrainResourceAdmission FVoxelSceneColumnCapture::TryGrantCapacity(FVoxelTerrainResources& InResources,
+	const FVoxelGenerationConsumerKey& InConsumer, const EVoxelTerrainResourcePool InPool, const uint64 InBytes,
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& InOutLease, FString& OutError)
+{
+	EVoxelTerrainResourceAdmission Admission = EVoxelTerrainResourceAdmission::InvalidRequest;
+	if (InConsumer.IsValid() && InPool < EVoxelTerrainResourcePool::Count &&
+		(!InOutLease || (InOutLease->IsOwnedBy(InResources) && InOutLease->GetPool() == InPool)))
+	{
+		FVoxelGenerationRequiredCapacity Required;
+		if (FVoxelGenerationRequiredSourceScope::Collect(InResources, InOutLease.Get(), Required, OutError))
+		{
+			const auto Limits = InResources.Snapshot().Limits;
+			const uint64 PoolLimits[] = {Limits.InputBytes, Limits.WorkingBytes, Limits.StagedBytes,
+				Limits.ResidentBytes - Limits.OverlapBytes, Limits.OverlapBytes};
+			const uint64 RequiredBytes = Required.Bytes[int32(InPool)];
+			if (RequiredBytes > PoolLimits[int32(InPool)] || InBytes > PoolLimits[int32(InPool)] - RequiredBytes)
+				Admission = EVoxelTerrainResourceAdmission::CapacityUnachievable;
+			else if (InOutLease)
+				Admission = InOutLease->TryResize(InBytes, Required.Bytes[int32(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+			else if (InBytes == 0)
+				Admission = EVoxelTerrainResourceAdmission::Granted;
+			else
+				Admission = InResources.TryAcquire(InConsumer, InPool, InBytes, InOutLease, 0,
+					Required.Bytes[int32(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+		}
+		else Admission = EVoxelTerrainResourceAdmission::CapacityUnachievable;
+	}
+	if (Admission == EVoxelTerrainResourceAdmission::Granted) OutError.Reset();
+	else OutError = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ?
+		TEXT("CapacityBlocked: original Scene column backing was not granted") :
+		Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+		TEXT("CapacityUnachievable: original Scene column backing cannot fit its resource domain") :
+		TEXT("InvalidRequest: original Scene column resource owner");
+	return Admission;
+}
+
 FString FVoxelSceneColumnCodec::RelativePath(const FIntPoint InColumn)
 {
 	return FString::Printf(TEXT("voxel/actors/c_%d_%d.bin"), InColumn.X, InColumn.Y);
@@ -104,20 +175,26 @@ bool FVoxelSceneColumnCodec::EncodePayloads(const FVoxelSceneColumnCapture& InCa
 		OutError = TEXT("Scene column save exceeds 8MiB");
 		return false;
 	}
+	FVoxelGenerationRequiredSourceScope CaptureSource(InCapture.Resources.Get(), &InCapture,
+		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+		{
+			const auto& Capture = *static_cast<const FVoxelSceneColumnCapture*>(Context);
+			Capture.VisitRequiredSources(*Capture.Resources, Visit);
+		});
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> SortLease;
-	const uint64 SortBytes = VoxelBoundedAllocation::ArrayBytes<int32>(InCapture.Actors.Num());
-	const uint64 OutputBytes = VoxelBoundedAllocation::ArrayBytes<uint8>(int32(ByteCount));
-	if ((!InCapture.Actors.IsEmpty() && !InCapture.Resources->Acquire(EncodingConsumer, EVoxelTerrainResourcePool::Working,
-		SortBytes, SortLease)) ||
-		!InCapture.Resources->Acquire(EncodingConsumer, EVoxelTerrainResourcePool::Input,
-			OutputBytes, Completion.ResourceLease))
-	{
-		OutError = TEXT("CapacityBlocked: Scene column sort/output backing was not granted");
-		return false;
-	}
+	const uint64 SortBytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<int32, FDefaultAllocator>(InCapture.Actors.Num());
+	const uint64 OutputBytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(int32(ByteCount));
+	if (FVoxelSceneColumnCapture::TryGrantCapacity(*InCapture.Resources, EncodingConsumer,
+		EVoxelTerrainResourcePool::Working, SortBytes, SortLease, OutError) != EVoxelTerrainResourceAdmission::Granted) return false;
+	FVoxelGenerationRequiredSourceScope SortSource(InCapture.Resources.Get(), SortLease.Get());
+	const uint64 PreviousOutput = VoxelGenerationAllocation::AllocatedBytes(Completion.Bytes);
+	if (OutputBytes > MAX_uint64 - PreviousOutput ||
+		FVoxelSceneColumnCapture::TryGrantCapacity(*InCapture.Resources, EncodingConsumer,
+			EVoxelTerrainResourcePool::Input, PreviousOutput + OutputBytes, Completion.ResourceLease, OutError) !=
+			EVoxelTerrainResourceAdmission::Granted) return false;
 	TArray<int32> Order;
 	Order.Reserve(InCapture.Actors.Num());
-	check(Order.GetAllocatedSize() <= SortBytes);
+	check(VoxelGenerationAllocation::AllocatedBytes(Order) <= SortBytes);
 	for (int32 Index = 0; Index < InCapture.Actors.Num(); ++Index) Order.Add(Index);
 	Order.Sort([&](const int32 Left, const int32 Right)
 	{
@@ -144,8 +221,9 @@ bool FVoxelSceneColumnCodec::EncodePayloads(const FVoxelSceneColumnCapture& InCa
 	}
 	Writer.Blob(InCapture.ProjectBytes, 1024 * 1024);
 	if (!Writer.Finish(Completion.Bytes)) return false;
-	check(Completion.Bytes.GetAllocatedSize() <= OutputBytes);
-	verify(Completion.ResourceLease->Resize(Completion.Bytes.GetAllocatedSize()));
+	check(VoxelGenerationAllocation::AllocatedBytes(Completion.Bytes) <= OutputBytes);
+	verify(Completion.ResourceLease->TryResize(VoxelGenerationAllocation::AllocatedBytes(Completion.Bytes)) ==
+		EVoxelTerrainResourceAdmission::Granted);
 	Completion.bEncoded = true;
 	OutError.Reset();
 	return true;

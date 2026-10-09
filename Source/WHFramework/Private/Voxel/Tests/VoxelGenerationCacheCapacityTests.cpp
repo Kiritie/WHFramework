@@ -274,7 +274,7 @@ namespace
 				Stamp.WorldEpoch, Stamp.OwnerId, Stamp.OwnerIncarnation, EVoxelGenerationSpatialKind::Section,
 				Stamp.Section, Stamp.Section, Stamp.Token};
 			TAtomic<bool> Cancel{false};
-			FVoxelGenerationPlanningReadScope Scope({}, &Stamp, &Cancel, &Consumer);
+			FVoxelGenerationPlanningReadScope Scope(nullptr, &Stamp, &Cancel, &Consumer);
 			Test.TestTrue(TEXT("TLS 使用完整原任务 stamp"), FVoxelGenerationPlanningReadScope::GetTaskStamp() == &Stamp);
 			Test.TestTrue(TEXT("TLS 使用稳定完整 consumer"), FVoxelGenerationPlanningReadScope::GetConsumerKey() == &Consumer);
 			int32 WarmBuilds = 0;
@@ -312,7 +312,7 @@ namespace
 			for (const auto& InvalidStamp : InvalidStamps)
 			{
 				// 完整 logical consumer 不能掩盖缺失或跨 World 的原任务 stamp。
-				FVoxelGenerationPlanningReadScope InvalidScope({}, &InvalidStamp, &Cancel, &Consumer);
+				FVoxelGenerationPlanningReadScope InvalidScope(nullptr, &InvalidStamp, &Cancel, &Consumer);
 				for (const auto& RejectedKey : RejectedKeys)
 				{
 					Ptr InvalidOutput = Warmed;
@@ -470,7 +470,7 @@ namespace
 			Stamp.OwnerId = Consumer.OwnerId;
 			Stamp.OwnerIncarnation = Consumer.OwnerIncarnation;
 			Stamp.Token = Consumer.RequestSerial;
-			FVoxelGenerationPlanningReadScope Scope({}, &Stamp, nullptr, &Consumer);
+			FVoxelGenerationPlanningReadScope Scope(nullptr, &Stamp, nullptr, &Consumer);
 			FVoxelColumnSample Original;
 			if (!Test.TestTrue(TEXT("原 Query 沿真实水文链采样"), Query.SampleColumn(0, 0, Original, Error))) return;
 			auto Foreign = Consumer;
@@ -611,7 +611,11 @@ namespace
 			{
 				for (int32 Pass = 0; Pass < 32; ++Pass) Cache->TickMaintenance(128);
 				FVoxelBaseColumnEntryPtr Found;
-				Test.TestTrue(TEXT("维护消费的仍是原快照，原点列未被退休"), Cache->FindBaseColumn({}, Found) && Found == Value);
+				int32 UnexpectedBuilds = 0;
+				const bool bFound = Cache->GetOrBuildBaseColumn({},
+					[&](FVoxelBaseColumnEntry&, FString&) { ++UnexpectedBuilds; return false; }, Found, Error);
+				Test.TestTrue(TEXT("维护消费的仍是原快照，原点列未被退休"), bFound && Found == Value);
+				Test.TestEqual(TEXT("原快照保留点的暖读取不重新构建"), UnexpectedBuilds, 0);
 			};
 			TAtomic<bool> Cancel{false};
 			Test.TestFalse(TEXT("晚取消不发布候选保留点"), Cache->UpdateRetention(Retention, 1,
@@ -820,7 +824,6 @@ namespace
 			Feature.AlgorithmVersion = 1;
 			Feature.Stage = EVoxelGenerationStage::Vegetation;
 			Feature.Placement.Spacing = 64;
-			Feature.Placement.Separation = 0;
 			Feature.Placement.ChancePermille = 1000;
 			Feature.Placement.bRequireSurface = true;
 			FVoxelByteWriter Writer(4096);
@@ -875,7 +878,7 @@ namespace
 			Stamp.OwnerId = Consumer.OwnerId;
 			Stamp.OwnerIncarnation = Consumer.OwnerIncarnation;
 			Stamp.Token = Consumer.RequestSerial;
-			FVoxelGenerationPlanningReadScope ReadScope({}, &Stamp, nullptr, &Consumer);
+			FVoxelGenerationPlanningReadScope ReadScope(nullptr, &Stamp, nullptr, &Consumer);
 			auto BuildWarm = [&](PlanType& OutPlan, FString& OutError)
 			{
 				return Family::Build(SharedRecipe, WarmBounds, OutPlan, OutError);
@@ -1002,7 +1005,7 @@ namespace
 			Stamp.OwnerId = Consumer.OwnerId;
 			Stamp.OwnerIncarnation = Consumer.OwnerIncarnation;
 			Stamp.Token = Consumer.RequestSerial;
-			FVoxelGenerationPlanningReadScope Scope({}, &Stamp, nullptr, &Consumer);
+			FVoxelGenerationPlanningReadScope Scope(nullptr, &Stamp, nullptr, &Consumer);
 			auto BuildWarm = [&](FVoxelEcologyPlan& OutPlan, FString& OutError)
 			{
 				return Generator.BuildPlan(Bounds, SampleColumn, SampleBase, OutPlan, OutError);
@@ -1016,15 +1019,19 @@ namespace
 				uint32 Value = MAX_uint32;
 				if (!Test.TestTrue(TEXT("授额后的真实 resolved 索引保持值"), Warmed->Sample(Write.Position, Value) && Value == Write.Value)) return;
 			}
-			const auto BeforeStore = Resources->Snapshot();
-			Test.TestFalse(TEXT("不能将现有正文的租约冒充另一个新 key 的原租约"),
-				Cache->StoreEcology(ColdKey, Warmed, Error));
-			Test.TestTrue(TEXT("无租约证明的 Store 明确拒收"), Error.StartsWith(TEXT("InvalidResource")));
-			Test.TestEqual(TEXT("拒收不发布另一个 immutable key"), Cache->GetStats().Ecology, 1);
-			Test.TestEqual(TEXT("拒收不重复占用 Resident"),
+			const auto BeforeLookup = Resources->Snapshot();
+			FVoxelEcologyPlanPtr Missing = Warmed;
+			Test.TestFalse(TEXT("已有暖正文不能冒充未发布冷 key 的正文"), Cache->FindEcology(ColdKey, Missing));
+			Test.TestTrue(TEXT("冷 key 缺失保留调用方旧 immutable Out"), Missing == Warmed);
+			Test.TestEqual(TEXT("查询不发布另一个 immutable key"), Cache->GetStats().Ecology, 1);
+			Test.TestEqual(TEXT("查询不重复占用 Resident"),
 				Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Resident)],
-				BeforeStore.Used[int32(EVoxelTerrainResourcePool::Resident)]);
-			Test.TestTrue(TEXT("同 key 已发布 immutable 继续优先"), Cache->StoreEcology(WarmKey, Warmed, Error));
+				BeforeLookup.Used[int32(EVoxelTerrainResourcePool::Resident)]);
+			FVoxelEcologyPlanPtr WarmAgain;
+			int32 UnexpectedWarmBuilds = 0;
+			Test.TestTrue(TEXT("同 key 已发布 immutable 继续优先"), Cache->GetOrBuildEcology(WarmKey,
+				[&](FVoxelEcologyPlan&, FString&) { ++UnexpectedWarmBuilds; return false; }, WarmAgain, Error) && WarmAgain == Warmed);
+			Test.TestEqual(TEXT("已有暖正文不执行替代构建"), UnexpectedWarmBuilds, 0);
 			auto OtherConsumer = Consumer;
 			OtherConsumer.OwnerId = FGuid::NewGuid();
 			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Blocker;

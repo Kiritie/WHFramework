@@ -1,5 +1,7 @@
 #pragma once
 
+class FVoxelTerrainResourceLease;
+
 #include "CoreMinimal.h"
 #include "Voxel/Generation/VoxelGenerationRecipe.h"
 #include "Voxel/Generation/VoxelStructure.h"
@@ -57,6 +59,8 @@ FORCEINLINE uint32 GetTypeHash(
 
 struct WHFRAMEWORK_API FVoxelStructurePlan
 {
+	// 原正文 grant 的共享来源；深层 backing 先析构，controller deleter 仍保活到最后 weak。
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 	FVoxelGenerationBounds Bounds;
 
 	TArray<FVoxelStructurePlanClear> Clears;

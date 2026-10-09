@@ -91,6 +91,7 @@ class WHFRAMEWORK_API UVoxelModule : public UModuleBase
 
 public:
 	UVoxelModule();
+	UVoxelModule(FVTableHelper& Helper);
 	virtual ~UVoxelModule() override;
 	static void AddReferencedObjects(UObject* InThis, FReferenceCollector& InCollector);
 
@@ -163,6 +164,8 @@ public:
 	void UnregisterTerrainNetwork(UVoxelModuleNetworkComponent* InComponent);
 	void QueueTerrainWorldControl(UVoxelModuleNetworkComponent* InComponent);
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> GetTerrainFactResources() const;
+	bool EnsureTerrainFactBootstrap(TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& OutResources,
+		FVoxelGenerationConsumerKey& OutControl, FString& OutError);
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> GetTerrainResources() const;
 	FVoxelGenerationConsumerKey GetTerrainTaskControlConsumer() const;
 	TSharedPtr<FVoxelPhysicsRetirement, ESPMode::ThreadSafe> GetPhysicsRetirement();
@@ -218,9 +221,10 @@ public:
 	FVoxelTerrainFrameContext& GetTerrainFrameContext();
 	FVoxelStreamingReadiness QueryBoundsReadiness(const FVoxelGenerationBounds& InBounds, bool bInRequireCollision) const;
 	void ForceVoxelStreamingRefresh();
-	void SetRemoteChangeState(const FIntVector& InSection, EVoxelSectionChangeState InState);
+	bool SetRemoteChangeState(const FIntVector& InSection, EVoxelSectionChangeState InState, FString& OutError);
 	bool ApplyRemoteRepresentation(const FVoxelRepresentationReply& InReply, FString& OutError);
-	void InvalidateRemoteRepresentations(const FVoxelRepresentationInvalidate& InInvalidate);
+	bool InvalidateRemoteRepresentations(const FVoxelRepresentationInvalidate& InInvalidate,
+		int32& InOutCursor, FString& OutError, int32 InMaximumEntries = 8);
 	bool RequestRemoteRepresentation(
 		EVoxelRepresentationWireType InType,
 		const FVoxelRepresentationWireKey& InKey,
@@ -399,6 +403,9 @@ private:
 	void RequestSceneDurableSave();
 	bool HasUnpersistedSceneState() const;
 	bool ReserveSimulationStorage(int32 InSectionCount, int32 InRegionCount);
+	void RecordSimulationAdmissionFailure(
+		FVoxelSection& InSection,
+		EVoxelTerrainResourceAdmission InAdmission);
 	void RegisterSceneRegion(UVoxelSceneRegion& InRegion);
 	void UnregisterSceneRegion(UVoxelSceneRegion& InRegion);
 	void AdvanceSceneRegions();
@@ -440,6 +447,8 @@ private:
 	TUniquePtr<FVoxelEmergeManager> EmergeManager;
 	TUniquePtr<FVoxelResidencyManager> ResidencyManager;
 	TUniquePtr<FVoxelTaskScheduler> Scheduler;
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> PendingTerrainFactResources;
+	FVoxelGenerationConsumerKey PendingTerrainFactControl;
 	TUniquePtr<FVoxelOverlayReplica> OverlayReplica;
 	TArray<TWeakObjectPtr<UVoxelModuleNetworkComponent>> TerrainNetworkComponents;
 	TWeakObjectPtr<UVoxelModuleNetworkComponent> PendingTerrainWorldControl;
@@ -447,6 +456,10 @@ private:
 	TQueue<TSharedPtr<const FVoxelOverlayCommitNotification, ESPMode::ThreadSafe>> OverlayChangeQueue;
 	TSharedPtr<const FVoxelOverlayCommitNotification, ESPMode::ThreadSafe> ApplyingOverlayChange;
 	int32 OverlayChangeCursor = 0;
+	bool bWaitingOverlayChangeCapacity = false;
+	bool bOverlayChangeInvalidated = false;
+	bool bOverlayChangeWaitingEmerge = false;
+	uint64 OverlayChangeCapacityVersion = 0;
 	TUniquePtr<FVoxelMapTileCache> MapTileCache;
 	TUniquePtr<FVoxelViewManager> ViewManager;
 	TUniquePtr<FVoxelCollisionPresenter> CollisionPresenter;

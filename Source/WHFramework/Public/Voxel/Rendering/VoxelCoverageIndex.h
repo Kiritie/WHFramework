@@ -5,6 +5,7 @@
 #include "Voxel/Rendering/VoxelGameThreadContinuation.h"
 #include "Voxel/Generation/VoxelGenerationConsumer.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
+#include "Voxel/Task/VoxelTerrainResources.h"
 
 class FVoxelTerrainResources;
 class FVoxelTerrainResourceLease;
@@ -52,6 +53,7 @@ struct WHFRAMEWORK_API FVoxelCoverageRecordReadGuard
 template<typename ElementType>
 class TVoxelCoverageSnapshotArray
 {
+	friend class FVoxelCoverageIndex;
 	struct FStorage { TArray<ElementType> Values; };
 	TSharedPtr<FStorage, ESPMode::ThreadSafe> Storage;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
@@ -101,6 +103,7 @@ struct WHFRAMEWORK_API FVoxelCoverageLocalSnapshot
 	int32 GuardCount = 0;
 	bool bCountOnly = false;
 	bool bChangeSet = false;
+	EVoxelTerrainResourceAdmission ResourceAdmission = EVoxelTerrainResourceAdmission::None;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 	static uint64 ArrayMetadataBytes()
 	{
@@ -119,6 +122,8 @@ public:
 	void BindStorageLease(TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InLease);
 	bool Upsert(TSharedPtr<const FVoxelCoverageRecord, ESPMode::ThreadSafe> InRecord, FString& OutError);
 	bool Upsert(const FVoxelCoverageRecord& InRecord, FString& OutError);
+	void MarkPublishedInputs() const;
+	bool CanRemoveWithoutAllocation(const FVoxelTerrainSpatialKey& InKey) const;
 	bool Remove(const FVoxelTerrainSpatialKey& InKey);
 	bool Remove(const FVoxelTerrainSpatialKey& InKey, FString& OutError);
 	TSharedPtr<const FVoxelCoverageRecord, ESPMode::ThreadSafe> Find(const FVoxelTerrainSpatialKey& InKey) const;
@@ -139,11 +144,24 @@ public:
 		bool bInIncludePresentation = false) const;
 	bool AnyRecord(const FIntVector& InMin, const FIntVector& InMax,
 		TFunctionRef<bool(const FVoxelCoverageRecord&)> InPredicate) const;
+	// 共享子树直接跳过；访问变化前后的记录，不创建临时 snapshot 数组。
+	void VisitChangedRecords(const FVoxelCoverageIndex& InPrevious,
+		TFunctionRef<void(const FVoxelCoverageRecord*, const FVoxelCoverageRecord*)> InVisitor) const;
 	void Reset();
 	void PruneEmptyNodes(int32 InOutstandingSnapshots);
 	int32 NumRecords() const;
 	int32 NumIndexNodes() const;
 	bool HasResourceBinding() const { return Resources.IsValid(); }
+	EVoxelTerrainResourceAdmission GetLastResourceAdmission() const { return LastResourceAdmission; }
+	// 仅声明调用方额外固持且不在本索引中的输入；不授额，不包含本索引旧根／新路径。
+	void SetAdditionalRequiredInput(uint64 InBytes, int32 InLeaseCount)
+	{ AdditionalRequiredInputBytes = InBytes; AdditionalRequiredLeaseCount = InLeaseCount; }
+	static bool AccumulateRetainedInputs(const FVoxelTerrainResources& InResources,
+		TConstArrayView<const FVoxelCoverageIndex*> InIndexes, TConstArrayView<uint64> InExcludedSerials,
+		uint64& InOutBytes, int32& InOutLeaseCount);
+	// 同空间路径的旧新冻结根按 serial 去重；使用固定递归栈，不分配追踪表。
+	bool AccumulateRetainedInput(const FVoxelTerrainResources& InResources, const FVoxelCoverageIndex* InOther,
+		TConstArrayView<uint64> InExcludedSerials, uint64& InOutBytes, int32& InOutLeaseCount) const;
 
 private:
 	struct FNode
@@ -151,6 +169,10 @@ private:
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 		TSharedPtr<const FNode, ESPMode::ThreadSafe> Children[8];
 		TSharedPtr<const FVoxelCoverageRecord, ESPMode::ThreadSafe> Records[4];
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RecordLeases[4];
+		const FVoxelTerrainResources* AggregateLedger = nullptr;
+		uint64 AggregateInputBytes = 0, MinimumSerial = MAX_uint64, MaximumSerial = 0;
+		int32 AggregateLeaseCount = 0;
 		uint64 RecordVersions[4][2] = {};
 		uint64 ChildVersions[8][2] = {};
 		uint64 OwnVersions[2] = {};
@@ -187,11 +209,14 @@ private:
 	static int32 ChildSlot(const FVoxelCoverageIndexKey& InTarget, uint8 InParentLevel);
 	static FQuery Query(const FIntVector& InMin, const FIntVector& InMax);
 	const FNode* FindNode(const FVoxelCoverageIndexKey& InKey, int32 InVersionKind, uint64& OutGapVersion) const;
+	bool RemoveUnique(const FVoxelTerrainSpatialKey& InKey);
+	void RefreshNode(FNode& InNode) const;
 	bool Mutate(const FVoxelTerrainSpatialKey& InKey, const FVoxelCoverageRecord* InRecord,
 		TSharedPtr<const FVoxelCoverageRecord, ESPMode::ThreadSafe> InSharedRecord, FString& OutError);
 	FNodePtr MutateNode(FNodePtr InPrevious, const FVoxelCoverageIndexKey& InNodeKey,
 		const FVoxelCoverageIndexKey& InTarget, int32 InRecordSlot,
-		TSharedPtr<const FVoxelCoverageRecord, ESPMode::ThreadSafe> InRecord, bool bInInputsChanged,
+		TSharedPtr<const FVoxelCoverageRecord, ESPMode::ThreadSafe> InRecord,
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InRecordLease, bool bInInputsChanged,
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InGrant);
 	static void CaptureNode(FNodePtr InNode, FVoxelCoverageIndexKey InKey, const FQuery& InQuery,
 		FVoxelCoverageLocalSnapshot& OutSnapshot, uint64 InGapVersion, bool bInCollect = false);
@@ -212,6 +237,9 @@ private:
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> StorageLease;
 	FVoxelGenerationConsumerKey Consumer;
+	EVoxelTerrainResourceAdmission LastResourceAdmission = EVoxelTerrainResourceAdmission::None;
+	uint64 AdditionalRequiredInputBytes = 0;
+	int32 AdditionalRequiredLeaseCount = 0;
 	uint64 Serial = 0;
 	uint64 MembershipVersion = 0;
 	uint64 StorageGeneration = 1;

@@ -1,4 +1,5 @@
 #include "Voxel/Authoring/VoxelFineStreamingPolicy.h"
+#include "Voxel/Task/VoxelTerrainResources.h"
 
 FVoxelFineWindowSettings FVoxelFineStreamingPolicy::WindowSettings() const
 {
@@ -15,6 +16,17 @@ FVoxelFineWindowSettings FVoxelFineStreamingPolicy::WindowSettings() const
 	return Result;
 }
 
+FVoxelTerrainResourceLimits FVoxelFineStreamingPolicy::GeometryLimits() const
+{
+	FVoxelTerrainResourceLimits Result;
+	Result.InputBytes = uint64(MaximumInputGeometryMegabytes) * 1024 * 1024;
+	Result.WorkingBytes = uint64(MaximumWorkingGeometryMegabytes) * 1024 * 1024;
+	Result.StagedBytes = uint64(MaximumStagedGeometryMegabytes) * 1024 * 1024;
+	Result.ResidentBytes = uint64(MaximumResidentGeometryMegabytes) * 1024 * 1024;
+	Result.OverlapBytes = uint64(ResidentGeometryOverlapMegabytes) * 1024 * 1024;
+	return Result;
+}
+
 bool FVoxelFineStreamingPolicy::Validate(FString& OutError) const
 {
 	if (!WindowSettings().Validate(InteractiveRadiusCells, CollisionGuardRadiusCells, OutError))
@@ -28,8 +40,9 @@ bool FVoxelFineStreamingPolicy::Validate(FString& OutError) const
 		!FMath::IsFinite(PredictionSeconds) || PredictionSeconds < 0.0 ||
 		MaximumMeshPieceMegabytes < 1 || MaximumMeshPieceMegabytes > 64 ||
 		MaximumShardGeometryMegabytes < 1 || MaximumShardGeometryMegabytes > 1024 ||
-		MaximumResidentGeometryMegabytes < MaximumShardGeometryMegabytes ||
-		ReservedNearWorkers < 1 || !FMath::IsFinite(MaximumBackgroundWaitSeconds) || MaximumBackgroundWaitSeconds <= 0.0)
+		MaximumInputGeometryMegabytes < 1 || MaximumWorkingGeometryMegabytes < 1 || MaximumStagedGeometryMegabytes < 1 ||
+		MaximumResidentGeometryMegabytes < MaximumShardGeometryMegabytes || ResidentGeometryOverlapMegabytes < 1 ||
+		!GeometryLimits().IsValid() || ReservedNearWorkers < 1 || !FMath::IsFinite(MaximumBackgroundWaitSeconds) || MaximumBackgroundWaitSeconds <= 0.0)
 	{
 		OutError = TEXT("Fine 交互、Page、内存或调度配置不合法");
 		return false;

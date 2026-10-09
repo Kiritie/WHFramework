@@ -5,11 +5,13 @@
 #include "Voxel/Save/VoxelDeltaCodec.h"
 #include "Voxel/Save/VoxelSceneSaveCapture.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 
 namespace
 {
 	struct FSaveCaptureReclaimer
 	{
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> TaskLease;
 		FVoxelWorldSaveCapture Capture;
 		void operator()() const
 		{
@@ -29,16 +31,71 @@ bool FVoxelWorldSaveAdapter::Capture(FVoxelWorldRuntime& InRuntime, const FVoxel
 		return false;
 	}
 	RetireCaptureTask = {};
-	RetireTaskLease.Reset();
-	FVoxelWorldSaveCapture Capture;
-	Capture.TransactionId = FGuid::NewGuid();
-	Capture.WorldEpoch = InRuntime.Epoch();
-	Capture.Manifest = InManifest;
-	Capture.Registry = InRegistry;
-	Capture.Journal = InRuntime.CaptureJournal();
-	Capture.SourceLease = InStore.GetSourceLease();
-	Capture.SourceDirectoryRoot = InStore.GetDirectorySnapshot();
-	const FString& Source = InStore.GetSourceDirectory();
+	if (!Pending.IsSet())
+	{
+		RetireTaskLease.Reset();
+		Pending.Emplace();
+		Pending->TransactionId = FGuid::NewGuid();
+		Pending->WorldEpoch = InRuntime.Epoch();
+		bCaptureRootsFrozen = false;
+		bCaptureCapacityBlocked = false;
+	}
+	auto& Capture = Pending.GetValue();
+	if (Capture.WorldEpoch != InRuntime.Epoch() || (bCaptureRootsFrozen && Capture.Registry != InRegistry))
+	{
+		OutError = TEXT("InvalidRequest: 原保存捕获的 World 或 Registry 已改变");
+		return false;
+	}
+	const TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources = InRuntime.GetTerrainResources();
+	const auto Consumer = FVoxelGenerationConsumerKey::Section(Capture.WorldEpoch, Capture.TransactionId, 1, {}, 1);
+	const uint64 BeforeVersion = Resources->ReleaseVersionExcludingOwner(Consumer);
+	if (bCaptureCapacityBlocked && BeforeVersion <= CaptureCapacityVersion)
+	{
+		OutError = TEXT("CapacityBlocked: 原保存固定切点等待外部容量释放");
+		return false;
+	}
+	bCaptureCapacityBlocked = false;
+	const auto Rejected = [&](const EVoxelTerrainResourceAdmission Admission, const TCHAR* Stage)
+	{
+		bCaptureCapacityBlocked = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked;
+		if (bCaptureCapacityBlocked) CaptureCapacityVersion = BeforeVersion;
+		OutError = FString::Printf(TEXT("%s: 保存固定切点%s"), bCaptureCapacityBlocked ? TEXT("CapacityBlocked") :
+			Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable") : TEXT("InvalidRequest"), Stage);
+		return false;
+	};
+	const FVoxelGenerationRequiredSourceScope TaskSource(Resources.Get(), RetireTaskLease.Get());
+	const FVoxelGenerationRequiredSourceScope MetadataSource(Resources.Get(), Capture.MetadataLease.Get());
+	const FVoxelGenerationRequiredSourceScope DirectorySource(Resources.Get(),
+		bCaptureRootsFrozen ? (Capture.SourceDirectoryRoot ? Capture.SourceDirectoryRoot->ResourceLease.Get() : nullptr) :
+		(InStore.GetDirectorySnapshot() ? InStore.GetDirectorySnapshot()->ResourceLease.Get() : nullptr));
+	const auto& FileGeneration = bCaptureRootsFrozen ? Capture.SourceLease : InStore.GetSourceLease();
+	const FVoxelGenerationRequiredSourceScope GenerationSource(Resources.Get(),
+		FileGeneration ? FileGeneration->GetResourceLease().Get() : nullptr);
+	const auto Grant = [&](const uint64 Bytes, TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& Lease)
+	{
+		FVoxelGenerationRequiredCapacity Required;
+		FString Error;
+		if (!FVoxelGenerationRequiredSourceScope::Collect(*Resources, Lease.Get(), Required, Error))
+			return EVoxelTerrainResourceAdmission::CapacityUnachievable;
+		return Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Input, Bytes, Lease,
+			0, Required.Bytes[0], Required.LeaseCount);
+	};
+	if (!RetireTaskLease)
+	{
+		const auto Admission = Grant(VoxelBoundedAllocation::TaskBytes<FSaveCaptureReclaimer>(), RetireTaskLease);
+		if (Admission != EVoxelTerrainResourceAdmission::Granted) return Rejected(Admission, TEXT("退休任务未授予"));
+	}
+	const FVoxelGenerationRequiredSourceScope AcquiredTaskSource(Resources.Get(), RetireTaskLease.Get());
+	if (!bCaptureRootsFrozen)
+	{
+		Capture.Manifest = InManifest;
+		Capture.Registry = InRegistry;
+		Capture.Journal = InRuntime.CaptureJournal();
+		Capture.SourceLease = InStore.GetSourceLease();
+		Capture.SourceDirectoryRoot = InStore.GetDirectorySnapshot();
+		bCaptureRootsFrozen = true;
+	}
+	const FString& Source = Capture.SourceLease ? Capture.SourceLease->Directory() : InStore.GetSourceDirectory();
 	if (!Source.IsEmpty() && (!Capture.SourceLease || !Capture.SourceLease->Matches(Source)))
 	{
 		OutError = TEXT("Voxel save capture requires its source generation lease");
@@ -46,27 +103,16 @@ bool FVoxelWorldSaveAdapter::Capture(FVoxelWorldRuntime& InRuntime, const FVoxel
 	}
 	const uint64 MetadataBytes = VoxelBoundedAllocation::SharedBytes<FString>() +
 		VoxelBoundedAllocation::SharedBytes<FVoxelWorldSaveCompletion>() +
-		VoxelBoundedAllocation::ArrayBytes<TCHAR>(Source.Len() + 1);
-	if (Capture.Journal.Resources && !Capture.Journal.Resources->Acquire(
-		FVoxelGenerationConsumerKey::Section(Capture.WorldEpoch, Capture.TransactionId, 1, FIntVector::ZeroValue, 1),
-		EVoxelTerrainResourcePool::Input, MetadataBytes, Capture.MetadataLease))
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<TCHAR, FDefaultAllocator>(Source.Len() + 1);
+	if (!Capture.MetadataLease)
 	{
-		OutError = TEXT("CapacityBlocked: 保存固定切点元数据未授予");
-		return false;
+		const auto Admission = Grant(MetadataBytes, Capture.MetadataLease);
+		if (Admission != EVoxelTerrainResourceAdmission::Granted) return Rejected(Admission, TEXT("元数据未授予"));
 	}
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> TaskLease;
-	if (Capture.Journal.Resources && !Capture.Journal.Resources->Acquire(
-		FVoxelGenerationConsumerKey::Section(Capture.WorldEpoch, Capture.TransactionId, 1, FIntVector::ZeroValue, 4),
-		EVoxelTerrainResourcePool::Input, VoxelBoundedAllocation::TaskBytes<FSaveCaptureReclaimer>(), TaskLease))
-	{
-		OutError = TEXT("CapacityBlocked: 保存捕获的异步释放任务未授予");
-		return false;
-	}
-	if (!Capture.Journal.PrepareSaveNotifications(Capture.TransactionId))
-	{
-		OutError = TEXT("CapacityBlocked: 保存落盘通知游标及异步释放未授予");
-		return false;
-	}
+	const FVoxelGenerationRequiredSourceScope AcquiredMetadataSource(Resources.Get(), Capture.MetadataLease.Get());
+	EVoxelTerrainResourceAdmission NotificationAdmission = EVoxelTerrainResourceAdmission::None;
+	if (!Capture.Journal.PrepareSaveNotifications(Capture.TransactionId, &NotificationAdmission))
+		return Rejected(NotificationAdmission, TEXT("落盘通知游标未授予"));
 	Capture.SourceDirectory = MakeShared<const FString, ESPMode::ThreadSafe>(Source);
 	Capture.Completion = MakeShared<FVoxelWorldSaveCompletion, ESPMode::ThreadSafe>();
 	Capture.Completion->TransactionId = Capture.TransactionId;
@@ -74,7 +120,9 @@ bool FVoxelWorldSaveAdapter::Capture(FVoxelWorldRuntime& InRuntime, const FVoxel
 	check(!Capture.MetadataLease || VoxelBoundedAllocation::SharedBytes<FString>() +
 		VoxelBoundedAllocation::SharedBytes<FVoxelWorldSaveCompletion>() + Capture.SourceDirectory->GetAllocatedSize() <= MetadataBytes);
 	Active = MoveTemp(Capture);
-	RetireTaskLease = MoveTemp(TaskLease);
+	Pending.Reset();
+	bCaptureRootsFrozen = false;
+	bCaptureCapacityBlocked = false;
 	OutError.Reset();
 	return true;
 }
@@ -95,7 +143,7 @@ bool FVoxelWorldSaveAdapter::AttachSceneCapture(TSharedPtr<const FVoxelSceneSave
 
 bool FVoxelWorldSaveAdapter::IsBusy() const
 {
-	return Active.IsSet();
+	return Active.IsSet() || Pending.IsSet();
 }
 
 bool FVoxelWorldSaveAdapter::CanCapture() const
@@ -166,7 +214,22 @@ bool FVoxelWorldSaveAdapter::Complete(FVoxelWorldRuntime& InRuntime, FVoxelRegio
 	TSharedPtr<const FVoxelSceneSaveCapture, ESPMode::ThreadSafe> InRetiredSceneReceipt)
 {
 	check(IsInGameThread());
-	if (!Active.IsSet()) return false;
+	if (!Active.IsSet())
+	{
+		if (Pending.IsSet())
+		{
+			if (bCaptureRootsFrozen)
+			{
+				check(RetireTaskLease);
+				RetireCaptureTask = UE::Tasks::Launch(UE_SOURCE_LOCATION,
+					FSaveCaptureReclaimer{MoveTemp(RetireTaskLease), MoveTemp(Pending.GetValue())});
+			}
+			Pending.Reset();
+		}
+		bCaptureCapacityBlocked = false;
+		bCaptureRootsFrozen = false;
+		return false;
+	}
 	bool bApplied = false;
 	if (bInSuccess && Active->WorldEpoch == InRuntime.Epoch() && InRuntime.CanCompleteJournalSave(Active->Journal))
 	{
@@ -187,7 +250,8 @@ bool FVoxelWorldSaveAdapter::Complete(FVoxelWorldRuntime& InRuntime, FVoxelRegio
 	}
 	Active->RetiredSceneAttempt = MoveTemp(InRetiredSceneAttempt);
 	Active->RetiredSceneReceipt = MoveTemp(InRetiredSceneReceipt);
-	RetireCaptureTask = UE::Tasks::Launch(UE_SOURCE_LOCATION, FSaveCaptureReclaimer{MoveTemp(Active.GetValue())});
+	RetireCaptureTask = UE::Tasks::Launch(UE_SOURCE_LOCATION,
+		FSaveCaptureReclaimer{MoveTemp(RetireTaskLease), MoveTemp(Active.GetValue())});
 	Active.Reset();
 	return bApplied;
 }
