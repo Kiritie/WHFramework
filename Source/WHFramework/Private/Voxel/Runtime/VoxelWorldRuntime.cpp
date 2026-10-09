@@ -1,6 +1,7 @@
 ﻿#include "Voxel/Runtime/VoxelWorldRuntime.h"
 
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Rendering/VoxelTerrainFrameContext.h"
 #include "Voxel/Save/VoxelBlockEntityCodec.h"
 #include "Voxel/Save/VoxelDeltaCodec.h"
@@ -261,7 +262,7 @@ bool FVoxelWorldRuntime::PublishBase(
 		}
 	}
 
-	const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<TArray<FVoxelBlockState>>() + InBaseBlocks.GetAllocatedSize();
+	const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<TArray<FVoxelBlockState>>() + VoxelGenerationAllocation::AllocatedBytes(InBaseBlocks);
 	if (InResourceLease)
 	{
 		if (InResourceLease->Bytes() < Bytes || !InResourceLease->Transfer(EVoxelTerrainResourcePool::Resident))
@@ -900,11 +901,11 @@ bool FVoxelWorldRuntime::CommitPreparedEdit(
 
 	AdvanceOverlaySequences(Batch.Sections);
 	InPrepared.Sections.Empty();
-	uint64 BatchBytes = VoxelBoundedAllocation::WorkerSharedBytes<TArray<FVoxelSectionPatch>>() + Batch.Sections.GetAllocatedSize();
+	uint64 BatchBytes = VoxelBoundedAllocation::WorkerSharedBytes<TArray<FVoxelSectionPatch>>() + VoxelGenerationAllocation::AllocatedBytes(Batch.Sections);
 	for (const auto& Patch : Batch.Sections)
 	{
-		BatchBytes += Patch.Edits.GetAllocatedSize() + Patch.Entities.GetAllocatedSize();
-		for (const auto& Write : Patch.Entities) BatchBytes += Write.Value.Payload.GetAllocatedSize();
+		BatchBytes += VoxelGenerationAllocation::AllocatedBytes(Patch.Edits) + VoxelGenerationAllocation::AllocatedBytes(Patch.Entities);
+		for (const auto& Write : Patch.Entities) BatchBytes += VoxelGenerationAllocation::AllocatedBytes(Write.Value.Payload);
 	}
 	check(BatchBytes <= Batch.ResourceLease->Bytes());
 	verify(Batch.ResourceLease->Resize(BatchBytes));
@@ -1503,8 +1504,9 @@ bool FVoxelWorldRuntime::PrepareJournal(const FIntVector& InSection, const uint6
 	Journal->ResourceLease = MoveTemp(Lease);
 	if (Journal->ResourceLease)
 	{
-		const uint64 Actual = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelOverlaySnapshot>() +
-			Journal->Blocks.GetAllocatedSize() + Journal->Entities.GetAllocatedSize() + EntityPayloadBytes;
+		uint64 Actual = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelOverlaySnapshot>() +
+			VoxelGenerationAllocation::AllocatedBytes(Journal->Blocks) + VoxelGenerationAllocation::AllocatedBytes(Journal->Entities);
+		for (const auto& Pair : Journal->Entities) Actual += VoxelGenerationAllocation::AllocatedBytes(Pair.Value.Payload);
 		check(Actual <= Bytes);
 		verify(Journal->ResourceLease->Resize(Actual));
 	}

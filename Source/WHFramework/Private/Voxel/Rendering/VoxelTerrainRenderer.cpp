@@ -5,7 +5,6 @@
 #include "Containers/Ticker.h"
 #include "DynamicMeshBuilder.h"
 #include "Engine/World.h"
-#include "GameFramework/Actor.h"
 #include "LocalVertexFactory.h"
 #include "Materials/MaterialInterface.h"
 #include "MeshElementCollector.h"
@@ -1310,7 +1309,6 @@ struct FVoxelTerrainRendererState : TSharedFromThis<FVoxelTerrainRendererState, 
 	uint64 NextCoverageSerial = 0;
 	uint64 LastFrame = MAX_uint64;
 	FGuid OwnerId;
-	TWeakObjectPtr<AActor> Actor;
 	TWeakObjectPtr<UVoxelTerrainPrimitiveComponent> Component;
 	TStrongObjectPtr<UVoxelTerrainPrimitiveComponent> ComponentPin;
 	TSharedPtr<ISceneViewExtension, ESPMode::ThreadSafe> Extension;
@@ -3380,8 +3378,11 @@ void FVoxelTerrainRenderer::Reset()
 	State->RetirementWalk.Reset();
 	State->CoarseRetirementSnapshot.Reset();
 	State->CoarseRetirementWalk.Reset();
-	if (AActor* Actor = State->Actor.Get()) Actor->Destroy();
-	if (auto* Component = State->Component.Get()) Component->TerrainState.Reset();
+	if (auto* Component = State->Component.Get())
+	{
+		Component->UnregisterComponent();
+		Component->TerrainState.Reset();
+	}
 	// 关闭之后继续由独立退休服务消费已发行帧；不依赖已销毁的 Module。
 	FTSTicker::GetCoreTicker().AddTicker(TEXT("VoxelTerrainRetirement"), 0.0f,
 		TUniqueFunction<bool(float)>(FVoxelRendererRetirement{State}));

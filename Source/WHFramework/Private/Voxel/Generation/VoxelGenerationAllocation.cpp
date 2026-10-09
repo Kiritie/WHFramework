@@ -439,7 +439,8 @@ bool FVoxelGenerationWorkspace::PrepareBytes(
 	const uint64 Current = Lease ? Lease->Bytes() : 0;
 	if (InOldBytes > Current)
 	{
-		return Fail(TEXT("AllocationAccountingMismatch: scratch backing is not covered by its workspace"), OutError);
+		return Fail(*FString::Printf(TEXT("AllocationAccountingMismatch: scratch backing is not covered by its workspace (old=%llu workspace=%llu requested=%llu)"),
+			InOldBytes, Current, InNewBytes), OutError);
 	}
 	const uint64 WorkingLimit = Resources->Snapshot().Limits.WorkingBytes;
 	FVoxelGenerationRequiredCapacity Sources;

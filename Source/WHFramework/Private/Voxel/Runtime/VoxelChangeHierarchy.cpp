@@ -217,19 +217,19 @@ bool FVoxelChangeHierarchy::RegisterGeometry(const FVoxelTerrainGeometry& InGeom
 	{
 		if (OldStep > 0 && --HaloStepCounts.FindChecked(OldStep) == 0) HaloStepCounts.Remove(OldStep);
 		++HaloStepCounts.FindOrAdd(RetainedStep);
-		RetainedHaloSteps.Add(InGeometry.Key, RetainedStep);
+		RetainedHaloSteps.FindOrAdd(InGeometry.Key) = RetainedStep;
 		MaximumHaloStep = FMath::Max(MaximumHaloStep, RetainedStep);
 	}
 	switch (InGeometry.Key.Representation)
 	{
 	case EVoxelTerrainRepresentation::VoxelProxy:
-		VoxelProxyRevision.Add(ProxyKey, FMath::Max(Revision, VoxelProxyRevision.FindRef(ProxyKey)));
+		VoxelProxyRevision.FindOrAdd(ProxyKey) = FMath::Max(Revision, VoxelProxyRevision.FindRef(ProxyKey));
 		break;
 	case EVoxelTerrainRepresentation::Surface:
-		SurfaceRevision.Add(SurfaceKey, FMath::Max(Revision, SurfaceRevision.FindRef(SurfaceKey)));
+		SurfaceRevision.FindOrAdd(SurfaceKey) = FMath::Max(Revision, SurfaceRevision.FindRef(SurfaceKey));
 		break;
 	case EVoxelTerrainRepresentation::Macro:
-		MacroRevision.Add(MacroKey, FMath::Max(Revision, MacroRevision.FindRef(MacroKey)));
+		MacroRevision.FindOrAdd(MacroKey) = FMath::Max(Revision, MacroRevision.FindRef(MacroKey));
 		break;
 	default:
 		break;
@@ -298,7 +298,7 @@ bool FVoxelChangeHierarchy::RegisterFineShard(const FVoxelFineShardKey& InKey, F
 	FineShardIndex = MoveTemp(Candidate);
 	FineShardIndex.MarkPublishedInputs();
 	FineShardReferences.Add(InKey, 1);
-	FineShardRevisions.Add(InKey, FMath::Max(Revision, FineShardRevisions.FindRef(InKey)));
+	FineShardRevisions.FindOrAdd(InKey) = FMath::Max(Revision, FineShardRevisions.FindRef(InKey));
 	if (OutAdded) *OutAdded = true;
 	Storage.Succeed();
 	OutError.Reset();
@@ -494,7 +494,7 @@ bool FVoxelChangeHierarchy::CommitInvalidations(FVoxelPreparedChangeInvalidation
 	{
 		const FIntVector Section = InSection(Index);
 		const uint64 Revision = ++RevisionSerial;
-		SectionRevision.Add(Section, Revision);
+		SectionRevision.FindOrAdd(Section) = Revision;
 		FVoxelGenerationBounds Edit;
 		const bool bHasBounds = SectionBounds(Section, Edit);
 		check(bHasBounds);
@@ -599,7 +599,7 @@ bool FVoxelChangeHierarchy::SetVoxelProxyRevision(const FVoxelViewKey& InKey, co
 	FWriteScopeLock Scope(Lock);
 	if (!PrepareStorageRequirements(OutError)) return false;
 	if (!ReserveEntry(Storage, VoxelProxyRevision, InKey, OutError)) return false;
-	VoxelProxyRevision.Add(InKey, InRevision);
+	VoxelProxyRevision.FindOrAdd(InKey) = InRevision;
 	RevisionSerial = FMath::Max(RevisionSerial, InRevision);
 	Storage.Succeed();
 	OutError.Reset();
@@ -611,7 +611,7 @@ bool FVoxelChangeHierarchy::SetSurfaceRevision(const FVoxelSurfaceTileKey& InKey
 	FWriteScopeLock Scope(Lock);
 	if (!PrepareStorageRequirements(OutError)) return false;
 	if (!ReserveEntry(Storage, SurfaceRevision, InKey, OutError)) return false;
-	SurfaceRevision.Add(InKey, InRevision);
+	SurfaceRevision.FindOrAdd(InKey) = InRevision;
 	RevisionSerial = FMath::Max(RevisionSerial, InRevision);
 	Storage.Succeed();
 	OutError.Reset();
@@ -623,7 +623,7 @@ bool FVoxelChangeHierarchy::SetMacroRevision(const FVoxelMacroTileKey& InKey, co
 	FWriteScopeLock Scope(Lock);
 	if (!PrepareStorageRequirements(OutError)) return false;
 	if (!ReserveEntry(Storage, MacroRevision, InKey, OutError)) return false;
-	MacroRevision.Add(InKey, InRevision);
+	MacroRevision.FindOrAdd(InKey) = InRevision;
 	RevisionSerial = FMath::Max(RevisionSerial, InRevision);
 	Storage.Succeed();
 	OutError.Reset();

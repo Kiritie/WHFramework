@@ -1,4 +1,4 @@
-﻿#if WITH_DEV_AUTOMATION_TESTS && WITH_RECAST
+#if WITH_DEV_AUTOMATION_TESTS && WITH_RECAST
 
 #include "Misc/AutomationTest.h"
 #include "Misc/ScopeExit.h"
@@ -6,6 +6,7 @@
 #include "Components/SceneComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Physics/Experimental/PhysScene_Chaos.h"
 #include "HAL/PlatformProcess.h"
 #include "Main/MainModule.h"
 #include "NavigationSystem.h"
@@ -147,17 +148,28 @@ bool FVoxelNavigationNativeTileTest::RunTest(const FString& InParameters)
 	Module->Generator = VoxelTest::MakeGenerator();
 	Module->Runtime = MakeUnique<FVoxelWorldRuntime>(Module->Epoch, true,
 		Module->Registry.GetSnapshot().ToSharedRef(), Module->Generator.ToSharedRef());
-	Module->Scheduler = MakeUnique<FVoxelTaskScheduler>(true);
+	const auto Control = FVoxelGenerationConsumerKey::Section(Module->Epoch, FGuid::NewGuid(), 1, {}, 1);
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> TerrainResources, RuntimeResources;
+	if (!TestTrue(TEXT("导航夹具建立生产原控制账本"),
+		FVoxelTerrainResources::Create({}, Control, TerrainResources, Error) &&
+		FVoxelTerrainResources::Create({}, Control, RuntimeResources, Error) &&
+		FVoxelTaskScheduler::Create(TerrainResources.ToSharedRef(), RuntimeResources.ToSharedRef(), Control, Module->Scheduler, Error)))
+	{
+		AddError(Error);
+		return false;
+	}
+	if (!TestTrue(TEXT("真实Scheduler初始化原控制身份和统计"), Module->Scheduler->InitializeStatistics(Module->Epoch))) return false;
 	if (!Module->TerrainFrameContext.Configure({}, Error)) return false;
 	Module->Scheduler->BindFrameContext(Module->TerrainFrameContext);
 	Module->CollisionPresenter = MakeUnique<FVoxelCollisionPresenter>(*Module, *Module->Scheduler, Module->Epoch);
 	Module->NavigationPresenter = MakeUnique<FVoxelNavigationPresenter>(*Module, *Module->Scheduler);
-	Module->ResidencyManager = MakeUnique<FVoxelResidencyManager>(*Module->Runtime, *Module->Scheduler,
-		[Module](const FIntVector& Key) { Module->OnSectionEvicting(Key); }, TFunction<bool(const FIntVector&)>(),
+	Module->ResidencyManager = MakeUnique<FVoxelResidencyManager>(*Module->Runtime, *Module->Scheduler);
+	if (!TestTrue(TEXT("真实ResidencyManager按原控制身份初始化有界回调"), Module->ResidencyManager->Initialize(
+		[Module](const FIntVector& Key) { Module->OnSectionEvicting(Key); }, [](const FIntVector&) { return false; },
 		[Module](const FIntVector& Key, const FVoxelSectionStamp& Stamp, const EVoxelRuntimeSectionEvent Event)
 		{
 			Module->OnSimulationSectionEvent(Key, Stamp, Event);
-		});
+		}, Error))) return false;
 	const FIntVector Lower(0, 0, 0);
 	const FIntVector Above(0, 0, 1);
 	for (const FIntVector& Key : {Lower, Above})
@@ -180,6 +192,7 @@ bool FVoxelNavigationNativeTileTest::RunTest(const FString& InParameters)
 	Interest->PublicationInputs = Inputs;
 	Interest->Exact.Add(Lower).bSimulation = true;
 	Interest->Exact.FindChecked(Lower).bCollision = true;
+	Interest->Exact.FindChecked(Lower).ServicePriority = {EVoxelTerrainServiceBand::P0, 0.0, 0.0, 0, FGuid::NewGuid()};
 	Interest->Exact.Add(Above).bData = true;
 	FVoxelStreamingSource Source;
 	Source.Id = FGuid::NewGuid();
@@ -200,6 +213,9 @@ bool FVoxelNavigationNativeTileTest::RunTest(const FString& InParameters)
 	Navigation->Tick(0.f);
 	auto* Data = Cast<AVoxelNavigationData>(Navigation->GetDefaultNavDataInstance(FNavigationSystem::DontCreate));
 	if (!TestNotNull(TEXT("夹具真实创建带tile提交证明的NavData"), Data)) return false;
+	// 查询跨实际 tile 边界，保证成本委托不能由同 polygon 的快捷成功替代。
+	Data->TileSizeUU = 200.f;
+	Data->RebuildAll();
 	Navigation->AddNavigationBuildLock(ENavigationBuildLock::Custom);
 	Module->WakeSimulationSection(Lower);
 	auto FindSurface = [&]() -> UVoxelNavigationSurfaceComponent*
@@ -224,6 +240,8 @@ bool FVoxelNavigationNativeTileTest::RunTest(const FString& InParameters)
 			if (const auto Retirement = Module->GetPhysicsRetirement()) Retirement->Advance(Module->TerrainFrameContext);
 			Module->TerrainFrameContext.End(FPlatformTime::Seconds());
 			World->Tick(LEVELTICK_All, 1.f / 60.f);
+			// 同步 Automation 阻塞引擎主循环；显式排空真实 Solver 的命令和粒子输入。
+			World->GetPhysicsScene()->Flush();
 			Navigation->Tick(1.f / 60.f);
 			FPlatformProcess::Sleep(0.001f);
 		}
@@ -233,7 +251,18 @@ bool FVoxelNavigationNativeTileTest::RunTest(const FString& InParameters)
 	if (!TestTrue(TEXT("真实Collision提交后可导出完整地板"), Pump([&]()
 	{
 		return FindSurface() && !FindSurface()->GetSurface().Indices.IsEmpty();
-	}))) return false;
+	})))
+	{
+		const auto* Body = Module->CollisionPresenter->FindBody(Lower);
+		FVoxelSectionSnapshot DiagnosticSnapshot;
+		AddInfo(FString::Printf(TEXT("Collision pipeline: body=%d prepared=%d preparing=%d sync=%d failed=%d capacityBlocked=%d requestBlocked=%d selectionAdmission=%d schedulerAdmission=%d snapshot=%d retirement=%d"),
+			Body != nullptr, Body && Body->Prepared.IsValid(), Body && Body->PreparingComponent.IsValid(), Body && Body->Sync.IsValid(),
+			Body && Body->bHasFailure, Body && Body->bCapacityBlocked,
+			Body && Body->AdmissionRequest.IsSet() ? int32(Body->AdmissionRequest->Blocked) : 0,
+			int32(Module->CollisionPresenter->Selection.GetLastResourceAdmission()), int32(Module->Scheduler->GetLastResourceAdmission()),
+			Module->Runtime->CaptureSnapshot(Lower, DiagnosticSnapshot), Module->GetPhysicsRetirement().IsValid()));
+		return false;
+	}
 	TestFalse(TEXT("仅Surface Apply不能提前宣告原生NavReady"), Module->IsNavigationReady(Lower));
 	Navigation->RemoveNavigationBuildLock(ENavigationBuildLock::Custom);
 	if (!TestTrue(TEXT("实际Recast构建和Detour提交形成NavReady"), Pump([&]()
@@ -249,14 +278,14 @@ bool FVoxelNavigationNativeTileTest::RunTest(const FString& InParameters)
 	const FVoxelBlockingNativeQueryFilter Blocking(*static_cast<const FRecastQueryFilter*>(Data->GetDefaultQueryFilter()->GetImplementation()), Gate);
 	const auto CallerFilter = MakeShared<FNavigationQueryFilter, ESPMode::ThreadSafe>();
 	CallerFilter->SetFilterImplementation(&Blocking);
-	FPathFindingQuery Query(Module, *Data, FVector(100., 100., 400.), FVector(300., 300., 400.), CallerFilter);
+	FPathFindingQuery Query(Module, *Data, FVector(100., 187.5, 400.), FVector(300., 187.5, 400.), CallerFilter);
 	auto QueryPath = Data->CreatePathInstance<FNavMeshPath>(Query);
 	QueryPath->SetSourceActor(*Owner);
 	QueryPath->SetGoalActorObservation(*Owner, 50.);
 	Query.PathInstanceToFill = QueryPath;
 	auto RunningQuery = UE::Tasks::Launch(UE_SOURCE_LOCATION, [Data, Query]()
 	{
-		return Data->FindPath(Query.NavAgentProperties, Query);
+		return Data->ANavigationData::FindPath(Query.NavAgentProperties, Query);
 	});
 	const double QueryEntryDeadline = FPlatformTime::Seconds() + 2.0;
 	while (!Gate->bEntered.Load() && FPlatformTime::Seconds() < QueryEntryDeadline) FPlatformProcess::Sleep(0.001f);
@@ -267,14 +296,14 @@ bool FVoxelNavigationNativeTileTest::RunTest(const FString& InParameters)
 		return false;
 	}
 	TestEqual(TEXT("真实查询持有原生读取屏障"), Data->NativeQueryReaders.Load(), 1);
-	TestFalse(TEXT("同一真实路径对象不能被并行查询再次Reset/写入"), Data->FindPath(Query.NavAgentProperties, Query).IsSuccessful());
+	TestFalse(TEXT("同一真实路径对象不能被并行查询再次Reset/写入"), Data->ANavigationData::FindPath(Query.NavAgentProperties, Query).IsSuccessful());
 	TestFalse(TEXT("读取中的真实查询阻止世界epoch/输入提前关闭"), Module->StopWorld(true, Error));
 	TestEqual(TEXT("原生查询停止等待不改变世界epoch"), Module->Epoch, uint64(43));
 	const FGuid NativeBeforeDeferredRebuild = Data->EvidenceOwnerId;
 	Data->RebuildAll();
 	TestTrue(TEXT("GT重建冲突保留原生意图并直接yield"), Data->bNativeRebuildPending &&
 		Data->EvidenceOwnerId == NativeBeforeDeferredRebuild);
-	TestFalse(TEXT("待写入期间关闭新查询接纳"), Data->FindPath(Query.NavAgentProperties, Query).IsSuccessful());
+	TestFalse(TEXT("待写入期间关闭新查询接纳"), Data->ANavigationData::FindPath(Query.NavAgentProperties, Query).IsSuccessful());
 	Gate->bResume.Store(true);
 	RunningQuery.Wait();
 	auto QueryResult = RunningQuery.GetResult();
@@ -313,7 +342,7 @@ bool FVoxelNavigationNativeTileTest::RunTest(const FString& InParameters)
 	QueryResult.Path.Reset();
 	RunningQuery = {};
 	FPathFindingQuery ActiveQuery(Module, *Data, FVector(100., 100., 400.), FVector(300., 300., 400.));
-	auto ActiveResult = Data->FindPath(ActiveQuery.NavAgentProperties, ActiveQuery);
+	auto ActiveResult = Data->ANavigationData::FindPath(ActiveQuery.NavAgentProperties, ActiveQuery);
 	if (!TestTrue(TEXT("建立实际活动路径用于寿命验证"), ActiveResult.IsSuccessful() && ActiveResult.Path && ActiveResult.Path->IsValid())) return false;
 	ActiveResult.Path->EnableRecalculationOnInvalidation(false);
 	Module->NavigationPresenter->RetireSection(Lower);
@@ -322,7 +351,7 @@ bool FVoxelNavigationNativeTileTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("路径保留的原输入仍可用于实际行走"), ActiveResult.Path->IsValid());
 	FPathFindingQuery ContinueQuery(ActiveQuery);
 	ContinueQuery.PathInstanceToFill = ActiveResult.Path;
-	auto ContinuedResult = Data->FindPath(ContinueQuery.NavAgentProperties, ContinueQuery);
+	auto ContinuedResult = Data->ANavigationData::FindPath(ContinueQuery.NavAgentProperties, ContinueQuery);
 	TestTrue(TEXT("Source普通接纳已关时，原真实路径可凭旧读取权限在同对象repath"),
 		ContinuedResult.IsSuccessful() && ContinuedResult.Path == ActiveResult.Path);
 	ContinueQuery.PathInstanceToFill.Reset();
@@ -366,7 +395,7 @@ bool FVoxelNavigationNativeTileTest::RunTest(const FString& InParameters)
 	Gate->bResume.Store(false);
 	auto StaleRunningQuery = UE::Tasks::Launch(UE_SOURCE_LOCATION, [Data, Query]()
 	{
-		return Data->FindPath(Query.NavAgentProperties, Query);
+		return Data->ANavigationData::FindPath(Query.NavAgentProperties, Query);
 	});
 	const double StaleEntryDeadline = FPlatformTime::Seconds() + 2.0;
 	while (!Gate->bEntered.Load() && FPlatformTime::Seconds() < StaleEntryDeadline) FPlatformProcess::Sleep(0.001f);
@@ -412,8 +441,8 @@ bool FVoxelNavigationNativeTileTest::RunTest(const FString& InParameters)
 	TestFalse(TEXT("上层净空换代立即使旧tile证明失效"), Data->HasCurrentTileForNode(OldProjection.NodeRef, OriginalVersion));
 	TestFalse(TEXT("旧tile仍能投影时NavReady保持等待"), Module->IsNavigationReady(Lower));
 	FPathFindingQuery StaleQuery(Module, *Data, FVector(100., 100., 400.), FVector(300., 300., 400.));
-	TestFalse(TEXT("实际FindPath不能使用仍能投影的旧输入tile"), Data->FindPath(StaleQuery.NavAgentProperties, StaleQuery).IsSuccessful());
-	TestFalse(TEXT("实际TestPath同样使用完整当前输入约束"), Data->TestPath(StaleQuery.NavAgentProperties, StaleQuery, nullptr));
+	TestFalse(TEXT("实际FindPath不能使用仍能投影的旧输入tile"), Data->ANavigationData::FindPath(StaleQuery.NavAgentProperties, StaleQuery).IsSuccessful());
+	TestFalse(TEXT("实际TestPath同样使用完整当前输入约束"), Data->ANavigationData::TestPath(StaleQuery.NavAgentProperties, StaleQuery, nullptr));
 	Navigation->RemoveNavigationBuildLock(ENavigationBuildLock::Custom);
 	if (!TestTrue(TEXT("局部重建恢复完整当前版本"), Pump([&]() { return Module->IsNavigationReady(Lower); }))) return false;
 	TestFalse(TEXT("新提交不能把旧节点重新标记为当前"), Data->HasCurrentTileForNode(OriginalNode.NodeRef, OriginalVersion));
@@ -486,7 +515,7 @@ bool FVoxelNavigationNativeTileTest::RunTest(const FString& InParameters)
 		auto* PathSource = MakePathActor(FVector(100., 100., 400.));
 		auto* PathGoal = MakePathActor(FVector(300., 300., 400.));
 		FPathFindingQuery RepathQuery(Module, *Data, PathSource->GetActorLocation(), PathGoal->GetActorLocation());
-		auto RepathResult = Data->FindPath(RepathQuery.NavAgentProperties, RepathQuery);
+		auto RepathResult = Data->ANavigationData::FindPath(RepathQuery.NavAgentProperties, RepathQuery);
 		if (!TestTrue(TEXT("自动重规划从真实当前Detour路径开始"), RepathResult.IsSuccessful() &&
 			RepathResult.Path && RepathResult.Path->IsValid())) return false;
 		const auto Path = RepathResult.Path;
@@ -608,7 +637,7 @@ bool FVoxelNavigationNativeTileTest::RunTest(const FString& InParameters)
 		PathGoal->SetActorLocation(FVector(300., 100., 400.));
 		FPathFindingQuery ReplacementQuery(Module, *Data, PathSource->GetActorLocation(), PathGoal->GetActorLocation(), Path->GetFilter());
 		ReplacementQuery.SetPathInstanceToUpdate(Path);
-		auto ReplacementResult = Data->FindPath(ReplacementQuery.NavAgentProperties, ReplacementQuery);
+		auto ReplacementResult = Data->ANavigationData::FindPath(ReplacementQuery.NavAgentProperties, ReplacementQuery);
 		if (!TestTrue(TEXT("独立真实新尝试先在原对象发布当前路径"), ReplacementResult.IsSuccessful() &&
 			ReplacementResult.Path == Path && Path->IsValid())) return false;
 		Path->DoneUpdating(ENavPathUpdateType::Custom);

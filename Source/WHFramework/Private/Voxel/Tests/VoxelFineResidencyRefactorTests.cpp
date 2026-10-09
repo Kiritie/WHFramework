@@ -418,7 +418,8 @@ bool FVoxelFineExactSamplingTest::RunTest(const FString& InParameters)
     Attempt.Input.Shard = {FIntVector(0, 0, 32), 32};
     const auto Resources = MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
     TestTrue(TEXT("采样使用生产容量池"), Resources->Configure({}));
-    const auto Consumer = FVoxelGenerationConsumerKey::Section(1, FGuid::NewGuid(), 1, Attempt.Input.Shard.Min, 1);
+    const FVoxelGenerationConsumerKey Consumer{EVoxelGenerationConsumerKind::FineShard, 1, FGuid::NewGuid(), 1,
+        EVoxelGenerationSpatialKind::Bounds, Attempt.Input.Shard.Min, Attempt.Input.Shard.Bounds().Max, Attempt.Serial};
     FVoxelFineShardSampler Sampler(Generator, Overlay, Resources, Consumer);
     if (!TestTrue(TEXT("独立 Shard 采样初始化"), Sampler.Initialize(Attempt, Config->Recipe->RecipeHash,
         Config->Recipe->Settings.MinZ, Config->Recipe->Settings.MaxZ, Error)))

@@ -95,7 +95,7 @@ public:
 	/**
 	 * 是否在编辑器下
 	 */
-	bool IsInEditor() const { return this == InstanceEditor; }
+	bool IsInEditor() const { return GetWorld() && GetWorld()->IsEditorWorld() && !GetWorld()->IsGameWorld(); }
 	/**
 	 * 获取模块列表
 	 */

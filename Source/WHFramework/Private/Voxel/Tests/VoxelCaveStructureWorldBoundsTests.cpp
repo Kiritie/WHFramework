@@ -227,9 +227,10 @@ bool FVoxelStructureWorldBoundsTest::RunTest(const FString& InParameters)
 	for (const int32 SurfaceZ : {MAX_int32, MIN_int32})
 	{
 		FVoxelGenerationRecipe VerticalRecipe = *VoxelTest::MakeGenerationConfig()->Recipe;
-		VerticalRecipe.Settings.MinZ = MIN_int32;
-		VerticalRecipe.Settings.MaxZ = MAX_int32;
+
 		FVoxelStructureRuntimeDefinition VerticalDefinition = MakeWorldBoundsStructure();
+		VerticalDefinition.Placement.MinZ = MIN_int32;
+		VerticalDefinition.Placement.MaxZ = MAX_int32 - 1;
 		VerticalDefinition.Adaptation = SurfaceZ == MIN_int32 ? EVoxelStructureAdaptation::Bury : EVoxelStructureAdaptation::None;
 		VerticalRecipe.Structures = {VerticalDefinition};
 		VerticalRecipe.Biomes[0].StructureIndices = {0};

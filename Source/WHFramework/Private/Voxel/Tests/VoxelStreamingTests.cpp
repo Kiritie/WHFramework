@@ -1836,6 +1836,7 @@ bool FVoxelMapTileBuildTest::RunTest(const FString& InParameters)
 	// 此用例验收后台栅格和纹理缓存；正式 Profile 的 20 km 地图另作运行验收。
 	MapRecipe.Settings.HydrologyRegionSide = 16;
 	MapRecipe.Settings.HydrologyHaloCells = 4;
+	MapRecipe.Settings.RiverSourceAccumulation = MAX_int32;
 	MapConfig.Recipe = MakeShared<const FVoxelGenerationRecipe, ESPMode::ThreadSafe>(MoveTemp(MapRecipe));
 	const auto Config = MakeShared<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe>(MoveTemp(MapConfig));
 	const auto Generator = MakeShared<const FVoxelGenerationPipeline, ESPMode::ThreadSafe>(

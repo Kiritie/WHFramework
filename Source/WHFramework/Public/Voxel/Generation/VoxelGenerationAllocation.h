@@ -156,7 +156,7 @@ namespace VoxelGenerationAllocation
 			}();
 			const uint64 RawBytes = Allocator.GetAllocatedSize(Capacity, sizeof(ElementType));
 			constexpr uint32 Alignment = TAllocatorTraits<AllocatorType>::SupportsElementAlignment ? alignof(ElementType) : DEFAULT_ALIGNMENT;
-			return RawBytes ? FMemory::QuantizeSize(RawBytes, Alignment) : 0;
+			return RawBytes ? VoxelBoundedAllocation::QuantizeBytes(RawBytes, Alignment) : 0;
 		}
 
 		template<typename ContainerType>
@@ -189,15 +189,15 @@ namespace VoxelGenerationAllocation
 		{
 #if UE_USE_COMPACT_SET_AS_DEFAULT
 			const uint64 RawBytes = InContainer.GetAllocatedSize();
-			return RawBytes ? FMemory::QuantizeSize(RawBytes, FMath::Max<uint32>(alignof(ElementType), sizeof(uint32))) : 0;
+			return RawBytes ? VoxelBoundedAllocation::QuantizeBytes(RawBytes, FMath::Max<uint32>(alignof(ElementType), sizeof(uint32))) : 0;
 #else
 			using FSparseElement = TSparseSetElement<ElementType>;
 			using FStorage = TSparseArrayElementOrFreeListLink<TAlignedBytes<sizeof(FSparseElement), alignof(FSparseElement)>>;
 			FSetCapacityArchive Capacity;
 			ReadSetCapacity(InContainer, Capacity);
-			const uint64 Data = Capacity.MaxBytes[0] ? FMemory::QuantizeSize(Capacity.MaxBytes[0], alignof(FStorage)) : 0;
-			const uint64 Flags = Capacity.MaxBytes[1] > 4 * sizeof(uint32) ? FMemory::QuantizeSize(Capacity.MaxBytes[1], DEFAULT_ALIGNMENT) : 0;
-			const uint64 Hash = Capacity.MaxBytes[2] > sizeof(FSetElementId) ? FMemory::QuantizeSize(Capacity.MaxBytes[2], DEFAULT_ALIGNMENT) : 0;
+			const uint64 Data = Capacity.MaxBytes[0] ? VoxelBoundedAllocation::QuantizeBytes(Capacity.MaxBytes[0], alignof(FStorage)) : 0;
+			const uint64 Flags = Capacity.MaxBytes[1] > 4 * sizeof(uint32) ? VoxelBoundedAllocation::QuantizeBytes(Capacity.MaxBytes[1], DEFAULT_ALIGNMENT) : 0;
+			const uint64 Hash = Capacity.MaxBytes[2] > sizeof(FSetElementId) ? VoxelBoundedAllocation::QuantizeBytes(Capacity.MaxBytes[2], DEFAULT_ALIGNMENT) : 0;
 			return Data + Flags + Hash;
 #endif
 		}
@@ -212,14 +212,14 @@ namespace VoxelGenerationAllocation
 				return MAX_uint64;
 			}
 			return FMath::Max(SetAllocatedBytes<ElementType>(InContainer),
-				uint64(FMemory::QuantizeSize(RawBytes, FMath::Max<uint32>(alignof(ElementType), sizeof(uint32)))));
+				uint64(VoxelBoundedAllocation::QuantizeBytes(RawBytes, FMath::Max<uint32>(alignof(ElementType), sizeof(uint32)))));
 #else
 			using FSparseElement = TSparseSetElement<ElementType>;
 			using FStorage = TSparseArrayElementOrFreeListLink<TAlignedBytes<sizeof(FSparseElement), alignof(FSparseElement)>>;
 			FSetCapacityArchive Capacity;
 			ReadSetCapacity(InContainer, Capacity);
 			const uint64 Data = FMath::Max(
-				Capacity.MaxBytes[0] ? uint64(FMemory::QuantizeSize(Capacity.MaxBytes[0], alignof(FStorage))) : 0,
+				Capacity.MaxBytes[0] ? uint64(VoxelBoundedAllocation::QuantizeBytes(Capacity.MaxBytes[0], alignof(FStorage))) : 0,
 				ArrayReserveBytes<FStorage, FDefaultAllocator>(InCapacity));
 			const int32 Words = int32((uint64(InCapacity) + 31) / 32);
 			const int32 OldWords = int32(Capacity.MaxBytes[1] / sizeof(uint32));
@@ -229,11 +229,29 @@ namespace VoxelGenerationAllocation
 			{
 				return MAX_uint64;
 			}
-			const uint64 Flags = FlagRaw > 4 * sizeof(uint32) ? FMemory::QuantizeSize(FlagRaw, DEFAULT_ALIGNMENT) : 0;
+			const uint64 Flags = FlagRaw > 4 * sizeof(uint32) ? VoxelBoundedAllocation::QuantizeBytes(FlagRaw, DEFAULT_ALIGNMENT) : 0;
 			const uint64 HashRaw = FMath::Max(Capacity.MaxBytes[2], uint64(FDefaultSetAllocator::GetNumberOfHashBuckets(InCapacity)) * sizeof(FSetElementId));
-			const uint64 Hash = HashRaw > sizeof(FSetElementId) ? FMemory::QuantizeSize(HashRaw, DEFAULT_ALIGNMENT) : 0;
+			const uint64 Hash = HashRaw > sizeof(FSetElementId) ? VoxelBoundedAllocation::QuantizeBytes(HashRaw, DEFAULT_ALIGNMENT) : 0;
 			return Data + Flags + Hash;
 #endif
+		}
+
+		template<typename ElementType>
+		uint64 SparseArrayReserveBytes(const TSparseArray<ElementType>& InArray, const int32 InCapacity)
+		{
+			using FStorage = TSparseArrayElementOrFreeListLink<TAlignedBytes<sizeof(ElementType), alignof(ElementType)>>;
+			FSetCapacityArchive Capacity;
+			InArray.CountBytes(Capacity);
+			check(Capacity.Count == 2);
+			const uint64 Data = FMath::Max(
+				Capacity.MaxBytes[0] ? uint64(VoxelBoundedAllocation::QuantizeBytes(Capacity.MaxBytes[0], alignof(FStorage))) : 0,
+				ArrayReserveBytes<FStorage, FDefaultAllocator>(InCapacity));
+			const int32 Words = int32((uint64(InCapacity) + 31) / 32);
+			const int32 OldWords = int32(Capacity.MaxBytes[1] / sizeof(uint32));
+			FDefaultBitArrayAllocator::ForElementType<uint32> Allocator;
+			const uint64 FlagRaw = Words > OldWords ?
+				uint64(Allocator.CalculateSlackGrow(Words, OldWords, sizeof(uint32))) * sizeof(uint32) : Capacity.MaxBytes[1];
+			return Data + (FlagRaw > 4 * sizeof(uint32) ? VoxelBoundedAllocation::QuantizeBytes(FlagRaw, DEFAULT_ALIGNMENT) : 0);
 		}
 	}
 
@@ -243,7 +261,19 @@ namespace VoxelGenerationAllocation
 		static_assert(Private::TSupportedArrayAllocator<AllocatorType>::value);
 		constexpr uint32 Alignment = TAllocatorTraits<AllocatorType>::SupportsElementAlignment ? alignof(ElementType) : DEFAULT_ALIGNMENT;
 		const uint64 RawBytes = InArray.GetAllocatedSize();
-		return RawBytes ? FMemory::QuantizeSize(RawBytes, Alignment) : 0;
+		return RawBytes ? VoxelBoundedAllocation::QuantizeBytes(RawBytes, Alignment) : 0;
+	}
+
+	template<typename ElementType>
+	uint64 AllocatedBytes(const TSparseArray<ElementType>& InArray)
+	{
+		using FStorage = TSparseArrayElementOrFreeListLink<TAlignedBytes<sizeof(ElementType), alignof(ElementType)>>;
+		Private::FSetCapacityArchive Capacity;
+		InArray.CountBytes(Capacity);
+		check(Capacity.Count == 2);
+		const uint64 Data = Capacity.MaxBytes[0] ? VoxelBoundedAllocation::QuantizeBytes(Capacity.MaxBytes[0], alignof(FStorage)) : 0;
+		const uint64 Flags = Capacity.MaxBytes[1] > 4 * sizeof(uint32) ? VoxelBoundedAllocation::QuantizeBytes(Capacity.MaxBytes[1], DEFAULT_ALIGNMENT) : 0;
+		return Data + Flags;
 	}
 
 	// Map/Set 仅支持原 default allocator；自定义 KeyFuncs 不改变 allocation 口径。

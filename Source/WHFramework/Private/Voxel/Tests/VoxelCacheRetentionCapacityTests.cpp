@@ -98,7 +98,7 @@ bool FVoxelCacheRetentionCapacityAdmissionTest::RunTest(const FString& InParamet
 	FString Error;
 	const auto Before = Resources->Snapshot();
 	TestFalse(TEXT("无Input授予不能创建保留节点"), Cache->RetainForTask(Point, Resources, Consumer, Lease, Error));
-	TestTrue(TEXT("容量拒收返回可恢复原因"), Error.StartsWith(TEXT("CapacityBlocked:")));
+	TestTrue(TEXT("固定Input上限小于必需对象和句柄时返回永久不可达原因"), Error.StartsWith(TEXT("CapacityUnachievable:")));
 	TestFalse(TEXT("拒收不产生租约"), Lease.IsValid());
 	const auto Rejected = Resources->Snapshot();
 	TestEqual(TEXT("拒收没有先分配账本"), Rejected.LedgerMetadataBytes, uint64(0));
@@ -128,6 +128,7 @@ bool FVoxelCacheRetentionCapacityAdmissionTest::RunTest(const FString& InParamet
 	const auto Full = Resources->Snapshot();
 	Point.Center = FIntPoint(1028, 1028);
 	TestFalse(TEXT("容量不足时拒绝替换节点"), Cache->RetainForTask(Point, Resources, Consumer, Lease, Error));
+	TestTrue(TEXT("固定上限可达但暂时占满时返回可恢复原因"), Error.StartsWith(TEXT("CapacityBlocked:")));
 	TestTrue(TEXT("拒收保留原OutLease"), Lease == OriginalLease);
 	TestEqual(TEXT("拒收没有分配另一资源句柄"), Resources->Snapshot().LeaseCount, Full.LeaseCount);
 	TestEqual(TEXT("拒收不改变原池容量"),

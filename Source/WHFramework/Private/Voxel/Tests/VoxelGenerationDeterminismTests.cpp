@@ -286,6 +286,7 @@ bool FVoxelGenerationPlanPreflightTest::RunTest(const FString& InParameters)
 		VoxelTest::HashBlocks(PreflightBlocks), VoxelTest::HashBlocks(ReferenceBlocks));
 	TestEqual(TEXT("Preflight avoids cache gate waits"), Cache->GetStats().GateWaitCount, 0ull);
 	TestTrue(TEXT("A narrow streaming source keeps the consumer's completed hydrology available"), Cache->GetStats().Hydrology > 0);
+	Coordinator.ReleaseConsumer(Consumer);
 	ConsumerRetention.Reset();
 	for (int32 Index = 0; Index < FVoxelGenerationPlanCache::ShardCount * 4; ++Index) Cache->TickMaintenance(256);
 	TestEqual(TEXT("Consumer completion releases plans outside the narrow streaming retention"), Cache->GetStats().Hydrology, 0);

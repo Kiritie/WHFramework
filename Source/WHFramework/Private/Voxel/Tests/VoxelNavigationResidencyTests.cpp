@@ -8,6 +8,7 @@
 #include "AI/Navigation/NavigationRelevantData.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Physics/Experimental/PhysScene_Chaos.h"
 #include "EngineUtils.h"
 #include "EngineGlobals.h"
 #include "HAL/PlatformProcess.h"
@@ -99,18 +100,29 @@ bool FVoxelNavigationResidencyTest::RunTest(const FString& InParameters)
 	Module->Shapes = Shapes;
 	Module->Generator = VoxelTest::MakeGenerator();
 	Module->Runtime = MakeUnique<FVoxelWorldRuntime>(Module->Epoch, true, Module->Registry.GetSnapshot().ToSharedRef(), Module->Generator.ToSharedRef());
-	Module->Scheduler = MakeUnique<FVoxelTaskScheduler>(true);
+	const auto Control = FVoxelGenerationConsumerKey::Section(Module->Epoch, FGuid::NewGuid(), 1, {}, 1);
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> TerrainResources, RuntimeResources;
+	if (!TestTrue(TEXT("导航夹具建立生产原控制账本"),
+		FVoxelTerrainResources::Create({}, Control, TerrainResources, Error) &&
+		FVoxelTerrainResources::Create({}, Control, RuntimeResources, Error) &&
+		FVoxelTaskScheduler::Create(TerrainResources.ToSharedRef(), RuntimeResources.ToSharedRef(), Control, Module->Scheduler, Error)))
+	{
+		AddError(Error);
+		return false;
+	}
+	if (!TestTrue(TEXT("真实Scheduler初始化原控制身份和统计"), Module->Scheduler->InitializeStatistics(Module->Epoch))) return false;
 	Module->Runtime->BindTerrainResources(Module->Scheduler->GetRuntimeResources());
 	if (!Module->TerrainFrameContext.Configure({}, Error)) return false;
 	Module->Scheduler->BindFrameContext(Module->TerrainFrameContext);
 	Module->CollisionPresenter = MakeUnique<FVoxelCollisionPresenter>(*Module, *Module->Scheduler, Module->Epoch);
 	Module->NavigationPresenter = MakeUnique<FVoxelNavigationPresenter>(*Module, *Module->Scheduler);
-	Module->ResidencyManager = MakeUnique<FVoxelResidencyManager>(*Module->Runtime, *Module->Scheduler,
-		[Module](const FIntVector& Section) { Module->OnSectionEvicting(Section); }, TFunction<bool(const FIntVector&)>(),
+	Module->ResidencyManager = MakeUnique<FVoxelResidencyManager>(*Module->Runtime, *Module->Scheduler);
+	if (!TestTrue(TEXT("真实ResidencyManager按原控制身份初始化有界回调"), Module->ResidencyManager->Initialize(
+		[Module](const FIntVector& Section) { Module->OnSectionEvicting(Section); }, [](const FIntVector&) { return false; },
 		[Module](const FIntVector& Section, const FVoxelSectionStamp& Stamp, const EVoxelRuntimeSectionEvent Event)
 		{
 			Module->OnSimulationSectionEvent(Section, Stamp, Event);
-		});
+		}, Error))) return false;
 	Module->ResidencyManager->SetEvictGraceFrames(0);
 	const FIntVector Lower(0, 0, 0);
 	const FIntVector Above(0, 0, 1);
@@ -152,6 +164,7 @@ bool FVoxelNavigationResidencyTest::RunTest(const FString& InParameters)
 		TestFalse(TEXT("Simulation cannot activate before actual collision publication"), Module->ActivateSimulationSection(Key));
 		Demand.bSimulation = false;
 		Demand.bCollision = true;
+		Demand.ServicePriority = {EVoxelTerrainServiceBand::P0, 0.0, 0.0, 0, FGuid::NewGuid()};
 	}
 	auto FindSurface = [&](const FIntVector& Key) -> UVoxelNavigationSurfaceComponent*
 	{
@@ -183,6 +196,8 @@ bool FVoxelNavigationResidencyTest::RunTest(const FString& InParameters)
 			Module->TerrainFrameContext.End(FPlatformTime::Seconds());
 			// 该夹具必须推进真实 Scene/PT 输入；仅等待 Worker 或轮询不会形成物理提交回执。
 			World->Tick(LEVELTICK_All, 1.0f / 60.0f);
+			// 同步 Automation 阻塞引擎主循环；显式排空真实 Solver 的命令和粒子输入。
+			World->GetPhysicsScene()->Flush();
 			FPlatformProcess::Sleep(0.001f);
 			if (!bPollInFrame) bFinished = Finished();
 		}
@@ -192,7 +207,18 @@ bool FVoxelNavigationResidencyTest::RunTest(const FString& InParameters)
 	if (!TestTrue(TEXT("Real collision jobs publish their physics components"), Pump([&]()
 	{
 		return Module->IsCollisionReady(Lower) && Module->IsCollisionReady(Distant);
-	}))) return false;
+	})))
+	{
+		const auto* Body = Module->CollisionPresenter->FindBody(Lower);
+		FVoxelSectionSnapshot DiagnosticSnapshot;
+		AddInfo(FString::Printf(TEXT("Collision pipeline: body=%d prepared=%d preparing=%d sync=%d failed=%d capacityBlocked=%d requestBlocked=%d selectionAdmission=%d schedulerAdmission=%d snapshot=%d retirement=%d"),
+			Body != nullptr, Body && Body->Prepared.IsValid(), Body && Body->PreparingComponent.IsValid(), Body && Body->Sync.IsValid(),
+			Body && Body->bHasFailure, Body && Body->bCapacityBlocked,
+			Body && Body->AdmissionRequest.IsSet() ? int32(Body->AdmissionRequest->Blocked) : 0,
+			int32(Module->CollisionPresenter->Selection.GetLastResourceAdmission()), int32(Module->Scheduler->GetLastResourceAdmission()),
+			Module->Runtime->CaptureSnapshot(Lower, DiagnosticSnapshot), Module->GetPhysicsRetirement().IsValid()));
+		return false;
+	}
 	TestNull(TEXT("Collision/data residency alone creates no navigation surface"), FindSurface(Lower));
 	TestFalse(TEXT("Collision readiness without Simulation cannot activate a scene region"), Module->ActivateSimulationSection(Lower));
 	for (const FIntVector& Key : {Lower, Distant})
@@ -215,7 +241,7 @@ bool FVoxelNavigationResidencyTest::RunTest(const FString& InParameters)
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResidentBlocker;
 	const auto BlockerConsumer = FVoxelGenerationConsumerKey::Section(Module->Epoch, FGuid::NewGuid(), 1, Lower, 1);
 	if (!TestTrue(TEXT("模拟控制表容量阻塞来自实际资源池"), FactResources->Acquire(BlockerConsumer,
-		EVoxelTerrainResourcePool::Resident, FactState.Limits.ResidentBytes -
+		EVoxelTerrainResourcePool::Resident, FactState.Limits.ResidentBytes - FactState.Limits.OverlapBytes -
 			FactState.Used[int32(EVoxelTerrainResourcePool::Resident)], ResidentBlocker))) return false;
 	if (!TestTrue(TEXT("容量不足保留事件续行，不提前取得Simulation pin"), Pump([&]()
 	{
@@ -260,7 +286,11 @@ bool FVoxelNavigationResidencyTest::RunTest(const FString& InParameters)
 	const FIntVector SharedRegionSection(1, 0, 0);
 	TestTrue(TEXT("同Region第二个模拟Section及净空输入发布"), PublishSection(SharedRegionSection, 0) &&
 		PublishSection(SharedRegionSection + FIntVector(0, 0, 1), -1));
-	Interest->Exact.Add(SharedRegionSection).bSimulation = true;
+	auto& SharedDemand = Interest->Exact.Add(SharedRegionSection);
+	SharedDemand.bSimulation = true;
+	SharedDemand.bCollision = true;
+	SharedDemand.ServicePriority = {EVoxelTerrainServiceBand::P0, 0.0, 0.0, 0, FGuid::NewGuid()};
+	Inputs->RuntimeSections.Add(SharedRegionSection);
 	Module->WakeSimulationSection(SharedRegionSection);
 	if (!TestTrue(TEXT("同Region第二个Section实际取得模拟驻留"), Pump([&]()
 	{
@@ -416,7 +446,11 @@ bool FVoxelNavigationResidencyTest::RunTest(const FString& InParameters)
 	Module->Manifest.RegistryHash = Module->Registry.GetSnapshot()->Hash;
 	Module->Manifest.RecipeHash = VoxelTest::MakeGenerationConfig()->Recipe->RecipeHash;
 	Module->SetPersistenceEnabled(true);
-	Interest->Exact.Add(Distant).bSimulation = true;
+	auto& RestoredDemand = Interest->Exact.Add(Distant);
+	RestoredDemand.bSimulation = true;
+	RestoredDemand.bCollision = true;
+	RestoredDemand.ServicePriority = {EVoxelTerrainServiceBand::P0, 0.0, 0.0, 0, FGuid::NewGuid()};
+	Inputs->RuntimeSections.Add(Distant);
 	Module->WakeSimulationSection(Distant);
 	if (!TestTrue(TEXT("持久世界经原激活链重新取得Simulation"), Pump([&]()
 	{
@@ -439,6 +473,9 @@ bool FVoxelNavigationResidencyTest::RunTest(const FString& InParameters)
 	{
 		auto* Producer = NewObject<UVoxelNavigationTestSceneRegion>(Module);
 		Producer->Initialize(Module, FIntVector(90, 90, 0));
+		TArray<uint8> EmptySceneBytes;
+		if (!TestTrue(TEXT("独立 Scene producer 通过真实空存档恢复后接纳保存"),
+			FVoxelSceneColumnCodec::Encode({}, FParameter(), EmptySceneBytes, Error) && Producer->RestoreActors(EmptySceneBytes, Error))) return false;
 		FVoxelModuleSaveData ActorData;
 		ActorData.Seed = 91;
 		for (int32 Index = 0; Index < 130; ++Index) Producer->AddPendingCaptureActor(FGuid::NewGuid(), FParameter(ActorData));

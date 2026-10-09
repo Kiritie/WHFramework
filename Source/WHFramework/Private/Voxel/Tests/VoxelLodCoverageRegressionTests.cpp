@@ -280,6 +280,8 @@ bool FVoxelEmptyTransitionConvergenceTest::RunTest(const FString& InParameters)
 	UVoxelModule* Module = NewObject<UVoxelModule>();
 	FVoxelTaskScheduler Scheduler(true);
 	Scheduler.SetObservedTerrainStage(3);
+	Module->Runtime = MakeUnique<FVoxelWorldRuntime>(7, true, VoxelTest::MakeRegistry(),
+		VoxelTest::MakeGenerator(), Scheduler.GetTerrainResources());
 	FVoxelViewManager Manager(*Module, Scheduler, 7);
 	const FVoxelViewKey Node{FIntVector::ZeroValue, 1};
 	const FVoxelPublishGroupKey Owner{1, FIntPoint::ZeroValue, 1};
@@ -289,13 +291,13 @@ bool FVoxelEmptyTransitionConvergenceTest::RunTest(const FString& InParameters)
 	Interest.TerrainPlan.Required = {Node};
 	Manager.GetInputRoot().ProxyWanted.Add(Node);
 	Manager.VoxelProxyReady.Add(Node);
-	Manager.CommitTerrainOwnership(Owner, MakeArrayView(&Node, 1));
 	auto Data = MakeShared<FVoxelVoxelProxyData, ESPMode::ThreadSafe>();
 	Data->Key = Node;
 	Data->Geometry = {{EVoxelTerrainRepresentation::VoxelProxy, Node.Coordinate, Node.Level}, 2, -128, 256, 17, 23};
 	Interest.Geometry.Add(Data->Geometry.Key, Data->Geometry);
 	Data->Revision = 1;
 	Manager.VoxelProxyData.Add(Node, Data);
+	Manager.CommitTerrainOwnership(Owner, MakeArrayView(&Node, 1));
 	Manager.RebuildVolumeTransitions({Node});
 	const double Deadline = FPlatformTime::Seconds() + 5.0;
 	while (Scheduler.ActiveCount() > 0 && FPlatformTime::Seconds() < Deadline)
@@ -332,6 +334,8 @@ bool FVoxelFineProxyDependenciesTest::RunTest(const FString& InParameters)
 	UVoxelModule* Module = NewObject<UVoxelModule>();
 	FVoxelTaskScheduler Scheduler(true);
 	Scheduler.SetObservedTerrainStage(0);
+	Module->Runtime = MakeUnique<FVoxelWorldRuntime>(11, true, VoxelTest::MakeRegistry(),
+		VoxelTest::MakeGenerator(), Scheduler.GetTerrainResources());
 	FVoxelViewManager Manager(*Module, Scheduler, 11);
 	const FVoxelViewKey Dependency{FIntVector::ZeroValue, 1};
 	const FVoxelViewKey Distant{FIntVector(10, 0, 0), 1};

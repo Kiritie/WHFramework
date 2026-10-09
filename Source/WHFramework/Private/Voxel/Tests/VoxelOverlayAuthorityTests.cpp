@@ -81,7 +81,13 @@ bool FVoxelOverlayPinnedCaptureTest::RunTest(const FString& InParameters)
 	Result.Snapshot->ApplyAt(Consumer.Min * 16, Cell);
 	TestTrue(TEXT("借用正文保留显式 Air"), Cell.IsAir());
 	TestEqual(TEXT("借用不会再次收费驻留正文"), Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Resident)], ResidentBefore);
+	const TWeakPtr<const FVoxelOverlaySnapshot, ESPMode::ThreadSafe> WeakOverlay = Result.Snapshot->PinnedSections.FindChecked(Consumer.Min);
 	Result = {};
+	if (const auto Retained = WeakOverlay.Pin())
+	{
+		AddInfo(FString::Printf(TEXT("Overlay retirement diagnostic: references=%d capturePins=%d captureLease=%d readerBytes=%llu"),
+			Retained.GetSharedReferenceCount() - 1, Capture.Resident.PinnedSections.Num(), Capture.ReadLeaseSet.IsValid(), Reader.AllocatedBytes()));
+	}
 	TestEqual(TEXT("最后读取者退出释放提交正文"), Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Resident)], uint64(0));
 	return true;
 }

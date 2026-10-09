@@ -1,6 +1,7 @@
 ﻿#include "Voxel/Runtime/VoxelWorldRuntime.h"
 
 #include "Voxel/Task/VoxelBoundedAllocation.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Rendering/VoxelTerrainFrameContext.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "VoxelRuntimeStorage.h"
@@ -56,8 +57,8 @@ bool FVoxelWorldRuntime::ReserveRuntimeStorage(const int32 InSectionCount)
 	PendingResidentPromotion.Reserve(Capacity);
 	RetirementTimers.Reserve(Capacity);
 	const uint64 Actual = VoxelBoundedAllocation::WorkerSharedBytes<VoxelRuntimeStorage::FRetiredStorage>() +
-		Sections.GetAllocatedSize() + ResidencyOrder.GetAllocatedSize() + PendingResidentPromotion.GetAllocatedSize() +
-		RetirementTimers.GetAllocatedSize();
+		VoxelGenerationAllocation::AllocatedBytes(Sections) + VoxelGenerationAllocation::AllocatedBytes(ResidencyOrder) +
+		VoxelGenerationAllocation::AllocatedBytes(PendingResidentPromotion) + VoxelGenerationAllocation::AllocatedBytes(RetirementTimers);
 	check(Actual <= Bytes);
 	verify(NewLease->Resize(Actual));
 	StorageLease = MoveTemp(NewLease);
@@ -83,8 +84,9 @@ void FVoxelWorldRuntime::FinishRuntimeData(FVoxelSection& InSection, const FIntV
 	check(InLease);
 	InSection.DataLease = MoveTemp(InLease);
 	uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<VoxelRuntimeStorage::FRetiredData>() +
-		InSection.Blocks.GetAllocatedSize() + InSection.Overlay.GetAllocatedSize() + InSection.Entities.GetAllocatedSize();
-	for (const auto& Pair : InSection.Entities) Bytes += Pair.Value.Payload.GetAllocatedSize();
+		VoxelGenerationAllocation::AllocatedBytes(InSection.Blocks) + VoxelGenerationAllocation::AllocatedBytes(InSection.Overlay) +
+		VoxelGenerationAllocation::AllocatedBytes(InSection.Entities);
+	for (const auto& Pair : InSection.Entities) Bytes += VoxelGenerationAllocation::AllocatedBytes(Pair.Value.Payload);
 	check(Bytes <= InSection.DataLease->Bytes());
 	verify(InSection.DataLease->Resize(Bytes));
 	if (InSection.DataLease->Transfer(EVoxelTerrainResourcePool::Resident)) PendingResidentPromotion.Remove(InKey);
@@ -191,8 +193,9 @@ bool FVoxelWorldRuntime::ReserveOverlaySequenceKeys(const TConstArrayView<FIntVe
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> NewLease;
 		if (!AcquireRuntimeData({}, Bytes, OverlaySequenceLease.IsValid(), NewLease)) return false;
 		OverlayRegionSequences.Reserve(Capacity);
-		check(HeadBytes + OverlayRegionSequences.GetAllocatedSize() <= Bytes);
-		verify(NewLease->Resize(HeadBytes + OverlayRegionSequences.GetAllocatedSize()));
+		const uint64 Actual = HeadBytes + VoxelGenerationAllocation::AllocatedBytes(OverlayRegionSequences);
+		check(Actual <= Bytes);
+		verify(NewLease->Resize(Actual));
 		OverlaySequenceLease = MoveTemp(NewLease);
 		OverlaySequenceLease->Transfer(EVoxelTerrainResourcePool::Resident);
 		OverlaySequenceCapacity = Capacity;

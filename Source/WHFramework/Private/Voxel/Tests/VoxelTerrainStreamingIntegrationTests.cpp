@@ -25,6 +25,16 @@ bool FVoxelKnownInitialInterestIntegrationTest::RunTest(const FString& InParamet
 	Manifest.Settings.MinZ = -256;
 	Manifest.Settings.MaxZ = 256;
 	FVoxelViewSettings Settings;
+	Settings.Fine.InteractiveRadiusCells = 1;
+	Settings.Fine.InteractiveVerticalHalfExtentCells = 1;
+	Settings.Fine.CollisionGuardRadiusCells = 2;
+	Settings.Fine.ResidencyHorizontalHalfExtentCells = 64;
+	Settings.Fine.ResidencyVerticalHalfExtentCells = 64;
+	Settings.Fine.HorizontalShiftStepCells = 32;
+	Settings.Fine.VerticalShiftStepCells = 32;
+	Settings.Fine.GuardMarginCells = 0;
+	Settings.Fine.MaximumPageLevel = 1;
+	Settings.Fine.FirstMergeDistanceCells = 32;
 	FVoxelStreamingSource Source;
 	Source.Id = FGuid::NewGuid();
 	Source.Center = FIntVector(8);
@@ -40,26 +50,36 @@ bool FVoxelKnownInitialInterestIntegrationTest::RunTest(const FString& InParamet
 		Source.View.InitialChunkSideCells = Initial;
 		const FVoxelInterestSet Interest = FVoxelInterestManager().Compute(MakeArrayView(&Source, 1), Manifest, Settings);
 		TestTrue(TEXT("Real interest planner succeeds"), Interest.PlanningError.IsEmpty());
+		if (!Interest.PlanningError.IsEmpty()) AddError(Interest.PlanningError);
 		if (!Interest.FinePagePlan)
 		{
 			AddError(TEXT("Real interest is missing the shared Fine page plan"));
 			return false;
 		}
-		TestEqual(TEXT("Data halo never expands the visible initial family"), Interest.FinePagePlan->Pages.Num(), 1);
-		TestEqual(TEXT("Real initial family contains all its Sections"), Interest.FinePagePlan->SectionOwners.Num(), Initial == 32 ? 8 : 1);
+		TestTrue(TEXT("实际Fine驻留窗口包含Core之外的Shard"), Interest.FinePagePlan->Pages.Num() > 1);
+		const auto* Accepted = Interest.Sources.Find(Source.Id);
+		if (!TestNotNull(TEXT("实际Source保留F0需求"), Accepted)) return false;
+		TestEqual(TEXT("F0包含交互核心的物理Halo"), Accepted->F0CoreSections.Num(), 27);
 		for (const auto& Pair : Interest.FinePagePlan->SectionOwners)
 		{
-			const FVoxelExactDemand& Demand = Interest.Exact.FindChecked(Pair.Key);
-			TestTrue(TEXT("Each merged Section retains real Fine data and render work"), Demand.bData && Demand.bFineData && Demand.bFineRender);
-			TestFalse(TEXT("Page closure does not expand collision or simulation"), Demand.bCollision || Demand.bSimulation);
+			const auto* Demand = Interest.Exact.Find(Pair.Key);
+			if (Accepted->F0CoreSections.Contains(Pair.Key))
+			{
+				TestTrue(TEXT("F0保留真实Fine数据和渲染需求"), Demand && Demand->bData && Demand->bFineData && Demand->bFineRender);
+			}
+			else
+			{
+				TestTrue(TEXT("F1Page不能扩大Runtime渲染闭包"), !Demand || !Demand->bFineRender);
+			}
+			TestTrue(TEXT("FinePage不会隐式扩张碰撞或模拟"), !Demand || (!Demand->bCollision && !Demand->bSimulation));
 		}
 	}
 	FVoxelStreamingSource Previous = Source;
 	Previous.View.InitialChunkSideCells = 16;
 	TestTrue(TEXT("Size changes invalidate the effective source"), FVoxelInterestRuntime::NeedsUpdate(Previous, Source, Settings));
-	Source.View.InitialChunkSideCells = 24;
+	Settings.Fine.ShardSideCells = 24;
 	const FVoxelInterestSet Invalid = FVoxelInterestManager().Compute(MakeArrayView(&Source, 1), Manifest, Settings);
-	TestFalse(TEXT("Real planner rejects invalid initial sizing"), Invalid.PlanningError.IsEmpty());
+	TestFalse(TEXT("实际规划器拒绝非法FineShard尺寸"), Invalid.PlanningError.IsEmpty());
 	return true;
 }
 
@@ -119,7 +139,11 @@ bool FVoxelKnownSchedulerProgressIntegrationTest::RunTest(const FString& InParam
 {
 	for (const int32 WorkerCount : {1, 4})
 	{
+		FVoxelTerrainFrameContext Frame;
+		FString FrameError;
+		if (!TestTrue(TEXT("实际帧预算初始化"), Frame.Configure({}, FrameError))) return false;
 		FVoxelTaskScheduler Scheduler(true);
+		Scheduler.BindFrameContext(Frame);
 		FVoxelTaskBudget Budget;
 		Budget.MaxConcurrentTasks = WorkerCount;
 		Budget.MaxConcurrentCoarseTerrainTasks = WorkerCount;
@@ -157,8 +181,10 @@ bool FVoxelKnownSchedulerProgressIntegrationTest::RunTest(const FString& InParam
 		TestFalse(TEXT("Duplicate acceptance cannot leak producer reservations"), Enqueue(Kinds[1], 2));
 		Release.Store(true);
 		const double Deadline = FPlatformTime::Seconds() + 5.0;
+		uint64 FrameSerial = 0;
 		while (FPlatformTime::Seconds() < Deadline)
 		{
+			if (!Frame.Begin(1, ++FrameSerial, FPlatformTime::Seconds(), {})) return false;
 			Enqueue(EVoxelTaskKind::BuildViewCoverage, ++NextCoverage);
 			Scheduler.Tick([&](FVoxelTaskResult&& Result)
 			{
@@ -167,12 +193,16 @@ bool FVoxelKnownSchedulerProgressIntegrationTest::RunTest(const FString& InParam
 					++Completed[Result.Stamp.Token - 1];
 				}
 			}, 8.0);
+			Frame.End(FPlatformTime::Seconds());
 			bool bFinished = true;
 			for (const int32 Count : Completed) bFinished &= Count == 1;
 			if (bFinished) break;
 			FPlatformProcess::Sleep(0.001f);
 		}
-		for (const int32 Count : Completed) TestEqual(TEXT("Each real lane progresses under continuous Coverage"), Count, 1);
+		for (int32 Index = 0; Index < UE_ARRAY_COUNT(Kinds); ++Index)
+		{
+			TestEqual(*FString::Printf(TEXT("连续Coverage下实际lane完成: workers=%d kind=%d"), WorkerCount, int32(Kinds[Index])), Completed[Index], 1);
+		}
 		Scheduler.SetObservedTerrainStage(0);
 		Scheduler.StopAndJoin();
 	}

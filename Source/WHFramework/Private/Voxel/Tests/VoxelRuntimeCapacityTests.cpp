@@ -7,6 +7,7 @@
 #include "Voxel/Save/VoxelRegionStore.h"
 #include "Voxel/Streaming/VoxelEmergeManager.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Tests/VoxelTestUtilities.h"
 
 namespace
@@ -53,6 +54,33 @@ namespace
 		FAutomationTestBase& Test;
 		double Deadline;
 	};
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelRuntimeContainerBackingTest,
+	"WHFramework.Voxel.Runtime.ContainerBackingAccounting",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelRuntimeContainerBackingTest::RunTest(const FString&)
+{
+	TSparseArray<FIntVector> Slots;
+	TestEqual(TEXT("空稀疏容器不把内嵌位图算成堆"), VoxelGenerationAllocation::AllocatedBytes(Slots), uint64(0));
+	Slots.Reserve(32);
+	using FSlotStorage = TSparseArrayElementOrFreeListLink<TAlignedBytes<sizeof(FIntVector), alignof(FIntVector)>>;
+	TestEqual(TEXT("小稀疏容器只按Data堆容量上界收费"), VoxelGenerationAllocation::AllocatedBytes(Slots),
+		VoxelBoundedAllocation::QuantizeBytes(uint64(Slots.GetAllocatedSize()) - 4 * sizeof(uint32), alignof(FSlotStorage)));
+	Slots.Reserve(257);
+	TestTrue(TEXT("超过内嵌位图后Data和位图堆块均收费"),
+		VoxelGenerationAllocation::AllocatedBytes(Slots) >= uint64(Slots.GetAllocatedSize()));
+	const auto Resources = MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
+	FVoxelWorldRuntime Runtime(1, true, VoxelTest::MakeRegistry(), VoxelTest::MakeGenerator());
+	Runtime.BindTerrainResources(Resources);
+	for (int32 Index = 0; Index < 257; ++Index)
+	{
+		if (!TestNotNull(TEXT("实际Runtime可跨过表扩容和位图堆增长边界"), Runtime.FindOrAllocate(FIntVector(Index, 0, 0), 1))) return false;
+	}
+	TestEqual(TEXT("目录保留所有已接纳Section"), Runtime.NumSections(), 257);
+	TestEqual(TEXT("真实Residency扫描槽与目录一致"), Runtime.GetResidencyOrder().Num(), 257);
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelRuntimeAllocationAdmissionTest,

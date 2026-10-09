@@ -5,6 +5,7 @@
 #include "Misc/AutomationTest.h"
 #include "Misc/Crc.h"
 #include "Misc/ScopeExit.h"
+#include "Misc/SecureHash.h"
 #include "HAL/PlatformProcess.h"
 #include "EngineGlobals.h"
 #include "Voxel/Network/VoxelNetworkEnvelope.h"
@@ -28,6 +29,27 @@ namespace VoxelNetworkEnvelopeTest
 		if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input, VoxelGenerationAllocation::AllocatedBytes(Wire), Input)) return nullptr;
 		return FVoxelNetworkEnvelopeDecode::Create(Resources, Consumer, MoveTemp(Wire), MoveTemp(Input), Crc, false, Error);
 	}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelOverlayHashKnownVectorsTest, "WHFramework.Voxel.FineRefactor.Network.SHA256KnownVectors",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelOverlayHashKnownVectorsTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelOverlayHash Hash;
+	if (!TestTrue(TEXT("SHA256 accepts empty input"), FVoxelOverlayHash::Compute({}, Hash))) return false;
+	TestEqual(TEXT("Empty SHA256 standard digest"), BytesToHex(Hash.Bytes, 32).ToLower(),
+		FString(TEXT("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")));
+	const uint8 Abc[] = {'a', 'b', 'c'};
+	if (!TestTrue(TEXT("SHA256 accepts bytes"), FVoxelOverlayHash::Compute(MakeArrayView(Abc), Hash))) return false;
+	TestEqual(TEXT("ABC SHA256 standard digest"), BytesToHex(Hash.Bytes, 32).ToLower(),
+		FString(TEXT("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")));
+	const uint8 MultiBlock[] = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+	if (!TestTrue(TEXT("SHA256 accepts multiple blocks"), FVoxelOverlayHash::Compute(MakeArrayView(MultiBlock, UE_ARRAY_COUNT(MultiBlock) - 1), Hash))) return false;
+	TestEqual(TEXT("Multiple block SHA256 standard digest"), BytesToHex(Hash.Bytes, 32).ToLower(),
+		FString(TEXT("248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1")));
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelNetworkEnvelopeBoundedCrcTest, "WHFramework.Voxel.FineRefactor.Network.EnvelopeBoundedCrc",
@@ -144,7 +166,7 @@ bool FVoxelPreparedEnvelopeTransferTest::RunTest(const FString& InParameters)
 	if (!FVoxelNetworkCodec::Encode(EVoxelMessage::Reply, FGuid::NewGuid(), Payload, Wire)) return false;
 	const uint32 WrongWorkerCrc = FCrc::MemCrc32(Wire.GetData(), Wire.Num()) ^ 1;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-	if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Staged, Wire.GetAllocatedSize(), Lease)) return false;
+	if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Staged, VoxelGenerationAllocation::AllocatedBytes(Wire), Lease)) return false;
 	TestTrue(TEXT("GT 接管 Worker 正文及租约"), Sender.EnqueuePrepared(EVoxelTransferPriority::Normal, MoveTemp(Wire), WrongWorkerCrc, Lease));
 	bool bRejected = false;
 	TArray<uint8> Completed;

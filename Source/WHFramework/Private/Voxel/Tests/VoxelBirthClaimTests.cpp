@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Components/SceneComponent.h"
 #include "Voxel/VoxelWorldReadinessRuntime.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelBirthClaimIdentityTest,
@@ -11,7 +12,7 @@ bool FVoxelBirthClaimIdentityTest::RunTest(const FString& Parameters)
 {
 	FVoxelWorldReadinessRuntime Runtime;
 	FVoxelPlayerClaimState State;
-	UObject* Pawn = NewObject<UObject>();
+	UObject* Pawn = NewObject<USceneComponent>();
 	FVoxelPlayerClaimToken Identity;
 	Identity.WorldEpoch = 7;
 	Identity.SourceId = FGuid::NewGuid();
@@ -48,7 +49,7 @@ bool FVoxelBirthClaimIdentityTest::RunTest(const FString& Parameters)
 	Stale.PawnIncarnation = FGuid::NewGuid();
 	RejectChangedIdentity(TEXT("同坐标的新角色不能使用旧角色令牌"), Stale);
 	TestFalse(TEXT("另一角色不能抢占活跃准备租约"),
-		Runtime.PreparePlayerClaim(State, Identity, NewObject<UObject>(), Again));
+		Runtime.PreparePlayerClaim(State, Identity, NewObject<USceneComponent>(), Again));
 	TestTrue(TEXT("完整合同允许接管"), Runtime.CommitPlayerClaim(State, Token, Pawn));
 	TestTrue(TEXT("接管保留源身份"), State.Token.SourceId == Identity.SourceId);
 	TestFalse(TEXT("接管后旧 Abort 不能撤销正式玩家租约"), Runtime.AbortPlayerClaim(State, Token));
@@ -69,14 +70,14 @@ bool FVoxelBirthClaimAbortTest::RunTest(const FString& Parameters)
 	Identity.SourceIncarnation = 9;
 	Identity.CandidateRevision = 1;
 	Identity.PawnIncarnation = FGuid::NewGuid();
-	UObject* Pawn = NewObject<UObject>();
+	UObject* Pawn = NewObject<USceneComponent>();
 	FVoxelPlayerClaimToken First;
 	TestTrue(TEXT("第一角色准备"), Runtime.PreparePlayerClaim(State, Identity, Pawn, First));
 	TestTrue(TEXT("撤销临时准备"), Runtime.AbortPlayerClaim(State, First));
 	TestFalse(TEXT("重复撤销不影响其他租约"), Runtime.AbortPlayerClaim(State, First));
 	Identity.PawnIncarnation = FGuid::NewGuid();
 	FVoxelPlayerClaimToken Second;
-	UObject* Replacement = NewObject<UObject>();
+	UObject* Replacement = NewObject<USceneComponent>();
 	TestTrue(TEXT("同出生源准备新角色"), Runtime.PreparePlayerClaim(State, Identity, Replacement, Second));
 	TestTrue(TEXT("保持源与候选身份"), First.SourceId == Second.SourceId && First.CandidateRevision == Second.CandidateRevision);
 	TestTrue(TEXT("新角色具有新序号"), First.Serial != Second.Serial);

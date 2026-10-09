@@ -102,6 +102,8 @@ bool FVoxelFinePageObsoleteDirtyCleanupTest::RunTest(const FString& InParameters
 	Input.Shard = Retained;
 	FString Error;
 	auto& Slot = Manager.FineShardSlots.Add(Retained);
+	Slot.OrderIndex = Manager.FineShardSlotOrder.Add(Retained);
+	Manager.FineShardOwnershipAtomCapacity = 8;
 	if (!Slot.Build.Initialize(Input, Error)) return false;
 	const auto Attempt = Slot.Build.BeginAttempt();
 
@@ -179,6 +181,8 @@ bool FVoxelFineShardAttemptIsolationTest::RunTest(const FString& InParameters)
 	Input.Shard = Key;
 	FString Error;
 	auto& Slot = Manager.FineShardSlots.Add(Key);
+	Slot.OrderIndex = Manager.FineShardSlotOrder.Add(Key);
+	Manager.FineShardOwnershipAtomCapacity = 8;
 	if (!Slot.Build.Initialize(Input, Error)) return false;
 	const auto Old = Slot.Build.BeginAttempt();
 	const FGuid OwnerId = FGuid::NewGuid();

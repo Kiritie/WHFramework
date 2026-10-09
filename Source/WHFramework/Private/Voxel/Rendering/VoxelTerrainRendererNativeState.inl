@@ -126,24 +126,12 @@ bool FVoxelTerrainRenderer::EnsureState()
 	Candidate->Handoff.SetSectionChangedCallback(FVoxelRendererSectionChanged{BoundModule, BootstrapConsumer.WorldEpoch});
 	if (bRendering)
 	{
-		FActorSpawnParameters Parameters;
-		Parameters.ObjectFlags |= RF_Transient;
-		Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		AActor* Actor = World->SpawnActor<AActor>(AActor::StaticClass(), FTransform::Identity, Parameters);
-		if (!Actor)
-		{
-			BootstrapAdmission = EVoxelTerrainResourceAdmission::InvalidRequest;
-			return false;
-		}
-		Candidate->Actor = Actor;
-		Actor->SetReplicates(false);
-		Actor->SetActorEnableCollision(false);
-		auto* Component = NewObject<UVoxelTerrainPrimitiveComponent>(Actor);
+		// 退休材质保持者独立于关卡，GPU退休不能强引用已结束的PIE World。
+		auto* Component = NewObject<UVoxelTerrainPrimitiveComponent>(GetTransientPackage());
 		Component->InitializeTerrain(Candidate);
 		Candidate->Component = Component;
 		Candidate->ComponentPin.Reset(Component);
-		Actor->SetRootComponent(Component);
-		Component->RegisterComponent();
+		Component->RegisterComponentWithWorld(World);
 		Candidate->Extension = FSceneViewExtensions::NewExtension<FVoxelTerrainViewExtension>(Candidate.ToSharedRef(), World->Scene);
 	}
 	State = MoveTemp(Candidate);

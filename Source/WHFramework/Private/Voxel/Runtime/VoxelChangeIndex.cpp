@@ -144,7 +144,7 @@ bool FVoxelChangeIndex::SetModified(const FIntVector& InSection, const bool bInM
 			if (RegionMasks.Num() == MAX_int32) return Storage.Fail(EVoxelTerrainResourceAdmission::CapacityUnachievable, OutError);
 			if (!Storage.Reserve(RegionMasks, RegionMasks.Num() + 1, OutError)) return false;
 		}
-		RegionMasks.Add(Region, Candidate);
+		RegionMasks.FindOrAdd(Region) = Candidate;
 	}
 	else RegionMasks.Remove(Region);
 	ModifiedCount = ModifiedCount - Previous + After;
@@ -181,7 +181,7 @@ bool FVoxelChangeIndex::SetRegionMask(const FIntVector& InRegion, const TConstAr
 			if (RegionMasks.Num() == MAX_int32) return Storage.Fail(EVoxelTerrainResourceAdmission::CapacityUnachievable, OutError);
 			if (!Storage.Reserve(RegionMasks, RegionMasks.Num() + 1, OutError)) return false;
 		}
-		RegionMasks.Add(InRegion, Candidate);
+		RegionMasks.FindOrAdd(InRegion) = Candidate;
 	}
 	else RegionMasks.Remove(InRegion);
 	ModifiedCount = ModifiedCount - Before + After;

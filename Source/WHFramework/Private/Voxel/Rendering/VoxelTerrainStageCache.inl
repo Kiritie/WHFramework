@@ -296,8 +296,8 @@ namespace
 		const FVoxelTerrainPageCost& Cost, const int32 Priority, const bool bFloor, FString& Error)
 	{
 		if (!ReserveStagePlan(Plan, Plan.Pages.Num() + (Plan.Pages.Contains(Geometry.Key) ? 0 : 1), Error)) return false;
-		Plan.Pages.Add(Geometry.Key, Geometry); Plan.Costs.Add(Geometry.Key, Cost);
-		Plan.Priorities.Add(Geometry.Key, Priority);
+		Plan.Pages.FindOrAdd(Geometry.Key) = Geometry; Plan.Costs.FindOrAdd(Geometry.Key) = Cost;
+		Plan.Priorities.FindOrAdd(Geometry.Key) = Priority;
 		if (bFloor) Plan.ResolutionFloorPages.Add(Geometry.Key);
 		else Plan.ResolutionFloorPages.Remove(Geometry.Key);
 		return true;
@@ -532,7 +532,12 @@ namespace
 			const auto Admission = Work.Lease ? Work.Lease->TryResize(Metadata + Peak, Input, Count) :
 				Plan.Resources->TryAcquire(Plan.Consumer, EVoxelTerrainResourcePool::Input, Metadata + Peak, Work.Lease, 0, Input, Count);
 			if (Admission != EVoxelTerrainResourceAdmission::Granted)
-			{ Error = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: coarse dirty work") : TEXT("CapacityUnachievable: coarse dirty work"); return false; }
+			{
+				Error = FString::Printf(TEXT("%s: coarse dirty work admission=%d bytes=%llu retainedInput=%llu retainedCount=%d inputLimit=%llu"),
+					Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked") : TEXT("CapacityUnachievable"),
+					int32(Admission), Metadata + Peak, Input, Count, Plan.Resources->Snapshot().Limits.InputBytes);
+				return false;
+			}
 		}
 		Work.Ranges.Reserve(RangeCapacity); Work.Queue.Reserve(QueueCapacity); Work.Membership.Reserve(MembershipCapacity);
 		const uint64 Actual = Metadata + VoxelGenerationAllocation::AllocatedBytes(Work.Ranges) + VoxelGenerationAllocation::AllocatedBytes(Work.Queue) +
@@ -546,10 +551,11 @@ namespace
 	{
 		if (const auto* Previous = Work.Membership.Find(Key); Previous && *Previous <= MaximumPageLevel) return true;
 		const int32 Membership = Work.Membership.Num() + (Work.Membership.Contains(Key) ? 0 : 1);
-		const int32 QueueCapacity = FMath::Max(Work.Queue.Num() + 1, FMath::Min(1 << 22, FMath::Max(16, Work.Queue.Max() * 2)));
+		const int32 QueueCapacity = Work.Queue.Num() < Work.Queue.Max() ? Work.Queue.Max() :
+			FMath::Max(Work.Queue.Num() + 1, FMath::Min(1 << 22, FMath::Max(16, Work.Queue.Max() * 2)));
 		const int32 MembershipCapacity = FMath::Max(Membership, FMath::Min(1 << 20, FMath::Max(16, Work.Membership.Num() * 2)));
 		if (!ReserveStageWork(Work, Work.Ranges.Max(), QueueCapacity, MembershipCapacity, Plan, Error)) return false;
-		Work.Membership.Add(Key, MaximumPageLevel); Work.Queue.Add({Key, MaximumPageLevel}); return true;
+		Work.Membership.FindOrAdd(Key) = MaximumPageLevel; Work.Queue.Add({Key, MaximumPageLevel}); return true;
 	}
 	bool StageRangeForBounds(const FIntVector& Min, const FIntVector& Max, const bool Column, const uint8 Level,
 		FVoxelTerrainStageRootRange& Out)

@@ -56,7 +56,7 @@ bool FVoxelCollisionBodyIndexLifetimeTest::RunTest(const FString& InParameters)
 	const auto State = Resources->Snapshot();
 	if (!Resources->Acquire(FVoxelGenerationConsumerKey::Section(7, Owner, 11, {}, ++Serial),
 		EVoxelTerrainResourcePool::Resident,
-		State.Limits.ResidentBytes - State.Used[int32(EVoxelTerrainResourcePool::Resident)], Blocker)) return false;
+		State.Limits.ResidentBytes - State.Limits.OverlapBytes - State.Used[int32(EVoxelTerrainResourcePool::Resident)], Blocker)) return false;
 	bool bAdded = true;
 	auto* Existing = Index.FindOrAdd(Keys[2], *Resources,
 		FVoxelGenerationConsumerKey::Section(7, Owner, 11, Keys[2], ++Serial), bAdded);

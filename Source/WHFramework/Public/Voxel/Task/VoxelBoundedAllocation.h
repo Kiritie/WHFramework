@@ -9,6 +9,9 @@ class FVoxelTerrainResourceLease;
 
 namespace VoxelBoundedAllocation
 {
+	/** 当前 allocator 的 native 容量上界，包含对齐慢路径；调用方须在分配前授予。 */
+	WHFRAMEWORK_API uint64 QuantizeBytes(uint64 InBytes, uint32 InAlignment = DEFAULT_ALIGNMENT);
+
 	template<typename FunctorType, bool bUnique = true>
 	uint64 FunctionBytes()
 	{
@@ -22,7 +25,7 @@ namespace VoxelBoundedAllocation
 #endif
 		{
 			using FHeapObject = UE::Core::Private::Function::TFunction_OwnedObject<FunctorType, bUnique, true>;
-			return FMemory::QuantizeSize(sizeof(FHeapObject), alignof(FHeapObject));
+			return QuantizeBytes(sizeof(FHeapObject), alignof(FHeapObject));
 		}
 	}
 
@@ -31,7 +34,7 @@ namespace VoxelBoundedAllocation
 	{
 		using TaskType = UE::Tasks::Private::TExecutableTask<TaskBodyType>;
 		return sizeof(TaskType) <= UE::Tasks::Private::SmallTaskSize ? UE::Tasks::Private::SmallTaskSize :
-			FMemory::QuantizeSize(sizeof(TaskType), alignof(TaskType));
+			QuantizeBytes(sizeof(TaskType), alignof(TaskType));
 	}
 
 	template<typename ElementType>
@@ -53,7 +56,7 @@ namespace VoxelBoundedAllocation
 			Capacity = Allocator.CalculateSlackReserve(InCount, sizeof(ElementType));
 		}
 		check(Capacity >= InCount);
-		return uint64(Capacity) * sizeof(ElementType);
+		return QuantizeBytes(uint64(Capacity) * sizeof(ElementType), TAllocatorTraits<FDefaultAllocator>::SupportsElementAlignment ? alignof(ElementType) : DEFAULT_ALIGNMENT);
 	}
 
 	template<typename ElementType>
@@ -71,7 +74,7 @@ namespace VoxelBoundedAllocation
 		{
 			Capacity = Allocator.CalculateSlackGrow(InCount, 0, sizeof(ElementType));
 		}
-		return uint64(Capacity) * sizeof(ElementType);
+		return QuantizeBytes(uint64(Capacity) * sizeof(ElementType), TAllocatorTraits<FDefaultAllocator>::SupportsElementAlignment ? alignof(ElementType) : DEFAULT_ALIGNMENT);
 	}
 
 	template<typename ElementType>
@@ -85,11 +88,20 @@ namespace VoxelBoundedAllocation
 		return InArray.GetAllocatedSize() <= InReservedBytes;
 	}
 
+	// 与 UE 模块的全局 operator new 一致，小对象也使用默认 new 对齐而非仅类型对齐。
+	template<typename ObjectType>
+	uint64 NewBytes()
+	{
+		constexpr uint32 Alignment = alignof(ObjectType) > __STDCPP_DEFAULT_NEW_ALIGNMENT__ ?
+			alignof(ObjectType) : sizeof(ObjectType) <= 8 ? 8 : __STDCPP_DEFAULT_NEW_ALIGNMENT__;
+		return QuantizeBytes(sizeof(ObjectType), Alignment);
+	}
+
 	template<typename ObjectType>
 	uint64 SharedBytes()
 	{
 		using FController = SharedPointerInternals::TIntrusiveReferenceController<ObjectType, ESPMode::ThreadSafe>;
-		return FMemory::QuantizeSize(sizeof(FController), alignof(FController));
+		return NewBytes<FController>();
 	}
 
 	template<typename ObjectType>
@@ -118,8 +130,8 @@ namespace VoxelBoundedAllocation
 	{
 		using FController = SharedPointerInternals::TReferenceControllerWithDeleter<ObjectType,
 			TWorkerDeleter<ObjectType, bAlwaysWorker>, ESPMode::ThreadSafe>;
-		return FMemory::QuantizeSize(sizeof(ObjectType), alignof(ObjectType)) +
-			FMemory::QuantizeSize(sizeof(FController), alignof(FController)) +
+		return NewBytes<ObjectType>() +
+			NewBytes<FController>() +
 			TaskBytes<TWorkerDeleteTask<ObjectType>>();
 	}
 
@@ -149,8 +161,8 @@ namespace VoxelBoundedAllocation
 			BitAllocator.CalculateSlackGrow(int32(Words), 0, sizeof(uint32)),
 			BitAllocator.CalculateSlackGrow(int32(Words), int32(Words) - 1, sizeof(uint32)))) * sizeof(uint32) : 0;
 		const uint32 HashBuckets = FDefaultSetAllocator::GetNumberOfHashBuckets(uint32(InCount));
-		return ArrayBytes<StorageType>(InCount) + BitBytes +
-			(HashBuckets > 1 ? uint64(HashBuckets) * sizeof(FSetElementId) : 0);
+		return ArrayBytes<StorageType>(InCount) + QuantizeBytes(BitBytes) +
+			(HashBuckets > 1 ? QuantizeBytes(uint64(HashBuckets) * sizeof(FSetElementId)) : 0);
 #endif
 	}
 
@@ -170,6 +182,6 @@ namespace VoxelBoundedAllocation
 		const uint64 BitBytes = Words > 4 ? uint64(FMath::Max(
 			BitAllocator.CalculateSlackGrow(int32(Words), 0, sizeof(uint32)),
 			BitAllocator.CalculateSlackGrow(int32(Words), int32(Words) - 1, sizeof(uint32)))) * sizeof(uint32) : 0;
-		return ArrayBytes<StorageType>(InCount) + BitBytes;
+		return ArrayBytes<StorageType>(InCount) + QuantizeBytes(BitBytes);
 	}
 }

@@ -39,6 +39,10 @@ public:
 		float InDeltaSeconds,
 		ELevelTick InTickType,
 		FActorTickFunction& InTickFunction) override;
+	virtual void RebuildAll() override;
+	virtual void ConditionalConstructGenerator() override;
+	virtual void TickAsyncBuild(
+		float InDeltaSeconds) override;
 	bool PrepareAsyncQuery(
 		FAsyncPathFindingQuery& InQuery);
 	ENavigationQueryResult::Type ValidateAsyncResult(
@@ -188,6 +192,7 @@ private:
 	TAtomic<bool> bQueryAdmissionOpen{false};
 	int32 NativeWriteDepth = 0;
 	bool bNativeRebuildPending = false;
+	bool bNativeGeneratorRebuildPending = false;
 	bool bNativeBoundsPending = false;
 	bool bNativeCancelPending = false;
 	bool bNativeCleanupPending = false;

@@ -1,5 +1,7 @@
 ﻿#include "Voxel/Streaming/VoxelFineResidency.h"
 
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
+
 void FVoxelFineResidency::BindResources(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
 	const FVoxelGenerationConsumerKey& InConsumer)
 {
@@ -613,8 +615,8 @@ void FVoxelFineResidency::Reset()
 
 uint64 FVoxelFineResidencyLeases::GetAllocatedBytes() const
 {
-	uint64 Bytes = Sources.GetAllocatedSize() + Counts.GetAllocatedSize();
-	for (const auto& Pair : Sources) Bytes += Pair.Value.GetAllocatedSize();
+	uint64 Bytes = VoxelGenerationAllocation::AllocatedBytes(Sources) + VoxelGenerationAllocation::AllocatedBytes(Counts);
+	for (const auto& Pair : Sources) Bytes += VoxelGenerationAllocation::AllocatedBytes(Pair.Value);
 	return Bytes;
 }
 
@@ -651,10 +653,12 @@ bool FVoxelFineResidencyLeases::TrySetSource(const FGuid& InSource, const TSet<F
 	{ OutError = TEXT("Oversized: Fine multi-Source lease rows"); return false; }
 	const uint64 Metadata = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelFineResidencyLeases>();
 	uint64 OtherSourceBytes = 0;
-	for (const auto& Pair : Sources) if (Pair.Key != InSource) OtherSourceBytes += Pair.Value.GetAllocatedSize();
-	const uint64 NewBytes = Metadata + OtherSourceBytes + VoxelBoundedAllocation::SetBytes<FVoxelFineShardKey>(InShards.Num()) +
-		FMath::Max<uint64>(Sources.GetAllocatedSize(), VoxelBoundedAllocation::MapBytes<FGuid, TSet<FVoxelFineShardKey>>(Sources.Num() + 1)) +
-		FMath::Max<uint64>(Counts.GetAllocatedSize(), VoxelBoundedAllocation::MapBytes<FVoxelFineShardKey, int32>(int32(MaximumCounts64)));
+	for (const auto& Pair : Sources) if (Pair.Key != InSource) OtherSourceBytes += VoxelGenerationAllocation::AllocatedBytes(Pair.Value);
+	const TSet<FVoxelFineShardKey> ReplacementShape;
+	const uint64 NewBytes = Metadata + OtherSourceBytes +
+		VoxelGenerationAllocation::Private::SetReserveBytes<FVoxelFineShardKey>(ReplacementShape, InShards.Num()) +
+		VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FGuid, TSet<FVoxelFineShardKey>>>(Sources, Sources.Num() + 1) +
+		VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FVoxelFineShardKey, int32>>(Counts, int32(MaximumCounts64));
 	TVoxelFineSetDelta<FVoxelFineShardKey> Global;
 	if (Resources)
 	{
@@ -693,7 +697,7 @@ bool FVoxelFineResidencyLeases::TrySetSource(const FGuid& InSource, const TSet<F
 		if (--Count == 0) { Counts.Remove(Key); Global.Removed.Add(Key); }
 		else Global.Retained.Add(Key);
 	}
-	Sources.Add(InSource, MoveTemp(Replacement));
+	Sources.FindOrAdd(InSource) = MoveTemp(Replacement);
 	check(GetAllocatedBytes() + Metadata <= NewBytes);
 	if (StorageLease)
 	{

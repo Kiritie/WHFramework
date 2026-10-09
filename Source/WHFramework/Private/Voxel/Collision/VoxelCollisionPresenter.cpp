@@ -387,9 +387,12 @@ void FVoxelCollisionPresenter::AdvanceBody(const FIntVector& InSection, FBodyRec
 		return;
 	}
 	const auto* CurrentDemand = Module.GetCurrentInterest().Exact.Find(InSection);
+	const FVoxelTerrainServicePriority ServicePriority = CurrentDemand &&
+		(CurrentDemand->bCollision || CurrentDemand->bWarmupCollision) ? CurrentDemand->ServicePriority :
+		FVoxelTerrainServicePriority{EVoxelTerrainServiceBand::P2, 0.0, 0.0, 0, OwnerId};
 	const auto Retirement = Module.GetPhysicsRetirement();
-	if (!CurrentDemand || !InBody.PreparingComponent->BeginDetachedCook(Scheduler, Consumer, InBody.PreparingLease,
-		CurrentDemand->ServicePriority, InBody.QueuedAt, Retirement) ||
+	if (!InBody.PreparingComponent->BeginDetachedCook(Scheduler, Consumer, InBody.PreparingLease,
+		ServicePriority, InBody.QueuedAt, Retirement) ||
 		InBody.PreparingComponent->IsDetachedCookRunning()) return;
 	if (InBody.PreparingComponent->HasDetachedCookFailed())
 	{

@@ -282,7 +282,7 @@ bool FVoxelFineOverlayRead::TakeResult(FVoxelFineOverlayReadResult& OutResult)
 	Result.ReplicaDirectoryEpoch = Capture.ReplicaDirectoryEpoch;
 	Result.ReplicaRegionSequences = MoveTemp(Capture.ReplicaRegionSequences);
 	Result.VersionProof = MoveTemp(Capture.VersionProof);
-	Result.Snapshot = MoveTemp(Snapshot);
+	Result.Snapshot = StaticCastSharedPtr<const FVoxelOverlaySnapshotSet>(MoveTemp(Snapshot));
 	Result.ReadLeaseSet = MoveTemp(Capture.ReadLeaseSet);
 	Result.Resources = MoveTemp(Capture.Resources);
 	Result.Consumer = Capture.Consumer;

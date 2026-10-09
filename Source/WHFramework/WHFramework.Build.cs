@@ -63,6 +63,6 @@ public class WHFramework : ModuleRules
 		{
 			PrivateDependencyModuleNames.Add("Navmesh");
 		}
-		AddEngineThirdPartyPrivateStaticDependencies(Target, "zlib");
+		AddEngineThirdPartyPrivateStaticDependencies(Target, "zlib", "OpenSSL");
 	}
 }

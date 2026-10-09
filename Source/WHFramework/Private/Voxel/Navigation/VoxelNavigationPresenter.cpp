@@ -158,24 +158,25 @@ bool FVoxelNavigationPresenter::ReserveStorage(const int32 InSectionCount, const
 	}
 	const int32 Sections = int32(SectionRows);
 	const int32 Bounds = int32(BoundsRows);
-	const uint64 OldBytes = Wanted.GetAllocatedSize() + InputLeases.GetAllocatedSize() + PendingPromotion.GetAllocatedSize() +
-		PendingRetirement.GetAllocatedSize() +
-		Dirty.GetAllocatedSize() + PendingSections.GetAllocatedSize() +
-		PublishedVersions.GetAllocatedSize() + Requested.GetAllocatedSize() + Prepared.GetAllocatedSize() +
-		Admissions.GetAllocatedSize() + Failures.GetAllocatedSize() +
-		Components.GetAllocatedSize() + RegionBounds.GetAllocatedSize();
-	const uint64 NewBytes = VoxelBoundedAllocation::SetBytes<FIntVector>(Sections) +
-		VoxelBoundedAllocation::MapBytes<FIntVector, FInputLeases>(Sections) +
-		VoxelBoundedAllocation::SetBytes<FIntVector>(Sections) +
-		VoxelBoundedAllocation::SetBytes<FIntVector>(Sections) +
-		VoxelBoundedAllocation::MapBytes<FIntVector, int32>(Sections) + VoxelBoundedAllocation::SparseArrayBytes<FIntVector>(Sections) +
-		VoxelBoundedAllocation::MapBytes<FIntVector, FVoxelNavigationInputVersion>(Sections) +
-		VoxelBoundedAllocation::MapBytes<FIntVector, FVoxelTaskStamp>(Sections) +
-		VoxelBoundedAllocation::MapBytes<FIntVector, TSharedPtr<const FVoxelTaskCustomPayload, ESPMode::ThreadSafe>>(Sections) +
-		VoxelBoundedAllocation::MapBytes<FIntVector, FAdmission>(Sections) +
-		VoxelBoundedAllocation::MapBytes<FIntVector, FVoxelNavigationInputVersion>(Sections) +
-		VoxelBoundedAllocation::MapBytes<FIntVector, TObjectPtr<UVoxelNavigationSurfaceComponent>>(Sections) +
-		VoxelBoundedAllocation::MapBytes<FIntVector, FBoundsLease>(Bounds);
+	const uint64 OldBytes = VoxelGenerationAllocation::AllocatedBytes(Wanted) + VoxelGenerationAllocation::AllocatedBytes(InputLeases) + VoxelGenerationAllocation::AllocatedBytes(PendingPromotion) +
+		VoxelGenerationAllocation::AllocatedBytes(PendingRetirement) +
+		VoxelGenerationAllocation::AllocatedBytes(Dirty) + VoxelGenerationAllocation::AllocatedBytes(PendingSections) +
+		VoxelGenerationAllocation::AllocatedBytes(PublishedVersions) + VoxelGenerationAllocation::AllocatedBytes(Requested) + VoxelGenerationAllocation::AllocatedBytes(Prepared) +
+		VoxelGenerationAllocation::AllocatedBytes(Admissions) + VoxelGenerationAllocation::AllocatedBytes(Failures) +
+		VoxelGenerationAllocation::AllocatedBytes(Components) + VoxelGenerationAllocation::AllocatedBytes(RegionBounds);
+	const uint64 NewBytes = VoxelGenerationAllocation::Private::SetReserveBytes<FIntVector>(Wanted, Sections) +
+		VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FIntVector, FInputLeases>>(InputLeases, Sections) +
+		VoxelGenerationAllocation::Private::SetReserveBytes<FIntVector>(PendingPromotion, Sections) +
+		VoxelGenerationAllocation::Private::SetReserveBytes<FIntVector>(PendingRetirement, Sections) +
+		VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FIntVector, int32>>(Dirty, Sections) +
+		VoxelGenerationAllocation::Private::SparseArrayReserveBytes<FIntVector>(PendingSections, Sections) +
+		VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FIntVector, FVoxelNavigationInputVersion>>(PublishedVersions, Sections) +
+		VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FIntVector, FVoxelTaskStamp>>(Requested, Sections) +
+		VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FIntVector, TSharedPtr<const FVoxelTaskCustomPayload, ESPMode::ThreadSafe>>>(Prepared, Sections) +
+		VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FIntVector, FAdmission>>(Admissions, Sections) +
+		VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FIntVector, FVoxelNavigationInputVersion>>(Failures, Sections) +
+		VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FIntVector, TObjectPtr<UVoxelNavigationSurfaceComponent>>>(Components, Sections) +
+		VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FIntVector, FBoundsLease>>(RegionBounds, Bounds);
 	const uint64 Metadata = sizeof(*this) + VoxelBoundedAllocation::WorkerSharedBytes<TAtomic<bool>>();
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(WorldEpoch, OwnerId, 1, {}, 1);
 	const auto Resources = Scheduler.GetTerrainResources();
@@ -207,12 +208,12 @@ bool FVoxelNavigationPresenter::ReserveStorage(const int32 InSectionCount, const
 	SectionCapacity = Sections;
 	BoundsCapacity = Bounds;
 	if (!Lifetime) Lifetime = VoxelBoundedAllocation::MakeWorkerShared<TAtomic<bool>>(StorageLease, true);
-	const uint64 ActualBytes = Wanted.GetAllocatedSize() + InputLeases.GetAllocatedSize() + PendingPromotion.GetAllocatedSize() +
-		PendingRetirement.GetAllocatedSize() +
-		Dirty.GetAllocatedSize() + PendingSections.GetAllocatedSize() +
-		PublishedVersions.GetAllocatedSize() + Requested.GetAllocatedSize() + Prepared.GetAllocatedSize() +
-		Admissions.GetAllocatedSize() + Failures.GetAllocatedSize() +
-		Components.GetAllocatedSize() + RegionBounds.GetAllocatedSize();
+	const uint64 ActualBytes = VoxelGenerationAllocation::AllocatedBytes(Wanted) + VoxelGenerationAllocation::AllocatedBytes(InputLeases) + VoxelGenerationAllocation::AllocatedBytes(PendingPromotion) +
+		VoxelGenerationAllocation::AllocatedBytes(PendingRetirement) +
+		VoxelGenerationAllocation::AllocatedBytes(Dirty) + VoxelGenerationAllocation::AllocatedBytes(PendingSections) +
+		VoxelGenerationAllocation::AllocatedBytes(PublishedVersions) + VoxelGenerationAllocation::AllocatedBytes(Requested) + VoxelGenerationAllocation::AllocatedBytes(Prepared) +
+		VoxelGenerationAllocation::AllocatedBytes(Admissions) + VoxelGenerationAllocation::AllocatedBytes(Failures) +
+		VoxelGenerationAllocation::AllocatedBytes(Components) + VoxelGenerationAllocation::AllocatedBytes(RegionBounds);
 	check(ActualBytes <= NewBytes);
 	const bool bResized = StorageLease->Resize(Metadata + ActualBytes);
 	check(bResized);
@@ -366,7 +367,7 @@ void FVoxelNavigationPresenter::RetireSection(const FIntVector& InSection)
 	Leases->Consumers->SetAdmissionOpen(false);
 	if (Leases->Consumers->Num() != 0)
 	{
-		PendingRetirement.Add(InSection);
+		if (!PendingRetirement.Contains(InSection)) PendingRetirement.Add(InSection);
 		return;
 	}
 	RetireResources(InSection);
@@ -585,7 +586,7 @@ bool FVoxelNavigationPresenter::RequestSection(const FIntVector& InSection)
 				Admission.bCapacityBlocked = true;
 				Admission.CapacityVersion = BeforeAdmission;
 			}
-			else Failures.Add(InSection, Version);
+			else Failures.FindOrAdd(InSection) = Version;
 			return false;
 		}
 		Admission.Worker = VoxelBoundedAllocation::MakeWorkerShared<FVoxelNavigationWorker>(InputLease);
@@ -653,7 +654,7 @@ bool FVoxelNavigationPresenter::RequestSection(const FIntVector& InSection)
 		}
 		else
 		{
-			Failures.Add(InSection, Version);
+			Failures.FindOrAdd(InSection) = Version;
 			Admission.Request.Reset();
 			Admission.Worker.Reset();
 		}
@@ -669,7 +670,7 @@ bool FVoxelNavigationPresenter::RequestSection(const FIntVector& InSection)
 		Current->Request.Emplace(MoveTemp(AdmissionRequest));
 		if (Current->Request->Blocked == EVoxelTaskBlockReason::Oversized || Current->Request->Blocked == EVoxelTaskBlockReason::TerminalFailure)
 		{
-			Failures.Add(InSection, Version);
+			Failures.FindOrAdd(InSection) = Version;
 			Current->Request.Reset();
 			Current->Worker.Reset();
 		}
@@ -681,7 +682,7 @@ bool FVoxelNavigationPresenter::RequestSection(const FIntVector& InSection)
 		return false;
 	}
 	Current->Worker.Reset();
-	Requested.Add(InSection, Stamp);
+	Requested.FindOrAdd(InSection) = Stamp;
 	return true;
 }
 
@@ -755,7 +756,7 @@ void FVoxelNavigationPresenter::Apply(FVoxelTaskResult&& InResult)
 		return;
 	}
 	Payload->WorkReceipt = InResult.WorkReceipt;
-	Prepared.Add(InResult.Stamp.Section, Payload);
+	Prepared.FindOrAdd(InResult.Stamp.Section) = Payload;
 	if (!ApplyPrepared(InResult.Stamp.Section)) MarkDirty(InResult.Stamp.Section);
 }
 
@@ -797,8 +798,8 @@ bool FVoxelNavigationPresenter::ApplyPrepared(const FIntVector& InSection)
 	Component->SetWorldLocation(FVector(InSection * 16) * Module.BlockSize());
 	Payload->Surface->WorkReceipt = Payload->WorkReceipt;
 	Component->Apply(Payload->Surface);
-	PublishedVersions.Add(InSection, Version);
-	PendingPromotion.Add(InSection);
+	PublishedVersions.FindOrAdd(InSection) = Version;
+	if (!PendingPromotion.Contains(InSection)) PendingPromotion.Add(InSection);
 	Prepared.Remove(InSection);
 	return true;
 }

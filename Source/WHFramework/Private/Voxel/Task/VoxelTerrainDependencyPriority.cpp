@@ -1,6 +1,7 @@
 #include "Voxel/Task/VoxelTerrainDependencyPriority.h"
 
 #include "Voxel/Task/VoxelBoundedAllocation.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 
 FVoxelTerrainDependencyPriority::FVoxelTerrainDependencyPriority(
 	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
@@ -43,7 +44,7 @@ bool FVoxelTerrainDependencyPriority::PrepareNodes(const int32 InRequired, FStri
 		return false;
 	}
 	Storage->Nodes.Reserve(Capacity);
-	check(Storage->Nodes.GetAllocatedSize() <= Lease->Bytes());
+	check(VoxelGenerationAllocation::AllocatedBytes(Storage->Nodes) <= Lease->Bytes());
 	Storage->NodesLease = MoveTemp(Lease);
 	Storage->Capacity = Capacity;
 	return true;
@@ -203,13 +204,13 @@ bool FVoxelTerrainDependencyPriority::SetDependencies(const FGuid& InNode,
 	TSet<FGuid> Candidate;
 	Candidate.Reserve(InDependencies.Num());
 	for (const FGuid& Dependency : InDependencies) Candidate.Add(Dependency);
-	check(!DependenciesLease || Candidate.GetAllocatedSize() <= DependenciesLease->Bytes());
+	check(!DependenciesLease || VoxelGenerationAllocation::AllocatedBytes(Candidate) <= DependenciesLease->Bytes());
 	// 所有峰值已授予后，才修改边、反向集合或捐赠状态。
 	for (FConsumerGrowth& Plan : Growth)
 	{
 		FNode& Child = Storage->Nodes.FindChecked(Plan.Node);
 		Child.Consumers.Reserve(Plan.Capacity);
-		check(Child.Consumers.GetAllocatedSize() <= Plan.Lease->Bytes());
+		check(VoxelGenerationAllocation::AllocatedBytes(Child.Consumers) <= Plan.Lease->Bytes());
 		Child.ConsumersLease = MoveTemp(Plan.Lease);
 		Child.ConsumersCapacity = Plan.Capacity;
 	}

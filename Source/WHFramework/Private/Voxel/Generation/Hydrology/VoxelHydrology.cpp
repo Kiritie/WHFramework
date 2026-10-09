@@ -1853,9 +1853,7 @@ bool FVoxelHydrologyGenerator::SelectRiverSources(
                 }
                 SourceMapCapacity = Capacity;
             }
-            BestPerSourceCell.Add(
-                SourceBucket,
-                Candidate);
+            BestPerSourceCell.FindOrAdd(SourceBucket) = Candidate;
         }
     }
 
@@ -2177,9 +2175,7 @@ bool FVoxelHydrologyGenerator::BuildLakes(
                     }
                     SaddleCapacity = Capacity;
                 }
-                MinimumSaddle.Add(
-                    RootA,
-                    Saddle);
+                MinimumSaddle.FindOrAdd(RootA) = Saddle;
             }
         }
     }

@@ -11,6 +11,8 @@
 #include "Voxel/Rendering/VoxelViewManager.h"
 #include "Voxel/Rendering/VoxelViewPublisher.h"
 #include "Voxel/Runtime/VoxelChangeHierarchy.h"
+#include "Voxel/Runtime/VoxelWorldRuntime.h"
+#include "Voxel/Tests/VoxelTestUtilities.h"
 #include "Voxel/Streaming/VoxelInterestManager.h"
 #include "Voxel/Streaming/VoxelInterestRuntime.h"
 #include "Voxel/VoxelModule.h"
@@ -235,6 +237,8 @@ bool FVoxelFinePageCoverageTest::RunTest(const FString& InParameters)
 	FString PlanningError;
 	UVoxelModule* Module = NewObject<UVoxelModule>();
 	FVoxelTaskScheduler Scheduler(true);
+	Module->Runtime = MakeUnique<FVoxelWorldRuntime>(1, true, VoxelTest::MakeRegistry(),
+		VoxelTest::MakeGenerator(), Scheduler.GetTerrainResources());
 	FVoxelViewManager Manager(*Module, Scheduler, 1);
 	Manager.bFinePresentationDirty = false;
 	Manager.bHeightfieldTopologyDirty = false;
@@ -303,6 +307,11 @@ bool FVoxelFinePageCoverageTest::RunTest(const FString& InParameters)
 	TestEqual(TEXT("Each topology change rebuilds once"), Manager.HeightfieldTopologyRebuildCount, uint64(4));
 	const auto RevisedProxyCoverage = MakeShared<FVoxelVoxelProxyData, ESPMode::ThreadSafe>();
 	RevisedProxyCoverage->Key = {FIntVector(100, 0, 0), 1};
+	RevisedProxyCoverage->Geometry.SampleStepCells = 2;
+	RevisedProxyCoverage->Cells.Init(FVoxelBlockState(), 16 * 16 * 16);
+	bool bSurfaceComplete = false;
+	if (!TestTrue(TEXT("Proxy覆盖经过真实逐行采样"), RevisedProxyCoverage->AdvanceSurfaceCoverage(
+		16, bSurfaceComplete, PlanningError) && bSurfaceComplete)) return false;
 	Manager.UpdateProxySurfaceCoverage(RevisedProxyCoverage);
 	TestTrue(TEXT("A Proxy surface coverage revision dirties heightfield topology"), Manager.bHeightfieldTopologyDirty);
 	Manager.ResolveTransitionVisibility();
@@ -321,6 +330,10 @@ bool FVoxelFinePageCoverageTest::RunTest(const FString& InParameters)
 		FVoxelChangeHierarchy Hierarchy;
 		const FVoxelLodTopologySettings Lod;
 		Hierarchy.SetTopology(Lod);
+		FVoxelTerrainGeometry RegisteredProxy;
+		RegisteredProxy.Key = {EVoxelTerrainRepresentation::VoxelProxy, LocalProxy.Coordinate, LocalProxy.Level};
+		RegisteredProxy.SampleStepCells = 16;
+		if (!TestTrue(TEXT("局部编辑夹具登记实际参与的Proxy空间身份"), Hierarchy.RegisterGeometry(RegisteredProxy, PlanningError))) return false;
 		const FVoxelAffectedRepresentationKeys Affected = Hierarchy.GatherAffectedKeys(FIntVector(3, 0, 15));
 		for (const auto& Key : Affected.Proxy) TestTrue(TEXT("Edit enumerates only configured Proxy levels"), Key.Level <= Lod.MaximumVoxelProxyLevel);
 		for (const auto& Key : Affected.Surface) TestTrue(TEXT("Edit enumerates only configured Surface levels"), Key.Level <= Lod.MaximumSurfaceSpatialLevel);

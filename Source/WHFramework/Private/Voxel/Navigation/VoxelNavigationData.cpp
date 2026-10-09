@@ -706,8 +706,55 @@ void AVoxelNavigationData::FinishNativeWrite()
 
 bool AVoxelNavigationData::HasDeferredNativeWrite() const
 {
-	return bNativeRebuildPending || bNativeBoundsPending || bNativeCancelPending || bNativeCleanupPending ||
+	return bNativeRebuildPending || bNativeGeneratorRebuildPending || bNativeBoundsPending || bNativeCancelPending || bNativeCleanupPending ||
 		bNativeInvokersPending || bTerrainClearPending || !DeferredRemovals.IsEmpty();
+}
+
+void AVoxelNavigationData::RebuildAll()
+{
+	check(IsInGameThread());
+	bNativeGeneratorRebuildPending = true;
+	bNativeRebuildPending = true;
+	if (NativeWriteDepth != 0 || !TryBeginNativeWrite()) return;
+	ON_SCOPE_EXIT { FinishNativeWrite(); };
+#if WITH_RECAST
+	const auto* Generator = static_cast<const FVoxelRecastNavMeshGenerator*>(GetGenerator());
+	if (Generator && !Generator->CanCancelWithoutWaiting()) return;
+#endif
+	// ANavigationData 在调用 Generator::RebuildAll 之前会销毁并重建 generator。
+	// 原生读锁必须覆盖这个外层入口，不能只保护 tile generator 的内部重建。
+	bNativeGeneratorRebuildPending = false;
+	Super::RebuildAll();
+}
+
+void AVoxelNavigationData::ConditionalConstructGenerator()
+{
+	check(IsInGameThread());
+	if (!TryBeginNativeWrite())
+	{
+		bNativeGeneratorRebuildPending = true;
+		return;
+	}
+	ON_SCOPE_EXIT { FinishNativeWrite(); };
+#if WITH_RECAST
+	const auto* Generator = static_cast<const FVoxelRecastNavMeshGenerator*>(GetGenerator());
+	if (Generator && !Generator->CanCancelWithoutWaiting())
+	{
+		bNativeGeneratorRebuildPending = true;
+		return;
+	}
+#endif
+	Super::ConditionalConstructGenerator();
+}
+
+void AVoxelNavigationData::TickAsyncBuild(const float InDeltaSeconds)
+{
+	if (bNativeGeneratorRebuildPending)
+	{
+		RebuildAll();
+		if (bNativeGeneratorRebuildPending) return;
+	}
+	Super::TickAsyncBuild(InDeltaSeconds);
 }
 
 bool AVoxelNavigationData::TryCloseQueriesForWorldStop()
@@ -1477,6 +1524,7 @@ void AVoxelNavigationData::ClearTerrainEvidence()
 	PathMaintenanceFrame = MAX_uint64;
 	TerrainBindingId.Invalidate();
 	bNativeRebuildPending = false;
+	bNativeGeneratorRebuildPending = false;
 	bNativeBoundsPending = false;
 	bNativeCancelPending = false;
 	bNativeInvokersPending = false;

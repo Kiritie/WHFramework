@@ -304,16 +304,25 @@ bool FVoxelNetworkGrantedCompressionLimitTest::RunTest(const FString& InParamete
 	const uint64 OriginalLease = Encoded.ResourceLease->Serial();
 	FVoxelTerrainResourceLimits Limits;
 	Limits.WorkingBytes = 64 * 1024;
-	if (!TestTrue(TEXT("Constrain native scratch without invalidating live output"), Resources->Configure(Limits))) return false;
+	const auto LimitedResources = MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
+	if (!TestTrue(TEXT("独立账本在首个租约前冻结较小Scratch限额"), LimitedResources->Configure(Limits))) return false;
 	EVoxelTerrainResourceAdmission Admission;
 	TestFalse(TEXT("Native required allocation exceeds the configured limit"), VoxelBinary::CompressGranted(
-		Raw, Encoded, Resources, Consumer, Raw.Num(), 4096, bCapacityBlocked, &Admission));
+		Raw, Encoded, LimitedResources, Consumer, Raw.Num(), 4096, bCapacityBlocked, &Admission));
 	TestTrue(TEXT("Unreachable native layout is terminal for the current limits"), Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable);
 	TestFalse(TEXT("Unreachable layout does not wait on external release"), bCapacityBlocked);
 	TestEqual(TEXT("Denied attempt preserves old bytes"), Encoded.Bytes, Original);
 	TestEqual(TEXT("Denied attempt preserves old ownership"), Encoded.ResourceLease->Serial(), OriginalLease);
-	Limits.WorkingBytes = 256ull * 1024 * 1024;
-	if (!Resources->Configure(Limits)) return false;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ExternalScratch;
+	auto OtherConsumer = Consumer;
+	++OtherConsumer.RequestSerial;
+	if (!TestTrue(TEXT("外部消费者占用原账本Scratch"), Resources->Acquire(OtherConsumer, EVoxelTerrainResourcePool::Working,
+		Resources->Snapshot().Limits.WorkingBytes - 64 * 1024, ExternalScratch))) return false;
+	TestFalse(TEXT("暂时Scratch占用保留原输出并等待"), VoxelBinary::CompressGranted(
+		Raw, Encoded, Resources, Consumer, Raw.Num(), 4096, bCapacityBlocked, &Admission));
+	TestTrue(TEXT("外部占用形成CapacityBlocked而非不可达"), bCapacityBlocked && Admission == EVoxelTerrainResourceAdmission::CapacityBlocked);
+	TestEqual(TEXT("Waiting preserves accepted output"), Encoded.Bytes, Original);
+	ExternalScratch.Reset();
 	if (!TestTrue(TEXT("Same frozen input resumes after capacity restoration"), VoxelBinary::CompressGranted(
 		Raw, Encoded, Resources, Consumer, Raw.Num(), 4096, bCapacityBlocked))) return false;
 	TestEqual(TEXT("Capacity restoration keeps deterministic wire content"), Encoded.Bytes, Original);

@@ -31,6 +31,7 @@ namespace
 		enum class EPhase : uint8
 		{
 			None = 0,
+			Prepare,
 			Check,
 			Retire
 		};
@@ -47,6 +48,11 @@ namespace
 
 		virtual bool Update() override
 		{
+			if (Phase == EPhase::Prepare)
+			{
+				if (!PrepareFixture()) return false;
+				Phase = EPhase::Check;
+			}
 			if (Phase == EPhase::Check)
 			{
 				CheckFixture();
@@ -77,6 +83,11 @@ namespace
 		}
 
 	protected:
+		virtual bool PrepareFixture()
+		{
+			return true;
+		}
+
 		virtual void CheckFixture() = 0;
 
 		virtual void ReleaseFixture()
@@ -94,7 +105,7 @@ namespace
 		FString Error;
 
 	private:
-		EPhase Phase = EPhase::Check;
+		EPhase Phase = EPhase::Prepare;
 		double RetirementDeadline = 0.0;
 	};
 
@@ -247,7 +258,7 @@ namespace
 			}
 
 			const FIntPoint WarmKey(0, 0);
-			FIntPoint ColdKey;
+			FIntPoint ColdKey = FIntPoint::ZeroValue;
 			bool bFoundSameShard = false;
 			for (int32 X = 1; X <= 4096; ++X)
 			{
@@ -478,7 +489,12 @@ namespace
 			const auto BeforeForeign = Resources->Snapshot();
 			Test.TestFalse(TEXT("Query 构造拒绝跨 World 的完整 consumer"),
 				FVoxelGenerationQuery::Create(Config, Cache.ToSharedRef(), Query, Error, false, false, false, &Foreign));
-			Test.TestEqual(TEXT("身份拒收发生在所有 native grant 之前"), Resources->Snapshot().Version, BeforeForeign.Version);
+			const auto AfterForeign = Resources->Snapshot();
+			// 正文 scratch 的后台释放可能推进 Version；身份拒收不能新增原生额度或句柄。
+			Test.TestTrue(TEXT("身份拒收没有新增 native grant 或残留句柄"),
+				AfterForeign.LeaseCount <= BeforeForeign.LeaseCount &&
+				AfterForeign.Used[int32(EVoxelTerrainResourcePool::Input)] <= BeforeForeign.Used[int32(EVoxelTerrainResourcePool::Input)] &&
+				Error.StartsWith(TEXT("InvalidConsumer")));
 
 			auto BlockerConsumer = Consumer;
 			BlockerConsumer.OwnerId = FGuid::NewGuid();
@@ -528,19 +544,44 @@ namespace
 		}
 
 	protected:
+		virtual bool PrepareFixture() override
+		{
+			if (!bInitialized)
+			{
+				bInitialized = true;
+				const auto Control = MakeCacheControlConsumer();
+				if (!Test.TestTrue(TEXT("准备事务使用真实 Cache 与账本"), Resources->Configure({}) &&
+					FVoxelGenerationPlanCache::Create(Resources, Control, Cache, Error, true, false))) return true;
+				Consumer = Control;
+				Consumer.OwnerId = FGuid::NewGuid();
+				Consumer.RequestSerial = 93;
+				FVoxelGenerationConsumerScope Scope(Consumer);
+				const auto Config = VoxelTest::MakeGenerationConfig();
+				if (!Test.TestTrue(TEXT("原 Query 构造"), FVoxelGenerationQuery::Create(Config, Cache.ToSharedRef(), Query, Error))) return true;
+				if (!Test.TestTrue(TEXT("真实 Structure 计划引用准备"), Query.PrepareStructuresOnly(Bounds, Error))) return true;
+				PreparationDeadline = FPlatformTime::Seconds() + 8.0;
+			}
+			if (!Cache || !PreparationDeadline) return true;
+			// 首次计划构建有后台 scratch 退休；在原查询独占的稳定账本上施加压力。
+			const auto State = Resources->Snapshot();
+			if (State.LeaseCount == Query.GetRequiredInputLeaseCount() &&
+				State.Used[int32(EVoxelTerrainResourcePool::Working)] == 0)
+			{
+				bReady = true;
+				return true;
+			}
+			if (FPlatformTime::Seconds() >= PreparationDeadline)
+			{
+				Test.AddError(TEXT("Prepared capacity fixture 的后台 scratch 释放超过 8 秒"));
+				return true;
+			}
+			return false;
+		}
+
 		virtual void CheckFixture() override
 		{
-			const auto Control = MakeCacheControlConsumer();
-			if (!Test.TestTrue(TEXT("准备事务使用真实 Cache 与账本"), Resources->Configure({}) &&
-				FVoxelGenerationPlanCache::Create(Resources, Control, Cache, Error, true, false))) return;
-			auto Consumer = Control;
-			Consumer.OwnerId = FGuid::NewGuid();
-			Consumer.RequestSerial = 93;
+			if (!bReady) return;
 			FVoxelGenerationConsumerScope Scope(Consumer);
-			const auto Config = VoxelTest::MakeGenerationConfig();
-			if (!Test.TestTrue(TEXT("原 Query 构造"), FVoxelGenerationQuery::Create(Config, Cache.ToSharedRef(), Query, Error))) return;
-			const FVoxelGenerationBounds Bounds{FIntVector(0, 0, -64), FIntVector(1, 1, 128)};
-			if (!Test.TestTrue(TEXT("真实 Structure 计划引用准备"), Query.PrepareStructuresOnly(Bounds, Error))) return;
 			const auto Original = Query.GetPreparedStructurePlans();
 			if (!Test.TestTrue(TEXT("旧状态具有实际引用数组 backing"), !Original.IsEmpty())) return;
 			auto Other = Consumer;
@@ -579,6 +620,11 @@ namespace
 
 	private:
 		FVoxelGenerationQuery Query;
+		FVoxelGenerationConsumerKey Consumer;
+		const FVoxelGenerationBounds Bounds{FIntVector(0, 0, -64), FIntVector(1, 1, 128)};
+		double PreparationDeadline = 0.0;
+		bool bInitialized = false;
+		bool bReady = false;
 	};
 
 	class FRetentionSnapshotCapacityCommand final : public FCacheCapacityCommand
@@ -794,6 +840,7 @@ namespace
 			FVoxelGenerationRecipe Recipe = *VoxelTest::MakeGenerationConfig()->Recipe;
 			Recipe.Settings.MinZ = 0;
 			Recipe.Settings.MaxZ = 256;
+			Recipe.Settings.LavaCeiling = 0;
 			Recipe.Settings.CaveSpacing = 128;
 			Recipe.Settings.CaveMainRadius = 2;
 			Recipe.Settings.CaveBranchChancePermille = 0;
@@ -836,7 +883,11 @@ namespace
 			if (!Test.TestTrue(TEXT("真实 Ore wire 配置编码"), Writer.Finish(Feature.ConfigBytes))) return;
 			Recipe.Features = {MoveTemp(Feature)};
 			Recipe.Biomes[0].FeatureIndices = {0};
-			if (!Test.TestTrue(TEXT("真实生成配方建立查找"), Recipe.BuildLookups(Error))) return;
+			if (!Test.TestTrue(TEXT("真实生成配方建立查找"), Recipe.BuildLookups(Error)))
+			{
+				Test.AddError(Error);
+				return;
+			}
 			const auto SharedRecipe = MakeShared<const FVoxelGenerationRecipe, ESPMode::ThreadSafe>(MoveTemp(Recipe));
 			const FVoxelGenerationTileKey WarmKey{FIntVector::ZeroValue};
 			FVoxelGenerationTileKey ColdKey;

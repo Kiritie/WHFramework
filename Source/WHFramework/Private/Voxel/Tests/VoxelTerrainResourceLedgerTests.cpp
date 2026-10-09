@@ -4,11 +4,12 @@
 #include "Misc/AutomationTest.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Task/VoxelTerrainResources.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 
 namespace
 {
-	template<int32 InBytes>
-	struct FVoxelSharedAllocationProbe
+	template<int32 InBytes, uint32 InAlignment = 1>
+	struct alignas(InAlignment) FVoxelSharedAllocationProbe
 	{
 		uint8 Payload[InBytes] = {};
 	};
@@ -96,17 +97,17 @@ bool FVoxelReservedContainerCapacityTest::RunTest(const FString& InParameters)
 	TSparseArray<FGuid> Slots;
 	for (const int32 Count : {1, 5, 127, 128, 129, 255, 257, 511, 513, 4097})
 	{
-		const uint64 SetModel = FMath::Max<uint64>(Values.GetAllocatedSize(), VoxelBoundedAllocation::SetBytes<uint64>(Count));
-		const uint64 MapModel = FMath::Max<uint64>(Identities.GetAllocatedSize(), VoxelBoundedAllocation::MapBytes<FGuid, uint64>(Count));
-		const uint64 SparseModel = FMath::Max<uint64>(Slots.GetAllocatedSize(), VoxelBoundedAllocation::SparseArrayBytes<FGuid>(Count));
+		const uint64 SetModel = FMath::Max<uint64>(VoxelGenerationAllocation::AllocatedBytes(Values), VoxelGenerationAllocation::Private::SetReserveBytes<uint64>(Values, Count));
+		const uint64 MapModel = FMath::Max<uint64>(VoxelGenerationAllocation::AllocatedBytes(Identities), VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FGuid, uint64>>(Identities, Count));
+		const uint64 SparseModel = FMath::Max<uint64>(VoxelGenerationAllocation::AllocatedBytes(Slots), VoxelGenerationAllocation::Private::SparseArrayReserveBytes<FGuid>(Slots, Count));
 		Values.Reserve(Count);
 		Identities.Reserve(Count);
 		Slots.Reserve(Count);
-		TestTrue(TEXT("Set 的槽位、BitArray、Hash 真实容量不超过分配前模型"), uint64(Values.GetAllocatedSize()) <= SetModel);
-		TestTrue(TEXT("Map 的真实容量不超过分配前模型"), uint64(Identities.GetAllocatedSize()) <= MapModel);
-		TestTrue(TEXT("SparseArray 的真实容量不超过分配前模型"), uint64(Slots.GetAllocatedSize()) <= SparseModel);
+		TestTrue(TEXT("Set 的槽位、BitArray、Hash 真实容量不超过分配前模型"), uint64(VoxelGenerationAllocation::AllocatedBytes(Values)) <= SetModel);
+		TestTrue(TEXT("Map 的真实容量不超过分配前模型"), uint64(VoxelGenerationAllocation::AllocatedBytes(Identities)) <= MapModel);
+		TestTrue(TEXT("SparseArray 的真实容量不超过分配前模型"), uint64(VoxelGenerationAllocation::AllocatedBytes(Slots)) <= SparseModel);
 		for (int32 Index = Values.Num(); Index < Count; ++Index) Values.Add(uint64(Index));
-		TestTrue(TEXT("预留后填充不绕过 Set 容量授予"), uint64(Values.GetAllocatedSize()) <= SetModel);
+		TestTrue(TEXT("预留后填充不绕过 Set 容量授予"), uint64(VoxelGenerationAllocation::AllocatedBytes(Values)) <= SetModel);
 	}
 	// 独立复现已经有 heap 位图的增长，不能仅验证从空容器首次 Reserve。
 	TSet<uint64> GrowingValues;
@@ -114,15 +115,15 @@ bool FVoxelReservedContainerCapacityTest::RunTest(const FString& InParameters)
 	TSparseArray<FGuid> GrowingSlots;
 	for (const int32 Count : {256, 512, 1024})
 	{
-		const uint64 SetModel = VoxelBoundedAllocation::SetBytes<uint64>(Count);
-		const uint64 MapModel = VoxelBoundedAllocation::MapBytes<FGuid, uint64>(Count);
-		const uint64 SparseModel = VoxelBoundedAllocation::SparseArrayBytes<FGuid>(Count);
+		const uint64 SetModel = VoxelGenerationAllocation::Private::SetReserveBytes<uint64>(GrowingValues, Count);
+		const uint64 MapModel = VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FGuid, uint64>>(GrowingIdentities, Count);
+		const uint64 SparseModel = VoxelGenerationAllocation::Private::SparseArrayReserveBytes<FGuid>(GrowingSlots, Count);
 		GrowingValues.Reserve(Count);
 		GrowingIdentities.Reserve(Count);
 		GrowingSlots.Reserve(Count);
-		TestTrue(TEXT("已有 heap 位图的 Set 扩容不超过原授予模型"), uint64(GrowingValues.GetAllocatedSize()) <= SetModel);
-		TestTrue(TEXT("已有 heap 位图的 Map 扩容不超过原授予模型"), uint64(GrowingIdentities.GetAllocatedSize()) <= MapModel);
-		TestTrue(TEXT("已有 heap 位图的 SparseArray 扩容不超过原授予模型"), uint64(GrowingSlots.GetAllocatedSize()) <= SparseModel);
+		TestTrue(TEXT("已有 heap 位图的 Set 扩容不超过原授予模型"), uint64(VoxelGenerationAllocation::AllocatedBytes(GrowingValues)) <= SetModel);
+		TestTrue(TEXT("已有 heap 位图的 Map 扩容不超过原授予模型"), uint64(VoxelGenerationAllocation::AllocatedBytes(GrowingIdentities)) <= MapModel);
+		TestTrue(TEXT("已有 heap 位图的 SparseArray 扩容不超过原授予模型"), uint64(VoxelGenerationAllocation::AllocatedBytes(GrowingSlots)) <= SparseModel);
 	}
 	return true;
 }
@@ -142,13 +143,14 @@ bool FVoxelSharedAllocationCapacityTest::RunTest(const FString& InParameters)
 		const uint64 ActualBytes = FMemory::GetAllocSize(Controller);
 		const uint64 GrantedBytes = VoxelBoundedAllocation::SharedBytes<FProbe>();
 		TestTrue(TEXT("分配器报告了控制器实际容量"), ActualBytes > 0);
-		TestTrue(TEXT("SharedBytes 在分配前覆盖控制器的真实 allocator 容量"), ActualBytes <= GrantedBytes);
+		TestTrue(*FString::Printf(TEXT("SharedBytes 在分配前覆盖控制器的真实 allocator 容量 size=%llu align=%llu actual=%llu granted=%llu default=%llu"), uint64(sizeof(*Controller)), uint64(alignof(decltype(*Controller))), ActualBytes, GrantedBytes, uint64(FMemory::QuantizeSize(sizeof(*Controller)))), ActualBytes <= GrantedBytes);
 		Controller->ReleaseSharedReference();
 	};
 	Check(FVoxelSharedAllocationProbe<1>());
 	Check(FVoxelSharedAllocationProbe<17>());
 	Check(FVoxelSharedAllocationProbe<65>());
 	Check(FVoxelSharedAllocationProbe<513>());
+	Check(FVoxelSharedAllocationProbe<17, 64>());
 	return true;
 }
 
@@ -368,6 +370,36 @@ bool FVoxelResourceFrozenWorldDomainTest::RunTest(const FString& InParameters)
 		EVoxelTerrainResourcePool::Working, 256, Lease) == EVoxelTerrainResourceAdmission::Granted)) return false;
 	Lease.Reset();
 	TestEqual(TEXT("原消费者退出后无遗留句柄"), Resources->Snapshot().LeaseCount, 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelNativeAllocatorCapacityTest,
+	"WHFramework.Voxel.FineRefactor.Resources.NativeAllocatorCapacity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelNativeAllocatorCapacityTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	for (const uint64 Size : {uint64(1), uint64(24), uint64(40), uint64(88), uint64(536),
+		uint64(1023), uint64(65535), uint64(131072), uint64(131073), uint64(524287),
+		uint64(524288), uint64(2097152), uint64(8388608), uint64(33554433)})
+	{
+		for (const uint32 Alignment : {uint32(DEFAULT_ALIGNMENT), uint32(8), uint32(16), uint32(64)})
+		{
+			const uint64 Granted = VoxelBoundedAllocation::QuantizeBytes(Size, Alignment);
+			void* Allocation = FMemory::Malloc(Size, Alignment);
+			const uint64 Actual = FMemory::GetAllocSize(Allocation);
+			TestTrue(*FString::Printf(TEXT("分配前上界覆盖真实 heap 块 size=%llu align=%u actual=%llu granted=%llu"),
+				Size, Alignment, Actual, Granted), Actual >= Size && Actual <= Granted);
+			const uint64 GrownSize = Size + 17;
+			const uint64 GrowthGranted = VoxelBoundedAllocation::QuantizeBytes(GrownSize, Alignment);
+			Allocation = FMemory::Realloc(Allocation, GrownSize, Alignment);
+			const uint64 GrowthActual = FMemory::GetAllocSize(Allocation);
+			TestTrue(*FString::Printf(TEXT("扩容上界覆盖真实 Realloc 块 size=%llu align=%u actual=%llu granted=%llu"),
+				GrownSize, Alignment, GrowthActual, GrowthGranted), GrowthActual >= GrownSize && GrowthActual <= GrowthGranted);
+			FMemory::Free(Allocation);
+		}
+	}
 	return true;
 }
 

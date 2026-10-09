@@ -3,6 +3,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
 #include "HAL/PlatformProcess.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Generation/VoxelGenerationPlanCoordinator.h"
 #include "Voxel/Generation/VoxelGenerationPlanningRead.h"
 #include "Voxel/Generation/VoxelGenerationQuery.h"
@@ -182,7 +183,7 @@ bool FVoxelDependencyPriorityCapacityTest::RunTest(const FString& InParameters)
 	TestEqual(TEXT("Accepted replacement promotes new dependency"), uint8(Graph.Find(Right)->Band), uint8(EVoxelTerrainServiceBand::P0));
 	TestEqual(TEXT("Accepted replacement retracts old transitive donation"), uint8(Graph.Find(Leaf)->Band), uint8(EVoxelTerrainServiceBand::P6));
 	const uint64 ChargedInput = Resources->Snapshot().Used[uint8(EVoxelTerrainResourcePool::Input)];
-	const uint64 Backing = Graph.Storage->Nodes.GetAllocatedSize();
+	const uint64 Backing = VoxelGenerationAllocation::AllocatedBytes(Graph.Storage->Nodes);
 	TestTrue(TEXT("Persistent node backing is charged"), Backing <= Graph.Storage->NodesLease->Bytes() && Backing < ChargedInput);
 	for (int32 Index = 0; Index < 1024; ++Index)
 	{
@@ -393,14 +394,14 @@ bool FVoxelCoordinatorStorageCapacityTest::RunTest(const FString& InParameters)
 	if (!Coordinator.Ensure(MakeArrayView(&First, 1), EVoxelWorkClass::Critical, 0, 0.0, 1.0, Consumer).bReady ||
 		!Coordinator.Ensure(MakeArrayView(&Second, 1), EVoxelWorkClass::Visible, 1, 32.0, 0.0, Other).bReady) return false;
 	const auto& Body = *Coordinator.Storage;
-	TestTrue(TEXT("States backing is granted"), Body.States.GetAllocatedSize() <= Body.StatesLease->Bytes());
-	TestTrue(TEXT("Consumers backing is granted"), Body.Consumers.GetAllocatedSize() <= Body.ConsumersLease->Bytes());
-	TestTrue(TEXT("Fact identity backing is granted"), Body.PriorityFacts.GetAllocatedSize() <= Body.FactsLease->Bytes());
+	TestTrue(TEXT("States backing is granted"), VoxelGenerationAllocation::AllocatedBytes(Body.States) <= Body.StatesLease->Bytes());
+	TestTrue(TEXT("Consumers backing is granted"), VoxelGenerationAllocation::AllocatedBytes(Body.Consumers) <= Body.ConsumersLease->Bytes());
+	TestTrue(TEXT("Fact identity backing is granted"), VoxelGenerationAllocation::AllocatedBytes(Body.PriorityFacts) <= Body.FactsLease->Bytes());
 	const auto& Original = Body.Consumers.FindChecked(Consumer);
 	const uint64 Id = Original.Dependencies.FindChecked(First).Id;
 	const uint64 EdgeLease = Original.DependenciesLease->Serial();
 	const uint64 DonationLease = Body.States.FindChecked(First).DonationsLease->Serial();
-	TestTrue(TEXT("Nested subscriptions backing is granted"), Original.Dependencies.GetAllocatedSize() <= Original.DependenciesLease->Bytes());
+	TestTrue(TEXT("Nested subscriptions backing is granted"), VoxelGenerationAllocation::AllocatedBytes(Original.Dependencies) <= Original.DependenciesLease->Bytes());
 	if (!Saturate()) return false;
 	TestTrue(TEXT("Accepted cached closure needs no new grant under input pressure"), Coordinator.Ensure(
 		MakeArrayView(&First, 1), EVoxelWorkClass::Critical, 0, 0.0, 1.0, Consumer).bReady);
@@ -488,7 +489,12 @@ bool FVoxelCoordinatorWakeLifetimeTest::RunTest(const FString& InParameters)
 		TestEqual(TEXT("Missing fact owns one queued production attempt"), Scheduler.ActiveCount(), 1);
 	}
 	TestTrue(TEXT("Destroyed coordinator invalidates even a pinned old storage owner"), Retired && Retired->Owner == nullptr);
-	Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
+	const double CancellationDeadline = FPlatformTime::Seconds() + 5.0;
+	while (Scheduler.ActiveCount() > 0 && FPlatformTime::Seconds() < CancellationDeadline)
+	{
+		Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
+		FPlatformProcess::SleepNoStats(0.001f);
+	}
 	TestEqual(TEXT("Canceled callback can be consumed after coordinator destruction"), Scheduler.ActiveCount(), 0);
 	Retired.Reset();
 	Scheduler.StopAndJoin();

@@ -391,6 +391,11 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 	}
 	const int32 UpdateIndex = InGroup.UpdateIndices[InGroup.NativeSourceCursor];
 	const auto& Update = InPublication->Updates[UpdateIndex];
+	if (!Update.Actor.IsValid())
+	{
+		++InGroup.NativeSourceCursor;
+		return false;
+	}
 	if (!Update.NativeMesh) return false;
 	const bool* Hidden = InPublication->Visibility.Find(Update.Actor);
 	const bool bRemove = Hidden && *Hidden;

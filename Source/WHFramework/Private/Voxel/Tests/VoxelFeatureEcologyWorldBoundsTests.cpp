@@ -344,7 +344,11 @@ bool FVoxelEcologyPatchWorldBoundsTest::RunTest(const FString& InParameters)
 			const FVoxelGenerationBounds Bounds{{CellX, 0, -1}, {bMinimum ? MIN_int32 + 1 : MAX_int32, 3, 2}};
 			if (!TestTrue(TEXT("草花真实patch在世界边界裁切"), BuildEcology(Recipe, Bounds, 0, Columns, Bases, Plan, Error))) return false;
 			TestEqual(TEXT("五乘五patch保留合法的三列"), Plan.Writes.Num(), 15);
-			TestEqual(TEXT("域外patch不送进列sampler"), Columns.Num(), 16);
+			TestEqual(TEXT("Count与Build各采样合法中心及十五个patch列"), Columns.Num(), 32);
+			bool bFrozenColumnsEqual = Columns.Num() == 32;
+			for (int32 Index = 0; bFrozenColumnsEqual && Index < 16; ++Index)
+				bFrozenColumnsEqual = Columns[Index] == Columns[Index + 16];
+			TestTrue(TEXT("两遍冻结采样读取相同的合法列"), bFrozenColumnsEqual);
 			TestTrue(TEXT("草花采样没有远端wrap"), AreLocalQueries(Columns, Center, 2) && AreLocalQueries(Bases, Center, 2));
 			for (const FVoxelEcologyPlanWrite& Write : Plan.Writes)
 			{

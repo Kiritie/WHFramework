@@ -72,7 +72,7 @@ ModuleClass* ModuleClass::GetPtr(UWorld* InWorld, bool bForce) \
 { \
 	if(!::IsValid(InWorld)) return nullptr; \
 	const FScopedWorldContext WorldContextScope(InWorld); \
-	ModuleClass* MainModule = ModuleClass::GetPtr(InWorld->IsEditorWorld(), bForce); \
+	ModuleClass* MainModule = ModuleClass::GetPtr((InWorld->IsEditorWorld() && !InWorld->IsGameWorld()), bForce); \
 	return ::IsValid(MainModule) && MainModule->GetWorld() == InWorld ? MainModule : nullptr; \
 }
 
@@ -131,7 +131,7 @@ ModuleClass* ModuleClass::GetPtr(UWorld* InWorld) \
 { \
 	if(!::IsValid(InWorld)) return nullptr; \
 	const FScopedWorldContext WorldContextScope(InWorld); \
-	const bool bInEditor = InWorld->IsEditorWorld(); \
+	const bool bInEditor = (InWorld->IsEditorWorld() && !InWorld->IsGameWorld()); \
 	if(!ModuleClass::IsValid(bInEditor)) return nullptr; \
 	ModuleClass* Module = ModuleClass::GetPtr(bInEditor); \
 	return ::IsValid(Module) && Module->GetWorld() == InWorld ? Module : nullptr; \

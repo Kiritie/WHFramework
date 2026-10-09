@@ -493,8 +493,10 @@ bool FVoxelTerrainDomainBoundedRootsTest::RunTest(const FString& InParameters)
 	Plan.Pages.Add(Previous, {Previous, 1, -32, 64, 17, 23});
 	TestFalse(TEXT("超过64根首次推进返回pending"), Domain.AdvanceDirtyRoots(EVoxelTerrainRepresentation::Surface,
 		1, 64, -32, 64, 8.0, 17, 23, Plan, Error, nullptr, {}));
-	TestTrue(TEXT("未完成保留旧输出与可恢复原游标"), Error.StartsWith(TEXT("PlanningPending")) && Domain.HasPendingWork() &&
-		Domain.HasRetryReady() && Plan.Pages.Contains(Previous));
+	TestTrue(*FString::Printf(TEXT("未完成明确报告 PlanningPending: %s"), *Error), Error.StartsWith(TEXT("PlanningPending")));
+	TestTrue(TEXT("未完成保留原游标"), Domain.HasPendingWork());
+	TestTrue(TEXT("原游标可继续推进"), Domain.HasRetryReady());
+	TestTrue(TEXT("未完成保留旧输出"), Plan.Pages.Contains(Previous));
 	bool Complete = false;
 	for (int32 Step = 0; Step < 16 && !Complete; ++Step)
 	{

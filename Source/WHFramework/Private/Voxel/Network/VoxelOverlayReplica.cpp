@@ -1,6 +1,5 @@
 #include "Voxel/Network/VoxelOverlayReplica.h"
 
-#include "HAL/PlatformMisc.h"
 #include "Async/Async.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelManifestCodec.h"
@@ -8,6 +7,12 @@
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
 #include "Voxel/Generation/VoxelGenerationAllocation.h"
+
+#pragma push_macro("U64")
+THIRD_PARTY_INCLUDES_START
+#include <openssl/sha.h>
+THIRD_PARTY_INCLUDES_END
+#pragma pop_macro("U64")
 
 namespace
 {
@@ -132,9 +137,13 @@ bool FVoxelOverlayHash::IsZero() const
 
 bool FVoxelOverlayHash::Compute(TConstArrayView<uint8> InBytes, FVoxelOverlayHash& OutHash)
 {
-	FSHA256Signature Signature;
-	if (!FPlatformMisc::GetSHA256Signature(InBytes.GetData(), InBytes.Num(), Signature)) return false;
-	FMemory::Memcpy(OutHash.Bytes, Signature.Signature, 32);
+	SHA256_CTX Context;
+	FVoxelOverlayHash Hash;
+	// 原 SHA256 协议保持不变，固定栈上下文也不引入未计费的临时 heap 正文。
+	if (SHA256_Init(&Context) != 1 ||
+		SHA256_Update(&Context, InBytes.GetData(), static_cast<size_t>(InBytes.Num())) != 1 ||
+		SHA256_Final(Hash.Bytes, &Context) != 1) return false;
+	OutHash = Hash;
 	return true;
 }
 

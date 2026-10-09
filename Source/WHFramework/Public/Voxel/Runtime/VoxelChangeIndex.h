@@ -48,7 +48,9 @@ public:
 		if (!Prepare(NewBytes, OutError)) return false;
 		InSet.Reserve(InCount);
 		const uint64 Actual = VoxelGenerationAllocation::AllocatedBytes(InSet);
-		check(Actual <= NewBytes && OldBytes <= Bytes - NewBytes);
+		checkf(Actual <= NewBytes && OldBytes <= Bytes - NewBytes,
+			TEXT("change set reserve count=%d old=%llu forecast=%llu actual=%llu aggregate=%llu"),
+			InCount, OldBytes, NewBytes, Actual, Bytes);
 		Bytes = Bytes - OldBytes - NewBytes + Actual;
 		if (Lease)
 		{
@@ -72,7 +74,9 @@ public:
 		if (!Prepare(NewBytes, OutError)) return false;
 		InMap.Reserve(InCount);
 		const uint64 Actual = VoxelGenerationAllocation::AllocatedBytes(InMap);
-		check(Actual <= NewBytes && OldBytes <= Bytes - NewBytes);
+		checkf(Actual <= NewBytes && OldBytes <= Bytes - NewBytes,
+			TEXT("change map reserve count=%d old=%llu forecast=%llu actual=%llu aggregate=%llu"),
+			InCount, OldBytes, NewBytes, Actual, Bytes);
 		Bytes = Bytes - OldBytes - NewBytes + Actual;
 		if (Lease)
 		{

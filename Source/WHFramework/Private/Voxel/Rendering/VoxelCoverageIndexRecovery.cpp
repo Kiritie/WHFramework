@@ -2,6 +2,7 @@
 
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Task/VoxelTerrainResources.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/VoxelModule.h"
 
 void FVoxelViewManager::BindCoverageIndexResources()
@@ -19,8 +20,8 @@ bool FVoxelViewManager::ReserveCoverageIndexRetries(const int32 InCount)
 	const int64 Next = FMath::Max<int64>(InCount, FMath::Max<int64>(16, int64(CoverageIndexRetryCapacity) * 2));
 	if (Next > MAX_int32) return false;
 	const int32 Capacity = int32(Next);
-	const uint64 Bytes = VoxelBoundedAllocation::MapBytes<FVoxelTerrainSpatialKey, uint64>(Capacity);
-	const uint64 Previous = CoverageIndexRetries.GetAllocatedSize();
+	const uint64 Bytes = VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FVoxelTerrainSpatialKey, uint64>>(CoverageIndexRetries, Capacity);
+	const uint64 Previous = VoxelGenerationAllocation::AllocatedBytes(CoverageIndexRetries);
 	if (CoverageIndexRetryLease)
 	{
 		if (!CoverageIndexRetryLease->Resize(Previous + Bytes)) return false;
@@ -29,8 +30,9 @@ bool FVoxelViewManager::ReserveCoverageIndexRetries(const int32 InCount)
 		FVoxelGenerationConsumerKey::Section(WorldEpoch, TaskOwnerId, TaskOwnerIncarnation, {}, 1),
 		EVoxelTerrainResourcePool::Input, Previous + Bytes, CoverageIndexRetryLease)) return false;
 	CoverageIndexRetries.Reserve(Capacity);
-	check(CoverageIndexRetries.GetAllocatedSize() <= Bytes);
-	verify(CoverageIndexRetryLease->Resize(Bytes));
+	const uint64 Actual = VoxelGenerationAllocation::AllocatedBytes(CoverageIndexRetries);
+	check(Actual <= Bytes);
+	verify(CoverageIndexRetryLease->Resize(Actual));
 	CoverageIndexRetryCapacity = Capacity;
 	return true;
 }
@@ -58,7 +60,7 @@ bool FVoxelViewManager::ApplyCoverageIndexRecord(const FVoxelCoverageRecord& InR
 	{
 		// 只保留命中键和释放代；恢复时重新读取当前事实，不能重放过期 Record 或扫整张世界表。
 		check(CoverageIndexRetries.Num() < CoverageIndexRetryCapacity || CoverageIndexRetries.Contains(Key));
-		CoverageIndexRetries.Add(Key, Scheduler.GetTerrainResources()->Snapshot().ReleaseVersion);
+		CoverageIndexRetries.FindOrAdd(Key) = Scheduler.GetTerrainResources()->Snapshot().ReleaseVersion;
 		return false;
 	}
 	ensureMsgf(false, TEXT("Invalid immutable coverage input: %s"), *Error);

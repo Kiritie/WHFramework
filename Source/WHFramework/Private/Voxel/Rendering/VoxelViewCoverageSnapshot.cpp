@@ -4,6 +4,7 @@
 #include "Voxel/Rendering/VoxelProxyBuilder.h"
 #include "Voxel/Rendering/VoxelViewPublisher.h"
 #include "Voxel/Task/VoxelTerrainResources.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 
 FVoxelGameThreadContinuation FVoxelViewManager::AcquireCoverageCapacitySteps(const uint64 InBytes,
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& InOutLease, bool& OutComplete) const
@@ -74,11 +75,11 @@ FVoxelGameThreadContinuation FVoxelViewManager::CaptureCoverageCandidateSteps(
 				UE_LOG(LogTemp, Error, TEXT("Oversized: local coverage candidate count"));
 				co_return;
 			}
-		const uint64 OldBytes = OutFine.GetAllocatedSize() + OutProxy.GetAllocatedSize() + OutSurface.GetAllocatedSize() + OutMacro.GetAllocatedSize();
-		const uint64 NewBytes = FMath::Max<uint64>(OutFine.GetAllocatedSize(), VoxelBoundedAllocation::SetBytes<FIntVector>(int32(Counts[0]))) +
-			FMath::Max<uint64>(OutProxy.GetAllocatedSize(), VoxelBoundedAllocation::SetBytes<FVoxelViewKey>(int32(Counts[1]))) +
-			FMath::Max<uint64>(OutSurface.GetAllocatedSize(), VoxelBoundedAllocation::SetBytes<FVoxelSurfaceTileKey>(int32(Counts[2]))) +
-			FMath::Max<uint64>(OutMacro.GetAllocatedSize(), VoxelBoundedAllocation::SetBytes<FVoxelMacroTileKey>(int32(Counts[3])));
+		const uint64 OldBytes = VoxelGenerationAllocation::AllocatedBytes(OutFine) + VoxelGenerationAllocation::AllocatedBytes(OutProxy) + VoxelGenerationAllocation::AllocatedBytes(OutSurface) + VoxelGenerationAllocation::AllocatedBytes(OutMacro);
+		const uint64 NewBytes = FMath::Max<uint64>(VoxelGenerationAllocation::AllocatedBytes(OutFine), VoxelGenerationAllocation::Private::SetReserveBytes<FIntVector>(OutFine, int32(Counts[0]))) +
+			FMath::Max<uint64>(VoxelGenerationAllocation::AllocatedBytes(OutProxy), VoxelGenerationAllocation::Private::SetReserveBytes<FVoxelViewKey>(OutProxy, int32(Counts[1]))) +
+			FMath::Max<uint64>(VoxelGenerationAllocation::AllocatedBytes(OutSurface), VoxelGenerationAllocation::Private::SetReserveBytes<FVoxelSurfaceTileKey>(OutSurface, int32(Counts[2]))) +
+			FMath::Max<uint64>(VoxelGenerationAllocation::AllocatedBytes(OutMacro), VoxelGenerationAllocation::Private::SetReserveBytes<FVoxelMacroTileKey>(OutMacro, int32(Counts[3])));
 		bool bCapacity = false;
 		co_await AcquireCoverageCapacitySteps(OldBytes + NewBytes, OutLease, bCapacity);
 		if (!bCapacity) co_return;
@@ -86,8 +87,10 @@ FVoxelGameThreadContinuation FVoxelViewManager::CaptureCoverageCandidateSteps(
 		OutProxy.Reserve(int32(Counts[1]));
 		OutSurface.Reserve(int32(Counts[2]));
 		OutMacro.Reserve(int32(Counts[3]));
-		check(OutFine.GetAllocatedSize() + OutProxy.GetAllocatedSize() + OutSurface.GetAllocatedSize() + OutMacro.GetAllocatedSize() <= NewBytes);
-		if (OutLease) verify(OutLease->Resize(NewBytes));
+		const uint64 ActualBytes = VoxelGenerationAllocation::AllocatedBytes(OutFine) + VoxelGenerationAllocation::AllocatedBytes(OutProxy) +
+			VoxelGenerationAllocation::AllocatedBytes(OutSurface) + VoxelGenerationAllocation::AllocatedBytes(OutMacro);
+		check(ActualBytes <= NewBytes);
+		if (OutLease) verify(OutLease->Resize(ActualBytes));
 		for (const auto& Record : Snapshot.Records)
 		{
 			co_await FVoxelGameThreadContinuation::Yield();
@@ -131,18 +134,18 @@ FVoxelGameThreadContinuation FVoxelViewManager::BuildCoverageSnapshotSteps(FCove
 		UE_LOG(LogTemp, Error, TEXT("Oversized: local coverage snapshot count"));
 		co_return;
 	}
-	const uint64 Bytes = VoxelBoundedAllocation::SetBytes<FIntVector>(FineCandidates.Num()) +
-		VoxelBoundedAllocation::MapBytes<FIntVector, FVoxelFinePageKey>(FineCandidates.Num()) +
-		VoxelBoundedAllocation::SetBytes<FVoxelViewKey>(FineCandidates.Num()) +
-		VoxelBoundedAllocation::SetBytes<FVoxelViewKey>(ProxyCandidates.Num()) +
-		VoxelBoundedAllocation::SetBytes<FVoxelViewKey>(int32(FineBranches)) +
-		VoxelBoundedAllocation::SetBytes<FVoxelViewKey>(int32(ProxyBranches)) +
-		VoxelBoundedAllocation::ArrayBytes<FVoxelCoverageBox>(FineCandidates.Num()) +
-		VoxelBoundedAllocation::ArrayBytes<FVoxelCoverageBox>(ProxyCandidates.Num()) +
-		VoxelBoundedAllocation::ArrayBytes<FVoxelCoverageRect>(int32(ProxyRows)) +
-		VoxelBoundedAllocation::ArrayBytes<FVoxelCoverageRect>(SurfaceCandidates.Num()) +
-		VoxelBoundedAllocation::ArrayBytes<FVoxelCoverageRect>(MacroCandidates.Num()) +
-		2 * VoxelBoundedAllocation::ArrayBytes<FVoxelCoverageRect>(int32(HeightfieldCount));
+	const uint64 Bytes = VoxelGenerationAllocation::Private::SetReserveBytes<FIntVector>(OutSnapshot.PresentedFineSections, FineCandidates.Num()) +
+		VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FIntVector, FVoxelFinePageKey>>(OutSnapshot.PresentedFineOwners, FineCandidates.Num()) +
+		VoxelGenerationAllocation::Private::SetReserveBytes<FVoxelViewKey>(OutSnapshot.FineNodes, FineCandidates.Num()) +
+		VoxelGenerationAllocation::Private::SetReserveBytes<FVoxelViewKey>(OutSnapshot.ProxyNodes, ProxyCandidates.Num()) +
+		VoxelGenerationAllocation::Private::SetReserveBytes<FVoxelViewKey>(OutSnapshot.FineBranches, int32(FineBranches)) +
+		VoxelGenerationAllocation::Private::SetReserveBytes<FVoxelViewKey>(OutSnapshot.ProxyBranches, int32(ProxyBranches)) +
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelCoverageBox, FDefaultAllocator>(FineCandidates.Num()) +
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelCoverageBox, FDefaultAllocator>(ProxyCandidates.Num()) +
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelCoverageRect, FDefaultAllocator>(int32(ProxyRows)) +
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelCoverageRect, FDefaultAllocator>(SurfaceCandidates.Num()) +
+		VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelCoverageRect, FDefaultAllocator>(MacroCandidates.Num()) +
+		2 * VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelCoverageRect, FDefaultAllocator>(int32(HeightfieldCount));
 	bool bCapacity = false;
 	co_await AcquireCoverageCapacitySteps(Bytes, OutSnapshot.ResourceLease, bCapacity);
 	if (!bCapacity) co_return;
@@ -159,6 +162,21 @@ FVoxelGameThreadContinuation FVoxelViewManager::BuildCoverageSnapshotSteps(FCove
 	OutSnapshot.Macro.Reserve(MacroCandidates.Num());
 	OutSnapshot.Heightfield.Reserve(int32(HeightfieldCount));
 	OutSnapshot.WantedHeightfield.Reserve(int32(HeightfieldCount));
+	const uint64 ActualBytes = VoxelGenerationAllocation::AllocatedBytes(OutSnapshot.PresentedFineSections) +
+		VoxelGenerationAllocation::AllocatedBytes(OutSnapshot.PresentedFineOwners) +
+		VoxelGenerationAllocation::AllocatedBytes(OutSnapshot.FineNodes) +
+		VoxelGenerationAllocation::AllocatedBytes(OutSnapshot.ProxyNodes) +
+		VoxelGenerationAllocation::AllocatedBytes(OutSnapshot.FineBranches) +
+		VoxelGenerationAllocation::AllocatedBytes(OutSnapshot.ProxyBranches) +
+		VoxelGenerationAllocation::AllocatedBytes(OutSnapshot.Fine) +
+		VoxelGenerationAllocation::AllocatedBytes(OutSnapshot.Proxy) +
+		VoxelGenerationAllocation::AllocatedBytes(OutSnapshot.ProxySurface) +
+		VoxelGenerationAllocation::AllocatedBytes(OutSnapshot.Surface) +
+		VoxelGenerationAllocation::AllocatedBytes(OutSnapshot.Macro) +
+		VoxelGenerationAllocation::AllocatedBytes(OutSnapshot.Heightfield) +
+		VoxelGenerationAllocation::AllocatedBytes(OutSnapshot.WantedHeightfield);
+	check(ActualBytes <= Bytes);
+	if (OutSnapshot.ResourceLease) verify(OutSnapshot.ResourceLease->Resize(ActualBytes));
 	for (const FIntVector& Section : FineCandidates)
 	{
 		co_await FVoxelGameThreadContinuation::Yield();
@@ -215,9 +233,8 @@ FVoxelGameThreadContinuation FVoxelViewManager::BuildCoverageSnapshotSteps(FCove
 			while (Node.Level <= 20)
 			{
 				co_await FVoxelGameThreadContinuation::Yield();
-				bool bExists = false;
-				Branches.Add(Node, &bExists);
-				if (bExists) break;
+				if (Branches.Contains(Node)) break;
+				Branches.Add(Node);
 				Node = Node.GetParent();
 			}
 		}

@@ -24,9 +24,9 @@ bool UVoxelModule::ReserveSimulationStorage(const int32 InSectionCount, const in
 		UE_LOG(LogTemp, Error, TEXT("CapacityUnachievable: simulation directory count exceeds native capacity"));
 		return false;
 	}
-	const uint64 OldBytes = SimulationSections.GetAllocatedSize() + SceneRegions.GetAllocatedSize();
-	const uint64 NewBytes = VoxelBoundedAllocation::SetBytes<FIntVector>(int32(SectionRows)) +
-		VoxelBoundedAllocation::MapBytes<FIntVector, TObjectPtr<UVoxelSceneRegion>>(int32(RegionRows));
+	const uint64 OldBytes = VoxelGenerationAllocation::AllocatedBytes(SimulationSections) + VoxelGenerationAllocation::AllocatedBytes(SceneRegions);
+	const uint64 NewBytes = VoxelGenerationAllocation::Private::SetReserveBytes<FIntVector>(SimulationSections, int32(SectionRows)) +
+		VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FIntVector, TObjectPtr<UVoxelSceneRegion>>>(SceneRegions, int32(RegionRows));
 	const auto Resources = Scheduler->GetRuntimeResources();
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(Epoch, TerrainPlanningOwnerId, 1, {}, 1);
 	FVoxelGenerationRequiredCapacity Required;
@@ -55,7 +55,7 @@ bool UVoxelModule::ReserveSimulationStorage(const int32 InSectionCount, const in
 	SceneRegions.Reserve(int32(RegionRows));
 	SimulationSectionCapacity = int32(SectionRows);
 	SceneRegionCapacity = int32(RegionRows);
-	const uint64 ActualBytes = SimulationSections.GetAllocatedSize() + SceneRegions.GetAllocatedSize();
+	const uint64 ActualBytes = VoxelGenerationAllocation::AllocatedBytes(SimulationSections) + VoxelGenerationAllocation::AllocatedBytes(SceneRegions);
 	check(ActualBytes <= NewBytes);
 	verify(SimulationStorageLease->Resize(ActualBytes));
 	return true;

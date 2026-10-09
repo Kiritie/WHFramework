@@ -76,6 +76,7 @@ UCLASS()
 class WHFRAMEWORK_API UVoxelModule : public UModuleBase
 {
 #if WITH_DEV_AUTOMATION_TESTS
+	friend class FVoxelTerrainRendererWorldCleanupTest;
 	friend class FVoxelNavigationResidencyTest;
 	friend class FVoxelNavigationNativeTileTest;
 	friend class FVoxelFineShardAttemptIsolationTest;
@@ -84,6 +85,9 @@ class WHFRAMEWORK_API UVoxelModule : public UModuleBase
 	friend class FVoxelPublishEstimateRecoveryTest;
 	friend class FVoxelInterestInputBudgetTest;
 	friend class FVoxelNetworkWorldControlTest;
+	friend class FVoxelEmptyTransitionConvergenceTest;
+	friend class FVoxelFineProxyDependenciesTest;
+	friend class FVoxelFinePageCoverageTest;
 #endif
 	friend class UVoxelSceneRegion;
 	GENERATED_BODY()

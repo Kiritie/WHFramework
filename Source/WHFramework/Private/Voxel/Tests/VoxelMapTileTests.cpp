@@ -68,6 +68,7 @@ bool FVoxelMapStyleEpochTest::RunTest(const FString& InParameters)
 	FVoxelGenerationRecipe MapRecipe = *MapConfig.Recipe;
 	MapRecipe.Settings.HydrologyRegionSide = 16;
 	MapRecipe.Settings.HydrologyHaloCells = 4;
+	MapRecipe.Settings.RiverSourceAccumulation = MAX_int32;
 	MapConfig.Recipe = MakeShared<const FVoxelGenerationRecipe, ESPMode::ThreadSafe>(MoveTemp(MapRecipe));
 	const auto Config = MakeShared<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe>(MoveTemp(MapConfig));
 	const auto Generator = MakeShared<const FVoxelGenerationPipeline, ESPMode::ThreadSafe>(

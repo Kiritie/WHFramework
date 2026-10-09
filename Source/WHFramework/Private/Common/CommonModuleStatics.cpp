@@ -439,7 +439,7 @@ UWorld* UCommonModuleStatics::ResolveCurrentWorld(bool bInEditor)
 {
 	auto Matches = [bInEditor](const UWorld* World)
 	{
-		return IsValid(World) && (bInEditor ? World->IsEditorWorld() : World->IsGameWorld());
+		return IsValid(World) && (bInEditor ? World->IsEditorWorld() && !World->IsGameWorld() : World->IsGameWorld());
 	};
 	// 模块生命周期显式指定 World；Actor、组件和 RPC 使用引擎当前 World。
 	if (UObject* Context = FScopedWorldContext::Get(); IsValid(Context) && Matches(Context->GetWorld()))

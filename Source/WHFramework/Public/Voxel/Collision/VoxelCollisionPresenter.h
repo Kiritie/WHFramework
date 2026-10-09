@@ -54,6 +54,11 @@ public:
 	void Reset();
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FVoxelNavigationNativeTileTest;
+	friend class FVoxelNavigationResidencyTest;
+#endif
+
 	struct FPhysicsSync
 	{
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MetadataLease;
