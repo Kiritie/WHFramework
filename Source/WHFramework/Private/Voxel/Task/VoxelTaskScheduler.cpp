@@ -796,14 +796,17 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 		return Reject(EVoxelTaskBlockReason::Dependency);
 	}
 
-	if (IsCoarseTerrainKind(InRequest.Kind) && InRequest.WorkClass != EVoxelWorkClass::Critical)
+	if ((IsCoarseTerrainKind(InRequest.Kind) || IsRepresentationDataKind(InRequest.Kind) ||
+		InRequest.Kind == EVoxelTaskKind::BuildVoxelProxy) && InRequest.WorkClass != EVoxelWorkClass::Critical)
 	{
 		int32 PendingCoarseTerrainTasks = 0;
 
 		for (const FVoxelTaskRequest& PendingRequest : Pending)
 		{
 			PendingCoarseTerrainTasks +=
-				IsCoarseTerrainKind(PendingRequest.Kind)
+				(PendingRequest.WorkClass != EVoxelWorkClass::Critical &&
+					(IsCoarseTerrainKind(PendingRequest.Kind) || IsRepresentationDataKind(PendingRequest.Kind) ||
+						PendingRequest.Kind == EVoxelTaskKind::BuildVoxelProxy))
 					? 1
 					: 0;
 		}

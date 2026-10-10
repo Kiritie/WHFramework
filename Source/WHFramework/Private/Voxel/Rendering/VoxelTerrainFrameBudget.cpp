@@ -39,8 +39,8 @@ FVoxelTerrainFrameAllocation FVoxelTerrainFrameBudget::Observe(const FVoxelTerra
 	const double GameThread = bGameThreadValid ? InObservation.GameThreadMilliseconds :
 		FMath::Max(LastValidGameThreadMilliseconds, Target) + Settings.SafetyMilliseconds;
 	const double NonTerrain = bTerrainValid ? GameThread - InObservation.TerrainGameThreadMilliseconds : GameThread;
-	const double Render = bRenderValid ? InObservation.RenderThreadMilliseconds : FMath::Max(SmoothedRenderMilliseconds, Target);
-	const double GPU = bGPUValid ? InObservation.GPUMilliseconds : FMath::Max(SmoothedGPUMilliseconds, Target);
+	const double Render = bRenderValid ? InObservation.RenderThreadMilliseconds : SmoothedRenderMilliseconds;
+	const double GPU = bGPUValid ? InObservation.GPUMilliseconds : SmoothedGPUMilliseconds;
 	const auto ObservePressure = [this](const double InPrevious, const double InSample)
 	{
 		return !bHasObservation || InSample >= InPrevious ? InSample :
@@ -54,16 +54,12 @@ FVoxelTerrainFrameAllocation FVoxelTerrainFrameBudget::Observe(const FVoxelTerra
 
 	const double Floor = Settings.MinimumNearMilliseconds + Settings.MinimumBackgroundMilliseconds;
 	const double Remaining = Target - FMath::Max(NonTerrain, SmoothedNonTerrainMilliseconds) - Settings.SafetyMilliseconds;
-	const double KnownFrame = FMath::Max(FMath::Max(GameThread, SmoothedGameThreadMilliseconds),
-		FMath::Max(SmoothedRenderMilliseconds, SmoothedGPUMilliseconds));
 	const double RenderPressure = FMath::Max(SmoothedRenderMilliseconds, SmoothedGPUMilliseconds) / Target;
-	const double RenderScale = FMath::Clamp(2.0 - RenderPressure, 0.0, 1.0);
 	FVoxelTerrainFrameAllocation Result;
 	Result.bInvalidTiming = !bGameThreadValid || !bTerrainValid || !bRenderValid || !bGPUValid;
-	Result.bBaseFrameOverloaded = KnownFrame + Settings.SafetyMilliseconds > Target || Remaining < Floor;
-	const double Candidate = Result.bInvalidTiming || Result.bBaseFrameOverloaded ? Floor :
-		FMath::Min(Settings.MaximumTerrainMilliseconds, FMath::Max(0.0, Remaining)) * RenderScale;
-	Result.TotalMilliseconds = FMath::Clamp(Candidate, Floor, Settings.MaximumTerrainMilliseconds);
+	Result.bBaseFrameOverloaded = Remaining < Floor || RenderPressure > 1.0;
+	// 生成与发布共用配置上限，出生交接后也必须继续推进剩余地形。
+	Result.TotalMilliseconds = Settings.MaximumTerrainMilliseconds;
 	Result.NearMinimumMilliseconds = Settings.MinimumNearMilliseconds;
 	Result.BackgroundMinimumMilliseconds = Settings.MinimumBackgroundMilliseconds;
 	const double Span = Settings.MaximumTerrainMilliseconds - Floor;
@@ -71,8 +67,11 @@ FVoxelTerrainFrameAllocation FVoxelTerrainFrameBudget::Observe(const FVoxelTerra
 	Result.ProxyScale = FMath::Clamp(Result.BackgroundScale / 0.35, 0.0, 1.0);
 	Result.SurfaceScale = FMath::Clamp((Result.BackgroundScale - 0.20) / 0.55, 0.0, 1.0);
 	Result.MacroScale = FMath::Clamp((Result.BackgroundScale - 0.50) / 0.50, 0.0, 1.0);
+	// Worker 并发独立于渲染发布预算，避免 GPU 压力把后台数据生成也压成串行。
+	const double WorkerScale = InObservation.bInitialSpawn ? 1.0 :
+		FMath::Clamp(2.0 - FMath::Max(NonTerrain, SmoothedNonTerrainMilliseconds) / Target, 0.0, 1.0);
 	Result.MaximumWorkers = FMath::Clamp(FMath::RoundToInt(FMath::Lerp(double(Settings.MinimumWorkers),
-		double(Settings.MaximumWorkers), Result.BackgroundScale)), Settings.MinimumWorkers, Settings.MaximumWorkers);
+		double(Settings.MaximumWorkers), WorkerScale)), Settings.MinimumWorkers, Settings.MaximumWorkers);
 	return Result;
 }
 

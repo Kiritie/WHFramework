@@ -509,7 +509,9 @@ bool UVoxelAgentComponent::BuildStreamingSource(const bool bInLocalView, FVoxelS
 	if (!VoxelModule || !GetOwner()) return false;
 	FVoxelStreamingSource& Source = OutSource;
 	Source = {};
-	Source.Purpose = bInitialCollisionGatePending ? EVoxelStreamingSourcePurpose::InitialSpawn : EVoxelStreamingSourcePurpose::Observer;
+	// 接管成功后保持观察者身份；碰撞门稍后解除，不能在这期间重新清空出生凭证。
+	Source.Purpose = bInitialCollisionGatePending && !IsBirthSourceCommitted()
+		? EVoxelStreamingSourcePurpose::InitialSpawn : EVoxelStreamingSourcePurpose::Observer;
 	Source.bInheritWorldView = bInheritWorldView;
 	Source.View = StreamingView;
 	Source.bLocalView = bInLocalView;
@@ -679,9 +681,14 @@ void UVoxelAgentComponent::RefreshSource()
 		return;
 	}
 
+	if (BirthClaim.IsValid() && !IsBirthSourceCommitted())
+	{
+		TryCommitBirthSource();
+		return;
+	}
+
 	FVoxelStreamingSource Source;
 	if (!BuildStreamingSource(BoundController.IsValid() && BoundController->IsLocalController(), Source)) return;
-	if (BirthClaim.IsValid() && !IsBirthSourceCommitted()) Source.Purpose = EVoxelStreamingSourcePurpose::InitialSpawn;
 
 	if (!SourceId.IsValid())
 	{

@@ -1,11 +1,13 @@
 #include "ObjectPool/Provider/WidgetPoolProvider.h"
 
 #include "Blueprint/UserWidget.h"
+#include "CoreGlobals.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "ObjectPool/ObjectPoolBucket.h"
 #include "ObjectPool/ObjectPoolModule.h"
 #include "ObjectPool/ObjectPoolModuleTypes.h"
+#include "UObject/UObjectHash.h"
 
 FWidgetPoolProvider::FWidgetPoolProvider(UObjectPoolModule& InModule)
 	: Module(InModule)
@@ -23,20 +25,37 @@ UObject* FWidgetPoolProvider::Spawn(UClass* InClass, const FParameter& InParam)
 	{
 		return nullptr;
 	}
+#if WITH_EDITOR
+	// 游戏实例下的 Widget 不进入外层编辑器事务，避免退出 PIE 后被撤销记录继续持有。
+	TGuardValue<ITransaction*> TransactionGuard(GUndo, World->IsGameWorld() ? nullptr : GUndo);
+#endif
 	const FObjectPoolPolicy Policy = Module.GetPoolPolicy(InClass);
+	UUserWidget* Widget = nullptr;
 	if(!Policy.bEnablePooling || Policy.MaxIdle >= 0)
 	{
-		return UUserWidget::CreateWidgetInstance(*World, InClass, NAME_None);
+		Widget = UUserWidget::CreateWidgetInstance(*World, InClass, NAME_None);
 	}
-
-	APlayerController* PlayerController = Cast<APlayerController>(OwningObject);
-	UObject* Scope = OwningObject ? OwningObject : World;
-	UObjectPoolWidgetBucket* Bucket = Module.FindOrAddWidgetBucket(Scope, World, PlayerController);
-	UUserWidget* Widget = Bucket->Acquire(InClass);
-	if(Widget)
+	else
 	{
-		ActiveBuckets.Add(Widget, Bucket);
+		APlayerController* PlayerController = Cast<APlayerController>(OwningObject);
+		UObject* Scope = OwningObject ? OwningObject : World;
+		UObjectPoolWidgetBucket* Bucket = Module.FindOrAddWidgetBucket(Scope, World, PlayerController);
+		Widget = Bucket->Acquire(InClass);
+		if(Widget)
+		{
+			ActiveBuckets.Add(Widget, Bucket);
+		}
 	}
+#if WITH_EDITOR
+	if(Widget && World->IsGameWorld())
+	{
+		Widget->ClearFlags(RF_Transactional);
+		ForEachObjectWithOuter(Widget, [](UObject* Object)
+		{
+			Object->ClearFlags(RF_Transactional);
+		}, EGetObjectsFlags::IncludeNestedObjects);
+	}
+#endif
 	return Widget;
 }
 

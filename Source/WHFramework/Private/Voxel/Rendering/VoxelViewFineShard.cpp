@@ -566,10 +566,9 @@ void FVoxelViewManager::ProcessFineShardAdmissions()
 	const auto& Interest = GetViewInterest();
 	if (!Interest.PublicationInputs || Interest.PublicationInputs->FineShards.IsEmpty()) return;
 	const auto& Keys = Interest.PublicationInputs->FineShards;
-	const double Deadline = TerrainDeadline(0.5);
 	TArray<FVoxelTerrainServiceCandidate, TInlineAllocator<64>> Candidates;
 	TArray<FVoxelFineShardKey, TInlineAllocator<64>> Captured;
-	for (int32 Scans = 0; Scans < 64 && FPlatformTime::Seconds() < Deadline; ++Scans)
+	for (int32 Scans = 0; Scans < Keys.Num(); ++Scans)
 	{
 		if (FineShardAdmissionCursor >= Keys.Num()) FineShardAdmissionCursor = 0;
 		const FVoxelFineShardKey Key = Keys[FineShardAdmissionCursor++];
@@ -578,6 +577,9 @@ void FVoxelViewManager::ProcessFineShardAdmissions()
 		FFineShardSlot* Slot = FineShardSlots.Find(Key);
 		if (Slot && (Slot->bSubmitted || Slot->Build.IsMeshReady() || !Slot->Build.GetFailure().IsEmpty() ||
 			IsFineShardAdmissionWaiting(*Slot) || (!Slot->PendingRequest.IsSet() && !Slot->bDependencyWake))) continue;
+		if (!Candidates.IsEmpty() && !FVoxelTerrainWorkSelection::HigherPriority(Demand->ServicePriority, Candidates[0].Priority)) continue;
+		Candidates.Reset();
+		Captured.Reset();
 		FVoxelTerrainServiceCandidate& Candidate = Candidates.AddDefaulted_GetRef();
 		Candidate.Index = Captured.Add(Key);
 		Candidate.Priority = Demand->ServicePriority;
@@ -588,7 +590,7 @@ void FVoxelViewManager::ProcessFineShardAdmissions()
 	}
 	FVoxelTerrainServiceCapacity Capacity;
 	Capacity.MaximumWaitSeconds = Module.GetViewSettings().Fine.MaximumBackgroundWaitSeconds;
-	while (FPlatformTime::Seconds() < Deadline)
+	for (int32 Attempt = 0; Attempt < Candidates.Num(); ++Attempt)
 	{
 		Capacity.bAllowOverdueOpportunity = Module.GetTerrainFrameContext().IsOverdueOpportunityAvailable();
 		FVoxelTerrainServiceCharge Charge;
@@ -1067,13 +1069,12 @@ void FVoxelViewManager::PrepareFineShardPresentations()
 {
 	if (!AppliedInterestSnapshot || FineShardSlotOrder.IsEmpty()) return;
 	FVoxelTerrainRenderer& Renderer = Publisher->GetTerrainRenderer();
-	const double Deadline = TerrainDeadline(0.25);
 	TArray<FVoxelTerrainServiceCandidate, TInlineAllocator<64>> Candidates;
 	TArray<FVoxelFineShardKey, TInlineAllocator<64>> Keys;
 	for (uint8 Band = 1; Band < static_cast<uint8>(EVoxelTerrainServiceBand::Count); ++Band)
 	{
 		auto& Queue = FinePresentationQueues[Band];
-		for (int32 Scan = 0; Scan < FMath::Min(8, Queue.GetMaxIndex()) && FPlatformTime::Seconds() < Deadline; ++Scan)
+		for (int32 Scan = 0; Scan < Queue.GetMaxIndex(); ++Scan)
 		{
 		if (Queue.IsEmpty()) break;
 		FinePresentationQueueCursors[Band] %= Queue.GetMaxIndex();
@@ -1082,6 +1083,16 @@ void FVoxelViewManager::PrepareFineShardPresentations()
 		const auto& Key = Queue[Index];
 		FFineShardSlot* Slot = FineShardSlots.Find(Key);
 		if (!Slot || !Slot->Build.IsMeshReady()) continue;
+		if (Slot->bRenderPrepared && Slot->RenderGeometry == Slot->Build.GetPreparedGeometry() &&
+			Slot->RenderLeaseCursor >= Slot->RenderGeometry->Pieces.Num())
+		{
+			const int32 AtomCount = Slot->RenderAtoms.Num();
+			bool bAllPending = AtomCount > 0;
+			for (int32 AtomIndex = 0; AtomIndex < AtomCount && bAllPending; ++AtomIndex)
+				bAllPending = Slot->RenderTransactions[AtomIndex].IsValid() &&
+					Renderer.IsTransactionPending(Slot->RenderTransactions[AtomIndex]);
+			if (bAllPending) continue;
+		}
 		if (Slot->RenderGeometry == Slot->Build.GetPreparedGeometry())
 		{
 			if (Slot->RenderAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked)
@@ -1126,11 +1137,7 @@ void FVoxelViewManager::PrepareFineShardPresentations()
 	FVoxelTerrainServiceCharge Charge;
 	const int32 Chosen = FineShardPresentationSelection.Select(Candidates, Capacity, FPlatformTime::Seconds(), Charge);
 	if (Chosen == INDEX_NONE) return;
-	if (FPlatformTime::Seconds() >= Deadline)
-	{
-		verify(FineShardPresentationSelection.RefundBeforeStart(Charge.Serial));
-		return;
-	}
+	// 候选扫描耗尽局部切片时仍推进一个有界微步，避免区块被反复选中后退回而永不上传。
 	if (Charge.bOverdueOpportunity) Module.GetTerrainFrameContext().ConsumeOverdueOpportunity();
 	const double Started = FPlatformTime::Seconds();
 	const FVoxelFineShardKey Key = Keys[Chosen];
@@ -1399,6 +1406,22 @@ bool FVoxelViewManager::IsFineGeometryPrepared(const FIntVector& InSection) cons
 bool FVoxelViewManager::IsLatestFinePresented(const FIntVector& InSection) const
 {
 	const auto* Actual = Publisher->GetTerrainRenderer().FindPresentedAtom(InSection);
+#if !UE_BUILD_SHIPPING
+	static double NextMissingFineDiagnostic = 0.0;
+	if (!Actual && GetInputRoot().FineWanted.Contains(InSection) && FPlatformTime::Seconds() >= NextMissingFineDiagnostic)
+	{
+		NextMissingFineDiagnostic = FPlatformTime::Seconds() + 5.0;
+		if (const auto* Slot = FineShardSlots.Find({InSection * 16, 16}))
+		{
+			const auto Geometry = Slot->Build.GetPreparedGeometry();
+			UE_LOG(LogTemp, Display, TEXT("Missing Fine publication: section=%s admission=%d queue=%d band=%d prepared=%d complete=%d pieces=%d/%d batch=%d lease=%d atoms=%d transaction=%d pending=%d locked=%d"),
+				*InSection.ToString(), int32(Slot->RenderAdmission), Slot->PresentationQueueIndex, Slot->PresentationQueueBand,
+				Slot->bRenderPrepared, Slot->bPresentationComplete, Slot->RenderPieceCursor, Geometry ? Geometry->Pieces.Num() : 0,
+				Slot->RenderBatchCursor, Slot->RenderLeaseCursor, Slot->RenderAtoms.Num(), Slot->RenderTransactions[0].IsValid(),
+				Publisher->GetTerrainRenderer().IsTransactionPending(Slot->RenderTransactions[0]), Publisher->GetTerrainRenderer().IsLocked(InSection));
+		}
+	}
+#endif
 	if (!Actual || Actual->Stamp.WorldEpoch != WorldEpoch || Actual->Evidence.Content.SampleStepCells != 1 ||
 		(Actual->Evidence.Owner.Kind != EVoxelFineOwnerKind::F0 && Actual->Evidence.Owner.Kind != EVoxelFineOwnerKind::F1Plus)) return false;
 	const auto Geometry = StaticCastSharedPtr<const FVoxelFineShardGeometry>(Actual->Evidence.GeometryLease);

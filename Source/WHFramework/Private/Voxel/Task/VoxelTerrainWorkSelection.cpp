@@ -85,13 +85,13 @@ bool FVoxelTerrainWorkSelection::IsNear(const EVoxelTerrainServiceBand InBand)
 bool FVoxelTerrainWorkSelection::HigherPriority(const FVoxelTerrainServicePriority& InFirst,
 	const FVoxelTerrainServicePriority& InSecond)
 {
-	if (InFirst.Band != InSecond.Band)
-	{
-		return uint8(InFirst.Band) < uint8(InSecond.Band);
-	}
 	if (InFirst.DistanceCells != InSecond.DistanceCells)
 	{
 		return InFirst.DistanceCells < InSecond.DistanceCells;
+	}
+	if (InFirst.Band != InSecond.Band)
+	{
+		return uint8(InFirst.Band) < uint8(InSecond.Band);
 	}
 	if (InFirst.ForwardScore != InSecond.ForwardScore)
 	{
@@ -136,25 +136,10 @@ int32 FVoxelTerrainWorkSelection::Select(TConstArrayView<FVoxelTerrainServiceCan
 		return INDEX_NONE;
 	}
 
-	int32 Normal[BandCount];
-	int32 Oldest[BandCount];
-	for (int32 Band = 0; Band < BandCount; ++Band)
+	int32 BestIndex = INDEX_NONE;
+	for (int32 Index = 0; Index < InCandidates.Num(); ++Index)
 	{
-		Normal[Band] = INDEX_NONE;
-		Oldest[Band] = INDEX_NONE;
-	}
-	bool bHasNear = false;
-	bool bHasNonNear = false;
-	const auto IsOlder = [&InCandidates](const int32 FirstIndex, const int32 SecondIndex)
-	{
-		const FVoxelTerrainServiceCandidate& First = InCandidates[FirstIndex];
-		const FVoxelTerrainServiceCandidate& Second = InCandidates[SecondIndex];
-		return First.FirstQueuedSeconds != Second.FirstQueuedSeconds ?
-			First.FirstQueuedSeconds < Second.FirstQueuedSeconds : First.Sequence < Second.Sequence;
-	};
-	for (int32 CandidateIndex = 0; CandidateIndex < InCandidates.Num(); ++CandidateIndex)
-	{
-		const FVoxelTerrainServiceCandidate& Candidate = InCandidates[CandidateIndex];
+		const auto& Candidate = InCandidates[Index];
 		const int32 Band = static_cast<int32>(Candidate.Priority.Band);
 		if (!Candidate.bRunnable || Candidate.Index == INDEX_NONE || Band <= 0 || Band >= BandCount ||
 			!FMath::IsFinite(Candidate.Priority.DistanceCells) || Candidate.Priority.DistanceCells < 0.0 ||
@@ -164,163 +149,26 @@ int32 FVoxelTerrainWorkSelection::Select(TConstArrayView<FVoxelTerrainServiceCan
 		{
 			continue;
 		}
-		bHasNear |= IsNear(Candidate.Priority.Band);
-		bHasNonNear |= !IsNear(Candidate.Priority.Band);
-		const int32 Previous = Normal[Band];
-		if (Previous == INDEX_NONE || HigherPriority(Candidate.Priority, InCandidates[Previous].Priority) ||
-			(Candidate.Priority == InCandidates[Previous].Priority && IsOlder(CandidateIndex, Previous)))
+		if (BestIndex == INDEX_NONE || HigherPriority(Candidate.Priority, InCandidates[BestIndex].Priority) ||
+			(Candidate.Priority == InCandidates[BestIndex].Priority &&
+			 (Candidate.FirstQueuedSeconds < InCandidates[BestIndex].FirstQueuedSeconds ||
+			  (Candidate.FirstQueuedSeconds == InCandidates[BestIndex].FirstQueuedSeconds &&
+			   Candidate.Sequence < InCandidates[BestIndex].Sequence))))
 		{
-			Normal[Band] = CandidateIndex;
-		}
-		if (Oldest[Band] == INDEX_NONE || IsOlder(CandidateIndex, Oldest[Band]))
-		{
-			Oldest[Band] = CandidateIndex;
+			BestIndex = Index;
 		}
 	}
-	if (!bHasNear && !bHasNonNear)
+	if (BestIndex == INDEX_NONE || NextChargeSerial == MAX_uint64 || !ReserveCharges())
 	{
 		return INDEX_NONE;
 	}
-	if (!ReserveCharges()) return INDEX_NONE;
-
-	EVoxelTerrainServicePool Pool = EVoxelTerrainServicePool::All;
-	if (InCapacity.MaximumWorkers > 1)
-	{
-		const int32 NearFloor = FMath::Clamp(InCapacity.NearReservedWorkers, 1, InCapacity.MaximumWorkers - 1);
-		const int32 NonNearFloor = FMath::Clamp(InCapacity.MinimumNonNearWorkers, 1, InCapacity.MaximumWorkers - NearFloor);
-		const int32 RunningNonNear = InCapacity.RunningWorkers - InCapacity.RunningNearWorkers;
-		if (bHasNear && InCapacity.RunningNearWorkers < NearFloor)
-		{
-			Pool = EVoxelTerrainServicePool::Near;
-		}
-		else if (bHasNonNear && RunningNonNear < NonNearFloor)
-		{
-			Pool = EVoxelTerrainServicePool::NonNear;
-		}
-	}
-	FPoolState& State = Pools[static_cast<int32>(Pool)];
-	// 超期只获得一次有界微步骤；其真实耗时仍记入原池的欠额。
-	int32 OverdueIndex = INDEX_NONE;
-	if (InCapacity.bAllowOverdueOpportunity && IsValidCost(InCapacity.MaximumOverdueMicroseconds))
-	{
-		for (int32 Band = 1; Band < BandCount; ++Band)
-		{
-			const int32 Index = Oldest[Band];
-			if (Index == INDEX_NONE ||
-				(Pool == EVoxelTerrainServicePool::Near && !IsNear(EVoxelTerrainServiceBand(Band))) ||
-				(Pool == EVoxelTerrainServicePool::NonNear && IsNear(EVoxelTerrainServiceBand(Band))) ||
-				InNowSeconds - InCandidates[Index].FirstQueuedSeconds < InCapacity.MaximumWaitSeconds ||
-				InCandidates[Index].EstimatedMicroseconds > InCapacity.MaximumOverdueMicroseconds)
-			{
-				continue;
-			}
-			if (OverdueIndex == INDEX_NONE || IsOlder(Index, OverdueIndex))
-			{
-				OverdueIndex = Index;
-			}
-		}
-	}
-	if (OverdueIndex != INDEX_NONE && NextChargeSerial < MAX_uint64)
-	{
-		const auto& Candidate = InCandidates[OverdueIndex];
-		const double Cost = FMath::Max(1.0, Candidate.EstimatedMicroseconds);
-		if (!TryChangeCredit(State, int32(Candidate.Priority.Band), -Cost))
-		{
-			return INDEX_NONE;
-		}
-		OutCharge.Serial = ++NextChargeSerial;
-		OutCharge.Pool = Pool;
-		OutCharge.Band = Candidate.Priority.Band;
-		OutCharge.EstimatedMicroseconds = Cost;
-		OutCharge.bOverdueOpportunity = true;
-		OutstandingCharges.Add(OutCharge.Serial, OutCharge);
-		return Candidate.Index;
-	}
-	constexpr double Quantum[BandCount] = {0.0, 8000.0, 4000.0, 2000.0, 1000.0, 500.0, 250.0, 250.0};
-	int32 Heads[BandCount];
-	for (int32 Band = 0; Band < BandCount; ++Band)
-	{
-		Heads[Band] = INDEX_NONE;
-		if (Band == 0 || Normal[Band] == INDEX_NONE ||
-			(Pool == EVoxelTerrainServicePool::Near && !IsNear(EVoxelTerrainServiceBand(Band))) ||
-			(Pool == EVoxelTerrainServicePool::NonNear && IsNear(EVoxelTerrainServiceBand(Band))))
-		{
-			continue;
-		}
-		const bool bOldestTurn = State.DispatchCounts[Band] % 4 == 3 ||
-			InNowSeconds - InCandidates[Oldest[Band]].FirstQueuedSeconds >= InCapacity.MaximumWaitSeconds;
-		Heads[Band] = bOldestTurn ? Oldest[Band] : Normal[Band];
-	}
-
-	for (int32 Pass = 0; Pass < 2; ++Pass)
-	{
-		for (int32 Visit = 0; Visit < BandCount - 1; ++Visit)
-		{
-			const int32 Band = State.Cursor;
-			const int32 CandidateIndex = Heads[Band];
-			if (CandidateIndex != INDEX_NONE)
-			{
-				if (!State.bVisitOpen)
-				{
-					if (!TryChangeCredit(State, Band, Quantum[Band]))
-					{
-						return INDEX_NONE;
-					}
-					State.bVisitOpen = true;
-				}
-				const double Cost = FMath::Max(1.0, InCandidates[CandidateIndex].EstimatedMicroseconds);
-				if (State.Deficits[Band] >= Cost)
-				{
-					if (NextChargeSerial == MAX_uint64)
-					{
-						return INDEX_NONE;
-					}
-					if (!TryChangeCredit(State, Band, -Cost))
-					{
-						return INDEX_NONE;
-					}
-					++State.DispatchCounts[Band];
-					OutCharge.Serial = ++NextChargeSerial;
-					OutCharge.Pool = Pool;
-					OutCharge.Band = EVoxelTerrainServiceBand(Band);
-					OutCharge.EstimatedMicroseconds = Cost;
-					OutstandingCharges.Add(OutCharge.Serial, OutCharge);
-					return InCandidates[CandidateIndex].Index;
-				}
-			}
-			State.bVisitOpen = false;
-			State.Cursor = Band == BandCount - 1 ? 1 : Band + 1;
-		}
-
-		double AdditionalRounds = MAX_dbl;
-		for (int32 Band = 1; Band < BandCount; ++Band)
-		{
-			if (Heads[Band] == INDEX_NONE)
-			{
-				continue;
-			}
-			const double Cost = FMath::Max(1.0, InCandidates[Heads[Band]].EstimatedMicroseconds);
-			const double Missing = FMath::Max(0.0, Cost - State.Deficits[Band]);
-			AdditionalRounds = FMath::Min(AdditionalRounds, FMath::CeilToDouble(Missing / Quantum[Band]));
-		}
-		if (!FMath::IsFinite(AdditionalRounds) || AdditionalRounds == MAX_dbl)
-		{
-			bAccountingFault = true;
-			return INDEX_NONE;
-		}
-		const double SkippedRounds = FMath::Max(0.0, AdditionalRounds - 1.0);
-		for (int32 Band = 1; Band < BandCount; ++Band)
-		{
-			if (Heads[Band] != INDEX_NONE)
-			{
-				if (!TryChangeCredit(State, Band, SkippedRounds * Quantum[Band]))
-				{
-					return INDEX_NONE;
-				}
-			}
-		}
-	}
-	return INDEX_NONE;
+	const auto& Candidate = InCandidates[BestIndex];
+	OutCharge.Serial = ++NextChargeSerial;
+	OutCharge.Pool = EVoxelTerrainServicePool::All;
+	OutCharge.Band = Candidate.Priority.Band;
+	OutCharge.EstimatedMicroseconds = FMath::Max(1.0, Candidate.EstimatedMicroseconds);
+	OutstandingCharges.Add(OutCharge.Serial, OutCharge);
+	return Candidate.Index;
 }
 
 bool FVoxelTerrainWorkSelection::Settle(const uint64 InChargeSerial, const double InActualMicroseconds)
@@ -330,16 +178,13 @@ bool FVoxelTerrainWorkSelection::Settle(const uint64 InChargeSerial, const doubl
 	{
 		return false;
 	}
-	const FVoxelTerrainServiceCharge Charge = *Found;
 	OutstandingCharges.Remove(InChargeSerial);
 	if (!IsValidCost(InActualMicroseconds))
 	{
 		bAccountingFault = true;
 		return false;
 	}
-	FPoolState& State = Pools[static_cast<int32>(Charge.Pool)];
-	return TryChangeCredit(State, static_cast<int32>(Charge.Band),
-		Charge.EstimatedMicroseconds - FMath::Max(1.0, InActualMicroseconds));
+	return true;
 }
 
 bool FVoxelTerrainWorkSelection::RefundBeforeStart(const uint64 InChargeSerial)
@@ -349,9 +194,8 @@ bool FVoxelTerrainWorkSelection::RefundBeforeStart(const uint64 InChargeSerial)
 	{
 		return false;
 	}
-	const FVoxelTerrainServiceCharge Charge = *Found;
 	OutstandingCharges.Remove(InChargeSerial);
-	return TryChangeCredit(Pools[static_cast<int32>(Charge.Pool)], static_cast<int32>(Charge.Band), Charge.EstimatedMicroseconds);
+	return true;
 }
 
 bool FVoxelTerrainWorkSelection::Reset()
@@ -359,10 +203,6 @@ bool FVoxelTerrainWorkSelection::Reset()
 	if (!OutstandingCharges.IsEmpty())
 	{
 		return false;
-	}
-	for (FPoolState& State : Pools)
-	{
-		State = {};
 	}
 	bAccountingFault = false;
 	return true;
@@ -376,16 +216,4 @@ bool FVoxelTerrainWorkSelection::HasAccountingFault() const
 bool FVoxelTerrainWorkSelection::IsValidCost(const double InMicroseconds)
 {
 	return FMath::IsFinite(InMicroseconds) && InMicroseconds >= 0.0 && InMicroseconds <= MaximumTaskCostMicroseconds;
-}
-
-bool FVoxelTerrainWorkSelection::TryChangeCredit(FPoolState& InOutState, const int32 InBand, const double InDelta)
-{
-	const double Candidate = InOutState.Deficits[InBand] + InDelta;
-	if (!FMath::IsFinite(InDelta) || !FMath::IsFinite(Candidate) || FMath::Abs(Candidate) > MaximumAccountingMagnitude)
-	{
-		bAccountingFault = true;
-		return false;
-	}
-	InOutState.Deficits[InBand] = Candidate;
-	return true;
 }

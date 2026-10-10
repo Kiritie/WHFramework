@@ -144,6 +144,21 @@ private:
 		int32 ReservedSplits = 0;
 		bool bPublished = false;
 	};
+	struct FEntrySlot
+	{
+		FEntry Entry;
+		uint64 Serial = 0;
+		int32 NextFree = INDEX_NONE;
+	};
+	struct FEntryPage
+	{
+		static constexpr int32 Size = 16;
+		FEntrySlot Slots[Size];
+	};
+	FEntry* FindEntry(uint64 InSerial);
+	const FEntry* FindEntry(uint64 InSerial) const;
+	uint64 AddEntry(const FEntry& InEntry);
+	uint64 AdditionalLedgerBytes(int64 InRequiredEntries) const;
 	bool CanAdd(EVoxelTerrainResourcePool InPool, uint64 InBytes) const;
 	bool CanFitRequired(EVoxelTerrainResourcePool InPool, uint64 InBytes, int32 InReservedSplits,
 		uint64 InRequiredInputBytes, int32 InRequiredLeaseCount) const;
@@ -170,7 +185,8 @@ private:
 
 	mutable FCriticalSection Mutex;
 	FVoxelTerrainResourceSnapshot State;
-	TMap<uint64, FEntry> Entries;
+	TArray<TUniquePtr<FEntryPage>> EntryPages;
+	int32 FirstFreeEntry = INDEX_NONE;
 	int32 EntryCapacity = 0;
 	uint64 NextSerial = 0;
 	FReleaseEvent LatestRelease;

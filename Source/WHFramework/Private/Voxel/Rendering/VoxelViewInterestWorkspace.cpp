@@ -123,6 +123,7 @@ bool FVoxelViewManager::BeginInterestWorkspace(TSharedPtr<const FVoxelInterestSe
 	InterestWorkspace->RetiredShards.Reserve(ShardsCount);
 	InterestWorkspace->ChangedShardOwners.Reserve(ShardsCount);
 	InterestWorkspace->Snapshot = MoveTemp(InSnapshot);
+	InterestWorkspace->PreviousSnapshot = AppliedInterestSnapshot;
 	PendingInterestSnapshot = InterestWorkspace->Snapshot;
 	PendingPublicationInputs = PendingInterestSnapshot->PublicationInputs;
 	PendingInterestRevision = PendingInterestSnapshot->PublicationRevision;
@@ -268,6 +269,13 @@ void FVoxelViewManager::AdvanceInterestWorkspace(const double InDeadline)
 		case 13:
 			if (!Inputs.Geometry.IsValidIndex(Workspace.Cursor)) { NextPhase(); break; }
 			{
+				const auto& Geometry = Inputs.Geometry[Workspace.Cursor];
+				const auto* Previous = Workspace.PreviousSnapshot ? Workspace.PreviousSnapshot->Geometry.Find(Geometry.Key) : nullptr;
+				if (Previous && *Previous == Geometry)
+				{
+					++Workspace.Cursor;
+					break;
+				}
 				auto& Hierarchy = Module.GetRuntime()->GetChangeHierarchy();
 				const auto Owner = Hierarchy.GetControlConsumer();
 				const uint64 Before = Scheduler.GetRuntimeResources()->ReleaseVersionExcludingOwner(Owner);
@@ -281,7 +289,6 @@ void FVoxelViewManager::AdvanceInterestWorkspace(const double InDeadline)
 					if (Workspace.bWaitingHierarchyCapacity)
 					{
 						const auto Capacity = Scheduler.GetRuntimeResources()->Snapshot();
-						const auto& Geometry = Inputs.Geometry[Workspace.Cursor];
 						UE_LOG(LogTemp, Display,
 							TEXT("Voxel interest hierarchy waiting: cursor=%d/%d representation=%d coordinate=%s level=%u input=%llu/%llu metadata=%llu handles=%llu leases=%d splits=%d release=%llu reason=%s"),
 							Workspace.Cursor, Inputs.Geometry.Num(), int32(Geometry.Key.Representation), *Geometry.Key.Coordinate.ToString(),
@@ -402,8 +409,10 @@ void FVoxelViewManager::AdvanceCommittedInterestEvents(const double InDeadline)
 			});
 			break;
 		case 5:
-			Visit(Events.Snapshot->PublicationInputs->Geometry, [this](const FVoxelTerrainGeometry& Geometry)
+			Visit(Events.Snapshot->PublicationInputs->Geometry, [this, &Events](const FVoxelTerrainGeometry& Geometry)
 			{
+				const auto* Previous = Events.PreviousSnapshot ? Events.PreviousSnapshot->Geometry.Find(Geometry.Key) : nullptr;
+				if (Previous && *Previous == Geometry) return;
 				FIntVector Min, Max;
 				if (Geometry.Key.TryBounds(Geometry.WorldMinZ, Geometry.WorldMaxZ, Min, Max)) MarkCoverageDirty({FIntPoint(Min.X, Min.Y), FIntPoint(Max.X, Max.Y)});
 				bHeightfieldTopologyDirty |= Geometry.Key.IsColumn();

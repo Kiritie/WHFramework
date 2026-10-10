@@ -319,6 +319,10 @@ void UVoxelModule::OnRefresh(
 	const bool bDedicated = GetWorld()->GetNetMode() == NM_DedicatedServer;
 	const double MissingTiming = std::numeric_limits<double>::quiet_NaN();
 	FVoxelTerrainFrameObservation Observation;
+	for (const auto& Pair : Sources)
+	{
+		Observation.bInitialSpawn |= Pair.Value.Value.Purpose == EVoxelStreamingSourcePurpose::InitialSpawn;
+	}
 	Observation.GameThreadMilliseconds = GGameThreadTime > 0 ?
 		FPlatformTime::ToMilliseconds(GGameThreadTime) : MissingTiming;
 	Observation.TerrainGameThreadMilliseconds = TerrainFrameContext.GetLastTerrainMilliseconds();
@@ -481,6 +485,29 @@ void UVoxelModule::OnRefresh(
 	}
 
 	const double AfterInterest = FPlatformTime::Seconds();
+	// 先接纳新需求，避免旧区域工作耗尽预算后，新出生点无法接管。
+	if (ViewManager)
+	{
+		ViewManager->AdvanceInterestInputs(InterestRevision, CollectLocalViewObservers());
+	}
+	const auto TickView = [this]()
+	{
+		if (!ViewManager) return true;
+		ViewManager->Tick(InterestRevision, CollectLocalViewObservers());
+		const auto Admission = ViewManager->GetLastServiceResourceAdmission();
+		if (Admission != EVoxelTerrainResourceAdmission::CapacityUnachievable &&
+			Admission != EVoxelTerrainResourceAdmission::InvalidRequest) return true;
+		WorldState = EVoxelWorldState::Failed;
+		UE_LOG(LogTemp, Error, TEXT("Voxel service admission failed: %s"),
+			Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable") : TEXT("InvalidRequest"));
+		UpdateReadiness();
+		TerrainFrameContext.End(FPlatformTime::Seconds());
+		return false;
+	};
+	// 数据准入和可见发布轮流先执行，单次数据操作超时不能持续饿死已完成网格的提交。
+	const bool bViewFirst = (GFrameCounter & 1) == 0;
+	if (bViewFirst && !TickView()) return;
+	const double EmergeStart = FPlatformTime::Seconds();
 
 	EmergeManager->Tick(*CurrentInterest, CurrentInterest->DemandRevision, Now,
 		ViewSettings.Budget.DataAdmissionPerFrame, ViewSettings.Budget.AdmissionMilliseconds, &TerrainFrameContext);
@@ -497,7 +524,7 @@ void UVoxelModule::OnRefresh(
 	}
 
 	const double AfterEmerge = FPlatformTime::Seconds();
-	LastEmergeAdmissionMilliseconds = (AfterEmerge - AfterInterest) * 1000.0;
+	LastEmergeAdmissionMilliseconds = (AfterEmerge - EmergeStart) * 1000.0;
 
 	ResidencyManager->Tick(CurrentInterest->Exact, InterestRevision, Now, &TerrainFrameContext);
 
@@ -522,23 +549,7 @@ void UVoxelModule::OnRefresh(
 		NavigationPresenter->Tick();
 	}
 
-	if (ViewManager)
-	{
-		ViewManager->Tick(
-			InterestRevision,
-			CollectLocalViewObservers());
-		const auto ServiceAdmission = ViewManager->GetLastServiceResourceAdmission();
-		if (ServiceAdmission == EVoxelTerrainResourceAdmission::CapacityUnachievable ||
-			ServiceAdmission == EVoxelTerrainResourceAdmission::InvalidRequest)
-		{
-			WorldState = EVoxelWorldState::Failed;
-			UE_LOG(LogTemp, Error, TEXT("Voxel service admission failed: %s"),
-				ServiceAdmission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable") : TEXT("InvalidRequest"));
-			UpdateReadiness();
-			TerrainFrameContext.End(FPlatformTime::Seconds());
-			return;
-		}
-	}
+	if (!bViewFirst && !TickView()) return;
 
 	const double AfterView = FPlatformTime::Seconds();
 
@@ -2298,7 +2309,7 @@ void UVoxelModule::RefreshInterest(
 		{
 			return Result;
 		}
-		if (!Capture->Advance(16, Cancel))
+		if (!Capture->Advance(128, Cancel))
 		{
 			Result.bSuccess = Result.bContinue = !Cancel.Load();
 			return Result;
@@ -4358,7 +4369,8 @@ bool UVoxelModule::IsTerrainSafeAt(const FGuid& InSource, const FBox& InWorldBou
 	if (!IsReady() || !Source || !IsSourceAdmitted(InSource) || !InWorldBounds.IsValid ||
 		InWorldBounds.Min.ContainsNaN() || InWorldBounds.Max.ContainsNaN()) return false;
 	const bool bRequiresVisual = Source->Source.Has(EVoxelStreamingCapability::FineVisual);
-	if (bRequiresVisual && (Source->bRequiresTravelBarrier || !ViewManager)) return false;
+	// 角色安全依据本次实际占用范围；驻留窗口的预测屏障不能阻止在已就绪地形上落地。
+	if (bRequiresVisual && !ViewManager) return false;
 	const FVector Minimum = InWorldBounds.Min / BlockSize();
 	const FVector Maximum = InWorldBounds.Max / BlockSize();
 	const FIntVector First(FMath::FloorToInt(Minimum.X / 16.0), FMath::FloorToInt(Minimum.Y / 16.0), FMath::FloorToInt(Minimum.Z / 16.0));

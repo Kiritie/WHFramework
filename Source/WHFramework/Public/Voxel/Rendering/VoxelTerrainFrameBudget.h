@@ -32,6 +32,7 @@ struct WHFRAMEWORK_API FVoxelTerrainFrameObservation
 	double TerrainGameThreadMilliseconds = 0.0;
 	double RenderThreadMilliseconds = 0.0;
 	double GPUMilliseconds = 0.0;
+	bool bInitialSpawn = false;
 };
 
 struct WHFRAMEWORK_API FVoxelTerrainFrameAllocation

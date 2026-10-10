@@ -124,6 +124,7 @@ public:
 		uint64 InInterestRevision,
 		TConstArrayView<FVector> InObservers);
 	void RefreshTaskPriorities();
+	void AdvanceInterestInputs(uint64 InRevision, TConstArrayView<FVector> InObservers);
 	void ApplyInterestDelta(const FVoxelInterestDelta& InDelta);
 	FVoxelFrameTimings GetFrameTimings() const { return FrameTimings; }
 	EVoxelTerrainResourceAdmission GetLastServiceResourceAdmission() const { return LastServiceResourceAdmission; }
@@ -198,6 +199,7 @@ private:
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MetadataLease;
 		TSharedPtr<FInterestInputRoot, ESPMode::ThreadSafe> Root;
 		TSharedPtr<const FVoxelInterestSet, ESPMode::ThreadSafe> Snapshot;
+		TSharedPtr<const FVoxelInterestSet, ESPMode::ThreadSafe> PreviousSnapshot;
 		TArray<FVoxelPublishGroupKey> ChangedCoverage;
 		TArray<FVoxelPublishGroupKey> Retirements;
 		TArray<FVoxelFinePageKey> LayoutChanges;
@@ -547,6 +549,7 @@ private:
 	FVoxelPublishBudget& TerrainFrameBudget;
 	bool bTerrainFrameBudgetActive = false;
 	int32 NextManagerPhase = 0;
+	int32 NextAdmissionPhase = 0;
 	TSharedPtr<const FVoxelTerrainPublicationInputs, ESPMode::ThreadSafe> PendingPublicationInputs;
 	TSharedPtr<const FVoxelInterestSet, ESPMode::ThreadSafe> PendingInterestSnapshot;
 	TSharedPtr<const FVoxelInterestSet, ESPMode::ThreadSafe> QueuedInterestSnapshot;
@@ -559,7 +562,6 @@ private:
 	bool bPendingPageLayoutChanged = false;
 	FVoxelFinePagePlan PendingFinePagePlan;
 	TSet<FVoxelFinePageKey> PendingLayoutInvalidations;
-	void AdvanceInterestInputs(uint64 InRevision, TConstArrayView<FVector> InObservers);
 	double TerrainDeadline(double InMaximumMilliseconds) const;
 	TArray<FVector> PriorityObservers;
 	TMap<int32, int32> AdmissionScanIndices[4];

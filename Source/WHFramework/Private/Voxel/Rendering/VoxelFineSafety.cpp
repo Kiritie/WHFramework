@@ -49,6 +49,14 @@ bool FVoxelFineFeedbackCapture::Advance(const int32 InMaximumShards, const TAtom
 {
 	if (InCancel.Load() || InMaximumShards < 1) return false;
 	if (!Interest->PublicationInputs) return true;
+	// 安全查询先完整采集实际运行区；驻留分片只需找到首个缺失项即可判为未就绪。
+	const auto& RuntimeSections = Interest->PublicationInputs->RuntimeSections;
+	for (int32 Work = 0; Work < InMaximumShards * 8 && RuntimeSections.IsValidIndex(RuntimeCursor); ++Work)
+	{
+		if (InCancel.Load()) return false;
+		CaptureSection(RuntimeSections[RuntimeCursor++]);
+	}
+	if (RuntimeCursor < RuntimeSections.Num()) return false;
 	const auto& Shards = Interest->PublicationInputs->FineShards;
 	for (int32 Work = 0; Work < InMaximumShards && Shards.IsValidIndex(ShardCursor); ++Work)
 	{
@@ -56,20 +64,16 @@ bool FVoxelFineFeedbackCapture::Advance(const int32 InMaximumShards, const TAtom
 		const auto& Key = Shards[ShardCursor++];
 		const int32 Side = Key.SideCells / 16;
 		bool bCurrent = true;
-		for (int32 Z = 0; Z < Side; ++Z)
-			for (int32 Y = 0; Y < Side; ++Y)
-				for (int32 X = 0; X < Side; ++X)
+		for (int32 Z = 0; Z < Side && bCurrent; ++Z)
+			for (int32 Y = 0; Y < Side && bCurrent; ++Y)
+				for (int32 X = 0; X < Side && bCurrent; ++X)
 				{
 					const auto Coverage = CaptureSection(Key.Min / 16 + FIntVector(X, Y, Z));
 					bCurrent &= Coverage.bWholeVisualCommitted && Coverage.bContentVersionsCurrent;
 				}
 		Feedback->Shards.Add(Key, {bCurrent, bCurrent, bCurrent});
 	}
-	if (ShardCursor < Shards.Num()) return false;
-	const auto& RuntimeSections = Interest->PublicationInputs->RuntimeSections;
-	for (int32 Work = 0; Work < InMaximumShards * 8 && RuntimeSections.IsValidIndex(RuntimeCursor); ++Work)
-		CaptureSection(RuntimeSections[RuntimeCursor++]);
-	return RuntimeCursor >= RuntimeSections.Num();
+	return ShardCursor >= Shards.Num();
 }
 
 TSharedRef<const FVoxelFineResidencyFeedback, ESPMode::ThreadSafe> FVoxelFineFeedbackCapture::GetFeedback() const

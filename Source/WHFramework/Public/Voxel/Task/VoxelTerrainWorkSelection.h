@@ -95,23 +95,10 @@ public:
 
 private:
 	static constexpr int32 BandCount = static_cast<int32>(EVoxelTerrainServiceBand::Count);
-	static constexpr int32 PoolCount = static_cast<int32>(EVoxelTerrainServicePool::Count);
-
-	struct FPoolState
-	{
-		double Deficits[BandCount] = {};
-		uint64 DispatchCounts[BandCount] = {};
-		int32 Cursor = 1;
-		bool bVisitOpen = false;
-	};
-
-	bool TryChangeCredit(FPoolState& InOutState, int32 InBand, double InDelta);
 	bool ReserveCharges();
 
 	static constexpr double MaximumTaskCostMicroseconds = 1000000000.0;
-	static constexpr double MaximumAccountingMagnitude = 281474976710656.0;
 	static constexpr int32 MaximumOutstandingCharges = 4096;
-	FPoolState Pools[PoolCount];
 	TMap<uint64, FVoxelTerrainServiceCharge> OutstandingCharges;
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
 	FVoxelGenerationConsumerKey Consumer;

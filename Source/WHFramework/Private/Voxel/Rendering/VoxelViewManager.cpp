@@ -578,19 +578,36 @@ void FVoxelViewManager::Tick(
 			});
 		else if (Phase == 3 && bCurrentInterest)
 		{
-			// 接纳只创建带完整身份的后台工作，不修改当前 coverage pass 的局部输出。
-			Run(EVoxelPublishPhase::Admission, [this] { ProcessAdmissions(); });
-			Run(EVoxelPublishPhase::Admission, [this] { ProcessDataAdmissions(); });
-			Run(EVoxelPublishPhase::Admission, [this] { ProcessFineShardAdmissions(); });
-			Run(EVoxelPublishPhase::Prepare, [this]
+			const int32 FirstService = NextAdmissionPhase;
+			NextAdmissionPhase = (FirstService + 1) % 5;
+			for (int32 Service = 0; Service < 5 && TerrainFrameBudget.RemainingMilliseconds(FPlatformTime::Seconds()) > 0.0; ++Service)
 			{
-				const double Deadline = TerrainDeadline(0.25);
-				for (int32 Step = 0; Step < 32 && FPlatformTime::Seconds() < Deadline; ++Step) PrepareFineShardPresentations();
-			});
-			if (!bCoverageReadScope)
-			{
-				Run(EVoxelPublishPhase::Admission, [this] { PumpHeightfieldTransitions(); });
-				Run(EVoxelPublishPhase::Admission, [this] { PumpVolumeTransitions(); });
+				switch ((FirstService + Service) % 5)
+				{
+				case 0:
+					Run(EVoxelPublishPhase::Prepare, [this]
+					{
+						const double Deadline = TerrainDeadline(0.25);
+						for (int32 Step = 0; Step < 32 && FPlatformTime::Seconds() < Deadline; ++Step) PrepareFineShardPresentations();
+					});
+					break;
+				case 1:
+					Run(EVoxelPublishPhase::Admission, [this] { ProcessDataAdmissions(); });
+					break;
+				case 2:
+					Run(EVoxelPublishPhase::Admission, [this] { ProcessFineShardAdmissions(); });
+					break;
+				case 3:
+					Run(EVoxelPublishPhase::Admission, [this] { ProcessAdmissions(); });
+					break;
+				case 4:
+					if (!bCoverageReadScope)
+					{
+						Run(EVoxelPublishPhase::Admission, [this] { PumpHeightfieldTransitions(); });
+						Run(EVoxelPublishPhase::Admission, [this] { PumpVolumeTransitions(); });
+					}
+					break;
+				}
 			}
 		}
 		else if (Phase == 4 && bCurrentInterest &&
@@ -635,10 +652,13 @@ void FVoxelViewManager::Tick(
 #if !UE_BUILD_SHIPPING
 	if (FrameTimings.bPublishBudgetOverrun && FPlatformTime::Seconds() >= NextBudgetLog)
 	{
-		UE_LOG(LogTemp, Display, TEXT("Voxel terrain budget overrun: totalMs=%.3f maximumOperationMs=%.3f budgetMs=%.3f planMs=%.3f admissionMs=%.3f prepareMs=%.3f commitMs=%.3f retireMs=%.3f"),
-			FrameTimings.PublishTotalMilliseconds, FrameTimings.PublishMaximumOperationMilliseconds, Module.GetViewSettings().Budget.TerrainPublishMilliseconds,
+		UE_LOG(LogTemp, Display, TEXT("Voxel terrain budget overrun: totalMs=%.3f maximumOperationMs=%.3f budgetMs=%.3f planMs=%.3f admissionMs=%.3f prepareMs=%.3f commitMs=%.3f retireMs=%.3f workers=%d invalidTiming=%d overloaded=%d"),
+			FrameTimings.PublishTotalMilliseconds, FrameTimings.PublishMaximumOperationMilliseconds, Module.GetTerrainFrameContext().GetAllocation().TotalMilliseconds,
 			FrameTimings.PublishPlanMilliseconds, FrameTimings.AdmissionMilliseconds, FrameTimings.PublishPrepareMilliseconds,
-			FrameTimings.PublishCommitMilliseconds, FrameTimings.RetireMilliseconds);
+			FrameTimings.PublishCommitMilliseconds, FrameTimings.RetireMilliseconds,
+			Module.GetTerrainFrameContext().GetAllocation().MaximumWorkers,
+			Module.GetTerrainFrameContext().GetAllocation().bInvalidTiming,
+			Module.GetTerrainFrameContext().GetAllocation().bBaseFrameOverloaded);
 		NextBudgetLog = FPlatformTime::Seconds() + 5.0;
 	}
 #endif
@@ -902,11 +922,11 @@ void FVoxelViewManager::ProcessServiceAdmissions(const bool bInDataOnly)
 	TArray<FVoxelTerrainServiceCandidate, TInlineAllocator<128>> Candidates;
 	TArray<FVoxelTaskKey, TInlineAllocator<128>> Identities;
 	TArray<int32, TInlineAllocator<128>> CandidateAdmissions;
-	for (int32 Kind = bInDataOnly ? 1 : 0; Kind < 4 && FPlatformTime::Seconds() < Deadline; ++Kind)
+	for (int32 Kind = bInDataOnly ? 1 : 0; Kind < 4; ++Kind)
 	{
 		const auto& Lane = Interest.AdmissionLanes[Kind];
 		int32& Scan = ServiceAdmissionScans[Stage][Kind];
-		for (int32 Attempt = 0; Attempt < FMath::Min(32, Lane.Num()) && FPlatformTime::Seconds() < Deadline; ++Attempt)
+		for (int32 Attempt = 0; Attempt < Lane.Num(); ++Attempt)
 		{
 			Scan %= Lane.Num();
 			const int32 Index = Lane[Scan++];
@@ -955,6 +975,12 @@ void FVoxelViewManager::ProcessServiceAdmissions(const bool bInDataOnly)
 				continue;
 			}
 			if (Scheduler.Has(Identity.Stamp, Identity.Kind) || Limits[Kind] <= 0) continue;
+			if (!bInDataOnly && Geometry && Module.IsAuthority())
+			{
+				const EVoxelTaskKind DataKind = Admission.Kind == EVoxelViewAdmissionKind::VoxelProxy ? EVoxelTaskKind::GenerateVoxelProxy :
+					Admission.Kind == EVoxelViewAdmissionKind::Surface ? EVoxelTaskKind::GenerateSurface : EVoxelTaskKind::GenerateMacro;
+				if (!PreparedData.Contains({DataKind, Identity.Stamp})) continue;
+			}
 			EVoxelWorkClass WorkClass = EVoxelWorkClass::Visible;
 			FVoxelTerrainServicePriority Priority;
 			if (!ResolveTaskServicePriority(Identity.Kind, Identity.Stamp, WorkClass, Priority)) continue;
@@ -982,13 +1008,12 @@ void FVoxelViewManager::ProcessServiceAdmissions(const bool bInDataOnly)
 			Candidate.EstimatedMicroseconds = AdmissionCostEstimates[Stage][Kind] > 0.0 ?
 				AdmissionCostEstimates[Stage][Kind] : 25.0;
 			Candidate.bRunnable = true;
-			check(Candidates.Num() < 128 && Identities.Num() < 128 && CandidateAdmissions.Num() < 128);
 			Candidates.Add(Candidate);
 			Identities.Add(Identity);
 			CandidateAdmissions.Add(Index);
 		}
 	}
-	if (Candidates.IsEmpty() || FPlatformTime::Seconds() >= Deadline) return;
+	if (Candidates.IsEmpty()) return;
 	const uint64 BeforeSelection = Resources->ReleaseVersionExcludingOwner(GetServiceControlConsumer());
 	if (bServiceSelectionCapacityWaiting[Stage] && !AdmissionSelection[Stage].GetResourceLease() &&
 		BeforeSelection <= ServiceSelectionCapacityVersions[Stage])
@@ -1008,7 +1033,8 @@ void FVoxelViewManager::ProcessServiceAdmissions(const bool bInDataOnly)
 	}
 	bServiceSelectionCapacityWaiting[Stage] = false;
 	RecordServiceResourceAdmission(EVoxelTerrainResourceAdmission::Granted);
-	for (int32 Attempt = 0; Attempt < Candidates.Num() && FPlatformTime::Seconds() < Deadline; ++Attempt)
+	const double SubmitDeadline = FPlatformTime::Seconds() + 0.0005;
+	for (int32 Attempt = 0; Attempt < Candidates.Num() && FPlatformTime::Seconds() < SubmitDeadline; ++Attempt)
 	{
 		auto& Frame = Module.GetTerrainFrameContext();
 		FVoxelTerrainServiceCapacity Capacity;
@@ -3505,7 +3531,7 @@ FVoxelPrimaryFineReadiness FVoxelViewManager::GetFineRadiusReadiness(TConstArray
 }
 void FVoxelViewManager::AdvanceInterestInputs(const uint64 InRevision, TConstArrayView<FVector> InObservers)
 {
-	const double Deadline = TerrainDeadline(0.5);
+	const double Deadline = TerrainDeadline(1.0);
 	AdvanceCommittedInterestEvents(Deadline);
 	if (CommittedWorkspaceEvents) return;
 	const auto Latest = Module.GetDesiredInterestSnapshot();

@@ -158,6 +158,7 @@ bool FVoxelViewPublisher::StageImmutable(
 		InOutActor->SetActorEnableCollision(false);
 		USceneComponent* Root = NewObject<USceneComponent>(InOutActor);
 		InOutActor->SetRootComponent(Root);
+		Root->SetWorldLocation(InLocation);
 		Root->RegisterComponent();
 	}
 	FEntry& Entry = Entries.FindOrAdd(TWeakObjectPtr<AActor>(InOutActor));
@@ -2344,9 +2345,9 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 {
 	OutCharge = {};
 	TArray<FVoxelTerrainServiceCandidate> Candidates;
-	Candidates.Reserve(FMath::Min(64, InReady.Num()));
+	Candidates.Reserve(InReady.Num());
 	int32& Cursor = ReadySelectionCursors[bInCommit ? 1 : 0];
-	for (int32 Attempt = 0; Attempt < FMath::Min(64, InReady.Num()); ++Attempt)
+	for (int32 Attempt = 0; Attempt < InReady.Num(); ++Attempt)
 	{
 		Cursor %= InReady.Num();
 		const int32 Index = Cursor++;
@@ -2360,6 +2361,8 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 			return Index;
 		}
 		if (!Group.bPriorityReady) continue;
+		if (bInCommit && Group.NativeTransaction.IsValid() &&
+			TerrainRenderer->IsTransactionPending(Group.NativeTransaction)) continue;
 		if (bInCommit && Group.bNativeControlWaiting && TerrainRenderer->GetCoarseAdmissionVersion() == Group.NativeFrontendVersion &&
 			!(Group.bNativeBootstrapWaiting && TerrainRenderer->GetNativeStateAdmission() == EVoxelTerrainResourceAdmission::Granted))
 		{
