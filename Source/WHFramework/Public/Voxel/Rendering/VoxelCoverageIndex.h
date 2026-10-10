@@ -135,9 +135,12 @@ public:
 	{
 		Capture(InMin, InMax, OutCounts, false, true);
 	}
+	// 持有发布门禁的调用方禁止等待容量；失败以 bCountOnly 和 ResourceAdmission 返回。
 	FVoxelGameThreadContinuation CaptureSteps(
-		FIntVector InMin, FIntVector InMax, FVoxelCoverageLocalSnapshot& OutSnapshot, bool bInIncludePresentation = true) const;
-	FVoxelGameThreadContinuation CaptureAllSteps(FVoxelCoverageLocalSnapshot& OutSnapshot, bool bInIncludePresentation = true) const;
+		FIntVector InMin, FIntVector InMax, FVoxelCoverageLocalSnapshot& OutSnapshot, bool bInIncludePresentation = true,
+		bool bInWaitForCapacity = true) const;
+	FVoxelGameThreadContinuation CaptureAllSteps(FVoxelCoverageLocalSnapshot& OutSnapshot, bool bInIncludePresentation = true,
+		bool bInWaitForCapacity = true) const;
 	FVoxelGameThreadContinuation CaptureChangedSteps(const FVoxelCoverageIndex& InPrevious,
 		FVoxelCoverageLocalSnapshot& OutSnapshot) const;
 	bool IsCurrent(const FVoxelCoverageLocalSnapshot& InSnapshot) const;
@@ -228,7 +231,7 @@ private:
 	static FVoxelGameThreadContinuation CaptureNodeSteps(FNodePtr InNode, FVoxelCoverageIndexKey InKey,
 		FQuery InQuery, FVoxelCoverageLocalSnapshot& OutSnapshot, uint64 InGapVersion, bool bInCollect = false);
 	static FVoxelGameThreadContinuation CaptureFrozenSteps(FVoxelCoverageIndex InFrozen, FQuery InQuery,
-		FVoxelCoverageLocalSnapshot& OutSnapshot, bool bInIncludePresentation, bool bInFullIndex);
+		FVoxelCoverageLocalSnapshot& OutSnapshot, bool bInIncludePresentation, bool bInFullIndex, bool bInWaitForCapacity);
 	static FVoxelGameThreadContinuation CaptureChangedNodeSteps(FNodePtr InCurrent, FNodePtr InPrevious,
 		FVoxelCoverageLocalSnapshot& OutSnapshot);
 	static FVoxelGameThreadContinuation CaptureChangedFrozenSteps(FVoxelCoverageIndex InFrozen, FVoxelCoverageIndex InPrevious,

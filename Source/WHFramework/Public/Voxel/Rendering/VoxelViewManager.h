@@ -659,6 +659,7 @@ private:
 	double CoverageStartedSeconds = 0.0;
 	uint64 CoverageMicrosteps = 0;
 	uint64 CoverageContentRevision = 0;
+	bool bCoverageRetryRequested = false;
 	bool bCoverageDirty = true;
 	bool bCoverageDirtyFull = true;
 	bool bActiveCoverageFull = true;

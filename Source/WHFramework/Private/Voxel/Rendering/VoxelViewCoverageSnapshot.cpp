@@ -18,27 +18,16 @@ FVoxelGameThreadContinuation FVoxelViewManager::AcquireCoverageCapacitySteps(con
 	const auto Resources = Scheduler.GetTerrainResources();
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(WorldEpoch, TaskOwnerId, TaskOwnerIncarnation,
 		{}, FMath::Max<uint64>(1, AppliedInterestRevision));
-	uint64 LastReleaseVersion = MAX_uint64;
-	while (true)
+	const auto State = Resources->Snapshot();
+	if (InBytes > State.Limits.WorkingBytes)
 	{
-		const auto State = Resources->Snapshot();
-		if (InBytes > State.Limits.WorkingBytes)
-		{
-			UE_LOG(LogTemp, Error, TEXT("Oversized: local coverage working capacity bytes=%llu limit=%llu"), InBytes, State.Limits.WorkingBytes);
-			co_return;
-		}
-		if (LastReleaseVersion != State.ReleaseVersion)
-		{
-			LastReleaseVersion = State.ReleaseVersion;
-			if (InOutLease ? InOutLease->Bytes() >= InBytes || InOutLease->Resize(InBytes) :
-				Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Working, InBytes, InOutLease))
-			{
-				OutComplete = true;
-				co_return;
-			}
-		}
-		co_await FVoxelGameThreadContinuation::Yield();
+		UE_LOG(LogTemp, Error, TEXT("Oversized: local coverage working capacity bytes=%llu limit=%llu"), InBytes, State.Limits.WorkingBytes);
+		co_return;
 	}
+	// 容量释放可能依赖本轮门禁挡住的发布或 Apply；不能在门禁内等待。
+	OutComplete = InOutLease ? InOutLease->Bytes() >= InBytes || InOutLease->Resize(InBytes) :
+		Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Working, InBytes, InOutLease);
+	co_return;
 }
 
 FVoxelGameThreadContinuation FVoxelViewManager::CaptureCoverageCandidateSteps(
@@ -51,13 +40,14 @@ FVoxelGameThreadContinuation FVoxelViewManager::CaptureCoverageCandidateSteps(
 	{
 		FVoxelCoverageLocalSnapshot Snapshot;
 		if (bActiveCoverageFull)
-			co_await CoverageIndex.CaptureAllSteps(Snapshot);
+			co_await CoverageIndex.CaptureAllSteps(Snapshot, true, false);
 		else
 		{
 			const FVoxelCoverageRect Rect = ActiveDirtyCoverageRects[Query];
 			co_await CoverageIndex.CaptureSteps(
-				FIntVector(Rect.Min.X - 1, Rect.Min.Y - 1, MIN_int32 + 1), FIntVector(Rect.Max.X + 1, Rect.Max.Y + 1, MAX_int32), Snapshot);
+				FIntVector(Rect.Min.X - 1, Rect.Min.Y - 1, MIN_int32 + 1), FIntVector(Rect.Max.X + 1, Rect.Max.Y + 1, MAX_int32), Snapshot, true, false);
 		}
+		if (Snapshot.bCountOnly) co_return;
 		CoverageIndexNodesVisited += Snapshot.VisitedIndexNodes;
 		CoverageRecordsExamined += Snapshot.ExaminedRecords;
 		CoverageRecordsCaptured += Snapshot.Records.Num();

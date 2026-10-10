@@ -177,4 +177,47 @@ bool FVoxelCoverageIdentityIsolationTest::RunTest(const FString& InParameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelCoverageCapacityRetryTest,
+	"WHFramework.Voxel.FineRefactor.Coverage.CapacityRetry",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelCoverageCapacityRetryTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const auto Resources = MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
+	FVoxelTerrainResourceLimits Limits;
+	if (!Resources->Configure(Limits)) return false;
+	const auto Consumer = FVoxelGenerationConsumerKey::Section(31, FGuid::NewGuid(), 1, {}, 1);
+	FVoxelCoverageIndex Index;
+	Index.BindResources(Resources, Consumer);
+	FString Error;
+	auto Record = VoxelCoveragePersistentTest::Record({}, 1);
+	if (!Index.Upsert(Record, Error)) return false;
+	const auto Before = Resources->Snapshot();
+	const auto External = FVoxelGenerationConsumerKey::Section(31, FGuid::NewGuid(), 1, {}, 1);
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Blocker;
+	if (!Resources->Acquire(External, EVoxelTerrainResourcePool::Input,
+		Limits.InputBytes - Before.Used[int32(EVoxelTerrainResourcePool::Input)] - 256, Blocker)) return false;
+	for (const bool bFull : {false, true})
+	{
+		FVoxelCoverageLocalSnapshot Snapshot;
+		auto Capture = bFull ? Index.CaptureAllSteps(Snapshot, true, false) :
+			Index.CaptureSteps(Record.Min, Record.Max, Snapshot, true, false);
+		for (int32 Step = 0; Step < 8192 && !Capture.IsComplete(); ++Step) Capture.Resume();
+		TestTrue(TEXT("容量不足的捕获有限结束，不持有发布门禁等待"), Capture.IsComplete());
+		TestTrue(TEXT("失败保留明确的容量状态，不能提交为空覆盖"), Snapshot.bCountOnly &&
+			Snapshot.ResourceAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked && !Index.IsCurrent(Snapshot));
+		TestTrue(TEXT("失败不保留输出数组租约"), !Snapshot.ResourceLease);
+	}
+	Blocker.Reset();
+	Record.Stamp.ContentRevision = 2;
+	if (!Index.Upsert(Record, Error)) return false;
+	FVoxelCoverageLocalSnapshot Current;
+	auto Retry = Index.CaptureAllSteps(Current, true, false);
+	for (int32 Step = 0; Step < 8192 && !Retry.IsComplete(); ++Step) Retry.Resume();
+	if (!TestTrue(TEXT("释放容量后最新根捕获成功"), Retry.IsComplete() && Index.IsCurrent(Current) && Current.Records.Num() == 1)) return false;
+	TestEqual(TEXT("重试读取门禁释放期间接纳的最新版本"), Current.Records[0]->Stamp.ContentRevision, uint64(2));
+	return true;
+}
+
 #endif

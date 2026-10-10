@@ -2167,6 +2167,7 @@ bool FVoxelViewManager::CoverageAffects(const FVoxelCoverageRect& InBounds) cons
 
 void FVoxelViewManager::RetryActiveCoverage()
 {
+	bCoverageRetryRequested = true;
 	if (bActiveCoverageFull || ActiveDirtyCoverageRects.IsEmpty())
 	{
 		MarkCoverageDirty();
@@ -3165,6 +3166,7 @@ void FVoxelViewManager::Reset()
 	CoverageContinuation.Reset();
 	CoverageInterestSnapshot.Reset();
 	bCoverageReadScope = false;
+	bCoverageRetryRequested = false;
 	ReleaseInputRoot(CoverageInputRoot);
 	ReleaseInputRoot(AppliedInputRoot);
 	DeferredCoverageResults.Reset();
@@ -5266,7 +5268,8 @@ FVoxelGameThreadContinuation FVoxelViewManager::RebuildHeightfieldTransitionStep
 																							   : MacroCoverageRect({Owner.Coordinate, Owner.Level});
 			FVoxelCoverageLocalSnapshot Neighbors;
 			co_await HeightfieldCoverageIndex.CaptureSteps(
-				FIntVector(Rect.Min.X - 1, Rect.Min.Y - 1, MIN_int32 + 1), FIntVector(Rect.Max.X + 1, Rect.Max.Y + 1, MAX_int32), Neighbors);
+				FIntVector(Rect.Min.X - 1, Rect.Min.Y - 1, MIN_int32 + 1), FIntVector(Rect.Max.X + 1, Rect.Max.Y + 1, MAX_int32), Neighbors, true, false);
+			if (Neighbors.bCountOnly) { RetryActiveCoverage(); co_return; }
 			for (const auto& Record : Neighbors.Records)
 			{
 				co_await FVoxelGameThreadContinuation::Yield();
@@ -5477,7 +5480,8 @@ FVoxelGameThreadContinuation FVoxelViewManager::RebuildHeightfieldTransitionStep
 													 : MacroCoverageRect({Owner.Coordinate, Owner.Level});
 			FVoxelCoverageLocalSnapshot Guard;
 			co_await HeightfieldCoverageIndex.CaptureSteps(FIntVector(OwnerRect.Min.X - 1, OwnerRect.Min.Y - 1, Module.GetManifest().Settings.MinZ),
-				FIntVector(OwnerRect.Max.X + 1, OwnerRect.Max.Y + 1, Module.GetManifest().Settings.MaxZ), Guard, false);
+				FIntVector(OwnerRect.Max.X + 1, OwnerRect.Max.Y + 1, Module.GetManifest().Settings.MaxZ), Guard, false, false);
+			if (Guard.bCountOnly) { RetryActiveCoverage(); co_return; }
 			auto& ResumedState = HeightfieldCoveragePlans.FindChecked(Owner);
 			const uint64 Serial = HeightfieldPlanSerial;
 			{
@@ -6201,6 +6205,21 @@ FVoxelGameThreadContinuation FVoxelViewManager::RebuildVolumeTransitionSteps(con
 
 FVoxelGameThreadContinuation FVoxelViewManager::ResolveTransitionVisibilitySteps()
 {
+	bCoverageRetryRequested = false;
+	ON_SCOPE_EXIT
+	{
+		if (bCoverageRetryRequested)
+		{
+			// 失败发生在提交之前；归还原分组，下一轮按最新输入重新计算覆盖。
+			for (const auto& Pair : ActiveCoveragePublishGroups)
+			{
+				check(!OpenPublishGroups.Contains(Pair.Key));
+				OpenPublishGroups.Add(Pair.Key, Pair.Value);
+			}
+			ActiveCoveragePublishGroups.Reset();
+			bHeightfieldTopologyDirty = true;
+		}
+	};
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewHandoff);
 	const double ResolveStart = FPlatformTime::Seconds();
 	const auto ContentSnapshot = Module.GetRuntime()->GetChangeHierarchy().CaptureVersionSnapshot();
@@ -6239,7 +6258,8 @@ FVoxelGameThreadContinuation FVoxelViewManager::ResolveTransitionVisibilitySteps
 		{
 			co_await FVoxelGameThreadContinuation::Yield();
 			FVoxelCoverageLocalSnapshot Roots;
-			co_await GetInputRoot().TerrainRootIndex.CaptureSteps(FIntVector(Rect.Min.X, Rect.Min.Y, MIN_int32 + 1), FIntVector(Rect.Max.X, Rect.Max.Y, MAX_int32), Roots);
+			co_await GetInputRoot().TerrainRootIndex.CaptureSteps(FIntVector(Rect.Min.X, Rect.Min.Y, MIN_int32 + 1), FIntVector(Rect.Max.X, Rect.Max.Y, MAX_int32), Roots, true, false);
+			if (Roots.bCountOnly) { RetryActiveCoverage(); co_return; }
 			for (const auto& Record : Roots.Records)
 			{
 				co_await FVoxelGameThreadContinuation::Yield();
@@ -6462,6 +6482,7 @@ FVoxelGameThreadContinuation FVoxelViewManager::ResolveTransitionVisibilitySteps
 	for (const auto& Key : LocalMacroKeys)
 		LocalHeightfieldOwners.Add({EVoxelHeightfieldRepresentation::Macro, Key.Coordinate, Key.Level});
 	co_await RebuildVolumeTransitionSteps(TargetTerrainNodes);
+	if (bCoverageRetryRequested) co_return;
 	TMap<FVoxelViewKey, uint64> VolumeToCommit;
 	if (!bActiveCoverageFull)
 	{
@@ -6544,6 +6565,7 @@ FVoxelGameThreadContinuation FVoxelViewManager::ResolveTransitionVisibilitySteps
 	if (bHeightfieldTopologyDirty)
 	{
 		co_await RebuildHeightfieldTransitionSteps(CoverageSnapshot);
+		if (bCoverageRetryRequested) co_return;
 		bHeightfieldTopologyDirty = false;
 		++HeightfieldTopologyRebuildCount;
 	}
@@ -7137,21 +7159,21 @@ FVoxelGameThreadContinuation FVoxelViewManager::ResolveTransitionVisibilitySteps
 		Handles.Reserve(ActiveCoveragePublishGroups.Num());
 		for (const auto& Pair : ActiveCoveragePublishGroups) Handles.Add(Pair.Value);
 		Publisher->SetCommitCallbacks(MoveTemp(OnPublishCommitted), MoveTemp(OnGroupCommitted), Handles);
+		const FVoxelCoverageIndex FrozenCoverage = CoverageIndex;
 		bool bAccepted = true;
 		for (const auto& Pair : ActiveCoveragePublishGroups)
 		{
 			co_await FVoxelGameThreadContinuation::Yield();
 			const auto Bounds = FVoxelPublishGroupPlanner::OwnershipBounds(Pair.Key, Module.BlockSize(), Module.GetViewSettings().Lod);
-			FVoxelCoverageLocalSnapshot Guard;
+			FVoxelGenerationBounds GuardBounds;
 			if (Bounds.IsValid)
 			{
 				const bool bVolume = Pair.Key.Representation <= 1;
 				const int32 MinZ = bVolume ? FMath::FloorToInt(Bounds.Min.Z / Module.BlockSize()) - 1 : MIN_int32 + 1;
 				const int32 MaxZ = bVolume ? FMath::CeilToInt(Bounds.Max.Z / Module.BlockSize()) + 1 : MAX_int32;
-				co_await CoverageIndex.CaptureSteps(
+				GuardBounds = {
 					FIntVector(FMath::FloorToInt(Bounds.Min.X / Module.BlockSize()) - 1, FMath::FloorToInt(Bounds.Min.Y / Module.BlockSize()) - 1, MinZ),
-					FIntVector(FMath::CeilToInt(Bounds.Max.X / Module.BlockSize()) + 1, FMath::CeilToInt(Bounds.Max.Y / Module.BlockSize()) + 1, MaxZ), Guard,
-					false);
+					FIntVector(FMath::CeilToInt(Bounds.Max.X / Module.BlockSize()) + 1, FMath::CeilToInt(Bounds.Max.Y / Module.BlockSize()) + 1, MaxZ)};
 			}
 			const uint64 Epoch = WorldEpoch;
 			const FVoxelGenerationBounds DependencyBounds = Bounds.IsValid ? FVoxelGenerationBounds{
@@ -7160,9 +7182,10 @@ FVoxelGameThreadContinuation FVoxelViewManager::ResolveTransitionVisibilitySteps
 				FIntVector(FMath::CeilToInt(Bounds.Max.X / Module.BlockSize()), FMath::CeilToInt(Bounds.Max.Y / Module.BlockSize()),
 					Pair.Key.Representation <= 1 ? FMath::CeilToInt(Bounds.Max.Z / Module.BlockSize()) : Module.GetManifest().Settings.MaxZ)} : FVoxelGenerationBounds{};
 			Publisher->SetValidation(Pair.Value,
-				[this, Epoch, ContentSnapshot, DependencyBounds, Guard = MoveTemp(Guard)]
+				[this, Epoch, ContentSnapshot, DependencyBounds, GuardBounds, FrozenCoverage]
 				{
-					return Epoch == WorldEpoch && CoverageIndex.IsCurrent(Guard) && (!DependencyBounds.IsValid() ||
+					return Epoch == WorldEpoch && (!GuardBounds.IsValid() ||
+						CoverageIndex.IsRangeCurrent(FrozenCoverage, GuardBounds.Min, GuardBounds.Max)) && (!DependencyBounds.IsValid() ||
 						Module.GetRuntime()->GetChangeHierarchy().IsVersionSnapshotCurrent(ContentSnapshot, DependencyBounds));
 				});
 			bAccepted &= Publisher->CommitGroup(Pair.Value);

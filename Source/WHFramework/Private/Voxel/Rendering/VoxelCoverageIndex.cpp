@@ -760,7 +760,7 @@ FVoxelGameThreadContinuation FVoxelCoverageIndex::CaptureNodeSteps(FNodePtr InNo
 }
 
 FVoxelGameThreadContinuation FVoxelCoverageIndex::CaptureFrozenSteps(FVoxelCoverageIndex InFrozen, const FQuery InQuery,
-	FVoxelCoverageLocalSnapshot& OutSnapshot, const bool bInIncludePresentation, const bool bInFullIndex)
+	FVoxelCoverageLocalSnapshot& OutSnapshot, const bool bInIncludePresentation, const bool bInFullIndex, const bool bInWaitForCapacity)
 {
 	OutSnapshot = {};
 	OutSnapshot.StorageId = InFrozen.StorageId;
@@ -776,7 +776,7 @@ FVoxelGameThreadContinuation FVoxelCoverageIndex::CaptureFrozenSteps(FVoxelCover
 	{
 		const uint64 BeforeAdmission = InFrozen.Resources ? InFrozen.Resources->ReleaseVersionExcludingOwner(InFrozen.Consumer) : 0;
 		if (InFrozen.ReserveSnapshot(OutSnapshot)) break;
-		if (!InFrozen.Resources || OutSnapshot.ResourceAdmission != EVoxelTerrainResourceAdmission::CapacityBlocked) co_return;
+		if (!bInWaitForCapacity || !InFrozen.Resources || OutSnapshot.ResourceAdmission != EVoxelTerrainResourceAdmission::CapacityBlocked) co_return;
 		uint64 Version = BeforeAdmission;
 		do { co_await FVoxelGameThreadContinuation::Yield(); }
 		while (!InFrozen.Resources->TryGetReleaseVersionExcludingOwner(InFrozen.Consumer, Version) || Version <= BeforeAdmission);
@@ -789,15 +789,15 @@ FVoxelGameThreadContinuation FVoxelCoverageIndex::CaptureFrozenSteps(FVoxelCover
 }
 
 FVoxelGameThreadContinuation FVoxelCoverageIndex::CaptureSteps(const FIntVector InMin, const FIntVector InMax,
-	FVoxelCoverageLocalSnapshot& OutSnapshot, const bool bInIncludePresentation) const
+	FVoxelCoverageLocalSnapshot& OutSnapshot, const bool bInIncludePresentation, const bool bInWaitForCapacity) const
 {
 	// 此函数本身不是 coroutine；调用时立即复制 O(1) 根，不能延迟至首次 Resume 才读 Current。
-	return CaptureFrozenSteps(*this, Query(InMin, InMax), OutSnapshot, bInIncludePresentation, false);
+	return CaptureFrozenSteps(*this, Query(InMin, InMax), OutSnapshot, bInIncludePresentation, false, bInWaitForCapacity);
 }
 
-FVoxelGameThreadContinuation FVoxelCoverageIndex::CaptureAllSteps(FVoxelCoverageLocalSnapshot& OutSnapshot, const bool bInIncludePresentation) const
+FVoxelGameThreadContinuation FVoxelCoverageIndex::CaptureAllSteps(FVoxelCoverageLocalSnapshot& OutSnapshot, const bool bInIncludePresentation, const bool bInWaitForCapacity) const
 {
-	return CaptureFrozenSteps(*this, Query(FIntVector(MIN_int32), FIntVector(MAX_int32)), OutSnapshot, bInIncludePresentation, true);
+	return CaptureFrozenSteps(*this, Query(FIntVector(MIN_int32), FIntVector(MAX_int32)), OutSnapshot, bInIncludePresentation, true, bInWaitForCapacity);
 }
 
 FVoxelGameThreadContinuation FVoxelCoverageIndex::CaptureChangedNodeSteps(FNodePtr InCurrent, FNodePtr InPrevious,

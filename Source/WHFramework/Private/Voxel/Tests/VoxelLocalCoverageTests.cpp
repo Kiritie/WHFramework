@@ -685,12 +685,32 @@ bool FVoxelInterestInputBudgetTest::RunTest(const FString& InParameters)
 		CapacityBefore.Limits.WorkingBytes - CapacityBefore.Used[int32(EVoxelTerrainResourcePool::Working)] - 1, Blocker)) return false;
 	FVoxelViewManager::FCoveragePassSnapshot BlockedSnapshot;
 	auto Capture = Manager.BuildCoverageSnapshotSteps(BlockedSnapshot);
-	for (int32 Step = 0; Step < 1024; ++Step) Capture.Resume();
-	TestFalse(TEXT("覆盖容量不足时保持原捕获续行"), Capture.IsComplete());
-	TestFalse(TEXT("容量等待不能冒充完整空覆盖"), BlockedSnapshot.bComplete);
-	Blocker.Reset();
 	for (int32 Step = 0; Step < 16384 && !Capture.IsComplete(); ++Step) Capture.Resume();
-	TestTrue(TEXT("容量释放后同一覆盖捕获完成"), Capture.IsComplete() && BlockedSnapshot.bComplete);
+	TestTrue(TEXT("覆盖容量不足时结束原捕获并释放门禁"), Capture.IsComplete());
+	TestFalse(TEXT("容量等待不能冒充完整空覆盖"), BlockedSnapshot.bComplete);
+	Capture.Reset();
+	Manager.CoverageContinuation.Reset();
+	Manager.bActiveCoverageFull = true;
+	const FVoxelPublishGroupKey RetryKey{2, FIntVector::ZeroValue, 0};
+	const FGuid RetryGroup = Manager.BeginPublishGroup(RetryKey);
+	Manager.ActiveCoveragePublishGroups = MoveTemp(Manager.OpenPublishGroups);
+	Manager.CoverageContinuation = Manager.ResolveTransitionVisibilitySteps();
+	{
+		TGuardValue<bool> ReadScope(Manager.bCoverageReadScope, true);
+		for (int32 Step = 0; Step < 16384 && !Manager.CoverageContinuation.IsComplete(); ++Step)
+			Manager.CoverageContinuation.Resume();
+	}
+	TestTrue(TEXT("真实覆盖流程在 Working 容量不足时结束并登记重试"),
+		Manager.CoverageContinuation.IsComplete() && Manager.bCoverageRetryRequested && Manager.bCoverageDirty);
+	TestTrue(TEXT("未提交组原样归还，不被下一轮全量覆盖覆盖掉"),
+		Manager.ActiveCoveragePublishGroups.IsEmpty() && Manager.OpenPublishGroups.FindRef(RetryKey) == RetryGroup);
+	Manager.CoverageContinuation.Reset();
+	TestFalse(TEXT("失败捕获退出后，同区域的结果应用与发布门禁已释放"),
+		Manager.ShouldDeferCoverage(Manager.FineCoverageRect(FIntVector::ZeroValue)));
+	Blocker.Reset();
+	Capture = Manager.BuildCoverageSnapshotSteps(BlockedSnapshot);
+	for (int32 Step = 0; Step < 16384 && !Capture.IsComplete(); ++Step) Capture.Resume();
+	TestTrue(TEXT("容量释放后重新捕获完整覆盖"), Capture.IsComplete() && BlockedSnapshot.bComplete);
 	Capture.Reset();
 	BlockedSnapshot = {};
 	TestEqual(TEXT("捕获退休后 Working 容量归还"), Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Working)], uint64(0));
