@@ -1,4 +1,4 @@
-﻿#include "Voxel/Streaming/VoxelTerrainDomainPlanner.h"
+#include "Voxel/Streaming/VoxelTerrainDomainPlanner.h"
 
 #include "Voxel/Rendering/VoxelCoverageIndex.h"
 #include "Voxel/Rendering/VoxelCoveragePartition.h"
@@ -8,6 +8,7 @@
 #include "Voxel/Task/VoxelTerrainResources.h"
 #include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Misc/ScopeExit.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 
 void FVoxelTerrainDomainPlanner::BindResources(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
 	const FVoxelGenerationConsumerKey& InConsumer)
@@ -202,6 +203,7 @@ namespace
 bool FVoxelTerrainDomainPlanner::Build(TConstArrayView<FVoxelStreamingSource> InSources, const FVoxelWorldManifest& InManifest,
 	const FVoxelViewSettings& InSettings, FVoxelInterestSet& InOutInterest, FString& OutError, FVoxelTerrainDomainPlanner* InPersistent)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_TerrainDomainBuild);
 	check(InOutInterest.FinePagePlan);
 	const auto Resources = InPersistent ? InPersistent->Stages[0].Resources : nullptr;
 	const auto Consumer = InPersistent ? InPersistent->Stages[0].Consumer : FVoxelGenerationConsumerKey{};
@@ -370,6 +372,7 @@ bool FVoxelTerrainDomainPlanner::Build(TConstArrayView<FVoxelStreamingSource> In
 	}
 	const auto PrepareCoverageFloor = [&](FVoxelCoverageIndex& Index, const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& Extra = nullptr)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_TerrainDomainCoverageFloor);
 		if (!Resources) return true;
 		FDomainCompositionFloor Floor = InterestFloor;
 		if (!Floor.Add(SourceScratch, *Resources) || !Floor.Add(CompositionLease, *Resources) || !Floor.Add(Extra, *Resources) || !BindGraphFloor(Floor))
@@ -397,13 +400,20 @@ bool FVoxelTerrainDomainPlanner::Build(TConstArrayView<FVoxelStreamingSource> In
 			uint8(FMath::FloorLog2(uint32(Shard.SideCells / 16)))};
 		FVoxelCoverageRecord Record;
 		Record.Geometry = {Key, 1, InManifest.Settings.MinZ, InManifest.Settings.MaxZ, InManifest.BaseSampleHash, InManifest.RegistryHash};
-		if (!Key.TryBounds(InManifest.Settings.MinZ, InManifest.Settings.MaxZ, Record.Min, Record.Max) ||
-			!PrepareCoverageFloor(CandidatePlanner.FinePredecessor) || !CandidatePlanner.FinePredecessor.Upsert(Record, OutError)) return false;
+		if (!Key.TryBounds(InManifest.Settings.MinZ, InManifest.Settings.MaxZ, Record.Min, Record.Max)) return false;
+		if (CandidatePlanner.FinePredecessor.HasMatchingRecord(Record)) continue;
+		if (!PrepareCoverageFloor(CandidatePlanner.FinePredecessor) || !CandidatePlanner.FinePredecessor.Upsert(Record, OutError)) return false;
 	}
 	CandidatePlanner.FinePredecessor.SetAdditionalRequiredInput(0, 0);
 	CandidatePlanner.Predecessors[0] = CandidatePlanner.FinePredecessor;
 	for (int32 Stage = 1; Stage < 3; ++Stage)
 	{
+		// 空前驱直接共享已冻结 Fine 根，不逐条复制成独立但等价的树。
+		if (CandidatePlanner.Predecessors[Stage].NumRecords() == 0)
+		{
+			CandidatePlanner.Predecessors[Stage] = CandidatePlanner.FinePredecessor;
+			continue;
+		}
 		bool Ready = true;
 		CandidatePlanner.FinePredecessor.VisitChangedRecords(OldFinePredecessor, [&](const auto* Now, const auto* Old)
 		{
@@ -416,6 +426,7 @@ bool FVoxelTerrainDomainPlanner::Build(TConstArrayView<FVoxelStreamingSource> In
 	}
 	const auto AddCoverage = [&](const EVoxelTerrainRepresentation Representation, const FVoxelTerrainStagePlan& Plan)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_TerrainDomainAddCoverage);
 		const int32 FirstStage = int32(Representation) - int32(EVoxelTerrainRepresentation::VoxelProxy) + 1;
 		for (int32 Stage = FirstStage; Stage < 3; ++Stage)
 		{
@@ -431,8 +442,9 @@ bool FVoxelTerrainDomainPlanner::Build(TConstArrayView<FVoxelStreamingSource> In
 			for (const auto& Pair : Plan.Pages)
 			{
 				FVoxelCoverageRecord Record; Record.Geometry = Pair.Value;
-				if (!Pair.Key.TryBounds(Pair.Value.WorldMinZ, Pair.Value.WorldMaxZ, Record.Min, Record.Max) ||
-					!PrepareCoverageFloor(Prefix, Plan.ResourceLease) || !Prefix.Upsert(Record, OutError)) return false;
+				if (!Pair.Key.TryBounds(Pair.Value.WorldMinZ, Pair.Value.WorldMaxZ, Record.Min, Record.Max)) return false;
+				if (Prefix.HasMatchingRecord(Record)) continue;
+				if (!PrepareCoverageFloor(Prefix, Plan.ResourceLease) || !Prefix.Upsert(Record, OutError)) return false;
 			}
 			Prefix.SetAdditionalRequiredInput(0, 0);
 		}
@@ -491,7 +503,8 @@ bool FVoxelTerrainDomainPlanner::Build(TConstArrayView<FVoxelStreamingSource> In
 			FVoxelStreamingSource Source = InputSource;
 			const int32 StageIndex = static_cast<int32>(Representation) - 2;
 
-			if (const auto* Accepted = InOutInterest.Sources.Find(Source.Id); Accepted && Accepted->bHasStageCenters)
+			const auto* Accepted = InOutInterest.Sources.Find(Source.Id);
+			if (Accepted && Accepted->bHasStageCenters)
 			{
 				Source.Center = Accepted->StageCenters[StageIndex];
 			}
@@ -512,8 +525,20 @@ bool FVoxelTerrainDomainPlanner::Build(TConstArrayView<FVoxelStreamingSource> In
 				continue;
 			}
 
+			int32 LocalOuter = Ranges.Fine + Source.View.InitialChunkSideCells * 2;
+			if (bLocal && Accepted && Accepted->FineBounds.IsValid())
+			{
+				const auto& Bounds = Accepted->FineBounds;
+				const double X = FMath::Max(FMath::Abs(double(Bounds.Min.X) - Source.Center.X),
+					FMath::Abs(double(Bounds.Max.X) - Source.Center.X));
+				const double Y = FMath::Max(FMath::Abs(double(Bounds.Min.Y) - Source.Center.Y),
+					FMath::Abs(double(Bounds.Max.Y) - Source.Center.Y));
+				const double Radius = FMath::CeilToDouble(FMath::Sqrt(X * X + Y * Y)) + double(Source.View.InitialChunkSideCells) * 2.0;
+				if (Radius > MAX_int32) { OutError = TEXT("Oversized: local Proxy residency envelope"); return false; }
+				LocalOuter = int32(Radius);
+			}
 			const int32 Outer = Representation == EVoxelTerrainRepresentation::VoxelProxy
-									? (bLocal ? Ranges.Fine + Source.View.InitialChunkSideCells * 2 : Ranges.Proxy)
+									? (bLocal ? LocalOuter : Ranges.Proxy)
 								: Representation == EVoxelTerrainRepresentation::Surface ? Ranges.Surface
 																						 : Ranges.Macro;
 

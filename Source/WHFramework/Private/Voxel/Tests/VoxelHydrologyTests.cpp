@@ -443,6 +443,46 @@ bool FVoxelHydrologyMeanderRouteTest::RunTest(const FString& InParameters)
 	FString Error;
 	TestTrue(TEXT("Final route satisfies river plan invariants"),
 		First.ValidateRiverRoutes(Error));
+	FVoxelGenerationRecipe HighRecipe = *VoxelTest::MakeGenerationConfig()->Recipe;
+	HighRecipe.Settings.MaxZ = 4096;
+	const auto HighRecipeSnapshot = MakeShared<const FVoxelGenerationRecipe, ESPMode::ThreadSafe>(MoveTemp(HighRecipe));
+	const auto HighClimate = MakeShared<const FVoxelClimateGenerator, ESPMode::ThreadSafe>(HighRecipeSnapshot);
+	const auto HighTerrain = MakeShared<const FVoxelTerrainGenerator, ESPMode::ThreadSafe>(HighRecipeSnapshot, HighClimate);
+	const FVoxelHydrologyGenerator HighGenerator(HighRecipeSnapshot, HighTerrain);
+	FVoxelHydrologyPlan HighPlan, RepeatedHighPlan;
+	const bool bBuiltHighPlan = HighGenerator.BuildPlan({FIntPoint::ZeroValue}, HighPlan, Error);
+	if (!TestTrue(FString::Printf(TEXT("Actual high-world drainage with short fixed anchors builds: %s"), *Error), bBuiltHighPlan)) return false;
+	const bool bBuiltRepeatedPlan = HighGenerator.BuildPlan({FIntPoint::ZeroValue}, RepeatedHighPlan, Error);
+	if (!TestTrue(FString::Printf(TEXT("Repeated high-world drainage builds: %s"), *Error), bBuiltRepeatedPlan)) return false;
+	TestTrue(TEXT("The actual high-world centerlines satisfy the unchanged angle and water contracts"), HighPlan.ValidateRiverRoutes(Error));
+	TestEqual(TEXT("Local turn refinement preserves deterministic river count"), HighPlan.Rivers.Num(), RepeatedHighPlan.Rivers.Num());
+	int32 FixedAnchors = 0;
+	for (int32 RiverIndex = 0; RiverIndex < HighPlan.Rivers.Num(); ++RiverIndex)
+	{
+		const auto& HighRoute = HighPlan.Rivers[RiverIndex];
+		for (const auto& ShapePoint : HighRoute.ShapePoints)
+		{
+			if (!ShapePoint.bAnchor) continue;
+			++FixedAnchors;
+			TestTrue(TEXT("Quantized turn refinement retains every fixed connection and its original water level"),
+				HighRoute.MeanderPoints.ContainsByPredicate([&ShapePoint](const FVoxelRiverMeanderPoint& Point)
+				{
+					return Point.bAnchor && Point.Position == ShapePoint.Position && Point.WaterZ == ShapePoint.WaterZ;
+				}));
+		}
+		if (!RepeatedHighPlan.Rivers.IsValidIndex(RiverIndex)) continue;
+		const auto& RepeatedRoute = RepeatedHighPlan.Rivers[RiverIndex];
+		TestTrue(TEXT("Local refinement retains deterministic route identity"), HighRoute.Id == RepeatedRoute.Id);
+		TestEqual(TEXT("Local refinement retains deterministic centerline length"), HighRoute.MeanderPoints.Num(), RepeatedRoute.MeanderPoints.Num());
+		for (int32 PointIndex = 0; PointIndex < HighRoute.MeanderPoints.Num(); ++PointIndex)
+		{
+			if (!RepeatedRoute.MeanderPoints.IsValidIndex(PointIndex)) continue;
+			TestTrue(TEXT("Local refinement retains deterministic geometry and water"),
+				HighRoute.MeanderPoints[PointIndex].Position == RepeatedRoute.MeanderPoints[PointIndex].Position &&
+				HighRoute.MeanderPoints[PointIndex].WaterZ == RepeatedRoute.MeanderPoints[PointIndex].WaterZ);
+		}
+	}
+	TestTrue(TEXT("Actual high-world fixture covers fixed regional connections"), FixedAnchors > 2);
 	return true;
 }
 

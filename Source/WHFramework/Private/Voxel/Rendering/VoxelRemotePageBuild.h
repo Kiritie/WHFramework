@@ -20,6 +20,7 @@ struct FVoxelRemotePageBuild
 	uint64 MeshPieceLimit = 0;
 	uint64 GeometryLimit = 0;
 	bool bDecoded = false;
+	bool bCompacted = false;
 
 	static uint64 RawCapacity(const FVoxelTerrainGeometry& Geometry)
 	{
@@ -122,6 +123,14 @@ struct FVoxelRemotePageBuild
 			Result.bSuccess = Data.VoxelProxy->AdvanceSurfaceCoverage(1, bComplete, Result.Error, &Cancel);
 			Result.bContinue = Result.bSuccess; return Result;
 		}
+		if (!bCompacted)
+		{
+			if (Data.Surface && !Storage->CompactGeometryArray(Data.Surface->DistantCells,
+				VoxelBoundedAllocation::ArrayBytes<FVoxelDistantCell>(16384), Working, Result)) return Result;
+			if (Data.Macro && !Storage->CompactGeometryArray(Data.Macro->DistantCells,
+				VoxelBoundedAllocation::ArrayBytes<FVoxelDistantCell>(16384), Working, Result)) return Result;
+			bCompacted = true;
+		}
 		FVoxelSectionMeshResult Counted;
 		if (Data.VoxelProxy)
 			Result.bSuccess = ProxyCounter.Advance(*Data.VoxelProxy, Registry, Shapes, nullptr,
@@ -143,7 +152,8 @@ struct FVoxelRemotePageBuild
 		if (Data.Macro) Data.Macro->EstimatedMeshBytes = HeightfieldCounter.GetEstimatedMeshBytes();
 		Result.VoxelProxy = MoveTemp(Data.VoxelProxy); Result.Surface = MoveTemp(Data.Surface);
 		Result.Water = MoveTemp(Data.Water); Result.Macro = MoveTemp(Data.Macro);
-		Result.InputResourceLease = Storage->MetadataLease;
+		Result.InputResourceLease = Storage->ResultInputLease;
+		Storage->SettleCompleted(Result);
 		return Result;
 	}
 };

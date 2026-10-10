@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "HAL/CriticalSection.h"
@@ -46,6 +46,23 @@ struct WHFRAMEWORK_API FVoxelTerrainResourceSnapshot
 	int32 ReservedSplitCount = 0;
 	uint64 Used[static_cast<int32>(EVoxelTerrainResourcePool::Count)] = {};
 	FVoxelTerrainResourceLimits Limits;
+};
+
+struct WHFRAMEWORK_API FVoxelTerrainResourceGrantSnapshot
+{
+	uint64 Serial = 0;
+	FVoxelGenerationConsumerKey Consumer;
+	uint64 Bytes = 0;
+	bool bPublished = false;
+};
+
+struct WHFRAMEWORK_API FVoxelTerrainResourceGrantDiagnostics
+{
+	static constexpr int32 ConsumerKindCount = int32(EVoxelGenerationConsumerKind::WorldFact) + 1;
+	FVoxelTerrainResourceSnapshot Resources;
+	uint64 ConsumerBytes[ConsumerKindCount] = {};
+	int32 ConsumerLeaseCounts[ConsumerKindCount] = {};
+	int32 LargestCount = 0;
 };
 
 class FVoxelTerrainResources;
@@ -107,6 +124,10 @@ public:
 		uint64 InBytes, TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutLease,
 		int32 InReservedSplits = 0, uint64 InRequiredInputBytes = 0, int32 InRequiredLeaseCount = 0);
 	FVoxelTerrainResourceSnapshot Snapshot() const;
+	// 从原账本读取各类总量及至多16条最大租约；使用调用者固定存储，不建立诊断副本表。
+	FVoxelTerrainResourceGrantDiagnostics SnapshotGrants(
+		EVoxelTerrainResourcePool InPool,
+		TArrayView<FVoxelTerrainResourceGrantSnapshot> OutLargest) const;
 	FVoxelGenerationConsumerKey GetControlConsumer() const { return ControlConsumer; }
 	// owner 由完整 ConsumerKey 标识；同模块其它任务的释放仍可唤醒容量等待。
 	// 最近两个不同 owner 的释放事件足以查询任一 owner 的最新外部释放，不增加监听表。

@@ -1,4 +1,4 @@
-#include "CoreMinimal.h"
+﻿#include "CoreMinimal.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 #include "HAL/Event.h"
@@ -15,9 +15,17 @@ struct FVoxelSchedulerNativeBackingTestAccess
 		return static_cast<const UE::Tasks::FTask&>(InScheduler.Running[0].Task);
 	}
 
-	static bool IsNativeBlocked(const FVoxelTaskScheduler& InScheduler)
+	static const void* ExecutionReservation(const FVoxelTaskScheduler& InScheduler)
 	{
-		return InScheduler.Pending.Num() == 1 && InScheduler.Pending[0].bNativeCapacityBlocked;
+		if (!InScheduler.Pending.IsEmpty())
+		{
+			return InScheduler.Pending[0].ExecutionReservation.Get();
+		}
+		if (!InScheduler.Running.IsEmpty())
+		{
+			return InScheduler.Running[0].ExecutionReservation.Get();
+		}
+		return nullptr;
 	}
 
 	static FGuid Receipt(const FVoxelTaskScheduler& InScheduler)
@@ -60,6 +68,8 @@ namespace
 		TAtomic<bool> CancelObserved{false};
 		TAtomic<bool> GrantObserved{true};
 		TAtomic<bool> ConsumerObserved{true};
+		TAtomic<bool> PressureExpected{false};
+		TAtomic<bool> PressureObserved{true};
 	};
 
 	struct FCountingExecute
@@ -87,6 +97,12 @@ namespace
 			const auto* Active = FVoxelGenerationConsumerScope::GetConsumerKey();
 			if (!Active || *Active != Consumer) State->ConsumerObserved.Store(false);
 			const int32 Execution = ++State->Executions;
+			if (Execution > 1 && State->PressureExpected.Load() &&
+				(Snapshot.Used[int32(EVoxelTerrainResourcePool::Input)] != Snapshot.Limits.InputBytes ||
+					Snapshot.Used[int32(EVoxelTerrainResourcePool::Working)] != Snapshot.Limits.WorkingBytes))
+			{
+				State->PressureObserved.Store(false);
+			}
 			if (bBlock)
 			{
 				State->Entered.Store(true);
@@ -95,7 +111,7 @@ namespace
 			}
 			FVoxelTaskResult Result;
 			Result.bSuccess = true;
-			Result.bContinue = !bBlock && Execution == 1;
+			Result.bContinue = !bBlock && Execution < 4;
 			return Result;
 		}
 
@@ -152,6 +168,7 @@ namespace
 				if (!Queue(false, 1)) return true;
 				NativeHold = FVoxelSchedulerNativeBackingTestAccess::HoldNative(*Scheduler);
 				InitialReceipt = FVoxelSchedulerNativeBackingTestAccess::Receipt(*Scheduler);
+				InitialReservation = FVoxelSchedulerNativeBackingTestAccess::ExecutionReservation(*Scheduler);
 				SetPhase(EBackingPhase::HeldNative);
 			}
 			if (Phase != EBackingPhase::Drain && FPlatformTime::Seconds() > Deadline)
@@ -173,33 +190,49 @@ namespace
 			case EBackingPhase::Continuation:
 				if (Scheduler->ActiveCount() || Scheduler->GetDiagnostics().Pending != 1) return false;
 				Test.TestEqual(TEXT("续跑保留同一个统计执行身份"), FVoxelSchedulerNativeBackingTestAccess::Receipt(*Scheduler), InitialReceipt);
+				Test.TestTrue(TEXT("续跑保留同一个真实控制对象"),
+					FVoxelSchedulerNativeBackingTestAccess::ExecutionReservation(*Scheduler) == InitialReservation);
 				Test.TestEqual(TEXT("续跑不复制任何 Execute 捕获"), State->Copies.Load(), 0);
 				{
-					const auto Snapshot = State->Resources->Snapshot();
 					const auto BlockerConsumer = FVoxelGenerationConsumerKey::Section(701, FGuid::NewGuid(), 1, {}, 9);
-					if (!Test.TestTrue(TEXT("不同原 consumer 占满 Working"), State->Resources->Acquire(BlockerConsumer,
-						EVoxelTerrainResourcePool::Working, Snapshot.Limits.WorkingBytes - Snapshot.Used[int32(EVoxelTerrainResourcePool::Working)], Blocker)))
+					if (!Test.TestTrue(TEXT("外部压力先授予两个真实句柄"),
+						State->Resources->Acquire(BlockerConsumer, EVoxelTerrainResourcePool::Working, 1, Blocker) &&
+						State->Resources->Acquire(BlockerConsumer, EVoxelTerrainResourcePool::Input, 1, InputBlocker)))
+					{
+						CancelAndDrain();
+						return false;
+					}
+					const auto Snapshot = State->Resources->Snapshot();
+					if (!Test.TestTrue(TEXT("外部压力同时占满 Input 和 Working"),
+						Blocker->Resize(Blocker->Bytes() + Snapshot.Limits.WorkingBytes - Snapshot.Used[int32(EVoxelTerrainResourcePool::Working)]) &&
+						InputBlocker->Resize(InputBlocker->Bytes() + Snapshot.Limits.InputBytes - Snapshot.Used[int32(EVoxelTerrainResourcePool::Input)])))
 					{
 						CancelAndDrain();
 						return false;
 					}
 				}
+				State->PressureExpected.Store(true);
 				State->AllowContinuation.Store(true);
 				Scheduler->Tick([](FVoxelTaskResult&&) {}, 5.0);
-				Test.TestTrue(TEXT("容量不足在 Launch 前挂起原 attempt"), FVoxelSchedulerNativeBackingTestAccess::IsNativeBlocked(*Scheduler));
-				VersionAfterDenial = State->Resources->Snapshot().Version;
+				Test.TestTrue(TEXT("账本无空余仍可启动原续跑"), Scheduler->ActiveCount() > 0);
 				SetPhase(EBackingPhase::CapacityWait);
 				return false;
 			case EBackingPhase::CapacityWait:
-				Test.TestEqual(TEXT("容量未外部释放时不重试授额"), State->Resources->Snapshot().Version, VersionAfterDenial);
-				Test.TestEqual(TEXT("被拒收的 native body 没有执行"), State->Executions.Load(), 1);
-				if (++BlockedFrames < 3) return false;
+				if (Applied == 0)
+				{
+					Test.TestTrue(TEXT("压力下每一步都复用原控制对象"),
+						FVoxelSchedulerNativeBackingTestAccess::ExecutionReservation(*Scheduler) == InitialReservation);
+					return false;
+				}
+				Test.TestTrue(TEXT("三次续跑期间两本原账本始终没有空余"), State->PressureObserved.Load());
+				State->PressureExpected.Store(false);
+				InputBlocker.Reset();
 				Blocker.Reset();
 				SetPhase(EBackingPhase::Finished);
 				return false;
 			case EBackingPhase::Finished:
 				if (Scheduler->ActiveCount() || Scheduler->GetDiagnostics().Pending || Applied == 0) return false;
-				Test.TestEqual(TEXT("外部释放后原 Execute 正常完成"), State->Executions.Load(), 2);
+				Test.TestEqual(TEXT("无需外部释放即可完成四步原 Execute"), State->Executions.Load(), 4);
 				Test.TestEqual(TEXT("最终 Apply 只执行一次"), Applied, 1);
 				Test.TestEqual(TEXT("从绑定到原 attempt 完成都没有捕获复制"), State->Copies.Load(), 0);
 				Test.TestTrue(TEXT("真实执行前 Input 和 native Working 已授额"), State->GrantObserved.Load());
@@ -272,7 +305,9 @@ namespace
 		void CancelAndDrain()
 		{
 			NativeHold = UE::Tasks::FTask();
+			InputBlocker.Reset();
 			Blocker.Reset();
+			State->PressureExpected.Store(false);
 			State->AllowContinuation.Store(true);
 			State->Release->Trigger();
 			Scheduler->CancelMatching([](EVoxelTaskKind, const FVoxelTaskStamp&) { return true; });
@@ -284,12 +319,12 @@ namespace
 		TSharedPtr<FNativeBackingState, ESPMode::ThreadSafe> State;
 		FVoxelGenerationConsumerKey Consumer;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Blocker;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InputBlocker;
 		UE::Tasks::FTask NativeHold;
 		FGuid InitialReceipt;
+		const void* InitialReservation = nullptr;
 		EBackingPhase Phase = EBackingPhase::None;
 		double Deadline = 0.0;
-		uint64 VersionAfterDenial = 0;
-		int32 BlockedFrames = 0;
 		int32 Applied = 0;
 		bool bCanceledApplied = false;
 	};
@@ -303,6 +338,138 @@ bool FVoxelTaskSchedulerNativeBackingTest::RunTest(const FString& InParameters)
 {
 	(void)InParameters;
 	ADD_LATENT_AUTOMATION_COMMAND(FNativeBackingCommand(*this));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelTaskSchedulerExecutionAdmissionTest,
+	"WHFramework.Voxel.FineRefactor.Scheduler.ExecutionAdmissionCapacity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelTaskSchedulerExecutionAdmissionTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const auto Control = FVoxelGenerationConsumerKey::Section(705, FGuid::NewGuid(), 1, {}, 1);
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Terrain;
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Runtime;
+	TUniquePtr<FVoxelTaskScheduler> Scheduler;
+	FString Error;
+	if (!TestTrue(TEXT("创建真实原账本与生产 Scheduler"),
+		FVoxelTerrainResources::Create({}, Control, Terrain, Error) &&
+		FVoxelTerrainResources::Create({}, Control, Runtime, Error) &&
+		FVoxelTaskScheduler::Create(Terrain.ToSharedRef(), Runtime.ToSharedRef(), Control, Scheduler, Error) &&
+		Scheduler->InitializeStatistics(705)))
+	{
+		return false;
+	}
+	FVoxelTaskBudget Budget;
+	Budget.MaxPendingTasks = 1;
+	Budget.MaxConcurrentTasks = 1;
+	Scheduler->SetBudget(Budget);
+	const auto Owner = FGuid::NewGuid();
+	int32 Executed = 0;
+	int32 Canceled = 0;
+	const auto MakeRequest = [&](const uint64 Token, const EVoxelWorkClass WorkClass)
+	{
+		FVoxelTaskRequest Request;
+		const auto Consumer = FVoxelGenerationConsumerKey::Section(705, Owner, 1, {}, Token);
+		Request.GenerationConsumer = Consumer;
+		Request.Kind = EVoxelTaskKind::BuildGenerationPlan;
+		Request.WorkClass = WorkClass;
+		Request.Stamp.WorldEpoch = Consumer.WorldEpoch;
+		Request.Stamp.OwnerId = Consumer.OwnerId;
+		Request.Stamp.OwnerIncarnation = Consumer.OwnerIncarnation;
+		Request.Stamp.Token = Token;
+		TestTrue(TEXT("在函数分配前授予回调容量"),
+			Request.BindExecute(Terrain.ToSharedRef(), Consumer, [&Executed](const TAtomic<bool>&)
+			{
+				++Executed;
+				FVoxelTaskResult Result;
+				Result.bSuccess = true;
+				return Result;
+			}, Error) && Request.BindGetBlockReason(Terrain.ToSharedRef(), Consumer, []()
+			{
+				return EVoxelTaskBlockReason::Dependency;
+			}, Error) && Request.BindApply(Terrain.ToSharedRef(), Consumer, [&Canceled](FVoxelTaskResult&& Result)
+			{
+				if (Result.bCanceled)
+				{
+					++Canceled;
+				}
+			}, Error));
+		return Request;
+	};
+	auto Original = MakeRequest(1, EVoxelWorkClass::Background);
+	const auto OriginalStamp = Original.Stamp;
+	if (!TestTrue(TEXT("被依赖阻塞的原请求在接纳时已有执行授额"), Scheduler->Enqueue(MoveTemp(Original))))
+	{
+		return false;
+	}
+	TestTrue(TEXT("尚未 Launch 即保留真实 Working"), Terrain->Snapshot().Used[int32(EVoxelTerrainResourcePool::Working)] > 0);
+	const void* OriginalReservation = FVoxelSchedulerNativeBackingTestAccess::ExecutionReservation(*Scheduler);
+	auto Replacement = MakeRequest(2, EVoxelWorkClass::Critical);
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Pressure;
+	const auto PressureConsumer = FVoxelGenerationConsumerKey::Section(705, FGuid::NewGuid(), 1, {}, 9);
+	if (!TestTrue(TEXT("外部压力占满原 Working"), Terrain->Acquire(PressureConsumer,
+		EVoxelTerrainResourcePool::Working, 1, Pressure)))
+	{
+		return false;
+	}
+	const auto BeforeFill = Terrain->Snapshot();
+	if (!TestTrue(TEXT("完成真实 Working 压力填充"), Pressure->Resize(Pressure->Bytes() +
+		BeforeFill.Limits.WorkingBytes - BeforeFill.Used[int32(EVoxelTerrainResourcePool::Working)])))
+	{
+		return false;
+	}
+	TestFalse(TEXT("新请求执行容量不足在接纳点拒收"), Scheduler->Enqueue(MoveTemp(Replacement)));
+	TestTrue(TEXT("拒收保留原请求与原控制对象"), Scheduler->Has(OriginalStamp, EVoxelTaskKind::BuildGenerationPlan) &&
+		FVoxelSchedulerNativeBackingTestAccess::ExecutionReservation(*Scheduler) == OriginalReservation);
+	TestTrue(TEXT("拒收仍可重试原新请求回调"), bool(Replacement.Execute));
+	TestEqual(TEXT("执行授额拒收明确报告 Working 阻塞"), Replacement.Blocked, EVoxelTaskBlockReason::Memory);
+	TestEqual(TEXT("拒收不取消旧请求"), Canceled, 0);
+	Pressure.Reset();
+	auto InputDenied = MakeRequest(4, EVoxelWorkClass::Critical);
+	if (!TestTrue(TEXT("输入压力前保留完整接纳尝试"), Scheduler->ObserveDemand(InputDenied.Kind,
+		InputDenied.Stamp, EVoxelTaskBlockReason::InputMemory)))
+	{
+		return false;
+	}
+	if (!TestTrue(TEXT("外部输入压力句柄预授予"), Terrain->Acquire(PressureConsumer,
+		EVoxelTerrainResourcePool::Input, 1, Pressure)))
+	{
+		return false;
+	}
+	const auto BeforeInputFill = Terrain->Snapshot();
+	if (!TestTrue(TEXT("外部压力占满原 Input"), Pressure->Resize(Pressure->Bytes() +
+		BeforeInputFill.Limits.InputBytes - BeforeInputFill.Used[int32(EVoxelTerrainResourcePool::Input)])))
+	{
+		return false;
+	}
+	TestFalse(TEXT("控制对象输入不足也在接纳点拒收"), Scheduler->Enqueue(MoveTemp(InputDenied)));
+	TestEqual(TEXT("输入拒收明确报告 Input 阻塞"), InputDenied.Blocked, EVoxelTaskBlockReason::InputMemory);
+	TestTrue(TEXT("输入拒收保留原任务身份与回调"), Scheduler->Has(OriginalStamp, EVoxelTaskKind::BuildGenerationPlan) &&
+		FVoxelSchedulerNativeBackingTestAccess::ExecutionReservation(*Scheduler) == OriginalReservation && bool(InputDenied.Execute));
+	TestEqual(TEXT("输入拒收也不先取消旧请求"), Canceled, 0);
+	Pressure.Reset();
+	if (!TestTrue(TEXT("外部释放后原新请求正常接纳"), Scheduler->Enqueue(MoveTemp(Replacement))))
+	{
+		return false;
+	}
+	Scheduler->Tick([](FVoxelTaskResult&&) {}, 5.0);
+	TestEqual(TEXT("仅成功接纳替换后才交付旧取消"), Canceled, 1);
+	TestTrue(TEXT("新排队请求仍保留原执行授额"), Terrain->Snapshot().Used[int32(EVoxelTerrainResourcePool::Working)] > 0);
+	Scheduler->CancelMatching([](EVoxelTaskKind, const FVoxelTaskStamp&) { return true; });
+	Scheduler->Tick([](FVoxelTaskResult&&) {}, 5.0);
+	TestEqual(TEXT("排队取消只交付一次"), Canceled, 2);
+	TestEqual(TEXT("真实排队控制对象销毁后归还 Working"), Terrain->Snapshot().Used[int32(EVoxelTerrainResourcePool::Working)], 0ull);
+	auto StopRequest = MakeRequest(3, EVoxelWorkClass::Critical);
+	if (!TestTrue(TEXT("停止前接纳新的完整执行授额"), Scheduler->Enqueue(MoveTemp(StopRequest))))
+	{
+		return false;
+	}
+	Scheduler->StopAndJoin();
+	TestEqual(TEXT("StopAndJoin 退休所有尚未 Launch 的授额"), Terrain->Snapshot().Used[int32(EVoxelTerrainResourcePool::Working)], 0ull);
+	TestEqual(TEXT("依赖阻塞期间从未偷偷执行生产回调"), Executed, 0);
+	TestEqual(TEXT("停止后无排队请求"), Scheduler->GetDiagnostics().Pending, 0);
 	return true;
 }
 

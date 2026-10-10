@@ -1,4 +1,4 @@
-﻿#if WITH_DEV_AUTOMATION_TESTS
+#if WITH_DEV_AUTOMATION_TESTS
 
 #include "HAL/FileManager.h"
 #include "HAL/PlatformProcess.h"
@@ -338,6 +338,13 @@ bool FVoxelSceneColumnPinnedReadTest::RunTest(const FString& InParameters)
 		return false;
 	}
 	TestEqual(TEXT("Directory stores the exact Scene file size"), Directory->SceneColumns.FindRef(Column), uint32(Bytes.Num()));
+	TestTrue(TEXT("Scene-only directory has no voxel Region or record backing"),
+		Directory->Regions.IsEmpty() && Directory->Records.IsEmpty());
+	TestEqual(TEXT("Directory grant counts only native heap backing; inline map storage belongs to the root"),
+		Directory->ResourceLease->Bytes(), VoxelBoundedAllocation::SharedBytes<FVoxelRegionDirectorySnapshot>() +
+		VoxelGenerationAllocation::AllocatedBytes(Directory->Records) + VoxelGenerationAllocation::AllocatedBytes(Directory->Regions) +
+		VoxelGenerationAllocation::AllocatedBytes(Directory->SceneColumns) + VoxelGenerationAllocation::AllocatedBytes(Directory->RegionOrder) +
+		VoxelGenerationAllocation::AllocatedBytes(Directory->SpatialNodes));
 	TestTrue(TEXT("Read body preserves the complete file and its original owner"), Read->Body.Bytes == Bytes &&
 		Read->SourceLease == Source && Read->Consumer == Consumer && Read->Body.ResourceLease.IsValid());
 	TestEqual(TEXT("Worker indexes one actor without deserializing UObject data"), Read->Actors.Num(), 1);
@@ -502,9 +509,14 @@ bool FVoxelSaveGenerationGrantedLeaseTest::RunTest(const FString& InParameters)
 	if (!IFileManager::Get().MakeDirectory(*Directory, true) || !IFileManager::Get().MakeDirectory(*Sibling, true)) return false;
 	const auto Resources = MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
 	FVoxelTerrainResourceLimits Limits;
-	Limits.InputBytes = 0;
-	if (!Resources->Configure(Limits)) return false;
+	if (!TestTrue(TEXT("Original lease ledger configures valid native limits"), Resources->Configure(Limits))) return false;
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(85, FGuid::NewGuid(), 1, {}, 1);
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InputBlocker;
+	if (!TestTrue(TEXT("An actual owner withholds Input before the generation read"),
+		Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input, 1, InputBlocker))) return false;
+	const auto Capacity = Resources->Snapshot();
+	if (!TestTrue(TEXT("Withholding the remaining original Input capacity succeeds"),
+		InputBlocker->Resize(1 + Capacity.Limits.InputBytes - Capacity.Used[static_cast<int32>(EVoxelTerrainResourcePool::Input)]))) return false;
 	TSharedPtr<const FSaveGameGenerationReadLease, ESPMode::ThreadSafe> First;
 	TSharedPtr<const FSaveGameGenerationReadLease, ESPMode::ThreadSafe> Second;
 	bool bCapacityBlocked = false;
@@ -512,8 +524,9 @@ bool FVoxelSaveGenerationGrantedLeaseTest::RunTest(const FString& InParameters)
 		Consumer, First, bCapacityBlocked));
 	TestTrue(TEXT("容量拒绝返回原生等待原因且不产生 pin"), bCapacityBlocked && !First &&
 		FSaveGameGenerationReadLease::GetPinCount(Root) == 0);
-	if (!Resources->Configure(FVoxelTerrainResourceLimits()) ||
-		!FSaveGameGenerationReadLease::AcquireGranted(Directory, Resources, Consumer, First, bCapacityBlocked)) return false;
+	InputBlocker.Reset();
+	if (!TestTrue(TEXT("The same generation read resumes after external capacity release"),
+		FSaveGameGenerationReadLease::AcquireGranted(Directory, Resources, Consumer, First, bCapacityBlocked))) return false;
 	TestTrue(TEXT("实际租约绑定原资源所有者和 World"), First->IsResourceAccountedFor(&Resources.Get(), 85));
 	TestFalse(TEXT("另一个 World 不能借用原资源归属"), First->IsResourceAccountedFor(&Resources.Get(), 86));
 	TestTrue(TEXT("实际节点和路径计入 Input"), Resources->Snapshot().Used[static_cast<int32>(EVoxelTerrainResourcePool::Input)] > 0);
@@ -980,7 +993,15 @@ bool FVoxelDirectoryBootstrapIsolationTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("Bootstrap replacement Tombstone encodes"), FVoxelDeltaCodec::Encode(Manifest, *Registry, Original, Bytes));
 	TestTrue(TEXT("Bootstrap replacement Tombstone stages"), FVoxelRegionStore::StageSection(Second, Original.Section, MoveTemp(Bytes)));
 	if (!TestTrue(TEXT("Bootstrap replacement generation writes"), FVoxelRegionStore::WritePendingRegions(Second, SecondDirectory, Error))) return false;
-	FVoxelTaskScheduler Scheduler(true);
+	const auto Control = FVoxelGenerationConsumerKey::Section(83, FGuid::NewGuid(), 1, {}, 1);
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> GeometryResources, RuntimeResources;
+	TUniquePtr<FVoxelTaskScheduler> SchedulerOwner;
+	if (!TestTrue(TEXT("Directory bootstrap admits original bound ledgers and scheduler"),
+		FVoxelTerrainResources::Create({}, Control, GeometryResources, Error) &&
+		FVoxelTerrainResources::Create({}, Control, RuntimeResources, Error) &&
+		FVoxelTaskScheduler::Create(GeometryResources.ToSharedRef(), RuntimeResources.ToSharedRef(), Control, SchedulerOwner, Error))) return false;
+	auto& Scheduler = *SchedulerOwner;
+	if (!TestTrue(TEXT("Directory bootstrap initializes original scheduler statistics"), Scheduler.InitializeStatistics(83))) return false;
 	const auto Resources = Scheduler.GetRuntimeResources();
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Blocker;
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(83, FGuid::NewGuid(), 1, {}, 1);
@@ -1031,6 +1052,8 @@ bool FVoxelDirectoryBootstrapIsolationTest::RunTest(const FString& InParameters)
 	FVoxelRegionStore::ReleaseReadLease(Read);
 	Scheduler.StopAndJoin();
 	Store.Reset();
+	TestFalse(TEXT("Live change baseline retains its immutable file generation"), Store.TryRetireFileGeneration(Storage.GetWorldDir(SaveId)));
+	Index.Reset();
 	TestTrue(TEXT("Released bootstrap generations retire"), Store.TryRetireFileGeneration(Storage.GetWorldDir(SaveId)));
 	return true;
 }

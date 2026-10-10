@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "Voxel/Navigation/VoxelNavigationPresenter.h"
 
 #include "CoreMinimal.h"
@@ -77,6 +77,7 @@ class WHFRAMEWORK_API UVoxelModule : public UModuleBase
 {
 #if WITH_DEV_AUTOMATION_TESTS
 	friend class FVoxelTerrainRendererWorldCleanupTest;
+	friend class FVoxelTerrainPreparationInputTest;
 	friend class FVoxelNavigationResidencyTest;
 	friend class FVoxelNavigationNativeTileTest;
 	friend class FVoxelFineShardAttemptIsolationTest;
@@ -84,6 +85,8 @@ class WHFRAMEWORK_API UVoxelModule : public UModuleBase
 	friend class FVoxelCriticalDependencyAdmissionTest;
 	friend class FVoxelPublishEstimateRecoveryTest;
 	friend class FVoxelInterestInputBudgetTest;
+	friend class FVoxelManagerLocalCoverageTest;
+	friend class FVoxelConcurrentPublishCommitTest;
 	friend class FVoxelNetworkWorldControlTest;
 	friend class FVoxelEmptyTransitionConvergenceTest;
 	friend class FVoxelFineProxyDependenciesTest;

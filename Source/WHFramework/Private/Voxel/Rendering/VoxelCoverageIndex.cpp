@@ -1,4 +1,4 @@
-﻿#include "Voxel/Rendering/VoxelCoverageIndex.h"
+#include "Voxel/Rendering/VoxelCoverageIndex.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Task/VoxelTerrainResources.h"
 #include "Voxel/Generation/VoxelGenerationAllocation.h"
@@ -6,6 +6,13 @@
 namespace
 {
 	TAtomic<uint64> NextVoxelCoverageVersion(0);
+
+	bool SameCoverageRecord(const FVoxelCoverageRecord& InA, const FVoxelCoverageRecord& InB)
+	{
+		return InA.Geometry == InB.Geometry && InA.Stamp == InB.Stamp && InA.Min == InB.Min && InA.Max == InB.Max &&
+			InA.bWanted == InB.bWanted && InA.bReady == InB.bReady &&
+			InA.bCommitted == InB.bCommitted && InA.bHasGeometry == InB.bHasGeometry;
+	}
 }
 
 uint64 FVoxelCoverageIndex::MaximumStorageBytes(const int32 InRecordCount)
@@ -96,6 +103,12 @@ TSharedPtr<const FVoxelCoverageRecord, ESPMode::ThreadSafe> FVoxelCoverageIndex:
 int32 FVoxelCoverageIndex::NumRecords() const { return Root ? Root->Records : 0; }
 int32 FVoxelCoverageIndex::NumIndexNodes() const { return Root ? Root->NodesCount : 0; }
 
+bool FVoxelCoverageIndex::HasMatchingRecord(const FVoxelCoverageRecord& InRecord) const
+{
+	const auto Existing = Find(InRecord.Geometry.Key);
+	return Existing && SameCoverageRecord(*Existing, InRecord);
+}
+
 bool FVoxelCoverageIndex::Upsert(TSharedPtr<const FVoxelCoverageRecord, ESPMode::ThreadSafe> InRecord, FString& OutError)
 {
 	if (!InRecord) { LastResourceAdmission = EVoxelTerrainResourceAdmission::InvalidRequest; OutError = TEXT("Coverage record is null"); return false; }
@@ -134,9 +147,7 @@ bool FVoxelCoverageIndex::Mutate(const FVoxelTerrainSpatialKey& InKey, const FVo
 			!InKey.TryBounds(InRecord->Geometry.WorldMinZ, InRecord->Geometry.WorldMaxZ, Min, Max)) return false;
 		if (InRecord->Min != Min || InRecord->Max != Max)
 		{ OutError = TEXT("Coverage records require exact dyadic bounds"); return false; }
-		if (Existing && Existing->Geometry == InRecord->Geometry && Existing->Stamp == InRecord->Stamp &&
-			Existing->bWanted == InRecord->bWanted && Existing->bReady == InRecord->bReady &&
-			Existing->bCommitted == InRecord->bCommitted && Existing->bHasGeometry == InRecord->bHasGeometry)
+		if (Existing && SameCoverageRecord(*Existing, *InRecord))
 		{ LastResourceAdmission = EVoxelTerrainResourceAdmission::Granted; OutError.Reset(); return true; }
 		if (!Existing && ReservedRecordLimit > 0 && NumRecords() >= ReservedRecordLimit)
 		{ LastResourceAdmission = EVoxelTerrainResourceAdmission::CapacityUnachievable; OutError = TEXT("CapacityUnachievable: CoverageIndex record capacity"); return false; }

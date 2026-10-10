@@ -91,6 +91,8 @@ namespace VoxelStreamingGeometry
 	WHFRAMEWORK_API uint8 ResolveCoverageLevel(int32 InSampleStepCells, int32 InPreferredSamples,
 		const FVoxelTerrainStageRange& InRange);
 	WHFRAMEWORK_API int32 ResolveReplanStep(int32 InRadiusCells, double InFraction, int32 InMinimumSideCells);
+	WHFRAMEWORK_API bool CountShards(const FVoxelTerrainGeometry& InGeometry, int32 InMaximumSamplesPerAxis,
+		int32 InMaximumShardCount, int32& OutCount, FString& OutError);
 	WHFRAMEWORK_API bool BuildShards(const FVoxelTerrainGeometry& InGeometry, int32 InMaximumSamplesPerAxis,
 		int32 InMaximumShardCount, TArray<FVoxelTerrainBuildShard>& OutShards, FString& OutError);
 }

@@ -1,4 +1,4 @@
-﻿#if WITH_DEV_AUTOMATION_TESTS
+#if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
 #include "Engine/Engine.h"
@@ -156,6 +156,7 @@ bool FVoxelPublisherStageAndIndexTest::RunTest(const FString& InParameters)
 	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
 	UVoxelModule* Module = NewObject<UVoxelModule>();
 	FVoxelTaskScheduler Scheduler(true);
+	if (!TestTrue(TEXT("Publisher fixture owns its original World resource ledger"), Scheduler.InitializeStatistics(1))) return false;
 	Scheduler.SetObservedTerrainStage(3);
 	FVoxelViewPublisher Publisher(*Module, Scheduler, 1);
 	const TArray<FVector> Observers{FVector::ZeroVector};
@@ -187,7 +188,13 @@ bool FVoxelPublisherStageAndIndexTest::RunTest(const FString& InParameters)
 	Publisher.BuildGroups(Publication, true);
 	Publisher.SortGroups(Publication);
 	Publication->bGroupsPrepared = true;
-	for (int32 Step = 0; Step < 16 && !Publication->bBuildOrderInitialized; ++Step) Publisher.AdmitBuilds(Publication);
+	for (int32 Step = 0; Step < 16 && !Publication->bBuildOrderInitialized; ++Step)
+	{
+		auto& Frame = Module->GetTerrainFrameContext();
+		Frame.Begin(1, Frame.GetFrameCounter() + 1, FPlatformTime::Seconds(), {});
+		Publisher.AdmitBuilds(Publication);
+		Frame.End(FPlatformTime::Seconds());
+	}
 	TestTrue(TEXT("Build admission initialization completes within bounded work"), Publication->bBuildOrderInitialized);
 	for (int32 Index = 0; Index < Publication->Updates.Num(); ++Index)
 		TestTrue(TEXT("Every prepared direct mesh still belongs to its final update"),
@@ -260,7 +267,15 @@ bool FVoxelPublisherStageAndIndexTest::RunTest(const FString& InParameters)
 	const FGuid LogicalGroup = Publisher.BeginGroup({1, FIntPoint::ZeroValue, 1});
 	TestTrue(TEXT("Empty Proxy seam records its actual Fine dependency stage"), Publisher.SetTerrainStage(LogicalGroup, 0));
 	Publisher.CommitGroup(LogicalGroup);
-	Publisher.Tick();
+	int32 LogicalFrames = 0;
+	while (Publisher.IsBusy() && ++LogicalFrames < 256)
+	{
+		auto& Frame = Module->GetTerrainFrameContext();
+		Frame.Begin(1, Frame.GetFrameCounter() + 1, FPlatformTime::Seconds(), {});
+		Publisher.Tick(Frame.GetPublishBudget());
+		Frame.End(FPlatformTime::Seconds());
+	}
+	TestTrue(TEXT("Logical seam completes across bounded shared-budget frames"), LogicalFrames < 256);
 	TestTrue(TEXT("Logical empty seam commits through the Fine gate without an Actor or mesh"), bLogicalCommitted);
 	Scheduler.StopAndJoin();
 	Publisher.Reset();

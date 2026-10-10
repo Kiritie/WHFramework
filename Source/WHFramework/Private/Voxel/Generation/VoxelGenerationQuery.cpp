@@ -1,6 +1,7 @@
 #include "Voxel/Generation/VoxelGenerationQuery.h"
 
 #include "ProfilingDebugging/CpuProfilerTrace.h"
+#include "Misc/ScopeExit.h"
 #include "Voxel/Generation/Aquifer/VoxelAquiferGenerator.h"
 #include "Voxel/Generation/Biome/VoxelBiomeGenerator.h"
 #include "Voxel/Generation/Caves/VoxelCaveGenerator.h"
@@ -87,6 +88,7 @@ FVoxelGenerationQuery::FPreparedState& FVoxelGenerationQuery::FPreparedState::op
 	{
 		Reset();
 		Lease = MoveTemp(InOther.Lease);
+		HydrologyRetention = MoveTemp(InOther.HydrologyRetention);
 		Caves = MoveTemp(InOther.Caves);
 		Ecology = MoveTemp(InOther.Ecology);
 		Features = MoveTemp(InOther.Features);
@@ -108,6 +110,7 @@ void FVoxelGenerationQuery::FPreparedState::Reset()
 	Ecology.Empty();
 	Features.Empty();
 	Structures.Empty();
+	HydrologyRetention.Reset();
 	Lease.Reset();
 	Cancel = nullptr;
 	bColumnsPrepared = false;
@@ -242,6 +245,8 @@ void FVoxelGenerationQuery::VisitRequiredSources(FVoxelGenerationRequiredSourceS
 	const auto VisitPrepared = [this, &InVisit](const FPreparedState& InState)
 	{
 		FVoxelGenerationRequiredSourceScope::VisitLease(InState.Lease.Get(), InVisit);
+		if (InState.HydrologyRetention)
+			FVoxelGenerationRequiredSourceScope::VisitLease(&InState.HydrologyRetention->GetResourceLease().Get(), InVisit);
 		const auto VisitPlans = [this, &InVisit](const auto& InPlans)
 		{
 			for (const auto& Plan : InPlans)
@@ -343,6 +348,44 @@ bool FVoxelGenerationQuery::ValidateConsumer(FString& OutError) const
 		return false;
 	}
 	return true;
+}
+
+bool FVoxelGenerationQuery::RetainHydrologyReads(
+	const FVoxelGenerationBounds& InBounds,
+	const int64 InMargin,
+	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>& OutRetention,
+	FString& OutError) const
+{
+	// Ready-only 任务沿原预检闭包保留；冷构建必须让依赖活过本次自然采样。
+	if (!Resources || bRequireReadyHydrology || bRequireReadyPlans) return true;
+	const auto& Settings = Config->Recipe->Settings;
+	const int64 Margin = FMath::Max<int64>(0, InMargin);
+	const auto At = [&Settings](const int64 X, const int64 Y)
+	{
+		return HydrologyKeyForVoxel(
+			int32(FMath::Clamp<int64>(X, VoxelGeneration::WorldCellMin, VoxelGeneration::WorldCellMaxExclusive - 1)),
+			int32(FMath::Clamp<int64>(Y, VoxelGeneration::WorldCellMin, VoxelGeneration::WorldCellMaxExclusive - 1)), Settings).Coordinate;
+	};
+	const FIntPoint First = At(int64(InBounds.Min.X) - Margin, int64(InBounds.Min.Y) - Margin);
+	const FIntPoint Last = At(int64(InBounds.Max.X) - 1 + Margin, int64(InBounds.Max.Y) - 1 + Margin);
+	const int64 Side = int64(Settings.HydrologyRegionSide) * Settings.HydrologyCellSize;
+	const FInt64Vector2 FirstCenter(int64(First.X) * Side + Side / 2, int64(First.Y) * Side + Side / 2);
+	const FInt64Vector2 LastCenter(int64(Last.X) * Side + Side / 2, int64(Last.Y) * Side + Side / 2);
+	FVoxelGenerationCacheRetentionPoint Point;
+	Point.Center = FIntPoint(int32(FMath::Clamp<int64>((FirstCenter.X + LastCenter.X) / 2, MIN_int32, MAX_int32)),
+		int32(FMath::Clamp<int64>((FirstCenter.Y + LastCenter.Y) / 2, MIN_int32, MAX_int32)));
+	const int64 Radius = FMath::Max(
+		FMath::Max(FMath::Abs(FirstCenter.X - Point.Center.X), FMath::Abs(LastCenter.X - Point.Center.X)),
+		FMath::Max(FMath::Abs(FirstCenter.Y - Point.Center.Y), FMath::Abs(LastCenter.Y - Point.Center.Y)));
+	if (Radius > MAX_int32)
+	{
+		OutError = TEXT("Oversized: query hydrology retention range");
+		return false;
+	}
+	Point.HydrologyRadiusCells = int32(Radius);
+	Point.NaturalRadiusCells = -1;
+	Point.PlanRadiusCells = -1;
+	return Cache->RetainForTask(Point, Resources.ToSharedRef(), Consumer, OutRetention, OutError);
 }
 
 bool FVoxelGenerationQuery::GetPlanKeyRanges(const FVoxelGenerationBounds& InBounds,
@@ -514,6 +557,7 @@ bool FVoxelGenerationQuery::EnsureHydrologyPlan(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_QueryHydrologyPlan);
 	if (!ValidateConsumer(OutError)) return false;
 	FVoxelGenerationRequiredSourceScope Sources(Resources.Get(), this, EnumerateQueryRequiredSources);
 	FVoxelGenerationPlanningReadScope ConsumerScope(nullptr, nullptr, InCancel, Resources ? &Consumer : nullptr);
@@ -543,6 +587,7 @@ bool FVoxelGenerationQuery::EnsureHydrologyPlan(
 	return Cache->GetOrBuildHydrology(InKey,
 		[this, InKey, InCancel](FVoxelHydrologyPlan& Plan, FString& Error)
 		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_HydrologyPlanBuild);
 			return Hydrology->BuildPlan(InKey, Plan, Error, InCancel);
 		}, OutPlan, OutError, InCancel);
 }
@@ -572,6 +617,9 @@ bool FVoxelGenerationQuery::EnsureCavePlan(
 	return Cache->GetOrBuildCave(InKey,
 		[this, Bounds, InCancel](FVoxelCavePlan& Plan, FString& Error)
 		{
+			TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> Retention;
+			if (!Preparing && !RetainHydrologyReads(Bounds, FVoxelCaveGenerator::GetMaximumReach(Config->Recipe->Settings), Retention, Error)) return false;
+			FVoxelGenerationRequiredSourceScope RetentionSource(Resources.Get(), Retention ? &Retention->GetResourceLease().Get() : nullptr);
 			PlanSampleError[0] = 0;
 			auto ColumnSampler = [this, InCancel](
 				const FIntVector& Position, FVoxelColumnSample& Column)
@@ -609,6 +657,9 @@ bool FVoxelGenerationQuery::EnsureStructurePlan(
 	return Cache->GetOrBuildStructure(InKey,
 		[this, Bounds, InCancel](FVoxelStructurePlan& Plan, FString& Error)
 		{
+			TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> Retention;
+			if (!Preparing && !RetainHydrologyReads(Bounds, 0, Retention, Error)) return false;
+			FVoxelGenerationRequiredSourceScope RetentionSource(Resources.Get(), Retention ? &Retention->GetResourceLease().Get() : nullptr);
 			PlanSampleError[0] = 0;
 			auto ColumnSampler = [this, InCancel](
 				const FIntVector& Position, FVoxelColumnSample& Column)
@@ -647,16 +698,54 @@ bool FVoxelGenerationQuery::EnsureFeaturePlan(
 	return Cache->GetOrBuildFeature(InKey,
 		[this, Bounds, InCancel](FVoxelFeaturePlan& Plan, FString& Error)
 		{
+			int64 Margin = 0;
+			for (const auto& Feature : Config->Recipe->Features) Margin = FMath::Max<int64>(Margin, Feature.Placement.Spacing - 1);
+			TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> Retention;
+			if (!Preparing && !RetainHydrologyReads(Bounds, Margin, Retention, Error)) return false;
+			FVoxelGenerationRequiredSourceScope RetentionSource(Resources.Get(), Retention ? &Retention->GetResourceLease().Get() : nullptr);
 			PlanSampleError[0] = 0;
-			auto ColumnSampler = [this, InCancel](
+			FVoxelGenerationWorkspace SamplesWorkspace;
+			TMap<FIntPoint, FVoxelColumnSample> Samples;
+			int32 SampleCapacity = 0;
+			ON_SCOPE_EXIT { SamplesWorkspace.FreeMap(Samples); };
+			auto ColumnSampler = [this, InCancel, &SamplesWorkspace, &Samples, &SampleCapacity](
 				const FIntVector& Position, FVoxelColumnSample& Column)
 			{
-				return SamplePlanColumn(Position, Column, InCancel);
+				FString SamplingError;
+				const auto Fail = [this](const FString& InError)
+				{
+					FCString::Strncpy(PlanSampleError, *InError, UE_ARRAY_COUNT(PlanSampleError));
+					return false;
+				};
+				if (!ValidateConsumer(SamplingError)) return Fail(SamplingError);
+				if (!FVoxelGenerationPlanningReadScope::CanPublish())
+					return Fail(FVoxelGenerationPlanningReadScope::PublishBlockError());
+				const FIntPoint XY(Position.X, Position.Y);
+				if (const auto* Existing = Samples.Find(XY)) { Column = *Existing; return true; }
+				if (!SamplePlanColumn(Position, Column, InCancel)) return false;
+				if (!FVoxelGenerationPlanningReadScope::CanPublish())
+					return Fail(FVoxelGenerationPlanningReadScope::PublishBlockError());
+				if (Samples.Num() == SampleCapacity)
+				{
+					TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_FeatureColumnCacheGrowth);
+					if (SampleCapacity == MAX_int32) return Fail(TEXT("Oversized: feature sample cache capacity"));
+					const int32 NextCapacity = int32(FMath::Min<int64>(MAX_int32, FMath::Max<int64>(64, int64(SampleCapacity) * 2)));
+					if (!SamplesWorkspace.ReserveMap(Samples, NextCapacity, SamplingError)) return Fail(SamplingError);
+					SampleCapacity = NextCapacity;
+				}
+				Samples.Add(XY, Column);
+				return true;
 			};
-			auto SymbolSampler = [this, InCancel](
+			auto SymbolSampler = [this, &ColumnSampler](
 				const FIntVector& Position, uint32& Symbol)
 			{
-				return SamplePlanSymbol(Position, Symbol, InCancel);
+				// 自然列只取决于 XY；每个矿脉格仍用原坐标计算自身密度，不复用方块结果。
+				FVoxelColumnSample Column;
+				if (!ColumnSampler(Position, Column)) return false;
+				const int32 Density = Terrain->SampleDensityQ16(Position,
+					{Column.SurfaceZ, Column.DensityHeight, Column.SlopePermille});
+				Symbol = Density > 0 ? Config->Recipe->Palette.Stone : Config->Recipe->Palette.Air;
+				return true;
 			};
 			FVoxelFeaturePlanner Planner(Config->Recipe.ToSharedRef());
 			const bool bBuilt = Planner.BuildPlan(Bounds, ColumnSampler, SymbolSampler,
@@ -695,6 +784,10 @@ bool FVoxelGenerationQuery::EnsureEcologyPlan(
 	return Cache->GetOrBuildEcology(InKey,
 		[this, Bounds, InCancel](FVoxelEcologyPlan& Plan, FString& Error)
 		{
+			const auto& EcologySettings = Config->Recipe->Settings.Ecology;
+			TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> Retention;
+			if (!Preparing && !RetainHydrologyReads(Bounds, FMath::Max(EcologySettings.Grass.PatchRadius, EcologySettings.Flower.PatchRadius), Retention, Error)) return false;
+			FVoxelGenerationRequiredSourceScope RetentionSource(Resources.Get(), Retention ? &Retention->GetResourceLease().Get() : nullptr);
 			PlanSampleError[0] = 0;
 			auto ColumnSampler = [this, InCancel](
 				const FIntVector& Position, FVoxelColumnSample& Column)
@@ -861,8 +954,8 @@ bool FVoxelGenerationQuery::Create(
 			InRequiredOutputLease->GetPool(), InRequiredOutputLease->Bytes()};
 	}
 	Query.bUseColumnCache = bInUseColumnCache;
-	Query.bRequireReadyHydrology = bInRequireReadyHydrology || FVoxelGenerationPlanningReadScope::IsActive();
-	Query.bRequireReadyPlans = bInRequireReadyPlans || FVoxelGenerationPlanningReadScope::IsActive();
+	Query.bRequireReadyHydrology = bInRequireReadyHydrology || FVoxelGenerationPlanningReadScope::RequiresReadyPlans();
+	Query.bRequireReadyPlans = bInRequireReadyPlans || FVoxelGenerationPlanningReadScope::RequiresReadyPlans();
 
 	Query.Climate = MakeQueryGenerator<FVoxelClimateGenerator>(MoveTemp(GeneratorLeases[0]), InConfig->Recipe.ToSharedRef());
 	Query.Terrain = MakeQueryGenerator<FVoxelTerrainGenerator>(MoveTemp(GeneratorLeases[1]),
@@ -912,10 +1005,63 @@ bool FVoxelGenerationQuery::PrepareColumns(
 	Candidate.Bounds = InBounds;
 	Candidate.Cancel = InCancel;
 	Candidate.bColumnsPrepared = true;
+	FVoxelGenerationRequiredSourceScope Sources(Resources.Get(), this, EnumerateQueryRequiredSources);
+	if (!RetainHydrologyReads(InBounds, 0, Candidate.HydrologyRetention, OutError)) return false;
 	Prepared = MoveTemp(Candidate);
 
 	OutError.Reset();
 	return true;
+}
+
+bool FVoxelGenerationQuery::PrepareEnvironmentColumnRead(
+	const int32 InX,
+	const int32 InY,
+	FString& OutError)
+{
+	if (!ValidateConsumer(OutError)) return false;
+	if (!FVoxelGenerationPlanningReadScope::CanPublish())
+	{
+		OutError = FVoxelGenerationPlanningReadScope::PublishBlockError();
+		return false;
+	}
+	if (!VoxelGeneration::IsWorldCell(InX) || !VoxelGeneration::IsWorldCell(InY))
+	{
+		OutError = TEXT("Invalid environment read outside world cell domain");
+		return false;
+	}
+	// 原预检 reader 已持有完整自然闭包；仅冷操作随实际读取增长原保留范围。
+	if (!Resources || bRequireReadyHydrology || bRequireReadyPlans)
+	{
+		OutError.Reset();
+		return true;
+	}
+	if (Prepared.bSymbolsPrepared || !Prepared.Structures.IsEmpty())
+	{
+		OutError = TEXT("InvalidQueryState: environment read retention cannot replace prepared symbol plans");
+		return false;
+	}
+	const auto& Settings = Config->Recipe->Settings;
+	const auto Key = HydrologyKeyForVoxel(InX, InY, Settings);
+	const int64 Side = int64(Settings.HydrologyRegionSide) * Settings.HydrologyCellSize;
+	const int64 X = int64(Key.Coordinate.X) * Side;
+	const int64 Y = int64(Key.Coordinate.Y) * Side;
+	FVoxelGenerationBounds Bounds{
+		{int32(FMath::Max<int64>(VoxelGeneration::WorldCellMin, X)),
+			int32(FMath::Max<int64>(VoxelGeneration::WorldCellMin, Y)), 0},
+		{int32(FMath::Min<int64>(VoxelGeneration::WorldCellMaxExclusive, X + Side)),
+			int32(FMath::Min<int64>(VoxelGeneration::WorldCellMaxExclusive, Y + Side)), 1}};
+	if (Prepared.bColumnsPrepared && Prepared.HydrologyRetention)
+	{
+		if (Prepared.Bounds.Min.X <= Bounds.Min.X && Prepared.Bounds.Min.Y <= Bounds.Min.Y &&
+			Prepared.Bounds.Max.X >= Bounds.Max.X && Prepared.Bounds.Max.Y >= Bounds.Max.Y)
+		{
+			OutError.Reset();
+			return true;
+		}
+		Bounds.Min = Prepared.Bounds.Min.ComponentMin(Bounds.Min);
+		Bounds.Max = Prepared.Bounds.Max.ComponentMax(Bounds.Max);
+	}
+	return PrepareColumns(Bounds, OutError);
 }
 
 bool FVoxelGenerationQuery::Prepare(
@@ -941,6 +1087,20 @@ bool FVoxelGenerationQuery::Prepare(
 	FVoxelGenerationRequiredSourceScope Sources(Resources.Get(), this, EnumerateQueryRequiredSources);
 	FPreparedState Candidate;
 	TGuardValue<const FPreparedState*> PreparingGuard(Preparing, &Candidate);
+	int64 NaturalMargin = FVoxelCaveGenerator::GetMaximumReach(Settings);
+	for (const auto& Feature : Config->Recipe->Features) NaturalMargin = FMath::Max<int64>(NaturalMargin, Feature.Placement.Spacing - 1);
+	const int64 EcologyMargin = FMath::Max(Settings.Ecology.Grass.PatchRadius, Settings.Ecology.Flower.PatchRadius);
+	FVoxelGenerationBounds NaturalBounds = InBounds;
+	for (int32 Axis = 0; Axis < 2; ++Axis)
+	{
+		NaturalBounds.Min[Axis] = int32(FMath::Clamp<int64>(FMath::Min(
+			int64(Ranges.TileMin[Axis]) * GenerationPlanTileSide - NaturalMargin,
+			int64(Ranges.EcologyMin[Axis]) * EcologyTileSide - EcologyMargin), VoxelGeneration::WorldCellMin, VoxelGeneration::WorldCellMaxExclusive - 1));
+		NaturalBounds.Max[Axis] = int32(FMath::Clamp<int64>(FMath::Max(
+			(int64(Ranges.TileMax[Axis]) + 1) * GenerationPlanTileSide + NaturalMargin,
+			(int64(Ranges.EcologyMax[Axis]) + 1) * EcologyTileSide + EcologyMargin), VoxelGeneration::WorldCellMin + 1, VoxelGeneration::WorldCellMaxExclusive));
+	}
+	if (!RetainHydrologyReads(NaturalBounds, 0, Candidate.HydrologyRetention, OutError)) return false;
 	const uint64 ExistingInputBytes = GetRequiredInputBytes() + RequiredOutputInputBytes;
 	if (!Candidate.Reserve(Resources, Consumer, Ranges.TileCount, Ranges.EcologyCount, false, ExistingInputBytes, GetRequiredInputLeaseCount() + RequiredOutputLeaseCount, OutError))
 	{
@@ -1032,6 +1192,15 @@ bool FVoxelGenerationQuery::PrepareStructuresOnly(
 	{
 		return false;
 	}
+	FVoxelGenerationBounds NaturalBounds = InBounds;
+	for (int32 Axis = 0; Axis < 2; ++Axis)
+	{
+		NaturalBounds.Min[Axis] = int32(FMath::Clamp<int64>(int64(Range.Min[Axis]) * GenerationPlanTileSide,
+			VoxelGeneration::WorldCellMin, VoxelGeneration::WorldCellMaxExclusive - 1));
+		NaturalBounds.Max[Axis] = int32(FMath::Clamp<int64>((int64(Range.Max[Axis]) + 1) * GenerationPlanTileSide,
+			VoxelGeneration::WorldCellMin + 1, VoxelGeneration::WorldCellMaxExclusive));
+	}
+	if (!RetainHydrologyReads(NaturalBounds, 0, Candidate.HydrologyRetention, OutError)) return false;
 	for (int64 Y = Range.Min.Y; Y <= Range.Max.Y; ++Y)
 	{
 		for (int64 X = Range.Min.X; X <= Range.Max.X; ++X)
@@ -1068,6 +1237,7 @@ bool FVoxelGenerationQuery::GetBaseColumn(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_QueryBaseColumn);
 	if (!ValidateConsumer(OutError)) return false;
 	FVoxelGenerationRequiredSourceScope Sources(Resources.Get(), this, EnumerateQueryRequiredSources);
 	FVoxelGenerationPlanningReadScope ConsumerScope(nullptr, nullptr, InCancel, Resources ? &Consumer : nullptr);
@@ -1128,6 +1298,7 @@ bool FVoxelGenerationQuery::ComputeBaseColumn(
 	const int32 InY,
 	FVoxelColumnSample& OutColumn) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ComputeBaseColumn);
 	FVoxelColumnSample Column;
 
 	Column.Climate =
@@ -1236,6 +1407,7 @@ bool FVoxelGenerationQuery::ApplyHydrology(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_NaturalHydrology);
 	const FVoxelHydrologyRegionKey Key = HydrologyKeyForVoxel(
 		InX, InY, Config->Recipe->Settings);
 	FVoxelHydrologyPlanPtr Plan;
@@ -1253,10 +1425,13 @@ bool FVoxelGenerationQuery::ApplyHydrology(
 	}
 
 	FVoxelHydrologyInfluence Influence;
-	if (!Plan->Sample(InX, InY, InOutColumn.SurfaceZ, Influence))
 	{
-		OutError.Reset();
-		return true;
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_HydrologyPlanSample);
+		if (!Plan->Sample(InX, InY, InOutColumn.SurfaceZ, Influence))
+		{
+			OutError.Reset();
+			return true;
+		}
 	}
 
 	if (Influence.GroundOverrideZ != MIN_int32)

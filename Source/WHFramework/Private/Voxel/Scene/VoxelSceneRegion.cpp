@@ -1,4 +1,4 @@
-﻿#include "Voxel/Scene/VoxelSceneRegion.h"
+#include "Voxel/Scene/VoxelSceneRegion.h"
 
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/PickUp/AbilityPickUpBase.h"
@@ -71,6 +71,13 @@ bool UVoxelSceneRegion::TryDeactivateSection(const FIntVector& InSection,
 	if (!Module || !Module->IsAuthority() || !ActiveSections.Contains(InSection))
 	{
 		OutError = TEXT("Simulation section has no active scene-region owner");
+		return false;
+	}
+	if (bSceneLoading || bSceneFailed)
+	{
+		// 同一区域的后续退出票据保留原 owner，等加载完成或显式恢复，不能再次捕获失败输入。
+		if (OutWaitingForScene) *OutWaitingForScene = true;
+		OutError.Reset();
 		return false;
 	}
 	TArray<FVoxelSavedSceneActor> Actors;

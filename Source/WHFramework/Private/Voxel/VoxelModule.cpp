@@ -1,4 +1,4 @@
-﻿#include "Voxel/VoxelModule.h"
+#include "Voxel/VoxelModule.h"
 #include "Voxel/Rendering/VoxelStreamingGeometry.h"
 #include "Voxel/Rendering/VoxelViewLod.h"
 
@@ -2332,6 +2332,12 @@ void UVoxelModule::RefreshInterest(
 			return Result;
 		}
 		Result.bSuccess &= Result.Error.IsEmpty();
+		if (Result.bSuccess && !Payload->bHasSnapshot && Payload->CandidateRuntime->GetCoarsePlanningPending())
+		{
+			// 有界粗域推进尚未形成完整快照；原任务保留候选根、游标、Token 与排队年龄继续执行。
+			Result.bContinue = true;
+			return Result;
+		}
 		Result.CustomPayload = Payload;
 		return Result;
 	}, CallbackBindingError))

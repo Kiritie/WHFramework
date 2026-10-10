@@ -228,10 +228,265 @@ namespace
 		return Dot > 0 && Cross * 1024 <= Dot * InTangentQ10;
 	}
 
+	FVoxelRiverMeanderPoint InterpolateMeanderPoint(const FVoxelRiverMeanderPoint& A,
+		const FVoxelRiverMeanderPoint& B, const int32 InNumerator, const int32 InDenominator)
+	{
+		const auto Blend = [InNumerator, InDenominator](const int32 First, const int32 Second)
+		{
+			return int32(int64(First) + (int64(Second) - First) * InNumerator / InDenominator);
+		};
+		FVoxelRiverMeanderPoint Result;
+		Result.Position = FIntPoint(Blend(A.Position.X, B.Position.X), Blend(A.Position.Y, B.Position.Y));
+		Result.WaterZ = Blend(A.WaterZ, B.WaterZ);
+		Result.BedHalfWidth = Blend(A.BedHalfWidth, B.BedHalfWidth);
+		Result.WaterHalfWidth = Blend(A.WaterHalfWidth, B.WaterHalfWidth);
+		Result.BankWidth = Blend(A.BankWidth, B.BankWidth);
+		Result.ShoreWidth = Blend(A.ShoreWidth, B.ShoreWidth);
+		Result.Depth = Blend(A.Depth, B.Depth);
+		Result.Accumulation = InterpolateAccumulation(A.Accumulation, B.Accumulation, uint32(InNumerator), uint32(InDenominator));
+		Result.MeanderOffset = Blend(A.MeanderOffset, B.MeanderOffset);
+		return Result;
+	}
+
+	struct FMeanderSearchNode
+	{
+		uint64 Cost = MAX_uint64;
+		int32 Parent = INDEX_NONE;
+		int32 HeapIndex = INDEX_NONE;
+		bool bClosed = false;
+	};
+
+	bool RefineQuantizedMeanderTurn(TArray<FVoxelRiverMeanderPoint>& OutPoints,
+		const int32 InIndex, const int32 InTangentQ10, const int32 InRadius,
+		bool& bOutRefined, FString& OutError, const TAtomic<bool>* InCancel)
+	{
+		bOutRefined = false;
+		const int32 FirstIndex = FMath::Max(0, InIndex - 2);
+		const int32 LastIndex = FMath::Min(OutPoints.Num() - 1, InIndex + 2);
+		const auto Previous = OutPoints[FirstIndex];
+		const auto Next = OutPoints[LastIndex];
+		if (Previous.Position == Next.Position) return true;
+		// 量化修正只搜索原局部河段的有限邻域。状态包含入射方向与下一固定连接，
+		// 所有锚点按原顺序经过；首尾切向也必须与邻域外的原河段匹配。
+		const FIntPoint Directions[] = {FIntPoint(1, 0), FIntPoint(2, 1), FIntPoint(1, 1), FIntPoint(1, 2),
+			FIntPoint(0, 1), FIntPoint(-1, 2), FIntPoint(-1, 1), FIntPoint(-2, 1),
+			FIntPoint(-1, 0), FIntPoint(-2, -1), FIntPoint(-1, -1), FIntPoint(-1, -2),
+			FIntPoint(0, -1), FIntPoint(1, -2), FIntPoint(1, -1), FIntPoint(2, -1)};
+		const uint32 StepCosts[] = {1024, 2290, 1448, 2290, 1024, 2290, 1448, 2290,
+			1024, 2290, 1448, 2290, 1024, 2290, 1448, 2290};
+		constexpr int32 DirectionCount = UE_ARRAY_COUNT(Directions);
+		constexpr int32 StateDirections = DirectionCount + 1;
+		FVoxelRiverMeanderPoint Targets[4];
+		int32 TargetCount = 0;
+		FIntPoint OriginalMin = Previous.Position;
+		FIntPoint OriginalMax = Previous.Position;
+		for (int32 Index = FirstIndex + 1; Index <= LastIndex; ++Index)
+		{
+			const auto& Point = OutPoints[Index];
+			OriginalMin.X = FMath::Min(OriginalMin.X, Point.Position.X);
+			OriginalMin.Y = FMath::Min(OriginalMin.Y, Point.Position.Y);
+			OriginalMax.X = FMath::Max(OriginalMax.X, Point.Position.X);
+			OriginalMax.Y = FMath::Max(OriginalMax.Y, Point.Position.Y);
+			if (Point.bAnchor || Index == LastIndex) Targets[TargetCount++] = Point;
+		}
+		const int64 MinX = FMath::Max(VoxelGeneration::WorldCellMin, int64(OriginalMin.X) - InRadius);
+		const int64 MinY = FMath::Max(VoxelGeneration::WorldCellMin, int64(OriginalMin.Y) - InRadius);
+		const int64 MaxX = FMath::Min(VoxelGeneration::WorldCellMaxExclusive - 1, int64(OriginalMax.X) + InRadius);
+		const int64 MaxY = FMath::Min(VoxelGeneration::WorldCellMaxExclusive - 1, int64(OriginalMax.Y) + InRadius);
+		const uint64 Width = uint64(MaxX - MinX + 1);
+		const uint64 Height = uint64(MaxY - MinY + 1);
+		if (Width > MAX_int32 || Height > MAX_int32 || Width * Height > uint64(MAX_int32) / (StateDirections * TargetCount))
+		{
+			OutError = TEXT("Oversized: hydrology quantized turn search exceeds native capacity");
+			return false;
+		}
+		const int32 StateCount = int32(Width * Height * StateDirections * TargetCount);
+		FVoxelGenerationWorkspace Workspace;
+		TArray<FMeanderSearchNode> Nodes;
+		TArray<int32> Heap;
+		TArray<FIntPoint> Path;
+		if (!Workspace.ReserveArray(Nodes, StateCount, OutError) ||
+			!Workspace.ReserveArray(Heap, StateCount, OutError)) return false;
+		Nodes.SetNum(StateCount);
+		const auto StateIndex = [MinX, MinY, Width, TargetCount](const FIntPoint& Position, const int32 Direction, const int32 Target)
+		{
+			return int32(((uint64(int64(Position.Y) - MinY) * Width + uint64(int64(Position.X) - MinX)) *
+				TargetCount + Target) * StateDirections + Direction);
+		};
+		const auto PositionAt = [MinX, MinY, Width, TargetCount](const int32 Index)
+		{
+			const uint64 Cell = uint64(Index / StateDirections / TargetCount);
+			return FIntPoint(int32(MinX + int64(Cell % Width)), int32(MinY + int64(Cell / Width)));
+		};
+		const auto Less = [&Nodes](const int32 A, const int32 B)
+		{
+			return Nodes[A].Cost != Nodes[B].Cost ? Nodes[A].Cost < Nodes[B].Cost : A < B;
+		};
+		const auto SwapHeap = [&Nodes, &Heap](const int32 A, const int32 B)
+		{
+			Heap.Swap(A, B);
+			Nodes[Heap[A]].HeapIndex = A;
+			Nodes[Heap[B]].HeapIndex = B;
+		};
+		const auto PushOrDecrease = [&Nodes, &Heap, &Less, &SwapHeap](const int32 Index)
+		{
+			int32 Position = Nodes[Index].HeapIndex;
+			if (Position == INDEX_NONE)
+			{
+				Position = Heap.Add(Index);
+				Nodes[Index].HeapIndex = Position;
+			}
+			while (Position > 0)
+			{
+				const int32 Parent = (Position - 1) / 2;
+				if (!Less(Heap[Position], Heap[Parent])) break;
+				SwapHeap(Position, Parent);
+				Position = Parent;
+			}
+		};
+		const auto Pop = [&Nodes, &Heap, &Less, &SwapHeap]()
+		{
+			const int32 Result = Heap[0];
+			const int32 Last = Heap.Pop(EAllowShrinking::No);
+			Nodes[Result].HeapIndex = INDEX_NONE;
+			if (!Heap.IsEmpty())
+			{
+				Heap[0] = Last;
+				Nodes[Last].HeapIndex = 0;
+				int32 Position = 0;
+				while (int64(Position) * 2 + 1 < Heap.Num())
+				{
+					int32 Child = Position * 2 + 1;
+					if (Child + 1 < Heap.Num() && Less(Heap[Child + 1], Heap[Child])) ++Child;
+					if (!Less(Heap[Child], Heap[Position])) break;
+					SwapHeap(Position, Child);
+					Position = Child;
+				}
+			}
+			return Result;
+		};
+		const auto SegmentDistanceSquared = [](const FIntPoint& Position, const FIntPoint& A, const FIntPoint& B)
+		{
+			const FVector2D AP(double(int64(Position.X) - A.X), double(int64(Position.Y) - A.Y));
+			const FVector2D AB(double(int64(B.X) - A.X), double(int64(B.Y) - A.Y));
+			const double Fraction = AB.SizeSquared() > 0 ? FMath::Clamp(FVector2D::DotProduct(AP, AB) / AB.SizeSquared(), 0.0, 1.0) : 0.0;
+			return (AP - AB * Fraction).SizeSquared();
+		};
+		const int32 Initial = StateIndex(Previous.Position, DirectionCount, 0);
+		Nodes[Initial].Cost = 0;
+		PushOrDecrease(Initial);
+		int32 Goal = INDEX_NONE;
+		int32 Visited = 0;
+		while (!Heap.IsEmpty())
+		{
+			if ((Visited++ & 255) == 0 && InCancel && InCancel->Load())
+			{
+				OutError = TEXT("Canceled");
+				return false;
+			}
+			const int32 Index = Pop();
+			Nodes[Index].bClosed = true;
+			const auto Position = PositionAt(Index);
+			const int32 Incoming = Index % StateDirections;
+			const int32 Target = Index / StateDirections % TargetCount;
+			if (Position == Next.Position)
+			{
+				if (Target == TargetCount - 1 && Incoming < DirectionCount &&
+					(LastIndex + 1 >= OutPoints.Num() || IsMeanderAngleWithinLimit(
+						Position - Directions[Incoming], Position, OutPoints[LastIndex + 1].Position, InTangentQ10)))
+				{
+					Goal = Index;
+					break;
+				}
+				continue;
+			}
+			for (int32 Direction = 0; Direction < DirectionCount; ++Direction)
+			{
+				FIntPoint Candidate;
+				if (!VoxelGeneration::TryWorldPoint(FInt64Vector2(int64(Position.X) + Directions[Direction].X,
+					int64(Position.Y) + Directions[Direction].Y), Candidate) || Candidate.X < MinX || Candidate.X > MaxX ||
+					Candidate.Y < MinY || Candidate.Y > MaxY || Candidate == Previous.Position) continue;
+				if (Incoming < DirectionCount)
+				{
+					if (!IsMeanderAngleWithinLimit(FIntPoint::ZeroValue, Directions[Incoming],
+						Directions[Incoming] + Directions[Direction], InTangentQ10)) continue;
+				}
+				else if (FirstIndex > 0 && !IsMeanderAngleWithinLimit(OutPoints[FirstIndex - 1].Position,
+					Previous.Position, Candidate, InTangentQ10)) continue;
+				bool bWrongTarget = false;
+				for (int32 TargetIndex = 0; TargetIndex < TargetCount; ++TargetIndex)
+					bWrongTarget |= Candidate == Targets[TargetIndex].Position && TargetIndex != Target;
+				if (bWrongTarget) continue;
+				const int32 NextTarget = Candidate == Targets[Target].Position && Target + 1 < TargetCount ? Target + 1 : Target;
+				const int32 Child = StateIndex(Candidate, Direction, NextTarget);
+				if (Nodes[Child].bClosed) continue;
+				double DistanceSquared = MAX_dbl;
+				for (int32 PointIndex = FirstIndex; PointIndex < LastIndex; ++PointIndex)
+					DistanceSquared = FMath::Min(DistanceSquared, SegmentDistanceSquared(Candidate,
+						OutPoints[PointIndex].Position, OutPoints[PointIndex + 1].Position));
+				const uint64 Cost = Nodes[Index].Cost + StepCosts[Direction] +
+					uint64(FMath::RoundToInt(FMath::Min(65535.0, DistanceSquared) * 16.0));
+				if (Cost >= Nodes[Child].Cost) continue;
+				Nodes[Child].Cost = Cost;
+				Nodes[Child].Parent = Index;
+				PushOrDecrease(Child);
+			}
+		}
+		if (Goal == INDEX_NONE) return true;
+		int32 PathCount = 0;
+		for (int32 Index = Goal; Index != INDEX_NONE; Index = Nodes[Index].Parent) ++PathCount;
+		if (!Workspace.ReserveArray(Path, PathCount, OutError)) return false;
+		Path.SetNum(PathCount);
+		for (int32 Index = Goal, Ordinal = PathCount - 1; Index != INDEX_NONE; Index = Nodes[Index].Parent, --Ordinal)
+			Path[Ordinal] = PositionAt(Index);
+		// 共线细步合并，固定锚点仍是独立正文；合并不改变任何转角。
+		for (int32 Index = Path.Num() - 2; Index > 0; --Index)
+		{
+			bool bAnchor = false;
+			for (int32 TargetIndex = 0; TargetIndex < TargetCount; ++TargetIndex)
+				bAnchor |= Targets[TargetIndex].bAnchor && Path[Index] == Targets[TargetIndex].Position;
+			if (bAnchor) continue;
+			const FIntPoint A = Path[Index] - Path[Index - 1];
+			const FIntPoint B = Path[Index + 1] - Path[Index];
+			if (int64(A.X) * B.Y == int64(A.Y) * B.X) Path.RemoveAt(Index, 1, EAllowShrinking::No);
+		}
+		Workspace.FreeArray(Heap);
+		Workspace.FreeArray(Nodes);
+		const int32 RemovedPoints = LastIndex - FirstIndex - 1;
+		const int64 Required = int64(OutPoints.Num()) + Path.Num() - 2 - RemovedPoints;
+		if (Required > MAX_int32)
+		{
+			OutError = TEXT("Oversized: hydrology refined route exceeds native capacity");
+			return false;
+		}
+		const int32 Capacity = Required <= OutPoints.Max() ? OutPoints.Max() : NextHydrologyPlanCapacity(int32(Required), OutPoints.Max());
+		if (!VoxelGenerationAllocation::RetainArray(OutPoints, Capacity, OutError)) return false;
+		OutPoints.RemoveAt(FirstIndex + 1, RemovedPoints, EAllowShrinking::No);
+		int32 Target = 0;
+		int32 SegmentStart = 0;
+		int32 SegmentEnd = Path.IndexOfByKey(Targets[0].Position);
+		auto SegmentSource = Previous;
+		for (int32 Index = 1; Index + 1 < Path.Num(); ++Index)
+		{
+			auto Point = Index == SegmentEnd ? Targets[Target] :
+				InterpolateMeanderPoint(SegmentSource, Targets[Target], Index - SegmentStart, SegmentEnd - SegmentStart);
+			Point.Position = Path[Index];
+			OutPoints.Insert(Point, FirstIndex + Index);
+			if (Index == SegmentEnd)
+			{
+				SegmentSource = Targets[Target++];
+				SegmentStart = SegmentEnd;
+				SegmentEnd = Path.IndexOfByKey(Targets[Target].Position);
+			}
+		}
+		bOutRefined = true;
+		return true;
+	}
+
 	bool BuildMeanderRoute(const TArray<FVoxelRiverShapePoint>& InShape,
 		const int32 InSeed, const int32 InStrength, const int32 InFrequency,
 		const int32 InOctaves, const int32 InMaxAngle, const int32 InMinimumStep,
-		TArray<FVoxelRiverMeanderPoint>& OutPoints, FString& OutError)
+		TArray<FVoxelRiverMeanderPoint>& OutPoints, FString& OutError, const TAtomic<bool>* InCancel)
 	{
 		OutPoints.Reset();
 		if (!VoxelGenerationAllocation::RetainArray(OutPoints, InShape.Num(), OutError))
@@ -452,6 +707,17 @@ namespace
 			}
 			if (!bRemoved) ++Index;
 		}
+		// 对最后仍超限的量化转角使用同一组局部格点、角度和固定连接约束。
+		for (int32 Index = 1; Index + 1 < OutPoints.Num(); ++Index)
+		{
+			if (IsMeanderAngleWithinLimit(OutPoints[Index - 1].Position,
+				OutPoints[Index].Position, OutPoints[Index + 1].Position, TangentQ10)) continue;
+			const int32 BeforeCount = OutPoints.Num();
+			bool bRefined = false;
+			if (!RefineQuantizedMeanderTurn(OutPoints, Index, TangentQ10, InMinimumStep,
+				bRefined, OutError, InCancel)) return false;
+			if (bRefined) Index += OutPoints.Num() - BeforeCount;
+		}
 		for (int32 Index = 1; Index + 1 < OutPoints.Num(); ++Index)
 		{
 			const FVector2D A(double(int64(OutPoints[Index].Position.X) - OutPoints[Index - 1].Position.X),
@@ -500,7 +766,7 @@ bool FVoxelHydrologyPlan::Finalize(FString& OutError, const TAtomic<bool>* InCan
 			RiverMeanderStrength, RiverMeanderFrequency,
 			RiverMeanderOctaves, RiverMaxMeanderAngle,
 			FMath::Clamp(Grid.CellSize / 2, 2, 4),
-			River.MeanderPoints, OutError))
+			River.MeanderPoints, OutError, InCancel))
 		{
 			return false;
 		}

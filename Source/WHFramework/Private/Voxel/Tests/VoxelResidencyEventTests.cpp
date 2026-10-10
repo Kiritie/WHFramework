@@ -1,4 +1,4 @@
-﻿#if WITH_DEV_AUTOMATION_TESTS
+#if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
 #include "Misc/ScopeExit.h"
@@ -221,10 +221,30 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelResidencyTaskZeroTest,
 bool FVoxelResidencyTaskZeroTest::RunTest(const FString& InParameters)
 {
 	(void)InParameters;
-	FVoxelWorldRuntime Runtime(4, false, VoxelTest::MakeRegistry(), VoxelTest::MakeGenerator());
-	FVoxelTaskScheduler Scheduler(true);
-	if (!Scheduler.InitializeStatistics(4)) return false;
-	FVoxelResidencyManager Manager(Runtime, Scheduler, {});
+	const auto Control = FVoxelGenerationConsumerKey::Section(4, FGuid::NewGuid(), 1, {}, 1);
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> TerrainResources;
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> RuntimeResources;
+	TUniquePtr<FVoxelTaskScheduler> SchedulerOwner;
+	FString Error;
+	if (!TestTrue(TEXT("Real scheduler roots are admitted"),
+		FVoxelTerrainResources::Create({}, Control, TerrainResources, Error) &&
+		FVoxelTerrainResources::Create({}, Control, RuntimeResources, Error) &&
+		FVoxelTaskScheduler::Create(TerrainResources.ToSharedRef(), RuntimeResources.ToSharedRef(), Control, SchedulerOwner, Error)))
+	{
+		AddError(Error);
+		return false;
+	}
+	auto& Scheduler = *SchedulerOwner;
+	if (!TestTrue(TEXT("Real scheduler statistics initialize"), Scheduler.InitializeStatistics(4))) return false;
+	FVoxelWorldRuntime Runtime(4, false, VoxelTest::MakeRegistry(), VoxelTest::MakeGenerator(), RuntimeResources.ToSharedRef());
+	FVoxelResidencyManager Manager(Runtime, Scheduler);
+	if (!TestTrue(TEXT("Production idle callback binds in its original resource domain"), Manager.Initialize(
+		[](const FIntVector&) {}, [](const FIntVector&) { return false; },
+		[](const FIntVector&, const FVoxelSectionStamp&, EVoxelRuntimeSectionEvent) {}, Error)))
+	{
+		AddError(Error);
+		return false;
+	}
 	Manager.SetEvictGraceFrames(0);
 	const FIntVector Key(1, 2, 3);
 	auto* Section = Runtime.FindOrAllocate(Key, GFrameCounter);
@@ -238,8 +258,16 @@ bool FVoxelResidencyTaskZeroTest::RunTest(const FString& InParameters)
 	Request.Stamp.OwnerId = FGuid::NewGuid();
 	Request.Stamp.OwnerIncarnation = Section->Incarnation;
 	Request.ReservedBytes = 64;
-	Request.GetBlockReason = [] { return EVoxelTaskBlockReason::Memory; };
-	Request.Execute = [](const TAtomic<bool>&) { return FVoxelTaskResult(); };
+	Request.GenerationConsumer = FVoxelGenerationConsumerKey::Section(4, Request.Stamp.OwnerId,
+		Section->Incarnation, Key, Request.Stamp.Token);
+	if (!Request.BindGetBlockReason(TerrainResources.ToSharedRef(), Request.GenerationConsumer,
+		[] { return EVoxelTaskBlockReason::Memory; }, Error) ||
+		!Request.BindExecute(TerrainResources.ToSharedRef(), Request.GenerationConsumer,
+		[](const TAtomic<bool>&) { return FVoxelTaskResult(); }, Error))
+	{
+		AddError(Error);
+		return false;
+	}
 	if (!TestTrue(TEXT("Real scheduler accepts blocked section work"), Scheduler.Enqueue(MoveTemp(Request)))) return false;
 	AdvanceResidency(Manager);
 	TestNotNull(TEXT("Queued task keeps Section resident"), Runtime.FindSection(Key));
@@ -253,7 +281,6 @@ bool FVoxelResidencyTaskZeroTest::RunTest(const FString& InParameters)
 	if (!Section) return false;
 	TArray<FVoxelBlockState> Blocks;
 	Blocks.Init(FVoxelBlockState(), 4096);
-	FString Error;
 	if (!Runtime.PublishBase(Key, Section->Stamp, MoveTemp(Blocks), Error) || !Runtime.PublishFinal(Key, 0, {}, {}, Error)) return false;
 	const auto Identity = Section->GetResourceIdentity();
 	const auto OldStamp = Section->Stamp;

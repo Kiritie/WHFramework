@@ -1,4 +1,4 @@
-﻿#include "Voxel/Rendering/VoxelViewManager.h"
+#include "Voxel/Rendering/VoxelViewManager.h"
 
 #include "Voxel/Rendering/VoxelFineShardBuild.h"
 #include "Voxel/Rendering/VoxelTerrainRenderer.h"
@@ -532,7 +532,9 @@ void FVoxelViewManager::ApplyF0FineShardResult(const FVoxelFineShardKey& InKey, 
 	auto* Current = FineShardSlots.Find(InKey);
 	const auto* Runtime = Module.GetRuntime();
 	const FVoxelSection* Data = Runtime ? Runtime->FindSection(Section) : nullptr;
-	if (!Current || Current->Consumer != InConsumer || !Current->Build.IsCurrent(InAttempt)) return;
+	if (!Current || Current->Consumer != InConsumer || !Current->Build.IsCurrent(InAttempt) ||
+		!Current->Build.GetPendingAttempt().IsSet() || Current->Build.GetPendingAttempt().GetValue() != InAttempt) return;
+	ClearFineShardAdmission(*Current);
 	Current->bSubmitted = false;
 	const bool bCurrent = InResult.Stamp == Current->SubmittedStamp && Data && Data->Stamp == InSectionStamp &&
 		Data->CommittedRevision == InRevision && Runtime->GetChangeHierarchy().GetFineShardRevision(InKey) == InAttempt.Input.DataRevision &&
@@ -585,10 +587,10 @@ void FVoxelViewManager::ProcessFineShardAdmissions()
 		Candidate.bRunnable = true;
 	}
 	FVoxelTerrainServiceCapacity Capacity;
-	Capacity.bAllowOverdueOpportunity = Module.GetTerrainFrameContext().IsOverdueOpportunityAvailable();
 	Capacity.MaximumWaitSeconds = Module.GetViewSettings().Fine.MaximumBackgroundWaitSeconds;
 	while (FPlatformTime::Seconds() < Deadline)
 	{
+		Capacity.bAllowOverdueOpportunity = Module.GetTerrainFrameContext().IsOverdueOpportunityAvailable();
 		FVoxelTerrainServiceCharge Charge;
 		const int32 Chosen = FineShardAdmissionSelection.Select(Candidates, Capacity, FPlatformTime::Seconds(), Charge);
 		if (Chosen == INDEX_NONE) break;
@@ -750,11 +752,13 @@ void FVoxelViewManager::ApplyFineShardResult(const FVoxelFineShardKey& InKey, co
 {
 	Module.ReleaseGenerationFacts(InConsumer);
 	FFineShardSlot* Slot = FineShardSlots.Find(InKey);
-	if (!Slot || Slot->Consumer != InConsumer || !Slot->Build.IsCurrent(InAttempt))
+	if (!Slot || Slot->Consumer != InConsumer || !Slot->Build.IsCurrent(InAttempt) ||
+		!Slot->Build.GetPendingAttempt().IsSet() || Slot->Build.GetPendingAttempt().GetValue() != InAttempt)
 	{
 		++TerrainWorkMetrics.Stale;
 		return;
 	}
+	ClearFineShardAdmission(*Slot);
 	Slot->bSubmitted = false;
 	const auto* Runtime = Module.GetRuntime();
 	const bool bCurrent = Runtime && InResult.Stamp == Slot->SubmittedStamp && InResult.Stamp.WorldEpoch == WorldEpoch &&

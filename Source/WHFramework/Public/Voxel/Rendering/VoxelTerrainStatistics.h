@@ -39,8 +39,8 @@ struct WHFRAMEWORK_API FVoxelTerrainMetricEvidence
             Representation > EVoxelTerrainMetricRepresentation::None && Representation < EVoxelTerrainMetricRepresentation::Count; }
         friend uint32 GetTypeHash(const FTarget& InTarget)
         {
-            return HashCombineFast(HashCombineFast(::GetTypeHash(InTarget.WorldEpoch), ::GetTypeHash(InTarget.Min)),
-                HashCombineFast(::GetTypeHash(InTarget.Max), ::GetTypeHash(uint8(InTarget.Representation))));
+            return HashCombineFast(HashCombineFast(::GetTypeHash(InTarget.WorldEpoch), UE::Math::GetTypeHash(InTarget.Min)),
+                HashCombineFast(UE::Math::GetTypeHash(InTarget.Max), ::GetTypeHash(uint8(InTarget.Representation))));
         }
     };
     FTarget Target;

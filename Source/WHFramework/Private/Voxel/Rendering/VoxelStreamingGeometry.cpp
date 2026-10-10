@@ -241,10 +241,11 @@ int32 VoxelStreamingGeometry::ResolveReplanStep(const int32 InRadiusCells,
 	return Target - Lower <= Upper - Target ? Lower : Upper;
 }
 
-bool VoxelStreamingGeometry::BuildShards(const FVoxelTerrainGeometry& InGeometry,
+bool VoxelStreamingGeometry::CountShards(const FVoxelTerrainGeometry& InGeometry,
 	const int32 InMaximumSamplesPerAxis, const int32 InMaximumShardCount,
-	TArray<FVoxelTerrainBuildShard>& OutShards, FString& OutError)
+	int32& OutCount, FString& OutError)
 {
+	OutCount = 0;
 	if (!InGeometry.Validate(OutError))
 	{
 		return false;
@@ -263,8 +264,24 @@ bool VoxelStreamingGeometry::BuildShards(const FVoxelTerrainGeometry& InGeometry
 		OutError = TEXT("Build would exceed the shard metadata limit; demand is retained and reported as blocked");
 		return false;
 	}
+	OutCount = static_cast<int32>(Parts * Parts * (bColumn ? 1 : Parts));
+	OutError.Reset();
+	return true;
+}
+
+bool VoxelStreamingGeometry::BuildShards(const FVoxelTerrainGeometry& InGeometry,
+	const int32 InMaximumSamplesPerAxis, const int32 InMaximumShardCount,
+	TArray<FVoxelTerrainBuildShard>& OutShards, FString& OutError)
+{
+	int32 Count = 0;
+	if (!CountShards(InGeometry, InMaximumSamplesPerAxis, InMaximumShardCount, Count, OutError))
+	{
+		return false;
+	}
+	const int64 CellsPerAxis = InGeometry.Key.SideCells() / InGeometry.SampleStepCells;
+	const bool bColumn = InGeometry.Key.IsColumn();
 	TArray<FVoxelTerrainBuildShard> Candidate;
-	Candidate.Reserve(static_cast<int32>(Parts * Parts * (bColumn ? 1 : Parts)));
+	Candidate.Reserve(Count);
 	const int32 SideSamples = static_cast<int32>(CellsPerAxis);
 	for (int32 Z = 0; Z < (bColumn ? 1 : SideSamples); Z += InMaximumSamplesPerAxis)
 	{

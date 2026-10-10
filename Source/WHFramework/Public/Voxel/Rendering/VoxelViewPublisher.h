@@ -268,6 +268,7 @@ private:
 		TSet<FVoxelPublishGroupKey> OwnershipChanges;
 		TMap<FVoxelPublishGroupKey, FPriorityBoundsPtr> DeferredPriorityBounds;
 		TArray<FMeshPtr> PreparedMeshes;
+		FVoxelGameThreadContinuation CoverageWork;
 		int32 CoverageIndex = 0;
 		TArray<int32> BuildOrder;
 		TSet<int32> PendingBuildIndices;
@@ -379,6 +380,12 @@ private:
 	void SetPublicationPriority(FVoxelTaskRequest& InOutRequest, const FPublication& InPublication, TConstArrayView<int32> InGroupIndices) const;
 	void RefreshTaskPriorities();
 	void AdmitCoveragePreparation(const FPublicationRef& Publication, double InDeadline = MAX_dbl);
+	FVoxelGameThreadContinuation PrepareCoverageSteps(FPublication& InPublication);
+	const FUpdate* FindProjectedUpdate(TWeakObjectPtr<AActor> InActor, uint64 InBeforeSerial = MAX_uint64,
+		const FPublication** OutPublication = nullptr) const;
+	bool CaptureCoverageSource(TWeakObjectPtr<AActor> InActor, bool bInRetainPresented, FUpdate& OutSource) const;
+	FVoxelGameThreadContinuation SetCoverageSourceSteps(const FGuid& InGroup, AActor* InActor, FUpdate InSource,
+		TArray<FBox> InWorldCellBoxes, TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, bool& OutSuccess);
 	bool HigherBuildPriority(const FPublication& Publication, int32 First, int32 Second) const;
 	void AdmitBuilds(const FPublicationRef& Publication);
 	bool PrepareUpdate(const FPublicationRef& Publication, int32 InIndex, double InDeadline, int32& InOutPreparedComponents, bool& bOutComplete);

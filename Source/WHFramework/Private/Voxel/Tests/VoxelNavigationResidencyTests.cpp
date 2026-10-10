@@ -1,4 +1,4 @@
-﻿#if WITH_DEV_AUTOMATION_TESTS
+#if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
 #include "Misc/ScopeExit.h"
@@ -557,7 +557,8 @@ bool FVoxelNavigationResidencyTest::RunTest(const FString& InParameters)
 		{
 			return bFirstPolled || (bFirstPolled = FirstWorker.Poll(FirstResult, &Module->TerrainFrameContext));
 		}, true))) return false;
-		if (!TestTrue(TEXT("实际Scene文件、目录rename和manifest提交成功"), bool(FirstResult))) return false;
+		if (!TestTrue(FString::Printf(TEXT("实际Scene文件、目录rename和manifest提交成功: code=%d message=%s"),
+			int32(FirstResult.Code), *FirstResult.Message.ToString()), bool(FirstResult))) return false;
 		Module->OnAfterSaveData(bool(FirstResult));
 		TestTrue(TEXT("实际提交回执可在GT应用"), Module->bLatestSceneSaveSucceeded);
 		TestTrue(TEXT("已恢复的Simulation不被旧切点释放"), Module->IsSimulationResident(Distant) &&
@@ -586,7 +587,8 @@ bool FVoxelNavigationResidencyTest::RunTest(const FString& InParameters)
 		FSaveOperationResult SaveAsResult;
 		bool bSaveAsPolled = false;
 		if (!Pump([&]() { return bSaveAsPolled || (bSaveAsPolled = SaveAsWorker.Poll(SaveAsResult, &Module->TerrainFrameContext)); }, true) ||
-			!TestTrue(TEXT("原真实Worker完成另存到空目标槽"), bool(SaveAsResult))) return false;
+			!TestTrue(FString::Printf(TEXT("原真实Worker完成另存到空目标槽: code=%d message=%s"),
+				int32(SaveAsResult.Code), *SaveAsResult.Message.ToString()), bool(SaveAsResult))) return false;
 		Module->OnAfterSaveData(bool(SaveAsResult));
 		TArray<uint8> SaveAsEdit;
 		TestTrue(TEXT("干净Journal的另存仍保留源槽的实际编辑正文"),
@@ -625,7 +627,8 @@ bool FVoxelNavigationResidencyTest::RunTest(const FString& InParameters)
 		FSaveOperationResult FinalResult;
 		bool bFinalPolled = false;
 		if (!Pump([&]() { return bFinalPolled || (bFinalPolled = FinalWorker.Poll(FinalResult, &Module->TerrainFrameContext)); }, true) ||
-			!TestTrue(TEXT("重试实际提交新的保存代"), bool(FinalResult))) return false;
+			!TestTrue(FString::Printf(TEXT("重试实际提交新的保存代: code=%d message=%s"),
+				int32(FinalResult.Code), *FinalResult.Message.ToString()), bool(FinalResult))) return false;
 		Module->OnAfterSaveData(bool(FinalResult));
 		if (!TestTrue(TEXT("匹配的真实保存回执经局部链完成pin与区域释放"), Pump([&]()
 		{

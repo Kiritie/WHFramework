@@ -3,18 +3,6 @@
 #include "CoreMinimal.h"
 #include "VoxelGenerationTypes.generated.h"
 
-FORCEINLINE uint32 GetTypeHash(const FIntVector& InValue)
-{
-	return HashCombineFast(
-		HashCombineFast(::GetTypeHash(InValue.X), ::GetTypeHash(InValue.Y)),
-		::GetTypeHash(InValue.Z));
-}
-
-FORCEINLINE uint32 GetTypeHash(const FIntPoint& InValue)
-{
-	return HashCombineFast(::GetTypeHash(InValue.X), ::GetTypeHash(InValue.Y));
-}
-
 UENUM(BlueprintType)
 enum class EVoxelGenerationStage : uint8
 {
@@ -604,7 +592,7 @@ struct WHFRAMEWORK_API FVoxelGenerationTileKey
 
 FORCEINLINE uint32 GetTypeHash(const FVoxelGenerationTileKey& InKey)
 {
-	return ::GetTypeHash(InKey.Coordinate);
+	return UE::Math::GetTypeHash(InKey.Coordinate);
 }
 
 struct WHFRAMEWORK_API FVoxelEcologyTileKey
@@ -628,7 +616,7 @@ struct WHFRAMEWORK_API FVoxelEcologyTileKey
 
 FORCEINLINE uint32 GetTypeHash(const FVoxelEcologyTileKey& InKey)
 {
-	return ::GetTypeHash(InKey.Coordinate);
+	return UE::Math::GetTypeHash(InKey.Coordinate);
 }
 
 struct WHFRAMEWORK_API FVoxelHydrologyRegionKey
@@ -645,5 +633,5 @@ struct WHFRAMEWORK_API FVoxelHydrologyRegionKey
 
 FORCEINLINE uint32 GetTypeHash(const FVoxelHydrologyRegionKey& InKey)
 {
-	return ::GetTypeHash(InKey.Coordinate);
+	return UE::Math::GetTypeHash(InKey.Coordinate);
 }

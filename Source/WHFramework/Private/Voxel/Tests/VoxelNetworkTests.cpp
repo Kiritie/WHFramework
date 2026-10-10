@@ -427,7 +427,7 @@ bool FVoxelNetworkRemoteAdmissionCapacityTest::RunTest(const FString& InParamete
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> OtherLease, OwnLease;
 	if (!Resources->Acquire(OtherAttempt, EVoxelTerrainResourcePool::Working, 6 * 1024 * 1024, OtherLease) ||
 		!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Working, 32768, OwnLease)) return false;
-	FVoxelCoarseBuildStorage Storage(Resources, Consumer, nullptr);
+	FVoxelCoarseBuildStorage Storage(Resources, Consumer, nullptr, nullptr);
 	Storage.WorkingCapacityBytes = 4 * 1024 * 1024;
 	FVoxelTaskResult Result;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Working;

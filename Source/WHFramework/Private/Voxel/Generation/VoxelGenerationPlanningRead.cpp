@@ -31,11 +31,13 @@ FVoxelGenerationPlanningReadScope*& FVoxelGenerationPlanningReadScope::ActiveSco
 }
 
 FVoxelGenerationPlanningReadScope::FVoxelGenerationPlanningReadScope(const FObserver* InObserver,
-	const FVoxelTaskStamp* InStamp, const TAtomic<bool>* InCancel, const FVoxelGenerationConsumerKey* InConsumer)
+	const FVoxelTaskStamp* InStamp, const TAtomic<bool>* InCancel, const FVoxelGenerationConsumerKey* InConsumer,
+	const bool bInRequireReadyPlans)
 	: Observer(InObserver)
 	, Stamp(InStamp)
 	, Cancel(InCancel)
 	, Consumer(InConsumer)
+	, bRequireReadyPlans(bInRequireReadyPlans)
 	, Previous(ActiveScopeSlot())
 {
 	ActiveScopeSlot() = this;
@@ -50,6 +52,13 @@ FVoxelGenerationPlanningReadScope::~FVoxelGenerationPlanningReadScope()
 bool FVoxelGenerationPlanningReadScope::IsActive()
 {
 	return ActiveScopeSlot() != nullptr;
+}
+
+bool FVoxelGenerationPlanningReadScope::RequiresReadyPlans()
+{
+	for (auto* Scope = ActiveScopeSlot(); Scope; Scope = Scope->Previous)
+		if (Scope->bRequireReadyPlans) return true;
+	return false;
 }
 
 void FVoxelGenerationPlanningReadScope::Missing(const EVoxelGenerationPlanKind InKind, const FIntVector& InCoordinate)

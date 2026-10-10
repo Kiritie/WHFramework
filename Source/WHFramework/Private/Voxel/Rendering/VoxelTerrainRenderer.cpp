@@ -1,4 +1,4 @@
-﻿#include "Voxel/Rendering/VoxelTerrainRenderer.h"
+#include "Voxel/Rendering/VoxelTerrainRenderer.h"
 
 #include "Async/Async.h"
 #include "Components/SceneComponent.h"
@@ -664,9 +664,11 @@ namespace
 	struct FRootPreparation
 	{
 		FRootPreparation(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
-			const FVoxelGenerationConsumerKey& InConsumer)
+			const FVoxelGenerationConsumerKey& InConsumer, const int32 InChangedBounds)
 			: Resources(MoveTemp(InResources)), Consumer(InConsumer)
 		{
+			check(InChangedBounds > 0 && InChangedBounds <= 8200);
+			ChangedBounds.Reserve(InChangedBounds);
 		}
 
 		bool ObserveAdmission(const EVoxelTerrainResourceAdmission InAdmission, FString& OutError)
@@ -687,8 +689,12 @@ namespace
 				!Floor.Add(Publication->CoarseCallbackLease, Resources.Get()) ||
 				!Floor.Add(PrimaryPathLease, Resources.Get()))
 				return ObserveAdmission(EVoxelTerrainResourceAdmission::InvalidRequest, OutError);
-			return ObserveAdmission(Resources->TryAcquire(Consumer, Pool, Bytes, OutLease, 0,
+			const bool bGranted = ObserveAdmission(Resources->TryAcquire(Consumer, Pool, Bytes, OutLease, 0,
 				Floor.Bytes, Floor.LeaseCount), OutError);
+			if (!bGranted)
+				OutError += FString::Printf(TEXT(" pool=%d bytes=%llu retainedInput=%llu retainedLeases=%llu"),
+					int32(Pool), Bytes, Floor.Bytes, uint64(Floor.LeaseCount));
+			return bGranted;
 		}
 
 		bool AddExclusion(const FBox& Box, FString& OutError)
@@ -739,6 +745,17 @@ namespace
 				if (NativeAdmission != EVoxelTerrainResourceAdmission::Granted &&
 					NativeAdmission != EVoxelTerrainResourceAdmission::CapacityBlocked) return MoveTemp(Result);
 				if (!Result.Error.IsEmpty() && !Result.Error.StartsWith(TEXT("CapacityBlocked"))) return MoveTemp(Result);
+				const uint32 ErrorHash = GetTypeHash(Result.Error);
+				if (!bHasLoggedCapacityBlock || LastCapacityBlockHash != ErrorHash)
+				{
+					const FIntVector FineSection = FineBuild && FineBuild->Base ? FineBuild->Base->Section : FIntVector::ZeroValue;
+					UE_LOG(LogTemp, Log, TEXT("[TerrainNative] preparation blocked: request=%llu phase=%d atoms=%d/%d coarse=%d/%d fine=(%d,%d,%d) finePhase=%d face=%u tile=%u error=%s"),
+						Consumer.RequestSerial, Phase, AtomCursor, Publication->Atoms.Num(), CoarseCursor, Publication->CoarseChanges.Num(),
+						FineSection.X, FineSection.Y, FineSection.Z, FineBuild ? FineBuild->Phase : INDEX_NONE,
+						FineBuild ? uint32(FineBuild->FaceCursor) : 0u, FineBuild ? uint32(FineBuild->TileCursor) : 0u, *Result.Error);
+					LastCapacityBlockHash = ErrorHash;
+					bHasLoggedCapacityBlock = true;
+				}
 				CapacityVersion.Store(BeforeBuild);
 				bWaitingCapacity.Store(true);
 				Result.bSuccess = Result.bContinue = true;
@@ -937,7 +954,8 @@ namespace
 		FAtomNodePtr Root;
 		FCoarseNodePtr CoarseRoot;
 		FSnapshotPtr BaseSnapshot;
-		TArray<FBox, TInlineAllocator<8200>> ChangedBounds;
+		// 冻结 Publication 已确定全部变化范围；小事务不携带最大粗批次的内嵌数组。
+		TArray<FBox> ChangedBounds;
 		TArray<FCoarseWalk, TInlineAllocator<79>> Owners;
 		TArray<FCoarseWalk, TInlineAllocator<79>> ExclusionWalk;
 		TArray<FFineWalk, TInlineAllocator<33>> FineWalk;
@@ -967,6 +985,8 @@ namespace
 		EVoxelTerrainResourceAdmission NativeAdmission = EVoxelTerrainResourceAdmission::Granted;
 		TAtomic<bool> bWaitingCapacity{false};
 		TAtomic<uint64> CapacityVersion{0};
+		uint32 LastCapacityBlockHash = 0;
+		bool bHasLoggedCapacityBlock = false;
 		bool bAllowResidentOverlap = false;
 		double MaximumTextureStretchCells = 8.0;
 		uint64 MeshPieceLimit = 0;
@@ -1417,10 +1437,26 @@ namespace
 			return Align(sizeof(FVoxelSceneProxyStorage), alignof(FVoxelTerrainSceneProxy));
 		}
 
-		static uint64 AllocationBytes()
+		static uint64 MaterialListAllocationBytes(const int32 InCount)
+		{
+			FDefaultAllocator::ForElementType<UMaterialInterface*> Allocator;
+			int32 Capacity = 0;
+			for (int32 Index = 0; Index < InCount; ++Index)
+			{
+				if (Index == Capacity)
+					Capacity = Allocator.CalculateSlackGrow(Index + 1, Capacity, sizeof(UMaterialInterface*));
+			}
+			return VoxelBoundedAllocation::QuantizeBytes(uint64(Capacity) * sizeof(UMaterialInterface*));
+		}
+
+		static uint64 AllocationBytes(const int32 InMaterialCount)
 		{
 			return FMemory::QuantizeSize(StorageOffset() + sizeof(FVoxelTerrainSceneProxy),
-				FMath::Max(alignof(FVoxelSceneProxyStorage), alignof(FVoxelTerrainSceneProxy)));
+				FMath::Max(alignof(FVoxelSceneProxyStorage), alignof(FVoxelTerrainSceneProxy)))
+#if WITH_EDITOR
+				+ MaterialListAllocationBytes(InMaterialCount)
+#endif
+				;
 		}
 
 		static void* operator new(SIZE_T InSize, TSharedRef<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InLease)
@@ -1590,6 +1626,11 @@ UVoxelTerrainPrimitiveComponent::~UVoxelTerrainPrimitiveComponent()
 	MaterialLease.Reset();
 }
 
+int32 UVoxelTerrainPrimitiveComponent::GetNumMaterials() const
+{
+	return OverrideMaterials.Num();
+}
+
 int32 UVoxelTerrainPrimitiveComponent::RetainMaterial(UMaterialInterface* InMaterial, EVoxelTerrainResourceAdmission* OutAdmission)
 {
 	if (OutAdmission) *OutAdmission = EVoxelTerrainResourceAdmission::InvalidRequest;
@@ -1623,7 +1664,10 @@ int32 UVoxelTerrainPrimitiveComponent::RetainMaterial(UMaterialInterface* InMate
 		MaterialLease->MarkPublished();
 	}
 	if (OutAdmission) *OutAdmission = EVoxelTerrainResourceAdmission::Granted;
-	return OverrideMaterials.Add(InMaterial);
+	const int32 Index = OverrideMaterials.Num();
+	// 使用 UE 原材质入口，让流送、PSO 和已有 SceneProxy 的声明同步失效。
+	SetMaterial(Index, InMaterial);
+	return Index;
 }
 
 FPrimitiveSceneProxy* UVoxelTerrainPrimitiveComponent::CreateSceneProxy()
@@ -1640,8 +1684,21 @@ FPrimitiveSceneProxy* UVoxelTerrainPrimitiveComponent::CreateSceneProxy()
 	TerrainState->Resources->TryGetReleaseVersionExcludingOwner(TerrainState->ControlConsumer, TerrainState->ProxyCapacityVersion);
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 	TerrainState->ProxyAdmission = TerrainState->Resources->TryAcquire(TerrainState->ControlConsumer,
-		EVoxelTerrainResourcePool::Input, FVoxelTerrainSceneProxy::AllocationBytes(), Lease, 0, Floor.Bytes, Floor.LeaseCount);
+		EVoxelTerrainResourcePool::Input, FVoxelTerrainSceneProxy::AllocationBytes(GetNumMaterials()), Lease, 0, Floor.Bytes, Floor.LeaseCount);
 	if (TerrainState->ProxyAdmission != EVoxelTerrainResourceAdmission::Granted) return nullptr;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MaterialScratch;
+	if (!Floor.Add(Lease, TerrainState->Resources.Get()))
+	{
+		TerrainState->ProxyAdmission = EVoxelTerrainResourceAdmission::InvalidRequest;
+		return nullptr;
+	}
+	const uint64 MaterialScratchBytes = FVoxelTerrainSceneProxy::MaterialListAllocationBytes(GetNumMaterials());
+	if (MaterialScratchBytes)
+	{
+		TerrainState->ProxyAdmission = TerrainState->Resources->TryAcquire(TerrainState->ControlConsumer,
+			EVoxelTerrainResourcePool::Working, MaterialScratchBytes, MaterialScratch, 0, Floor.Bytes, Floor.LeaseCount);
+		if (TerrainState->ProxyAdmission != EVoxelTerrainResourceAdmission::Granted) return nullptr;
+	}
 	auto* Proxy = new (Lease.ToSharedRef()) FVoxelTerrainSceneProxy(this);
 	Lease->MarkPublished();
 	return Proxy;
@@ -1938,6 +1995,8 @@ bool FVoxelTerrainRendererState::BeginRootPreparation(FReadyTransaction& InTrans
 	};
 	if (!InTransaction.Preparation)
 	{
+		const int32 ChangedCount = InTransaction.Resources->Atoms.Num() + InTransaction.Resources->CoarseChanges.Num();
+		if (ChangedCount <= 0 || ChangedCount > 8200) { RejectAdmission(true); return false; }
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PathLease;
 		const uint64 PathBytes = 33ull * InTransaction.Resources->Atoms.Num() *
@@ -1951,7 +2010,8 @@ bool FVoxelTerrainRendererState::BeginRootPreparation(FReadyTransaction& InTrans
 			!InputFloor.Add(InTransaction.Resources->CoarseCallbackLease, Resources.Get()))
 		{ RejectAdmission(true); return false; }
 		const auto InputAdmission = Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Input,
-			RenderRootAllocationBytes<FRootPreparation>(), Lease, 0, InputFloor.Bytes, InputFloor.LeaseCount);
+			RenderRootAllocationBytes<FRootPreparation>() + VoxelBoundedAllocation::ArrayBytes<FBox>(ChangedCount),
+			Lease, 0, InputFloor.Bytes, InputFloor.LeaseCount);
 		if (InputAdmission != EVoxelTerrainResourceAdmission::Granted)
 		{
 			RejectAdmission(InputAdmission != EVoxelTerrainResourceAdmission::CapacityBlocked);
@@ -1965,7 +2025,9 @@ bool FVoxelTerrainRendererState::BeginRootPreparation(FReadyTransaction& InTrans
 			RejectAdmission(PathAdmission != EVoxelTerrainResourceAdmission::CapacityBlocked);
 			return false;
 		}
-		InTransaction.Preparation = CreateRenderRoot<FRootPreparation>(MoveTemp(Lease), Resources, Consumer);
+		InTransaction.Preparation = CreateRenderRoot<FRootPreparation>(MoveTemp(Lease), Resources, Consumer, ChangedCount);
+		check(RenderRootAllocationBytes<FRootPreparation>() + InTransaction.Preparation->ChangedBounds.GetAllocatedSize() <=
+			InTransaction.Preparation->InputLease->Bytes());
 		InTransaction.Preparation->ControlInputLease = InputLease;
 		InTransaction.Preparation->PrimaryPathLease = MoveTemp(PathLease);
 		InTransaction.Preparation->Publication = InTransaction.Resources;

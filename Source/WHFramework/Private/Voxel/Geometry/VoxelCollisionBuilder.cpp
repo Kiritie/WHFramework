@@ -10,11 +10,15 @@ bool FVoxelCollisionBuilder::Build(
 	FVoxelSectionCollisionResult& OutResult,
 	const TAtomic<bool>* InCancel)
 {
-	constexpr int32 MaxBoxes = 16384;
-	if (InSnapshot.Blocks.Num() != VoxelBlock::Volume || (InCancel && InCancel->Load())) return false;
+	int32 BoxCount = 0;
+	if (!VisitBoxes(InSnapshot, InRegistry, InShapes, [&BoxCount](const FBox&)
+	{
+		++BoxCount;
+		return true;
+	}, InCancel)) return false;
 
 	// 候选成功前旧输出仍有效，容量授予必须覆盖两份数组同时存活的峰值。
-	const uint64 CandidateBytes = VoxelBoundedAllocation::ArrayBytes<FBox>(MaxBoxes);
+	const uint64 CandidateBytes = VoxelBoundedAllocation::ArrayBytes<FBox>(BoxCount);
 	const uint64 PeakBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSectionCollisionResult>() +
 		OutResult.Boxes.GetAllocatedSize() + CandidateBytes;
 	if (OutResult.ResourceLease && OutResult.ResourceLease->Bytes() < PeakBytes) return false;
@@ -28,8 +32,38 @@ bool FVoxelCollisionBuilder::Build(
 	Candidate.Stamp.Section = InSnapshot.Section;
 	Candidate.Stamp.RegistryRevision = InRegistry.Hash;
 	Candidate.Stamp.ShapeRevision = InShapes.GetContentHash();
-	Candidate.Boxes.Reserve(MaxBoxes);
+	Candidate.Boxes.Reserve(BoxCount);
 	check(uint64(Candidate.Boxes.GetAllocatedSize()) <= CandidateBytes);
+	if (!VisitBoxes(InSnapshot, InRegistry, InShapes, [&Candidate, BoxCount](const FBox& Box)
+	{
+		if (Candidate.Boxes.Num() >= BoxCount) return false;
+		Candidate.Boxes.Add(Box);
+		return true;
+	}, InCancel) || Candidate.Boxes.Num() != BoxCount || (InCancel && InCancel->Load())) return false;
+	OutResult = MoveTemp(Candidate);
+	if (OutResult.ResourceLease)
+	{
+		verify(OutResult.ResourceLease->Resize(OutResult.Bytes()));
+	}
+	return true;
+}
+
+bool FVoxelCollisionBuilder::VisitBoxes(
+	const FVoxelSectionSnapshot& InSnapshot,
+	const FVoxelRegistrySnapshot& InRegistry,
+	const FVoxelShapeRegistry& InShapes,
+	TFunctionRef<bool(const FBox&)> InVisit,
+	const TAtomic<bool>* InCancel)
+{
+	constexpr int32 MaxBoxes = 16384;
+	if (InSnapshot.Blocks.Num() != VoxelBlock::Volume || (InCancel && InCancel->Load())) return false;
+	int32 BoxCount = 0;
+	const auto AddBox = [&InVisit, &BoxCount](const FBox& Box)
+	{
+		if (BoxCount == MaxBoxes || !InVisit(Box)) return false;
+		++BoxCount;
+		return true;
+	};
 	uint8 Filled[VoxelBlock::Volume] = {};
 	for (int32 Index = 0; Index < VoxelBlock::Volume; ++Index)
 	{
@@ -49,8 +83,7 @@ bool FVoxelCollisionBuilder::Build(
 		const FVector Position(VoxelCoord::Unlinear(uint16(Index)));
 		for (const FBox& Box : Shape->CollisionBoxes)
 		{
-			if (Candidate.Boxes.Num() == MaxBoxes) return false;
-			Candidate.Boxes.Add(FBox(Box.Min + Position, Box.Max + Position));
+			if (!AddBox(FBox(Box.Min + Position, Box.Max + Position))) return false;
 		}
 	}
 
@@ -96,11 +129,9 @@ bool FVoxelCollisionBuilder::Build(
 						for (int32 DX = 0; DX < Width; ++DX) At(X + DX, Y + DY, Z + DZ) = 0;
 					}
 				}
-				if (Candidate.Boxes.Num() == MaxBoxes) return false;
-				Candidate.Boxes.Add(FBox(FVector(X, Y, Z), FVector(X + Width, Y + Height, Z + Depth)));
+				if (!AddBox(FBox(FVector(X, Y, Z), FVector(X + Width, Y + Height, Z + Depth)))) return false;
 			}
 		}
 	}
-	OutResult = MoveTemp(Candidate);
 	return true;
 }

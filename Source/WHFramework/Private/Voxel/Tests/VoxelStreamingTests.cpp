@@ -1,4 +1,4 @@
-﻿#if WITH_DEV_AUTOMATION_TESTS
+#if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
 #include "Voxel/Geometry/VoxelSectionMesher.h"
@@ -16,6 +16,22 @@
 
 namespace
 {
+	bool AdvanceInterest(FAutomationTestBase& InTest, FVoxelInterestRuntime& InRuntime,
+		TConstArrayView<FVoxelStreamingSource> InSources, const FVoxelWorldManifest& InManifest,
+		const FVoxelViewSettings& InSettings, FVoxelInterestSet& OutInterest,
+		FVoxelInterestDelta& OutDelta, bool& bOutSnapshot)
+	{
+		bool bChanged = false;
+		for (int32 Step = 0; Step < 512; ++Step)
+		{
+			bChanged |= InRuntime.Update(InSources, InManifest, InSettings, OutInterest, OutDelta, bOutSnapshot);
+			if (bOutSnapshot) return bChanged;
+			if (!InRuntime.GetPlanningError().IsEmpty() || !InRuntime.GetCoarsePlanningPending()) break;
+		}
+		InTest.AddError(FString::Printf(TEXT("Interest did not publish a complete snapshot: %s"), *InRuntime.GetPlanningError()));
+		return false;
+	}
+
 	template<typename KeyType>
 	bool SameSet(const TSet<KeyType>& InA, const TSet<KeyType>& InB)
 	{
@@ -25,6 +41,19 @@ namespace
 			if (!InB.Contains(Key)) return false;
 		}
 		return true;
+	}
+
+	template<typename KeyType>
+	TSet<KeyType> TilesBeyondPlane(const TSet<KeyType>& InTiles, const int32 InPlaneX, const bool bInPositive)
+	{
+		TSet<KeyType> Result;
+		for (const KeyType& Key : InTiles)
+		{
+			const int64 Side = int64(16) << Key.Level;
+			const int64 MinX = int64(Key.Coordinate.X) * Side;
+			if (bInPositive ? MinX >= InPlaneX : MinX + Side <= InPlaneX) Result.Add(Key);
+		}
+		return Result;
 	}
 
 	template<typename KeyType>
@@ -75,6 +104,7 @@ bool FVoxelSurfaceTwoToOneBalanceTest::RunTest(const FString& InParameters)
 	FVoxelStreamingSource Sources[2];
 	for (FVoxelStreamingSource& Source : Sources)
 	{
+		Source.Id = FGuid::NewGuid();
 		Source.Capabilities = EVoxelStreamingCapability::Data |
 			EVoxelStreamingCapability::FineVisual |
 			EVoxelStreamingCapability::WorldVisual;
@@ -139,6 +169,7 @@ bool FVoxelMacroTwoToOneBalanceTest::RunTest(const FString& InParameters)
 	FVoxelStreamingSource Sources[2];
 	for (FVoxelStreamingSource& Source : Sources)
 	{
+		Source.Id = FGuid::NewGuid();
 		Source.Capabilities = EVoxelStreamingCapability::Data |
 			EVoxelStreamingCapability::FineVisual |
 			EVoxelStreamingCapability::WorldVisual;
@@ -188,8 +219,22 @@ bool FVoxelInterestLayerAnchorTest::RunTest(const FString& InParameters)
 	FVoxelInterestSet Interest;
 	FVoxelInterestDelta Delta;
 	bool bHasSnapshot = false;
-	TestTrue(TEXT("Initial source creates interest"), Runtime.Update(
-		MakeArrayView(&Source, 1), Manifest, Settings, Interest, Delta, bHasSnapshot));
+	const auto Update = [&](const FVoxelStreamingSource& InSource)
+	{
+		bool bChanged = false;
+		for (int32 Step = 0; Step < 512; ++Step)
+		{
+			bChanged = Runtime.Update(MakeArrayView(&InSource, 1), Manifest, Settings, Interest, Delta, bHasSnapshot);
+			if (bHasSnapshot || !Runtime.GetPlanningError().IsEmpty() || !Runtime.GetCoarsePlanningPending()) break;
+		}
+		if (!TestTrue(TEXT("Bounded planner publishes a complete source snapshot"), bHasSnapshot))
+		{
+			AddError(FString::Printf(TEXT("Interest planning failed: %s"), *Runtime.GetPlanningError()));
+			return false;
+		}
+		return bChanged;
+	};
+	if (!TestTrue(TEXT("Initial source creates interest"), Update(Source))) return false;
 	TestTrue(TEXT("Initial source publishes a snapshot"), bHasSnapshot);
 	const FVoxelInterestSet Direct = FVoxelInterestManager().Compute(
 		MakeArrayView(&Source, 1), Manifest, Settings);
@@ -208,15 +253,16 @@ bool FVoxelInterestLayerAnchorTest::RunTest(const FString& InParameters)
 		SameSet(Interest.Macro, Direct.Macro));
 	FVoxelStreamingSource SubcellSource = Source;
 	SubcellSource.Center.X = 1;
-	TestFalse(TEXT("Movement within all anchors skips planning"),
-		FVoxelInterestRuntime::NeedsUpdate(Source, SubcellSource));
+	TestEqual(TEXT("Movement within all anchors updates priority only"),
+		FVoxelInterestRuntime::ClassifySourceChange(Source, SubcellSource, Settings), EVoxelSourceChange::Priority);
 	const uint64 InitialPublicationRevision = Interest.PublicationRevision;
 	const uint64 InitialDemandRevision = Interest.DemandRevision;
-	Runtime.Update(MakeArrayView(&SubcellSource, 1), Manifest, Settings, Interest, Delta, bHasSnapshot);
+	Update(SubcellSource);
+	if (!bHasSnapshot) return false;
 	TestTrue(TEXT("Subcell movement publishes the exact source center"), bHasSnapshot);
 	TestEqual(TEXT("Accepted source center follows subcell movement"), Interest.Sources.FindChecked(Source.Id).Source.Center, SubcellSource.Center);
-	TestTrue(TEXT("Crossing a Fine merge boundary advances its publication"),
-		Delta.bVisualPartitionChanged && Interest.PublicationRevision > InitialPublicationRevision);
+	TestFalse(TEXT("Subcell movement preserves the visual partition"), Delta.bVisualPartitionChanged);
+	TestEqual(TEXT("Subcell movement preserves the content publication"), Interest.PublicationRevision, InitialPublicationRevision);
 	TestEqual(TEXT("Subcell movement preserves the logical demand revision"), Interest.DemandRevision, InitialDemandRevision);
 	FVoxelStreamingSource NegativeSource = Source;
 	NegativeSource.Center.X = -1;
@@ -229,19 +275,23 @@ bool FVoxelInterestLayerAnchorTest::RunTest(const FString& InParameters)
 	const TSet<FVoxelMacroTileKey> InitialMacro = Interest.Macro;
 	const FIntVector InitialMacroPlanCenter = Interest.Sources.FindChecked(Source.Id).StageCenters[2];
 	Source.Center.X = 4;
-	Runtime.Update(MakeArrayView(&Source, 1), Manifest, Settings, Interest, Delta, bHasSnapshot);
+	Update(Source);
+	if (!bHasSnapshot) return false;
 	TestTrue(TEXT("Exact movement keeps macro tiles"), SameSet(Interest.Macro, InitialMacro));
 	TestFalse(TEXT("Exact movement has no macro delta"),
 		!Delta.AddedMacro.IsEmpty() || !Delta.RemovedMacro.IsEmpty());
 	Source.Center.X = 20;
-	Runtime.Update(MakeArrayView(&Source, 1), Manifest, Settings, Interest, Delta, bHasSnapshot);
+	Update(Source);
+	if (!bHasSnapshot) return false;
 	TestTrue(TEXT("Fine anchor movement keeps macro tiles"), SameSet(Interest.Macro, InitialMacro));
 	Source.Center.X = 80;
-	Runtime.Update(MakeArrayView(&Source, 1), Manifest, Settings, Interest, Delta, bHasSnapshot);
+	Update(Source);
+	if (!bHasSnapshot) return false;
 	TestEqual(
 		TEXT("Proxy anchor movement does not move the Macro planning anchor"), Interest.Sources.FindChecked(Source.Id).StageCenters[2], InitialMacroPlanCenter);
 	Source.Center.X = 300;
-	Runtime.Update(MakeArrayView(&Source, 1), Manifest, Settings, Interest, Delta, bHasSnapshot);
+	Update(Source);
+	if (!bHasSnapshot) return false;
 	TestEqual(TEXT("Surface anchor movement does not move the Macro planning anchor"), Interest.Sources.FindChecked(Source.Id).StageCenters[2],
 		InitialMacroPlanCenter);
 	FVoxelStreamingSource DataSource = SubcellSource;
@@ -299,8 +349,8 @@ bool FVoxelInterestMultiSourceTest::RunTest(const FString& InParameters)
 	FVoxelInterestSet Interest;
 	FVoxelInterestDelta Delta;
 	bool bHasSnapshot = false;
-	TestTrue(TEXT("Multiple sources create interest"), Runtime.Update(
-		MakeArrayView(Sources), Manifest, Settings, Interest, Delta, bHasSnapshot));
+	if (!TestTrue(TEXT("Multiple sources create interest"), AdvanceInterest(*this, Runtime,
+		MakeArrayView(Sources), Manifest, Settings, Interest, Delta, bHasSnapshot))) return false;
 	const FVoxelInterestSet Direct = FVoxelInterestManager().Compute(
 		MakeArrayView(Sources), Manifest, Settings);
 	bool bExactKeysMatch = Interest.Exact.Num() == Direct.Exact.Num();
@@ -321,15 +371,21 @@ bool FVoxelInterestMultiSourceTest::RunTest(const FString& InParameters)
 		if (Pair.Value.bMovementCriticalFine) ++CriticalFineCount;
 	}
 	TestTrue(TEXT("Predicted movement marks critical Fine sections"), CriticalFineCount > 0);
+	const auto DistantMacro = TilesBeyondPlane(Direct.Macro, 1024, true);
+	TestFalse(TEXT("Macro retention fixture includes distant pages outside both local islands"), DistantMacro.IsEmpty());
 	Sources[1].Center.X += 32;
-	Runtime.Update(MakeArrayView(Sources), Manifest, Settings, Interest, Delta, bHasSnapshot);
+	AdvanceInterest(*this, Runtime, MakeArrayView(Sources), Manifest, Settings, Interest, Delta, bHasSnapshot);
+	if (!bHasSnapshot) return false;
 	TestTrue(TEXT("Local source movement keeps distant macro"),
-		SameSet(Interest.Macro, Direct.Macro));
-	Runtime.Update(MakeArrayView(Sources, 1), Manifest, Settings,
-		Interest, Delta, bHasSnapshot);
+		SameSet(TilesBeyondPlane(Interest.Macro, 1024, true), DistantMacro));
+	AdvanceInterest(*this, Runtime, MakeArrayView(Sources, 1), Manifest, Settings, Interest, Delta, bHasSnapshot);
+	if (!bHasSnapshot) return false;
 	TestEqual(TEXT("Removed source leaves one source"), Interest.Sources.Num(), 1);
 	TestTrue(TEXT("Removed local source keeps distant macro"),
-		SameSet(Interest.Macro, Direct.Macro));
+		SameSet(TilesBeyondPlane(Interest.Macro, 1024, true), DistantMacro));
+	const auto PlayerOnly = FVoxelInterestManager().Compute(MakeArrayView(Sources, 1), Manifest, Settings);
+	TestTrue(TEXT("Removing local refinement restores the player-only Surface topology"), SameSet(Interest.Surface, PlayerOnly.Surface));
+	TestTrue(TEXT("Removing local refinement restores the player-only Macro topology"), SameSet(Interest.Macro, PlayerOnly.Macro));
 	return true;
 }
 
@@ -345,8 +401,9 @@ bool FVoxelStreamingDemandTest::RunTest(const FString& InParameters)
 	Manifest.Settings.MinZ = -128;
 	Manifest.Settings.MaxZ = 128;
 	FVoxelStreamingSource Source;
+	Source.Id = FGuid::NewGuid();
 	Source.Center = FIntVector::ZeroValue;
-	Source.ExactRadius = 0;
+	Source.ExactRadius = -1;
 	Source.CollisionRadius = 24;
 	Source.Capabilities = EVoxelStreamingCapability::Data |
 		EVoxelStreamingCapability::Collision;
@@ -360,7 +417,7 @@ bool FVoxelStreamingDemandTest::RunTest(const FString& InParameters)
 	const FVoxelExactDemand& Demand = Interest.Exact.FindChecked(FIntVector::ZeroValue);
 	TestTrue(TEXT("Collision demand is marked collision"), Demand.bCollision);
 	TestFalse(TEXT("Collision-only demand is not in data warmup"), Demand.bWarmupData);
-	TestTrue(TEXT("Collision demand is in warmup collision"), Demand.bWarmupCollision);
+	TestFalse(TEXT("Collision-only source without readiness does not enter birth warmup"), Demand.bWarmupCollision);
 	TestFalse(TEXT("Collision-only demand is not marked exact"), Demand.bExact);
 	TestFalse(TEXT("Collision demand does not imply fine render"), Demand.bFineRender);
 	TestTrue(TEXT("Non-render source creates no voxel proxies"), Interest.VoxelProxy.IsEmpty());
@@ -394,6 +451,7 @@ bool FVoxelStreamingRenderScopeTest::RunTest(const FString& InParameters)
 	Manifest.Settings.MaxZ = 128;
 	FVoxelViewSettings Settings;
 	FVoxelStreamingSource Source;
+	Source.Id = FGuid::NewGuid();
 	Source.Center = FIntVector::ZeroValue;
 	Source.ExactRadius = 32;
 	Source.CollisionRadius = 32;
@@ -472,7 +530,7 @@ bool FVoxelIndependentSourceViewTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("Debug source requests its own fine section"), DebugDemand && DebugDemand->bFineRender);
 	if (DebugDemand)
 	{
-		TestFalse(TEXT("Debug fine does not request exact interaction"), DebugDemand->bExact);
+		TestTrue(TEXT("Debug Fine retains its actual F0 core data"), DebugDemand->bExact);
 		TestFalse(TEXT("Debug fine does not request collision"), DebugDemand->bCollision);
 		TestEqual(TEXT("Debug fine uses numeric source priority"), DebugDemand->Priority, -25);
 	}
@@ -483,11 +541,16 @@ bool FVoxelIndependentSourceViewTest::RunTest(const FString& InParameters)
 		const FIntVector BoundsMin = Key.GetBounds().Min;
 		const FIntVector BoundsMax = Key.GetBounds().Max;
 		const FIntVector Center = (BoundsMin + BoundsMax) / 2;
-		bProxyRemainsLocal &= Key.Level == 1 &&
-			FMath::Abs(Center.X - Sources[1].Center.X) < 256 &&
-			FMath::Abs(Center.Y - Sources[1].Center.Y) < 256;
+		bProxyRemainsLocal &= Key.Level >= 1 &&
+			FMath::Abs(Center.X - Sources[1].Center.X) < 512 &&
+			FMath::Abs(Center.Y - Sources[1].Center.Y) < 512;
 	}
 	TestTrue(TEXT("Debug proxy ignores the global radius and stays near its fine island"), bProxyRemainsLocal);
+	FVoxelStreamingSource WiderProxy = Sources[1];
+	WiderProxy.View.VoxelProxyRadiusCells *= 2;
+	const auto WiderDebug = Manager.Compute(MakeArrayView(&WiderProxy, 1), Manifest, Settings);
+	TestTrue(TEXT("Local Proxy topology depends on the actual Fine window"),
+		SameSet(DebugOnly.VoxelProxy, WiderDebug.VoxelProxy));
 	TestTrue(TEXT("Debug source does not request surface"), DebugOnly.Surface.IsEmpty());
 	TestTrue(TEXT("Debug source does not request macro"), DebugOnly.Macro.IsEmpty());
 
@@ -518,8 +581,14 @@ bool FVoxelIndependentSourceViewTest::RunTest(const FString& InParameters)
 		}
 	}
 	TestTrue(TEXT("Merged fine partition has source priorities"), bEveryFinePrioritized);
-	TestEqual(TEXT("Debug source does not add surface tiles"), Combined.Surface.Num(), PlayerOnly.Surface.Num());
-	TestEqual(TEXT("Debug source does not add macro tiles"), Combined.Macro.Num(), PlayerOnly.Macro.Num());
+	const auto DistantSurface = TilesBeyondPlane(PlayerOnly.Surface, 0, false);
+	const auto DistantMacro = TilesBeyondPlane(PlayerOnly.Macro, -1024, false);
+	TestFalse(TEXT("Surface fixture contains pages on the opposite side of the player"), DistantSurface.IsEmpty());
+	TestFalse(TEXT("Macro fixture contains distant pages outside debug refinement"), DistantMacro.IsEmpty());
+	TestTrue(TEXT("Debug refinement preserves distant Surface topology"),
+		SameSet(TilesBeyondPlane(Combined.Surface, 0, false), DistantSurface));
+	TestTrue(TEXT("Debug refinement preserves distant Macro topology"),
+		SameSet(TilesBeyondPlane(Combined.Macro, -1024, false), DistantMacro));
 	const FVoxelExactDemand* CombinedDemand = Combined.Exact.Find(FIntVector(64, 0, 0));
 	TestTrue(TEXT("Debug fine remains requested with player source"), CombinedDemand && CombinedDemand->bFineRender);
 	if (CombinedDemand)
@@ -544,6 +613,7 @@ bool FVoxelStreamingLodSymmetryTest::RunTest(const FString& InParameters)
 	Manifest.Settings.MaxZ = 128;
 	FVoxelViewSettings Settings;
 	FVoxelStreamingSource Source;
+	Source.Id = FGuid::NewGuid();
 	Source.Capabilities = EVoxelStreamingCapability::Data |
 		EVoxelStreamingCapability::Collision |
 		EVoxelStreamingCapability::FineVisual |
@@ -725,27 +795,41 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FVoxelFineLodHysteresisTest::RunTest(const FString& InParameters)
 {
-	FVoxelWorldManifest Manifest;
-	Manifest.Settings.MinZ = -128;
-	Manifest.Settings.MaxZ = 128;
-	FVoxelViewSettings Settings;
-	FVoxelStreamingSource Source;
-	Source.View.FineRadiusCells = 64;
-	Source.ExactRadius = 64;
-	Source.Capabilities = EVoxelStreamingCapability::Data |
-		EVoxelStreamingCapability::Collision |
-		EVoxelStreamingCapability::FineVisual;
-	const FVoxelInterestManager Manager;
-	const FIntVector Key(3, 0, 0);
-	const FVoxelInterestSet Initial = Manager.Compute(MakeArrayView(&Source, 1), Manifest, Settings);
-	TestTrue(TEXT("Approaching enters fine LOD"), Initial.Exact.FindChecked(Key).bFineRender);
-	Source.Center.X = -16;
-	const FVoxelInterestSet Retained = Manager.Compute(MakeArrayView(&Source, 1), Manifest, Settings, &Initial);
-	TestTrue(TEXT("Small retreat retains fine LOD"), Retained.Exact.FindChecked(Key).bFineRender);
-	Source.Center.X = -33;
-	const FVoxelInterestSet Retired = Manager.Compute(MakeArrayView(&Source, 1), Manifest, Settings, &Retained);
-	const FVoxelExactDemand* Demand = Retired.Exact.Find(Key);
-	TestFalse(TEXT("Retreat beyond hysteresis releases fine LOD"), Demand && Demand->bFineRender);
+	(void)InParameters;
+	FVoxelFineResidency Residency;
+	FString Error;
+	if (!TestTrue(TEXT("Real Fine residency initializes"), Residency.Initialize(FGuid::NewGuid(), {},
+		FIntVector::ZeroValue, 32, 64, 80, -512, 512, Error)))
+	{
+		AddError(Error);
+		return false;
+	}
+	const auto Initial = Residency.GetCurrent();
+	const FVoxelFineShardKey Tail{FIntVector(224, 0, 0), 32};
+	TestTrue(TEXT("Initial Fine window contains the trailing shard"), Residency.Retains(Tail));
+	FVoxelFineMovementDelta Movement;
+	FVoxelFineMigrationDecision Decision;
+	if (!TestTrue(TEXT("Small retreat updates the F0 core"), Residency.UpdateMovement(
+		FIntVector(-16, 0, 0), FVector::ZeroVector, 0.0, Movement, Error))) return false;
+	TestTrue(TEXT("Small retreat retains Fine geometry outside the new F0 core"), Residency.Retains(Tail));
+	TestEqual(TEXT("Small retreat keeps the accepted window"), Residency.GetCurrent().Serial, Initial.Serial);
+	const FVoxelFineSafetyContext Safety{1, 1, FIntVector(-144, 0, 0), 0.0};
+	const auto Coverage = [](const FIntVector&) { return FVoxelFineSectionCoverage{1, 1, true, true, true}; };
+	if (!TestTrue(TEXT("Larger retreat prepares a different Fine window"), Residency.UpdateMovement(
+		FIntVector(-144, 0, 0), FVector::ZeroVector, 0.0, Movement, Error) && Residency.PrepareMigration(
+		FIntVector(-144, 0, 0), FVector::ZeroVector, 0.5, Safety, Coverage, Decision, Error))) return false;
+	if (!TestTrue(TEXT("Retreat creates a pending window"), Residency.GetPending().IsSet())) return false;
+	const uint64 PendingSerial = Residency.GetPending()->Serial;
+	TVoxelFineSetDelta<FVoxelFineShardKey> Retired;
+	TestFalse(TEXT("Prepared meshes cannot release the trailing Fine shard"), Residency.CommitPending(PendingSerial,
+		[](const FVoxelFineShardKey&) { return FVoxelFineShardReadiness{true, true, false}; },
+		[](const FIntVector&) { return true; }, Safety, Coverage, Retired, Error));
+	TestTrue(TEXT("Uncommitted replacement preserves trailing Fine coverage"), Residency.Retains(Tail));
+	if (!TestTrue(TEXT("Committed replacement releases the previous tail"), Residency.CommitPending(PendingSerial,
+		[](const FVoxelFineShardKey&) { return FVoxelFineShardReadiness{true, true, true}; },
+		[](const FIntVector&) { return true; }, Safety, Coverage, Retired, Error))) return false;
+	TestTrue(TEXT("Retirement delta identifies the actual old tail"), Retired.Removed.Contains(Tail));
+	TestFalse(TEXT("New accepted window releases the trailing shard"), Residency.Retains(Tail));
 	return true;
 }
 
@@ -844,6 +928,7 @@ bool FVoxelStreamingViewDistanceScoreTest::RunTest(const FString& InParameters)
 	Manifest.Settings.MinZ = -128;
 	Manifest.Settings.MaxZ = 128;
 	FVoxelStreamingSource Source;
+	Source.Id = FGuid::NewGuid();
 	Source.Center = FIntVector::ZeroValue;
 	Source.ExactRadius = 64;
 	Source.CollisionRadius = 64;
@@ -905,6 +990,10 @@ bool FVoxelStreamingSchedulerCriticalFirstTest::RunTest(const FString& InParamet
 	Far.Kind = EVoxelTaskKind::BuildCollision;
 	Far.WorkClass = EVoxelWorkClass::Critical;
 	Far.DistanceScore = 512.0;
+	TestTrue(TEXT("Undonated near data follows the P0 distance band before distant support"),
+		FVoxelTaskScheduler::IsHigherPriority(Near, Far));
+	Far.ServiceBand = EVoxelTerrainServiceBand::P0;
+	Far.DistanceScore = 0.0;
 	TestTrue(TEXT("Critical support outranks ordinary nearer generation"), FVoxelTaskScheduler::IsHigherPriority(Far, Near));
 	TestFalse(TEXT("Ordinary generation cannot starve critical support"), FVoxelTaskScheduler::IsHigherPriority(Near, Far));
 	FVoxelTaskRequest Visual;
@@ -938,25 +1027,38 @@ bool FVoxelFineIndependentRadiusTest::RunTest(const FString& InParameters)
 	Manifest.Settings.MinZ = -256;
 	Manifest.Settings.MaxZ = 256;
 	FVoxelViewSettings Settings;
+	Settings.Fine.InteractiveVerticalHalfExtentCells = 32;
+	Settings.Fine.ResidencyVerticalHalfExtentCells = 192;
 	FVoxelStreamingSource Source;
+	Source.Id = FGuid::NewGuid();
 	Source.View.FineRadiusCells = 96;
 	Source.View.FineVerticalHalfExtentCells = 32;
 	Source.ExactRadius = 16;
 	Source.CollisionRadius = 16;
+	Source.SimulationRadius = 0;
 	Source.Capabilities = EVoxelStreamingCapability::Data |
 		EVoxelStreamingCapability::Collision |
 		EVoxelStreamingCapability::FineVisual;
 	const FVoxelInterestSet Interest = FVoxelInterestManager().Compute(MakeArrayView(&Source, 1), Manifest, Settings);
-	for (const FIntVector Key : { FIntVector(5, 0, 0), FIntVector(-6, 0, 0), FIntVector(0, 0, 1) })
+	if (!TestTrue(TEXT("Independent Fine window has valid complete demand"),
+		Interest.PlanningError.IsEmpty() && !Interest.FineShardDemands.IsEmpty())) return false;
+	const FVoxelSourceInterest& Contribution = Interest.Sources.FindChecked(Source.Id);
+	for (const FIntVector Key : { FIntVector(10, 0, 0), FIntVector(-11, 0, 0), FIntVector(0, 0, 7) })
 	{
 		const FVoxelExactDemand* Demand = Interest.Exact.Find(Key);
-		TestTrue(TEXT("Configured fine volume includes nearby horizontal and vertical sections"), Demand && Demand->bFineRender);
+		const FVoxelFineShardKey Shard{
+			FIntVector(VoxelGeneration::FloorDivide(Key.X, 2), VoxelGeneration::FloorDivide(Key.Y, 2),
+				VoxelGeneration::FloorDivide(Key.Z, 2)) * 32, 32};
+		TestTrue(TEXT("Fine residency includes horizontal and vertical buffer shards"), Contribution.GetFineShards().Contains(Shard));
+		TestFalse(TEXT("F1+ buffer does not expand Runtime exact or F0 meshing"), Demand && (Demand->bExact || Demand->bFineRender));
 		TestFalse(TEXT("Fine range does not enlarge collision or simulation"), Demand && (Demand->bCollision || Demand->bSimulation));
 	}
-	const FVoxelExactDemand* DeepDemand = Interest.Exact.Find(FIntVector(0, 0, 5));
+	const FVoxelExactDemand* DeepDemand = Interest.Exact.Find(FIntVector(0, 0, 14));
 	TestFalse(TEXT("Fine vertical radius excludes deep invisible sections"), DeepDemand && DeepDemand->bFineRender);
+	TestFalse(TEXT("Vertical residency boundary excludes deep shards"),
+		Contribution.GetFineShards().Contains({FIntVector(0, 0, 224), 32}));
 	TestFalse(TEXT("Deep invisible sections never enter fine admissions"),
-		Interest.FineSections && Interest.FineSections->Contains(FIntVector(0, 0, 5)));
+		Interest.FineSections && Interest.FineSections->Contains(FIntVector(0, 0, 14)));
 	for (const auto& Pair : Interest.Exact)
 	{
 		if (!Pair.Value.bFineRender) continue;
@@ -1201,6 +1303,7 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 	FVoxelTaskRequest Fine;
 	Fine.Kind = EVoxelTaskKind::BuildFineMesh;
 	Fine.WorkClass = EVoxelWorkClass::Visible;
+	Fine.DistanceScore = 16.0;
 	FVoxelTaskRequest FineCoverage;
 	FineCoverage.Kind = EVoxelTaskKind::BuildViewCoverage;
 	// A Fine consumer explicitly requests stage zero; a coarse continuation keeps its own stage.
@@ -1220,7 +1323,9 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 	CoarsePlan.TerrainStage = 2;
 	Fine.WorkClass = EVoxelWorkClass::Visible;
 	Fine.DistanceScore = 0.0;
-	FineCoverage.DistanceScore = 100000.0;
+	FineCoverage.ServiceBand = EVoxelTerrainServiceBand::P0;
+	FineCoverage.DistanceScore = 0.0;
+	FineCoverage.ForwardScore = 1.0;
 	TestTrue(TEXT("An admitted handoff finishes ahead of new ordinary Fine visual work"),
 		FVoxelTaskScheduler::IsHigherPriority(FineCoverage, Fine));
 	TestFalse(TEXT("New nearer visual work cannot repeatedly displace an admitted handoff"),
@@ -1232,8 +1337,8 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Earlier admitted handoffs retain their place ahead of newer nearby handoffs"),
 		FVoxelTaskScheduler::IsHigherPriority(FineCoverage, NewCoverage));
 	NewCoverage.WorkClass = EVoxelWorkClass::Critical;
-	TestTrue(TEXT("Critical Fine handoffs still overtake older ordinary handoffs"),
-		FVoxelTaskScheduler::IsHigherPriority(NewCoverage, FineCoverage));
+	TestTrue(TEXT("Equal donated priority retains the earlier handoff before the WorkClass label"),
+		FVoxelTaskScheduler::IsHigherPriority(FineCoverage, NewCoverage));
 	TestTrue(TEXT("Independent coarse coverage planning retains its own terrain stage"),
 		FVoxelTaskScheduler::IsHigherPriority(Fine, CoarsePlan));
 	FVoxelTaskRequest CriticalCoverage = FineCoverage.MakePriorityCopy();
@@ -1243,11 +1348,13 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 	CriticalFine.WorkClass = EVoxelWorkClass::Critical;
 	CriticalFine.DistanceScore = 0.0;
 	CriticalFine.ForwardScore = 1.0;
-	TestTrue(TEXT("Critical publication completion is not displaced by new nearer Critical Fine meshes"),
-		FVoxelTaskScheduler::IsHigherPriority(CriticalCoverage, CriticalFine));
+	CriticalFine.QueuedAt = 3.0;
+	TestTrue(TEXT("Within one donated band nearer Critical Fine precedes distant publication"),
+		FVoxelTaskScheduler::IsHigherPriority(CriticalFine, CriticalCoverage));
 	FVoxelTaskRequest CriticalData = CriticalFine.MakePriorityCopy();
 	CriticalData.Kind = EVoxelTaskKind::GenerateExactBase;
-	CriticalData.DistanceScore = 30.0;
+	CriticalData.DistanceScore = CriticalFine.DistanceScore;
+	CriticalData.QueuedAt = 0.0;
 	TestTrue(TEXT("Upstream Critical exact data remains ahead of publication clipping"),
 		FVoxelTaskScheduler::IsHigherPriority(CriticalData, CriticalCoverage));
 	TestTrue(TEXT("Upstream Critical data precedes new meshes without introducing a cyclic comparison"),
@@ -1255,14 +1362,16 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 	FVoxelTaskRequest NewCriticalCoverage = CriticalCoverage.MakePriorityCopy();
 	NewCriticalCoverage.QueuedAt = 2.0;
 	NewCriticalCoverage.DistanceScore = 0.0;
-	TestTrue(TEXT("Earlier Critical publication completes before new nearby Critical publication"),
-		FVoxelTaskScheduler::IsHigherPriority(CriticalCoverage, NewCriticalCoverage));
+	TestTrue(TEXT("Critical publication uses distance before admission age"),
+		FVoxelTaskScheduler::IsHigherPriority(NewCriticalCoverage, CriticalCoverage));
 	FVoxelTaskRequest PreferredSourceFine = CriticalFine.MakePriorityCopy();
 	PreferredSourceFine.SourcePriority = CriticalCoverage.SourcePriority - 1;
 	TestTrue(TEXT("Higher source priority still precedes another source's publication completion"),
 		FVoxelTaskScheduler::IsHigherPriority(PreferredSourceFine, CriticalCoverage));
+	TestTrue(TEXT("Source priority breaks equal band distance and direction ties"),
+		FVoxelTaskScheduler::IsHigherPriority(PreferredSourceFine, CriticalFine));
 	TArray<FVoxelTaskRequest> CriticalOrder;
-	for (const FVoxelTaskRequest* Request : {&CriticalData, &CriticalCoverage, &NewCriticalCoverage, &CriticalFine})
+	for (const FVoxelTaskRequest* Request : {&CriticalData, &NewCriticalCoverage, &CriticalFine, &CriticalCoverage})
 		CriticalOrder.Add(Request->MakePriorityCopy());
 	for (int32 Earlier = 0; Earlier < CriticalOrder.Num(); ++Earlier)
 		for (int32 Later = Earlier + 1; Later < CriticalOrder.Num(); ++Later)
@@ -1289,6 +1398,7 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 			Handoff.bPublicationContinuation = true;
 			Handoff.QueuedAt = 1.0;
 			Handoff.DistanceScore = 100000.0;
+			Handoff.ServiceBand = EVoxelTerrainServiceBand::P0;
 			PrioritySamples.Add(Handoff.MakePriorityCopy());
 			TArray<EVoxelTaskKind> MeshKinds{StageMeshes[Stage], EVoxelTaskKind::BuildViewTransition};
 			if (Stage <= 1) MeshKinds.Add(EVoxelTaskKind::BuildVolumeTransition);
@@ -1300,6 +1410,7 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 				Mesh.bPublicationContinuation = false;
 				Mesh.DistanceScore = 0.0;
 				Mesh.QueuedAt = 0.0;
+				Mesh.ServiceBand = static_cast<EVoxelTerrainServiceBand>(uint8(EVoxelTerrainServiceBand::P2) + Stage);
 				PrioritySamples.Add(Mesh.MakePriorityCopy());
 				TestTrue(*FString::Printf(TEXT("Admitted handoff precedes new representation: stage=%d kind=%d class=%d"),
 					Stage, int32(Kind), int32(WorkClass)), FVoxelTaskScheduler::IsHigherPriority(Handoff, Mesh));
@@ -1322,6 +1433,7 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 					FVoxelTaskRequest Upstream = Handoff.MakePriorityCopy();
 					Upstream.Kind = Kind;
 					Upstream.bPublicationContinuation = false;
+					Upstream.QueuedAt = 0.0;
 					PrioritySamples.Add(Upstream.MakePriorityCopy());
 					TestTrue(TEXT("Critical data collision and navigation remain upstream of same-stage publication"),
 						FVoxelTaskScheduler::IsHigherPriority(Upstream, Handoff));
@@ -1407,7 +1519,13 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 			FPlatformProcess::Sleep(0.001f);
 		}
 		Scheduler.StopAndJoin();
-		TestTrue(TEXT("Ordinary aging and Critical distance cannot undo the handoff dependency order"), Order == TArray<uint64>{1, 3, 2});
+		TestEqual(TEXT("Every upstream mesh and handoff completes under aging"), Order.Num(), 3);
+		if (Order.Num() == 3)
+		{
+			TestEqual(TEXT("Running upstream collision is preserved"), Order[0], uint64(1));
+			TestTrue(TEXT("Both mesh and admitted handoff retain a service opportunity"),
+				Order.Contains(2) && Order.Contains(3) && TSet<uint64>(Order).Num() == 3);
+		}
 	}
 	FVoxelTaskRequest LowPriorityPlanning;
 	LowPriorityPlanning.Kind = EVoxelTaskKind::ProjectBackground;
@@ -1422,6 +1540,7 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 	FinePlanning.TerrainStage = 0;
 	FinePlanning.WorkClass = EVoxelWorkClass::Visible;
 	FinePlanning.SourcePriority = 0;
+	FinePlanning.ServiceBand = EVoxelTerrainServiceBand::P2;
 	TestTrue(TEXT("Fine dependencies retain their consumer's stage before Proxy"),
 		FVoxelTaskScheduler::IsHigherPriority(FinePlanning, NearProxy));
 	const EVoxelTaskKind Kinds[] = {
@@ -1599,8 +1718,10 @@ bool FVoxelCriticalCapacitySchedulerTest::RunTest(const FString& Parameters)
 		Scheduler.Tick(Apply, 8.0);
 		FPlatformProcess::Sleep(0.001f);
 	}
-	TestTrue(TEXT("Ordinary foreground admission is deferred while Critical needs capacity"),
-		Scheduler.GetDiagnostics().CriticalAdmissionDeferrals > 0);
+	TestEqual(TEXT("Ordinary mesh waits while the shared reservation budget is occupied"),
+		Scheduler.GetDiagnostics().PendingByKind.FindRef(EVoxelTaskKind::BuildFineMesh), 1);
+	TestTrue(TEXT("Critical admission stays within the shared reservation budget"),
+		Scheduler.GetDiagnostics().ReservedBytes <= Budget.MaxReservedBytes);
 	TestEqual(TEXT("Default background quota keeps coarse work queued"),
 		Scheduler.GetDiagnostics().PendingByKind.FindRef(EVoxelTaskKind::BuildSurface), 1);
 	TestEqual(TEXT("Critical task takes released foreground capacity"), Scheduler.GetDiagnostics().CriticalRunning, 1);
@@ -1818,7 +1939,10 @@ bool FVoxelStreamingMultiSourceStageTest::RunTest(const FString& InParameters)
 	FVoxelTaskRequest DebugFine;
 	DebugFine.Kind = EVoxelTaskKind::BuildFineMesh;
 	DebugFine.SourcePriority = 100;
-	TestTrue(TEXT("Higher-priority player macro outranks lower-priority debug fine"),
+	TestTrue(TEXT("Near Fine service precedes Macro before the source-priority tie break"),
+		FVoxelTaskScheduler::IsHigherPriority(DebugFine, PlayerMacro));
+	PlayerMacro.ServiceBand = DebugFine.ServiceBand = EVoxelTerrainServiceBand::P2;
+	TestTrue(TEXT("Equal service and distance use numeric source priority"),
 		FVoxelTaskScheduler::IsHigherPriority(PlayerMacro, DebugFine));
 	return true;
 }
@@ -1908,7 +2032,8 @@ bool FVoxelCriticalFineDependencyClosureTest::RunTest(const FString& InParameter
 	FVoxelInterestSet Interest;
 	FVoxelInterestDelta Delta;
 	bool bSnapshot = false;
-	Runtime.Update(MakeArrayView(&Source, 1), Manifest, Settings, Interest, Delta, bSnapshot);
+	AdvanceInterest(*this, Runtime, MakeArrayView(&Source, 1), Manifest, Settings, Interest, Delta, bSnapshot);
+	if (!bSnapshot) return false;
 	const FVoxelExactDemand* Current = Interest.Exact.Find(FIntVector::ZeroValue);
 	if (!TestNotNull(TEXT("Current observer section remains in Fine"), Current)) return false;
 	TestTrue(TEXT("Prediction keeps current Fine critical even when the predicted center is far away"), Current->bMovementCriticalFine);

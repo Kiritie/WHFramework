@@ -6,6 +6,9 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Main/MainModule.h"
+#include "Materials/Material.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "PrimitiveSceneProxy.h"
 #include "RenderingThread.h"
 #include "UObject/UObjectIterator.h"
 #include "Voxel/Components/VoxelTerrainPrimitiveComponent.h"
@@ -50,6 +53,39 @@ bool FVoxelTerrainRendererWorldCleanupTest::RunTest(const FString&)
 	}
 	if (!TestTrue(TEXT("Renderer creates and registers its native primitive"), Component.IsValid())) return false;
 	TestTrue(TEXT("Retirement material holder has a world-independent outer"), Component->GetOuter() == GetTransientPackage());
+	TWeakObjectPtr<UMaterialInstanceDynamic> HeldMaterial;
+	for (int32 Index = 0; Index < 2; ++Index)
+	{
+		auto* Material = UMaterialInstanceDynamic::Create(UMaterial::GetDefaultMaterial(MD_Surface), GetTransientPackage());
+		HeldMaterial = Material;
+		EVoxelTerrainResourceAdmission Admission = EVoxelTerrainResourceAdmission::None;
+		if (!TestEqual(TEXT("Original native material append retains the expected UE slot"),
+			Component->RetainMaterial(Material, &Admission), Index)) return false;
+		TestEqual(TEXT("Original material backing is granted"), Admission, EVoxelTerrainResourceAdmission::Granted);
+		TestEqual(TEXT("UE material slot count includes all retained materials"), Component->GetNumMaterials(), Index + 1);
+		TArray<UMaterialInterface*> Used;
+		Component->GetUsedMaterials(Used, true);
+		TestTrue(TEXT("Inherited UE material enumeration declares the actual retained material"), Used.Contains(Material));
+		World->SendAllEndOfFrameUpdates();
+		FlushRenderingCommands();
+		auto* Proxy = Component->GetSceneProxy();
+		if (!TestNotNull(TEXT("UE end-of-frame material update recreates the real native proxy"), Proxy)) return false;
+		TAtomic<bool> Verified(false);
+		auto* RenderMaterial = Material->GetRenderProxy();
+		ENQUEUE_RENDER_COMMAND(VoxelVerifyRetainedMaterial)([Proxy, RenderMaterial, &Verified](FRHICommandListImmediate&)
+		{
+			Verified.Store(Proxy->VerifyUsedMaterial(RenderMaterial));
+		});
+		FlushRenderingCommands();
+		TestTrue(TEXT("Actual UE render-thread verification accepts materials appended after proxy creation"), Verified.Load());
+		const uint64 BeforeDuplicate = TerrainResources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Input)];
+		TestEqual(TEXT("Duplicate material retains its original slot"), Component->RetainMaterial(Material, &Admission), Index);
+		TestFalse(TEXT("Duplicate does not request another proxy recreation"), Component->IsRenderStateDirty());
+		TestEqual(TEXT("Duplicate material requires no new native Input grant"),
+			TerrainResources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Input)], BeforeDuplicate);
+		TestEqual(TEXT("Temporary original proxy material Working backing is released"),
+			TerrainResources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Working)], uint64(0));
+	}
 	auto PendingRenderReference = Component->TerrainState;
 	Renderer.Reset();
 	TestFalse(TEXT("Shutdown unregisters the primitive before world collection"), Component->IsRegistered());
@@ -62,12 +98,14 @@ bool FVoxelTerrainRendererWorldCleanupTest::RunTest(const FString&)
 	CollectGarbage(RF_NoFlags);
 	TestFalse(TEXT("An outstanding native render reference cannot retain the ended world"), EndedWorld.IsValid());
 	TestTrue(TEXT("Material holder survives until its native retirement references finish"), Component.IsValid());
+	TestTrue(TEXT("Retained material survives GC while original retirement references remain"), HeldMaterial.IsValid());
 	PendingRenderReference.Reset();
 	FTSTicker::GetCoreTicker().Tick(0.0f);
 	FlushRenderingCommands();
 	FTSTicker::GetCoreTicker().Tick(0.0f);
 	CollectGarbage(RF_NoFlags);
 	TestFalse(TEXT("Final retirement releases the material holder"), Component.IsValid());
+	TestFalse(TEXT("Final retirement also releases the actual retained material"), HeldMaterial.IsValid());
 	return true;
 }
 

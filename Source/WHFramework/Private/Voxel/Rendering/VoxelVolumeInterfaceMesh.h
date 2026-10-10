@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "Voxel/Geometry/DWVoxelBoundaryTransition.h"
 #include "Voxel/Rendering/VoxelCoarseBuildStorage.h"
@@ -161,7 +161,8 @@ struct FVoxelVolumeTransitionBuild
 				Body->FrozenBoundaryInputs = Inputs; Body->FrozenVoxelProxy = Data;
 				Boundary->FrozenBoundaryInputs = Inputs; Boundary->FrozenVoxelProxy = Data;
 				Result.VoxelProxyMesh = MoveTemp(Body); Result.VolumeBoundaryMesh = MoveTemp(Boundary);
-				Result.InputResourceLease = Storage->MetadataLease; Result.bSuccess = true;
+				Result.InputResourceLease = Storage->ResultInputLease; Result.bSuccess = true;
+				Storage->SettleCompleted(Result);
 				return Result;
 			}
 		}

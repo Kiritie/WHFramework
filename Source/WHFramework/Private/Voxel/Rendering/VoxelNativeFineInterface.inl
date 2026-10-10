@@ -178,6 +178,8 @@ struct FPreparedFine
 		OutError = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: Native Fine interface") :
 			Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: Native Fine interface") :
 			TEXT("InvalidRequest: Native Fine interface");
+		OutError += FString::Printf(TEXT(" pool=%d bytes=%llu retainedPool=%llu retainedInput=%llu retainedLeases=%llu"),
+			int32(Pool), Bytes, Required.Bytes[int32(Pool)], Required.Bytes[0], uint64(Required.LeaseCount));
 		return false;
 	}
 

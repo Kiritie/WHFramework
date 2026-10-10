@@ -2,6 +2,7 @@
 
 #if WITH_DEV_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
+#include "Voxel/Chunks/VoxelSectionKey.h"
 #include "Voxel/Collision/VoxelCollisionPresenter.h"
 #include "Voxel/Collision/VoxelPhysicsRetirement.h"
 #include "Voxel/Geometry/VoxelCollisionBuilder.h"
@@ -95,7 +96,7 @@ bool FVoxelCollisionFrozenBuildTest::RunTest(const FString& InParameters)
 	const auto Resources = MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
 	Resources->Configure({});
 	const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSectionCollisionResult>() +
-		VoxelBoundedAllocation::ArrayBytes<FBox>(16384);
+		VoxelBoundedAllocation::ArrayBytes<FBox>(1);
 	if (!Resources->Acquire(FVoxelGenerationConsumerKey::Section(17, Owner, 29, Snapshot.Section, 1),
 		EVoxelTerrainResourcePool::Staged, Bytes, Result.ResourceLease)) return false;
 	if (!TestTrue(TEXT("生产 Builder 在已授予容量内生成整个实心 Section"),
@@ -108,6 +109,7 @@ bool FVoxelCollisionFrozenBuildTest::RunTest(const FString& InParameters)
 	TestEqual(TEXT("记录实际 Registry 输入"), Result.Stamp.RegistryRevision, Registry.Hash);
 	TestEqual(TEXT("记录实际 Shape 输入"), Result.Stamp.ShapeRevision, Shapes.GetContentHash());
 	TestTrue(TEXT("真实输出容量未超过原授予"), Result.Bytes() <= Result.ResourceLease->Bytes());
+	TestEqual(TEXT("成功后租约按实际数组容量结算"), Result.ResourceLease->Bytes(), Result.Bytes());
 	const FVoxelTaskStamp Installed = Result.Stamp;
 	++Registry.Hash;
 	TestFalse(TEXT("重建峰值不足时在分配前等待"), FVoxelCollisionBuilder::Build(Snapshot, Registry, Shapes, Result));
@@ -119,6 +121,110 @@ bool FVoxelCollisionFrozenBuildTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("取消保留旧身份"), Result.Stamp == Installed);
 	TestTrue(TEXT("容量释放后允许同一输出重建"), FVoxelCollisionBuilder::Build(Snapshot, Registry, Shapes, Result));
 	TestEqual(TEXT("成功只发布实际新 Registry 版本"), Result.Stamp.RegistryRevision, Registry.Hash);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelCollisionExactCapacityTest,
+	"WHFramework.Voxel.FineRefactor.Physics.ExactCollisionCapacity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelCollisionExactCapacityTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelRegistrySnapshot Registry = *VoxelTest::MakeRegistry();
+	Registry.Definitions[1].bSolid = true;
+	FVoxelShapeRegistry Shapes;
+	Shapes.BuildDefaults();
+	FVoxelSectionSnapshot Snapshot;
+	Snapshot.Stamp.Epoch = 17;
+	Snapshot.Stamp.Token = 19;
+	Snapshot.Revision = 23;
+	Snapshot.Blocks.Init(FVoxelBlockState{}.Pack(), VoxelBlock::Volume);
+	const auto Consumer = FVoxelGenerationConsumerKey::Section(17, FGuid::NewGuid(), 1, {}, 1);
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
+	FString Error;
+	if (!FVoxelTerrainResources::Create({}, Consumer, Resources, Error)) return false;
+	for (int32 Scenario = 0; Scenario < 4; ++Scenario)
+	{
+		Registry.Definitions[1].Shape = Scenario == 3 ? EVoxelShapeKind::Stair : EVoxelShapeKind::FullCube;
+		for (int32 Index = 0; Index < VoxelBlock::Volume; ++Index)
+		{
+			const FIntVector Cell = VoxelCoord::Unlinear(uint16(Index));
+			const bool bSolid = Scenario == 1 || (Scenario == 2 && ((Cell.X + Cell.Y + Cell.Z) & 1) == 0) ||
+				(Scenario == 3 && Index == 0);
+			Snapshot.Blocks[Index] = bSolid ? FVoxelBlockState{1, 0}.Pack() : FVoxelBlockState{}.Pack();
+		}
+		const int32 ExpectedBoxes = Scenario == 0 ? 0 : Scenario == 1 ? 1 : Scenario == 2 ? VoxelBlock::Volume / 2 :
+			Shapes.Get(EVoxelShapeKind::Stair, 0).CollisionBoxes.Num();
+		FVoxelSectionCollisionResult Result;
+		const uint64 GrantedBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSectionCollisionResult>() +
+			VoxelBoundedAllocation::ArrayBytes<FBox>(ExpectedBoxes);
+		if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Staged, GrantedBytes, Result.ResourceLease)) return false;
+		const uint64 Serial = Result.ResourceLease->Serial();
+		if (!TestTrue(TEXT("空、实心、棋盘与非立方 Shape 只用真实 Count 的输出额度"),
+			FVoxelCollisionBuilder::Build(Snapshot, Registry, Shapes, Result))) return false;
+		TestEqual(TEXT("完整碰撞形状数量保持"), Result.Boxes.Num(), ExpectedBoxes);
+		TestTrue(TEXT("数组真实容量未超过 Count 上界"), uint64(Result.Boxes.GetAllocatedSize()) <=
+			VoxelBoundedAllocation::ArrayBytes<FBox>(ExpectedBoxes));
+		TestEqual(TEXT("结算保持原租约身份"), Result.ResourceLease->Serial(), Serial);
+		TestEqual(TEXT("结算保持 Staged 生命周期"), Result.ResourceLease->GetPool(), EVoxelTerrainResourcePool::Staged);
+		TestEqual(TEXT("Staged 只保留真实数组容量"), Result.ResourceLease->Bytes(), Result.Bytes());
+		if (Scenario == 3)
+		{
+			const auto& Expected = Shapes.Get(EVoxelShapeKind::Stair, 0).CollisionBoxes;
+			for (int32 Index = 0; Index < Expected.Num(); ++Index)
+				TestTrue(TEXT("非立方碰撞盒未被精简成 Filled"), Result.Boxes[Index] == Expected[Index]);
+		}
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelCollisionRetainedCapacityTest,
+	"WHFramework.Voxel.FineRefactor.Physics.RetainedCollisionCapacity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelCollisionRetainedCapacityTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelRegistrySnapshot Registry = *VoxelTest::MakeRegistry();
+	Registry.Definitions[1].bSolid = true;
+	FVoxelShapeRegistry Shapes;
+	Shapes.BuildDefaults();
+	FVoxelSectionSnapshot Snapshot;
+	Snapshot.Stamp.Epoch = 17;
+	Snapshot.Stamp.Token = 19;
+	Snapshot.Revision = 23;
+	Snapshot.Blocks.Init(FVoxelBlockState{1, 0}.Pack(), VoxelBlock::Volume);
+	FVoxelTerrainResourceLimits Limits;
+	Limits.StagedBytes = 2 * 1024 * 1024;
+	const auto Control = FVoxelGenerationConsumerKey::Section(17, FGuid::NewGuid(), 1, {}, 1);
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
+	FString Error;
+	if (!FVoxelTerrainResources::Create(Limits, Control, Resources, Error)) return false;
+	TArray<TSharedPtr<FVoxelSectionCollisionResult, ESPMode::ThreadSafe>> Retained;
+	Retained.Reserve(256);
+	uint64 RetainedBytes = 0;
+	for (int32 Index = 0; Index < 256; ++Index)
+	{
+		const auto Consumer = FVoxelGenerationConsumerKey::Section(17, Control.OwnerId, 1, FIntVector(Index, 0, 0), Index + 2);
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> OutputLease;
+		const uint64 CompletionBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSectionCollisionResult>() +
+			VoxelBoundedAllocation::ArrayBytes<FBox>(16384);
+		if (!TestTrue(TEXT("保留已有完成结果时仍能接纳下一任务的原始完成上界"),
+			Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Staged, CompletionBytes, OutputLease))) return false;
+		const uint64 Serial = OutputLease->Serial();
+		auto Result = VoxelBoundedAllocation::MakeWorkerShared<FVoxelSectionCollisionResult>(OutputLease);
+		Result->ResourceLease = OutputLease;
+		Snapshot.Section = Consumer.Min;
+		if (!FVoxelCollisionBuilder::Build(Snapshot, Registry, Shapes, *Result)) return false;
+		TestEqual(TEXT("结算不替换原完成租约"), OutputLease->Serial(), Serial);
+		RetainedBytes += Result->Bytes();
+		Retained.Add(MoveTemp(Result));
+	}
+	TestEqual(TEXT("所有未提交 CPU 结果仍在 Staged 如实计费"),
+		Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Staged)], RetainedBytes);
+	TestEqual(TEXT("未借 Resident 容量完成测试"), Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Resident)], uint64(0));
+	TestTrue(TEXT("256 个实心 Section 只保留实际合并后的数组"), RetainedBytes < Limits.StagedBytes / 2);
 	return true;
 }
 

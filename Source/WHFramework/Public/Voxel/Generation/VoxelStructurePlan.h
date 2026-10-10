@@ -51,7 +51,7 @@ FORCEINLINE uint32 GetTypeHash(
 	const FVoxelStructurePlanKey& InKey)
 {
 	return HashCombineFast(
-		::GetTypeHash(InKey.Position),
+		UE::Math::GetTypeHash(InKey.Position),
 		::GetTypeHash(
 			static_cast<uint8>(
 				InKey.Stage)));

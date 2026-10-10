@@ -50,7 +50,18 @@ uint64 FVoxelHeightfieldPageBuild::MaximumRetainedBytes() const
 	// Surface + Water 和 Macro 共用较大的 Surface 输出容量模型。
 	return WorkerSharedBytes<FVoxelHeightfieldPageBuild>() + ArrayBytes<FVoxelTerrainBuildShard>(Parts * Parts) +
 		4 * ArrayBytes<int32>(Count) + 2 * ArrayBytes<uint16>(Count) + 2 * ArrayBytes<uint8>(Count) +
-		ArrayBytes<FVoxelDistantCell>(MaximumWindowDistantCells * Parts * Parts);
+		MaximumDistantBytes();
+}
+
+uint64 FVoxelHeightfieldPageBuild::MaximumDistantBytes() const
+{
+	const int64 Cells = Geometry.Key.SideCells() / FMath::Max(1, Geometry.SampleStepCells);
+	if (Cells <= 0 || Cells > 256)
+	{
+		return MAX_uint64;
+	}
+	const int32 Parts = int32((Cells + GenerationSamples - 1) / GenerationSamples);
+	return VoxelBoundedAllocation::ArrayBytes<FVoxelDistantCell>(MaximumWindowDistantCells * Parts * Parts);
 }
 
 bool FVoxelHeightfieldPageBuild::Advance(const FVoxelSurfaceProxyBuilder& InBuilder,

@@ -29,12 +29,13 @@ public:
 	// Observer及其callable由调用栈持有，必须比Scope更晚析构。
 	explicit FVoxelGenerationPlanningReadScope(const FObserver* InObserver = nullptr,
 		const FVoxelTaskStamp* InStamp = nullptr, const TAtomic<bool>* InCancel = nullptr,
-		const FVoxelGenerationConsumerKey* InConsumer = nullptr);
+		const FVoxelGenerationConsumerKey* InConsumer = nullptr, bool bInRequireReadyPlans = true);
 	~FVoxelGenerationPlanningReadScope();
 	FVoxelGenerationPlanningReadScope(const FVoxelGenerationPlanningReadScope&) = delete;
 	FVoxelGenerationPlanningReadScope& operator=(const FVoxelGenerationPlanningReadScope&) = delete;
 
 	static bool IsActive();
+	static bool RequiresReadyPlans();
 	static bool CanPublish();
 	static FString PublishBlockError();
 	static const FVoxelTaskStamp* GetTaskStamp();
@@ -46,6 +47,7 @@ private:
 	const FVoxelTaskStamp* Stamp = nullptr;
 	const TAtomic<bool>* Cancel = nullptr;
 	const FVoxelGenerationConsumerKey* Consumer = nullptr;
+	bool bRequireReadyPlans = true;
 	bool bMissing = false;
 	FVoxelGenerationPlanningReadScope* Previous = nullptr;
 	static FVoxelGenerationPlanningReadScope*& ActiveScopeSlot();

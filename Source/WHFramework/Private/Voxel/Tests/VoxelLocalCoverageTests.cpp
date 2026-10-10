@@ -1,8 +1,10 @@
-﻿#if WITH_DEV_AUTOMATION_TESTS
+#if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Misc/ScopeExit.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
+#include "Main/MainModule.h"
 #include "Voxel/Rendering/VoxelViewManager.h"
 #include "Voxel/Rendering/VoxelViewPublisher.h"
 #include "Voxel/Rendering/VoxelProxyBuilder.h"
@@ -16,6 +18,8 @@
 #include "Voxel/Geometry/VoxelShapeRegistry.h"
 #include "Voxel/Runtime/VoxelWorldRuntime.h"
 #include "Voxel/Task/VoxelTerrainResources.h"
+#include "Voxel/Generation/VoxelManifestCodec.h"
+#include "Voxel/Serialization/VoxelBinaryCodec.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelCoverageRegionHaloTest,
 	"WHFramework.Voxel.Rendering.CoverageRegionHalo",
@@ -61,13 +65,98 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 {
 	(void)InParameters;
 	UVoxelModule* Module = NewObject<UVoxelModule>();
-	FVoxelTaskScheduler Scheduler(true);
+	FString FixtureError;
+	if (!Module->Registry.Build({}, false, FixtureError)) return false;
+	const auto Shapes = MakeShared<FVoxelShapeRegistry, ESPMode::ThreadSafe>();
+	Shapes->BuildDefaults();
+	Module->Shapes = Shapes;
+	Module->Generator = VoxelTest::MakeGenerator();
+	Module->Epoch = 7;
+	Module->GenerationConfig = VoxelTest::MakeGenerationConfig();
+	Module->Manifest.WorldId = FGuid::NewGuid();
+	Module->Manifest.RegistryHash = Module->GetRegistry()->Hash;
+	Module->Manifest.RecipeHash = Module->GenerationConfig->Recipe->RecipeHash;
+	Module->Manifest.Settings = Module->GenerationConfig->Recipe->Settings;
+	Module->Manifest.BaseSampleHash = VoxelBinary::Mix64(FVoxelManifestCodec::RecipeFingerprint(Module->Manifest) ^
+		VoxelBinary::Mix64(Module->Manifest.RegistryHash) ^ VoxelBinary::Mix64(Module->Manifest.RecipeHash));
+	const auto CreateScheduler = [this](const uint64 Epoch, TUniquePtr<FVoxelTaskScheduler>& OutScheduler)
+	{
+		const auto Control = FVoxelGenerationConsumerKey::Section(Epoch, FGuid::NewGuid(), 1, {}, 1);
+		TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> GeometryResources, FactResources;
+		FString Error;
+		return TestTrue(TEXT("Coverage fixture admits its original ledgers and scheduler identity"),
+			FVoxelTerrainResources::Create({}, Control, GeometryResources, Error) &&
+			FVoxelTerrainResources::Create({}, Control, FactResources, Error) &&
+			FVoxelTaskScheduler::Create(GeometryResources.ToSharedRef(), FactResources.ToSharedRef(), Control, OutScheduler, Error) &&
+			OutScheduler->InitializeStatistics(Epoch));
+	};
+	TUniquePtr<FVoxelTaskScheduler> SchedulerOwner;
+	if (!CreateScheduler(7, SchedulerOwner)) return false;
+	auto& Scheduler = *SchedulerOwner;
 	FVoxelTaskBudget Budget;
 	Budget.MaxConcurrentTasks = 2;
 	Budget.MaxCompletedResultsPerFrame = 1;
 	Scheduler.SetBudget(Budget);
 	FVoxelViewManager Manager(*Module, Scheduler, 7);
-	const TSet<FVoxelViewKey> Nodes{{FIntVector(0, 0, 0), 0}, {FIntVector(1000, 0, 0), 0}};
+	const auto EnsureProxyInputs = [this, Module, &Scheduler, &Manager](const TSet<FVoxelViewKey>& InNodes)
+	{
+		auto& Interest = const_cast<FVoxelInterestSet&>(Module->GetCurrentInterest());
+		for (const auto& Key : InNodes)
+		{
+			if (Manager.VoxelProxyData.Contains(Key)) continue;
+			const auto Consumer = FVoxelGenerationConsumerKey::Section(7, FGuid::NewGuid(), 1, Key.Coordinate, 1);
+			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+			const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelVoxelProxyData>() +
+				VoxelBoundedAllocation::ArrayBytes<FVoxelBlockState>(4096) +
+				6 * VoxelBoundedAllocation::ArrayBytes<FVoxelBlockState>(256);
+			if (!TestTrue(TEXT("Frozen coarse cells and halos acquire their original resident lease"),
+				Scheduler.GetTerrainResources()->Acquire(Consumer, EVoxelTerrainResourcePool::Resident, Bytes, Lease))) return false;
+			auto Data = VoxelBoundedAllocation::MakeWorkerShared<FVoxelVoxelProxyData>(Lease);
+			Data->ResourceLease = Lease;
+			Data->Key = Key;
+			Data->Geometry = {{EVoxelTerrainRepresentation::VoxelProxy, Key.Coordinate, Key.Level}, 2,
+				Module->Manifest.Settings.MinZ, Module->Manifest.Settings.MaxZ,
+				Module->Manifest.BaseSampleHash, Module->GetRegistry()->Hash};
+			Data->Revision = 1;
+			Data->Cells.Init(FVoxelBlockState(), 4096);
+			for (int32 Face = 0; Face < 6; ++Face)
+			{
+				Data->Known[Face] = true;
+				Data->Halo[Face].Init(FVoxelBlockState(), 256);
+			}
+			Interest.Geometry.Add(Data->Geometry.Key, Data->Geometry);
+			Manager.VoxelProxyData.Add(Key, MoveTemp(Data));
+		}
+		return true;
+	};
+	const auto PrepareTransitions = [this, Module, &Scheduler, &Manager](const TSet<FVoxelViewKey>& InNodes)
+	{
+		const double PrepareDeadline = FPlatformTime::Seconds() + 10.0;
+		while (FPlatformTime::Seconds() < PrepareDeadline)
+		{
+			Manager.RebuildVolumeTransitions(InNodes);
+			bool bPrepared = true;
+			for (const auto& Key : InNodes)
+			{
+				const uint64 Desired = Manager.DesiredVolumeSignatures.FindRef(Key);
+				bPrepared &= Desired != 0 && Manager.PreparedVolumeSignatures.FindRef(Key) == Desired &&
+					Manager.PreparedVolumeMeshes.Contains(Key);
+			}
+			if (bPrepared) return true;
+			auto& Frame = Module->GetTerrainFrameContext();
+			Frame.Begin(7, Frame.GetFrameCounter() + 1, FPlatformTime::Seconds(), {});
+			Manager.PumpVolumeTransitions();
+			Frame.End(FPlatformTime::Seconds());
+			Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
+			FPlatformProcess::Sleep(0.001f);
+		}
+		return TestTrue(TEXT("Actual frozen coarse inputs prepare every local body and boundary through the scheduler"), false);
+	};
+	const TSet<FVoxelViewKey> FineNodes{{FIntVector::ZeroValue, 0}, {FIntVector(1000, 0, 0), 0}};
+	Manager.RebuildVolumeTransitions(FineNodes);
+	TestTrue(TEXT("Native Fine ownership does not enqueue redundant coarse topology plans"), Manager.VolumeCoveragePlans.IsEmpty());
+	TestEqual(TEXT("Fine-only topology does not occupy a coarse planning worker"), Scheduler.ActiveCount(), 0);
+	const TSet<FVoxelViewKey> Nodes{{FIntVector(2, 0, 0), 1}, {FIntVector(1000, 0, 0), 1}};
 	Manager.RebuildVolumeTransitions(Nodes);
 	TestEqual(TEXT("Distant regions have independent coverage jobs"), Manager.VolumeCoveragePlans.Num(), 2);
 	int32 Ready = 0;
@@ -89,7 +178,7 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 	{
 		const FVoxelGenerationBounds Bounds = Pair.Key.GetBounds();
 		const FVoxelCoverageBox Box{Bounds.Min, Bounds.Max};
-		TestFalse(TEXT("Uniform Fine ownership does not wait on a redundant LOD plan"),
+		TestTrue(TEXT("A topology proof alone cannot release a region with missing frozen coarse inputs"),
 			VoxelCoverage::IntersectsAny3D(Box, Manager.PendingVolumeHandoffBoxes));
 	}
 	while (Scheduler.ActiveCount() > 0 && FPlatformTime::Seconds() < Deadline)
@@ -98,13 +187,15 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 		FPlatformProcess::Sleep(0.001f);
 	}
 	Manager.RebuildVolumeTransitions(Nodes);
-	TestTrue(TEXT("Ready regions release all local handoff waits"), Manager.PendingVolumeHandoffBoxes.IsEmpty());
-	const FVoxelViewKey ReadOnlyRegion{FIntVector(15, 0, 0), 6};
+	TestFalse(TEXT("Completed topology still waits for actual body and frozen boundary preparation"), Manager.PendingVolumeHandoffBoxes.IsEmpty());
+	if (!EnsureProxyInputs(Nodes) || !PrepareTransitions(Nodes)) { Scheduler.StopAndJoin(); return false; }
+	TestTrue(TEXT("Prepared regions release all local handoff waits"), Manager.PendingVolumeHandoffBoxes.IsEmpty());
+	const FVoxelViewKey ReadOnlyRegion{FIntVector(31, 0, 0), 6};
 	const uint64 DistantSignature = Manager.VolumeCoveragePlans.FindChecked(ReadOnlyRegion).DesiredSignature;
 	Manager.bActiveCoverageFull = false;
 	Manager.ActiveDirtyCoverageRects = {{FIntPoint::ZeroValue, FIntPoint(1024, 1024)}};
 	TSet<FVoxelViewKey> WithReadOnlyNeighbors = Nodes;
-	WithReadOnlyNeighbors.Add({FIntVector(1001, 0, 0), 0});
+	WithReadOnlyNeighbors.Add({FIntVector(1001, 0, 0), 1});
 	Manager.RebuildVolumeTransitions(WithReadOnlyNeighbors);
 	TestEqual(TEXT("Read-only neighboring input cannot replace a region outside the update scope"),
 		Manager.VolumeCoveragePlans.FindChecked(ReadOnlyRegion).DesiredSignature, DistantSignature);
@@ -115,18 +206,18 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 	TMap<FVoxelViewKey, TSet<FVoxelViewKey>> Before, After;
 	FVoxelVolumeTransitionPlanner::GatherCoverageRegions(Nodes, Before);
 	TSet<FVoxelViewKey> Changed = Nodes;
-	Changed.Add({FIntVector(1, 0, 0), 0});
+	Changed.Add({FIntVector(1, 0, 0), 1});
 	FVoxelVolumeTransitionPlanner::GatherCoverageRegions(Changed, After);
-	const FVoxelViewKey Distant{FIntVector(15, 0, 0), 6};
+	const FVoxelViewKey Distant{FIntVector(31, 0, 0), 6};
 	TestTrue(TEXT("A local edit preserves distant planning inputs"),
 		Before.Contains(Distant) && After.Contains(Distant) && Before[Distant].Includes(After[Distant]) && Before[Distant].Num() == After[Distant].Num());
 	const FVoxelViewKey LocalRegion{FIntVector::ZeroValue, 6};
 	const auto InitialPlan = Manager.VolumeCoveragePlans.FindChecked(LocalRegion).Plan;
 	Changed = Nodes;
-	Changed.Add({FIntVector(8, 0, 0), 0});
+	Changed.Add({FIntVector(8, 0, 0), 1});
 	Manager.RebuildVolumeTransitions(Changed);
 	const uint64 PendingSignature = Manager.VolumeCoveragePlans.FindChecked(LocalRegion).PendingSignature;
-	Changed.Add({FIntVector(9, 0, 0), 0});
+	Changed.Add({FIntVector(9, 0, 0), 1});
 	Manager.RebuildVolumeTransitions(Changed);
 	TestTrue(TEXT("Changing topology retains its in-flight immutable plan"), PendingSignature != 0 &&
 		Manager.VolumeCoveragePlans.FindChecked(LocalRegion).PendingSignature == PendingSignature);
@@ -148,8 +239,9 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 		FPlatformProcess::Sleep(0.001f);
 	}
 	Manager.RebuildVolumeTransitions(Changed);
+	if (!EnsureProxyInputs(Changed) || !PrepareTransitions(Changed)) { Scheduler.StopAndJoin(); return false; }
 	TestTrue(TEXT("Coalesced latest topology eventually releases all handoffs"), Manager.PendingVolumeHandoffBoxes.IsEmpty());
-	Changed.Add({FIntVector(0, 0, 16), 0});
+	Changed.Add({FIntVector(0, 0, 16), 1});
 	Manager.RebuildVolumeTransitions(Changed);
 	TestFalse(TEXT("A topology change at another height cannot block ground Fine at the same XY"),
 		VoxelCoverage::IntersectsAny3D(Manager.FineCoverageBox(FIntVector::ZeroValue), Manager.PendingVolumeHandoffBoxes));
@@ -159,14 +251,7 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 		FPlatformProcess::Sleep(0.001f);
 	}
 	const TSet<FVoxelViewKey> Column{{FIntVector(0, 0, 0), 1}, {FIntVector(0, 0, 1), 1}};
-	for (const auto& Key : Column)
-	{
-		auto Data = MakeShared<FVoxelVoxelProxyData, ESPMode::ThreadSafe>();
-		Data->Key = Key;
-		Data->Geometry = {{EVoxelTerrainRepresentation::VoxelProxy, Key.Coordinate, Key.Level}, 2, -128, 256, 17, 23};
-		Data->Revision = 1;
-		Manager.VoxelProxyData.Add(Key, Data);
-	}
+	if (!EnsureProxyInputs(Column)) { Scheduler.StopAndJoin(); return false; }
 	Manager.RebuildVolumeTransitions(Column);
 	while (Scheduler.ActiveCount() > 0 && FPlatformTime::Seconds() < Deadline)
 	{
@@ -176,7 +261,7 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 	Manager.RebuildVolumeTransitions(Column);
 	TestEqual(TEXT("Same-column owners can all prepare before any publication"), Manager.DesiredVolumeSignatures.Num(), 2);
 	const FVoxelViewKey Prepared{FIntVector(0, 0, 0), 1};
-	Manager.PreparedVolumeSignatures.Add(Prepared, Manager.DesiredVolumeSignatures.FindRef(Prepared));
+	if (!PrepareTransitions(Column)) { Scheduler.StopAndJoin(); return false; }
 	Manager.RebuildVolumeTransitions(Column);
 	TestTrue(TEXT("Another unpublished owner cannot discard a prepared column result"), Manager.PreparedVolumeSignatures.Contains(Prepared));
 	Scheduler.StopAndJoin();
@@ -234,7 +319,13 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 	TestFalse(TEXT("Extending a distant handoff preserves unrelated intermediate space"),
 		Manager.CoverageAffects(Manager.FineCoverageRect(FIntVector(100, 100, 0))));
 	Manager.Reset();
-	FVoxelTaskScheduler ScopedScheduler(true);
+	TUniquePtr<FVoxelTaskScheduler> ScopedSchedulerOwner;
+	if (!CreateScheduler(8, ScopedSchedulerOwner)) return false;
+	auto& ScopedScheduler = *ScopedSchedulerOwner;
+	Module->Epoch = 8;
+	Module->Runtime = MakeUnique<FVoxelWorldRuntime>(8, true, Module->GetRegistry().ToSharedRef(),
+		Module->Generator.ToSharedRef(), ScopedScheduler.GetRuntimeResources());
+	ON_SCOPE_EXIT { ScopedScheduler.StopAndJoin(); Module->Runtime.Reset(); };
 	FVoxelViewManager ScopedManager(*Module, ScopedScheduler, 8);
 	auto& Interest = const_cast<FVoxelInterestSet&>(Module->GetCurrentInterest());
 	const FVoxelViewKey NearRoot{FIntVector::ZeroValue, 1};
@@ -259,8 +350,9 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 	for (const auto& Root : Interest.TerrainPlan.Roots)
 	{
 		auto Record = MakeShared<FVoxelCoverageRecord, ESPMode::ThreadSafe>();
-		Record->Geometry.Key = {EVoxelTerrainRepresentation::VoxelProxy, Root.Coordinate, Root.Level};
-		Record->Geometry.SampleStepCells = 2;
+		Record->Geometry = {{EVoxelTerrainRepresentation::VoxelProxy, Root.Coordinate, Root.Level}, 2,
+			Module->Manifest.Settings.MinZ, Module->Manifest.Settings.MaxZ, Module->Manifest.BaseSampleHash, Module->GetRegistry()->Hash};
+		Interest.Geometry.Add(Record->Geometry.Key, Record->Geometry);
 		const auto Bounds = Root.GetBounds(); Record->Min = Bounds.Min; Record->Max = Bounds.Max;
 		FString IndexError;
 		TestTrue(TEXT("Fixture registers each terrain root"), ScopedManager.GetInputRoot().TerrainRootIndex.Upsert(Record, IndexError));
@@ -420,7 +512,18 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelInterestInputBudgetTest,
 bool FVoxelInterestInputBudgetTest::RunTest(const FString& InParameters)
 {
 	(void)InParameters;
-	UVoxelModule* Module = NewObject<UVoxelModule>();
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	if (!TestNotNull(TEXT("Interest budget fixture has a World"), World)) return false;
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	ON_SCOPE_EXIT
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+	};
+	AMainModule* Owner = World->SpawnActor<AMainModule>();
+	if (!TestNotNull(TEXT("Interest budget fixture has its module owner"), Owner)) return false;
+	UVoxelModule* Module = NewObject<UVoxelModule>(Owner);
+	if (!TestEqual(TEXT("Fine admissions resolve the actual authority World"), Module->GetWorld(), World)) return false;
 	Module->Epoch = 9;
 	FString FixtureError;
 	if (!Module->Registry.Build({}, false, FixtureError)) return false;
@@ -428,8 +531,31 @@ bool FVoxelInterestInputBudgetTest::RunTest(const FString& InParameters)
 	Shapes->BuildDefaults();
 	Module->Shapes = Shapes;
 	Module->Generator = VoxelTest::MakeGenerator();
-	Module->Runtime = MakeUnique<FVoxelWorldRuntime>(9, false, Module->Registry.GetSnapshot().ToSharedRef(), Module->Generator.ToSharedRef());
-	FVoxelTaskScheduler Scheduler(true);
+	const auto Control = FVoxelGenerationConsumerKey::Section(9, FGuid::NewGuid(), 1, {}, 1);
+	Module->GenerationConfig = VoxelTest::MakeGenerationConfig();
+	Module->Manifest.WorldId = FGuid::NewGuid();
+	Module->Manifest.RegistryHash = Module->GetRegistry()->Hash;
+	Module->Manifest.RecipeHash = Module->GenerationConfig->Recipe->RecipeHash;
+	Module->Manifest.Settings = Module->GenerationConfig->Recipe->Settings;
+	Module->Manifest.BaseSampleHash = VoxelBinary::Mix64(FVoxelManifestCodec::RecipeFingerprint(Module->Manifest) ^
+		VoxelBinary::Mix64(Module->Manifest.RegistryHash) ^ VoxelBinary::Mix64(Module->Manifest.RecipeHash));
+	if (!TestTrue(TEXT("Fine admission fixture has its actual generation identity"), Module->Manifest.BaseSampleHash != 0)) return false;
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> GeometryResources, FactResources;
+	if (!TestTrue(TEXT("Fine budget fixture admits original geometry and fact ledgers"),
+		FVoxelTerrainResources::Create({}, Control, GeometryResources, FixtureError) &&
+		FVoxelTerrainResources::Create({}, Control, FactResources, FixtureError) &&
+		FVoxelTaskScheduler::Create(GeometryResources.ToSharedRef(), FactResources.ToSharedRef(), Control, Module->Scheduler, FixtureError))) return false;
+	ON_SCOPE_EXIT
+	{
+		Module->Scheduler->StopAndJoin();
+		Module->Runtime.Reset();
+		Module->Scheduler.Reset();
+	};
+	auto& Scheduler = *Module->Scheduler;
+	if (!TestTrue(TEXT("Fine budget fixture initializes its original scheduler epoch"), Scheduler.InitializeStatistics(9))) return false;
+	Module->Runtime = MakeUnique<FVoxelWorldRuntime>(9, true, Module->Registry.GetSnapshot().ToSharedRef(),
+		Module->Generator.ToSharedRef(), FactResources.ToSharedRef());
+	Scheduler.BindFrameContext(Module->GetTerrainFrameContext());
 	FVoxelViewManager Manager(*Module, Scheduler, 9);
 	uint64 FrameSerial = 0;
 	TSharedPtr<const FVoxelInterestSet, ESPMode::ThreadSafe> QueuedDesired;
@@ -470,6 +596,7 @@ bool FVoxelInterestInputBudgetTest::RunTest(const FString& InParameters)
 		FlushDesired();
 	};
 	FVoxelStreamingSource Source;
+	Source.Id = FGuid::NewGuid();
 	TickManager(0, {});
 	TestFalse(TEXT("Bootstrap waits for the first accepted publication snapshot"), Manager.PendingInterestSnapshot.IsValid());
 	TestFalse(TEXT("Unaccepted bootstrap state is never applied as a complete interest"), Manager.AppliedInterestSnapshot.IsValid());
@@ -586,6 +713,8 @@ bool FVoxelInterestInputBudgetTest::RunTest(const FString& InParameters)
 		EndFrame();
 		FlushDesired();
 	};
+	// 原生容器扩容留下的旧耗时尖峰必须在低预算新帧恢复，仍使用完整发布游标。
+	Manager.InterestMicrostepEstimateMilliseconds = 8.0;
 	Advance(1);
 	TestEqual(TEXT("A large interest is not applied in one publication slice"), Manager.AppliedInterestRevision, uint64(0));
 	TestTrue(TEXT("The first slice does not copy the complete Fine domain"), Manager.GetInputRoot().FineWanted.Num() < Interest.FineSections->Num());
@@ -595,6 +724,7 @@ bool FVoxelInterestInputBudgetTest::RunTest(const FString& InParameters)
 	Interest.PublicationRevision = 2;
 	QueueDesired(Interest);
 	if (!TestTrue(TEXT("Superseding 32-cell interest remains valid"), Interest.PlanningError.IsEmpty())) return false;
+	Manager.InterestMicrostepEstimateMilliseconds = 8.0;
 	for (int32 Slice = 0; Slice < 4096 && Manager.AppliedInterestRevision != 2; ++Slice) Advance(2);
 	TestEqual(TEXT("A superseded cursor converges to the latest interest"), Manager.AppliedInterestRevision, uint64(2));
 	TestTrue(TEXT("No Fine demand from the superseded interest remains"),
@@ -609,6 +739,7 @@ bool FVoxelInterestInputBudgetTest::RunTest(const FString& InParameters)
 	QueueDesired(Interest);
 	for (int32 Slice = 0; Slice < 4096 && !Manager.PendingInterestSnapshot; ++Slice) Advance(3);
 	if (!TestTrue(TEXT("A complete in-flight snapshot is retained"), Manager.PendingInterestSnapshot.IsValid())) return false;
+	bool bThirdSnapshotCompleted = false;
 	for (uint64 Revision = 4; Revision <= 8; ++Revision)
 	{
 		Source.Center.X += 16;
@@ -616,12 +747,19 @@ bool FVoxelInterestInputBudgetTest::RunTest(const FString& InParameters)
 		Interest.PublicationRevision = Revision;
 		QueueDesired(Interest);
 		Advance(Revision);
-		TestEqual(TEXT("Moving layouts cannot restart the in-flight input"), Manager.PendingInterestSnapshot->PublicationRevision, uint64(3));
+		bThirdSnapshotCompleted |= Manager.AppliedInterestRevision == 3;
+		if (!bThirdSnapshotCompleted)
+		{
+			if (!TestTrue(TEXT("Moving layouts retain the unfinished original snapshot"), Manager.PendingInterestSnapshot.IsValid())) return false;
+			TestEqual(TEXT("Moving layouts cannot restart the in-flight input"), Manager.PendingInterestSnapshot->PublicationRevision, uint64(3));
+		}
 	}
 	for (int32 Slice = 0; Slice < 8192 && Manager.AppliedInterestRevision != 8; ++Slice)
 	{
 		Advance(8);
+		bThirdSnapshotCompleted |= Manager.AppliedInterestRevision == 3;
 	}
+	TestTrue(TEXT("The original moving snapshot completes before its queued successors"), bThirdSnapshotCompleted);
 	TestEqual(TEXT("The latest of several moving layouts is eventually adopted"), Manager.AppliedInterestRevision, uint64(8));
 	TestTrue(TEXT("Latest layout owns the complete Fine partition"),
 		Manager.GetInputRoot().FineWanted.Num() == Interest.FineSections->Num() && Manager.GetInputRoot().FineWanted.Difference(*Interest.FineSections).IsEmpty());
@@ -639,12 +777,12 @@ bool FVoxelInterestInputBudgetTest::RunTest(const FString& InParameters)
 		TickManager(8, {});
 	TestTrue(TEXT("An uncommitted publication cannot consume every shared operation and starve actual Fine mesh admission"),
 		Scheduler.ActiveCount() > 0 || !Manager.FineReady.IsEmpty());
-	const FIntVector RebuildKey = Interest.FineSections->Array()[0];
+	const FIntVector RebuildKey = Source.Center / 16;
+	if (!TestTrue(TEXT("Neighbor rebuild uses an interior demanded F0 section"), Interest.FineSections->Contains(RebuildKey))) return false;
 	FVoxelSection* RebuildSection = Module->Runtime->FindSection(RebuildKey);
 	Manager.Reset();
-	Manager.AppliedInterestSnapshot = Module->CurrentInterest;
-	Manager.AppliedInterestRevision = 8;
-	Manager.GetInputRoot().FineWanted.Add(RebuildKey);
+	for (int32 Slice = 0; Slice < 4096 && Manager.AppliedInterestRevision != 8; ++Slice) Advance(8);
+	if (!TestEqual(TEXT("Reset restores the complete admission snapshot"), Manager.AppliedInterestRevision, uint64(8))) return false;
 	Manager.FineReady.Add(RebuildKey);
 	Manager.FineRevisions.Add(RebuildKey, RebuildSection->CommittedRevision);
 	Manager.InvalidateNeighbors(RebuildKey - FIntVector(1, 0, 0));
@@ -652,17 +790,19 @@ bool FVoxelInterestInputBudgetTest::RunTest(const FString& InParameters)
 	FVoxelViewAdmission RebuildAdmission;
 	RebuildAdmission.Kind = EVoxelViewAdmissionKind::Fine;
 	RebuildAdmission.FineKey = RebuildKey;
-	Manager.TrySubmitAdmission(RebuildAdmission);
-	FVoxelTaskStamp RebuildStamp;
-	RebuildStamp.WorldEpoch = 9;
-	RebuildStamp.Token = RebuildSection->Stamp.Token;
-	RebuildStamp.Revision = RebuildSection->CommittedRevision;
-	RebuildStamp.Section = RebuildKey;
+	const FVoxelFineShardKey RebuildShard{RebuildKey * 16, 16};
+	for (int32 Step = 0; Step < 16; ++Step)
+	{
+		Manager.TrySubmitAdmission(RebuildAdmission);
+		const auto* Slot = Manager.FineShardSlots.Find(RebuildShard);
+		if (Slot && Slot->bSubmitted) break;
+	}
+	const auto* RebuiltSlot = Manager.FineShardSlots.Find(RebuildShard);
 	TestTrue(TEXT("Unchanged section revision still rebuilds invalidated neighbor geometry"),
-		Manager.FineReady.Contains(RebuildKey) || Scheduler.Has(RebuildStamp, EVoxelTaskKind::BuildFineMesh));
+		RebuiltSlot && RebuiltSlot->bSubmitted && Scheduler.Has(RebuiltSlot->SubmittedStamp, EVoxelTaskKind::BuildFineShard));
 	Manager.Reset();
-	Manager.AppliedInterestSnapshot = Module->CurrentInterest;
-	Manager.AppliedInterestRevision = 8;
+	for (int32 Slice = 0; Slice < 4096 && Manager.AppliedInterestRevision != 8; ++Slice) Advance(8);
+	if (!TestEqual(TEXT("Retirement fixture restores complete admission state"), Manager.AppliedInterestRevision, uint64(8))) return false;
 	Interest.PublicationRevision = 9;
 	QueueDesired(Interest);
 	Advance(9);

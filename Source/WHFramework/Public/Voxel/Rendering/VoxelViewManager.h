@@ -379,6 +379,7 @@ private:
 	friend class FVoxelFineProxyDependenciesTest;
 	friend class FVoxelFinePageCoverageTest;
 	friend class FVoxelKnownEmptyPageIntegrationTest;
+	friend class FVoxelDeferredRepresentationAdmissionTest;
 #endif
 	void UpdateWantedTimestamps(double InNow);
 	bool IsCriticalDependency(const FVoxelViewAdmission& InAdmission) const;
@@ -406,6 +407,7 @@ private:
 	bool IsPreparedDataCurrent(const FVoxelTaskKey& InKey) const;
 	FVoxelTaskStamp MakeRepresentationStamp(const FVoxelTerrainGeometry& InGeometry, uint64 InRevision) const;
 	bool IsRepresentationStampCurrent(const FVoxelTaskStamp& InStamp) const;
+	bool HasDeferredRepresentation(const FVoxelTaskStamp& InStamp) const;
 	void PrunePreparedData();
 	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> RetainPreparedEnvironment(
 		const FVoxelTaskKey& InKey, const FVoxelGenerationPipeline& InGenerator,
@@ -531,7 +533,13 @@ private:
 	FGuid TaskOwnerId = FGuid::NewGuid();
 	uint64 TaskOwnerIncarnation = 1;
 	mutable uint64 NextRepresentationAttempt = 0;
-	mutable TMap<FVoxelTerrainSpatialKey, FVoxelTaskStamp> RepresentationAttempts;
+	struct FRepresentationAttempt
+	{
+		FVoxelTaskStamp Stamp;
+		// Scheduler 交出结果后，覆盖回调消费前仍属于同一请求。
+		EVoxelTaskKind DeferredKind = EVoxelTaskKind::None;
+	};
+	mutable TMap<FVoxelTerrainSpatialKey, FRepresentationAttempt> RepresentationAttempts;
 	uint64 AppliedInterestRevision = 0;
 	bool bTerrainBuildStageDirty = true;
 	bool bTaskPrioritiesDirty = false;

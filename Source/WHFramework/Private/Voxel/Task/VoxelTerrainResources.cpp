@@ -1,4 +1,4 @@
-﻿#include "Voxel/Task/VoxelTerrainResources.h"
+#include "Voxel/Task/VoxelTerrainResources.h"
 
 #include "Misc/ScopeLock.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
@@ -458,6 +458,36 @@ FVoxelTerrainResourceSnapshot FVoxelTerrainResources::Snapshot() const
 {
 	FScopeLock Lock(&Mutex);
 	return State;
+}
+
+FVoxelTerrainResourceGrantDiagnostics FVoxelTerrainResources::SnapshotGrants(
+	const EVoxelTerrainResourcePool InPool,
+	const TArrayView<FVoxelTerrainResourceGrantSnapshot> OutLargest) const
+{
+	FScopeLock Lock(&Mutex);
+	FVoxelTerrainResourceGrantDiagnostics Result;
+	Result.Resources = State;
+	if (InPool >= EVoxelTerrainResourcePool::Count) return Result;
+	const int32 Capacity = FMath::Min(16, OutLargest.Num());
+	for (const auto& Pair : Entries)
+	{
+		const FEntry& Entry = Pair.Value;
+		if (Entry.Pool != InPool) continue;
+		const int32 Kind = int32(Entry.Attempt.Kind);
+		check(Kind >= 0 && Kind < FVoxelTerrainResourceGrantDiagnostics::ConsumerKindCount);
+		Result.ConsumerBytes[Kind] += Entry.Bytes;
+		++Result.ConsumerLeaseCounts[Kind];
+		if (!Capacity || !Entry.Bytes) continue;
+		int32 Index = Result.LargestCount;
+		while (Index > 0 && (OutLargest[Index - 1].Bytes < Entry.Bytes ||
+			(OutLargest[Index - 1].Bytes == Entry.Bytes && OutLargest[Index - 1].Serial > Pair.Key))) --Index;
+		if (Index >= Capacity) continue;
+		for (int32 Move = FMath::Min(Result.LargestCount, Capacity - 1); Move > Index; --Move)
+			OutLargest[Move] = OutLargest[Move - 1];
+		OutLargest[Index] = {Pair.Key, Entry.Attempt, Entry.Bytes, Entry.bPublished};
+		Result.LargestCount = FMath::Min(Result.LargestCount + 1, Capacity);
+	}
+	return Result;
 }
 
 EVoxelTerrainResourcePool FVoxelTerrainResources::GetPool(const uint64 InSerial) const

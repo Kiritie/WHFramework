@@ -29,4 +29,12 @@ public:
 		const FVoxelShapeRegistry& InShapes,
 		FVoxelSectionCollisionResult& OutResult,
 		const TAtomic<bool>* InCancel = nullptr);
+
+private:
+	static bool VisitBoxes(
+		const FVoxelSectionSnapshot& InSnapshot,
+		const FVoxelRegistrySnapshot& InRegistry,
+		const FVoxelShapeRegistry& InShapes,
+		TFunctionRef<bool(const FBox&)> InVisit,
+		const TAtomic<bool>* InCancel);
 };

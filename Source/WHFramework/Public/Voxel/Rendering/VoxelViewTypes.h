@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
@@ -44,7 +44,7 @@ struct WHFRAMEWORK_API FVoxelViewKey
 
 FORCEINLINE uint32 GetTypeHash(const FVoxelViewKey& InKey)
 {
-	return HashCombineFast(::GetTypeHash(InKey.Coordinate), ::GetTypeHash(InKey.Level));
+	return HashCombineFast(UE::Math::GetTypeHash(InKey.Coordinate), ::GetTypeHash(InKey.Level));
 }
 
 struct WHFRAMEWORK_API FVoxelSurfaceTileKey
@@ -57,7 +57,7 @@ struct WHFRAMEWORK_API FVoxelSurfaceTileKey
 
 FORCEINLINE uint32 GetTypeHash(const FVoxelSurfaceTileKey& InKey)
 {
-	return HashCombineFast(::GetTypeHash(InKey.Coordinate), ::GetTypeHash(InKey.Level));
+	return HashCombineFast(UE::Math::GetTypeHash(InKey.Coordinate), ::GetTypeHash(InKey.Level));
 }
 
 struct WHFRAMEWORK_API FVoxelMacroTileKey
@@ -70,7 +70,7 @@ struct WHFRAMEWORK_API FVoxelMacroTileKey
 
 FORCEINLINE uint32 GetTypeHash(const FVoxelMacroTileKey& InKey)
 {
-	return HashCombineFast(::GetTypeHash(InKey.Coordinate), ::GetTypeHash(InKey.Level));
+	return HashCombineFast(UE::Math::GetTypeHash(InKey.Coordinate), ::GetTypeHash(InKey.Level));
 }
 
 enum class EVoxelViewAdmissionKind : uint8

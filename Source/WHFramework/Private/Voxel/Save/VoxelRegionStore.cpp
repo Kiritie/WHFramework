@@ -1,4 +1,4 @@
-﻿#include "Voxel/Save/VoxelRegionStore.h"
+#include "Voxel/Save/VoxelRegionStore.h"
 
 #include "HAL/FileManager.h"
 #include "Misc/Crc.h"
@@ -585,8 +585,9 @@ bool FVoxelRegionStore::BuildDirectory(const FString& InDirectory,
 	if (Snapshot->ResourceLease)
 	{
 		const uint64 Actual = VoxelBoundedAllocation::SharedBytes<FVoxelRegionDirectorySnapshot>() +
-			Snapshot->Records.GetAllocatedSize() + Snapshot->Regions.GetAllocatedSize() + Snapshot->RegionOrder.GetAllocatedSize() +
-			Snapshot->SpatialNodes.GetAllocatedSize() + Snapshot->SceneColumns.GetAllocatedSize();
+			VoxelGenerationAllocation::AllocatedBytes(Snapshot->Records) + VoxelGenerationAllocation::AllocatedBytes(Snapshot->Regions) +
+			VoxelGenerationAllocation::AllocatedBytes(Snapshot->RegionOrder) + VoxelGenerationAllocation::AllocatedBytes(Snapshot->SpatialNodes) +
+			VoxelGenerationAllocation::AllocatedBytes(Snapshot->SceneColumns);
 		check(Actual <= MetadataBytes);
 		verify(Snapshot->ResourceLease->Resize(Actual));
 	}

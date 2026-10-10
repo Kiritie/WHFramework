@@ -343,7 +343,24 @@ bool FVoxelNavigationNativeTileTest::RunTest(const FString& InParameters)
 	RunningQuery = {};
 	FPathFindingQuery ActiveQuery(Module, *Data, FVector(100., 100., 400.), FVector(300., 300., 400.));
 	auto ActiveResult = Data->ANavigationData::FindPath(ActiveQuery.NavAgentProperties, ActiveQuery);
-	if (!TestTrue(TEXT("建立实际活动路径用于寿命验证"), ActiveResult.IsSuccessful() && ActiveResult.Path && ActiveResult.Path->IsValid())) return false;
+	// Section 中心的当前 tile 就绪不代表两个端点的异步 tile 都已提交；等待原生路径自身的完成证明。
+	if (!TestTrue(TEXT("建立实际活动路径用于寿命验证"), Pump([&]()
+	{
+		ActiveResult = Data->ANavigationData::FindPath(ActiveQuery.NavAgentProperties, ActiveQuery);
+		return ActiveResult.IsSuccessful() && ActiveResult.Path && ActiveResult.Path->IsValid();
+	})))
+	{
+		FNavLocation StartNode, EndNode;
+		const bool bStartProjected = Navigation->ProjectPointToNavigation(ActiveQuery.StartLocation, StartNode, Data->GetDefaultQueryExtent(), Data);
+		const bool bEndProjected = Navigation->ProjectPointToNavigation(ActiveQuery.EndLocation, EndNode, Data->GetDefaultQueryExtent(), Data);
+		AddInfo(FString::Printf(TEXT("Native active path: result=%d ready=%d valid=%d points=%d admission=%d deferred=%d worldClose=%d tiles=%d pathInputs=%d startProjected=%d endProjected=%d startCurrent=%d endCurrent=%d navReady=%d"),
+			int32(ActiveResult.Result), ActiveResult.Path && ActiveResult.Path->IsReady(), ActiveResult.Path && ActiveResult.Path->IsValid(),
+			ActiveResult.Path ? ActiveResult.Path->GetPathPoints().Num() : 0, Data->bQueryAdmissionOpen.Load(), Data->HasDeferredNativeWrite(),
+			Data->bWorldCloseRequested, Data->CommittedTiles.Num(), Data->PathInputs.Num(), bStartProjected, bEndProjected,
+			bStartProjected && Data->HasCurrentTileForNode(StartNode.NodeRef, FindSurface()->GetSurface().InputVersion),
+			bEndProjected && Data->HasCurrentTileForNode(EndNode.NodeRef, FindSurface()->GetSurface().InputVersion), Module->IsNavigationReady(Lower)));
+		return false;
+	}
 	ActiveResult.Path->EnableRecalculationOnInvalidation(false);
 	Module->NavigationPresenter->RetireSection(Lower);
 	TestTrue(TEXT("Nav Source撤销时实际路径仍保留lower/upper与物理需求"),

@@ -1,4 +1,4 @@
-﻿#include "Voxel/Rendering/VoxelViewPublisher.h"
+#include "Voxel/Rendering/VoxelViewPublisher.h"
 
 #include "GameFramework/Actor.h"
 #include "Voxel/Rendering/VoxelTerrainCoarseMesh.h"
@@ -98,9 +98,24 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 {
 	(void)InOutPreparedComponents;
 	FUpdate& Update = InPublication->Updates[InIndex];
-	bOutComplete = Update.NativeMesh.IsValid() || !Update.Actor.IsValid();
+	if (Update.Source && Update.Source->Stamp.bHasGeometryIdentity && Update.Source->Stamp != Update.NativeStamp) return false;
+	const bool* Hidden = InPublication->Visibility.Find(Update.Actor);
+	const bool bVisibilityChange = Hidden && Update.Actor.IsValid() && Update.Actor->IsHidden() != *Hidden;
+	if (!Update.bSourceDirty && !Update.NativeMesh)
+		if (const auto* Entry = Entries.Find(Update.Actor); Entry && Entry->NativeMesh &&
+			Entry->PresentedSource == Update.Source && Entry->PresentedNativeStamp == Update.NativeStamp &&
+			Entry->NativeMesh->WorldCellOrigin == Update.Location / Module.BlockSize() &&
+			Entry->NativeMesh->CellScale == Update.Scale / Module.BlockSize()) Update.NativeMesh = Entry->NativeMesh;
+	if (Update.NativeMesh && (Update.NativeMesh->Source != Update.Source || Update.NativeMesh->Stamp != Update.NativeStamp ||
+		Update.NativeMesh->WorldCellOrigin != Update.Location / Module.BlockSize() ||
+		Update.NativeMesh->CellScale != Update.Scale / Module.BlockSize())) Update.NativeMesh.Reset();
+	bOutComplete = (Update.bUnchanged && !bVisibilityChange) || Update.NativeMesh.IsValid() || !Update.Actor.IsValid();
 	if (bOutComplete || Update.bNativeMeshPending || FPlatformTime::Seconds() >= InDeadline) return true;
-	if (!Update.Source || !IsNativeGeometryCurrent(Update.NativeStamp) || (MeshValidator && !MeshValidator(*Update.Source))) return false;
+	// 保留前代尚未完成的正文，等待该代提交后复用其索引，不能再建同一源。
+	if (Update.bRetainSource && !Update.bSourceDirty) return true;
+	if (!Update.Source || !IsNativeGeometryCurrent(Update.NativeStamp) ||
+		(Update.Source->Stamp.bHasGeometryIdentity && Update.Source->Stamp != Update.NativeStamp) ||
+		(MeshValidator && !MeshValidator(*Update.Source))) return false;
 	const auto Resources = Scheduler.GetTerrainResources();
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(WorldEpoch, NativeOwnerId,
 		InPublication->Serial, FIntVector(MIN_int32, 7, InIndex), Update.NativeStamp.Token);
@@ -195,6 +210,13 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 		auto& Target = InPublication->Updates[InIndex];
 		if (Target.NativeStamp != Stamp) return;
 		Target.bNativeMeshPending = false;
+		if (InResult.bCanceled && InResult.Stamp.WorldEpoch == WorldEpoch && IsNativeGeometryCurrent(Stamp) &&
+			!Scheduler.IsTerminal({InResult.Kind, InResult.Stamp}))
+		{
+			Target.bNativeAdmissionWaiting = false;
+			QueueReadyGroup(InPublication, Target.GroupIndex);
+			return;
+		}
 		if (!InResult.bSuccess || InResult.bCanceled || InResult.Stamp.WorldEpoch != WorldEpoch || !IsNativeGeometryCurrent(Stamp))
 		{
 			const bool bTerminal = Scheduler.IsTerminal({InResult.Kind, InResult.Stamp}) ||
@@ -224,6 +246,11 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 
 bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublication, FGroup& InGroup)
 {
+	if (InGroup.VisibilityActors.IsEmpty() && !InGroup.UpdateIndices.ContainsByPredicate([&InPublication](const int32 Index)
+	{
+		const auto& Update = InPublication->Updates[Index];
+		return Update.Actor.IsValid() && !Update.bUnchanged && Update.bSourceDirty;
+	})) return true;
 	const auto NativeResources = Scheduler.GetTerrainResources();
 	struct FNativeGroupSources
 	{
@@ -246,6 +273,11 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 				{
 					Visit(Update.NativeMesh->MetadataLease);
 					if (Update.NativeMesh->Source) FVoxelTerrainRenderer::VisitMeshSources(*Update.NativeMesh->Source, Context.Resources, InVisit);
+				}
+				if (const auto* Entry = Context.Owner.Entries.Find(Update.Actor); Entry && Entry->NativeMesh)
+				{
+					Visit(Entry->NativeMesh->MetadataLease);
+					if (Entry->NativeMesh->Source) FVoxelTerrainRenderer::VisitMeshSources(*Entry->NativeMesh->Source, Context.Resources, InVisit);
 				}
 			}
 			for (const auto& Group : Context.Publication.Groups)
@@ -391,7 +423,7 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 	}
 	const int32 UpdateIndex = InGroup.UpdateIndices[InGroup.NativeSourceCursor];
 	const auto& Update = InPublication->Updates[UpdateIndex];
-	if (!Update.Actor.IsValid())
+	if (!Update.Actor.IsValid() || ((!Update.bSourceDirty || Update.bUnchanged) && !InPublication->Visibility.Contains(Update.Actor)))
 	{
 		++InGroup.NativeSourceCursor;
 		return false;
@@ -399,13 +431,25 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 	if (!Update.NativeMesh) return false;
 	const bool* Hidden = InPublication->Visibility.Find(Update.Actor);
 	const bool bRemove = Hidden && *Hidden;
+	const auto* Entry = Entries.Find(Update.Actor);
+	if (!Entry) { DiscardPublication(InPublication, false); return false; }
+	if (bRemove && (!Entry->bPresented || Update.Actor->IsHidden()))
+	{
+		++InGroup.NativeSourceCursor;
+		return false;
+	}
+	// 移除当前根中的旧几何；本代新源只保留为下一次显示的不可变正文。
+	const auto RenderGeometry = bRemove ? Entry->NativeMesh : Update.NativeMesh;
+	if (!RenderGeometry || !RenderGeometry->Source) { DiscardPublication(InPublication, false); return false; }
+	const auto& RenderSource = RenderGeometry->Source;
+	const auto& RenderStamp = RenderGeometry->Stamp;
 	const auto Resources = Scheduler.GetTerrainResources();
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(WorldEpoch, NativeOwnerId, InPublication->Serial,
 		Update.NativeStamp.GeometryIdentity.Key.Coordinate, Update.NativeStamp.Token);
 	if (!InGroup.NativeCoarse)
 	{
 		const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelTerrainRenderCoarse>() +
-			VoxelBoundedAllocation::ArrayBytes<TSharedPtr<const FVoxelTerrainRenderChunk, ESPMode::ThreadSafe>>(Update.Source->Batches.Num());
+			VoxelBoundedAllocation::ArrayBytes<TSharedPtr<const FVoxelTerrainRenderChunk, ESPMode::ThreadSafe>>(RenderSource->Batches.Num());
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 		const uint64 BeforeAdmission = Resources->ReleaseVersionExcludingOwner(Consumer);
 		FVoxelGenerationRequiredCapacity Required;
@@ -423,18 +467,12 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 		}
 		auto Item = VoxelBoundedAllocation::MakeWorkerShared<FVoxelTerrainRenderCoarse>(Lease);
 		Item->MetadataLease = MoveTemp(Lease);
-		const auto* Entry = Entries.Find(Update.Actor);
-		if (!Entry)
-		{
-			RejectNativeAdmission(EVoxelTerrainResourceAdmission::InvalidRequest, Consumer, BeforeAdmission, false);
-			return false;
-		}
 		Item->SourceId = Entry->NativeSourceId;
-		Item->bBoundaryOnly = Update.bTransition;
-		Item->Geometry = Update.NativeMesh;
-		Item->SourceChunks.Reserve(Update.Source->Batches.Num());
-		Item->SourceChunks.SetNum(Update.Source->Batches.Num());
-		const auto& Input = Update.NativeStamp;
+		Item->bBoundaryOnly = bRemove ? Entry->bTransition : Update.bTransition;
+		Item->Geometry = RenderGeometry;
+		Item->SourceChunks.Reserve(RenderSource->Batches.Num());
+		Item->SourceChunks.SetNum(RenderSource->Batches.Num());
+		const auto& Input = RenderStamp;
 		FIntVector Min;
 		FIntVector Max;
 		if (!Input.GeometryIdentity.Key.TryBounds(Input.GeometryIdentity.WorldMinZ, Input.GeometryIdentity.WorldMaxZ, Min, Max))
@@ -449,10 +487,10 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 			Input.OwnerId, Input.OwnerIncarnation};
 		Item->Evidence.Content = {WorldEpoch, Input.GeometryIdentity.GeneratorIdentity, Module.GetManifest().RecipeHash,
 			Module.GetRegistry()->Hash, Module.GetShapes()->GetContentHash(), Input.Revision, Input.Revision,
-			Input.Token, Update.NativeMesh->GeometryIdentity, Input.GeometryIdentity.SampleStepCells};
+			Input.Token, RenderGeometry->GeometryIdentity, Input.GeometryIdentity.SampleStepCells};
 		Item->Evidence.bGeometryReady = Item->Evidence.bCanStage = true;
-		Item->Evidence.bKnownEmpty = !Update.Source->Batches.ContainsByPredicate([](const auto& Batch) { return !Batch.Mesh.Triangles.IsEmpty(); });
-		Item->Evidence.GeometryLease = Update.NativeMesh;
+		Item->Evidence.bKnownEmpty = !RenderSource->Batches.ContainsByPredicate([](const auto& Batch) { return !Batch.Mesh.Triangles.IsEmpty(); });
+		Item->Evidence.GeometryLease = RenderGeometry;
 		InGroup.NativeCoarse = MoveTemp(Item);
 		return false;
 	}

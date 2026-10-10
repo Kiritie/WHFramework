@@ -1,4 +1,4 @@
-﻿#if WITH_DEV_AUTOMATION_TESTS
+#if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
 #include "Voxel/Rendering/VoxelTerrainStatistics.h"
@@ -305,23 +305,7 @@ bool FVoxelEmergeCapacityContinuationTest::RunTest(const FString&)
 	TestTrue(TEXT("容量事件恢复原输出"), Manager.RequestSection(Key, Demand));
 	TestTrue(TEXT("恢复后清空预授予完成槽"), Section->PendingPublish->Kind == EVoxelTaskKind::None);
 	TestEqual(TEXT("真实接纳才计Used"), Scheduler.GetTerrainStatistics()->GetWorkAccounting().Used, Used + 1);
-	const FVoxelSectionStamp Old = Section->Stamp;
-	TestTrue(TEXT("无修改Section可退休"), Runtime.RemoveSection(Key));
-	Section = Runtime.FindOrAllocate(Key, 2);
-	if (!Section) return false;
-	FVoxelTaskResult Late;
-	Late.Kind = EVoxelTaskKind::GenerateExactBase;
-	Late.bSuccess = true;
-	Late.Stamp.OwnerId = Manager.GenerationOwnerId;
-	Late.Stamp.OwnerIncarnation = Old.Token;
-	Late.Stamp.WorldEpoch = Old.Epoch;
-	Late.Stamp.Token = Old.Token;
-	Late.Stamp.Section = Key;
-	Late.Stamp.Revision = Consumer.RequestSerial;
-	Late.BaseBlocks.Init(FVoxelBlockState(), 4096);
-	Manager.OnTask(MoveTemp(Late));
-	TestTrue(TEXT("旧代结果不能写入新代或完成槽"), Section->Status == EVoxelSectionStatus::Allocated &&
-		Section->PendingPublish->Kind == EVoxelTaskKind::None && !Section->BaseBlocks);
+	// 在撤销夹具完成前保留已接纳的实际 Section；异步退休不能改变填满后的容量前置条件。
 	const FIntVector CanceledKey(4, 0, 0);
 	auto* CanceledSection = Runtime.FindOrAllocate(CanceledKey, 2);
 	if (!CanceledSection) return false;
@@ -351,6 +335,23 @@ bool FVoxelEmergeCapacityContinuationTest::RunTest(const FString&)
 	TestTrue(TEXT("撤销前输出完整保留在完成槽"), CanceledSection->PendingPublish->WorkReceipt.IsValid());
 	TestTrue(TEXT("无需求的容量等待输出可以退休"), Runtime.RemoveSection(CanceledKey));
 	Blocker.Reset();
+	const FVoxelSectionStamp Old = Section->Stamp;
+	TestTrue(TEXT("无修改Section可退休"), Runtime.RemoveSection(Key));
+	Section = Runtime.FindOrAllocate(Key, 2);
+	if (!Section) return false;
+	FVoxelTaskResult Late;
+	Late.Kind = EVoxelTaskKind::GenerateExactBase;
+	Late.bSuccess = true;
+	Late.Stamp.OwnerId = Manager.GenerationOwnerId;
+	Late.Stamp.OwnerIncarnation = Old.Token;
+	Late.Stamp.WorldEpoch = Old.Epoch;
+	Late.Stamp.Token = Old.Token;
+	Late.Stamp.Section = Key;
+	Late.Stamp.Revision = Consumer.RequestSerial;
+	Late.BaseBlocks.Init(FVoxelBlockState(), 4096);
+	Manager.OnTask(MoveTemp(Late));
+	TestTrue(TEXT("旧代结果不能写入新代或完成槽"), Section->Status == EVoxelSectionStatus::Allocated &&
+		Section->PendingPublish->Kind == EVoxelTaskKind::None && !Section->BaseBlocks);
 	FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FWaitForDiscard>(
 		Scheduler.GetTerrainStatistics().ToSharedRef(), Discarded + 1, *this));
 	return true;

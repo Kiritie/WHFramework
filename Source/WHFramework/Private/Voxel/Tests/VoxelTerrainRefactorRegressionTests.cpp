@@ -1,11 +1,16 @@
-﻿#include "CoreMinimal.h"
+#include "CoreMinimal.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Misc/ScopeExit.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "Main/MainModule.h"
+#include "HAL/PlatformProcess.h"
+#include "Voxel/Geometry/VoxelShapeRegistry.h"
+#include "Voxel/Voxels/Data/VoxelData.h"
 #include "Voxel/Rendering/VoxelCoverageIndex.h"
 #include "Voxel/Rendering/VoxelCoverage.h"
 #include "Voxel/Rendering/VoxelPublishBudget.h"
@@ -30,7 +35,7 @@ bool FVoxelInterestFineLayoutRevisionTest::RunTest(const FString& InParameters)
 	FVoxelInterestRuntime Runtime;
 	FVoxelWorldManifest Manifest;
 	FVoxelViewSettings Settings;
-	Settings.Lod.MaximumFineLevel = 2;
+	Settings.Fine.MaximumPageLevel = 2;
 
 	FVoxelStreamingSource Source;
 	Source.Id = FGuid::NewGuid();
@@ -44,7 +49,18 @@ bool FVoxelInterestFineLayoutRevisionTest::RunTest(const FString& InParameters)
 	FVoxelInterestSet First;
 	FVoxelInterestDelta Delta;
 	bool bSnapshot = false;
-	TestTrue(TEXT("Initial interest changes"), Runtime.Update(MakeArrayView(&Source, 1), Manifest, Settings, First, Delta, bSnapshot));
+	const auto Advance = [&](FVoxelInterestSet& OutInterest)
+	{
+		bool bChanged = false;
+		for (int32 Step = 0; Step < 512; ++Step)
+		{
+			bChanged |= Runtime.Update(MakeArrayView(&Source, 1), Manifest, Settings, OutInterest, Delta, bSnapshot);
+			if (bSnapshot || !Runtime.GetPlanningError().IsEmpty() || !Runtime.GetCoarsePlanningPending()) break;
+		}
+		if (!bSnapshot) AddError(FString::Printf(TEXT("Layout fixture planning failed: %s"), *Runtime.GetPlanningError()));
+		return bChanged;
+	};
+	TestTrue(TEXT("Initial interest changes"), Advance(First));
 	if (!TestTrue(TEXT("Initial snapshot exists"), bSnapshot) || !TestTrue(TEXT("Initial Fine set exists"), First.FineSections.IsValid()) ||
 		!TestTrue(TEXT("Initial Fine page plan exists"), First.FinePagePlan.IsValid()))
 	{
@@ -57,12 +73,12 @@ bool FVoxelInterestFineLayoutRevisionTest::RunTest(const FString& InParameters)
 	// 只改变 Page 最大合并级，不改变 Source 中心、FineRadius、ExactRadius、
 	// CollisionRadius 或任何需求范围。旧实现会得到新的 FinePagePlan，
 	// 但因为 logical demand/geometry/priorities 都相同而返回 bChanged=false。
-	Settings.Lod.MaximumFineLevel = 3;
+	Settings.Fine.MaximumPageLevel = 3;
 
 	FVoxelInterestSet Second;
 	Delta.Reset();
 	bSnapshot = false;
-	const bool bChanged = Runtime.Update(MakeArrayView(&Source, 1), Manifest, Settings, Second, Delta, bSnapshot);
+	const bool bChanged = Advance(Second);
 
 	if (!TestTrue(TEXT("Layout-only policy update produces accepted change"), bChanged && bSnapshot) ||
 		!TestTrue(TEXT("Updated Fine set exists"), Second.FineSections.IsValid()) ||
@@ -195,6 +211,17 @@ bool FVoxelFineShardAttemptIsolationTest::RunTest(const FString& InParameters)
 	Slot.SubmittedStamp.WorldEpoch = 11;
 	Slot.SubmittedStamp.Token = Current.Serial;
 	Slot.bSubmitted = true;
+	const auto Resources = Scheduler.GetTerrainResources();
+	const int32 OriginalLeaseCount = Resources->Snapshot().LeaseCount;
+	const auto RetainSamplingProgress = [&]()
+	{
+		if (Resources->TryAcquire(Slot.Consumer, EVoxelTerrainResourcePool::Input, 65536,
+			Slot.SamplesReadyLease) != EVoxelTerrainResourceAdmission::Granted) return false;
+		Slot.SamplesReady = MakeShared<TAtomic<bool>, ESPMode::ThreadSafe>(true);
+		return true;
+	};
+	if (!TestTrue(TEXT("采样进度持有原输入租约"), RetainSamplingProgress())) return false;
+	const uint64 OriginalProgressSerial = Slot.SamplesReadyLease->Serial();
 	Manager.InvalidateFinePageLayout(Other);
 	const uint64 ContentVersion = Slot.Build.GetInput().MeshRevision;
 	const uint64 TopologyVersion = Slot.Build.GetTopologyRevision();
@@ -209,28 +236,49 @@ bool FVoxelFineShardAttemptIsolationTest::RunTest(const FString& InParameters)
 	Manager.ApplyFineShardResult(Key, Old, OldConsumer, MoveTemp(Late));
 	TestTrue(TEXT("Late original-consumer callback cannot clear the real new Shard attempt"),
 		Slot.bSubmitted && Slot.Build.GetPendingAttempt().IsSet() && Slot.Build.GetPendingAttempt().GetValue() == Current);
+	TestTrue(TEXT("迟到回调保留新采样进度与原租约"), Slot.SamplesReady && Slot.SamplesReady->Load() &&
+		Slot.SamplesReadyLease && Slot.SamplesReadyLease->Serial() == OriginalProgressSerial);
+	const auto CanceledConsumer = Slot.Consumer;
 	FVoxelTaskResult Cancelled;
 	Cancelled.Stamp = Slot.SubmittedStamp;
 	Cancelled.bCanceled = true;
+	Cancelled.InputResourceLease = Slot.SamplesReadyLease;
 	Manager.ApplyFineShardResult(Key, Current, Slot.Consumer, MoveTemp(Cancelled));
 	TestFalse(TEXT("Matching native cancellation releases its original attempt"), Slot.Build.GetPendingAttempt().IsSet());
 	TestTrue(TEXT("Matching native cancellation permits retained demand retry"), Slot.Build.GetFailure().IsEmpty() && !Slot.bSubmitted);
+	TestTrue(TEXT("匹配完成撤销槽对整个工作输入的额外持有"), !Slot.SamplesReady && !Slot.SamplesReadyLease);
+	TestEqual(TEXT("原结果仍存活时输入没有提前退款"), Resources->Snapshot().LeaseCount, OriginalLeaseCount + 1);
+	Cancelled.InputResourceLease.Reset();
+	TestEqual(TEXT("原结果退出后工作输入真实归还"), Resources->Snapshot().LeaseCount, OriginalLeaseCount);
 	const auto FailedAttempt = Slot.Build.BeginAttempt();
 	Slot.Consumer.RequestSerial = FailedAttempt.Serial;
 	Slot.SubmittedStamp.Token = FailedAttempt.Serial;
 	Slot.bSubmitted = true;
+	if (!TestTrue(TEXT("同内容重试取得独立原输入授予"), RetainSamplingProgress())) return false;
+	const uint64 RetryProgressSerial = Slot.SamplesReadyLease->Serial();
+	FVoxelTaskResult LateCancellation;
+	LateCancellation.Stamp = Cancelled.Stamp;
+	LateCancellation.bCanceled = true;
+	Manager.ApplyFineShardResult(Key, Current, CanceledConsumer, MoveTemp(LateCancellation));
+	TestTrue(TEXT("相同内容的旧取消不能撤销新序号"), Slot.bSubmitted &&
+		Slot.Build.GetPendingAttempt().IsSet() && Slot.Build.GetPendingAttempt().GetValue() == FailedAttempt &&
+		Slot.SamplesReady && Slot.SamplesReadyLease && Slot.SamplesReadyLease->Serial() == RetryProgressSerial);
 	FVoxelTaskResult Failed;
 	Failed.Stamp = Slot.SubmittedStamp;
 	Failed.Error = TEXT("Rejected mesh fixture");
+	Failed.InputResourceLease = Slot.SamplesReadyLease;
 	AddExpectedError(TEXT("Fine shard build failed"), EAutomationExpectedErrorFlags::Contains, 1);
 	Manager.ApplyFineShardResult(Key, FailedAttempt, Slot.Consumer, MoveTemp(Failed));
 	TestTrue(TEXT("Native Shard failure remains an explicit terminal input result"), !Slot.Build.GetFailure().IsEmpty());
+	TestTrue(TEXT("失败完成也撤销采样进度持有"), !Slot.SamplesReady && !Slot.SamplesReadyLease);
+	Failed.InputResourceLease.Reset();
+	TestEqual(TEXT("失败结果退出后不遗留工作输入授予"), Resources->Snapshot().LeaseCount, OriginalLeaseCount);
 	TestEqual(TEXT("Failure remains available to acceptance diagnostics"), Manager.GetTerrainWorkMetrics().Failed, uint64(1));
 	Manager.InvalidateFinePageLayout(Other);
 	TestTrue(TEXT("Layout-only events do not clear a real content failure"), !Slot.Build.GetFailure().IsEmpty());
 	Slot.Build.NotifyDataChanged(1, 1);
 	TestTrue(TEXT("A real content change can recover from the native failure"), Slot.Build.GetFailure().IsEmpty());
-	TestEqual(TEXT("Late and canceled results are distinguished"), Manager.GetTerrainWorkMetrics().Stale, uint64(1));
+	TestEqual(TEXT("Late and canceled results are distinguished"), Manager.GetTerrainWorkMetrics().Stale, uint64(2));
 	TestEqual(TEXT("Matching native cancellation is accounted once"), Manager.GetTerrainWorkMetrics().Canceled, uint64(1));
 	return true;
 }
@@ -239,7 +287,18 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelSourceAcceptanceBarrierTest, "WHFramework
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FVoxelSourceAcceptanceBarrierTest::RunTest(const FString& InParameters)
 {
-	UVoxelModule* Module = NewObject<UVoxelModule>();
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	if (!TestNotNull(TEXT("Source acceptance fixture has a World"), World)) return false;
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	ON_SCOPE_EXIT
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+	};
+	AMainModule* Owner = World->SpawnActor<AMainModule>();
+	if (!TestNotNull(TEXT("Source acceptance fixture has its real module owner"), Owner)) return false;
+	UVoxelModule* Module = NewObject<UVoxelModule>(Owner);
+	if (!TestEqual(TEXT("Source acceptance module resolves its owning World"), Module->GetWorld(), World)) return false;
 	Module->Epoch = 11;
 	FVoxelStreamingSource Source;
 	Source.Id = FGuid::NewGuid();
@@ -266,6 +325,93 @@ bool FVoxelSourceAcceptanceBarrierTest::RunTest(const FString& InParameters)
 	TestFalse(TEXT("World epoch invalidates source acknowledgment"), Module->IsSourceAdmittedAt(Source.Id, Moved, 10));
 	Module->Sources.Remove(Source.Id);
 	TestFalse(TEXT("Removed source cannot acknowledge a candidate"), Module->IsSourceAdmittedAt(Source.Id, Moved, 11));
+
+	// 经真实 Scheduler 分多次推进；只取得 PlanningPending 不能完成原 Source 的接纳任务。
+	UVoxelModule* PlanningModule = NewObject<UVoxelModule>(Owner);
+	PlanningModule->Epoch = 12;
+	ON_SCOPE_EXIT
+	{
+		FString StopError;
+		PlanningModule->StopWorld(true, StopError);
+	};
+	FString Error;
+	UVoxelData* Definition = NewObject<UVoxelData>();
+	Definition->BlockName = TEXT("test:interest_continuation");
+	if (!TestTrue(TEXT("Native planning fixture builds its real registry"), PlanningModule->Registry.Build({Definition}, false, Error))) return false;
+	const auto Shapes = MakeShared<FVoxelShapeRegistry, ESPMode::ThreadSafe>();
+	Shapes->BuildDefaults();
+	PlanningModule->Shapes = Shapes;
+	const auto Control = FVoxelGenerationConsumerKey::Section(12, FGuid::NewGuid(), 1, {}, 1);
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> GeometryResources, FactResources;
+	if (!TestTrue(TEXT("Native planning fixture creates both resource ledgers and the real scheduler"),
+		FVoxelTerrainResources::Create({}, Control, GeometryResources, Error) &&
+		FVoxelTerrainResources::Create({}, Control, FactResources, Error) &&
+		FVoxelTaskScheduler::Create(GeometryResources.ToSharedRef(), FactResources.ToSharedRef(), Control, PlanningModule->Scheduler, Error))) return false;
+	if (!PlanningModule->Scheduler->InitializeStatistics(12) || !PlanningModule->TerrainFrameContext.Configure({}, Error)) return false;
+	PlanningModule->Scheduler->BindFrameContext(PlanningModule->TerrainFrameContext);
+	PlanningModule->Generator = VoxelTest::MakeGenerator();
+	PlanningModule->Runtime = MakeUnique<FVoxelWorldRuntime>(12, true, PlanningModule->GetRegistry().ToSharedRef(),
+		PlanningModule->Generator.ToSharedRef(), FactResources.ToSharedRef());
+	PlanningModule->Manifest.WorldId = FGuid::NewGuid();
+	PlanningModule->Manifest.RegistryHash = PlanningModule->GetRegistry()->Hash;
+	PlanningModule->Manifest.BaseSampleHash = 17;
+	PlanningModule->Manifest.Settings.MinZ = -32;
+	PlanningModule->Manifest.Settings.MaxZ = 64;
+	PlanningModule->ViewSettings.Lod.MaximumSurfaceSpatialLevel = 2;
+	PlanningModule->WorldState = EVoxelWorldState::Running;
+	PlanningModule->InterestRuntime = MakeShared<FVoxelInterestRuntime, ESPMode::ThreadSafe>();
+	PlanningModule->DesiredInterestRuntime = PlanningModule->InterestRuntime;
+	PlanningModule->CurrentInterest = MakeShared<FVoxelInterestSet, ESPMode::ThreadSafe>();
+	PlanningModule->DesiredInterest = PlanningModule->CurrentInterest;
+	FVoxelStreamingSource LargeSource;
+	LargeSource.Capabilities = EVoxelStreamingCapability::WorldVisual;
+	LargeSource.bInheritWorldView = false;
+	LargeSource.View.FineRadiusCells = 0;
+	LargeSource.View.VoxelProxyRadiusCells = 0;
+	LargeSource.View.SurfaceRadiusCells = 512;
+	LargeSource.View.MacroRadiusCells = 0;
+	LargeSource.View.InitialChunkSideCells = 16;
+	const FGuid LargeId = PlanningModule->RegisterSource(PlanningModule, LargeSource);
+	if (!TestTrue(TEXT("Native planning source is registered through the public API"), LargeId.IsValid())) return false;
+	{
+		FVoxelInterestRuntime Fixture;
+		FVoxelInterestSet Partial;
+		FVoxelInterestDelta PartialDelta;
+		bool bPartialSnapshot = false;
+		const auto& RegisteredSource = PlanningModule->Sources.FindChecked(LargeId).Value;
+		Fixture.Update(MakeArrayView(&RegisteredSource, 1), PlanningModule->Manifest, PlanningModule->ViewSettings,
+			Partial, PartialDelta, bPartialSnapshot);
+		if (!TestTrue(TEXT("Fixture genuinely exceeds one bounded coarse planning quantum"),
+			!bPartialSnapshot && Fixture.GetCoarsePlanningPending() && Fixture.GetPlanningError().IsEmpty())) return false;
+	}
+	PlanningModule->RefreshInterest(FPlatformTime::Seconds());
+	if (!TestTrue(TEXT("Actual interest planning attempt is admitted"), PlanningModule->bInterestBuildPending)) return false;
+	const uint64 OriginalAttempt = PlanningModule->InterestAttemptSerial;
+	TestFalse(TEXT("An admitted task cannot acknowledge an incomplete source"), PlanningModule->IsSourceAdmittedAt(LargeId, {}, 12));
+	uint64 Frame = 0;
+	const double Deadline = FPlatformTime::Seconds() + 10.0;
+	while (PlanningModule->bInterestBuildPending && FPlatformTime::Seconds() < Deadline)
+	{
+		PlanningModule->TerrainFrameContext.Begin(12, ++Frame, FPlatformTime::Seconds(), {});
+		PlanningModule->Scheduler->Tick([](FVoxelTaskResult&&) {}, 8.0);
+		PlanningModule->TerrainFrameContext.End(FPlatformTime::Seconds());
+		FPlatformProcess::Sleep(0.001f);
+	}
+	TestFalse(TEXT("The original bounded attempt eventually finishes"), PlanningModule->bInterestBuildPending);
+	TestEqual(TEXT("Coarse resumptions preserve the original attempt identity"), PlanningModule->InterestAttemptSerial, OriginalAttempt);
+	TestTrue(TEXT("Only a complete native source snapshot releases the acceptance barrier"),
+		PlanningModule->IsSourceAdmittedAt(LargeId, {}, 12));
+	const auto& CompleteSource = PlanningModule->Sources.FindChecked(LargeId).Value;
+	const auto Expected = FVoxelInterestManager().Compute(MakeArrayView(&CompleteSource, 1),
+		PlanningModule->Manifest, PlanningModule->ViewSettings);
+	TestEqual(TEXT("Complete topology reference has no planning failure"), Expected.PlanningError, FString());
+	if (!TestTrue(TEXT("Complete topology reference builds actual Surface demand"),
+		Expected.PlanningError.IsEmpty() && !Expected.Surface.IsEmpty())) return false;
+	TestEqual(TEXT("The native multi-quantum task commits the complete expected Surface count"),
+		PlanningModule->CurrentInterest->Surface.Num(), Expected.Surface.Num());
+	for (const auto& Key : Expected.Surface)
+		TestTrue(TEXT("Every expected Surface page survives the original task resumptions"), PlanningModule->CurrentInterest->Surface.Contains(Key));
+	TestEqual(TEXT("Complete planning commits exactly once"), PlanningModule->InterestRevision, uint64(1));
 	return true;
 }
 
@@ -660,7 +806,8 @@ bool FVoxelPublishEstimateRecoveryTest::RunTest(const FString& InParameters)
 																								  ++Executed;
 																							  }));
 	TestEqual(TEXT("Successful progress clears consecutive deferrals"), Publisher.PhaseConsecutiveDeferrals[Phase], uint64(0));
-	TestTrue(TEXT("The estimate is bounded by a valid frame fraction"), Publisher.PhaseOperationEstimateMilliseconds[Phase] <= 0.05);
+	TestTrue(TEXT("The estimate is bounded by a valid frame fraction"), Publisher.PhaseOperationEstimateMilliseconds[Phase] <=
+		double(Module->ViewSettings.Budget.TerrainPublishMilliseconds) * 0.5);
 	return true;
 }
 

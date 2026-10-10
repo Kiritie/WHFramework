@@ -12,6 +12,7 @@ public:
 	bool Advance(const FVoxelMacroTerrainBuilder& InBuilder, FVoxelMacroTileData& OutData,
 		bool& bOutComplete, FString& OutError, const TAtomic<bool>* InCancel);
 	uint64 MaximumRetainedBytes() const;
+	uint64 MaximumDistantBytes() const;
 
 private:
 	FVoxelTerrainGeometry Geometry;

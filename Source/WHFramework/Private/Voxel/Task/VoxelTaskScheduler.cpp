@@ -16,6 +16,16 @@
 #include "Voxel/Rendering/VoxelTerrainFrameContext.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 
+struct FVoxelTaskExecutionReservation
+{
+	// Slot 的函数、结果、错误缓冲与共享控制器沿原租约存活。
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MetadataLease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> NativeLease;
+	FVoxelGenerationConsumerKey Consumer;
+	uint64 ErrorBytes = 0;
+	FVoxelTaskScheduler::FSlot Slot;
+};
+
 namespace
 {
 	constexpr TCHAR TaskBudgetError[] = TEXT("Oversized: voxel task result exceeds its declared unleased budget");
@@ -611,6 +621,67 @@ FVoxelGenerationConsumerKey FVoxelTaskScheduler::ResolveNativeConsumer(const FVo
 	return Consumer;
 }
 
+EVoxelTerrainResourceAdmission FVoxelTaskScheduler::ReserveNativeExecution(FVoxelTaskRequest& InRequest,
+	EVoxelTaskBlockReason& OutBlocked)
+{
+	OutBlocked = EVoxelTaskBlockReason::InputMemory;
+	if (!ControlConsumer.IsValid())
+	{
+		return EVoxelTerrainResourceAdmission::Granted;
+	}
+	check(!InRequest.ExecutionReservation);
+	if (InRequest.GetBindingBytes() > MAX_uint64 - InRequest.GetRequiredBindingInputBytes() ||
+		InRequest.GetBindingLeaseCount() > MAX_int32 - InRequest.GetRequiredBindingInputLeaseCount())
+	{
+		return EVoxelTerrainResourceAdmission::CapacityUnachievable;
+	}
+	const uint64 CallbackInputs = InRequest.GetBindingBytes() + InRequest.GetRequiredBindingInputBytes();
+	const int32 CallbackLeases = InRequest.GetBindingLeaseCount() + InRequest.GetRequiredBindingInputLeaseCount();
+	const uint64 SlotBytes = VoxelBoundedAllocation::SharedBytes<FVoxelTaskExecutionReservation>();
+	const uint64 ControlInputs = RootInputBytes + BackingBytes + (IdleBindingLease ? IdleBindingLease->Bytes() : 0);
+	const int32 BackingHandles = int32(RootInputBytes != 0) + int32(BackingLease.IsValid()) + int32(IdleBindingLease.IsValid());
+	if (CallbackInputs > MAX_uint64 - ControlInputs || CallbackInputs + ControlInputs > MAX_uint64 - SlotBytes ||
+		CallbackLeases > MAX_int32 - BackingHandles - 1)
+	{
+		return EVoxelTerrainResourceAdmission::CapacityUnachievable;
+	}
+	const uint64 RequiredInputs = ControlInputs + CallbackInputs;
+	const int32 RequiredLeases = BackingHandles + CallbackLeases;
+	using FEngineTask = UE::Tasks::Private::TExecutableTask<FTaskBody>;
+	static_assert(sizeof(FEngineTask) > UE::Tasks::Private::SmallTaskSize, "Scheduler task requires direct native allocation accounting");
+	const uint64 ErrorBytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<TCHAR, FDefaultAllocator>(UE_ARRAY_COUNT(TaskBudgetError));
+	const uint64 NativeBytes = FMemory::QuantizeSize(sizeof(FEngineTask), alignof(FEngineTask)) + ErrorBytes;
+	const auto Consumer = ResolveNativeConsumer(InRequest);
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MetadataLease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> NativeLease;
+	auto Admission = TerrainResources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Input,
+		SlotBytes, MetadataLease, 0, RequiredInputs, RequiredLeases);
+	if (Admission != EVoxelTerrainResourceAdmission::Granted)
+	{
+		return Admission;
+	}
+	OutBlocked = EVoxelTaskBlockReason::Memory;
+	Admission = TerrainResources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Working,
+		NativeBytes, NativeLease, 0, RequiredInputs + MetadataLease->Bytes(), RequiredLeases + 1);
+	if (Admission != EVoxelTerrainResourceAdmission::Granted)
+	{
+		return Admission;
+	}
+	// 所有租约先授予，才构造唯一 Slot 与错误缓冲；未接纳不取消任何旧请求。
+	auto Reservation = MakeShared<FVoxelTaskExecutionReservation, ESPMode::ThreadSafe>();
+	Reservation->MetadataLease = MoveTemp(MetadataLease);
+	Reservation->NativeLease = MoveTemp(NativeLease);
+	Reservation->Consumer = Consumer;
+	Reservation->ErrorBytes = ErrorBytes;
+	Reservation->Slot.SlotLease = Reservation->MetadataLease;
+	Reservation->Slot.BudgetErrorLease = Reservation->NativeLease;
+	Reservation->Slot.BudgetError.GetCharArray().Reserve(UE_ARRAY_COUNT(TaskBudgetError));
+	Reservation->Slot.BudgetError.GetCharArray().Append(TaskBudgetError, UE_ARRAY_COUNT(TaskBudgetError));
+	InRequest.ExecutionReservation = MoveTemp(Reservation);
+	OutBlocked = EVoxelTaskBlockReason::None;
+	return EVoxelTerrainResourceAdmission::Granted;
+}
+
 bool FVoxelTaskScheduler::ObserveDemand(const EVoxelTaskKind InKind, const FVoxelTaskStamp& InStamp,
 	const EVoxelTaskBlockReason InReason, const uint64 InInputBytes, const uint64 InResultBytes)
 {
@@ -796,6 +867,14 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 		RemainingInput -= Pending[Worst].InputBytes;
 		const int32 ExistingLane = TerrainLane(Pending[Worst]);
 		if (ExistingLane != INDEX_NONE) --Counts[ExistingLane];
+	}
+	EVoxelTaskBlockReason NativeBlocked;
+	const auto NativeAdmission = ReserveNativeExecution(InRequest, NativeBlocked);
+	if (NativeAdmission != EVoxelTerrainResourceAdmission::Granted)
+	{
+		return Reject(NativeAdmission == EVoxelTerrainResourceAdmission::InvalidRequest ?
+			EVoxelTaskBlockReason::TerminalFailure : NativeAdmission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+			EVoxelTaskBlockReason::Oversized : NativeBlocked);
 	}
 	DisplacedIndices.Sort([](const int32 A, const int32 B) { return A > B; });
 	for (const int32 Index : DisplacedIndices)
@@ -1051,7 +1130,6 @@ void FVoxelTaskScheduler::Tick(
 
 			Running.RemoveAt(Index, 1, EAllowShrinking::No);
 			Completed.Task.Retire();
-			if (Completed.NativeLease) verify(Completed.NativeLease->Resize(Completed.BudgetErrorBytes));
 			if (!Completed.bServiceSettled)
 			{
 				WorkerSelection.Settle(Completed.ServiceChargeSerial, Completed.Slot->ExecuteMicroseconds);
@@ -1070,11 +1148,20 @@ void FVoxelTaskScheduler::Tick(
 			{
 				OriginalRequest.AccumulatedExecuteMilliseconds = Completed.Slot->Result.ExecuteMilliseconds;
 				QueuedInputBytes += OriginalRequest.InputBytes;
+				FVoxelTaskRequest Continuation = MoveTemp(OriginalRequest);
+				OriginalRequest = FVoxelTaskRequest();
+				Completed.Slot->Result = FVoxelTaskResult();
+				Continuation.ExecutionReservation = MoveTemp(Completed.ExecutionReservation);
 				check(Pending.Num() < Pending.Max());
-				Pending.Add(MoveTemp(OriginalRequest));
+				Pending.Add(MoveTemp(Continuation));
 				CompletedSelection.Settle(ApplyCharge.Serial, (FPlatformTime::Seconds() - ServiceStart) * 1000000.0);
 				++Applied;
 				continue;
+			}
+			// 最后一次原生执行实际退休后才结算；续跑保留同一完整授额。
+			if (Completed.NativeLease)
+			{
+				verify(Completed.NativeLease->Resize(Completed.BudgetErrorBytes));
 			}
 			RemoveActive(
 				Completed.Stamp,
@@ -1771,13 +1858,6 @@ void FVoxelTaskScheduler::Pump()
 		for (int32 Index = 0; Index < Pending.Num(); ++Index)
 		{
 			FVoxelTaskRequest& Request = Pending[Index];
-			if (Request.bNativeCapacityBlocked)
-			{
-				const auto Consumer = ResolveNativeConsumer(Request);
-				if (TerrainResources->ReleaseVersionExcludingOwner(Consumer) == Request.NativeCapacityVersion)
-					Request.Blocked = EVoxelTaskBlockReason::Memory;
-				else Request.bNativeCapacityBlocked = false;
-			}
 			if (Request.bReceiptCapacityBlocked)
 			{
 				const auto Consumer = FVoxelGenerationConsumerKey::Section(StatisticsWorldEpoch, StatisticsOwnerId, 1,
@@ -1869,61 +1949,8 @@ void FVoxelTaskScheduler::Pump()
 			}
 			Pending[BestIndex].WorkReceipt = MoveTemp(Receipt);
 		}
-		const auto Consumer = ResolveNativeConsumer(Pending[BestIndex]);
-		const uint64 BeforeNativeAdmission = TerrainResources->ReleaseVersionExcludingOwner(Consumer);
-		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> SlotLease;
-		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> NativeLease;
-		EVoxelTerrainResourceAdmission NativeAdmission = EVoxelTerrainResourceAdmission::Granted;
-		const FVoxelTaskRequest& Selected = Pending[BestIndex];
-		const uint64 CallbackInputs = Selected.GetBindingBytes() + Selected.GetRequiredBindingInputBytes();
-		const int32 CallbackLeases = Selected.GetBindingLeaseCount() + Selected.GetRequiredBindingInputLeaseCount();
-		const uint64 SlotBytes = VoxelBoundedAllocation::SharedBytes<FSlot>();
-		const uint64 ControlInputs = RootInputBytes + BackingBytes + (IdleBindingLease ? IdleBindingLease->Bytes() : 0);
-		const int32 BackingHandles = int32(RootInputBytes != 0) + int32(BackingLease.IsValid()) + int32(IdleBindingLease.IsValid());
-		const bool bFloorOverflow = CallbackInputs > MAX_uint64 - ControlInputs ||
-			CallbackInputs + ControlInputs > MAX_uint64 - SlotBytes || CallbackLeases > MAX_int32 - BackingHandles - 1;
-		const uint64 RequiredInputs = bFloorOverflow ? 0 : ControlInputs + CallbackInputs;
-		const int32 RequiredLeases = bFloorOverflow ? 0 : BackingHandles + CallbackLeases;
-		using FEngineTask = UE::Tasks::Private::TExecutableTask<FTaskBody>;
-		static_assert(sizeof(FEngineTask) > UE::Tasks::Private::SmallTaskSize, "Scheduler task requires direct native allocation accounting");
-		const uint64 ErrorBytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<TCHAR, FDefaultAllocator>(UE_ARRAY_COUNT(TaskBudgetError));
-		const uint64 NativeBytes = FMemory::QuantizeSize(sizeof(FEngineTask), alignof(FEngineTask)) + ErrorBytes;
-		if (ControlConsumer.IsValid())
-		{
-			NativeAdmission = bFloorOverflow ? EVoxelTerrainResourceAdmission::CapacityUnachievable :
-				TerrainResources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Input,
-					SlotBytes, SlotLease, 0, RequiredInputs, RequiredLeases);
-			if (NativeAdmission == EVoxelTerrainResourceAdmission::Granted)
-			{
-				NativeAdmission = TerrainResources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Working,
-					NativeBytes, NativeLease, 0, RequiredInputs + SlotLease->Bytes(), RequiredLeases + 1);
-			}
-		}
-		if (NativeAdmission != EVoxelTerrainResourceAdmission::Granted)
-		{
-			WorkerSelection.RefundBeforeStart(Charge.Serial);
-			SlotLease.Reset();
-			Pending[BestIndex].Blocked = NativeAdmission == EVoxelTerrainResourceAdmission::InvalidRequest ?
-				EVoxelTaskBlockReason::TerminalFailure : NativeAdmission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
-				EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::Memory;
-			AdmissionAttempts.FindChecked({Selected.Kind, Selected.Stamp}).Blocked = Pending[BestIndex].Blocked;
-			if (NativeAdmission == EVoxelTerrainResourceAdmission::CapacityUnachievable || NativeAdmission == EVoxelTerrainResourceAdmission::InvalidRequest)
-			{
-				FVoxelTaskRequest Rejected = MoveTemp(Pending[BestIndex]);
-				Pending.RemoveAtSwap(BestIndex, 1, EAllowShrinking::No);
-				QueuedInputBytes -= Rejected.InputBytes;
-				const FAdmissionAttempt Preserved = AdmissionAttempts.FindChecked({Rejected.Kind, Rejected.Stamp});
-				RemoveActive(Rejected.Stamp, Rejected.Kind, Rejected.WorkClass);
-				AdmissionAttempts.Add({Rejected.Kind, Rejected.Stamp}, Preserved);
-				QueueCanceled(MoveTemp(Rejected));
-			}
-			else
-			{
-				Pending[BestIndex].bNativeCapacityBlocked = true;
-				Pending[BestIndex].NativeCapacityVersion = BeforeNativeAdmission;
-			}
-			continue;
-		}
+		// 已接纳任务只消费原授额；调度与续跑不再向 Geometry 账本索取执行容量。
+		check(!ControlConsumer.IsValid() || Pending[BestIndex].ExecutionReservation);
 		if (Charge.bOverdueOpportunity) FrameContext->ConsumeOverdueOpportunity();
 		FVoxelTaskRequest Request = MoveTemp(Pending[BestIndex]);
 		Pending.RemoveAtSwap(BestIndex, 1, EAllowShrinking::No);
@@ -1946,14 +1973,24 @@ void FVoxelTaskScheduler::Pump()
 		RunningTask.Sequence = Request.Sequence;
 		RunningTask.QueuedAt = Request.QueuedAt;
 		RunningTask.ReservedBytes = Request.ReservedBytes;
-		RunningTask.BudgetErrorBytes = ErrorBytes;
-		RunningTask.SlotLease = MoveTemp(SlotLease);
-		RunningTask.NativeLease = MoveTemp(NativeLease);
-		RunningTask.Slot = MakeShared<FSlot, ESPMode::ThreadSafe>();
-		RunningTask.Slot->SlotLease = RunningTask.SlotLease;
-		RunningTask.Slot->BudgetErrorLease = RunningTask.NativeLease;
-		RunningTask.Slot->BudgetError.GetCharArray().Reserve(UE_ARRAY_COUNT(TaskBudgetError));
-		RunningTask.Slot->BudgetError.GetCharArray().Append(TaskBudgetError, UE_ARRAY_COUNT(TaskBudgetError));
+		RunningTask.ExecutionReservation = MoveTemp(Request.ExecutionReservation);
+		if (RunningTask.ExecutionReservation)
+		{
+			const auto& Reservation = RunningTask.ExecutionReservation;
+			check(Reservation->Consumer == ResolveNativeConsumer(Request));
+			RunningTask.BudgetErrorBytes = Reservation->ErrorBytes;
+			RunningTask.SlotLease = Reservation->MetadataLease;
+			RunningTask.NativeLease = Reservation->NativeLease;
+			RunningTask.Slot = TSharedPtr<FSlot, ESPMode::ThreadSafe>(Reservation, &Reservation->Slot);
+		}
+		else
+		{
+			// 无控制账本的被动选择夹具保留原执行方式。
+			RunningTask.Slot = MakeShared<FSlot, ESPMode::ThreadSafe>();
+			RunningTask.Slot->BudgetError.GetCharArray().Reserve(UE_ARRAY_COUNT(TaskBudgetError));
+			RunningTask.Slot->BudgetError.GetCharArray().Append(TaskBudgetError, UE_ARRAY_COUNT(TaskBudgetError));
+		}
+		RunningTask.Slot->Cancel.Store(false);
 		RunningTask.Slot->WorkReceipt = Request.WorkReceipt;
 		if (Request.bResumable) RunningContinuationInputBytes += Request.InputBytes;
 		RunningTask.Slot->Request = MoveTemp(Request);

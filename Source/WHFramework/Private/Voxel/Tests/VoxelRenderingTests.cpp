@@ -1,4 +1,4 @@
-﻿#if WITH_DEV_AUTOMATION_TESTS
+#if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
 #include "Voxel/Rendering/VoxelViewLod.h"
@@ -157,6 +157,7 @@ bool FVoxelKnownEmptyMeshTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Fine boundary exposure must not be hidden by solid coarse halo"),
 		FVoxelSectionMesher::IsKnownEmpty(Snapshot, Registry, &Transition));
 	FVoxelShapeRegistry Shapes;
+	Shapes.BuildDefaults();
 	FVoxelSectionMeshResult Mesh;
 	TestTrue(TEXT("Fine exposure builds actual transition geometry"),
 		FVoxelSectionMesher::Build(Snapshot, Registry, Shapes, Mesh, nullptr, 1.0, &Transition));
@@ -627,18 +628,19 @@ bool FVoxelHeightfieldTransitionInvariantTest::RunTest(const FString& InParamete
 		TestTrue(TEXT("Loading edge is explicitly pending"), PendingEdges[0].bPending);
 		TMap<FVoxelHeightfieldNodeKey, FVoxelHeightfieldTileView> OwnerOnlyMap;
 		OwnerOnlyMap.Add(Owner.Key, Owner);
-		FVoxelSectionMeshResult SafetyMesh;
-		if (!TestTrue(TEXT("Pending edge builds only a shallow ground skirt"),
+		FVoxelSectionMeshResult SafetyMesh = Mesh;
+		TestFalse(TEXT("Pending edge waits for its actual frozen neighbor"),
 			FVoxelHeightfieldTransitionBuilder::BuildMesh(Owner, PendingEdges, OwnerOnlyMap,
-				*Config, Registry, -64, 4.0, SafetyMesh, Error))) return false;
-		for (const FVoxelRenderBatch& Batch : SafetyMesh.Batches)
+				*Config, Registry, -64, 4.0, SafetyMesh, Error));
+		TestTrue(TEXT("Missing frozen boundary reports a typed dependency wait"),
+			Error.StartsWith(TEXT("DependencyNotReady:")));
+		TestEqual(TEXT("Waiting retains the previous committed boundary batches"),
+			SafetyMesh.Batches.Num(), Mesh.Batches.Num());
+		for (int32 Index = 0; Index < Mesh.Batches.Num() && Index < SafetyMesh.Batches.Num(); ++Index)
 		{
-			TestTrue(TEXT("Pending edge has no water mesh"),
-				Batch.Group != EVoxelRenderGroup::Water);
-			for (const FVector& Vertex : Batch.Mesh.Vertices)
-			{
-				TestTrue(TEXT("Loading wall is at most two cells deep"), Vertex.Z >= 9.0);
-			}
+			TestTrue(TEXT("Waiting cannot replace the previous boundary with a skirt or empty result"),
+				SafetyMesh.Batches[Index].Mesh.Vertices == Mesh.Batches[Index].Mesh.Vertices &&
+				SafetyMesh.Batches[Index].Mesh.Triangles == Mesh.Batches[Index].Mesh.Triangles);
 		}
 		TestTrue(TEXT("Ready neighbor replaces the pending-edge signature"),
 			FVoxelHeightfieldTransitionBuilder::BuildSignature(
@@ -650,30 +652,39 @@ bool FVoxelHeightfieldTransitionInvariantTest::RunTest(const FString& InParamete
 	Neighbor.WaterKind = RiverKind;
 	ViewMap.Add(Neighbor.Key, Neighbor);
 	FVoxelSectionMeshResult RiverMesh;
-	if (!TestTrue(TEXT("Ready river edge builds a top slope"),
+	if (!TestTrue(TEXT("Ready river edge joins its actual frozen water heights"),
 		FVoxelHeightfieldTransitionBuilder::BuildMesh(Owner, Edges, ViewMap,
 			*Config, Registry, -64, 4.0, RiverMesh, Error))) return false;
 	WaterVertices = 0;
-	bool bCrossesBoundary = false;
+	double WaterInterfaceArea = 0.0;
 	for (const FVoxelRenderBatch& Batch : RiverMesh.Batches)
 	{
 		if (Batch.Group != EVoxelRenderGroup::Water) continue;
 		WaterVertices += Batch.Mesh.Vertices.Num();
 		for (const FVector& Vertex : Batch.Mesh.Vertices)
 		{
-			bCrossesBoundary |= Vertex.X != 16.0;
+			TestEqual(TEXT("Water interface stays on the shared owner plane"), Vertex.X, 16.0);
+			TestTrue(TEXT("Water interface joins both frozen water levels"), Vertex.Z == 13.0 || Vertex.Z == 9.0);
 		}
 		for (const FVector& Normal : Batch.Mesh.Normals)
 		{
-			TestTrue(TEXT("River top slope faces upward"), Normal.Z > 0.0);
+			TestTrue(TEXT("Water interface faces the lower neighboring volume"), Normal.X > 0.99);
+		}
+		for (int32 Index = 0; Index + 2 < Batch.Mesh.Triangles.Num(); Index += 3)
+		{
+			const FVector& A = Batch.Mesh.Vertices[Batch.Mesh.Triangles[Index]];
+			const FVector& B = Batch.Mesh.Vertices[Batch.Mesh.Triangles[Index + 1]];
+			const FVector& C = Batch.Mesh.Vertices[Batch.Mesh.Triangles[Index + 2]];
+			WaterInterfaceArea += FVector::CrossProduct(B - A, C - A).Size() * 0.5;
 		}
 	}
-	TestEqual(TEXT("River edge has two top slope quads"), WaterVertices, 8);
-	TestTrue(TEXT("River transition spans the shared boundary"), bCrossesBoundary);
+	TestEqual(TEXT("River interface retains each actual half-cell water breakpoint"), WaterVertices, 16);
+	TestEqual(TEXT("River interface closes the full shared interval without holes or duplicate area"), WaterInterfaceArea, 16.0);
 	TArray<uint8> OceanKind;
 	OceanKind.Init(static_cast<uint8>(EVoxelWaterKind::Ocean), 9);
 	Owner.WaterKind = OceanKind;
 	Neighbor.WaterKind = OceanKind;
+	Neighbor.Water = OwnerWater;
 	ViewMap.Add(Owner.Key, Owner);
 	ViewMap.Add(Neighbor.Key, Neighbor);
 	FVoxelSectionMeshResult OceanMesh;
@@ -1557,7 +1568,11 @@ bool FVoxelSurfaceStateTest::RunTest(const FString& InParameters)
 	const FVoxelSurfaceTileKey Key { FIntPoint::ZeroValue, 0 };
 	FVoxelSurfaceTileData Data;
 	FString Error;
-	if (!TestTrue(TEXT("Natural reference builds"), Builder.Build(Key, Data, Error, nullptr, nullptr, nullptr, FixtureGeometry(Key, 1)))) return false;
+	if (!TestTrue(TEXT("Natural reference builds"), Builder.Build(Key, Data, Error, nullptr, nullptr, nullptr, FixtureGeometry(Key, 1))))
+	{
+		AddError(Error);
+		return false;
+	}
 	const int32 Ground = Data.GroundZ[0];
 	const int32 EditedWaterZ = FMath::Max(Ground, Data.WaterZ[0]) + 8;
 	if (!TestTrue(TEXT("Water edit remains above natural ground and water within world bounds"),

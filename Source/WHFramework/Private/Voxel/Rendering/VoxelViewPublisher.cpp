@@ -1,5 +1,6 @@
-﻿#include "Voxel/Rendering/VoxelViewPublisher.h"
+#include "Voxel/Rendering/VoxelViewPublisher.h"
 #include "Voxel/Rendering/VoxelTerrainRenderer.h"
+#include "Voxel/Rendering/VoxelTerrainCoarseMesh.h"
 #include "Voxel/Rendering/VoxelViewLod.h"
 #include "Algo/Compare.h"
 
@@ -16,30 +17,54 @@
 
 namespace
 {
-	struct FCoveragePreparationInput
+	FVoxelGameThreadContinuation FindCoverageChangesSteps(TConstArrayView<FBox> InPrevious,
+		TConstArrayView<FBox> InCurrent, const FBox InBounds, TArray<FBox>& OutChanges)
 	{
-		FVector Origin;
-		double Step = 1.0;
-		FBox Bounds;
-		TArray<FBox> Boxes;
-		TArray<FBox> Previous;
-		TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> Common;
-		bool bDirty = false;
-	};
-
-	struct FCoveragePreparationResult final : FVoxelTaskCustomPayload
-	{
-		TArray<TArray<FBox>> Boxes;
-		TArray<TArray<FBox>> ChangedBounds;
-		TArray<uint8> Unchanged;
-		virtual uint64 GetAllocatedBytes() const override
+		OutChanges.Reset();
+		if (!InBounds.IsValid) co_return;
+		for (int32 Direction = 0; Direction < 2; ++Direction)
 		{
-			uint64 Bytes = Boxes.GetAllocatedSize() + ChangedBounds.GetAllocatedSize() + Unchanged.GetAllocatedSize();
-			for (const auto& Entry : Boxes) Bytes += Entry.GetAllocatedSize();
-			for (const auto& Entry : ChangedBounds) Bytes += Entry.GetAllocatedSize();
-			return Bytes;
+			const auto From = Direction == 0 ? InPrevious : InCurrent;
+			const auto Against = Direction == 0 ? InCurrent : InPrevious;
+			for (const FBox& Box : From)
+			{
+				co_await FVoxelGameThreadContinuation::Yield();
+				if (!Box.Intersect(InBounds)) continue;
+				TArray<FBox> Fragments{Box.Overlap(InBounds)};
+				for (const FBox& Other : Against)
+				{
+					TArray<FBox> Remaining;
+					for (FBox Fragment : Fragments)
+					{
+						co_await FVoxelGameThreadContinuation::Yield();
+						if (!Fragment.Intersect(Other)) { Remaining.Add(Fragment); continue; }
+						const FBox Intersection = Fragment.Overlap(Other);
+						for (int32 Axis = 0; Axis < 3; ++Axis)
+						{
+							if (Fragment.Min[Axis] < Intersection.Min[Axis])
+							{
+								FBox Part = Fragment;
+								Part.Max[Axis] = Intersection.Min[Axis];
+								Remaining.Add(Part);
+								Fragment.Min[Axis] = Intersection.Min[Axis];
+							}
+							if (Fragment.Max[Axis] > Intersection.Max[Axis])
+							{
+								FBox Part = Fragment;
+								Part.Min[Axis] = Intersection.Max[Axis];
+								Remaining.Add(Part);
+								Fragment.Max[Axis] = Intersection.Max[Axis];
+							}
+						}
+					}
+					Fragments = MoveTemp(Remaining);
+					if (Fragments.IsEmpty()) break;
+				}
+				co_await VoxelGameThread::AppendSteps(OutChanges, Fragments);
+			}
 		}
-	};
+		co_await VoxelMeshClipper::NormalizeBoxesSteps(OutChanges);
+	}
 }
 
 FVoxelViewPublisher::FVoxelViewPublisher(UVoxelModule& InModule, FVoxelTaskScheduler& InScheduler, const uint64 InWorldEpoch)
@@ -185,32 +210,112 @@ bool FVoxelViewPublisher::SetCoverage(const FGuid& InGroup, AActor* InActor, TAr
 	return bSuccess;
 }
 
+const FVoxelViewPublisher::FUpdate* FVoxelViewPublisher::FindProjectedUpdate(
+	const TWeakObjectPtr<AActor> InActor, const uint64 InBeforeSerial, const FPublication** OutPublication) const
+{
+	if (OutPublication) *OutPublication = nullptr;
+	if (InBeforeSerial == MAX_uint64)
+	{
+		if (const int32* Index = PendingUpdateIndices.Find(InActor)) return &PendingUpdates[*Index];
+		if (PendingPlan)
+			if (const int32* Index = PendingPlan->UpdateIndices.Find(InActor))
+				if (PendingPlan->Updates[*Index].Source) return &PendingPlan->Updates[*Index];
+	}
+	const FUpdate* Latest = nullptr;
+	uint64 Serial = 0;
+	if (const auto* Generations = ActorUpdateGenerations.Find(InActor))
+		for (const auto& Generation : *Generations)
+		{
+			const auto& Publication = Generation.Publication;
+			const auto& Update = Publication->Updates[Generation.UpdateIndex];
+			if (Publication->bCanceled || Publication->bFinished || !Update.Source ||
+				Publication->Serial >= InBeforeSerial || Publication->Serial <= Serial) continue;
+			Serial = Publication->Serial;
+			Latest = &Update;
+			if (OutPublication) *OutPublication = &Publication.Get();
+		}
+	return Latest;
+}
+
+bool FVoxelViewPublisher::CaptureCoverageSource(const TWeakObjectPtr<AActor> InActor,
+	const bool bInRetainPresented, FUpdate& OutSource) const
+{
+	const FEntry* Entry = Entries.Find(InActor);
+	if (!Entry) return false;
+	const FUpdate* Projected = FindProjectedUpdate(InActor);
+	OutSource.Actor = InActor;
+	OutSource.bRetainSource = bInRetainPresented;
+	if (bInRetainPresented && Projected)
+	{
+		OutSource.Source = Projected->Source;
+		OutSource.NativeStamp = Projected->NativeStamp;
+		OutSource.NativeMesh = Projected->NativeMesh;
+		OutSource.Location = Projected->Location;
+		OutSource.Scale = Projected->Scale;
+		OutSource.Bounds = Projected->Bounds;
+		OutSource.LocalWorldBoxes = Projected->LocalWorldBoxes;
+		OutSource.CommonBoxes = Projected->CommonBoxes;
+		OutSource.TerrainStage = Projected->TerrainStage;
+		OutSource.bTransition = Projected->bTransition;
+	}
+	else
+	{
+		OutSource.Source = bInRetainPresented ? Entry->PresentedSource : Entry->Source;
+		OutSource.NativeStamp = bInRetainPresented ? Entry->PresentedNativeStamp : Entry->NativeStamp;
+		OutSource.NativeMesh = bInRetainPresented || Entry->Source == Entry->PresentedSource ? Entry->NativeMesh : nullptr;
+		OutSource.Location = Entry->Location;
+		OutSource.Scale = Entry->Scale;
+		OutSource.Bounds = Entry->Bounds;
+		if (bInRetainPresented && Entry->NativeMesh)
+		{
+			OutSource.Location = Entry->NativeMesh->WorldCellOrigin * Module.BlockSize();
+			OutSource.Scale = Entry->NativeMesh->CellScale * Module.BlockSize();
+			OutSource.Bounds = Entry->NativeMesh->Source->LocalBounds;
+		}
+		OutSource.LocalWorldBoxes = Entry->LocalWorldBoxes;
+		OutSource.TerrainStage = Entry->TerrainStage;
+		OutSource.bTransition = Entry->bTransition;
+	}
+	OutSource.PreviousExclusions = Projected ? Projected->Exclusions : Entry->Exclusions;
+	OutSource.bSourceDirty = !bInRetainPresented && Entry->bDirty;
+	return OutSource.Source.IsValid() && OutSource.Scale > 0.0;
+}
+
 FVoxelGameThreadContinuation FVoxelViewPublisher::SetCoverageSteps(
-	const FGuid& InGroup, AActor* InActor, TArray<FBox> InWorldCellBoxes, TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, bool& OutSuccess)
+	const FGuid& InGroup, AActor* InActor, TArray<FBox> InWorldCellBoxes,
+	TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, bool& OutSuccess)
+{
+	FUpdate Source;
+	OutSuccess = false;
+	if (!CaptureCoverageSource(InActor, false, Source)) co_return;
+	co_await SetCoverageSourceSteps(InGroup, InActor, MoveTemp(Source), MoveTemp(InWorldCellBoxes), MoveTemp(InCommonBoxes), OutSuccess);
+}
+
+FVoxelGameThreadContinuation FVoxelViewPublisher::SetCoverageSourceSteps(
+	const FGuid& InGroup, AActor* InActor, FUpdate InSource, TArray<FBox> InWorldCellBoxes,
+	TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, bool& OutSuccess)
 {
 	OutSuccess = false;
-	const FPendingGroup* Group = FindPendingGroup(InGroup);
 	const TWeakObjectPtr<AActor> ActorKey(InActor);
-	FEntry* Entry = Entries.Find(ActorKey);
-	if (!Group || Group->bCommitted || !Entry || Entry->GroupKey != Group->Key)
-	{
-		co_return;
-	}
+	const FPendingGroup* Group = FindPendingGroup(InGroup);
+	const FEntry* Entry = Entries.Find(ActorKey);
+	if (!Group || Group->bCommitted || !Entry || Entry->GroupKey != Group->Key) co_return;
 	const FVoxelPublishGroupKey GroupKey = Group->Key;
+	const bool bMatchesPresentedSource = InSource.Source == Entry->PresentedSource;
+	// 先拥有不可变比较快照，再让协程跨预算边界；Entry 的待替换位姿不能改写保留源。
+	FUpdate Previous;
+	const FUpdate* Latest = FindProjectedUpdate(ActorKey);
+	const bool bHasProjected = Latest != nullptr;
+	if (Latest) Previous = *Latest;
 	TArray<FBox> WorldExclusions;
 	co_await VoxelGameThread::AppendSteps(WorldExclusions, InWorldCellBoxes);
-	if (InCommonBoxes)
-	{
-		co_await VoxelGameThread::AppendSteps(WorldExclusions, *InCommonBoxes);
-	}
+	if (InCommonBoxes) co_await VoxelGameThread::AppendSteps(WorldExclusions, *InCommonBoxes);
 	Entry = Entries.Find(ActorKey);
-	if (!Entry)
-	{
-		co_return;
-	}
+	if (!Entry) co_return;
 	OwnerActors.FindOrAdd(GroupKey).Add(ActorKey);
-	Entry->DesiredWorldExclusions = MoveTemp(WorldExclusions);
-	Entry->bHasDesiredExclusions = true;
+	FEntry& Current = Entries.FindChecked(ActorKey);
+	Current.DesiredWorldExclusions = WorldExclusions;
+	Current.bHasDesiredExclusions = true;
 	auto EqualBoxes = [](TConstArrayView<FBox> Left, TConstArrayView<FBox> Right, bool& OutEqual) -> FVoxelGameThreadContinuation
 	{
 		OutEqual = Left.Num() == Right.Num();
@@ -220,110 +325,44 @@ FVoxelGameThreadContinuation FVoxelViewPublisher::SetCoverageSteps(
 			OutEqual = Left[Index] == Right[Index];
 		}
 	};
+	if (bHasProjected)
 	{
-		const FUpdate* Latest = nullptr;
-		if (const int32* Index = PendingUpdateIndices.Find(ActorKey))
-			Latest = &PendingUpdates[*Index];
-		else if (PendingPlan)
+		bool bSameCommon = Previous.CommonBoxes == InCommonBoxes;
+		if (!bSameCommon && Previous.CommonBoxes && InCommonBoxes)
+			co_await EqualBoxes(*Previous.CommonBoxes, *InCommonBoxes, bSameCommon);
+		bool bSameLocal = false;
+		co_await EqualBoxes(Previous.LocalWorldBoxes, InWorldCellBoxes, bSameLocal);
+		if (Previous.Source == InSource.Source && Previous.NativeStamp == InSource.NativeStamp &&
+			Previous.Location == InSource.Location && Previous.Scale == InSource.Scale && bSameLocal && bSameCommon)
 		{
-			if (const int32* FrozenIndex = PendingPlan->UpdateIndices.Find(ActorKey))
-				if (PendingPlan->Updates[*FrozenIndex].Source) Latest = &PendingPlan->Updates[*FrozenIndex];
-		}
-		if (!Latest)
-		{
-			uint64 LatestSerial = 0;
-			if (const auto* Generations = ActorUpdateGenerations.Find(ActorKey))
-				for (const auto& Generation : *Generations)
-				{
-					co_await FVoxelGameThreadContinuation::Yield();
-					const auto& Publication = Generation.Publication;
-					const auto& Update = Publication->Updates[Generation.UpdateIndex];
-					if (Publication->bCanceled || Publication->bFinished || !Update.Source || Publication->Serial <= LatestSerial) continue;
-					LatestSerial = Publication->Serial;
-					Latest = &Update;
-				}
-		}
-		if (Latest)
-		{
-			bool bSameCommon = Latest->CommonBoxes == InCommonBoxes;
-			if (!bSameCommon && Latest->CommonBoxes && InCommonBoxes)
-			{
-				co_await EqualBoxes(*Latest->CommonBoxes, *InCommonBoxes, bSameCommon);
-			}
-			bool bSameLocal = false;
-			co_await EqualBoxes(Latest->LocalWorldBoxes, InWorldCellBoxes, bSameLocal);
-			Entry = Entries.Find(ActorKey);
-			if (!Entry)
-			{
-				co_return;
-			}
-			if (Latest->Source == Entry->Source && Latest->Location == Entry->Location && Latest->Scale == Entry->Scale && bSameLocal && bSameCommon)
-			{
-				OutSuccess = true;
-				co_return;
-			}
-		}
-		else if (!Entry->bDirty && Entry->Source == Entry->PresentedSource)
-		{
-			TArray<FBox> Desired;
-			const FVector Origin = Entry->Location / Module.BlockSize();
-			const double Step = Entry->Scale / Module.BlockSize();
-			const FBox Bounds = Entry->Bounds;
-			for (const FBox& WorldBox : Entry->DesiredWorldExclusions)
-			{
-				co_await FVoxelGameThreadContinuation::Yield();
-				const FBox Local((WorldBox.Min - Origin) / Step, (WorldBox.Max - Origin) / Step);
-				if (Bounds.Intersect(Local))
-					Desired.Add(Local);
-			}
-			co_await VoxelMeshClipper::NormalizeBoxesSteps(Desired);
-			Entry = Entries.Find(ActorKey);
-			if (!Entry)
-			{
-				co_return;
-			}
-			bool bSame = false;
-			co_await EqualBoxes(Desired, Entry->Exclusions, bSame);
-			if (bSame)
-			{
-				OutSuccess = true;
-				co_return;
-			}
+			OutSuccess = true;
+			co_return;
 		}
 	}
-	TArray<FBox> LocalWorldBoxes;
-	TArray<FBox> PreviousExclusions;
-	co_await VoxelGameThread::AppendSteps(LocalWorldBoxes, InWorldCellBoxes);
-	Entry = Entries.Find(ActorKey);
-	if (!Entry)
+	else if (!InSource.bSourceDirty && bMatchesPresentedSource)
 	{
-		co_return;
+		TArray<FBox> Desired;
+		const FVector Origin = InSource.Location / Module.BlockSize();
+		const double Step = InSource.Scale / Module.BlockSize();
+		for (const FBox& WorldBox : WorldExclusions)
+		{
+			co_await FVoxelGameThreadContinuation::Yield();
+			const FBox Local((WorldBox.Min - Origin) / Step, (WorldBox.Max - Origin) / Step);
+			if (InSource.Bounds.Intersect(Local)) Desired.Add(Local);
+		}
+		co_await VoxelMeshClipper::NormalizeBoxesSteps(Desired);
+		bool bSame = false;
+		co_await EqualBoxes(Desired, InSource.PreviousExclusions, bSame);
+		if (bSame) { OutSuccess = true; co_return; }
 	}
-	co_await VoxelGameThread::AppendSteps(PreviousExclusions, Entry->Exclusions);
-	Entry = Entries.Find(ActorKey);
-	if (!Entry)
-	{
-		co_return;
-	}
+	if (!Entries.Contains(ActorKey)) co_return;
 	const int32* Existing = PendingUpdateIndices.Find(ActorKey);
 	const int32 Index = Existing ? *Existing : PendingUpdates.AddDefaulted();
 	if (!Existing) PendingUpdateIndices.Add(ActorKey, Index);
-	FUpdate& Update = PendingUpdates[Index];
-	Update = FUpdate();
-	Update.Actor = InActor;
-	Update.Source = Entry->Source;
-	Update.NativeStamp = Entry->NativeStamp;
-	if (Entry->PresentedSource == Entry->Source) Update.NativeMesh = Entry->NativeMesh;
-	Update.TerrainStage = Entry->TerrainStage;
-	Update.Location = Entry->Location;
-	Update.Scale = Entry->Scale;
-	Update.Exclusions = MoveTemp(InWorldCellBoxes);
-	Update.LocalWorldBoxes = MoveTemp(LocalWorldBoxes);
-	Update.CommonBoxes = MoveTemp(InCommonBoxes);
-	Update.Bounds = Entry->Bounds;
-	Update.PreviousExclusions = MoveTemp(PreviousExclusions);
-	Update.bSourceDirty = Entry->bDirty;
-	Update.bTransition = Entry->bTransition;
+	InSource.Exclusions = InWorldCellBoxes;
+	InSource.LocalWorldBoxes = MoveTemp(InWorldCellBoxes);
+	InSource.CommonBoxes = MoveTemp(InCommonBoxes);
+	PendingUpdates[Index] = MoveTemp(InSource);
 	OutSuccess = true;
 }
 
@@ -343,33 +382,10 @@ FVoxelGameThreadContinuation FVoxelViewPublisher::SetSharedCoverageSteps(
 	const FGuid& InGroup, AActor* InActor, TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, bool& OutSuccess)
 {
 	OutSuccess = false;
-	const TWeakObjectPtr<AActor> ActorKey(InActor);
-	const FEntry* Entry = Entries.Find(ActorKey);
-	if (!Entry || !Entry->bPresented || !Entry->PresentedSource)
-	{
-		co_return;
-	}
-	// 远景拓扑等待期间保留已提交的层间裁剪，仅更新与 Fine 共用的覆盖。
-	TArray<FBox> LocalBoxes;
-	co_await VoxelGameThread::AppendSteps(LocalBoxes, Entry->LocalWorldBoxes);
-	co_await SetCoverageSteps(InGroup, InActor, MoveTemp(LocalBoxes), MoveTemp(InCommonBoxes), OutSuccess);
-	Entry = Entries.Find(ActorKey);
-	if (!OutSuccess || !Entry)
-	{
-		OutSuccess = false;
-		co_return;
-	}
-	if (const int32* Index = PendingUpdateIndices.Find(ActorKey))
-	{
-		FUpdate* Update = &PendingUpdates[*Index];
-		Update->Source = Entry->PresentedSource;
-		Update->Bounds = Entry->PresentedWorldBounds.IsValid
-			? FBox((Entry->PresentedWorldBounds.Min - Entry->Location) / Entry->Scale,
-				(Entry->PresentedWorldBounds.Max - Entry->Location) / Entry->Scale)
-			: FBox(ForceInit);
-		Update->bSourceDirty = false;
-		Update->bRetainSource = true;
-	}
+	FUpdate Source;
+	if (!CaptureCoverageSource(InActor, true, Source)) co_return;
+	TArray<FBox> LocalBoxes = Source.LocalWorldBoxes;
+	co_await SetCoverageSourceSteps(InGroup, InActor, MoveTemp(Source), MoveTemp(LocalBoxes), MoveTemp(InCommonBoxes), OutSuccess);
 }
 
 bool FVoxelViewPublisher::SetHidden(const FGuid& InGroup, AActor* InActor, const bool bInHidden)
@@ -395,6 +411,29 @@ bool FVoxelViewPublisher::SetHidden(const FGuid& InGroup, AActor* InActor, const
 		return true;
 	}
 
+	if (!PendingUpdateIndices.Contains(Key))
+	{
+		FUpdate Source;
+		if (CaptureCoverageSource(Key, true, Source))
+		{
+			// 可见性也进入同一原生粗层事务，Actor 标志不能独自代表呈现根中的移除。
+			if (!FindProjectedUpdate(Key))
+			{
+				const FVector Origin = Source.Location / Module.BlockSize();
+				const double Step = Source.Scale / Module.BlockSize();
+				auto Combined = MakeShared<TArray<FBox>, ESPMode::ThreadSafe>();
+				Combined->Reserve(Source.PreviousExclusions.Num());
+				for (const FBox& Box : Source.PreviousExclusions)
+					Combined->Add(FBox(Origin + Box.Min * Step, Origin + Box.Max * Step));
+				Source.CommonBoxes = MoveTemp(Combined);
+			}
+			Source.Exclusions = Source.PreviousExclusions;
+			Source.bUnchanged = true;
+			PendingUpdateIndices.Add(Key, PendingUpdates.Num());
+			PendingUpdates.Add(MoveTemp(Source));
+			OwnerActors.FindOrAdd(Group->Key).Add(Key);
+		}
+	}
 	PendingVisibility.Add(Key, bInHidden);
 	return true;
 }
@@ -607,7 +646,9 @@ FVoxelViewPublisher::FGroupPriority FVoxelViewPublisher::BoundsPriority(const TC
 			Candidate.Service.SourcePriority = Source.GetSchedulingPriority();
 			Candidate.Service.SourceStableKey = Source.Id;
 			// 粗表示邻近观察源不构成 Core/Guard 依赖，不能因此抢占 Near 池。
-			const bool bNear = InStage == 0 && Candidate.Service.DistanceCells <= Policy.CollisionGuardRadiusCells;
+			const bool bLocalRefinement = Source.Has(EVoxelStreamingCapability::LocalRefinement) &&
+				!Source.Has(EVoxelStreamingCapability::WorldVisual);
+			const bool bNear = !bLocalRefinement && InStage == 0 && Candidate.Service.DistanceCells <= Policy.CollisionGuardRadiusCells;
 			Candidate.Service.Band = bNear ?
 				(Candidate.Service.DistanceCells <= Policy.InteractiveRadiusCells ? EVoxelTerrainServiceBand::P0 : EVoxelTerrainServiceBand::P1) :
 				(InStage == 0 ? EVoxelTerrainServiceBand::P2 : InStage == 1 ? EVoxelTerrainServiceBand::P3 :
@@ -1739,64 +1780,117 @@ void FVoxelViewPublisher::RefreshTaskPriorities()
 	TMap<uint64, const FPublication*> Active;
 	for (const auto& Publication : Publications)
 		if (!Publication->bCanceled && !Publication->bFinished) Active.Add(Publication->Serial, &Publication.Get());
-	Scheduler.UpdateServicePriorities([this, &Active](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp,
-		EVoxelWorkClass& WorkClass, FVoxelTerrainServicePriority& ServicePriority)
+	const auto FindNativePublication = [this, &Active](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp) -> const FPublication*
 	{
 		if (Kind != EVoxelTaskKind::BuildViewCoverage || Stamp.WorldEpoch != WorldEpoch ||
-			Stamp.Section.X != MIN_int32 || (Stamp.Section.Y != 2 && Stamp.Section.Y != 3)) return;
-		const FPublication* const* Found = Active.Find(Stamp.Token);
-		if (!Found) return;
-		const FPublication& Publication = **Found;
-		TSet<int32> GroupIndices;
-		if (Stamp.Section.Y == 3)
-		{
-			if (!Publication.Updates.IsValidIndex(Stamp.Section.Z)) return;
-			GroupIndices.Add(Publication.Updates[Stamp.Section.Z].GroupIndex);
-		}
-		else
-		{
-			for (int32 Index = Publication.CoverageIndex;
-				Index < FMath::Min(Publication.Updates.Num(), Publication.CoverageIndex + 128); ++Index)
-				GroupIndices.Add(Publication.Updates[Index].GroupIndex);
-		}
-		TArray<int32> PriorityGroups = GroupIndices.Array();
+			Stamp.OwnerId != NativeOwnerId || Stamp.Section.X != MIN_int32 || Stamp.Section.Y != 7) return nullptr;
+		const FPublication* const* Found = Active.Find(Stamp.OwnerIncarnation);
+		if (!Found || !(**Found).Updates.IsValidIndex(Stamp.Section.Z)) return nullptr;
+		const auto& Update = (**Found).Updates[Stamp.Section.Z];
+		if (!(**Found).Groups.IsValidIndex(Update.GroupIndex)) return nullptr;
+		FVoxelTaskStamp Expected = Update.NativeStamp;
+		Expected.OwnerId = NativeOwnerId;
+		Expected.OwnerIncarnation = (**Found).Serial;
+		Expected.Section = FIntVector(MIN_int32, 7, Stamp.Section.Z);
+		return Expected == Stamp ? *Found : nullptr;
+	};
+	Scheduler.UpdateServicePriorities([this, &FindNativePublication](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp,
+		EVoxelWorkClass& WorkClass, FVoxelTerrainServicePriority& ServicePriority)
+	{
+		const FPublication* Publication = FindNativePublication(Kind, Stamp);
+		if (!Publication) return;
+		const int32 GroupIndex = Publication->Updates[Stamp.Section.Z].GroupIndex;
 		FVoxelTaskRequest Priority;
 		Priority.WorkClass = EVoxelWorkClass::Visible;
-		SetPublicationPriority(Priority, Publication, PriorityGroups);
+		SetPublicationPriority(Priority, *Publication, MakeArrayView(&GroupIndex, 1));
 		WorkClass = Priority.WorkClass;
 		ServicePriority = FVoxelTaskScheduler::ResolveServicePriority(Priority);
 	});
-	Scheduler.UpdateTerrainStages([this, &Active](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp, int32& TerrainStage)
+	Scheduler.UpdateTerrainStages([&FindNativePublication](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp, int32& TerrainStage)
 	{
-		if (Kind != EVoxelTaskKind::BuildViewCoverage || Stamp.WorldEpoch != WorldEpoch ||
-			Stamp.Section.X != MIN_int32 || (Stamp.Section.Y != 2 && Stamp.Section.Y != 3)) return;
-		const FPublication* const* Found = Active.Find(Stamp.Token);
-		if (!Found) return;
-		const FPublication& Publication = **Found;
-		FGroupPriority Priority;
-		if (Stamp.Section.Y == 3)
-		{
-			if (!Publication.Updates.IsValidIndex(Stamp.Section.Z)) return;
-			MergePriority(Priority, Publication.Groups[Publication.Updates[Stamp.Section.Z].GroupIndex].Priority);
-		}
-		else
-		{
-			for (int32 Index = Publication.CoverageIndex;
-				Index < FMath::Min(Publication.Updates.Num(), Publication.CoverageIndex + 128); ++Index)
-				MergePriority(Priority, Publication.Groups[Publication.Updates[Index].GroupIndex].Priority);
-		}
-		TerrainStage = Priority.TerrainStage;
+		const FPublication* Publication = FindNativePublication(Kind, Stamp);
+		if (!Publication) return;
+		TerrainStage = Publication->Groups[Publication->Updates[Stamp.Section.Z].GroupIndex].Priority.TerrainStage;
 	});
+}
+
+FVoxelGameThreadContinuation FVoxelViewPublisher::PrepareCoverageSteps(FPublication& InPublication)
+{
+	for (; InPublication.CoverageIndex < InPublication.Updates.Num(); ++InPublication.CoverageIndex)
+	{
+		FUpdate& Update = InPublication.Updates[InPublication.CoverageIndex];
+		FUpdate Previous;
+		bool bHasPrevious = false;
+		for (;;)
+		{
+			const FPublication* Older = nullptr;
+			const FUpdate* Projected = FindProjectedUpdate(Update.Actor, InPublication.Serial, &Older);
+			if (Older && !Older->bCoveragePrepared)
+			{
+				co_await FVoxelGameThreadContinuation::Yield();
+				continue;
+			}
+			if (Projected) { Previous = *Projected; bHasPrevious = true; }
+			else if (const FEntry* Entry = Entries.Find(Update.Actor); Entry && Entry->PresentedSource)
+			{
+				Previous.Source = Entry->PresentedSource;
+				Previous.NativeStamp = Entry->PresentedNativeStamp;
+				Previous.Exclusions = Entry->Exclusions;
+				Previous.Location = Entry->NativeMesh ? Entry->NativeMesh->WorldCellOrigin * Module.BlockSize() : Entry->Location;
+				Previous.Scale = Entry->NativeMesh ? Entry->NativeMesh->CellScale * Module.BlockSize() : Entry->Scale;
+				Previous.NativeMesh = Entry->NativeMesh;
+				bHasPrevious = true;
+			}
+			break;
+		}
+		const FVector Origin = Update.Location / Module.BlockSize();
+		const double Step = Update.Scale / Module.BlockSize();
+		TArray<FBox> WorldBoxes;
+		co_await VoxelGameThread::AppendSteps(WorldBoxes, Update.LocalWorldBoxes);
+		if (Update.CommonBoxes) co_await VoxelGameThread::AppendSteps(WorldBoxes, *Update.CommonBoxes);
+		Update.Exclusions.Reset();
+		for (const FBox& Box : WorldBoxes)
+		{
+			co_await FVoxelGameThreadContinuation::Yield();
+			const FBox Local((Box.Min - Origin) / Step, (Box.Max - Origin) / Step);
+			if (Update.Bounds.Intersect(Local)) Update.Exclusions.Add(Local);
+		}
+		co_await VoxelMeshClipper::NormalizeBoxesSteps(Update.Exclusions);
+		Update.bSourceDirty = !bHasPrevious || Previous.Source != Update.Source || Previous.NativeStamp != Update.NativeStamp ||
+			Previous.Location != Update.Location || Previous.Scale != Update.Scale;
+		Update.PreviousExclusions = MoveTemp(Previous.Exclusions);
+		co_await FindCoverageChangesSteps(Update.PreviousExclusions, Update.Exclusions, Update.Bounds, Update.ChangedBounds);
+		Update.bUnchanged = !Update.bSourceDirty && Update.ChangedBounds.IsEmpty();
+		if (!Update.bSourceDirty && !Update.NativeMesh) Update.NativeMesh = Previous.NativeMesh;
+		for (FBox& Box : Update.ChangedBounds)
+		{
+			co_await FVoxelGameThreadContinuation::Yield();
+			Box = FBox(Update.Location + Box.Min * Update.Scale, Update.Location + Box.Max * Update.Scale);
+		}
+	}
+	InPublication.bCoveragePrepared = true;
+	InPublication.bCoveragePreparing = false;
 }
 
 void FVoxelViewPublisher::AdmitCoveragePreparation(const FPublicationRef& InPublication, const double InDeadline)
 {
-	(void)InDeadline;
-	// 原始事实已在 Worker 分块。覆盖替换由同一帧 Atom owner 事务完成。
-	InPublication->CoverageIndex = InPublication->Updates.Num();
-	InPublication->bCoveragePrepared = true;
-	InPublication->bCoveragePreparing = false;
+	if (InPublication->bCoveragePrepared || InPublication->bCanceled) return;
+	if (!InPublication->CoverageWork.IsValid())
+	{
+		InPublication->CoverageWork = PrepareCoverageSteps(InPublication.Get());
+		InPublication->bCoveragePreparing = true;
+	}
+	const int32 End = FMath::Min(InPublication->Updates.Num(), InPublication->CoverageIndex +
+		FMath::Max(1, Module.GetViewSettings().Budget.CoveragePreparationBatchSize));
+	// 正文仍由原生 Atom 根处理；此游标只恢复所有权规划所需的覆盖元数据。
+	for (int32 Steps = 0; Steps < 64 && InPublication->CoverageIndex < End &&
+		FPlatformTime::Seconds() < InDeadline && !InPublication->CoverageWork.IsComplete(); ++Steps)
+		InPublication->CoverageWork.Resume();
+	if (InPublication->CoverageIndex == InPublication->Updates.Num() && !InPublication->CoverageWork.IsComplete())
+		InPublication->CoverageWork.Resume();
+	if (InPublication->CoverageWork.IsComplete()) InPublication->CoverageWork.Reset();
 }
+
 bool FVoxelViewPublisher::HigherBuildPriority(const FPublication& Publication, const int32 First, const int32 Second) const
 {
 	const int32 FirstGroup = Publication.Updates[First].GroupIndex;
@@ -1912,7 +2006,7 @@ void FVoxelViewPublisher::CommitReadyGroups(const FPublicationRef& Publication, 
 		});
 		if (bHasChanges && CommittedThisFrame >= Limit) continue;
 		CommitReadyGroup(Publication, Group);
-		CommittedThisFrame += bHasChanges ? 1 : 0;
+		if (Group.bCommitted) CommittedThisFrame += bHasChanges ? 1 : 0;
 		if (FPlatformTime::Seconds() >= Deadline) break;
 	}
 	if (InGroupIndex != INDEX_NONE && Publication->Groups[InGroupIndex].bCommitted) Publication->GroupOrder.Remove(InGroupIndex);
@@ -1936,7 +2030,11 @@ void FVoxelViewPublisher::CommitReadyGroup(const FPublicationRef& Publication, F
 		if (!Actor || !Entry) continue;
 		Entry->LocalWorldBoxes = MoveTemp(Update.LocalWorldBoxes);
 		Update.CommonBoxes.Reset();
-		if (Update.bUnchanged)
+		const bool bRetainedGeometry = !Update.bSourceDirty && Entry->NativeMesh &&
+			Entry->PresentedSource == Update.Source && Entry->PresentedNativeStamp == Update.NativeStamp &&
+			Entry->NativeMesh->WorldCellOrigin == Update.Location / Module.BlockSize() &&
+			Entry->NativeMesh->CellScale == Update.Scale / Module.BlockSize();
+		if (Update.bUnchanged || bRetainedGeometry)
 		{
 			Entry->Exclusions = MoveTemp(Update.Exclusions);
 			Entry->bDirty = Entry->Source != Update.Source || Entry->Location != Update.Location || Entry->Scale != Update.Scale;
@@ -2043,6 +2141,7 @@ void FVoxelViewPublisher::DiscardGroups()
 
 void FVoxelViewPublisher::DiscardPublication(const FPublicationRef& Publication, const bool bInAllowRetry)
 {
+	Publication->CoverageWork.Reset();
 	Publication->bCanceled = true;
 	for (const auto& Group : Publication->Groups) if (!Group.bCommitted)
 		for (const auto& Key : Group.Keys)
@@ -2434,7 +2533,7 @@ void FVoxelViewPublisher::Tick(FVoxelPublishBudget& InBudget, bool bInAllowCommi
 			AdmissionCursor %= Publications.Num();
 			const FPublicationRef Publication = Publications[AdmissionCursor++];
 			if (!Publication->bCanceled && !Publication->bFinished &&
-				((!Publication->bCoveragePrepared && !Publication->bCoveragePreparing) ||
+				((!Publication->bCoveragePrepared) ||
 				(Publication->bGroupsPrepared && !Publication->BuildOrder.IsEmpty()) || !Publication->bBuildOrderInitialized))
 				bWorked = Run(EVoxelPublishPhase::Admission, [this, Publication, &InBudget]
 				{
@@ -2539,6 +2638,8 @@ FVoxelGameThreadContinuation FVoxelViewPublisher::SetScopedCoverageSteps(const F
 	const bool bInRetainPresented)
 {
 	OutSuccess = false;
+	FUpdate Source;
+	if (!CaptureCoverageSource(InActor, bInRetainPresented, Source)) co_return;
 	FEntry* Entry = Entries.Find(TWeakObjectPtr<AActor>(InActor));
 	if (!Entry)
 	{
@@ -2546,7 +2647,7 @@ FVoxelGameThreadContinuation FVoxelViewPublisher::SetScopedCoverageSteps(const F
 	}
 	if (bInRetainPresented)
 	{
-		co_await VoxelGameThread::AppendSteps(InWorldCellBoxes, Entry->LocalWorldBoxes);
+		co_await VoxelGameThread::AppendSteps(InWorldCellBoxes, Source.LocalWorldBoxes);
 	}
 	TArray<FBox> Previous;
 	Entry = Entries.Find(InActor);
@@ -2554,11 +2655,11 @@ FVoxelGameThreadContinuation FVoxelViewPublisher::SetScopedCoverageSteps(const F
 	{
 		co_return;
 	}
-	const FVector Origin = Entry->Location / Module.BlockSize();
-	const double Step = Entry->Scale / Module.BlockSize();
+	const FVector Origin = Source.Location / Module.BlockSize();
+	const double Step = Source.Scale / Module.BlockSize();
 	if (!Entry->bHasDesiredExclusions)
 	{
-		for (const FBox& Box : Entry->Exclusions)
+		for (const FBox& Box : Source.PreviousExclusions)
 		{
 			co_await FVoxelGameThreadContinuation::Yield();
 			Previous.Add(FBox(Origin + Box.Min * Step, Origin + Box.Max * Step));
@@ -2619,35 +2720,7 @@ FVoxelGameThreadContinuation FVoxelViewPublisher::SetScopedCoverageSteps(const F
 		}
 	}
 	co_await VoxelMeshClipper::NormalizeBoxesSteps(Previous);
-	co_await SetCoverageSteps(InGroup, InActor, MoveTemp(Previous), nullptr, OutSuccess);
-	Entry = Entries.Find(InActor);
-	if (!OutSuccess || !Entry)
-	{
-		OutSuccess = false;
-		co_return;
-	}
-	if (bInRetainPresented)
-	{
-		const int32* Index = PendingUpdateIndices.Find(TWeakObjectPtr<AActor>(InActor));
-		if (!Entry->PresentedSource)
-		{
-			OutSuccess = false;
-			co_return;
-		}
-		if (!Index)
-		{
-			co_return;
-		}
-		FUpdate& Update = PendingUpdates[*Index];
-		Update.Source = Entry->PresentedSource;
-		Update.NativeStamp = Entry->PresentedNativeStamp;
-		Update.NativeMesh = Entry->NativeMesh;
-		Update.bSourceDirty = false;
-		Update.bRetainSource = true;
-		Update.Bounds = Entry->PresentedWorldBounds.IsValid ? FBox(
-			(Entry->PresentedWorldBounds.Min - Entry->Location) / Entry->Scale,
-			(Entry->PresentedWorldBounds.Max - Entry->Location) / Entry->Scale) : FBox(ForceInit);
-	}
+	co_await SetCoverageSourceSteps(InGroup, InActor, MoveTemp(Source), MoveTemp(Previous), nullptr, OutSuccess);
 }
 
 bool FVoxelViewPublisher::RunBudgetedPhase(FVoxelPublishBudget& InBudget, const EVoxelPublishPhase InPhase, TFunctionRef<void()> InOperation)

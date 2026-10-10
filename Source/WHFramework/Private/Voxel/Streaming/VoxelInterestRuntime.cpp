@@ -1,9 +1,10 @@
-﻿#include "Voxel/Streaming/VoxelInterestRuntime.h"
+#include "Voxel/Streaming/VoxelInterestRuntime.h"
 
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Rendering/VoxelViewLod.h"
 #include "Voxel/Streaming/VoxelInterestManager.h"
 #include "Misc/ScopeExit.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 
 namespace
 {
@@ -205,6 +206,7 @@ bool FVoxelInterestRuntime::UpdateSnapshot(TConstArrayView<FVoxelStreamingSource
 	TSharedPtr<FVoxelInterestSet, ESPMode::ThreadSafe>& OutInterest, FVoxelInterestDelta& OutDelta,
 	bool& bOutSnapshot, const FVoxelFineResidencyFeedback* InFeedback)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_InterestRuntimeUpdate);
 	OutInterest.Reset();
 	static const FVoxelInterestSet EmptyInterest;
 	const FVoxelInterestSet& PreviousInterest = LatestInterest ? *LatestInterest : EmptyInterest;
@@ -336,6 +338,11 @@ bool FVoxelInterestRuntime::UpdateSnapshot(TConstArrayView<FVoxelStreamingSource
 		const uint64 AcceptedResidency = State.FineResidency.GetResidencyRevision();
 		const bool bHadFineResidency = State.bHasFineResidency;
 		const EVoxelSourceChange Change = ClassifySourceChange(State.Source, Source, InSettings, PreviousInterest.Sources.Find(Source.Id));
+		FVoxelStreamingSource PreviousAtCurrentCenter = State.Source;
+		PreviousAtCurrentCenter.Center = Source.Center;
+		const bool bCoarseSettingsChanged = bPolicyChanged || EnumHasAnyFlags(
+			ClassifySourceChange(PreviousAtCurrentCenter, Source, InSettings, PreviousInterest.Sources.Find(Source.Id)),
+			EVoxelSourceChange::CoarseTopology);
 		bool bRuntimeChanged = bPolicyChanged || EnumHasAnyFlags(Change, EVoxelSourceChange::RuntimeDemand);
 		const bool bCoarseChanged = bPolicyChanged || EnumHasAnyFlags(Change, EVoxelSourceChange::CoarseTopology);
 		bAnyChanged |= Change != EVoxelSourceChange::None;
@@ -461,19 +468,19 @@ bool FVoxelInterestRuntime::UpdateSnapshot(TConstArrayView<FVoxelStreamingSource
 		const FIntVector ProxyAnchor = Snap3D(Source.Center, Steps.Proxy);
 		const FIntPoint SurfaceAnchor = Snap2D(Source.Center, Steps.Surface);
 		const FIntPoint MacroAnchor = Snap2D(Source.Center, Steps.Macro);
-		if (bCoarseChanged || State.ProxyAnchor != ProxyAnchor)
+		if (bCoarseSettingsChanged || State.ProxyAnchor != ProxyAnchor)
 		{
 			State.ProxyAnchor = ProxyAnchor;
 			State.ProxyPlanCenter = Source.Center;
 			bCoarsePlanChanged = true;
 		}
-		if (bCoarseChanged || State.SurfaceAnchor != SurfaceAnchor)
+		if (bCoarseSettingsChanged || State.SurfaceAnchor != SurfaceAnchor)
 		{
 			State.SurfaceAnchor = SurfaceAnchor;
 			State.SurfacePlanCenter = Source.Center;
 			bCoarsePlanChanged = true;
 		}
-		if (bCoarseChanged || State.MacroAnchor != MacroAnchor)
+		if (bCoarseSettingsChanged || State.MacroAnchor != MacroAnchor)
 		{
 			State.MacroAnchor = MacroAnchor;
 			State.MacroPlanCenter = Source.Center;

@@ -1,4 +1,4 @@
-﻿#include "Voxel/Streaming/VoxelEmergeManager.h"
+#include "Voxel/Streaming/VoxelEmergeManager.h"
 
 #include "EngineGlobals.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
@@ -594,6 +594,39 @@ void FVoxelEmergeManager::Tick(const FVoxelInterestSet& InInterest, const uint64
 	const double Started = FPlatformTime::Seconds();
 	const double Deadline = InFrameContext ? InFrameContext->Deadline(InAdmissionMilliseconds) :
 		Started + FMath::Max(0.0, InAdmissionMilliseconds) / 1000.0;
+	if (InNow - LastAdmissionDiagnosticTime >= 5.0)
+	{
+		UE_LOG(LogTemp, Display,
+			TEXT("Voxel emerge admission: desired=%llu applied=%llu priority=%llu/%llu rebuild=%d phase=%d cursor=%d waitingCapacity=%d admission=%d budgetMs=%.3f exact=%d critical=%d ready=%d blocked=%d fallback=%d planPending=%d overlayPending=%d enqueued=%d"),
+			InInterestRevision, CurrentInterestRevision, InInterest.PriorityRevision, CurrentPriorityRevision,
+			DemandRebuild.bActive, DemandRebuild.Phase, DemandRebuild.Cursor, bTickWaitingCapacity,
+			static_cast<int32>(LastResourceAdmission), (Deadline - Started) * 1000.0, CurrentDemand.Num(), CriticalAdmissionKeys.Num(), QueuedCriticalSections.Num(), WaitingPlanSections.Num(), CriticalFallbackCursor,
+			PlanPendingAttempts, OverlayPendingAttempts, EnqueuedTasks);
+		int32 Reported = 0;
+		for (const auto& Pair : WaitingPlanSections)
+		{
+			if (Reported >= 8 || FPlatformTime::Seconds() >= Deadline)
+			{
+				break;
+			}
+			const FVoxelExactDemand* Demand = CurrentDemand.Find(Pair.Key);
+			if (!Demand || !IsCriticalDemand(*Demand))
+			{
+				continue;
+			}
+			const FVoxelSection* Section = Runtime.FindSection(Pair.Key);
+			UE_LOG(LogTemp, Display,
+				TEXT("Voxel critical blocked: section=(%d,%d,%d) epoch=%llu token=%llu serial=%llu status=%d ageMs=%.2f planReady=%d overlayReady=%d factCapacity=%d taskCapacity=%d"),
+				Pair.Key.X, Pair.Key.Y, Pair.Key.Z, Pair.Value.Stamp.Epoch, Pair.Value.Stamp.Token, Pair.Value.Consumer.RequestSerial,
+				Section ? static_cast<int32>(Section->Status) : -1, (InNow - Pair.Value.BlockedSinceSeconds) * 1000.0,
+				Pair.Value.bPlanReady, Pair.Value.bOverlayReady, Pair.Value.bWaitingCapacity, Pair.Value.bWaitingTaskCapacity);
+			++Reported;
+		}
+		LastAdmissionDiagnosticTime = InNow;
+		PlanPendingAttempts = 0;
+		OverlayPendingAttempts = 0;
+		EnqueuedTasks = 0;
+	}
 	if (Started >= Deadline)
 	{
 		return;
@@ -826,37 +859,7 @@ void FVoxelEmergeManager::Tick(const FVoxelInterestSet& InInterest, const uint64
 		}
 	}
 	LastResourceAdmission = EVoxelTerrainResourceAdmission::Granted;
-	if (InNow - LastAdmissionDiagnosticTime >= 5.0 && FPlatformTime::Seconds() < Deadline)
-	{
-		UE_LOG(LogTemp, Display,
-			TEXT("Voxel emerge admission: exact=%d critical=%d ready=%d blocked=%d fallback=%d planPending=%d overlayPending=%d enqueued=%d"),
-			CurrentDemand.Num(), CriticalAdmissionKeys.Num(), QueuedCriticalSections.Num(), WaitingPlanSections.Num(), CriticalFallbackCursor,
-			PlanPendingAttempts, OverlayPendingAttempts, EnqueuedTasks);
-		int32 Reported = 0;
-		for (const auto& Pair : WaitingPlanSections)
-		{
-			if (Reported >= 8 || FPlatformTime::Seconds() >= Deadline)
-			{
-				break;
-			}
-			const FVoxelExactDemand* Demand = CurrentDemand.Find(Pair.Key);
-			if (!Demand || !IsCriticalDemand(*Demand))
-			{
-				continue;
-			}
-			const FVoxelSection* Section = Runtime.FindSection(Pair.Key);
-			UE_LOG(LogTemp, Display,
-				TEXT("Voxel critical blocked: section=(%d,%d,%d) epoch=%llu token=%llu serial=%llu status=%d ageMs=%.2f planReady=%d overlayReady=%d factCapacity=%d taskCapacity=%d"),
-				Pair.Key.X, Pair.Key.Y, Pair.Key.Z, Pair.Value.Stamp.Epoch, Pair.Value.Stamp.Token, Pair.Value.Consumer.RequestSerial,
-				Section ? static_cast<int32>(Section->Status) : -1, (InNow - Pair.Value.BlockedSinceSeconds) * 1000.0,
-				Pair.Value.bPlanReady, Pair.Value.bOverlayReady, Pair.Value.bWaitingCapacity, Pair.Value.bWaitingTaskCapacity);
-			++Reported;
-		}
-		LastAdmissionDiagnosticTime = InNow;
-		PlanPendingAttempts = 0;
-		OverlayPendingAttempts = 0;
-		EnqueuedTasks = 0;
-	}
+
 }
 
 bool FVoxelEmergeManager::OnTask(FVoxelTaskResult&& InResult)

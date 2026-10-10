@@ -1,5 +1,7 @@
 #include "Voxel/Generation/VoxelGenerationAllocation.h"
 
+#include "ProfilingDebugging/CpuProfilerTrace.h"
+
 FVoxelGenerationAllocationScope*& FVoxelGenerationAllocationScope::ActiveScopeSlot()
 {
 	static thread_local FVoxelGenerationAllocationScope* Scope = nullptr;
@@ -111,6 +113,16 @@ bool FVoxelGenerationRequiredSourceScope::Measure(const void* InContext, FEnumer
 bool FVoxelGenerationRequiredSourceScope::MeasureSources(TFunctionRef<void(FVisit)> InEnumerate,
 	const uint64 InExcludedSerial, FVoxelGenerationRequiredCapacity& OutCapacity, FString& OutError)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_SourceCapacityMeasure);
+	struct FIdentity
+	{
+		const void* Object = nullptr;
+		uint64 Serial = 0;
+	};
+	constexpr uint32 SlotCount = 1024;
+	constexpr uint32 MaximumTracked = SlotCount / 2;
+	FIdentity Identities[SlotCount] = {};
+	uint32 Tracked = 0;
 	FVoxelGenerationRequiredCapacity Capacity;
 	uint64 Index = 0;
 	bool bValid = true;
@@ -124,14 +136,39 @@ bool FVoxelGenerationRequiredSourceScope::MeasureSources(TFunctionRef<void(FVisi
 			return;
 		}
 		bool bDuplicate = false;
-		uint64 PrefixIndex = 0;
-		// 枚举前缀而不建立 heap set；同一事实由多个 reader/scope 强持仍只计一次。
-		InEnumerate([&](const FVoxelGenerationRequiredSource& InPrevious)
+		bool bTracked = false;
+		uint32 Slot = (InSource.Serial ? GetTypeHash(InSource.Serial) : PointerHash(InSource.Object)) & (SlotCount - 1);
+		for (uint32 Probe = 0; Probe < SlotCount; ++Probe, Slot = (Slot + 1) & (SlotCount - 1))
 		{
-			if (PrefixIndex++ < SourceIndex && (InSource.Serial
-				? InPrevious.Serial == InSource.Serial
-				: !InPrevious.Serial && InPrevious.Object == InSource.Object)) bDuplicate = true;
-		});
+			auto& Identity = Identities[Slot];
+			if (!Identity.Serial && !Identity.Object)
+			{
+				if (Tracked < MaximumTracked)
+				{
+					Identity = {InSource.Serial ? nullptr : InSource.Object, InSource.Serial};
+					++Tracked;
+					bTracked = true;
+				}
+				break;
+			}
+			if (InSource.Serial ? Identity.Serial == InSource.Serial : !Identity.Serial && Identity.Object == InSource.Object)
+			{
+				bDuplicate = true;
+				bTracked = true;
+				break;
+			}
+		}
+		if (!bTracked)
+		{
+			uint64 PrefixIndex = 0;
+			// 固定栈表不改变来源数量上限；超出栈容量的身份仍按原前缀判定。
+			InEnumerate([&](const FVoxelGenerationRequiredSource& InPrevious)
+			{
+				if (PrefixIndex++ < SourceIndex && (InSource.Serial
+					? InPrevious.Serial == InSource.Serial
+					: !InPrevious.Serial && InPrevious.Object == InSource.Object)) bDuplicate = true;
+			});
+		}
 		if (bDuplicate) return;
 		uint64& Bytes = Capacity.Bytes[static_cast<int32>(InSource.Pool)];
 		if (InSource.Bytes > MAX_uint64 - Bytes || InSource.LeaseCount > MAX_int32 - Capacity.LeaseCount)

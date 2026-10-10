@@ -1,4 +1,4 @@
-﻿#include "Voxel/Rendering/VoxelViewManager.h"
+#include "Voxel/Rendering/VoxelViewManager.h"
 
 #include "Async/Async.h"
 #include "Voxel/Rendering/VoxelViewPublisher.h"
@@ -8,6 +8,20 @@
 
 namespace
 {
+	double BoundInterestOperationEstimate(UVoxelModule& InModule, double& InOutEstimate)
+	{
+		const auto& Policy = InModule.GetViewSettings().Budget;
+		const auto& Frame = InModule.GetTerrainFrameContext();
+		// Interest 每次最多占用 0.5ms slice；估计需能进入动态 floor 帧的一个微步。
+		// EWMA 的旧尖峰不能永久关闭游标，实际耗时仍由 Finish 与共享 deadline 完整记账。
+		const double FrameShare = Frame.IsActive() ? Frame.GetAllocation().TotalMilliseconds * 0.5 : 0.25;
+		const double Ceiling = FMath::Min(0.25, FMath::Min(FrameShare,
+			FMath::Min(double(Policy.TerrainPublishMilliseconds) * 0.5, double(Policy.PublishOperationEstimateCeilingMilliseconds))));
+		const double Floor = FMath::Min(Ceiling, double(Policy.PublishOperationEstimateFloorMilliseconds));
+		InOutEstimate = FMath::Clamp(InOutEstimate, Floor, Ceiling);
+		return InOutEstimate;
+	}
+
 	template<typename PayloadType>
 	struct TVoxelInterestReclaimTask
 	{
@@ -146,7 +160,7 @@ void FVoxelViewManager::AdvanceInterestWorkspace(const double InDeadline)
 	for (int32 Work = 0; Work < 8192 && Workspace.Phase < 14 && FPlatformTime::Seconds() < InDeadline; ++Work)
 	{
 		const double Start = FPlatformTime::Seconds();
-		if (!TerrainFrameBudget.TryStart(EVoxelPublishPhase::Plan, Start, InterestMicrostepEstimateMilliseconds)) return;
+		if (!TerrainFrameBudget.TryStart(EVoxelPublishPhase::Plan, Start, BoundInterestOperationEstimate(Module, InterestMicrostepEstimateMilliseconds))) return;
 		bool bStop = false;
 		switch (Workspace.Phase)
 		{
@@ -264,6 +278,17 @@ void FVoxelViewManager::AdvanceInterestWorkspace(const double InDeadline)
 					Workspace.bWaitingHierarchyCapacity = Workspace.HierarchyAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked;
 					Workspace.HierarchyCapacityVersion = Before;
 					bStop = true;
+					if (Workspace.bWaitingHierarchyCapacity)
+					{
+						const auto Capacity = Scheduler.GetRuntimeResources()->Snapshot();
+						const auto& Geometry = Inputs.Geometry[Workspace.Cursor];
+						UE_LOG(LogTemp, Display,
+							TEXT("Voxel interest hierarchy waiting: cursor=%d/%d representation=%d coordinate=%s level=%u input=%llu/%llu metadata=%llu handles=%llu leases=%d splits=%d release=%llu reason=%s"),
+							Workspace.Cursor, Inputs.Geometry.Num(), int32(Geometry.Key.Representation), *Geometry.Key.Coordinate.ToString(),
+							uint32(Geometry.Key.Level), Capacity.Used[int32(EVoxelTerrainResourcePool::Input)], Capacity.Limits.InputBytes,
+							Capacity.LedgerMetadataBytes, Capacity.LeaseHandleBytes, Capacity.LeaseCount, Capacity.ReservedSplitCount,
+							Before, *Error);
+					}
 					if (!Workspace.bWaitingHierarchyCapacity)
 						UE_LOG(LogTemp, Error, TEXT("Voxel interest geometry rejected before commit: %s"), *Error);
 				}
@@ -295,7 +320,7 @@ bool FVoxelViewManager::TryCommitInterestRoot()
 		return false;
 	}
 	const double Start = FPlatformTime::Seconds();
-	if (!TerrainFrameBudget.TryStart(EVoxelPublishPhase::Plan, Start, InterestMicrostepEstimateMilliseconds)) return false;
+	if (!TerrainFrameBudget.TryStart(EVoxelPublishPhase::Plan, Start, BoundInterestOperationEstimate(Module, InterestMicrostepEstimateMilliseconds))) return false;
 	// 同一次GT步骤交换全部Wanted、根索引、布局与查询快照。
 	auto Previous = MoveTemp(AppliedInputRoot);
 	AppliedInputRoot = MoveTemp(InterestWorkspace->Root);
@@ -340,7 +365,7 @@ void FVoxelViewManager::AdvanceCommittedInterestEvents(const double InDeadline)
 	for (int32 Work = 0; Work < 8192 && FPlatformTime::Seconds() < InDeadline; ++Work)
 	{
 		const double Start = FPlatformTime::Seconds();
-		if (!TerrainFrameBudget.TryStart(EVoxelPublishPhase::Plan, Start, InterestMicrostepEstimateMilliseconds)) return;
+		if (!TerrainFrameBudget.TryStart(EVoxelPublishPhase::Plan, Start, BoundInterestOperationEstimate(Module, InterestMicrostepEstimateMilliseconds))) return;
 		switch (Events.Phase)
 		{
 		case 0:

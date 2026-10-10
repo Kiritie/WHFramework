@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Voxel/Rendering/VoxelStreamingGeometry.h"
@@ -127,6 +127,7 @@ public:
 	bool Remove(const FVoxelTerrainSpatialKey& InKey);
 	bool Remove(const FVoxelTerrainSpatialKey& InKey, FString& OutError);
 	TSharedPtr<const FVoxelCoverageRecord, ESPMode::ThreadSafe> Find(const FVoxelTerrainSpatialKey& InKey) const;
+	bool HasMatchingRecord(const FVoxelCoverageRecord& InRecord) const;
 	void Capture(const FIntVector& InMin, const FIntVector& InMax, FVoxelCoverageLocalSnapshot& OutSnapshot,
 		bool bInIncludePresentation = true, bool bInCountOnly = false) const;
 	// 计数不分配数组；调用方先授予容量，再按同一只读索引捕获。

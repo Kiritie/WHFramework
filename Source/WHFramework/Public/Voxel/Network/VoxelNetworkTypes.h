@@ -164,7 +164,7 @@ struct WHFRAMEWORK_API FVoxelRepresentationWireKey
 
 FORCEINLINE uint32 GetTypeHash(const FVoxelRepresentationWireKey& InKey)
 {
-	return HashCombineFast(::GetTypeHash(InKey.Coordinate), ::GetTypeHash(InKey.Level));
+	return HashCombineFast(UE::Math::GetTypeHash(InKey.Coordinate), ::GetTypeHash(InKey.Level));
 }
 
 struct WHFRAMEWORK_API FVoxelRepresentationRequest

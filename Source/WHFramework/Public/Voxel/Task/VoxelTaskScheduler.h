@@ -202,6 +202,8 @@ struct WHFRAMEWORK_API FVoxelTaskResult
 	bool HasHeavyApply() const;
 };
 
+struct FVoxelTaskExecutionReservation;
+
 struct WHFRAMEWORK_API FVoxelTaskRequest
 {
 	FVoxelTaskRequest() = default;
@@ -250,8 +252,6 @@ struct WHFRAMEWORK_API FVoxelTaskRequest
 
 	double AccumulatedExecuteMilliseconds = 0.0;
 	bool bResumable = false;
-	bool bNativeCapacityBlocked = false;
-	uint64 NativeCapacityVersion = 0;
 	bool bReceiptCapacityBlocked = false;
 	uint64 ReceiptCapacityVersion = 0;
 	TFunction<EVoxelTaskBlockReason()> GetBlockReason;
@@ -315,6 +315,12 @@ struct WHFRAMEWORK_API FVoxelTaskRequest
 	}
 
 private:
+	friend class FVoxelTaskScheduler;
+#if WITH_DEV_AUTOMATION_TESTS
+	friend struct FVoxelSchedulerNativeBackingTestAccess;
+#endif
+	// 接纳前授予；运行时移出 Request，避免控制对象与自身 Slot 形成引用环。
+	TSharedPtr<FVoxelTaskExecutionReservation, ESPMode::ThreadSafe> ExecutionReservation;
 	uint64 ExecuteBindingBytes = 0;
 	uint64 ApplyBindingBytes = 0;
 	uint64 BlockBindingBytes = 0;
@@ -651,6 +657,7 @@ public:
 	static FVoxelTerrainServicePriority ResolveServicePriority(const FVoxelTaskRequest& InRequest);
 
 private:
+	friend struct FVoxelTaskExecutionReservation;
 	FVoxelTaskScheduler(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InTerrainResources,
 		TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InRuntimeResources,
 		const FVoxelGenerationConsumerKey& InControlConsumer, uint64 InRootInputBytes);
@@ -704,6 +711,7 @@ private:
 		uint64 ReservedBytes = 0;
 		uint64 BudgetErrorBytes = 0;
 
+		TSharedPtr<FVoxelTaskExecutionReservation, ESPMode::ThreadSafe> ExecutionReservation;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> SlotLease;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> NativeLease;
 		TSharedPtr<FSlot, ESPMode::ThreadSafe> Slot;
@@ -745,6 +753,8 @@ private:
 	void RefreshBlockReasons();
 	void VisitPriorityStates(TFunctionRef<void(FVoxelTaskRequest&)> InUpdate);
 	FVoxelGenerationConsumerKey ResolveNativeConsumer(const FVoxelTaskRequest& InRequest) const;
+	EVoxelTerrainResourceAdmission ReserveNativeExecution(FVoxelTaskRequest& InRequest,
+		EVoxelTaskBlockReason& OutBlocked);
 
 	template<typename ElementType, typename AllocatorType>
 	bool ReserveArray(TArray<ElementType, AllocatorType>& InArray, const int32 InCount)

@@ -131,6 +131,10 @@ public:
 		const FVoxelGenerationBounds& InBounds,
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr);
+	bool PrepareEnvironmentColumnRead(
+		int32 InX,
+		int32 InY,
+		FString& OutError);
 
 	bool Prepare(
 		const FVoxelGenerationBounds& InBounds,
@@ -210,6 +214,7 @@ private:
 
 		// 数组先释放真实 backing，再销毁覆盖它们的原 Input 租约。
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+		TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> HydrologyRetention;
 		TArray<FVoxelCavePlanPtr> Caves;
 		TArray<FVoxelEcologyPlanPtr> Ecology;
 		TArray<FVoxelFeaturePlanPtr> Features;
@@ -221,6 +226,11 @@ private:
 	};
 
 	bool ValidateConsumer(FString& OutError) const;
+	bool RetainHydrologyReads(
+		const FVoxelGenerationBounds& InBounds,
+		int64 InMargin,
+		TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>& OutRetention,
+		FString& OutError) const;
 
 	bool SamplePlanColumn(
 		const FIntVector& InPosition,

@@ -1,4 +1,4 @@
-﻿#include "Voxel/Components/VoxelCollisionComponent.h"
+#include "Voxel/Components/VoxelCollisionComponent.h"
 
 #include "PhysicsEngine/BodySetup.h"
 #include "PhysicsEngine/BoxElem.h"
@@ -8,6 +8,7 @@
 #include "Physics/PhysicsInterfaceCore.h"
 #include "Physics/PhysicsInterfaceTypes.h"
 #include "UObject/StrongObjectPtr.h"
+#include "UObject/Package.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Task/VoxelTerrainResources.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
@@ -22,7 +23,8 @@ struct FVoxelDetachedPhysicsCook : FVoxelPhysicsRetirementPayload
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PhysicalLease;
 	TStrongObjectPtr<UBodySetup> Setup;
 	TStrongObjectPtr<UPhysicalMaterial> Material;
-	TStrongObjectPtr<UVoxelCollisionComponent> InstalledComponent;
+	// Proxy 的 UserData 地址活到原生退休；移除时解绑 BodyInstance，不保留旧 World。
+	FPhysicsUserData ActorUserData;
 	FVoxelGenerationConsumerKey Consumer;
 	FBodyCollisionData CollisionData;
 	FTransform Transform;
@@ -154,9 +156,10 @@ void UVoxelCollisionComponent::OnCreatePhysicsState()
 
 void UVoxelCollisionComponent::OnDestroyPhysicsState()
 {
-	// Root 在安装前已持有 Cook/Setup/材质和组件；TermBody 后仍等真正的代理销毁证明。
+	// 原生票据持有 Cook/Setup/材质；组件解绑后，地址稳定的 UserData 不再引用其 BodyInstance。
 	if (Cook && bInstalled && NativeTicket)
 	{
+		Cook->ActorUserData = FPhysicsUserData();
 		Cook->bReleaseInputs.Store(true);
 		Super::OnDestroyPhysicsState();
 		NativeTicket->bRemovalIssued = true;
@@ -202,7 +205,8 @@ bool UVoxelCollisionComponent::BeginPrepare(const int32 InBoxCount, const double
 		PreparedReclaimLease = MoveTemp(Reclaim);
 		PreparedPhysicalLease = MoveTemp(InPhysicalLease);
 	}
-	Setup = NewObject<UBodySetup>(this);
+	// 退休几何可晚于组件和 World；组件的 UPROPERTY 与 Cook 分别拥有 Setup。
+	Setup = NewObject<UBodySetup>(GetTransientPackage());
 	Setup->CollisionTraceFlag = CTF_UseSimpleAsComplex;
 	Setup->bNeverNeedsCookedCollisionData = true;
 	Setup->AggGeom.BoxElems.Reserve(InBoxCount);
@@ -420,7 +424,6 @@ bool UVoxelCollisionComponent::PrepareNativeRetirement(
 	if (!Retirement->PrepareTicket(Cook->Actor, Cook->Consumer, Cook, NativeTicket, bNativeCapacityBlocked)) return false;
 	NativeTicket->CookWorkReceipt = Cook->WorkReceipt;
 	NativeTicket->InputWorkReceipt = MoveTemp(InInputWorkReceipt);
-	Cook->InstalledComponent.Reset(this);
 	return true;
 }
 
@@ -444,7 +447,8 @@ bool UVoxelCollisionComponent::InstallPreparedPhysics()
 		BodyInstance.SetPhysicsActor(Cook->Actor);
 		Cook->Actor = nullptr;
 		BodyInstance.PhysicsUserData = FPhysicsUserData(&BodyInstance);
-		FPhysicsInterface::SetActorUserData_AssumesLocked(BodyInstance.GetPhysicsActor(), &BodyInstance.PhysicsUserData);
+		Cook->ActorUserData = FPhysicsUserData(&BodyInstance);
+		FPhysicsInterface::SetActorUserData_AssumesLocked(BodyInstance.GetPhysicsActor(), &Cook->ActorUserData);
 		TArray<FPhysicsActorHandle> Actors;
 		Actors.Reserve(1);
 		Actors.Add(BodyInstance.GetPhysicsActor());

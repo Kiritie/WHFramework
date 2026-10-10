@@ -1,4 +1,4 @@
-﻿#if WITH_DEV_AUTOMATION_TESTS
+#if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
 #include "Voxel/Runtime/VoxelChangeHierarchy.h"
@@ -42,6 +42,19 @@ bool FVoxelNaturalPublicationRevisionTest::RunTest(const FString& InParameters)
 	const FVoxelSurfaceTileKey Surface{FIntPoint::ZeroValue, 0};
 	const FVoxelMacroTileKey Macro{FIntPoint::ZeroValue, 0};
 	FString Error;
+	const auto RegisterRepresentations = [&](FVoxelWorldRuntime& InRuntime)
+	{
+		for (const auto Representation : {EVoxelTerrainRepresentation::VoxelProxy, EVoxelTerrainRepresentation::Surface, EVoxelTerrainRepresentation::Macro})
+		{
+			const bool bProxy = Representation == EVoxelTerrainRepresentation::VoxelProxy;
+			const FVoxelTerrainGeometry Geometry{{Representation, FIntVector::ZeroValue, uint8(bProxy ? 1 : 0)},
+				bProxy ? 2 : 1, -128, 512, 17, 23};
+			if (!TestTrue(TEXT("The edited Runtime owns the actual registered representation"),
+				InRuntime.GetChangeHierarchy().RegisterGeometry(Geometry, Error))) return false;
+		}
+		return true;
+	};
+	if (!RegisterRepresentations(Runtime)) return false;
 	if (!TestTrue(TEXT("First natural section publishes"), PublishTestSection(Runtime, Origin, 0, Error))) return false;
 	const FVoxelChangeHierarchy& Hierarchy = Runtime.GetChangeHierarchy();
 	TestEqual(TEXT("Natural residency preserves procedural Proxy revision"), Hierarchy.GetVoxelProxyRevision(Proxy), 0ull);
@@ -58,6 +71,7 @@ bool FVoxelNaturalPublicationRevisionTest::RunTest(const FString& InParameters)
 	if (!TestTrue(TEXT("Neighbor natural section publishes"), PublishTestSection(Runtime, FIntVector(1, 0, 0), 0, Error))) return false;
 	TestEqual(TEXT("Neighbor residency cannot cancel a prepared changed Proxy"), Hierarchy.GetVoxelProxyRevision(Proxy), ChangedRevision);
 	FVoxelWorldRuntime Replica(1, false, VoxelTest::MakeRegistry(), VoxelTest::MakeGenerator());
+	if (!RegisterRepresentations(Replica)) return false;
 	if (!PublishTestSection(Replica, Origin, 0, Error)) return false;
 	const TMap<int32, FVoxelBlockState> Overlay{{0, FVoxelBlockState(1, 0)}};
 	Replica.InvalidateRemoteSection(Origin);
@@ -85,6 +99,20 @@ bool FVoxelChangeHierarchyRevisionTest::RunTest(const FString& InParameters)
 {
 	(void)InParameters;
 	FVoxelChangeHierarchy Hierarchy;
+	FString Error;
+	const auto Register = [&](const EVoxelTerrainRepresentation Representation, const FIntVector& Coordinate,
+		const uint8 Level, const int32 Step)
+	{
+		return TestTrue(TEXT("The hierarchy tracks a real geometry and sampling halo"),
+			Hierarchy.RegisterGeometry({{Representation, Coordinate, Level}, Step, -128, 512, 17, 23}, Error));
+	};
+	if (!Register(EVoxelTerrainRepresentation::VoxelProxy, {-9, 1, -1}, 1, 2) ||
+		!Register(EVoxelTerrainRepresentation::Macro, {0, 0, 0}, 7, 128) ||
+		!Register(EVoxelTerrainRepresentation::Macro, {3, 0, 0}, 7, 128) ||
+		!Register(EVoxelTerrainRepresentation::VoxelProxy, {0, 0, 0}, 1, 2) ||
+		!Register(EVoxelTerrainRepresentation::VoxelProxy, {0, 0, 1}, 1, 2) ||
+		!Register(EVoxelTerrainRepresentation::VoxelProxy, {0, 0, 2}, 1, 2) ||
+		!Register(EVoxelTerrainRepresentation::Surface, {0, 0, 0}, 0, 1)) return false;
 	const FIntVector Section(-17, 3, -2);
 	const uint64 First = Hierarchy.InvalidateSection(Section);
 	Hierarchy.ReleaseSection(Section);

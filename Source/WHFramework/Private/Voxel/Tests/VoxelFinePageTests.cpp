@@ -1,4 +1,4 @@
-﻿#if WITH_DEV_AUTOMATION_TESTS
+#if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
 #include "Engine/Engine.h"
@@ -139,8 +139,10 @@ bool FVoxelLodPolicyTest::RunTest(const FString& InParameters)
 
 	FString PlanningError;
 	FVoxelStreamingSource Source;
+	Source.Id = FGuid::NewGuid();
 	FVoxelViewSettings Settings;
-	Source.Capabilities = EVoxelStreamingCapability::Data | EVoxelStreamingCapability::FineVisual | EVoxelStreamingCapability::WorldVisual;
+	Source.Capabilities = EVoxelStreamingCapability::Data | EVoxelStreamingCapability::Collision |
+		EVoxelStreamingCapability::FineVisual | EVoxelStreamingCapability::WorldVisual;
 
 	FVoxelSourceInterest Accepted;
 	Accepted.FirstSideCells[0] = 64;
@@ -173,6 +175,11 @@ bool FVoxelLodPolicyTest::RunTest(const FString& InParameters)
 	FVoxelInterestManager Manager;
 	const auto Sources = MakeArrayView(&Source, 1);
 	const auto Baseline = Manager.Compute(Sources, Manifest, Settings);
+	if (!TestTrue(TEXT("Baseline interest has complete valid facts"), Baseline.PlanningError.IsEmpty() && Baseline.FineSections.IsValid()))
+	{
+		AddError(Baseline.PlanningError);
+		return false;
+	}
 
 	Settings.Budget.FineAdmissionPerFrame = 1;
 	Settings.Budget.VoxelProxyAdmissionPerFrame = 1;
@@ -188,8 +195,18 @@ bool FVoxelLodPolicyTest::RunTest(const FString& InParameters)
 	FVoxelInterestSet ProxyB;
 	FVoxelInterestSet FineA;
 	FVoxelInterestSet FineB;
+	FVoxelFineResidency FineResidency;
+	if (!TestTrue(TEXT("Fine demand owns its explicit residency window"), FineResidency.Initialize(Source.Id,
+		Settings.Fine.WindowSettings(), Source.Center, Settings.Fine.InteractiveRadiusCells,
+		Settings.Fine.InteractiveVerticalHalfExtentCells, Settings.Fine.CollisionGuardRadiusCells,
+		Manifest.Settings.MinZ, Manifest.Settings.MaxZ, PlanningError)))
+	{
+		AddError(PlanningError);
+		return false;
+	}
 	Manager.BuildSourceProxy(Source, Manifest, Settings, ProxyA);
-	Manager.BuildSourceExact(Source, Manifest, Settings, FineA);
+	Manager.BuildSourceExact(Source, Manifest, Settings, FineA, nullptr, &FineResidency);
+	if (!TestTrue(TEXT("Fine baseline demand is valid and nonempty"), FineA.PlanningError.IsEmpty() && !FineA.Exact.IsEmpty())) return false;
 
 	Source.View.FineVerticalHalfExtentCells += 64;
 	Manager.BuildSourceProxy(Source, Manifest, Settings, ProxyB);
@@ -198,12 +215,14 @@ bool FVoxelLodPolicyTest::RunTest(const FString& InParameters)
 
 	Source.View.FineVerticalHalfExtentCells -= 64;
 	Source.View.VoxelProxyVerticalHalfExtentCells += 128;
-	Manager.BuildSourceExact(Source, Manifest, Settings, FineB);
+	Manager.BuildSourceExact(Source, Manifest, Settings, FineB, nullptr, &FineResidency);
+	if (!TestTrue(TEXT("Independent Proxy extent keeps valid Fine demand"), FineB.PlanningError.IsEmpty() && !FineB.Exact.IsEmpty())) return false;
 	TestTrue(TEXT("Proxy vertical extent does not change Fine source demand"), FineA.Exact.Num() == FineB.Exact.Num());
 	Source.View.VoxelProxyVerticalHalfExtentCells -= 128;
 
 	Source.VelocityCellsPerSecond = FVector(512, 0, 0);
 	const auto Moving = Manager.Compute(Sources, Manifest, Settings);
+	if (!TestTrue(TEXT("Swept guard planning remains valid"), Moving.PlanningError.IsEmpty() && Moving.FineSections.IsValid())) return false;
 	TestTrue(TEXT("Forward prefetch adds data beyond the stationary set"), Moving.Exact.Num() > Slow.Exact.Num());
 	TestTrue(TEXT("Forward prefetch does not expand the Fine display domain"),
 		Moving.FineSections->Num() == Slow.FineSections->Num() && Moving.FineSections->Includes(*Slow.FineSections));

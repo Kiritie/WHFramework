@@ -16,6 +16,7 @@ public:
 	explicit UVoxelTerrainPrimitiveComponent(
 		const FObjectInitializer& InObjectInitializer);
 	virtual ~UVoxelTerrainPrimitiveComponent() override;
+	virtual int32 GetNumMaterials() const override;
 	virtual FPrimitiveSceneProxy* CreateSceneProxy() override;
 	virtual FBoxSphereBounds CalcBounds(
 		const FTransform& InLocalToWorld) const override;
