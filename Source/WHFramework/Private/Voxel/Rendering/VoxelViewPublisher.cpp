@@ -2483,6 +2483,18 @@ void FVoxelViewPublisher::Tick(FVoxelPublishBudget& InBudget, bool bInAllowCommi
 					Publication->Serial, Index, Group.Keys.Num(), Group.PreparedUpdates, Group.UpdateIndices.Num(),
 					Group.bPriorityReady, static_cast<int32>(Group.Priority.WorkClass), Group.Priority.SourcePriority, FirstSerial,
 					Group.bPrepareQueued, Group.bCommitQueued, Publication->CoverageIndex, Publication->Updates.Num());
+				const bool bGateBlocked = CommitGate && Group.Keys.ContainsByPredicate(
+					[this](const auto& Key) { return !CommitGate(Key); });
+				uint64 ControlReleaseVersion = 0;
+				const bool bControlReleaseKnown = Group.bNativeControlWaiting &&
+					Scheduler.GetTerrainResources()->TryGetReleaseVersionExcludingOwner(Group.NativeControlConsumer, ControlReleaseVersion);
+				UE_LOG(LogTemp, Display, TEXT("Publisher gate diagnostic: serial=%llu index=%d allowCommit=%d coverageGate=%d ownerGate=%d controlWait=%d bootstrapWait=%d controlVersion=%llu releaseKnown=%d releaseVersion=%llu frontendVersion=%llu currentFrontendVersion=%llu stateAdmission=%d transaction=%d submitted=%d sourceCursor=%d/%d dependencyActive=%d dependencySerial=%llu dependencyNext=%llu"),
+					Publication->Serial, Index, bInAllowCommit, bGateBlocked, FirstSerial < Publication->Serial,
+					Group.bNativeControlWaiting, Group.bNativeBootstrapWaiting, Group.NativeControlVersion,
+					bControlReleaseKnown, ControlReleaseVersion, Group.NativeFrontendVersion, TerrainRenderer->GetCoarseAdmissionVersion(),
+					static_cast<int32>(TerrainRenderer->GetNativeStateAdmission()), Group.NativeTransaction.IsValid(),
+					Group.bNativeSubmitted, Group.NativeSourceCursor, Group.NativeChanges.Num(),
+					Group.bDependencyQueryActive, Group.DependencyQuerySerial, Group.DependencyNextSerial);
 				++LoggedGroups;
 			}
 		}

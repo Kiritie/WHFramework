@@ -1206,6 +1206,18 @@ void FVoxelTaskScheduler::Tick(
 				for (auto* Mesh : Meshes) if (Mesh) Mesh->WorkReceipt = Result.WorkReceipt;
 			}
 
+#if !UE_BUILD_SHIPPING
+			if (!Result.bSuccess && !Result.bCanceled)
+			{
+				UE_LOG(LogTemp, Display, TEXT("Voxel task failure: kind=%d epoch=%llu owner=%08x%08x%08x%08x incarnation=%llu token=%llu section=(%d,%d,%d) input=%llu reserved=%llu executeMs=%.3f error=%s"),
+					static_cast<int32>(Result.Kind), Result.Stamp.WorldEpoch,
+					Result.Stamp.OwnerId.A, Result.Stamp.OwnerId.B, Result.Stamp.OwnerId.C, Result.Stamp.OwnerId.D,
+					Result.Stamp.OwnerIncarnation, Result.Stamp.Token,
+					Result.Stamp.Section.X, Result.Stamp.Section.Y, Result.Stamp.Section.Z,
+					OriginalRequest.InputBytes, OriginalRequest.ReservedBytes, Result.ExecuteMilliseconds, *Result.Error);
+			}
+#endif
+
 			/**
 			 * Move 前缓存 diagnostics。
 			 */
