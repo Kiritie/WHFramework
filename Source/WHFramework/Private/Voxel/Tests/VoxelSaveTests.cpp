@@ -3,6 +3,7 @@
 #include "HAL/FileManager.h"
 #include "HAL/PlatformProcess.h"
 #include "HAL/PlatformFileManager.h"
+#include "HAL/PlatformMisc.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Main/MainModule.h"
@@ -398,8 +399,20 @@ bool FVoxelSceneColumnPinnedReadTest::RunTest(const FString& InParameters)
 		FPlatformProcess::SleepNoStats(0.001f);
 	TestTrue(TEXT("Scene source pin eventually releases after actual background destruction"),
 		FSaveGameGenerationReadLease::GetPinCount(SourceDirectory) == 0);
-	TestTrue(TEXT("Fixture world retires after its last actual reader"), Storage.DeleteWorldDirectory(SaveId));
-	IFileManager::Get().DeleteDirectory(*Root, false, true);
+	const uint64 WorldPins = FSaveGameGenerationReadLease::GetPinCount(Storage.GetWorldDir(SaveId));
+	TestEqual(TEXT("场景源释放后整槽没有其他读租约"), WorldPins, uint64(0));
+	const bool bRetired = Storage.DeleteWorldDirectory(SaveId);
+	const uint32 RetirementError = FPlatformMisc::GetLastError();
+	TestTrue(TEXT("Fixture world retires after its last actual reader"), bRetired);
+	if (bRetired)
+	{
+		IFileManager::Get().DeleteDirectory(*Root, false, true);
+	}
+	else
+	{
+		AddError(FString::Printf(TEXT("Scene fixture retirement rejected: nativeError=%u worldPins=%llu root=%s saveId=%s"),
+			RetirementError, WorldPins, *Root, *SaveId.ToString(EGuidFormats::Digits)));
+	}
 	return true;
 }
 

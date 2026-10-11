@@ -755,9 +755,12 @@ bool FVoxelInterestInputBudgetTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("Applied interest retains runnable admission priorities"), !Manager.AdmissionPriorities.IsEmpty());
 	TestEqual(TEXT("Applied admission entries match the accepted worker snapshot"), Manager.Admissions.Num(), Interest.Admissions.Num());
 	TestEqual(TEXT("The final complete snapshot was adopted"), Manager.AppliedInterestSnapshot->PublicationRevision, uint64(2));
+	for (int32 Slice = 0; Slice < 4096 && Manager.CommittedWorkspaceEvents; ++Slice) Advance(2);
+	if (!TestFalse(TEXT("Accepted input events finish before the next workspace begins"), Manager.CommittedWorkspaceEvents.IsValid())) return false;
 	Interest.PublicationRevision = 3;
 	QueueDesired(Interest);
-	for (int32 Slice = 0; Slice < 4096 && !Manager.PendingInterestSnapshot; ++Slice) Advance(3);
+	if (!TestTrue(TEXT("Begin the production workspace before advancing its bounded cursor"),
+		Manager.BeginInterestWorkspace(Module->GetDesiredInterestSnapshot()))) return false;
 	if (!TestTrue(TEXT("A complete in-flight snapshot is retained"), Manager.PendingInterestSnapshot.IsValid())) return false;
 	bool bThirdSnapshotCompleted = false;
 	for (uint64 Revision = 4; Revision <= 8; ++Revision)

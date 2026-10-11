@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "Voxel/Streaming/VoxelInterestManager.h"
+#include "Voxel/Streaming/VoxelInterestRuntime.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Task/VoxelTerrainWorkSelection.h"
 
@@ -50,8 +51,63 @@ bool FVoxelInterestPriorityPublicationTest::RunTest(const FString& InParameters)
 	TestEqual(TEXT("旧发布输入仍保持原优先级"), PreviousInputs->Admissions[0].Priority, 4);
 	TestEqual(TEXT("新发布输入包含新优先级"), Next.PublicationInputs->Admissions[0].Priority, 9);
 	TestEqual(TEXT("精确集合保持"), Next.Exact.Num(), Previous.Exact.Num());
-	TestTrue(TEXT("复制表的独立租约涵盖实际分配"), Next.CopyLease && Next.CopyLease->Bytes() >= Next.GetOwnedAllocatedBytes());
+	if (!TestTrue(TEXT("副本与重排分别持有独立租约"), Next.CopyLease && Next.FinalizationLease &&
+		Next.CopyLease != Next.FinalizationLease)) return false;
+	TestTrue(TEXT("两个租约属于原输入账本"), Next.CopyLease->IsOwnedBy(*Resources) &&
+		Next.FinalizationLease->IsOwnedBy(*Resources) && Next.CopyLease->GetPool() == EVoxelTerrainResourcePool::Input &&
+		Next.FinalizationLease->GetPool() == EVoxelTerrainResourcePool::Input);
+	const uint64 FinalizationBytes = Next.GetFinalizationAllocatedBytes();
+	TestEqual(TEXT("重排租约按其实际容器容量结算"), Next.FinalizationLease->Bytes(), FMath::Max<uint64>(1, FinalizationBytes));
+	TestEqual(TEXT("复制租约只承担非重排容器"), Next.CopyLease->Bytes(),
+		FMath::Max<uint64>(1, Next.GetOwnedAllocatedBytes() - FinalizationBytes));
+	TestTrue(TEXT("全部独立分配有实际授额"), Next.GetResourceAccountedBytes() >= Next.GetOwnedAllocatedBytes());
 	TestTrue(TEXT("不可变Fine内容集合复用"), Next.FineSections == Previous.FineSections);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelInterestPriorityDeltaAccountingTest,
+	"WHFramework.Voxel.FineRefactor.Interest.PriorityDeltaAccounting",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelInterestPriorityDeltaAccountingTest::RunTest(const FString& InParameters)
+{
+	const auto Resources = MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
+	Resources->Configure({});
+	const auto Consumer = FVoxelGenerationConsumerKey::Section(31, FGuid::NewGuid(), 1, {}, 1);
+	FVoxelInterestRuntime Runtime;
+	Runtime.BindPlanningResources(Resources, Consumer);
+	FVoxelWorldManifest Manifest;
+	Manifest.Settings.MinZ = -32;
+	Manifest.Settings.MaxZ = 32;
+	FVoxelViewSettings Settings;
+	FVoxelStreamingSource Source;
+	Source.Id = FGuid::NewGuid();
+	Source.Center = FIntVector(8);
+	Source.Capabilities = EVoxelStreamingCapability::Data | EVoxelStreamingCapability::Collision;
+	Source.ExactRadius = Source.CollisionRadius = 1;
+	Source.bInheritWorldView = false;
+	Source.Normalize();
+	FVoxelInterestDelta Delta;
+	TSharedPtr<FVoxelInterestSet, ESPMode::ThreadSafe> Initial;
+	bool bSnapshot = false;
+	Runtime.UpdateSnapshot(MakeArrayView(&Source, 1), Manifest, Settings, Initial, Delta, bSnapshot);
+	if (!TestTrue(TEXT("原账本授额后发布初始碰撞需求"), bSnapshot && Initial &&
+		Initial->PlanningError.IsEmpty() && Delta.ResourceLease && !Delta.AddedExact.IsEmpty())) return false;
+	TestTrue(TEXT("拓扑Delta的实际独立分配由原租约覆盖"),
+		Delta.GetAllocatedBytes() > 0 && Delta.ResourceLease->Bytes() >= Delta.GetAllocatedBytes());
+	Source.Center.X += 1;
+	Source.Priority = 9;
+	TSharedPtr<FVoxelInterestSet, ESPMode::ThreadSafe> Updated;
+	const bool bChanged = Runtime.UpdateSnapshot(MakeArrayView(&Source, 1), Manifest, Settings, Updated, Delta, bSnapshot);
+	if (!TestTrue(TEXT("窗内移动发布完整优先级快照"), bSnapshot && Updated)) return false;
+	TestFalse(TEXT("窗内移动不重建拓扑"), bChanged);
+	TestEqual(TEXT("快照接纳实际移动位置"), Updated->Sources.FindChecked(Source.Id).Source.Center, Source.Center);
+	TestEqual(TEXT("内容发布版本保持"), Updated->PublicationRevision, Initial->PublicationRevision);
+	TestTrue(TEXT("优先级版本推进"), Updated->PriorityRevision > Initial->PriorityRevision);
+	TestEqual(TEXT("无拓扑事件的Delta没有独立heap分配"), Delta.GetAllocatedBytes(), uint64(0));
+	TestFalse(TEXT("空Delta不需要额外输入租约"), Delta.ResourceLease.IsValid());
+	TestTrue(TEXT("优先级结果的全部独立分配有授额，不重复统计内联Delta"),
+		Updated->GetResourceAccountedBytes() >= Updated->GetOwnedAllocatedBytes() + Delta.GetAllocatedBytes());
 	return true;
 }
 

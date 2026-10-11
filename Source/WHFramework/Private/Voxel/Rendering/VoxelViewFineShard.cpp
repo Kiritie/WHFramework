@@ -1081,8 +1081,7 @@ void FVoxelViewManager::PrepareFineShardPresentations(const double InDeadline)
 	if (StartedScanning >= Deadline) return;
 	const double ScanDeadline = StartedScanning + (Deadline - StartedScanning) * 0.5;
 	FVoxelTerrainRenderer& Renderer = Publisher->GetTerrainRenderer();
-	TArray<FVoxelTerrainServiceCandidate, TInlineAllocator<64>> Candidates;
-	TArray<FVoxelFineShardKey, TInlineAllocator<64>> Keys;
+	FVoxelTerrainServiceCandidateSet CandidateSet;
 	const int32 BandCount = static_cast<int32>(EVoxelTerrainServiceBand::Count) - 1;
 	const int32 FirstBand = FineShardPresentationCursor;
 	FineShardPresentationCursor = (FineShardPresentationCursor + 1) % BandCount;
@@ -1090,7 +1089,7 @@ void FVoxelViewManager::PrepareFineShardPresentations(const double InDeadline)
 	{
 		const int32 Band = 1 + (FirstBand + Offset) % BandCount;
 		auto& Queue = FinePresentationQueues[Band];
-		const int32 ScanCount = FMath::Min(8, Queue.GetMaxIndex());
+		const int32 ScanCount = Queue.GetMaxIndex();
 		for (int32 Scan = 0; Scan < ScanCount && FPlatformTime::Seconds() < ScanDeadline; ++Scan)
 		{
 			if (Queue.IsEmpty()) break;
@@ -1139,15 +1138,17 @@ void FVoxelViewManager::PrepareFineShardPresentations(const double InDeadline)
 			}
 			else if (const auto* Demand = GetViewInterest().FineShardDemands.Find(Key)) Priority = &Demand->ServicePriority;
 			if (!Priority) continue;
-			auto& Candidate = Candidates.AddDefaulted_GetRef();
-			Candidate.Index = Keys.Add(Key);
+			FVoxelTerrainServiceCandidate Candidate;
+			Candidate.Index = Slot->OrderIndex;
 			Candidate.Priority = *Priority;
 			Candidate.FirstQueuedSeconds = Slot->PresentationQueuedAt;
 			Candidate.Sequence = Slot->QueueSequence;
 			Candidate.EstimatedMicroseconds = FineShardPresentationCostMicroseconds;
 			Candidate.bRunnable = true;
+			CandidateSet.Add(Candidate);
 		}
 	}
+	const auto Candidates = CandidateSet.GetCandidates();
 	if (Candidates.IsEmpty() || FPlatformTime::Seconds() >= Deadline) return;
 	FVoxelTerrainServiceCapacity Capacity;
 	Capacity.bAllowOverdueOpportunity = Module.GetTerrainFrameContext().IsOverdueOpportunityAvailable();
@@ -1162,7 +1163,7 @@ void FVoxelViewManager::PrepareFineShardPresentations(const double InDeadline)
 	}
 	if (Charge.bOverdueOpportunity) Module.GetTerrainFrameContext().ConsumeOverdueOpportunity();
 	const double Started = FPlatformTime::Seconds();
-	const FVoxelFineShardKey Key = Keys[Chosen];
+	const FVoxelFineShardKey Key = FineShardSlotOrder[Chosen];
 	FFineShardSlot& Slot = FineShardSlots.FindChecked(Key);
 	const auto Geometry = Slot.Build.GetPreparedGeometry();
 	const auto Resources = Scheduler.GetTerrainResources();
@@ -1363,12 +1364,15 @@ void FVoxelViewManager::PrepareFineShardPresentations(const double InDeadline)
 					Module.GetRuntime()->GetChangeHierarchy().GetFineShardRevision(Key) == Input.DataRevision;
 			},
 			[this](const FIntVector& CheckSection, const FVoxelFineOwnerEvidence&) { return Module.IsCollisionReady(CheckSection); },
-			[this, Section] { OnPresentationReady(Section); }, Transaction, Candidates[Chosen].Priority, Slot.FirstQueuedSeconds,
+			[this, Section] { OnPresentationReady(Section); }, Transaction,
+			Candidates.FindByPredicate([Chosen](const auto& Candidate) { return Candidate.Index == Chosen; })->Priority, Slot.FirstQueuedSeconds,
 			&TransactionAdmission, Slot.Consumer)) PendingTransaction = Transaction;
 		else if (TransactionAdmission != EVoxelTerrainResourceAdmission::Granted)
 			ObserveRenderAdmission(TransactionAdmission, BeforeTransaction);
 	};
 	Advance();
+	// 每次实际服务只消费一个微步骤，后续步骤重新累计等待年龄。
+	Slot.PresentationQueuedAt = FPlatformTime::Seconds();
 	if (Slot.bPresentationComplete && Slot.PresentationQueueIndex != INDEX_NONE)
 	{
 		FinePresentationQueues[Slot.PresentationQueueBand].RemoveAt(Slot.PresentationQueueIndex);

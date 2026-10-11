@@ -29,16 +29,8 @@ struct WHFRAMEWORK_API FVoxelInterestDelta
 	bool bFineResidencyChanged = false;
 	bool bPageLayoutChanged = false;
 
-	uint64 GetAllocatedBytes() const
-	{
-		return AddedExact.GetAllocatedSize() + RemovedExact.GetAllocatedSize() +
-			AddedSimulation.GetAllocatedSize() + RemovedSimulation.GetAllocatedSize() +
-			AddedFine.GetAllocatedSize() + RemovedFine.GetAllocatedSize() +
-			FineResidency.Added.GetAllocatedSize() + FineResidency.Removed.GetAllocatedSize() + FineResidency.Retained.GetAllocatedSize() +
-			AddedProxy.GetAllocatedSize() + RemovedProxy.GetAllocatedSize() +
-			AddedSurface.GetAllocatedSize() + RemovedSurface.GetAllocatedSize() +
-			AddedMacro.GetAllocatedSize() + RemovedMacro.GetAllocatedSize() + ChangedGeometry.GetAllocatedSize();
-	}
+	// 对象内的 set allocation flags 已由任务 metadata 持有，只结算独立 heap backing。
+	uint64 GetAllocatedBytes() const;
 
 	void Reset()
 	{

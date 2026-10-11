@@ -187,7 +187,8 @@ uint64 FVoxelNetworkEnvelopeDecode::GetAllocatedBytes() const
 {
 	return VoxelBoundedAllocation::WorkerSharedBytes<FVoxelNetworkEnvelopeDecode>() +
 		Bytes.GetAllocatedSize() +
-		Message.Payload.GetAllocatedSize() + Overlay.AllocatedBytes() +
+		Message.Payload.GetAllocatedSize() + Overlay.Heads.GetAllocatedSize() +
+		Overlay.Entries.GetAllocatedSize() + Overlay.Payload.GetAllocatedSize() +
 		(RepresentationReply.SharedData ? RepresentationReply.SharedData->Bytes.GetAllocatedSize() +
 			VoxelBoundedAllocation::WorkerSharedBytes<FVoxelRepresentationReplyData>() : 0);
 }

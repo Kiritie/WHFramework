@@ -47,6 +47,45 @@ struct WHFRAMEWORK_API FVoxelTerrainServiceCandidate
 	bool bRunnable = false;
 };
 
+// 有界扫描只保留各服务带的优先项与最老项，与选择器的两种选择完全对应。
+struct FVoxelTerrainServiceCandidateSet
+{
+	void Add(const FVoxelTerrainServiceCandidate& InCandidate)
+	{
+		const int32 Band = int32(InCandidate.Priority.Band);
+		if (!InCandidate.bRunnable || InCandidate.Index == INDEX_NONE || Band <= 0 || Band >= BandCount) return;
+		const auto IsOlder = [](const auto& First, const auto& Second)
+		{
+			return First.FirstQueuedSeconds != Second.FirstQueuedSeconds ?
+				First.FirstQueuedSeconds < Second.FirstQueuedSeconds : First.Sequence < Second.Sequence;
+		};
+		auto& Normal = NormalHeads[Band];
+		if (Normal.Index == INDEX_NONE || HigherPriority(InCandidate.Priority, Normal.Priority) ||
+			(InCandidate.Priority == Normal.Priority && IsOlder(InCandidate, Normal))) Normal = InCandidate;
+		auto& Oldest = OldestHeads[Band];
+		if (Oldest.Index == INDEX_NONE || IsOlder(InCandidate, Oldest)) Oldest = InCandidate;
+	}
+
+	TConstArrayView<FVoxelTerrainServiceCandidate> GetCandidates()
+	{
+		int32 Count = 0;
+		for (int32 Band = 1; Band < BandCount; ++Band)
+		{
+			if (NormalHeads[Band].Index == INDEX_NONE) continue;
+			Heads[Count++] = NormalHeads[Band];
+			if (OldestHeads[Band].Index != NormalHeads[Band].Index) Heads[Count++] = OldestHeads[Band];
+		}
+		return MakeArrayView(Heads, Count);
+	}
+
+private:
+	static bool HigherPriority(const FVoxelTerrainServicePriority& First, const FVoxelTerrainServicePriority& Second);
+	static constexpr int32 BandCount = int32(EVoxelTerrainServiceBand::Count);
+	FVoxelTerrainServiceCandidate NormalHeads[BandCount];
+	FVoxelTerrainServiceCandidate OldestHeads[BandCount];
+	FVoxelTerrainServiceCandidate Heads[2 * (BandCount - 1)];
+};
+
 struct WHFRAMEWORK_API FVoxelTerrainServiceCapacity
 {
 	int32 MaximumWorkers = 1;
@@ -121,3 +160,9 @@ private:
 	bool bAccountingFault = false;
 	EVoxelTerrainResourceAdmission Admission = EVoxelTerrainResourceAdmission::None;
 };
+
+inline bool FVoxelTerrainServiceCandidateSet::HigherPriority(const FVoxelTerrainServicePriority& First,
+	const FVoxelTerrainServicePriority& Second)
+{
+	return FVoxelTerrainWorkSelection::HigherPriority(First, Second);
+}

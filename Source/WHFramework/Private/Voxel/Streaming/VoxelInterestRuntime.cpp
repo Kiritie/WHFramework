@@ -1,10 +1,23 @@
 #include "Voxel/Streaming/VoxelInterestRuntime.h"
 
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Rendering/VoxelViewLod.h"
 #include "Voxel/Streaming/VoxelInterestManager.h"
 #include "Misc/ScopeExit.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
+
+uint64 FVoxelInterestDelta::GetAllocatedBytes() const
+{
+	using VoxelGenerationAllocation::AllocatedBytes;
+	return AllocatedBytes(AddedExact) + AllocatedBytes(RemovedExact) +
+		AllocatedBytes(AddedSimulation) + AllocatedBytes(RemovedSimulation) +
+		AllocatedBytes(AddedFine) + AllocatedBytes(RemovedFine) +
+		AllocatedBytes(FineResidency.Added) + AllocatedBytes(FineResidency.Removed) + AllocatedBytes(FineResidency.Retained) +
+		AllocatedBytes(AddedProxy) + AllocatedBytes(RemovedProxy) +
+		AllocatedBytes(AddedSurface) + AllocatedBytes(RemovedSurface) +
+		AllocatedBytes(AddedMacro) + AllocatedBytes(RemovedMacro) + AllocatedBytes(ChangedGeometry);
+}
 
 namespace
 {

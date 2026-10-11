@@ -200,9 +200,12 @@ bool FVoxelSaveExecutorCapacityCutTest::RunTest(const FString& InParameters)
 	while (!Adapter.CanCapture() && FPlatformTime::Seconds() < CancelRetireDeadline) FPlatformProcess::SleepNoStats(0.001f);
 	Manifest.SaveId = FGuid::NewGuid();
 	Manifest.CurrentGeneration = 0;
+	Manifest.LastCommitOperationId.Invalidate();
 	Stage = TEXT("cancelable created slot capture");
-	if (!Adapter.CanCapture() || !Storage.CreateWorldDirectory(Manifest.SaveId) ||
-		!Storage.WriteManifestAtomic(Manifest.SaveId, Manifest) || !MakePlan(true, Plan) || !HoldWorkingCapacity()) return false;
+	if (!TestTrue(TEXT("冲突切点退休后可以捕获新槽"), Adapter.CanCapture()) ||
+		!TestTrue(TEXT("取消夹具创建独立新槽"), Storage.CreateWorldDirectory(Manifest.SaveId)) ||
+		!TestTrue(TEXT("独立新槽写入无旧提交身份的gen0清单"), Storage.WriteManifestAtomic(Manifest.SaveId, Manifest)) ||
+		!MakePlan(true, Plan) || !HoldWorkingCapacity()) return false;
 	if (!Executor.Start(MoveTemp(Plan), &Error) || !WaitForCapacity(Executor)) return false;
 	Executor.RequestCancel();
 	if (!TestTrue(TEXT("取消容量等待无需先释放容量，也不在 GT 执行原生清理"), WaitForResult(Executor, Result))) return false;

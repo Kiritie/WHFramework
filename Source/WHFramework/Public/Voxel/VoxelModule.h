@@ -215,6 +215,7 @@ public:
 	bool IsPersistenceEnabled() const;
 	TSoftObjectPtr<UVoxelWorldGenerationProfile> GetWorldGenerationProfileAsset() const;
 	int32 GetDefaultWorldSeed() const;
+	int32 ResolveDefaultWorldSeed() const;
 
 	FGuid RegisterSource(UObject* InOwner, const FVoxelStreamingSource& InSource);
 	bool UpdateSource(const FGuid& InId, const FVoxelStreamingSource& InSource);
@@ -347,7 +348,7 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Voxel|Generation")
 	TSoftObjectPtr<UVoxelWorldGenerationProfile> WorldGenerationProfileAsset;
 
-	UPROPERTY(EditAnywhere, Category = "Voxel|Generation")
+	UPROPERTY(EditAnywhere, Category = "Voxel|Generation", meta = (ToolTip = "Zero chooses a random positive seed when creating an automatic world."))
 	int32 DefaultWorldSeed = 1;
 
 	UPROPERTY(Transient)

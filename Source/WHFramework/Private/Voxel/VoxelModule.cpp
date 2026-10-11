@@ -313,7 +313,7 @@ void UVoxelModule::OnPreparatory(const EPhase InPhase)
 	if (bAutoGenerate && IsAuthority() && !Runtime && WorldState != EVoxelWorldState::Failed)
 	{
 		FString Error;
-		if (!CreateWorldFromProfile(DefaultWorldSeed, Error))
+		if (!CreateWorldFromProfile(ResolveDefaultWorldSeed(), Error))
 		{
 			UE_LOG(LogTemp, Error, TEXT("Voxel auto world creation: %s"), *Error);
 		}
@@ -1926,6 +1926,12 @@ int32 UVoxelModule::GetDefaultWorldSeed() const
 	return DefaultWorldSeed;
 }
 
+int32 UVoxelModule::ResolveDefaultWorldSeed() const
+{
+	return DefaultWorldSeed == 0 ?
+		FMath::Max(1, static_cast<int32>(FGuid::NewGuid().A & 0x7fffffffu)) : DefaultWorldSeed;
+}
+
 FGuid UVoxelModule::RegisterSource(UObject* InOwner, const FVoxelStreamingSource& InSource)
 {
 	if (!InOwner || !IsReady())
@@ -2461,7 +2467,8 @@ void UVoxelModule::RefreshInterest(
 			Payload->ErrorBuffer.Empty();
 			Payload->ErrorLease.Reset();
 		}
-		Result.CustomPayload = Payload;
+		// Failed planning only needs its error and lease. The unfinished snapshot and delta are not publication results.
+		if (Result.bSuccess) Result.CustomPayload = Payload;
 		return Result;
 	}, CallbackBindingError))
 		{
