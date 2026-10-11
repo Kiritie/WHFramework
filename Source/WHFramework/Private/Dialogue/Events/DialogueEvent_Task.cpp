@@ -3,6 +3,7 @@
 #include "Task/TaskAgentInterface.h"
 #include "Task/TaskComponent.h"
 #include "Task/TaskModule.h"
+#include "GameFramework/PlayerController.h"
 
 void UDialogueEvent_Task::PostLoad()
 {
@@ -12,15 +13,15 @@ void UDialogueEvent_Task::PostLoad()
 
 bool UDialogueEvent_Task::Execute_Implementation(const FInteractionContext& InContext, FText& OutReason) const
 {
-	return ApplyTaskAction(InContext.Target);
+	return ApplyTaskAction(InContext.Target, InContext.Interactor);
 }
 
 void UDialogueEvent_Task::ReceiveEventTriggered_Implementation(APlayerController* ConsideringPlayer, AActor* NPCActor)
 {
-	ApplyTaskAction(NPCActor);
+	ApplyTaskAction(NPCActor, ConsideringPlayer ? ConsideringPlayer->GetPawn() : nullptr);
 }
 
-bool UDialogueEvent_Task::ApplyTaskAction(AActor* InTarget) const
+bool UDialogueEvent_Task::ApplyTaskAction(AActor* InTarget, AActor* InInteractor) const
 {
 	if (!UTaskModule::IsValid()) return false;
 	UTaskModule& Module = UTaskModule::Get();
@@ -29,7 +30,7 @@ bool UDialogueEvent_Task::ApplyTaskAction(AActor* InTarget) const
 	if(Action == EDialogueTaskAction::Accept && Component)
 	{
 		UTaskAsset* Source = ResolvedTaskAsset ? ResolvedTaskAsset : Task.Asset.Get();
-		return Component->AcceptTask(Source, Task.TaskGUID) != nullptr;
+		return Component->AcceptTask(Source, Task.TaskGUID, InInteractor) != nullptr;
 	}
 	UTaskBase* RuntimeTask = Component ? Component->ResolveTask(Task) : (Action == EDialogueTaskAction::Accept ? Module.EnsureTask(Task) : Module.ResolveTask(Task));
 	if (!RuntimeTask) return false;

@@ -15,6 +15,12 @@ protected:
 	FGameplayTag SlotTag;
 
 public:
+	// Configure native layouts before the owning screen builds its mount-slot cache.
+	void SetSlotTag(const FGameplayTag& InSlotTag)
+	{
+		SlotTag = InSlotTag;
+	}
+
 	UFUNCTION(BlueprintPure)
 	FGameplayTag GetSlotTag() const
 	{

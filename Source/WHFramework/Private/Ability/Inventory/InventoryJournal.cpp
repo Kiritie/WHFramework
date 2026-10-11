@@ -2,6 +2,7 @@
 
 #include "Ability/Inventory/InventoryBinaryArchive.h"
 #include "Ability/Inventory/InventorySnapshotCodec.h"
+#include "Ability/Inventory/InventoryStoreLock.h"
 #include "GenericPlatform/GenericPlatformFile.h"
 #include "HAL/FileManager.h"
 #include "HAL/PlatformFileManager.h"
@@ -156,36 +157,8 @@ FInventoryJournal::~FInventoryJournal()
 
 bool FInventoryJournal::AcquireStoreLock(FString& OutError)
 {
-    const FString LockPath = Directory / TEXT("store.lock");
-#if PLATFORM_WINDOWS
-    const HANDLE Handle = ::CreateFileW(*LockPath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if(Handle == INVALID_HANDLE_VALUE)
-    {
-        OutError = TEXT("Inventory.StoreAlreadyOpenOrLockUnavailable");
-        return false;
-    }
-    StoreLock = static_cast<int64>(reinterpret_cast<UPTRINT>(Handle));
-    return true;
-#elif PLATFORM_LINUX
-    const FTCHARToUTF8 Path(*LockPath);
-    const int Descriptor = ::open(Path.Get(), O_CREAT | O_RDWR | O_CLOEXEC, 0600);
-    if(Descriptor < 0)
-    {
-        OutError = TEXT("Inventory.StoreLockOpenFailed");
-        return false;
-    }
-    if(::flock(Descriptor, LOCK_EX | LOCK_NB) != 0)
-    {
-        ::close(Descriptor);
-        OutError = TEXT("Inventory.StoreAlreadyOpenOrLockUnavailable");
-        return false;
-    }
-    StoreLock = Descriptor;
-    return true;
-#else
-    OutError = TEXT("Inventory.UnsupportedDurabilityPlatform");
-    return false;
-#endif
+    StoreLock = FInventoryStoreLock::Acquire(Directory, OutError);
+    return StoreLock != -1;
 }
 
 void FInventoryJournal::ReleaseStoreLock()
@@ -194,12 +167,7 @@ void FInventoryJournal::ReleaseStoreLock()
     {
         return;
     }
-#if PLATFORM_WINDOWS
-    ::CloseHandle(reinterpret_cast<HANDLE>(static_cast<UPTRINT>(StoreLock)));
-#elif PLATFORM_LINUX
-    ::flock(static_cast<int>(StoreLock), LOCK_UN);
-    ::close(static_cast<int>(StoreLock));
-#endif
+    FInventoryStoreLock::Release(StoreLock);
     StoreLock = -1;
 }
 

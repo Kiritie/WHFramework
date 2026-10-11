@@ -1,6 +1,7 @@
 ﻿#include "SaveGame/SaveGameStorage.h"
 
 #include "HAL/FileManager.h"
+#include "Ability/Inventory/InventoryStoreLock.h"
 #include "HAL/PlatformFileManager.h"
 #include "Dom/JsonObject.h"
 #include "JsonObjectConverter.h"
@@ -180,29 +181,11 @@ struct FSaveInventoryRetirementLocks
 			if (!bDirectory) return true;
 			FGuid StoreId;
 			if (Handles.Num() >= 256 || !FGuid::ParseExact(FPaths::GetCleanFilename(Path), EGuidFormats::Digits, StoreId)) return false;
-			const FString LockPath = FString(Path) / TEXT("store.lock");
-			if (!Platform.FileExists(*LockPath)) return true;
-#if PLATFORM_WINDOWS
-			const FString NativePath = NativeSavePath(LockPath);
-			const HANDLE Handle = ::CreateFileW(*NativePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_DELETE,
-				nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-			if (Handle == INVALID_HANDLE_VALUE) return false;
-			Handles.Add(static_cast<int64>(reinterpret_cast<UPTRINT>(Handle)));
-			return true;
-#elif PLATFORM_LINUX
-			FTCHARToUTF8 NativePath(*FPaths::ConvertRelativePathToFull(LockPath));
-			const int Handle = ::open(NativePath.Get(), O_RDWR | O_CLOEXEC);
-			if (Handle < 0) return false;
-			if (::flock(Handle, LOCK_EX | LOCK_NB) != 0)
-			{
-				::close(Handle);
-				return false;
-			}
+			FString Error;
+			const int64 Handle = FInventoryStoreLock::Acquire(Path, Error);
+			if (Handle == -1) return false;
 			Handles.Add(Handle);
 			return true;
-#else
-			return false;
-#endif
 		});
 	}
 };

@@ -37,7 +37,7 @@ public:
 	virtual void ReceiveEventTriggered_Implementation(APlayerController* ConsideringPlayer, AActor* NPCActor) override;
 
 private:
-	bool ApplyTaskAction(AActor* InTarget) const;
+	bool ApplyTaskAction(AActor* InTarget, AActor* InInteractor) const;
 
 	UPROPERTY(Transient)
 	UTaskAsset* ResolvedTaskAsset = nullptr;

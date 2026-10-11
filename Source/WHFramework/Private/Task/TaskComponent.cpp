@@ -127,16 +127,24 @@ UTaskBase* UTaskComponent::ResolveTask(const FTaskReference& InReference) const
 	return nullptr;
 }
 
-UTaskBase* UTaskComponent::AcceptTask(UTaskAsset* InAsset, FString InTaskGUID)
+UTaskBase* UTaskComponent::AcceptTask(UTaskAsset* InAsset, FString InTaskGUID, AActor* InInteractor)
 {
 	if(!bAgentActive || !UTaskModule::IsValid() || (!AgentID.IsValid() && !ResolveAgentID())) return nullptr;
+	FGuid OwnerActorID;
+	if(InInteractor)
+	{
+		if(InInteractor->GetWorld() != GetWorld() || !InInteractor->HasAuthority() ||
+			!InInteractor->Implements<USceneActorInterface>()) return nullptr;
+		OwnerActorID = ISceneActorInterface::Execute_GetActorID(InInteractor);
+		if(!OwnerActorID.IsValid()) return nullptr;
+	}
 	if(!InAsset)
 	{
 		const TArray<UTaskAsset*> Offers = GetOfferedAssets();
 		InAsset = Offers.IsEmpty() ? nullptr : Offers[0];
 	}
 	if(!InAsset || HasRuntimeAsset(InAsset)) return nullptr;
-	UTaskAsset* RuntimeAsset = UTaskModule::Get().CreateAsset(InAsset, AgentID);
+	UTaskAsset* RuntimeAsset = UTaskModule::Get().CreateAsset(InAsset, AgentID, OwnerActorID);
 	if(!RuntimeAsset) return nullptr;
 	RuntimeAsset->AgentLocation = GetOwner()->GetActorLocation();
 	UTaskBase* Task = InTaskGUID.IsEmpty() ? (RuntimeAsset->RootTasks.IsEmpty() ? nullptr : RuntimeAsset->RootTasks[0]) : RuntimeAsset->TaskMap.FindRef(InTaskGUID);

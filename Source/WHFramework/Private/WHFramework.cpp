@@ -12,6 +12,7 @@
 #include "Pawn/Base/PawnBase.h"
 #include "Voxel/Components/VoxelMeshComponent.h"
 #include "Voxel/VoxelModuleTypes.h"
+#include "Voxel/Save/InventoryVoxelEntityCodec.h"
 #include "Widget/Common/CommonOptionSelector.h"
 #include "Widget/WidgetModuleTypes.h"
 #include "UObject/CoreRedirects.h"
@@ -20,6 +21,10 @@
 
 void FWHFrameworkModule::StartupModule()
 {
+	if (!FInventoryVoxelEntityCodec::Register())
+	{
+		UE_LOG(LogTemp, Fatal, TEXT("WHFramework inventory entity codec registration failed"));
+	}
 	TArray<FCoreRedirect> Redirects;
 	const TPair<const TCHAR*, const TCHAR*> Classes[] = {{TEXT("Dialogue"), TEXT("DialogueAsset")},
 	                                                     {TEXT("DialogueEvents"), TEXT("DialogueEventBase")},

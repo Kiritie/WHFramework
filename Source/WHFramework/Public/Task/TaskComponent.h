@@ -40,7 +40,7 @@ public:
 	UTaskBase* ResolveTask(const FTaskReference& InReference) const;
 
 	UFUNCTION(BlueprintCallable)
-	UTaskBase* AcceptTask(UTaskAsset* InAsset = nullptr, FString InTaskGUID = FString());
+	UTaskBase* AcceptTask(UTaskAsset* InAsset = nullptr, FString InTaskGUID = FString(), AActor* InInteractor = nullptr);
 
 	UFUNCTION(BlueprintCallable)
 	bool TurnInTask(UTaskBase* InTask = nullptr);
