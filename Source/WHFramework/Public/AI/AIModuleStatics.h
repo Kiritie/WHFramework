@@ -6,7 +6,7 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "AIModuleStatics.generated.h"
 /**
- * 
+ *
  */
 UCLASS()
 class WHFRAMEWORK_API UAIModuleStatics : public UBlueprintFunctionLibrary

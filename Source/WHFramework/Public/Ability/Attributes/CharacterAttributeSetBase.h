@@ -35,11 +35,11 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_RotationSpeed, Category = "CharacterAttributes")
 	FGameplayAttributeData RotationSpeed;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, RotationSpeed)
-	
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, ReplicatedUsing = OnRep_SwimSpeed, Category = "CharacterAttributes")
 	FGameplayAttributeData SwimSpeed;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, SwimSpeed)
-		
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, ReplicatedUsing = OnRep_FlySpeed, Category = "CharacterAttributes")
 	FGameplayAttributeData FlySpeed;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, FlySpeed)

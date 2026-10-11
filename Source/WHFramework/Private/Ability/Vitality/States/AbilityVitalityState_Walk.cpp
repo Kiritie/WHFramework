@@ -6,7 +6,7 @@
 
 UAbilityVitalityState_Walk::UAbilityVitalityState_Walk()
 {
-	StateName = FName("Walk");
+	StateName = FName("Active");
 }
 
 void UAbilityVitalityState_Walk::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
@@ -25,9 +25,8 @@ void UAbilityVitalityState_Walk::OnEnter(UFiniteStateBase* InLastState, const TA
 
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
-	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Walking);
+	SetStateTag(GameplayTags::State_Vitality_Active, true);
 
-	Vitality->DoAction(GameplayTags::Ability_Vitality_Action_Walk);
 }
 
 void UAbilityVitalityState_Walk::OnRefresh(float DeltaSeconds)
@@ -41,9 +40,8 @@ void UAbilityVitalityState_Walk::OnLeave(UFiniteStateBase* InNextState)
 
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
-	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Walking);
+	SetStateTag(GameplayTags::State_Vitality_Active, false);
 
-	Vitality->StopAction(GameplayTags::Ability_Vitality_Action_Walk);
 }
 
 void UAbilityVitalityState_Walk::OnTermination()

@@ -1,5 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "AIController.h"
@@ -8,90 +6,69 @@
 #include "AIControllerBase.generated.h"
 
 class UBehaviorTreeComponent;
-class ACharacterBase;
+class UBehaviorTree;
 class UAIBlackboardBase;
-class UFiniteStateBase;
+class UAIBlackboardContext;
 
-DECLARE_DELEGATE_TwoParams(FAIPerceptionUpdated, ACharacterBase*, bool)
-
-/**
- */
 UCLASS()
 class WHFRAMEWORK_API AAIControllerBase : public AAIController, public IWHActorInterface
 {
 	GENERATED_BODY()
 
 public:
-    AAIControllerBase();
-	
-	//////////////////////////////////////////////////////////////////////////
-	/// WHActor
-public:
+	AAIControllerBase();
 	virtual void OnInitialize_Implementation() override;
-
 	virtual void OnPreparatory_Implementation() override;
-
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
-
 	virtual void OnTermination_Implementation() override;
+	virtual void Tick(float DeltaSeconds) override;
 
-protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "WHActor")
-	bool bInitialized;
-	
-protected:
-	virtual bool IsInitialized_Implementation() const override { return bInitialized; }
-	
-	virtual bool IsUseDefaultLifecycle_Implementation() const override { return true; }
+	virtual void InitBehaviorTree(bool bAutoRun = false);
+	virtual bool RunBehaviorTree(UBehaviorTree* BTAsset) override;
+	virtual bool RunBehaviorTree(bool bForce = false);
+	virtual void StopBehaviorTree();
+	bool SetBehaviorTree(UBehaviorTree* InAsset, bool bAutoRun);
+	bool IsRunningBehaviorTree() const;
+	UBehaviorTree* GetBehaviorTree() const { return CurrentBehaviorTree; }
+	UAIBlackboardContext* GetBlackboard() const { return CurrentBlackboard; }
+	UBehaviorTreeComponent* GetBehaviorTreeComponent() const;
 
-protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	UBehaviorTree* SourceBehaviorTree;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	UBehaviorTree* CurrentBehaviorTree;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	UAIBlackboardBase* SourceBlackboard;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	UAIBlackboardBase* CurrentBlackboard;
+	template<class T>
+	T* GetBlackboard() const
+	{
+		return Cast<T>(CurrentBlackboard);
+	}
 
 protected:
 	virtual void BeginPlay() override;
-
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-	
 	virtual void OnPossess(APawn* InPawn) override;
-
 	virtual void OnUnPossess() override;
 
 	UFUNCTION()
 	virtual void OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
 
-public:
-	virtual void Tick(float DeltaSeconds) override;
-	
-	virtual void InitBehaviorTree(bool bAutoRun = false);
+	virtual bool IsInitialized_Implementation() const override { return bInitialized; }
+	virtual bool IsUseDefaultLifecycle_Implementation() const override { return true; }
+	void ReleaseBlackboardContext();
 
-	virtual bool RunBehaviorTree(UBehaviorTree* BTAsset) override;
+	UPROPERTY(Transient)
+	bool bInitialized = false;
 
-	virtual bool RunBehaviorTree(bool bForce = false);
+	UPROPERTY(Transient)
+	TObjectPtr<UBehaviorTree> CurrentBehaviorTree;
 
-	virtual void StopBehaviorTree();
+	UPROPERTY(Transient)
+	TObjectPtr<UAIBlackboardBase> SourceBlackboard;
 
-public:
-	bool IsRunningBehaviorTree() const;
+	UPROPERTY(Transient)
+	TObjectPtr<UAIBlackboardContext> CurrentBlackboard;
 
-	UBehaviorTree* GetBehaviorTree() const { return CurrentBehaviorTree; }
+	UPROPERTY(Transient)
+	TWeakObjectPtr<APawn> BlackboardPawn;
 
-	template<class T>
-	T* GetBlackboard() const
-	{
-		return  Cast<T>(CurrentBlackboard);
-	}
+	UPROPERTY(EditDefaultsOnly)
+	float BlackboardRefreshInterval = 0.2f;
 
-	UAIBlackboardBase* GetBlackboard() const { return CurrentBlackboard; }
-
-	UBehaviorTreeComponent* GetBehaviorTreeComponent() const;
+	float BlackboardRefreshRemaining = 0.f;
 };

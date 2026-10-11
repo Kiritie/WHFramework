@@ -1,13 +1,10 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #include "AI/Base/Tasks/AITask_ResetData.h"
-
-#include "AI/Base/AIBlackboardBase.h"
+#include "AI/Base/AIBlackboardContext.h"
 #include "AI/Base/AIControllerBase.h"
 #include "BehaviorTree/BehaviorTree.h"
-#include "BehaviorTree/BehaviorTreeTypes.h"
 
-UAITask_ResetData::UAITask_ResetData(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
+UAITask_ResetData::UAITask_ResetData(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
 {
 	bNotifyTick = false;
 }
@@ -15,10 +12,12 @@ UAITask_ResetData::UAITask_ResetData(const FObjectInitializer& ObjectInitializer
 void UAITask_ResetData::InitializeFromAsset(UBehaviorTree& Asset)
 {
 	Super::InitializeFromAsset(Asset);
-
-	for(auto& Iter : ResetKeys)
+	if (Asset.BlackboardAsset)
 	{
-		Iter.ResolveSelectedKey(*Asset.BlackboardAsset);
+		for (FBlackboardKeySelector& Key : ResetKeys)
+		{
+			Key.ResolveSelectedKey(*Asset.BlackboardAsset);
+		}
 	}
 }
 
@@ -29,15 +28,21 @@ EBTNodeResult::Type UAITask_ResetData::AbortTask(UBehaviorTreeComponent& OwnerCo
 
 EBTNodeResult::Type UAITask_ResetData::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
-	if (!InitTask(OwnerComp)) return EBTNodeResult::Failed;
-
-	for(auto& Iter : ResetKeys)
+	if (Super::ExecuteTask(OwnerComp, NodeMemory) == EBTNodeResult::Failed)
 	{
-		if(!Iter.SelectedKeyName.IsNone())
+		return EBTNodeResult::Failed;
+	}
+	UAIBlackboardContext* Context = Controller->GetBlackboard();
+	if (!Context)
+	{
+		return EBTNodeResult::Failed;
+	}
+	for (const FBlackboardKeySelector& Key : ResetKeys)
+	{
+		if (!Key.SelectedKeyName.IsNone())
 		{
-			Controller->GetBlackboard()->ResetValue(Iter.SelectedKeyName);
+			Context->ResetValue(Key.SelectedKeyName);
 		}
 	}
-	
-	return Super::ExecuteTask(OwnerComp, NodeMemory);
+	return EBTNodeResult::Succeeded;
 }

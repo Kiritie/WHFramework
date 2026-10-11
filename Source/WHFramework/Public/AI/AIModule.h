@@ -12,7 +12,7 @@ UCLASS()
 class WHFRAMEWORK_API UAIModule : public UModuleBase
 {
 	GENERATED_BODY()
-	
+
 	GENERATED_MODULE(UAIModule)
 
 public:

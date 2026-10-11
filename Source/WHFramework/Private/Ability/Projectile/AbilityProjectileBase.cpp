@@ -6,19 +6,25 @@
 #include "TimerManager.h"
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystemGlobals.h"
 #include "Ability/Abilities/AbilityBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Ability/Effects/EffectBase.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "Net/UnrealNetwork.h"
+#include "Components/MeshComponent.h"
+#include "Components/PrimitiveComponent.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 
 AAbilityProjectileBase::AAbilityProjectileBase()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	bReplicates = true;
+	SetReplicateMovement(true);
 
 	OriginSocketName = NAME_None;
 	FinalSocketName = NAME_None;
-	MaxDurationTime = 0.f;
+	MaxDurationTime = 10.f;
 	OwnerActor = nullptr;
 	AbilityLevel = 0;
 	EffectContainerMap = TMap<FGameplayTag, FGameplayEffectContainer>();
@@ -29,49 +35,79 @@ AAbilityProjectileBase::AAbilityProjectileBase()
 void AAbilityProjectileBase::OnSpawn_Implementation(const FParameter& InParam)
 {
 	Super::OnSpawn_Implementation(InParam);
-
-	const FAbilityProjectileSpawnParameter* Param = InParam.GetPtr<FAbilityProjectileSpawnParameter>();
-	if(!Param)
+	SetHitAble(false);
+	ClearHitTargets();
+	bLaunched = false;
+	bDestroyingProjectile = false;
+	PreparedEffects.Reset();
+	ProjectileContext = FGameplayEffectContextHandle();
+	SourceActivationId.Invalidate();
+	if (GetWorld())
+	{
+		GetWorld()->GetTimerManager().ClearTimer(DestroyTimer);
+	}
+	if (!HasAuthority())
 	{
 		return;
 	}
-	OwnerActor = Param->Owner.Get();
-
-	if(IAbilityActorInterface* AbilityActor = GetOwnerActor<IAbilityActorInterface>())
+	const FAbilityProjectileSpawnParameter* Param = InParam.GetPtr<FAbilityProjectileSpawnParameter>();
+	OwnerActor = Param ? Param->Owner.Get() : nullptr;
+	IAbilityActorInterface* AbilityActor = Cast<IAbilityActorInterface>(OwnerActor);
+	UAbilitySystemComponentBase* SourceSystem = AbilityActor ? Cast<UAbilitySystemComponentBase>(AbilityActor->GetAbilitySystemComponent()) : nullptr;
+	const FGameplayAbilitySpec* Spec = SourceSystem && Param ? SourceSystem->FindAbilitySpecFromHandle(Param->AbilityHandle) : nullptr;
+	UAbilityBase* Action = Spec ? Cast<UAbilityBase>(Spec->GetPrimaryInstance()) : nullptr;
+	FGameplayTag Reason;
+	if (!IsValid(OwnerActor) || !Action || !Action->IsActive() || !SourceSystem->IsOwnerActorAuthoritative() || SourceSystem->GetAvatarActor() != OwnerActor || !SourceSystem->ValidateGrantedRequest(Action->GetActionRequest(), Reason))
 	{
-		AbilityActor->AttachActor(this, FAttachmentTransformRules::SnapToTargetNotIncludingScale, OriginSocketName);
-		SetActorRotation(FinalSocketName.IsNone() ? OwnerActor->GetActorRotation() : UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), AbilityActor->GetMeshComponent()->GetSocketLocation(FinalSocketName)));
-
-		if(UAbilitySystemComponentBase* OwningASC = Cast<UAbilitySystemComponentBase>(AbilityActor->GetAbilitySystemComponent()))
+		Destroy();
+		return;
+	}
+	SetOwner(OwnerActor);
+	SetActorHiddenInGame(false);
+	SourceActivationId = Action->GetActionActivationId();
+	AbilityLevel = Action->GetAbilityLevel();
+	EffectContainerMap = Action->EffectContainerMap;
+	ProjectileContext = SourceSystem->MakeEffectContext();
+	ProjectileContext.AddSourceObject(Spec->SourceObject.Get());
+	for (const TPair<FGameplayTag, FGameplayEffectContainer>& Entry : EffectContainerMap)
+	{
+		for (TSubclassOf<UEffectBase> EffectClass : Entry.Value.TargetGameplayEffectClasses)
 		{
-			const FGameplayAbilitySpec Spec = OwningASC->FindAbilitySpecForHandle(Param->AbilityHandle);
-			if(UAbilityBase* Ability = Cast<UAbilityBase>(Spec.GetPrimaryInstance()))
+			if (EffectClass && !PreparedEffects.Contains(EffectClass))
 			{
-				AbilityLevel = Ability->GetAbilityLevel();
-				AbilityActorInfo = Ability->GetActorInfo();
-				EffectContainerMap = Ability->EffectContainerMap;
+				PreparedEffects.Add(EffectClass, SourceSystem->MakeOutgoingSpec(EffectClass, AbilityLevel, ProjectileContext));
 			}
 		}
 	}
+	AbilityActor->AttachActor(this, FAttachmentTransformRules::SnapToTargetNotIncludingScale, OriginSocketName);
+	if (UMeshComponent* Mesh = AbilityActor->GetMeshComponent())
+	{
+		SetActorRotation(FinalSocketName.IsNone() ? OwnerActor->GetActorRotation() : UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), Mesh->GetSocketLocation(FinalSocketName)));
+	}
+	const float Lifetime = FMath::IsFinite(MaxDurationTime) ? FMath::Clamp(MaxDurationTime, 0.01f, 120.f) : 10.f;
+	GetWorld()->GetTimerManager().SetTimer(DestroyTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { Destroy(); }), Lifetime, false);
+	ForceNetUpdate();
 }
 
 void AAbilityProjectileBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	if(IAbilityActorInterface* AbilityActor = GetOwnerActor<IAbilityActorInterface>())
+	if (GetWorld())
 	{
-		AbilityActor->DetachActor(this, FDetachmentTransformRules::KeepWorldTransform);
+		GetWorld()->GetTimerManager().ClearTimer(DestroyTimer);
 	}
-
-	Super::OnDespawn_Implementation(InMode);
-
 	SetHitAble(false);
+	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	ClearHitTargets();
-
+	PreparedEffects.Reset();
+	ProjectileContext = FGameplayEffectContextHandle();
+	SourceActivationId.Invalidate();
 	OwnerActor = nullptr;
+	SetOwner(nullptr);
 	AbilityLevel = 0;
-	AbilityActorInfo = FGameplayAbilityActorInfo();
-	EffectContainerMap.Empty();
+	EffectContainerMap.Reset();
 	bLaunched = false;
+	bDestroyingProjectile = true;
+	Super::OnDespawn_Implementation(InMode);
 }
 
 void AAbilityProjectileBase::OnPreparatory_Implementation()
@@ -82,66 +118,79 @@ void AAbilityProjectileBase::OnPreparatory_Implementation()
 void AAbilityProjectileBase::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);
-
-	if(UMeshComponent* MeshComponent = Cast<UMeshComponent>(RootComponent->GetAttachParent()))
+	if (HasAuthority() && !bLaunched && IsValid(OwnerActor) && RootComponent)
 	{
-		SetActorRotation(FinalSocketName.IsNone() ? OwnerActor->GetActorRotation() : UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), MeshComponent->GetSocketLocation(FinalSocketName)));
+		if (UMeshComponent* Mesh = Cast<UMeshComponent>(RootComponent->GetAttachParent()))
+		{
+			SetActorRotation(FinalSocketName.IsNone() ? OwnerActor->GetActorRotation() : UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), Mesh->GetSocketLocation(FinalSocketName)));
+		}
 	}
 }
 
 void AAbilityProjectileBase::Launch_Implementation(FVector InDirection)
 {
-	bLaunched = true;
-	
-	if(IAbilityActorInterface* AbilityActor = GetOwnerActor<IAbilityActorInterface>())
+	if (!HasAuthority() || bLaunched || bDestroyingProjectile || !SourceActivationId.IsValid() || !IsValid(OwnerActor) || InDirection.ContainsNaN())
 	{
-		AbilityActor->DetachActor(this, FDetachmentTransformRules::KeepWorldTransform);
+		return;
 	}
-
-	SetActorRotation(InDirection != FVector::ZeroVector ? InDirection.Rotation() : OwnerActor->GetActorRotation());
-
+	bLaunched = true;
+	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	SetActorRotation(InDirection.IsNearlyZero() ? OwnerActor->GetActorRotation() : InDirection.GetSafeNormal().Rotation());
 	SetHitAble(true);
-
-	GetWorld()->GetTimerManager().SetTimer(DestroyTimer, [this](){
-		Destroy();
-	}, MaxDurationTime, false);
+	ForceNetUpdate();
 }
 
 void AAbilityProjectileBase::Destroy_Implementation()
 {
+	if (!HasAuthority() || bDestroyingProjectile)
+	{
+		return;
+	}
+	bDestroyingProjectile = true;
+	SetHitAble(false);
+	if (GetWorld())
+	{
+		GetWorld()->GetTimerManager().ClearTimer(DestroyTimer);
+	}
 	UObjectPoolModuleStatics::DespawnObject(this);
-
-	GetWorld()->GetTimerManager().ClearTimer(DestroyTimer);
 }
 
 bool AAbilityProjectileBase::CanHitTarget(AActor* InTarget) const
 {
-	return InTarget != OwnerActor && !HitTargets.Contains(InTarget);
+	return HasAuthority() && IsHitAble() && IsValid(InTarget) && InTarget->GetWorld() == GetWorld() && InTarget != this && InTarget != OwnerActor && !HitTargets.Contains(InTarget);
 }
 
 void AAbilityProjectileBase::OnHitTarget(AActor* InTarget, const FHitResult& InHitResult)
 {
+	if (!CanHitTarget(InTarget))
+	{
+		return;
+	}
 	HitTargets.Add(InTarget);
-	
-	FGameplayEventData EventData;
-	EventData.Instigator = OwnerActor;
-	EventData.Target = InTarget;
-	EventData.OptionalObject = this;
-	EventData.ContextHandle.AddHitResult(InHitResult);
-
-	ApplyEffectContainer(HitEventTag, EventData, -1);
-	
+	FHitResult Hit = InHitResult;
+	if (Hit.GetActor() != InTarget)
+	{
+		Hit = FHitResult(InTarget, Cast<UPrimitiveComponent>(InTarget->GetRootComponent()), InTarget->GetActorLocation(), -GetActorForwardVector());
+	}
+	FGameplayEventData Event;
+	Event.EventTag = HitEventTag;
+	Event.Instigator = OwnerActor;
+	Event.Target = InTarget;
+	Event.OptionalObject = this;
+	Event.ContextHandle = ProjectileContext.Duplicate();
+	Event.ContextHandle.AddHitResult(Hit, true);
+	ApplyEffectContainer(HitEventTag, Event, INDEX_NONE);
 	Destroy();
 }
 
 bool AAbilityProjectileBase::IsHitAble() const
 {
-	return true;
+	return HasAuthority() && bLaunched && bHitEnabled && !bDestroyingProjectile;
 }
 
 void AAbilityProjectileBase::SetHitAble(bool bValue)
 {
-
+	bHitEnabled = bValue && HasAuthority() && bLaunched && !bDestroyingProjectile;
 }
 
 void AAbilityProjectileBase::ClearHitTargets()
@@ -156,36 +205,45 @@ TArray<AActor*> AAbilityProjectileBase::GetHitTargets() const
 
 FGameplayEffectContainerSpec AAbilityProjectileBase::MakeEffectContainerSpecFromContainer(const FGameplayEffectContainer& InContainer, const FGameplayEventData& EventData, int32 OverrideGameplayLevel)
 {
-	// First figure out our actor info
-	FGameplayEffectContainerSpec ReturnSpec;
-
-	if (UAbilitySystemComponentBase* OwningASC = UAbilitySystemComponentBase::GetAbilitySystemComponentFormActor(OwnerActor))
+	FGameplayEffectContainerSpec Result;
+	if (!HasAuthority() || (OverrideGameplayLevel != INDEX_NONE && OverrideGameplayLevel != AbilityLevel))
 	{
-		// If we have a target type, run the targeting logic. This is optional, targets can be added later
-		if (InContainer.TargetType.Get())
-		{
-			TArray<FHitResult> HitResults;
-			TArray<AActor*> TargetActors;
-			const UTargetType* TargetType = InContainer.TargetType.GetDefaultObject();
-			AActor* AvatarActor = AbilityActorInfo.AvatarActor.Get();
-			TargetType->GetTargets(OwnerActor, AvatarActor, EventData, HitResults, TargetActors);
-			ReturnSpec.AddTargets(HitResults, TargetActors);
-		}
-		// If we don't have an override level, use the ability level
-		if (OverrideGameplayLevel == INDEX_NONE)
-		{
-			//OverrideGameplayLevel = OwningASC->GetDefaultAbilityLevel();
-			OverrideGameplayLevel = AbilityLevel;
-		}
-		// Build GameplayEffectSpecs for each applied effect
-		for (const TSubclassOf<UEffectBase>& EffectClass : InContainer.TargetGameplayEffectClasses)
-		{
-			auto EffectContext = OwningASC->MakeEffectContext();
-			EffectContext.AddSourceObject(this);
-			ReturnSpec.TargetGameplayEffectSpecs.Add(OwningASC->MakeOutgoingSpec(EffectClass, OverrideGameplayLevel, EffectContext));
-		}
+		return Result;
 	}
-	return ReturnSpec;
+	TArray<FHitResult> Hits;
+	TArray<AActor*> Targets;
+	if (InContainer.TargetType)
+	{
+		InContainer.TargetType.GetDefaultObject()->GetTargets(OwnerActor, OwnerActor, EventData, Hits, Targets);
+	}
+	else if (IsValid(EventData.Target.Get()))
+	{
+		Targets.Add(const_cast<AActor*>(EventData.Target.Get()));
+	}
+	Targets.RemoveAll([this](const AActor* Target) { return !IsValid(Target) || Target->GetWorld() != GetWorld(); });
+	Hits.RemoveAll([this](const FHitResult& Hit) { return !IsValid(Hit.GetActor()) || Hit.GetActor()->GetWorld() != GetWorld(); });
+	Result.AddTargets(Hits, Targets);
+	for (TSubclassOf<UEffectBase> EffectClass : InContainer.TargetGameplayEffectClasses)
+	{
+		const FGameplayEffectSpecHandle* Prepared = PreparedEffects.Find(EffectClass);
+		if (!Prepared || !Prepared->IsValid())
+		{
+			continue;
+		}
+		FGameplayEffectSpecHandle Spec(new FGameplayEffectSpec(*Prepared->Data.Get()));
+		FGameplayEffectContextHandle Context = Spec.Data->GetContext().Duplicate();
+		if (Context.IsValid() && Context.Get()->GetScriptStruct() == FGameplayEffectContextBase::StaticStruct())
+		{
+			static_cast<FGameplayEffectContextBase*>(Context.Get())->EffectInstanceId = FGuid::NewGuid();
+		}
+		if (const FHitResult* Hit = EventData.ContextHandle.GetHitResult())
+		{
+			Context.AddHitResult(*Hit, true);
+		}
+		Spec.Data->SetContext(Context);
+		Result.TargetGameplayEffectSpecs.Add(Spec);
+	}
+	return Result;
 }
 
 FGameplayEffectContainerSpec AAbilityProjectileBase::MakeEffectContainerSpec(FGameplayTag ContainerTag, const FGameplayEventData& EventData, int32 OverrideGameplayLevel)
@@ -214,26 +272,49 @@ TArray<FActiveGameplayEffectHandle> AAbilityProjectileBase::ApplyEffectContainer
 	FGameplayEffectContainerSpec Spec = MakeEffectContainerSpec(ContainerTag, EventData, OverrideGameplayLevel);
 	return ApplyEffectContainerSpec(Spec);
 }
- 
+
 TArray<FActiveGameplayEffectHandle> AAbilityProjectileBase::ApplyGameplayEffectSpecToTarget(const FGameplayEffectSpecHandle SpecHandle, const FGameplayAbilityTargetDataHandle& TargetData) const
 {
-	TArray<FActiveGameplayEffectHandle> EffectHandles;
-
-	UAbilitySystemComponentBase* OwningASC = UAbilitySystemComponentBase::GetAbilitySystemComponentFormActor(OwnerActor);
-
-	if (SpecHandle.IsValid() && OwningASC)
+	TArray<FActiveGameplayEffectHandle> Applied;
+	if (!HasAuthority() || !SpecHandle.IsValid())
 	{
-		for (TSharedPtr<FGameplayAbilityTargetData> Data : TargetData.Data)
+		return Applied;
+	}
+	TSet<AActor*> Visited;
+	for (const TSharedPtr<FGameplayAbilityTargetData>& Data : TargetData.Data)
+	{
+		if (!Data.IsValid())
 		{
-			if (Data.IsValid())
+			continue;
+		}
+		for (const TWeakObjectPtr<AActor>& Target : Data->GetActors())
+		{
+			if (!Target.IsValid() || Target->GetWorld() != GetWorld() || Visited.Contains(Target.Get()))
 			{
-				EffectHandles.Append(Data->ApplyGameplayEffectSpec(*SpecHandle.Data.Get(), OwningASC->GetPredictionKeyForNewAction()));
+				continue;
 			}
-			else
+			Visited.Add(Target.Get());
+			UAbilitySystemComponent* TargetSystem = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(Target.Get());
+			if (TargetSystem && TargetSystem->IsOwnerActorAuthoritative())
 			{
-				WHLog(FString::Printf(TEXT("ApplyGameplayEffectSpecToTarget invalid target data passed in. Ability: %s"), *GetPathName()), EDC_Ability, EDV_Warning);
+				FGameplayEffectSpec PerTarget(*SpecHandle.Data.Get());
+				FGameplayEffectContextHandle Context = PerTarget.GetContext().Duplicate();
+				if (Context.IsValid() && Context.Get()->GetScriptStruct() == FGameplayEffectContextBase::StaticStruct())
+				{
+					static_cast<FGameplayEffectContextBase*>(Context.Get())->EffectInstanceId = FGuid::NewGuid();
+				}
+				PerTarget.SetContext(Context);
+				Applied.Add(TargetSystem->ApplyGameplayEffectSpecToSelf(PerTarget));
 			}
 		}
 	}
-	return EffectHandles;
+	return Applied;
+}
+
+
+void AAbilityProjectileBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AAbilityProjectileBase, OwnerActor);
+	DOREPLIFETIME(AAbilityProjectileBase, bLaunched);
 }

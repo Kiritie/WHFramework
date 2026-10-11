@@ -7,7 +7,7 @@
 #include "AIAgentInterface.generated.h"
 
 class AAIControllerBase;
-class UAIBlackboardBase;
+class UAIBlackboardContext;
 class UBehaviorTree;
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
@@ -17,7 +17,7 @@ class UAIAgentInterface : public UInterface
 };
 
 /**
-* 
+*
 */
 class WHFRAMEWORK_API IAIAgentInterface
 {
@@ -35,5 +35,5 @@ public:
 		return  Cast<T>(GetBlackboard());
 	}
 
-	UAIBlackboardBase* GetBlackboard() const;
+	UAIBlackboardContext* GetBlackboard() const;
 };

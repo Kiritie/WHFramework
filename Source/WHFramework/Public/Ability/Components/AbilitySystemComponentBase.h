@@ -2,6 +2,9 @@
 
 #include "AbilitySystemComponent.h"
 #include "Ability/AbilityModuleTypes.h"
+#include "Ability/AbilityActionTypes.h"
+#include "Ability/AbilityGrantTypes.h"
+#include "Ability/Effects/AbilityEffectSaveTypes.h"
 #include "AbilitySystemComponentBase.generated.h"
 
 class UEffectBase;
@@ -22,6 +25,12 @@ public:
 
 	UPROPERTY()
 	FGameplayAbilityLocalAnimMontage LocalMontageInfo;
+
+	UPROPERTY()
+	uint32 PlayInstanceId = 0;
+
+	UPROPERTY()
+	bool bReplicateMontage = false;
 
 	FGameplayAbilityLocalAnimMontageForMesh() : Mesh(nullptr), LocalMontageInfo()
 	{
@@ -53,6 +62,9 @@ public:
 	UPROPERTY()
 	FGameplayAbilityRepAnimMontage RepMontageInfo;
 
+	UPROPERTY()
+	uint32 PlayInstanceId = 0;
+
 	FGameplayAbilityRepAnimMontageForMesh() : Mesh(nullptr), RepMontageInfo()
 	{
 	}
@@ -74,6 +86,87 @@ class WHFRAMEWORK_API UAbilitySystemComponentBase : public UAbilitySystemCompone
 public:
 	UAbilitySystemComponentBase();
 
+	FAbilityActionStartResult RequestAction(const FAbilityActionRequest& Request);
+	bool CancelAction(const FGuid& ActivationId, FGameplayTag Reason);
+	bool GetActionResult(const FGuid& ActivationId, FAbilityActionResult& OutResult) const;
+	bool IsActionActive(const FGuid& ActivationId) const;
+	FOnAbilityActionFinished OnActionFinished;
+	bool ValidateGrantedRequest(const FAbilityActionRequest& Request, FGameplayTag& OutReason, bool bRequireReplicatedEntry = true) const;
+	void PublishActionResult(const FAbilityActionResult& Result);
+	bool BindOwnerAvatar(AActor* OwnerActor, AActor* AvatarActor);
+	void UnbindAvatar(FGameplayTag Reason);
+	void SetAbilityEntityId(FGuid InEntityId);
+	FGuid GetAbilityEntityId() const;
+	virtual FGameplayEffectContextHandle MakeEffectContext() const override;
+	virtual FGameplayEffectSpecHandle MakeOutgoingSpec(TSubclassOf<UGameplayEffect> GameplayEffectClass, float Level, FGameplayEffectContextHandle Context) const override;
+	void NotifyActionInstanceEnded(const FGuid& ActivationId);
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void NotifyAbilityFailed(const FGameplayAbilitySpecHandle Handle, UGameplayAbility* Ability, const FGameplayTagContainer& FailureReason) override;
+
+	bool SetGrantSource(FGuid SourceId, const TArray<FAbilityGrantDefinition>& Abilities, const TArray<TSubclassOf<UEffectBase>>& Effects, int32 Level);
+	bool RemoveGrantSource(FGuid SourceId);
+	void SetGrantSourceSuspended(FGuid SourceId, bool bSuspended);
+	void RevokeGrantSource(FGuid SourceId);
+	bool ValidateGrantSourceSet(const TSet<FGuid>& OwnedSources, const TArray<FAbilityGrantSourceDefinition>& DesiredSources) const;
+	bool IsGrantSourceChangePending(const TSet<FGuid>& OwnedSources, const TArray<FAbilityGrantSourceDefinition>& DesiredSources) const;
+	bool ReplaceGrantSourceSet(const TSet<FGuid>& OwnedSources, const TArray<FAbilityGrantSourceDefinition>& DesiredSources);
+	bool FindGrantedAbility(FPrimaryAssetId DefinitionId, FGameplayTag ActionTag, FGameplayAbilitySpecHandle& OutHandle) const;
+	const TArray<FAbilityGrantedEntry>& GetGrantedEntries() const;
+	bool CapturePersistentEffects(TArray<FAbilityEffectSaveData>& OutEffects) const;
+	bool ValidatePersistentEffects(const TArray<FAbilityEffectSaveData>& Effects) const;
+	bool RestorePersistentEffects(const TArray<FAbilityEffectSaveData>& Effects);
+	static void GatherPersistentEffectAssets(const TArray<FAbilityEffectSaveData>& Effects, TArray<FSoftObjectPath>& OutAssets);
+	void RemoveEffectsOnDeath();
+	void ClearPersistentEffects();
+	void ClearIndependentEffects();
+
+protected:
+	virtual void InternalServerTryActivateAbility(FGameplayAbilitySpecHandle AbilityToActivate, bool InputPressed, const FPredictionKey& PredictionKey, const FGameplayEventData* TriggerEventData) override;
+
+private:
+	friend class UAbilityBase;
+	bool TrackActionActivation(const FGuid& ActivationId, FGameplayAbilitySpecHandle Handle);
+
+	UFUNCTION(Server, Reliable)
+	void ServerCancelRequestedAction(FGuid ActivationId, FGameplayAbilitySpecHandle Handle, FGameplayTag Reason);
+
+	UAbilityBase* FindActiveAction(const FGuid& ActivationId) const;
+	bool IsGrantEffect(FActiveGameplayEffectHandle Handle) const;
+	bool CanReplaceGrantSource(const FAbilityGrantSourceState& Source) const;
+	bool MatchesGrantSource(const FAbilityGrantSourceState& Existing, const FAbilityGrantSourceDefinition& Desired) const;
+	void RemoveGrantSourceInternal(FGuid SourceId);
+	void TryFinishAvatarUnbind();
+	void TryReleaseRevokedGrantSources();
+
+	UFUNCTION(Client, Reliable)
+	void ClientReceiveActionResult(const FAbilityActionResult& Result);
+
+	UPROPERTY(Replicated)
+	TArray<FAbilityGrantedEntry> GrantedEntries;
+
+	UPROPERTY(Transient)
+	TMap<FGuid, FAbilityGrantSourceState> GrantSources;
+
+	UPROPERTY(Transient)
+	TMap<FGuid, FAbilityActionResult> RecentActionResults;
+
+	TArray<FGuid> RecentActionOrder;
+	TMap<FGuid, FGameplayAbilitySpecHandle> PendingActionReplies;
+	FGuid DispatchedActionId;
+	FGameplayAbilitySpecHandle DispatchedAbilityHandle;
+	FGuid AbilityEntityId;
+	bool bGrantMutation = false;
+	bool bReleasingGrantSources = false;
+	TSet<FGuid> SuspendedGrantSources;
+	TSet<FGuid> RevokedGrantSources;
+	FTimerHandle GrantReleaseTimer;
+	bool bAvatarUnbinding = false;
+	FGameplayTag AvatarUnbindReason;
+	FTimerHandle AvatarUnbindTimer;
+	UPROPERTY(Transient)
+	TMap<FGuid, FAbilityActionResult> DeferredAuthoritativeResults;
+
+
 public:
 	bool bCharacterAbilitiesGiven = false;
 	bool bStartupEffectsApplied = false;
@@ -90,7 +183,7 @@ public:
 
 	// Input bound to an ability is pressed
 	virtual void AbilityLocalInputPressed(int32 InputID) override;
-			
+
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Abilities")
 	virtual FGameplayAbilitySpec FindAbilitySpecForHandle(FGameplayAbilitySpecHandle Handle);
 
@@ -99,7 +192,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Abilities")
 	virtual FGameplayAbilitySpec FindAbilitySpecForInputID(int32 InputID);
-			
+
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Abilities")
 	virtual FGameplayAbilitySpecHandle FindAbilitySpecHandleForClass(TSubclassOf<UGameplayAbility> AbilityClass, UObject* OptionalSourceObject=nullptr);
@@ -177,7 +270,7 @@ public:
 	// ----------------------------------------------------------------------------------------------------------------
 	//	AnimMontage Support for multiple USkeletalMeshComponents on the AvatarActor.
 	//  Only one ability can be animating at a time though?
-	// ----------------------------------------------------------------------------------------------------------------	
+	// ----------------------------------------------------------------------------------------------------------------
 
 	// Plays a montage and handles replication and prediction based on passed in ability/activation info
 	virtual float PlayMontageForMesh(UGameplayAbility* AnimatingAbility, class USkeletalMeshComponent* InMesh, FGameplayAbilityActivationInfo ActivationInfo, UAnimMontage* Montage, float InPlayRate, FName StartSectionName = NAME_None, bool bReplicateMontage = true);
@@ -234,7 +327,7 @@ protected:
 	// ----------------------------------------------------------------------------------------------------------------
 	//	AnimMontage Support for multiple USkeletalMeshComponents on the AvatarActor.
 	//  Only one ability can be animating at a time though?
-	// ----------------------------------------------------------------------------------------------------------------	
+	// ----------------------------------------------------------------------------------------------------------------
 
 	// Set if montage rep happens while we don't have the animinstance associated with us yet
 	UPROPERTY()
@@ -256,14 +349,14 @@ protected:
 	FGameplayAbilityRepAnimMontageForMesh& GetGameplayAbilityRepAnimMontageForMesh(USkeletalMeshComponent* InMesh);
 
 	// Called when a prediction key that played a montage is rejected
-	void OnPredictiveMontageRejectedForMesh(USkeletalMeshComponent* InMesh, UAnimMontage* PredictiveMontage);
+	void OnPredictiveMontageRejectedForMesh(USkeletalMeshComponent* InMesh, UAnimMontage* PredictiveMontage, uint32 PlayInstanceId);
 
 	// Copy LocalAnimMontageInfo into RepAnimMontageInfo
 	void AnimMontage_UpdateReplicatedDataForMesh(USkeletalMeshComponent* InMesh);
 	void AnimMontage_UpdateReplicatedDataForMesh(FGameplayAbilityRepAnimMontageForMesh& OutRepAnimMontageInfo);
 
 	// Copy over playing flags for duplicate animation data
-	void AnimMontage_UpdateForcedPlayFlagsForMesh(FGameplayAbilityRepAnimMontageForMesh& OutRepAnimMontageInfo);	
+	void AnimMontage_UpdateForcedPlayFlagsForMesh(FGameplayAbilityRepAnimMontageForMesh& OutRepAnimMontageInfo);
 
 	UFUNCTION()
 	virtual void OnRep_ReplicatedAnimMontageForMesh();
@@ -271,23 +364,6 @@ protected:
 	// Returns true if we are ready to handle replicated montage information
 	virtual bool IsReadyForReplicatedMontageForMesh();
 
-	// RPC function called from CurrentMontageSetNextSectionName, replicates to other clients
-	UFUNCTION(Reliable, Server, WithValidation)
-	void ServerCurrentMontageSetNextSectionNameForMesh(USkeletalMeshComponent* InMesh, UAnimMontage* ClientAnimMontage, float ClientPosition, FName SectionName, FName NextSectionName);
-	void ServerCurrentMontageSetNextSectionNameForMesh_Implementation(USkeletalMeshComponent* InMesh, UAnimMontage* ClientAnimMontage, float ClientPosition, FName SectionName, FName NextSectionName);
-	bool ServerCurrentMontageSetNextSectionNameForMesh_Validate(USkeletalMeshComponent* InMesh, UAnimMontage* ClientAnimMontage, float ClientPosition, FName SectionName, FName NextSectionName);
-
-	// RPC function called from CurrentMontageJumpToSection, replicates to other clients
-	UFUNCTION(Reliable, Server, WithValidation)
-	void ServerCurrentMontageJumpToSectionNameForMesh(USkeletalMeshComponent* InMesh, UAnimMontage* ClientAnimMontage, FName SectionName);
-	void ServerCurrentMontageJumpToSectionNameForMesh_Implementation(USkeletalMeshComponent* InMesh, UAnimMontage* ClientAnimMontage, FName SectionName);
-	bool ServerCurrentMontageJumpToSectionNameForMesh_Validate(USkeletalMeshComponent* InMesh, UAnimMontage* ClientAnimMontage, FName SectionName);
-
-	// RPC function called from CurrentMontageSetPlayRate, replicates to other clients
-	UFUNCTION(Reliable, Server, WithValidation)
-	void ServerCurrentMontageSetPlayRateForMesh(USkeletalMeshComponent* InMesh, UAnimMontage* ClientAnimMontage, float InPlayRate);
-	void ServerCurrentMontageSetPlayRateForMesh_Implementation(USkeletalMeshComponent* InMesh, UAnimMontage* ClientAnimMontage, float InPlayRate);
-	bool ServerCurrentMontageSetPlayRateForMesh_Validate(USkeletalMeshComponent* InMesh, UAnimMontage* ClientAnimMontage, float InPlayRate);
 
 public:
 	/** 根据标签获取当前激活的Ability列表 */
@@ -300,4 +376,3 @@ public:
 	/** 通过Actor获取AbilitySystemComponent */
 	static UAbilitySystemComponentBase* GetAbilitySystemComponentFormActor(const AActor* Actor, bool LookForComponent = false);
 };
-

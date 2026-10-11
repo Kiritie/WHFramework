@@ -14,7 +14,7 @@ UAbilityVitalityState_Spawn::UAbilityVitalityState_Spawn()
 {
 	StateName = FName("Spawn");
 
-	Rescuer = nullptr;
+	RescuerActor.Reset();
 }
 
 void UAbilityVitalityState_Spawn::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
@@ -33,20 +33,19 @@ void UAbilityVitalityState_Spawn::OnEnter(UFiniteStateBase* InLastState, const T
 
 	if(InParams.IsValidIndex(0))
 	{
-		Rescuer = Cast<IAbilityVitalityInterface>(InParams[0].Get<UObject*>());
+		RescuerActor = Cast<AActor>(InParams[0].Get<UObject*>());
 	}
-	
-	UEventModuleStatics::BroadcastEvent<FEventVitalitySpawned>(this, { GetAgent(), Cast<UObject>(Rescuer) });
+
+	UEventModuleStatics::BroadcastEvent<FEventVitalitySpawned>(this, { GetAgent(), RescuerActor.Get() });
 
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
-	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Active);
+	SetStateTag(GameplayTags::State_Vitality_Active, false);
 
-	Vitality->DoAction(GameplayTags::Ability_Vitality_Action_Spawn);
 
 	Vitality->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Vitality->GetInteractionComponent()->SetInteractable(false);
-	
+
 	Vitality->ResetData();
 }
 
@@ -60,15 +59,12 @@ void UAbilityVitalityState_Spawn::OnRefresh(float DeltaSeconds)
 void UAbilityVitalityState_Spawn::OnLeave(UFiniteStateBase* InNextState)
 {
 	Super::OnLeave(InNextState);
-
-	Rescuer = nullptr;
-
+	RescuerActor.Reset();
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
-
-	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Active);
-	
-	Vitality->StopAction(GameplayTags::Ability_Vitality_Action_Spawn);
-
+	if (!Vitality || !FSM || FSM->IsTerminating() || !InNextState || !InNextState->IsA<UAbilityVitalityState_Walk>())
+	{
+		return;
+	}
 	Vitality->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	Vitality->GetInteractionComponent()->SetInteractable(true);
 }

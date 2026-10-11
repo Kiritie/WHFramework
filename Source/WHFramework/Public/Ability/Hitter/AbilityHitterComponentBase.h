@@ -14,7 +14,7 @@ UCLASS()
 class WHFRAMEWORK_API UAbilityHitterComponentBase : public UBoxComponent, public IAbilityHitterInterface
 {
 	GENERATED_BODY()
-	
+
 public:
 	UAbilityHitterComponentBase(const FObjectInitializer& ObjectInitializer);
 
@@ -28,10 +28,13 @@ public:
 	virtual void OnHitTarget(AActor* InTarget, const FHitResult& InHitResult) override;
 
 public:
+	bool BeginHitWindow(class UAbilityBase* SourceAction);
+	void EndHitWindow(const FGuid& ActivationId);
+
 	virtual bool IsHitAble() const override;
-	
+
 	virtual void SetHitAble(bool bValue) override;
-	
+
 	virtual void ClearHitTargets() override;
 
 	virtual TArray<AActor*> GetHitTargets() const override;
@@ -39,6 +42,13 @@ public:
 protected:
 	UPROPERTY()
 	TArray<AActor*> HitTargets;
+
+	TWeakObjectPtr<class UAbilityBase> WindowAction;
+	FGuid WindowActivationId;
+	TWeakObjectPtr<class UAbilitySystemComponentBase> WindowSystem;
+	FDelegateHandle WindowFinishedDelegate;
+	void OnActionFinished(const struct FAbilityActionResult& Result);
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 public:
 	template<class T>

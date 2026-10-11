@@ -1,6 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Ability/Pawn/States/AbilityPawnState_Static.h"
+#include "Ability/AbilityActionTypes.h"
+#include "FSM/Components/FSMComponent.h"
 
 #include "AbilitySystemComponent.h"
 #include "Ability/Pawn/AbilityPawnBase.h"
@@ -12,6 +14,7 @@
 UAbilityPawnState_Static::UAbilityPawnState_Static()
 {
 	StateName = FName("Static");
+	StateDomain = TEXT("Control");
 }
 
 void UAbilityPawnState_Static::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
@@ -30,15 +33,14 @@ void UAbilityPawnState_Static::OnEnter(UFiniteStateBase* InLastState, const TArr
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
-	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Active);
+	SetStateTag(AbilityActionTags::StaticControl, true);
 
-	Pawn->DoAction(GameplayTags::Ability_Vitality_Action_Static);
 
-	Pawn->GetMovementComponent()->SetActive(false);
+	if (Pawn->GetMovementComponent()) { Pawn->GetMovementComponent()->StopMovementImmediately(); Pawn->GetMovementComponent()->SetActive(false); }
 
-	if(!Pawn->IsPlayer())
+	if (AAIControllerBase* Controller = Pawn->GetController<AAIControllerBase>())
 	{
-		Pawn->GetController<AAIControllerBase>()->StopBehaviorTree();
+		Controller->StopBehaviorTree();
 	}
 }
 
@@ -53,15 +55,14 @@ void UAbilityPawnState_Static::OnLeave(UFiniteStateBase* InNextState)
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
-	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Active);
+	SetStateTag(AbilityActionTags::StaticControl, false);
 
-	Pawn->StopAction(GameplayTags::Ability_Vitality_Action_Static);
 
-	Pawn->GetMovementComponent()->SetActive(true);
+	if (Pawn->GetMovementComponent() && FSM && !FSM->IsTerminating() && !InNextState && Pawn->IsActive() && !Pawn->IsDead()) { Pawn->GetMovementComponent()->SetActive(true); }
 
-	if(!Pawn->IsPlayer())
+	if (AAIControllerBase* Controller = Pawn->GetController<AAIControllerBase>())
 	{
-		Pawn->GetController<AAIControllerBase>()->RunBehaviorTree();
+		if (FSM && !FSM->IsTerminating() && !InNextState && Pawn->IsActive() && !Pawn->IsDead()) { Controller->RunBehaviorTree(); }
 	}
 }
 

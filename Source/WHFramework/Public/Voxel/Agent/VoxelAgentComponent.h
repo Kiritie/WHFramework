@@ -141,22 +141,6 @@ public:
 		Category = "Voxel|Interaction")
 	bool bCreativeInStandalone = false;
 
-	UPROPERTY(
-		EditAnywhere,
-		BlueprintReadWrite,
-		Category = "Voxel|Movement")
-	bool bGateInitialSpawnUntilCollision = true;
-
-	UPROPERTY(
-		EditAnywhere,
-		Category = "Voxel|Movement")
-	bool bUseSmallVoxelStepHeight = false;
-
-	UPROPERTY(
-		EditAnywhere,
-		Category = "Voxel|Movement",
-		meta = (ClampMin = "0.01"))
-	float CollisionPredictionSeconds = 0.10f;
 
 private:
 	bool View(
@@ -172,17 +156,7 @@ private:
 		FVoxelEditIntent InIntent);
 
 	void RefreshSource();
-	void RefreshStepHeight();
-	void RefreshCollisionMovementGuard();
-
-	void ResetInitialCollisionGate();
-	void ApplyInitialCollisionGate(
-		ACharacter& InCharacter,
-		UCharacterMovementComponent& InMovement);
-
-	void ReleaseInitialCollisionGate(
-		ACharacter& InCharacter,
-		UCharacterMovementComponent& InMovement);
+	void ResetBirthClaim();
 
 	bool IsCollisionReadyAt(
 		const ACharacter& InCharacter,
@@ -205,21 +179,7 @@ private:
 	bool bHeld = false;
 	bool bBreakActive = false;
 
-	/**
-	 * 只允许 Initial Spawn 使用 MOVE_None。
-	 */
-	bool bInitialCollisionGatePending = true;
-	bool bInitialCollisionGateApplied = false;
-
-	uint8 InitialPreviousMoveMode = 0;
-	uint8 InitialPreviousCustomMode = 0;
-
-	bool bHasLastSafeLocation = false;
-	FVector LastSafeLocation = FVector::ZeroVector;
-
 	uint64 ObservedWorldEpoch = 0;
-
-	float PreviousStepHeight = -1.0f;
 
 	FIntVector BreakTarget = FIntVector::ZeroValue;
 	double LastPulse = -10.0;

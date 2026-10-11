@@ -2,6 +2,7 @@
 
 #include "Ability/Item/AbilityItemDataBase.h"
 #include "Ability/AbilityModuleTypes.h"
+#include "Ability/Effects/EffectBase.h"
 
 #include "AbilityActorDataBase.generated.h"
 
@@ -23,16 +24,16 @@ public:
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSubclassOf<AActor> Class;
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSubclassOf<UGameplayEffect> PEClass;
+	TSubclassOf<UEffectBase> PEClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float Radius;
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float HalfHeight;
-		
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TObjectPtr<UInventoryProfile> InventoryProfile;
 
@@ -42,4 +43,3 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FInventoryInitialPlacement> InitialInventoryPlacements;
 };
-

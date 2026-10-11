@@ -41,14 +41,10 @@ class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase,
 
 	friend class UAbilityCharacterState_Death;
 	friend class UAbilityCharacterState_Spawn;
-	friend class UAbilityCharacterState_Fall;
-	friend class UAbilityCharacterState_Jump;
-	friend class UAbilityCharacterState_Static;
-	friend class UAbilityCharacterState_Walk;
 
 public:
 	AAbilityCharacterBase(const FObjectInitializer& ObjectInitializer);
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	void InitializeAbilities(AActor* InOwnerActor = nullptr, AActor* InAvatarActor = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
@@ -89,12 +85,15 @@ protected:
 
 	virtual void ResetData() override;
 
-	virtual void OnFiniteStateRefresh(UFiniteStateBase* InCurrentState) override;
 
-	virtual void OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode) override;
 
 public:
 	virtual void Death(IAbilityVitalityInterface* InKiller) override;
+	virtual bool IsAbilityRuntimeReady() const;
+	bool IsBaseAttributeSourceReady() const { return bBaseAttributeSourceReady; }
+	virtual bool IsMovementExternallyManaged() const;
+	virtual void OnLifecycleActivated();
+	virtual void OnLifecycleSuspended(bool bDeath);
 	virtual void ApplyDeathAttributes();
 
 	virtual void Kill(IAbilityVitalityInterface* InTarget) override;
@@ -128,17 +127,9 @@ public:
 
 	virtual void UnCrouch(bool bClientSimulation) override;
 
-	UFUNCTION(BlueprintCallable)
-	virtual void Swim() override;
 
-	UFUNCTION(BlueprintCallable)
-	virtual void UnSwim() override;
 
-	UFUNCTION(BlueprintCallable)
-	virtual void Float(float InWaterPosZ) override;
 
-	UFUNCTION(BlueprintCallable)
-	virtual void UnFloat() override;
 
 	UFUNCTION(BlueprintCallable)
 	virtual void Climb() override;
@@ -158,8 +149,6 @@ public:
 	UFUNCTION(BlueprintCallable)
 	virtual bool StopAction(const FGameplayTag& InActionTag) override;
 
-	UFUNCTION(BlueprintCallable)
-	virtual void EndAction(const FGameplayTag& InActionTag, bool bWasCancelled) override;
 
 public:
 
@@ -200,10 +189,10 @@ public:
 
 protected:
 	// stats
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
 	FName RaceID;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
 	int32 Level;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
@@ -244,7 +233,11 @@ protected:
 
 	float DefaultAirControl;
 
-	TMap<FGameplayTag, FVitalityActionAbilityData> ActionAbilities;
+	FActiveGameplayEffectHandle StaticEffect;
+	FActiveGameplayEffectHandle InterruptEffect;
+	const FGuid BaseStatsSource = FGuid(0x74FD8520, 0xB13E40AF, 0x9A9EFD04, 0xD49EE5D2);
+	bool bBaseAttributeSourceReady = false;
+	const FGuid StaticMovementSource = FGuid(0x0A2C1130, 0x4E6D4D2D, 0x8BC804B6, 0x0431316E);
 
 public:
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Exp)
@@ -462,14 +455,12 @@ public:
 	virtual FVitalityActionAbilityData GetActionAbility(const FGameplayTag& InActionTag) override;
 
 	UFUNCTION(BlueprintPure)
-	virtual TMap<FGameplayTag, FVitalityActionAbilityData>& GetActionAbilities() override
-	{
-		return ActionAbilities;
-	}
+	virtual TMap<FGameplayTag, FVitalityActionAbilityData> GetActionAbilities() const override;
 
 public:
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 	virtual void OnRep_Controller() override;
 
 	virtual void OnRep_PlayerState() override;
 };
-

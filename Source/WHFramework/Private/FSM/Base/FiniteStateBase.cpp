@@ -1,35 +1,27 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #include "FSM/Base/FiniteStateBase.h"
-
-#include "Debug/DebugModuleTypes.h"
-#include "Event/EventModuleStatics.h"
-#include "FSM/Components/FSMComponent.h"
 #include "Common/CommonModuleStatics.h"
+#include "Event/EventModuleStatics.h"
 #include "Event/Events/FSM/Event_FiniteStateEntered.h"
 #include "Event/Events/FSM/Event_FiniteStateLeaved.h"
+#include "FSM/Components/FSMComponent.h"
 
 UFiniteStateBase::UFiniteStateBase()
 {
-	StateName = FName("FiniteStateBase");
-	StateIndex = 0;
+	StateName = TEXT("FiniteStateBase");
+	StateDomain = NAME_None;
+	StateIndex = INDEX_NONE;
 	FSM = nullptr;
-
-	const UFunction* OnPreEnterFunction = GetClass()->FindFunctionByName(FName(TEXT("K2_OnPreEnter")));
-	bHasBlueprintOnPreEnter = UCommonModuleStatics::IsImplementedInBlueprint(OnPreEnterFunction);
-
-	const UFunction* OnPreLeaveFunction = GetClass()->FindFunctionByName(FName(TEXT("K2_OnPreLeave")));
-	bHasBlueprintOnPreLeave = UCommonModuleStatics::IsImplementedInBlueprint(OnPreLeaveFunction);
+	bHasBlueprintOnPreEnter = false;
+	bHasBlueprintOnPreLeave = false;
 }
 
 void UFiniteStateBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	
 }
 
 void UFiniteStateBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	StateIndex = 0;
+	StateIndex = INDEX_NONE;
 	FSM = nullptr;
 }
 
@@ -37,24 +29,19 @@ void UFiniteStateBase::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
 {
 	FSM = InFSM;
 	StateIndex = InStateIndex;
+	bHasBlueprintOnPreEnter = UCommonModuleStatics::IsImplementedInBlueprint(GetClass()->FindFunctionByName(GET_FUNCTION_NAME_CHECKED(UFiniteStateBase, K2_OnPreEnter)));
+	bHasBlueprintOnPreLeave = UCommonModuleStatics::IsImplementedInBlueprint(GetClass()->FindFunctionByName(GET_FUNCTION_NAME_CHECKED(UFiniteStateBase, K2_OnPreLeave)));
 	K2_OnInitialize();
 }
 
 bool UFiniteStateBase::OnPreEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	if(bHasBlueprintOnPreEnter && !K2_OnPreEnter(InLastState, InParams)) return false;
-	return true;
+	return !bHasBlueprintOnPreEnter || K2_OnPreEnter(InLastState, InParams);
 }
 
 void UFiniteStateBase::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
-	if(FSM->bShowDebugMessage)
-	{
-		WHLog(FString::Printf(TEXT("%s=>进入状态: %s"), *GetAgent()->GetActorNameOrLabel(), *StateName.ToString()), EDC_FSM);
-	}
-
 	K2_OnEnter(InLastState, InParams);
-
 	UEventModuleStatics::BroadcastEvent<FEventFiniteStateEntered>(this, {this, FSM});
 }
 
@@ -65,53 +52,61 @@ void UFiniteStateBase::OnRefresh(float DeltaSeconds)
 
 bool UFiniteStateBase::OnPreLeave(UFiniteStateBase* InNextState)
 {
-	if(bHasBlueprintOnPreLeave && !K2_OnPreLeave(InNextState)) return false;
-	return true;
+	return !bHasBlueprintOnPreLeave || K2_OnPreLeave(InNextState);
 }
 
 void UFiniteStateBase::OnLeave(UFiniteStateBase* InNextState)
 {
-	if(FSM->bShowDebugMessage)
-	{
-		WHLog(FString::Printf(TEXT("%s=>离开状态: %s"), *GetAgent()->GetActorNameOrLabel(), *StateName.ToString()), EDC_FSM);
-	}
-
 	K2_OnLeave(InNextState);
-
 	UEventModuleStatics::BroadcastEvent<FEventFiniteStateLeaved>(this, {this, FSM});
+}
+
+void UFiniteStateBase::OnPresentationEnter(UFiniteStateBase* InLastState, const FFSMReplicatedState& InState)
+{
+	K2_OnPresentationEnter(InLastState, InState);
+}
+
+void UFiniteStateBase::OnPresentationLeave(UFiniteStateBase* InNextState)
+{
+	K2_OnPresentationLeave(InNextState);
 }
 
 void UFiniteStateBase::OnTermination()
 {
 	K2_OnTermination();
+	FSM = nullptr;
+	StateIndex = INDEX_NONE;
 }
 
 void UFiniteStateBase::Terminate()
 {
-	FSM->TerminateState(this);
+	if (FSM)
+	{
+		FSM->TerminateState(this);
+	}
 }
 
 bool UFiniteStateBase::Switch(UFiniteStateBase* InState, const TArray<FParameter>& InParams)
 {
-	return FSM->SwitchState(InState, InParams);
+	return FSM && FSM->SwitchState(InState, InParams);
 }
 
 bool UFiniteStateBase::SwitchLast(const TArray<FParameter>& InParams)
 {
-	return FSM->SwitchLastState(InParams);
+	return FSM && FSM->SwitchLastState(InParams);
 }
 
 bool UFiniteStateBase::SwitchNext(const TArray<FParameter>& InParams)
 {
-	return FSM->SwitchNextState(InParams);
+	return FSM && FSM->SwitchNextState(InParams);
 }
 
 AActor* UFiniteStateBase::GetAgent(TSubclassOf<AActor> InClass) const
 {
-	return FSM->GetAgent(InClass);
+	return FSM ? FSM->GetAgent(InClass) : nullptr;
 }
 
 bool UFiniteStateBase::IsCurrent()
 {
-	return FSM->IsCurrentState(this);
+	return FSM && FSM->IsCurrentState(this);
 }

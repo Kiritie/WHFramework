@@ -1,110 +1,37 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "AI/Base/AIBlackboardBase.h"
 
+#include "AI/Base/AIBlackboardContext.h"
 #include "AI/Base/AIControllerBase.h"
-#include "Math/MathTypes.h"
+#include "BehaviorTree/Blackboard/BlackboardKeyType_Bool.h"
+#include "BehaviorTree/Blackboard/BlackboardKeyType_Object.h"
+#include "BehaviorTree/Blackboard/BlackboardKeyType_Vector.h"
 
-void UAIBlackboardBase::PostLoad()
+UAIBlackboardBase::UAIBlackboardBase()
 {
-	Super::PostLoad();
-
-	// BLACKBOARD_VALUE_GENERATE_BOOL(IsLostTarget);
-	// BLACKBOARD_VALUE_GENERATE_VECTOR(TargetLocation);
-	// BLACKBOARD_VALUE_GENERATE_OBJECT(TargetAgent, APawn);
+	ContextClass = UAIBlackboardContext::StaticClass();
+	FBlackboardEntry LostEntry;
+	LostEntry.EntryName = TEXT("IsLostTarget");
+	LostEntry.KeyType = CreateDefaultSubobject<UBlackboardKeyType_Bool>(TEXT("LostTargetKey"));
+	Keys.Add(LostEntry);
+	FBlackboardEntry LocationEntry;
+	LocationEntry.EntryName = TEXT("TargetLocation");
+	LocationEntry.KeyType = CreateDefaultSubobject<UBlackboardKeyType_Vector>(TEXT("TargetLocationKey"));
+	Keys.Add(LocationEntry);
+	FBlackboardEntry TargetEntry;
+	TargetEntry.EntryName = TEXT("TargetAgent");
+	UBlackboardKeyType_Object* TargetType = CreateDefaultSubobject<UBlackboardKeyType_Object>(TEXT("TargetAgentKey"));
+	TargetType->BaseClass = AActor::StaticClass();
+	TargetEntry.KeyType = TargetType;
+	Keys.Add(TargetEntry);
 }
 
-void UAIBlackboardBase::OnInitialize()
+UAIBlackboardContext* UAIBlackboardBase::CreateContext(AAIControllerBase* InController, UBlackboardComponent* InComponent) const
 {
-	Reset();
-}
-
-void UAIBlackboardBase::OnReset()
-{
-	ResetIsLostTarget();
-	ResetTargetLocation();
-	ResetTargetAgent();
-}
-
-void UAIBlackboardBase::OnRefresh()
-{
-	
-}
-
-void UAIBlackboardBase::OnValueReset(FName InValueName)
-{
-	if(InValueName.IsEqual(NAME_IsLostTarget))
+	if (!InController || !InComponent || !ContextClass)
 	{
-		SetIsLostTarget(false);
+		return nullptr;
 	}
-	else if(InValueName.IsEqual(NAME_TargetLocation))
-	{
-		SetTargetLocation(EMPTY_Vector);
-	}
-	else if(InValueName.IsEqual(NAME_TargetAgent))
-	{
-		SetTargetAgent(nullptr);
-	}
-}
-
-void UAIBlackboardBase::OnValuePreChange(FName InValueName)
-{
-	OnBlackboardValuePreChange.Broadcast(InValueName);
-}
-
-void UAIBlackboardBase::OnValueChanged(FName InValueName)
-{
-	OnBlackboardValueChanged.Broadcast(InValueName);
-
-	if(InValueName.IsEqual(NAME_IsLostTarget))
-	{
-		if(GetIsLostTarget())
-		{
-			if(GetTargetAgent<APawn>())
-			{
-				SetTargetLocation(GetTargetAgent<APawn>()->GetActorLocation());
-			}
-			else
-			{
-				ResetIsLostTarget();
-			}
-		}
-		else
-		{
-			ResetTargetLocation();
-		}
-	}
-}
-
-void UAIBlackboardBase::Initialize(UBlackboardComponent* InComponent)
-{
-	Component = InComponent;
-	Controller = Cast<AAIControllerBase>(Component->GetOwner());
-	if (Controller)
-	{
-		Agent = Cast<IAIAgentInterface>(Controller->GetPawn());
-	}
-
-	OnInitialize();
-}
-
-void UAIBlackboardBase::Reset()
-{
-	OnReset();
-}
-
-void UAIBlackboardBase::ResetValue(FName InValueName)
-{
-	OnValueReset(InValueName);
-}
-
-void UAIBlackboardBase::Refresh()
-{
-	OnRefresh();
-}
-
-APawn* UAIBlackboardBase::GetAgent(TSubclassOf<APawn> InClass) const
-{
-	return GetDeterminesOutputObject(Cast<APawn>(Agent), InClass);
+	UAIBlackboardContext* Context = NewObject<UAIBlackboardContext>(InController, ContextClass);
+	Context->Initialize(this, InController, InComponent);
+	return Context;
 }

@@ -11,13 +11,13 @@
 class UFiniteStateBase;
 class UFSMComponent;
 /**
- * 
+ *
  */
 UCLASS()
 class WHFRAMEWORK_API UFSMModule : public UModuleBase
 {
 	GENERATED_BODY()
-		
+
 	GENERATED_MODULE(UFSMModule)
 
 public:
@@ -134,13 +134,9 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure)
-	FFSMGroup& GetGroup(const FName InGroupName)
+	FFSMGroup GetGroup(const FName InGroupName) const
 	{
-		if(HasGroup(InGroupName))
-		{
-			return GroupMap[InGroupName];
-		}
-		static FFSMGroup TempGroup;
-		return TempGroup;
+		const FFSMGroup* Group = GroupMap.Find(InGroupName);
+		return Group ? *Group : FFSMGroup();
 	}
 };

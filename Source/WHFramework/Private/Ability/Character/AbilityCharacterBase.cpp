@@ -1,6 +1,11 @@
 // Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 
 #include "Ability/Character/AbilityCharacterBase.h"
+#include "Ability/Character/States/AbilityCharacterState_Alive.h"
+#include "Ability/Effects/CharacterStateEffectBase.h"
+#include "Character/Components/CharacterMovementComponentBase.h"
+#include "Animation/AnimInstance.h"
+#include "GameplayEffectAggregator.h"
 #include "Net/UnrealNetwork.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
 #include "Ability/Inventory/InventoryWorldSubsystem.h"
@@ -14,10 +19,6 @@
 #include "Ability/Character/AbilityCharacterDataBase.h"
 #include "Ability/Character/States/AbilityCharacterState_Death.h"
 #include "Ability/Character/States/AbilityCharacterState_Spawn.h"
-#include "Ability/Character/States/AbilityCharacterState_Fall.h"
-#include "Ability/Character/States/AbilityCharacterState_Jump.h"
-#include "Ability/Character/States/AbilityCharacterState_Static.h"
-#include "Ability/Character/States/AbilityCharacterState_Walk.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Common/Interaction/InteractionComponent.h"
 #include "FSM/Components/FSMComponent.h"
@@ -25,25 +26,27 @@
 #include "Scene/SceneModuleStatics.h"
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/Abilities/VitalityActionAbilityBase.h"
-#include "Ability/Character/States/AbilityCharacterState_Climb.h"
-#include "Ability/Character/States/AbilityCharacterState_Crouch.h"
-#include "Ability/Character/States/AbilityCharacterState_Float.h"
-#include "Ability/Character/States/AbilityCharacterState_Fly.h"
-#include "Ability/Character/States/AbilityCharacterState_Interrupt.h"
-#include "Ability/Character/States/AbilityCharacterState_Swim.h"
 #include "Common/Looking/LookingComponent.h"
 #include "Scene/Actor/PhysicsVolume/PhysicsVolumeBase.h"
 
 //////////////////////////////////////////////////////////////////////////
 // AAbilityCharacterBase
 AAbilityCharacterBase::AAbilityCharacterBase(const FObjectInitializer& ObjectInitializer)
-    : Super(ObjectInitializer)
+    : Super(ObjectInitializer.SetDefaultSubobjectClass<UCharacterMovementComponentBase>(ACharacter::CharacterMovementComponentName))
 {
 	AutoPossessAI = EAutoPossessAI::Disabled;
+	GetCharacterMovement()->bAutoActivate = false;
+	GetCharacterMovement()->PrimaryComponentTick.bStartWithTickEnabled = false;
+	GetCharacterMovement()->SetComponentTickEnabled(false);
+	GetCharacterMovement()->DisableMovement();
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
-	AbilitySystem->SetIsReplicated(true);
-	AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
+	AbilitySystem = CreateOptionalDefaultSubobject<UAbilitySystemComponentBase>(FName("AbilitySystem"));
+	if (AbilitySystem)
+	{
+		AbilitySystem->SetIsReplicated(true);
+		AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
+	}
 
 	AttributeSet = CreateDefaultSubobject<UCharacterAttributeSetBase>(FName("AttributeSet"));
 
@@ -61,19 +64,11 @@ AAbilityCharacterBase::AAbilityCharacterBase(const FObjectInitializer& ObjectIni
 	FSM->DefaultState = UAbilityCharacterState_Spawn::StaticClass();
 	FSM->FinalState = UAbilityCharacterState_Death::StaticClass();
 
-	FSM->States.Add(UAbilityCharacterState_Climb::StaticClass());
-	FSM->States.Add(UAbilityCharacterState_Crouch::StaticClass());
-	FSM->States.Add(UAbilityCharacterState_Death::StaticClass());
-	FSM->States.Add(UAbilityCharacterState_Spawn::StaticClass());
-	FSM->States.Add(UAbilityCharacterState_Fall::StaticClass());
-	FSM->States.Add(UAbilityCharacterState_Float::StaticClass());
-	FSM->States.Add(UAbilityCharacterState_Fly::StaticClass());
-	FSM->States.Add(UAbilityCharacterState_Interrupt::StaticClass());
-	FSM->States.Add(UAbilityCharacterState_Jump::StaticClass());
-	FSM->States.Add(UAbilityCharacterState_Static::StaticClass());
-	FSM->States.Add(UAbilityCharacterState_Swim::StaticClass());
-	FSM->States.Add(UAbilityCharacterState_Walk::StaticClass());
 
+	FSM->DomainName = TEXT("Lifecycle");
+	FSM->States = {UAbilityCharacterState_Spawn::StaticClass(), UAbilityCharacterState_Alive::StaticClass(), UAbilityCharacterState_Death::StaticClass()};
+	bReplicates = true;
+	SetReplicateMovement(true);
 	// stats
 	AssetID = FPrimaryAssetId();
 	Name = NAME_None;
@@ -85,35 +80,46 @@ AAbilityCharacterBase::AAbilityCharacterBase(const FObjectInitializer& ObjectIni
 	MovementRate = 1.f;
 	RotationRate = 1.f;
 
-	ActionAbilities = TMap<FGameplayTag, FVitalityActionAbilityData>();
+}
+
+void AAbilityCharacterBase::InitializeAbilities(AActor* InOwnerActor, AActor* InAvatarActor)
+{
+	IAbilityActorInterface::InitializeAbilities(InOwnerActor, InAvatarActor);
+	if (HasAuthority() && AbilitySystem && AbilitySystem->GetAvatarActor() == this && AssetID.IsValid() && !bBaseAttributeSourceReady)
+	{
+		AAbilityCharacterBase::SetLevelA(Level);
+	}
 }
 
 void AAbilityCharacterBase::OnSpawn_Implementation(const FParameter& InParam)
 {
+	bBaseAttributeSourceReady = false;
 	Super::OnSpawn_Implementation(InParam);
-
 	InitializeAbilities();
-
-	SpawnDefaultController();
-
-	SwitchDefaultFiniteState();
+	if (HasAuthority())
+	{
+		SpawnDefaultController();
+		SwitchDefaultFiniteState();
+	}
 }
 
 void AAbilityCharacterBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
+	bBaseAttributeSourceReady = false;
+	UninitializeAbilities();
+	if (UCharacterMovementComponentBase* Movement = Cast<UCharacterMovementComponentBase>(GetCharacterMovement()))
+	{
+		Movement->ResetMovementSources();
+	}
 	BindInventory(nullptr);
 	SelectedInventorySlot = FInventorySlotKey();
-	Super::OnDespawn_Implementation(InMode);
-
-	SetMotionRate(1.f, 1.f);
-
 	AssetID = FPrimaryAssetId();
 	RaceID = NAME_None;
 	Level = 0;
-
 	BirthTransform = FTransform::Identity;
-
-
+	StaticEffect.Invalidate();
+	InterruptEffect.Invalidate();
+	Super::OnDespawn_Implementation(InMode);
 }
 
 void AAbilityCharacterBase::OnInitialize_Implementation()
@@ -134,27 +140,12 @@ void AAbilityCharacterBase::OnPreparatory_Implementation()
 void AAbilityCharacterBase::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);
-
-	if (IsActive())
-	{
-		ModifyHealth(ATTRIBUTE_DELTAVALUE_CLAMP(this, Health, GetHealthRegenSpeed() * DeltaSeconds));
-
-		if (GetMoveVelocity(true).Size() > 0.2f)
-		{
-			if (!IsMoving())
-			{
-				AbilitySystem->AddLooseGameplayTag(GameplayTags::State_Pawn_Moving);
-			}
-		}
-		else if (IsMoving())
-		{
-			AbilitySystem->RemoveLooseGameplayTag(GameplayTags::State_Pawn_Moving);
-		}
-	}
 }
 
 void AAbilityCharacterBase::OnTermination_Implementation()
 {
+	BindInventory(nullptr);
+	UninitializeAbilities();
 	Super::OnTermination_Implementation();
 }
 
@@ -167,86 +158,46 @@ void AAbilityCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInp
 
 void AAbilityCharacterBase::BindASCInput()
 {
-	if (!bASCInputBound && IsValid(AbilitySystem) && IsValid(InputComponent))
+	if (!bASCInputBound && AbilitySystem && InputComponent && IsLocallyControlled())
 	{
 		AbilitySystem->BindAbilityActivationToInputComponent(InputComponent,
-		                                                     FGameplayAbilityInputBinds(FString("ConfirmTarget"),
-		                                                                                FString("CancelTarget"),
-		                                                                                FTopLevelAssetPath("/Script/WHFramework", FName("EAbilityInputID")),
-		                                                                                static_cast<int32>(EAbilityInputID::Confirm),
-		                                                                                static_cast<int32>(EAbilityInputID::Cancel)));
+			FGameplayAbilityInputBinds(TEXT("ConfirmTarget"), TEXT("CancelTarget"),
+				FTopLevelAssetPath(TEXT("/Script/WHFramework"), TEXT("EAbilityInputID")),
+				static_cast<int32>(EAbilityInputID::Confirm), static_cast<int32>(EAbilityInputID::Cancel)));
 		bASCInputBound = true;
 	}
 }
 
 void AAbilityCharacterBase::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
 {
-	if (IsFloating())
+	if (IsActive() && !WorldDirection.ContainsNaN() && FMath::IsFinite(ScaleValue))
 	{
-		if (WorldDirection.Z > -0.5f)
-		{
-			WorldDirection.Z = 0.f;
-		}
+		Super::AddMovementInput(WorldDirection, FMath::Clamp(ScaleValue, -1.f, 1.f), bForce);
 	}
-	Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
 }
 
 void AAbilityCharacterBase::Serialize(FArchive& Ar)
 {
 	Super::Serialize(Ar);
-
-	if (!AttributeSet || HasAnyFlags(EObjectFlags::RF_ClassDefaultObject))
-		return;
-
-	if (Ar.ArIsSaveGame)
-	{
-		if (Ar.IsLoading())
-		{
-			Ar << Level;
-		}
-		else if (Ar.IsSaving())
-		{
-			Ar << Level;
-		}
-		AttributeSet->SerializeAttributes(Ar);
-	}
 }
 
 void AAbilityCharacterBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	auto& SaveData = InSaveData.GetRef<FCharacterSaveData>();
-
+	const FCharacterSaveData& SaveData = InSaveData.GetRef<FCharacterSaveData>();
 	if (PHASEC(InPhase, EPhase::Primary))
 	{
-		SetActorTransform(SaveData.SpawnTransform);
-		if (!SaveData.IsSaved())
+		bBaseAttributeSourceReady = false;
+		if (HasAuthority())
 		{
-			BirthTransform = SaveData.SpawnTransform;
-
-			const UAbilityCharacterDataBase& CharacterData = GetCharacterData<UAbilityCharacterDataBase>();
-
-			for (auto Iter : CharacterData.ActionAbilities)
-			{
-				Iter.AbilityHandle = AbilitySystem->K2_GiveAbility(Iter.AbilityClass, Iter.Level);
-				ActionAbilities.Add(Iter.AbilityClass->GetDefaultObject<UAbilityBase>()->AbilityTags.GetByIndex(0), Iter);
-			}
+			SetActorTransform(SaveData.SpawnTransform, false, nullptr, ETeleportType::TeleportPhysics);
 		}
-		else
-		{
-			BirthTransform = SaveData.BirthTransform;
-
-			ActionAbilities = SaveData.ActionAbilities;
-			for (auto& Iter : ActionAbilities)
-			{
-				Iter.Value.AbilityHandle = AbilitySystem->K2_GiveAbility(Iter.Value.AbilityClass, Iter.Value.Level);
-			}
-		}
+		BirthTransform = SaveData.IsSaved() ? SaveData.BirthTransform : SaveData.SpawnTransform;
 	}
 	if (PHASEC(InPhase, EPhase::All))
 	{
 		SetNameA(SaveData.Name);
-		SetLevelA(SaveData.Level);
 		SetRaceID(SaveData.RaceID);
+		SetLevelA(SaveData.Level);
 
 		if (HasAuthority() && SaveData.InventorySnapshot.InventoryId.IsValid())
 		{
@@ -265,7 +216,6 @@ void AAbilityCharacterBase::LoadData(const FParameter& InSaveData, EPhase InPhas
 FParameter AAbilityCharacterBase::ToData()
 {
 	FCharacterSaveData SaveData;
-
 	SaveData.ActorID = ActorID;
 	SaveData.AssetID = AssetID;
 	SaveData.Name = Name;
@@ -279,91 +229,27 @@ FParameter AAbilityCharacterBase::ToData()
 
 	SaveData.SpawnTransform = GetActorTransform();
 	SaveData.BirthTransform = BirthTransform;
-
-	SaveData.ActionAbilities = ActionAbilities;
-
 	return FParameter(MoveTemp(SaveData));
 }
 
 void AAbilityCharacterBase::ResetData()
 {
-	SetHealth(GetMaxHealth());
-}
-
-void AAbilityCharacterBase::OnFiniteStateRefresh(UFiniteStateBase* InCurrentState)
-{
-	if (!IsActive())
-		return;
-	if (InCurrentState && !IsWalking() && !IsJumping() && !IsFalling() && !IsSwimming() && !IsFloating() && !IsFlying())
-		return;
-
-	switch (GetCharacterMovement()->MovementMode)
+	if (HasAuthority() && AbilitySystem)
 	{
-		case MOVE_Walking:
-		case MOVE_NavWalking:
-		{
-			if (!IsJumping() && !IsWalking())
-			{
-				SwitchFiniteStateByClass<UAbilityCharacterState_Walk>();
-			}
-			break;
-		}
-		case MOVE_Falling:
-		{
-			if (!IsFalling())
-				SwitchFiniteStateByClass<UAbilityCharacterState_Fall>();
-			break;
-		}
-		case MOVE_Swimming:
-		{
-			if (!InCurrentState)
-			{
-				SwitchFiniteStateByClass<UAbilityCharacterState_Fall>();
-			}
-			else if (!IsSwimming() && !IsFloating())
-			{
-				Swim();
-			}
-			break;
-		}
-		case MOVE_Flying:
-		{
-			if (!InCurrentState)
-			{
-				SwitchFiniteStateByClass<UAbilityCharacterState_Fall>();
-			}
-			else if (!IsFlying())
-			{
-				Fly();
-			}
-			break;
-		}
-		default:
-			break;
+		SetHealth(GetMaxHealth());
 	}
 }
 
-void AAbilityCharacterBase::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode)
-{
-	Super::OnMovementModeChanged(PrevMovementMode, PreviousCustomMode);
 
-	if (!IsActive())
-		return;
 
-	UCharacterMovementComponent* Movement = GetCharacterMovement();
-	APhysicsVolume* PhysicsVolume =
-	    Movement->MovementMode == MOVE_Swimming ? USceneModuleStatics::GetPhysicsVolumeByName(FName("Water")) : USceneModuleStatics::GetDefaultPhysicsVolume();
-	if (Movement->UpdatedComponent && PhysicsVolume && Movement->GetPhysicsVolume() != PhysicsVolume)
-	{
-		Movement->UpdatedComponent->SetPhysicsVolume(PhysicsVolume, true);
-	}
 
-	RefreshFiniteState();
-}
 
 void AAbilityCharacterBase::Death(IAbilityVitalityInterface* InKiller)
 {
-	SwitchFinalFiniteState({Cast<UObject>(InKiller)});
+	if (HasAuthority() && !IsDead())
+	{
+		SwitchFinalFiniteState({Cast<UObject>(InKiller)});
+	}
 }
 
 void AAbilityCharacterBase::ApplyDeathAttributes()
@@ -374,6 +260,10 @@ void AAbilityCharacterBase::ApplyDeathAttributes()
 
 void AAbilityCharacterBase::Kill(IAbilityVitalityInterface* InTarget)
 {
+	if (!HasAuthority() || !InTarget || InTarget->IsDead())
+	{
+		return;
+	}
 	if (InTarget != this)
 	{
 		ModifyExp(InTarget->GetLevelA() * 10.f);
@@ -383,58 +273,77 @@ void AAbilityCharacterBase::Kill(IAbilityVitalityInterface* InTarget)
 
 void AAbilityCharacterBase::Revive(IAbilityVitalityInterface* InRescuer)
 {
-	SwitchDefaultFiniteState({Cast<UObject>(InRescuer)});
+	if (HasAuthority() && IsDead())
+	{
+		SwitchDefaultFiniteState({Cast<UObject>(InRescuer)});
+	}
 }
 
 void AAbilityCharacterBase::Static()
 {
-	SwitchFiniteStateByClass<UAbilityCharacterState_Static>();
+	if (!AbilitySystem || !HasAuthority() || StaticEffect.IsValid())
+	{
+		return;
+	}
+	FGameplayEffectSpecHandle Spec = AbilitySystem->MakeOutgoingSpec(UCharacterStateEffectBase::StaticClass(), 1.f, AbilitySystem->MakeEffectContext());
+	Spec.Data->DynamicGrantedTags.AddTag(CharacterLifecycleTags::Suspended);
+	StaticEffect = AbilitySystem->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+	FCharacterMovementConstraint Constraint;
+	Constraint.bBlockMovement = true;
+	Constraint.bBlockRotation = true;
+	CastChecked<UCharacterMovementComponentBase>(GetCharacterMovement())->SetMovementConstraint(StaticMovementSource, this, Constraint);
 }
 
 void AAbilityCharacterBase::UnStatic()
 {
-	if (IsCurrentFiniteStateClass<UAbilityCharacterState_Static>())
+	if (HasAuthority() && AbilitySystem)
 	{
-		SwitchFiniteState(nullptr);
+		AbilitySystem->RemoveActiveGameplayEffect(StaticEffect);
+		StaticEffect.Invalidate();
+		CastChecked<UCharacterMovementComponentBase>(GetCharacterMovement())->ReleaseMovementSource(StaticMovementSource, this);
 	}
 }
 
 void AAbilityCharacterBase::Interrupt(float InDuration /*= -1*/)
 {
-	SwitchFiniteStateByClass<UAbilityCharacterState_Interrupt>({InDuration});
+	if (!HasAuthority() || !AbilitySystem || !FMath::IsFinite(InDuration) || InDuration <= 0.f)
+	{
+		return;
+	}
+	FGameplayEffectSpecHandle Spec = AbilitySystem->MakeOutgoingSpec(UCharacterTimedStateEffectBase::StaticClass(), 1.f, AbilitySystem->MakeEffectContext());
+	Spec.Data->SetDuration(InDuration, true);
+	Spec.Data->DynamicGrantedTags.AddTag(GameplayTags::State_Vitality_Interrupting);
+	InterruptEffect = AbilitySystem->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
 }
 
 void AAbilityCharacterBase::UnInterrupt()
 {
-	if (IsCurrentFiniteStateClass<UAbilityCharacterState_Interrupt>())
+	if (HasAuthority() && AbilitySystem)
 	{
-		SwitchFiniteState(nullptr);
+		AbilitySystem->RemoveActiveGameplayEffect(InterruptEffect);
+		InterruptEffect.Invalidate();
 	}
 }
 
 void AAbilityCharacterBase::FreeToAnim()
 {
-	if (!IsFreeToAnim())
+	if (HasAuthority() && AbilitySystem)
 	{
-		AbilitySystem->AddLooseGameplayTag(GameplayTags::State_Character_FreeToAnim);
+		AbilitySystem->SetLooseGameplayTagCount(GameplayTags::State_Character_FreeToAnim, 1, EGameplayTagReplicationState::TagAndCountToAll);
 	}
 }
 
 void AAbilityCharacterBase::LimitToAnim()
 {
-	if (IsFreeToAnim())
+	if (HasAuthority() && AbilitySystem)
 	{
-		AbilitySystem->RemoveLooseGameplayTag(GameplayTags::State_Character_FreeToAnim);
+		AbilitySystem->SetLooseGameplayTagCount(GameplayTags::State_Character_FreeToAnim, 0, EGameplayTagReplicationState::TagAndCountToAll);
 	}
 }
 
 void AAbilityCharacterBase::Jump()
 {
-	if (!IsCurrentFiniteStateClass<UAbilityCharacterState_Jump>())
-	{
-		SwitchFiniteStateByClass<UAbilityCharacterState_Jump>();
-	}
-	else
+	if (IsActive() && !IsInterrupting())
 	{
 		Super::Jump();
 	}
@@ -442,23 +351,12 @@ void AAbilityCharacterBase::Jump()
 
 void AAbilityCharacterBase::UnJump()
 {
-	if (IsCurrentFiniteStateClass<UAbilityCharacterState_Jump>())
-	{
-		SwitchFiniteState(nullptr);
-	}
-	else
-	{
-		Super::StopJumping();
-	}
+	Super::StopJumping();
 }
 
 void AAbilityCharacterBase::Crouch(bool bClientSimulation)
 {
-	if (!IsCurrentFiniteStateClass<UAbilityCharacterState_Crouch>())
-	{
-		SwitchFiniteStateByClass<UAbilityCharacterState_Crouch>({bClientSimulation});
-	}
-	else
+	if (IsActive() || bClientSimulation)
 	{
 		Super::Crouch(bClientSimulation);
 	}
@@ -466,141 +364,72 @@ void AAbilityCharacterBase::Crouch(bool bClientSimulation)
 
 void AAbilityCharacterBase::UnCrouch(bool bClientSimulation)
 {
-	if (IsCurrentFiniteStateClass<UAbilityCharacterState_Crouch>())
-	{
-		SwitchFiniteState(nullptr);
-	}
-	else
-	{
-		Super::UnCrouch(bClientSimulation);
-	}
+	Super::UnCrouch(bClientSimulation);
 }
 
-void AAbilityCharacterBase::Swim()
-{
-	SwitchFiniteStateByClass<UAbilityCharacterState_Swim>();
-}
 
-void AAbilityCharacterBase::UnSwim()
-{
-	if (IsCurrentFiniteStateClass<UAbilityCharacterState_Swim>())
-	{
-		SwitchFiniteState(nullptr);
-	}
-}
 
-void AAbilityCharacterBase::Float(float InWaterPosZ)
-{
-	SwitchFiniteStateByClass<UAbilityCharacterState_Float>({InWaterPosZ});
-}
 
-void AAbilityCharacterBase::UnFloat()
-{
-	if (IsCurrentFiniteStateClass<UAbilityCharacterState_Float>())
-	{
-		SwitchFiniteState(nullptr);
-	}
-}
+
+
+
+
 
 void AAbilityCharacterBase::Climb()
 {
-	SwitchFiniteStateByClass<UAbilityCharacterState_Climb>();
+	DoAction(GameplayTags::Ability_Character_Action_Climb);
 }
 
 void AAbilityCharacterBase::UnClimb()
 {
-	if (IsCurrentFiniteStateClass<UAbilityCharacterState_Climb>())
-	{
-		SwitchFiniteState(nullptr);
-	}
+	StopAction(GameplayTags::Ability_Character_Action_Climb);
 }
 
 void AAbilityCharacterBase::Fly()
 {
-	SwitchFiniteStateByClass<UAbilityCharacterState_Fly>();
+	DoAction(GameplayTags::Ability_Character_Action_Fly);
 }
 
 void AAbilityCharacterBase::UnFly()
 {
-	if (IsCurrentFiniteStateClass<UAbilityCharacterState_Fly>())
-	{
-		SwitchFiniteState(nullptr);
-	}
+	StopAction(GameplayTags::Ability_Character_Action_Fly);
 }
 
 bool AAbilityCharacterBase::DoAction(const FGameplayTag& InActionTag)
 {
-	if (!AssetID.IsValid())
-		return true;
-
-	if (!HasActionAbility(InActionTag))
+	if (!AbilitySystem || !IsActive())
+	{
 		return false;
-
-	const FVitalityActionAbilityData AbilityData = GetActionAbility(InActionTag);
-	const bool bSuccess = AbilitySystem->TryActivateAbility(AbilityData.AbilityHandle);
-	const FGameplayAbilitySpec Spec = AbilitySystem->FindAbilitySpecForHandle(AbilityData.AbilityHandle);
-	return bSuccess;
+	}
+	FAbilityActionRequest Request;
+	Request.ActionTag = InActionTag;
+	Request.AimDirection = GetBaseAimRotation().Vector();
+	return AbilitySystem->RequestAction(Request).bAccepted;
 }
 
 bool AAbilityCharacterBase::StopAction(const FGameplayTag& InActionTag)
 {
-	if (!AssetID.IsValid())
-		return true;
-
-	if (!HasActionAbility(InActionTag))
+	if (!AbilitySystem)
+	{
 		return false;
-
-	const FVitalityActionAbilityData AbilityData = GetActionAbility(InActionTag);
-	const FGameplayAbilitySpec Spec = AbilitySystem->FindAbilitySpecForHandle(AbilityData.AbilityHandle);
-	if (UVitalityActionAbilityBase* Ability = Cast<UVitalityActionAbilityBase>(Spec.GetPrimaryInstance()))
-	{
-		Ability->SetStopped(true);
 	}
-	AbilitySystem->CancelAbilityHandle(AbilityData.AbilityHandle);
-	return true;
-}
-
-void AAbilityCharacterBase::EndAction(const FGameplayTag& InActionTag, bool bWasCancelled)
-{
-	if (InActionTag.MatchesTag(GameplayTags::Ability_Vitality_Action_Death))
+	TArray<FGuid> Requests;
+	for (const FGameplayAbilitySpec& Spec : AbilitySystem->GetActivatableAbilities())
 	{
-		if (IsCurrentFiniteStateClass<UAbilityCharacterState_Death>())
+		if (UAbilityBase* Ability = Cast<UAbilityBase>(Spec.GetPrimaryInstance()))
 		{
-			FSM->GetCurrentState<UAbilityCharacterState_Death>()->DeathEnd();
+			if (Ability->IsActive() && Ability->ActionTag == InActionTag)
+			{
+				Requests.Add(Ability->GetActionActivationId());
+			}
 		}
 	}
-	else if (InActionTag.MatchesTag(GameplayTags::Ability_Vitality_Action_Static))
+	bool bCancelled = false;
+	for (const FGuid& Request : Requests)
 	{
-		UnStatic();
+		bCancelled |= AbilitySystem->CancelAction(Request, AbilityActionTags::Cancelled);
 	}
-	else if (InActionTag.MatchesTag(GameplayTags::Ability_Vitality_Action_Interrupt))
-	{
-		UnInterrupt();
-	}
-	else if (InActionTag.MatchesTag(GameplayTags::Ability_Character_Action_Jump))
-	{
-		UnJump();
-	}
-	else if (InActionTag.MatchesTag(GameplayTags::Ability_Character_Action_Crouch))
-	{
-		UnCrouch(false);
-	}
-	else if (InActionTag.MatchesTag(GameplayTags::Ability_Character_Action_Swim))
-	{
-		UnSwim();
-	}
-	else if (InActionTag.MatchesTag(GameplayTags::Ability_Character_Action_Float))
-	{
-		UnFloat();
-	}
-	else if (InActionTag.MatchesTag(GameplayTags::Ability_Character_Action_Climb))
-	{
-		UnClimb();
-	}
-	else if (InActionTag.MatchesTag(GameplayTags::Ability_Character_Action_Fly))
-	{
-		UnFly();
-	}
+	return bCancelled;
 }
 
 
@@ -615,28 +444,22 @@ void AAbilityCharacterBase::OnLeaveInteract(IInteractionAgentInterface* InIntera
 
 void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
 {
-	if (InAttributeChangeData.Attribute == GetExpAttribute())
+	if (!AbilitySystem || !AttributeSet)
 	{
-		if (InAttributeChangeData.NewValue >= GetMaxExp())
+		return;
+	}
+	if (HasAuthority() && InAttributeChangeData.Attribute == GetExpAttribute() && GetMaxExp() > 0.f && InAttributeChangeData.NewValue >= GetMaxExp())
+	{
+		const float Remaining = InAttributeChangeData.NewValue - GetMaxExp();
+		if (SetLevelA(Level + 1))
 		{
-			const float Exp = InAttributeChangeData.NewValue - GetMaxExp();
-			SetLevelA(GetLevelA() + 1);
-			SetExp(Exp);
+			SetExp(Remaining);
 		}
 	}
-	else if (InAttributeChangeData.Attribute == GetMoveSpeedAttribute())
-	{
-		GetCharacterMovement()->MaxWalkSpeed = InAttributeChangeData.NewValue * MovementRate;
-	}
-	else if (InAttributeChangeData.Attribute == GetRotationSpeedAttribute())
-	{
-		GetCharacterMovement()->RotationRate = FRotator(0, InAttributeChangeData.NewValue * RotationRate, 0);
-		Looking->LookingRotationSpeed = InAttributeChangeData.NewValue * RotationRate;
-	}
-	else if (InAttributeChangeData.Attribute == GetJumpForceAttribute())
-	{
-		GetCharacterMovement()->JumpZVelocity = InAttributeChangeData.NewValue;
-	}
+	CastChecked<UCharacterMovementComponentBase>(GetCharacterMovement())->SetBaseMovementSettings(
+		GetMoveSpeed() * MovementRate, GetSwimSpeed() * MovementRate, GetFlySpeed() * MovementRate,
+		GetRotationSpeed() * RotationRate, GetJumpForce());
+	Looking->LookingRotationSpeed = GetRotationSpeed() * RotationRate;
 }
 
 void AAbilityCharacterBase::OnActorAttached(AActor* InActor)
@@ -655,45 +478,30 @@ void AAbilityCharacterBase::HandleDamage(const FGameplayAttribute& DamageAttribu
                                          const FGameplayTagContainer& SourceTags,
                                          AActor* SourceActor)
 {
+	if (!HasAuthority() || IsDead() || !FMath::IsFinite(DamageValue) || DamageValue < 0.f)
+	{
+		return;
+	}
 	ModifyHealth(-DamageValue);
-
 	if (GetHealth() <= 0.f)
 	{
-		if (IAbilityVitalityInterface* SourceVitality = Cast<IAbilityVitalityInterface>(SourceActor))
+		if (IAbilityVitalityInterface* Source = Cast<IAbilityVitalityInterface>(SourceActor))
 		{
-			SourceVitality->Kill(this);
+			Source->Kill(this);
 		}
 		else
 		{
 			Death(nullptr);
 		}
 	}
-
-	if (DamageValue >= 1.f)
-	{
-		USceneModuleStatics::SpawnWorldText(FString::FromInt(DamageValue),
-		                                    UAbilityModuleStatics::GetAttributeColor(DamageAttribute),
-		                                    !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress,
-		                                    GetActorLocation(),
-		                                    FVector(20.f));
-	}
-	if (DefendValue >= 1.f)
-	{
-		USceneModuleStatics::SpawnWorldText(FString::FromInt(DefendValue), FColor::Cyan, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
-	}
 }
 
 void AAbilityCharacterBase::HandleRecovery(
     const FGameplayAttribute& RecoveryAttribute, float RecoveryValue, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
 {
-	if (RecoveryAttribute == GetHealthRecoveryAttribute())
+	if (HasAuthority() && !IsDead() && RecoveryAttribute == GetHealthRecoveryAttribute() && FMath::IsFinite(RecoveryValue))
 	{
-		ModifyHealth(RecoveryValue);
-
-		if (RecoveryValue > 1.f)
-		{
-			USceneModuleStatics::SpawnWorldText(FString::FromInt(RecoveryValue), FColor::Green, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
-		}
+		ModifyHealth(FMath::Max(0.f, RecoveryValue));
 	}
 }
 
@@ -703,6 +511,10 @@ void AAbilityCharacterBase::HandleInterrupt(const FGameplayAttribute& InterruptA
                                             const FGameplayTagContainer& SourceTags,
                                             AActor* SourceActor)
 {
+	if (HasAuthority() && InterruptDuration > 0.f)
+	{
+		Interrupt(InterruptDuration);
+	}
 }
 
 UAbilitySystemComponent* AAbilityCharacterBase::GetAbilitySystemComponent() const
@@ -737,87 +549,89 @@ UAbilityInventoryBase* AAbilityCharacterBase::GetInventory() const
 
 bool AAbilityCharacterBase::IsPlayer() const
 {
-	return UCommonModuleStatics::GetPlayerPawn() == this;
+	return GetPlayerState() != nullptr || IsPlayerControlled();
 }
 
 bool AAbilityCharacterBase::IsEnemy(IAbilityPawnInterface* InTarget) const
 {
-	return !InTarget->GetRaceID().IsEqual(RaceID);
+	return InTarget && InTarget != this && InTarget->GetRaceID() != RaceID;
 }
 
 bool AAbilityCharacterBase::IsActive() const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Active);
+	return FSM && FSM->GetCurrentState() && FSM->GetCurrentState()->GetStateName() == TEXT("Alive")
+		&& AbilitySystem && !AbilitySystem->HasMatchingGameplayTag(CharacterLifecycleTags::Suspended);
 }
 
 bool AAbilityCharacterBase::IsDead(bool bCheckDying) const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Dead) || (bCheckDying && IsDying());
+	return FSM && FSM->GetCurrentState() && FSM->GetCurrentState()->GetStateName() == TEXT("Death") && (bCheckDying || !IsDying());
 }
 
 bool AAbilityCharacterBase::IsDying() const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Dying);
+	const UAbilityCharacterState_Death* State = FSM ? Cast<UAbilityCharacterState_Death>(FSM->GetCurrentState()) : nullptr;
+	return State && !State->IsDeathPresentationFinished();
 }
 
 bool AAbilityCharacterBase::IsWalking(bool bReally) const
 {
-	return !bReally ? AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Walking) : GetCharacterMovement()->IsWalking();
+	return GetCharacterMovement()->IsMovingOnGround();
 }
 
 bool AAbilityCharacterBase::IsInterrupting() const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Interrupting);
+	return AbilitySystem && AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Interrupting);
 }
 
 bool AAbilityCharacterBase::IsMoving() const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Pawn_Moving);
+	return GetVelocity().SizeSquared() > 1.f;
 }
 
 bool AAbilityCharacterBase::IsFreeToAnim() const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Character_FreeToAnim);
+	return IsActive() && !IsInterrupting() && !IsAnimating();
 }
 
 bool AAbilityCharacterBase::IsAnimating() const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Character_Animating);
+	return GetMesh() && GetMesh()->GetAnimInstance() && GetMesh()->GetAnimInstance()->IsAnyMontagePlaying();
 }
 
 bool AAbilityCharacterBase::IsJumping() const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Character_Jumping);
+	return GetCharacterMovement()->IsFalling() && GetVelocity().Z > 0.f;
 }
 
 bool AAbilityCharacterBase::IsFalling(bool bReally) const
 {
-	return !bReally ? AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Character_Falling) : GetCharacterMovement()->IsFalling();
+	return GetCharacterMovement()->IsFalling();
 }
 
 bool AAbilityCharacterBase::IsCrouching(bool bReally) const
 {
-	return !bReally ? AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Character_Crouching) : GetCharacterMovement()->IsCrouching();
+	return GetCharacterMovement()->IsCrouching();
 }
 
 bool AAbilityCharacterBase::IsSwimming(bool bReally) const
 {
-	return !bReally ? AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Character_Swimming) : GetCharacterMovement()->IsSwimming();
+	return GetCharacterMovement()->IsSwimming();
 }
 
 bool AAbilityCharacterBase::IsFloating() const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Character_Floating);
+	return CastChecked<UCharacterMovementComponentBase>(GetCharacterMovement())->IsFloating();
 }
 
 bool AAbilityCharacterBase::IsClimbing() const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Character_Climbing);
+	return CastChecked<UCharacterMovementComponentBase>(GetCharacterMovement())->IsClimbing();
 }
 
 bool AAbilityCharacterBase::IsFlying(bool bReally) const
 {
-	return !bReally ? AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Character_Flying) : GetCharacterMovement()->IsFlying();
+	return GetCharacterMovement()->IsFlying();
 }
 
 bool AAbilityCharacterBase::IsTargetAble_Implementation(APawn* InPlayerPawn) const
@@ -847,24 +661,36 @@ void AAbilityCharacterBase::SetRaceID(FName InRaceID)
 
 bool AAbilityCharacterBase::SetLevelA(int32 InLevel)
 {
-	const auto& CharacterData = GetCharacterData<UAbilityCharacterDataBase>();
-	InLevel = CharacterData.ClampLevel(InLevel);
-
-	if (Level != InLevel)
+	if (!HasAuthority() || !AssetID.IsValid())
 	{
-		Level = InLevel;
-
-		auto EffectContext = AbilitySystem->MakeEffectContext();
-		EffectContext.AddSourceObject(this);
-		auto SpecHandle = AbilitySystem->MakeOutgoingSpec(CharacterData.PEClass, InLevel, EffectContext);
-		if (SpecHandle.IsValid())
-		{
-			AbilitySystem->BP_ApplyGameplayEffectSpecToSelf(SpecHandle);
-		}
-		ResetData();
-		return true;
+		return false;
 	}
-	return false;
+	const UAbilityCharacterDataBase& Data = GetCharacterData<UAbilityCharacterDataBase>();
+	const int32 NewLevel = Data.ClampLevel(InLevel);
+	const bool bChanged = Level != NewLevel;
+	const int32 PreviousLevel = Level;
+	const bool bWasReady = bBaseAttributeSourceReady;
+	FScopedAggregatorOnDirtyBatch AttributeBatch;
+	Level = NewLevel;
+	if (!AbilitySystem)
+	{
+		bBaseAttributeSourceReady = false;
+		return bChanged;
+	}
+	TArray<TSubclassOf<UEffectBase>> BaseEffects;
+	if (Data.PEClass)
+	{
+		BaseEffects.Add(Data.PEClass);
+	}
+	if (!AbilitySystem->SetGrantSource(BaseStatsSource, {}, BaseEffects, NewLevel))
+	{
+		Level = PreviousLevel;
+		bBaseAttributeSourceReady = bWasReady;
+		UE_LOG(LogTemp, Error, TEXT("角色基础属性来源建立失败: %s"), *AssetID.ToString());
+		return false;
+	}
+	bBaseAttributeSourceReady = true;
+	return bChanged;
 }
 
 FString AAbilityCharacterBase::GetHeadInfo() const
@@ -898,7 +724,7 @@ float AAbilityCharacterBase::GetDistance(AActor* InTargetActor, bool bIgnoreRadi
 	return FVector::Distance(
 	           FVector(GetActorLocation().X, GetActorLocation().Y, bIgnoreZAxis ? 0 : GetActorLocation().Z),
 	           FVector(InTargetActor->GetActorLocation().X, InTargetActor->GetActorLocation().Y, bIgnoreZAxis ? 0 : InTargetActor->GetActorLocation().Z)) -
-	       (bIgnoreRadius ? 0 : TargetAbilityActor->GetRadius());
+	       (bIgnoreRadius || !TargetAbilityActor ? 0.f : TargetAbilityActor->GetRadius());
 }
 
 void AAbilityCharacterBase::GetMotionRate(float& OutMovementRate, float& OutRotationRate)
@@ -909,27 +735,27 @@ void AAbilityCharacterBase::GetMotionRate(float& OutMovementRate, float& OutRota
 
 void AAbilityCharacterBase::SetMotionRate(float InMovementRate, float InRotationRate)
 {
-	MovementRate = InMovementRate;
-	RotationRate = InRotationRate;
-
-	GetCharacterMovement()->MaxWalkSpeed = GetMoveSpeed() * MovementRate;
-	GetCharacterMovement()->RotationRate = FRotator(0, GetRotationSpeed() * RotationRate, 0);
-
-	Looking->LookingRotationSpeed = GetRotationSpeed() * RotationRate;
+	MovementRate = FMath::IsFinite(InMovementRate) ? FMath::Clamp(InMovementRate, 0.f, 10.f) : 1.f;
+	RotationRate = FMath::IsFinite(InRotationRate) ? FMath::Clamp(InRotationRate, 0.f, 10.f) : 1.f;
+	if (AbilitySystem && AttributeSet)
+	{
+		CastChecked<UCharacterMovementComponentBase>(GetCharacterMovement())->SetBaseMovementSettings(
+			GetMoveSpeed() * MovementRate, GetSwimSpeed() * MovementRate, GetFlySpeed() * MovementRate,
+			GetRotationSpeed() * RotationRate, GetJumpForce());
+	}
 }
 
 bool AAbilityCharacterBase::HasActionAbility(const FGameplayTag& InActionTag) const
 {
-	return ActionAbilities.Contains(InActionTag);
+	FGameplayAbilitySpecHandle Handle;
+	return AbilitySystem && AbilitySystem->FindGrantedAbility(FPrimaryAssetId(), InActionTag, Handle);
 }
 
 FVitalityActionAbilityData AAbilityCharacterBase::GetActionAbility(const FGameplayTag& InActionTag)
 {
-	if (HasActionAbility(InActionTag))
-	{
-		return ActionAbilities[InActionTag];
-	}
-	return FVitalityActionAbilityData();
+	const TMap<FGameplayTag, FVitalityActionAbilityData> Definitions = GetActionAbilities();
+	const FVitalityActionAbilityData* Found = Definitions.Find(InActionTag);
+	return Found ? *Found : FVitalityActionAbilityData();
 }
 
 void AAbilityCharacterBase::OnRep_Controller()
@@ -947,6 +773,93 @@ void AAbilityCharacterBase::OnRep_PlayerState()
 	}
 }
 
+
+TMap<FGameplayTag, FVitalityActionAbilityData> AAbilityCharacterBase::GetActionAbilities() const
+{
+	TMap<FGameplayTag, FVitalityActionAbilityData> Result;
+	if (!AbilitySystem)
+	{
+		return Result;
+	}
+	for (const FGameplayAbilitySpec& Spec : AbilitySystem->GetActivatableAbilities())
+	{
+		const UAbilityBase* Ability = Cast<UAbilityBase>(Spec.Ability);
+		if (!Ability || !Ability->ActionTag.IsValid())
+		{
+			continue;
+		}
+		FVitalityActionAbilityData Data;
+		Data.AbilityClass = Ability->GetClass();
+		Data.AbilityHandle = Spec.Handle;
+		Data.Level = Spec.Level;
+		Result.Add(Ability->ActionTag, Data);
+	}
+	return Result;
+}
+
+void AAbilityCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AAbilityCharacterBase, Level);
+	DOREPLIFETIME(AAbilityCharacterBase, RaceID);
+	DOREPLIFETIME_CONDITION(AAbilityCharacterBase, SelectedInventorySlot, COND_OwnerOnly);
+}
+
+bool AAbilityCharacterBase::IsAbilityRuntimeReady() const
+{
+	return AbilitySystem && AbilitySystem->GetAvatarActor() == this && AttributeSet
+		&& (!HasAuthority() || bBaseAttributeSourceReady);
+}
+
+bool AAbilityCharacterBase::IsMovementExternallyManaged() const
+{
+	return false;
+}
+
+void AAbilityCharacterBase::OnLifecycleActivated()
+{
+	if (HasAuthority() && AbilitySystem)
+	{
+		for (FGameplayTag Tag : {GameplayTags::State_Vitality_Dead.GetTag(), GameplayTags::State_Vitality_Dying.GetTag()})
+		{
+			AbilitySystem->SetLooseGameplayTagCount(Tag, 0, EGameplayTagReplicationState::TagAndCountToAll);
+		}
+		AbilitySystem->SetLooseGameplayTagCount(GameplayTags::State_Vitality_Active, 1, EGameplayTagReplicationState::TagAndCountToAll);
+	}
+	if (!IsMovementExternallyManaged())
+	{
+		SetActorEnableCollision(true);
+		GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	}
+	Interaction->SetInteractable(true);
+	FreeToAnim();
+}
+
+void AAbilityCharacterBase::OnLifecycleSuspended(bool bDeath)
+{
+	if (HasAuthority() && AbilitySystem)
+	{
+		AbilitySystem->SetLooseGameplayTagCount(GameplayTags::State_Vitality_Active, 0, EGameplayTagReplicationState::TagAndCountToAll);
+		TArray<TWeakObjectPtr<UAbilityBase>> Actions;
+		for (const FGameplayAbilitySpec& Spec : AbilitySystem->GetActivatableAbilities())
+		{
+			if (UAbilityBase* Ability = Cast<UAbilityBase>(Spec.GetPrimaryInstance()); Ability && Ability->IsActive())
+			{
+				Actions.Add(Ability);
+			}
+		}
+		for (const TWeakObjectPtr<UAbilityBase>& Action : Actions)
+		{
+			if (Action.IsValid())
+			{
+				Action->FailAction(bDeath ? GameplayTags::State_Vitality_Dead.GetTag() : AbilityActionTags::AvatarRemoved.GetTag());
+			}
+		}
+	}
+	Interaction->SetInteractable(false);
+	Looking->TargetLookingOff();
+	CastChecked<UCharacterMovementComponentBase>(GetCharacterMovement())->ResetMovementSources();
+}
 
 void AAbilityCharacterBase::BindInventory(UAbilityInventoryBase* InInventory)
 {
@@ -971,12 +884,6 @@ void AAbilityCharacterBase::BindInventory(UAbilityInventoryBase* InInventory)
 			PreviousSubsystem->ReleaseLease(PreviousInventory->GetInventoryId());
 		}
 	}
-}
-
-void AAbilityCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
-{
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME_CONDITION(AAbilityCharacterBase, SelectedInventorySlot, COND_OwnerOnly);
 }
 
 void AAbilityCharacterBase::SetSelectedInventorySlot(const FInventorySlotKey& InSlotKey)

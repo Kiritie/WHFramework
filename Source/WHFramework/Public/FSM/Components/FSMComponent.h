@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "Components/ActorComponent.h"
 #include "Common/CommonModuleTypes.h"
 #include "FSM/FSMModuleTypes.h"
 #include "FSM/Base/FiniteStateBase.h"
@@ -11,7 +12,7 @@
 class UFiniteStateBase;
 
 /**
- * 
+ *
  */
 UCLASS()
 class WHFRAMEWORK_API UFSMComponent : public UActorComponent
@@ -24,6 +25,8 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
@@ -41,6 +44,9 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void OnTermination();
+
+	UFUNCTION(BlueprintPure)
+	bool IsTerminating() const { return bTerminating || bTerminationRequested; }
 
 	//////////////////////////////////////////////////////////////////////////
 	/// State
@@ -125,6 +131,12 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Stats
 public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FName DomainName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	EFSMExecutionPolicy ExecutionPolicy;
+
 	/// 自动切换默认状态
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
 	bool bAutoSwitchDefault;
@@ -147,6 +159,9 @@ public:
 	UPROPERTY(BlueprintAssignable)
 	FOnFiniteStateChanged OnStateChanged;
 
+	UPROPERTY(BlueprintAssignable)
+	FOnFiniteStateChanged OnStatePresented;
+
 protected:
 	/// 当前状态
 	UPROPERTY(VisibleAnywhere, Transient, Category = "Stats")
@@ -157,6 +172,26 @@ protected:
 	bool bSwitchingState;
 	UPROPERTY()
 	bool bInitialized;
+
+	UPROPERTY(Transient)
+	TArray<UFiniteStateBase*> OrderedStates;
+
+	UPROPERTY(Transient)
+	UFiniteStateBase* PresentedState;
+
+	UPROPERTY(ReplicatedUsing = OnRep_ReplicatedState)
+	FFSMReplicatedState ReplicatedState;
+
+	int64 PresentedRevision = INDEX_NONE;
+	bool bTerminating;
+	bool bTerminationRequested;
+
+	UFUNCTION()
+	void OnRep_ReplicatedState();
+
+	void UpdateReplicatedState();
+	void ApplyPresentation(UFiniteStateBase* InState);
+	double GetServerTime() const;
 
 public:
 	UFUNCTION(BlueprintPure)
@@ -170,10 +205,10 @@ public:
 	{
 		return Cast<T>(GetStateByIndex(InStateIndex, InStateClass));
 	}
-	
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InStateIndex"))
+
+	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InStateClass"))
 	UFiniteStateBase* GetStateByIndex(int32 InStateIndex, TSubclassOf<UFiniteStateBase> InStateClass) const;
-	
+
 	UFUNCTION(BlueprintPure)
 	bool HasStateByName(const FName InStateName) const;
 
@@ -191,7 +226,7 @@ public:
 	{
 		return HasStateByClass(InStateClass);
 	}
-	
+
 	UFUNCTION(BlueprintPure)
 	bool HasStateByClass(TSubclassOf<UFiniteStateBase> InStateClass) const;
 
@@ -234,10 +269,16 @@ public:
 	* 获取状态列表
 	*/
 	UFUNCTION(BlueprintPure)
-	TArray<UFiniteStateBase*>& GetStates() const;
+	TArray<UFiniteStateBase*> GetStates() const;
 
 	UFUNCTION(BlueprintPure)
-	TMap<FName, UFiniteStateBase*>& GetStateMap() { return StateMap; }
+	TMap<FName, UFiniteStateBase*> GetStateMap() const { return StateMap; }
+
+	UFUNCTION(BlueprintPure)
+	bool CanExecuteStateLogic() const;
+
+	UFUNCTION(BlueprintPure)
+	FFSMReplicatedState GetReplicatedState() const { return ReplicatedState; }
 
 	template<class T>
 	T* GetAgent() const

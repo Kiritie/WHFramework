@@ -14,16 +14,27 @@ UActorAttributeSetBase::UActorAttributeSetBase()
 void UActorAttributeSetBase::SerializeAttributes(FArchive& Ar)
 {
 	Super::SerializeAttributes(Ar);
-
-	if(Ar.IsLoading())
+	if (Ar.IsLoading() && !Ar.IsError())
 	{
-		GetOwnerActor<IAbilityActorInterface>()->RefreshAttributes();
+		UAbilitySystemComponent* AbilitySystem = GetOwningAbilitySystemComponent();
+		if (IAbilityActorInterface* Actor = Cast<IAbilityActorInterface>(AbilitySystem ? AbilitySystem->GetAvatarActor() : nullptr))
+		{
+			Actor->RefreshAttributes();
+		}
 	}
 }
 
 void UActorAttributeSetBase::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
 {
 	Super::PreAttributeChange(Attribute, NewValue);
+	if (Attribute == GetExpAttribute())
+	{
+		NewValue = FMath::Max(0.f, NewValue);
+	}
+	else if (Attribute == GetMaxExpAttribute())
+	{
+		NewValue = FMath::Max(1.f, NewValue);
+	}
 }
 
 void UActorAttributeSetBase::PostAttributeChange(const FGameplayAttribute& Attribute, float OldValue, float NewValue)

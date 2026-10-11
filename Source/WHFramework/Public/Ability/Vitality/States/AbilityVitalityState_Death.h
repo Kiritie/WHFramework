@@ -8,7 +8,7 @@
 
 class IAbilityVitalityInterface;
 /**
- * 
+ *
  */
 UCLASS()
 class WHFRAMEWORK_API UAbilityVitalityState_Death : public UAbilityVitalityStateBase
@@ -26,7 +26,7 @@ public:
 	virtual bool OnPreEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams) override;
 
 	virtual void OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams) override;
-	
+
 	virtual void OnRefresh(float DeltaSeconds) override;
 
 	virtual bool OnPreLeave(UFiniteStateBase* InNextState) override;
@@ -43,5 +43,10 @@ public:
 	virtual void DeathEnd();
 
 protected:
-	IAbilityVitalityInterface* Killer;
+	TWeakObjectPtr<AActor> KillerActor;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Lifecycle", meta = (ClampMin = "0.0"))
+	float CorpseLifetime = 1.5f;
+	float RemainingLifetime = 0.f;
+	bool bDeathFinalized = false;
 };

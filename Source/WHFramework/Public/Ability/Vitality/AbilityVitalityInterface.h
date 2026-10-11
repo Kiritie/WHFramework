@@ -16,9 +16,9 @@ class WHFRAMEWORK_API IAbilityVitalityInterface : public IAbilityActorInterface
 
 public:
 	virtual void Death(IAbilityVitalityInterface* InKiller) = 0;
-	
+
 	virtual void Kill(IAbilityVitalityInterface* InTarget) = 0;
-	
+
 	virtual void Revive(IAbilityVitalityInterface* InRescuer) = 0;
 
 	virtual void Static() = 0;
@@ -33,24 +33,23 @@ public:
 
 	virtual bool StopAction(const FGameplayTag& InActionTag) = 0;
 
-	virtual void EndAction(const FGameplayTag& InActionTag, bool bWasCancelled) = 0;
 
 public:
 	virtual float GetHealth() const = 0;
-	
+
 	virtual float GetMaxHealth() const = 0;
-	
+
 	virtual void ModifyHealth(float InDeltaValue) = 0;
 
 public:
 	virtual bool IsActive() const = 0;
 
 	virtual bool IsDead(bool bCheckDying = true) const = 0;
-	
+
 	virtual bool IsDying() const = 0;
-	
+
 	virtual bool IsWalking(bool bReally = false) const = 0;
-	
+
 	virtual bool IsInterrupting() const = 0;
 
 public:
@@ -64,12 +63,12 @@ public:
 
 	virtual FVitalityActionAbilityData GetActionAbility(const FGameplayTag& InActionTag) = 0;
 
-	virtual TMap<FGameplayTag, FVitalityActionAbilityData>& GetActionAbilities() = 0;
+	virtual TMap<FGameplayTag, FVitalityActionAbilityData> GetActionAbilities() const = 0;
 
 public:
 	virtual void HandleDamage(const FGameplayAttribute& DamageAttribute, float DamageValue, float DefendValue, bool bHasCrited, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) = 0;
-	
+
 	virtual void HandleRecovery(const FGameplayAttribute& RecoveryAttribute, float RecoveryValue, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) = 0;
-	
+
 	virtual void HandleInterrupt(const FGameplayAttribute& InterruptAttribute, float InterruptDuration, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor) = 0;
 };

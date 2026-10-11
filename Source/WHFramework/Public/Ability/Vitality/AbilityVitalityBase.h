@@ -53,6 +53,11 @@ public:
 	virtual void OnTermination_Implementation() override;
 
 protected:
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	FGuid GetDefaultGrantSourceId() const;
+	FGuid GetProgressionGrantSourceId() const;
+
+protected:
 	virtual void LoadData(const FParameter& InSaveData, EPhase InPhase) override;
 
 	virtual FParameter ToData() override;
@@ -88,8 +93,6 @@ public:
 	UFUNCTION(BlueprintCallable)
 	virtual bool StopAction(const FGameplayTag& InActionTag) override;
 
-	UFUNCTION(BlueprintCallable)
-	virtual void EndAction(const FGameplayTag& InActionTag, bool bWasCancelled) override;
 
 public:
 	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) override;
@@ -130,14 +133,16 @@ protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UFSMComponent* FSM;
 
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UFSMComponent> ControlFSM;
+
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "VitalityStats")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Replicated, Category = "VitalityStats")
 	FName RaceID;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Voxel")
 	TObjectPtr<UVoxelAgentComponent> VoxelAgentComponent;
 
-	TMap<FGameplayTag, FVitalityActionAbilityData> ActionAbilities;
 
 public:
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Exp)
@@ -192,10 +197,7 @@ public:
 		return Super::GetLevelA();
 	}
 
-	virtual bool SetLevelA(int32 InLevel) override
-	{
-		return Super::SetLevelA(InLevel);
-	}
+	virtual bool SetLevelA(int32 InLevel) override;
 
 	virtual float GetRadius() const override
 	{
@@ -204,7 +206,7 @@ public:
 
 	virtual float GetHalfHeight() const override
 	{
-		return Super::GetRadius();
+		return Super::GetHalfHeight();
 	}
 
 	virtual float GetDistance(AActor* InTargetActor, bool bIgnoreRadius = true, bool bIgnoreZAxis = true) const override
@@ -239,10 +241,7 @@ public:
 	virtual FVitalityActionAbilityData GetActionAbility(const FGameplayTag& InActionTag) override;
 
 	UFUNCTION(BlueprintPure)
-	virtual TMap<FGameplayTag, FVitalityActionAbilityData>& GetActionAbilities() override
-	{
-		return ActionAbilities;
-	}
+	virtual TMap<FGameplayTag, FVitalityActionAbilityData> GetActionAbilities() const override;
 
 	template <class T> T& GetVitalityData() const
 	{
@@ -288,4 +287,3 @@ public:
 		return Super::GetAbilitySystemComponent();
 	}
 };
-

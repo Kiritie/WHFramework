@@ -14,31 +14,33 @@ UCLASS()
 class WHFRAMEWORK_API AAbilityProjectileBase : public AWHActor, public IAbilityHitterInterface
 {
 	GENERATED_BODY()
-	
-public:	
+
+public:
 	AAbilityProjectileBase();
-	
+
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
 public:
 
 	virtual void OnSpawn_Implementation(const FParameter& InParam) override;
-		
+
 	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode)
 		override;
 
 public:
 	virtual void OnPreparatory_Implementation() override;
-	
+
 	virtual void OnRefresh_Implementation(float DeltaSeconds) override;
 
 protected:
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 	virtual bool IsUseDefaultLifecycle_Implementation() const override {  return true;}
-	
+
 public:
 	UFUNCTION(BlueprintNativeEvent)
 	void Launch(FVector InDirection = FVector::ZeroVector);
-	
+
 	UFUNCTION(BlueprintNativeEvent)
 	void Destroy();
 
@@ -79,14 +81,12 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FGameplayTag HitEventTag;
 
-	UPROPERTY()
+	UPROPERTY(Replicated)
 	AActor* OwnerActor;
 
 	UPROPERTY()
 	int32 AbilityLevel;
 
-	UPROPERTY()
-	FGameplayAbilityActorInfo AbilityActorInfo;
 
 	UPROPERTY()
 	TMap<FGameplayTag, FGameplayEffectContainer> EffectContainerMap;
@@ -94,8 +94,18 @@ protected:
 	UPROPERTY()
 	TArray<AActor*> HitTargets;
 
-	UPROPERTY()
+	UPROPERTY(Replicated)
 	bool bLaunched;
+
+	bool bHitEnabled = false;
+	bool bDestroyingProjectile = false;
+	FGuid SourceActivationId;
+
+	UPROPERTY(Transient)
+	FGameplayEffectContextHandle ProjectileContext;
+
+	UPROPERTY(Transient)
+	TMap<TSubclassOf<UEffectBase>, FGameplayEffectSpecHandle> PreparedEffects;
 
 private:
 	FTimerHandle DestroyTimer;

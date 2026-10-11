@@ -1,43 +1,47 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #include "AI/Base/Tasks/AITask_Duration.h"
 
-UAITask_Duration::UAITask_Duration(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
+UAITask_Duration::UAITask_Duration(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
 {
-	DurationTime = -1.f;
-	RandomDeviation = 0.f;
-	LocalRemainTime = 0.f;
 }
 
 void UAITask_Duration::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
 {
-	if (!InitTask(OwnerComp)) return;
-
-	if(LocalRemainTime != -1.f)
+	const uint64 Generation = GetTaskGeneration();
+	Super::TickTask(OwnerComp, NodeMemory, DeltaSeconds);
+	if (!IsTaskActive() || GetTaskGeneration() != Generation)
 	{
-		LocalRemainTime -= DeltaSeconds;
-		if(LocalRemainTime <= 0.f)
-		{
-			FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
-		}
+		return;
+	}
+	LocalRemainTime -= DeltaSeconds;
+	if (LocalRemainTime <= 0.f)
+	{
+		FinishTaskOnce(OwnerComp, EBTNodeResult::Succeeded);
 	}
 }
 
 EBTNodeResult::Type UAITask_Duration::AbortTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
+	LocalRemainTime = 0.f;
 	return Super::AbortTask(OwnerComp, NodeMemory);
 }
 
 EBTNodeResult::Type UAITask_Duration::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
-	if(!InitTask(OwnerComp)) return EBTNodeResult::Failed;
-
-	LocalRemainTime = DurationTime != -1.f ? DurationTime + FMath::RandRange(-RandomDeviation, RandomDeviation) : -1.f;
-
-	return EBTNodeResult::InProgress;
+	if (Super::ExecuteTask(OwnerComp, NodeMemory) == EBTNodeResult::Failed)
+	{
+		return EBTNodeResult::Failed;
+	}
+	if (!FMath::IsFinite(DurationTime) || DurationTime < 0.f || !FMath::IsFinite(RandomDeviation))
+	{
+		return EBTNodeResult::Failed;
+	}
+	LocalRemainTime = FMath::Max(0.f, DurationTime + FMath::FRandRange(-FMath::Max(0.f, RandomDeviation), FMath::Max(0.f, RandomDeviation)));
+	return LocalRemainTime <= 0.f ? EBTNodeResult::Succeeded : EBTNodeResult::InProgress;
 }
 
-bool UAITask_Duration::EDC_RandomDeviation() const
+void UAITask_Duration::OnTaskFinished(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, EBTNodeResult::Type TaskResult)
 {
-	return DurationTime != -1.f;
+	LocalRemainTime = 0.f;
+	Super::OnTaskFinished(OwnerComp, NodeMemory, TaskResult);
 }

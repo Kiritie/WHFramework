@@ -5,6 +5,7 @@
 UAbilityCharacterStateBase::UAbilityCharacterStateBase()
 {
 	StateName = FName("AbilityCharacterStateBase");
+	StateDomain = TEXT("Lifecycle");
 }
 
 void UAbilityCharacterStateBase::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)

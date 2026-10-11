@@ -25,6 +25,10 @@ class WHFRAMEWORK_API AVoxelNavigationData : public ARecastNavMesh
 
 public:
 	AVoxelNavigationData(const FObjectInitializer& InObjectInitializer);
+	static FPathFindingResult FindTerrainPathWithWait(
+		const FNavAgentProperties& InAgent,
+		const FPathFindingQuery& InQuery,
+		bool* OutWaiting);
 	bool BindTerrain(UVoxelModule& InModule, TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources);
 	void UnbindTerrain(const UVoxelModule& InModule);
 	bool HasCurrentTileForNode(NavNodeRef InNode, const FVoxelNavigationInputVersion& InVersion) const;
@@ -116,10 +120,6 @@ private:
 	static FPathFindingResult FindTerrainPath(
 		const FNavAgentProperties& InAgent,
 		const FPathFindingQuery& InQuery);
-	static FPathFindingResult FindTerrainPathWithWait(
-		const FNavAgentProperties& InAgent,
-		const FPathFindingQuery& InQuery,
-		bool* OutWaiting);
 	bool IsPathInputAttemptCurrent(
 		const FNavPathSharedPtr& InPath,
 		const TSharedPtr<FVoxelNavigationQueryInputs, ESPMode::ThreadSafe>& InInputs) const;

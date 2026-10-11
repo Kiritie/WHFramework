@@ -6,6 +6,7 @@
 #include "AbilityActorInterface.generated.h"
 
 class UAttributeSetBase;
+class UAbilitySystemComponentBase;
 class UAbilityBase;
 class UShapeComponent;
 
@@ -22,6 +23,8 @@ class WHFRAMEWORK_API IAbilityActorInterface : public IAbilitySystemInterface
 public:
 	void InitializeAbilities(AActor* InOwnerActor = nullptr, AActor* InAvatarActor = nullptr);
 
+	void UninitializeAbilities(bool bUnbindAvatar = true);
+
 	void RefreshAttributes();
 
 	bool AttachActor(AActor* InActor, const FAttachmentTransformRules& InAttachmentRules, FName InSocketName = NAME_None);
@@ -32,12 +35,12 @@ public:
 	virtual float GetExp() const = 0;
 
 	virtual float GetMaxExp() const = 0;
-	
+
 	virtual void ModifyExp(float InDeltaValue) = 0;
 
 protected:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) = 0;
-	
+
 	virtual void OnActorAttached(AActor* InActor) = 0;
 
 	virtual void OnActorDetached(AActor* InActor) = 0;
@@ -67,4 +70,7 @@ public:
 
 private:
 	bool bAbilitiesInitialized = false;
+	TWeakObjectPtr<UAbilitySystemComponentBase> BoundAbilitySystem;
+	TWeakObjectPtr<AActor> BoundAbilityAvatar;
+	TMap<FGameplayAttribute, FDelegateHandle> AttributeDelegateHandles;
 };

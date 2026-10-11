@@ -19,16 +19,12 @@ public:
 
 	virtual void LimitToAnim() = 0;
 
-	virtual void Swim() = 0;
-		
-	virtual void UnSwim() = 0;
-						
-	virtual void Float(float InWaterPosZ) = 0;
-						
-	virtual void UnFloat() = 0;
+
+
+
 
 	virtual void Climb() = 0;
-			
+
 	virtual void UnClimb() = 0;
 
 	virtual void Fly() = 0;

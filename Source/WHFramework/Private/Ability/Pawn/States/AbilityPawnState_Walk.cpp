@@ -6,7 +6,7 @@
 
 UAbilityPawnState_Walk::UAbilityPawnState_Walk()
 {
-	StateName = FName("Walk");
+	StateName = FName("Active");
 }
 
 void UAbilityPawnState_Walk::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
@@ -25,9 +25,8 @@ void UAbilityPawnState_Walk::OnEnter(UFiniteStateBase* InLastState, const TArray
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
-	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Walking);
+	SetStateTag(GameplayTags::State_Vitality_Active, true);
 
-	Pawn->DoAction(GameplayTags::Ability_Vitality_Action_Walk);
 }
 
 void UAbilityPawnState_Walk::OnRefresh(float DeltaSeconds)
@@ -41,9 +40,8 @@ void UAbilityPawnState_Walk::OnLeave(UFiniteStateBase* InNextState)
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
-	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Walking);
+	SetStateTag(GameplayTags::State_Vitality_Active, false);
 
-	Pawn->StopAction(GameplayTags::Ability_Vitality_Action_Walk);
 }
 
 void UAbilityPawnState_Walk::OnTermination()

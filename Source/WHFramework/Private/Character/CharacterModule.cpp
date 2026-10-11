@@ -12,6 +12,7 @@
 #include "Common/CommonModuleStatics.h"
 #include "Net/UnrealNetwork.h"
 #include "Scene/SceneModuleStatics.h"
+#include "Engine/World.h"
 
 IMPLEMENTATION_MODULE(UCharacterModule)
 
@@ -22,7 +23,7 @@ UCharacterModule::UCharacterModule()
 	ModuleDisplayName = FText::FromString(TEXT("Character Module"));
 	SaveScope = ESaveScope::World;
 
-	
+
 	ModuleNetworkComponent = UCharacterModuleNetworkComponent::StaticClass();
 
 	Characters = TArray<ACharacterBase*>();
@@ -144,27 +145,46 @@ void UCharacterModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 FParameter UCharacterModule::ToData()
 {
 	FCharacterModuleSaveData SaveData;
-
 	SaveData.CurrentCharacterId = CurrentCharacter ? CurrentCharacter->GetActorID_Implementation() : FGuid();
-	for(ACharacterBase* Character : Characters)
+	const TArray<ACharacterBase*> CapturedCharacters = Characters;
+	for (ACharacterBase* Character : CapturedCharacters)
 	{
-		if(Character)
+		if (!::IsValid(Character) || Character->GetWorld() != GetWorld())
 		{
-			FCharacterSaveRecord Record;
-			Record.CharacterId = Character->GetActorID_Implementation();
-			Record.CharacterAssetId = Character->GetAssetID_Implementation();
-			Record.Data = Character->GetSaveData(true);
-			SaveData.Characters.Add(MoveTemp(Record));
+			UE_LOG(LogTemp, Error, TEXT("Character module capture lost a registered character"));
+			return FParameter();
+		}
+		FCharacterSaveRecord Record;
+		Record.CharacterId = Character->GetActorID_Implementation();
+		Record.CharacterAssetId = Character->GetAssetID_Implementation();
+		Record.Data = Character->GetSaveData(true);
+		if (!Record.Data.HasValue() || !::IsValid(Character) ||
+			Character->GetActorID_Implementation() != Record.CharacterId ||
+			Characters.Num() != CapturedCharacters.Num() || !Characters.Contains(Character))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Character module capture failed for %s; no partial module will be saved"),
+				*Record.CharacterId.ToString());
+			return FParameter();
+		}
+		SaveData.Characters.Add(MoveTemp(Record));
+	}
+	if (UWorld* World = GetWorld())
+	{
+		for (FConstPlayerControllerIterator Iterator = World->GetPlayerControllerIterator(); Iterator; ++Iterator)
+		{
+			AWHPlayerController* Player = Cast<AWHPlayerController>(Iterator->Get());
+			if (!Player || !Player->IsLocalController()) continue;
+			if (ISaveDataAgentInterface* Controller = Cast<ISaveDataAgentInterface>(Player))
+			{
+				SaveData.PlayerControllerData = Controller->GetSaveData(true);
+				if (!SaveData.PlayerControllerData.HasValue())
+				{
+					UE_LOG(LogTemp, Error, TEXT("Character module capture failed for the local controller"));
+					return FParameter();
+				}
+			}
 		}
 	}
-	if(AWHPlayerController* Player = UCommonModuleStatics::GetPlayerController<AWHPlayerController>(); Player && Player->IsLocalController())
-	{
-		if(ISaveDataAgentInterface* Controller = Cast<ISaveDataAgentInterface>(Player))
-		{
-			SaveData.PlayerControllerData = Controller->GetSaveData(true);
-		}
-	}
-
 	return FParameter(MoveTemp(SaveData));
 }
 
@@ -202,7 +222,7 @@ void UCharacterModule::SwitchCharacter(ACharacterBase* InCharacter, bool bResetC
 	if(CurrentCharacter == InCharacter) return;
 
 	AWHPlayerController* PlayerController = UCommonModuleStatics::GetPlayerController<AWHPlayerController>();
-	
+
 	if(InCharacter)
 	{
 		if(CurrentCharacter)
@@ -254,7 +274,7 @@ void UCharacterModule::SwitchCharacterByName(FName InName, bool bResetCamera, bo
 bool UCharacterModule::HasCharacterByClass(TSubclassOf<ACharacterBase> InClass) const
 {
 	if(!InClass) return false;
-	
+
 	const FName CharacterName = InClass->GetDefaultObject<ACharacterBase>()->GetNameP();
 	return HasCharacterByName(CharacterName);
 }
@@ -277,7 +297,7 @@ ACharacterBase* UCharacterModule::GetCurrentCharacter(TSubclassOf<ACharacterBase
 ACharacterBase* UCharacterModule::GetCharacterByClass(TSubclassOf<ACharacterBase> InClass) const
 {
 	if(!InClass) return nullptr;
-	
+
 	const FName CharacterName = InClass->GetDefaultObject<ACharacterBase>()->GetNameP();
 	return GetCharacterByName(CharacterName);
 }

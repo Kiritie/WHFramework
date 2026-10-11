@@ -1,72 +1,77 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "AI/Base/AITaskBase.h"
-
 #include "AI/Base/AIControllerBase.h"
-#include "Character/Base/CharacterBase.h"
-#include "BehaviorTree/BehaviorTree.h"
+#include "BehaviorTree/BehaviorTreeComponent.h"
+#include "GameFramework/Pawn.h"
 
-UAITaskBase::UAITaskBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
+UAITaskBase::UAITaskBase(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
 {
+	bCreateNodeInstance = true;
 	bNotifyTick = true;
 	bNotifyTaskFinished = true;
-
-	Controller = nullptr;
-	Agent = nullptr;
 }
 
 void UAITaskBase::InitializeFromAsset(UBehaviorTree& Asset)
 {
 	Super::InitializeFromAsset(Asset);
-
-	// if(HasAnyFlags(EObjectFlags::RF_ClassDefaultObject)) return;
-	//
-	// for(TFieldIterator<FProperty> PropertyIt(GetClass(), EFieldIteratorFlags::ExcludeSuper); PropertyIt; ++PropertyIt)
-	// {
-	// 	FStructProperty* Property = CastField<FStructProperty>(*PropertyIt);
-	// 	if(Property && Property->Struct == FBlackboardKeySelector::StaticStruct())
-	// 	{
-	// 		FBlackboardKeySelector& KeySelector = ((FBlackboardKeySelector&)Property);
-	// 		if(KeySelector.IsSet())
-	// 		{
-	// 			KeySelector.ResolveSelectedKey(*Asset.BlackboardAsset);
-	// 		}
-	// 	}
-	// }
 }
 
 bool UAITaskBase::InitTask(UBehaviorTreeComponent& OwnerComp)
 {
-	Controller = Cast<AAIControllerBase>(OwnerComp.GetOwner());
-	if (Controller)
-	{
-		Agent = Cast<IAIAgentInterface>(Controller->GetPawn());
-	}
-	return Controller && Agent;
+	Controller = Cast<AAIControllerBase>(OwnerComp.GetAIOwner());
+	Agent = Controller.IsValid() ? Controller->GetPawn() : nullptr;
+	return Agent.IsValid() && Agent->HasAuthority() && GetAgent() != nullptr;
 }
 
 void UAITaskBase::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
 {
-	
-}
-
-EBTNodeResult::Type UAITaskBase::AbortTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
-{
-	return EBTNodeResult::Aborted;
+	if (bTaskActive && !InitTask(OwnerComp))
+	{
+		FinishTaskOnce(OwnerComp, EBTNodeResult::Failed);
+	}
 }
 
 EBTNodeResult::Type UAITaskBase::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
-	return EBTNodeResult::Succeeded;
+	++TaskGeneration;
+	bTaskActive = InitTask(OwnerComp);
+	return bTaskActive ? EBTNodeResult::Succeeded : EBTNodeResult::Failed;
+}
+
+EBTNodeResult::Type UAITaskBase::AbortTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+{
+	++TaskGeneration;
+	bTaskActive = false;
+	return EBTNodeResult::Aborted;
 }
 
 void UAITaskBase::OnTaskFinished(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, EBTNodeResult::Type TaskResult)
 {
-	
+	++TaskGeneration;
+	bTaskActive = false;
+	Controller.Reset();
+	Agent.Reset();
+}
+
+bool UAITaskBase::FinishTaskOnce(UBehaviorTreeComponent& OwnerComp, EBTNodeResult::Type InResult)
+{
+	if (!bTaskActive || !IsValid(&OwnerComp))
+	{
+		return false;
+	}
+	++TaskGeneration;
+	bTaskActive = false;
+	FinishLatentTask(OwnerComp, InResult);
+	return true;
 }
 
 APawn* UAITaskBase::GetAgent(TSubclassOf<APawn> InClass) const
 {
-	return GetDeterminesOutputObject(Cast<APawn>(Agent), InClass);
+	APawn* Pawn = Agent.Get();
+	return Pawn && (!InClass || Pawn->IsA(InClass)) ? Pawn : nullptr;
+}
+
+bool UAITaskBase::FinishTaskOnce(UBehaviorTreeComponent& OwnerComp, EBTNodeResult::Type InResult, uint64 ExpectedGeneration)
+{
+	return TaskGeneration == ExpectedGeneration && FinishTaskOnce(OwnerComp, InResult);
 }

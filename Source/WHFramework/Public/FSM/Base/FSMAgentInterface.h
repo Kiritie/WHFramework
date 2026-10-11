@@ -16,7 +16,7 @@ class UFSMAgentInterface : public UInterface
 };
 
 /**
- * 
+ *
  */
 class WHFRAMEWORK_API IFSMAgentInterface
 {
@@ -84,15 +84,17 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual bool TerminateFiniteState(UFiniteStateBase* InState);
-
 public:
-	virtual void OnFiniteStateRefresh(UFiniteStateBase* InCurrentState) { }
-
-	virtual void OnFiniteStateChanged(UFiniteStateBase* InCurrentState, UFiniteStateBase* InLastState) { }
+	virtual void OnFiniteStateRefresh(UFiniteStateBase* InCurrentState)
+{
+}
+	virtual void OnFiniteStateChanged(UFiniteStateBase* InCurrentState, UFiniteStateBase* InLastState)
+	{
+	}
 
 public:
 	virtual UFSMComponent* GetFSMComponent() const = 0;
-	
+
 	UFUNCTION(BlueprintCallable)
 	virtual bool HasFiniteState(UFiniteStateBase* InState) const;
 
@@ -104,10 +106,10 @@ public:
 	{
 		return Cast<T>(GetFiniteStateByIndex(InStateIndex, InStateClass));
 	}
-	
+
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"))
 	virtual UFiniteStateBase* GetFiniteStateByIndex(int32 InStateIndex, TSubclassOf<UFiniteStateBase> InStateClass) const;
-	
+
 	UFUNCTION(BlueprintCallable)
 	virtual bool HasFiniteStateByName(const FName InStateName) const;
 
@@ -125,7 +127,7 @@ public:
 	{
 		return HasFiniteStateByClass(InStateClass);
 	}
-	
+
 	UFUNCTION(BlueprintCallable)
 	virtual bool HasFiniteStateByClass(TSubclassOf<UFiniteStateBase> InStateClass) const;
 

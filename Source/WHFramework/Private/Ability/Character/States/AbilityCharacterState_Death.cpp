@@ -3,6 +3,12 @@
 #include "Ability/Character/States/AbilityCharacterState_Death.h"
 
 #include "AbilitySystemComponent.h"
+#include "Ability/Components/AbilitySystemComponentBase.h"
+#include "Character/Components/CharacterMovementComponentBase.h"
+#include "FSM/Components/FSMComponent.h"
+#include "GameFramework/GameStateBase.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Animation/AnimInstance.h"
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Character/States/AbilityCharacterState_Spawn.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -34,41 +40,35 @@ bool UAbilityCharacterState_Death::OnPreEnter(UFiniteStateBase* InLastState, con
 void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams)
 {
 	Super::OnEnter(InLastState, InParams);
-
-	if (InParams.IsValidIndex(0))
-	{
-		Killer = Cast<IAbilityVitalityInterface>(InParams[0].Get<UObject*>());
-	}
-
-	UEventModuleStatics::BroadcastEvent<FEventVitalityDead>(this, {GetAgent(), Cast<UObject>(Killer)});
-
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
-
-	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Active);
-	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dying);
-
-	Character->GetInteractionComponent()->SetInteractable(false);
-
-	if (Character->GetController<AAIControllerBase>())
-	{
-		Character->GetController<AAIControllerBase>()->StopBehaviorTree();
-	}
-
+	Character->GetCharacterMovement()->Activate(true);
+	Character->GetCharacterMovement()->SetComponentTickEnabled(true);
+	Killer = InParams.IsValidIndex(0) ? InParams[0].Get<UObject*>() : nullptr;
+	bDeathStarted = false;
+	bRestoringDeath = InParams.IsValidIndex(1) && InParams[1].Get<bool>();
+	bDeathEnded = bRestoringDeath;
+	Character->OnLifecycleSuspended(true);
+	Character->GetAbilitySystemComponent()->SetLooseGameplayTagCount(GameplayTags::State_Vitality_Dead, 1, EGameplayTagReplicationState::TagAndCountToAll);
 	Character->ApplyDeathAttributes();
-
-	Character->GetLooking()->TargetLookingOff();
-	Character->LimitToAnim();
+	if (AAIControllerBase* Controller = Cast<AAIControllerBase>(Character->GetController()))
+	{
+		Controller->StopBehaviorTree();
+	}
+	MovementSource = FGuid::NewGuid();
+	FCharacterMovementConstraint Constraint;
+	Constraint.bBlockMovement = true;
+	Constraint.bBlockRotation = true;
+	CastChecked<UCharacterMovementComponentBase>(Character->GetCharacterMovement())->SetMovementConstraint(MovementSource, this, Constraint);
+	if (!bRestoringDeath) UEventModuleStatics::BroadcastEvent<FEventVitalityDead>(this, {Character, Killer.Get()});
+	DeathStart();
 }
 
 void UAbilityCharacterState_Death::OnRefresh(float DeltaSeconds)
 {
 	Super::OnRefresh(DeltaSeconds);
-
-	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
-
-	if (Character->IsDying() && !Character->IsFalling(true) && !bDeathStarted)
+	if (!bDeathEnded && IsDeathPresentationFinished())
 	{
-		DeathStart();
+		DeathEnd();
 	}
 }
 
@@ -82,59 +82,81 @@ bool UAbilityCharacterState_Death::OnPreLeave(UFiniteStateBase* InNextState)
 
 void UAbilityCharacterState_Death::OnLeave(UFiniteStateBase* InNextState)
 {
-	Super::OnLeave(InNextState);
-
-	Killer = nullptr;
-	bDeathStarted = false;
-
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
-
-	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dying);
-	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dead);
-	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Active);
-
-	Character->StopAction(GameplayTags::Ability_Vitality_Action_Death);
-
-	if (Character->IsPlayer())
-	{
-		Character->Execute_SetActorVisible(Character, true);
-	}
+	CastChecked<UCharacterMovementComponentBase>(Character->GetCharacterMovement())->ReleaseMovementSource(MovementSource, this);
+	MovementSource.Invalidate();
+	Killer.Reset();
+	bDeathStarted = false;
+	bDeathEnded = false;
+	bRestoringDeath = false;
+	Super::OnLeave(InNextState);
 }
 
 void UAbilityCharacterState_Death::OnTermination()
 {
+	if (AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>())
+	{
+		CastChecked<UCharacterMovementComponentBase>(Character->GetCharacterMovement())->ReleaseMovementSource(MovementSource, this);
+	}
+	MovementSource.Invalidate();
+	Killer.Reset();
 	Super::OnTermination();
 }
 
 void UAbilityCharacterState_Death::DeathStart()
 {
 	bDeathStarted = true;
-
-	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
-
-	Character->GetCharacterMovement()->SetActive(false);
-	Character->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	if (!Character->DoAction(GameplayTags::Ability_Vitality_Action_Death))
-	{
-		DeathEnd();
-	}
 }
 
 void UAbilityCharacterState_Death::DeathEnd()
 {
 	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
-
-	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dying);
-	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dead);
+	if (!Character || !Character->HasAuthority() || bDeathEnded)
+	{
+		return;
+	}
+	bDeathEnded = true;
 
 	if (!Character->IsPlayer())
 	{
 		UObjectPoolModuleStatics::DespawnObject(Character);
 	}
-	else
+}
+
+
+bool UAbilityCharacterState_Death::IsDeathPresentationFinished() const
+{
+	if (bRestoringDeath) return true;
+	const AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
+	if (!Character || !Character->GetWorld())
 	{
-		Character->Execute_SetActorVisible(Character, false);
+		return false;
+	}
+	const AGameStateBase* GameState = Character->GetWorld()->GetGameState();
+	const double Time = GameState ? GameState->GetServerWorldTimeSeconds() : Character->GetWorld()->GetTimeSeconds();
+	return Time - Character->GetFSMComponent()->GetReplicatedState().StartedAt >= DeathPresentationDuration;
+}
+
+void UAbilityCharacterState_Death::OnPresentationEnter(UFiniteStateBase* Last, const FFSMReplicatedState& State)
+{
+	Super::OnPresentationEnter(Last, State);
+	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
+	Character->GetCharacterMovement()->Activate(true);
+	Character->GetCharacterMovement()->SetComponentTickEnabled(true);
+	if (DeathMontage && Character->GetMesh()->GetAnimInstance() && !IsDeathPresentationFinished())
+	{
+		const AGameStateBase* GameState = Character->GetWorld()->GetGameState();
+		const double Time = GameState ? GameState->GetServerWorldTimeSeconds() : Character->GetWorld()->GetTimeSeconds();
+		Character->GetMesh()->GetAnimInstance()->Montage_Play(DeathMontage, 1.f, EMontagePlayReturnType::MontageLength, FMath::Max(0.0, Time - State.StartedAt));
 	}
 }
 
+void UAbilityCharacterState_Death::OnPresentationLeave(UFiniteStateBase* Next)
+{
+	AAbilityCharacterBase* Character = GetAgent<AAbilityCharacterBase>();
+	if (DeathMontage && Character && Character->GetMesh()->GetAnimInstance())
+	{
+		Character->GetMesh()->GetAnimInstance()->Montage_Stop(0.1f, DeathMontage);
+	}
+	Super::OnPresentationLeave(Next);
+}

@@ -14,7 +14,7 @@ UAbilityVitalityState_Death::UAbilityVitalityState_Death()
 {
 	StateName = FName("Death");
 
-	Killer = nullptr;
+	KillerActor.Reset();
 }
 
 void UAbilityVitalityState_Death::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
@@ -33,15 +33,15 @@ void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastState, const T
 
 	if (InParams.IsValidIndex(0))
 	{
-		Killer = Cast<IAbilityVitalityInterface>(InParams[0].Get<UObject*>());
+		KillerActor = Cast<AActor>(InParams[0].Get<UObject*>());
 	}
 
-	UEventModuleStatics::BroadcastEvent<FEventVitalityDead>(this, {GetAgent(), Cast<UObject>(Killer)});
+	UEventModuleStatics::BroadcastEvent<FEventVitalityDead>(this, {GetAgent(), KillerActor.Get()});
 
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
-	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Active);
-	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dying);
+	SetStateTag(GameplayTags::State_Vitality_Active, false);
+	SetStateTag(GameplayTags::State_Vitality_Dying, true);
 
 	Vitality->GetInteractionComponent()->SetInteractable(false);
 
@@ -54,6 +54,14 @@ void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastState, const T
 void UAbilityVitalityState_Death::OnRefresh(float DeltaSeconds)
 {
 	Super::OnRefresh(DeltaSeconds);
+	if (!bDeathFinalized && FMath::IsFinite(DeltaSeconds) && DeltaSeconds > 0.f)
+	{
+		RemainingLifetime = FMath::Max(0.f, RemainingLifetime - DeltaSeconds);
+		if (RemainingLifetime <= 0.f)
+		{
+			DeathEnd();
+		}
+	}
 }
 
 bool UAbilityVitalityState_Death::OnPreLeave(UFiniteStateBase* InNextState)
@@ -68,15 +76,13 @@ void UAbilityVitalityState_Death::OnLeave(UFiniteStateBase* InNextState)
 {
 	Super::OnLeave(InNextState);
 
-	Killer = nullptr;
+	KillerActor.Reset();
 
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
-	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dying);
-	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dead);
-	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Active);
+	SetStateTag(GameplayTags::State_Vitality_Dying, false);
+	SetStateTag(GameplayTags::State_Vitality_Dead, false);
 
-	Vitality->StopAction(GameplayTags::Ability_Vitality_Action_Death);
 }
 
 void UAbilityVitalityState_Death::OnTermination()
@@ -87,22 +93,28 @@ void UAbilityVitalityState_Death::OnTermination()
 void UAbilityVitalityState_Death::DeathStart()
 {
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
-
-	Vitality->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	if (!Vitality->DoAction(GameplayTags::Ability_Vitality_Action_Death))
+	if (!Vitality || !Vitality->HasAuthority())
 	{
-		DeathEnd();
+		return;
 	}
+	bDeathFinalized = false;
+	RemainingLifetime = FMath::IsFinite(CorpseLifetime) ? FMath::Max(0.f, CorpseLifetime) : 1.5f;
+	Vitality->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
 void UAbilityVitalityState_Death::DeathEnd()
 {
+	if (bDeathFinalized || !GetAgent() || !GetAgent()->HasAuthority())
+	{
+		return;
+	}
+	bDeathFinalized = true;
+
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
-	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dying);
-	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dead);
+	SetStateTag(GameplayTags::State_Vitality_Dying, false);
+	SetStateTag(GameplayTags::State_Vitality_Dead, true);
+
 
 	UObjectPoolModuleStatics::DespawnObject(Vitality);
 }
-

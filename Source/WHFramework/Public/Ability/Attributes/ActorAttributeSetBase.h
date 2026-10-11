@@ -33,7 +33,7 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_Exp, Category = "ActorAttributes")
 	FGameplayAttributeData Exp;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UActorAttributeSetBase, Exp)
-	
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_MaxExp, Category = "ActorAttributes")
 	FGameplayAttributeData MaxExp;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UActorAttributeSetBase, MaxExp)

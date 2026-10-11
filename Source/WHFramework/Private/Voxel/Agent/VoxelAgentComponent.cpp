@@ -63,7 +63,7 @@ void UVoxelAgentComponent::BeginPlay()
 		}
 	}
 
-	ResetInitialCollisionGate();
+	ResetBirthClaim();
 }
 
 void UVoxelAgentComponent::BindController(
@@ -489,8 +489,8 @@ bool UVoxelAgentComponent::BuildStreamingSource(const bool bInLocalView, FVoxelS
 	if (!VoxelModule || !GetOwner()) return false;
 	FVoxelStreamingSource& Source = OutSource;
 	Source = {};
-	// 接管成功后保持观察者身份；碰撞门稍后解除，不能在这期间重新清空出生凭证。
-	Source.Purpose = bInitialCollisionGatePending && !IsBirthSourceCommitted()
+	// 出生凭证只由出生事务拥有；此组件不持有移动模式。
+	Source.Purpose = BirthClaim.IsValid() && !IsBirthSourceCommitted()
 		? EVoxelStreamingSourcePurpose::InitialSpawn : EVoxelStreamingSourcePurpose::Observer;
 	Source.bInheritWorldView = bInheritWorldView;
 	Source.View = StreamingView;
@@ -602,6 +602,14 @@ bool UVoxelAgentComponent::BuildStreamingSource(const bool bInLocalView, FVoxelS
 
 void UVoxelAgentComponent::RefreshSource()
 {
+	if (!Module.IsValid())
+	{
+		Module = UVoxelModule::GetPtr(GetWorld());
+	}
+	if (Module.IsValid() && Module->IsReady() && ObservedWorldEpoch != Module->GetWorldEpoch())
+	{
+		ResetBirthClaim();
+	}
 	UVoxelModule* VoxelModule =
 		Module.Get();
 
@@ -685,7 +693,7 @@ void UVoxelAgentComponent::RefreshSource()
 	{
 		SourceId.Invalidate();
 	}
-	if (bInitialCollisionGatePending && SourceId.IsValid()) TryCommitBirthSource();
+	if (BirthClaim.IsValid() && !IsBirthSourceCommitted()) TryCommitBirthSource();
 }
 
 bool UVoxelAgentComponent::PrepareBirthSource(const FGuid& InSource)
@@ -704,6 +712,7 @@ bool UVoxelAgentComponent::PrepareBirthSource(const FGuid& InSource)
 	const FGuid Previous = SourceId;
 	BirthClaim = Prepared;
 	SourceId = InSource;
+	ObservedWorldEpoch = VoxelModule->GetWorldEpoch();
 	// Bootstrap 仍持有同一条记录；直到 Commit 成功都不能撤销它。
 	if (Previous.IsValid() && Previous != SourceId &&
 		(VoxelModule->IsSourceOwnedBy(Previous, this) || VoxelModule->IsSourceOwnedBy(Previous, GetOwner())))
@@ -726,67 +735,15 @@ bool UVoxelAgentComponent::IsBirthSourceCommitted() const
 	return Module.IsValid() && Module->IsPlayerClaimCommitted(BirthClaim, GetOwner());
 }
 
-void UVoxelAgentComponent::RefreshStepHeight()
-{
-	ACharacter* Character =
-		Cast<ACharacter>(
-			GetOwner());
 
-	UVoxelModule* VoxelModule =
-		Module.Get();
-
-	if (!Character ||
-		!Character->
-			GetCharacterMovement())
-	{
-		return;
-	}
-
-	UCharacterMovementComponent* Movement =
-		Character->
-			GetCharacterMovement();
-
-	if (bUseSmallVoxelStepHeight &&
-		VoxelModule &&
-		VoxelModule->IsReady())
-	{
-		if (PreviousStepHeight <
-			0.0f)
-		{
-			PreviousStepHeight =
-				Movement->
-					MaxStepHeight;
-		}
-
-		Movement->MaxStepHeight =
-			FMath::Clamp(
-				static_cast<float>(
-					VoxelModule->
-						BlockSize()) +
-					5.0f,
-				20.0f,
-				40.0f);
-	}
-	else if (PreviousStepHeight >=
-		0.0f)
-	{
-		Movement->MaxStepHeight =
-			PreviousStepHeight;
-
-		PreviousStepHeight =
-			-1.0f;
-	}
-}
 
 void UVoxelAgentComponent::NotifyTravelTeleported()
 {
-	bHasLastSafeLocation = false;
 	RefreshSource();
 	if (Module.IsValid())
 	{
 		Module->ForceVoxelStreamingRefresh();
 	}
-	RefreshCollisionMovementGuard();
 }
 
 bool UVoxelAgentComponent::IsTravelObserverReady() const
@@ -796,35 +753,15 @@ bool UVoxelAgentComponent::IsTravelObserverReady() const
 		IsCollisionReadyAt(*Character, Character->GetActorLocation());
 }
 
-void UVoxelAgentComponent::ResetInitialCollisionGate()
+void UVoxelAgentComponent::ResetBirthClaim()
 {
-	if (Module.IsValid()) Module->AbortPlayerClaim(BirthClaim);
+	if (Module.IsValid())
+	{
+		Module->AbortPlayerClaim(BirthClaim);
+	}
 	BirthClaim = {};
 	BirthPawnIncarnation = FGuid::NewGuid();
-	bInitialCollisionGatePending =
-		bGateInitialSpawnUntilCollision;
-
-	// An epoch change must not discard a movement mode already held by the gate.
-	// Keep it disabled until collision for the new world is ready.
-
-	bHasLastSafeLocation =
-		false;
-
-	LastSafeLocation =
-		FVector::ZeroVector;
-
-	if (!bInitialCollisionGateApplied)
-	{
-		InitialPreviousMoveMode = 0;
-		InitialPreviousCustomMode = 0;
-	}
-
-	ObservedWorldEpoch =
-		Module.IsValid() &&
-		Module->IsReady()
-			? Module->
-				GetWorldEpoch()
-			: 0;
+	ObservedWorldEpoch = Module.IsValid() && Module->IsReady() ? Module->GetWorldEpoch() : 0;
 }
 
 bool UVoxelAgentComponent::IsCollisionReadyAt(
@@ -862,239 +799,11 @@ bool UVoxelAgentComponent::IsCollisionReadyAt(
 		FBox(InLocation - Extent, InLocation + Extent));
 }
 
-void UVoxelAgentComponent::ApplyInitialCollisionGate(
-	ACharacter& InCharacter,
-	UCharacterMovementComponent& InMovement)
-{
-	// Another state may already own MOVE_None (for example, spawn placement).
-	// Wait for it to restore movement rather than capturing and later restoring MOVE_None.
-	if (bInitialCollisionGateApplied || InMovement.MovementMode == MOVE_None)
-	{
-		return;
-	}
 
-	InitialPreviousMoveMode =
-		static_cast<uint8>(
-			InMovement.MovementMode);
 
-	InitialPreviousCustomMode =
-		InMovement.CustomMovementMode;
 
-	bInitialCollisionGateApplied =
-		true;
 
-	InMovement.
-		StopMovementImmediately();
 
-	InMovement.
-		DisableMovement();
-}
-
-void UVoxelAgentComponent::ReleaseInitialCollisionGate(
-	ACharacter& InCharacter,
-	UCharacterMovementComponent& InMovement)
-{
-	if (bInitialCollisionGateApplied)
-	{
-		InMovement.SetMovementMode(
-			static_cast<EMovementMode>(
-				InitialPreviousMoveMode),
-			InitialPreviousCustomMode);
-	}
-
-	bInitialCollisionGateApplied =
-		false;
-
-	bInitialCollisionGatePending =
-		false;
-
-	bHasLastSafeLocation =
-		true;
-
-	LastSafeLocation =
-		InCharacter.
-			GetActorLocation();
-}
-
-void UVoxelAgentComponent::RefreshCollisionMovementGuard()
-{
-	ACharacter* Character =
-		Cast<ACharacter>(
-			GetOwner());
-
-	UVoxelModule* VoxelModule =
-		Module.Get();
-
-	if (!Character ||
-		!Character->IsPlayerControlled() ||
-		!VoxelModule ||
-		!VoxelModule->IsReady())
-	{
-		return;
-	}
-
-	UCharacterMovementComponent* Movement =
-		Character->
-			GetCharacterMovement();
-
-	if (!Movement)
-	{
-		return;
-	}
-
-	const uint64 CurrentEpoch =
-		VoxelModule->
-			GetWorldEpoch();
-
-	if (ObservedWorldEpoch !=
-		CurrentEpoch)
-	{
-		ResetInitialCollisionGate();
-
-		ObservedWorldEpoch =
-			CurrentEpoch;
-	}
-
-	const FVector CurrentLocation =
-		Character->
-			GetActorLocation();
-
-	const bool bCurrentReady =
-		(!bInitialCollisionGatePending || IsBirthSourceCommitted()) && IsCollisionReadyAt(
-			*Character,
-			CurrentLocation);
-
-	/**
-	 * Initial Gate:
-	 * 只允许这一段使用 DisableMovement。
-	 */
-	if (bInitialCollisionGatePending)
-	{
-		if (!bCurrentReady)
-		{
-			ApplyInitialCollisionGate(
-				*Character,
-				*Movement);
-
-			return;
-		}
-
-		ReleaseInitialCollisionGate(
-			*Character,
-			*Movement);
-
-		return;
-	}
-
-	/**
-	 * Runtime:
-	 * 绝不再把 MovementMode 改成 MOVE_None。
-	 */
-	if (!bCurrentReady)
-	{
-		if (bHasLastSafeLocation)
-		{
-			const FVector UnsafeDirection =
-				(CurrentLocation -
-					LastSafeLocation).
-					GetSafeNormal();
-
-			if (!UnsafeDirection.
-				IsNearlyZero())
-			{
-				const double OutwardSpeed =
-					FVector::DotProduct(
-						Movement->Velocity,
-						UnsafeDirection);
-
-				if (OutwardSpeed > 0.0)
-				{
-					Movement->Velocity -=
-						UnsafeDirection *
-						OutwardSpeed;
-				}
-			}
-
-			Character->
-				SetActorLocation(
-					LastSafeLocation,
-					false,
-					nullptr,
-					ETeleportType::
-						TeleportPhysics);
-		}
-
-		return;
-	}
-
-	bHasLastSafeLocation =
-		true;
-
-	LastSafeLocation =
-		CurrentLocation;
-
-	/**
-	 * PrePhysics 预测一步。
-	 * 如果下一小步没有 Collision，就只阻止这一帧向外输入，
-	 * 不改变 MovementMode。
-	 */
-	const FVector PendingInput =
-		Character->
-			GetPendingMovementInputVector();
-
-	const FVector MoveDirection =
-		PendingInput.
-			GetSafeNormal();
-
-	if (MoveDirection.IsNearlyZero())
-	{
-		return;
-	}
-
-	const double PredictionDistance =
-		FMath::Max(
-			VoxelModule->
-				BlockSize() *
-				0.5,
-			static_cast<double>(
-				Movement->
-					Velocity.Size()) *
-				FMath::Max(
-					0.01f,
-					CollisionPredictionSeconds));
-
-	const FVector PredictedLocation =
-		CurrentLocation +
-		MoveDirection *
-			PredictionDistance;
-
-	if (IsCollisionReadyAt(
-		*Character,
-		PredictedLocation))
-	{
-		return;
-	}
-
-	const double OutwardSpeed =
-		FVector::DotProduct(
-			Movement->Velocity,
-			MoveDirection);
-
-	if (OutwardSpeed > 0.0)
-	{
-		Movement->Velocity -=
-			MoveDirection *
-				OutwardSpeed;
-	}
-
-	/**
-	 * 只消费这一帧 pending input。
-	 * Enhanced Input 持续 Triggered 时下一帧会重新写入，
-	 * 因此用户不需要松开再按。
-	 */
-	Character->
-		ConsumeMovementInputVector();
-}
 
 void UVoxelAgentComponent::TickComponent(
 	const float InDeltaSeconds,
@@ -1107,8 +816,6 @@ void UVoxelAgentComponent::TickComponent(
 		InTickFunction);
 
 	RefreshSource();
-	RefreshStepHeight();
-	RefreshCollisionMovementGuard();
 
 	const double Now =
 		FPlatformTime::Seconds();
@@ -1158,127 +865,53 @@ void UVoxelAgentComponent::TickComponent(
 	}
 }
 
-void UVoxelAgentComponent::EndPlay(
-	const EEndPlayReason::Type InReason)
+void UVoxelAgentComponent::EndPlay(const EEndPlayReason::Type InReason)
 {
 	EndBreak();
-
-	if (Module.IsValid()) Module->AbortPlayerClaim(BirthClaim);
-	if (Module.IsValid() && SourceId.IsValid() &&
-		(Module->IsSourceOwnedBy(SourceId, this) || Module->IsSourceOwnedBy(SourceId, GetOwner())))
+	if (Module.IsValid())
 	{
-		Module->
-			UnregisterSource(
-				SourceId);
-	}
-
-	SourceId.Invalidate();
-
-	if (Network.IsValid())
-	{
-		Network->
-			OnIntentReply.
-			Remove(
-				ReplyHandle);
-	}
-
-	if (ACharacter* Character =
-		Cast<ACharacter>(
-			GetOwner()))
-	{
-		if (UCharacterMovementComponent* Movement =
-			Character->
-				GetCharacterMovement())
+		Module->AbortPlayerClaim(BirthClaim);
+		if (SourceId.IsValid() && (Module->IsSourceOwnedBy(SourceId, this) || Module->IsSourceOwnedBy(SourceId, GetOwner())))
 		{
-			if (PreviousStepHeight >=
-				0.0f)
-			{
-				Movement->
-					MaxStepHeight =
-						PreviousStepHeight;
-			}
-
-			if (bInitialCollisionGateApplied)
-			{
-				Movement->
-					SetMovementMode(
-						static_cast<EMovementMode>(
-							InitialPreviousMoveMode),
-						InitialPreviousCustomMode);
-			}
+			Module->UnregisterSource(SourceId);
 		}
 	}
-
-	PreviousStepHeight =
-		-1.0f;
-
-	bInitialCollisionGateApplied =
-		false;
-
-	Super::EndPlay(
-		InReason);
+	SourceId.Invalidate();
+	BindController(nullptr);
+	Super::EndPlay(InReason);
 }
 
-void UVoxelAgentComponent::SetAgentEnabled(
-	const bool bInEnabled)
+void UVoxelAgentComponent::SetAgentEnabled(const bool bInEnabled)
 {
 	if (bInEnabled == bEnableStreaming)
 	{
-		if (bInEnabled) RefreshSource();
+		if (bInEnabled)
+		{
+			RefreshSource();
+		}
 		return;
 	}
 	if (!bInEnabled)
 	{
 		EndBreak();
-		if (Module.IsValid()) Module->AbortPlayerClaim(BirthClaim);
-		BirthClaim = {};
-
-		if (Module.IsValid() && SourceId.IsValid() &&
-			(Module->IsSourceOwnedBy(SourceId, this) || Module->IsSourceOwnedBy(SourceId, GetOwner())))
+		if (Module.IsValid())
 		{
-			Module->
-				UnregisterSource(
-					SourceId);
-		}
-
-		SourceId.Invalidate();
-
-		BindController(
-			nullptr);
-
-		if (bInitialCollisionGateApplied)
-		{
-			if (ACharacter* Character =
-				Cast<ACharacter>(
-					GetOwner()))
+			Module->AbortPlayerClaim(BirthClaim);
+			if (SourceId.IsValid() && (Module->IsSourceOwnedBy(SourceId, this) || Module->IsSourceOwnedBy(SourceId, GetOwner())))
 			{
-				if (UCharacterMovementComponent* Movement =
-					Character->
-						GetCharacterMovement())
-				{
-					Movement->
-						SetMovementMode(
-							static_cast<EMovementMode>(
-								InitialPreviousMoveMode),
-							InitialPreviousCustomMode);
-				}
+				Module->UnregisterSource(SourceId);
 			}
 		}
-
-		bInitialCollisionGateApplied =
-			false;
+		BirthClaim = {};
+		SourceId.Invalidate();
+		BindController(nullptr);
 	}
 	else
 	{
-		ResetInitialCollisionGate();
+		ResetBirthClaim();
 	}
-
-	bEnableStreaming =
-		bInEnabled;
-
-	SetComponentTickEnabled(
-		bInEnabled);
-
+	bEnableStreaming = bInEnabled;
+	SetComponentTickEnabled(bInEnabled);
 	if (bInEnabled)
 	{
 		RefreshSource();

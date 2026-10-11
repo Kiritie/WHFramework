@@ -16,7 +16,7 @@ UAbilityPawnState_Death::UAbilityPawnState_Death()
 {
 	StateName = FName("Death");
 
-	Killer = nullptr;
+	KillerActor.Reset();
 }
 
 void UAbilityPawnState_Death::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
@@ -35,15 +35,15 @@ void UAbilityPawnState_Death::OnEnter(UFiniteStateBase* InLastState, const TArra
 
 	if (InParams.IsValidIndex(0))
 	{
-		Killer = Cast<IAbilityVitalityInterface>(InParams[0].Get<UObject*>());
+		KillerActor = Cast<AActor>(InParams[0].Get<UObject*>());
 	}
 
-	UEventModuleStatics::BroadcastEvent<FEventVitalityDead>(this, {GetAgent(), Cast<UObject>(Killer)});
+	UEventModuleStatics::BroadcastEvent<FEventVitalityDead>(this, {GetAgent(), KillerActor.Get()});
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
-	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Active);
-	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dying);
+	SetStateTag(GameplayTags::State_Vitality_Active, false);
+	SetStateTag(GameplayTags::State_Vitality_Dying, true);
 
 	Pawn->GetInteractionComponent()->SetInteractable(false);
 
@@ -61,6 +61,14 @@ void UAbilityPawnState_Death::OnEnter(UFiniteStateBase* InLastState, const TArra
 void UAbilityPawnState_Death::OnRefresh(float DeltaSeconds)
 {
 	Super::OnRefresh(DeltaSeconds);
+	if (!bDeathFinalized && FMath::IsFinite(DeltaSeconds) && DeltaSeconds > 0.f)
+	{
+		RemainingLifetime = FMath::Max(0.f, RemainingLifetime - DeltaSeconds);
+		if (RemainingLifetime <= 0.f)
+		{
+			DeathEnd();
+		}
+	}
 }
 
 bool UAbilityPawnState_Death::OnPreLeave(UFiniteStateBase* InNextState)
@@ -75,15 +83,13 @@ void UAbilityPawnState_Death::OnLeave(UFiniteStateBase* InNextState)
 {
 	Super::OnLeave(InNextState);
 
-	Killer = nullptr;
+	KillerActor.Reset();
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
-	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dying);
-	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dead);
-	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Active);
+	SetStateTag(GameplayTags::State_Vitality_Dying, false);
+	SetStateTag(GameplayTags::State_Vitality_Dead, false);
 
-	Pawn->StopAction(GameplayTags::Ability_Vitality_Action_Death);
 
 	if (Pawn->IsPlayer())
 	{
@@ -99,22 +105,33 @@ void UAbilityPawnState_Death::OnTermination()
 void UAbilityPawnState_Death::DeathStart()
 {
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
-
-	Pawn->GetMovementComponent()->SetActive(false);
-	Pawn->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	if (!Pawn->DoAction(GameplayTags::Ability_Vitality_Action_Death))
+	if (!Pawn || !Pawn->HasAuthority())
 	{
-		DeathEnd();
+		return;
+	}
+	bDeathFinalized = false;
+	RemainingLifetime = FMath::IsFinite(CorpseLifetime) ? FMath::Max(0.f, CorpseLifetime) : 1.5f;
+	Pawn->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	if (Pawn->GetMovementComponent())
+	{
+		Pawn->GetMovementComponent()->StopMovementImmediately();
+		if (Pawn->GetMovementComponent()) { Pawn->GetMovementComponent()->SetActive(false); }
 	}
 }
 
 void UAbilityPawnState_Death::DeathEnd()
 {
+	if (bDeathFinalized || !GetAgent() || !GetAgent()->HasAuthority())
+	{
+		return;
+	}
+	bDeathFinalized = true;
+
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
-	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dying);
-	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dead);
+	SetStateTag(GameplayTags::State_Vitality_Dying, false);
+	SetStateTag(GameplayTags::State_Vitality_Dead, true);
+
 
 	if (!Pawn->IsPlayer())
 	{

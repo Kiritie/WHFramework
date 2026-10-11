@@ -50,8 +50,11 @@ public:
 	{
 		if (bEntered) Data->FinishTerrainQuery();
 	}
+	bool IsEntered() const
+	{
+		return bEntered;
+	}
 
-	bool IsEntered() const { return bEntered; }
 	FVoxelNavigationNativeQueryScope(const FVoxelNavigationNativeQueryScope&) = delete;
 	FVoxelNavigationNativeQueryScope& operator=(const FVoxelNavigationNativeQueryScope&) = delete;
 
@@ -911,7 +914,7 @@ FPathFindingResult AVoxelNavigationData::FindTerrainPathWithWait(const FNavAgent
 	}
 	if (OutWaiting)
 	{
-		*OutWaiting = !Result.IsSuccessful() && !Result.IsPartial() &&
+		*OutWaiting = (!Result.IsSuccessful() || Result.IsPartial()) &&
 			(Result.Result == ENavigationQueryResult::Error || Inputs->bMissingInput || !Inputs->IsCurrent());
 	}
 	return Result;

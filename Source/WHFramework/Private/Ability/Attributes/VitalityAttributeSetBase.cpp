@@ -24,77 +24,99 @@ UVitalityAttributeSetBase::UVitalityAttributeSetBase()
 void UVitalityAttributeSetBase::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
 {
 	Super::PreAttributeChange(Attribute, NewValue);
-	
 	if (Attribute == GetHealthAttribute())
 	{
-		NewValue = FMath::Clamp(NewValue, 0.f, GetMaxHealth());
+		NewValue = FMath::Clamp(NewValue, 0.f, FMath::Max(1.f, GetMaxHealth()));
+	}
+	else if (Attribute == GetMaxHealthAttribute())
+	{
+		NewValue = FMath::Max(1.f, NewValue);
+	}
+	else if (Attribute.GetAttributeSetClass() == StaticClass())
+	{
+		NewValue = FMath::Max(0.f, NewValue);
 	}
 }
 
 void UVitalityAttributeSetBase::PostAttributeChange(const FGameplayAttribute& Attribute, float OldValue, float NewValue)
 {
 	Super::PostAttributeChange(Attribute, OldValue, NewValue);
-	
+
 	if (Attribute == GetMaxHealthAttribute())
 	{
 		AdjustAttributeForMaxChange(GetHealthAttribute(), OldValue, NewValue);
 	}
 }
 
-void UVitalityAttributeSetBase::PostGameplayEffectExecute(const struct FGameplayEffectModCallbackData& Data)
+void UVitalityAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)
 {
 	Super::PostGameplayEffectExecute(Data);
-
-	FGameplayEffectContextHandle Context = Data.EffectSpec.GetContext();
-	UAbilitySystemComponent* Source = Context.GetOriginalInstigatorAbilitySystemComponent();
-	const FGameplayTagContainer& SourceTags = *Data.EffectSpec.CapturedSourceTags.GetAggregatedTags();
-
-	AActor* SourceActor = nullptr;
-	if (Source && Source->AbilityActorInfo.IsValid() && Source->AbilityActorInfo->AvatarActor.IsValid())
+	if (!Data.Target.IsOwnerActorAuthoritative())
 	{
-		SourceActor = Source->AbilityActorInfo->AvatarActor.Get();
+		return;
 	}
-	FHitResult HitResult;
-	if (Context.GetHitResult())
+	const FGameplayAttribute Changed = Data.EvaluatedData.Attribute;
+	if (Changed == GetHealthAttribute())
 	{
-		HitResult = *Context.GetHitResult();
+		SetHealth(FMath::Clamp(GetHealth(), 0.f, FMath::Max(1.f, GetMaxHealth())));
+		return;
 	}
-
-	AActor* TargetActor = nullptr;
-	if (Data.Target.AbilityActorInfo.IsValid() && Data.Target.AbilityActorInfo->AvatarActor.IsValid())
+	float Magnitude = 0.f;
+	if (Changed == GetHealthRecoveryAttribute())
 	{
-		TargetActor = Data.Target.AbilityActorInfo->AvatarActor.Get();
-	}
-
-	if(Data.EvaluatedData.Attribute == GetHealthRecoveryAttribute())
-	{
-		UReferencePoolModuleStatics::GetDefaultReference<URecoveryHandle>(RecoveryHandleClass).HandleRecovery(SourceActor, TargetActor, GetHealthRecovery(), GetHealthRecoveryAttribute(), HitResult, SourceTags);
+		Magnitude = GetHealthRecovery();
 		SetHealthRecovery(0.f);
 	}
-	else if(Data.EvaluatedData.Attribute == GetPhysicsDamageAttribute())
+	else if (Changed == GetPhysicsDamageAttribute())
 	{
-		UReferencePoolModuleStatics::GetDefaultReference<UDamageHandle>(DamageHandleClass).HandleDamage(SourceActor, TargetActor, GetPhysicsDamage(), GetPhysicsDamageAttribute(), HitResult, SourceTags);
+		Magnitude = GetPhysicsDamage();
 		SetPhysicsDamage(0.f);
 	}
-	else if(Data.EvaluatedData.Attribute == GetMagicDamageAttribute())
+	else if (Changed == GetMagicDamageAttribute())
 	{
-		UReferencePoolModuleStatics::GetDefaultReference<UDamageHandle>(DamageHandleClass).HandleDamage(SourceActor, TargetActor, GetMagicDamage(), GetMagicDamageAttribute(), HitResult, SourceTags);
+		Magnitude = GetMagicDamage();
 		SetMagicDamage(0.f);
 	}
-	else if(Data.EvaluatedData.Attribute == GetFallDamageAttribute())
+	else if (Changed == GetFallDamageAttribute())
 	{
-		UReferencePoolModuleStatics::GetDefaultReference<UDamageHandle>(DamageHandleClass).HandleDamage(SourceActor, TargetActor, GetFallDamage(), GetFallDamageAttribute(), HitResult, SourceTags);
+		Magnitude = GetFallDamage();
 		SetFallDamage(0.f);
 	}
-	else if(Data.EvaluatedData.Attribute == GetRealDamageAttribute())
+	else if (Changed == GetRealDamageAttribute())
 	{
-		UReferencePoolModuleStatics::GetDefaultReference<UDamageHandle>(DamageHandleClass).HandleDamage(SourceActor, TargetActor, GetRealDamage(), GetRealDamageAttribute(), HitResult, SourceTags);
+		Magnitude = GetRealDamage();
 		SetRealDamage(0.f);
 	}
-	else if (Data.EvaluatedData.Attribute == GetInterruptAttribute())
+	else if (Changed == GetInterruptAttribute())
 	{
-		UReferencePoolModuleStatics::GetDefaultReference<UInterruptHandle>(InterruptHandleClass).HandleInterrupt(SourceActor, TargetActor, GetInterrupt(), GetInterruptAttribute(), HitResult, SourceTags);
+		Magnitude = GetInterrupt();
 		SetInterrupt(0.f);
+	}
+	if (!FMath::IsFinite(Magnitude) || Magnitude <= 0.f)
+	{
+		return;
+	}
+	const FGameplayEffectContextHandle& Context = Data.EffectSpec.GetContext();
+	AActor* SourceActor = Context.GetEffectCauser();
+	AActor* TargetActor = Data.Target.GetAvatarActor();
+	const FGameplayTagContainer* CapturedTags = Data.EffectSpec.CapturedSourceTags.GetAggregatedTags();
+	const FGameplayTagContainer SourceTags = CapturedTags ? *CapturedTags : FGameplayTagContainer();
+	const FHitResult Hit = Context.GetHitResult() ? *Context.GetHitResult() : FHitResult();
+	if (!IsValid(TargetActor))
+	{
+		return;
+	}
+	if (Changed == GetHealthRecoveryAttribute() && RecoveryHandleClass)
+	{
+		UReferencePoolModuleStatics::GetDefaultReference<URecoveryHandle>(RecoveryHandleClass).HandleRecovery(SourceActor, TargetActor, Magnitude, Changed, Hit, SourceTags);
+	}
+	else if (Changed == GetInterruptAttribute() && InterruptHandleClass)
+	{
+		UReferencePoolModuleStatics::GetDefaultReference<UInterruptHandle>(InterruptHandleClass).HandleInterrupt(SourceActor, TargetActor, Magnitude, Changed, Hit, SourceTags);
+	}
+	else if (DamageHandleClass)
+	{
+		UReferencePoolModuleStatics::GetDefaultReference<UDamageHandle>(DamageHandleClass).HandleDamage(SourceActor, TargetActor, Magnitude, Changed, Hit, SourceTags);
 	}
 }
 
@@ -104,13 +126,7 @@ void UVitalityAttributeSetBase::GetLifetimeReplicatedProps(TArray<FLifetimePrope
 
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, Health, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, MaxHealth, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, HealthRecovery, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, HealthRegenSpeed, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, PhysicsDamage, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, MagicDamage, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, FallDamage, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, RealDamage, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UVitalityAttributeSetBase, Interrupt, COND_None, REPNOTIFY_Always);
 }
 
 void UVitalityAttributeSetBase::OnRep_Health(const FGameplayAttributeData& OldHealth)
@@ -123,37 +139,9 @@ void UVitalityAttributeSetBase::OnRep_MaxHealth(const FGameplayAttributeData& Ol
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UVitalityAttributeSetBase, MaxHealth, OldMaxHealth);
 }
 
-void UVitalityAttributeSetBase::OnRep_HealthRecovery(const FGameplayAttributeData& OldRecovery)
-{
-	GAMEPLAYATTRIBUTE_REPNOTIFY(UVitalityAttributeSetBase, HealthRecovery, OldRecovery);
-}
+
 
 void UVitalityAttributeSetBase::OnRep_HealthRegenSpeed(const FGameplayAttributeData& OldMaxHealth)
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UVitalityAttributeSetBase, HealthRegenSpeed, OldMaxHealth);
-}
-
-void UVitalityAttributeSetBase::OnRep_PhysicsDamage(const FGameplayAttributeData& OldPhysicsDamage)
-{
-	GAMEPLAYATTRIBUTE_REPNOTIFY(UVitalityAttributeSetBase, PhysicsDamage, OldPhysicsDamage);
-}
-
-void UVitalityAttributeSetBase::OnRep_MagicDamage(const FGameplayAttributeData& OldMagicDamage)
-{
-	GAMEPLAYATTRIBUTE_REPNOTIFY(UVitalityAttributeSetBase, MagicDamage, OldMagicDamage);
-}
-
-void UVitalityAttributeSetBase::OnRep_FallDamage(const FGameplayAttributeData& OldFallDamage)
-{
-	GAMEPLAYATTRIBUTE_REPNOTIFY(UVitalityAttributeSetBase, FallDamage, OldFallDamage);
-}
-
-void UVitalityAttributeSetBase::OnRep_RealDamage(const FGameplayAttributeData& OldRealDamage)
-{
-	GAMEPLAYATTRIBUTE_REPNOTIFY(UVitalityAttributeSetBase, RealDamage, OldRealDamage);
-}
-
-void UVitalityAttributeSetBase::OnRep_Interrupt(const FGameplayAttributeData& OldInterrupt)
-{
-	GAMEPLAYATTRIBUTE_REPNOTIFY(UVitalityAttributeSetBase, Interrupt, OldInterrupt);
 }

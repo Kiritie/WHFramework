@@ -72,7 +72,7 @@ USceneModule::USceneModule()
 	WorldMapRange = 4096.f;
 	WorldMapMinRange = 512.f;
 	WorldMapMaxRange = 3000000.f;
-	
+
 	static ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> MiniMapTexFinder(TEXT("/Script/Engine.TextureRenderTarget2D'/WHFramework/Scene/Textures/Render/RT_MiniMap_Default.RT_MiniMap_Default'"));
 	if(MiniMapTexFinder.Succeeded())
 	{
@@ -86,7 +86,7 @@ USceneModule::USceneModule()
 	bWorldMarkerWidgetsDirty = true;
 	bDrawSceneArea = false;
 	SceneAreaHeight = 1000.f;
-	
+
 	WorldTimer = nullptr;
 	WorldWeather = nullptr;
 
@@ -94,11 +94,11 @@ USceneModule::USceneModule()
 	SceneActorMap = TMap<FGuid, AActor*>();
 
 	TargetPoints = TMap<FName, ATargetPoint*>();
-	
+
 	ScenePoints = TMap<FName, USceneComponent*>();
 
 	PhysicsVolumes = TMap<FName, APhysicsVolumeBase*>();
-	
+
 	DefaultPhysicsVolumes = TArray<FPhysicsVolumeData>();
 
 	FPhysicsVolumeData WaterPhysicsVolume;
@@ -193,7 +193,7 @@ void USceneModule::OnInitialize()
 	OutlineMatInst = UKismetMaterialLibrary::CreateDynamicMaterialInstance(this, OutlineMat);
 
 	APostProcessVolume* UnboundPostProcessVolume = nullptr;
-	
+
 	for (IInterface_PostProcessVolume* PostProcessVolumeInterface : GetWorld()->PostProcessVolumes)
 	{
 		if (PostProcessVolumeInterface)
@@ -208,18 +208,18 @@ void USceneModule::OnInitialize()
 			}
 		}
 	}
-	
+
 	if (!UnboundPostProcessVolume)
 	{
 		APostProcessVolume* PostProcessVolume = GetWorld()->SpawnActor<APostProcessVolume>();
-		
+
 		if (PostProcessVolume)
 		{
 			PostProcessVolume->bUnbound = true;
 			UnboundPostProcessVolume = PostProcessVolume;
 		}
 	}
-	
+
 	if (UnboundPostProcessVolume)
 	{
 		bool bNeedAddMat = true;
@@ -241,7 +241,7 @@ void USceneModule::OnInitialize()
 			UnboundPostProcessVolume->Settings.WeightedBlendables.Array.Add(FWeightedBlendable(1.f, OutlineMatInst ? OutlineMatInst : OutlineMat));
 		}
 	}
-	
+
 	SetOutlineColor(OutlineColor);
 }
 
@@ -269,7 +269,7 @@ void USceneModule::OnPreparatory(EPhase InPhase)
 void USceneModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
 	Super::OnRefresh(DeltaSeconds, bInEditor);
-	
+
 	if(bInEditor) return;
 
 	FSceneArea PendingSceneArea;
@@ -311,17 +311,17 @@ void USceneModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 		}
 		MiniMapCapture->GetCapture()->OrthoWidth = MiniMapRange;
 	}
-	
+
 	if(WorldTimer)
 	{
 		WorldTimer->OnRefresh(DeltaSeconds);
 	}
-	
+
 	if(WorldWeather)
 	{
 		WorldWeather->OnRefresh(DeltaSeconds);
 	}
-	
+
 	if(AsyncLoadLevelQueue.Num() > 0)
 	{
 		FAsyncLoadLevelTask& Task = AsyncLoadLevelQueue[0];
@@ -419,12 +419,12 @@ void USceneModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 			TrackedMarkerID = SaveData.TrackedMarkerID;
 			NotifySceneMarkersChanged();
 		}
-		
+
 		if(WorldTimer && WorldTimer->IsAutoSave())
 		{
 			WorldTimer->LoadSaveData(FParameter(SaveData.TimerData), InPhase);
 		}
-		
+
 		if(WorldWeather && WorldWeather->IsAutoSave())
 		{
 			WorldWeather->LoadSaveData(FParameter(SaveData.WeatherData), InPhase);
@@ -485,37 +485,49 @@ void USceneModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 FParameter USceneModule::ToData()
 {
 	FSceneModuleSaveData SaveData;
-
 	SaveData.MiniMapRange = MiniMapRange;
 	SaveData.WorldMapCenter = WorldMapCenter;
 	SaveData.WorldMapRange = WorldMapRange;
 	SaveData.TrackedMarkerID = TrackedMarkerID;
 	SaveData.SceneAreas = SceneAreas;
-	for(const auto& Iter : Markers)
+	for (const auto& Iter : Markers)
 	{
-		if(Iter.Value.bPersistent) SaveData.Markers.Add(Iter.Value);
+		if (Iter.Value.bPersistent) SaveData.Markers.Add(Iter.Value);
 	}
-	
-	if(WorldTimer && WorldTimer->IsAutoSave())
+	if (WorldTimer && WorldTimer->IsAutoSave())
 	{
-		SaveData.TimerData = WorldTimer->GetSaveData(true).GetRef<FWorldTimerSaveData>();
+		const FParameter Data = WorldTimer->GetSaveData(true);
+		const FWorldTimerSaveData* Timer = Data.GetPtr<FWorldTimerSaveData>();
+		if (!Timer)
+		{
+			UE_LOG(LogTemp, Error, TEXT("Scene capture failed for the world timer"));
+			return FParameter();
+		}
+		SaveData.TimerData = *Timer;
 	}
-	
-	if(WorldWeather && WorldWeather->IsAutoSave())
+	if (WorldWeather && WorldWeather->IsAutoSave())
 	{
-		SaveData.WeatherData = WorldWeather->GetSaveData(true).GetRef<FWorldWeatherSaveData>();
+		const FParameter Data = WorldWeather->GetSaveData(true);
+		const FWorldWeatherSaveData* Weather = Data.GetPtr<FWorldWeatherSaveData>();
+		if (!Weather)
+		{
+			UE_LOG(LogTemp, Error, TEXT("Scene capture failed for the world weather"));
+			return FParameter();
+		}
+		SaveData.WeatherData = *Weather;
 	}
-
-	if(bSaveActorDatas)
+	if (bSaveActorDatas)
 	{
-		for(const TPair<FGuid, AActor*>& Iter : SceneActorMap)
+		const TMap<FGuid, AActor*> CapturedActors = SceneActorMap;
+		for (const TPair<FGuid, AActor*>& Iter : CapturedActors)
 		{
 			AActor* Actor = Iter.Value;
-			if(!::IsValid(Actor))
+			if (!::IsValid(Actor))
 			{
-				continue;
+				UE_LOG(LogTemp, Error, TEXT("Scene capture lost a registered actor"));
+				return FParameter();
 			}
-			if(ISaveDataAgentInterface* Agent = Cast<ISaveDataAgentInterface>(Actor))
+			if (ISaveDataAgentInterface* Agent = Cast<ISaveDataAgentInterface>(Actor))
 			{
 				FSceneActorSaveRecord Record;
 				Record.ActorId = Iter.Key;
@@ -523,14 +535,20 @@ FParameter USceneModule::ToData()
 				Record.Transform = Actor->GetActorTransform();
 				Record.bRuntimeSpawned = !Actor->HasAnyFlags(RF_WasLoaded);
 				Record.Data = Agent->GetSaveData(true);
-				if(Actor->Implements<UPrimaryEntityInterface>())
+				if (!Record.Data.HasValue() || !::IsValid(Actor) ||
+					SceneActorMap.FindRef(Iter.Key) != Actor || SceneActorMap.Num() != CapturedActors.Num())
+				{
+					UE_LOG(LogTemp, Error, TEXT("Scene capture failed for %s; actor was not omitted"), *Iter.Key.ToString());
+					return FParameter();
+				}
+				if (Actor->Implements<UPrimaryEntityInterface>())
 				{
 					Record.AssetId = IPrimaryEntityInterface::Execute_GetAssetID(Actor);
 				}
 				SaveData.ActorSaveRecords.Add(MoveTemp(Record));
 			}
 		}
-		for(const FGuid& ActorId : DestroyedSceneActorIds)
+		for (const FGuid& ActorId : DestroyedSceneActorIds)
 		{
 			FSceneActorSaveRecord Record;
 			Record.ActorId = ActorId;
@@ -538,7 +556,6 @@ FParameter USceneModule::ToData()
 			SaveData.ActorSaveRecords.Add(MoveTemp(Record));
 		}
 	}
-
 	return FParameter(MoveTemp(SaveData));
 }
 
@@ -1426,14 +1443,14 @@ APhysicsVolumeBase* USceneModule::GetPhysicsVolumeByName(const FName InName, TSu
 void USceneModule::AddPhysicsVolume(APhysicsVolumeBase* InPhysicsVolume)
 {
 	if(!InPhysicsVolume) return;
-	
+
 	AddPhysicsVolumeByName(InPhysicsVolume->GetVolumeName(), InPhysicsVolume);
 }
 
 void USceneModule::AddPhysicsVolumeByName(const FName InName, APhysicsVolumeBase* InPhysicsVolume)
 {
 	if(!InPhysicsVolume) return;
-	
+
 	if(!PhysicsVolumes.Contains(InName))
 	{
 		PhysicsVolumes.Add(InName, InPhysicsVolume);
@@ -1587,7 +1604,7 @@ void USceneModule::AsyncLoadLevelInternal(FAsyncLoadLevelTask& InTask)
 		UWidgetModuleStatics::OpenUserWidget<UWidgetLoadingLevelPanel>(
 			FLoadingLevelWidgetOpenParameter(InTask.LevelPath, false));
 	}
-	
+
 	LoadPackageAsync(LoadPackagePath, FLoadPackageAsyncDelegate::CreateLambda([this, InTask](const FName PackageName, UPackage* LoadedPackage, EAsyncLoadingResult::Type Result){
 		if(Result == EAsyncLoadingResult::Failed)
 		{
@@ -1650,7 +1667,7 @@ void USceneModule::OnAsyncUnloadLevelFinished(FAsyncLoadLevelTask InTask)
 	{
 		UWidgetModuleStatics::CloseUserWidget<UWidgetLoadingLevelPanel>();
 	}
-	
+
 	if(InTask.OnLoadFinished.IsBound())
 	{
 		InTask.OnLoadFinished.Execute(InTask.LevelPath);

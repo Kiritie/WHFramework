@@ -4,15 +4,22 @@
 #include "FSM/FSMModuleStatics.h"
 
 #include "FSM/FSMModule.h"
+#include "FSM/Components/FSMComponent.h"
 
 void UFSMModuleStatics::RegisterFSM(UFSMComponent* InFSM)
 {
-	UFSMModule::Get().RegisterFSM(InFSM);
+	if (InFSM)
+	{
+		if (UFSMModule* Module = UFSMModule::GetPtr(InFSM->GetWorld())) Module->RegisterFSM(InFSM);
+	}
 }
 
 void UFSMModuleStatics::UnregisterFSM(UFSMComponent* InFSM)
 {
-	UFSMModule::Get().UnregisterFSM(InFSM);
+	if (InFSM)
+	{
+		if (UFSMModule* Module = UFSMModule::GetPtr(InFSM->GetWorld())) Module->UnregisterFSM(InFSM);
+	}
 }
 
 bool UFSMModuleStatics::HasFSMGroup(const FName InGroupName)

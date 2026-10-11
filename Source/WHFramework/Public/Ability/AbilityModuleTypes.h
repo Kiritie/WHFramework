@@ -11,11 +11,13 @@
 #include "Scene/SceneModuleTypes.h"
 #include "Widget/WidgetModuleTypes.h"
 
+#include "UObject/StrongObjectPtr.h"
 #include "AbilityModuleTypes.generated.h"
 
 class UEffectBase;
 class UAbilityActorDataBase;
 class UVitalityActionAbilityBase;
+class UAbilityBase;
 class UAbilityInventoryBase;
 class UAbilityCharacterDataBase;
 class UAbilityVitalityDataBase;
@@ -155,6 +157,27 @@ struct WHFRAMEWORK_API FGameplayEffectContextBase : public FGameplayEffectContex
 	GENERATED_USTRUCT_BODY()
 
 public:
+	UPROPERTY()
+	FGuid SourceId;
+
+	UPROPERTY()
+	FGuid EffectInstanceId;
+
+	UPROPERTY()
+	FGuid GrantSourceId;
+
+	/** A committed external domain owns this effect's save/restore record. */
+	UPROPERTY()
+	FName ExternalPersistenceDomain;
+
+	TStrongObjectPtr<UObject> SourceDefinition;
+
+	virtual void AddSourceObject(const UObject* NewSourceObject) override
+	{
+		Super::AddSourceObject(NewSourceObject);
+		SourceDefinition.Reset(NewSourceObject && (NewSourceObject->IsAsset() || NewSourceObject->HasAnyFlags(RF_ClassDefaultObject)) ? const_cast<UObject*>(NewSourceObject) : nullptr);
+	}
+
 
 	virtual FGameplayAbilityTargetDataHandle GetTargetData()
 	{
@@ -179,14 +202,11 @@ public:
 	{
 		FGameplayEffectContextBase* NewContext = new FGameplayEffectContextBase();
 		*NewContext = *this;
-		NewContext->AddActors(Actors);
 		if (GetHitResult())
 		{
 			// Does a deep copy of the hit result
 			NewContext->AddHitResult(*GetHitResult(), true);
 		}
-		// Shallow copy of TargetData, is this okay?
-		NewContext->TargetData.Append(TargetData);
 		return NewContext;
 	}
 
@@ -223,7 +243,7 @@ public:
 	{
 	}
 
-	FAbilityMeshMontage(class USkeletalMeshComponent* InMesh, class UAnimMontage* InMontage) 
+	FAbilityMeshMontage(class USkeletalMeshComponent* InMesh, class UAnimMontage* InMontage)
 		: Mesh(InMesh), Montage(InMontage)
 	{
 	}
@@ -263,7 +283,7 @@ class WHFRAMEWORK_API UTargetType_UseOwner : public UTargetType
 
 public:
 	UTargetType_UseOwner() {}
-	
+
 	virtual void GetTargets_Implementation(AActor* OwningActor, AActor* TargetingActor, FGameplayEventData EventData, TArray<FHitResult>& OutHitResults, TArray<AActor*>& OutActors) const override;
 };
 
@@ -363,7 +383,7 @@ public:
     /** 目标GameplayEffect规格 */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "GameplayEffectContainer")
     TArray<FGameplayEffectSpecHandle> TargetGameplayEffectSpecs;
-    
+
     /** 是否有有效目标 */
     bool HasValidTargets() const;
 
@@ -529,7 +549,7 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Level;
-	
+
 	UPROPERTY(Transient)
 	FGameplayAbilitySpecHandle AbilityHandle;
 
@@ -562,7 +582,7 @@ struct WHFRAMEWORK_API FVitalityActionAbilityData : public FAbilityData
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSubclassOf<UVitalityActionAbilityBase> AbilityClass;
+	TSubclassOf<UAbilityBase> AbilityClass;
 
 	FORCEINLINE FVitalityActionAbilityData()
 	{
@@ -846,7 +866,7 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Level;
-	
+
 	UPROPERTY(BlueprintReadWrite)
 	FInventorySnapshot InventorySnapshot;
 
@@ -858,7 +878,7 @@ public:
 	{
 		return AssetID.IsValid();
 	}
-	
+
 
 
 	virtual void InitData(FRandomStream InRandomStream = FRandomStream());
@@ -881,21 +901,17 @@ public:
 	FORCEINLINE FVitalitySaveData()
 	{
 		RaceID = NAME_None;
-		ActionAbilities = TMap<FGameplayTag, FVitalityActionAbilityData>();
 	}
 
 	FORCEINLINE FVitalitySaveData(const FActorSaveData& InActorSaveData) : FActorSaveData(InActorSaveData)
 	{
 		RaceID = NAME_None;
-		ActionAbilities = TMap<FGameplayTag, FVitalityActionAbilityData>();
 	}
 
 public:
 	UPROPERTY(BlueprintReadWrite)
 	FName RaceID;
 
-	UPROPERTY()
-	TMap<FGameplayTag, FVitalityActionAbilityData> ActionAbilities;
 };
 
 USTRUCT(BlueprintType)
@@ -906,12 +922,12 @@ struct WHFRAMEWORK_API FPawnSaveData : public FVitalitySaveData
 public:
 	FORCEINLINE FPawnSaveData()
 	{
-		
+
 	}
 
 	FORCEINLINE FPawnSaveData(const FVitalitySaveData& InVitalitySaveData) : FVitalitySaveData(InVitalitySaveData)
 	{
-		
+
 	}
 };
 
@@ -929,4 +945,3 @@ public:
 	{
 	}
 };
-

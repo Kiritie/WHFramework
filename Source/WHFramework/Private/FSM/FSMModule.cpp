@@ -5,7 +5,7 @@
 
 #include "FSM/FSMModuleNetworkComponent.h"
 #include "FSM/Components/FSMComponent.h"
-		
+
 IMPLEMENTATION_MODULE(UFSMModule)
 
 // ParamSets default values
@@ -72,27 +72,25 @@ void UFSMModule::OnTermination(EPhase InPhase)
 
 void UFSMModule::RegisterFSM(UFSMComponent* InFSM)
 {
-	if(!HasGroup(InFSM->GroupName)) GroupMap.Add(InFSM->GroupName);
+	if (!::IsValid(InFSM) || InFSM->GetWorld() != GetWorld()) return;
 
-	FFSMGroup& Group = GetGroup(InFSM->GroupName);
-	if(Group.FSMArray.Contains(InFSM))
-	{
-		Group.FSMArray.Add(InFSM);
-	}
+	UnregisterFSM(InFSM);
+	FFSMGroup& Group = GroupMap.FindOrAdd(InFSM->GroupName);
+	Group.FSMArray.AddUnique(InFSM);
 }
 
 void UFSMModule::UnregisterFSM(UFSMComponent* InFSM)
 {
-	if(!HasGroup(InFSM->GroupName)) return;
-
-	FFSMGroup& Group = GetGroup(InFSM->GroupName);
-	if(Group.FSMArray.Contains(InFSM))
+	for (auto Iterator = GroupMap.CreateIterator(); Iterator; ++Iterator)
 	{
-		Group.FSMArray.Remove(InFSM);
-	}
-	if(Group.FSMArray.IsEmpty())
-	{
-		GroupMap.Remove(InFSM->GroupName);
+		Iterator.Value().FSMArray.RemoveAll([InFSM](const UFSMComponent* Component)
+		{
+			return Component == InFSM || !::IsValid(Component);
+		});
+		if (Iterator.Value().FSMArray.IsEmpty())
+		{
+			Iterator.RemoveCurrent();
+		}
 	}
 }
 
@@ -100,8 +98,9 @@ void UFSMModule::SwitchGroupStateByIndex(const FName InGroupName, int32 InStateI
 {
 	if(!HasGroup(InGroupName)) return;
 
-	for(auto Iter : GetGroup(InGroupName).FSMArray)
+	for (UFSMComponent* Iter : GetGroup(InGroupName).FSMArray)
 	{
+		if (!::IsValid(Iter) || !Iter->CanExecuteStateLogic()) continue;
 		Iter->SwitchStateByIndex(InStateIndex, InParams);
 	}
 }
@@ -110,8 +109,9 @@ void UFSMModule::SwitchGroupStateByName(const FName InGroupName, const FName InS
 {
 	if(!HasGroup(InGroupName)) return;
 
-	for(auto Iter : GetGroup(InGroupName).FSMArray)
+	for (UFSMComponent* Iter : GetGroup(InGroupName).FSMArray)
 	{
+		if (!::IsValid(Iter) || !Iter->CanExecuteStateLogic()) continue;
 		Iter->SwitchStateByName(InStateName, InParams);
 	}
 }
@@ -120,8 +120,9 @@ void UFSMModule::SwitchGroupStateByClass(const FName InGroupName, TSubclassOf<UF
 {
 	if(!HasGroup(InGroupName)) return;
 
-	for(auto Iter : GetGroup(InGroupName).FSMArray)
+	for (UFSMComponent* Iter : GetGroup(InGroupName).FSMArray)
 	{
+		if (!::IsValid(Iter) || !Iter->CanExecuteStateLogic()) continue;
 		Iter->SwitchStateByClass(InStateClass, InParams);
 	}
 }
@@ -130,8 +131,9 @@ void UFSMModule::SwitchGroupDefaultState(const FName InGroupName, const TArray<F
 {
 	if(!HasGroup(InGroupName)) return;
 
-	for(auto Iter : GetGroup(InGroupName).FSMArray)
+	for (UFSMComponent* Iter : GetGroup(InGroupName).FSMArray)
 	{
+		if (!::IsValid(Iter) || !Iter->CanExecuteStateLogic()) continue;
 		Iter->SwitchDefaultState(InParams);
 	}
 }
@@ -140,8 +142,9 @@ void UFSMModule::SwitchGroupFinalState(const FName InGroupName, const TArray<FPa
 {
 	if(!HasGroup(InGroupName)) return;
 
-	for(auto Iter : GetGroup(InGroupName).FSMArray)
+	for (UFSMComponent* Iter : GetGroup(InGroupName).FSMArray)
 	{
+		if (!::IsValid(Iter) || !Iter->CanExecuteStateLogic()) continue;
 		Iter->SwitchFinalState(InParams);
 	}
 }
@@ -150,8 +153,9 @@ void UFSMModule::SwitchGroupLastState(const FName InGroupName, const TArray<FPar
 {
 	if(!HasGroup(InGroupName)) return;
 
-	for(auto Iter : GetGroup(InGroupName).FSMArray)
+	for (UFSMComponent* Iter : GetGroup(InGroupName).FSMArray)
 	{
+		if (!::IsValid(Iter) || !Iter->CanExecuteStateLogic()) continue;
 		Iter->SwitchLastState(InParams);
 	}
 }
@@ -160,8 +164,9 @@ void UFSMModule::SwitchGroupNextState(const FName InGroupName, const TArray<FPar
 {
 	if(!HasGroup(InGroupName)) return;
 
-	for(auto Iter : GetGroup(InGroupName).FSMArray)
+	for (UFSMComponent* Iter : GetGroup(InGroupName).FSMArray)
 	{
+		if (!::IsValid(Iter) || !Iter->CanExecuteStateLogic()) continue;
 		Iter->SwitchNextState(InParams);
 	}
 }

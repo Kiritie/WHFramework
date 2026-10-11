@@ -40,7 +40,7 @@ void ISaveDataAgentInterface::LoadSaveData(const FParameter& InSaveData, EPhase 
 FParameter ISaveDataAgentInterface::GetSaveData(bool bRefresh)
 {
 	FParameter SaveData = bRefresh ? ToData() : GetData();
-	if(!SaveData.HasValue())
+	if(!bRefresh && !SaveData.HasValue())
 	{
 		SaveData = ToData();
 	}

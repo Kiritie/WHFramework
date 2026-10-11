@@ -1,82 +1,95 @@
 #include "Ability/Abilities/ItemAbilityBase.h"
 
 #include "Ability/Effects/EffectBase.h"
+#include "AbilitySystemComponent.h"
 #include "Ability/Inventory/InventoryAbilitySource.h"
 
 UItemAbilityBase::UItemAbilityBase()
 {
-    NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
+	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
+	ActionTag = AbilityActionTags::ItemUse;
+	bActivateOnInput = false;
 }
 
-bool UItemAbilityBase::CanActivateAbility(const FGameplayAbilitySpecHandle Handle,
-    const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags,
-    const FGameplayTagContainer* TargetTags, FGameplayTagContainer* OptionalRelevantTags) const
+void UItemAbilityBase::BeginAction_Implementation()
 {
-    if (!ActorInfo || !ActorInfo->AvatarActor.IsValid())
-    {
-        return false;
-    }
-    const UInventoryAbilitySource* Source = Cast<UInventoryAbilitySource>(GetSourceObject(Handle, ActorInfo));
-    FAbilityItem Item;
-    return Source && Source->Avatar == ActorInfo->AvatarActor && Source->ResolveItem(Item)
-        && Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags);
+	EffectHandles.Reset();
+	const FGuid ApplyingId = GetActionActivationId();
+	TWeakObjectPtr<UAbilitySystemComponent> ApplyingSystem = GetAbilitySystemComponentFromActorInfo();
+	for (TSubclassOf<UEffectBase> EffectClass : EffectClasses)
+	{
+		const FGameplayEffectSpecHandle Spec = MakeOutgoingGameplayEffectSpec(EffectClass, GetAbilityLevel());
+		if (!Spec.IsValid())
+		{
+			FailAction(AbilityActionTags::InvalidRequest);
+			return;
+		}
+		const FActiveGameplayEffectHandle Applied = ApplyGameplayEffectSpecToOwner(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, Spec);
+		if (!IsActive() || GetActionActivationId() != ApplyingId)
+		{
+			if (ApplyingSystem.IsValid() && Applied.IsValid())
+			{
+				ApplyingSystem->RemoveActiveGameplayEffect(Applied);
+			}
+			return;
+		}
+		if (!Applied.WasSuccessfullyApplied())
+		{
+			FailAction(AbilityActionTags::ActivationFailed);
+			return;
+		}
+		if (Applied.IsValid())
+		{
+			EffectHandles.Add(Applied);
+		}
+	}
+	CompleteAction();
 }
 
-bool UItemAbilityBase::GetInventoryItem(FAbilityItem& OutItem) const
+void UItemAbilityBase::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-    OutItem = FAbilityItem();
-    const FGameplayAbilitySpec* Spec = GetCurrentAbilitySpec();
-    const UInventoryAbilitySource* Source = Spec ? Cast<UInventoryAbilitySource>(Spec->SourceObject.Get()) : nullptr;
-    return Source && Source->ResolveItem(OutItem);
-}
-
-void UItemAbilityBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
-    const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
-    const FGameplayEventData* TriggerEventData)
-{
-    const UInventoryAbilitySource* Source = ActorInfo ? Cast<UInventoryAbilitySource>(GetSourceObject(Handle, ActorInfo)) : nullptr;
-    FAbilityItem Item;
-    if (!Source || !ActorInfo->AvatarActor.IsValid() || Source->Avatar != ActorInfo->AvatarActor || !Source->ResolveItem(Item))
-    {
-        EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-        return;
-    }
-    Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-    for (const TSubclassOf<UEffectBase>& EffectClass : EffectClasses)
-    {
-        if (!EffectClass)
-        {
-            continue;
-        }
-        const FGameplayEffectSpecHandle Spec = MakeOutgoingGameplayEffectSpec(EffectClass, Item.Level);
-        if (Spec.IsValid())
-        {
-            const FActiveGameplayEffectHandle Effect = ApplyGameplayEffectSpecToOwner(Handle, ActorInfo, ActivationInfo, Spec);
-            if (Effect.IsValid())
-            {
-                EffectHandles.Add(Effect);
-            }
-        }
-    }
-}
-
-void UItemAbilityBase::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
-    const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
-{
-    if (bWasCancelled)
-    {
-        for (const FActiveGameplayEffectHandle& Effect : EffectHandles)
-        {
-            BP_RemoveGameplayEffectFromOwnerWithHandle(Effect);
-        }
-    }
-    EffectHandles.Reset();
-    Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+	if (!IsActive() || bCleaningEffects)
+	{
+		return;
+	}
+	bCleaningEffects = true;
+	const FGuid EndingId = GetActionActivationId();
+	const TArray<FActiveGameplayEffectHandle> Applied = MoveTemp(EffectHandles);
+	if (bWasCancelled)
+	{
+		for (FActiveGameplayEffectHandle Effect : Applied)
+		{
+			BP_RemoveGameplayEffectFromOwnerWithHandle(Effect);
+		}
+	}
+	bCleaningEffects = false;
+	if (IsActive() && GetActionActivationId() == EndingId)
+	{
+		Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+	}
 }
 
 TArray<TSubclassOf<UEffectBase>> UItemAbilityBase::GetEffectClasses() const
 {
-    TArray<TSubclassOf<UEffectBase>> Result = EffectClasses;
-    Result.Append(Super::GetEffectClasses());
-    return Result;
+	TArray<TSubclassOf<UEffectBase>> Result = EffectClasses;
+	Result.Append(Super::GetEffectClasses());
+	return Result;
+}
+
+bool UItemAbilityBase::CanActivateAbility(FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayTagContainer* SourceTags, const FGameplayTagContainer* TargetTags, FGameplayTagContainer* OptionalRelevantTags) const
+{
+	if (!ActorInfo || !ActorInfo->AvatarActor.IsValid() || !ActorInfo->IsNetAuthority()) return false;
+	const UInventoryAbilitySource* Source = Cast<UInventoryAbilitySource>(GetSourceObject(Handle, ActorInfo));
+	FAbilityItem Item;
+	return Source && Source->Avatar == ActorInfo->AvatarActor && Source->ResolveItem(Item)
+		&& Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags);
+}
+
+bool UItemAbilityBase::GetInventoryItem(FAbilityItem& OutItem) const
+{
+	OutItem = FAbilityItem();
+	const FGameplayAbilitySpec* Spec = GetCurrentAbilitySpec();
+	const UInventoryAbilitySource* Source = Spec ? Cast<UInventoryAbilitySource>(Spec->SourceObject.Get()) : nullptr;
+	return Source && Source->ResolveItem(OutItem);
 }

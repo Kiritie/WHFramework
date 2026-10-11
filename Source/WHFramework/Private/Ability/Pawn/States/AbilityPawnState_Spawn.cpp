@@ -16,7 +16,7 @@ UAbilityPawnState_Spawn::UAbilityPawnState_Spawn()
 {
 	StateName = FName("Spawn");
 
-	Rescuer = nullptr;
+	RescuerActor.Reset();
 }
 
 void UAbilityPawnState_Spawn::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
@@ -35,21 +35,20 @@ void UAbilityPawnState_Spawn::OnEnter(UFiniteStateBase* InLastState, const TArra
 
 	if(InParams.IsValidIndex(0))
 	{
-		Rescuer = Cast<IAbilityVitalityInterface>(InParams[0].Get<UObject*>());
+		RescuerActor = Cast<AActor>(InParams[0].Get<UObject*>());
 	}
-	
-	UEventModuleStatics::BroadcastEvent<FEventVitalitySpawned>(this, { GetAgent(), Cast<UObject>(Rescuer) });
+
+	UEventModuleStatics::BroadcastEvent<FEventVitalitySpawned>(this, { GetAgent(), RescuerActor.Get() });
 
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
-	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Active);
+	SetStateTag(GameplayTags::State_Vitality_Active, false);
 
-	Pawn->DoAction(GameplayTags::Ability_Vitality_Action_Spawn);
 
-	Pawn->GetMovementComponent()->SetActive(false);
+	if (Pawn->GetMovementComponent()) { Pawn->GetMovementComponent()->SetActive(false); }
 	Pawn->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Pawn->GetInteractionComponent()->SetInteractable(false);
-	
+
 	Pawn->ResetData();
 	Pawn->SetMotionRate(1.f, 1.f);
 }
@@ -64,22 +63,21 @@ void UAbilityPawnState_Spawn::OnRefresh(float DeltaSeconds)
 void UAbilityPawnState_Spawn::OnLeave(UFiniteStateBase* InNextState)
 {
 	Super::OnLeave(InNextState);
-
-	Rescuer = nullptr;
-
+	RescuerActor.Reset();
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
-
-	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Active);
-	
-	Pawn->StopAction(GameplayTags::Ability_Vitality_Action_Spawn);
-
-	Pawn->GetMovementComponent()->SetActive(true);
+	if (!Pawn || !FSM || FSM->IsTerminating() || !InNextState || !InNextState->IsA<UAbilityPawnState_Walk>())
+	{
+		return;
+	}
 	Pawn->GetCollisionComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	Pawn->GetInteractionComponent()->SetInteractable(true);
-
-	if(!Pawn->IsPlayer())
+	if (Pawn->GetMovementComponent())
 	{
-		Pawn->GetController<AAIControllerBase>()->RunBehaviorTree();
+		if (Pawn->GetMovementComponent()) { Pawn->GetMovementComponent()->SetActive(true); }
+	}
+	if (AAIControllerBase* Controller = Pawn->GetController<AAIControllerBase>())
+	{
+		Controller->RunBehaviorTree();
 	}
 }
 

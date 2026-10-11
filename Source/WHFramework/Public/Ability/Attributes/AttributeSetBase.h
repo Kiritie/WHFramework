@@ -59,7 +59,7 @@ public:
 	{
 		return Cast<T>(GetOwnerActor());
 	}
-	
+
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	AActor* GetOwnerActor(TSubclassOf<AActor> InClass = nullptr) const;
 };

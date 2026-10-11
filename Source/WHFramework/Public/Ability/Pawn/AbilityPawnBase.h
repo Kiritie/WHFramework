@@ -62,6 +62,11 @@ public:
 	virtual void OnTermination_Implementation() override;
 
 protected:
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	FGuid GetDefaultGrantSourceId() const;
+	FGuid GetProgressionGrantSourceId() const;
+
+protected:
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 	virtual void BindASCInput() override;
@@ -109,8 +114,6 @@ public:
 	UFUNCTION(BlueprintCallable)
 	virtual bool StopAction(const FGameplayTag& InActionTag) override;
 
-	UFUNCTION(BlueprintCallable)
-	virtual void EndAction(const FGameplayTag& InActionTag, bool bWasCancelled) override;
 
 public:
 	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) override;
@@ -163,11 +166,14 @@ protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UFSMComponent* FSM;
 
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UFSMComponent> ControlFSM;
+
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "PawnStats")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Replicated, Category = "PawnStats")
 	FName RaceID;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "PawnStats")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Replicated, Category = "PawnStats")
 	int32 Level;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "PawnStats")
@@ -179,7 +185,6 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "PawnStats")
 	float RotationRate;
 
-	TMap<FGameplayTag, FVitalityActionAbilityData> ActionAbilities;
 
 public:
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Exp)
@@ -344,14 +349,10 @@ public:
 	virtual FVitalityActionAbilityData GetActionAbility(const FGameplayTag& InActionTag) override;
 
 	UFUNCTION(BlueprintPure)
-	virtual TMap<FGameplayTag, FVitalityActionAbilityData>& GetActionAbilities() override
-	{
-		return ActionAbilities;
-	}
+	virtual TMap<FGameplayTag, FVitalityActionAbilityData> GetActionAbilities() const override;
 
 public:
 	virtual void OnRep_Controller() override;
 
 	virtual void OnRep_PlayerState() override;
 };
-

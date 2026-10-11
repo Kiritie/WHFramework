@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Ability/Vitality/States/AbilityVitalityState_Static.h"
+#include "Ability/AbilityActionTypes.h"
 
 #include "AbilitySystemComponent.h"
 #include "Ability/Vitality/AbilityVitalityBase.h"
@@ -10,6 +11,7 @@
 UAbilityVitalityState_Static::UAbilityVitalityState_Static()
 {
 	StateName = FName("Static");
+	StateDomain = TEXT("Control");
 }
 
 void UAbilityVitalityState_Static::OnInitialize(UFSMComponent* InFSM, int32 InStateIndex)
@@ -28,9 +30,8 @@ void UAbilityVitalityState_Static::OnEnter(UFiniteStateBase* InLastState, const 
 
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
-	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Active);
+	SetStateTag(AbilityActionTags::StaticControl, true);
 
-	Vitality->DoAction(GameplayTags::Ability_Vitality_Action_Static);
 }
 
 void UAbilityVitalityState_Static::OnRefresh(float DeltaSeconds)
@@ -44,9 +45,8 @@ void UAbilityVitalityState_Static::OnLeave(UFiniteStateBase* InNextState)
 
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
-	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Active);
+	SetStateTag(AbilityActionTags::StaticControl, false);
 
-	Vitality->StopAction(GameplayTags::Ability_Vitality_Action_Static);
 }
 
 void UAbilityVitalityState_Static::OnTermination()

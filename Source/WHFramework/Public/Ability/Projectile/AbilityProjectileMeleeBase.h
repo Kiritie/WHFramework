@@ -12,7 +12,7 @@ UCLASS()
 class WHFRAMEWORK_API AAbilityProjectileMeleeBase : public AAbilityProjectileBase
 {
 	GENERATED_BODY()
-	
-public:	
+
+public:
 	AAbilityProjectileMeleeBase();
 };

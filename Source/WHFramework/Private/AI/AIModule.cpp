@@ -30,7 +30,7 @@ void UAIModule::OnGenerate()
 void UAIModule::OnDestroy()
 {
 	Super::OnDestroy();
-	
+
 	TERMINATION_MODULE(UAIModule)
 }
 #endif

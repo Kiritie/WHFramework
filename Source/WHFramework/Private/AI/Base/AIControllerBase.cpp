@@ -1,11 +1,10 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "AI/Base/AIControllerBase.h"
 
 #include "AI/Base/AIAgentInterface.h"
 #include "AI/Base/AIBlackboardBase.h"
+#include "AI/Base/AIBlackboardContext.h"
 #include "BehaviorTree/BehaviorTree.h"
+#include "BehaviorTree/BehaviorTreeComponent.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Damage.h"
 #include "Perception/AISenseConfig_Sight.h"
@@ -13,28 +12,21 @@
 AAIControllerBase::AAIControllerBase()
 {
 	bAttachToPawn = true;
-
-	PerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>(FName("AIPerception"));
+	PrimaryActorTick.bCanEverTick = true;
+	PerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("AIPerception"));
 	PerceptionComponent->OnTargetPerceptionUpdated.AddDynamic(this, &AAIControllerBase::OnTargetPerceptionUpdated);
-
-	FAISenseAffiliationFilter AffiliationFilter;
-	AffiliationFilter.bDetectEnemies = true;
-	AffiliationFilter.bDetectFriendlies = true;
-	AffiliationFilter.bDetectNeutrals = true;
-
-	const auto SightSenseConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(FName("SightSenseConfig"));
-	SightSenseConfig->SightRadius = 1000;
-	SightSenseConfig->LoseSightRadius = 1200;
-	SightSenseConfig->PeripheralVisionAngleDegrees = 90;
-	SightSenseConfig->DetectionByAffiliation = AffiliationFilter;
-	SightSenseConfig->SetMaxAge(5);
-	PerceptionComponent->ConfigureSense(*SightSenseConfig);
-	PerceptionComponent->SetDominantSense(*SightSenseConfig->GetSenseImplementation());
-
-	const auto DamageSenseConfig = CreateDefaultSubobject<UAISenseConfig_Damage>(FName("DamageSenseConfig"));
-	PerceptionComponent->ConfigureSense(*DamageSenseConfig);
-
-	bInitialized = false;
+	UAISenseConfig_Sight* Sight = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightSenseConfig"));
+	Sight->SightRadius = 1000.f;
+	Sight->LoseSightRadius = 1200.f;
+	Sight->PeripheralVisionAngleDegrees = 90.f;
+	Sight->DetectionByAffiliation.bDetectEnemies = true;
+	Sight->DetectionByAffiliation.bDetectFriendlies = true;
+	Sight->DetectionByAffiliation.bDetectNeutrals = true;
+	Sight->SetMaxAge(5.f);
+	PerceptionComponent->ConfigureSense(*Sight);
+	PerceptionComponent->SetDominantSense(*Sight->GetSenseImplementation());
+	UAISenseConfig_Damage* Damage = CreateDefaultSubobject<UAISenseConfig_Damage>(TEXT("DamageSenseConfig"));
+	PerceptionComponent->ConfigureSense(*Damage);
 }
 
 void AAIControllerBase::OnInitialize_Implementation()
@@ -44,36 +36,36 @@ void AAIControllerBase::OnInitialize_Implementation()
 
 void AAIControllerBase::OnPreparatory_Implementation()
 {
-	
 }
 
 void AAIControllerBase::OnRefresh_Implementation(float DeltaSeconds)
 {
-	IAIAgentInterface* OwnerAgent = GetPawn<IAIAgentInterface>();
-
-	if(!OwnerAgent) return;
-
-	if(IsRunningBehaviorTree())
+	if (!HasAuthority() || !CurrentBlackboard)
 	{
-		if(CurrentBlackboard)
-		{
-			CurrentBlackboard->Refresh();
-		}
+		return;
+	}
+	BlackboardRefreshRemaining -= DeltaSeconds;
+	if (BlackboardRefreshRemaining <= 0.f)
+	{
+		BlackboardRefreshRemaining = FMath::Max(0.05f, BlackboardRefreshInterval);
+		CurrentBlackboard->Refresh();
 	}
 }
 
 void AAIControllerBase::OnTermination_Implementation()
 {
-	
+	StopBehaviorTree();
+	ReleaseBlackboardContext();
+	CurrentBehaviorTree = nullptr;
+	bInitialized = false;
 }
 
 void AAIControllerBase::BeginPlay()
 {
 	Super::BeginPlay();
-
-	if(Execute_IsUseDefaultLifecycle(this))
+	if (Execute_IsUseDefaultLifecycle(this))
 	{
-		if(!Execute_IsInitialized(this))
+		if (!Execute_IsInitialized(this))
 		{
 			Execute_OnInitialize(this);
 		}
@@ -83,57 +75,72 @@ void AAIControllerBase::BeginPlay()
 
 void AAIControllerBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	Super::EndPlay(EndPlayReason);
-
-	if(Execute_IsUseDefaultLifecycle(this))
+	if (Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnTermination(this);
 	}
+	Super::EndPlay(EndPlayReason);
 }
 
 void AAIControllerBase::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
-
+	ReleaseBlackboardContext();
+	if (PerceptionComponent)
+	{
+		PerceptionComponent->ForgetAll();
+		PerceptionComponent->RequestStimuliListenerUpdate();
+	}
+	BlackboardRefreshRemaining = 0.f;
 	InitBehaviorTree(true);
 }
 
 void AAIControllerBase::OnUnPossess()
 {
-	Super::OnUnPossess();
-
 	StopBehaviorTree();
+	ReleaseBlackboardContext();
+	CurrentBehaviorTree = nullptr;
+	if (PerceptionComponent)
+	{
+		PerceptionComponent->ForgetAll();
+	}
+	Super::OnUnPossess();
+}
+
+void AAIControllerBase::ReleaseBlackboardContext()
+{
+	if (CurrentBlackboard)
+	{
+		CurrentBlackboard->Uninitialize();
+	}
+	CurrentBlackboard = nullptr;
+	SourceBlackboard = nullptr;
+	BlackboardPawn.Reset();
 }
 
 void AAIControllerBase::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
-	APawn* OwnerAgent = GetPawn();
-	APawn* TargetAgent = Cast<APawn>(Actor);
-
-	if (!OwnerAgent || !TargetAgent || TargetAgent == OwnerAgent) return;
-	
+	APawn* Target = Cast<APawn>(Actor);
+	if (!HasAuthority() || !CurrentBlackboard || !Target || Target == GetPawn())
+	{
+		return;
+	}
 	if (Stimulus.WasSuccessfullySensed())
 	{
-		if (!GetBlackboard()->GetTargetAgent())
-		{
-			GetBlackboard()->SetTargetAgent(TargetAgent);
-		}
-		else if(TargetAgent == GetBlackboard()->GetTargetAgent())
-		{
-			GetBlackboard()->SetIsLostTarget(false);
-		}
+		CurrentBlackboard->SetTargetAgent(Target);
+		CurrentBlackboard->SetTargetLocation(Target->GetActorLocation());
+		CurrentBlackboard->SetIsLostTarget(false);
 	}
-	else if(TargetAgent == GetBlackboard()->GetTargetAgent())
+	else if (CurrentBlackboard->GetTargetAgent() == Target)
 	{
-		GetBlackboard()->SetIsLostTarget(true);
+		CurrentBlackboard->SetIsLostTarget(true);
 	}
 }
 
 void AAIControllerBase::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-
-	if(Execute_IsUseDefaultLifecycle(this))
+	if (Execute_IsUseDefaultLifecycle(this))
 	{
 		Execute_OnRefresh(this, DeltaSeconds);
 	}
@@ -141,64 +148,91 @@ void AAIControllerBase::Tick(float DeltaSeconds)
 
 void AAIControllerBase::InitBehaviorTree(bool bAutoRun)
 {
-	IAIAgentInterface* OwnerAgent = GetPawn<IAIAgentInterface>();
-	
-	if(!OwnerAgent) return;
-
-	UBehaviorTree* BehaviorTreeAsset = OwnerAgent->GetBehaviorTreeAsset();
-	
-	if(!BehaviorTreeAsset) return;
-
-	if(SourceBehaviorTree != BehaviorTreeAsset)
+	const IAIAgentInterface* Agent = Cast<IAIAgentInterface>(GetPawn());
+	if (HasAuthority() && Agent)
 	{
-		SourceBehaviorTree = BehaviorTreeAsset;
-		CurrentBehaviorTree = DuplicateObject<UBehaviorTree>(SourceBehaviorTree, this);
+		SetBehaviorTree(Agent->GetBehaviorTreeAsset(), bAutoRun);
+	}
+}
 
-		if(SourceBlackboard != CurrentBehaviorTree->BlackboardAsset)
+bool AAIControllerBase::SetBehaviorTree(UBehaviorTree* InAsset, bool bAutoRun)
+{
+	if (!HasAuthority() || !GetPawn())
+	{
+		return false;
+	}
+	if (!InAsset)
+	{
+		StopBehaviorTree();
+		ReleaseBlackboardContext();
+		CurrentBehaviorTree = nullptr;
+		return false;
+	}
+	UAIBlackboardBase* Definition = Cast<UAIBlackboardBase>(InAsset->BlackboardAsset);
+	if (!Definition)
+	{
+		UE_LOG(LogTemp, Error, TEXT("行为树必须使用AIBlackboardBase定义：%s"), *GetNameSafe(InAsset));
+		return false;
+	}
+	if (CurrentBehaviorTree != InAsset || BlackboardPawn.Get() != GetPawn())
+	{
+		StopBehaviorTree();
+	}
+	if (!CurrentBlackboard || SourceBlackboard != Definition || BlackboardPawn.Get() != GetPawn())
+	{
+		ReleaseBlackboardContext();
+		UBlackboardComponent* BlackboardComponent = nullptr;
+		if (!UseBlackboard(Definition, BlackboardComponent) || !BlackboardComponent)
 		{
-			SourceBlackboard = Cast<UAIBlackboardBase>(CurrentBehaviorTree->BlackboardAsset);
-			CurrentBlackboard = DuplicateObject<UAIBlackboardBase>(SourceBlackboard, this);
-
-			UBlackboardComponent* BlackboardComponent;
-			if(UseBlackboard(CurrentBlackboard, BlackboardComponent))
-			{
-				CurrentBlackboard->Initialize(BlackboardComponent);
-			}
+			return false;
 		}
-		CurrentBehaviorTree->BlackboardAsset = CurrentBlackboard;
+		if (!BlackboardComponent->InitializeBlackboard(*Definition))
+		{
+			return false;
+		}
+		SourceBlackboard = Definition;
+		BlackboardPawn = GetPawn();
+		CurrentBlackboard = Definition->CreateContext(this, BlackboardComponent);
+		if (!CurrentBlackboard)
+		{
+			ReleaseBlackboardContext();
+			return false;
+		}
 	}
-	
-	if(bAutoRun)
-	{
-		RunBehaviorTree(true);
-	}
+	CurrentBehaviorTree = InAsset;
+	return !bAutoRun || IsRunningBehaviorTree() || Super::RunBehaviorTree(InAsset);
 }
 
 bool AAIControllerBase::RunBehaviorTree(UBehaviorTree* BTAsset)
 {
-	return Super::RunBehaviorTree(BTAsset);
+	return SetBehaviorTree(BTAsset, true);
 }
 
 bool AAIControllerBase::RunBehaviorTree(bool bForce)
 {
-	if(!IsRunningBehaviorTree() || bForce)
+	if (!HasAuthority() || !CurrentBehaviorTree)
 	{
-		return RunBehaviorTree(CurrentBehaviorTree);
+		return false;
 	}
-	return false;
+	if (bForce)
+	{
+		StopBehaviorTree();
+	}
+	return IsRunningBehaviorTree() || Super::RunBehaviorTree(CurrentBehaviorTree);
 }
 
 void AAIControllerBase::StopBehaviorTree()
 {
-	if(IsRunningBehaviorTree())
+	if (UBehaviorTreeComponent* Behavior = GetBehaviorTreeComponent())
 	{
-		GetBehaviorTreeComponent()->StopTree();
+		Behavior->StopTree(EBTStopMode::Forced);
 	}
 }
 
 bool AAIControllerBase::IsRunningBehaviorTree() const
 {
-	return GetBehaviorTreeComponent() && GetBehaviorTreeComponent()->IsRunning();
+	const UBehaviorTreeComponent* Behavior = GetBehaviorTreeComponent();
+	return Behavior && Behavior->IsRunning();
 }
 
 UBehaviorTreeComponent* AAIControllerBase::GetBehaviorTreeComponent() const

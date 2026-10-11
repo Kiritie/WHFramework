@@ -1,47 +1,82 @@
-#pragma once
-
 #include "Ability/Actor/AbilityActorInterface.h"
 
 #include "Ability/Attributes/AttributeSetBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
+#include "Components/MeshComponent.h"
 
 void IAbilityActorInterface::InitializeAbilities(AActor* InOwnerActor, AActor* InAvatarActor)
 {
-	if(bAbilitiesInitialized) return;
-
-	UAbilitySystemComponentBase* AbilitySystemComponent = Cast<UAbilitySystemComponentBase>(GetAbilitySystemComponent());
-	UAttributeSetBase* AttributeSet = GetAttributeSet();
-
-	InOwnerActor = InOwnerActor ? InOwnerActor : Cast<AActor>(this);
-	if(AbilitySystemComponent->HasBeenInitialized())
+	UAbilitySystemComponentBase* AbilitySystem = Cast<UAbilitySystemComponentBase>(GetAbilitySystemComponent());
+	UAttributeSetBase* Attributes = GetAttributeSet();
+	AActor* InterfaceActor = Cast<AActor>(_getUObject());
+	AActor* Owner = InOwnerActor ? InOwnerActor : (AbilitySystem ? AbilitySystem->GetOwner() : InterfaceActor);
+	AActor* Avatar = InAvatarActor ? InAvatarActor : InterfaceActor;
+	if (!AbilitySystem || !Attributes || !Owner || !Avatar)
 	{
-		AbilitySystemComponent->InitAbilityActorInfo(InOwnerActor, InOwnerActor);
+		return;
 	}
-
-	for(auto& Iter : AttributeSet->GetAllAttributes())
+	if (bAbilitiesInitialized && BoundAbilitySystem == AbilitySystem && BoundAbilityAvatar == Avatar)
 	{
-		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(Iter).AddRaw(this, &IAbilityActorInterface::OnAttributeChange);
+		AbilitySystem->BindOwnerAvatar(Owner, Avatar);
+		return;
 	}
-
+	UninitializeAbilities(false);
+	if (!AbilitySystem->BindOwnerAvatar(Owner, Avatar))
+	{
+		return;
+	}
+	BoundAbilitySystem = AbilitySystem;
+	BoundAbilityAvatar = Avatar;
+	for (const FGameplayAttribute& Attribute : Attributes->GetAllAttributes())
+	{
+		const FDelegateHandle Delegate = AbilitySystem->GetGameplayAttributeValueChangeDelegate(Attribute).AddWeakLambda(_getUObject(), [this](const FOnAttributeChangeData& Change)
+		{
+			OnAttributeChange(Change);
+		});
+		AttributeDelegateHandles.Add(Attribute, Delegate);
+	}
 	bAbilitiesInitialized = true;
+}
+
+void IAbilityActorInterface::UninitializeAbilities(bool bUnbindAvatar)
+{
+	if (UAbilitySystemComponentBase* AbilitySystem = BoundAbilitySystem.Get())
+	{
+		for (const TPair<FGameplayAttribute, FDelegateHandle>& Entry : AttributeDelegateHandles)
+		{
+			AbilitySystem->GetGameplayAttributeValueChangeDelegate(Entry.Key).Remove(Entry.Value);
+		}
+		if (bUnbindAvatar && AbilitySystem->GetAvatarActor() == BoundAbilityAvatar.Get())
+		{
+			AbilitySystem->UnbindAvatar(AbilityActionTags::AvatarRemoved);
+		}
+	}
+	AttributeDelegateHandles.Reset();
+	BoundAbilitySystem.Reset();
+	BoundAbilityAvatar.Reset();
+	bAbilitiesInitialized = false;
 }
 
 void IAbilityActorInterface::RefreshAttributes()
 {
-	UAttributeSetBase* AttributeSet = GetAttributeSet();
-	for(auto& Iter : AttributeSet->GetAllAttributes())
+	UAttributeSetBase* Attributes = GetAttributeSet();
+	if (!Attributes)
 	{
-		FOnAttributeChangeData OnAttributeChangeData;
-		OnAttributeChangeData.Attribute = Iter;
-		OnAttributeChangeData.OldValue = AttributeSet->GetAttributeValue(Iter);
-		OnAttributeChangeData.NewValue = AttributeSet->GetAttributeValue(Iter);
-		OnAttributeChange(OnAttributeChangeData);
+		return;
+	}
+	for (const FGameplayAttribute& Attribute : Attributes->GetAllAttributes())
+	{
+		FOnAttributeChangeData Change;
+		Change.Attribute = Attribute;
+		Change.OldValue = Attributes->GetAttributeValue(Attribute);
+		Change.NewValue = Change.OldValue;
+		OnAttributeChange(Change);
 	}
 }
 
 bool IAbilityActorInterface::AttachActor(AActor* InActor, const FAttachmentTransformRules& InAttachmentRules, FName InSocketName)
 {
-	if(InActor->AttachToComponent(GetMeshComponent(), InAttachmentRules, InSocketName))
+	if (IsValid(InActor) && GetMeshComponent() && InActor->AttachToComponent(GetMeshComponent(), InAttachmentRules, InSocketName))
 	{
 		OnActorAttached(InActor);
 		return true;
@@ -51,6 +86,9 @@ bool IAbilityActorInterface::AttachActor(AActor* InActor, const FAttachmentTrans
 
 void IAbilityActorInterface::DetachActor(AActor* InActor, const FDetachmentTransformRules& InDetachmentRules)
 {
-	InActor->DetachFromActor(InDetachmentRules);
-	OnActorDetached(InActor);
+	if (IsValid(InActor))
+	{
+		InActor->DetachFromActor(InDetachmentRules);
+		OnActorDetached(InActor);
+	}
 }

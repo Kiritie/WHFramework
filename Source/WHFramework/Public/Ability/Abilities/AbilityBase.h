@@ -2,6 +2,7 @@
 
 #include "Abilities/GameplayAbility.h"
 #include "Ability/AbilityModuleTypes.h"
+#include "Ability/AbilityActionTypes.h"
 #include "AbilityBase.generated.h"
 
 /**
@@ -15,9 +16,58 @@ class WHFRAMEWORK_API UAbilityBase : public UGameplayAbility
 public:
 	UAbilityBase();
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	FGameplayTag ActionTag;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	EAbilityActionTargetPolicy TargetPolicy = EAbilityActionTargetPolicy::None;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	float MaximumTargetRange = 2500.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	bool bRequireLineOfSight = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TEnumAsByte<ECollisionChannel> TargetTraceChannel = ECC_Visibility;
+
+	UFUNCTION(BlueprintPure)
+	const FAbilityActionRequest& GetActionRequest() const;
+
+	UFUNCTION(BlueprintPure)
+	FGuid GetActionActivationId() const;
+
+	UFUNCTION(BlueprintCallable)
+	void CompleteAction();
+
+	UFUNCTION(BlueprintCallable)
+	void FailAction(FGameplayTag Reason);
+
+	bool RequestActionCancellation(FGameplayTag Reason);
+	virtual bool ValidateActionRequest(const FAbilityActionRequest& Request, FGameplayTag& OutReason) const;
+	virtual bool ValidateReplicatedTargetData(const FGameplayAbilityTargetDataHandle& Data, FGameplayTag& OutReason) const;
+
+	UFUNCTION(BlueprintNativeEvent)
+	void BeginAction();
+	virtual void BeginAction_Implementation();
+
+private:
+	friend class UAbilitySystemComponentBase;
+	void ResolveAuthoritativeResult(const FAbilityActionResult& Result);
+
+	UPROPERTY(Transient)
+	FAbilityActionRequest ActionRequest;
+
+	FGuid ActionActivationId;
+	EAbilityActionOutcome ActionOutcome = EAbilityActionOutcome::None;
+	FGameplayTag ActionReason;
+	FGameplayTagContainer ActionFailureTags;
+	bool bEndingAction = false;
+
+
 protected:
 	virtual void OnGiveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec) override;
-	
+
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
@@ -68,7 +118,7 @@ public:
 
 	// Same as calling K2_EndAbility. Meant for use with batching system to end the ability externally.
 	virtual void ExternalEndAbility();
-	
+
 	// Returns the current prediction key and if it's valid for more predicting. Used for debugging ability prediction windows.
 	UFUNCTION(BlueprintCallable, Category = "Ability")
 	virtual FString GetCurrentPredictionKeyStatus();
@@ -91,7 +141,7 @@ public:
 	// Allows C++ and Blueprint abilities to override how cost is applied in case they don't use a GE like weapon ammo
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Ability")
 	void ApplyCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo& ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const;
-	virtual void ApplyCost_Implementation(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo& ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const {};
+	virtual void ApplyCost_Implementation(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo& ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const;
 
 	/** Returns the time in seconds remaining on the currently active cooldown and the original duration for this cooldown. */
 	virtual void GetCooldownTimeRemainingAndDuration(FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, float& TimeRemaining, float& CooldownDuration) const override;
@@ -113,7 +163,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Ability")
 	virtual bool IsInputPressed() const;
 
-	
+
 	// ----------------------------------------------------------------------------------------------------------------
 	//	Animation Support for multiple USkeletalMeshComponents on the AvatarActor
 	// ----------------------------------------------------------------------------------------------------------------
@@ -166,7 +216,7 @@ public:
 	{
 		return Cast<T>(GetOwningActorFromActorInfo());
 	}
-	
+
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	AActor* GetOwnerActor(TSubclassOf<AActor> InClass = nullptr) const;
 

@@ -36,7 +36,7 @@ public:
 public:
 
 	virtual void OnSpawn_Implementation(const FParameter& InParam) override;
-		
+
 	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode)
 		override;
 
@@ -55,6 +55,7 @@ public:
 	virtual bool HasArchive() const override { return true; }
 
 	virtual void Serialize(FArchive& Ar) override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	virtual void LoadData(const FParameter& InSaveData, EPhase InPhase) override;
 
@@ -78,27 +79,27 @@ protected:
 protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UBoxComponent* BoxComponent;
-	
+
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UAbilitySystemComponentBase* AbilitySystem;
-	
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UAttributeSetBase* AttributeSet;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UInteractionComponent* Interaction;
-	
+
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
 	UAbilityInventoryBase* Inventory;
-	
+
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "ActorStats")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "ActorStats", ReplicatedUsing = OnRep_ActorMetadata)
 	FPrimaryAssetId AssetID;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "ActorStats")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "ActorStats", ReplicatedUsing = OnRep_ActorMetadata)
 	FName Name;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "ActorStats")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "ActorStats", ReplicatedUsing = OnRep_ActorMetadata)
 	int32 Level;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "ActorStats")
@@ -106,7 +107,7 @@ protected:
 
 public:
 	ATTRIBUTE_ACCESSORS(UActorAttributeSetBase, Exp)
-	
+
 	ATTRIBUTE_ACCESSORS(UActorAttributeSetBase, MaxExp)
 
 public:
@@ -115,7 +116,7 @@ public:
 	{
 		return static_cast<T&>(GetActorData());
 	}
-	
+
 	UAbilityActorDataBase& GetActorData() const;
 
 	template<class T>
@@ -152,15 +153,15 @@ public:
 	virtual EInteractAgentType GetInteractAgentType() const override { return EInteractAgentType::Passivity; }
 
 	virtual UInteractionComponent* GetInteractionComponent() const override { return Interaction; }
-	
+
 	virtual UAbilityInventoryBase* GetInventory() const override { return Inventory; }
 
 	void BindInventory(UAbilityInventoryBase* InInventory);
 
 	virtual FPrimaryAssetId GetAssetID_Implementation() const override { return AssetID; }
-	
+
 	virtual void SetAssetID_Implementation(const FPrimaryAssetId& InID) override { AssetID = InID; }
-	
+
 	UFUNCTION(BlueprintPure)
 	virtual FName GetNameA() const override { return Name; }
 
@@ -172,17 +173,21 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual bool SetLevelA(int32 InLevel) override;
-	
+
 	UFUNCTION(BlueprintPure)
 	virtual float GetRadius() const override;
 
 	UFUNCTION(BlueprintPure)
 	virtual float GetHalfHeight() const override;
-	
+
 	UFUNCTION(BlueprintPure)
 	virtual float GetDistance(AActor* InTargetActor, bool bIgnoreRadius = true, bool bIgnoreZAxis = true) const override;
 
 	UFUNCTION(BlueprintPure)
 	virtual FTransform GetBirthTransform() const override { return BirthTransform; }
-};
+protected:
+	UFUNCTION()
+	void OnRep_ActorMetadata();
+	FGuid GetActorStatSourceId() const;
 
+};

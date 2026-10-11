@@ -248,6 +248,11 @@ bool UVoxelSceneRegion::CaptureInactiveActors(FString& OutError, const FIntVecto
 				return false;
 			}
 			Data = Agent->GetSaveData(true);
+			if (!Data.HasValue())
+			{
+				OutError = TEXT("Scene actor capture failed; retirement retained its prior actor and snapshot");
+				return false;
+			}
 			Validation.Add({Pair.Key, Data});
 		}
 		Retiring.Add({Actor, {Pair.Key, MoveTemp(Data)}});
@@ -400,17 +405,23 @@ bool UVoxelSceneRegion::CaptureActors(
 bool UVoxelSceneRegion::CaptureActorStates(TArray<FVoxelSavedSceneActor>& OutActors,
 	FParameter& OutProjectData, FString& OutError) const
 {
-	OutActors.Reset();
+	OutError.Reset();
+	const uint64 Revision = SceneRevision;
+	TArray<FVoxelSavedSceneActor> CapturedActors;
+	FParameter ProjectData;
 	for (const auto& Pair : PendingActors)
 	{
-		OutActors.Add({Pair.Key, Pair.Value});
-	}
-	for (const TPair<FGuid, TObjectPtr<AActor>>& Pair : SceneActorMap)
-	{
-		if (!ShouldPersistActor(Pair.Value))
+		if (!Pair.Value.HasValue())
 		{
-			continue;
+			OutError = TEXT("Pending scene actor has no valid captured payload");
+			return false;
 		}
+		CapturedActors.Add({Pair.Key, Pair.Value});
+	}
+	const TMap<FGuid, TObjectPtr<AActor>> LiveActors = SceneActorMap;
+	for (const TPair<FGuid, TObjectPtr<AActor>>& Pair : LiveActors)
+	{
+		if (!ShouldPersistActor(Pair.Value)) continue;
 		ISaveDataAgentInterface* Agent = Cast<ISaveDataAgentInterface>(Pair.Value);
 		if (!Agent)
 		{
@@ -420,14 +431,21 @@ bool UVoxelSceneRegion::CaptureActorStates(TArray<FVoxelSavedSceneActor>& OutAct
 		FVoxelSavedSceneActor Saved;
 		Saved.Id = Pair.Key;
 		Saved.Data = Agent->GetSaveData(true);
-		OutActors.Add(MoveTemp(Saved));
+		if (!Saved.Data.HasValue() || SceneRevision != Revision ||
+			SceneActorMap.FindRef(Pair.Key) != Pair.Value)
+		{
+			OutError = FString::Printf(TEXT("Voxel scene actor %s capture failed or ownership changed"), *Pair.Key.ToString());
+			return false;
+		}
+		CapturedActors.Add(MoveTemp(Saved));
 	}
-
-	if (!CaptureProjectData(OutProjectData))
+	if (!CaptureProjectData(ProjectData) || SceneRevision != Revision)
 	{
-		OutError = TEXT("Voxel scene region project data capture failed");
+		OutError = TEXT("Voxel scene region project data capture failed or actor cut changed");
 		return false;
 	}
+	OutActors = MoveTemp(CapturedActors);
+	OutProjectData = MoveTemp(ProjectData);
 	return true;
 }
 
@@ -809,4 +827,3 @@ const TMap<FGuid, FParameter>& UVoxelSceneRegion::GetPendingActors() const
 {
 	return PendingActors;
 }
-

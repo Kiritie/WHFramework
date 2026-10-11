@@ -12,12 +12,25 @@ FPrimaryAssetId PAID_EXP = FPrimaryAssetId(TEXT("Misc:DA_Exp"));
 
 bool FGameplayEffectContextBase::NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuccess)
 {
-	return Super::NetSerialize(Ar, Map, bOutSuccess) && TargetData.NetSerialize(Ar, Map, bOutSuccess);
+	bool bBaseSuccess = true;
+	bool bTargetSuccess = true;
+	const bool bBaseMapped = Super::NetSerialize(Ar, Map, bBaseSuccess);
+	if (Ar.IsLoading())
+	{
+		AddSourceObject(GetSourceObject());
+	}
+	const bool bTargetMapped = TargetData.NetSerialize(Ar, Map, bTargetSuccess);
+	Ar << SourceId;
+	Ar << EffectInstanceId;
+	Ar << GrantSourceId;
+	Ar << ExternalPersistenceDomain;
+	bOutSuccess = bBaseSuccess && bTargetSuccess && !Ar.IsError();
+	return bBaseMapped && bTargetMapped;
 }
 
 void UTargetType::GetTargets_Implementation(AActor* OwningActor, AActor* TargetingActor, FGameplayEventData EventData, TArray<FHitResult>& OutHitResults, TArray<AActor*>& OutActors) const
 {
-	
+
 }
 
 void UTargetType_UseOwner::GetTargets_Implementation(AActor* OwningActor, AActor* TargetingActor, FGameplayEventData EventData, TArray<FHitResult>& OutHitResults, TArray<AActor*>& OutActors) const
@@ -40,6 +53,11 @@ void UTargetType_UseEventData::GetTargets_Implementation(AActor* OwningActor, AA
 
 void UDamageHandle::HandleDamage(AActor* SourceActor, AActor* TargetActor, float DamageValue, const FGameplayAttribute& DamageAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
 {
+	if (!IsValid(TargetActor) || !TargetActor->HasAuthority())
+	{
+		return;
+	}
+
 	IAbilityVitalityInterface* TargetVitality = Cast<IAbilityVitalityInterface>(TargetActor);
 
 	if (DamageValue > 0.f)
@@ -53,6 +71,11 @@ void UDamageHandle::HandleDamage(AActor* SourceActor, AActor* TargetActor, float
 
 void URecoveryHandle::HandleRecovery(AActor* SourceActor, AActor* TargetActor, float RecoveryValue, const FGameplayAttribute& RecoveryAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
 {
+	if (!IsValid(TargetActor) || !TargetActor->HasAuthority())
+	{
+		return;
+	}
+
 	IAbilityVitalityInterface* TargetVitality = Cast<IAbilityVitalityInterface>(TargetActor);
 
 	if (RecoveryValue > 0.f)
@@ -66,6 +89,11 @@ void URecoveryHandle::HandleRecovery(AActor* SourceActor, AActor* TargetActor, f
 
 void UInterruptHandle::HandleInterrupt(AActor* SourceActor, AActor* TargetActor, float InterruptDuration, const FGameplayAttribute& InterruptAttribute, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags)
 {
+	if (!IsValid(TargetActor) || !TargetActor->HasAuthority())
+	{
+		return;
+	}
+
 	IAbilityVitalityInterface* TargetVitality = Cast<IAbilityVitalityInterface>(TargetActor);
 
 	if (InterruptDuration > 0.f)
@@ -79,12 +107,12 @@ void UInterruptHandle::HandleInterrupt(AActor* SourceActor, AActor* TargetActor,
 
 bool FGameplayEffectContainerSpec::HasValidTargets() const
 {
-	return TargetGameplayEffectSpecs.Num() > 0;
+	return TargetData.Num() > 0;
 }
 
 bool FGameplayEffectContainerSpec::HasValidEffects() const
 {
-	return TargetData.Num() > 0;
+	return TargetGameplayEffectSpecs.Num() > 0;
 }
 
 void FGameplayEffectContainerSpec::AddTargets(const TArray<FHitResult>& HitResults, const TArray<AActor*>& TargetActors)
@@ -133,4 +161,3 @@ UAbilityActorDataBase& FActorSaveData::GetData() const
 {
 	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityActorDataBase>(AssetID);
 }
-

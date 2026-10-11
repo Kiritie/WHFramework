@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Common/Base/WHObject.h"
+#include "FSM/FSMModuleTypes.h"
 
 #include "FiniteStateBase.generated.h"
 
@@ -24,7 +25,7 @@ public:
 public:
 
 	virtual void OnSpawn_Implementation(const FParameter& InParam) override;
-		
+
 	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode)
 		override;
 
@@ -86,6 +87,17 @@ public:
 	virtual void OnTermination();
 
 public:
+	virtual void OnPresentationEnter(UFiniteStateBase* InLastState, const FFSMReplicatedState& InState);
+
+	virtual void OnPresentationLeave(UFiniteStateBase* InNextState);
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void K2_OnPresentationEnter(UFiniteStateBase* InLastState, const FFSMReplicatedState& InState);
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void K2_OnPresentationLeave(UFiniteStateBase* InNextState);
+
+public:
 	/**
 	* 终止状态
 	*/
@@ -120,6 +132,9 @@ public:
 	bool SwitchNext(const TArray<FParameter>& InParams);
 
 protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	FName StateDomain;
+
 	/// 状态名称
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FName StateName;
@@ -133,17 +148,20 @@ protected:
 private:
 	bool bHasBlueprintOnPreEnter;
 	bool bHasBlueprintOnPreLeave;
-	
+
 public:
 	UFUNCTION(BlueprintPure)
 	FName GetStateName() const { return StateName; }
-	
+
+	UFUNCTION(BlueprintPure)
+	FName GetStateDomain() const { return StateDomain; }
+
 	UFUNCTION(BlueprintPure)
 	int32 GetStateIndex() const { return StateIndex; }
-	
+
 	UFUNCTION(BlueprintCallable)
 	void SetStateIndex(int32 InStateIndex) { StateIndex = InStateIndex; }
-	
+
 	UFUNCTION(BlueprintPure)
 	UFSMComponent* GetFSMComponent() const { return FSM; }
 

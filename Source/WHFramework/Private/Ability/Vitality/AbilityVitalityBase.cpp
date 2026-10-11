@@ -1,6 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Ability/Vitality/AbilityVitalityBase.h"
+#include "Net/UnrealNetwork.h"
+#include "Ability/Effects/EffectBase.h"
 #include "Voxel/Agent/VoxelAgentComponent.h"
 
 #include "Ability/Interaction/AbilityInteractionOptions.h"
@@ -24,14 +26,19 @@ AAbilityVitalityBase::AAbilityVitalityBase(const FObjectInitializer& ObjectIniti
 {
 	FSM = CreateDefaultSubobject<UFSMComponent>(FName("FSM"));
 	FSM->GroupName = TEXT("Vitality");
+	FSM->DomainName = TEXT("Lifecycle");
+	FSM->bAutoSwitchDefault = false;
+	ControlFSM = CreateDefaultSubobject<UFSMComponent>(TEXT("ControlFSM"));
+	ControlFSM->DomainName = TEXT("Control");
+	ControlFSM->bAutoSwitchDefault = false;
+	ControlFSM->States.Add(UAbilityVitalityState_Static::StaticClass());
+	ControlFSM->States.Add(UAbilityVitalityState_Interrupt::StaticClass());
 
 	FSM->DefaultState = UAbilityVitalityState_Spawn::StaticClass();
 	FSM->FinalState = UAbilityVitalityState_Death::StaticClass();
 
 	FSM->States.Add(UAbilityVitalityState_Death::StaticClass());
-	FSM->States.Add(UAbilityVitalityState_Interrupt::StaticClass());
 	FSM->States.Add(UAbilityVitalityState_Spawn::StaticClass());
-	FSM->States.Add(UAbilityVitalityState_Static::StaticClass());
 	FSM->States.Add(UAbilityVitalityState_Walk::StaticClass());
 
 	Interaction->Options.Add(CreateDefaultSubobject<UInteractionOption_AbilityRevive>(TEXT("ReviveOption")));
@@ -40,18 +47,23 @@ AAbilityVitalityBase::AAbilityVitalityBase(const FObjectInitializer& ObjectIniti
 	RaceID = NAME_None;
 	VoxelAgentComponent = CreateDefaultSubobject<UVoxelAgentComponent>(TEXT("VoxelAgentComponent"));
 
-	ActionAbilities = TMap<FGameplayTag, FVitalityActionAbilityData>();
 }
 
 void AAbilityVitalityBase::OnSpawn_Implementation(const FParameter& InParam)
 {
+	ControlFSM->OnInitialize();
+
 	Super::OnSpawn_Implementation(InParam);
 	if (VoxelAgentComponent)
 	{
 		VoxelAgentComponent->SetAgentEnabled(true);
 	}
 
-	SwitchDefaultFiniteState();
+	AbilitySystem->SetAbilityEntityId(ActorID);
+	if (HasAuthority())
+	{
+		SwitchDefaultFiniteState();
+	}
 }
 
 UVoxelAgentComponent* AAbilityVitalityBase::GetVoxelAgentComponent() const
@@ -61,6 +73,14 @@ UVoxelAgentComponent* AAbilityVitalityBase::GetVoxelAgentComponent() const
 
 void AAbilityVitalityBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
+	ControlFSM->OnTermination();
+
+	if (HasAuthority())
+	{
+		AbilitySystem->RemoveGrantSource(GetDefaultGrantSourceId());
+		AbilitySystem->RemoveGrantSource(GetProgressionGrantSourceId());
+	}
+
 	Super::OnDespawn_Implementation(InMode);
 
 	SwitchFiniteState(nullptr);
@@ -86,7 +106,7 @@ void AAbilityVitalityBase::OnRefresh_Implementation(float DeltaSeconds)
 {
 	Super::OnRefresh_Implementation(DeltaSeconds);
 
-	if (IsActive())
+	if (HasAuthority() && IsActive() && FMath::IsFinite(DeltaSeconds) && DeltaSeconds > 0.f)
 	{
 		ModifyHealth(ATTRIBUTE_DELTAVALUE_CLAMP(this, Health, GetHealthRegenSpeed() * DeltaSeconds));
 	}
@@ -94,46 +114,65 @@ void AAbilityVitalityBase::OnRefresh_Implementation(float DeltaSeconds)
 
 void AAbilityVitalityBase::OnTermination_Implementation()
 {
+	ControlFSM->OnTermination();
+
+	if (HasAuthority())
+	{
+		AbilitySystem->RemoveGrantSource(GetDefaultGrantSourceId());
+		AbilitySystem->RemoveGrantSource(GetProgressionGrantSourceId());
+	}
+
 	Super::OnTermination_Implementation();
 }
 
 void AAbilityVitalityBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
+	if (!HasAuthority())
+	{
+		return;
+	}
 	Super::LoadData(InSaveData, InPhase);
-
-	auto& SaveData = InSaveData.GetRef<FVitalitySaveData>();
-
+	const FVitalitySaveData* SaveData = InSaveData.GetPtr<FVitalitySaveData>();
+	if (!SaveData)
+	{
+		return;
+	}
 	if (PHASEC(InPhase, EPhase::Primary))
 	{
-		if (SaveData.IsSaved())
+		AbilitySystem->SetAbilityEntityId(ActorID);
+		const UAbilityVitalityDataBase& Data = GetVitalityData();
+		TArray<FAbilityGrantDefinition> Grants;
+		for (const FVitalityActionAbilityData& Action : Data.ActionAbilities)
 		{
-			ActionAbilities = SaveData.ActionAbilities;
-			for (auto& Iter : ActionAbilities)
-			{
-				Iter.Value.AbilityHandle = AbilitySystem->K2_GiveAbility(Iter.Value.AbilityClass, Iter.Value.Level);
-			}
+			FAbilityGrantDefinition Grant;
+			Grant.DefinitionId = Action.ID;
+			Grant.AbilityClass = Action.AbilityClass;
+			Grant.SourceObject = const_cast<UAbilityVitalityDataBase*>(&Data);
+			Grant.Level = Action.Level;
+			Grants.Add(Grant);
 		}
-		else
+		if (!AbilitySystem->SetGrantSource(GetDefaultGrantSourceId(), Grants, {}, 1))
 		{
-			const UAbilityVitalityDataBase& VitalityData = GetVitalityData<UAbilityVitalityDataBase>();
-
-			for (auto Iter : VitalityData.ActionAbilities)
-			{
-				Iter.AbilityHandle = AbilitySystem->K2_GiveAbility(Iter.AbilityClass, Iter.Level);
-				ActionAbilities.Add(Iter.AbilityClass->GetDefaultObject<UAbilityBase>()->AbilityTags.GetByIndex(0), Iter);
-			}
+			UE_LOG(LogTemp, Error, TEXT("Invalid action definitions on %s"), *GetName());
+			return;
 		}
 	}
 	if (PHASEC(InPhase, EPhase::All))
 	{
-		SetRaceID(SaveData.RaceID);
+		SetRaceID(SaveData->RaceID);
 	}
 }
 
 FParameter AAbilityVitalityBase::ToData()
 {
 	FVitalitySaveData SaveData;
-	SaveData = Super::ToData().GetRef<FActorSaveData>();
+	const FParameter ParentData = Super::ToData();
+	const FActorSaveData* Parent = ParentData.GetPtr<FActorSaveData>();
+	if (!Parent)
+	{
+		return FParameter();
+	}
+	SaveData = *Parent;
 
 	SaveData.RaceID = RaceID;
 
@@ -147,7 +186,14 @@ void AAbilityVitalityBase::ResetData()
 
 void AAbilityVitalityBase::OnFiniteStateRefresh(UFiniteStateBase* InCurrentState)
 {
-	SwitchFiniteStateByClass<UAbilityVitalityState_Walk>();
+	if (InCurrentState && ControlFSM->GetCurrentState() == InCurrentState)
+	{
+		ControlFSM->SwitchState(nullptr);
+	}
+	else if (!IsDead())
+	{
+		SwitchFiniteStateByClass<UAbilityVitalityState_Walk>();
+	}
 }
 
 void AAbilityVitalityBase::Serialize(FArchive& Ar)
@@ -157,11 +203,32 @@ void AAbilityVitalityBase::Serialize(FArchive& Ar)
 
 void AAbilityVitalityBase::Death(IAbilityVitalityInterface* InKiller)
 {
+	if (!HasAuthority() || IsDead())
+	{
+		return;
+	}
+
+	ControlFSM->SwitchState(nullptr);
+	const TArray<FAbilityGrantedEntry> Entries = AbilitySystem->GetGrantedEntries();
+	for (const FAbilityGrantedEntry& Entry : Entries)
+	{
+		const FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromHandle(Entry.AbilityHandle);
+		if (UAbilityBase* Action = Spec ? Cast<UAbilityBase>(Spec->GetPrimaryInstance()) : nullptr; Action && Action->IsActive())
+		{
+			Action->FailAction(AbilityActionTags::Blocked);
+		}
+	}
+	AbilitySystem->RemoveEffectsOnDeath();
 	SwitchFinalFiniteState({Cast<UObject>(InKiller)});
 }
 
 void AAbilityVitalityBase::Kill(IAbilityVitalityInterface* InTarget)
 {
+	if (!HasAuthority() || !InTarget || InTarget->IsDead())
+	{
+		return;
+	}
+
 	if (InTarget != this)
 	{
 		ModifyExp(InTarget->GetLevelA() * 10.f);
@@ -171,79 +238,90 @@ void AAbilityVitalityBase::Kill(IAbilityVitalityInterface* InTarget)
 
 void AAbilityVitalityBase::Revive(IAbilityVitalityInterface* InRescuer)
 {
+	if (!HasAuthority() || !IsDead())
+	{
+		return;
+	}
+
 	SwitchDefaultFiniteState({Cast<UObject>(InRescuer)});
 }
 
 void AAbilityVitalityBase::Static()
 {
-	SwitchFiniteStateByClass<UAbilityVitalityState_Static>();
+	if (HasAuthority() && !IsDead())
+	{
+		ControlFSM->SwitchStateByClass<UAbilityVitalityState_Static>();
+	}
 }
 
 void AAbilityVitalityBase::UnStatic()
 {
-	if (IsCurrentFiniteStateClass<UAbilityVitalityState_Static>())
+	if (HasAuthority() && ControlFSM->IsCurrentStateClass<UAbilityVitalityState_Static>())
 	{
-		SwitchFiniteState(nullptr);
+		ControlFSM->SwitchState(nullptr);
 	}
 }
 
-void AAbilityVitalityBase::Interrupt(float InDuration /*= -1*/)
+void AAbilityVitalityBase::Interrupt(float InDuration)
 {
-	SwitchFiniteStateByClass<UAbilityVitalityState_Interrupt>({InDuration});
+	if (HasAuthority() && !IsDead() && FMath::IsFinite(InDuration))
+	{
+		ControlFSM->SwitchStateByClass<UAbilityVitalityState_Interrupt>({InDuration});
+	}
 }
 
 void AAbilityVitalityBase::UnInterrupt()
 {
-	if (IsCurrentFiniteStateClass<UAbilityVitalityState_Interrupt>())
+	if (HasAuthority() && ControlFSM->IsCurrentStateClass<UAbilityVitalityState_Interrupt>())
 	{
-		SwitchFiniteState(nullptr);
+		ControlFSM->SwitchState(nullptr);
 	}
 }
 
 bool AAbilityVitalityBase::DoAction(const FGameplayTag& InActionTag)
 {
-	if (!HasActionAbility(InActionTag))
+	FGameplayAbilitySpecHandle Handle;
+	if (!AbilitySystem->FindGrantedAbility(FPrimaryAssetId(), InActionTag, Handle))
+	{
 		return false;
-
-	const FVitalityActionAbilityData AbilityData = GetActionAbility(InActionTag);
-	const bool bSuccess = AbilitySystem->TryActivateAbility(AbilityData.AbilityHandle);
-	const FGameplayAbilitySpec Spec = AbilitySystem->FindAbilitySpecForHandle(AbilityData.AbilityHandle);
-	return bSuccess;
+	}
+	const FAbilityGrantedEntry* Entry = AbilitySystem->GetGrantedEntries().FindByPredicate([Handle](const FAbilityGrantedEntry& Value) { return Value.AbilityHandle == Handle; });
+	if (!Entry)
+	{
+		return false;
+	}
+	FAbilityActionRequest Request;
+	Request.AbilityHandle = Handle;
+	Request.DefinitionId = Entry->DefinitionId;
+	Request.ActionTag = Entry->ActionTag;
+	Request.TargetActor = this;
+	Request.TargetLocation = GetActorLocation();
+	Request.AimDirection = GetActorForwardVector();
+	return AbilitySystem->RequestAction(Request).bAccepted;
 }
 
 bool AAbilityVitalityBase::StopAction(const FGameplayTag& InActionTag)
 {
-	if (!HasActionAbility(InActionTag))
-		return false;
-
-	const FVitalityActionAbilityData AbilityData = GetActionAbility(InActionTag);
-	const FGameplayAbilitySpec Spec = AbilitySystem->FindAbilitySpecForHandle(AbilityData.AbilityHandle);
-	if (UVitalityActionAbilityBase* Ability = Cast<UVitalityActionAbilityBase>(Spec.GetPrimaryInstance()))
+	bool bCancelled = false;
+	const TArray<FAbilityGrantedEntry> Entries = AbilitySystem->GetGrantedEntries();
+	for (const FAbilityGrantedEntry& Entry : Entries)
 	{
-		Ability->SetStopped(true);
-	}
-	AbilitySystem->CancelAbilityHandle(AbilityData.AbilityHandle);
-	return true;
-}
-
-void AAbilityVitalityBase::EndAction(const FGameplayTag& InActionTag, bool bWasCancelled)
-{
-	if (InActionTag.MatchesTag(GameplayTags::Ability_Vitality_Action_Death))
-	{
-		if (IsCurrentFiniteStateClass<UAbilityVitalityState_Death>())
+		if (Entry.ActionTag != InActionTag)
 		{
-			FSM->GetCurrentState<UAbilityVitalityState_Death>()->DeathEnd();
+			continue;
+		}
+		const FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromHandle(Entry.AbilityHandle);
+		UAbilityBase* Action = Spec ? Cast<UAbilityBase>(Spec->GetPrimaryInstance()) : nullptr;
+		if (Action && Action->IsActive())
+		{
+			const FGuid Id = Action->GetActionActivationId();
+			bCancelled |= AbilitySystem->CancelAction(Id, AbilityActionTags::Cancelled);
 		}
 	}
-	else if (InActionTag.MatchesTag(GameplayTags::Ability_Vitality_Action_Static))
-	{
-		UnStatic();
-	}
-	else if (InActionTag.MatchesTag(GameplayTags::Ability_Vitality_Action_Interrupt))
-	{
-		UnInterrupt();
-	}
+	return bCancelled;
 }
+
+
 
 void AAbilityVitalityBase::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
 {
@@ -258,6 +336,11 @@ void AAbilityVitalityBase::OnLeaveInteract(IInteractionAgentInterface* InInterac
 
 void AAbilityVitalityBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
 {
+	if (!HasAuthority())
+	{
+		return;
+	}
+
 	Super::OnAttributeChange(InAttributeChangeData);
 }
 
@@ -279,6 +362,11 @@ void AAbilityVitalityBase::HandleDamage(const FGameplayAttribute& DamageAttribut
                                         const FGameplayTagContainer& SourceTags,
                                         AActor* SourceActor)
 {
+	if (!HasAuthority() || IsDead() || !FMath::IsFinite(DamageValue) || DamageValue <= 0.f)
+	{
+		return;
+	}
+
 	ModifyHealth(-DamageValue);
 
 	if (GetHealth() <= 0.f)
@@ -310,6 +398,11 @@ void AAbilityVitalityBase::HandleDamage(const FGameplayAttribute& DamageAttribut
 void AAbilityVitalityBase::HandleRecovery(
     const FGameplayAttribute& RecoveryAttribute, float RecoveryValue, const FHitResult& HitResult, const FGameplayTagContainer& SourceTags, AActor* SourceActor)
 {
+	if (!HasAuthority() || IsDead() || !FMath::IsFinite(RecoveryValue) || RecoveryValue <= 0.f)
+	{
+		return;
+	}
+
 	if (RecoveryAttribute == GetHealthRecoveryAttribute())
 	{
 		ModifyHealth(RecoveryValue);
@@ -327,6 +420,10 @@ void AAbilityVitalityBase::HandleInterrupt(const FGameplayAttribute& InterruptAt
                                            const FGameplayTagContainer& SourceTags,
                                            AActor* SourceActor)
 {
+	if (HasAuthority() && !IsDead() && FMath::IsFinite(InterruptDuration) && InterruptDuration > 0.f)
+	{
+		Interrupt(InterruptDuration);
+	}
 }
 
 bool AAbilityVitalityBase::IsActive() const
@@ -346,7 +443,7 @@ bool AAbilityVitalityBase::IsDying() const
 
 bool AAbilityVitalityBase::IsWalking(bool bReally) const
 {
-	return AbilitySystem->HasMatchingGameplayTag(GameplayTags::State_Vitality_Walking);
+	return false;
 }
 
 bool AAbilityVitalityBase::IsInterrupting() const
@@ -361,16 +458,15 @@ FString AAbilityVitalityBase::GetHeadInfo() const
 
 bool AAbilityVitalityBase::HasActionAbility(const FGameplayTag& InActionTag) const
 {
-	return ActionAbilities.Contains(InActionTag);
+	FGameplayAbilitySpecHandle Handle;
+	return AbilitySystem->FindGrantedAbility(FPrimaryAssetId(), InActionTag, Handle);
 }
 
 FVitalityActionAbilityData AAbilityVitalityBase::GetActionAbility(const FGameplayTag& InActionTag)
 {
-	if (HasActionAbility(InActionTag))
-	{
-		return ActionAbilities[InActionTag];
-	}
-	return FVitalityActionAbilityData();
+	const TMap<FGameplayTag, FVitalityActionAbilityData> Projection = GetActionAbilities();
+	const FVitalityActionAbilityData* Data = Projection.Find(InActionTag);
+	return Data ? *Data : FVitalityActionAbilityData();
 }
 
 UAbilityVitalityDataBase& AAbilityVitalityBase::GetVitalityData() const
@@ -378,3 +474,70 @@ UAbilityVitalityDataBase& AAbilityVitalityBase::GetVitalityData() const
 	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityVitalityDataBase>(AssetID);
 }
 
+
+TMap<FGameplayTag, FVitalityActionAbilityData> AAbilityVitalityBase::GetActionAbilities() const
+{
+	TMap<FGameplayTag, FVitalityActionAbilityData> Result;
+	for (const FAbilityGrantedEntry& Entry : AbilitySystem->GetGrantedEntries())
+	{
+		FGameplayAbilitySpecHandle Selected;
+		if (!AbilitySystem->FindGrantedAbility(FPrimaryAssetId(), Entry.ActionTag, Selected) || Selected != Entry.AbilityHandle)
+		{
+			continue;
+		}
+		const FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromHandle(Selected);
+		if (Spec && Spec->Ability)
+		{
+			FVitalityActionAbilityData Data;
+			Data.ID = Entry.DefinitionId;
+			Data.Level = Entry.Level;
+			Data.AbilityClass = Spec->Ability->GetClass();
+			Data.AbilityHandle = Selected;
+			Result.Add(Entry.ActionTag, Data);
+		}
+	}
+	return Result;
+}
+
+FGuid AAbilityVitalityBase::GetDefaultGrantSourceId() const
+{
+	return FGuid(ActorID.A ^ 0x1D305B4Eu, ActorID.B, ActorID.C, ActorID.D ^ 0x083A49C2u);
+}
+
+FGuid AAbilityVitalityBase::GetProgressionGrantSourceId() const
+{
+	return FGuid(ActorID.A ^ 0x6C02753Du, ActorID.B, ActorID.C, ActorID.D ^ 0x732749E1u);
+}
+
+void AAbilityVitalityBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AAbilityVitalityBase, RaceID);
+}
+
+bool AAbilityVitalityBase::SetLevelA(int32 InLevel)
+{
+	if (!HasAuthority())
+	{
+		return false;
+	}
+	const auto& Data = GetVitalityData();
+	InLevel = Data.ClampLevel(InLevel);
+	if (InLevel == Level)
+	{
+		return false;
+	}
+	TArray<TSubclassOf<UEffectBase>> Effects;
+	if (Data.PEClass)
+	{
+		Effects.Add(Data.PEClass);
+	}
+	if (!AbilitySystem->SetGrantSource(GetProgressionGrantSourceId(), {}, Effects, InLevel))
+	{
+		return false;
+	}
+	Level = InLevel;
+	SetHealth(FMath::Clamp(GetHealth(), 0.f, GetMaxHealth()));
+	ForceNetUpdate();
+	return true;
+}

@@ -3,11 +3,15 @@
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Ability/Effects/EffectBase.h"
 #include "Common/CommonModuleTypes.h"
+#include "Engine/World.h"
+#include "GameFramework/Actor.h"
 
 UAbilityBase::UAbilityBase()
 {
 	// Default to Instance Per Actor
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
+	bRetriggerInstancedAbility = false;
 
 	bActivateOnInput = true;
 
@@ -21,12 +25,94 @@ void UAbilityBase::OnGiveAbility(const FGameplayAbilityActorInfo* ActorInfo, con
 
 void UAbilityBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
-	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+	ActionRequest = FAbilityActionRequest();
+	ActionActivationId.Invalidate();
+	ActionOutcome = EAbilityActionOutcome::None;
+	ActionReason = FGameplayTag();
+	ActionFailureTags.Reset();
+	bEndingAction = false;
+	UAbilitySystemComponentBase* AbilitySystem = ActorInfo ? Cast<UAbilitySystemComponentBase>(ActorInfo->AbilitySystemComponent.Get()) : nullptr;
+	if (!AbilitySystem || !FAbilityActionTargetData::Read(TriggerEventData, ActionActivationId, ActionRequest))
+	{
+		ActionOutcome = EAbilityActionOutcome::Rejected;
+		ActionReason = AbilityActionTags::InvalidRequest;
+		EndAbility(Handle, ActorInfo, ActivationInfo, false, true);
+		return;
+	}
+	ActionRequest.AbilityHandle = Handle;
+	if (!AbilitySystem->TrackActionActivation(ActionActivationId, Handle))
+	{
+		ActionOutcome = EAbilityActionOutcome::Rejected;
+		ActionReason = AbilityActionTags::InvalidRequest;
+		EndAbility(Handle, ActorInfo, ActivationInfo, false, true);
+		return;
+	}
+	const bool bExecuteGameplay = AbilitySystem->IsOwnerActorAuthoritative() || NetExecutionPolicy == EGameplayAbilityNetExecutionPolicy::LocalPredicted;
+	FGameplayTag Rejection;
+	if (!AbilitySystem->ValidateGrantedRequest(ActionRequest, Rejection, bExecuteGameplay) || (bExecuteGameplay && !ValidateActionRequest(ActionRequest, Rejection)))
+	{
+		ActionOutcome = EAbilityActionOutcome::Rejected;
+		ActionReason = Rejection;
+		EndAbility(Handle, ActorInfo, ActivationInfo, bExecuteGameplay, true);
+		return;
+	}
+	const FGuid ActivatingId = ActionActivationId;
+	if (bExecuteGameplay)
+	{
+		const bool bCommitted = CommitAbility(Handle, ActorInfo, ActivationInfo, &ActionFailureTags);
+		if (!IsActive() || ActionActivationId != ActivatingId)
+		{
+			return;
+		}
+		if (!bCommitted)
+		{
+			ActionOutcome = EAbilityActionOutcome::Rejected;
+			ActionReason = AbilityActionTags::ActivationFailed;
+			EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+			return;
+		}
+	}
+	BeginAction();
 }
 
 void UAbilityBase::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+	if (bEndingAction || !IsActive())
+	{
+		return;
+	}
+	bEndingAction = true;
+	FAbilityActionResult Result;
+	Result.ActivationId = ActionActivationId;
+	Result.AbilityHandle = Handle;
+	Result.Outcome = ActionOutcome != EAbilityActionOutcome::None ? ActionOutcome : (bWasCancelled ? EAbilityActionOutcome::Cancelled : EAbilityActionOutcome::Completed);
+	Result.Reason = ActionReason;
+	Result.FailureTags = ActionFailureTags;
+	if (Result.Outcome == EAbilityActionOutcome::Cancelled && !Result.Reason.IsValid())
+	{
+		Result.Reason = AbilityActionTags::Cancelled;
+	}
+	TWeakObjectPtr<UAbilitySystemComponentBase> AbilitySystem = ActorInfo ? Cast<UAbilitySystemComponentBase>(ActorInfo->AbilitySystemComponent.Get()) : nullptr;
+	const bool bCanReplicateEnd = AbilitySystem.IsValid() && (AbilitySystem->IsOwnerActorAuthoritative() || NetExecutionPolicy == EGameplayAbilityNetExecutionPolicy::LocalPredicted);
+	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility && bCanReplicateEnd, bWasCancelled);
+	bEndingAction = false;
+	if (IsActive() && ActionActivationId == Result.ActivationId)
+	{
+		return;
+	}
+	if (ActionActivationId == Result.ActivationId)
+	{
+		ActionActivationId.Invalidate();
+		ActionRequest = FAbilityActionRequest();
+	}
+	if (AbilitySystem.IsValid() && Result.ActivationId.IsValid() && AbilitySystem->IsOwnerActorAuthoritative())
+	{
+		AbilitySystem->PublishActionResult(Result);
+	}
+	else if (AbilitySystem.IsValid() && Result.ActivationId.IsValid())
+	{
+		AbilitySystem->NotifyActionInstanceEnded(Result.ActivationId);
+	}
 }
 
 void UAbilityBase::OnAvatarSet(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)
@@ -251,15 +337,17 @@ UAnimMontage* UAbilityBase::GetCurrentMontageForMesh(USkeletalMeshComponent* InM
 void UAbilityBase::SetCurrentMontageForMesh(USkeletalMeshComponent* InMesh, UAnimMontage* InCurrentMontage)
 {
 	ensure(IsInstantiated());
-
-	FAbilityMeshMontage AbilityMeshMontage;
-	if (FindAbillityMeshMontage(InMesh, AbilityMeshMontage))
+	for (FAbilityMeshMontage& Entry : CurrentAbilityMeshMontages)
 	{
-		AbilityMeshMontage.Montage = InCurrentMontage;
+		if (Entry.Mesh == InMesh)
+		{
+			Entry.Montage = InCurrentMontage;
+			return;
+		}
 	}
-	else
+	if (InMesh && InCurrentMontage)
 	{
-		CurrentAbilityMeshMontages.Add(FAbilityMeshMontage(InMesh, InCurrentMontage));
+		CurrentAbilityMeshMontages.Emplace(InMesh, InCurrentMontage);
 	}
 }
 
@@ -341,4 +429,124 @@ TArray<TSubclassOf<UEffectBase>> UAbilityBase::GetEffectClasses() const
 		ReturnValues.Append(Iter.Value.TargetGameplayEffectClasses);
 	}
 	return ReturnValues;
+}
+
+
+const FAbilityActionRequest& UAbilityBase::GetActionRequest() const
+{
+	return ActionRequest;
+}
+
+FGuid UAbilityBase::GetActionActivationId() const
+{
+	return ActionActivationId;
+}
+
+void UAbilityBase::CompleteAction()
+{
+	if (IsActive())
+	{
+		ActionOutcome = EAbilityActionOutcome::Completed;
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+	}
+}
+
+void UAbilityBase::FailAction(FGameplayTag Reason)
+{
+	if (IsActive())
+	{
+		ActionOutcome = EAbilityActionOutcome::Failed;
+		ActionReason = Reason;
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+	}
+}
+
+bool UAbilityBase::RequestActionCancellation(FGameplayTag Reason)
+{
+	if (!IsActive() || !CanBeCanceled() || !CurrentActorInfo || !CurrentActorInfo->IsNetAuthority())
+	{
+		return false;
+	}
+	ActionOutcome = EAbilityActionOutcome::Cancelled;
+	ActionReason = Reason.IsValid() ? Reason : AbilityActionTags::Cancelled;
+	CancelAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true);
+	return !IsActive();
+}
+
+bool UAbilityBase::ValidateActionRequest(const FAbilityActionRequest& Request, FGameplayTag& OutReason) const
+{
+	const AActor* Avatar = GetAvatarActorFromActorInfo();
+	if (!IsValid(Avatar) || !Request.ActionTag.IsValid() || Request.ActionTag != ActionTag || Request.TargetLocation.ContainsNaN() || Request.AimDirection.ContainsNaN() || Request.AimDirection.IsNearlyZero() || Request.WeaponPart < 0 || Request.WeaponPart > 255 || Request.ComboIndex < INDEX_NONE || Request.ComboIndex > 255)
+	{
+		OutReason = AbilityActionTags::InvalidRequest;
+		return false;
+	}
+	if (Request.TargetActor && (!IsValid(Request.TargetActor) || Request.TargetActor->GetWorld() != Avatar->GetWorld()))
+	{
+		OutReason = AbilityActionTags::InvalidTarget;
+		return false;
+	}
+	if (TargetPolicy == EAbilityActionTargetPolicy::Actor && !IsValid(Request.TargetActor))
+	{
+		OutReason = AbilityActionTags::InvalidTarget;
+		return false;
+	}
+	if (TargetPolicy == EAbilityActionTargetPolicy::None)
+	{
+		return true;
+	}
+	const FVector Target = TargetPolicy == EAbilityActionTargetPolicy::Actor ? Request.TargetActor->GetActorLocation() : Request.TargetLocation;
+	if (!FMath::IsFinite(MaximumTargetRange) || MaximumTargetRange <= 0.f || FVector::DistSquared(Avatar->GetActorLocation(), Target) > FMath::Square(MaximumTargetRange))
+	{
+		OutReason = AbilityActionTags::OutOfRange;
+		return false;
+	}
+	if (bRequireLineOfSight)
+	{
+		FHitResult Hit;
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(AbilityActionTarget), false, Avatar);
+		if (Avatar->GetWorld()->LineTraceSingleByChannel(Hit, Avatar->GetActorLocation(), Target, TargetTraceChannel, Params) && Hit.GetActor() != Request.TargetActor)
+		{
+			OutReason = AbilityActionTags::Blocked;
+			return false;
+		}
+	}
+	return true;
+}
+
+void UAbilityBase::BeginAction_Implementation()
+{
+	CompleteAction();
+}
+
+void UAbilityBase::ApplyCost_Implementation(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo& ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const
+{
+}
+
+bool UAbilityBase::ValidateReplicatedTargetData(const FGameplayAbilityTargetDataHandle& Data, FGameplayTag& OutReason) const
+{
+	if (!IsActive() || Data.Num() != 1 || !Data.Get(0) || Data.Get(0)->GetScriptStruct() != FGameplayAbilityTargetData_ActorArray::StaticStruct() || !IsValid(ActionRequest.TargetActor))
+	{
+		OutReason = AbilityActionTags::InvalidTarget;
+		return false;
+	}
+	const TArray<TWeakObjectPtr<AActor>> Actors = Data.Get(0)->GetActors();
+	if (Actors.Num() != 1 || Actors[0].Get() != ActionRequest.TargetActor.Get())
+	{
+		OutReason = AbilityActionTags::InvalidTarget;
+		return false;
+	}
+	return ValidateActionRequest(ActionRequest, OutReason);
+}
+
+void UAbilityBase::ResolveAuthoritativeResult(const FAbilityActionResult& Result)
+{
+	if (!IsActive() || GetActionActivationId() != Result.ActivationId || CurrentSpecHandle != Result.AbilityHandle)
+	{
+		return;
+	}
+	ActionOutcome = Result.Outcome;
+	ActionReason = Result.Reason;
+	ActionFailureTags = Result.FailureTags;
+	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, false, Result.Outcome != EAbilityActionOutcome::Completed);
 }

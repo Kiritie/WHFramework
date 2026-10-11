@@ -11,13 +11,13 @@
 
 class UFSMBase;
 /**
- * 
+ *
  */
 UCLASS()
 class WHFRAMEWORK_API UFSMModuleStatics : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
-	
+
 	//////////////////////////////////////////////////////////////////////////
 	/// FSM
 public:

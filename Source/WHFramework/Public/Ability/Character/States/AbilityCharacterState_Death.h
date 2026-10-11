@@ -6,10 +6,11 @@
 #include "UObject/Object.h"
 #include "AbilityCharacterState_Death.generated.h"
 
+class UAnimMontage;
 class IAbilityVitalityInterface;
 class AAbilityCharacterBase;
 /**
- * 
+ *
  */
 UCLASS()
 class WHFRAMEWORK_API UAbilityCharacterState_Death : public UAbilityCharacterStateBase
@@ -27,7 +28,7 @@ public:
 	virtual bool OnPreEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams) override;
 
 	virtual void OnEnter(UFiniteStateBase* InLastState, const TArray<FParameter>& InParams) override;
-	
+
 	virtual void OnRefresh(float DeltaSeconds) override;
 
 	virtual bool OnPreLeave(UFiniteStateBase* InNextState) override;
@@ -39,12 +40,22 @@ public:
 public:
 	UFUNCTION(BlueprintCallable)
 	virtual void DeathStart();
+	bool IsDeathPresentationFinished() const;
+	virtual void OnPresentationEnter(UFiniteStateBase* Last, const FFSMReplicatedState& State) override;
+	virtual void OnPresentationLeave(UFiniteStateBase* Next) override;
+	UPROPERTY(EditDefaultsOnly)
+	float DeathPresentationDuration = 2.f;
+	UPROPERTY(EditDefaultsOnly)
+	TObjectPtr<UAnimMontage> DeathMontage = nullptr;
 
 	UFUNCTION(BlueprintCallable)
 	virtual void DeathEnd();
 
 protected:
-	IAbilityVitalityInterface* Killer;
+	TWeakObjectPtr<UObject> Killer;
+	FGuid MovementSource;
+	bool bDeathEnded = false;
+	bool bRestoringDeath = false;
 
 	bool bDeathStarted;
 };

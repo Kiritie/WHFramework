@@ -9,25 +9,55 @@ UAttributeSetBase::UAttributeSetBase()
 
 void UAttributeSetBase::SerializeAttributes(FArchive& Ar)
 {
-	float BaseValue = 0.f;
-	float CurrentValue = 0.f;
-	for(FGameplayAttribute& Attribute : GetPersistentAttributes())
+	if (!Ar.IsLoading() && !Ar.IsSaving())
 	{
-		if(FGameplayAttributeData* AttributeData = Attribute.GetGameplayAttributeData(this))
+		return;
+	}
+	TArray<FGameplayAttribute> Attributes = GetPersistentAttributes();
+	Attributes.Sort([](const FGameplayAttribute& A, const FGameplayAttribute& B)
+	{
+		return A.GetName() < B.GetName();
+	});
+	uint32 Format = 0x57484132;
+	int32 Count = Attributes.Num();
+	Ar << Format;
+	Ar << Count;
+	if (Format != 0x57484132 || Count < 0 || Count > 256)
+	{
+		Ar.SetError();
+		return;
+	}
+	TMap<FName, float> Loaded;
+	for (int32 Index = 0; Index < Count; ++Index)
+	{
+		FName Name = Ar.IsSaving() ? FName(*Attributes[Index].GetName()) : NAME_None;
+		float Value = Ar.IsSaving() ? Attributes[Index].GetGameplayAttributeData(this)->GetBaseValue() : 0.f;
+		Ar << Name;
+		Ar << Value;
+		if (Name.IsNone() || !FMath::IsFinite(Value) || Loaded.Contains(Name))
 		{
-			if(Ar.IsLoading())
+			Ar.SetError();
+			return;
+		}
+		Loaded.Add(Name, Value);
+	}
+	if (Ar.IsLoading() && !Ar.IsError())
+	{
+		UAbilitySystemComponent* AbilitySystem = GetOwningAbilitySystemComponent();
+		if (!AbilitySystem || !AbilitySystem->IsOwnerActorAuthoritative())
+		{
+			Ar.SetError();
+			return;
+		}
+		Attributes.StableSort([](const FGameplayAttribute& A, const FGameplayAttribute& B)
+		{
+			return A.GetName().StartsWith(TEXT("Max")) && !B.GetName().StartsWith(TEXT("Max"));
+		});
+		for (const FGameplayAttribute& Attribute : Attributes)
+		{
+			if (const float* Value = Loaded.Find(FName(*Attribute.GetName())))
 			{
-				Ar << BaseValue;
-				Ar << CurrentValue;
-				AttributeData->SetBaseValue(BaseValue);
-				AttributeData->SetCurrentValue(CurrentValue);
-			}
-			else if(Ar.IsSaving())
-			{
-				BaseValue = AttributeData->GetBaseValue();
-				CurrentValue = AttributeData->GetCurrentValue();
-				Ar << BaseValue;
-				Ar << CurrentValue;
+				AbilitySystem->SetNumericAttributeBase(Attribute, *Value);
 			}
 		}
 	}
@@ -43,6 +73,10 @@ void UAttributeSetBase::PreAttributeBaseChange(const FGameplayAttribute& Attribu
 void UAttributeSetBase::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
 {
 	Super::PreAttributeChange(Attribute, NewValue);
+	if (!FMath::IsFinite(NewValue))
+	{
+		NewValue = 0.f;
+	}
 }
 
 void UAttributeSetBase::PostAttributeChange(const FGameplayAttribute& Attribute, float OldValue, float NewValue)
@@ -58,17 +92,21 @@ void UAttributeSetBase::PostGameplayEffectExecute(const struct FGameplayEffectMo
 void UAttributeSetBase::AdjustAttributeForMaxChange(const FGameplayAttribute& Attribute, float OldMaxValue, float NewMaxValue)
 {
 	UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();
-	if(!FMath::IsNearlyEqual(OldMaxValue, NewMaxValue) && AbilityComp)
+	const FGameplayAttributeData* Data = Attribute.GetGameplayAttributeData(this);
+	if (!AbilityComp || !AbilityComp->IsOwnerActorAuthoritative() || !Data || !FMath::IsFinite(OldMaxValue) || !FMath::IsFinite(NewMaxValue) || FMath::IsNearlyEqual(OldMaxValue, NewMaxValue))
 	{
-		const float CurrentValue = Attribute.GetGameplayAttributeData(this)->GetCurrentValue();
-		float NewDelta = CurrentValue / OldMaxValue * NewMaxValue - CurrentValue;
-		ModifyAttributeValue(Attribute, NewDelta);
+		return;
 	}
+	const float Current = Data->GetCurrentValue();
+	const float NewMaximum = FMath::Max(NewMaxValue, 0.f);
+	const float Next = OldMaxValue > UE_SMALL_NUMBER ? FMath::Clamp(Current / OldMaxValue * NewMaximum, 0.f, NewMaximum) : FMath::Clamp(Current, 0.f, NewMaximum);
+	ModifyAttributeValue(Attribute, Next - Current);
 }
 
 FGameplayAttributeData UAttributeSetBase::GetAttributeData(FGameplayAttribute InAttribute)
 {
-	return *InAttribute.GetGameplayAttributeData(this);
+	const FGameplayAttributeData* Data = InAttribute.GetGameplayAttributeData(this);
+	return Data ? *Data : FGameplayAttributeData();
 }
 
 float UAttributeSetBase::GetAttributeValue(FGameplayAttribute InAttribute)
@@ -84,23 +122,30 @@ float UAttributeSetBase::GetAttributeBaseValue(FGameplayAttribute InAttribute)
 void UAttributeSetBase::SetAttributeValue(FGameplayAttribute InAttribute, float InValue)
 {
 	UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();
-	
+	if (!AbilityComp || !AbilityComp->IsOwnerActorAuthoritative() || !InAttribute.IsValid() || !InAttribute.GetGameplayAttributeData(this) || !FMath::IsFinite(InValue))
+	{
+		return;
+	}
 	AbilityComp->ApplyModToAttributeUnsafe(InAttribute, EGameplayModOp::Override, InValue);
 }
 
 void UAttributeSetBase::ModifyAttributeValue(FGameplayAttribute InAttribute, float InDeltaValue)
 {
-	if(InDeltaValue == 0.f) return;
-	
 	UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();
-	
+	if (!AbilityComp || !AbilityComp->IsOwnerActorAuthoritative() || !InAttribute.IsValid() || !InAttribute.GetGameplayAttributeData(this) || !FMath::IsFinite(InDeltaValue))
+	{
+		return;
+	}
 	AbilityComp->ApplyModToAttributeUnsafe(InAttribute, EGameplayModOp::Additive, InDeltaValue);
 }
 
 void UAttributeSetBase::MultipleAttributeValue(FGameplayAttribute InAttribute, float InMultipleValue)
 {
 	UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();
-	
+	if (!AbilityComp || !AbilityComp->IsOwnerActorAuthoritative() || !InAttribute.IsValid() || !InAttribute.GetGameplayAttributeData(this) || !FMath::IsFinite(InMultipleValue))
+	{
+		return;
+	}
 	AbilityComp->ApplyModToAttributeUnsafe(InAttribute, EGameplayModOp::Multiplicitive, InMultipleValue);
 }
 

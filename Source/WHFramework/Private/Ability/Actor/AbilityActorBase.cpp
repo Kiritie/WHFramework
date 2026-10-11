@@ -12,12 +12,16 @@
 #include "Asset/AssetModuleStatics.h"
 #include "Common/Interaction/InteractionComponent.h"
 #include "Components/BoxComponent.h"
+#include "Ability/Effects/EffectBase.h"
+#include "Net/UnrealNetwork.h"
 
 AAbilityActorBase::AAbilityActorBase(const FObjectInitializer& ObjectInitializer) :
 	Super(ObjectInitializer)
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
+	bReplicates = true;
+	SetReplicateMovement(true);
 
 	BoxComponent = CreateDefaultSubobject<UBoxComponent>(FName("BoxComponent"));
 	BoxComponent->SetCollisionProfileName(FName("Vitality"));
@@ -30,7 +34,7 @@ AAbilityActorBase::AAbilityActorBase(const FObjectInitializer& ObjectInitializer
 	AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 
 	AttributeSet = CreateDefaultSubobject<UActorAttributeSetBase>(FName("AttributeSet"));
-		
+
 	Inventory = nullptr;
 
 	Interaction = CreateDefaultSubobject<UInteractionComponent>(FName("Interaction"));
@@ -46,6 +50,20 @@ AAbilityActorBase::AAbilityActorBase(const FObjectInitializer& ObjectInitializer
 
 void AAbilityActorBase::OnSpawn_Implementation(const FParameter& InParam)
 {
+	if (HasAuthority() && AttributeSet)
+	{
+		const UAttributeSetBase* Defaults = AttributeSet->GetClass()->GetDefaultObject<UAttributeSetBase>();
+		TArray<FGameplayAttribute> Attributes = AttributeSet->GetAllAttributes();
+		Attributes.StableSort([](const FGameplayAttribute& A, const FGameplayAttribute& B) { return A.GetName().StartsWith(TEXT("Max")) && !B.GetName().StartsWith(TEXT("Max")); });
+		for (const FGameplayAttribute& Attribute : Attributes)
+		{
+			if (const FGameplayAttributeData* Value = Attribute.GetGameplayAttributeData(Defaults))
+			{
+				AbilitySystem->SetNumericAttributeBase(Attribute, Value->GetBaseValue());
+			}
+		}
+	}
+
 	if(const FAbilityActorSpawnParameter* Param = InParam.GetPtr<FAbilityActorSpawnParameter>())
 	{
 		AssetID = Param->AssetID;
@@ -53,11 +71,23 @@ void AAbilityActorBase::OnSpawn_Implementation(const FParameter& InParam)
 
 	Super::OnSpawn_Implementation(InParam);
 
+	AbilitySystem->SetAbilityEntityId(ActorID);
 	InitializeAbilities();
 }
 
 void AAbilityActorBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
+	UninitializeAbilities();
+	if (HasAuthority())
+	{
+		AbilitySystem->RemoveGrantSource(GetActorStatSourceId());
+		AbilitySystem->ClearAllAbilities();
+		for (FActiveGameplayEffectHandle Effect : AbilitySystem->GetActiveEffects(FGameplayEffectQuery()))
+		{
+			AbilitySystem->RemoveActiveGameplayEffect(Effect);
+		}
+	}
+	AbilitySystem->SetAbilityEntityId(FGuid());
 	BindInventory(nullptr);
 	Super::OnDespawn_Implementation(InMode);
 
@@ -66,7 +96,7 @@ void AAbilityActorBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 	Level = 0;
 
 	BirthTransform = FTransform::Identity;
-	
+
 
 }
 
@@ -89,6 +119,12 @@ void AAbilityActorBase::OnRefresh_Implementation(float DeltaSeconds)
 
 void AAbilityActorBase::OnTermination_Implementation()
 {
+	BindInventory(nullptr);
+	UninitializeAbilities();
+	if (HasAuthority())
+	{
+		AbilitySystem->RemoveGrantSource(GetActorStatSourceId());
+	}
 	Super::OnTermination_Implementation();
 }
 
@@ -114,6 +150,10 @@ void AAbilityActorBase::Serialize(FArchive& Ar)
 
 void AAbilityActorBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
+	if (!HasAuthority() || !InSaveData.GetPtr<FActorSaveData>())
+	{
+		return;
+	}
 	Super::LoadData(InSaveData, InPhase);
 
 	auto& SaveData = InSaveData.GetRef<FActorSaveData>();
@@ -152,7 +192,13 @@ void AAbilityActorBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 FParameter AAbilityActorBase::ToData()
 {
 	FActorSaveData SaveData;
-	SaveData = Super::ToData().GetRef<FSceneActorSaveData>();
+	const FParameter ParentData = Super::ToData();
+	const FSceneActorSaveData* Parent = ParentData.GetPtr<FSceneActorSaveData>();
+	if (!Parent)
+	{
+		return FParameter();
+	}
+	SaveData = *Parent;
 
 	SaveData.AssetID = AssetID;
 	SaveData.Name = Name;
@@ -184,6 +230,11 @@ void AAbilityActorBase::OnLeaveInteract(IInteractionAgentInterface* InInteractio
 
 void AAbilityActorBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
 {
+	if (!HasAuthority())
+	{
+		return;
+	}
+
 	if(InAttributeChangeData.Attribute == GetExpAttribute())
 	{
 		if(InAttributeChangeData.NewValue >= GetMaxExp())
@@ -197,12 +248,12 @@ void AAbilityActorBase::OnAttributeChange(const FOnAttributeChangeData& InAttrib
 
 void AAbilityActorBase::OnActorAttached(AActor* InActor)
 {
-	
+
 }
 
 void AAbilityActorBase::OnActorDetached(AActor* InActor)
 {
-	
+
 }
 
 UAbilityActorDataBase& AAbilityActorBase::GetActorData() const
@@ -232,24 +283,28 @@ UAbilitySystemComponent* AAbilityActorBase::GetAbilitySystemComponent() const
 
 bool AAbilityActorBase::SetLevelA(int32 InLevel)
 {
-	const auto& ActorData = GetActorData<UAbilityActorDataBase>();
-	InLevel = ActorData.ClampLevel(InLevel);
-
-	if(Level != InLevel)
+	if (!HasAuthority() || !AssetID.IsValid())
 	{
-		Level = InLevel;
-
-		auto EffectContext = AbilitySystem->MakeEffectContext();
-		EffectContext.AddSourceObject(this);
-		auto SpecHandle = AbilitySystem->MakeOutgoingSpec(ActorData.PEClass, InLevel, EffectContext);
-		if (SpecHandle.IsValid())
-		{
-			AbilitySystem->BP_ApplyGameplayEffectSpecToSelf(SpecHandle);
-		}
-		ResetData();
-		return true;
+		return false;
 	}
-	return false;
+	const UAbilityActorDataBase& Data = GetActorData();
+	InLevel = Data.ClampLevel(InLevel);
+	if (InLevel == Level)
+	{
+		return false;
+	}
+	TArray<TSubclassOf<UEffectBase>> Effects;
+	if (Data.PEClass)
+	{
+		Effects.Add(Data.PEClass);
+	}
+	if (!AbilitySystem->SetGrantSource(GetActorStatSourceId(), {}, Effects, InLevel))
+	{
+		return false;
+	}
+	Level = InLevel;
+	ForceNetUpdate();
+	return true;
 }
 
 float AAbilityActorBase::GetRadius() const
@@ -268,9 +323,27 @@ float AAbilityActorBase::GetDistance(AActor* InTargetActor, bool bIgnoreRadius /
 
 	IAbilityActorInterface* TargetAbilityActor = Cast<IAbilityActorInterface>(InTargetActor);
 
-	return FVector::Distance(FVector(GetActorLocation().X, GetActorLocation().Y, bIgnoreZAxis ? 0 : GetActorLocation().Z), FVector(InTargetActor->GetActorLocation().X, InTargetActor->GetActorLocation().Y, bIgnoreZAxis ? 0 : InTargetActor->GetActorLocation().Z)) - (bIgnoreRadius ? 0 : TargetAbilityActor->GetRadius());
+	return FVector::Distance(FVector(GetActorLocation().X, GetActorLocation().Y, bIgnoreZAxis ? 0 : GetActorLocation().Z), FVector(InTargetActor->GetActorLocation().X, InTargetActor->GetActorLocation().Y, bIgnoreZAxis ? 0 : InTargetActor->GetActorLocation().Z)) - (bIgnoreRadius || !TargetAbilityActor ? 0.f : TargetAbilityActor->GetRadius());
 }
 
+
+FGuid AAbilityActorBase::GetActorStatSourceId() const
+{
+	return FGuid(ActorID.A ^ 0x649D7912, ActorID.B ^ 0xCC3545FE, ActorID.C ^ 0x88D5FE1A, ActorID.D ^ 0x9052C3F0);
+}
+
+void AAbilityActorBase::OnRep_ActorMetadata()
+{
+	RefreshAttributes();
+}
+
+void AAbilityActorBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AAbilityActorBase, AssetID);
+	DOREPLIFETIME(AAbilityActorBase, Name);
+	DOREPLIFETIME(AAbilityActorBase, Level);
+}
 
 void AAbilityActorBase::BindInventory(UAbilityInventoryBase* InInventory)
 {

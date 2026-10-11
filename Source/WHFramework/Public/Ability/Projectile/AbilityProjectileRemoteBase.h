@@ -16,31 +16,34 @@ UCLASS()
 class WHFRAMEWORK_API AAbilityProjectileRemoteBase : public AAbilityProjectileBase
 {
 	GENERATED_BODY()
-	
-public:	
+
+public:
 	AAbilityProjectileRemoteBase();
-	
+
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
 public:
 
 	virtual void OnSpawn_Implementation(const FParameter& InParam) override;
-		
+
 	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode)
 		override;
-	
+
 protected:
+	UFUNCTION()
+	void OnProjectileStopped(const FHitResult& Hit);
+
 	UFUNCTION()
 	void OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
 public:
 	virtual void Launch_Implementation(FVector InDirection) override;
-		
+
 public:
 	virtual bool CanHitTarget(AActor* InTarget) const override;
 
 	virtual void OnHitTarget(AActor* InTarget, const FHitResult& InHitResult) override;
-	
+
 	virtual bool IsHitAble() const override;
 
 	virtual void SetHitAble(bool bValue) override;
@@ -48,7 +51,7 @@ public:
 protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	USphereComponent* SphereComponent;
-	
+
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UProjectileMovementComponent* ProjectileMovement;
 
