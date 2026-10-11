@@ -2,6 +2,7 @@
 
 #include "Ability/Effects/EffectBase.h"
 #include "Ability/Effects/Calculation/UEffectCalculation_Level.h"
+#include "Ability/Effects/Calculation/UEffectCalculation_Constant.h"
 #include "GameplayEffectComponent.h"
 
 void UEffectBase::OnSpawn_Implementation(const FParameter& InParam)
@@ -62,7 +63,8 @@ bool UEffectBase::SupportsAttributeGrant(float Level) const
 		const EGameplayEffectMagnitudeCalculation Type = Modifier.ModifierMagnitude.GetMagnitudeCalculationType();
 		const bool bPureMagnitude = Type == EGameplayEffectMagnitudeCalculation::ScalableFloat
 			|| (Type == EGameplayEffectMagnitudeCalculation::CustomCalculationClass
-				&& Modifier.ModifierMagnitude.GetCustomMagnitudeCalculationClass() == UUEffectCalculation_Level::StaticClass());
+				&& (Modifier.ModifierMagnitude.GetCustomMagnitudeCalculationClass() == UUEffectCalculation_Level::StaticClass()
+					|| Modifier.ModifierMagnitude.GetCustomMagnitudeCalculationClass() == UUEffectCalculation_Constant::StaticClass()));
 		if (!Modifier.Attribute.IsValid() || !bPureMagnitude
 			|| !Modifier.ModifierMagnitude.AttemptCalculateMagnitude(Spec, Magnitude, false, 0.f) || !FMath::IsFinite(Magnitude)
 			|| (Modifier.ModifierOp == EGameplayModOp::Division && FMath::IsNearlyZero(Magnitude)))

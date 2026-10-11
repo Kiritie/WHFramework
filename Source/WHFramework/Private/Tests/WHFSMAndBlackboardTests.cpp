@@ -20,7 +20,8 @@ namespace WHFSMTests
 
 		bool Initialize(FAutomationTestBase& Test)
 		{
-			World.Reset(UWorld::CreateWorld(EWorldType::Game, false));
+			const UWorld::InitializationValues Values = UWorld::InitializationValues().CreateAISystem(true);
+			World.Reset(UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Values));
 			if (!Test.TestNotNull(TEXT("Isolated world"), World.Get()) || !Test.TestNotNull(TEXT("Engine"), GEngine))
 			{
 				return false;
@@ -224,6 +225,12 @@ bool FWHBlackboardOwnershipTest::RunTest(const FString& Parameters)
 	AWHBlackboardTestPawn* PawnA = Fixture.World->SpawnActor<AWHBlackboardTestPawn>();
 	AWHBlackboardTestPawn* PawnB = Fixture.World->SpawnActor<AWHBlackboardTestPawn>();
 	AWHBlackboardTestPawn* PawnC = Fixture.World->SpawnActor<AWHBlackboardTestPawn>();
+	if (!TestNotNull(TEXT("真实 AI 系统"), Fixture.World->GetAISystem()) ||
+		!TestNotNull(TEXT("第一控制器"), ControllerA) || !TestNotNull(TEXT("第二控制器"), ControllerB) ||
+		!TestNotNull(TEXT("第一身体"), PawnA) || !TestNotNull(TEXT("第二身体"), PawnB) || !TestNotNull(TEXT("接管身体"), PawnC))
+	{
+		return false;
+	}
 	ControllerA->Possess(PawnA);
 	ControllerB->Possess(PawnB);
 	if (!TestTrue(TEXT("First controller creates its runtime"), ControllerA->SetBehaviorTree(Tree, false)) ||

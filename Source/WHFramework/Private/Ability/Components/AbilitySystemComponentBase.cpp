@@ -1333,13 +1333,13 @@ void UAbilitySystemComponentBase::NotifyActionInstanceEnded(const FGuid& Activat
 	}
 }
 
-bool UAbilitySystemComponentBase::BindOwnerAvatar(AActor* OwnerActor, AActor* AvatarActor)
+bool UAbilitySystemComponentBase::BindOwnerAvatar(AActor* InOwnerActor, AActor* InAvatarActor)
 {
-	if (bAvatarUnbinding || !IsValid(OwnerActor) || !IsValid(AvatarActor) || OwnerActor != GetOwner() || OwnerActor->GetWorld() != AvatarActor->GetWorld())
+	if (bAvatarUnbinding || !IsValid(InOwnerActor) || !IsValid(InAvatarActor) || InOwnerActor != GetOwner() || InOwnerActor->GetWorld() != InAvatarActor->GetWorld())
 	{
 		return false;
 	}
-	if (AbilityActorInfo.IsValid() && AbilityActorInfo->OwnerActor == OwnerActor && AbilityActorInfo->AvatarActor == AvatarActor)
+	if (AbilityActorInfo.IsValid() && AbilityActorInfo->OwnerActor == InOwnerActor && AbilityActorInfo->AvatarActor == InAvatarActor)
 	{
 		RefreshAbilityActorInfo();
 		return true;
@@ -1352,7 +1352,7 @@ bool UAbilitySystemComponentBase::BindOwnerAvatar(AActor* OwnerActor, AActor* Av
 			return false;
 		}
 	}
-	InitAbilityActorInfo(OwnerActor, AvatarActor);
+	InitAbilityActorInfo(InOwnerActor, InAvatarActor);
 	return true;
 }
 
