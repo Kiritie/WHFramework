@@ -1,5 +1,5 @@
 #include "Voxel/Voxels/Data/VoxelData.h"
-#include "Ability/PickUp/AbilityPickUpVoxel.h"
+#include "Ability/Inventory/InventoryPickupActor.h"
 #include "Voxel/Save/VoxelBlockEntityCodec.h"
 bool FVoxelBakedFaceRef::ToRuntime(FVoxelRuntimeFaceRef&O)const
 {
@@ -8,7 +8,7 @@ bool FVoxelBakedFaceRef::ToRuntime(FVoxelRuntimeFaceRef&O)const
 }
 UVoxelData::UVoxelData()
 {
-    Type=TEXT("Voxel");MaxCount=64;MaxLevel=0;PickUpClass=AAbilityPickUpVoxel::StaticClass();
+    Type=TEXT("Voxel");MaxCount=64;MaxLevel=0;PickUpClass=AInventoryPickupActor::StaticClass();
 }
 void UVoxelData::OnInitialize_Implementation(){Super::OnInitialize_Implementation();}
 void UVoxelData::OnReset_Implementation(){Super::OnReset_Implementation();}
@@ -61,3 +61,4 @@ bool UVoxelData::ValidateDefinition(bool Render,FString&E)const
     }
     E.Reset();return true;
 }
+

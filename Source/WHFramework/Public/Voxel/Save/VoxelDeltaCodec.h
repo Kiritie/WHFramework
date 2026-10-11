@@ -39,11 +39,11 @@ private:
 class WHFRAMEWORK_API FVoxelDeltaCodec
 {
 public:
-	static constexpr uint64 MaxSectionWireBytes = 512 * 1024;
-	static constexpr uint64 MaxAtomicBatchWireBytes = 1536 * 1024;
-	static constexpr int32 MaximumRawBytes = 1024 * 1024;
+	static constexpr uint64 MaxSectionWireBytes = (16 * 1024 * 1024) + (64 * 1024);
+	static constexpr uint64 MaxAtomicBatchWireBytes = (48 * 1024 * 1024) + (192 * 1024);
+	static constexpr int32 MaximumRawBytes = 16 * 1024 * 1024;
 	static constexpr int32 MaximumEntityCount = 256;
-	static constexpr int32 MaximumEntityPayloadBytes = 32768;
+	static constexpr int32 MaximumEntityPayloadBytes = (1024 * 1024) + 16;
 
 	static uint64 MaxEncodedBytes(
 		const FVoxelRegistrySnapshot& InRegistry,

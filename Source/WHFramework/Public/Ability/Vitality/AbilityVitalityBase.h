@@ -18,7 +18,6 @@ class UVitalityAbilityBase;
 class UAbilitySystemComponentBase;
 class UBoxComponent;
 class UAttributeSetBase;
-class UAbilityVitalityInventoryBase;
 class UVoxelAgentComponent;
 
 /**
@@ -97,21 +96,6 @@ public:
 
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
-	virtual void OnPreChangeItem(const FAbilityItem& InOldItem) override;
-
-	virtual void OnChangeItem(const FAbilityItem& InNewItem) override;
-
-	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
-
-	virtual void OnRemoveItem(const FAbilityItem& InItem) override;
-
-	virtual void OnDeactiveItem(const FAbilityItem& InItem, bool bPassive) override;
-
-	virtual void OnDiscardItem(const FAbilityItem& InItem, bool bInPlace) override;
-
-	virtual void OnSelectItem(const FAbilityItem& InItem) override;
-
-	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
 
 protected:
 protected:
@@ -304,3 +288,4 @@ public:
 		return Super::GetAbilitySystemComponent();
 	}
 };
+

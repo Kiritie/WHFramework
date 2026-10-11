@@ -2,7 +2,8 @@
 
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
-#include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
+#include "Ability/Inventory/InventoryNetworkComponent.h"
+#include "Ability/Inventory/InventoryWorldSubsystem.h"
 
 #include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
@@ -206,10 +207,24 @@ bool UVoxelAgentComponent::TraceVoxel(
 		OutHit.VoxelItem);
 }
 
+FGuid UVoxelAgentComponent::GetInventoryStoreId() const
+{
+    if(GetOwner() && GetOwner()->HasAuthority())
+    {
+        const UInventoryWorldSubsystem* System = GetWorld() ? GetWorld()->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+        return System && System->IsReady() ? System->GetStoreId() : FGuid();
+    }
+    const UInventoryNetworkComponent* InventoryNetwork = BoundController.IsValid() ?
+        BoundController->FindComponentByClass<UInventoryNetworkComponent>() : nullptr;
+    return InventoryNetwork ? InventoryNetwork->GetStoreId() : FGuid();
+}
+
 bool UVoxelAgentComponent::MakeIntent(
 	const EVoxelEditAction InAction,
 	FVoxelEditIntent& OutIntent) const
 {
+	OutIntent.InventoryStoreId = GetInventoryStoreId();
+	if (!OutIntent.InventoryStoreId.IsValid()) return false;
 	UVoxelModule* VoxelModule =
 		Module.Get();
 
@@ -267,25 +282,38 @@ bool UVoxelAgentComponent::MakeIntent(
 			? BoundController->GetPawn()
 			: GetOwner();
 
-	if (IAbilityInventoryAgentInterface* Agent =
-		Cast<IAbilityInventoryAgentInterface>(
-			InventoryOwner))
-	{
-		if (UAbilityInventoryBase* Inventory =
-			Agent->GetInventory())
-		{
-			if (UAbilityInventorySlotBase* Slot =
-				Inventory->GetSelectedSlot(
-					ESlotSplitType::Shortcut))
-			{
-				OutIntent.InventorySlot =
-					Slot->GetSlotIndex();
 
-				OutIntent.ExpectedItemID =
-					Slot->GetItem().ID;
-			}
-		}
-	}
+    if(IAbilityInventoryAgentInterface* InventoryAgent = Cast<IAbilityInventoryAgentInterface>(InventoryOwner))
+    {
+        OutIntent.InventorySlot = InventoryAgent->GetSelectedInventorySlot();
+        const FInventorySnapshot* View = nullptr;
+        FInventorySnapshot ServerSnapshot;
+        if(InventoryOwner->HasAuthority())
+        {
+            if(const UAbilityInventoryBase* Inventory = InventoryAgent->GetInventory())
+            {
+                ServerSnapshot = Inventory->MakeSnapshot();
+                View = &ServerSnapshot;
+            }
+        }
+        else if(BoundController.IsValid())
+        {
+            if(const UInventoryNetworkComponent* InventoryNetwork = BoundController->FindComponentByClass<UInventoryNetworkComponent>())
+            {
+                View = InventoryNetwork->FindView(InventoryNetwork->GetOwnerInventoryId());
+            }
+        }
+        if(View)
+        {
+            OutIntent.ExpectedInventoryId = View->InventoryId;
+            OutIntent.ExpectedInventoryRevision = View->Revision;
+            OutIntent.ExpectedInventoryGeneration = View->Generation;
+            if(const FInventorySlotState* Slot = View->FindSlot(OutIntent.InventorySlot))
+            {
+                OutIntent.ExpectedItemID = Slot->Item.ItemId;
+            }
+        }
+    }
 
 	return true;
 }
@@ -293,6 +321,10 @@ bool UVoxelAgentComponent::MakeIntent(
 bool UVoxelAgentComponent::Send(
 	FVoxelEditIntent InIntent)
 {
+	// BreakCancel 没有射线捕获步骤；其他请求保留 MakeIntent 时捕获的分支身份。
+	if (InIntent.Action == EVoxelEditAction::BreakCancel && !InIntent.InventoryStoreId.IsValid())
+		InIntent.InventoryStoreId = GetInventoryStoreId();
+	if (!InIntent.InventoryStoreId.IsValid()) return false;
 	UVoxelModule* VoxelModule =
 		Module.Get();
 
@@ -434,61 +466,9 @@ bool UVoxelAgentComponent::UseTarget()
 			Intent);
 }
 
-bool UVoxelAgentComponent::TakeContainerSlot(
-	const int32 InContainerSlot,
-	const int32 InCount)
-{
-	FVoxelEditIntent Intent;
 
-	if (InContainerSlot < 0 ||
-		InContainerSlot >= 27 ||
-		InCount <= 0 ||
-		InCount > 100000 ||
-		!MakeIntent(
-			EVoxelEditAction::
-				ContainerTake,
-			Intent))
-	{
-		return false;
-	}
 
-	Intent.ContainerSlot =
-		InContainerSlot;
 
-	Intent.Count =
-		InCount;
-
-	return Send(
-		Intent);
-}
-
-bool UVoxelAgentComponent::PutContainerSlot(
-	const int32 InContainerSlot,
-	const int32 InCount)
-{
-	FVoxelEditIntent Intent;
-
-	if (InContainerSlot < 0 ||
-		InContainerSlot >= 27 ||
-		InCount <= 0 ||
-		InCount > 100000 ||
-		!MakeIntent(
-			EVoxelEditAction::
-				ContainerPut,
-			Intent))
-	{
-		return false;
-	}
-
-	Intent.ContainerSlot =
-		InContainerSlot;
-
-	Intent.Count =
-		InCount;
-
-	return Send(
-		Intent);
-}
 
 void UVoxelAgentComponent::OnReply(
 	const FVoxelEditReply& InReply)

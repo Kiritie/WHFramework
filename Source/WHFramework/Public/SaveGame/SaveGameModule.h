@@ -9,6 +9,8 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FWorldSaveFinished, FGuid, SaveId, const FSaveOperationResult&, Result);
 
+using FSaveWorldLoadGuard = TFunction<bool(const FGuid&, const TMap<FName, FParameter>&, EPhase, FString&)>;
+
 UCLASS()
 class WHFRAMEWORK_API USaveGameModule : public UModuleBase
 {
@@ -22,6 +24,13 @@ class WHFRAMEWORK_API USaveGameModule : public UModuleBase
 
 public:
 	USaveGameModule();
+
+	// 全部模块文件验证后、任何模块应用前执行准备；应用后执行一致性验证。
+	bool RegisterWorldLoadGuard(FName InName, FSaveWorldLoadGuard InBefore, FSaveWorldLoadGuard InAfter);
+	void UnregisterWorldLoadGuard(FName InName);
+	bool RegisterWorldStoreParticipant(FName InName, FSaveWorldStoreParticipant InParticipant);
+	void UnregisterWorldStoreParticipant(FName InName);
+	FString GetStorageRoot() const;
 	~USaveGameModule();
 
 	//////////////////////////////////////////////////////////////////////////
@@ -215,6 +224,7 @@ private:
 	FGuid AsyncOperationId;
 	FSaveOperationResult LastWorldSaveResult;
 	FGuid PendingCreatedSaveId;
+	TOptional<FSaveManifest> PendingCreatedManifest;
 	FGuid PendingCreationPreviousSaveId;
 	bool bAsyncCompletesPendingSlot = false;
 	bool bAsyncWorkerStarted = false;
@@ -232,4 +242,21 @@ private:
 	TWeakObjectPtr<APlayerController> QuitController;
 	TWeakObjectPtr<UVoxelModule> QuitVoxel;
 	FGuid AsyncSaveId;
+private:
+    struct FWorldLoadGuardEntry
+    {
+        FSaveWorldLoadGuard Before;
+        FSaveWorldLoadGuard After;
+    };
+    TMap<FName, FWorldLoadGuardEntry> WorldLoadGuards;
+    bool RunWorldLoadGuards(const FGuid& InSaveId, const TMap<FName, FParameter>& InModules, EPhase InPhase, bool bInAfter, FString& OutError);
+    FName WorldStoreParticipantName;
+    FSaveWorldStoreParticipant WorldStoreParticipant;
+    FSaveWorldStoreParticipant AsyncStoreParticipant;
+    TSharedPtr<FSaveWorldExternalOperation, ESPMode::ThreadSafe> AsyncExternalOperation;
+    bool BeginExternalStore(FSaveWorldCaptureContext InContext, const TMap<FName, FParameter>& InSourceModules,
+        FSaveWorldStoreParticipant& OutParticipant, TSharedPtr<FSaveWorldExternalOperation, ESPMode::ThreadSafe>& OutOperation, FString& OutError);
+    bool FinishExternalStore(const FSaveWorldStoreParticipant& InParticipant,
+        const TSharedPtr<FSaveWorldExternalOperation, ESPMode::ThreadSafe>& InOperation, bool bInFilesCommitted, FString& OutError);
 };
+

@@ -197,4 +197,107 @@ bool FVoxelTerrainSourceTupleTest::RunTest(const FString& InParameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelTerrainActualServiceCostTest,
+	"WHFramework.Voxel.FineResidency.ActualServiceCost",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelTerrainActualServiceCostTest::RunTest(const FString& InParameters)
+{
+	const auto RunCost = [this](const double InNearActual)
+	{
+		FVoxelTerrainWorkSelection Selection;
+		FVoxelTerrainServiceCapacity Capacity;
+		Capacity.MaximumWaitSeconds = 1000000.0;
+		TArray<FVoxelTerrainServiceCandidate> Candidates;
+		for (int32 Index = 0; Index < 2; ++Index)
+		{
+			auto& Candidate = Candidates.AddDefaulted_GetRef();
+			Candidate.Index = Index;
+			Candidate.Priority.Band = Index == 0 ? EVoxelTerrainServiceBand::P0 : EVoxelTerrainServiceBand::P3;
+			Candidate.Priority.DistanceCells = Index;
+			Candidate.EstimatedMicroseconds = 100.0;
+			Candidate.Sequence = Index + 1;
+			Candidate.bRunnable = true;
+		}
+		FIntPoint Dispatches = FIntPoint::ZeroValue;
+		double Now = 0.0;
+		for (int32 Event = 0; Event < 4000; ++Event)
+		{
+			FVoxelTerrainServiceCharge Charge;
+			const int32 Chosen = Selection.Select(Candidates, Capacity, Now, Charge);
+			if (!TestTrue(TEXT("实际成本结算后仍可选择可运行任务"), Chosen != INDEX_NONE)) return Dispatches;
+			const double Actual = Chosen == 0 ? InNearActual : 100.0;
+			TestTrue(TEXT("实际耗时只结算一次"), Selection.Settle(Charge.Serial, Actual));
+			TestFalse(TEXT("已结算凭据不能重复扣款"), Selection.Settle(Charge.Serial, Actual));
+			Now += Actual / 1000000.0;
+			if (Chosen == 0) ++Dispatches.X;
+			else ++Dispatches.Y;
+		}
+		TestFalse(TEXT("成本差额不破坏账本"), Selection.HasAccountingFault());
+		TestTrue(TEXT("全部结算后可重置"), Selection.Reset());
+		return Dispatches;
+	};
+	const FIntPoint Cheap = RunCost(100.0);
+	const FIntPoint Expensive = RunCost(100000.0);
+	TestTrue(TEXT("低估的长任务按真实成本让出后续服务"), Expensive.X < Cheap.X && Expensive.Y > Cheap.Y);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelTerrainRefundAndAgingTest,
+	"WHFramework.Voxel.FineResidency.RefundAndAging",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelTerrainRefundAndAgingTest::RunTest(const FString& InParameters)
+{
+	FVoxelTerrainWorkSelection Refunded;
+	FVoxelTerrainWorkSelection Control;
+	FVoxelTerrainServiceCapacity Capacity;
+	TArray<FVoxelTerrainServiceCandidate> Candidates;
+	for (int32 Index = 0; Index < 2; ++Index)
+	{
+		auto& Candidate = Candidates.AddDefaulted_GetRef();
+		Candidate.Index = Index;
+		Candidate.Priority.Band = Index == 0 ? EVoxelTerrainServiceBand::P0 : EVoxelTerrainServiceBand::P3;
+		Candidate.Priority.DistanceCells = Index;
+		Candidate.EstimatedMicroseconds = 100.0;
+		Candidate.Sequence = Index + 1;
+		Candidate.bRunnable = true;
+	}
+	for (int32 Attempt = 0; Attempt < 1000; ++Attempt)
+	{
+		FVoxelTerrainServiceCharge Charge;
+		if (!TestEqual(TEXT("未开工退款保留出生任务服务额度"), Refunded.Select(Candidates, Capacity, 0.0, Charge), 0)) return false;
+		TestFalse(TEXT("未结清凭据阻止重置"), Refunded.Reset());
+		TestTrue(TEXT("未开工凭据可退款"), Refunded.RefundBeforeStart(Charge.Serial));
+		TestFalse(TEXT("同一凭据不能二次退款"), Refunded.RefundBeforeStart(Charge.Serial));
+		TestFalse(TEXT("退款后不能再次结算"), Refunded.Settle(Charge.Serial, 100.0));
+	}
+	for (int32 Attempt = 0; Attempt < 256; ++Attempt)
+	{
+		FVoxelTerrainServiceCharge RefundedCharge;
+		FVoxelTerrainServiceCharge ControlCharge;
+		const int32 RefundedChoice = Refunded.Select(Candidates, Capacity, 0.0, RefundedCharge);
+		const int32 ControlChoice = Control.Select(Candidates, Capacity, 0.0, ControlCharge);
+		if (!TestTrue(TEXT("两份账本均有可运行任务"), RefundedChoice != INDEX_NONE && ControlChoice != INDEX_NONE)) return false;
+		TestEqual(TEXT("退款不改变后续已执行任务的成本份额"), RefundedChoice, ControlChoice);
+		TestTrue(TEXT("退款路径后续任务可结算"), Refunded.Settle(RefundedCharge.Serial, 100.0));
+		TestTrue(TEXT("对照任务可结算"), Control.Settle(ControlCharge.Serial, 100.0));
+	}
+	TestTrue(TEXT("退款账本可重置"), Refunded.Reset());
+	Candidates[0].Priority.Band = Candidates[1].Priority.Band = EVoxelTerrainServiceBand::P2;
+	Candidates[0].FirstQueuedSeconds = 1.0;
+	Candidates[1].FirstQueuedSeconds = 0.0;
+	FVoxelTerrainServiceCharge Charge;
+	TestEqual(TEXT("同一优先带的较远超期任务能够推进"), Refunded.Select(Candidates, Capacity, 1.0, Charge), 1);
+	TestTrue(TEXT("超期任务按实际成本结算"), Refunded.Settle(Charge.Serial, 100.0));
+	FVoxelTerrainServicePriority Birth;
+	Birth.Band = EVoxelTerrainServiceBand::P0;
+	Birth.DistanceCells = 1024.0;
+	FVoxelTerrainServicePriority Background;
+	Background.Band = EVoxelTerrainServiceBand::P3;
+	Background.DistanceCells = 1.0;
+	TestTrue(TEXT("出生关键任务优先于距离更近的背景任务"), FVoxelTerrainWorkSelection::HigherPriority(Birth, Background));
+	return true;
+}
+
 #endif

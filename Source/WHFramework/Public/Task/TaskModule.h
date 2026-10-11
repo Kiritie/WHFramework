@@ -81,6 +81,15 @@ public:
 	/** 根据任务资产模板创建独立运行时副本 */
 	UFUNCTION(BlueprintCallable)
 	UTaskAsset* CreateAsset(UTaskAsset* InAsset, FGuid InAgentID, FGuid InOwnerActorID = FGuid());
+
+	// 库存事务准备期只克隆、验证并冻结目录容量，不初始化、进入任务或发布事件。
+	UTaskAsset* PrepareRuntimeAsset(UTaskAsset* InAsset, FGuid InInstanceID, FGuid InAgentID, FGuid InOwnerActorID, FString& OutError);
+	bool InstallPreparedRuntimeAsset(UTaskAsset* InAsset, FString& OutError);
+	void CancelPreparedRuntimeAsset(UTaskAsset* InAsset);
+	bool IsRuntimeArchiveReady() const { return !bLoadingTasks; }
+	bool EnableOwnerDefaultAssets(FString& OutError);
+	bool PrepareOwnerDefaultAssets(const FGuid& InWorldID, const FGuid& InOwnerActorID, TArray<UTaskAsset*>& OutAssets, TSet<FGuid>& OutCreated, FString& OutError);
+	static FGuid MakeOwnerDefaultInstanceID(const FGuid& InWorldID, const FGuid& InOwnerActorID, const FString& InTemplatePath);
 	
 	UFUNCTION(BlueprintCallable)
 	void RemoveAsset(UTaskAsset* InAsset);
@@ -157,6 +166,8 @@ protected:
 	/// 流程资产列表
 	UPROPERTY(VisibleAnywhere, Category = "TaskModule|Task Stats")
 	TArray<UTaskAsset*> Assets;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UTaskAsset>> PreparedRuntimeAssets;
 	/// 默认流程资产 
 	UPROPERTY(EditAnywhere, Category = "TaskModule|Task Stats")
 	TArray<UTaskAsset*> DefaultAssets;
@@ -167,6 +178,7 @@ protected:
 	UPROPERTY(Transient)
 	TMap<UTaskBase*, FTaskRuntimeSaveData> PendingResume;
 	bool bLoadingTasks = false;
+	bool bDefaultAssetsPerOwner = false;
 	UTaskBase* TurningInTask = nullptr;
 	TSet<FGuid> TaskMarkerIDs;
 	int32 TaskMutationDepth = 0;
@@ -221,3 +233,4 @@ public:
 	UFUNCTION(BlueprintPure)
 	UTaskBase* GetTaskByGUID(const FString& InTaskGUID) const;
 };
+

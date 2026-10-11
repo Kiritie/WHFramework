@@ -26,6 +26,7 @@ bool FVoxelWorldReadinessRuntime::PreparePlayerClaim(FVoxelPlayerClaimState& InO
 	InOutState.Token = InIdentity;
 	InOutState.Token.Serial = ++NextClaimSerial;
 	InOutState.Pawn = InPawn;
+	InOutState.bVerificationPending = true;
 	OutToken = InOutState.Token;
 	return true;
 }

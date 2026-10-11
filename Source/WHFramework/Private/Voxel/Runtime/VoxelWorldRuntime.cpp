@@ -4,6 +4,7 @@
 #include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Rendering/VoxelTerrainFrameContext.h"
 #include "Voxel/Save/VoxelBlockEntityCodec.h"
+#include "Voxel/Save/InventoryVoxelEntityCodec.h"
 #include "Voxel/Save/VoxelDeltaCodec.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
@@ -24,7 +25,7 @@ namespace VoxelWorldRuntimePrivate
 
 	uint64 DefaultEntityBytes()
 	{
-		return VoxelBoundedAllocation::InitialGrowBytes<uint8>(FVoxelDeltaCodec::MaximumEntityPayloadBytes);
+		return VoxelBoundedAllocation::InitialGrowBytes<uint8>(FVoxelBlockEntityCodec::MaximumDefaultPayloadBytes);
 	}
 
 	uint64 MutableDataBytes(const int32 InOverlayCount, const int32 InEntityCount, const uint64 InPayloadBytes)
@@ -316,7 +317,8 @@ bool FVoxelWorldRuntime::PublishFinal(
 	}
 	for (const auto& Pair : InEntities)
 	{
-		if (Pair.Key < 0 || Pair.Key >= SectionVolume || Pair.Value.Payload.Num() > FVoxelDeltaCodec::MaximumEntityPayloadBytes)
+		if (Pair.Key < 0 || Pair.Key >= SectionVolume || Pair.Value.Payload.Num() > FVoxelDeltaCodec::MaximumEntityPayloadBytes ||
+			(bAuthority && FInventoryVoxelEntityCodec::IsPublic(Pair.Value)))
 		{
 			OutError = TEXT("Voxel最终实体格子或Payload超出Codec容量");
 			return false;
@@ -406,6 +408,8 @@ bool FVoxelWorldRuntime::PublishFinal(
 	Section->CommittedRevision = InRevision;
 	Section->PersistedRevision = ExistingJournal ? GetPersistedRevision(InSection) : InRevision;
 	Section->Status = EVoxelSectionStatus::DataReady;
+	check(DataReadyRevision < MAX_uint64);
+	++DataReadyRevision;
 	Section->Error.Reset();
 	Section->bCollisionDirty = true;
 	Section->bFineMeshDirty = true;
@@ -1298,7 +1302,8 @@ bool FVoxelWorldRuntime::ValidateSection(
 	for (const TPair<int32, FVoxelBlockEntityState>& Entity : InEntities)
 	{
 		const FVoxelRuntimeDefinition* Definition = InBlocks.IsValidIndex(Entity.Key) ? Registry->Find(InBlocks[Entity.Key].TypeId) : nullptr;
-		if (!Definition || !Definition->EntityKind || Definition->EntityKind != Entity.Value.Kind || !FVoxelBlockEntityCodec::Validate(Entity.Value))
+		if (!Definition || !Definition->EntityKind || Definition->EntityKind != Entity.Value.Kind ||
+			!FVoxelBlockEntityCodec::Validate(Entity.Value) || (bAuthority && FInventoryVoxelEntityCodec::IsPublic(Entity.Value)))
 		{
 			OutError = TEXT("Voxel entity kind or payload does not match its owning block");
 			return false;
@@ -1534,11 +1539,11 @@ namespace
 }
 
 void FVoxelWorldRuntime::RetainJournal(const FIntVector& InSection,
-	TSharedPtr<const FVoxelOverlaySnapshot, ESPMode::ThreadSafe> InJournal)
+	TSharedPtr<const FVoxelOverlaySnapshot, ESPMode::ThreadSafe> InJournal, bool bInNotify)
 {
 	check(InJournal && InJournal->Section == InSection);
 	CommittedJournal.Publish(MoveTemp(InJournal));
-	NotifySectionEvent(InSection, EVoxelRuntimeSectionEvent::Committed);
+	if(bInNotify) NotifySectionEvent(InSection, EVoxelRuntimeSectionEvent::Committed);
 }
 
 void FVoxelWorldRuntime::GatherCommittedOverlaySections(const FVoxelGenerationBounds& InBounds,
@@ -1576,4 +1581,359 @@ uint64 FVoxelWorldRuntime::GetOverlayRegionSequence(const FIntVector& InRegion) 
 uint64 FVoxelWorldRuntime::GetContentRevision() const
 {
 	return ChangeHierarchy.GetContentRevision();
+}
+
+
+
+bool FVoxelWorldRuntime::PrepareInventorySections(TConstArrayView<FVoxelInventorySectionTarget> InTargets,
+    const FGuid& InTransactionId, bool bInRecovery, FVoxelPreparedInventoryCommit& OutPrepared, FString& OutError)
+{
+    check(IsInGameThread());
+    if(!bAuthority || !InTransactionId.IsValid() || InTargets.Num() > 64 || OutPrepared.bPrepared ||
+        !OutPrepared.Sections.IsEmpty() || OutPrepared.ScratchLease || OutPrepared.Batch.ResourceLease ||
+        NextAllocationSerial > MAX_uint64 - uint64(InTargets.Num()) * 2 - 4)
+    {
+        OutError = TEXT("Inventory.VoxelPrepareInvalid");
+        return false;
+    }
+    OutError.Reset();
+    OutPrepared.WorldEpoch = WorldEpoch;
+    OutPrepared.HierarchyRevision = ChangeHierarchy.GetContentRevision();
+    OutPrepared.Batch.TransactionId = InTransactionId;
+    uint64 PatchBytes = VoxelBoundedAllocation::WorkerSharedBytes<TArray<FVoxelSectionPatch>>() +
+        VoxelBoundedAllocation::ArrayBytes<FVoxelSectionPatch>(InTargets.Num());
+    for(const FVoxelInventorySectionTarget& Target : InTargets)
+    {
+        if(Target.After.Blocks.Num() > SectionVolume || Target.After.Entities.Num() > FVoxelDeltaCodec::MaximumEntityCount)
+        {
+            OutError = TEXT("Inventory.VoxelSectionBounds");
+            CancelInventorySections(OutPrepared);
+            return false;
+        }
+        for(const auto& Entity : Target.After.Entities)
+        {
+            if(Entity.Value.Payload.Num() > FVoxelDeltaCodec::MaximumEntityPayloadBytes)
+            {
+                OutError = TEXT("Inventory.VoxelEntityBounds");
+                CancelInventorySections(OutPrepared);
+                return false;
+            }
+        }
+        PatchBytes += VoxelBoundedAllocation::ArrayBytes<FVoxelSectionCellEdit>(SectionVolume);
+        PatchBytes += VoxelBoundedAllocation::ArrayBytes<FVoxelEntityWrite>(SectionVolume);
+        PatchBytes += EntityCopyBytes(Target.After.Entities);
+    }
+    const uint64 ScratchBytes = VoxelBoundedAllocation::WorkerSharedBytes<TArray<FVoxelPreparedInventorySection>>() +
+        VoxelBoundedAllocation::ArrayBytes<FVoxelPreparedInventorySection>(InTargets.Num());
+    const auto Consumer = FVoxelGenerationConsumerKey::Section(WorldEpoch, RuntimeOwnerId, 1, {}, ++NextAllocationSerial);
+    if(!TerrainResources->Acquire(Consumer, EVoxelTerrainResourcePool::Working, FMath::Max<uint64>(ScratchBytes, 1), OutPrepared.ScratchLease) ||
+        !TerrainResources->Acquire(Consumer, EVoxelTerrainResourcePool::Input, FMath::Max<uint64>(PatchBytes, 1), OutPrepared.Batch.ResourceLease))
+    {
+        OutError = TEXT("CapacityBlocked: Inventory体素事务冻结工作区");
+        CancelInventorySections(OutPrepared);
+        return false;
+    }
+    OutPrepared.Sections.Reserve(InTargets.Num());
+    OutPrepared.Batch.Sections.Reserve(InTargets.Num());
+    auto Fail = [&]()
+    {
+        CancelInventorySections(OutPrepared);
+        return false;
+    };
+
+    for(int32 TargetIndex = 0; TargetIndex < InTargets.Num(); ++TargetIndex)
+    {
+        const FVoxelInventorySectionTarget& Target = InTargets[TargetIndex];
+        const FVoxelPersistentSection& After = Target.After;
+        for(int32 Previous = 0; Previous < TargetIndex; ++Previous)
+        {
+            if(InTargets[Previous].After.Section == After.Section)
+            {
+                OutError = TEXT("Inventory.VoxelDuplicateSection");
+                return Fail();
+            }
+        }
+        if(After.Blocks.Num() > SectionVolume || After.Entities.Num() > FVoxelDeltaCodec::MaximumEntityCount || After.Revision == MAX_uint64)
+        {
+            OutError = TEXT("Inventory.VoxelSectionBounds");
+            return Fail();
+        }
+        for(const auto& Cell : After.Blocks)
+        {
+            if(Cell.Key < 0 || Cell.Key >= SectionVolume || !ValidateState(Cell.Value))
+            {
+                OutError = TEXT("Inventory.VoxelCellInvalid");
+                return Fail();
+            }
+        }
+        for(const auto& Entity : After.Entities)
+        {
+            if(Entity.Key < 0 || Entity.Key >= SectionVolume || !FVoxelBlockEntityCodec::Validate(Entity.Value) ||
+                FInventoryVoxelEntityCodec::IsPublic(Entity.Value))
+            {
+                OutError = TEXT("Inventory.VoxelEntityInvalid");
+                return Fail();
+            }
+        }
+        FVoxelSection* Loaded = FindSection(After.Section);
+        const bool bLoaded = Loaded && Loaded->Status == EVoxelSectionStatus::DataReady;
+        const auto ExistingJournal = FindCommittedOverlay(After.Section);
+        const uint64 CurrentRevision = bLoaded ? Loaded->CommittedRevision : ExistingJournal ? ExistingJournal->Revision : 0;
+        const TMap<int32, FVoxelBlockState> EmptyBlocks;
+        const TMap<int32, FVoxelBlockEntityState> EmptyEntities;
+        const auto& BeforeBlocks = bLoaded ? Loaded->Overlay : ExistingJournal ? ExistingJournal->Blocks : EmptyBlocks;
+        const auto& BeforeEntities = bLoaded ? Loaded->Entities : ExistingJournal ? ExistingJournal->Entities : EmptyEntities;
+        if(CurrentRevision == After.Revision)
+        {
+            if(!BeforeBlocks.OrderIndependentCompareEqual(After.Blocks) || !BeforeEntities.OrderIndependentCompareEqual(After.Entities))
+            {
+                OutError = TEXT("Inventory.VoxelRedoDiverged");
+                return Fail();
+            }
+            continue;
+        }
+        if(CurrentRevision != Target.ExpectedRevision || CurrentRevision >= After.Revision ||
+            (!bInRecovery && After.Revision != CurrentRevision + 1))
+        {
+            OutError = TEXT("Inventory.VoxelRevisionStale");
+            return Fail();
+        }
+        FVoxelPreparedInventorySection& Prepared = OutPrepared.Sections.AddDefaulted_GetRef();
+        Prepared.Section = After.Section;
+        Prepared.bLoaded = bLoaded;
+        Prepared.Data.Patch.Section = After.Section;
+        Prepared.Data.Patch.FromRevision = CurrentRevision;
+        Prepared.Data.Patch.ToRevision = After.Revision;
+        Prepared.Data.Patch.Edits.Reserve(SectionVolume);
+        Prepared.Data.Patch.Entities.Reserve(SectionVolume);
+        if(bLoaded)
+        {
+            Prepared.Data.Before = Loaded->Stamp;
+            Prepared.Resource = Loaded->GetResourceIdentity();
+            Prepared.bPinned = TryPinSection(After.Section, Prepared.Resource);
+            if(!Prepared.bPinned || !Loaded->BaseBlocks || Loaded->BaseBlocks->Num() != SectionVolume ||
+                !AcquireRuntimeData(After.Section, MutableDataBytes(After.Blocks.Num(), After.Entities.Num(), EntityCopyBytes(After.Entities)),
+                    Loaded->DataLease.IsValid(), Prepared.Data.DataLease))
+            {
+                OutError = TEXT("CapacityBlocked: Inventory体素数据授额或Pin失败");
+                return Fail();
+            }
+            Prepared.Data.Blocks = *Loaded->BaseBlocks;
+            Prepared.Data.Overlay = After.Blocks;
+            Prepared.Data.Entities = After.Entities;
+            for(const auto& Cell : After.Blocks)
+            {
+                Prepared.Data.Blocks[Cell.Key] = Cell.Value;
+            }
+            if(!ValidateSection(Prepared.Data.Blocks, Prepared.Data.Overlay, Prepared.Data.Entities, OutError))
+            {
+                return Fail();
+            }
+        }
+        for(const auto& Cell : BeforeBlocks)
+        {
+            if(!After.Blocks.Contains(Cell.Key))
+            {
+                FVoxelSectionCellEdit& Edit = Prepared.Data.Patch.Edits.AddDefaulted_GetRef();
+                Edit.CellIndex = Cell.Key;
+                Edit.bNatural = true;
+            }
+        }
+        for(const auto& Cell : After.Blocks)
+        {
+            const FVoxelBlockState* Before = BeforeBlocks.Find(Cell.Key);
+            if(!Before || *Before != Cell.Value)
+            {
+                FVoxelSectionCellEdit& Edit = Prepared.Data.Patch.Edits.AddDefaulted_GetRef();
+                Edit.CellIndex = Cell.Key;
+                Edit.State = Cell.Value;
+            }
+        }
+        for(const auto& Entity : BeforeEntities)
+        {
+            if(!After.Entities.Contains(Entity.Key))
+            {
+                FVoxelEntityWrite& Edit = Prepared.Data.Patch.Entities.AddDefaulted_GetRef();
+                Edit.CellIndex = Entity.Key;
+                Edit.bRemove = true;
+            }
+        }
+        for(const auto& Entity : After.Entities)
+        {
+            const FVoxelBlockEntityState* Before = BeforeEntities.Find(Entity.Key);
+            if(!Before || !(*Before == Entity.Value))
+            {
+                FVoxelEntityWrite& Edit = Prepared.Data.Patch.Entities.AddDefaulted_GetRef();
+                Edit.CellIndex = Entity.Key;
+                Edit.Value = Entity.Value;
+            }
+        }
+        Prepared.Data.Patch.Edits.Sort([](const auto& A, const auto& B) { return A.CellIndex < B.CellIndex; });
+        Prepared.Data.Patch.Entities.Sort([](const auto& A, const auto& B) { return A.CellIndex < B.CellIndex; });
+        if(!PrepareJournal(After.Section, After.Revision, After.Blocks, After.Entities, Prepared.Journal, OutError))
+        {
+            return Fail();
+        }
+    }
+    if(OutPrepared.Sections.IsEmpty())
+    {
+        OutPrepared.bPrepared = true;
+        return true;
+    }
+    if(AuthorityCommitCut == MAX_uint64)
+    {
+        OutError = TEXT("Inventory.VoxelCommitCutExhausted");
+        return Fail();
+    }
+    TArray<FIntVector, TInlineAllocator<64>> Keys;
+    for(const auto& Section : OutPrepared.Sections)
+    {
+        Keys.Add(Section.Data.Patch.Section);
+    }
+    const auto SectionAt = [&OutPrepared](int32 Index) { return OutPrepared.Sections[Index].Data.Patch.Section; };
+    if(!ReserveOverlaySequenceKeys(Keys) || !ChangeIndex.PrepareModified(OutPrepared.Sections.Num(), SectionAt, OutError))
+    {
+        return Fail();
+    }
+    const auto ModifiedLease = ChangeIndex.GetStorageLease();
+    const auto DirectoryLease = ChangeIndex.GetBaselineLease();
+    FVoxelGenerationRequiredSourceScope ModifiedSource(TerrainResources.Get(), ModifiedLease.Get());
+    FVoxelGenerationRequiredSourceScope DirectorySource(TerrainResources.Get(), DirectoryLease.Get());
+    if(!ChangeHierarchy.PrepareInvalidations(OutPrepared.Sections.Num(), SectionAt, OutPrepared.Invalidations, OutError))
+    {
+        return Fail();
+    }
+    OutPrepared.bPrepared = true;
+    return true;
+}
+
+bool FVoxelWorldRuntime::ValidateInventorySections(const FVoxelPreparedInventoryCommit& InPrepared, FString& OutError) const
+{
+    if(!IsInGameThread() || !bAuthority || !InPrepared.bPrepared || !InPrepared.Batch.TransactionId.IsValid() ||
+        !InPrepared.ScratchLease || !InPrepared.Batch.ResourceLease || InPrepared.WorldEpoch != WorldEpoch ||
+        InPrepared.HierarchyRevision != ChangeHierarchy.GetContentRevision() ||
+        (!InPrepared.Sections.IsEmpty() && AuthorityCommitCut == MAX_uint64))
+    {
+        OutError = TEXT("Inventory.VoxelPreparedEpochChanged");
+        return false;
+    }
+    for(const auto& Prepared : InPrepared.Sections)
+    {
+        const FVoxelSection* Loaded = FindSection(Prepared.Data.Patch.Section);
+        const auto Journal = FindCommittedOverlay(Prepared.Data.Patch.Section);
+        const uint64 CurrentRevision = Loaded && Loaded->Status == EVoxelSectionStatus::DataReady ? Loaded->CommittedRevision : Journal ? Journal->Revision : 0;
+        const bool bCurrentlyLoaded = Loaded && Loaded->Status == EVoxelSectionStatus::DataReady;
+        if(Prepared.Section != Prepared.Data.Patch.Section || !Prepared.Journal ||
+            CurrentRevision != Prepared.Data.Patch.FromRevision || bCurrentlyLoaded != Prepared.bLoaded ||
+            (Prepared.bLoaded && (!Prepared.bPinned || Loaded->PinCount.Load() <= 0 ||
+                Loaded->GetResourceIdentity() != Prepared.Resource ||
+                !IsCurrentStamp(Prepared.Section, Prepared.Data.Before))))
+        {
+            OutError = TEXT("Inventory.VoxelPreparedRevisionChanged");
+            return false;
+        }
+    }
+    return true;
+}
+
+bool FVoxelWorldRuntime::CommitInventorySections(FVoxelPreparedInventoryCommit& InPrepared, FVoxelEditBatch& OutBatch, FString& OutError)
+{
+    check(IsInGameThread());
+    if(!ValidateInventorySections(InPrepared, OutError))
+    {
+        return false;
+    }
+    if(!InPrepared.Sections.IsEmpty())
+    {
+        const auto SectionAt = [&InPrepared](int32 Index) { return InPrepared.Sections[Index].Data.Patch.Section; };
+        if(!ChangeHierarchy.CommitInvalidations(MoveTemp(InPrepared.Invalidations), SectionAt, OutError))
+        {
+            return false;
+        }
+        for(auto& Prepared : InPrepared.Sections)
+        {
+            const FIntVector Key = Prepared.Data.Patch.Section;
+            const bool bModified = !Prepared.Journal->Blocks.IsEmpty() || !Prepared.Journal->Entities.IsEmpty();
+            if(!ChangeIndex.SetModified(Key, bModified, OutError))
+            {
+                return false;
+            }
+            if(Prepared.bLoaded)
+            {
+                FVoxelSection& Section = *FindSection(Key);
+                RetireRuntimeData(Section);
+                Section.Blocks = MoveTemp(Prepared.Data.Blocks);
+                Section.Overlay = MoveTemp(Prepared.Data.Overlay);
+                Section.Entities = MoveTemp(Prepared.Data.Entities);
+                FinishRuntimeData(Section, Key, MoveTemp(Prepared.Data.DataLease));
+                Section.CommittedRevision = Prepared.Data.Patch.ToRevision;
+                Section.bCollisionDirty = true;
+                Section.bFineMeshDirty = true;
+            }
+            RetainJournal(Key, MoveTemp(Prepared.Journal), false);
+            InPrepared.Batch.Sections.Add(MoveTemp(Prepared.Data.Patch));
+        }
+        AdvanceOverlaySequences(InPrepared.Batch.Sections);
+        ++AuthorityCommitCut;
+    }
+    OutBatch = MoveTemp(InPrepared.Batch);
+    InPrepared.bPrepared = false;
+    OutError.Reset();
+    return true;
+}
+
+void FVoxelWorldRuntime::CancelInventorySections(FVoxelPreparedInventoryCommit& InPrepared)
+{
+    check(IsInGameThread());
+    InPrepared.bPrepared = false;
+    for(auto& Prepared : InPrepared.Sections)
+    {
+        if(Prepared.bPinned)
+        {
+            ReleaseSectionPin(Prepared.Section, Prepared.Resource);
+            Prepared.bPinned = false;
+        }
+    }
+    if(InPrepared.ScratchLease && !InPrepared.Sections.IsEmpty())
+    {
+        auto Retired = VoxelBoundedAllocation::MakeWorkerShared<TArray<FVoxelPreparedInventorySection>>(
+            InPrepared.ScratchLease, MoveTemp(InPrepared.Sections));
+    }
+    else
+    {
+        InPrepared.Sections.Empty();
+    }
+    InPrepared.Batch = FVoxelEditBatch();
+    InPrepared.Invalidations = FVoxelPreparedChangeInvalidations();
+    InPrepared.ScratchLease.Reset();
+    InPrepared.WorldEpoch = 0;
+    InPrepared.HierarchyRevision = 0;
+}
+
+bool FVoxelWorldRuntime::RestoreInventorySection(const FVoxelPersistentSection& InSection, FString& OutError)
+{
+    const auto Existing = FindCommittedOverlay(InSection.Section);
+    const FVoxelSection* Loaded = FindSection(InSection.Section);
+    FVoxelInventorySectionTarget Target;
+    Target.ExpectedRevision = Loaded && Loaded->Status == EVoxelSectionStatus::DataReady ? Loaded->CommittedRevision : Existing ? Existing->Revision : 0;
+    Target.After = InSection;
+    FVoxelPreparedInventoryCommit Prepared;
+    FVoxelEditBatch Batch;
+    if(!PrepareInventorySections(MakeArrayView(&Target, 1), FGuid::NewGuid(), true, Prepared, OutError) ||
+        !CommitInventorySections(Prepared, Batch, OutError))
+    {
+        CancelInventorySections(Prepared);
+        return false;
+    }
+    PublishInventorySections(Batch);
+    CancelInventorySections(Prepared);
+    return true;
+}
+
+void FVoxelWorldRuntime::PublishInventorySections(const FVoxelEditBatch& InBatch)
+{
+    for(const FVoxelSectionPatch& Patch : InBatch.Sections)
+    {
+        NotifySectionEvent(Patch.Section, EVoxelRuntimeSectionEvent::Committed);
+    }
 }

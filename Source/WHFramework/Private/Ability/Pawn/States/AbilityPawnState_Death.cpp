@@ -4,7 +4,6 @@
 
 #include "AbilitySystemComponent.h"
 #include "Ability/Pawn/AbilityPawnBase.h"
-#include "Ability/Pawn/AbilityPawnInventoryBase.h"
 #include "Ability/Pawn/States/AbilityPawnState_Spawn.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
@@ -116,8 +115,6 @@ void UAbilityPawnState_Death::DeathEnd()
 
 	Pawn->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dying);
 	Pawn->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dead);
-
-	Pawn->Inventory->DiscardItems();
 
 	if (!Pawn->IsPlayer())
 	{

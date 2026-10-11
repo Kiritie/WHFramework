@@ -4,7 +4,6 @@
 
 #include "AbilitySystemComponent.h"
 #include "Ability/Character/AbilityCharacterBase.h"
-#include "Ability/Character/AbilityCharacterInventoryBase.h"
 #include "Ability/Character/States/AbilityCharacterState_Spawn.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
@@ -55,8 +54,7 @@ void UAbilityCharacterState_Death::OnEnter(UFiniteStateBase* InLastState, const 
 		Character->GetController<AAIControllerBase>()->StopBehaviorTree();
 	}
 
-	Character->SetExp(0.f);
-	Character->SetHealth(0.f);
+	Character->ApplyDeathAttributes();
 
 	Character->GetLooking()->TargetLookingOff();
 	Character->LimitToAnim();
@@ -130,8 +128,6 @@ void UAbilityCharacterState_Death::DeathEnd()
 	Character->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dying);
 	Character->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dead);
 
-	Character->Inventory->DiscardItems();
-
 	if (!Character->IsPlayer())
 	{
 		UObjectPoolModuleStatics::DespawnObject(Character);
@@ -141,3 +137,4 @@ void UAbilityCharacterState_Death::DeathEnd()
 		Character->Execute_SetActorVisible(Character, false);
 	}
 }
+

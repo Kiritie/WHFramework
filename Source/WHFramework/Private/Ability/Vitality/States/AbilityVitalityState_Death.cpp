@@ -5,7 +5,6 @@
 #include "AbilitySystemComponent.h"
 #include "Ability/Vitality/AbilityVitalityBase.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Spawn.h"
-#include "Ability/Vitality/AbilityVitalityInventoryBase.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "Common/Interaction/InteractionComponent.h"
 #include "Event/EventModuleStatics.h"
@@ -104,7 +103,6 @@ void UAbilityVitalityState_Death::DeathEnd()
 	Vitality->GetAbilitySystemComponent()->RemoveLooseGameplayTag(GameplayTags::State_Vitality_Dying);
 	Vitality->GetAbilitySystemComponent()->AddLooseGameplayTag(GameplayTags::State_Vitality_Dead);
 
-	Vitality->Inventory->DiscardItems();
-
 	UObjectPoolModuleStatics::DespawnObject(Vitality);
 }
+

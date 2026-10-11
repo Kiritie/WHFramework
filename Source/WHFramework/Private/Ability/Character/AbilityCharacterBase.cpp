@@ -1,6 +1,10 @@
 // Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 
 #include "Ability/Character/AbilityCharacterBase.h"
+#include "Net/UnrealNetwork.h"
+#include "Ability/Inventory/AbilityInventoryBase.h"
+#include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Engine/World.h"
 
 #include "Ability/Interaction/AbilityInteractionOptions.h"
 #include "Components/CapsuleComponent.h"
@@ -21,15 +25,12 @@
 #include "Scene/SceneModuleStatics.h"
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/Abilities/VitalityActionAbilityBase.h"
-#include "Ability/Character/AbilityCharacterInventoryBase.h"
 #include "Ability/Character/States/AbilityCharacterState_Climb.h"
 #include "Ability/Character/States/AbilityCharacterState_Crouch.h"
 #include "Ability/Character/States/AbilityCharacterState_Float.h"
 #include "Ability/Character/States/AbilityCharacterState_Fly.h"
 #include "Ability/Character/States/AbilityCharacterState_Interrupt.h"
 #include "Ability/Character/States/AbilityCharacterState_Swim.h"
-#include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
-#include "Ability/PickUp/AbilityPickUpBase.h"
 #include "Common/Looking/LookingComponent.h"
 #include "Scene/Actor/PhysicsVolume/PhysicsVolumeBase.h"
 
@@ -46,7 +47,7 @@ AAbilityCharacterBase::AAbilityCharacterBase(const FObjectInitializer& ObjectIni
 
 	AttributeSet = CreateDefaultSubobject<UCharacterAttributeSetBase>(FName("AttributeSet"));
 
-	Inventory = CreateDefaultSubobject<UAbilityCharacterInventoryBase>(FName("Inventory"));
+	Inventory = nullptr;
 
 	Interaction = CreateDefaultSubobject<UInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);
@@ -100,6 +101,8 @@ void AAbilityCharacterBase::OnSpawn_Implementation(const FParameter& InParam)
 
 void AAbilityCharacterBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
+	BindInventory(nullptr);
+	SelectedInventorySlot = FInventorySlotKey();
 	Super::OnDespawn_Implementation(InMode);
 
 	SetMotionRate(1.f, 1.f);
@@ -110,7 +113,7 @@ void AAbilityCharacterBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 
 	BirthTransform = FTransform::Identity;
 
-	Inventory->UnloadSaveData();
+
 }
 
 void AAbilityCharacterBase::OnInitialize_Implementation()
@@ -245,7 +248,17 @@ void AAbilityCharacterBase::LoadData(const FParameter& InSaveData, EPhase InPhas
 		SetLevelA(SaveData.Level);
 		SetRaceID(SaveData.RaceID);
 
-		Inventory->LoadSaveData(SaveData.InventoryData, InPhase);
+		if (HasAuthority() && SaveData.InventorySnapshot.InventoryId.IsValid())
+		{
+			UInventoryWorldSubsystem* Subsystem = GetWorld() ? GetWorld()->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+			UAbilityInventoryBase* Resolved = Subsystem ? Subsystem->Resolve(SaveData.InventorySnapshot.InventoryId) : nullptr;
+			if (!Resolved)
+			{
+				UE_LOG(LogTemp, Error, TEXT("Inventory restore requires the recovered world store: %s"), *SaveData.InventorySnapshot.InventoryId.ToString());
+				return;
+			}
+			BindInventory(Resolved);
+		}
 	}
 }
 
@@ -259,7 +272,10 @@ FParameter AAbilityCharacterBase::ToData()
 	SaveData.RaceID = RaceID;
 	SaveData.Level = Level;
 
-	SaveData.InventoryData = Inventory->GetSaveData(true);
+	if (Inventory)
+	{
+		SaveData.InventorySnapshot = Inventory->MakeSnapshot();
+	}
 
 	SaveData.SpawnTransform = GetActorTransform();
 	SaveData.BirthTransform = BirthTransform;
@@ -348,6 +364,12 @@ void AAbilityCharacterBase::OnMovementModeChanged(EMovementMode PrevMovementMode
 void AAbilityCharacterBase::Death(IAbilityVitalityInterface* InKiller)
 {
 	SwitchFinalFiniteState({Cast<UObject>(InKiller)});
+}
+
+void AAbilityCharacterBase::ApplyDeathAttributes()
+{
+	SetExp(0.f);
+	SetHealth(0.f);
 }
 
 void AAbilityCharacterBase::Kill(IAbilityVitalityInterface* InTarget)
@@ -581,13 +603,6 @@ void AAbilityCharacterBase::EndAction(const FGameplayTag& InActionTag, bool bWas
 	}
 }
 
-void AAbilityCharacterBase::OnPickUp(AAbilityPickUpBase* InPickUp)
-{
-	if (InPickUp)
-	{
-		Inventory->AddItemByRange(InPickUp->GetItem(), -1);
-	}
-}
 
 void AAbilityCharacterBase::OnEnterInteract(IInteractionAgentInterface* InInteractionAgent)
 {
@@ -597,49 +612,6 @@ void AAbilityCharacterBase::OnLeaveInteract(IInteractionAgentInterface* InIntera
 {
 }
 
-void AAbilityCharacterBase::OnAdditionItem(const FAbilityItem& InItem)
-{
-	if (InItem.ID == PAID_EXP)
-	{
-		ModifyExp(InItem.Count);
-	}
-}
-
-void AAbilityCharacterBase::OnRemoveItem(const FAbilityItem& InItem)
-{
-}
-
-void AAbilityCharacterBase::OnPreChangeItem(const FAbilityItem& InOldItem)
-{
-}
-
-void AAbilityCharacterBase::OnChangeItem(const FAbilityItem& InNewItem)
-{
-}
-
-void AAbilityCharacterBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
-{
-}
-
-void AAbilityCharacterBase::OnDeactiveItem(const FAbilityItem& InItem, bool bPassive)
-{
-}
-
-void AAbilityCharacterBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPlace)
-{
-	FVector Pos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
-	if (!bInPlace)
-		Pos += GetActorForwardVector() * (GetRadius() + 35.f);
-	UAbilityModuleStatics::SpawnAbilityPickUp(InItem, Pos, Container.GetInterface());
-}
-
-void AAbilityCharacterBase::OnSelectItem(const FAbilityItem& InItem)
-{
-}
-
-void AAbilityCharacterBase::OnAuxiliaryItem(const FAbilityItem& InItem)
-{
-}
 
 void AAbilityCharacterBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
 {
@@ -889,7 +861,6 @@ bool AAbilityCharacterBase::SetLevelA(int32 InLevel)
 		{
 			AbilitySystem->BP_ApplyGameplayEffectSpecToSelf(SpecHandle);
 		}
-		Inventory->ResetItems();
 		ResetData();
 		return true;
 	}
@@ -974,4 +945,61 @@ void AAbilityCharacterBase::OnRep_PlayerState()
 	{
 		BindASCInput();
 	}
+}
+
+
+void AAbilityCharacterBase::BindInventory(UAbilityInventoryBase* InInventory)
+{
+	if (Inventory == InInventory)
+	{
+		return;
+	}
+	UInventoryWorldSubsystem* NextSubsystem = InInventory ? Cast<UInventoryWorldSubsystem>(InInventory->GetOuter()) : nullptr;
+	UInventoryWorldSubsystem* WorldSubsystem = GetWorld() ? GetWorld()->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+	if (InInventory && (!NextSubsystem || NextSubsystem != WorldSubsystem || !NextSubsystem->AcquireLease(InInventory->GetInventoryId())))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Inventory binding rejected for %s"), *GetName());
+		return;
+	}
+	UAbilityInventoryBase* PreviousInventory = Inventory;
+	Inventory = InInventory;
+	SetSelectedInventorySlot(FInventorySlotKey());
+	if (PreviousInventory)
+	{
+		if (UInventoryWorldSubsystem* PreviousSubsystem = Cast<UInventoryWorldSubsystem>(PreviousInventory->GetOuter()))
+		{
+			PreviousSubsystem->ReleaseLease(PreviousInventory->GetInventoryId());
+		}
+	}
+}
+
+void AAbilityCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME_CONDITION(AAbilityCharacterBase, SelectedInventorySlot, COND_OwnerOnly);
+}
+
+void AAbilityCharacterBase::SetSelectedInventorySlot(const FInventorySlotKey& InSlotKey)
+{
+	if (!HasAuthority() || SelectedInventorySlot == InSlotKey)
+	{
+		return;
+	}
+	if (InSlotKey.IsValid() && (!Inventory || !Inventory->MakeSnapshot().FindSlot(InSlotKey)))
+	{
+		return;
+	}
+	SelectedInventorySlot = InSlotKey;
+	OnInventorySelectionUpdated(SelectedInventorySlot);
+	ForceNetUpdate();
+}
+
+void AAbilityCharacterBase::OnRep_SelectedInventorySlot()
+{
+	OnInventorySelectionUpdated(SelectedInventorySlot);
+}
+
+void AAbilityCharacterBase::OnInventorySelectionUpdated(const FInventorySlotKey& InSlotKey)
+{
+	OnInventorySelectionChanged.Broadcast(InSlotKey);
 }

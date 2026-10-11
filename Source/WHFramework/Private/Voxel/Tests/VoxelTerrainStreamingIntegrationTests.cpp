@@ -271,6 +271,71 @@ bool FVoxelResumablePageIntegrationTest::RunTest(const FString& InParameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelResumableFineSameBandFairnessTest,
+	"WHFramework.Voxel.KnownRequirements.ResumableFineSameBandFairness",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelResumableFineSameBandFairnessTest::RunTest(const FString& InParameters)
+{
+	FVoxelTaskScheduler Scheduler(true);
+	FVoxelTaskBudget Budget;
+	Budget.MaxConcurrentTasks = 1;
+	Scheduler.SetBudget(Budget);
+	TAtomic<int32> FineExecutions(0);
+
+	FVoxelTaskRequest Fine;
+	Fine.Kind = EVoxelTaskKind::BuildFineShard;
+	Fine.WorkClass = EVoxelWorkClass::Visible;
+	Fine.Stamp.Token = 801;
+	Fine.DistanceScore = 100.0;
+	Fine.InputBytes = 1024;
+	Fine.ReservedBytes = 1024;
+	Fine.bResumable = true;
+	Fine.Execute = [&FineExecutions](const TAtomic<bool>& Cancel)
+	{
+		++FineExecutions;
+		FVoxelTaskResult Result;
+		Result.bSuccess = !Cancel.Load();
+		Result.bContinue = Result.bSuccess;
+		return Result;
+	};
+	if (!TestTrue(TEXT("持续续跑的 Fine 任务入队"), Scheduler.Enqueue(MoveTemp(Fine)))) return false;
+
+	FVoxelTaskRequest Exact;
+	Exact.Kind = EVoxelTaskKind::GenerateExactBase;
+	Exact.WorkClass = EVoxelWorkClass::Visible;
+	Exact.Stamp.Token = 802;
+	Exact.DistanceScore = 200.0;
+	Exact.InputBytes = 1024;
+	Exact.ReservedBytes = 1024;
+	Exact.Execute = [](const TAtomic<bool>& Cancel)
+	{
+		FVoxelTaskResult Result;
+		Result.bSuccess = !Cancel.Load();
+		return Result;
+	};
+	if (!TestTrue(TEXT("同服务带的精确地形任务入队"), Scheduler.Enqueue(MoveTemp(Exact))))
+	{
+		Scheduler.StopAndJoin();
+		return false;
+	}
+
+	bool bExactApplied = false;
+	const double Deadline = FPlatformTime::Seconds() + 5.0;
+	while (!bExactApplied && FPlatformTime::Seconds() < Deadline)
+	{
+		Scheduler.Tick([&bExactApplied](FVoxelTaskResult&& Result)
+		{
+			if (Result.Stamp.Token == 802 && Result.bSuccess) bExactApplied = true;
+		});
+		FPlatformProcess::Sleep(0.001f);
+	}
+	TestTrue(TEXT("Fine 至少执行一次切片"), FineExecutions.Load() > 0);
+	TestTrue(TEXT("持续 Fine 续跑期间，同服务带 Exact 也得到执行"), bExactApplied);
+	Scheduler.StopAndJoin();
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelHeightfieldWindowIntegrationTest,
 	"WHFramework.Voxel.KnownRequirements.HeightfieldWindowIntegration",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

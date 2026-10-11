@@ -1,11 +1,10 @@
 #include "Ability/Item/AbilityItemDataBase.h"
+#include "GameplayEffect.h"
 
 #include "Ability/AbilityModule.h"
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/Abilities/ItemAbilityBase.h"
-#include "Ability/Actor/AbilityActorInterface.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
-#include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
 #include "Common/CommonModuleStatics.h"
 
 UAbilityItemDataBase::UAbilityItemDataBase()
@@ -16,8 +15,8 @@ UAbilityItemDataBase::UAbilityItemDataBase()
 	Detail = FText::GetEmpty();
 	Rarity = EAbilityItemRarity::None;
 	Icon = nullptr;
-	MaxCount = 0;
-	MaxLevel = 0;
+	MaxCount = 1;
+	MaxLevel = 1;
 	AbilityClass = nullptr;
 	PickUpClass = nullptr;
 
@@ -40,12 +39,12 @@ void UAbilityItemDataBase::OnReset_Implementation()
 
 int32 UAbilityItemDataBase::ClampCount(int32 InCount) const
 {
-	return FMath::Clamp(InCount, 0, MaxCount != -1 ? MaxCount : InCount);
+	return FMath::Clamp(InCount, 0, MaxCount);
 }
 
 int32 UAbilityItemDataBase::ClampLevel(int32 InLevel) const
 {
-	return FMath::Clamp(InLevel, 0, MaxLevel != -1 ? MaxLevel : InLevel);
+	return FMath::Clamp(InLevel, 0, MaxLevel);
 }
 
 EAbilityItemType UAbilityItemDataBase::GetItemType() const
@@ -101,18 +100,34 @@ FString UAbilityItemDataBase::GetItemAbilityInfo(int32 InLevel) const
 	return TEXT("");
 }
 
-FString UAbilityItemDataBase::GetItemErrorInfo(FAbilityItem InItem) const
+FString UAbilityItemDataBase::GetItemErrorInfo(FAbilityItem InItem, int32 InActorLevel) const
 {
-	FString ErrorInfo;
-	if(UAbilityInventorySlotBase* InventorySlot = InItem.GetPayload<UAbilityInventorySlotBase>())
-	{
-		if(IAbilityActorInterface* AbilityActor = InventorySlot->GetInventory()->GetOwnerAgent<IAbilityActorInterface>())
-		{
-			if(AbilityActor->GetLevelA() < InItem.Level)
-			{
-				ErrorInfo = FText::Format(NSLOCTEXT("WH.AbilityItem", "RequiredLevel", "角色未达到[{0}]级"), FText::AsNumber(InItem.Level)).ToString();
-			}
-		}
-	}
-	return ErrorInfo;
+    if (InActorLevel < InItem.Level)
+    {
+        return FText::Format(NSLOCTEXT("WH.AbilityItem", "RequiredLevel", "角色未达到[{0}]级"), FText::AsNumber(InItem.Level)).ToString();
+    }
+    return FString();
+}
+
+FInventoryItemDefinition UAbilityItemDataBase::BuildInventoryDefinition() const
+{
+    FInventoryItemDefinition Definition;
+    Definition.ItemId = GetPrimaryAssetId();
+    Definition.DisplayName = Name;
+    Definition.Icon = FSoftObjectPath(Icon);
+    Definition.Tags = InventoryTags;
+    Definition.MaxStack = MaxCount;
+    Definition.MaxLevel = MaxLevel;
+    Definition.StackPolicy = StackPolicy;
+    Definition.UsePolicy = UsePolicy;
+    Definition.AbilityClass = FSoftClassPath(AbilityClass.Get());
+    Definition.ConsumableCount = ConsumableCount;
+    Definition.bCanTrade = bCanTrade;
+    Definition.bCanDrop = bCanDrop;
+    Definition.PropertyRules = PropertyRules;
+    for (const TSubclassOf<UGameplayEffect>& Effect : PassiveEffects)
+    {
+        Definition.PassiveEffects.Add(FSoftClassPath(Effect.Get()));
+    }
+    return Definition;
 }

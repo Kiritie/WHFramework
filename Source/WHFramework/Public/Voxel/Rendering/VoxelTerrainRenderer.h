@@ -166,7 +166,7 @@ public:
 	bool ConsumeTransactionFailure(const FGuid& InTransaction);
 	void PollRenderReceipts();
 	void AdvanceFramePublication();
-	void AdvanceRetirement(TFunction<void(const FIntVector&)> InOnRetired);
+	void AdvanceRetirement(TFunction<void(const FIntVector&)> InOnRetired, double InDeadline = MAX_dbl);
 	const FVoxelFinePresentedAtom* FindPresentedAtom(const FIntVector& InSection) const;
 	TSharedPtr<const IVoxelTerrainPresentedSnapshot, ESPMode::ThreadSafe> CapturePresentedSnapshot() const;
 	bool HasPresentedCoverage(const FBox& InCellBounds) const;

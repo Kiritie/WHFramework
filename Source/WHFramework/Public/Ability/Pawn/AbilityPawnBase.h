@@ -16,12 +16,12 @@
 
 class UFSMComponent;
 class UInteractionComponent;
+class UAbilityInventoryBase;
 class UVitalityAttributeSetBase;
 class UVitalityAbilityBase;
 class UAbilitySystemComponentBase;
 class UBoxComponent;
 class UAttributeSetBase;
-class UAbilityPawnInventoryBase;
 class UAbilityPawnDataBase;
 
 /**
@@ -117,23 +117,6 @@ public:
 
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
-	virtual void OnAdditionItem(const FAbilityItem& InItem) override;
-
-	virtual void OnRemoveItem(const FAbilityItem& InItem) override;
-
-	virtual void OnPreChangeItem(const FAbilityItem& InOldItem) override;
-
-	virtual void OnChangeItem(const FAbilityItem& InNewItem) override;
-
-	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
-
-	virtual void OnDeactiveItem(const FAbilityItem& InItem, bool bPassive) override;
-
-	virtual void OnDiscardItem(const FAbilityItem& InItem, bool bInPlace) override;
-
-	virtual void OnSelectItem(const FAbilityItem& InItem) override;
-
-	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
 
 protected:
 protected:
@@ -174,8 +157,8 @@ protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UInteractionComponent* Interaction;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UAbilityPawnInventoryBase* Inventory;
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+	UAbilityInventoryBase* Inventory;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UFSMComponent* FSM;
@@ -262,6 +245,8 @@ public:
 	virtual UInteractionComponent* GetInteractionComponent() const override;
 
 	virtual UAbilityInventoryBase* GetInventory() const override;
+
+	void BindInventory(UAbilityInventoryBase* InInventory);
 
 	virtual UFSMComponent* GetFSMComponent() const override
 	{
@@ -369,3 +354,4 @@ public:
 
 	virtual void OnRep_PlayerState() override;
 };
+

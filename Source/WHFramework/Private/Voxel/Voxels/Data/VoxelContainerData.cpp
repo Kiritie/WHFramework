@@ -1,2 +1,9 @@
 #include "Voxel/Voxels/Data/VoxelContainerData.h"
-UVoxelContainerData::UVoxelContainerData(){EntityKind=1;}
+
+#include "Voxel/Save/InventoryVoxelEntityCodec.h"
+
+UVoxelContainerData::UVoxelContainerData()
+{
+    EntityKind = FInventoryVoxelEntityCodec::Kind;
+    EntityVariant = 0;
+}

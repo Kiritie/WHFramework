@@ -1,12 +1,13 @@
 #pragma once
 
 #include "Ability/AbilityModuleTypes.h"
+#include "Ability/Inventory/InventoryItemRegistry.h"
 #include "Asset/Primary/PrimaryAssetBase.h"
 
 #include "AbilityItemDataBase.generated.h"
 
 class UItemAbilityBase;
-class AAbilityPickUpBase;
+class AInventoryPickupActor;
 
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UAbilityItemDataBase : public UPrimaryAssetBase
@@ -44,7 +45,32 @@ public:
 	TSubclassOf<UItemAbilityBase> AbilityClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSubclassOf<AAbilityPickUpBase> PickUpClass;
+	TSubclassOf<AInventoryPickupActor> PickUpClass;
+
+public:
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    EInventoryStackPolicy StackPolicy = EInventoryStackPolicy::Stackable;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    EInventoryUsePolicy UsePolicy = EInventoryUsePolicy::None;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    FGameplayTagContainer InventoryTags;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    TArray<FInventoryPropertyRule> PropertyRules;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    TArray<TSubclassOf<UGameplayEffect>> PassiveEffects;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    int32 ConsumableCount = 1;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    bool bCanTrade = true;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    bool bCanDrop = true;
 
 protected:
 	UPROPERTY(Transient)
@@ -64,5 +90,8 @@ public:
 	virtual FString GetItemAbilityInfo(int32 InLevel = 1) const;
 
 	UFUNCTION(BlueprintPure)
-	virtual FString GetItemErrorInfo(FAbilityItem InItem) const;
+	virtual FString GetItemErrorInfo(FAbilityItem InItem, int32 InActorLevel) const;
+
+	virtual FInventoryItemDefinition BuildInventoryDefinition() const;
 };
+

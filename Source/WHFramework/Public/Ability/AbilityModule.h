@@ -12,7 +12,6 @@ class IAbilityActorInterface;
 class AAbilityItemBase;
 class AAbilityVitalityBase;
 class AAbilityCharacterBase;
-class AAbilityPickUpBase;
 class AAbilityActorBase;
 class AAbilityPawnBase;
 class AAbilityProjectileBase;
@@ -72,13 +71,6 @@ public:
 	virtual AAbilityItemBase* SpawnAbilityItem(FAbilityItem InItem, AActor* InOwnerActor = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
-	// PickUp
-public:
-	virtual AAbilityPickUpBase* SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer = nullptr, bool bEnableCollision = true);
-
-	virtual AAbilityPickUpBase* SpawnAbilityPickUp(const FParameter& InSaveData, ISceneContainerInterface* InContainer = nullptr, bool bEnableCollision = true);
-
-	//////////////////////////////////////////////////////////////////////////
 	// Projectile
 public:
 	virtual AAbilityProjectileBase* SpawnAbilityProjectile(const TSubclassOf<AAbilityProjectileBase>& InClass, AActor* InOwnerActor = nullptr, const FGameplayAbilitySpecHandle& InAbilityHandle = FGameplayAbilitySpecHandle());
@@ -88,3 +80,4 @@ public:
 public:
 	virtual AActor* SpawnAbilityActor(const FParameter& InSaveData, ISceneContainerInterface* InContainer = nullptr);
 };
+

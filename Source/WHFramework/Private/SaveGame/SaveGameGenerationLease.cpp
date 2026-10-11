@@ -155,6 +155,15 @@ bool FSaveGameGenerationReadLease::AcquireGranted(const FString& InDirectory,
 
 bool FSaveGameGenerationReadLease::TryRetireDirectory(const FString& InDirectory, const FSaveGameGenerationWriteLease* InWriter)
 {
+    return TryRetireDirectory(InDirectory, InWriter, [&InDirectory]()
+    {
+        return IFileManager::Get().DeleteDirectory(*InDirectory, false, true);
+    });
+}
+
+bool FSaveGameGenerationReadLease::TryRetireDirectory(const FString& InDirectory,
+    const FSaveGameGenerationWriteLease* InWriter, TFunctionRef<bool()> InRetireAction)
+{
 	if (InDirectory.IsEmpty()) return false;
 	SaveGameGeneration::FDirectoryLink Retiring;
 	Retiring.Directory = CanonicalSaveGenerationDirectory(InDirectory);
@@ -172,7 +181,7 @@ bool FSaveGameGenerationReadLease::TryRetireDirectory(const FString& InDirectory
 		RegisterSaveDirectory(State, Retiring);
 	}
 	// 登记真实栈节点保护原生删除，文件系统操作不持有注册表锁。
-	const bool bDeleted = IFileManager::Get().DeleteDirectory(*InDirectory, false, true);
+	const bool bDeleted = InRetireAction();
 	{
 		FScopeLock Lock(&State.Mutex);
 		UnregisterSaveDirectory(State, Retiring);
@@ -267,3 +276,4 @@ uint64 FSaveGameGenerationWriteLease::ReleaseVersion()
 {
 	return SaveGenerationRegistry().WriterReleaseVersion.load(std::memory_order_acquire);
 }
+

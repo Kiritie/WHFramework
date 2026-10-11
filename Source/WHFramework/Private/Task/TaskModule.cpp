@@ -17,6 +17,7 @@
 #include "Task/TaskModuleNetworkComponent.h"
 #include "Misc/Crc.h"
 #include "Misc/ScopeExit.h"
+#include "Misc/SecureHash.h"
 
 IMPLEMENTATION_MODULE(UTaskModule)
 
@@ -128,6 +129,7 @@ void UTaskModule::ClearRuntimeAssets()
 	const bool bHadCurrentTask = CurrentTask != nullptr;
 	CurrentTask = nullptr;
 	Assets.Reset();
+	PreparedRuntimeAssets.Reset();
 	PendingResume.Reset();
 	if(bHadCurrentTask) UEventModuleStatics::BroadcastEvent<FEventCurrentTaskChanged>(this, { nullptr });
 }
@@ -283,6 +285,7 @@ UTaskAsset* UTaskModule::AddAssetInternal(UTaskAsset* InAsset, FGuid InInstanceI
 	if(!InAsset) return nullptr;
 	UTaskAsset* Source = Cast<UTaskAsset>(InAsset->SourceObject ? InAsset->SourceObject : InAsset);
 	if(!Source) return nullptr;
+	if(bDefaultAssetsPerOwner && !InOwnerActorID.IsValid() && !bPresentationOnly && DefaultAssets.Contains(Source)) return nullptr;
 	if(UTaskAsset* Existing = GetAssetByInstance(Source, InInstanceID)) return Existing;
 	BeginTaskMutation();
 	ON_SCOPE_EXIT { EndTaskMutation(); };
@@ -322,6 +325,165 @@ UTaskAsset* UTaskModule::AddAssetInternal(UTaskAsset* InAsset, FGuid InInstanceI
 	}
 	RequestTaskMarkersRefresh();
 	return RuntimeAsset;
+}
+
+UTaskAsset* UTaskModule::PrepareRuntimeAsset(UTaskAsset* InAsset, FGuid InInstanceID, FGuid InAgentID, FGuid InOwnerActorID, FString& OutError)
+{
+	if(!IsInGameThread() || !GetWorld() || GetWorld()->GetNetMode() == NM_Client || bLoadingTasks ||
+		!InAsset || !InInstanceID.IsValid() || !InAgentID.IsValid() || !InOwnerActorID.IsValid() || PreparedRuntimeAssets.Num() >= 64)
+	{
+		OutError = TEXT("Task.PreparedAssetUnavailable");
+		return nullptr;
+	}
+	UTaskAsset* Source = Cast<UTaskAsset>(InAsset->SourceObject ? InAsset->SourceObject : InAsset);
+	if(!Source || GetAssetByInstance(Source, InInstanceID))
+	{
+		OutError = TEXT("Task.PreparedInstanceAlreadyExists");
+		return nullptr;
+	}
+	TArray<FText> Errors;
+	if(!Source->ValidateTasks(Errors))
+	{
+		OutError = Errors.IsEmpty() ? TEXT("Task.InvalidTemplate") : Errors[0].ToString();
+		return nullptr;
+	}
+	UTaskAsset* Candidate = DuplicateObject<UTaskAsset>(Source, this);
+	if(!Candidate)
+	{
+		OutError = TEXT("Task.CannotCloneTemplate");
+		return nullptr;
+	}
+	Candidate->SourceObject = Source;
+	Candidate->InstanceID = InInstanceID;
+	Candidate->AgentID = InAgentID;
+	Candidate->OwnerActorID = InOwnerActorID;
+	Candidate->bPresentationOnly = true;
+	if(!Candidate->ExpandTaskAssetReferences(Errors) || !Candidate->RebuildTaskMap(false) ||
+		!Candidate->ValidateTasks(Errors) || Candidate->TaskMap.Num() > 256 || Candidate->RootTasks.IsEmpty())
+	{
+		OutError = Errors.IsEmpty() ? TEXT("Task.InvalidRuntimeHierarchy") : Errors[0].ToString();
+		return nullptr;
+	}
+	for(const auto& Pair : Candidate->TaskMap)
+	{
+		UTaskBase* Task = Pair.Value;
+		FTaskPresentationState Initial;
+		Initial.TaskGUID = Pair.Key;
+		Initial.Target = Task->Target;
+		Task->ApplyPresentation(Initial);
+		Task->bRuntimeSelected = false;
+		for(FTaskObjective& Objective : Task->Objectives)
+		{
+			if(Objective.RequiredCountRange == FIntPoint::ZeroValue) continue;
+			const FString Key = InInstanceID.ToString(EGuidFormats::Digits) + TEXT("/") + Pair.Key + TEXT("/") + Objective.ObjectiveID.ToString();
+			Objective.RequiredCount = FRandomStream(FCrc::StrCrc32(*Key)).RandRange(Objective.RequiredCountRange.X, Objective.RequiredCountRange.Y);
+		}
+	}
+	Assets.Reserve(Assets.Num() + PreparedRuntimeAssets.Num() + 1);
+	PreparedRuntimeAssets.Add(Candidate);
+	OutError.Reset();
+	return Candidate;
+}
+
+bool UTaskModule::InstallPreparedRuntimeAsset(UTaskAsset* InAsset, FString& OutError)
+{
+	if(!IsInGameThread() || bLoadingTasks || !InAsset || InAsset->GetOuter() != this || !InAsset->SourceObject ||
+		!InAsset->InstanceID.IsValid() || !InAsset->OwnerActorID.IsValid())
+	{
+		OutError = TEXT("Task.PreparedAssetIdentityChanged");
+		return false;
+	}
+	if(Assets.Contains(InAsset)) return true;
+	if(!PreparedRuntimeAssets.Contains(InAsset) || GetAssetByInstance(Cast<UTaskAsset>(InAsset->SourceObject), InAsset->InstanceID))
+	{
+		OutError = TEXT("Task.PreparedAssetMissingOrReplaced");
+		return false;
+	}
+	Assets.Add(InAsset);
+	PreparedRuntimeAssets.Remove(InAsset);
+	OutError.Reset();
+	return true;
+}
+
+void UTaskModule::CancelPreparedRuntimeAsset(UTaskAsset* InAsset)
+{
+	check(IsInGameThread());
+	PreparedRuntimeAssets.Remove(InAsset);
+}
+
+bool UTaskModule::EnableOwnerDefaultAssets(FString& OutError)
+{
+	if(!IsInGameThread() || !GetWorld() || GetWorld()->GetNetMode() == NM_Client || bLoadingTasks)
+	{
+		OutError = TEXT("Task.OwnerDefaultsUnavailable");
+		return false;
+	}
+	bDefaultAssetsPerOwner = true;
+	const TArray<UTaskAsset*> Existing = Assets;
+	for(UTaskAsset* Asset : Existing)
+	{
+		if(Asset && !Asset->OwnerActorID.IsValid() && DefaultAssets.Contains(Cast<UTaskAsset>(Asset->SourceObject)))
+		{
+			Asset->bPresentationOnly = true;
+			RemoveAsset(Asset);
+		}
+	}
+	OutError.Reset();
+	return true;
+}
+
+FGuid UTaskModule::MakeOwnerDefaultInstanceID(const FGuid& InWorldID, const FGuid& InOwnerActorID, const FString& InTemplatePath)
+{
+	if(!InWorldID.IsValid() || !InOwnerActorID.IsValid() || InTemplatePath.IsEmpty()) return FGuid();
+	const FString Key = TEXT("OwnerDefaultTask/") + InWorldID.ToString(EGuidFormats::Digits) + TEXT("/") +
+		InOwnerActorID.ToString(EGuidFormats::Digits) + TEXT("/") + InTemplatePath;
+	FGuid Result;
+	FGuid::ParseExact(FMD5::HashAnsiString(*Key), EGuidFormats::Digits, Result);
+	return Result;
+}
+
+bool UTaskModule::PrepareOwnerDefaultAssets(const FGuid& InWorldID, const FGuid& InOwnerActorID, TArray<UTaskAsset*>& OutAssets, TSet<FGuid>& OutCreated, FString& OutError)
+{
+	OutAssets.Reset();
+	OutCreated.Reset();
+	if(!bDefaultAssetsPerOwner || !InWorldID.IsValid() || !InOwnerActorID.IsValid() || bLoadingTasks ||
+		!GetWorld() || GetWorld()->GetNetMode() == NM_Client)
+	{
+		OutError = TEXT("Task.OwnerDefaultsNotReady");
+		return false;
+	}
+	TSet<UTaskAsset*> Seen;
+	for(UTaskAsset* Definition : DefaultAssets)
+	{
+		UTaskAsset* Source = Definition ? Cast<UTaskAsset>(Definition->SourceObject ? Definition->SourceObject : Definition) : nullptr;
+		if(!Source || Seen.Contains(Source))
+		{
+			OutError = TEXT("Task.OwnerDefaultTemplateInvalid");
+			return false;
+		}
+		Seen.Add(Source);
+		const FGuid InstanceID = MakeOwnerDefaultInstanceID(InWorldID, InOwnerActorID, Source->GetPathName());
+		UTaskAsset* Asset = GetAssetByInstance(Source, InstanceID);
+		if(Asset && Asset->OwnerActorID != InOwnerActorID)
+		{
+			OutError = TEXT("Task.OwnerDefaultIdentityChanged");
+			return false;
+		}
+		if(!Asset)
+		{
+			Asset = PrepareRuntimeAsset(Source, InstanceID, InOwnerActorID, InOwnerActorID, OutError);
+			if(!Asset) return false;
+			if(!InstallPreparedRuntimeAsset(Asset, OutError))
+			{
+				CancelPreparedRuntimeAsset(Asset);
+				return false;
+			}
+			OutCreated.Add(InstanceID);
+		}
+		OutAssets.Add(Asset);
+	}
+	OutError.Reset();
+	return true;
 }
 
 void UTaskModule::RemoveAsset(UTaskAsset* InAsset)
@@ -881,3 +1043,4 @@ TArray<UTaskAsset*> UTaskModule::GetVisibleAssets() const
 	}
 	return Result;
 }
+

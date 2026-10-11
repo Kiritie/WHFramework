@@ -2,6 +2,7 @@
 #include "Voxel/Navigation/VoxelNavigationPresenter.h"
 
 #include "CoreMinimal.h"
+#include "Ability/Inventory/InventoryDomain.h"
 #include "Main/Base/ModuleBase.h"
 #include "Voxel/Interaction/VoxelRaycast.h"
 #include "Voxel/Interaction/VoxelEditTypes.h"
@@ -71,6 +72,9 @@ struct WHFRAMEWORK_API FVoxelModuleSaveCapture
 	FVoxelWorldSaveCapture Voxels;
 	TSharedPtr<const FVoxelSceneSaveCapture, ESPMode::ThreadSafe> Scenes;
 };
+
+class FVoxelInventoryDomainBridge;
+using FInventoryVoxelContribution = TFunction<bool(FVoxelInteractionPlan&, AActor*, FInventoryBatchRequest&, FString&)>;
 
 UCLASS()
 class WHFRAMEWORK_API UVoxelModule : public UModuleBase
@@ -153,6 +157,8 @@ public:
 	FGuid GetSessionId() const;
 	uint64 GetWorldEpoch() const;
 	uint64 GetInterestRevision() const;
+	bool HasInterestBuildFailed() const;
+	const FString& GetInterestBuildError() const;
 	TSharedPtr<const FVoxelInterestSet, ESPMode::ThreadSafe> GetCurrentInterestSnapshot() const;
 	TSharedPtr<const FVoxelInterestSet, ESPMode::ThreadSafe> GetDesiredInterestSnapshot() const;
 	bool CanCommitTerrainInterest(const FVoxelInterestSet& InSnapshot) const;
@@ -241,6 +247,8 @@ public:
 	bool BeginProjectMutation();
 	void EndProjectMutation();
 	void PublishProjectEdit(const FVoxelEditBatch& InBatch);
+	void BindInventoryBridge(TSharedRef<FVoxelInventoryDomainBridge> InBridge, FInventoryVoxelContribution InContribution);
+	bool ExecuteInventoryWorldEdit(FVoxelInteractionPlan& InOutPlan, AActor* InSource, FInventoryBatchRequest& InOutRequest, const FInventoryAuthorityContext& InAuthority, FInventoryCommandResult& OutResult, FString& OutError);
 	bool IsProjectSceneSimulationEnabled() const;
 	AActor* FindSceneActor(const FGuid& InId) const;
 	UVoxelSceneRegion* GetSceneRegion(const FIntVector& InSection, bool bCreate);
@@ -309,12 +317,6 @@ protected:
 		FVoxelInteractionPlan& InOutPlan,
 		FString& OutError);
 
-	virtual void OnContainerTransferCommitted(
-		APlayerController* InController,
-		AActor* InSource,
-		const FIntVector& InAnchor,
-		const FAbilityItem& InTransferredItem,
-		bool bInTaken);
 
 	/** Project-specific authored content that changes the generated base world. */
 	virtual uint64 GetGenerationIdentitySalt() const;
@@ -386,6 +388,7 @@ private:
 
 	struct FBreak
 	{
+		FGuid InventoryStoreId;
 		FIntVector Target = FIntVector::ZeroValue;
 		FVoxelBlockState Expected;
 		double Began = 0.0;
@@ -394,6 +397,7 @@ private:
 
 	void ApplyTask(FVoxelTaskResult&& InResult);
 	void RefreshInterest(double InNow);
+	void RecordInterestBuildFailure(const FString& InError, uint64 InSourceRevision, uint64 InToken);
 	void QueueSimulationDemandEvents(TSharedPtr<const FVoxelResidencyDemandEvents, ESPMode::ThreadSafe> InEvents);
 	void ReconcileSimulationDemand();
 	void WakeSimulationSection(const FIntVector& InSection);
@@ -435,11 +439,6 @@ private:
 		const FVoxelWorldSaveData& InData,
 		FString& OutError);
 	UAbilityInventoryBase* ResolveInventory(APlayerController* InController, AActor* InSource) const;
-	FVoxelEditReply TransferContainer(
-		APlayerController* InController,
-		AActor* InSource,
-		const FVoxelEditIntent& InIntent,
-		const FVoxelTraceResult& InHit);
 
 private:
 	FVoxelRegistry Registry;
@@ -448,6 +447,8 @@ private:
 	TSharedPtr<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> GenerationCache;
 	TSharedPtr<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> Generator;
 	TUniquePtr<FVoxelWorldRuntime> Runtime;
+	TSharedPtr<FVoxelInventoryDomainBridge> InventoryBridge;
+	FInventoryVoxelContribution InventoryContribution;
 	TSharedPtr<const FVoxelInterestRuntime, ESPMode::ThreadSafe> InterestRuntime;
 	TSharedPtr<const FVoxelInterestRuntime, ESPMode::ThreadSafe> DesiredInterestRuntime;
 	TSharedPtr<const FVoxelTaskCustomPayload, ESPMode::ThreadSafe> DesiredInterestTaskPayload;
@@ -499,6 +500,9 @@ private:
 	uint64 InterestRevision = 0;
 	uint64 SourceRevision = 0;
 	uint64 InterestAttemptSerial = 0;
+	FString InterestBuildError;
+	uint64 FailedInterestSourceRevision = MAX_uint64;
+	uint64 FailedInterestEpoch = 0;
 	uint64 SafetyCaptureSerial = 0;
 	FGuid TerrainPlanningOwnerId = FGuid::NewGuid();
 	uint64 LastPlannedRenderCoverageSerial = 0;
@@ -528,6 +532,7 @@ private:
 	double SceneRegionCostMilliseconds = 0.03;
 	uint64 SimulationResidencyRevision = 0;
 	double LastInterestRefresh = -1.0;
+	double LastInterestCapacityDiagnostic = -5.0;
 	double LastDiagnosticsLog = -1.0;
 	TArray<double> DiagnosticFrameTimes;
 	TArray<double> DiagnosticModuleTimes;

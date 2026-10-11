@@ -4,6 +4,7 @@
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelManifestCodec.h"
 #include "Voxel/Network/VoxelNetworkCodec.h"
+#include "Voxel/Save/InventoryVoxelEntityCodec.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
 #include "Voxel/Generation/VoxelGenerationAllocation.h"
@@ -330,13 +331,16 @@ bool FVoxelOverlayRegionCodec::EncodeOverlay(const FVoxelOverlaySnapshot& InOver
 	{ OutError = TEXT("InvalidResource: Overlay block cell index"); return false; }
 	for (const auto& Pair : InOverlay.Entities)
 	{
-		if (Pair.Key < 0 || Pair.Key >= 4096 || Pair.Value.Payload.Num() > 256 * 1024)
+		const bool bInventory = FInventoryVoxelEntityCodec::IsInventory(Pair.Value);
+		const int32 PayloadBytes = bInventory ? FInventoryVoxelEntityCodec::GetPublicPayload().Num() : Pair.Value.Payload.Num();
+		if (Pair.Key < 0 || Pair.Key >= 4096 ||
+			(bInventory ? !FInventoryVoxelEntityCodec::Validate(Pair.Value) : PayloadBytes > 256 * 1024))
 		{ OutError = TEXT("InvalidResource: Overlay entity cell or payload limit"); return false; }
-		WireBytes += Pair.Value.Payload.Num();
+		WireBytes += PayloadBytes;
 	}
 	if (WireBytes > FVoxelNetworkCodec::MaxRepresentationBytes)
 	{ OutError = TEXT("CapacityUnachievable: Overlay Section wire limit"); return false; }
-	// 调用方 Authority 已授予这两数组、各 payload 副本与完整编码 buffer 的 native 容量。
+	// 调用方按公开投影计费；库存实体只复制固定标记，不复制私有物品正文。
 	FVoxelNetworkSectionSnapshot Snapshot;
 	Snapshot.Section = InOverlay.Section; Snapshot.Revision = InOverlay.Revision;
 	Snapshot.Blocks.Reserve(InOverlay.Blocks.Num());
@@ -349,8 +353,10 @@ bool FVoxelOverlayRegionCodec::EncodeOverlay(const FVoxelOverlaySnapshot& InOver
 		Edit.bRemove = false;
 		Edit.Value.Kind = Pair.Value.Kind;
 		Edit.Value.Schema = Pair.Value.Schema;
-		Edit.Value.Payload.Reserve(Pair.Value.Payload.Num());
-		Edit.Value.Payload.Append(Pair.Value.Payload);
+		const TConstArrayView<uint8> Payload = FInventoryVoxelEntityCodec::IsInventory(Pair.Value) ?
+			FInventoryVoxelEntityCodec::GetPublicPayload() : MakeArrayView(Pair.Value.Payload);
+		Edit.Value.Payload.Reserve(Payload.Num());
+		Edit.Value.Payload.Append(Payload.GetData(), Payload.Num());
 		Snapshot.Entities.Add(MoveTemp(Edit));
 	}
 	Snapshot.Blocks.Sort([](const auto& A, const auto& B) { return A.CellIndex < B.CellIndex; });
@@ -437,8 +443,18 @@ bool FVoxelOverlayRegionCodec::OverlayCapacity(TConstArrayView<uint8> InBytes, u
 	{
 		const uint16 Cell = Reader.U16();
 		if (Cell >= 4096 || Cell <= Previous || Reader.U8() != 0) return false;
-		Reader.U16(); Reader.U16();
+		const uint16 Kind = Reader.U16();
+		const uint16 Schema = Reader.U16();
 		const auto Payload = Reader.BlobView(256 * 1024);
+		if (Kind == FInventoryVoxelEntityCodec::Kind)
+		{
+			const TConstArrayView<uint8> PublicPayload = FInventoryVoxelEntityCodec::GetPublicPayload();
+			if (Schema != FInventoryVoxelEntityCodec::Schema || Payload.Num() != PublicPayload.Num() ||
+				FMemory::Memcmp(Payload.GetData(), PublicPayload.GetData(), PublicPayload.Num()) != 0)
+			{
+				return false;
+			}
+		}
 		PayloadBytes += VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(Payload.Num());
 		Previous = Cell;
 	}
@@ -457,6 +473,12 @@ bool FVoxelOverlayRegionCodec::EncodeDelta(TConstArrayView<FVoxelOverlayDirector
 	Writer.U32(InEntries.Num());
 	for (int32 Index = 0; Index < InEntries.Num(); ++Index)
 	{
+		uint64 Capacity = 0;
+		if (InEntries[Index].bTombstone ? !InPayloads[Index].IsEmpty() :
+			!OverlayCapacity(InPayloads[Index], Capacity))
+		{
+			return false;
+		}
 		WriteEntry(Writer, InEntries[Index], true);
 		Writer.Blob(InPayloads[Index], FVoxelNetworkCodec::MaxRepresentationBytes);
 	}
@@ -2482,3 +2504,4 @@ uint64 FVoxelOverlayReplica::GetAuthorityEpoch() const { return AuthorityEpoch; 
 uint64 FVoxelOverlayReplica::GetProgressSerial() const { return ProgressSerial; }
 const FGuid& FVoxelOverlayReplica::GetDirectoryEpoch() const { return DirectoryEpoch; }
 const FVoxelOverlayHash& FVoxelOverlayReplica::GetManifestIdentity() const { return ManifestIdentity; }
+

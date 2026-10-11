@@ -1,24 +1,21 @@
 ﻿#pragma once
-#include "UObject/PrimaryAssetId.h"
+
 #include "CoreMinimal.h"
 #include "Voxel/Save/VoxelDeltaTypes.h"
-struct WHFRAMEWORK_API FVoxelItemStack
-{
-    FPrimaryAssetId ID;
-    int32 Count=0,Level=0;
-};
+
 class WHFRAMEWORK_API FVoxelBlockEntityCodec
 {
 public:
+    // 默认实体只保存生成标记；完整持久实体使用 DeltaCodec 的独立上限。
+    static constexpr int32 MaximumDefaultPayloadBytes = 32 * 1024;
+
     using FMakeDefault = bool (*)(FVoxelBlockEntityState&, uint8);
-    // Validate 在冻结计数和 Worker 中使用；只读协议字节，不分配容器、不创建名称、不访问 UObject。
+    // Worker 验证只读有界字节，不创建名称、资产或可变库存。
     using FValidate = bool (*)(const FVoxelBlockEntityState&);
 
-    static bool Register(uint16 Kind, FMakeDefault MakeDefault, FValidate Validate);
-    static bool IsRegistered(uint16 Kind);
-    static bool MakeDefault(uint16 Kind,FVoxelBlockEntityState& Out,uint8 Variant=0);
-    static bool Validate(const FVoxelBlockEntityState& State);
-    static bool EncodeContainer(const TArray<FVoxelItemStack>& Slots,FVoxelBlockEntityState& Out);
-    static bool DecodeContainer(const FVoxelBlockEntityState& State,TArray<FVoxelItemStack>& Out);
-    static bool IncrementCounter(const FVoxelBlockEntityState& In,FVoxelBlockEntityState& Out);
+    static bool Register(uint16 InKind, FMakeDefault InMakeDefault, FValidate InValidate);
+    static bool IsRegistered(uint16 InKind);
+    static bool MakeDefault(uint16 InKind, FVoxelBlockEntityState& OutState, uint8 InVariant = 0);
+    static bool Validate(const FVoxelBlockEntityState& InState);
+    static bool IncrementCounter(const FVoxelBlockEntityState& InState, FVoxelBlockEntityState& OutState);
 };

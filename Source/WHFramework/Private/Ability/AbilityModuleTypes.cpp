@@ -5,10 +5,8 @@
 #include "Ability/Item/AbilityItemDataBase.h"
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
-#include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
 #include "Ability/Vitality/AbilityVitalityInterface.h"
 #include "Common/CommonModuleStatics.h"
-#include "ReferencePool/ReferencePoolModuleStatics.h"
 
 FPrimaryAssetId PAID_EXP = FPrimaryAssetId(TEXT("Misc:DA_Exp"));
 
@@ -109,155 +107,12 @@ void FGameplayEffectContainerSpec::AddTargets(const TArray<FHitResult>& HitResul
 	}
 }
 
-EAbilityItemType FAbilityItem::GetType() const
-{
-	return GetData().GetItemType();
-}
 
 UPrimaryAssetBase& FAbilityData::GetData() const
 {
 	return UAssetModuleStatics::LoadPrimaryAssetRef<UPrimaryAssetBase>(ID);
 }
 
-FAbilityItems FInventorySlots::GetItems()
-{
-	FAbilityItems Items;
-	for(const auto Iter : Slots)
-	{
-		Items.Items.Add(Iter->GetItem());
-	}
-	return Items;
-}
-
-void FInventorySaveData::FillItems(int32 InLevel, FRandomStream InRandomStream)
-{
-	if(InRandomStream.GetInitialSeed() == 0) InRandomStream = FRandomStream(FMath::Rand());
-	
-	for(auto& Iter1 : FillRules)
-	{
-		if(Iter1.Key == EAbilityItemType::None) continue;
-
-		const FName ItemType = *UCommonModuleStatics::GetEnumAuthoredNameByValue(TEXT("/Script/WHFramework.EAbilityItemType"), (int32)Iter1.Key);
-
-		int32 ItemNum = 0;
-		EAbilityItemRarity ItemParity = EAbilityItemRarity::None;
-		const float ParityRate = InRandomStream.FRand();
-		for(auto& Iter2 : Iter1.Value.Rules)
-		{
-			if(ParityRate <= Iter2.Value.Rate)
-			{
-				ItemParity = Iter2.Key;
-				switch(Iter2.Value.Type)
-				{
-					case EAbilityItemFillType::Fixed:
-					{
-						ItemNum = Iter2.Value.Num;
-						break;
-					}
-					case EAbilityItemFillType::Random:
-					{
-						ItemNum = InRandomStream.RandRange(Iter2.Value.MinNum, Iter2.Value.MaxNum);
-						break;
-					}
-					case EAbilityItemFillType::Rate:
-					{
-						const float ItemRate = InRandomStream.FRand();
-						for(auto& Iter3 : Iter2.Value.Rows)
-						{
-							if(ItemRate < Iter3.Rate)
-							{
-								ItemNum = Iter3.Num;
-								break;
-							}
-						}
-						break;
-					}
-				}
-				break;
-			}
-		}
-
-		TArray<UAbilityItemDataBase*> ItemDatas;
-		for(auto Iter : UAssetModuleStatics::LoadPrimaryAssets<UAbilityItemDataBase>(ItemType))
-		{
-			if(Iter->Rarity == ItemParity)
-			{
-				ItemDatas.Add(Iter);
-			}
-		}
-
-		if(Iter1.Key == EAbilityItemType::Coin)
-		{
-			if (ItemDatas.IsValidIndex(0))
-			{
-				AddItem(FAbilityItem(ItemDatas[0]->GetPrimaryAssetId(), ItemNum, ItemDatas[0]->ClampLevel(InLevel)));
-			}
-		}
-		else
-		{
-			for (int32 i = 0; i < ItemNum; i++)
-			{
-				if(ItemDatas.IsEmpty()) break;
-
-				const int32 Index = InRandomStream.RandRange(0, ItemDatas.Num() - 1);
-				AddItem(FAbilityItem(ItemDatas[Index]->GetPrimaryAssetId(), InRandomStream.RandRange(1, FMath::CeilToInt(ItemDatas[Index]->MaxCount * (1.f / (int32)ItemParity))), ItemDatas[Index]->ClampLevel(InLevel)));
-				ItemDatas.RemoveAt(Index);
-			}
-		}
-	}
-}
-
-void FInventorySaveData::CopyItems(const FInventorySaveData& InSaveData)
-{
-	SplitItems = InSaveData.SplitItems;
-}
-
-void FInventorySaveData::AddItem(FAbilityItem InItem, bool bUnique)
-{
-	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(InventoryClass);
-
-	Inventory.LoadSaveData(FParameter(*this));
-	if(!bUnique || !Inventory.QueryItemByRange(EItemQueryType::Get, InItem).IsValid())
-	{
-		Inventory.AddItemByRange(InItem, 0, -1, false);
-	}
-
-	CopyItems(Inventory.GetSaveData(true).GetRef<FInventorySaveData>());
-	UReferencePoolModuleStatics::ResetReference<UAbilityInventoryBase>(InventoryClass);
-}
-
-void FInventorySaveData::RemoveItem(FAbilityItem InItem)
-{
-	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(InventoryClass);
-
-	Inventory.LoadSaveData(FParameter(*this));
-	Inventory.RemoveItemByRange(InItem, 0, -1, false);
-
-	CopyItems(Inventory.GetSaveData(true).GetRef<FInventorySaveData>());
-	UReferencePoolModuleStatics::ResetReference<UAbilityInventoryBase>(InventoryClass);
-}
-
-void FInventorySaveData::ClearItem(FAbilityItem InItem)
-{
-	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(InventoryClass);
-
-	Inventory.LoadSaveData(FParameter(*this));
-	Inventory.ClearItem(InItem);
-
-	CopyItems(Inventory.GetSaveData(true).GetRef<FInventorySaveData>());
-	UReferencePoolModuleStatics::ResetReference<UAbilityInventoryBase>(InventoryClass);
-}
-
-void FInventorySaveData::ClearItems()
-{
-	UAbilityInventoryBase& Inventory = UReferencePoolModuleStatics::GetReference<UAbilityInventoryBase>(InventoryClass);
-
-	Inventory.LoadSaveData(FParameter(*this));
-	Inventory.ClearItems();
-
-	CopyItems(Inventory.GetSaveData(true).GetRef<FInventorySaveData>());
-	UReferencePoolModuleStatics::ResetReference<UAbilityInventoryBase>(InventoryClass);
-}
 
 UAbilityItemDataBase& FRaceItem::GetData() const
 {
@@ -266,12 +121,16 @@ UAbilityItemDataBase& FRaceItem::GetData() const
 
 void FActorSaveData::InitData(FRandomStream InRandomStream)
 {
-	FInventorySaveData Data = GetData().InventoryData;
-	Data.FillItems(Level, InRandomStream);
-	InventoryData = FParameter(MoveTemp(Data));
+	const UAbilityActorDataBase& Definition = GetData();
+	Level = Definition.ClampLevel(Level);
+	if (Name.IsNone())
+	{
+		Name = FName(*Definition.Name.ToString());
+	}
 }
 
 UAbilityActorDataBase& FActorSaveData::GetData() const
 {
 	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityActorDataBase>(AssetID);
 }
+

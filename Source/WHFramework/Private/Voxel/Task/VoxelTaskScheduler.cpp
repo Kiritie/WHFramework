@@ -29,6 +29,10 @@ struct FVoxelTaskExecutionReservation
 namespace
 {
 	constexpr TCHAR TaskBudgetError[] = TEXT("Oversized: voxel task result exceeds its declared unleased budget");
+	constexpr TCHAR TaskReceiptCapacityError[] = TEXT("CapacityUnachievable: voxel task receipt");
+	constexpr TCHAR TaskReceiptRequestError[] = TEXT("InvalidRequest: voxel task receipt");
+	static_assert(UE_ARRAY_COUNT(TaskReceiptCapacityError) <= UE_ARRAY_COUNT(TaskBudgetError));
+	static_assert(UE_ARRAY_COUNT(TaskReceiptRequestError) <= UE_ARRAY_COUNT(TaskBudgetError));
 	struct FSchedulerAllocation
 	{
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
@@ -279,13 +283,29 @@ void FVoxelTaskScheduler::FTaskBody::operator()() const
 	Slot->Result.ExecuteMilliseconds = FMath::Max(0.0, (End - Start) * 1000.0) + Request.AccumulatedExecuteMilliseconds;
 	Slot->ExecuteMicroseconds = FMath::Max(0.0, (End - Start) * 1000000.0);
 	const uint64 ResultBytes = Slot->Result.ResultBytes();
-	if (ResultBytes > Request.ReservedBytes && ResultBytes - Request.ReservedBytes > Slot->Result.GetResourceAccountedBytes())
+	const uint64 AccountedBytes = Slot->Result.GetResourceAccountedBytes();
+	if (ResultBytes > Request.ReservedBytes && ResultBytes - Request.ReservedBytes > AccountedBytes)
 	{
 		FVoxelTaskResult ErrorResult;
 		ErrorResult.Stamp = Stamp;
 		ErrorResult.Kind = Request.Kind;
+		ErrorResult.bCanceled = Slot->Result.bCanceled;
 		ErrorResult.QueueMilliseconds = Slot->Result.QueueMilliseconds;
 		ErrorResult.ExecuteMilliseconds = Slot->Result.ExecuteMilliseconds;
+		ErrorResult.RejectedResultBytes = ResultBytes;
+		ErrorResult.RejectedAccountedBytes = AccountedBytes;
+		ErrorResult.RejectedPayloadBytes = Slot->Result.CustomPayload ? Slot->Result.CustomPayload->GetAllocatedBytes() : 0;
+		ErrorResult.RejectedPayloadAccountedBytes = Slot->Result.CustomPayload ? Slot->Result.CustomPayload->GetResourceAccountedBytes() : 0;
+		ErrorResult.RejectedInputLeaseBytes = Slot->Result.InputResourceLease ? Slot->Result.InputResourceLease->Bytes() : 0;
+		ErrorResult.RejectedOutputLeaseBytes = Slot->Result.OutputResourceLease ? Slot->Result.OutputResourceLease->Bytes() : 0;
+#if !UE_BUILD_SHIPPING
+		UE_LOG(LogTemp, Error, TEXT("Voxel result accounting rejected: kind=%d epoch=%llu owner=%08x%08x%08x%08x token=%llu actual=%llu reserved=%llu accounted=%llu deficit=%llu payload=%llu payloadAccounted=%llu inputLease=%llu outputLease=%llu"),
+			int32(Request.Kind), Stamp.WorldEpoch, Stamp.OwnerId.A, Stamp.OwnerId.B, Stamp.OwnerId.C, Stamp.OwnerId.D, Stamp.Token,
+			ResultBytes, Request.ReservedBytes, AccountedBytes, ResultBytes - Request.ReservedBytes - AccountedBytes,
+			ErrorResult.RejectedPayloadBytes, ErrorResult.RejectedPayloadAccountedBytes,
+			ErrorResult.RejectedInputLeaseBytes, ErrorResult.RejectedOutputLeaseBytes);
+		if (Slot->Result.CustomPayload) Slot->Result.CustomPayload->LogResourceAccounting(Stamp);
+#endif
 		ErrorResult.Error = MoveTemp(Slot->BudgetError);
 		ErrorResult.InputResourceLease = Slot->BudgetErrorLease;
 		Slot->Result = MoveTemp(ErrorResult);
@@ -1136,6 +1156,7 @@ void FVoxelTaskScheduler::Tick(
 			if (!Completed.bServiceSettled)
 			{
 				WorkerSelection.Settle(Completed.ServiceChargeSerial, Completed.Slot->ExecuteMicroseconds);
+				Completed.ServiceChargeSerial = 0;
 				Completed.bServiceSettled = true;
 				const double ActualCost = FMath::Max(1.0, Completed.Slot->ExecuteMicroseconds);
 				double& Estimate = WorkerCostEstimates.FindOrAdd(Completed.Kind, ActualCost);
@@ -1152,6 +1173,8 @@ void FVoxelTaskScheduler::Tick(
 				OriginalRequest.AccumulatedExecuteMilliseconds = Completed.Slot->Result.ExecuteMilliseconds;
 				QueuedInputBytes += OriginalRequest.InputBytes;
 				FVoxelTaskRequest Continuation = MoveTemp(OriginalRequest);
+				// 每次原生执行切片完成后重新计算等待年龄，避免续跑永久占据同一服务带的最老位置。
+				Continuation.FirstRunnableSeconds = -1.0;
 				OriginalRequest = FVoxelTaskRequest();
 				Completed.Slot->Result = FVoxelTaskResult();
 				Continuation.ExecutionReservation = MoveTemp(Completed.ExecutionReservation);
@@ -1212,12 +1235,13 @@ void FVoxelTaskScheduler::Tick(
 #if !UE_BUILD_SHIPPING
 			if (!Result.bSuccess && !Result.bCanceled)
 			{
-				UE_LOG(LogTemp, Display, TEXT("Voxel task failure: kind=%d epoch=%llu owner=%08x%08x%08x%08x incarnation=%llu token=%llu section=(%d,%d,%d) input=%llu reserved=%llu executeMs=%.3f error=%s"),
+				UE_LOG(LogTemp, Display, TEXT("Voxel task failure: kind=%d epoch=%llu owner=%08x%08x%08x%08x incarnation=%llu token=%llu section=(%d,%d,%d) input=%llu reserved=%llu executeMs=%.3f rejectedActual=%llu rejectedAccounted=%llu error=%s"),
 					static_cast<int32>(Result.Kind), Result.Stamp.WorldEpoch,
 					Result.Stamp.OwnerId.A, Result.Stamp.OwnerId.B, Result.Stamp.OwnerId.C, Result.Stamp.OwnerId.D,
 					Result.Stamp.OwnerIncarnation, Result.Stamp.Token,
 					Result.Stamp.Section.X, Result.Stamp.Section.Y, Result.Stamp.Section.Z,
-					OriginalRequest.InputBytes, OriginalRequest.ReservedBytes, Result.ExecuteMilliseconds, *Result.Error);
+					OriginalRequest.InputBytes, OriginalRequest.ReservedBytes, Result.ExecuteMilliseconds,
+					Result.RejectedResultBytes, Result.RejectedAccountedBytes, *Result.Error);
 			}
 #endif
 
@@ -1296,7 +1320,17 @@ void FVoxelTaskScheduler::Tick(
 			FVoxelTaskResult Sample;
 			Sample.Kind = Completed.Result.Kind;
 			Sample.Stamp = Completed.Result.Stamp;
-			Sample.bCanceled = true;
+			Sample.bCanceled = Completed.Result.bCanceled;
+			Sample.bSuccess = Completed.Result.bSuccess;
+
+#if !UE_BUILD_SHIPPING
+			if (!Completed.Result.bCanceled)
+			{
+				UE_LOG(LogTemp, Display, TEXT("Voxel task admission failure: kind=%d epoch=%llu token=%llu blocked=%u input=%llu reserved=%llu error=%s"),
+					int32(Completed.Result.Kind), Completed.Result.Stamp.WorldEpoch, Completed.Result.Stamp.Token,
+					uint16(Completed.Request.Blocked), Completed.Request.InputBytes, Completed.Request.ReservedBytes, *Completed.Result.Error);
+			}
+#endif
 
 			const double ApplyStart =
 				FPlatformTime::Seconds();
@@ -1326,6 +1360,80 @@ void FVoxelTaskScheduler::Tick(
 	Pump();
 	Diagnostics.LastAdmissionMilliseconds = (FPlatformTime::Seconds() - AdmissionStart) * 1000.0;
 	FlushSectionIdleNotifications();
+	LogAdmissionStall(FPlatformTime::Seconds());
+}
+
+void FVoxelTaskScheduler::LogAdmissionStall(const double InNow)
+{
+#if !UE_BUILD_SHIPPING
+	if (!Running.IsEmpty() || (Pending.IsEmpty() && AdmissionAttempts.IsEmpty()))
+	{
+		AdmissionStallStarted = -1.0;
+		return;
+	}
+	if (AdmissionStallStarted < 0.0) AdmissionStallStarted = InNow;
+	if (InNow - AdmissionStallStarted < 5.0 || InNow - LastAdmissionStallLog < 15.0) return;
+	if (Pending.IsEmpty())
+	{
+		bool bHasBlocked = false;
+		for (const auto& Pair : AdmissionAttempts) bHasBlocked |= Pair.Value.Blocked != EVoxelTaskBlockReason::None;
+		if (!bHasBlocked)
+		{
+			AdmissionStallStarted = -1.0;
+			return;
+		}
+	}
+	LastAdmissionStallLog = InNow;
+	UE_LOG(LogTemp, Warning, TEXT("Voxel scheduler admission stalled: epoch=%llu noRunningSeconds=%.3f pending=%d admissionAttempts=%d resultReserved=%llu queuedInput=%llu backingAdmission=%d"),
+		ControlConsumer.WorldEpoch, InNow - AdmissionStallStarted, Pending.Num(), AdmissionAttempts.Num(), ReservedBytes, QueuedInputBytes, int32(BackingAdmission));
+	int32 Printed = 0;
+	for (const auto& Request : Pending)
+	{
+		if (Printed++ == 8) break;
+		UE_LOG(LogTemp, Warning, TEXT("Voxel stalled task: kind=%d epoch=%llu owner=%08x%08x%08x%08x token=%llu section=(%d,%d,%d) blocked=%u ageSeconds=%.3f input=%llu unleasedResult=%llu bindingInput=%llu requiredInput=%llu requiredLeases=%d receiptWait=%d receiptVersion=%llu"),
+			int32(Request.Kind), Request.Stamp.WorldEpoch, Request.Stamp.OwnerId.A, Request.Stamp.OwnerId.B, Request.Stamp.OwnerId.C, Request.Stamp.OwnerId.D,
+			Request.Stamp.Token, Request.Stamp.Section.X, Request.Stamp.Section.Y, Request.Stamp.Section.Z, uint32(Request.Blocked),
+			FMath::Max(0.0, InNow - Request.FirstRunnableSeconds), Request.InputBytes, Request.ReservedBytes,
+			Request.GetBindingBytes(), Request.GetRequiredBindingInputBytes(), Request.GetRequiredBindingInputLeaseCount(),
+			Request.bReceiptCapacityBlocked, Request.ReceiptCapacityVersion);
+	}
+	Printed = 0;
+	for (const auto& Pair : AdmissionAttempts)
+	{
+		if (Pair.Value.Blocked == EVoxelTaskBlockReason::None) continue;
+		if (Printed++ == 8) break;
+		UE_LOG(LogTemp, Warning, TEXT("Voxel stalled admission: kind=%d epoch=%llu owner=%08x%08x%08x%08x token=%llu section=(%d,%d,%d) blocked=%u ageSeconds=%.3f input=%llu unleasedResult=%llu rejections=%llu"),
+			int32(Pair.Key.Kind), Pair.Key.Stamp.WorldEpoch, Pair.Key.Stamp.OwnerId.A, Pair.Key.Stamp.OwnerId.B, Pair.Key.Stamp.OwnerId.C, Pair.Key.Stamp.OwnerId.D,
+			Pair.Key.Stamp.Token, Pair.Key.Stamp.Section.X, Pair.Key.Stamp.Section.Y, Pair.Key.Stamp.Section.Z, uint32(Pair.Value.Blocked),
+			FMath::Max(0.0, InNow - Pair.Value.FirstRequested), Pair.Value.InputBytes, Pair.Value.ResultBytes, Pair.Value.Rejections);
+	}
+	// 固定数量的最大租约足以定位持有者；诊断不分配新的全账本副本。
+	const FVoxelTerrainResources* Ledgers[] = {&TerrainResources.Get(), &RuntimeResources.Get()};
+	const TCHAR* LedgerNames[] = {TEXT("terrain"), TEXT("runtime")};
+	for (int32 LedgerIndex = 0; LedgerIndex < UE_ARRAY_COUNT(Ledgers); ++LedgerIndex)
+	{
+		for (int32 PoolIndex = 0; PoolIndex < int32(EVoxelTerrainResourcePool::Count); ++PoolIndex)
+		{
+			FVoxelTerrainResourceGrantSnapshot Largest[4];
+			const auto Grants = Ledgers[LedgerIndex]->SnapshotGrants(EVoxelTerrainResourcePool(PoolIndex), MakeArrayView(Largest));
+			const auto& State = Grants.Resources;
+			const uint64 Limits[] = {State.Limits.InputBytes, State.Limits.WorkingBytes, State.Limits.StagedBytes, State.Limits.ResidentBytes, State.Limits.OverlapBytes};
+			UE_LOG(LogTemp, Warning, TEXT("Voxel stalled resource pool: ledger=%s pool=%d used=%llu limit=%llu free=%llu version=%llu releaseVersion=%llu publishedRetirement=%llu leaseCount=%d ledgerBytes=%llu handleBytes=%llu rootInput=%llu"),
+				LedgerNames[LedgerIndex], PoolIndex, State.Used[PoolIndex], Limits[PoolIndex],
+				Limits[PoolIndex] > State.Used[PoolIndex] ? Limits[PoolIndex] - State.Used[PoolIndex] : 0,
+				State.Version, State.ReleaseVersion, State.PublishedRetirementVersion, State.LeaseCount, State.LedgerMetadataBytes, State.LeaseHandleBytes, State.RootInputBytes);
+			for (int32 Index = 0; Index < Grants.LargestCount; ++Index)
+			{
+				const auto& Grant = Largest[Index];
+				const auto& Consumer = Grant.Consumer;
+				UE_LOG(LogTemp, Warning, TEXT("Voxel stalled lease: ledger=%s pool=%d serial=%llu bytes=%llu published=%d consumerKind=%d epoch=%llu owner=%08x%08x%08x%08x incarnation=%llu request=%llu min=(%d,%d,%d) max=(%d,%d,%d)"),
+					LedgerNames[LedgerIndex], PoolIndex, Grant.Serial, Grant.Bytes, Grant.bPublished, int32(Consumer.Kind), Consumer.WorldEpoch,
+					Consumer.OwnerId.A, Consumer.OwnerId.B, Consumer.OwnerId.C, Consumer.OwnerId.D, Consumer.OwnerIncarnation, Consumer.RequestSerial,
+					Consumer.Min.X, Consumer.Min.Y, Consumer.Min.Z, Consumer.Max.X, Consumer.Max.Y, Consumer.Max.Z);
+			}
+		}
+	}
+#endif
 }
 
 void FVoxelTaskScheduler::CancelSection(
@@ -1455,6 +1563,8 @@ void FVoxelTaskScheduler::StopAndJoin()
 		if (!Task.bServiceSettled)
 		{
 			WorkerSelection.Settle(Task.ServiceChargeSerial, Task.Slot->ExecuteMicroseconds);
+			Task.ServiceChargeSerial = 0;
+			Task.bServiceSettled = true;
 		}
 	}
 
@@ -1943,7 +2053,8 @@ void FVoxelTaskScheduler::Pump()
 					Preserved.Blocked = Rejected.Blocked;
 					RemoveActive(Rejected.Stamp, Rejected.Kind, Rejected.WorkClass);
 					AdmissionAttempts.Add({Rejected.Kind, Rejected.Stamp}, Preserved);
-					QueueCanceled(MoveTemp(Rejected));
+					const EVoxelTaskBlockReason Failure = Rejected.Blocked;
+					QueueCanceled(MoveTemp(Rejected), Failure);
 					continue;
 				}
 				Pending[BestIndex].bReceiptCapacityBlocked = true;
@@ -2017,7 +2128,7 @@ void FVoxelTaskScheduler::Pump()
 }
 
 void FVoxelTaskScheduler::QueueCanceled(
-	FVoxelTaskRequest&& InRequest)
+	FVoxelTaskRequest&& InRequest, const EVoxelTaskBlockReason InFailure)
 {
 	FCompleted Completed;
 	Completed.Result.WorkReceipt = InRequest.WorkReceipt;
@@ -2032,7 +2143,26 @@ void FVoxelTaskScheduler::QueueCanceled(
 		InRequest.Kind;
 
 	Completed.Result.bCanceled =
-		true;
+		InFailure == EVoxelTaskBlockReason::None;
+	if (!Completed.Result.bCanceled)
+	{
+		const TCHAR* Error = InFailure == EVoxelTaskBlockReason::Oversized ? TaskReceiptCapacityError : TaskReceiptRequestError;
+		// 入队时已为错误正文授额；拒绝开工也必须沿同一结果通道返回确定性失败。
+		if (InRequest.ExecutionReservation)
+		{
+			auto& ErrorBuffer = InRequest.ExecutionReservation->Slot.BudgetError;
+			ErrorBuffer.Reset();
+			const int32 Length = FCString::Strlen(Error) + 1;
+			check(ErrorBuffer.GetCharArray().Max() >= Length);
+			ErrorBuffer.GetCharArray().Append(Error, Length);
+			Completed.Result.Error = MoveTemp(ErrorBuffer);
+			Completed.Result.InputResourceLease = InRequest.ExecutionReservation->Slot.BudgetErrorLease;
+		}
+		else
+		{
+			Completed.Result.Error = Error;
+		}
+	}
 
 	Completed.Request = MoveTemp(InRequest);
 

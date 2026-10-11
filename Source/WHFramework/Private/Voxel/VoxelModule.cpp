@@ -1,4 +1,8 @@
 #include "Voxel/VoxelModule.h"
+#include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Voxel/Interaction/VoxelInventoryDomainBridge.h"
+#include "Voxel/Save/InventoryVoxelEntityCodec.h"
+#include "Misc/SecureHash.h"
 #include "Voxel/Rendering/VoxelStreamingGeometry.h"
 #include "Voxel/Rendering/VoxelViewLod.h"
 
@@ -10,9 +14,7 @@
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
-#include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
 #include "Ability/Item/AbilityItemDataBase.h"
-#include "Ability/PickUp/AbilityPickUpVoxel.h"
 #include "Asset/AssetModuleStatics.h"
 #include "GameFramework/PlayerController.h"
 #include "Main/MainModule.h"
@@ -38,7 +40,6 @@
 #include "Voxel/Geometry/VoxelShapeRegistry.h"
 #include "Voxel/Agent/VoxelAgentComponent.h"
 #include "Voxel/Interaction/VoxelEditTransaction.h"
-#include "Voxel/Interaction/VoxelInventoryTransaction.h"
 #include "Voxel/Network/VoxelModuleNetworkComponent.h"
 #include "Voxel/Network/VoxelOverlayReplica.h"
 #include "Voxel/Map/VoxelMapTileCache.h"
@@ -67,12 +68,21 @@
 
 namespace
 {
+	constexpr int32 InterestErrorCapacity = 1024;
+	bool IsTerminalInterestBuildError(const FString& InError)
+	{
+		return InError.StartsWith(TEXT("Oversized")) || InError.StartsWith(TEXT("CapacityUnachievable")) ||
+			InError.StartsWith(TEXT("TerminalFailure")) || InError.StartsWith(TEXT("InvalidConsumer")) || InError.StartsWith(TEXT("InvalidRequest"));
+	}
+
 	struct FVoxelInterestTaskPayload : FVoxelTaskCustomPayload, FVoxelResidencyDemandEvents
 	{
 		TSharedPtr<FVoxelInterestSet, ESPMode::ThreadSafe> Interest;
 		TSharedPtr<FVoxelInterestRuntime, ESPMode::ThreadSafe> CandidateRuntime;
 		FVoxelInterestDelta Delta;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MetadataLease;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ErrorLease;
+		FString ErrorBuffer;
 		TAtomic<bool> bCapacityWaiting{false};
 		TAtomic<uint64> CapacityVersion{0};
 		bool bChanged = false;
@@ -88,19 +98,34 @@ namespace
 				VoxelBoundedAllocation::WorkerSharedBytes<FVoxelInterestRuntime>() +
 				VoxelBoundedAllocation::WorkerSharedBytes<FVoxelInterestSet>() +
 				(Interest && Interest->SafetyVersions ? VoxelBoundedAllocation::WorkerSharedBytes<FVoxelChangeHierarchySnapshot>() : 0) +
-				(Interest ? Interest->GetOwnedAllocatedBytes() : 0) +
-				Delta.AddedExact.GetAllocatedSize() + Delta.RemovedExact.GetAllocatedSize() +
-				Delta.AddedSimulation.GetAllocatedSize() + Delta.RemovedSimulation.GetAllocatedSize() +
-				Delta.AddedFine.GetAllocatedSize() + Delta.RemovedFine.GetAllocatedSize() +
-				Delta.FineResidency.Added.GetAllocatedSize() + Delta.FineResidency.Removed.GetAllocatedSize() + Delta.FineResidency.Retained.GetAllocatedSize() +
-				Delta.AddedProxy.GetAllocatedSize() + Delta.RemovedProxy.GetAllocatedSize() +
-				Delta.AddedSurface.GetAllocatedSize() + Delta.RemovedSurface.GetAllocatedSize() +
-				Delta.AddedMacro.GetAllocatedSize() + Delta.RemovedMacro.GetAllocatedSize() + Delta.ChangedGeometry.GetAllocatedSize();
+				(Interest ? Interest->GetOwnedAllocatedBytes() : 0) + Delta.GetAllocatedBytes() + ErrorBuffer.GetAllocatedSize();
 		}
 		virtual uint64 GetResourceAccountedBytes() const override
 		{
 			return (MetadataLease ? MetadataLease->Bytes() : 0) + (Interest ? Interest->GetResourceAccountedBytes() : 0) +
-				(Delta.ResourceLease ? Delta.ResourceLease->Bytes() : 0);
+				(Delta.ResourceLease ? Delta.ResourceLease->Bytes() : 0) + (ErrorLease ? ErrorLease->Bytes() : 0);
+		}
+		virtual void LogResourceAccounting(const FVoxelTaskStamp& InStamp) const override
+		{
+#if !UE_BUILD_SHIPPING
+			UE_LOG(LogTemp, Error, TEXT("Voxel interest accounting: epoch=%llu token=%llu actual=%llu accounted=%llu owned=%llu finalizationActual=%llu deltaActual=%llu metadata=%llu deltaLease=%llu errorBuffer=%llu errorLease=%llu"),
+				InStamp.WorldEpoch, InStamp.Token, GetAllocatedBytes(), GetResourceAccountedBytes(),
+				Interest ? Interest->GetOwnedAllocatedBytes() : 0, Interest ? Interest->GetFinalizationAllocatedBytes() : 0,
+				Delta.GetAllocatedBytes(), MetadataLease ? MetadataLease->Bytes() : 0, Delta.ResourceLease ? Delta.ResourceLease->Bytes() : 0,
+				ErrorBuffer.GetAllocatedSize(), ErrorLease ? ErrorLease->Bytes() : 0);
+			if (!Interest) return;
+			const FVoxelTerrainResourceLease* Leases[] = {MetadataLease.Get(), Interest->DemandLease.Get(), Interest->CompositionLease.Get(),
+				Interest->CopyLease.Get(), Interest->FinalizationLease.Get(), Interest->CoarseCompositionLease.Get(),
+				Interest->CoarsePlanLeases[0].Get(), Interest->CoarsePlanLeases[1].Get(), Interest->CoarsePlanLeases[2].Get(), Delta.ResourceLease.Get()};
+			const TCHAR* Names[] = {TEXT("metadata"), TEXT("demand"), TEXT("composition"), TEXT("copy"), TEXT("finalization"),
+				TEXT("coarseComposition"), TEXT("coarse0"), TEXT("coarse1"), TEXT("coarse2"), TEXT("delta")};
+			for (int32 Index = 0; Index < UE_ARRAY_COUNT(Leases); ++Index)
+			{
+				const auto* Lease = Leases[Index];
+				if (Lease) UE_LOG(LogTemp, Error, TEXT("Voxel interest lease: epoch=%llu token=%llu name=%s serial=%llu pool=%d bytes=%llu"),
+					InStamp.WorldEpoch, InStamp.Token, Names[Index], Lease->Serial(), int32(Lease->GetPool()), Lease->Bytes());
+			}
+#endif
 		}
 	};
 	struct FVoxelInterestSourceCapture
@@ -469,8 +494,8 @@ void UVoxelModule::OnRefresh(
 		GenerationCache->TickMaintenance(256);
 	}
 
-	const double Now =
-		FPlatformTime::Seconds();
+	const double InterestStart = FPlatformTime::Seconds();
+	const double Now = InterestStart;
 	const auto RenderCoverage = ViewManager ? ViewManager->CapturePresentedSnapshot() : nullptr;
 	const auto PhysicsCoverage = CollisionPresenter ? CollisionPresenter->CaptureSnapshot() : nullptr;
 	if ((RenderCoverage ? RenderCoverage->GetSerial() : 0) != LastPlannedRenderCoverageSerial ||
@@ -490,10 +515,14 @@ void UVoxelModule::OnRefresh(
 	{
 		ViewManager->AdvanceInterestInputs(InterestRevision, CollectLocalViewObservers());
 	}
-	const auto TickView = [this]()
+	const double AfterInterestInputs = FPlatformTime::Seconds();
+	double ViewMilliseconds = 0.0;
+	const auto TickView = [this, &ViewMilliseconds]()
 	{
 		if (!ViewManager) return true;
+		const double ViewStart = FPlatformTime::Seconds();
 		ViewManager->Tick(InterestRevision, CollectLocalViewObservers());
+		ViewMilliseconds += (FPlatformTime::Seconds() - ViewStart) * 1000.0;
 		const auto Admission = ViewManager->GetLastServiceResourceAdmission();
 		if (Admission != EVoxelTerrainResourceAdmission::CapacityUnachievable &&
 			Admission != EVoxelTerrainResourceAdmission::InvalidRequest) return true;
@@ -548,6 +577,7 @@ void UVoxelModule::OnRefresh(
 	{
 		NavigationPresenter->Tick();
 	}
+	const double AfterNavigation = FPlatformTime::Seconds();
 
 	if (!bViewFirst && !TickView()) return;
 
@@ -571,10 +601,11 @@ void UVoxelModule::OnRefresh(
 	if (FPlatformTime::Seconds() - VoxelTickStart > 0.008 && Now - LastSlowTickLog > 2.0)
 	{
 		LastSlowTickLog = Now;
-		UE_LOG(LogTemp, Display, TEXT("Voxel slow tick ms: scheduler=%.2f interest=%.2f emerge=%.2f residency=%.2f collision=%.2f view=%.2f scenes=%.2f readiness=%.2f"),
-			(AfterScheduler - VoxelTickStart) * 1000, (AfterInterest - AfterScheduler) * 1000,
-			(AfterEmerge - AfterInterest) * 1000, (AfterResidency - AfterEmerge) * 1000,
-			(AfterCollision - AfterResidency) * 1000, (AfterView - AfterCollision) * 1000,
+		UE_LOG(LogTemp, Display, TEXT("Voxel slow tick ms: scheduler=%.2f streaming=%.2f interest=%.2f interestInputs=%.2f emerge=%.2f residency=%.2f collision=%.2f navigation=%.2f view=%.2f scenes=%.2f readiness=%.2f"),
+			(AfterScheduler - VoxelTickStart) * 1000, (InterestStart - AfterScheduler) * 1000,
+			(AfterInterest - InterestStart) * 1000, (AfterInterestInputs - AfterInterest) * 1000,
+			LastEmergeAdmissionMilliseconds, (AfterResidency - AfterEmerge) * 1000,
+			(AfterCollision - AfterResidency) * 1000, (AfterNavigation - AfterCollision) * 1000, ViewMilliseconds,
 			(AfterScenes - AfterView) * 1000, (FPlatformTime::Seconds() - AfterScenes) * 1000);
 	}
 	if (DiagnosticFrameTimes.Num() < 4096)
@@ -1275,6 +1306,9 @@ bool UVoxelModule::StopWorld(const bool bDiscardDirty, FString& OutError)
 	bOverlayChangeInvalidated = false;
 	bOverlayChangeWaitingEmerge = false;
 	OverlayChangeCapacityVersion = 0;
+	if(InventoryBridge) InventoryBridge->DetachRuntime();
+	InventoryBridge.Reset();
+	InventoryContribution = nullptr;
 	Runtime.Reset();
 	Generator.Reset();
 
@@ -1480,6 +1514,17 @@ uint64 UVoxelModule::GetWorldEpoch() const
 uint64 UVoxelModule::GetInterestRevision() const
 {
 	return InterestRevision;
+}
+
+bool UVoxelModule::HasInterestBuildFailed() const
+{
+	return !InterestBuildError.IsEmpty() && FailedInterestEpoch == Epoch && FailedInterestSourceRevision == SourceRevision;
+}
+
+const FString& UVoxelModule::GetInterestBuildError() const
+{
+	static const FString Empty;
+	return HasInterestBuildFailed() ? InterestBuildError : Empty;
 }
 
 FVoxelWorldRuntime* UVoxelModule::GetRuntime()
@@ -2187,40 +2232,78 @@ bool UVoxelModule::IsProjectSceneSimulationEnabled() const
 	return bEnableProjectSceneSimulation;
 }
 
+void UVoxelModule::RecordInterestBuildFailure(const FString& InError, const uint64 InSourceRevision, const uint64 InToken)
+{
+	if (!IsTerminalInterestBuildError(InError)) return;
+	FailedInterestEpoch = Epoch;
+	FailedInterestSourceRevision = InSourceRevision;
+	InterestBuildError = InError;
+	UE_LOG(LogTemp, Error, TEXT("Voxel interest build stopped: epoch=%llu sourceRevision=%llu token=%llu currentInterest=%llu error=%s"),
+		FailedInterestEpoch, FailedInterestSourceRevision, InToken, InterestRevision, *InterestBuildError);
+}
+
 void UVoxelModule::RefreshInterest(
 	const double InNow)
 {
 	if (bInterestBuildPending || DesiredInterest != CurrentInterest) return;
+	for (auto Iterator = Sources.CreateIterator(); Iterator; ++Iterator)
+	{
+		if (Iterator.Value().Owner.IsValid()) continue;
+		Iterator.RemoveCurrent();
+		check(SourceRevision < MAX_uint64);
+		++SourceRevision;
+		bInterestDirty = true;
+	}
+	if (HasInterestBuildFailed()) return;
+	InterestBuildError.Reset();
+	FailedInterestSourceRevision = MAX_uint64;
+	FailedInterestEpoch = 0;
+	LastInterestRefresh = InNow;
 	check(InterestAttemptSerial < MAX_uint64);
 	const auto PlanningResources = Scheduler->GetTerrainResources();
+	const uint64 CapturedSourceRevision = SourceRevision;
+	FVoxelTaskStamp AttemptStamp;
+	AttemptStamp.OwnerId = TerrainPlanningOwnerId;
+	AttemptStamp.OwnerIncarnation = 1;
+	AttemptStamp.WorldEpoch = Epoch;
+	AttemptStamp.Token = InterestAttemptSerial + 1;
+	const auto AcceptAllocation = [this, InNow, PlanningResources, AttemptStamp, CapturedSourceRevision](
+		const EVoxelTerrainResourceAdmission Admission, const TCHAR* InStage, const uint64 InBytes, const uint64 InRequiredInput)
+	{
+		if (Admission == EVoxelTerrainResourceAdmission::Granted) return true;
+		const auto State = PlanningResources->Snapshot();
+		const bool bTerminal = Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable || Admission == EVoxelTerrainResourceAdmission::InvalidRequest;
+		Scheduler->ObserveDemand(EVoxelTaskKind::BuildInterest, AttemptStamp,
+			bTerminal ? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory, InBytes, 1);
+		if (bTerminal)
+		{
+			RecordInterestBuildFailure(FString::Printf(TEXT("%s: interest %s request=%llu requiredInput=%llu used=%llu limit=%llu leases=%d releaseVersion=%llu"),
+				Admission == EVoxelTerrainResourceAdmission::InvalidRequest ? TEXT("InvalidRequest") : TEXT("CapacityUnachievable"),
+				InStage, InBytes, InRequiredInput, State.Used[int32(EVoxelTerrainResourcePool::Input)], State.Limits.InputBytes, State.LeaseCount, State.ReleaseVersion),
+				CapturedSourceRevision, AttemptStamp.Token);
+		}
+		else if (InNow - LastInterestCapacityDiagnostic >= 5.0)
+		{
+			LastInterestCapacityDiagnostic = InNow;
+			UE_LOG(LogTemp, Warning, TEXT("Voxel interest admission waiting: epoch=%llu sourceRevision=%llu token=%llu stage=%s admission=%d request=%llu requiredInput=%llu input=%llu/%llu working=%llu/%llu leases=%d releaseVersion=%llu"),
+				Epoch, CapturedSourceRevision, AttemptStamp.Token, InStage, int32(Admission), InBytes, InRequiredInput,
+				State.Used[int32(EVoxelTerrainResourcePool::Input)], State.Limits.InputBytes,
+				State.Used[int32(EVoxelTerrainResourcePool::Working)], State.Limits.WorkingBytes, State.LeaseCount, State.ReleaseVersion);
+		}
+		return false;
+	};
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> SourcesLease;
-	const auto SourcesConsumer = FVoxelGenerationConsumerKey::Section(Epoch, TerrainPlanningOwnerId, 1, {}, InterestAttemptSerial + 1);
-	if (!PlanningResources->Acquire(SourcesConsumer, EVoxelTerrainResourcePool::Input,
-		VoxelBoundedAllocation::WorkerSharedBytes<FVoxelInterestSourceCapture>() +
-		VoxelBoundedAllocation::ArrayBytes<FVoxelStreamingSource>(Sources.Num()), SourcesLease)) return;
+	const auto SourcesConsumer = FVoxelGenerationConsumerKey::Section(Epoch, TerrainPlanningOwnerId, 1, {}, AttemptStamp.Token);
+	const uint64 SourcesBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelInterestSourceCapture>() +
+		VoxelBoundedAllocation::ArrayBytes<FVoxelStreamingSource>(Sources.Num());
+	if (!AcceptAllocation(PlanningResources->TryAcquire(SourcesConsumer, EVoxelTerrainResourcePool::Input, SourcesBytes, SourcesLease),
+		TEXT("Source capture"), SourcesBytes, 0)) return;
 	const auto SourcesCapture = VoxelBoundedAllocation::MakeWorkerShared<FVoxelInterestSourceCapture>(SourcesLease);
 	SourcesCapture->Lease = MoveTemp(SourcesLease);
 	auto& ActiveSources = SourcesCapture->Values;
 	ActiveSources.Reserve(Sources.Num());
 
-	for (auto Iterator =
-		Sources.CreateIterator();
-		Iterator;
-		++Iterator)
-	{
-		if (!Iterator.Value().
-			Owner.IsValid())
-		{
-			Iterator.RemoveCurrent();
-			check(SourceRevision < MAX_uint64);
-			++SourceRevision;
-			bInterestDirty = true;
-			continue;
-		}
-
-		ActiveSources.Add(
-			Iterator.Value().Value);
-	}
+	for (const auto& Pair : Sources) ActiveSources.Add(Pair.Value.Value);
 
 	ActiveSources.Sort([](const FVoxelStreamingSource& A, const FVoxelStreamingSource& B)
 	{
@@ -2243,24 +2326,19 @@ void UVoxelModule::RefreshInterest(
 	Request.Kind = EVoxelTaskKind::BuildInterest;
 	Request.WorkClass = EVoxelWorkClass::Interactive;
 	Request.ServiceBand = EVoxelTerrainServiceBand::P1;
-	Request.Stamp.OwnerId = TerrainPlanningOwnerId;
-	Request.Stamp.OwnerIncarnation = 1;
-	Request.Stamp.WorldEpoch = Epoch;
-	check(InterestAttemptSerial < MAX_uint64);
-	Request.Stamp.Token = ++InterestAttemptSerial;
-	const uint64 CapturedSourceRevision = SourceRevision;
+	Request.Stamp = AttemptStamp;
 	const auto RenderRoot = ViewManager ? ViewManager->CapturePresentedSnapshot() : nullptr;
 	const auto PhysicsRoot = CollisionPresenter ? CollisionPresenter->CaptureSnapshot() : nullptr;
 	const int32 ShardCount = CurrentInterest->PublicationInputs ? CurrentInterest->PublicationInputs->FineShards.Num() : 0;
 	const int32 MaximumRows = CurrentInterest->PublicationInputs ? CurrentInterest->PublicationInputs->MaximumFeedbackSections : 0;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> FeedbackLease;
-	if (!Scheduler->GetTerrainResources()->Acquire(FVoxelGenerationConsumerKey::Section(Epoch, TerrainPlanningOwnerId,
-		1, FIntVector::ZeroValue, Request.Stamp.Token), EVoxelTerrainResourcePool::Input,
-		VoxelBoundedAllocation::WorkerSharedBytes<FVoxelFineResidencyFeedback>() +
+	const uint64 FeedbackBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelFineResidencyFeedback>() +
 		VoxelBoundedAllocation::WorkerSharedBytes<FVoxelFineFeedbackCapture>() +
 		VoxelBoundedAllocation::MapBytes<FIntVector, FVoxelFineSectionCoverage>(MaximumRows) +
 		VoxelBoundedAllocation::MapBytes<FVoxelFineShardKey, FVoxelFineShardReadiness>(ShardCount) +
-		VoxelBoundedAllocation::MapBytes<FGuid, FIntVector>(Sources.Num()), FeedbackLease)) return;
+		VoxelBoundedAllocation::MapBytes<FGuid, FIntVector>(Sources.Num());
+	if (!AcceptAllocation(PlanningResources->TryAcquire(SourcesConsumer, EVoxelTerrainResourcePool::Input,
+		FeedbackBytes, FeedbackLease, 0, SourcesCapture->Lease->Bytes(), 1), TEXT("feedback capture"), FeedbackBytes, SourcesCapture->Lease->Bytes())) return;
 	auto Feedback = VoxelBoundedAllocation::MakeWorkerShared<FVoxelFineResidencyFeedback>(FeedbackLease);
 	Feedback->Sections.Reserve(MaximumRows);
 	Feedback->Shards.Reserve(ShardCount);
@@ -2271,17 +2349,32 @@ void UVoxelModule::RefreshInterest(
 	auto Capture = VoxelBoundedAllocation::MakeWorkerShared<FVoxelFineFeedbackCapture>(Feedback->ResourceLease, CurrentInterest.ToSharedRef(),
 		RenderRoot, PhysicsRoot, Runtime->GetChangeHierarchy(), Manifest, Shapes->GetContentHash(), ++SafetyCaptureSerial, Feedback.ToSharedRef());
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> WorkLease;
-	if (!PlanningResources->Acquire(FVoxelGenerationConsumerKey::Section(Epoch, TerrainPlanningOwnerId, 1, {}, Request.Stamp.Token),
-		EVoxelTerrainResourcePool::Input, VoxelBoundedAllocation::WorkerSharedBytes<FVoxelInterestTaskPayload>() +
+	const uint64 WorkBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelInterestTaskPayload>() +
 		VoxelBoundedAllocation::WorkerSharedBytes<FVoxelInterestRuntime>() + VoxelBoundedAllocation::WorkerSharedBytes<FVoxelInterestSet>() +
-		VoxelBoundedAllocation::WorkerSharedBytes<FVoxelChangeHierarchySnapshot>(), WorkLease)) return;
+		VoxelBoundedAllocation::WorkerSharedBytes<FVoxelChangeHierarchySnapshot>();
+	const uint64 CapturedInputBytes = SourcesCapture->Lease->Bytes() + Feedback->ResourceLease->Bytes();
+	if (!AcceptAllocation(PlanningResources->TryAcquire(SourcesConsumer, EVoxelTerrainResourcePool::Input,
+		WorkBytes, WorkLease, 0, CapturedInputBytes, 2), TEXT("task metadata"), WorkBytes, CapturedInputBytes)) return;
 	const auto Payload = VoxelBoundedAllocation::MakeWorkerShared<FVoxelInterestTaskPayload>(WorkLease);
 	Payload->MetadataLease = MoveTemp(WorkLease);
+	const uint64 ErrorBytes = VoxelBoundedAllocation::ArrayBytes<TCHAR>(InterestErrorCapacity);
+	const uint64 RequiredErrorInput = CapturedInputBytes + Payload->MetadataLease->Bytes();
+	if (!AcceptAllocation(PlanningResources->TryAcquire(SourcesConsumer, EVoxelTerrainResourcePool::Input,
+		ErrorBytes, Payload->ErrorLease, 0, RequiredErrorInput, 3), TEXT("error buffer"), ErrorBytes, RequiredErrorInput)) return;
+	Payload->ErrorBuffer.GetCharArray().Reserve(InterestErrorCapacity);
+	check(Payload->ErrorBuffer.GetAllocatedSize() <= Payload->ErrorLease->Bytes());
 	Request.ReservedBytes = 1;
 	Request.InputBytes = 0;
 	Request.FirstRunnableSeconds = InNow;
 	Request.bResumable = true;
-	Request.SetRequiredBindingInput(SourcesCapture->Lease->Bytes() + Feedback->ResourceLease->Bytes() + Payload->MetadataLease->Bytes(), 3);
+	Request.SetRequiredBindingInput(RequiredErrorInput + Payload->ErrorLease->Bytes(), 4);
+	const auto RejectBinding = [this, &Request, CapturedSourceRevision](const FString& InError)
+	{
+		Scheduler->ObserveDemand(Request.Kind, Request.Stamp,
+			IsTerminalInterestBuildError(InError) ? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory,
+			Request.GetBindingBytes() + Request.GetRequiredBindingInputBytes(), Request.ReservedBytes);
+		RecordInterestBuildFailure(InError, CapturedSourceRevision, Request.Stamp.Token);
+	};
 	{
 		FString CallbackBindingError;
 		if (!Request.BindGetBlockReason((*Scheduler).GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : (*Scheduler).GetControlConsumer()),
@@ -2291,9 +2384,7 @@ void UVoxelModule::RefreshInterest(
 			EVoxelTaskBlockReason::Memory : EVoxelTaskBlockReason::None;
 	}, CallbackBindingError))
 		{
-			(*Scheduler).ObserveDemand(Request.Kind, Request.Stamp,
-				CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
-					? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+			RejectBinding(CallbackBindingError);
 			return;
 		}
 	}
@@ -2332,30 +2423,49 @@ void UVoxelModule::RefreshInterest(
 		Payload->Interest->RenderCoverageSerial = Capture->GetRenderSerial();
 		Payload->Interest->PhysicsCoverageSerial = Capture->GetPhysicsSerial();
 		Result.bSuccess = !Cancel.Load();
-		Result.Error = Payload->CandidateRuntime->GetPlanningError();
-		if (Result.Error.StartsWith(TEXT("CapacityBlocked")))
+		const FString& PlanningError = Payload->CandidateRuntime->GetPlanningError();
+		if (PlanningError.StartsWith(TEXT("CapacityBlocked")))
 		{
 			// 同一个规划 continuation 保留根、Token 和首次排队年龄；只在真正释放容量后重试。
 			Payload->CapacityVersion.Store(Resources->Snapshot().ReleaseVersion);
 			Payload->bCapacityWaiting.Store(true);
-			Result.Error.Reset();
 			Result.bSuccess = Result.bContinue = !Cancel.Load();
 			return Result;
 		}
-		Result.bSuccess &= Result.Error.IsEmpty();
+		Result.bSuccess &= PlanningError.IsEmpty();
 		if (Result.bSuccess && !Payload->bHasSnapshot && Payload->CandidateRuntime->GetCoarsePlanningPending())
 		{
 			// 有界粗域推进尚未形成完整快照；原任务保留候选根、游标、Token 与排队年龄继续执行。
 			Result.bContinue = true;
 			return Result;
 		}
+		if (!PlanningError.IsEmpty())
+		{
+			// 接纳前固定错误容量；结果与其授额一起转移，不在失败路径重新申请内存。
+			auto& Buffer = Payload->ErrorBuffer.GetCharArray();
+			Buffer.Reset();
+			const bool bUnclassifiedFailure = !IsTerminalInterestBuildError(PlanningError) &&
+				!PlanningError.StartsWith(TEXT("DependencyNotReady")) && !PlanningError.StartsWith(TEXT("PlanningPending"));
+			constexpr TCHAR TerminalPrefix[] = TEXT("TerminalFailure: ");
+			if (bUnclassifiedFailure) Buffer.Append(TerminalPrefix, UE_ARRAY_COUNT(TerminalPrefix) - 1);
+			const int32 Count = FMath::Min(PlanningError.Len(), InterestErrorCapacity - Buffer.Num() - 1);
+			Buffer.Append(*PlanningError, Count);
+			Buffer.Add(TCHAR(0));
+			if (Count < PlanningError.Len())
+				UE_LOG(LogTemp, Error, TEXT("Voxel interest full failure: epoch=%llu token=%llu error=%s"), PlanningStamp.WorldEpoch, PlanningStamp.Token, *PlanningError);
+			Result.Error = MoveTemp(Payload->ErrorBuffer);
+			Result.OutputResourceLease = MoveTemp(Payload->ErrorLease);
+		}
+		else
+		{
+			Payload->ErrorBuffer.Empty();
+			Payload->ErrorLease.Reset();
+		}
 		Result.CustomPayload = Payload;
 		return Result;
 	}, CallbackBindingError))
 		{
-			(*Scheduler).ObserveDemand(Request.Kind, Request.Stamp,
-				CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
-					? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+			RejectBinding(CallbackBindingError);
 			return;
 		}
 	}
@@ -2376,15 +2486,27 @@ void UVoxelModule::RefreshInterest(
 		}
 		if (!Result.bSuccess || Result.bCanceled || !bOwnersValid)
 		{
+			if (!Result.bCanceled && bOwnersValid && IsTerminalInterestBuildError(Result.Error))
+			{
+				// 同一输入的确定性错误只报告一次；新的 Source 版本或世界允许重新规划。
+				const FString Error = Result.RejectedResultBytes != 0 ? FString::Printf(
+					TEXT("%s; actual=%llu accounted=%llu payload=%llu payloadAccounted=%llu"), *Result.Error,
+					Result.RejectedResultBytes, Result.RejectedAccountedBytes, Result.RejectedPayloadBytes, Result.RejectedPayloadAccountedBytes) : Result.Error;
+				RecordInterestBuildFailure(Error, CapturedSourceRevision, Result.Stamp.Token);
+			}
 			bInterestDirty = true;
 			return;
 		}
 		const auto Payload = StaticCastSharedPtr<const FVoxelInterestTaskPayload>(Result.CustomPayload);
 		if (!Payload)
 		{
+			RecordInterestBuildFailure(TEXT("TerminalFailure: interest result payload is missing"), CapturedSourceRevision, Result.Stamp.Token);
 			bInterestDirty = true;
 			return;
 		}
+		InterestBuildError.Reset();
+		FailedInterestSourceRevision = MAX_uint64;
+		FailedInterestEpoch = 0;
 		bInterestDirty |= SourceRevision != CapturedSourceRevision;
 		LastPlannedRenderCoverageSerial = Payload->Interest->RenderCoverageSerial;
 		LastPlannedPhysicsCoverageSerial = Payload->Interest->PhysicsCoverageSerial;
@@ -2418,16 +2540,22 @@ void UVoxelModule::RefreshInterest(
 		// 不清除执行期间新产生的移动请求，避免连续行走丢失末次位置。
 	}, CallbackBindingError))
 		{
-			(*Scheduler).ObserveDemand(Request.Kind, Request.Stamp,
-				CallbackBindingError.StartsWith(TEXT("Oversized")) || CallbackBindingError.StartsWith(TEXT("CapacityUnachievable"))
-					? EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
+			RejectBinding(CallbackBindingError);
 			return;
 		}
 	}
 	if (!Scheduler->Enqueue(MoveTemp(Request)))
 	{
+		if (Request.Blocked == EVoxelTaskBlockReason::Oversized || Request.Blocked == EVoxelTaskBlockReason::TerminalFailure)
+		{
+			RecordInterestBuildFailure(FString::Printf(TEXT("TerminalFailure: interest enqueue blocked=%u input=%llu reserved=%llu requiredInput=%llu"),
+				uint32(Request.Blocked), Request.InputBytes, Request.ReservedBytes, Request.GetRequiredBindingInputBytes()),
+				CapturedSourceRevision, AttemptStamp.Token);
+		}
 		return;
 	}
+	// 未接纳的容量重试复用原尝试身份，避免诊断等待表随重试无界增长。
+	InterestAttemptSerial = AttemptStamp.Token;
 	bInterestBuildPending = true;
 	LastInterestRefresh = InNow;
 	bInterestDirty = false;
@@ -2877,6 +3005,19 @@ FVoxelEditReply UVoxelModule::ExecuteIntent(
 		Reply.Code = EVoxelEditCode::Busy;
 		return Reply;
 	}
+	UInventoryWorldSubsystem* System = GetWorld()->GetSubsystem<UInventoryWorldSubsystem>();
+	if (!System || !System->IsReady() || System->IsArchiveFrozen())
+	{
+		Reply.Code = EVoxelEditCode::Busy;
+		Reply.Reason = TEXT("Inventory.WorldNotReadyOrSaving");
+		return Reply;
+	}
+	if (!InIntent.InventoryStoreId.IsValid() || InIntent.InventoryStoreId != System->GetStoreId())
+	{
+		Reply.Code = EVoxelEditCode::Stale;
+		Reply.Reason = TEXT("Inventory.StoreChanged");
+		return Reply;
+	}
 	if (InIntent.Action == EVoxelEditAction::BreakCancel)
 	{
 		Breaking.Remove(InSource);
@@ -2904,6 +3045,7 @@ FVoxelEditReply UVoxelModule::ExecuteIntent(
 	if (InIntent.Action == EVoxelEditAction::BreakBegin)
 	{
 		FBreak Break;
+		Break.InventoryStoreId = InIntent.InventoryStoreId;
 		Break.Target = Hit.Index;
 		Break.Expected = Hit.State;
 		Break.Began = Now;
@@ -2916,6 +3058,7 @@ FVoxelEditReply UVoxelModule::ExecuteIntent(
 	{
 		FBreak* Break = Breaking.Find(InSource);
 		if (!Break ||
+			Break->InventoryStoreId != InIntent.InventoryStoreId ||
 			Break->Target != Hit.Index ||
 			Break->Expected != Hit.State ||
 			Now - Break->LastPulse > 0.35)
@@ -2932,133 +3075,95 @@ FVoxelEditReply UVoxelModule::ExecuteIntent(
 			return Reply;
 		}
 	}
-	if (InIntent.Action == EVoxelEditAction::ContainerTake ||
-		InIntent.Action == EVoxelEditAction::ContainerPut)
-	{
-		return TransferContainer(InController, InSource, InIntent, Hit);
-	}
 
-	UAbilityInventoryBase* Inventory = ResolveInventory(InController, InSource);
-	UAbilityInventorySlotBase* Slot = nullptr;
-	uint16 PlaceType = 0;
-	const UVoxelAgentComponent* Agent = InSource->FindComponentByClass<UVoxelAgentComponent>();
-	bTrustedStandaloneCreative = bTrustedStandaloneCreative &&
-		GetWorld()->GetNetMode() == NM_Standalone &&
-		Agent &&
-		Agent->bCreativeInStandalone;
-	FAbilityItem Before;
-	FAbilityItem After;
-	if (InIntent.Action == EVoxelEditAction::Place)
-	{
-		const FVoxelRuntimeDefinition* Definition = Registry.GetSnapshot()->Find(InIntent.ExpectedItemID);
-		if (!Definition)
-		{
-			Reply.Reason = TEXT("Unknown inventory block");
-			return Reply;
-		}
-		PlaceType = Definition->TypeId;
-		if (!bTrustedStandaloneCreative)
-		{
-			Slot = Inventory ? Inventory->GetSlotBySplitTypeAndIndex(
-				ESlotSplitType::Shortcut,
-				InIntent.InventorySlot) : nullptr;
-			if (!Slot ||
-				Slot != Inventory->GetSelectedSlot(ESlotSplitType::Shortcut) ||
-				!Slot->IsEnabled() ||
-				Slot->GetItem().ID != InIntent.ExpectedItemID ||
-				Slot->GetItem().Count <= 0 ||
-				Slot->GetItem().Level != 0)
-			{
-				Reply.Reason = TEXT("Server inventory slot does not contain this block");
-				return Reply;
-			}
-			Before = Slot->GetItem();
-			After = Before;
-			--After.Count;
-			if (After.Count == 0)
-			{
-				After = FAbilityItem::Empty;
-			}
-		}
-	}
-
-	FVoxelInteractionPlan Plan;
-	if (!BuildInteractionPlan(
-		Hit,
-		InIntent.Action,
-		PlaceType,
-		InIntent.Direction,
-		InSource,
-		Plan,
-		Reply.Reason) || !ValidateInteractionPlan(Plan, Reply.Reason))
-	{
-		return Reply;
-	}
-	if ((InIntent.Action == EVoxelEditAction::Place || InIntent.Action == EVoxelEditAction::Use) &&
-		PlacementOverlapsActors(Plan))
-	{
-		Reply.Reason = TEXT("Result would overlap an actor");
-		return Reply;
-	}
-	FVoxelPreparedEdit Prepared;
-	if (!Runtime->PrepareEdit(Plan.Cells, Plan.Entities, Prepared, Reply.Reason))
-	{
-		return Reply;
-	}
-
-	TGuardValue<bool> Guard(bMutating, true);
-	AAbilityPickUpVoxel* Drop = nullptr;
-	if (Plan.DropID.IsValid() && Plan.DropCount > 0)
-	{
-		UVoxelSceneRegion* Region = GetSceneRegion(VoxelModuleToSection(Hit.Index), true);
-		Drop = AAbilityPickUpVoxel::CreateReserved(
-			GetWorld(),
-			FAbilityItem(Plan.DropID, Plan.DropCount),
-			Hit.Point,
-			Region);
-		if (!Drop)
-		{
-			Reply.Reason = TEXT("Cannot allocate a drop; block was not changed");
-			return Reply;
-		}
-	}
-	if (Slot && !FVoxelInventoryTransaction::SetSilent(*Slot, Before, After))
-	{
-		if (Drop)
-		{
-			Drop->Destroy();
-		}
-		Reply.Code = EVoxelEditCode::Stale;
-		return Reply;
-	}
-	FVoxelEditBatch Batch;
-	if (!Runtime->CommitPreparedEdit(MoveTemp(Prepared), Batch, Reply.Reason))
-	{
-		if (Slot)
-		{
-			FVoxelInventoryTransaction::RestoreSilent(*Slot, Before);
-		}
-		if (Drop)
-		{
-			Drop->Destroy();
-		}
-		Reply.Code = EVoxelEditCode::Stale;
-		return Reply;
-	}
-	if (Drop)
-	{
-		Drop->ActivateReserved();
-	}
-	if (Slot)
-	{
-		FVoxelInventoryTransaction::Notify(*Slot, Before);
-	}
-	Breaking.Remove(InSource);
-	PublishProjectEdit(Batch);
-	OnInteractionCommitted(Plan, InSource);
-	Reply.Code = EVoxelEditCode::Accepted;
-	return Reply;
+    UAbilityInventoryBase* Inventory = ResolveInventory(InController, InSource);
+    if(!System || !System->IsReady() || !Inventory || !InventoryBridge || !InventoryContribution)
+    {
+        Reply.Reason = TEXT("Inventory.WorldNotReady");
+        return Reply;
+    }
+    const FInventorySnapshot Snapshot = Inventory->MakeSnapshot();
+    const UVoxelAgentComponent* Agent = InSource->FindComponentByClass<UVoxelAgentComponent>();
+    bTrustedStandaloneCreative = bTrustedStandaloneCreative && GetWorld()->GetNetMode() == NM_Standalone && Agent && Agent->bCreativeInStandalone;
+    uint16 PlaceType = 0;
+    const FInventorySlotState* Slot = nullptr;
+    if(InIntent.Action == EVoxelEditAction::Place)
+    {
+        FPrimaryAssetId VoxelId = InIntent.ExpectedItemID;
+        if(!bTrustedStandaloneCreative)
+        {
+            const IAbilityInventoryAgentInterface* InventoryAgent = Cast<IAbilityInventoryAgentInterface>(InSource);
+            Slot = Snapshot.FindSlot(InIntent.InventorySlot);
+            if(!InventoryAgent || InIntent.InventorySlot != InventoryAgent->GetSelectedInventorySlot() ||
+                Snapshot.InventoryId != InIntent.ExpectedInventoryId || Snapshot.Revision != InIntent.ExpectedInventoryRevision ||
+                Snapshot.Generation != InIntent.ExpectedInventoryGeneration || !Slot || Slot->bLocked || Slot->Item.IsEmpty() ||
+                Slot->Item.ItemId != InIntent.ExpectedItemID)
+            {
+                Reply.Code = EVoxelEditCode::Stale;
+                Reply.Reason = TEXT("Inventory.SelectedSlotChanged");
+                return Reply;
+            }
+            const FInventoryItemDefinition* ItemDefinition = System->GetRegistry().Find(Slot->Item.ItemId);
+            if(!ItemDefinition || !ItemDefinition->PlaceableVoxelId.IsValid())
+            {
+                Reply.Reason = TEXT("Inventory.ItemNotPlaceable");
+                return Reply;
+            }
+            VoxelId = ItemDefinition->PlaceableVoxelId;
+        }
+        const FVoxelRuntimeDefinition* Definition = Registry.GetSnapshot()->Find(VoxelId);
+        if(!Definition)
+        {
+            Reply.Reason = TEXT("Inventory.PlaceableVoxelUnknown");
+            return Reply;
+        }
+        PlaceType = Definition->TypeId;
+    }
+    FVoxelInteractionPlan Plan;
+    if(!BuildInteractionPlan(Hit, InIntent.Action, PlaceType, InIntent.Direction, InSource, Plan, Reply.Reason) ||
+        !ValidateInteractionPlan(Plan, Reply.Reason))
+    {
+        return Reply;
+    }
+    Plan.Action = InIntent.Action;
+    Plan.RequestId = InIntent.RequestId;
+    const FString EventText = FString::Printf(TEXT("Voxel/%s/%s/%s/%llu/%d"),
+        *System->GetWorldEpoch().ToString(EGuidFormats::Digits), *System->GetStoreId().ToString(EGuidFormats::Digits), *Snapshot.OwnerId.ToString(EGuidFormats::Digits),
+        InIntent.RequestId, static_cast<int32>(InIntent.Action));
+    const FTCHARToUTF8 EventUtf8(*EventText);
+    FMD5 EventHash;
+    EventHash.Update(reinterpret_cast<const uint8*>(EventUtf8.Get()), EventUtf8.Length());
+    uint8 EventDigest[16];
+    EventHash.Final(EventDigest);
+    FVoxelByteReader EventReader(MakeArrayView(EventDigest));
+    Plan.EventId = EventReader.Guid();
+    FInventoryBatchRequest Request;
+    if(Slot && Plan.Cost > 0)
+    {
+        FInventoryOperation Remove;
+        Remove.Type = EInventoryOperationType::Remove;
+        Remove.SourceInventoryId = Snapshot.InventoryId;
+        Remove.SourceSlot = Slot->Key;
+        Remove.Filter.bMatchSignature = true;
+        Remove.Filter.Signature = Slot->Item.Signature();
+        Remove.Requested = Plan.Cost;
+        Remove.AmountMode = EInventoryAmountMode::Exact;
+        Request.Operations.Add(MoveTemp(Remove));
+        Request.ExpectedRevisions.Add({Snapshot.InventoryId, Snapshot.Revision, Snapshot.Generation});
+    }
+    FInventoryCommandResult Result;
+    if(!ExecuteInventoryWorldEdit(Plan, InSource, Request, System->MakeServerAuthority(Snapshot.OwnerId, TEXT("Voxel.Interaction")), Result, Reply.Reason))
+    {
+        Reply.Code = Result.Code == EInventoryResultCode::ConfirmationPending ? EVoxelEditCode::ConfirmationPending :
+            Result.Code == EInventoryResultCode::RevisionStale ? EVoxelEditCode::Stale : EVoxelEditCode::Rejected;
+        return Reply;
+    }
+    Breaking.Remove(InSource);
+    OnInteractionCommitted(Plan, InSource);
+    Reply.Code = EVoxelEditCode::Accepted;
+    return Reply;
 }
+
 
 bool UVoxelModule::BuildInteractionPlan(const FVoxelTraceResult& InHit, EVoxelEditAction InAction, uint16 InPlaceType, const FVector& InViewDirection, AActor* InSource, FVoxelInteractionPlan& OutPlan, FString& OutError)
 {
@@ -3074,127 +3179,9 @@ bool UVoxelModule::ValidateInteractionPlan(FVoxelInteractionPlan& InOutPlan, FSt
 	return FVoxelEditTransaction::ValidateBatch(*Runtime, *Registry.GetSnapshot(), *Shapes, InOutPlan.Cells, OutError);
 }
 
-void UVoxelModule::OnContainerTransferCommitted(
-	APlayerController* InController,
-	AActor* InSource,
-	const FIntVector& InAnchor,
-	const FAbilityItem& InTransferredItem,
-	bool bInTaken)
-{
-}
 
-FVoxelEditReply UVoxelModule::TransferContainer(
-	APlayerController* InController,
-	AActor* InSource,
-	const FVoxelEditIntent& InIntent,
-	const FVoxelTraceResult& InHit)
-{
-	FVoxelEditReply Reply;
-	Reply.RequestId = InIntent.RequestId;
-	Reply.Code = EVoxelEditCode::Rejected;
-	FVoxelSection* Section = Runtime->FindSection(VoxelModuleToSection(InHit.Index));
-	if (!Section ||
-		Section->CommittedRevision != InIntent.ExpectedRevision ||
-		InIntent.ContainerSlot < 0 ||
-		InIntent.ContainerSlot >= 27)
-	{
-		Reply.Code = EVoxelEditCode::Stale;
-		return Reply;
-	}
-	FVoxelBlockEntityState* Entity = Section->Entities.Find(VoxelModuleToCellIndex(InHit.Index));
-	TArray<FVoxelItemStack> Items;
-	UAbilityInventoryBase* Inventory = ResolveInventory(InController, InSource);
-	UAbilityInventorySlotBase* Slot = Inventory ? Inventory->GetSlotBySplitTypeAndIndex(
-		ESlotSplitType::Shortcut,
-		InIntent.InventorySlot) : nullptr;
-	if (!Slot || !Slot->IsEnabled() || !Entity || !FVoxelBlockEntityCodec::DecodeContainer(*Entity, Items))
-	{
-		return Reply;
-	}
-	FAbilityItem Before = Slot->GetItem();
-	FAbilityItem After = Before;
-	FVoxelItemStack& Cell = Items[InIntent.ContainerSlot];
-	const int32 Count = InIntent.Count;
-	if (Count <= 0)
-	{
-		return Reply;
-	}
-	if (InIntent.Action == EVoxelEditAction::ContainerTake)
-	{
-		if (Cell.Count < Count)
-		{
-			return Reply;
-		}
-		const FAbilityItem Taken(Cell.ID, Count, Cell.Level);
-		if (!Slot->MatchItem(Taken, true) || Slot->GetRemainVolume(Taken) < Count)
-		{
-			return Reply;
-		}
-		After = Before.Count > 0 ?
-			FAbilityItem(Before.ID, Before.Count + Count, Before.Level) :
-			Taken;
-		Cell.Count -= Count;
-		if (Cell.Count == 0)
-		{
-			Cell = {};
-		}
-	}
-	else
-	{
-		if (Before.Count < Count ||
-			!Before.ID.IsValid() ||
-			Before.ID != InIntent.ExpectedItemID ||
-			(Cell.Count > 0 && (Cell.ID != Before.ID || Cell.Level != Before.Level)))
-		{
-			return Reply;
-		}
-		const UAbilityItemDataBase* Data = UAssetModuleStatics::LoadPrimaryAsset<UAbilityItemDataBase>(Before.ID, false);
-		if (!Data || Count > Data->MaxCount - Cell.Count)
-		{
-			return Reply;
-		}
-		Cell.ID = Before.ID;
-		Cell.Level = Before.Level;
-		Cell.Count += Count;
-		After.Count -= Count;
-		if (After.Count == 0)
-		{
-			After = FAbilityItem::Empty;
-		}
-	}
 
-	FVoxelEntityEdit EntityEdit;
-	EntityEdit.Position = InHit.Index;
-	if (!FVoxelBlockEntityCodec::EncodeContainer(Items, EntityEdit.Value))
-	{
-		return Reply;
-	}
-	FVoxelPreparedEdit Prepared;
-	if (!Runtime->PrepareEdit({}, { EntityEdit }, Prepared, Reply.Reason))
-	{
-		return Reply;
-	}
-	TGuardValue<bool> Guard(bMutating, true);
-	if (!FVoxelInventoryTransaction::SetSilent(*Slot, Before, After))
-	{
-		Reply.Code = EVoxelEditCode::Stale;
-		return Reply;
-	}
-	FVoxelEditBatch Batch;
-	if (!Runtime->CommitPreparedEdit(MoveTemp(Prepared), Batch, Reply.Reason))
-	{
-		FVoxelInventoryTransaction::RestoreSilent(*Slot, Before);
-		Reply.Code = EVoxelEditCode::Stale;
-		return Reply;
-	}
-	FVoxelInventoryTransaction::Notify(*Slot, Before);
-	PublishProjectEdit(Batch);
-	FAbilityItem Transferred = InIntent.Action == EVoxelEditAction::ContainerTake ? After : Before;
-	Transferred.Count = Count;
-	OnContainerTransferCommitted(InController, InSource, InHit.Index, Transferred, InIntent.Action == EVoxelEditAction::ContainerTake);
-	Reply.Code = EVoxelEditCode::Accepted;
-	return Reply;
-}
+
 
 bool UVoxelModule::ApplyPrefab(
 	const FVoxelPrefabSaveData& InPrefab,
@@ -3251,20 +3238,20 @@ bool UVoxelModule::ApplyPrefab(
 		OutError = TEXT("Prefab overlaps live actors");
 		return false;
 	}
-	FVoxelPreparedEdit Prepared;
-	if (!Runtime->PrepareEdit(Plan.Cells, Plan.Entities, Prepared, OutError))
-	{
-		return false;
-	}
-	TGuardValue<bool> Guard(bMutating, true);
-	FVoxelEditBatch Batch;
-	if (!Runtime->CommitPreparedEdit(MoveTemp(Prepared), Batch, OutError))
-	{
-		return false;
-	}
-	PublishProjectEdit(Batch);
-	return true;
+
+    Plan.EventId = FGuid::NewGuid();
+    Plan.ObjectAction = TEXT("World.ApplyPrefab");
+    UInventoryWorldSubsystem* System = GetWorld()->GetSubsystem<UInventoryWorldSubsystem>();
+    if(!System)
+    {
+        OutError = TEXT("Inventory.WorldNotReady");
+        return false;
+    }
+    FInventoryBatchRequest Request;
+    FInventoryCommandResult Result;
+    return ExecuteInventoryWorldEdit(Plan, nullptr, Request, System->MakeServerAuthority(System->GetWorldId(), TEXT("World.ApplyPrefab")), Result, OutError);
 }
+
 
 bool UVoxelModule::ExportPrefab(
 	const FIntVector& InMin,
@@ -4395,4 +4382,51 @@ void UVoxelModule::LogTerrainGeometryHistogram() const
 	// 采样由 ViewManager 在同一帧期限内推进；日志只读取固定数量的桶，不遍历世界或网格。
 	if (const auto Statistics = GetTerrainStatistics())
 		UE_LOG(LogTemp, Display, TEXT("Voxel target readiness histogram (incremental owner samples):\n%s"), *Statistics->ToCsv());
+}
+
+
+
+void UVoxelModule::BindInventoryBridge(TSharedRef<FVoxelInventoryDomainBridge> InBridge, FInventoryVoxelContribution InContribution)
+{
+    InventoryBridge = InBridge;
+    InventoryContribution = MoveTemp(InContribution);
+    const TWeakObjectPtr<UVoxelModule> Weak(this);
+    InBridge->SetPublisher([Weak](const FVoxelEditBatch& Batch)
+    {
+        if(Weak.IsValid())
+        {
+            Weak->PublishProjectEdit(Batch);
+        }
+    });
+}
+
+bool UVoxelModule::ExecuteInventoryWorldEdit(FVoxelInteractionPlan& InOutPlan, AActor* InSource,
+    FInventoryBatchRequest& InOutRequest, const FInventoryAuthorityContext& InAuthority,
+    FInventoryCommandResult& OutResult, FString& OutError)
+{
+    UInventoryWorldSubsystem* System = GetWorld()->GetSubsystem<UInventoryWorldSubsystem>();
+    if(!System || !System->IsReady() || !IsAuthority() || !IsReady() || bMutating || !InventoryBridge || !InventoryContribution)
+    {
+        OutError = TEXT("Inventory.WorldEditUnavailable");
+        return false;
+    }
+    TGuardValue<bool> Guard(bMutating, true);
+    if(!InventoryContribution(InOutPlan, InSource, InOutRequest, OutError) ||
+        !ValidateInteractionPlan(InOutPlan, OutError) || PlacementOverlapsActors(InOutPlan) ||
+        !InventoryBridge->AppendEdit(InOutPlan.Cells, InOutPlan.Entities, InOutRequest.DomainChanges, OutError))
+    {
+        if(OutError.IsEmpty()) OutError = TEXT("Inventory.WorldEditOverlapsActor");
+        return false;
+    }
+    if(InOutRequest.Operations.IsEmpty() && InOutRequest.CreateInventories.IsEmpty() && InOutRequest.DeleteInventories.IsEmpty() && InOutRequest.DomainChanges.IsEmpty())
+    {
+        OutResult.Code = EInventoryResultCode::Success;
+        // 已通过交互规划与权限校验的非经济 Use 可直接触发其表现事件。
+        // 游戏可以注册开窗、休息等动作；没有状态改动时不伪造 WAL 写入。
+        return InOutPlan.Action == EVoxelEditAction::Use && ::IsValid(InSource) &&
+            InOutPlan.ObjectId.IsValid() && !InOutPlan.ObjectAction.IsNone();
+    }
+    OutResult = System->ExecuteAuthorizedBatch(InOutRequest, InAuthority);
+    OutError = OutResult.IsSuccess() ? FString() : StaticEnum<EInventoryResultCode>()->GetNameStringByValue(static_cast<int64>(OutResult.Code));
+    return OutResult.IsSuccess();
 }

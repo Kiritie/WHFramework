@@ -1,6 +1,5 @@
 #include "Ability/Pawn/AbilityPawnDataBase.h"
 
-#include "Ability/Pawn/AbilityPawnInventoryBase.h"
 
 UAbilityPawnDataBase::UAbilityPawnDataBase()
 {
@@ -10,8 +9,5 @@ UAbilityPawnDataBase::UAbilityPawnDataBase()
 	PEClass = nullptr;
 	Radius = 40.f;
 	HalfHeight = 40.f;
-
-	InventoryData = FInventorySaveData();
-	InventoryData.InventoryClass = UAbilityPawnInventoryBase::StaticClass();
-	InventoryData.SplitItems.Add(ESlotSplitType::Default, 5);
 }
+

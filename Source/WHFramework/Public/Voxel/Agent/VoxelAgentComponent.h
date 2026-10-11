@@ -49,6 +49,8 @@ public:
 	bool PrepareBirthSource(const FGuid& InSource);
 	bool TryCommitBirthSource();
 	bool IsBirthSourceCommitted() const;
+	const FVoxelPlayerClaimToken& GetBirthClaimToken() const { return BirthClaim; }
+	bool IsBirthCandidateCommitted() const { return bBirthCandidateCommitted; }
 	void SetBirthCandidateCommitted(bool bInCommitted) { bBirthCandidateCommitted = bInCommitted; }
 	const FGuid& GetStreamingSourceId() const { return SourceId; }
 
@@ -72,15 +74,7 @@ public:
 	UFUNCTION(BlueprintCallable)
 	bool UseTarget();
 
-	UFUNCTION(BlueprintCallable)
-	bool TakeContainerSlot(
-		int32 InContainerSlot,
-		int32 InCount);
 
-	UFUNCTION(BlueprintCallable)
-	bool PutContainerSlot(
-		int32 InContainerSlot,
-		int32 InCount);
 
 public:
 	UPROPERTY(
@@ -172,6 +166,7 @@ private:
 	bool MakeIntent(
 		EVoxelEditAction InAction,
 		FVoxelEditIntent& OutIntent) const;
+	FGuid GetInventoryStoreId() const;
 
 	bool Send(
 		FVoxelEditIntent InIntent);

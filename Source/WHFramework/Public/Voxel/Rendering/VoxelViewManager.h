@@ -295,11 +295,11 @@ private:
 	int32 TransitionAdmissionCursor[2] = {};
 	double TransitionAdmissionCostMicroseconds[2] = {50.0, 50.0};
 	void ProcessFineShardAdmissions();
-	void PrepareFineShardPresentations();
+	void PrepareFineShardPresentations(double InDeadline = MAX_dbl);
 	void EnqueueFinePresentation(const FVoxelFineShardKey& InKey);
 	void OnFineOwnershipChanged(const FIntVector& InSection);
 	void OnPresentationReady(const FIntVector& InSection);
-	void AdvanceNativeFineRetirement();
+	void AdvanceNativeFineRetirement(double InDeadline);
 	void RefreshTerrainStatistics();
 	FVoxelTerrainMetricEvidence SampleTerrainMetric(const FVoxelTerrainMetricEvidence::FTarget& InTarget) const;
 	int32 StatisticsInputPhase = 0;
@@ -583,6 +583,7 @@ private:
 	uint64 ServiceSelectionCapacityVersions[2] = {};
 	EVoxelTerrainResourceAdmission LastServiceResourceAdmission = EVoxelTerrainResourceAdmission::None;
 	int32 ServiceAdmissionScans[2][4] = {};
+	int32 ServiceAdmissionKinds[2] = {};
 	double AdmissionCostEstimates[2][4] = {};
 	uint64 NextAdmissionSequence = 0;
 	TConstArrayView<int32> AdmissionPriorities;

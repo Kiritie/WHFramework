@@ -58,6 +58,9 @@ void FVoxelViewManager::ResetRetirementContinuation()
 void FVoxelViewManager::CleanupRetiredRepresentations(const double InNow)
 {
 	const double Start = FPlatformTime::Seconds();
+	const double Deadline = TerrainDeadline(0.25);
+	ON_SCOPE_EXIT { LastRetireMilliseconds = (FPlatformTime::Seconds() - Start) * 1000.0; };
+	if (Start >= Deadline) return;
 	if (!RetirementContinuation.IsValid())
 	{
 		if (RetirementQueue.IsEmpty()) return;
@@ -83,7 +86,8 @@ void FVoxelViewManager::CleanupRetiredRepresentations(const double InNow)
 		case 3: RetirementBounds = MacroCoverageRect({FIntPoint(RetirementCandidate.Coordinate.X, RetirementCandidate.Coordinate.Y), RetirementCandidate.Level}); break;
 		default: RemoveRetirement(RetirementCandidate); return;
 		}
-		if (ShouldDeferCoverage(RetirementBounds) || Publisher->IsGroupBusy(RetirementCandidate)) return;
+		if (ShouldDeferCoverage(RetirementBounds) || Publisher->IsGroupBusy(RetirementCandidate) ||
+			FPlatformTime::Seconds() >= Deadline) return;
 		const auto Consumer = FVoxelGenerationConsumerKey::Section(WorldEpoch, TaskOwnerId, TaskOwnerIncarnation,
 			RetirementCandidate.Coordinate, FMath::Max<uint64>(1, AppliedInterestRevision));
 		if (!Scheduler.GetTerrainResources()->Acquire(Consumer, EVoxelTerrainResourcePool::Input,
@@ -105,7 +109,6 @@ void FVoxelViewManager::CleanupRetiredRepresentations(const double InNow)
 			bVolume ? RetirementContentMin.Z + Side : Module.GetManifest().Settings.MaxZ);
 		RetirementContinuation = CleanupRetiredRepresentationSteps(InNow, RetirementCandidate);
 	}
-	const double Deadline = TerrainDeadline(0.25);
 	const FIntVector Min(RetirementBounds.Min.X - 1, RetirementBounds.Min.Y - 1, MIN_int32 + 1);
 	const FIntVector Max(RetirementBounds.Max.X + 1, RetirementBounds.Max.Y + 1, MAX_int32);
 	for (int32 Step = 0; Step < 4096 && !RetirementContinuation.IsComplete() && FPlatformTime::Seconds() < Deadline; ++Step)
@@ -139,6 +142,7 @@ void FVoxelViewManager::CleanupRetiredRepresentations(const double InNow)
 			}
 			RetirementHierarchyAdmission = EVoxelTerrainResourceAdmission::Granted;
 		}
+		if (FPlatformTime::Seconds() >= Deadline) break;
 		// 只在当前微步借用局部读取范围，Yield 后立即恢复 coverage pass 的原范围。
 		TGuardValue<bool> ReadScope(bRetirementReadScope, true);
 		TGuardValue<bool> FullScope(bActiveCoverageFull, false);
@@ -147,7 +151,6 @@ void FVoxelViewManager::CleanupRetiredRepresentations(const double InNow)
 		RetirementContinuation.Resume();
 	}
 	if (RetirementContinuation.IsComplete()) ResetRetirementContinuation();
-	LastRetireMilliseconds = (FPlatformTime::Seconds() - Start) * 1000.0;
 }
 
 bool FVoxelViewManager::ReleaseRetirementGeometry(const FVoxelTerrainSpatialKey& InKey)

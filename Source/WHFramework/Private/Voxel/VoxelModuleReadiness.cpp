@@ -29,7 +29,10 @@ bool UVoxelModule::PreparePlayerClaim(const FGuid& InSource, UObject* InPawn,
 	Identity.ControlRevision = Source->ControlRevision;
 	Identity.PawnIncarnation = InPawnIncarnation;
 	Identity.CandidateCell = InCandidateCell;
-	return ReadinessRuntime.PreparePlayerClaim(Source->PlayerClaim, Identity, InPawn, OutToken);
+	const FVoxelPlayerClaimToken PreviousToken = Source->PlayerClaim.Token;
+	const bool bPrepared = ReadinessRuntime.PreparePlayerClaim(Source->PlayerClaim, Identity, InPawn, OutToken);
+	if (bPrepared && !(PreviousToken == OutToken)) Source->ClaimVerification.Reset();
+	return bPrepared;
 }
 
 bool UVoxelModule::CommitPlayerClaim(const FVoxelPlayerClaimToken& InToken, UObject* InPawn)
@@ -44,7 +47,8 @@ bool UVoxelModule::CommitPlayerClaim(const FVoxelPlayerClaimToken& InToken, UObj
 		!VoxelCoord::FromWorld(Actor->GetActorLocation(), BlockSize(), Cell) || Cell != InToken.CandidateCell) return false;
 	if (Source->PlayerClaim.bPlayerOwned) return IsPlayerClaimCommitted(InToken, InPawn);
 	if (Source->ControlRevision != InToken.ControlRevision || Source->ClaimContractRevision != Source->ContractRevision ||
-		Source->ClaimContentRevision != Runtime->GetContentRevision() || !IsSourceAdmitted(InToken.SourceId) ||
+		Source->ClaimContentRevision != Runtime->GetContentRevision() ||
+		!IsSourceAdmittedAt(InToken.SourceId, InToken.CandidateCell, InToken.WorldEpoch) ||
 		!ReadinessRuntime.CommitPlayerClaim(Source->PlayerClaim, InToken, InPawn)) return false;
 	check(Source->ControlRevision < MAX_uint64);
 	Source->Owner = InPawn;
@@ -97,7 +101,9 @@ FVoxelGameThreadContinuation UVoxelModule::VerifyPlayerClaimSteps(FVoxelPlayerCl
 		const FSource* Source = Sources.Find(InToken.SourceId);
 		return Source && Source->PlayerClaim.Token == InToken && Source->PlayerClaim.Pawn.IsValid() &&
 			InToken.WorldEpoch == Epoch && InToken.SourceIncarnation == Source->Value.RegistrationOrder &&
-			InToken.CandidateRevision == Source->CandidateRevision && Source->ContractRevision == ContractRevision &&
+			InToken.CandidateRevision == Source->CandidateRevision && InToken.ControlRevision == Source->ControlRevision &&
+			IsSourceAdmittedAt(InToken.SourceId, InToken.CandidateCell, InToken.WorldEpoch) &&
+			Source->ContractRevision == ContractRevision &&
 			Source->ClaimContentRevision == Runtime->GetContentRevision();
 	};
 	const bool bVisual = Interest->Source.Has(EVoxelStreamingCapability::FineVisual);
@@ -137,6 +143,7 @@ void UVoxelModule::AdvancePlayerClaims()
 	const auto Physics = CollisionPresenter ? CollisionPresenter->CaptureSnapshot() : nullptr;
 	const uint64 RenderSerial = Render ? Render->GetSerial() : 0;
 	const uint64 PhysicsSerial = Physics ? Physics->Serial : 0;
+	const uint64 DataReadyRevision = Runtime->GetDataReadyRevision();
 	bool bAdvancedClaim = false;
 #if !UE_BUILD_SHIPPING
 	static double NextClaimDiagnostic = 0.0;
@@ -147,6 +154,8 @@ void UVoxelModule::AdvancePlayerClaims()
 	{
 		if (bAdvancedClaim && FPlatformTime::Seconds() >= Deadline) break;
 		FSource& Source = Pair.Value;
+		const bool bExactAdmitted = Source.PlayerClaim.Token.IsValid() &&
+			IsSourceAdmittedAt(Pair.Key, Source.PlayerClaim.Token.CandidateCell, Source.PlayerClaim.Token.WorldEpoch);
 #if !UE_BUILD_SHIPPING
 		if (bLogClaim && !Source.PlayerClaim.bPlayerOwned)
 		{
@@ -162,11 +171,15 @@ void UVoxelModule::AdvancePlayerClaims()
 				for (const auto& Key : Interest->F0CoreSections) MissingFine += !ViewManager || !ViewManager->IsLatestFinePresented(Key);
 				for (const auto& Key : Interest->SimulationSections) MissingSimulation += !SimulationSections.Contains(Key);
 			}
-			UE_LOG(LogTemp, Display, TEXT("Birth claim: token=%d pawn=%d admitted=%d core=%d residency=%d complete=%d contract=%llu/%llu content=%llu/%llu missing=%d/%d/%d/%d"),
+			const FVoxelSourceInterest* Accepted = CurrentInterest->Sources.Find(Pair.Key);
+			const FString AcceptedCenter = Accepted ? Accepted->Source.Center.ToString() : TEXT("<none>");
+			UE_LOG(LogTemp, Display, TEXT("Birth claim: token=%d pawn=%d admitted=%d core=%d residency=%d complete=%d contract=%llu/%llu content=%llu/%llu missing=%d/%d/%d/%d source=%s candidate=%s accepted=%s exactAdmitted=%d verificationPending=%d dataRevision=%llu/%llu"),
 				Source.PlayerClaim.Token.IsValid(), Source.PlayerClaim.Pawn.IsValid(), IsSourceAdmitted(Pair.Key),
 				Source.PlayerClaim.bSpawnCoreReady, Source.PlayerClaim.bResidencyReady, Source.ClaimVerification.IsComplete(),
 				Source.ClaimContractRevision, Source.ContractRevision, Source.ClaimContentRevision, Runtime->GetContentRevision(),
-				MissingData, MissingCollision, MissingFine, MissingSimulation);
+				MissingData, MissingCollision, MissingFine, MissingSimulation, *Pair.Key.ToString(),
+				*Source.PlayerClaim.Token.CandidateCell.ToString(), *AcceptedCenter, bExactAdmitted,
+				Source.PlayerClaim.bVerificationPending, Source.PlayerClaim.VerificationDataReadyRevision, DataReadyRevision);
 		}
 #endif
 		if (!Source.PlayerClaim.Token.IsValid() || Source.PlayerClaim.bPlayerOwned) continue;
@@ -176,14 +189,24 @@ void UVoxelModule::AdvancePlayerClaims()
 			Source.ClaimVerification.Reset();
 			continue;
 		}
-		if (!IsSourceAdmitted(Pair.Key)) continue;
-		const bool bInputsChanged = Source.ClaimContractRevision != Source.ContractRevision ||
+		if (!bExactAdmitted)
+		{
+			Source.PlayerClaim.ClearEvidence();
+			Source.PlayerClaim.bVerificationPending = true;
+			Source.ClaimVerification.Reset();
+			continue;
+		}
+		const bool bInputsChanged = Source.PlayerClaim.bVerificationPending ||
+			Source.ClaimContractRevision != Source.ContractRevision ||
 			Source.ClaimContentRevision != Runtime->GetContentRevision();
 		const bool bCoverageChanged = Source.ClaimRenderSerial != RenderSerial || Source.ClaimPhysicsSerial != PhysicsSerial ||
-			Source.ClaimSimulationRevision != SimulationResidencyRevision;
+			Source.ClaimSimulationRevision != SimulationResidencyRevision ||
+			Source.PlayerClaim.VerificationDataReadyRevision != DataReadyRevision;
 		if (bInputsChanged || (!Source.PlayerClaim.bResidencyReady && Source.ClaimVerification.IsComplete() && bCoverageChanged))
 		{
 			Source.PlayerClaim.ClearEvidence();
+			Source.PlayerClaim.bVerificationPending = false;
+			Source.PlayerClaim.VerificationDataReadyRevision = DataReadyRevision;
 			Source.ClaimContractRevision = Source.ContractRevision;
 			Source.ClaimContentRevision = Runtime->GetContentRevision();
 			Source.ClaimRenderSerial = RenderSerial;

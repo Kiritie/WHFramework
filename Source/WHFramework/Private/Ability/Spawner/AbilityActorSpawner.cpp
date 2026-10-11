@@ -3,6 +3,9 @@
 #include "Ability/Spawner/AbilityActorSpawner.h"
 
 #include "Ability/AbilityModuleStatics.h"
+#include "Ability/Inventory/InventoryItemAssetCatalog.h"
+#include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Engine/World.h"
 #include "Ability/AbilityModuleTypes.h"
 #include "Ability/Actor/AbilityActorBase.h"
 #include "Ability/Actor/AbilityActorDataBase.h"
@@ -58,22 +61,33 @@ void AAbilityActorSpawner::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 
-	const auto& ActorData = AbilityItem.GetData<UAbilityActorDataBase>(false);
-	
-	GetCapsuleComponent()->SetCapsuleRadius(ActorData.Radius);
-	GetCapsuleComponent()->SetCapsuleHalfHeight(ActorData.HalfHeight);
+	const UInventoryWorldSubsystem* Subsystem = GetWorld() ? GetWorld()->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+	const UInventoryItemAssetCatalog* Catalog = Subsystem ? Subsystem->GetItemAssets() : nullptr;
+	const UAbilityActorDataBase* Definition = Catalog ? Catalog->FindAs<UAbilityActorDataBase>(AbilityItem.ItemId) : nullptr;
+	if (Definition)
+	{
+		GetCapsuleComponent()->SetCapsuleRadius(Definition->Radius);
+		GetCapsuleComponent()->SetCapsuleHalfHeight(Definition->HalfHeight);
+	}
 }
 
 AActor* AAbilityActorSpawner::SpawnImpl_Implementation(const FAbilityItem& InAbilityItem)
 {
-	const auto& ActorData = InAbilityItem.GetData<UAbilityActorDataBase>();
+	const UInventoryWorldSubsystem* Subsystem = GetWorld() ? GetWorld()->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+	const UInventoryItemAssetCatalog* Catalog = Subsystem ? Subsystem->GetItemAssets() : nullptr;
+	const UAbilityActorDataBase* Definition = Catalog ? Catalog->FindAs<UAbilityActorDataBase>(InAbilityItem.ItemId) : nullptr;
+	if (!Definition || InAbilityItem.Level < 0 || InAbilityItem.Level > Definition->MaxLevel)
+	{
+		return nullptr;
+	}
+	const UAbilityActorDataBase& ActorData = *Definition;
 	
 	auto SaveData = FActorSaveData();
 	SaveData.AssetID = ActorData.GetPrimaryAssetId();
 	SaveData.Name = *ActorData.Name.ToString();
 	SaveData.Level = InAbilityItem.Level;
 	SaveData.SpawnTransform = GetActorTransform();
-	SaveData.InventoryData = FParameter(ActorData.InventoryData);
+
 
 	return UAbilityModuleStatics::SpawnAbilityActor(FParameter(MoveTemp(SaveData)));
 }
@@ -82,3 +96,4 @@ void AAbilityActorSpawner::DestroyImpl_Implementation(AActor* InAbilityActor)
 {
 	Super::DestroyImpl_Implementation(InAbilityActor);
 }
+

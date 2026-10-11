@@ -1,6 +1,7 @@
 #include "Voxel/Network/VoxelOverlayAuthority.h"
 
 #include "Voxel/Network/VoxelNetworkCodec.h"
+#include "Voxel/Save/InventoryVoxelEntityCodec.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 
 namespace
@@ -64,13 +65,16 @@ namespace
 		}
 		for (const auto& Pair : Overlay.Entities)
 		{
-			if (Pair.Key < 0 || Pair.Key >= 4096 || Pair.Value.Payload.Num() > 256 * 1024)
+			const bool bInventory = FInventoryVoxelEntityCodec::IsInventory(Pair.Value);
+			const int32 PayloadBytes = bInventory ? FInventoryVoxelEntityCodec::GetPublicPayload().Num() : Pair.Value.Payload.Num();
+			if (Pair.Key < 0 || Pair.Key >= 4096 ||
+				(bInventory ? !FInventoryVoxelEntityCodec::Validate(Pair.Value) : PayloadBytes > 256 * 1024))
 			{
 				Error = TEXT("CapacityUnachievable: Overlay entity cell or payload limit");
 				return nullptr;
 			}
-			EntityScratch += VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(Pair.Value.Payload.Num());
-			EntityWire += Pair.Value.Payload.Num();
+			EntityScratch += VoxelGenerationAllocation::Private::ArrayReserveBytes<uint8, FDefaultAllocator>(PayloadBytes);
+			EntityWire += PayloadBytes;
 		}
 		const bool bHasContent = !Overlay.Blocks.IsEmpty() || !Overlay.Entities.IsEmpty();
 		const uint64 WireBytes = bHasContent ? 24 + uint64(Overlay.Blocks.Num()) * 7 + uint64(Overlay.Entities.Num()) * 11 + EntityWire : 0;
@@ -1160,3 +1164,4 @@ bool FVoxelOverlayDeltaEncoder::Advance(FVoxelOverlayEncodedMessage& OutMessage,
 	Error.Reset();
 	return true;
 }
+

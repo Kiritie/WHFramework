@@ -6,6 +6,7 @@
 #include "AbilityActorDataBase.generated.h"
 
 class AAbilityActorBase;
+class UInventoryProfile;
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UAbilityActorDataBase : public UAbilityItemDataBase
 {
@@ -33,5 +34,12 @@ public:
 	float HalfHeight;
 		
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FInventorySaveData InventoryData;
+	TObjectPtr<UInventoryProfile> InventoryProfile;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FAbilityItem> InitialInventoryItems;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FInventoryInitialPlacement> InitialInventoryPlacements;
 };
+

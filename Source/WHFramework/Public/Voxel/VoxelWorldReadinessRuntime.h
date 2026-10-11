@@ -26,6 +26,8 @@ struct WHFRAMEWORK_API FVoxelPlayerClaimState
 	bool bSpawnCoreReady = false;
 	bool bResidencyReady = false;
 	bool bPlayerOwned = false;
+	bool bVerificationPending = false;
+	uint64 VerificationDataReadyRevision = 0;
 
 	void ClearEvidence();
 };

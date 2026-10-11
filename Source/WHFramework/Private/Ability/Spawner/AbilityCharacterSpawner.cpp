@@ -3,6 +3,9 @@
 #include "Ability/Spawner/AbilityCharacterSpawner.h"
 
 #include "Ability/AbilityModuleStatics.h"
+#include "Ability/Inventory/InventoryItemAssetCatalog.h"
+#include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Engine/World.h"
 #include "Ability/AbilityModuleTypes.h"
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Character/AbilityCharacterDataBase.h"
@@ -55,7 +58,14 @@ AAbilityCharacterSpawner::AAbilityCharacterSpawner()
 
 AActor* AAbilityCharacterSpawner::SpawnImpl_Implementation(const FAbilityItem& InAbilityItem)
 {
-	const auto& CharacterData = InAbilityItem.GetData<UAbilityCharacterDataBase>();
+	const UInventoryWorldSubsystem* Subsystem = GetWorld() ? GetWorld()->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+	const UInventoryItemAssetCatalog* Catalog = Subsystem ? Subsystem->GetItemAssets() : nullptr;
+	const UAbilityCharacterDataBase* Definition = Catalog ? Catalog->FindAs<UAbilityCharacterDataBase>(InAbilityItem.ItemId) : nullptr;
+	if (!Definition || InAbilityItem.Level < 0 || InAbilityItem.Level > Definition->MaxLevel)
+	{
+		return nullptr;
+	}
+	const UAbilityCharacterDataBase& CharacterData = *Definition;
 	
 	auto SaveData = FCharacterSaveData();
 	SaveData.AssetID = CharacterData.GetPrimaryAssetId();
@@ -63,7 +73,6 @@ AActor* AAbilityCharacterSpawner::SpawnImpl_Implementation(const FAbilityItem& I
 	SaveData.RaceID = CharacterData.RaceID;
 	SaveData.Level = InAbilityItem.Level;
 	SaveData.SpawnTransform = GetActorTransform();
-	SaveData.InitData();
 
 	return UAbilityModuleStatics::SpawnAbilityActor(FParameter(MoveTemp(SaveData)));
 }
@@ -72,3 +81,4 @@ void AAbilityCharacterSpawner::DestroyImpl_Implementation(AActor* InAbilityActor
 {
 	Super::DestroyImpl_Implementation(InAbilityActor);
 }
+

@@ -160,6 +160,7 @@ struct WHFRAMEWORK_API FVoxelInterestSet
 	const FVoxelTerrainGeometry* FindGeometry(const FVoxelSurfaceTileKey& InKey) const;
 	const FVoxelTerrainGeometry* FindGeometry(const FVoxelMacroTileKey& InKey) const;
 	uint64 GetOwnedAllocatedBytes() const;
+	uint64 GetFinalizationAllocatedBytes() const;
 	uint64 GetResourceAccountedBytes() const;
 
 	uint64 GetAllocatedBytes() const

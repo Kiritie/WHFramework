@@ -22,6 +22,7 @@
 #include "Voxel/Save/VoxelRegionStore.h"
 #include "Voxel/Streaming/VoxelInterestManager.h"
 #include "Voxel/Streaming/VoxelInterestRuntime.h"
+#include "Voxel/Task/VoxelTerrainResources.h"
 #include "Voxel/VoxelModule.h"
 #include "VoxelTestUtilities.h"
 
@@ -323,6 +324,24 @@ bool FVoxelSourceAcceptanceBarrierTest::RunTest(const FString& InParameters)
 	Module->CurrentInterest = MakeShared<const FVoxelInterestSet, ESPMode::ThreadSafe>(Accepted);
 	TestTrue(TEXT("New complete source snapshot acknowledges the candidate"), Module->IsSourceAdmittedAt(Source.Id, Moved, 11));
 	TestFalse(TEXT("World epoch invalidates source acknowledgment"), Module->IsSourceAdmittedAt(Source.Id, Moved, 10));
+	Module->DesiredInterest = Module->CurrentInterest;
+	AddExpectedError(TEXT("Voxel interest build stopped"), EAutomationExpectedErrorFlags::Contains, 1);
+	Module->RecordInterestBuildFailure(TEXT("Oversized: interest failure fixture"), Module->SourceRevision,
+		Module->InterestAttemptSerial + 1);
+	TestTrue(TEXT("当前输入的确定性错误进入终态"), Module->HasInterestBuildFailed());
+	TestFalse(TEXT("终态保留可展示的错误"), Module->GetInterestBuildError().IsEmpty());
+	const uint64 FailedAttempt = Module->InterestAttemptSerial;
+	Module->RefreshInterest(FPlatformTime::Seconds());
+	Module->RefreshInterest(FPlatformTime::Seconds() + 1.0);
+	TestEqual(TEXT("同一输入不再建立重试任务"), Module->InterestAttemptSerial, FailedAttempt);
+	++Module->Epoch;
+	TestFalse(TEXT("新世界不继承旧终态"), Module->HasInterestBuildFailed());
+	TestTrue(TEXT("新世界不展示旧错误"), Module->GetInterestBuildError().IsEmpty());
+	--Module->Epoch;
+	MovedSource.Center += FIntVector(1, 0, 0);
+	TestTrue(TEXT("终态后仍能接受新的 Source 输入"), Module->UpdateSource(Source.Id, MovedSource));
+	TestFalse(TEXT("真实 Source 变化解除旧输入终态"), Module->HasInterestBuildFailed());
+	TestTrue(TEXT("新输入不展示旧输入错误"), Module->GetInterestBuildError().IsEmpty());
 	Module->Sources.Remove(Source.Id);
 	TestFalse(TEXT("Removed source cannot acknowledge a candidate"), Module->IsSourceAdmittedAt(Source.Id, Moved, 11));
 
@@ -808,6 +827,151 @@ bool FVoxelPublishEstimateRecoveryTest::RunTest(const FString& InParameters)
 	TestEqual(TEXT("Successful progress clears consecutive deferrals"), Publisher.PhaseConsecutiveDeferrals[Phase], uint64(0));
 	TestTrue(TEXT("The estimate is bounded by a valid frame fraction"), Publisher.PhaseOperationEstimateMilliseconds[Phase] <=
 		double(Module->ViewSettings.Budget.TerrainPublishMilliseconds) * 0.5);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelTaskAdmissionFailureTest, "WHFramework.Voxel.Streaming.TaskAdmissionFailure",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelTaskAdmissionFailureTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const auto Consumer = FVoxelGenerationConsumerKey::Section(22, FGuid::NewGuid(), 1, {}, 1);
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> GeometryResources, FactResources;
+	TUniquePtr<FVoxelTaskScheduler> Scheduler;
+	FString Error;
+	if (!TestTrue(TEXT("以实际账本建立 Scheduler"),
+		FVoxelTerrainResources::Create({}, Consumer, GeometryResources, Error) &&
+		FVoxelTerrainResources::Create({}, Consumer, FactResources, Error) &&
+		FVoxelTaskScheduler::Create(GeometryResources.ToSharedRef(), FactResources.ToSharedRef(), Consumer, Scheduler, Error))) return false;
+	if (!TestTrue(TEXT("初始化真实调度统计与工作选择状态"), Scheduler->InitializeStatistics(22))) return false;
+	if (!TestTrue(TEXT("为拒绝结果预授予队列容量"), Scheduler->PrepareQueues(2))) return false;
+	FVoxelTaskRequest Rejected;
+	Rejected.Kind = EVoxelTaskKind::BuildInterest;
+	Rejected.Stamp.WorldEpoch = 22;
+	Rejected.Stamp.Token = 1;
+	Rejected.Stamp.OwnerId = Consumer.OwnerId;
+	Rejected.Stamp.OwnerIncarnation = 1;
+	Rejected.Sequence = 1;
+	Rejected.ReservedBytes = 1;
+	EVoxelTaskBlockReason Blocked;
+	if (!TestTrue(TEXT("开工前取得生产执行槽和错误缓冲"),
+		Scheduler->ReserveNativeExecution(Rejected, Blocked) == EVoxelTerrainResourceAdmission::Granted)) return false;
+	Rejected.Blocked = EVoxelTaskBlockReason::Oversized;
+	Scheduler->QueueCanceled(MoveTemp(Rejected), EVoxelTaskBlockReason::Oversized);
+	TestFalse(TEXT("永久接纳拒绝不是取消"), Scheduler->Canceled.Last().Result.bCanceled);
+	TestFalse(TEXT("永久接纳拒绝保持失败状态"), Scheduler->Canceled.Last().Result.bSuccess);
+	TestTrue(TEXT("错误正文通过原生预授额缓冲保留原因"),
+		Scheduler->Canceled.Last().Result.Error.StartsWith(TEXT("CapacityUnachievable:")));
+	TestTrue(TEXT("延后转移结果仍携带错误缓冲授额"), Scheduler->Canceled.Last().Result.InputResourceLease.IsValid());
+	FVoxelTaskRequest Canceled;
+	Canceled.Kind = EVoxelTaskKind::BuildInterest;
+	Canceled.Stamp.WorldEpoch = 22;
+	Canceled.Stamp.Token = 2;
+	Canceled.Blocked = EVoxelTaskBlockReason::Oversized;
+	Scheduler->QueueCanceled(MoveTemp(Canceled));
+	TestTrue(TEXT("真实取消不因旧 BlockReason 被改成失败"), Scheduler->Canceled.Last().Result.bCanceled);
+	TestTrue(TEXT("真实取消不产生虚假的终态正文"), Scheduler->Canceled.Last().Result.Error.IsEmpty());
+	int32 Failures = 0, Cancellations = 0;
+	Scheduler->Tick([&Failures, &Cancellations](FVoxelTaskResult&& Result)
+	{
+		if (Result.bCanceled) ++Cancellations;
+		else if (!Result.bSuccess && Result.Error.StartsWith(TEXT("CapacityUnachievable:"))) ++Failures;
+	}, 8.0);
+	TestEqual(TEXT("终态结果回调恰好一次"), Failures, 1);
+	TestEqual(TEXT("取消结果回调恰好一次"), Cancellations, 1);
+	Scheduler->Tick([](FVoxelTaskResult&&) {}, 8.0);
+	TestTrue(TEXT("结果没有留下重复回调"), Scheduler->Canceled.IsEmpty());
+	Scheduler->StopAndJoin();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelInterestPriorityAllocationTest, "WHFramework.Voxel.Streaming.PriorityAllocation",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelInterestPriorityAllocationTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FVoxelInterestSet Previous;
+	FVoxelStreamingSource Source;
+	Source.Id = FGuid::NewGuid();
+	Source.Capabilities = EVoxelStreamingCapability::Data;
+	Source.ExactRadius = 64;
+	Source.Normalize();
+	auto& Contribution = Previous.Sources.FindOrAdd(Source.Id);
+	Contribution.Source = Source;
+	for (int32 Index = 0; Index < 256; ++Index)
+	{
+		const FIntVector Key(Index % 16, Index / 16, 0);
+		Contribution.DataSections.Add(Key);
+		auto& Demand = Previous.Exact.FindOrAdd(Key);
+		Demand.bData = true;
+		Demand.Priority = Source.GetSchedulingPriority();
+	}
+	const uint64 PreviousOwned = Previous.GetOwnedAllocatedBytes();
+	const uint64 PreviousFinalization = Previous.GetFinalizationAllocatedBytes();
+	const auto Consumer = FVoxelGenerationConsumerKey::Section(21, FGuid::NewGuid(), 1, {}, 1);
+	FString Error;
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
+	if (!TestTrue(TEXT("建立实际资源账本"), FVoxelTerrainResources::Create({}, Consumer, Resources, Error))) return false;
+	FVoxelInterestManager Manager;
+	Manager.BindResources(Resources.ToSharedRef(), Consumer);
+	{
+		FVoxelInterestSet Updated;
+		if (!TestTrue(TEXT("重排前复制并授予增长容量"), Manager.CopyForPriority(Previous, Updated, Error)))
+		{
+			AddError(Error);
+			return false;
+		}
+		TestTrue(TEXT("副本和重排分别持有真实租约"), Updated.CopyLease.IsValid() && Updated.FinalizationLease.IsValid());
+		Source.Priority = 7;
+		Source.SchedulingPriority = 7;
+		Updated.Sources.FindChecked(Source.Id).Source = Source;
+		for (auto& Pair : Updated.Exact) Pair.Value.bMovementCriticalData = Pair.Key.X < 8;
+		if (!TestTrue(TEXT("通过生产重排路径结算新增 lane 容量"), FVoxelInterestManager::RefreshPriorities(
+			MakeArrayView(&Source, 1), 32, Updated, Error, Resources, Consumer)))
+		{
+			AddError(Error);
+			return false;
+		}
+		const uint64 Finalization = Updated.GetFinalizationAllocatedBytes();
+		TestTrue(TEXT("夹具实际增长重排容器"), Finalization > PreviousFinalization);
+		TestTrue(TEXT("增长后的真实分配全部有授额"), Updated.GetOwnedAllocatedBytes() <= Updated.GetResourceAccountedBytes());
+		TestEqual(TEXT("重排授额按真实容量结算"), Updated.FinalizationLease->Bytes(), FMath::Max<uint64>(1, Finalization));
+		TestEqual(TEXT("副本只保留非重排容器授额"), Updated.CopyLease->Bytes(),
+			FMath::Max<uint64>(1, Updated.GetOwnedAllocatedBytes() - Finalization));
+		TestEqual(TEXT("优先级更新成功"), Updated.Exact.FindChecked(FIntVector::ZeroValue).Priority, 7);
+		TestEqual(TEXT("关键 lane 使用真实输入分流"), Updated.ExactAdmissionLanes[0].Num(), 128);
+		TestEqual(TEXT("普通 lane 保留其余输入"), Updated.ExactAdmissionLanes[1].Num(), 128);
+		TestEqual(TEXT("旧快照不被重排修改"), Previous.Exact.FindChecked(FIntVector::ZeroValue).Priority,
+			Contribution.Source.GetSchedulingPriority());
+	}
+	TestEqual(TEXT("完成副本退休后释放所有临时租约"), Resources->Snapshot().LeaseCount, 0);
+
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Blocker;
+	const auto OtherConsumer = FVoxelGenerationConsumerKey::Section(21, FGuid::NewGuid(), 1, {}, 1);
+	if (!TestTrue(TEXT("建立可释放的外部占用"), Resources->Acquire(OtherConsumer, EVoxelTerrainResourcePool::Input, 1, Blocker))) return false;
+	const auto BeforeBlock = Resources->Snapshot();
+	const uint64 FreeInput = BeforeBlock.Limits.InputBytes - BeforeBlock.Used[int32(EVoxelTerrainResourcePool::Input)];
+	if (!TestTrue(TEXT("夹具保留可复制但不足以重排的空间"), FreeInput > PreviousOwned + 1024)) return false;
+	if (!TestTrue(TEXT("外部占用约束实际 Input 池"), Blocker->Resize(Blocker->Bytes() + FreeInput - PreviousOwned - 1024))) return false;
+	const int32 LeasesBeforeFailure = Resources->Snapshot().LeaseCount;
+	{
+		FVoxelInterestSet Failed;
+		TestFalse(TEXT("容量不足不执行无授额的重排"), Manager.CopyForPriority(Previous, Failed, Error));
+		TestTrue(TEXT("外部占用被区分为可恢复阻塞"), Error.StartsWith(TEXT("CapacityBlocked:")));
+		TestTrue(TEXT("失败点确实在已取得副本之后"), Failed.CopyLease.IsValid());
+	}
+	TestEqual(TEXT("失败副本退出后不持有自身等待的租约"), Resources->Snapshot().LeaseCount, LeasesBeforeFailure);
+	const uint64 BeforeRelease = Resources->ReleaseVersionExcludingOwner(Consumer);
+	Blocker.Reset();
+	TestTrue(TEXT("外部释放能够唤醒原消费者"), Resources->ReleaseVersionExcludingOwner(Consumer) > BeforeRelease);
+	FVoxelInterestSet Retried;
+	if (!TestTrue(TEXT("外部释放后同一输入可恢复"), Manager.CopyForPriority(Previous, Retried, Error))) return false;
+	Retried.Sources.FindChecked(Source.Id).Source = Source;
+	TestTrue(TEXT("恢复后仍通过完整生产结算"), FVoxelInterestManager::RefreshPriorities(
+		MakeArrayView(&Source, 1), 32, Retried, Error, Resources, Consumer));
+	TestTrue(TEXT("恢复后所有输出分配有授额"), Retried.GetOwnedAllocatedBytes() <= Retried.GetResourceAccountedBytes());
 	return true;
 }
 

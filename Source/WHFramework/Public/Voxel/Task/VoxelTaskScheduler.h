@@ -144,6 +144,7 @@ struct WHFRAMEWORK_API FVoxelTaskCustomPayload
 	{
 		return 0;
 	}
+	virtual void LogResourceAccounting(const FVoxelTaskStamp& InStamp) const {}
 };
 
 struct WHFRAMEWORK_API FVoxelTaskResult
@@ -173,6 +174,13 @@ struct WHFRAMEWORK_API FVoxelTaskResult
 	double QueueMilliseconds = 0.0;
 	double ExecuteMilliseconds = 0.0;
 	double ApplyMilliseconds = 0.0;
+	// 拒收前冻结原结果数字；错误结果释放正文后仍保留可核对的差额。
+	uint64 RejectedResultBytes = 0;
+	uint64 RejectedAccountedBytes = 0;
+	uint64 RejectedPayloadBytes = 0;
+	uint64 RejectedPayloadAccountedBytes = 0;
+	uint64 RejectedInputLeaseBytes = 0;
+	uint64 RejectedOutputLeaseBytes = 0;
 
 	TArray<FVoxelBlockState> BaseBlocks;
 	TArray<uint8> Payload;
@@ -318,6 +326,7 @@ private:
 	friend class FVoxelTaskScheduler;
 #if WITH_DEV_AUTOMATION_TESTS
 	friend struct FVoxelSchedulerNativeBackingTestAccess;
+	friend class FVoxelTaskAdmissionFailureTest;
 #endif
 	// 接纳前授予；运行时移出 Request，避免控制对象与自身 Slot 形成引用环。
 	TSharedPtr<FVoxelTaskExecutionReservation, ESPMode::ThreadSafe> ExecutionReservation;
@@ -663,6 +672,7 @@ private:
 		const FVoxelGenerationConsumerKey& InControlConsumer, uint64 InRootInputBytes);
 #if WITH_DEV_AUTOMATION_TESTS
 	friend struct FVoxelSchedulerNativeBackingTestAccess;
+	friend class FVoxelTaskAdmissionFailureTest;
 #endif
 	struct FNativeTask : UE::Tasks::FTask
 	{
@@ -731,7 +741,7 @@ private:
 	bool CanStartKind(EVoxelTaskKind InKind) const;
 
 	void Pump();
-	void QueueCanceled(FVoxelTaskRequest&& InRequest);
+	void QueueCanceled(FVoxelTaskRequest&& InRequest, EVoxelTaskBlockReason InFailure = EVoxelTaskBlockReason::None);
 
 	void AddActive(
 		const FVoxelTaskStamp& InStamp,
@@ -751,6 +761,7 @@ private:
 	void FreeBacking();
 	void FlushSectionIdleNotifications();
 	void RefreshBlockReasons();
+	void LogAdmissionStall(double InNow);
 	void VisitPriorityStates(TFunctionRef<void(FVoxelTaskRequest&)> InUpdate);
 	FVoxelGenerationConsumerKey ResolveNativeConsumer(const FVoxelTaskRequest& InRequest) const;
 	EVoxelTerrainResourceAdmission ReserveNativeExecution(FVoxelTaskRequest& InRequest,
@@ -829,6 +840,8 @@ private:
 	uint64 BlockRefreshSequence = 0;
 
 	double LastBudgetWarning = -10.0;
+	double AdmissionStallStarted = -1.0;
+	double LastAdmissionStallLog = -15.0;
 	bool bStopped = false;
 	bool bAllowPassive = false;
 	bool bPumping = false;

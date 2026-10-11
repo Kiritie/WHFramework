@@ -264,6 +264,7 @@ bool FVoxelInterestRuntime::UpdateSnapshot(TConstArrayView<FVoxelStreamingSource
 		if (!Source.Id.IsValid() || ActiveIds.Contains(Source.Id) || Source.Direction.ContainsNaN() ||
 			Source.VelocityCellsPerSecond.ContainsNaN())
 		{
+			ConfigurationError = TEXT("InvalidRequest: interest source identity or numeric values");
 			OutInterest.Reset();
 			return false;
 		}
@@ -708,6 +709,21 @@ bool FVoxelInterestRuntime::UpdateSnapshot(TConstArrayView<FVoxelStreamingSource
 		const auto* PreviousGeometry = PreviousInterest.Geometry.Find(Pair.Key);
 		if (!PreviousGeometry || *PreviousGeometry != Pair.Value)
 		{ OutDelta.ChangedGeometry.Add(Pair.Key); OutDelta.bVisualPartitionChanged = true; }
+	}
+	if (OutDelta.ResourceLease)
+	{
+		const uint64 Actual = OutDelta.GetAllocatedBytes();
+		const uint64 Granted = OutDelta.ResourceLease->Bytes();
+		if (Actual > Granted)
+		{
+			ConfigurationError = FString::Printf(TEXT("TerminalFailure: interest delta actual=%llu granted=%llu"), Actual, Granted);
+			return false;
+		}
+		if (!OutDelta.ResourceLease->Resize(FMath::Max<uint64>(1, Actual)))
+		{
+			ConfigurationError = TEXT("TerminalFailure: interest delta settlement");
+			return false;
+		}
 	}
 	OutDelta.bVisualPartitionChanged |= !SameFinePagePlan(PreviousInterest.FinePagePlan, Next.FinePagePlan) ||
 										!SameRuntimeSet(PreviousInterest.TerrainPlan.Roots, Next.TerrainPlan.Roots) ||

@@ -1,6 +1,5 @@
 #include "Ability/Actor/AbilityActorDataBase.h"
 
-#include "Ability/Inventory/AbilityInventoryBase.h"
 
 UAbilityActorDataBase::UAbilityActorDataBase()
 {
@@ -10,10 +9,7 @@ UAbilityActorDataBase::UAbilityActorDataBase()
 	PEClass = nullptr;
 	Radius = 40.f;
 	HalfHeight = 40.f;
-
-	InventoryData = FInventorySaveData();
-	InventoryData.InventoryClass = UAbilityInventoryBase::StaticClass();
-	InventoryData.SplitItems.Add(ESlotSplitType::Default, 5);
+	InventoryProfile = nullptr;
 }
 
 void UAbilityActorDataBase::OnInitialize_Implementation()
@@ -25,3 +21,4 @@ void UAbilityActorDataBase::OnReset_Implementation()
 {
 	Super::OnReset_Implementation();
 }
+

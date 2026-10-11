@@ -67,23 +67,6 @@ public:
 
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
-	virtual void OnAdditionItem(const FAbilityItem& InItem) override;
-
-	virtual void OnRemoveItem(const FAbilityItem& InItem) override;
-
-	virtual void OnPreChangeItem(const FAbilityItem& InOldItem) override;
-
-	virtual void OnChangeItem(const FAbilityItem& InNewItem) override;
-
-	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
-		
-	virtual void OnDeactiveItem(const FAbilityItem& InItem, bool bPassive) override;
-
-	virtual void OnDiscardItem(const FAbilityItem& InItem, bool bInPlace) override;
-
-	virtual void OnSelectItem(const FAbilityItem& InItem) override;
-
-	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
 
 protected:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
@@ -105,7 +88,7 @@ protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UInteractionComponent* Interaction;
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
 	UAbilityInventoryBase* Inventory;
 	
 protected:
@@ -172,6 +155,8 @@ public:
 	
 	virtual UAbilityInventoryBase* GetInventory() const override { return Inventory; }
 
+	void BindInventory(UAbilityInventoryBase* InInventory);
+
 	virtual FPrimaryAssetId GetAssetID_Implementation() const override { return AssetID; }
 	
 	virtual void SetAssetID_Implementation(const FPrimaryAssetId& InID) override { AssetID = InID; }
@@ -200,3 +185,4 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual FTransform GetBirthTransform() const override { return BirthTransform; }
 };
+

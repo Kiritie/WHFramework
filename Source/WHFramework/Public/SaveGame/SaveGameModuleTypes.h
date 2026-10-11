@@ -83,7 +83,8 @@ enum class ESaveResultCode : uint8
 	Unknown,
 	Accepted,
 	CapacityBlocked,
-	SlotBusy
+	SlotBusy,
+	ConfirmationPending
 };
 
 USTRUCT(BlueprintType)
@@ -184,6 +185,10 @@ struct WHFRAMEWORK_API FSaveManifest
 {
 	GENERATED_BODY()
 
+	// 普通 Manifest 是整个世界分支唯一的发布回执。
+	UPROPERTY()
+	FGuid LastCommitOperationId;
+
 	UPROPERTY()
 	FGuid SaveId;
 
@@ -269,3 +274,4 @@ struct WHFRAMEWORK_API FPendingSaveLoadContext
 		return SaveId.IsValid() && Generation > 0 && !TargetMap.IsNone();
 	}
 };
+

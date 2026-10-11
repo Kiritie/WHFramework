@@ -2,6 +2,26 @@
 
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 
+namespace
+{
+	bool GrantInterestInput(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources,
+		const FVoxelGenerationConsumerKey& Consumer, const uint64 Bytes,
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutLease, const TCHAR* Stage,
+		FString& OutError, const uint64 RequiredInputBytes = 0, const int32 RequiredLeaseCount = 0)
+	{
+		const auto Admission = Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Input, Bytes, OutLease,
+			0, RequiredInputBytes, RequiredLeaseCount);
+		if (Admission == EVoxelTerrainResourceAdmission::Granted) return true;
+		const auto State = Resources->Snapshot();
+		const TCHAR* Reason = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked") :
+			Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable") : TEXT("InvalidRequest");
+		OutError = FString::Printf(TEXT("%s: interest %s request=%llu requiredInput=%llu requiredLeases=%d used=%llu limit=%llu leases=%d releaseVersion=%llu"),
+			Reason, Stage, Bytes, RequiredInputBytes, RequiredLeaseCount, State.Used[int32(EVoxelTerrainResourcePool::Input)],
+			State.Limits.InputBytes, State.LeaseCount, State.ReleaseVersion);
+		return false;
+	}
+}
+
 uint64 FVoxelInterestSet::GetOwnedAllocatedBytes() const
 {
 	return GetAllocatedBytes() - (PublicationInputs ? PublicationInputs->GetAllocatedBytes() : 0) -
@@ -27,6 +47,17 @@ uint64 FVoxelInterestSet::GetResourceAccountedBytes() const
 	return Bytes;
 }
 
+uint64 FVoxelInterestSet::GetFinalizationAllocatedBytes() const
+{
+	return Admissions.GetAllocatedSize() + AdmissionPriorities.GetAllocatedSize() +
+		AdmissionLanes[0].GetAllocatedSize() + AdmissionLanes[1].GetAllocatedSize() +
+		AdmissionLanes[2].GetAllocatedSize() + AdmissionLanes[3].GetAllocatedSize() +
+		ExactOrder.GetAllocatedSize() + ExactAdmissionLanes[0].GetAllocatedSize() + ExactAdmissionLanes[1].GetAllocatedSize() +
+		PlayableFineKeys.GetAllocatedSize() + FinePagePriorities.GetAllocatedSize() + FinePageServicePriorities.GetAllocatedSize() +
+		GeometryServicePriorities.GetAllocatedSize() + CriticalFinePages.GetAllocatedSize() + CriticalDependencies.GetAllocatedSize() +
+		VoxelProxyPriorities.GetAllocatedSize() + SurfacePriorities.GetAllocatedSize() + MacroPriorities.GetAllocatedSize();
+}
+
 bool FVoxelInterestManager::CopyForPriority(const FVoxelInterestSet& InPrevious,
 	FVoxelInterestSet& OutInterest, FString& OutError) const
 {
@@ -34,17 +65,23 @@ bool FVoxelInterestManager::CopyForPriority(const FVoxelInterestSet& InPrevious,
 	const uint64 Bytes = FMath::Max<uint64>(1, InPrevious.GetOwnedAllocatedBytes());
 	if (Resources)
 	{
-		if (Bytes > Resources->Snapshot().Limits.InputBytes)
-		{ OutError = TEXT("Oversized: priority interest copy"); return false; }
-		if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input, Bytes, Lease))
-		{ OutError = TEXT("CapacityBlocked: priority interest copy"); return false; }
+		if (!GrantInterestInput(Resources.ToSharedRef(), Consumer, Bytes, Lease, TEXT("priority copy"), OutError)) return false;
 	}
 	OutInterest = InPrevious;
 	OutInterest.DemandLease.Reset(); OutInterest.CompositionLease.Reset();
 	OutInterest.FinalizationLease.Reset(); OutInterest.CoarseCompositionLease.Reset();
 	for (auto& Existing : OutInterest.CoarsePlanLeases) Existing.Reset();
 	OutInterest.CopyLease = MoveTemp(Lease);
-	check(!Resources || OutInterest.GetOwnedAllocatedBytes() <= Bytes);
+	if (Resources && OutInterest.GetOwnedAllocatedBytes() > Bytes)
+	{
+		OutError = FString::Printf(TEXT("TerminalFailure: priority interest copy actual=%llu granted=%llu"),
+			OutInterest.GetOwnedAllocatedBytes(), Bytes);
+		return false;
+	}
+	int32 FineCount = 0;
+	for (const auto& Pair : OutInterest.Exact) FineCount += Pair.Value.bFineRender ? 1 : 0;
+	// 复制只授予旧容量；重排前为可能增长的 Map、Set 和 lane 单独授予完整上界。
+	if (!ReserveFinalization(OutInterest, FineCount, OutError)) return false;
 	OutError.Reset();
 	return true;
 }
@@ -54,28 +91,32 @@ bool FVoxelInterestManager::ReserveFinalization(FVoxelInterestSet& Interest, con
 	const int64 Rows64 = int64(FineCount) + Interest.VoxelProxy.Num() + Interest.Surface.Num() + Interest.Macro.Num();
 	if (Rows64 > MAX_int32)
 	{ OutError = TEXT("Oversized: terrain admission rows"); return false; }
-	const int32 Rows = int32(Rows64);
-	const int32 Pages = Interest.FinePagePlan->Pages.Num();
-	const uint64 Bytes = VoxelBoundedAllocation::ArrayBytes<FVoxelViewAdmission>(Rows) +
-		5 * VoxelBoundedAllocation::ArrayBytes<int32>(Rows) +
-		VoxelBoundedAllocation::ArrayBytes<FIntVector>(Interest.Exact.Num()) +
-		2 * VoxelBoundedAllocation::ArrayBytes<int32>(Interest.Exact.Num()) +
-		VoxelBoundedAllocation::ArrayBytes<FIntVector>(FineCount) +
-		VoxelBoundedAllocation::MapBytes<FVoxelFinePageKey, int32>(Pages) +
-		VoxelBoundedAllocation::MapBytes<FVoxelFinePageKey, FVoxelTerrainServicePriority>(Pages) +
-		VoxelBoundedAllocation::MapBytes<FVoxelTerrainSpatialKey, FVoxelTerrainServicePriority>(Interest.Geometry.Num()) +
-		VoxelBoundedAllocation::SetBytes<FVoxelFinePageKey>(Pages) +
-		VoxelBoundedAllocation::SetBytes<FVoxelTerrainSpatialKey>(Interest.Geometry.Num()) +
-		VoxelBoundedAllocation::MapBytes<FVoxelViewKey, int32>(Interest.VoxelProxy.Num()) +
-		VoxelBoundedAllocation::MapBytes<FVoxelSurfaceTileKey, int32>(Interest.Surface.Num()) +
-		VoxelBoundedAllocation::MapBytes<FVoxelMacroTileKey, int32>(Interest.Macro.Num());
+	const int32 Rows = FMath::Max(int32(Rows64), Interest.Admissions.Num());
+	const int32 Pages = Interest.FinePagePlan ? Interest.FinePagePlan->Pages.Num() : 0;
+	const auto Capacity = [](const uint64 Existing, const uint64 Required) { return FMath::Max(Existing, Required); };
+	uint64 Bytes = Capacity(Interest.Admissions.GetAllocatedSize(), VoxelBoundedAllocation::ArrayBytes<FVoxelViewAdmission>(Rows)) +
+		Capacity(Interest.AdmissionPriorities.GetAllocatedSize(), VoxelBoundedAllocation::ArrayBytes<int32>(Rows)) +
+		Capacity(Interest.ExactOrder.GetAllocatedSize(), VoxelBoundedAllocation::ArrayBytes<FIntVector>(Interest.Exact.Num())) +
+		Capacity(Interest.PlayableFineKeys.GetAllocatedSize(), VoxelBoundedAllocation::ArrayBytes<FIntVector>(FineCount)) +
+		Capacity(Interest.FinePagePriorities.GetAllocatedSize(), VoxelBoundedAllocation::MapBytes<FVoxelFinePageKey, int32>(Pages)) +
+		Capacity(Interest.FinePageServicePriorities.GetAllocatedSize(), VoxelBoundedAllocation::MapBytes<FVoxelFinePageKey, FVoxelTerrainServicePriority>(Pages)) +
+		Capacity(Interest.GeometryServicePriorities.GetAllocatedSize(), VoxelBoundedAllocation::MapBytes<FVoxelTerrainSpatialKey, FVoxelTerrainServicePriority>(Interest.Geometry.Num())) +
+		Capacity(Interest.CriticalFinePages.GetAllocatedSize(), VoxelBoundedAllocation::SetBytes<FVoxelFinePageKey>(Pages)) +
+		Capacity(Interest.CriticalDependencies.GetAllocatedSize(), VoxelBoundedAllocation::SetBytes<FVoxelTerrainSpatialKey>(Interest.Geometry.Num())) +
+		Capacity(Interest.VoxelProxyPriorities.GetAllocatedSize(), VoxelBoundedAllocation::MapBytes<FVoxelViewKey, int32>(Interest.VoxelProxy.Num())) +
+		Capacity(Interest.SurfacePriorities.GetAllocatedSize(), VoxelBoundedAllocation::MapBytes<FVoxelSurfaceTileKey, int32>(Interest.Surface.Num())) +
+		Capacity(Interest.MacroPriorities.GetAllocatedSize(), VoxelBoundedAllocation::MapBytes<FVoxelMacroTileKey, int32>(Interest.Macro.Num()));
+	for (const auto& Lane : Interest.AdmissionLanes)
+		Bytes += Capacity(Lane.GetAllocatedSize(), VoxelBoundedAllocation::ArrayBytes<int32>(Rows));
+	for (const auto& Lane : Interest.ExactAdmissionLanes)
+		Bytes += Capacity(Lane.GetAllocatedSize(), VoxelBoundedAllocation::ArrayBytes<int32>(Interest.Exact.Num()));
 	if (Resources)
 	{
-		if (Bytes > Resources->Snapshot().Limits.InputBytes)
-		{ OutError = TEXT("Oversized: terrain finalization containers"); return false; }
-		if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input,
-			FMath::Max<uint64>(1, Bytes), Interest.FinalizationLease))
-		{ OutError = TEXT("CapacityBlocked: terrain finalization containers"); return false; }
+		if (Interest.FinalizationLease)
+		{ OutError = TEXT("TerminalFailure: interest finalization already owns a reservation"); return false; }
+		const uint64 RequiredInput = Interest.CopyLease ? Interest.CopyLease->Bytes() : 0;
+		if (!GrantInterestInput(Resources.ToSharedRef(), Consumer, FMath::Max<uint64>(1, Bytes), Interest.FinalizationLease,
+			TEXT("finalization containers"), OutError, RequiredInput, Interest.CopyLease ? 1 : 0)) return false;
 	}
 	Interest.Admissions.Reserve(Rows); Interest.AdmissionPriorities.Reserve(Rows);
 	for (auto& Lane : Interest.AdmissionLanes) Lane.Reserve(Rows);
@@ -88,6 +129,57 @@ bool FVoxelInterestManager::ReserveFinalization(FVoxelInterestSet& Interest, con
 	Interest.VoxelProxyPriorities.Reserve(Interest.VoxelProxy.Num());
 	Interest.SurfacePriorities.Reserve(Interest.Surface.Num()); Interest.MacroPriorities.Reserve(Interest.Macro.Num());
 	OutError.Reset();
+	return true;
+}
+
+bool FVoxelInterestManager::SettleFinalization(FVoxelInterestSet& Interest, FString& OutError)
+{
+	if (!Interest.FinalizationLease) return true;
+	const uint64 Actual = Interest.GetFinalizationAllocatedBytes();
+	const uint64 Granted = Interest.FinalizationLease->Bytes();
+	if (Actual > Granted)
+	{
+		OutError = FString::Printf(TEXT("TerminalFailure: interest finalization actual=%llu granted=%llu owned=%llu accounted=%llu"),
+			Actual, Granted, Interest.GetOwnedAllocatedBytes(), Interest.GetResourceAccountedBytes());
+		return false;
+	}
+	if (Interest.CopyLease)
+	{
+		const uint64 OwnedBeforeSettlement = Interest.GetOwnedAllocatedBytes();
+		if (Actual > OwnedBeforeSettlement)
+		{
+			OutError = FString::Printf(TEXT("TerminalFailure: interest ownership subset actual=%llu owned=%llu"), Actual, OwnedBeforeSettlement);
+			return false;
+		}
+		const uint64 CopyActual = OwnedBeforeSettlement - Actual;
+		if (CopyActual > Interest.CopyLease->Bytes())
+		{
+			OutError = FString::Printf(TEXT("TerminalFailure: priority interest retained actual=%llu granted=%llu"),
+				CopyActual, Interest.CopyLease->Bytes());
+			return false;
+		}
+		// 新快照的两个租约各自承担实际拥有的容器；不把旧副本授额重复长期占用。
+		if (!Interest.CopyLease->Resize(FMath::Max<uint64>(1, CopyActual)))
+		{
+			OutError = TEXT("TerminalFailure: priority interest copy settlement");
+			return false;
+		}
+	}
+	if (!Interest.FinalizationLease->Resize(FMath::Max<uint64>(1, Actual)))
+	{
+		OutError = TEXT("TerminalFailure: interest finalization settlement");
+		return false;
+	}
+	const uint64 Owned = Interest.GetOwnedAllocatedBytes();
+	const uint64 Accounted = Interest.GetResourceAccountedBytes();
+	if (Owned > Accounted)
+	{
+		OutError = FString::Printf(TEXT("TerminalFailure: interest owned allocation actual=%llu accounted=%llu finalization=%llu copy=%llu composition=%llu coarse=%llu"),
+			Owned, Accounted, Actual, Interest.CopyLease ? Interest.CopyLease->Bytes() : 0,
+			Interest.CompositionLease ? Interest.CompositionLease->Bytes() : 0,
+			Interest.CoarseCompositionLease ? Interest.CoarseCompositionLease->Bytes() : 0);
+		return false;
+	}
 	return true;
 }
 
@@ -121,10 +213,7 @@ bool FVoxelInterestManager::BuildPublicationInputs(FVoxelInterestSet& Interest, 
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 	if (Resources)
 	{
-		if (Bytes > Resources->Snapshot().Limits.InputBytes)
-		{ OutError = TEXT("Oversized: terrain publication inputs"); return false; }
-		if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input, Bytes, Lease))
-		{ OutError = TEXT("CapacityBlocked: terrain publication inputs"); return false; }
+		if (!GrantInterestInput(Resources.ToSharedRef(), Consumer, Bytes, Lease, TEXT("publication inputs"), OutError)) return false;
 	}
 	auto Inputs = Lease ? VoxelBoundedAllocation::MakeWorkerShared<FVoxelTerrainPublicationInputs>(Lease) :
 		MakeShared<FVoxelTerrainPublicationInputs, ESPMode::ThreadSafe>();
@@ -156,7 +245,17 @@ bool FVoxelInterestManager::BuildPublicationInputs(FVoxelInterestSet& Interest, 
 		Inputs->AdmissionLanes[Lane].Reserve(Interest.AdmissionLanes[Lane].Num());
 		Inputs->AdmissionLanes[Lane].Append(Interest.AdmissionLanes[Lane]);
 	}
-	check(Inputs->GetAllocatedBytes() + VoxelBoundedAllocation::WorkerSharedBytes<FVoxelTerrainPublicationInputs>() <= Bytes);
+	const uint64 ActualBytes = Inputs->GetAllocatedBytes() + VoxelBoundedAllocation::WorkerSharedBytes<FVoxelTerrainPublicationInputs>();
+	if (ActualBytes > Bytes)
+	{
+		OutError = FString::Printf(TEXT("TerminalFailure: terrain publication input actual=%llu granted=%llu"), ActualBytes, Bytes);
+		return false;
+	}
+	if (Lease && !Lease->Resize(FMath::Max<uint64>(1, ActualBytes)))
+	{
+		OutError = TEXT("TerminalFailure: terrain publication input settlement");
+		return false;
+	}
 	Interest.PublicationInputs = MoveTemp(Inputs);
 	OutError.Reset();
 	return true;

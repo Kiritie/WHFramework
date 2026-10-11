@@ -110,15 +110,6 @@ AAbilityItemBase* UAbilityModuleStatics::SpawnAbilityItem(FAbilityItem InItem, A
 	return UAbilityModule::Get().SpawnAbilityItem(InItem, InOwnerActor);
 }
 
-AAbilityPickUpBase* UAbilityModuleStatics::SpawnAbilityPickUp(FAbilityItem InItem, FVector InLocation, ISceneContainerInterface* InContainer, bool bEnableCollision)
-{
-	return UAbilityModule::Get().SpawnAbilityPickUp(InItem, InLocation, InContainer, bEnableCollision);
-}
-
-AAbilityPickUpBase* UAbilityModuleStatics::SpawnAbilityPickUp(const FParameter& InSaveData, ISceneContainerInterface* InContainer, bool bEnableCollision)
-{
-	return UAbilityModule::Get().SpawnAbilityPickUp(InSaveData, InContainer, bEnableCollision);
-}
 
 AAbilityProjectileBase* UAbilityModuleStatics::SpawnAbilityProjectile(const TSubclassOf<AAbilityProjectileBase>& InClass, AActor* InOwnerActor, const FGameplayAbilitySpecHandle& InAbilityHandle)
 {
@@ -129,3 +120,4 @@ AActor* UAbilityModuleStatics::SpawnAbilityActor(const FParameter& InSaveData, I
 {
 	return UAbilityModule::Get().SpawnAbilityActor(InSaveData, InContainer);
 }
+

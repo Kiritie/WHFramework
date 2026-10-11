@@ -1,7 +1,6 @@
 #include "Voxel/Scene/VoxelSceneRegion.h"
 
 #include "Ability/AbilityModuleStatics.h"
-#include "Ability/PickUp/AbilityPickUpBase.h"
 #include "GameFramework/Pawn.h"
 #include "SaveGame/Base/SaveDataAgentInterface.h"
 #include "SaveGame/SaveDataSerializer.h"
@@ -310,13 +309,8 @@ bool UVoxelSceneRegion::CaptureInactiveActors(FString& OutError, const FIntVecto
 bool UVoxelSceneRegion::RestorePendingActor(const FGuid& InId, const FParameter& InData)
 {
 	FVector Location;
-	const FPickUpSaveData* Pickup = InData.GetPtr<FPickUpSaveData>();
 	const FSceneActorSaveData* SceneActor = InData.GetPtr<FSceneActorSaveData>();
-	if (Pickup)
-	{
-		Location = Pickup->Location;
-	}
-	else if (SceneActor)
+	if (SceneActor)
 	{
 		Location = SceneActor->SpawnTransform.GetLocation();
 	}
@@ -339,8 +333,7 @@ bool UVoxelSceneRegion::RestorePendingActor(const FGuid& InId, const FParameter&
 		return false;
 	}
 	TGuardValue<FGuid> RestoreIdentity(RestoringActorId, InId);
-	AActor* Actor = Pickup ? static_cast<AActor*>(UAbilityModuleStatics::SpawnAbilityPickUp(InData, this))
-		: UAbilityModuleStatics::SpawnAbilityActor(InData, this);
+	AActor* Actor = UAbilityModuleStatics::SpawnAbilityActor(InData, this);
 	if (!Actor || !Actor->Implements<USceneActorInterface>())
 	{
 		if (Actor)
@@ -816,3 +809,4 @@ const TMap<FGuid, FParameter>& UVoxelSceneRegion::GetPendingActors() const
 {
 	return PendingActors;
 }
+

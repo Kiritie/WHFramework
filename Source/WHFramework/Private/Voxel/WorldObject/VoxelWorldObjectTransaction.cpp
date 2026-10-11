@@ -158,23 +158,7 @@ bool FVoxelWorldObjectTransaction::Build(const FVoxelWorldRuntime& InWorld, cons
 			OutError = TEXT("World object cannot be destroyed");
 			return false;
 		}
-		const FVoxelBlockEntityState* Entity = FindEntity(InWorld, Object.Anchor);
-		if (Entity && Entity->Kind == 1)
-		{
-			TArray<FVoxelItemStack> Items;
-			if (!FVoxelBlockEntityCodec::DecodeContainer(*Entity, Items))
-			{
-				return false;
-			}
-			for (const FVoxelItemStack& Item : Items)
-			{
-				if (Item.Count > 0)
-				{
-					OutError = TEXT("Empty the container before destroying it");
-					return false;
-				}
-			}
-		}
+		// 箱内是否允许销毁及强制掉落由统一库存事务的游戏领域贡献者验证。
 		Plan.DropID = AnchorBlock->DropAssetID;
 		Plan.DropCount = AnchorBlock->DropCount;
 	}
@@ -323,3 +307,4 @@ bool FVoxelWorldObjectTransaction::Validate(const FVoxelWorldRuntime& InWorld, c
 	InOutCells = MoveTemp(Cells);
 	return true;
 }
+

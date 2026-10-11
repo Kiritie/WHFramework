@@ -1,4 +1,5 @@
 #include "Voxel/Interaction/VoxelEditTransaction.h"
+#include "Voxel/Save/InventoryVoxelEntityCodec.h"
 #include "Voxel/Save/VoxelBlockEntityCodec.h"
 #include "Voxel/Chunks/VoxelSectionKey.h"
 bool FVoxelEditTransaction::Build(const FVoxelWorldRuntime&W,const FVoxelRegistrySnapshot&R,const FVoxelShapeRegistry&Shapes,
@@ -6,7 +7,7 @@ bool FVoxelEditTransaction::Build(const FVoxelWorldRuntime&W,const FVoxelRegistr
 {
     if(!W.IsServer()||H.Status!=EVoxelTraceStatus::Hit||H.bStartedInside||!R.IsValid(H.State)||Size<=0)
     {Error=TEXT("Invalid interaction target");return false;}
-    FVoxelInteractionPlan P;TMap<FIntVector,int32>Map;
+    FVoxelInteractionPlan P;P.Action=Action;P.ObjectAnchor=H.Index;TMap<FIntVector,int32>Map;
     auto Read=[&](const FIntVector&Pos,FVoxelBlockState&State)->bool
     {if(const int32*I=Map.Find(Pos)){State=P.Cells[*I].Value;return true;}return W.TryGetBlock(Pos,State);};
     auto Write=[&](const FIntVector&Pos,FVoxelBlockState State)->bool
@@ -36,13 +37,7 @@ bool FVoxelEditTransaction::Build(const FVoxelWorldRuntime&W,const FVoxelRegistr
         else if(!Write(Target,{}))return false;
         P.DropID=HitDef->DropAssetID;P.DropCount=HitDef->DropCount;
         if(HitDef->Shape==EVoxelShapeKind::Slab&&(H.State.State&0x800))P.DropCount*=2;
-        // 不丢弃有内容的容器：先取空，再破坏。没有隐式销毁 Inventory 的路径。
-        if(HitDef->EntityKind==1)
-        {
-            const FVoxelSectionKey Key=VoxelCoord::Section(Target);const auto*S=W.FindSection(FIntVector(Key.X,Key.Y,Key.Z));const auto*B=S->Entities.Find(VoxelCoord::Linear(VoxelCoord::Local(Target)));
-            TArray<FVoxelItemStack>Slots;if(!B||!FVoxelBlockEntityCodec::DecodeContainer(*B,Slots))return false;
-            for(const auto&I:Slots)if(I.Count>0){Error=TEXT("Empty the container before breaking it");return false;}
-        }
+        // 容器内容的搬移、拒绝或掉落由统一库存世界贡献器在提交前决定。
     }
     else if(Action==EVoxelEditAction::Use)
     {
@@ -60,7 +55,9 @@ bool FVoxelEditTransaction::Build(const FVoxelWorldRuntime&W,const FVoxelRegistr
             const FVoxelSectionKey Key=VoxelCoord::Section(Target);const auto*S=W.FindSection(FIntVector(Key.X,Key.Y,Key.Z));const auto*B=S->Entities.Find(VoxelCoord::Linear(VoxelCoord::Local(Target)));
             FVoxelEntityEdit E;E.Position=Target;if(!B||!FVoxelBlockEntityCodec::IncrementCounter(*B,E.Value))return false;P.Entities.Add(E);
         }
-        else{Error=TEXT("This block has no Use action; container operations use explicit slot intents");return false;}
+        else if(HitDef->EntityKind==FInventoryVoxelEntityCodec::Kind)
+        {P.Action=Action;P.ObjectAnchor=H.Index;P.ObjectAction=TEXT("Inventory.Open");O=MoveTemp(P);Error.Reset();return true;}
+        else{Error=TEXT("This block has no Use action");return false;}
     }
     else if(Action==EVoxelEditAction::Place)
     {
@@ -151,10 +148,7 @@ bool FVoxelEditTransaction::ValidateBatch(const FVoxelWorldRuntime&W,const FVoxe
     for(int32 I=0;I<Candidate.Num();++I)
     {auto&E=Candidate[I];FVoxelBlockState Actual;if(Map.Contains(E.Position)||!R.IsValid(E.Value)||!W.TryGetBlock(E.Position,Actual)||Actual!=E.Expected)
         {Error=TEXT("Duplicate, stale or invalid batch cell");return false;}Map.Add(E.Position,I);
-        if(Actual!=E.Value)
-        {const FVoxelSectionKey Key=VoxelCoord::Section(E.Position);const auto*S=W.FindSection(FIntVector(Key.X,Key.Y,Key.Z));const auto*BE=S->Entities.Find(VoxelCoord::Linear(VoxelCoord::Local(E.Position)));
-            if(BE&&BE->Kind==1){TArray<FVoxelItemStack>Items;if(!FVoxelBlockEntityCodec::DecodeContainer(*BE,Items))return false;
-                for(const auto&Item:Items)if(Item.Count>0){Error=TEXT("Batch would destroy nonempty container");return false;}}}}
+    }
     auto Read=[&](const FIntVector&P,FVoxelBlockState&B){if(const int32*I=Map.Find(P)){B=Candidate[*I].Value;return true;}return W.TryGetBlock(P,B);};
     auto Supports=[&](const FIntVector&P,uint8 F){FVoxelBlockState B;if(!Read(P,B)||B.IsAir())return false;const auto*D=R.Find(B.TypeId);
         return D&&D->bSolid&&(Shapes.Get(D->Shape,B.State).OcclusionMask&(1u<<F));};

@@ -964,6 +964,9 @@ namespace
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InputLease;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ControlInputLease;
 		TSharedPtr<FAtomPublication, ESPMode::ThreadSafe> Publication;
+		FBox SchedulingBounds = FBox(ForceInit);
+		EVoxelTerrainServiceBand SchedulingBand = EVoxelTerrainServiceBand::P6;
+		int32 ActiveIndex = INDEX_NONE;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PrimaryPathLease;
 		FAtomNodePtr Root;
 		FCoarseNodePtr CoarseRoot;
@@ -1307,13 +1310,13 @@ struct FVoxelTerrainRendererState : TSharedFromThis<FVoxelTerrainRendererState, 
 		UploadSelection.BindResources(Resources, SelectionConsumer);
 	}
 
-	FSnapshotPtr SealFrameSnapshot(uint64 InFrameCounter);
+	FSnapshotPtr SealFrameSnapshot(uint64 InFrameCounter, double InDeadline);
 	FSnapshotPtr BindFrameSnapshot(uint64 InFrameCounter);
 	bool PrepareMetadata();
 	bool BeginRootPreparation(FReadyTransaction& InTransaction);
-	void AdvanceRootPreparations();
-	void AdvanceRootUpload(FVoxelTerrainRenderer& InRenderer);
-	void AdvanceRootUpload(FVoxelTerrainRenderer& InRenderer, FRootPreparation& InWork, int32 InMaximumSteps);
+	void AdvanceRootPreparations(double InDeadline);
+	void AdvanceRootUpload(FVoxelTerrainRenderer& InRenderer, double InDeadline);
+	void AdvanceRootUpload(FVoxelTerrainRenderer& InRenderer, FRootPreparation& InWork, int32 InMaximumSteps, double InDeadline);
 	bool BeginRootMerge(FReadyTransaction& InTransaction);
 	void ReleasePreparation(FReadyTransaction& InTransaction);
 	void TerminateTransaction(FReadyTransaction& InTransaction);
@@ -1348,6 +1351,7 @@ struct FVoxelTerrainRendererState : TSharedFromThis<FVoxelTerrainRendererState, 
 	TStrongObjectPtr<UVoxelTerrainPrimitiveComponent> ComponentPin;
 	TSharedPtr<ISceneViewExtension, ESPMode::ThreadSafe> Extension;
 	TArray<FReadyTransaction> Ready;
+	TArray<FRootPreparation*, TInlineAllocator<16>> ActivePreparations;
 	TSharedPtr<FRootMerge, ESPMode::ThreadSafe> RootMerge;
 	FVoxelTerrainWorkSelection SealSelection;
 	FVoxelTerrainWorkSelection PreparationSelection;
@@ -1355,7 +1359,12 @@ struct FVoxelTerrainRendererState : TSharedFromThis<FVoxelTerrainRendererState, 
 	double PreparationCostMicroseconds = 50.0;
 	double UploadCostMicroseconds = 50.0;
 	int32 PreparationScanCursor = 0;
+	int32 PreparationAdmissionCursor = 0;
+	int32 PreparationRetryCursor = 0;
+	int32 PreparationPriorityCursor = 0;
+	int32 PreparationDiagnosticCursor = 0;
 	int32 UploadScanCursor = 0;
+	int32 NextPublicationPhase = 0;
 	double SealCostMicroseconds = 50.0;
 	int32 SealScanCursor = 0;
 	TMap<FGuid, TFunction<void()>> SubmittedCallbacks;
@@ -2007,6 +2016,7 @@ bool FVoxelTerrainRenderer::ConsumeTransactionFailure(const FGuid& InTransaction
 	});
 	if (Index == INDEX_NONE) return false;
 	State->AdvanceCoarseAdmissionVersion();
+	State->ReleasePreparation(State->Ready[Index]);
 	State->Ready.RemoveAtSwap(Index, 1, EAllowShrinking::No);
 	return true;
 }
@@ -2014,6 +2024,7 @@ bool FVoxelTerrainRenderer::ConsumeTransactionFailure(const FGuid& InTransaction
 bool FVoxelTerrainRendererState::BeginRootPreparation(FReadyTransaction& InTransaction)
 {
 	if (InTransaction.bTerminalFailure) return false;
+	if (!InTransaction.Preparation && ActivePreparations.Num() >= 16) return false;
 	if (!InTransaction.PreparationConsumer.IsValid())
 	{
 		if (NextMetadataSerial == MAX_uint64) { TerminateTransaction(InTransaction); return false; }
@@ -2066,6 +2077,9 @@ bool FVoxelTerrainRendererState::BeginRootPreparation(FReadyTransaction& InTrans
 			return false;
 		}
 		InTransaction.Preparation = CreateRenderRoot<FRootPreparation>(MoveTemp(Lease), Resources, Consumer, ChangedCount);
+		InTransaction.Preparation->ActiveIndex = ActivePreparations.Add(InTransaction.Preparation.Get());
+		InTransaction.Preparation->SchedulingBounds = InTransaction.Resources->GetChangedBounds().ExpandBy(32.0);
+		InTransaction.Preparation->SchedulingBand = InTransaction.Priority.Band;
 		check(RenderRootAllocationBytes<FRootPreparation>() + InTransaction.Preparation->ChangedBounds.GetAllocatedSize() <=
 			InTransaction.Preparation->InputLease->Bytes());
 		InTransaction.Preparation->ControlInputLease = InputLease;
@@ -2189,36 +2203,61 @@ bool FVoxelTerrainRendererState::BeginRootPreparation(FReadyTransaction& InTrans
 	return false;
 }
 
-void FVoxelTerrainRendererState::AdvanceRootUpload(FVoxelTerrainRenderer& Renderer)
+void FVoxelTerrainRendererState::AdvanceRootUpload(FVoxelTerrainRenderer& Renderer, const double InDeadline)
 {
-	for (int32 Step = 0; Step < 16 && Module.GetTerrainFrameContext().RemainingMilliseconds() > 0.0; ++Step)
+	const double Deadline = FMath::Min(InDeadline, Module.GetTerrainFrameContext().Deadline());
+	for (int32 Step = 0; Step < 16 && FPlatformTime::Seconds() < Deadline; ++Step)
 	{
-		const double Started = FPlatformTime::Seconds();
+		const double ScanStarted = FPlatformTime::Seconds();
+		const double ScanDeadline = ScanStarted + (Deadline - ScanStarted) * 0.5;
 		TArray<FVoxelTerrainServiceCandidate, TInlineAllocator<32>> Candidates;
-		for (int32 Scan = 0; Scan < Ready.Num(); ++Scan)
+		const auto AddCandidate = [&](const int32 Index)
 		{
-			UploadScanCursor %= Ready.Num();
-			const int32 Index = UploadScanCursor++;
 			auto& Pending = Ready[Index];
 			if (Pending.Preparation && Pending.Preparation->UploadAdmission != EVoxelTerrainResourceAdmission::Granted &&
 				Pending.Preparation->UploadAdmission != EVoxelTerrainResourceAdmission::CapacityBlocked)
 			{
 				TerminateTransaction(Pending);
-				continue;
+				return;
 			}
 			const bool bRunnable = Pending.Preparation && Pending.Preparation->bDecodeComplete && !Pending.Preparation->bUploadComplete &&
 				(Pending.Preparation->UploadAdmission == EVoxelTerrainResourceAdmission::Granted ||
 					RendererHasExternalRelease(Resources, Pending.Preparation->Consumer, Pending.Preparation->UploadCapacityVersion));
 			if (bRunnable) Candidates.Add({Index, Pending.Priority, Pending.FirstQueuedSeconds, Pending.Sequence, UploadCostMicroseconds, true});
+		};
+		int32 F0Candidates = 0;
+		for (int32 Index = 0; Index < Ready.Num() && F0Candidates < 32 && FPlatformTime::Seconds() < ScanDeadline; ++Index)
+		{
+			const auto& Pending = Ready[Index];
+			if (Pending.Resources->Atoms.IsEmpty() ||
+				Pending.Resources->Atoms[0]->Evidence.Owner.Kind != EVoxelFineOwnerKind::F0) continue;
+			const int32 Before = Candidates.Num();
+			AddCandidate(Index);
+			F0Candidates += Candidates.Num() != Before;
+		}
+		for (int32 Scan = 0; Scan < FMath::Min(32, Ready.Num()) && FPlatformTime::Seconds() < ScanDeadline; ++Scan)
+		{
+			UploadScanCursor %= Ready.Num();
+			const int32 Index = UploadScanCursor++;
+			const auto& Pending = Ready[Index];
+			if (!Pending.Resources->Atoms.IsEmpty() &&
+				Pending.Resources->Atoms[0]->Evidence.Owner.Kind == EVoxelFineOwnerKind::F0) continue;
+			AddCandidate(Index);
 		}
 		FVoxelTerrainServiceCapacity Capacity;
 		Capacity.bAllowOverdueOpportunity = Module.GetTerrainFrameContext().IsOverdueOpportunityAvailable();
 		Capacity.MaximumWaitSeconds = Module.GetViewSettings().Fine.MaximumBackgroundWaitSeconds;
 		FVoxelTerrainServiceCharge Charge;
-		const int32 Index = UploadSelection.Select(Candidates, Capacity, Started, Charge);
+		const int32 Index = UploadSelection.Select(Candidates, Capacity, FPlatformTime::Seconds(), Charge);
 		if (Index == INDEX_NONE) break;
+		if (FPlatformTime::Seconds() >= Deadline)
+		{
+			verify(UploadSelection.RefundBeforeStart(Charge.Serial));
+			break;
+		}
 		if (Charge.bOverdueOpportunity) Module.GetTerrainFrameContext().ConsumeOverdueOpportunity();
-		AdvanceRootUpload(Renderer, *Ready[Index].Preparation, 1);
+		const double Started = FPlatformTime::Seconds();
+		AdvanceRootUpload(Renderer, *Ready[Index].Preparation, 1, Deadline);
 		const double Actual = FMath::Max(1.0, (FPlatformTime::Seconds() - Started) * 1000000.0);
 		verify(UploadSelection.Settle(Charge.Serial, Actual));
 		UploadCostMicroseconds = FMath::Lerp(UploadCostMicroseconds, Actual, 0.15);
@@ -2226,9 +2265,9 @@ void FVoxelTerrainRendererState::AdvanceRootUpload(FVoxelTerrainRenderer& Render
 }
 
 void FVoxelTerrainRendererState::AdvanceRootUpload(FVoxelTerrainRenderer& Renderer, FRootPreparation& Work,
-	const int32 InMaximumSteps)
+	const int32 InMaximumSteps, const double InDeadline)
 {
-	const double Deadline = Module.GetTerrainFrameContext().Deadline();
+	const double Deadline = FMath::Min(InDeadline, Module.GetTerrainFrameContext().Deadline());
 	if (Work.UploadAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked &&
 		!RendererHasExternalRelease(Work.Resources, Work.Consumer, Work.UploadCapacityVersion)) return;
 	if (Work.UploadAdmission != EVoxelTerrainResourceAdmission::Granted &&
@@ -2391,6 +2430,12 @@ void FVoxelTerrainRendererState::ReleasePreparation(FReadyTransaction& InTransac
 		return Kind == EVoxelTaskKind::BuildViewCoverage && Stamp.OwnerId == OwnerId &&
 			Stamp.OwnerIncarnation == 1 && Stamp.WorldEpoch == Epoch && Stamp.Token == Token;
 	});
+	FRootPreparation* Preparation = InTransaction.Preparation.Get();
+	const int32 ActiveIndex = Preparation->ActiveIndex;
+	check(ActivePreparations.IsValidIndex(ActiveIndex) && ActivePreparations[ActiveIndex] == Preparation);
+	ActivePreparations.RemoveAtSwap(ActiveIndex, 1, EAllowShrinking::No);
+	if (ActivePreparations.IsValidIndex(ActiveIndex)) ActivePreparations[ActiveIndex]->ActiveIndex = ActiveIndex;
+	Preparation->ActiveIndex = INDEX_NONE;
 	InTransaction.Preparation.Reset();
 }
 
@@ -2425,10 +2470,15 @@ void FVoxelTerrainRendererState::TerminateTransaction(FReadyTransaction& InTrans
 	ReleasePreparation(InTransaction);
 }
 
-void FVoxelTerrainRendererState::AdvanceRootPreparations()
+void FVoxelTerrainRendererState::AdvanceRootPreparations(const double InDeadline)
 {
-	for (auto& Pending : Ready)
+	const double Deadline = FMath::Min(InDeadline, Module.GetTerrainFrameContext().Deadline());
+	const double PriorityStarted = FPlatformTime::Seconds();
+	const double PriorityDeadline = PriorityStarted + (Deadline - PriorityStarted) * 0.125;
+	for (int32 Scan = 0; Scan < FMath::Min(32, Ready.Num()) && FPlatformTime::Seconds() < PriorityDeadline; ++Scan)
 	{
+		PreparationPriorityCursor %= Ready.Num();
+		auto& Pending = Ready[PreparationPriorityCursor++];
 		const FBox Bounds = Pending.Resources->GetChangedBounds();
 		FVoxelTerrainServicePriority Priority;
 		for (const auto& Pair : Module.GetCurrentInterest().Sources)
@@ -2446,6 +2496,7 @@ void FVoxelTerrainRendererState::AdvanceRootPreparations()
 			Priority = FVoxelTerrainWorkSelection::Promote(Priority, Candidate);
 		}
 		if (Priority.DistanceCells != MAX_dbl) Pending.Priority = Priority;
+		if (Pending.Preparation) Pending.Preparation->SchedulingBand = Pending.Priority.Band;
 	}
 #if !UE_BUILD_SHIPPING
 	static double NextPreparationDiagnostic = 0.0;
@@ -2453,9 +2504,11 @@ void FVoxelTerrainRendererState::AdvanceRootPreparations()
 	{
 		NextPreparationDiagnostic = FPlatformTime::Seconds() + 5.0;
 		int32 Logged = 0;
-		for (const auto& Pending : Ready)
+		for (int32 Scan = 0; Scan < FMath::Min(32, Ready.Num()) && FPlatformTime::Seconds() < Deadline; ++Scan)
 		{
 			if (Logged == 8) break;
+			PreparationDiagnosticCursor %= Ready.Num();
+			const auto& Pending = Ready[PreparationDiagnosticCursor++];
 			if (!Pending.Resources->Atoms.ContainsByPredicate([](const FAtomPtr& Atom)
 				{ return Atom->Evidence.Owner.Kind == EVoxelFineOwnerKind::F0; })) continue;
 			++Logged;
@@ -2470,7 +2523,7 @@ void FVoxelTerrainRendererState::AdvanceRootPreparations()
 #endif
 	// 过期事务即使在容量等待中也必须撤销，不能一直占有 Atom 锁及准备名额。
 	for (int32 Scan = 0; Scan < FMath::Min(32, Ready.Num()) &&
-		Module.GetTerrainFrameContext().RemainingMilliseconds() > 0.0; ++Scan)
+		FPlatformTime::Seconds() < Deadline; ++Scan)
 	{
 		PreparationScanCursor %= Ready.Num();
 		const int32 Index = PreparationScanCursor++;
@@ -2484,6 +2537,7 @@ void FVoxelTerrainRendererState::AdvanceRootPreparations()
 				!Pending.IsCoarseCurrent || !Pending.IsCoarseCurrent())
 			{
 				AdvanceCoarseAdmissionVersion();
+				ReleasePreparation(Pending);
 				Ready.RemoveAtSwap(Index, 1, EAllowShrinking::No);
 			}
 			continue;
@@ -2502,55 +2556,85 @@ void FVoxelTerrainRendererState::AdvanceRootPreparations()
 		AdvanceCoarseAdmissionVersion();
 		Ready.RemoveAtSwap(Index, 1, EAllowShrinking::No);
 	}
-	for (int32 Step = 0; Step < 16 && !Ready.IsEmpty() &&
-		Module.GetTerrainFrameContext().RemainingMilliseconds() > 0.0; ++Step)
+	FVoxelTerrainServiceCapacity Capacity;
+	Capacity.MaximumWorkers = 16;
+	Capacity.NearReservedWorkers = Capacity.MinimumNonNearWorkers = 8;
+	Capacity.MaximumWaitSeconds = Module.GetViewSettings().Fine.MaximumBackgroundWaitSeconds;
+	FBox ActiveBounds[16];
+	int32 ActiveBoundsCount = 0;
+	for (const FRootPreparation* Preparation : ActivePreparations)
 	{
-		const double Started = FPlatformTime::Seconds();
-		FVoxelTerrainServiceCapacity Capacity;
-		Capacity.MaximumWorkers = 16;
-		Capacity.NearReservedWorkers = Capacity.MinimumNonNearWorkers = 8;
-		Capacity.MaximumWaitSeconds = Module.GetViewSettings().Fine.MaximumBackgroundWaitSeconds;
+		if (FPlatformTime::Seconds() >= Deadline) return;
+		++Capacity.RunningWorkers;
+		Capacity.RunningNearWorkers += FVoxelTerrainWorkSelection::IsNear(Preparation->SchedulingBand) ? 1 : 0;
+		check(ActiveBoundsCount < UE_ARRAY_COUNT(ActiveBounds));
+		ActiveBounds[ActiveBoundsCount++] = Preparation->SchedulingBounds;
+	}
+	for (int32 Step = 0; Step < 16 && !Ready.IsEmpty() && FPlatformTime::Seconds() < Deadline; ++Step)
+	{
+		const double ScanStarted = FPlatformTime::Seconds();
+		const double ScanDeadline = ScanStarted + (Deadline - ScanStarted) * 0.5;
 		Capacity.bAllowOverdueOpportunity = Module.GetTerrainFrameContext().IsOverdueOpportunityAvailable();
-		FBox ActiveBounds[16];
-		int32 ActiveBoundsCount = 0;
-		for (const auto& Pending : Ready)
-		{
-			if (!Pending.Preparation) continue;
-			++Capacity.RunningWorkers;
-			Capacity.RunningNearWorkers += FVoxelTerrainWorkSelection::IsNear(Pending.Priority.Band) ? 1 : 0;
-			// 接口重建涉及变化区的一层邻居，邻居又读取一层边界输入。
-			if (ActiveBoundsCount < UE_ARRAY_COUNT(ActiveBounds))
-				ActiveBounds[ActiveBoundsCount++] = Pending.Resources->GetChangedBounds().ExpandBy(32.0);
-		}
 		TArray<FVoxelTerrainServiceCandidate, TInlineAllocator<32>> Candidates;
-		for (int32 Scan = 0; Scan < Ready.Num(); ++Scan)
+		const auto AddCandidate = [&](const int32 Index)
 		{
-			PreparationScanCursor %= Ready.Num();
-			const int32 Index = PreparationScanCursor++;
 			const auto& Pending = Ready[Index];
+			if (Pending.bTerminalFailure || Pending.Preparation) return;
 			const FBox Bounds = Pending.Resources->GetChangedBounds();
-			bool bOverlapsPreparation = false;
 			for (int32 ActiveIndex = 0; ActiveIndex < ActiveBoundsCount; ++ActiveIndex)
-				bOverlapsPreparation |= ActiveBounds[ActiveIndex].Intersect(Bounds);
-			const bool bRunnable = !bOverlapsPreparation && !Pending.bTerminalFailure && !Pending.Preparation &&
-				(!Pending.bPreparationAdmissionWaiting || RendererHasExternalRelease(Resources, Pending.PreparationConsumer, Pending.PreparationAdmissionVersion));
-			if (bRunnable) Candidates.Add({Index, Pending.Priority, Pending.FirstQueuedSeconds, Pending.Sequence, PreparationCostMicroseconds, true});
+				if (ActiveBounds[ActiveIndex].Intersect(Bounds)) return;
+			if (Pending.bPreparationAdmissionWaiting &&
+				!RendererHasExternalRelease(Resources, Pending.PreparationConsumer, Pending.PreparationAdmissionVersion)) return;
+			Candidates.Add({Index, Pending.Priority, Pending.FirstQueuedSeconds, Pending.Sequence, PreparationCostMicroseconds, true});
+		};
+		// F0 项在大批 F1+ 事务中仍进入同一服务选择器，避免 32 项扫描窗口遗漏出生可游玩的 Fine。
+		int32 F0Candidates = 0;
+		for (int32 Index = 0; Index < Ready.Num() && F0Candidates < 32 && FPlatformTime::Seconds() < ScanDeadline; ++Index)
+		{
+			const auto& Pending = Ready[Index];
+			if (Pending.Resources->Atoms.IsEmpty() ||
+				Pending.Resources->Atoms[0]->Evidence.Owner.Kind != EVoxelFineOwnerKind::F0) continue;
+			const int32 Before = Candidates.Num();
+			AddCandidate(Index);
+			F0Candidates += Candidates.Num() != Before;
+		}
+		for (int32 Scan = 0; Scan < FMath::Min(32, Ready.Num()) && FPlatformTime::Seconds() < ScanDeadline; ++Scan)
+		{
+			PreparationAdmissionCursor %= Ready.Num();
+			const int32 Index = PreparationAdmissionCursor++;
+			const auto& Pending = Ready[Index];
+			if (!Pending.Resources->Atoms.IsEmpty() &&
+				Pending.Resources->Atoms[0]->Evidence.Owner.Kind == EVoxelFineOwnerKind::F0) continue;
+			AddCandidate(Index);
 		}
 		FVoxelTerrainServiceCharge Charge;
-		const int32 Index = PreparationSelection.Select(Candidates, Capacity, Started, Charge);
+		const int32 Index = PreparationSelection.Select(Candidates, Capacity, FPlatformTime::Seconds(), Charge);
 		if (Index == INDEX_NONE) break;
+		if (FPlatformTime::Seconds() >= Deadline)
+		{
+			verify(PreparationSelection.RefundBeforeStart(Charge.Serial));
+			break;
+		}
 		if (Charge.bOverdueOpportunity) Module.GetTerrainFrameContext().ConsumeOverdueOpportunity();
+		const double Started = FPlatformTime::Seconds();
 		BeginRootPreparation(Ready[Index]);
 		const double Actual = FMath::Max(1.0, (FPlatformTime::Seconds() - Started) * 1000000.0);
 		verify(PreparationSelection.Settle(Charge.Serial, Actual));
 		PreparationCostMicroseconds = FMath::Lerp(PreparationCostMicroseconds, Actual, 0.15);
+		if (Ready[Index].Preparation)
+		{
+			++Capacity.RunningWorkers;
+			Capacity.RunningNearWorkers += FVoxelTerrainWorkSelection::IsNear(Ready[Index].Priority.Band) ? 1 : 0;
+			check(ActiveBoundsCount < UE_ARRAY_COUNT(ActiveBounds));
+			ActiveBounds[ActiveBoundsCount++] = Ready[Index].Preparation->SchedulingBounds;
+		}
 	}
 	// Scheduler 配额暂缓时保留原准备及年龄，不重新申请路径租约。
 	for (int32 Scan = 0; Scan < FMath::Min(32, Ready.Num()) &&
-		Module.GetTerrainFrameContext().RemainingMilliseconds() > 0.0; ++Scan)
+		FPlatformTime::Seconds() < Deadline; ++Scan)
 	{
-		PreparationScanCursor %= Ready.Num();
-		auto& Pending = Ready[PreparationScanCursor++];
+		PreparationRetryCursor %= Ready.Num();
+		auto& Pending = Ready[PreparationRetryCursor++];
 		if (Pending.Preparation && !Pending.Preparation->bEnqueued) BeginRootPreparation(Pending);
 	}
 }
@@ -2715,12 +2799,13 @@ bool FVoxelTerrainRendererState::BeginRootMerge(FReadyTransaction& InTransaction
 	return false;
 }
 
-FSnapshotPtr FVoxelTerrainRendererState::SealFrameSnapshot(const uint64 InFrameCounter)
+FSnapshotPtr FVoxelTerrainRendererState::SealFrameSnapshot(const uint64 InFrameCounter, const double InDeadline)
 {
 	check(IsInGameThread());
+	const double Deadline = FMath::Min(InDeadline, Module.GetTerrainFrameContext().Deadline());
+	if (FPlatformTime::Seconds() >= Deadline) return LastSealedSnapshot;
 	if (InFrameCounter == LastFrame || !PrepareMetadata() || Ready.IsEmpty() || PendingIssued.Num() == 512 ||
 		NextPresentation == MAX_uint64 || NextMetadataSerial == MAX_uint64) return LastSealedSnapshot;
-	const double Started = FPlatformTime::Seconds();
 	FVoxelTerrainServiceCharge Charge;
 	int32 Index = INDEX_NONE;
 	if (RootMerge)
@@ -2735,10 +2820,10 @@ FSnapshotPtr FVoxelTerrainRendererState::SealFrameSnapshot(const uint64 InFrameC
 			ReleaseRootMerge();
 		}
 		TArray<FVoxelTerrainServiceCandidate, TInlineAllocator<32>> Candidates;
-		for (int32 Scan = 0; Scan < Ready.Num(); ++Scan)
+		const double ScanStarted = FPlatformTime::Seconds();
+		const double ScanDeadline = ScanStarted + (Deadline - ScanStarted) * 0.5;
+		const auto AddCandidate = [&](const int32 CandidateIndex)
 		{
-			SealScanCursor %= Ready.Num();
-			const int32 CandidateIndex = SealScanCursor++;
 			auto& Candidate = Ready[CandidateIndex];
 			if (Candidate.bMergeCapacityBlocked && RendererHasExternalRelease(Resources, Candidate.MergeConsumer, Candidate.MergeCapacityVersion))
 				Candidate.bMergeCapacityBlocked = false;
@@ -2747,14 +2832,39 @@ FSnapshotPtr FVoxelTerrainRendererState::SealFrameSnapshot(const uint64 InFrameC
 			const bool bRunnable = !Candidate.bTerminalFailure && Candidate.Preparation && Candidate.Preparation->bUploadComplete &&
 				!Candidate.bMergeCapacityBlocked && !Candidate.bSealCapacityBlocked;
 			if (bRunnable) Candidates.Add({CandidateIndex, Candidate.Priority, Candidate.FirstQueuedSeconds, Candidate.Sequence, SealCostMicroseconds, true});
+		};
+		int32 F0Candidates = 0;
+		for (int32 CandidateIndex = 0; CandidateIndex < Ready.Num() && F0Candidates < 32 && FPlatformTime::Seconds() < ScanDeadline; ++CandidateIndex)
+		{
+			const auto& Candidate = Ready[CandidateIndex];
+			if (Candidate.Resources->Atoms.IsEmpty() ||
+				Candidate.Resources->Atoms[0]->Evidence.Owner.Kind != EVoxelFineOwnerKind::F0) continue;
+			const int32 Before = Candidates.Num();
+			AddCandidate(CandidateIndex);
+			F0Candidates += Candidates.Num() != Before;
+		}
+		for (int32 Scan = 0; Scan < FMath::Min(32, Ready.Num()) && FPlatformTime::Seconds() < ScanDeadline; ++Scan)
+		{
+			SealScanCursor %= Ready.Num();
+			const int32 CandidateIndex = SealScanCursor++;
+			const auto& Candidate = Ready[CandidateIndex];
+			if (!Candidate.Resources->Atoms.IsEmpty() &&
+				Candidate.Resources->Atoms[0]->Evidence.Owner.Kind == EVoxelFineOwnerKind::F0) continue;
+			AddCandidate(CandidateIndex);
 		}
 		FVoxelTerrainServiceCapacity Capacity;
 		Capacity.bAllowOverdueOpportunity = Module.GetTerrainFrameContext().IsOverdueOpportunityAvailable();
 		Capacity.MaximumWaitSeconds = Module.GetViewSettings().Fine.MaximumBackgroundWaitSeconds;
-		Index = SealSelection.Select(Candidates, Capacity, Started, Charge);
+		Index = SealSelection.Select(Candidates, Capacity, FPlatformTime::Seconds(), Charge);
 		if (Index == INDEX_NONE) return LastSealedSnapshot;
-		if (Charge.bOverdueOpportunity) Module.GetTerrainFrameContext().ConsumeOverdueOpportunity();
 	}
+	if (FPlatformTime::Seconds() >= Deadline)
+	{
+		if (Charge.Serial) verify(SealSelection.RefundBeforeStart(Charge.Serial));
+		return LastSealedSnapshot;
+	}
+	if (Charge.bOverdueOpportunity) Module.GetTerrainFrameContext().ConsumeOverdueOpportunity();
+	const double Started = FPlatformTime::Seconds();
 	ON_SCOPE_EXIT
 	{
 		if (Charge.Serial)
@@ -2958,45 +3068,62 @@ void FVoxelTerrainRenderer::AdvanceFramePublication()
 {
 	if (!EnsureState()) return;
 	auto& Context = State->Module.GetTerrainFrameContext();
-	while (!State->RetiringBoundSnapshots.IsEmpty() && Context.RemainingMilliseconds() > 0.0)
+	const double Deadline = Context.Deadline();
+	while (!State->RetiringBoundSnapshots.IsEmpty() && FPlatformTime::Seconds() < Deadline)
 	{
 		auto Retiring = State->RetiringBoundSnapshots.Pop(EAllowShrinking::No);
 		Retiring.Reset();
 	}
-	if (Context.RemainingMilliseconds() <= 0.0) return;
-	State->AdvanceRootPreparations();
-	State->AdvanceRootUpload(*this);
-	// 容量等待只阻塞该事务；释放合并通道，让无需额外合并容量的其他局部根仍可封存。
-	if (State->RootMerge)
+	const int32 FirstPhase = State->NextPublicationPhase;
+	State->NextPublicationPhase = (FirstPhase + 1) % 3;
+	for (int32 Offset = 0; Offset < 3 && FPlatformTime::Seconds() < Deadline; ++Offset)
 	{
-		const int32 Index = State->Ready.IndexOfByPredicate([this](const FReadyTransaction& Pending)
+		const int32 Phase = (FirstPhase + Offset) % 3;
+		if (Phase == 0)
 		{
-			return Pending.Preparation == State->RootMerge->Preparation;
-		});
-		if (Index != INDEX_NONE && (State->RootMerge->bWaitingCapacity.Load() || State->Ready[Index].bSealCapacityBlocked))
-		{
-			if (State->RootMerge->bWaitingCapacity.Load())
-			{
-				State->Ready[Index].bMergeCapacityBlocked = true;
-				State->Ready[Index].MergeCapacityVersion = State->RootMerge->CapacityVersion.Load();
-			}
-			State->RootMerge->bSuspended.Store(true);
-			State->Ready[Index].SuspendedMerge = MoveTemp(State->RootMerge);
+			State->AdvanceRootPreparations(Deadline);
 		}
-		else if (Index == INDEX_NONE) State->ReleaseRootMerge();
+		else if (Phase == 1)
+		{
+			State->AdvanceRootUpload(*this, Deadline);
+		}
+		else
+		{
+			// 容量等待只阻塞该事务；释放合并通道，让无需额外合并容量的其他局部根仍可封存。
+			if (State->RootMerge)
+			{
+				const int32 Index = State->Ready.IndexOfByPredicate([this](const FReadyTransaction& Pending)
+				{
+					return Pending.Preparation == State->RootMerge->Preparation;
+				});
+				if (Index != INDEX_NONE && (State->RootMerge->bWaitingCapacity.Load() || State->Ready[Index].bSealCapacityBlocked))
+				{
+					if (State->RootMerge->bWaitingCapacity.Load())
+					{
+						State->Ready[Index].bMergeCapacityBlocked = true;
+						State->Ready[Index].MergeCapacityVersion = State->RootMerge->CapacityVersion.Load();
+					}
+					State->RootMerge->bSuspended.Store(true);
+					State->Ready[Index].SuspendedMerge = MoveTemp(State->RootMerge);
+				}
+				else if (Index == INDEX_NONE) State->ReleaseRootMerge();
+			}
+			State->SealFrameSnapshot(Context.GetFrameCounter(), Deadline);
+		}
 	}
-	State->SealFrameSnapshot(Context.GetFrameCounter());
 }
 
-void FVoxelTerrainRenderer::AdvanceRetirement(TFunction<void(const FIntVector&)> InOnRetired)
+void FVoxelTerrainRenderer::AdvanceRetirement(TFunction<void(const FIntVector&)> InOnRetired, const double InDeadline)
 {
 	if (!State || !State->bActive.Load() || !State->PresentedSnapshot) return;
+	const double Deadline = FMath::Min(InDeadline, State->Module.GetTerrainFrameContext().Deadline(0.05));
+	if (FPlatformTime::Seconds() >= Deadline) return;
 	if (!State->CoarseRetirementSnapshot)
 	{
 		State->CoarseRetirementSnapshot = State->PresentedSnapshot;
 		if (State->CoarseRetirementSnapshot->CoarseRoot) State->CoarseRetirementWalk.Add({State->CoarseRetirementSnapshot->CoarseRoot, 0});
 	}
-	const double CoarseDeadline = State->Module.GetTerrainFrameContext().Deadline(0.025);
+	const double CoarseDeadline = FMath::Min(Deadline, State->Module.GetTerrainFrameContext().Deadline(0.025));
 	for (int32 Step = 0; Step < 32 && !State->CoarseRetirementWalk.IsEmpty() && FPlatformTime::Seconds() < CoarseDeadline; ++Step)
 	{
 		auto& Walk = State->CoarseRetirementWalk.Last();
@@ -3067,6 +3194,7 @@ void FVoxelTerrainRenderer::AdvanceRetirement(TFunction<void(const FIntVector&)>
 				State->CoarseRetirementWalk.Pop(EAllowShrinking::No);
 				continue;
 			}
+			if (FPlatformTime::Seconds() >= CoarseDeadline) break;
 			if (!Attempt.Consumer.IsValid())
 			{
 				if (State->NextCoarseAttemptSerial == MAX_uint64)
@@ -3160,7 +3288,6 @@ void FVoxelTerrainRenderer::AdvanceRetirement(TFunction<void(const FIntVector&)>
 		State->RetirementSnapshot = State->PresentedSnapshot;
 		if (State->RetirementSnapshot->Root) State->RetirementWalk.Add({State->RetirementSnapshot->Root, 0});
 	}
-	const double Deadline = State->Module.GetTerrainFrameContext().Deadline(0.05);
 	for (int32 Step = 0; Step < 64 && !State->RetirementWalk.IsEmpty() && FPlatformTime::Seconds() < Deadline; ++Step)
 	{
 		auto& Walk = State->RetirementWalk.Last();
@@ -3176,6 +3303,7 @@ void FVoxelTerrainRenderer::AdvanceRetirement(TFunction<void(const FIntVector&)>
 			State->RetirementWalk.Pop(EAllowShrinking::No);
 			continue;
 		}
+		if (FPlatformTime::Seconds() >= Deadline) break;
 		check(State->NextMetadataSerial < MAX_uint64);
 		const uint64 Serial = ++State->NextMetadataSerial;
 		const auto Consumer = FVoxelGenerationConsumerKey::Section(State->Epoch, State->OwnerId, 1, Section, Serial);
@@ -3517,6 +3645,7 @@ void FVoxelTerrainRenderer::Reset()
 		State->Handoff.RequestCancel(Pending.Id, Canceled);
 	}
 	State->Ready.Reset();
+	check(State->ActivePreparations.IsEmpty());
 	State->SubmittedCallbacks.Reset();
 	State->PendingCoarseSources.Reset();
 	State->LastSealedSnapshot.Reset();

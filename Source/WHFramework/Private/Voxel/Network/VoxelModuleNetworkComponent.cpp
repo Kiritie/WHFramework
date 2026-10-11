@@ -5,7 +5,6 @@
 #include "Voxel/Rendering/VoxelViewLod.h"
 
 #include "GameFramework/PlayerController.h"
-#include "Net/UnrealNetwork.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Network/VoxelGeometryWire.h"
@@ -119,14 +118,6 @@ void UVoxelModuleNetworkComponent::TickComponent(
 	}
 }
 
-void UVoxelModuleNetworkComponent::GetLifetimeReplicatedProps(
-	TArray<FLifetimeProperty>& OutLifetimeProps) const
-{
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(UVoxelModuleNetworkComponent, InventoryPawn);
-	DOREPLIFETIME(UVoxelModuleNetworkComponent, InventoryEpoch);
-}
-
 uint64 UVoxelModuleNetworkComponent::AllocateRequestId()
 {
 	return NextOutboundId == MAX_uint64 ? 0 : NextOutboundId++;
@@ -222,11 +213,6 @@ AActor* UVoxelModuleNetworkComponent::GetAuthorizedObserver() const
 	}
 	const APlayerController* PlayerController = Controller();
 	return PlayerController ? PlayerController->GetPawn() : nullptr;
-}
-
-void UVoxelModuleNetworkComponent::PushInventoryFor(AActor* InOwner)
-{
-	(void)InOwner;
 }
 
 void UVoxelModuleNetworkComponent::ServerReceive_Implementation(const FVoxelRPCPacket& InPacket)
@@ -1551,3 +1537,4 @@ APlayerController* UVoxelModuleNetworkComponent::Controller() const
 {
 	return Cast<APlayerController>(GetOwner());
 }
+

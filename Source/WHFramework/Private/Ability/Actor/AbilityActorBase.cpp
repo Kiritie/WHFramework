@@ -7,6 +7,8 @@
 #include "Ability/Attributes/ActorAttributeSetBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
+#include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Engine/World.h"
 #include "Asset/AssetModuleStatics.h"
 #include "Common/Interaction/InteractionComponent.h"
 #include "Components/BoxComponent.h"
@@ -29,7 +31,7 @@ AAbilityActorBase::AAbilityActorBase(const FObjectInitializer& ObjectInitializer
 
 	AttributeSet = CreateDefaultSubobject<UActorAttributeSetBase>(FName("AttributeSet"));
 		
-	Inventory = CreateDefaultSubobject<UAbilityInventoryBase>(FName("Inventory"));
+	Inventory = nullptr;
 
 	Interaction = CreateDefaultSubobject<UInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);
@@ -56,6 +58,7 @@ void AAbilityActorBase::OnSpawn_Implementation(const FParameter& InParam)
 
 void AAbilityActorBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
+	BindInventory(nullptr);
 	Super::OnDespawn_Implementation(InMode);
 
 	AssetID = FPrimaryAssetId();
@@ -64,7 +67,7 @@ void AAbilityActorBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 
 	BirthTransform = FTransform::Identity;
 	
-	Inventory->UnloadSaveData();
+
 }
 
 void AAbilityActorBase::OnInitialize_Implementation()
@@ -132,7 +135,17 @@ void AAbilityActorBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 		SetNameA(SaveData.Name);
 		SetLevelA(SaveData.Level);
 
-		Inventory->LoadSaveData(SaveData.InventoryData, InPhase);
+		if (HasAuthority() && SaveData.InventorySnapshot.InventoryId.IsValid())
+		{
+			UInventoryWorldSubsystem* Subsystem = GetWorld() ? GetWorld()->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+			UAbilityInventoryBase* Resolved = Subsystem ? Subsystem->Resolve(SaveData.InventorySnapshot.InventoryId) : nullptr;
+			if (!Resolved)
+			{
+				UE_LOG(LogTemp, Error, TEXT("Inventory restore requires the recovered world store: %s"), *SaveData.InventorySnapshot.InventoryId.ToString());
+				return;
+			}
+			BindInventory(Resolved);
+		}
 	}
 }
 
@@ -145,7 +158,10 @@ FParameter AAbilityActorBase::ToData()
 	SaveData.Name = Name;
 	SaveData.Level = Level;
 
-	SaveData.InventoryData = Inventory->GetSaveData(true);
+	if (Inventory)
+	{
+		SaveData.InventorySnapshot = Inventory->MakeSnapshot();
+	}
 
 	SaveData.SpawnTransform = GetActorTransform();
 	SaveData.BirthTransform = BirthTransform;
@@ -165,54 +181,6 @@ void AAbilityActorBase::OnLeaveInteract(IInteractionAgentInterface* InInteractio
 {
 }
 
-void AAbilityActorBase::OnAdditionItem(const FAbilityItem& InItem)
-{
-	if(InItem == PAID_EXP)
-	{
-		ModifyExp(InItem.Count);
-	}
-}
-
-void AAbilityActorBase::OnRemoveItem(const FAbilityItem& InItem)
-{
-}
-
-void AAbilityActorBase::OnPreChangeItem(const FAbilityItem& InOldItem)
-{
-	
-}
-
-void AAbilityActorBase::OnChangeItem(const FAbilityItem& InNewItem)
-{
-	
-}
-
-void AAbilityActorBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
-{
-
-}
-
-void AAbilityActorBase::OnDeactiveItem(const FAbilityItem& InItem, bool bPassive)
-{
-
-}
-
-void AAbilityActorBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPlace)
-{
-	FVector Pos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
-	if(!bInPlace) Pos += GetActorForwardVector() * (GetRadius() + 35.f);
-	UAbilityModuleStatics::SpawnAbilityPickUp(InItem, Pos, Container.GetInterface());
-}
-
-void AAbilityActorBase::OnSelectItem(const FAbilityItem& InItem)
-{
-	
-}
-
-void AAbilityActorBase::OnAuxiliaryItem(const FAbilityItem& InItem)
-{
-
-}
 
 void AAbilityActorBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
 {
@@ -278,7 +246,6 @@ bool AAbilityActorBase::SetLevelA(int32 InLevel)
 		{
 			AbilitySystem->BP_ApplyGameplayEffectSpecToSelf(SpecHandle);
 		}
-		Inventory->ResetItems();
 		ResetData();
 		return true;
 	}
@@ -302,4 +269,29 @@ float AAbilityActorBase::GetDistance(AActor* InTargetActor, bool bIgnoreRadius /
 	IAbilityActorInterface* TargetAbilityActor = Cast<IAbilityActorInterface>(InTargetActor);
 
 	return FVector::Distance(FVector(GetActorLocation().X, GetActorLocation().Y, bIgnoreZAxis ? 0 : GetActorLocation().Z), FVector(InTargetActor->GetActorLocation().X, InTargetActor->GetActorLocation().Y, bIgnoreZAxis ? 0 : InTargetActor->GetActorLocation().Z)) - (bIgnoreRadius ? 0 : TargetAbilityActor->GetRadius());
+}
+
+
+void AAbilityActorBase::BindInventory(UAbilityInventoryBase* InInventory)
+{
+	if (Inventory == InInventory)
+	{
+		return;
+	}
+	UInventoryWorldSubsystem* NextSubsystem = InInventory ? Cast<UInventoryWorldSubsystem>(InInventory->GetOuter()) : nullptr;
+	UInventoryWorldSubsystem* WorldSubsystem = GetWorld() ? GetWorld()->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+	if (InInventory && (!NextSubsystem || NextSubsystem != WorldSubsystem || !NextSubsystem->AcquireLease(InInventory->GetInventoryId())))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Inventory binding rejected for %s"), *GetName());
+		return;
+	}
+	UAbilityInventoryBase* PreviousInventory = Inventory;
+	Inventory = InInventory;
+	if (PreviousInventory)
+	{
+		if (UInventoryWorldSubsystem* PreviousSubsystem = Cast<UInventoryWorldSubsystem>(PreviousInventory->GetOuter()))
+		{
+			PreviousSubsystem->ReleaseLease(PreviousInventory->GetInventoryId());
+		}
+	}
 }

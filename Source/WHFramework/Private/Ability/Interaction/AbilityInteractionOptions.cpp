@@ -1,7 +1,8 @@
 #include "Ability/Interaction/AbilityInteractionOptions.h"
 
-#include "Ability/PickUp/AbilityPickerInterface.h"
-#include "Ability/PickUp/AbilityPickUpBase.h"
+#include "Ability/Inventory/InventoryPickupActor.h"
+#include "Ability/Inventory/InventoryNetworkComponent.h"
+#include "GameFramework/PlayerController.h"
 #include "Ability/Vitality/AbilityVitalityInterface.h"
 
 bool UInteractionCondition_AbilityRevive::Evaluate_Implementation(const FInteractionContext& InContext, FText& OutReason) const
@@ -29,18 +30,26 @@ UInteractionOption_AbilityRevive::UInteractionOption_AbilityRevive()
 
 bool UInteractionCondition_AbilityPickUp::Evaluate_Implementation(const FInteractionContext& InContext, FText& OutReason) const
 {
-	AAbilityPickUpBase* PickUp = Cast<AAbilityPickUpBase>(InContext.Target);
-	const IAbilityPickerInterface* Picker = Cast<IAbilityPickerInterface>(InContext.Interactor);
-	return PickUp && Picker && PickUp->GetItem().IsValid() && !Picker->IsAutoPickUp();
+    const AInventoryPickupActor* Pickup = Cast<AInventoryPickupActor>(InContext.Target);
+    const APlayerController* Player = InContext.Player;
+    return Pickup && Pickup->GetInventoryId().IsValid() && Pickup->GetPublicCount() > 0 && !Pickup->GetPickupAction().IsNone()
+        && Player && Player->FindComponentByClass<UInventoryNetworkComponent>();
 }
 
 bool UInteractionAction_AbilityPickUp::Execute_Implementation(const FInteractionContext& InContext, FText& OutReason) const
 {
-	AAbilityPickUpBase* PickUp = Cast<AAbilityPickUpBase>(InContext.Target);
-	IAbilityPickerInterface* Picker = Cast<IAbilityPickerInterface>(InContext.Interactor);
-	if (!PickUp || !Picker || !PickUp->GetItem().IsValid() || Picker->IsAutoPickUp()) return false;
-	PickUp->OnPickUp(Picker);
-	return true;
+    const AInventoryPickupActor* Pickup = Cast<AInventoryPickupActor>(InContext.Target);
+    UInventoryNetworkComponent* Network = InContext.Player ? InContext.Player->FindComponentByClass<UInventoryNetworkComponent>() : nullptr;
+    if(!Pickup || !Network || Pickup->GetPublicCount() <= 0 || Pickup->GetPickupAction().IsNone()) return false;
+    FInventoryClientRequest Request;
+    Request.DomainAction = Pickup->GetPickupAction();
+    Request.SourceInventoryId = Network->GetOwnerInventoryId();
+    Request.TargetEntityId = Pickup->GetInventoryId();
+    Request.Quantity = Pickup->GetPublicCount();
+    Request.bAllowPartial = true;
+    const bool bSubmitted = Network->SubmitRequest(MoveTemp(Request)) != 0;
+    if(!bSubmitted) OutReason = NSLOCTEXT("Interaction", "PickupUnavailable", "拾取请求暂不可提交。");
+    return bSubmitted;
 }
 
 UInteractionOption_AbilityPickUp::UInteractionOption_AbilityPickUp()
@@ -50,3 +59,4 @@ UInteractionOption_AbilityPickUp::UInteractionOption_AbilityPickUp()
 	VisibilityConditions.Add(CreateDefaultSubobject<UInteractionCondition_AbilityPickUp>(TEXT("PickUpCondition")));
 	Actions.Add(CreateDefaultSubobject<UInteractionAction_AbilityPickUp>(TEXT("PickUpAction")));
 }
+

@@ -27,6 +27,7 @@
 #include "Voxel/Rendering/VoxelMeshClipper.h"
 #include "Voxel/Rendering/VoxelViewPublisher.h"
 #include "Voxel/Rendering/VoxelTerrainRenderer.h"
+#include "Voxel/Rendering/VoxelFineShardBuild.h"
 #include "Voxel/Rendering/VoxelViewLod.h"
 #include "Voxel/Rendering/VoxelMacroTerrain.h"
 #include "Voxel/Rendering/VoxelMaterialSet.h"
@@ -282,6 +283,7 @@ struct FProxyMeshEstimate
 						return Result;
 					}
 					Result.CustomPayload = MoveTemp(Payload); Result.InputResourceLease = Storage->ResultInputLease;
+					Result.OutputResourceLease = Storage->GeometryLease;
 					Result.bSuccess = true; return Result;
 				}
 			}
@@ -474,7 +476,10 @@ void FVoxelViewManager::Tick(
 		const double Floor = Policy.PublishOperationEstimateFloorMilliseconds;
 		const double Ceiling = FMath::Min(double(Policy.PublishOperationEstimateCeilingMilliseconds), double(Policy.TerrainPublishMilliseconds) * 0.5);
 		Estimate = FMath::Clamp(Estimate > 0.0 ? Estimate : Floor, Floor, Ceiling);
-		if (!TerrainFrameBudget.TryStart(Phase, Start, Estimate))
+		const bool bCanYield = Phase == EVoxelPublishPhase::Admission || Phase == EVoxelPublishPhase::Prepare ||
+			Phase == EVoxelPublishPhase::Retire;
+		const double StartEstimate = bCanYield ? FMath::Min(Estimate, TerrainFrameBudget.RemainingMilliseconds(Start)) : Estimate;
+		if (!TerrainFrameBudget.TryStart(Phase, Start, StartEstimate))
 		{
 			const uint64 Count = ++ManagerPhaseDeferrals[Index];
 			if (Count == 60 || Count % 600 == 0)
@@ -518,8 +523,10 @@ void FVoxelViewManager::Tick(
 			Run(EVoxelPublishPhase::Commit, [this] { Publisher->GetTerrainRenderer().AdvanceFramePublication(); });
 			Run(EVoxelPublishPhase::Retire, [this]
 			{
-				AdvanceNativeFineRetirement();
-				Publisher->GetTerrainRenderer().AdvanceRetirement([this](const FIntVector& Section) { OnPresentationReady(Section); });
+				const double Deadline = TerrainDeadline(0.1);
+				AdvanceNativeFineRetirement(Deadline);
+				Publisher->GetTerrainRenderer().AdvanceRetirement(
+					[this](const FIntVector& Section) { OnPresentationReady(Section); }, Deadline);
 			});
 			const bool bAllowCommit = true;
 			Publisher->Tick(TerrainFrameBudget, bAllowCommit);
@@ -588,7 +595,10 @@ void FVoxelViewManager::Tick(
 					Run(EVoxelPublishPhase::Prepare, [this]
 					{
 						const double Deadline = TerrainDeadline(0.25);
-						for (int32 Step = 0; Step < 32 && FPlatformTime::Seconds() < Deadline; ++Step) PrepareFineShardPresentations();
+						for (int32 Step = 0; Step < 32 && FPlatformTime::Seconds() < Deadline; ++Step)
+						{
+							PrepareFineShardPresentations(Deadline);
+						}
 					});
 					break;
 				case 1:
@@ -912,7 +922,10 @@ void FVoxelViewManager::ProcessServiceAdmissions(const bool bInDataOnly)
 		bInDataOnly ? Policy.Budget.DataAdmissionPerFrame : Policy.Budget.MacroAdmissionPerFrame};
 	int32 Submitted[4] = {};
 	const double Deadline = TerrainDeadline(Policy.Budget.AdmissionMilliseconds);
-	PruneServiceAdmissionAges(Stage, Deadline);
+	const double StartedScanning = FPlatformTime::Seconds();
+	if (StartedScanning >= Deadline) return;
+	const double ScanDeadline = StartedScanning + (Deadline - StartedScanning) * 0.5;
+	PruneServiceAdmissionAges(Stage, ScanDeadline);
 	const auto Resources = Scheduler.GetTerrainResources();
 	FVoxelGenerationRequiredSourceScope Sources(&Resources.Get(), this,
 		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
@@ -922,11 +935,17 @@ void FVoxelViewManager::ProcessServiceAdmissions(const bool bInDataOnly)
 	TArray<FVoxelTerrainServiceCandidate, TInlineAllocator<128>> Candidates;
 	TArray<FVoxelTaskKey, TInlineAllocator<128>> Identities;
 	TArray<int32, TInlineAllocator<128>> CandidateAdmissions;
-	for (int32 Kind = bInDataOnly ? 1 : 0; Kind < 4; ++Kind)
+	const int32 MinimumKind = bInDataOnly ? 1 : 0;
+	const int32 KindCount = 4 - MinimumKind;
+	const int32 FirstKind = MinimumKind + ServiceAdmissionKinds[Stage];
+	ServiceAdmissionKinds[Stage] = (ServiceAdmissionKinds[Stage] + 1) % KindCount;
+	for (int32 Offset = 0; Offset < KindCount && FPlatformTime::Seconds() < ScanDeadline; ++Offset)
 	{
+		const int32 Kind = MinimumKind + (FirstKind - MinimumKind + Offset) % KindCount;
 		const auto& Lane = Interest.AdmissionLanes[Kind];
 		int32& Scan = ServiceAdmissionScans[Stage][Kind];
-		for (int32 Attempt = 0; Attempt < Lane.Num(); ++Attempt)
+		const int32 ScanCount = FMath::Min(32, Lane.Num());
+		for (int32 Attempt = 0; Attempt < ScanCount && FPlatformTime::Seconds() < ScanDeadline; ++Attempt)
 		{
 			Scan %= Lane.Num();
 			const int32 Index = Lane[Scan++];
@@ -1013,7 +1032,7 @@ void FVoxelViewManager::ProcessServiceAdmissions(const bool bInDataOnly)
 			CandidateAdmissions.Add(Index);
 		}
 	}
-	if (Candidates.IsEmpty()) return;
+	if (Candidates.IsEmpty() || FPlatformTime::Seconds() >= Deadline) return;
 	const uint64 BeforeSelection = Resources->ReleaseVersionExcludingOwner(GetServiceControlConsumer());
 	if (bServiceSelectionCapacityWaiting[Stage] && !AdmissionSelection[Stage].GetResourceLease() &&
 		BeforeSelection <= ServiceSelectionCapacityVersions[Stage])
@@ -1033,8 +1052,7 @@ void FVoxelViewManager::ProcessServiceAdmissions(const bool bInDataOnly)
 	}
 	bServiceSelectionCapacityWaiting[Stage] = false;
 	RecordServiceResourceAdmission(EVoxelTerrainResourceAdmission::Granted);
-	const double SubmitDeadline = FPlatformTime::Seconds() + 0.0005;
-	for (int32 Attempt = 0; Attempt < Candidates.Num() && FPlatformTime::Seconds() < SubmitDeadline; ++Attempt)
+	for (int32 Attempt = 0; Attempt < Candidates.Num() && FPlatformTime::Seconds() < Deadline; ++Attempt)
 	{
 		auto& Frame = Module.GetTerrainFrameContext();
 		FVoxelTerrainServiceCapacity Capacity;
@@ -1043,6 +1061,11 @@ void FVoxelViewManager::ProcessServiceAdmissions(const bool bInDataOnly)
 		FVoxelTerrainServiceCharge Charge;
 		const int32 Selected = AdmissionSelection[Stage].Select(Candidates, Capacity, FPlatformTime::Seconds(), Charge);
 		if (Selected == INDEX_NONE) break;
+		if (FPlatformTime::Seconds() >= Deadline)
+		{
+			verify(AdmissionSelection[Stage].RefundBeforeStart(Charge.Serial));
+			break;
+		}
 		if (Charge.bOverdueOpportunity) Frame.ConsumeOverdueOpportunity();
 		Candidates[Selected].bRunnable = false;
 		const auto& Identity = Identities[Selected];
@@ -3259,6 +3282,7 @@ void FVoxelViewManager::Reset()
 		AdmissionAgeCapacityVersions[Stage] = 0;
 		bServiceSelectionCapacityWaiting[Stage] = false;
 		ServiceSelectionCapacityVersions[Stage] = 0;
+		ServiceAdmissionKinds[Stage] = 0;
 		for (int32 Kind = 0; Kind < 4; ++Kind)
 		{
 			ServiceAdmissionScans[Stage][Kind] = 0;

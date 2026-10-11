@@ -53,6 +53,7 @@ public:
 
 private:
 	bool ReserveFinalization(FVoxelInterestSet& InOutInterest, int32 InFineCount, FString& OutError) const;
+	static bool SettleFinalization(FVoxelInterestSet& InOutInterest, FString& OutError);
 	bool ReserveDemands(FVoxelInterestSet& InOutInterest, FVoxelSourceInterest& InOutSource,
 		int32 InAdditionalKeys, FString& OutError) const;
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;

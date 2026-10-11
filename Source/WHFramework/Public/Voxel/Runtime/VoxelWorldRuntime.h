@@ -55,6 +55,35 @@ struct WHFRAMEWORK_API FVoxelPreparedEdit
 	TArray<FVoxelPreparedSection> Sections;
 };
 
+
+struct WHFRAMEWORK_API FVoxelInventorySectionTarget
+{
+    uint64 ExpectedRevision = 0;
+    FVoxelPersistentSection After;
+};
+
+struct WHFRAMEWORK_API FVoxelPreparedInventorySection
+{
+    FIntVector Section = FIntVector::ZeroValue;
+    FVoxelPreparedSection Data;
+    TSharedPtr<const FVoxelOverlaySnapshot, ESPMode::ThreadSafe> Journal;
+    FVoxelRuntimeSectionIdentity Resource;
+    bool bLoaded = false;
+    bool bPinned = false;
+};
+
+// 所有正文、Journal、失效目录及网络 Patch 存储在 durable point 前授额。
+struct WHFRAMEWORK_API FVoxelPreparedInventoryCommit
+{
+    bool bPrepared = false;
+    uint64 WorldEpoch = 0;
+    uint64 HierarchyRevision = 0;
+    TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ScratchLease;
+    TArray<FVoxelPreparedInventorySection> Sections;
+    FVoxelPreparedChangeInvalidations Invalidations;
+    FVoxelEditBatch Batch;
+};
+
 class WHFRAMEWORK_API FVoxelWorldRuntime
 {
 public:
@@ -111,6 +140,14 @@ public:
 		FVoxelPreparedEdit&& InPrepared,
 		FVoxelEditBatch& OutBatch,
 		FString& OutError);
+
+    bool PrepareInventorySections(TConstArrayView<FVoxelInventorySectionTarget> InTargets,
+        const FGuid& InTransactionId, bool bInRecovery, FVoxelPreparedInventoryCommit& OutPrepared, FString& OutError);
+    bool ValidateInventorySections(const FVoxelPreparedInventoryCommit& InPrepared, FString& OutError) const;
+    bool CommitInventorySections(FVoxelPreparedInventoryCommit& InPrepared, FVoxelEditBatch& OutBatch, FString& OutError);
+    void CancelInventorySections(FVoxelPreparedInventoryCommit& InPrepared);
+    bool RestoreInventorySection(const FVoxelPersistentSection& InSection, FString& OutError);
+    void PublishInventorySections(const FVoxelEditBatch& InBatch);
 	bool ApplyPatch(const FVoxelSectionPatch& InPatch, FString& OutError);
 	bool ApplyRemotePatchBatch(const FVoxelEditBatch& InBatch, FString& OutError);
 
@@ -145,6 +182,7 @@ public:
 	void VisitCommittedOverlaySections(const FVoxelGenerationBounds& InBounds,
 		TFunctionRef<void(const FIntVector&)> InVisit) const;
 	uint64 GetContentRevision() const;
+	uint64 GetDataReadyRevision() const { return DataReadyRevision; }
 	bool InvalidateRemoteSection(const FIntVector& InSection, FString& OutError);
 #if WITH_DEV_AUTOMATION_TESTS
 	void InvalidateRemoteSection(const FIntVector& InSection)
@@ -192,13 +230,14 @@ private:
 		TSharedPtr<const FVoxelOverlaySnapshot, ESPMode::ThreadSafe>& OutJournal, FString& OutError,
 		bool bInPersisted = false) const;
 	void RetainJournal(const FIntVector& InSection,
-		TSharedPtr<const FVoxelOverlaySnapshot, ESPMode::ThreadSafe> InJournal);
+		TSharedPtr<const FVoxelOverlaySnapshot, ESPMode::ThreadSafe> InJournal, bool bInNotify = true);
 	void AdvanceOverlaySequences(TConstArrayView<FVoxelSectionPatch> InPatches);
 	bool ReserveOverlaySequences(TConstArrayView<FVoxelSectionPatch> InPatches);
 	bool ReserveOverlaySequenceKeys(TConstArrayView<FIntVector> InSections);
 
 private:
 	uint64 WorldEpoch = 0;
+	uint64 DataReadyRevision = 0;
 	uint64 NextToken = 1;
 	bool bAuthority = false;
 	TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> Registry;
@@ -236,3 +275,4 @@ private:
 	TFunction<bool(const FIntVector&, uint64)> RemoteSectionValidator;
 	TFunction<void(const FIntVector&, const FVoxelSectionStamp&, EVoxelRuntimeSectionEvent)> SectionEventCallback;
 };
+

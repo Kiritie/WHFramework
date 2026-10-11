@@ -34,14 +34,36 @@ struct FSaveGameAsyncExecutor::FWorker
 		if (!State->Result && State->Result.Code != ESaveResultCode::CapacityBlocked && Plan.Voxel.IsSet() &&
 			Plan.Voxel->Voxels.Completion && !Plan.Voxel->Voxels.Completion->bGenerationCommitted)
 			Plan.Voxel->Voxels.Completion->TargetReadLease.Reset();
-		if (!State->Result && State->Result.Code != ESaveResultCode::CapacityBlocked && Plan.bDeleteCreatedSlotOnFailure)
-		{
-			FSaveManifest Current;
-			// 只回收仍然未提交的原新槽，不能删掉并发产生的已提交文件代。
-			if (Storage.ReadManifest(Plan.SaveId, Current) && Current.CurrentGeneration == 0 &&
-				Plan.Manifest.CurrentGeneration == 0 && !Storage.DeleteWorldDirectory(Plan.SaveId))
-				State->Result.Message = FText::FromString(TEXT("Save failed and its uncommitted created slot could not be removed"));
-		}
+        const bool bTerminal = State->Result.Code != ESaveResultCode::CapacityBlocked &&
+            State->Result.Code != ESaveResultCode::SlotBusy;
+        if (bTerminal && Plan.ExternalOperation)
+        {
+            FString Error;
+            if (Plan.ExternalOperation->bFilesCommitted.load())
+            {
+                // Manifest 已发布，即使清除 intent 失败也保留目标并让 GT 采用同一准备句柄。
+                if (!Storage.CompletePendingWorld(Plan.ExternalOperation->PendingLease, Error))
+                    UE_LOG(LogTemp, Warning, TEXT("Committed world branch retains its recovery intent: %s"), *Error);
+            }
+            else if (Plan.ExternalOperation->Context.bPublicationUncertain)
+            {
+                Plan.ExternalOperation->Store->CloseNative();
+                UE_LOG(LogTemp, Error, TEXT("目标 Manifest 暂时不可读，保留整个分支与 intent 等待确认。"));
+            }
+            else
+            {
+                Plan.ExternalOperation->Store->CloseNative();
+                if (!Storage.AbortPendingWorld(Plan.ExternalOperation->PendingLease, Error))
+                    State->Result.Message = FText::FromString(State->Result.Message.ToString() + TEXT("; ") + Error);
+            }
+        }
+        else if (bTerminal && !State->Result && Plan.bDeleteCreatedSlotOnFailure)
+        {
+            FSaveManifest Current;
+            if (Storage.ReadManifest(Plan.SaveId, Current) && Current.CurrentGeneration == 0 &&
+                Plan.Manifest.CurrentGeneration == 0 && !Storage.DeleteWorldDirectory(Plan.SaveId))
+                State->Result.Message = FText::FromString(TEXT("保存失败，未提交的新槽暂时保留，待持有者退出后回收。"));
+        }
 	}
 };
 
@@ -87,6 +109,7 @@ bool FSaveGameAsyncExecutor::Start(FSaveGenerationPlan&& P, FString* OutError)
 		if (OutError) *OutError = TEXT("Save worker transaction differs from its frozen voxel cut");
 		return false;
 	}
+	if (!P.OperationId.IsValid()) P.OperationId = P.TransactionId;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 	if (P.Voxel.IsSet() && P.Voxel->Voxels.Journal.Resources)
 	{
@@ -184,9 +207,20 @@ FSaveOperationResult FSaveGameAsyncExecutor::Execute(const FSaveGenerationPlan& 
 		return FSaveOperationResult::Failed(C, FText::FromString(T));
 	};
 	if (Cancel.load()) return Fail(ESaveResultCode::Busy, TEXT("Save canceled before write"));
-	FSaveManifest Current;
-	if (!Storage.ReadManifest(P.SaveId, Current) || (!P.bResolveManifestOnWorker && Current.CurrentGeneration != P.Manifest.CurrentGeneration))
-		return Fail(ESaveResultCode::CommitFailed, TEXT("Save slot generation changed before write"));
+    const TSharedPtr<FSavePendingWorldLease, ESPMode::ThreadSafe> PendingLease = P.ExternalOperation ?
+        P.ExternalOperation->PendingLease : TSharedPtr<FSavePendingWorldLease, ESPMode::ThreadSafe>();
+    FSaveManifest Current;
+    if (!Storage.ReadManifest(P.SaveId, Current))
+    {
+        if (!P.bCreateSlotAtWrite || !Storage.CreateWorldDirectory(P.SaveId) ||
+            !Storage.WriteManifestAtomic(P.SaveId, P.Manifest, PendingLease))
+            return Fail(ESaveResultCode::WriteFailed, TEXT("无法建立本次操作持有的新存档槽。"));
+        Current = P.Manifest;
+    }
+    if ((!P.bResolveManifestOnWorker && Current.CurrentGeneration != P.Manifest.CurrentGeneration) ||
+        (P.ExternalOperation && (Current.CurrentGeneration != 0 ||
+            P.ExternalOperation->Context.TargetGeneration != 1)))
+        return Fail(ESaveResultCode::CommitFailed, TEXT("目标存档代次已变化，不能覆盖另一个已提交世界。"));
 	if (Cancel.load())
 		return Fail(ESaveResultCode::Busy, TEXT("Save canceled before write"));
 	if (Current.CurrentGeneration == MAX_int32)
@@ -199,7 +233,7 @@ FSaveOperationResult FSaveGameAsyncExecutor::Execute(const FSaveGenerationPlan& 
 		if (Completion && Completion->TargetGeneration > 0 &&
 			(Completion->TargetSaveId != P.SaveId || Completion->TargetGeneration != Next))
 			return Fail(ESaveResultCode::CommitFailed, TEXT("Accepted save target generation changed while waiting for capacity"));
-		if (Completion && P.bResolveManifestOnWorker && !Completion->TargetDirectory)
+		if (Completion && !Completion->TargetDirectory)
 		{
 			if (!Completion->ExpectedStorageRoot || Completion->ExpectedSaveId != P.SaveId ||
 				!FPaths::IsSamePath(*Completion->ExpectedStorageRoot, Storage.GetRootDir()) || !Capture.Journal.Resources)
@@ -272,18 +306,47 @@ FSaveOperationResult FSaveGameAsyncExecutor::Execute(const FSaveGenerationPlan& 
 			(Capture.Journal.Resources && !Completion->TargetReadLease->IsResourceAccountedFor(Capture.Journal.Resources.Get(), Capture.WorldEpoch)))
 			return Fail(ESaveResultCode::CaptureFailed, TEXT("Prepared target generation lease differs from its original world owner"));
 	}
+    if (P.ExternalOperation)
+    {
+        FString Error;
+        if (!P.ExternalOperation->PendingLease || !P.ExternalOperation->Store ||
+            !P.ExternalOperation->Store->PrepareNative(Error) || !P.ExternalOperation->Store->MarkReadyNative(Error))
+            return FSaveOperationResult::Failed(ESaveResultCode::WriteFailed, FText::FromString(Error.IsEmpty() ?
+                TEXT("外部世界存储没有完成持久准备。") : Error));
+    }
 	if (Cancel.load()) return Fail(ESaveResultCode::Busy, TEXT("Save canceled before generation publication"));
 	if (!Storage.CommitGeneration(P.SaveId, Next))
 		return Fail(ESaveResultCode::CommitFailed, TEXT("Generation commit failed"));
 	// 文件代已发布后继续完成 manifest，取消不能把仅 rename 的目录当作提交成功。
 	FSaveManifest Manifest = Current;
 	Manifest.CurrentGeneration = Next;
+	Manifest.LastCommitOperationId = P.OperationId;
 	Manifest.CurrentMap = P.CurrentMap;
 	Manifest.UpdatedAt = FDateTime::UtcNow();
 	for (const auto& M : P.Modules)
 		Manifest.ModuleVersions.Add(M.ModuleName, M.Version);
-	if (!Storage.WriteManifestAtomic(P.SaveId, Manifest))
-		return Fail(ESaveResultCode::CommitFailed, TEXT("Manifest commit failed"));
+    if (!Storage.WriteManifestAtomic(P.SaveId, Manifest, PendingLease))
+    {
+        FSaveManifest Observed;
+        // rename 后目录刷盘失败可能已经发布；以同 OperationId 的完整 Manifest 为准。
+        const bool bObserved = Storage.ReadManifest(P.SaveId, Observed);
+        const bool bMatches = bObserved && Observed.LastCommitOperationId == P.OperationId && Observed.CurrentGeneration == Next;
+        if (!bObserved || (bMatches && !Storage.IsGenerationComplete(P.SaveId, Next, Observed)))
+        {
+            if (P.ExternalOperation) P.ExternalOperation->Context.bPublicationUncertain = true;
+            return Fail(ESaveResultCode::ConfirmationPending, TEXT("目标发布结果暂时无法确认；数据与 intent 已保留，请重新读取存档结果。"));
+        }
+        if (!bMatches)
+            return Fail(ESaveResultCode::CommitFailed, TEXT("普通存档 Manifest 未发布，原活动世界保持不变。"));
+        FString ConfirmError;
+        if (!Storage.ConfirmManifestCommit(P.SaveId, P.OperationId, Next, ConfirmError))
+        {
+            if (P.ExternalOperation) P.ExternalOperation->Context.bPublicationUncertain = true;
+            return FSaveOperationResult::Failed(ESaveResultCode::ConfirmationPending, FText::FromString(ConfirmError));
+        }
+        UE_LOG(LogTemp, Warning, TEXT("Manifest publication initially failed; its exact receipt and durable flush were subsequently confirmed."));
+    }
+    if (P.ExternalOperation) P.ExternalOperation->bFilesCommitted.store(true);
 	if (P.Voxel.IsSet())
 	{
 		// 仅此实际事务可发布文件代回执；目录 rename 或 Scene 内存捕获都不足以证明提交。
@@ -295,3 +358,4 @@ FSaveOperationResult FSaveGameAsyncExecutor::Execute(const FSaveGenerationPlan& 
 	}
 	return FSaveOperationResult::Success();
 }
+

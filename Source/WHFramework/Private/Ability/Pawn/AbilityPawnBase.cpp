@@ -1,6 +1,9 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Ability/Pawn/AbilityPawnBase.h"
+#include "Ability/Inventory/AbilityInventoryBase.h"
+#include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Engine/World.h"
 
 #include "Ability/Interaction/AbilityInteractionOptions.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
@@ -15,8 +18,6 @@
 #include "Voxel/VoxelModule.h"
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/Abilities/VitalityActionAbilityBase.h"
-#include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
-#include "Ability/Pawn/AbilityPawnInventoryBase.h"
 #include "Ability/Pawn/States/AbilityPawnState_Interrupt.h"
 #include "Ability/Pawn/States/AbilityPawnState_Static.h"
 #include "Ability/Pawn/States/AbilityPawnState_Walk.h"
@@ -32,7 +33,7 @@ AAbilityPawnBase::AAbilityPawnBase(const FObjectInitializer& ObjectInitializer)
 
 	AttributeSet = CreateDefaultSubobject<UVitalityAttributeSetBase>(FName("AttributeSet"));
 
-	Inventory = CreateDefaultSubobject<UAbilityPawnInventoryBase>(FName("Inventory"));
+	Inventory = nullptr;
 
 	Interaction = CreateDefaultSubobject<UInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);
@@ -77,12 +78,14 @@ void AAbilityPawnBase::OnSpawn_Implementation(const FParameter& InParam)
 
 void AAbilityPawnBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
+	BindInventory(nullptr);
+	Super::OnDespawn_Implementation(InMode);
 	RaceID = NAME_None;
 	Level = 0;
 
 	BirthTransform = FTransform::Identity;
 
-	Inventory->UnloadSaveData();
+
 }
 
 void AAbilityPawnBase::OnInitialize_Implementation()
@@ -204,7 +207,17 @@ void AAbilityPawnBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 		SetLevelA(SaveData.Level);
 		SetRaceID(SaveData.RaceID);
 
-		Inventory->LoadSaveData(SaveData.InventoryData, InPhase);
+		if (HasAuthority() && SaveData.InventorySnapshot.InventoryId.IsValid())
+		{
+			UInventoryWorldSubsystem* Subsystem = GetWorld() ? GetWorld()->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+			UAbilityInventoryBase* Resolved = Subsystem ? Subsystem->Resolve(SaveData.InventorySnapshot.InventoryId) : nullptr;
+			if (!Resolved)
+			{
+				UE_LOG(LogTemp, Error, TEXT("Inventory restore requires the recovered world store: %s"), *SaveData.InventorySnapshot.InventoryId.ToString());
+				return;
+			}
+			BindInventory(Resolved);
+		}
 	}
 }
 
@@ -218,7 +231,10 @@ FParameter AAbilityPawnBase::ToData()
 	SaveData.RaceID = RaceID;
 	SaveData.Level = Level;
 
-	SaveData.InventoryData = Inventory->GetSaveData(true);
+	if (Inventory)
+	{
+		SaveData.InventorySnapshot = Inventory->MakeSnapshot();
+	}
 
 	SaveData.SpawnTransform = GetActorTransform();
 	SaveData.BirthTransform = BirthTransform;
@@ -336,49 +352,6 @@ void AAbilityPawnBase::OnLeaveInteract(IInteractionAgentInterface* InInteraction
 {
 }
 
-void AAbilityPawnBase::OnAdditionItem(const FAbilityItem& InItem)
-{
-	if (InItem.ID == PAID_EXP)
-	{
-		ModifyExp(InItem.Count);
-	}
-}
-
-void AAbilityPawnBase::OnRemoveItem(const FAbilityItem& InItem)
-{
-}
-
-void AAbilityPawnBase::OnPreChangeItem(const FAbilityItem& InOldItem)
-{
-}
-
-void AAbilityPawnBase::OnChangeItem(const FAbilityItem& InNewItem)
-{
-}
-
-void AAbilityPawnBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
-{
-}
-
-void AAbilityPawnBase::OnDeactiveItem(const FAbilityItem& InItem, bool bPassive)
-{
-}
-
-void AAbilityPawnBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPlace)
-{
-	FVector Pos = GetActorLocation() + FMath::RandPointInBox(FBox(FVector(-20.f, -20.f, -10.f), FVector(20.f, 20.f, 10.f)));
-	if (!bInPlace)
-		Pos += GetActorForwardVector() * (GetRadius() + 35.f);
-	UAbilityModuleStatics::SpawnAbilityPickUp(InItem, Pos, Container.GetInterface());
-}
-
-void AAbilityPawnBase::OnSelectItem(const FAbilityItem& InItem)
-{
-}
-
-void AAbilityPawnBase::OnAuxiliaryItem(const FAbilityItem& InItem)
-{
-}
 
 void AAbilityPawnBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
 {
@@ -550,7 +523,6 @@ bool AAbilityPawnBase::SetLevelA(int32 InLevel)
 		{
 			AbilitySystem->BP_ApplyGameplayEffectSpecToSelf(SpecHandle);
 		}
-		Inventory->ResetItems();
 		ResetData();
 		return true;
 	}
@@ -623,5 +595,30 @@ void AAbilityPawnBase::OnRep_PlayerState()
 	if (GetPlayerState())
 	{
 		BindASCInput();
+	}
+}
+
+
+void AAbilityPawnBase::BindInventory(UAbilityInventoryBase* InInventory)
+{
+	if (Inventory == InInventory)
+	{
+		return;
+	}
+	UInventoryWorldSubsystem* NextSubsystem = InInventory ? Cast<UInventoryWorldSubsystem>(InInventory->GetOuter()) : nullptr;
+	UInventoryWorldSubsystem* WorldSubsystem = GetWorld() ? GetWorld()->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+	if (InInventory && (!NextSubsystem || NextSubsystem != WorldSubsystem || !NextSubsystem->AcquireLease(InInventory->GetInventoryId())))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Inventory binding rejected for %s"), *GetName());
+		return;
+	}
+	UAbilityInventoryBase* PreviousInventory = Inventory;
+	Inventory = InInventory;
+	if (PreviousInventory)
+	{
+		if (UInventoryWorldSubsystem* PreviousSubsystem = Cast<UInventoryWorldSubsystem>(PreviousInventory->GetOuter()))
+		{
+			PreviousSubsystem->ReleaseLease(PreviousInventory->GetInventoryId());
+		}
 	}
 }

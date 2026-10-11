@@ -1,44 +1,38 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "Ability/AbilityModuleTypes.h"
 #include "Widget/Sub/SubButtonWidgetBase.h"
 #include "WidgetAbilityItemBase.generated.h"
 
-/**
- * UI构建项
- */
+class UAbilityItemDataBase;
+
+/** 物品展示值不持有槽位、背包或运行时宿主。 */
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UWidgetAbilityItemBase : public USubButtonWidgetBase
 {
-	GENERATED_BODY()
-	
-public:
-	UWidgetAbilityItemBase(const FObjectInitializer& ObjectInitializer);
-
-	//////////////////////////////////////////////////////////////////////////
-	/// ObjectPool
-public:
-
-	virtual void OnSpawn_Implementation(const FParameter& InParam) override;
-		
-	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode)
-		override;
+    GENERATED_BODY()
 
 public:
-	virtual void OnCreate(const FParameter& InParam) override;
+    UWidgetAbilityItemBase(const FObjectInitializer& ObjectInitializer);
 
-	virtual void OnInitialize(const FParameter& InParam) override;
+    //////////////////////////////////////////////////////////////////////////
+    /// ObjectPool
+public:
+    virtual void OnSpawn_Implementation(const FParameter& InParam) override;
+    virtual void OnDespawn_Implementation(EObjectDespawnMode InMode) override;
 
-	virtual void OnRefresh() override;
+public:
+    virtual void OnCreate(const FParameter& InParam) override;
+    virtual void OnInitialize(const FParameter& InParam) override;
+    virtual void OnRefresh() override;
+    virtual void OnDestroy(EObjectDespawnMode InMode) override;
 
-	virtual void OnDestroy(EObjectDespawnMode InMode) override;
+    void SetItem(const FAbilityItem& InItem);
+    FAbilityItem GetItem() const { return Item; }
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	FAbilityItem Item; 
+    const UAbilityItemDataBase* FindItemData() const;
 
-public:
-	FAbilityItem GetItem() const { return Item; }
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+    FAbilityItem Item;
 };

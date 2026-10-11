@@ -2,11 +2,9 @@
 
 #include "Ability/Spawner/AbilitySpawnerBase.h"
 
-#include "Ability/AbilityModuleNetworkComponent.h"
 #include "Ability/Spawner/Widget/WidgetAbilitySpawnerInfo.h"
 #include "Components/ArrowComponent.h"
 #include "Components/CapsuleComponent.h"
-#include "Main/MainModule.h"
 #include "Math/MathTypes.h"
 #include "Net/UnrealNetwork.h"
 #include "Scene/SceneModuleStatics.h"
@@ -187,25 +185,18 @@ void AAbilitySpawnerBase::Tick(float DeltaSeconds)
 
 void AAbilitySpawnerBase::Spawn_Implementation()
 {
-	if(HasAuthority())
+	if (HasAuthority() && !IsValid(AbilityActor))
 	{
 		AbilityActor = SpawnImpl(AbilityItem);
-	}
-	else if(UAbilityModuleNetworkComponent* AbilityModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UAbilityModuleNetworkComponent>())
-	{
-		AbilityModuleNetworkComponent->ServerSpawnerSpawn(this);
 	}
 }
 
 void AAbilitySpawnerBase::Destroy_Implementation()
 {
-	if(HasAuthority())
+	if (HasAuthority() && IsValid(AbilityActor))
 	{
 		DestroyImpl(AbilityActor);
-	}
-	else if(UAbilityModuleNetworkComponent* AbilityModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UAbilityModuleNetworkComponent>())
-	{
-		AbilityModuleNetworkComponent->ServerSpawnerDestroy(this);
+		AbilityActor = nullptr;
 	}
 }
 
@@ -228,3 +219,4 @@ void AAbilitySpawnerBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 
 	DOREPLIFETIME(AAbilitySpawnerBase, AbilityActor);
 }
+

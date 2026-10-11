@@ -4,7 +4,6 @@
 
 #include "Ability/Attributes/CharacterAttributeSetBase.h"
 #include "Common/Interaction/InteractionAgentInterface.h"
-#include "Ability/PickUp/AbilityPickerInterface.h"
 #include "Character/Base/CharacterBase.h"
 #include "FSM/Base/FSMAgentInterface.h"
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
@@ -15,6 +14,7 @@
 
 class UFSMComponent;
 class UInteractionComponent;
+class UAbilityInventoryBase;
 class UCharacterAttributeSetBase;
 class UBoxComponent;
 class UVoxelSceneRegion;
@@ -23,7 +23,8 @@ class AController;
 class UAbilityBase;
 class UAbilitySystemComponentBase;
 class AAbilityProjectileBase;
-class UAbilityCharacterInventoryBase;
+
+DECLARE_MULTICAST_DELEGATE_OneParam(FInventorySelectionChanged, const FInventorySlotKey&);
 
 /**
  * Ability Character基类
@@ -32,7 +33,6 @@ UCLASS()
 class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase,
                                               public IAbilityCharacterInterface,
                                               public IFSMAgentInterface,
-                                              public IAbilityPickerInterface,
                                               public IInteractionAgentInterface,
                                               public IAbilityInventoryAgentInterface,
                                               public ITargetingAgentInterface
@@ -48,6 +48,7 @@ class WHFRAMEWORK_API AAbilityCharacterBase : public ACharacterBase,
 
 public:
 	AAbilityCharacterBase(const FObjectInitializer& ObjectInitializer);
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
@@ -94,6 +95,7 @@ protected:
 
 public:
 	virtual void Death(IAbilityVitalityInterface* InKiller) override;
+	virtual void ApplyDeathAttributes();
 
 	virtual void Kill(IAbilityVitalityInterface* InTarget) override;
 
@@ -160,29 +162,12 @@ public:
 	virtual void EndAction(const FGameplayTag& InActionTag, bool bWasCancelled) override;
 
 public:
-	virtual void OnPickUp(AAbilityPickUpBase* InPickUp) override;
+
 
 	virtual void OnEnterInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
 	virtual void OnLeaveInteract(IInteractionAgentInterface* InInteractionAgent) override;
 
-	virtual void OnAdditionItem(const FAbilityItem& InItem) override;
-
-	virtual void OnRemoveItem(const FAbilityItem& InItem) override;
-
-	virtual void OnPreChangeItem(const FAbilityItem& InOldItem) override;
-
-	virtual void OnChangeItem(const FAbilityItem& InNewItem) override;
-
-	virtual void OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess) override;
-
-	virtual void OnDeactiveItem(const FAbilityItem& InItem, bool bPassive) override;
-
-	virtual void OnDiscardItem(const FAbilityItem& InItem, bool bInPlace) override;
-
-	virtual void OnSelectItem(const FAbilityItem& InItem) override;
-
-	virtual void OnAuxiliaryItem(const FAbilityItem& InItem) override;
 
 protected:
 protected:
@@ -240,8 +225,16 @@ protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UInteractionComponent* Interaction;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UAbilityCharacterInventoryBase* Inventory;
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+	UAbilityInventoryBase* Inventory;
+
+	UPROPERTY(Transient, ReplicatedUsing=OnRep_SelectedInventorySlot)
+	FInventorySlotKey SelectedInventorySlot;
+
+	UFUNCTION()
+	void OnRep_SelectedInventorySlot();
+
+	virtual void OnInventorySelectionUpdated(const FInventorySlotKey& InSlotKey);
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UFSMComponent* FSM;
@@ -327,6 +320,14 @@ public:
 	virtual UInteractionComponent* GetInteractionComponent() const override;
 
 	virtual UAbilityInventoryBase* GetInventory() const override;
+
+	void BindInventory(UAbilityInventoryBase* InInventory);
+
+	virtual FInventorySlotKey GetSelectedInventorySlot() const override { return SelectedInventorySlot; }
+
+	void SetSelectedInventorySlot(const FInventorySlotKey& InSlotKey);
+
+	FInventorySelectionChanged OnInventorySelectionChanged;
 
 	virtual UFSMComponent* GetFSMComponent() const override
 	{
@@ -471,3 +472,4 @@ public:
 
 	virtual void OnRep_PlayerState() override;
 };
+

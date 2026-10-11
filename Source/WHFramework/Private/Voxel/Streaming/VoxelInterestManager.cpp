@@ -634,6 +634,15 @@ bool FVoxelInterestManager::RefreshPriorities(TConstArrayView<FVoxelStreamingSou
 	InOutInterest.SurfacePriorities.Reset();
 	InOutInterest.MacroPriorities.Reset();
 	InOutInterest.CriticalFinePages.Reset();
+	const int32 PageCount = InOutInterest.FinePagePlan ? InOutInterest.FinePagePlan->Pages.Num() : 0;
+	// Reset 后必须重新固定哈希容量，不能依赖复制容器恰好保留旧 slack。
+	InOutInterest.FinePageServicePriorities.Reserve(PageCount);
+	InOutInterest.FinePagePriorities.Reserve(PageCount);
+	InOutInterest.CriticalFinePages.Reserve(PageCount);
+	InOutInterest.GeometryServicePriorities.Reserve(InOutInterest.Geometry.Num());
+	InOutInterest.VoxelProxyPriorities.Reserve(InOutInterest.VoxelProxy.Num());
+	InOutInterest.SurfacePriorities.Reserve(InOutInterest.Surface.Num());
+	InOutInterest.MacroPriorities.Reserve(InOutInterest.Macro.Num());
 	for (auto& Pair : InOutInterest.FineShardDemands)
 	{
 		const FVoxelFineShardKey& Shard = Pair.Key;
@@ -766,9 +775,11 @@ bool FVoxelInterestManager::RefreshPriorities(TConstArrayView<FVoxelStreamingSou
 	}
 	InOutInterest.Admissions.Sort();
 	InOutInterest.AdmissionPriorities.Reset();
+	InOutInterest.AdmissionPriorities.Reserve(InOutInterest.Admissions.Num());
 	for (TArray<int32>& Lane : InOutInterest.AdmissionLanes)
 	{
 		Lane.Reset();
+		Lane.Reserve(InOutInterest.Admissions.Num());
 	}
 	for (int32 Index = 0; Index < InOutInterest.Admissions.Num(); ++Index)
 	{
@@ -781,7 +792,7 @@ bool FVoxelInterestManager::RefreshPriorities(TConstArrayView<FVoxelStreamingSou
 	}
 	SortExactDemands(InOutInterest);
 	OutError.Reset();
-	return true;
+	return SettleFinalization(InOutInterest, OutError);
 }
 
 void FVoxelInterestManager::SortExactDemands(FVoxelInterestSet& Result)

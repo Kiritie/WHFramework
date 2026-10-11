@@ -1,4 +1,5 @@
 ﻿#include "Voxel/Network/VoxelNetworkCodec.h"
+#include "Voxel/Save/InventoryVoxelEntityCodec.h"
 #include "Voxel/Network/VoxelGeometryWire.h"
 #include "Voxel/Generation/VoxelManifestCodec.h"
 
@@ -709,8 +710,8 @@ bool FVoxelNetworkCodec::EncodeIntent(
 	const FVoxelEditIntent& InIntent,
 	TArray<uint8>& OutBytes)
 {
-	if (InIntent.RequestId == 0 ||
-		static_cast<uint8>(InIntent.Action) > static_cast<uint8>(EVoxelEditAction::ContainerPut) ||
+	if (InIntent.RequestId == 0 || !InIntent.InventoryStoreId.IsValid() ||
+		static_cast<uint8>(InIntent.Action) > static_cast<uint8>(EVoxelEditAction::Use) ||
 		InIntent.Origin.ContainsNaN() ||
 		InIntent.Direction.ContainsNaN())
 	{
@@ -718,6 +719,7 @@ bool FVoxelNetworkCodec::EncodeIntent(
 	}
 	FVoxelByteWriter Writer(1024);
 	Writer.U64(InIntent.RequestId);
+	Writer.Guid(InIntent.InventoryStoreId);
 	Writer.U8(static_cast<uint8>(InIntent.Action));
 	for (int32 Axis = 0; Axis < 3; ++Axis)
 	{
@@ -738,9 +740,11 @@ bool FVoxelNetworkCodec::EncodeIntent(
 	}
 	WriteVector(Writer, InIntent.ExpectedTarget);
 	Writer.String(InIntent.ExpectedItemID.IsValid() ? InIntent.ExpectedItemID.ToString() : FString(), 256);
-	Writer.I32(InIntent.InventorySlot);
-	Writer.I32(InIntent.ContainerSlot);
-	Writer.I32(InIntent.Count);
+	Writer.Guid(InIntent.ExpectedInventoryId);
+	Writer.String(InIntent.InventorySlot.Group.IsValid() ? InIntent.InventorySlot.Group.ToString() : FString(), 256);
+	Writer.I32(InIntent.InventorySlot.Index);
+	Writer.U64(InIntent.ExpectedInventoryRevision);
+	Writer.U32(InIntent.ExpectedInventoryGeneration);
 	Writer.U64(InIntent.ExpectedRevision);
 	return Writer.Finish(OutBytes);
 }
@@ -756,8 +760,9 @@ bool FVoxelNetworkCodec::DecodeIntent(
 	FVoxelByteReader Reader(InBytes);
 	FVoxelEditIntent Value;
 	Value.RequestId = Reader.U64();
+	Value.InventoryStoreId = Reader.Guid();
 	const uint8 Action = Reader.U8();
-	if (Value.RequestId == 0 || Action > static_cast<uint8>(EVoxelEditAction::ContainerPut))
+	if (Value.RequestId == 0 || !Value.InventoryStoreId.IsValid() || Action > static_cast<uint8>(EVoxelEditAction::Use))
 	{
 		return false;
 	}
@@ -773,21 +778,23 @@ bool FVoxelNetworkCodec::DecodeIntent(
 	Value.ExpectedTarget = ReadVector(Reader);
 	const FString ItemId = Reader.String(256);
 	Value.ExpectedItemID = ItemId.IsEmpty() ? FPrimaryAssetId() : FPrimaryAssetId(ItemId);
-	Value.InventorySlot = Reader.I32();
-	Value.ContainerSlot = Reader.I32();
-	Value.Count = Reader.I32();
+	Value.ExpectedInventoryId = Reader.Guid();
+	const FString GroupName = Reader.String(256);
+	Value.InventorySlot.Group = GroupName.IsEmpty() ? FGameplayTag() : FGameplayTag::RequestGameplayTag(FName(*GroupName), false);
+	Value.InventorySlot.Index = Reader.I32();
+	Value.ExpectedInventoryRevision = Reader.U64();
+	Value.ExpectedInventoryGeneration = Reader.U32();
 	Value.ExpectedRevision = Reader.U64();
 	const double DirectionLength = Value.Direction.SizeSquared();
 	if (!Reader.End() ||
 		DirectionLength < 0.99 ||
 		DirectionLength > 1.01 ||
 		(!ItemId.IsEmpty() && !Value.ExpectedItemID.IsValid()) ||
-		Value.InventorySlot < 0 ||
-		Value.InventorySlot > 255 ||
-		Value.ContainerSlot < 0 ||
-		Value.ContainerSlot >= 27 ||
-		Value.Count < 1 ||
-		Value.Count > 100000)
+		Action == static_cast<uint8>(EVoxelEditAction::None) ||
+		Value.InventorySlot.Index < INDEX_NONE ||
+		Value.InventorySlot.Index >= 4096 ||
+		(!GroupName.IsEmpty() && !Value.InventorySlot.Group.IsValid()) ||
+		Value.ExpectedInventoryGeneration == 0)
 	{
 		return false;
 	}
@@ -815,7 +822,7 @@ bool FVoxelNetworkCodec::DecodeReply(
 	FVoxelEditReply Value;
 	Value.RequestId = Reader.U64();
 	const uint8 Code = Reader.U8();
-	if (Code > static_cast<uint8>(EVoxelEditCode::InventoryFull))
+	if (Code > static_cast<uint8>(EVoxelEditCode::ConfirmationPending))
 	{
 		return false;
 	}
@@ -862,8 +869,9 @@ void FVoxelNetworkCodec::WriteEntity(
 	InWriter.U16(static_cast<uint16>(InEdit.CellIndex));
 	InWriter.U8(InEdit.bRemove ? 1 : 0);
 	InWriter.U16(InEdit.Value.Kind);
-	InWriter.U16(InEdit.Value.Schema);
-	InWriter.Blob(InEdit.Value.Payload, MaxEntityPayloadBytes);
+	const bool bInventory = !InEdit.bRemove && FInventoryVoxelEntityCodec::IsInventory(InEdit.Value);
+	InWriter.U16(bInventory ? FInventoryVoxelEntityCodec::Schema : InEdit.Value.Schema);
+	InWriter.Blob(bInventory ? FInventoryVoxelEntityCodec::GetPublicPayload() : MakeArrayView(InEdit.Value.Payload), MaxEntityPayloadBytes);
 }
 
 bool FVoxelNetworkCodec::ReadEntity(
@@ -881,6 +889,7 @@ bool FVoxelNetworkCodec::ReadEntity(
 		return false;
 	}
 	Value.bRemove = Remove != 0;
+	if(!Value.bRemove && FInventoryVoxelEntityCodec::IsInventory(Value.Value) && !FInventoryVoxelEntityCodec::IsPublic(Value.Value)) return false;
 	OutEdit = MoveTemp(Value);
 	return true;
 }

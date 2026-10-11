@@ -100,8 +100,6 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Abilities")
 	virtual FGameplayAbilitySpec FindAbilitySpecForInputID(int32 InputID);
 			
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Abilities")
-	virtual FGameplayAbilitySpec FindAbilitySpecForItem(FAbilityItem Item);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Abilities")
 	virtual FGameplayAbilitySpecHandle FindAbilitySpecHandleForClass(TSubclassOf<UGameplayAbility> AbilityClass, UObject* OptionalSourceObject=nullptr);
@@ -302,3 +300,4 @@ public:
 	/** 通过Actor获取AbilitySystemComponent */
 	static UAbilitySystemComponentBase* GetAbilitySystemComponentFormActor(const AActor* Actor, bool LookForComponent = false);
 };
+

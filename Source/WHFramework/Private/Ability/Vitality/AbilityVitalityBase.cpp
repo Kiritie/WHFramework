@@ -7,7 +7,6 @@
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/Abilities/VitalityActionAbilityBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
-#include "Ability/Inventory/Slot/AbilityInventorySlotBase.h"
 #include "Ability/Vitality/AbilityVitalityDataBase.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Death.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Spawn.h"
@@ -15,15 +14,13 @@
 #include "FSM/Components/FSMComponent.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Voxel/VoxelModule.h"
-#include "Ability/Vitality/AbilityVitalityInventoryBase.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Interrupt.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Static.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Walk.h"
 #include "Common/Interaction/InteractionComponent.h"
 
 AAbilityVitalityBase::AAbilityVitalityBase(const FObjectInitializer& ObjectInitializer)
-    : Super(ObjectInitializer.SetDefaultSubobjectClass<UVitalityAttributeSetBase>(FName("AttributeSet"))
-                .SetDefaultSubobjectClass<UAbilityVitalityInventoryBase>(FName("Inventory")))
+    : Super(ObjectInitializer.SetDefaultSubobjectClass<UVitalityAttributeSetBase>(FName("AttributeSet")))
 {
 	FSM = CreateDefaultSubobject<UFSMComponent>(FName("FSM"));
 	FSM->GroupName = TEXT("Vitality");
@@ -258,45 +255,6 @@ void AAbilityVitalityBase::OnLeaveInteract(IInteractionAgentInterface* InInterac
 	Super::OnLeaveInteract(InInteractionAgent);
 }
 
-void AAbilityVitalityBase::OnPreChangeItem(const FAbilityItem& InOldItem)
-{
-	Super::OnPreChangeItem(InOldItem);
-}
-
-void AAbilityVitalityBase::OnChangeItem(const FAbilityItem& InNewItem)
-{
-	Super::OnChangeItem(InNewItem);
-}
-
-void AAbilityVitalityBase::OnActiveItem(const FAbilityItem& InItem, bool bPassive, bool bSuccess)
-{
-	Super::OnActiveItem(InItem, bPassive, bSuccess);
-}
-
-void AAbilityVitalityBase::OnRemoveItem(const FAbilityItem& InItem)
-{
-	Super::OnRemoveItem(InItem);
-}
-
-void AAbilityVitalityBase::OnDeactiveItem(const FAbilityItem& InItem, bool bPassive)
-{
-	Super::OnDeactiveItem(InItem, bPassive);
-}
-
-void AAbilityVitalityBase::OnDiscardItem(const FAbilityItem& InItem, bool bInPlace)
-{
-	Super::OnDiscardItem(InItem, bInPlace);
-}
-
-void AAbilityVitalityBase::OnSelectItem(const FAbilityItem& InItem)
-{
-	Super::OnSelectItem(InItem);
-}
-
-void AAbilityVitalityBase::OnAuxiliaryItem(const FAbilityItem& InItem)
-{
-	Super::OnAuxiliaryItem(InItem);
-}
 
 void AAbilityVitalityBase::OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData)
 {
@@ -419,3 +377,4 @@ UAbilityVitalityDataBase& AAbilityVitalityBase::GetVitalityData() const
 {
 	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityVitalityDataBase>(AssetID);
 }
+

@@ -6,7 +6,6 @@
 #include "Voxel/Network/VoxelNetworkTypes.h"
 #include "VoxelModuleNetworkComponent.generated.h"
 
-class APawn;
 class APlayerController;
 class UVoxelModule;
 struct FVoxelOverlayNetworkState;
@@ -41,7 +40,6 @@ public:
 		float InDeltaSeconds,
 		ELevelTick InTickType,
 		FActorComponentTickFunction* InFunction) override;
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	uint64 AllocateRequestId();
 	bool SubmitIntent(const FVoxelEditIntent& InIntent);
@@ -55,7 +53,6 @@ public:
 	void OnTerrainWorldStopping();
 	void SetAuthorizedObserver(AActor* InObserver, bool bInAllowBuild);
 	AActor* GetAuthorizedObserver() const;
-	static void PushInventoryFor(AActor* InOwner);
 
 	UPROPERTY(BlueprintAssignable)
 	FVoxelProtocolFailure OnProtocolFailure;
@@ -70,12 +67,6 @@ protected:
 
 	UFUNCTION(Client, Reliable)
 	void ClientReceive(const FVoxelRPCPacket& InPacket);
-
-	UPROPERTY(Replicated)
-	TObjectPtr<APawn> InventoryPawn;
-
-	UPROPERTY(Replicated)
-	uint64 InventoryEpoch = 0;
 
 private:
 	void BindModule();
@@ -185,3 +176,4 @@ private:
 	bool bWelcomed = false;
 	bool bRejected = false;
 };
+

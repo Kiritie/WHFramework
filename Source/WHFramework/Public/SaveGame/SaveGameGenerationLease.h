@@ -57,6 +57,9 @@ public:
 		const FVoxelGenerationConsumerKey& InConsumer,
 		TSharedPtr<const FSaveGameGenerationReadLease, ESPMode::ThreadSafe>& OutLease, bool& bOutCapacityBlocked);
 	static bool TryRetireDirectory(const FString& InDirectory, const FSaveGameGenerationWriteLease* InWriter = nullptr);
+	// 在原生 Retiring 登记保护期间执行一次同步文件系统动作，不持有注册表互斥锁。
+	static bool TryRetireDirectory(const FString& InDirectory, const FSaveGameGenerationWriteLease* InWriter,
+		TFunctionRef<bool()> InRetireAction);
 	static uint64 GetPinCount(const FString& InDirectory);
 
 private:
@@ -92,3 +95,4 @@ private:
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 	SaveGameGeneration::FDirectoryLink Link;
 };
+

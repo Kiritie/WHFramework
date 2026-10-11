@@ -1,22 +1,59 @@
 #include "Voxel/Voxels/VoxelItemBridge.h"
-bool FVoxelItemBridge::ToItem(const FVoxelRegistrySnapshot&R,FVoxelBlockState S,int32 N,FVoxelItem&O)
+
+bool FVoxelItemBridge::ToItem(const FVoxelRegistrySnapshot& Registry, FVoxelBlockState State, int32 Count, FVoxelItem& Out)
 {
-    const auto*D=R.Find(S.TypeId);if(!D||S.IsAir()||!R.IsValid(S)||N<=0||N>100000)return false;
-    O=FVoxelItem(D->AssetID,S.State,N);return true;
+    const FVoxelRuntimeDefinition* Definition = Registry.Find(State.TypeId);
+    if (!Definition || State.IsAir() || !Registry.IsValid(State) || Count <= 0 || Count > 100000)
+    {
+        return false;
+    }
+    Out = FVoxelItem(Definition->AssetID, State.State, Count);
+    return true;
 }
-bool FVoxelItemBridge::ToBlock(const FVoxelRegistrySnapshot&R,const FVoxelItem&I,FVoxelBlockState&O)
+
+bool FVoxelItemBridge::ToBlock(const FVoxelRegistrySnapshot& Registry, const FVoxelItem& Item, FVoxelBlockState& Out)
 {
-    if(!I.IsValid())return false;const auto*D=R.Find(I.VoxelAssetID);if(!D||D->TypeId==0)return false;
-    FVoxelBlockState S{D->TypeId,uint16(I.State)};if(!R.IsValid(S))return false;O=S;return true;
+    if (!Item.IsValid())
+    {
+        return false;
+    }
+    const FVoxelRuntimeDefinition* Definition = Registry.Find(Item.VoxelAssetID);
+    if (!Definition || Definition->TypeId == 0)
+    {
+        return false;
+    }
+    const FVoxelBlockState State{Definition->TypeId, static_cast<uint16>(Item.State)};
+    if (!Registry.IsValid(State))
+    {
+        return false;
+    }
+    Out = State;
+    return true;
 }
-bool FVoxelItemBridge::ToAbility(const FVoxelRegistrySnapshot&R,const FVoxelItem&I,FAbilityItem&O)
+
+bool FVoxelItemBridge::ToAbility(const FVoxelRegistrySnapshot& Registry, const FVoxelItem& Item, FAbilityItem& Out)
 {
-    FVoxelBlockState S;if(!ToBlock(R,I,S))return false;
+    FVoxelBlockState State;
+    if (!ToBlock(Registry, Item, State))
+    {
+        return false;
+    }
     // 放回背包后方向/连接/开关状态不持久化到通用 FAbilityItem；下次放置重新求值。
-    O=FAbilityItem(I.VoxelAssetID,I.Count,0);return true;
+    Out = FAbilityItem(Item.VoxelAssetID, Item.Count, 0);
+    return true;
 }
-bool FVoxelItemBridge::FromAbility(const FVoxelRegistrySnapshot&R,const FAbilityItem&I,FVoxelItem&O)
+
+bool FVoxelItemBridge::FromAbility(const FVoxelRegistrySnapshot& Registry, const FAbilityItem& Item, FVoxelItem& Out)
 {
-    if(!I.IsValid()||I.Count<=0||I.Level!=0)return false;const auto*D=R.Find(I.ID);if(!D||D->TypeId==0)return false;
-    O=FVoxelItem(I.ID,0,I.Count);return true;
+    if (!Item.ItemId.IsValid() || Item.Count <= 0 || Item.Level != 0 || Item.InstanceId.IsValid() || !Item.Properties.IsEmpty())
+    {
+        return false;
+    }
+    const FVoxelRuntimeDefinition* Definition = Registry.Find(Item.ItemId);
+    if (!Definition || Definition->TypeId == 0)
+    {
+        return false;
+    }
+    Out = FVoxelItem(Item.ItemId, 0, Item.Count);
+    return true;
 }

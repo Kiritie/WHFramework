@@ -4,7 +4,6 @@
 #include "Ability/AbilityModuleTypes.h"
 #include "Ability/Actor/AbilityActorBase.h"
 #include "Ability/Item/AbilityItemBase.h"
-#include "Ability/Item/Widget/WidgetAbilityDragItemBase.h"
 #include "Ability/Projectile/AbilityProjectileBase.h"
 #include "Ability/Spawner/AbilitySpawnerBase.h"
 #include "Character/Base/CharacterBase.h"
@@ -48,7 +47,6 @@ void FWHFrameworkModule::StartupModule()
 	FObjectPoolSpawnParameterRegistry::Register(AAbilitySpawnerBase::StaticClass(), FWHActorSpawnParameter::StaticStruct());
 	FObjectPoolSpawnParameterRegistry::Register(ACharacterBase::StaticClass(), FAbilityActorSpawnParameter::StaticStruct());
 	FObjectPoolSpawnParameterRegistry::Register(APawnBase::StaticClass(), FAbilityActorSpawnParameter::StaticStruct());
-	FObjectPoolSpawnParameterRegistry::Register(UWidgetAbilityDragItemBase::StaticClass(), FAbilityWidgetSpawnParameter::StaticStruct());
 	FObjectPoolSpawnParameterRegistry::Register(UCommonOptionSelector::StaticClass(), FCommonOptionSelectorSpawnParameter::StaticStruct());
 }
 

@@ -3,6 +3,9 @@
 #include "Ability/Spawner/AbilityPawnSpawner.h"
 
 #include "Ability/AbilityModuleStatics.h"
+#include "Ability/Inventory/InventoryItemAssetCatalog.h"
+#include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Engine/World.h"
 #include "Ability/AbilityModuleTypes.h"
 #include "Ability/Pawn/AbilityPawnBase.h"
 #include "Ability/Pawn/AbilityPawnDataBase.h"
@@ -56,7 +59,14 @@ AAbilityPawnSpawner::AAbilityPawnSpawner()
 
 AActor* AAbilityPawnSpawner::SpawnImpl_Implementation(const FAbilityItem& InAbilityItem)
 {
-	const auto& PawnData = InAbilityItem.GetData<UAbilityPawnDataBase>();
+	const UInventoryWorldSubsystem* Subsystem = GetWorld() ? GetWorld()->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+	const UInventoryItemAssetCatalog* Catalog = Subsystem ? Subsystem->GetItemAssets() : nullptr;
+	const UAbilityPawnDataBase* Definition = Catalog ? Catalog->FindAs<UAbilityPawnDataBase>(InAbilityItem.ItemId) : nullptr;
+	if (!Definition || InAbilityItem.Level < 0 || InAbilityItem.Level > Definition->MaxLevel)
+	{
+		return nullptr;
+	}
+	const UAbilityPawnDataBase& PawnData = *Definition;
 	
 	auto SaveData = FPawnSaveData();
 	SaveData.AssetID = PawnData.GetPrimaryAssetId();
@@ -64,7 +74,6 @@ AActor* AAbilityPawnSpawner::SpawnImpl_Implementation(const FAbilityItem& InAbil
 	SaveData.RaceID = PawnData.RaceID;
 	SaveData.Level = InAbilityItem.Level;
 	SaveData.SpawnTransform = GetActorTransform();
-	SaveData.InitData();
 
 	return UAbilityModuleStatics::SpawnAbilityActor(FParameter(MoveTemp(SaveData)));
 }
@@ -73,3 +82,4 @@ void AAbilityPawnSpawner::DestroyImpl_Implementation(AActor* InAbilityActor)
 {
 	Super::DestroyImpl_Implementation(InAbilityActor);
 }
+
