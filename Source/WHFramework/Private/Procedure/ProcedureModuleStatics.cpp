@@ -1,106 +1,131 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Procedure/ProcedureModuleStatics.h"
 
-#include "Procedure/Base/ProcedureBase.h"
-
-TArray<UProcedureAsset*> UProcedureModuleStatics::GetProcedureAssets()
+bool UProcedureModuleStatics::StartMain()
 {
-	return UProcedureModule::Get().GetAssets();
+    return UProcedureModule::Get().StartMain();
 }
 
-UProcedureAsset* UProcedureModuleStatics::GetCurrentProcedureAsset()
+void UProcedureModuleStatics::StopMain()
 {
-	return UProcedureModule::Get().GetCurrentAsset();
+    UProcedureModule::Get().StopMain();
 }
 
-UProcedureBase* UProcedureModuleStatics::GetCurrentProcedure(TSubclassOf<UProcedureBase> InClass)
+bool UProcedureModuleStatics::SwitchProcedure(UProcedureBase* InProcedure)
 {
-	return GetDeterminesOutputObject(UProcedureModule::Get().GetCurrentProcedure(), InClass);
+    return UProcedureModule::Get().SwitchProcedure(InProcedure);
 }
 
-UProcedureAsset* UProcedureModuleStatics::GetProcedureAsset(UProcedureAsset* InAsset)
+bool UProcedureModuleStatics::SwitchProcedureFrom(const FProcedureActivationToken& Token, UProcedureBase* InProcedure)
 {
-	return UProcedureModule::Get().GetAsset(InAsset);
+    return UProcedureModule::Get().SwitchProcedureFrom(Token, InProcedure);
 }
 
-void UProcedureModuleStatics::AddProcedureAsset(UProcedureAsset* InAsset)
+bool UProcedureModuleStatics::CanSwitchProcedure(UProcedureBase* InProcedure)
 {
-	UProcedureModule::Get().AddAsset(InAsset);
+    return UProcedureModule::Get().CanSwitchProcedure(InProcedure);
 }
 
-void UProcedureModuleStatics::RemoveProcedureAsset(UProcedureAsset* InAsset)
+bool UProcedureModuleStatics::SwitchProcedureByIndex(int32 InIndex)
 {
-	UProcedureModule::Get().RemoveAsset(InAsset);
+    return UProcedureModule::Get().SwitchProcedureByIndex(InIndex);
 }
 
-void UProcedureModuleStatics::SwitchProcedureAsset(UProcedureAsset* InAsset)
+bool UProcedureModuleStatics::CanSwitchProcedureByIndex(int32 InIndex)
 {
-	UProcedureModule::Get().SwitchAsset(InAsset);
+    return UProcedureModule::Get().CanSwitchProcedureByIndex(InIndex);
 }
 
-bool UProcedureModuleStatics::HasProcedureByIndex(int32 InIndex)
+bool UProcedureModuleStatics::SwitchProcedureByClass(TSubclassOf<UProcedureBase> InClass)
 {
-	return UProcedureModule::Get().HasProcedureByIndex(InIndex);
+    return UProcedureModule::Get().SwitchProcedureByClass(InClass);
 }
 
-UProcedureBase* UProcedureModuleStatics::GetProcedureByIndex(int32 InIndex, TSubclassOf<UProcedureBase> InClass)
+bool UProcedureModuleStatics::CanSwitchProcedureByClass(TSubclassOf<UProcedureBase> InClass)
 {
-	return UProcedureModule::Get().GetProcedureByIndex(InIndex, InClass);
+    return UProcedureModule::Get().CanSwitchProcedureByClass(InClass);
 }
 
-bool UProcedureModuleStatics::HasProcedureByClass(TSubclassOf<UProcedureBase> InClass)
+bool UProcedureModuleStatics::SwitchFirstProcedure()
 {
-	return UProcedureModule::Get().HasProcedureByClass(InClass);
+    return UProcedureModule::Get().SwitchFirstProcedure();
 }
 
-UProcedureBase* UProcedureModuleStatics::GetProcedureByClass(TSubclassOf<UProcedureBase> InClass)
+bool UProcedureModuleStatics::SwitchLastProcedure()
 {
-	return UProcedureModule::Get().GetProcedureByClass(InClass);
+    return UProcedureModule::Get().SwitchLastProcedure();
 }
 
-bool UProcedureModuleStatics::IsCurrentProcedure(UProcedureBase* InProcedure)
+bool UProcedureModuleStatics::SwitchPreProcedure()
 {
-	return UProcedureModule::Get().IsCurrentProcedure(InProcedure);
+    return UProcedureModule::Get().SwitchPreProcedure();
 }
 
-bool UProcedureModuleStatics::IsCurrentProcedureIndex(int32 InIndex)
+bool UProcedureModuleStatics::SwitchNextProcedure()
 {
-	return UProcedureModule::Get().IsCurrentProcedureIndex(InIndex);
+    return UProcedureModule::Get().SwitchNextProcedure();
 }
 
-void UProcedureModuleStatics::SwitchProcedure(UProcedureBase* InProcedure)
+bool UProcedureModuleStatics::Advance(FName Output)
 {
-	UProcedureModule::Get().SwitchProcedure(InProcedure);
+    return UProcedureModule::Get().Advance(Output);
 }
 
-void UProcedureModuleStatics::SwitchProcedureByIndex(int32 InIndex)
+bool UProcedureModuleStatics::CanAdvance(FName Output)
 {
-	UProcedureModule::Get().SwitchProcedureByIndex(InIndex);
+    return UProcedureModule::Get().CanAdvance(Output);
 }
 
-void UProcedureModuleStatics::SwitchProcedureByClass(TSubclassOf<UProcedureBase> InClass)
+bool UProcedureModuleStatics::AdvanceFrom(const FProcedureActivationToken& Token, FName Output)
 {
-	UProcedureModule::Get().SwitchProcedureByClass(InClass);
-}
-
-void UProcedureModuleStatics::SwitchFirstProcedure()
-{
-	UProcedureModule::Get().SwitchFirstProcedure();
-}
-
-void UProcedureModuleStatics::SwitchLastProcedure()
-{
-	UProcedureModule::Get().SwitchLastProcedure();
-}
-
-void UProcedureModuleStatics::SwitchNextProcedure()
-{
-	UProcedureModule::Get().SwitchNextProcedure();
+    return UProcedureModule::Get().AdvanceFrom(Token, Output);
 }
 
 void UProcedureModuleStatics::GuideCurrentProcedure()
 {
-	UProcedureModule::Get().GuideCurrentProcedure();
+    UProcedureModule::Get().GuideCurrentProcedure();
+}
+
+UProcedureAsset* UProcedureModuleStatics::GetCurrentProcedureAsset()
+{
+    return UProcedureModule::Get().GetCurrentAsset();
+}
+
+UProcedureBase* UProcedureModuleStatics::GetCurrentProcedure(TSubclassOf<UProcedureBase> InClass)
+{
+    return UProcedureModule::Get().GetCurrentProcedure(InClass);
+}
+
+UProcedureBase* UProcedureModuleStatics::GetProcedureByClass(TSubclassOf<UProcedureBase> InClass)
+{
+    return UProcedureModule::Get().GetProcedureByClass(InClass);
+}
+
+bool UProcedureModuleStatics::HasProcedureByClass(TSubclassOf<UProcedureBase> InClass)
+{
+    return UProcedureModule::Get().HasProcedureByClass(InClass);
+}
+
+bool UProcedureModuleStatics::IsCurrentProcedure(UProcedureBase* InProcedure)
+{
+    return UProcedureModule::Get().IsCurrentProcedure(InProcedure);
+}
+
+bool UProcedureModuleStatics::IsCurrentProcedureClass(TSubclassOf<UProcedureBase> InClass)
+{
+    return UProcedureModule::Get().IsCurrentProcedureClass(InClass);
+}
+
+bool UProcedureModuleStatics::HasProcedureByIndex(int32 InIndex)
+{
+    return UProcedureModule::Get().HasProcedureByIndex(InIndex);
+}
+
+bool UProcedureModuleStatics::IsCurrentProcedureIndex(int32 InIndex)
+{
+    return UProcedureModule::Get().IsCurrentProcedureIndex(InIndex);
+}
+
+UProcedureBase* UProcedureModuleStatics::GetProcedureByIndex(int32 InIndex, TSubclassOf<UProcedureBase> InClass)
+{
+    return UProcedureModule::Get().GetProcedureByIndex(InIndex, InClass);
 }

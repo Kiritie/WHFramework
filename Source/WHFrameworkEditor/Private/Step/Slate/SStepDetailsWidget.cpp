@@ -3,8 +3,8 @@
 #include "Step/Slate/SStepDetailsWidget.h"
 
 #include "SlateOptMacros.h"
+#include "Step/Slate/SStepGraphWidget.h"
 #include "Step/Base/StepBase.h"
-#include "Step/Slate/SStepListWidget.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
@@ -39,7 +39,6 @@ void SStepDetailsWidget::Construct(const FArguments& InArgs)
 		.BorderImage(FCoreStyle::Get().GetBrush("ToolPanel.GroupBorder"))
 		[
 			SNew(SBox)
-			.WidthOverride(420)
 			[
 				SNew(SVerticalBox)
 
@@ -75,27 +74,13 @@ void SStepDetailsWidget::OnReset()
 void SStepDetailsWidget::OnRefresh()
 {
 	SEditorWidgetBase::OnRefresh();
-
-	if(StepEditor.Pin()->ListWidget->bDefaults)
-	{
-		DetailsView->SetObject(StepEditor.Pin()->GetEditingAsset());
-	}
-	else if(StepEditor.Pin()->ListWidget->SelectedStepListItems.Num() > 0)
-	{
-		TArray<UObject*> Steps = TArray<UObject*>();
-		for(auto Iter : StepEditor.Pin()->ListWidget->SelectedStepListItems)
-		{
-			if(Iter->Step)
-			{
-				Steps.Add(Iter->Step);
-			}
-		}
-		DetailsView->SetObjects(Steps);
-	}
-	else
-	{
-		DetailsView->SetObject(nullptr);
-	}
+	const TSharedPtr<FStepEditor> Editor = StepEditor.Pin();
+	if (!Editor) return;
+	TArray<UObject*> Objects;
+	if (Editor->GraphWidget)
+		for (UStepBase* Step : Editor->GraphWidget->GetSelectedSteps()) Objects.Add(Step);
+	if (Objects.IsEmpty()) Objects.Add(Editor->GetEditingAsset());
+	DetailsView->SetObjects(Objects);
 }
 
 void SStepDetailsWidget::OnDestroy()

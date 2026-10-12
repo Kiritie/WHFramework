@@ -81,6 +81,7 @@ class WHFRAMEWORK_API UVoxelModule : public UModuleBase
 {
 #if WITH_DEV_AUTOMATION_TESTS
 	friend class FVoxelTerrainRendererWorldCleanupTest;
+	friend class FVoxelFinePresentationCapacityTest;
 	friend class FVoxelTerrainPreparationInputTest;
 	friend class FVoxelNavigationResidencyTest;
 	friend class FVoxelNavigationNativeTileTest;

@@ -3,108 +3,124 @@
 #include "Task/Graph/TaskAssetGraph.h"
 #include "Task/Graph/TaskAssetGraphNode.h"
 #include "Task/Graph/TaskGraphOperations.h"
-#include "Task/Base/TaskAsset.h"
-#include "Task/Base/TaskBase.h"
-#include "Task/Base/TaskAssetReferenceTask.h"
 #include "ScopedTransaction.h"
-#include "UObject/UObjectIterator.h"
 
 #define LOCTEXT_NAMESPACE "TaskGraph"
 
 const FPinConnectionResponse UTaskAssetGraphSchema::CanCreateConnection(const UEdGraphPin* A, const UEdGraphPin* B) const
 {
-	if (!A || !B || A->Direction == B->Direction || A->GetOwningNode()->GetGraph() != B->GetOwningNode()->GetGraph())
-		return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW, LOCTEXT("Direction", "Connect Out to In."));
+	if(!A || !B || A->Direction == B->Direction || A->PinType.PinCategory != TEXT("Task") || B->PinType.PinCategory != TEXT("Task") ||
+		A->GetOwningNode()->GetGraph() != B->GetOwningNode()->GetGraph())
+	{
+		return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW, LOCTEXT("Direction", "Connect Out to In in the same graph."));
+	}
 	const UTaskAssetGraphNode* Parent = Cast<UTaskAssetGraphNode>((A->Direction == EGPD_Output ? A : B)->GetOwningNode());
 	const UTaskAssetGraphNode* Child = Cast<UTaskAssetGraphNode>((A->Direction == EGPD_Input ? A : B)->GetOwningNode());
-	if (!Parent || !Child || !Parent->Task || !Child->Task || Parent == Child || Child->Task->IsParentOf(Parent->Task))
-		return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW, LOCTEXT("Cycle", "A task cannot contain itself or an ancestor."));
-	if(Parent->Task->IsA<UTaskAssetReferenceTask>())
-		return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW, LOCTEXT("ReferenceChildren", "Task asset reference nodes receive children from their referenced asset at runtime."));
-	return FPinConnectionResponse(CONNECT_RESPONSE_MAKE, LOCTEXT("Reparent", "Set parent task."));
+	if(!Parent || !Child || Child->bStartNode)
+	{
+		return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW, LOCTEXT("StartInput", "Start has no input."));
+	}
+	const UTaskAssetGraph* Graph = Cast<UTaskAssetGraph>(Parent->GetGraph());
+	FText Reason;
+	const bool bAllowed = Graph && FTaskGraphOperations::CanConnect(Graph->TaskAsset, Parent->Task, Child->Task, Parent->bStartNode, Reason);
+	return FPinConnectionResponse(bAllowed ? CONNECT_RESPONSE_MAKE : CONNECT_RESPONSE_DISALLOW, Reason);
 }
 
 bool UTaskAssetGraphSchema::TryCreateConnection(UEdGraphPin* A, UEdGraphPin* B) const
 {
-	if (CanCreateConnection(A, B).Response == CONNECT_RESPONSE_DISALLOW) return false;
-	UTaskBase* Parent = CastChecked<UTaskAssetGraphNode>((A->Direction == EGPD_Output ? A : B)->GetOwningNode())->Task;
-	UTaskBase* Child = CastChecked<UTaskAssetGraphNode>((A->Direction == EGPD_Input ? A : B)->GetOwningNode())->Task;
-	UTaskAssetGraph* Graph = CastChecked<UTaskAssetGraph>(A->GetOwningNode()->GetGraph());
-	if (!FTaskGraphOperations::CanEdit(Graph->TaskAsset) || Child->ParentTask == Parent) return false;
+	if(CanCreateConnection(A, B).Response == CONNECT_RESPONSE_DISALLOW)
+	{
+		return false;
+	}
+	UTaskAssetGraphNode* Parent = CastChecked<UTaskAssetGraphNode>((A->Direction == EGPD_Output ? A : B)->GetOwningNode());
+	UTaskAssetGraphNode* Child = CastChecked<UTaskAssetGraphNode>((A->Direction == EGPD_Input ? A : B)->GetOwningNode());
+	UTaskAssetGraph* Graph = CastChecked<UTaskAssetGraph>(Parent->GetGraph());
 	const FScopedTransaction Transaction(LOCTEXT("Connect", "Connect Tasks"));
-	Graph->TaskAsset->Modify();
-	for (const auto& Pair : Graph->TaskAsset->TaskMap) Pair.Value->Modify();
+	Graph->Modify();
 	Parent->Modify();
 	Child->Modify();
-	if (Child->ParentTask)
+	const bool bChanged = FTaskGraphOperations::Connect(Graph->TaskAsset, Parent->Task, Child->Task, Parent->bStartNode);
+	if(bChanged)
 	{
-		Child->ParentTask->Modify();
-		Child->ParentTask->SubTasks.Remove(Child);
+		Graph->OnTasksChanged.ExecuteIfBound();
 	}
-	Graph->TaskAsset->RootTasks.Remove(Child);
-	Parent->SubTasks.Add(Child);
-	Graph->TaskAsset->RebuildTaskMap(false);
-	FTaskGraphOperations::SortSiblings(Graph->TaskAsset, Child);
-	Graph->OnTasksChanged.ExecuteIfBound();
-	return true;
+	return bChanged;
 }
 
 void UTaskAssetGraphSchema::BreakPinLinks(UEdGraphPin& Pin, bool bSendsNodeNotification) const
 {
-	UTaskAssetGraph* Graph = CastChecked<UTaskAssetGraph>(Pin.GetOwningNode()->GetGraph());
-	UTaskBase* Task = CastChecked<UTaskAssetGraphNode>(Pin.GetOwningNode())->Task;
-	if (!FTaskGraphOperations::CanEdit(Graph->TaskAsset) || (Pin.Direction == EGPD_Input ? !Task->ParentTask : Task->SubTasks.IsEmpty())) return;
+	UTaskAssetGraph* Graph = Cast<UTaskAssetGraph>(Pin.GetOwningNode()->GetGraph());
+	UTaskAssetGraphNode* Node = Cast<UTaskAssetGraphNode>(Pin.GetOwningNode());
+	if(!Graph || !Node || Pin.LinkedTo.IsEmpty() || !FTaskGraphOperations::CanEdit(Graph->TaskAsset))
+	{
+		return;
+	}
 	const FScopedTransaction Transaction(LOCTEXT("Disconnect", "Disconnect Tasks"));
-	Graph->TaskAsset->Modify();
-	for (const auto& Pair : Graph->TaskAsset->TaskMap) Pair.Value->Modify();
-	Task->Modify();
-	UTaskBase* SortTask = Task;
-	if (Pin.Direction == EGPD_Input && Task->ParentTask)
+	Graph->Modify();
+	Node->Modify();
+	for(UEdGraphPin* Other : Pin.LinkedTo)
 	{
-		Task->ParentTask->Modify();
-		Task->ParentTask->SubTasks.Remove(Task);
-		Graph->TaskAsset->RootTasks.AddUnique(Task);
+		Other->GetOwningNode()->Modify();
 	}
-	else if (Pin.Direction == EGPD_Output)
+	if(FTaskGraphOperations::Disconnect(Graph->TaskAsset, Node->Task, Pin.Direction == EGPD_Input, Pin.Direction == EGPD_Output, Node->bStartNode))
 	{
-		if(!Task->SubTasks.IsEmpty()) SortTask = Task->SubTasks[0];
-		for (UTaskBase* Child : Task->SubTasks)
-		{
-			Child->Modify();
-			Graph->TaskAsset->RootTasks.AddUnique(Child);
-		}
-		Task->SubTasks.Reset();
+		Graph->OnTasksChanged.ExecuteIfBound();
 	}
-	Graph->TaskAsset->RebuildTaskMap(false);
-	FTaskGraphOperations::SortSiblings(Graph->TaskAsset, SortTask);
-	Graph->OnTasksChanged.ExecuteIfBound();
 }
 
 void UTaskAssetGraphSchema::BreakNodeLinks(UEdGraphNode& TargetNode) const
 {
-	UTaskAssetGraph* Graph = CastChecked<UTaskAssetGraph>(TargetNode.GetGraph());
-	UTaskBase* Task = CastChecked<UTaskAssetGraphNode>(&TargetNode)->Task;
-	if (!FTaskGraphOperations::CanEdit(Graph->TaskAsset) || (!Task->ParentTask && Task->SubTasks.IsEmpty())) return;
-	const FScopedTransaction Transaction(LOCTEXT("DisconnectNode", "Disconnect Task Node"));
-	Graph->TaskAsset->Modify();
-	for (const auto& Pair : Graph->TaskAsset->TaskMap) Pair.Value->Modify();
-	if (Task->ParentTask)
+	UTaskAssetGraph* Graph = Cast<UTaskAssetGraph>(TargetNode.GetGraph());
+	UTaskAssetGraphNode* Node = Cast<UTaskAssetGraphNode>(&TargetNode);
+	if(!Graph || !Node || !FTaskGraphOperations::CanEdit(Graph->TaskAsset))
 	{
-		Task->ParentTask->SubTasks.Remove(Task);
-		Graph->TaskAsset->RootTasks.AddUnique(Task);
+		return;
 	}
-	for (UTaskBase* Child : Task->SubTasks) Graph->TaskAsset->RootTasks.AddUnique(Child);
-	Task->SubTasks.Reset();
-	Graph->TaskAsset->RebuildTaskMap(false);
-	FTaskGraphOperations::SortSiblings(Graph->TaskAsset, Task);
-	Graph->OnTasksChanged.ExecuteIfBound();
+	bool bHasLinks = false;
+	for(UEdGraphPin* Pin : Node->Pins)
+	{
+		bHasLinks |= !Pin->LinkedTo.IsEmpty();
+	}
+	if(!bHasLinks)
+	{
+		return;
+	}
+	const FScopedTransaction Transaction(LOCTEXT("DisconnectNode", "Disconnect Task Node"));
+	Graph->Modify();
+	Node->Modify();
+	for(UEdGraphPin* Pin : Node->Pins)
+	{
+		for(UEdGraphPin* Other : Pin->LinkedTo)
+		{
+			Other->GetOwningNode()->Modify();
+		}
+	}
+	if(FTaskGraphOperations::Disconnect(Graph->TaskAsset, Node->Task, true, true, Node->bStartNode))
+	{
+		Graph->OnTasksChanged.ExecuteIfBound();
+	}
 }
 
 void UTaskAssetGraphSchema::BreakSinglePinLink(UEdGraphPin* SourcePin, UEdGraphPin* TargetPin) const
 {
-	if (SourcePin && TargetPin && SourcePin->LinkedTo.Contains(TargetPin))
+	if(!SourcePin || !TargetPin || !SourcePin->LinkedTo.Contains(TargetPin))
 	{
-		BreakPinLinks(*(SourcePin->Direction == EGPD_Input ? SourcePin : TargetPin), true);
+		return;
+	}
+	UTaskAssetGraphNode* Parent = Cast<UTaskAssetGraphNode>((SourcePin->Direction == EGPD_Output ? SourcePin : TargetPin)->GetOwningNode());
+	UTaskAssetGraphNode* Child = Cast<UTaskAssetGraphNode>((SourcePin->Direction == EGPD_Input ? SourcePin : TargetPin)->GetOwningNode());
+	UTaskAssetGraph* Graph = Parent ? Cast<UTaskAssetGraph>(Parent->GetGraph()) : nullptr;
+	if(!Graph || !Child || !FTaskGraphOperations::CanEdit(Graph->TaskAsset))
+	{
+		return;
+	}
+	const FScopedTransaction Transaction(LOCTEXT("DisconnectEdge", "Disconnect Task Link"));
+	Graph->Modify();
+	Parent->Modify();
+	Child->Modify();
+	if(FTaskGraphOperations::DisconnectEdge(Graph->TaskAsset, Parent->Task, Child->Task, Parent->bStartNode))
+	{
+		Graph->OnTasksChanged.ExecuteIfBound();
 	}
 }
 

@@ -1,22 +1,26 @@
 #pragma once
 
 #include "Event/EventModuleTypes.h"
-
+#include "Procedure/ProcedureModuleTypes.h"
 #include "Event_SwitchProcedure.generated.h"
 
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FEventSwitchProcedure : public FEventBase
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
-public:
-	FEventSwitchProcedure() = default;
+    FEventSwitchProcedure() = default;
+    FEventSwitchProcedure(TSubclassOf<class UProcedureBase> InProcedureClass)
+        : ProcedureClass(InProcedureClass)
+    {
+    }
+    FEventSwitchProcedure(const FProcedureActivationToken& InToken, TSubclassOf<class UProcedureBase> InProcedureClass)
+        : ProcedureClass(InProcedureClass), Token(InToken)
+    {
+    }
 
-	FEventSwitchProcedure(TSubclassOf<class UProcedureBase> InProcedureClass)
-		: ProcedureClass(MoveTemp(InProcedureClass))
-	{
-	}
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSubclassOf<class UProcedureBase> ProcedureClass = nullptr;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    TSubclassOf<class UProcedureBase> ProcedureClass;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    FProcedureActivationToken Token;
 };

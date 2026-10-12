@@ -783,7 +783,8 @@ namespace
 		int32& InOutCursor,
 		int32& InOutBudget,
 		TRetiredCacheValues<ValueType>& OutRetired,
-		KeepPredicate&& InKeep)
+		KeepPredicate&& InKeep,
+		const bool bRetireUnreferenced = false)
 	{
 		while (InOutBudget > 0 &&
 			!InKeys.IsEmpty())
@@ -819,7 +820,7 @@ namespace
 				continue;
 			}
 
-			if (!InKeep(Key))
+			if (!InKeep(Key) || (bRetireUnreferenced && InValues.FindChecked(Key).IsUnique()))
 			{
 				if (TSharedPtr<const ValueType, ESPMode::ThreadSafe>* Retired =
 					InValues.Find(Key))
@@ -1878,6 +1879,19 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 	{
 		return;
 	}
+	bool bNaturalCapacityPressure = false;
+	// 自然列由冻结配置确定；容量紧张时退休仅由 Cache 持有的正文，为新采样腾出空间。
+	// 正在读取的 shared ref 及依赖就绪所需的五族计划继续保持原有生命周期。
+	if (Resources)
+	{
+		const auto State = Resources->Snapshot();
+		const uint64 NativeLimit = State.Limits.ResidentBytes - State.Limits.OverlapBytes;
+		const uint64 Headroom = FMath::Min(NativeLimit / 16,
+			uint64(MaximumRetiredEntriesPerGroup * ShardCount) *
+			(VoxelBoundedAllocation::WorkerSharedBytes<const FVoxelBaseColumnEntry>() +
+				VoxelBoundedAllocation::WorkerSharedBytes<const FVoxelNaturalColumnEntry>()));
+		bNaturalCapacityPressure = State.Used[int32(EVoxelTerrainResourcePool::Resident)] >= NativeLimit - Headroom;
+	}
 
 	int32 RemainingGroups = 7;
 	auto TakeGroupBudget =
@@ -1943,7 +1957,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 				return VoxelGeneration::IsWorldCell(InKey.X) && VoxelGeneration::IsWorldCell(InKey.Y) && IsRetained(
 					FInt64Vector2(InKey.X, InKey.Y),
 					&FVoxelGenerationCacheRetentionPoint::NaturalRadiusCells);
-			});
+			}, bNaturalCapacityPressure);
 
 		bRetirementLimited |= !TrimMapBudgeted(
 			Shard.NaturalColumns,
@@ -1957,7 +1971,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 				return VoxelGeneration::IsWorldCell(InKey.X) && VoxelGeneration::IsWorldCell(InKey.Y) && IsRetained(
 					FInt64Vector2(InKey.X, InKey.Y),
 					&FVoxelGenerationCacheRetentionPoint::NaturalRadiusCells);
-			});
+			}, bNaturalCapacityPressure);
 
 	}
 

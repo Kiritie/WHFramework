@@ -231,6 +231,7 @@ private:
 	struct FFineShardWorker;
 	struct FF0FineWorker;
 	friend class FVoxelFineAdmissionRetentionTest;
+	friend class FVoxelFinePresentationCapacityTest;
 	struct FFineShardSlot
 	{
 		FVoxelFineBuildState Build;

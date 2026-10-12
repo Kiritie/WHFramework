@@ -12,29 +12,36 @@ bool FTaskAssetReferenceTest::RunTest(const FString& Parameters)
 {
 	auto NewAsset = [](const TCHAR* BaseName)
 	{
-		return NewObject<UTaskAsset>(GetTransientPackage(), MakeUniqueObjectName(GetTransientPackage(), UTaskAsset::StaticClass(), FName(BaseName)));
+		UTaskAsset* Asset = NewObject<UTaskAsset>(GetTransientPackage(), MakeUniqueObjectName(GetTransientPackage(), UTaskAsset::StaticClass(), FName(BaseName)));
+		Asset->InitializeGraph();
+		return Asset;
 	};
 	auto NewTask = [](UTaskAsset* Asset, UClass* Class = UTaskBase::StaticClass())
 	{
-		return NewObject<UTaskBase>(Asset, Class, NAME_None);
+		UTaskBase* Task = NewObject<UTaskBase>(Asset, Class, NAME_None);
+		Task->TaskGUID = FGuid::NewGuid().ToString();
+		Task->GraphPosition = FVector2D(Asset->AuthoredTasks.Num() * 320.f, Asset->AuthoredTasks.Num() * 160.f);
+		Task->bHasGraphPosition = true;
+		Asset->AuthoredTasks.Add(Task);
+		return Task;
 	};
 
 	TStrongObjectPtr<UTaskAsset> LeafDefinition(NewAsset(TEXT("TaskReferenceLeaf")));
 	UTaskBase* LeafRoot = NewTask(LeafDefinition.Get());
 	LeafRoot->TaskDisplayName = FText::FromString(TEXT("Return for reward"));
-	LeafDefinition->RootTasks = {LeafRoot};
+	LeafDefinition->StartTasks = {LeafRoot};
 
 	TStrongObjectPtr<UTaskAsset> ReusedDefinition(NewAsset(TEXT("TaskReferenceReusable")));
 	UTaskBase* ReusedRoot = NewTask(ReusedDefinition.Get());
 	UTaskBase* ReusedLeaf = NewTask(ReusedDefinition.Get());
 	UTaskAssetReferenceTask* NestedReference = CastChecked<UTaskAssetReferenceTask>(NewTask(ReusedDefinition.Get(), UTaskAssetReferenceTask::StaticClass()));
 	NestedReference->ReferencedAsset = LeafDefinition.Get();
-	ReusedRoot->SubTasks = {ReusedLeaf, NestedReference};
+	ReusedRoot->GraphChildren = {ReusedLeaf, NestedReference};
 	FTaskReference LocalPrerequisite;
 	LocalPrerequisite.Asset = ReusedDefinition.Get();
 	LocalPrerequisite.TaskGUID = ReusedRoot->TaskGUID;
 	ReusedLeaf->Prerequisites = {LocalPrerequisite};
-	ReusedDefinition->RootTasks = {ReusedRoot};
+	ReusedDefinition->StartTasks = {ReusedRoot};
 
 	TStrongObjectPtr<UTaskAsset> MainDefinition(NewAsset(TEXT("TaskReferenceMain")));
 	UTaskAssetReferenceTask* FirstReference = CastChecked<UTaskAssetReferenceTask>(NewTask(MainDefinition.Get(), UTaskAssetReferenceTask::StaticClass()));
@@ -42,8 +49,10 @@ bool FTaskAssetReferenceTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("引用节点默认自动离开以允许顺序组合继续"), FirstReference->TaskLeaveType, ETaskLeaveType::Automatic);
 	FirstReference->ReferencedAsset = ReusedDefinition.Get();
 	SecondReference->ReferencedAsset = ReusedDefinition.Get();
-	MainDefinition->RootTasks = {FirstReference, SecondReference};
+	MainDefinition->StartTasks = {FirstReference, SecondReference};
 
+	UTaskAssetReferenceTask* Disconnected = CastChecked<UTaskAssetReferenceTask>(NewTask(MainDefinition.Get(), UTaskAssetReferenceTask::StaticClass()));
+	Disconnected->ReferencedAsset.Reset();
 	TArray<FText> Errors;
 	TestTrue(TEXT("嵌套与重复引用的源定义有效"), MainDefinition->ValidateTasks(Errors));
 	if(!Errors.IsEmpty())
@@ -58,7 +67,7 @@ bool FTaskAssetReferenceTest::RunTest(const FString& Parameters)
 			MakeUniqueObjectName(GetTransientPackage(), UTaskAsset::StaticClass(), TEXT("TaskReferenceRuntime")));
 		Runtime->SourceObject = MainDefinition.Get();
 		TArray<FText> ExpansionErrors;
-		if(!Runtime->ExpandTaskAssetReferences(ExpansionErrors))
+		if(!Runtime->CompileTasks(ExpansionErrors) || !Runtime->ExpandTaskAssetReferences(ExpansionErrors))
 		{
 			for(const FText& Error : ExpansionErrors) AddError(Error.ToString());
 			return nullptr;
@@ -70,6 +79,9 @@ bool FTaskAssetReferenceTest::RunTest(const FString& Parameters)
 	TStrongObjectPtr<UTaskAsset> RuntimeOne(MakeRuntime());
 	if(!TestNotNull(TEXT("运行时任务资产可展开"), RuntimeOne.Get())) return false;
 	TestEqual(TEXT("两个引用点各自展开完整嵌套树"), RuntimeOne->TaskMap.Num(), 10);
+	TestTrue(TEXT("运行副本清除全部作者集合"), RuntimeOne->AuthoredTasks.IsEmpty() && RuntimeOne->StartTasks.IsEmpty());
+	TestFalse(TEXT("断开引用不进入运行索引"), RuntimeOne->TaskMap.Contains(Disconnected->TaskGUID));
+	TestEqual(TEXT("源资产保留断开作者节点"), MainDefinition->AuthoredTasks.Num(), 3);
 	UTaskAssetReferenceTask* RuntimeFirst = CastChecked<UTaskAssetReferenceTask>(RuntimeOne->RootTasks[0]);
 	UTaskAssetReferenceTask* RuntimeSecond = CastChecked<UTaskAssetReferenceTask>(RuntimeOne->RootTasks[1]);
 	TestTrue(TEXT("引用节点标记为运行时展开"), RuntimeFirst->IsRuntimeExpanded() && RuntimeSecond->IsRuntimeExpanded());
@@ -112,20 +124,20 @@ bool FTaskAssetReferenceTest::RunTest(const FString& Parameters)
 	UTaskAssetReferenceTask* CycleBTask = CastChecked<UTaskAssetReferenceTask>(NewTask(CycleB.Get(), UTaskAssetReferenceTask::StaticClass()));
 	CycleATask->ReferencedAsset = CycleB.Get();
 	CycleBTask->ReferencedAsset = CycleA.Get();
-	CycleA->RootTasks = {CycleATask};
-	CycleB->RootTasks = {CycleBTask};
+	CycleA->StartTasks = {CycleATask};
+	CycleB->StartTasks = {CycleBTask};
 	Errors.Reset();
 	TestFalse(TEXT("循环任务资产引用被拒绝"), CycleA->ValidateTasks(Errors));
 	TestTrue(TEXT("循环引用提供明确错误"), Errors.ContainsByPredicate([](const FText& Error)
 	{
-		return Error.ToString().Contains(TEXT("cycle"), ESearchCase::IgnoreCase);
+		return Error.ToString().Contains(TEXT("循环"), ESearchCase::IgnoreCase);
 	}));
 
 	TStrongObjectPtr<UTaskAsset> AuthoredChildren(NewAsset(TEXT("TaskReferenceAuthoredChildren")));
 	UTaskAssetReferenceTask* InvalidReference = CastChecked<UTaskAssetReferenceTask>(NewTask(AuthoredChildren.Get(), UTaskAssetReferenceTask::StaticClass()));
 	InvalidReference->ReferencedAsset = LeafDefinition.Get();
-	InvalidReference->SubTasks = {NewTask(AuthoredChildren.Get())};
-	AuthoredChildren->RootTasks = {InvalidReference};
+	InvalidReference->GraphChildren = {NewTask(AuthoredChildren.Get())};
+	AuthoredChildren->StartTasks = {InvalidReference};
 	Errors.Reset();
 	TestFalse(TEXT("引用节点不允许混入手工子节点"), AuthoredChildren->ValidateTasks(Errors));
 

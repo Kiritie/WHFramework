@@ -17,7 +17,7 @@
 
 #include "ScopedTransaction.h"
 #include "Procedure/Base/ProcedureBase.h"
-#include "Windows/WindowsPlatformApplicationMisc.h"
+
 
 FProcedureCustomization::FProcedureCustomization()
 {

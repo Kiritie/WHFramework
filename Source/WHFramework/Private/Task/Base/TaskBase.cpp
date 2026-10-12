@@ -15,6 +15,9 @@
 #include "Task/Base/TaskAsset.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
+#if WITH_EDITOR
+#include "UObject/UObjectHash.h"
+#endif
 
 UTaskBase::UTaskBase()
 {
@@ -292,7 +295,8 @@ UTaskAsset* UTaskBase::GetTaskAsset() const
 
 bool UTaskBase::IsCurrent() const
 {
-	return UTaskModuleStatics::GetCurrentTask() == this;
+	const UTaskModule* Module = UTaskModule::GetPtr(GetWorld());
+	return Module && Module->GetCurrentTask() == this;
 }
 
 bool UTaskBase::IsEntered() const
@@ -374,17 +378,26 @@ bool UTaskBase::IsParentOf(UTaskBase* InTask) const
 
 void UTaskBase::Restore()
 {
-	UTaskModuleStatics::RestoreTask(this);
+	if(UTaskModule* Module = UTaskModule::GetPtr(GetWorld()))
+	{
+		Module->RestoreTask(this);
+	}
 }
 
 void UTaskBase::Enter(bool bSetAsCurrent)
 {
-	UTaskModuleStatics::EnterTask(this, bSetAsCurrent);
+	if(UTaskModule* Module = UTaskModule::GetPtr(GetWorld()))
+	{
+		Module->EnterTask(this, bSetAsCurrent);
+	}
 }
 
 void UTaskBase::Refresh()
 {
-	UTaskModuleStatics::RefreshTask(this);
+	if(UTaskModule* Module = UTaskModule::GetPtr(GetWorld()))
+	{
+		Module->RefreshTask(this);
+	}
 }
 
 void UTaskBase::Restate()
@@ -394,22 +407,34 @@ void UTaskBase::Restate()
 
 void UTaskBase::Guide()
 {
-	UTaskModuleStatics::GuideTask(this);
+	if(UTaskModule* Module = UTaskModule::GetPtr(GetWorld()))
+	{
+		Module->GuideTask(this);
+	}
 }
 
 void UTaskBase::Execute()
 {
-	UTaskModuleStatics::ExecuteTask(this);
+	if(UTaskModule* Module = UTaskModule::GetPtr(GetWorld()))
+	{
+		Module->ExecuteTask(this);
+	}
 }
 
 void UTaskBase::Complete(ETaskExecuteResult InTaskExecuteResult)
 {
-	UTaskModuleStatics::CompleteTask(this, InTaskExecuteResult);
+	if(UTaskModule* Module = UTaskModule::GetPtr(GetWorld()))
+	{
+		Module->CompleteTask(this, InTaskExecuteResult);
+	}
 }
 
 void UTaskBase::Leave()
 {
-	UTaskModuleStatics::LeaveTask(this);
+	if(UTaskModule* Module = UTaskModule::GetPtr(GetWorld()))
+	{
+		Module->LeaveTask(this);
+	}
 }
 
 void UTaskBase::Serialize(FArchive& Ar)
@@ -603,6 +628,23 @@ bool UTaskBase::IsAllSubLeaved() const
 }
 
 #if WITH_EDITOR
+void UTaskBase::PreEditChange(FProperty* PropertyAboutToChange)
+{
+	Super::PreEditChange(PropertyAboutToChange);
+	if(UTaskAsset* Asset = GetTaskAsset(); Asset && !Asset->SourceObject)
+	{
+		Asset->Modify();
+		for(UTaskBase* Task : Asset->AuthoredTasks)
+		{
+			if(Task)
+			{
+				Task->Modify();
+				ForEachObjectWithOuter(Task, [](UObject* Object) { Object->Modify(); }, true);
+			}
+		}
+	}
+}
+
 bool UTaskBase::CanEditChange(const FProperty* InProperty) const
 {
 	if(InProperty)
@@ -664,6 +706,11 @@ void UTaskBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
 	}
 
 	Super::PostEditChangeProperty(PropertyChangedEvent);
+	if(UTaskAsset* Asset = GetTaskAsset(); Asset && !Asset->SourceObject)
+	{
+		TArray<FText> Errors;
+		Asset->CompileTasks(Errors);
+	}
 }
 #endif
 
@@ -687,10 +734,14 @@ ETaskStage UTaskBase::GetTaskStage() const
 bool UTaskBase::ArePrerequisitesMet() const
 {
 	if (Prerequisites.IsEmpty()) return true;
-	if (!UTaskModule::IsValid()) return false;
+	const UTaskModule* Module = UTaskModule::GetPtr(GetWorld());
+	if(!Module)
+	{
+		return false;
+	}
 	for (const FTaskReference& Reference : Prerequisites)
 	{
-		const UTaskBase* Task = UTaskModule::Get().ResolveTask(Reference, GetTaskAsset());
+		const UTaskBase* Task = Module->ResolveTask(Reference, GetTaskAsset());
 		if (!Task || Task->TaskState != ETaskState::Leaved || !Task->IsSucceed()) return false;
 	}
 	return true;

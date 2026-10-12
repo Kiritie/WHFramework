@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Misc/NotifyHook.h"
 #include "WHFrameworkEditorTypes.h"
 #include "Common/Asset/AssetEditorBase.h"
 #include "Main/Module/EditorModuleBase.h"
@@ -26,12 +27,7 @@ public:
 	virtual void ShutdownModule() override;
 
 public:
-	virtual void RegisterSettings(ISettingsModule* SettingsModule) override;
 
-	virtual void UnRegisterSettings(ISettingsModule* SettingsModule) override;
-
-	virtual bool HandleSettingsSaved() override;
-	
 	virtual void RegisterCommands(const TSharedPtr<FUICommandList>& Commands) override;
 
 	virtual void RegisterMenus(const TSharedPtr<FUICommandList>& Commands) override;
@@ -47,11 +43,12 @@ public:
 
 private:
 	void OnClickedProcedureEditorButton();
+	TSharedPtr<struct FGraphPanelNodeFactory> GraphNodeFactory;
 };
 
 //////////////////////////////////////////////////////////////////////////
 /// ProcedureEditor
-class FProcedureEditor : public FAssetEditorBase
+class FProcedureEditor : public FAssetEditorBase, public FNotifyHook
 {
 public:
 	FProcedureEditor();
@@ -67,17 +64,19 @@ public:
 
 	virtual TSharedRef<FTabManager::FLayout> CreateDefaultLayout() override;
 
-	virtual void ExtendToolbar(FToolBarBuilder& ToolbarBuilder) override;
-
 	virtual void PostUndo(bool bSuccess) override;
 	
 	virtual void PostRedo(bool bSuccess) override;
 
 public:
 	virtual FEditorModuleBase* GetEditorModule() const override;
+	void RefreshDetails();
+    virtual void NotifyPreChange(FProperty* PropertyAboutToChange) override;
+    virtual void NotifyPreChange(FEditPropertyChain* PropertyAboutToChange) override;
+	void OnProcedurePropertyChanged(const FPropertyChangedEvent& Event);
 
 protected:
-	TSharedRef<SDockTab> SpawnListWidgetTab(const FSpawnTabArgs& Args);
+	TSharedRef<SDockTab> SpawnGraphWidgetTab(const FSpawnTabArgs& Args);
 
 	TSharedRef<SDockTab> SpawnDetailsWidgetTab(const FSpawnTabArgs& Args);
 
@@ -86,18 +85,13 @@ protected:
 protected:
 	virtual void OnBlueprintCompiled() override;
 
-	virtual void OnDefaultsToggled();
-
-	virtual void OnEditingToggled();
-	
 	//////////////////////////////////////////////////////////////////////////
 	/// Widgets
 public:
-	TSharedPtr<class SProcedureListWidget> ListWidget;
+	TSharedPtr<class SProcedureGraphWidget> GraphWidget;
 
-	TSharedPtr<class SProcedureDetailsWidget> DetailsWidget;
+	TSharedPtr<class IDetailsView> DetailsView;
 
-	TSharedPtr<class SProcedureStatusWidget> StatusWidget;
 };
 
 //////////////////////////////////////////////////////////////////////////

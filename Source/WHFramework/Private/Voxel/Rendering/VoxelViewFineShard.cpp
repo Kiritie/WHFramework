@@ -1226,6 +1226,32 @@ void FVoxelViewManager::PrepareFineShardPresentations(const double InDeadline)
 			Slot.bRenderPrepared = false;
 			Slot.bPresentationComplete = Slot.bCycleNeedsPresentation = false;
 		}
+		// 已完成几何先转入 Resident，释放 Staged 后再创建发布 Atom 与上传 Chunk。
+		if (Slot.RenderLeaseCursor < Geometry->Pieces.Num())
+		{
+			const auto Lease = Slot.RenderLeaseCursor == -2 ? Geometry->MetadataLease : Slot.RenderLeaseCursor == -1 ?
+				(Geometry->Boundary ? Geometry->Boundary->ResourceLease : nullptr) : Geometry->Pieces[Slot.RenderLeaseCursor].Mesh->ResourceLease;
+			if (Lease)
+			{
+				const uint64 Before = Resources->ReleaseVersionExcludingOwner(Slot.Consumer);
+				if (!Lease->IsOwnedBy(Resources.Get()))
+				{
+					ObserveRenderAdmission(EVoxelTerrainResourceAdmission::InvalidRequest, Before);
+					return;
+				}
+				const bool bAllowOverlap = Renderer.HasPresentedCoverage(FBox(FVector(Key.Bounds().Min), FVector(Key.Bounds().Max)));
+				if (!Lease->Transfer(EVoxelTerrainResourcePool::Resident) &&
+					(!bAllowOverlap || !Lease->Transfer(EVoxelTerrainResourcePool::ResidentOverlap)))
+				{
+					const auto Limits = Resources->Snapshot().Limits;
+					ObserveRenderAdmission(Lease->Bytes() > Limits.ResidentBytes && (!bAllowOverlap || Lease->Bytes() > Limits.OverlapBytes) ?
+						EVoxelTerrainResourceAdmission::CapacityUnachievable : EVoxelTerrainResourceAdmission::CapacityBlocked, Before);
+					return;
+				}
+			}
+			++Slot.RenderLeaseCursor;
+			return;
+		}
 		const int32 AtomSide = Key.SideCells / 16;
 		const int32 AtomCount = AtomSide * AtomSide * AtomSide;
 		check(AtomCount > 0 && AtomCount <= 64);
@@ -1286,73 +1312,53 @@ void FVoxelViewManager::PrepareFineShardPresentations(const double InDeadline)
 			return;
 		}
 		Slot.bRenderPrepared = true;
-		if (Slot.RenderLeaseCursor < Geometry->Pieces.Num())
+		TArray<TSharedPtr<const FVoxelTerrainRenderAtom, ESPMode::ThreadSafe>, TInlineAllocator<8>> Atoms;
+		TArray<int32, TInlineAllocator<8>> AtomIndices;
+		uint64 AtomMask = 0;
+		bool bRequiresCollision = false;
+		// 使用 Renderer 已有的 8-Atom 有界事务，同批保持相同碰撞契约。
+		for (int32 Scan = 0; Scan < FMath::Min(8, AtomCount); ++Scan)
 		{
-			const auto Lease = Slot.RenderLeaseCursor == -2 ? Geometry->MetadataLease : Slot.RenderLeaseCursor == -1 ?
-				(Geometry->Boundary ? Geometry->Boundary->ResourceLease : nullptr) : Geometry->Pieces[Slot.RenderLeaseCursor].Mesh->ResourceLease;
-			if (Lease)
+			Slot.RenderAtomCursor %= AtomCount;
+			const int32 AtomIndex = Slot.RenderAtomCursor++;
+			if (AtomIndex == 0) Slot.bCycleNeedsPresentation = false;
+			auto& PendingTransaction = Slot.RenderTransactions[AtomIndex];
+			if (PendingTransaction.IsValid())
 			{
-				const uint64 Before = Resources->ReleaseVersionExcludingOwner(Slot.Consumer);
-				if (!Lease->IsOwnedBy(Resources.Get()))
+				if (Renderer.ConsumeTransactionFailure(PendingTransaction))
 				{
-					ObserveRenderAdmission(EVoxelTerrainResourceAdmission::InvalidRequest, Before);
+					PendingTransaction.Invalidate();
+					Slot.RenderAdmission = EVoxelTerrainResourceAdmission::InvalidRequest;
 					return;
 				}
-				const bool bAllowOverlap = Renderer.HasPresentedCoverage(FBox(FVector(Key.Bounds().Min), FVector(Key.Bounds().Max)));
-				if (!Lease->Transfer(EVoxelTerrainResourcePool::Resident) &&
-					(!bAllowOverlap || !Lease->Transfer(EVoxelTerrainResourcePool::ResidentOverlap)))
-				{
-					const auto Limits = Resources->Snapshot().Limits;
-					ObserveRenderAdmission(Lease->Bytes() > Limits.ResidentBytes && (!bAllowOverlap || Lease->Bytes() > Limits.OverlapBytes) ?
-						EVoxelTerrainResourceAdmission::CapacityUnachievable : EVoxelTerrainResourceAdmission::CapacityBlocked, Before);
-					return;
-				}
-			}
-			++Slot.RenderLeaseCursor;
-			return;
-		}
-		Slot.RenderAtomCursor %= AtomCount;
-		const int32 AtomIndex = Slot.RenderAtomCursor++;
-		auto& PendingTransaction = Slot.RenderTransactions[AtomIndex];
-		if (PendingTransaction.IsValid())
-		{
-			if (Renderer.ConsumeTransactionFailure(PendingTransaction))
-			{
+				if (Renderer.IsTransactionPending(PendingTransaction)) { Slot.bCycleNeedsPresentation = true; continue; }
 				PendingTransaction.Invalidate();
-				Slot.RenderAdmission = EVoxelTerrainResourceAdmission::InvalidRequest;
-				return;
 			}
-			if (Renderer.IsTransactionPending(PendingTransaction))
-			{
-				Slot.bCycleNeedsPresentation = true;
-				return;
-			}
-			PendingTransaction.Invalidate();
+			const FIntVector Section = Key.Min / 16 + FIntVector(AtomIndex % AtomSide,
+				(AtomIndex / AtomSide) % AtomSide, AtomIndex / (AtomSide * AtomSide));
+			if (Key.SideCells > 16 && GetInputRoot().FineWanted.Contains(Section) && IsFineGeometryPrepared(Section)) continue;
+			const auto Atom = Slot.RenderAtoms[AtomIndex];
+			if (!Atom || !Atom->IsResourceReady() || Renderer.IsLocked(Section)) { Slot.bCycleNeedsPresentation = true; continue; }
+			if (const auto* Existing = Renderer.FindPresentedAtom(Section); Existing &&
+				Existing->Evidence.Owner == Atom->Evidence.Owner && Existing->Evidence.Content == Atom->Evidence.Content) continue;
+			Slot.bCycleNeedsPresentation = true;
+			const auto* RuntimeDemand = GetViewInterest().Exact.Find(Section);
+			const bool bAtomRequiresCollision = RuntimeDemand && (RuntimeDemand->bCollision || RuntimeDemand->bWarmupCollision);
+			if (!Atoms.IsEmpty() && bRequiresCollision != bAtomRequiresCollision) continue;
+			bRequiresCollision = bAtomRequiresCollision;
+			Atoms.Add(Atom);
+			AtomIndices.Add(AtomIndex);
+			AtomMask |= 1ull << AtomIndex;
 		}
-		if (AtomIndex == 0) Slot.bCycleNeedsPresentation = false;
-		const FIntVector Section = Key.Min / 16 + FIntVector(AtomIndex % AtomSide,
-			(AtomIndex / AtomSide) % AtomSide, AtomIndex / (AtomSide * AtomSide));
-		if (Key.SideCells > 16 && GetInputRoot().FineWanted.Contains(Section) && IsFineGeometryPrepared(Section))
+		if (Atoms.IsEmpty())
 		{
 			if (Slot.RenderAtomCursor == AtomCount && !Slot.bCycleNeedsPresentation) Slot.bPresentationComplete = true;
 			return;
 		}
-		const auto Atom = Slot.RenderAtoms[AtomIndex];
-		if (!Atom || !Atom->IsResourceReady() || Renderer.IsLocked(Section)) { Slot.bCycleNeedsPresentation = true; return; }
-		if (const auto* Existing = Renderer.FindPresentedAtom(Section); Existing &&
-			Existing->Evidence.Owner == Atom->Evidence.Owner && Existing->Evidence.Content == Atom->Evidence.Content)
-		{
-			if (Slot.RenderAtomCursor == AtomCount && !Slot.bCycleNeedsPresentation) Slot.bPresentationComplete = true;
-			return;
-		}
-		Slot.bCycleNeedsPresentation = true;
-		const TSharedPtr<const FVoxelTerrainRenderAtom, ESPMode::ThreadSafe> ImmutableAtom = Atom;
 		FGuid Transaction;
-		const auto* RuntimeDemand = GetViewInterest().Exact.Find(Section);
-		const bool bRequiresCollision = RuntimeDemand && (RuntimeDemand->bCollision || RuntimeDemand->bWarmupCollision);
 		EVoxelTerrainResourceAdmission TransactionAdmission = EVoxelTerrainResourceAdmission::Granted;
 		const uint64 BeforeTransaction = Scheduler.GetTerrainResources()->ReleaseVersionExcludingOwner(Slot.Consumer);
-		if (Renderer.PrepareAtomTransaction(MakeArrayView(&ImmutableAtom, 1), AppliedInterestRevision, bRequiresCollision,
+		if (Renderer.PrepareAtomTransaction(Atoms, AppliedInterestRevision, bRequiresCollision,
 			[this, Key, Input = Geometry->Attempt.Input](const FIntVector& CheckSection, const FVoxelFineOwnerEvidence& Evidence)
 			{
 				const auto* Current = FineShardSlots.Find(Key);
@@ -1364,9 +1370,18 @@ void FVoxelViewManager::PrepareFineShardPresentations(const double InDeadline)
 					Module.GetRuntime()->GetChangeHierarchy().GetFineShardRevision(Key) == Input.DataRevision;
 			},
 			[this](const FIntVector& CheckSection, const FVoxelFineOwnerEvidence&) { return Module.IsCollisionReady(CheckSection); },
-			[this, Section] { OnPresentationReady(Section); }, Transaction,
+			[this, Key, AtomMask]
+			{
+				const int32 Side = Key.SideCells / 16;
+				for (int32 Index = 0; Index < Side * Side * Side; ++Index)
+					if (AtomMask & (1ull << Index)) OnPresentationReady(Key.Min / 16 +
+						FIntVector(Index % Side, (Index / Side) % Side, Index / (Side * Side)));
+			}, Transaction,
 			Candidates.FindByPredicate([Chosen](const auto& Candidate) { return Candidate.Index == Chosen; })->Priority, Slot.FirstQueuedSeconds,
-			&TransactionAdmission, Slot.Consumer)) PendingTransaction = Transaction;
+			&TransactionAdmission, Slot.Consumer))
+		{
+			for (const int32 Index : AtomIndices) Slot.RenderTransactions[Index] = Transaction;
+		}
 		else if (TransactionAdmission != EVoxelTerrainResourceAdmission::Granted)
 			ObserveRenderAdmission(TransactionAdmission, BeforeTransaction);
 	};

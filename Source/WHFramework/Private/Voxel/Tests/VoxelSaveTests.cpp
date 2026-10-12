@@ -29,6 +29,38 @@
 #include "Voxel/Tests/VoxelSaveTestTypes.h"
 #include "Voxel/VoxelModuleTypes.h"
 
+namespace
+{
+	class FObserveBootstrapRetirement final : public IAutomationLatentCommand
+	{
+	public:
+		FObserveBootstrapRetirement(FAutomationTestBase& InTest, FString InDirectory)
+			: Test(InTest), Directory(MoveTemp(InDirectory)), Deadline(FPlatformTime::Seconds() + 8.0)
+		{
+		}
+
+		virtual bool Update() override
+		{
+			const uint64 Pins = FSaveGameGenerationReadLease::GetPinCount(Directory);
+			if (Pins != 0)
+			{
+				if (FPlatformTime::Seconds() < Deadline) return false;
+				Test.AddError(FString::Printf(TEXT("Released bootstrap generation still owns %llu actual read pins after worker retirement: %s"),
+					Pins, *Directory));
+				return true;
+			}
+			Test.TestTrue(TEXT("Released bootstrap generations retire after actual read pins leave"),
+				FSaveGameGenerationReadLease::TryRetireDirectory(Directory));
+			return true;
+		}
+
+	private:
+		FAutomationTestBase& Test;
+		FString Directory;
+		double Deadline;
+	};
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelSaveStorageAtomicCommitTest,
 	"WHFramework.Voxel.Save.StorageAtomicCommit",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -1062,12 +1094,13 @@ bool FVoxelDirectoryBootstrapIsolationTest::RunTest(const FString& InParameters)
 	TestEqual(TEXT("Current source reads replacement generation"), FVoxelRegionStore::Read(Read, Bytes, Error), EVoxelRegionRead::Loaded);
 	FVoxelPersistentSection Decoded;
 	TestTrue(TEXT("Source switch keeps replacement Tombstone revision"), FVoxelDeltaCodec::Decode(Bytes, Manifest, *Registry, Decoded) && Decoded.Revision == 8 && Decoded.IsEmpty());
-	FVoxelRegionStore::ReleaseReadLease(Read);
 	Scheduler.StopAndJoin();
 	Store.Reset();
-	TestFalse(TEXT("Live change baseline retains its immutable file generation"), Store.TryRetireFileGeneration(Storage.GetWorldDir(SaveId)));
+	TestFalse(TEXT("Live pinned baseline read retains its immutable file generation"), Store.TryRetireFileGeneration(Storage.GetWorldDir(SaveId)));
 	Index.Reset();
-	TestTrue(TEXT("Released bootstrap generations retire"), Store.TryRetireFileGeneration(Storage.GetWorldDir(SaveId)));
+	FVoxelRegionStore::ReleaseReadLease(Read);
+	// 原生 callable 的最后引用在真实 worker deleter 上退出；GT 不把 StopAndJoin 当成其析构回执。
+	FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FObserveBootstrapRetirement>(*this, Storage.GetWorldDir(SaveId)));
 	return true;
 }
 

@@ -8,6 +8,8 @@
 // UStepGraph
 
 UStepGraph::UStepGraph(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer) {}
+	: Super(ObjectInitializer)
+{
+}
 
 #undef LOCTEXT_NAMESPACE

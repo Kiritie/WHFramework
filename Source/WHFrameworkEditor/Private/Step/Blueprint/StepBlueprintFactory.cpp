@@ -21,6 +21,8 @@ UStepBlueprintFactory::UStepBlueprintFactory(const FObjectInitializer& ObjectIni
 	DefaultEventGraph = FName("Step Graph");
 
 	DefaultEventNodes.Add(FName("K2_OnInitialize"));
+	DefaultEventNodes.Add(FName("K2_OnResume"));
+	DefaultEventNodes.Add(FName("K2_OnSuspend"));
 	DefaultEventNodes.Add(FName("K2_OnRestore"));
 	DefaultEventNodes.Add(FName("K2_OnEnter"));
 	DefaultEventNodes.Add(FName("K2_OnRefresh"));

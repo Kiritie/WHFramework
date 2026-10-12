@@ -5,9 +5,12 @@
 #include "Task/Base/TaskBase.h"
 #include "Task/Base/TaskAssetReferenceTask.h"
 #include "Task/TaskModuleTypes.h"
+#include "Task/TaskGraphCompiler.h"
 #include "Misc/SecureHash.h"
 #if WITH_EDITOR
 #include "Misc/DataValidation.h"
+#include "UObject/ObjectSaveContext.h"
+#include "UObject/UObjectHash.h"
 #endif
 
 UTaskAsset::UTaskAsset(const FObjectInitializer& ObjectInitializer)
@@ -21,16 +24,31 @@ UTaskAsset::UTaskAsset(const FObjectInitializer& ObjectInitializer)
 	TaskMap = TMap<FString, UTaskBase*>();
 }
 
+void UTaskAsset::PostLoad()
+{
+	Super::PostLoad();
+	if(bCompiledValid && !RebuildTaskMap(false))
+	{
+		ClearCompiledTasks();
+	}
+}
+
 void UTaskAsset::Initialize()
 {
-	Super::Initialize();
-	if (!RebuildTaskMap()) return;
-	for (UTaskBase* Task : RootTasks) Task->OnInitialize();
+	if(!SourceObject)
+	{
+		return;
+	}
+	InitializeRuntimeTasks();
 }
 
 bool UTaskAsset::InitializeRuntimeTasks()
 {
-	if(!RebuildTaskMap(false)) return false;
+	TArray<FText> Errors;
+	if(!SourceObject || !bCompiledValid || !ValidateTasks(Errors) || !RebuildTaskMap(false))
+	{
+		return false;
+	}
 	Super::Initialize();
 	for(UTaskBase* Task : RootTasks)
 	{
@@ -65,88 +83,7 @@ namespace TaskAssetReferences
 		}
 	}
 
-	void ValidateDefinition(const UTaskAsset* Asset, TArray<FText>& OutErrors, TSet<const UTaskAsset*>& ActiveAssets, TSet<const UTaskAsset*>& ValidatedAssets)
-	{
-		if(!Asset) return;
-		if(ActiveAssets.Contains(Asset))
-		{
-			AddError(OutErrors, Asset, TEXT("Task asset references contain a cycle."));
-			return;
-		}
-		if(ValidatedAssets.Contains(Asset)) return;
-		ActiveAssets.Add(Asset);
 
-		TSet<const UTaskBase*> Visited;
-		TSet<FString> GUIDs;
-		TArray<const UTaskBase*> Tasks;
-		TFunction<void(const TArray<UTaskBase*>&)> Visit = [&](const TArray<UTaskBase*>& Nodes)
-		{
-			for(const UTaskBase* Task : Nodes)
-			{
-				if(!Task || Visited.Contains(Task))
-				{
-					AddError(OutErrors, Asset, TEXT("Task hierarchy contains a null, shared or cyclic node."));
-					continue;
-				}
-				Visited.Add(Task);
-				Tasks.Add(Task);
-				if(Task->GetTaskAsset() != Asset || Task->TaskGUID.IsEmpty() || GUIDs.Contains(Task->TaskGUID))
-				{
-					AddError(OutErrors, Asset, FString::Printf(TEXT("Invalid owner or duplicate/missing GUID: %s"), *Task->TaskDisplayName.ToString()));
-				}
-				GUIDs.Add(Task->TaskGUID);
-				TSet<FName> ObjectiveIDs;
-				for(const FTaskObjective& Objective : Task->Objectives)
-				{
-					if(Objective.ObjectiveID.IsNone() || ObjectiveIDs.Contains(Objective.ObjectiveID) || !Objective.EventTag.IsValid() || Objective.RequiredCount < 1 ||
-						(Objective.RequiredCountRange != FIntPoint::ZeroValue && (Objective.RequiredCountRange.X < 1 || Objective.RequiredCountRange.Y < Objective.RequiredCountRange.X)))
-					{
-						AddError(OutErrors, Asset, FString::Printf(TEXT("Invalid objective in task: %s"), *Task->TaskDisplayName.ToString()));
-					}
-					ObjectiveIDs.Add(Objective.ObjectiveID);
-				}
-				Visit(Task->SubTasks);
-			}
-		};
-		Visit(Asset->RootTasks);
-
-		const FSoftObjectPath AssetPath(Asset);
-		for(const UTaskBase* Task : Tasks)
-		{
-			for(const FTaskReference& Reference : Task->Prerequisites)
-			{
-				const bool bLocal = Reference.Asset.ToSoftObjectPath() == AssetPath;
-				if(Reference.Asset.IsNull() || Reference.TaskGUID.IsEmpty() || (bLocal && (!GUIDs.Contains(Reference.TaskGUID) || Reference.TaskGUID == Task->TaskGUID)))
-				{
-					AddError(OutErrors, Asset, FString::Printf(TEXT("Invalid prerequisite in task: %s"), *Task->TaskDisplayName.ToString()));
-				}
-			}
-
-			if(const UTaskAssetReferenceTask* ReferenceTask = Cast<UTaskAssetReferenceTask>(Task))
-			{
-				if(!ReferenceTask->SubTasks.IsEmpty())
-				{
-					AddError(OutErrors, Asset, FString::Printf(TEXT("Task asset reference must not have authored child tasks: %s"), *Task->TaskDisplayName.ToString()));
-				}
-				UTaskAsset* ReferencedAsset = ReferenceTask->ReferencedAsset.LoadSynchronous();
-				if(!ReferencedAsset)
-				{
-					AddError(OutErrors, Asset, FString::Printf(TEXT("Task asset reference is empty or missing: %s"), *Task->TaskDisplayName.ToString()));
-				}
-				else if(ReferencedAsset->RootTasks.IsEmpty())
-				{
-					AddError(OutErrors, Asset, FString::Printf(TEXT("Referenced task asset has no root tasks: %s"), *ReferencedAsset->GetPathName()));
-				}
-				else
-				{
-					ValidateDefinition(ReferencedAsset, OutErrors, ActiveAssets, ValidatedAssets);
-				}
-			}
-		}
-
-		ActiveAssets.Remove(Asset);
-		ValidatedAssets.Add(Asset);
-	}
 }
 
 bool UTaskAsset::ExpandTaskAssetReferences(TArray<FText>& OutErrors)
@@ -172,7 +109,7 @@ bool UTaskAsset::ExpandTaskAssetReferences(TArray<FText>& OutErrors)
 				return false;
 			}
 			UTaskAsset* ReferencedAsset = ReferenceTask->ReferencedAsset.Get();
-			if(!ReferencedAsset || ReferencedAsset->RootTasks.IsEmpty())
+			if(!ReferencedAsset)
 			{
 				TaskAssetReferences::AddError(OutErrors, DefinitionAsset, FString::Printf(TEXT("Task asset reference is empty, missing, or has no roots: %s"), *Task->TaskDisplayName.ToString()));
 				return false;
@@ -195,6 +132,13 @@ bool UTaskAsset::ExpandTaskAssetReferences(TArray<FText>& OutErrors)
 				return false;
 			}
 
+			DuplicatedAsset->SourceObject = ReferencedAsset;
+			if(!DuplicatedAsset->CompileTasks(OutErrors) || DuplicatedAsset->RootTasks.IsEmpty())
+			{
+				TaskAssetReferences::AddError(OutErrors, ReferencedAsset, TEXT("被引用资产没有有效的 Start 可达任务。"));
+				ActiveAssets.Remove(ReferencedAsset);
+				return false;
+			}
 			TArray<UTaskBase*> DuplicatedRoots = DuplicatedAsset->RootTasks;
 			TArray<UTaskBase*> DuplicatedTasks;
 			TMap<FString, FString> RemappedGUIDs;
@@ -205,12 +149,6 @@ bool UTaskAsset::ExpandTaskAssetReferences(TArray<FText>& OutErrors)
 				{
 					DuplicatedTasks.Add(const_cast<UTaskBase*>(Item));
 				});
-			}
-			if(DuplicatedRoots.Num() != ReferencedAsset->RootTasks.Num())
-			{
-				TaskAssetReferences::AddError(OutErrors, ReferencedAsset, TEXT("Failed to duplicate all referenced root tasks."));
-				ActiveAssets.Remove(ReferencedAsset);
-				return false;
 			}
 			for(UTaskBase* DuplicatedTask : DuplicatedTasks)
 			{
@@ -285,6 +223,10 @@ bool UTaskAsset::ExpandTaskAssetReferences(TArray<FText>& OutErrors)
 	{
 		if(!ExpandTask(RootTask, RuntimeSource)) return false;
 	}
+	if(OutErrors.IsEmpty())
+	{
+		DiscardAuthoringData();
+	}
 	return OutErrors.IsEmpty();
 }
 
@@ -292,10 +234,7 @@ bool UTaskAsset::ValidateTasks(TArray<FText>& OutErrors) const
 {
 	if(!SourceObject)
 	{
-		TSet<const UTaskAsset*> ActiveAssets;
-		TSet<const UTaskAsset*> ValidatedAssets;
-		TaskAssetReferences::ValidateDefinition(this, OutErrors, ActiveAssets, ValidatedAssets);
-		return OutErrors.IsEmpty();
+		return FTaskGraphCompiler::Validate(this, OutErrors);
 	}
 
 	TSet<const UTaskBase*> Visited;
@@ -428,25 +367,164 @@ EDataValidationResult UTaskAsset::IsDataValid(FDataValidationContext& Context) c
 
 bool UTaskAsset::CanAddTask(TSubclassOf<UTaskBase> InTaskClass)
 {
-	return true;
+	return InTaskClass && InTaskClass->IsChildOf(UTaskBase::StaticClass()) &&
+		!InTaskClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists);
 }
 
 void UTaskAsset::ClearAllTask()
 {
 	Modify();
-	for(auto Iter : RootTasks)
+	for(UTaskBase* Task : AuthoredTasks)
 	{
-		if(Iter)
+		if(Task)
 		{
-			Iter->OnUnGenerate();
-
+			Task->Modify();
+			Task->OnUnGenerate();
 		}
 	}
-	
-	RootTasks.Empty();
-
-	TaskMap.Empty();
-
-	Modify();
+	AuthoredTasks.Reset();
+	StartTasks.Reset();
+	TArray<FText> Errors;
+	CompileTasks(Errors);
 }
 #endif
+
+
+bool UTaskAsset::CompileTasks(TArray<FText>& OutErrors)
+{
+	OutErrors.Reset();
+	const bool bResult = FTaskGraphCompiler::Compile(this, OutErrors);
+#if WITH_EDITORONLY_DATA
+	CompileErrors = OutErrors;
+#endif
+	return bResult;
+}
+
+void UTaskAsset::ClearCompiledTasks()
+{
+	bCompiledValid = false;
+	RootTasks.Reset();
+	TaskMap.Reset();
+#if WITH_EDITORONLY_DATA
+	for(UTaskBase* Task : AuthoredTasks)
+	{
+		if(!Task)
+		{
+			continue;
+		}
+		Task->SubTasks.Reset();
+		Task->RootTask = nullptr;
+		Task->ParentTask = nullptr;
+		Task->TaskIndex = INDEX_NONE;
+		Task->TaskHierarchy = INDEX_NONE;
+	}
+#endif
+}
+
+#if WITH_EDITOR
+void UTaskAsset::InitializeGraph()
+{
+	StartGUID = FGuid::NewGuid();
+	StartPosition = FVector2D(-320.f, 0.f);
+	StartTasks.Reset();
+	AuthoredTasks.Reset();
+	TArray<FText> Errors;
+	CompileTasks(Errors);
+}
+
+UTaskBase* UTaskAsset::FindAuthoredTask(const FString& TaskGUID) const
+{
+	for(UTaskBase* Task : AuthoredTasks)
+	{
+		if(Task && Task->TaskGUID == TaskGUID)
+		{
+			return Task;
+		}
+	}
+	return nullptr;
+}
+
+UTaskBase* UTaskAsset::FindGraphParent(const UTaskBase* Task) const
+{
+	for(UTaskBase* Parent : AuthoredTasks)
+	{
+		if(Parent && Parent->GraphChildren.Contains(Task))
+		{
+			return Parent;
+		}
+	}
+	return nullptr;
+}
+
+void UTaskAsset::PreEditChange(FProperty* PropertyAboutToChange)
+{
+	Super::PreEditChange(PropertyAboutToChange);
+	if(SourceObject)
+	{
+		return;
+	}
+	Modify();
+	for(UTaskBase* Task : AuthoredTasks)
+	{
+		if(Task)
+		{
+			Task->Modify();
+			ForEachObjectWithOuter(Task, [](UObject* Object) { Object->Modify(); }, true);
+		}
+	}
+}
+
+void UTaskAsset::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+	if(!SourceObject)
+	{
+		TArray<FText> Errors;
+		CompileTasks(Errors);
+	}
+}
+
+void UTaskAsset::PreSave(FObjectPreSaveContext SaveContext)
+{
+	if(!SourceObject)
+	{
+		TArray<FText> Errors;
+		if(!CompileTasks(Errors))
+		{
+			for(const FText& Error : Errors)
+			{
+				UE_LOG(LogTemp, Error, TEXT("%s"), *Error.ToString());
+			}
+		}
+	}
+	Super::PreSave(SaveContext);
+}
+#endif
+
+void UTaskAsset::DiscardAuthoringData()
+{
+#if WITH_EDITORONLY_DATA
+	for(UTaskBase* Task : AuthoredTasks)
+	{
+		if(Task)
+		{
+			Task->GraphChildren.Reset();
+		}
+	}
+	TSet<UTaskBase*> Visited;
+	TArray<UTaskBase*> Pending = RootTasks;
+	while(!Pending.IsEmpty())
+	{
+		UTaskBase* Task = Pending.Pop(EAllowShrinking::No);
+		if(Task && !Visited.Contains(Task))
+		{
+			Visited.Add(Task);
+			Task->GraphChildren.Reset();
+			Pending.Append(Task->SubTasks);
+		}
+	}
+	AuthoredTasks.Reset();
+	StartTasks.Reset();
+	CompileErrors.Reset();
+#endif
+}

@@ -7,318 +7,339 @@
 #include "Task/Graph/TaskAssetGraphNode.h"
 #include "Task/Graph/TaskAssetGraphSchema.h"
 #include "Task/Slate/STaskGraphWidget.h"
-#include "Task/Slate/STaskDetailsWidget.h"
-#include "Task/Slate/STaskStatusWidget.h"
 #include "Task/Base/TaskAsset.h"
 #include "Task/Base/TaskBase.h"
+#include "Task/Base/TaskAssetReferenceTask.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "Engine/Blueprint.h"
 #include "Editor.h"
 #include "ScopedTransaction.h"
 #include "UObject/StrongObjectPtr.h"
-#include "IDetailsView.h"
-#include "SGraphPanel.h"
-#include "SGraphNode.h"
 #include "Framework/Commands/GenericCommands.h"
-#include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "HAL/PlatformApplicationMisc.h"
-#include "Subsystems/AssetEditorSubsystem.h"
-#include "Widgets/SBoxPanel.h"
-#include "Widgets/Text/STextBlock.h"
-#include "Slate/WidgetRenderer.h"
-#include "ImageUtils.h"
-#include "ImageCore.h"
-#include "Engine/TextureRenderTarget2D.h"
-#include "Misc/CommandLine.h"
 #include "Misc/ScopeExit.h"
+#include "Subsystems/AssetEditorSubsystem.h"
+#include "SGraphNode.h"
+#include "SGraphPanel.h"
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTaskEditorTest, "WHFramework.Task.Editor", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+namespace TaskGraphTests
+{
+	UTaskAsset* NewAsset()
+	{
+		UTaskAsset* Asset = NewObject<UTaskAsset>(GetTransientPackage(), NAME_None, RF_Transactional);
+		Asset->InitializeGraph();
+		return Asset;
+	}
 
-bool FTaskEditorTest::RunTest(const FString& Parameters)
+	UTaskBase* Add(UTaskAsset* Asset, FVector2D Position, UTaskBase* Parent = nullptr, bool bStart = false)
+	{
+		return FTaskGraphOperations::AddTask(Asset, UTaskBase::StaticClass(), Position, Parent, nullptr, bStart);
+	}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTaskGraphReachabilityTest, "WHFramework.Task.Graph.ReachabilityAndSiblingOrder", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FTaskGraphReachabilityTest::RunTest(const FString& Parameters)
+{
+	if(!TestNotNull(TEXT("需要编辑器事务环境"), GEditor))
+	{
+		return false;
+	}
+	TStrongObjectPtr<UTaskAsset> Asset(TaskGraphTests::NewAsset());
+	UTaskBase* LowerRoot = TaskGraphTests::Add(Asset.Get(), FVector2D(0.f, 400.f));
+	UTaskBase* UpperRoot = TaskGraphTests::Add(Asset.Get(), FVector2D(0.f, 100.f));
+	UTaskBase* HighDescendant = TaskGraphTests::Add(Asset.Get(), FVector2D(320.f, -1000.f), LowerRoot);
+	UTaskBase* LowerChild = TaskGraphTests::Add(Asset.Get(), FVector2D(320.f, 300.f), UpperRoot);
+	UTaskBase* UpperChild = TaskGraphTests::Add(Asset.Get(), FVector2D(320.f, 200.f), UpperRoot);
+	if(!LowerRoot || !UpperRoot || !HighDescendant || !LowerChild || !UpperChild)
+	{
+		AddError(TEXT("创建测试节点失败"));
+		return false;
+	}
+	TestTrue(TEXT("断开树完整保存在作者集合"), Asset->AuthoredTasks.Num() == 5 && LowerRoot->GraphChildren.Contains(HighDescendant));
+	TestTrue(TEXT("断开节点不进入编译结构"), Asset->RootTasks.IsEmpty() && Asset->TaskMap.IsEmpty() && LowerRoot->SubTasks.IsEmpty());
+	TestTrue(TEXT("连接下方根到 Start"), FTaskGraphOperations::Connect(Asset.Get(), nullptr, LowerRoot, true));
+	TestTrue(TEXT("连接上方根到 Start"), FTaskGraphOperations::Connect(Asset.Get(), nullptr, UpperRoot, true));
+	TestTrue(TEXT("只排序 Start 的直接子节点"), Asset->RootTasks == TArray<UTaskBase*>({UpperRoot, LowerRoot}));
+	TestTrue(TEXT("每个父节点独立排序"), UpperRoot->SubTasks == TArray<UTaskBase*>({UpperChild, LowerChild}));
+	TestEqual(TEXT("Y 最小的孙节点不会成为全局根"), HighDescendant->ParentTask, LowerRoot);
+	TestEqual(TEXT("父子层级保持"), HighDescendant->TaskHierarchy, 1);
+	TestEqual(TEXT("同级索引从零独立计数"), UpperChild->TaskIndex, 0);
+	UTaskBase* TieRight = TaskGraphTests::Add(Asset.Get(), FVector2D(640.f, 600.f), UpperRoot);
+	UTaskBase* TieLeft = TaskGraphTests::Add(Asset.Get(), FVector2D(320.f, 600.f), UpperRoot);
+	TestTrue(TEXT("同 Y 以 X 排序"), UpperRoot->SubTasks.IndexOfByKey(TieLeft) < UpperRoot->SubTasks.IndexOfByKey(TieRight));
+	{
+		const FScopedTransaction Transaction(NSLOCTEXT("TaskGraphTests", "Tie", "Move Task"));
+		FTaskGraphOperations::SetNodePosition(Asset.Get(), TieRight, false, TieLeft->GraphPosition);
+	}
+	const bool bLeftFirst = TieLeft->TaskGUID < TieRight->TaskGUID;
+	TestEqual(TEXT("同 Y/X 以稳定身份排序"), UpperRoot->SubTasks.IndexOfByKey(TieLeft) < UpperRoot->SubTasks.IndexOfByKey(TieRight), bLeftFirst);
+	const TArray<UTaskBase*> RootsBeforeLayout = Asset->RootTasks;
+	const TArray<UTaskBase*> ChildrenBeforeLayout = UpperRoot->SubTasks;
+	FTaskGraphOperations::AutoLayout(Asset.Get());
+	TestTrue(TEXT("布局保留按纵向位置确定的根顺序"), Asset->RootTasks == RootsBeforeLayout);
+	TestTrue(TEXT("布局保留直接同级顺序，不恢复插入数组顺序"), UpperRoot->SubTasks == ChildrenBeforeLayout);
+	for(int32 Left = 0; Left < Asset->AuthoredTasks.Num(); ++Left)
+	{
+		for(int32 Right = Left + 1; Right < Asset->AuthoredTasks.Num(); ++Right)
+		{
+			TestTrue(TEXT("业务节点各占独立行"), FMath::Abs(Asset->AuthoredTasks[Left]->GraphPosition.Y - Asset->AuthoredTasks[Right]->GraphPosition.Y) >= 200.f);
+		}
+	}
+	FText Reason;
+	TestFalse(TEXT("拒绝第二个父节点"), FTaskGraphOperations::CanConnect(Asset.Get(), LowerRoot, UpperChild, false, Reason));
+	TestTrue(TEXT("断开 Start 不删除下方整棵作者树"), FTaskGraphOperations::DisconnectEdge(Asset.Get(), nullptr, LowerRoot, true));
+	TestFalse(TEXT("断开后的孙节点不在 TaskMap"), Asset->TaskMap.Contains(HighDescendant->TaskGUID));
+	TestTrue(TEXT("断开后保留内部连接"), LowerRoot->GraphChildren == TArray<UTaskBase*>({HighDescendant}));
+	TestTrue(TEXT("断开后清理运行层级"), LowerRoot->SubTasks.IsEmpty() && HighDescendant->ParentTask == nullptr && HighDescendant->TaskHierarchy == INDEX_NONE);
+	TestFalse(TEXT("拒绝断开子树内的循环"), FTaskGraphOperations::CanConnect(Asset.Get(), HighDescendant, LowerRoot, false, Reason));
+	UTaskAssetReferenceTask* InvalidReference = CastChecked<UTaskAssetReferenceTask>(FTaskGraphOperations::AddTask(Asset.Get(), UTaskAssetReferenceTask::StaticClass(), FVector2D(0.f, 900.f)));
+	TestTrue(TEXT("断开的未配置引用不会参与业务验证"), Asset->bCompiledValid);
+	TestTrue(TEXT("连入未配置引用保留连线供修复"), FTaskGraphOperations::Connect(Asset.Get(), nullptr, InvalidReference, true));
+	TestTrue(TEXT("失败立即清旧编译结果"), !Asset->bCompiledValid && Asset->RootTasks.IsEmpty() && Asset->TaskMap.IsEmpty() && !Asset->CompileErrors.IsEmpty());
+	TestTrue(TEXT("修复断线恢复编译"), FTaskGraphOperations::DisconnectEdge(Asset.Get(), nullptr, InvalidReference, true) && Asset->bCompiledValid);
+	TArray<FText> Errors;
+	UTaskBase* Duplicate = TaskGraphTests::Add(Asset.Get(), FVector2D(0.f, 1200.f));
+	const FString OriginalID = Duplicate->TaskGUID;
+	const FGuid EquivalentID = FGuid::NewGuid();
+	Duplicate->TaskGUID = EquivalentID.ToString(EGuidFormats::DigitsWithHyphens).ToUpper();
+	InvalidReference->TaskGUID = EquivalentID.ToString(EGuidFormats::DigitsWithHyphensInBraces).ToLower();
+	TestFalse(TEXT("同 GUID 不同字符串格式也拒绝"), Asset->CompileTasks(Errors));
+	Duplicate->TaskGUID = OriginalID;
+	InvalidReference->TaskGUID = FGuid::NewGuid().ToString();
+	Errors.Reset();
+	TestTrue(TEXT("修复身份后可重新编译"), Asset->CompileTasks(Errors));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTaskGraphTransactionTest, "WHFramework.Task.Graph.TransactionsAndClipboard", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FTaskGraphTransactionTest::RunTest(const FString& Parameters)
+{
+	if(!TestNotNull(TEXT("需要编辑器事务环境"), GEditor))
+	{
+		return false;
+	}
+	TStrongObjectPtr<UTaskAsset> Asset(TaskGraphTests::NewAsset());
+	TStrongObjectPtr<UTaskAsset> Destination(TaskGraphTests::NewAsset());
+	UTaskBase* Root = TaskGraphTests::Add(Asset.Get(), FVector2D::ZeroVector, nullptr, true);
+	UTaskBase* Child = TaskGraphTests::Add(Asset.Get(), FVector2D(320.f, 160.f), Root);
+	if(!Root || !Child)
+	{
+		return false;
+	}
+	const FString ChildID = Child->TaskGUID;
+	GEditor->UndoTransaction();
+	TestTrue(TEXT("创建撤销恢复作者及编译集合"), Asset->AuthoredTasks.Num() == 1 && Asset->TaskMap.Num() == 1);
+	GEditor->RedoTransaction();
+	Child = Asset->FindAuthoredTask(ChildID);
+	if(!TestNotNull(TEXT("重做按稳定身份重新取对象"), Child))
+	{
+		return false;
+	}
+	TestEqual(TEXT("重做恢复父关系"), Child->ParentTask, Root);
+	Child->TaskDescription = NSLOCTEXT("TaskGraphTests", "PreservedText", "复制时保留文本身份");
+	Child->bRequireExplicitTurnIn = true;
+	FString Clipboard;
+	TestTrue(TEXT("核心导出无需系统剪贴板"), FTaskGraphOperations::ExportTasks(Asset.Get(), {Root, Child}, Clipboard));
+	const TArray<UTaskBase*> Copies = FTaskGraphOperations::ImportTasks(Destination.Get(), Clipboard, FVector2D(500.f, 500.f));
+	if(!TestEqual(TEXT("粘贴选中节点数量"), Copies.Num(), 2))
+	{
+		return false;
+	}
+	UTaskBase* CopiedRoot = Copies[0];
+	UTaskBase* CopiedChild = Copies[1];
+	TestTrue(TEXT("粘贴根保持断开"), Destination->StartTasks.IsEmpty() && Destination->RootTasks.IsEmpty() && Destination->TaskMap.IsEmpty());
+	TestTrue(TEXT("只保留选择内部连接"), CopiedRoot->GraphChildren == TArray<UTaskBase*>({CopiedChild}));
+	TestTrue(TEXT("粘贴身份独立"), CopiedRoot->TaskGUID != Root->TaskGUID && CopiedChild->TaskGUID != ChildID);
+	TestTrue(TEXT("文本及参数保留"), CopiedChild->TaskDescription.EqualTo(Child->TaskDescription) && CopiedChild->bRequireExplicitTurnIn);
+	GEditor->UndoTransaction();
+	TestTrue(TEXT("粘贴撤销移除所有作者节点"), Destination->AuthoredTasks.IsEmpty());
+	GEditor->RedoTransaction();
+	TestEqual(TEXT("粘贴重做恢复整个作者子图"), Destination->AuthoredTasks.Num(), 2);
+	const int32 BeforeMalformed = Destination->AuthoredTasks.Num();
+	TestTrue(TEXT("无效导入失败且不修改"), FTaskGraphOperations::ImportTasks(Destination.Get(), TEXT("{}"), FVector2D::ZeroVector).IsEmpty() && Destination->AuthoredTasks.Num() == BeforeMalformed);
+	TestTrue(TEXT("删除仅删除选中父节点"), FTaskGraphOperations::DeleteTasks(Asset.Get(), {Root}));
+	TestTrue(TEXT("未选择的子节点留下断开草稿"), Asset->AuthoredTasks.Contains(Child) && Asset->TaskMap.IsEmpty());
+	GEditor->UndoTransaction();
+	TestTrue(TEXT("删除撤销恢复模型连接与结构"), Root->GraphChildren.Contains(Child) && Child->ParentTask == Root && Asset->TaskMap.Num() == 2);
+	TStrongObjectPtr<UBlueprint> Blueprint(FKismetEditorUtilities::CreateBlueprint(UTaskBase::StaticClass(), GetTransientPackage(),
+		MakeUniqueObjectName(GetTransientPackage(), UBlueprint::StaticClass(), TEXT("TaskGraphTypeTest")), BPTYPE_Normal));
+	UTaskBase* Replacement = FTaskGraphOperations::ChangeTaskType(Asset.Get(), Child, Blueprint->GeneratedClass);
+	if(!TestNotNull(TEXT("完整蓝图类型替换"), Replacement))
+	{
+		return false;
+	}
+	TestTrue(TEXT("改类型保留身份和参数"), Replacement->TaskGUID == ChildID && Replacement->bRequireExplicitTurnIn);
+	GEditor->UndoTransaction();
+	TestEqual(TEXT("改类型撤销恢复原对象"), Asset->FindAuthoredTask(ChildID), Child);
+	GEditor->RedoTransaction();
+	TestEqual(TEXT("改类型重做按身份找到新对象"), Asset->FindAuthoredTask(ChildID), Replacement);
+	GEditor->UndoTransaction();
+	TStrongObjectPtr<UTaskAssetGraph> Graph(NewObject<UTaskAssetGraph>());
+	Graph->TaskAsset = Asset.Get();
+	Graph->Schema = UTaskAssetGraphSchema::StaticClass();
+	Graph->OnTasksChanged.BindLambda([&Graph] { Graph->RebuildFromAsset(); });
+	Graph->RebuildFromAsset();
+	const FString StartID = Asset->StartGUID.ToString();
+	UTaskAssetGraphNode* Start = Graph->FindNode(StartID);
+	if(!TestNotNull(TEXT("图中唯一 Start"), Start))
+	{
+		return false;
+	}
+	TestTrue(TEXT("Start 不能复制或删除且没有输入"), !Start->CanDuplicateNode() && !Start->CanUserDeleteNode() && !Start->FindPin(TEXT("In")) && Start->FindPin(TEXT("Out")));
+	const UTaskAssetGraphSchema* Schema = GetDefault<UTaskAssetGraphSchema>();
+	Schema->BreakPinLinks(*Start->FindPin(TEXT("Out")), true);
+	TestTrue(TEXT("Start 断开清空执行结构，作者节点和 Start 保留"), Asset->TaskMap.IsEmpty() && Graph->Nodes.Num() == 3);
+	GEditor->UndoTransaction();
+	Graph->RebuildFromAsset();
+	Start = Graph->FindNode(StartID);
+	TestTrue(TEXT("撤销后重新取节点和引脚"), Start && Start->FindPin(TEXT("Out")) && Start->FindPin(TEXT("Out"))->LinkedTo.Num() == 1 && Asset->TaskMap.Num() == 2);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTaskGraphMigrationTest, "WHFramework.Task.Graph.ExplicitMigration", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FTaskGraphMigrationTest::RunTest(const FString& Parameters)
 {
 	TStrongObjectPtr<UTaskAsset> Asset(NewObject<UTaskAsset>(GetTransientPackage(), NAME_None, RF_Transactional));
-	TStrongObjectPtr<UTaskAsset> Destination(NewObject<UTaskAsset>(GetTransientPackage(), NAME_None, RF_Transactional));
-	UTaskBase* Root = FTaskGraphOperations::AddTask(Asset.Get(), UTaskBase::StaticClass(), FVector2D(60, 80));
-	if (!TestNotNull(TEXT("创建根任务"), Root)) return false;
-	const FString RootID = Root->TaskGUID;
-	GEditor->UndoTransaction();
-	TestTrue(TEXT("创建撤销"), Asset->RootTasks.IsEmpty());
-	GEditor->RedoTransaction();
-	TestEqual(TEXT("创建重做保留身份"), Asset->RootTasks[0]->TaskGUID, RootID);
-	Asset->RebuildTaskMap(false);
-	UTaskBase* Child = FTaskGraphOperations::AddTask(Asset.Get(), UTaskBase::StaticClass(), FVector2D(400, 80), Root);
-	UTaskBase* Leaf = FTaskGraphOperations::AddTask(Asset.Get(), UTaskBase::StaticClass(), FVector2D(720, 80), Child);
-	UTaskBase* Other = FTaskGraphOperations::AddTask(Asset.Get(), UTaskBase::StaticClass(), FVector2D(400, 350), Root);
-	Root->TaskDisplayName = NSLOCTEXT("TaskEditorTest", "Root", "寻找失踪的调查员");
-	Child->TaskDisplayName = NSLOCTEXT("TaskEditorTest", "Child", "调查营地");
-	Leaf->TaskDisplayName = NSLOCTEXT("TaskEditorTest", "Leaf", "检查遗留的线索");
-	Other->TaskDisplayName = NSLOCTEXT("TaskEditorTest", "Other", "向守卫报告");
-	Child->TaskDescription = NSLOCTEXT("TaskEditorTest", "Description", "检查营地中的物品，寻找调查员的去向。");
-	Child->bRequireExplicitTurnIn = true;
-	Child->AutoExecuteTaskTime = 4.5f;
-	FTaskReference Requirement; Requirement.Asset = Asset.Get(); Requirement.TaskGUID = Child->TaskGUID;
-	Other->Prerequisites = {Requirement};
-	Other->ClearFlags(RF_Transactional);
+	UTaskBase* Root = NewObject<UTaskBase>(Asset.Get());
+	UTaskBase* Child = NewObject<UTaskBase>(Asset.Get());
+	Root->TaskGUID = TEXT("Commission.Root");
+	Child->TaskGUID = TEXT("Commission.Objective");
+	Root->SubTasks = {Child};
+	Asset->RootTasks = {Root};
+	TArray<FText> Errors;
+	TestFalse(TEXT("旧定义不能自动进入运行编译"), Asset->CompileTasks(Errors));
+	TestTrue(TEXT("保留旧树仅供显式迁移"), !Asset->bCompiledValid && Asset->RootTasks == TArray<UTaskBase*>({Root}) && Root->SubTasks == TArray<UTaskBase*>({Child}));
+	Errors.Reset();
+	TestTrue(TEXT("显式迁移保留所有节点"), FTaskGraphOperations::MigrateAsset(Asset.Get(), Errors) && Errors.IsEmpty());
+	TestTrue(TEXT("稳定业务字符串身份保持"), Root->TaskGUID == TEXT("Commission.Root") && Child->TaskGUID == TEXT("Commission.Objective"));
+	TestTrue(TEXT("迁移同时填充作者树和编译树"), Asset->AuthoredTasks.Num() == 2 && Root->GraphChildren.Contains(Child) && Child->ParentTask == Root);
+	const FGuid StartID = Asset->StartGUID;
+	FTaskGraphOperations::DisconnectEdge(Asset.Get(), nullptr, Root, true);
+	TestFalse(TEXT("重复迁移不重连断开的节点"), FTaskGraphOperations::MigrateAsset(Asset.Get(), Errors));
+	TestTrue(TEXT("保持原 Start 以及用户断线"), Asset->StartGUID == StartID && Asset->StartTasks.IsEmpty() && Asset->AuthoredTasks.Num() == 2);
+	TStrongObjectPtr<UTaskAsset> Duplicated(DuplicateObject<UTaskAsset>(Asset.Get(), GetTransientPackage()));
+	TestTrue(TEXT("持久化属性参与完整对象复制"), Duplicated->StartGUID == StartID && Duplicated->AuthoredTasks.Num() == 2 && Duplicated->StartTasks.IsEmpty());
+	TestTrue(TEXT("子对象所有者重定向到副本"), Duplicated->AuthoredTasks[0]->GetTaskAsset() == Duplicated.Get());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTaskGraphCommandsTest, "WHFramework.Task.Graph.EditorCommands", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FTaskGraphCommandsTest::RunTest(const FString& Parameters)
+{
+	if(!TestNotNull(TEXT("需要编辑器"), GEditor))
+	{
+		return false;
+	}
+	TStrongObjectPtr<UTaskAsset> Asset(TaskGraphTests::NewAsset());
+	UTaskBase* Root = TaskGraphTests::Add(Asset.Get(), FVector2D::ZeroVector, nullptr, true);
+	if(!Root)
+	{
+		return false;
+	}
 	TSharedRef<FTaskEditor> Editor = FTaskEditorModule::Get().CreateTaskEditor(EToolkitMode::Standalone, nullptr, Asset.Get());
 	ON_SCOPE_EXIT { GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->CloseAllEditorsForAsset(Asset.Get()); };
-	TestTrue(TEXT("已有节点打开编辑器后支持事务"), Other->HasAnyFlags(RF_Transactional));
-	const TSharedRef<STaskGraphWidget> View = Editor->GraphWidget.ToSharedRef();
+	TSharedRef<STaskGraphWidget> View = Editor->GraphWidget.ToSharedRef();
+	View->SelectTasks({Root});
 	const TSharedPtr<FUICommandList> Commands = View->GetCommands();
-	auto Undo = [&] { TestTrue(TEXT("撤销命令执行"), Commands->ExecuteAction(FGenericCommands::Get().Undo.ToSharedRef())); };
-	auto Redo = [&] { TestTrue(TEXT("重做命令执行"), Commands->ExecuteAction(FGenericCommands::Get().Redo.ToSharedRef())); };
-	auto Graph = [&] { return CastChecked<UTaskAssetGraph>(View->GetGraphEditor()->GetGraphPanel()->GetGraphObj()); };
-	auto Node = [&](UTaskBase* Task) -> UTaskAssetGraphNode*
-	{
-		const FString TaskID = Task ? Task->TaskGUID : FString();
-		for (UEdGraphNode* Item : Graph()->Nodes)
-			if (UTaskAssetGraphNode* Found = Cast<UTaskAssetGraphNode>(Item); Found && Found->Task && Found->Task->TaskGUID == TaskID) return Found;
-		return nullptr;
-	};
-	const UTaskAssetGraphSchema* Schema = GetDefault<UTaskAssetGraphSchema>();
-	View->SelectTasks({Child});
-	TestEqual(TEXT("详情跟随当前图节点"), Editor->DetailsWidget->DetailsView->GetSelectedObjects()[0].Get(), static_cast<UObject*>(Child));
-	TestNotNull(TEXT("输入端口 In"), Node(Child)->FindPin(TEXT("In")));
-	TestNotNull(TEXT("输出端口 Out"), Node(Child)->FindPin(TEXT("Out")));
-	TestNull(TEXT("旧端口 Parent 已移除"), Node(Child)->FindPin(TEXT("Parent")));
-	TestTrue(TEXT("节点标题显示层级执行序号"), Node(Child)->GetNodeTitle(ENodeTitleType::FullTitle).ToString().StartsWith(TEXT("[1.1]")));
-	TestTrue(TEXT("创建节点立即按纵向位置排序"), Root->SubTasks == TArray<UTaskBase*>{Child, Other});
-
-	UTaskBase* Inserted = FTaskGraphOperations::AddTask(Asset.Get(), UTaskBase::StaticClass(), FVector2D(560, 180), nullptr, Leaf);
-	View->Rebuild();
-	TestEqual(TEXT("从 In 创建节点保留原上游"), Inserted->ParentTask, Child);
-	TestEqual(TEXT("从 In 创建节点连接原节点"), Leaf->ParentTask, Inserted);
-	Undo();
-	TestEqual(TEXT("创建中间节点撤销"), Leaf->ParentTask, Child);
-	Redo();
-	TestEqual(TEXT("创建中间节点重做"), Leaf->ParentTask, Inserted);
-	Undo();
-
-	TStrongObjectPtr<UBlueprint> Blueprint(FKismetEditorUtilities::CreateBlueprint(UTaskBase::StaticClass(), GetTransientPackage(),
-		MakeUniqueObjectName(GetTransientPackage(), UBlueprint::StaticClass(), TEXT("TaskEditorTest")), BPTYPE_Normal));
-	UTaskBase* Changed = FTaskGraphOperations::ChangeTaskType(Asset.Get(), Child, Blueprint->GeneratedClass);
-	if (!TestNotNull(TEXT("切换为蓝图类型"), Changed)) return false;
-	View->Rebuild();
-	TestEqual(TEXT("类型切换保留 GUID"), Changed->TaskGUID, Child->TaskGUID);
-	TestTrue(TEXT("类型切换保留参数"), Changed->bRequireExplicitTurnIn && Changed->AutoExecuteTaskTime == 4.5f);
-	TestEqual(TEXT("类型切换保留原子节点实例"), Changed->SubTasks[0], Leaf);
-	TestEqual(TEXT("类型切换修正父指针"), Leaf->ParentTask, Changed);
-	TestTrue(TEXT("类型切换恢复选择"), View->GetSelectedTasks() == TArray<UTaskBase*>{Changed});
-	Undo();
-	TestEqual(TEXT("类型切换撤销"), Asset->TaskMap.FindRef(Child->TaskGUID), Child);
-	TestTrue(TEXT("类型切换撤销恢复选择"), View->GetSelectedTasks() == TArray<UTaskBase*>{Child});
-	Redo();
-	TestEqual(TEXT("类型切换重做"), Asset->TaskMap.FindRef(Child->TaskGUID), Changed);
-	Undo();
-
-	UTaskBase* BlueprintTask = FTaskGraphOperations::AddTask(Destination.Get(), Blueprint->GeneratedClass, FVector2D(120, 160));
-	BlueprintTask->TaskDescription = NSLOCTEXT("TaskEditorTest", "BlueprintText", "蓝图任务的复制参数");
-	FString BlueprintClipboard;
-	TestTrue(TEXT("复制派生蓝图任务"), FTaskGraphOperations::ExportTasks(Destination.Get(), {BlueprintTask}, BlueprintClipboard));
-	const TArray<UTaskBase*> BlueprintCopies = FTaskGraphOperations::ImportTasks(Destination.Get(), BlueprintClipboard, FVector2D(340, 260));
-	if (TestEqual(TEXT("粘贴派生蓝图任务"), BlueprintCopies.Num(), 1))
-	{
-		TestEqual(TEXT("剪贴板保留蓝图类"), BlueprintCopies[0]->GetClass(), Blueprint->GeneratedClass.Get());
-		TestTrue(TEXT("剪贴板保留蓝图实例文本"), BlueprintCopies[0]->TaskDescription.EqualTo(BlueprintTask->TaskDescription));
-	}
-	Undo();
-	Undo();
-
-	const FText Description = Child->TaskDescription;
-	{
-		const FScopedTransaction Transaction(NSLOCTEXT("TaskEditorTest", "Properties", "Edit Task Properties"));
-		Child->Modify();
-		Child->TaskDescription = FText::FromString(TEXT("已修改的描述"));
-		Child->Objectives.AddDefaulted();
-	}
-	Editor->OnTaskPropertyChanged(FPropertyChangedEvent(FindFProperty<FProperty>(UTaskBase::StaticClass(), GET_MEMBER_NAME_CHECKED(UTaskBase, Objectives))));
-	TestEqual(TEXT("未完成的目标配置仍显示整张图"), Graph()->Nodes.Num(), 4);
-	TArray<FText> Errors;
-	TestFalse(TEXT("运行定义仍严格校验未配置目标"), Asset->ValidateTasks(Errors));
-	Undo();
-	TestTrue(TEXT("详情属性撤销"), Child->TaskDescription.EqualTo(Description) && Child->Objectives.IsEmpty());
-	Redo();
-	TestEqual(TEXT("详情属性重做"), Child->Objectives.Num(), 1);
-	Undo();
-
-	FString Clipboard;
-	TestTrue(TEXT("复制选择子树"), FTaskGraphOperations::ExportTasks(Asset.Get(), {Child, Leaf, Other}, Clipboard));
-	const TArray<UTaskBase*> Imported = FTaskGraphOperations::ImportTasks(Destination.Get(), Clipboard, FVector2D(300, 200));
-	if (!TestEqual(TEXT("复制重叠选择去重"), Imported.Num(), 2)) return false;
-	UTaskBase* Copied = Imported[0];
-	UTaskBase* CopiedOther = Imported[1];
-	TestEqual(TEXT("复制保留层级"), Copied->SubTasks.Num(), 1);
-	TestTrue(TEXT("复制所有 GUID 独立"), Copied->TaskGUID != Child->TaskGUID && Copied->SubTasks[0]->TaskGUID != Leaf->TaskGUID);
-	TestEqual(TEXT("子节点归属目标资产"), Copied->SubTasks[0]->GetOuter(), static_cast<UObject*>(Destination.Get()));
-	FString OriginalText, CopiedText;
-	FTextStringHelper::WriteToBuffer(OriginalText, Child->TaskDescription);
-	FTextStringHelper::WriteToBuffer(CopiedText, Copied->TaskDescription);
-	TestEqual(TEXT("本地化文本身份保留"), CopiedText, OriginalText);
-	TestTrue(TEXT("本地前置依赖重映射"), CopiedOther->Prerequisites[0].Asset.Get() == Destination.Get() && CopiedOther->Prerequisites[0].TaskGUID == Copied->TaskGUID);
-	Undo();
-	TestTrue(TEXT("跨资产粘贴撤销"), Destination->RootTasks.IsEmpty());
-	Redo();
-	TestEqual(TEXT("跨资产粘贴重做"), Destination->RootTasks.Num(), 2);
-	TestTrue(TEXT("无关剪贴板不修改资产"), FTaskGraphOperations::ImportTasks(Destination.Get(), TEXT("{}"), FVector2D::ZeroVector).IsEmpty());
-
+	TestTrue(TEXT("重复命令走共同入口"), Commands->ExecuteAction(FGenericCommands::Get().Duplicate.ToSharedRef()));
+	TestTrue(TEXT("重复节点保持断开"), Asset->AuthoredTasks.Num() == 2 && Asset->TaskMap.Num() == 1);
+	Commands->ExecuteAction(FGenericCommands::Get().Undo.ToSharedRef());
+	TestEqual(TEXT("快捷键撤销作者节点"), Asset->AuthoredTasks.Num(), 1);
+	Commands->ExecuteAction(FGenericCommands::Get().Redo.ToSharedRef());
+	TestEqual(TEXT("快捷键重做作者节点"), Asset->AuthoredTasks.Num(), 2);
+	Commands->ExecuteAction(FGenericCommands::Get().Undo.ToSharedRef());
 	FString PreviousClipboard;
 	FPlatformApplicationMisc::ClipboardPaste(PreviousClipboard);
-	const FString ClipboardProbe = FString::Printf(TEXT("WHFrameworkTaskEditorTest_%s"), *FGuid::NewGuid().ToString());
-	FPlatformApplicationMisc::ClipboardCopy(*ClipboardProbe);
-	FString ClipboardProbeResult;
-	FPlatformApplicationMisc::ClipboardPaste(ClipboardProbeResult);
-	const bool bClipboardAvailable = ClipboardProbeResult == ClipboardProbe;
-	ON_SCOPE_EXIT { if (bClipboardAvailable) FPlatformApplicationMisc::ClipboardCopy(*PreviousClipboard); };
-	if (bClipboardAvailable)
+	const FString Probe = FGuid::NewGuid().ToString();
+	FPlatformApplicationMisc::ClipboardCopy(*Probe);
+	FString Readback;
+	FPlatformApplicationMisc::ClipboardPaste(Readback);
+	if(Readback != Probe)
 	{
-		View->SelectTasks({Child});
-		TestTrue(TEXT("右键复制命令"), Commands->ExecuteAction(FGenericCommands::Get().Copy.ToSharedRef()));
-		TestTrue(TEXT("右键粘贴命令"), Commands->ExecuteAction(FGenericCommands::Get().Paste.ToSharedRef()));
-		TestEqual(TEXT("同资产粘贴名称不冲突"), Asset->TaskMap.Num(), 6);
-		Undo();
-		TestEqual(TEXT("粘贴撤销"), Asset->TaskMap.Num(), 4);
-		Redo();
-		TestEqual(TEXT("粘贴重做"), Asset->TaskMap.Num(), 6);
-		Undo();
+		AddInfo(TEXT("系统剪贴板不可用；核心 JSON 导入导出由独立测试覆盖，本测试停止剪切/粘贴步骤。"));
+		return true;
 	}
-	else AddInfo(TEXT("系统剪贴板不可用，跳过依赖系统剪贴板的复制、粘贴和剪切命令检查"));
+	ON_SCOPE_EXIT { FPlatformApplicationMisc::ClipboardCopy(*PreviousClipboard); };
+	View->SelectTasks({Root});
+	TestTrue(TEXT("复制命令可执行"), Commands->ExecuteAction(FGenericCommands::Get().Copy.ToSharedRef()));
+	TestTrue(TEXT("粘贴命令可执行"), Commands->ExecuteAction(FGenericCommands::Get().Paste.ToSharedRef()));
+	TestTrue(TEXT("粘贴不自动加入 Start"), Asset->AuthoredTasks.Num() == 2 && Asset->TaskMap.Num() == 1);
+	Commands->ExecuteAction(FGenericCommands::Get().Undo.ToSharedRef());
+	View->SelectTasks({Root});
+	TestTrue(TEXT("剪切复制成功后才删除"), Commands->ExecuteAction(FGenericCommands::Get().Cut.ToSharedRef()));
+	TestTrue(TEXT("剪切移除业务节点，Start 保留"), Asset->AuthoredTasks.IsEmpty() && Asset->StartGUID.IsValid());
+	Commands->ExecuteAction(FGenericCommands::Get().Undo.ToSharedRef());
+	TestEqual(TEXT("剪切撤销恢复原身份"), Asset->AuthoredTasks[0]->TaskGUID, Root->TaskGUID);
+	return true;
+}
 
-	View->SelectTasks({Child});
-	Commands->ExecuteAction(FGenericCommands::Get().Duplicate.ToSharedRef());
-	TestEqual(TEXT("副本命令复制完整子树"), Asset->TaskMap.Num(), 6);
-	Undo();
-	TestEqual(TEXT("副本撤销"), Asset->TaskMap.Num(), 4);
-	Redo();
-	TestEqual(TEXT("副本重做"), Asset->TaskMap.Num(), 6);
-	Undo();
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTaskGraphDragTest, "WHFramework.Task.Graph.SlateDraggingAndUndo", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-	if (bClipboardAvailable)
+bool FTaskGraphDragTest::RunTest(const FString& Parameters)
+{
+	if(!TestNotNull(TEXT("需要编辑器"), GEditor) || !TestNull(TEXT("拖动测试不在 PIE 中修改资产"), GEditor->PlayWorld))
 	{
-		View->SelectTasks({Child});
-		Commands->ExecuteAction(FGenericCommands::Get().Cut.ToSharedRef());
-		TestEqual(TEXT("剪切删除子树"), Asset->TaskMap.Num(), 2);
-		TestTrue(TEXT("删除清理本地前置依赖"), Other->Prerequisites.IsEmpty());
-		Undo();
-		TestTrue(TEXT("剪切撤销恢复依赖和子树"), Asset->TaskMap.Num() == 4 && Other->Prerequisites.Num() == 1);
-		Redo();
-		TestEqual(TEXT("剪切重做"), Asset->TaskMap.Num(), 2);
-		Undo();
+		return false;
 	}
-	View->SelectTasks({Leaf});
-	Commands->ExecuteAction(FGenericCommands::Get().Delete.ToSharedRef());
-	TestEqual(TEXT("删除命令"), Asset->TaskMap.Num(), 3);
-	Undo();
-	TestEqual(TEXT("删除撤销"), Leaf->ParentTask, Child);
-	Redo();
-	TestEqual(TEXT("删除重做"), Asset->TaskMap.Num(), 3);
-	Undo();
-
-	TestEqual(TEXT("删除撤销后图同步重建"), Graph()->Nodes.Num(), 4);
-	UTaskAssetGraphNode* OtherNode = Node(Other);
-	UTaskAssetGraphNode* LeafNode = Node(Leaf);
-	if (!TestNotNull(TEXT("删除撤销后保留 Other 图节点"), OtherNode) || !TestNotNull(TEXT("删除撤销后恢复 Leaf 图节点"), LeafNode)) return false;
-	Schema->TryCreateConnection(OtherNode->FindPinChecked(TEXT("Out")), LeafNode->FindPinChecked(TEXT("In")));
-	TestEqual(TEXT("连线修改父节点"), Leaf->ParentTask, Other);
-	Undo();
-	TestEqual(TEXT("连线撤销"), Leaf->ParentTask, Child);
-	Redo();
-	TestEqual(TEXT("连线重做"), Leaf->ParentTask, Other);
-	Undo();
-	Schema->BreakSinglePinLink(Node(Child)->FindPinChecked(TEXT("Out")), Node(Leaf)->FindPinChecked(TEXT("In")));
-	TestNull(TEXT("断开单条线"), Leaf->ParentTask);
-	Undo();
-	TestEqual(TEXT("断线撤销"), Leaf->ParentTask, Child);
-	Redo();
-	TestNull(TEXT("断线重做"), Leaf->ParentTask);
-	Undo();
-	Schema->BreakNodeLinks(*Node(Child));
-	TestTrue(TEXT("断开节点同时处理 In 和 Out"), !Child->ParentTask && !Leaf->ParentTask);
-	Undo();
-	TestTrue(TEXT("断开节点一步撤销完整关系"), Child->ParentTask == Root && Leaf->ParentTask == Child);
-	Redo();
-	TestTrue(TEXT("断开节点重做"), !Child->ParentTask && !Leaf->ParentTask);
-	Undo();
-	Schema->BreakPinLinks(*Node(Root)->FindPinChecked(TEXT("Out")), true);
-	TestTrue(TEXT("断开 Out 保留子树"), !Child->ParentTask && !Other->ParentTask && Leaf->ParentTask == Child);
-	Undo();
-	TestTrue(TEXT("断开 Out 撤销"), Child->ParentTask == Root && Other->ParentTask == Root);
-	Redo();
-	TestNull(TEXT("断开 Out 重做"), Child->ParentTask);
-	Undo();
-
-	View->GetGraphEditor()->GetGraphPanel()->Update();
-	const FVector2D BeforeMove = Other->GraphPosition;
+	TStrongObjectPtr<UTaskAsset> Asset(TaskGraphTests::NewAsset());
+	UTaskBase* Upper = TaskGraphTests::Add(Asset.Get(), FVector2D(0, 200), nullptr, true);
+	UTaskBase* Lower = TaskGraphTests::Add(Asset.Get(), FVector2D(0, 400), nullptr, true);
+	if(!TestNotNull(TEXT("上方任务"), Upper) || !TestNotNull(TEXT("下方任务"), Lower))
 	{
-		const FScopedTransaction Transaction(NSLOCTEXT("TaskEditorTest", "Move", "Move Task Node"));
-		SGraphNode::FNodeSet Filter;
-		View->GetGraphEditor()->GetGraphPanel()->GetNodeWidgetFromGuid(Node(Other)->NodeGuid)->MoveTo(FVector2f(400, -80), Filter);
+		return false;
 	}
-	TestTrue(TEXT("实际 Slate 节点拖动写入资产并排序"), Other->GraphPosition.Y == -80 && Root->SubTasks[0] == Other);
-	TestTrue(TEXT("拖动排序后节点序号同步更新"), Node(Other)->GetNodeTitle(ENodeTitleType::FullTitle).ToString().StartsWith(TEXT("[1.1]")) &&
-		Node(Child)->GetNodeTitle(ENodeTitleType::FullTitle).ToString().StartsWith(TEXT("[1.2]")));
-	Undo();
-	TestTrue(TEXT("拖动撤销恢复位置和执行顺序"), Other->GraphPosition == BeforeMove && Root->SubTasks[0] == Child);
-	Redo();
-	TestTrue(TEXT("拖动重做恢复位置和执行顺序"), Other->GraphPosition.Y == -80 && Root->SubTasks[0] == Other);
-	Undo();
-	const FVector2D BeforeLayout = Leaf->GraphPosition;
-	FTaskGraphOperations::AutoLayout(Asset.Get()); View->Rebuild();
-	TestTrue(TEXT("自动布局改变节点位置"), Leaf->GraphPosition != BeforeLayout);
-	Undo();
-	TestEqual(TEXT("自动布局撤销"), Leaf->GraphPosition, BeforeLayout);
-	Redo();
-	TestTrue(TEXT("自动布局重做"), Leaf->GraphPosition != BeforeLayout);
-	Undo();
-
-	View->SelectTasks({Child});
-	FMenuBuilder NodeMenuBuilder(true, Commands);
-	FActionMenuContent NodeMenu = View->CreateNodeMenu(Graph(), Node(Child), nullptr, &NodeMenuBuilder, false);
-	FActionMenuContent BackgroundMenu = View->CreateActionMenu(Graph(), FVector2f::ZeroVector, {}, false, SGraphEditor::FActionMenuClosed());
-	TFunction<FString(TSharedRef<SWidget>)> ReadText = [&](TSharedRef<SWidget> Widget)
+	TSharedRef<FTaskEditor> Editor = FTaskEditorModule::Get().CreateTaskEditor(EToolkitMode::Standalone, nullptr, Asset.Get());
+	ON_SCOPE_EXIT { GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->CloseAllEditorsForAsset(Asset.Get()); };
+	TSharedRef<STaskGraphWidget> View = Editor->GraphWidget.ToSharedRef();
+	SGraphPanel* Panel = View->GetGraphEditor()->GetGraphPanel();
+	if(!TestNotNull(TEXT("真实图面板"), Panel))
 	{
-		FString Text;
-		if (Widget->GetType() == FName("STextBlock")) Text += StaticCastSharedRef<STextBlock>(Widget)->GetText().ToString() + TEXT("\n");
-		FChildren* Children = Widget->GetChildren();
-		for (int32 Index = 0; Index < Children->Num(); ++Index) Text += ReadText(Children->GetChildAt(Index));
-		return Text;
-	};
-	const FString MenuText = ReadText(NodeMenu.Content);
-	TestTrue(TEXT("节点右键保留类型与代码编辑"), MenuText.Contains(TEXT("Change Task Type")) && MenuText.Contains(TEXT("Go to Task Code")));
-	TestFalse(TEXT("没有旧列表操作"), MenuText.Contains(TEXT("Move Up")) || MenuText.Contains(TEXT("Append")) || MenuText.Contains(TEXT("Insert")));
-	TestTrue(TEXT("背景右键提供创建入口"), ReadText(BackgroundMenu.Content).Contains(TEXT("Create Task")));
-	TestTrue(TEXT("状态栏显示当前选择与撤销说明"), ReadText(Editor->StatusWidget->TakeWidget()).Contains(TEXT("Ctrl+Z")));
-	Asset->SourceObject = Destination.Get();
-	TestFalse(TEXT("运行实例禁止修改"), View->CanEdit());
-	TestFalse(TEXT("运行实例不能删除"), Commands->CanExecuteAction(FGenericCommands::Get().Delete.ToSharedRef()));
-	TestNull(TEXT("运行实例不能新建"), FTaskGraphOperations::AddTask(Asset.Get(), UTaskBase::StaticClass(), FVector2D::ZeroVector));
-	Asset->SourceObject = nullptr;
-
-	FString Preview;
-	if (FApp::CanEverRender() && FParse::Value(FCommandLine::Get(), TEXT("TaskPreview="), Preview))
-	{
-		View->GetGraphEditor()->GetGraphPanel()->Update();
-		View->GetGraphEditor()->SetViewLocation(FVector2D(-40, -40), 0.9f);
-		TSharedRef<SWidget> Layout = SNew(SVerticalBox)
-			+ SVerticalBox::Slot().FillHeight(1)[
-				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot().FillWidth(0.74f)[View]
-				+ SHorizontalBox::Slot().FillWidth(0.26f)[Editor->DetailsWidget->TakeWidget()]
-			]
-			+ SVerticalBox::Slot().AutoHeight()[Editor->StatusWidget->TakeWidget()];
-		auto Render = [&](TSharedRef<SWidget> Widget, const FString& Path, FVector2D Size)
-		{
-			FWidgetRenderer Renderer(true);
-			UTextureRenderTarget2D* Target = Renderer.DrawWidget(Widget, Size);
-			FImage Image;
-			if (TestTrue(TEXT("任务编辑器渲染"), FImageUtils::GetRenderTargetImage(Target, Image)))
-			{
-				if (Image.Format == ERawImageFormat::BGRA8) Image.GammaSpace = EGammaSpace::sRGB;
-				TestTrue(TEXT("任务编辑器预览导出"), FImageUtils::SaveImageByExtension(*Path, Image));
-			}
-		};
-		Render(Layout, Preview, FVector2D(1320, 680));
-		Render(NodeMenu.Content, FPaths::GetPath(Preview) / TEXT("TaskNodeMenu.png"), FVector2D(340, 590));
-		Render(BackgroundMenu.Content, FPaths::GetPath(Preview) / TEXT("TaskBackgroundMenu.png"), FVector2D(340, 550));
+		return false;
 	}
+	Panel->Update();
+	UTaskAssetGraph* Graph = CastChecked<UTaskAssetGraph>(Panel->GetGraphObj());
+	UTaskAssetGraphNode* Node = Graph->FindNode(Lower->TaskGUID);
+	if(!TestNotNull(TEXT("按稳定身份找到拖动节点"), Node))
+	{
+		return false;
+	}
+	TSharedPtr<SGraphNode> Widget = Panel->GetNodeWidgetFromGuid(Node->NodeGuid);
+	if(!TestTrue(TEXT("使用正式节点工厂生成的 Slate 控件"), Widget.IsValid()))
+	{
+		return false;
+	}
+	int32 GraphNotifications = 0;
+	const FDelegateHandle Handler = Graph->AddOnGraphChangedHandler(FOnGraphChanged::FDelegate::CreateLambda(
+		[&GraphNotifications](const FEdGraphEditAction&) { ++GraphNotifications; }));
+	ON_SCOPE_EXIT { Graph->RemoveOnGraphChangedHandler(Handler); };
+	{
+		const FScopedTransaction Transaction(NSLOCTEXT("TaskGraphTests", "SlateDrag", "Drag Task"));
+		SNodePanel::SNode::FNodeSet NodeFilter;
+		Widget->MoveTo(FVector2f(80.6f, 100.6f), NodeFilter);
+		TestEqual(TEXT("作者位置与图节点统一取整"), Lower->GraphPosition, FVector2D(81, 101));
+		Widget->MoveTo(FVector2f(120, 120), NodeFilter);
+		TestEqual(TEXT("同一移动集合不会重复移动"), Lower->GraphPosition, FVector2D(81, 101));
+		NodeFilter.Reset();
+		Widget->MoveTo(FVector2f(100, 90), NodeFilter);
+	}
+	TestEqual(TEXT("拖动中不刷新或替换正在使用的图控件"), GraphNotifications, 0);
+	TestTrue(TEXT("连续移动保留原 Slate 控件"), Panel->GetNodeWidgetFromGuid(Node->NodeGuid) == Widget);
+	TestEqual(TEXT("图位置同步更新"), Node->GetPosition(), FVector2f(100, 90));
+	TestTrue(TEXT("拖动同步直接同级纵向顺序"), Asset->RootTasks == TArray<UTaskBase*>({Lower, Upper}));
+	TestTrue(TEXT("标题同步排序序号"), Node->GetNodeTitle(ENodeTitleType::FullTitle).ToString().StartsWith(TEXT("[1]")));
+	GEditor->UndoTransaction();
+	TestEqual(TEXT("一次撤销恢复整个连续拖动"), Lower->GraphPosition, FVector2D(0, 400));
+	TestTrue(TEXT("撤销同时恢复编译顺序"), Asset->RootTasks == TArray<UTaskBase*>({Upper, Lower}));
+	GEditor->RedoTransaction();
+	TestEqual(TEXT("重做恢复最终拖动位置"), Lower->GraphPosition, FVector2D(100, 90));
+	TestTrue(TEXT("重做恢复编译顺序"), Asset->RootTasks == TArray<UTaskBase*>({Lower, Upper}));
+	View->Rebuild();
+	Node = Graph->FindNode(Lower->TaskGUID);
+	TestTrue(TEXT("重建后稳定身份及最终位置仍有效"), Node && Node->GetPosition() == FVector2f(100, 90));
 	return true;
 }
 

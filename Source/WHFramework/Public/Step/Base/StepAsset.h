@@ -1,15 +1,12 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
-
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Asset/Base/AssetBase.h"
+#include "Step/StepModuleTypes.h"
 #include "StepAsset.generated.h"
 
 class UStepBase;
-/**
- * Imported spreadsheet table.
- */
+
 UCLASS(BlueprintType, Meta = (LoadBehavior = "LazyOnDemand"))
 class WHFRAMEWORK_API UStepAsset : public UAssetBase
 {
@@ -18,35 +15,36 @@ class WHFRAMEWORK_API UStepAsset : public UAssetBase
 public:
 	UStepAsset(const FObjectInitializer& ObjectInitializer);
 
-public:
 	virtual void Initialize() override;
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Step Stats
-public:
-	/// 自动开始初始步骤
 	UPROPERTY(EditAnywhere)
-	bool bAutoStartFirst;
-	/// 初始步骤 
-	UPROPERTY(VisibleAnywhere)
-	UStepBase* FirstStep;
-	/// 根步骤
-	UPROPERTY(VisibleAnywhere)
-	TArray<UStepBase*> RootSteps;
-	/// 步骤Map
-	UPROPERTY(Transient)
-	TMap<FString, UStepBase*> StepMap;
+	bool bAutoStartFirst = false;
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Editor
-public:
+	UPROPERTY(Instanced)
+	TArray<UStepBase*> Steps;
+
+	UPROPERTY()
+	FString StartGUID;
+
+	UPROPERTY()
+	FVector2D StartPosition = FVector2D::ZeroVector;
+
+	UPROPERTY()
+	TArray<FStepGraphLink> Links;
+
+	UPROPERTY()
+	FStepCompiledGraph CompiledGraph;
+
+	UPROPERTY()
+	bool bCompiled = false;
+
+	bool BuildCompiledGraph(FStepCompiledGraph& OutGraph, TArray<FText>& OutErrors) const;
+	bool Compile(TArray<FText>& OutErrors);
+	UStepBase* FindDefinition(const FString& InGUID) const;
+	bool CanAddStep(TSubclassOf<UStepBase> InClass) const;
+
 #if WITH_EDITOR
-	void GenerateStepListItem(TArray<TSharedPtr<struct FStepListItem>>& OutStepListItems, const FString& InFilterText = TEXT(""));
-
-	void UpdateStepListItem(TArray<TSharedPtr<struct FStepListItem>>& OutStepListItems);
-
-	bool CanAddStep(TSubclassOf<UStepBase> InStepClass);
-
-	void ClearAllStep();
+	virtual void PreSave(FObjectPreSaveContext SaveContext) override;
+	virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) const override;
 #endif
 };

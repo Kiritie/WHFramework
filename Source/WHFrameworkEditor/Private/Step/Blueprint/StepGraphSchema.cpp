@@ -3,4 +3,6 @@
 #include "Step/Blueprint/StepGraphSchema.h"
 
 UStepGraphSchema::UStepGraphSchema(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer) {}
+	: Super(ObjectInitializer)
+{
+}

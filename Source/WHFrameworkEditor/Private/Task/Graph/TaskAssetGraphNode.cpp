@@ -8,7 +8,7 @@
 #include "EdGraphUtilities.h"
 #include "SGraphNodeDefault.h"
 
-namespace
+namespace TaskGraphNodes
 {
 	FString GetTaskOrderLabel(const UTaskBase* Task)
 	{
@@ -30,14 +30,28 @@ namespace
 
 void UTaskAssetGraphNode::AllocateDefaultPins()
 {
-	CreatePin(EGPD_Input, TEXT("Task"), TEXT("In"));
+	if(!bStartNode)
+	{
+		CreatePin(EGPD_Input, TEXT("Task"), TEXT("In"));
+	}
 	CreatePin(EGPD_Output, TEXT("Task"), TEXT("Out"));
 }
 
 FText UTaskAssetGraphNode::GetNodeTitle(ENodeTitleType::Type TitleType) const
 {
-	if(!Task) return FText::GetEmpty();
-	const FText Order = FText::FromString(GetTaskOrderLabel(Task));
+	if(bStartNode)
+	{
+		return NSLOCTEXT("TaskGraph", "Start", "Start");
+	}
+	if(!Task)
+	{
+		return FText::GetEmpty();
+	}
+	if(!Task->GetTaskAsset()->TaskMap.Contains(Task->TaskGUID))
+	{
+		return FText::Format(NSLOCTEXT("TaskGraph", "DisconnectedTitle", "[Disconnected] {0}"), Task->TaskDisplayName);
+	}
+	const FText Order = FText::FromString(TaskGraphNodes::GetTaskOrderLabel(Task));
 	if(const UTaskAssetReferenceTask* ReferenceTask = Cast<UTaskAssetReferenceTask>(Task))
 	{
 		const FString AssetName = ReferenceTask->ReferencedAsset.IsNull() ? TEXT("None") : ReferenceTask->ReferencedAsset.ToSoftObjectPath().GetAssetName();
@@ -49,6 +63,10 @@ FText UTaskAssetGraphNode::GetNodeTitle(ENodeTitleType::Type TitleType) const
 
 FText UTaskAssetGraphNode::GetTooltipText() const
 {
+	if(bStartNode)
+	{
+		return NSLOCTEXT("TaskGraph", "StartTooltip", "Only tasks reachable from Start enter the compiled task tree.");
+	}
 	if(const UTaskAssetReferenceTask* ReferenceTask = Cast<UTaskAssetReferenceTask>(Task))
 	{
 		return FText::Format(NSLOCTEXT("TaskGraph", "ReferenceTooltip", "{0}\nReferenced asset: {1}\nDouble-click to open the referenced task graph."),
@@ -59,7 +77,14 @@ FText UTaskAssetGraphNode::GetTooltipText() const
 
 FLinearColor UTaskAssetGraphNode::GetNodeTitleColor() const
 {
-	if (!Task) return FLinearColor::Gray;
+	if(bStartNode)
+	{
+		return FLinearColor(0.1f, 0.55f, 0.25f);
+	}
+	if(!Task || !Task->GetTaskAsset()->TaskMap.Contains(Task->TaskGUID))
+	{
+		return FLinearColor::Gray;
+	}
 	if(Task->IsA<UTaskAssetReferenceTask>()) return FLinearColor(0.12f, 0.48f, 0.52f);
 	switch (Task->TaskState)
 	{
@@ -86,24 +111,18 @@ public:
 	{
 		UTaskAssetGraphNode* Node = CastChecked<UTaskAssetGraphNode>(GraphNode);
 		if (NodeFilter.Contains(SharedThis(this))) return;
-		if (Node->Task && bMarkDirty)
+		UTaskAssetGraph* Graph = CastChecked<UTaskAssetGraph>(Node->GetGraph());
+		const FVector2D Position(FMath::RoundToInt(NewPosition.X), FMath::RoundToInt(NewPosition.Y));
+		const FVector2D Previous = Node->bStartNode ? Graph->TaskAsset->StartPosition : Node->Task->GraphPosition;
+		if(bMarkDirty && Position != Previous)
 		{
-			UTaskAssetGraph* Graph = CastChecked<UTaskAssetGraph>(Node->GetGraph());
-			if (!FTaskGraphOperations::CanEdit(Graph->TaskAsset)) return;
-			for (UEdGraphNode* Item : Graph->Nodes)
+			if(!FTaskGraphOperations::CanEdit(Graph->TaskAsset))
 			{
-				UTaskAssetGraphNode* Other = CastChecked<UTaskAssetGraphNode>(Item);
-				if (Other->Task->ParentTask == Node->Task->ParentTask && !Other->Task->bHasGraphPosition)
-				{
-					Other->Task->Modify();
-					Other->Task->GraphPosition = FVector2D(Other->NodePosX, Other->NodePosY);
-					Other->Task->bHasGraphPosition = true;
-				}
+				return;
 			}
-			Node->Task->Modify();
-			Node->Task->GraphPosition = FVector2D(NewPosition);
-			Node->Task->bHasGraphPosition = true;
-			FTaskGraphOperations::SortSiblings(Graph->TaskAsset, Node->Task);
+			Graph->Modify();
+			Node->Modify();
+			FTaskGraphOperations::SetNodePosition(Graph->TaskAsset, Node->Task, Node->bStartNode, Position);
 		}
 		SGraphNodeDefault::MoveTo(NewPosition, NodeFilter, bMarkDirty);
 	}
@@ -125,4 +144,20 @@ public:
 TSharedRef<FGraphPanelNodeFactory> CreateTaskGraphNodeFactory()
 {
 	return MakeShared<FTaskAssetGraphNodeFactory>();
+}
+
+
+FString UTaskAssetGraphNode::GetStableGUID() const
+{
+	return bStartNode ? NodeGuid.ToString() : Task ? Task->TaskGUID : FString();
+}
+
+bool UTaskAssetGraphNode::CanUserDeleteNode() const
+{
+	return !bStartNode && Task != nullptr;
+}
+
+bool UTaskAssetGraphNode::CanDuplicateNode() const
+{
+	return !bStartNode && Task != nullptr;
 }

@@ -14,4 +14,6 @@ class UTaskAssetFactory : public UAssetFactoryBase
 
 public:
 	UTaskAssetFactory(const FObjectInitializer& ObjectInitializer);
+	virtual UObject* FactoryCreateNew(UClass* Class, UObject* InParent, FName Name, EObjectFlags Flags, UObject* Context, FFeedbackContext* Warn) override;
+	virtual UObject* FactoryCreateNew(UClass* Class, UObject* InParent, FName Name, EObjectFlags Flags, UObject* Context, FFeedbackContext* Warn, FName CallingContext) override;
 };

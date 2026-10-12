@@ -1,121 +1,88 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
-#include "ProcedureModule.h"
-
+#include "Procedure/ProcedureModule.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
-
 #include "ProcedureModuleStatics.generated.h"
 
-class UProcedureBase;
-/**
- * 
- */
 UCLASS()
 class WHFRAMEWORK_API UProcedureModuleStatics : public UBlueprintFunctionLibrary
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintPure, Category = "ProcedureModuleStatics")
-	static TArray<UProcedureAsset*> GetProcedureAssets();
-
-	UFUNCTION(BlueprintPure, Category = "ProcedureModuleStatics")
-	static UProcedureAsset* GetCurrentProcedureAsset();
-
-	template<class T>
-	static T* GetCurrentProcedure()
-	{
-		return Cast<T>(GetCurrentProcedure());
-	}
-	
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "ProcedureModuleStatics")
-	static UProcedureBase* GetCurrentProcedure(TSubclassOf<UProcedureBase> InClass = nullptr);
-
-public:
-	UFUNCTION(BlueprintPure, Category = "ProcedureModuleStatics")
-	static UProcedureAsset* GetProcedureAsset(UProcedureAsset* InAsset);
-	
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleStatics")
-	static void AddProcedureAsset(UProcedureAsset* InAsset);
-	
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleStatics")
-	static void RemoveProcedureAsset(UProcedureAsset* InAsset);
-	
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleStatics")
-	static void SwitchProcedureAsset(UProcedureAsset* InAsset);
-
-	UFUNCTION(BlueprintPure, Category = "ProcedureModuleStatics")
-	static bool HasProcedureByIndex(int32 InIndex);
-
-	template<class T>
-	static T* GetProcedureByIndex(int32 InIndex)
-	{
-		return UProcedureModule::Get().GetProcedureByIndex<T>(InIndex);
-	}
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetProcedureByIndex", DeterminesOutputType = "InIndex"))
-	static UProcedureBase* GetProcedureByIndex(int32 InIndex, TSubclassOf<UProcedureBase> InClass);
-	
-	template<class T>
-	static bool HasProcedureByClass()
-	{
-		return UProcedureModule::Get().HasProcedureByClass<T>(T::StaticClass());
-	}
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "HasProcedureByClass"))
-	static bool HasProcedureByClass(TSubclassOf<UProcedureBase> InClass);
-
-	template<class T>
-	static T* GetProcedureByClass(TSubclassOf<UProcedureBase> InClass = T::StaticClass())
-	{
-		return UProcedureModule::Get().GetProcedureByClass<T>(InClass);
-	}
-	UFUNCTION(BlueprintPure, meta = (DisplayName = "GetProcedureByClass", DeterminesOutputType = "InClass"))
-	static UProcedureBase* GetProcedureByClass(TSubclassOf<UProcedureBase> InClass);
-			
-	UFUNCTION(BlueprintPure, Category = "ProcedureModuleStatics")
-	static bool IsCurrentProcedure(UProcedureBase* InProcedure);
-
-	UFUNCTION(BlueprintPure, Category = "ProcedureModuleStatics")
-	static bool IsCurrentProcedureIndex(int32 InIndex);
-
-	template<class T>
-	static bool IsCurrentProcedureClass()
-	{
-		return IsCurrentProcedureClass(T::StaticClass());
-	}
-
-	UFUNCTION(BlueprintPure, Category = "ProcedureModuleStatics")
-	static bool IsCurrentProcedureClass(TSubclassOf<UProcedureBase> InClass)
-	{
-		return UProcedureModule::Get().IsCurrentProcedureClass(InClass);
-	}
-
-public:
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleStatics")
-	static void SwitchProcedure(UProcedureBase* InProcedure);
-
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleStatics")
-	static void SwitchProcedureByIndex(int32 InIndex);
-
-	template<class T>
-	static void SwitchProcedureByClass(TSubclassOf<UProcedureBase> InClass = T::StaticClass())
-	{
-		SwitchProcedureByClass(InClass);
-	}
-
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleStatics")
-	static void SwitchProcedureByClass(TSubclassOf<UProcedureBase> InClass);
-
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleStatics")
-	static void SwitchFirstProcedure();
-
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleStatics")
-	static void SwitchLastProcedure();
-
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleStatics")
-	static void SwitchNextProcedure();
-
-	UFUNCTION(BlueprintCallable, Category = "ProcedureModuleStatics")
-	static void GuideCurrentProcedure();
+    UFUNCTION(BlueprintCallable)
+    static bool StartMain();
+    UFUNCTION(BlueprintCallable)
+    static void StopMain();
+    UFUNCTION(BlueprintCallable)
+    static bool SwitchProcedure(UProcedureBase* InProcedure);
+    UFUNCTION(BlueprintCallable)
+    static bool SwitchProcedureFrom(const FProcedureActivationToken& Token, UProcedureBase* InProcedure);
+    UFUNCTION(BlueprintPure)
+    static bool CanSwitchProcedure(UProcedureBase* InProcedure);
+    UFUNCTION(BlueprintCallable)
+    static bool SwitchProcedureByIndex(int32 InIndex);
+    UFUNCTION(BlueprintPure)
+    static bool CanSwitchProcedureByIndex(int32 InIndex);
+    UFUNCTION(BlueprintCallable)
+    static bool SwitchProcedureByClass(TSubclassOf<UProcedureBase> InClass);
+    UFUNCTION(BlueprintPure)
+    static bool CanSwitchProcedureByClass(TSubclassOf<UProcedureBase> InClass);
+    UFUNCTION(BlueprintCallable)
+    static bool SwitchFirstProcedure();
+    UFUNCTION(BlueprintCallable)
+    static bool SwitchLastProcedure();
+    UFUNCTION(BlueprintCallable)
+    static bool SwitchPreProcedure();
+    UFUNCTION(BlueprintCallable)
+    static bool SwitchNextProcedure();
+    UFUNCTION(BlueprintCallable)
+    static bool Advance(FName Output = "Out");
+    UFUNCTION(BlueprintPure)
+    static bool CanAdvance(FName Output = "Out");
+    UFUNCTION(BlueprintCallable)
+    static bool AdvanceFrom(const FProcedureActivationToken& Token, FName Output = "Out");
+    UFUNCTION(BlueprintCallable)
+    static void GuideCurrentProcedure();
+    UFUNCTION(BlueprintPure)
+    static UProcedureAsset* GetCurrentProcedureAsset();
+    UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+    static UProcedureBase* GetCurrentProcedure(TSubclassOf<UProcedureBase> InClass = nullptr);
+    UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+    static UProcedureBase* GetProcedureByClass(TSubclassOf<UProcedureBase> InClass);
+    UFUNCTION(BlueprintPure)
+    static bool HasProcedureByClass(TSubclassOf<UProcedureBase> InClass);
+    UFUNCTION(BlueprintPure)
+    static bool IsCurrentProcedure(UProcedureBase* InProcedure);
+    UFUNCTION(BlueprintPure)
+    static bool IsCurrentProcedureClass(TSubclassOf<UProcedureBase> InClass);
+    UFUNCTION(BlueprintPure)
+    static bool HasProcedureByIndex(int32 InIndex);
+    UFUNCTION(BlueprintPure)
+    static bool IsCurrentProcedureIndex(int32 InIndex);
+    UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+    static UProcedureBase* GetProcedureByIndex(int32 InIndex, TSubclassOf<UProcedureBase> InClass = nullptr);
+    template <class T>
+    static T* GetCurrentProcedure() { return UProcedureModule::Get().GetCurrentProcedure<T>(); }
+    template <class T>
+    static T* GetProcedureByClass(TSubclassOf<UProcedureBase> InClass = T::StaticClass())
+    {
+        return UProcedureModule::Get().GetProcedureByClass<T>(InClass);
+    }
+    template <class T>
+    static T* GetProcedureByIndex(int32 InIndex) { return UProcedureModule::Get().GetProcedureByIndex<T>(InIndex); }
+    template <class T>
+    static bool HasProcedureByClass() { return UProcedureModule::Get().HasProcedureByClass<T>(); }
+    template <class T>
+    static bool IsCurrentProcedureClass() { return UProcedureModule::Get().IsCurrentProcedureClass<T>(); }
+    template <class T>
+    static bool SwitchProcedureByClass(TSubclassOf<UProcedureBase> InClass = T::StaticClass())
+    {
+        return UProcedureModule::Get().SwitchProcedureByClass(InClass);
+    }
+    template <class T>
+    static bool CanSwitchProcedureByClass(TSubclassOf<UProcedureBase> InClass = T::StaticClass())
+    {
+        return UProcedureModule::Get().CanSwitchProcedureByClass(InClass);
+    }
 };

@@ -1,6 +1,1 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Step/StepModuleTypes.h"
-
-

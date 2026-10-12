@@ -15,24 +15,27 @@ UTaskComponent::UTaskComponent(const FObjectInitializer& ObjectInitializer)
 
 void UTaskComponent::BeginPlay()
 {
+	UTaskModule* TaskModule = UTaskModule::GetPtr(GetWorld());
 	Super::BeginPlay();
 	ResolveAgentID();
 	ResolveTaskAssets();
-	if(UTaskModule::IsValid()) UTaskModule::Get().OnTaskAssetsChanged.AddUniqueDynamic(this, &UTaskComponent::OnTaskAssetsChanged);
+	if(TaskModule != nullptr) TaskModule->OnTaskAssetsChanged.AddUniqueDynamic(this, &UTaskComponent::OnTaskAssetsChanged);
 	RefreshTaskMarker();
 }
 
 void UTaskComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	if(UTaskModule::IsValid())
+	UTaskModule* TaskModule = UTaskModule::GetPtr(GetWorld());
+	USceneModule* SceneModule = USceneModule::GetPtr(GetWorld());
+	if(TaskModule != nullptr)
 	{
-		UTaskModule::Get().OnTaskAssetsChanged.RemoveDynamic(this, &UTaskComponent::OnTaskAssetsChanged);
+		TaskModule->OnTaskAssetsChanged.RemoveDynamic(this, &UTaskComponent::OnTaskAssetsChanged);
 		for(UTaskAsset* Asset : GetRuntimeAssets())
 		{
 			if(Asset && GetOwner()) Asset->AgentLocation = GetOwner()->GetActorLocation();
 		}
 	}
-	if(USceneModule::IsValid() && MarkerID.IsValid()) USceneModule::Get().RemoveMarker(MarkerID);
+	if(SceneModule != nullptr && MarkerID.IsValid()) SceneModule->RemoveMarker(MarkerID);
 	ResolvedTaskAssets.Reset();
 	Super::EndPlay(EndPlayReason);
 }
@@ -64,7 +67,8 @@ void UTaskComponent::SetTaskAssets(const TArray<TSoftObjectPtr<UTaskAsset>>& InA
 
 TArray<UTaskAsset*> UTaskComponent::GetRuntimeAssets() const
 {
-	return UTaskModule::IsValid() && AgentID.IsValid() ? UTaskModule::Get().GetAssetsByAgent(AgentID) : TArray<UTaskAsset*>();
+	UTaskModule* TaskModule = UTaskModule::GetPtr(GetWorld());
+	return TaskModule != nullptr && AgentID.IsValid() ? TaskModule->GetAssetsByAgent(AgentID) : TArray<UTaskAsset*>();
 }
 
 bool UTaskComponent::HasRuntimeAsset(UTaskAsset* InSource) const
@@ -115,8 +119,9 @@ UTaskBase* UTaskComponent::GetTask(ETaskStage InStage) const
 
 UTaskBase* UTaskComponent::ResolveTask(const FTaskReference& InReference) const
 {
-	if(!UTaskModule::IsValid()) return nullptr;
-	if(InReference.InstanceID.IsValid()) return UTaskModule::Get().ResolveTask(InReference);
+	UTaskModule* TaskModule = UTaskModule::GetPtr(GetWorld());
+	if(TaskModule == nullptr) return nullptr;
+	if(InReference.InstanceID.IsValid()) return TaskModule->ResolveTask(InReference);
 	for(UTaskAsset* Asset : GetRuntimeAssets())
 	{
 		if(!Asset || !Asset->SourceObject) continue;
@@ -129,7 +134,8 @@ UTaskBase* UTaskComponent::ResolveTask(const FTaskReference& InReference) const
 
 UTaskBase* UTaskComponent::AcceptTask(UTaskAsset* InAsset, FString InTaskGUID, AActor* InInteractor)
 {
-	if(!bAgentActive || !UTaskModule::IsValid() || (!AgentID.IsValid() && !ResolveAgentID())) return nullptr;
+	UTaskModule* TaskModule = UTaskModule::GetPtr(GetWorld());
+	if(!bAgentActive || TaskModule == nullptr || (!AgentID.IsValid() && !ResolveAgentID())) return nullptr;
 	FGuid OwnerActorID;
 	if(InInteractor)
 	{
@@ -144,19 +150,19 @@ UTaskBase* UTaskComponent::AcceptTask(UTaskAsset* InAsset, FString InTaskGUID, A
 		InAsset = Offers.IsEmpty() ? nullptr : Offers[0];
 	}
 	if(!InAsset || HasRuntimeAsset(InAsset)) return nullptr;
-	UTaskAsset* RuntimeAsset = UTaskModule::Get().CreateAsset(InAsset, AgentID, OwnerActorID);
+	UTaskAsset* RuntimeAsset = TaskModule->CreateAsset(InAsset, AgentID, OwnerActorID);
 	if(!RuntimeAsset) return nullptr;
 	RuntimeAsset->AgentLocation = GetOwner()->GetActorLocation();
 	UTaskBase* Task = InTaskGUID.IsEmpty() ? (RuntimeAsset->RootTasks.IsEmpty() ? nullptr : RuntimeAsset->RootTasks[0]) : RuntimeAsset->TaskMap.FindRef(InTaskGUID);
 	if(!Task)
 	{
-		UTaskModule::Get().RemoveAsset(RuntimeAsset);
+		TaskModule->RemoveAsset(RuntimeAsset);
 		return nullptr;
 	}
-	UTaskModule::Get().EnterTask(Task, true);
+	TaskModule->EnterTask(Task, true);
 	if(Task->GetTaskState() == ETaskState::None)
 	{
-		UTaskModule::Get().RemoveAsset(RuntimeAsset);
+		TaskModule->RemoveAsset(RuntimeAsset);
 		return nullptr;
 	}
 	OnTaskAccepted.Broadcast(Task);
@@ -166,9 +172,10 @@ UTaskBase* UTaskComponent::AcceptTask(UTaskAsset* InAsset, FString InTaskGUID, A
 
 bool UTaskComponent::TurnInTask(UTaskBase* InTask)
 {
-	if(!bAgentActive || !UTaskModule::IsValid()) return false;
+	UTaskModule* TaskModule = UTaskModule::GetPtr(GetWorld());
+	if(!bAgentActive || TaskModule == nullptr) return false;
 	if(!InTask) InTask = GetTask(ETaskStage::Deliverable);
-	const bool bSucceeded = UTaskModule::Get().TurnInTask(InTask, GetOwner());
+	const bool bSucceeded = TaskModule->TurnInTask(InTask, GetOwner());
 	RefreshTaskMarker();
 	return bSucceeded;
 }
@@ -199,6 +206,7 @@ void UTaskComponent::OnTaskAssetsChanged()
 
 void UTaskComponent::RefreshTaskMarker()
 {
+	USceneModule* SceneModule = USceneModule::GetPtr(GetWorld());
 	const bool bAvailable = HasAvailableTask();
 	if(bHasAvailableTask != bAvailable)
 	{
@@ -206,9 +214,9 @@ void UTaskComponent::RefreshTaskMarker()
 		OnTaskAvailabilityChanged.Broadcast(bAvailable);
 		if(UInteractionComponent* Interaction = GetOwner()->FindComponentByClass<UInteractionComponent>()) Interaction->NotifyOptionsChanged();
 	}
-	if(!bAgentActive || !USceneModule::IsValid() || (!AgentID.IsValid() && !ResolveAgentID()))
+	if(!bAgentActive || SceneModule == nullptr || (!AgentID.IsValid() && !ResolveAgentID()))
 	{
-		if(USceneModule::IsValid() && MarkerID.IsValid()) USceneModule::Get().RemoveMarker(MarkerID);
+		if(SceneModule != nullptr && MarkerID.IsValid()) SceneModule->RemoveMarker(MarkerID);
 		LastMarkerTag = FGameplayTag();
 		return;
 	}
@@ -229,7 +237,7 @@ void UTaskComponent::RefreshTaskMarker()
 	}
 	else
 	{
-		if(MarkerID.IsValid()) USceneModule::Get().RemoveMarker(MarkerID);
+		if(MarkerID.IsValid()) SceneModule->RemoveMarker(MarkerID);
 		if(LastMarkerTag.IsValid())
 		{
 			if(UInteractionComponent* Interaction = GetOwner()->FindComponentByClass<UInteractionComponent>()) Interaction->NotifyOptionsChanged();
@@ -252,6 +260,6 @@ void UTaskComponent::RefreshTaskMarker()
 	Marker.ActorID = AgentID;
 	Marker.Channels = static_cast<int32>(ESceneMarkerChannel::World);
 	Marker.Priority = 200;
-	if(!USceneModule::Get().UpdateMarker(Marker)) USceneModule::Get().AddMarker(Marker);
+	if(!SceneModule->UpdateMarker(Marker)) SceneModule->AddMarker(Marker);
 	LastMarkerTag = MarkerTag;
 }

@@ -230,6 +230,112 @@ namespace
 	};
 
 	template<typename ValueType>
+	class TCacheColumnPressureCommand final : public FCacheCapacityCommand
+	{
+		using Family = TCacheColumnFamily<ValueType>;
+		using Ptr = typename Family::Ptr;
+
+	public:
+		explicit TCacheColumnPressureCommand(FAutomationTestBase& InTest)
+			: FCacheCapacityCommand(InTest)
+		{
+		}
+
+	protected:
+		virtual bool PrepareFixture() override
+		{
+			if (!bStarted)
+			{
+				bStarted = true;
+				const uint64 BodyBytes = VoxelBoundedAllocation::WorkerSharedBytes<const ValueType>();
+				FVoxelTerrainResourceLimits Limits;
+				Limits.ResidentBytes = BodyBytes * 80;
+				Limits.OverlapBytes = BodyBytes * 16;
+				const auto Consumer = MakeCacheControlConsumer();
+				if (!Test.TestTrue(TEXT("压力测试使用真实受限缓存账本"), Resources->Configure(Limits) &&
+					FVoxelGenerationPlanCache::Create(Resources, Consumer, Cache, Error, true, false))) return true;
+				Ptr Unused;
+				const auto Build = [](ValueType& Value, FString& BuildError)
+				{
+					Value.Column.SurfaceZ = 93;
+					BuildError.Reset();
+					return true;
+				};
+				if (!Test.TestTrue(TEXT("建立正在读取和缓存独占的两列"),
+					Family::Get(*Cache, FIntPoint(0, 0), Build, Held, Error, nullptr) &&
+					Family::Get(*Cache, FIntPoint(1, 0), Build, Unused, Error, nullptr))) return true;
+				Unused.Reset();
+				FVoxelGenerationCacheRetention Retention;
+				Retention.Revision = 1;
+				if (!Test.TestTrue(TEXT("接纳覆盖两列的保留范围"), Cache->UpdateRetention(Retention, 1,
+					[](TArrayView<FVoxelGenerationCacheRetentionPoint> Points, FString& FillError)
+					{
+						Points[0].NaturalRadiusCells = 16;
+						FillError.Reset();
+						return true;
+					}, Error))) return true;
+				for (int32 Step = 0; Step < FVoxelGenerationPlanCache::ShardCount * 2; ++Step) Cache->TickMaintenance(128);
+				Test.TestEqual(TEXT("有容量时保留范围仍保持两列"), ColumnCount(), 2);
+				if (!Test.TestTrue(TEXT("真实租约占满剩余原生驻留容量"), Resources->Acquire(Consumer,
+					EVoxelTerrainResourcePool::Resident, BodyBytes * 62, Blocker))) return true;
+				Ptr Rejected;
+				int32 UnexpectedBuilds = 0;
+				Test.TestFalse(TEXT("满容量下新列先等待，不执行采样"), Family::Get(*Cache, FIntPoint(2, 0),
+					[&](ValueType&, FString&) { ++UnexpectedBuilds; return true; }, Rejected, Error, nullptr));
+				Test.TestEqual(TEXT("满容量没有越过授额执行构建"), UnexpectedBuilds, 0);
+				Test.TestTrue(TEXT("新列报告真实容量等待"), Error.StartsWith(TEXT("CapacityBlocked")));
+				for (int32 Step = 0; Step < FVoxelGenerationPlanCache::ShardCount * 2; ++Step) Cache->TickMaintenance(128);
+				Test.TestEqual(TEXT("压力下只退休缓存独占列"), ColumnCount(), 1);
+				Test.TestEqual(TEXT("正在读取的 immutable 内容仍有效"), Held->Column.SurfaceZ, 93);
+				bPrepared = true;
+				Deadline = FPlatformTime::Seconds() + 5.0;
+			}
+			if (!bPrepared) return true;
+			const uint64 BodyBytes = VoxelBoundedAllocation::WorkerSharedBytes<const ValueType>();
+			if (Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Resident)] <= BodyBytes * 63) return true;
+			if (FPlatformTime::Seconds() < Deadline) return false;
+			Test.AddError(TEXT("压力退休正文未在真实后台释放后归还容量"));
+			bPrepared = false;
+			return true;
+		}
+
+		virtual void CheckFixture() override
+		{
+			if (!bPrepared) return;
+			Ptr NewColumn;
+			Test.TestTrue(TEXT("退休归还容量后新采样正常推进"), Family::Get(*Cache, FIntPoint(2, 0),
+				[](ValueType& Value, FString& BuildError)
+				{
+					Value.Column.SurfaceZ = 107;
+					BuildError.Reset();
+					return true;
+				}, NewColumn, Error, nullptr));
+			Test.TestTrue(TEXT("新列提供真实构建结果"), NewColumn && NewColumn->Column.SurfaceZ == 107);
+			Test.TestEqual(TEXT("原读取未被压力回收改写"), Held->Column.SurfaceZ, 93);
+		}
+
+		virtual void ReleaseFixture() override
+		{
+			Held.Reset();
+			Blocker.Reset();
+		}
+
+	private:
+		int32 ColumnCount() const
+		{
+			const auto Stats = Cache->GetStats();
+			if constexpr (std::is_same_v<ValueType, FVoxelBaseColumnEntry>) return Stats.BaseColumns;
+			else return Stats.NaturalColumns;
+		}
+
+		Ptr Held;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Blocker;
+		bool bStarted = false;
+		bool bPrepared = false;
+		double Deadline = 0.0;
+	};
+
+	template<typename ValueType>
 	class TCacheColumnCapacityCommand final : public FCacheCapacityCommand
 	{
 		using Family = TCacheColumnFamily<ValueType>;
@@ -1151,6 +1257,18 @@ bool FVoxelQueryGeneratorCapacityTest::RunTest(const FString& InParameters)
 {
 	(void)InParameters;
 	FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FQueryGeneratorCapacityCommand>(*this));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelCacheColumnPressureProgressTest,
+	"WHFramework.Voxel.FineRefactor.Generation.CacheColumnPressureProgress",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelCacheColumnPressureProgressTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<TCacheColumnPressureCommand<FVoxelBaseColumnEntry>>(*this));
+	FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<TCacheColumnPressureCommand<FVoxelNaturalColumnEntry>>(*this));
 	return true;
 }
 

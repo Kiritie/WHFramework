@@ -3447,10 +3447,12 @@ FVoxelTerrainReadinessSnapshot FVoxelViewManager::CaptureTerrainReadiness() cons
 			for (const FIntVector& Section : Sections)
 			{
 				const FVoxelSection* Data = Module.GetRuntime()->FindSection(Section);
-				Target.ReadySections += Data && Data->Status == EVoxelSectionStatus::DataReady ? 1 : 0;
 				Target.bFailed |= Data && Data->Status == EVoxelSectionStatus::Failed;
 				const bool bPresented = IsLatestFinePresented(Section);
 				const bool bPrepared = IsFineGeometryPrepared(Section);
+				// F1+ 从独立采样生成，不创建 Runtime Section；当前版本几何证明其采样已完成。
+				const bool bShardDataReady = !GetInputRoot().FineWanted.Contains(Section) && (bPrepared || bPresented);
+				Target.ReadySections += (Data && Data->Status == EVoxelSectionStatus::DataReady) || bShardDataReady ? 1 : 0;
 				Target.PresentedSections += bPresented ? 1 : 0;
 				Target.bMeshReady &= bPrepared || bPresented;
 				Target.bPublishing |= bPrepared && !bPresented;

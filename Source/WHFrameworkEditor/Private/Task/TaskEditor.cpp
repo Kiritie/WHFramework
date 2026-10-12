@@ -6,6 +6,7 @@
 #include "EdGraphUtilities.h"
 
 #include "Editor.h"
+#include "UObject/UObjectHash.h"
 #include "WHFrameworkSlateStatics.h"
 #include "Task/TaskModule.h"
 #include "Task/Base/TaskAsset.h"
@@ -109,12 +110,19 @@ FTaskEditor::FTaskEditor()
 
 FTaskEditor::~FTaskEditor()
 {
-	
+	if(GEditor)
+	{
+		GEditor->UnregisterForUndo(this);
+	}
 }
 
 void FTaskEditor::InitAssetEditorBase(const EToolkitMode::Type Mode, const TSharedPtr<IToolkitHost>& InitToolkitHost, UObject* Asset)
 {
 	Asset->SetFlags(RF_Transactional);
+	if(const UTaskAsset* TaskAsset = Cast<UTaskAsset>(Asset); TaskAsset && !TaskAsset->SourceObject)
+	{
+		ForEachObjectWithOuter(Asset, [](UObject* Object) { Object->SetFlags(RF_Transactional); }, true);
+	}
 	GEditor->RegisterForUndo(this);
 	FAssetEditorBase::InitAssetEditorBase(Mode, InitToolkitHost, Asset);
 }

@@ -1,5 +1,6 @@
 ﻿#include "Voxel/Streaming/VoxelInterestManager.h"
 
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 
 namespace
@@ -22,11 +23,37 @@ namespace
 	}
 }
 
+uint64 FVoxelInterestSet::GetAllocatedBytes() const
+{
+	using VoxelGenerationAllocation::AllocatedBytes;
+	uint64 SourceBytes = AllocatedBytes(Sources);
+	for (const auto& Pair : Sources)
+	{
+		SourceBytes += AllocatedBytes(Pair.Value.DataSections) + AllocatedBytes(Pair.Value.FineDataSections) +
+			AllocatedBytes(Pair.Value.F0CoreSections) + AllocatedBytes(Pair.Value.CollisionSections) + AllocatedBytes(Pair.Value.SimulationSections);
+	}
+	uint64 ShardPageBytes = AllocatedBytes(FineShardPages);
+	for (const auto& Pair : FineShardPages) ShardPageBytes += AllocatedBytes(Pair.Value.Shards);
+	return ShardPageBytes + AllocatedBytes(FineShardDemands) + AllocatedBytes(FineShardOwners) +
+		AllocatedBytes(FinePageServicePriorities) + AllocatedBytes(GeometryServicePriorities) +
+		AllocatedBytes(FinePagePriorities) + AllocatedBytes(CriticalFinePages) + AllocatedBytes(AdmissionPriorities) +
+		(PublicationInputs ? PublicationInputs->GetAllocatedBytes() : 0) + AllocatedBytes(Geometry) + AllocatedBytes(ResolutionFloorPages) +
+		AllocatedBytes(CriticalDependencies) +
+		(FinePagePlan ? AllocatedBytes(FinePagePlan->Pages) + AllocatedBytes(FinePagePlan->SectionOwners) : 0) + SourceBytes +
+		(FineSections ? AllocatedBytes(*FineSections) : 0) + AllocatedBytes(Warmup) + AllocatedBytes(ExactOrder) +
+		AllocatedBytes(ExactAdmissionLanes[0]) + AllocatedBytes(ExactAdmissionLanes[1]) + AllocatedBytes(PlayableFineKeys) +
+		AllocatedBytes(Admissions) + AllocatedBytes(AdmissionLanes[0]) + AllocatedBytes(AdmissionLanes[1]) +
+		AllocatedBytes(AdmissionLanes[2]) + AllocatedBytes(AdmissionLanes[3]) + AllocatedBytes(Exact) + AllocatedBytes(VoxelProxy) +
+		AllocatedBytes(Surface) + AllocatedBytes(Macro) + AllocatedBytes(VoxelProxyPriorities) + AllocatedBytes(SurfacePriorities) +
+		AllocatedBytes(MacroPriorities) + AllocatedBytes(TerrainPlan.Roots) + AllocatedBytes(TerrainPlan.Leaves) +
+		AllocatedBytes(TerrainPlan.Required) + AllocatedBytes(TerrainPlan.FineDependencies);
+}
+
 uint64 FVoxelInterestSet::GetOwnedAllocatedBytes() const
 {
 	return GetAllocatedBytes() - (PublicationInputs ? PublicationInputs->GetAllocatedBytes() : 0) -
-		(FinePagePlan ? FinePagePlan->Pages.GetAllocatedSize() + FinePagePlan->SectionOwners.GetAllocatedSize() : 0) -
-		(FineSections ? FineSections->GetAllocatedSize() : 0) + PlanningError.GetAllocatedSize();
+		(FinePagePlan ? VoxelGenerationAllocation::AllocatedBytes(FinePagePlan->Pages) + VoxelGenerationAllocation::AllocatedBytes(FinePagePlan->SectionOwners) : 0) -
+		(FineSections ? VoxelGenerationAllocation::AllocatedBytes(*FineSections) : 0) + PlanningError.GetAllocatedSize();
 }
 
 uint64 FVoxelInterestSet::GetResourceAccountedBytes() const
@@ -49,13 +76,14 @@ uint64 FVoxelInterestSet::GetResourceAccountedBytes() const
 
 uint64 FVoxelInterestSet::GetFinalizationAllocatedBytes() const
 {
-	return Admissions.GetAllocatedSize() + AdmissionPriorities.GetAllocatedSize() +
-		AdmissionLanes[0].GetAllocatedSize() + AdmissionLanes[1].GetAllocatedSize() +
-		AdmissionLanes[2].GetAllocatedSize() + AdmissionLanes[3].GetAllocatedSize() +
-		ExactOrder.GetAllocatedSize() + ExactAdmissionLanes[0].GetAllocatedSize() + ExactAdmissionLanes[1].GetAllocatedSize() +
-		PlayableFineKeys.GetAllocatedSize() + FinePagePriorities.GetAllocatedSize() + FinePageServicePriorities.GetAllocatedSize() +
-		GeometryServicePriorities.GetAllocatedSize() + CriticalFinePages.GetAllocatedSize() + CriticalDependencies.GetAllocatedSize() +
-		VoxelProxyPriorities.GetAllocatedSize() + SurfacePriorities.GetAllocatedSize() + MacroPriorities.GetAllocatedSize();
+	using VoxelGenerationAllocation::AllocatedBytes;
+	return AllocatedBytes(Admissions) + AllocatedBytes(AdmissionPriorities) +
+		AllocatedBytes(AdmissionLanes[0]) + AllocatedBytes(AdmissionLanes[1]) +
+		AllocatedBytes(AdmissionLanes[2]) + AllocatedBytes(AdmissionLanes[3]) +
+		AllocatedBytes(ExactOrder) + AllocatedBytes(ExactAdmissionLanes[0]) + AllocatedBytes(ExactAdmissionLanes[1]) +
+		AllocatedBytes(PlayableFineKeys) + AllocatedBytes(FinePagePriorities) + AllocatedBytes(FinePageServicePriorities) +
+		AllocatedBytes(GeometryServicePriorities) + AllocatedBytes(CriticalFinePages) + AllocatedBytes(CriticalDependencies) +
+		AllocatedBytes(VoxelProxyPriorities) + AllocatedBytes(SurfacePriorities) + AllocatedBytes(MacroPriorities);
 }
 
 bool FVoxelInterestManager::CopyForPriority(const FVoxelInterestSet& InPrevious,
@@ -94,22 +122,23 @@ bool FVoxelInterestManager::ReserveFinalization(FVoxelInterestSet& Interest, con
 	const int32 Rows = FMath::Max(int32(Rows64), Interest.Admissions.Num());
 	const int32 Pages = Interest.FinePagePlan ? Interest.FinePagePlan->Pages.Num() : 0;
 	const auto Capacity = [](const uint64 Existing, const uint64 Required) { return FMath::Max(Existing, Required); };
-	uint64 Bytes = Capacity(Interest.Admissions.GetAllocatedSize(), VoxelBoundedAllocation::ArrayBytes<FVoxelViewAdmission>(Rows)) +
-		Capacity(Interest.AdmissionPriorities.GetAllocatedSize(), VoxelBoundedAllocation::ArrayBytes<int32>(Rows)) +
-		Capacity(Interest.ExactOrder.GetAllocatedSize(), VoxelBoundedAllocation::ArrayBytes<FIntVector>(Interest.Exact.Num())) +
-		Capacity(Interest.PlayableFineKeys.GetAllocatedSize(), VoxelBoundedAllocation::ArrayBytes<FIntVector>(FineCount)) +
-		Capacity(Interest.FinePagePriorities.GetAllocatedSize(), VoxelBoundedAllocation::MapBytes<FVoxelFinePageKey, int32>(Pages)) +
-		Capacity(Interest.FinePageServicePriorities.GetAllocatedSize(), VoxelBoundedAllocation::MapBytes<FVoxelFinePageKey, FVoxelTerrainServicePriority>(Pages)) +
-		Capacity(Interest.GeometryServicePriorities.GetAllocatedSize(), VoxelBoundedAllocation::MapBytes<FVoxelTerrainSpatialKey, FVoxelTerrainServicePriority>(Interest.Geometry.Num())) +
-		Capacity(Interest.CriticalFinePages.GetAllocatedSize(), VoxelBoundedAllocation::SetBytes<FVoxelFinePageKey>(Pages)) +
-		Capacity(Interest.CriticalDependencies.GetAllocatedSize(), VoxelBoundedAllocation::SetBytes<FVoxelTerrainSpatialKey>(Interest.Geometry.Num())) +
-		Capacity(Interest.VoxelProxyPriorities.GetAllocatedSize(), VoxelBoundedAllocation::MapBytes<FVoxelViewKey, int32>(Interest.VoxelProxy.Num())) +
-		Capacity(Interest.SurfacePriorities.GetAllocatedSize(), VoxelBoundedAllocation::MapBytes<FVoxelSurfaceTileKey, int32>(Interest.Surface.Num())) +
-		Capacity(Interest.MacroPriorities.GetAllocatedSize(), VoxelBoundedAllocation::MapBytes<FVoxelMacroTileKey, int32>(Interest.Macro.Num()));
+	using VoxelGenerationAllocation::AllocatedBytes;
+	uint64 Bytes = Capacity(AllocatedBytes(Interest.Admissions), VoxelBoundedAllocation::ArrayBytes<FVoxelViewAdmission>(Rows)) +
+		Capacity(AllocatedBytes(Interest.AdmissionPriorities), VoxelBoundedAllocation::ArrayBytes<int32>(Rows)) +
+		Capacity(AllocatedBytes(Interest.ExactOrder), VoxelBoundedAllocation::ArrayBytes<FIntVector>(Interest.Exact.Num())) +
+		Capacity(AllocatedBytes(Interest.PlayableFineKeys), VoxelBoundedAllocation::ArrayBytes<FIntVector>(FineCount)) +
+		Capacity(AllocatedBytes(Interest.FinePagePriorities), VoxelBoundedAllocation::MapBytes<FVoxelFinePageKey, int32>(Pages)) +
+		Capacity(AllocatedBytes(Interest.FinePageServicePriorities), VoxelBoundedAllocation::MapBytes<FVoxelFinePageKey, FVoxelTerrainServicePriority>(Pages)) +
+		Capacity(AllocatedBytes(Interest.GeometryServicePriorities), VoxelBoundedAllocation::MapBytes<FVoxelTerrainSpatialKey, FVoxelTerrainServicePriority>(Interest.Geometry.Num())) +
+		Capacity(AllocatedBytes(Interest.CriticalFinePages), VoxelBoundedAllocation::SetBytes<FVoxelFinePageKey>(Pages)) +
+		Capacity(AllocatedBytes(Interest.CriticalDependencies), VoxelBoundedAllocation::SetBytes<FVoxelTerrainSpatialKey>(Interest.Geometry.Num())) +
+		Capacity(AllocatedBytes(Interest.VoxelProxyPriorities), VoxelBoundedAllocation::MapBytes<FVoxelViewKey, int32>(Interest.VoxelProxy.Num())) +
+		Capacity(AllocatedBytes(Interest.SurfacePriorities), VoxelBoundedAllocation::MapBytes<FVoxelSurfaceTileKey, int32>(Interest.Surface.Num())) +
+		Capacity(AllocatedBytes(Interest.MacroPriorities), VoxelBoundedAllocation::MapBytes<FVoxelMacroTileKey, int32>(Interest.Macro.Num()));
 	for (const auto& Lane : Interest.AdmissionLanes)
-		Bytes += Capacity(Lane.GetAllocatedSize(), VoxelBoundedAllocation::ArrayBytes<int32>(Rows));
+		Bytes += Capacity(AllocatedBytes(Lane), VoxelBoundedAllocation::ArrayBytes<int32>(Rows));
 	for (const auto& Lane : Interest.ExactAdmissionLanes)
-		Bytes += Capacity(Lane.GetAllocatedSize(), VoxelBoundedAllocation::ArrayBytes<int32>(Interest.Exact.Num()));
+		Bytes += Capacity(AllocatedBytes(Lane), VoxelBoundedAllocation::ArrayBytes<int32>(Interest.Exact.Num()));
 	if (Resources)
 	{
 		if (Interest.FinalizationLease)

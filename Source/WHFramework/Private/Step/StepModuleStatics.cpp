@@ -1,96 +1,146 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Step/StepModuleStatics.h"
 
 #include "Step/StepModule.h"
+#include "Step/Base/StepBase.h"
 
-TArray<UStepAsset*> UStepModuleStatics::GetStepAssets()
+UStepModule* UStepModuleStatics::ResolveModule(const UObject* WorldContextObject)
 {
-	return UStepModule::Get().GetAssets();
+	return WorldContextObject ? UStepModule::GetPtr(WorldContextObject->GetWorld()) : UStepModule::GetPtr();
 }
 
-UStepAsset* UStepModuleStatics::GetCurrentStepAsset()
+TArray<UStepAsset*> UStepModuleStatics::GetStepAssets(const UObject* WorldContextObject)
 {
-	return UStepModule::Get().GetCurrentAsset();
+	UStepModule* Module = ResolveModule(WorldContextObject);
+	return Module ? Module->GetAssets() : TArray<UStepAsset*>();
 }
 
-UStepBase* UStepModuleStatics::GetCurrentStep()
+UStepAsset* UStepModuleStatics::GetCurrentStepAsset(const UObject* WorldContextObject)
 {
-	return UStepModule::Get().GetCurrentStep();
+	UStepModule* Module = ResolveModule(WorldContextObject);
+	return Module ? Module->GetCurrentAsset() : nullptr;
 }
 
-UStepBase* UStepModuleStatics::GetCurrentRootStep()
+UStepBase* UStepModuleStatics::GetCurrentStep(const UObject* WorldContextObject)
 {
-	return UStepModule::Get().GetCurrentRootStep();
+	UStepModule* Module = ResolveModule(WorldContextObject);
+	return Module ? Module->GetCurrentStep() : nullptr;
 }
 
-UStepBase* UStepModuleStatics::GetStepByGUID(const FString& InStepGUID)
+UStepBase* UStepModuleStatics::GetCurrentRootStep(const UObject* WorldContextObject)
 {
-	return UStepModule::Get().GetStepByGUID(InStepGUID);
+	UStepModule* Module = ResolveModule(WorldContextObject);
+	return Module ? Module->GetCurrentRootStep() : nullptr;
 }
 
-UStepAsset* UStepModuleStatics::GetStepAsset(UStepAsset* InAsset)
+UStepBase* UStepModuleStatics::GetStepByGUID(const FString& InStepGUID, const UObject* WorldContextObject)
 {
-	return UStepModule::Get().GetAsset(InAsset);
+	UStepModule* Module = ResolveModule(WorldContextObject);
+	return Module ? Module->GetStepByGUID(InStepGUID) : nullptr;
 }
 
-void UStepModuleStatics::AddStepAsset(UStepAsset* InAsset)
+UStepAsset* UStepModuleStatics::GetStepAsset(UStepAsset* InAsset, const UObject* WorldContextObject)
 {
-	UStepModule::Get().AddAsset(InAsset);
+	UStepModule* Module = ResolveModule(WorldContextObject);
+	return Module ? Module->GetAsset(InAsset) : nullptr;
 }
 
-void UStepModuleStatics::RemoveStepAsset(UStepAsset* InAsset)
+void UStepModuleStatics::AddStepAsset(UStepAsset* InAsset, const UObject* WorldContextObject)
 {
-	UStepModule::Get().RemoveAsset(InAsset);
+	UStepModule* Module = ResolveModule(WorldContextObject);
+	if(Module)
+	{
+		Module->AddAsset(InAsset);
+	}
 }
 
-void UStepModuleStatics::SwitchStepAsset(UStepAsset* InAsset)
+void UStepModuleStatics::RemoveStepAsset(UStepAsset* InAsset, const UObject* WorldContextObject)
 {
-	UStepModule::Get().SwitchAsset(InAsset);
+	UStepModule* Module = ResolveModule(WorldContextObject);
+	if(Module)
+	{
+		Module->RemoveAsset(InAsset);
+	}
 }
 
-void UStepModuleStatics::StartStep(int32 InRootStepIndex, bool bSkipSteps)
+void UStepModuleStatics::SwitchStepAsset(UStepAsset* InAsset, const UObject* WorldContextObject)
 {
-	UStepModule::Get().StartStep(InRootStepIndex, bSkipSteps);
+	UStepModule* Module = ResolveModule(WorldContextObject);
+	if(Module)
+	{
+		Module->SwitchAsset(InAsset);
+	}
 }
 
-void UStepModuleStatics::EndStep(bool bRestoreSteps)
+void UStepModuleStatics::StartStep(int32 InRootStepIndex, bool bSkipSteps, const UObject* WorldContextObject)
 {
-	UStepModule::Get().EndStep(bRestoreSteps);
+	UStepModule* Module = ResolveModule(WorldContextObject);
+	if(Module)
+	{
+		Module->StartStep(InRootStepIndex, bSkipSteps);
+	}
+}
+
+void UStepModuleStatics::EndStep(bool bRestoreSteps, const UObject* WorldContextObject)
+{
+	UStepModule* Module = ResolveModule(WorldContextObject);
+	if(Module)
+	{
+		Module->EndStep(bRestoreSteps);
+	}
 }
 
 void UStepModuleStatics::RestoreStep(UStepBase* InStep)
 {
-	UStepModule::Get().RestoreStep(InStep);
+	if(InStep)
+	{
+		InStep->Restore();
+	}
 }
 
 void UStepModuleStatics::EnterStep(UStepBase* InStep)
 {
-	UStepModule::Get().EnterStep(InStep);
+	if(InStep)
+	{
+		InStep->Enter();
+	}
 }
 
 void UStepModuleStatics::RefreshStep(UStepBase* InStep)
 {
-	UStepModule::Get().RefreshStep(InStep);
+	if(InStep)
+	{
+		InStep->Refresh();
+	}
 }
 
 void UStepModuleStatics::GuideStep(UStepBase* InStep)
 {
-	UStepModule::Get().GuideStep(InStep);
+	if(InStep)
+	{
+		InStep->Guide();
+	}
 }
 
 void UStepModuleStatics::ExecuteStep(UStepBase* InStep)
 {
-	UStepModule::Get().ExecuteStep(InStep);
-}
-
-void UStepModuleStatics::CompleteStep(UStepBase* InStep, EStepExecuteResult InStepExecuteResult)
-{
-	UStepModule::Get().CompleteStep(InStep, InStepExecuteResult);
+	if(InStep)
+	{
+		InStep->Execute();
+	}
 }
 
 void UStepModuleStatics::LeaveStep(UStepBase* InStep)
 {
-	UStepModule::Get().LeaveStep(InStep);
+	if(InStep)
+	{
+		InStep->Leave();
+	}
+}
+
+void UStepModuleStatics::CompleteStep(UStepBase* InStep, EStepExecuteResult InStepExecuteResult)
+{
+	if(InStep)
+	{
+		InStep->Complete(InStepExecuteResult);
+	}
 }

@@ -23,8 +23,16 @@ void STaskStatusWidget::Construct(const FArguments& InArgs)
 				const TSharedPtr<FTaskEditor> Editor = TaskEditor.Pin();
 				if (!Editor || !Editor->GraphWidget) return FText::GetEmpty();
 				const UTaskAsset* Asset = Editor->GetEditingAsset<UTaskAsset>();
+				if(!Asset->CompileErrors.IsEmpty())
+				{
+					return FText::Format(LOCTEXT("CompileError", "Compilation failed ({0}): {1}"), FText::AsNumber(Asset->CompileErrors.Num()), Asset->CompileErrors[0]);
+				}
+				if(!Asset->SourceObject && !Asset->StartGUID.IsValid())
+				{
+					return LOCTEXT("MigrationRequired", "Start is missing. Use explicit graph migration before editing or running this asset.");
+				}
 				const bool bEditable = Editor->GraphWidget->CanEdit();
-				return FText::Format(LOCTEXT("Status", "Task Graph  |  Tasks: {0}  |  Selected: {1}  |  Roots: {2}  |  {3}"),
+				return FText::Format(LOCTEXT("Status", "Task Graph  |  Reachable: {0}  |  Selected: {1}  |  Roots: {2}  |  {3}"),
 					FText::AsNumber(Asset->TaskMap.Num()), FText::AsNumber(Editor->GraphWidget->GetSelectedTasks().Num()),
 					FText::AsNumber(Asset->RootTasks.Num()), bEditable ?
 					LOCTEXT("EditHint", "Right-click to edit; Out > In to connect; Ctrl+Z / Ctrl+Y to undo / redo") :

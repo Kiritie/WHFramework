@@ -381,7 +381,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SubTask")
 	bool bMergeSubTask;
 	/// 子任务
-	UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly, Category = "SubTask")
+	UPROPERTY(VisibleAnywhere, Instanced, BlueprintReadOnly, Category = "SubTask")
 	TArray<UTaskBase*> SubTasks;
 public:
 	/**
@@ -430,11 +430,15 @@ public:
 public:
 #if WITH_EDITORONLY_DATA
 	UPROPERTY()
+	TArray<UTaskBase*> GraphChildren;
+
+	UPROPERTY()
 	FVector2D GraphPosition = FVector2D::ZeroVector;
 	UPROPERTY()
 	bool bHasGraphPosition = false;
 #endif
 #if WITH_EDITOR
+	virtual void PreEditChange(FProperty* PropertyAboutToChange) override;
 	virtual bool CanEditChange(const FProperty* InProperty) const override;
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif

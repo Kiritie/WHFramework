@@ -438,12 +438,19 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 			OutError = TEXT("Distant tree materials are invalid");
 			return false;
 		}
-		if (!Generator->EnumerateTrees(Bounds,
+		FString TreeSampleError;
+		bool bTreeSampleFailed = false;
+		const bool bTreesEnumerated = Generator->EnumerateTrees(Bounds,
 			[&](const FIntVector& Anchor, const int32 Height,
 				const FVoxelStableId TreeId)
 			{
+				if (bTreeSampleFailed) return;
 				FVoxelColumnSample Column;
-				if (!Generator->SampleColumn(Anchor.X, Anchor.Y, Column, OutError, InCancel)) return;
+				if (!Generator->SampleColumn(Anchor.X, Anchor.Y, Column, TreeSampleError, InCancel))
+				{
+					bTreeSampleFailed = true;
+					return;
+				}
 				const FVoxelEcologyGenerator Ecology(Config->Recipe.ToSharedRef());
 				const FVoxelTreeSpecies Species = Ecology.SelectTreeSpecies(Column, TreeId);
 				if (!Config->ToRuntime(Species.Trunk, Trunk) || !Config->ToRuntime(Species.LeavesMid, Leaves)) return;
@@ -494,7 +501,13 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 						}
 					}
 				}
-			}, OutError, InCancel)) return false;
+			}, OutError, InCancel);
+		if (bTreeSampleFailed)
+		{
+			OutError = MoveTemp(TreeSampleError);
+			return false;
+		}
+		if (!bTreesEnumerated) return false;
 	}
 
 	struct FEditVote

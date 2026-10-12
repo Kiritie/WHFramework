@@ -1,19 +1,23 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Step/StepEditor.h"
+#include "Step/Slate/SStepGraphWidget.h"
+#include "Step/Graph/StepAssetGraphNode.h"
+#include "EdGraphUtilities.h"
 
 #include "Editor.h"
-#include "ISettingsSection.h"
+#include "UObject/UObjectHash.h"
+#include "Subsystems/AssetEditorSubsystem.h"
 #include "WHFrameworkSlateStatics.h"
-#include "Step/StepEditorTypes.h"
 #include "Step/StepModule.h"
 #include "Step/Base/StepAsset.h"
 #include "Step/Base/StepBlueprint.h"
 #include "Step/Blueprint/StepBlueprintActions.h"
 #include "Step/Blueprint/StepGraphSchema.h"
 #include "Step/Customization/StepCustomization.h"
+#include "Step/StepEditorTypes.h"
 #include "Step/Slate/SStepDetailsWidget.h"
-#include "Step/Slate/SStepListWidget.h"
+#include "IDetailsView.h"
 #include "Step/Slate/SStepStatusWidget.h"
 
 #define LOCTEXT_NAMESPACE "FStepEditor"
@@ -30,33 +34,15 @@ FStepEditorModule::FStepEditorModule()
 void FStepEditorModule::StartupModule()
 {
 	FStepEditorCommands::Register();
+	GraphNodeFactory = CreateStepGraphNodeFactory();
+	FEdGraphUtilities::RegisterVisualNodeFactory(GraphNodeFactory);
 }
 
 void FStepEditorModule::ShutdownModule()
 {
+	FEdGraphUtilities::UnregisterVisualNodeFactory(GraphNodeFactory);
+	GraphNodeFactory.Reset();
 	FStepEditorCommands::Unregister();
-}
-
-void FStepEditorModule::RegisterSettings(ISettingsModule* SettingsModule)
-{
-	GStepEditorIni = GConfig->GetDestIniFilename(TEXT("StepEditor"), *UGameplayStatics::GetPlatformName(), *FPaths::GeneratedConfigDir());
-	const ISettingsSectionPtr SettingsSection = SettingsModule->RegisterSettings(FName("Project"), FName("WHFramework"), FName("Step Editor"), FText::FromString(TEXT("Step Editor")), FText::FromString(TEXT("Configure the Step editor plugin")), GetMutableDefault<UStepEditorSettings>());
-	if(SettingsSection.IsValid())
-	{
-		SettingsSection->OnModified().BindRaw(this, &FStepEditorModule::HandleSettingsSaved);
-	}
-}
-
-void FStepEditorModule::UnRegisterSettings(ISettingsModule* SettingsModule)
-{
-	SettingsModule->UnregisterSettings(FName("Project"), FName("Plugins"), FName("Step Editor"));
-}
-
-bool FStepEditorModule::HandleSettingsSaved()
-{
-	UStepEditorSettings* StepEditorSetting = GetMutableDefault<UStepEditorSettings>();
-	StepEditorSetting->SaveConfig();
-	return true;
 }
 
 void FStepEditorModule::RegisterCommands(const TSharedPtr<FUICommandList>& Commands)
@@ -102,11 +88,12 @@ TSharedRef<FStepEditor> FStepEditorModule::CreateStepEditor(const EToolkitMode::
 
 void FStepEditorModule::OnClickedStepEditorButton()
 {
-	if(const UStepModule* StepModule = UStepModule::GetPtr(!UCommonModuleStatics::IsPlaying()))
+	if(const UStepModule* Module = UStepModule::GetPtr(!UCommonModuleStatics::IsPlaying()))
 	{
-		if(UStepAsset* StepAsset = !UCommonModuleStatics::IsPlaying() ? StepModule->GetDefaultAsset() : StepModule->GetCurrentAsset())
+		UStepAsset* Asset = UCommonModuleStatics::IsPlaying() ? Module->GetCurrentAsset() : Module->GetDefaultAsset();
+		if(Asset)
 		{
-			GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(StepAsset);
+			GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(Asset);
 		}
 	}
 }
@@ -118,18 +105,27 @@ FStepEditor::FStepEditor()
 	ToolkitFName = FName("StepEditor");
 	BaseToolkitName =  LOCTEXT("AppLabel", "Step Editor");
 	MenuCategory = LOCTEXT("StepEditor", "Step Editor");
-	DefaultLayoutName = FName("StepEditor_Layout");
+	DefaultLayoutName = FName("StepEditor_StartGraphLayout_v1");
 	WorldCentricTabPrefix =  LOCTEXT("WorldCentricTabPrefix", "Step ").ToString();
 	WorldCentricTabColorScale =  FLinearColor( 0.0f, 0.0f, 0.2f, 0.5f );
 }
 
 FStepEditor::~FStepEditor()
 {
-	
+	if(GEditor)
+	{
+		GEditor->UnregisterForUndo(this);
+	}
 }
 
 void FStepEditor::InitAssetEditorBase(const EToolkitMode::Type Mode, const TSharedPtr<IToolkitHost>& InitToolkitHost, UObject* Asset)
 {
+	Asset->SetFlags(RF_Transactional);
+	ForEachObjectWithOuter(Asset, [](UObject* Object)
+	{
+		Object->SetFlags(RF_Transactional);
+	}, true);
+	GEditor->RegisterForUndo(this);
 	FAssetEditorBase::InitAssetEditorBase(Mode, InitToolkitHost, Asset);
 }
 
@@ -137,18 +133,20 @@ void FStepEditor::RegisterTabSpawners(const TSharedRef<class FTabManager>& InTab
 {
 	FAssetEditorBase::RegisterTabSpawners(InTabManager);
 
-	SAssignNewEd(ListWidget, SStepListWidget, true)
-		.StepEditor(SharedThis(this));
-
 	SAssignNewEd(DetailsWidget, SStepDetailsWidget, true)
 		.StepEditor(SharedThis(this));
 
 	SAssignNewEd(StatusWidget, SStepStatusWidget, true)
 		.StepEditor(SharedThis(this));
 
-	RegisterTrackedTabSpawner(InTabManager, "List", FOnSpawnTab::CreateSP(this, &FStepEditor::SpawnListWidgetTab))
-		.SetDisplayName(LOCTEXT("ListTab", "List"))
-		.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Outliner"));
+	SAssignNew(GraphWidget, SStepGraphWidget).StepEditor(SharedThis(this));
+	GetToolkitCommands()->Append(GraphWidget->GetCommands().ToSharedRef());
+	DetailsWidget->DetailsView->OnFinishedChangingProperties().AddSP(this, &FStepEditor::OnStepPropertyChanged);
+	DetailsWidget->DetailsView->SetIsPropertyEditingEnabledDelegate(FIsPropertyEditingEnabled::CreateSP(GraphWidget.ToSharedRef(), &SStepGraphWidget::CanEdit));
+	RefreshDetails();
+	RegisterTrackedTabSpawner(InTabManager, "Graph", FOnSpawnTab::CreateSP(this, &FStepEditor::SpawnGraphWidgetTab))
+		.SetDisplayName(LOCTEXT("GraphTab", "Step Graph"))
+		.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "GraphEditor.EventGraph_16x"));
 
 	RegisterTrackedTabSpawner(InTabManager, "Details", FOnSpawnTab::CreateSP(this, &FStepEditor::SpawnDetailsWidgetTab))
 		.SetDisplayName(LOCTEXT("DetailsTab", "Details"))
@@ -163,97 +161,24 @@ void FStepEditor::UnregisterTabSpawners(const TSharedRef<class FTabManager>& InT
 {
 	FAssetEditorToolkit::UnregisterTabSpawners(InTabManager);
 
-	InTabManager->UnregisterTabSpawner("List");
+	InTabManager->UnregisterTabSpawner("Graph");
 	InTabManager->UnregisterTabSpawner("Details");
 	InTabManager->UnregisterTabSpawner("Status");
 }
 
 TSharedRef<FTabManager::FLayout> FStepEditor::CreateDefaultLayout()
 {
-	const TSharedRef<FTabManager::FLayout> DefaultLayout = FAssetEditorBase::CreateDefaultLayout();
-
-	DefaultLayout->AddArea
-	(
-		FTabManager::NewPrimaryArea()
-		->SetOrientation(Orient_Vertical)
-		->Split
-		(
-			// Main application area
-			FTabManager::NewSplitter()
-			->SetOrientation(Orient_Horizontal)
-			->SetSizeCoefficient(0.9f)
-			->Split
-			(
-				FTabManager::NewStack()
-				->SetHideTabWell(false)
-				->SetSizeCoefficient(0.5f)
-				->AddTab("List", ETabState::OpenedTab)
-			)
-			->Split
-			(
-				FTabManager::NewStack()
-				->SetHideTabWell(false)
-				->SetSizeCoefficient(0.5f)
-				->AddTab("Details", ETabState::OpenedTab)
-			)
-		)
-		->Split
-		(
-			FTabManager::NewStack()
-			->SetHideTabWell(true)
-			->SetSizeCoefficient(0.1f)
-			->AddTab("Status", ETabState::OpenedTab)
-		)
-	);
-
-	return DefaultLayout;
+	return FTabManager::NewLayout(DefaultLayoutName)->AddArea(
+		FTabManager::NewPrimaryArea()->SetOrientation(Orient_Vertical)
+		->Split(FTabManager::NewSplitter()->SetOrientation(Orient_Horizontal)->SetSizeCoefficient(0.95f)
+			->Split(FTabManager::NewStack()->SetHideTabWell(true)->SetSizeCoefficient(0.75f)->AddTab("Graph", ETabState::OpenedTab))
+			->Split(FTabManager::NewStack()->SetHideTabWell(true)->SetSizeCoefficient(0.25f)->AddTab("Details", ETabState::OpenedTab)))
+		->Split(FTabManager::NewStack()->SetHideTabWell(true)->SetSizeCoefficient(0.05f)->AddTab("Status", ETabState::OpenedTab)));
 }
 
-void FStepEditor::ExtendToolbar(FToolBarBuilder& ToolbarBuilder)
+TSharedRef<SDockTab> FStepEditor::SpawnGraphWidgetTab(const FSpawnTabArgs& Args)
 {
-	ToolbarBuilder.BeginSection("List");
-	{
-		ToolbarBuilder.AddToolBarButton(
-			FUIAction(
-				FExecuteAction::CreateRaw(this, &FStepEditor::OnDefaultsToggled),
-				FCanExecuteAction(),
-				FGetActionCheckState::CreateLambda([this](){
-					return ListWidget->bDefaults ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
-				})
-			),
-			NAME_None,
-			FText::FromString(TEXT("Defaults")),
-			FText::FromString(TEXT("Toggle Defaults")),
-			FSlateIcon(FAppStyle::GetAppStyleSetName(), "FullBlueprintEditor.EditGlobalOptions"),
-			EUserInterfaceActionType::ToggleButton
-		);
-		ToolbarBuilder.AddToolBarButton(
-			FUIAction(
-				FExecuteAction::CreateRaw(this, &FStepEditor::OnEditingToggled),
-				FCanExecuteAction(),
-				FGetActionCheckState::CreateLambda([this](){
-					return ListWidget->bEditing ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
-				})
-			),
-			NAME_None,
-			FText::FromString(TEXT("Editing")),
-			FText::FromString(TEXT("Toggle Editing")),
-			FSlateIcon(FAppStyle::GetAppStyleSetName(), "LevelEditor.Tabs.Details"),
-			EUserInterfaceActionType::ToggleButton
-		);
-	}
-	ToolbarBuilder.EndSection();
-}
-
-TSharedRef<SDockTab> FStepEditor::SpawnListWidgetTab(const FSpawnTabArgs& Args)
-{
-	TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab)
-		.Label(LOCTEXT("ListTab", "List"))
-		.ShouldAutosize(false)
-		[
-			ListWidget->TakeWidget()
-		];
-	return SpawnedTab;
+	return SNew(SDockTab)[GraphWidget.ToSharedRef()];
 }
 
 TSharedRef<SDockTab> FStepEditor::SpawnDetailsWidgetTab(const FSpawnTabArgs& Args)
@@ -281,11 +206,19 @@ TSharedRef<SDockTab> FStepEditor::SpawnStatusWidgetTab(const FSpawnTabArgs& Args
 void FStepEditor::PostUndo(bool bSuccess)
 {
 	FAssetEditorBase::PostUndo(bSuccess);
+	if(bSuccess && GraphWidget)
+	{
+		GraphWidget->Rebuild();
+	}
 }
 
 void FStepEditor::PostRedo(bool bSuccess)
 {
 	FAssetEditorBase::PostRedo(bSuccess);
+	if(bSuccess && GraphWidget)
+	{
+		GraphWidget->Rebuild();
+	}
 }
 
 FEditorModuleBase* FStepEditor::GetEditorModule() const
@@ -297,17 +230,26 @@ void FStepEditor::OnBlueprintCompiled()
 {
 	FAssetEditorBase::OnBlueprintCompiled();
 
-	ListWidget->Refresh();
+	if(GraphWidget)
+	{
+		GraphWidget->Rebuild();
+	}
 }
 
-void FStepEditor::OnDefaultsToggled()
+void FStepEditor::RefreshDetails()
 {
-	ListWidget->ToggleDefaults();
+	if(DetailsWidget)
+	{
+		DetailsWidget->Refresh();
+	}
 }
 
-void FStepEditor::OnEditingToggled()
+void FStepEditor::OnStepPropertyChanged(const FPropertyChangedEvent& Event)
 {
-	ListWidget->ToggleEditing();
+	if(GraphWidget)
+	{
+		GraphWidget->Rebuild();
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////

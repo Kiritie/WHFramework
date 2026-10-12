@@ -163,33 +163,8 @@ struct WHFRAMEWORK_API FVoxelInterestSet
 	uint64 GetFinalizationAllocatedBytes() const;
 	uint64 GetResourceAccountedBytes() const;
 
-	uint64 GetAllocatedBytes() const
-	{
-		uint64 SourceBytes = Sources.GetAllocatedSize();
-		for (const auto& Pair : Sources)
-		{
-			SourceBytes += Pair.Value.DataSections.GetAllocatedSize() + Pair.Value.FineDataSections.GetAllocatedSize() + Pair.Value.F0CoreSections.GetAllocatedSize() + Pair.Value.CollisionSections.GetAllocatedSize() +
-				Pair.Value.SimulationSections.GetAllocatedSize();
-		}
-		uint64 ShardPageBytes = FineShardPages.GetAllocatedSize();
-		for (const auto& Pair : FineShardPages)
-		{
-			ShardPageBytes += Pair.Value.Shards.GetAllocatedSize();
-		}
-		return ShardPageBytes + FineShardDemands.GetAllocatedSize() + FineShardOwners.GetAllocatedSize() +
-			   FinePageServicePriorities.GetAllocatedSize() + GeometryServicePriorities.GetAllocatedSize() +
-			   FinePagePriorities.GetAllocatedSize() + CriticalFinePages.GetAllocatedSize() + AdmissionPriorities.GetAllocatedSize() +
-			   (PublicationInputs ? PublicationInputs->GetAllocatedBytes() : 0) + Geometry.GetAllocatedSize() + ResolutionFloorPages.GetAllocatedSize() +
-			   CriticalDependencies.GetAllocatedSize() +
-			   (FinePagePlan ? FinePagePlan->Pages.GetAllocatedSize() + FinePagePlan->SectionOwners.GetAllocatedSize() : 0) + SourceBytes +
-			   (FineSections ? FineSections->GetAllocatedSize() : 0) + Warmup.GetAllocatedSize() + ExactOrder.GetAllocatedSize() +
-			   ExactAdmissionLanes[0].GetAllocatedSize() + ExactAdmissionLanes[1].GetAllocatedSize() + PlayableFineKeys.GetAllocatedSize() +
-			   Admissions.GetAllocatedSize() + AdmissionLanes[0].GetAllocatedSize() + AdmissionLanes[1].GetAllocatedSize() +
-			   AdmissionLanes[2].GetAllocatedSize() + AdmissionLanes[3].GetAllocatedSize() + Exact.GetAllocatedSize() + VoxelProxy.GetAllocatedSize() +
-			   Surface.GetAllocatedSize() + Macro.GetAllocatedSize() + VoxelProxyPriorities.GetAllocatedSize() + SurfacePriorities.GetAllocatedSize() +
-			   MacroPriorities.GetAllocatedSize() + TerrainPlan.Roots.GetAllocatedSize() + TerrainPlan.Leaves.GetAllocatedSize() +
-			   TerrainPlan.Required.GetAllocatedSize() + TerrainPlan.FineDependencies.GetAllocatedSize();
-	}
+	// 内联 backing 属于对象或其外层容器，只统计独立分配的容量。
+	uint64 GetAllocatedBytes() const;
 };
 
 struct WHFRAMEWORK_API FVoxelViewSettings

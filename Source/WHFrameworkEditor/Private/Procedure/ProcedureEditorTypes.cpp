@@ -1,42 +1,29 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
-
 #include "Procedure/ProcedureEditorTypes.h"
 
-#include "Procedure/Base/ProcedureAsset.h"
 #include "Procedure/Base/ProcedureBase.h"
 
-#define LOCTEXT_NAMESPACE "ProcedureEditorTypes"
-
-//////////////////////////////////////////////////////////////////////////
-// ClassFilter
 FProcedureClassFilter::FProcedureClassFilter()
 {
-	DisallowedClassFlags = CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists | CLASS_HideDropDown;
-	AllowedChildrenOfClasses.Add(UProcedureBase::StaticClass());
-	bIncludeBaseClasses = false;
-	bIncludeParentClasses = false;
-		
-	ProcedureEditor = nullptr;
+    DisallowedClassFlags = CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists | CLASS_HideDropDown;
+    AllowedChildrenOfClasses.Add(UProcedureBase::StaticClass());
+    bIncludeBaseClasses = true;
+    bIncludeParentClasses = true;
 }
 
 bool FProcedureClassFilter::IsClassAllowed(UClass* InClass)
 {
-	return ProcedureEditor.Pin()->GetEditingAsset<UProcedureAsset>()->CanAddProcedure(InClass);
+    return InClass && InClass->IsChildOf(UProcedureBase::StaticClass()) &&
+        !InClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists | CLASS_HideDropDown);
 }
 
-//////////////////////////////////////////////////////////////////////////
-// Commands
+FProcedureEditorCommands::FProcedureEditorCommands()
+    : TCommands<FProcedureEditorCommands>(TEXT("ProcedureEditor"), NSLOCTEXT("ProcedureGraph", "Commands", "流程图编辑器"), NAME_None, FWHFrameworkEditorStyle::GetStyleSetName())
+{
+}
+
 void FProcedureEditorCommands::RegisterCommands()
 {
-	UI_COMMAND(OpenProcedureEditorWindow, "Procedure Editor", "Bring up ProcedureEditor window", EUserInterfaceActionType::Button, FInputGesture());
-}
-
-//////////////////////////////////////////////////////////////////////////
-// EditorSettings
-UProcedureEditorSettings::UProcedureEditorSettings()
-{
-	bDefaultIsDefaults = false;
-	bDefaultIsEditing = false;
-}
-
+#define LOCTEXT_NAMESPACE "ProcedureEditorCommands"
+    UI_COMMAND(OpenProcedureEditorWindow, "Procedure Editor", "打开流程图编辑器", EUserInterfaceActionType::Button, FInputChord());
 #undef LOCTEXT_NAMESPACE
+}

@@ -290,7 +290,14 @@ UTaskAsset* UTaskModule::AddAssetInternal(UTaskAsset* InAsset, FGuid InInstanceI
 	BeginTaskMutation();
 	ON_SCOPE_EXIT { EndTaskMutation(); };
 	TArray<FText> Errors;
-	if(!Source->ValidateTasks(Errors)) return nullptr;
+	if(!Source->ValidateTasks(Errors))
+	{
+		for(const FText& Error : Errors)
+		{
+			UE_LOG(LogTemp, Error, TEXT("%s"), *Error.ToString());
+		}
+		return nullptr;
+	}
 	UTaskAsset* RuntimeAsset = DuplicateObject<UTaskAsset>(Source, this);
 	RuntimeAsset->SourceObject = Source;
 	RuntimeAsset->InstanceID = InInstanceID;
@@ -298,7 +305,7 @@ UTaskAsset* UTaskModule::AddAssetInternal(UTaskAsset* InAsset, FGuid InInstanceI
 	RuntimeAsset->OwnerActorID = InOwnerActorID;
 	RuntimeAsset->bPresentationOnly = bPresentationOnly;
 	TArray<FText> ExpansionErrors;
-	if(!RuntimeAsset->ExpandTaskAssetReferences(ExpansionErrors))
+	if(!RuntimeAsset->CompileTasks(ExpansionErrors) || !RuntimeAsset->ExpandTaskAssetReferences(ExpansionErrors))
 	{
 		for(const FText& Error : ExpansionErrors) UE_LOG(LogTemp, Warning, TEXT("%s"), *Error.ToString());
 		return nullptr;
@@ -358,7 +365,7 @@ UTaskAsset* UTaskModule::PrepareRuntimeAsset(UTaskAsset* InAsset, FGuid InInstan
 	Candidate->AgentID = InAgentID;
 	Candidate->OwnerActorID = InOwnerActorID;
 	Candidate->bPresentationOnly = true;
-	if(!Candidate->ExpandTaskAssetReferences(Errors) || !Candidate->RebuildTaskMap(false) ||
+	if(!Candidate->CompileTasks(Errors) || !Candidate->ExpandTaskAssetReferences(Errors) || !Candidate->RebuildTaskMap(false) ||
 		!Candidate->ValidateTasks(Errors) || Candidate->TaskMap.Num() > 256 || Candidate->RootTasks.IsEmpty())
 	{
 		OutError = Errors.IsEmpty() ? TEXT("Task.InvalidRuntimeHierarchy") : Errors[0].ToString();
@@ -1043,4 +1050,3 @@ TArray<UTaskAsset*> UTaskModule::GetVisibleAssets() const
 	}
 	return Result;
 }
-

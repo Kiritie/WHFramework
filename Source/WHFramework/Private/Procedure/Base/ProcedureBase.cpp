@@ -13,39 +13,57 @@
 #include "Event/Events/Procedure/Event_ProcedureStateChanged.h"
 #include "Procedure/ProcedureModule.h"
 #include "Procedure/ProcedureModuleStatics.h"
+#include "TimerManager.h"
+#include "UObject/UObjectHash.h"
+
 
 UProcedureBase::UProcedureBase()
 {
-	ProcedureName = FName("ProcedureBase");
-	ProcedureDisplayName = FText::FromString(TEXT("Procedure Base"));
-	ProcedureDescription = FText::GetEmpty();
+    ProcedureName = TEXT("ProcedureBase");
+    ProcedureDisplayName = NSLOCTEXT("Procedure", "Base", "流程");
+}
 
-	bFirstProcedure = false;
-	ProcedureIndex = 0;
-	ProcedureState = EProcedureState::None;
-	ProcedureGuideType = EProcedureGuideType::None;
-	ProcedureGuideIntervalTime = 0.f;
-
-	OperationTarget = nullptr;
-	bApplyCameraAction = false;
-	bRestoreDefaultCameraOnLeave = false;
+UWorld* UProcedureBase::GetWorld() const
+{
+    return RuntimeOwner ? RuntimeOwner->GetWorld() : nullptr;
 }
 
 #if WITH_EDITOR
 void UProcedureBase::OnGenerate()
 {
-	
 }
 
 void UProcedureBase::OnUnGenerate()
 {
-	if(bFirstProcedure)
-	{
-		if(GetProcedureAsset()->FirstProcedure == this)
-		{
-			GetProcedureAsset()->FirstProcedure = nullptr;
-		}
-	}
+}
+
+void UProcedureBase::PreEditChange(FProperty* PropertyAboutToChange)
+{
+    Super::PreEditChange(PropertyAboutToChange);
+    if (UProcedureAsset* Asset = Cast<UProcedureAsset>(GetOuter()); Asset && !Asset->SourceObject)
+    {
+        Asset->SetFlags(RF_Transactional);
+        Asset->Modify();
+        SetFlags(RF_Transactional);
+        Modify();
+        TArray<UObject*> Objects;
+        GetObjectsWithOuter(this, Objects, true);
+        for (UObject* Object : Objects)
+        {
+            Object->SetFlags(RF_Transactional);
+            Object->Modify();
+        }
+    }
+}
+
+void UProcedureBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+    Super::PostEditChangeProperty(PropertyChangedEvent);
+    if (UProcedureAsset* Asset = Cast<UProcedureAsset>(GetOuter()))
+    {
+        Asset->Modify();
+        Asset->Recompile();
+    }
 }
 #endif
 
@@ -77,8 +95,9 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 	switch(ProcedureGuideType)
 	{
 		case EProcedureGuideType::TimerOnce:
+		case EProcedureGuideType::TimerLoop:
 		{
-			GetWorld()->GetTimerManager().SetTimer(StartGuideTimerHandle, this, &UProcedureBase::OnGuide, ProcedureGuideIntervalTime, false);
+			ScheduleGuide();
 			break;
 		}
 		default: break;
@@ -94,13 +113,18 @@ void UProcedureBase::OnRefresh()
 
 void UProcedureBase::OnGuide()
 {
+	if (!IsCurrent())
+	{
+		return;
+	}
+
 	ApplyCameraAction();
 
 	switch(ProcedureGuideType)
 	{
 		case EProcedureGuideType::TimerLoop:
 		{
-			GetWorld()->GetTimerManager().SetTimer(StartGuideTimerHandle, this, &UProcedureBase::OnGuide, ProcedureGuideIntervalTime, false);
+			ScheduleGuide();
 			break;
 		}
 		default: break;
@@ -111,24 +135,28 @@ void UProcedureBase::OnGuide()
 
 void UProcedureBase::OnLeave(UProcedureBase* InNextProcedure)
 {
-	if(CameraOverrideHandle.IsValid())
-	{
-		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
-		{
-			CameraManager->PopCameraConfigOverride(CameraOverrideHandle);
-		}
-		CameraOverrideHandle.Reset();
-	}
+    UWorld* World = GetWorld();
+    if (World)
+    {
+        World->GetTimerManager().ClearTimer(StartGuideTimerHandle);
+    }
+    UCameraModule* CameraModule = UCameraModule::GetPtr(World);
+    ACameraManagerBase* CameraManager = CameraModule ? CameraModule->GetCameraManager() : nullptr;
+    if (CameraOverrideHandle.IsValid())
+    {
+        if (CameraManager)
+        {
+            CameraManager->PopCameraConfigOverride(CameraOverrideHandle);
+        }
+        CameraOverrideHandle.Reset();
+    }
 	ProcedureState = EProcedureState::Leaved;
 	OnStateChanged(ProcedureState);
 
-	if(bRestoreDefaultCameraOnLeave)
-	{
-		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
-		{
-			CameraManager->SetDefaultMode(CameraTransition);
-		}
-	}
+    if (bRestoreDefaultCameraOnLeave && CameraManager)
+    {
+        CameraManager->SetDefaultMode(CameraTransition);
+    }
 
 	WHDebug(FString::Printf(TEXT("离开流程: %s"), *ProcedureDisplayName.ToString()), EDM_All, EDC_Procedure, EDV_Log, FColor::Orange, 5.f);
 
@@ -137,45 +165,51 @@ void UProcedureBase::OnLeave(UProcedureBase* InNextProcedure)
 	UEventModuleStatics::BroadcastEvent<FEventProcedureLeaved>(this, {this});
 }
 
-void UProcedureBase::Switch_Implementation()
-{
-	UProcedureModuleStatics::SwitchProcedure(this);
-}
 
-void UProcedureBase::UnSwitch_Implementation()
+void UProcedureBase::OnShutdown()
 {
-	if(IsCurrent())
-	{
-		UProcedureModuleStatics::SwitchProcedure(nullptr);
-	}
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(StartGuideTimerHandle);
+    }
 }
 
 void UProcedureBase::Guide_Implementation()
 {
-	if(IsCurrent())
-	{
-		OnGuide();
-	}
-}
-
-void UProcedureBase::SwitchLast_Implementation()
-{
-	UProcedureModuleStatics::SwitchLastProcedure();
-}
-
-void UProcedureBase::SwitchNext_Implementation()
-{
-	UProcedureModuleStatics::SwitchNextProcedure();
+    if (IsCurrent())
+    {
+        OnGuide();
+    }
 }
 
 bool UProcedureBase::IsCurrent_Implementation()
 {
-	return UProcedureModuleStatics::IsCurrentProcedure(this);
+    return RuntimeOwner && RuntimeOwner->IsCurrentProcedure(this);
+}
+
+bool UProcedureBase::Advance(FName Output)
+{
+    return RuntimeOwner && RuntimeOwner->AdvanceFrom(Activation, Output);
+}
+
+bool UProcedureBase::CanAdvance(FName Output) const
+{
+    return RuntimeOwner && RuntimeOwner->IsCurrentProcedure(this) && RuntimeOwner->CanAdvance(Output);
+}
+
+FProcedureActivationToken UProcedureBase::CaptureActivation() const
+{
+    return Activation;
+}
+
+UProcedureModule* UProcedureBase::GetProcedureModule() const
+{
+    return RuntimeOwner;
 }
 
 UProcedureAsset* UProcedureBase::GetProcedureAsset() const
 {
-	return Cast<UProcedureAsset>(GetOuter());
+    return RuntimeOwner ? RuntimeOwner->GetCurrentAsset() : Cast<UProcedureAsset>(GetOuter());
 }
 
 void UProcedureBase::ApplyCameraAction()
@@ -185,7 +219,8 @@ void UProcedureBase::ApplyCameraAction()
 		return;
 	}
 
-	ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager();
+    UCameraModule* CameraModule = UCameraModule::GetPtr(GetWorld());
+    ACameraManagerBase* CameraManager = CameraModule ? CameraModule->GetCameraManager() : nullptr;
 	if(!CameraManager)
 	{
 		return;
@@ -209,7 +244,8 @@ void UProcedureBase::ApplyCameraAction()
 
 AActor* UProcedureBase::GetOperationTarget(TSubclassOf<AActor> InClass) const
 {
-	return OperationTarget.LoadSynchronous();
+	AActor* Target = OperationTarget.Get();
+	return Target && (!InClass || Target->IsA(InClass)) ? Target : nullptr;
 }
 
 void UProcedureBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCameraView)
@@ -221,57 +257,59 @@ void UProcedureBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCa
 	}
 }
 
-#if WITH_EDITOR
-bool UProcedureBase::GenerateListItem(TSharedPtr<FProcedureListItem> OutProcedureListItem, const FString& InFilterText)
+void UProcedureBase::Switch_Implementation()
 {
-	OutProcedureListItem->Procedure = this;
-	if(!InFilterText.IsEmpty())
-	{
-		return ProcedureDisplayName.ToString().Contains(InFilterText);
-	}
-	return true;
+    if (RuntimeOwner)
+    {
+        RuntimeOwner->SwitchProcedure(this);
+    }
 }
 
-void UProcedureBase::UpdateListItem(TSharedPtr<FProcedureListItem> OutProcedureListItem)
+void UProcedureBase::UnSwitch_Implementation()
 {
-	OutProcedureListItem->Procedure = this;
+    if (IsCurrent())
+    {
+        RuntimeOwner->SwitchProcedure(nullptr);
+    }
 }
 
-bool UProcedureBase::CanEditChange(const FProperty* InProperty) const
+void UProcedureBase::SwitchLast_Implementation()
 {
-	if(InProperty)
-	{
-		const FString PropertyName = InProperty->GetName();
-	}
-
-	return Super::CanEditChange(InProperty);
+    if (IsCurrent())
+    {
+        RuntimeOwner->SwitchLastProcedure();
+    }
 }
 
-void UProcedureBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+void UProcedureBase::SwitchNext_Implementation()
 {
-	const FProperty* Property = PropertyChangedEvent.MemberProperty;
-
-	if(Property && PropertyChangedEvent.ChangeType != EPropertyChangeType::Interactive)
-	{
-		const FName PropertyName = Property->GetFName();
-		
-		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UProcedureBase, bFirstProcedure))
-		{
-			if(bFirstProcedure)
-			{
-				if(GetProcedureAsset()->FirstProcedure)
-				{
-					GetProcedureAsset()->FirstProcedure->bFirstProcedure = false;
-				}
-				GetProcedureAsset()->FirstProcedure = this;
-			}
-			else if(GetProcedureAsset()->FirstProcedure == this)
-			{
-				GetProcedureAsset()->FirstProcedure = nullptr;
-			}
-		}
-	}
-
-	Super::PostEditChangeProperty(PropertyChangedEvent);
+    if (IsCurrent())
+    {
+        RuntimeOwner->SwitchNextProcedure();
+    }
 }
-#endif
+
+void UProcedureBase::SwitchPre()
+{
+    SwitchLast();
+}
+
+void UProcedureBase::ScheduleGuide()
+{
+    UProcedureModule* Module = GetProcedureModule();
+    UWorld* World = GetWorld();
+    if (!Module || !World || !IsCurrent())
+    {
+        return;
+    }
+    const FProcedureActivationToken Token = CaptureActivation();
+    const TWeakObjectPtr<UProcedureModule> WeakModule(Module);
+    FTimerDelegate Callback = FTimerDelegate::CreateWeakLambda(this, [WeakModule, Token]
+    {
+        if (UProcedureModule* Owner = WeakModule.Get(); Owner && Owner->CaptureActivation() == Token)
+        {
+            Owner->GuideCurrentProcedure();
+        }
+    });
+    World->GetTimerManager().SetTimer(StartGuideTimerHandle, Callback, FMath::Max(0.01f, ProcedureGuideIntervalTime), false);
+}

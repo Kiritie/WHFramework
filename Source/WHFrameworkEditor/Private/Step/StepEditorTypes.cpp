@@ -1,42 +1,30 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
-
 #include "Step/StepEditorTypes.h"
 
 #include "Step/Base/StepAsset.h"
 #include "Step/Base/StepBase.h"
 
-#define LOCTEXT_NAMESPACE "StepEditorTypes"
-
-//////////////////////////////////////////////////////////////////////////
-// ClassFilter
 FStepClassFilter::FStepClassFilter()
 {
 	DisallowedClassFlags = CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists | CLASS_HideDropDown;
 	AllowedChildrenOfClasses.Add(UStepBase::StaticClass());
 	bIncludeBaseClasses = true;
 	bIncludeParentClasses = true;
-		
-	StepEditor = nullptr;
 }
 
 bool FStepClassFilter::IsClassAllowed(UClass* InClass)
 {
-	return StepEditor.Pin()->GetEditingAsset<UStepAsset>()->CanAddStep(InClass);
+	const TSharedPtr<FStepEditor> Editor = StepEditor.Pin();
+	return Editor && Editor->GetEditingAsset<UStepAsset>()->CanAddStep(InClass);
 }
 
-//////////////////////////////////////////////////////////////////////////
-// Commands
+FStepEditorCommands::FStepEditorCommands()
+	: TCommands<FStepEditorCommands>(FName("StepEditor"), NSLOCTEXT("StepEditor", "Commands", "Step Editor Commands"), NAME_None, FWHFrameworkEditorStyle::GetStyleSetName())
+{
+}
+
+#define LOCTEXT_NAMESPACE "StepEditorTypes"
 void FStepEditorCommands::RegisterCommands()
 {
-	UI_COMMAND(OpenStepEditorWindow, "Step Editor", "Bring up StepEditor window", EUserInterfaceActionType::Button, FInputGesture());
+	UI_COMMAND(OpenStepEditorWindow, "Step Editor", "Open the step graph editor", EUserInterfaceActionType::Button, FInputChord());
 }
-
-//////////////////////////////////////////////////////////////////////////
-// EditorSettings
-UStepEditorSettings::UStepEditorSettings()
-{
-	bDefaultIsDefaults = false;
-	bDefaultIsEditing = false;
-}
-
 #undef LOCTEXT_NAMESPACE

@@ -1,52 +1,62 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
-
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Asset/Base/AssetBase.h"
+#include "Procedure/ProcedureModuleTypes.h"
 #include "ProcedureAsset.generated.h"
 
 class UProcedureBase;
-/**
- * Imported spreadsheet table.
- */
+
 UCLASS(BlueprintType, Meta = (LoadBehavior = "LazyOnDemand"))
 class WHFRAMEWORK_API UProcedureAsset : public UAssetBase
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-	UProcedureAsset(const FObjectInitializer& ObjectInitializer);
-	
-public:
-	virtual void Initialize() override;
+    UProcedureAsset(const FObjectInitializer& ObjectInitializer);
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Procedure Stats
-public:
-	/// 自动切换初始流程 
-	UPROPERTY(EditAnywhere)
-	bool bAutoSwitchFirst;
-	/// 初始流程 
-	UPROPERTY(VisibleAnywhere)
-	UProcedureBase* FirstProcedure;
-	/// 流程列表
-	UPROPERTY(VisibleAnywhere)
-	TArray<UProcedureBase*> Procedures;
-	/// 流程Map
-	UPROPERTY(Transient)
-	TMap<TSubclassOf<UProcedureBase>, UProcedureBase*> ProcedureMap;
+    virtual void Initialize() override;
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Editor
-public:
+    UPROPERTY(EditAnywhere)
+    bool bAutoStart = true;
+
+#if WITH_EDITORONLY_DATA
+    UPROPERTY()
+    FGuid StartId;
+
+    UPROPERTY()
+    FVector2D StartPosition = FVector2D::ZeroVector;
+
+    UPROPERTY(Instanced)
+    TArray<TObjectPtr<UProcedureBase>> Nodes;
+
+    UPROPERTY()
+    TArray<FProcedureLink> Links;
+#endif
+
+    UPROPERTY(VisibleAnywhere)
+    bool bCompiled = false;
+
+    UPROPERTY(VisibleAnywhere)
+    FGuid EntryNodeId;
+
+    UPROPERTY(VisibleAnywhere, Instanced)
+    TArray<TObjectPtr<UProcedureBase>> CompiledNodes;
+
+    UPROPERTY()
+    TArray<FProcedureLink> CompiledLinks;
+
+    UPROPERTY(VisibleAnywhere)
+    FString CompileError;
+
+    bool ValidateCompiled(FString& OutError) const;
+
 #if WITH_EDITOR
-	void GenerateProcedureListItem(TArray<TSharedPtr<struct FProcedureListItem>>& OutProcedureListItems, const FString& InFilterText = TEXT(""));
-
-	void UpdateProcedureListItem(TArray<TSharedPtr<struct FProcedureListItem>>& OutProcedureListItems);
-
-	bool CanAddProcedure(TSubclassOf<UProcedureBase> InProcedureClass);
-
-	void ClearAllProcedure();
+    bool Recompile();
+    bool BuildCompiled(TArray<UProcedureBase*>& OutNodes, TArray<FProcedureLink>& OutLinks, FGuid& OutEntry, FString& OutError) const;
+    UProcedureBase* FindNode(const FGuid& InNodeId) const;
+    virtual void PreSave(FObjectPreSaveContext SaveContext) override;
+    virtual void PreEditChange(FProperty* PropertyAboutToChange) override;
+    virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 };

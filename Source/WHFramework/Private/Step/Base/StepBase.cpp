@@ -1,6 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Step/Base/StepBase.h"
 
 #include "Camera/CameraModule.h"
@@ -12,8 +9,12 @@
 #include "Event/Events/Step/Event_StepExecuted.h"
 #include "Event/Events/Step/Event_StepLeaved.h"
 #include "Event/Events/Step/Event_StepStateChanged.h"
+#include "Step/Base/StepAsset.h"
+#include "Step/Base/StepRuntime.h"
 #include "Step/StepModule.h"
-#include "Step/StepModuleStatics.h"
+#include "Serialization/MemoryReader.h"
+#include "Serialization/MemoryWriter.h"
+#include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 
 UStepBase::UStepBase()
 {
@@ -21,7 +22,6 @@ UStepBase::UStepBase()
 	StepDisplayName = FText::FromString(TEXT("Step Base"));
 	StepDescription = FText::GetEmpty();
 
-	bFirstStep = false;
 	StepIndex = 0;
 	StepHierarchy = 0;
 	StepState = EStepState::None;
@@ -70,311 +70,476 @@ void UStepBase::OnUnGenerate()
 }
 #endif
 
+void UStepBase::InitializeRuntime(UStepRuntime* InRuntime)
+{
+	Runtime = InRuntime;
+	bRuntimeInitialized = false;
+	RootStep = nullptr;
+	ParentStep = nullptr;
+	SubSteps.Reset();
+	StepState = EStepState::None;
+	StepExecuteResult = EStepExecuteResult::None;
+	CurrentSubStepIndex = INDEX_NONE;
+	CurrentStepTaskIndex = INDEX_NONE;
+	StepTaskItems.Reset();
+	CameraOverrideHandle.Reset();
+	ClearRuntimeTimers();
+}
+
+void UStepBase::ShutdownRuntime()
+{
+	ClearRuntimeTimers();
+	ReleaseCameraAction(false);
+	if(bRuntimeInitialized)
+	{
+		bRuntimeInitialized = false;
+		K2_OnSuspend();
+	}
+	StepTaskItems.Reset();
+	Runtime = nullptr;
+}
+
+bool UStepBase::CanContinueRuntimeCallback() const
+{
+	const UStepModule* Module = GetStepModule();
+	return Runtime && Module && !Module->IsShuttingDown();
+}
+
+void UStepBase::ClearRuntimeTimers()
+{
+	AutoExecuteRemaining = -1.f;
+	AutoCompleteRemaining = -1.f;
+	AutoLeaveRemaining = -1.f;
+	GuideRemaining = -1.f;
+}
+
+void UStepBase::SetRuntimeState(EStepState InState, bool bNotify)
+{
+	if(StepState == InState)
+	{
+		return;
+	}
+	StepState = InState;
+	if(bNotify)
+	{
+		OnStateChanged(InState);
+	}
+}
+
 void UStepBase::OnStateChanged(EStepState InStepState)
 {
 	OnStepStateChanged.Broadcast(InStepState);
+	if(!CanContinueRuntimeCallback())
+	{
+		return;
+	}
 	K2_OnStateChanged(InStepState);
-
-	UEventModuleStatics::BroadcastEvent<FEventStepStateChanged>(this, {this});
+	if(CanContinueRuntimeCallback())
+	{
+		UEventModuleStatics::BroadcastEvent<FEventStepStateChanged>(this, {this});
+	}
 }
 
 void UStepBase::OnInitialize()
 {
-	for (auto Iter : SubSteps)
-	{
-		if(Iter)
-		{
-			Iter->RootStep = IsRootStep() ? this : RootStep;
-			Iter->ParentStep = this;
-			Iter->OnInitialize();
-		}
-	}
-
 	K2_OnInitialize();
 }
 
 void UStepBase::OnRestore()
 {
-	StepState = EStepState::None;
-	OnStateChanged(StepState);
-
-	CurrentSubStepIndex = -1;
-	CurrentStepTaskIndex = -1;
-
-	for(int32 i = 0; i < StepTaskItems.Num(); i++)
+	ClearRuntimeTimers();
+	ReleaseCameraAction(false);
+	StepExecuteResult = EStepExecuteResult::None;
+	CurrentSubStepIndex = INDEX_NONE;
+	CurrentStepTaskIndex = INDEX_NONE;
+	for(FStepTaskItem& Item : StepTaskItems)
 	{
-		StepTaskItems[i].TaskState = EStepTaskState::None;
+		Item.TaskState = EStepTaskState::None;
+		Item.RemainTime = 0.f;
 	}
-
-	K2_OnRestore();
-
-	for(int32 i = SubSteps.Num() - 1; i >= 0; i--)
+	SetRuntimeState(EStepState::None);
+	if(CanContinueRuntimeCallback())
 	{
-		if(SubSteps[i])
-		{
-			SubSteps[i]->OnRestore();
-		}
+		K2_OnRestore();
 	}
 }
 
 void UStepBase::OnEnter(UStepBase* InLastStep)
 {
-	StepState = EStepState::Entered;
-	OnStateChanged(StepState);
-
-	GetWorld()->GetTimerManager().ClearTimer(AutoExecuteTimerHandle);
-	
+	ClearRuntimeTimers();
+	StepExecuteResult = EStepExecuteResult::None;
 	if(ParentStep)
 	{
 		ParentStep->CurrentSubStepIndex = StepIndex;
 	}
-
-	StepExecuteResult = EStepExecuteResult::None;
-
-	WHDebug(FString::Printf(TEXT("进入步骤: %s"), *StepDisplayName.ToString()), EDM_All, EDC_Step, EDV_Log, FColor::Cyan, 5.f);
-
-	K2_OnEnter(InLastStep);
-
-	ApplyCameraAction();
-
-	switch(StepGuideType)
+	SetRuntimeState(EStepState::Entered);
+	if(!CanContinueRuntimeCallback() || StepState != EStepState::Entered)
 	{
-		case EStepGuideType::TimerOnce:
-		{
-			GetWorld()->GetTimerManager().SetTimer(StartGuideTimerHandle, this, &UStepBase::Guide, StepGuideIntervalTime, false);
-			break;
-		}
-		default: break;
+		return;
 	}
-
+	K2_OnEnter(InLastStep);
+	if(!CanContinueRuntimeCallback() || StepState != EStepState::Entered)
+	{
+		return;
+	}
+	ApplyCameraAction();
+	if(StepGuideType != EStepGuideType::None)
+	{
+		GuideRemaining = FMath::Max(0.f, StepGuideIntervalTime);
+	}
 	UEventModuleStatics::BroadcastEvent<FEventStepEntered>(this, {this});
+	if(CanContinueRuntimeCallback() && StepState == EStepState::Entered)
+	{
+		RefreshAutomaticTimers();
+	}
+}
 
+void UStepBase::OnExecute()
+{
+	AutoExecuteRemaining = -1.f;
+	SetRuntimeState(EStepState::Executing);
+	if(!CanContinueRuntimeCallback() || StepState != EStepState::Executing)
+	{
+		return;
+	}
+	K2_OnExecute();
+	if(!CanContinueRuntimeCallback() || StepState != EStepState::Executing)
+	{
+		return;
+	}
+	UEventModuleStatics::BroadcastEvent<FEventStepExecuted>(this, {this});
+	if(!CanContinueRuntimeCallback() || StepState != EStepState::Executing)
+	{
+		return;
+	}
+	if(GetStepCompleteType() == EStepCompleteType::Skip)
+	{
+		Complete(EStepExecuteResult::Skipped);
+		return;
+	}
 	if(bMergeSubStep)
 	{
-		for (auto Iter : SubSteps)
+		for(UStepBase* Child : SubSteps)
 		{
-			if(Iter)
+			if(!CanContinueRuntimeCallback() || GetStepModule()->GetStepModuleState() != EStepModuleState::Running || StepState != EStepState::Executing)
 			{
-				Iter->OnEnter(InLastStep);
+				return;
+			}
+			const bool bMatches = Child->CheckStepCondition(nullptr);
+			if(!CanContinueRuntimeCallback() || GetStepModule()->GetStepModuleState() != EStepModuleState::Running)
+			{
+				return;
+			}
+			if(bMatches)
+			{
+				Child->Enter();
+			}
+			else
+			{
+				GetStepModule()->SkipUnmatchedStep(Child);
 			}
 		}
 	}
-
-	if(StepExecuteType == EStepExecuteType::Automatic && StepState != EStepState::Executing)
+	else
 	{
-		if(AutoExecuteStepTime > 0.f)
+		AdvanceChildren();
+	}
+	if(CanContinueRuntimeCallback())
+	{
+		RefreshAutomaticTimers();
+	}
+}
+
+void UStepBase::AdvanceChildren()
+{
+	if(!CanContinueRuntimeCallback() || GetStepModule()->GetStepModuleState() != EStepModuleState::Running || bMergeSubStep || StepState != EStepState::Executing)
+	{
+		return;
+	}
+	UStepBase* Previous = GetCurrentSubStep();
+	if(Previous && Previous->StepState != EStepState::Leaved)
+	{
+		return;
+	}
+	while(SubSteps.IsValidIndex(CurrentSubStepIndex + 1))
+	{
+		if(!CanContinueRuntimeCallback() || GetStepModule()->GetStepModuleState() != EStepModuleState::Running || StepState != EStepState::Executing)
 		{
-			GetWorld()->GetTimerManager().SetTimer(AutoExecuteTimerHandle, this, &UStepBase::Execute, AutoExecuteStepTime, false);
+			return;
 		}
-		else
+		UStepBase* Child = SubSteps[CurrentSubStepIndex + 1];
+		const bool bMatches = Child->CheckStepCondition(Previous);
+		if(!CanContinueRuntimeCallback() || GetStepModule()->GetStepModuleState() != EStepModuleState::Running || StepState != EStepState::Executing)
 		{
-			Execute();
+			return;
 		}
+		++CurrentSubStepIndex;
+		if(bMatches)
+		{
+			Child->Enter();
+			return;
+		}
+		GetStepModule()->SkipUnmatchedStep(Child);
+		Previous = Child;
 	}
 }
 
 void UStepBase::OnRefresh()
 {
-	if(HasSubStep(false))
+	K2_OnRefresh();
+	if(!CanContinueRuntimeCallback() || GetStepModule()->GetStepModuleState() != EStepModuleState::Running || StepState != EStepState::Executing)
 	{
-		if(!IsAllSubCompleted())
+		return;
+	}
+	if(!SubSteps.IsEmpty())
+	{
+		if(bMergeSubStep)
 		{
-			const int32 Index = CurrentSubStepIndex + 1;
-			if(SubSteps.IsValidIndex(Index))
+			bool bAllLeaved = true;
+			for(UStepBase* Child : SubSteps)
 			{
-				UStepBase* SubStep = SubSteps[Index];
-				if(SubStep)
+				if(!CanContinueRuntimeCallback() || GetStepModule()->GetStepModuleState() != EStepModuleState::Running)
 				{
-					if(SubStep->CheckStepCondition(GetCurrentSubStep()))
+					return;
+				}
+				if(Child->StepState == EStepState::None)
+				{
+					const bool bMatches = Child->CheckStepCondition(nullptr);
+					if(!CanContinueRuntimeCallback() || GetStepModule()->GetStepModuleState() != EStepModuleState::Running)
 					{
-						SubStep->Enter();
+						return;
+					}
+					if(bMatches)
+					{
+						Child->Enter();
 					}
 					else
 					{
-						SubStep->Complete(EStepExecuteResult::Skipped);
-						CurrentSubStepIndex++;
+						GetStepModule()->SkipUnmatchedStep(Child);
 					}
 				}
-			}
-		}
-		else
-		{
-			Complete(IsAllSubExecuteSucceed() ? EStepExecuteResult::Succeed : EStepExecuteResult::Failed);
-		}
-	}
-	else if(HasStepTask())
-	{
-		if(!IsAllTaskCompleted())
-		{
-			const int32 Index = CurrentStepTaskIndex + 1;
-			if(StepTaskItems.IsValidIndex(Index))
-			{
-				FStepTaskItem& TaskItem = StepTaskItems[Index];
-				if(TaskItem.IsValid())
+				else if(Child->StepState != EStepState::Leaved)
 				{
-					switch(TaskItem.TaskState)
-					{
-						case EStepTaskState::None:
-						{
-							TaskItem.Prepare();
-							break;
-						}
-						case EStepTaskState::Preparing:
-						{
-							TaskItem.TryExecute(GetWorld()->GetDeltaSeconds());
-							break;
-						}
-						case EStepTaskState::Executing:
-						{
-							TaskItem.TryComplete(GetWorld()->GetDeltaSeconds());
-							break;
-						}
-						case EStepTaskState::Completed:
-						{
-							CurrentStepTaskIndex++;
-							break;
-						}
-					}
+					Child->TickRuntime(RefreshDeltaSeconds);
 				}
+				bAllLeaved &= Child->StepState == EStepState::Leaved;
+			}
+			if(!bAllLeaved)
+			{
+				return;
 			}
 		}
 		else
 		{
-			Complete(EStepExecuteResult::Succeed);
+			UStepBase* Child = GetCurrentSubStep();
+			if(Child && Child->StepState != EStepState::Leaved)
+			{
+				Child->TickRuntime(RefreshDeltaSeconds);
+			}
+			AdvanceChildren();
+			if(CurrentSubStepIndex < SubSteps.Num() - 1 || (GetCurrentSubStep() && GetCurrentSubStep()->StepState != EStepState::Leaved))
+			{
+				return;
+			}
 		}
 	}
+	if(!CanContinueRuntimeCallback() || GetStepModule()->GetStepModuleState() != EStepModuleState::Running || StepState != EStepState::Executing)
+	{
+		return;
+	}
+	if(HasStepTask())
+	{
+		RefreshStepTasks(RefreshDeltaSeconds);
+		if(!CanContinueRuntimeCallback() || GetStepModule()->GetStepModuleState() != EStepModuleState::Running || CurrentStepTaskIndex < StepTaskItems.Num())
+		{
+			return;
+		}
+	}
+	if(!SubSteps.IsEmpty() || HasStepTask())
+	{
+		Complete(IsAllSubExecuteSucceed() ? EStepExecuteResult::Succeed : EStepExecuteResult::Failed);
+	}
+}
 
-	K2_OnRefresh();
+void UStepBase::RefreshStepTasks(float DeltaSeconds)
+{
+	if(CurrentStepTaskIndex == INDEX_NONE)
+	{
+		CurrentStepTaskIndex = 0;
+	}
+	if(!StepTaskItems.IsValidIndex(CurrentStepTaskIndex))
+	{
+		return;
+	}
+	FStepTaskItem& Item = StepTaskItems[CurrentStepTaskIndex];
+	switch(Item.TaskState)
+	{
+		case EStepTaskState::None:
+		{
+			Item.Prepare();
+			break;
+		}
+		case EStepTaskState::Preparing:
+		{
+			Item.TryExecute(DeltaSeconds);
+			break;
+		}
+		case EStepTaskState::Executing:
+		{
+			Item.TryComplete(DeltaSeconds);
+			break;
+		}
+		case EStepTaskState::Completed:
+		{
+			++CurrentStepTaskIndex;
+			break;
+		}
+	}
 }
 
 void UStepBase::OnGuide()
 {
 	ApplyCameraAction();
-
-	switch(StepGuideType)
-	{
-		case EStepGuideType::TimerLoop:
-		{
-			GetWorld()->GetTimerManager().SetTimer(StartGuideTimerHandle, this, &UStepBase::OnGuide, StepGuideIntervalTime, false);
-			break;
-		}
-		default: break;
-	}
-
 	K2_OnGuide();
-}
-
-void UStepBase::OnExecute()
-{
-	StepState = EStepState::Executing;
-	OnStateChanged(StepState);
-
-	GetWorld()->GetTimerManager().ClearTimer(AutoExecuteTimerHandle);
-
-	K2_OnExecute();
-
-	UEventModuleStatics::BroadcastEvent<FEventStepExecuted>(this, {this});
-
-	if(StepState != EStepState::Completed)
+	if(CanContinueRuntimeCallback())
 	{
-		switch(GetStepCompleteType())
-		{
-			case EStepCompleteType::Automatic:
-			{
-				if(!HasSubStep(false))
-				{
-					if(AutoCompleteStepTime > 0.f)
-					{
-						GetWorld()->GetTimerManager().SetTimer(AutoCompleteTimerHandle, FTimerDelegate::CreateUObject(this, &UStepBase::Complete, EStepExecuteResult::Succeed), AutoCompleteStepTime, false);
-					}
-					else
-					{
-						Complete();
-					}
-				}
-				break;
-			}
-			case EStepCompleteType::Skip:
-			{
-				Complete(EStepExecuteResult::Skipped);
-			}
-			default: break;
-		}
+		GuideRemaining = StepGuideType == EStepGuideType::TimerLoop ? FMath::Max(KINDA_SMALL_NUMBER, StepGuideIntervalTime) : -1.f;
 	}
 }
 
 void UStepBase::OnComplete(EStepExecuteResult InStepExecuteResult)
 {
-	StepState = EStepState::Completed;
-	OnStateChanged(StepState);
-
+	ClearRuntimeTimers();
 	StepExecuteResult = InStepExecuteResult;
-
-	GetWorld()->GetTimerManager().ClearTimer(AutoCompleteTimerHandle);
-
-	GetWorld()->GetTimerManager().ClearTimer(StartGuideTimerHandle);
-
-	K2_OnComplete(InStepExecuteResult);
-
-	UEventModuleStatics::BroadcastEvent<FEventStepCompleted>(this, {this});
-
-	if(GetStepLeaveType() == EStepLeaveType::Automatic && StepState != EStepState::Leaved)
+	SetRuntimeState(EStepState::Completed);
+	if(!CanContinueRuntimeCallback() || StepState != EStepState::Completed)
 	{
-		if(StepExecuteResult != EStepExecuteResult::Skipped && AutoLeaveStepTime > 0.f)
-		{
-			GetWorld()->GetTimerManager().SetTimer(AutoLeaveTimerHandle, this, &UStepBase::Leave, AutoLeaveStepTime, false);
-		}
-		else
-		{
-			Leave();
-		}
+		return;
+	}
+	K2_OnComplete(InStepExecuteResult);
+	if(!CanContinueRuntimeCallback() || StepState != EStepState::Completed)
+	{
+		return;
+	}
+	UEventModuleStatics::BroadcastEvent<FEventStepCompleted>(this, {this});
+	if(CanContinueRuntimeCallback() && StepState == EStepState::Completed)
+	{
+		RefreshAutomaticTimers();
 	}
 }
 
 void UStepBase::OnLeave()
 {
-	if(CameraOverrideHandle.IsValid())
+	ClearRuntimeTimers();
+	ReleaseCameraAction(bRestoreDefaultCameraOnLeave);
+	SetRuntimeState(EStepState::Leaved);
+	if(!CanContinueRuntimeCallback() || StepState != EStepState::Leaved)
 	{
-		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
-		{
-			CameraManager->PopCameraConfigOverride(CameraOverrideHandle);
-		}
-		CameraOverrideHandle.Reset();
+		return;
 	}
-	StepState = EStepState::Leaved;
-	OnStateChanged(StepState);
-
-	if(bRestoreDefaultCameraOnLeave)
-	{
-		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
-		{
-			CameraManager->SetDefaultMode(CameraTransition);
-		}
-	}
-
-	GetWorld()->GetTimerManager().ClearTimer(AutoLeaveTimerHandle);
-	
-	WHDebug(FString::Printf(TEXT("%s步骤: %s"), StepExecuteResult != EStepExecuteResult::Skipped ? TEXT("离开") : TEXT("跳过"), *StepDisplayName.ToString()), EDM_All, EDC_Step, EDV_Log, FColor::Orange, 5.f);
-
 	K2_OnLeave();
-
-	UEventModuleStatics::BroadcastEvent<FEventStepLeaved>(this, {this});
-
-	if(bMergeSubStep)
+	if(CanContinueRuntimeCallback())
 	{
-		for(auto Iter : SubSteps)
+		UEventModuleStatics::BroadcastEvent<FEventStepLeaved>(this, {this});
+	}
+}
+
+void UStepBase::TickRuntime(float DeltaSeconds)
+{
+	const UStepModule* Module = GetStepModule();
+	if(!Runtime || !Module || Module->GetStepModuleState() != EStepModuleState::Running || !Module->Owns(this))
+	{
+		return;
+	}
+	RefreshDeltaSeconds = FMath::Max(0.f, DeltaSeconds);
+	if(IsEntered() && GuideRemaining >= 0.f)
+	{
+		GuideRemaining -= RefreshDeltaSeconds;
+		if(GuideRemaining <= 0.f)
 		{
-			if(Iter)
+			GuideRemaining = -1.f;
+			Guide();
+		}
+	}
+	if(!CanContinueRuntimeCallback() || Module->GetStepModuleState() != EStepModuleState::Running || !Module->Owns(this))
+	{
+		return;
+	}
+	switch(StepState)
+	{
+		case EStepState::Entered:
+		{
+			if(AutoExecuteRemaining >= 0.f)
 			{
-				Iter->OnLeave();
+				AutoExecuteRemaining -= RefreshDeltaSeconds;
+				if(AutoExecuteRemaining <= 0.f)
+				{
+					AutoExecuteRemaining = -1.f;
+					Execute();
+				}
 			}
+			break;
+		}
+		case EStepState::Executing:
+		{
+			Refresh();
+			if(CanContinueRuntimeCallback() && Module->GetStepModuleState() == EStepModuleState::Running && Module->Owns(this) && StepState == EStepState::Executing && AutoCompleteRemaining >= 0.f)
+			{
+				AutoCompleteRemaining -= RefreshDeltaSeconds;
+				if(AutoCompleteRemaining <= 0.f)
+				{
+					AutoCompleteRemaining = -1.f;
+					Complete();
+				}
+			}
+			break;
+		}
+		case EStepState::Completed:
+		{
+			if(AutoLeaveRemaining >= 0.f)
+			{
+				AutoLeaveRemaining -= RefreshDeltaSeconds;
+				if(AutoLeaveRemaining <= 0.f)
+				{
+					AutoLeaveRemaining = -1.f;
+					Leave();
+				}
+			}
+			break;
+		}
+		default:
+		{
+			break;
 		}
 	}
 }
 
+void UStepBase::RefreshAutomaticTimers(bool bPreserveRemaining)
+{
+	auto Update = [bPreserveRemaining](float& Remaining, bool bEnabled, float Duration)
+	{
+		if(!bEnabled)
+		{
+			Remaining = -1.f;
+		}
+		else if(!bPreserveRemaining || Remaining < 0.f)
+		{
+			Remaining = FMath::Max(0.f, Duration);
+		}
+	};
+	Update(AutoExecuteRemaining, StepState == EStepState::Entered && GetStepExecuteType() == EStepExecuteType::Automatic, AutoExecuteStepTime);
+	Update(AutoCompleteRemaining, StepState == EStepState::Executing && GetStepCompleteType() == EStepCompleteType::Automatic && SubSteps.IsEmpty() && !HasStepTask(), AutoCompleteStepTime);
+	Update(AutoLeaveRemaining, StepState == EStepState::Completed && GetStepLeaveType() == EStepLeaveType::Automatic, AutoLeaveStepTime);
+}
+
 UStepAsset* UStepBase::GetStepAsset() const
 {
-	return Cast<UStepAsset>(GetOuter());
+	return Runtime ? Runtime->Definition : Cast<UStepAsset>(GetOuter());
+}
+
+UStepModule* UStepBase::GetStepModule() const
+{
+	return Runtime ? Runtime->GetModule() : nullptr;
 }
 
 bool UStepBase::IsEntered() const
@@ -394,12 +559,12 @@ bool UStepBase::IsSkipAble_Implementation() const
 
 void UStepBase::ApplyCameraAction()
 {
-	if(StepState != EStepState::Entered || !bApplyCameraAction)
+	if(!Runtime || !IsEntered() || !bApplyCameraAction)
 	{
 		return;
 	}
-
-	ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager();
+	UCameraModule* CameraModule = UCameraModule::GetPtr(GetWorld());
+	ACameraManagerBase* CameraManager = CameraModule ? CameraModule->GetCameraManager() : nullptr;
 	if(!CameraManager)
 	{
 		return;
@@ -407,10 +572,8 @@ void UStepBase::ApplyCameraAction()
 	if(CameraOverrideHandle.IsValid())
 	{
 		CameraManager->PopCameraConfigOverride(CameraOverrideHandle);
-		CameraOverrideHandle.Reset();
 	}
 	CameraOverrideHandle = CameraManager->PushCameraConfigOverride(CameraOverride, 20);
-
 	if(CameraModeClass)
 	{
 		FCameraModeContext Context;
@@ -421,9 +584,28 @@ void UStepBase::ApplyCameraAction()
 	}
 }
 
+void UStepBase::ReleaseCameraAction(bool bRestoreMode)
+{
+	UCameraModule* CameraModule = UCameraModule::GetPtr(GetWorld());
+	ACameraManagerBase* CameraManager = CameraModule ? CameraModule->GetCameraManager() : nullptr;
+	if(CameraManager)
+	{
+		if(CameraOverrideHandle.IsValid())
+		{
+			CameraManager->PopCameraConfigOverride(CameraOverrideHandle);
+		}
+		if(bRestoreMode)
+		{
+			CameraManager->SetDefaultMode(CameraTransition);
+		}
+	}
+	CameraOverrideHandle.Reset();
+}
+
 AActor* UStepBase::GetOperationTarget(TSubclassOf<AActor> InClass) const
 {
-	return OperationTarget.LoadSynchronous();
+	AActor* Target = OperationTarget.Get();
+	return Target && (!InClass || Target->IsA(InClass)) ? Target : nullptr;
 }
 
 void UStepBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCameraView)
@@ -442,114 +624,66 @@ bool UStepBase::CheckStepCondition(UStepBase* InStep) const
 
 EStepExecuteType UStepBase::GetStepExecuteType() const
 {
-	if(!HasSubStep(false))
+	const UStepModule* Module = GetStepModule();
+	if(!HasSubStep(false) && Module && Module->GetGlobalStepExecuteType() != EStepExecuteType::None)
 	{
-		if(UStepModule::Get().GetGlobalStepExecuteType() != EStepExecuteType::None)
-		{
-			return UStepModule::Get().GetGlobalStepExecuteType();
-		}
+		return Module->GetGlobalStepExecuteType();
 	}
-	return StepExecuteType;
+	return HasSubStep(false) ? EStepExecuteType::Automatic : StepExecuteType;
 }
 
 EStepLeaveType UStepBase::GetStepLeaveType() const
 {
-	if(!HasSubStep(false))
+	const UStepModule* Module = GetStepModule();
+	if(!HasSubStep(false) && Module && Module->GetGlobalStepLeaveType() != EStepLeaveType::None)
 	{
-		if(UStepModule::Get().GetGlobalStepLeaveType() != EStepLeaveType::None)
-		{
-			return UStepModule::Get().GetGlobalStepLeaveType();
-		}
+		return Module->GetGlobalStepLeaveType();
 	}
-	return StepLeaveType;
+	return HasSubStep(false) ? EStepLeaveType::Automatic : StepLeaveType;
 }
 
 EStepCompleteType UStepBase::GetStepCompleteType() const
 {
-	if(!HasSubStep(false))
+	const UStepModule* Module = GetStepModule();
+	if(!HasSubStep(false) && Module && Module->GetGlobalStepCompleteType() != EStepCompleteType::None)
 	{
-		if(UStepModule::Get().GetGlobalStepCompleteType() != EStepCompleteType::None)
-		{
-			return UStepModule::Get().GetGlobalStepCompleteType();
-		}
+		return Module->GetGlobalStepCompleteType();
 	}
-	return StepCompleteType;
+	return HasSubStep(false) ? EStepCompleteType::Procedure : StepCompleteType;
 }
 
 bool UStepBase::IsParentOf(UStepBase* InStep) const
 {
-	if(InStep && InStep->ParentStep)
+	for(const UStepBase* Parent = InStep ? InStep->ParentStep : nullptr; Parent; Parent = Parent->ParentStep)
 	{
-		if(InStep->ParentStep == this) return true;
-		return InStep->ParentStep->IsParentOf(InStep);
+		if(Parent == this)
+		{
+			return true;
+		}
 	}
 	return false;
-}
-
-void UStepBase::Restore()
-{
-	UStepModuleStatics::RestoreStep(this);
-}
-
-void UStepBase::Enter()
-{
-	UStepModuleStatics::EnterStep(this);
-}
-
-void UStepBase::Refresh()
-{
-	UStepModuleStatics::RefreshStep(this);
-}
-
-void UStepBase::Guide()
-{
-	UStepModuleStatics::GuideStep(this);
-}
-
-void UStepBase::Execute()
-{
-	UStepModuleStatics::ExecuteStep(this);
-}
-
-void UStepBase::Complete(EStepExecuteResult InStepExecuteResult)
-{
-	UStepModuleStatics::CompleteStep(this, InStepExecuteResult);
-}
-
-void UStepBase::Leave()
-{
-	UStepModuleStatics::LeaveStep(this);
-}
-
-bool UStepBase::HasSubStep(bool bIgnoreMerge) const
-{
-	return SubSteps.Num() > 0 && (bIgnoreMerge || !bMergeSubStep);
-}
-
-UStepBase* UStepBase::GetCurrentSubStep() const
-{
-	if(SubSteps.IsValidIndex(CurrentSubStepIndex))
-	{
-		return SubSteps[CurrentSubStepIndex];
-	}
-	return nullptr;
 }
 
 bool UStepBase::IsSubOf(UStepBase* InStep) const
 {
-	if(InStep && ParentStep)
-	{
-		if(InStep == ParentStep) return true;
-		return ParentStep->IsSubOf(InStep);
-	}
-	return false;
+	return InStep && InStep->IsParentOf(const_cast<UStepBase*>(this));
+}
+
+bool UStepBase::HasSubStep(bool bIgnoreMerge) const
+{
+	return !SubSteps.IsEmpty() && (bIgnoreMerge || !bMergeSubStep);
+}
+
+UStepBase* UStepBase::GetCurrentSubStep() const
+{
+	return SubSteps.IsValidIndex(CurrentSubStepIndex) ? SubSteps[CurrentSubStepIndex] : nullptr;
 }
 
 bool UStepBase::IsAllSubCompleted() const
 {
-	for (auto Iter : SubSteps)
+	for(const UStepBase* Child : SubSteps)
 	{
-		if(Iter && !Iter->IsCompleted())
+		if(!Child->IsCompleted(true))
 		{
 			return false;
 		}
@@ -559,9 +693,9 @@ bool UStepBase::IsAllSubCompleted() const
 
 bool UStepBase::IsAllSubExecuteSucceed() const
 {
-	for (auto Iter : SubSteps)
+	for(const UStepBase* Child : SubSteps)
 	{
-		if(Iter && Iter->StepExecuteResult == EStepExecuteResult::Failed)
+		if(Child->StepExecuteResult == EStepExecuteResult::Failed)
 		{
 			return false;
 		}
@@ -571,14 +705,14 @@ bool UStepBase::IsAllSubExecuteSucceed() const
 
 bool UStepBase::HasStepTask() const
 {
-	return StepTaskItems.Num() > 0;
+	return !StepTaskItems.IsEmpty();
 }
 
 bool UStepBase::IsAllTaskCompleted() const
 {
-	for (auto Iter : StepTaskItems)
+	for(const FStepTaskItem& Item : StepTaskItems)
 	{
-		if(Iter.TaskState != EStepTaskState::Completed)
+		if(Item.TaskState != EStepTaskState::Completed)
 		{
 			return false;
 		}
@@ -586,136 +720,177 @@ bool UStepBase::IsAllTaskCompleted() const
 	return true;
 }
 
-FStepTaskItem& UStepBase::AddStepTask(const FName InTaskName, float InDurationTime, float InStartDelayTime)
+FStepTaskItem& UStepBase::AddStepTask(const FName InTaskName, float InDurationTime, float InDelayTime)
 {
-	StepTaskItems.Add(FStepTaskItem(InTaskName, InDurationTime, InStartDelayTime));
-	return StepTaskItems[StepTaskItems.Num() - 1];
+	checkf(!InTaskName.IsNone(), TEXT("StepTask 必须具有稳定名称。"));
+	checkf(!StepTaskItems.ContainsByPredicate([InTaskName](const FStepTaskItem& Item){ return Item.TaskName == InTaskName; }), TEXT("StepTask 名称不可重复。"));
+	checkf(CurrentStepTaskIndex == INDEX_NONE, TEXT("StepTask 调度开始后不能追加条目。"));
+	return StepTaskItems.Emplace_GetRef(InTaskName, FMath::Max(0.f, InDurationTime), FMath::Max(0.f, InDelayTime));
 }
 
-#if WITH_EDITOR
-bool UStepBase::GenerateListItem(TSharedPtr<FStepListItem> OutStepListItem, const FString& InFilterText)
+FStepRuntimeSaveData UStepBase::CaptureRuntimeData()
 {
-	OutStepListItem->Step = this;
-	for (int32 i = 0; i < SubSteps.Num(); i++)
+	FStepRuntimeSaveData Data;
+	Data.StepGUID = StepGUID;
+	Data.State = StepState;
+	Data.Result = StepExecuteResult;
+	Data.CurrentChildGUID = GetCurrentSubStep() ? GetCurrentSubStep()->StepGUID : FString();
+	Data.CurrentTaskName = StepTaskItems.IsValidIndex(CurrentStepTaskIndex) ? StepTaskItems[CurrentStepTaskIndex].TaskName : NAME_None;
+	Data.AutoExecuteRemaining = AutoExecuteRemaining;
+	Data.AutoCompleteRemaining = AutoCompleteRemaining;
+	Data.AutoLeaveRemaining = AutoLeaveRemaining;
+	Data.GuideRemaining = GuideRemaining;
+	for(const FStepTaskItem& Item : StepTaskItems)
 	{
-		if(SubSteps[i])
+		FStepTaskSaveData TaskData;
+		TaskData.TaskName = Item.TaskName;
+		TaskData.State = Item.TaskState;
+		TaskData.Remaining = Item.RemainTime;
+		Data.Tasks.Add(TaskData);
+	}
+	FMemoryWriter Writer(Data.CustomData, true);
+	FObjectAndNameAsStringProxyArchive Archive(Writer, false);
+	Archive.ArIsSaveGame = true;
+	Serialize(Archive);
+	return Data;
+}
+
+bool UStepBase::RestoreRuntimeData(const FStepRuntimeSaveData& InData, FText& OutError)
+{
+	if(InData.StepGUID != StepGUID || InData.State > EStepState::Leaved || InData.Result > EStepExecuteResult::Skipped)
+	{
+		OutError = FText::FromString(TEXT("步骤状态记录无效。"));
+		return false;
+	}
+	CurrentSubStepIndex = InData.CurrentChildGUID.IsEmpty() ? INDEX_NONE : SubSteps.IndexOfByPredicate([&InData](const UStepBase* Step){ return Step->StepGUID == InData.CurrentChildGUID; });
+	if(!InData.CurrentChildGUID.IsEmpty() && CurrentSubStepIndex == INDEX_NONE)
+	{
+		OutError = FText::FromString(TEXT("当前子步骤 GUID 不属于保存节点的直接孩子。"));
+		return false;
+	}
+	if(InData.Tasks.Num() != StepTaskItems.Num())
+	{
+		OutError = FText::FromString(TEXT("StepTask 定义已改变，无法恢复旧步骤任务。"));
+		return false;
+	}
+	TSet<FName> RestoredTasks;
+	for(const FStepTaskSaveData& TaskData : InData.Tasks)
+	{
+		FStepTaskItem* Item = StepTaskItems.FindByPredicate([&TaskData](const FStepTaskItem& Candidate){ return Candidate.TaskName == TaskData.TaskName; });
+		if(!Item || RestoredTasks.Contains(TaskData.TaskName) || TaskData.State > EStepTaskState::Completed || !FMath::IsFinite(TaskData.Remaining))
 		{
-			auto Item = MakeShared<FStepListItem>();
-			Item->ParentListItem = OutStepListItem;
-			if(SubSteps[i]->GenerateListItem(Item, InFilterText))
-			{
-				OutStepListItem->SubListItems.Add(Item);
-			}
+			OutError = FText::FromString(TEXT("StepTask 保存身份或计时状态无效。"));
+			return false;
+		}
+		RestoredTasks.Add(TaskData.TaskName);
+		Item->TaskState = TaskData.State;
+		Item->RemainTime = TaskData.Remaining;
+	}
+	CurrentStepTaskIndex = InData.CurrentTaskName.IsNone() ? (IsAllTaskCompleted() ? StepTaskItems.Num() : INDEX_NONE) : StepTaskItems.IndexOfByPredicate([&InData](const FStepTaskItem& Item){ return Item.TaskName == InData.CurrentTaskName; });
+	if(!InData.CurrentTaskName.IsNone() && CurrentStepTaskIndex == INDEX_NONE)
+	{
+		OutError = FText::FromString(TEXT("当前 StepTask 名称不存在。"));
+		return false;
+	}
+	const float Delays[] = {InData.AutoExecuteRemaining, InData.AutoCompleteRemaining, InData.AutoLeaveRemaining, InData.GuideRemaining};
+	for(float Delay : Delays)
+	{
+		if(!FMath::IsFinite(Delay) || Delay < -1.f)
+		{
+			OutError = FText::FromString(TEXT("步骤延迟记录无效。"));
+			return false;
 		}
 	}
-	if(!InFilterText.IsEmpty())
+	if(!InData.CustomData.IsEmpty())
 	{
-		OutStepListItem->GetStates().bExpanded = true;
-		return StepDisplayName.ToString().Contains(InFilterText);
+		FMemoryReader Reader(InData.CustomData, true);
+		FObjectAndNameAsStringProxyArchive Archive(Reader, true);
+		Archive.ArIsSaveGame = true;
+		Serialize(Archive);
+		if(Archive.IsError())
+		{
+			OutError = FText::FromString(TEXT("步骤自定义 SaveGame 数据损坏。"));
+			return false;
+		}
 	}
+	SetRuntimeState(InData.State, false);
+	StepExecuteResult = InData.Result;
+	AutoExecuteRemaining = InData.AutoExecuteRemaining;
+	AutoCompleteRemaining = InData.AutoCompleteRemaining;
+	AutoLeaveRemaining = InData.AutoLeaveRemaining;
+	GuideRemaining = InData.GuideRemaining;
 	return true;
 }
 
-void UStepBase::UpdateListItem(TSharedPtr<FStepListItem> OutStepListItem)
+void UStepBase::ResumeRuntime()
 {
-	OutStepListItem->Step = this;
-	for (int32 i = 0; i < SubSteps.Num(); i++)
+	if(IsEntered())
 	{
-		if(SubSteps[i])
-		{
-			SubSteps[i]->StepIndex = i;
-			SubSteps[i]->StepHierarchy = StepHierarchy + 1;
-			SubSteps[i]->RootStep = IsRootStep() ? this : RootStep;
-			SubSteps[i]->ParentStep = this;
-			if(OutStepListItem->SubListItems.IsValidIndex(i))
-			{
-				SubSteps[i]->UpdateListItem(OutStepListItem->SubListItems[i]);
-			}
-		}
+		ApplyCameraAction();
 	}
+	K2_OnResume(StepState);
 }
 
+#if WITH_EDITOR
 bool UStepBase::CanEditChange(const FProperty* InProperty) const
 {
-	if(InProperty)
-	{
-		const FString PropertyName = InProperty->GetName();
-
-		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, StepExecuteType) ||
-			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, StepCompleteType) ||
-			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, StepLeaveType) ||
-			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, StepGuideType))
-		{
-			return !HasSubStep(false);
-		}
-
-		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, AutoExecuteStepTime))
-		{
-			return StepExecuteType == EStepExecuteType::Automatic;
-		}
-
-		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, AutoCompleteStepTime))
-		{
-			return StepCompleteType == EStepCompleteType::Automatic;
-		}
-
-		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, AutoLeaveStepTime))
-		{
-			return StepLeaveType == EStepLeaveType::Automatic;
-		}
-
-		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, StepGuideIntervalTime))
-		{
-			return !HasSubStep(false) && (StepGuideType == EStepGuideType::TimerOnce || StepGuideType == EStepGuideType::TimerLoop);
-		}
-	}
-
-	return Super::CanEditChange(InProperty);
-}
-
-void UStepBase::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
-{
-	const FProperty* Property = PropertyChangedEvent.MemberProperty;
-
-	if(Property && PropertyChangedEvent.ChangeType != EPropertyChangeType::Interactive)
-	{
-		const FName PropertyName = Property->GetFName();
-
-		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, OperationTarget))
-		{
-		}
-
-		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, SubSteps) ||
-			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, bMergeSubStep))
-		{
-			if(HasSubStep(false))
-			{
-				StepExecuteType = EStepExecuteType::Automatic;
-				StepCompleteType = EStepCompleteType::Procedure;
-				AutoCompleteStepTime = 0.f;
-				StepLeaveType = EStepLeaveType::Automatic;
-				StepGuideType = EStepGuideType::None;				
-				StepGuideIntervalTime = 0.f;
-			}
-		}
-
-		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UStepBase, bFirstStep))
-		{
-			if(bFirstStep)
-			{
-				if(GetStepAsset()->FirstStep)
-				{
-					GetStepAsset()->FirstStep->bFirstStep = false;
-				}
-				GetStepAsset()->FirstStep = this;
-			}
-			else if(GetStepAsset()->FirstStep == this)
-			{
-				GetStepAsset()->FirstStep = nullptr;
-			}
-		}
-	}
-
-	Super::PostEditChangeProperty(PropertyChangedEvent);
+	return !Runtime && Super::CanEditChange(InProperty);
 }
 #endif
+
+
+void UStepBase::Restore()
+{
+	if(UStepModule* Module = GetStepModule())
+	{
+		Module->RestoreStep(this);
+	}
+}
+
+void UStepBase::Enter()
+{
+	if(UStepModule* Module = GetStepModule())
+	{
+		Module->EnterStep(this);
+	}
+}
+
+void UStepBase::Refresh()
+{
+	if(UStepModule* Module = GetStepModule())
+	{
+		Module->RefreshStep(this);
+	}
+}
+
+void UStepBase::Guide()
+{
+	if(UStepModule* Module = GetStepModule())
+	{
+		Module->GuideStep(this);
+	}
+}
+
+void UStepBase::Execute()
+{
+	if(UStepModule* Module = GetStepModule())
+	{
+		Module->ExecuteStep(this);
+	}
+}
+
+void UStepBase::Leave()
+{
+	if(UStepModule* Module = GetStepModule())
+	{
+		Module->LeaveStep(this);
+	}
+}
+
+void UStepBase::Complete(EStepExecuteResult InStepExecuteResult)
+{
+	if(UStepModule* Module = GetStepModule())
+	{
+		Module->CompleteStep(this, InStepExecuteResult);
+	}
+}

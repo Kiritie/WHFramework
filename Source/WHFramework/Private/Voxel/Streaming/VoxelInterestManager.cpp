@@ -2,6 +2,7 @@
 
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Rendering/VoxelMacroTerrain.h"
 #include "Voxel/Rendering/VoxelViewLod.h"
 #include "Voxel/Rendering/VoxelCoverageIndex.h"
@@ -847,15 +848,16 @@ bool FVoxelInterestManager::ReserveDemands(FVoxelInterestSet& InOutInterest, FVo
 	{ OutError = TEXT("Oversized: exact demand rows"); return false; }
 	const int32 DemandCount = int32(DemandCount64), SourceCount = int32(SourceCount64);
 	const uint64 OldBytes = InOutInterest.GetAllocatedBytes();
-	const uint64 OldTables = InOutInterest.Exact.GetAllocatedSize() + InOutInterest.Warmup.GetAllocatedSize();
-	const uint64 OldSource = InOutSource.DataSections.GetAllocatedSize() + InOutSource.FineDataSections.GetAllocatedSize() +
-		InOutSource.F0CoreSections.GetAllocatedSize() + InOutSource.CollisionSections.GetAllocatedSize() + InOutSource.SimulationSections.GetAllocatedSize();
-	const uint64 NewTables = FMath::Max<uint64>(InOutInterest.Exact.GetAllocatedSize(), VoxelBoundedAllocation::MapBytes<FIntVector, FVoxelExactDemand>(DemandCount)) +
-		FMath::Max<uint64>(InOutInterest.Warmup.GetAllocatedSize(), VoxelBoundedAllocation::MapBytes<FIntVector, FVoxelExactDemand>(DemandCount));
+	using VoxelGenerationAllocation::AllocatedBytes;
+	const uint64 OldTables = AllocatedBytes(InOutInterest.Exact) + AllocatedBytes(InOutInterest.Warmup);
+	const uint64 OldSource = AllocatedBytes(InOutSource.DataSections) + AllocatedBytes(InOutSource.FineDataSections) +
+		AllocatedBytes(InOutSource.F0CoreSections) + AllocatedBytes(InOutSource.CollisionSections) + AllocatedBytes(InOutSource.SimulationSections);
+	const uint64 NewTables = FMath::Max<uint64>(AllocatedBytes(InOutInterest.Exact), VoxelBoundedAllocation::MapBytes<FIntVector, FVoxelExactDemand>(DemandCount)) +
+		FMath::Max<uint64>(AllocatedBytes(InOutInterest.Warmup), VoxelBoundedAllocation::MapBytes<FIntVector, FVoxelExactDemand>(DemandCount));
 	const uint64 PerSet = VoxelBoundedAllocation::SetBytes<FIntVector>(SourceCount);
-	const uint64 NewSource = FMath::Max<uint64>(PerSet, InOutSource.DataSections.GetAllocatedSize()) +
-		FMath::Max<uint64>(PerSet, InOutSource.FineDataSections.GetAllocatedSize()) + FMath::Max<uint64>(PerSet, InOutSource.F0CoreSections.GetAllocatedSize()) +
-		FMath::Max<uint64>(PerSet, InOutSource.CollisionSections.GetAllocatedSize()) + FMath::Max<uint64>(PerSet, InOutSource.SimulationSections.GetAllocatedSize());
+	const uint64 NewSource = FMath::Max<uint64>(PerSet, AllocatedBytes(InOutSource.DataSections)) +
+		FMath::Max<uint64>(PerSet, AllocatedBytes(InOutSource.FineDataSections)) + FMath::Max<uint64>(PerSet, AllocatedBytes(InOutSource.F0CoreSections)) +
+		FMath::Max<uint64>(PerSet, AllocatedBytes(InOutSource.CollisionSections)) + FMath::Max<uint64>(PerSet, AllocatedBytes(InOutSource.SimulationSections));
 	const uint64 NewBytes = OldBytes - OldTables - OldSource + NewTables + NewSource;
 	const uint64 Peak = OldBytes + NewBytes;
 	if (Peak > Resources->Snapshot().Limits.InputBytes)

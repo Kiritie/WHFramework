@@ -21,12 +21,16 @@ public:
 
 public:
 	virtual void Initialize() override;
+	virtual void PostLoad() override;
 	bool InitializeRuntimeTasks();
 	virtual UWorld* GetWorld() const override;
 	/** Expands nested task-asset reference nodes in a runtime duplicate. */
 	bool ExpandTaskAssetReferences(TArray<FText>& OutErrors);
 	bool RebuildTaskMap(bool bValidateDefinition = true);
 	bool ValidateTasks(TArray<FText>& OutErrors) const;
+	bool CompileTasks(TArray<FText>& OutErrors);
+	void ClearCompiledTasks();
+	void DiscardAuthoringData();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Task Stats
@@ -52,6 +56,9 @@ public:
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly)
 	FVector AgentLocation = FVector::ZeroVector;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool bCompiledValid = false;
+
 	/// 根任务
 	UPROPERTY(VisibleAnywhere, Instanced)
 	TArray<UTaskBase*> RootTasks;
@@ -70,7 +77,29 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Editor
 public:
+#if WITH_EDITORONLY_DATA
+	UPROPERTY()
+	FGuid StartGUID;
+
+	UPROPERTY()
+	FVector2D StartPosition = FVector2D(-320.f, 0.f);
+
+	UPROPERTY(Instanced)
+	TArray<UTaskBase*> AuthoredTasks;
+
+	UPROPERTY()
+	TArray<UTaskBase*> StartTasks;
+
+	UPROPERTY(Transient, VisibleAnywhere)
+	TArray<FText> CompileErrors;
+#endif
 #if WITH_EDITOR
+	void InitializeGraph();
+	UTaskBase* FindAuthoredTask(const FString& TaskGUID) const;
+	UTaskBase* FindGraphParent(const UTaskBase* Task) const;
+	virtual void PreEditChange(FProperty* PropertyAboutToChange) override;
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+	virtual void PreSave(FObjectPreSaveContext SaveContext) override;
 	virtual EDataValidationResult IsDataValid(class FDataValidationContext& Context) const override;
 
 	bool CanAddTask(TSubclassOf<UTaskBase> InTaskClass);

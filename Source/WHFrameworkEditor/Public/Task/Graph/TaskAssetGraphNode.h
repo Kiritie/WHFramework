@@ -14,6 +14,13 @@ public:
 	UPROPERTY()
 	UTaskBase* Task;
 
+	UPROPERTY()
+	bool bStartNode = false;
+
+	FString GetStableGUID() const;
+	virtual bool CanUserDeleteNode() const override;
+	virtual bool CanDuplicateNode() const override;
+
 	virtual void AllocateDefaultPins() override;
 	virtual FText GetNodeTitle(ENodeTitleType::Type TitleType) const override;
 	virtual FText GetTooltipText() const override;

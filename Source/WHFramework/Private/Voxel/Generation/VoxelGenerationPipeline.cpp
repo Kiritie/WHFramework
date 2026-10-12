@@ -778,10 +778,13 @@ bool FVoxelGenerationPipeline::EnumerateTrees(
 	FVoxelGenerationRequiredSourceScope QuerySources(Cache->GetResources().Get(), &Query, EnumeratePipelineQuerySources);
 	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError, true, bRequirePlanPreflight)) return false;
 	bool bSampleFailed = false;
+	FString FirstSampleError;
 	auto SampleColumn = [&](const FIntVector& Position, FVoxelColumnSample& Column)
 	{
-		if (!Query.SampleEnvironmentColumn(Position.X, Position.Y, Column, OutError, InCancel))
+		FString SampleError;
+		if (!Query.SampleEnvironmentColumn(Position.X, Position.Y, Column, SampleError, InCancel))
 		{
+			if (!bSampleFailed) FirstSampleError = MoveTemp(SampleError);
 			bSampleFailed = true;
 			return false;
 		}
@@ -802,7 +805,11 @@ bool FVoxelGenerationPipeline::EnumerateTrees(
 		{
 			InVisit(Anchor, Height, Id);
 		}, Candidates, Accepted, InCancel);
-	if (bSampleFailed) return false;
+	if (bSampleFailed)
+	{
+		OutError = MoveTemp(FirstSampleError);
+		return false;
+	}
 	if (InCancel && InCancel->Load())
 	{
 		OutError = TEXT("Canceled");

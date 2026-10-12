@@ -30,6 +30,7 @@ public:
 private:
 	void OnSelectionChanged(const FGraphPanelSelectionSet& Selection);
 	void OnTasksChanged();
+	EActiveTimerReturnType RebuildLater(double CurrentTime, float DeltaTime);
 	void DeleteSelected();
 	void CopySelected();
 	void CutSelected();
@@ -40,8 +41,8 @@ private:
 	bool CanCopy() const;
 	bool CanPaste() const;
 	void AddCommonMenu(FMenuBuilder& Menu);
-	TSharedRef<SWidget> CreateClassPicker(bool bChangeType, TWeakObjectPtr<UTaskBase> Task, EEdGraphPinDirection Direction, FVector2D Position);
-	void OnClassPicked(UClass* Class, bool bChangeType, TWeakObjectPtr<UTaskBase> Task, EEdGraphPinDirection Direction, FVector2D Position);
+	TSharedRef<SWidget> CreateClassPicker(bool bChangeType, TWeakObjectPtr<UTaskBase> Task, EEdGraphPinDirection Direction, FVector2D Position, bool bFromStart = false);
+	void OnClassPicked(UClass* Class, bool bChangeType, TWeakObjectPtr<UTaskBase> Task, EEdGraphPinDirection Direction, FVector2D Position, bool bFromStart = false);
 	void EditTaskSource(UTaskBase* Task);
 	void OnNodeDoubleClicked(UEdGraphNode* Node);
 
@@ -53,4 +54,5 @@ private:
 	mutable bool bCanPasteCached = false;
 	TSet<FString> SelectedTaskIDs;
 	bool bSelecting = false;
+	bool bRebuildQueued = false;
 };

@@ -15,4 +15,6 @@ public:
 	UTaskAsset* TaskAsset;
 
 	FSimpleDelegate OnTasksChanged;
+	void RebuildFromAsset();
+	class UTaskAssetGraphNode* FindNode(const FString& StableGUID) const;
 };

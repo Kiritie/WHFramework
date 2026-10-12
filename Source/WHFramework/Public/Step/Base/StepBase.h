@@ -13,30 +13,13 @@
 class UStepAsset;
 class ACameraShotAnchor;
 class UCameraModeBase;
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FStepListItemStates
-{
-	GENERATED_BODY()
-
-public:
-	UPROPERTY()
-	bool bExpanded;
-
-	UPROPERTY()
-	bool bSelected;
-
-	FORCEINLINE FStepListItemStates()
-	{
-		bExpanded = true;
-		bSelected = false;
-	}
-};
+class UStepRuntime;
+class UStepModule;
 
 /**
  * 步骤基类
  */
-UCLASS(Blueprintable, hidecategories = (Default))
+UCLASS(Blueprintable, EditInlineNew, DefaultToInstanced, hidecategories = (Default))
 class WHFRAMEWORK_API UStepBase : public UWHObject
 {
 	GENERATED_BODY()
@@ -177,20 +160,17 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Index/State
 public:
-	/// 是否为开始步骤
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Index/State")
-	bool bFirstStep;
 	/// 步骤索引
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/State")
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category = "Index/State")
 	int32 StepIndex;
 	/// 步骤层级
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/State")
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category = "Index/State")
 	int32 StepHierarchy;
 	/// 步骤状态
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/State")
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category = "Index/State")
 	EStepState StepState;
 
-	UPROPERTY(BlueprintAssignable)
+	UPROPERTY(Transient, BlueprintAssignable)
 	FOnStepStateChanged OnStepStateChanged;
 
 public:
@@ -277,7 +257,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
 	EStepExecuteResult StepExecuteCondition;
 	/// 步骤执行结果
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
 	EStepExecuteResult StepExecuteResult;
 	/// 步骤执行方式
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Execute/Guide")
@@ -305,7 +285,7 @@ public:
 	float StepGuideIntervalTime;
 
 protected:
-	FTimerHandle StartGuideTimerHandle;
+	float GuideRemaining = -1.f;
 
 public:
 	/**
@@ -327,10 +307,10 @@ public:
 	/// ParentStep
 public:
 	/// 根步骤
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ParentStep")
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category = "ParentStep")
 	UStepBase* RootStep;
 	/// 父步骤
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ParentStep")
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category = "ParentStep")
 	UStepBase* ParentStep;
 
 public:
@@ -344,10 +324,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SubStep")
 	bool bMergeSubStep;
 	/// 当前子步骤索引
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SubStep")
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category = "SubStep")
 	int32 CurrentSubStepIndex;
 	/// 子步骤
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SubStep")
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category = "SubStep")
 	TArray<UStepBase*> SubSteps;
 
 public:
@@ -382,7 +362,7 @@ public:
 	/// StepTask
 protected:
 	/// 当前步骤任务项索引
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "StepTask")
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category = "StepTask")
 	int32 CurrentStepTaskIndex;
 	/// 步骤任务项
 	TArray<struct FStepTaskItem> StepTaskItems;
@@ -404,93 +384,48 @@ public:
 	struct FStepTaskItem& AddStepTask(const FName InTaskName, float InDurationTime = 0.f, float InDelayTime = 1.f);
 
 protected:
-	FTimerHandle AutoExecuteTimerHandle;
-	FTimerHandle AutoLeaveTimerHandle;
-	FTimerHandle AutoCompleteTimerHandle;
+	float AutoExecuteRemaining = -1.f;
+	float AutoCompleteRemaining = -1.f;
+	float AutoLeaveRemaining = -1.f;
+	float RefreshDeltaSeconds = 0.f;
 
-	//////////////////////////////////////////////////////////////////////////
-	/// StepListItem
 public:
-#if WITH_EDITORONLY_DATA
 	UPROPERTY()
-	struct FStepListItemStates StepListItemStates;
-#endif
-#if WITH_EDITOR
-	/**
-	 * 构建步骤列表项
-	 */
-	virtual bool GenerateListItem(TSharedPtr<struct FStepListItem> OutStepListItem, const FString& InFilterText = TEXT(""));
-	/**
-	 * 更新步骤列表项
-	 */
-	virtual void UpdateListItem(TSharedPtr<struct FStepListItem> OutStepListItem);
+	FVector2D GraphPosition = FVector2D::ZeroVector;
 
+	UPROPERTY(Transient)
+	UStepRuntime* Runtime = nullptr;
+
+	void InitializeRuntime(UStepRuntime* InRuntime);
+	void ShutdownRuntime();
+	void TickRuntime(float DeltaSeconds);
+	void RefreshAutomaticTimers(bool bPreserveRemaining = false);
+	FStepRuntimeSaveData CaptureRuntimeData();
+	bool RestoreRuntimeData(const FStepRuntimeSaveData& InData, FText& OutError);
+	void ResumeRuntime();
+	void SetRuntimeState(EStepState InState, bool bNotify = true);
+	UStepModule* GetStepModule() const;
+
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnResume")
+	void K2_OnResume(EStepState InState);
+
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnSuspend")
+	void K2_OnSuspend();
+
+protected:
+	friend class UStepRuntime;
+	bool bRuntimeInitialized = false;
+	bool CanContinueRuntimeCallback() const;
+	void ClearRuntimeTimers();
+	void ReleaseCameraAction(bool bRestoreMode);
+	void AdvanceChildren();
+	void RefreshStepTasks(float DeltaSeconds);
+
+public:
+#if WITH_EDITOR
 	virtual bool CanEditChange(const FProperty* InProperty) const override;
-	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 };
-
-/**
- * 步骤列表项
- */
-#if WITH_EDITOR
-struct FStepListItem : public TSharedFromThis<FStepListItem>
-{
-public:
-	FStepListItem()
-	{
-		Step = nullptr;
-		ParentListItem = nullptr;
-		SubListItems = TArray<TSharedPtr<FStepListItem>>();
-	}
-
-	UStepBase* Step;
-
-	TSharedPtr<FStepListItem> ParentListItem;
-
-	TArray<TSharedPtr<FStepListItem>> SubListItems;
-
-public:
-	FStepListItemStates& GetStates() const
-	{
-		return Step->StepListItemStates;
-	}
-
-	int32& GetStepIndex() const
-	{
-		return Step->StepIndex;
-	}
-
-	UStepBase* GetParentStep() const
-	{
-		return Step->ParentStep;
-	}
-
-	TArray<UStepBase*>& GetSubSteps() const
-	{
-		return Step->SubSteps;
-	}
-
-	void GetSubStepNum(int32& OutNum) const
-	{
-		OutNum += SubListItems.Num();
-		for (auto Iter : SubListItems)
-		{
-			Iter->GetSubStepNum(OutNum);
-		}
-	}
-
-	TArray<UStepBase*>& GetParentSubSteps() const
-	{
-		return ParentListItem->GetSubSteps();
-	}
-
-	TArray<TSharedPtr<FStepListItem>>& GetParentSubListItems() const
-	{
-		return ParentListItem->SubListItems;
-	}
-};
-#endif
 
 /**
  * 步骤任务项
@@ -542,8 +477,8 @@ public:
 	{
 		if (InStep)
 		{
-			UFunction* Func = InStep->FindFunction(InFuncName);
-			if (ensureEditor(Func))
+			UFunction* Function = InStep->FindFunction(InFuncName);
+			if (ensureEditor(Function))
 			{
 				OnExecuteDelegate.Add(FOnExecuteStepTaskDelegate::FDelegate::CreateUFunction(InStep, InFuncName, Vars...));
 			}
@@ -564,8 +499,10 @@ public:
 
 	void TryExecute(float DeltaSeconds)
 	{
-		if (!Refresh(DeltaSeconds))
+		if(!Refresh(DeltaSeconds))
+		{
 			return;
+		}
 
 		TaskState = EStepTaskState::Executing;
 		RemainTime = DurationTime;

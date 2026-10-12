@@ -1,277 +1,139 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
+
 #include "Camera/Mode/CameraModeBase.h"
-
 #include "Camera/CameraModuleTypes.h"
-
-#include "Procedure/ProcedureModuleTypes.h"
 #include "Common/Base/WHObject.h"
-
+#include "Procedure/ProcedureModuleTypes.h"
 #include "ProcedureBase.generated.h"
 
 class UProcedureAsset;
+class UProcedureModule;
 class ACameraShotAnchor;
-class UCameraModeBase;
 
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FProcedureListItemStates
-{
-	GENERATED_BODY()
-
-public:
-	UPROPERTY()
-	bool bSelected;
-
-	FORCEINLINE FProcedureListItemStates()
-	{
-		bSelected = false;
-	}
-};
-
-/**
- * 流程基类
- */
-UCLASS(Blueprintable, hidecategories = (Default))
+UCLASS(Blueprintable, EditInlineNew, DefaultToInstanced, hidecategories = (Default))
 class WHFRAMEWORK_API UProcedureBase : public UWHObject
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
+
+    friend class UProcedureModule;
 
 public:
-	UProcedureBase();
+    UProcedureBase();
+    virtual UWorld* GetWorld() const override;
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Procedure
-public:
 #if WITH_EDITOR
-	/**
-	 * 流程构建
-	 */
-	virtual void OnGenerate();
-	/**
-	 * 流程取消构建
-	 */
-	virtual void OnUnGenerate();
+    virtual void OnGenerate();
+    virtual void OnUnGenerate();
+    virtual void PreEditChange(FProperty* PropertyAboutToChange) override;
+    virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 
-public:
-	/**
-	 * 流程状态改变
-	 */
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnStateChanged")
-	void K2_OnStateChanged(EProcedureState InProcedureState);
-	UFUNCTION()
-	virtual void OnStateChanged(EProcedureState InProcedureState);
-	/**
-	 * 流程初始化
-	 */
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitialize")
-	void K2_OnInitialize();
-	UFUNCTION()
-	virtual void OnInitialize();
-	/**
-	 * 流程进入
-	 * @param InLastProcedure 上一个流程
-	 */
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnEnter")
-	void K2_OnEnter(UProcedureBase* InLastProcedure);
-	UFUNCTION()
-	virtual void OnEnter(UProcedureBase* InLastProcedure);
-	/**
-	 * 流程帧刷新
-	 */
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
-	void K2_OnRefresh();
-	UFUNCTION()
-	virtual void OnRefresh();
-	/**
-	 * 流程指引
-	 */
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnGuide")
-	void K2_OnGuide();
-	UFUNCTION()
-	virtual void OnGuide();
-	/**
-	 * 流程离开
-	 * @param InNextProcedure 下一个流程
-	 */
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnLeave")
-	void K2_OnLeave(UProcedureBase* InNextProcedure);
-	UFUNCTION()
-	virtual void OnLeave(UProcedureBase* InNextProcedure);
+    UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnStateChanged")
+    void K2_OnStateChanged(EProcedureState InProcedureState);
+    UFUNCTION()
+    virtual void OnStateChanged(EProcedureState InProcedureState);
+    UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitialize")
+    void K2_OnInitialize();
+    UFUNCTION()
+    virtual void OnInitialize();
+    UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnEnter")
+    void K2_OnEnter(UProcedureBase* InLastProcedure);
+    UFUNCTION()
+    virtual void OnEnter(UProcedureBase* InLastProcedure);
+    UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnRefresh")
+    void K2_OnRefresh();
+    UFUNCTION()
+    virtual void OnRefresh();
+    UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnGuide")
+    void K2_OnGuide();
+    UFUNCTION()
+    virtual void OnGuide();
+    UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnLeave")
+    void K2_OnLeave(UProcedureBase* InNextProcedure);
+    UFUNCTION()
+    virtual void OnLeave(UProcedureBase* InNextProcedure);
+    virtual void OnShutdown();
 
-public:
-	/**
-	 * 指引流程
-	 */
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	void Guide();
-	/**
-	 * 切入当前流程
-	 */
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	void Switch();
-	/**
-	 * 切出当前流程
-	 */
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	void UnSwitch();
-	/**
-	 * 切换到上一个流程
-	 */
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	void SwitchLast();
-	/**
-	 * 切换到下一个流程
-	 */
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	void SwitchNext();
-	/**
-	 * 是否是当前流程
-	 */
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	bool IsCurrent();
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+    void Guide();
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+    bool IsCurrent();
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+    void Switch();
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+    void UnSwitch();
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+    void SwitchLast();
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+    void SwitchNext();
+    UFUNCTION(BlueprintCallable)
+    void SwitchPre();
+    UFUNCTION(BlueprintCallable)
+    bool Advance(FName Output = "Out");
+    UFUNCTION(BlueprintPure)
+    bool CanAdvance(FName Output = "Out") const;
+    UFUNCTION(BlueprintPure)
+    FProcedureActivationToken CaptureActivation() const;
+    UFUNCTION(BlueprintPure)
+    UProcedureModule* GetProcedureModule() const;
+    UFUNCTION(BlueprintPure)
+    UProcedureAsset* GetProcedureAsset() const;
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Name/Description
-public:
-	/// 流程名称
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Name/Description")
-	FName ProcedureName;
-	/// 流程显示名称
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Name/Description")
-	FText ProcedureDisplayName;
-	/// 流程描述
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (MultiLine = "true"), Category = "Name/Description")
-	FText ProcedureDescription;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+    FGuid NodeId;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    FName ProcedureName;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    FText ProcedureDisplayName;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (MultiLine = "true"))
+    FText ProcedureDescription;
+#if WITH_EDITORONLY_DATA
+    UPROPERTY()
+    FVector2D GraphPosition = FVector2D::ZeroVector;
+#endif
+    UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly)
+    EProcedureState ProcedureState = EProcedureState::None;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    EProcedureGuideType ProcedureGuideType = EProcedureGuideType::None;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.01"))
+    float ProcedureGuideIntervalTime = 1.f;
+    UPROPERTY(BlueprintAssignable)
+    FOnProcedureStateChanged OnProcedureStateChanged;
+    UFUNCTION(BlueprintPure)
+    EProcedureState GetProcedureState() const { return ProcedureState; }
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Index/Type/Guide
-public:
-	/// 是否为开始流程
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Index/Type/Guide")
-	bool bFirstProcedure;
-	/// 流程索引
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/Guide")
-	int32 ProcedureIndex;
-	/// 流程状态
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Index/Type/Guide")
-	EProcedureState ProcedureState;
-	/// 流程指引类型
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Index/Type/Guide")
-	EProcedureGuideType ProcedureGuideType;
-	/// 流程指引间隔时间
-	UPROPERTY(EditAnywhere,
-	          BlueprintReadOnly,
-	          meta = (EditConditionHides, EditCondition = "ProcedureGuideType != EProcedureGuideType::None"),
-	          Category = "Index/Type/Guide")
-	float ProcedureGuideIntervalTime;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Operation Target")
+    TSoftObjectPtr<AActor> OperationTarget;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
+    bool bApplyCameraAction = false;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "bApplyCameraAction"), Category = "Camera")
+    TSubclassOf<UCameraModeBase> CameraModeClass;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "bApplyCameraAction"), Category = "Camera")
+    FCameraConfigOverride CameraOverride;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "bApplyCameraAction"), Category = "Camera")
+    TSoftObjectPtr<ACameraShotAnchor> CameraAnchor;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "bApplyCameraAction"), Category = "Camera")
+    FCameraTransitionParams CameraTransition;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
+    bool bRestoreDefaultCameraOnLeave = false;
+    FCameraConfigOverrideHandle CameraOverrideHandle;
 
-	UPROPERTY(BlueprintAssignable)
-	FOnProcedureStateChanged OnProcedureStateChanged;
+    UFUNCTION(BlueprintCallable)
+    void ApplyCameraAction();
+    template <class T>
+    T* GetOperationTarget() const { return Cast<T>(GetOperationTarget(T::StaticClass())); }
+    UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+    AActor* GetOperationTarget(TSubclassOf<AActor> InClass) const;
+    UFUNCTION(BlueprintCallable)
+    void SetOperationTarget(AActor* InOperationTarget, bool bResetCameraView = true);
 
 protected:
-	FTimerHandle StartGuideTimerHandle;
+    FTimerHandle StartGuideTimerHandle;
 
-public:
-	/**
-	 * 获取流程状态
-	 */
-	UFUNCTION(BlueprintPure)
-	EProcedureState GetProcedureState() const
-	{
-		return ProcedureState;
-	}
-	/**
-	 * 获取流程资产
-	 */
-	UFUNCTION(BlueprintPure)
-	UProcedureAsset* GetProcedureAsset() const;
+private:
+    void ScheduleGuide();
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Operation Target
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Operation Target")
-	TSoftObjectPtr<AActor> OperationTarget;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
-	bool bApplyCameraAction;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "bApplyCameraAction"), Category = "Camera")
-	TSubclassOf<UCameraModeBase> CameraModeClass;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "bApplyCameraAction"), Category = "Camera")
-	FCameraConfigOverride CameraOverride;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "bApplyCameraAction"), Category = "Camera")
-	TSoftObjectPtr<ACameraShotAnchor> CameraAnchor;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "bApplyCameraAction"), Category = "Camera")
-	FCameraTransitionParams CameraTransition;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
-	bool bRestoreDefaultCameraOnLeave;
-
-	FCameraConfigOverrideHandle CameraOverrideHandle;
-
-public:
-	UFUNCTION(BlueprintCallable)
-	void ApplyCameraAction();
-	/**
-	 * 获取操作目标
-	 */
-	template <class T> T* GetOperationTarget() const
-	{
-		return Cast<T>(GetOperationTarget(T::StaticClass()));
-	}
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	AActor* GetOperationTarget(TSubclassOf<AActor> InClass) const;
-	/**
-	 * 设置操作目标
-	 */
-	UFUNCTION(BlueprintCallable)
-	void SetOperationTarget(AActor* InOperationTarget, bool bResetCameraView = true);
-
-	//////////////////////////////////////////////////////////////////////////
-	/// ProcedureListItem
-public:
-#if WITH_EDITORONLY_DATA
-	UPROPERTY()
-	FProcedureListItemStates ProcedureListItemStates;
-#endif
-#if WITH_EDITOR
-	/**
-	 * 构建流程列表项
-	 */
-	virtual bool GenerateListItem(TSharedPtr<struct FProcedureListItem> OutProcedureListItem, const FString& InFilterText = TEXT(""));
-	/**
-	 * 更新流程列表项
-	 */
-	virtual void UpdateListItem(TSharedPtr<struct FProcedureListItem> OutProcedureListItem);
-
-	virtual bool CanEditChange(const FProperty* InProperty) const override;
-	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
-#endif
+    UPROPERTY(Transient)
+    TObjectPtr<UProcedureModule> RuntimeOwner;
+    FProcedureActivationToken Activation;
 };
-
-/**
- * 流程列表项
- */
-#if WITH_EDITOR
-struct FProcedureListItem : public TSharedFromThis<FProcedureListItem>
-{
-public:
-	FProcedureListItem()
-	{
-		Procedure = nullptr;
-	}
-
-	UProcedureBase* Procedure;
-
-public:
-	FProcedureListItemStates& GetStates() const
-	{
-		return Procedure->ProcedureListItemStates;
-	}
-
-	int32& GetProcedureIndex() const
-	{
-		return Procedure->ProcedureIndex;
-	}
-};
-#endif
