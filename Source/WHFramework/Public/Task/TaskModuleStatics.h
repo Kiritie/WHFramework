@@ -97,5 +97,5 @@ public:
 	static bool TurnInTask(UTaskBase* InTask, AActor* InTarget);
 
 	UFUNCTION(BlueprintCallable, Category = "TaskModuleStatics")
-	static void ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTargetTag, int32 InCount = 1, FPrimaryAssetId InTargetAssetID = FPrimaryAssetId(), FName InTargetName = NAME_None);
+	static void ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTargetTag, int32 InCount = 1, FPrimaryAssetId InTargetAssetID = FPrimaryAssetId(), FName InTargetName = NAME_None, FGuid InOwnerActorID = FGuid());
 };
