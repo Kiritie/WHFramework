@@ -39,7 +39,7 @@ bool UDialogueModule::IsNetworkBridgeOwner(const UObject* InOwner) const
 bool UDialogueModule::BindNetworkBridge(UObject* InOwner, FDialogueNetworkBegin InBegin, FDialogueNetworkSelect InSelect,
     FDialogueNetworkContinue InContinue, FDialogueNetworkEnd InEnd)
 {
-    if (!IsValid(InOwner) || !InBegin.IsBound() || !InSelect.IsBound() || !InContinue.IsBound() || !InEnd.IsBound() ||
+    if (!::IsValid(InOwner) || !InBegin.IsBound() || !InSelect.IsBound() || !InContinue.IsBound() || !InEnd.IsBound() ||
         (NetworkBridgeOwner.IsValid() && NetworkBridgeOwner.Get() != InOwner))
     {
         return false;
@@ -95,7 +95,7 @@ void UDialogueModule::ClearNetworkPresentation()
 bool UDialogueModule::ApplyNetworkPresentation(UObject* InOwner, APlayerController* InPlayer, AActor* InNPC,
     const FDialogueNetworkNode& InCurrent, const TArray<FDialogueNetworkNode>& InAvailable)
 {
-    if (!IsNetworkBridgeOwner(InOwner) || !InPlayer || !InPlayer->IsLocalController() || !IsValid(InNPC) ||
+    if (!IsNetworkBridgeOwner(InOwner) || !InPlayer || !InPlayer->IsLocalController() || !::IsValid(InNPC) ||
         InPlayer->GetWorld() != GetWorld() || InNPC->GetWorld() != GetWorld() || InCurrent.Id < 0 || InAvailable.Num() > 32)
     {
         return false;

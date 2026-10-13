@@ -7,7 +7,7 @@
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelSaveSuspensionOwnershipTest,
 	"WHFramework.Voxel.Save.SuspensionOwnership",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
 
 bool FVoxelSaveSuspensionOwnershipTest::RunTest(const FString& Parameters)
 {

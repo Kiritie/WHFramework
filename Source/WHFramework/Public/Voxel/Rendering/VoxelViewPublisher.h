@@ -423,7 +423,7 @@ private:
 	mutable TOptional<FVoxelTerrainRenderer> TerrainRenderer;
 	uint64 BatchSerial = 0;
 	FGuid NativeOwnerId = FGuid::NewGuid();
-	static constexpr int32 MaximumNativeGroups = 8;
+	static constexpr int32 MaximumNativeGroups = 32;
 	int32 ActiveNativeGroups = 0;
 	uint64 NativeSourceSerial = 0;
 	TMap<TWeakObjectPtr<AActor>, FEntry> Entries;

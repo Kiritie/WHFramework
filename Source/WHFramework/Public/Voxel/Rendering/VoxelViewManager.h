@@ -70,6 +70,7 @@ struct WHFRAMEWORK_API FVoxelTerrainWorkMetrics
 struct WHFRAMEWORK_API FVoxelTerrainTargetReadiness
 {
 	FVoxelTerrainGeometry Geometry;
+	FName DataAdmissionGate;
 	bool bDataReady = false;
 	bool bMeshReady = false;
 	bool bPresented = false;
@@ -295,7 +296,7 @@ private:
 	FVoxelTerrainWorkSelection TransitionAdmissionSelection[2];
 	int32 TransitionAdmissionCursor[2] = {};
 	double TransitionAdmissionCostMicroseconds[2] = {50.0, 50.0};
-	void ProcessFineShardAdmissions();
+	void ProcessFineShardAdmissions(double InDeadline);
 	void PrepareFineShardPresentations(double InDeadline = MAX_dbl);
 	void EnqueueFinePresentation(const FVoxelFineShardKey& InKey);
 	void OnFineOwnershipChanged(const FIntVector& InSection);
@@ -388,9 +389,9 @@ private:
 	void UpdateWantedTimestamps(double InNow);
 	bool IsCriticalDependency(const FVoxelViewAdmission& InAdmission) const;
 	bool IsCriticalDependency(const FVoxelTerrainSpatialKey& InKey) const;
-	void ProcessAdmissions();
-	void ProcessDataAdmissions();
-	void ProcessServiceAdmissions(bool bInDataOnly);
+	void ProcessAdmissions(double InDeadline);
+	void ProcessDataAdmissions(double InDeadline);
+	void ProcessServiceAdmissions(bool bInDataOnly, double InDeadline);
 	bool ReserveServiceAdmissionAges(int32 InStage, int32 InCount);
 	void PruneServiceAdmissionAges(int32 InStage, double InDeadline);
 	bool IsServiceAdmissionIdentityCurrent(const FVoxelTaskKey& InIdentity) const;
@@ -410,6 +411,7 @@ private:
 	void InvalidateRepresentationKeys(const FVoxelAffectedRepresentationKeys& InAffected);
 	bool IsPreparedDataCurrent(const FVoxelTaskKey& InKey) const;
 	FVoxelTaskStamp MakeRepresentationStamp(const FVoxelTerrainGeometry& InGeometry, uint64 InRevision) const;
+	void RecordDataAdmissionGate(const FVoxelTaskStamp& InStamp, FName InGate);
 	bool IsRepresentationStampCurrent(const FVoxelTaskStamp& InStamp) const;
 	bool HasDeferredRepresentation(const FVoxelTaskStamp& InStamp) const;
 	void PrunePreparedData();
@@ -470,10 +472,10 @@ private:
 		const FVoxelHeightfieldNodeKey& InOwner,
 		uint64 InSignature,
 		FVoxelTaskResult&& InResult);
-	void PumpHeightfieldTransitions();
+	void PumpHeightfieldTransitions(double InDeadline = MAX_dbl);
 	void RebuildVolumeTransitions(const TSet<FVoxelViewKey>& InTargetNodes);
 	bool VolumeHandoffAffectsHeightfield(const FVoxelHeightfieldNodeKey& InKey) const;
-	void PumpVolumeTransitions();
+	void PumpVolumeTransitions(double InDeadline = MAX_dbl);
 	TSharedPtr<const FVoxelFineShardGeometry, ESPMode::ThreadSafe> FindFineBoundaryGeometry(const FIntVector& InSection) const;
 	bool AreBoundaryInputsCurrent(const FVoxelBoundaryTransitionContext& InContext) const;
 	bool AreHeightfieldInputsCurrent(const FVoxelFrozenHeightfieldInputs& InInputs) const;
@@ -542,6 +544,7 @@ private:
 		FVoxelTaskStamp Stamp;
 		// Scheduler 交出结果后，覆盖回调消费前仍属于同一请求。
 		EVoxelTaskKind DeferredKind = EVoxelTaskKind::None;
+		FName DataAdmissionGate;
 	};
 	mutable TMap<FVoxelTerrainSpatialKey, FRepresentationAttempt> RepresentationAttempts;
 	uint64 AppliedInterestRevision = 0;

@@ -616,12 +616,12 @@ void FVoxelViewManager::ApplyF0FineShardResult(const FVoxelFineShardKey& InKey, 
 	else UpdateDerivedCoverage();
 }
 
-void FVoxelViewManager::ProcessFineShardAdmissions()
+void FVoxelViewManager::ProcessFineShardAdmissions(const double InDeadline)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewFineShardAdmissions);
 	const auto& Interest = GetViewInterest();
 	if (!Interest.PublicationInputs || Interest.PublicationInputs->FineShards.IsEmpty()) return;
-	const double Deadline = TerrainDeadline(Module.GetViewSettings().Budget.AdmissionMilliseconds);
+	const double Deadline = FMath::Min(InDeadline, TerrainDeadline(Module.GetViewSettings().Budget.AdmissionMilliseconds));
 	const double StartedScanning = FPlatformTime::Seconds();
 	if (StartedScanning >= Deadline) return;
 	const double ScanDeadline = StartedScanning + (Deadline - StartedScanning) * 0.5;

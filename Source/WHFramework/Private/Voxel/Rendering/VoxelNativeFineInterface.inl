@@ -97,6 +97,23 @@ struct FPreparedFine
 		return true;
 	}
 
+	bool CanReuseNativeInterfaces(const FSnapshotPtr& Previous) const
+	{
+		if (!Previous || !Base->bUseDrawRanges || FindFineAtom(Previous->Root, Base->Section) != Base)
+			return false;
+		for (uint8 Face = 0; Face < 6; ++Face)
+		{
+			const FIntVector Section = Base->Section + VoxelCoord::Direction(Face);
+			const auto Fine = FindFineAtom(Previous->Root, Section);
+			if (!SameFineInput(Fine, NeighborFine[Face])) return false;
+			if (Fine) continue;
+			const auto Coarse = FindCoarseOwner(Previous->CoarseRoot, Section);
+			if (bool(Coarse) != bool(NeighborCoarse[Face]) ||
+				(Coarse && !SameCoarseGeometry(Coarse, NeighborCoarse[Face]))) return false;
+		}
+		return true;
+	}
+
 	bool KeepTriangle(const FVoxelTerrainRenderChunk& Chunk, const int32 Triangle) const
 	{
 		const auto& Mesh = Chunk.Source->Batches[Chunk.SourceBatch].Mesh;
@@ -343,7 +360,7 @@ struct FPreparedFine
 			DistantSlice->TileOffsets[TileCursor + 1] - DistantSlice->TileOffsets[TileCursor]);
 		if (!PendingPlan)
 		{
-			if (!AcquireNative(EVoxelTerrainResourcePool::Working, Scratch, PendingWorkingLease, OutError)) return RejectedAdmission(OutError);
+			if (!PendingWorkingLease && !AcquireNative(EVoxelTerrainResourcePool::Working, Scratch, PendingWorkingLease, OutError)) return RejectedAdmission(OutError);
 			FVoxelSectionMeshResult Counted;
 			if (!NativeHeightfieldInterface::BuildTile(*Base, *Neighbor, FaceCursor, TileCursor, Config, Registry, Shapes,
 				MaximumTextureStretchCells, TileIndices, Counted, OutError, true)) return EVoxelFineBuildProgress::Failed;
@@ -376,9 +393,9 @@ struct FPreparedFine
 			LastPiece = MoveTemp(Piece); OutputBytesTotal += Bytes;
 		}
 		PendingPlan.Reset();
-		PendingWorkingLease.Reset();
 		if (++TileCursor == 256)
 		{
+			PendingWorkingLease.Reset();
 			TileCursor = 0; ++FaceCursor; DistantSlice.Reset(); DistantCursor = DistantCount = 0; bDistantSliceReady = false;
 			FMemory::Memzero(DistantTileCursors);
 		}
@@ -391,6 +408,7 @@ struct FPreparedFine
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_NativeFineAdvance);
 		if (Cancel.Load()) return EVoxelFineBuildProgress::Canceled;
+		if (bReuseNativeInterfaces) return EVoxelFineBuildProgress::Complete;
 		if (Phase < 2)
 		{
 			if (ChunkCursor == Base->Chunks.Num())
@@ -485,7 +503,7 @@ struct FPreparedFine
 		if (!Plan.Batches.ContainsByPredicate([](const FVoxelRenderBatch& Batch) { return Batch.Mesh.PlannedIndices > 0; }))
 		{
 			ClearPendingPlan();
-			if (++TileCursor == 16) { TileCursor = 0; ++FaceCursor; }
+			if (++TileCursor == 16) { TileCursor = 0; ++FaceCursor; PendingWorkingLease.Reset(); }
 			return EVoxelFineBuildProgress::Working;
 		}
 		const uint64 ContextBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelBoundaryTransitionContext>() + Context.Patches.GetAllocatedSize();
@@ -509,7 +527,7 @@ struct FPreparedFine
 		LastPiece = MoveTemp(Piece);
 		OutputBytesTotal += OutputBytes;
 		ClearPendingPlan();
-		if (++TileCursor == 16) { TileCursor = 0; ++FaceCursor; }
+		if (++TileCursor == 16) { TileCursor = 0; ++FaceCursor; PendingWorkingLease.Reset(); }
 		return EVoxelFineBuildProgress::Working;
 	}
 
@@ -518,7 +536,6 @@ struct FPreparedFine
 		PendingPlan.Reset();
 		PendingSnapshot.Reset();
 		PendingContext.Reset();
-		PendingWorkingLease.Reset();
 	}
 
 	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
@@ -537,6 +554,7 @@ struct FPreparedFine
 	FAtomPtr NeighborFine[6];
 	FCoarsePtr NeighborCoarse[6];
 	bool bSuppress[6] = {};
+	bool bReuseNativeInterfaces = false;
 	bool bAllowOverlap = false;
 	TSharedPtr<FVoxelTerrainRenderAtom, ESPMode::ThreadSafe> Item;
 	TSharedPtr<FPreparedFine, ESPMode::ThreadSafe> Next;
