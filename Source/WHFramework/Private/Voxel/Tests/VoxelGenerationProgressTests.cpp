@@ -222,6 +222,7 @@ bool FVoxelIdleKindBorrowTest::RunTest(const FString& InParameters)
 		Budget.bBorrowIdleKindSlots = bAutomatic;
 		Scheduler.SetBudget(Budget);
 		const FGuid Owner = FGuid::NewGuid();
+		TAtomic<bool> ReleaseWorkers(false);
 		{
 			FVoxelTaskScheduler::FEnqueueBatch Batch(Scheduler);
 			for (uint64 Token = 1; Token <= 3; ++Token)
@@ -237,8 +238,9 @@ bool FVoxelIdleKindBorrowTest::RunTest(const FString& InParameters)
 				{
 					return Token == 1 ? EVoxelTaskBlockReason::Dependency : EVoxelTaskBlockReason::None;
 				};
-				Request.Execute = [](const TAtomic<bool>& Cancel)
+				Request.Execute = [&ReleaseWorkers](const TAtomic<bool>& Cancel)
 				{
+					while (!ReleaseWorkers.Load() && !Cancel.Load()) FPlatformProcess::Sleep(0.001f);
 					FVoxelTaskResult Result;
 					Result.bCanceled = Cancel.Load();
 					Result.bSuccess = !Result.bCanceled;
@@ -252,6 +254,7 @@ bool FVoxelIdleKindBorrowTest::RunTest(const FString& InParameters)
 			Diagnostics.Running, bAutomatic ? 2 : 1);
 		TestEqual(TEXT("真实依赖阻塞永远不能因类别借位而开工"), Diagnostics.Pending, bAutomatic ? 1 : 2);
 		TestEqual(TEXT("只有真正启动的借位才计数"), Diagnostics.BorrowedKindSlots, bAutomatic ? uint64(1) : uint64(0));
+		ReleaseWorkers.Store(true);
 		Scheduler.StopAndJoin();
 	}
 	return true;

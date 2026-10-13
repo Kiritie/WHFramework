@@ -1614,7 +1614,7 @@ bool FVoxelTerrainStagePriorityTest::RunTest(const FString& Parameters)
 		int32 Canceled = 0;
 		int32 Failed = 0;
 		TArray<int32> Stages;
-		while ((Scheduler.GetDiagnostics().Running > 0 || Scheduler.GetDiagnostics().Pending > 0) &&
+		while (Scheduler.ActiveCount() > 0 &&
 			FPlatformTime::Seconds() < Deadline)
 		{
 			Scheduler.Tick([&](FVoxelTaskResult&& Result)
@@ -1739,7 +1739,7 @@ bool FVoxelCriticalCapacitySchedulerTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Critical completes without waiting for background release"), Completed[2], 1);
 	TestEqual(TEXT("Background task is still held after Critical completion"), Completed[0], 0);
 	ReleaseBackground.Store(true);
-	while ((Scheduler.GetDiagnostics().Running > 0 || Scheduler.GetDiagnostics().Pending > 0) &&
+	while (Scheduler.ActiveCount() > 0 &&
 		FPlatformTime::Seconds() < Deadline)
 	{
 		Scheduler.Tick(Apply, 8.0);
@@ -1806,7 +1806,7 @@ bool FVoxelDataPrefetchSchedulerTest::RunTest(const FString& Parameters)
 		int32 Canceled = 0;
 		Release.Store(true);
 		const double Deadline = FPlatformTime::Seconds() + 5.0;
-		while ((Scheduler.GetDiagnostics().Running > 0 || Scheduler.GetDiagnostics().Pending > 0) &&
+		while (Scheduler.ActiveCount() > 0 &&
 			FPlatformTime::Seconds() < Deadline)
 		{
 			Scheduler.Tick([&](FVoxelTaskResult&& Result)

@@ -2060,6 +2060,7 @@ void FVoxelTaskScheduler::Pump()
 	const int32 MaximumWorkers = FrameContext ? FMath::Min(Budget.MaxConcurrentTasks, FrameContext->GetAllocation().MaximumWorkers) : Budget.MaxConcurrentTasks;
 	const double Deadline = FrameContext ? FrameContext->Deadline() : MAX_dbl;
 	TArray<uint64, TFixedAllocator<64>> ReceiptBlocked;
+	bool bUnframedOverdueOpportunityAvailable = true;
 	if (!PrepareQueues(0)) return;
 	if (!bStopped && Running.Num() < MaximumWorkers && !Pending.IsEmpty() && FPlatformTime::Seconds() < Deadline)
 	{
@@ -2076,7 +2077,8 @@ void FVoxelTaskScheduler::Pump()
 		Capacity.MaximumWorkers = MaximumWorkers;
 		Capacity.RunningWorkers = Running.Num();
 		Capacity.NearReservedWorkers = FMath::Min(Budget.CriticalReservedTasks, MaximumWorkers);
-		Capacity.bAllowOverdueOpportunity = FrameContext && FrameContext->IsOverdueOpportunityAvailable();
+		Capacity.bAllowOverdueOpportunity = FrameContext ? FrameContext->IsOverdueOpportunityAvailable() :
+			bUnframedOverdueOpportunityAvailable;
 		Capacity.bPreserveDistanceOrder = true;
 		for (const FRunning& Task : Running)
 		{
@@ -2225,7 +2227,11 @@ void FVoxelTaskScheduler::Pump()
 		}
 		// 已接纳任务只消费原授额；调度与续跑不再向 Geometry 账本索取执行容量。
 		check(!ControlConsumer.IsValid() || Pending[BestIndex].ExecutionReservation);
-		if (Charge.bOverdueOpportunity) FrameContext->ConsumeOverdueOpportunity();
+		if (Charge.bOverdueOpportunity)
+		{
+			if (FrameContext) FrameContext->ConsumeOverdueOpportunity();
+			else bUnframedOverdueOpportunityAvailable = false;
+		}
 		FVoxelTaskRequest Request = MoveTemp(Pending[BestIndex]);
 		Pending.RemoveAtSwap(BestIndex, 1, EAllowShrinking::No);
 		QueuedInputBytes -= Request.InputBytes;

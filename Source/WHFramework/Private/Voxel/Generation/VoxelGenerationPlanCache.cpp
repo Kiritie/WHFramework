@@ -1888,7 +1888,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 		const auto State = Resources->Snapshot();
 		const uint64 NativeLimit = State.Limits.ResidentBytes - State.Limits.OverlapBytes;
 		// 至少留出一轮自然列和常规驻留区的 1/16，不能只在剩余不足一个计划正文时才开始退休。
-		NaturalHeadroom = FMath::Min(NativeLimit, FMath::Max(NativeLimit / 16,
+		NaturalHeadroom = FMath::Min(NativeLimit / 4, FMath::Max(NativeLimit / 16,
 			uint64(MaximumRetiredEntriesPerGroup * ShardCount) *
 			(VoxelBoundedAllocation::WorkerSharedBytes<const FVoxelBaseColumnEntry>() +
 				VoxelBoundedAllocation::WorkerSharedBytes<const FVoxelNaturalColumnEntry>())));

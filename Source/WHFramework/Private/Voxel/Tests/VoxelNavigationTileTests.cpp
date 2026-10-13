@@ -267,7 +267,7 @@ bool FVoxelNavigationNativeTileTest::RunTest(const FString& InParameters)
 	Navigation->RemoveNavigationBuildLock(ENavigationBuildLock::Custom);
 	if (!TestTrue(TEXT("实际Recast构建和Detour提交形成NavReady"), Pump([&]()
 	{
-		return Module->IsNavigationReady(Lower);
+		return Module->IsNavigationReady(Lower) && Data->bQueryAdmissionOpen.Load();
 	}))) return false;
 	FNavLocation OriginalNode;
 	if (!TestTrue(TEXT("Ready属于实际导航节点"), Navigation->ProjectPointToNavigation(FVector(200., 200., 400.),
@@ -293,6 +293,9 @@ bool FVoxelNavigationNativeTileTest::RunTest(const FString& InParameters)
 	{
 		Gate->bResume.Store(true);
 		RunningQuery.Wait();
+		AddInfo(FString::Printf(TEXT("Native query entry: result=%d admission=%d readers=%d rebuild=%d bounds=%d worldClosing=%d committedTiles=%d"),
+			int32(RunningQuery.GetResult().Result), Data->bQueryAdmissionOpen.Load(), Data->NativeQueryReaders.Load(),
+			Data->bNativeRebuildPending, Data->bNativeBoundsPending, Data->bWorldCloseRequested, Data->CommittedTiles.Num()));
 		return false;
 	}
 	TestEqual(TEXT("真实查询持有原生读取屏障"), Data->NativeQueryReaders.Load(), 1);
